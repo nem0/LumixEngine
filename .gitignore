@@ -1,0 +1,8 @@
+tmp/
+bin/
+obj/
+*.sdf
+*.suo
+*.opensdf
+*.user
+evona_test/

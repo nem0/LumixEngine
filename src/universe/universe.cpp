@@ -1,0 +1,281 @@
+#include "universe.h"
+#include "core/event_manager.h"
+//#include "physics/physics_system.h"
+#include "physics/physics_scene.h"
+#include "component_event.h"
+#include "core/matrix.h"
+#include "entity_moved_event.h"
+#include "entity_destroyed_event.h"
+#include "core/json_serializer.h"
+
+
+namespace Lux
+{
+
+
+const Entity Entity::INVALID(0, -1);
+const Component Component::INVALID(Entity(0, -1), 0, 0, -1);
+
+
+Universe::~Universe()
+{
+	delete m_event_manager;
+}
+
+
+void Universe::destroy()
+{
+	m_positions.clear();
+	m_rotations.clear();
+	m_component_list.clear();
+	m_first_free_slot = -1;
+	m_physics_scene->destroy();
+	delete m_physics_scene;
+	m_physics_scene = 0;
+}
+
+
+void Universe::create(PhysicsSystem& physics_system)
+{
+	m_physics_scene = new PhysicsScene();
+	m_physics_scene->create(physics_system, *this);
+	m_positions.reserve(1000);
+	m_rotations.reserve(1000);
+	m_component_list.reserve(1000);
+}
+
+
+Universe::Universe()
+{
+	m_first_free_slot = -1;
+	m_event_manager = new EventManager;
+	m_event_manager->registerListener(ComponentEvent::type, this, &Universe::onEvent);
+}
+
+
+const Quat& Entity::getRotation() const
+{
+	return universe->m_rotations[index];
+}
+
+
+const Vec3& Entity::getPosition() const
+{
+	return universe->m_positions[index];
+}
+
+
+const Component& Entity::getComponent(unsigned int type)
+{
+	const Universe::EntityComponentList& cmps = universe->getComponents(*this);
+	for(int i = 0, c = cmps.size(); i < c; ++i)
+	{
+		if(cmps[i].type == type)
+		{
+			return cmps[i];
+		}
+	}
+	return Component::INVALID;
+}
+
+
+Matrix Entity::getMatrix() const
+{
+	Matrix mtx;
+	universe->m_rotations[index].toMatrix(mtx);
+	mtx.setTranslation(universe->m_positions[index]);
+	return mtx;
+}
+
+
+void Entity::getMatrix(Matrix& mtx) const
+{
+	universe->getRotations()[index].toMatrix(mtx);
+	mtx.setTranslation(universe->getPositions()[index]);
+}
+
+
+void Entity::setMatrix(const Vec3& pos, const Quat& rot)
+{
+	universe->m_positions[index] = pos;
+	universe->m_rotations[index] = rot;
+	universe->getEventManager()->emitEvent(EntityMovedEvent(*this));
+}
+
+
+void Entity::setMatrix(const Matrix& mtx)
+{
+	Quat rot;
+	mtx.getRotation(rot);
+	universe->m_positions[index] = mtx.getTranslation();
+	universe->m_rotations[index] = rot;
+	universe->getEventManager()->emitEvent(EntityMovedEvent(*this));
+}
+
+
+void Entity::setPosition(float x, float y, float z)
+{
+	universe->m_positions[index].set(x, y, z);
+	universe->getEventManager()->emitEvent(EntityMovedEvent(*this));
+}
+
+
+void Entity::setPosition(const Vec3& pos)
+{
+	universe->m_positions[index] = pos;
+	universe->getEventManager()->emitEvent(EntityMovedEvent(*this));
+}
+
+
+bool Entity::operator ==(const Entity& rhs) const
+{
+	return index == rhs.index && universe == rhs.universe;
+}
+
+
+void Entity::translate(const Vec3& t)
+{
+	universe->m_positions[index] += t;
+}
+
+
+void Entity::setRotation(float x, float y, float z, float w)
+{
+	universe->m_rotations[index].set(x, y, z, w);
+	universe->getEventManager()->emitEvent(EntityMovedEvent(*this));
+}
+
+
+void Entity::setRotation(const Quat& rot)
+{
+	universe->m_rotations[index] = rot;
+	universe->getEventManager()->emitEvent(EntityMovedEvent(*this));
+}
+
+
+Entity Universe::createEntity()
+{
+	if(m_first_free_slot != -1)
+	{
+		Entity e(this, m_first_free_slot);
+		m_first_free_slot = *(int*)(&m_positions[m_first_free_slot].x);
+		m_positions[e.index].set(0, 0, 0);
+		m_rotations[e.index].set(0, 0, 0, 1);
+		m_component_list[e.index].clear();
+		return e;
+	}
+	else
+	{
+		m_positions.push_back(Vec3(0, 0, 0));
+		m_rotations.push_back(Quat(0, 0, 0, 1));
+		m_component_list.push_back_empty();
+		return Entity(this, m_positions.size() - 1);
+	}
+}
+
+
+void Universe::destroyEntity(Entity entity)
+{
+	if(entity.isValid())
+	{
+		m_event_manager->emitEvent(EntityDestroyedEvent(entity));
+		m_component_list[entity.index].clear();
+		if(m_first_free_slot == -1)
+		{
+			m_first_free_slot = entity.index;
+			*(int*)(&m_positions[entity.index].x) = -1;
+		}
+		else
+		{
+			*(int*)(&m_positions[entity.index].x) = m_first_free_slot;
+			m_first_free_slot = entity.index;
+		}
+	}
+}
+
+
+void Universe::onEvent(void* data, Event& event)
+{
+	static_cast<Universe*>(data)->onEvent(event);
+}
+
+
+void Universe::onEvent(Event& evt)
+{
+	if(evt.getType() == ComponentEvent::type)
+	{
+		ComponentEvent& e = static_cast<ComponentEvent&>(evt);
+		if(e.is_created)
+		{
+			m_component_list[e.component.entity.index].push_back(e.component);
+		}
+		else
+		{
+			vector<Component>& list = m_component_list[e.component.entity.index];
+			for(int i = 0, c = list.size(); i < c; ++i)
+			{
+				if(list[i] == e.component)
+				{
+					list.eraseFast(i);
+					break;
+				}
+			}
+		}
+	}
+}
+
+
+void Universe::serialize(ISerializer& serializer)
+{
+	serializer.serialize("first_free_slot", m_first_free_slot);
+	serializer.serialize("count", m_positions.size());
+	serializer.beginArray("positions");
+	for(int i = 0; i < m_positions.size(); ++i)
+	{
+		serializer.serializeArrayItem(m_positions[i].x);
+		serializer.serializeArrayItem(m_positions[i].y);
+		serializer.serializeArrayItem(m_positions[i].z);
+	}
+	serializer.endArray();
+	serializer.beginArray("rotations");
+	for(int i = 0; i < m_rotations.size(); ++i)
+	{
+		serializer.serializeArrayItem(m_rotations[i].x);
+		serializer.serializeArrayItem(m_rotations[i].y);
+		serializer.serializeArrayItem(m_rotations[i].z);
+		serializer.serializeArrayItem(m_rotations[i].w);
+	}
+	serializer.endArray();
+}
+
+
+void Universe::deserialize(ISerializer& serializer)
+{
+	serializer.deserialize("first_free_slot", m_first_free_slot);
+	int count;
+	serializer.deserialize("count", count);
+	m_component_list.resize(count);
+	m_positions.resize(count);
+	m_rotations.resize(count);
+	serializer.deserializeArrayBegin("positions");
+	for(int i = 0; i < count; ++i)
+	{
+		serializer.deserializeArrayItem(m_positions[i].x);
+		serializer.deserializeArrayItem(m_positions[i].y);
+		serializer.deserializeArrayItem(m_positions[i].z);
+	}
+	serializer.deserializeArrayEnd();
+	serializer.deserializeArrayBegin("rotations");
+	for(int i = 0; i < count; ++i)
+	{
+		serializer.deserializeArrayItem(m_rotations[i].x);
+		serializer.deserializeArrayItem(m_rotations[i].y);
+		serializer.deserializeArrayItem(m_rotations[i].z);
+		serializer.deserializeArrayItem(m_rotations[i].w);
+	}
+	serializer.deserializeArrayEnd();
+}
+
+
+
+} // !namespace Lux

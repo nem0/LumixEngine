@@ -1,0 +1,261 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="graphics">
+      <UniqueIdentifier>{81110112-66f3-46cb-a161-4e2ab92b01d4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="universe">
+      <UniqueIdentifier>{72baf105-26cd-4555-9e97-a4b92ab1f676}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="physics">
+      <UniqueIdentifier>{41e86905-3a15-460f-af40-92fe8e542217}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="editor">
+      <UniqueIdentifier>{69a0e835-15da-4c43-a0ed-57a169bbe67f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="detour">
+      <UniqueIdentifier>{7b62410b-763f-475d-974d-aa9699e97316}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="AI">
+      <UniqueIdentifier>{6b1a8d41-dbe3-4718-b4d7-7c3c1ce4a7e5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="script">
+      <UniqueIdentifier>{1687822c-73d0-4a28-9c22-71b902c329eb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="animation">
+      <UniqueIdentifier>{2bb241e1-0051-401f-b64c-47c220e77ff3}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\src\graphics\renderer.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\universe\universe.cpp">
+      <Filter>universe</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\physics\physics_scene.cpp">
+      <Filter>physics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\physics\physics_system.cpp">
+      <Filter>physics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\universe\component_event.cpp">
+      <Filter>universe</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\universe\entity_moved_event.cpp">
+      <Filter>universe</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\editor\editor_server.cpp">
+      <Filter>editor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\editor\gizmo.cpp">
+      <Filter>editor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\editor\editor_icon.cpp">
+      <Filter>editor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\editor\property_descriptor.cpp">
+      <Filter>editor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\detour\DetourAlloc.cpp">
+      <Filter>detour</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\detour\DetourCommon.cpp">
+      <Filter>detour</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\detour\DetourNavMesh.cpp">
+      <Filter>detour</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\detour\DetourNavMeshBuilder.cpp">
+      <Filter>detour</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\detour\DetourNavMeshQuery.cpp">
+      <Filter>detour</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\detour\DetourNode.cpp">
+      <Filter>detour</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\ai\navigation.cpp">
+      <Filter>AI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\detour\DebugDraw.cpp">
+      <Filter>detour</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\detour\DetourDebugDraw.cpp">
+      <Filter>detour</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\detour\RecastDebugDraw.cpp">
+      <Filter>detour</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\detour\RecastDump.cpp">
+      <Filter>detour</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\detour\Recast.cpp">
+      <Filter>detour</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\detour\RecastAlloc.cpp">
+      <Filter>detour</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\detour\RecastArea.cpp">
+      <Filter>detour</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\detour\RecastContour.cpp">
+      <Filter>detour</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\detour\RecastFilter.cpp">
+      <Filter>detour</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\detour\RecastLayers.cpp">
+      <Filter>detour</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\detour\RecastMesh.cpp">
+      <Filter>detour</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\detour\RecastMeshDetail.cpp">
+      <Filter>detour</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\detour\RecastRasterization.cpp">
+      <Filter>detour</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\detour\RecastRegion.cpp">
+      <Filter>detour</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\detour\DetourTileCache.cpp">
+      <Filter>detour</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\detour\DetourTileCacheBuilder.cpp">
+      <Filter>detour</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\universe\entity_destroyed_event.cpp">
+      <Filter>universe</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\script\script_system.cpp">
+      <Filter>script</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\script\save_script_visitor.cpp">
+      <Filter>script</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\script\set_property_visitor.cpp">
+      <Filter>script</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\script\get_property_visitor.cpp">
+      <Filter>script</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\animation\animation_system.cpp">
+      <Filter>animation</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\src\graphics\renderer.h">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\universe\universe.h">
+      <Filter>universe</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\physics\physics_scene.h">
+      <Filter>physics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\physics\physics_system.h">
+      <Filter>physics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\universe\component_event.h">
+      <Filter>universe</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\universe\entity_moved_event.h">
+      <Filter>universe</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\editor\editor_server.h">
+      <Filter>editor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\editor\property_descriptor.h">
+      <Filter>editor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\editor\gizmo.h">
+      <Filter>editor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\editor\editor_icon.h">
+      <Filter>editor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\detour\DetourAlloc.h">
+      <Filter>detour</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\detour\DetourAssert.h">
+      <Filter>detour</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\detour\DetourCommon.h">
+      <Filter>detour</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\detour\DetourNavMesh.h">
+      <Filter>detour</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\detour\DetourNavMeshBuilder.h">
+      <Filter>detour</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\detour\DetourNavMeshQuery.h">
+      <Filter>detour</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\detour\DetourNode.h">
+      <Filter>detour</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\detour\DetourStatus.h">
+      <Filter>detour</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\ai\navigation.h">
+      <Filter>AI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\detour\DebugDraw.h">
+      <Filter>detour</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\detour\DetourDebugDraw.h">
+      <Filter>detour</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\detour\RecastDebugDraw.h">
+      <Filter>detour</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\detour\RecastDump.h">
+      <Filter>detour</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\detour\Recast.h">
+      <Filter>detour</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\detour\RecastAlloc.h">
+      <Filter>detour</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\detour\RecastAssert.h">
+      <Filter>detour</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\detour\DetourTileCache.h">
+      <Filter>detour</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\detour\DetourTileCacheBuilder.h">
+      <Filter>detour</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\universe\entity_destroyed_event.h">
+      <Filter>universe</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\script\script_system.h">
+      <Filter>script</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\script\base_script.h">
+      <Filter>script</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\script\script_visitor.h">
+      <Filter>script</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\script\save_script_visitor.h">
+      <Filter>script</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\script\set_property_visitor.h">
+      <Filter>script</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\script\get_property_visitor.h">
+      <Filter>script</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\animation\animation_system.h">
+      <Filter>animation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\physics\physics_system_impl.h">
+      <Filter>physics</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
