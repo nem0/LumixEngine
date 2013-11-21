@@ -1,0 +1,128 @@
+#pragma once
+
+
+#include "core/lux.h"
+#include "core/vec3.h"
+
+
+namespace Lux
+{
+
+
+struct Quat;
+
+
+struct LUX_CORE_API Matrix
+{
+	Matrix() {}
+
+	Matrix(const float* m)
+	{
+		m11 = m[0]; m12 = m[1]; m13 = m[2]; m14 = m[3];
+		m21 = m[4]; m22 = m[5]; m23 = m[6]; m24 = m[7];
+		m31 = m[8]; m32 = m[9]; m33 = m[10]; m34 = m[11];
+		m41 = m[12]; m42 = m[13]; m43 = m[14]; m44 = m[15];
+	}
+
+	Matrix(
+		float r11, float r12, float r13, float r14,
+		float r21, float r22, float r23, float r24,
+		float r31, float r32, float r33, float r34,
+		float r41, float r42, float r43, float r44
+	)
+	{
+		m11 = r11; m12 = r12; m13 = r13; m14 = r14;
+		m21 = r21; m22 = r22; m23 = r23; m24 = r24;
+		m31 = r31; m32 = r32; m33 = r33; m34 = r34;
+		m41 = r41; m42 = r42; m43 = r43; m44 = r44;
+	}
+
+	Matrix operator *(const Matrix& rhs) const;
+
+	Vec3 operator *(const Vec3& rhs) const
+	{
+		return Vec3(
+			m11 * rhs.x + m21 * rhs.y + m31 * rhs.z,	
+			m12 * rhs.x + m22 * rhs.y + m32 * rhs.z,	
+			m13 * rhs.x + m23 * rhs.y + m33 * rhs.z
+		);
+	}
+
+	Vec3 getZVector() const
+	{
+		return Vec3(m31, m32, m33);
+	}
+
+	Vec3 getYVector() const
+	{
+		return Vec3(m21, m22, m23);
+	}
+
+	Vec3 getXVector() const
+	{
+		return Vec3(m11, m12, m13);
+	}
+
+	void fastInverse()
+	{
+		float tmp = m21;
+		m21 = m12;
+		m12 = tmp;
+
+		tmp = m32;
+		m32 = m23;
+		m23 = tmp;
+
+		tmp = m31;
+		m31 = m13;
+		m13 = tmp;
+
+		float m41 = -this->m41;
+		float m42 = -this->m42;
+		float m43 = -this->m43;
+		this->m41 = m41 * m11 + m42 * m21 + m43 * m31;
+		this->m42 = m41 * m12 + m42 * m22 + m43 * m32;
+		this->m43 = m41 * m13 + m42 * m23 + m43 * m33;
+	}
+
+	void translate(const Vec3& t)
+	{
+		m41 += t.x;
+		m42 += t.y;
+		m43 += t.z;
+	}
+
+	void translate(float x, float y, float z)
+	{
+		m41 += x;
+		m42 += y;
+		m43 += z;
+	}
+
+	void setTranslation(const Vec3& t)
+	{
+		m41 = t.x;
+		m42 = t.y;
+		m43 = t.z;
+	}
+
+	void getTranslation(Vec3& pos) const;
+	Vec3 getTranslation() const;
+	void getRotation(Quat& rot) const;
+	void transpose();
+	Vec3 mutliplyPosition(const Vec3& pos);
+	static void setIdentity(Matrix& mtx);
+
+	float m11, m12, m13, m14;
+	float m21, m22, m23, m24;
+	float m31, m32, m33, m34;
+	float m41, m42, m43, m44;
+
+	static Matrix IDENTITY;
+};
+
+
+void multiplicate(Matrix& result, const Matrix& op1, const Matrix& op2);
+
+
+} // !namespace Lux
