@@ -29,16 +29,11 @@ void Universe::destroy()
 	m_positions.clear();
 	m_rotations.clear();
 	m_component_list.clear();
-	m_physics_scene->destroy();
-	delete m_physics_scene;
-	m_physics_scene = 0;
 }
 
 
-void Universe::create(PhysicsSystem& physics_system)
+void Universe::create()
 {
-	m_physics_scene = new PhysicsScene();
-	m_physics_scene->create(physics_system, *this);
 	m_positions.reserve(1000);
 	m_rotations.reserve(1000);
 	m_component_list.reserve(1000);
@@ -64,9 +59,16 @@ const Vec3& Entity::getPosition() const
 }
 
 
+const Entity::ComponentList& Entity::getComponents() const
+{
+	assert(isValid());
+	return universe->m_component_list[index];
+}
+
+
 const Component& Entity::getComponent(unsigned int type)
 {
-	const Universe::EntityComponentList& cmps = universe->getComponents(*this);
+	const Entity::ComponentList& cmps = getComponents();
 	for(int i = 0, c = cmps.size(); i < c; ++i)
 	{
 		if(cmps[i].type == type)
@@ -89,8 +91,8 @@ Matrix Entity::getMatrix() const
 
 void Entity::getMatrix(Matrix& mtx) const
 {
-	universe->getRotations()[index].toMatrix(mtx);
-	mtx.setTranslation(universe->getPositions()[index]);
+	universe->m_rotations[index].toMatrix(mtx);
+	mtx.setTranslation(universe->m_positions[index]);
 }
 
 

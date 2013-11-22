@@ -195,7 +195,6 @@ void Renderer::renderScene()
 				Entity(m_impl->universe, m_impl->renderables[i].entity).getMatrix(mtx);
 				h3dSetNodeTransMat(node, &mtx.m11);
 				Entity e(m_impl->universe, m_impl->renderables[i].entity);
-				m_impl->universe->getEventManager()->emitEvent(ComponentEvent(Component(e, rend_type, this, i)));			
 			}
 		}
 		m_impl->update_bb = false;
@@ -268,15 +267,12 @@ void Renderer::setMesh(Component cmp, const string& str)
 
 Component Renderer::getRenderable(Universe& universe, H3DNode node)
 {
-	for(int i = 0, c = universe.getComponents().size(); i < c; ++i)
+	for(int i = 0; i < m_impl->renderables.size(); ++i)
 	{
-		const vector<Component>& cmps = universe.getComponents()[i];
-		for(int j = 0, cj = cmps.size(); j < cj; ++j)
-		{		
-			if(cmps[j].type == rend_type && m_impl->renderables[cmps[j].index].node == node)
-			{
-				return cmps[j];
-			}
+		if(m_impl->renderables[i].node == node)
+		{
+			Entity e(m_impl->universe, i);
+			return Component(e, rend_type, this, i);
 		}
 	}
 	return Component::INVALID;
@@ -314,8 +310,8 @@ void RendererImpl::postDeserialize()
 		H3DNode& node = lights[i].node;
 		node = h3dAddLightNode(H3DRootNode, "", 0, "LIGHTING", "SHADOWMAP");
 		Matrix mtx;
-		universe->getRotations()[lights[i].entity].toMatrix(mtx);
-		mtx.setTranslation(universe->getPositions()[lights[i].entity]);
+		universe->getRotation(lights[i].entity).toMatrix(mtx);
+		mtx.setTranslation(universe->getPosition(lights[i].entity));
 		h3dSetNodeTransMat(node, &mtx.m11);
 		h3dSetNodeParamF(node, H3DLight::RadiusF, 0, 20.0f);
 		h3dSetNodeParamF(node, H3DLight::FovF, 0, 90);
@@ -492,7 +488,7 @@ void RendererImpl::onEvent(Event& event)
 	{
 		Matrix mtx;
 		Entity entity = static_cast<EntityMovedEvent&>(event).entity;
-		const vector<Component>& cmps = entity.universe->getComponents(entity);
+		const Entity::ComponentList& cmps = entity.getComponents();
 		for(int i = 0, c = cmps.size(); i < c; ++i)
 		{
 			if(cmps[i].type == rend_type)
@@ -511,7 +507,7 @@ void RendererImpl::onEvent(Event& event)
 	else if(event.getType() == EntityDestroyedEvent::type)
 	{
 		Entity entity = static_cast<EntityDestroyedEvent&>(event).entity;
-		const vector<Component>& cmps = entity.universe->getComponents(entity);
+		const Entity::ComponentList& cmps = entity.getComponents();
 		for(int i = 0, c = cmps.size(); i < c; ++i)
 		{
 			if(cmps[i].type == rend_type)
