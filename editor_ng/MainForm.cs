@@ -40,7 +40,7 @@ namespace editor_ng
             m_file_server.ui = m_file_server_ui;
             m_asset_monitor = new AssetMonitor();
             m_scene_view = new SceneView();
-            m_asset_list = new AssetList();
+            m_asset_list = new AssetList(this);
             m_asset_list.main_form = this;
             m_property_grid = new PropertyGrid();
             m_property_grid.main_form = this;
@@ -210,10 +210,10 @@ namespace editor_ng
 
         private Dictionary<System.Diagnostics.Process, string> m_import_model_processes = new Dictionary<System.Diagnostics.Process, string>();
 
-        private void importModelToolStripMenuItem_Click(object sender, EventArgs e)
+        public void importModel()
         {
             OpenFileDialog dlg = new OpenFileDialog();
-            if(dlg.ShowDialog() == DialogResult.OK)
+            if (dlg.ShowDialog() == DialogResult.OK)
             {
                 m_notifications.showNotification("Importing model " + dlg.FileName);
 
@@ -225,6 +225,11 @@ namespace editor_ng
                 m_import_model_processes.Add(process, dlg.FileName);
                 process.Exited += importModelFinished;
             }
+        }
+
+        private void importModelToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            importModel();
         }
 
         void importModelFinished(object sender, EventArgs e)
