@@ -111,8 +111,8 @@ class LUX_ENGINE_API Universe
 	private:
 		vector<Vec3>		m_positions;		//< entity positions
 		vector<Quat>		m_rotations;		//< entity rotations
+		vector<int>			m_free_slots;
 		ComponentList		m_component_list;
-		int					m_first_free_slot;
 		EventManager*		m_event_manager;
 		PhysicsScene*		m_physics_scene;
 };
