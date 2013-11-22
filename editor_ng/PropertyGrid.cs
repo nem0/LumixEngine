@@ -362,7 +362,7 @@ namespace editor_ng
         {
             DataGridView dgv = sender as DataGridView;
             DataGridViewCellEventArgs e = args as DataGridViewCellEventArgs;
-            server.setComponentProperty(m_selected_entity, (uint)dgv.Tag, dgv.Rows[e.RowIndex].Cells[0].Value as string, dgv.Rows[e.RowIndex].Cells[1].Value.ToString());
+            server.setComponentProperty((uint)dgv.Tag, dgv.Rows[e.RowIndex].Cells[0].Value as string, dgv.Rows[e.RowIndex].Cells[1].Value.ToString());
         }
 
         private void onCreateComponentClicked(object sender, EventArgs args)
@@ -418,14 +418,14 @@ namespace editor_ng
                 if (file.IndexOf("scene.xml") >= 0)
                 {
                     server.createComponent(Crc32.Compute("renderable"));
-                    server.setComponentProperty(m_selected_entity, Crc32.Compute("renderable"), "path", file);
-                    server.requestComponentProperties(m_selected_entity, Crc32.Compute("renderable"));
+                    server.setComponentProperty(Crc32.Compute("renderable"), "path", file);
+                    server.requestComponentProperties(Crc32.Compute("renderable"));
                 }
                 else if (file.IndexOf(".phy") >= 0)
                 {
                     server.createComponent(Crc32.Compute("physical"));
-                    server.setComponentProperty(m_selected_entity, Crc32.Compute("physical"), "source", file);
-                    server.requestComponentProperties(m_selected_entity, Crc32.Compute("physical"));
+                    server.setComponentProperty(Crc32.Compute("physical"), "source", file);
+                    server.requestComponentProperties(Crc32.Compute("physical"));
                 }
             }
         }
@@ -486,7 +486,7 @@ namespace editor_ng
                 };
                 panel1.Controls.Add(l);
 
-                server.requestComponentProperties(m_selected_entity, cmp);  
+                server.requestComponentProperties(cmp);  
             }
 
             server.requestPosition();

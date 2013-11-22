@@ -126,14 +126,14 @@ namespace editor_ng
                 if (file.IndexOf("scene.xml") >= 0)
                 {
                     server.createComponent(Crc32.Compute("renderable"));
-                    server.setComponentProperty(m_selected_entity, Crc32.Compute("renderable"), "path", file);
-                    server.requestComponentProperties(m_selected_entity, Crc32.Compute("renderable"));
+                    server.setComponentProperty(Crc32.Compute("renderable"), "path", file);
+                    server.requestComponentProperties(Crc32.Compute("renderable"));
                 }
                 else if (file.IndexOf(".phy") >= 0)
                 {
                     server.createComponent(Crc32.Compute("physical"));
-                    server.setComponentProperty(m_selected_entity, Crc32.Compute("physical"), "source", file);
-                    server.requestComponentProperties(m_selected_entity, Crc32.Compute("physical"));
+                    server.setComponentProperty(Crc32.Compute("physical"), "source", file);
+                    server.requestComponentProperties(Crc32.Compute("physical"));
                 }
                 else if (file.IndexOf(".unv") >= 0)
                 {

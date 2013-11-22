@@ -132,11 +132,10 @@ namespace editor_ng.native
             sendMessage();
         }
 
-        public void setComponentProperty(int entity, uint cmp, string name, string value)
+        public void setComponentProperty(uint cmp, string name, string value)
         {
             startMessage();
             m_writer.Write(4);
-            m_writer.Write(entity);
             m_writer.Write(cmp);
             m_writer.Write(name.Length);
             m_writer.Write(System.Text.Encoding.ASCII.GetBytes(name));
@@ -271,7 +270,7 @@ namespace editor_ng.native
             sendMessage();
         }
 
-        public void requestComponentProperties(int entity, uint cmp)
+        public void requestComponentProperties(uint cmp)
         {
             startMessage();
             m_writer.Write(9);

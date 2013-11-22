@@ -4,6 +4,7 @@
 #include "core/lux.h"
 #include <cstdlib>
 #include <new>
+#include <cassert>
 
 
 template <class T>
@@ -150,7 +151,7 @@ class vector
 			}
 		}
 
-		const T& operator[] (int index) const { return mData[index]; }
+		const T& operator[] (int index) const { assert(index < mSize); return mData[index]; }
 		T& operator[](int index) { return mData[index]; }
  		int size() const { return mSize; }
 		int capacity() const { return mCapacity; }
