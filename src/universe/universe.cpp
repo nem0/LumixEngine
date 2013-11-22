@@ -25,10 +25,10 @@ Universe::~Universe()
 
 void Universe::destroy()
 {
+	m_free_slots.clear();
 	m_positions.clear();
 	m_rotations.clear();
 	m_component_list.clear();
-	m_first_free_slot = -1;
 	m_physics_scene->destroy();
 	delete m_physics_scene;
 	m_physics_scene = 0;
@@ -47,7 +47,6 @@ void Universe::create(PhysicsSystem& physics_system)
 
 Universe::Universe()
 {
-	m_first_free_slot = -1;
 	m_event_manager = new EventManager;
 	m_event_manager->registerListener(ComponentEvent::type, this, &Universe::onEvent);
 }
@@ -155,21 +154,22 @@ void Entity::setRotation(const Quat& rot)
 
 Entity Universe::createEntity()
 {
-	if(m_first_free_slot != -1)
-	{
-		Entity e(this, m_first_free_slot);
-		m_first_free_slot = *(int*)(&m_positions[m_first_free_slot].x);
-		m_positions[e.index].set(0, 0, 0);
-		m_rotations[e.index].set(0, 0, 0, 1);
-		m_component_list[e.index].clear();
-		return e;
-	}
-	else
+	
+	if(m_free_slots.empty())
 	{
 		m_positions.push_back(Vec3(0, 0, 0));
 		m_rotations.push_back(Quat(0, 0, 0, 1));
 		m_component_list.push_back_empty();
 		return Entity(this, m_positions.size() - 1);
+	}
+	else
+	{
+		Entity e(this, m_free_slots.back());
+		m_free_slots.pop_back();
+		m_positions[e.index].set(0, 0, 0);
+		m_rotations[e.index].set(0, 0, 0, 1);
+		m_component_list[e.index].clear();
+		return e;
 	}
 }
 
@@ -180,16 +180,7 @@ void Universe::destroyEntity(Entity entity)
 	{
 		m_event_manager->emitEvent(EntityDestroyedEvent(entity));
 		m_component_list[entity.index].clear();
-		if(m_first_free_slot == -1)
-		{
-			m_first_free_slot = entity.index;
-			*(int*)(&m_positions[entity.index].x) = -1;
-		}
-		else
-		{
-			*(int*)(&m_positions[entity.index].x) = m_first_free_slot;
-			m_first_free_slot = entity.index;
-		}
+		m_free_slots.push_back(entity.index);
 	}
 }
 
@@ -227,7 +218,6 @@ void Universe::onEvent(Event& evt)
 
 void Universe::serialize(ISerializer& serializer)
 {
-	serializer.serialize("first_free_slot", m_first_free_slot);
 	serializer.serialize("count", m_positions.size());
 	serializer.beginArray("positions");
 	for(int i = 0; i < m_positions.size(); ++i)
@@ -246,12 +236,18 @@ void Universe::serialize(ISerializer& serializer)
 		serializer.serializeArrayItem(m_rotations[i].w);
 	}
 	serializer.endArray();
+	serializer.serialize("free_slot_count", m_free_slots.size());
+	serializer.beginArray("free_slots");
+	for(int i = 0; i < m_free_slots.size(); ++i)
+	{
+		serializer.serializeArrayItem(m_free_slots[i]);
+	}
+	serializer.endArray();
 }
 
 
 void Universe::deserialize(ISerializer& serializer)
 {
-	serializer.deserialize("first_free_slot", m_first_free_slot);
 	int count;
 	serializer.deserialize("count", count);
 	m_component_list.resize(count);
@@ -272,6 +268,14 @@ void Universe::deserialize(ISerializer& serializer)
 		serializer.deserializeArrayItem(m_rotations[i].y);
 		serializer.deserializeArrayItem(m_rotations[i].z);
 		serializer.deserializeArrayItem(m_rotations[i].w);
+	}
+	serializer.deserializeArrayEnd();
+	serializer.deserialize("free_slot_count", count);
+	m_free_slots.resize(count);
+	serializer.deserializeArrayBegin("free_slots");
+	for(int i = 0; i < count; ++i)
+	{
+		serializer.deserializeArrayItem(m_free_slots[i]);
 	}
 	serializer.deserializeArrayEnd();
 }
