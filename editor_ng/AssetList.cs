@@ -18,6 +18,7 @@ namespace editor_ng
         public MainForm main_form { get; set; }
 
         private native.EditorServer m_server;
+        private MainForm m_main_form;
 
         public native.EditorServer server
         {
@@ -37,8 +38,9 @@ namespace editor_ng
         }
 
 
-        public AssetList()
+        public AssetList(MainForm main_form)
         {
+            m_main_form = main_form;
             InitializeComponent();
             
             string root = System.IO.Directory.GetCurrentDirectory();
@@ -149,6 +151,11 @@ namespace editor_ng
         private void mainTreeView_ItemDrag(object sender, ItemDragEventArgs e)
         {
             DoDragDrop((e.Item as TreeNode).Tag as string, DragDropEffects.Link);
+        }
+
+        private void importModelButton_Click(object sender, EventArgs e)
+        {
+            m_main_form.importModel();
         }
     }
 }

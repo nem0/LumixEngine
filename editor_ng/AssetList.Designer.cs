@@ -29,6 +29,7 @@
         private void InitializeComponent()
         {
             this.mainTreeView = new System.Windows.Forms.TreeView();
+            this.importModelButton = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // mainTreeView
@@ -40,11 +41,23 @@
             this.mainTreeView.TabIndex = 0;
             this.mainTreeView.ItemDrag += new System.Windows.Forms.ItemDragEventHandler(this.mainTreeView_ItemDrag);
             // 
+            // importModelButton
+            // 
+            this.importModelButton.Dock = System.Windows.Forms.DockStyle.Bottom;
+            this.importModelButton.Location = new System.Drawing.Point(0, 239);
+            this.importModelButton.Name = "importModelButton";
+            this.importModelButton.Size = new System.Drawing.Size(284, 23);
+            this.importModelButton.TabIndex = 1;
+            this.importModelButton.Text = "Import collada (*.DAE)";
+            this.importModelButton.UseVisualStyleBackColor = true;
+            this.importModelButton.Click += new System.EventHandler(this.importModelButton_Click);
+            // 
             // AssetList
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(284, 262);
+            this.Controls.Add(this.importModelButton);
             this.Controls.Add(this.mainTreeView);
             this.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(238)));
             this.HideOnClose = true;
@@ -57,5 +70,6 @@
         #endregion
 
         private System.Windows.Forms.TreeView mainTreeView;
+        private System.Windows.Forms.Button importModelButton;
     }
 }
