@@ -767,19 +767,19 @@ void EditorServer::setProperty(void* data, int size)
 {
 	MemoryStream stream;
 	stream.create(data, size);
-	int entity_id;
-	stream.read(entity_id);
 	unsigned int component_type;
 	stream.read(component_type);
-	Entity e(m_universe, entity_id);
-	const Universe::EntityComponentList& cmps = m_universe->getComponents(e);
 	Component cmp = Component::INVALID;
-	for(int i = 0; i < cmps.size(); ++i)
+	if(m_selected_entity.isValid())
 	{
-		if(cmps[i].type == component_type)
+		const Universe::EntityComponentList& cmps = m_universe->getComponents(m_selected_entity);
+		for(int i = 0; i < cmps.size(); ++i)
 		{
-			cmp = cmps[i];
-			break;
+			if(cmps[i].type == component_type)
+			{
+				cmp = cmps[i];
+				break;
+			}
 		}
 	}
 	if(cmp.isValid())
