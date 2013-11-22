@@ -549,10 +549,10 @@ void EditorServer::removeComponent(unsigned int type_crc)
 	{
 		m_universe->getPhysicsScene()->destroyActor(cmp);
 	}
-/*	else if(type_crc == point_light_type)
+	else if(type_crc == point_light_type)
 	{
-		m_renderer->createPointLight(m_selected_entity);
-	}*/
+		m_renderer->destroyPointLight(cmp);
+	}
 	else
 	{
 		assert(false);
@@ -952,6 +952,15 @@ void EditorServer::onEvent(Event& evt)
 				}
 			}
 			if(!found)
+			{
+				EditorIcon* er = new EditorIcon();
+				er->create(e.component.entity, e.component);
+				m_editor_icons.push_back(er);
+			}
+		}
+		else
+		{
+			if(e.component.entity.universe->getComponents(e.component.entity).empty())
 			{
 				EditorIcon* er = new EditorIcon();
 				er->create(e.component.entity, e.component);
