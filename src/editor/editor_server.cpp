@@ -443,6 +443,15 @@ void EditorServer::addComponent(unsigned int type_crc)
 {
 	if(m_selected_entity.isValid())
 	{
+		const Universe::EntityComponentList& cmps = m_selected_entity.universe->getComponents(m_selected_entity);
+		for(int i = 0; i < cmps.size(); ++i)
+		{
+			if(cmps[i].type == type_crc)
+			{
+				return;
+			}
+		}
+
 		if(type_crc == renderable_type)
 		{
 			m_renderer->createRenderable(m_selected_entity);
