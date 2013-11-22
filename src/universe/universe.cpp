@@ -47,6 +47,17 @@ Universe::Universe()
 }
 
 
+bool Entity::existsInUniverse() const
+{
+	for(int i = 0; i < universe->m_free_slots.size(); ++i)
+	{
+		if(universe->m_free_slots[i] == index)
+			return false;
+	}	
+	return index != -1;
+}
+
+
 const Quat& Entity::getRotation() const
 {
 	return universe->m_rotations[index];
@@ -180,9 +191,9 @@ void Universe::destroyEntity(Entity entity)
 {
 	if(entity.isValid())
 	{
+		m_free_slots.push_back(entity.index);
 		m_event_manager->emitEvent(EntityDestroyedEvent(entity));
 		m_component_list[entity.index].clear();
-		m_free_slots.push_back(entity.index);
 	}
 }
 

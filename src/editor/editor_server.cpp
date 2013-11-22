@@ -961,7 +961,7 @@ void EditorServer::onEvent(Event& evt)
 		}
 		else
 		{
-			if(e.component.entity.getComponents().empty())
+			if(e.component.entity.existsInUniverse() &&  e.component.entity.getComponents().empty())
 			{
 				EditorIcon* er = new EditorIcon();
 				er->create(e.component.entity, Component::INVALID);

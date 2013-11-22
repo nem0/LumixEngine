@@ -43,7 +43,7 @@ struct LUX_ENGINE_API Entity LUX_FINAL
 	bool isValid() const { return index >= 0; }
 	const Component& getComponent(unsigned int type);
 	const ComponentList& getComponents() const;
-
+	bool existsInUniverse() const;
 
 	bool operator ==(const Entity& rhs) const;
 
