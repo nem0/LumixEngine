@@ -963,7 +963,7 @@ void EditorServer::onEvent(Event& evt)
 			if(e.component.entity.universe->getComponents(e.component.entity).empty())
 			{
 				EditorIcon* er = new EditorIcon();
-				er->create(e.component.entity, e.component);
+				er->create(e.component.entity, Component::INVALID);
 				m_editor_icons.push_back(er);
 			}
 		}
