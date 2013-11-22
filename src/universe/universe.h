@@ -13,8 +13,6 @@ namespace Lux
 
 
 class EventManager;
-class PhysicsScene;
-class PhysicsSystem;
 struct Vec3;
 struct Quat;
 class Event;
@@ -26,6 +24,8 @@ class ISerializer;
 
 struct LUX_ENGINE_API Entity LUX_FINAL
 {
+	typedef vector<Component> ComponentList;
+
 	Entity() {}
 	Entity(Universe* uni, int i) : index(i), universe(uni) {}
 
@@ -42,6 +42,8 @@ struct LUX_ENGINE_API Entity LUX_FINAL
 	void translate(const Vec3& t);
 	bool isValid() const { return index >= 0; }
 	const Component& getComponent(unsigned int type);
+	const ComponentList& getComponents() const;
+
 
 	bool operator ==(const Entity& rhs) const;
 
@@ -78,28 +80,24 @@ struct LUX_ENGINE_API Component LUX_FINAL
 };
 
 
-class LUX_ENGINE_API Universe
+class LUX_ENGINE_API Universe LUX_FINAL
 {
 	friend struct Entity;
 	public:
-		typedef vector<Component> EntityComponentList;
-		typedef vector<EntityComponentList> ComponentList;
+		typedef vector<Entity::ComponentList> ComponentList;
 
 	public:
 		Universe();
 		~Universe();
 
-		void create(PhysicsSystem& physics_system);
+		void create();
 		void destroy();
 
 		Entity createEntity();
 		void destroyEntity(Entity entity);
+		Vec3 getPosition(int index) { return m_positions[index]; }
+		Quat getRotation(int index) { return m_rotations[index]; }
 		EventManager* getEventManager() const { return m_event_manager; }
-		PhysicsScene* getPhysicsScene() const { return m_physics_scene; }
-		const vector<Vec3>& getPositions() const { return m_positions; }
-		const vector<Quat>& getRotations() const { return m_rotations; }
-		const EntityComponentList& getComponents(Entity e) const { return m_component_list[e.index]; }
-		const ComponentList& getComponents() const { return m_component_list; }
 
 		void serialize(ISerializer& serializer);
 		void deserialize(ISerializer& serializer);
@@ -114,7 +112,6 @@ class LUX_ENGINE_API Universe
 		vector<int>			m_free_slots;
 		ComponentList		m_component_list;
 		EventManager*		m_event_manager;
-		PhysicsScene*		m_physics_scene;
 };
 
 

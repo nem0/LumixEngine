@@ -92,7 +92,7 @@ namespace Lux
 			int entity_index;
 			serializer.deserializeArrayItem(entity_index);
 			Entity e(m_impl->universe, entity_index);
-			const Universe::EntityComponentList& cmps = m_impl->universe->getComponents(e);
+			const Entity::ComponentList& cmps = e.getComponents();
 			m_impl->animables[i].renderable = Component::INVALID;
 			for(int j = 0; j < cmps.size(); ++j)
 			{
@@ -117,7 +117,7 @@ namespace Lux
 			ComponentEvent& e = static_cast<ComponentEvent&>(event);
 			if(e.component.type == renderable_type)
 			{
-				const Universe::EntityComponentList& cmps = e.component.entity.universe->getComponents(e.component.entity);
+				const Entity::ComponentList& cmps = e.component.entity.getComponents();
 				for(int i = 0; i < cmps.size(); ++i)
 				{
 					if(cmps[i].type == animable_type)
@@ -138,7 +138,7 @@ namespace Lux
 		animable.time = 0;
 		animable.renderable = Component::INVALID;
 
-		const Universe::EntityComponentList& cmps = entity.universe->getComponents(entity);
+		const Entity::ComponentList& cmps = entity.getComponents();
 		for(int i = 0; i < cmps.size(); ++i)
 		{
 			if(cmps[i].type == renderable_type)

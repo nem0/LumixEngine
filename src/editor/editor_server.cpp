@@ -127,6 +127,7 @@ private:
 		Universe* m_universe;
 		Navigation m_navigation;
 		PhysicsSystem* m_physics_system;
+		PhysicsScene* m_physics_scene;
 		ResponceCallback m_response_callback;
 		MemoryStream m_stream;
 		map<unsigned int, vector<PropertyDescriptor> > m_component_properties;
@@ -247,7 +248,7 @@ void EditorServer::save(IStream& stream)
 	m_universe->serialize(serializer);
 	m_script_system->serialize(serializer);
 	m_renderer->serialize(serializer);
-	m_universe->getPhysicsScene()->serialize(serializer);
+	m_physics_scene->serialize(serializer);
 	m_animation_system->serialize(serializer);
 	serializer.serialize("cam_pos_x", m_camera_pos.x);
 	serializer.serialize("cam_pos_y", m_camera_pos.y);
@@ -340,7 +341,7 @@ void EditorServer::gameModeLoop()
 
 			m_script_system->update(0.05f);
 			m_navigation.update(0.05f);
-			m_universe->getPhysicsScene()->update(0.05f);
+			m_physics_scene->update(0.05f);
 			input_system.update(0.05f);
 		}
 		HDC hdc;
@@ -391,7 +392,7 @@ void EditorServer::sendComponent(unsigned int type_crc)
 	{
 		m_stream.flush();
 		m_stream.write(2);
-		const Universe::EntityComponentList& cmps = m_universe->getComponents(m_selected_entity);
+		const Entity::ComponentList& cmps = m_selected_entity.getComponents();
 		string value;
 		for(int i = 0; i < cmps.size(); ++i)
 		{
@@ -443,7 +444,7 @@ void EditorServer::addComponent(unsigned int type_crc)
 {
 	if(m_selected_entity.isValid())
 	{
-		const Universe::EntityComponentList& cmps = m_selected_entity.universe->getComponents(m_selected_entity);
+		const Entity::ComponentList& cmps = m_selected_entity.getComponents();
 		for(int i = 0; i < cmps.size(); ++i)
 		{
 			if(cmps[i].type == type_crc)
@@ -458,7 +459,7 @@ void EditorServer::addComponent(unsigned int type_crc)
 		}
 		else if(type_crc == physical_type)
 		{
-			m_universe->getPhysicsScene()->createActor(m_selected_entity);
+			m_physics_scene->createActor(m_selected_entity);
 		}
 		else if(type_crc == point_light_type)
 		{
@@ -466,7 +467,7 @@ void EditorServer::addComponent(unsigned int type_crc)
 		}
 		else if(type_crc == physical_controller_type)
 		{
-			m_universe->getPhysicsScene()->createController(m_selected_entity);
+			m_physics_scene->createController(m_selected_entity);
 		}
 		else if(type_crc == script_type)
 		{
@@ -508,7 +509,7 @@ void EditorServer::lookAtSelected()
 void EditorServer::editScript()
 {
 	string path;
-	const Universe::EntityComponentList& cmps = m_universe->getComponents(m_selected_entity);
+	const Entity::ComponentList& cmps = m_selected_entity.getComponents();
 	for(int i = 0; i < cmps.size(); ++i)
 	{
 		if(cmps[i].type == script_type)
@@ -531,7 +532,7 @@ void EditorServer::removeEntity()
 
 void EditorServer::removeComponent(unsigned int type_crc)
 {
-	const Universe::EntityComponentList& cmps = m_selected_entity.universe->getComponents(m_selected_entity);
+	const Entity::ComponentList& cmps = m_selected_entity.getComponents();
 	Component cmp;
 	for(int i = 0; i < cmps.size(); ++i)
 	{
@@ -547,7 +548,7 @@ void EditorServer::removeComponent(unsigned int type_crc)
 	}
 	else if(type_crc == physical_type)
 	{
-		m_universe->getPhysicsScene()->destroyActor(cmp);
+		m_physics_scene->destroyActor(cmp);
 	}
 	else if(type_crc == point_light_type)
 	{
@@ -587,7 +588,7 @@ void EditorServer::load(IStream& stream)
 	m_universe->deserialize(serializer);
 	m_script_system->deserialize(serializer);
 	m_renderer->deserialize(serializer);
-	m_universe->getPhysicsScene()->deserialize(serializer);
+	m_physics_scene->deserialize(serializer);
 	m_animation_system->deserialize(serializer);
 	serializer.deserialize("cam_pos_x", m_camera_pos.x);
 	serializer.deserialize("cam_pos_y", m_camera_pos.y);
@@ -716,8 +717,8 @@ void EditorServer::renderPhysics()
 	glDisableClientState(GL_NORMAL_ARRAY);
 	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 
-	int nbac = m_universe->getPhysicsScene()->getRawScene()->getNbActors(physx::PxActorTypeSelectionFlag::eRIGID_STATIC);
-	const physx::PxRenderBuffer& rb = m_universe->getPhysicsScene()->getRawScene()->getRenderBuffer();
+	int nbac = m_physics_scene->getRawScene()->getNbActors(physx::PxActorTypeSelectionFlag::eRIGID_STATIC);
+	const physx::PxRenderBuffer& rb = m_physics_scene->getRawScene()->getRenderBuffer();
 	const physx::PxU32 numLines = rb.getNbLines();
 	const physx::PxU32 numPoints = rb.getNbPoints();
 	const physx::PxU32 numTri = rb.getNbTriangles();
@@ -781,7 +782,7 @@ void EditorServer::setProperty(void* data, int size)
 	Component cmp = Component::INVALID;
 	if(m_selected_entity.isValid())
 	{
-		const Universe::EntityComponentList& cmps = m_universe->getComponents(m_selected_entity);
+		const Entity::ComponentList& cmps = m_selected_entity.getComponents();
 		for(int i = 0; i < cmps.size(); ++i)
 		{
 			if(cmps[i].type == component_type)
@@ -873,7 +874,7 @@ void EditorServer::selectEntity(Entity e)
 		m_stream.flush();
 		m_stream.write(1);
 		m_stream.write(e.index);
-		const Universe::EntityComponentList& cmps = m_universe->getComponents(e);
+		const Entity::ComponentList& cmps = e.getComponents();
 		m_stream.write(cmps.size());
 		for(int i = 0; i < cmps.size(); ++i)
 		{
@@ -941,7 +942,7 @@ void EditorServer::onEvent(Event& evt)
 		}			
 		if(e.is_created)
 		{
-			Lux::Universe::EntityComponentList cmps = e.component.entity.universe->getComponents(e.component.entity);
+			Lux::Entity::ComponentList cmps = e.component.entity.getComponents();
 			bool found = false;
 			for(int i = 0; i < cmps.size(); ++i)
 			{
@@ -960,7 +961,7 @@ void EditorServer::onEvent(Event& evt)
 		}
 		else
 		{
-			if(e.component.entity.universe->getComponents(e.component.entity).empty())
+			if(e.component.entity.getComponents().empty())
 			{
 				EditorIcon* er = new EditorIcon();
 				er->create(e.component.entity, Component::INVALID);
@@ -1001,6 +1002,9 @@ void EditorServer::destroyUniverse()
 	m_animation_system->setUniverse(0);
 	m_script_system->setUniverse(0);
 	m_gizmo.setUniverse(0);
+	m_physics_scene->destroy();
+	delete m_physics_scene;
+	m_physics_scene = 0;
 	m_universe->destroy();
 	delete m_universe;
 	m_universe = 0;
@@ -1009,7 +1013,9 @@ void EditorServer::destroyUniverse()
 void EditorServer::createUniverse(bool create_scene, const char* base_path)
 {
 	m_universe = new Universe();
-	m_universe->create(*m_physics_system);
+	m_physics_scene = new PhysicsScene();
+	m_physics_scene->create(*m_physics_system, *m_universe);
+	m_universe->create();
 	m_universe->getEventManager()->registerListener(EntityMovedEvent::type, this, &EditorServer::onEvent);
 	m_universe->getEventManager()->registerListener(ComponentEvent::type, this, &EditorServer::onEvent);
 	m_universe->getEventManager()->registerListener(EntityDestroyedEvent::type, this, &EditorServer::onEvent);
