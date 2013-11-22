@@ -29,6 +29,7 @@ namespace editor_ng
         FileServer.FileServer m_file_server;
         FileServer.FileServerUI m_file_server_ui;
         Notifications m_notifications;
+        string m_universe_filename = "";
 
         public MainForm()
         {
@@ -135,6 +136,7 @@ namespace editor_ng
             ofd.Filter = "Level files (.unv)|*.unv|All Files (*.*)|*.*";
             if (ofd.ShowDialog() == DialogResult.OK)
             {
+                m_universe_filename = ofd.FileName;
                 m_server.openUniverse(ofd.FileName);
             }
         }
@@ -145,6 +147,7 @@ namespace editor_ng
             ofd.Filter = "Level files (.unv)|*.unv|All Files (*.*)|*.*";
             if (ofd.ShowDialog() == DialogResult.OK)
             {
+                m_universe_filename = ofd.FileName;
                 m_server.saveUniverseAs(ofd.FileName);
             }
         }
@@ -242,6 +245,18 @@ namespace editor_ng
         private void lookAtSelectedToolStripMenuItem_Click(object sender, EventArgs e)
         {
             m_server.lookAtSelected();
+        }
+
+        private void saveToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (m_universe_filename == "")
+            {
+                saveAsToolStripMenuItem_Click(sender, e);
+            }
+            else
+            {
+                m_server.saveUniverseAs(m_universe_filename);
+            }
         }
     }
 }

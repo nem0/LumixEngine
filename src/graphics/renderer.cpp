@@ -517,10 +517,12 @@ void RendererImpl::onEvent(Event& event)
 			if(cmps[i].type == rend_type)
 			{
 				destroyRenderable(cmps[i]);
+				break;
 			}
 			else if(cmps[i].type == point_light_type)
 			{
 				destroyPointLight(cmps[i]);
+				break;
 			}
 			else
 			{
