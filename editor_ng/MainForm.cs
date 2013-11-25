@@ -263,5 +263,11 @@ namespace editor_ng
                 m_server.saveUniverseAs(m_universe_filename);
             }
         }
+
+        private void newToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            m_server.newUniverse();
+            m_universe_filename = "";
+        }
     }
 }

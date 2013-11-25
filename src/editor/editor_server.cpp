@@ -100,6 +100,7 @@ class EditorServer
 		void editScript();
 		void reloadScript(const char* path);
 		void lookAtSelected();
+		void newUniverse();
 		Entity& getSelectedEntity() { return m_selected_entity; }
 		Mutex& getMessageMutex() { return m_message_mutex; }
 		bool isGameMode() const { return m_is_game_mode; }
@@ -577,6 +578,13 @@ void loadMap(void* user_data, char* file_data, int length, bool success)
 void EditorServer::load(const char path[])
 {
 	m_fs.openFile(path, &loadMap, this);
+}
+
+
+void EditorServer::newUniverse()
+{
+	destroyUniverse();
+	createUniverse(false, "");
 }
 
 
@@ -1126,8 +1134,9 @@ namespace MessageType
 		SET_EDIT_MODE,			// 16
 		EDIT_SCRIPT,			// 17
 		RELOAD_SCRIPT,			// 18
-								// 19
+		NEW_UNIVERSE,			// 19
 		LOOK_AT_SELECTED = 20,	// 20
+
 	};
 }
 
@@ -1204,6 +1213,9 @@ extern "C" LUX_ENGINE_API void __stdcall luxServerMessage(void* ptr, void* msgpt
 			break;
 		case MessageType::LOOK_AT_SELECTED:
 			server->lookAtSelected();
+			break;
+		case MessageType::NEW_UNIVERSE:
+			server->newUniverse();
 			break;
 		default:
 			assert(false); // unknown message
