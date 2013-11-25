@@ -13,161 +13,161 @@ class vector
 	public:
 		vector()
 		{
-			mData = 0;
-			mCapacity = 0;
-			mSize = 0;
+			m_data = 0;
+			m_capacity = 0;
+			m_size = 0;
 		}
 
 		vector(const vector<T>& rhs)
 		{
-			mCapacity = 0;
-			mSize = 0;
-			mData = 0;
-			reserve(rhs.mCapacity);
-			memcpy(mData, rhs.mData, sizeof(T) * rhs.mSize);
-			mSize = rhs.mSize;
+			m_capacity = 0;
+			m_size = 0;
+			m_data = 0;
+			reserve(rhs.m_capacity);
+			memcpy(m_data, rhs.m_data, sizeof(T) * rhs.m_size);
+			m_size = rhs.m_size;
 		}
 
 		~vector()
 		{
-			for(int i = 0; i < mSize; ++i)
+			for(int i = 0; i < m_size; ++i)
 			{
-				mData[i].~T();
+				m_data[i].~T();
 			}
-			delete[] (char*)mData;
+			delete[] (char*)m_data;
 		}
 
 		void eraseFast(int index)
 		{
-			if(index >= 0 && index < mSize)
+			if(index >= 0 && index < m_size)
 			{
-				mData[index].~T();
-				if(index != mSize - 1)
+				m_data[index].~T();
+				if(index != m_size - 1)
 				{
-					memmove(mData + index, mData + mSize - 1, sizeof(T));
+					memmove(m_data + index, m_data + m_size - 1, sizeof(T));
 				}
-				--mSize;
+				--m_size;
 			}
 		}
 
 		void erase(int index)
 		{
-			if(index >= 0 && index < mSize)
+			if(index >= 0 && index < m_size)
 			{
-				mData[index].~T();
-				memmove(mData + index, mData + index + 1, sizeof(T) * (mSize - index - 1));
-				--mSize;
+				m_data[index].~T();
+				memmove(m_data + index, m_data + index + 1, sizeof(T) * (m_size - index - 1));
+				--m_size;
 			}
 		}
 
 		void push_back(const T& value)
 		{
-			if(mSize == mCapacity)
+			if(m_size == m_capacity)
 			{
 				grow();
 			}
-			new ((char*)(mData+mSize)) T(value);
-			++mSize;
+			new ((char*)(m_data+m_size)) T(value);
+			++m_size;
 		}
 
-		bool empty() const { return mSize == 0; }
+		bool empty() const { return m_size == 0; }
 
 		void clear()
 		{
-			for(int i = 0; i < mSize; ++i)
+			for(int i = 0; i < m_size; ++i)
 			{
-				mData[i].~T();
+				m_data[i].~T();
 			}
-			mSize = 0;
+			m_size = 0;
 		}
 
 		T& push_back_empty()
 		{
-			if(mSize == mCapacity)
+			if(m_size == m_capacity)
 			{
 				grow();
 			}
-			new ((char*)(mData+mSize)) T();
-			++mSize;
-			return mData[mSize-1];
+			new ((char*)(m_data+m_size)) T();
+			++m_size;
+			return m_data[m_size-1];
 		}
 
 
 		const T& back() const
 		{
-			return mData[mSize-1];
+			return m_data[m_size-1];
 		}
 
 
 		T& back()
 		{
-			return mData[mSize-1];
+			return m_data[m_size-1];
 		}
 
 
 		void pop_back()
 		{
-			if(mSize > 0)
+			if(m_size > 0)
 			{
-				mData[mSize-1].~T();
-				--mSize;
+				m_data[m_size-1].~T();
+				--m_size;
 			}
 		}
 
 		void set_size(int size)
 		{
-			if(size <= mCapacity)
+			if(size <= m_capacity)
 			{
-				mSize = size;
+				m_size = size;
 			}
 		}
 
 		void resize(int size)
 		{
-			if(size > mCapacity)
+			if(size > m_capacity)
 			{
 				reserve(size);
 			}
-			for(int i = mSize; i < size; ++i)
+			for(int i = m_size; i < size; ++i)
 			{
-				new ((char*)(mData+i)) T();
+				new ((char*)(m_data+i)) T();
 			}
-			for(int i = size; i < mSize; ++i)
+			for(int i = size; i < m_size; ++i)
 			{
-				mData[i].~T();
+				m_data[i].~T();
 			}
-			mSize = size;
+			m_size = size;
 		}
 
 		void reserve(int capacity)
 		{
-			if(capacity > mCapacity)
+			if(capacity > m_capacity)
 			{
 				T* newData = (T*)new char[capacity * sizeof(T)];
-				memcpy(newData, mData, mSize * sizeof(T));
-				delete[] ((char*)mData);
-				mData = newData;
-				mCapacity = capacity;			
+				memcpy(newData, m_data, m_size * sizeof(T));
+				delete[] ((char*)m_data);
+				m_data = newData;
+				m_capacity = capacity;			
 			}
 		}
 
-		const T& operator[] (int index) const { assert(index < mSize); return mData[index]; }
-		T& operator[](int index) { return mData[index]; }
- 		int size() const { return mSize; }
-		int capacity() const { return mCapacity; }
+		const T& operator[] (int index) const { assert(index < m_size); return m_data[index]; }
+		T& operator[](int index) { return m_data[index]; }
+ 		int size() const { return m_size; }
+		int capacity() const { return m_capacity; }
 
 		void operator =(const vector<T>& rhs) 
 		{
-			if(mCapacity < rhs.mSize)
+			if(m_capacity < rhs.m_size)
 			{
-				delete[] mData;
-				mData = (T*)new char[rhs.mSize * sizeof(T)];
-				mCapacity = rhs.mSize;
+				delete[] m_data;
+				m_data = (T*)new char[rhs.m_size * sizeof(T)];
+				m_capacity = rhs.m_size;
 			}
-			mSize = rhs.mSize;
-			if(mSize > 0)
+			m_size = rhs.m_size;
+			if(m_size > 0)
 			{
-				memcpy(mData, rhs.mData, sizeof(T) * rhs.mSize);
+				memcpy(m_data, rhs.m_data, sizeof(T) * rhs.m_size);
 			}
 		}
 	private:
@@ -175,16 +175,16 @@ class vector
 
 		void grow()
 		{
-			int newCapacity = mCapacity == 0 ? 4 : mCapacity * 2;
+			int newCapacity = m_capacity == 0 ? 4 : m_capacity * 2;
 			T* newData = (T*)new char[newCapacity * sizeof(T)];
-			memcpy(newData, mData, mSize * sizeof(T));
-			delete[] ((char*)mData);
-			mData = newData;
-			mCapacity = newCapacity;
+			memcpy(newData, m_data, m_size * sizeof(T));
+			delete[] ((char*)m_data);
+			m_data = newData;
+			m_capacity = newCapacity;
 		}
 
 	private:
-		int mCapacity;
-		int mSize;
-		T* mData;
+		int m_capacity;
+		int m_size;
+		T* m_data;
 };

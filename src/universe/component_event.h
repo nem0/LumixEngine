@@ -12,7 +12,7 @@ namespace Lux
 class LUX_ENGINE_API ComponentEvent : public Event
 {
 	public:
-		static Event::Type type;
+		static const Event::Type type;
 
 	public:
 		ComponentEvent(Component _component) : component(_component) { m_type = ComponentEvent::type; is_created = true; }

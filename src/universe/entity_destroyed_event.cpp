@@ -6,7 +6,7 @@ namespace Lux
 {
 
 
-Event::Type EntityDestroyedEvent::type = crc32("entity_destroyed");
+const Event::Type EntityDestroyedEvent::type = crc32("entity_destroyed");
 
 
 } // !namespace Lux

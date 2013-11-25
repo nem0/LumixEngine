@@ -6,7 +6,7 @@ namespace Lux
 {
 
 
-Event::Type ComponentEvent::type = crc32("component");
+const Event::Type ComponentEvent::type = crc32("component");
 
 
 } // !namespace Lux

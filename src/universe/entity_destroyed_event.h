@@ -12,7 +12,7 @@ namespace Lux
 class LUX_ENGINE_API EntityDestroyedEvent : public Event
 {
 	public:
-		static Event::Type type;
+		static const Event::Type type;
 
 	public:
 		EntityDestroyedEvent(Entity _entity) : entity(_entity) { m_type = EntityDestroyedEvent::type; }

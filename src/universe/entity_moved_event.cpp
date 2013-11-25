@@ -6,7 +6,7 @@ namespace Lux
 {
 
 
-Event::Type EntityMovedEvent::type = crc32("entity_moved");
+const Event::Type EntityMovedEvent::type = crc32("entity_moved");
 
 
 } // !namespace Lux
