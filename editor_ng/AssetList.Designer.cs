@@ -34,17 +34,20 @@
             // 
             // mainTreeView
             // 
-            this.mainTreeView.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.mainTreeView.Location = new System.Drawing.Point(0, 0);
+            this.mainTreeView.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.mainTreeView.Location = new System.Drawing.Point(0, 29);
             this.mainTreeView.Name = "mainTreeView";
-            this.mainTreeView.Size = new System.Drawing.Size(284, 262);
+            this.mainTreeView.Size = new System.Drawing.Size(284, 233);
             this.mainTreeView.TabIndex = 0;
             this.mainTreeView.ItemDrag += new System.Windows.Forms.ItemDragEventHandler(this.mainTreeView_ItemDrag);
             // 
             // importModelButton
             // 
-            this.importModelButton.Dock = System.Windows.Forms.DockStyle.Bottom;
-            this.importModelButton.Location = new System.Drawing.Point(0, 239);
+            this.importModelButton.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.importModelButton.Location = new System.Drawing.Point(0, 0);
             this.importModelButton.Name = "importModelButton";
             this.importModelButton.Size = new System.Drawing.Size(284, 23);
             this.importModelButton.TabIndex = 1;

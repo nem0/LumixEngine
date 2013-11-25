@@ -252,6 +252,13 @@ namespace editor_ng.native
             sendMessage();
         }
 
+        public void newUniverse()
+        {
+            startMessage();
+            m_writer.Write(19);
+            sendMessage();
+        }
+
         public void saveUniverseAs(string filename)
         {
             startMessage();
