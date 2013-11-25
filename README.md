@@ -10,3 +10,6 @@ TODO
 * new renderer (no 3rd party)
 * finish tcp file system
 * consistent naming of member variables
+* std int types
+* macros for new/delete, platform, assert
+* log system
