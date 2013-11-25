@@ -99,24 +99,24 @@ class map
 	public:
 		map()
 		{
-			mRoot = 0;
-			mSize = 0;
+			m_root = 0;
+			m_size = 0;
 		}
 
 		int size()
 		{
-			return mSize;
+			return m_size;
 		}
 
 		void clear()
 		{
-			clearNode(mRoot);
-			mRoot = 0;
+			clearNode(m_root);
+			m_root = 0;
 		}
 
 		iterator begin() const
 		{
-			return iterator(mRoot);
+			return iterator(m_root);
 		}
 
 		iterator end() const 
@@ -160,13 +160,13 @@ class map
 
 		void insert(const Key& key, const Value& value)
 		{
-			insert(key, value, mRoot, 0);
-			++mSize;
+			insert(key, value, m_root, 0);
+			++m_size;
 		}
 
 		void erase(const Key& key)
 		{
-			mRoot = deleteNode(key, mRoot);
+			m_root = deleteNode(key, m_root);
 		}
 
 	private:
@@ -273,7 +273,7 @@ class map
 
 		Node* _find(const Key& key) const
 		{
-			Node* node = mRoot;
+			Node* node = m_root;
 			Node* found = 0;
 			while(node)
 			{
@@ -312,7 +312,7 @@ class map
 					else 
 						*root = *temp;
 
-					--mSize; 
+					--m_size; 
 					delete temp;
 				}
 				else
@@ -365,8 +365,8 @@ class map
 		}
 
 	private:
-		Node*	mRoot;
-		int		mSize;
+		Node*	m_root;
+		int		m_size;
 };
 
 

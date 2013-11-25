@@ -3,11 +3,11 @@
 #include <cstdio>
 
 
-JsonObject::JsonObject(int token_idx, char* data, jsmntok_t* tokens)
+JsonObject::JsonObject(int m_token_idx, char* data, jsmntok_t* m_tokens)
 {
-	this->token_idx = token_idx;
-	this->data = data;
-	this->tokens = tokens;
+	this->m_token_idx = m_token_idx;
+	this->m_data = data;
+	this->m_tokens = m_tokens;
 }
 
 
@@ -25,7 +25,7 @@ JsonObject JsonObject::operator[](int index) const
 
 JsonObject::operator unsigned int() const
 {
-	if(token_idx == -1 || tokens[token_idx].type != JSMN_PRIMITIVE)
+	if(m_token_idx == -1 || m_tokens[m_token_idx].type != JSMN_PRIMITIVE)
 	{
 		return 0;
 	}
@@ -37,7 +37,7 @@ JsonObject::operator unsigned int() const
 
 int JsonObject::skip(int index) const
 {
-	switch(tokens[index].type)
+	switch(m_tokens[index].type)
 	{
 		case JSMN_STRING:
 		case JSMN_PRIMITIVE:
@@ -46,8 +46,8 @@ int JsonObject::skip(int index) const
 		case JSMN_OBJECT:
 			{
 				int i = index + 1;
-				int end = tokens[index].end;
-				while(tokens[i].start < end)
+				int end = m_tokens[index].end;
+				while(m_tokens[i].start < end)
 				{
 					++i;
 				}
@@ -60,89 +60,89 @@ int JsonObject::skip(int index) const
 
 JsonObject JsonObject::getProperty(const char* name) const
 {
-	if(token_idx == -1 || tokens[token_idx].type != JSMN_OBJECT)
+	if(m_token_idx == -1 || m_tokens[m_token_idx].type != JSMN_OBJECT)
 	{
-		return JsonObject(-1, data, tokens);
+		return JsonObject(-1, m_data, m_tokens);
 	}
-	int idx = token_idx + 1;
+	int idx = m_token_idx + 1;
 	int len = strlen(name);
-	while(tokens[idx].start < tokens[token_idx].end)
+	while(m_tokens[idx].start < m_tokens[m_token_idx].end)
 	{
-		if(strncmp(data + tokens[idx].start, name, len) == 0)
+		if(strncmp(m_data + m_tokens[idx].start, name, len) == 0)
 		{
-			switch(tokens[idx + 1].type)
+			switch(m_tokens[idx + 1].type)
 			{
 				case JSMN_ARRAY:
-					return JsonObject(idx + 1, data, tokens);
+					return JsonObject(idx + 1, m_data, m_tokens);
 				case JSMN_OBJECT:
-					return JsonObject(idx + 1, data, tokens);
+					return JsonObject(idx + 1, m_data, m_tokens);
 				case JSMN_STRING:
-					return JsonObject(idx + 1, data, tokens);
+					return JsonObject(idx + 1, m_data, m_tokens);
 				case JSMN_PRIMITIVE:
-					return JsonObject(idx + 1, data, tokens);
+					return JsonObject(idx + 1, m_data, m_tokens);
 			}
 		}
 		idx = skip(idx + 1);
 	}
-	return JsonObject(-1, data, tokens);
+	return JsonObject(-1, m_data, m_tokens);
 }
 
 
 bool JsonObject::toString(char* str, int max_size) const
 {
-	if(token_idx == -1 || tokens[token_idx].type != JSMN_STRING)
+	if(m_token_idx == -1 || m_tokens[m_token_idx].type != JSMN_STRING)
 	{
 		return false;
 	}
-	strncpy_s(str, max_size, data + tokens[token_idx].start, tokens[token_idx].end - tokens[token_idx].start);
+	strncpy_s(str, max_size, m_data + m_tokens[m_token_idx].start, m_tokens[m_token_idx].end - m_tokens[m_token_idx].start);
 	return true;
 }
 
 
 JsonObject JsonObject::getArrayItem(int index) const
 {
-	if(token_idx == -1 || tokens[token_idx].type != JSMN_ARRAY)
+	if(m_token_idx == -1 || m_tokens[m_token_idx].type != JSMN_ARRAY)
 	{
-		return JsonObject(-1, data, tokens);
+		return JsonObject(-1, m_data, m_tokens);
 	}
-	int idx = token_idx + 1;
+	int idx = m_token_idx + 1;
 	int countdown = index;
-	while(tokens[idx].start < tokens[token_idx].end)
+	while(m_tokens[idx].start < m_tokens[m_token_idx].end)
 	{
 		if(countdown == 0)
 		{
-			switch(tokens[idx].type)
+			switch(m_tokens[idx].type)
 			{
 				case JSMN_ARRAY:
-					return JsonObject(idx, data, tokens);
+					return JsonObject(idx, m_data, m_tokens);
 				case JSMN_OBJECT:
-					return JsonObject(idx, data, tokens);
+					return JsonObject(idx, m_data, m_tokens);
 				case JSMN_STRING:
-					return JsonObject(idx, data, tokens);
+					return JsonObject(idx, m_data, m_tokens);
 				case JSMN_PRIMITIVE:
-					return JsonObject(idx, data, tokens);
+					return JsonObject(idx, m_data, m_tokens);
 			}
 		}
 		--countdown;
 		idx = skip(idx);
 	}
-	return JsonObject(-1, data, tokens);		
+	return JsonObject(-1, m_data, m_tokens);		
 }
 
 
 char* JsonObject::getStart() const
 {
-	return data + tokens[token_idx].start;
+	return m_data + m_tokens[m_token_idx].start;
 }
 	
 
 int JsonObject::getLength() const
 {
-	return tokens[token_idx].end - tokens[token_idx].start;
+	return m_tokens[m_token_idx].end - m_tokens[m_token_idx].start;
 }
 
 
 bool JsonObject::isString() const
 {
-	return token_idx >= 0 && tokens[token_idx].type == JSMN_STRING;
+	return m_token_idx >= 0 && m_tokens[m_token_idx].type == JSMN_STRING;
 }

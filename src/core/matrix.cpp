@@ -8,7 +8,7 @@ namespace Lux
 {
 
 
-Matrix Matrix::IDENTITY(
+const Matrix Matrix::IDENTITY(
 	1, 0, 0, 0,
 	0, 1, 0, 0,
 	0, 0, 1, 0,

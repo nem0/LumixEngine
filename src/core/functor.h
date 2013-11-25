@@ -41,16 +41,16 @@ class Functor : public IFunctor<TRet>
 	public:
 		Functor(Function function)
 		{
-			mFunction = function;
+			m_function = function;
 		}
 
 		virtual TRet operator() ()
 		{
-			return (*mFunction)();
+			return (*m_function)();
 		}
 
 	private:
-		Function mFunction;
+		Function m_function;
 };
 
 
@@ -63,16 +63,16 @@ class Functor1 : public IFunctor1<TRet, Arg1>
 	public:
 		Functor1(Function function)
 		{
-			mFunction = function;
+			m_function = function;
 		}
 
 		virtual TRet operator() (Arg1 a)
 		{
-			return (*mFunction)(a);
+			return (*m_function)(a);
 		}
 
 	private:
-		Function	mFunction;
+		Function	m_function;
 };
 
 
@@ -85,16 +85,16 @@ class Functor3 : public IFunctor3<TRet, Arg1, Arg2, Arg3>
 	public:
 		Functor3(Function function)
 		{
-			mFunction = function;
+			m_function = function;
 		}
 
 		virtual TRet operator() (Arg1 a, Arg2 b, Arg3 c)
 		{
-			return (*mFunction)(a, b, c);
+			return (*m_function)(a, b, c);
 		}
 
 	private:
-		Function	mFunction;
+		Function	m_function;
 };
 
 
@@ -107,16 +107,16 @@ class Functor1<void, Arg1> : public IFunctor1<void, Arg1>
 	public:
 		Functor1(Function function)
 		{
-			mFunction = function;
+			m_function = function;
 		}
 
 		virtual void operator() (Arg1 a)
 		{
-			(*mFunction)(a);
+			(*m_function)(a);
 		}
 
 	private:
-		Function	mFunction;
+		Function	m_function;
 };
 
 
@@ -129,16 +129,16 @@ class Functor3<void, Arg1, Arg2, Arg3> : public IFunctor3<void, Arg1, Arg2, Arg3
 	public:
 		Functor3(Function function)
 		{
-			mFunction = function;
+			m_function = function;
 		}
 
 		virtual void operator() (Arg1 a, Arg2 b, Arg3 c)
 		{
-			(*mFunction)(a, b, c);
+			(*m_function)(a, b, c);
 		}
 
 	private:
-		Function	mFunction;
+		Function	m_function;
 };
 
 
@@ -151,18 +151,18 @@ class MethodFunctor : public IFunctor<TRet>
 	public:
 		MethodFunctor(TObj* obj, Function function)
 		{
-			mFunction = function;
-			mObj = obj;
+			m_function = function;
+			m_obj = obj;
 		}
 
 		virtual TRet operator() ()
 		{
-			return (mObj->*mFunction)();
+			return (m_obj->*m_function)();
 		}
 
 	private:
-		TObj*		mObj;
-		Function	mFunction;
+		TObj*		m_obj;
+		Function	m_function;
 };
 
 
@@ -175,16 +175,16 @@ class Functor<void> : public IFunctor<void>
 	public:
 		Functor(Function function)
 		{
-			mFunction = function;
+			m_function = function;
 		}
 
 		virtual void operator() ()
 		{
-			(*mFunction)();
+			(*m_function)();
 		}
 
 	private:
-		Function mFunction;
+		Function m_function;
 };
 
 
@@ -197,18 +197,18 @@ class MethodFunctor<void, TObj> : public IFunctor<void>
 	public:
 		MethodFunctor(TObj* obj, Function function)
 		{
-			mFunction = function;
-			mObj = obj;
+			m_function = function;
+			m_obj = obj;
 		}
 
 		virtual void operator() ()
 		{
-			(mObj->*mFunction)();
+			(m_obj->*m_function)();
 		}
 
 	private:
-		TObj*		mObj;
-		Function	mFunction;
+		TObj*		m_obj;
+		Function	m_function;
 };
 
 

@@ -118,7 +118,7 @@ struct LUX_CORE_API Matrix
 	float m31, m32, m33, m34;
 	float m41, m42, m43, m44;
 
-	static Matrix IDENTITY;
+	static const Matrix IDENTITY;
 };
 
 

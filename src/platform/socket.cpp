@@ -7,7 +7,7 @@
 
 struct SocketImpl
 {
-	SOCKET socket;
+	SOCKET m_socket;
 };
 
 
@@ -33,9 +33,9 @@ bool Socket::init()
 
 bool Socket::create(unsigned short port)
 {
-	m_implmentation->socket = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+	m_implmentation->m_socket = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 
-    if(m_implmentation->socket == INVALID_SOCKET)
+    if(m_implmentation->m_socket == INVALID_SOCKET)
     {
         return false;
     }
@@ -45,36 +45,36 @@ bool Socket::create(unsigned short port)
     sin.sin_port = htons(port);
     sin.sin_addr.s_addr = INADDR_ANY;
 
-	int retVal = bind(m_implmentation->socket, (LPSOCKADDR)&sin, sizeof(sin));
+	int retVal = bind(m_implmentation->m_socket, (LPSOCKADDR)&sin, sizeof(sin));
 	int err = WSAGetLastError();
 	if(retVal == SOCKET_ERROR)
     {
         return false;
     }
-	return ::listen(m_implmentation->socket, 10) == 0;		
+	return ::listen(m_implmentation->m_socket, 10) == 0;		
 }
 
 Socket* Socket::accept()
 {
 	Socket* s = new Socket;
-	s->m_implmentation->socket = ::accept(m_implmentation->socket, NULL, NULL);
+	s->m_implmentation->m_socket = ::accept(m_implmentation->m_socket, NULL, NULL);
 	return s;
 }
 
 bool Socket::send(const void* data, int size)
 {
-	return ::send(m_implmentation->socket, static_cast<const char*>(data), size, 0) == size;
+	return ::send(m_implmentation->m_socket, static_cast<const char*>(data), size, 0) == size;
 }
 
 int Socket::receive(void* data, int size)
 {
-	return ::recv(m_implmentation->socket, static_cast<char*>(data), size, 0);
+	return ::recv(m_implmentation->m_socket, static_cast<char*>(data), size, 0);
 }
 
 bool Socket::canReceive()
 {
 	u_long x;
-	ioctlsocket(m_implmentation->socket, FIONREAD, &x);
+	ioctlsocket(m_implmentation->m_socket, FIONREAD, &x);
 	return x > 0;
 }
 

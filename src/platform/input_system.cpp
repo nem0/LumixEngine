@@ -14,24 +14,24 @@ namespace Lux
 			InputSystem::InputType type;
 			int key;
 		};
-		map<unsigned int, Action> actions;
-		float mouse_rel_x;
-		float mouse_rel_y;
+		map<unsigned int, Action> m_actions;
+		float m_mouse_rel_x;
+		float m_mouse_rel_y;
 	};
 
 
 	void InputSystem::update(float dt)
 	{
-		m_impl->mouse_rel_x = 0;
-		m_impl->mouse_rel_y = 0;
+		m_impl->m_mouse_rel_x = 0;
+		m_impl->m_mouse_rel_y = 0;
 	}
 
 
 	bool InputSystem::create()
 	{
 		m_impl = new InputSystemImpl();
-		m_impl->mouse_rel_x = 0;
-		m_impl->mouse_rel_y = 0;
+		m_impl->m_mouse_rel_x = 0;
+		m_impl->m_mouse_rel_y = 0;
 		return true;
 	}
 
@@ -44,13 +44,13 @@ namespace Lux
 
 	void InputSystem::injectMouseXMove(float value)
 	{
-		m_impl->mouse_rel_x = value;
+		m_impl->m_mouse_rel_x = value;
 	}
 
 
 	void InputSystem::injectMouseYMove(float value)
 	{
-		m_impl->mouse_rel_y = value;
+		m_impl->m_mouse_rel_y = value;
 	}
 
 
@@ -59,14 +59,14 @@ namespace Lux
 		InputSystemImpl::Action value;
 		value.key = key;
 		value.type = type;
-		m_impl->actions.insert(action, value);
+		m_impl->m_actions.insert(action, value);
 	}
 
 
 	float InputSystem::getActionValue(unsigned int action)
 	{
 		InputSystemImpl::Action value;
-		if(m_impl->actions.find(action, value))
+		if(m_impl->m_actions.find(action, value))
 		{
 			switch(value.type)
 			{
@@ -77,10 +77,10 @@ namespace Lux
 					return GetAsyncKeyState(value.key) & 1 ? 1.0f : 0;
 					break;
 				case InputType::MOUSE_X:
-					return m_impl->mouse_rel_x;
+					return m_impl->m_mouse_rel_x;
 					break;
 				case InputType::MOUSE_Y:
-					return m_impl->mouse_rel_y;
+					return m_impl->m_mouse_rel_y;
 					break;
 			};
 		}

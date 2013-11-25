@@ -4,8 +4,8 @@
 
 struct TaskImpl
 {
-	HANDLE handle;
-	DWORD thread_id;
+	HANDLE m_handle;
+	DWORD m_thread_id;
 };
 
 
@@ -18,7 +18,7 @@ static DWORD WINAPI threadFunction(LPVOID task)
 Task::Task()
 {
 	m_implementation = new TaskImpl();
-	m_implementation->handle = NULL;
+	m_implementation->m_handle = NULL;
 }
 
 
@@ -30,14 +30,14 @@ Task::~Task()
 
 bool Task::create()
 {
-	m_implementation->handle = CreateThread(NULL, 0, threadFunction, this, CREATE_SUSPENDED, &m_implementation->thread_id);
-	return m_implementation->handle != NULL;
+	m_implementation->m_handle = CreateThread(NULL, 0, threadFunction, this, CREATE_SUSPENDED, &m_implementation->m_thread_id);
+	return m_implementation->m_handle != NULL;
 }
 
 
 bool Task::run()
 {
-	return ResumeThread(m_implementation->handle) != -1;
+	return ResumeThread(m_implementation->m_handle) != -1;
 }
 
 

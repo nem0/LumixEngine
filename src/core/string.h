@@ -21,65 +21,65 @@ class base_string
 
 		base_string()
 		{
-			mCStr = 0;
-			mSize = 0;
+			m_cstr = 0;
+			m_size = 0;
 		}
 
 		base_string(const base_string<T>& rhs, int start, size_t length)
 		{
-			mSize = length - start <= rhs.mSize ? length : rhs.mSize - start;
-			mCStr = new T[mSize + 1];
-			memcpy(mCStr, rhs.mCStr + start, mSize * sizeof(T));
-			mCStr[mSize] = 0;
+			m_size = length - start <= rhs.m_size ? length : rhs.m_size - start;
+			m_cstr = new T[m_size + 1];
+			memcpy(m_cstr, rhs.m_cstr + start, m_size * sizeof(T));
+			m_cstr[m_size] = 0;
 		}
 		
 		base_string(const base_string<T>& rhs)
 		{
-			mCStr = new T[rhs.mSize+1];
-			mSize = rhs.mSize;
-			memcpy(mCStr, rhs.mCStr, mSize * sizeof(T));
-			mCStr[mSize] = 0;
+			m_cstr = new T[rhs.m_size+1];
+			m_size = rhs.m_size;
+			memcpy(m_cstr, rhs.m_cstr, m_size * sizeof(T));
+			m_cstr[m_size] = 0;
 		}
 
 		base_string(const T* rhs)
 		{
-			mSize = strlen(rhs);
-			mCStr = new T[mSize + 1];
-			memcpy(mCStr, rhs, sizeof(T) * (mSize + 1));
+			m_size = strlen(rhs);
+			m_cstr = new T[m_size + 1];
+			memcpy(m_cstr, rhs, sizeof(T) * (m_size + 1));
 		}
 
 		~base_string()
 		{
-			delete[] mCStr;
+			delete[] m_cstr;
 		}
 
 		void operator = (const base_string<T>& rhs) 
 		{
 			if(&rhs != this)
 			{
-				delete[] mCStr;
-				mCStr = new T[rhs.mSize + 1];
-				mSize = rhs.mSize;
-				memcpy(mCStr, rhs.mCStr, sizeof(T) * (mSize + 1));
+				delete[] m_cstr;
+				m_cstr = new T[rhs.m_size + 1];
+				m_size = rhs.m_size;
+				memcpy(m_cstr, rhs.m_cstr, sizeof(T) * (m_size + 1));
 			}
 		}
 
 		void operator = (const T* rhs) 
 		{
-			delete[] mCStr;
-			mSize = strlen(rhs);
-			mCStr = new T[mSize + 1];
-			memcpy(mCStr, rhs, sizeof(T) * (mSize + 1));
+			delete[] m_cstr;
+			m_size = strlen(rhs);
+			m_cstr = new T[m_size + 1];
+			memcpy(m_cstr, rhs, sizeof(T) * (m_size + 1));
 		}
 
 		bool operator !=(const base_string<T>& rhs) const
 		{
-			return this->strcmp(rhs.mCStr) != 0;
+			return this->strcmp(rhs.m_cstr) != 0;
 		}
 
 		bool operator ==(const base_string<T>& rhs) const
 		{
-			return this->strcmp(rhs.mCStr) == 0;
+			return this->strcmp(rhs.m_cstr) == 0;
 		}
 
 		bool operator ==(const T* rhs) const
@@ -89,27 +89,27 @@ class base_string
 
 		bool operator <(const base_string<T>& rhs) const
 		{
-			return this->strcmp(rhs.mCStr) < 0;
+			return this->strcmp(rhs.m_cstr) < 0;
 		}
 
 		bool operator >(const base_string<T>& rhs) const
 		{
-			return this->strcmp(rhs.mCStr) > 0;
+			return this->strcmp(rhs.m_cstr) > 0;
 		}
 		
 		int rfind(T c) const
 		{
-			int i = mSize - 1;
-			while(i >= 0 && mCStr[i] != c)
+			int i = m_size - 1;
+			while(i >= 0 && m_cstr[i] != c)
 			{
 				--i;
 			}
 			return i >= 0 ? i : npos;
 		}
 
-		int length() const { return mSize; }
+		int length() const { return m_size; }
 
-		const T* c_str() const { return mCStr; }
+		const T* c_str() const { return m_cstr; }
 		
 		base_string<T> substr(int start, int length) const
 		{
@@ -118,32 +118,32 @@ class base_string
 		
 		void operator += (const T* rhs)
 		{
-			if(mCStr)
+			if(m_cstr)
 			{
-				mSize += base_string<T>::strlen(rhs);
-				T* newStr = new T[mSize+1];
-				base_string<T>::strcpy(newStr, mCStr);
+				m_size += base_string<T>::strlen(rhs);
+				T* newStr = new T[m_size+1];
+				base_string<T>::strcpy(newStr, m_cstr);
 				base_string<T>::strcat(newStr, rhs);
-				delete[] mCStr;
-				mCStr = newStr;
+				delete[] m_cstr;
+				m_cstr = newStr;
 			}
 			else
 			{
-				mSize = base_string<T>::strlen(rhs);
-				T* newStr = new T[mSize+1];
+				m_size = base_string<T>::strlen(rhs);
+				T* newStr = new T[m_size+1];
 				base_string<T>::strcpy(newStr, rhs);
-				mCStr = newStr;
+				m_cstr = newStr;
 			}
 		}
 
 		void operator += (const base_string<T>& rhs)
 		{
-			mSize += rhs.mSize;
-			T* newStr = new T[mSize];
-			base_string<T>::strcpy(newStr, mCStr);
-			base_string<T>::strcat(newStr, rhs.mCStr);
-			delete[] mCStr;
-			mCStr = newStr;
+			m_size += rhs.m_size;
+			T* newStr = new T[m_size];
+			base_string<T>::strcpy(newStr, m_cstr);
+			base_string<T>::strcat(newStr, rhs.m_cstr);
+			delete[] m_cstr;
+			m_cstr = newStr;
 		}
 
 		base_string<T> operator +(const base_string<T>& rhs)
@@ -199,11 +199,11 @@ class base_string
 
 		int strcmp(const T* rhs) const
 		{
-			if(!mCStr)
+			if(!m_cstr)
 			{
 				return rhs > 0;
 			}
-			const T* left = mCStr;
+			const T* left = m_cstr;
 			const T* right = rhs;
 
 			while(*left == *right && *left != 0)
@@ -216,8 +216,8 @@ class base_string
 
 
 	private:
-		size_t mSize;
-		T*	mCStr;
+		size_t m_size;
+		T*	m_cstr;
 };
 
 

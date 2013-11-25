@@ -77,7 +77,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\src\core\base64.cpp" />
+    <ClCompile Include="..\..\src\core\base64.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="..\..\src\core\crc32.cpp" />
     <ClCompile Include="..\..\src\core\event_manager.cpp" />
     <ClCompile Include="..\..\src\core\file_utils.cpp" />
@@ -97,7 +99,9 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\src\core\base64.h" />
+    <ClInclude Include="..\..\src\core\base64.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+    </ClInclude>
     <ClInclude Include="..\..\src\core\crc32.h" />
     <ClInclude Include="..\..\src\core\file_utils.h" />
     <ClInclude Include="..\..\src\core\functor.h" />

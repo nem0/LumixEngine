@@ -12,7 +12,7 @@ namespace Lux
 class LUX_ENGINE_API EntityMovedEvent : public Event
 {
 	public:
-		static Event::Type type;
+		static const Event::Type type;
 
 	public:
 		EntityMovedEvent(Entity _entity) : entity(_entity) { m_type = EntityMovedEvent::type; }
