@@ -289,6 +289,7 @@ void RendererImpl::postDeserialize()
 {
 	for(int i = 0; i < paths.size(); ++i)
 	{
+		Entity e(universe, renderables[i].entity);
 		if(paths[i] != "")
 		{
 			H3DRes res = h3dAddResource(H3DResTypes::SceneGraph, paths[i].c_str(), 0);
@@ -297,11 +298,13 @@ void RendererImpl::postDeserialize()
 				H3DNode& node = renderables[i].node;
 				node = h3dAddNodes(H3DRootNode, res);
 				Matrix mtx;
-				Entity(universe, renderables[i].entity).getMatrix(mtx);
+				e.getMatrix(mtx);
 				h3dSetNodeTransMat(node, &mtx.m11);
-				Entity e(universe, renderables[i].entity);
-				universe->getEventManager()->emitEvent(ComponentEvent(Component(e, rend_type, owner, i)));			
 			}
+		}
+		if(e.isValid())
+		{
+			universe->getEventManager()->emitEvent(ComponentEvent(Component(e, rend_type, owner, i)));			
 		}
 	}
 	loadResources();
