@@ -58,7 +58,10 @@ namespace editor_ng
             m_dock_contents.Add(m_asset_list);
             m_dock_contents.Add(m_property_grid);
             m_dock_contents.Add(m_file_server_ui);
-            dockPanel.LoadFromXml("layout.xml", new DeserializeDockContent(GetContentFromPersistString));
+            if (System.IO.File.Exists("layout.xml"))
+            {
+                dockPanel.LoadFromXml("layout.xml", new DeserializeDockContent(GetContentFromPersistString));
+            }
         }
 
         protected IDockContent GetContentFromPersistString(string persistString)
