@@ -28,7 +28,7 @@ struct RaycastHit
 };
 
 
-class LUX_ENGINE_API PhysicsScene
+class LUX_PHYSICS_API PhysicsScene
 {
 	friend class PhysicsSystem;
 	public:

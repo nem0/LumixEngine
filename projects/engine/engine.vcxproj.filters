@@ -7,9 +7,6 @@
     <Filter Include="universe">
       <UniqueIdentifier>{72baf105-26cd-4555-9e97-a4b92ab1f676}</UniqueIdentifier>
     </Filter>
-    <Filter Include="physics">
-      <UniqueIdentifier>{41e86905-3a15-460f-af40-92fe8e542217}</UniqueIdentifier>
-    </Filter>
     <Filter Include="editor">
       <UniqueIdentifier>{69a0e835-15da-4c43-a0ed-57a169bbe67f}</UniqueIdentifier>
     </Filter>
@@ -32,12 +29,6 @@
     </ClCompile>
     <ClCompile Include="..\..\src\universe\universe.cpp">
       <Filter>universe</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\physics\physics_scene.cpp">
-      <Filter>physics</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\physics\physics_system.cpp">
-      <Filter>physics</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\universe\component_event.cpp">
       <Filter>universe</Filter>
@@ -144,6 +135,9 @@
     <ClCompile Include="..\..\src\animation\animation_system.cpp">
       <Filter>animation</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\editor\iplugin.cpp">
+      <Filter>editor</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\graphics\renderer.h">
@@ -151,12 +145,6 @@
     </ClInclude>
     <ClInclude Include="..\..\src\universe\universe.h">
       <Filter>universe</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\physics\physics_scene.h">
-      <Filter>physics</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\physics\physics_system.h">
-      <Filter>physics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\universe\component_event.h">
       <Filter>universe</Filter>
@@ -254,8 +242,8 @@
     <ClInclude Include="..\..\src\animation\animation_system.h">
       <Filter>animation</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\physics\physics_system_impl.h">
-      <Filter>physics</Filter>
+    <ClInclude Include="..\..\src\editor\iplugin.h">
+      <Filter>editor</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

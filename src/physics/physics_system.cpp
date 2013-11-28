@@ -5,9 +5,9 @@
 #include "cooking/PxCooking.h"
 #include "universe/entity_moved_event.h"
 #include "physics_system_impl.h"
-
-
-#ifndef DISABLE_PHYSICS
+#include "editor/editor_properties.h"
+#include "editor/property_descriptor.h"
+#include "core/crc32.h"
 
 
 #pragma comment(lib, "PhysXVisualDebuggerSDKCHECKED.lib")
@@ -18,13 +18,18 @@
 #pragma comment(lib, "PhysX3CookingCHECKED_x86.lib")
 
 
-#endif // DISABLE_PHYSICS
-
 namespace Lux
 {
 
 
-#ifndef DISABLE_PHYSICS
+static const uint32_t physical_type = crc32("physical");
+static const uint32_t controller_type = crc32("physical_controller");
+
+
+extern "C" IPlugin* createPlugin()
+{
+	return new PhysicsSystem();
+}
 
 
 struct CustomErrorCallback : public physx::PxErrorCallback
@@ -33,8 +38,62 @@ struct CustomErrorCallback : public physx::PxErrorCallback
 };
 
 
-bool PhysicsSystem::create()
+void PhysicsSystem::onCreateUniverse(Universe& universe)
 {
+	m_impl->scene = new PhysicsScene();
+	m_impl->scene->create(*this, universe);
+
+}
+
+
+void PhysicsSystem::onDestroyUniverse(Universe& universe)
+{
+	m_impl->scene->destroy();
+	delete m_impl->scene;
+	m_impl->scene = 0;
+}
+
+
+void PhysicsSystem::serialize(ISerializer& serializer)
+{
+	m_impl->scene->serialize(serializer);
+}
+
+
+void PhysicsSystem::deserialize(ISerializer& serializer)
+{
+	m_impl->scene->deserialize(serializer);
+}
+
+
+Component PhysicsSystem::createComponent(uint32_t component_type, const Entity& entity)
+{
+	if(component_type == controller_type)
+	{
+		return m_impl->scene->createController(entity);
+	}
+	else if(component_type == physical_type)
+	{
+		return m_impl->scene->createActor(entity);
+	}
+	return Component::INVALID;
+}
+
+
+void PhysicsSystem::update(float dt)
+{
+	m_impl->scene->update(dt);
+}
+
+
+bool PhysicsSystem::create(EditorPropertyMap& properties, ComponentCreatorList& creators)
+{
+	properties[crc32("physical")].push_back(PropertyDescriptor("source", (PropertyDescriptor::Getter)&PhysicsScene::getShapeSource, (PropertyDescriptor::Setter)&PhysicsScene::setShapeSource, PropertyDescriptor::FILE));
+	properties[crc32("physical")].push_back(PropertyDescriptor("dynamic", (PropertyDescriptor::BoolGetter)&PhysicsScene::getIsDynamic, (PropertyDescriptor::BoolSetter)&PhysicsScene::setIsDynamic));
+
+	creators.insert(physical_type, this);
+	creators.insert(controller_type, this);
+
 	m_impl = new PhysicsSystemImpl;
 	m_impl->allocator = new physx::PxDefaultAllocator();
 	m_impl->error_callback = new CustomErrorCallback();
@@ -88,16 +147,6 @@ void CustomErrorCallback::reportError(physx::PxErrorCode::Enum code, const char*
 {
 	printf(message);
 }
-
-
-#else // DISABLE_PHYSICS
-
-
-bool PhysicsSystem::create() { return true; }
-void PhysicsSystem::destroy() {}
-
-
-#endif // DISABLE_PHYSICS
 
 
 } // !namespace Lux

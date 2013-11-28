@@ -3,7 +3,6 @@
 
 #include "core/string.h"
 #include "universe/universe.h"
-#include "Gwen/Controls.h"
 
 
 
@@ -57,37 +56,6 @@ struct EditorProperty
 	{
 	}
 };
-
-
-
-struct CustomGwenBooleanProperty : public Gwen::Controls::Property::Checkbox
-{
-	CustomGwenBooleanProperty(Component _cmp, Gwen::Controls::Base* parent);
-	void onPropertyChange(Gwen::Controls::Base* ctrl);
-
-	Component cmp;
-};
-
-
-struct CustomGwenTextProperty : public Gwen::Controls::Property::Text
-{
-	CustomGwenTextProperty(Component _cmp, Gwen::Controls::Base* parent);
-	void onPropertyChange(Gwen::Controls::Base* ctrl);
-
-	Component cmp;
-};
-
-
-struct CustomGwenFileProperty : public Gwen::Controls::Property::File
-{
-	CustomGwenFileProperty(Component _cmp, Gwen::Controls::Base* parent);
-	void onPropertyChange(Gwen::Controls::Base* ctrl);
-
-	Component cmp;
-};
-
-
-Gwen::Controls::Property::Base* createGwenProperty(EditorProperty& prop, Component cmp, Gwen::Controls::Base* parent);
 
 
 extern map<Component::Type, vector<EditorProperty> > g_properties;
