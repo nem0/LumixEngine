@@ -447,6 +447,7 @@ namespace editor_ng
             foreach (uint cmp in e.cmps)
             {
                 DataGridView dgv = new DataGridView();
+                dgv.CurrentCellDirtyStateChanged += dgv_CurrentCellDirtyStateChanged;
                 dgv.Tag = cmp;
                 dgv.Columns.Add("name", "name");
                 dgv.Columns[0].ReadOnly = true;
@@ -490,7 +491,12 @@ namespace editor_ng
             }
 
             server.requestPosition();
-        }        
+        }
+
+        void dgv_CurrentCellDirtyStateChanged(object sender, EventArgs e)
+        {
+            (sender as DataGridView).EndEdit();
+        }
 
         public PropertyGrid()
         {

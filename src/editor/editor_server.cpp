@@ -1,7 +1,6 @@
 #include "editor_server.h"
 #include "graphics/renderer.h"
 #include "universe/universe.h"
-#include "physics/physics_system.h"
 #include "core/matrix.h"
 #include "core/memory_stream.h"
 #include "core/vector.h"
@@ -13,10 +12,8 @@
 #include "universe/component_event.h"
 #include "core/raw_file_stream.h"
 #include "core/json_serializer.h"
-#include "physics/physics_scene.h"
 #include "graphics/renderer.h"
 #include "universe/universe.h"
-#include "PxPhysicsAPI.h"
 #include "ai/navigation.h"
 #include "universe/entity_moved_event.h"
 #include "universe/entity_destroyed_event.h"
@@ -31,6 +28,7 @@
 #include <gl/GL.h>
 #include "Horde3DUtils.h"
 #include "animation/animation_system.h"
+#include "editor/iplugin.h"
 
 
 namespace Lux
@@ -114,8 +112,8 @@ private:
 		void rotateCamera(int x, int y);
 		void onEvent(Event& evt);
 		void destroyUniverse();
-		void renderPhysics();
 		void gameModeLoop();
+		bool loadPlugin(const char* plugin_name);
 
 		static void onEvent(void* data, Event& evt);
 
@@ -127,11 +125,11 @@ private:
 		ScriptSystem* m_script_system;
 		Universe* m_universe;
 		Navigation m_navigation;
-		PhysicsSystem* m_physics_system;
-		PhysicsScene* m_physics_scene;
+		vector<IPlugin*> m_plugins;
 		ResponceCallback m_response_callback;
 		MemoryStream m_stream;
-		map<unsigned int, vector<PropertyDescriptor> > m_component_properties;
+		map<uint32_t, vector<PropertyDescriptor> > m_component_properties;
+		map<uint32_t, IPlugin*> m_creators;
 		MouseMode::Value m_mouse_mode;
 		vector<EditorIcon*>	m_editor_icons;
 		HWND m_hwnd;
@@ -146,8 +144,8 @@ private:
 void EditorServer::registerProperties()
 {
 	m_component_properties[crc32("renderable")].push_back(PropertyDescriptor("path", (PropertyDescriptor::Getter)&Renderer::getMesh, (PropertyDescriptor::Setter)&Renderer::setMesh, PropertyDescriptor::FILE));
-	m_component_properties[crc32("physical")].push_back(PropertyDescriptor("source", (PropertyDescriptor::Getter)&PhysicsScene::getShapeSource, (PropertyDescriptor::Setter)&PhysicsScene::setShapeSource, PropertyDescriptor::FILE));
-	m_component_properties[crc32("physical")].push_back(PropertyDescriptor("dynamic", (PropertyDescriptor::BoolGetter)&PhysicsScene::getIsDynamic, (PropertyDescriptor::BoolSetter)&PhysicsScene::setIsDynamic));
+	//m_component_properties[crc32("physical")].push_back(PropertyDescriptor("source", (PropertyDescriptor::Getter)&PhysicsScene::getShapeSource, (PropertyDescriptor::Setter)&PhysicsScene::setShapeSource, PropertyDescriptor::FILE));
+	//m_component_properties[crc32("physical")].push_back(PropertyDescriptor("dynamic", (PropertyDescriptor::BoolGetter)&PhysicsScene::getIsDynamic, (PropertyDescriptor::BoolSetter)&PhysicsScene::setIsDynamic));
 	m_component_properties[crc32("point_light")].push_back(PropertyDescriptor("fov", (PropertyDescriptor::DecimalGetter)&Renderer::getLightFov, (PropertyDescriptor::DecimalSetter)&Renderer::setLightFov));
 	m_component_properties[crc32("point_light")].push_back(PropertyDescriptor("radius", (PropertyDescriptor::DecimalGetter)&Renderer::getLightRadius, (PropertyDescriptor::DecimalSetter)&Renderer::setLightRadius));
 	m_component_properties[crc32("script")].push_back(PropertyDescriptor("path", (PropertyDescriptor::Getter)&ScriptSystem::getScriptPath, (PropertyDescriptor::Setter)&ScriptSystem::setScriptPath, PropertyDescriptor::FILE));
@@ -249,7 +247,10 @@ void EditorServer::save(IStream& stream)
 	m_universe->serialize(serializer);
 	m_script_system->serialize(serializer);
 	m_renderer->serialize(serializer);
-	m_physics_scene->serialize(serializer);
+	for(int i = 0; i < m_plugins.size(); ++i)
+	{
+		m_plugins[i]->serialize(serializer);
+	}
 	m_animation_system->serialize(serializer);
 	serializer.serialize("cam_pos_x", m_camera_pos.x);
 	serializer.serialize("cam_pos_y", m_camera_pos.y);
@@ -340,10 +341,14 @@ void EditorServer::gameModeLoop()
 				 }
 			}
 
-			m_script_system->update(0.05f);
-			m_navigation.update(0.05f);
-			m_physics_scene->update(0.05f);
-			input_system.update(0.05f);
+			float dt = 0.05f;
+			m_script_system->update(dt);
+			m_navigation.update(dt);
+			for(int i = 0; i < m_plugins.size(); ++i)
+			{
+				m_plugins[i]->update(dt);
+			}
+			input_system.update(dt);
 		}
 		HDC hdc;
 		PAINTSTRUCT ps;
@@ -454,13 +459,18 @@ void EditorServer::addComponent(unsigned int type_crc)
 			}
 		}
 
-		if(type_crc == renderable_type)
+		IPlugin* plugin = 0;
+		if(m_creators.find(type_crc, plugin))
+		{
+			plugin->createComponent(type_crc, m_selected_entity);
+		}
+		else if(type_crc == renderable_type)
 		{
 			m_renderer->createRenderable(m_selected_entity);
 		}
 		else if(type_crc == physical_type)
 		{
-			m_physics_scene->createActor(m_selected_entity);
+			//m_physics_scene->createActor(m_selected_entity);
 		}
 		else if(type_crc == point_light_type)
 		{
@@ -468,7 +478,7 @@ void EditorServer::addComponent(unsigned int type_crc)
 		}
 		else if(type_crc == physical_controller_type)
 		{
-			m_physics_scene->createController(m_selected_entity);
+			//m_physics_scene->createController(m_selected_entity);
 		}
 		else if(type_crc == script_type)
 		{
@@ -549,7 +559,7 @@ void EditorServer::removeComponent(unsigned int type_crc)
 	}
 	else if(type_crc == physical_type)
 	{
-		m_physics_scene->destroyActor(cmp);
+		//m_physics_scene->destroyActor(cmp);
 	}
 	else if(type_crc == point_light_type)
 	{
@@ -596,7 +606,10 @@ void EditorServer::load(IStream& stream)
 	m_universe->deserialize(serializer);
 	m_script_system->deserialize(serializer);
 	m_renderer->deserialize(serializer);
-	m_physics_scene->deserialize(serializer);
+	for(int i = 0; i < m_plugins.size(); ++i)
+	{
+		m_plugins[i]->deserialize(serializer);
+	}
 	m_animation_system->deserialize(serializer);
 	serializer.deserialize("cam_pos_x", m_camera_pos.x);
 	serializer.deserialize("cam_pos_y", m_camera_pos.y);
@@ -625,7 +638,6 @@ bool EditorServer::create(HWND hwnd, const char* base_path)
 	m_message_mutex.create();
 	m_fs.create();
 	m_hwnd = hwnd;
-	registerProperties();
 	m_renderer = new Renderer();
 	m_animation_system = new AnimationSystem();
 	RECT rect;
@@ -643,17 +655,36 @@ bool EditorServer::create(HWND hwnd, const char* base_path)
 	}
 	glPopAttrib();
 	
-	m_physics_system = new PhysicsSystem();
-	m_physics_system->create();	
-	
+	loadPlugin("physics.dll");
+
 	EditorIcon::createResources(base_path);
 
 	createUniverse(true, base_path);
 	m_gizmo.create(base_path);
 	m_gizmo.hide();
+	registerProperties();
 	//m_navigation.load("models/level2/level2.pda");
 	
 	return true;
+}
+
+
+bool EditorServer::loadPlugin(const char* plugin_name)
+{
+	typedef IPlugin* (*PluginCreator)();
+	HMODULE lib = LoadLibrary(TEXT("physics.dll"));
+	if(lib)
+	{
+		PluginCreator creator = (PluginCreator)GetProcAddress(lib, TEXT("createPlugin"));
+		if(creator)
+		{
+			IPlugin* plugin = creator();
+			plugin->create(m_component_properties, m_creators);
+			m_plugins.push_back(plugin);
+			return true;
+		}
+	}
+	return false;
 }
 
 
@@ -699,7 +730,7 @@ void EditorServer::renderScene()
 }
 
 
-void EditorServer::renderPhysics()
+/*void EditorServer::renderPhysics()
 {
 	glMatrixMode(GL_PROJECTION);
 	float proj[16];
@@ -743,7 +774,7 @@ void EditorServer::renderPhysics()
 		}
 		glEnd();
 	}
-}
+}*/
 
 
 EditorServer::EditorServer()
@@ -1010,9 +1041,10 @@ void EditorServer::destroyUniverse()
 	m_animation_system->setUniverse(0);
 	m_script_system->setUniverse(0);
 	m_gizmo.setUniverse(0);
-	m_physics_scene->destroy();
-	delete m_physics_scene;
-	m_physics_scene = 0;
+	for(int i = 0; i < m_plugins.size(); ++i)
+	{
+		m_plugins[i]->onDestroyUniverse(*m_universe);
+	}
 	m_universe->destroy();
 	delete m_universe;
 	m_universe = 0;
@@ -1021,8 +1053,10 @@ void EditorServer::destroyUniverse()
 void EditorServer::createUniverse(bool create_scene, const char* base_path)
 {
 	m_universe = new Universe();
-	m_physics_scene = new PhysicsScene();
-	m_physics_scene->create(*m_physics_system, *m_universe);
+	for(int i = 0; i < m_plugins.size(); ++i)
+	{
+		m_plugins[i]->onCreateUniverse(*m_universe);
+	}
 	m_universe->create();
 	m_universe->getEventManager()->registerListener(EntityMovedEvent::type, this, &EditorServer::onEvent);
 	m_universe->getEventManager()->registerListener(ComponentEvent::type, this, &EditorServer::onEvent);

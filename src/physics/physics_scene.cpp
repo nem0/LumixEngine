@@ -20,9 +20,6 @@ namespace Lux
 {
 
 
-#ifndef DISABLE_PHYSICS
-
-
 struct PhysicsSceneImpl
 {
 	static void handleEvent(void* data, Event& event);
@@ -446,7 +443,7 @@ void PhysicsSceneImpl::postDeserialize()
 	{
 		entities[i].universe = universe;
 		owner->setIsDynamic(Component(entities[i], physical_type, this, i), is_dynamic[i]);
-		Component cmp(entities[i], physical_type, this, i);
+		Component cmp(entities[i], physical_type, owner, i);
 		universe->getEventManager()->emitEvent(ComponentEvent(cmp));
 	}
 	index_map.resize(shape_sources.size());
@@ -533,7 +530,7 @@ void PhysicsSceneImpl::handleEvent(Event& event)
 	if(event.getType() == EntityMovedEvent::type)
 	{
 		Entity& e = static_cast<EntityMovedEvent&>(event).entity;
-		const vector<Component>& cmps = universe->getComponents(e);
+		const vector<Component>& cmps = e.getComponents();
 		for(int i = 0, c = cmps.size(); i < c; ++i)
 		{
 			if(cmps[i].type == physical_type)
@@ -636,28 +633,6 @@ physx::PxScene* PhysicsScene::getRawScene()
 {
 	return m_impl->scene;
 }
-
-
-#else 
-
-PhysicsScene::PhysicsScene() {}
-bool PhysicsScene::create(PhysicsSystem& system, Universe& universe) { return true; }
-void PhysicsScene::destroy() {}
-void PhysicsScene::destroyActor(Component cmp) {}
-void PhysicsScene::serialize(ISerializer& serializer) {}
-void PhysicsScene::deserialize(ISerializer& serializer){}
-Component PhysicsScene::createController(Entity entity) { return Component::INVALID; }
-Component PhysicsScene::createActor(Entity entity) { return Component::INVALID; }
-void PhysicsScene::getShapeSource(Component cmp, string& str) {}
-void PhysicsScene::setShapeSource(Component cmp, const string& str) {}
-void PhysicsScene::update(float time_delta) {}
-void PhysicsScene::moveController(Component cmp, const Vec3& v, float dt) {}
-bool PhysicsScene::raycast(const Vec3& origin, const Vec3& dir, float distance, RaycastHit& result) { return false; }
-void PhysicsScene::getIsDynamic(Component cmp, bool& is) {}
-void PhysicsScene::setIsDynamic(Component cmp, const bool& is) {}
-physx::PxScene* PhysicsScene::getRawScene() { return 0; }
-
-#endif // DISABLE_PHYSICS
 
 
 } // !namespace Lux

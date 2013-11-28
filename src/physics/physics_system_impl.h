@@ -8,9 +8,6 @@ namespace Lux
 {
 
 	
-#ifndef DISABLE_PHYSICS
-
-
 struct PhysicsSystemImpl
 {
 	bool connect2VisualDebugger();
@@ -21,13 +18,8 @@ struct PhysicsSystemImpl
 	physx::PxAllocatorCallback*	allocator;
 	physx::PxErrorCallback*		error_callback;
 	physx::PxCooking*			cooking;
+	class PhysicsScene*			scene;
 };
 
-
-#else
-
-	struct PhysicsSystemImpl {};
-
-#endif
 
 };

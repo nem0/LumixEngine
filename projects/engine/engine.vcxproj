@@ -54,13 +54,13 @@
       <Optimization>Disabled</Optimization>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinimalRebuild>false</MinimalRebuild>
-      <AdditionalIncludeDirectories>..\..\external\physx\include;..\..\src;..\..\external\sdl\include;..\..\external\horde3d\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\external\physx\include;..\..\src;..\..\external\horde3d\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <PreprocessorDefinitions>WIN32;BUILDING_ENGINE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>..\..\external\physx\lib;..\..\external\horde3d\lib\$(Configuration);..\..\external\sdl\lib;..\..\bin\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\..\external\horde3d\lib\$(Configuration);..\..\bin\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>core.lib;platform.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
       <IgnoreSpecificDefaultLibraries>libcmt.lib</IgnoreSpecificDefaultLibraries>
@@ -114,14 +114,9 @@
     <ClCompile Include="..\..\src\editor\editor_icon.cpp" />
     <ClCompile Include="..\..\src\editor\editor_server.cpp" />
     <ClCompile Include="..\..\src\editor\gizmo.cpp" />
+    <ClCompile Include="..\..\src\editor\iplugin.cpp" />
     <ClCompile Include="..\..\src\editor\property_descriptor.cpp" />
     <ClCompile Include="..\..\src\graphics\renderer.cpp" />
-    <ClCompile Include="..\..\src\physics\physics_scene.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
-    </ClCompile>
-    <ClCompile Include="..\..\src\physics\physics_system.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
-    </ClCompile>
     <ClCompile Include="..\..\src\script\get_property_visitor.cpp" />
     <ClCompile Include="..\..\src\script\save_script_visitor.cpp" />
     <ClCompile Include="..\..\src\script\script_system.cpp" />
@@ -156,15 +151,9 @@
     <ClInclude Include="..\..\src\editor\editor_icon.h" />
     <ClInclude Include="..\..\src\editor\editor_server.h" />
     <ClInclude Include="..\..\src\editor\gizmo.h" />
+    <ClInclude Include="..\..\src\editor\iplugin.h" />
     <ClInclude Include="..\..\src\editor\property_descriptor.h" />
     <ClInclude Include="..\..\src\graphics\renderer.h" />
-    <ClInclude Include="..\..\src\physics\physics_scene.h">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
-    </ClInclude>
-    <ClInclude Include="..\..\src\physics\physics_system.h">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
-    </ClInclude>
-    <ClInclude Include="..\..\src\physics\physics_system_impl.h" />
     <ClInclude Include="..\..\src\script\base_script.h" />
     <ClInclude Include="..\..\src\script\get_property_visitor.h" />
     <ClInclude Include="..\..\src\script\save_script_visitor.h" />

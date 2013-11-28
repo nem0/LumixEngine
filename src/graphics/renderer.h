@@ -11,7 +11,6 @@ namespace Lux
 
 
 class Event;
-class PhysicsScene;
 struct Vec3;
 class IFileSystem;
 class ISerializer;

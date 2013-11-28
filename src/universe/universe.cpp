@@ -1,7 +1,5 @@
 #include "universe.h"
 #include "core/event_manager.h"
-//#include "physics/physics_system.h"
-#include "physics/physics_scene.h"
 #include "component_event.h"
 #include "core/matrix.h"
 #include "entity_moved_event.h"
