@@ -9,7 +9,7 @@
 #include "core/json_serializer.h"
 
 
-static const unsigned int script_type = crc32("script");
+static const uint32_t script_type = crc32("script");
 
 
 namespace Lux

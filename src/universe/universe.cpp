@@ -75,7 +75,7 @@ const Entity::ComponentList& Entity::getComponents() const
 }
 
 
-const Component& Entity::getComponent(unsigned int type)
+const Component& Entity::getComponent(uint32_t type)
 {
 	const Entity::ComponentList& cmps = getComponents();
 	for(int i = 0, c = cmps.size(); i < c; ++i)

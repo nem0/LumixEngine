@@ -133,9 +133,9 @@ bool PhysicsSystemImpl::connect2VisualDebugger()
 	if(physics->getPvdConnectionManager() == NULL)
 		return false;
 
-	const char*     pvd_host_ip = "127.0.0.1";
-	int             port        = 5425;
-	unsigned int    timeout     = 100; 
+	const char* pvd_host_ip = "127.0.0.1";
+	int port = 5425;
+	unsigned int timeout = 100; 
 	physx::PxVisualDebuggerConnectionFlags connectionFlags = physx::PxVisualDebuggerExt::getAllConnectionFlags();
 
 	PVD::PvdConnection* theConnection = physx::PxVisualDebuggerExt::createConnection(physics->getPvdConnectionManager(), pvd_host_ip, port, timeout, connectionFlags);
