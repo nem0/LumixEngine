@@ -46,7 +46,7 @@
     <Reference Include="System.Xml" />
     <Reference Include="WeifenLuo.WinFormsUI.Docking, Version=2.4.0.16114, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\bin\Debug\WeifenLuo.WinFormsUI.Docking.dll</HintPath>
+      <HintPath>..\external\editor\WeifenLuo.WinFormsUI.Docking.dll</HintPath>
     </Reference>
     <Reference Include="WindowsBase" />
   </ItemGroup>
@@ -129,6 +129,12 @@
     <WCFMetadata Include="Service References\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>copy $(SolutionDir)external\editor\*.dll $(SolutionDir)\bin\$(Configuration)\
+copy $(SolutionDir)external\physx\dll\*.dll $(SolutionDir)\bin\$(Configuration)\
+copy $(SolutionDir)external\horde3d\lib\$(Configuration)\*.dll $(SolutionDir)\bin\$(Configuration)\
+</PostBuildEvent>
+  </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">
