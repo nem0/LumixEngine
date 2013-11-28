@@ -321,19 +321,31 @@ namespace editor_ng.native
         private void entitySelectedCallback(BinaryReader reader)
         {
             int entity_id = reader.ReadInt32();
-            //m_selected_entity_id = entity_id;
-            int component_count = reader.ReadInt32();
-            uint[] types = new uint[component_count];
-            for (int i = 0; i < component_count; ++i)
+            if (entity_id == -1)
             {
-                types[i] = reader.ReadUInt32();
+                if (onEntitySelected != null)
+                {
+                    EntitySelectedArgs args = new EntitySelectedArgs();
+                    args.cmps = null;
+                    args.uid = entity_id;
+                    onEntitySelected(this, args);
+                }
             }
-            if (onEntitySelected != null)
+            else
             {
-                EntitySelectedArgs args = new EntitySelectedArgs();
-                args.cmps = types;
-                args.uid = entity_id;
-                onEntitySelected(this, args);
+                int component_count = reader.ReadInt32();
+                uint[] types = new uint[component_count];
+                for (int i = 0; i < component_count; ++i)
+                {
+                    types[i] = reader.ReadUInt32();
+                }
+                if (onEntitySelected != null)
+                {
+                    EntitySelectedArgs args = new EntitySelectedArgs();
+                    args.cmps = types;
+                    args.uid = entity_id;
+                    onEntitySelected(this, args);
+                }
             }
         }
 
