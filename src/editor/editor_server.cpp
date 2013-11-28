@@ -273,11 +273,18 @@ static const unsigned int animable_type = crc32("animable");
 
 void EditorServer::addEntity()
 {
-	selectEntity(m_universe->createEntity());
+	Entity e = m_universe->createEntity();
+	e.setPosition(m_camera_pos	+ m_camera_rot * Vec3(0, 0, -2));
+	selectEntity(e);
 	EditorIcon* er = new EditorIcon();
 	er->create(m_selected_entity, Component::INVALID);
 	m_editor_icons.push_back(er);
-	
+	/*** this is here because camera render node does not exists untitle pipeline resource is loaded, do this properly*/
+	Matrix mtx;
+	m_camera_rot.toMatrix(mtx);
+	mtx.setTranslation(m_camera_pos);
+	m_renderer->setCameraMatrix(mtx);	
+	/***/
 }
 
 
@@ -1098,8 +1105,8 @@ void EditorServer::createUniverse(bool create_scene, const char* base_path)
 		e.setRotation(q.x, q.y, q.z, q.w);
 		Component light2 = m_renderer->createPointLight(e);
 		*/
-		m_camera_pos.set(7, 2, -10);
-		m_camera_rot = Quat(Vec3(0, 1, 0), 3.14159265f);
+		m_camera_pos.set(0, 0, 2);
+		m_camera_rot = Quat(0, 0, 0, 1);
 		Matrix mtx;
 		m_camera_rot.toMatrix(mtx);
 		mtx.setTranslation(m_camera_pos);
