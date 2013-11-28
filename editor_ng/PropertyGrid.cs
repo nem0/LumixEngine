@@ -444,53 +444,55 @@ namespace editor_ng
             native.EditorServer.EntitySelectedArgs e = args as native.EditorServer.EntitySelectedArgs;
             m_selected_entity = e.uid;
             entityIDtextBox.Text = e.uid.ToString();
-            foreach (uint cmp in e.cmps)
+            if (e.cmps != null)
             {
-                DataGridView dgv = new DataGridView();
-                dgv.CurrentCellDirtyStateChanged += dgv_CurrentCellDirtyStateChanged;
-                dgv.Tag = cmp;
-                dgv.Columns.Add("name", "name");
-                dgv.Columns[0].ReadOnly = true;
-                dgv.Columns.Add("value", "value");
-                dgv.Columns[0].FillWeight = 100;
-                dgv.Columns[0].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
-                dgv.Columns[0].MinimumWidth = 100;
-                dgv.Columns[1].FillWeight = 100;
-                dgv.Columns[1].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-                dgv.Dock = DockStyle.Top;
-                dgv.AllowUserToAddRows = false;
-                dgv.AllowUserToDeleteRows = false;
-                dgv.RowHeadersVisible = false;
-                dgv.ColumnHeadersVisible = false;
-                dgv.CellEndEdit += onCellEndEdit;
-                panel1.Controls.Add(dgv);
-                Label l = new Label();
-                l.Text = main_form.componentType2Name(cmp);
-                l.Dock = DockStyle.Top;
-                l.Tag = dgv;
-                dgv.Margin = new Padding(0);
-                l.MouseClick += (a, b) => 
+                foreach (uint cmp in e.cmps)
                 {
-                    if ((b as MouseEventArgs).Button == MouseButtons.Left)
+                    DataGridView dgv = new DataGridView();
+                    dgv.CurrentCellDirtyStateChanged += dgv_CurrentCellDirtyStateChanged;
+                    dgv.Tag = cmp;
+                    dgv.Columns.Add("name", "name");
+                    dgv.Columns[0].ReadOnly = true;
+                    dgv.Columns.Add("value", "value");
+                    dgv.Columns[0].FillWeight = 100;
+                    dgv.Columns[0].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+                    dgv.Columns[0].MinimumWidth = 100;
+                    dgv.Columns[1].FillWeight = 100;
+                    dgv.Columns[1].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+                    dgv.Dock = DockStyle.Top;
+                    dgv.AllowUserToAddRows = false;
+                    dgv.AllowUserToDeleteRows = false;
+                    dgv.RowHeadersVisible = false;
+                    dgv.ColumnHeadersVisible = false;
+                    dgv.CellEndEdit += onCellEndEdit;
+                    panel1.Controls.Add(dgv);
+                    Label l = new Label();
+                    l.Text = main_form.componentType2Name(cmp);
+                    l.Dock = DockStyle.Top;
+                    l.Tag = dgv;
+                    dgv.Margin = new Padding(0);
+                    l.MouseClick += (a, b) =>
                     {
-                        DataGridView tmp = ((a as Label).Tag as DataGridView);
-                        if (tmp.Visible)
-                            tmp.Hide();
-                        else
-                            tmp.Show();
-                    }
-                    else if ((b as MouseEventArgs).Button == MouseButtons.Right)
-                    {
-                        m_selected_component = (uint)((a as Control).Tag as Control).Tag;
-                        componentContextMenu.Show(a as Control, 0, (a as Control).Size.Height);
-                    }
-                };
-                panel1.Controls.Add(l);
+                        if ((b as MouseEventArgs).Button == MouseButtons.Left)
+                        {
+                            DataGridView tmp = ((a as Label).Tag as DataGridView);
+                            if (tmp.Visible)
+                                tmp.Hide();
+                            else
+                                tmp.Show();
+                        }
+                        else if ((b as MouseEventArgs).Button == MouseButtons.Right)
+                        {
+                            m_selected_component = (uint)((a as Control).Tag as Control).Tag;
+                            componentContextMenu.Show(a as Control, 0, (a as Control).Size.Height);
+                        }
+                    };
+                    panel1.Controls.Add(l);
 
-                server.requestComponentProperties(cmp);  
+                    server.requestComponentProperties(cmp);
+                }
+                server.requestPosition();
             }
-
-            server.requestPosition();
         }
 
         void dgv_CurrentCellDirtyStateChanged(object sender, EventArgs e)

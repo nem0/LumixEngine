@@ -364,6 +364,7 @@ void EditorServer::gameModeLoop()
 
 void EditorServer::runGameMode()
 {
+	selectEntity(Entity::INVALID);
 	MemoryStream stream;
 	save(stream);
 	m_is_game_mode = true;
@@ -920,10 +921,14 @@ void EditorServer::selectEntity(Entity e)
 			m_stream.write(cmps[i].type);
 		}
 		m_response_callback(m_stream.getBuffer(), m_stream.getBufferSize());
-		/*m_mouse_mode = MouseMode::TRANSFORM;
-		m_gizmo.startTransform(x, y, Gizmo::TransformMode::CAMERA_XZ, m_renderer, m_camera);*/
 	}
-
+	else
+	{
+		m_stream.flush();
+		m_stream.write(1);
+		m_stream.write(-1);
+		m_response_callback(m_stream.getBuffer(), m_stream.getBufferSize());
+	}
 }
 
 
