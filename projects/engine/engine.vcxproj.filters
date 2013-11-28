@@ -13,9 +13,6 @@
     <Filter Include="detour">
       <UniqueIdentifier>{7b62410b-763f-475d-974d-aa9699e97316}</UniqueIdentifier>
     </Filter>
-    <Filter Include="AI">
-      <UniqueIdentifier>{6b1a8d41-dbe3-4718-b4d7-7c3c1ce4a7e5}</UniqueIdentifier>
-    </Filter>
     <Filter Include="script">
       <UniqueIdentifier>{1687822c-73d0-4a28-9c22-71b902c329eb}</UniqueIdentifier>
     </Filter>
@@ -65,9 +62,6 @@
     </ClCompile>
     <ClCompile Include="..\..\src\detour\DetourNode.cpp">
       <Filter>detour</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\ai\navigation.cpp">
-      <Filter>AI</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\detour\DebugDraw.cpp">
       <Filter>detour</Filter>
@@ -187,9 +181,6 @@
     </ClInclude>
     <ClInclude Include="..\..\src\detour\DetourStatus.h">
       <Filter>detour</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\ai\navigation.h">
-      <Filter>AI</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\detour\DebugDraw.h">
       <Filter>detour</Filter>

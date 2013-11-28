@@ -628,4 +628,11 @@ bool Navigation::load(const char path[])
 
 
 
+extern "C" IPlugin* createPlugin()
+{
+	return new Navigation();
+}
+
+
+
 }

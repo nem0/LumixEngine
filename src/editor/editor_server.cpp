@@ -14,7 +14,6 @@
 #include "core/json_serializer.h"
 #include "graphics/renderer.h"
 #include "universe/universe.h"
-#include "ai/navigation.h"
 #include "universe/entity_moved_event.h"
 #include "universe/entity_destroyed_event.h"
 #include "script\script_system.h"
@@ -124,7 +123,6 @@ private:
 		AnimationSystem* m_animation_system;
 		ScriptSystem* m_script_system;
 		Universe* m_universe;
-		Navigation m_navigation;
 		vector<IPlugin*> m_plugins;
 		ResponceCallback m_response_callback;
 		MemoryStream m_stream;
@@ -350,7 +348,6 @@ void EditorServer::gameModeLoop()
 
 			float dt = 0.05f;
 			m_script_system->update(dt);
-			m_navigation.update(dt);
 			for(int i = 0; i < m_plugins.size(); ++i)
 			{
 				m_plugins[i]->update(dt);
@@ -651,7 +648,6 @@ bool EditorServer::create(HWND hwnd, const char* base_path)
 	RECT rect;
 	m_script_system = new ScriptSystem();
 	m_script_system->setRenderer(m_renderer);
-	m_script_system->setNavigation(&m_navigation);
 	GetWindowRect(hwnd, &rect);
 	if(!m_renderer->create(&m_fs, rect.right - rect.left, rect.bottom - rect.top, base_path))
 	{
@@ -664,6 +660,7 @@ bool EditorServer::create(HWND hwnd, const char* base_path)
 	glPopAttrib();
 	
 	loadPlugin("physics.dll");
+	loadPlugin("navigation.dll");
 
 	EditorIcon::createResources(base_path);
 
@@ -680,14 +677,19 @@ bool EditorServer::create(HWND hwnd, const char* base_path)
 bool EditorServer::loadPlugin(const char* plugin_name)
 {
 	typedef IPlugin* (*PluginCreator)();
-	HMODULE lib = LoadLibrary(TEXT("physics.dll"));
+	HMODULE lib = LoadLibrary(TEXT(plugin_name));
 	if(lib)
 	{
 		PluginCreator creator = (PluginCreator)GetProcAddress(lib, TEXT("createPlugin"));
 		if(creator)
 		{
 			IPlugin* plugin = creator();
-			plugin->create(m_component_properties, m_creators);
+			if(!plugin->create(m_component_properties, m_creators))
+			{
+				delete plugin;
+				assert(false);
+				return false;
+			}
 			m_plugins.push_back(plugin);
 			return true;
 		}

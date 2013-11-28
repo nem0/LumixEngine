@@ -111,7 +111,8 @@ bool PhysicsSystem::create(EditorPropertyMap& properties, ComponentCreatorList& 
 	
 	m_impl->controller_manager = PxCreateControllerManager(*m_impl->foundation);
 	m_impl->cooking = PxCreateCooking(PX_PHYSICS_VERSION, *m_impl->foundation, physx::PxCookingParams());
-	return m_impl->connect2VisualDebugger();
+	m_impl->connect2VisualDebugger();
+	return true;
 }
 
 
