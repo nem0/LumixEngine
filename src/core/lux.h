@@ -18,6 +18,13 @@
 #endif
 
 
+#ifdef BUILDING_NAVIGATION
+#define LUX_NAVIGATION_API __declspec(dllexport)
+#else
+#define LUX_NAVIGATION_API __declspec(dllimport)
+#endif
+
+
 #ifdef BUILDING_ENGINE
 #define LUX_ENGINE_API __declspec(dllexport)
 #else

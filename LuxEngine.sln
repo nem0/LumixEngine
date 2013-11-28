@@ -24,6 +24,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "physics", "projects\physics
 		{575E3E55-7662-4D79-92C4-2CF77C56E3EA} = {575E3E55-7662-4D79-92C4-2CF77C56E3EA}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "navigation", "projects\navigation\navigation.vcxproj", "{4E43FCF5-D5BE-4B75-A75D-964C747D5826}"
+	ProjectSection(ProjectDependencies) = postProject
+		{575E3E55-7662-4D79-92C4-2CF77C56E3EA} = {575E3E55-7662-4D79-92C4-2CF77C56E3EA}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -84,6 +89,16 @@ Global
 		{13B10E62-BBE6-4B9C-86D0-F90141319326}.Release|Mixed Platforms.Build.0 = Release|Win32
 		{13B10E62-BBE6-4B9C-86D0-F90141319326}.Release|Win32.ActiveCfg = Release|Win32
 		{13B10E62-BBE6-4B9C-86D0-F90141319326}.Release|Win32.Build.0 = Release|Win32
+		{4E43FCF5-D5BE-4B75-A75D-964C747D5826}.Debug|Any CPU.ActiveCfg = Debug|Win32
+		{4E43FCF5-D5BE-4B75-A75D-964C747D5826}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32
+		{4E43FCF5-D5BE-4B75-A75D-964C747D5826}.Debug|Mixed Platforms.Build.0 = Debug|Win32
+		{4E43FCF5-D5BE-4B75-A75D-964C747D5826}.Debug|Win32.ActiveCfg = Debug|Win32
+		{4E43FCF5-D5BE-4B75-A75D-964C747D5826}.Debug|Win32.Build.0 = Debug|Win32
+		{4E43FCF5-D5BE-4B75-A75D-964C747D5826}.Release|Any CPU.ActiveCfg = Release|Win32
+		{4E43FCF5-D5BE-4B75-A75D-964C747D5826}.Release|Mixed Platforms.ActiveCfg = Release|Win32
+		{4E43FCF5-D5BE-4B75-A75D-964C747D5826}.Release|Mixed Platforms.Build.0 = Release|Win32
+		{4E43FCF5-D5BE-4B75-A75D-964C747D5826}.Release|Win32.ActiveCfg = Release|Win32
+		{4E43FCF5-D5BE-4B75-A75D-964C747D5826}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
