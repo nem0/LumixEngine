@@ -86,28 +86,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\animation\animation_system.cpp" />
-    <ClCompile Include="..\..\src\detour\DebugDraw.cpp" />
-    <ClCompile Include="..\..\src\detour\DetourAlloc.cpp" />
-    <ClCompile Include="..\..\src\detour\DetourCommon.cpp" />
-    <ClCompile Include="..\..\src\detour\DetourDebugDraw.cpp" />
-    <ClCompile Include="..\..\src\detour\DetourNavMesh.cpp" />
-    <ClCompile Include="..\..\src\detour\DetourNavMeshBuilder.cpp" />
-    <ClCompile Include="..\..\src\detour\DetourNavMeshQuery.cpp" />
-    <ClCompile Include="..\..\src\detour\DetourNode.cpp" />
-    <ClCompile Include="..\..\src\detour\DetourTileCache.cpp" />
-    <ClCompile Include="..\..\src\detour\DetourTileCacheBuilder.cpp" />
-    <ClCompile Include="..\..\src\detour\Recast.cpp" />
-    <ClCompile Include="..\..\src\detour\RecastAlloc.cpp" />
-    <ClCompile Include="..\..\src\detour\RecastArea.cpp" />
-    <ClCompile Include="..\..\src\detour\RecastContour.cpp" />
-    <ClCompile Include="..\..\src\detour\RecastDebugDraw.cpp" />
-    <ClCompile Include="..\..\src\detour\RecastDump.cpp" />
-    <ClCompile Include="..\..\src\detour\RecastFilter.cpp" />
-    <ClCompile Include="..\..\src\detour\RecastLayers.cpp" />
-    <ClCompile Include="..\..\src\detour\RecastMesh.cpp" />
-    <ClCompile Include="..\..\src\detour\RecastMeshDetail.cpp" />
-    <ClCompile Include="..\..\src\detour\RecastRasterization.cpp" />
-    <ClCompile Include="..\..\src\detour\RecastRegion.cpp" />
     <ClCompile Include="..\..\src\editor\editor_icon.cpp" />
     <ClCompile Include="..\..\src\editor\editor_server.cpp" />
     <ClCompile Include="..\..\src\editor\gizmo.cpp" />
@@ -125,23 +103,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\animation\animation_system.h" />
-    <ClInclude Include="..\..\src\detour\DebugDraw.h" />
-    <ClInclude Include="..\..\src\detour\DetourAlloc.h" />
-    <ClInclude Include="..\..\src\detour\DetourAssert.h" />
-    <ClInclude Include="..\..\src\detour\DetourCommon.h" />
-    <ClInclude Include="..\..\src\detour\DetourDebugDraw.h" />
-    <ClInclude Include="..\..\src\detour\DetourNavMesh.h" />
-    <ClInclude Include="..\..\src\detour\DetourNavMeshBuilder.h" />
-    <ClInclude Include="..\..\src\detour\DetourNavMeshQuery.h" />
-    <ClInclude Include="..\..\src\detour\DetourNode.h" />
-    <ClInclude Include="..\..\src\detour\DetourStatus.h" />
-    <ClInclude Include="..\..\src\detour\DetourTileCache.h" />
-    <ClInclude Include="..\..\src\detour\DetourTileCacheBuilder.h" />
-    <ClInclude Include="..\..\src\detour\Recast.h" />
-    <ClInclude Include="..\..\src\detour\RecastAlloc.h" />
-    <ClInclude Include="..\..\src\detour\RecastAssert.h" />
-    <ClInclude Include="..\..\src\detour\RecastDebugDraw.h" />
-    <ClInclude Include="..\..\src\detour\RecastDump.h" />
     <ClInclude Include="..\..\src\editor\editor_icon.h" />
     <ClInclude Include="..\..\src\editor\editor_server.h" />
     <ClInclude Include="..\..\src\editor\gizmo.h" />

@@ -10,9 +10,6 @@
     <Filter Include="editor">
       <UniqueIdentifier>{69a0e835-15da-4c43-a0ed-57a169bbe67f}</UniqueIdentifier>
     </Filter>
-    <Filter Include="detour">
-      <UniqueIdentifier>{7b62410b-763f-475d-974d-aa9699e97316}</UniqueIdentifier>
-    </Filter>
     <Filter Include="script">
       <UniqueIdentifier>{1687822c-73d0-4a28-9c22-71b902c329eb}</UniqueIdentifier>
     </Filter>
@@ -44,72 +41,6 @@
     </ClCompile>
     <ClCompile Include="..\..\src\editor\property_descriptor.cpp">
       <Filter>editor</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\detour\DetourAlloc.cpp">
-      <Filter>detour</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\detour\DetourCommon.cpp">
-      <Filter>detour</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\detour\DetourNavMesh.cpp">
-      <Filter>detour</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\detour\DetourNavMeshBuilder.cpp">
-      <Filter>detour</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\detour\DetourNavMeshQuery.cpp">
-      <Filter>detour</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\detour\DetourNode.cpp">
-      <Filter>detour</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\detour\DebugDraw.cpp">
-      <Filter>detour</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\detour\DetourDebugDraw.cpp">
-      <Filter>detour</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\detour\RecastDebugDraw.cpp">
-      <Filter>detour</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\detour\RecastDump.cpp">
-      <Filter>detour</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\detour\Recast.cpp">
-      <Filter>detour</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\detour\RecastAlloc.cpp">
-      <Filter>detour</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\detour\RecastArea.cpp">
-      <Filter>detour</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\detour\RecastContour.cpp">
-      <Filter>detour</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\detour\RecastFilter.cpp">
-      <Filter>detour</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\detour\RecastLayers.cpp">
-      <Filter>detour</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\detour\RecastMesh.cpp">
-      <Filter>detour</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\detour\RecastMeshDetail.cpp">
-      <Filter>detour</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\detour\RecastRasterization.cpp">
-      <Filter>detour</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\detour\RecastRegion.cpp">
-      <Filter>detour</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\detour\DetourTileCache.cpp">
-      <Filter>detour</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\detour\DetourTileCacheBuilder.cpp">
-      <Filter>detour</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\universe\entity_destroyed_event.cpp">
       <Filter>universe</Filter>
@@ -157,57 +88,6 @@
     </ClInclude>
     <ClInclude Include="..\..\src\editor\editor_icon.h">
       <Filter>editor</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\detour\DetourAlloc.h">
-      <Filter>detour</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\detour\DetourAssert.h">
-      <Filter>detour</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\detour\DetourCommon.h">
-      <Filter>detour</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\detour\DetourNavMesh.h">
-      <Filter>detour</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\detour\DetourNavMeshBuilder.h">
-      <Filter>detour</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\detour\DetourNavMeshQuery.h">
-      <Filter>detour</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\detour\DetourNode.h">
-      <Filter>detour</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\detour\DetourStatus.h">
-      <Filter>detour</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\detour\DebugDraw.h">
-      <Filter>detour</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\detour\DetourDebugDraw.h">
-      <Filter>detour</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\detour\RecastDebugDraw.h">
-      <Filter>detour</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\detour\RecastDump.h">
-      <Filter>detour</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\detour\Recast.h">
-      <Filter>detour</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\detour\RecastAlloc.h">
-      <Filter>detour</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\detour\RecastAssert.h">
-      <Filter>detour</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\detour\DetourTileCache.h">
-      <Filter>detour</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\detour\DetourTileCacheBuilder.h">
-      <Filter>detour</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\universe\entity_destroyed_event.h">
       <Filter>universe</Filter>
