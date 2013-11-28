@@ -29,10 +29,10 @@ namespace Lux
 			void destroy();
 
 			void update(float dt);
-			float getActionValue(unsigned int action);
+			float getActionValue(uint32_t action);
 			void injectMouseXMove(float value);
 			void injectMouseYMove(float value);
-			void addAction(unsigned int action, InputType type, int key);
+			void addAction(uint32_t action, InputType type, int key);
 
 		private:
 			struct InputSystemImpl* m_impl;

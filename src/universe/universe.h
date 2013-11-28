@@ -41,7 +41,7 @@ struct LUX_ENGINE_API Entity LUX_FINAL
 	void setRotation(const Quat& rot);
 	void translate(const Vec3& t);
 	bool isValid() const { return index >= 0; }
-	const Component& getComponent(unsigned int type);
+	const Component& getComponent(uint32_t type);
 	const ComponentList& getComponents() const;
 	bool existsInUniverse() const;
 
@@ -56,10 +56,10 @@ struct LUX_ENGINE_API Entity LUX_FINAL
 
 struct LUX_ENGINE_API Component LUX_FINAL
 {
-	typedef unsigned int Type;
+	typedef uint32_t Type;
 
 	Component() { index = -1; }
-	Component(Entity _entity, unsigned int _type, void* _system, int _index)
+	Component(Entity _entity, uint32_t _type, void* _system, int _index)
 		: entity(_entity)
 		, type(_type)
 		, system(_system)

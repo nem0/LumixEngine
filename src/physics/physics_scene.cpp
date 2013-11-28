@@ -50,8 +50,8 @@ struct PhysicsSceneImpl
 };
 
 
-static const unsigned int physical_type = crc32("physical");
-static const unsigned int controller_type = crc32("physical_controller");
+static const uint32_t physical_type = crc32("physical");
+static const uint32_t controller_type = crc32("physical_controller");
 
 
 struct OutputStream : public physx::PxOutputStream
@@ -377,14 +377,14 @@ void PhysicsSceneImpl::createTriMesh(const char* path, physx::PxTriangleMeshGeom
 	{
 		vector<Vec3> verts;
 		int num_verts, num_indices;
-		vector<unsigned int> tris;
+		vector<uint32_t> tris;
 
 		fread(&num_verts, sizeof(num_verts), 1, fp);
 		verts.resize(num_verts);
 		fread(&verts[0], sizeof(Vec3), num_verts, fp);
 		fread(&num_indices, sizeof(num_indices), 1, fp);
 		tris.resize(num_indices);
-		fread(&tris[0], sizeof(unsigned int), num_indices, fp);
+		fread(&tris[0], sizeof(uint32_t), num_indices, fp);
 		physx::PxTriangleMeshDesc meshDesc;
 		meshDesc.points.count = num_verts;
 		meshDesc.points.stride = sizeof(physx::PxVec3);

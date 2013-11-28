@@ -11,7 +11,7 @@ namespace Lux
 
 H3DRes EditorIcon::s_geom;
 H3DRes EditorIcon::s_materials[2];
-static const unsigned int point_light_type = crc32("point_light");
+static const uint32_t point_light_type = crc32("point_light");
 
 void EditorIcon::create(Entity& entity, const Component& cmp)
 {

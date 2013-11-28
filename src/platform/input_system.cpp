@@ -14,7 +14,7 @@ namespace Lux
 			InputSystem::InputType type;
 			int key;
 		};
-		map<unsigned int, Action> m_actions;
+		map<uint32_t, Action> m_actions;
 		float m_mouse_rel_x;
 		float m_mouse_rel_y;
 	};
@@ -54,7 +54,7 @@ namespace Lux
 	}
 
 
-	void InputSystem::addAction(unsigned int action, InputType type, int key)
+	void InputSystem::addAction(uint32_t action, InputType type, int key)
 	{
 		InputSystemImpl::Action value;
 		value.key = key;
@@ -63,7 +63,7 @@ namespace Lux
 	}
 
 
-	float InputSystem::getActionValue(unsigned int action)
+	float InputSystem::getActionValue(uint32_t action)
 	{
 		InputSystemImpl::Action value;
 		if(m_impl->m_actions.find(action, value))

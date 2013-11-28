@@ -1,7 +1,7 @@
 #include "core/crc32.h"
 
 
-unsigned int crc32Table[256] =
+uint32_t crc32Table[256] =
 {
 	0x00000000, 0x77073096, 0xEE0E612C, 0x990951BA, 0x076DC419, 0x706AF48F, 0xE963A535, 0x9E6495A3,
 	0x0EDB8832, 0x79DCB8A4, 0xE0D5E91E, 0x97D2D988, 0x09B64C2B, 0x7EB17CBD, 0xE7B82D07, 0x90BF1D91,
@@ -38,10 +38,10 @@ unsigned int crc32Table[256] =
 };
 
 
-unsigned int crc32(const void* data, int length)
+uint32_t crc32(const void* data, int length)
 {
 	const char* c = static_cast<const char*>(data);
-	unsigned int crc = 0xffffFFFF;
+	uint32_t crc = 0xffffFFFF;
 	int len = length;
 	while(len)
 	{
@@ -53,10 +53,10 @@ unsigned int crc32(const void* data, int length)
 }
 
 
-unsigned int crc32(const char str[])
+uint32_t crc32(const char str[])
 {
 	const char* c = str;
-	unsigned int crc = 0xffffFFFF;
+	uint32_t crc = 0xffffFFFF;
 	while(*c)
 	{
 		crc = (crc >> 8) ^ crc32Table[crc & 0xFF ^ *c];		

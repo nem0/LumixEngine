@@ -87,9 +87,9 @@ class EditorServer
 		void renderScene();
 		void save(const char path[]);
 		void load(const char path[]);
-		void addComponent(unsigned int type_crc);
-		void sendComponent(unsigned int type_crc);
-		void removeComponent(unsigned int type_crc);
+		void addComponent(uint32_t type_crc);
+		void sendComponent(uint32_t type_crc);
+		void removeComponent(uint32_t type_crc);
 		void sendEntityPosition(int uid);
 		void setEntityPosition(int uid, float* pos);
 		void addEntity();
@@ -106,7 +106,7 @@ class EditorServer
 		void load(IStream& stream);
 
 private:
-		const PropertyDescriptor& getPropertyDescriptor(unsigned int type, const char* name);
+		const PropertyDescriptor& getPropertyDescriptor(uint32_t type, const char* name);
 		H3DNode castRay(int x, int y, Vec3& hit_pos, char* name, int max_name_size);
 		void registerProperties();
 		void rotateCamera(int x, int y);
@@ -139,6 +139,15 @@ private:
 		Mutex m_message_mutex;
 		TCPFileSystem m_fs;
 };
+
+
+static const uint32_t renderable_type = crc32("renderable");
+static const uint32_t physical_type = crc32("physical");
+static const uint32_t camera_type = crc32("camera");
+static const uint32_t point_light_type = crc32("point_light");
+static const uint32_t physical_controller_type = crc32("physical_controller");
+static const uint32_t script_type = crc32("script");
+static const uint32_t animable_type = crc32("animable");
 
 
 void EditorServer::registerProperties()
@@ -260,15 +269,6 @@ void EditorServer::save(IStream& stream)
 	serializer.serialize("cam_rot_z", m_camera_rot.z);
 	serializer.serialize("cam_rot_w", m_camera_rot.w);
 }
-
-
-static const unsigned int renderable_type = crc32("renderable");
-static const unsigned int physical_type = crc32("physical");
-static const unsigned int camera_type = crc32("camera");
-static const unsigned int point_light_type = crc32("point_light");
-static const unsigned int physical_controller_type = crc32("physical_controller");
-static const unsigned int script_type = crc32("script");
-static const unsigned int animable_type = crc32("animable");
 
 
 void EditorServer::addEntity()
@@ -400,7 +400,7 @@ void EditorServer::runGameMode()
 }
 
 
-void EditorServer::sendComponent(unsigned int type_crc)
+void EditorServer::sendComponent(uint32_t type_crc)
 {
 	if(m_selected_entity.isValid())
 	{
@@ -454,7 +454,7 @@ void EditorServer::sendEntityPosition(int uid)
 }
 
 
-void EditorServer::addComponent(unsigned int type_crc)
+void EditorServer::addComponent(uint32_t type_crc)
 {
 	if(m_selected_entity.isValid())
 	{
@@ -549,7 +549,7 @@ void EditorServer::removeEntity()
 }
 
 
-void EditorServer::removeComponent(unsigned int type_crc)
+void EditorServer::removeComponent(uint32_t type_crc)
 {
 	const Entity::ComponentList& cmps = m_selected_entity.getComponents();
 	Component cmp;
@@ -805,7 +805,7 @@ void EditorServer::navigate(float forward, float right, int fast)
 }
 
 
-const PropertyDescriptor& EditorServer::getPropertyDescriptor(unsigned int type, const char* name)
+const PropertyDescriptor& EditorServer::getPropertyDescriptor(uint32_t type, const char* name)
 {
 	vector<PropertyDescriptor>& props = m_component_properties[type];
 	for(int i = 0; i < props.size(); ++i)
@@ -824,7 +824,7 @@ void EditorServer::setProperty(void* data, int size)
 {
 	MemoryStream stream;
 	stream.create(data, size);
-	unsigned int component_type;
+	uint32_t component_type;
 	stream.read(component_type);
 	Component cmp = Component::INVALID;
 	if(m_selected_entity.isValid())
@@ -975,10 +975,6 @@ void EditorServer::onEvent(void* data, Event& evt)
 
 void EditorServer::onEvent(Event& evt)
 {
-	static const unsigned int point_light_type = crc32("point_light");
-	static const unsigned int camera_type = crc32("camera");
-	static const unsigned int rend_type = crc32("renderable");
-	static const unsigned int physical_type = crc32("physical");
 	if(evt.getType() == ComponentEvent::type)
 	{
 		ComponentEvent& e = static_cast<ComponentEvent&>(evt);
@@ -997,7 +993,7 @@ void EditorServer::onEvent(Event& evt)
 			bool found = false;
 			for(int i = 0; i < cmps.size(); ++i)
 			{
-				if(cmps[i].type == rend_type)
+				if(cmps[i].type == renderable_type)
 				{
 					found = true;
 					break;
@@ -1228,13 +1224,13 @@ extern "C" LUX_ENGINE_API void __stdcall luxServerMessage(void* ptr, void* msgpt
 			server->load(reinterpret_cast<char*>(&msg[1]));
 			break;
 		case MessageType::ADD_COMPONENT:
-			server->addComponent(*reinterpret_cast<unsigned int*>(&msg[1]));
+			server->addComponent(*reinterpret_cast<uint32_t*>(&msg[1]));
 			break;
 		case MessageType::GET_PROPERTIES:
-			server->sendComponent(*reinterpret_cast<unsigned int*>(&msg[1]));
+			server->sendComponent(*reinterpret_cast<uint32_t*>(&msg[1]));
 			break;
 		case MessageType::REMOVE_COMPONENT:
-			server->removeComponent(*reinterpret_cast<unsigned int*>(&msg[1]));
+			server->removeComponent(*reinterpret_cast<uint32_t*>(&msg[1]));
 			break;
 		case MessageType::ADD_ENTITY:
 			server->addEntity();

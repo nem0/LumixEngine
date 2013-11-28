@@ -13,7 +13,7 @@ namespace Lux
 class LUX_CORE_API Event
 {
 	public:
-		typedef unsigned int Type;
+		typedef uint32_t Type;
 
 	public:
 		Type getType() const { return m_type; }
@@ -31,7 +31,7 @@ class LUX_CORE_API EventManager
 		void emitEvent(Event& event);
 
 	private:
-		typedef unsigned int EventType;
+		typedef uint32_t EventType;
 
 		struct Listener
 		{
