@@ -350,13 +350,20 @@ namespace editor_ng.native
         }
 
         public event EventHandler onLogMessage;
+        public class LegMessageEventArgs : EventArgs
+        {
+            public string system;
+            public string message;
+        }
 
         private void logMessage(BinaryReader reader)
         {
-            string message = readString(reader);
+            LegMessageEventArgs e = new LegMessageEventArgs();
+            e.system = readString(reader);
+            e.message = readString(reader);
             if (onLogMessage != null)
             {
-                onLogMessage(message, null);
+                onLogMessage(this, e);
             }
         }
 

@@ -23,9 +23,10 @@ namespace editor_ng.Log
             InitializeComponent();
         }
 
-        void onLogMessage(object sender, EventArgs e)
+        void onLogMessage(object sender, EventArgs args)
         {
-            dataGridView1.Rows.Add(new [] { sender as string});
+            native.EditorServer.LegMessageEventArgs e = args as native.EditorServer.LegMessageEventArgs;
+            dataGridView1.Rows.Add(new [] {e.system, e.message});
         }
     }
 }
