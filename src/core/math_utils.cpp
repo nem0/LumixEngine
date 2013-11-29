@@ -7,7 +7,12 @@ namespace Lux
 
 Vec3 getRayPlaneIntersecion(const Vec3& origin, const Vec3& dir, const Vec3& plane_point, const Vec3& normal)
 {
-	float d = dotProduct(plane_point - origin, normal) / dotProduct(dir, normal);
+	float d = dotProduct(dir, normal);
+	if(d == 0) 
+	{
+		return origin;
+	}
+	d = dotProduct(plane_point - origin, normal) / d;
 	return dir * d + origin;
 }
 
