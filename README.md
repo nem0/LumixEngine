@@ -6,7 +6,6 @@ LuxEngine
 TODO
 =========
 * Entity names
-* physics and navigation as DLLs
 * Path class
 * script compilation in editor, not in engine
 * new renderer (no 3rd party)
