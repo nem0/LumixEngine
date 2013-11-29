@@ -349,6 +349,18 @@ namespace editor_ng.native
             }
         }
 
+        public event EventHandler onLogMessage;
+
+        private void logMessage(BinaryReader reader)
+        {
+            string message = readString(reader);
+            if (onLogMessage != null)
+            {
+                onLogMessage(message, null);
+            }
+        }
+
+
         private void entityPositionCallback(BinaryReader reader)
         {
             int uid = reader.ReadInt32();
@@ -388,6 +400,9 @@ namespace editor_ng.native
                                 break;
                             case 3:
                                 entityPositionCallback(reader);
+                                break;
+                            case 4:
+                                logMessage(reader);
                                 break;
                         }
                     }

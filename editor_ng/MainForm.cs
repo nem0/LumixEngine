@@ -29,6 +29,7 @@ namespace editor_ng
         FileServer.FileServer m_file_server;
         FileServer.FileServerUI m_file_server_ui;
         Notifications m_notifications;
+        Log.LogUI m_log_ui;
         string m_universe_filename = "";
 
         public MainForm()
@@ -46,6 +47,7 @@ namespace editor_ng
             m_property_grid.main_form = this;
 
             m_server = new native.EditorServer(m_scene_view.panel1.Handle, System.IO.Directory.GetCurrentDirectory());
+            m_log_ui = new Log.LogUI(m_server);
             m_file_server.start();
             m_asset_monitor.server = m_server;
             m_scene_view.server = m_server;
@@ -58,6 +60,7 @@ namespace editor_ng
             m_dock_contents.Add(m_asset_list);
             m_dock_contents.Add(m_property_grid);
             m_dock_contents.Add(m_file_server_ui);
+            m_dock_contents.Add(m_log_ui);
             if (System.IO.File.Exists("layout.xml"))
             {
                 dockPanel.LoadFromXml("layout.xml", new DeserializeDockContent(GetContentFromPersistString));
@@ -271,6 +274,11 @@ namespace editor_ng
         {
             m_server.newUniverse();
             m_universe_filename = "";
+        }
+
+        private void logToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            m_log_ui.Show(dockPanel);
         }
     }
 }
