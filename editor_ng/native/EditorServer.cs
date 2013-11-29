@@ -354,11 +354,13 @@ namespace editor_ng.native
         {
             public string system;
             public string message;
+            public int type;
         }
 
         private void logMessage(BinaryReader reader)
         {
             LegMessageEventArgs e = new LegMessageEventArgs();
+            e.type = reader.ReadInt32();
             e.system = readString(reader);
             e.message = readString(reader);
             if (onLogMessage != null)
