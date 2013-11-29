@@ -62,15 +62,11 @@
             // 
             // timeColumn
             // 
-            this.timeColumn.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
-            this.timeColumn.FillWeight = 86.18443F;
             this.timeColumn.HeaderText = "Time";
             this.timeColumn.Name = "timeColumn";
             // 
             // systemColumn
             // 
-            this.systemColumn.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
-            this.systemColumn.FillWeight = 86.18443F;
             this.systemColumn.HeaderText = "System";
             this.systemColumn.Name = "systemColumn";
             // 
