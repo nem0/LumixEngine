@@ -98,6 +98,7 @@ class EditorServer
 		void reloadScript(const char* path);
 		void lookAtSelected();
 		void newUniverse();
+		void logMessage(const char* msg);
 		Entity& getSelectedEntity() { return m_selected_entity; }
 		Mutex& getMessageMutex() { return m_message_mutex; }
 		bool isGameMode() const { return m_is_game_mode; }
@@ -605,6 +606,7 @@ void EditorServer::newUniverse()
 
 void EditorServer::load(IStream& stream)
 {
+	logMessage("map load started...");
 	destroyUniverse();
 	createUniverse(false, "");
 	JsonSerializer serializer(stream, JsonSerializer::READ);
@@ -627,6 +629,7 @@ void EditorServer::load(IStream& stream)
 	m_camera_rot.toMatrix(mtx);
 	mtx.setTranslation(m_camera_pos);
 	m_renderer->setCameraMatrix(mtx);
+	logMessage("map load finished.");
 }
 
 
@@ -912,6 +915,14 @@ void EditorServer::writeString(const char* str)
 	m_stream.write(str, len);
 }
 
+
+void EditorServer::logMessage(const char* msg)
+{
+	m_stream.flush();
+	m_stream.write(4);
+	writeString(msg);
+	m_response_callback(m_stream.getBuffer(), m_stream.getBufferSize());
+}
 
 
 void EditorServer::selectEntity(Entity e)
