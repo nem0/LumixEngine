@@ -40,8 +40,8 @@ static const Component::Type point_light_type = crc32("point_light");
 struct RenderNode
 {
 	RenderNode() {}
-	H3DNode node;
-	int entity;
+	H3DNode m_node;
+	int m_entity;
 };
 
 
@@ -54,22 +54,22 @@ struct RendererImpl
 	void destroyPointLight(Component cmp);
 	void destroyRenderable(Component cmp);
 
-	int					width;
-	int					height;
-	vector<RenderNode>	lights;
-	vector<RenderNode>	renderables;
-	vector<string>		paths;
-	vector<Entity>		entities;
-	H3DRes				pipeline_handle;
-	Universe*			universe;
-	H3DNode				camera_node;
-	int					first_free_renderable;
-	int					first_free_light;
-	string				base_path;
-	IFileSystem*		file_system;
-	H3DRes				loading_res;
-	Renderer*			owner;
-	bool				update_bb;
+	int					m_width;
+	int					m_height;
+	vector<RenderNode>	m_lights;
+	vector<RenderNode>	m_renderables;
+	vector<string>		m_paths;
+	vector<Entity>		m_entities;
+	H3DRes				m_pipeline_handle;
+	Universe*			m_universe;
+	H3DNode				m_camera_node;
+	int					m_first_free_renderable;
+	int					m_first_free_light;
+	string				m_base_path;
+	IFileSystem*		m_file_system;
+	H3DRes				m_loading_res;
+	Renderer*			m_owner;
+	bool				m_update_bb;
 };
 
 
@@ -87,14 +87,14 @@ void Renderer::onResize(int w, int h)
 
 void RendererImpl::onResize(int w, int h)
 {
-	width = w;
-	height = h;
-	h3dResizePipelineBuffers(pipeline_handle, width, height);
-	h3dSetNodeParamI(camera_node, H3DCamera::ViewportXI, 0);
-	h3dSetNodeParamI(camera_node, H3DCamera::ViewportYI, 0);
-	h3dSetNodeParamI(camera_node, H3DCamera::ViewportWidthI, width);
-	h3dSetNodeParamI(camera_node, H3DCamera::ViewportHeightI, height);
-	h3dSetupCameraView(camera_node, 45.0f, (float)width / height, 0.1f, 1000.0f);
+	m_width = w;
+	m_height = h;
+	h3dResizePipelineBuffers(m_pipeline_handle, m_width, m_height);
+	h3dSetNodeParamI(m_camera_node, H3DCamera::ViewportXI, 0);
+	h3dSetNodeParamI(m_camera_node, H3DCamera::ViewportYI, 0);
+	h3dSetNodeParamI(m_camera_node, H3DCamera::ViewportWidthI, m_width);
+	h3dSetNodeParamI(m_camera_node, H3DCamera::ViewportHeightI, m_height);
+	h3dSetupCameraView(m_camera_node, 45.0f, (float)m_width / m_height, 0.1f, 1000.0f);
 }
 
 
@@ -104,26 +104,26 @@ void resourceLoaded(void* user_data, char* file_data, int length, bool success)
 	RendererImpl* renderer = static_cast<RendererImpl*>(user_data);
 	if(success)
 	{
-		renderer->update_bb = true;
-		h3dLoadResource(renderer->loading_res, file_data, length);
-		if(renderer->loading_res == renderer->pipeline_handle)
+		renderer->m_update_bb = true;
+		h3dLoadResource(renderer->m_loading_res, file_data, length);
+		if(renderer->m_loading_res == renderer->m_pipeline_handle)
 		{
-			h3dResizePipelineBuffers(renderer->pipeline_handle, renderer->width, renderer->height);
+			h3dResizePipelineBuffers(renderer->m_pipeline_handle, renderer->m_width, renderer->m_height);
 	//		h3dSetOption( H3DOptions::DebugViewMode, 1 );
 			h3dSetOption( H3DOptions::LoadTextures, 1 );
 			h3dSetOption( H3DOptions::TexCompression, 0 );
 			h3dSetOption( H3DOptions::FastAnimation, 0 );
 			h3dSetOption( H3DOptions::MaxAnisotropy, 4 );
 			h3dSetOption( H3DOptions::ShadowMapSize, 512 );
-			renderer->camera_node = h3dAddCameraNode(H3DRootNode, "", renderer->pipeline_handle);
-			renderer->onResize(renderer->width, renderer->height);
+			renderer->m_camera_node = h3dAddCameraNode(H3DRootNode, "", renderer->m_pipeline_handle);
+			renderer->onResize(renderer->m_width, renderer->m_height);
 		}
-		renderer->loading_res = 0;
+		renderer->m_loading_res = 0;
 		renderer->loadResources();
 	}
 	else
 	{
-		h3dLoadResource(renderer->loading_res, 0, 0);
+		h3dLoadResource(renderer->m_loading_res, 0, 0);
 	}
 }
 
@@ -132,11 +132,11 @@ void RendererImpl::loadResources()
 {
 	H3DRes res = h3dQueryUnloadedResource(0);
 	char path[255]; /// TODO 255 -> platform constant
-	if(res != 0 && res != loading_res)
+	if(res != 0 && res != m_loading_res)
 	{
-		loading_res = res;
-		sprintf_s(path, "%s%s/%s", base_path.c_str(), h3dutGetResourcePath(h3dGetResType(res)), h3dGetResName(res));
-		file_system->openFile(path, &resourceLoaded, this);
+		m_loading_res = res;
+		sprintf_s(path, "%s%s/%s", m_base_path.c_str(), h3dutGetResourcePath(h3dGetResType(res)), h3dGetResName(res));
+		m_file_system->openFile(path, &resourceLoaded, this);
 	}
 }
 
@@ -144,17 +144,17 @@ void RendererImpl::loadResources()
 bool Renderer::create(IFileSystem* fs, int w, int h, const char* base_path)
 {
 	m_impl = new RendererImpl();
-	m_impl->owner = this;
-	m_impl->file_system = fs;
-	m_impl->first_free_renderable = -1;
-	m_impl->first_free_light = -1;
-	m_impl->width = -1;
-	m_impl->height = -1;
-	m_impl->universe = 0;
+	m_impl->m_owner = this;
+	m_impl->m_file_system = fs;
+	m_impl->m_first_free_renderable = -1;
+	m_impl->m_first_free_light = -1;
+	m_impl->m_width = -1;
+	m_impl->m_height = -1;
+	m_impl->m_universe = 0;
 
-	m_impl->base_path = base_path;
-	m_impl->width = w;
-	m_impl->height = h;
+	m_impl->m_base_path = base_path;
+	m_impl->m_width = w;
+	m_impl->m_height = h;
 	
 	if(!h3dInit())
 	{	
@@ -163,7 +163,7 @@ bool Renderer::create(IFileSystem* fs, int w, int h, const char* base_path)
 		h3dutDumpMessages();
 		return false;
 	}
-	m_impl->pipeline_handle = h3dAddResource(H3DResTypes::Pipeline, "pipelines/forward.pipeline.xml", 0);
+	m_impl->m_pipeline_handle = h3dAddResource(H3DResTypes::Pipeline, "pipelines/forward.pipeline.xml", 0);
 	m_impl->loadResources();
 	glUseProgramEXT = (glUseProgramEXT_func)wglGetProcAddress("glUseProgram");
 	glActiveTextureEXT = (glActiveTextureEXT_func)wglGetProcAddress("glActiveTexture");
@@ -181,25 +181,25 @@ void Renderer::destroy()
 
 void Renderer::renderScene()
 {
-	if(m_impl->update_bb && h3dQueryUnloadedResource(0) == 0)
+	if(m_impl->m_update_bb && h3dQueryUnloadedResource(0) == 0)
 	{
 		// update boundingboxes because horde3d does not update them when geometry is loaded
-		for(int i = 0; i < m_impl->renderables.size(); ++i)
+		for(int i = 0; i < m_impl->m_renderables.size(); ++i)
 		{
-			if(m_impl->renderables[i].node == 0)
+			if(m_impl->m_renderables[i].m_node == 0)
 			{
-				H3DRes res = h3dFindResource(H3DResTypes::SceneGraph, m_impl->paths[i].c_str());
-				H3DNode& node = m_impl->renderables[i].node;
+				H3DRes res = h3dFindResource(H3DResTypes::SceneGraph, m_impl->m_paths[i].c_str());
+				H3DNode& node = m_impl->m_renderables[i].m_node;
 				node = h3dAddNodes(H3DRootNode, res);
 				Matrix mtx;
-				Entity(m_impl->universe, m_impl->renderables[i].entity).getMatrix(mtx);
+				Entity(m_impl->m_universe, m_impl->m_renderables[i].m_entity).getMatrix(mtx);
 				h3dSetNodeTransMat(node, &mtx.m11);
-				Entity e(m_impl->universe, m_impl->renderables[i].entity);
+				Entity e(m_impl->m_universe, m_impl->m_renderables[i].m_entity);
 			}
 		}
-		m_impl->update_bb = false;
+		m_impl->m_update_bb = false;
 	}
-	h3dRender(m_impl->camera_node);
+	h3dRender(m_impl->m_camera_node);
 	
 	h3dFinalizeFrame();
 	glUseProgramEXT(0);
@@ -220,46 +220,46 @@ void Renderer::endFrame()
 
 void Renderer::getLightFov(Component cmp, float& fov)
 {
-	fov = h3dGetNodeParamF(m_impl->lights[cmp.index].node, H3DLight::FovF, 0);
+	fov = h3dGetNodeParamF(m_impl->m_lights[cmp.index].m_node, H3DLight::FovF, 0);
 }
 
 
 void Renderer::setLightFov(Component cmp, const float& fov)
 {
-	h3dSetNodeParamF(m_impl->lights[cmp.index].node, H3DLight::FovF, 0, fov);
+	h3dSetNodeParamF(m_impl->m_lights[cmp.index].m_node, H3DLight::FovF, 0, fov);
 }
 
 
 void Renderer::getLightRadius(Component cmp, float& r)
 {
-	r = h3dGetNodeParamF(m_impl->lights[cmp.index].node, H3DLight::RadiusF, 0);
+	r = h3dGetNodeParamF(m_impl->m_lights[cmp.index].m_node, H3DLight::RadiusF, 0);
 }
 
 
 void Renderer::setLightRadius(Component cmp, const float& r)
 {
-	h3dSetNodeParamF(m_impl->lights[cmp.index].node, H3DLight::RadiusF, 0, r);
+	h3dSetNodeParamF(m_impl->m_lights[cmp.index].m_node, H3DLight::RadiusF, 0, r);
 }
 
 
 void Renderer::getMesh(Component cmp, string& str)
 {
-	str = m_impl->paths[cmp.index];
+	str = m_impl->m_paths[cmp.index];
 }
 
 
 void Renderer::setMesh(Component cmp, const string& str)
 {
-	m_impl->paths[cmp.index] = str;
+	m_impl->m_paths[cmp.index] = str;
 	H3DRes res = h3dAddResource(H3DResTypes::SceneGraph, str.c_str(), 0);
 	if(h3dIsResLoaded(res))
 	{
-		H3DNode& node = m_impl->renderables[cmp.index].node;
+		H3DNode& node = m_impl->m_renderables[cmp.index].m_node;
 		node = h3dAddNodes(H3DRootNode, res);
 		Matrix mtx;
-		Entity(m_impl->universe, m_impl->renderables[cmp.index].entity).getMatrix(mtx);
+		Entity(m_impl->m_universe, m_impl->m_renderables[cmp.index].m_entity).getMatrix(mtx);
 		h3dSetNodeTransMat(node, &mtx.m11);
-		Entity e(m_impl->universe, m_impl->renderables[cmp.index].entity);
+		Entity e(m_impl->m_universe, m_impl->m_renderables[cmp.index].m_entity);
 	}
 	m_impl->loadResources();
 }
@@ -267,11 +267,11 @@ void Renderer::setMesh(Component cmp, const string& str)
 
 Component Renderer::getRenderable(Universe& universe, H3DNode node)
 {
-	for(int i = 0; i < m_impl->renderables.size(); ++i)
+	for(int i = 0; i < m_impl->m_renderables.size(); ++i)
 	{
-		if(m_impl->renderables[i].node == node)
+		if(m_impl->m_renderables[i].m_node == node)
 		{
-			Entity e(m_impl->universe, i);
+			Entity e(m_impl->m_universe, i);
 			return Component(e, rend_type, this, i);
 		}
 	}
@@ -281,21 +281,21 @@ Component Renderer::getRenderable(Universe& universe, H3DNode node)
 
 void Renderer::getRay(int x, int y, Vec3& origin, Vec3& dir)
 {
-	h3dutPickRay(m_impl->camera_node, x / (float)m_impl->width, (m_impl->height - y) / (float)m_impl->height, &origin.x, &origin.y, &origin.z, &dir.x, &dir.y, &dir.z);
+	h3dutPickRay(m_impl->m_camera_node, x / (float)m_impl->m_width, (m_impl->m_height - y) / (float)m_impl->m_height, &origin.x, &origin.y, &origin.z, &dir.x, &dir.y, &dir.z);
 }
 
 
 void RendererImpl::postDeserialize()
 {
-	for(int i = 0; i < paths.size(); ++i)
+	for(int i = 0; i < m_paths.size(); ++i)
 	{
-		Entity e(universe, renderables[i].entity);
-		if(paths[i] != "")
+		Entity e(m_universe, m_renderables[i].m_entity);
+		if(m_paths[i] != "")
 		{
-			H3DRes res = h3dAddResource(H3DResTypes::SceneGraph, paths[i].c_str(), 0);
+			H3DRes res = h3dAddResource(H3DResTypes::SceneGraph, m_paths[i].c_str(), 0);
 			if(h3dIsResLoaded(res))
 			{
-				H3DNode& node = renderables[i].node;
+				H3DNode& node = m_renderables[i].m_node;
 				node = h3dAddNodes(H3DRootNode, res);
 				Matrix mtx;
 				e.getMatrix(mtx);
@@ -304,17 +304,17 @@ void RendererImpl::postDeserialize()
 		}
 		if(e.isValid())
 		{
-			universe->getEventManager()->emitEvent(ComponentEvent(Component(e, rend_type, owner, i)));			
+			m_universe->getEventManager()->emitEvent(ComponentEvent(Component(e, rend_type, m_owner, i)));			
 		}
 	}
 	loadResources();
-	for(int i = 0; i < lights.size(); ++i)
+	for(int i = 0; i < m_lights.size(); ++i)
 	{
-		H3DNode& node = lights[i].node;
+		H3DNode& node = m_lights[i].m_node;
 		node = h3dAddLightNode(H3DRootNode, "", 0, "LIGHTING", "SHADOWMAP");
 		Matrix mtx;
-		universe->getRotation(lights[i].entity).toMatrix(mtx);
-		mtx.setTranslation(universe->getPosition(lights[i].entity));
+		m_universe->getRotation(m_lights[i].m_entity).toMatrix(mtx);
+		mtx.setTranslation(m_universe->getPosition(m_lights[i].m_entity));
 		h3dSetNodeTransMat(node, &mtx.m11);
 		h3dSetNodeParamF(node, H3DLight::RadiusF, 0, 20.0f);
 		h3dSetNodeParamF(node, H3DLight::FovF, 0, 90);
@@ -324,8 +324,8 @@ void RendererImpl::postDeserialize()
 		h3dSetNodeParamF(node, H3DLight::ColorF3, 1, 1.0f);
 		h3dSetNodeParamF(node, H3DLight::ColorF3, 2, 1.0f);
 		h3dSetNodeParamF(node, H3DLight::ColorMultiplierF, 0, 1.0f);
-		Entity e(universe, lights[i].entity);
-		universe->getEventManager()->emitEvent(ComponentEvent(Component(e, point_light_type, owner, i)));
+		Entity e(m_universe, m_lights[i].m_entity);
+		m_universe->getEventManager()->emitEvent(ComponentEvent(Component(e, point_light_type, m_owner, i)));
 	}
 }
 
@@ -339,10 +339,10 @@ void Renderer::destroyPointLight(Component cmp)
 void RendererImpl::destroyPointLight(Component cmp)
 {
 	assert(cmp.type == point_light_type);
-	h3dRemoveNode(lights[cmp.index].node);
-	lights[cmp.index].entity = first_free_light; // entity is used for freelist
-	first_free_light = cmp.index;
-	universe->getEventManager()->emitEvent(ComponentEvent(cmp, false));
+	h3dRemoveNode(m_lights[cmp.index].m_node);
+	m_lights[cmp.index].m_entity = m_first_free_light; // entity is used for freelist
+	m_first_free_light = cmp.index;
+	m_universe->getEventManager()->emitEvent(ComponentEvent(cmp, false));
 }
 
 
@@ -355,36 +355,36 @@ void Renderer::destroyRenderable(Component cmp)
 void RendererImpl::destroyRenderable(Component cmp)
 {
 	assert(cmp.type == rend_type);
-	h3dRemoveNode(renderables[cmp.index].node);
-	paths[cmp.index] = "";
-	renderables[cmp.index].entity = first_free_renderable; // entity is used for freelist
-	first_free_renderable = cmp.index;
-	universe->getEventManager()->emitEvent(ComponentEvent(cmp, false));
+	h3dRemoveNode(m_renderables[cmp.index].m_node);
+	m_paths[cmp.index] = "";
+	m_renderables[cmp.index].m_entity = m_first_free_renderable; // entity is used for freelist
+	m_first_free_renderable = cmp.index;
+	m_universe->getEventManager()->emitEvent(ComponentEvent(cmp, false));
 }
 
 
 Component Renderer::createRenderable(Entity entity)
 {
 	int index = -1;
-	if(m_impl->first_free_renderable == -1)
+	if(m_impl->m_first_free_renderable == -1)
 	{
-		m_impl->renderables.push_back_empty();
-		m_impl->renderables.back().entity = entity.index;
-		m_impl->renderables.back().node = 0;
-		m_impl->paths.push_back("");
-		index = m_impl->renderables.size() - 1;
+		m_impl->m_renderables.push_back_empty();
+		m_impl->m_renderables.back().m_entity = entity.index;
+		m_impl->m_renderables.back().m_node = 0;
+		m_impl->m_paths.push_back("");
+		index = m_impl->m_renderables.size() - 1;
 	}
 	else
 	{
-		int next_free = m_impl->renderables[m_impl->first_free_renderable].entity;
-		m_impl->renderables[m_impl->first_free_renderable].node = -1;
-		m_impl->renderables[m_impl->first_free_renderable].entity = entity.index;
-		m_impl->paths[m_impl->first_free_renderable] = "";
-		index = m_impl->first_free_renderable;
-		m_impl->first_free_renderable = next_free;
+		int next_free = m_impl->m_renderables[m_impl->m_first_free_renderable].m_entity;
+		m_impl->m_renderables[m_impl->m_first_free_renderable].m_node = -1;
+		m_impl->m_renderables[m_impl->m_first_free_renderable].m_entity = entity.index;
+		m_impl->m_paths[m_impl->m_first_free_renderable] = "";
+		index = m_impl->m_first_free_renderable;
+		m_impl->m_first_free_renderable = next_free;
 	}
 	Component cmp(entity, rend_type, this, index);
-	m_impl->universe->getEventManager()->emitEvent(ComponentEvent(cmp));
+	m_impl->m_universe->getEventManager()->emitEvent(ComponentEvent(cmp));
 	return cmp;
 }
 
@@ -392,7 +392,7 @@ Component Renderer::createRenderable(Entity entity)
 void Renderer::getCameraMatrix(Matrix& mtx)
 {
 	const float* tmp;
-	h3dGetNodeTransMats(m_impl->camera_node, 0, &tmp);
+	h3dGetNodeTransMats(m_impl->m_camera_node, 0, &tmp);
 	for(int i = 0; i < 16; ++i)
 	{
 		(&mtx.m11)[i] = tmp[i];
@@ -401,13 +401,13 @@ void Renderer::getCameraMatrix(Matrix& mtx)
 
 void Renderer::setCameraMatrix(const Matrix& mtx)
 {
-	h3dSetNodeTransMat(m_impl->camera_node, &mtx.m11);
+	h3dSetNodeTransMat(m_impl->m_camera_node, &mtx.m11);
 }
 
 
 float Renderer::getHalfFovTan()
 {
-	H3DNode node = m_impl->camera_node;
+	H3DNode node = m_impl->m_camera_node;
 	float top = h3dGetNodeParamF(node, H3DCamera::TopPlaneF, 1);
 	float n = h3dGetNodeParamF(node, H3DCamera::NearPlaneF, 1);
 	return top / n;
@@ -417,22 +417,22 @@ float Renderer::getHalfFovTan()
 Component Renderer::createPointLight(Entity entity)
 {
 	int index = -1;
-	if(m_impl->first_free_light == -1)
+	if(m_impl->m_first_free_light == -1)
 	{
-		m_impl->lights.push_back_empty();
-		m_impl->lights.back().entity = entity.index;
-		index = m_impl->lights.size() - 1;
+		m_impl->m_lights.push_back_empty();
+		m_impl->m_lights.back().m_entity = entity.index;
+		index = m_impl->m_lights.size() - 1;
 	}
 	else
 	{
-		int next_free = m_impl->lights[m_impl->first_free_light].entity;
-		m_impl->lights[m_impl->first_free_light].node = -1;
-		m_impl->lights[m_impl->first_free_light].entity = entity.index;
-		index = m_impl->first_free_light;
-		m_impl->first_free_light = next_free;
+		int next_free = m_impl->m_lights[m_impl->m_first_free_light].m_entity;
+		m_impl->m_lights[m_impl->m_first_free_light].m_node = -1;
+		m_impl->m_lights[m_impl->m_first_free_light].m_entity = entity.index;
+		index = m_impl->m_first_free_light;
+		m_impl->m_first_free_light = next_free;
 	}
 
-	H3DNode& node = m_impl->lights[index].node;
+	H3DNode& node = m_impl->m_lights[index].m_node;
 	node = h3dAddLightNode(H3DRootNode, "", 0, "LIGHTING", "SHADOWMAP");
 	Matrix mtx;
 	entity.getMatrix(mtx);
@@ -446,7 +446,7 @@ Component Renderer::createPointLight(Entity entity)
 	h3dSetNodeParamF(node, H3DLight::ColorF3, 2, 1.0f);
 	h3dSetNodeParamF(node, H3DLight::ColorMultiplierF, 0, 1.0f);
 	Component cmp(entity, point_light_type, this, index);
-	m_impl->universe->getEventManager()->emitEvent(ComponentEvent(cmp));
+	m_impl->m_universe->getEventManager()->emitEvent(ComponentEvent(cmp));
 	return cmp;
 }
 
@@ -459,28 +459,28 @@ void onEvent(void* data, Event& event)
 
 void Renderer::setUniverse(Universe* universe)
 {
-	if(m_impl->universe)
+	if(m_impl->m_universe)
 	{
-		for(int i = 0; i < m_impl->renderables.size(); ++i)
+		for(int i = 0; i < m_impl->m_renderables.size(); ++i)
 		{
-			h3dRemoveNode(m_impl->renderables[i].node);
+			h3dRemoveNode(m_impl->m_renderables[i].m_node);
 		}
-		m_impl->renderables.clear();
-		for(int i = 0; i < m_impl->lights.size(); ++i)
+		m_impl->m_renderables.clear();
+		for(int i = 0; i < m_impl->m_lights.size(); ++i)
 		{
-			h3dRemoveNode(m_impl->lights[i].node);
+			h3dRemoveNode(m_impl->m_lights[i].m_node);
 		}
-		m_impl->lights.clear();
-		m_impl->entities.clear();
-		m_impl->paths.clear();
-		m_impl->universe->getEventManager()->unregisterListener(EntityMovedEvent::type, m_impl, &onEvent);
-		m_impl->universe->getEventManager()->unregisterListener(EntityDestroyedEvent::type, m_impl, &onEvent);
+		m_impl->m_lights.clear();
+		m_impl->m_entities.clear();
+		m_impl->m_paths.clear();
+		m_impl->m_universe->getEventManager()->unregisterListener(EntityMovedEvent::type, m_impl, &onEvent);
+		m_impl->m_universe->getEventManager()->unregisterListener(EntityDestroyedEvent::type, m_impl, &onEvent);
 	}
-	m_impl->universe = universe;
-	if(m_impl->universe)
+	m_impl->m_universe = universe;
+	if(m_impl->m_universe)
 	{
-		m_impl->universe->getEventManager()->registerListener(EntityMovedEvent::type, m_impl, &onEvent);
-		m_impl->universe->getEventManager()->registerListener(EntityDestroyedEvent::type, m_impl, &onEvent);
+		m_impl->m_universe->getEventManager()->registerListener(EntityMovedEvent::type, m_impl, &onEvent);
+		m_impl->m_universe->getEventManager()->registerListener(EntityDestroyedEvent::type, m_impl, &onEvent);
 	}
 }
 
@@ -497,13 +497,13 @@ void RendererImpl::onEvent(Event& event)
 			if(cmps[i].type == rend_type)
 			{
 				cmps[i].entity.getMatrix(mtx);
-				h3dSetNodeTransMat(renderables[cmps[i].index].node, &mtx.m11);
+				h3dSetNodeTransMat(m_renderables[cmps[i].index].m_node, &mtx.m11);
 				break;
 			}
 			else if(cmps[i].type == point_light_type)
 			{
 				cmps[i].entity.getMatrix(mtx);
-				h3dSetNodeTransMat(lights[cmps[i].index].node, &mtx.m11);
+				h3dSetNodeTransMat(m_lights[cmps[i].index].m_node, &mtx.m11);
 			}
 		}
 	}
@@ -534,49 +534,49 @@ void RendererImpl::onEvent(Event& event)
 
 const char* Renderer::getBasePath() const
 {
-	return m_impl->base_path.c_str();
+	return m_impl->m_base_path.c_str();
 }
 
 
 int Renderer::getWidth() const
 {
-	return m_impl->width;
+	return m_impl->m_width;
 }
 
 
 int Renderer::getHeight() const
 {
-	return m_impl->height;
+	return m_impl->m_height;
 }
 
 
 H3DNode Renderer::getMeshNode(Component cmp)
 {
-	return m_impl->renderables[cmp.index].node; 
+	return m_impl->m_renderables[cmp.index].m_node; 
 }
 
 
 H3DNode Renderer::getRawCameraNode()
 {
-	return m_impl->camera_node;
+	return m_impl->m_camera_node;
 }
 
 
 void Renderer::serialize(ISerializer& serializer)
 {
-	serializer.serialize("count", m_impl->renderables.size());
+	serializer.serialize("count", m_impl->m_renderables.size());
 	serializer.beginArray("renderables");
-	for(int i = 0; i < m_impl->renderables.size(); ++i)
+	for(int i = 0; i < m_impl->m_renderables.size(); ++i)
 	{
-		serializer.serializeArrayItem(m_impl->renderables[i].entity);
-		serializer.serializeArrayItem(m_impl->paths[i]);
+		serializer.serializeArrayItem(m_impl->m_renderables[i].m_entity);
+		serializer.serializeArrayItem(m_impl->m_paths[i]);
 	}
 	serializer.endArray();
-	serializer.serialize("count", m_impl->lights.size());
+	serializer.serialize("count", m_impl->m_lights.size());
 	serializer.beginArray("lights");
-	for(int i = 0; i < m_impl->lights.size(); ++i)
+	for(int i = 0; i < m_impl->m_lights.size(); ++i)
 	{
-		serializer.serializeArrayItem(m_impl->lights[i].entity);
+		serializer.serializeArrayItem(m_impl->m_lights[i].m_entity);
 	}
 	serializer.endArray();
 }
@@ -585,22 +585,22 @@ void Renderer::deserialize(ISerializer& serializer)
 {
 	int count;
 	serializer.deserialize("count", count);
-	m_impl->renderables.resize(count);
-	m_impl->paths.resize(count);
+	m_impl->m_renderables.resize(count);
+	m_impl->m_paths.resize(count);
 	serializer.deserializeArrayBegin("renderables");
-	for(int i = 0; i < m_impl->paths.size(); ++i)
+	for(int i = 0; i < m_impl->m_paths.size(); ++i)
 	{
-		m_impl->renderables[i].node = 0;
-		serializer.deserializeArrayItem(m_impl->renderables[i].entity);
-		serializer.deserializeArrayItem(m_impl->paths[i]);
+		m_impl->m_renderables[i].m_node = 0;
+		serializer.deserializeArrayItem(m_impl->m_renderables[i].m_entity);
+		serializer.deserializeArrayItem(m_impl->m_paths[i]);
 	}
 	serializer.deserializeArrayEnd();
 	serializer.deserialize("count", count);
-	m_impl->lights.resize(count);
+	m_impl->m_lights.resize(count);
 	serializer.deserializeArrayBegin("lights");
-	for(int i = 0; i < m_impl->lights.size(); ++i)
+	for(int i = 0; i < m_impl->m_lights.size(); ++i)
 	{
-		serializer.deserializeArrayItem(m_impl->lights[i].entity);
+		serializer.deserializeArrayItem(m_impl->m_lights[i].m_entity);
 	}
 	serializer.deserializeArrayEnd();
 	m_impl->postDeserialize();

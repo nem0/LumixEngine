@@ -12,13 +12,13 @@ struct PhysicsSystemImpl
 {
 	bool connect2VisualDebugger();
 
-	physx::PxPhysics*			physics;
-	physx::PxFoundation*		foundation;
-	physx::PxControllerManager*	controller_manager;
-	physx::PxAllocatorCallback*	allocator;
-	physx::PxErrorCallback*		error_callback;
-	physx::PxCooking*			cooking;
-	class PhysicsScene*			scene;
+	physx::PxPhysics*			m_physics;
+	physx::PxFoundation*		m_foundation;
+	physx::PxControllerManager*	m_controller_manager;
+	physx::PxAllocatorCallback*	m_allocator;
+	physx::PxErrorCallback*		m_error_callback;
+	physx::PxCooking*			m_cooking;
+	class PhysicsScene*			m_scene;
 };
 
 
