@@ -40,29 +40,29 @@ struct CustomErrorCallback : public physx::PxErrorCallback
 
 void PhysicsSystem::onCreateUniverse(Universe& universe)
 {
-	m_impl->scene = new PhysicsScene();
-	m_impl->scene->create(*this, universe);
+	m_impl->m_scene = new PhysicsScene();
+	m_impl->m_scene->create(*this, universe);
 
 }
 
 
 void PhysicsSystem::onDestroyUniverse(Universe& universe)
 {
-	m_impl->scene->destroy();
-	delete m_impl->scene;
-	m_impl->scene = 0;
+	m_impl->m_scene->destroy();
+	delete m_impl->m_scene;
+	m_impl->m_scene = 0;
 }
 
 
 void PhysicsSystem::serialize(ISerializer& serializer)
 {
-	m_impl->scene->serialize(serializer);
+	m_impl->m_scene->serialize(serializer);
 }
 
 
 void PhysicsSystem::deserialize(ISerializer& serializer)
 {
-	m_impl->scene->deserialize(serializer);
+	m_impl->m_scene->deserialize(serializer);
 }
 
 
@@ -70,11 +70,11 @@ Component PhysicsSystem::createComponent(uint32_t component_type, const Entity& 
 {
 	if(component_type == controller_type)
 	{
-		return m_impl->scene->createController(entity);
+		return m_impl->m_scene->createController(entity);
 	}
 	else if(component_type == physical_type)
 	{
-		return m_impl->scene->createActor(entity);
+		return m_impl->m_scene->createActor(entity);
 	}
 	return Component::INVALID;
 }
@@ -82,7 +82,7 @@ Component PhysicsSystem::createComponent(uint32_t component_type, const Entity& 
 
 void PhysicsSystem::update(float dt)
 {
-	m_impl->scene->update(dt);
+	m_impl->m_scene->update(dt);
 }
 
 
@@ -95,22 +95,22 @@ bool PhysicsSystem::create(EditorPropertyMap& properties, ComponentCreatorList& 
 	creators.insert(controller_type, this);
 
 	m_impl = new PhysicsSystemImpl;
-	m_impl->allocator = new physx::PxDefaultAllocator();
-	m_impl->error_callback = new CustomErrorCallback();
-	m_impl->foundation = PxCreateFoundation(
+	m_impl->m_allocator = new physx::PxDefaultAllocator();
+	m_impl->m_error_callback = new CustomErrorCallback();
+	m_impl->m_foundation = PxCreateFoundation(
 		PX_PHYSICS_VERSION,
-		*m_impl->allocator,
-		*m_impl->error_callback
+		*m_impl->m_allocator,
+		*m_impl->m_error_callback
 	);
 
-	m_impl->physics = PxCreatePhysics(
+	m_impl->m_physics = PxCreatePhysics(
 		PX_PHYSICS_VERSION,
-		*m_impl->foundation,
+		*m_impl->m_foundation,
 		physx::PxTolerancesScale()
 	);
 	
-	m_impl->controller_manager = PxCreateControllerManager(*m_impl->foundation);
-	m_impl->cooking = PxCreateCooking(PX_PHYSICS_VERSION, *m_impl->foundation, physx::PxCookingParams());
+	m_impl->m_controller_manager = PxCreateControllerManager(*m_impl->m_foundation);
+	m_impl->m_cooking = PxCreateCooking(PX_PHYSICS_VERSION, *m_impl->m_foundation, physx::PxCookingParams());
 	m_impl->connect2VisualDebugger();
 	return true;
 }
@@ -118,12 +118,12 @@ bool PhysicsSystem::create(EditorPropertyMap& properties, ComponentCreatorList& 
 
 void PhysicsSystem::destroy()
 {
-	m_impl->controller_manager->release();
-	m_impl->cooking->release();
-	m_impl->physics->release();
-	m_impl->foundation->release();
-	delete m_impl->allocator;
-	delete m_impl->error_callback;
+	m_impl->m_controller_manager->release();
+	m_impl->m_cooking->release();
+	m_impl->m_physics->release();
+	m_impl->m_foundation->release();
+	delete m_impl->m_allocator;
+	delete m_impl->m_error_callback;
 	delete m_impl;
 	m_impl = 0;
 }
@@ -131,7 +131,7 @@ void PhysicsSystem::destroy()
 
 bool PhysicsSystemImpl::connect2VisualDebugger()
 {
-	if(physics->getPvdConnectionManager() == NULL)
+	if(m_physics->getPvdConnectionManager() == NULL)
 		return false;
 
 	const char* pvd_host_ip = "127.0.0.1";
@@ -139,7 +139,7 @@ bool PhysicsSystemImpl::connect2VisualDebugger()
 	unsigned int timeout = 100; 
 	physx::PxVisualDebuggerConnectionFlags connectionFlags = physx::PxVisualDebuggerExt::getAllConnectionFlags();
 
-	PVD::PvdConnection* theConnection = physx::PxVisualDebuggerExt::createConnection(physics->getPvdConnectionManager(), pvd_host_ip, port, timeout, connectionFlags);
+	PVD::PvdConnection* theConnection = physx::PxVisualDebuggerExt::createConnection(m_physics->getPvdConnectionManager(), pvd_host_ip, port, timeout, connectionFlags);
 	return theConnection != NULL;
 }
 
