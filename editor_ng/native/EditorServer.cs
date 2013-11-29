@@ -11,11 +11,9 @@ namespace editor_ng.native
     public class EditorServer
     {
         [DllImport("engine.dll")]
-        static extern IntPtr luxServerInit(IntPtr hwnd, IntPtr base_path);
+        static extern IntPtr luxServerInit(IntPtr hwnd, IntPtr base_path, IntPtr callback);
         [DllImport("engine.dll")]
         static extern void luxServerMessage(IntPtr server, IntPtr msg, int size);
-        [DllImport("engine.dll")]
-        static extern void luxServerSetCallback(IntPtr server, IntPtr callback);
         [DllImport("engine.dll")]
         static extern void luxServerDraw(IntPtr hwnd, IntPtr server);
         [DllImport("engine.dll")]
@@ -53,15 +51,13 @@ namespace editor_ng.native
         };
         public event EventHandler onComponentProperties;
 
-        public EditorServer(IntPtr hwnd, string base_path)
+        public void create(IntPtr hwnd, string base_path)
         {
             IntPtr strPtr = Marshal.StringToHGlobalAnsi(base_path);
-            m_server = luxServerInit(hwnd, strPtr);
-            Marshal.FreeHGlobal(strPtr);
             m_editor_server_callback = editorServerCallback;
-            luxServerSetCallback(m_server, Marshal.GetFunctionPointerForDelegate(m_editor_server_callback));
+            m_server = luxServerInit(hwnd, strPtr, Marshal.GetFunctionPointerForDelegate(m_editor_server_callback));
+            Marshal.FreeHGlobal(strPtr);
         }
-
 
         public void sendMessage(IntPtr ptr, int length)
         {
@@ -349,6 +345,27 @@ namespace editor_ng.native
             }
         }
 
+        public event EventHandler onLogMessage;
+        public class LegMessageEventArgs : EventArgs
+        {
+            public string system;
+            public string message;
+            public int type;
+        }
+
+        private void logMessage(BinaryReader reader)
+        {
+            LegMessageEventArgs e = new LegMessageEventArgs();
+            e.type = reader.ReadInt32();
+            e.system = readString(reader);
+            e.message = readString(reader);
+            if (onLogMessage != null)
+            {
+                onLogMessage(this, e);
+            }
+        }
+
+
         private void entityPositionCallback(BinaryReader reader)
         {
             int uid = reader.ReadInt32();
@@ -388,6 +405,9 @@ namespace editor_ng.native
                                 break;
                             case 3:
                                 entityPositionCallback(reader);
+                                break;
+                            case 4:
+                                logMessage(reader);
                                 break;
                         }
                     }

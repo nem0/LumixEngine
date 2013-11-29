@@ -66,6 +66,12 @@
     <Compile Include="FileServer\FileServerUI.Designer.cs">
       <DependentUpon>FileServerUI.cs</DependentUpon>
     </Compile>
+    <Compile Include="Log\LogUI.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Log\LogUI.Designer.cs">
+      <DependentUpon>LogUI.cs</DependentUpon>
+    </Compile>
     <Compile Include="MainForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -93,6 +99,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="FileServer\FileServerUI.resx">
       <DependentUpon>FileServerUI.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Log\LogUI.resx">
+      <DependentUpon>LogUI.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="MainForm.resx">
       <DependentUpon>MainForm.cs</DependentUpon>
