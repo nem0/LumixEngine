@@ -35,19 +35,21 @@ namespace editor_ng
         public MainForm()
         {
             InitializeComponent();
+            m_scene_view = new SceneView();
+            m_server = new native.EditorServer();
+            m_log_ui = new Log.LogUI(m_server);
+            m_server.create(m_scene_view.panel1.Handle, System.IO.Directory.GetCurrentDirectory());
             m_notifications = new Notifications(this);
+
             m_file_server = new FileServer.FileServer();
             m_file_server_ui = new FileServer.FileServerUI();
             m_file_server.ui = m_file_server_ui;
             m_asset_monitor = new AssetMonitor();
-            m_scene_view = new SceneView();
             m_asset_list = new AssetList(this);
             m_asset_list.main_form = this;
             m_property_grid = new PropertyGrid();
             m_property_grid.main_form = this;
 
-            m_server = new native.EditorServer(m_scene_view.panel1.Handle, System.IO.Directory.GetCurrentDirectory());
-            m_log_ui = new Log.LogUI(m_server);
             m_file_server.start();
             m_asset_monitor.server = m_server;
             m_scene_view.server = m_server;
