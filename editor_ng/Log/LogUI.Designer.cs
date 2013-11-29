@@ -29,6 +29,8 @@
         private void InitializeComponent()
         {
             this.dataGridView1 = new System.Windows.Forms.DataGridView();
+            this.typeColumn = new System.Windows.Forms.DataGridViewImageColumn();
+            this.timeColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.systemColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.messageColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).BeginInit();
@@ -40,6 +42,8 @@
             this.dataGridView1.AllowUserToDeleteRows = false;
             this.dataGridView1.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             this.dataGridView1.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
+            this.typeColumn,
+            this.timeColumn,
             this.systemColumn,
             this.messageColumn});
             this.dataGridView1.Dock = System.Windows.Forms.DockStyle.Fill;
@@ -49,15 +53,31 @@
             this.dataGridView1.Size = new System.Drawing.Size(558, 294);
             this.dataGridView1.TabIndex = 0;
             // 
+            // typeColumn
+            // 
+            this.typeColumn.HeaderText = "Type";
+            this.typeColumn.Name = "typeColumn";
+            this.typeColumn.ReadOnly = true;
+            this.typeColumn.Width = 40;
+            // 
+            // timeColumn
+            // 
+            this.timeColumn.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
+            this.timeColumn.FillWeight = 86.18443F;
+            this.timeColumn.HeaderText = "Time";
+            this.timeColumn.Name = "timeColumn";
+            // 
             // systemColumn
             // 
             this.systemColumn.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
+            this.systemColumn.FillWeight = 86.18443F;
             this.systemColumn.HeaderText = "System";
             this.systemColumn.Name = "systemColumn";
             // 
             // messageColumn
             // 
             this.messageColumn.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
+            this.messageColumn.FillWeight = 86.18443F;
             this.messageColumn.HeaderText = "Message";
             this.messageColumn.Name = "messageColumn";
             // 
@@ -78,6 +98,8 @@
         #endregion
 
         private System.Windows.Forms.DataGridView dataGridView1;
+        private System.Windows.Forms.DataGridViewImageColumn typeColumn;
+        private System.Windows.Forms.DataGridViewTextBoxColumn timeColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn systemColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn messageColumn;
     }

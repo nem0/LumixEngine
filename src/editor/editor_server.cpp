@@ -28,6 +28,7 @@
 #include "Horde3DUtils.h"
 #include "animation/animation_system.h"
 #include "editor/iplugin.h"
+#include "core/log.h"
 
 
 namespace Lux
@@ -98,7 +99,7 @@ class EditorServer
 		void reloadScript(const char* path);
 		void lookAtSelected();
 		void newUniverse();
-		void logMessage(const char* system, const char* msg);
+		void logMessage(int32_t type, const char* system, const char* msg);
 		Entity& getSelectedEntity() { return m_selected_entity; }
 		Mutex& getMessageMutex() { return m_message_mutex; }
 		bool isGameMode() const { return m_is_game_mode; }
@@ -114,6 +115,9 @@ private:
 		void destroyUniverse();
 		void gameModeLoop();
 		bool loadPlugin(const char* plugin_name);
+		void onLogInfo(const char* system, const char* message);
+		void onLogWarning(const char* system, const char* message);
+		void onLogError(const char* system, const char* message);
 
 		static void onEvent(void* data, Event& evt);
 
@@ -606,7 +610,7 @@ void EditorServer::newUniverse()
 
 void EditorServer::load(IStream& stream)
 {
-	logMessage("test", "map load started...");
+	g_log_info.log("test", "map load started...");
 	destroyUniverse();
 	createUniverse(false, "");
 	JsonSerializer serializer(stream, JsonSerializer::READ);
@@ -629,7 +633,7 @@ void EditorServer::load(IStream& stream)
 	m_camera_rot.toMatrix(mtx);
 	mtx.setTranslation(m_camera_pos);
 	m_renderer->setCameraMatrix(mtx);
-	logMessage("test", "map load finished.");
+	g_log_info.log("test", "map load finished.");
 }
 
 
@@ -673,7 +677,29 @@ bool EditorServer::create(HWND hwnd, const char* base_path)
 	registerProperties();
 	//m_navigation.load("models/level2/level2.pda");
 	
+	g_log_info.registerCallback(makeFunctor(this, &EditorServer::onLogInfo));
+	g_log_warning.registerCallback(makeFunctor(this, &EditorServer::onLogWarning));
+	g_log_error.registerCallback(makeFunctor(this, &EditorServer::onLogError));
+
 	return true;
+}
+
+
+void EditorServer::onLogInfo(const char* system, const char* message)
+{
+	logMessage(0, system, message);
+}
+
+
+void EditorServer::onLogWarning(const char* system, const char* message)
+{
+	logMessage(1, system, message);
+}
+
+
+void EditorServer::onLogError(const char* system, const char* message)
+{
+	logMessage(2, system, message);
 }
 
 
@@ -916,10 +942,11 @@ void EditorServer::writeString(const char* str)
 }
 
 
-void EditorServer::logMessage(const char* system, const char* msg)
+void EditorServer::logMessage(int32_t type, const char* system, const char* msg)
 {
 	m_stream.flush();
 	m_stream.write(4);
+	m_stream.write(type);
 	writeString(system);
 	writeString(msg);
 	m_response_callback(m_stream.getBuffer(), m_stream.getBufferSize());
