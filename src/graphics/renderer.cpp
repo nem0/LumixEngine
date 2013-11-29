@@ -100,7 +100,6 @@ void RendererImpl::onResize(int w, int h)
 
 void resourceLoaded(void* user_data, char* file_data, int length, bool success)
 {
-	assert(success);
 	RendererImpl* renderer = static_cast<RendererImpl*>(user_data);
 	if(success)
 	{
