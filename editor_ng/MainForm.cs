@@ -44,7 +44,7 @@ namespace editor_ng
             m_file_server = new FileServer.FileServer();
             m_file_server_ui = new FileServer.FileServerUI();
             m_file_server.ui = m_file_server_ui;
-            m_asset_monitor = new AssetMonitor();
+            m_asset_monitor = new AssetMonitor(this);
             m_asset_list = new AssetList(this);
             m_asset_list.main_form = this;
             m_property_grid = new PropertyGrid();
@@ -218,20 +218,27 @@ namespace editor_ng
 
         private Dictionary<System.Diagnostics.Process, string> m_import_model_processes = new Dictionary<System.Diagnostics.Process, string>();
 
+        public void importModel(string filename)
+        {
+            BeginInvoke(new Action(() => {
+                m_notifications.showNotification("Importing model " + filename);
+            }));
+
+            System.Diagnostics.ProcessStartInfo start_info = new System.Diagnostics.ProcessStartInfo("models\\ColladaConv.bat", filename);
+            start_info.CreateNoWindow = true;
+            start_info.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;
+            System.Diagnostics.Process process = System.Diagnostics.Process.Start(start_info);
+            process.EnableRaisingEvents = true;
+            m_import_model_processes.Add(process, filename);
+            process.Exited += importModelFinished;        
+        }
+
         public void importModel()
         {
             OpenFileDialog dlg = new OpenFileDialog();
             if (dlg.ShowDialog() == DialogResult.OK)
             {
-                m_notifications.showNotification("Importing model " + dlg.FileName);
-
-                System.Diagnostics.ProcessStartInfo start_info = new System.Diagnostics.ProcessStartInfo("models\\ColladaConv.bat", dlg.FileName);
-                start_info.CreateNoWindow = true;
-                start_info.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;
-                System.Diagnostics.Process process = System.Diagnostics.Process.Start(start_info);
-                process.EnableRaisingEvents = true;
-                m_import_model_processes.Add(process, dlg.FileName);
-                process.Exited += importModelFinished;
+                importModel(dlg.FileName);
             }
         }
 
