@@ -33,6 +33,12 @@ namespace editor_ng.Log
             }
         }
 
+        public void logMessage(int type, string system, string message)
+        {
+            var objs = new object[] { m_icons[type], DateTime.Now.ToString("HH:mm:ss.fff"), system, message };
+            dataGridView1.Rows.Add(objs); 
+        }
+
         void onLogMessage(object sender, EventArgs args)
         {
             native.EditorServer.LegMessageEventArgs e = args as native.EditorServer.LegMessageEventArgs;

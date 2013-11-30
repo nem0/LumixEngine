@@ -263,16 +263,7 @@ namespace editor_ng.native
             m_writer.Write(0);
             sendMessage();
         }
-
-        public void reloadScript(string path)
-        {
-            startMessage();
-            m_writer.Write(18);
-            m_writer.Write(System.Text.Encoding.ASCII.GetBytes(path));
-            m_writer.Write(0);
-            sendMessage();
-        }
-
+        
         public void requestComponentProperties(uint cmp)
         {
             startMessage();

@@ -150,6 +150,7 @@ bool Renderer::create(IFileSystem* fs, int w, int h, const char* base_path)
 	m_impl->m_width = -1;
 	m_impl->m_height = -1;
 	m_impl->m_universe = 0;
+	m_impl->m_camera_node = 0;
 
 	m_impl->m_base_path = base_path;
 	m_impl->m_width = w;
@@ -250,6 +251,11 @@ void Renderer::getMesh(Component cmp, string& str)
 void Renderer::setMesh(Component cmp, const string& str)
 {
 	m_impl->m_paths[cmp.index] = str;
+	if(m_impl->m_renderables[cmp.index].m_node != 0)
+	{
+		h3dRemoveNode(m_impl->m_renderables[cmp.index].m_node);
+		m_impl->m_renderables[cmp.index].m_node = 0;
+	}
 	H3DRes res = h3dAddResource(H3DResTypes::SceneGraph, str.c_str(), 0);
 	if(h3dIsResLoaded(res))
 	{

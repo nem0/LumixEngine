@@ -94,6 +94,7 @@
     <Compile Include="SceneView.Designer.cs">
       <DependentUpon>SceneView.cs</DependentUpon>
     </Compile>
+    <Compile Include="ScriptCompiler.cs" />
     <EmbeddedResource Include="AssetList.resx">
       <DependentUpon>AssetList.cs</DependentUpon>
     </EmbeddedResource>
@@ -142,6 +143,7 @@
     <PostBuildEvent>copy $(SolutionDir)external\editor\*.dll $(SolutionDir)\bin\$(Configuration)\
 copy $(SolutionDir)external\physx\dll\*.dll $(SolutionDir)\bin\$(Configuration)\
 copy $(SolutionDir)external\horde3d\lib\$(Configuration)\*.dll $(SolutionDir)\bin\$(Configuration)\
+copy $(SolutionDir)external\horde3d\lib\$(Configuration)\*.pdb $(SolutionDir)\bin\$(Configuration)\
 </PostBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

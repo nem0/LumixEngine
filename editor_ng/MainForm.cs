@@ -29,6 +29,7 @@ namespace editor_ng
         FileServer.FileServer m_file_server;
         FileServer.FileServerUI m_file_server_ui;
         Notifications m_notifications;
+        ScriptCompiler m_script_compiler;
         Log.LogUI m_log_ui;
         string m_universe_filename = "";
 
@@ -49,7 +50,11 @@ namespace editor_ng
             m_asset_list.main_form = this;
             m_property_grid = new PropertyGrid();
             m_property_grid.main_form = this;
+            m_script_compiler = new ScriptCompiler();
+            m_script_compiler.onScriptUpdated += ScriptCompiler_onScriptUpdated;
+            m_script_compiler.onCompileError += ScriptCompiler_onCompileError;
 
+            m_asset_monitor.script_compiler = m_script_compiler;
             m_file_server.start();
             m_asset_monitor.server = m_server;
             m_scene_view.server = m_server;
@@ -67,6 +72,14 @@ namespace editor_ng
             {
                 dockPanel.LoadFromXml("layout.xml", new DeserializeDockContent(GetContentFromPersistString));
             }
+        }
+
+        void ScriptCompiler_onScriptUpdated(object sender, EventArgs e)
+        {
+            ScriptCompiler.ScriptUpdatedEventArgs args = e as ScriptCompiler.ScriptUpdatedEventArgs;
+            BeginInvoke((MethodInvoker)(() => {
+                m_notifications.showNotification("Script " + args.script_name + " updated");
+            }));
         }
 
         protected IDockContent GetContentFromPersistString(string persistString)
@@ -165,9 +178,29 @@ namespace editor_ng
             Application.Exit();
         }
 
+        private void ScriptCompiler_onAllScriptsCompiled(object sender, EventArgs e)
+        {
+            BeginInvoke((MethodInvoker)(() => {
+                m_notifications.showNotification("All scripts compiled");
+                m_server.startGameMode(); 
+            }));
+        }
+
         private void gameModeToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            m_server.startGameMode();
+            m_script_compiler.onAllScriptsCompiled -= ScriptCompiler_onAllScriptsCompiled; 
+            m_script_compiler.onAllScriptsCompiled += ScriptCompiler_onAllScriptsCompiled;
+            m_script_compiler.compileAllScripts();
+        }
+
+        void ScriptCompiler_onCompileError(object sender, EventArgs e)
+        {
+            BeginInvoke((MethodInvoker)(() =>
+            {
+                ScriptCompiler.CompileErrorEventArgs args = e as ScriptCompiler.CompileErrorEventArgs;
+                m_log_ui.logMessage(1, "system", "Script " + args.script_name + " failed to compile");
+                m_notifications.showNotification("Script " + args.script_name + " failed to compile");
+            }));
         }
 
         private void MainForm_Shown(object sender, EventArgs e)
