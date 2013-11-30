@@ -12,21 +12,18 @@ namespace editor_ng
         FileSystemWatcher m_watcher;
 
         public native.EditorServer server { get; set; }
+        public ScriptCompiler script_compiler { get; set; }
 
         public void start()
         {
             m_watcher = new FileSystemWatcher();
             m_watcher.Path = ".";
             m_watcher.Filter = "*.*";
-            m_watcher.NotifyFilter = NotifyFilters.LastWrite;
+            m_watcher.NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName;
             m_watcher.IncludeSubdirectories = true;
             m_watcher.Changed += onChanged;
+            m_watcher.Renamed += onChanged;
             m_watcher.EnableRaisingEvents = true;
-        }
-
-        private void reloadScript(string path)
-        {
-            
         }
 
         private void onChanged(object sender, FileSystemEventArgs args)
@@ -34,7 +31,7 @@ namespace editor_ng
             switch (System.IO.Path.GetExtension(args.FullPath))
             {
                 case ".cpp":
-                    server.reloadScript(args.FullPath.StartsWith(".\\") ? args.FullPath.Substring(2) : args.FullPath);
+                    script_compiler.compile(args.FullPath, args.Name, true);
                     break;
             }
         }

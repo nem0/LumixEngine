@@ -95,7 +95,6 @@ class EditorServer
 		void removeEntity();
 		void runGameMode();
 		void editScript();
-		void reloadScript(const char* path);
 		void lookAtSelected();
 		void newUniverse();
 		Entity& getSelectedEntity() { return m_selected_entity; }
@@ -500,13 +499,6 @@ void EditorServer::addComponent(uint32_t type_crc)
 	}
 	selectEntity(m_selected_entity);
 }
-
-
-void EditorServer::reloadScript(const char* path)
-{
-	m_script_system->reloadScript(path);
-}
-
 
 void EditorServer::lookAtSelected()
 {
@@ -1193,8 +1185,8 @@ namespace MessageType
 		REMOVE_ENTITY,			// 15
 		SET_EDIT_MODE,			// 16
 		EDIT_SCRIPT,			// 17
-		RELOAD_SCRIPT,			// 18
-		NEW_UNIVERSE,			// 19
+								// 18
+		NEW_UNIVERSE = 19,		// 19
 		LOOK_AT_SELECTED = 20,	// 20
 
 	};
@@ -1267,9 +1259,6 @@ extern "C" LUX_ENGINE_API void __stdcall luxServerMessage(void* ptr, void* msgpt
 			break;
 		case MessageType::EDIT_SCRIPT:
 			server->editScript();
-			break;
-		case MessageType::RELOAD_SCRIPT:
-			server->reloadScript(reinterpret_cast<char*>(&msg[1]));
 			break;
 		case MessageType::LOOK_AT_SELECTED:
 			server->lookAtSelected();

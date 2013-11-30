@@ -19,7 +19,6 @@ namespace Lux
 		void postDeserialize();
 		void compile();
 		void getDll(const char* script_path, char* dll_path, int max_length);
-		void compile(const char* path);
 		void getScriptDefaultPath(Entity e, char* path, int max_path, const char* ext);
 
 		vector<int> m_scripts;
@@ -90,7 +89,6 @@ namespace Lux
 
 	void ScriptSystem::start()
 	{
-		m_impl->compile();
 		char path[MAX_PATH];
 		for(int i = 0; i < m_impl->m_scripts.size(); ++i)
 		{
@@ -168,29 +166,6 @@ namespace Lux
 	}
 
 
-	void ScriptSystemImpl::compile(const char* path)
-	{
-		SHELLEXECUTEINFO info;
-		info.cbSize = sizeof(info);
-		info.fMask = SEE_MASK_NOCLOSEPROCESS; //lets us see the handle
-		info.hwnd = NULL;
-		info.lpVerb = "open";
-		info.lpFile = "scripts\\compile.bat";
-		info.lpParameters = path;
-		info.lpDirectory = NULL;
-		info.nShow = 0;
-		ShellExecuteEx(&info);
-		WaitForSingleObject(info.hProcess, INFINITE);
-	}
-
-	void ScriptSystemImpl::compile()
-	{
-		for(int i = 0; i < m_scripts.size(); ++i)
-		{
-			compile(m_paths[i].c_str());
-		}
-	}
-
 	void ScriptSystem::getScriptPath(Component cmp, string& str)
 	{
 		str = m_impl->m_paths[cmp.index];
@@ -199,7 +174,6 @@ namespace Lux
 	void ScriptSystem::setScriptPath(Component cmp, const string& str)
 	{
 		m_impl->m_paths[cmp.index] = str;
-		m_impl->compile(str.c_str());
 	}
 	
 	void ScriptSystemImpl::getDll(const char* script_path, char* dll_path, int max_length)
@@ -223,47 +197,6 @@ namespace Lux
 		{
 			Entity e(m_universe, m_scripts[i]);
 			m_universe->getEventManager()->emitEvent(ComponentEvent(Component(e, script_type, m_owner, i)));
-		}
-	}
-
-	void ScriptSystem::reloadScript(const char* path)
-	{
-		if(m_impl->m_script_objs.empty())
-		{
-			return;
-		}
-		for(int i = 0; i < m_impl->m_paths.size(); ++i)
-		{
-			if(m_impl->m_paths[i] == path)
-			{
-				// serialize
-				SaveScriptVisitor visitor;
-				visitor.startSaving();
-				m_impl->m_script_objs[i]->visit(visitor);
-					
-				// destroy
-				DestroyScriptFunction f = (DestroyScriptFunction)GetProcAddress(m_impl->m_libs[i], "destroyScript");
-				f(m_impl->m_script_objs[i]);
-				FreeLibrary(m_impl->m_libs[i]);
-
-				//compile
-				m_impl->compile(m_impl->m_paths[i].c_str());
-
-				//create
-				char tmp[MAX_PATH];
-				Entity e(m_impl->m_universe, m_impl->m_scripts[i]);
-				m_impl->getDll(m_impl->m_paths[i].c_str(), tmp, MAX_PATH);
-				m_impl->m_libs[i] = LoadLibrary(tmp);
-				CreateScriptFunction f2 = (CreateScriptFunction)GetProcAddress(m_impl->m_libs[i], TEXT("createScript"));
-				BaseScript* script = f2();
-				script->create(*this, e);
-				m_impl->m_script_objs[i] = script;
-
-				// deserialize
-				visitor.startLoading();
-				script->visit(visitor);
-				break;
-			}
 		}
 	}
 
