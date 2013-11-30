@@ -108,7 +108,7 @@ namespace Lux
 			}
 			else
 			{
-				g_log_warning.log("script", "failed to load script %s", m_impl->paths[i].c_str());
+				g_log_warning.log("script", "failed to load script %s", m_impl->m_paths[i].c_str());
 				m_impl->m_script_objs.push_back(0);
 			}
 		}
