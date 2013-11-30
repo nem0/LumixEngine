@@ -29,6 +29,7 @@ namespace editor_ng
         FileServer.FileServer m_file_server;
         FileServer.FileServerUI m_file_server_ui;
         Notifications m_notifications;
+        ScriptCompiler m_script_compiler;
         string m_universe_filename = "";
 
         public MainForm()
@@ -44,6 +45,7 @@ namespace editor_ng
             m_asset_list.main_form = this;
             m_property_grid = new PropertyGrid();
             m_property_grid.main_form = this;
+            m_script_compiler = new ScriptCompiler(m_notifications);
 
             m_server = new native.EditorServer(m_scene_view.panel1.Handle, System.IO.Directory.GetCurrentDirectory());
             m_file_server.start();
@@ -162,6 +164,7 @@ namespace editor_ng
 
         private void gameModeToolStripMenuItem_Click(object sender, EventArgs e)
         {
+            m_script_compiler.compileAllScripts();
             m_server.startGameMode();
         }
 
