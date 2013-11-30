@@ -164,8 +164,13 @@ namespace editor_ng
 
         private void gameModeToolStripMenuItem_Click(object sender, EventArgs e)
         {
+            m_script_compiler.onAllScriptsCompiled += (object o, EventArgs a) => { BeginInvoke((MethodInvoker)(() => { m_server.startGameMode(); }));  };
             m_script_compiler.compileAllScripts();
-            m_server.startGameMode();
+        }
+
+        void ScriptCompiler_onAllScriptsCompiled(object sender, EventArgs e)
+        {
+           
         }
 
         private void MainForm_Shown(object sender, EventArgs e)
