@@ -7,6 +7,7 @@
 #include "base_script.h"
 #include "save_script_visitor.h"
 #include "core/json_serializer.h"
+#include "core/log.h"
 
 
 static const uint32_t script_type = crc32("script");
@@ -105,6 +106,7 @@ namespace Lux
 			}
 			else
 			{
+				g_log_warning.log("script", "failed to load script %s", m_impl->m_paths[i].c_str());
 				m_impl->m_script_objs.push_back(0);
 			}
 		}
@@ -159,12 +161,6 @@ namespace Lux
 			m_impl->m_script_objs[i]->update(dt);
 		}
 	}
-
-	extern "C" void error_f(void* opaque, const char* er)
-	{
-		printf(er);
-	}
-
 
 	void ScriptSystem::getScriptPath(Component cmp, string& str)
 	{

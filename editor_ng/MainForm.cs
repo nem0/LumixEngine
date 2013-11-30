@@ -30,17 +30,22 @@ namespace editor_ng
         FileServer.FileServerUI m_file_server_ui;
         Notifications m_notifications;
         ScriptCompiler m_script_compiler;
+        Log.LogUI m_log_ui;
         string m_universe_filename = "";
 
         public MainForm()
         {
             InitializeComponent();
+            m_scene_view = new SceneView();
+            m_server = new native.EditorServer();
+            m_log_ui = new Log.LogUI(m_server);
+            m_server.create(m_scene_view.panel1.Handle, System.IO.Directory.GetCurrentDirectory());
             m_notifications = new Notifications(this);
+
             m_file_server = new FileServer.FileServer();
             m_file_server_ui = new FileServer.FileServerUI();
             m_file_server.ui = m_file_server_ui;
             m_asset_monitor = new AssetMonitor();
-            m_scene_view = new SceneView();
             m_asset_list = new AssetList(this);
             m_asset_list.main_form = this;
             m_property_grid = new PropertyGrid();
@@ -50,7 +55,6 @@ namespace editor_ng
             m_script_compiler.onCompileError += ScriptCompiler_onCompileError;
 
             m_asset_monitor.script_compiler = m_script_compiler;
-            m_server = new native.EditorServer(m_scene_view.panel1.Handle, System.IO.Directory.GetCurrentDirectory());
             m_file_server.start();
             m_asset_monitor.server = m_server;
             m_scene_view.server = m_server;
@@ -63,6 +67,7 @@ namespace editor_ng
             m_dock_contents.Add(m_asset_list);
             m_dock_contents.Add(m_property_grid);
             m_dock_contents.Add(m_file_server_ui);
+            m_dock_contents.Add(m_log_ui);
             if (System.IO.File.Exists("layout.xml"))
             {
                 dockPanel.LoadFromXml("layout.xml", new DeserializeDockContent(GetContentFromPersistString));
@@ -193,6 +198,7 @@ namespace editor_ng
             BeginInvoke((MethodInvoker)(() =>
             {
                 ScriptCompiler.CompileErrorEventArgs args = e as ScriptCompiler.CompileErrorEventArgs;
+                m_log_ui.logMessage(1, "system", "Script " + args.script_name + " failed to compile");
                 m_notifications.showNotification("Script " + args.script_name + " failed to compile");
             }));
         }
@@ -303,6 +309,11 @@ namespace editor_ng
         {
             m_server.newUniverse();
             m_universe_filename = "";
+        }
+
+        private void logToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            m_log_ui.Show(dockPanel);
         }
     }
 }

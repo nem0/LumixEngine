@@ -28,6 +28,7 @@
 #include "Horde3DUtils.h"
 #include "animation/animation_system.h"
 #include "editor/iplugin.h"
+#include "core/log.h"
 
 
 namespace Lux
@@ -70,7 +71,7 @@ class EditorServer
 	public:
 		EditorServer();
 
-		bool create(HWND hwnd, const char* base_path);
+		bool create(HWND hwnd, const char* base_path, ResponceCallback callback);
 		void destroy();
 		void update();
 		void onPointerDown(int x, int y, MouseButton::Value button);
@@ -81,7 +82,6 @@ class EditorServer
 		void writeString(const char* str);
 		void setProperty(void* data, int size);
 		void onResize(int w, int h) { m_renderer->onResize(w, h); }
-		void setResponseCallback(ResponceCallback callback) { m_response_callback = callback; }
 		void createUniverse(bool create_scene, const char* base_path);
 		void renderScene();
 		void save(const char path[]);
@@ -97,6 +97,7 @@ class EditorServer
 		void editScript();
 		void lookAtSelected();
 		void newUniverse();
+		void logMessage(int32_t type, const char* system, const char* msg);
 		Entity& getSelectedEntity() { return m_selected_entity; }
 		Mutex& getMessageMutex() { return m_message_mutex; }
 		bool isGameMode() const { return m_is_game_mode; }
@@ -112,6 +113,9 @@ private:
 		void destroyUniverse();
 		void gameModeLoop();
 		bool loadPlugin(const char* plugin_name);
+		void onLogInfo(const char* system, const char* message);
+		void onLogWarning(const char* system, const char* message);
+		void onLogError(const char* system, const char* message);
 
 		static void onEvent(void* data, Event& evt);
 
@@ -139,7 +143,6 @@ private:
 
 
 static const uint32_t renderable_type = crc32("renderable");
-static const uint32_t physical_type = crc32("physical");
 static const uint32_t camera_type = crc32("camera");
 static const uint32_t point_light_type = crc32("point_light");
 static const uint32_t physical_controller_type = crc32("physical_controller");
@@ -241,6 +244,7 @@ void EditorServer::onPointerUp(int x, int y, MouseButton::Value button)
 
 void EditorServer::save(const char path[])
 {
+	g_log_info.log("editor server", "saving universe %s...", path);
 	RawFileStream stream;
 	stream.create(path, RawFileStream::Mode::WRITE);
 	save(stream);
@@ -265,6 +269,7 @@ void EditorServer::save(IStream& stream)
 	serializer.serialize("cam_rot_y", m_camera_rot.y);
 	serializer.serialize("cam_rot_z", m_camera_rot.z);
 	serializer.serialize("cam_rot_w", m_camera_rot.w);
+	g_log_info.log("editor server", "universe saved");
 }
 
 
@@ -472,17 +477,9 @@ void EditorServer::addComponent(uint32_t type_crc)
 		{
 			m_renderer->createRenderable(m_selected_entity);
 		}
-		else if(type_crc == physical_type)
-		{
-			//m_physics_scene->createActor(m_selected_entity);
-		}
 		else if(type_crc == point_light_type)
 		{
 			m_renderer->createPointLight(m_selected_entity);
-		}
-		else if(type_crc == physical_controller_type)
-		{
-			//m_physics_scene->createController(m_selected_entity);
 		}
 		else if(type_crc == script_type)
 		{
@@ -554,10 +551,6 @@ void EditorServer::removeComponent(uint32_t type_crc)
 	{
 		m_renderer->destroyRenderable(cmp);
 	}
-	else if(type_crc == physical_type)
-	{
-		//m_physics_scene->destroyActor(cmp);
-	}
 	else if(type_crc == point_light_type)
 	{
 		m_renderer->destroyPointLight(cmp);
@@ -584,6 +577,7 @@ void loadMap(void* user_data, char* file_data, int length, bool success)
 
 void EditorServer::load(const char path[])
 {
+	g_log_info.log("editor server", "loading universe %s...", path);
 	m_fs.openFile(path, &loadMap, this);
 }
 
@@ -592,11 +586,13 @@ void EditorServer::newUniverse()
 {
 	destroyUniverse();
 	createUniverse(false, "");
+	g_log_info.log("editor server", "new universe created");
 }
 
 
 void EditorServer::load(IStream& stream)
 {
+	g_log_info.log("editor server", "parsing universe...");
 	destroyUniverse();
 	createUniverse(false, "");
 	JsonSerializer serializer(stream, JsonSerializer::READ);
@@ -619,6 +615,7 @@ void EditorServer::load(IStream& stream)
 	m_camera_rot.toMatrix(mtx);
 	mtx.setTranslation(m_camera_pos);
 	m_renderer->setCameraMatrix(mtx);
+	g_log_info.log("editor server", "universe parsed");
 }
 
 
@@ -630,8 +627,13 @@ void EditorServer::destroy()
 }
 
 
-bool EditorServer::create(HWND hwnd, const char* base_path)
+bool EditorServer::create(HWND hwnd, const char* base_path, EditorServer::ResponceCallback callback)
 {
+	m_response_callback = callback;
+	g_log_info.registerCallback(makeFunctor(this, &EditorServer::onLogInfo));
+	g_log_warning.registerCallback(makeFunctor(this, &EditorServer::onLogWarning));
+	g_log_error.registerCallback(makeFunctor(this, &EditorServer::onLogError));
+
 	m_message_mutex.create();
 	m_fs.create();
 	m_hwnd = hwnd;
@@ -643,16 +645,24 @@ bool EditorServer::create(HWND hwnd, const char* base_path)
 	GetWindowRect(hwnd, &rect);
 	if(!m_renderer->create(&m_fs, rect.right - rect.left, rect.bottom - rect.top, base_path))
 	{
+		g_log_error.log("editor server", "renderer has not been created");
 		return false;
 	}
 	if(!m_animation_system->create())
 	{
+		g_log_error.log("editor server", "animation system has not been created");
 		return false;
 	}
 	glPopAttrib();
 	
-	loadPlugin("physics.dll");
-	loadPlugin("navigation.dll");
+	if(!loadPlugin("physics.dll"))
+	{
+		g_log_info.log("plugins", "physics plugin has not been loaded");
+	}
+	if(!loadPlugin("navigation.dll"))
+	{
+		g_log_info.log("plugins", "navigation plugin has not been loaded");
+	}
 
 	EditorIcon::createResources(base_path);
 
@@ -666,8 +676,27 @@ bool EditorServer::create(HWND hwnd, const char* base_path)
 }
 
 
+void EditorServer::onLogInfo(const char* system, const char* message)
+{
+	logMessage(0, system, message);
+}
+
+
+void EditorServer::onLogWarning(const char* system, const char* message)
+{
+	logMessage(1, system, message);
+}
+
+
+void EditorServer::onLogError(const char* system, const char* message)
+{
+	logMessage(2, system, message);
+}
+
+
 bool EditorServer::loadPlugin(const char* plugin_name)
 {
+	g_log_info.log("plugins", "loading plugin %s", plugin_name);
 	typedef IPlugin* (*PluginCreator)();
 	HMODULE lib = LoadLibrary(TEXT(plugin_name));
 	if(lib)
@@ -683,6 +712,7 @@ bool EditorServer::loadPlugin(const char* plugin_name)
 				return false;
 			}
 			m_plugins.push_back(plugin);
+			g_log_info.log("plugins", "plugin laoded");
 			return true;
 		}
 	}
@@ -921,6 +951,19 @@ void EditorServer::writeString(const char* str)
 }
 
 
+void EditorServer::logMessage(int32_t type, const char* system, const char* msg)
+{
+	m_stream.flush();
+	m_stream.write(4);
+	m_stream.write(type);
+	writeString(system);
+	writeString(msg);
+	if(m_response_callback)
+	{
+		m_response_callback(m_stream.getBuffer(), m_stream.getBufferSize());
+	}
+}
+
 
 void EditorServer::selectEntity(Entity e)
 {
@@ -1123,7 +1166,7 @@ void EditorServer::createUniverse(bool create_scene, const char* base_path)
 }
 
 
-extern "C" LUX_ENGINE_API void* __stdcall luxServerInit(HWND hwnd, const char* base_path)
+extern "C" LUX_ENGINE_API void* __stdcall luxServerInit(HWND hwnd, const char* base_path, void* callback_ptr)
 {
 	PAINTSTRUCT ps;
 	HDC hdc;
@@ -1155,7 +1198,7 @@ extern "C" LUX_ENGINE_API void* __stdcall luxServerInit(HWND hwnd, const char* b
 	EndPaint(hwnd, &ps);
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	EditorServer* server = new EditorServer;
-	if(!server->create(hwnd, base_path))
+	if(!server->create(hwnd, base_path, static_cast<EditorServer::ResponceCallback>(callback_ptr)))
 	{
 		delete server;
 		return NULL;
@@ -1192,12 +1235,6 @@ namespace MessageType
 	};
 }
 
-
-extern "C" LUX_ENGINE_API void __stdcall luxServerSetCallback(void* ptr, void* callback_ptr)
-{
-	EditorServer* server = static_cast<EditorServer*>(ptr);
-	server->setResponseCallback(static_cast<EditorServer::ResponceCallback>(callback_ptr));
-}
 
 extern "C" LUX_ENGINE_API void __stdcall luxServerMessage(void* ptr, void* msgptr, int size)
 {
