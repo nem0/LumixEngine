@@ -88,6 +88,7 @@
     <Compile Include="SceneView.Designer.cs">
       <DependentUpon>SceneView.cs</DependentUpon>
     </Compile>
+    <Compile Include="ScriptCompiler.cs" />
     <EmbeddedResource Include="AssetList.resx">
       <DependentUpon>AssetList.cs</DependentUpon>
     </EmbeddedResource>

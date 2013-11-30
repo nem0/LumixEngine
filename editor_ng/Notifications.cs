@@ -42,6 +42,14 @@ namespace editor_ng
             m_panels.Add(p);
         }
 
+        public void invokeNotification(string text)
+        {
+            IAsyncResult res = m_main_form.BeginInvoke(new Action(() => {
+               showNotification(text);
+            }));
+            m_main_form.EndInvoke(res);
+        }
+
         void timer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
             (sender as System.Timers.Timer).Enabled = false;
