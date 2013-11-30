@@ -32,20 +32,20 @@ namespace Lux
 				SUCCESS,
 				FAIL
 			};
-			string path;
-			IFileSystem::ReadCallback callback;
-			void* user_data;
-			char* file_data;
-			int file_length;
-			int uid;
-			Status status;
+			string m_path;
+			IFileSystem::ReadCallback m_callback;
+			void* m_user_data;
+			char* m_file_data;
+			int m_file_length;
+			int m_uid;
+			Status m_status;
 		};
 
-		TCPFileSystemTask* task;
-		vector<FileItem*> queue;
-		vector<FileItem*> loaded;
-		vector<FileItem*> in_progress;
-		int last_uid;
+		TCPFileSystemTask* m_task;
+		vector<FileItem*> m_queue;
+		vector<FileItem*> m_loaded;
+		vector<FileItem*> m_in_progress;
+		int m_last_uid;
 	};
 
 
@@ -60,21 +60,21 @@ namespace Lux
 		while(!m_finished)
 		{
 			m_mutex.lock();
-			if(!m_fs->queue.empty())
+			if(!m_fs->m_queue.empty())
 			{
-				TCPFileSystemImpl::FileItem* item = m_fs->queue.back();
-				m_fs->queue.pop_back();
+				TCPFileSystemImpl::FileItem* item = m_fs->m_queue.back();
+				m_fs->m_queue.pop_back();
 				m_mutex.unlock();
 				
-				int len = item->path.length() + 5;
+				int len = item->m_path.length() + 5;
 				memcpy(buffer, &len, sizeof(len));				
 				buffer[4] = 0;
-				memcpy(buffer+5, &item->uid, sizeof(item->uid));
+				memcpy(buffer+5, &item->m_uid, sizeof(item->m_uid));
 				
 				m_work_socket->send(buffer, 9);
-				m_work_socket->send(item->path.c_str(), item->path.length());
+				m_work_socket->send(item->m_path.c_str(), item->m_path.length());
 
-				m_fs->in_progress.push_back(item);
+				m_fs->m_in_progress.push_back(item);
 			}
 			else
 			{
@@ -108,28 +108,28 @@ namespace Lux
 			{
 				int uid = *(int*)(buffer + 5);
 				bool found = false;
-				for(int i = 0; i < m_fs->in_progress.size(); ++i)
+				for(int i = 0; i < m_fs->m_in_progress.size(); ++i)
 				{
-					if(m_fs->in_progress[i]->uid == uid)
+					if(m_fs->m_in_progress[i]->m_uid == uid)
 					{
 						if(len < 0)
 						{
-							m_fs->in_progress[i]->file_length = -1;
-							m_fs->in_progress[i]->file_data = 0;
-							m_fs->in_progress[i]->status = TCPFileSystemImpl::FileItem::FAIL;
+							m_fs->m_in_progress[i]->m_file_length = -1;
+							m_fs->m_in_progress[i]->m_file_data = 0;
+							m_fs->m_in_progress[i]->m_status = TCPFileSystemImpl::FileItem::FAIL;
 						}
 						else
 						{
-							m_fs->in_progress[i]->file_length = len - 5;
-							m_fs->in_progress[i]->file_data = new char[len - 5];
+							m_fs->m_in_progress[i]->m_file_length = len - 5;
+							m_fs->m_in_progress[i]->m_file_data = new char[len - 5];
 							if(size > 9)
-								memcpy(m_fs->in_progress[i]->file_data, buffer + 9, size - 9);
-							m_work_socket->receiveAllBytes(m_fs->in_progress[i]->file_data + size - 9, len - size + 4); 					
-							m_fs->in_progress[i]->status = TCPFileSystemImpl::FileItem::SUCCESS;
+								memcpy(m_fs->m_in_progress[i]->m_file_data, buffer + 9, size - 9);
+							m_work_socket->receiveAllBytes(m_fs->m_in_progress[i]->m_file_data + size - 9, len - size + 4); 					
+							m_fs->m_in_progress[i]->m_status = TCPFileSystemImpl::FileItem::SUCCESS;
 						}
 						m_mutex.lock();
-						m_fs->loaded.push_back(m_fs->in_progress[i]);
-						m_fs->in_progress.eraseFast(i);
+						m_fs->m_loaded.push_back(m_fs->m_in_progress[i]);
+						m_fs->m_in_progress.eraseFast(i);
 						m_mutex.unlock();
 						found = true;
 						break;
@@ -148,18 +148,18 @@ namespace Lux
 
 	void TCPFileSystem::processLoaded()
 	{
-		m_impl->task->m_mutex.lock();
-		if(!m_impl->loaded.empty())
+		m_impl->m_task->m_mutex.lock();
+		if(!m_impl->m_loaded.empty())
 		{
-			TCPFileSystemImpl::FileItem* item = m_impl->loaded.back();
-			m_impl->loaded.pop_back();
-			m_impl->task->m_mutex.lock();
-			item->callback(item->user_data, item->file_data, item->file_length, item->status == TCPFileSystemImpl::FileItem::SUCCESS);
+			TCPFileSystemImpl::FileItem* item = m_impl->m_loaded.back();
+			m_impl->m_loaded.pop_back();
+			m_impl->m_task->m_mutex.lock();
+			item->m_callback(item->m_user_data, item->m_file_data, item->m_file_length, item->m_status == TCPFileSystemImpl::FileItem::SUCCESS);
 			delete item;
 		}
 		else
 		{
-			m_impl->task->m_mutex.unlock();
+			m_impl->m_task->m_mutex.unlock();
 		}
 	}
 
@@ -174,19 +174,19 @@ namespace Lux
 	{
 		Socket::init();
 		m_impl = new TCPFileSystemImpl();
-		m_impl->last_uid = 0;
-		m_impl->task = new TCPFileSystemTask();
-		m_impl->task->m_fs = m_impl;
-		if(!m_impl->task->create())
+		m_impl->m_last_uid = 0;
+		m_impl->m_task = new TCPFileSystemTask();
+		m_impl->m_task->m_fs = m_impl;
+		if(!m_impl->m_task->create())
 		{
-			m_impl->task->m_mutex.create();
+			m_impl->m_task->m_mutex.create();
 			delete m_impl;
 			m_impl = 0;
 			return false;
 		}
-		if(!m_impl->task->run())
+		if(!m_impl->m_task->run())
 		{
-			m_impl->task->destroy();
+			m_impl->m_task->destroy();
 			delete m_impl;
 			m_impl = 0;
 			return false;
@@ -199,9 +199,9 @@ namespace Lux
 	{
 		if(m_impl)
 		{
-			m_impl->task->stop();
-			m_impl->task->m_mutex.destroy();			
-			m_impl->task->destroy();
+			m_impl->m_task->stop();
+			m_impl->m_task->m_mutex.destroy();			
+			m_impl->m_task->destroy();
 			delete m_impl;
 			m_impl = 0;
 		}
@@ -211,14 +211,14 @@ namespace Lux
 	IFileSystem::Handle TCPFileSystem::openFile(const char* path, ReadCallback callback, void* user_data)
 	{
 		TCPFileSystemImpl::FileItem* item = new TCPFileSystemImpl::FileItem();
-		item->callback = callback;
-		item->path = path;
-		item->user_data = user_data;
-		item->uid = ++m_impl->last_uid;
-		m_impl->task->m_mutex.lock();
-		m_impl->queue.push_back(item);
-		m_impl->task->m_mutex.unlock();
-		return item->uid;
+		item->m_callback = callback;
+		item->m_path = path;
+		item->m_user_data = user_data;
+		item->m_uid = ++m_impl->m_last_uid;
+		m_impl->m_task->m_mutex.lock();
+		m_impl->m_queue.push_back(item);
+		m_impl->m_task->m_mutex.unlock();
+		return item->m_uid;
 	}
 
 

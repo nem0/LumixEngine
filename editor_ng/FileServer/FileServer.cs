@@ -53,6 +53,8 @@ namespace editor_ng.FileServer
                 {
                     ui.onFileNotFound(idx, path);
                     m_client.GetStream().Write(BitConverter.GetBytes(-1), 0, 4);
+                    m_client.GetStream().Write(BitConverter.GetBytes(0), 0, 1);
+                    m_client.GetStream().Write(BitConverter.GetBytes(idx), 0, 4);
                 }
             }
         }

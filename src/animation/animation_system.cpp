@@ -18,13 +18,13 @@ namespace Lux
 	{
 		struct Animable
 		{
-			bool manual;
-			Component renderable;
-			float time;
+			bool m_manual;
+			Component m_renderable;
+			float m_time;
 		};
 
-		vector<Animable> animables;
-		Universe* universe;
+		vector<Animable> m_animables;
+		Universe* m_universe;
 
 		void onEvent(Event& event);
 	};
@@ -38,7 +38,7 @@ namespace Lux
 	bool AnimationSystem::create()
 	{
 		m_impl = new AnimationSystemImpl();
-		m_impl->universe = 0;
+		m_impl->m_universe = 0;
 		return m_impl != 0;
 	}
 
@@ -52,28 +52,28 @@ namespace Lux
 
 	void AnimationSystem::setUniverse(Universe* universe)
 	{
-		if(m_impl->universe)
+		if(m_impl->m_universe)
 		{
-			m_impl->animables.clear();
-			m_impl->universe->getEventManager()->unregisterListener(ComponentEvent::type, m_impl, &onEvent);
+			m_impl->m_animables.clear();
+			m_impl->m_universe->getEventManager()->unregisterListener(ComponentEvent::type, m_impl, &onEvent);
 		}
-		m_impl->universe = universe;
-		if(m_impl->universe)
+		m_impl->m_universe = universe;
+		if(m_impl->m_universe)
 		{
-			m_impl->universe->getEventManager()->registerListener(ComponentEvent::type, m_impl, &onEvent);
+			m_impl->m_universe->getEventManager()->registerListener(ComponentEvent::type, m_impl, &onEvent);
 		}
 	}
 
 
 	void AnimationSystem::serialize(ISerializer& serializer)
 	{
-		serializer.serialize("count", m_impl->animables.size());
+		serializer.serialize("count", m_impl->m_animables.size());
 		serializer.beginArray("animables");
-		for(int i = 0; i < m_impl->animables.size(); ++i)
+		for(int i = 0; i < m_impl->m_animables.size(); ++i)
 		{
-			serializer.serializeArrayItem(m_impl->animables[i].manual);
-			serializer.serializeArrayItem(m_impl->animables[i].renderable.entity.index);
-			serializer.serializeArrayItem(m_impl->animables[i].time);
+			serializer.serializeArrayItem(m_impl->m_animables[i].m_manual);
+			serializer.serializeArrayItem(m_impl->m_animables[i].m_renderable.entity.index);
+			serializer.serializeArrayItem(m_impl->m_animables[i].m_time);
 		}
 		serializer.endArray();
 	}
@@ -84,27 +84,27 @@ namespace Lux
 		int count;
 		serializer.deserialize("count", count);
 		serializer.deserializeArrayBegin("animables");
-		m_impl->animables.clear();
+		m_impl->m_animables.clear();
 		for(int i = 0; i < count; ++i)
 		{
-			m_impl->animables.push_back_empty();
-			serializer.deserializeArrayItem(m_impl->animables[i].manual);
+			m_impl->m_animables.push_back_empty();
+			serializer.deserializeArrayItem(m_impl->m_animables[i].m_manual);
 			int entity_index;
 			serializer.deserializeArrayItem(entity_index);
-			Entity e(m_impl->universe, entity_index);
+			Entity e(m_impl->m_universe, entity_index);
 			const Entity::ComponentList& cmps = e.getComponents();
-			m_impl->animables[i].renderable = Component::INVALID;
+			m_impl->m_animables[i].m_renderable = Component::INVALID;
 			for(int j = 0; j < cmps.size(); ++j)
 			{
 				if(cmps[j].type == renderable_type)
 				{
-					m_impl->animables[i].renderable = cmps[j];
+					m_impl->m_animables[i].m_renderable = cmps[j];
 					break;
 				}
 			}
-			serializer.deserializeArrayItem(m_impl->animables[i].time);
+			serializer.deserializeArrayItem(m_impl->m_animables[i].m_time);
 			Component cmp(e, animable_type, this, i);
-			m_impl->universe->getEventManager()->emitEvent(ComponentEvent(cmp));
+			m_impl->m_universe->getEventManager()->emitEvent(ComponentEvent(cmp));
 		}
 		serializer.deserializeArrayEnd();
 	}
@@ -122,7 +122,7 @@ namespace Lux
 				{
 					if(cmps[i].type == animable_type)
 					{
-						animables[cmps[i].index].renderable = e.component;
+						m_animables[cmps[i].index].m_renderable = e.component;
 						break;
 					}
 				}
@@ -133,29 +133,29 @@ namespace Lux
 
 	Component AnimationSystem::createAnimable(const Entity& entity)
 	{
-		AnimationSystemImpl::Animable& animable = m_impl->animables.push_back_empty();
-		animable.manual = true;
-		animable.time = 0;
-		animable.renderable = Component::INVALID;
+		AnimationSystemImpl::Animable& animable = m_impl->m_animables.push_back_empty();
+		animable.m_manual = true;
+		animable.m_time = 0;
+		animable.m_renderable = Component::INVALID;
 
 		const Entity::ComponentList& cmps = entity.getComponents();
 		for(int i = 0; i < cmps.size(); ++i)
 		{
 			if(cmps[i].type == renderable_type)
 			{
-				animable.renderable = cmps[i];
+				animable.m_renderable = cmps[i];
 				break;
 			}
 		}
 
-		Component cmp(entity, animable_type, this, m_impl->animables.size() - 1);
-		m_impl->universe->getEventManager()->emitEvent(ComponentEvent(cmp));
-		return Component(entity, animable_type, this, m_impl->animables.size() - 1);
+		Component cmp(entity, animable_type, this, m_impl->m_animables.size() - 1);
+		m_impl->m_universe->getEventManager()->emitEvent(ComponentEvent(cmp));
+		return Component(entity, animable_type, this, m_impl->m_animables.size() - 1);
 	}
 
 	void AnimationSystem::playAnimation(const Component& cmp, const char* path)
 	{
-		Component renderable = m_impl->animables[cmp.index].renderable;
+		Component renderable = m_impl->m_animables[cmp.index].m_renderable;
 		if(renderable.isValid())
 		{
 			Renderer* renderer = static_cast<Renderer*>(renderable.system);
@@ -165,34 +165,34 @@ namespace Lux
 			h3dSetupModelAnimStage(node, 0, animRes, 0, "", false);
 			h3dSetModelAnimParams(node, 0, 0, 1.0f);
 
-			m_impl->animables[cmp.index].manual = false;
+			m_impl->m_animables[cmp.index].m_manual = false;
 		}
 	}
 
 
 	void AnimationSystem::setAnimationTime(const Component& cmp, float time)
 	{
-		Renderer* renderer = static_cast<Renderer*>(m_impl->animables[cmp.index].renderable.system);
-		H3DNode node = renderer->getMeshNode(m_impl->animables[cmp.index].renderable);
-		m_impl->animables[cmp.index].time = time;
+		Renderer* renderer = static_cast<Renderer*>(m_impl->m_animables[cmp.index].m_renderable.system);
+		H3DNode node = renderer->getMeshNode(m_impl->m_animables[cmp.index].m_renderable);
+		m_impl->m_animables[cmp.index].m_time = time;
 		h3dSetModelAnimParams(node, 0, time, 1.0f);
 	}
 
 
 	void AnimationSystem::update(float time_delta)
 	{
-		if(m_impl->animables.empty())
+		if(m_impl->m_animables.empty())
 			return;
-		Renderer* renderer = static_cast<Renderer*>(m_impl->animables[0].renderable.system);
-		for(int i = 0, c = m_impl->animables.size(); i < c; ++i)
+		Renderer* renderer = static_cast<Renderer*>(m_impl->m_animables[0].m_renderable.system);
+		for(int i = 0, c = m_impl->m_animables.size(); i < c; ++i)
 		{
-			if(!m_impl->animables[i].manual)
+			if(!m_impl->m_animables[i].m_manual)
 			{
-				H3DNode node = renderer->getMeshNode(m_impl->animables[i].renderable);
-				float time = m_impl->animables[i].time;
+				H3DNode node = renderer->getMeshNode(m_impl->m_animables[i].m_renderable);
+				float time = m_impl->m_animables[i].m_time;
 				time += time_delta;
 				h3dSetModelAnimParams(node, 0, time, 1.0f);
-				m_impl->animables[i].time = time;
+				m_impl->m_animables[i].m_time = time;
 			}
 		}
 	}
