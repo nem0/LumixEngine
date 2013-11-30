@@ -44,10 +44,9 @@ namespace editor_ng
 
         public void invokeNotification(string text)
         {
-            IAsyncResult res = m_main_form.BeginInvoke(new Action(() => {
-               showNotification(text);
+            IAsyncResult res = m_main_form.BeginInvoke((MethodInvoker)(() => {
+                showNotification(text);
             }));
-            m_main_form.EndInvoke(res);
         }
 
         void timer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)

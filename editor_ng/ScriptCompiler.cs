@@ -19,6 +19,9 @@ namespace editor_ng
         Notifications m_notifications;
         List<CompilationProcess> m_processes = new List<CompilationProcess>();
 
+
+        public event EventHandler onAllScriptsCompiled;
+
         public ScriptCompiler(Notifications notifications)
         {
             m_notifications = notifications;
@@ -47,6 +50,11 @@ namespace editor_ng
             }
         }
 
+        public bool areAllScriptCompiled()
+        {
+            return m_processes.Count == 0;
+        }
+
         void process_Exited(object sender, EventArgs e)
         {
             foreach (CompilationProcess p in m_processes)
@@ -56,10 +64,15 @@ namespace editor_ng
                     if (p.process.ExitCode != 0)
                     {
                         //string output = process.StandardOutput.ReadToEnd();
-                        error notification does not work here
+                        //error notification does not work here
                         m_notifications.invokeNotification("Script " + p.script_name + " failed to compile");
                     }
                     m_processes.Remove(p);
+                    if (m_processes.Count == 0 && onAllScriptsCompiled != null)
+                    {
+                        onAllScriptsCompiled(this, null);
+                    }
+
                     break;
                 }
             }
