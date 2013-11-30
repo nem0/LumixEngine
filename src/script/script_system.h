@@ -30,8 +30,6 @@ class LUX_ENGINE_API ScriptSystem
 		void reloadScript(const char* path);
 		Renderer* getRenderer() const;
 		void setRenderer(Renderer* renderer);
-		Navigation* getNavigation() const;
-		void setNavigation(Navigation* navigation);
 		void setInputSystem(InputSystem* input_system);
 		InputSystem* getInputSystem() const;
 

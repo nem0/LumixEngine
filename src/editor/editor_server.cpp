@@ -107,7 +107,7 @@ class EditorServer
 
 private:
 		const PropertyDescriptor& getPropertyDescriptor(uint32_t type, const char* name);
-		H3DNode castRay(int x, int y, Vec3& hit_pos, char* name, int max_name_size);
+		H3DNode castRay(int x, int y, Vec3& hit_pos, char* name, int max_name_size, H3DNode gizmo_node);
 		void registerProperties();
 		void rotateCamera(int x, int y);
 		void onEvent(Event& evt);
@@ -172,7 +172,7 @@ void EditorServer::onPointerDown(int x, int y, MouseButton::Value button)
 	{
 		Vec3 hit_pos;
 		char node_name[20];
-		H3DNode node = castRay(x, y, hit_pos, node_name, 20);
+		H3DNode node = castRay(x, y, hit_pos, node_name, 20, m_gizmo.getNode());
 		Component r = m_renderer->getRenderable(*m_universe, node);
 		if(node == m_gizmo.getNode() && m_selected_entity.isValid())
 		{
@@ -909,18 +909,34 @@ void EditorServer::rotateCamera(int x, int y)
 }
 
 
-H3DNode EditorServer::castRay(int x, int y, Vec3& hit_pos, char* name, int max_name_size)
+H3DNode EditorServer::castRay(int x, int y, Vec3& hit_pos, char* name, int max_name_size, H3DNode gizmo_node)
 {
 	Vec3 origin, dir;
 	m_renderer->getRay(x, y, origin, dir);
 	
-	if(h3dCastRay(H3DRootNode, origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, 1) == 0)
+	if(h3dCastRay(H3DRootNode, origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, 0) == 0)
 	{
 		return 0;
 	}
 	else
 	{
 		H3DNode node = 0;
+		int i = 0;
+		while(h3dGetCastRayResult(i, &node, 0, &hit_pos.x))
+		{
+			H3DNode original_node = node;
+			while(node && h3dGetNodeType(node) != H3DNodeTypes::Model)
+			{
+				node = h3dGetNodeParent(node);
+			}
+			if(node == gizmo_node)
+			{
+				const char* node_name = h3dGetNodeParamStr(original_node, H3DNodeParams::NameStr);
+				strcpy_s(name, max_name_size, node_name);
+				return node;
+			}
+			++i;
+		}
 		if(h3dGetCastRayResult(0, &node, 0, &hit_pos.x))
 		{
 			const char* node_name = h3dGetNodeParamStr(node, H3DNodeParams::NameStr);
