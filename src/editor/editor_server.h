@@ -5,8 +5,7 @@
 #include <Windows.h>
 
 
-extern "C" LUX_ENGINE_API void* __stdcall luxServerInit(HWND hdc, const char* base_path, void* callback_ptr);
-extern "C" LUX_ENGINE_API void __stdcall luxServerDraw(HWND hdc, void* ptr);
-extern "C" LUX_ENGINE_API void __stdcall luxServerUpdate(void* ptr);
-extern "C" LUX_ENGINE_API void __stdcall luxServerResize(HWND hdc, void* ptr);
-extern "C" LUX_ENGINE_API void __stdcall luxServerMessage(void* ptr, void* msg, int size);
+extern "C" LUX_ENGINE_API void* __stdcall luxServerInit(HWND hwnd, HWND game_hwnd, const char* base_path);
+extern "C" LUX_ENGINE_API void __stdcall luxServerTick(HWND hwnd, HWND game_hwnd, void* ptr);
+extern "C" LUX_ENGINE_API void __stdcall luxServerResize(HWND hwnd, void* ptr);
+

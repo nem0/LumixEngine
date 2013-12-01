@@ -30,15 +30,17 @@ namespace editor_ng
         FileServer.FileServerUI m_file_server_ui;
         Notifications m_notifications;
         Log.LogUI m_log_ui;
+        GameView m_game_view;
         string m_universe_filename = "";
 
         public MainForm()
         {
             InitializeComponent();
             m_scene_view = new SceneView();
+            m_game_view = new GameView();
             m_server = new native.EditorServer();
             m_log_ui = new Log.LogUI(m_server);
-            m_server.create(m_scene_view.panel1.Handle, System.IO.Directory.GetCurrentDirectory());
+            m_server.create(m_scene_view.panel1.Handle, m_game_view.viewPanel.Handle, System.IO.Directory.GetCurrentDirectory());
             m_notifications = new Notifications(this);
 
             m_file_server = new FileServer.FileServer();
@@ -48,11 +50,12 @@ namespace editor_ng
             m_asset_list = new AssetList(this);
             m_asset_list.main_form = this;
             m_property_grid = new PropertyGrid();
-            m_property_grid.main_form = this;
 
+            m_property_grid.main_form = this;
             m_file_server.start();
             m_asset_monitor.server = m_server;
             m_scene_view.server = m_server;
+            m_scene_view.game_view = m_game_view;
             m_asset_list.server = m_server;
             m_property_grid.server = m_server;
             m_asset_monitor.start();
@@ -63,6 +66,9 @@ namespace editor_ng
             m_dock_contents.Add(m_property_grid);
             m_dock_contents.Add(m_file_server_ui);
             m_dock_contents.Add(m_log_ui);
+            m_dock_contents.Add(m_game_view);
+
+
             if (System.IO.File.Exists("layout.xml"))
             {
                 dockPanel.LoadFromXml("layout.xml", new DeserializeDockContent(GetContentFromPersistString));
@@ -96,7 +102,6 @@ namespace editor_ng
 
         public void tick()
         {
-            m_server.update();
             m_scene_view.panel1.Refresh();
             if (m_scene_view.panel1.ContainsFocus)
             {
@@ -288,6 +293,11 @@ namespace editor_ng
         private void logToolStripMenuItem_Click(object sender, EventArgs e)
         {
             m_log_ui.Show(dockPanel);
+        }
+
+        private void gameToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            m_game_view.Show(dockPanel);
         }
     }
 }
