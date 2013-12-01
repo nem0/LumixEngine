@@ -575,6 +575,7 @@ void EditorServer::newUniverse()
 void EditorServer::load(IStream& stream)
 {
 	g_log_info.log("editor server", "parsing universe...");
+	int selected_idx = m_selected_entity.index;
 	destroyUniverse();
 	createUniverse(false, "");
 	JsonSerializer serializer(stream, JsonSerializer::READ);
@@ -593,6 +594,7 @@ void EditorServer::load(IStream& stream)
 	serializer.deserialize("cam_rot_y", m_camera_rot.y);
 	serializer.deserialize("cam_rot_z", m_camera_rot.z);
 	serializer.deserialize("cam_rot_w", m_camera_rot.w);
+	selectEntity(Entity(m_universe, selected_idx));
 	Matrix mtx;
 	m_camera_rot.toMatrix(mtx);
 	mtx.setTranslation(m_camera_pos);
@@ -1086,7 +1088,7 @@ void EditorServer::destroyUniverse()
 		m_editor_icons[i]->destroy();
 	}
 
-	m_gizmo.hide();
+	selectEntity(Entity::INVALID);
 	m_editor_icons.clear();
 	m_renderer->setUniverse(0);
 	m_animation_system->setUniverse(0);
