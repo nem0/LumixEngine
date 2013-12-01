@@ -63,6 +63,12 @@
     <ClCompile Include="..\..\src\editor\iplugin.cpp">
       <Filter>editor</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\universe\entity.cpp">
+      <Filter>universe</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\universe\component.cpp">
+      <Filter>universe</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\graphics\renderer.h">
@@ -115,6 +121,12 @@
     </ClInclude>
     <ClInclude Include="..\..\src\editor\iplugin.h">
       <Filter>editor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\universe\entity.h">
+      <Filter>universe</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\universe\component.h">
+      <Filter>universe</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

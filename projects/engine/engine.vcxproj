@@ -100,7 +100,9 @@
     <ClCompile Include="..\..\src\script\save_script_visitor.cpp" />
     <ClCompile Include="..\..\src\script\script_system.cpp" />
     <ClCompile Include="..\..\src\script\set_property_visitor.cpp" />
+    <ClCompile Include="..\..\src\universe\component.cpp" />
     <ClCompile Include="..\..\src\universe\component_event.cpp" />
+    <ClCompile Include="..\..\src\universe\entity.cpp" />
     <ClCompile Include="..\..\src\universe\entity_destroyed_event.cpp" />
     <ClCompile Include="..\..\src\universe\entity_moved_event.cpp" />
     <ClCompile Include="..\..\src\universe\universe.cpp" />
@@ -119,7 +121,9 @@
     <ClInclude Include="..\..\src\script\script_system.h" />
     <ClInclude Include="..\..\src\script\script_visitor.h" />
     <ClInclude Include="..\..\src\script\set_property_visitor.h" />
+    <ClInclude Include="..\..\src\universe\component.h" />
     <ClInclude Include="..\..\src\universe\component_event.h" />
+    <ClInclude Include="..\..\src\universe\entity.h" />
     <ClInclude Include="..\..\src\universe\entity_destroyed_event.h" />
     <ClInclude Include="..\..\src\universe\entity_moved_event.h" />
     <ClInclude Include="..\..\src\universe\universe.h" />
