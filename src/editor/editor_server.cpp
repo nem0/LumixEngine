@@ -1212,9 +1212,6 @@ void EditorServer::onMessage(void* msgptr, int size)
 		case MessageType::EDIT_SCRIPT:
 			editScript();
 			break;
-		case MessageType::RELOAD_SCRIPT:
-			reloadScript(reinterpret_cast<char*>(&msg[1]));
-			break;
 		case MessageType::LOOK_AT_SELECTED:
 			lookAtSelected();
 			break;
