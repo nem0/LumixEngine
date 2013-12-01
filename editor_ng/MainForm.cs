@@ -55,6 +55,7 @@ namespace editor_ng
             m_file_server.start();
             m_asset_monitor.server = m_server;
             m_scene_view.server = m_server;
+            m_scene_view.game_view = m_game_view;
             m_asset_list.server = m_server;
             m_property_grid.server = m_server;
             m_asset_monitor.start();

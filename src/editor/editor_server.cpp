@@ -143,8 +143,6 @@ private:
 		map<uint32_t, IPlugin*> m_creators;
 		MouseMode::Value m_mouse_mode;
 		vector<EditorIcon*>	m_editor_icons;
-		HWND m_hwnd;
-		HWND m_game_hwnd;
 		HGLRC m_hglrc;
 		HGLRC m_game_hglrc;
 		bool m_is_game_mode;
@@ -663,8 +661,6 @@ bool EditorServer::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 	m_message_task->create();
 	m_message_task->run();
 		
-	m_hwnd = hwnd;
-	m_game_hwnd = game_hwnd;
 	m_hglrc = createGLContext(hwnd);
 	m_game_hglrc = createGLContext(game_hwnd);
 	wglShareLists(m_hglrc, m_game_hglrc);
@@ -1291,16 +1287,16 @@ extern "C" LUX_ENGINE_API void* __stdcall luxServerInit(HWND hwnd, HWND game_hwn
 }
 
 
-extern "C" LUX_ENGINE_API void __stdcall luxServerResize(void* ptr)
+extern "C" LUX_ENGINE_API void __stdcall luxServerResize(HWND hwnd, void* ptr)
 {
 	EditorServer* server = static_cast<EditorServer*>(ptr);
 	RECT rect;
-	GetWindowRect(server->m_hwnd, &rect);
+	GetWindowRect(hwnd, &rect);
 	server->onResize(rect.right - rect.left, rect.bottom - rect.top);
 }
 
 
-extern "C" LUX_ENGINE_API void __stdcall luxServerTick(void* ptr)
+extern "C" LUX_ENGINE_API void __stdcall luxServerTick(HWND hwnd, HWND game_hwnd, void* ptr)
 {
 	EditorServer* server = static_cast<EditorServer*>(ptr);
 	PAINTSTRUCT ps;
@@ -1317,18 +1313,23 @@ extern "C" LUX_ENGINE_API void __stdcall luxServerTick(void* ptr)
 	}
 
 	server->m_renderer->enableStage("Gizmo", true);
-	hdc = BeginPaint(server->m_hwnd, &ps);
+	hdc = BeginPaint(hwnd, &ps);
+	assert(hdc);
 	wglMakeCurrent(hdc, server->m_hglrc);
 	server->renderScene();
 	wglSwapLayerBuffers(hdc, WGL_SWAP_MAIN_PLANE);
-	EndPaint(server->m_hwnd, &ps);
+	EndPaint(hwnd, &ps);
 
-	server->m_renderer->enableStage("Gizmo", false);
-	hdc = BeginPaint(server->m_game_hwnd, &ps);
-	wglMakeCurrent(hdc, server->m_game_hglrc);
-	server->renderScene();
-	wglSwapLayerBuffers(hdc, WGL_SWAP_MAIN_PLANE);
-	EndPaint(server->m_game_hwnd, &ps);
+	if(game_hwnd)
+	{
+		server->m_renderer->enableStage("Gizmo", false);
+		hdc = BeginPaint(game_hwnd, &ps);
+		assert(hdc);
+		wglMakeCurrent(hdc, server->m_game_hglrc);
+		server->renderScene();
+		wglSwapLayerBuffers(hdc, WGL_SWAP_MAIN_PLANE);
+		EndPaint(game_hwnd, &ps);
+	}
 }
 
 

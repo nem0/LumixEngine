@@ -18,5 +18,17 @@ namespace editor_ng
             InitializeComponent();
         }
 
+
+        public class UserDrawnPanel : Panel
+        {
+            public UserDrawnPanel()
+            {
+                SetStyle(ControlStyles.UserPaint, true);
+            }
+
+            protected override void OnPaintBackground(PaintEventArgs e)
+            {
+            }
+        }
     }
 }

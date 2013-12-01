@@ -6,6 +6,6 @@
 
 
 extern "C" LUX_ENGINE_API void* __stdcall luxServerInit(HWND hwnd, HWND game_hwnd, const char* base_path);
-extern "C" LUX_ENGINE_API void __stdcall luxServerTick(void* ptr);
-extern "C" LUX_ENGINE_API void __stdcall luxServerResize(void* ptr);
+extern "C" LUX_ENGINE_API void __stdcall luxServerTick(HWND hwnd, HWND game_hwnd, void* ptr);
+extern "C" LUX_ENGINE_API void __stdcall luxServerResize(HWND hwnd, void* ptr);
 
