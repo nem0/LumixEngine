@@ -29,16 +29,12 @@
 #include "animation/animation_system.h"
 #include "editor/iplugin.h"
 #include "core/log.h"
+#include "platform/task.h"
+#include "platform/socket.h"
 
 
 namespace Lux
 {
-
-
-H3DNode g_node[16];
-
-
-class EditorServer;
 
 
 struct MouseButton
@@ -50,9 +46,21 @@ struct MouseButton
 		RIGHT
 	};
 };
-	
 
-class EditorServer
+
+class MessageTask : public Task
+{
+	public:
+		virtual int task() LUX_OVERRIDE;
+
+		struct EditorServer* m_server;
+		Socket m_socket;
+		Socket* m_work_socket;
+};
+
+
+
+struct EditorServer
 {
 	public:
 		struct MouseMode
@@ -65,15 +73,11 @@ class EditorServer
 				TRANSFORM
 			};
 		};
-	public:
-		typedef void (__stdcall *ResponceCallback)(const void*, int);
 
-	public:
 		EditorServer();
 
-		bool create(HWND hwnd, const char* base_path, ResponceCallback callback);
+		bool create(HWND hwnd, HWND game_hwnd, const char* base_path);
 		void destroy();
-		void update();
 		void onPointerDown(int x, int y, MouseButton::Value button);
 		void onPointerMove(int x, int y, int relx, int rely);
 		void onPointerUp(int x, int y, MouseButton::Value button);
@@ -94,33 +98,35 @@ class EditorServer
 		void addEntity();
 		void removeEntity();
 		void runGameMode();
+		void stopGameMode();
+		void gameModeTick();
 		void editScript();
 		void reloadScript(const char* path);
 		void lookAtSelected();
 		void newUniverse();
 		void logMessage(int32_t type, const char* system, const char* msg);
 		Entity& getSelectedEntity() { return m_selected_entity; }
-		Mutex& getMessageMutex() { return m_message_mutex; }
 		bool isGameMode() const { return m_is_game_mode; }
 		void save(IStream& stream);
 		void load(IStream& stream);
+		void onMessage(void* msgptr, int size);
 
-private:
 		const PropertyDescriptor& getPropertyDescriptor(uint32_t type, const char* name);
 		H3DNode castRay(int x, int y, Vec3& hit_pos, char* name, int max_name_size, H3DNode gizmo_node);
 		void registerProperties();
 		void rotateCamera(int x, int y);
 		void onEvent(Event& evt);
 		void destroyUniverse();
-		void gameModeLoop();
 		bool loadPlugin(const char* plugin_name);
 		void onLogInfo(const char* system, const char* message);
 		void onLogWarning(const char* system, const char* message);
 		void onLogError(const char* system, const char* message);
+		void sendMessage(const char* data, int32_t length);
 
 		static void onEvent(void* data, Event& evt);
 
-	private:
+		Mutex m_universe_mutex;
+		Mutex m_send_mutex;
 		Gizmo m_gizmo;
 		Entity m_selected_entity;
 		Renderer* m_renderer;
@@ -128,18 +134,20 @@ private:
 		ScriptSystem* m_script_system;
 		Universe* m_universe;
 		vector<IPlugin*> m_plugins;
-		ResponceCallback m_response_callback;
 		MemoryStream m_stream;
 		map<uint32_t, vector<PropertyDescriptor> > m_component_properties;
 		map<uint32_t, IPlugin*> m_creators;
 		MouseMode::Value m_mouse_mode;
 		vector<EditorIcon*>	m_editor_icons;
-		HWND m_hwnd;
+		HGLRC m_hglrc;
+		HGLRC m_game_hglrc;
 		bool m_is_game_mode;
 		Quat m_camera_rot;
 		Vec3 m_camera_pos;
-		Mutex m_message_mutex;
 		TCPFileSystem m_fs;
+		MemoryStream m_game_mode_stream;
+		MessageTask* m_message_task;
+		InputSystem m_input_system;
 };
 
 
@@ -153,12 +161,10 @@ static const uint32_t animable_type = crc32("animable");
 
 void EditorServer::registerProperties()
 {
-	m_component_properties[crc32("renderable")].push_back(PropertyDescriptor("path", (PropertyDescriptor::Getter)&Renderer::getMesh, (PropertyDescriptor::Setter)&Renderer::setMesh, PropertyDescriptor::FILE));
-	//m_component_properties[crc32("physical")].push_back(PropertyDescriptor("source", (PropertyDescriptor::Getter)&PhysicsScene::getShapeSource, (PropertyDescriptor::Setter)&PhysicsScene::setShapeSource, PropertyDescriptor::FILE));
-	//m_component_properties[crc32("physical")].push_back(PropertyDescriptor("dynamic", (PropertyDescriptor::BoolGetter)&PhysicsScene::getIsDynamic, (PropertyDescriptor::BoolSetter)&PhysicsScene::setIsDynamic));
-	m_component_properties[crc32("point_light")].push_back(PropertyDescriptor("fov", (PropertyDescriptor::DecimalGetter)&Renderer::getLightFov, (PropertyDescriptor::DecimalSetter)&Renderer::setLightFov));
-	m_component_properties[crc32("point_light")].push_back(PropertyDescriptor("radius", (PropertyDescriptor::DecimalGetter)&Renderer::getLightRadius, (PropertyDescriptor::DecimalSetter)&Renderer::setLightRadius));
-	m_component_properties[crc32("script")].push_back(PropertyDescriptor("path", (PropertyDescriptor::Getter)&ScriptSystem::getScriptPath, (PropertyDescriptor::Setter)&ScriptSystem::setScriptPath, PropertyDescriptor::FILE));
+	m_component_properties[renderable_type].push_back(PropertyDescriptor("path", (PropertyDescriptor::Getter)&Renderer::getMesh, (PropertyDescriptor::Setter)&Renderer::setMesh, PropertyDescriptor::FILE));
+	m_component_properties[point_light_type].push_back(PropertyDescriptor("fov", (PropertyDescriptor::DecimalGetter)&Renderer::getLightFov, (PropertyDescriptor::DecimalSetter)&Renderer::setLightFov));
+	m_component_properties[point_light_type].push_back(PropertyDescriptor("radius", (PropertyDescriptor::DecimalGetter)&Renderer::getLightRadius, (PropertyDescriptor::DecimalSetter)&Renderer::setLightRadius));
+	m_component_properties[script_type].push_back(PropertyDescriptor("path", (PropertyDescriptor::Getter)&ScriptSystem::getScriptPath, (PropertyDescriptor::Setter)&ScriptSystem::setScriptPath, PropertyDescriptor::FILE));
 }
 
 
@@ -291,114 +297,83 @@ void EditorServer::addEntity()
 }
 
 
-void EditorServer::gameModeLoop()
+void EditorServer::gameModeTick()
+{
+	static long last_tick = GetTickCount();
+	long tick = GetTickCount();
+	float dt = (tick - last_tick) / 1000.0f;
+	last_tick = tick;
+	
+	m_script_system->update(dt);
+	for(int i = 0; i < m_plugins.size(); ++i)
+	{
+		m_plugins[i]->update(dt);
+	}
+	if(m_input_system.getActionValue(crc32("quit_game")) > 0)
+	{
+		stopGameMode();
+		return;
+	}
+	m_input_system.update(dt);
+	m_animation_system->update(dt);
+	m_fs.processLoaded();
+}
+
+
+int MessageTask::task()
 {
 	bool finished = false;
-	bool mousemove_handling = false;
-	InputSystem input_system;
-	input_system.create();
-	input_system.addAction(crc32("up"), InputSystem::DOWN, 'W');
-	input_system.addAction(crc32("down"), InputSystem::DOWN, 'S');
-	input_system.addAction(crc32("left"), InputSystem::DOWN, 'A');
-	input_system.addAction(crc32("right"), InputSystem::DOWN, 'D');
-	input_system.addAction(crc32("select"), InputSystem::DOWN, 'Q');
-	
-	m_script_system->setInputSystem(&input_system);
+	m_socket.create(10002);
+	m_work_socket = m_socket.accept();
+	vector<uint8_t> data;
+	data.resize(5);
 	while(!finished)
 	{
+		if(m_work_socket->receiveAllBytes(&data[0], 5))
 		{
-			Lock lock(m_message_mutex);
-			MSG msg;
-			while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE) > 0)
+			int length = *(int*)&data[0];
+			if(length > 0)
 			{
-				 TranslateMessage(&msg);
-				 //DispatchMessage(&msg);
-				 switch(msg.message)
-				 {
-					case WM_PAINT:
-						DispatchMessage(&msg);
-						break;
-					case WM_KEYDOWN:
-						if(msg.wParam == VK_ESCAPE)
-						{
-							finished = true;
-						}
-						break;
-					case WM_MOUSEMOVE:
-						{
-							if(!mousemove_handling)
-							{
-								RECT rect;
-								GetWindowRect(m_hwnd, &rect);
-								int cx = (rect.left + rect.right) >> 1;
-								int cy = (rect.bottom + rect.top) >> 1;
-								POINT cp;
-								cp.x = LOWORD(msg.lParam);
-								cp.y = HIWORD(msg.lParam);
-								ClientToScreen(m_hwnd, &cp);
-								if(cp.x != cx || cp.y != cy)
-								{
-									SetCursorPos(cx, cy);
-								}
-								input_system.injectMouseXMove((float)(cp.x - cx));
-								input_system.injectMouseYMove((float)(cp.y - cy));
-							}
-							mousemove_handling = !mousemove_handling;
-						}
-						break;
-					case WM_KEYUP:
-						break;
-				 }
+				data.resize(length);
+				m_work_socket->receiveAllBytes(&data[0], length);
+				Lock lock(m_server->m_universe_mutex);
+				m_server->onMessage(&data[0], data.size());
 			}
-
-			float dt = 0.05f;
-			m_script_system->update(dt);
-			for(int i = 0; i < m_plugins.size(); ++i)
-			{
-				m_plugins[i]->update(dt);
-			}
-			input_system.update(dt);
 		}
-		HDC hdc;
-		PAINTSTRUCT ps;
-		hdc = BeginPaint(m_hwnd, &ps);
-		update();
-		renderScene();
-		wglSwapLayerBuffers(hdc, WGL_SWAP_MAIN_PLANE);
-		EndPaint(m_hwnd, &ps);
 	}
-	input_system.destroy();
+	return 1;
 }
 
 
 void EditorServer::runGameMode()
 {
-	selectEntity(Entity::INVALID);
-	MemoryStream stream;
-	save(stream);
-	m_is_game_mode = true;
-	ShowCursor(FALSE);
-	m_gizmo.hide();
-	for(int i = 0; i < m_editor_icons.size(); ++i)
-	{
-		m_editor_icons[i]->hide();
-	}
+	m_game_mode_stream.clearBuffer();
+	save(m_game_mode_stream);
 	m_script_system->start();
-	gameModeLoop();
+	m_input_system.create();
+	m_input_system.addAction(crc32("up"), InputSystem::DOWN, 'W');
+	m_input_system.addAction(crc32("down"), InputSystem::DOWN, 'S');
+	m_input_system.addAction(crc32("left"), InputSystem::DOWN, 'A');
+	m_input_system.addAction(crc32("right"), InputSystem::DOWN, 'D');
+	m_input_system.addAction(crc32("select"), InputSystem::DOWN, 'Q');
+	m_input_system.addAction(crc32("quit_game"), InputSystem::DOWN, VK_ESCAPE);
+
+	m_is_game_mode = true;
+}
+
+
+void EditorServer::stopGameMode()
+{
+	m_is_game_mode = false;
+
+	m_input_system.destroy();
 	m_script_system->stop();
-	m_gizmo.show();
-	for(int i = 0; i < m_editor_icons.size(); ++i)
-	{
-		m_editor_icons[i]->show();
-	}
 	Matrix mtx;
 	m_camera_rot.toMatrix(mtx);
 	mtx.setTranslation(m_camera_pos);
 	m_renderer->setCameraMatrix(mtx);
-	ShowCursor(TRUE);
-	m_is_game_mode = false;
-	stream.rewindForRead();
-	load(stream);
+	m_game_mode_stream.rewindForRead();
+	load(m_game_mode_stream);
 }
 
 
@@ -427,7 +402,7 @@ void EditorServer::sendComponent(uint32_t type_crc)
 				break;
 			}
 		}
-		m_response_callback(m_stream.getBuffer(), m_stream.getBufferSize());
+		sendMessage(m_stream.getBuffer(), m_stream.getBufferSize());
 	}
 }
 
@@ -450,8 +425,7 @@ void EditorServer::sendEntityPosition(int uid)
 		m_stream.write(entity.getPosition().x);
 		m_stream.write(entity.getPosition().y);
 		m_stream.write(entity.getPosition().z);
-		if(m_response_callback)
-			m_response_callback(m_stream.getBuffer(), m_stream.getBufferSize());
+		sendMessage(m_stream.getBuffer(), m_stream.getBufferSize());
 	}
 }
 
@@ -601,6 +575,7 @@ void EditorServer::newUniverse()
 void EditorServer::load(IStream& stream)
 {
 	g_log_info.log("editor server", "parsing universe...");
+	int selected_idx = m_selected_entity.index;
 	destroyUniverse();
 	createUniverse(false, "");
 	JsonSerializer serializer(stream, JsonSerializer::READ);
@@ -619,6 +594,7 @@ void EditorServer::load(IStream& stream)
 	serializer.deserialize("cam_rot_y", m_camera_rot.y);
 	serializer.deserialize("cam_rot_z", m_camera_rot.z);
 	serializer.deserialize("cam_rot_w", m_camera_rot.w);
+	selectEntity(Entity(m_universe, selected_idx));
 	Matrix mtx;
 	m_camera_rot.toMatrix(mtx);
 	mtx.setTranslation(m_camera_pos);
@@ -629,22 +605,67 @@ void EditorServer::load(IStream& stream)
 
 void EditorServer::destroy()
 {
-	m_message_mutex.destroy();
+	m_universe_mutex.destroy();
 	m_fs.destroy();
 	// TODO
 }
 
 
-bool EditorServer::create(HWND hwnd, const char* base_path, EditorServer::ResponceCallback callback)
+HGLRC createGLContext(HWND hwnd)
 {
-	m_response_callback = callback;
+	PAINTSTRUCT ps;
+	HDC hdc;
+	hdc = BeginPaint(hwnd, &ps);
+	PIXELFORMATDESCRIPTOR pfd = { 
+	sizeof(PIXELFORMATDESCRIPTOR),  //  size of this pfd  
+	1,                     // version number  
+	PFD_DRAW_TO_WINDOW |   // support window  
+	PFD_SUPPORT_OPENGL |   // support OpenGL  
+	PFD_DOUBLEBUFFER,      // double buffered  
+	PFD_TYPE_RGBA,         // RGBA type  
+	24,                    // 24-bit color depth  
+	0, 0, 0, 0, 0, 0,      // color bits ignored  
+	0,                     // no alpha buffer  
+	0,                     // shift bit ignored  
+	0,                     // no accumulation buffer  
+	0, 0, 0, 0,            // accum bits ignored  
+	32,                    // 32-bit z-buffer      
+	0,                     // no stencil buffer  
+	0,                     // no auxiliary buffer  
+	PFD_MAIN_PLANE,        // main layer  
+	0,                     // reserved  
+	0, 0, 0                // layer masks ignored  
+	}; 
+	int pixelformat = ChoosePixelFormat(hdc, &pfd);
+	SetPixelFormat(hdc, pixelformat, &pfd);
+	HGLRC hglrc = wglCreateContext(hdc);
+	wglMakeCurrent(hdc, hglrc);
+	EndPaint(hwnd, &ps);
+	glPushAttrib(GL_ALL_ATTRIB_BITS);
+	return hglrc;
+}
+
+
+bool EditorServer::create(HWND hwnd, HWND game_hwnd, const char* base_path)
+{
+	m_universe_mutex.create();
+	m_send_mutex.create();
+	Socket::init();
+	m_message_task = new MessageTask();
+	m_message_task->m_server = this;
+	m_message_task->m_work_socket = 0;
+	m_message_task->create();
+	m_message_task->run();
+		
+	m_hglrc = createGLContext(hwnd);
+	m_game_hglrc = createGLContext(game_hwnd);
+	wglShareLists(m_hglrc, m_game_hglrc);
+
 	g_log_info.registerCallback(makeFunctor(this, &EditorServer::onLogInfo));
 	g_log_warning.registerCallback(makeFunctor(this, &EditorServer::onLogWarning));
 	g_log_error.registerCallback(makeFunctor(this, &EditorServer::onLogError));
 
-	m_message_mutex.create();
 	m_fs.create();
-	m_hwnd = hwnd;
 	m_renderer = new Renderer();
 	m_animation_system = new AnimationSystem();
 	RECT rect;
@@ -656,6 +677,7 @@ bool EditorServer::create(HWND hwnd, const char* base_path, EditorServer::Respon
 		g_log_error.log("editor server", "renderer has not been created");
 		return false;
 	}
+
 	if(!m_animation_system->create())
 	{
 		g_log_error.log("editor server", "animation system has not been created");
@@ -702,6 +724,19 @@ void EditorServer::onLogError(const char* system, const char* message)
 }
 
 
+void EditorServer::sendMessage(const char* data, int32_t length)
+{
+	if(m_message_task->m_work_socket)
+	{
+		Lock lock(m_send_mutex);
+		const uint32_t guard = 0x12345678;
+		m_message_task->m_work_socket->send(&length, 4);
+		m_message_task->m_work_socket->send(&guard, 4);
+		m_message_task->m_work_socket->send(data, length);
+	}
+}
+
+
 bool EditorServer::loadPlugin(const char* plugin_name)
 {
 	g_log_info.log("plugins", "loading plugin %s", plugin_name);
@@ -728,34 +763,15 @@ bool EditorServer::loadPlugin(const char* plugin_name)
 }
 
 
-void EditorServer::update()
-{
-	m_fs.processLoaded();
-}
-
-
 void EditorServer::renderScene()
 {
-	static float t = 0;
-	static long last_tick = GetTickCount();
-	long tick = GetTickCount();
-	t += 30.0f * (tick - last_tick) / 1000.0f;
-	m_animation_system->update(30.0f * (tick - last_tick) / 1000.0f);
-	last_tick = tick;
-/*	for(int i = 0; i< 16; ++i)
+	if(m_selected_entity.isValid())
 	{
-		h3dSetModelAnimParams(g_node[i], 0, t, 1.0f );
-	}*/
-	if(!m_is_game_mode)
+		m_gizmo.updateScale(m_renderer);
+	}
+	for(int i = 0, c = m_editor_icons.size(); i < c; ++i)
 	{
-		if(m_selected_entity.isValid())
-		{
-			m_gizmo.updateScale(m_renderer);
-		}
-		for(int i = 0, c = m_editor_icons.size(); i < c; ++i)
-		{
-			m_editor_icons[i]->update(m_renderer);
-		}
+		m_editor_icons[i]->update(m_renderer);
 	}
 	m_renderer->renderScene();
 
@@ -820,7 +836,6 @@ void EditorServer::renderScene()
 EditorServer::EditorServer()
 {
 	m_is_game_mode = false;
-	m_response_callback = 0;
 	m_selected_entity = Entity::INVALID;
 }
 
@@ -966,10 +981,7 @@ void EditorServer::logMessage(int32_t type, const char* system, const char* msg)
 	m_stream.write(type);
 	writeString(system);
 	writeString(msg);
-	if(m_response_callback)
-	{
-		m_response_callback(m_stream.getBuffer(), m_stream.getBufferSize());
-	}
+	sendMessage(m_stream.getBuffer(), m_stream.getBufferSize());
 }
 
 
@@ -988,43 +1000,15 @@ void EditorServer::selectEntity(Entity e)
 		{
 			m_stream.write(cmps[i].type);
 		}
-		m_response_callback(m_stream.getBuffer(), m_stream.getBufferSize());
+		sendMessage(m_stream.getBuffer(), m_stream.getBufferSize());
 	}
 	else
 	{
 		m_stream.flush();
 		m_stream.write(1);
 		m_stream.write(-1);
-		m_response_callback(m_stream.getBuffer(), m_stream.getBufferSize());
+		sendMessage(m_stream.getBuffer(), m_stream.getBufferSize());
 	}
-}
-
-
-extern "C" LUX_ENGINE_API void __stdcall luxServerResize(HWND hwnd, void* ptr)
-{
-	EditorServer* server = static_cast<EditorServer*>(ptr);
-	RECT rect;
-	GetWindowRect(hwnd, &rect);
-	server->onResize(rect.right - rect.left, rect.bottom - rect.top);
-}
-
-
-extern "C" LUX_ENGINE_API void __stdcall luxServerDraw(HWND hwnd, void* ptr)
-{
-	EditorServer* server = static_cast<EditorServer*>(ptr);
-	PAINTSTRUCT ps;
-	HDC hdc;
-	hdc = BeginPaint(hwnd, &ps);
-	server->renderScene();
-	wglSwapLayerBuffers(hdc, WGL_SWAP_MAIN_PLANE);
-	EndPaint(hwnd, &ps);
-}
-
-
-extern "C" LUX_ENGINE_API void __stdcall luxServerUpdate(void* ptr)
-{
-	EditorServer* server = static_cast<EditorServer*>(ptr);
-	server->update();
 }
 
 
@@ -1104,7 +1088,7 @@ void EditorServer::destroyUniverse()
 		m_editor_icons[i]->destroy();
 	}
 
-	m_gizmo.hide();
+	selectEntity(Entity::INVALID);
 	m_editor_icons.clear();
 	m_renderer->setUniverse(0);
 	m_animation_system->setUniverse(0);
@@ -1137,31 +1121,6 @@ void EditorServer::createUniverse(bool create_scene, const char* base_path)
 	if(create_scene)
 	{
 		Quat q(Vec3(0, 1, 0), 3.14159265f);
-	
-		/*Entity e = m_universe->createEntity();
-		e.setPosition(0, 0, -5);
-		Component renderable = m_renderer->createRenderable(m_universe->createEntity());
-		m_renderer->setMesh(renderable, "models/draha/draha.scene.xml");
-		
-		for(int i = 0; i < 16; ++i)
-		{
-			Entity e = m_universe->createEntity();
-			e.setPosition(0, 0, 0);
-			Component renderable = m_renderer->createRenderable(e);
-			m_renderer->setMesh(renderable, "models/zebra/zebra_run.scene.xml");
-			
-			Component animable = m_animation_system->createAnimable(e);	
-			m_animation_system->playAnimation(animable, "models/zebra/zebra_run.anim");
-			
-			g_node[i] = m_renderer->getMeshNode(renderable);
-			h3dSetNodeTransform(g_node[i], 0 + (float)i, 0, 10, 0, 0, 0, 0.01f, 0.01f, 0.01f);
-		}
-
-		e = m_universe->createEntity();
-		e.setPosition(0, 0, -5);
-		e.setRotation(q.x, q.y, q.z, q.w);
-		Component light2 = m_renderer->createPointLight(e);
-		*/
 		m_camera_pos.set(0, 0, 2);
 		m_camera_rot = Quat(0, 0, 0, 1);
 		Matrix mtx;
@@ -1173,47 +1132,6 @@ void EditorServer::createUniverse(bool create_scene, const char* base_path)
 	m_selected_entity = Entity::INVALID;
 }
 
-
-extern "C" LUX_ENGINE_API void* __stdcall luxServerInit(HWND hwnd, const char* base_path, void* callback_ptr)
-{
-	PAINTSTRUCT ps;
-	HDC hdc;
-	hdc = BeginPaint(hwnd, &ps);
-	PIXELFORMATDESCRIPTOR pfd = { 
-    sizeof(PIXELFORMATDESCRIPTOR),  //  size of this pfd  
-    1,                     // version number  
-    PFD_DRAW_TO_WINDOW |   // support window  
-    PFD_SUPPORT_OPENGL |   // support OpenGL  
-    PFD_DOUBLEBUFFER,      // double buffered  
-    PFD_TYPE_RGBA,         // RGBA type  
-    24,                    // 24-bit color depth  
-    0, 0, 0, 0, 0, 0,      // color bits ignored  
-    0,                     // no alpha buffer  
-    0,                     // shift bit ignored  
-    0,                     // no accumulation buffer  
-    0, 0, 0, 0,            // accum bits ignored  
-    32,                    // 32-bit z-buffer      
-    0,                     // no stencil buffer  
-    0,                     // no auxiliary buffer  
-    PFD_MAIN_PLANE,        // main layer  
-    0,                     // reserved  
-    0, 0, 0                // layer masks ignored  
-    }; 
-	int pixelformat = ChoosePixelFormat(hdc, &pfd);
-	SetPixelFormat(hdc, pixelformat, &pfd);
-	HGLRC hglrc = wglCreateContext(hdc);
-	wglMakeCurrent(hdc, hglrc);
-	EndPaint(hwnd, &ps);
-	glPushAttrib(GL_ALL_ATTRIB_BITS);
-	EditorServer* server = new EditorServer;
-	if(!server->create(hwnd, base_path, static_cast<EditorServer::ResponceCallback>(callback_ptr)))
-	{
-		delete server;
-		return NULL;
-	}
-
-	return server;
-}
 
 namespace MessageType
 {
@@ -1239,88 +1157,140 @@ namespace MessageType
 		RELOAD_SCRIPT,			// 18
 		NEW_UNIVERSE,			// 19
 		LOOK_AT_SELECTED = 20,	// 20
-
+		STOP_GAME_MODE,			// 21
 	};
 }
 
 
-extern "C" LUX_ENGINE_API void __stdcall luxServerMessage(void* ptr, void* msgptr, int size)
+void EditorServer::onMessage(void* msgptr, int size)
 {
-	EditorServer* server = static_cast<EditorServer*>(ptr);
 	bool locked = false;
-	if(server->isGameMode())
-	{
-		server->getMessageMutex().lock();
-		locked = true;
-	}
 	int* msg = static_cast<int*>(msgptr);
 	float* fmsg = static_cast<float*>(msgptr); 
 	switch(msg[0])
 	{
 		case MessageType::POINTER_DOWN:
-			server->onPointerDown(msg[1], msg[2], (MouseButton::Value)msg[3]);
+			onPointerDown(msg[1], msg[2], (MouseButton::Value)msg[3]);
 			break;
 		case MessageType::POINTER_MOVE:
-			server->onPointerMove(msg[1], msg[2], msg[3], msg[4]);
+			onPointerMove(msg[1], msg[2], msg[3], msg[4]);
 			break;
 		case MessageType::POINTER_UP:
-			server->onPointerUp(msg[1], msg[2], (MouseButton::Value)msg[3]);
+			onPointerUp(msg[1], msg[2], (MouseButton::Value)msg[3]);
 			break;
 		case MessageType::PROPERTY_SET:
-			server->setProperty(msg+1, size - 4);
+			setProperty(msg+1, size - 4);
 			break;
 		case MessageType::MOVE_CAMERA:
-			server->navigate(fmsg[1], fmsg[2], msg[3]);
+			navigate(fmsg[1], fmsg[2], msg[3]);
 			break;
 		case MessageType::SAVE:
-			server->save(reinterpret_cast<char*>(&msg[1]));
+			save(reinterpret_cast<char*>(&msg[1]));
 			break;
 		case MessageType::LOAD:
-			server->load(reinterpret_cast<char*>(&msg[1]));
+			load(reinterpret_cast<char*>(&msg[1]));
 			break;
 		case MessageType::ADD_COMPONENT:
-			server->addComponent(*reinterpret_cast<uint32_t*>(&msg[1]));
+			addComponent(*reinterpret_cast<uint32_t*>(&msg[1]));
 			break;
 		case MessageType::GET_PROPERTIES:
-			server->sendComponent(*reinterpret_cast<uint32_t*>(&msg[1]));
+			sendComponent(*reinterpret_cast<uint32_t*>(&msg[1]));
 			break;
 		case MessageType::REMOVE_COMPONENT:
-			server->removeComponent(*reinterpret_cast<uint32_t*>(&msg[1]));
+			removeComponent(*reinterpret_cast<uint32_t*>(&msg[1]));
 			break;
 		case MessageType::ADD_ENTITY:
-			server->addEntity();
+			addEntity();
 			break;
 		case MessageType::RUN_GAME_MODE:
-			server->runGameMode();
+			runGameMode();
+			break;
+		case MessageType::STOP_GAME_MODE:
+			stopGameMode();
 			break;
 		case MessageType::GET_POSITION:
-			server->sendEntityPosition(server->getSelectedEntity().index);
+			sendEntityPosition(getSelectedEntity().index);
 			break;
 		case MessageType::SET_POSITION:
-			server->setEntityPosition(msg[1], reinterpret_cast<float*>(&msg[2]));
+			setEntityPosition(msg[1], reinterpret_cast<float*>(&msg[2]));
 			break;
 		case MessageType::REMOVE_ENTITY:
-			server->removeEntity();
+			removeEntity();
 			break;
 		case MessageType::EDIT_SCRIPT:
-			server->editScript();
+			editScript();
 			break;
 		case MessageType::RELOAD_SCRIPT:
-			server->reloadScript(reinterpret_cast<char*>(&msg[1]));
+			reloadScript(reinterpret_cast<char*>(&msg[1]));
 			break;
 		case MessageType::LOOK_AT_SELECTED:
-			server->lookAtSelected();
+			lookAtSelected();
 			break;
 		case MessageType::NEW_UNIVERSE:
-			server->newUniverse();
+			newUniverse();
 			break;
 		default:
 			assert(false); // unknown message
 			break;
 	}
-	if(locked)
+}
+
+
+extern "C" LUX_ENGINE_API void* __stdcall luxServerInit(HWND hwnd, HWND game_hwnd, const char* base_path)
+{
+	EditorServer* server = new EditorServer;
+	if(!server->create(hwnd, game_hwnd, base_path))
 	{
-		server->getMessageMutex().unlock();
+		delete server;
+		return NULL;
+	}
+
+	return server;
+}
+
+
+extern "C" LUX_ENGINE_API void __stdcall luxServerResize(HWND hwnd, void* ptr)
+{
+	EditorServer* server = static_cast<EditorServer*>(ptr);
+	RECT rect;
+	GetWindowRect(hwnd, &rect);
+	server->onResize(rect.right - rect.left, rect.bottom - rect.top);
+}
+
+
+extern "C" LUX_ENGINE_API void __stdcall luxServerTick(HWND hwnd, HWND game_hwnd, void* ptr)
+{
+	EditorServer* server = static_cast<EditorServer*>(ptr);
+	PAINTSTRUCT ps;
+	HDC hdc;
+	Lock lock(server->m_universe_mutex);
+
+	if(server->m_is_game_mode)
+	{
+		server->gameModeTick();
+	}
+	else
+	{
+		server->m_fs.processLoaded();
+	}
+
+	server->m_renderer->enableStage("Gizmo", true);
+	hdc = BeginPaint(hwnd, &ps);
+	assert(hdc);
+	wglMakeCurrent(hdc, server->m_hglrc);
+	server->renderScene();
+	wglSwapLayerBuffers(hdc, WGL_SWAP_MAIN_PLANE);
+	EndPaint(hwnd, &ps);
+
+	if(game_hwnd)
+	{
+		server->m_renderer->enableStage("Gizmo", false);
+		hdc = BeginPaint(game_hwnd, &ps);
+		assert(hdc);
+		wglMakeCurrent(hdc, server->m_game_hglrc);
+		server->renderScene();
+		wglSwapLayerBuffers(hdc, WGL_SWAP_MAIN_PLANE);
+		EndPaint(game_hwnd, &ps);
 	}
 }
 

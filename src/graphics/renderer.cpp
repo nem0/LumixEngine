@@ -114,6 +114,7 @@ void resourceLoaded(void* user_data, char* file_data, int length, bool success)
 			h3dSetOption( H3DOptions::FastAnimation, 0 );
 			h3dSetOption( H3DOptions::MaxAnisotropy, 4 );
 			h3dSetOption( H3DOptions::ShadowMapSize, 512 );
+
 			renderer->m_camera_node = h3dAddCameraNode(H3DRootNode, "", renderer->m_pipeline_handle);
 			renderer->onResize(renderer->m_width, renderer->m_height);
 		}
@@ -123,6 +124,26 @@ void resourceLoaded(void* user_data, char* file_data, int length, bool success)
 	else
 	{
 		h3dLoadResource(renderer->m_loading_res, 0, 0);
+	}
+}
+
+
+void Renderer::enableStage(const char* name, bool enable)
+{
+	int i = 0;
+	while(true)
+	{
+		const char* n = h3dGetResParamStr(m_impl->m_pipeline_handle, H3DPipeRes::StageElem, i, H3DPipeRes::StageNameStr);
+		if(strcmp(n, name) == 0)
+		{
+			h3dSetResParamI(m_impl->m_pipeline_handle, H3DPipeRes::StageElem, i, H3DPipeRes::StageActivationI, enable ? 1 : 0);
+			return;
+		}
+		if(n == 0 || n[0] == '\0')
+		{
+			return;
+		}
+		++i;
 	}
 }
 

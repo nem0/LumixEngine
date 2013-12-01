@@ -1,8 +1,10 @@
 #pragma once
 
 
+#include "core/lux.h"
 
-class Task
+
+class LUX_PLATFORM_API Task
 {
 	public:
 		Task();
