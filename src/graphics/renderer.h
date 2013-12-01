@@ -26,6 +26,7 @@ class LUX_ENGINE_API Renderer
 
 		void renderScene();
 		void endFrame();
+		void enableStage(const char* name, bool enable);
 		int getWidth() const;
 		int getHeight() const;
 		void getRay(int x, int y, Vec3& origin, Vec3& dir);

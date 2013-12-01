@@ -18,6 +18,7 @@ namespace Lux
 			const char* getBuffer() const { return &m_buffer[0]; }
 			int getBufferSize() const { return m_size; }
 			void flush() { m_size = 0; }
+			void clearBuffer() { m_buffer.clear(); m_pos = 0; m_size = 0; }
 
 			template <class T>
 			void write(T value) { write(&value, sizeof(T)); }
