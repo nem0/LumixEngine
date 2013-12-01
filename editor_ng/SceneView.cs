@@ -33,12 +33,12 @@ namespace editor_ng
 
         private void panel1_Paint(object sender, PaintEventArgs e)
         {
-            server.draw(panel1.Handle);
+            server.draw();
         }
 
         private void panel1_Resize(object sender, EventArgs e)
         {
-            server.resize(panel1.Handle);
+            server.resize();
         }
 
         private void panel1_MouseDown(object sender, MouseEventArgs e)
