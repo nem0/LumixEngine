@@ -14,6 +14,13 @@ namespace editor_ng
         public native.EditorServer server { get; set; }
         public ScriptCompiler script_compiler { get; set; }
 
+        MainForm m_main_form;
+
+        public AssetMonitor(MainForm main_form)
+        {
+            m_main_form = main_form;
+        }
+
         public void start()
         {
             m_watcher = new FileSystemWatcher();
@@ -28,10 +35,13 @@ namespace editor_ng
 
         private void onChanged(object sender, FileSystemEventArgs args)
         {
-            switch (System.IO.Path.GetExtension(args.FullPath))
+            switch (System.IO.Path.GetExtension(args.FullPath.ToLower()))
             {
                 case ".cpp":
                     script_compiler.compile(args.FullPath, args.Name, true);
+                    break;
+                case ".dae":
+                    m_main_form.importModel(args.FullPath);
                     break;
             }
         }
