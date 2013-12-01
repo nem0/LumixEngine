@@ -56,6 +56,7 @@ namespace editor_ng
             m_script_compiler = new ScriptCompiler();
             m_script_compiler.onScriptUpdated += ScriptCompiler_onScriptUpdated;
             m_script_compiler.onCompileError += ScriptCompiler_onCompileError;
+            m_script_compiler.onAllScriptsCompiled += ScriptCompiler_onAllScriptsCompiled;
 
             m_asset_monitor.script_compiler = m_script_compiler;
             m_file_server.start();
@@ -79,6 +80,8 @@ namespace editor_ng
             {
                 dockPanel.LoadFromXml("layout.xml", new DeserializeDockContent(GetContentFromPersistString));
             }
+
+            m_script_compiler.compileAllScripts();
         }
 
         void ScriptCompiler_onScriptUpdated(object sender, EventArgs e)
@@ -188,15 +191,12 @@ namespace editor_ng
         {
             BeginInvoke((MethodInvoker)(() => {
                 m_notifications.showNotification("All scripts compiled");
-                m_server.startGameMode(); 
             }));
         }
 
         private void gameModeToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            m_script_compiler.onAllScriptsCompiled -= ScriptCompiler_onAllScriptsCompiled; 
-            m_script_compiler.onAllScriptsCompiled += ScriptCompiler_onAllScriptsCompiled;
-            m_script_compiler.compileAllScripts();
+            m_server.startGameMode(); 
         }
 
         void ScriptCompiler_onCompileError(object sender, EventArgs e)
