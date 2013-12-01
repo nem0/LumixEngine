@@ -337,18 +337,15 @@ int MessageTask::task()
 	data.resize(5);
 	while(!finished)
 	{
-		if(m_work_socket->canReceive())
+		if(m_work_socket->receiveAllBytes(&data[0], 5))
 		{
-			Lock lock(m_server->m_universe_mutex);
-			if(m_work_socket->receiveAllBytes(&data[0], 5))
+			int length = *(int*)&data[0];
+			if(length > 0)
 			{
-				int length = *(int*)&data[0];
-				if(length > 0)
-				{
-					data.resize(length);
-					m_work_socket->receiveAllBytes(&data[0], length);
-					m_server->onMessage(&data[0], data.size());
-				}
+				data.resize(length);
+				m_work_socket->receiveAllBytes(&data[0], length);
+				Lock lock(m_server->m_universe_mutex);
+				m_server->onMessage(&data[0], data.size());
 			}
 		}
 	}
