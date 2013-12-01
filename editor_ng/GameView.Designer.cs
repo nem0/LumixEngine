@@ -28,7 +28,7 @@
         /// </summary>
         private void InitializeComponent()
         {
-            this.viewPanel = new System.Windows.Forms.Panel();
+            this.viewPanel = new editor_ng.GameView.UserDrawnPanel();
             this.SuspendLayout();
             // 
             // viewPanel
@@ -36,9 +36,9 @@
             this.viewPanel.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.viewPanel.Location = new System.Drawing.Point(0, 0);
+            this.viewPanel.Location = new System.Drawing.Point(1, 1);
             this.viewPanel.Name = "viewPanel";
-            this.viewPanel.Size = new System.Drawing.Size(804, 378);
+            this.viewPanel.Size = new System.Drawing.Size(799, 378);
             this.viewPanel.TabIndex = 0;
             // 
             // GameView
@@ -48,6 +48,7 @@
             this.ClientSize = new System.Drawing.Size(802, 380);
             this.Controls.Add(this.viewPanel);
             this.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(238)));
+            this.HideOnClose = true;
             this.Name = "GameView";
             this.Text = "GameView";
             this.ResumeLayout(false);
@@ -56,7 +57,8 @@
 
         #endregion
 
-        public System.Windows.Forms.Panel viewPanel;
+        public GameView.UserDrawnPanel viewPanel;
+
 
     }
 }

@@ -16,9 +16,9 @@ namespace editor_ng.native
         [DllImport("engine.dll")]
         static extern IntPtr luxServerInit(IntPtr hwnd, IntPtr game_hwnd, IntPtr base_path);
         [DllImport("engine.dll")]
-        static extern void luxServerTick(IntPtr server);
+        static extern void luxServerTick(IntPtr hwnd, IntPtr game_hwnd, IntPtr server);
         [DllImport("engine.dll")]
-        static extern void luxServerResize(IntPtr server);
+        static extern void luxServerResize(IntPtr hwnd, IntPtr server);
 
         private IntPtr m_server = IntPtr.Zero;
         private byte[] m_buffer;
@@ -152,14 +152,14 @@ namespace editor_ng.native
             sendMessage(stream);
         }
 
-        public void resize()
+        public void resize(IntPtr hwnd)
         {
-            luxServerResize(m_server);
+            luxServerResize(hwnd, m_server);
         }
 
-        public void draw()
+        public void draw(IntPtr hwnd, IntPtr game_hwnd)
         {
-            luxServerTick(m_server);
+            luxServerTick(hwnd, game_hwnd, m_server);
         }
 
         public void createComponent(uint cmp)
