@@ -1,10 +1,13 @@
 #pragma once
 
 
+#include "core/lux.h"
+
+
 #ifndef DISABLE_NETWORK
 
 
-class Socket
+class LUX_PLATFORM_API Socket
 {
 	public:
 		Socket();
