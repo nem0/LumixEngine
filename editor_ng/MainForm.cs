@@ -117,8 +117,17 @@ namespace editor_ng
             m_component_names[Crc32.Compute(System.Text.Encoding.ASCII.GetBytes("animable"))] = "animable";
         }
 
+        public long m_last_tick = System.Diagnostics.Stopwatch.GetTimestamp();
+
         public void tick()
         {
+            long time = System.Diagnostics.Stopwatch.GetTimestamp();
+            while ((time - m_last_tick) / (float)System.Diagnostics.Stopwatch.Frequency < 0.15)
+            {
+                Thread.Sleep(1);
+                time = System.Diagnostics.Stopwatch.GetTimestamp();
+            }
+            m_last_tick = time;
             m_scene_view.panel1.Refresh();
             if (m_scene_view.panel1.ContainsFocus)
             {
