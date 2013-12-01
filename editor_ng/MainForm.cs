@@ -122,7 +122,7 @@ namespace editor_ng
         public void tick()
         {
             long time = System.Diagnostics.Stopwatch.GetTimestamp();
-            while ((time - m_last_tick) / (float)System.Diagnostics.Stopwatch.Frequency < 0.15)
+            while ((time - m_last_tick) / (float)System.Diagnostics.Stopwatch.Frequency < 0.03)
             {
                 Thread.Sleep(1);
                 time = System.Diagnostics.Stopwatch.GetTimestamp();
