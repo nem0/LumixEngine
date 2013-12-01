@@ -36,8 +36,6 @@
 namespace Lux
 {
 
-class EditorServer;
-
 
 struct MouseButton
 {
@@ -55,14 +53,14 @@ class MessageTask : public Task
 	public:
 		virtual int task() LUX_OVERRIDE;
 
-		EditorServer* m_server;
+		struct EditorServer* m_server;
 		Socket m_socket;
 		Socket* m_work_socket;
 };
 
 
 
-class EditorServer
+struct EditorServer
 {
 	public:
 		struct MouseMode
@@ -75,7 +73,7 @@ class EditorServer
 				TRANSFORM
 			};
 		};
-	public:
+
 		EditorServer();
 
 		bool create(HWND hwnd, HWND game_hwnd, const char* base_path);
@@ -113,7 +111,6 @@ class EditorServer
 		void load(IStream& stream);
 		void onMessage(void* msgptr, int size);
 
-private:
 		const PropertyDescriptor& getPropertyDescriptor(uint32_t type, const char* name);
 		H3DNode castRay(int x, int y, Vec3& hit_pos, char* name, int max_name_size, H3DNode gizmo_node);
 		void registerProperties();
@@ -128,7 +125,6 @@ private:
 
 		static void onEvent(void* data, Event& evt);
 
-	public:
 		Mutex m_universe_mutex;
 		Mutex m_send_mutex;
 		Gizmo m_gizmo;
@@ -166,8 +162,6 @@ static const uint32_t animable_type = crc32("animable");
 void EditorServer::registerProperties()
 {
 	m_component_properties[renderable_type].push_back(PropertyDescriptor("path", (PropertyDescriptor::Getter)&Renderer::getMesh, (PropertyDescriptor::Setter)&Renderer::setMesh, PropertyDescriptor::FILE));
-	//m_component_properties[crc32("physical")].push_back(PropertyDescriptor("source", (PropertyDescriptor::Getter)&PhysicsScene::getShapeSource, (PropertyDescriptor::Setter)&PhysicsScene::setShapeSource, PropertyDescriptor::FILE));
-	//m_component_properties[crc32("physical")].push_back(PropertyDescriptor("dynamic", (PropertyDescriptor::BoolGetter)&PhysicsScene::getIsDynamic, (PropertyDescriptor::BoolSetter)&PhysicsScene::setIsDynamic));
 	m_component_properties[point_light_type].push_back(PropertyDescriptor("fov", (PropertyDescriptor::DecimalGetter)&Renderer::getLightFov, (PropertyDescriptor::DecimalSetter)&Renderer::setLightFov));
 	m_component_properties[point_light_type].push_back(PropertyDescriptor("radius", (PropertyDescriptor::DecimalGetter)&Renderer::getLightRadius, (PropertyDescriptor::DecimalSetter)&Renderer::setLightRadius));
 	m_component_properties[script_type].push_back(PropertyDescriptor("path", (PropertyDescriptor::Getter)&ScriptSystem::getScriptPath, (PropertyDescriptor::Setter)&ScriptSystem::setScriptPath, PropertyDescriptor::FILE));
@@ -734,9 +728,9 @@ void EditorServer::sendMessage(const char* data, int32_t length)
 	{
 		Lock lock(m_send_mutex);
 		const uint32_t guard = 0x12345678;
-		assert(m_message_task->m_work_socket->send(&length, 4));
-		assert(m_message_task->m_work_socket->send(&guard, 4));
-		assert(m_message_task->m_work_socket->send(data, length));
+		m_message_task->m_work_socket->send(&length, 4);
+		m_message_task->m_work_socket->send(&guard, 4);
+		m_message_task->m_work_socket->send(data, length);
 	}
 }
 
@@ -1125,31 +1119,6 @@ void EditorServer::createUniverse(bool create_scene, const char* base_path)
 	if(create_scene)
 	{
 		Quat q(Vec3(0, 1, 0), 3.14159265f);
-	
-		/*Entity e = m_universe->createEntity();
-		e.setPosition(0, 0, -5);
-		Component renderable = m_renderer->createRenderable(m_universe->createEntity());
-		m_renderer->setMesh(renderable, "models/draha/draha.scene.xml");
-		
-		for(int i = 0; i < 16; ++i)
-		{
-			Entity e = m_universe->createEntity();
-			e.setPosition(0, 0, 0);
-			Component renderable = m_renderer->createRenderable(e);
-			m_renderer->setMesh(renderable, "models/zebra/zebra_run.scene.xml");
-			
-			Component animable = m_animation_system->createAnimable(e);	
-			m_animation_system->playAnimation(animable, "models/zebra/zebra_run.anim");
-			
-			g_node[i] = m_renderer->getMeshNode(renderable);
-			h3dSetNodeTransform(g_node[i], 0 + (float)i, 0, 10, 0, 0, 0, 0.01f, 0.01f, 0.01f);
-		}
-
-		e = m_universe->createEntity();
-		e.setPosition(0, 0, -5);
-		e.setRotation(q.x, q.y, q.z, q.w);
-		Component light2 = m_renderer->createPointLight(e);
-		*/
 		m_camera_pos.set(0, 0, 2);
 		m_camera_rot = Quat(0, 0, 0, 1);
 		Matrix mtx;
@@ -1194,11 +1163,6 @@ namespace MessageType
 void EditorServer::onMessage(void* msgptr, int size)
 {
 	bool locked = false;
-/*	if(isGameMode())
-	{
-		getMessageMutex().lock();
-		locked = true;
-	}*/
 	int* msg = static_cast<int*>(msgptr);
 	float* fmsg = static_cast<float*>(msgptr); 
 	switch(msg[0])
@@ -1267,10 +1231,6 @@ void EditorServer::onMessage(void* msgptr, int size)
 			assert(false); // unknown message
 			break;
 	}
-	/*if(locked)
-	{
-		getMessageMutex().unlock();
-	}*/
 }
 
 
