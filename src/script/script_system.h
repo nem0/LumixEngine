@@ -13,6 +13,7 @@ namespace Lux
 class Renderer;
 class Navigation;
 class InputSystem;
+class EntityNamesMap;
 
 
 class LUX_ENGINE_API ScriptSystem
@@ -32,6 +33,9 @@ class LUX_ENGINE_API ScriptSystem
 		void setRenderer(Renderer* renderer);
 		void setInputSystem(InputSystem* input_system);
 		InputSystem* getInputSystem() const;
+		
+		void setEntityNamesMap(EntityNamesMap* names_map);
+		Entity getEntityByName(const char* entity_name) const;
 
 		void deserialize(ISerializer& serializer);
 		void serialize(ISerializer& serializer);

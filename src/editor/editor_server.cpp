@@ -28,6 +28,7 @@
 #include "Horde3DUtils.h"
 #include "animation/animation_system.h"
 #include "editor/iplugin.h"
+#include "universe/entity_names_map.h"
 
 
 namespace Lux
@@ -90,7 +91,9 @@ class EditorServer
 		void sendComponent(uint32_t type_crc);
 		void removeComponent(uint32_t type_crc);
 		void sendEntityPosition(int uid);
+		void sendEntityProperties(int uid);
 		void setEntityPosition(int uid, float* pos);
+		void setEntityName(int uid, const char* name);
 		void addEntity();
 		void removeEntity();
 		void runGameMode();
@@ -123,6 +126,7 @@ private:
 		AnimationSystem* m_animation_system;
 		ScriptSystem* m_script_system;
 		Universe* m_universe;
+		EntityNamesMap* m_entity_names_map;
 		vector<IPlugin*> m_plugins;
 		ResponceCallback m_response_callback;
 		MemoryStream m_stream;
@@ -259,6 +263,7 @@ void EditorServer::save(IStream& stream)
 		m_plugins[i]->serialize(serializer);
 	}
 	m_animation_system->serialize(serializer);
+	m_entity_names_map->serialize(serializer);
 	serializer.serialize("cam_pos_x", m_camera_pos.x);
 	serializer.serialize("cam_pos_y", m_camera_pos.y);
 	serializer.serialize("cam_pos_z", m_camera_pos.z);
@@ -433,6 +438,10 @@ void EditorServer::setEntityPosition(int uid, float* pos)
 	e.setPosition(pos[0], pos[1], pos[2]);
 }
 
+void EditorServer::setEntityName(int uid, const char* name)
+{
+	m_entity_names_map->setEntityName(name, uid);
+}
 
 void EditorServer::sendEntityPosition(int uid)
 {
@@ -445,11 +454,33 @@ void EditorServer::sendEntityPosition(int uid)
 		m_stream.write(entity.getPosition().x);
 		m_stream.write(entity.getPosition().y);
 		m_stream.write(entity.getPosition().z);
+
 		if(m_response_callback)
 			m_response_callback(m_stream.getBuffer(), m_stream.getBufferSize());
 	}
 }
 
+void EditorServer::sendEntityProperties(int uid)
+{
+	Entity entity(m_universe, uid);
+	if(entity.isValid())
+	{
+		m_stream.flush();
+		m_stream.write(4);
+		m_stream.write(entity.index);
+		m_stream.write(entity.getPosition().x);
+		m_stream.write(entity.getPosition().y);
+		m_stream.write(entity.getPosition().z);
+
+		const char* name = m_entity_names_map->getEntityName(uid);
+		size_t len = strlen(name);
+		m_stream.write(int32_t(len));
+		m_stream.write(name, len);
+
+		if(m_response_callback)
+			m_response_callback(m_stream.getBuffer(), m_stream.getBufferSize());
+	}
+}
 
 void EditorServer::addComponent(uint32_t type_crc)
 {
@@ -541,6 +572,8 @@ void EditorServer::editScript()
 
 void EditorServer::removeEntity()
 {
+	m_entity_names_map->removeEntityName(m_selected_entity.index);
+	
 	m_universe->destroyEntity(m_selected_entity);
 	selectEntity(Lux::Entity::INVALID);
 }
@@ -616,6 +649,7 @@ void EditorServer::load(IStream& stream)
 		m_plugins[i]->deserialize(serializer);
 	}
 	m_animation_system->deserialize(serializer);
+	m_entity_names_map->deserialize(serializer);
 	serializer.deserialize("cam_pos_x", m_camera_pos.x);
 	serializer.deserialize("cam_pos_y", m_camera_pos.y);
 	serializer.deserialize("cam_pos_z", m_camera_pos.z);
@@ -645,6 +679,7 @@ bool EditorServer::create(HWND hwnd, const char* base_path)
 	m_hwnd = hwnd;
 	m_renderer = new Renderer();
 	m_animation_system = new AnimationSystem();
+
 	RECT rect;
 	m_script_system = new ScriptSystem();
 	m_script_system->setRenderer(m_renderer);
@@ -668,6 +703,10 @@ bool EditorServer::create(HWND hwnd, const char* base_path)
 	m_gizmo.create(base_path);
 	m_gizmo.hide();
 	registerProperties();
+
+	m_entity_names_map = new EntityNamesMap(m_universe);
+	m_script_system->setEntityNamesMap(m_entity_names_map);
+
 	//m_navigation.load("models/level2/level2.pda");
 	
 	return true;
@@ -1180,7 +1219,8 @@ namespace MessageType
 		RELOAD_SCRIPT,			// 18
 		NEW_UNIVERSE,			// 19
 		LOOK_AT_SELECTED = 20,	// 20
-
+		SET_ENTITY_NAME,		// 21
+		GET_ENTITY_PROPERTIES,  // 22
 	};
 }
 
@@ -1245,6 +1285,12 @@ extern "C" LUX_ENGINE_API void __stdcall luxServerMessage(void* ptr, void* msgpt
 			break;
 		case MessageType::SET_POSITION:
 			server->setEntityPosition(msg[1], reinterpret_cast<float*>(&msg[2]));
+			break;
+		case MessageType::SET_ENTITY_NAME:
+			server->setEntityName(msg[1], reinterpret_cast<char*>(&msg[2]));
+			break;
+		case MessageType::GET_ENTITY_PROPERTIES:
+			server->sendEntityProperties(server->getSelectedEntity().index);
 			break;
 		case MessageType::REMOVE_ENTITY:
 			server->removeEntity();

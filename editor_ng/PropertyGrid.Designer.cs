@@ -40,6 +40,8 @@
             this.yPositionTextBox = new System.Windows.Forms.TextBox();
             this.label4 = new System.Windows.Forms.Label();
             this.zPositionTextBox = new System.Windows.Forms.TextBox();
+            this.label5 = new System.Windows.Forms.Label();
+            this.entityNameTextBox = new System.Windows.Forms.TextBox();
             this.componentContextMenu.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -70,9 +72,9 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.panel1.AutoScroll = true;
-            this.panel1.Location = new System.Drawing.Point(0, 57);
+            this.panel1.Location = new System.Drawing.Point(0, 94);
             this.panel1.Name = "panel1";
-            this.panel1.Size = new System.Drawing.Size(224, 586);
+            this.panel1.Size = new System.Drawing.Size(224, 549);
             this.panel1.TabIndex = 4;
             // 
             // componentContextMenu
@@ -91,7 +93,7 @@
             // 
             // xPositionTextBox
             // 
-            this.xPositionTextBox.Location = new System.Drawing.Point(31, 31);
+            this.xPositionTextBox.Location = new System.Drawing.Point(31, 57);
             this.xPositionTextBox.Name = "xPositionTextBox";
             this.xPositionTextBox.Size = new System.Drawing.Size(46, 20);
             this.xPositionTextBox.TabIndex = 0;
@@ -101,7 +103,7 @@
             // label2
             // 
             this.label2.AutoSize = true;
-            this.label2.Location = new System.Drawing.Point(12, 35);
+            this.label2.Location = new System.Drawing.Point(12, 61);
             this.label2.Name = "label2";
             this.label2.Size = new System.Drawing.Size(14, 13);
             this.label2.TabIndex = 6;
@@ -110,7 +112,7 @@
             // label3
             // 
             this.label3.AutoSize = true;
-            this.label3.Location = new System.Drawing.Point(82, 35);
+            this.label3.Location = new System.Drawing.Point(82, 61);
             this.label3.Name = "label3";
             this.label3.Size = new System.Drawing.Size(14, 13);
             this.label3.TabIndex = 8;
@@ -118,7 +120,7 @@
             // 
             // yPositionTextBox
             // 
-            this.yPositionTextBox.Location = new System.Drawing.Point(101, 31);
+            this.yPositionTextBox.Location = new System.Drawing.Point(101, 57);
             this.yPositionTextBox.Name = "yPositionTextBox";
             this.yPositionTextBox.Size = new System.Drawing.Size(46, 20);
             this.yPositionTextBox.TabIndex = 7;
@@ -128,7 +130,7 @@
             // label4
             // 
             this.label4.AutoSize = true;
-            this.label4.Location = new System.Drawing.Point(152, 35);
+            this.label4.Location = new System.Drawing.Point(152, 61);
             this.label4.Name = "label4";
             this.label4.Size = new System.Drawing.Size(14, 13);
             this.label4.TabIndex = 10;
@@ -136,17 +138,39 @@
             // 
             // zPositionTextBox
             // 
-            this.zPositionTextBox.Location = new System.Drawing.Point(171, 31);
+            this.zPositionTextBox.Location = new System.Drawing.Point(171, 57);
             this.zPositionTextBox.Name = "zPositionTextBox";
             this.zPositionTextBox.Size = new System.Drawing.Size(46, 20);
             this.zPositionTextBox.TabIndex = 9;
             this.zPositionTextBox.Text = "0";
             this.zPositionTextBox.TextChanged += new System.EventHandler(this.xPositionTextBox_TextChanged);
             // 
+            // label5
+            // 
+            this.label5.AutoSize = true;
+            this.label5.Location = new System.Drawing.Point(12, 35);
+            this.label5.Name = "label5";
+            this.label5.Size = new System.Drawing.Size(38, 13);
+            this.label5.TabIndex = 11;
+            this.label5.Text = "Name:";
+            // 
+            // entityNameTextBox
+            // 
+            this.entityNameTextBox.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.entityNameTextBox.Location = new System.Drawing.Point(71, 32);
+            this.entityNameTextBox.Name = "entityNameTextBox";
+            this.entityNameTextBox.Size = new System.Drawing.Size(147, 20);
+            this.entityNameTextBox.TabIndex = 12;
+            this.entityNameTextBox.Text = "name";
+            this.entityNameTextBox.TextChanged += new System.EventHandler(this.entityNameTextBox_TextChanged);
+            // 
             // PropertyGrid
             // 
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
             this.ClientSize = new System.Drawing.Size(230, 643);
+            this.Controls.Add(this.label5);
+            this.Controls.Add(this.entityNameTextBox);
             this.Controls.Add(this.label4);
             this.Controls.Add(this.zPositionTextBox);
             this.Controls.Add(this.label3);
@@ -179,6 +203,8 @@
         private System.Windows.Forms.TextBox yPositionTextBox;
         private System.Windows.Forms.Label label4;
         private System.Windows.Forms.TextBox zPositionTextBox;
+        private System.Windows.Forms.Label label5;
+        private System.Windows.Forms.TextBox entityNameTextBox;
 
     }
 }

@@ -103,6 +103,7 @@
     <ClCompile Include="..\..\src\universe\component_event.cpp" />
     <ClCompile Include="..\..\src\universe\entity_destroyed_event.cpp" />
     <ClCompile Include="..\..\src\universe\entity_moved_event.cpp" />
+    <ClCompile Include="..\..\src\universe\entity_names_map.cpp" />
     <ClCompile Include="..\..\src\universe\universe.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -122,6 +123,7 @@
     <ClInclude Include="..\..\src\universe\component_event.h" />
     <ClInclude Include="..\..\src\universe\entity_destroyed_event.h" />
     <ClInclude Include="..\..\src\universe\entity_moved_event.h" />
+    <ClInclude Include="..\..\src\universe\entity_names_map.h" />
     <ClInclude Include="..\..\src\universe\universe.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

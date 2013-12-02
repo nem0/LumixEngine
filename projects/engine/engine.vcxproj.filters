@@ -63,6 +63,9 @@
     <ClCompile Include="..\..\src\editor\iplugin.cpp">
       <Filter>editor</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\universe\entity_names_map.cpp">
+      <Filter>universe</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\graphics\renderer.h">
@@ -115,6 +118,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\editor\iplugin.h">
       <Filter>editor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\universe\entity_names_map.h">
+      <Filter>universe</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
