@@ -266,19 +266,27 @@ namespace editor_ng
 
         private Dictionary<System.Diagnostics.Process, string> m_import_model_processes = new Dictionary<System.Diagnostics.Process, string>();
 
-        public void importModel(string filename)
+        public void importModel(string path)
         {
-            BeginInvoke(new Action(() => {
+            string filename = Path.GetFileName(path);
+            foreach (KeyValuePair<System.Diagnostics.Process, string> entry in m_import_model_processes)
+            {
+
+                if (Path.GetFileName(entry.Value) == filename)
+                    return;
+            }
+            BeginInvoke(new Action(() =>
+            {
                 m_notifications.showNotification("Importing model " + filename);
             }));
 
-            System.Diagnostics.ProcessStartInfo start_info = new System.Diagnostics.ProcessStartInfo("models\\ColladaConv.bat", filename);
+            System.Diagnostics.ProcessStartInfo start_info = new System.Diagnostics.ProcessStartInfo("models\\ColladaConv.bat", path);
             start_info.CreateNoWindow = true;
             start_info.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;
             System.Diagnostics.Process process = System.Diagnostics.Process.Start(start_info);
             process.EnableRaisingEvents = true;
             m_import_model_processes.Add(process, filename);
-            process.Exited += importModelFinished;        
+            process.Exited += importModelFinished;
         }
 
         public void importModel()
