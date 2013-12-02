@@ -1,13 +1,16 @@
-#include "physics_system.h"
+#include "physics/physics_system.h"
+
 #include <PxPhysicsAPI.h>
-#include "physics_scene.h"
-#include "universe/component_event.h"
+
 #include "cooking/PxCooking.h"
-#include "universe/entity_moved_event.h"
-#include "physics_system_impl.h"
-#include "editor/editor_properties.h"
-#include "editor/property_descriptor.h"
 #include "core/crc32.h"
+#include "editor/editor_server.h"
+#include "editor/property_descriptor.h"
+#include "engine/engine.h"
+#include "physics/physics_scene.h"
+#include "physics/physics_system_impl.h"
+#include "universe/component_event.h"
+#include "universe/entity_moved_event.h"
 
 
 #pragma comment(lib, "PhysXVisualDebuggerSDKCHECKED.lib")
@@ -86,13 +89,12 @@ void PhysicsSystem::update(float dt)
 }
 
 
-bool PhysicsSystem::create(EditorPropertyMap& properties, ComponentCreatorList& creators)
+bool PhysicsSystem::create(Engine& engine)
 {
-	properties[crc32("physical")].push_back(PropertyDescriptor("source", (PropertyDescriptor::Getter)&PhysicsScene::getShapeSource, (PropertyDescriptor::Setter)&PhysicsScene::setShapeSource, PropertyDescriptor::FILE));
-	properties[crc32("physical")].push_back(PropertyDescriptor("dynamic", (PropertyDescriptor::BoolGetter)&PhysicsScene::getIsDynamic, (PropertyDescriptor::BoolSetter)&PhysicsScene::setIsDynamic));
-
-	creators.insert(physical_type, this);
-	creators.insert(controller_type, this);
+	engine.getEditorServer()->registerProperty("physical", PropertyDescriptor("source", (PropertyDescriptor::Getter)&PhysicsScene::getShapeSource, (PropertyDescriptor::Setter)&PhysicsScene::setShapeSource, PropertyDescriptor::FILE));
+	engine.getEditorServer()->registerProperty("physical", PropertyDescriptor("dynamic", (PropertyDescriptor::BoolGetter)&PhysicsScene::getIsDynamic, (PropertyDescriptor::BoolSetter)&PhysicsScene::setIsDynamic));
+	engine.getEditorServer()->registerCreator(physical_type, *this);
+	engine.getEditorServer()->registerCreator(controller_type, *this);
 
 	m_impl = new PhysicsSystemImpl;
 	m_impl->m_allocator = new physx::PxDefaultAllocator();
