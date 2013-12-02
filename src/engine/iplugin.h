@@ -9,6 +9,7 @@
 
 namespace Lux
 {
+	class Engine;
 	class Universe;
 	class ISerializer;
 	class PropertyDescriptor;
@@ -21,7 +22,7 @@ namespace Lux
 		public:
 			virtual ~IPlugin();
 
-			virtual bool create(EditorPropertyMap&, ComponentCreatorList&) = 0;
+			virtual bool create(Engine& engine) = 0;
 			virtual void onCreateUniverse(Universe&) {}
 			virtual void onDestroyUniverse(Universe&) {}
 			virtual void serialize(ISerializer&) {}

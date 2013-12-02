@@ -9,12 +9,14 @@ data can be found at https://dl.dropboxusercontent.com/u/28934398/luxengine_data
 
 TODO
 =========
+* OS X port
 * Entity names
 * Path class
-* script compilation in editor, not in engine
 * new renderer (no 3rd party)
 * finish tcp file system
 * std int types
 * macros for new/delete, platform, assert
-* log system
 * Atomic increment / decrement
+* sort includes
+* MainFrame.cs - do not send unnecessary 0 at the end of some messages
+* check user input (not geo files as renderables)
