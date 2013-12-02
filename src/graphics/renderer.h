@@ -4,6 +4,7 @@
 #include "Horde3D.h"
 #include "universe/universe.h"
 #include "core/string.h"
+#include "engine/iplugin.h"
 
 
 namespace Lux

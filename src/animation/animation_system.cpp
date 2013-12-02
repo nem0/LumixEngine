@@ -1,12 +1,14 @@
 #include "animation_system.h"
-#include "universe/universe.h"
-#include "core/crc32.h"
 #include "Horde3D.h"
 #include "Horde3DUtils.h"
-#include "graphics/renderer.h"
+#include "core/crc32.h"
 #include "core/event_manager.h"
-#include "universe/component_event.h"
 #include "core/json_serializer.h"
+#include "editor/editor_server.h"
+#include "engine/engine.h"
+#include "graphics/renderer.h"
+#include "universe/component_event.h"
+#include "universe/universe.h"
 
 namespace Lux
 {
@@ -35,10 +37,11 @@ namespace Lux
 	}
 
 
-	bool AnimationSystem::create()
+	bool AnimationSystem::create(Engine& engine)
 	{
 		m_impl = new AnimationSystemImpl();
 		m_impl->m_universe = 0;
+		engine.getEditorServer()->registerCreator(animable_type, *this);
 		return m_impl != 0;
 	}
 
@@ -50,18 +53,30 @@ namespace Lux
 	}
 
 
-	void AnimationSystem::setUniverse(Universe* universe)
+	void AnimationSystem::onCreateUniverse(Universe& universe)
 	{
-		if(m_impl->m_universe)
+		assert(!m_impl->m_universe);
+		m_impl->m_universe = &universe;
+		m_impl->m_universe->getEventManager()->registerListener(ComponentEvent::type, m_impl, &onEvent);
+	}
+
+
+	void AnimationSystem::onDestroyUniverse(Universe& universe)
+	{
+		assert(m_impl->m_universe);
+		m_impl->m_animables.clear();
+		m_impl->m_universe->getEventManager()->unregisterListener(ComponentEvent::type, m_impl, &onEvent);
+		m_impl->m_universe = 0;
+	}
+
+
+	Component AnimationSystem::createComponent(uint32_t component_type, const Entity& entity) 
+	{
+		if(component_type == animable_type)
 		{
-			m_impl->m_animables.clear();
-			m_impl->m_universe->getEventManager()->unregisterListener(ComponentEvent::type, m_impl, &onEvent);
+			return createAnimable(entity);
 		}
-		m_impl->m_universe = universe;
-		if(m_impl->m_universe)
-		{
-			m_impl->m_universe->getEventManager()->registerListener(ComponentEvent::type, m_impl, &onEvent);
-		}
+		return Component::INVALID;
 	}
 
 

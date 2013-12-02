@@ -27,8 +27,9 @@ Gizmo::~Gizmo()
 }
 
 
-void Gizmo::create(const char* base_path)
+void Gizmo::create(const char* base_path, Renderer& renderer)
 {
+	m_renderer = &renderer;
 	H3DRes res = h3dAddResource(H3DResTypes::SceneGraph, "models/tgizmo/tgizmo.scene.xml", 0);
 	h3dutLoadResourcesFromDisk(base_path);
 	m_handle = h3dAddNodes(H3DRootNode, res);
@@ -71,14 +72,14 @@ void Gizmo::getMatrix(Matrix& mtx)
 }
 
 
-void Gizmo::updateScale(Renderer* renderer)
+void Gizmo::updateScale()
 {
 	Matrix camera_mtx;
-	renderer->getCameraMatrix(camera_mtx);
+	m_renderer->getCameraMatrix(camera_mtx);
 	Matrix mtx;
 	getMatrix(mtx);
 	Vec3 pos = mtx.getTranslation();
-	float scale = renderer->getHalfFovTan() * (mtx.getTranslation() - camera_mtx.getTranslation()).length() * 2;
+	float scale = m_renderer->getHalfFovTan() * (mtx.getTranslation() - camera_mtx.getTranslation()).length() * 2;
 	scale /= 20 * mtx.getXVector().length();
 	Matrix scale_mtx = Matrix::IDENTITY;
 	scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = scale;
@@ -126,15 +127,15 @@ void Gizmo::onEvent(void* data, Event& evt)
 }
 
 
-void Gizmo::startTransform(int x, int y, TransformMode mode, Renderer* renderer)
+void Gizmo::startTransform(int x, int y, TransformMode mode)
 {
 	m_transform_mode = mode;
-	m_transform_point = getMousePlaneIntersection(x, y, renderer);
+	m_transform_point = getMousePlaneIntersection(x, y);
 	m_relx_accum = m_rely_accum = 0;
 }
 
 
-void Gizmo::transform(TransformOperation operation, int x, int y, int relx, int rely, Renderer* renderer, int flags)
+void Gizmo::transform(TransformOperation operation, int x, int y, int relx, int rely, int flags)
 {
 	if(m_selected_entity.index != -1)
 	{
@@ -185,7 +186,7 @@ void Gizmo::transform(TransformOperation operation, int x, int y, int relx, int 
 		}
 		else
 		{
-			Vec3 intersection = getMousePlaneIntersection(x, y, renderer);
+			Vec3 intersection = getMousePlaneIntersection(x, y);
 			Vec3 delta = intersection - m_transform_point;
 			m_transform_point = intersection;
 			Matrix mtx;
@@ -198,13 +199,13 @@ void Gizmo::transform(TransformOperation operation, int x, int y, int relx, int 
 }
 
 
-Vec3 Gizmo::getMousePlaneIntersection(int x, int y, Renderer* renderer)
+Vec3 Gizmo::getMousePlaneIntersection(int x, int y)
 {
 	Vec3 origin, dir;
-	renderer->getRay(x, y, origin, dir);	
+	m_renderer->getRay(x, y, origin, dir);	
 	dir.normalize();
 	Matrix camera_mtx;
-	renderer->getCameraMatrix(camera_mtx);
+	m_renderer->getCameraMatrix(camera_mtx);
 	if(m_transform_mode == TransformMode::CAMERA_XZ)
 	{
 		Vec3 a = crossProduct(Vec3(0, 1, 0), camera_mtx.getXVector());
