@@ -5,28 +5,24 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using System.Net.Sockets;
+using System.Net; 
+
 
 namespace editor_ng.native
 {
     public class EditorServer
     {
         [DllImport("engine.dll")]
-        static extern IntPtr luxServerInit(IntPtr hwnd, IntPtr base_path);
+        static extern IntPtr luxServerInit(IntPtr hwnd, IntPtr game_hwnd, IntPtr base_path);
         [DllImport("engine.dll")]
-        static extern void luxServerMessage(IntPtr server, IntPtr msg, int size);
-        [DllImport("engine.dll")]
-        static extern void luxServerSetCallback(IntPtr server, IntPtr callback);
-        [DllImport("engine.dll")]
-        static extern void luxServerDraw(IntPtr hwnd, IntPtr server);
-        [DllImport("engine.dll")]
-        static extern void luxServerUpdate(IntPtr server);
+        static extern void luxServerTick(IntPtr hwnd, IntPtr game_hwnd, IntPtr server);
         [DllImport("engine.dll")]
         static extern void luxServerResize(IntPtr hwnd, IntPtr server);
 
         private IntPtr m_server = IntPtr.Zero;
-        private delegate void EditorServerCallback(IntPtr ptr, int size);
-        private EditorServerCallback m_editor_server_callback;
-
+        private byte[] m_buffer;
+        private TcpClient m_client;
 
         public class EntityPositionArgs : EventArgs
         {
@@ -63,19 +59,89 @@ namespace editor_ng.native
         };
         public event EventHandler onComponentProperties;
 
-        public EditorServer(IntPtr hwnd, string base_path)
+        public void create(IntPtr hwnd, IntPtr game_hwnd, string base_path)
         {
             IntPtr strPtr = Marshal.StringToHGlobalAnsi(base_path);
-            m_server = luxServerInit(hwnd, strPtr);
+            m_server = luxServerInit(hwnd, game_hwnd, strPtr);
             Marshal.FreeHGlobal(strPtr);
-            m_editor_server_callback = editorServerCallback;
-            luxServerSetCallback(m_server, Marshal.GetFunctionPointerForDelegate(m_editor_server_callback));
+
+            m_buffer = new byte[1024*256];
+            System.Threading.Thread.Sleep(1000); // waiting for native part /// TODO remove this hack
+            m_client = new TcpClient("127.0.0.1", 10002);
+            m_client.GetStream().BeginRead(m_buffer, 0, 1024*256, new AsyncCallback(onReceive), this);
         }
 
+        private int m_pos = 0;
 
-        public void sendMessage(IntPtr ptr, int length)
+        private void handleMessage(int read)
         {
-            luxServerMessage(m_server, ptr, length);
+            m_pos += read;
+
+            if (m_pos > 8)
+            {
+                if (BitConverter.ToInt32(m_buffer, 4) == 0x12345678)
+                {
+                    int len = BitConverter.ToInt32(m_buffer, 0);
+                    if (m_pos < 8 + len)
+                    {
+                        return;
+                    }
+
+                    using (MemoryStream memory = new MemoryStream(m_buffer, 8, len + 8))
+                    {
+                        using (BinaryReader reader = new BinaryReader(memory))
+                        {
+                            int type = reader.ReadInt32();
+                            switch (type)
+                            {
+                                case 1:
+                                    entitySelectedCallback(reader);
+                                    break;
+                                case 2:
+                                    componentPropertiesCallback(reader);
+                                    break;
+                                case 3:
+                                    entityPositionCallback(reader);
+                                    break;
+                                case 4:
+                                    entityPropertiesCallback(reader);
+                                    break;
+                                case 5:
+                                    logMessage(reader);
+                                    break;
+                            }
+                        }
+                    }
+                    if (m_pos > 8 + len)
+                    {
+                        Array.Copy(m_buffer, 8 + len, m_buffer, 0, m_pos - len - 8);
+                    }
+                    m_pos -= 8 + len;
+                    if (m_pos >= 8)
+                    {
+                        handleMessage(0);
+                    }
+                }
+            }
+        }
+
+        private void onReceive(IAsyncResult result)
+        {
+            int read = (result.AsyncState as EditorServer).m_client.GetStream().EndRead(result);
+
+            if (read > 0)
+            {
+                handleMessage(read);
+            }
+            m_client.GetStream().BeginRead(m_buffer, m_pos, 256 * 1024 - m_pos, new AsyncCallback(onReceive), this);
+        }
+
+        private void sendMessage(System.IO.MemoryStream stream)
+        {
+            m_client.GetStream().Write(BitConverter.GetBytes(stream.Length), 0, 4);
+            m_client.GetStream().Write(BitConverter.GetBytes(0), 0, 1);
+            m_client.GetStream().Write(stream.GetBuffer(), 0, (int)stream.Length);
+            //luxServerMessage(m_server, ptr, length);
         }
 
         private MemoryStream m_stream = null;
@@ -99,30 +165,14 @@ namespace editor_ng.native
             sendMessage(stream);
         }
 
-        private void sendMessage(System.IO.MemoryStream stream)
-        {
-            stream.Flush();
-            byte[] bytes = stream.GetBuffer();
-            int length = bytes.Count();
-            IntPtr pnt = Marshal.AllocHGlobal(length);
-            Marshal.Copy(bytes, 0, pnt, length);
-            sendMessage(pnt, length);
-            Marshal.FreeHGlobal(pnt);
-        }
-
         public void resize(IntPtr hwnd)
         {
             luxServerResize(hwnd, m_server);
         }
 
-        public void update()
+        public void draw(IntPtr hwnd, IntPtr game_hwnd)
         {
-            luxServerUpdate(m_server);
-        }
-
-        public void draw(IntPtr hwnd)
-        {
-            luxServerDraw(hwnd, m_server);
+            luxServerTick(hwnd, game_hwnd, m_server);
         }
 
         public void createComponent(uint cmp)
@@ -231,7 +281,8 @@ namespace editor_ng.native
             startMessage();
             m_writer.Write(21);
             m_writer.Write(entity);
-            m_writer.Write(name.ToCharArray());
+            m_writer.Write(System.Text.Encoding.ASCII.GetBytes(name));
+            m_writer.Write(0);
             sendMessage();
         }
 
@@ -294,16 +345,7 @@ namespace editor_ng.native
             m_writer.Write(0);
             sendMessage();
         }
-
-        public void reloadScript(string path)
-        {
-            startMessage();
-            m_writer.Write(18);
-            m_writer.Write(System.Text.Encoding.ASCII.GetBytes(path));
-            m_writer.Write(0);
-            sendMessage();
-        }
-
+        
         public void requestComponentProperties(uint cmp)
         {
             startMessage();
@@ -376,6 +418,27 @@ namespace editor_ng.native
             }
         }
 
+        public event EventHandler onLogMessage;
+        public class LegMessageEventArgs : EventArgs
+        {
+            public string system;
+            public string message;
+            public int type;
+        }
+
+        private void logMessage(BinaryReader reader)
+        {
+            LegMessageEventArgs e = new LegMessageEventArgs();
+            e.type = reader.ReadInt32();
+            e.system = readString(reader);
+            e.message = readString(reader);
+            if (onLogMessage != null)
+            {
+                onLogMessage(this, e);
+            }
+        }
+
+
         private void entityPositionCallback(BinaryReader reader)
         {
             int uid = reader.ReadInt32();
@@ -410,38 +473,6 @@ namespace editor_ng.native
                 args.uid = uid;
                 args.name = name;
                 onEntityProperties(this, args);
-            }
-        }
-
-
-        public void editorServerCallback(IntPtr ptr, int size)
-        {
-            if (ptr != IntPtr.Zero)
-            {
-                byte[] bytes = new byte[size];
-                Marshal.Copy(ptr, bytes, 0, size);
-                using (MemoryStream memory = new MemoryStream(bytes))
-                {
-                    using (BinaryReader reader = new BinaryReader(memory))
-                    {
-                        int type = reader.ReadInt32();
-                        switch (type)
-                        {
-                            case 1:
-                                entitySelectedCallback(reader);
-                                break;
-                            case 2:
-                                componentPropertiesCallback(reader);
-                                break;
-                            case 3:
-                                entityPositionCallback(reader);
-                                break;
-                            case 4:
-                                entityPropertiesCallback(reader);
-                                break;
-                        }
-                    }
-                }
             }
         }
     }

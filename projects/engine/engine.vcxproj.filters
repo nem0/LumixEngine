@@ -16,6 +16,9 @@
     <Filter Include="animation">
       <UniqueIdentifier>{2bb241e1-0051-401f-b64c-47c220e77ff3}</UniqueIdentifier>
     </Filter>
+    <Filter Include="engine">
+      <UniqueIdentifier>{a05964d9-bc93-4b17-8bae-42733a26b9a9}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\graphics\renderer.cpp">
@@ -60,8 +63,20 @@
     <ClCompile Include="..\..\src\animation\animation_system.cpp">
       <Filter>animation</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\editor\iplugin.cpp">
-      <Filter>editor</Filter>
+    <ClCompile Include="..\..\src\universe\entity.cpp">
+      <Filter>universe</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\universe\component.cpp">
+      <Filter>universe</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\engine\engine.cpp">
+      <Filter>engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\engine\iplugin.cpp">
+      <Filter>engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\engine\plugin_manager.cpp">
+      <Filter>engine</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\universe\entity_names_map.cpp">
       <Filter>universe</Filter>
@@ -116,8 +131,20 @@
     <ClInclude Include="..\..\src\animation\animation_system.h">
       <Filter>animation</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\editor\iplugin.h">
-      <Filter>editor</Filter>
+    <ClInclude Include="..\..\src\universe\entity.h">
+      <Filter>universe</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\universe\component.h">
+      <Filter>universe</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\engine\engine.h">
+      <Filter>engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\engine\iplugin.h">
+      <Filter>engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\engine\plugin_manager.h">
+      <Filter>engine</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\universe\entity_names_map.h">
       <Filter>universe</Filter>

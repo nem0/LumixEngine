@@ -29,26 +29,40 @@ namespace editor_ng
         FileServer.FileServer m_file_server;
         FileServer.FileServerUI m_file_server_ui;
         Notifications m_notifications;
+        ScriptCompiler m_script_compiler;
+        Log.LogUI m_log_ui;
+        GameView m_game_view;
         string m_universe_filename = "";
 
         public MainForm()
         {
             InitializeComponent();
+            m_scene_view = new SceneView();
+            m_game_view = new GameView();
+            m_server = new native.EditorServer();
+            m_log_ui = new Log.LogUI(m_server);
+            m_server.create(m_scene_view.panel1.Handle, m_game_view.viewPanel.Handle, System.IO.Directory.GetCurrentDirectory());
             m_notifications = new Notifications(this);
+
             m_file_server = new FileServer.FileServer();
             m_file_server_ui = new FileServer.FileServerUI();
             m_file_server.ui = m_file_server_ui;
-            m_asset_monitor = new AssetMonitor();
-            m_scene_view = new SceneView();
+            m_asset_monitor = new AssetMonitor(this);
             m_asset_list = new AssetList(this);
             m_asset_list.main_form = this;
             m_property_grid = new PropertyGrid();
-            m_property_grid.main_form = this;
 
-            m_server = new native.EditorServer(m_scene_view.panel1.Handle, System.IO.Directory.GetCurrentDirectory());
+            m_property_grid.main_form = this;
+            m_script_compiler = new ScriptCompiler();
+            m_script_compiler.onScriptUpdated += ScriptCompiler_onScriptUpdated;
+            m_script_compiler.onCompileError += ScriptCompiler_onCompileError;
+            m_script_compiler.onAllScriptsCompiled += ScriptCompiler_onAllScriptsCompiled;
+
+            m_asset_monitor.script_compiler = m_script_compiler;
             m_file_server.start();
             m_asset_monitor.server = m_server;
             m_scene_view.server = m_server;
+            m_scene_view.game_view = m_game_view;
             m_asset_list.server = m_server;
             m_property_grid.server = m_server;
             m_asset_monitor.start();
@@ -58,10 +72,24 @@ namespace editor_ng
             m_dock_contents.Add(m_asset_list);
             m_dock_contents.Add(m_property_grid);
             m_dock_contents.Add(m_file_server_ui);
+            m_dock_contents.Add(m_log_ui);
+            m_dock_contents.Add(m_game_view);
+
+
             if (System.IO.File.Exists("layout.xml"))
             {
                 dockPanel.LoadFromXml("layout.xml", new DeserializeDockContent(GetContentFromPersistString));
             }
+
+            m_script_compiler.compileAllScripts();
+        }
+
+        void ScriptCompiler_onScriptUpdated(object sender, EventArgs e)
+        {
+            ScriptCompiler.ScriptUpdatedEventArgs args = e as ScriptCompiler.ScriptUpdatedEventArgs;
+            BeginInvoke((MethodInvoker)(() => {
+                m_notifications.showNotification("Script " + args.script_name + " updated");
+            }));
         }
 
         protected IDockContent GetContentFromPersistString(string persistString)
@@ -89,9 +117,17 @@ namespace editor_ng
             m_component_names[Crc32.Compute(System.Text.Encoding.ASCII.GetBytes("animable"))] = "animable";
         }
 
+        public long m_last_tick = System.Diagnostics.Stopwatch.GetTimestamp();
+
         public void tick()
         {
-            m_server.update();
+            long time = System.Diagnostics.Stopwatch.GetTimestamp();
+            while ((time - m_last_tick) / (float)System.Diagnostics.Stopwatch.Frequency < 0.03)
+            {
+                Thread.Sleep(1);
+                time = System.Diagnostics.Stopwatch.GetTimestamp();
+            }
+            m_last_tick = time;
             m_scene_view.panel1.Refresh();
             if (m_scene_view.panel1.ContainsFocus)
             {
@@ -160,9 +196,26 @@ namespace editor_ng
             Application.Exit();
         }
 
+        private void ScriptCompiler_onAllScriptsCompiled(object sender, EventArgs e)
+        {
+            BeginInvoke((MethodInvoker)(() => {
+                m_notifications.showNotification("All scripts compiled");
+            }));
+        }
+
         private void gameModeToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            m_server.startGameMode();
+            m_server.startGameMode(); 
+        }
+
+        void ScriptCompiler_onCompileError(object sender, EventArgs e)
+        {
+            BeginInvoke((MethodInvoker)(() =>
+            {
+                ScriptCompiler.CompileErrorEventArgs args = e as ScriptCompiler.CompileErrorEventArgs;
+                m_log_ui.logMessage(1, "system", "Script " + args.script_name + " failed to compile");
+                m_notifications.showNotification("Script " + args.script_name + " failed to compile");
+            }));
         }
 
         private void MainForm_Shown(object sender, EventArgs e)
@@ -213,20 +266,35 @@ namespace editor_ng
 
         private Dictionary<System.Diagnostics.Process, string> m_import_model_processes = new Dictionary<System.Diagnostics.Process, string>();
 
+        public void importModel(string path)
+        {
+            string filename = Path.GetFileName(path);
+            foreach (KeyValuePair<System.Diagnostics.Process, string> entry in m_import_model_processes)
+            {
+
+                if (Path.GetFileName(entry.Value) == filename)
+                    return;
+            }
+            BeginInvoke(new Action(() =>
+            {
+                m_notifications.showNotification("Importing model " + filename);
+            }));
+
+            System.Diagnostics.ProcessStartInfo start_info = new System.Diagnostics.ProcessStartInfo("models\\ColladaConv.bat", path);
+            start_info.CreateNoWindow = true;
+            start_info.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;
+            System.Diagnostics.Process process = System.Diagnostics.Process.Start(start_info);
+            process.EnableRaisingEvents = true;
+            m_import_model_processes.Add(process, filename);
+            process.Exited += importModelFinished;
+        }
+
         public void importModel()
         {
             OpenFileDialog dlg = new OpenFileDialog();
             if (dlg.ShowDialog() == DialogResult.OK)
             {
-                m_notifications.showNotification("Importing model " + dlg.FileName);
-
-                System.Diagnostics.ProcessStartInfo start_info = new System.Diagnostics.ProcessStartInfo("models\\ColladaConv.bat", dlg.FileName);
-                start_info.CreateNoWindow = true;
-                start_info.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;
-                System.Diagnostics.Process process = System.Diagnostics.Process.Start(start_info);
-                process.EnableRaisingEvents = true;
-                m_import_model_processes.Add(process, dlg.FileName);
-                process.Exited += importModelFinished;
+                importModel(dlg.FileName);
             }
         }
 
@@ -271,6 +339,16 @@ namespace editor_ng
         {
             m_server.newUniverse();
             m_universe_filename = "";
+        }
+
+        private void logToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            m_log_ui.Show(dockPanel);
+        }
+
+        private void gameToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            m_game_view.Show(dockPanel);
         }
     }
 }

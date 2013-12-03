@@ -172,7 +172,6 @@ namespace Lux
 
 	bool TCPFileSystem::create()
 	{
-		Socket::init();
 		m_impl = new TCPFileSystemImpl();
 		m_impl->m_last_uid = 0;
 		m_impl->m_task = new TCPFileSystemTask();

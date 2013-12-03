@@ -28,7 +28,6 @@ class LUX_ENGINE_API ScriptSystem
 		void setUniverse(Universe* universe);
 		Universe* getUniverse() const;
 		Component createScript(Entity entity);
-		void reloadScript(const char* path);
 		Renderer* getRenderer() const;
 		void setRenderer(Renderer* renderer);
 		void setInputSystem(InputSystem* input_system);

@@ -108,13 +108,6 @@ namespace editor_ng
             root_node.Expand();
         }
 
-
-       
-
-        
-
-        
-
         private void onDoubleClick(object sender, TreeNodeMouseClickEventArgs args)
         {
             string root = args.Node.Tag as string;

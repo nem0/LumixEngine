@@ -1,4 +1,4 @@
-#include "editor/iplugin.h"
+#include "engine/iplugin.h"
 
 
 namespace Lux

@@ -114,6 +114,7 @@ void resourceLoaded(void* user_data, char* file_data, int length, bool success)
 			h3dSetOption( H3DOptions::FastAnimation, 0 );
 			h3dSetOption( H3DOptions::MaxAnisotropy, 4 );
 			h3dSetOption( H3DOptions::ShadowMapSize, 512 );
+
 			renderer->m_camera_node = h3dAddCameraNode(H3DRootNode, "", renderer->m_pipeline_handle);
 			renderer->onResize(renderer->m_width, renderer->m_height);
 		}
@@ -123,6 +124,26 @@ void resourceLoaded(void* user_data, char* file_data, int length, bool success)
 	else
 	{
 		h3dLoadResource(renderer->m_loading_res, 0, 0);
+	}
+}
+
+
+void Renderer::enableStage(const char* name, bool enable)
+{
+	int i = 0;
+	while(true)
+	{
+		const char* n = h3dGetResParamStr(m_impl->m_pipeline_handle, H3DPipeRes::StageElem, i, H3DPipeRes::StageNameStr);
+		if(strcmp(n, name) == 0)
+		{
+			h3dSetResParamI(m_impl->m_pipeline_handle, H3DPipeRes::StageElem, i, H3DPipeRes::StageActivationI, enable ? 1 : 0);
+			return;
+		}
+		if(n == 0 || n[0] == '\0')
+		{
+			return;
+		}
+		++i;
 	}
 }
 
@@ -150,6 +171,7 @@ bool Renderer::create(IFileSystem* fs, int w, int h, const char* base_path)
 	m_impl->m_width = -1;
 	m_impl->m_height = -1;
 	m_impl->m_universe = 0;
+	m_impl->m_camera_node = 0;
 
 	m_impl->m_base_path = base_path;
 	m_impl->m_width = w;
@@ -250,6 +272,11 @@ void Renderer::getMesh(Component cmp, string& str)
 void Renderer::setMesh(Component cmp, const string& str)
 {
 	m_impl->m_paths[cmp.index] = str;
+	if(m_impl->m_renderables[cmp.index].m_node != 0)
+	{
+		h3dRemoveNode(m_impl->m_renderables[cmp.index].m_node);
+		m_impl->m_renderables[cmp.index].m_node = 0;
+	}
 	H3DRes res = h3dAddResource(H3DResTypes::SceneGraph, str.c_str(), 0);
 	if(h3dIsResLoaded(res))
 	{

@@ -2,33 +2,35 @@
 
 
 #include "core/lux.h"
-#include "universe/universe.h"
+#include "engine/iplugin.h"
 
 
 namespace Lux
 {
 
+	class Engine;
 	struct Entity;
-	class Universe;
 	class ISerializer;
+	class Universe;
 
-	class LUX_ENGINE_API AnimationSystem
+	class LUX_ENGINE_API AnimationSystem : public IPlugin
 	{
 		public:
 			AnimationSystem() { m_impl = 0; }
 
-			bool create();
+			virtual bool create(Engine&) LUX_OVERRIDE;
+			virtual void update(float time_delta) LUX_OVERRIDE;
+			virtual void onCreateUniverse(Universe& universe) LUX_OVERRIDE;
+			virtual void onDestroyUniverse(Universe& universe) LUX_OVERRIDE;
+			virtual void serialize(ISerializer& serializer) LUX_OVERRIDE;
+			virtual void deserialize(ISerializer& serializer) LUX_OVERRIDE;
+			virtual Component createComponent(uint32_t, const Entity&) LUX_OVERRIDE;
+
 			void destroy();
-
-			void setUniverse(Universe* universe);
-
 			Component createAnimable(const Entity& entity);
 			void playAnimation(const Component& cmp, const char* path);
 			void setAnimationTime(const Component& cmp, float time);
-			void update(float time_delta);
 		
-			void serialize(ISerializer& serializer);
-			void deserialize(ISerializer& serializer);
 
 		private:
 			struct AnimationSystemImpl* m_impl;

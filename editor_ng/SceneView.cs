@@ -19,6 +19,7 @@ namespace editor_ng
         private int m_last_mouse_x;
         private int m_last_mouse_y;
 
+        public GameView game_view { get; set; }
         public native.EditorServer server { get; set; }
 
         public SceneView()
@@ -33,7 +34,7 @@ namespace editor_ng
 
         private void panel1_Paint(object sender, PaintEventArgs e)
         {
-            server.draw(panel1.Handle);
+            server.draw(panel1.Handle, game_view.Visible ? game_view.viewPanel.Handle : IntPtr.Zero);
         }
 
         private void panel1_Resize(object sender, EventArgs e)

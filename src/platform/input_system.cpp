@@ -59,7 +59,7 @@ namespace Lux
 		InputSystemImpl::Action value;
 		value.key = key;
 		value.type = type;
-		m_impl->m_actions.insert(action, value);
+		m_impl->m_actions[action] =  value;
 	}
 
 

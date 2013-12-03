@@ -16,7 +16,8 @@ namespace editor_ng
     public partial class PropertyGrid : DockContent
     {
         private int m_selected_entity = -1;
-       
+        private bool m_is_position_update = false;
+
         private native.EditorServer m_server = null;
         public native.EditorServer server 
         {
@@ -299,76 +300,87 @@ namespace editor_ng
 
         private void onEntityPosition(object sender, EventArgs args)
         {
-            native.EditorServer.EntityPositionArgs e = args as native.EditorServer.EntityPositionArgs;
-            if (m_selected_entity == e.uid)
+            BeginInvoke(new Action(() =>
             {
-                xPositionTextBox.Text = e.x.ToString();
-                yPositionTextBox.Text = e.y.ToString();
-                zPositionTextBox.Text = e.z.ToString();
-            }
+                native.EditorServer.EntityPositionArgs e = args as native.EditorServer.EntityPositionArgs;
+                if (m_selected_entity == e.uid)
+                {
+                    m_is_position_update = true;
+                    xPositionTextBox.Text = e.x.ToString();
+                    yPositionTextBox.Text = e.y.ToString();
+                    zPositionTextBox.Text = e.z.ToString();
+                    m_is_position_update = false;
+                }
+            }));
         }
 
         private void onEntityProperties(object sender, EventArgs args)
         {
-            native.EditorServer.EntityPropertiesArgs e = args as native.EditorServer.EntityPropertiesArgs;
-            if (m_selected_entity == e.uid)
+            BeginInvoke(new Action(() =>
             {
-                xPositionTextBox.Text = e.x.ToString();
-                yPositionTextBox.Text = e.y.ToString();
-                zPositionTextBox.Text = e.z.ToString();
-                entityNameTextBox.Text = e.name;
-            }
+                native.EditorServer.EntityPropertiesArgs e = args as native.EditorServer.EntityPropertiesArgs;
+                if (m_selected_entity == e.uid)
+                {
+                    xPositionTextBox.Text = e.x.ToString();
+                    yPositionTextBox.Text = e.y.ToString();
+                    zPositionTextBox.Text = e.z.ToString();
+                    entityNameTextBox.Text = e.name;
+                }
+            }));
         }
 
         private void onComponentProperties(object sender, EventArgs args)
         {
-            native.EditorServer.ComponentPropertiesArgs e = args as native.EditorServer.ComponentPropertiesArgs;
-            foreach (Control c in panel1.Controls)
+            BeginInvoke(new Action(() =>
             {
-                if (c is DataGridView && c.Tag != null && (uint)c.Tag == e.cmp_type)
+                native.EditorServer.ComponentPropertiesArgs e = args as native.EditorServer.ComponentPropertiesArgs;
+                foreach (Control c in panel1.Controls)
                 {
-                    DataGridView dgv = c as DataGridView;
-                    dgv.Rows.Clear();
-                    for (int i = 0; i < e.names.Length; ++i)
+                    if (c is DataGridView && c.Tag != null && (uint)c.Tag == e.cmp_type)
                     {
-                        switch (e.types[i])
+                        DataGridView dgv = c as DataGridView;
+                        dgv.Rows.Clear();
+                        for (int i = 0; i < e.names.Length; ++i)
                         {
-                            case 2: // bool
-                                {
-                                    int n = dgv.Rows.Add(new object[] { e.names[i], e.values[i] == "true" });
-                                    DataGridViewCheckBoxCell cell = new DataGridViewCheckBoxCell();
-                                    dgv.Rows[n].Cells[1] = cell;
-                                    cell.Value = e.values[i] == "true";
-                                }
-                                break;
-                            case 1: // decimal
-                                dgv.Rows.Add(new object[] { e.names[i], e.values[i] });
-                                break;
-                            case 0: // filename
-                                {
-                                    DataGridViewFilenameCell cell = new DataGridViewFilenameCell();
-                                    int n = dgv.Rows.Add(new object[] { e.names[i], e.values[i] });
-                                    dgv.Rows[n].Cells[1] = cell;
-                                    cell.Value = e.values[i];
-                                }
-                                break;
-                            default:
-                                dgv.Rows.Add(new object[] { e.names[i], e.values[i] });
-                                break;
+                            switch (e.types[i])
+                            {
+                                case 2: // bool
+                                    {
+                                        int n = dgv.Rows.Add(new object[] { e.names[i], e.values[i] == "true" });
+                                        DataGridViewCheckBoxCell cell = new DataGridViewCheckBoxCell();
+                                        dgv.Rows[n].Cells[1] = cell;
+                                        cell.Value = e.values[i] == "true";
+                                    }
+                                    break;
+                                case 1: // decimal
+                                    dgv.Rows.Add(new object[] { e.names[i], e.values[i] });
+                                    break;
+                                case 0: // filename
+                                    {
+                                        DataGridViewFilenameCell cell = new DataGridViewFilenameCell();
+                                        int n = dgv.Rows.Add(new object[] { e.names[i], e.values[i] });
+                                        dgv.Rows[n].Cells[1] = cell;
+                                        cell.Value = e.values[i];
+                                    }
+                                    break;
+                                default:
+                                    dgv.Rows.Add(new object[] { e.names[i], e.values[i] });
+                                    break;
+                            }
                         }
+                        int h = 0;
+                        foreach (DataGridViewRow row in dgv.Rows)
+                        {
+                            h += row.Height;
+                        }
+                        Size s = new Size();
+                        s.Height = h + 5;
+                        s.Width = dgv.ClientSize.Width;
+                        dgv.ClientSize = s;
+                        break;
                     }
-                    int h = 0;
-                    foreach (DataGridViewRow row in dgv.Rows)
-                    {
-                        h += row.Height;
-                    }
-                    Size s = new Size();
-                    s.Height = h + 5;
-                    s.Width = dgv.ClientSize.Width;
-                    dgv.ClientSize = s;
-                    break;
                 }
-            }
+            }));
         }
 
         private void onCellEndEdit(object sender, EventArgs args)
@@ -445,67 +457,71 @@ namespace editor_ng
         
         private void onEntitySelected(object sender, EventArgs args)
         {
-            panel1.Controls.Clear();
-            Button create_cmp_button = new Button();
-            create_cmp_button.AllowDrop = true;
-            create_cmp_button.DragEnter += onCreateComponentDragEnter;
-            create_cmp_button.DragDrop += onCreateComponentDragDrop;
-            create_cmp_button.Dock = DockStyle.Top;
-            create_cmp_button.Text = "Create component";
-            panel1.Controls.Add(create_cmp_button);
-            create_cmp_button.Click += onCreateComponentClicked;
-            native.EditorServer.EntitySelectedArgs e = args as native.EditorServer.EntitySelectedArgs;
-            m_selected_entity = e.uid;
-            entityIDtextBox.Text = e.uid.ToString();
-            if (e.cmps != null)
+            BeginInvoke(new Action(() =>
             {
-                foreach (uint cmp in e.cmps)
+                panel1.Controls.Clear();
+                Button create_cmp_button = new Button();
+                create_cmp_button.AllowDrop = true;
+                create_cmp_button.DragEnter += onCreateComponentDragEnter;
+                create_cmp_button.DragDrop += onCreateComponentDragDrop;
+                create_cmp_button.Dock = DockStyle.Top;
+                create_cmp_button.Text = "Create component";
+                panel1.Controls.Add(create_cmp_button);
+                create_cmp_button.Click += onCreateComponentClicked;
+                native.EditorServer.EntitySelectedArgs e = args as native.EditorServer.EntitySelectedArgs;
+                m_selected_entity = e.uid;
+                entityIDtextBox.Text = e.uid.ToString();
+                if (e.cmps != null)
                 {
-                    DataGridView dgv = new DataGridView();
-                    dgv.CurrentCellDirtyStateChanged += dgv_CurrentCellDirtyStateChanged;
-                    dgv.Tag = cmp;
-                    dgv.Columns.Add("name", "name");
-                    dgv.Columns[0].ReadOnly = true;
-                    dgv.Columns.Add("value", "value");
-                    dgv.Columns[0].FillWeight = 100;
-                    dgv.Columns[0].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
-                    dgv.Columns[0].MinimumWidth = 100;
-                    dgv.Columns[1].FillWeight = 100;
-                    dgv.Columns[1].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-                    dgv.Dock = DockStyle.Top;
-                    dgv.AllowUserToAddRows = false;
-                    dgv.AllowUserToDeleteRows = false;
-                    dgv.RowHeadersVisible = false;
-                    dgv.ColumnHeadersVisible = false;
-                    dgv.CellEndEdit += onCellEndEdit;
-                    panel1.Controls.Add(dgv);
-                    Label l = new Label();
-                    l.Text = main_form.componentType2Name(cmp);
-                    l.Dock = DockStyle.Top;
-                    l.Tag = dgv;
-                    dgv.Margin = new Padding(0);
-                    l.MouseClick += (a, b) =>
+                    foreach (uint cmp in e.cmps)
                     {
-                        if ((b as MouseEventArgs).Button == MouseButtons.Left)
+                        DataGridView dgv = new DataGridView();
+                        dgv.CurrentCellDirtyStateChanged += dgv_CurrentCellDirtyStateChanged;
+                        dgv.Tag = cmp;
+                        dgv.Columns.Add("name", "name");
+                        dgv.Columns[0].ReadOnly = true;
+                        dgv.Columns.Add("value", "value");
+                        dgv.Columns[0].FillWeight = 100;
+                        dgv.Columns[0].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+                        dgv.Columns[0].MinimumWidth = 100;
+                        dgv.Columns[1].FillWeight = 100;
+                        dgv.Columns[1].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+                        dgv.Dock = DockStyle.Top;
+                        dgv.AllowUserToAddRows = false;
+                        dgv.AllowUserToDeleteRows = false;
+                        dgv.RowHeadersVisible = false;
+                        dgv.ColumnHeadersVisible = false;
+                        dgv.CellEndEdit += onCellEndEdit;
+                        panel1.Controls.Add(dgv);
+                        Label l = new Label();
+                        l.Text = main_form.componentType2Name(cmp);
+                        l.Dock = DockStyle.Top;
+                        l.Tag = dgv;
+                        dgv.Margin = new Padding(0);
+                        l.MouseClick += (a, b) =>
                         {
-                            DataGridView tmp = ((a as Label).Tag as DataGridView);
-                            if (tmp.Visible)
-                                tmp.Hide();
-                            else
-                                tmp.Show();
-                        }
-                        else if ((b as MouseEventArgs).Button == MouseButtons.Right)
-                        {
-                            m_selected_component = (uint)((a as Control).Tag as Control).Tag;
-                            componentContextMenu.Show(a as Control, 0, (a as Control).Size.Height);
-                        }
-                    };
-                    panel1.Controls.Add(l);
+                            if ((b as MouseEventArgs).Button == MouseButtons.Left)
+                            {
+                                DataGridView tmp = ((a as Label).Tag as DataGridView);
+                                if (tmp.Visible)
+                                    tmp.Hide();
+                                else
+                                    tmp.Show();
+                            }
+                            else if ((b as MouseEventArgs).Button == MouseButtons.Right)
+                            {
+                                m_selected_component = (uint)((a as Control).Tag as Control).Tag;
+                                componentContextMenu.Show(a as Control, 0, (a as Control).Size.Height);
+                            }
+                        };
+                        panel1.Controls.Add(l);
 
-                    server.requestComponentProperties(cmp);
+                        server.requestComponentProperties(cmp);
+                    }
+                    server.requestPosition();
                 }
                 server.requestProperties();
-            }
+            }));
         }
 
         void dgv_CurrentCellDirtyStateChanged(object sender, EventArgs e)
@@ -526,7 +542,10 @@ namespace editor_ng
         [System.Diagnostics.DebuggerStepThrough]
         private void xPositionTextBox_TextChanged(object sender, EventArgs e)
         {
-            server.setPosition(m_selected_entity, Convert.ToSingle(xPositionTextBox.Text), Convert.ToSingle(yPositionTextBox.Text), Convert.ToSingle(zPositionTextBox.Text));
+            if (!m_is_position_update)
+            {
+                server.setPosition(m_selected_entity, Convert.ToSingle(xPositionTextBox.Text), Convert.ToSingle(yPositionTextBox.Text), Convert.ToSingle(zPositionTextBox.Text));
+            }
         }
 
         private void entityNameTextBox_TextChanged(object sender, EventArgs e)

@@ -4,6 +4,7 @@
 #include "Horde3D.h"
 #include "universe/universe.h"
 #include "core/string.h"
+#include "engine/iplugin.h"
 
 
 namespace Lux
@@ -26,6 +27,7 @@ class LUX_ENGINE_API Renderer
 
 		void renderScene();
 		void endFrame();
+		void enableStage(const char* name, bool enable);
 		int getWidth() const;
 		int getHeight() const;
 		void getRay(int x, int y, Vec3& origin, Vec3& dir);

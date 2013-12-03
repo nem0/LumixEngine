@@ -3,7 +3,7 @@
 
 #include "universe\universe.h"
 #include "core/lux.h"
-#include "editor/iplugin.h"
+#include "engine/iplugin.h"
 
 
 namespace Lux
@@ -14,7 +14,7 @@ namespace Lux
 			Navigation();
 			virtual ~Navigation();
 
-			virtual bool create(EditorPropertyMap&, ComponentCreatorList&) LUX_OVERRIDE { return true; }
+			virtual bool create(Engine& engine) LUX_OVERRIDE { return true; }
 			virtual Component createComponent(uint32_t, const Entity&) LUX_OVERRIDE { return Component::INVALID; }
 			virtual void update(float dt) LUX_OVERRIDE;
 
