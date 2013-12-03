@@ -10,9 +10,9 @@ namespace Lux
 {
 
 
-class Renderer;
-class Navigation;
 class InputSystem;
+class Navigation;
+class Renderer;
 
 
 class LUX_ENGINE_API ScriptSystem

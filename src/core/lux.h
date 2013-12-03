@@ -2,6 +2,12 @@
 
 
 #include <cstdint>
+#include <cassert>
+
+
+#ifndef ASSERT
+#define ASSERT(x) assert(x)
+#endif
 
 
 #ifdef BUILDING_CORE

@@ -1,19 +1,16 @@
-#include "physics_scene.h"
-#include "physics_system.h"
+#include "physics/physics_scene.h"
+#include <cstdio>
 #include <PxPhysicsAPI.h>
 #include "cooking/PxCooking.h"
-#include "common/PxIO.h"
-#include <cassert>
-#include <cstdio>
 #include "core/crc32.h"
-#include "core/matrix.h"
-#include "core/json_object.h"
 #include "core/event_manager.h"
-#include "universe/entity_moved_event.h"
-#include "universe/component_event.h"
-#include "physics/physics_system.h"
 #include "core/iserializer.h"
-#include "physics_system_impl.h"
+#include "core/json_object.h"
+#include "core/matrix.h"
+#include "universe/component_event.h"
+#include "universe/entity_moved_event.h"
+#include "physics/physics_system.h"
+#include "physics/physics_system_impl.h"
 
 
 namespace Lux
@@ -625,12 +622,6 @@ void PhysicsScene::deserialize(ISerializer& serializer)
 PhysicsSystem& PhysicsScene::getSystem() const
 {
 	return *m_impl->m_system;
-}
-
-
-physx::PxScene* PhysicsScene::getRawScene()
-{
-	return m_impl->m_scene;
 }
 
 

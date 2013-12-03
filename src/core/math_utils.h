@@ -1,8 +1,8 @@
 #pragma once
 
 
-#include "lux.h"
-#include "vec3.h"
+#include "core/lux.h"
+#include "core/vec3.h"
 
 
 namespace Lux

@@ -1,9 +1,9 @@
 #pragma once
 
 
-#include "universe\universe.h"
 #include "core/lux.h"
 #include "engine/iplugin.h"
+#include "universe\universe.h"
 
 
 namespace Lux

@@ -1,5 +1,7 @@
 #include "navigation.h"
 #include <cstdio>
+#include <Windows.h>
+#include <gl/GL.h>
 #include "core/vec3.h"
 #include "core/vector.h"
 #include "detour/Recast.h"
@@ -8,8 +10,6 @@
 #include "detour/DetourNavMesh.h"
 #include "detour/DetourNavMeshQuery.h"
 #include "detour/DetourNavMeshBuilder.h"
-#include <Windows.h>
-#include <gl/GL.h>
 
 
 namespace Lux

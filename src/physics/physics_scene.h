@@ -2,22 +2,13 @@
 
 
 #include "core/lux.h"
+#include "core/string.h"
 #include "core/vec3.h"
 #include "universe/universe.h"
-#include "core/string.h"
-
-
-namespace physx
-{
-	class PxScene;
-}
 
 
 namespace Lux
 {
-
-
-class PhysicsSystem;
 
 
 struct RaycastHit
@@ -42,7 +33,6 @@ class LUX_PHYSICS_API PhysicsScene
 		Component createController(Entity entity);
 		void destroyActor(Component cmp);
 		PhysicsSystem& getSystem() const;
-		physx::PxScene* getRawScene();
 		void getShapeSource(Component cmp, string& str);
 		void setShapeSource(Component cmp, const string& str);
 		void getIsDynamic(Component cmp, bool& is);

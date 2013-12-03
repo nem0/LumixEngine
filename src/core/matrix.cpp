@@ -1,7 +1,6 @@
 #include "core/matrix.h"
-#include <cassert>
-#include "core/vec3.h"
 #include "core/quat.h"
+#include "core/vec3.h"
 
 
 namespace Lux

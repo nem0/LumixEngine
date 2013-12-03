@@ -1,8 +1,10 @@
 #pragma once
 
+
 #include "core/lux.h"
 #include "core/istream.h"
 #include "core/vector.h"
+
 
 namespace Lux
 {
@@ -15,7 +17,7 @@ namespace Lux
 			void create(void* data, int size) { m_data = data; m_size = size; m_pos = 0; }
 			virtual void write(const void* data, size_t size);
 			virtual bool read(void* data, size_t size);
-			const char* getBuffer() const { return &m_buffer[0]; }
+			const uint8_t* getBuffer() const { return &m_buffer[0]; }
 			int getBufferSize() const { return m_size; }
 			void flush() { m_size = 0; }
 			void clearBuffer() { m_buffer.clear(); m_pos = 0; m_size = 0; }
@@ -28,7 +30,7 @@ namespace Lux
 
 
 		private:
-			vector<char> m_buffer;
+			vector<uint8_t> m_buffer;
 			int m_pos;
 			int m_size;
 			void* m_data; 

@@ -2,20 +2,15 @@
 
 
 #include "core/lux.h"
-#include "core/vector.h"
-#include "core/map.h"
-#include "universe/universe.h"
+#include "universe/component.h"
 
 
 namespace Lux
 {
 	class Engine;
-	class Universe;
 	class ISerializer;
-	class PropertyDescriptor;
-	class IPlugin;
-	typedef map<uint32_t, vector<PropertyDescriptor> > EditorPropertyMap;
-	typedef map<uint32_t, IPlugin*> ComponentCreatorList;
+	class Universe;
+
 
 	class LUX_ENGINE_API IPlugin LUX_ABSTRACT
 	{
