@@ -17,8 +17,8 @@ const Matrix Matrix::IDENTITY(
 
 void multiplicate(Matrix& result, const Matrix& op1, const Matrix& op2)
 {
-	assert(&result != &op2);
-	assert(&result != &op1); // use operator *
+	ASSERT(&result != &op2);
+	ASSERT(&result != &op1); // use operator *
 
 	/// TODO optimize
 	result.m11 = op1.m11 * op2.m11 + op1.m21 * op2.m12 + op1.m31 * op2.m13 + op1.m41 * op2.m14;

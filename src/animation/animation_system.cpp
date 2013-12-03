@@ -56,7 +56,7 @@ namespace Lux
 
 	void AnimationSystem::onCreateUniverse(Universe& universe)
 	{
-		assert(!m_impl->m_universe);
+		ASSERT(!m_impl->m_universe);
 		m_impl->m_universe = &universe;
 		m_impl->m_universe->getEventManager()->registerListener(ComponentEvent::type, m_impl, &onEvent);
 	}
@@ -64,7 +64,7 @@ namespace Lux
 
 	void AnimationSystem::onDestroyUniverse(Universe& universe)
 	{
-		assert(m_impl->m_universe);
+		ASSERT(m_impl->m_universe);
 		m_impl->m_animables.clear();
 		m_impl->m_universe->getEventManager()->unregisterListener(ComponentEvent::type, m_impl, &onEvent);
 		m_impl->m_universe = 0;

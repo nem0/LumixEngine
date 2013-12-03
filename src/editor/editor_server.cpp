@@ -177,7 +177,7 @@ void EditorServer::tick(HWND hwnd, HWND game_hwnd)
 
 	m_impl->m_engine.getRenderer().enableStage("Gizmo", true);
 	hdc = BeginPaint(hwnd, &ps);
-	assert(hdc);
+	ASSERT(hdc);
 	wglMakeCurrent(hdc, m_impl->m_hglrc);
 	m_impl->renderScene();
 	wglSwapLayerBuffers(hdc, WGL_SWAP_MAIN_PLANE);
@@ -187,7 +187,7 @@ void EditorServer::tick(HWND hwnd, HWND game_hwnd)
 	{
 		m_impl->m_engine.getRenderer().enableStage("Gizmo", false);
 		hdc = BeginPaint(game_hwnd, &ps);
-		assert(hdc);
+		ASSERT(hdc);
 		wglMakeCurrent(hdc, m_impl->m_game_hglrc);
 		m_impl->renderScene();
 		wglSwapLayerBuffers(hdc, WGL_SWAP_MAIN_PLANE);
@@ -494,7 +494,7 @@ void EditorServerImpl::addComponent(uint32_t type_crc)
 		}
 		else
 		{
-			assert(false);
+			ASSERT(false);
 		}
 	}
 	selectEntity(m_selected_entity);
@@ -560,7 +560,7 @@ void EditorServerImpl::removeComponent(uint32_t type_crc)
 	}
 	else
 	{
-		assert(false);
+		ASSERT(false);
 	}
 	selectEntity(m_selected_entity);
 }
@@ -568,7 +568,7 @@ void EditorServerImpl::removeComponent(uint32_t type_crc)
 
 void loadMap(void* user_data, char* file_data, int length, bool success)
 {
-	assert(success);
+	ASSERT(success);
 	if(success)
 	{
 		MemoryStream stream;
@@ -840,7 +840,7 @@ const PropertyDescriptor& EditorServerImpl::getPropertyDescriptor(uint32_t type,
 			return props[i];
 		}
 	}
-	assert(false);
+	ASSERT(false);
 	return m_component_properties[type][0];
 }
 
@@ -1186,7 +1186,7 @@ void EditorServerImpl::onMessage(void* msgptr, int size)
 			newUniverse();
 			break;
 		default:
-			assert(false); // unknown message
+			ASSERT(false); // unknown message
 			break;
 	}
 }

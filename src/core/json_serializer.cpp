@@ -1,6 +1,5 @@
 #include "json_serializer.h"
 #include <cstring>
-#include <cassert>
 
 
 namespace Lux
@@ -375,7 +374,7 @@ void JsonSerializer::deserialize(const char* label, bool& value)
 void JsonSerializer::deserializeLabel(const char* label)
 {
 	unsigned char c = m_buffer;
-	assert(m_buffer == '"');
+	ASSERT(m_buffer == '"');
 	char tmp[255];
 	char* to = tmp;
 	do
@@ -387,7 +386,7 @@ void JsonSerializer::deserializeLabel(const char* label)
 	while(c != '"');
 	--to;
 	*to = 0;
-	assert(strcmp(label, tmp) == 0);
+	ASSERT(strcmp(label, tmp) == 0);
 	m_stream.read(&m_buffer, 1);
 	skipControl();
 }

@@ -178,7 +178,7 @@ void matrix2Transform(const Matrix& mtx, physx::PxTransform& transform)
 
 void PhysicsScene::destroyActor(Component cmp)
 {
-	assert(cmp.type == physical_type);
+	ASSERT(cmp.type == physical_type);
 	int inner_index = m_impl->m_index_map[cmp.index];
 	m_impl->m_scene->removeActor(*m_impl->m_actors[inner_index]);
 	m_impl->m_actors[inner_index]->release();
@@ -330,7 +330,7 @@ void PhysicsScene::setShapeSource(Component cmp, const string& str)
 			}
 			else
 			{
-				assert(false); // unsupported type
+				ASSERT(false); // unsupported type
 			}
 		}
 		delete[] buffer;

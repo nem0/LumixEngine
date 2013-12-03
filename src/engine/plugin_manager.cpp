@@ -80,7 +80,7 @@ namespace Lux
 				if(!plugin->create(*m_impl->m_engine))
 				{
 					delete plugin;
-					assert(false);
+					ASSERT(false);
 					return false;
 				}
 				m_impl->m_plugins.push_back(plugin);

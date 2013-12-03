@@ -1,5 +1,4 @@
 #include "mutex.h"
-#include <cassert>
 
 
 namespace Lux
@@ -28,7 +27,7 @@ namespace Lux
 
 	void Mutex::unlock()
 	{
-		assert(m_locked);
+		ASSERT(m_locked);
 		--m_locked; 
 		ReleaseMutex(m_handle);
 	}

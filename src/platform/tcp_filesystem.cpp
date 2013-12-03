@@ -99,7 +99,7 @@ namespace Lux
 			if(size < 9)
 			{
 				if(!m_work_socket->receiveAllBytes(buffer + size, 9 - size))
-					assert(false);
+					ASSERT(false);
 				size = 9;
 			}
 			
@@ -135,12 +135,12 @@ namespace Lux
 						break;
 					}
 					int last_err = WSAGetLastError();
-					assert(found);
+					ASSERT(found);
 				}
 			}
 			else
 			{
-				assert(false);
+				ASSERT(false);
 			}
 		}
 	}
