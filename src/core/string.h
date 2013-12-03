@@ -3,7 +3,6 @@
 
 #include "core/lux.h"
 #include <cstring>
-#include <cassert>
 
 
 namespace Lux

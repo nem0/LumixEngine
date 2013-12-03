@@ -4,7 +4,10 @@
 #include "core/lux.h"
 #include <cstdlib>
 #include <new>
-#include <cassert>
+
+
+namespace Lux
+{
 
 
 template <class T>
@@ -188,3 +191,6 @@ class vector
 		int m_size;
 		T* m_data;
 };
+
+
+} // ~namespace Lux

@@ -16,6 +16,7 @@ namespace Lux
 	static const uint32_t renderable_type = crc32("renderable");
 	static const uint32_t animable_type = crc32("animable");
 
+
 	struct AnimationSystemImpl
 	{
 		struct Animable

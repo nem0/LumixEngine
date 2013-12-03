@@ -13,13 +13,13 @@ namespace Lux
 {
 
 
-class EventManager;
-struct Vec3;
-struct Quat;
 class Event;
-class Universe;
-struct Matrix;
+class EventManager;
 class ISerializer;
+struct Matrix;
+struct Quat;
+class Universe;
+struct Vec3;
 
 
 class LUX_ENGINE_API Universe LUX_FINAL

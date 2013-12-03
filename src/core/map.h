@@ -2,7 +2,6 @@
 
 
 #include "core/lux.h"
-#include <cassert>
 
 
 #ifndef max

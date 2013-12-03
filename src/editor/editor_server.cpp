@@ -117,7 +117,7 @@ struct EditorServerImpl
 		void onLogInfo(const char* system, const char* message);
 		void onLogWarning(const char* system, const char* message);
 		void onLogError(const char* system, const char* message);
-		void sendMessage(const char* data, int32_t length);
+		void sendMessage(const uint8_t* data, int32_t length);
 
 		static void onEvent(void* data, Event& evt);
 
@@ -728,7 +728,7 @@ void EditorServerImpl::onLogError(const char* system, const char* message)
 }
 
 
-void EditorServerImpl::sendMessage(const char* data, int32_t length)
+void EditorServerImpl::sendMessage(const uint8_t* data, int32_t length)
 {
 	if(m_message_task->m_work_socket)
 	{
