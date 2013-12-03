@@ -15,10 +15,8 @@ TODO
 * Path class
 * new renderer (no 3rd party vs. Horde3d improvements)
 * finish tcp file system
-* std int types
-* macros for new/delete, platform, assert
+* macros for new/delete, platform
 * Atomic increment / decrement
-* sort includes
 * MainFrame.cs - do not send unnecessary 0 at the end of some messages
 * check user input (not geo files as renderables)
 * show script compilation errors

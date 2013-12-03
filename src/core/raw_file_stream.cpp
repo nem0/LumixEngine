@@ -1,5 +1,4 @@
 #include "raw_file_stream.h"
-#include <cassert>
 
 
 namespace Lux
@@ -14,7 +13,7 @@ RawFileStream::RawFileStream()
 
 RawFileStream::~RawFileStream()
 {
-	assert(m_fp == 0);
+	ASSERT(m_fp == 0);
 }
 
 

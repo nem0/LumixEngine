@@ -1,6 +1,5 @@
 #include "renderer.h"
 #include "universe/component_event.h"
-#include <cassert>
 #include <cmath>
 #include "Horde3D.h"
 #include "Horde3DUtils.h"
@@ -364,7 +363,7 @@ void Renderer::destroyPointLight(Component cmp)
 
 void RendererImpl::destroyPointLight(Component cmp)
 {
-	assert(cmp.type == point_light_type);
+	ASSERT(cmp.type == point_light_type);
 	h3dRemoveNode(m_lights[cmp.index].m_node);
 	m_lights[cmp.index].m_entity = m_first_free_light; // entity is used for freelist
 	m_first_free_light = cmp.index;
@@ -380,7 +379,7 @@ void Renderer::destroyRenderable(Component cmp)
 
 void RendererImpl::destroyRenderable(Component cmp)
 {
-	assert(cmp.type == rend_type);
+	ASSERT(cmp.type == rend_type);
 	h3dRemoveNode(m_renderables[cmp.index].m_node);
 	m_paths[cmp.index] = "";
 	m_renderables[cmp.index].m_entity = m_first_free_renderable; // entity is used for freelist
@@ -551,7 +550,7 @@ void RendererImpl::onEvent(Event& event)
 			}
 			else
 			{
-				assert(false);
+				ASSERT(false);
 			}
 		}
 	}

@@ -1,5 +1,4 @@
 #include "memory_stream.h"
-#include <cassert>
 
 
 namespace Lux

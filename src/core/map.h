@@ -264,7 +264,7 @@ class map
 			}
 			else
 			{
-				assert(false); // key == node->key -> key already in tree
+				ASSERT(false); // key == node->key -> key already in tree
 			}
 			node->height = max(node->getLeftHeight(), node->getRightHeight()) + 1;
 		}

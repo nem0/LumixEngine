@@ -35,7 +35,7 @@ namespace Lux
 
 	const Entity::ComponentList& Entity::getComponents() const
 	{
-		assert(isValid());
+		ASSERT(isValid());
 		return universe->m_component_list[index];
 	}
 
