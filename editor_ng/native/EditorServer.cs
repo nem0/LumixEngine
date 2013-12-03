@@ -32,6 +32,16 @@ namespace editor_ng.native
             public float z;
         };
         public event EventHandler onEntityPosition;
+        
+        public class EntityPropertiesArgs : EventArgs
+        {
+            public int uid;
+            public float x;
+            public float y;
+            public float z;
+            public string name;
+        };
+        public event EventHandler onEntityProperties;
 
         public class EntitySelectedArgs : EventArgs
         {
@@ -94,6 +104,9 @@ namespace editor_ng.native
                                     entityPositionCallback(reader);
                                     break;
                                 case 4:
+                                    entityPropertiesCallback(reader);
+                                    break;
+                                case 5:
                                     logMessage(reader);
                                     break;
                             }
@@ -179,6 +192,14 @@ namespace editor_ng.native
             sendMessage();
         }
 
+        public void requestProperties()
+        {
+            startMessage();
+            m_writer.Write(22);
+            m_writer.Write(0);
+            sendMessage();
+        }
+
         public void setComponentProperty(uint cmp, string name, string value)
         {
             startMessage();
@@ -251,6 +272,16 @@ namespace editor_ng.native
             m_writer.Write(x);
             m_writer.Write(y);
             m_writer.Write(z);
+            m_writer.Write(0);
+            sendMessage();
+        }
+
+        public void setEntityName(int entity, string name)
+        {
+            startMessage();
+            m_writer.Write(21);
+            m_writer.Write(entity);
+            m_writer.Write(System.Text.Encoding.ASCII.GetBytes(name));
             m_writer.Write(0);
             sendMessage();
         }
@@ -425,35 +456,23 @@ namespace editor_ng.native
             }
         }
 
-
-        public void editorServerCallback(IntPtr ptr, int size)
+        private void entityPropertiesCallback(BinaryReader reader)
         {
-            if (ptr != IntPtr.Zero)
+            int uid = reader.ReadInt32();
+            float x = reader.ReadSingle();
+            float y = reader.ReadSingle();
+            float z = reader.ReadSingle();
+            int len = reader.ReadInt32();
+            string name = new string(reader.ReadChars(len));
+            if (onEntityProperties != null)
             {
-                byte[] bytes = new byte[size];
-                Marshal.Copy(ptr, bytes, 0, size);
-                using (MemoryStream memory = new MemoryStream(bytes))
-                {
-                    using (BinaryReader reader = new BinaryReader(memory))
-                    {
-                        int type = reader.ReadInt32();
-                        switch (type)
-                        {
-                            case 1:
-                                entitySelectedCallback(reader);
-                                break;
-                            case 2:
-                                componentPropertiesCallback(reader);
-                                break;
-                            case 3:
-                                entityPositionCallback(reader);
-                                break;
-                            case 4:
-                                logMessage(reader);
-                                break;
-                        }
-                    }
-                }
+                EntityPropertiesArgs args = new EntityPropertiesArgs();
+                args.x = x;
+                args.y = y;
+                args.z = z;
+                args.uid = uid;
+                args.name = name;
+                onEntityProperties(this, args);
             }
         }
     }

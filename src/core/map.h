@@ -112,6 +112,7 @@ class map
 		{
 			clearNode(m_root);
 			m_root = 0;
+			m_size = 0;
 		}
 
 		iterator begin() const

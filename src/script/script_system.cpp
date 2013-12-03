@@ -4,6 +4,7 @@
 #include "core/crc32.h"
 #include "universe/universe.h"
 #include "universe/component_event.h"
+#include "universe/entity_names_map.h"
 #include "base_script.h"
 #include "save_script_visitor.h"
 #include "core/json_serializer.h"
@@ -30,6 +31,7 @@ namespace Lux
 		bool m_is_running;
 		Renderer* m_renderer;
 		InputSystem* m_input_system;
+		EntityNamesMap* m_entity_names_map;
 		ScriptSystem* m_owner;
 	};
 
@@ -75,6 +77,15 @@ namespace Lux
 		m_impl->m_renderer = renderer;
 	}
 
+	Entity ScriptSystem::getEntityByName(const char* entity_name) const
+	{
+		return m_impl->m_entity_names_map->getEntityByName(entity_name);
+	}
+
+	void ScriptSystem::setEntityNamesMap(EntityNamesMap* names_map)
+	{
+		m_impl->m_entity_names_map = names_map;
+	}
 
 	Universe* ScriptSystem::getUniverse() const
 	{

@@ -30,6 +30,7 @@
 #include "universe/entity_destroyed_event.h"
 #include "universe/entity_moved_event.h"
 #include "universe/universe.h"
+#include "universe/entity_names_map.h"
 
 
 namespace Lux
@@ -92,7 +93,9 @@ struct EditorServerImpl
 		void sendComponent(uint32_t type_crc);
 		void removeComponent(uint32_t type_crc);
 		void sendEntityPosition(int uid);
+		void sendEntityProperties(int uid);
 		void setEntityPosition(int uid, float* pos);
+		void setEntityName(int uid, const char* name);
 		void addEntity();
 		void removeEntity();
 		void runGameMode();
@@ -125,6 +128,7 @@ struct EditorServerImpl
 		Mutex m_send_mutex;
 		Gizmo m_gizmo;
 		Entity m_selected_entity;
+		EntityNamesMap* m_entity_names_map;
 		MemoryStream m_stream;
 		map<uint32_t, vector<PropertyDescriptor> > m_component_properties;
 		map<uint32_t, IPlugin*> m_creators;
@@ -334,6 +338,7 @@ void EditorServerImpl::save(IStream& stream)
 {
 	JsonSerializer serializer(stream, JsonSerializer::WRITE);
 	m_engine.serialize(serializer);
+	m_entity_names_map->serialize(serializer);
 	serializer.serialize("cam_pos_x", m_camera_pos.x);
 	serializer.serialize("cam_pos_y", m_camera_pos.y);
 	serializer.serialize("cam_pos_z", m_camera_pos.z);
@@ -445,6 +450,10 @@ void EditorServerImpl::setEntityPosition(int uid, float* pos)
 	e.setPosition(pos[0], pos[1], pos[2]);
 }
 
+void EditorServerImpl::setEntityName(int uid, const char* name)
+{
+	m_entity_names_map->setEntityName(name, uid);
+}
 
 void EditorServerImpl::sendEntityPosition(int uid)
 {
@@ -457,6 +466,27 @@ void EditorServerImpl::sendEntityPosition(int uid)
 		m_stream.write(entity.getPosition().x);
 		m_stream.write(entity.getPosition().y);
 		m_stream.write(entity.getPosition().z);
+		sendMessage(m_stream.getBuffer(), m_stream.getBufferSize());
+	}
+}
+
+void EditorServerImpl::sendEntityProperties(int uid)
+{
+	Entity entity(m_engine.getUniverse(), uid);
+	if(entity.isValid())
+	{
+		m_stream.flush();
+		m_stream.write(4);
+		m_stream.write(entity.index);
+		m_stream.write(entity.getPosition().x);
+		m_stream.write(entity.getPosition().y);
+		m_stream.write(entity.getPosition().z);
+
+		const char* name = m_entity_names_map->getEntityName(uid);
+		size_t len = strlen(name);
+		m_stream.write(int32_t(len));
+		m_stream.write(name, len);
+
 		sendMessage(m_stream.getBuffer(), m_stream.getBufferSize());
 	}
 }
@@ -533,6 +563,7 @@ void EditorServerImpl::editScript()
 
 void EditorServerImpl::removeEntity()
 {
+	m_entity_names_map->removeEntityName(m_selected_entity.index);
 	m_engine.getUniverse()->destroyEntity(m_selected_entity);
 	selectEntity(Lux::Entity::INVALID);
 }
@@ -602,6 +633,7 @@ void EditorServerImpl::load(IStream& stream)
 	JsonSerializer serializer(stream, JsonSerializer::READ);
 	
 	m_engine.deserialize(serializer);
+	m_entity_names_map->deserialize(serializer);
 	serializer.deserialize("cam_pos_x", m_camera_pos.x);
 	serializer.deserialize("cam_pos_y", m_camera_pos.y);
 	serializer.deserialize("cam_pos_z", m_camera_pos.z);
@@ -680,6 +712,7 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 	g_log_warning.registerCallback(makeFunctor(this, &EditorServerImpl::onLogWarning));
 	g_log_error.registerCallback(makeFunctor(this, &EditorServerImpl::onLogError));
 
+
 	RECT rect;
 	GetWindowRect(hwnd, &rect);
 	if(!m_engine.create(rect.right - rect.left, rect.bottom - rect.top, base_path, m_owner))
@@ -704,6 +737,10 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 	m_gizmo.create(base_path, m_engine.getRenderer());
 	m_gizmo.hide();
 	registerProperties();
+
+	m_entity_names_map = new EntityNamesMap(m_engine.getUniverse());
+	m_engine.getScriptSystem().setEntityNamesMap(m_entity_names_map);
+
 	//m_navigation.load("models/level2/level2.pda");
 	
 	return true;
@@ -955,7 +992,7 @@ void EditorServerImpl::writeString(const char* str)
 void EditorServerImpl::logMessage(int32_t type, const char* system, const char* msg)
 {
 	m_stream.flush();
-	m_stream.write(4);
+	m_stream.write(5);
 	m_stream.write(type);
 	writeString(system);
 	writeString(msg);
@@ -1116,7 +1153,9 @@ namespace MessageType
 								// 18
 		NEW_UNIVERSE = 19,		// 19
 		LOOK_AT_SELECTED = 20,	// 20
-		STOP_GAME_MODE,			// 21
+		SET_ENTITY_NAME,		// 21
+		GET_ENTITY_PROPERTIES,  // 22
+		STOP_GAME_MODE,			// 23
 	};
 }
 
@@ -1172,6 +1211,12 @@ void EditorServerImpl::onMessage(void* msgptr, int size)
 			break;
 		case MessageType::SET_POSITION:
 			setEntityPosition(msg[1], reinterpret_cast<float*>(&msg[2]));
+			break;
+		case MessageType::SET_ENTITY_NAME:
+			setEntityName(msg[1], reinterpret_cast<char*>(&msg[2]));
+			break;
+		case MessageType::GET_ENTITY_PROPERTIES:
+			sendEntityProperties(getSelectedEntity().index);
 			break;
 		case MessageType::REMOVE_ENTITY:
 			removeEntity();

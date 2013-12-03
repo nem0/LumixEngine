@@ -28,12 +28,14 @@ namespace editor_ng
                 {
                     m_server.onEntitySelected -= onEntitySelected;
                     m_server.onComponentProperties -= onComponentProperties;
+                    m_server.onEntityProperties -= onEntityProperties;
                     m_server.onEntityPosition -= onEntityPosition;
                 }
                 m_server = value;
                 if (m_server != null)
                 {
                     m_server.onEntityPosition += onEntityPosition;
+                    m_server.onEntityProperties += onEntityProperties;
                     m_server.onComponentProperties += onComponentProperties;
                     m_server.onEntitySelected += onEntitySelected;
                 }
@@ -296,7 +298,6 @@ namespace editor_ng
             }
         }
 
-
         private void onEntityPosition(object sender, EventArgs args)
         {
             BeginInvoke(new Action(() =>
@@ -309,6 +310,21 @@ namespace editor_ng
                     yPositionTextBox.Text = e.y.ToString();
                     zPositionTextBox.Text = e.z.ToString();
                     m_is_position_update = false;
+                }
+            }));
+        }
+
+        private void onEntityProperties(object sender, EventArgs args)
+        {
+            BeginInvoke(new Action(() =>
+            {
+                native.EditorServer.EntityPropertiesArgs e = args as native.EditorServer.EntityPropertiesArgs;
+                if (m_selected_entity == e.uid)
+                {
+                    xPositionTextBox.Text = e.x.ToString();
+                    yPositionTextBox.Text = e.y.ToString();
+                    zPositionTextBox.Text = e.z.ToString();
+                    entityNameTextBox.Text = e.name;
                 }
             }));
         }
@@ -504,6 +520,7 @@ namespace editor_ng
                     }
                     server.requestPosition();
                 }
+                server.requestProperties();
             }));
         }
 
@@ -529,6 +546,11 @@ namespace editor_ng
             {
                 server.setPosition(m_selected_entity, Convert.ToSingle(xPositionTextBox.Text), Convert.ToSingle(yPositionTextBox.Text), Convert.ToSingle(zPositionTextBox.Text));
             }
+        }
+
+        private void entityNameTextBox_TextChanged(object sender, EventArgs e)
+        {
+            server.setEntityName(m_selected_entity, entityNameTextBox.Text);
         }
     }
 }

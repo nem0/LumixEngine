@@ -78,6 +78,9 @@
     <ClCompile Include="..\..\src\engine\plugin_manager.cpp">
       <Filter>engine</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\universe\entity_names_map.cpp">
+      <Filter>universe</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\graphics\renderer.h">
@@ -142,6 +145,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\engine\plugin_manager.h">
       <Filter>engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\universe\entity_names_map.h">
+      <Filter>universe</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

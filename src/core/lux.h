@@ -3,6 +3,10 @@
 
 #include <cstdint>
 
+#ifndef NULL
+#define NULL 0
+#endif
+
 
 #ifdef BUILDING_CORE
 #define LUX_CORE_API __declspec(dllexport)
