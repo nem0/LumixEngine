@@ -1,20 +1,19 @@
 #include "renderer.h"
-#include "universe/component_event.h"
 #include <cmath>
-#include "Horde3D.h"
-#include "Horde3DUtils.h"
-#include "universe/universe.h"
-#include "core/vec3.h"
-#include "core/matrix.h"
-#include "core/quat.h"
-#include "core/crc32.h"
-#include "universe/entity_moved_event.h"
-#include "universe/entity_destroyed_event.h"
-#include <Windows.h>
-#include "gl/GL.h"
 #include <cstdio>
+#include <Windows.h>
+#include "Horde3DUtils.h"
+#include "core/crc32.h"
 #include "core/ifilesystem.h"
 #include "core/json_serializer.h"
+#include "core/matrix.h"
+#include "core/quat.h"
+#include "core/vec3.h"
+#include "gl/GL.h"
+#include "universe/component_event.h"
+#include "universe/entity_destroyed_event.h"
+#include "universe/entity_moved_event.h"
+#include "universe/universe.h"
 
 
 #pragma comment(lib, "Horde3D.lib")
@@ -270,23 +269,26 @@ void Renderer::getMesh(Component cmp, string& str)
 
 void Renderer::setMesh(Component cmp, const string& str)
 {
-	m_impl->m_paths[cmp.index] = str;
-	if(m_impl->m_renderables[cmp.index].m_node != 0)
+	if(str.substr(str.length()-10, 10) == ".scene.xml")
 	{
-		h3dRemoveNode(m_impl->m_renderables[cmp.index].m_node);
-		m_impl->m_renderables[cmp.index].m_node = 0;
+		m_impl->m_paths[cmp.index] = str;
+		if(m_impl->m_renderables[cmp.index].m_node != 0)
+		{
+			h3dRemoveNode(m_impl->m_renderables[cmp.index].m_node);
+			m_impl->m_renderables[cmp.index].m_node = 0;
+		}
+		H3DRes res = h3dAddResource(H3DResTypes::SceneGraph, str.c_str(), 0);
+		if(h3dIsResLoaded(res))
+		{
+			H3DNode& node = m_impl->m_renderables[cmp.index].m_node;
+			node = h3dAddNodes(H3DRootNode, res);
+			Matrix mtx;
+			Entity(m_impl->m_universe, m_impl->m_renderables[cmp.index].m_entity).getMatrix(mtx);
+			h3dSetNodeTransMat(node, &mtx.m11);
+			Entity e(m_impl->m_universe, m_impl->m_renderables[cmp.index].m_entity);
+		}
+		m_impl->loadResources();
 	}
-	H3DRes res = h3dAddResource(H3DResTypes::SceneGraph, str.c_str(), 0);
-	if(h3dIsResLoaded(res))
-	{
-		H3DNode& node = m_impl->m_renderables[cmp.index].m_node;
-		node = h3dAddNodes(H3DRootNode, res);
-		Matrix mtx;
-		Entity(m_impl->m_universe, m_impl->m_renderables[cmp.index].m_entity).getMatrix(mtx);
-		h3dSetNodeTransMat(node, &mtx.m11);
-		Entity e(m_impl->m_universe, m_impl->m_renderables[cmp.index].m_entity);
-	}
-	m_impl->loadResources();
 }
 
 

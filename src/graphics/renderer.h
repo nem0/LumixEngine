@@ -2,9 +2,9 @@
 
 #include "core/lux.h"
 #include "Horde3D.h"
-#include "universe/universe.h"
 #include "core/string.h"
 #include "engine/iplugin.h"
+#include "universe/universe.h"
 
 
 namespace Lux
@@ -12,9 +12,9 @@ namespace Lux
 
 
 class Event;
-struct Vec3;
 class IFileSystem;
 class ISerializer;
+struct Vec3;
 
 
 class LUX_ENGINE_API Renderer

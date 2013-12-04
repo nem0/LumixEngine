@@ -490,7 +490,7 @@ void EditorServerImpl::addComponent(uint32_t type_crc)
 		}
 		else if(type_crc == script_type)
 		{
-			//m_script_system->createScript(m_selected_entity);
+			m_engine.getScriptSystem().createScript(m_selected_entity);
 		}
 		else
 		{
