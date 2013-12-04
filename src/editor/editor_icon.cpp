@@ -30,7 +30,6 @@ void EditorIcon::create(Entity& entity, const Component& cmp)
 void EditorIcon::destroy()
 {
 	h3dRemoveNode(m_handle);
-	delete this;
 }
 
 
