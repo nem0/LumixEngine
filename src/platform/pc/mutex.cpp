@@ -36,21 +36,21 @@ namespace Lux
 		void WinMutex::lock()
 		{
 			::WaitForSingleObject(m_id, INFINITE);
-			assert(m_locked == 0 && "Recursive lock is forbiden!");
+			ASSERT(m_locked == 0 && "Recursive lock is forbiden!");
 			++m_locked;
 		}
 
 		bool WinMutex::poll()
 		{
 			unsigned int res = ::WaitForSingleObject(m_id, 0);
-			assert(m_locked == 0 && "Recursive lock is forbiden!");
+			ASSERT(m_locked == 0 && "Recursive lock is forbiden!");
 			m_locked += res ? 1 : 0;
 			return res > 0;
 		}
 
 		void WinMutex::unlock()
 		{
-			assert(m_locked);
+			ASSERT(m_locked);
 			--m_locked;
 			::ReleaseMutex(m_id);
 		}

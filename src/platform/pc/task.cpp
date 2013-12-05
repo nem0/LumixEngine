@@ -17,7 +17,7 @@ namespace Lux
 			unsigned int m_affinity_mask;
 			unsigned int m_priority;
 			volatile bool m_is_running;
-			volatile bool m_force_exit;
+			volatile bool m_force_exit; //TODO: m_force_exit
 			volatile bool m_exited;
 			const char* m_thread_name;
 			Task* m_owner;
@@ -87,7 +87,7 @@ namespace Lux
 			return true;
 		}
 
-		const DWORD MS_VC_EXCEPTION=0x406D1388;
+		static const DWORD MS_VC_EXCEPTION=0x406D1388;
 
 		#pragma pack(push,8)
 		typedef struct tagTHREADNAME_INFO
