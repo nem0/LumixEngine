@@ -24,5 +24,5 @@ namespace Lux
 		private:
 			struct TaskImpl* m_implementation;
 		};	
-	}
+	} // ~namespace MT
 } // ~namespace Lux

@@ -23,9 +23,9 @@ namespace  Lux
 			HANDLE m_id;
 		};
 
-		Event* Event::create(const char* name, bool signaled /* = false */, bool manual_reset /* = true */)
+		Event* Event::create(const char* name, EventFlags flags)
 		{
-			return new WinEvent(name, signaled, manual_reset);
+			return new WinEvent(name, flags & EventFlags::SIGNALED ? true : false, flags & EventFlags::MANUAL_RESET ? true : false);
 		}
 
 		void Event::destroy(Event* event)
