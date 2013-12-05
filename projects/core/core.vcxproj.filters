@@ -42,5 +42,8 @@
     <ClInclude Include="..\..\src\core\ifilesystem.h" />
     <ClInclude Include="..\..\src\core\iserializer.h" />
     <ClInclude Include="..\..\src\core\log.h" />
+    <ClInclude Include="..\..\src\core\lock_free_fifo.h" />
+    <ClInclude Include="..\..\src\core\lock_free_queue.h" />
+    <ClInclude Include="..\..\src\core\transaction_queue.h" />
   </ItemGroup>
 </Project>
