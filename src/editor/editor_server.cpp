@@ -10,7 +10,6 @@
 #include "core/map.h"
 #include "core/matrix.h"
 #include "core/memory_stream.h"
-#include "core/mutex.h"
 #include "core/crc32.h"
 #include "core/raw_file_stream.h"
 #include "core/vector.h"
@@ -22,6 +21,7 @@
 #include "engine/plugin_manager.h"
 #include "graphics/renderer.h"
 #include "platform/input_system.h"
+#include "platform/mutex.h"
 #include "platform/socket.h"
 #include "platform/task.h"
 #include "platform/tcp_filesystem.h"
@@ -89,7 +89,7 @@ struct MouseButton
 };
 
 
-class MessageTask : public Task
+class MessageTask : public MT::Task
 {
 	public:
 		virtual int task() LUX_OVERRIDE;
@@ -164,8 +164,8 @@ struct EditorServerImpl
 
 		static void onEvent(void* data, Event& evt);
 
-		Mutex m_universe_mutex;
-		Mutex m_send_mutex;
+		MT::Mutex* m_universe_mutex;
+		MT::Mutex* m_send_mutex;
 		Gizmo m_gizmo;
 		Entity m_selected_entity;
 		MemoryStream m_stream;
@@ -209,7 +209,7 @@ void EditorServer::tick(HWND hwnd, HWND game_hwnd)
 {
 	PAINTSTRUCT ps;
 	HDC hdc;
-	Lock lock(m_impl->m_universe_mutex);
+	MT::Lock lock(*m_impl->m_universe_mutex);
 
 	if(m_impl->m_is_game_mode)
 	{
@@ -413,7 +413,7 @@ int MessageTask::task()
 			{
 				data.resize(length);
 				m_work_socket->receiveAllBytes(&data[0], length);
-				Lock lock(m_server->m_universe_mutex);
+				MT::Lock lock(*m_server->m_universe_mutex);
 				m_server->onMessage(&data[0], data.size());
 			}
 		}
@@ -663,7 +663,7 @@ void EditorServerImpl::load(IStream& stream)
 
 void EditorServerImpl::destroy()
 {
-	m_universe_mutex.destroy();
+	MT::Mutex::destroy(m_universe_mutex);
 	m_engine.destroy();
 	// TODO
 }
@@ -706,13 +706,13 @@ HGLRC createGLContext(HWND hwnd)
 
 bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 {
-	m_universe_mutex.create();
-	m_send_mutex.create();
+	m_universe_mutex = MT::Mutex::create("Universe");
+	m_send_mutex = MT::Mutex::create("Send");
 	Socket::init();
 	m_message_task = new MessageTask();
 	m_message_task->m_server = this;
 	m_message_task->m_work_socket = 0;
-	m_message_task->create();
+	m_message_task->create("Message Task");
 	m_message_task->run();
 		
 	m_hglrc = createGLContext(hwnd);
@@ -775,7 +775,7 @@ void EditorServerImpl::sendMessage(const uint8_t* data, int32_t length)
 {
 	if(m_message_task->m_work_socket)
 	{
-		Lock lock(m_send_mutex);
+		MT::Lock lock(*m_send_mutex);
 		const uint32_t guard = 0x12345678;
 		m_message_task->m_work_socket->send(&length, 4);
 		m_message_task->m_work_socket->send(&guard, 4);
