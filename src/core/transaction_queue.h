@@ -31,8 +31,8 @@ namespace Lux
 			T*						alloc(bool wait);
 			void					dealoc(T* tr);
 
-			bool					push(T* tr, bool wait = true);
-			T*						pop(bool wait = true);
+			bool					push(T* tr, bool wait);
+			T*						pop(bool wait);
 
 			bool					isAborted();
 			void					abort();

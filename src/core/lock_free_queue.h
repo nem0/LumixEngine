@@ -13,8 +13,8 @@ namespace Lux
 			LockFreeQueue();
 			~LockFreeQueue();
 
-			int32_t		push(T* data, bool wait = true);
-			int32_t		pop(T*& data, bool wait = true);
+			int32_t		push(T* data, bool wait);
+			int32_t		pop(T*& data, bool wait);
 			bool		isEmpty() const;
 
 			bool		isAborted() const;
