@@ -86,6 +86,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\src\platform\atomic.h" />
     <ClInclude Include="..\..\src\platform\event.h" />
     <ClInclude Include="..\..\src\platform\input_system.h" />
     <ClInclude Include="..\..\src\platform\mutex.h" />
@@ -96,6 +97,7 @@
     <ClInclude Include="..\..\src\platform\tcp_filesystem.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\platform\pc\atomic.cpp" />
     <ClCompile Include="..\..\src\platform\pc\event.cpp" />
     <ClCompile Include="..\..\src\platform\pc\input_system.cpp" />
     <ClCompile Include="..\..\src\platform\pc\mutex.cpp" />

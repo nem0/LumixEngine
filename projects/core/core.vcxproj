@@ -111,6 +111,8 @@
     <ClInclude Include="..\..\src\core\functor.h" />
     <ClInclude Include="..\..\src\core\ifilesystem.h" />
     <ClInclude Include="..\..\src\core\iserializer.h" />
+    <ClInclude Include="..\..\src\core\lock_free_fifo.h" />
+    <ClInclude Include="..\..\src\core\lock_free_queue.h" />
     <ClInclude Include="..\..\src\core\log.h" />
     <ClInclude Include="..\..\src\core\lux.h" />
     <ClInclude Include="..\..\src\core\event_manager.h" />
@@ -128,6 +130,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
     </ClInclude>
     <ClInclude Include="..\..\src\core\string.h" />
+    <ClInclude Include="..\..\src\core\transaction_queue.h" />
     <ClInclude Include="..\..\src\core\vec3.h" />
     <ClInclude Include="..\..\src\core\vector.h" />
   </ItemGroup>
