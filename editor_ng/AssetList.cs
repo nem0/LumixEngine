@@ -120,7 +120,7 @@ namespace editor_ng
                 if (file.IndexOf("scene.xml") >= 0)
                 {
                     server.createComponent(Crc32.Compute("renderable"));
-                    server.setComponentProperty("renderable", "source", file);
+                    server.setComponentProperty("renderable", "source", System.Text.Encoding.ASCII.GetBytes(file));
                     server.requestComponentProperties("renderable");
                 }
                 else if (file.IndexOf(".unv") >= 0)

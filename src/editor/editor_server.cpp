@@ -150,7 +150,7 @@ struct EditorServerImpl
 		void load(IStream& stream);
 		void onMessage(void* msgptr, int size);
 
-		const PropertyDescriptor& getPropertyDescriptor(uint32_t type, const char* name);
+		const PropertyDescriptor& getPropertyDescriptor(uint32_t type, uint32_t name_hash);
 		H3DNode castRay(int x, int y, Vec3& hit_pos, char* name, int max_name_size, H3DNode gizmo_node);
 		void registerProperties();
 		void rotateCamera(int x, int y);
@@ -267,12 +267,12 @@ void EditorServer::destroy()
 
 void EditorServerImpl::registerProperties()
 {
-	m_component_properties[renderable_type].push_back(PropertyDescriptor("source", (PropertyDescriptor::Getter)&Renderer::getMesh, (PropertyDescriptor::Setter)&Renderer::setMesh, PropertyDescriptor::FILE));
-	m_component_properties[renderable_type].push_back(PropertyDescriptor("visible", (PropertyDescriptor::BoolGetter)&Renderer::getVisible, (PropertyDescriptor::BoolSetter)&Renderer::setVisible));
-	m_component_properties[renderable_type].push_back(PropertyDescriptor("cast shadows", (PropertyDescriptor::BoolGetter)&Renderer::getCastShadows, (PropertyDescriptor::BoolSetter)&Renderer::setCastShadows));
-	m_component_properties[point_light_type].push_back(PropertyDescriptor("fov", (PropertyDescriptor::DecimalGetter)&Renderer::getLightFov, (PropertyDescriptor::DecimalSetter)&Renderer::setLightFov));
-	m_component_properties[point_light_type].push_back(PropertyDescriptor("radius", (PropertyDescriptor::DecimalGetter)&Renderer::getLightRadius, (PropertyDescriptor::DecimalSetter)&Renderer::setLightRadius));
-	m_component_properties[script_type].push_back(PropertyDescriptor("source", (PropertyDescriptor::Getter)&ScriptSystem::getScriptPath, (PropertyDescriptor::Setter)&ScriptSystem::setScriptPath, PropertyDescriptor::FILE));
+	m_component_properties[renderable_type].push_back(PropertyDescriptor(crc32("source"), (PropertyDescriptor::Getter)&Renderer::getMesh, (PropertyDescriptor::Setter)&Renderer::setMesh, PropertyDescriptor::FILE));
+	m_component_properties[renderable_type].push_back(PropertyDescriptor(crc32("visible"), (PropertyDescriptor::BoolGetter)&Renderer::getVisible, (PropertyDescriptor::BoolSetter)&Renderer::setVisible));
+	m_component_properties[renderable_type].push_back(PropertyDescriptor(crc32("cast shadows"), (PropertyDescriptor::BoolGetter)&Renderer::getCastShadows, (PropertyDescriptor::BoolSetter)&Renderer::setCastShadows));
+	m_component_properties[point_light_type].push_back(PropertyDescriptor(crc32("fov"), (PropertyDescriptor::DecimalGetter)&Renderer::getLightFov, (PropertyDescriptor::DecimalSetter)&Renderer::setLightFov));
+	m_component_properties[point_light_type].push_back(PropertyDescriptor(crc32("radius"), (PropertyDescriptor::DecimalGetter)&Renderer::getLightRadius, (PropertyDescriptor::DecimalSetter)&Renderer::setLightRadius));
+	m_component_properties[script_type].push_back(PropertyDescriptor(crc32("source"), (PropertyDescriptor::Getter)&ScriptSystem::getScriptPath, (PropertyDescriptor::Setter)&ScriptSystem::setScriptPath, PropertyDescriptor::FILE));
 }
 
 
@@ -460,7 +460,6 @@ void EditorServerImpl::sendComponent(uint32_t type_crc)
 		m_stream.flush();
 		m_stream.write(ServerMessageType::PROPERTY_LIST);
 		const Entity::ComponentList& cmps = m_selected_entity.getComponents();
-		string value;
 		for(int i = 0; i < cmps.size(); ++i)
 		{
 			if(cmps[i].type == type_crc)
@@ -470,10 +469,8 @@ void EditorServerImpl::sendComponent(uint32_t type_crc)
 				m_stream.write(type_crc);
 				for(int j = 0; j < props.size(); ++j)
 				{
-					writeString(props[j].getName().c_str());
-					props[j].get(cmps[i], value);
-					writeString(value.c_str());
-					m_stream.write(props[j].getType());
+					m_stream.write(props[j].getNameHash());
+					props[j].get(cmps[i], m_stream);
 				}
 				break;
 			}
@@ -880,12 +877,12 @@ void EditorServerImpl::navigate(float forward, float right, int fast)
 }
 
 
-const PropertyDescriptor& EditorServerImpl::getPropertyDescriptor(uint32_t type, const char* name)
+const PropertyDescriptor& EditorServerImpl::getPropertyDescriptor(uint32_t type, uint32_t name_hash)
 {
 	vector<PropertyDescriptor>& props = m_component_properties[type];
 	for(int i = 0; i < props.size(); ++i)
 	{
-		if(props[i].getName() == name)
+		if(props[i].getNameHash() == name_hash)
 		{
 			return props[i];
 		}
@@ -916,16 +913,15 @@ void EditorServerImpl::setProperty(void* data, int size)
 	}
 	if(cmp.isValid())
 	{
-		char tmp[255];
+		uint32_t name_hash;
+		stream.read(name_hash);
+		const PropertyDescriptor& cp = getPropertyDescriptor(cmp.type, name_hash);
+		uint8_t tmp[255];
 		int len;
 		stream.read(len);
+		ASSERT(len < 255);
 		stream.read(tmp, len);
-		tmp[len] = 0;
-		const PropertyDescriptor& cp = getPropertyDescriptor(cmp.type, tmp);
-		stream.read(len);
-		stream.read(tmp, len);
-		tmp[len] = 0;
-		cp.set(cmp, string(tmp));
+		cp.set(cmp, tmp, len);
 	}
 }
 
