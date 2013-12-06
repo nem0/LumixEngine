@@ -179,11 +179,11 @@ namespace editor_ng.native
             sendMessage();
         }
 
-        public void setComponentProperty(uint cmp, string name, string value)
+        public void setComponentProperty(string cmp, string name, string value)
         {
             startMessage();
             m_writer.Write(4);
-            m_writer.Write(cmp);
+            m_writer.Write(Crc32.Compute(cmp));
             m_writer.Write(name.Length);
             m_writer.Write(System.Text.Encoding.ASCII.GetBytes(name));
             m_writer.Write(value.Length);
@@ -315,6 +315,15 @@ namespace editor_ng.native
             sendMessage();
         }
         
+        public void requestComponentProperties(string cmp)
+        {
+            startMessage();
+            m_writer.Write(9);
+            m_writer.Write(Crc32.Compute(cmp));
+            m_writer.Write(0);
+            sendMessage();
+        }
+
         public void requestComponentProperties(uint cmp)
         {
             startMessage();

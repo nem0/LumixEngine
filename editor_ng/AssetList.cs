@@ -77,7 +77,6 @@ namespace editor_ng
         private bool isAsset(string filename)
         {
             return filename.EndsWith(".scene.xml")
-                || filename.EndsWith(".phy")
                 || filename.EndsWith(".unv");
         }
 
@@ -121,14 +120,8 @@ namespace editor_ng
                 if (file.IndexOf("scene.xml") >= 0)
                 {
                     server.createComponent(Crc32.Compute("renderable"));
-                    server.setComponentProperty(Crc32.Compute("renderable"), "path", file);
-                    server.requestComponentProperties(Crc32.Compute("renderable"));
-                }
-                else if (file.IndexOf(".phy") >= 0)
-                {
-                    server.createComponent(Crc32.Compute("physical"));
-                    server.setComponentProperty(Crc32.Compute("physical"), "source", file);
-                    server.requestComponentProperties(Crc32.Compute("physical"));
+                    server.setComponentProperty("renderable", "source", file);
+                    server.requestComponentProperties("renderable");
                 }
                 else if (file.IndexOf(".unv") >= 0)
                 {

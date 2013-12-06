@@ -25,6 +25,7 @@ namespace Lux
 			virtual void serialize(ISerializer& serializer) LUX_OVERRIDE;
 			virtual void deserialize(ISerializer& serializer) LUX_OVERRIDE;
 			virtual Component createComponent(uint32_t, const Entity&) LUX_OVERRIDE;
+			virtual const char* getName() const LUX_OVERRIDE { return "animation"; }
 
 			void destroy();
 			Component createAnimable(const Entity& entity);
