@@ -42,9 +42,9 @@ namespace editor_ng.PropertyGrid
                 native.EditorServer.ComponentPropertiesArgs args = e as native.EditorServer.ComponentPropertiesArgs;
                 for (int i = 0; i < args.names.Length; ++i)
                 {
-                    if (args.names[i] == "source")
+                    if (args.names[i] == Crc32.Compute("source"))
                     {
-                        sourceFileInput.Value = args.values[i];
+                        sourceFileInput.Value = System.Text.Encoding.ASCII.GetString(args.values[i]);
                     }
                 }
             }));

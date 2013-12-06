@@ -36,13 +36,13 @@ namespace editor_ng.PropertyGrid
                 native.EditorServer.ComponentPropertiesArgs args = e as native.EditorServer.ComponentPropertiesArgs;
                 for (int i = 0; i < args.names.Length; ++i)
                 {
-                    if (args.names[i] == "radius")
+                    if (args.names[i] == Crc32.Compute("radius"))
                     {
-                        radiusNumericUpDown.Value = (decimal)float.Parse(args.values[i].Replace('.', ','));
+                        radiusNumericUpDown.Value = (decimal)BitConverter.ToSingle(args.values[i], 0);
                     }
-                    else if (args.names[i] == "fov")
+                    else if (args.names[i] == Crc32.Compute("fov"))
                     {
-                        fovNumericUpDown.Value = (decimal)float.Parse(args.values[i].Replace('.', ','));
+                        fovNumericUpDown.Value = (decimal)BitConverter.ToSingle(args.values[i], 0);
                     }
                 }
             }));
@@ -50,12 +50,12 @@ namespace editor_ng.PropertyGrid
 
         private void radiusNumericUpDown_ValueChanged(object sender, EventArgs e)
         {
-            m_editor_server.setComponentProperty("point_light", "radius", radiusNumericUpDown.Value.ToString());
+            m_editor_server.setComponentProperty("point_light", "radius", radiusNumericUpDown.Value);
         }
 
         private void fovNumericUpDown_ValueChanged(object sender, EventArgs e)
         {
-            m_editor_server.setComponentProperty("point_light", "fov", fovNumericUpDown.Value.ToString());
+            m_editor_server.setComponentProperty("point_light", "fov", fovNumericUpDown.Value);
         }
 
         private void sizeNumericUpDown_ValueChanged(object sender, EventArgs e)

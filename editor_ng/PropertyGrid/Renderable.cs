@@ -40,17 +40,17 @@ namespace editor_ng.PropertyGrid
                 {
                     for (int i = 0; i < args.names.Length; ++i)
                     {
-                        switch (args.names[i])
+                        if (args.names[i] == Crc32.Compute("source"))
                         {
-                            case "source":
-                                sourceInput.Value = args.values[i];
-                                break;
-                            case "visible":
-                                visibleCheckBox.Checked = args.values[i] == "true";
-                                break;
-                            case "cast shadows":
-                                castShadowsCheckbox.Checked = args.values[i] == "true";
-                                break;
+                            sourceInput.Value = System.Text.Encoding.ASCII.GetString(args.values[i]);
+                        }
+                        else if (args.names[i] == Crc32.Compute("visible"))
+                        {
+                            visibleCheckBox.Checked = BitConverter.ToBoolean(args.values[i], 0);
+                        }
+                        else if (args.names[i] == Crc32.Compute("cast shadows"))
+                        {
+                            castShadowsCheckbox.Checked = BitConverter.ToBoolean(args.values[i], 0);
                         }
                     }
                 }
@@ -64,12 +64,12 @@ namespace editor_ng.PropertyGrid
 
         private void visibleCheckBox_CheckedChanged(object sender, EventArgs e)
         {
-            m_editor_server.setComponentProperty("renderable", "visible", visibleCheckBox.Checked ? "true" : "false");
+            m_editor_server.setComponentProperty("renderable", "visible", visibleCheckBox.Checked);
         }
 
         private void castShadowsCheckbox_CheckedChanged(object sender, EventArgs e)
         {
-            m_editor_server.setComponentProperty("renderable", "cast shadows", castShadowsCheckbox.Checked ? "true" : "false");
+            m_editor_server.setComponentProperty("renderable", "cast shadows", castShadowsCheckbox.Checked);
         }
     }
 }

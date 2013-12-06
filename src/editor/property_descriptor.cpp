@@ -1,42 +1,44 @@
 #include "property_descriptor.h"
 #include <cstdio>
+#include "core/istream.h"
 
 
 namespace Lux
 {
 
 
-void PropertyDescriptor::set(Component cmp, const string& value) const
+void PropertyDescriptor::set(Component cmp, const uint8_t* data, int size) const
 {
 	switch(m_type)
 	{
 		case DECIMAL:
 			{
 				float f;
-				sscanf_s(value.c_str(), "%f", &f);
+				f = *(float*)data;
 				(static_cast<S*>(cmp.system)->*m_decimal_setter)(cmp, f); 
 			}
 			break;
 		case BOOL:
-			(static_cast<S*>(cmp.system)->*m_bool_setter)(cmp, _stricmp(value.c_str(), "true") == 0); 
+			{
+				bool b;
+				b = *(bool*)data;
+				(static_cast<S*>(cmp.system)->*m_bool_setter)(cmp, b); 
+			}
 			break;
 		case FILE:
-			(static_cast<S*>(cmp.system)->*m_setter)(cmp, value); 
+			{
+				char tmp[300];
+				ASSERT(size < 300);
+				strncpy_s(tmp, (char*)data, size);
+				tmp[size] = '\0';
+				string s = (char*)tmp;
+				(static_cast<S*>(cmp.system)->*m_setter)(cmp, s); 
+			}
 			break;
 		case VEC3:
 			{
-				char tmp[255];
-				ASSERT(value.length() < 255);
-				strcpy(tmp, value.c_str());
-				for(int i = 0; i < value.length(); ++i)
-				{
-					if(tmp[i] == ',')
-					{
-						tmp[i] = '.';
-					}
-				}
 				Vec3 v;
-				sscanf(tmp, "%f;%f;%f", &v.x, &v.y, &v.z);
+				v = *(Vec3*)data;
 				(static_cast<S*>(cmp.system)->*m_vec3_setter)(cmp, v);
 			}
 			break;
@@ -47,36 +49,45 @@ void PropertyDescriptor::set(Component cmp, const string& value) const
 }
 
 
-void PropertyDescriptor::get(Component cmp, string& value) const
+void PropertyDescriptor::get(Component cmp, IStream& stream) const
 {
+	int len = 4;
 	switch(m_type)
 	{
 		case FILE:
-			(static_cast<S*>(cmp.system)->*m_getter)(cmp, value);
+			{
+				string value;
+				(static_cast<S*>(cmp.system)->*m_getter)(cmp, value);
+				len = value.length();
+				stream.write(&len, sizeof(len));
+				stream.write(value.c_str(), len);
+			}
 			break;
 		case DECIMAL:
 			{
 				float f;
-				char tmp[30];
 				(static_cast<S*>(cmp.system)->*m_decimal_getter)(cmp, f);
-				sprintf_s(tmp, "%f", f);
-				value = tmp;
+				len = sizeof(f);
+				stream.write(&len, sizeof(len));
+				stream.write(&f, len);
 			}
 			break;
 		case BOOL:
 			{
 				bool b;
 				(static_cast<S*>(cmp.system)->*m_bool_getter)(cmp, b);
-				value = b ? "true" : "false";
+				len = sizeof(b);
+				stream.write(&len, sizeof(len));
+				stream.write(&b, len);
 			}
 			break;
 		case VEC3:
 			{
-				char tmp[150];
 				Vec3 v;
 				(static_cast<S*>(cmp.system)->*m_vec3_getter)(cmp, v);
-				sprintf(tmp, "%f;%f;%f", v.x, v.y, v.z);
-				value = tmp;
+				len = sizeof(v);
+				stream.write(&len, sizeof(len));
+				stream.write(&v, len);
 			}
 			break;
 		default:

@@ -36,17 +36,15 @@ namespace editor_ng.PropertyGrid
                 native.EditorServer.ComponentPropertiesArgs args = e as native.EditorServer.ComponentPropertiesArgs;
                 for (int i = 0; i < args.names.Length; ++i)
                 {
-                    if (args.names[i] == "dynamic")
+                    if (args.names[i] == Crc32.Compute("dynamic"))
                     {
-                        dynamicCheckbox.Checked = args.values[i] == "true";
+                        dynamicCheckbox.Checked = BitConverter.ToBoolean(args.values[i], 0);
                     }
-                    else if (args.names[i] == "size")
+                    else if (args.names[i] == Crc32.Compute("size"))
                     {
-                        string s = args.values[i].Replace('.', ',');
-                        var strs = s.Split(new char[] { ';' });
-                        xNumericUpDown.Value = (decimal)float.Parse(strs[0]);
-                        yNumericUpDown.Value = (decimal)float.Parse(strs[1]);
-                        zNumericUpDown.Value = (decimal)float.Parse(strs[2]);
+                        xNumericUpDown.Value = (decimal)BitConverter.ToSingle(args.values[i], 0);
+                        yNumericUpDown.Value = (decimal)BitConverter.ToSingle(args.values[i], 4);
+                        zNumericUpDown.Value = (decimal)BitConverter.ToSingle(args.values[i], 8);
                     }
                 }
             }));
@@ -54,12 +52,12 @@ namespace editor_ng.PropertyGrid
 
         private void dynamicCheckbox_CheckedChanged(object sender, EventArgs e)
         {
-            m_editor_server.setComponentProperty("box_rigid_actor", "dynamic", dynamicCheckbox.Checked ? "true" : "false");
+            m_editor_server.setComponentProperty("box_rigid_actor", "dynamic", dynamicCheckbox.Checked);
         }
 
         private void sendSize()
         {
-            m_editor_server.setComponentProperty("box_rigid_actor", "size", xNumericUpDown.Value.ToString() + ";" + yNumericUpDown.Value.ToString() + ";" + zNumericUpDown.Value.ToString()); 
+            m_editor_server.setComponentProperty("box_rigid_actor", "size", xNumericUpDown.Value); 
         }
 
         private void xNumericUpDown_ValueChanged(object sender, EventArgs e)

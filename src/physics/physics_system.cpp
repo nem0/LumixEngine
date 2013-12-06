@@ -100,8 +100,8 @@ void PhysicsSystem::update(float dt)
 
 bool PhysicsSystem::create(Engine& engine)
 {
-	engine.getEditorServer()->registerProperty("box_rigid_actor", PropertyDescriptor("dynamic", (PropertyDescriptor::BoolGetter)&PhysicsScene::getIsDynamic, (PropertyDescriptor::BoolSetter)&PhysicsScene::setIsDynamic));
-	engine.getEditorServer()->registerProperty("box_rigid_actor", PropertyDescriptor("size", (PropertyDescriptor::Vec3Getter)&PhysicsScene::getHalfExtents, (PropertyDescriptor::Vec3Setter)&PhysicsScene::setHalfExtents));
+	engine.getEditorServer()->registerProperty("box_rigid_actor", PropertyDescriptor(crc32("dynamic"), (PropertyDescriptor::BoolGetter)&PhysicsScene::getIsDynamic, (PropertyDescriptor::BoolSetter)&PhysicsScene::setIsDynamic));
+	engine.getEditorServer()->registerProperty("box_rigid_actor", PropertyDescriptor(crc32("size"), (PropertyDescriptor::Vec3Getter)&PhysicsScene::getHalfExtents, (PropertyDescriptor::Vec3Setter)&PhysicsScene::setHalfExtents));
 	engine.getEditorServer()->registerCreator(box_rigid_actor_type, *this);
 	engine.getEditorServer()->registerCreator(controller_type, *this);
 
