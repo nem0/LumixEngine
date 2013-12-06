@@ -25,7 +25,7 @@ namespace Lux
 {
 
 
-static const uint32_t physical_type = crc32("physical");
+static const uint32_t box_rigid_actor_type = crc32("box_rigid_actor");
 static const uint32_t controller_type = crc32("physical_controller");
 
 
@@ -69,15 +69,24 @@ void PhysicsSystem::deserialize(ISerializer& serializer)
 }
 
 
+void PhysicsSystem::sendMessage(const char* message)
+{
+	if(strcmp("render", message) == 0)
+	{
+		m_impl->m_scene->render();
+	}
+}
+
+
 Component PhysicsSystem::createComponent(uint32_t component_type, const Entity& entity)
 {
 	if(component_type == controller_type)
 	{
 		return m_impl->m_scene->createController(entity);
 	}
-	else if(component_type == physical_type)
+	else if(component_type == box_rigid_actor_type)
 	{
-		return m_impl->m_scene->createActor(entity);
+		return m_impl->m_scene->createBoxRigidActor(entity);
 	}
 	return Component::INVALID;
 }
@@ -91,9 +100,9 @@ void PhysicsSystem::update(float dt)
 
 bool PhysicsSystem::create(Engine& engine)
 {
-	engine.getEditorServer()->registerProperty("physical", PropertyDescriptor("source", (PropertyDescriptor::Getter)&PhysicsScene::getShapeSource, (PropertyDescriptor::Setter)&PhysicsScene::setShapeSource, PropertyDescriptor::FILE));
-	engine.getEditorServer()->registerProperty("physical", PropertyDescriptor("dynamic", (PropertyDescriptor::BoolGetter)&PhysicsScene::getIsDynamic, (PropertyDescriptor::BoolSetter)&PhysicsScene::setIsDynamic));
-	engine.getEditorServer()->registerCreator(physical_type, *this);
+	engine.getEditorServer()->registerProperty("box_rigid_actor", PropertyDescriptor(crc32("dynamic"), (PropertyDescriptor::BoolGetter)&PhysicsScene::getIsDynamic, (PropertyDescriptor::BoolSetter)&PhysicsScene::setIsDynamic));
+	engine.getEditorServer()->registerProperty("box_rigid_actor", PropertyDescriptor(crc32("size"), (PropertyDescriptor::Vec3Getter)&PhysicsScene::getHalfExtents, (PropertyDescriptor::Vec3Setter)&PhysicsScene::setHalfExtents));
+	engine.getEditorServer()->registerCreator(box_rigid_actor_type, *this);
 	engine.getEditorServer()->registerCreator(controller_type, *this);
 
 	m_impl = new PhysicsSystemImpl;

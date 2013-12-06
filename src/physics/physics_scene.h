@@ -28,15 +28,18 @@ class LUX_PHYSICS_API PhysicsScene
 		bool create(PhysicsSystem& system, Universe& universe);
 		void destroy();
 		void update(float time_delta);
+		void render();
 		bool raycast(const Vec3& origin, const Vec3& dir, float distance, RaycastHit& result);
-		Component createActor(Entity entity);
+		Component createBoxRigidActor(Entity entity);
 		Component createController(Entity entity);
 		void destroyActor(Component cmp);
 		PhysicsSystem& getSystem() const;
-		void getShapeSource(Component cmp, string& str);
-		void setShapeSource(Component cmp, const string& str);
+		
 		void getIsDynamic(Component cmp, bool& is);
 		void setIsDynamic(Component cmp, const bool& is);
+		void getHalfExtents(Component cmp, Vec3& size);
+		void setHalfExtents(Component cmp, const Vec3& size);
+
 		void moveController(Component cmp, const Vec3& v, float dt);
 	
 		void serialize(ISerializer& serializer);

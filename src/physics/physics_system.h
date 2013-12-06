@@ -23,6 +23,8 @@ class LUX_PHYSICS_API PhysicsSystem : public IPlugin
 		virtual void deserialize(ISerializer& serializer) LUX_OVERRIDE;
 		virtual void update(float dt) LUX_OVERRIDE;
 		virtual Component createComponent(uint32_t component_type, const Entity& entity) LUX_OVERRIDE;
+		virtual const char* getName() const LUX_OVERRIDE { return "physics"; }
+		virtual void sendMessage(const char* message) LUX_OVERRIDE;
 
 		virtual void destroy();
 
