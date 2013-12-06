@@ -1,21 +1,28 @@
 #pragma once
 
-
 #include "core/lux.h"
 
-
-class LUX_PLATFORM_API Task
+namespace Lux
 {
-	public:
-		Task();
-		~Task();
+	namespace MT
+	{
+		class LUX_PLATFORM_API Task
+		{
+		public:
+			Task();
+			~Task();
 
-		virtual int task() = 0;
+			virtual int task() = 0;
 
-		bool create();
-		bool run();
-		bool destroy();
+			bool create(const char* name);
+			bool run();
+			bool destroy();
 
-	private:
-		struct TaskImpl* m_implementation;
-};
+			bool setAffinityMask(unsigned int affinity_mask);
+			bool setThreadPriority(unsigned int priority);
+
+		private:
+			struct TaskImpl* m_implementation;
+		};	
+	} // ~namespace MT
+} // ~namespace Lux
