@@ -24,6 +24,8 @@ namespace Lux
 			virtual void deserialize(ISerializer&) {}
 			virtual void update(float) {}
 			virtual Component createComponent(uint32_t, const Entity&) = 0;
+			virtual const char* getName() const = 0;
+			virtual void sendMessage(const char* message) {};
 	};
 
 

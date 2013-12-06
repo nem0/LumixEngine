@@ -261,6 +261,48 @@ void Renderer::setLightRadius(Component cmp, const float& r)
 }
 
 
+void Renderer::setVisible(Component cmp, const bool& visible)
+{
+	H3DNode node = m_impl->m_renderables[cmp.index].m_node;
+	int flags = h3dGetNodeFlags(node);
+	if(visible)
+	{
+		h3dSetNodeFlags(node, flags & ~H3DNodeFlags::NoDraw, true);
+	}
+	else
+	{
+		h3dSetNodeFlags(node, flags | H3DNodeFlags::NoDraw, true);
+	}
+}
+
+
+void Renderer::getVisible(Component cmp, bool& visible)
+{
+	visible = !(h3dGetNodeFlags(m_impl->m_renderables[cmp.index].m_node) & H3DNodeFlags::NoDraw);
+}
+
+
+void Renderer::getCastShadows(Component cmp, bool& cast_shadows)
+{
+	cast_shadows = !(h3dGetNodeFlags(m_impl->m_renderables[cmp.index].m_node) & H3DNodeFlags::NoCastShadow);
+}
+
+
+void Renderer::setCastShadows(Component cmp, const bool& cast_shadows)
+{
+	H3DNode node = m_impl->m_renderables[cmp.index].m_node;
+	int flags = h3dGetNodeFlags(node);
+	if(cast_shadows)
+	{
+		h3dSetNodeFlags(node, flags & ~H3DNodeFlags::NoCastShadow, true);
+	}
+	else
+	{
+		h3dSetNodeFlags(node, flags | H3DNodeFlags::NoCastShadow, true);
+	}
+}
+
+
 void Renderer::getMesh(Component cmp, string& str)
 {
 	str = m_impl->m_paths[cmp.index];
