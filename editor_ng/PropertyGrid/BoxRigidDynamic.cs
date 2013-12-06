@@ -57,7 +57,11 @@ namespace editor_ng.PropertyGrid
 
         private void sendSize()
         {
-            m_editor_server.setComponentProperty("box_rigid_actor", "size", xNumericUpDown.Value); 
+            byte[] data = new byte[12];
+            Buffer.BlockCopy(BitConverter.GetBytes((float)xNumericUpDown.Value), 0, data, 0, 4);
+            Buffer.BlockCopy(BitConverter.GetBytes((float)yNumericUpDown.Value), 0, data, 4, 4);
+            Buffer.BlockCopy(BitConverter.GetBytes((float)zNumericUpDown.Value), 0, data, 8, 4);
+            m_editor_server.setComponentProperty("box_rigid_actor", "size", data); 
         }
 
         private void xNumericUpDown_ValueChanged(object sender, EventArgs e)
