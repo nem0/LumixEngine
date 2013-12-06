@@ -15,8 +15,8 @@
     <ClCompile Include="..\..\src\core\raw_file_stream.cpp" />
     <ClCompile Include="..\..\src\core\math_utils.cpp" />
     <ClCompile Include="..\..\src\core\memory_stream.cpp" />
-    <ClCompile Include="..\..\src\core\mutex.cpp" />
     <ClCompile Include="..\..\src\core\ifilesystem.cpp" />
+    <ClCompile Include="..\..\src\core\log.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\base64.h" />
@@ -38,9 +38,9 @@
     <ClInclude Include="..\..\src\core\raw_file_stream.h" />
     <ClInclude Include="..\..\src\core\math_utils.h" />
     <ClInclude Include="..\..\src\core\memory_stream.h" />
-    <ClInclude Include="..\..\src\core\mutex.h" />
     <ClInclude Include="..\..\src\core\functor.h" />
     <ClInclude Include="..\..\src\core\ifilesystem.h" />
     <ClInclude Include="..\..\src\core\iserializer.h" />
+    <ClInclude Include="..\..\src\core\log.h" />
   </ItemGroup>
 </Project>
