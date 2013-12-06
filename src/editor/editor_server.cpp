@@ -916,12 +916,7 @@ void EditorServerImpl::setProperty(void* data, int size)
 		uint32_t name_hash;
 		stream.read(name_hash);
 		const PropertyDescriptor& cp = getPropertyDescriptor(cmp.type, name_hash);
-		uint8_t tmp[255];
-		int len;
-		stream.read(len);
-		ASSERT(len < 255);
-		stream.read(tmp, len);
-		cp.set(cmp, tmp, len);
+		cp.set(cmp, stream);
 	}
 }
 

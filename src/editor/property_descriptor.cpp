@@ -7,30 +7,32 @@ namespace Lux
 {
 
 
-void PropertyDescriptor::set(Component cmp, const uint8_t* data, int size) const
+void PropertyDescriptor::set(Component cmp, IStream& stream) const
 {
+	int len;
+	stream.read(&len, sizeof(len));
 	switch(m_type)
 	{
 		case DECIMAL:
 			{
 				float f;
-				f = *(float*)data;
+				stream.read(&f, sizeof(f));
 				(static_cast<S*>(cmp.system)->*m_decimal_setter)(cmp, f); 
 			}
 			break;
 		case BOOL:
 			{
 				bool b;
-				b = *(bool*)data;
+				stream.read(&b, sizeof(b));
 				(static_cast<S*>(cmp.system)->*m_bool_setter)(cmp, b); 
 			}
 			break;
 		case FILE:
 			{
-				char tmp[300];
-				ASSERT(size < 300);
-				strncpy_s(tmp, (char*)data, size);
-				tmp[size] = '\0';
+				char tmp[301];
+				ASSERT(len < 300);
+				stream.read(tmp, len);
+				tmp[len] = '\0';
 				string s = (char*)tmp;
 				(static_cast<S*>(cmp.system)->*m_setter)(cmp, s); 
 			}
@@ -38,7 +40,7 @@ void PropertyDescriptor::set(Component cmp, const uint8_t* data, int size) const
 		case VEC3:
 			{
 				Vec3 v;
-				v = *(Vec3*)data;
+				stream.read(&v, sizeof(v));
 				(static_cast<S*>(cmp.system)->*m_vec3_setter)(cmp, v);
 			}
 			break;
