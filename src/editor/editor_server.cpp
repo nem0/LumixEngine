@@ -128,7 +128,7 @@ struct EditorServerImpl
 		Mutex m_send_mutex;
 		Gizmo m_gizmo;
 		Entity m_selected_entity;
-		EntityNamesMap* m_entity_names_map;
+		EntityNamesMap m_entity_names_map;
 		MemoryStream m_stream;
 		map<uint32_t, vector<PropertyDescriptor> > m_component_properties;
 		map<uint32_t, IPlugin*> m_creators;
@@ -338,7 +338,7 @@ void EditorServerImpl::save(IStream& stream)
 {
 	JsonSerializer serializer(stream, JsonSerializer::WRITE);
 	m_engine.serialize(serializer);
-	m_entity_names_map->serialize(serializer);
+	m_entity_names_map.serialize(serializer);
 	serializer.serialize("cam_pos_x", m_camera_pos.x);
 	serializer.serialize("cam_pos_y", m_camera_pos.y);
 	serializer.serialize("cam_pos_z", m_camera_pos.z);
@@ -452,7 +452,8 @@ void EditorServerImpl::setEntityPosition(int uid, float* pos)
 
 void EditorServerImpl::setEntityName(int uid, const char* name)
 {
-	m_entity_names_map->setEntityName(name, uid);
+	Entity entity(m_engine.getUniverse(), uid);
+	m_entity_names_map.setEntityName(name, entity);
 }
 
 void EditorServerImpl::sendEntityPosition(int uid)
@@ -482,7 +483,7 @@ void EditorServerImpl::sendEntityProperties(int uid)
 		m_stream.write(entity.getPosition().y);
 		m_stream.write(entity.getPosition().z);
 
-		const char* name = m_entity_names_map->getEntityName(uid);
+		const char* name = m_entity_names_map.getEntityName(entity);
 		size_t len = strlen(name);
 		m_stream.write(int32_t(len));
 		m_stream.write(name, len);
@@ -563,7 +564,8 @@ void EditorServerImpl::editScript()
 
 void EditorServerImpl::removeEntity()
 {
-	m_entity_names_map->removeEntityName(m_selected_entity.index);
+	Entity entity(m_engine.getUniverse(), m_selected_entity.index);
+	m_entity_names_map.removeEntityName(entity);
 	m_engine.getUniverse()->destroyEntity(m_selected_entity);
 	selectEntity(Lux::Entity::INVALID);
 }
@@ -633,7 +635,7 @@ void EditorServerImpl::load(IStream& stream)
 	JsonSerializer serializer(stream, JsonSerializer::READ);
 	
 	m_engine.deserialize(serializer);
-	m_entity_names_map->deserialize(serializer);
+	m_entity_names_map.deserialize(serializer);
 	serializer.deserialize("cam_pos_x", m_camera_pos.x);
 	serializer.deserialize("cam_pos_y", m_camera_pos.y);
 	serializer.deserialize("cam_pos_z", m_camera_pos.z);
@@ -738,8 +740,8 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 	m_gizmo.hide();
 	registerProperties();
 
-	m_entity_names_map = new EntityNamesMap(m_engine.getUniverse());
-	m_engine.getScriptSystem().setEntityNamesMap(m_entity_names_map);
+	m_entity_names_map.setUniverse(m_engine.getUniverse());
+	m_engine.getScriptSystem().setEntityNamesMap(&m_entity_names_map);
 
 	//m_navigation.load("models/level2/level2.pda");
 	

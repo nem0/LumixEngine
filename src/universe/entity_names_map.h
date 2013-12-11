@@ -13,18 +13,19 @@ namespace Lux
 	class LUX_ENGINE_API EntityNamesMap LUX_FINAL
 	{
 		public:
-			EntityNamesMap(Universe* universe);
+			void setUniverse(Universe* universe);
 
 			Entity getEntityByName(const char* entity_name) const;
-			const char* getEntityName(int uid) const;
-			bool setEntityName(const char* entity_name, int uid);
-			void removeEntityName(int uid);
+			const char* getEntityName(const Entity& entity) const;
+			bool setEntityName(const char* entity_name, const Entity& entity);
+			void removeEntityName(const Entity& entity);
 
 			void serialize(ISerializer& serializer);
 			void deserialize(ISerializer& serializer);
 
 		private:
-			Lux::map<Lux::string, int> m_names_map;
+			map<string, int> m_names_map; //TODO: remove
+			map<uint32_t, int> m_crc_names_map;
 			Universe* m_universe;
 	};
 

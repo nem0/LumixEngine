@@ -159,10 +159,10 @@
             this.entityNameTextBox.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.entityNameTextBox.Location = new System.Drawing.Point(71, 32);
+            this.entityNameTextBox.MaxLength = 31;
             this.entityNameTextBox.Name = "entityNameTextBox";
             this.entityNameTextBox.Size = new System.Drawing.Size(147, 20);
             this.entityNameTextBox.TabIndex = 12;
-            this.entityNameTextBox.Text = "name";
             this.entityNameTextBox.TextChanged += new System.EventHandler(this.entityNameTextBox_TextChanged);
             // 
             // PropertyGrid

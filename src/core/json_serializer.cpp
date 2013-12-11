@@ -21,7 +21,7 @@ JsonSerializer::JsonSerializer(IStream& stream, AccessMode access_mode)
 void JsonSerializer::serialize(const char* label, unsigned int value)
 {
 	writeBlockComma();
-	char tmp[20];
+	char tmp[100];
 	sprintf_s(tmp, "\"%s\" : %u", label, value);
 	m_stream.write(tmp);
 	m_is_first_in_block = false;
@@ -173,6 +173,7 @@ void JsonSerializer::deserialize(const char* label, unsigned int& value)
 	value = 0;
 	while(c >= '0' && c <= '9')
 	{
+		value *= 10;
 		value += c - '0';
 		m_stream.read(&c, 1);
 	}
