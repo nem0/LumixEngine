@@ -10,6 +10,7 @@
     <ClInclude Include="..\..\src\platform\semaphore.h" />
     <ClInclude Include="..\..\src\platform\spin_mutex.h" />
     <ClInclude Include="..\..\src\platform\atomic.h" />
+    <ClInclude Include="..\..\src\platform\os_file.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\platform\pc\event.cpp" />
@@ -21,5 +22,6 @@
     <ClCompile Include="..\..\src\platform\pc\task.cpp" />
     <ClCompile Include="..\..\src\platform\pc\tcp_filesystem.cpp" />
     <ClCompile Include="..\..\src\platform\pc\atomic.cpp" />
+    <ClCompile Include="..\..\src\platform\os_file.cpp" />
   </ItemGroup>
 </Project>

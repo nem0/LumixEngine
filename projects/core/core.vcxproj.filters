@@ -17,6 +17,14 @@
     <ClCompile Include="..\..\src\core\memory_stream.cpp" />
     <ClCompile Include="..\..\src\core\ifilesystem.cpp" />
     <ClCompile Include="..\..\src\core\log.cpp" />
+    <ClCompile Include="..\..\src\core\disk_file_system.cpp" />
+    <ClCompile Include="..\..\src\core\memory_file_system.cpp" />
+    <ClCompile Include="..\..\src\core\file_system.cpp" />
+    <ClCompile Include="..\..\src\core\tcp_file_system.cpp" />
+    <ClCompile Include="..\..\src\core\tcp_acceptor.cpp" />
+    <ClCompile Include="..\..\src\core\tcp_stream.cpp" />
+    <ClCompile Include="..\..\src\core\tcp_connector.cpp" />
+    <ClCompile Include="..\..\src\core\tcp_file_server.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\base64.h" />
@@ -45,5 +53,16 @@
     <ClInclude Include="..\..\src\core\lock_free_fifo.h" />
     <ClInclude Include="..\..\src\core\lock_free_queue.h" />
     <ClInclude Include="..\..\src\core\transaction_queue.h" />
+    <ClInclude Include="..\..\src\core\disk_file_system.h" />
+    <ClInclude Include="..\..\src\core\idevice.h" />
+    <ClInclude Include="..\..\src\core\ifile.h" />
+    <ClInclude Include="..\..\src\core\ifile_system_defines.h" />
+    <ClInclude Include="..\..\src\core\memory_file_system.h" />
+    <ClInclude Include="..\..\src\core\file_system.h" />
+    <ClInclude Include="..\..\src\core\tcp_file_system.h" />
+    <ClInclude Include="..\..\src\core\tcp_acceptor.h" />
+    <ClInclude Include="..\..\src\core\tcp_stream.h" />
+    <ClInclude Include="..\..\src\core\tcp_connector.h" />
+    <ClInclude Include="..\..\src\core\tcp_file_server.h" />
   </ItemGroup>
 </Project>

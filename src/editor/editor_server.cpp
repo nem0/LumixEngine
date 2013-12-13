@@ -6,6 +6,8 @@
 #include "Horde3DUtils.h"
 
 #include "core/json_serializer.h"
+#include "core/file_system.h"
+#include "core/ifile.h"
 #include "core/log.h"
 #include "core/map.h"
 #include "core/matrix.h"
@@ -95,8 +97,8 @@ class MessageTask : public MT::Task
 		virtual int task() LUX_OVERRIDE;
 
 		struct EditorServerImpl* m_server;
-		Socket m_socket;
-		Socket* m_work_socket;
+		Net::Socket m_socket;
+		Net::Socket* m_work_socket;
 };
 
 
@@ -215,7 +217,7 @@ void EditorServer::tick(HWND hwnd, HWND game_hwnd)
 	{
 		m_impl->m_engine.update();
 	}
-	static_cast<TCPFileSystem&>(m_impl->m_engine.getFileSystem()).processLoaded();
+	m_impl->m_engine.getFileSystem().updateAsyncTransactions();
 
 	m_impl->m_engine.getRenderer().enableStage("Gizmo", true);
 	hdc = BeginPaint(hwnd, &ps);
@@ -400,7 +402,7 @@ void EditorServerImpl::addEntity()
 int MessageTask::task()
 {
 	bool finished = false;
-	m_socket.create(10002);
+	m_socket.create(NULL, 10002);
 	m_work_socket = m_socket.accept();
 	vector<uint8_t> data;
 	data.resize(5);
@@ -624,7 +626,7 @@ void loadMap(void* user_data, char* file_data, int length, bool success)
 void EditorServerImpl::load(const char path[])
 {
 	g_log_info.log("editor server", "loading universe %s...", path);
-	m_engine.getFileSystem().openFile(path, &loadMap, this);
+	m_engine.getFileSystem().open("memory:tcp", path, FS::Mode::OPEN | FS::Mode::READ);
 }
 
 
@@ -708,7 +710,7 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 {
 	m_universe_mutex = MT::Mutex::create("Universe");
 	m_send_mutex = MT::Mutex::create("Send");
-	Socket::init();
+	Net::Socket::init();
 	m_message_task = new MessageTask();
 	m_message_task->m_server = this;
 	m_message_task->m_work_socket = 0;
