@@ -59,7 +59,6 @@ namespace editor_ng
             m_script_compiler.onAllScriptsCompiled += ScriptCompiler_onAllScriptsCompiled;
 
             m_asset_monitor.script_compiler = m_script_compiler;
-            m_file_server.start();
             m_asset_monitor.server = m_server;
             m_scene_view.server = m_server;
             m_scene_view.game_view = m_game_view;

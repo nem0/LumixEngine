@@ -19,8 +19,8 @@ namespace Lux
 		bool m_finished;
 		MT::Mutex* m_mutex;
 		struct TCPFileSystemImpl* m_fs;
-		Socket m_socket;
-		Socket* m_work_socket;
+		Net::Socket m_socket;
+		Net::Socket* m_work_socket;
 	};
 
 
@@ -54,7 +54,7 @@ namespace Lux
 	int TCPFileSystemTask::task()
 	{
 		char* buffer = new char[256];
-		m_socket.create(10001);
+		m_socket.create(NULL, 10001);
 		m_work_socket = m_socket.accept();
 
 		m_finished = false;

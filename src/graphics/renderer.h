@@ -12,17 +12,20 @@ namespace Lux
 
 
 class Event;
-class IFileSystem;
 class ISerializer;
 struct Vec3;
 
+namespace FS
+{
+	class FileSystem;
+}
 
 class LUX_ENGINE_API Renderer
 {
 	public:
 		Renderer();
 		
-		bool create(IFileSystem* fs, int w, int h, const char* base_path);
+		bool create(FS::FileSystem* fs, int w, int h, const char* base_path);
 		void destroy();
 
 		void renderScene();
