@@ -8,6 +8,10 @@ namespace Lux
 {
 
 
+struct Vec3;
+class IStream;
+
+
 class PropertyDescriptor
 {
 	public:
@@ -15,7 +19,8 @@ class PropertyDescriptor
 		{
 			FILE = 0,
 			DECIMAL,
-			BOOL
+			BOOL,
+			VEC3
 		};
 		struct S {};
 		typedef void (S::*Getter)(Component, string&);
@@ -24,29 +29,34 @@ class PropertyDescriptor
 		typedef void (S::*BoolSetter)(Component, const bool&);
 		typedef void (S::*DecimalGetter)(Component, float&);
 		typedef void (S::*DecimalSetter)(Component, const float&);
+		typedef void (S::*Vec3Getter)(Component, Vec3&);
+		typedef void (S::*Vec3Setter)(Component, const Vec3&);
 
 	public:
-		PropertyDescriptor(const char* _name, Getter _getter, Setter _setter, Type _type) { m_name = _name; m_getter = _getter; m_setter = _setter; m_type = _type; }
-		PropertyDescriptor(const char* _name, BoolGetter _getter, BoolSetter _setter) { m_name = _name; m_bool_getter = _getter; m_bool_setter = _setter; m_type = BOOL; }
-		PropertyDescriptor(const char* _name, DecimalGetter _getter, DecimalSetter _setter) { m_name = _name; m_decimal_getter = _getter; m_decimal_setter = _setter; m_type = DECIMAL; }
-		void set(Component cmp, const string& value) const;
-		void get(Component cmp, string& value) const;
-		const string& getName() const { return m_name; }
+		PropertyDescriptor(uint32_t _name_hash, Getter _getter, Setter _setter, Type _type) { m_name_hash = _name_hash; m_getter = _getter; m_setter = _setter; m_type = _type; }
+		PropertyDescriptor(uint32_t _name_hash, BoolGetter _getter, BoolSetter _setter) { m_name_hash = _name_hash; m_bool_getter = _getter; m_bool_setter = _setter; m_type = BOOL; }
+		PropertyDescriptor(uint32_t _name_hash, DecimalGetter _getter, DecimalSetter _setter) { m_name_hash = _name_hash; m_decimal_getter = _getter; m_decimal_setter = _setter; m_type = DECIMAL; }
+		PropertyDescriptor(uint32_t _name_hash, Vec3Getter _getter, Vec3Setter _setter) { m_name_hash = _name_hash; m_vec3_getter = _getter; m_vec3_setter = _setter; m_type = VEC3; }
+		void set(Component cmp, IStream& stream) const;
+		void get(Component cmp, IStream& stream) const;
+		uint32_t getNameHash() const { return m_name_hash; }
 		Type getType() const { return m_type; }
 
 	private:
-		string m_name;
+		uint32_t m_name_hash;
 		union
 		{
 			Getter m_getter;
 			BoolGetter m_bool_getter;
 			DecimalGetter m_decimal_getter;
+			Vec3Getter m_vec3_getter;
 		};
 		union 
 		{
 			Setter m_setter;
 			BoolSetter m_bool_setter;
 			DecimalSetter m_decimal_setter;
+			Vec3Setter m_vec3_setter;
 		};
 		Type m_type;
 

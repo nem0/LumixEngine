@@ -43,9 +43,8 @@ namespace editor_ng.native
         public class ComponentPropertiesArgs : EventArgs
         {
             public uint cmp_type;
-            public string[] names;
-            public string[] values;
-            public uint[] types;
+            public uint[] names;
+            public byte[][] values;
         };
         public event EventHandler onComponentProperties;
 
@@ -179,15 +178,30 @@ namespace editor_ng.native
             sendMessage();
         }
 
-        public void setComponentProperty(uint cmp, string name, string value)
+
+        public void setComponentProperty(string cmp, string name, bool value)
+        {
+            setComponentProperty(cmp, name, BitConverter.GetBytes(value));
+        }
+
+        public void setComponentProperty(string cmp, string name, decimal value)
+        {
+            setComponentProperty(cmp, name, BitConverter.GetBytes((Single)value));
+        }
+        
+        public void setComponentProperty(string cmp, string name, string value)
+        {
+            setComponentProperty(cmp, name, System.Text.Encoding.ASCII.GetBytes(value));
+        }
+
+        public void setComponentProperty(string cmp, string name, byte[] bytes)
         {
             startMessage();
             m_writer.Write(4);
-            m_writer.Write(cmp);
-            m_writer.Write(name.Length);
-            m_writer.Write(System.Text.Encoding.ASCII.GetBytes(name));
-            m_writer.Write(value.Length);
-            m_writer.Write(System.Text.Encoding.ASCII.GetBytes(value));
+            m_writer.Write(Crc32.Compute(cmp));
+            m_writer.Write(Crc32.Compute(name));
+            m_writer.Write((int)bytes.Length);
+            m_writer.Write(bytes);
             sendMessage();
         }
 
@@ -315,6 +329,15 @@ namespace editor_ng.native
             sendMessage();
         }
         
+        public void requestComponentProperties(string cmp)
+        {
+            startMessage();
+            m_writer.Write(9);
+            m_writer.Write(Crc32.Compute(cmp));
+            m_writer.Write(0);
+            sendMessage();
+        }
+
         public void requestComponentProperties(uint cmp)
         {
             startMessage();
@@ -328,14 +351,14 @@ namespace editor_ng.native
         {
             int count = reader.ReadInt32();
             uint cmp_type = reader.ReadUInt32();
-            string[] names = new string[count];
-            string[] values = new string[count];
+            uint[] names = new uint[count];
+            byte[][] values = new byte[count][];
             uint[] types = new uint[count];
             for (int i = 0; i < count; ++i)
             {
-                names[i] = readString(reader);
-                values[i] = readString(reader);
-                types[i] = reader.ReadUInt32();
+                names[i] = reader.ReadUInt32();
+                int len = reader.ReadInt32();
+                values[i] = reader.ReadBytes(len);
             }
             if (onComponentProperties != null)
             {
@@ -343,7 +366,6 @@ namespace editor_ng.native
                 args.cmp_type = cmp_type;
                 args.names = names;
                 args.values = values;
-                args.types = types;
                 onComponentProperties(this, args);
             }
         }

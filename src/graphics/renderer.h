@@ -41,8 +41,14 @@ class LUX_ENGINE_API Renderer
 		float getHalfFovTan();
 		void setUniverse(Universe* universe);
 		Component getRenderable(Universe& universe, H3DNode node);
+
+		void getVisible(Component cmp, bool& visible);
+		void setVisible(Component cmp, const bool& visible);
 		void getMesh(Component cmp, string& str);
 		void setMesh(Component cmp, const string& str);
+		void getCastShadows(Component cmp, bool& cast_shadows);
+		void setCastShadows(Component cmp, const bool& cast_shadows);
+
 		H3DNode getMeshNode(Component cmp);
 		void getLightFov(Component cmp, float& fov);
 		void setLightFov(Component cmp, const float& fov);
