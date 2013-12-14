@@ -95,7 +95,6 @@
     <ClInclude Include="..\..\src\platform\socket.h" />
     <ClInclude Include="..\..\src\platform\spin_mutex.h" />
     <ClInclude Include="..\..\src\platform\task.h" />
-    <ClInclude Include="..\..\src\platform\tcp_filesystem.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\platform\os_file.cpp" />
@@ -107,7 +106,6 @@
     <ClCompile Include="..\..\src\platform\pc\socket.cpp" />
     <ClCompile Include="..\..\src\platform\pc\spin_mutex.cpp" />
     <ClCompile Include="..\..\src\platform\pc\task.cpp" />
-    <ClCompile Include="..\..\src\platform\pc\tcp_filesystem.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

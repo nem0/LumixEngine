@@ -93,7 +93,6 @@
     <ClCompile Include="..\..\src\core\event_manager.cpp" />
     <ClCompile Include="..\..\src\core\file_system.cpp" />
     <ClCompile Include="..\..\src\core\file_utils.cpp" />
-    <ClCompile Include="..\..\src\core\ifilesystem.cpp" />
     <ClCompile Include="..\..\src\core\istream.cpp" />
     <ClCompile Include="..\..\src\core\jsmn.cpp" />
     <ClCompile Include="..\..\src\core\json_object.cpp" />
@@ -104,7 +103,6 @@
     <ClCompile Include="..\..\src\core\memory_file_system.cpp" />
     <ClCompile Include="..\..\src\core\memory_stream.cpp" />
     <ClCompile Include="..\..\src\core\quat.cpp" />
-    <ClCompile Include="..\..\src\core\raw_file_stream.cpp" />
     <ClCompile Include="..\..\src\core\sha1.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
     </ClCompile>
@@ -125,7 +123,6 @@
     <ClInclude Include="..\..\src\core\functor.h" />
     <ClInclude Include="..\..\src\core\idevice.h" />
     <ClInclude Include="..\..\src\core\ifile.h" />
-    <ClInclude Include="..\..\src\core\ifilesystem.h" />
     <ClInclude Include="..\..\src\core\ifile_system_defines.h" />
     <ClInclude Include="..\..\src\core\iserializer.h" />
     <ClInclude Include="..\..\src\core\lock_free_fifo.h" />
@@ -143,7 +140,6 @@
     <ClInclude Include="..\..\src\core\memory_file_system.h" />
     <ClInclude Include="..\..\src\core\memory_stream.h" />
     <ClInclude Include="..\..\src\core\quat.h" />
-    <ClInclude Include="..\..\src\core\raw_file_stream.h" />
     <ClInclude Include="..\..\src\core\sha1.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
     </ClInclude>

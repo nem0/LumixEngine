@@ -1,6 +1,6 @@
 #include "core/tcp_file_server.h"
 
-#include "core/tcp_connector.h"
+#include "core/tcp_acceptor.h"
 #include "core/tcp_file_system.h"
 #include "core/tcp_stream.h"
 #include "platform/task.h"
@@ -18,11 +18,14 @@ namespace Lux
 
 			int task()
 			{
-				Net::TCPStream* stream = m_connector.connect("127.0.0.1", 10001);
 				char buffer[1024];
+				bool quit = false;
+
+				m_acceptor.start("127.0.0.1", 10001);
+				Net::TCPStream* stream = m_acceptor.accept();
 
 				OsFile* file = new OsFile();
-				while(true)
+				while(!quit)
 				{
 					int32_t op = 0;
 					stream->read(op);
@@ -67,8 +70,8 @@ namespace Lux
 							while(size > 0)
 							{
 								int32_t read = size > 1024 ? 1024 : size;
-								stream->read(buffer, read);
-								file->write(buffer, read);
+								stream->read((void*)buffer, read);
+								file->write((void*)buffer, read);
 								size -= read;
 							}
 						}
@@ -96,6 +99,14 @@ namespace Lux
 							stream->write(pos);
 						}
 						break;
+					case TCPCommand::Disconnect:
+						{
+							quit = true;
+							break;
+						}
+					default:
+						ASSERT(0);
+						break;
 					}
 				}
 				return 0;
@@ -104,7 +115,7 @@ namespace Lux
 			void stop() {} // TODO: implement stop 
 
 		private:
-			Net::TCPConnector m_connector;
+			Net::TCPAcceptor m_acceptor;
 		};
 
 		struct TCPFileServerImpl

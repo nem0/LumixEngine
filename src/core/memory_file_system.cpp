@@ -63,7 +63,7 @@ namespace Lux
 			virtual bool read(void* buffer, size_t size) LUX_OVERRIDE
 			{
 				size_t amount = m_pos + size < m_size ? size : m_size - m_pos;
-				memcpy(m_buffer + m_pos, buffer, amount);
+				memcpy(buffer, m_buffer + m_pos, amount);
 				m_pos += amount;
 				return amount == size;
 			}

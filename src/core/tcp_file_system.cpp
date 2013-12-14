@@ -2,7 +2,7 @@
 #include "core/ifile.h"
 #include "core/ifile_system_defines.h"
 #include "core/file_system.h"
-#include "core/tcp_acceptor.h"
+#include "core/tcp_connector.h"
 #include "core/tcp_stream.h"
 #include "platform/task.h"
 
@@ -19,7 +19,6 @@ namespace Lux
 
 			virtual bool open(const char* path, Mode mode) LUX_OVERRIDE
 			{
-				while(!m_fs->isInitialized());
 				int32_t op = TCPCommand::OpenFile;
 				int32_t ret = 0;
 
@@ -101,30 +100,8 @@ namespace Lux
 
 		struct TCPImpl
 		{
+			Net::TCPConnector m_connector;
 			Net::TCPStream* m_stream;
-		};
-
-		class TCPFileSystemTask : public MT::Task
-		{
-		public:
-			TCPFileSystemTask(TCPImpl* impl) : m_impl(impl) {}
-			~TCPFileSystemTask() {};
-
-			int task()
-			{
-				m_impl->m_stream = m_acceptor.accept(); 
-
-				return 0;
-			}
-
-			void start(const char* ip, uint16_t port)
-			{
-				m_acceptor.start(ip, port);
-			}
-
-		private:
-			TCPImpl* m_impl;
-			Net::TCPAcceptor m_acceptor;
 		};
 
 		IFile* TCPFileSystem::create(IFile* parent)
@@ -135,28 +112,13 @@ namespace Lux
 		void TCPFileSystem::start(const char* ip, uint16_t port)
 		{
 			m_impl = new TCPImpl;
-			m_task = new TCPFileSystemTask(m_impl);
-			m_task->start(ip, port);
-			m_task->create("TCP File System");
-			m_task->run();
+			m_impl->m_stream = m_impl->m_connector.connect(ip, port);
 		}
 
 		void TCPFileSystem::stop()
 		{
-			// todo: destroy task after it's finished
-			m_task->destroy();
-			delete m_task;
+			m_impl->m_stream->write(TCPCommand::Disconnect);
 			delete m_impl;
-		}
-
-		bool TCPFileSystem::isInitialized() const
-		{
-			return m_task->isFinished();
-		}
-
-		Net::TCPStream* TCPFileSystem::getStream()
-		{
-			return m_impl->m_stream;
 		}
 	} // namespace FS
 } // ~namespace Lux
