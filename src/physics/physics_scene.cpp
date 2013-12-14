@@ -4,9 +4,12 @@
 #include "cooking/PxCooking.h"
 #include "core/crc32.h"
 #include "core/event_manager.h"
+#include "core/file_system.h"
+#include "core/ifile.h"
 #include "core/iserializer.h"
 #include "core/json_object.h"
 #include "core/matrix.h"
+#include "engine/engine.h"
 #include "universe/component_event.h"
 #include "universe/entity_moved_event.h"
 #include "physics/physics_system.h"
@@ -33,6 +36,7 @@ struct PhysicsSceneImpl
 	};
 
 	Universe*						m_universe;
+	Engine*							m_engine;
 	physx::PxScene*					m_scene;
 	PhysicsSystem*					m_system;
 	physx::PxMaterial*				m_default_material;
@@ -268,9 +272,9 @@ void PhysicsScene::setShapeSource(Component cmp, const string& str)
 	{
 		return;
 	}
-	FILE* fp;
-	fopen_s(&fp, str.c_str(), "r");
-	if(fp)
+
+	FS::IFile* file = m_impl->m_engine->getFileSystem().open("disk", str.c_str(), FS::Mode::OPEN | FS::Mode::READ);
+	if(file)
 	{
 		physx::PxTransform transform;
 		Matrix mtx;
@@ -282,11 +286,10 @@ void PhysicsScene::setShapeSource(Component cmp, const string& str)
 		physx::PxConvexMeshGeometry convex_geom;
 		physx::PxTriangleMeshGeometry trimesh_geom;
 
-		fseek(fp, 0, SEEK_END);
-		long size = ftell(fp);
-		fseek(fp, 0, SEEK_SET);
+		long size = file->size();
 		char* buffer = new char[size];
-		fread(buffer, size, 1, fp);
+		file->read(buffer, size);
+
 		jsmn_parser parser;
 		jsmn_init(&parser);
 		jsmntok_t tokens[255];

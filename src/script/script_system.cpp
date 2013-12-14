@@ -2,6 +2,9 @@
 #include <Windows.h>
 #include <cstdio>
 #include "core/crc32.h"
+#include "core/file_system.h"
+#include "core/ifile.h"
+#include "engine/engine.h"
 #include "universe/universe.h"
 #include "universe/component_event.h"
 #include "base_script.h"
@@ -27,6 +30,7 @@ namespace Lux
 		vector<HMODULE> m_libs;
 		vector<string> m_paths;
 		Universe* m_universe;
+		Engine* m_engine;
 		bool m_is_running;
 		Renderer* m_renderer;
 		InputSystem* m_input_system;
@@ -200,17 +204,16 @@ namespace Lux
 	{
 		char path[MAX_PATH];
 		m_impl->getScriptDefaultPath(entity, path, MAX_PATH, "cpp");
-		FILE* fp;
-		fopen_s(&fp, path, "r");
-		if(!fp)
-		{
-			fopen_s(&fp, path, "w");
-		}
-		fclose(fp);
+
+		FS::IFile* file = m_impl->m_engine->getFileSystem().open("memory:tcp", path, FS::Mode::OPEN_OR_CREATE);
+		m_impl->m_engine->getFileSystem().close(file);
+
 		m_impl->m_scripts.push_back(entity.index);
 		m_impl->m_paths.push_back(path);
+
 		Component cmp(entity, script_type, this, m_impl->m_scripts.size() - 1);
 		m_impl->m_universe->getEventManager()->emitEvent(ComponentEvent(cmp));
+
 		return cmp;
 	}
 

@@ -44,7 +44,7 @@ namespace Lux
 
 					tr->data.m_result = tr->data.m_user_data != NULL 
 						? tr->data.m_file->open(tr->data.m_path, tr->data.m_mode)
-						: true, tr->data.m_file->close();
+						: (tr->data.m_file->close(), true);
 					tr->setCompleted();
 				}
 				return 0;

@@ -28,6 +28,7 @@ namespace Lux
 				Seek,
 				Pos,
 				Exit,
+				Disconnect,
 			};
 
 			TCPCommand() : value(0) {}
@@ -46,11 +47,7 @@ namespace Lux
 			void start(const char* ip, uint16_t port);
 			void stop();
 
-			bool isInitialized() const;
-			Net::TCPStream* getStream();
-
 		private:
-			TCPFileSystemTask* m_task;
 			TCPImpl* m_impl;
 		};
 	} // ~namespace FS

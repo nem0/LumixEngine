@@ -13,7 +13,7 @@ namespace Lux
 		class DiskFile : public IFile
 		{
 		public:
-			DiskFile(IFile* parent) {}
+			DiskFile() {}
 			virtual ~DiskFile() {}
 
 			virtual bool open(const char* path, Mode mode) LUX_OVERRIDE
@@ -60,9 +60,9 @@ namespace Lux
 			OsFile m_file;
 		};
 
-		IFile* DiskFileSystem::create(IFile* parent)
+		IFile* DiskFileSystem::create(IFile* child)
 		{
-			return new DiskFile(parent);
+			return new DiskFile();
 		}
 	} // namespace FS
 } // ~namespace Lux
