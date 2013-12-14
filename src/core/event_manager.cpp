@@ -17,6 +17,7 @@ void EventManager::emitEvent(Event& event)
 	}
 }
 
+
 void EventManager::registerListener(Event::Type type, void* data, void (*listener)(void*, Event&))
 {
 	Listener l;
@@ -24,7 +25,6 @@ void EventManager::registerListener(Event::Type type, void* data, void (*listene
 	l.listener = listener;
 	m_listeners[type].push_back(l);
 }
-
 
 
 void EventManager::unregisterListener(Event::Type type, void* data, void (*listener)(void*, Event&))

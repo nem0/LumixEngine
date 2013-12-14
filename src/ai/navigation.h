@@ -16,6 +16,7 @@ namespace Lux
 
 			virtual bool create(Engine& engine) LUX_OVERRIDE { return true; }
 			virtual Component createComponent(uint32_t, const Entity&) LUX_OVERRIDE { return Component::INVALID; }
+			virtual const char* getName() const LUX_OVERRIDE { return "navigation"; }
 			virtual void update(float dt) LUX_OVERRIDE;
 
 			void navigate(Entity e, const Vec3& dest, float speed);

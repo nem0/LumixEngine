@@ -105,8 +105,16 @@ namespace Lux
 			{
 				CreateScriptFunction f = (CreateScriptFunction)GetProcAddress(h, TEXT("createScript"));
 				BaseScript* script = f();
-				m_impl->m_script_objs.push_back(script);
-				script->create(*this, e);
+				if(!f)
+				{
+					g_log_warning.log("script", "failed to create script %s", m_impl->m_paths[i].c_str());
+					m_impl->m_script_objs.push_back(0);
+				}
+				else
+				{
+					m_impl->m_script_objs.push_back(script);
+					script->create(*this, e);
+				}
 			}
 			else
 			{

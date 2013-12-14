@@ -1,5 +1,8 @@
 #include "physics/physics_scene.h"
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 #include <cstdio>
+#include <gl/gl.h>
 #include <PxPhysicsAPI.h>
 #include "cooking/PxCooking.h"
 #include "core/crc32.h"
@@ -22,12 +25,19 @@ namespace Lux
 
 struct PhysicsSceneImpl
 {
+	enum ActorType
+	{
+		BOX
+	};
+
 	static void handleEvent(void* data, Event& event);
 	void handleEvent(Event& event);
 	void createConvexGeom(const char* path, physx::PxConvexMeshGeometry& geom);
 	void createTriMesh(const char* path, physx::PxTriangleMeshGeometry& geom);
-	void postDeserialize();
+
 	void setControllerPosition(int index, const Vec3& pos);
+	void serializeActor(ISerializer& serializer, int idx);
+	void deserializeActor(ISerializer& serializer, int idx);
 
 	struct Controller
 	{
@@ -50,7 +60,7 @@ struct PhysicsSceneImpl
 };
 
 
-static const uint32_t physical_type = crc32("physical");
+static const uint32_t box_rigid_actor_type = crc32("box_rigid_actor");
 static const uint32_t controller_type = crc32("physical_controller");
 
 
@@ -182,7 +192,7 @@ void matrix2Transform(const Matrix& mtx, physx::PxTransform& transform)
 
 void PhysicsScene::destroyActor(Component cmp)
 {
-	ASSERT(cmp.type == physical_type);
+	ASSERT(cmp.type == box_rigid_actor_type);
 	int inner_index = m_impl->m_index_map[cmp.index];
 	m_impl->m_scene->removeActor(*m_impl->m_actors[inner_index]);
 	m_impl->m_actors[inner_index]->release();
@@ -229,7 +239,7 @@ Component PhysicsScene::createController(Entity entity)
 }
 
 
-Component PhysicsScene::createActor(Entity entity)
+Component PhysicsScene::createBoxRigidActor(Entity entity)
 {
 	int new_index = m_impl->m_entities.size();
 	for(int i = 0; i < m_impl->m_index_map.size(); ++i)
@@ -254,13 +264,31 @@ Component PhysicsScene::createActor(Entity entity)
 		m_impl->m_is_dynamic[new_index] = false;
 		m_impl->m_entities[new_index] = entity;
 	}
-	Component cmp(entity, physical_type, this, m_impl->m_actors.size() - 1);
+
+	physx::PxBoxGeometry geom;
+	geom.halfExtents.x = 1;
+	geom.halfExtents.y = 1;
+	geom.halfExtents.z = 1;
+	physx::PxTransform transform;
+	Matrix mtx;
+	entity.getMatrix(mtx);
+	matrix2Transform(mtx, transform);
+
+	physx::PxRigidStatic* actor = PxCreateStatic(*m_impl->m_system->m_impl->m_physics, transform, geom, *m_impl->m_default_material);
+	actor->userData = (void*)entity.index;
+	m_impl->m_scene->addActor(*actor);
+	m_impl->m_scene->simulate(0.01f);
+	m_impl->m_scene->fetchResults(true);
+	m_impl->m_actors[new_index] = actor;
+	actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
+
+	Component cmp(entity, box_rigid_actor_type, this, m_impl->m_actors.size() - 1);
 	m_impl->m_universe->getEventManager()->emitEvent(ComponentEvent(cmp));
 	return cmp;
 }
 
 
-void PhysicsScene::getShapeSource(Component cmp, string& str)
+/*void PhysicsScene::getShapeSource(Component cmp, string& str)
 {
 	str = m_impl->m_shape_sources[cmp.index];
 }
@@ -365,7 +393,7 @@ void PhysicsScene::setShapeSource(Component cmp, const string& str)
 			m_impl->m_shape_sources[cmp.index] = str;
 		}
 	}
-}
+}*/
 
 
 void PhysicsSceneImpl::createTriMesh(const char* path, physx::PxTriangleMeshGeometry& geom)
@@ -435,28 +463,33 @@ void PhysicsSceneImpl::createConvexGeom(const char* path, physx::PxConvexMeshGeo
 }
 
 
-void PhysicsSceneImpl::postDeserialize()
-{
-	m_actors.resize(m_shape_sources.size());
-	for(int i = 0; i < m_shape_sources.size(); ++i)
-	{
-		m_entities[i].universe = m_universe;
-		m_owner->setIsDynamic(Component(m_entities[i], physical_type, this, i), m_is_dynamic[i]);
-		Component cmp(m_entities[i], physical_type, m_owner, i);
-		m_universe->getEventManager()->emitEvent(ComponentEvent(cmp));
-	}
-	m_index_map.resize(m_shape_sources.size());
-	for(int i = 0; i < m_shape_sources.size(); ++i)
-	{
-		m_index_map[i] = i;
-	}
-}
-
-
 void PhysicsSceneImpl::setControllerPosition(int index, const Vec3& pos)
 {
 	physx::PxExtendedVec3 p(pos.x, pos.y, pos.z);
 	m_controllers[index].m_controller->setPosition(p);
+}
+
+
+void PhysicsScene::render()
+{
+	m_impl->m_scene->getNbActors(physx::PxActorTypeSelectionFlag::eRIGID_STATIC);
+	const physx::PxRenderBuffer& rb = m_impl->m_scene->getRenderBuffer();
+	const physx::PxU32 numLines = rb.getNbLines();
+	const physx::PxU32 numPoints = rb.getNbPoints();
+	const physx::PxU32 numTri = rb.getNbTriangles();
+	if(numLines)
+	{
+		glBegin(GL_LINES);
+		const physx::PxDebugLine* PX_RESTRICT lines = rb.getLines();
+		for(physx::PxU32 i=0; i<numLines; i++)
+		{
+			const physx::PxDebugLine& line = lines[i];
+			glColor3f(0, 1, 0);				
+			glVertex3fv((GLfloat*)&line.pos0);
+			glVertex3fv((GLfloat*)&line.pos1);
+		}
+		glEnd();
+	}
 }
 
 
@@ -532,7 +565,7 @@ void PhysicsSceneImpl::handleEvent(Event& event)
 		const vector<Component>& cmps = e.getComponents();
 		for(int i = 0, c = cmps.size(); i < c; ++i)
 		{
-			if(cmps[i].type == physical_type)
+			if(cmps[i].type == box_rigid_actor_type)
 			{
 				Vec3 pos = e.getPosition();
 				physx::PxVec3 pvec(pos.x, pos.y, pos.z);
@@ -564,10 +597,136 @@ void PhysicsScene::getIsDynamic(Component cmp, bool& is)
 }
 
 
+void PhysicsScene::getHalfExtents(Component cmp, Vec3& size)
+{
+	physx::PxRigidActor* actor = m_impl->m_actors[cmp.index];
+	physx::PxShape* shapes;
+	if(actor->getNbShapes() == 1 && m_impl->m_actors[cmp.index]->getShapes(&shapes, 1))
+	{
+		physx::PxVec3& half = shapes->getGeometry().box().halfExtents;
+		size.x = half.x;
+		size.y = half.y;
+		size.z = half.z;
+	}
+}
+
+
+void PhysicsScene::setHalfExtents(Component cmp, const Vec3& size)
+{
+	physx::PxRigidActor* actor = m_impl->m_actors[cmp.index];
+	physx::PxShape* shapes;
+	if(actor->getNbShapes() == 1 && m_impl->m_actors[cmp.index]->getShapes(&shapes, 1))
+	{
+		physx::PxBoxGeometry box;
+		bool is_box = shapes->getBoxGeometry(box);
+		ASSERT(is_box);
+		physx::PxVec3& half = box.halfExtents;
+		half.x = size.x;
+		half.y = size.y;
+		half.z = size.z;
+		shapes->setGeometry(box);
+	}
+}
+
+
 void PhysicsScene::setIsDynamic(Component cmp, const bool& is)
 {
-	m_impl->m_is_dynamic[cmp.index] = is;
-	setShapeSource(cmp, m_impl->m_shape_sources[cmp.index]);
+	if(m_impl->m_is_dynamic[cmp.index] != is)
+	{
+		m_impl->m_is_dynamic[cmp.index] = is;
+		physx::PxShape* shapes;
+		if(m_impl->m_actors[cmp.index]->getNbShapes() == 1 && m_impl->m_actors[cmp.index]->getShapes(&shapes, 1, 0))
+		{
+			physx::PxGeometryHolder geom = shapes->getGeometry();
+			
+			physx::PxTransform transform;
+			matrix2Transform(cmp.entity.getMatrix(), transform);
+
+			physx::PxRigidActor* actor;
+			if(is)
+			{
+				actor = PxCreateDynamic(*m_impl->m_system->m_impl->m_physics, transform, geom.any(), *m_impl->m_default_material, 1.0f);
+			}
+			else
+			{
+				actor = PxCreateStatic(*m_impl->m_system->m_impl->m_physics, transform, geom.any(), *m_impl->m_default_material);
+			}
+			m_impl->m_scene->removeActor(*m_impl->m_actors[cmp.index]);
+			m_impl->m_actors[cmp.index]->release();
+			m_impl->m_scene->addActor(*actor);
+			m_impl->m_actors[cmp.index] = actor;
+		}
+	}
+}
+
+
+void PhysicsSceneImpl::serializeActor(ISerializer& serializer, int idx)
+{
+	physx::PxShape* shapes;
+	if(m_actors[idx]->getNbShapes() == 1 && m_actors[idx]->getShapes(&shapes, 1))
+	{
+		physx::PxBoxGeometry geom;
+		if(shapes->getBoxGeometry(geom))
+		{
+			serializer.serialize("type", (int32_t)BOX);
+			serializer.serialize("x", geom.halfExtents.x);
+			serializer.serialize("y", geom.halfExtents.y);
+			serializer.serialize("z", geom.halfExtents.z);
+		}
+		else
+		{
+			ASSERT(false);
+		}
+	}
+	else
+	{
+		ASSERT(false);
+	}
+}
+
+
+void PhysicsSceneImpl::deserializeActor(ISerializer& serializer, int idx)
+{
+	ActorType type;
+	serializer.deserialize("type", (int32_t&)type);
+	physx::PxTransform transform;
+	Matrix mtx;
+	m_entities[idx].getMatrix(mtx);
+	matrix2Transform(mtx, transform);
+
+	physx::PxGeometry* geom;
+	physx::PxBoxGeometry box_geom;
+	switch(type)
+	{
+		case BOX:
+			{
+				serializer.deserialize("x", box_geom.halfExtents.x);
+				serializer.deserialize("y", box_geom.halfExtents.y);
+				serializer.deserialize("z", box_geom.halfExtents.z);
+				geom = &box_geom;
+			}
+			break;
+		default:
+			ASSERT(false);
+			break;
+	}
+
+	physx::PxRigidActor* actor;
+	if(m_is_dynamic[idx])
+	{
+		actor = PxCreateDynamic(*m_system->m_impl->m_physics, transform, *geom, *m_default_material, 1.0f);
+	}
+	else
+	{
+		actor = PxCreateStatic(*m_system->m_impl->m_physics, transform, *geom, *m_default_material);
+	}
+	actor->userData = (void*)m_entities[idx].index;
+	m_scene->addActor(*actor);
+	m_actors[idx] = actor;
+	actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
+
+	Component cmp(m_entities[idx], box_rigid_actor_type, m_owner, idx);
+	m_universe->getEventManager()->emitEvent(ComponentEvent(cmp));
 }
 
 
@@ -580,6 +739,7 @@ void PhysicsScene::serialize(ISerializer& serializer)
 		serializer.serializeArrayItem(m_impl->m_shape_sources[i]);
 		serializer.serializeArrayItem(m_impl->m_is_dynamic[i]);
 		serializer.serializeArrayItem(m_impl->m_entities[i].index);
+		m_impl->serializeActor(serializer, i);
 	}
 	serializer.endArray();
 	serializer.serialize("count", m_impl->m_controllers.size());
@@ -599,12 +759,15 @@ void PhysicsScene::deserialize(ISerializer& serializer)
 	m_impl->m_shape_sources.resize(count);
 	m_impl->m_is_dynamic.resize(count);
 	m_impl->m_entities.resize(count);
+	m_impl->m_actors.resize(count);
 	serializer.deserializeArrayBegin("actors");
 	for(int i = 0; i < m_impl->m_shape_sources.size(); ++i)
 	{
 		serializer.deserializeArrayItem(m_impl->m_shape_sources[i]);
 		serializer.deserializeArrayItem(m_impl->m_is_dynamic[i]);
 		serializer.deserializeArrayItem(m_impl->m_entities[i].index);
+		m_impl->m_entities[i].universe = m_impl->m_universe;
+		m_impl->deserializeActor(serializer, i);
 	}
 	serializer.deserialize("count", count);
 	m_impl->m_controllers.clear();
@@ -618,7 +781,6 @@ void PhysicsScene::deserialize(ISerializer& serializer)
 		m_impl->setControllerPosition(i, e.getPosition());
 	}		
 	serializer.deserializeArrayEnd();
-	m_impl->postDeserialize();
 }
 
 

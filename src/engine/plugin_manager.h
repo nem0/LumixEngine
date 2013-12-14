@@ -19,13 +19,14 @@ namespace Lux
 
 			bool create(Engine& engine);
 			void destroy();
-			IPlugin* PluginManager::load(const char* path);
+			IPlugin* load(const char* path);
 			void addPlugin(IPlugin* plugin);
 			void update(float dt);
 			void serialize(ISerializer& serializer);
 			void deserialize(ISerializer& serializer);
 			void onDestroyUniverse(Universe& universe);
 			void onCreateUniverse(Universe& universe);
+			IPlugin* getPlugin(const char* name);
 
 		private:
 			struct PluginManagerImpl* m_impl;
