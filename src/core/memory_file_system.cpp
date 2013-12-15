@@ -12,11 +12,12 @@ namespace Lux
 		{
 		public:
 			MemoryFile(IFile* file)
-				: m_file(file) 
-				, m_buffer(NULL)
+				: m_buffer(NULL)
 				, m_size(0)
 				, m_capacity(0)
 				, m_pos(0)
+				, m_file(file) 
+				, m_write(false)
 			{
 			}
 
@@ -37,6 +38,7 @@ namespace Lux
 						m_capacity = m_size = 0;
 						m_buffer = NULL;
 						m_pos = 0;
+						m_write = true;
 					}
 					else
 					{
@@ -54,8 +56,15 @@ namespace Lux
 
 			virtual void close() LUX_OVERRIDE
 			{
-				ASSERT(NULL != m_file);
-				m_file->close();
+				if(m_file)
+				{
+					if(m_write)
+					{
+						m_file->seek(SeekMode::BEGIN, 0);
+						m_file->write(m_buffer, m_size);
+					}
+					m_file->close();
+				}
 
 				delete [] m_buffer;
 			}
@@ -126,11 +135,12 @@ namespace Lux
 			}
 
 		private:
-			IFile* m_file;
 			uint8_t* m_buffer;
 			uint32_t m_size;
 			uint32_t m_capacity;
 			uint32_t m_pos;
+			IFile* m_file;
+			bool m_write;
 		};
 
 		IFile* MemoryFileSystem::create(IFile* child)

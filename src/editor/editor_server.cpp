@@ -11,6 +11,7 @@
 #include "core/log.h"
 #include "core/map.h"
 #include "core/matrix.h"
+#include "core/memory_file_system.h"
 #include "core/crc32.h"
 #include "core/memory_stream.h"
 #include "core/vector.h"
@@ -179,7 +180,7 @@ struct EditorServerImpl
 		bool m_is_game_mode;
 		Quat m_camera_rot;
 		Vec3 m_camera_pos;
-//		MemoryStream m_game_mode_stream;
+		FS::IFile* m_game_mode_file;
 		MessageTask* m_message_task;
 		Engine m_engine;
 		EditorServer* m_owner;
@@ -248,12 +249,14 @@ bool EditorServer::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 {
 	m_impl = new EditorServerImpl();
 	m_impl->m_owner = this;
+	
 	if(!m_impl->create(hwnd, game_hwnd, base_path))
 	{
 		delete m_impl;
 		m_impl = 0;
 		return false;
 	}
+
 	return true;
 }
 
@@ -431,8 +434,8 @@ void EditorServerImpl::toggleGameMode()
 	}
 	else
 	{
-//		m_game_mode_stream.clearBuffer();
-//		save(m_game_mode_stream);
+		m_game_mode_file = m_engine.getFileSystem().open("memory", "", 0);
+		save(*m_game_mode_file);
 		m_engine.getScriptSystem().start();
 		m_is_game_mode = true;
 	}
@@ -447,8 +450,10 @@ void EditorServerImpl::stopGameMode()
 	m_camera_rot.toMatrix(mtx);
 	mtx.setTranslation(m_camera_pos);
 	m_engine.getRenderer().setCameraMatrix(mtx);
-//	m_game_mode_stream.rewindForRead();
-//	load(m_game_mode_stream);
+	m_game_mode_file->seek(FS::SeekMode::BEGIN, 0);
+	load(*m_game_mode_file);
+	m_engine.getFileSystem().close(m_game_mode_file);
+	m_game_mode_file = NULL;
 }
 
 
@@ -622,9 +627,9 @@ void loadMap(FS::IFile* file, bool success, void* user_data)
 void EditorServerImpl::load(const char path[])
 {
 	g_log_info.log("editor server", "loading universe %s...", path);
-	m_engine.getFileSystem().openAsync("memory:tcp", path, FS::Mode::OPEN | FS::Mode::READ, &loadMap, this);
+	FS::FileSystem& fs = m_engine.getFileSystem();
+	fs.openAsync(fs.getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, &loadMap, this);
 }
-
 
 void EditorServerImpl::newUniverse()
 {

@@ -185,8 +185,7 @@ void RendererImpl::loadResources()
 	{
 		m_loading_res = res;
 		sprintf_s(path, "%s%s/%s", m_base_path.c_str(), h3dutGetResourcePath(h3dGetResType(res)), h3dGetResName(res));
-//		m_file_system->openFile(path, &resourceLoaded, this);
-		m_file_system->openAsync("memory:tcp", path, FS::Mode::OPEN | FS::Mode::READ, &resourceLoaded, this);
+		m_file_system->openAsync(m_file_system->getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, &resourceLoaded, this);
 	}
 }
 
