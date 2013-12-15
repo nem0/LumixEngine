@@ -29,6 +29,9 @@ namespace Lux
 			virtual void closeAsync(IFile* file) = 0;
 
 			virtual void updateAsyncTransactions() = 0;
+
+			virtual const char* getDefaultDevice() const = 0;
+			virtual const char* getSaveGameDefice() const = 0;
 		};
 	} // ~namespace FS
 } // ~namespace Lux
