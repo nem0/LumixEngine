@@ -91,6 +91,7 @@ void Gizmo::updateScale()
 
 void Gizmo::setEntity(Entity entity)
 {
+	h3dSetNodeFlags(m_handle, H3DNodeFlags::NoCastShadow, true);
 	m_selected_entity = entity;
 	if(m_selected_entity.index != -1)
 	{

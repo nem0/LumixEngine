@@ -127,7 +127,8 @@ struct EditorServerImpl
 		void writeString(const char* str);
 		void setProperty(void* data, int size);
 		void createUniverse(bool create_scene, const char* base_path);
-		void renderScene();
+		void renderScene(bool is_render_physics);
+		void renderPhysics();
 		void save(const char path[]);
 		void load(const char path[]);
 		void addComponent(uint32_t type_crc);
@@ -149,7 +150,7 @@ struct EditorServerImpl
 		void load(IStream& stream);
 		void onMessage(void* msgptr, int size);
 
-		const PropertyDescriptor& getPropertyDescriptor(uint32_t type, const char* name);
+		const PropertyDescriptor& getPropertyDescriptor(uint32_t type, uint32_t name_hash);
 		H3DNode castRay(int x, int y, Vec3& hit_pos, char* name, int max_name_size, H3DNode gizmo_node);
 		void registerProperties();
 		void rotateCamera(int x, int y);
@@ -188,7 +189,6 @@ struct EditorServerImpl
 static const uint32_t renderable_type = crc32("renderable");
 static const uint32_t camera_type = crc32("camera");
 static const uint32_t point_light_type = crc32("point_light");
-static const uint32_t physical_controller_type = crc32("physical_controller");
 static const uint32_t script_type = crc32("script");
 static const uint32_t animable_type = crc32("animable");
 
@@ -221,7 +221,7 @@ void EditorServer::tick(HWND hwnd, HWND game_hwnd)
 	hdc = BeginPaint(hwnd, &ps);
 	ASSERT(hdc);
 	wglMakeCurrent(hdc, m_impl->m_hglrc);
-	m_impl->renderScene();
+	m_impl->renderScene(true);
 	wglSwapLayerBuffers(hdc, WGL_SWAP_MAIN_PLANE);
 	EndPaint(hwnd, &ps);
 
@@ -231,7 +231,7 @@ void EditorServer::tick(HWND hwnd, HWND game_hwnd)
 		hdc = BeginPaint(game_hwnd, &ps);
 		ASSERT(hdc);
 		wglMakeCurrent(hdc, m_impl->m_game_hglrc);
-		m_impl->renderScene();
+		m_impl->renderScene(false);
 		wglSwapLayerBuffers(hdc, WGL_SWAP_MAIN_PLANE);
 		EndPaint(game_hwnd, &ps);
 	}
@@ -267,10 +267,12 @@ void EditorServer::destroy()
 
 void EditorServerImpl::registerProperties()
 {
-	m_component_properties[renderable_type].push_back(PropertyDescriptor("path", (PropertyDescriptor::Getter)&Renderer::getMesh, (PropertyDescriptor::Setter)&Renderer::setMesh, PropertyDescriptor::FILE));
-	m_component_properties[point_light_type].push_back(PropertyDescriptor("fov", (PropertyDescriptor::DecimalGetter)&Renderer::getLightFov, (PropertyDescriptor::DecimalSetter)&Renderer::setLightFov));
-	m_component_properties[point_light_type].push_back(PropertyDescriptor("radius", (PropertyDescriptor::DecimalGetter)&Renderer::getLightRadius, (PropertyDescriptor::DecimalSetter)&Renderer::setLightRadius));
-	m_component_properties[script_type].push_back(PropertyDescriptor("path", (PropertyDescriptor::Getter)&ScriptSystem::getScriptPath, (PropertyDescriptor::Setter)&ScriptSystem::setScriptPath, PropertyDescriptor::FILE));
+	m_component_properties[renderable_type].push_back(PropertyDescriptor(crc32("source"), (PropertyDescriptor::Getter)&Renderer::getMesh, (PropertyDescriptor::Setter)&Renderer::setMesh, PropertyDescriptor::FILE));
+	m_component_properties[renderable_type].push_back(PropertyDescriptor(crc32("visible"), (PropertyDescriptor::BoolGetter)&Renderer::getVisible, (PropertyDescriptor::BoolSetter)&Renderer::setVisible));
+	m_component_properties[renderable_type].push_back(PropertyDescriptor(crc32("cast shadows"), (PropertyDescriptor::BoolGetter)&Renderer::getCastShadows, (PropertyDescriptor::BoolSetter)&Renderer::setCastShadows));
+	m_component_properties[point_light_type].push_back(PropertyDescriptor(crc32("fov"), (PropertyDescriptor::DecimalGetter)&Renderer::getLightFov, (PropertyDescriptor::DecimalSetter)&Renderer::setLightFov));
+	m_component_properties[point_light_type].push_back(PropertyDescriptor(crc32("radius"), (PropertyDescriptor::DecimalGetter)&Renderer::getLightRadius, (PropertyDescriptor::DecimalSetter)&Renderer::setLightRadius));
+	m_component_properties[script_type].push_back(PropertyDescriptor(crc32("source"), (PropertyDescriptor::Getter)&ScriptSystem::getScriptPath, (PropertyDescriptor::Setter)&ScriptSystem::setScriptPath, PropertyDescriptor::FILE));
 }
 
 
@@ -458,7 +460,6 @@ void EditorServerImpl::sendComponent(uint32_t type_crc)
 		m_stream.flush();
 		m_stream.write(ServerMessageType::PROPERTY_LIST);
 		const Entity::ComponentList& cmps = m_selected_entity.getComponents();
-		string value;
 		for(int i = 0; i < cmps.size(); ++i)
 		{
 			if(cmps[i].type == type_crc)
@@ -468,10 +469,8 @@ void EditorServerImpl::sendComponent(uint32_t type_crc)
 				m_stream.write(type_crc);
 				for(int j = 0; j < props.size(); ++j)
 				{
-					writeString(props[j].getName().c_str());
-					props[j].get(cmps[i], value);
-					writeString(value.c_str());
-					m_stream.write(props[j].getType());
+					m_stream.write(props[j].getNameHash());
+					props[j].get(cmps[i], m_stream);
 				}
 				break;
 			}
@@ -784,7 +783,7 @@ void EditorServerImpl::sendMessage(const uint8_t* data, int32_t length)
 }
 
 
-void EditorServerImpl::renderScene()
+void EditorServerImpl::renderScene(bool is_render_physics)
 {
 	if(m_selected_entity.isValid())
 	{
@@ -796,10 +795,10 @@ void EditorServerImpl::renderScene()
 	}
 	m_engine.getRenderer().renderScene();
 
-	/*if(!m_is_game_mode)
+	if(is_render_physics)
 	{
 		renderPhysics();
-	}*/
+	}
 
 	m_engine.getRenderer().endFrame();
 		
@@ -807,21 +806,21 @@ void EditorServerImpl::renderScene()
 }
 
 
-/*void EditorServerImpl::renderPhysics()
+void EditorServerImpl::renderPhysics()
 {
 	glMatrixMode(GL_PROJECTION);
 	float proj[16];
-	h3dGetCameraProjMat(m_renderer->getRawCameraNode(), proj);
+	h3dGetCameraProjMat(m_engine.getRenderer().getRawCameraNode(), proj);
 	glLoadMatrixf(proj);
 		
 	glMatrixMode(GL_MODELVIEW);
 	
 	Matrix mtx;
-	m_renderer->getCameraMatrix(mtx);
+	m_engine.getRenderer().getCameraMatrix(mtx);
 	mtx.fastInverse();
 	glLoadMatrixf(&mtx.m11);
 
-	glViewport(0, 0, m_renderer->getWidth(), m_renderer->getHeight());
+	glViewport(0, 0, m_engine.getRenderer().getWidth(), m_engine.getRenderer().getHeight());
 
 	glEnable(GL_DEPTH_TEST);
 	glDisable(GL_CULL_FACE);
@@ -833,7 +832,12 @@ void EditorServerImpl::renderScene()
 	glDisableClientState(GL_NORMAL_ARRAY);
 	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 
-	int nbac = m_physics_scene->getRawScene()->getNbActors(physx::PxActorTypeSelectionFlag::eRIGID_STATIC);
+	IPlugin* physics = m_engine.getPluginManager().getPlugin("physics");
+	if(physics)
+	{
+		physics->sendMessage("render");
+	}
+	/*m_physics_scene->getRawScene()->getNbActors(physx::PxActorTypeSelectionFlag::eRIGID_STATIC);
 	const physx::PxRenderBuffer& rb = m_physics_scene->getRawScene()->getRenderBuffer();
 	const physx::PxU32 numLines = rb.getNbLines();
 	const physx::PxU32 numPoints = rb.getNbPoints();
@@ -850,8 +854,8 @@ void EditorServerImpl::renderScene()
 			glVertex3fv((GLfloat*)&line.pos1);
 		}
 		glEnd();
-	}
-}*/
+	}*/
+}
 
 
 EditorServerImpl::EditorServerImpl()
@@ -873,12 +877,12 @@ void EditorServerImpl::navigate(float forward, float right, int fast)
 }
 
 
-const PropertyDescriptor& EditorServerImpl::getPropertyDescriptor(uint32_t type, const char* name)
+const PropertyDescriptor& EditorServerImpl::getPropertyDescriptor(uint32_t type, uint32_t name_hash)
 {
 	vector<PropertyDescriptor>& props = m_component_properties[type];
 	for(int i = 0; i < props.size(); ++i)
 	{
-		if(props[i].getName() == name)
+		if(props[i].getNameHash() == name_hash)
 		{
 			return props[i];
 		}
@@ -909,16 +913,10 @@ void EditorServerImpl::setProperty(void* data, int size)
 	}
 	if(cmp.isValid())
 	{
-		char tmp[255];
-		int len;
-		stream.read(len);
-		stream.read(tmp, len);
-		tmp[len] = 0;
-		const PropertyDescriptor& cp = getPropertyDescriptor(cmp.type, tmp);
-		stream.read(len);
-		stream.read(tmp, len);
-		tmp[len] = 0;
-		cp.set(cmp, string(tmp));
+		uint32_t name_hash;
+		stream.read(name_hash);
+		const PropertyDescriptor& cp = getPropertyDescriptor(cmp.type, name_hash);
+		cp.set(cmp, stream);
 	}
 }
 

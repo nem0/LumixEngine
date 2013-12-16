@@ -65,6 +65,17 @@ namespace Lux
 		}
 	}
 
+	IPlugin* PluginManager::getPlugin(const char* name)
+	{
+		for(int i = 0; i < m_impl->m_plugins.size(); ++i)
+		{
+			if(strcmp(m_impl->m_plugins[i]->getName(), name) == 0)
+			{
+				return m_impl->m_plugins[i];
+			}
+		}
+		return 0;
+	}
 
 	IPlugin* PluginManager::load(const char* path)
 	{

@@ -58,6 +58,30 @@
       <DependentUpon>AssetList.cs</DependentUpon>
     </Compile>
     <Compile Include="AssetMonitor.cs" />
+    <Compile Include="PropertyGrid\BoxRigidDynamic.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="PropertyGrid\BoxRigidDynamic.Designer.cs">
+      <DependentUpon>BoxRigidDynamic.cs</DependentUpon>
+    </Compile>
+    <Compile Include="PropertyGrid\PointLight.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="PropertyGrid\PointLight.Designer.cs">
+      <DependentUpon>PointLight.cs</DependentUpon>
+    </Compile>
+    <Compile Include="PropertyGrid\Renderable.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="PropertyGrid\Renderable.Designer.cs">
+      <DependentUpon>Renderable.cs</DependentUpon>
+    </Compile>
+    <Compile Include="PropertyGrid\FileInput.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="PropertyGrid\FileInput.Designer.cs">
+      <DependentUpon>FileInput.cs</DependentUpon>
+    </Compile>
     <Compile Include="Crc32.cs" />
     <Compile Include="FileServer\FileServer.cs" />
     <Compile Include="FileServer\FileServerUI.cs">
@@ -87,13 +111,19 @@
     <Compile Include="native\EditorServer.cs" />
     <Compile Include="Notifications.cs" />
     <Compile Include="Program.cs" />
-    <Compile Include="PropertyGrid.cs">
+    <Compile Include="PropertyGrid\PropertyGrid.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="PropertyGrid.Designer.cs">
+    <Compile Include="PropertyGrid\PropertyGrid.Designer.cs">
       <DependentUpon>PropertyGrid.cs</DependentUpon>
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="PropertyGrid\Script.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="PropertyGrid\Script.Designer.cs">
+      <DependentUpon>Script.cs</DependentUpon>
+    </Compile>
     <Compile Include="SceneView.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -103,6 +133,18 @@
     <Compile Include="ScriptCompiler.cs" />
     <EmbeddedResource Include="AssetList.resx">
       <DependentUpon>AssetList.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="PropertyGrid\BoxRigidDynamic.resx">
+      <DependentUpon>BoxRigidDynamic.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="PropertyGrid\PointLight.resx">
+      <DependentUpon>PointLight.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="PropertyGrid\Renderable.resx">
+      <DependentUpon>Renderable.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="PropertyGrid\FileInput.resx">
+      <DependentUpon>FileInput.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="FileServer\FileServerUI.resx">
       <DependentUpon>FileServerUI.cs</DependentUpon>
@@ -116,7 +158,7 @@
     <EmbeddedResource Include="MainForm.resx">
       <DependentUpon>MainForm.cs</DependentUpon>
     </EmbeddedResource>
-    <EmbeddedResource Include="PropertyGrid.resx">
+    <EmbeddedResource Include="PropertyGrid\PropertyGrid.resx">
       <DependentUpon>PropertyGrid.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Properties\Resources.resx">
@@ -128,6 +170,9 @@
       <AutoGen>True</AutoGen>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
+    <EmbeddedResource Include="PropertyGrid\Script.resx">
+      <DependentUpon>Script.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="SceneView.resx">
       <DependentUpon>SceneView.cs</DependentUpon>
     </EmbeddedResource>
