@@ -2,11 +2,11 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Express 2012 for Windows Desktop
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "core", "projects\core\core.vcxproj", "{D7D53204-FC0C-4495-8473-FF6F5EBD1C40}"
+	ProjectSection(ProjectDependencies) = postProject
+		{0C468713-C946-4EDB-B1C4-457DDBB61A69} = {0C468713-C946-4EDB-B1C4-457DDBB61A69}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "platform", "projects\platform\platform.vcxproj", "{0C468713-C946-4EDB-B1C4-457DDBB61A69}"
-	ProjectSection(ProjectDependencies) = postProject
-		{D7D53204-FC0C-4495-8473-FF6F5EBD1C40} = {D7D53204-FC0C-4495-8473-FF6F5EBD1C40}
-	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "engine", "projects\engine\engine.vcxproj", "{575E3E55-7662-4D79-92C4-2CF77C56E3EA}"
 	ProjectSection(ProjectDependencies) = postProject

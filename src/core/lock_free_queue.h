@@ -1,25 +1,21 @@
 #pragma once
 
-#include "platform/semaphore.h"
+#include "platform/atomic.h"
 
-namespace Lux
+namespace Lux 
 {
 	namespace MT
 	{
-		template <class T, int32_t size> class LockFreeQueue 
+		template <class T, int32_t size> class LockFreeQueue
 		{
 		public:
 
 			LockFreeQueue();
 			~LockFreeQueue();
 
-			int32_t		push(T* data, bool wait);
-			int32_t		pop(T*& data, bool wait);
+			int32_t		push(T* data);
+			T*			pop();
 			bool		isEmpty() const;
-
-			bool		isAborted() const;
-			void		abort();
-			void		abortFromService();
 
 		protected:
 			struct Node
@@ -43,22 +39,17 @@ namespace Lux
 				{}
 			};
 
-			Semaphore*			m_wr_event;
-			Semaphore*			m_rd_event;
 			volatile int32_t	m_rd;
 			volatile int32_t	m_wr;
-			volatile bool		m_aborted;
 			Node				m_queue[size];
 		};
 
-		template <class T, int32_t size>		LockFreeQueue<T,size>::LockFreeQueue()
+		template <class T, int32_t size>		LockFreeQueue<T, size>::LockFreeQueue()
 			: m_rd(0)
 			, m_wr(0)
-			, m_aborted(false)
 		{
 			ASSERT(size > 0);
-			m_wr_event = MT::Semaphore::create("LockFreQueue::wr", size, size);
-			m_rd_event = MT::Semaphore::create("LockFreQueue::rd", 0, size);
+			ASSERT((size & (size - 1)) == 0); // power of two
 
 			for (int32_t i = 0; i < size; ++i)
 			{
@@ -67,93 +58,60 @@ namespace Lux
 			}
 		}
 
-		template <class T, int32_t size>		LockFreeQueue<T,size>::~LockFreeQueue()
+		template <class T, int32_t size>		LockFreeQueue<T, size>::~LockFreeQueue()
 		{
 		}
 
-		template <class T, int32_t size> void	LockFreeQueue<T,size>::abort()
-		{
-			m_wr_event->wait();
-			m_rd_event->signal();
-		}
-
-		template <class T, int32_t size> void	LockFreeQueue<T,size>::abortFromService()
-		{
-			m_aborted = true;
-		}
-
-		template <class T, int32_t size> bool	LockFreeQueue<T,size>::isAborted() const
-		{
-			return m_aborted;
-		}
-
-		template <class T, int32_t size> bool LockFreeQueue<T,size>::isEmpty() const
+		template <class T, int32_t size> bool LockFreeQueue<T, size>::isEmpty() const
 		{
 			return m_wr == m_rd;
 		}
 
-		template <class T, int32_t size> int32_t LockFreeQueue<T,size>::push(T* data, bool wait)
+		template <class T, int32_t size> int32_t LockFreeQueue<T, size>::push(T* data)
 		{
 			ASSERT(NULL != data);
 
-			if (isAborted()) 
-			{
-				return -2;
-			}
-			
-			int32_t result = -1;
-			bool can_write = wait ? m_wr_event->wait(), true : m_wr_event->poll();
-			if (can_write) 
-			{
-				Node cur_node(0, NULL);
-				Node new_node(0, data);
+			Node cur_node(0, (T*)NULL);
+			Node new_node(0, data);
 
-				while (true)
+			while ((m_wr - m_rd) < size)
+			{
+				int32_t cur_write_idx = m_wr;
+				int32_t idx = cur_write_idx & (size - 1);
+
+				cur_node.key = cur_write_idx;
+				new_node.key = cur_write_idx;
+
+				if (compareAndExchange64(&m_queue[idx].val, new_node.val, cur_node.val))
 				{
-					int32_t cur_write_idx = m_wr;
-					int32_t idx = cur_write_idx & (size - 1);
-
-					cur_node.key = cur_write_idx;
-					new_node.key = cur_write_idx;
-
-					if (compareAndExchange64(&m_queue[idx].val, new_node.val, cur_node.val))
-					{
-						atomicIncrement(&m_wr);
-						result = idx;
-						m_rd_event->signal();
-						break;
-					}
+					atomicIncrement(&m_wr);
+					return idx;
 				}
-			} 
-			return isAborted() ? -2 : result;
+			}
+
+			return -1;
 		}
 
-		template <class T, int32_t size> int32_t LockFreeQueue<T,size>::pop(T*& data, bool wait)
+		template <class T, int32_t size> T* LockFreeQueue<T, size>::pop()
 		{
-			int32_t result = -1;
-			bool can_read = wait ? m_rd_event->wait(), true : m_rd_event->poll();
-			if (can_read) 
+			while (m_rd != m_wr)
 			{
-				while (true)
+				int cur_read_idx = m_rd;
+				int32_t idx = cur_read_idx & (size - 1);
+
+				Node cur_node(cur_read_idx, m_queue[idx].el);
+				Node new_node(cur_read_idx + size, NULL);
+
+				if (compareAndExchange64(&m_queue[idx].val, new_node.val, cur_node.val))
 				{
-					int cur_read_idx = m_rd;
-					int32_t idx = cur_read_idx & (size - 1);
-
-					Node cur_node(cur_read_idx, m_queue[idx].el);
-					Node new_node(cur_read_idx + size, NULL);
-
-					if (compareAndExchange64(&m_queue[idx].val, new_node.val, cur_node.val))
-					{
-						atomicIncrement(&m_rd);
-						data = cur_node.el;
-						result = idx;
-						m_wr_event->signal();
-						break;
-					}
+					atomicIncrement(&m_rd);
+					return cur_node.el;
 				}
 			}
 
-			return isAborted() ? -2 : result;
+			return (T*)NULL;
 		}
+
 	} // ~namespace MT
 } // ~namespace Lux
+

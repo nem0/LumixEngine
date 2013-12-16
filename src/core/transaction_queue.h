@@ -65,12 +65,12 @@ namespace Lux
 				{}
 			};
 
-			MT::Semaphore*			m_alloc_sema;
+			Semaphore*			m_alloc_sema;
 			volatile int32_t		m_alloc_ptr;
 			volatile int32_t		m_free_ptr;
 			AllocNode				m_alloc[size];
 			T						m_trans[size];
-			LockFreeQueue<T, size>	m_queue;
+			BlockingQueue<T, size>	m_queue;
 		};
 
 		template <class T, int32_t size>
