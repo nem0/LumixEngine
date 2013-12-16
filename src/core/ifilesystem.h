@@ -16,6 +16,8 @@ namespace Lux
 		public:
 			virtual ~IFileSystem();
 
+			virtual void processLoaded() = 0;
+			virtual void destroy() {}
 			virtual Handle openFile(const char* path, ReadCallback callback, void* user_data) = 0;
 	};
 

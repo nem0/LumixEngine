@@ -193,6 +193,12 @@ static const uint32_t script_type = crc32("script");
 static const uint32_t animable_type = crc32("animable");
 
 
+Engine& EditorServer::getEngine()
+{
+	return m_impl->m_engine;
+}
+
+
 void EditorServer::registerProperty(const char* component_type, PropertyDescriptor& descriptor)
 {
 	m_impl->m_component_properties[crc32(component_type)].push_back(descriptor);
@@ -217,13 +223,20 @@ void EditorServer::tick(HWND hwnd, HWND game_hwnd)
 	}
 	static_cast<TCPFileSystem&>(m_impl->m_engine.getFileSystem()).processLoaded();
 
-	m_impl->m_engine.getRenderer().enableStage("Gizmo", true);
-	hdc = BeginPaint(hwnd, &ps);
-	ASSERT(hdc);
-	wglMakeCurrent(hdc, m_impl->m_hglrc);
-	m_impl->renderScene(true);
-	wglSwapLayerBuffers(hdc, WGL_SWAP_MAIN_PLANE);
-	EndPaint(hwnd, &ps);
+	if(hwnd)
+	{
+		m_impl->m_engine.getRenderer().enableStage("Gizmo", true);
+		hdc = BeginPaint(hwnd, &ps);
+		ASSERT(hdc);
+		wglMakeCurrent(hdc, m_impl->m_hglrc);
+		m_impl->renderScene(true);
+		wglSwapLayerBuffers(hdc, WGL_SWAP_MAIN_PLANE);
+		EndPaint(hwnd, &ps);
+	}
+	else
+	{
+		m_impl->renderScene(false);
+	}
 
 	if(game_hwnd)
 	{
@@ -714,9 +727,15 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 	m_message_task->create("Message Task");
 	m_message_task->run();
 		
-	m_hglrc = createGLContext(hwnd);
-	m_game_hglrc = createGLContext(game_hwnd);
-	wglShareLists(m_hglrc, m_game_hglrc);
+	if(hwnd)
+	{
+		m_hglrc = createGLContext(hwnd);
+		if(game_hwnd)
+		{
+			m_game_hglrc = createGLContext(game_hwnd);
+			wglShareLists(m_hglrc, m_game_hglrc);
+		}
+	}
 
 	g_log_info.registerCallback(makeFunctor(this, &EditorServerImpl::onLogInfo));
 	g_log_warning.registerCallback(makeFunctor(this, &EditorServerImpl::onLogWarning));
@@ -1130,6 +1149,8 @@ void EditorServerImpl::createUniverse(bool create_scene, const char* base_path)
 	m_camera_rot.toMatrix(mtx);
 	mtx.setTranslation(m_camera_pos);
 	m_engine.getRenderer().setCameraMatrix(mtx);
+
+	addEntity();
 
 	m_gizmo.setUniverse(universe);
 	m_selected_entity = Entity::INVALID;
