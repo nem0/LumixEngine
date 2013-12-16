@@ -1,4 +1,4 @@
-﻿namespace editor_ng
+﻿namespace editor_ng.PropertyGrid
 {
     partial class PropertyGrid
     {
@@ -40,6 +40,7 @@
             this.yPositionTextBox = new System.Windows.Forms.TextBox();
             this.label4 = new System.Windows.Forms.Label();
             this.zPositionTextBox = new System.Windows.Forms.TextBox();
+            this.createComponentButton = new System.Windows.Forms.Button();
             this.componentContextMenu.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -72,7 +73,7 @@
             this.panel1.AutoScroll = true;
             this.panel1.Location = new System.Drawing.Point(0, 57);
             this.panel1.Name = "panel1";
-            this.panel1.Size = new System.Drawing.Size(224, 586);
+            this.panel1.Size = new System.Drawing.Size(230, 400);
             this.panel1.TabIndex = 4;
             // 
             // componentContextMenu
@@ -143,10 +144,23 @@
             this.zPositionTextBox.Text = "0";
             this.zPositionTextBox.TextChanged += new System.EventHandler(this.xPositionTextBox_TextChanged);
             // 
+            // createComponentButton
+            // 
+            this.createComponentButton.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.createComponentButton.Location = new System.Drawing.Point(15, 463);
+            this.createComponentButton.Name = "createComponentButton";
+            this.createComponentButton.Size = new System.Drawing.Size(203, 23);
+            this.createComponentButton.TabIndex = 0;
+            this.createComponentButton.Text = "Create Component";
+            this.createComponentButton.UseVisualStyleBackColor = true;
+            this.createComponentButton.Click += new System.EventHandler(this.createComponentButton_Click);
+            // 
             // PropertyGrid
             // 
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
-            this.ClientSize = new System.Drawing.Size(230, 643);
+            this.ClientSize = new System.Drawing.Size(230, 489);
+            this.Controls.Add(this.createComponentButton);
             this.Controls.Add(this.label4);
             this.Controls.Add(this.zPositionTextBox);
             this.Controls.Add(this.label3);
@@ -179,6 +193,7 @@
         private System.Windows.Forms.TextBox yPositionTextBox;
         private System.Windows.Forms.Label label4;
         private System.Windows.Forms.TextBox zPositionTextBox;
+        private System.Windows.Forms.Button createComponentButton;
 
     }
 }

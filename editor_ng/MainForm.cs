@@ -20,7 +20,7 @@ namespace editor_ng
     public partial class MainForm : Form
     {
         SceneView m_scene_view;
-        PropertyGrid m_property_grid;
+        PropertyGrid.PropertyGrid m_property_grid;
         AssetList m_asset_list;
         List<DockContent> m_dock_contents;
         native.EditorServer m_server;
@@ -50,7 +50,7 @@ namespace editor_ng
             m_asset_monitor = new AssetMonitor(this);
             m_asset_list = new AssetList(this);
             m_asset_list.main_form = this;
-            m_property_grid = new PropertyGrid();
+            m_property_grid = new PropertyGrid.PropertyGrid();
 
             m_property_grid.main_form = this;
             m_script_compiler = new ScriptCompiler();
@@ -108,13 +108,13 @@ namespace editor_ng
         {
             m_component_names = new Dictionary<uint,string>();
             m_component_names[Crc32.Compute(System.Text.Encoding.ASCII.GetBytes("renderable"))] = "renderable";
-            m_component_names[Crc32.Compute(System.Text.Encoding.ASCII.GetBytes("physical"))] = "physical";
-            m_component_names[Crc32.Compute(System.Text.Encoding.ASCII.GetBytes("physical_controller"))] = "physical controller";
+            m_component_names[Crc32.Compute(System.Text.Encoding.ASCII.GetBytes("box_rigid_actor"))] = "box rigid actor";
+            //m_component_names[Crc32.Compute(System.Text.Encoding.ASCII.GetBytes("physical_controller"))] = "physical controller";
             m_component_names[Crc32.Compute(System.Text.Encoding.ASCII.GetBytes("point_light"))] = "point light";
-            m_component_names[Crc32.Compute(System.Text.Encoding.ASCII.GetBytes("player_controller"))] = "player controller";
-            m_component_names[Crc32.Compute(System.Text.Encoding.ASCII.GetBytes("camera"))] = "camera";
+            //m_component_names[Crc32.Compute(System.Text.Encoding.ASCII.GetBytes("player_controller"))] = "player controller";
+            //m_component_names[Crc32.Compute(System.Text.Encoding.ASCII.GetBytes("camera"))] = "camera";
             m_component_names[Crc32.Compute(System.Text.Encoding.ASCII.GetBytes("script"))] = "script";
-            m_component_names[Crc32.Compute(System.Text.Encoding.ASCII.GetBytes("animable"))] = "animable";
+            //m_component_names[Crc32.Compute(System.Text.Encoding.ASCII.GetBytes("animable"))] = "animable";
         }
 
         public long m_last_tick = System.Diagnostics.Stopwatch.GetTimestamp();
@@ -168,6 +168,17 @@ namespace editor_ng
             }
             return 0;
         }
+
+        public List<string> getComponentNames()
+        {
+            List<string> list = new List<string>();
+            foreach (var a in m_component_names)
+            {
+                list.Add(a.Value);
+            }
+            return list;
+        }
+
 
         private void openToolStripMenuItem_Click(object sender, EventArgs e)
         {
