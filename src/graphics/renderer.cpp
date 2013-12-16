@@ -4,7 +4,9 @@
 #include <Windows.h>
 #include "Horde3DUtils.h"
 #include "core/crc32.h"
-#include "core/ifilesystem.h"
+#include "core/file_system.h"
+#include "core/ifile.h"
+#include "core/ifile_system_defines.h"
 #include "core/json_serializer.h"
 #include "core/matrix.h"
 #include "core/quat.h"
@@ -64,7 +66,7 @@ struct RendererImpl
 	int					m_first_free_renderable;
 	int					m_first_free_light;
 	string				m_base_path;
-	IFileSystem*		m_file_system;
+	FS::FileSystem*		m_file_system;
 	H3DRes				m_loading_res;
 	Renderer*			m_owner;
 	bool				m_update_bb;
@@ -125,6 +127,35 @@ void resourceLoaded(void* user_data, char* file_data, int length, bool success)
 	}
 }
 
+void resourceLoaded(FS::IFile* file, bool success, void* user_data)
+{
+	RendererImpl* renderer = static_cast<RendererImpl*>(user_data);
+	if(success)
+	{
+		renderer->m_update_bb = true;
+		h3dLoadResource(renderer->m_loading_res, (const char*)file->getBuffer(), file->size());
+		if(renderer->m_loading_res == renderer->m_pipeline_handle)
+		{
+			h3dResizePipelineBuffers(renderer->m_pipeline_handle, renderer->m_width, renderer->m_height);
+	//		h3dSetOption( H3DOptions::DebugViewMode, 1 );
+			h3dSetOption( H3DOptions::LoadTextures, 1 );
+			h3dSetOption( H3DOptions::TexCompression, 0 );
+			h3dSetOption( H3DOptions::FastAnimation, 0 );
+			h3dSetOption( H3DOptions::MaxAnisotropy, 4 );
+			h3dSetOption( H3DOptions::ShadowMapSize, 512 );
+
+			renderer->m_camera_node = h3dAddCameraNode(H3DRootNode, "", renderer->m_pipeline_handle);
+			renderer->onResize(renderer->m_width, renderer->m_height);
+		}
+		renderer->m_loading_res = 0;
+		renderer->loadResources();
+	}
+	else
+	{
+		h3dLoadResource(renderer->m_loading_res, 0, 0);
+	}
+}
+
 
 void Renderer::enableStage(const char* name, bool enable)
 {
@@ -154,12 +185,12 @@ void RendererImpl::loadResources()
 	{
 		m_loading_res = res;
 		sprintf_s(path, "%s%s/%s", m_base_path.c_str(), h3dutGetResourcePath(h3dGetResType(res)), h3dGetResName(res));
-		m_file_system->openFile(path, &resourceLoaded, this);
+		m_file_system->openAsync(m_file_system->getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, &resourceLoaded, this);
 	}
 }
 
 
-bool Renderer::create(IFileSystem* fs, int w, int h, const char* base_path)
+bool Renderer::create(FS::FileSystem* fs, int w, int h, const char* base_path)
 {
 	m_impl = new RendererImpl();
 	m_impl->m_owner = this;
