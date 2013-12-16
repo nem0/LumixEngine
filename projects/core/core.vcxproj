@@ -125,8 +125,8 @@
     <ClInclude Include="..\..\src\core\ifile.h" />
     <ClInclude Include="..\..\src\core\ifile_system_defines.h" />
     <ClInclude Include="..\..\src\core\iserializer.h" />
-    <ClInclude Include="..\..\src\core\lock_free_fifo.h" />
     <ClInclude Include="..\..\src\core\lock_free_queue.h" />
+    <ClInclude Include="..\..\src\core\blocking_queue.h" />
     <ClInclude Include="..\..\src\core\log.h" />
     <ClInclude Include="..\..\src\core\lux.h" />
     <ClInclude Include="..\..\src\core\event_manager.h" />

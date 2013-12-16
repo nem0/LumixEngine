@@ -61,9 +61,6 @@
     <ClInclude Include="..\..\src\core\functor.h" />
     <ClInclude Include="..\..\src\core\iserializer.h" />
     <ClInclude Include="..\..\src\core\log.h" />
-    <ClInclude Include="..\..\src\core\lock_free_fifo.h" />
-    <ClInclude Include="..\..\src\core\lock_free_queue.h" />
-    <ClInclude Include="..\..\src\core\transaction_queue.h" />
     <ClInclude Include="..\..\src\core\ifile_system_defines.h">
       <Filter>FS</Filter>
     </ClInclude>
@@ -98,6 +95,15 @@
     <ClInclude Include="..\..\src\core\disk_file_device.h">
       <Filter>FS</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\lock_free_queue.h">
+      <Filter>MT</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\blocking_queue.h">
+      <Filter>MT</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\transaction_queue.h">
+      <Filter>MT</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="FS">
@@ -105,6 +111,9 @@
     </Filter>
     <Filter Include="Net">
       <UniqueIdentifier>{711c9117-702c-45a0-b264-2ca658a044b2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="MT">
+      <UniqueIdentifier>{fe4dad03-9173-476b-8718-01b5dc84a305}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>
