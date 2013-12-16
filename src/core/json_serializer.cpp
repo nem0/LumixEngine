@@ -53,7 +53,7 @@ void JsonSerializer::serialize(const char* label, const char* value)
 	writeBlockComma();
 	writeString(label);
 	m_stream.write(" : \"");
-	m_stream.write(value);
+	m_stream.write(value ? value : "");
 	m_stream.write("\"");
 	m_is_first_in_block = false;
 }
@@ -207,7 +207,8 @@ void JsonSerializer::deserialize(const char* label, int& value)
 void JsonSerializer::deserialize(const char* label, char* value, int max_length)
 {
 	deserializeLabel(label);
-
+	//m_stream.read(&m_buffer, 1);
+	ASSERT(m_buffer == '"');
 	int index = 0;
 	unsigned char c;
 	m_stream.read(&c, 1);
@@ -235,7 +236,7 @@ void JsonSerializer::deserializeArrayItem(char* value, int max_length)
 	unsigned char c;
 	m_stream.read(&c, 1);
 	char* out = value;
-	while(c != '"' && out - value < max_length - 1)
+	while(c != '\"' && out - value < max_length - 1)
 	{
 		*out = c;
 		++out;
@@ -359,13 +360,15 @@ void JsonSerializer::deserialize(const char* label, bool& value)
 	unsigned char tmp[5];
 	if(m_buffer == 't')
 	{
+		value = true;
 		m_stream.read(tmp, 3);
-		m_buffer = tmp[2];
+		m_stream.read(&m_buffer, 1);
 	}
 	else
 	{
+		value = false;
 		m_stream.read(tmp, 4);
-		m_buffer = tmp[3];
+		m_stream.read(&m_buffer, 1);
 	}
 	skipControl();
 }

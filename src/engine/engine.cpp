@@ -7,6 +7,7 @@
 #include "engine/plugin_manager.h"
 #include "graphics/renderer.h"
 #include "platform/input_system.h"
+#include "platform/native_file_system.h"
 #include "platform/tcp_filesystem.h"
 #include "script/script_system.h"
 
@@ -18,7 +19,7 @@ namespace Lux
 		bool create(int w, int h, const char* base_path, Engine& owner);
 
 		Renderer m_renderer;
-		TCPFileSystem m_file_system; 
+		IFileSystem* m_file_system; 
 		string m_base_path;
 		EditorServer* m_editor_server;
 		PluginManager m_plugin_manager;
@@ -31,11 +32,13 @@ namespace Lux
 	bool EngineImpl::create(int w, int h, const char* base_path, Engine& owner)
 	{
 		m_universe = 0;
-		if(!m_file_system.create())
+		NativeFileSystem* fs = new NativeFileSystem();
+		if(!fs->create())
 		{
 			return false;
 		}
-		if(!m_renderer.create(&m_file_system, w, h, base_path))
+		m_file_system = fs;
+		if(!m_renderer.create(m_file_system, w, h, base_path))
 		{
 			return false;
 		}
@@ -77,7 +80,7 @@ namespace Lux
 	{
 		m_impl->m_plugin_manager.destroy();
 		m_impl->m_renderer.destroy();
-		m_impl->m_file_system.destroy();
+		m_impl->m_file_system->destroy();
 		
 		delete m_impl;
 		m_impl = 0;
@@ -98,7 +101,7 @@ namespace Lux
 
 	IFileSystem& Engine::getFileSystem()
 	{
-		return m_impl->m_file_system;
+		return *m_impl->m_file_system;
 	}
 
 
