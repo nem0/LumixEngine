@@ -6,12 +6,14 @@
 #include "Horde3DUtils.h"
 
 #include "core/json_serializer.h"
+#include "core/file_system.h"
+#include "core/ifile.h"
 #include "core/log.h"
 #include "core/map.h"
 #include "core/matrix.h"
-#include "core/memory_stream.h"
+#include "core/memory_file_device.h"
 #include "core/crc32.h"
-#include "core/raw_file_stream.h"
+#include "core/memory_stream.h"
 #include "core/vector.h"
 #include "editor/editor_icon.h"
 #include "editor/gizmo.h"
@@ -24,7 +26,6 @@
 #include "platform/mutex.h"
 #include "platform/socket.h"
 #include "platform/task.h"
-#include "platform/tcp_filesystem.h"
 #include "script\script_system.h"
 #include "universe/component_event.h"
 #include "universe/entity_destroyed_event.h"
@@ -95,8 +96,8 @@ class MessageTask : public MT::Task
 		virtual int task() LUX_OVERRIDE;
 
 		struct EditorServerImpl* m_server;
-		Socket m_socket;
-		Socket* m_work_socket;
+		Net::Socket m_socket;
+		Net::Socket* m_work_socket;
 };
 
 
@@ -146,8 +147,8 @@ struct EditorServerImpl
 		void logMessage(int32_t type, const char* system, const char* msg);
 		Entity& getSelectedEntity() { return m_selected_entity; }
 		bool isGameMode() const { return m_is_game_mode; }
-		void save(IStream& stream);
-		void load(IStream& stream);
+		void save(FS::IFile& file);
+		void load(FS::IFile& file);
 		void onMessage(void* msgptr, int size);
 
 		const PropertyDescriptor& getPropertyDescriptor(uint32_t type, uint32_t name_hash);
@@ -179,7 +180,7 @@ struct EditorServerImpl
 		bool m_is_game_mode;
 		Quat m_camera_rot;
 		Vec3 m_camera_pos;
-		MemoryStream m_game_mode_stream;
+		FS::IFile* m_game_mode_file;
 		MessageTask* m_message_task;
 		Engine m_engine;
 		EditorServer* m_owner;
@@ -221,7 +222,7 @@ void EditorServer::tick(HWND hwnd, HWND game_hwnd)
 	{
 		m_impl->m_engine.update();
 	}
-	static_cast<TCPFileSystem&>(m_impl->m_engine.getFileSystem()).processLoaded();
+	m_impl->m_engine.getFileSystem().updateAsyncTransactions();
 
 	if(hwnd)
 	{
@@ -261,12 +262,14 @@ bool EditorServer::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 {
 	m_impl = new EditorServerImpl();
 	m_impl->m_owner = this;
+	
 	if(!m_impl->create(hwnd, game_hwnd, base_path))
 	{
 		delete m_impl;
 		m_impl = 0;
 		return false;
 	}
+
 	return true;
 }
 
@@ -373,16 +376,15 @@ void EditorServerImpl::onPointerUp(int x, int y, MouseButton::Value button)
 void EditorServerImpl::save(const char path[])
 {
 	g_log_info.log("editor server", "saving universe %s...", path);
-	RawFileStream stream;
-	stream.create(path, RawFileStream::Mode::WRITE);
-	save(stream);
-	stream.destroy();
+	FS::IFile* file = m_engine.getFileSystem().open("tcp", path, FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
+	save(*file);
+	m_engine.getFileSystem().close(file);
 }
 
 
-void EditorServerImpl::save(IStream& stream)
+void EditorServerImpl::save(FS::IFile& file)
 {
-	JsonSerializer serializer(stream, JsonSerializer::WRITE);
+	JsonSerializer serializer(file, JsonSerializer::WRITE);
 	m_engine.serialize(serializer);
 	serializer.serialize("cam_pos_x", m_camera_pos.x);
 	serializer.serialize("cam_pos_y", m_camera_pos.y);
@@ -415,7 +417,7 @@ void EditorServerImpl::addEntity()
 int MessageTask::task()
 {
 	bool finished = false;
-	m_socket.create(10002);
+	m_socket.create("127.0.0.1", 10002);
 	m_work_socket = m_socket.accept();
 	vector<uint8_t> data;
 	data.resize(5);
@@ -445,8 +447,8 @@ void EditorServerImpl::toggleGameMode()
 	}
 	else
 	{
-		m_game_mode_stream.clearBuffer();
-		save(m_game_mode_stream);
+		m_game_mode_file = m_engine.getFileSystem().open("memory", "", 0);
+		save(*m_game_mode_file);
 		m_engine.getScriptSystem().start();
 		m_is_game_mode = true;
 	}
@@ -461,8 +463,10 @@ void EditorServerImpl::stopGameMode()
 	m_camera_rot.toMatrix(mtx);
 	mtx.setTranslation(m_camera_pos);
 	m_engine.getRenderer().setCameraMatrix(mtx);
-	m_game_mode_stream.rewindForRead();
-	load(m_game_mode_stream);
+	m_game_mode_file->seek(FS::SeekMode::BEGIN, 0);
+	load(*m_game_mode_file);
+	m_engine.getFileSystem().close(m_game_mode_file);
+	m_game_mode_file = NULL;
 }
 
 
@@ -621,14 +625,14 @@ void EditorServerImpl::removeComponent(uint32_t type_crc)
 }
 
 
-void loadMap(void* user_data, char* file_data, int length, bool success)
+void loadMap(FS::IFile* file, bool success, void* user_data)
 {
 	ASSERT(success);
 	if(success)
 	{
-		MemoryStream stream;
-		stream.create(file_data, length);
-		static_cast<EditorServerImpl*>(user_data)->load(stream);
+		static_cast<EditorServerImpl*>(user_data)->load(*file);
+		//TODO: close
+		//file->close();
 	}
 }
 
@@ -636,9 +640,9 @@ void loadMap(void* user_data, char* file_data, int length, bool success)
 void EditorServerImpl::load(const char path[])
 {
 	g_log_info.log("editor server", "loading universe %s...", path);
-	m_engine.getFileSystem().openFile(path, &loadMap, this);
+	FS::FileSystem& fs = m_engine.getFileSystem();
+	fs.openAsync(fs.getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, &loadMap, this);
 }
-
 
 void EditorServerImpl::newUniverse()
 {
@@ -648,13 +652,13 @@ void EditorServerImpl::newUniverse()
 }
 
 
-void EditorServerImpl::load(IStream& stream)
+void EditorServerImpl::load(FS::IFile& file)
 {
 	g_log_info.log("editor server", "parsing universe...");
 	int selected_idx = m_selected_entity.index;
 	destroyUniverse();
 	createUniverse(false, "");
-	JsonSerializer serializer(stream, JsonSerializer::READ);
+	JsonSerializer serializer(file, JsonSerializer::READ);
 	
 	m_engine.deserialize(serializer);
 	serializer.deserialize("cam_pos_x", m_camera_pos.x);
@@ -720,7 +724,7 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 {
 	m_universe_mutex = MT::Mutex::create("Universe");
 	m_send_mutex = MT::Mutex::create("Send");
-	Socket::init();
+	Net::Socket::init();
 	m_message_task = new MessageTask();
 	m_message_task->m_server = this;
 	m_message_task->m_work_socket = 0;

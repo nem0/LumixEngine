@@ -13,6 +13,8 @@
     </ClInclude>
     <ClInclude Include="..\..\src\gui\controls.h" />
     <ClInclude Include="..\..\src\gui\decorator_base.h" />
+    <ClInclude Include="..\..\src\gui\atlas.h" />
+    <ClInclude Include="..\..\src\gui\texture_base.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\gui\gui.cpp" />
@@ -25,6 +27,7 @@
       <Filter>decorators</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\gui\controls.cpp" />
+    <ClCompile Include="..\..\src\gui\atlas.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="decorators">

@@ -53,7 +53,7 @@ namespace UI
 			m_parts[i].m_w = 0;
 			m_parts[i].m_h = 0;
 		}
-		renderer.loadImage(image);
+		m_image = renderer.loadImage(image);
 		return m_image >= 0;
 	}
 

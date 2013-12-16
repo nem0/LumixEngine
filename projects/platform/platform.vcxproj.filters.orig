@@ -8,8 +8,12 @@
     <ClInclude Include="..\..\src\platform\mutex.h" />
     <ClInclude Include="..\..\src\platform\semaphore.h" />
     <ClInclude Include="..\..\src\platform\spin_mutex.h" />
+<<<<<<< HEAD
+    <ClInclude Include="..\..\src\platform\native_file_system.h" />
+=======
     <ClInclude Include="..\..\src\platform\atomic.h" />
     <ClInclude Include="..\..\src\platform\os_file.h" />
+>>>>>>> 5718c77eb0823db2b8da709171e53f2260a27307
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\platform\pc\event.cpp" />
@@ -19,7 +23,12 @@
     <ClCompile Include="..\..\src\platform\pc\socket.cpp" />
     <ClCompile Include="..\..\src\platform\pc\spin_mutex.cpp" />
     <ClCompile Include="..\..\src\platform\pc\task.cpp" />
+<<<<<<< HEAD
+    <ClCompile Include="..\..\src\platform\pc\tcp_filesystem.cpp" />
+    <ClCompile Include="..\..\src\platform\pc\native_file_system.cpp" />
+=======
     <ClCompile Include="..\..\src\platform\pc\atomic.cpp" />
     <ClCompile Include="..\..\src\platform\os_file.cpp" />
+>>>>>>> 5718c77eb0823db2b8da709171e53f2260a27307
   </ItemGroup>
 </Project>

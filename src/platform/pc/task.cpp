@@ -55,6 +55,7 @@ namespace Lux
 
 		Task::~Task()
 		{
+			ASSERT(NULL == m_implementation->m_handle);
 			delete m_implementation;
 		}
 
@@ -85,6 +86,11 @@ namespace Lux
 			::CloseHandle(m_implementation->m_handle);
 			m_implementation->m_handle = NULL;
 			return true;
+		}
+
+		bool Task::isFinished() const 
+		{ 
+			return m_implementation->m_exited; 
 		}
 
 		static const DWORD MS_VC_EXCEPTION=0x406D1388;
