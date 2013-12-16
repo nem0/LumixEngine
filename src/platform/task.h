@@ -21,6 +21,7 @@ namespace Lux
 			bool setAffinityMask(unsigned int affinity_mask);
 			bool setThreadPriority(unsigned int priority);
 
+			bool isFinished() const;
 		private:
 			struct TaskImpl* m_implementation;
 		};	
