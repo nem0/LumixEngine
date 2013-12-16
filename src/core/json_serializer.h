@@ -44,7 +44,7 @@ namespace Lux
 			virtual void deserialize(const char* label, uint32_t& value) LUX_OVERRIDE;
 			virtual void deserialize(const char* label, float& value) LUX_OVERRIDE;
 			virtual void deserialize(const char* label, int32_t& value) LUX_OVERRIDE;
-			virtual void deserialize(const char* label, char* value) LUX_OVERRIDE;
+			virtual void deserialize(const char* label, char* value, int max_length) LUX_OVERRIDE;
 			virtual void deserialize(const char* label, bool& value) LUX_OVERRIDE;
 			virtual void deserializeArrayBegin(const char* label) LUX_OVERRIDE;
 			virtual void deserializeArrayEnd() LUX_OVERRIDE { skipControl(); }
@@ -52,7 +52,7 @@ namespace Lux
 			virtual void deserializeArrayItem(int32_t& value) LUX_OVERRIDE;
 			virtual void deserializeArrayItem(float& value) LUX_OVERRIDE;
 			virtual void deserializeArrayItem(bool& value) LUX_OVERRIDE;
-			virtual void deserializeArrayItem(char* value) LUX_OVERRIDE;
+			virtual void deserializeArrayItem(char* value, int max_length) LUX_OVERRIDE;
 			virtual void deserializeArrayItem(string& value) LUX_OVERRIDE;
 		
 		private:
