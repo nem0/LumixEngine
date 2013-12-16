@@ -6,8 +6,12 @@
 
 namespace Lux
 {
+	namespace FS
+	{
+			class FileSystem;
+	}
+
 	class EditorServer;
-	class IFileSystem;
 	class InputSystem;
 	class IPlugin;
 	class ISerializer;
@@ -24,7 +28,7 @@ namespace Lux
 			bool create(int w, int h, const char* base_path, EditorServer* editor_server);
 			void destroy();
 			EditorServer* getEditorServer() const;
-			IFileSystem& getFileSystem();
+			FS::FileSystem& getFileSystem();
 			Renderer& getRenderer();
 			ScriptSystem& getScriptSystem();
 			InputSystem& getInputSystem();
