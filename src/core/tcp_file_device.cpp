@@ -1,10 +1,9 @@
-#include "core/tcp_file_system.h"
+#include "core/tcp_file_device.h"
 #include "core/ifile.h"
 #include "core/ifile_system_defines.h"
 #include "core/file_system.h"
 #include "core/tcp_connector.h"
 #include "core/tcp_stream.h"
-#include "platform/task.h"
 
 
 namespace Lux
@@ -14,7 +13,7 @@ namespace Lux
 		class TCPFile : public IFile
 		{
 		public:
-			TCPFile(IFile* parent, Net::TCPStream* stream) : m_stream(stream) {}
+			TCPFile(Net::TCPStream* stream) : m_stream(stream) {}
 			~TCPFile() {}
 
 			virtual bool open(const char* path, Mode mode) LUX_OVERRIDE
@@ -104,18 +103,18 @@ namespace Lux
 			Net::TCPStream* m_stream;
 		};
 
-		IFile* TCPFileSystem::create(IFile* parent)
+		IFile* TCPFileDevice::createFile(IFile* child)
 		{
-			return new TCPFile(parent, m_impl->m_stream);
+			return new TCPFile(m_impl->m_stream);
 		}
 
-		void TCPFileSystem::start(const char* ip, uint16_t port)
+		void TCPFileDevice::connect(const char* ip, uint16_t port)
 		{
 			m_impl = new TCPImpl;
 			m_impl->m_stream = m_impl->m_connector.connect(ip, port);
 		}
 
-		void TCPFileSystem::stop()
+		void TCPFileDevice::disconnect()
 		{
 			m_impl->m_stream->write(TCPCommand::Disconnect);
 			delete m_impl;

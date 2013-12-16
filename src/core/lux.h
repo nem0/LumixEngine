@@ -13,6 +13,9 @@
 #define NULL 0
 #endif
 
+#define LUX_INLINE __inline
+#define LUX_FORCE_INLINE __forceinline
+
 #ifdef BUILDING_CORE
 #define LUX_CORE_API __declspec(dllexport)
 #else

@@ -14,19 +14,10 @@
     <ClCompile Include="..\..\src\core\file_utils.cpp" />
     <ClCompile Include="..\..\src\core\math_utils.cpp" />
     <ClCompile Include="..\..\src\core\log.cpp" />
-    <ClCompile Include="..\..\src\core\disk_file_system.cpp">
-      <Filter>FS</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\core\memory_file_system.cpp">
-      <Filter>FS</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\core\file_system.cpp">
       <Filter>FS</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\core\tcp_file_server.cpp">
-      <Filter>FS</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\core\tcp_file_system.cpp">
       <Filter>FS</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\core\tcp_acceptor.cpp">
@@ -39,6 +30,15 @@
       <Filter>Net</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\core\memory_stream.cpp" />
+    <ClCompile Include="..\..\src\core\tcp_file_device.cpp">
+      <Filter>FS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\memory_file_device.cpp">
+      <Filter>FS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\disk_file_device.cpp">
+      <Filter>FS</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\base64.h" />
@@ -64,22 +64,13 @@
     <ClInclude Include="..\..\src\core\lock_free_fifo.h" />
     <ClInclude Include="..\..\src\core\lock_free_queue.h" />
     <ClInclude Include="..\..\src\core\transaction_queue.h" />
-    <ClInclude Include="..\..\src\core\disk_file_system.h">
-      <Filter>FS</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\ifile_system_defines.h">
-      <Filter>FS</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\memory_file_system.h">
       <Filter>FS</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\file_system.h">
       <Filter>FS</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\tcp_file_server.h">
-      <Filter>FS</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\tcp_file_system.h">
       <Filter>FS</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\tcp_acceptor.h">
@@ -94,10 +85,19 @@
     <ClInclude Include="..\..\src\core\ifile.h">
       <Filter>FS</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\idevice.h">
+    <ClInclude Include="..\..\src\core\memory_stream.h" />
+    <ClInclude Include="..\..\src\core\ifile_device.h">
       <Filter>FS</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\memory_stream.h" />
+    <ClInclude Include="..\..\src\core\tcp_file_device.h">
+      <Filter>FS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\memory_file_device.h">
+      <Filter>FS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\disk_file_device.h">
+      <Filter>FS</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="FS">

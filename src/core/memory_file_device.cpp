@@ -1,6 +1,7 @@
-#include "core/memory_file_system.h"
+#include "core/memory_file_device.h"
 #include "core/ifile.h"
 #include "core/ifile_system_defines.h"
+#include "core/math_utils.h"
 
 #include <string.h>
 
@@ -113,12 +114,15 @@ namespace Lux
 				switch(base)
 				{
 				case SeekMode::BEGIN:
+					ASSERT(pos >= 0 && pos <= (int32_t)m_size);
 					m_pos = pos;
 					break;
 				case SeekMode::CURRENT:
+					ASSERT(0 <= (int32_t)m_pos + pos && (int32_t)m_pos + pos <= (int32_t)m_size);
 					m_pos += pos;
 					break;
 				case SeekMode::END:
+					ASSERT(0 <= pos && pos <= (int32_t)m_size);
 					m_pos = m_size - pos;
 					break;
 				default:
@@ -126,6 +130,7 @@ namespace Lux
 					break;
 				}
 
+				m_pos = Math::min(m_pos, m_size);
 				return m_pos;
 			}
 
@@ -143,7 +148,7 @@ namespace Lux
 			bool m_write;
 		};
 
-		IFile* MemoryFileSystem::create(IFile* child)
+		IFile* MemoryFileDevice::createFile(IFile* child)
 		{
 			return new MemoryFile(child);
 		}

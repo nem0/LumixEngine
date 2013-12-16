@@ -41,10 +41,24 @@ namespace editor_ng.Log
 
         void onLogMessage(object sender, EventArgs args)
         {
-            native.EditorServer.LegMessageEventArgs e = args as native.EditorServer.LegMessageEventArgs;
-            
-            var objs = new object[] { m_icons[e.type], DateTime.Now.ToString("HH:mm:ss.fff"), e.system, e.message };
-            dataGridView1.Rows.Add(objs);
+                native.EditorServer.LegMessageEventArgs e = args as native.EditorServer.LegMessageEventArgs;
+
+                setDGValues(e);
+        }
+
+        private delegate void setDGValuesDelegate(native.EditorServer.LegMessageEventArgs e);
+
+        private void setDGValues(native.EditorServer.LegMessageEventArgs e)
+        {
+            if (dataGridView1.InvokeRequired)
+            {
+                dataGridView1.Invoke(new setDGValuesDelegate(setDGValues), e);
+            }
+            else
+            {
+                var objs = new object[] { m_icons[e.type], DateTime.Now.ToString("HH:mm:ss.fff"), e.system, e.message };
+                dataGridView1.Rows.Add(objs);
+            }
         }
     }
 }
