@@ -208,14 +208,14 @@ void JsonSerializer::deserialize(const char* label, int& value)
 }
 
 
-void JsonSerializer::deserialize(const char* label, char* value)
+void JsonSerializer::deserialize(const char* label, char* value, int max_length)
 {
 	deserializeLabel(label);
 
 	int index = 0;
 	unsigned char c;
 	m_file.read(&c, 1);
-	while(c != '\"')
+	while(c != '\"' && index < max_length - 1)
 	{
 		value[index] = c;
 		m_file.read(&c, 1);
@@ -234,12 +234,12 @@ void JsonSerializer::deserializeArrayBegin(const char* label)
 }
 
 
-void JsonSerializer::deserializeArrayItem(char* value)
+void JsonSerializer::deserializeArrayItem(char* value, int max_length)
 {
 	unsigned char c;
 	m_file.read(&c, 1);
 	char* out = value;
-	while(c != '"')
+	while(c != '"' && out - value < max_length - 1)
 	{
 		*out = c;
 		++out;
