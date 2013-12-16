@@ -212,7 +212,7 @@ Vec3 Gizmo::getMousePlaneIntersection(int x, int y)
 		Vec3 a = crossProduct(Vec3(0, 1, 0), camera_mtx.getXVector());
 		Vec3 b = crossProduct(Vec3(0, 1, 0), camera_mtx.getZVector());
 		Vec3 plane_normal = crossProduct(a, b);
-		return getRayPlaneIntersecion(origin, dir, m_selected_entity.getPosition(), plane_normal);
+		return Math::getRayPlaneIntersecion(origin, dir, m_selected_entity.getPosition(), plane_normal);
 	}
 	Vec3 axis;
 	switch(m_transform_mode)

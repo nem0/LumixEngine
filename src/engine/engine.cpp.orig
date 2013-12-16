@@ -7,6 +7,11 @@
 #include "engine/plugin_manager.h"
 #include "graphics/renderer.h"
 #include "platform/input_system.h"
+<<<<<<< HEAD
+#include "platform/native_file_system.h"
+#include "platform/tcp_filesystem.h"
+=======
+>>>>>>> 5718c77eb0823db2b8da709171e53f2260a27307
 #include "script/script_system.h"
 
 #include "core/file_system.h"
@@ -23,11 +28,15 @@ namespace Lux
 		bool create(int w, int h, const char* base_path, Engine& owner);
 
 		Renderer m_renderer;
+<<<<<<< HEAD
+		IFileSystem* m_file_system; 
+=======
 		FS::FileSystem* m_file_system; 
 		FS::MemoryFileDevice m_mem_file_device;
 		FS::DiskFileDevice m_disk_file_device;
 		FS::TCPFileDevice m_tcp_file_device;
 
+>>>>>>> 5718c77eb0823db2b8da709171e53f2260a27307
 		string m_base_path;
 		EditorServer* m_editor_server;
 		PluginManager m_plugin_manager;
@@ -40,6 +49,14 @@ namespace Lux
 	bool EngineImpl::create(int w, int h, const char* base_path, Engine& owner)
 	{
 		m_universe = 0;
+<<<<<<< HEAD
+		NativeFileSystem* fs = new NativeFileSystem();
+		if(!fs->create())
+		{
+			return false;
+		}
+		m_file_system = fs;
+=======
 		m_file_system = FS::FileSystem::create();
 
 		FS::TCPFileServer* server = new FS::TCPFileServer();
@@ -51,6 +68,7 @@ namespace Lux
 		m_file_system->mount(&m_disk_file_device);
 		m_file_system->mount(&m_tcp_file_device);
 
+>>>>>>> 5718c77eb0823db2b8da709171e53f2260a27307
 		if(!m_renderer.create(m_file_system, w, h, base_path))
 		{
 			return false;
@@ -93,6 +111,10 @@ namespace Lux
 	{
 		m_impl->m_plugin_manager.destroy();
 		m_impl->m_renderer.destroy();
+<<<<<<< HEAD
+		m_impl->m_file_system->destroy();
+=======
+>>>>>>> 5718c77eb0823db2b8da709171e53f2260a27307
 		
 		m_impl->m_tcp_file_device.disconnect();
 		FS::FileSystem::destroy(m_impl->m_file_system);

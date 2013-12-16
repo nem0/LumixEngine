@@ -52,9 +52,15 @@ void JsonSerializer::serialize(const char* label, const char* value)
 {
 	writeBlockComma();
 	writeString(label);
+<<<<<<< HEAD
+	m_stream.write(" : \"");
+	m_stream.write(value ? value : "");
+	m_stream.write("\"");
+=======
 	m_file.write(" : \"", 4);
 	m_file.write(value, strlen(value));
 	m_file.write("\"", 1);
+>>>>>>> 5718c77eb0823db2b8da709171e53f2260a27307
 	m_is_first_in_block = false;
 }
 
@@ -364,15 +370,25 @@ void JsonSerializer::deserialize(const char* label, bool& value)
 	unsigned char tmp[5];
 	if(m_buffer == 't')
 	{
+<<<<<<< HEAD
 		value = true;
-		m_file.read(tmp, 3);
-		m_file.read(&m_buffer, 1);
+		m_stream.read(tmp, 3);
+		m_stream.read(&m_buffer, 1);
 	}
 	else
 	{
 		value = false;
+		m_stream.read(tmp, 4);
+		m_stream.read(&m_buffer, 1);
+=======
+		m_file.read(tmp, 3);
+		m_buffer = tmp[2];
+	}
+	else
+	{
 		m_file.read(tmp, 4);
-		m_file.read(&m_buffer, 1);
+		m_buffer = tmp[3];
+>>>>>>> 5718c77eb0823db2b8da709171e53f2260a27307
 	}
 	skipControl();
 }

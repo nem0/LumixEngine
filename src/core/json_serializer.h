@@ -5,7 +5,7 @@
 #include <map>
 #include <vector>
 #include "core/iserializer.h"
-#include "core/istream.h"
+#include "core/ifile.h"
 #include "core/string.h"
 
 
@@ -23,7 +23,7 @@ namespace Lux
 			};
 
 		public:
-			JsonSerializer(IStream& stream, AccessMode access_mode);
+			JsonSerializer(FS::IFile& file, AccessMode access_mode);
 
 			// serialize
 			virtual void serialize(const char* label, uint32_t value) LUX_OVERRIDE;
@@ -60,16 +60,16 @@ namespace Lux
 
 			inline void writeString(const char* str)
 			{
-				m_stream.write("\"", 1);
-				m_stream.write(str);
-				m_stream.write("\"", 1);
+				m_file.write("\"", 1);
+				m_file.write(str, strlen(str));
+				m_file.write("\"", 1);
 			}
 
 			inline void writeBlockComma()
 			{
 				if(!m_is_first_in_block)
 				{
-					m_stream.write(",\n");
+					m_file.write(",\n", 2);
 				}
 			}
 
@@ -78,7 +78,7 @@ namespace Lux
 				unsigned char c = m_buffer;
 				while(c == ','|| c == ' ' || c == '\t' || c == '{' || c == '[' || c == '\n' || c == '\r' || c == ':' || c == ']' || c == '}')
 				{
-					if(!m_stream.read(&c, 1))
+					if(!m_file.read(&c, 1))
 						return;
 				}
 				m_buffer = c;
@@ -89,7 +89,7 @@ namespace Lux
 			unsigned char m_buffer;
 			bool m_is_first_in_block;
 			unsigned char* m_data;
-			IStream& m_stream;
+			FS::IFile& m_file;
 	};
 
 

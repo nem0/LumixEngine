@@ -11,8 +11,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{3C7800B3-C971-4E27-BD17-60B033642566}</ProjectGuid>
-    <RootNamespace>gui</RootNamespace>
+    <ProjectGuid>{0C468713-C946-4EDB-B1C4-457DDBB61A69}</ProjectGuid>
+    <RootNamespace>platform</RootNamespace>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -25,7 +25,7 @@
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v110</PlatformToolset>
-    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
     <CharacterSet>NotSet</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
@@ -46,23 +46,26 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <OutDir>$(SolutionDir)bin\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)tmp\$(Configuration)\$(ProjectName)\</IntDir>
+    <TargetExt>.dll</TargetExt>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <SDLCheck>
-      </SDLCheck>
-      <AdditionalIncludeDirectories>..\..\src;..\..\external\sdl\include</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <PreprocessorDefinitions>BUILDING_GUI;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
+      <AdditionalIncludeDirectories>..\..\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>BUILDING_PLATFORM;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>..\..\bin\$(Configuration)\</AdditionalLibraryDirectories>
-      <AdditionalDependencies>opengl32.lib;core.lib;engine.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\..\bin\$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -70,40 +73,44 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <SDLCheck>
-      </SDLCheck>
-      <PreprocessorDefinitions>BUILDING_GUI;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\..\src;..\..\external\sdl\include</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PreprocessorDefinitions>BUILDING_PLATFORM;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\..\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>opengl32.lib;core.lib;engine.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>..\..\bin\$(Configuration)\</AdditionalLibraryDirectories>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\..\bin\$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\src\gui\atlas.h" />
-    <ClInclude Include="..\..\src\gui\controls.h" />
-    <ClInclude Include="..\..\src\gui\decorators\box_decorator.h" />
-    <ClInclude Include="..\..\src\gui\decorators\text_decorator.h" />
-    <ClInclude Include="..\..\src\gui\decorator_base.h" />
-    <ClInclude Include="..\..\src\gui\gui.h" />
-    <ClInclude Include="..\..\src\gui\block.h" />
-    <ClInclude Include="..\..\src\gui\irenderer.h" />
-    <ClInclude Include="..\..\src\gui\texture_base.h" />
-    <ClInclude Include="..\..\src\gui\opengl_renderer.h" />
+    <ClInclude Include="..\..\src\platform\atomic.h" />
+    <ClInclude Include="..\..\src\platform\event.h" />
+    <ClInclude Include="..\..\src\platform\input_system.h" />
+    <ClInclude Include="..\..\src\platform\mutex.h" />
+<<<<<<< HEAD
+    <ClInclude Include="..\..\src\platform\native_file_system.h" />
+=======
+    <ClInclude Include="..\..\src\platform\os_file.h" />
+>>>>>>> 5718c77eb0823db2b8da709171e53f2260a27307
+    <ClInclude Include="..\..\src\platform\semaphore.h" />
+    <ClInclude Include="..\..\src\platform\socket.h" />
+    <ClInclude Include="..\..\src\platform\spin_mutex.h" />
+    <ClInclude Include="..\..\src\platform\task.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\src\gui\atlas.cpp" />
-    <ClCompile Include="..\..\src\gui\block.cpp" />
-    <ClCompile Include="..\..\src\gui\controls.cpp" />
-    <ClCompile Include="..\..\src\gui\decorators\box_decorator.cpp" />
-    <ClCompile Include="..\..\src\gui\decorators\text_decorator.cpp" />
-    <ClCompile Include="..\..\src\gui\gui.cpp" />
-    <ClCompile Include="..\..\src\gui\opengl_renderer.cpp" />
+    <ClCompile Include="..\..\src\platform\os_file.cpp" />
+    <ClCompile Include="..\..\src\platform\pc\atomic.cpp" />
+    <ClCompile Include="..\..\src\platform\pc\event.cpp" />
+    <ClCompile Include="..\..\src\platform\pc\input_system.cpp" />
+    <ClCompile Include="..\..\src\platform\pc\mutex.cpp" />
+    <ClCompile Include="..\..\src\platform\pc\native_file_system.cpp" />
+    <ClCompile Include="..\..\src\platform\pc\semaphore.cpp" />
+    <ClCompile Include="..\..\src\platform\pc\socket.cpp" />
+    <ClCompile Include="..\..\src\platform\pc\spin_mutex.cpp" />
+    <ClCompile Include="..\..\src\platform\pc\task.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

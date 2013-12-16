@@ -1,7 +1,7 @@
 #include "SDL.h"
 #include <SDL_opengl.h>
 #include "core/crc32.h"
-#include "core/ifilesystem.h"
+#include "core/file_system.h"
 #include "core/json_serializer.h"
 #include "core/memory_stream.h"
 #include "editor/editor_server.h"
@@ -72,14 +72,14 @@ void initGui(Lux::EditorServer& server)
 	gui->addCallback("clickClicked", &clickClicked);
 	button->registerEventHandler("click", gui->getCallback("clickClicked"));*/
 	Lux::UI::createTextBox(0, 0, root, gui);
-	
-	Lux::MemoryStream stream;
-	Lux::JsonSerializer serializer(stream, Lux::JsonSerializer::WRITE);
+	/*
+	Lux::FS::IFile* file = server.getEngine().getFileSystem().open("memory", "", Lux::FS::Mode::CREATE | Lux::FS::Mode::WRITE);
+	Lux::JsonSerializer serializer(*file, Lux::JsonSerializer::WRITE);
 	root->serialize(serializer);
 
-	
+	/*
 	{
-		stream.rewindForRead();
+		
 		Lux::JsonSerializer serializer2(stream, Lux::JsonSerializer::READ);
 		Lux::UI::Block* root2 = gui->createTopLevelBlock(800, 600);
 		root2->deserialize(serializer2);
@@ -87,7 +87,7 @@ void initGui(Lux::EditorServer& server)
 		root2->setPosition(100, 100);
 		root2->layout();
 	}
-
+	*/
 	/*Lux::UI::Block* button = new Lux::UI::Block();
 	button->create(root, text_decorator);
 	button->setText("click here!");

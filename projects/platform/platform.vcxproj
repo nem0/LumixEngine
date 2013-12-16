@@ -60,7 +60,7 @@
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>..\..\bin\$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>core.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>
@@ -81,31 +81,31 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>core.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>..\..\bin\$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\src\platform\atomic.h" />
     <ClInclude Include="..\..\src\platform\event.h" />
     <ClInclude Include="..\..\src\platform\input_system.h" />
     <ClInclude Include="..\..\src\platform\mutex.h" />
-    <ClInclude Include="..\..\src\platform\native_file_system.h" />
+    <ClInclude Include="..\..\src\platform\os_file.h" />
     <ClInclude Include="..\..\src\platform\semaphore.h" />
     <ClInclude Include="..\..\src\platform\socket.h" />
     <ClInclude Include="..\..\src\platform\spin_mutex.h" />
     <ClInclude Include="..\..\src\platform\task.h" />
-    <ClInclude Include="..\..\src\platform\tcp_filesystem.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\platform\os_file.cpp" />
+    <ClCompile Include="..\..\src\platform\pc\atomic.cpp" />
     <ClCompile Include="..\..\src\platform\pc\event.cpp" />
     <ClCompile Include="..\..\src\platform\pc\input_system.cpp" />
     <ClCompile Include="..\..\src\platform\pc\mutex.cpp" />
-    <ClCompile Include="..\..\src\platform\pc\native_file_system.cpp" />
     <ClCompile Include="..\..\src\platform\pc\semaphore.cpp" />
     <ClCompile Include="..\..\src\platform\pc\socket.cpp" />
     <ClCompile Include="..\..\src\platform\pc\spin_mutex.cpp" />
     <ClCompile Include="..\..\src\platform\pc\task.cpp" />
-    <ClCompile Include="..\..\src\platform\pc\tcp_filesystem.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
