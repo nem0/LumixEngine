@@ -10,9 +10,9 @@
 #include "script/script_system.h"
 
 #include "core/file_system.h"
-#include "core/disk_file_system.h"
-#include "core/memory_file_system.h"
-#include "core/tcp_file_system.h"
+#include "core/disk_file_device.h"
+#include "core/memory_file_device.h"
+#include "core/tcp_file_device.h"
 
 #include "core/tcp_file_server.h"
 
@@ -24,9 +24,9 @@ namespace Lux
 
 		Renderer m_renderer;
 		FS::FileSystem* m_file_system; 
-		FS::MemoryFileSystem m_mem_filesystem;
-		FS::DiskFileSystem m_disk_filesystem;
-		FS::TCPFileSystem m_tcp_filesystem;
+		FS::MemoryFileDevice m_mem_file_device;
+		FS::DiskFileDevice m_disk_file_device;
+		FS::TCPFileDevice m_tcp_file_device;
 
 		string m_base_path;
 		EditorServer* m_editor_server;
@@ -45,11 +45,11 @@ namespace Lux
 		FS::TCPFileServer* server = new FS::TCPFileServer();
 		server->start();
 
-		m_tcp_filesystem.start("127.0.0.1", 10001);
+		m_tcp_file_device.connect("127.0.0.1", 10001);
 
-		m_file_system->mount(&m_mem_filesystem);
-		m_file_system->mount(&m_disk_filesystem);
-		m_file_system->mount(&m_tcp_filesystem);
+		m_file_system->mount(&m_mem_file_device);
+		m_file_system->mount(&m_disk_file_device);
+		m_file_system->mount(&m_tcp_file_device);
 
 		if(!m_renderer.create(m_file_system, w, h, base_path))
 		{
@@ -94,7 +94,7 @@ namespace Lux
 		m_impl->m_plugin_manager.destroy();
 		m_impl->m_renderer.destroy();
 		
-		m_impl->m_tcp_filesystem.stop();
+		m_impl->m_tcp_file_device.disconnect();
 		FS::FileSystem::destroy(m_impl->m_file_system);
 
 		delete m_impl;

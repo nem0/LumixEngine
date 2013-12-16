@@ -7,25 +7,25 @@ namespace Lux
 {
 	namespace Net
 	{
-			TCPAcceptor::TCPAcceptor()
-			{
-				m_socket = new Socket();
-			}
+		TCPAcceptor::TCPAcceptor()
+		{
+			m_socket = new Socket();
+		}
 
-			TCPAcceptor::~TCPAcceptor()
-			{
-				delete m_socket;
-			}
+		TCPAcceptor::~TCPAcceptor()
+		{
+			delete m_socket;
+		}
 
-			bool TCPAcceptor::start(const char* ip, uint16_t port)
-			{
-				return m_socket->create(ip, port);
-			}
+		bool TCPAcceptor::start(const char* ip, uint16_t port)
+		{
+			return m_socket->create(ip, port);
+		}
 
-			TCPStream* TCPAcceptor::accept()
-			{
-				Socket* wrk = m_socket->accept();
-				return new TCPStream(wrk);
-			}
+		TCPStream* TCPAcceptor::accept()
+		{
+			Socket* wrk = m_socket->accept();
+			return new TCPStream(wrk);
+		}
 	} // ~namespace Net
 } // ~namespace Lux

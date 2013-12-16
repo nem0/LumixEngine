@@ -31,7 +31,7 @@ namespace Lux
 			virtual void updateAsyncTransactions() = 0;
 
 			virtual const char* getDefaultDevice() const = 0;
-			virtual const char* getSaveGameDefice() const = 0;
+			virtual const char* getSaveGameDevice() const = 0;
 		};
 	} // ~namespace FS
 } // ~namespace Lux

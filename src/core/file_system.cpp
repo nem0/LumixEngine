@@ -1,5 +1,5 @@
 #include "core/file_system.h"
-#include "core/disk_file_system.h"
+#include "core/disk_file_device.h"
 #include "core/ifile.h"
 #include "core/string.h"
 #include "core/transaction_queue.h"
@@ -23,10 +23,11 @@ namespace Lux
 			bool m_result;
 
 		};
-	
+
 		typedef MT::Transaction<AsyncItem> AsynTrans;
 		typedef MT::TransactionQueue<AsynTrans, 16> TransQueue;
 		typedef vector<AsynTrans*> TransTable;
+		typedef vector<IFileDevice*> DevicesTable;
 
 		class FSTask : public MT::Task
 		{
@@ -89,7 +90,7 @@ namespace Lux
 				m_devices.push_back(device);
 				return true;
 			}
-			
+
 			bool unMount(IFileDevice* device) LUX_OVERRIDE
 			{
 				for(int i = 0; i < m_devices.size(); i++)
@@ -146,7 +147,7 @@ namespace Lux
 				}
 				return NULL;
 			}
-			 
+
 			void close(IFile* file) LUX_OVERRIDE
 			{
 				file->close();
@@ -155,19 +156,19 @@ namespace Lux
 
 			void closeAsync(IFile* file) LUX_OVERRIDE
 			{
-					AsynTrans* tr = m_transaction_queue.alloc(true);
-					if(tr)
-					{
-						tr->data.m_file = file;
-						tr->data.m_user_data = NULL;
-						tr->data.m_cb = closeAsync;
-						tr->data.m_mode = 0;
-						tr->data.m_result = false;
-						tr->reset();
+				AsynTrans* tr = m_transaction_queue.alloc(true);
+				if(tr)
+				{
+					tr->data.m_file = file;
+					tr->data.m_user_data = NULL;
+					tr->data.m_cb = closeAsync;
+					tr->data.m_mode = 0;
+					tr->data.m_result = false;
+					tr->reset();
 
-						m_transaction_queue.push(tr, true);
-						m_in_progress.push_back(tr);
-					}
+					m_transaction_queue.push(tr, true);
+					m_in_progress.push_back(tr);
+				}
 			}
 
 			void updateAsyncTransactions() LUX_OVERRIDE
@@ -188,7 +189,7 @@ namespace Lux
 			}
 
 			const char* getDefaultDevice() const LUX_OVERRIDE { return "memory:tcp"; }
-			const char* getSaveGameDefice() const LUX_OVERRIDE { return "memory:disk"; }
+			const char* getSaveGameDevice() const LUX_OVERRIDE { return "memory:disk"; }
 
 			IFileDevice* getDevice(const char* device)
 			{
@@ -223,7 +224,7 @@ namespace Lux
 					IFileDevice* dev = getDevice(token.c_str());
 					if(NULL != dev)
 					{
-						prev = dev->create(prev);
+						prev = dev->createFile(prev);
 					}
 				}
 
@@ -240,9 +241,10 @@ namespace Lux
 				m_transaction_queue.abort();
 				m_task->destroy();
 			}
+
 		private:
 			FSTask* m_task;
-			vector<IFileDevice*> m_devices;
+			DevicesTable m_devices;
 
 			TransQueue m_transaction_queue;
 			TransTable m_in_progress;

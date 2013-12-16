@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/lux.h"
-#include "core/idevice.h"
+#include "core/ifile_device.h"
 
 namespace Lux
 {
@@ -9,10 +9,10 @@ namespace Lux
 	{
 		class IFile;
 
-		class LUX_CORE_API MemoryFileSystem : public IFileDevice
+		class LUX_CORE_API MemoryFileDevice : public IFileDevice
 		{
 		public:
-			virtual IFile* create(IFile* child) LUX_OVERRIDE;
+			virtual IFile* createFile(IFile* child) LUX_OVERRIDE;
 
 			const char* name() const { return "memory"; }
 		};

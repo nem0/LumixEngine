@@ -13,7 +13,7 @@ namespace Lux
 			IFileDevice() {}
 			~IFileDevice() {}
 
-			virtual IFile* create(IFile* child) = 0;
+			virtual IFile* createFile(IFile* child) = 0;
 
 			virtual const char* name() const = 0;
 		};

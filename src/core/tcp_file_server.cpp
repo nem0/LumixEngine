@@ -1,7 +1,7 @@
 #include "core/tcp_file_server.h"
 
 #include "core/tcp_acceptor.h"
-#include "core/tcp_file_system.h"
+#include "core/tcp_file_device.h"
 #include "core/tcp_stream.h"
 #include "platform/task.h"
 #include "platform/os_file.h"

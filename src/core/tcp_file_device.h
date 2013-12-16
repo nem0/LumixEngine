@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/lux.h"
-#include "core/idevice.h"
+#include "core/ifile_device.h"
 
 namespace Lux
 {
@@ -27,7 +27,6 @@ namespace Lux
 				Size,
 				Seek,
 				Pos,
-				Exit,
 				Disconnect,
 			};
 
@@ -38,14 +37,17 @@ namespace Lux
 			int32_t value;
 		};
 
-		class LUX_CORE_API TCPFileSystem : public IFileDevice
+		class LUX_CORE_API TCPFileDevice : public IFileDevice
 		{
 		public:
-			virtual IFile* create(IFile* child) LUX_OVERRIDE;
+			virtual IFile* createFile(IFile* child) LUX_OVERRIDE;
 			virtual const char* name() const LUX_OVERRIDE { return "tcp"; }
 
-			void start(const char* ip, uint16_t port);
-			void stop();
+			void connect(const char* ip, uint16_t port);
+			void disconnect();
+
+			bool isInitialized() const;
+			Net::TCPStream* getStream();
 
 		private:
 			TCPImpl* m_impl;

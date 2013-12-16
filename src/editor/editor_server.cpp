@@ -11,7 +11,7 @@
 #include "core/log.h"
 #include "core/map.h"
 #include "core/matrix.h"
-#include "core/memory_file_system.h"
+#include "core/memory_file_device.h"
 #include "core/crc32.h"
 #include "core/memory_stream.h"
 #include "core/vector.h"

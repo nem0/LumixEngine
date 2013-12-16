@@ -1,4 +1,4 @@
-#include "core/disk_file_system.h"
+#include "core/disk_file_device.h"
 
 #include "core/file_system.h"
 #include "core/ifile.h"
@@ -60,7 +60,7 @@ namespace Lux
 			OsFile m_file;
 		};
 
-		IFile* DiskFileSystem::create(IFile* child)
+		IFile* DiskFileDevice::createFile(IFile* child)
 		{
 			return new DiskFile();
 		}
