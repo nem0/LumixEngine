@@ -29,27 +29,30 @@ namespace Lux
 
 			virtual bool open(const char* path, Mode mode) LUX_OVERRIDE
 			{
-				ASSERT(NULL != m_file);
 				ASSERT(NULL == m_buffer); // reopen is not supported currently
 
-				if(m_file->open(path, mode))
+				m_write = mode & Mode::WRITE;
+				if(m_file)
+				{
+					if(m_file->open(path, mode))
+					{
+						if(mode & Mode::READ)
+						{
+							m_capacity = m_size = m_file->size();
+							m_buffer = new uint8_t[m_size];
+							m_file->read(m_buffer, m_size);
+							m_pos = 0;
+						}
+
+						return true;
+					}
+				}
+				else
 				{
 					if(mode & Mode::WRITE)
 					{
-						m_capacity = m_size = 0;
-						m_buffer = NULL;
-						m_pos = 0;
-						m_write = true;
+						return true;
 					}
-					else
-					{
-						m_capacity = m_size = m_file->size();
-						m_buffer = new uint8_t[m_size];
-						m_file->read(m_buffer, m_size);
-						m_pos = 0;
-					}
-
-					return true;
 				}
 
 				return false;
