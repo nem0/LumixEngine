@@ -709,8 +709,8 @@ HGLRC createGLContext(HWND hwnd)
 
 bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 {
-	m_universe_mutex = MT::Mutex::create("Universe");
-	m_send_mutex = MT::Mutex::create("Send");
+	m_universe_mutex = MT::Mutex::create(false);
+	m_send_mutex = MT::Mutex::create(false);
 	Net::Socket::init();
 	m_message_task = new MessageTask();
 	m_message_task->m_server = this;
