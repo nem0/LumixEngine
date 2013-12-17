@@ -213,8 +213,9 @@ namespace Lux
 		char path[MAX_PATH];
 		m_impl->getScriptDefaultPath(entity, path, MAX_PATH, "cpp");
 
-		FS::IFile* file = m_impl->m_engine->getFileSystem().open("memory:tcp", path, FS::Mode::OPEN_OR_CREATE);
-		m_impl->m_engine->getFileSystem().close(file);
+		FS::FileSystem& fs = m_impl->m_engine->getFileSystem();
+		FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::OPEN_OR_CREATE);
+		fs.close(file);
 
 		m_impl->m_scripts.push_back(entity.index);
 		m_impl->m_paths.push_back(path);
