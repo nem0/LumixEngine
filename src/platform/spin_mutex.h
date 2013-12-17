@@ -8,7 +8,7 @@ namespace Lux
 		class LUX_PLATFORM_API SpinMutex LUX_ABSTRACT
 		{
 		public:
-			static SpinMutex* create(const char* name, bool locked = false);
+			static SpinMutex* create(bool locked);
 			static void destroy(SpinMutex* spin_mutex);
 
 			virtual void lock() = 0;

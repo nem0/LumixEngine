@@ -8,7 +8,7 @@ namespace Lux
 		class LUX_PLATFORM_API Semaphore LUX_ABSTRACT
 		{
 		public:
-			static Semaphore* create(const char* name, int init_count, int max_count);
+			static Semaphore* create(int init_count, int max_count);
 			static void destroy(Semaphore*);
 
 			virtual void signal() = 0;
