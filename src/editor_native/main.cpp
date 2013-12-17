@@ -59,13 +59,13 @@ void initGui(Lux::EditorServer& server)
 	renderer->setWindowHeight(600);
 	Lux::UI::TextDecorator* text_decorator = new Lux::UI::TextDecorator("_text");
 	Lux::UI::BoxDecorator* box_decorator = new Lux::UI::BoxDecorator("_box");
-	box_decorator->create(*renderer, "gui/invader.tga");
-	box_decorator->setPart(0, 252/512.0f, 6/512.0f, (399-252)/512.0f, 31/512.0f);
 	server.getEngine().loadPlugin("gui.dll");
 	Lux::UI::Gui* gui = (Lux::UI::Gui*)server.getEngine().getPluginManager().getPlugin("gui");
 	gui->addDecorator(*text_decorator);
 	gui->addDecorator(*box_decorator);
 	gui->setRenderer(*renderer);
+	box_decorator->create(*gui, "gui/invader.tga");
+	box_decorator->setPart(0, 252/512.0f, 6/512.0f, (399-252)/512.0f, 31/512.0f);
 	Lux::UI::Block* root = gui->createTopLevelBlock(800, 600);
 	
 	/*Lux::UI::Block* button = Lux::UI::createButton("Click here!", 0, 0, root, gui);

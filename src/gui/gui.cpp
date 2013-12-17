@@ -1,6 +1,8 @@
 #include "gui/gui.h"
 #include "core/crc32.h"
 #include "core/map.h"
+#include "engine/engine.h"
+#include "gui/atlas.h"
 #include "gui/decorator_base.h"
 #include "gui/block.h"
 
@@ -16,11 +18,13 @@ namespace UI
 		static void comboboxBlur(Block& block);
 		static void textboxKeyDown(int32_t key, Block& block);
 
+		Engine* m_engine;
 		vector<Block*> m_blocks;
 		map<uint32_t, Block::EventCallback> m_callbacks;
 		map<uint32_t, DecoratorBase*> m_decorators;
 		Block* m_focus;
 		IRenderer* m_renderer;
+		vector<Atlas*> m_atlases;
 	};
 
 
@@ -69,6 +73,7 @@ namespace UI
 		m_impl = new GuiImpl();
 		m_impl->m_focus = NULL;
 		m_impl->m_renderer = NULL;
+		m_impl->m_engine = &engine;
 		addCallback("_cb_click", &GuiImpl::comboboxClick);
 		addCallback("_cb_blur", &GuiImpl::comboboxBlur);
 		addCallback("_tb_key_down", (Block::EventCallback)&GuiImpl::textboxKeyDown);
@@ -117,6 +122,27 @@ namespace UI
 	void Gui::addCallback(const char* name, Block::EventCallback callback)
 	{
 		m_impl->m_callbacks.insert(crc32(name), callback);
+	}
+
+
+	Atlas* Gui::loadAtlas(const char* path)
+	{
+		for(int i = 0; i < m_impl->m_atlases.size(); ++i)
+		{
+			if(m_impl->m_atlases[i]->getPath() == path)
+			{
+				return m_impl->m_atlases[i];
+			}
+		}
+		Atlas* atlas = new Atlas();
+		if(!atlas->create())
+		{
+			delete atlas;
+			return NULL;
+		}
+		m_impl->m_atlases.push_back(atlas);
+		atlas->load(*m_impl->m_renderer, m_impl->m_engine->getFileSystem(), path);
+		return atlas;
 	}
 
 

@@ -11,7 +11,11 @@ namespace Lux
 namespace UI
 {
 
+	class Atlas;
+	class Gui;
 	class IRenderer;
+	class TextureBase;
+
 
 	class LUX_GUI_API BoxDecorator : public DecoratorBase
 	{
@@ -27,12 +31,12 @@ namespace UI
 		public:
 			BoxDecorator(const char* name) : DecoratorBase(name) {}
 
-			bool create(IRenderer& renderer, const char* image);
+			bool create(Gui& gui, const char* atlas);
 			void setPart(int part, float x, float y, float w, float h);
 			virtual void render(IRenderer& renderer, Block& block) LUX_OVERRIDE;
 
 		private:
-			int m_image;
+			Atlas* m_atlas;
 			Part m_parts[3];
 			Vec3 m_vertices[108];
 			float m_uvs[108];

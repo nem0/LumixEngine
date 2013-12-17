@@ -70,6 +70,7 @@ struct RendererImpl
 	H3DRes				m_loading_res;
 	Renderer*			m_owner;
 	bool				m_update_bb;
+	bool				m_is_pipeline_loaded;
 };
 
 
@@ -117,6 +118,7 @@ void resourceLoaded(void* user_data, char* file_data, int length, bool success)
 
 			renderer->m_camera_node = h3dAddCameraNode(H3DRootNode, "", renderer->m_pipeline_handle);
 			renderer->onResize(renderer->m_width, renderer->m_height);
+			renderer->m_is_pipeline_loaded = false;
 		}
 		renderer->m_loading_res = 0;
 		renderer->loadResources();
@@ -193,6 +195,7 @@ void RendererImpl::loadResources()
 bool Renderer::create(FS::FileSystem* fs, int w, int h, const char* base_path)
 {
 	m_impl = new RendererImpl();
+	m_impl->m_pipeline_handle = -1;
 	m_impl->m_owner = this;
 	m_impl->m_file_system = fs;
 	m_impl->m_first_free_renderable = -1;
@@ -201,7 +204,7 @@ bool Renderer::create(FS::FileSystem* fs, int w, int h, const char* base_path)
 	m_impl->m_height = -1;
 	m_impl->m_universe = 0;
 	m_impl->m_camera_node = 0;
-
+	m_impl->m_is_pipeline_loaded = false;
 	m_impl->m_base_path = base_path;
 	m_impl->m_width = w;
 	m_impl->m_height = h;
@@ -496,7 +499,14 @@ void Renderer::getCameraMatrix(Matrix& mtx)
 	for(int i = 0; i < 16; ++i)
 	{
 		(&mtx.m11)[i] = tmp[i];
-	}}
+	}
+}
+
+
+bool Renderer::isReady() const
+{
+	return m_impl->m_is_pipeline_loaded;
+}
 
 
 void Renderer::setCameraMatrix(const Matrix& mtx)
