@@ -23,7 +23,7 @@ namespace  Lux
 		class LUX_PLATFORM_API Event LUX_ABSTRACT
 		{
 		public:
-			static Event* create(const char* name, EventFlags flags);
+			static Event* create(EventFlags flags);
 			static void destroy(Event* event);
 
 			virtual void reset() = 0;

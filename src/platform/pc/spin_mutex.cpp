@@ -20,7 +20,7 @@ namespace Lux
 			LPCRITICAL_SECTION m_id;
 		};
 
-		SpinMutex* SpinMutex::create(const char* name, bool locked)
+		SpinMutex* SpinMutex::create(bool locked)
 		{
 			return new WinSpinMutex(locked);
 		}

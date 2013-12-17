@@ -57,8 +57,8 @@ namespace Lux
 			, m_aborted(false)
 		{
 			ASSERT(size > 0);
-			m_wr_semaphore = MT::Semaphore::create("LockFreQueue::wr", size, size);
-			m_rd_semaphore = MT::Semaphore::create("LockFreQueue::rd", 0, size);
+			m_wr_semaphore = MT::Semaphore::create(size, size);
+			m_rd_semaphore = MT::Semaphore::create(0, size);
 
 			for (int32_t i = 0; i < size; ++i)
 			{

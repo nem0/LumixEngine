@@ -18,7 +18,7 @@ namespace Lux
 
 			T			data;
 
-			Transaction() { m_event = MT::Event::create("Transaction", MT::EventFlags::MANUAL_RESET); }
+			Transaction() { m_event = MT::Event::create(MT::EventFlags::MANUAL_RESET); }
 			MT::Event*	m_event;
 		};
 
@@ -78,7 +78,7 @@ namespace Lux
 			: m_alloc_ptr(0)
 			, m_free_ptr(0)
 		{
-			m_alloc_sema = MT::Semaphore::create("TransactionQueue::AllocSema", size, size);
+			m_alloc_sema = MT::Semaphore::create(size, size);
 			for (int32_t i = 0; i < size; i++) 
 			{
 				m_alloc[i].key = i;
