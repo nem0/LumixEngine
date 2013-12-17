@@ -15,7 +15,7 @@ namespace Lux
 
 			virtual void unlock() LUX_OVERRIDE;
 
-			WinMutex(const char* name, bool locked);
+			WinMutex(bool locked);
 			~WinMutex();
 
 		private:
@@ -23,9 +23,9 @@ namespace Lux
 			int m_locked;
 		};
 
-		Mutex* Mutex::create(const char* name, bool locked /* = false */)
+		Mutex* Mutex::create(bool locked)
 		{
-			return new WinMutex(name, locked);
+			return new WinMutex(locked);
 		}
 
 		void Mutex::destroy(Mutex* mutex)
@@ -55,9 +55,9 @@ namespace Lux
 			::ReleaseMutex(m_id);
 		}
 
-		WinMutex::WinMutex(const char* name, bool locked)
+		WinMutex::WinMutex(bool locked)
 		{
-			m_id = ::CreateMutex(NULL, locked, name);
+			m_id = ::CreateMutex(NULL, locked, NULL);
 			m_locked = 0;
 		}
 

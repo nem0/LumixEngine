@@ -376,9 +376,10 @@ void EditorServerImpl::onPointerUp(int x, int y, MouseButton::Value button)
 void EditorServerImpl::save(const char path[])
 {
 	g_log_info.log("editor server", "saving universe %s...", path);
-	FS::IFile* file = m_engine.getFileSystem().open("tcp", path, FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
+	FS::FileSystem& fs = m_engine.getFileSystem();
+	FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
 	save(*file);
-	m_engine.getFileSystem().close(file);
+	fs.close(file);
 }
 
 
@@ -631,8 +632,7 @@ void loadMap(FS::IFile* file, bool success, void* user_data)
 	if(success)
 	{
 		static_cast<EditorServerImpl*>(user_data)->load(*file);
-		//TODO: close
-		//file->close();
+		file->close();
 	}
 }
 
