@@ -16,16 +16,16 @@ namespace  Lux
 			virtual void wait() LUX_OVERRIDE;
 			virtual bool poll() LUX_OVERRIDE;
 
-			WinEvent(const char* name, bool signaled, bool manual_reset);
+			WinEvent(bool signaled, bool manual_reset);
 			~WinEvent();
 
 		private:
 			HANDLE m_id;
 		};
 
-		Event* Event::create(const char* name, EventFlags flags)
+		Event* Event::create(EventFlags flags)
 		{
-			return new WinEvent(name, flags & EventFlags::SIGNALED ? true : false, flags & EventFlags::MANUAL_RESET ? true : false);
+			return new WinEvent(flags & EventFlags::SIGNALED ? true : false, flags & EventFlags::MANUAL_RESET ? true : false);
 		}
 
 		void Event::destroy(Event* event)
@@ -53,9 +53,9 @@ namespace  Lux
 			return WAIT_OBJECT_0 == ::WaitForSingleObject(m_id, 0);
 		}
 
-		WinEvent::WinEvent(const char* name, bool signaled, bool manual_reset)
+		WinEvent::WinEvent(bool signaled, bool manual_reset)
 		{
-			m_id = ::CreateEvent(NULL, manual_reset, signaled, name);
+			m_id = ::CreateEvent(NULL, manual_reset, signaled, NULL);
 		}
 
 		WinEvent::~WinEvent()
