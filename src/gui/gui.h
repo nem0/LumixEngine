@@ -11,6 +11,7 @@ namespace Lux
 namespace UI
 {
 
+	class Atlas;
 	class Block;
 
 
@@ -35,6 +36,7 @@ namespace UI
 			DecoratorBase* getDecorator(const char* name);
 			void addDecorator(DecoratorBase& decorator);
 			void addCallback(const char* name, Block::EventCallback callback);
+			Atlas* loadAtlas(const char* path);
 
 		private:
 			struct GuiImpl* m_impl;

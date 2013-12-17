@@ -6,6 +6,7 @@
 #include "core/string.h"
 #include "core/vec3.h"
 #include "core/vector.h"
+#include "gui/texture_base.h"
 
 
 namespace Lux
@@ -13,12 +14,18 @@ namespace Lux
 namespace UI
 {
 
-	struct Image
+	class OpenGLTexture : public TextureBase
 	{
-		string m_name;
-		GLuint m_gl_image;
-		float m_width;
-		float m_height;
+		public:
+			OpenGLTexture(const char* name, float width, float height)
+				: TextureBase(name, width, height)
+			{}
+
+			GLuint getId() const { return m_gl_id; }
+			void setId(GLuint id) { m_gl_id = id; }
+
+		private:
+			GLuint m_gl_id;
 	};
 
 	struct OpenGLRendererImpl
@@ -36,13 +43,11 @@ namespace UI
 			float x_advance;
 		};
 
-		Image* getImage(const char* name);
+		TextureBase* getImage(const char* name);
 
 		map<char, Character> m_characters;
-		vector<Image*> m_images;
-		int m_font_image;
-		int m_font_image_width;
-		int m_font_image_height;
+		vector<TextureBase*> m_images;
+		OpenGLTexture* m_font_image;
 		int m_window_height;
 	};
 
@@ -78,11 +83,11 @@ namespace UI
 		m_impl = 0;
 	}
 
-	Image* OpenGLRendererImpl::getImage(const char* name)
+	TextureBase* OpenGLRendererImpl::getImage(const char* name)
 	{
 		for(int i = 0; i < m_images.size(); ++i)
 		{
-			if(m_images[i]->m_name == name)
+			if(m_images[i]->getName() == name)
 			{
 				return m_images[i];
 			}
@@ -91,14 +96,13 @@ namespace UI
 	}
 
 
-	int OpenGLRenderer::loadImage(const char* name)
+	TextureBase* OpenGLRenderer::loadImage(const char* name)
 	{
-		Image* img = m_impl->getImage(name);
+		TextureBase* img = m_impl->getImage(name);
 		if(img)
 		{
-			return img->m_gl_image;
+			return img;
 		}
-		img = new Image();
 		FILE* fp;
 		fopen_s(&fp, name, "rb");
 
@@ -118,20 +122,18 @@ namespace UI
 	
 		if (header.dataType != 2)
 		{
-			return -1;
+			return NULL;
 		}
 	
 		if (color_mode < 3)
 		{
-			return -1;
+			return NULL;
 		}
 	
 		const char* image_src = buffer + sizeof(TGAHeader);
 		unsigned char* image_dest = new unsigned char[image_size];
 	
-		img->m_width = (float)header.width;
-		img->m_height = (float)header.height;
-		img->m_name = name;
+		img = new OpenGLTexture(name, (float)header.width, (float)header.height);
 
 		// Targa is BGR, swap to RGB and flip Y axis
 		for (long y = 0; y < header.height; y++)
@@ -157,27 +159,24 @@ namespace UI
 		glGenTextures(1, &texture_id);
 		if (texture_id == 0)
 		{
-			//printf("Failed to generate textures\n");
-			return -1;
+			return NULL;
 		}
 
 		glBindTexture(GL_TEXTURE_2D, texture_id);
 
-		uint32_t color = 0xffffFFFF;
-		//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, &color);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, header.width, header.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_dest);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-		/*glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-*/
+/*		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);*/
+
 		delete [] image_dest;
 		delete [] buffer;
 	
-		img->m_gl_image = texture_id;
+		static_cast<OpenGLTexture*>(img)->setId(texture_id);
 
-		return texture_id;
+		return img;
 	}
 
 
@@ -305,9 +304,7 @@ namespace UI
 
 	bool OpenGLRenderer::loadFont(const char* path)
 	{
-		m_impl->m_font_image_width = 256;
-		m_impl->m_font_image_height = 256;
-		m_impl->m_font_image = loadImage(path);
+		m_impl->m_font_image = static_cast<OpenGLTexture*>(loadImage(path));
 		char tmp[255];
 		strcpy_s(tmp, path);
 		int len = strlen(tmp);
@@ -335,18 +332,18 @@ namespace UI
 				int tmp;
 				c = getNextNumberPos(c);
 				sscanf_s(c, "%d", &tmp);
-				character.left = (float)tmp / m_impl->m_font_image_width;
+				character.left = (float)tmp / m_impl->m_font_image->getWidth();
 				c = getNextNumberPos(c);
 				sscanf_s(c, "%d", &tmp);
-				character.top = (float)tmp / m_impl->m_font_image_height;
+				character.top = (float)tmp / m_impl->m_font_image->getHeight();
 				c = getNextNumberPos(c);
 				sscanf_s(c, "%d", &tmp);
 				character.pixel_w = (float)tmp;
 				c = getNextNumberPos(c);
 				sscanf_s(c, "%d", &tmp);
 				character.pixel_h = (float)tmp;
-				character.right = character.left + character.pixel_w / m_impl->m_font_image_width;
-				character.bottom = character.top + character.pixel_h / m_impl->m_font_image_height;
+				character.right = character.left + character.pixel_w / m_impl->m_font_image->getWidth();
+				character.bottom = character.top + character.pixel_h / m_impl->m_font_image->getHeight();
 				c = getNextNumberPos(c);
 				sscanf_s(c, "%d", &tmp);
 				character.x_offset = (float)tmp;
@@ -364,7 +361,7 @@ namespace UI
 	}
 
 
-	void OpenGLRenderer::renderImage(int image, float* vertices, float* tex_coords, int vertex_count)
+	void OpenGLRenderer::renderImage(TextureBase* image, float* vertices, float* tex_coords, int vertex_count)
 	{
 		glDisableClientState(GL_COLOR_ARRAY);
 		glDisableClientState(GL_NORMAL_ARRAY);
@@ -373,7 +370,7 @@ namespace UI
 		glVertexPointer(3, GL_FLOAT, 0, vertices);
 		
 		glEnable(GL_TEXTURE_2D);
-		glBindTexture(GL_TEXTURE_2D, (GLuint)image);
+		glBindTexture(GL_TEXTURE_2D, static_cast<OpenGLTexture*>(image)->getId());
 		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 		glTexCoordPointer(2, GL_FLOAT, 0, tex_coords);
 

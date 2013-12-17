@@ -1,6 +1,9 @@
 #include "gui/decorators/box_decorator.h"
-#include "gui/irenderer.h"
+#include "gui/atlas.h"
 #include "gui/block.h"
+#include "gui/gui.h"
+#include "gui/irenderer.h"
+
 
 namespace Lux
 {
@@ -40,11 +43,11 @@ namespace UI
 		m_uvs[10] = m_parts[0].m_x + m_parts[0].m_w;
 		m_uvs[11] = m_parts[0].m_y;
 
-		renderer.renderImage(m_image, &m_vertices[0].x, m_uvs, 6);
+		renderer.renderImage(m_atlas->getTexture(), &m_vertices[0].x, m_uvs, 6);
 	}
 
 
-	bool BoxDecorator::create(IRenderer& renderer, const char* image)
+	bool BoxDecorator::create(Gui& gui, const char* atlas)
 	{
 		for(int i = 0; i < 9; ++i)
 		{
@@ -53,8 +56,8 @@ namespace UI
 			m_parts[i].m_w = 0;
 			m_parts[i].m_h = 0;
 		}
-		m_image = renderer.loadImage(image);
-		return m_image >= 0;
+		m_atlas = gui.loadAtlas(atlas);
+		return m_atlas != NULL;
 	}
 
 

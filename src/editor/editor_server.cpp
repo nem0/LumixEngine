@@ -808,24 +808,27 @@ void EditorServerImpl::sendMessage(const uint8_t* data, int32_t length)
 
 void EditorServerImpl::renderScene(bool is_render_physics)
 {
-	if(m_selected_entity.isValid())
+	if(m_engine.getRenderer().isReady())
 	{
-		m_gizmo.updateScale();
-	}
-	for(int i = 0, c = m_editor_icons.size(); i < c; ++i)
-	{
-		m_editor_icons[i]->update(&m_engine.getRenderer());
-	}
-	m_engine.getRenderer().renderScene();
+		if(m_selected_entity.isValid())
+		{
+			m_gizmo.updateScale();
+		}
+		for(int i = 0, c = m_editor_icons.size(); i < c; ++i)
+		{
+			m_editor_icons[i]->update(&m_engine.getRenderer());
+		}
+		m_engine.getRenderer().renderScene();
 
-	if(is_render_physics)
-	{
-		renderPhysics();
-	}
+		if(is_render_physics)
+		{
+			renderPhysics();
+		}
 
-	m_engine.getRenderer().endFrame();
+		m_engine.getRenderer().endFrame();
 		
-	//m_navigation.draw();
+		//m_navigation.draw();
+	}
 }
 
 
