@@ -434,7 +434,7 @@ void EditorServerImpl::toggleGameMode()
 	}
 	else
 	{
-		m_game_mode_file = m_engine.getFileSystem().open("memory", "", 0);
+		m_game_mode_file = m_engine.getFileSystem().open("memory", "", FS::Mode::WRITE);
 		save(*m_game_mode_file);
 		m_engine.getScriptSystem().start();
 		m_is_game_mode = true;
