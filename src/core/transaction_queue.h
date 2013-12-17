@@ -65,7 +65,7 @@ namespace Lux
 				{}
 			};
 
-			Semaphore*			m_alloc_sema;
+			Semaphore*				m_alloc_sema;
 			volatile int32_t		m_alloc_ptr;
 			volatile int32_t		m_free_ptr;
 			AllocNode				m_alloc[size];
