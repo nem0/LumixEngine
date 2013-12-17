@@ -149,6 +149,7 @@ void resourceLoaded(FS::IFile* file, bool success, void* user_data)
 		}
 		renderer->m_loading_res = 0;
 		renderer->loadResources();
+		file->close();
 	}
 	else
 	{
