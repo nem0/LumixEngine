@@ -8,7 +8,7 @@ namespace Lux
 		class LUX_PLATFORM_API Mutex LUX_ABSTRACT
 		{
 		public:
-			static Mutex* create(bool locked = false);
+			static Mutex* create(bool locked);
 			static void destroy(Mutex* mutex);
 
 			virtual void lock() = 0;
