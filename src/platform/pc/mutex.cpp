@@ -23,7 +23,7 @@ namespace Lux
 			int m_locked;
 		};
 
-		Mutex* Mutex::create(bool locked /* = false */)
+		Mutex* Mutex::create(bool locked)
 		{
 			return new WinMutex(locked);
 		}
