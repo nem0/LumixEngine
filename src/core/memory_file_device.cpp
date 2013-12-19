@@ -31,7 +31,7 @@ namespace Lux
 			{
 				ASSERT(NULL == m_buffer); // reopen is not supported currently
 
-				m_write = mode & Mode::WRITE;
+				m_write = mode & Mode::WRITE ? true : false;
 				if(m_file)
 				{
 					if(m_file->open(path, mode))
@@ -88,11 +88,12 @@ namespace Lux
 				uint32_t sz = m_size;
 				if(pos + size > cap)
 				{
-					uint8_t* new_data = new uint8_t[0 != cap ? cap << 1 : 0x8000];
+					uint32_t new_cap = 0 != cap ? cap << 1 : 0x8000;
+					uint8_t* new_data = new uint8_t[new_cap];
 					memcpy(new_data, m_buffer, sz);
-					delete m_buffer;
+					delete [] m_buffer;
 					m_buffer = new_data;
-					m_capacity = cap << 1;
+					m_capacity = new_cap;
 				}
 
 				memcpy(m_buffer + pos, buffer, size);
