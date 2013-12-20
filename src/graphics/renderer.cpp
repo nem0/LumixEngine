@@ -148,6 +148,7 @@ void resourceLoaded(FS::IFile* file, bool success, void* user_data)
 
 			renderer->m_camera_node = h3dAddCameraNode(H3DRootNode, "", renderer->m_pipeline_handle);
 			renderer->onResize(renderer->m_width, renderer->m_height);
+			renderer->m_is_pipeline_loaded = true;
 		}
 		renderer->m_loading_res = 0;
 		renderer->loadResources();

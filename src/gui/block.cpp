@@ -10,23 +10,17 @@ namespace Lux
 namespace UI
 {
 
-	Block::Block()
+	Block::Block(Gui& gui, Block* parent, const char* decorator_name)
 	{
-		m_decorator = NULL;
-		m_parent = NULL;
-		m_gui = NULL;
+		m_gui = &gui;
 		m_tag = NULL;
-	}
-
-
-	void Block::create(Block* parent, DecoratorBase* decorator)
-	{
-		m_decorator = 0;
-		m_tag = 0;
+		m_z = 0;
+		m_is_mouse_clickable = true;
 		m_local_area.top = m_local_area.bottom = m_local_area.left = m_local_area.right = 0;
 		m_global_area.top = m_global_area.bottom = m_global_area.left = m_global_area.right = 0;
 		m_is_shown = true;
 		m_is_dirty_layout = true;
+		m_is_focus_processing = false;
 		m_parent = parent;
 		m_fit_content = false;
 		m_is_floating = false;
@@ -34,28 +28,94 @@ namespace UI
 		{
 			m_gui = m_parent->m_gui;
 			m_parent->addChild(*this);
+			m_z = parent->m_z;
 		}
-		m_decorator = decorator;
+		m_decorator = decorator_name ? m_gui->getDecorator(decorator_name) : NULL;
+	}
+
+
+	void Block::destroy()
+	{
+		setParent(NULL);
+		delete this;
+	}
+
+
+	Block::~Block()
+	{
+		if(m_gui->getFocusedBlock() == this)
+		{
+			m_gui->focus(NULL);
+		}
+		for(int i = 0; i < m_children.size(); ++i)
+		{
+			delete m_children[i];
+		}
+	}
+
+
+	void Block::setZIndex(int z_index)
+	{
+		m_z = z_index / 100.0f;
+		if(m_parent)
+		{
+			for(int i = 0; i < m_parent->m_children.size() - 1; ++i)
+			{
+				if(m_parent->m_children[i]->getZ() < m_parent->m_children[i+1]->getZ())
+				{
+					Lux::UI::Block* tmp = m_parent->m_children[i];
+					m_parent->m_children[i] = m_parent->m_children[i+1];
+					m_parent->m_children[i+1] = tmp;
+				}
+			}
+			for(int i = m_parent->m_children.size() - 1; i > 0; --i)
+			{
+				if(m_parent->m_children[i]->getZ() > m_parent->m_children[i-1]->getZ())
+				{
+					Lux::UI::Block* tmp = m_parent->m_children[i];
+					m_parent->m_children[i] = m_parent->m_children[i-1];
+					m_parent->m_children[i-1] = tmp;
+				}
+			}
+		}
+	}
+
+
+	void Block::setArea(float rel_left, float left, float rel_top, float top, float rel_right, float right, float rel_bottom, float bottom)
+	{
+		m_local_area.rel_left = rel_left;
+		m_local_area.left = left;
+		m_local_area.rel_top = rel_top;
+		m_local_area.top = top;
+		m_local_area.rel_right = rel_right;
+		m_local_area.right = right;
+		m_local_area.rel_bottom = rel_bottom;
+		m_local_area.bottom = bottom;
+		m_is_dirty_layout = true;
 	}
 
 
 	void Block::blur()
 	{
-		static const uint32_t blur_hash = crc32("blur");
-		EventHandler* handler = getEventHandler(blur_hash);
-		if(handler)
+		if(!m_is_focus_processing)
 		{
-			handler->callback(*this);
-		}
-		if(m_parent)
-		{
-			m_parent->blur();
+			static const uint32_t blur_hash = crc32("blur");
+			EventHandler* handler = getEventHandler(blur_hash);
+			if(handler)
+			{
+				handler->callback(*this);
+			}
+			if(m_parent)
+			{
+				m_parent->blur();
+			}
 		}
 	}
 
 
 	void Block::focus()
 	{
+		m_is_focus_processing = false;
 		static const uint32_t blur_hash = crc32("focus");
 		EventHandler* handler = getEventHandler(blur_hash);
 		if(handler)
@@ -84,6 +144,19 @@ namespace UI
 	void Block::addChild(Block& child)
 	{
 		m_children.push_back(&child);
+		for(int i = m_children.size() - 1; i > 0; --i)
+		{
+			if(m_children[i]->getZ() < m_children[i-1]->getZ())
+			{
+				Lux::UI::Block* tmp = m_children[i];
+				m_children[i] = m_children[i-1];
+				m_children[i-1] = tmp;
+			}
+			else
+			{
+				break;
+			}
+		}
 	}
 
 
@@ -109,6 +182,7 @@ namespace UI
 		m_parent = block;
 		if(m_parent)
 		{
+			m_z = m_parent->m_z;
 			m_parent->addChild(*this);
 		}
 	}
@@ -187,20 +261,30 @@ namespace UI
 		serializer.deserializeArrayBegin("children");
 		for(int i = 0; i < count; ++i)
 		{
-			m_children[i] = new Block();
-			m_children[i]->m_parent = this;
-			m_children[i]->m_gui = m_gui;
+			m_children[i] = m_gui->createBlock(this, NULL);
 			m_children[i]->deserialize(serializer);
 		}
 		serializer.deserializeArrayEnd();
 	}
 
 
+	void Block::emitEvent(const char* type)
+	{
+		uint32_t hash = crc32(type);
+		for(int i = 0, c = m_event_handlers.size(); i < c; ++i)
+		{
+			if(m_event_handlers[i].type == hash)
+			{
+				m_event_handlers[i].callback(*this);
+			}
+		}
+	}
 
-	void Block::registerEventHandler(const char* type, void* callback)
+
+	void Block::registerEventHandler(const char* type, const char* callback)
 	{
 		EventHandler handler;
-		handler.callback = (EventCallback)callback;
+		handler.callback = m_gui->getCallback(callback);
 		handler.type = crc32(type);
 		m_event_handlers.push_back(handler);
 	}
@@ -220,18 +304,13 @@ namespace UI
 			{
 				clicked_this = true;
 			}
-			if(clicked_this)
+			if(clicked_this && m_is_mouse_clickable)
 			{
 				if(!focused)
 				{
 					m_gui->focus(this);
 				}
-				static const uint32_t click_hash = crc32("click");
-				EventHandler* handler = getEventHandler(click_hash);
-				if(handler)
-				{
-					handler->callback(*this);
-				}
+				emitEvent("click");
 				return true;
 			}
 			return focused;
@@ -245,7 +324,13 @@ namespace UI
 		left = area.left < left ? area.left : left;
 		right = area.right > right ? area.right : right;
 		top = area.top < top ? area.top : top;
-		bottom = area.bottom > left ? area.bottom : bottom;
+		bottom = area.bottom > bottom ? area.bottom : bottom;
+	}
+
+
+	float round(float value)
+	{
+		return (float)(int)value;
 	}
 
 
@@ -254,17 +339,17 @@ namespace UI
 		m_is_dirty_layout = false;
 		if(m_parent)
 		{
-			m_global_area.left = m_parent->m_global_area.left + m_local_area.left;
-			m_global_area.right = m_parent->m_global_area.left + m_local_area.right;
-			m_global_area.top = m_parent->m_global_area.top + m_local_area.top;
-			m_global_area.bottom = m_parent->m_global_area.top + m_local_area.bottom;
+			m_global_area.left = round(m_parent->m_global_area.left + m_local_area.left + m_local_area.rel_left * (m_parent->m_global_area.right - m_parent->m_global_area.left));
+			m_global_area.right = round(m_parent->m_global_area.left + m_local_area.right + m_local_area.rel_right * (m_parent->m_global_area.right - m_parent->m_global_area.left));
+			m_global_area.top = round(m_parent->m_global_area.top + m_local_area.top + m_local_area.rel_top * (m_parent->m_global_area.bottom - m_parent->m_global_area.top));
+			m_global_area.bottom = round(m_parent->m_global_area.top + m_local_area.bottom + m_local_area.rel_bottom * (m_parent->m_global_area.bottom - m_parent->m_global_area.top));
 		}
 		else
 		{
-			m_global_area.left = m_local_area.left;
-			m_global_area.right = m_local_area.right;
-			m_global_area.top = m_local_area.top;
-			m_global_area.bottom = m_local_area.bottom;
+			m_global_area.left = round(m_local_area.left);
+			m_global_area.right = round(m_local_area.right);
+			m_global_area.top = round(m_local_area.top);
+			m_global_area.bottom = round(m_local_area.bottom);
 		}
 		m_click_area = m_global_area;
 		for(int i = 0, c = m_children.size(); i < c; ++i)

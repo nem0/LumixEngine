@@ -197,6 +197,30 @@ class MethodFunctor : public IFunctor<TRet>
 };
 
 
+template <class TRet, class TObj, class TArg1>
+class MethodFunctor1 : public IFunctor1<TRet, TArg1>
+{
+	public:
+		typedef TRet (TObj::*Function)(TArg1);
+
+	public:
+		MethodFunctor1(TObj* obj, Function function)
+		{
+			m_function = function;
+			m_obj = obj;
+		}
+
+		virtual TRet operator() (TArg1 a)
+		{
+			return (m_obj->*m_function)(a);
+		}
+
+	private:
+		TObj*		m_obj;
+		Function	m_function;
+};
+
+
 template <class TRet, class TObj, class TArg1, class TArg2>
 class MethodFunctor2 : public IFunctor2<TRet, TArg1, TArg2>
 {
@@ -280,10 +304,18 @@ IFunctor1<TRet, Arg1>* makeFunctor(TRet (*function)(Arg1))
 	return new Functor1<TRet, Arg1>(function);
 }
 
+
 template <class TRet, class TObj>
 IFunctor<TRet>* makeFunctor(TObj* obj, TRet (TObj::*method)())
 {
 	return new MethodFunctor<TRet, TObj>(obj, method);
+}
+
+
+template <class TRet, class TObj, class TArg1>
+IFunctor1<TRet, TArg1>* makeFunctor(TObj* obj, TRet (TObj::*method)(TArg1))
+{
+	return new MethodFunctor1<TRet, TObj, TArg1>(obj, method);
 }
 
 

@@ -20,15 +20,17 @@ namespace UI
 		public:
 			Gui() { m_impl = 0; }
 
+			Block* createBlock(Block* parent, const char* decorator);
 			virtual bool create(Engine& engine) LUX_OVERRIDE;
 			virtual Component createComponent(uint32_t, const Entity&) LUX_OVERRIDE;
 			virtual const char* getName() const LUX_OVERRIDE { return "gui"; }
 			void setRenderer(IRenderer& renderer);
 			void render();
 			void layout();
-			Block* createTopLevelBlock(int width, int height);
+			Block* createTopLevelBlock(float width, float height);
 			void focus(Block* block);
-			void click(int x, int y);
+			Block* getFocusedBlock() const;
+			bool click(int x, int y);
 			void keyDown(int32_t key);
 			Block::EventCallback getCallback(const char* name);
 			Block::EventCallback getCallback(uint32_t name_hash);

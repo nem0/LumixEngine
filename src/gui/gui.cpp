@@ -16,7 +16,10 @@ namespace UI
 	{
 		static void comboboxClick(Block& block);
 		static void comboboxBlur(Block& block);
+		static void menuShowSubmenu(Block& block);
 		static void textboxKeyDown(int32_t key, Block& block);
+		static void hideBlock(Block& block);
+		static void hideParentBlock(Block& block);
 
 		Engine* m_engine;
 		vector<Block*> m_blocks;
@@ -28,12 +31,27 @@ namespace UI
 	};
 
 
+	void GuiImpl::hideBlock(Block& block)
+	{
+		block.hide();
+	}
+	
+	
+	void GuiImpl::hideParentBlock(Block& block)
+	{
+		block.getParent()->hide();
+	}
+
+
 	void GuiImpl::textboxKeyDown(int32_t key, Block& block) 
 	{
 		Lux::string s = block.getText();
 		char c[2];
 		switch(key)
 		{
+			case '\r':
+				block.emitEvent("text_accepted");
+				break;
 			case '\b':
 				s = s.substr(0, s.length() - 1);
 				break;
@@ -45,6 +63,16 @@ namespace UI
 		}
 		block.setText(s.c_str());
 	}
+
+	void GuiImpl::menuShowSubmenu(Block& block)
+	{
+		if(block.getChild(1))
+		{
+			block.getChild(1)->show();
+			block.getChild(1)->getGui()->focus(block.getChild(1));
+		}
+	}
+
 
 	void GuiImpl::comboboxBlur(Block& block)
 	{
@@ -76,7 +104,10 @@ namespace UI
 		m_impl->m_engine = &engine;
 		addCallback("_cb_click", &GuiImpl::comboboxClick);
 		addCallback("_cb_blur", &GuiImpl::comboboxBlur);
+		addCallback("_menu_show_submenu", &GuiImpl::menuShowSubmenu);
 		addCallback("_tb_key_down", (Block::EventCallback)&GuiImpl::textboxKeyDown);
+		addCallback("_hide", &GuiImpl::hideBlock);
+		addCallback("_hide_parent", &GuiImpl::hideParentBlock);
 
 		return true;
 	}
@@ -121,7 +152,7 @@ namespace UI
 
 	void Gui::addCallback(const char* name, Block::EventCallback callback)
 	{
-		m_impl->m_callbacks.insert(crc32(name), callback);
+		m_impl->m_callbacks[crc32(name)] =  callback;
 	}
 
 
@@ -166,13 +197,16 @@ namespace UI
 	}
 
 
-	Block* Gui::createTopLevelBlock(int width, int height)
+	Block* Gui::createBlock(Block* parent, const char* decorator)
 	{
-		Block* block = new Block();
-		block->create(NULL, NULL);
-		block->setPosition(0, 0);
-		block->setSize(width, height);
-		block->m_gui = this;
+		return new Block(*this, parent, decorator);
+	}
+
+
+	Block* Gui::createTopLevelBlock(float width, float height)
+	{
+		Block* block = createBlock(NULL, NULL);
+		block->setArea(0, 0, 0, 0, 0, width, 0, height);
 		m_impl->m_blocks.push_back(block);
 		return block;
 	}
@@ -217,7 +251,7 @@ namespace UI
 	}
 
 
-	void Gui::click(int x, int y)
+	bool Gui::click(int x, int y)
 	{
 		bool focused = false;
 		for(int i = 0; i < m_impl->m_blocks.size(); ++i)
@@ -228,6 +262,13 @@ namespace UI
 		{
 			m_impl->m_focus = NULL;
 		}
+		return focused;
+	}
+
+
+	Block* Gui::getFocusedBlock() const
+	{
+		return m_impl->m_focus;
 	}
 
 
@@ -235,6 +276,10 @@ namespace UI
 	{
 		if(m_impl->m_focus)
 		{
+			if(block)
+			{
+				block->setFocusProcessing();
+			}
 			m_impl->m_focus->blur();
 		}
 		m_impl->m_focus = block;

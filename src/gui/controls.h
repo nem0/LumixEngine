@@ -14,9 +14,9 @@ class Block;
 class Gui;
 
 
-LUX_GUI_API Block* createComboBox(int x, int y, Block* parent, Gui* gui);
-LUX_GUI_API Block* createButton(const char* label, int x, int y, Block* parent, Gui* gui);
-LUX_GUI_API Block* createTextBox(int x, int y, Block* parent, Gui* gui);
+LUX_GUI_API Block* createComboBox(float x, float y, Block* parent, Gui& gui);
+LUX_GUI_API Block* createButton(const char* label, float x, float y, Block* parent, Gui& gui);
+LUX_GUI_API Block* createTextBox(float x, float y, Block* parent, Gui& gui);
 
 LUX_GUI_API Block& addComboboxItem(Block& cb, Block& item);
 
