@@ -4,7 +4,10 @@
 #include "core/file_system.h"
 #include "core/json_serializer.h"
 #include "core/memory_stream.h"
+#include "editor/editor_client.h"
 #include "editor/editor_server.h"
+#include "editor/server_message_types.h"
+#include "editor_native/main_frame.h"
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
 #include "graphics/renderer.h"
@@ -16,9 +19,12 @@
 #include "gui/opengl_renderer.h"
 #include "platform/socket.h"
 
+
 SDL_Renderer* displayRenderer;
 SDL_Window* displayWindow;
 Lux::Engine g_engine;
+MainFrame g_main_frame;
+
 
 void Display_InitGL()
 {
@@ -46,12 +52,7 @@ int Display_SetViewport( int width, int height )
 }
  
 
-void clickClicked(Lux::UI::Block& block)
-{
-}
-
-
-void initGui(Lux::EditorServer& server)
+void initGui(Lux::EditorClient& client, Lux::EditorServer& server)
 {
 	Lux::UI::OpenGLRenderer* renderer = new Lux::UI::OpenGLRenderer();
 	renderer->create();
@@ -64,37 +65,8 @@ void initGui(Lux::EditorServer& server)
 	gui->addDecorator(*text_decorator);
 	gui->addDecorator(*box_decorator);
 	gui->setRenderer(*renderer);
-	box_decorator->create(*gui, "gui/invader.tga");
-	box_decorator->setPart(0, 252/512.0f, 6/512.0f, (399-252)/512.0f, 31/512.0f);
-	Lux::UI::Block* root = gui->createTopLevelBlock(800, 600);
-	
-	/*Lux::UI::Block* button = Lux::UI::createButton("Click here!", 0, 0, root, gui);
-	gui->addCallback("clickClicked", &clickClicked);
-	button->registerEventHandler("click", gui->getCallback("clickClicked"));*/
-	Lux::UI::createTextBox(0, 0, root, gui);
-	/*
-	Lux::FS::IFile* file = server.getEngine().getFileSystem().open("memory", "", Lux::FS::Mode::CREATE | Lux::FS::Mode::WRITE);
-	Lux::JsonSerializer serializer(*file, Lux::JsonSerializer::WRITE);
-	root->serialize(serializer);
-
-	/*
-	{
-		
-		Lux::JsonSerializer serializer2(stream, Lux::JsonSerializer::READ);
-		Lux::UI::Block* root2 = gui->createTopLevelBlock(800, 600);
-		root2->deserialize(serializer2);
-		//root->hide();
-		root2->setPosition(100, 100);
-		root2->layout();
-	}
-	*/
-	/*Lux::UI::Block* button = new Lux::UI::Block();
-	button->create(root, text_decorator);
-	button->setText("click here!");
-	button->setPosition(0, 0);
-	button->setSize(100, 20);*/
-
-	root->layout();
+	box_decorator->create(*gui, "gui/skin.atl");
+	g_main_frame.create(client, *gui, 800, 600);
 }
 
 
@@ -124,13 +96,12 @@ int main(int argc, char* argv[])
 	Lux::EditorServer server;
 	server.create(NULL, NULL, path);
 	server.onResize(800, 600);
-	initGui(server);
+	Lux::EditorClient client;
+	client.create();
+	initGui(client, server);
 	Lux::UI::Gui* gui = (Lux::UI::Gui*)server.getEngine().getPluginManager().getPlugin("gui");
-
 	SDL_Event evt;
 	bool finished = false;
-	int mx, my;
-	SDL_GetMouseState(&mx, &my);
 	while(!finished)
 	{
 		while(SDL_PollEvent(&evt))
@@ -149,11 +120,16 @@ int main(int argc, char* argv[])
 				case SDL_KEYUP:
 					break;
 				case SDL_MOUSEBUTTONDOWN:
-					gui->click(evt.button.x, evt.button.y);
+					if(!gui->click(evt.button.x, evt.button.y))
+					{
+						client.mouseDown(evt.button.x, evt.button.y, evt.button.button == SDL_BUTTON_LEFT ? 0 : 2);
+					}
 					break;
 				case SDL_MOUSEBUTTONUP:
+					client.mouseUp(evt.button.x, evt.button.y, evt.button.button == SDL_BUTTON_LEFT ? 0 : 2);
 					break;
 				case SDL_MOUSEMOTION:
+					client.mouseMove(evt.motion.x, evt.motion.y, evt.motion.xrel, evt.motion.yrel);
 					break;
 				case SDL_QUIT:
 					finished = true;

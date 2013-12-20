@@ -2,10 +2,37 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="..\..\src\editor_native\main.cpp" />
+    <ClCompile Include="..\..\src\editor_native\main_frame.cpp" />
+    <ClCompile Include="..\..\src\editor_native\property_frame\property_frame.cpp">
+      <Filter>property_frame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\editor_native\main_menu.cpp" />
+    <ClCompile Include="..\..\src\editor_native\property_frame\box_rigid_actor_ui.cpp">
+      <Filter>property_frame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\editor_native\property_frame\renderable_ui.cpp">
+      <Filter>property_frame</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <Filter Include="components_ui">
-      <UniqueIdentifier>{5907dffa-e54f-431f-9884-a05ac6606a39}</UniqueIdentifier>
+    <ClInclude Include="..\..\src\editor_native\main_frame.h" />
+    <ClInclude Include="..\..\src\editor_native\property_frame\property_frame.h">
+      <Filter>property_frame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\editor_native\main_menu.h" />
+    <ClInclude Include="..\..\src\editor_native\property_frame\box_rigid_actor_ui.h">
+      <Filter>property_frame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\editor_native\property_frame\icomponent_ui.h">
+      <Filter>property_frame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\editor_native\property_frame\renderable_ui.h">
+      <Filter>property_frame</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="property_frame">
+      <UniqueIdentifier>{c8aff708-f661-4415-b043-d6e1821ef495}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

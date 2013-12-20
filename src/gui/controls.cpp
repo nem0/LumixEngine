@@ -10,64 +10,44 @@ namespace UI
 {
 
 
-Block* createButton(const char* label, int x, int y, Block* parent, Gui* gui)
+Block* createButton(const char* label, float x, float y, Block* parent, Gui& gui)
 {
-	Block* block = new Block;
-	block->setGui(gui);
-	block->create(parent, gui->getDecorator("_box"));
-	block->setPosition(x, y);
-	block->setSize(100, 20);
+	Block* block = gui.createBlock(parent, "_box");
+	block->setArea(0, x, 0, y, 0, x + 100, 0, y + 20);
 
-	Block* block2 = new Block;
+	Block* block2 = gui.createBlock(block, "_text");
 	block2->setText(label);
-	block2->create(block, gui->getDecorator("_text"));
-	block2->setPosition(0, 0);
-	block2->setSize(100, 20);
+	block2->setArea(0, 0, 0, 0, 1, 0, 1, 0);
 	return block;
 }
 
 
-Block* createTextBox(int x, int y, Block* parent, Gui* gui)
+Block* createTextBox(float x, float y, Block* parent, Gui& gui)
 {
-	Block* block = new Block();
-	block->setGui(gui);
-	block->create(parent, gui->getDecorator("_box"));
-	block->setPosition(x, y);
-	block->setSize(100, 20);
+	Block* block = gui.createBlock(parent, "_box");
+	block->setArea(0, x, 0, y, 0, x + 100, 0, y + 20);
 	
-	Block* text = new Block();
-	text->create(block, gui->getDecorator("_text"));
-	text->setPosition(0, 0);
-	text->setSize(100, 20);
-	struct KeyDown {
-		
-	};
-	text->registerEventHandler("key_down", gui->getCallback("_tb_key_down"));
+	Block* text = gui.createBlock(block, "_text");
+	text->setArea(0, 0, 0, 0, 1, 0, 1, 0);
+	text->registerEventHandler("key_down", "_tb_key_down");
 
 	return block;
 }
 
 
-Block* createComboBox(int x, int y, Block* parent, Gui* gui)
+Block* createComboBox(float x, float y, Block* parent, Gui& gui)
 {
-	Block* envelope = new Block();
-	envelope->setGui(gui);
-	envelope->create(parent, NULL);
-	envelope->setPosition(x, y);
-	envelope->setSize(100, 20);
+	Block* envelope = gui.createBlock(parent, NULL);
+	envelope->setArea(0, x, 0, y, 0, x + 100, 0, y + 20);
 
-	Block* cb = new Block();
-	cb->create(envelope, gui->getDecorator("_box"));
-	cb->setPosition(0, 0);
-	cb->setSize(100, 20);
-	cb->registerEventHandler("click", gui->getCallback("_cb_click"));
+	Block* cb = gui.createBlock(envelope, "_box");
+	cb->setArea(0, 0, 0, 0, 1, 0, 0, 20);
+	cb->registerEventHandler("click", "_cb_click");
 
-	Block* popup = new Block();
-	popup->create(envelope, gui->getDecorator("_box"));
+	Block* popup = gui.createBlock(envelope, "_box");
 	popup->hide();
-	popup->setPosition(0, 20);
-	popup->setSize(100, 180);
-	popup->registerEventHandler("blur", gui->getCallback("_cb_blur"));
+	popup->setArea(0, 0, 0, 20, 1, 0, 0, 180);
+	popup->registerEventHandler("blur", "_cb_blur");
 	
 	return envelope;
 }
@@ -76,19 +56,16 @@ Block* createComboBox(int x, int y, Block* parent, Gui* gui)
 Block& addComboboxItem(Block& cb, Block& item)
 {
 	Block* popup = cb.getChild(1);
-	int y = 0;
-	int width = popup->getWidth();
+	float y = 0;
 	for(int i = 0, c = popup->getChildCount(); i < c; ++i)
 	{
-		int h = popup->getChild(i)->getHeight();
-		popup->getChild(i)->setPosition(0, y);
-		popup->getChild(i)->setSize(width, h);
+		float h = popup->getChild(i)->getHeight();
+		popup->getChild(i)->setArea(0, 0, 0, y, 1, 0, 0, h);
 		y += popup->getChild(i)->getHeight();
 	}
 	item.setParent(cb.getChild(1));
-	int h = item.getHeight();
-	item.setPosition(0, y);
-	item.setSize(width, h);
+	float h = item.getHeight();
+	item.setArea(0, 0, 0, y, 1, 0, 0, h);
 	return item;
 }
 

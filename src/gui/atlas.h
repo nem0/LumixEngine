@@ -26,12 +26,15 @@ namespace Lux
 			public:
 				struct Part
 				{
+					void getUvs(float* uvs) const;
+
 					float m_left;
 					float m_top;
 					float m_right;
 					float m_bottom;
-					int m_pixel_width;
-					int m_pixel_height;
+					float m_pixel_width;
+					float m_pixel_height;
+					string name;
 				};
 
 			public:

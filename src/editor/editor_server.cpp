@@ -5,15 +5,17 @@
 #include <Windows.h>
 #include "Horde3DUtils.h"
 
-#include "core/json_serializer.h"
+#include "core/crc32.h"
 #include "core/file_system.h"
 #include "core/ifile.h"
+#include "core/json_serializer.h"
 #include "core/log.h"
 #include "core/map.h"
 #include "core/matrix.h"
 #include "core/memory_file_device.h"
-#include "core/crc32.h"
 #include "core/memory_stream.h"
+#include "core/tcp_acceptor.h"
+#include "core/tcp_stream.h"
 #include "core/vector.h"
 #include "editor/editor_icon.h"
 #include "editor/gizmo.h"
@@ -96,8 +98,8 @@ class MessageTask : public MT::Task
 		virtual int task() LUX_OVERRIDE;
 
 		struct EditorServerImpl* m_server;
-		Net::Socket m_socket;
-		Net::Socket* m_work_socket;
+		Net::TCPAcceptor m_acceptor;
+		Net::TCPStream* m_stream;
 };
 
 
@@ -236,7 +238,7 @@ void EditorServer::tick(HWND hwnd, HWND game_hwnd)
 	}
 	else
 	{
-		m_impl->renderScene(false);
+		m_impl->renderScene(true);
 	}
 
 	if(game_hwnd)
@@ -418,19 +420,19 @@ void EditorServerImpl::addEntity()
 int MessageTask::task()
 {
 	bool finished = false;
-	m_socket.create("127.0.0.1", 10002);
-	m_work_socket = m_socket.accept();
+	m_acceptor.start("127.0.0.1", 10002);
+	m_stream = m_acceptor.accept();
 	vector<uint8_t> data;
 	data.resize(5);
 	while(!finished)
 	{
-		if(m_work_socket->receiveAllBytes(&data[0], 5))
+		if(m_stream->read(&data[0], 5))
 		{
 			int length = *(int*)&data[0];
 			if(length > 0)
 			{
 				data.resize(length);
-				m_work_socket->receiveAllBytes(&data[0], length);
+				m_stream->read(&data[0], length);
 				MT::Lock lock(*m_server->m_universe_mutex);
 				m_server->onMessage(&data[0], data.size());
 			}
@@ -555,8 +557,8 @@ void EditorServerImpl::addComponent(uint32_t type_crc)
 		{
 			ASSERT(false);
 		}
+		selectEntity(m_selected_entity);
 	}
-	selectEntity(m_selected_entity);
 }
 
 
@@ -727,7 +729,7 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 	Net::Socket::init();
 	m_message_task = new MessageTask();
 	m_message_task->m_server = this;
-	m_message_task->m_work_socket = 0;
+	m_message_task->m_stream = NULL;
 	m_message_task->create("Message Task");
 	m_message_task->run();
 		
@@ -795,13 +797,13 @@ void EditorServerImpl::onLogError(const char* system, const char* message)
 
 void EditorServerImpl::sendMessage(const uint8_t* data, int32_t length)
 {
-	if(m_message_task->m_work_socket)
+	if(m_message_task->m_stream)
 	{
 		MT::Lock lock(*m_send_mutex);
 		const uint32_t guard = 0x12345678;
-		m_message_task->m_work_socket->send(&length, 4);
-		m_message_task->m_work_socket->send(&guard, 4);
-		m_message_task->m_work_socket->send(data, length);
+		m_message_task->m_stream->write(&length, 4);
+		m_message_task->m_stream->write(&guard, 4);
+		m_message_task->m_stream->write(data, length);
 	}
 }
 

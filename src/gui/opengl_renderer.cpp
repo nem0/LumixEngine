@@ -188,6 +188,7 @@ namespace UI
 
 	void OpenGLRenderer::beginRender()
 	{
+		glColor3f(1, 1, 1);
 		glEnable(GL_SCISSOR_TEST);
 		glMatrixMode(GL_PROJECTION);
 		glLoadIdentity();
@@ -228,7 +229,7 @@ namespace UI
 	}
 
 
-	void OpenGLRenderer::renderText(const char* text, float x, float y)
+	void OpenGLRenderer::renderText(const char* text, float x, float y, float z)
 	{
 		if(!text)
 		{
@@ -253,13 +254,13 @@ namespace UI
 			OpenGLRendererImpl::Character character;
 			m_impl->m_characters.find(*c, character);
 			float cur_y = y + character.y_offset;
-			verts[i*6].set(cur_x, cur_y, 0);
-			verts[i*6+1].set(cur_x, cur_y + character.pixel_h, 0);
-			verts[i*6+2].set(cur_x + character.pixel_w, cur_y + character.pixel_h, 0);
+			verts[i*6].set(cur_x, cur_y, z);
+			verts[i*6+1].set(cur_x, cur_y + character.pixel_h, z);
+			verts[i*6+2].set(cur_x + character.pixel_w, cur_y + character.pixel_h, z);
 			
-			verts[i*6+3].set(cur_x, cur_y, 0);
-			verts[i*6+4].set(cur_x + character.pixel_w, cur_y + character.pixel_h, 0);
-			verts[i*6+5].set(cur_x + character.pixel_w, cur_y, 0);
+			verts[i*6+3].set(cur_x, cur_y, z);
+			verts[i*6+4].set(cur_x + character.pixel_w, cur_y + character.pixel_h, z);
+			verts[i*6+5].set(cur_x + character.pixel_w, cur_y, z);
 			
 			cur_x += character.x_advance;
 

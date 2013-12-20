@@ -50,6 +50,7 @@ namespace Lux
 			int err = ::WSAGetLastError();
 			if(retVal == SOCKET_ERROR)
 			{
+				ASSERT(false);
 				return false;
 			}
 
@@ -81,6 +82,7 @@ namespace Lux
 			
 			if (::connect(m_implmentation->m_socket, (LPSOCKADDR)&sin, sizeof(sin)) != 0) 
 			{
+				ASSERT(false);
 				return NULL;
 			}
 			

@@ -53,7 +53,14 @@ void JsonSerializer::serialize(const char* label, const char* value)
 	writeBlockComma();
 	writeString(label);
 	m_file.write(" : \"", 4);
-	m_file.write(value, strlen(value));
+	if(value == NULL)
+	{
+		m_file.write("", 1);
+	}
+	else
+	{
+		m_file.write(value, strlen(value));
+	}
 	m_file.write("\"", 1);
 	m_is_first_in_block = false;
 }
