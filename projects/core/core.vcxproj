@@ -117,10 +117,10 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
     </ClInclude>
     <ClInclude Include="..\..\src\core\crc32.h" />
+    <ClInclude Include="..\..\src\core\delegate.h" />
     <ClInclude Include="..\..\src\core\disk_file_device.h" />
     <ClInclude Include="..\..\src\core\file_system.h" />
     <ClInclude Include="..\..\src\core\file_utils.h" />
-    <ClInclude Include="..\..\src\core\functor.h" />
     <ClInclude Include="..\..\src\core\ifile_device.h" />
     <ClInclude Include="..\..\src\core\ifile.h" />
     <ClInclude Include="..\..\src\core\ifile_system_defines.h" />

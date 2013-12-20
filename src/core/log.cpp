@@ -17,7 +17,7 @@ namespace Lux
 	{
 		void sendMessage();
 
-		vector<Log::Callback*> m_callbacks;
+		vector<Log::Callback> m_callbacks;
 	};
 
 
@@ -44,15 +44,15 @@ namespace Lux
 
 		for(int i = 0, c = m_impl->m_callbacks.size(); i < c; ++i)
 		{
-			(*m_impl->m_callbacks[i])(system, tmp);
+			m_impl->m_callbacks[i].invoke(system, tmp);
 		}
 		va_end(args);
 	}
 
 
-	void Log::registerCallback(Callback* callback)
+	Log::Callback& Log::addCallback()
 	{
-		m_impl->m_callbacks.push_back(callback);
+		return m_impl->m_callbacks.push_back_empty();
 	}
 
 
