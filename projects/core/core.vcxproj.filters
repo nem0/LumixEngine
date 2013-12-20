@@ -58,7 +58,6 @@
     <ClInclude Include="..\..\src\core\lux.h" />
     <ClInclude Include="..\..\src\core\file_utils.h" />
     <ClInclude Include="..\..\src\core\math_utils.h" />
-    <ClInclude Include="..\..\src\core\functor.h" />
     <ClInclude Include="..\..\src\core\iserializer.h" />
     <ClInclude Include="..\..\src\core\log.h" />
     <ClInclude Include="..\..\src\core\ifile_system_defines.h">
@@ -104,6 +103,7 @@
     <ClInclude Include="..\..\src\core\transaction_queue.h">
       <Filter>MT</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\delegate.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="FS">

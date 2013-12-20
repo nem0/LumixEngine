@@ -743,9 +743,9 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 		}
 	}
 
-	g_log_info.registerCallback(makeFunctor(this, &EditorServerImpl::onLogInfo));
-	g_log_warning.registerCallback(makeFunctor(this, &EditorServerImpl::onLogWarning));
-	g_log_error.registerCallback(makeFunctor(this, &EditorServerImpl::onLogError));
+	g_log_info.addCallback().bind<EditorServerImpl, &EditorServerImpl::onLogInfo>(this);
+	g_log_warning.addCallback().bind<EditorServerImpl, &EditorServerImpl::onLogWarning>(this);
+	g_log_error.addCallback().bind<EditorServerImpl, &EditorServerImpl::onLogError>(this);
 
 	RECT rect;
 	GetWindowRect(hwnd, &rect);
