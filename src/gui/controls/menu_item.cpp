@@ -1,8 +1,8 @@
-#include "gui/menu_item.h"
+#include "gui/controls/menu_item.h"
 #include "core/crc32.h"
 #include "core/iserializer.h"
+#include "gui/controls/menu_bar.h"
 #include "gui/gui.h"
-#include "gui/menu_bar.h"
 
 
 namespace Lux

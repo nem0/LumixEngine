@@ -15,6 +15,7 @@
 #include "gui/decorators/box_decorator.h"
 #include "gui/decorators/check_box_decorator.h"
 #include "gui/decorators/text_decorator.h"
+#include "gui/decorators/scrollbar_decorator.h"
 #include "gui/gui.h"
 #include "gui/opengl_renderer.h"
 #include "platform/socket.h"
@@ -24,32 +25,6 @@ SDL_Renderer* displayRenderer;
 SDL_Window* displayWindow;
 MainFrame g_main_frame;
 
-
-void Display_InitGL()
-{
-    glShadeModel( GL_SMOOTH );
-    glClearColor( 0.0f, 0.0f, 0.0f, 0.0f );
-    glClearDepth( 1.0f );
-    glEnable( GL_DEPTH_TEST );
-    glDepthFunc( GL_LEQUAL );
-    glHint( GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST );
-}
-
-int Display_SetViewport( int width, int height )
-{
-    GLfloat ratio;
-    if ( height == 0 ) {
-        height = 1;
-    }
-    ratio = ( GLfloat )width / ( GLfloat )height;
-    glViewport( 0, 0, ( GLsizei )width, ( GLsizei )height );
-    glMatrixMode( GL_PROJECTION );
-    glLoadIdentity( );
-    glMatrixMode( GL_MODELVIEW );
-    glLoadIdentity( );
-    return 1;
-}
- 
 
 void initGui(Lux::EditorClient& client, Lux::EditorServer& server)
 {
@@ -62,14 +37,17 @@ void initGui(Lux::EditorClient& client, Lux::EditorServer& server)
 	Lux::UI::TextDecorator* text_centered_decorator = new Lux::UI::TextDecorator("_text_centered");
 	text_centered_decorator->setTextCentered(true);
 	Lux::UI::BoxDecorator* box_decorator = new Lux::UI::BoxDecorator("_box");
+	Lux::UI::ScrollbarDecorator* scrollbar_decorator = new Lux::UI::ScrollbarDecorator("_scrollbar"); 
 	server.getEngine().loadPlugin("gui.dll");
 	Lux::UI::Gui* gui = (Lux::UI::Gui*)server.getEngine().getPluginManager().getPlugin("gui");
 	gui->addDecorator(*text_decorator);
 	gui->addDecorator(*text_centered_decorator);
 	gui->addDecorator(*box_decorator);
+	gui->addDecorator(*scrollbar_decorator);
 	gui->addDecorator(*check_box_decorator);
 	gui->setRenderer(*renderer);
 	check_box_decorator->create(*gui, "gui/skin.atl");
+	scrollbar_decorator->create(*gui, "gui/skin.atl");
 	box_decorator->create(*gui, "gui/skin.atl");
 	g_main_frame.create(client, *gui, 800, 600);
 }
@@ -90,11 +68,7 @@ int main(int argc, char* argv[])
     SDL_GL_SetAttribute( SDL_GL_CONTEXT_MAJOR_VERSION, 3 );
     SDL_GL_SetAttribute( SDL_GL_CONTEXT_MINOR_VERSION, 2 );
     
-   // Display_InitGL();
-    
-    Display_SetViewport(800, 600);
-    
-	char path[MAX_PATH];
+    char path[MAX_PATH];
 	GetCurrentDirectoryA(MAX_PATH, path);
 	GLenum glerr = glGetError();
 	const GLubyte* glstr = glGetString(GL_VENDOR);
@@ -125,15 +99,18 @@ int main(int argc, char* argv[])
 				case SDL_KEYUP:
 					break;
 				case SDL_MOUSEBUTTONDOWN:
+					gui->mouseDown(evt.button.x, evt.button.y);
 					if(!gui->click(evt.button.x, evt.button.y))
 					{
 						client.mouseDown(evt.button.x, evt.button.y, evt.button.button == SDL_BUTTON_LEFT ? 0 : 2);
 					}
 					break;
 				case SDL_MOUSEBUTTONUP:
+					gui->mouseUp(evt.button.x, evt.button.y);
 					client.mouseUp(evt.button.x, evt.button.y, evt.button.button == SDL_BUTTON_LEFT ? 0 : 2);
 					break;
 				case SDL_MOUSEMOTION:
+					gui->mouseMove(evt.motion.x, evt.motion.y, evt.motion.xrel, evt.motion.yrel);
 					client.mouseMove(evt.motion.x, evt.motion.y, evt.motion.xrel, evt.motion.yrel);
 					break;
 				case SDL_QUIT:

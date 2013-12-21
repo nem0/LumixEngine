@@ -1,4 +1,4 @@
-#include "gui/text_box.h"
+#include "gui/controls/text_box.h"
 #include "core/crc32.h"
 #include "core/iserializer.h"
 
