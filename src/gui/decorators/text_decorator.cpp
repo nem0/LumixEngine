@@ -8,13 +8,27 @@ namespace Lux
 namespace UI
 {
 
+
+	TextDecorator::TextDecorator(const char* name)
+		: DecoratorBase(name)
+	{
+		m_is_text_centered = false;
+	}
+
 	
 	void TextDecorator::render(IRenderer& renderer, Block& block)
 	{
 		float w, h;
-		renderer.measureText(block.getText().c_str(), &w, &h);
+		renderer.measureText(block.getBlockText().c_str(), &w, &h);
 		renderer.setScissorArea((int)block.getGlobalLeft(), (int)block.getGlobalTop(), (int)block.getGlobalRight(), (int)block.getGlobalBottom());
-		renderer.renderText(block.getText().c_str(), (block.getGlobalLeft() + block.getGlobalRight() - w) / 2.0f, (float)block.getGlobalTop(), block.getZ());
+		if(m_is_text_centered)
+		{
+			renderer.renderText(block.getBlockText().c_str(), (block.getGlobalRight() + block.getGlobalLeft() - w) / 2, (float)block.getGlobalTop(), block.getZ());
+		}
+		else
+		{
+			renderer.renderText(block.getBlockText().c_str(), block.getGlobalLeft(), (float)block.getGlobalTop(), block.getZ());
+		}
 	}
 
 

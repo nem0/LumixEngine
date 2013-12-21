@@ -1,6 +1,9 @@
 #pragma once
 
 
+#include "gui/menu_bar.h"
+
+
 namespace Lux
 {
 
@@ -15,15 +18,17 @@ namespace Lux
 class MainFrame;
 
 
-class MainMenu
+class MainMenu : public Lux::UI::MenuBar
 {
 	public:
-		bool create(MainFrame& main_frame);
+		MainMenu(MainFrame& main_frame);
 
 	private:
-		static void entityCreateClick(Lux::UI::Block& block);
+		void toolsPlay(Lux::UI::Block& block, void*);
+		void openFileClicked(Lux::UI::Block& block, void*);
+		void saveFileClicked(Lux::UI::Block& block, void*);
+		void entityCreateClick(Lux::UI::Block& block, void*);
 
 	private:
-		Lux::UI::Block* m_ui;
 		MainFrame* m_main_frame;
 };

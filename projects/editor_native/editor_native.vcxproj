@@ -84,12 +84,12 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <SubSystem>Console</SubSystem>
-      <AdditionalLibraryDirectories>..\..\bin\$(Configuration)\;..\..\external\sdl\lib\;..\..\external\cegui\lib\$(Configuration)\</AdditionalLibraryDirectories>
-      <AdditionalDependencies>CEGUISILLYImageCodec.lib;CEGUIBase-0.lib;CEGUICommonDialogs-0.lib;CEGUICoreWindowRendererSet.lib;CEGUIOpenGLRenderer-0.lib;CEGUITinyXMLParser.lib;gui.lib;opengl32.lib;core.lib;engine.lib;platform.lib;SDL2main.lib;SDL2.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\..\bin\$(Configuration)\;..\..\external\sdl\lib\</AdditionalLibraryDirectories>
+      <AdditionalDependencies>gui.lib;opengl32.lib;core.lib;engine.lib;platform.lib;SDL2main.lib;SDL2.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>copy $(SolutionDir)external\sdl\lib\*.dll $(SolutionDir)\bin\$(Configuration)\
-copy $(SolutionDir)external\cegui\bin\$(Configuration)\*.dll $(SolutionDir)\bin\$(Configuration)\</Command>
+</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>

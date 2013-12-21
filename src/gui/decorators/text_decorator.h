@@ -24,9 +24,13 @@ namespace UI
 			};
 
 		public:
-			TextDecorator(const char* name) : DecoratorBase(name) {}
+			TextDecorator(const char* name);
 
 			virtual void render(IRenderer& renderer, Block& block) LUX_OVERRIDE;
+			void setTextCentered(bool is_centered) { m_is_text_centered = is_centered; }
+		
+		private:
+			bool m_is_text_centered;
 	};
 
 } // ~namespace UI

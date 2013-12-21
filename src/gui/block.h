@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include "core/delegate.h"
 #include "core/lux.h"
 #include "core/vector.h"
 #include "core/string.h"
@@ -23,8 +24,7 @@ namespace UI
 	{
 		friend class Gui;
 		public:
-			typedef void (*EventCallback)(Block& block);
-			typedef void (*KeyEventCallback)(int key, Block& block);
+			typedef Delegate<void (Block&, void*)> EventCallback;
 
 			struct Area	
 			{
@@ -41,23 +41,28 @@ namespace UI
 			};
 
 		public:
+			Block(Gui& gui, Block* parent, const char* decorator_name);
+			virtual ~Block();
+			virtual uint32_t getType() const;
 			void destroy();
 			void setArea(float rel_left, float left, float rel_top, float top, float rel_right, float right, float rel_bottom, float bottom);
+			void setArea(const Area& area);
 			float getGlobalTop() const { return m_global_area.top; }
 			float getGlobalRight() const { return m_global_area.right; }
 			float getGlobalBottom() const { return m_global_area.bottom; }
 			float getGlobalLeft() const { return m_global_area.left; }
 			Area& getGlobalArea() { return m_global_area; }
 			Area& getClickArea() { return m_click_area; }
-			void setText(const char* text) { m_text = text; }
-			const string& getText() const { return m_text; }
+			Area& getLocalArea() { return m_local_area; }
+			void setBlockText(const char* text) { m_text = text; }
+			const string& getBlockText() const { return m_text; }
 			bool isShown() const { return m_is_shown; }
 			void hide() { m_is_shown = false; }
 			void show() { m_is_shown = true; }
 			void setParent(Block* block);
 			Block* getParent() const { return m_parent; }
 			int getChildCount() const { return m_children.size(); }
-			Block* getChild(int index) { return m_children.size() > index ? m_children[index] : NULL; }
+			Block* getChild(int index) const { return m_children.size() > index ? m_children[index] : NULL; }
 			Gui* getGui() const { return m_gui; }
 			void render(IRenderer& renderer);
 			void layout();
@@ -73,25 +78,20 @@ namespace UI
 			void emitEvent(const char* type);
 			void setIsClickable(bool clickable) { m_is_mouse_clickable = clickable; }
 
-			void serialize(ISerializer& serializer);
-			void deserialize(ISerializer& serializer);
+			virtual void serialize(ISerializer& serializer);
+			virtual void deserialize(ISerializer& serializer);
+			void serializeWOChild(ISerializer& serializer);
+			void deserializeWOChild(ISerializer& serializer);
 
 		private:
 			struct EventHandler
 			{
 				EventHandler() {}
 				uint32_t type;
-				union 
-				{
-					EventCallback callback;
-					KeyEventCallback key_callback;
-				};
+				EventCallback callback;
 			};
 
 		private:
-			Block(Gui& gui, Block* parent, const char* decorator_name);
-			~Block();
-
 			void addChild(Block& block);
 			void removeChild(Block& block);
 			EventHandler* getEventHandler(uint32_t type);
