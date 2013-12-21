@@ -29,7 +29,6 @@
     <ClCompile Include="..\..\src\core\tcp_stream.cpp">
       <Filter>Net</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\core\memory_stream.cpp" />
     <ClCompile Include="..\..\src\core\tcp_file_device.cpp">
       <Filter>FS</Filter>
     </ClCompile>
@@ -39,6 +38,7 @@
     <ClCompile Include="..\..\src\core\disk_file_device.cpp">
       <Filter>FS</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\blob.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\base64.h" />
@@ -81,7 +81,6 @@
     <ClInclude Include="..\..\src\core\ifile.h">
       <Filter>FS</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\memory_stream.h" />
     <ClInclude Include="..\..\src\core\ifile_device.h">
       <Filter>FS</Filter>
     </ClInclude>
@@ -104,6 +103,7 @@
       <Filter>MT</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\delegate.h" />
+    <ClInclude Include="..\..\src\core\blob.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="FS">
