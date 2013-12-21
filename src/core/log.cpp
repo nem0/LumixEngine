@@ -38,9 +38,7 @@ namespace Lux
 		char tmp[1024];
 		va_list args;
 		va_start(args, message);
-#pragma warning (disable : 4996)
 		vsnprintf(tmp, 1024, message, args);
-#pragma warning (default : 4996)
 
 		for(int i = 0, c = m_impl->m_callbacks.size(); i < c; ++i)
 		{
