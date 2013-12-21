@@ -1,9 +1,9 @@
 #include "SDL.h"
 #include <SDL_opengl.h>
+#include "core/blob.h"
 #include "core/crc32.h"
 #include "core/file_system.h"
 #include "core/json_serializer.h"
-#include "core/memory_stream.h"
 #include "editor/editor_client.h"
 #include "editor/editor_server.h"
 #include "editor/server_message_types.h"
