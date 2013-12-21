@@ -9,10 +9,10 @@
 namespace Lux
 {
 
-	class LUX_CORE_API MemoryStream : public IStream
+	class LUX_CORE_API Blob
 	{
 		public:
-			MemoryStream();
+			Blob();
 
 			void create(void* data, int size) { m_data = data; m_size = size; m_pos = 0; }
 			virtual void write(const void* data, size_t size);
