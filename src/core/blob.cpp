@@ -1,18 +1,18 @@
-#include "memory_stream.h"
+#include "core/blob.h"
 
 
 namespace Lux
 {
 
 
-MemoryStream::MemoryStream()
+Blob::Blob()
 {
 	m_pos = 0;
 	m_size = 0;
 }
 
 	
-void MemoryStream::write(const void* data, size_t size)
+void Blob::write(const void* data, size_t size)
 {
 	if(m_size + (int)size > m_buffer.size())
 	{
@@ -23,7 +23,7 @@ void MemoryStream::write(const void* data, size_t size)
 }
 
 
-bool MemoryStream::read(void* data, size_t size)
+bool Blob::read(void* data, size_t size)
 {
 	if(m_pos + (int)size > m_size)
 	{
