@@ -21,7 +21,8 @@ void JsonSerializer::serialize(const char* label, unsigned int value)
 {
 	writeBlockComma();
 	char tmp[20];
-	sprintf_s(tmp, "\"%s\" : %u", label, value);
+	writeString(label);
+	sprintf(tmp, " : %u", value);
 	m_file.write(tmp, strlen(tmp));
 	m_is_first_in_block = false;
 }
@@ -30,8 +31,9 @@ void JsonSerializer::serialize(const char* label, unsigned int value)
 void JsonSerializer::serialize(const char* label, float value)
 {
 	writeBlockComma();
-	char tmp[100];
-	sprintf_s(tmp, "\"%s\" : %f", label, value);
+	char tmp[20];
+	writeString(label);
+	sprintf(tmp, " : %f", value);
 	m_file.write(tmp, strlen(tmp));
 	m_is_first_in_block = false;
 }
@@ -41,8 +43,9 @@ void JsonSerializer::serialize(const char* label, float value)
 void JsonSerializer::serialize(const char* label, int value)
 {
 	writeBlockComma();
-	char tmp[100];
-	sprintf_s(tmp, "\"%s\" : %d", label, value);
+	char tmp[20];
+	writeString(label);
+	sprintf(tmp, " : %d", value);
 	m_file.write(tmp, strlen(tmp));
 	m_is_first_in_block = false;
 }
@@ -110,7 +113,7 @@ void JsonSerializer::serializeArrayItem(unsigned int value)
 {
 	writeBlockComma();
 	char tmp[20];
-	sprintf_s(tmp, "%u", value); 
+	sprintf(tmp, "%u", value); 
 	m_file.write(tmp, strlen(tmp));
 	m_is_first_in_block = false;
 }
@@ -120,7 +123,7 @@ void JsonSerializer::serializeArrayItem(int value)
 {
 	writeBlockComma();
 	char tmp[20];
-	sprintf_s(tmp, "%d", value); 
+	sprintf(tmp, "%d", value); 
 	m_file.write(tmp, strlen(tmp));
 	m_is_first_in_block = false;
 }
@@ -130,7 +133,7 @@ void JsonSerializer::serializeArrayItem(float value)
 {
 	writeBlockComma();
 	char tmp[20];
-	sprintf_s(tmp, "%f", value); 
+	sprintf(tmp, "%f", value); 
 	m_file.write(tmp, strlen(tmp));
 	m_is_first_in_block = false;
 }
