@@ -8,7 +8,7 @@
 class LUX_CORE_API JsonObject
 {
 	public:
-		JsonObject(int token_idx, char* data, jsmntok_t* tokens);
+		JsonObject(int token_idx, const char* data, jsmntok_t* tokens);
 
 		JsonObject operator[](const char* name) const;
 		JsonObject operator[](int index) const;
@@ -16,7 +16,7 @@ class LUX_CORE_API JsonObject
 		JsonObject getProperty(const char* name) const;
 		JsonObject getArrayItem(int index) const;
 		bool isString() const;
-		char* getStart() const;	
+		const char* getStart() const;	
 		int getLength() const;
 		bool toString(char* str, int max_size) const;
 
@@ -25,6 +25,6 @@ class LUX_CORE_API JsonObject
 
 	private:
 		int m_token_idx;
-		char* m_data;
+		const char* m_data;
 		jsmntok_t* m_tokens;
 };

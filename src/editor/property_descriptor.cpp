@@ -60,7 +60,7 @@ void PropertyDescriptor::get(Component cmp, IStream& stream) const
 			{
 				string value;
 				(static_cast<S*>(cmp.system)->*m_getter)(cmp, value);
-				len = value.length();
+				len = value.length() + 1;
 				stream.write(&len, sizeof(len));
 				stream.write(value.c_str(), len);
 			}

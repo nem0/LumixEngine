@@ -78,6 +78,12 @@
     <ClCompile Include="..\..\src\engine\plugin_manager.cpp">
       <Filter>engine</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\editor\editor_client.cpp">
+      <Filter>editor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\editor\server_message_types.cpp">
+      <Filter>editor</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\graphics\renderer.h">
@@ -142,6 +148,15 @@
     </ClInclude>
     <ClInclude Include="..\..\src\engine\plugin_manager.h">
       <Filter>engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\editor\editor_client.h">
+      <Filter>editor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\editor\client_message_types.h">
+      <Filter>editor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\editor\server_message_types.h">
+      <Filter>editor</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
