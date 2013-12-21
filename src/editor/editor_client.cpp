@@ -1,7 +1,7 @@
 #include "editor_client.h"
+#include "core/blob.h"
 #include "core/crc32.h"
 #include "core/event_manager.h"
-#include "core/memory_stream.h"
 #include "core/tcp_connector.h"
 #include "core/tcp_stream.h"
 #include "core/vector.h"
@@ -72,7 +72,7 @@ namespace Lux
 
 	void EditorClientImpl::onMessage(uint8_t* data, int size)
 	{
-		MemoryStream stream;
+		Blob stream;
 		stream.create(data, size);
 		int32_t message_type;
 		stream.read(message_type);
@@ -187,7 +187,7 @@ namespace Lux
 
 	void EditorClient::setComponentProperty(const char* component, const char* property, const void* value, int32_t length)
 	{
-		static MemoryStream stream;
+		static Blob stream;
 		stream.clearBuffer();
 		uint32_t tmp = crc32(component);
 		stream.write(&tmp, sizeof(tmp));

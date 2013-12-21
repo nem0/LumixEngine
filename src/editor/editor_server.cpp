@@ -5,6 +5,7 @@
 #include <Windows.h>
 #include "Horde3DUtils.h"
 
+#include "core/blob.h"
 #include "core/crc32.h"
 #include "core/file_system.h"
 #include "core/ifile.h"
@@ -13,7 +14,6 @@
 #include "core/map.h"
 #include "core/matrix.h"
 #include "core/memory_file_device.h"
-#include "core/memory_stream.h"
 #include "core/tcp_acceptor.h"
 #include "core/tcp_stream.h"
 #include "core/vector.h"
@@ -172,7 +172,7 @@ struct EditorServerImpl
 		MT::Mutex* m_send_mutex;
 		Gizmo m_gizmo;
 		Entity m_selected_entity;
-		MemoryStream m_stream;
+		Blob m_stream;
 		map<uint32_t, vector<PropertyDescriptor> > m_component_properties;
 		map<uint32_t, IPlugin*> m_creators;
 		MouseMode::Value m_mouse_mode;
@@ -922,7 +922,7 @@ const PropertyDescriptor& EditorServerImpl::getPropertyDescriptor(uint32_t type,
 
 void EditorServerImpl::setProperty(void* data, int size)
 {
-	MemoryStream stream;
+	Blob stream;
 	stream.create(data, size);
 	uint32_t component_type;
 	stream.read(component_type);

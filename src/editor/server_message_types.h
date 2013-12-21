@@ -10,7 +10,7 @@ namespace Lux
 {
 
 
-class IStream;
+class Blob;
 
 
 struct ServerMessageType
@@ -30,7 +30,7 @@ struct LUX_ENGINE_API EntityPositionEvent : public Event
 	EntityPositionEvent() { m_type = ServerMessageType::ENTITY_POSITION; }
 	
 	//virtual void write(IStream& stream) LUX_OVERRIDE;
-	void read(IStream& stream);
+	void read(Blob& stream);
 	
 	int32_t index;
 	float x;
@@ -44,7 +44,7 @@ struct LUX_ENGINE_API EntitySelectedEvent : public Event
 	EntitySelectedEvent() { m_type = ServerMessageType::ENTITY_SELECTED; }
 	
 	//virtual void write(IStream& stream) LUX_OVERRIDE;
-	void read(IStream& stream);
+	void read(Blob& stream);
 	
 	int32_t index;
 	vector<uint32_t> components;
@@ -64,7 +64,7 @@ struct LUX_ENGINE_API PropertyListEvent : public Event
 	PropertyListEvent() { m_type = ServerMessageType::PROPERTY_LIST; }
 	
 	//virtual void write(IStream& stream) LUX_OVERRIDE;
-	void read(IStream& stream);
+	void read(Blob& stream);
 	
 	uint32_t type_hash;
 	vector<Property> properties;

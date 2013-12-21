@@ -1,5 +1,5 @@
 #include "server_message_types.h"
-#include "core/istream.h"
+#include "core/blob.h"
 
 
 namespace Lux
@@ -15,7 +15,7 @@ void EntityPositionMessage::write(IStream& stream)
 }
 */
 
-void EntityPositionEvent::read(IStream& stream)
+void EntityPositionEvent::read(Blob& stream)
 {
 	stream.read(&index, sizeof(index));
 	stream.read(&x, sizeof(x));
@@ -36,7 +36,7 @@ void EntitySelectedMessage::write(IStream& stream)
 }
 */
 
-void EntitySelectedEvent::read(IStream& stream)
+void EntitySelectedEvent::read(Blob& stream)
 {
 	stream.read(&index, sizeof(index));
 	int32_t count;
@@ -63,7 +63,7 @@ void PropertyListMessage::write(IStream& stream)
 }
 */
 
-void PropertyListEvent::read(IStream& stream)
+void PropertyListEvent::read(Blob& stream)
 {
 	int32_t count;
 	stream.read(&count, sizeof(count));
