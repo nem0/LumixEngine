@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include "gui/block.h"
 #include "editor_native/property_frame/icomponent_ui.h"
 
 
@@ -8,22 +9,28 @@ class PropertyFrame;
 namespace Lux
 {
 	class EditorClient;
+	namespace UI
+	{
+		class Button;
+		class TextBox;
+	}
 }
 
 
-class RenderableUI : public IComponentUI
+class RenderableUI : public IComponentUI, public Lux::UI::Block
 {
 	public:
-		RenderableUI(Lux::UI::Block* owner, Lux::EditorClient& client);
+		RenderableUI(PropertyFrame& property_frame, Lux::UI::Block* owner, Lux::EditorClient& client);
 		~RenderableUI();
-		Lux::UI::Block* getUI() const { return m_ui; }
 		virtual void onEntityProperties(Lux::PropertyListEvent& evt) LUX_OVERRIDE;
 
 	private:
-		static void sourceChanged(Lux::UI::Block& block);
+		void sourceChanged(Lux::UI::Block& block, void*);
+		void browseSource(Lux::UI::Block& block, void*);
 
 	private:
-		Lux::UI::Block* m_ui;
-		Lux::UI::Block* m_source_box;
+		Lux::UI::TextBox* m_source_box;
+		Lux::UI::Button* m_browse_source_button;
 		Lux::EditorClient* m_client;
+		PropertyFrame& m_property_frame;
 };

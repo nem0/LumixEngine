@@ -225,7 +225,6 @@ namespace UI
 	void OpenGLRenderer::setScissorArea(int left, int top, int right, int bottom)
 	{
 		glScissor(left, m_impl->m_window_height - bottom, right - left, bottom - top);
-		//glScissor(left, top, right - left, bottom - top);
 	}
 
 

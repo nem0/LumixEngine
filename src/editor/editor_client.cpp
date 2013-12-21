@@ -126,6 +126,10 @@ namespace Lux
 		m_impl->sendMessage((uint32_t)ClientMessageType::ADD_COMPONENT, &type, sizeof(type));
 	}
 
+	void EditorClient::toggleGameMode()
+	{
+		m_impl->sendMessage((uint32_t)ClientMessageType::TOGGLE_GAME_MODE, NULL, 0);
+	}
 
 	void EditorClient::addEntity()
 	{
@@ -160,6 +164,16 @@ namespace Lux
 		return m_impl->m_event_manager;
 	}
 
+
+	void EditorClient::loadUniverse(const char* path)
+	{
+		m_impl->sendMessage(ClientMessageType::LOAD, path, strlen(path)+1);
+	}
+
+	void EditorClient::saveUniverse(const char* path)
+	{
+		m_impl->sendMessage(ClientMessageType::SAVE, path, strlen(path)+1);
+	}
 
 	void EditorClient::navigate(float forward, float right, int32_t fast)
 	{

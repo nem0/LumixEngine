@@ -18,6 +18,7 @@ namespace UI
 		m_is_mouse_clickable = true;
 		m_local_area.top = m_local_area.bottom = m_local_area.left = m_local_area.right = 0;
 		m_global_area.top = m_global_area.bottom = m_global_area.left = m_global_area.right = 0;
+		m_global_area.rel_top = m_global_area.rel_bottom = m_global_area.rel_left = m_global_area.rel_right = 0;
 		m_is_shown = true;
 		m_is_dirty_layout = true;
 		m_is_focus_processing = false;
@@ -54,6 +55,13 @@ namespace UI
 	}
 
 
+	uint32_t Block::getType() const
+	{
+		static const uint32_t hash = crc32("block");
+		return hash;
+	}
+
+
 	void Block::setZIndex(int z_index)
 	{
 		m_z = z_index / 100.0f;
@@ -78,6 +86,16 @@ namespace UI
 				}
 			}
 		}
+		for(int i = 0; i < m_children.size(); ++i)
+		{
+			m_children[i]->setZIndex(z_index);
+		}
+	}
+
+
+	void Block::setArea(const Area& area)
+	{
+		m_local_area = area;
 	}
 
 
@@ -103,7 +121,7 @@ namespace UI
 			EventHandler* handler = getEventHandler(blur_hash);
 			if(handler)
 			{
-				handler->callback(*this);
+				handler->callback.invoke(*this, NULL);
 			}
 			if(m_parent)
 			{
@@ -120,7 +138,7 @@ namespace UI
 		EventHandler* handler = getEventHandler(blur_hash);
 		if(handler)
 		{
-			handler->callback(*this);
+			handler->callback.invoke(*this, NULL);
 		}
 		if(m_parent)
 		{
@@ -204,7 +222,7 @@ namespace UI
 	}
 
 
-	void Block::serialize(ISerializer& serializer)
+	void Block::serializeWOChild(ISerializer& serializer)
 	{
 		serializer.serialize("decorator", m_decorator ? m_decorator->getName() : "");
 		serializer.serialize("event_count", (int32_t)m_event_handlers.size());
@@ -221,17 +239,10 @@ namespace UI
 		serializer.serialize("right", m_local_area.right);
 		serializer.serialize("bottom", m_local_area.bottom);
 		serializer.serialize("text", m_text.c_str());
-		serializer.serialize("child_count", (int32_t)m_children.size());
-		serializer.beginArray("children");
-		for(int i = 0; i < m_children.size(); ++i)
-		{
-			m_children[i]->serialize(serializer);
-		}
-		serializer.endArray();
 	}
 
 
-	void Block::deserialize(ISerializer& serializer)
+	void Block::deserializeWOChild(ISerializer& serializer)
 	{
 		char tmp[1024];
 		serializer.deserialize("decorator", tmp, 1024);
@@ -256,12 +267,35 @@ namespace UI
 		serializer.deserialize("bottom", m_local_area.bottom);
 		serializer.deserialize("text", tmp, 1024);
 		m_text = tmp;
+	}
+
+
+	void Block::serialize(ISerializer& serializer)
+	{
+		serializeWOChild(serializer);
+		serializer.serialize("child_count", (int32_t)m_children.size());
+		serializer.beginArray("children");
+		for(int i = 0; i < m_children.size(); ++i)
+		{
+			serializer.serializeArrayItem(m_children[i]->getType());
+			m_children[i]->serialize(serializer);
+		}
+		serializer.endArray();
+	}
+
+
+	void Block::deserialize(ISerializer& serializer)
+	{
+		deserializeWOChild(serializer);
+		int32_t count;
 		serializer.deserialize("child_count", count);
-		m_children.resize(count);
+		m_children.reserve(count);
 		serializer.deserializeArrayBegin("children");
 		for(int i = 0; i < count; ++i)
 		{
-			m_children[i] = m_gui->createBlock(this, NULL);
+			uint32_t type;
+			serializer.deserializeArrayItem(type);
+			m_children.push_back(m_gui->createBlock(type, this));
 			m_children[i]->deserialize(serializer);
 		}
 		serializer.deserializeArrayEnd();
@@ -275,7 +309,7 @@ namespace UI
 		{
 			if(m_event_handlers[i].type == hash)
 			{
-				m_event_handlers[i].callback(*this);
+				m_event_handlers[i].callback.invoke(*this, NULL);
 			}
 		}
 	}

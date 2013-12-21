@@ -57,6 +57,11 @@ namespace Lux
 				return m_stub.second(m_stub.first);
 			}
 
+			bool operator ==(const Delegate<R>& rhs)
+			{
+				return m_stub.first == rhs.m_stub.first && m_stub.second == rhs.m_stub.second;
+			}
+
 		private:
 			Stub m_stub;
 	}; 
@@ -106,6 +111,11 @@ namespace Lux
 			{
 				ASSERT(m_stub.second != NULL);
 				return m_stub.second(m_stub.first, a0);
+			}
+
+			bool operator ==(const Delegate<R (A0)>& rhs)
+			{
+				return m_stub.first == rhs.m_stub.first && m_stub.second == rhs.m_stub.second;
 			}
 
 		private:
@@ -158,6 +168,11 @@ namespace Lux
 			{
 				ASSERT(m_stub.second != NULL);
 				return m_stub.second(m_stub.first, a0, a1);
+			}
+
+			bool operator ==(const Delegate<R (A0, A1)>& rhs)
+			{
+				return m_stub.first == rhs.m_stub.first && m_stub.second == rhs.m_stub.second;
 			}
 
 		private:

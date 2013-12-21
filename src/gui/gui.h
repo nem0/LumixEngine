@@ -8,6 +8,12 @@
 
 namespace Lux
 {
+
+namespace FS
+{
+	class IFile;
+}
+
 namespace UI
 {
 
@@ -20,7 +26,6 @@ namespace UI
 		public:
 			Gui() { m_impl = 0; }
 
-			Block* createBlock(Block* parent, const char* decorator);
 			virtual bool create(Engine& engine) LUX_OVERRIDE;
 			virtual Component createComponent(uint32_t, const Entity&) LUX_OVERRIDE;
 			virtual const char* getName() const LUX_OVERRIDE { return "gui"; }
@@ -32,13 +37,14 @@ namespace UI
 			Block* getFocusedBlock() const;
 			bool click(int x, int y);
 			void keyDown(int32_t key);
-			Block::EventCallback getCallback(const char* name);
-			Block::EventCallback getCallback(uint32_t name_hash);
 			uint32_t getCallbackNameHash(Block::EventCallback callback);
 			DecoratorBase* getDecorator(const char* name);
 			void addDecorator(DecoratorBase& decorator);
-			void addCallback(const char* name, Block::EventCallback callback);
+			Block::EventCallback& getCallback(uint32_t name_hash);
+			Block::EventCallback& getCallback(const char* name);
 			Atlas* loadAtlas(const char* path);
+			Block* createGui(Lux::FS::IFile& file);
+			Block* createBlock(uint32_t type, Block* parent);
 
 		private:
 			struct GuiImpl* m_impl;

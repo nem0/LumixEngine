@@ -1,5 +1,5 @@
 #include "main_frame.h"
-#include "core/functor.h"
+#include <Windows.h>
 #include "editor/editor_client.h"
 #include "editor/server_message_types.h"
 #include "editor_native/main_menu.h"
@@ -15,13 +15,15 @@ bool MainFrame::create(Lux::EditorClient& client, Lux::UI::Gui& gui, float width
 	m_ui->setArea(0, 0, 0, 0, 0, width, 0, height);
 	m_ui->setIsClickable(false);
 
-	m_main_menu = new MainMenu();
-	m_main_menu->create(*this);
-
-	m_property_frame = new PropertyFrame();
-	m_property_frame->create(*this);
+	m_main_menu = new MainMenu(*this);
+	m_property_frame = new PropertyFrame(*this);
 
 	m_ui->layout();
+
+	char path[MAX_PATH];
+	GetCurrentDirectory(MAX_PATH, path);
+	m_startup_directory = path;
+
 	return true;
 }
 

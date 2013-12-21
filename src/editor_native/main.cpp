@@ -12,8 +12,8 @@
 #include "engine/plugin_manager.h"
 #include "graphics/renderer.h"
 #include "gui/block.h"
-#include "gui/controls.h"
 #include "gui/decorators/box_decorator.h"
+#include "gui/decorators/check_box_decorator.h"
 #include "gui/decorators/text_decorator.h"
 #include "gui/gui.h"
 #include "gui/opengl_renderer.h"
@@ -22,7 +22,6 @@
 
 SDL_Renderer* displayRenderer;
 SDL_Window* displayWindow;
-Lux::Engine g_engine;
 MainFrame g_main_frame;
 
 
@@ -58,13 +57,19 @@ void initGui(Lux::EditorClient& client, Lux::EditorServer& server)
 	renderer->create();
 	renderer->loadFont("gui/font.tga");
 	renderer->setWindowHeight(600);
+	Lux::UI::CheckBoxDecorator* check_box_decorator = new Lux::UI::CheckBoxDecorator("_check_box");
 	Lux::UI::TextDecorator* text_decorator = new Lux::UI::TextDecorator("_text");
+	Lux::UI::TextDecorator* text_centered_decorator = new Lux::UI::TextDecorator("_text_centered");
+	text_centered_decorator->setTextCentered(true);
 	Lux::UI::BoxDecorator* box_decorator = new Lux::UI::BoxDecorator("_box");
 	server.getEngine().loadPlugin("gui.dll");
 	Lux::UI::Gui* gui = (Lux::UI::Gui*)server.getEngine().getPluginManager().getPlugin("gui");
 	gui->addDecorator(*text_decorator);
+	gui->addDecorator(*text_centered_decorator);
 	gui->addDecorator(*box_decorator);
+	gui->addDecorator(*check_box_decorator);
 	gui->setRenderer(*renderer);
+	check_box_decorator->create(*gui, "gui/skin.atl");
 	box_decorator->create(*gui, "gui/skin.atl");
 	g_main_frame.create(client, *gui, 800, 600);
 }
@@ -135,6 +140,23 @@ int main(int argc, char* argv[])
 					finished = true;
 					break;
 			}
+		}
+		const Uint8* keys = SDL_GetKeyboardState(NULL);
+		if(gui->getFocusedBlock() == NULL)
+		{
+
+			bool forward = keys[SDL_SCANCODE_W] != 0;
+			bool backward = keys[SDL_SCANCODE_S] != 0;
+			bool left =  keys[SDL_SCANCODE_A] != 0;
+			bool right =  keys[SDL_SCANCODE_D] != 0;
+			bool shift =  keys[SDL_SCANCODE_LSHIFT] != 0;
+			if (forward || backward || left || right)
+			{
+				float camera_speed = 1.0f;
+				client.navigate(forward ? camera_speed : (backward ? -camera_speed : 0.0f)
+					, right ? camera_speed : (left ? -camera_speed : 0.0f)
+					, shift ? 1 : 0);
+			} 
 		}
 		server.tick(NULL, NULL);
 		gui->render();

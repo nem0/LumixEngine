@@ -1,43 +1,85 @@
 #include "editor_native/property_frame/renderable_ui.h"
 #include <cstdio>
+#include <Windows.h>
 #include "core/crc32.h"
 #include "editor/editor_client.h"
 #include "editor/server_message_types.h"
+#include "editor_native/main_frame.h"
 #include "editor_native/property_frame/property_frame.h"
-#include "gui/controls.h"
+#include "gui/button.h"
 #include "gui/gui.h"
+#include "gui/text_box.h"
 
 
-RenderableUI::RenderableUI(Lux::UI::Block* owner, Lux::EditorClient& client)
+RenderableUI::RenderableUI(PropertyFrame& property_frame, Lux::UI::Block* parent, Lux::EditorClient& client)
+	: Block(*parent->getGui(), parent, NULL)
+	, m_property_frame(property_frame)
 {
 	m_client = &client;
-	m_ui = owner->getGui()->createBlock(owner, NULL);
-	m_ui->setArea(0, 0, 0, 0, 1, 0, 0, 20);
-	Lux::UI::Block* label = owner->getGui()->createBlock(m_ui, "_text");
-	label->setText("Renderable");
+	setArea(0, 0, 0, 0, 1, 0, 0, 40);
+	Lux::UI::Block* label = new Lux::UI::Block(*getGui(), this, "_text_centered");
+	label->setBlockText("Renderable");
 	label->setArea(0, 0, 0, 0, 1, 0, 0, 20);
 
-	label = owner->getGui()->createBlock(m_ui, "_text");
-	label->setText("Source");
+	label = new Lux::UI::Block(*getGui(), this, "_text");
+	label->setBlockText("Source");
 	label->setArea(0, 0, 0, 20, 0, 50, 0, 40);
 
-	owner->getGui()->addCallback("RenderableUI_sourceChanged", &RenderableUI::sourceChanged);
+	getGui()->getCallback("RenderableUI_sourceChanged").bind<RenderableUI, &RenderableUI::sourceChanged>(this);
+	getGui()->getCallback("RenderableUI_browseSource").bind<RenderableUI, &RenderableUI::browseSource>(this);
 
-	m_source_box = Lux::UI::createTextBox(50, 20, m_ui, *owner->getGui());
-	m_source_box->setArea(0, 50, 0, 20, 1, -1, 0, 40);
-	m_source_box->getChild(0)->setText("empty");
-	m_source_box->setTag(this);
-	m_source_box->getChild(0)->registerEventHandler("text_accepted", "RenderableUI_sourceChanged");
+	m_source_box = new Lux::UI::TextBox("empty", *getGui(), this);
+	m_source_box->setArea(0, 50, 0, 20, 1, -21, 0, 40);
+	m_source_box->setOnTextAccepted("RenderableUI_sourceChanged");
 	
+	m_browse_source_button = new Lux::UI::Button("...", *getGui(), this);
+	m_browse_source_button->setArea(1, -20, 0, 20, 1, -1, 0, 40);
+	m_browse_source_button->registerEventHandler("click", "RenderableUI_browseSource");
 }
 
 
-void RenderableUI::sourceChanged(Lux::UI::Block& block)
+void RenderableUI::sourceChanged(Lux::UI::Block& block, void*)
 {
-	RenderableUI* that = static_cast<RenderableUI*>(block.getParent()->getTag());
-	const Lux::string& s = that->m_source_box->getChild(0)->getText();
-	that->m_client->setComponentProperty("renderable", "source", s.c_str(), s.length()+1);
+	const Lux::string& s = m_source_box->getChild(0)->getBlockText();
+	m_client->setComponentProperty("renderable", "source", s.c_str(), s.length()+1);
 }
+
+
+void RenderableUI::browseSource(Lux::UI::Block& block, void*)
+{
+	OPENFILENAME ofn;
+	ZeroMemory(&ofn, sizeof(ofn));
+
+	ofn.lStructSize = sizeof(ofn);
+	ofn.hwndOwner = NULL;
+	ofn.lpstrFilter = "models\0*.scene.xml\0";
+	char buf[MAX_PATH];
+	buf[0] = 0;
+	ofn.lpstrFile = buf;
+	ofn.nMaxFile = MAX_PATH;
+	ofn.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
+	if(GetOpenFileName(&ofn) != FALSE)
+	{
+		Lux::string& s = m_property_frame.getMainFrame()->getStartupDirectory();
+		if(strncmp(s.c_str(), buf, s.length()) == 0)
+		{
+			if(buf[s.length()] == '\\')
+			{
+				strcpy_s(buf, buf + s.length()+1);
+			}
+			else
+			{
+				strcpy_s(buf, buf + s.length());
+			}
+		}
+		m_source_box->getChild(0)->setBlockText(buf);
+		m_source_box->getChild(0)->emitEvent("text_accepted");
+	}
+
+	const Lux::string& s = m_source_box->getText();
+	m_client->setComponentProperty("renderable", "source", s.c_str(), s.length()+1);
+}
+
 
 
 void RenderableUI::onEntityProperties(Lux::PropertyListEvent& evt)
@@ -50,7 +92,7 @@ void RenderableUI::onEntityProperties(Lux::PropertyListEvent& evt)
 			{
 				if(evt.properties[i].data_size > 0)
 				{
-					m_source_box->getChild(0)->setText((char*)evt.properties[i].data);
+					m_source_box->setText((char*)evt.properties[i].data);
 				}
 			}
 		}
@@ -60,5 +102,4 @@ void RenderableUI::onEntityProperties(Lux::PropertyListEvent& evt)
 
 RenderableUI::~RenderableUI()
 {
-	m_ui->destroy();
 }
