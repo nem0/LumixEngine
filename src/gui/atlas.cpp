@@ -81,8 +81,12 @@ namespace Lux
 				serializer.deserializeArrayItem(part->m_top);
 				serializer.deserializeArrayItem(part->m_right);
 				serializer.deserializeArrayItem(part->m_bottom);
-				part->m_pixel_width = (part->m_right - part->m_left) * atlas->m_texture->getWidth();
-				part->m_pixel_height = (part->m_bottom - part->m_top) * atlas->m_texture->getHeight();
+				part->m_pixel_width = part->m_right - part->m_left;
+				part->m_pixel_height = part->m_bottom - part->m_top;
+				part->m_right /= atlas->m_texture->getWidth();
+				part->m_left /= atlas->m_texture->getWidth();
+				part->m_top /= atlas->m_texture->getHeight();
+				part->m_bottom /= atlas->m_texture->getHeight();
 				part->name = tmp;
 				atlas->m_parts.insert(crc32(tmp), part);
 			}

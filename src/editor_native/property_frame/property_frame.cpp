@@ -7,9 +7,9 @@
 #include "editor_native/main_frame.h"
 #include "editor_native/property_frame/box_rigid_actor_ui.h"
 #include "editor_native/property_frame/renderable_ui.h"
-#include "gui/button.h"
+#include "gui/controls/button.h"
+#include "gui/controls/text_box.h"
 #include "gui/gui.h"
-#include "gui/text_box.h"
 
 
 void PropertyFrame::createComponentClicked(Lux::UI::Block& block, void*)

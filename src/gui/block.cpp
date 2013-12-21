@@ -315,12 +315,39 @@ namespace UI
 	}
 
 
+	Block::EventCallback& Block::getCallback(const char* type)
+	{
+		EventHandler handler;
+		handler.type = crc32(type);
+		m_event_handlers.push_back(handler);
+		return m_event_handlers[m_event_handlers.size()-1].callback;
+	}
+
+
 	void Block::registerEventHandler(const char* type, const char* callback)
 	{
 		EventHandler handler;
 		handler.callback = m_gui->getCallback(callback);
 		handler.type = crc32(type);
 		m_event_handlers.push_back(handler);
+	}
+
+
+	bool Block::mouseDown(int x, int y)
+	{
+		if(x > m_click_area.left && x < m_click_area.right && y > m_click_area.top && y < m_click_area.bottom && m_is_shown)
+		{
+			for(int i = 0,c = m_children.size(); i < c; ++i)
+			{
+				m_children[i]->mouseDown(x, y);
+			}
+			if(m_is_mouse_clickable)
+			{
+				emitEvent("mouse_down");
+			}
+			return true;
+		}
+		return false;
 	}
 
 

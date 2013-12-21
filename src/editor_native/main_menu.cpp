@@ -3,7 +3,7 @@
 #include "editor/editor_client.h"
 #include "editor_native/main_frame.h"
 #include "gui/gui.h"
-#include "gui/menu_item.h"
+#include "gui/controls/menu_item.h"
 
 
 void MainMenu::openFileClicked(Lux::UI::Block& block, void*)

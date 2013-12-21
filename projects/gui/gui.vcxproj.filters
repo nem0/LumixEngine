@@ -14,12 +14,28 @@
     <ClInclude Include="..\..\src\gui\decorator_base.h" />
     <ClInclude Include="..\..\src\gui\atlas.h" />
     <ClInclude Include="..\..\src\gui\texture_base.h" />
-    <ClInclude Include="..\..\src\gui\menu_bar.h" />
-    <ClInclude Include="..\..\src\gui\menu_item.h" />
-    <ClInclude Include="..\..\src\gui\button.h" />
-    <ClInclude Include="..\..\src\gui\text_box.h" />
-    <ClInclude Include="..\..\src\gui\check_box.h" />
     <ClInclude Include="..\..\src\gui\decorators\check_box_decorator.h">
+      <Filter>decorators</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\gui\controls\scrollbar.h">
+      <Filter>controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\gui\controls\button.h">
+      <Filter>controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\gui\controls\check_box.h">
+      <Filter>controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\gui\controls\menu_bar.h">
+      <Filter>controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\gui\controls\menu_item.h">
+      <Filter>controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\gui\controls\text_box.h">
+      <Filter>controls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\gui\decorators\scrollbar_decorator.h">
       <Filter>decorators</Filter>
     </ClInclude>
   </ItemGroup>
@@ -34,18 +50,37 @@
       <Filter>decorators</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\gui\atlas.cpp" />
-    <ClCompile Include="..\..\src\gui\menu_bar.cpp" />
-    <ClCompile Include="..\..\src\gui\menu_item.cpp" />
-    <ClCompile Include="..\..\src\gui\button.cpp" />
-    <ClCompile Include="..\..\src\gui\text_box.cpp" />
-    <ClCompile Include="..\..\src\gui\check_box.cpp" />
     <ClCompile Include="..\..\src\gui\decorators\check_box_decorator.cpp">
+      <Filter>decorators</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gui\controls\scrollbar.cpp">
+      <Filter>controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gui\controls\button.cpp">
+      <Filter>controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gui\controls\check_box.cpp">
+      <Filter>controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gui\controls\menu_bar.cpp">
+      <Filter>controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gui\controls\menu_item.cpp">
+      <Filter>controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gui\controls\text_box.cpp">
+      <Filter>controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gui\decorators\scrollbar_decorator.cpp">
       <Filter>decorators</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="decorators">
       <UniqueIdentifier>{26d01923-e3f8-4161-901a-6395e4788c30}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="controls">
+      <UniqueIdentifier>{ef56d276-5e1d-4822-bc44-76ffaf6d8fac}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

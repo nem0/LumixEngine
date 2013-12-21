@@ -6,9 +6,9 @@
 #include "editor/server_message_types.h"
 #include "editor_native/main_frame.h"
 #include "editor_native/property_frame/property_frame.h"
-#include "gui/button.h"
+#include "gui/controls/button.h"
+#include "gui/controls/text_box.h"
 #include "gui/gui.h"
-#include "gui/text_box.h"
 
 
 RenderableUI::RenderableUI(PropertyFrame& property_frame, Lux::UI::Block* parent, Lux::EditorClient& client)

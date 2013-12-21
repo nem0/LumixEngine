@@ -1,7 +1,7 @@
 #include "gui/decorators/check_box_decorator.h"
 #include "gui/atlas.h"
 #include "gui/block.h"
-#include "gui/check_box.h"
+#include "gui/controls/check_box.h"
 #include "gui/gui.h"
 #include "gui/irenderer.h"
 #include "gui/texture_base.h"

@@ -24,6 +24,9 @@ namespace UI
 	class LUX_GUI_API Gui : public IPlugin
 	{
 		public:
+			typedef Delegate<void (int, int)> MouseCallback;
+
+		public:
 			Gui() { m_impl = 0; }
 
 			virtual bool create(Engine& engine) LUX_OVERRIDE;
@@ -36,6 +39,9 @@ namespace UI
 			void focus(Block* block);
 			Block* getFocusedBlock() const;
 			bool click(int x, int y);
+			void mouseDown(int x, int y);
+			void mouseMove(int x, int y, int rel_x, int rel_y);
+			void mouseUp(int x, int y);
 			void keyDown(int32_t key);
 			uint32_t getCallbackNameHash(Block::EventCallback callback);
 			DecoratorBase* getDecorator(const char* name);
@@ -45,6 +51,10 @@ namespace UI
 			Atlas* loadAtlas(const char* path);
 			Block* createGui(Lux::FS::IFile& file);
 			Block* createBlock(uint32_t type, Block* parent);
+			MouseCallback& addMouseMoveCallback();
+			MouseCallback& addMouseUpCallback();
+			void removeMouseMoveCallback(MouseCallback& callback);
+			void removeMouseUpCallback(MouseCallback& callback);
 
 		private:
 			struct GuiImpl* m_impl;

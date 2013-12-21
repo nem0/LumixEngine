@@ -4,9 +4,9 @@
 #include "editor/editor_client.h"
 #include "editor/server_message_types.h"
 #include "editor_native/property_frame/property_frame.h"
-#include "gui/check_box.h"
+#include "gui/controls/check_box.h"
+#include "gui/controls/text_box.h"
 #include "gui/gui.h"
-#include "gui/text_box.h"
 
 
 BoxRigidActorUI::BoxRigidActorUI(Lux::UI::Block* parent, Lux::EditorClient& client)

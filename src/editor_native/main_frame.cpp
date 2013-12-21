@@ -6,6 +6,7 @@
 #include "editor_native/property_frame/property_frame.h"
 #include "gui/gui.h"
 
+#include "gui/controls/scrollbar.h"
 
 bool MainFrame::create(Lux::EditorClient& client, Lux::UI::Gui& gui, float width, float height)
 {
@@ -17,6 +18,14 @@ bool MainFrame::create(Lux::EditorClient& client, Lux::UI::Gui& gui, float width
 
 	m_main_menu = new MainMenu(*this);
 	m_property_frame = new PropertyFrame(*this);
+
+	Lux::UI::Scrollbar* scrollbar = new Lux::UI::Scrollbar(gui, m_ui);
+	scrollbar->setArea(0.5f, 0, 1, -20, 1, -50, 1, 0);
+
+	scrollbar = new Lux::UI::Scrollbar(gui, m_ui);
+	scrollbar->setArea(1, -20, 0.5f, 0, 1, 0, 1, 0);
+	scrollbar->setScrollbarType(Lux::UI::Scrollbar::VERTICAL);
+
 
 	m_ui->layout();
 

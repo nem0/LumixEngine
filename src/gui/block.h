@@ -44,6 +44,7 @@ namespace UI
 			Block(Gui& gui, Block* parent, const char* decorator_name);
 			virtual ~Block();
 			virtual uint32_t getType() const;
+			virtual void layout();
 			void destroy();
 			void setArea(float rel_left, float left, float rel_top, float top, float rel_right, float right, float rel_bottom, float bottom);
 			void setArea(const Area& area);
@@ -65,12 +66,13 @@ namespace UI
 			Block* getChild(int index) const { return m_children.size() > index ? m_children[index] : NULL; }
 			Gui* getGui() const { return m_gui; }
 			void render(IRenderer& renderer);
-			void layout();
 			float getWidth() const { return m_local_area.right - m_local_area.left; }
 			float getHeight() const { return m_local_area.bottom - m_local_area.top; }
 			void* getTag() const { return m_tag; }
 			void setTag(void* tag) { m_tag = tag; }
 			bool click(int x, int y);
+			bool mouseDown(int x, int y);
+			Block::EventCallback& getCallback(const char* type);
 			void registerEventHandler(const char* type, const char* callback);
 			void setZIndex(int z_index);
 			float getZ() const { return m_z; }

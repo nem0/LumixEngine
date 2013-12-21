@@ -5,12 +5,12 @@
 #include "engine/engine.h"
 #include "gui/atlas.h"
 #include "gui/block.h"
-#include "gui/button.h"
-#include "gui/check_box.h"
+#include "gui/controls/button.h"
+#include "gui/controls/check_box.h"
+#include "gui/controls/menu_bar.h"
+#include "gui/controls/menu_item.h"
+#include "gui/controls/text_box.h"
 #include "gui/decorator_base.h"
-#include "gui/menu_bar.h"
-#include "gui/menu_item.h"
-#include "gui/text_box.h"
 
 
 
@@ -39,6 +39,8 @@ namespace UI
 		IRenderer* m_renderer;
 		vector<Atlas*> m_atlases;
 		map<uint32_t, BlockCreator> m_block_creators;
+		vector<Gui::MouseCallback> m_mouse_move_callbacks;
+		vector<Gui::MouseCallback> m_mouse_up_callbacks;
 	};
 
 
@@ -187,6 +189,74 @@ namespace UI
 	Block::EventCallback& Gui::getCallback(const char* name)
 	{
 		return m_impl->m_callbacks[crc32(name)];
+	}
+
+
+	Gui::MouseCallback& Gui::addMouseMoveCallback()
+	{
+		return m_impl->m_mouse_move_callbacks.push_back_empty();
+	}
+
+
+	Gui::MouseCallback& Gui::addMouseUpCallback()
+	{
+		return m_impl->m_mouse_up_callbacks.push_back_empty();
+	}
+
+
+	void Gui::removeMouseMoveCallback(MouseCallback& callback)
+	{
+		for(int i = m_impl->m_mouse_move_callbacks.size() - 1; i >= 0; --i)
+		{
+			if(m_impl->m_mouse_move_callbacks[i] == callback)
+			{
+				m_impl->m_mouse_move_callbacks.eraseFast(i);
+				return;
+			}
+		}
+	}
+
+
+	void Gui::removeMouseUpCallback(MouseCallback& callback)
+	{
+		for(int i = m_impl->m_mouse_up_callbacks.size() - 1; i >= 0; --i)
+		{
+			if(m_impl->m_mouse_up_callbacks[i] == callback)
+			{
+				m_impl->m_mouse_up_callbacks.eraseFast(i);
+				return;
+			}
+		}
+	}
+
+
+	void Gui::mouseDown(int x, int y)
+	{
+		for(int i = 0; i < m_impl->m_blocks.size(); ++i)
+		{
+			if(m_impl->m_blocks[i]->mouseDown(x, y))
+			{
+				return;
+			}
+		}
+	}
+
+
+	void Gui::mouseMove(int x, int y, int rel_x, int rel_y)
+	{
+		for(int i = m_impl->m_mouse_move_callbacks.size() - 1; i >= 0; --i)
+		{
+			m_impl->m_mouse_move_callbacks[i].invoke(x, y);
+		}
+	}
+
+
+	void Gui::mouseUp(int x, int y)
+	{
+		for(int i = m_impl->m_mouse_up_callbacks.size() - 1; i >= 0; --i)
+		{
+			m_impl->m_mouse_up_callbacks[i].invoke(x, y);
+		}
 	}
 
 

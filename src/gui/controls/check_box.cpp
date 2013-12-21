@@ -1,4 +1,4 @@
-#include "gui/check_box.h"
+#include "gui/controls/check_box.h"
 #include "core/crc32.h"
 #include "core/iserializer.h"
 
