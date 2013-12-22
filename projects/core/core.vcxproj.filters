@@ -20,15 +20,6 @@
     <ClCompile Include="..\..\src\core\tcp_file_server.cpp">
       <Filter>FS</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\core\tcp_acceptor.cpp">
-      <Filter>Net</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\core\tcp_connector.cpp">
-      <Filter>Net</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\core\tcp_stream.cpp">
-      <Filter>Net</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\core\memory_stream.cpp" />
     <ClCompile Include="..\..\src\core\tcp_file_device.cpp">
       <Filter>FS</Filter>
@@ -70,15 +61,6 @@
     <ClInclude Include="..\..\src\core\tcp_file_server.h">
       <Filter>FS</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\tcp_acceptor.h">
-      <Filter>Net</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\tcp_connector.h">
-      <Filter>Net</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\tcp_stream.h">
-      <Filter>Net</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\ifile.h">
       <Filter>FS</Filter>
     </ClInclude>
@@ -108,9 +90,6 @@
   <ItemGroup>
     <Filter Include="FS">
       <UniqueIdentifier>{44dff5e3-a667-4449-ae33-ca7c1b548fe3}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Net">
-      <UniqueIdentifier>{711c9117-702c-45a0-b264-2ca658a044b2}</UniqueIdentifier>
     </Filter>
     <Filter Include="MT">
       <UniqueIdentifier>{fe4dad03-9173-476b-8718-01b5dc84a305}</UniqueIdentifier>

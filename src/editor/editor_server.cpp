@@ -24,8 +24,9 @@
 #include "graphics/renderer.h"
 #include "platform/input_system.h"
 #include "platform/mutex.h"
-#include "platform/socket.h"
 #include "platform/task.h"
+#include "platform/tcp_acceptor.h"
+#include "platform/tcp_stream.h"
 #include "script\script_system.h"
 #include "universe/component_event.h"
 #include "universe/entity_destroyed_event.h"
@@ -96,8 +97,8 @@ class MessageTask : public MT::Task
 		virtual int task() LUX_OVERRIDE;
 
 		struct EditorServerImpl* m_server;
-		Net::Socket m_socket;
-		Net::Socket* m_work_socket;
+		Net::TCPAcceptor m_acceptor;
+		Net::TCPStream* m_stream;
 };
 
 
@@ -405,19 +406,19 @@ void EditorServerImpl::addEntity()
 int MessageTask::task()
 {
 	bool finished = false;
-	m_socket.create("127.0.0.1", 10002);
-	m_work_socket = m_socket.accept();
+	m_acceptor.start("127.0.0.1", 10002);
+	m_stream = m_acceptor.accept();
 	vector<uint8_t> data;
 	data.resize(5);
 	while(!finished)
 	{
-		if(m_work_socket->receiveAllBytes(&data[0], 5))
+		if(m_stream->read(&data[0], 5))
 		{
 			int length = *(int*)&data[0];
 			if(length > 0)
 			{
 				data.resize(length);
-				m_work_socket->receiveAllBytes(&data[0], length);
+				m_stream->read(&data[0], length);
 				MT::Lock lock(*m_server->m_universe_mutex);
 				m_server->onMessage(&data[0], data.size());
 			}
@@ -711,10 +712,9 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 {
 	m_universe_mutex = MT::Mutex::create(false);
 	m_send_mutex = MT::Mutex::create(false);
-	Net::Socket::init();
 	m_message_task = new MessageTask();
 	m_message_task->m_server = this;
-	m_message_task->m_work_socket = 0;
+	m_message_task->m_stream = NULL;
 	m_message_task->create("Message Task");
 	m_message_task->run();
 		
@@ -776,13 +776,13 @@ void EditorServerImpl::onLogError(const char* system, const char* message)
 
 void EditorServerImpl::sendMessage(const uint8_t* data, int32_t length)
 {
-	if(m_message_task->m_work_socket)
+	if(m_message_task->m_stream)
 	{
 		MT::Lock lock(*m_send_mutex);
 		const uint32_t guard = 0x12345678;
-		m_message_task->m_work_socket->send(&length, 4);
-		m_message_task->m_work_socket->send(&guard, 4);
-		m_message_task->m_work_socket->send(data, length);
+		m_message_task->m_stream->write(length);
+		m_message_task->m_stream->write(guard);
+		m_message_task->m_stream->write(data, length);
 	}
 }
 
