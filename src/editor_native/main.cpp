@@ -57,7 +57,7 @@ int main(int argc, char* argv[])
 {
 	SDL_Init(SDL_INIT_VIDEO);
     SDL_RendererInfo displayRendererInfo;
-    SDL_CreateWindowAndRenderer(800, 600, SDL_WINDOW_OPENGL, &displayWindow, &displayRenderer);
+    SDL_CreateWindowAndRenderer(800, 600, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE, &displayWindow, &displayRenderer);
     SDL_GetRendererInfo(displayRenderer, &displayRendererInfo);
 	SDL_GLContext context = SDL_GL_CreateContext(displayWindow);
     if ((displayRendererInfo.flags & SDL_RENDERER_ACCELERATED) == 0 || 
@@ -87,6 +87,15 @@ int main(int argc, char* argv[])
 		{
 			switch(evt.type)
 			{
+				case SDL_WINDOWEVENT:
+					if(evt.window.event == SDL_WINDOWEVENT_RESIZED)
+					{
+						static_cast<Lux::UI::OpenGLRenderer&>(gui->getRenderer()).setWindowHeight(evt.window.data2);
+						server.onResize(evt.window.data1, evt.window.data2);
+						g_main_frame.getUI().setArea(0, 0, 0, 0, 0, evt.window.data1, 0, evt.window.data2);
+						g_main_frame.getUI().layout();
+					}
+					break;
 				case SDL_TEXTEDITING:
 					evt.text.text;
 					finished = false;

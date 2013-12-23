@@ -337,6 +337,12 @@ namespace UI
 		m_impl->m_renderer = &renderer;
 	}
 
+
+	IRenderer& Gui::getRenderer()
+	{
+		return *m_impl->m_renderer;
+	}
+
 	
 	void Gui::layout()
 	{
@@ -349,9 +355,9 @@ namespace UI
 	
 	void Gui::render()
 	{
-		m_impl->m_renderer->beginRender();
 		for(int i = 0; i < m_impl->m_blocks.size(); ++i)
 		{
+			m_impl->m_renderer->beginRender(m_impl->m_blocks[i]->getGlobalWidth(), m_impl->m_blocks[i]->getGlobalHeight());
 			m_impl->m_blocks[i]->render(*m_impl->m_renderer);
 		}
 	}

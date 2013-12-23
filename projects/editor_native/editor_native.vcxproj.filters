@@ -13,6 +13,7 @@
     <ClCompile Include="..\..\src\editor_native\property_frame\renderable_ui.cpp">
       <Filter>property_frame</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\editor_native\log_ui.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\editor_native\main_frame.h" />
@@ -29,6 +30,7 @@
     <ClInclude Include="..\..\src\editor_native\property_frame\renderable_ui.h">
       <Filter>property_frame</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\editor_native\log_ui.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="property_frame">

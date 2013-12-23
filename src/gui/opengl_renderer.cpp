@@ -188,14 +188,14 @@ namespace UI
 	}
 
 
-	void OpenGLRenderer::beginRender()
+	void OpenGLRenderer::beginRender(float w, float h)
 	{
 		m_impl->m_scissors_areas.clear();
 		glColor3f(1, 1, 1);
 		glEnable(GL_SCISSOR_TEST);
 		glMatrixMode(GL_PROJECTION);
 		glLoadIdentity();
-		glOrtho(0, 800, 600, 0, -1, 1);
+		glOrtho(0, w, h, 0, -1, 1);
 		glMatrixMode(GL_MODELVIEW);
 		glLoadIdentity();
 	}

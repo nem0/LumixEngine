@@ -36,4 +36,5 @@ class MainFrame
 		Lux::string m_startup_directory;
 		class PropertyFrame* m_property_frame;
 		class MainMenu* m_main_menu;
+		class LogUI* m_log_ui;
 };
