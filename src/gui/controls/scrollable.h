@@ -23,7 +23,7 @@ namespace UI
 			Lux::UI::Block* getContainer() const { return m_container; } 
 
 		private:
-			void scollbarValueChanged(Block& block, void*);
+			void scrollbarValueChanged(Block& block, void*);
 
 		private:
 			Scrollbar* m_horizontal_scrollbar;

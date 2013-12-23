@@ -65,11 +65,17 @@ namespace Lux
 
 		void atlasLoaded(Lux::FS::IFile* file, bool success, void* user_data)
 		{
+			if(!success)
+			{
+				return;
+			}
 			AtlasImpl* atlas = static_cast<AtlasImpl*>(user_data);
+			ASSERT(atlas);
 			JsonSerializer serializer(*file, JsonSerializer::READ);
 			char tmp[260];
 			serializer.deserialize("image", tmp, 260);
 			atlas->m_texture = atlas->m_renderer->loadImage(tmp);
+			ASSERT(atlas->m_texture);
 			int count;
 			serializer.deserialize("part_count", count);
 			serializer.deserializeArrayBegin("parts");

@@ -21,11 +21,11 @@ void LogUI::onLogMessage(void* user_data, Lux::Event& evt)
 	Lux::UI::Block* container = that->getContainer();
 	float y = container->getChildCount() > 0 ? container->getChild(container->getChildCount() -1 )->getLocalArea().bottom : 0;
 	Lux::LogEvent log_evt = static_cast<Lux::LogEvent&>(evt);
-	Lux::UI::Block* cell = new Lux::UI::Block(*that->getGui(), that->getContainer(), "_text");
+	Lux::UI::Block* cell = new Lux::UI::Block(that->getGui(), that->getContainer(), "_text");
 	cell->setBlockText(log_evt.system.c_str());
 	cell->setArea(0, 0, 0, y, 0.3f, 0, 0, y + 20);
 
-	cell = new Lux::UI::Block(*that->getGui(), that->getContainer(), "_text");
+	cell = new Lux::UI::Block(that->getGui(), that->getContainer(), "_text");
 	cell->setBlockText(log_evt.message.c_str());
 	cell->setArea(0.3f, 0, 0, y, 1, 0, 0, y + 20);
 	that->layout();
