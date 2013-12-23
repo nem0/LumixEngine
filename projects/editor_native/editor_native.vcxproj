@@ -93,6 +93,7 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\editor_native\log_ui.cpp" />
     <ClCompile Include="..\..\src\editor_native\main.cpp" />
     <ClCompile Include="..\..\src\editor_native\main_frame.cpp" />
     <ClCompile Include="..\..\src\editor_native\main_menu.cpp" />
@@ -101,6 +102,7 @@
     <ClCompile Include="..\..\src\editor_native\property_frame\renderable_ui.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\src\editor_native\log_ui.h" />
     <ClInclude Include="..\..\src\editor_native\main_frame.h" />
     <ClInclude Include="..\..\src\editor_native\main_menu.h" />
     <ClInclude Include="..\..\src\editor_native\property_frame\box_rigid_actor_ui.h" />

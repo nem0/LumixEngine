@@ -21,7 +21,7 @@ namespace UI
 
 			virtual TextureBase* loadImage(const char* name) LUX_OVERRIDE;
 			virtual bool loadFont(const char* path) LUX_OVERRIDE;
-			virtual void beginRender() LUX_OVERRIDE;
+			virtual void beginRender(float w, float h) LUX_OVERRIDE;
 			virtual void renderImage(TextureBase* image, float* vertices, float* tex_coords, int vertex_count) LUX_OVERRIDE;
 			virtual void measureText(const char* text, float* w, float* h) LUX_OVERRIDE;
 			virtual void renderText(const char* text, float x, float y, float z) LUX_OVERRIDE;

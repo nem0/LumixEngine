@@ -100,6 +100,11 @@ namespace Lux
 				}
 				break;
 			case ServerMessageType::LOG_MESSAGE:
+				{
+					LogEvent msg;
+					msg.read(stream);
+					m_event_manager.emitEvent(msg);
+				}
 				break;
 			default:
 				break;

@@ -2,11 +2,11 @@
 #include <Windows.h>
 #include "editor/editor_client.h"
 #include "editor/server_message_types.h"
+#include "editor_native/log_ui.h"
 #include "editor_native/main_menu.h"
 #include "editor_native/property_frame/property_frame.h"
 #include "gui/gui.h"
 
-#include "gui/controls/scrollable.h"
 
 bool MainFrame::create(Lux::EditorClient& client, Lux::UI::Gui& gui, float width, float height)
 {
@@ -18,6 +18,7 @@ bool MainFrame::create(Lux::EditorClient& client, Lux::UI::Gui& gui, float width
 
 	m_main_menu = new MainMenu(*this);
 	m_property_frame = new PropertyFrame(*this);
+	m_log_ui = new LogUI(*this);
 
 	m_ui->layout();
 
