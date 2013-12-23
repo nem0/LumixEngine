@@ -92,7 +92,7 @@ int main(int argc, char* argv[])
 					{
 						static_cast<Lux::UI::OpenGLRenderer&>(gui->getRenderer()).setWindowHeight(evt.window.data2);
 						server.onResize(evt.window.data1, evt.window.data2);
-						g_main_frame.getUI().setArea(0, 0, 0, 0, 0, evt.window.data1, 0, evt.window.data2);
+						g_main_frame.getUI().setArea(0, 0, 0, 0, 0, (float)evt.window.data1, 0, (float)evt.window.data2);
 						g_main_frame.getUI().layout();
 					}
 					break;

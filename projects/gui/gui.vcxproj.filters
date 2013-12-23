@@ -41,6 +41,9 @@
     <ClInclude Include="..\..\src\gui\controls\scrollable.h">
       <Filter>controls</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\gui\controls\tab_block.h">
+      <Filter>controls</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\gui\gui.cpp" />
@@ -78,6 +81,9 @@
       <Filter>decorators</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\gui\controls\scrollable.cpp">
+      <Filter>controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gui\controls\tab_block.cpp">
       <Filter>controls</Filter>
     </ClCompile>
   </ItemGroup>

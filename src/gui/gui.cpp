@@ -104,9 +104,9 @@ namespace UI
 		else
 		{
 			popup->show();
-			popup->getGui()->focus(popup);
+			popup->getGui().focus(popup);
 		}
-		block.getGui()->layout();
+		block.getGui().layout();
 	}
 
 	Block* createButton(Gui& gui, Block* parent)

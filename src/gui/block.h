@@ -68,7 +68,7 @@ namespace UI
 			Block* getParent() const { return m_parent; }
 			int getChildCount() const { return m_children.size(); }
 			Block* getChild(int index) const { return m_children.size() > index ? m_children[index] : NULL; }
-			Gui* getGui() const { return m_gui; }
+			Gui& getGui() const { return m_gui; }
 			void render(IRenderer& renderer);
 			float getWidth() const { return m_local_area.right - m_local_area.left; }
 			float getHeight() const { return m_local_area.bottom - m_local_area.top; }
@@ -77,6 +77,7 @@ namespace UI
 			bool click(int x, int y);
 			bool mouseDown(int x, int y);
 			Block::EventCallback& getCallback(const char* type);
+			Block::EventCallback& getCallback(uint32_t type);
 			void registerEventHandler(const char* type, const char* callback);
 			void setZIndex(int z_index);
 			float getZ() const { return m_z; }
@@ -120,7 +121,7 @@ namespace UI
 			bool m_is_focus_processing;
 			bool m_is_mouse_clickable;
 			bool m_is_clipping;
-			Gui* m_gui;
+			Gui& m_gui;
 			void* m_tag;
 			float m_z;
 	};

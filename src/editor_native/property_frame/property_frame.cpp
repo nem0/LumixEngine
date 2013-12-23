@@ -14,7 +14,7 @@
 
 void PropertyFrame::createComponentClicked(Lux::UI::Block& block, void*)
 {
-	m_type_list_popup->getGui()->focus(m_type_list_popup);
+	m_type_list_popup->getGui().focus(m_type_list_popup);
 	m_type_list_popup->show();
 }
 

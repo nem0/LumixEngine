@@ -19,13 +19,13 @@ Scrollbar::Scrollbar(Gui& gui, Block* parent)
 	m_value = 0;
 	m_step = 1;
 	setArea(0, 0, 0, 0, 1, 0, 0, 20);
-	m_down_arrow = new Block(*getGui(), this, NULL);
+	m_down_arrow = new Block(getGui(), this, NULL);
 	m_down_arrow->getCallback("click").bind<Scrollbar, &Scrollbar::downArrowClicked>(this);
 	m_down_arrow->setArea(1, -20, 0, 0, 1, 0, 0, 20);
-	m_up_arrow = new Block(*getGui(), this, NULL);
+	m_up_arrow = new Block(getGui(), this, NULL);
 	m_up_arrow->getCallback("click").bind<Scrollbar, &Scrollbar::upArrowClicked>(this);
 	m_up_arrow->setArea(0, 0, 0, 0, 0, 20, 0, 20);
-	m_slider = new Block(*getGui(), this, NULL);
+	m_slider = new Block(getGui(), this, NULL);
 	m_slider->setArea(0, 20, 0, 0, 0, 40, 0, 20);
 	m_slider->getCallback("mouse_down").bind<Scrollbar, &Scrollbar::sliderMouseDown>(this);
 	setScrollbarType(HORIZONTAL);
@@ -34,8 +34,8 @@ Scrollbar::Scrollbar(Gui& gui, Block* parent)
 
 void Scrollbar::sliderMouseDown(Block& block, void*)
 {
-	getGui()->addMouseMoveCallback().bind<Scrollbar, &Scrollbar::sliderMouseMove>(this);
-	getGui()->addMouseUpCallback().bind<Scrollbar, &Scrollbar::sliderMouseUp>(this);
+	getGui().addMouseMoveCallback().bind<Scrollbar, &Scrollbar::sliderMouseMove>(this);
+	getGui().addMouseUpCallback().bind<Scrollbar, &Scrollbar::sliderMouseUp>(this);
 }
 
 
@@ -58,9 +58,9 @@ void Scrollbar::sliderMouseUp(int x, int y)
 {
 	Gui::MouseCallback cb;
 	cb.bind<Scrollbar, &Scrollbar::sliderMouseUp>(this);
-	getGui()->removeMouseUpCallback(cb);
+	getGui().removeMouseUpCallback(cb);
 	cb.bind<Scrollbar, &Scrollbar::sliderMouseMove>(this);
-	getGui()->removeMouseMoveCallback(cb);
+	getGui().removeMouseMoveCallback(cb);
 }
 
 

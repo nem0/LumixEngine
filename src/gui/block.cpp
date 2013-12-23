@@ -11,8 +11,8 @@ namespace UI
 {
 
 	Block::Block(Gui& gui, Block* parent, const char* decorator_name)
+		: m_gui(gui)
 	{
-		m_gui = &gui;
 		m_tag = NULL;
 		m_z = 0;
 		m_is_clipping = false;
@@ -32,7 +32,7 @@ namespace UI
 			m_parent->addChild(*this);
 			m_z = parent->m_z;
 		}
-		m_decorator = decorator_name ? m_gui->getDecorator(decorator_name) : NULL;
+		m_decorator = decorator_name ? m_gui.getDecorator(decorator_name) : NULL;
 	}
 
 
@@ -45,9 +45,9 @@ namespace UI
 
 	Block::~Block()
 	{
-		if(m_gui->getFocusedBlock() == this)
+		if(m_gui.getFocusedBlock() == this)
 		{
-			m_gui->focus(NULL);
+			m_gui.focus(NULL);
 		}
 		for(int i = 0; i < m_children.size(); ++i)
 		{
@@ -238,7 +238,7 @@ namespace UI
 		serializer.beginArray("events");
 		for(int i = 0; i < m_event_handlers.size(); ++i)
 		{
-			serializer.serializeArrayItem(m_gui->getCallbackNameHash(m_event_handlers[i].callback));
+			serializer.serializeArrayItem(m_gui.getCallbackNameHash(m_event_handlers[i].callback));
 			serializer.serializeArrayItem(m_event_handlers[i].type);
 		}
 		serializer.endArray();
@@ -255,7 +255,7 @@ namespace UI
 	{
 		char tmp[1024];
 		serializer.deserialize("decorator", tmp, 1024);
-		m_decorator = m_gui->getDecorator(tmp);
+		m_decorator = m_gui.getDecorator(tmp);
 		int32_t count;
 		serializer.deserialize("event_count", count);
 		m_event_handlers.resize(count);
@@ -264,7 +264,7 @@ namespace UI
 		{
 			uint32_t hash;
 			serializer.deserializeArrayItem(hash);
-			EventCallback callback = m_gui->getCallback(hash);
+			EventCallback callback = m_gui.getCallback(hash);
 			m_event_handlers[i].callback = callback;
 			serializer.deserializeArrayItem(m_event_handlers[i].type);
 		}
@@ -304,7 +304,7 @@ namespace UI
 		{
 			uint32_t type;
 			serializer.deserializeArrayItem(type);
-			m_children.push_back(m_gui->createBlock(type, this));
+			m_children.push_back(m_gui.createBlock(type, this));
 			m_children[i]->deserialize(serializer);
 		}
 		serializer.deserializeArrayEnd();
@@ -326,8 +326,14 @@ namespace UI
 
 	Block::EventCallback& Block::getCallback(const char* type)
 	{
+		return getCallback(crc32(type));
+	}
+
+
+	Block::EventCallback& Block::getCallback(uint32_t type)
+	{
 		EventHandler handler;
-		handler.type = crc32(type);
+		handler.type = type;
 		m_event_handlers.push_back(handler);
 		return m_event_handlers[m_event_handlers.size()-1].callback;
 	}
@@ -336,7 +342,7 @@ namespace UI
 	void Block::registerEventHandler(const char* type, const char* callback)
 	{
 		EventHandler handler;
-		handler.callback = m_gui->getCallback(callback);
+		handler.callback = m_gui.getCallback(callback);
 		handler.type = crc32(type);
 		m_event_handlers.push_back(handler);
 	}
@@ -378,7 +384,7 @@ namespace UI
 			{
 				if(!focused)
 				{
-					m_gui->focus(this);
+					m_gui.focus(this);
 				}
 				emitEvent("click");
 				return true;
