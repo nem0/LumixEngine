@@ -15,6 +15,7 @@ namespace UI
 		m_gui = &gui;
 		m_tag = NULL;
 		m_z = 0;
+		m_is_clipping = false;
 		m_is_mouse_clickable = true;
 		m_local_area.top = m_local_area.bottom = m_local_area.left = m_local_area.right = 0;
 		m_global_area.top = m_global_area.bottom = m_global_area.left = m_global_area.right = 0;
@@ -210,6 +211,10 @@ namespace UI
 	{
 		if(m_is_shown)
 		{
+			if(m_is_clipping)
+			{
+				renderer.pushScissorArea(m_global_area.left, m_global_area.top, m_global_area.right, m_global_area.bottom);
+			}
 			if(m_decorator)
 			{
 				m_decorator->render(renderer, *this);
@@ -217,6 +222,10 @@ namespace UI
 			for(int i = 0, c = m_children.size(); i < c; ++i)
 			{
 				m_children[i]->render(renderer);
+			}
+			if(m_is_clipping)
+			{
+				renderer.popScissorArea();
 			}
 		}
 	}
@@ -335,7 +344,7 @@ namespace UI
 
 	bool Block::mouseDown(int x, int y)
 	{
-		if(x > m_click_area.left && x < m_click_area.right && y > m_click_area.top && y < m_click_area.bottom && m_is_shown)
+		if(x > m_content_area.left && x < m_content_area.right && y > m_content_area.top && y < m_content_area.bottom && m_is_shown)
 		{
 			for(int i = 0,c = m_children.size(); i < c; ++i)
 			{
@@ -353,7 +362,7 @@ namespace UI
 
 	bool Block::click(int x, int y)
 	{
-		if(x > m_click_area.left && x < m_click_area.right && y > m_click_area.top && y < m_click_area.bottom && m_is_shown)
+		if(x > m_content_area.left && x < m_content_area.right && y > m_content_area.top && y < m_content_area.bottom && m_is_shown)
 		{
 			bool focused = false;
 			for(int i = 0,c = m_children.size(); i < c; ++i)
@@ -412,11 +421,14 @@ namespace UI
 			m_global_area.top = round(m_local_area.top);
 			m_global_area.bottom = round(m_local_area.bottom);
 		}
-		m_click_area = m_global_area;
+		m_content_area = m_global_area;
 		for(int i = 0, c = m_children.size(); i < c; ++i)
 		{
 			m_children[i]->layout();
-			m_click_area.merge(m_children[i]->getClickArea());
+			if(!m_is_clipping)
+			{
+				m_content_area.merge(m_children[i]->getContentArea());
+			}
 		}
 	}
 

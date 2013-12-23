@@ -31,7 +31,6 @@ namespace UI
 		int i = static_cast<CheckBox&>(block).isChecked() ? 1 : 0;
 		if(m_parts[i])
 		{
-			renderer.setScissorArea((int)block.getGlobalLeft(), (int)block.getGlobalTop(), (int)block.getGlobalRight(), (int)block.getGlobalBottom());
 			setVertices(&m_vertices[0], block.getGlobalLeft(), block.getGlobalTop(), block.getGlobalRight(), block.getGlobalBottom(), block.getZ());
 			m_parts[i]->getUvs(&m_uvs[0]);
 

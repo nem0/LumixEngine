@@ -102,6 +102,7 @@ void Scrollbar::upArrowClicked(Block& block, void*)
 
 void Scrollbar::setValue(float value)
 {
+	float old_value = m_value;
 	m_value = value;
 	float t =(m_value - m_min) / (m_max - m_min);
 	if(m_scrollbar_type == VERTICAL)
@@ -123,7 +124,10 @@ void Scrollbar::setValue(float value)
 		m_slider->setArea(0, t, 0, 0, 0, t + 20, 0, 20);
 	}
 	m_slider->layout();
-	emitEvent("value_changed");
+	if(old_value != m_value)
+	{
+		emitEvent("value_changed");
+	}
 }
 
 

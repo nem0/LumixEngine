@@ -31,6 +31,7 @@ namespace UI
 			float getMax() const { return m_max; }
 			float getValue() const { return m_value; }
 			float getStep() const { return m_step; }
+			float getRelativeValue() const { return (m_value - m_min) / (m_max - m_min); }
 
 			void setRange(float min, float max) { m_min = min; m_max = max; }
 			void setValue(float value);
