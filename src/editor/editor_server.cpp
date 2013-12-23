@@ -14,8 +14,6 @@
 #include "core/map.h"
 #include "core/matrix.h"
 #include "core/memory_file_device.h"
-#include "core/tcp_acceptor.h"
-#include "core/tcp_stream.h"
 #include "core/vector.h"
 #include "editor/editor_icon.h"
 #include "editor/gizmo.h"
@@ -26,8 +24,9 @@
 #include "graphics/renderer.h"
 #include "platform/input_system.h"
 #include "platform/mutex.h"
-#include "platform/socket.h"
 #include "platform/task.h"
+#include "platform/tcp_acceptor.h"
+#include "platform/tcp_stream.h"
 #include "script\script_system.h"
 #include "universe/component_event.h"
 #include "universe/entity_destroyed_event.h"
@@ -726,7 +725,6 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 {
 	m_universe_mutex = MT::Mutex::create(false);
 	m_send_mutex = MT::Mutex::create(false);
-	Net::Socket::init();
 	m_message_task = new MessageTask();
 	m_message_task->m_server = this;
 	m_message_task->m_stream = NULL;
@@ -801,8 +799,8 @@ void EditorServerImpl::sendMessage(const uint8_t* data, int32_t length)
 	{
 		MT::Lock lock(*m_send_mutex);
 		const uint32_t guard = 0x12345678;
-		m_message_task->m_stream->write(&length, 4);
-		m_message_task->m_stream->write(&guard, 4);
+		m_message_task->m_stream->write(length);
+		m_message_task->m_stream->write(guard);
 		m_message_task->m_stream->write(data, length);
 	}
 }
