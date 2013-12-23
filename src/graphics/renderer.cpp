@@ -585,14 +585,16 @@ void Renderer::setUniverse(Universe* universe)
 		m_impl->m_lights.clear();
 		m_impl->m_entities.clear();
 		m_impl->m_paths.clear();
-		m_impl->m_universe->getEventManager()->unregisterListener(EntityMovedEvent::type, m_impl, &onEvent);
-		m_impl->m_universe->getEventManager()->unregisterListener(EntityDestroyedEvent::type, m_impl, &onEvent);
+		EventManager::Listener cb;
+		cb.bind<RendererImpl, &RendererImpl::onEvent>(m_impl);
+		m_impl->m_universe->getEventManager()->removeListener(EntityMovedEvent::type, cb);
+		m_impl->m_universe->getEventManager()->removeListener(EntityDestroyedEvent::type, cb);
 	}
 	m_impl->m_universe = universe;
 	if(m_impl->m_universe)
 	{
-		m_impl->m_universe->getEventManager()->registerListener(EntityMovedEvent::type, m_impl, &onEvent);
-		m_impl->m_universe->getEventManager()->registerListener(EntityDestroyedEvent::type, m_impl, &onEvent);
+		m_impl->m_universe->getEventManager()->addListener(EntityMovedEvent::type).bind<RendererImpl, &RendererImpl::onEvent>(m_impl);
+		m_impl->m_universe->getEventManager()->addListener(EntityDestroyedEvent::type).bind<RendererImpl, &RendererImpl::onEvent>(m_impl);
 	}
 }
 

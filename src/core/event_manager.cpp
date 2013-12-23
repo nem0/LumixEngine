@@ -12,35 +12,21 @@ void EventManager::emitEvent(Event& event)
 	{
 		for(int i = 0, c = iter.second().size(); i < c; ++i)
 		{
-			iter.second()[i].listener(iter.second()[i].data, event);
+			iter.second()[i].invoke(event);
 		}
 	}
 }
 
 
-void EventManager::registerListener(Event::Type type, void* data, void (*listener)(void*, Event&))
+EventManager::Listener& EventManager::addListener(Event::Type type)
 {
-	Listener l;
-	l.data = data;
-	l.listener = listener;
-	m_listeners[type].push_back(l);
+	return m_listeners[type].push_back_empty();
 }
 
 
-void EventManager::unregisterListener(Event::Type type, void* data, void (*listener)(void*, Event&))
+void EventManager::removeListener(Event::Type type, const Listener& listener)
 {
-	Listener l;
-	l.data = data;
-	l.listener = listener;
-	vector<Listener>& listeners = m_listeners[type];
-	for(int i = 0; i < listeners.size(); ++i)
-	{
-		if(listeners[i].data == data && listeners[i].listener == listener)
-		{
-			listeners.erase(i);
-			break;
-		}
-	}
+	ASSERT(false); // TODO
 }
 
 
