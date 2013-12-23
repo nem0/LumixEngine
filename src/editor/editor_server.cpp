@@ -1147,9 +1147,9 @@ void EditorServerImpl::createUniverse(bool create_scene, const char* base_path)
 {
 	Universe* universe = m_engine.createUniverse();
 	
-	universe->getEventManager()->registerListener(EntityMovedEvent::type, this, &EditorServerImpl::onEvent);
-	universe->getEventManager()->registerListener(ComponentEvent::type, this, &EditorServerImpl::onEvent);
-	universe->getEventManager()->registerListener(EntityDestroyedEvent::type, this, &EditorServerImpl::onEvent);
+	universe->getEventManager()->addListener(EntityMovedEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);
+	universe->getEventManager()->addListener(ComponentEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);
+	universe->getEventManager()->addListener(EntityDestroyedEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);
 
 	Quat q(0, 0, 0, 1);
 	m_camera_pos.set(0, 0, 0);

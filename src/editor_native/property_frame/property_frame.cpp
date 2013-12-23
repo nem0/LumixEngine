@@ -36,69 +36,66 @@ void PropertyFrame::positionChanged(Lux::UI::Block& block, void*)
 }
 
 
-void PropertyFrame::onEntitySelected(void* user_data, Lux::Event& evt)
+void PropertyFrame::onEntitySelected(Lux::Event& evt)
 {
-	PropertyFrame* that = static_cast<PropertyFrame*>(user_data);
-	while(that->m_component_container->getChildCount() > 0)
+	while(m_component_container->getChildCount() > 0)
 	{
-		that->m_component_container->getChild(0)->destroy();
+		m_component_container->getChild(0)->destroy();
 	}
-	that->m_component_uis.clear();
+	m_component_uis.clear();
 	Lux::EntitySelectedEvent& e = static_cast<Lux::EntitySelectedEvent&>(evt);
 	for(int i = 0; i < e.components.size(); ++i)
 	{
 		IComponentUI* ui = NULL;
-		that->m_main_frame->getEditorClient()->requestProperties(e.components[i]);
+		m_main_frame->getEditorClient()->requestProperties(e.components[i]);
 		if(e.components[i] == crc32("box_rigid_actor"))
 		{
-			ui = new BoxRigidActorUI(that->m_component_container, *that->m_main_frame->getEditorClient());
+			ui = new BoxRigidActorUI(m_component_container, *m_main_frame->getEditorClient());
 		}
 		else if(e.components[i] == crc32("renderable"))
 		{
-			ui = new RenderableUI(*that, that->m_component_container, *that->m_main_frame->getEditorClient());
+			ui = new RenderableUI(*this, m_component_container, *m_main_frame->getEditorClient());
 		}
 		else
 		{
 			ASSERT(false);
 		}
-		that->m_component_uis.push_back(ui);
+		m_component_uis.push_back(ui);
 	}
-	that->layout();
+	layout();
 	float h = 0;
-	for(int i = 0; i < that->m_component_container->getChildCount(); ++i)
+	for(int i = 0; i < m_component_container->getChildCount(); ++i)
 	{
-		Lux::UI::Block::Area& area = that->m_component_container->getChild(i)->getLocalArea();
+		Lux::UI::Block::Area& area = m_component_container->getChild(i)->getLocalArea();
 		area.top += h;
 		area.bottom += h;
-		that->m_component_container->getChild(i)->setArea(area);
+		m_component_container->getChild(i)->setArea(area);
 		h += area.bottom - area.top;
 	}
-	that->layout();
+	layout();
 }
 
 
-void PropertyFrame::onEntityProperties(void* user_data, Lux::Event& evt)
+void PropertyFrame::onEntityProperties(Lux::Event& evt)
 {
-	PropertyFrame* that = static_cast<PropertyFrame*>(user_data);
 	Lux::PropertyListEvent& e = static_cast<Lux::PropertyListEvent&>(evt);
-	for(int i = 0; i < that->m_component_uis.size(); ++i)
+	for(int i = 0; i < m_component_uis.size(); ++i)
 	{
-		that->m_component_uis[i]->onEntityProperties(e);
+		m_component_uis[i]->onEntityProperties(e);
 	}
 }
 
 
-void PropertyFrame::onEntityPosition(void* user_data, Lux::Event& evt)
+void PropertyFrame::onEntityPosition(Lux::Event& evt)
 {
-	PropertyFrame* that = static_cast<PropertyFrame*>(user_data);
 	Lux::EntityPositionEvent& e = static_cast<Lux::EntityPositionEvent&>(evt);
 	char tmp[30];
 	sprintf_s(tmp, "%f", e.x);
-	that->m_pos_x_box->setText(tmp);
+	m_pos_x_box->setText(tmp);
 	sprintf_s(tmp, "%f", e.y);
-	that->m_pos_y_box->setText(tmp);
+	m_pos_y_box->setText(tmp);
 	sprintf_s(tmp, "%f", e.z);
-	that->m_pos_z_box->setText(tmp);
+	m_pos_z_box->setText(tmp);
 }
 
 
@@ -156,8 +153,8 @@ PropertyFrame::PropertyFrame(MainFrame& main_frame)
 		item->setTag((void*)crc32("box_rigid_actor"));
 	}
 	
-	main_frame.getEditorClient()->getEventManager().registerListener(Lux::ServerMessageType::ENTITY_POSITION, this, &PropertyFrame::onEntityPosition);
-	main_frame.getEditorClient()->getEventManager().registerListener(Lux::ServerMessageType::PROPERTY_LIST, this, &PropertyFrame::onEntityProperties);
-	main_frame.getEditorClient()->getEventManager().registerListener(Lux::ServerMessageType::ENTITY_SELECTED, this, &PropertyFrame::onEntitySelected);
+	main_frame.getEditorClient()->getEventManager().addListener(Lux::ServerMessageType::ENTITY_POSITION).bind<PropertyFrame, &PropertyFrame::onEntityPosition>(this);
+	main_frame.getEditorClient()->getEventManager().addListener(Lux::ServerMessageType::PROPERTY_LIST).bind<PropertyFrame, &PropertyFrame::onEntityProperties>(this);
+	main_frame.getEditorClient()->getEventManager().addListener(Lux::ServerMessageType::ENTITY_SELECTED).bind<PropertyFrame, &PropertyFrame::onEntitySelected>(this);
 	
 }

@@ -30,7 +30,6 @@ struct PhysicsSceneImpl
 		BOX
 	};
 
-	static void handleEvent(void* data, Event& event);
 	void handleEvent(Event& event);
 	void createConvexGeom(const char* path, physx::PxConvexMeshGeometry& geom);
 	void createTriMesh(const char* path, physx::PxTriangleMeshGeometry& geom);
@@ -144,7 +143,7 @@ bool PhysicsScene::create(PhysicsSystem& system, Universe& universe)
 	m_impl = new PhysicsSceneImpl;
 	m_impl->m_owner = this;
 	m_impl->m_universe = &universe;
-	m_impl->m_universe->getEventManager()->registerListener(EntityMovedEvent::type, m_impl, &PhysicsSceneImpl::handleEvent);
+	m_impl->m_universe->getEventManager()->addListener(EntityMovedEvent::type).bind<PhysicsSceneImpl, &PhysicsSceneImpl::handleEvent>(m_impl);
 	physx::PxSceneDesc sceneDesc(system.m_impl->m_physics->getTolerancesScale());
 	sceneDesc.gravity = physx::PxVec3(0.0f, -9.8f, 0.0f);
 	if(!sceneDesc.cpuDispatcher) {
@@ -548,12 +547,6 @@ bool PhysicsScene::raycast(const Vec3& origin, const Vec3& dir, float distance, 
 			result.entity.index = (int)actor.userData;
 	}
 	return status;
-}
-
-
-void PhysicsSceneImpl::handleEvent(void* data, Event& event)
-{
-	static_cast<PhysicsSceneImpl*>(data)->handleEvent(event);
 }
 
 
