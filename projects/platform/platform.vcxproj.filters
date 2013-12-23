@@ -9,7 +9,6 @@
     <ClInclude Include="..\..\src\platform\spin_mutex.h" />
     <ClInclude Include="..\..\src\platform\atomic.h" />
     <ClInclude Include="..\..\src\platform\os_file.h" />
-    <ClInclude Include="..\..\scr\platform\tcp_stream_impl.h" />
     <ClInclude Include="..\..\src\platform\tcp_acceptor.h">
       <Filter>Net</Filter>
     </ClInclude>

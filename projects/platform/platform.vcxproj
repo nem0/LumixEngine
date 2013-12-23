@@ -86,7 +86,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\scr\platform\tcp_stream_impl.h" />
     <ClInclude Include="..\..\src\platform\atomic.h" />
     <ClInclude Include="..\..\src\platform\event.h" />
     <ClInclude Include="..\..\src\platform\input_system.h" />
