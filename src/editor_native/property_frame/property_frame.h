@@ -31,9 +31,9 @@ class PropertyFrame : public Lux::UI::Block
 		void createComponentClicked(Lux::UI::Block& block, void*);
 		void positionChanged(Lux::UI::Block& block, void*);
 		void newComponentClick(Lux::UI::Block& block, void*);
-		static void onEntitySelected(void* user_data, Lux::Event& evt);
-		static void onEntityPosition(void* user_data, Lux::Event& evt);
-		static void onEntityProperties(void* user_data, Lux::Event& evt);
+		void onEntitySelected(Lux::Event& evt);
+		void onEntityPosition(Lux::Event& evt);
+		void onEntityProperties(Lux::Event& evt);
 
 	private:
 		Lux::UI::Button* m_create_component_button;
