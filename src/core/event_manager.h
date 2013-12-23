@@ -2,6 +2,7 @@
 
 
 #include "core/lux.h"
+#include "core/delegate.h"
 #include "core/vector.h"
 #include "core/map.h"
 
@@ -26,18 +27,15 @@ class LUX_CORE_API Event
 class LUX_CORE_API EventManager
 {
 	public:
-		void registerListener(Event::Type type, void* data, void (*listener)(void*, Event&));
-		void unregisterListener(Event::Type type, void* data, void (*listener)(void*, Event&));
+		typedef Delegate<void (Event&)> Listener;
+
+	public:
+		Listener& addListener(Event::Type type);
+		void removeListener(Event::Type type, const Listener& listener);
 		void emitEvent(Event& event);
 
 	private:
 		typedef uint32_t EventType;
-
-		struct Listener
-		{
-			void* data;
-			void (*listener)(void*, Event&);
-		};
 
 		typedef map<Event::Type, vector<Listener> > ListenerMap;
 

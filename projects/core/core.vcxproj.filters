@@ -1,7 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="..\..\src\core\base64.cpp" />
     <ClCompile Include="..\..\src\core\crc32.cpp" />
     <ClCompile Include="..\..\src\core\event_manager.cpp" />
     <ClCompile Include="..\..\src\core\istream.cpp" />
@@ -10,7 +9,6 @@
     <ClCompile Include="..\..\src\core\json_serializer.cpp" />
     <ClCompile Include="..\..\src\core\matrix.cpp" />
     <ClCompile Include="..\..\src\core\quat.cpp" />
-    <ClCompile Include="..\..\src\core\sha1.cpp" />
     <ClCompile Include="..\..\src\core\file_utils.cpp" />
     <ClCompile Include="..\..\src\core\math_utils.cpp" />
     <ClCompile Include="..\..\src\core\log.cpp" />
@@ -29,7 +27,6 @@
     <ClCompile Include="..\..\src\core\tcp_stream.cpp">
       <Filter>Net</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\core\memory_stream.cpp" />
     <ClCompile Include="..\..\src\core\tcp_file_device.cpp">
       <Filter>FS</Filter>
     </ClCompile>
@@ -39,9 +36,9 @@
     <ClCompile Include="..\..\src\core\disk_file_device.cpp">
       <Filter>FS</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\blob.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\src\core\base64.h" />
     <ClInclude Include="..\..\src\core\crc32.h" />
     <ClInclude Include="..\..\src\core\event_manager.h" />
     <ClInclude Include="..\..\src\core\istream.h" />
@@ -51,14 +48,12 @@
     <ClInclude Include="..\..\src\core\map.h" />
     <ClInclude Include="..\..\src\core\matrix.h" />
     <ClInclude Include="..\..\src\core\quat.h" />
-    <ClInclude Include="..\..\src\core\sha1.h" />
     <ClInclude Include="..\..\src\core\string.h" />
     <ClInclude Include="..\..\src\core\vec3.h" />
     <ClInclude Include="..\..\src\core\vector.h" />
     <ClInclude Include="..\..\src\core\lux.h" />
     <ClInclude Include="..\..\src\core\file_utils.h" />
     <ClInclude Include="..\..\src\core\math_utils.h" />
-    <ClInclude Include="..\..\src\core\functor.h" />
     <ClInclude Include="..\..\src\core\iserializer.h" />
     <ClInclude Include="..\..\src\core\log.h" />
     <ClInclude Include="..\..\src\core\ifile_system_defines.h">
@@ -82,7 +77,6 @@
     <ClInclude Include="..\..\src\core\ifile.h">
       <Filter>FS</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\memory_stream.h" />
     <ClInclude Include="..\..\src\core\ifile_device.h">
       <Filter>FS</Filter>
     </ClInclude>
@@ -104,6 +98,8 @@
     <ClInclude Include="..\..\src\core\transaction_queue.h">
       <Filter>MT</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\delegate.h" />
+    <ClInclude Include="..\..\src\core\blob.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="FS">
