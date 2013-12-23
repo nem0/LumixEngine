@@ -49,8 +49,16 @@
 #define LUX_PLATFORM_API __declspec(dllimport)
 #endif
 
+#ifdef BUILDING_GUI
+#define LUX_GUI_API __declspec(dllexport)
+#else
+#define LUX_GUI_API __declspec(dllimport)
+#endif
+
+
 #define LUX_FINAL final
 #define LUX_OVERRIDE override
 #define LUX_ABSTRACT abstract
 
-#pragma warning( disable : 4251 )
+#pragma warning(disable : 4251)
+#pragma warning(disable : 4996)

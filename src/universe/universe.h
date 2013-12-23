@@ -45,7 +45,6 @@ class LUX_ENGINE_API Universe LUX_FINAL
 		void deserialize(ISerializer& serializer);
 
 	private:
-		static void onEvent(void* data, Event& event);
 		void onEvent(Event& event);
 	
 	private:
