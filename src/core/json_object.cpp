@@ -3,7 +3,7 @@
 #include <cstdio>
 
 
-JsonObject::JsonObject(int m_token_idx, char* data, jsmntok_t* m_tokens)
+JsonObject::JsonObject(int m_token_idx, const char* data, jsmntok_t* m_tokens)
 {
 	this->m_token_idx = m_token_idx;
 	this->m_data = data;
@@ -130,7 +130,7 @@ JsonObject JsonObject::getArrayItem(int index) const
 }
 
 
-char* JsonObject::getStart() const
+const char* JsonObject::getStart() const
 {
 	return m_data + m_tokens[m_token_idx].start;
 }

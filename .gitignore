@@ -6,3 +6,4 @@ obj/
 *.opensdf
 *.user
 evona_test/
+*.orig
