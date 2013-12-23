@@ -28,7 +28,7 @@ class LogUI : public Lux::UI::Scrollable
 		LogUI(MainFrame& main_frame);
 
 	private:
-		static void onLogMessage(void* user_data, Lux::Event& evt);
+		void onLogMessage(Lux::Event& evt);
 
 	private:
 		MainFrame& m_main_frame;
