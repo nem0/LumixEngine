@@ -40,7 +40,6 @@ namespace UI
 			if(scrollbar.getScrollbarType() == Scrollbar::HORIZONTAL)
 			{
 				float w = m_atlas->getTexture()->getWidth();
-				renderer.setScissorArea((int)block.getGlobalLeft(), (int)block.getGlobalTop(), (int)block.getGlobalRight(), (int)block.getGlobalBottom());
 				float l = block.getGlobalLeft() + m_parts[HORIZONTAL_BEGIN]->m_pixel_width;
 				float r = block.getGlobalRight() - m_parts[HORIZONTAL_END]->m_pixel_width;
 
@@ -55,7 +54,6 @@ namespace UI
 			else 
 			{
 				float w = m_atlas->getTexture()->getWidth();
-				renderer.setScissorArea((int)block.getGlobalLeft(), (int)block.getGlobalTop(), (int)block.getGlobalRight(), (int)block.getGlobalBottom());
 				float t = block.getGlobalTop() + m_parts[VERTICAL_BEGIN]->m_pixel_height;
 				float b = block.getGlobalBottom() - m_parts[VERTICAL_END]->m_pixel_height;
 

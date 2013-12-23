@@ -17,6 +17,7 @@ TextBox::TextBox(const char* text, Gui& gui, Block* parent)
 	label_ui->setBlockText(text);
 	label_ui->setArea(0, 3, 0, 0, 1, 0, 1, 0);
 	label_ui->registerEventHandler("key_down", "_tb_key_down");
+	label_ui->setIsClipping(true);
 }
 
 

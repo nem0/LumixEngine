@@ -29,7 +29,7 @@ namespace UI
 			struct Area	
 			{
 				void merge(const Area& area);
-
+				
 				float left;
 				float right;
 				float top;
@@ -53,11 +53,15 @@ namespace UI
 			float getGlobalBottom() const { return m_global_area.bottom; }
 			float getGlobalLeft() const { return m_global_area.left; }
 			Area& getGlobalArea() { return m_global_area; }
-			Area& getClickArea() { return m_click_area; }
+			float getGlobalWidth() const { return m_global_area.right - m_global_area.left; }
+			float getGlobalHeight() const { return m_global_area.bottom - m_global_area.top; }
+			Area& getContentArea() { return m_content_area; }
 			Area& getLocalArea() { return m_local_area; }
 			void setBlockText(const char* text) { m_text = text; }
 			const string& getBlockText() const { return m_text; }
 			bool isShown() const { return m_is_shown; }
+			bool isClipping() const { return m_is_clipping; }
+			void setIsClipping(bool is_clipping) { m_is_clipping = is_clipping; }
 			void hide() { m_is_shown = false; }
 			void show() { m_is_shown = true; }
 			void setParent(Block* block);
@@ -107,7 +111,7 @@ namespace UI
 			vector<EventHandler> m_event_handlers; 
 			Area m_local_area;
 			Area m_global_area;
-			Area m_click_area;
+			Area m_content_area;
 			string m_text;
 			bool m_is_shown;
 			bool m_is_dirty_layout;
@@ -115,6 +119,7 @@ namespace UI
 			bool m_fit_content;
 			bool m_is_focus_processing;
 			bool m_is_mouse_clickable;
+			bool m_is_clipping;
 			Gui* m_gui;
 			void* m_tag;
 			float m_z;
