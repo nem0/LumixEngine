@@ -6,18 +6,35 @@ namespace Lux
 {
 	namespace MT
 	{
+		const uint32_t STACK_SIZE = 0x8000;
+
 		void SetThreadName(DWORD thread_id, const char* thread_name);
 
-		const unsigned int STACK_SIZE = 0x8000;
+		
+		static uint32_t s_main_thread_id = 0;
+
+		void sleep(uint32_t miliseconds) { ::Sleep(miliseconds); }
+
+		uint32_t getCurrentThreadID() { return ::GetCurrentThreadId(); }
+
+		uint32_t getProccessAffinityMask() 
+		{ 
+			uint32_t process, system;
+			::GetProcessAffinityMask(::GetCurrentProcess(), (PDWORD_PTR)&process, (PDWORD_PTR)&system);
+			return process;
+		}
+
+		bool isMainThread() { return s_main_thread_id == ::GetCurrentThreadId(); }
+		void setMainThread() { s_main_thread_id = ::GetCurrentThreadId(); }
 
 		struct TaskImpl
 		{
 			HANDLE m_handle;
 			DWORD m_thread_id;
-			unsigned int m_affinity_mask;
-			unsigned int m_priority;
+			uint32_t m_affinity_mask;
+			uint32_t m_priority;
 			volatile bool m_is_running;
-			volatile bool m_force_exit; //TODO: m_force_exit
+			volatile bool m_force_exit;
 			volatile bool m_exited;
 			const char* m_thread_name;
 			Task* m_owner;
@@ -25,8 +42,8 @@ namespace Lux
 
 		static DWORD WINAPI threadFunction(LPVOID ptr)
 		{
-			unsigned int ret = -1;
-			struct TaskImpl* impl =  reinterpret_cast<TaskImpl*>(ptr);
+			uint32_t ret = -1;
+			struct TaskImpl* impl = reinterpret_cast<TaskImpl*>(ptr);
 			if(!impl->m_force_exit)
 			{
 				impl->m_is_running = true;
@@ -42,7 +59,7 @@ namespace Lux
 		{
 			TaskImpl* impl = new TaskImpl();
 			impl->m_handle = NULL;
-			impl->m_affinity_mask = 0; //TODO ::GetProcessAffinityMask(Getcur);
+			impl->m_affinity_mask = getProccessAffinityMask();
 			impl->m_priority = ::GetThreadPriority(GetCurrentThread());
 			impl->m_is_running = false;
 			impl->m_force_exit = false;
@@ -73,7 +90,7 @@ namespace Lux
 
 		bool Task::run()
 		{
-			return ResumeThread(m_implementation->m_handle) != -1;
+			return ::ResumeThread(m_implementation->m_handle) != -1;
 		}
 
 		bool Task::destroy()
@@ -88,9 +105,57 @@ namespace Lux
 			return true;
 		}
 
+		void Task::setAffinityMask(uint32_t affinity_mask)
+		{
+			m_implementation->m_affinity_mask = affinity_mask;
+			if(m_implementation->m_handle)
+			{
+				::SetThreadAffinityMask(m_implementation->m_handle, affinity_mask);
+			}
+		}
+
+		void Task::setPriority(uint32_t priority)
+		{
+			m_implementation->m_priority = priority;
+			if(m_implementation->m_handle)
+			{
+				::SetThreadPriority(m_implementation->m_handle, priority);
+			}
+		}
+
+		uint32_t Task::getAffinityMask() const
+		{
+			return m_implementation->m_affinity_mask;
+		}
+
+		uint32_t Task::getPriority() const
+		{
+			return m_implementation->m_priority;
+		}
+
+		bool Task::isRunning() const
+		{
+			return m_implementation->m_is_running;
+		}
+
 		bool Task::isFinished() const 
 		{ 
 			return m_implementation->m_exited; 
+		}
+
+		bool Task::isForceExit() const
+		{
+			return m_implementation->m_force_exit;
+		}
+
+		void Task::forceExit(bool wait)
+		{
+			m_implementation->m_force_exit = true;
+
+			while(!isFinished() && wait)
+			{
+				Sleep(0);
+			}
 		}
 
 		static const DWORD MS_VC_EXCEPTION=0x406D1388;
