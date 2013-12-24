@@ -18,8 +18,6 @@
 #include "gui/decorators/scrollbar_decorator.h"
 #include "gui/gui.h"
 #include "gui/opengl_renderer.h"
-#include "platform/socket.h"
-
 
 SDL_Renderer* displayRenderer;
 SDL_Window* displayWindow;
