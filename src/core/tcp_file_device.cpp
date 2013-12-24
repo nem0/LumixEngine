@@ -24,15 +24,16 @@ namespace Lux
 				m_stream->write(op);
 				m_stream->write(mode);
 				m_stream->write(path);
-				m_stream->read(ret);
+				m_stream->read(m_file);
 
-				return 1 == ret;
+				return -1 != m_file;
 			}
 
 			virtual void close() LUX_OVERRIDE
 			{
 				int32_t op = TCPCommand::Close;
 				m_stream->write(op);
+				m_stream->write(m_file);
 			}
 
 			virtual bool read(void* buffer, size_t size) LUX_OVERRIDE
@@ -40,6 +41,7 @@ namespace Lux
 				int32_t op = TCPCommand::Read;
 
 				m_stream->write(op);
+				m_stream->write(m_file);
 				m_stream->write(size);
 				return m_stream->read(buffer, size);
 			}
@@ -49,6 +51,7 @@ namespace Lux
 				int32_t op = TCPCommand::Write;
 
 				m_stream->write(op);
+				m_stream->write(m_file);
 				m_stream->write(size);
 				return m_stream->write(buffer, size);
 			}
@@ -63,6 +66,7 @@ namespace Lux
 				int32_t op = TCPCommand::Size;
 				uint32_t size = 0;
 				m_stream->write(op);
+				m_stream->write(m_file);
 				m_stream->read(size);
 
 				return size;
@@ -73,6 +77,7 @@ namespace Lux
 				int32_t op = TCPCommand::Seek;
 
 				m_stream->write(op);
+				m_stream->write(m_file);
 				m_stream->write(base);
 				m_stream->write(pos);
 
@@ -88,6 +93,7 @@ namespace Lux
 				size_t pos = 0;
 
 				m_stream->write(op);
+				m_stream->write(m_file);
 				m_stream->read(pos);
 
 				return pos;
@@ -95,6 +101,7 @@ namespace Lux
 
 		private:
 			Net::TCPStream* m_stream;
+			uint32_t m_file;
 		};
 
 		struct TCPImpl
