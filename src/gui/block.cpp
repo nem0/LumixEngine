@@ -102,6 +102,7 @@ namespace UI
 
 	void Block::setArea(float rel_left, float left, float rel_top, float top, float rel_right, float right, float rel_bottom, float bottom)
 	{
+		ASSERT(rel_left >= 0 && rel_top >= 0);
 		m_local_area.rel_left = rel_left;
 		m_local_area.left = left;
 		m_local_area.rel_top = rel_top;
@@ -189,6 +190,27 @@ namespace UI
 				break;
 			}
 		}
+	}
+
+
+	Block* Block::getBlock(float x, float y)
+	{
+		if(x > m_content_area.left && x < m_content_area.right && y > m_content_area.top && y < m_content_area.bottom && m_is_shown)
+		{
+			for(int i = 0; i < m_children.size(); ++i)
+			{
+				Block* dest = m_children[i]->getBlock(x, y);
+				if(dest)
+				{
+					return dest;
+				}
+			}
+			if(x > m_global_area.left && x < m_global_area.right && y > m_global_area.top && y < m_global_area.bottom)
+			{
+				return this;
+			}
+		}
+		return NULL;
 	}
 
 

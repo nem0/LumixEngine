@@ -23,7 +23,7 @@
 
 SDL_Renderer* displayRenderer;
 SDL_Window* displayWindow;
-MainFrame g_main_frame;
+MainFrame* g_main_frame;
 
 
 void initGui(Lux::EditorClient& client, Lux::EditorServer& server)
@@ -49,7 +49,8 @@ void initGui(Lux::EditorClient& client, Lux::EditorServer& server)
 	check_box_decorator->create(*gui, "gui/skin.atl");
 	scrollbar_decorator->create(*gui, "gui/skin.atl");
 	box_decorator->create(*gui, "gui/skin.atl");
-	g_main_frame.create(client, *gui, 800, 600);
+	g_main_frame = new MainFrame(client, *gui, gui->createTopLevelBlock(800, 600));
+	g_main_frame->getParent()->layout();
 }
 
 
@@ -92,8 +93,8 @@ int main(int argc, char* argv[])
 					{
 						static_cast<Lux::UI::OpenGLRenderer&>(gui->getRenderer()).setWindowHeight(evt.window.data2);
 						server.onResize(evt.window.data1, evt.window.data2);
-						g_main_frame.getUI().setArea(0, 0, 0, 0, 0, (float)evt.window.data1, 0, (float)evt.window.data2);
-						g_main_frame.getUI().layout();
+						g_main_frame->getParent()->setArea(0, 0, 0, 0, 0, (float)evt.window.data1, 0, (float)evt.window.data2);
+						g_main_frame->getParent()->layout();
 					}
 					break;
 				case SDL_TEXTEDITING:

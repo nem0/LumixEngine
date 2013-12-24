@@ -2,7 +2,7 @@
 
 
 #include "core/string.h"
-#include "gui/controls/scrollable.h"
+#include "gui/controls/dockable.h"
 
 
 class MainFrame;
@@ -18,11 +18,12 @@ namespace Lux
 	namespace UI
 	{
 		class Gui;
+		class Scrollable;
 	}
 }
 
 
-class LogUI : public Lux::UI::Scrollable
+class LogUI : public Lux::UI::Dockable
 {
 	public:
 		LogUI(MainFrame& main_frame);
@@ -32,4 +33,5 @@ class LogUI : public Lux::UI::Scrollable
 
 	private:
 		MainFrame& m_main_frame;
+		Lux::UI::Scrollable* m_scrollable;
 };

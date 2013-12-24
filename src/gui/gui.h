@@ -52,6 +52,7 @@ namespace UI
 			Atlas* loadAtlas(const char* path);
 			Block* createGui(Lux::FS::IFile& file);
 			Block* createBlock(uint32_t type, Block* parent);
+			Block* getBlock(int x, int y);
 			MouseCallback& addMouseMoveCallback();
 			MouseCallback& addMouseUpCallback();
 			void removeMouseMoveCallback(MouseCallback& callback);

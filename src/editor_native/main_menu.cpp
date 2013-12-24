@@ -73,7 +73,7 @@ void MainMenu::saveFileClicked(Lux::UI::Block& block, void*)
 
 
 MainMenu::MainMenu(MainFrame& main_frame)
-	: MenuBar(main_frame.getGui(), &main_frame.getUI())
+	: MenuBar(main_frame.getGui(), &main_frame)
 {
 	m_main_frame = &main_frame;
 	// file
