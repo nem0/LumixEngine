@@ -618,8 +618,9 @@ void loadMap(FS::IFile* file, bool success, void* user_data)
 	ASSERT(success);
 	if(success)
 	{
-		static_cast<EditorServerImpl*>(user_data)->load(*file);
-		file->close();
+		EditorServerImpl* esi = static_cast<EditorServerImpl*>(user_data);
+		esi->load(*file);
+		esi->m_engine.getFileSystem().close(file);
 	}
 }
 

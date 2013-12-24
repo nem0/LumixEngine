@@ -188,7 +188,7 @@ namespace Lux
 				}
 			}
 
-			const char* getDefaultDevice() const LUX_OVERRIDE { return "memory:disk"; }
+			const char* getDefaultDevice() const LUX_OVERRIDE { return "memory:tcp"; }
 			const char* getSaveGameDevice() const LUX_OVERRIDE { return "memory:disk"; }
 
 			IFileDevice* getDevice(const char* device)

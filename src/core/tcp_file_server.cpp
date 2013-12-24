@@ -1,8 +1,10 @@
 #include "core/tcp_file_server.h"
 
+#include "core/free_list.h"
 #include "core/tcp_acceptor.h"
 #include "core/tcp_file_device.h"
 #include "core/tcp_stream.h"
+#include "core/vector.h"
 #include "platform/task.h"
 #include "platform/os_file.h"
 
@@ -24,7 +26,14 @@ namespace Lux
 				m_acceptor.start("127.0.0.1", 10001);
 				Net::TCPStream* stream = m_acceptor.accept();
 
-				OsFile* file = new OsFile();
+				vector<OsFile*> files;
+				vector<uint32_t> ids;
+				files.resize(255);
+				ids.resize(255);
+				for(int i = 0; i < 255; i++) ids[i] = i;
+
+				uint32_t rd = 0;
+
 				while(!quit)
 				{
 					int32_t op = 0;
@@ -38,18 +47,32 @@ namespace Lux
 							stream->read(mode);
 							stream->read(buffer, 1024);
 
-							int32_t ret = file->open(buffer, mode) ? 1 : 0;
+							uint32_t id = ids[rd++];
+							OsFile* file = new OsFile();
+							files[id & 0xFF] = file;
+
+							int32_t ret = file->open(buffer, mode) ? id : -1;
 							stream->write(ret);
 							//todo: return id as well
 						}
 						break;
 					case TCPCommand::Close:
 						{
+							uint32_t id = -1;
+							stream->read(id);
+							OsFile* file = files[id & 0xFF];
+							ids[--rd] = id;
+
 							file->close();
+							delete file;
 						}
 						break;
 					case TCPCommand::Read:
 						{
+							uint32_t id = -1;
+							stream->read(id);
+							OsFile* file = files[id & 0xFF];
+
 							uint32_t size = 0;
 							stream->read(size);
 
@@ -64,6 +87,10 @@ namespace Lux
 						break;
 					case TCPCommand::Write:
 						{
+							uint32_t id = -1;
+							stream->read(id);
+							OsFile* file = files[id & 0xFF];
+
 							uint32_t size = 0;
 							stream->read(size);
 
@@ -78,12 +105,20 @@ namespace Lux
 						break;
 					case TCPCommand::Size:
 						{
+							uint32_t id = -1;
+							stream->read(id);
+							OsFile* file = files[id & 0xFF];
+
 							uint32_t size = file->size();
 							stream->write(size);
 						}
 						break;
 					case TCPCommand::Seek:
 						{
+							uint32_t id = -1;
+							stream->read(id);
+							OsFile* file = files[id & 0xFF];
+
 							uint32_t base = 0;
 							int32_t offset = 0;
 							stream->read(base);
@@ -95,6 +130,10 @@ namespace Lux
 						break;
 					case TCPCommand::Pos:
 						{
+							uint32_t id = -1;
+							stream->read(id);
+							OsFile* file = files[id & 0xFF];
+
 							uint32_t pos = file->pos();
 							stream->write(pos);
 						}
