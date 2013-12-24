@@ -7,19 +7,18 @@ namespace Lux
 	namespace Net
 	{
 		class TCPStream;
-		class Socket;
 
-		class LUX_CORE_API TCPAcceptor
+		class LUX_PLATFORM_API TCPAcceptor
 		{
 		public:
-			TCPAcceptor();
+			TCPAcceptor() {}
 			~TCPAcceptor();
 
 			bool start(const char* ip, uint16_t port);
 			TCPStream* accept();
-
+			
 		private:
-			Socket* m_socket;
+			uintptr_t m_socket;
 		};
 	} // ~namespace Net
 } // ~namespace Lux
