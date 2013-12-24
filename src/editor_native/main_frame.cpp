@@ -8,25 +8,28 @@
 #include "gui/gui.h"
 
 
-bool MainFrame::create(Lux::EditorClient& client, Lux::UI::Gui& gui, float width, float height)
+MainFrame::MainFrame(Lux::EditorClient& client, Lux::UI::Gui& gui, Lux::UI::Block* parent)
+	: Block(gui, parent, NULL)
 {
 	m_editor_client = &client;
 	m_gui = &gui;
-	m_ui = gui.createTopLevelBlock(width, height);
-	m_ui->setArea(0, 0, 0, 0, 0, width, 0, height);
-	m_ui->setIsClickable(false);
+
+	setArea(0, 0, 0, 0, 1, 0, 1, 0);
+	m_dockable = new Lux::UI::Dockable(gui, this);
+	m_dockable->setArea(0, 0, 0, 20, 1, 0, 1, 0);
+
+	parent->setIsClickable(false);
+	setIsClickable(false);
+	m_dockable->setIsClickable(false);
+	m_dockable->getContent()->setIsClickable(false);
 
 	m_main_menu = new MainMenu(*this);
 	m_property_frame = new PropertyFrame(*this);
 	m_log_ui = new LogUI(*this);
 
-	m_ui->layout();
-
 	char path[MAX_PATH];
 	GetCurrentDirectory(MAX_PATH, path);
 	m_startup_directory = path;
-
-	return true;
 }
 
 

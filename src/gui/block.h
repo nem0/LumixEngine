@@ -68,6 +68,7 @@ namespace UI
 			Block* getParent() const { return m_parent; }
 			int getChildCount() const { return m_children.size(); }
 			Block* getChild(int index) const { return m_children.size() > index ? m_children[index] : NULL; }
+			Block* getBlock(float x, float y);
 			Gui& getGui() const { return m_gui; }
 			void render(IRenderer& renderer);
 			float getWidth() const { return m_local_area.right - m_local_area.left; }

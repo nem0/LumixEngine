@@ -251,6 +251,21 @@ namespace UI
 	}
 
 
+	Block* Gui::getBlock(int x, int y)
+	{
+		float fx = (float)x;
+		float fy = (float)y;
+		for(int i = m_impl->m_blocks.size() - 1; i >= 0; --i)
+		{
+			Block* dest = m_impl->m_blocks[i]->getBlock(fx, fy);
+			if(dest)
+			{
+				return dest;
+			}
+		}
+	}
+
+
 	void Gui::mouseUp(int x, int y)
 	{
 		for(int i = m_impl->m_mouse_up_callbacks.size() - 1; i >= 0; --i)
