@@ -59,6 +59,7 @@ class LUX_ENGINE_API Renderer
 		void getCameraMatrix(Matrix& mtx);
 		void setCameraMatrix(const Matrix& mtx);
 		const char* getBasePath() const;
+		bool isReady() const;
 
 		void serialize(ISerializer& serializer);
 		void deserialize(ISerializer& serializer);

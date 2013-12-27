@@ -37,7 +37,7 @@ void Universe::create()
 Universe::Universe()
 {
 	m_event_manager = new EventManager;
-	m_event_manager->registerListener(ComponentEvent::type, this, &Universe::onEvent);
+	m_event_manager->addListener(ComponentEvent::type).bind<Universe, &Universe::onEvent>(this);
 }
 
 
@@ -74,12 +74,6 @@ void Universe::destroyEntity(const Entity& entity)
 		m_event_manager->emitEvent(EntityDestroyedEvent(entity));
 		m_component_list[entity.index].clear();
 	}
-}
-
-
-void Universe::onEvent(void* data, Event& event)
-{
-	static_cast<Universe*>(data)->onEvent(event);
 }
 
 

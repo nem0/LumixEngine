@@ -32,12 +32,6 @@ namespace Lux
 		void onEvent(Event& event);
 	};
 
-	static void onEvent(void* data, Event& event)
-	{
-		static_cast<AnimationSystemImpl*>(data)->onEvent(event);
-	}
-
-
 	bool AnimationSystem::create(Engine& engine)
 	{
 		m_impl = new AnimationSystemImpl();
@@ -58,7 +52,7 @@ namespace Lux
 	{
 		ASSERT(!m_impl->m_universe);
 		m_impl->m_universe = &universe;
-		m_impl->m_universe->getEventManager()->registerListener(ComponentEvent::type, m_impl, &onEvent);
+		m_impl->m_universe->getEventManager()->addListener(ComponentEvent::type).bind<AnimationSystemImpl, &AnimationSystemImpl::onEvent>(m_impl);
 	}
 
 
@@ -66,7 +60,9 @@ namespace Lux
 	{
 		ASSERT(m_impl->m_universe);
 		m_impl->m_animables.clear();
-		m_impl->m_universe->getEventManager()->unregisterListener(ComponentEvent::type, m_impl, &onEvent);
+		EventManager::Listener cb;
+		cb.bind<AnimationSystemImpl, &AnimationSystemImpl::onEvent>(m_impl);
+		m_impl->m_universe->getEventManager()->removeListener(ComponentEvent::type, cb);
 		m_impl->m_universe = 0;
 	}
 

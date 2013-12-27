@@ -16,6 +16,7 @@ namespace Lux
 
 
 	class IPlugin;
+	class Engine;
 
 
 	class LUX_ENGINE_API EditorServer
@@ -29,6 +30,7 @@ namespace Lux
 			void tick(HWND hwnd, HWND game_hwnd);
 			void registerCreator(uint32_t type, IPlugin& creator);
 			void registerProperty(const char* component_type, PropertyDescriptor& descriptor);
+			Engine& getEngine();
 
 		private:
 			struct EditorServerImpl* m_impl;

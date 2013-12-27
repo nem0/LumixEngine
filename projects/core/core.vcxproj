@@ -85,9 +85,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\src\core\base64.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
-    </ClCompile>
+    <ClCompile Include="..\..\src\core\blob.cpp" />
     <ClCompile Include="..\..\src\core\crc32.cpp" />
     <ClCompile Include="..\..\src\core\disk_file_device.cpp" />
     <ClCompile Include="..\..\src\core\event_manager.cpp" />
@@ -101,26 +99,17 @@
     <ClCompile Include="..\..\src\core\math_utils.cpp" />
     <ClCompile Include="..\..\src\core\matrix.cpp" />
     <ClCompile Include="..\..\src\core\memory_file_device.cpp" />
-    <ClCompile Include="..\..\src\core\memory_stream.cpp" />
     <ClCompile Include="..\..\src\core\quat.cpp" />
-    <ClCompile Include="..\..\src\core\sha1.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
-    </ClCompile>
-    <ClCompile Include="..\..\src\core\tcp_acceptor.cpp" />
-    <ClCompile Include="..\..\src\core\tcp_connector.cpp" />
     <ClCompile Include="..\..\src\core\tcp_file_server.cpp" />
-    <ClCompile Include="..\..\src\core\tcp_stream.cpp" />
     <ClCompile Include="..\..\src\core\tcp_file_device.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\src\core\base64.h">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
-    </ClInclude>
+    <ClInclude Include="..\..\src\core\blob.h" />
     <ClInclude Include="..\..\src\core\crc32.h" />
+    <ClInclude Include="..\..\src\core\delegate.h" />
     <ClInclude Include="..\..\src\core\disk_file_device.h" />
     <ClInclude Include="..\..\src\core\file_system.h" />
     <ClInclude Include="..\..\src\core\file_utils.h" />
-    <ClInclude Include="..\..\src\core\functor.h" />
     <ClInclude Include="..\..\src\core\ifile_device.h" />
     <ClInclude Include="..\..\src\core\ifile.h" />
     <ClInclude Include="..\..\src\core\ifile_system_defines.h" />
@@ -138,16 +127,9 @@
     <ClInclude Include="..\..\src\core\math_utils.h" />
     <ClInclude Include="..\..\src\core\matrix.h" />
     <ClInclude Include="..\..\src\core\memory_file_device.h" />
-    <ClInclude Include="..\..\src\core\memory_stream.h" />
     <ClInclude Include="..\..\src\core\quat.h" />
-    <ClInclude Include="..\..\src\core\sha1.h">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\string.h" />
-    <ClInclude Include="..\..\src\core\tcp_acceptor.h" />
-    <ClInclude Include="..\..\src\core\tcp_connector.h" />
     <ClInclude Include="..\..\src\core\tcp_file_server.h" />
-    <ClInclude Include="..\..\src\core\tcp_stream.h" />
     <ClInclude Include="..\..\src\core\tcp_file_device.h" />
     <ClInclude Include="..\..\src\core\transaction_queue.h" />
     <ClInclude Include="..\..\src\core\vec3.h" />

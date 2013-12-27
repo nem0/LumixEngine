@@ -110,19 +110,19 @@ void Gizmo::setUniverse(Universe* universe)
 	m_universe = universe;
 	if(m_universe)
 	{
-		m_universe->getEventManager()->registerListener(EntityMovedEvent::type, this, &Gizmo::onEvent);
+		m_universe->getEventManager()->addListener(EntityMovedEvent::type).bind<Gizmo, &Gizmo::onEvent>(this);
 	}
 }
 
 
-void Gizmo::onEvent(void* data, Event& evt)
+void Gizmo::onEvent(Event& evt)
 {
 	if(evt.getType() == EntityMovedEvent::type)
 	{
 		Entity e = static_cast<EntityMovedEvent&>(evt).entity;
-		if(e == static_cast<Gizmo*>(data)->m_selected_entity)
+		if(e == m_selected_entity)
 		{
-			static_cast<Gizmo*>(data)->setMatrix(e.getMatrix());
+			setMatrix(e.getMatrix());
 		}
 	}
 }
