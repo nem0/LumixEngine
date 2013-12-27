@@ -88,7 +88,7 @@ class Gizmo
 		H3DNode getNode() const { return m_handle; }
 
 	private:
-		static void onEvent(void* data, Event& evt);
+		void onEvent(Event& evt);
 		Vec3 getMousePlaneIntersection(int x, int y);
 
 	private:
