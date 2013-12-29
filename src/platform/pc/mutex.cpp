@@ -42,7 +42,7 @@ namespace Lux
 
 		bool WinMutex::poll()
 		{
-			unsigned int res = ::WaitForSingleObject(m_id, 0);
+			uint32_t res = ::WaitForSingleObject(m_id, 0);
 			ASSERT(m_locked == 0 && "Recursive lock is forbiden!");
 			m_locked += res ? 1 : 0;
 			return res > 0;
