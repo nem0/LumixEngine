@@ -43,7 +43,7 @@ namespace UI
 			void upArrowClicked(Block& block, void*);
 			void downArrowClicked(Block& block, void*);
 			void sliderMouseDown(Block& block, void*);
-			void sliderMouseMove(int x, int y);
+			void sliderMouseMove(int x, int y, int, int);
 			void sliderMouseUp(int x, int y);
 
 		private:

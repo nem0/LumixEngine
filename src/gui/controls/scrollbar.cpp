@@ -39,7 +39,7 @@ void Scrollbar::sliderMouseDown(Block& block, void*)
 }
 
 
-void Scrollbar::sliderMouseMove(int x, int y)
+void Scrollbar::sliderMouseMove(int x, int y, int, int)
 {
 	if(m_scrollbar_type == VERTICAL)
 	{
@@ -59,8 +59,9 @@ void Scrollbar::sliderMouseUp(int x, int y)
 	Gui::MouseCallback cb;
 	cb.bind<Scrollbar, &Scrollbar::sliderMouseUp>(this);
 	getGui().removeMouseUpCallback(cb);
-	cb.bind<Scrollbar, &Scrollbar::sliderMouseMove>(this);
-	getGui().removeMouseMoveCallback(cb);
+	Gui::MouseMoveCallback cb2;
+	cb2.bind<Scrollbar, &Scrollbar::sliderMouseMove>(this);
+	getGui().removeMouseMoveCallback(cb2);
 }
 
 

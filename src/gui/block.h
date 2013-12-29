@@ -81,6 +81,7 @@ namespace UI
 			Block::EventCallback& getCallback(uint32_t type);
 			void registerEventHandler(const char* type, const char* callback);
 			void setZIndex(int z_index);
+			int getZIndex() const;
 			float getZ() const { return m_z; }
 			void setFocusProcessing() { m_is_focus_processing = true; }
 			void emitEvent(const char* type);

@@ -39,7 +39,7 @@ namespace UI
 		IRenderer* m_renderer;
 		vector<Atlas*> m_atlases;
 		map<uint32_t, BlockCreator> m_block_creators;
-		vector<Gui::MouseCallback> m_mouse_move_callbacks;
+		vector<Gui::MouseMoveCallback> m_mouse_move_callbacks;
 		vector<Gui::MouseCallback> m_mouse_up_callbacks;
 	};
 
@@ -192,7 +192,7 @@ namespace UI
 	}
 
 
-	Gui::MouseCallback& Gui::addMouseMoveCallback()
+	Gui::MouseMoveCallback& Gui::addMouseMoveCallback()
 	{
 		return m_impl->m_mouse_move_callbacks.push_back_empty();
 	}
@@ -204,7 +204,7 @@ namespace UI
 	}
 
 
-	void Gui::removeMouseMoveCallback(MouseCallback& callback)
+	void Gui::removeMouseMoveCallback(MouseMoveCallback& callback)
 	{
 		for(int i = m_impl->m_mouse_move_callbacks.size() - 1; i >= 0; --i)
 		{
@@ -246,7 +246,7 @@ namespace UI
 	{
 		for(int i = m_impl->m_mouse_move_callbacks.size() - 1; i >= 0; --i)
 		{
-			m_impl->m_mouse_move_callbacks[i].invoke(x, y);
+			m_impl->m_mouse_move_callbacks[i].invoke(x, y, rel_x, rel_y);
 		}
 	}
 
@@ -263,6 +263,7 @@ namespace UI
 				return dest;
 			}
 		}
+		return NULL;
 	}
 
 

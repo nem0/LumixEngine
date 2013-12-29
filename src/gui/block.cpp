@@ -63,6 +63,11 @@ namespace UI
 	}
 
 
+	int Block::getZIndex() const
+	{
+		return (int)(m_z * 100);
+	}
+
 	void Block::setZIndex(int z_index)
 	{
 		m_z = z_index / 100.0f;
