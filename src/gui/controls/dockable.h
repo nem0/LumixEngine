@@ -39,9 +39,13 @@ namespace UI
 
 		private:
 			void drop(int x, int y); 
+			void dividerMouseDown(Block& block, void* user_data); 
+			void dividerMouseMove(int x, int y, int rel_x, int rel_y); 
+			void dividerMouseUp(int x, int y); 
 
 		private:
 			Block* m_content;
+			Block* m_divider;
 			Dockable* m_containing_dockable;
 	};
 

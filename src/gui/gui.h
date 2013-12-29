@@ -25,6 +25,7 @@ namespace UI
 	{
 		public:
 			typedef Delegate<void (int, int)> MouseCallback;
+			typedef Delegate<void (int, int, int, int)> MouseMoveCallback;
 
 		public:
 			Gui() { m_impl = 0; }
@@ -53,9 +54,9 @@ namespace UI
 			Block* createGui(Lux::FS::IFile& file);
 			Block* createBlock(uint32_t type, Block* parent);
 			Block* getBlock(int x, int y);
-			MouseCallback& addMouseMoveCallback();
+			MouseMoveCallback& addMouseMoveCallback();
 			MouseCallback& addMouseUpCallback();
-			void removeMouseMoveCallback(MouseCallback& callback);
+			void removeMouseMoveCallback(MouseMoveCallback& callback);
 			void removeMouseUpCallback(MouseCallback& callback);
 
 		private:

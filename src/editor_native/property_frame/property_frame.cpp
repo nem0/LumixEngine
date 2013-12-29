@@ -12,19 +12,12 @@
 #include "gui/gui.h"
 
 
-/*void startDrag(Lux::UI::Block& block, void*)
-{
-	static_cast<Lux::UI::Dockable*>(block.getParent())->startDrag();
-}*/
-
-
-
 PropertyFrame::PropertyFrame(MainFrame& main_frame)
 	: Dockable(main_frame.getGui(), NULL)
 {
 	main_frame.getDockable().dock(*this, Dockable::LEFT);
 	m_main_frame = &main_frame;
-		Lux::UI::Block* handle = new Lux::UI::Block(getGui(), getContent(), "_box");
+	Lux::UI::Block* handle = new Lux::UI::Block(getGui(), getContent(), "_box");
 	handle->setArea(0, 0, 0, 0, 1, 0, 0, 20);
 	handle->getCallback("mouse_down").bind<Dockable, &Dockable::startDrag>(this);
 	Lux::UI::Block* root = new Lux::UI::Block(getGui(), getContent(), "_box");
