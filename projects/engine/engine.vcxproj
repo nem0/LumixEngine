@@ -94,7 +94,6 @@
     <ClCompile Include="..\..\src\editor\editor_icon.cpp" />
     <ClCompile Include="..\..\src\editor\editor_server.cpp" />
     <ClCompile Include="..\..\src\editor\gizmo.cpp" />
-    <ClCompile Include="..\..\src\editor\property_descriptor.cpp" />
     <ClCompile Include="..\..\src\editor\server_message_types.cpp" />
     <ClCompile Include="..\..\src\engine\engine.cpp" />
     <ClCompile Include="..\..\src\engine\iplugin.cpp" />

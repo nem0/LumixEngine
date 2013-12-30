@@ -152,7 +152,7 @@ struct EditorServerImpl
 		void load(FS::IFile& file);
 		void onMessage(void* msgptr, int size);
 
-		const PropertyDescriptor& getPropertyDescriptor(uint32_t type, uint32_t name_hash);
+		const IPropertyDescriptor& getPropertyDescriptor(uint32_t type, uint32_t name_hash);
 		H3DNode castRay(int x, int y, Vec3& hit_pos, char* name, int max_name_size, H3DNode gizmo_node);
 		void registerProperties();
 		void rotateCamera(int x, int y);
@@ -172,7 +172,7 @@ struct EditorServerImpl
 		Gizmo m_gizmo;
 		Entity m_selected_entity;
 		Blob m_stream;
-		map<uint32_t, vector<PropertyDescriptor> > m_component_properties;
+		map<uint32_t, vector<IPropertyDescriptor*> > m_component_properties;
 		map<uint32_t, IPlugin*> m_creators;
 		MouseMode::Value m_mouse_mode;
 		vector<EditorIcon*>	m_editor_icons;
@@ -201,8 +201,9 @@ Engine& EditorServer::getEngine()
 }
 
 
-void EditorServer::registerProperty(const char* component_type, PropertyDescriptor& descriptor)
+void EditorServer::registerProperty(const char* component_type, IPropertyDescriptor* descriptor)
 {
+	ASSERT(descriptor);
 	m_impl->m_component_properties[crc32(component_type)].push_back(descriptor);
 }
 
@@ -284,12 +285,12 @@ void EditorServer::destroy()
 
 void EditorServerImpl::registerProperties()
 {
-	m_component_properties[renderable_type].push_back(PropertyDescriptor(crc32("source"), (PropertyDescriptor::Getter)&Renderer::getMesh, (PropertyDescriptor::Setter)&Renderer::setMesh, PropertyDescriptor::FILE));
-	m_component_properties[renderable_type].push_back(PropertyDescriptor(crc32("visible"), (PropertyDescriptor::BoolGetter)&Renderer::getVisible, (PropertyDescriptor::BoolSetter)&Renderer::setVisible));
-	m_component_properties[renderable_type].push_back(PropertyDescriptor(crc32("cast shadows"), (PropertyDescriptor::BoolGetter)&Renderer::getCastShadows, (PropertyDescriptor::BoolSetter)&Renderer::setCastShadows));
-	m_component_properties[point_light_type].push_back(PropertyDescriptor(crc32("fov"), (PropertyDescriptor::DecimalGetter)&Renderer::getLightFov, (PropertyDescriptor::DecimalSetter)&Renderer::setLightFov));
-	m_component_properties[point_light_type].push_back(PropertyDescriptor(crc32("radius"), (PropertyDescriptor::DecimalGetter)&Renderer::getLightRadius, (PropertyDescriptor::DecimalSetter)&Renderer::setLightRadius));
-	m_component_properties[script_type].push_back(PropertyDescriptor(crc32("source"), (PropertyDescriptor::Getter)&ScriptSystem::getScriptPath, (PropertyDescriptor::Setter)&ScriptSystem::setScriptPath, PropertyDescriptor::FILE));
+	m_component_properties[renderable_type].push_back(new PropertyDescriptor<Renderer>(crc32("source"), &Renderer::getMesh, &Renderer::setMesh, IPropertyDescriptor::FILE));
+	m_component_properties[renderable_type].push_back(new PropertyDescriptor<Renderer>(crc32("visible"), &Renderer::getVisible, &Renderer::setVisible));
+	m_component_properties[renderable_type].push_back(new PropertyDescriptor<Renderer>(crc32("cast shadows"), &Renderer::getCastShadows, &Renderer::setCastShadows));
+	m_component_properties[point_light_type].push_back(new PropertyDescriptor<Renderer>(crc32("fov"), &Renderer::getLightFov, &Renderer::setLightFov));
+	m_component_properties[point_light_type].push_back(new PropertyDescriptor<Renderer>(crc32("radius"), &Renderer::getLightRadius, &Renderer::setLightRadius));
+	m_component_properties[script_type].push_back(new PropertyDescriptor<ScriptSystem>(crc32("source"), &ScriptSystem::getScriptPath, &ScriptSystem::setScriptPath, IPropertyDescriptor::FILE));
 }
 
 
@@ -483,13 +484,13 @@ void EditorServerImpl::sendComponent(uint32_t type_crc)
 		{
 			if(cmps[i].type == type_crc)
 			{
-				vector<PropertyDescriptor>& props = m_component_properties[cmps[i].type];
+				vector<IPropertyDescriptor*>& props = m_component_properties[cmps[i].type];
 				m_stream.write(props.size());
 				m_stream.write(type_crc);
 				for(int j = 0; j < props.size(); ++j)
 				{
-					m_stream.write(props[j].getNameHash());
-					props[j].get(cmps[i], m_stream);
+					m_stream.write(props[j]->getNameHash());
+					props[j]->get(cmps[i], m_stream);
 				}
 				break;
 			}
@@ -903,18 +904,18 @@ void EditorServerImpl::navigate(float forward, float right, int fast)
 }
 
 
-const PropertyDescriptor& EditorServerImpl::getPropertyDescriptor(uint32_t type, uint32_t name_hash)
+const IPropertyDescriptor& EditorServerImpl::getPropertyDescriptor(uint32_t type, uint32_t name_hash)
 {
-	vector<PropertyDescriptor>& props = m_component_properties[type];
+	vector<IPropertyDescriptor*>& props = m_component_properties[type];
 	for(int i = 0; i < props.size(); ++i)
 	{
-		if(props[i].getNameHash() == name_hash)
+		if(props[i]->getNameHash() == name_hash)
 		{
-			return props[i];
+			return *props[i];
 		}
 	}
 	ASSERT(false);
-	return m_component_properties[type][0];
+	return *m_component_properties[type][0];
 }
 
 
@@ -941,7 +942,7 @@ void EditorServerImpl::setProperty(void* data, int size)
 	{
 		uint32_t name_hash;
 		stream.read(name_hash);
-		const PropertyDescriptor& cp = getPropertyDescriptor(cmp.type, name_hash);
+		const IPropertyDescriptor& cp = getPropertyDescriptor(cmp.type, name_hash);
 		cp.set(cmp, stream);
 	}
 }
