@@ -18,6 +18,7 @@ namespace Lux
 			virtual ~IPlugin();
 
 			virtual bool create(Engine& engine) = 0;
+			virtual void destroy() = 0;
 			virtual void onCreateUniverse(Universe&) {}
 			virtual void onDestroyUniverse(Universe&) {}
 			virtual void serialize(ISerializer&) {}

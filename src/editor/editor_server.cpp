@@ -99,6 +99,7 @@ class MessageTask : public MT::Task
 		struct EditorServerImpl* m_server;
 		Net::TCPAcceptor m_acceptor;
 		Net::TCPStream* m_stream;
+		bool m_is_finished;
 };
 
 
@@ -278,6 +279,7 @@ bool EditorServer::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 
 void EditorServer::destroy()
 {
+	m_impl->destroy();
 	delete m_impl;
 	m_impl = 0;
 }
@@ -419,12 +421,12 @@ void EditorServerImpl::addEntity()
 
 int MessageTask::task()
 {
-	bool finished = false;
+	m_is_finished = false;
 	m_acceptor.start("127.0.0.1", 10002);
 	m_stream = m_acceptor.accept();
 	vector<uint8_t> data;
 	data.resize(5);
-	while(!finished)
+	while(!m_is_finished)
 	{
 		if(m_stream->read(&data[0], 5))
 		{
@@ -679,14 +681,6 @@ void EditorServerImpl::load(FS::IFile& file)
 }
 
 
-void EditorServerImpl::destroy()
-{
-	MT::Mutex::destroy(m_universe_mutex);
-	m_engine.destroy();
-	// TODO
-}
-
-
 HGLRC createGLContext(HWND hwnd)
 {
 	PAINTSTRUCT ps;
@@ -773,6 +767,19 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 	//m_navigation.load("models/level2/level2.pda");
 	
 	return true;
+}
+
+
+void EditorServerImpl::destroy()
+{
+	MT::Mutex::destroy(m_universe_mutex);
+	MT::Mutex::destroy(m_send_mutex);
+/*	m_message_task->m_is_finished = true;
+	m_message_task->somehow_cancel_the_read_operation();
+	m_message_task->destroy();
+*/ /// TODO destroy message task
+	m_engine.destroy();
+
 }
 
 
