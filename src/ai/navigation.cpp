@@ -213,6 +213,20 @@ void Navigation::update(float dt)
 }
 
 
+void Navigation::destroy()
+{
+	if(m_impl)
+	{
+		rcFreePolyMeshDetail(m_impl->m_detail_mesh);
+		rcFreePolyMesh(m_impl->m_polymesh);
+		dtFreeNavMeshQuery(m_impl->m_navquery);
+		dtFreeNavMesh(m_impl->m_navmesh);
+		delete m_impl;
+		m_impl = NULL;
+	}
+}
+
+
 void Navigation::draw()
 {
 	DebugDrawGL dd;
@@ -243,7 +257,7 @@ Navigation::Navigation()
 
 Navigation::~Navigation()
 {
-	delete m_impl;
+	ASSERT(m_impl == NULL);
 }
 
 

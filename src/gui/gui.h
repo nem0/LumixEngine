@@ -27,6 +27,7 @@ namespace UI
 			Gui() { m_impl = 0; }
 
 			virtual bool create(Engine& engine) LUX_OVERRIDE;
+			virtual void destroy() LUX_OVERRIDE;
 			virtual Component createComponent(uint32_t, const Entity&) LUX_OVERRIDE;
 			virtual const char* getName() const LUX_OVERRIDE { return "gui"; }
 			void setRenderer(IRenderer& renderer);
