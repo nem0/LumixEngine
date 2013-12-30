@@ -41,7 +41,7 @@ void EditorIcon::show()
 
 void EditorIcon::hide()
 {
-	h3dSetNodeFlags(m_handle, H3DNodeFlags::Inactive, true);
+	h3dSetNodeFlags(m_handle, h3dGetNodeFlags(m_handle) | H3DNodeFlags::Inactive, true);
 }
 
 
