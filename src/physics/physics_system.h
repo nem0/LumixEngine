@@ -17,6 +17,7 @@ class LUX_PHYSICS_API PhysicsSystem : public IPlugin
 		PhysicsSystem() { m_impl = 0; }
 		
 		virtual bool create(Engine& engine) LUX_OVERRIDE;
+		virtual void destroy() LUX_OVERRIDE;
 		virtual void onCreateUniverse(Universe& universe) LUX_OVERRIDE;
 		virtual void onDestroyUniverse(Universe& universe) LUX_OVERRIDE;
 		virtual void serialize(ISerializer& serializer) LUX_OVERRIDE;
@@ -25,8 +26,6 @@ class LUX_PHYSICS_API PhysicsSystem : public IPlugin
 		virtual Component createComponent(uint32_t component_type, const Entity& entity) LUX_OVERRIDE;
 		virtual const char* getName() const LUX_OVERRIDE { return "physics"; }
 		virtual void sendMessage(const char* message) LUX_OVERRIDE;
-
-		virtual void destroy();
 
 	private:
 		struct PhysicsSystemImpl* m_impl;

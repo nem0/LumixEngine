@@ -33,7 +33,8 @@ void Gizmo::create(const char* base_path, Renderer& renderer)
 	H3DRes res = h3dAddResource(H3DResTypes::SceneGraph, "models/tgizmo/tgizmo.scene.xml", 0);
 	h3dutLoadResourcesFromDisk(base_path);
 	m_handle = h3dAddNodes(H3DRootNode, res);
-	h3dSetNodeFlags(m_handle, H3DNodeFlags::NoCastShadow, true);
+	int flags = h3dGetNodeFlags(m_handle);
+	h3dSetNodeFlags(m_handle, flags | H3DNodeFlags::NoCastShadow, true);
 }
 
 
@@ -45,13 +46,14 @@ void Gizmo::destroy()
 
 void Gizmo::hide()
 {
-	h3dSetNodeFlags(m_handle, H3DNodeFlags::Inactive, true);
+	h3dSetNodeFlags(m_handle, h3dGetNodeFlags(m_handle) | H3DNodeFlags::Inactive, true);
 }
 
 
 void Gizmo::show()
 {
 	h3dSetNodeFlags(m_handle, h3dGetNodeFlags(m_handle) & ~H3DNodeFlags::Inactive, true);
+	h3dSetNodeFlags(m_handle, h3dGetNodeFlags(m_handle) | H3DNodeFlags::NoCastShadow, true);	
 }
 
 
@@ -91,7 +93,7 @@ void Gizmo::updateScale()
 
 void Gizmo::setEntity(Entity entity)
 {
-	h3dSetNodeFlags(m_handle, H3DNodeFlags::NoCastShadow, true);
+	h3dSetNodeFlags(m_handle, h3dGetNodeFlags(m_handle) | H3DNodeFlags::NoCastShadow, true);	
 	m_selected_entity = entity;
 	if(m_selected_entity.index != -1)
 	{

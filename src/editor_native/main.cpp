@@ -151,6 +151,7 @@ int main(int argc, char* argv[])
 		gui->render();
 		SDL_GL_SwapWindow(displayWindow);
 	}
+	server.destroy();
     SDL_Quit();
     return 0;
 }

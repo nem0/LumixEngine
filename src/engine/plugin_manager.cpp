@@ -12,7 +12,7 @@ namespace Lux
 		typedef vector<IPlugin*> PluginList;
 
 		Engine* m_engine;
-		vector<IPlugin*> m_plugins;
+		PluginList m_plugins;
 	};
 
 
@@ -119,6 +119,11 @@ namespace Lux
 
 	void PluginManager::destroy()
 	{
+		for(int i = 0; i < m_impl->m_plugins.size(); ++i)
+		{
+			m_impl->m_plugins[i]->destroy();
+			delete m_impl->m_plugins[i];
+		}
 		delete m_impl;
 		m_impl = 0;
 	}
