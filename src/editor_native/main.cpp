@@ -14,6 +14,7 @@
 #include "gui/block.h"
 #include "gui/decorators/box_decorator.h"
 #include "gui/decorators/check_box_decorator.h"
+#include "gui/decorators/dockable_decorator.h"
 #include "gui/decorators/text_decorator.h"
 #include "gui/decorators/scrollbar_decorator.h"
 #include "gui/gui.h"
@@ -34,6 +35,7 @@ void initGui(Lux::EditorClient& client, Lux::EditorServer& server)
 	Lux::UI::TextDecorator* text_decorator = new Lux::UI::TextDecorator("_text");
 	Lux::UI::TextDecorator* text_centered_decorator = new Lux::UI::TextDecorator("_text_centered");
 	text_centered_decorator->setTextCentered(true);
+	Lux::UI::DockableDecorator* dockable_decorator = new Lux::UI::DockableDecorator("_dockable");
 	Lux::UI::BoxDecorator* box_decorator = new Lux::UI::BoxDecorator("_box");
 	Lux::UI::ScrollbarDecorator* scrollbar_decorator = new Lux::UI::ScrollbarDecorator("_scrollbar"); 
 	server.getEngine().loadPlugin("gui.dll");
@@ -41,12 +43,14 @@ void initGui(Lux::EditorClient& client, Lux::EditorServer& server)
 	gui->addDecorator(*text_decorator);
 	gui->addDecorator(*text_centered_decorator);
 	gui->addDecorator(*box_decorator);
+	gui->addDecorator(*dockable_decorator);
 	gui->addDecorator(*scrollbar_decorator);
 	gui->addDecorator(*check_box_decorator);
 	gui->setRenderer(*renderer);
 	check_box_decorator->create(*gui, "gui/skin.atl");
 	scrollbar_decorator->create(*gui, "gui/skin.atl");
 	box_decorator->create(*gui, "gui/skin.atl");
+	dockable_decorator->create(*gui, "gui/skin.atl");
 	g_main_frame = new MainFrame(client, *gui, gui->createTopLevelBlock(800, 600));
 	g_main_frame->getParent()->layout();
 }

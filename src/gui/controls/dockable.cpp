@@ -11,7 +11,7 @@ namespace UI
 
 
 Dockable::Dockable(Gui& gui, Block* parent)
-	: Block(gui, parent, NULL)
+	: Block(gui, parent, "_dockable")
 {
 	setArea(0, 0, 0, 0, 1, 0, 1, 0);
 	m_content = new Block(getGui(), this, NULL);
@@ -19,6 +19,7 @@ Dockable::Dockable(Gui& gui, Block* parent)
 	m_containing_dockable = NULL;
 	m_content->setIsClickable(false);
 	m_divider = NULL;
+	m_is_dragged = false;
 }
 
 
@@ -144,9 +145,18 @@ void Dockable::dock(Dockable& dockable, Slot slot)
 }
 
 
+void Dockable::dragMove(int x, int y, int, int)
+{
+	m_drag_x = x;
+	m_drag_y = y;
+}
+
+
 void Dockable::startDrag()
 {
+	m_is_dragged = true;
 	ASSERT(getType() == crc32("dockable"));
+	getGui().addMouseMoveCallback().bind<Dockable, &Dockable::dragMove>(this);
 	getGui().addMouseUpCallback().bind<Dockable, &Dockable::drop>(this);
 }
 
@@ -218,11 +228,15 @@ void Dockable::dividerMouseUp(int x, int y)
 
 void Dockable::drop(int x, int y)
 {
+	m_is_dragged = false;
 	static const uint32_t dockable_hash = crc32("dockable");
 
 	Gui::MouseCallback cb;
 	cb.bind<Dockable, &Dockable::drop>(this);
 	getGui().removeMouseUpCallback(cb);
+	Gui::MouseMoveCallback cb2;
+	cb2.bind<Dockable, &Dockable::dragMove>(this);
+	getGui().removeMouseMoveCallback(cb2);
 
 	Block* dest = getGui().getBlock(x, y);
 	while(dest && dest->getType() != dockable_hash)

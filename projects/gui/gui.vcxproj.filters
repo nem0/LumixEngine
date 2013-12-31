@@ -47,6 +47,9 @@
     <ClInclude Include="..\..\src\gui\controls\dockable.h">
       <Filter>controls</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\gui\decorators\dockable_decorator.h">
+      <Filter>decorators</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\gui\gui.cpp" />
@@ -91,6 +94,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src\gui\controls\dockable.cpp">
       <Filter>controls</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gui\decorators\dockable_decorator.cpp">
+      <Filter>decorators</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

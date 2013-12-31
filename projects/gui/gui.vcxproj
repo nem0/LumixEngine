@@ -97,6 +97,7 @@
     <ClInclude Include="..\..\src\gui\controls\text_box.h" />
     <ClInclude Include="..\..\src\gui\decorators\box_decorator.h" />
     <ClInclude Include="..\..\src\gui\decorators\check_box_decorator.h" />
+    <ClInclude Include="..\..\src\gui\decorators\dockable_decorator.h" />
     <ClInclude Include="..\..\src\gui\decorators\scrollbar_decorator.h" />
     <ClInclude Include="..\..\src\gui\decorators\text_decorator.h" />
     <ClInclude Include="..\..\src\gui\decorator_base.h" />
@@ -120,6 +121,7 @@
     <ClCompile Include="..\..\src\gui\controls\text_box.cpp" />
     <ClCompile Include="..\..\src\gui\decorators\box_decorator.cpp" />
     <ClCompile Include="..\..\src\gui\decorators\check_box_decorator.cpp" />
+    <ClCompile Include="..\..\src\gui\decorators\dockable_decorator.cpp" />
     <ClCompile Include="..\..\src\gui\decorators\scrollbar_decorator.cpp" />
     <ClCompile Include="..\..\src\gui\decorators\text_decorator.cpp" />
     <ClCompile Include="..\..\src\gui\gui.cpp" />
