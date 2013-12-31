@@ -8,6 +8,7 @@
 #include "editor/editor_server.h"
 #include "editor/server_message_types.h"
 #include "editor_native/main_frame.h"
+#include "editor_native/script_compiler.h"
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
 #include "graphics/renderer.h"
@@ -20,8 +21,7 @@
 #include "gui/gui.h"
 #include "gui/opengl_renderer.h"
 
-SDL_Renderer* displayRenderer;
-SDL_Window* displayWindow;
+
 MainFrame* g_main_frame;
 
 
@@ -58,6 +58,8 @@ void initGui(Lux::EditorClient& client, Lux::EditorServer& server)
 
 int main(int argc, char* argv[])
 {
+	SDL_Renderer* displayRenderer;
+	SDL_Window* displayWindow;
 	SDL_Init(SDL_INIT_VIDEO);
     SDL_RendererInfo displayRendererInfo;
     SDL_CreateWindowAndRenderer(800, 600, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE, &displayWindow, &displayRenderer);
@@ -147,6 +149,7 @@ int main(int argc, char* argv[])
 					, shift ? 1 : 0);
 			} 
 		}
+		g_main_frame->update();
 		server.tick(NULL, NULL);
 		gui->render();
 		SDL_GL_SwapWindow(displayWindow);

@@ -70,7 +70,7 @@ namespace UI
 
 	void Block::setZIndex(int z_index)
 	{
-		m_z = z_index / 100.0f;
+		m_z = z_index / 1000.0f;
 		if(m_parent)
 		{
 			for(int i = 0; i < m_parent->m_children.size() - 1; ++i)
