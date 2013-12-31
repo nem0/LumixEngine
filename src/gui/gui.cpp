@@ -23,8 +23,8 @@ namespace UI
 	{
 		typedef Delegate<Block* (Gui&, Block*)> BlockCreator;
 
-		void comboboxClick(Block& block, void*);
-		void comboboxBlur(Block& block, void*);
+		~GuiImpl();
+
 		void menuShowSubmenu(Block& block, void*);
 		void textboxKeyDown(Block& block, void*);
 		void hideBlock(Block& block, void*);
@@ -42,6 +42,27 @@ namespace UI
 		vector<Gui::MouseMoveCallback> m_mouse_move_callbacks;
 		vector<Gui::MouseCallback> m_mouse_up_callbacks;
 	};
+
+
+	GuiImpl::~GuiImpl()
+	{
+		for(int i = 0; i < m_blocks.size(); ++i)
+		{
+			m_blocks[i]->destroy();
+		}
+		m_blocks.clear();
+		for(map<uint32_t, DecoratorBase*>::iterator iter = m_decorators.begin(), end = m_decorators.end(); iter != end; ++iter)
+		{
+			delete iter.second();
+		}
+		m_decorators.clear();
+		for(int i = 0; i < m_atlases.size(); ++i)
+		{
+			m_atlases[i]->destroy();
+			delete m_atlases[i];
+		}
+		m_atlases.clear();
+	}
 
 
 	void GuiImpl::hideBlock(Block& block, void*)
@@ -87,28 +108,6 @@ namespace UI
 		static_cast<Lux::UI::MenuItem&>(block).showSubMenu();
 	}
 
-
-	void GuiImpl::comboboxBlur(Block& block, void*)
-	{
-		block.hide();
-	}
-
-
-	void GuiImpl::comboboxClick(Block& block, void*)
-	{
-		Lux::UI::Block* popup = block.getParent()->getChild(1);
-		if(popup->isShown())
-		{
-			popup->hide();					
-		}
-		else
-		{
-			popup->show();
-			popup->getGui().focus(popup);
-		}
-		block.getGui().layout();
-	}
-
 	Block* createButton(Gui& gui, Block* parent)
 	{
 		return new Button("", gui, parent);
@@ -142,8 +141,6 @@ namespace UI
 		m_impl->m_focus = NULL;
 		m_impl->m_renderer = NULL;
 		m_impl->m_engine = &engine;
-		getCallback("_cb_click").bind<GuiImpl, &GuiImpl::comboboxClick>(m_impl);
-		getCallback("_cb_blur").bind<GuiImpl, &GuiImpl::comboboxBlur>(m_impl);
 		getCallback("_menu_show_submenu").bind<GuiImpl, &GuiImpl::menuShowSubmenu>(m_impl);
 		getCallback("_tb_key_down").bind<GuiImpl, &GuiImpl::textboxKeyDown>(m_impl);
 		getCallback("_hide").bind<GuiImpl, &GuiImpl::hideBlock>(m_impl);
@@ -156,6 +153,13 @@ namespace UI
 		m_impl->m_block_creators[crc32("check_box")].bind<&createCheckBox>();
 
 		return true;
+	}
+
+
+	void Gui::destroy()
+	{
+		delete m_impl;
+		m_impl = NULL;
 	}
 
 
