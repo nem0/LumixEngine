@@ -107,6 +107,7 @@
     <ClInclude Include="..\..\src\core\blob.h" />
     <ClInclude Include="..\..\src\core\crc32.h" />
     <ClInclude Include="..\..\src\core\delegate.h" />
+    <ClInclude Include="..\..\src\core\delegate_list.h" />
     <ClInclude Include="..\..\src\core\disk_file_device.h" />
     <ClInclude Include="..\..\src\core\file_system.h" />
     <ClInclude Include="..\..\src\core\file_utils.h" />

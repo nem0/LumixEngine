@@ -14,6 +14,8 @@
       <Filter>property_frame</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\editor_native\log_ui.cpp" />
+    <ClCompile Include="..\..\src\editor_native\script_compiler.cpp" />
+    <ClCompile Include="..\..\src\editor_native\notifications.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\editor_native\main_frame.h" />
@@ -31,6 +33,8 @@
       <Filter>property_frame</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\editor_native\log_ui.h" />
+    <ClInclude Include="..\..\src\editor_native\script_compiler.h" />
+    <ClInclude Include="..\..\src\editor_native\notifications.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="property_frame">
