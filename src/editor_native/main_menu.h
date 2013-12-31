@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "gui/menu_bar.h"
+#include "gui/controls/menu_bar.h"
 
 
 namespace Lux

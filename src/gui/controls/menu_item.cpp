@@ -1,8 +1,8 @@
-#include "gui/menu_item.h"
+#include "gui/controls/menu_item.h"
 #include "core/crc32.h"
 #include "core/iserializer.h"
+#include "gui/controls/menu_bar.h"
 #include "gui/gui.h"
-#include "gui/menu_bar.h"
 
 
 namespace Lux
@@ -14,7 +14,7 @@ namespace UI
 MenuItem::MenuItem(const char* label, Gui& gui)
 	: Block(gui, NULL, NULL)
 {
-	m_label = new Block(*getGui(), this, "_text");
+	m_label = new Block(getGui(), this, "_text");
 	m_label->setArea(0, 20, 0, 2, 1, 0, 1, 0);
 	m_label->setBlockText(label);
 
@@ -32,7 +32,7 @@ MenuItem::~MenuItem()
 void MenuItem::showSubMenu()
 {
 	m_sub_container->show();
-	getGui()->focus(m_sub_container);
+	getGui().focus(m_sub_container);
 }
 
 

@@ -2,7 +2,7 @@
 
 
 #include "core/vector.h"
-#include "gui/block.h"
+#include "gui/controls/dockable.h"
 
 
 namespace Lux
@@ -21,7 +21,7 @@ class MainFrame;
 class IComponentUI;
 
 
-class PropertyFrame : public Lux::UI::Block
+class PropertyFrame : public Lux::UI::Dockable
 {
 	public:
 		PropertyFrame(MainFrame& main_frame);

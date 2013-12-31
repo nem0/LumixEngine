@@ -37,7 +37,6 @@ namespace UI
 		if(m_parts[0])
 		{
 			float w = m_atlas->getTexture()->getWidth();
-			renderer.setScissorArea((int)block.getGlobalLeft(), (int)block.getGlobalTop(), (int)block.getGlobalRight(), (int)block.getGlobalBottom());
 			float l = block.getGlobalLeft() + m_parts[0]->m_pixel_width;
 			float r = block.getGlobalRight() - m_parts[2]->m_pixel_width;
 			float t = block.getGlobalTop() + m_parts[0]->m_pixel_height;
