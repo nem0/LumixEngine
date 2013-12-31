@@ -48,6 +48,37 @@ void EntitySelectedEvent::read(Blob& stream)
 	}
 }
 
+
+void LogEvent::read(Blob& stream)
+{
+	stream.read(&type, sizeof(type));
+	int32_t len;
+	stream.read(&len, sizeof(len));
+	char tmp[255];
+	if(len < 255)
+	{
+		stream.read(tmp, len);	
+		tmp[len] = 0;
+	}
+	system = tmp;
+	stream.read(&len, sizeof(len));
+	if(len < 255)
+	{
+		stream.read(tmp, len);	
+		tmp[len] = 0;
+	}
+	message = tmp;
+/*	stream.read(&index, sizeof(index));
+	int32_t count;
+	stream.read(&count, sizeof(count));
+	components.resize(count);
+	for(int i = 0; i < count; ++i)
+	{
+		stream.read(&components[i], sizeof(components[i]));
+	}*/
+}
+
+
 /*
 void PropertyListMessage::write(IStream& stream)
 {

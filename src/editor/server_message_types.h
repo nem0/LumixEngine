@@ -2,6 +2,7 @@
 
 
 #include "core/map.h"
+#include "core/string.h"
 #include "core/vector.h"
 #include "core/event_manager.h"
 
@@ -48,6 +49,19 @@ struct LUX_ENGINE_API EntitySelectedEvent : public Event
 	
 	int32_t index;
 	vector<uint32_t> components;
+};
+
+
+struct LUX_ENGINE_API LogEvent : public Event
+{
+	LogEvent() { m_type = ServerMessageType::LOG_MESSAGE; }
+	
+	//virtual void write(IStream& stream) LUX_OVERRIDE;
+	void read(Blob& stream);
+	
+	int32_t type;
+	string message;
+	string system;
 };
 
 

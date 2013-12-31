@@ -6,6 +6,7 @@
 #include "core/string.h"
 #include "core/vec3.h"
 #include "core/vector.h"
+#include "gui/block.h"
 #include "gui/texture_base.h"
 
 
@@ -49,6 +50,7 @@ namespace UI
 		vector<TextureBase*> m_images;
 		OpenGLTexture* m_font_image;
 		int m_window_height;
+		vector<Block::Area> m_scissors_areas;
 	};
 
 	#pragma pack(1) 
@@ -186,13 +188,14 @@ namespace UI
 	}
 
 
-	void OpenGLRenderer::beginRender()
+	void OpenGLRenderer::beginRender(float w, float h)
 	{
+		m_impl->m_scissors_areas.clear();
 		glColor3f(1, 1, 1);
 		glEnable(GL_SCISSOR_TEST);
 		glMatrixMode(GL_PROJECTION);
 		glLoadIdentity();
-		glOrtho(0, 800, 600, 0, -1, 1);
+		glOrtho(0, w, h, 0, -1, 1);
 		glMatrixMode(GL_MODELVIEW);
 		glLoadIdentity();
 	}
@@ -222,11 +225,46 @@ namespace UI
 		*h = height;
 	}
 
-	void OpenGLRenderer::setScissorArea(int left, int top, int right, int bottom)
+	void OpenGLRenderer::pushScissorArea(float left, float top, float right, float bottom)
 	{
-		glScissor(left, m_impl->m_window_height - bottom, right - left, bottom - top);
+		Block::Area r;
+		r.left = left;
+		r.top = top;
+		r.right = right;
+		r.bottom = bottom;
+		if(m_impl->m_scissors_areas.empty())
+		{
+			r.rel_left = left;
+			r.rel_top = top;
+			r.rel_right = right;
+			r.rel_bottom = bottom;
+			glEnable(GL_SCISSOR_TEST);
+		}
+		else
+		{
+			Block::Area& parent_area = m_impl->m_scissors_areas.back();
+			r.rel_left = max(left, parent_area.rel_left);
+			r.rel_top = max(top, parent_area.rel_top);
+			r.rel_right = min(right, parent_area.rel_right);
+			r.rel_bottom = min(bottom, parent_area.rel_bottom);
+		}
+		glScissor((int)r.rel_left, (int)(m_impl->m_window_height - r.rel_bottom), (int)(r.rel_right - r.rel_left), (int)(r.rel_bottom - r.rel_top));
+		m_impl->m_scissors_areas.push_back(r);
 	}
 
+	void OpenGLRenderer::popScissorArea()
+	{
+		m_impl->m_scissors_areas.pop_back();
+		if(m_impl->m_scissors_areas.empty())
+		{
+			glDisable(GL_SCISSOR_TEST);
+		}
+		else
+		{
+			Block::Area& r = m_impl->m_scissors_areas.back();
+			glScissor((int)r.rel_left, (int)(m_impl->m_window_height - r.rel_bottom), (int)(r.rel_right - r.rel_left), (int)(r.rel_bottom - r.rel_top));
+		}
+	}
 
 	void OpenGLRenderer::renderText(const char* text, float x, float y, float z)
 	{
