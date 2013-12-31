@@ -77,7 +77,7 @@ void Scrollable::layout()
 		float container_delta_w = 0;
 		float container_delta_h = 0;
 		bool both_visible = true;
-		if(m_container->getGlobalWidth() < content_size.right)
+		if(m_container->getGlobalWidth() < content_size.right - content_size.left)
 		{
 			m_horizontal_scrollbar->show();
 			container_delta_h = -m_horizontal_scrollbar->getGlobalHeight();
@@ -87,7 +87,7 @@ void Scrollable::layout()
 			both_visible = false;
 			m_horizontal_scrollbar->hide();
 		}
-		if(m_container->getGlobalHeight() < content_size.bottom)
+		if(m_container->getGlobalHeight() < content_size.bottom - content_size.top)
 		{
 			m_vertical_scrollbar->show();
 			container_delta_w = -m_vertical_scrollbar->getGlobalWidth();
