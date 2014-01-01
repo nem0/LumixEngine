@@ -1080,7 +1080,7 @@ void EditorServerImpl::onComponentEvent(ComponentEvent& e)
 	}			
 	if(e.is_created)
 	{
-		Lux::Entity::ComponentList cmps = e.component.entity.getComponents();
+		const Lux::Entity::ComponentList& cmps = e.component.entity.getComponents();
 		bool found = false;
 		for(int i = 0; i < cmps.size(); ++i)
 		{
