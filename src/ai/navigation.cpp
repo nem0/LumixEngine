@@ -291,6 +291,9 @@ void Navigation::navigate(Entity e, const Vec3& dest, float speed)
 
 bool Navigation::load(const char path[])
 {
+	ASSERT(false);
+	return false;
+	/// TODO
 /*	if (!m_geom || !m_geom->getMesh())
 	{
 		ctx.log(RC_LOG_ERROR, "buildNavigation: Input mesh is not specified.");

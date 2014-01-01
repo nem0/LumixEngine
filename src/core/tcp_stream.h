@@ -7,7 +7,7 @@ namespace Lux
 {
 	namespace Net
 	{
-		class LUX_PLATFORM_API TCPStream
+		class LUX_CORE_API TCPStream
 		{
 		public:
 			TCPStream(uintptr_t socket) : m_socket(socket) { } 

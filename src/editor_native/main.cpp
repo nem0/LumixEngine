@@ -21,7 +21,6 @@
 #include "gui/gui.h"
 #include "gui/opengl_renderer.h"
 
-
 MainFrame* g_main_frame;
 
 

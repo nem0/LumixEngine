@@ -5,7 +5,7 @@ namespace Lux
 {
 	namespace MT
 	{
-		class LUX_PLATFORM_API Semaphore LUX_ABSTRACT
+		class LUX_CORE_API Semaphore LUX_ABSTRACT
 		{
 		public:
 			static Semaphore* create(int init_count, int max_count);

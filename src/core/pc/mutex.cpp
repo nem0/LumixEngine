@@ -1,4 +1,4 @@
-#include "platform/mutex.h"
+#include "core/mutex.h"
 #include <Windows.h>
 #include <cassert>
 

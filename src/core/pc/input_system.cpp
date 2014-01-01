@@ -1,4 +1,4 @@
-#include "platform/input_system.h"
+#include "core/input_system.h"
 #include "core/map.h"
 #include "core/string.h"
 #include <Windows.h>

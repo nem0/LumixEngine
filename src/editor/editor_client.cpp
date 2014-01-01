@@ -5,9 +5,9 @@
 #include "core/vector.h"
 #include "editor/client_message_types.h"
 #include "editor/server_message_types.h"
-#include "platform/task.h"
-#include "platform/tcp_connector.h"
-#include "platform/tcp_stream.h"
+#include "core/task.h"
+#include "core/tcp_connector.h"
+#include "core/tcp_stream.h"
 
 namespace Lux
 {

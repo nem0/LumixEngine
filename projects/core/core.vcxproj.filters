@@ -28,6 +28,24 @@
       <Filter>FS</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\core\blob.cpp" />
+    <ClCompile Include="..\..\src\core\default_allocator.cpp" />
+    <ClCompile Include="..\..\src\core\os_file.cpp" />
+    <ClCompile Include="..\..\src\core\pc\tcp_acceptor.cpp">
+      <Filter>Net</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\pc\tcp_connector.cpp">
+      <Filter>Net</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\pc\tcp_stream.cpp">
+      <Filter>Net</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\pc\task.cpp" />
+    <ClCompile Include="..\..\src\core\pc\atomic.cpp" />
+    <ClCompile Include="..\..\src\core\pc\event.cpp" />
+    <ClCompile Include="..\..\src\core\pc\input_system.cpp" />
+    <ClCompile Include="..\..\src\core\pc\mutex.cpp" />
+    <ClCompile Include="..\..\src\core\pc\semaphore.cpp" />
+    <ClCompile Include="..\..\src\core\pc\spin_mutex.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\crc32.h" />
@@ -83,6 +101,24 @@
     <ClInclude Include="..\..\src\core\delegate.h" />
     <ClInclude Include="..\..\src\core\blob.h" />
     <ClInclude Include="..\..\src\core\delegate_list.h" />
+    <ClInclude Include="..\..\src\core\default_allocator.h" />
+    <ClInclude Include="..\..\src\core\atomic.h" />
+    <ClInclude Include="..\..\src\core\event.h" />
+    <ClInclude Include="..\..\src\core\input_system.h" />
+    <ClInclude Include="..\..\src\core\mutex.h" />
+    <ClInclude Include="..\..\src\core\os_file.h" />
+    <ClInclude Include="..\..\src\core\semaphore.h" />
+    <ClInclude Include="..\..\src\core\spin_mutex.h" />
+    <ClInclude Include="..\..\src\core\task.h" />
+    <ClInclude Include="..\..\src\core\tcp_acceptor.h">
+      <Filter>Net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\tcp_connector.h">
+      <Filter>Net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\tcp_stream.h">
+      <Filter>Net</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="FS">
@@ -90,6 +126,9 @@
     </Filter>
     <Filter Include="MT">
       <UniqueIdentifier>{fe4dad03-9173-476b-8718-01b5dc84a305}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Net">
+      <UniqueIdentifier>{d79d8f86-9ff1-4db9-813a-deea0bc7c40a}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

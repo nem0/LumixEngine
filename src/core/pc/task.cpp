@@ -1,5 +1,5 @@
 #include "core/lux.h"
-#include "platform/task.h"
+#include "core/task.h"
 #include <Windows.h>
 
 namespace Lux

@@ -1,5 +1,5 @@
-#include "platform/tcp_connector.h"
-#include "platform/tcp_stream.h"
+#include "core/tcp_connector.h"
+#include "core/tcp_stream.h"
 
 #ifndef DISABLE_NETWORK
 

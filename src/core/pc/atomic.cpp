@@ -1,4 +1,4 @@
-#include "platform/atomic.h"
+#include "core/atomic.h"
 #include <Windows.h>
 
 namespace Lux
