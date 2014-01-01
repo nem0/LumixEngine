@@ -69,10 +69,6 @@ class PODArray
 			if(index >= 0 && index < m_size)
 			{
 				memmove(m_data + index, m_data + index + 1, sizeof(T) * (m_size - index - 1));
-				for(int i = index + 1; i < m_size; ++i)
-				{
-					new ((char*)(m_data+i-1)) T(m_data[i]);
-				}
 				--m_size;
 			}
 		}
