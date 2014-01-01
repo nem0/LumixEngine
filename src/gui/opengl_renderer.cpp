@@ -217,7 +217,7 @@ namespace UI
 			if(m_impl->m_characters.find(*c, character))
 			{
 				width += character.x_advance;
-				height = max(height, character.pixel_h);
+				height = Math::max(height, character.pixel_h);
 			}
 			++c;
 		}
@@ -243,10 +243,10 @@ namespace UI
 		else
 		{
 			Block::Area& parent_area = m_impl->m_scissors_areas.back();
-			r.rel_left = max(left, parent_area.rel_left);
-			r.rel_top = max(top, parent_area.rel_top);
-			r.rel_right = min(right, parent_area.rel_right);
-			r.rel_bottom = min(bottom, parent_area.rel_bottom);
+			r.rel_left = Math::max(left, parent_area.rel_left);
+			r.rel_top = Math::max(top, parent_area.rel_top);
+			r.rel_right = Math::min(right, parent_area.rel_right);
+			r.rel_bottom = Math::min(bottom, parent_area.rel_bottom);
 		}
 		glScissor((int)r.rel_left, (int)(m_impl->m_window_height - r.rel_bottom), (int)(r.rel_right - r.rel_left), (int)(r.rel_bottom - r.rel_top));
 		m_impl->m_scissors_areas.push_back(r);
