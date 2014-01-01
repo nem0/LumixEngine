@@ -10,7 +10,7 @@ namespace Lux
 {
 
 
-template <class T>
+template <typename T>
 class vector
 {
 	public:
@@ -27,16 +27,16 @@ class vector
 			m_size = 0;
 			m_data = 0;
 			reserve(rhs.m_capacity);
-			memcpy(m_data, rhs.m_data, sizeof(T) * rhs.m_size);
+			for(int i = 0; i < rhs.m_size; ++i)
+			{
+				new ((char*)(m_data+i)) T(rhs.m_data[i]);
+			}
 			m_size = rhs.m_size;
 		}
 
 		~vector()
 		{
-			for(int i = 0; i < m_size; ++i)
-			{
-				m_data[i].~T();
-			}
+			callDestructors(m_data, m_data + m_size);
 			delete[] (char*)m_data;
 		}
 
@@ -47,7 +47,7 @@ class vector
 				m_data[index].~T();
 				if(index != m_size - 1)
 				{
-					memmove(m_data + index, m_data + m_size - 1, sizeof(T));
+					new ((char*)(m_data+index)) T(m_data[m_size - 1]);
 				}
 				--m_size;
 			}
@@ -58,7 +58,11 @@ class vector
 			if(index >= 0 && index < m_size)
 			{
 				m_data[index].~T();
-				memmove(m_data + index, m_data + index + 1, sizeof(T) * (m_size - index - 1));
+				for(int i = index + 1; i < m_size; ++i)
+				{
+					new ((char*)(m_data+i-1)) T(m_data[i]);
+					m_data[i].~T();
+				}
 				--m_size;
 			}
 		}
@@ -77,10 +81,7 @@ class vector
 
 		void clear()
 		{
-			for(int i = 0; i < m_size; ++i)
-			{
-				m_data[i].~T();
-			}
+			callDestructors(m_data, m_data + m_size);
 			m_size = 0;
 		}
 
@@ -117,6 +118,7 @@ class vector
 			}
 		}
 
+		/// TODO remove this when we have PODArray
 		void set_size(int size)
 		{
 			if(size <= m_capacity)
@@ -135,10 +137,7 @@ class vector
 			{
 				new ((char*)(m_data+i)) T();
 			}
-			for(int i = size; i < m_size; ++i)
-			{
-				m_data[i].~T();
-			}
+			callDestructors(m_data + size, m_data + m_size);
 			m_size = size;
 		}
 
@@ -147,7 +146,11 @@ class vector
 			if(capacity > m_capacity)
 			{
 				T* newData = (T*)new char[capacity * sizeof(T)];
-				memcpy(newData, m_data, m_size * sizeof(T));
+				for(int i = 0; i < m_size; ++i)
+				{
+					new ((char*)(newData+i)) T(m_data[i]);
+				}
+				callDestructors(m_data, m_data + m_size);
 				delete[] ((char*)m_data);
 				m_data = newData;
 				m_capacity = capacity;			
@@ -161,6 +164,7 @@ class vector
 
 		void operator =(const vector<T>& rhs) 
 		{
+			callDestructors(m_data, m_data + m_size);
 			if(m_capacity < rhs.m_size)
 			{
 				delete[] m_data;
@@ -170,7 +174,10 @@ class vector
 			m_size = rhs.m_size;
 			if(m_size > 0)
 			{
-				memcpy(m_data, rhs.m_data, sizeof(T) * rhs.m_size);
+				for(int i = 0; i < rhs.m_size; ++i)
+				{
+					new ((char*)(m_data + i)) T(rhs.m_data[i]);
+				}
 			}
 		}
 	private:
@@ -180,10 +187,22 @@ class vector
 		{
 			int newCapacity = m_capacity == 0 ? 4 : m_capacity * 2;
 			T* newData = (T*)new char[newCapacity * sizeof(T)];
-			memcpy(newData, m_data, m_size * sizeof(T));
+			for(int i = 0; i < m_size; ++i)
+			{
+				new ((char*)(newData + i)) T(m_data[i]);
+			}
+			callDestructors(m_data, m_data + m_size);
 			delete[] ((char*)m_data);
 			m_data = newData;
 			m_capacity = newCapacity;
+		}
+
+		void callDestructors(T* begin, T* end)
+		{
+			for(; begin < end; ++begin)
+			{
+				begin->~T();
+			}
 		}
 
 	private:
