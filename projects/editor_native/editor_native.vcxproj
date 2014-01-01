@@ -85,7 +85,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <SubSystem>Console</SubSystem>
       <AdditionalLibraryDirectories>..\..\bin\$(Configuration)\;..\..\external\sdl\lib\</AdditionalLibraryDirectories>
-      <AdditionalDependencies>gui.lib;opengl32.lib;core.lib;engine.lib;platform.lib;SDL2main.lib;SDL2.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>gui.lib;opengl32.lib;core.lib;engine.lib;SDL2main.lib;SDL2.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>copy $(SolutionDir)external\sdl\lib\*.dll $(SolutionDir)\bin\$(Configuration)\
