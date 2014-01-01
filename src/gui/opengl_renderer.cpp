@@ -289,28 +289,29 @@ namespace UI
 		while(*c)
 		{
 			OpenGLRendererImpl::Character character;
-			m_impl->m_characters.find(*c, character);
-			float cur_y = y + character.y_offset;
-			verts[i*6].set(cur_x, cur_y, z);
-			verts[i*6+1].set(cur_x, cur_y + character.pixel_h, z);
-			verts[i*6+2].set(cur_x + character.pixel_w, cur_y + character.pixel_h, z);
+			if(m_impl->m_characters.find(*c, character))
+			{
+				float cur_y = y + character.y_offset;
+				verts[i*6].set(cur_x, cur_y, z);
+				verts[i*6+1].set(cur_x, cur_y + character.pixel_h, z);
+				verts[i*6+2].set(cur_x + character.pixel_w, cur_y + character.pixel_h, z);
 			
-			verts[i*6+3].set(cur_x, cur_y, z);
-			verts[i*6+4].set(cur_x + character.pixel_w, cur_y + character.pixel_h, z);
-			verts[i*6+5].set(cur_x + character.pixel_w, cur_y, z);
+				verts[i*6+3].set(cur_x, cur_y, z);
+				verts[i*6+4].set(cur_x + character.pixel_w, cur_y + character.pixel_h, z);
+				verts[i*6+5].set(cur_x + character.pixel_w, cur_y, z);
 			
-			cur_x += character.x_advance;
+				cur_x += character.x_advance;
 
-			uvs[i*6].set(character.left, character.top);
-			uvs[i*6+1].set(character.left, character.bottom);
-			uvs[i*6+2].set(character.right, character.bottom);
+				uvs[i*6].set(character.left, character.top);
+				uvs[i*6+1].set(character.left, character.bottom);
+				uvs[i*6+2].set(character.right, character.bottom);
 			
-			uvs[i*6+3].set(character.left, character.top);
-			uvs[i*6+4].set(character.right, character.bottom);
-			uvs[i*6+5].set(character.right, character.top);
-
+				uvs[i*6+3].set(character.left, character.top);
+				uvs[i*6+4].set(character.right, character.bottom);
+				uvs[i*6+5].set(character.right, character.top);
+				++i;
+			}
 			++c;
-			++i;
 		}
 		glEnable(GL_BLEND);
 		glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);

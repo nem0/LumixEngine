@@ -23,6 +23,8 @@ class ScriptCompiler
 		struct Process
 		{
 			HANDLE m_handle;
+			HANDLE m_pipe;
+			HANDLE m_write_pipe;
 			Lux::string m_path;
 		};
 

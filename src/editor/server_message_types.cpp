@@ -66,16 +66,16 @@ void LogEvent::read(Blob& stream)
 	{
 		stream.read(tmp, len);	
 		tmp[len] = 0;
+		message = tmp;
 	}
-	message = tmp;
-/*	stream.read(&index, sizeof(index));
-	int32_t count;
-	stream.read(&count, sizeof(count));
-	components.resize(count);
-	for(int i = 0; i < count; ++i)
+	else
 	{
-		stream.read(&components[i], sizeof(components[i]));
-	}*/
+		char* buf = new char[len+1];
+		stream.read(buf, len);
+		buf[len] = 0;
+		message = buf;
+		delete[] buf;
+	}
 }
 
 

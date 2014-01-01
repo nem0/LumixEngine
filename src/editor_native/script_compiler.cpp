@@ -1,6 +1,6 @@
 #include "editor_native/script_compiler.h"
 #include <cstdio>
-
+#include "core/log.h"
 
 void ScriptCompiler::compileAll()
 {
@@ -29,6 +29,18 @@ void ScriptCompiler::compile(const char path[])
     si.cb = sizeof(si);
     ZeroMemory( &pi, sizeof(pi) );
 	char cmd_line[255];
+	HANDLE read_pipe, write_pipe;
+
+	SECURITY_ATTRIBUTES saAttr; 
+	saAttr.nLength = sizeof(SECURITY_ATTRIBUTES); 
+	saAttr.bInheritHandle = TRUE; 
+	saAttr.lpSecurityDescriptor = NULL; 
+
+	CreatePipe(&read_pipe, &write_pipe, &saAttr, 0);
+	SetHandleInformation(read_pipe, HANDLE_FLAG_INHERIT, 0);
+	si.hStdInput = read_pipe;
+	si.hStdOutput = write_pipe;
+	si.dwFlags |= STARTF_USESTDHANDLES;
 	sprintf(cmd_line, "/C scripts\\compile.bat %s", path);
     if ( CreateProcess("C:\\windows\\system32\\cmd.exe",     // Application name
         cmd_line,
@@ -44,7 +56,13 @@ void ScriptCompiler::compile(const char path[])
 		Process* p = new Process();
 		p->m_handle = pi.hProcess;
 		p->m_path = path;
+		p->m_pipe = read_pipe;
+		p->m_write_pipe = write_pipe;
 		m_processes.push_back(p);
+	}
+	else
+	{
+		ASSERT(false);
 	}
 }
 
@@ -60,6 +78,22 @@ void ScriptCompiler::checkFinished()
 				Process* p = m_processes[i];
 				m_processes.eraseFast(i);
 				m_delegates.invoke(p->m_path.c_str(), code);
+				char buf[512];
+				DWORD read;
+				if(code != 0)
+				{
+					static Lux::string text = "";
+					do
+					{
+						ReadFile(p->m_pipe, buf, 512, &read, NULL);
+						buf[read] = '\0';
+						text += buf;
+					}
+					while(read == 512);
+					Lux::g_log_info.log("compile script", text.c_str());
+				}
+				CloseHandle(p->m_pipe);
+				CloseHandle(p->m_write_pipe);
 				delete p;
 			}
 		}
