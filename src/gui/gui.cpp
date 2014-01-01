@@ -32,15 +32,15 @@ namespace UI
 		void checkBoxToggle(Block& block, void*);
 
 		Engine* m_engine;
-		vector<Block*> m_blocks;
+		PODArray<Block*> m_blocks;
 		map<uint32_t, Block::EventCallback> m_callbacks;
 		map<uint32_t, DecoratorBase*> m_decorators;
 		Block* m_focus;
 		IRenderer* m_renderer;
-		vector<Atlas*> m_atlases;
+		PODArray<Atlas*> m_atlases;
 		map<uint32_t, BlockCreator> m_block_creators;
-		vector<Gui::MouseMoveCallback> m_mouse_move_callbacks;
-		vector<Gui::MouseCallback> m_mouse_up_callbacks;
+		PODArray<Gui::MouseMoveCallback> m_mouse_move_callbacks;
+		PODArray<Gui::MouseCallback> m_mouse_up_callbacks;
 	};
 
 
@@ -198,13 +198,13 @@ namespace UI
 
 	Gui::MouseMoveCallback& Gui::addMouseMoveCallback()
 	{
-		return m_impl->m_mouse_move_callbacks.push_back_empty();
+		return m_impl->m_mouse_move_callbacks.pushEmpty();
 	}
 
 
 	Gui::MouseCallback& Gui::addMouseUpCallback()
 	{
-		return m_impl->m_mouse_up_callbacks.push_back_empty();
+		return m_impl->m_mouse_up_callbacks.pushEmpty();
 	}
 
 
@@ -317,7 +317,7 @@ namespace UI
 			delete atlas;
 			return NULL;
 		}
-		m_impl->m_atlases.push_back(atlas);
+		m_impl->m_atlases.push(atlas);
 		atlas->load(*m_impl->m_renderer, m_impl->m_engine->getFileSystem(), path);
 		return atlas;
 	}
@@ -347,7 +347,7 @@ namespace UI
 	{
 		Block* block = new Block(*this, NULL, NULL);
 		block->setArea(0, 0, 0, 0, 0, width, 0, height);
-		m_impl->m_blocks.push_back(block);
+		m_impl->m_blocks.push(block);
 		return block;
 	}
 

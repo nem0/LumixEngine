@@ -106,7 +106,7 @@ void PropertyDescriptor<S>::set(Component cmp, Blob& stream) const
 				ASSERT(len < 300);
 				stream.read(tmp, len);
 				tmp[len] = '\0';
-				string s = (char*)tmp;
+				string s((char*)tmp);
 				(static_cast<S*>(cmp.system)->*m_setter)(cmp, s); 
 			}
 			break;

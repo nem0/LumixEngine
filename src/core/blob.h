@@ -3,7 +3,7 @@
 
 #include "core/lux.h"
 #include "core/istream.h"
-#include "core/vector.h"
+#include "core/pod_array.h"
 
 
 namespace Lux
@@ -30,7 +30,7 @@ namespace Lux
 
 
 		private:
-			vector<uint8_t> m_buffer;
+			PODArray<uint8_t> m_buffer;
 			int m_pos;
 			int m_size;
 			void* m_data; 

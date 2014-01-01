@@ -125,7 +125,7 @@ void PropertyFrame::onEntitySelected(Lux::Event& evt)
 		{
 			ASSERT(false);
 		}
-		m_component_uis.push_back(ui);
+		m_component_uis.push(ui);
 	}
 	layout();
 	float h = 0;

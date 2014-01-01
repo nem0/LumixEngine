@@ -168,7 +168,7 @@ namespace UI
 
 	void Block::addChild(Block& child)
 	{
-		m_children.push_back(&child);
+		m_children.push(&child);
 		for(int i = m_children.size() - 1; i > 0; --i)
 		{
 			if(m_children[i]->getZ() < m_children[i-1]->getZ())
@@ -331,7 +331,7 @@ namespace UI
 		{
 			uint32_t type;
 			serializer.deserializeArrayItem(type);
-			m_children.push_back(m_gui.createBlock(type, this));
+			m_children.push(m_gui.createBlock(type, this));
 			m_children[i]->deserialize(serializer);
 		}
 		serializer.deserializeArrayEnd();
@@ -361,7 +361,7 @@ namespace UI
 	{
 		EventHandler handler;
 		handler.type = type;
-		m_event_handlers.push_back(handler);
+		m_event_handlers.push(handler);
 		return m_event_handlers[m_event_handlers.size()-1].callback;
 	}
 
@@ -371,7 +371,7 @@ namespace UI
 		EventHandler handler;
 		handler.callback = m_gui.getCallback(callback);
 		handler.type = crc32(type);
-		m_event_handlers.push_back(handler);
+		m_event_handlers.push(handler);
 	}
 
 

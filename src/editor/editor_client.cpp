@@ -2,7 +2,7 @@
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/event_manager.h"
-#include "core/vector.h"
+#include "core/pod_array.h"
 #include "editor/client_message_types.h"
 #include "editor/server_message_types.h"
 #include "core/task.h"
@@ -36,7 +36,7 @@ namespace Lux
 	int ReceiveTask::task()
 	{
 		bool finished = false;
-		vector<uint8_t> data;
+		PODArray<uint8_t> data;
 		data.resize(8);
 		while(!finished)
 		{

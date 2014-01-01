@@ -4,13 +4,14 @@
 #include "core/crc32.h"
 #include "core/file_system.h"
 #include "core/ifile.h"
+#include "core/json_serializer.h"
+#include "core/log.h"
+#include "core/pod_array.h"
 #include "engine/engine.h"
 #include "universe/universe.h"
 #include "universe/component_event.h"
 #include "base_script.h"
 #include "save_script_visitor.h"
-#include "core/json_serializer.h"
-#include "core/log.h"
 
 
 static const uint32_t script_type = crc32("script");
@@ -25,10 +26,10 @@ namespace Lux
 		void getDll(const char* script_path, char* dll_path, int max_length);
 		void getScriptDefaultPath(Entity e, char* path, int max_path, const char* ext);
 
-		vector<int> m_scripts;
-		vector<BaseScript*> m_script_objs;
-		vector<HMODULE> m_libs;
-		vector<string> m_paths;
+		PODArray<int> m_scripts;
+		PODArray<BaseScript*> m_script_objs;
+		PODArray<HMODULE> m_libs;
+		Array<string> m_paths;
 		Universe* m_universe;
 		Engine* m_engine;
 		bool m_is_running;
@@ -100,7 +101,7 @@ namespace Lux
 			Entity e(m_impl->m_universe, m_impl->m_scripts[i]);
 			m_impl->getDll(m_impl->m_paths[i].c_str(), path, MAX_PATH);
 			HMODULE h = LoadLibrary(path);
-			m_impl->m_libs.push_back(h);
+			m_impl->m_libs.push(h);
 			if(h)
 			{
 				CreateScriptFunction f = (CreateScriptFunction)GetProcAddress(h, TEXT("createScript"));
@@ -108,18 +109,18 @@ namespace Lux
 				if(!f)
 				{
 					g_log_warning.log("script", "failed to create script %s", m_impl->m_paths[i].c_str());
-					m_impl->m_script_objs.push_back(0);
+					m_impl->m_script_objs.push(0);
 				}
 				else
 				{
-					m_impl->m_script_objs.push_back(script);
+					m_impl->m_script_objs.push(script);
 					script->create(*this, e);
 				}
 			}
 			else
 			{
 				g_log_warning.log("script", "failed to load script %s", m_impl->m_paths[i].c_str());
-				m_impl->m_script_objs.push_back(0);
+				m_impl->m_script_objs.push(0);
 			}
 		}
 		m_impl->m_is_running = true;
@@ -217,8 +218,8 @@ namespace Lux
 		FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::OPEN_OR_CREATE);
 		fs.close(file);
 
-		m_impl->m_scripts.push_back(entity.index);
-		m_impl->m_paths.push_back(path);
+		m_impl->m_scripts.push(entity.index);
+		m_impl->m_paths.push(string(path));
 
 		Component cmp(entity, script_type, this, m_impl->m_scripts.size() - 1);
 		m_impl->m_universe->getEventManager()->emitEvent(ComponentEvent(cmp));

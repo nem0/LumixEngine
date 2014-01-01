@@ -9,6 +9,7 @@
 #include "core/ifile_system_defines.h"
 #include "core/json_serializer.h"
 #include "core/matrix.h"
+#include "core/pod_array.h"
 #include "core/quat.h"
 #include "core/vec3.h"
 #include "gl/GL.h"
@@ -46,7 +47,6 @@ struct LoadInfo
 
 struct RenderNode
 {
-	RenderNode() {}
 	H3DNode m_node;
 	int m_entity;
 };
@@ -63,10 +63,10 @@ struct RendererImpl
 
 	int					m_width;
 	int					m_height;
-	vector<RenderNode>	m_lights;
-	vector<RenderNode>	m_renderables;
-	vector<string>		m_paths;
-	vector<Entity>		m_entities;
+	PODArray<RenderNode>	m_lights;
+	PODArray<RenderNode>	m_renderables;
+	Array<string>		m_paths;
+	PODArray<Entity>	m_entities;
 	H3DRes				m_pipeline_handle;
 	Universe*			m_universe;
 	H3DNode				m_camera_node;
@@ -452,10 +452,10 @@ Component Renderer::createRenderable(Entity entity)
 	int index = -1;
 	if(m_impl->m_first_free_renderable == -1)
 	{
-		m_impl->m_renderables.push_back_empty();
+		m_impl->m_renderables.pushEmpty();
 		m_impl->m_renderables.back().m_entity = entity.index;
 		m_impl->m_renderables.back().m_node = 0;
-		m_impl->m_paths.push_back("");
+		m_impl->m_paths.push(string(""));
 		index = m_impl->m_renderables.size() - 1;
 	}
 	else
@@ -510,7 +510,7 @@ Component Renderer::createPointLight(Entity entity)
 	int index = -1;
 	if(m_impl->m_first_free_light == -1)
 	{
-		m_impl->m_lights.push_back_empty();
+		m_impl->m_lights.pushEmpty();
 		m_impl->m_lights.back().m_entity = entity.index;
 		index = m_impl->m_lights.size() - 1;
 	}

@@ -3,7 +3,7 @@
 
 #include "core/delegate.h"
 #include "core/lux.h"
-#include "core/vector.h"
+#include "core/pod_array.h"
 #include "core/string.h"
 
 
@@ -110,8 +110,8 @@ namespace UI
 		private:
 			DecoratorBase* m_decorator;
 			Block* m_parent;
-			vector<Block*> m_children; 
-			vector<EventHandler> m_event_handlers; 
+			PODArray<Block*> m_children; 
+			PODArray<EventHandler> m_event_handlers; 
 			Area m_local_area;
 			Area m_global_area;
 			Area m_content_area;

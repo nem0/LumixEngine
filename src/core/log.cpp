@@ -1,5 +1,5 @@
 #include "core/log.h"
-#include "core/vector.h"
+#include "core/pod_array.h"
 #include "core/string.h"
 #include <cstdio>
 #include <cstdarg>
@@ -17,7 +17,7 @@ namespace Lux
 	{
 		void sendMessage();
 
-		vector<Log::Callback> m_callbacks;
+		PODArray<Log::Callback> m_callbacks;
 	};
 
 
@@ -50,7 +50,7 @@ namespace Lux
 
 	Log::Callback& Log::addCallback()
 	{
-		return m_impl->m_callbacks.push_back_empty();
+		return m_impl->m_callbacks.pushEmpty();
 	}
 
 

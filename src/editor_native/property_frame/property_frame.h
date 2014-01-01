@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "core/vector.h"
+#include "core/pod_array.h"
 #include "gui/controls/dockable.h"
 
 
@@ -43,5 +43,5 @@ class PropertyFrame : public Lux::UI::Dockable
 		Lux::UI::TextBox* m_pos_z_box;
 		Lux::UI::Block* m_component_container;
 		MainFrame* m_main_frame;
-		Lux::vector<IComponentUI*> m_component_uis; 
+		Lux::PODArray<IComponentUI*> m_component_uis; 
 };

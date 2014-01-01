@@ -3,9 +3,10 @@
 #include <Windows.h>
 #include <gl/GL.h>
 #include "core/map.h"
+#include "core/pod_array.h"
 #include "core/string.h"
 #include "core/vec3.h"
-#include "core/vector.h"
+#include "core/array.h"
 #include "gui/block.h"
 #include "gui/texture_base.h"
 
@@ -47,10 +48,10 @@ namespace UI
 		TextureBase* getImage(const char* name);
 
 		map<char, Character> m_characters;
-		vector<TextureBase*> m_images;
+		PODArray<TextureBase*> m_images;
 		OpenGLTexture* m_font_image;
 		int m_window_height;
-		vector<Block::Area> m_scissors_areas;
+		PODArray<Block::Area> m_scissors_areas;
 	};
 
 	#pragma pack(1) 
@@ -249,12 +250,12 @@ namespace UI
 			r.rel_bottom = Math::min(bottom, parent_area.rel_bottom);
 		}
 		glScissor((int)r.rel_left, (int)(m_impl->m_window_height - r.rel_bottom), (int)(r.rel_right - r.rel_left), (int)(r.rel_bottom - r.rel_top));
-		m_impl->m_scissors_areas.push_back(r);
+		m_impl->m_scissors_areas.push(r);
 	}
 
 	void OpenGLRenderer::popScissorArea()
 	{
-		m_impl->m_scissors_areas.pop_back();
+		m_impl->m_scissors_areas.pop();
 		if(m_impl->m_scissors_areas.empty())
 		{
 			glDisable(GL_SCISSOR_TEST);
@@ -278,8 +279,8 @@ namespace UI
 			void set(float _x, float _y) { x = _x; y = _y; }
 			float x, y;
 		};
-		static vector<Vec3> verts;
-		static vector<Vec2> uvs;
+		static PODArray<Vec3> verts;
+		static PODArray<Vec2> uvs;
 		int len = strlen(text);
 		verts.resize(len * 6);
 		uvs.resize(len * 6);

@@ -20,13 +20,13 @@ void EventManager::emitEvent(Event& event)
 
 EventManager::Listener& EventManager::addListener(Event::Type type)
 {
-	return m_listeners[type].push_back_empty();
+	return m_listeners[type].pushEmpty();
 }
 
 
 void EventManager::removeListener(Event::Type type, const Listener& listener)
 {
-	vector<Listener>& listeners = m_listeners[type];
+	PODArray<Listener>& listeners = m_listeners[type];
 	for(int i = 0; i < listeners.size(); ++i)
 	{
 		if(listeners[i] == listener)

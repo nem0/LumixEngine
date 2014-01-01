@@ -14,7 +14,8 @@
 #include "core/map.h"
 #include "core/matrix.h"
 #include "core/memory_file_device.h"
-#include "core/vector.h"
+#include "core/pod_array.h"
+#include "core/array.h"
 #include "editor/editor_icon.h"
 #include "editor/gizmo.h"
 #include "editor/property_descriptor.h"
@@ -173,10 +174,10 @@ struct EditorServerImpl
 		Gizmo m_gizmo;
 		Entity m_selected_entity;
 		Blob m_stream;
-		map<uint32_t, vector<IPropertyDescriptor*> > m_component_properties;
+		map<uint32_t, PODArray<IPropertyDescriptor*> > m_component_properties;
 		map<uint32_t, IPlugin*> m_creators;
 		MouseMode::Value m_mouse_mode;
-		vector<EditorIcon*>	m_editor_icons;
+		PODArray<EditorIcon*> m_editor_icons;
 		HGLRC m_hglrc;
 		HGLRC m_game_hglrc;
 		bool m_is_game_mode;
@@ -205,7 +206,7 @@ Engine& EditorServer::getEngine()
 void EditorServer::registerProperty(const char* component_type, IPropertyDescriptor* descriptor)
 {
 	ASSERT(descriptor);
-	m_impl->m_component_properties[crc32(component_type)].push_back(descriptor);
+	m_impl->m_component_properties[crc32(component_type)].push(descriptor);
 }
 
 
@@ -287,12 +288,12 @@ void EditorServer::destroy()
 
 void EditorServerImpl::registerProperties()
 {
-	m_component_properties[renderable_type].push_back(new PropertyDescriptor<Renderer>(crc32("source"), &Renderer::getMesh, &Renderer::setMesh, IPropertyDescriptor::FILE));
-	m_component_properties[renderable_type].push_back(new PropertyDescriptor<Renderer>(crc32("visible"), &Renderer::getVisible, &Renderer::setVisible));
-	m_component_properties[renderable_type].push_back(new PropertyDescriptor<Renderer>(crc32("cast shadows"), &Renderer::getCastShadows, &Renderer::setCastShadows));
-	m_component_properties[point_light_type].push_back(new PropertyDescriptor<Renderer>(crc32("fov"), &Renderer::getLightFov, &Renderer::setLightFov));
-	m_component_properties[point_light_type].push_back(new PropertyDescriptor<Renderer>(crc32("radius"), &Renderer::getLightRadius, &Renderer::setLightRadius));
-	m_component_properties[script_type].push_back(new PropertyDescriptor<ScriptSystem>(crc32("source"), &ScriptSystem::getScriptPath, &ScriptSystem::setScriptPath, IPropertyDescriptor::FILE));
+	m_component_properties[renderable_type].push(new PropertyDescriptor<Renderer>(crc32("source"), &Renderer::getMesh, &Renderer::setMesh, IPropertyDescriptor::FILE));
+	m_component_properties[renderable_type].push(new PropertyDescriptor<Renderer>(crc32("visible"), &Renderer::getVisible, &Renderer::setVisible));
+	m_component_properties[renderable_type].push(new PropertyDescriptor<Renderer>(crc32("cast shadows"), &Renderer::getCastShadows, &Renderer::setCastShadows));
+	m_component_properties[point_light_type].push(new PropertyDescriptor<Renderer>(crc32("fov"), &Renderer::getLightFov, &Renderer::setLightFov));
+	m_component_properties[point_light_type].push(new PropertyDescriptor<Renderer>(crc32("radius"), &Renderer::getLightRadius, &Renderer::setLightRadius));
+	m_component_properties[script_type].push(new PropertyDescriptor<ScriptSystem>(crc32("source"), &ScriptSystem::getScriptPath, &ScriptSystem::setScriptPath, IPropertyDescriptor::FILE));
 }
 
 
@@ -409,7 +410,7 @@ void EditorServerImpl::addEntity()
 	selectEntity(e);
 	EditorIcon* er = new EditorIcon();
 	er->create(m_selected_entity, Component::INVALID);
-	m_editor_icons.push_back(er);
+	m_editor_icons.push(er);
 	/*** this is here because camera render node does not exists untitle pipeline resource is loaded, do this properly*/
 	Matrix mtx;
 	m_camera_rot.toMatrix(mtx);
@@ -424,7 +425,7 @@ int MessageTask::task()
 	m_is_finished = false;
 	m_acceptor.start("127.0.0.1", 10002);
 	m_stream = m_acceptor.accept();
-	vector<uint8_t> data;
+	PODArray<uint8_t> data;
 	data.resize(5);
 	while(!m_is_finished)
 	{
@@ -486,7 +487,7 @@ void EditorServerImpl::sendComponent(uint32_t type_crc)
 		{
 			if(cmps[i].type == type_crc)
 			{
-				vector<IPropertyDescriptor*>& props = m_component_properties[cmps[i].type];
+				PODArray<IPropertyDescriptor*>& props = m_component_properties[cmps[i].type];
 				m_stream.write(props.size());
 				m_stream.write(type_crc);
 				for(int j = 0; j < props.size(); ++j)
@@ -913,7 +914,7 @@ void EditorServerImpl::navigate(float forward, float right, int fast)
 
 const IPropertyDescriptor& EditorServerImpl::getPropertyDescriptor(uint32_t type, uint32_t name_hash)
 {
-	vector<IPropertyDescriptor*>& props = m_component_properties[type];
+	PODArray<IPropertyDescriptor*>& props = m_component_properties[type];
 	for(int i = 0; i < props.size(); ++i)
 	{
 		if(props[i]->getNameHash() == name_hash)
@@ -1093,7 +1094,7 @@ void EditorServerImpl::onComponentEvent(ComponentEvent& e)
 		{
 			EditorIcon* er = new EditorIcon();
 			er->create(e.component.entity, e.component);
-			m_editor_icons.push_back(er);
+			m_editor_icons.push(er);
 		}
 	}
 	else
@@ -1102,7 +1103,7 @@ void EditorServerImpl::onComponentEvent(ComponentEvent& e)
 		{
 			EditorIcon* er = new EditorIcon();
 			er->create(e.component.entity, Component::INVALID);
-			m_editor_icons.push_back(er);
+			m_editor_icons.push(er);
 		}
 	}
 }

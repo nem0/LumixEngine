@@ -48,7 +48,7 @@ class base_string
 			m_cstr[m_size] = 0;
 		}
 
-		base_string(const T* rhs)
+		explicit base_string(const T* rhs)
 		{
 			m_size = strlen(rhs);
 			m_cstr = (T*)m_allocator.allocate((m_size + 1) * sizeof(T));
@@ -82,6 +82,11 @@ class base_string
 		bool operator !=(const base_string<T, Allocator>& rhs) const
 		{
 			return this->strcmp(rhs.m_cstr) != 0;
+		}
+
+		bool operator !=(const T* rhs) const
+		{
+			return this->strcmp(rhs) != 0;
 		}
 
 		bool operator ==(const base_string<T, Allocator>& rhs) const
