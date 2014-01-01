@@ -61,6 +61,7 @@ namespace Lux
 			}
 			else
 			{
+				ASSERT(false);
 				return false;
 			}
 
@@ -72,7 +73,7 @@ namespace Lux
 
 				return true;
 			}
-
+			ASSERT(false);
 			return false;
 		}
 

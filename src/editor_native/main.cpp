@@ -28,7 +28,7 @@ void initGui(Lux::EditorClient& client, Lux::EditorServer& server)
 {
 	Lux::UI::OpenGLRenderer* renderer = new Lux::UI::OpenGLRenderer();
 	renderer->create();
-	renderer->loadFont("gui/font.tga");
+	renderer->loadFont("gui/font.tga", server.getEngine().getFileSystem());
 	renderer->setWindowHeight(600);
 	Lux::UI::CheckBoxDecorator* check_box_decorator = new Lux::UI::CheckBoxDecorator("_check_box");
 	Lux::UI::TextDecorator* text_decorator = new Lux::UI::TextDecorator("_text");

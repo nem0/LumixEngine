@@ -2,11 +2,13 @@
 #include <cstdio>
 #include <Windows.h>
 #include <gl/GL.h>
+#include "core/array.h"
+#include "core/file_system.h"
+#include "core/ifile.h"
 #include "core/map.h"
 #include "core/pod_array.h"
 #include "core/string.h"
 #include "core/vec3.h"
-#include "core/array.h"
 #include "gui/block.h"
 #include "gui/texture_base.h"
 
@@ -46,6 +48,7 @@ namespace UI
 		};
 
 		TextureBase* getImage(const char* name);
+		static void fontLoaded(FS::IFile* file, bool success, void* user_data);
 
 		map<char, Character> m_characters;
 		PODArray<TextureBase*> m_images;
@@ -320,6 +323,17 @@ namespace UI
 		
 	}
 
+	bool readLine(FS::IFile* file, char buffer[], int max_size)
+	{
+		int i = 0;
+		while(file->read(buffer + i, 1) && buffer[i] != '\n' && buffer[i] != '\0' && i < max_size - 1)
+		{
+			++i;
+		}
+		buffer[i+1] = 0;
+		return buffer[i] == '\n' || buffer[i] == '\0' || i == max_size - 1;
+	}
+
 	const char* getFirstNumberPos(const char* str)
 	{
 		const char* c = str;
@@ -341,63 +355,64 @@ namespace UI
 	}
 
 
+	void OpenGLRendererImpl::fontLoaded(FS::IFile* file, bool success, void* user_data)
+	{
+		if(success)
+		{
+			char line[255];
+			OpenGLRendererImpl* that = static_cast<OpenGLRendererImpl*>(user_data);
+			while(readLine(file, line, 255) && strncmp(line, "chars count", 11) != 0);
+			if(strncmp(line, "chars count", 11) == 0)
+			{
+				int count;
+				sscanf_s(getFirstNumberPos(line), "%d", &count);
+				for(int i = 0; i < count; ++i)
+				{
+					readLine(file, line, 255);
+					const char* c = getFirstNumberPos(line);
+					int id;
+					sscanf_s(c, "%d", &id);
+					OpenGLRendererImpl::Character character;
+					int tmp;
+					c = getNextNumberPos(c);
+					sscanf_s(c, "%d", &tmp);
+					character.left = (float)tmp / that->m_font_image->getWidth();
+					c = getNextNumberPos(c);
+					sscanf_s(c, "%d", &tmp);
+					character.top = (float)tmp / that->m_font_image->getHeight();
+					c = getNextNumberPos(c);
+					sscanf_s(c, "%d", &tmp);
+					character.pixel_w = (float)tmp;
+					c = getNextNumberPos(c);
+					sscanf_s(c, "%d", &tmp);
+					character.pixel_h = (float)tmp;
+					character.right = character.left + character.pixel_w / that->m_font_image->getWidth();
+					character.bottom = character.top + character.pixel_h / that->m_font_image->getHeight();
+					c = getNextNumberPos(c);
+					sscanf_s(c, "%d", &tmp);
+					character.x_offset = (float)tmp;
+					c = getNextNumberPos(c);
+					sscanf_s(c, "%d", &tmp);
+					character.y_offset = (float)tmp;
+					c = getNextNumberPos(c);
+					sscanf_s(c, "%d", &tmp);
+					character.x_advance = (float)tmp;
+					that->m_characters.insert((char)id, character);
+				}
+			}
+		}
+		file->close();
+	}
 
-	bool OpenGLRenderer::loadFont(const char* path)
+
+	void OpenGLRenderer::loadFont(const char* path, FS::FileSystem& file_system)
 	{
 		m_impl->m_font_image = static_cast<OpenGLTexture*>(loadImage(path));
 		char tmp[255];
 		strcpy_s(tmp, path);
 		int len = strlen(tmp);
 		strcpy_s(tmp + len - 4, 255 - len + 4, ".fnt");
-		FILE* fp;
-		fopen_s(&fp, tmp, "r");
-		char line[255];
-		fgets(line, 255, fp);
-		while(!feof(fp) && strncmp(line, "chars count", 11) != 0)
-		{
-			fgets(line, 255, fp);
-
-		}
-		if(strncmp(line, "chars count", 11) == 0)
-		{
-			int count;
-			sscanf_s(getFirstNumberPos(line), "%d", &count);
-			for(int i = 0; i < count; ++i)
-			{
-				fgets(line, 255, fp);
-				const char* c = getFirstNumberPos(line);
-				int id;
-				sscanf_s(c, "%d", &id);
-				OpenGLRendererImpl::Character character;
-				int tmp;
-				c = getNextNumberPos(c);
-				sscanf_s(c, "%d", &tmp);
-				character.left = (float)tmp / m_impl->m_font_image->getWidth();
-				c = getNextNumberPos(c);
-				sscanf_s(c, "%d", &tmp);
-				character.top = (float)tmp / m_impl->m_font_image->getHeight();
-				c = getNextNumberPos(c);
-				sscanf_s(c, "%d", &tmp);
-				character.pixel_w = (float)tmp;
-				c = getNextNumberPos(c);
-				sscanf_s(c, "%d", &tmp);
-				character.pixel_h = (float)tmp;
-				character.right = character.left + character.pixel_w / m_impl->m_font_image->getWidth();
-				character.bottom = character.top + character.pixel_h / m_impl->m_font_image->getHeight();
-				c = getNextNumberPos(c);
-				sscanf_s(c, "%d", &tmp);
-				character.x_offset = (float)tmp;
-				c = getNextNumberPos(c);
-				sscanf_s(c, "%d", &tmp);
-				character.y_offset = (float)tmp;
-				c = getNextNumberPos(c);
-				sscanf_s(c, "%d", &tmp);
-				character.x_advance = (float)tmp;
-				m_impl->m_characters.insert((char)id, character);
-			}
-		}
-		fclose(fp);
-		return false;
+		file_system.openAsync(file_system.getDefaultDevice(), tmp, FS::Mode::OPEN | FS::Mode::READ, &OpenGLRendererImpl::fontLoaded, m_impl);
 	}
 
 
