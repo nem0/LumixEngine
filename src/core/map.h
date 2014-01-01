@@ -155,8 +155,10 @@ class map
 			Node* node = _find(key);
 			if(!node || node->key != key)
 			{
-				insert(key, Value());
-				node = _find(key);
+				Node* new_node = new ((Node*)m_allocator.allocate(sizeof(Node))) Node();
+				new_node->key = key;
+				insert(key, m_root, NULL, new_node);
+				return new_node->value;
 			}
 
 			return node->value;
@@ -164,7 +166,10 @@ class map
 
 		void insert(const Key& key, const Value& value)
 		{
-			insert(key, value, m_root, 0);
+			Node* new_node = new ((Node*)m_allocator.allocate(sizeof(Node))) Node();
+			new_node->key = key;
+			new_node->value = value;
+			insert(key, m_root, 0, new_node);
 			++m_size;
 		}
 
@@ -228,18 +233,16 @@ class map
 			rotateLeft(node);
 		}
 
-		void insert(const Key& key, const Value& value, Node*& node, Node* parent)
+		void insert(const Key& key, Node*& node, Node* parent, Node* new_node)
 		{
 			if(node == 0)
 			{
-				node = new ((Node*)m_allocator.allocate(sizeof(Node))) Node();
-				node->key = key;
-				node->value = value;
+				node = new_node;
 				node->parent = parent;
 			}
 			else if(key < node->key)
 			{
-				insert(key, value, node->left, node);
+				insert(key, node->left, node, new_node);
 				if(node->getLeftHeight() - node->getRightHeight() == 2)
 				{
 					if(key < node->left->key)
@@ -254,7 +257,7 @@ class map
 			}
 			else if(key > node->key)
 			{
-				insert(key, value, node->right, node);
+				insert(key, node->right, node, new_node);
 				if(node->getRightHeight() - node->getLeftHeight() == 2)
 				{
 					if(key > node->right->key)
