@@ -26,7 +26,7 @@ namespace Lux
 			float m_time;
 		};
 
-		vector<Animable> m_animables;
+		Array<Animable> m_animables;
 		Universe* m_universe;
 
 		void onEvent(Event& event);
@@ -99,7 +99,7 @@ namespace Lux
 		m_impl->m_animables.clear();
 		for(int i = 0; i < count; ++i)
 		{
-			m_impl->m_animables.push_back_empty();
+			m_impl->m_animables.pushEmpty();
 			serializer.deserializeArrayItem(m_impl->m_animables[i].m_manual);
 			int entity_index;
 			serializer.deserializeArrayItem(entity_index);
@@ -145,7 +145,7 @@ namespace Lux
 
 	Component AnimationSystem::createAnimable(const Entity& entity)
 	{
-		AnimationSystemImpl::Animable& animable = m_impl->m_animables.push_back_empty();
+		AnimationSystemImpl::Animable& animable = m_impl->m_animables.pushEmpty();
 		animable.m_manual = true;
 		animable.m_time = 0;
 		animable.m_renderable = Component::INVALID;

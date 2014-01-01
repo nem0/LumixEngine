@@ -3,7 +3,7 @@
 #include <Windows.h>
 #include <gl/GL.h>
 #include "core/vec3.h"
-#include "core/vector.h"
+#include "core/array.h"
 #include "detour/Recast.h"
 #include "detour/RecastDebugDraw.h"
 #include "detour/DebugDraw.h"
@@ -21,7 +21,7 @@ struct NavigationImpl
 	struct Path
 	{
 		Entity entity;
-		vector<Vec3> vertices;
+		PODArray<Vec3> vertices;
 		int vertex_count;
 		int current_index;
 		float speed;
@@ -31,7 +31,7 @@ struct NavigationImpl
 	rcPolyMeshDetail* m_detail_mesh;
 	dtNavMesh* m_navmesh;
 	dtNavMeshQuery* m_navquery;
-	vector<Path> m_paths;
+	Array<Path> m_paths;
 };
 
 
@@ -265,7 +265,7 @@ void Navigation::navigate(Entity e, const Vec3& dest, float speed)
 {
 	if(e.isValid())
 	{
-		NavigationImpl::Path& path = m_impl->m_paths.push_back_empty();
+		NavigationImpl::Path& path = m_impl->m_paths.pushEmpty();
 		path.speed = speed;
 		path.vertices.resize(128);
 		path.entity = e;
@@ -308,9 +308,9 @@ bool Navigation::load(const char path[])
 	{
 		return false;
 	}
-	vector<Vec3> v_verts;
+	PODArray<Vec3> v_verts;
 	int nverts, ntris;
-	vector<unsigned int> v_tris;
+	PODArray<unsigned int> v_tris;
 
 	fread(&nverts, sizeof(nverts), 1, fp);
 	v_verts.resize(nverts);

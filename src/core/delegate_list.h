@@ -2,7 +2,7 @@
 
 
 #include "core/delegate.h"
-#include "core/vector.h"
+#include "core/pod_array.h"
 
 
 namespace Lux
@@ -18,7 +18,7 @@ namespace Lux
 			{
 				Delegate<R> cb;
 				cb.bind<C, Function>(instance);
-				m_delegates.push_back(cb);
+				m_delegates.push(cb);
 			}
 
 			template <typename C, R (C::*Function)()>
@@ -45,7 +45,7 @@ namespace Lux
 			}
 
 		private:
-			vector<Delegate<R> > m_delegates;
+			PODArray<Delegate<R> > m_delegates;
 	};
 
 	template <typename R, typename A0>
@@ -57,7 +57,7 @@ namespace Lux
 			{
 				Delegate<R (A0)> cb;
 				cb.bind<C, Function>(instance);
-				m_delegates.push_back(cb);
+				m_delegates.push(cb);
 			}
 
 			template <typename C, R (C::*Function)(A0)>
@@ -84,7 +84,7 @@ namespace Lux
 			}
 
 		private:
-			vector<Delegate<R (A0)> > m_delegates;
+			PODArray<Delegate<R (A0)> > m_delegates;
 	};
 
 	template <typename R, typename A0, typename A1>
@@ -96,7 +96,7 @@ namespace Lux
 			{
 				Delegate<R (A0, A1)> cb;
 				cb.bind<C, Function>(instance);
-				m_delegates.push_back(cb);
+				m_delegates.push(cb);
 			}
 
 			template <typename C, R (C::*Function)(A0, A1)>
@@ -123,6 +123,6 @@ namespace Lux
 			}
 
 		private:
-			vector<Delegate<R (A0, A1)> > m_delegates;
+			PODArray<Delegate<R (A0, A1)> > m_delegates;
 	};
 } // ~namespace Lux

@@ -58,7 +58,7 @@ void ScriptCompiler::compile(const char path[])
 		p->m_path = path;
 		p->m_pipe = read_pipe;
 		p->m_write_pipe = write_pipe;
-		m_processes.push_back(p);
+		m_processes.push(p);
 	}
 	else
 	{
@@ -82,7 +82,8 @@ void ScriptCompiler::checkFinished()
 				DWORD read;
 				if(code != 0)
 				{
-					static Lux::string text = "";
+					static Lux::string text;
+					text = "";
 					do
 					{
 						ReadFile(p->m_pipe, buf, 512, &read, NULL);

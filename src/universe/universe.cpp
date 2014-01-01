@@ -49,15 +49,15 @@ Entity Universe::createEntity()
 	
 	if(m_free_slots.empty())
 	{
-		m_positions.push_back(Vec3(0, 0, 0));
-		m_rotations.push_back(Quat(0, 0, 0, 1));
-		m_component_list.push_back_empty();
+		m_positions.push(Vec3(0, 0, 0));
+		m_rotations.push(Quat(0, 0, 0, 1));
+		m_component_list.pushEmpty();
 		return Entity(this, m_positions.size() - 1);
 	}
 	else
 	{
 		Entity e(this, m_free_slots.back());
-		m_free_slots.pop_back();
+		m_free_slots.pop();
 		m_positions[e.index].set(0, 0, 0);
 		m_rotations[e.index].set(0, 0, 0, 1);
 		m_component_list[e.index].clear();
@@ -70,7 +70,7 @@ void Universe::destroyEntity(const Entity& entity)
 {
 	if(entity.isValid())
 	{
-		m_free_slots.push_back(entity.index);
+		m_free_slots.push(entity.index);
 		m_event_manager->emitEvent(EntityDestroyedEvent(entity));
 		m_component_list[entity.index].clear();
 	}
@@ -84,11 +84,11 @@ void Universe::onEvent(Event& evt)
 		ComponentEvent& e = static_cast<ComponentEvent&>(evt);
 		if(e.is_created)
 		{
-			m_component_list[e.component.entity.index].push_back(e.component);
+			m_component_list[e.component.entity.index].push(e.component);
 		}
 		else
 		{
-			vector<Component>& list = m_component_list[e.component.entity.index];
+			PODArray<Component>& list = m_component_list[e.component.entity.index];
 			for(int i = 0, c = list.size(); i < c; ++i)
 			{
 				if(list[i] == e.component)

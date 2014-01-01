@@ -21,7 +21,7 @@ string getCwd()
 		++from;
 	}
 	*to = 0;
-	return tmp;
+	return string(tmp);
 }
 
 

@@ -23,7 +23,7 @@ void Notifications::showNotification(const char* text)
 	Notification n;
 	n.m_ui = b;
 	n.m_time = GetTickCount();
-	m_notifications.push_back(n);
+	m_notifications.push(n);
 }
 
 
