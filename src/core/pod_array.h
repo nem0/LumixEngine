@@ -23,6 +23,23 @@ class PODArray
 			m_size = 0;
 		}
 
+		PODArray(const PODArray& rhs)
+		{
+			m_data = NULL;
+			m_capacity = 0;
+			m_size = 0;
+			*this = rhs;
+		}
+
+		void operator =(const PODArray& rhs)
+		{
+			m_allocator.deallocate(m_data, sizeof(T) * m_capacity);
+			m_data = (T*)m_allocator.allocate(rhs.m_capacity * sizeof(T));
+			m_capacity = rhs.m_capacity;
+			m_size = rhs.m_size;
+			memmove(m_data, rhs.m_data, sizeof(T) * m_size);
+		}
+
 		PODArray()
 		{
 			m_data = NULL;
