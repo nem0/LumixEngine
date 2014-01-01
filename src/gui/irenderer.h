@@ -7,6 +7,12 @@
 namespace Lux
 {
 
+
+namespace FS
+{
+	class FileSystem;
+}
+
 namespace UI
 {
 
@@ -16,7 +22,7 @@ namespace UI
 	class IRenderer LUX_ABSTRACT
 	{
 		public:
-			virtual bool loadFont(const char* path) = 0;
+			virtual void loadFont(const char* path, FS::FileSystem& file_system) = 0;
 			virtual TextureBase* loadImage(const char* name) = 0;
 			virtual void beginRender(float w, float h) = 0;
 			virtual void renderImage(TextureBase* image, float* vertices, float* tex_coords, int vertex_count) = 0;

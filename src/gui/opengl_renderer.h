@@ -7,6 +7,7 @@
 
 namespace Lux
 {
+
 namespace UI
 {
 
@@ -20,7 +21,7 @@ namespace UI
 			void destroy();
 
 			virtual TextureBase* loadImage(const char* name) LUX_OVERRIDE;
-			virtual bool loadFont(const char* path) LUX_OVERRIDE;
+			virtual void loadFont(const char* path, FS::FileSystem& file_system) LUX_OVERRIDE;
 			virtual void beginRender(float w, float h) LUX_OVERRIDE;
 			virtual void renderImage(TextureBase* image, float* vertices, float* tex_coords, int vertex_count) LUX_OVERRIDE;
 			virtual void measureText(const char* text, float* w, float* h) LUX_OVERRIDE;
