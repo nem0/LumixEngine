@@ -8,7 +8,7 @@ namespace Lux
 	{
 		class TCPStream;
 
-		class LUX_PLATFORM_API TCPConnector
+		class LUX_CORE_API TCPConnector
 		{
 		public:
 			TCPConnector() {}

@@ -5,7 +5,7 @@ namespace Lux
 {
 	namespace MT
 	{
-		class LUX_PLATFORM_API SpinMutex LUX_ABSTRACT
+		class LUX_CORE_API SpinMutex LUX_ABSTRACT
 		{
 		public:
 			static SpinMutex* create(bool locked);

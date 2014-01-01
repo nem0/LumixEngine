@@ -2,16 +2,10 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Express 2012 for Windows Desktop
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "core", "projects\core\core.vcxproj", "{D7D53204-FC0C-4495-8473-FF6F5EBD1C40}"
-	ProjectSection(ProjectDependencies) = postProject
-		{0C468713-C946-4EDB-B1C4-457DDBB61A69} = {0C468713-C946-4EDB-B1C4-457DDBB61A69}
-	EndProjectSection
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "platform", "projects\platform\platform.vcxproj", "{0C468713-C946-4EDB-B1C4-457DDBB61A69}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "engine", "projects\engine\engine.vcxproj", "{575E3E55-7662-4D79-92C4-2CF77C56E3EA}"
 	ProjectSection(ProjectDependencies) = postProject
 		{D7D53204-FC0C-4495-8473-FF6F5EBD1C40} = {D7D53204-FC0C-4495-8473-FF6F5EBD1C40}
-		{0C468713-C946-4EDB-B1C4-457DDBB61A69} = {0C468713-C946-4EDB-B1C4-457DDBB61A69}
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "editor_ng", "editor_ng\editor_ng.csproj", "{950F0C29-6267-4121-96B0-4A0AEA44633E}"
@@ -30,11 +24,14 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "navigation", "projects\navi
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gui", "projects\gui\gui.vcxproj", "{3C7800B3-C971-4E27-BD17-60B033642566}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D7D53204-FC0C-4495-8473-FF6F5EBD1C40} = {D7D53204-FC0C-4495-8473-FF6F5EBD1C40}
+		{575E3E55-7662-4D79-92C4-2CF77C56E3EA} = {575E3E55-7662-4D79-92C4-2CF77C56E3EA}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "editor_native", "projects\editor_native\editor_native.vcxproj", "{8EB8C1E2-F4FB-4703-9E3A-9115B6F4B8C8}"
 	ProjectSection(ProjectDependencies) = postProject
 		{D7D53204-FC0C-4495-8473-FF6F5EBD1C40} = {D7D53204-FC0C-4495-8473-FF6F5EBD1C40}
-		{0C468713-C946-4EDB-B1C4-457DDBB61A69} = {0C468713-C946-4EDB-B1C4-457DDBB61A69}
 		{575E3E55-7662-4D79-92C4-2CF77C56E3EA} = {575E3E55-7662-4D79-92C4-2CF77C56E3EA}
 		{3C7800B3-C971-4E27-BD17-60B033642566} = {3C7800B3-C971-4E27-BD17-60B033642566}
 	EndProjectSection
@@ -59,16 +56,6 @@ Global
 		{D7D53204-FC0C-4495-8473-FF6F5EBD1C40}.Release|Mixed Platforms.Build.0 = Release|Win32
 		{D7D53204-FC0C-4495-8473-FF6F5EBD1C40}.Release|Win32.ActiveCfg = Release|Win32
 		{D7D53204-FC0C-4495-8473-FF6F5EBD1C40}.Release|Win32.Build.0 = Release|Win32
-		{0C468713-C946-4EDB-B1C4-457DDBB61A69}.Debug|Any CPU.ActiveCfg = Debug|Win32
-		{0C468713-C946-4EDB-B1C4-457DDBB61A69}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32
-		{0C468713-C946-4EDB-B1C4-457DDBB61A69}.Debug|Mixed Platforms.Build.0 = Debug|Win32
-		{0C468713-C946-4EDB-B1C4-457DDBB61A69}.Debug|Win32.ActiveCfg = Debug|Win32
-		{0C468713-C946-4EDB-B1C4-457DDBB61A69}.Debug|Win32.Build.0 = Debug|Win32
-		{0C468713-C946-4EDB-B1C4-457DDBB61A69}.Release|Any CPU.ActiveCfg = Release|Win32
-		{0C468713-C946-4EDB-B1C4-457DDBB61A69}.Release|Mixed Platforms.ActiveCfg = Release|Win32
-		{0C468713-C946-4EDB-B1C4-457DDBB61A69}.Release|Mixed Platforms.Build.0 = Release|Win32
-		{0C468713-C946-4EDB-B1C4-457DDBB61A69}.Release|Win32.ActiveCfg = Release|Win32
-		{0C468713-C946-4EDB-B1C4-457DDBB61A69}.Release|Win32.Build.0 = Release|Win32
 		{575E3E55-7662-4D79-92C4-2CF77C56E3EA}.Debug|Any CPU.ActiveCfg = Debug|Win32
 		{575E3E55-7662-4D79-92C4-2CF77C56E3EA}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32
 		{575E3E55-7662-4D79-92C4-2CF77C56E3EA}.Debug|Mixed Platforms.Build.0 = Debug|Win32

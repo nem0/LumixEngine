@@ -1,4 +1,4 @@
-#include "platform/spin_mutex.h"
+#include "core/spin_mutex.h"
 #include <Windows.h>
 
 namespace Lux

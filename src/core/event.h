@@ -20,7 +20,7 @@ namespace  Lux
 		};
 
 
-		class LUX_PLATFORM_API Event LUX_ABSTRACT
+		class LUX_CORE_API Event LUX_ABSTRACT
 		{
 		public:
 			static Event* create(EventFlags flags);

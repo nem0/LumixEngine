@@ -5,7 +5,7 @@ namespace Lux
 {
 	namespace MT
 	{
-		class LUX_PLATFORM_API Mutex LUX_ABSTRACT
+		class LUX_CORE_API Mutex LUX_ABSTRACT
 		{
 		public:
 			static Mutex* create(bool locked);

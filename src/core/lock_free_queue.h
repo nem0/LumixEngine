@@ -1,6 +1,6 @@
 #pragma once
 
-#include "platform/atomic.h"
+#include "core/atomic.h"
 
 namespace Lux 
 {

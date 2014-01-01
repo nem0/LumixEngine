@@ -7,7 +7,7 @@ namespace Lux
 {
 	namespace FS
 	{
-		class LUX_PLATFORM_API OsFile
+		class LUX_CORE_API OsFile
 		{
 		public:
 			OsFile();

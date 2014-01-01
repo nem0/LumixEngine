@@ -1,5 +1,5 @@
-#include "platform/tcp_acceptor.h"
-#include "platform/tcp_stream.h"
+#include "core/tcp_acceptor.h"
+#include "core/tcp_stream.h"
 
 #include <Windows.h>
 
