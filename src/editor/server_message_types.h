@@ -2,7 +2,8 @@
 
 
 #include "core/map.h"
-#include "core/vector.h"
+#include "core/pod_array.h"
+#include "core/string.h"
 #include "core/event_manager.h"
 
 
@@ -47,7 +48,20 @@ struct LUX_ENGINE_API EntitySelectedEvent : public Event
 	void read(Blob& stream);
 	
 	int32_t index;
-	vector<uint32_t> components;
+	PODArray<uint32_t> components;
+};
+
+
+struct LUX_ENGINE_API LogEvent : public Event
+{
+	LogEvent() { m_type = ServerMessageType::LOG_MESSAGE; }
+	
+	//virtual void write(IStream& stream) LUX_OVERRIDE;
+	void read(Blob& stream);
+	
+	int32_t type;
+	string message;
+	string system;
 };
 
 
@@ -67,7 +81,7 @@ struct LUX_ENGINE_API PropertyListEvent : public Event
 	void read(Blob& stream);
 	
 	uint32_t type_hash;
-	vector<Property> properties;
+	PODArray<Property> properties;
 };
 
 

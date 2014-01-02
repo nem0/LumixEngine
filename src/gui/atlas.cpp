@@ -65,11 +65,17 @@ namespace Lux
 
 		void atlasLoaded(Lux::FS::IFile* file, bool success, void* user_data)
 		{
+			if(!success)
+			{
+				return;
+			}
 			AtlasImpl* atlas = static_cast<AtlasImpl*>(user_data);
+			ASSERT(atlas);
 			JsonSerializer serializer(*file, JsonSerializer::READ);
 			char tmp[260];
 			serializer.deserialize("image", tmp, 260);
 			atlas->m_texture = atlas->m_renderer->loadImage(tmp);
+			ASSERT(atlas->m_texture);
 			int count;
 			serializer.deserialize("part_count", count);
 			serializer.deserializeArrayBegin("parts");
@@ -81,8 +87,12 @@ namespace Lux
 				serializer.deserializeArrayItem(part->m_top);
 				serializer.deserializeArrayItem(part->m_right);
 				serializer.deserializeArrayItem(part->m_bottom);
-				part->m_pixel_width = (part->m_right - part->m_left) * atlas->m_texture->getWidth();
-				part->m_pixel_height = (part->m_bottom - part->m_top) * atlas->m_texture->getHeight();
+				part->m_pixel_width = part->m_right - part->m_left;
+				part->m_pixel_height = part->m_bottom - part->m_top;
+				part->m_right /= atlas->m_texture->getWidth();
+				part->m_left /= atlas->m_texture->getWidth();
+				part->m_top /= atlas->m_texture->getHeight();
+				part->m_bottom /= atlas->m_texture->getHeight();
 				part->name = tmp;
 				atlas->m_parts.insert(crc32(tmp), part);
 			}

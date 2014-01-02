@@ -22,12 +22,12 @@ namespace Lux
 		{
 			char* data = new char[sizeof(value)];
 			memcpy(data, &value, sizeof(value));
-			m_items.insert(name, data);
+			m_items.insert(string(name), data);
 		}
 		else
 		{
 			char* item_value;
-			if(m_items.find(name, item_value))
+			if(m_items.find(string(name), item_value))
 			{
 				memcpy(&value, item_value, sizeof(value));
 			}

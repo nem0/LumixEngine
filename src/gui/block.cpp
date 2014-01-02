@@ -11,10 +11,11 @@ namespace UI
 {
 
 	Block::Block(Gui& gui, Block* parent, const char* decorator_name)
+		: m_gui(gui)
 	{
-		m_gui = &gui;
 		m_tag = NULL;
 		m_z = 0;
+		m_is_clipping = false;
 		m_is_mouse_clickable = true;
 		m_local_area.top = m_local_area.bottom = m_local_area.left = m_local_area.right = 0;
 		m_global_area.top = m_global_area.bottom = m_global_area.left = m_global_area.right = 0;
@@ -31,7 +32,7 @@ namespace UI
 			m_parent->addChild(*this);
 			m_z = parent->m_z;
 		}
-		m_decorator = decorator_name ? m_gui->getDecorator(decorator_name) : NULL;
+		m_decorator = decorator_name ? m_gui.getDecorator(decorator_name) : NULL;
 	}
 
 
@@ -44,9 +45,9 @@ namespace UI
 
 	Block::~Block()
 	{
-		if(m_gui->getFocusedBlock() == this)
+		if(m_gui.getFocusedBlock() == this)
 		{
-			m_gui->focus(NULL);
+			m_gui.focus(NULL);
 		}
 		for(int i = 0; i < m_children.size(); ++i)
 		{
@@ -62,9 +63,14 @@ namespace UI
 	}
 
 
+	int Block::getZIndex() const
+	{
+		return (int)(m_z * 100);
+	}
+
 	void Block::setZIndex(int z_index)
 	{
-		m_z = z_index / 100.0f;
+		m_z = z_index / 1000.0f;
 		if(m_parent)
 		{
 			for(int i = 0; i < m_parent->m_children.size() - 1; ++i)
@@ -101,6 +107,7 @@ namespace UI
 
 	void Block::setArea(float rel_left, float left, float rel_top, float top, float rel_right, float right, float rel_bottom, float bottom)
 	{
+		ASSERT(rel_left >= 0 && rel_top >= 0);
 		m_local_area.rel_left = rel_left;
 		m_local_area.left = left;
 		m_local_area.rel_top = rel_top;
@@ -161,7 +168,7 @@ namespace UI
 
 	void Block::addChild(Block& child)
 	{
-		m_children.push_back(&child);
+		m_children.push(&child);
 		for(int i = m_children.size() - 1; i > 0; --i)
 		{
 			if(m_children[i]->getZ() < m_children[i-1]->getZ())
@@ -191,6 +198,27 @@ namespace UI
 	}
 
 
+	Block* Block::getBlock(float x, float y)
+	{
+		if(x > m_content_area.left && x < m_content_area.right && y > m_content_area.top && y < m_content_area.bottom && m_is_shown)
+		{
+			for(int i = 0; i < m_children.size(); ++i)
+			{
+				Block* dest = m_children[i]->getBlock(x, y);
+				if(dest)
+				{
+					return dest;
+				}
+			}
+			if(x > m_global_area.left && x < m_global_area.right && y > m_global_area.top && y < m_global_area.bottom)
+			{
+				return this;
+			}
+		}
+		return NULL;
+	}
+
+
 	void Block::setParent(Block* block)
 	{
 		if(m_parent)
@@ -210,6 +238,10 @@ namespace UI
 	{
 		if(m_is_shown)
 		{
+			if(m_is_clipping)
+			{
+				renderer.pushScissorArea(m_global_area.left, m_global_area.top, m_global_area.right, m_global_area.bottom);
+			}
 			if(m_decorator)
 			{
 				m_decorator->render(renderer, *this);
@@ -217,6 +249,10 @@ namespace UI
 			for(int i = 0, c = m_children.size(); i < c; ++i)
 			{
 				m_children[i]->render(renderer);
+			}
+			if(m_is_clipping)
+			{
+				renderer.popScissorArea();
 			}
 		}
 	}
@@ -229,7 +265,7 @@ namespace UI
 		serializer.beginArray("events");
 		for(int i = 0; i < m_event_handlers.size(); ++i)
 		{
-			serializer.serializeArrayItem(m_gui->getCallbackNameHash(m_event_handlers[i].callback));
+			serializer.serializeArrayItem(m_gui.getCallbackNameHash(m_event_handlers[i].callback));
 			serializer.serializeArrayItem(m_event_handlers[i].type);
 		}
 		serializer.endArray();
@@ -246,7 +282,7 @@ namespace UI
 	{
 		char tmp[1024];
 		serializer.deserialize("decorator", tmp, 1024);
-		m_decorator = m_gui->getDecorator(tmp);
+		m_decorator = m_gui.getDecorator(tmp);
 		int32_t count;
 		serializer.deserialize("event_count", count);
 		m_event_handlers.resize(count);
@@ -255,7 +291,7 @@ namespace UI
 		{
 			uint32_t hash;
 			serializer.deserializeArrayItem(hash);
-			EventCallback callback = m_gui->getCallback(hash);
+			EventCallback callback = m_gui.getCallback(hash);
 			m_event_handlers[i].callback = callback;
 			serializer.deserializeArrayItem(m_event_handlers[i].type);
 		}
@@ -295,7 +331,7 @@ namespace UI
 		{
 			uint32_t type;
 			serializer.deserializeArrayItem(type);
-			m_children.push_back(m_gui->createBlock(type, this));
+			m_children.push(m_gui.createBlock(type, this));
 			m_children[i]->deserialize(serializer);
 		}
 		serializer.deserializeArrayEnd();
@@ -315,18 +351,51 @@ namespace UI
 	}
 
 
+	Block::EventCallback& Block::getCallback(const char* type)
+	{
+		return getCallback(crc32(type));
+	}
+
+
+	Block::EventCallback& Block::getCallback(uint32_t type)
+	{
+		EventHandler handler;
+		handler.type = type;
+		m_event_handlers.push(handler);
+		return m_event_handlers[m_event_handlers.size()-1].callback;
+	}
+
+
 	void Block::registerEventHandler(const char* type, const char* callback)
 	{
 		EventHandler handler;
-		handler.callback = m_gui->getCallback(callback);
+		handler.callback = m_gui.getCallback(callback);
 		handler.type = crc32(type);
-		m_event_handlers.push_back(handler);
+		m_event_handlers.push(handler);
+	}
+
+
+	bool Block::mouseDown(int x, int y)
+	{
+		if(x > m_content_area.left && x < m_content_area.right && y > m_content_area.top && y < m_content_area.bottom && m_is_shown)
+		{
+			for(int i = 0,c = m_children.size(); i < c; ++i)
+			{
+				m_children[i]->mouseDown(x, y);
+			}
+			if(m_is_mouse_clickable)
+			{
+				emitEvent("mouse_down");
+			}
+			return true;
+		}
+		return false;
 	}
 
 
 	bool Block::click(int x, int y)
 	{
-		if(x > m_click_area.left && x < m_click_area.right && y > m_click_area.top && y < m_click_area.bottom && m_is_shown)
+		if(x > m_content_area.left && x < m_content_area.right && y > m_content_area.top && y < m_content_area.bottom && m_is_shown)
 		{
 			bool focused = false;
 			for(int i = 0,c = m_children.size(); i < c; ++i)
@@ -342,7 +411,7 @@ namespace UI
 			{
 				if(!focused)
 				{
-					m_gui->focus(this);
+					m_gui.focus(this);
 				}
 				emitEvent("click");
 				return true;
@@ -385,11 +454,14 @@ namespace UI
 			m_global_area.top = round(m_local_area.top);
 			m_global_area.bottom = round(m_local_area.bottom);
 		}
-		m_click_area = m_global_area;
+		m_content_area = m_global_area;
 		for(int i = 0, c = m_children.size(); i < c; ++i)
 		{
 			m_children[i]->layout();
-			m_click_area.merge(m_children[i]->getClickArea());
+			if(!m_is_clipping)
+			{
+				m_content_area.merge(m_children[i]->getContentArea());
+			}
 		}
 	}
 

@@ -1,19 +1,17 @@
 #pragma once
 
 
+#include <new>
+#include "core/default_allocator.h"
 #include "core/lux.h"
-
-
-#ifndef max
-#define max(x, y) ((x) > (y) ? (x) : (y))
-#endif
+#include "core/math_utils.h"
 
 
 namespace Lux
 {
 
 
-template <class Key, class Value>
+template <typename Key, typename Value, typename Allocator = DefaultAllocator>
 class map
 {
 	private:
@@ -96,9 +94,16 @@ class map
 		};
 
 	public:
+		map(const Allocator& allocator)
+			: m_allocator(allocator)
+		{
+			m_root = NULL;
+			m_size = 0;
+		}
+
 		map()
 		{
-			m_root = 0;
+			m_root = NULL;
 			m_size = 0;
 		}
 
@@ -150,8 +155,10 @@ class map
 			Node* node = _find(key);
 			if(!node || node->key != key)
 			{
-				insert(key, Value());
-				node = _find(key);
+				Node* new_node = new ((Node*)m_allocator.allocate(sizeof(Node))) Node();
+				new_node->key = key;
+				insert(key, m_root, NULL, new_node);
+				return new_node->value;
 			}
 
 			return node->value;
@@ -159,7 +166,10 @@ class map
 
 		void insert(const Key& key, const Value& value)
 		{
-			insert(key, value, m_root, 0);
+			Node* new_node = new ((Node*)m_allocator.allocate(sizeof(Node))) Node();
+			new_node->key = key;
+			new_node->value = value;
+			insert(key, m_root, 0, new_node);
 			++m_size;
 		}
 
@@ -175,7 +185,7 @@ class map
 			{
 				clearNode(node->left);
 				clearNode(node->right);
-				delete node;
+				m_allocator.deallocate(node, sizeof(*node));
 			}
 		}
 
@@ -189,8 +199,8 @@ class map
 			rightChild->parent = node->parent;
 			if(rightChild->left)
 				rightChild->left->parent = rightChild;
-			rightChild->height = max(rightChild->getLeftHeight(), rightChild->getRightHeight()) + 1;
-			node->height = max(node->getLeftHeight(), node->getRightHeight()) + 1;
+			rightChild->height = Math::max(rightChild->getLeftHeight(), rightChild->getRightHeight()) + 1;
+			node->height = Math::max(node->getLeftHeight(), node->getRightHeight()) + 1;
 			node = rightChild;
 			return node;
 		}
@@ -211,8 +221,8 @@ class map
 			leftChild->parent = node->parent;
 			if(leftChild->right)
 				leftChild->right->parent = leftChild;
-			leftChild->height = max(leftChild->getLeftHeight(), leftChild->getRightHeight()) + 1;
-			node->height = max(node->getLeftHeight(), node->getRightHeight()) + 1;
+			leftChild->height = Math::max(leftChild->getLeftHeight(), leftChild->getRightHeight()) + 1;
+			node->height = Math::max(node->getLeftHeight(), node->getRightHeight()) + 1;
 			node = leftChild;
 			return node;
 		}
@@ -223,18 +233,16 @@ class map
 			rotateLeft(node);
 		}
 
-		void insert(const Key& key, const Value& value, Node*& node, Node* parent)
+		void insert(const Key& key, Node*& node, Node* parent, Node* new_node)
 		{
 			if(node == 0)
 			{
-				node = new Node();
-				node->key = key;
-				node->value = value;
+				node = new_node;
 				node->parent = parent;
 			}
 			else if(key < node->key)
 			{
-				insert(key, value, node->left, node);
+				insert(key, node->left, node, new_node);
 				if(node->getLeftHeight() - node->getRightHeight() == 2)
 				{
 					if(key < node->left->key)
@@ -249,7 +257,7 @@ class map
 			}
 			else if(key > node->key)
 			{
-				insert(key, value, node->right, node);
+				insert(key, node->right, node, new_node);
 				if(node->getRightHeight() - node->getLeftHeight() == 2)
 				{
 					if(key > node->right->key)
@@ -266,7 +274,7 @@ class map
 			{
 				ASSERT(false); // key == node->key -> key already in tree
 			}
-			node->height = max(node->getLeftHeight(), node->getRightHeight()) + 1;
+			node->height = Math::max(node->getLeftHeight(), node->getRightHeight()) + 1;
 		}
 
 
@@ -325,7 +333,7 @@ class map
 			if (root == NULL)
 				return root;
 
-			root->height = max(root->getLeftHeight(), root->getRightHeight()) + 1;
+			root->height = Math::max(root->getLeftHeight(), root->getRightHeight()) + 1;
 
 			int balance = root->getLeftHeight() - root->getRightHeight();
 
@@ -366,6 +374,7 @@ class map
 	private:
 		Node*	m_root;
 		int		m_size;
+		Allocator m_allocator;
 };
 
 

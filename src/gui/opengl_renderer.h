@@ -7,6 +7,7 @@
 
 namespace Lux
 {
+
 namespace UI
 {
 
@@ -20,12 +21,13 @@ namespace UI
 			void destroy();
 
 			virtual TextureBase* loadImage(const char* name) LUX_OVERRIDE;
-			virtual bool loadFont(const char* path) LUX_OVERRIDE;
-			virtual void beginRender() LUX_OVERRIDE;
+			virtual void loadFont(const char* path, FS::FileSystem& file_system) LUX_OVERRIDE;
+			virtual void beginRender(float w, float h) LUX_OVERRIDE;
 			virtual void renderImage(TextureBase* image, float* vertices, float* tex_coords, int vertex_count) LUX_OVERRIDE;
 			virtual void measureText(const char* text, float* w, float* h) LUX_OVERRIDE;
 			virtual void renderText(const char* text, float x, float y, float z) LUX_OVERRIDE;
-			virtual void setScissorArea(int left, int top, int right, int bottom) LUX_OVERRIDE;
+			virtual void pushScissorArea(float left, float top, float right, float bottom) LUX_OVERRIDE;
+			virtual void popScissorArea() LUX_OVERRIDE;
 			void setWindowHeight(int height);
 
 		private:

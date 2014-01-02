@@ -2,12 +2,12 @@
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/event_manager.h"
-#include "core/vector.h"
+#include "core/pod_array.h"
 #include "editor/client_message_types.h"
 #include "editor/server_message_types.h"
-#include "platform/task.h"
-#include "platform/tcp_connector.h"
-#include "platform/tcp_stream.h"
+#include "core/task.h"
+#include "core/tcp_connector.h"
+#include "core/tcp_stream.h"
 
 namespace Lux
 {
@@ -36,7 +36,7 @@ namespace Lux
 	int ReceiveTask::task()
 	{
 		bool finished = false;
-		vector<uint8_t> data;
+		PODArray<uint8_t> data;
 		data.resize(8);
 		while(!finished)
 		{
@@ -98,6 +98,11 @@ namespace Lux
 				}
 				break;
 			case ServerMessageType::LOG_MESSAGE:
+				{
+					LogEvent msg;
+					msg.read(stream);
+					m_event_manager.emitEvent(msg);
+				}
 				break;
 			default:
 				break;

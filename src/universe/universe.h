@@ -2,9 +2,10 @@
 
 
 #include "core/lux.h"
-#include "core/vector.h"
-#include "core/vec3.h"
+#include "core/pod_array.h"
 #include "core/quat.h"
+#include "core/array.h"
+#include "core/vec3.h"
 #include "universe/component.h"
 #include "universe/entity.h"
 
@@ -26,7 +27,7 @@ class LUX_ENGINE_API Universe LUX_FINAL
 {
 	friend struct Entity;
 	public:
-		typedef vector<Entity::ComponentList> ComponentList;
+		typedef Array<Entity::ComponentList> ComponentList;
 
 	public:
 		Universe();
@@ -48,9 +49,9 @@ class LUX_ENGINE_API Universe LUX_FINAL
 		void onEvent(Event& event);
 	
 	private:
-		vector<Vec3>		m_positions;		//< entity positions
-		vector<Quat>		m_rotations;		//< entity rotations
-		vector<int>			m_free_slots;
+		PODArray<Vec3>		m_positions;		//< entity positions
+		PODArray<Quat>		m_rotations;		//< entity rotations
+		PODArray<int>		m_free_slots;
 		ComponentList		m_component_list;
 		EventManager*		m_event_manager;
 };

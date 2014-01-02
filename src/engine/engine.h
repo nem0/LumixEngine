@@ -23,7 +23,8 @@ namespace Lux
 	class LUX_ENGINE_API Engine
 	{
 		public:
-			Engine() { m_impl = 0; }
+			Engine() { m_impl = NULL; }
+			~Engine() { ASSERT(m_impl == NULL); }
 
 			bool create(int w, int h, const char* base_path, EditorServer* editor_server);
 			void destroy();

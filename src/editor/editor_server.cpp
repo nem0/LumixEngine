@@ -14,7 +14,8 @@
 #include "core/map.h"
 #include "core/matrix.h"
 #include "core/memory_file_device.h"
-#include "core/vector.h"
+#include "core/pod_array.h"
+#include "core/array.h"
 #include "editor/editor_icon.h"
 #include "editor/gizmo.h"
 #include "editor/property_descriptor.h"
@@ -22,11 +23,11 @@
 #include "engine/iplugin.h"
 #include "engine/plugin_manager.h"
 #include "graphics/renderer.h"
-#include "platform/input_system.h"
-#include "platform/mutex.h"
-#include "platform/task.h"
-#include "platform/tcp_acceptor.h"
-#include "platform/tcp_stream.h"
+#include "core/input_system.h"
+#include "core/mutex.h"
+#include "core/task.h"
+#include "core/tcp_acceptor.h"
+#include "core/tcp_stream.h"
 #include "script\script_system.h"
 #include "universe/component_event.h"
 #include "universe/entity_destroyed_event.h"
@@ -99,6 +100,7 @@ class MessageTask : public MT::Task
 		struct EditorServerImpl* m_server;
 		Net::TCPAcceptor m_acceptor;
 		Net::TCPStream* m_stream;
+		bool m_is_finished;
 };
 
 
@@ -152,7 +154,7 @@ struct EditorServerImpl
 		void load(FS::IFile& file);
 		void onMessage(void* msgptr, int size);
 
-		const PropertyDescriptor& getPropertyDescriptor(uint32_t type, uint32_t name_hash);
+		const IPropertyDescriptor& getPropertyDescriptor(uint32_t type, uint32_t name_hash);
 		H3DNode castRay(int x, int y, Vec3& hit_pos, char* name, int max_name_size, H3DNode gizmo_node);
 		void registerProperties();
 		void rotateCamera(int x, int y);
@@ -172,10 +174,10 @@ struct EditorServerImpl
 		Gizmo m_gizmo;
 		Entity m_selected_entity;
 		Blob m_stream;
-		map<uint32_t, vector<PropertyDescriptor> > m_component_properties;
+		map<uint32_t, PODArray<IPropertyDescriptor*> > m_component_properties;
 		map<uint32_t, IPlugin*> m_creators;
 		MouseMode::Value m_mouse_mode;
-		vector<EditorIcon*>	m_editor_icons;
+		PODArray<EditorIcon*> m_editor_icons;
 		HGLRC m_hglrc;
 		HGLRC m_game_hglrc;
 		bool m_is_game_mode;
@@ -201,9 +203,10 @@ Engine& EditorServer::getEngine()
 }
 
 
-void EditorServer::registerProperty(const char* component_type, PropertyDescriptor& descriptor)
+void EditorServer::registerProperty(const char* component_type, IPropertyDescriptor* descriptor)
 {
-	m_impl->m_component_properties[crc32(component_type)].push_back(descriptor);
+	ASSERT(descriptor);
+	m_impl->m_component_properties[crc32(component_type)].push(descriptor);
 }
 
 
@@ -277,6 +280,7 @@ bool EditorServer::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 
 void EditorServer::destroy()
 {
+	m_impl->destroy();
 	delete m_impl;
 	m_impl = 0;
 }
@@ -284,12 +288,12 @@ void EditorServer::destroy()
 
 void EditorServerImpl::registerProperties()
 {
-	m_component_properties[renderable_type].push_back(PropertyDescriptor(crc32("source"), (PropertyDescriptor::Getter)&Renderer::getMesh, (PropertyDescriptor::Setter)&Renderer::setMesh, PropertyDescriptor::FILE));
-	m_component_properties[renderable_type].push_back(PropertyDescriptor(crc32("visible"), (PropertyDescriptor::BoolGetter)&Renderer::getVisible, (PropertyDescriptor::BoolSetter)&Renderer::setVisible));
-	m_component_properties[renderable_type].push_back(PropertyDescriptor(crc32("cast shadows"), (PropertyDescriptor::BoolGetter)&Renderer::getCastShadows, (PropertyDescriptor::BoolSetter)&Renderer::setCastShadows));
-	m_component_properties[point_light_type].push_back(PropertyDescriptor(crc32("fov"), (PropertyDescriptor::DecimalGetter)&Renderer::getLightFov, (PropertyDescriptor::DecimalSetter)&Renderer::setLightFov));
-	m_component_properties[point_light_type].push_back(PropertyDescriptor(crc32("radius"), (PropertyDescriptor::DecimalGetter)&Renderer::getLightRadius, (PropertyDescriptor::DecimalSetter)&Renderer::setLightRadius));
-	m_component_properties[script_type].push_back(PropertyDescriptor(crc32("source"), (PropertyDescriptor::Getter)&ScriptSystem::getScriptPath, (PropertyDescriptor::Setter)&ScriptSystem::setScriptPath, PropertyDescriptor::FILE));
+	m_component_properties[renderable_type].push(new PropertyDescriptor<Renderer>(crc32("source"), &Renderer::getMesh, &Renderer::setMesh, IPropertyDescriptor::FILE));
+	m_component_properties[renderable_type].push(new PropertyDescriptor<Renderer>(crc32("visible"), &Renderer::getVisible, &Renderer::setVisible));
+	m_component_properties[renderable_type].push(new PropertyDescriptor<Renderer>(crc32("cast shadows"), &Renderer::getCastShadows, &Renderer::setCastShadows));
+	m_component_properties[point_light_type].push(new PropertyDescriptor<Renderer>(crc32("fov"), &Renderer::getLightFov, &Renderer::setLightFov));
+	m_component_properties[point_light_type].push(new PropertyDescriptor<Renderer>(crc32("radius"), &Renderer::getLightRadius, &Renderer::setLightRadius));
+	m_component_properties[script_type].push(new PropertyDescriptor<ScriptSystem>(crc32("source"), &ScriptSystem::getScriptPath, &ScriptSystem::setScriptPath, IPropertyDescriptor::FILE));
 }
 
 
@@ -406,7 +410,7 @@ void EditorServerImpl::addEntity()
 	selectEntity(e);
 	EditorIcon* er = new EditorIcon();
 	er->create(m_selected_entity, Component::INVALID);
-	m_editor_icons.push_back(er);
+	m_editor_icons.push(er);
 	/*** this is here because camera render node does not exists untitle pipeline resource is loaded, do this properly*/
 	Matrix mtx;
 	m_camera_rot.toMatrix(mtx);
@@ -418,12 +422,12 @@ void EditorServerImpl::addEntity()
 
 int MessageTask::task()
 {
-	bool finished = false;
+	m_is_finished = false;
 	m_acceptor.start("127.0.0.1", 10002);
 	m_stream = m_acceptor.accept();
-	vector<uint8_t> data;
+	PODArray<uint8_t> data;
 	data.resize(5);
-	while(!finished)
+	while(!m_is_finished)
 	{
 		if(m_stream->read(&data[0], 5))
 		{
@@ -483,13 +487,13 @@ void EditorServerImpl::sendComponent(uint32_t type_crc)
 		{
 			if(cmps[i].type == type_crc)
 			{
-				vector<PropertyDescriptor>& props = m_component_properties[cmps[i].type];
+				PODArray<IPropertyDescriptor*>& props = m_component_properties[cmps[i].type];
 				m_stream.write(props.size());
 				m_stream.write(type_crc);
 				for(int j = 0; j < props.size(); ++j)
 				{
-					m_stream.write(props[j].getNameHash());
-					props[j].get(cmps[i], m_stream);
+					m_stream.write(props[j]->getNameHash());
+					props[j]->get(cmps[i], m_stream);
 				}
 				break;
 			}
@@ -679,14 +683,6 @@ void EditorServerImpl::load(FS::IFile& file)
 }
 
 
-void EditorServerImpl::destroy()
-{
-	MT::Mutex::destroy(m_universe_mutex);
-	m_engine.destroy();
-	// TODO
-}
-
-
 HGLRC createGLContext(HWND hwnd)
 {
 	PAINTSTRUCT ps;
@@ -773,6 +769,19 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 	//m_navigation.load("models/level2/level2.pda");
 	
 	return true;
+}
+
+
+void EditorServerImpl::destroy()
+{
+	MT::Mutex::destroy(m_universe_mutex);
+	MT::Mutex::destroy(m_send_mutex);
+/*	m_message_task->m_is_finished = true;
+	m_message_task->somehow_cancel_the_read_operation();
+	m_message_task->destroy();
+*/ /// TODO destroy message task
+	m_engine.destroy();
+
 }
 
 
@@ -904,18 +913,18 @@ void EditorServerImpl::navigate(float forward, float right, int fast)
 }
 
 
-const PropertyDescriptor& EditorServerImpl::getPropertyDescriptor(uint32_t type, uint32_t name_hash)
+const IPropertyDescriptor& EditorServerImpl::getPropertyDescriptor(uint32_t type, uint32_t name_hash)
 {
-	vector<PropertyDescriptor>& props = m_component_properties[type];
+	PODArray<IPropertyDescriptor*>& props = m_component_properties[type];
 	for(int i = 0; i < props.size(); ++i)
 	{
-		if(props[i].getNameHash() == name_hash)
+		if(props[i]->getNameHash() == name_hash)
 		{
-			return props[i];
+			return *props[i];
 		}
 	}
 	ASSERT(false);
-	return m_component_properties[type][0];
+	return *m_component_properties[type][0];
 }
 
 
@@ -942,7 +951,7 @@ void EditorServerImpl::setProperty(void* data, int size)
 	{
 		uint32_t name_hash;
 		stream.read(name_hash);
-		const PropertyDescriptor& cp = getPropertyDescriptor(cmp.type, name_hash);
+		const IPropertyDescriptor& cp = getPropertyDescriptor(cmp.type, name_hash);
 		cp.set(cmp, stream);
 	}
 }
@@ -1072,7 +1081,7 @@ void EditorServerImpl::onComponentEvent(ComponentEvent& e)
 	}			
 	if(e.is_created)
 	{
-		Lux::Entity::ComponentList cmps = e.component.entity.getComponents();
+		const Lux::Entity::ComponentList& cmps = e.component.entity.getComponents();
 		bool found = false;
 		for(int i = 0; i < cmps.size(); ++i)
 		{
@@ -1086,7 +1095,7 @@ void EditorServerImpl::onComponentEvent(ComponentEvent& e)
 		{
 			EditorIcon* er = new EditorIcon();
 			er->create(e.component.entity, e.component);
-			m_editor_icons.push_back(er);
+			m_editor_icons.push(er);
 		}
 	}
 	else
@@ -1095,7 +1104,7 @@ void EditorServerImpl::onComponentEvent(ComponentEvent& e)
 		{
 			EditorIcon* er = new EditorIcon();
 			er->create(e.component.entity, Component::INVALID);
-			m_editor_icons.push_back(er);
+			m_editor_icons.push(er);
 		}
 	}
 }

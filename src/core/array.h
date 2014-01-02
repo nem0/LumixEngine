@@ -1,136 +1,206 @@
 #pragma once
 
-#include <array>
+
+#include <cstdlib>
+#include <new>
+#include "core/default_allocator.h"
+
+
 
 namespace Lux
 {
-	template <class T, size_t Size> 
-	class Array
-	{
+
+
+template <typename T, typename Allocator = DefaultAllocator>
+class Array
+{
 	public:
-
-		typedef T						value_type;
-		typedef Array<value_type, Size>	my_type;
-		typedef size_t					size_type;
-
-	public:
-		enum { elementSize = sizeof(value_type) };
-
-		void assign(const value_type& val)
+		Array(const Allocator& allocator)
+			: m_allocator(allocator)
 		{
-			for(size_type i = 0; i < Size; ++i)
+			m_data = NULL;
+			m_capacity = 0;
+			m_size = 0;
+		}
+	
+		Array(const Array& rhs)
+		{
+			m_data = NULL;
+			m_capacity = 0;
+			m_size = 0;
+			*this = rhs;
+		}
+
+		void operator =(const Array& rhs)
+		{
+			callDestructors(m_data, m_data + m_size);
+			m_allocator.deallocate(m_data, sizeof(T) * m_capacity);
+			m_data = (T*)m_allocator.allocate(rhs.m_capacity * sizeof(T));
+			m_capacity = rhs.m_capacity;
+			m_size = rhs.m_size;
+			for(int i = 0; i < m_size; ++i)
 			{
-				_a[i] = val;
+				new ((char*)(m_data + i)) T(rhs.m_data[i]);
 			}
 		}
 
-		LUX_FORCE_INLINE size_type size() const 
+		Array()
 		{
-			return Size;
+			m_data = NULL;
+			m_capacity = 0;
+			m_size = 0;
 		}
 
-		LUX_FORCE_INLINE size_type max_size() const 
+		~Array()
 		{
-			return Size;
+			callDestructors(m_data, m_data + m_size);
+			m_allocator.deallocate(m_data, m_capacity * sizeof(T));
 		}
 
-		bool empty() const 
+		void eraseFast(int index)
 		{
-			return 0 == Size;
-		}
-
-		value_type& at(size_type i) 
-		{
-			ASSERT(i >= 0 && i < Size);
-			return _a[i];
-		}
-
-		const value_type& at(size_type i) const 
-		{
-			ASSERT(i >= 0 && i < Size);
-			return _a[i];
-		}
-
-		value_type& operator[](size_type i) 
-		{
-			ASSERT(i >= 0 && i < Size);
-			return _a[i];
-		}
-
-		const value_type& operator[](size_type i) const 
-		{
-			ASSERT(i >= 0 && i < Size);
-			return _a[i];
-		}
-
-		value_type& front() 
-		{
-			return _a[0];
-		}
-
-		const value_type& front() const 
-		{
-			return _a[0];
-		}
-
-		value_type& back() 
-		{
-			return _a[Size - 1];
-		}
-
-		const value_type& back() const 
-		{
-			return _a[Size - 1];
-		}
-
-		size_type find(size_type from, size_type to, const value_type& val) const
-		{
-			ASSERT(size() >= to);
-			for (size_type i = from; i < to; ++i)
+			if(index >= 0 && index < m_size)
 			{
-				if (_a[i] == val)
-					return i;
-			}
-
-			return(-1);
-		}
-
-		size_type find(const value_type& val) const
-		{
-			return find(0, size(), val);
-		}
-
-		void swap(size_type idx1, size_type idx2)
-		{
-			ASSERT(idx1 < Size && idx2 < Size);
-
-			if (idx1 != idx2)
-			{
-				value_type tmp = _a[idx1];
-				_a[idx1] = _a[idx2];
-				_a[idx2] = tmp;
+				m_data[index].~T();
+				if(index != m_size - 1)
+				{
+					new ((char*)(m_data+index)) T(m_data[m_size - 1]);
+				}
+				--m_size;
 			}
 		}
 
-		value_type* data() 
-		{ 
-			return _a;
+		void erase(int index)
+		{
+			if(index >= 0 && index < m_size)
+			{
+				m_data[index].~T();
+				for(int i = index + 1; i < m_size; ++i)
+				{
+					new ((char*)(m_data+i-1)) T(m_data[i]);
+					m_data[i].~T();
+				}
+				--m_size;
+			}
 		}
 
-		const value_type* data() const
+		void push(const T& value)
 		{
-			return _a;
+			if(m_size == m_capacity)
+			{
+				grow();
+			}
+			new ((char*)(m_data+m_size)) T(value);
+			++m_size;
+		}
+
+		bool empty() const { return m_size == 0; }
+
+		void clear()
+		{
+			callDestructors(m_data, m_data + m_size);
+			m_size = 0;
+		}
+
+		T& pushEmpty()
+		{
+			if(m_size == m_capacity)
+			{
+				grow();
+			}
+			new ((char*)(m_data+m_size)) T();
+			++m_size;
+			return m_data[m_size-1];
+		}
+
+
+		const T& back() const
+		{
+			return m_data[m_size-1];
+		}
+
+
+		T& back()
+		{
+			return m_data[m_size-1];
+		}
+
+
+		void pop()
+		{
+			if(m_size > 0)
+			{
+				m_data[m_size-1].~T();
+				--m_size;
+			}
+		}
+
+		void resize(int size)
+		{
+			if(size > m_capacity)
+			{
+				reserve(size);
+			}
+			for(int i = m_size; i < size; ++i)
+			{
+				new ((char*)(m_data+i)) T();
+			}
+			callDestructors(m_data + size, m_data + m_size);
+			m_size = size;
+		}
+
+		void reserve(int capacity)
+		{
+			if(capacity > m_capacity)
+			{
+				T* newData = (T*)m_allocator.allocate(capacity * sizeof(T));
+				for(int i = 0; i < m_size; ++i)
+				{
+					new ((char*)(newData+i)) T(m_data[i]);
+				}
+				callDestructors(m_data, m_data + m_size);
+				m_allocator.deallocate(m_data, m_capacity * sizeof(T));
+				m_data = newData;
+				m_capacity = capacity;			
+			}
+		}
+
+		const T& operator[] (int index) const { ASSERT(index < m_size); return m_data[index]; }
+		T& operator[](int index) { return m_data[index]; }
+ 		int size() const { return m_size; }
+		int capacity() const { return m_capacity; }
+
+	private:
+		void* operator &() { return 0; }
+
+		void grow()
+		{
+			int newCapacity = m_capacity == 0 ? 4 : m_capacity * 2;
+			T* newData = (T*)m_allocator.allocate(newCapacity * sizeof(T));
+			for(int i = 0; i < m_size; ++i)
+			{
+				new ((char*)(newData + i)) T(m_data[i]);
+			}
+			callDestructors(m_data, m_data + m_size);
+			m_allocator.deallocate(m_data, m_capacity * sizeof(T));
+			m_data = newData;
+			m_capacity = newCapacity;
+		}
+
+		void callDestructors(T* begin, T* end)
+		{
+			for(; begin < end; ++begin)
+			{
+				begin->~T();
+			}
 		}
 
 	private:
-		void _fill(const value_type& val)
-		{
-			for(value_type* ptr = &front(); ptr < &back(); ++ptr)
-				*ptr = val;
-		}
+		int m_capacity;
+		int m_size;
+		T* m_data;
+		Allocator m_allocator;
+};
 
-		value_type _a[Size];
-	};
-	// not supported
-	template <class T> class Array<T, 0>;
+
 } // ~namespace Lux

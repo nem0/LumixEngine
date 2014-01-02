@@ -1,9 +1,9 @@
 #pragma once
 
 #include "core/blocking_queue.h"
-#include "platform/atomic.h"
-#include "platform/event.h"
-#include "platform/semaphore.h"
+#include "core/atomic.h"
+#include "core/event.h"
+#include "core/semaphore.h"
 
 namespace Lux
 {

@@ -1,8 +1,8 @@
 #pragma once
 
 
-#include "core/vector.h"
-#include "gui/block.h"
+#include "core/pod_array.h"
+#include "gui/controls/dockable.h"
 
 
 namespace Lux
@@ -21,7 +21,7 @@ class MainFrame;
 class IComponentUI;
 
 
-class PropertyFrame : public Lux::UI::Block
+class PropertyFrame : public Lux::UI::Dockable
 {
 	public:
 		PropertyFrame(MainFrame& main_frame);
@@ -43,5 +43,5 @@ class PropertyFrame : public Lux::UI::Block
 		Lux::UI::TextBox* m_pos_z_box;
 		Lux::UI::Block* m_component_container;
 		MainFrame* m_main_frame;
-		Lux::vector<IComponentUI*> m_component_uis; 
+		Lux::PODArray<IComponentUI*> m_component_uis; 
 };

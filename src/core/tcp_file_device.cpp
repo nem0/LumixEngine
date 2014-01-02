@@ -2,8 +2,8 @@
 #include "core/ifile.h"
 #include "core/ifile_system_defines.h"
 #include "core/file_system.h"
-#include "platform/tcp_connector.h"
-#include "platform/tcp_stream.h"
+#include "core/tcp_connector.h"
+#include "core/tcp_stream.h"
 
 
 namespace Lux
