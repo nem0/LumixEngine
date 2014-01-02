@@ -152,6 +152,7 @@
     <ClInclude Include="..\..\src\core\quat.h" />
     <ClInclude Include="..\..\src\core\semaphore.h" />
     <ClInclude Include="..\..\src\core\spin_mutex.h" />
+	<ClInclude Include="..\..\src\core\static_array.h" />
     <ClInclude Include="..\..\src\core\string.h" />
     <ClInclude Include="..\..\src\core\task.h" />
     <ClInclude Include="..\..\src\core\tcp_acceptor.h" />
@@ -161,7 +162,6 @@
     <ClInclude Include="..\..\src\core\tcp_stream.h" />
     <ClInclude Include="..\..\src\core\transaction_queue.h" />
     <ClInclude Include="..\..\src\core\vec3.h" />
-    <ClInclude Include="..\..\src\core\array.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -121,7 +121,7 @@
       <Filter>Net</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\pod_array.h" />
-    <ClInclude Include="..\..\src\core\array.h" />
+    <ClInclude Include="..\..\src\core\static_array.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="FS">

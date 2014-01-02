@@ -24,8 +24,11 @@ namespace Lux
 
 			template <class T>
 			void write(T value) { write(&value, sizeof(T)); }
+			void write(const char* string);
+
 			template <class T>
 			void read(T& value) { read(&value, sizeof(T)); }
+
 			void rewindForRead() { m_pos = 0; m_data = &m_buffer[0]; m_size = m_buffer.size(); }
 
 

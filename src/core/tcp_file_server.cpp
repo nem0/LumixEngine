@@ -2,6 +2,7 @@
 
 #include "core/array.h"
 #include "core/free_list.h"
+#include "core/static_array.h"
 #include "core/tcp_file_device.h"
 #include "core/task.h"
 #include "core/tcp_acceptor.h"
@@ -20,14 +21,10 @@ namespace Lux
 
 			int task()
 			{
-				Array<char, 1024> buffer;
 				bool quit = false;
 
 				m_acceptor.start("127.0.0.1", 10001);
 				Net::TCPStream* stream = m_acceptor.accept();
-
-				Array<OsFile*, 0x8000> files;
-				FreeList<int32_t, 0x8000> ids;
 
 				while(!quit)
 				{
@@ -40,16 +37,16 @@ namespace Lux
 							int32_t mode = 0;
 							int32_t len = 0;
 							stream->read(mode);
-							stream->read(buffer.data(), buffer.size());
+							stream->read(m_buffer.data(), m_buffer.size());
 
 							int32_t ret = -2;
-							int32_t id = ids.alloc();
+							int32_t id = m_ids.alloc();
 							if(id > 0)
 							{
 								OsFile* file = new OsFile();
-								files[id] = file;
+								m_files[id] = file;
 
-								ret = file->open(buffer.data(), mode) ? id : -1;
+								ret = file->open(m_buffer.data(), mode) ? id : -1;
 							}
 							stream->write(ret);
 						}
@@ -58,8 +55,8 @@ namespace Lux
 						{
 							uint32_t id = -1;
 							stream->read(id);
-							OsFile* file = files[id];
-							ids.release(id);
+							OsFile* file = m_files[id];
+							m_ids.release(id);
 
 							file->close();
 							delete file;
@@ -69,16 +66,16 @@ namespace Lux
 						{
 							uint32_t id = -1;
 							stream->read(id);
-							OsFile* file = files[id];
+							OsFile* file = m_files[id];
 
 							uint32_t size = 0;
 							stream->read(size);
 
 							while(size > 0)
 							{
-								int32_t read = size > buffer.size() ? buffer.size() : size;
-								file->read(buffer.data(), read);
-								stream->write(buffer.data(), read);
+								int32_t read = size > m_buffer.size() ? m_buffer.size() : size;
+								file->read((void*)m_buffer.data(), read);
+								stream->write((const void*)m_buffer.data(), read);
 								size -= read;
 							}
 						}
@@ -87,16 +84,16 @@ namespace Lux
 						{
 							uint32_t id = -1;
 							stream->read(id);
-							OsFile* file = files[id];
+							OsFile* file = m_files[id];
 
 							uint32_t size = 0;
 							stream->read(size);
 
 							while(size > 0)
 							{
-								int32_t read = size > buffer.size() ? buffer.size() : size;
-								stream->read(buffer.data(), read);
-								file->write(buffer.data(), read);
+								int32_t read = size > m_buffer.size() ? m_buffer.size() : size;
+								stream->read((void*)m_buffer.data(), read);
+								file->write(m_buffer.data(), read);
 								size -= read;
 							}
 						}
@@ -105,7 +102,7 @@ namespace Lux
 						{
 							uint32_t id = -1;
 							stream->read(id);
-							OsFile* file = files[id];
+							OsFile* file = m_files[id];
 
 							uint32_t size = file->size();
 							stream->write(size);
@@ -115,7 +112,7 @@ namespace Lux
 						{
 							uint32_t id = -1;
 							stream->read(id);
-							OsFile* file = files[id];
+							OsFile* file = m_files[id];
 
 							uint32_t base = 0;
 							int32_t offset = 0;
@@ -130,7 +127,7 @@ namespace Lux
 						{
 							uint32_t id = -1;
 							stream->read(id);
-							OsFile* file = files[id];
+							OsFile* file = m_files[id];
 
 							uint32_t pos = file->pos();
 							stream->write(pos);
@@ -152,7 +149,10 @@ namespace Lux
 			void stop() {} // TODO: implement stop 
 
 		private:
-			Net::TCPAcceptor m_acceptor;
+			Net::TCPAcceptor			m_acceptor;
+			StaticArray<char, 0x50000>	m_buffer;
+			StaticArray<OsFile*, 0x50000> m_files;
+			FreeList<int32_t, 0x50000>	m_ids;
 		};
 
 		struct TCPFileServerImpl
