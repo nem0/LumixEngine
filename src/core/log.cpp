@@ -23,13 +23,13 @@ namespace Lux
 
 	Log::Log()
 	{
-		m_impl = new LogImpl();
+		m_impl = LUX_NEW(LogImpl)();
 	}
 
 
 	Log::~Log()
 	{
-		delete m_impl;
+		LUX_DELETE(m_impl);
 	}
 
 

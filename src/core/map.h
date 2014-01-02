@@ -325,7 +325,7 @@ class map
 						*root = *temp;
 
 					--m_size; 
-					delete temp;
+					allocator.deallocate(temp);
 				}
 				else
 				{

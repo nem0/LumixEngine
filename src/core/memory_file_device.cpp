@@ -24,7 +24,7 @@ namespace Lux
 
 			~MemoryFile() 
 			{ 
-				delete m_file; 
+				LUX_DELETE(m_file); 
 			}
 
 			virtual bool open(const char* path, Mode mode) LUX_OVERRIDE
@@ -39,7 +39,7 @@ namespace Lux
 						if(mode & Mode::READ)
 						{
 							m_capacity = m_size = m_file->size();
-							m_buffer = new uint8_t[m_size];
+							m_buffer = LUX_NEW_ARRAY(uint8_t, m_size);
 							m_file->read(m_buffer, m_size);
 							m_pos = 0;
 						}
@@ -70,7 +70,7 @@ namespace Lux
 					m_file->close();
 				}
 
-				delete [] m_buffer;
+				LUX_DELETE_ARRAY(m_buffer);
 			}
 
 			virtual bool read(void* buffer, size_t size) LUX_OVERRIDE
@@ -89,9 +89,9 @@ namespace Lux
 				if(pos + size > cap)
 				{
 					uint32_t new_cap = 0 != cap ? cap << 1 : 0x8000;
-					uint8_t* new_data = new uint8_t[new_cap];
+					uint8_t* new_data = LUX_NEW_ARRAY(uint8_t, new_cap);
 					memcpy(new_data, m_buffer, sz);
-					delete [] m_buffer;
+					LUX_DELETE_ARRAY(m_buffer);
 					m_buffer = new_data;
 					m_capacity = new_cap;
 				}
@@ -154,7 +154,7 @@ namespace Lux
 
 		IFile* MemoryFileDevice::createFile(IFile* child)
 		{
-			return new MemoryFile(child);
+			return LUX_NEW(MemoryFile)(child);
 		}
 	} // ~namespace FS
 } // ~namespace Lux

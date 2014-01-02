@@ -39,7 +39,7 @@ namespace UI
 	void Block::destroy()
 	{
 		setParent(NULL);
-		delete this;
+		LUX_DELETE(this);
 	}
 
 
@@ -51,7 +51,7 @@ namespace UI
 		}
 		for(int i = 0; i < m_children.size(); ++i)
 		{
-			delete m_children[i];
+			LUX_DELETE(m_children[i]);
 		}
 	}
 

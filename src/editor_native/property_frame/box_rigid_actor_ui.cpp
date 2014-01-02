@@ -14,34 +14,34 @@ BoxRigidActorUI::BoxRigidActorUI(Lux::UI::Block* parent, Lux::EditorClient& clie
 {
 	m_client = &client;
 	setArea(0, 0, 0, 0, 1, 0, 0, 60);
-	Lux::UI::Block* label = new Lux::UI::Block(getGui(), this, "_text_centered");
+	Lux::UI::Block* label = LUX_NEW(Lux::UI::Block)(getGui(), this, "_text_centered");
 	label->setBlockText("Box rigid actor");
 	label->setArea(0, 0, 0, 0, 1, 0, 0, 20);
 
-	label = new Lux::UI::Block(getGui(), this, "_text");
+	label = LUX_NEW(Lux::UI::Block)(getGui(), this, "_text");
 	label->setBlockText("Size");
 	label->setArea(0, 0, 0, 20, 0, 60, 0, 40);
 
-	Lux::UI::Block* container = new Block(getGui(), this, NULL);
+	Lux::UI::Block* container = LUX_NEW(Block)(getGui(), this, NULL);
 	container->setArea(0, 60, 0, 20, 1, 0, 0, 40);
 
-	m_x_size_box = new Lux::UI::TextBox("0", getGui(), container);
+	m_x_size_box = LUX_NEW(Lux::UI::TextBox)("0", getGui(), container);
 	m_x_size_box->setArea(0, 0, 0, 0, 0.33f, -1, 0, 20);
 	m_x_size_box->onEvent("text_accepted").bind<BoxRigidActorUI, &BoxRigidActorUI::sizeChanged>(this);
 	
-	m_y_size_box = new Lux::UI::TextBox("0", getGui(), container);
+	m_y_size_box = LUX_NEW(Lux::UI::TextBox)("0", getGui(), container);
 	m_y_size_box->setArea(0.33f, 0, 0, 0, 0.66f, -1, 0, 20);
 	m_y_size_box->onEvent("text_accepted").bind<BoxRigidActorUI, &BoxRigidActorUI::sizeChanged>(this);
 	
-	m_z_size_box = new Lux::UI::TextBox("0", getGui(), container);
+	m_z_size_box = LUX_NEW(Lux::UI::TextBox)("0", getGui(), container);
 	m_z_size_box->setArea(0.66f, 0, 0, 0, 1, -1, 0, 20);
 	m_z_size_box->onEvent("text_accepted").bind<BoxRigidActorUI, &BoxRigidActorUI::sizeChanged>(this);
 
-	label = new Lux::UI::Block(getGui(), this, "_text");
+	label = LUX_NEW(Lux::UI::Block)(getGui(), this, "_text");
 	label->setBlockText("Dynamic");
 	label->setArea(0, 0, 0, 40, 0, 60, 0, 60);
 
-	m_is_dynamic_ui = new Lux::UI::CheckBox(false, getGui(), this);
+	m_is_dynamic_ui = LUX_NEW(Lux::UI::CheckBox)(false, getGui(), this);
 	m_is_dynamic_ui->setArea(0, 60, 0, 42, 0, 76, 0, 58);
 	m_is_dynamic_ui->onEvent("check_state_changed").bind<BoxRigidActorUI, &BoxRigidActorUI::isDynamicChanged>(this);
 }

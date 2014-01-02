@@ -54,5 +54,10 @@
 #define LUX_OVERRIDE override
 #define LUX_ABSTRACT abstract
 
+#define LUX_NEW(T) new T
+#define LUX_NEW_ARRAY(T, count) new T[count]
+#define LUX_DELETE(ptr) delete (ptr);
+#define LUX_DELETE_ARRAY(ptr) delete[] (ptr)
+
 #pragma warning(disable : 4251)
 #pragma warning(disable : 4996)

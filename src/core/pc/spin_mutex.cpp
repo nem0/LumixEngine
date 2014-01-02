@@ -22,12 +22,12 @@ namespace Lux
 
 		SpinMutex* SpinMutex::create(bool locked)
 		{
-			return new WinSpinMutex(locked);
+			return LUX_NEW(WinSpinMutex)(locked);
 		}
 
 		void SpinMutex::destroy(SpinMutex* spin_mutex)
 		{
-			delete static_cast<WinSpinMutex*>(spin_mutex);
+			LUX_DELETE(static_cast<WinSpinMutex*>(spin_mutex));
 		}
 
 		void WinSpinMutex::lock()

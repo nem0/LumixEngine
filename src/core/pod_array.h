@@ -2,7 +2,6 @@
 
 
 #include <cstdlib>
-#include <new>
 #include "core/default_allocator.h"
 
 

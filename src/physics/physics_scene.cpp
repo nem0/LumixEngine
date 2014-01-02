@@ -66,14 +66,14 @@ struct OutputStream : public physx::PxOutputStream
 {
 	OutputStream()
 	{
-		data = new unsigned char[4096];
+		data = LUX_NEW_ARRAY(uint8_t, 4096);
 		capacity = 4096;
 		size = 0;
 	}
 
 	~OutputStream()
 	{
-		delete[] data;
+		LUX_DELETE_ARRAY(data);
 	}
 
 
@@ -81,9 +81,9 @@ struct OutputStream : public physx::PxOutputStream
 	{
 		if(size + (int)count > capacity)
 		{
-			unsigned char* new_data = new unsigned char[capacity + 4096];
+			uint8_t* new_data = LUX_NEW_ARRAY(unsigned char, capacity + 4096);
 			memcpy(new_data, data, size);
-			delete[] data;
+			LUX_DELETE_ARRAY(data);
 			data = new_data;
 			capacity += 4096;
 		}
@@ -92,7 +92,7 @@ struct OutputStream : public physx::PxOutputStream
 		return count;
 	}
 
-	unsigned char* data;
+	uint8_t* data;
 	int capacity;
 	int size;
 };
@@ -139,7 +139,7 @@ PhysicsScene::PhysicsScene()
 
 bool PhysicsScene::create(PhysicsSystem& system, Universe& universe)
 {
-	m_impl = new PhysicsSceneImpl;
+	m_impl = LUX_NEW(PhysicsSceneImpl);
 	m_impl->m_owner = this;
 	m_impl->m_universe = &universe;
 	m_impl->m_universe->getEventManager()->addListener(EntityMovedEvent::type).bind<PhysicsSceneImpl, &PhysicsSceneImpl::handleEvent>(m_impl);
@@ -169,8 +169,8 @@ void PhysicsScene::destroy()
 {
 	m_impl->m_default_material->release();
 	m_impl->m_scene->release();
-	delete m_impl;
-	m_impl = 0;
+	LUX_DELETE(m_impl);
+	m_impl = NULL;
 }
 
 
@@ -313,7 +313,7 @@ void PhysicsScene::setShapeSource(Component cmp, const string& str)
 		physx::PxTriangleMeshGeometry trimesh_geom;
 
 		long size = file->size();
-		char* buffer = new char[size];
+		char* buffer = LUX_NEW_ARRAY(char, size);
 		file->read(buffer, size);
 
 		jsmn_parser parser;
@@ -362,7 +362,7 @@ void PhysicsScene::setShapeSource(Component cmp, const string& str)
 				ASSERT(false); // unsupported type
 			}
 		}
-		delete[] buffer;
+		LUX_DELETE_ARRAY(buffer);
 
 		if(m_impl->m_actors[cmp.index])
 		{

@@ -8,13 +8,13 @@ namespace Lux
 	{
 		m_property_name = name;
 		m_value_size = value_size;
-		m_value = new char[m_value_size];
+		m_value = LUX_NEW_ARRAY(char, m_value_size);
 		memcpy(m_value, value, m_value_size);
 	}
 
 	SetPropertyVisitor::~SetPropertyVisitor()
 	{
-		delete[] m_value;
+		LUX_DELETE_ARRAY(m_value);
 	}
 
 	void SetPropertyVisitor::visit(const char* name, float& value)
