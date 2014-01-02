@@ -35,8 +35,6 @@ class LUX_CORE_API EventManager
 		void emitEvent(Event& event);
 
 	private:
-		typedef uint32_t EventType;
-
 		typedef map<Event::Type, PODArray<Listener> > ListenerMap;
 
 	private:

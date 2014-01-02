@@ -93,8 +93,6 @@
     <ClCompile Include="..\..\src\core\file_system.cpp" />
     <ClCompile Include="..\..\src\core\file_utils.cpp" />
     <ClCompile Include="..\..\src\core\istream.cpp" />
-    <ClCompile Include="..\..\src\core\jsmn.cpp" />
-    <ClCompile Include="..\..\src\core\json_object.cpp" />
     <ClCompile Include="..\..\src\core\json_serializer.cpp" />
     <ClCompile Include="..\..\src\core\log.cpp" />
     <ClCompile Include="..\..\src\core\math_utils.cpp" />
@@ -137,8 +135,6 @@
     <ClInclude Include="..\..\src\core\lux.h" />
     <ClInclude Include="..\..\src\core\event_manager.h" />
     <ClInclude Include="..\..\src\core\istream.h" />
-    <ClInclude Include="..\..\src\core\jsmn.h" />
-    <ClInclude Include="..\..\src\core\json_object.h" />
     <ClInclude Include="..\..\src\core\json_serializer.h" />
     <ClInclude Include="..\..\src\core\map.h" />
     <ClInclude Include="..\..\src\core\math_utils.h" />
