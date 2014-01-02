@@ -122,6 +122,7 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\pod_array.h" />
     <ClInclude Include="..\..\src\core\static_array.h" />
+    <ClInclude Include="..\..\src\core\queue.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="FS">

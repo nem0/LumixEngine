@@ -150,9 +150,10 @@
     <ClInclude Include="..\..\src\core\os_file.h" />
     <ClInclude Include="..\..\src\core\pod_array.h" />
     <ClInclude Include="..\..\src\core\quat.h" />
+    <ClInclude Include="..\..\src\core\queue.h" />
     <ClInclude Include="..\..\src\core\semaphore.h" />
     <ClInclude Include="..\..\src\core\spin_mutex.h" />
-	<ClInclude Include="..\..\src\core\static_array.h" />
+    <ClInclude Include="..\..\src\core\static_array.h" />
     <ClInclude Include="..\..\src\core\string.h" />
     <ClInclude Include="..\..\src\core\task.h" />
     <ClInclude Include="..\..\src\core\tcp_acceptor.h" />
