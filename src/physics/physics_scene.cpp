@@ -10,7 +10,6 @@
 #include "core/file_system.h"
 #include "core/ifile.h"
 #include "core/iserializer.h"
-#include "core/json_object.h"
 #include "core/matrix.h"
 #include "engine/engine.h"
 #include "universe/component_event.h"
