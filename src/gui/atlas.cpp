@@ -17,6 +17,8 @@ namespace Lux
 
 		struct AtlasImpl
 		{
+			void imageLoaded(TextureBase& img);
+
 			map<uint32_t, Atlas::Part*> m_parts;
 			TextureBase* m_texture;
 			string m_path;
@@ -62,11 +64,23 @@ namespace Lux
 			m_impl = 0;
 		}
 
+		void AtlasImpl::imageLoaded(TextureBase& img)
+		{
+			for(map<uint32_t, Atlas::Part*>::iterator iter = m_parts.begin(), end = m_parts.end(); iter != end; ++iter)
+			{
+				iter.second()->m_left /= img.getWidth(); 
+				iter.second()->m_right /= img.getWidth(); 
+				iter.second()->m_top /= img.getHeight(); 
+				iter.second()->m_bottom /= img.getHeight(); 
+			}
+		}
+
 
 		void atlasLoaded(Lux::FS::IFile* file, bool success, void* user_data)
 		{
 			if(!success)
 			{
+				file->close();
 				return;
 			}
 			AtlasImpl* atlas = static_cast<AtlasImpl*>(user_data);
@@ -74,8 +88,9 @@ namespace Lux
 			JsonSerializer serializer(*file, JsonSerializer::READ);
 			char tmp[260];
 			serializer.deserialize("image", tmp, 260);
-			atlas->m_texture = atlas->m_renderer->loadImage(tmp);
+			atlas->m_texture = atlas->m_renderer->loadImage(tmp, *atlas->m_filesystem);
 			ASSERT(atlas->m_texture);
+			atlas->m_texture->onLoaded().bind<AtlasImpl, &AtlasImpl::imageLoaded>(atlas);
 			int count;
 			serializer.deserialize("part_count", count);
 			serializer.deserializeArrayBegin("parts");
@@ -89,10 +104,6 @@ namespace Lux
 				serializer.deserializeArrayItem(part->m_bottom);
 				part->m_pixel_width = part->m_right - part->m_left;
 				part->m_pixel_height = part->m_bottom - part->m_top;
-				part->m_right /= atlas->m_texture->getWidth();
-				part->m_left /= atlas->m_texture->getWidth();
-				part->m_top /= atlas->m_texture->getHeight();
-				part->m_bottom /= atlas->m_texture->getHeight();
 				part->name = tmp;
 				atlas->m_parts.insert(crc32(tmp), part);
 			}

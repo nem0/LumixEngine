@@ -3,6 +3,7 @@
 #include <Windows.h>
 #include <gl/GL.h>
 #include "core/array.h"
+#include "core/delegate_list.h"
 #include "core/file_system.h"
 #include "core/ifile.h"
 #include "core/map.h"
@@ -28,6 +29,8 @@ namespace UI
 			GLuint getId() const { return m_gl_id; }
 			void setId(GLuint id) { m_gl_id = id; }
 
+			static void imageLoaded(FS::IFile* file, bool success, void* user_data);
+
 		private:
 			GLuint m_gl_id;
 	};
@@ -49,12 +52,14 @@ namespace UI
 
 		TextureBase* getImage(const char* name);
 		static void fontLoaded(FS::IFile* file, bool success, void* user_data);
+		void fontImageLoaded(TextureBase& img);
 
 		map<char, Character> m_characters;
 		PODArray<TextureBase*> m_images;
 		OpenGLTexture* m_font_image;
 		int m_window_height;
 		PODArray<Block::Area> m_scissors_areas;
+		FS::FileSystem* m_file_system;
 	};
 
 	#pragma pack(1) 
@@ -102,87 +107,99 @@ namespace UI
 	}
 
 
-	TextureBase* OpenGLRenderer::loadImage(const char* name)
+	TextureBase* OpenGLRenderer::loadImage(const char* name, FS::FileSystem& file_system)
 	{
 		TextureBase* img = m_impl->getImage(name);
 		if(img)
 		{
 			return img;
 		}
-		FILE* fp;
-		fopen_s(&fp, name, "rb");
-
-		fseek(fp, 0, SEEK_END);
-		long buffer_size = ftell(fp);
-		fseek(fp, 0, SEEK_SET);
-	
-		char* buffer = new char[buffer_size];
-		fread(buffer, buffer_size, 1, fp);
-		fclose(fp);
-
-		TGAHeader header;
-		memcpy(&header, buffer, sizeof(TGAHeader));
-	
-		int color_mode = header.bitsPerPixel / 8;
-		int image_size = header.width * header.height * 4; 
-	
-		if (header.dataType != 2)
-		{
-			return NULL;
-		}
-	
-		if (color_mode < 3)
-		{
-			return NULL;
-		}
-	
-		const char* image_src = buffer + sizeof(TGAHeader);
-		unsigned char* image_dest = new unsigned char[image_size];
-	
-		img = new OpenGLTexture(name, (float)header.width, (float)header.height);
-
-		// Targa is BGR, swap to RGB and flip Y axis
-		for (long y = 0; y < header.height; y++)
-		{
-			long read_index = y * header.width * color_mode;
-			long write_index = ((header.imageDescriptor & 32) != 0) ? read_index : (header.height - y - 1) * header.width * color_mode;
-			for (long x = 0; x < header.width; x++)
-			{
-				image_dest[write_index] = image_src[read_index+2];
-				image_dest[write_index+1] = image_src[read_index+1];
-				image_dest[write_index+2] = image_src[read_index];
-				if (color_mode == 4)
-					image_dest[write_index+3] = image_src[read_index+3];
-				else
-					image_dest[write_index+3] = 255;
-			
-				write_index += 4;
-				read_index += color_mode;
-			}
-		}
-
-		GLuint texture_id = 0;
-		glGenTextures(1, &texture_id);
-		if (texture_id == 0)
-		{
-			return NULL;
-		}
-
-		glBindTexture(GL_TEXTURE_2D, texture_id);
-
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, header.width, header.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_dest);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-/*		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);*/
-
-		delete [] image_dest;
-		delete [] buffer;
-	
-		static_cast<OpenGLTexture*>(img)->setId(texture_id);
-
+		img = new OpenGLTexture(name, (float)0, (float)0);
+		static_cast<OpenGLTexture*>(img)->setId(0);
+		file_system.openAsync(file_system.getDefaultDevice(), name, FS::Mode::OPEN | FS::Mode::READ, &OpenGLTexture::imageLoaded, img);
 		return img;
+	}
+
+	void OpenGLTexture::imageLoaded(FS::IFile* file, bool success, void* user_data)
+	{
+		if(success)
+		{
+			size_t buffer_size = file->size();
+			char* buffer = new char[buffer_size];
+			file->read(buffer, buffer_size);			
+			file->close();
+
+			TGAHeader header;
+			memcpy(&header, buffer, sizeof(TGAHeader));
+	
+			int color_mode = header.bitsPerPixel / 8;
+			int image_size = header.width * header.height * 4; 
+	
+			if (header.dataType != 2)
+			{
+				delete[] buffer;
+				return;
+			}
+	
+			if (color_mode < 3)
+			{
+				delete[] buffer;
+				return;
+			}
+	
+			const char* image_src = buffer + sizeof(TGAHeader);
+			unsigned char* image_dest = new unsigned char[image_size];
+	
+
+			// Targa is BGR, swap to RGB and flip Y axis
+			for (long y = 0; y < header.height; y++)
+			{
+				long read_index = y * header.width * color_mode;
+				long write_index = ((header.imageDescriptor & 32) != 0) ? read_index : (header.height - y - 1) * header.width * color_mode;
+				for (long x = 0; x < header.width; x++)
+				{
+					image_dest[write_index] = image_src[read_index+2];
+					image_dest[write_index+1] = image_src[read_index+1];
+					image_dest[write_index+2] = image_src[read_index];
+					if (color_mode == 4)
+						image_dest[write_index+3] = image_src[read_index+3];
+					else
+						image_dest[write_index+3] = 255;
+			
+					write_index += 4;
+					read_index += color_mode;
+				}
+			}
+
+			GLuint texture_id = 0;
+			glGenTextures(1, &texture_id);
+			if (texture_id == 0)
+			{
+				delete[] buffer;
+				return;
+			}
+
+			glBindTexture(GL_TEXTURE_2D, texture_id);
+
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, header.width, header.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_dest);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+			/*glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);*/
+
+			delete [] image_dest;
+			delete [] buffer;
+	
+			OpenGLTexture* img = static_cast<OpenGLTexture*>(user_data);
+			img->setId(texture_id);
+			img->setSize((float)header.width, (float)header.height);
+			img->onLoaded().invoke(*img);
+		}
+		else
+		{
+			file->close();
+		}
 	}
 
 
@@ -355,6 +372,16 @@ namespace UI
 	}
 
 
+	void OpenGLRendererImpl::fontImageLoaded(TextureBase& texture)
+	{
+		char tmp[255];
+		strcpy_s(tmp, texture.getName().c_str());
+		int len = strlen(tmp);
+		strcpy_s(tmp + len - 4, 255 - len + 4, ".fnt");
+		m_file_system->openAsync(m_file_system->getDefaultDevice(), tmp, FS::Mode::OPEN | FS::Mode::READ, &OpenGLRendererImpl::fontLoaded, this);
+	}
+
+
 	void OpenGLRendererImpl::fontLoaded(FS::IFile* file, bool success, void* user_data)
 	{
 		if(success)
@@ -407,12 +434,9 @@ namespace UI
 
 	void OpenGLRenderer::loadFont(const char* path, FS::FileSystem& file_system)
 	{
-		m_impl->m_font_image = static_cast<OpenGLTexture*>(loadImage(path));
-		char tmp[255];
-		strcpy_s(tmp, path);
-		int len = strlen(tmp);
-		strcpy_s(tmp + len - 4, 255 - len + 4, ".fnt");
-		file_system.openAsync(file_system.getDefaultDevice(), tmp, FS::Mode::OPEN | FS::Mode::READ, &OpenGLRendererImpl::fontLoaded, m_impl);
+		m_impl->m_file_system = &file_system;
+		m_impl->m_font_image = static_cast<OpenGLTexture*>(loadImage(path, file_system));
+		m_impl->m_font_image->onLoaded().bind<OpenGLRendererImpl, &OpenGLRendererImpl::fontImageLoaded>(m_impl);
 	}
 
 
