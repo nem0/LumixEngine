@@ -22,7 +22,11 @@ class ScriptUI : public IComponentUI, public Lux::UI::Block
 	public:
 		ScriptUI(PropertyFrame& property_frame, Lux::UI::Block* owner, Lux::EditorClient& client);
 		~ScriptUI() {}
-		virtual void onEntityProperties(Lux::PropertyListEvent& evt) LUX_OVERRIDE {}
+		virtual void onEntityProperties(Lux::PropertyListEvent& evt) LUX_OVERRIDE;
+
+	private:
+		void sourceChanged(Lux::UI::Block& block, void*);
+		void browseSource(Lux::UI::Block& block, void*);
 
 	private:
 		Lux::UI::TextBox* m_source_box;

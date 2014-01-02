@@ -27,6 +27,70 @@ ScriptUI::ScriptUI(PropertyFrame& property_frame, Lux::UI::Block* parent, Lux::E
 
 	m_source_box = new Lux::UI::TextBox("empty", getGui(), this);
 	m_source_box->setArea(0, 50, 0, 20, 1, -21, 0, 40);
-//	m_source_box->onEvent("text_accepted").bind<ScriptUI, &ScriptUI::sourceChanged>(this);
+	m_source_box->onEvent("text_accepted").bind<ScriptUI, &ScriptUI::sourceChanged>(this);
+
+	Lux::UI::Button* browse_button = new Lux::UI::Button("...", getGui(), this);
+	browse_button->setArea(1, -20, 0, 20, 1, -1, 0, 40);
+	browse_button->onEvent("click").bind<ScriptUI, &ScriptUI::browseSource>(this);	
 }
 
+
+void ScriptUI::sourceChanged(Lux::UI::Block& block, void*)
+{
+	const Lux::string& s = m_source_box->getChild(0)->getBlockText();
+	m_client->setComponentProperty("script", "source", s.c_str(), s.length()+1);
+}
+
+
+void ScriptUI::browseSource(Lux::UI::Block& block, void*)
+{
+	OPENFILENAME ofn;
+	ZeroMemory(&ofn, sizeof(ofn));
+
+	ofn.lStructSize = sizeof(ofn);
+	ofn.hwndOwner = NULL;
+	ofn.lpstrFilter = "models\0*.scene.xml\0";
+	char buf[MAX_PATH];
+	buf[0] = 0;
+	ofn.lpstrFile = buf;
+	ofn.nMaxFile = MAX_PATH;
+	ofn.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
+	if(GetOpenFileName(&ofn) != FALSE)
+	{
+		Lux::string& s = m_property_frame.getMainFrame()->getStartupDirectory();
+		if(strncmp(s.c_str(), buf, s.length()) == 0)
+		{
+			if(buf[s.length()] == '\\')
+			{
+				strcpy_s(buf, buf + s.length()+1);
+			}
+			else
+			{
+				strcpy_s(buf, buf + s.length());
+			}
+		}
+		m_source_box->getChild(0)->setBlockText(buf);
+		m_source_box->getChild(0)->emitEvent("text_accepted");
+	}
+
+	const Lux::string& s = m_source_box->getText();
+	m_client->setComponentProperty("script", "source", s.c_str(), s.length()+1);
+}
+
+
+void ScriptUI::onEntityProperties(Lux::PropertyListEvent& evt)
+{
+	if(evt.type_hash == crc32("script"))
+	{
+		for(int i = 0; i < evt.properties.size(); ++i)
+		{
+			if(evt.properties[i].name_hash == crc32("source"))
+			{
+				if(evt.properties[i].data_size > 0)
+				{
+					m_source_box->setText((char*)evt.properties[i].data);
+				}
+			}
+		}
+	}
+}
