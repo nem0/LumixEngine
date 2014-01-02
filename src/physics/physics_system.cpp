@@ -31,7 +31,7 @@ static const uint32_t controller_type = crc32("physical_controller");
 
 extern "C" IPlugin* createPlugin()
 {
-	return new PhysicsSystem();
+	return LUX_NEW(PhysicsSystem)();
 }
 
 
@@ -43,7 +43,7 @@ struct CustomErrorCallback : public physx::PxErrorCallback
 
 void PhysicsSystem::onCreateUniverse(Universe& universe)
 {
-	m_impl->m_scene = new PhysicsScene();
+	m_impl->m_scene = LUX_NEW(PhysicsScene)();
 	m_impl->m_scene->create(*this, universe);
 
 }
@@ -52,8 +52,8 @@ void PhysicsSystem::onCreateUniverse(Universe& universe)
 void PhysicsSystem::onDestroyUniverse(Universe& universe)
 {
 	m_impl->m_scene->destroy();
-	delete m_impl->m_scene;
-	m_impl->m_scene = 0;
+	LUX_DELETE(m_impl->m_scene);
+	m_impl->m_scene = NULL;
 }
 
 
@@ -100,14 +100,14 @@ void PhysicsSystem::update(float dt)
 
 bool PhysicsSystem::create(Engine& engine)
 {
-	engine.getEditorServer()->registerProperty("box_rigid_actor", new PropertyDescriptor<PhysicsScene>(crc32("dynamic"), &PhysicsScene::getIsDynamic, &PhysicsScene::setIsDynamic));
-	engine.getEditorServer()->registerProperty("box_rigid_actor", new PropertyDescriptor<PhysicsScene>(crc32("size"), &PhysicsScene::getHalfExtents, &PhysicsScene::setHalfExtents));
+	engine.getEditorServer()->registerProperty("box_rigid_actor", LUX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("dynamic"), &PhysicsScene::getIsDynamic, &PhysicsScene::setIsDynamic));
+	engine.getEditorServer()->registerProperty("box_rigid_actor", LUX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("size"), &PhysicsScene::getHalfExtents, &PhysicsScene::setHalfExtents));
 	engine.getEditorServer()->registerCreator(box_rigid_actor_type, *this);
 	engine.getEditorServer()->registerCreator(controller_type, *this);
 
-	m_impl = new PhysicsSystemImpl;
-	m_impl->m_allocator = new physx::PxDefaultAllocator();
-	m_impl->m_error_callback = new CustomErrorCallback();
+	m_impl = LUX_NEW(PhysicsSystemImpl);
+	m_impl->m_allocator = LUX_NEW(physx::PxDefaultAllocator)();
+	m_impl->m_error_callback = LUX_NEW(CustomErrorCallback)();
 	m_impl->m_foundation = PxCreateFoundation(
 		PX_PHYSICS_VERSION,
 		*m_impl->m_allocator,
@@ -133,9 +133,9 @@ void PhysicsSystem::destroy()
 	m_impl->m_cooking->release();
 	m_impl->m_physics->release();
 	m_impl->m_foundation->release();
-	delete m_impl->m_allocator;
-	delete m_impl->m_error_callback;
-	delete m_impl;
+	LUX_DELETE(m_impl->m_allocator);
+	LUX_DELETE(m_impl->m_error_callback);
+	LUX_DELETE(m_impl);
 	m_impl = 0;
 }
 

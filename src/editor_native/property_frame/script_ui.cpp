@@ -17,19 +17,19 @@ ScriptUI::ScriptUI(PropertyFrame& property_frame, Lux::UI::Block* parent, Lux::E
 {
 	m_client = &client;
 	setArea(0, 0, 0, 0, 1, 0, 0, 40);
-	Lux::UI::Block* label = new Lux::UI::Block(getGui(), this, "_text_centered");
+	Lux::UI::Block* label = LUX_NEW(Lux::UI::Block)(getGui(), this, "_text_centered");
 	label->setBlockText("Script");
 	label->setArea(0, 0, 0, 0, 1, 0, 0, 20);
 
-	label = new Lux::UI::Block(getGui(), this, "_text");
+	label = LUX_NEW(Lux::UI::Block)(getGui(), this, "_text");
 	label->setBlockText("Source");
 	label->setArea(0, 0, 0, 20, 0, 50, 0, 40);
 
-	m_source_box = new Lux::UI::TextBox("empty", getGui(), this);
+	m_source_box = LUX_NEW(Lux::UI::TextBox)("empty", getGui(), this);
 	m_source_box->setArea(0, 50, 0, 20, 1, -21, 0, 40);
 	m_source_box->onEvent("text_accepted").bind<ScriptUI, &ScriptUI::sourceChanged>(this);
 
-	Lux::UI::Button* browse_button = new Lux::UI::Button("...", getGui(), this);
+	Lux::UI::Button* browse_button = LUX_NEW(Lux::UI::Button)("...", getGui(), this);
 	browse_button->setArea(1, -20, 0, 20, 1, -1, 0, 40);
 	browse_button->onEvent("click").bind<ScriptUI, &ScriptUI::browseSource>(this);	
 }

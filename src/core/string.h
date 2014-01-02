@@ -134,7 +134,7 @@ class base_string
 			{
 				size_t old_size = m_size;
 				m_size += base_string<T>::strlen(rhs);
-				T* newStr = new T[m_size+1];
+				T* newStr = (T*)m_allocator.allocate(m_size + 1);
 				base_string<T>::strcpy(newStr, m_cstr);
 				base_string<T>::strcat(newStr, rhs);
 				m_allocator.deallocate(m_cstr, old_size + 1);

@@ -14,7 +14,7 @@ Dockable::Dockable(Gui& gui, Block* parent)
 	: Block(gui, parent, "_dockable")
 {
 	setArea(0, 0, 0, 0, 1, 0, 1, 0);
-	m_content = new Block(getGui(), this, NULL);
+	m_content = LUX_NEW(Block)(getGui(), this, NULL);
 	m_content->setArea(0, 0, 0, 0, 1, 0, 1, 0);
 	m_containing_dockable = NULL;
 	m_content->setIsClickable(false);
@@ -101,11 +101,11 @@ void Dockable::dock(Dockable& dockable, Slot slot)
 	dockable.undock();
 
 	Lux::UI::Block* parent = getParent();
-	Dockable* new_root = new Dockable(getGui(), NULL);
+	Dockable* new_root = LUX_NEW(Dockable)(getGui(), NULL);
 	setParent(new_root->getContent());
 	dockable.setParent(new_root->getContent());	
 
-	new_root->m_divider = new Lux::UI::Block(getGui(), new_root->getContent(), NULL);
+	new_root->m_divider = LUX_NEW(Lux::UI::Block)(getGui(), new_root->getContent(), NULL);
 	new_root->m_divider->onEvent("mouse_down").bind<Dockable, &Dockable::dividerMouseDown>(new_root);
 	new_root->m_divider->setZIndex(dockable.getZIndex() + 1);
 	new_root->m_divider->setBlockText("divider");

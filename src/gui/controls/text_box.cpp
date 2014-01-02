@@ -13,7 +13,7 @@ TextBox::TextBox(const char* text, Gui& gui, Block* parent)
 	: Block(gui, parent, "_box")
 {
 	setArea(0, 0, 0, 0, 0, 100, 0, 20);
-	Lux::UI::Block* label_ui = new Block(gui, this, "_text");
+	Lux::UI::Block* label_ui = LUX_NEW(Block)(gui, this, "_text");
 	label_ui->setBlockText(text);
 	label_ui->setArea(0, 3, 0, 0, 1, 0, 1, 0);
 	label_ui->onEvent("key_down").bind<TextBox, &TextBox::keyDown>(this);

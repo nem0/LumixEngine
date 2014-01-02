@@ -13,7 +13,7 @@ Button::Button(const char* label, Gui& gui, Block* parent)
 	: Block(gui, parent, "_box")
 {
 	setArea(0, 0, 0, 0, 0, 100, 0, 20);
-	Lux::UI::Block* label_ui = new Block(gui, this, "_text_centered");
+	Lux::UI::Block* label_ui = LUX_NEW(Block)(gui, this, "_text_centered");
 	label_ui->setBlockText(label);
 	label_ui->setArea(0, 0, 0, 0, 1, 0, 1, 0);
 }

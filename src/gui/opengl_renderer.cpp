@@ -83,15 +83,15 @@ namespace UI
 
 	bool OpenGLRenderer::create()
 	{
-		m_impl = new OpenGLRendererImpl();
+		m_impl = LUX_NEW(OpenGLRendererImpl)();
 		return true;
 	}
 
 
 	void OpenGLRenderer::destroy()
 	{
-		delete m_impl;
-		m_impl = 0;
+		LUX_DELETE(m_impl);
+		m_impl = NULL;
 	}
 
 	TextureBase* OpenGLRendererImpl::getImage(const char* name)
@@ -114,7 +114,7 @@ namespace UI
 		{
 			return img;
 		}
-		img = new OpenGLTexture(name, (float)0, (float)0);
+		img = LUX_NEW(OpenGLTexture)(name, (float)0, (float)0);
 		static_cast<OpenGLTexture*>(img)->setId(0);
 		file_system.openAsync(file_system.getDefaultDevice(), name, FS::Mode::OPEN | FS::Mode::READ, &OpenGLTexture::imageLoaded, img);
 		return img;
@@ -125,7 +125,7 @@ namespace UI
 		if(success)
 		{
 			size_t buffer_size = file->size();
-			char* buffer = new char[buffer_size];
+			char* buffer = LUX_NEW_ARRAY(char, buffer_size);
 			file->read(buffer, buffer_size);			
 			file->close();
 
@@ -137,18 +137,18 @@ namespace UI
 	
 			if (header.dataType != 2)
 			{
-				delete[] buffer;
+				LUX_DELETE_ARRAY(buffer);
 				return;
 			}
 	
 			if (color_mode < 3)
 			{
-				delete[] buffer;
+				LUX_DELETE_ARRAY(buffer);
 				return;
 			}
 	
 			const char* image_src = buffer + sizeof(TGAHeader);
-			unsigned char* image_dest = new unsigned char[image_size];
+			unsigned char* image_dest = LUX_NEW_ARRAY(unsigned char, image_size);
 	
 
 			// Targa is BGR, swap to RGB and flip Y axis
@@ -175,7 +175,7 @@ namespace UI
 			glGenTextures(1, &texture_id);
 			if (texture_id == 0)
 			{
-				delete[] buffer;
+				LUX_DELETE_ARRAY(buffer);
 				return;
 			}
 
@@ -188,8 +188,8 @@ namespace UI
 			/*glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);*/
 
-			delete [] image_dest;
-			delete [] buffer;
+			LUX_DELETE_ARRAY(image_dest);
+			LUX_DELETE_ARRAY(buffer);
 	
 			OpenGLTexture* img = static_cast<OpenGLTexture*>(user_data);
 			img->setId(texture_id);

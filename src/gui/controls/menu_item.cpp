@@ -14,11 +14,11 @@ namespace UI
 MenuItem::MenuItem(const char* label, Gui& gui)
 	: Block(gui, NULL, NULL)
 {
-	m_label = new Block(getGui(), this, "_text");
+	m_label = LUX_NEW(Block)(getGui(), this, "_text");
 	m_label->setArea(0, 20, 0, 2, 1, 0, 1, 0);
 	m_label->setBlockText(label);
 
-	m_sub_container = new Block(gui, this, "_box");
+	m_sub_container = LUX_NEW(Block)(gui, this, "_box");
 	m_sub_container->hide();
 	m_sub_container->onEvent("blur").bind<MenuItem, &MenuItem::blurSubMenu>(this);
 }

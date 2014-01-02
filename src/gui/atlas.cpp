@@ -51,7 +51,7 @@ namespace Lux
 
 		bool Atlas::create()
 		{
-			m_impl = new AtlasImpl();
+			m_impl = LUX_NEW(AtlasImpl)();
 			m_impl->m_texture = NULL;
 			m_impl->m_renderer = NULL;
 			return m_impl != 0;
@@ -60,8 +60,8 @@ namespace Lux
 
 		void Atlas::destroy()
 		{
-			delete m_impl;
-			m_impl = 0;
+			LUX_DELETE(m_impl);
+			m_impl = NULL;
 		}
 
 		void AtlasImpl::imageLoaded(TextureBase& img)
@@ -97,7 +97,7 @@ namespace Lux
 			for(int i = 0; i < count; ++i)
 			{
 				serializer.deserializeArrayItem(tmp, 260);
-				Atlas::Part* part = new Atlas::Part();
+				Atlas::Part* part = LUX_NEW(Atlas::Part)();
 				serializer.deserializeArrayItem(part->m_left);
 				serializer.deserializeArrayItem(part->m_top);
 				serializer.deserializeArrayItem(part->m_right);

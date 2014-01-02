@@ -13,7 +13,7 @@ namespace Lux
 
 	GetPropertyVisitor::~GetPropertyVisitor()
 	{
-		delete[] m_value;
+		LUX_DELETE_ARRAY(m_value);
 	}
 
 	void GetPropertyVisitor::visit(const char* name, float& value)
@@ -21,7 +21,7 @@ namespace Lux
 		if(m_property_name == name && m_value == 0)
 		{
 			m_type = FLOAT;
-			m_value = new char[sizeof(float)];
+			m_value = LUX_NEW_ARRAY(char, sizeof(float));
 			memcpy(m_value, &value, sizeof(value));
 			m_value_size = sizeof(value);
 		}

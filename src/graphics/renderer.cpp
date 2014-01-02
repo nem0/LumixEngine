@@ -165,7 +165,7 @@ void RendererImpl::loadResources()
 	{
 		h3dLoadResource(res, NULL, 0);
 		sprintf_s(path, "%s%s/%s", m_base_path.c_str(), h3dutGetResourcePath(h3dGetResType(res)), h3dGetResName(res));
-		LoadInfo* info = new LoadInfo();
+		LoadInfo* info = LUX_NEW(LoadInfo)();
 		info->m_renderer = this;
 		info->m_res = res;		
 		m_file_system->openAsync(m_file_system->getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, &resourceLoaded, info);
@@ -175,7 +175,7 @@ void RendererImpl::loadResources()
 
 bool Renderer::create(FS::FileSystem* fs, int w, int h, const char* base_path)
 {
-	m_impl = new RendererImpl();
+	m_impl = LUX_NEW(RendererImpl)();
 	m_impl->m_pipeline_handle = -1;
 	m_impl->m_owner = this;
 	m_impl->m_file_system = fs;
@@ -192,8 +192,8 @@ bool Renderer::create(FS::FileSystem* fs, int w, int h, const char* base_path)
 	
 	if(!h3dInit())
 	{	
-		delete m_impl;
-		m_impl = 0;
+		LUX_DELETE(m_impl);
+		m_impl = NULL;
 		h3dutDumpMessages();
 		return false;
 	}
@@ -208,8 +208,8 @@ bool Renderer::create(FS::FileSystem* fs, int w, int h, const char* base_path)
 void Renderer::destroy()
 {
 	h3dRelease();
-	delete m_impl;
-	m_impl = 0;
+	LUX_DELETE(m_impl);
+	m_impl = NULL;
 }
 
 

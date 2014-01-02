@@ -59,7 +59,7 @@ namespace Lux
 
 	bool EditorClient::create()
 	{
-		m_impl = new EditorClientImpl;
+		m_impl = LUX_NEW(EditorClientImpl);
 		m_impl->m_stream = m_impl->m_connector.connect("127.0.0.1", 10002);
 		m_impl->m_task.m_client = m_impl;
 		bool success = m_impl->m_task.create("ClientReceiver");

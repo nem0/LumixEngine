@@ -43,7 +43,7 @@ namespace Lux
 
 	ScriptSystem::ScriptSystem()
 	{
-		m_impl = new ScriptSystemImpl;
+		m_impl = LUX_NEW(ScriptSystemImpl);
 		m_impl->m_owner = this;
 		m_impl->m_is_running = false;
 	}
@@ -51,7 +51,7 @@ namespace Lux
 
 	ScriptSystem::~ScriptSystem()
 	{
-		delete m_impl;
+		LUX_DELETE(m_impl);
 	}
 
 

@@ -52,13 +52,13 @@ namespace UI
 		m_blocks.clear();
 		for(map<uint32_t, DecoratorBase*>::iterator iter = m_decorators.begin(), end = m_decorators.end(); iter != end; ++iter)
 		{
-			delete iter.second();
+			LUX_DELETE(iter.second());
 		}
 		m_decorators.clear();
 		for(int i = 0; i < m_atlases.size(); ++i)
 		{
 			m_atlases[i]->destroy();
-			delete m_atlases[i];
+			LUX_DELETE(m_atlases[i]);
 		}
 		m_atlases.clear();
 	}
@@ -109,34 +109,34 @@ namespace UI
 
 	Block* createButton(Gui& gui, Block* parent)
 	{
-		return new Button("", gui, parent);
+		return LUX_NEW(Button)("", gui, parent);
 	}
 
 	Block* createCheckBox(Gui& gui, Block* parent)
 	{
-		return new CheckBox("", gui, parent);
+		return LUX_NEW(CheckBox)("", gui, parent);
 	}
 
 	Block* createMenuBar(Gui& gui, Block* parent)
 	{
-		return new MenuBar(gui, parent);
+		return LUX_NEW(MenuBar)(gui, parent);
 	}
 
 	Block* createMenuItem(Gui& gui, Block* parent)
 	{
-		MenuItem* menu_item = new MenuItem("", gui);
+		MenuItem* menu_item = LUX_NEW(MenuItem)("", gui);
 		static_cast<MenuBar*>(parent)->addItem(menu_item);
 		return menu_item;
 	}
 
 	Block* createTextBox(Gui& gui, Block* parent)
 	{
-		return new TextBox("", gui, parent);
+		return LUX_NEW(TextBox)("", gui, parent);
 	}
 
 	bool Gui::create(Engine& engine)
 	{
-		m_impl = new GuiImpl();
+		m_impl = LUX_NEW(GuiImpl)();
 		m_impl->m_focus = NULL;
 		m_impl->m_renderer = NULL;
 		m_impl->m_engine = &engine;
@@ -152,7 +152,7 @@ namespace UI
 
 	void Gui::destroy()
 	{
-		delete m_impl;
+		LUX_DELETE(m_impl);
 		m_impl = NULL;
 	}
 
@@ -256,13 +256,13 @@ namespace UI
 			return creator.invoke(*this, parent);
 		}
 		ASSERT(type == block_hash);
-		return new Block(*this, parent, NULL);
+		return LUX_NEW(Block)(*this, parent, NULL);
 	}
 
 
 	Block* Gui::createGui(Lux::FS::IFile& file)
 	{
-		Block* root = new Block(*this, NULL, NULL);
+		Block* root = LUX_NEW(Block)(*this, NULL, NULL);
 		JsonSerializer serializer(file, JsonSerializer::READ); 
 		root->deserialize(serializer);
 		return root;
@@ -278,10 +278,10 @@ namespace UI
 				return m_impl->m_atlases[i];
 			}
 		}
-		Atlas* atlas = new Atlas();
+		Atlas* atlas = LUX_NEW(Atlas)();
 		if(!atlas->create())
 		{
-			delete atlas;
+			LUX_DELETE(atlas);
 			return NULL;
 		}
 		m_impl->m_atlases.push(atlas);
@@ -312,7 +312,7 @@ namespace UI
 
 	Block* Gui::createTopLevelBlock(float width, float height)
 	{
-		Block* block = new Block(*this, NULL, NULL);
+		Block* block = LUX_NEW(Block)(*this, NULL, NULL);
 		block->setArea(0, 0, 0, 0, 0, width, 0, height);
 		m_impl->m_blocks.push(block);
 		return block;
@@ -401,7 +401,7 @@ namespace UI
 
 	extern "C" LUX_GUI_API IPlugin* createPlugin()
 	{
-		return new Gui();
+		return LUX_NEW(Gui)();
 	}
 
 } // ~namespace UI

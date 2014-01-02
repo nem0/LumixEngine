@@ -17,11 +17,11 @@ AnimableUI::AnimableUI(PropertyFrame& property_frame, Lux::UI::Block* parent, Lu
 {
 	m_client = &client;
 	setArea(0, 0, 0, 0, 1, 0, 0, 40);
-	Lux::UI::Block* label = new Lux::UI::Block(getGui(), this, "_text_centered");
+	Lux::UI::Block* label = LUX_NEW(Lux::UI::Block)(getGui(), this, "_text_centered");
 	label->setBlockText("Animable");
 	label->setArea(0, 0, 0, 0, 1, 0, 0, 20);
 
-	label = new Lux::UI::Block(getGui(), this, "_text");
+	label = LUX_NEW(Lux::UI::Block)(getGui(), this, "_text");
 	label->setBlockText("No properties");
 	label->setArea(0, 0, 0, 20, 1, 0, 0, 40);
 }

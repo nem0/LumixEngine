@@ -49,7 +49,7 @@ namespace Lux
 		TCPStream* TCPAcceptor::accept()
 		{
 			SOCKET socket = ::accept(m_socket, NULL, NULL);
-			return new TCPStream(socket);
+			return LUX_NEW(TCPStream)(socket);
 		}
 	} // ~namespace Net
 } // ~namespace Lux

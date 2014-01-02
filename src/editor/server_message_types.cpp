@@ -70,11 +70,11 @@ void LogEvent::read(Blob& stream)
 	}
 	else
 	{
-		char* buf = new char[len+1];
+		char* buf = LUX_NEW_ARRAY(char, len+1);
 		stream.read(buf, len);
 		buf[len] = 0;
 		message = buf;
-		delete[] buf;
+		LUX_DELETE_ARRAY(buf);
 	}
 }
 
@@ -104,7 +104,7 @@ void PropertyListEvent::read(Blob& stream)
 	{
 		stream.read(&properties[i].name_hash, sizeof(properties[i].name_hash));
 		stream.read(&properties[i].data_size, sizeof(properties[i].data_size));
-		properties[i].data = new uint8_t[properties[i].data_size];
+		properties[i].data = LUX_NEW_ARRAY(uint8_t, properties[i].data_size);
 		stream.read(properties[i].data, properties[i].data_size);
 	}
 }
