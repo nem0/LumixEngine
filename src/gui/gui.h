@@ -46,11 +46,8 @@ namespace UI
 			void mouseMove(int x, int y, int rel_x, int rel_y);
 			void mouseUp(int x, int y);
 			void keyDown(int32_t key);
-			uint32_t getCallbackNameHash(Block::EventCallback callback);
 			DecoratorBase* getDecorator(const char* name);
 			void addDecorator(DecoratorBase& decorator);
-			Block::EventCallback& getCallback(uint32_t name_hash);
-			Block::EventCallback& getCallback(const char* name);
 			Atlas* loadAtlas(const char* path);
 			Block* createGui(Lux::FS::IFile& file);
 			Block* createBlock(uint32_t type, Block* parent);

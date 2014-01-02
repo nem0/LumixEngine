@@ -14,7 +14,7 @@ LogUI::LogUI(MainFrame& main_frame)
 	main_frame.getEditorClient()->getEventManager().addListener(Lux::ServerMessageType::LOG_MESSAGE).bind<LogUI, &LogUI::onLogMessage>(this);
 	Lux::UI::Block* handle = new Lux::UI::Block(getGui(), this, "_box");
 	handle->setArea(0, 0, 0, 0, 1, 0, 0, 20);
-	handle->getCallback("mouse_down").bind<Dockable, &Dockable::startDrag>(this);
+	handle->onEvent("mouse_down").bind<Dockable, &Dockable::startDrag>(this);
 	m_scrollable = new Lux::UI::Scrollable(getGui(), this);
 	m_scrollable->setArea(0, 0, 0, 20, 1, 0, 1, 0);
 }

@@ -20,12 +20,24 @@ MenuItem::MenuItem(const char* label, Gui& gui)
 
 	m_sub_container = new Block(gui, this, "_box");
 	m_sub_container->hide();
-	m_sub_container->registerEventHandler("blur", "_hide");
+	m_sub_container->onEvent("blur").bind<MenuItem, &MenuItem::blurSubMenu>(this);
 }
 
 
 MenuItem::~MenuItem()
 {
+}
+
+
+void MenuItem::blurSubMenu(Block& block, void*)
+{
+	m_sub_container->hide();
+}
+
+
+void MenuItem::click(Block& block, void*)
+{
+	showSubMenu();
 }
 
 
@@ -38,7 +50,7 @@ void MenuItem::showSubMenu()
 
 void MenuItem::addSubItem(MenuItem* item)
 {
-	registerEventHandler("click", "_menu_show_submenu");
+	onEvent("click").bind<MenuItem, &MenuItem::click>(this);
 	item->setArea(0, 0, 0, m_sub_container->getChildCount() * 20.0f, 1, 0, 0, 20.0f + m_sub_container->getChildCount() * 20.0f);
 	item->setParent(m_sub_container);
 	m_sub_container->setZIndex(1);

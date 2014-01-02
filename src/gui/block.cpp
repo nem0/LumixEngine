@@ -125,10 +125,9 @@ namespace UI
 		if(!m_is_focus_processing)
 		{
 			static const uint32_t blur_hash = crc32("blur");
-			EventHandler* handler = getEventHandler(blur_hash);
-			if(handler)
+			if(m_event_handlers.contains(blur_hash))
 			{
-				handler->callback.invoke(*this, NULL);
+				m_event_handlers[blur_hash].invoke(*this, NULL);
 			}
 			if(m_parent)
 			{
@@ -142,27 +141,14 @@ namespace UI
 	{
 		m_is_focus_processing = false;
 		static const uint32_t blur_hash = crc32("focus");
-		EventHandler* handler = getEventHandler(blur_hash);
-		if(handler)
+		if(m_event_handlers.contains(blur_hash))
 		{
-			handler->callback.invoke(*this, NULL);
+			m_event_handlers[blur_hash].invoke(*this, NULL);
 		}
 		if(m_parent)
 		{
 			m_parent->focus();
 		}
-	}
-
-	Block::EventHandler* Block::getEventHandler(uint32_t type)
-	{
-		for(int i = 0, c = m_event_handlers.size(); i < c; ++i)
-		{
-			if(m_event_handlers[i].type == type)
-			{
-				return &m_event_handlers[i];
-			}
-		}
-		return NULL;
 	}
 
 
@@ -261,14 +247,6 @@ namespace UI
 	void Block::serializeWOChild(ISerializer& serializer)
 	{
 		serializer.serialize("decorator", m_decorator ? m_decorator->getName() : "");
-		serializer.serialize("event_count", (int32_t)m_event_handlers.size());
-		serializer.beginArray("events");
-		for(int i = 0; i < m_event_handlers.size(); ++i)
-		{
-			serializer.serializeArrayItem(m_gui.getCallbackNameHash(m_event_handlers[i].callback));
-			serializer.serializeArrayItem(m_event_handlers[i].type);
-		}
-		serializer.endArray();
 		serializer.serialize("is_shown", m_is_shown);
 		serializer.serialize("left", m_local_area.left);
 		serializer.serialize("top", m_local_area.top);
@@ -283,19 +261,6 @@ namespace UI
 		char tmp[1024];
 		serializer.deserialize("decorator", tmp, 1024);
 		m_decorator = m_gui.getDecorator(tmp);
-		int32_t count;
-		serializer.deserialize("event_count", count);
-		m_event_handlers.resize(count);
-		serializer.deserializeArrayBegin("events");
-		for(int i = 0; i < m_event_handlers.size(); ++i)
-		{
-			uint32_t hash;
-			serializer.deserializeArrayItem(hash);
-			EventCallback callback = m_gui.getCallback(hash);
-			m_event_handlers[i].callback = callback;
-			serializer.deserializeArrayItem(m_event_handlers[i].type);
-		}
-		serializer.deserializeArrayEnd();
 		serializer.deserialize("is_shown", m_is_shown);
 		serializer.deserialize("left", m_local_area.left);
 		serializer.deserialize("top", m_local_area.top);
@@ -341,37 +306,22 @@ namespace UI
 	void Block::emitEvent(const char* type)
 	{
 		uint32_t hash = crc32(type);
-		for(int i = 0, c = m_event_handlers.size(); i < c; ++i)
+		if(m_event_handlers.contains(hash))
 		{
-			if(m_event_handlers[i].type == hash)
-			{
-				m_event_handlers[i].callback.invoke(*this, NULL);
-			}
+			m_event_handlers[hash].invoke(*this, NULL);
 		}
 	}
 
 
-	Block::EventCallback& Block::getCallback(const char* type)
+	Block::EventCallback& Block::onEvent(const char* type)
 	{
-		return getCallback(crc32(type));
+		return onEvent(crc32(type));
 	}
 
 
-	Block::EventCallback& Block::getCallback(uint32_t type)
+	Block::EventCallback& Block::onEvent(uint32_t type)
 	{
-		EventHandler handler;
-		handler.type = type;
-		m_event_handlers.push(handler);
-		return m_event_handlers[m_event_handlers.size()-1].callback;
-	}
-
-
-	void Block::registerEventHandler(const char* type, const char* callback)
-	{
-		EventHandler handler;
-		handler.callback = m_gui.getCallback(callback);
-		handler.type = crc32(type);
-		m_event_handlers.push(handler);
+		return m_event_handlers[type];
 	}
 
 

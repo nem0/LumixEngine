@@ -33,7 +33,6 @@ namespace UI
 
 		Engine* m_engine;
 		PODArray<Block*> m_blocks;
-		map<uint32_t, Block::EventCallback> m_callbacks;
 		map<uint32_t, DecoratorBase*> m_decorators;
 		Block* m_focus;
 		IRenderer* m_renderer;
@@ -141,11 +140,6 @@ namespace UI
 		m_impl->m_focus = NULL;
 		m_impl->m_renderer = NULL;
 		m_impl->m_engine = &engine;
-		getCallback("_menu_show_submenu").bind<GuiImpl, &GuiImpl::menuShowSubmenu>(m_impl);
-		getCallback("_tb_key_down").bind<GuiImpl, &GuiImpl::textboxKeyDown>(m_impl);
-		getCallback("_hide").bind<GuiImpl, &GuiImpl::hideBlock>(m_impl);
-		getCallback("_hide_parent").bind<GuiImpl, &GuiImpl::hideParentBlock>(m_impl);
-		getCallback("_checkbox_toggle").bind<GuiImpl, &GuiImpl::checkBoxToggle>(m_impl);
 		m_impl->m_block_creators[crc32("button")].bind<&createButton>();
 		m_impl->m_block_creators[crc32("menu_item")].bind<&createMenuItem>();
 		m_impl->m_block_creators[crc32("menu_bar")].bind<&createMenuBar>();
@@ -163,36 +157,9 @@ namespace UI
 	}
 
 
-	uint32_t Gui::getCallbackNameHash(Block::EventCallback callback)
-	{
-		map<uint32_t, Block::EventCallback>::iterator iter = m_impl->m_callbacks.begin(), end = m_impl->m_callbacks.end();
-		while(iter != end)
-		{
-			if(iter.second() == callback)
-			{
-				return iter.first();
-			}
-			++ iter;
-		}
-		return 0;
-	}
-
-
-	Block::EventCallback& Gui::getCallback(uint32_t name_hash)
-	{
-		return m_impl->m_callbacks[name_hash];
-	}
-
-
 	void Gui::addDecorator(DecoratorBase& decorator)
 	{
 		m_impl->m_decorators.insert(crc32(decorator.getName()), &decorator);
-	}
-
-
-	Block::EventCallback& Gui::getCallback(const char* name)
-	{
-		return m_impl->m_callbacks[crc32(name)];
 	}
 
 
@@ -388,11 +355,7 @@ namespace UI
 		static const uint32_t key_down_hash = crc32("key_down");
 		if(m_impl->m_focus)
 		{
-			Lux::UI::Block::EventHandler* handler = m_impl->m_focus->getEventHandler(key_down_hash);
-			if(handler)
-			{
-				handler->callback.invoke(*m_impl->m_focus, (void*)key);
-			}
+			m_impl->m_focus->onEvent(key_down_hash).invoke(*m_impl->m_focus, (void*)key);
 		}
 	}
 

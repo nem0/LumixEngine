@@ -25,20 +25,17 @@ BoxRigidActorUI::BoxRigidActorUI(Lux::UI::Block* parent, Lux::EditorClient& clie
 	Lux::UI::Block* container = new Block(getGui(), this, NULL);
 	container->setArea(0, 60, 0, 20, 1, 0, 0, 40);
 
-	getGui().getCallback("BoxRigidActorUI_sizeChanged").bind<BoxRigidActorUI, &BoxRigidActorUI::sizeChanged>(this);
-	getGui().getCallback("BoxRigidActorUI_isDynamicChanged").bind<BoxRigidActorUI, &BoxRigidActorUI::isDynamicChanged>(this);
-
 	m_x_size_box = new Lux::UI::TextBox("0", getGui(), container);
 	m_x_size_box->setArea(0, 0, 0, 0, 0.33f, -1, 0, 20);
-	m_x_size_box->setOnTextAccepted("BoxRigidActorUI_sizeChanged");
+	m_x_size_box->onEvent("text_accepted").bind<BoxRigidActorUI, &BoxRigidActorUI::sizeChanged>(this);
 	
 	m_y_size_box = new Lux::UI::TextBox("0", getGui(), container);
 	m_y_size_box->setArea(0.33f, 0, 0, 0, 0.66f, -1, 0, 20);
-	m_y_size_box->setOnTextAccepted("BoxRigidActorUI_sizeChanged");
+	m_y_size_box->onEvent("text_accepted").bind<BoxRigidActorUI, &BoxRigidActorUI::sizeChanged>(this);
 	
 	m_z_size_box = new Lux::UI::TextBox("0", getGui(), container);
 	m_z_size_box->setArea(0.66f, 0, 0, 0, 1, -1, 0, 20);
-	m_z_size_box->setOnTextAccepted("BoxRigidActorUI_sizeChanged");
+	m_z_size_box->onEvent("text_accepted").bind<BoxRigidActorUI, &BoxRigidActorUI::sizeChanged>(this);
 
 	label = new Lux::UI::Block(getGui(), this, "_text");
 	label->setBlockText("Dynamic");
@@ -46,7 +43,7 @@ BoxRigidActorUI::BoxRigidActorUI(Lux::UI::Block* parent, Lux::EditorClient& clie
 
 	m_is_dynamic_ui = new Lux::UI::CheckBox(false, getGui(), this);
 	m_is_dynamic_ui->setArea(0, 60, 0, 42, 0, 76, 0, 58);
-	m_is_dynamic_ui->registerEventHandler("check_state_changed", "BoxRigidActorUI_isDynamicChanged");
+	m_is_dynamic_ui->onEvent("check_state_changed").bind<BoxRigidActorUI, &BoxRigidActorUI::isDynamicChanged>(this);
 }
 
 

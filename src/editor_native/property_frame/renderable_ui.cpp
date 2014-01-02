@@ -25,16 +25,13 @@ RenderableUI::RenderableUI(PropertyFrame& property_frame, Lux::UI::Block* parent
 	label->setBlockText("Source");
 	label->setArea(0, 0, 0, 20, 0, 50, 0, 40);
 
-	getGui().getCallback("RenderableUI_sourceChanged").bind<RenderableUI, &RenderableUI::sourceChanged>(this);
-	getGui().getCallback("RenderableUI_browseSource").bind<RenderableUI, &RenderableUI::browseSource>(this);
-
 	m_source_box = new Lux::UI::TextBox("empty", getGui(), this);
 	m_source_box->setArea(0, 50, 0, 20, 1, -21, 0, 40);
-	m_source_box->setOnTextAccepted("RenderableUI_sourceChanged");
+	m_source_box->onEvent("text_accepted").bind<RenderableUI, &RenderableUI::sourceChanged>(this);
 	
 	m_browse_source_button = new Lux::UI::Button("...", getGui(), this);
 	m_browse_source_button->setArea(1, -20, 0, 20, 1, -1, 0, 40);
-	m_browse_source_button->registerEventHandler("click", "RenderableUI_browseSource");
+	m_browse_source_button->onEvent("click").bind<RenderableUI, &RenderableUI::browseSource>(this);
 }
 
 

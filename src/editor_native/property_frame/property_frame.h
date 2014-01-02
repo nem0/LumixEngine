@@ -34,6 +34,7 @@ class PropertyFrame : public Lux::UI::Dockable
 		void onEntitySelected(Lux::Event& evt);
 		void onEntityPosition(Lux::Event& evt);
 		void onEntityProperties(Lux::Event& evt);
+		void blurComponentTypeList(Lux::UI::Block& block, void*);
 
 	private:
 		Lux::UI::Button* m_create_component_button;

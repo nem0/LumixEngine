@@ -106,7 +106,7 @@ void Dockable::dock(Dockable& dockable, Slot slot)
 	dockable.setParent(new_root->getContent());	
 
 	new_root->m_divider = new Lux::UI::Block(getGui(), new_root->getContent(), NULL);
-	new_root->m_divider->getCallback("mouse_down").bind<Dockable, &Dockable::dividerMouseDown>(new_root);
+	new_root->m_divider->onEvent("mouse_down").bind<Dockable, &Dockable::dividerMouseDown>(new_root);
 	new_root->m_divider->setZIndex(dockable.getZIndex() + 1);
 	new_root->m_divider->setBlockText("divider");
 

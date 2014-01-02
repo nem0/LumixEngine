@@ -19,10 +19,12 @@ namespace UI
 			virtual void serialize(ISerializer& serializer) LUX_OVERRIDE;
 			virtual void deserialize(ISerializer& serializer) LUX_OVERRIDE;
 
-			void setOnTextAccepted(const char* callback);
 			void setText(const string& text);
 			void setText(const char* text);
 			const string& getText() const;
+
+		private:
+			void keyDown(Block& block, void* user_data);
 	};
 
 

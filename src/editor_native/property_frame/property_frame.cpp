@@ -5,8 +5,10 @@
 #include "editor/editor_client.h"
 #include "editor/server_message_types.h"
 #include "editor_native/main_frame.h"
+#include "editor_native/property_frame/animable_ui.h"
 #include "editor_native/property_frame/box_rigid_actor_ui.h"
 #include "editor_native/property_frame/renderable_ui.h"
+#include "editor_native/property_frame/script_ui.h"
 #include "gui/controls/button.h"
 #include "gui/controls/text_box.h"
 #include "gui/gui.h"
@@ -19,13 +21,12 @@ PropertyFrame::PropertyFrame(MainFrame& main_frame)
 	m_main_frame = &main_frame;
 	Lux::UI::Block* handle = new Lux::UI::Block(getGui(), getContent(), "_box");
 	handle->setArea(0, 0, 0, 0, 1, 0, 0, 20);
-	handle->getCallback("mouse_down").bind<Dockable, &Dockable::startDrag>(this);
+	handle->onEvent("mouse_down").bind<Dockable, &Dockable::startDrag>(this);
 	Lux::UI::Block* root = new Lux::UI::Block(getGui(), getContent(), "_box");
 	root->setArea(0, 0, 0, 20, 1, 0, 1, 0);
 	m_create_component_button = new Lux::UI::Button("create component", main_frame.getGui(), root);
 	m_create_component_button->setArea(0, 5, 1, -25, 1, -5, 1, -5);
-	main_frame.getGui().getCallback("PropertyFrame_createComponentClicked").bind<PropertyFrame, &PropertyFrame::createComponentClicked>(this);
-	m_create_component_button->registerEventHandler("click", "PropertyFrame_createComponentClicked");
+	m_create_component_button->onEvent("click").bind<PropertyFrame, &PropertyFrame::createComponentClicked>(this);
 	
 	Lux::UI::Block* label = new Block(main_frame.getGui(), root, "_text");
 	label->setArea(0, 2, 0, 2, 0, 50, 0, 20);
@@ -34,16 +35,15 @@ PropertyFrame::PropertyFrame(MainFrame& main_frame)
 	Lux::UI::Block* positions = new Block(main_frame.getGui(), root, NULL);
 	positions->setArea(0, 50, 0, 2, 1, -2, 0, 20);
 
-	main_frame.getGui().getCallback("PropertyFrame_positionChanged").bind<PropertyFrame, &PropertyFrame::positionChanged>(this);
 	m_pos_x_box = new Lux::UI::TextBox("0", main_frame.getGui(), positions);
 	m_pos_x_box->setArea(0, 1, 0, 0, 0.33f, 0, 0, 20);
-	m_pos_x_box->setOnTextAccepted("PropertyFrame_positionChanged");
+	m_pos_x_box->onEvent("text_accepted").bind<PropertyFrame, &PropertyFrame::positionChanged>(this);
 	m_pos_y_box = new Lux::UI::TextBox("0", main_frame.getGui(), positions);
 	m_pos_y_box->setArea(0.33f, 1, 0, 0, 0.66f, 0, 0, 20);
-	m_pos_y_box->setOnTextAccepted("PropertyFrame_positionChanged");
+	m_pos_y_box->onEvent("text_accepted").bind<PropertyFrame, &PropertyFrame::positionChanged>(this);
 	m_pos_z_box = new Lux::UI::TextBox("0", main_frame.getGui(), positions);
 	m_pos_z_box->setArea(0.66f, 1, 0, 0, 1, 0, 0, 20);
-	m_pos_z_box->setOnTextAccepted("PropertyFrame_positionChanged");
+	m_pos_z_box->onEvent("text_accepted").bind<PropertyFrame, &PropertyFrame::positionChanged>(this);
 	
 	m_component_container = new Block(main_frame.getGui(), root, NULL);
 	m_component_container->setArea(0, 0, 0, 24, 1, 0, 1, -30);
@@ -51,29 +51,48 @@ PropertyFrame::PropertyFrame(MainFrame& main_frame)
 	m_type_list_popup = new Block(main_frame.getGui(), root, "_box");
 	m_type_list_popup->setArea(0, 5, 0.5f, 0, 1, -5, 1, -25);
 	m_type_list_popup->hide();
-	m_type_list_popup->registerEventHandler("blur", "_hide");
+	m_type_list_popup->onEvent("blur").bind<PropertyFrame, &PropertyFrame::blurComponentTypeList>(this);
 	m_type_list_popup->setZIndex(1);
 
-	main_frame.getGui().getCallback("PropertyFrame_newComponentClick").bind<PropertyFrame, &PropertyFrame::newComponentClick>(this);
 	{
 		Lux::UI::Block* item = new Block(main_frame.getGui(), m_type_list_popup, "_text_centered");
 		item->setArea(0, 0, 0, 0, 1, 0, 0, 20);
-		item->setBlockText("Renderable");
-		item->registerEventHandler("click", "PropertyFrame_newComponentClick");
-		item->setTag((void*)crc32("renderable"));
+		item->setBlockText("Animable");
+		item->onEvent("click").bind<PropertyFrame, &PropertyFrame::newComponentClick>(this);
+		item->setTag((void*)crc32("animable"));
 	}
 	{
 		Lux::UI::Block* item = new Block(main_frame.getGui(), m_type_list_popup, "_text_centered");
 		item->setArea(0, 0, 0, 20, 1, 0, 0, 40);
 		item->setBlockText("Box rigid actor");
-		item->registerEventHandler("click", "PropertyFrame_newComponentClick");
+		item->onEvent("click").bind<PropertyFrame, &PropertyFrame::newComponentClick>(this);
 		item->setTag((void*)crc32("box_rigid_actor"));
+	}
+	{
+		Lux::UI::Block* item = new Block(main_frame.getGui(), m_type_list_popup, "_text_centered");
+		item->setArea(0, 0, 0, 40, 1, 0, 0, 60);
+		item->setBlockText("Renderable");
+		item->onEvent("click").bind<PropertyFrame, &PropertyFrame::newComponentClick>(this);
+		item->setTag((void*)crc32("renderable"));
+	}
+	{
+		Lux::UI::Block* item = new Block(main_frame.getGui(), m_type_list_popup, "_text_centered");
+		item->setArea(0, 0, 0, 60, 1, 0, 0, 80);
+		item->setBlockText("Script");
+		item->onEvent("click").bind<PropertyFrame, &PropertyFrame::newComponentClick>(this);
+		item->setTag((void*)crc32("script"));
 	}
 	
 	main_frame.getEditorClient()->getEventManager().addListener(Lux::ServerMessageType::ENTITY_POSITION).bind<PropertyFrame, &PropertyFrame::onEntityPosition>(this);
 	main_frame.getEditorClient()->getEventManager().addListener(Lux::ServerMessageType::PROPERTY_LIST).bind<PropertyFrame, &PropertyFrame::onEntityProperties>(this);
 	main_frame.getEditorClient()->getEventManager().addListener(Lux::ServerMessageType::ENTITY_SELECTED).bind<PropertyFrame, &PropertyFrame::onEntitySelected>(this);
 	
+}
+
+
+void PropertyFrame::blurComponentTypeList(Lux::UI::Block& block, void*)
+{
+	m_type_list_popup->hide();
 }
 
 
@@ -120,6 +139,14 @@ void PropertyFrame::onEntitySelected(Lux::Event& evt)
 		else if(e.components[i] == crc32("renderable"))
 		{
 			ui = new RenderableUI(*this, m_component_container, *m_main_frame->getEditorClient());
+		}
+		else if(e.components[i] == crc32("animable"))
+		{
+			ui = new AnimableUI(*this, m_component_container, *m_main_frame->getEditorClient());
+		}
+		else if(e.components[i] == crc32("script"))
+		{
+			ui = new ScriptUI(*this, m_component_container, *m_main_frame->getEditorClient());
 		}
 		else
 		{

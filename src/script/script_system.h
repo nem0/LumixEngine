@@ -10,6 +10,7 @@ namespace Lux
 {
 
 
+class Engine;
 class InputSystem;
 class Navigation;
 class Renderer;
@@ -27,10 +28,7 @@ class LUX_ENGINE_API ScriptSystem
 		void setUniverse(Universe* universe);
 		Universe* getUniverse() const;
 		Component createScript(Entity entity);
-		Renderer* getRenderer() const;
-		void setRenderer(Renderer* renderer);
-		void setInputSystem(InputSystem* input_system);
-		InputSystem* getInputSystem() const;
+		void setEngine(Engine& engine);
 
 		void deserialize(ISerializer& serializer);
 		void serialize(ISerializer& serializer);
