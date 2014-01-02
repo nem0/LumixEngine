@@ -1,7 +1,7 @@
 #include "gui/decorators/check_box_decorator.h"
 #include "gui/atlas.h"
 #include "gui/block.h"
-#include "gui/check_box.h"
+#include "gui/controls/check_box.h"
 #include "gui/gui.h"
 #include "gui/irenderer.h"
 #include "gui/texture_base.h"
@@ -31,7 +31,6 @@ namespace UI
 		int i = static_cast<CheckBox&>(block).isChecked() ? 1 : 0;
 		if(m_parts[i])
 		{
-			renderer.setScissorArea((int)block.getGlobalLeft(), (int)block.getGlobalTop(), (int)block.getGlobalRight(), (int)block.getGlobalBottom());
 			setVertices(&m_vertices[0], block.getGlobalLeft(), block.getGlobalTop(), block.getGlobalRight(), block.getGlobalBottom(), block.getZ());
 			m_parts[i]->getUvs(&m_uvs[0]);
 

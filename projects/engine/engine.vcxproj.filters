@@ -42,9 +42,6 @@
     <ClCompile Include="..\..\src\editor\editor_icon.cpp">
       <Filter>editor</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\editor\property_descriptor.cpp">
-      <Filter>editor</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\universe\entity_destroyed_event.cpp">
       <Filter>universe</Filter>
     </ClCompile>

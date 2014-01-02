@@ -1,11 +1,11 @@
 #include "core/file_system.h"
 #include "core/disk_file_device.h"
 #include "core/ifile.h"
+#include "core/pod_array.h"
 #include "core/string.h"
 #include "core/transaction_queue.h"
-#include "core/vector.h"
 
-#include "platform/task.h"
+#include "core/task.h"
 
 namespace Lux
 {
@@ -26,8 +26,8 @@ namespace Lux
 
 		typedef MT::Transaction<AsyncItem> AsynTrans;
 		typedef MT::TransactionQueue<AsynTrans, 16> TransQueue;
-		typedef vector<AsynTrans*> TransTable;
-		typedef vector<IFileDevice*> DevicesTable;
+		typedef PODArray<AsynTrans*> TransTable;
+		typedef PODArray<IFileDevice*> DevicesTable;
 
 		class FSTask : public MT::Task
 		{
@@ -87,7 +87,7 @@ namespace Lux
 					}
 				}
 
-				m_devices.push_back(device);
+				m_devices.push(device);
 				return true;
 			}
 
@@ -142,7 +142,7 @@ namespace Lux
 						tr->reset();
 
 						m_transaction_queue.push(tr, true);
-						m_in_progress.push_back(tr);
+						m_in_progress.push(tr);
 					}
 				}
 				return NULL;
@@ -167,7 +167,7 @@ namespace Lux
 					tr->reset();
 
 					m_transaction_queue.push(tr, true);
-					m_in_progress.push_back(tr);
+					m_in_progress.push(tr);
 				}
 			}
 
@@ -205,7 +205,7 @@ namespace Lux
 			IFile* parseDeviceList(const char* device_list)
 			{
 				IFile* prev = NULL;
-				string token, dev_list = device_list;
+				string token, dev_list(device_list);
 				while(dev_list.length() > 0)
 				{
 					int pos = dev_list.rfind(':');

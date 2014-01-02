@@ -29,7 +29,7 @@ namespace Lux
 			void onResize(int w, int h);
 			void tick(HWND hwnd, HWND game_hwnd);
 			void registerCreator(uint32_t type, IPlugin& creator);
-			void registerProperty(const char* component_type, PropertyDescriptor& descriptor);
+			void registerProperty(const char* component_type, IPropertyDescriptor* descriptor);
 			Engine& getEngine();
 
 		private:

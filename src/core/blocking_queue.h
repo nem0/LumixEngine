@@ -1,6 +1,6 @@
 #pragma once
 
-#include "platform/semaphore.h"
+#include "core/semaphore.h"
 
 namespace Lux
 {

@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include "core/default_allocator.h"
 #include "core/lux.h"
 #include <cstring>
 
@@ -9,55 +10,62 @@ namespace Lux
 {
 	
 
-template <class T>
+template <class T, typename Allocator = DefaultAllocator>
 class base_string
 {
 	public:
-		static base_string<T> create(unsigned int length, const char *s)
+		static base_string<T, Allocator> create(unsigned int length, const char *s)
 		{
-			return base_string<T>(s);
+			return base_string<T, Allocator>(s);
+		}
+
+		base_string(const Allocator& allocator)
+			: m_allocator(allocator)
+		{
+			m_cstr = NULL;
+			m_size = 0;
 		}
 
 		base_string()
 		{
-			m_cstr = 0;
+			m_cstr = NULL;
 			m_size = 0;
 		}
 
-		base_string(const base_string<T>& rhs, int start, size_t length)
+		base_string(const base_string<T, Allocator>& rhs, int start, size_t length)
 		{
 			m_size = length - start <= rhs.m_size ? length : rhs.m_size - start;
-			m_cstr = new T[m_size + 1];
+			m_cstr = (T*)m_allocator.allocate((m_size + 1) * sizeof(T));
 			memcpy(m_cstr, rhs.m_cstr + start, m_size * sizeof(T));
 			m_cstr[m_size] = 0;
 		}
 		
-		base_string(const base_string<T>& rhs)
+		base_string(const base_string<T, Allocator>& rhs)
 		{
-			m_cstr = new T[rhs.m_size+1];
+			m_cstr = (T*)m_allocator.allocate((rhs.m_size + 1) * sizeof(T));
 			m_size = rhs.m_size;
 			memcpy(m_cstr, rhs.m_cstr, m_size * sizeof(T));
 			m_cstr[m_size] = 0;
 		}
 
-		base_string(const T* rhs)
+		explicit base_string(const T* rhs)
 		{
 			m_size = strlen(rhs);
-			m_cstr = new T[m_size + 1];
+			m_cstr = (T*)m_allocator.allocate((m_size + 1) * sizeof(T));
 			memcpy(m_cstr, rhs, sizeof(T) * (m_size + 1));
 		}
 
 		~base_string()
 		{
-			delete[] m_cstr;
+			m_allocator.deallocate(m_cstr, m_size + 1);
 		}
 
-		void operator = (const base_string<T>& rhs) 
+		void operator = (const base_string<T, Allocator>& rhs) 
 		{
 			if(&rhs != this)
 			{
-				delete[] m_cstr;
-				m_cstr = new T[rhs.m_size + 1];
+				m_allocator.deallocate(m_cstr, m_size + 1);
+				m_cstr = (T*)m_allocator.allocate((rhs.m_size + 1) * sizeof(T));
 				m_size = rhs.m_size;
 				memcpy(m_cstr, rhs.m_cstr, sizeof(T) * (m_size + 1));
 			}
@@ -65,18 +73,23 @@ class base_string
 
 		void operator = (const T* rhs) 
 		{
-			delete[] m_cstr;
+			m_allocator.deallocate(m_cstr, m_size + 1);
 			m_size = strlen(rhs);
-			m_cstr = new T[m_size + 1];
+			m_cstr = (T*)m_allocator.allocate((m_size + 1) * sizeof(T));
 			memcpy(m_cstr, rhs, sizeof(T) * (m_size + 1));
 		}
 
-		bool operator !=(const base_string<T>& rhs) const
+		bool operator !=(const base_string<T, Allocator>& rhs) const
 		{
 			return this->strcmp(rhs.m_cstr) != 0;
 		}
 
-		bool operator ==(const base_string<T>& rhs) const
+		bool operator !=(const T* rhs) const
+		{
+			return this->strcmp(rhs) != 0;
+		}
+
+		bool operator ==(const base_string<T, Allocator>& rhs) const
 		{
 			return this->strcmp(rhs.m_cstr) == 0;
 		}
@@ -86,12 +99,12 @@ class base_string
 			return this->strcmp(rhs) == 0;
 		}
 
-		bool operator <(const base_string<T>& rhs) const
+		bool operator <(const base_string<T, Allocator>& rhs) const
 		{
 			return this->strcmp(rhs.m_cstr) < 0;
 		}
 
-		bool operator >(const base_string<T>& rhs) const
+		bool operator >(const base_string<T, Allocator>& rhs) const
 		{
 			return this->strcmp(rhs.m_cstr) > 0;
 		}
@@ -110,42 +123,44 @@ class base_string
 
 		const T* c_str() const { return m_cstr; }
 		
-		base_string<T> substr(int start, int length) const
+		base_string<T, Allocator> substr(int start, int length) const
 		{
-			return base_string<T>(*this, start, length);
+			return base_string<T, Allocator>(*this, start, length);
 		}
 		
 		void operator += (const T* rhs)
 		{
 			if(m_cstr)
 			{
+				size_t old_size = m_size;
 				m_size += base_string<T>::strlen(rhs);
 				T* newStr = new T[m_size+1];
 				base_string<T>::strcpy(newStr, m_cstr);
 				base_string<T>::strcat(newStr, rhs);
-				delete[] m_cstr;
+				m_allocator.deallocate(m_cstr, old_size + 1);
 				m_cstr = newStr;
 			}
 			else
 			{
 				m_size = base_string<T>::strlen(rhs);
-				T* newStr = new T[m_size+1];
+				T* newStr = (T*)m_allocator.allocate(m_size + 1);
 				base_string<T>::strcpy(newStr, rhs);
 				m_cstr = newStr;
 			}
 		}
 
-		void operator += (const base_string<T>& rhs)
+		void operator += (const base_string<T, Allocator>& rhs)
 		{
+			size_t old_size = m_size;
 			m_size += rhs.m_size;
-			T* newStr = new T[m_size];
+			T* newStr = m_allocator.deallocate(m_cstr, m_size + 1);
 			base_string<T>::strcpy(newStr, m_cstr);
 			base_string<T>::strcat(newStr, rhs.m_cstr);
-			delete[] m_cstr;
+			m_allocator.deallocate(m_cstr, old_size + 1);
 			m_cstr = newStr;
 		}
 
-		base_string<T> operator +(const base_string<T>& rhs)
+		base_string<T> operator +(const base_string<T, Allocator>& rhs)
 		{
 			base_string<T> ret = *this;
 			ret += rhs;
@@ -217,6 +232,7 @@ class base_string
 	private:
 		size_t m_size;
 		T*	m_cstr;
+		Allocator m_allocator;
 };
 
 

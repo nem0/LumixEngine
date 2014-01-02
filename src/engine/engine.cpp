@@ -6,7 +6,7 @@
 #include "animation/animation_system.h"
 #include "engine/plugin_manager.h"
 #include "graphics/renderer.h"
-#include "platform/input_system.h"
+#include "core/input_system.h"
 #include "script/script_system.h"
 
 #include "core/file_system.h"

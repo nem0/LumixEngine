@@ -49,12 +49,12 @@ struct PhysicsSceneImpl
 	physx::PxScene*					m_scene;
 	PhysicsSystem*					m_system;
 	physx::PxMaterial*				m_default_material;
-	vector<physx::PxRigidActor*>	m_actors;
-	vector<string>					m_shape_sources;
-	vector<bool>					m_is_dynamic;
-	vector<Entity>					m_entities;
-	vector<int>						m_index_map;
-	vector<Controller>				m_controllers;
+	PODArray<physx::PxRigidActor*>	m_actors;
+	Array<string>					m_shape_sources;
+	PODArray<bool>					m_is_dynamic;
+	PODArray<Entity>				m_entities;
+	PODArray<int>					m_index_map;
+	PODArray<Controller>			m_controllers;
 	PhysicsScene*					m_owner;
 };
 
@@ -230,7 +230,7 @@ Component PhysicsScene::createController(Entity entity)
 	c.m_controller = m_impl->m_system->m_impl->m_controller_manager->createController(*m_impl->m_system->m_impl->m_physics, m_impl->m_scene, cDesc);
 	c.m_entity = entity;
 
-	m_impl->m_controllers.push_back(c);
+	m_impl->m_controllers.push(c);
 	
 	Component cmp(entity, controller_type, this, m_impl->m_controllers.size() - 1);
 	m_impl->m_universe->getEventManager()->emitEvent(ComponentEvent(cmp));
@@ -251,10 +251,10 @@ Component PhysicsScene::createBoxRigidActor(Entity entity)
 	}
 	if(new_index == m_impl->m_entities.size())
 	{
-		m_impl->m_actors.push_back(0);
-		m_impl->m_shape_sources.push_back("");
-		m_impl->m_is_dynamic.push_back(false);
-		m_impl->m_entities.push_back(entity);
+		m_impl->m_actors.push(0);
+		m_impl->m_shape_sources.push(string(""));
+		m_impl->m_is_dynamic.push(false);
+		m_impl->m_entities.push(entity);
 	}
 	else
 	{
@@ -401,9 +401,9 @@ void PhysicsSceneImpl::createTriMesh(const char* path, physx::PxTriangleMeshGeom
 	fopen_s(&fp, path, "rb");
 	if(fp)
 	{
-		vector<Vec3> verts;
+		PODArray<Vec3> verts;
 		int num_verts, num_indices;
-		vector<uint32_t> tris;
+		PODArray<uint32_t> tris;
 
 		fread(&num_verts, sizeof(num_verts), 1, fp);
 		verts.resize(num_verts);
@@ -439,9 +439,8 @@ void PhysicsSceneImpl::createConvexGeom(const char* path, physx::PxConvexMeshGeo
 		fseek(fp, 0, SEEK_END);
 		long size = ftell(fp);
 		fseek(fp, 0, SEEK_SET);
-		vector<Vec3> vertices;
-		vertices.reserve(size / sizeof(Vec3));
-		vertices.set_size(size / sizeof(Vec3));
+		PODArray<Vec3> vertices;
+		vertices.resize(size / sizeof(Vec3));
 		fread(&vertices[0], size, 1, fp);
 		fclose(fp);
 		physx::PxConvexMeshDesc meshDesc;
@@ -555,7 +554,7 @@ void PhysicsSceneImpl::handleEvent(Event& event)
 	if(event.getType() == EntityMovedEvent::type)
 	{
 		Entity& e = static_cast<EntityMovedEvent&>(event).entity;
-		const vector<Component>& cmps = e.getComponents();
+		const Entity::ComponentList& cmps = e.getComponents();
 		for(int i = 0, c = cmps.size(); i < c; ++i)
 		{
 			if(cmps[i].type == box_rigid_actor_type)

@@ -2,10 +2,14 @@
 #include <cstdio>
 #include <Windows.h>
 #include <gl/GL.h>
+#include "core/array.h"
+#include "core/file_system.h"
+#include "core/ifile.h"
 #include "core/map.h"
+#include "core/pod_array.h"
 #include "core/string.h"
 #include "core/vec3.h"
-#include "core/vector.h"
+#include "gui/block.h"
 #include "gui/texture_base.h"
 
 
@@ -44,11 +48,13 @@ namespace UI
 		};
 
 		TextureBase* getImage(const char* name);
+		static void fontLoaded(FS::IFile* file, bool success, void* user_data);
 
 		map<char, Character> m_characters;
-		vector<TextureBase*> m_images;
+		PODArray<TextureBase*> m_images;
 		OpenGLTexture* m_font_image;
 		int m_window_height;
+		PODArray<Block::Area> m_scissors_areas;
 	};
 
 	#pragma pack(1) 
@@ -186,13 +192,14 @@ namespace UI
 	}
 
 
-	void OpenGLRenderer::beginRender()
+	void OpenGLRenderer::beginRender(float w, float h)
 	{
+		m_impl->m_scissors_areas.clear();
 		glColor3f(1, 1, 1);
 		glEnable(GL_SCISSOR_TEST);
 		glMatrixMode(GL_PROJECTION);
 		glLoadIdentity();
-		glOrtho(0, 800, 600, 0, -1, 1);
+		glOrtho(0, w, h, 0, -1, 1);
 		glMatrixMode(GL_MODELVIEW);
 		glLoadIdentity();
 	}
@@ -214,7 +221,7 @@ namespace UI
 			if(m_impl->m_characters.find(*c, character))
 			{
 				width += character.x_advance;
-				height = max(height, character.pixel_h);
+				height = Math::max(height, character.pixel_h);
 			}
 			++c;
 		}
@@ -222,11 +229,46 @@ namespace UI
 		*h = height;
 	}
 
-	void OpenGLRenderer::setScissorArea(int left, int top, int right, int bottom)
+	void OpenGLRenderer::pushScissorArea(float left, float top, float right, float bottom)
 	{
-		glScissor(left, m_impl->m_window_height - bottom, right - left, bottom - top);
+		Block::Area r;
+		r.left = left;
+		r.top = top;
+		r.right = right;
+		r.bottom = bottom;
+		if(m_impl->m_scissors_areas.empty())
+		{
+			r.rel_left = left;
+			r.rel_top = top;
+			r.rel_right = right;
+			r.rel_bottom = bottom;
+			glEnable(GL_SCISSOR_TEST);
+		}
+		else
+		{
+			Block::Area& parent_area = m_impl->m_scissors_areas.back();
+			r.rel_left = Math::max(left, parent_area.rel_left);
+			r.rel_top = Math::max(top, parent_area.rel_top);
+			r.rel_right = Math::min(right, parent_area.rel_right);
+			r.rel_bottom = Math::min(bottom, parent_area.rel_bottom);
+		}
+		glScissor((int)r.rel_left, (int)(m_impl->m_window_height - r.rel_bottom), (int)(r.rel_right - r.rel_left), (int)(r.rel_bottom - r.rel_top));
+		m_impl->m_scissors_areas.push(r);
 	}
 
+	void OpenGLRenderer::popScissorArea()
+	{
+		m_impl->m_scissors_areas.pop();
+		if(m_impl->m_scissors_areas.empty())
+		{
+			glDisable(GL_SCISSOR_TEST);
+		}
+		else
+		{
+			Block::Area& r = m_impl->m_scissors_areas.back();
+			glScissor((int)r.rel_left, (int)(m_impl->m_window_height - r.rel_bottom), (int)(r.rel_right - r.rel_left), (int)(r.rel_bottom - r.rel_top));
+		}
+	}
 
 	void OpenGLRenderer::renderText(const char* text, float x, float y, float z)
 	{
@@ -240,8 +282,8 @@ namespace UI
 			void set(float _x, float _y) { x = _x; y = _y; }
 			float x, y;
 		};
-		static vector<Vec3> verts;
-		static vector<Vec2> uvs;
+		static PODArray<Vec3> verts;
+		static PODArray<Vec2> uvs;
 		int len = strlen(text);
 		verts.resize(len * 6);
 		uvs.resize(len * 6);
@@ -251,33 +293,45 @@ namespace UI
 		while(*c)
 		{
 			OpenGLRendererImpl::Character character;
-			m_impl->m_characters.find(*c, character);
-			float cur_y = y + character.y_offset;
-			verts[i*6].set(cur_x, cur_y, z);
-			verts[i*6+1].set(cur_x, cur_y + character.pixel_h, z);
-			verts[i*6+2].set(cur_x + character.pixel_w, cur_y + character.pixel_h, z);
+			if(m_impl->m_characters.find(*c, character))
+			{
+				float cur_y = y + character.y_offset;
+				verts[i*6].set(cur_x, cur_y, z);
+				verts[i*6+1].set(cur_x, cur_y + character.pixel_h, z);
+				verts[i*6+2].set(cur_x + character.pixel_w, cur_y + character.pixel_h, z);
 			
-			verts[i*6+3].set(cur_x, cur_y, z);
-			verts[i*6+4].set(cur_x + character.pixel_w, cur_y + character.pixel_h, z);
-			verts[i*6+5].set(cur_x + character.pixel_w, cur_y, z);
+				verts[i*6+3].set(cur_x, cur_y, z);
+				verts[i*6+4].set(cur_x + character.pixel_w, cur_y + character.pixel_h, z);
+				verts[i*6+5].set(cur_x + character.pixel_w, cur_y, z);
 			
-			cur_x += character.x_advance;
+				cur_x += character.x_advance;
 
-			uvs[i*6].set(character.left, character.top);
-			uvs[i*6+1].set(character.left, character.bottom);
-			uvs[i*6+2].set(character.right, character.bottom);
+				uvs[i*6].set(character.left, character.top);
+				uvs[i*6+1].set(character.left, character.bottom);
+				uvs[i*6+2].set(character.right, character.bottom);
 			
-			uvs[i*6+3].set(character.left, character.top);
-			uvs[i*6+4].set(character.right, character.bottom);
-			uvs[i*6+5].set(character.right, character.top);
-
+				uvs[i*6+3].set(character.left, character.top);
+				uvs[i*6+4].set(character.right, character.bottom);
+				uvs[i*6+5].set(character.right, character.top);
+				++i;
+			}
 			++c;
-			++i;
 		}
 		glEnable(GL_BLEND);
 		glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		renderImage(m_impl->m_font_image, &verts[0].x, &uvs[0].x, verts.size());
 		
+	}
+
+	bool readLine(FS::IFile* file, char buffer[], int max_size)
+	{
+		int i = 0;
+		while(file->read(buffer + i, 1) && buffer[i] != '\n' && buffer[i] != '\0' && i < max_size - 1)
+		{
+			++i;
+		}
+		buffer[i+1] = 0;
+		return buffer[i] == '\n' || buffer[i] == '\0' || i == max_size - 1;
 	}
 
 	const char* getFirstNumberPos(const char* str)
@@ -301,63 +355,64 @@ namespace UI
 	}
 
 
+	void OpenGLRendererImpl::fontLoaded(FS::IFile* file, bool success, void* user_data)
+	{
+		if(success)
+		{
+			char line[255];
+			OpenGLRendererImpl* that = static_cast<OpenGLRendererImpl*>(user_data);
+			while(readLine(file, line, 255) && strncmp(line, "chars count", 11) != 0);
+			if(strncmp(line, "chars count", 11) == 0)
+			{
+				int count;
+				sscanf_s(getFirstNumberPos(line), "%d", &count);
+				for(int i = 0; i < count; ++i)
+				{
+					readLine(file, line, 255);
+					const char* c = getFirstNumberPos(line);
+					int id;
+					sscanf_s(c, "%d", &id);
+					OpenGLRendererImpl::Character character;
+					int tmp;
+					c = getNextNumberPos(c);
+					sscanf_s(c, "%d", &tmp);
+					character.left = (float)tmp / that->m_font_image->getWidth();
+					c = getNextNumberPos(c);
+					sscanf_s(c, "%d", &tmp);
+					character.top = (float)tmp / that->m_font_image->getHeight();
+					c = getNextNumberPos(c);
+					sscanf_s(c, "%d", &tmp);
+					character.pixel_w = (float)tmp;
+					c = getNextNumberPos(c);
+					sscanf_s(c, "%d", &tmp);
+					character.pixel_h = (float)tmp;
+					character.right = character.left + character.pixel_w / that->m_font_image->getWidth();
+					character.bottom = character.top + character.pixel_h / that->m_font_image->getHeight();
+					c = getNextNumberPos(c);
+					sscanf_s(c, "%d", &tmp);
+					character.x_offset = (float)tmp;
+					c = getNextNumberPos(c);
+					sscanf_s(c, "%d", &tmp);
+					character.y_offset = (float)tmp;
+					c = getNextNumberPos(c);
+					sscanf_s(c, "%d", &tmp);
+					character.x_advance = (float)tmp;
+					that->m_characters.insert((char)id, character);
+				}
+			}
+		}
+		file->close();
+	}
 
-	bool OpenGLRenderer::loadFont(const char* path)
+
+	void OpenGLRenderer::loadFont(const char* path, FS::FileSystem& file_system)
 	{
 		m_impl->m_font_image = static_cast<OpenGLTexture*>(loadImage(path));
 		char tmp[255];
 		strcpy_s(tmp, path);
 		int len = strlen(tmp);
 		strcpy_s(tmp + len - 4, 255 - len + 4, ".fnt");
-		FILE* fp;
-		fopen_s(&fp, tmp, "r");
-		char line[255];
-		fgets(line, 255, fp);
-		while(!feof(fp) && strncmp(line, "chars count", 11) != 0)
-		{
-			fgets(line, 255, fp);
-
-		}
-		if(strncmp(line, "chars count", 11) == 0)
-		{
-			int count;
-			sscanf_s(getFirstNumberPos(line), "%d", &count);
-			for(int i = 0; i < count; ++i)
-			{
-				fgets(line, 255, fp);
-				const char* c = getFirstNumberPos(line);
-				int id;
-				sscanf_s(c, "%d", &id);
-				OpenGLRendererImpl::Character character;
-				int tmp;
-				c = getNextNumberPos(c);
-				sscanf_s(c, "%d", &tmp);
-				character.left = (float)tmp / m_impl->m_font_image->getWidth();
-				c = getNextNumberPos(c);
-				sscanf_s(c, "%d", &tmp);
-				character.top = (float)tmp / m_impl->m_font_image->getHeight();
-				c = getNextNumberPos(c);
-				sscanf_s(c, "%d", &tmp);
-				character.pixel_w = (float)tmp;
-				c = getNextNumberPos(c);
-				sscanf_s(c, "%d", &tmp);
-				character.pixel_h = (float)tmp;
-				character.right = character.left + character.pixel_w / m_impl->m_font_image->getWidth();
-				character.bottom = character.top + character.pixel_h / m_impl->m_font_image->getHeight();
-				c = getNextNumberPos(c);
-				sscanf_s(c, "%d", &tmp);
-				character.x_offset = (float)tmp;
-				c = getNextNumberPos(c);
-				sscanf_s(c, "%d", &tmp);
-				character.y_offset = (float)tmp;
-				c = getNextNumberPos(c);
-				sscanf_s(c, "%d", &tmp);
-				character.x_advance = (float)tmp;
-				m_impl->m_characters.insert((char)id, character);
-			}
-		}
-		fclose(fp);
-		return false;
+		file_system.openAsync(file_system.getDefaultDevice(), tmp, FS::Mode::OPEN | FS::Mode::READ, &OpenGLRendererImpl::fontLoaded, m_impl);
 	}
 
 

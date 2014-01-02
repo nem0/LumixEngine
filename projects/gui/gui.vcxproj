@@ -86,34 +86,46 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\gui\atlas.h" />
-    <ClInclude Include="..\..\src\gui\button.h" />
-    <ClInclude Include="..\..\src\gui\check_box.h" />
+    <ClInclude Include="..\..\src\gui\controls\button.h" />
+    <ClInclude Include="..\..\src\gui\controls\check_box.h" />
+    <ClInclude Include="..\..\src\gui\controls\dockable.h" />
+    <ClInclude Include="..\..\src\gui\controls\menu_bar.h" />
+    <ClInclude Include="..\..\src\gui\controls\menu_item.h" />
+    <ClInclude Include="..\..\src\gui\controls\scrollable.h" />
+    <ClInclude Include="..\..\src\gui\controls\scrollbar.h" />
+    <ClInclude Include="..\..\src\gui\controls\tab_block.h" />
+    <ClInclude Include="..\..\src\gui\controls\text_box.h" />
     <ClInclude Include="..\..\src\gui\decorators\box_decorator.h" />
     <ClInclude Include="..\..\src\gui\decorators\check_box_decorator.h" />
+    <ClInclude Include="..\..\src\gui\decorators\dockable_decorator.h" />
+    <ClInclude Include="..\..\src\gui\decorators\scrollbar_decorator.h" />
     <ClInclude Include="..\..\src\gui\decorators\text_decorator.h" />
     <ClInclude Include="..\..\src\gui\decorator_base.h" />
     <ClInclude Include="..\..\src\gui\gui.h" />
     <ClInclude Include="..\..\src\gui\block.h" />
     <ClInclude Include="..\..\src\gui\irenderer.h" />
-    <ClInclude Include="..\..\src\gui\menu_bar.h" />
-    <ClInclude Include="..\..\src\gui\menu_item.h" />
     <ClInclude Include="..\..\src\gui\texture_base.h" />
     <ClInclude Include="..\..\src\gui\opengl_renderer.h" />
-    <ClInclude Include="..\..\src\gui\text_box.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\gui\atlas.cpp" />
     <ClCompile Include="..\..\src\gui\block.cpp" />
-    <ClCompile Include="..\..\src\gui\button.cpp" />
-    <ClCompile Include="..\..\src\gui\check_box.cpp" />
+    <ClCompile Include="..\..\src\gui\controls\button.cpp" />
+    <ClCompile Include="..\..\src\gui\controls\check_box.cpp" />
+    <ClCompile Include="..\..\src\gui\controls\dockable.cpp" />
+    <ClCompile Include="..\..\src\gui\controls\menu_bar.cpp" />
+    <ClCompile Include="..\..\src\gui\controls\menu_item.cpp" />
+    <ClCompile Include="..\..\src\gui\controls\scrollable.cpp" />
+    <ClCompile Include="..\..\src\gui\controls\scrollbar.cpp" />
+    <ClCompile Include="..\..\src\gui\controls\tab_block.cpp" />
+    <ClCompile Include="..\..\src\gui\controls\text_box.cpp" />
     <ClCompile Include="..\..\src\gui\decorators\box_decorator.cpp" />
     <ClCompile Include="..\..\src\gui\decorators\check_box_decorator.cpp" />
+    <ClCompile Include="..\..\src\gui\decorators\dockable_decorator.cpp" />
+    <ClCompile Include="..\..\src\gui\decorators\scrollbar_decorator.cpp" />
     <ClCompile Include="..\..\src\gui\decorators\text_decorator.cpp" />
     <ClCompile Include="..\..\src\gui\gui.cpp" />
-    <ClCompile Include="..\..\src\gui\menu_bar.cpp" />
-    <ClCompile Include="..\..\src\gui\menu_item.cpp" />
     <ClCompile Include="..\..\src\gui\opengl_renderer.cpp" />
-    <ClCompile Include="..\..\src\gui\text_box.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

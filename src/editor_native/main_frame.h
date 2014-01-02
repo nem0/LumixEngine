@@ -2,6 +2,7 @@
 
 
 #include "core/string.h"
+#include "gui/controls/dockable.h"
 
 
 namespace Lux
@@ -20,20 +21,27 @@ namespace Lux
 }
 
 
-class MainFrame
+class MainFrame : public Lux::UI::Block
 {
 	public:
-		bool create(Lux::EditorClient& client, Lux::UI::Gui& gui, float width, float height);
+		MainFrame(Lux::EditorClient& client, Lux::UI::Gui& gui, Lux::UI::Block* parent);
+		void update();
 		Lux::UI::Gui& getGui() { return *m_gui; }
-		Lux::UI::Block& getUI() { return *m_ui; }
 		Lux::EditorClient* getEditorClient() const { return m_editor_client; }
 		Lux::string& getStartupDirectory() { return m_startup_directory; }
+		Lux::UI::Dockable& getDockable() { return *m_dockable; }
 
 	private:
-		Lux::UI::Block* m_ui;
+		void scriptCompiled(const char* path, uint32_t exit_code);
+
+	private:
 		Lux::UI::Gui* m_gui;
 		Lux::EditorClient* m_editor_client;
 		Lux::string m_startup_directory;
 		class PropertyFrame* m_property_frame;
 		class MainMenu* m_main_menu;
+		class LogUI* m_log_ui;
+		class ScriptCompiler* m_script_compiler; 
+		class Notifications* m_notifications;
+		Lux::UI::Dockable* m_dockable;
 };

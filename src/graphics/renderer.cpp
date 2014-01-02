@@ -9,6 +9,7 @@
 #include "core/ifile_system_defines.h"
 #include "core/json_serializer.h"
 #include "core/matrix.h"
+#include "core/pod_array.h"
 #include "core/quat.h"
 #include "core/vec3.h"
 #include "gl/GL.h"
@@ -37,9 +38,15 @@ static const Component::Type rend_type = crc32("renderable");
 static const Component::Type point_light_type = crc32("point_light");
 
 
+struct LoadInfo
+{
+    RendererImpl* m_renderer;
+    H3DRes m_res;
+};
+
+
 struct RenderNode
 {
-	RenderNode() {}
 	H3DNode m_node;
 	int m_entity;
 };
@@ -56,10 +63,10 @@ struct RendererImpl
 
 	int					m_width;
 	int					m_height;
-	vector<RenderNode>	m_lights;
-	vector<RenderNode>	m_renderables;
-	vector<string>		m_paths;
-	vector<Entity>		m_entities;
+	PODArray<RenderNode>	m_lights;
+	PODArray<RenderNode>	m_renderables;
+	Array<string>		m_paths;
+	PODArray<Entity>	m_entities;
 	H3DRes				m_pipeline_handle;
 	Universe*			m_universe;
 	H3DNode				m_camera_node;
@@ -67,7 +74,6 @@ struct RendererImpl
 	int					m_first_free_light;
 	string				m_base_path;
 	FS::FileSystem*		m_file_system;
-	H3DRes				m_loading_res;
 	Renderer*			m_owner;
 	bool				m_update_bb;
 	bool				m_is_pipeline_loaded;
@@ -99,44 +105,15 @@ void RendererImpl::onResize(int w, int h)
 }
 
 
-void resourceLoaded(void* user_data, char* file_data, int length, bool success)
-{
-	RendererImpl* renderer = static_cast<RendererImpl*>(user_data);
-	if(success)
-	{
-		renderer->m_update_bb = true;
-		h3dLoadResource(renderer->m_loading_res, file_data, length);
-		if(renderer->m_loading_res == renderer->m_pipeline_handle)
-		{
-			h3dResizePipelineBuffers(renderer->m_pipeline_handle, renderer->m_width, renderer->m_height);
-	//		h3dSetOption( H3DOptions::DebugViewMode, 1 );
-			h3dSetOption( H3DOptions::LoadTextures, 1 );
-			h3dSetOption( H3DOptions::TexCompression, 0 );
-			h3dSetOption( H3DOptions::FastAnimation, 0 );
-			h3dSetOption( H3DOptions::MaxAnisotropy, 4 );
-			h3dSetOption( H3DOptions::ShadowMapSize, 512 );
-
-			renderer->m_camera_node = h3dAddCameraNode(H3DRootNode, "", renderer->m_pipeline_handle);
-			renderer->onResize(renderer->m_width, renderer->m_height);
-			renderer->m_is_pipeline_loaded = false;
-		}
-		renderer->m_loading_res = 0;
-		renderer->loadResources();
-	}
-	else
-	{
-		h3dLoadResource(renderer->m_loading_res, 0, 0);
-	}
-}
-
 void resourceLoaded(FS::IFile* file, bool success, void* user_data)
 {
-	RendererImpl* renderer = static_cast<RendererImpl*>(user_data);
+	LoadInfo* info = static_cast<LoadInfo*>(user_data);
+	RendererImpl* renderer = info->m_renderer;
 	if(success)
 	{
 		renderer->m_update_bb = true;
-		h3dLoadResource(renderer->m_loading_res, (const char*)file->getBuffer(), file->size());
-		if(renderer->m_loading_res == renderer->m_pipeline_handle)
+		h3dLoadResource(info->m_res, (const char*)file->getBuffer(), file->size());
+		if(info->m_res == renderer->m_pipeline_handle)
 		{
 			h3dResizePipelineBuffers(renderer->m_pipeline_handle, renderer->m_width, renderer->m_height);
 	//		h3dSetOption( H3DOptions::DebugViewMode, 1 );
@@ -150,13 +127,12 @@ void resourceLoaded(FS::IFile* file, bool success, void* user_data)
 			renderer->onResize(renderer->m_width, renderer->m_height);
 			renderer->m_is_pipeline_loaded = true;
 		}
-		renderer->m_loading_res = 0;
 		renderer->loadResources();
 		file->close();
 	}
 	else
 	{
-		h3dLoadResource(renderer->m_loading_res, 0, 0);
+		h3dLoadResource(info->m_res, 0, 0);
 	}
 }
 
@@ -185,11 +161,14 @@ void RendererImpl::loadResources()
 {
 	H3DRes res = h3dQueryUnloadedResource(0);
 	char path[255]; /// TODO 255 -> platform constant
-	if(res != 0 && res != m_loading_res)
+	if(res != 0)
 	{
-		m_loading_res = res;
+		h3dLoadResource(res, NULL, 0);
 		sprintf_s(path, "%s%s/%s", m_base_path.c_str(), h3dutGetResourcePath(h3dGetResType(res)), h3dGetResName(res));
-		m_file_system->openAsync(m_file_system->getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, &resourceLoaded, this);
+		LoadInfo* info = new LoadInfo();
+		info->m_renderer = this;
+		info->m_res = res;		
+		m_file_system->openAsync(m_file_system->getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, &resourceLoaded, info);
 	}
 }
 
@@ -473,10 +452,10 @@ Component Renderer::createRenderable(Entity entity)
 	int index = -1;
 	if(m_impl->m_first_free_renderable == -1)
 	{
-		m_impl->m_renderables.push_back_empty();
+		m_impl->m_renderables.pushEmpty();
 		m_impl->m_renderables.back().m_entity = entity.index;
 		m_impl->m_renderables.back().m_node = 0;
-		m_impl->m_paths.push_back("");
+		m_impl->m_paths.push(string(""));
 		index = m_impl->m_renderables.size() - 1;
 	}
 	else
@@ -531,7 +510,7 @@ Component Renderer::createPointLight(Entity entity)
 	int index = -1;
 	if(m_impl->m_first_free_light == -1)
 	{
-		m_impl->m_lights.push_back_empty();
+		m_impl->m_lights.pushEmpty();
 		m_impl->m_lights.back().m_entity = entity.index;
 		index = m_impl->m_lights.size() - 1;
 	}

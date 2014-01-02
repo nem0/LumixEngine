@@ -1,7 +1,7 @@
 #include "engine/plugin_manager.h"
 #include "engine/iplugin.h"
-#include "core/vector.h"
 #include "core/log.h"
+#include "core/pod_array.h"
 #include <Windows.h>
 
 
@@ -9,10 +9,10 @@ namespace Lux
 {
 	struct PluginManagerImpl
 	{
-		typedef vector<IPlugin*> PluginList;
+		typedef PODArray<IPlugin*> PluginList;
 
 		Engine* m_engine;
-		vector<IPlugin*> m_plugins;
+		PluginList m_plugins;
 	};
 
 
@@ -94,7 +94,7 @@ namespace Lux
 					ASSERT(false);
 					return false;
 				}
-				m_impl->m_plugins.push_back(plugin);
+				m_impl->m_plugins.push(plugin);
 				g_log_info.log("plugins", "plugin laoded");
 				return plugin;
 			}
@@ -105,7 +105,7 @@ namespace Lux
 
 	void PluginManager::addPlugin(IPlugin* plugin)
 	{
-		m_impl->m_plugins.push_back(plugin);
+		m_impl->m_plugins.push(plugin);
 	}
 
 	
@@ -119,6 +119,11 @@ namespace Lux
 
 	void PluginManager::destroy()
 	{
+		for(int i = 0; i < m_impl->m_plugins.size(); ++i)
+		{
+			m_impl->m_plugins[i]->destroy();
+			delete m_impl->m_plugins[i];
+		}
 		delete m_impl;
 		m_impl = 0;
 	}

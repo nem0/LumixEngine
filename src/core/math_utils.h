@@ -4,6 +4,14 @@
 #include "core/lux.h"
 #include "core/vec3.h"
 
+#ifdef max
+#undef max
+#endif
+
+#ifdef min
+#undef min
+#endif
+
 
 namespace Lux
 {

@@ -178,6 +178,62 @@ namespace Lux
 		private:
 			Stub m_stub;
 	}; 
+
+	template <typename R, typename A0, typename A1, typename A2, typename A3>
+	class Delegate<R (A0, A1, A2, A3)> 
+	{
+		private:
+			typedef void* InstancePtr;
+			typedef R (*InternalFunction)(InstancePtr, A0, A1, A2, A3);
+			struct Stub { InstancePtr first; InternalFunction second; };
+
+			template <R (*Function)(A0, A1, A2, A3)>
+			static LUX_FORCE_INLINE R FunctionStub(InstancePtr, A0 a0, A1 a1, A2 a2, A3 a3)
+			{
+				return (Function)(a0, a1, a2, a3);
+			}
+
+			template <class C, R (C::*Function)(A0, A1, A2, A3)>
+			static LUX_FORCE_INLINE R ClassMethodStub(InstancePtr instance, A0 a0, A1 a1, A2 a2, A3 a3)
+			{
+				return (static_cast<C*>(instance)->*Function)(a0, a1, a2, a3);
+			}
+
+		public:
+			Delegate(void)
+			{
+				m_stub.first = NULL;
+				m_stub.second = NULL;
+			}
+
+			template <R (*Function)(A0, A1, A2, A3)>
+			void bind(void)
+			{
+				m_stub.first = nullptr;
+				m_stub.second = &FunctionStub<Function>;
+			}
+
+			template <class C, R (C::*Function)(A0, A1, A2, A3)>
+			void bind(C* instance)
+			{
+				m_stub.first = instance;
+				m_stub.second = &ClassMethodStub<C, Function>;
+			}
+
+			R invoke(A0 a0, A1 a1, A2 a2, A3 a3) const
+			{
+				ASSERT(m_stub.second != NULL);
+				return m_stub.second(m_stub.first, a0, a1, a2, a3);
+			}
+
+			bool operator ==(const Delegate<R (A0, A1, A2, A3)>& rhs)
+			{
+				return m_stub.first == rhs.m_stub.first && m_stub.second == rhs.m_stub.second;
+			}
+
+		private:
+			Stub m_stub;
+	}; 
 }
 
 
