@@ -82,6 +82,8 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\delegate.h" />
     <ClInclude Include="..\..\src\core\blob.h" />
+    <ClInclude Include="..\..\src\core\free_list.h" />
+    <ClInclude Include="..\..\src\core\array.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="FS">
