@@ -1,8 +1,8 @@
 #include "core/tcp_file_server.h"
 
+#include "core/array.h"
 #include "core/free_list.h"
 #include "core/tcp_file_device.h"
-#include "core/vector.h"
 #include "platform/task.h"
 #include "platform/tcp_acceptor.h"
 #include "platform/tcp_stream.h"
@@ -20,19 +20,14 @@ namespace Lux
 
 			int task()
 			{
-				char buffer[1024];
+				Array<char, 1024> buffer;
 				bool quit = false;
 
 				m_acceptor.start("127.0.0.1", 10001);
 				Net::TCPStream* stream = m_acceptor.accept();
 
-				vector<OsFile*> files;
-				vector<uint32_t> ids;
-				files.resize(255);
-				ids.resize(255);
-				for(int i = 0; i < 255; i++) ids[i] = i;
-
-				uint32_t rd = 0;
+				Array<OsFile*, 0x8000> files;
+				FreeList<int32_t, 0x8000> ids;
 
 				while(!quit)
 				{
@@ -45,23 +40,26 @@ namespace Lux
 							int32_t mode = 0;
 							int32_t len = 0;
 							stream->read(mode);
-							stream->read(buffer, 1024);
+							stream->read(buffer.data(), buffer.size());
 
-							uint32_t id = ids[rd++];
-							OsFile* file = new OsFile();
-							files[id & 0xFF] = file;
+							int32_t ret = -2;
+							int32_t id = ids.alloc();
+							if(id > 0)
+							{
+								OsFile* file = new OsFile();
+								files[id] = file;
 
-							int32_t ret = file->open(buffer, mode) ? id : -1;
+								ret = file->open(buffer.data(), mode) ? id : -1;
+							}
 							stream->write(ret);
-							//todo: return id as well
 						}
 						break;
 					case TCPCommand::Close:
 						{
 							uint32_t id = -1;
 							stream->read(id);
-							OsFile* file = files[id & 0xFF];
-							ids[--rd] = id;
+							OsFile* file = files[id];
+							ids.release(id);
 
 							file->close();
 							delete file;
@@ -71,16 +69,16 @@ namespace Lux
 						{
 							uint32_t id = -1;
 							stream->read(id);
-							OsFile* file = files[id & 0xFF];
+							OsFile* file = files[id];
 
 							uint32_t size = 0;
 							stream->read(size);
 
 							while(size > 0)
 							{
-								int32_t read = size > 1024 ? 1024 : size;
-								file->read(buffer, read);
-								stream->write(buffer, read);
+								int32_t read = size > buffer.size() ? buffer.size() : size;
+								file->read(buffer.data(), read);
+								stream->write(buffer.data(), read);
 								size -= read;
 							}
 						}
@@ -89,16 +87,16 @@ namespace Lux
 						{
 							uint32_t id = -1;
 							stream->read(id);
-							OsFile* file = files[id & 0xFF];
+							OsFile* file = files[id];
 
 							uint32_t size = 0;
 							stream->read(size);
 
 							while(size > 0)
 							{
-								int32_t read = size > 1024 ? 1024 : size;
-								stream->read((void*)buffer, read);
-								file->write((void*)buffer, read);
+								int32_t read = size > buffer.size() ? buffer.size() : size;
+								stream->read(buffer.data(), read);
+								file->write(buffer.data(), read);
 								size -= read;
 							}
 						}
@@ -107,7 +105,7 @@ namespace Lux
 						{
 							uint32_t id = -1;
 							stream->read(id);
-							OsFile* file = files[id & 0xFF];
+							OsFile* file = files[id];
 
 							uint32_t size = file->size();
 							stream->write(size);
@@ -117,7 +115,7 @@ namespace Lux
 						{
 							uint32_t id = -1;
 							stream->read(id);
-							OsFile* file = files[id & 0xFF];
+							OsFile* file = files[id];
 
 							uint32_t base = 0;
 							int32_t offset = 0;
@@ -132,7 +130,7 @@ namespace Lux
 						{
 							uint32_t id = -1;
 							stream->read(id);
-							OsFile* file = files[id & 0xFF];
+							OsFile* file = files[id];
 
 							uint32_t pos = file->pos();
 							stream->write(pos);
