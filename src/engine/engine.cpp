@@ -20,6 +20,7 @@ namespace Lux
 {
 	struct EngineImpl
 	{
+		EngineImpl(Engine& engine) : m_owner(engine) {}
 		bool create(int w, int h, const char* base_path, Engine& owner);
 
 		Renderer m_renderer;
@@ -34,6 +35,7 @@ namespace Lux
 		Universe* m_universe;
 		ScriptSystem m_script_system;
 		InputSystem m_input_system;
+		Engine& m_owner;
 	};
 
 
@@ -70,14 +72,14 @@ namespace Lux
 		{
 			return false;
 		}
-		m_script_system.setRenderer(&m_renderer);			
+		m_script_system.setEngine(m_owner);
 		return true;
 	}
 
 
 	bool Engine::create(int w, int h, const char* base_path, EditorServer* editor_server)
 	{
-		m_impl = new EngineImpl();
+		m_impl = new EngineImpl(*this);
 		m_impl->m_editor_server = editor_server;
 		if(!m_impl->create(w, h, base_path, *this))
 		{

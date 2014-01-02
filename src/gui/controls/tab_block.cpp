@@ -49,7 +49,7 @@ Lux::UI::Block& TabBlock::addPage(const char* title)
 	Block* label = new Block(getGui(), m_header, "_text");
 	label->setArea(0, x, 0, 0, 0, x + 50, 0, 20);
 	label->setBlockText(title);
-	label->getCallback("click").bind<TabBlock, &TabBlock::labelClick>(this);
+	label->onEvent("click").bind<TabBlock, &TabBlock::labelClick>(this);
 
 	Block* content = new Block(getGui(), m_tab_content, NULL);
 	content->setArea(0, 0, 0, 0, 1, 0, 1, 0);

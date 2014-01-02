@@ -22,6 +22,10 @@ namespace UI
 			void toggle() { m_is_checked = !m_is_checked; }
 			void setIsChecked(bool is_checked) { m_is_checked = is_checked; }
 			bool isChecked() const { return m_is_checked; }
+		
+		private:
+			void click(Block& block, void*);
+	
 		private:
 			bool m_is_checked;
 	};

@@ -128,14 +128,19 @@ class map
 			return iterator(0);
 		}
 
+		bool contains(const Key& key)
+		{
+			return _find(key) != NULL;
+		}
+
 		iterator find(const Key& key) const
 		{
 			Node* node = _find(key);
-			if(node != 0 && node->key == key)
+			if(node != NULL && node->key == key)
 			{
 				return iterator(node);
 			}
-			return iterator(0);
+			return iterator(NULL);
 		}
 
 
