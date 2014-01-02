@@ -23,7 +23,7 @@ namespace Lux
 			virtual size_t size() = 0;
 
 			virtual size_t seek(SeekMode base, int32_t pos) = 0;
-			virtual size_t pos() const = 0;
+			virtual size_t pos() = 0;
 		};
 
 	} // ~namespace FS

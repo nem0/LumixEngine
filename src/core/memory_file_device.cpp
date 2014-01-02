@@ -138,7 +138,7 @@ namespace Lux
 				return m_pos;
 			}
 
-			virtual size_t pos() const LUX_OVERRIDE
+			virtual size_t pos() LUX_OVERRIDE
 			{
 				return m_pos;
 			}
