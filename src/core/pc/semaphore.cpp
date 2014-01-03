@@ -15,9 +15,10 @@ namespace Lux
 			virtual bool poll() LUX_OVERRIDE;
 
 			WinSemaphore(int init_count, int max_count);
-			~WinSemaphore();
 
 		private:
+			~WinSemaphore();
+
 			HANDLE m_id;
 		};
 
@@ -28,7 +29,7 @@ namespace Lux
 
 		void Semaphore::destroy(Semaphore* semaphore)
 		{
-			LUX_DELETE(static_cast<WinSemaphore*>(semaphore));
+			LUX_DELETE(semaphore);
 		}
 
 		void WinSemaphore::signal()
