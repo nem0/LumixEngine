@@ -48,13 +48,14 @@ namespace UI
 		};
 
 		TextureBase* getImage(const char* name);
-		static void fontLoaded(FS::IFile* file, bool success, void* user_data);
+		void fontLoaded(FS::IFile* file, bool success);
 
 		map<char, Character> m_characters;
 		PODArray<TextureBase*> m_images;
 		OpenGLTexture* m_font_image;
 		int m_window_height;
 		PODArray<Block::Area> m_scissors_areas;
+		FS::ReadCallback m_font_loaded_cb;
 	};
 
 	#pragma pack(1) 
@@ -79,6 +80,7 @@ namespace UI
 	bool OpenGLRenderer::create()
 	{
 		m_impl = new OpenGLRendererImpl();
+		m_impl->m_font_loaded_cb.bind<OpenGLRendererImpl, &OpenGLRendererImpl::fontLoaded>(m_impl);
 		return true;
 	}
 
@@ -355,12 +357,11 @@ namespace UI
 	}
 
 
-	void OpenGLRendererImpl::fontLoaded(FS::IFile* file, bool success, void* user_data)
+	void OpenGLRendererImpl::fontLoaded(FS::IFile* file, bool success)
 	{
 		if(success)
 		{
 			char line[255];
-			OpenGLRendererImpl* that = static_cast<OpenGLRendererImpl*>(user_data);
 			while(readLine(file, line, 255) && strncmp(line, "chars count", 11) != 0);
 			if(strncmp(line, "chars count", 11) == 0)
 			{
@@ -376,18 +377,18 @@ namespace UI
 					int tmp;
 					c = getNextNumberPos(c);
 					sscanf_s(c, "%d", &tmp);
-					character.left = (float)tmp / that->m_font_image->getWidth();
+					character.left = (float)tmp / m_font_image->getWidth();
 					c = getNextNumberPos(c);
 					sscanf_s(c, "%d", &tmp);
-					character.top = (float)tmp / that->m_font_image->getHeight();
+					character.top = (float)tmp / m_font_image->getHeight();
 					c = getNextNumberPos(c);
 					sscanf_s(c, "%d", &tmp);
 					character.pixel_w = (float)tmp;
 					c = getNextNumberPos(c);
 					sscanf_s(c, "%d", &tmp);
 					character.pixel_h = (float)tmp;
-					character.right = character.left + character.pixel_w / that->m_font_image->getWidth();
-					character.bottom = character.top + character.pixel_h / that->m_font_image->getHeight();
+					character.right = character.left + character.pixel_w / m_font_image->getWidth();
+					character.bottom = character.top + character.pixel_h / m_font_image->getHeight();
 					c = getNextNumberPos(c);
 					sscanf_s(c, "%d", &tmp);
 					character.x_offset = (float)tmp;
@@ -397,7 +398,7 @@ namespace UI
 					c = getNextNumberPos(c);
 					sscanf_s(c, "%d", &tmp);
 					character.x_advance = (float)tmp;
-					that->m_characters.insert((char)id, character);
+					m_characters.insert((char)id, character);
 				}
 			}
 		}
@@ -412,7 +413,7 @@ namespace UI
 		strcpy_s(tmp, path);
 		int len = strlen(tmp);
 		strcpy_s(tmp + len - 4, 255 - len + 4, ".fnt");
-		file_system.openAsync(file_system.getDefaultDevice(), tmp, FS::Mode::OPEN | FS::Mode::READ, &OpenGLRendererImpl::fontLoaded, m_impl);
+		file_system.openAsync(file_system.getDefaultDevice(), tmp, FS::Mode::OPEN | FS::Mode::READ, m_impl->m_font_loaded_cb);
 	}
 
 

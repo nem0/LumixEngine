@@ -17,7 +17,6 @@ namespace Lux
 			AsyncItem() {}
 
 			IFile* m_file;
-			void* m_user_data;
 			ReadCallback m_cb;
 			Mode m_mode;
 			char m_path[_MAX_PATH];
@@ -133,7 +132,7 @@ namespace Lux
 				return NULL;
 			}
 
-			IFile* openAsync(const char* device_list, const char* file, int mode, ReadCallback call_back, void* user_data) LUX_OVERRIDE
+			IFile* openAsync(const char* device_list, const char* file, int mode, const ReadCallback& call_back) LUX_OVERRIDE
 			{
 				IFile* prev = parseDeviceList(device_list);
 
@@ -142,7 +141,6 @@ namespace Lux
 					AsyncItem& item = m_pending.pushEmpty();
 
 					item.m_file = prev;
-					item.m_user_data = user_data;
 					item.m_cb = call_back;
 					item.m_mode = mode;
 					strcpy(item.m_path, file);
@@ -162,8 +160,7 @@ namespace Lux
 				AsyncItem& item = m_pending.pushEmpty();
 
 				item.m_file = file;
-				item.m_user_data = NULL;
-				item.m_cb = closeAsync;
+				item.m_cb.bind<closeAsync>();
 				item.m_mode = 0;
 				item.m_flags = 0;
 			}
@@ -177,7 +174,7 @@ namespace Lux
 					{
 						m_in_progress.pop();
 
-						tr->data.m_cb(tr->data.m_file, !!tr->data.m_flags & 0x1, tr->data.m_user_data);
+						tr->data.m_cb.invoke(tr->data.m_file, !!tr->data.m_flags & 0x1);
 						m_transaction_queue.dealoc(tr);
 					}
 					else
@@ -194,7 +191,6 @@ namespace Lux
 					{
 						AsyncItem& item = m_pending[0];
 						tr->data.m_file = item.m_file;
-						tr->data.m_user_data = item.m_user_data;
 						tr->data.m_cb = item.m_cb;
 						tr->data.m_mode = item.m_mode;
 						strcpy(tr->data.m_path, item.m_path);
@@ -253,7 +249,7 @@ namespace Lux
 				return prev;
 			}
 
-			static void closeAsync(IFile* file, bool success, void* user_data)
+			static void closeAsync(IFile* file, bool success)
 			{
 				delete file;
 			}
