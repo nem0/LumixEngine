@@ -1,12 +1,13 @@
-#include "gui/opengl_renderer.h"
 #include <cstdio>
 #include <Windows.h>
 #include <gl/GL.h>
+#include "gui/opengl_renderer.h"
 #include "core/array.h"
 #include "core/delegate_list.h"
 #include "core/file_system.h"
 #include "core/ifile.h"
 #include "core/map.h"
+#include "core/math_utils.h"
 #include "core/pod_array.h"
 #include "core/string.h"
 #include "core/vec3.h"
@@ -219,6 +220,73 @@ namespace UI
 		glOrtho(0, w, h, 0, -1, 1);
 		glMatrixMode(GL_MODELVIEW);
 		glLoadIdentity();
+	}
+
+	Block::Area OpenGLRenderer::getCharArea(const char* text, int pos, float max_width)
+	{
+		Block::Area area;
+		if(text)
+		{
+			float width = 0;
+			float height = 0;
+			float prev_h = 0;
+			const char* c = text;
+			bool is_multiline = false;
+			OpenGLRendererImpl::Character character;
+			bool found = false;
+			bool is_some_char = false;
+			while(*c)
+			{
+				if(m_impl->m_characters.find(*c, character))
+				{
+					is_some_char = true;
+					if(c - text == pos)
+					{
+						found = true;
+						area.left = width;
+						area.top = prev_h + character.y_offset;
+						area.right = width + character.x_advance;
+						area.bottom = prev_h + character.pixel_h + character.y_offset;
+						area.rel_bottom = area.rel_left = area.rel_right = area.rel_top = 0;
+						break;
+					}
+					width += character.x_advance;
+					height = Math::max(height, character.pixel_h);
+					if(width > max_width || *c == '\n')
+					{
+						is_multiline = true;
+						width = 0;
+						prev_h += height;
+					}
+				}
+				else if(*c == '\n')
+				{
+					is_multiline = true;
+					width = 0;
+					prev_h += height;
+				}
+				++c;
+			}
+			if(!found)
+			{
+				if(is_some_char)
+				{
+					area.left = width;
+					area.top = prev_h + character.y_offset;
+					area.right = width + character.x_advance;
+					area.bottom = prev_h + character.pixel_h + character.y_offset;
+				}
+				else
+				{
+					area.left = 0;
+					area.right = 3;
+					area.top = 0;
+					area.bottom = 20;
+				}
+				area.rel_bottom = area.rel_left = area.rel_right = area.rel_top = 0;
+			}
+		}
+		return area;
 	}
 
 	void OpenGLRenderer::measureText(const char* text, float* w, float* h, float max_width)
