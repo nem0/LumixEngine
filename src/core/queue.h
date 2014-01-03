@@ -1,5 +1,7 @@
 #pragma once
 
+#include <new>
+
 namespace Lux
 {
 	template <typename T, uint32_t count>
