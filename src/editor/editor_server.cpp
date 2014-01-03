@@ -28,7 +28,7 @@
 #include "core/task.h"
 #include "core/tcp_acceptor.h"
 #include "core/tcp_stream.h"
-#include "script\script_system.h"
+#include "script/script_system.h"
 #include "universe/component_event.h"
 #include "universe/entity_destroyed_event.h"
 #include "universe/entity_moved_event.h"
@@ -135,6 +135,7 @@ struct EditorServerImpl
 		void renderPhysics();
 		void save(const char path[]);
 		void load(const char path[]);
+		void loadMap(FS::IFile* file, bool success);
 		void addComponent(uint32_t type_crc);
 		void sendComponent(uint32_t type_crc);
 		void removeComponent(uint32_t type_crc);
@@ -187,6 +188,7 @@ struct EditorServerImpl
 		MessageTask* m_message_task;
 		Engine m_engine;
 		EditorServer* m_owner;
+		FS::ReadCallback m_file_read_cb;
 };
 
 
@@ -630,24 +632,21 @@ void EditorServerImpl::removeComponent(uint32_t type_crc)
 	selectEntity(m_selected_entity);
 }
 
-
-void loadMap(FS::IFile* file, bool success, void* user_data)
-{
-	ASSERT(success);
-	if(success)
-	{
-		EditorServerImpl* esi = static_cast<EditorServerImpl*>(user_data);
-		esi->load(*file);
-		esi->m_engine.getFileSystem().close(file);
-	}
-}
-
-
 void EditorServerImpl::load(const char path[])
 {
 	g_log_info.log("editor server", "loading universe %s...", path);
 	FS::FileSystem& fs = m_engine.getFileSystem();
-	fs.openAsync(fs.getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, &loadMap, this);
+	fs.openAsync(fs.getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, m_file_read_cb);
+}
+
+void EditorServerImpl::loadMap(FS::IFile* file, bool success)
+{
+	ASSERT(success);
+	if(success)
+	{
+		load(*file);
+		m_engine.getFileSystem().close(file);
+	}
 }
 
 void EditorServerImpl::newUniverse()
@@ -720,6 +719,7 @@ HGLRC createGLContext(HWND hwnd)
 
 bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 {
+	m_file_read_cb.bind<EditorServerImpl, &EditorServerImpl::loadMap>(this);
 	m_universe_mutex = MT::Mutex::create(false);
 	m_send_mutex = MT::Mutex::create(false);
 	m_message_task = new MessageTask();
