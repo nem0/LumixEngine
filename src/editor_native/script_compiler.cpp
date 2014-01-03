@@ -38,8 +38,9 @@ void ScriptCompiler::compile(const char path[])
 
 	CreatePipe(&read_pipe, &write_pipe, &saAttr, 0);
 	SetHandleInformation(read_pipe, HANDLE_FLAG_INHERIT, 0);
-	si.hStdInput = read_pipe;
+	//si.hStdInput = read_pipe;
 	si.hStdOutput = write_pipe;
+	si.hStdError = write_pipe;
 	si.dwFlags |= STARTF_USESTDHANDLES;
 	sprintf(cmd_line, "/C scripts\\compile.bat %s", path);
     if ( CreateProcess("C:\\windows\\system32\\cmd.exe",     // Application name
@@ -53,7 +54,7 @@ void ScriptCompiler::compile(const char path[])
         &si,
         &pi) == TRUE)
 	{
-		Process* p = LUX_NEW(Process)();
+		Process* p = new Process();
 		p->m_handle = pi.hProcess;
 		p->m_path = path;
 		p->m_pipe = read_pipe;
@@ -78,7 +79,7 @@ void ScriptCompiler::checkFinished()
 				Process* p = m_processes[i];
 				m_processes.eraseFast(i);
 				m_delegates.invoke(p->m_path.c_str(), code);
-				char buf[512];
+				char buf[513];
 				DWORD read;
 				if(code != 0)
 				{
@@ -95,7 +96,7 @@ void ScriptCompiler::checkFinished()
 				}
 				CloseHandle(p->m_pipe);
 				CloseHandle(p->m_write_pipe);
-				LUX_DELETE(p);
+				delete p;
 			}
 		}
 	}
