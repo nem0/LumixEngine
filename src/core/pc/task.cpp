@@ -57,7 +57,7 @@ namespace Lux
 
 		Task::Task()
 		{
-			TaskImpl* impl = new TaskImpl();
+			TaskImpl* impl = LUX_NEW(TaskImpl)();
 			impl->m_handle = NULL;
 			impl->m_affinity_mask = getProccessAffinityMask();
 			impl->m_priority = ::GetThreadPriority(GetCurrentThread());
@@ -73,7 +73,7 @@ namespace Lux
 		Task::~Task()
 		{
 			ASSERT(NULL == m_implementation->m_handle);
-			delete m_implementation;
+			LUX_DELETE(m_implementation);
 		}
 
 		bool Task::create(const char* name)

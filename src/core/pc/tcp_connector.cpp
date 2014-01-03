@@ -44,7 +44,7 @@ namespace Lux
 				return NULL;
 			}
 
-			return new TCPStream(socket);		
+			return LUX_NEW(TCPStream)(socket);		
 		}
 	} // ~namespace Net
 } // ~namespace Lux

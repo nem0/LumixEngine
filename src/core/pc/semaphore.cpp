@@ -23,12 +23,12 @@ namespace Lux
 
 		Semaphore* Semaphore::create(int init_count, int max_count)
 		{
-			return new WinSemaphore(init_count, max_count);
+			return LUX_NEW(WinSemaphore)(init_count, max_count);
 		}
 
 		void Semaphore::destroy(Semaphore* semaphore)
 		{
-			delete static_cast<WinSemaphore*>(semaphore);
+			LUX_DELETE(static_cast<WinSemaphore*>(semaphore));
 		}
 
 		void WinSemaphore::signal()

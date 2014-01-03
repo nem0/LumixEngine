@@ -34,7 +34,7 @@ namespace Lux
 
 	bool AnimationSystem::create(Engine& engine)
 	{
-		m_impl = new AnimationSystemImpl();
+		m_impl = LUX_NEW(AnimationSystemImpl)();
 		m_impl->m_universe = 0;
 		engine.getEditorServer()->registerCreator(animable_type, *this);
 		return m_impl != 0;
@@ -43,7 +43,7 @@ namespace Lux
 
 	void AnimationSystem::destroy()
 	{
-		delete m_impl;
+		LUX_DELETE(m_impl);
 		m_impl = 0;
 	}
 

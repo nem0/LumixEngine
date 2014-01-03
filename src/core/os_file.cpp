@@ -68,7 +68,7 @@ namespace Lux
 
 			if(INVALID_HANDLE_VALUE != hnd)
 			{
-				OsFileImpl* impl = new OsFileImpl(); //TODO: lock-free free list
+				OsFileImpl* impl = LUX_NEW(OsFileImpl)(); //TODO: lock-free free list
 				impl->m_file = hnd;
 				m_impl = impl;
 
@@ -83,7 +83,7 @@ namespace Lux
 			ASSERT(NULL != m_impl);
 
 			::CloseHandle(m_impl->m_file);
-			delete(m_impl);
+			LUX_DELETE(m_impl);
 			m_impl = NULL;
 		}
 

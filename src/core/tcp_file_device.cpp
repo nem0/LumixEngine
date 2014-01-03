@@ -137,19 +137,19 @@ namespace Lux
 
 		IFile* TCPFileDevice::createFile(IFile* child)
 		{
-			return new TCPFile(m_impl->m_stream);
+			return LUX_NEW(TCPFile)(m_impl->m_stream);
 		}
 
 		void TCPFileDevice::connect(const char* ip, uint16_t port)
 		{
-			m_impl = new TCPImpl;
+			m_impl = LUX_NEW(TCPImpl);
 			m_impl->m_stream = m_impl->m_connector.connect(ip, port);
 		}
 
 		void TCPFileDevice::disconnect()
 		{
 			m_impl->m_stream->write(TCPCommand::Disconnect);
-			delete m_impl;
+			LUX_DELETE(m_impl);
 		}
 	} // namespace FS
 } // ~namespace Lux

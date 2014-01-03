@@ -33,8 +33,6 @@ namespace Lux
 		Universe* m_universe;
 		Engine* m_engine;
 		bool m_is_running;
-		Renderer* m_renderer;
-		InputSystem* m_input_system;
 		ScriptSystem* m_owner;
 	};
 
@@ -45,7 +43,7 @@ namespace Lux
 
 	ScriptSystem::ScriptSystem()
 	{
-		m_impl = new ScriptSystemImpl;
+		m_impl = LUX_NEW(ScriptSystemImpl);
 		m_impl->m_owner = this;
 		m_impl->m_is_running = false;
 	}
@@ -53,33 +51,14 @@ namespace Lux
 
 	ScriptSystem::~ScriptSystem()
 	{
-		delete m_impl;
+		LUX_DELETE(m_impl);
 	}
 
 
-	void ScriptSystem::setInputSystem(InputSystem* m_input_system)
+	void ScriptSystem::setEngine(Engine& engine)
 	{
-		m_impl->m_input_system = m_input_system;
+		m_impl->m_engine = &engine;
 	}
-
-
-	InputSystem* ScriptSystem::getInputSystem() const
-	{
-		return m_impl->m_input_system;
-	}
-
-
-	Renderer* ScriptSystem::getRenderer() const
-	{
-		return m_impl->m_renderer;
-	}
-
-
-	void ScriptSystem::setRenderer(Renderer* renderer)
-	{
-		m_impl->m_renderer = renderer;
-	}
-
 
 	Universe* ScriptSystem::getUniverse() const
 	{

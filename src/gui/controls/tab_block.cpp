@@ -14,10 +14,10 @@ TabBlock::TabBlock(Gui& gui, Block* parent)
 	: Block(gui, parent, "_box")
 {
 	setArea(0, 0, 0, 0, 1, 0, 1, 0);
-	m_header = new Block(getGui(), this, NULL);
+	m_header = LUX_NEW(Block)(getGui(), this, NULL);
 	m_header->setArea(0, 0, 0, 0, 1, 0, 0, 20);
 
-	m_tab_content = new Block(getGui(), this, "_box");
+	m_tab_content = LUX_NEW(Block)(getGui(), this, "_box");
 	m_tab_content->setArea(0, 0, 0, 20, 1, 0, 1, 0);
 }
 
@@ -46,12 +46,12 @@ void TabBlock::labelClick(Block& block, void*)
 Lux::UI::Block& TabBlock::addPage(const char* title)
 {
 	float x = m_header->getChildCount() > 0 ? m_header->getChild(m_header->getChildCount() - 1)->getLocalArea().right : 0; 
-	Block* label = new Block(getGui(), m_header, "_text");
+	Block* label = LUX_NEW(Block)(getGui(), m_header, "_text");
 	label->setArea(0, x, 0, 0, 0, x + 50, 0, 20);
 	label->setBlockText(title);
-	label->getCallback("click").bind<TabBlock, &TabBlock::labelClick>(this);
+	label->onEvent("click").bind<TabBlock, &TabBlock::labelClick>(this);
 
-	Block* content = new Block(getGui(), m_tab_content, NULL);
+	Block* content = LUX_NEW(Block)(getGui(), m_tab_content, NULL);
 	content->setArea(0, 0, 0, 0, 1, 0, 1, 0);
 	if(m_tab_content->getChildCount() > 1)
 	{

@@ -20,6 +20,7 @@ namespace Lux
 {
 	struct EngineImpl
 	{
+		EngineImpl(Engine& engine) : m_owner(engine) {}
 		bool create(int w, int h, const char* base_path, Engine& owner);
 
 		Renderer m_renderer;
@@ -34,6 +35,7 @@ namespace Lux
 		Universe* m_universe;
 		ScriptSystem m_script_system;
 		InputSystem m_input_system;
+		Engine& m_owner;
 	};
 
 
@@ -42,7 +44,7 @@ namespace Lux
 		m_universe = 0;
 		m_file_system = FS::FileSystem::create();
 
-		FS::TCPFileServer* server = new FS::TCPFileServer();
+		FS::TCPFileServer* server = LUX_NEW(FS::TCPFileServer)();
 		server->start();
 
 		m_tcp_file_device.connect("127.0.0.1", 10001);
@@ -59,10 +61,10 @@ namespace Lux
 		{
 			return false;
 		}
-		AnimationSystem* anim_system = new AnimationSystem();
+		AnimationSystem* anim_system = LUX_NEW(AnimationSystem)();
 		if(!anim_system->create(owner))
 		{
-			delete anim_system;
+			LUX_DELETE(anim_system);
 			return false;
 		}
 		m_plugin_manager.addPlugin(anim_system);
@@ -70,19 +72,19 @@ namespace Lux
 		{
 			return false;
 		}
-		m_script_system.setRenderer(&m_renderer);			
+		m_script_system.setEngine(m_owner);
 		return true;
 	}
 
 
 	bool Engine::create(int w, int h, const char* base_path, EditorServer* editor_server)
 	{
-		m_impl = new EngineImpl();
+		m_impl = LUX_NEW(EngineImpl)(*this);
 		m_impl->m_editor_server = editor_server;
 		if(!m_impl->create(w, h, base_path, *this))
 		{
-			delete m_impl;
-			m_impl = 0;
+			LUX_DELETE(m_impl);
+			m_impl = NULL;
 			return false;
 		}
 		return true;
@@ -97,7 +99,7 @@ namespace Lux
 		m_impl->m_tcp_file_device.disconnect();
 		FS::FileSystem::destroy(m_impl->m_file_system);
 
-		delete m_impl;
+		LUX_DELETE(m_impl);
 		m_impl = 0;
 	}
 
@@ -150,13 +152,13 @@ namespace Lux
 		m_impl->m_script_system.setUniverse(0);
 		m_impl->m_plugin_manager.onDestroyUniverse(*m_impl->m_universe);
 		m_impl->m_universe->destroy();
-		delete m_impl->m_universe;
+		LUX_DELETE(m_impl->m_universe);
 		m_impl->m_universe = 0;
 	}
 
 	Universe* Engine::createUniverse()
 	{
-		m_impl->m_universe = new Universe();
+		m_impl->m_universe = LUX_NEW(Universe)();
 		m_impl->m_plugin_manager.onCreateUniverse(*m_impl->m_universe);
 		m_impl->m_script_system.setUniverse(m_impl->m_universe);
 		m_impl->m_universe->create();

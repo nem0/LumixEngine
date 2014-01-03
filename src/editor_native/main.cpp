@@ -26,17 +26,17 @@ MainFrame* g_main_frame;
 
 void initGui(Lux::EditorClient& client, Lux::EditorServer& server)
 {
-	Lux::UI::OpenGLRenderer* renderer = new Lux::UI::OpenGLRenderer();
+	Lux::UI::OpenGLRenderer* renderer = LUX_NEW(Lux::UI::OpenGLRenderer)();
 	renderer->create();
 	renderer->loadFont("gui/font.tga", server.getEngine().getFileSystem());
 	renderer->setWindowHeight(600);
-	Lux::UI::CheckBoxDecorator* check_box_decorator = new Lux::UI::CheckBoxDecorator("_check_box");
-	Lux::UI::TextDecorator* text_decorator = new Lux::UI::TextDecorator("_text");
-	Lux::UI::TextDecorator* text_centered_decorator = new Lux::UI::TextDecorator("_text_centered");
+	Lux::UI::CheckBoxDecorator* check_box_decorator = LUX_NEW(Lux::UI::CheckBoxDecorator)("_check_box");
+	Lux::UI::TextDecorator* text_decorator = LUX_NEW(Lux::UI::TextDecorator)("_text");
+	Lux::UI::TextDecorator* text_centered_decorator = LUX_NEW(Lux::UI::TextDecorator)("_text_centered");
 	text_centered_decorator->setTextCentered(true);
-	Lux::UI::DockableDecorator* dockable_decorator = new Lux::UI::DockableDecorator("_dockable");
-	Lux::UI::BoxDecorator* box_decorator = new Lux::UI::BoxDecorator("_box");
-	Lux::UI::ScrollbarDecorator* scrollbar_decorator = new Lux::UI::ScrollbarDecorator("_scrollbar"); 
+	Lux::UI::DockableDecorator* dockable_decorator = LUX_NEW(Lux::UI::DockableDecorator)("_dockable");
+	Lux::UI::BoxDecorator* box_decorator = LUX_NEW(Lux::UI::BoxDecorator)("_box");
+	Lux::UI::ScrollbarDecorator* scrollbar_decorator = LUX_NEW(Lux::UI::ScrollbarDecorator)("_scrollbar"); 
 	server.getEngine().loadPlugin("gui.dll");
 	Lux::UI::Gui* gui = (Lux::UI::Gui*)server.getEngine().getPluginManager().getPlugin("gui");
 	gui->addDecorator(*text_decorator);
@@ -50,7 +50,7 @@ void initGui(Lux::EditorClient& client, Lux::EditorServer& server)
 	scrollbar_decorator->create(*gui, "gui/skin.atl");
 	box_decorator->create(*gui, "gui/skin.atl");
 	dockable_decorator->create(*gui, "gui/skin.atl");
-	g_main_frame = new MainFrame(client, *gui, gui->createTopLevelBlock(800, 600));
+	g_main_frame = LUX_NEW(MainFrame)(client, *gui, gui->createTopLevelBlock(800, 600));
 	g_main_frame->getParent()->layout();
 }
 

@@ -266,13 +266,13 @@ void EditorServer::onResize(int w, int h)
 
 bool EditorServer::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 {
-	m_impl = new EditorServerImpl();
+	m_impl = LUX_NEW(EditorServerImpl)();
 	m_impl->m_owner = this;
 	
 	if(!m_impl->create(hwnd, game_hwnd, base_path))
 	{
-		delete m_impl;
-		m_impl = 0;
+		LUX_DELETE(m_impl);
+		m_impl = NULL;
 		return false;
 	}
 
@@ -283,19 +283,19 @@ bool EditorServer::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 void EditorServer::destroy()
 {
 	m_impl->destroy();
-	delete m_impl;
-	m_impl = 0;
+	LUX_DELETE(m_impl);
+	m_impl = NULL;
 }
 
 
 void EditorServerImpl::registerProperties()
 {
-	m_component_properties[renderable_type].push(new PropertyDescriptor<Renderer>(crc32("source"), &Renderer::getMesh, &Renderer::setMesh, IPropertyDescriptor::FILE));
-	m_component_properties[renderable_type].push(new PropertyDescriptor<Renderer>(crc32("visible"), &Renderer::getVisible, &Renderer::setVisible));
-	m_component_properties[renderable_type].push(new PropertyDescriptor<Renderer>(crc32("cast shadows"), &Renderer::getCastShadows, &Renderer::setCastShadows));
-	m_component_properties[point_light_type].push(new PropertyDescriptor<Renderer>(crc32("fov"), &Renderer::getLightFov, &Renderer::setLightFov));
-	m_component_properties[point_light_type].push(new PropertyDescriptor<Renderer>(crc32("radius"), &Renderer::getLightRadius, &Renderer::setLightRadius));
-	m_component_properties[script_type].push(new PropertyDescriptor<ScriptSystem>(crc32("source"), &ScriptSystem::getScriptPath, &ScriptSystem::setScriptPath, IPropertyDescriptor::FILE));
+	m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("source"), &Renderer::getMesh, &Renderer::setMesh, IPropertyDescriptor::FILE));
+	m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("visible"), &Renderer::getVisible, &Renderer::setVisible));
+	m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("cast shadows"), &Renderer::getCastShadows, &Renderer::setCastShadows));
+	m_component_properties[point_light_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("fov"), &Renderer::getLightFov, &Renderer::setLightFov));
+	m_component_properties[point_light_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("radius"), &Renderer::getLightRadius, &Renderer::setLightRadius));
+	m_component_properties[script_type].push(LUX_NEW(PropertyDescriptor<ScriptSystem>)(crc32("source"), &ScriptSystem::getScriptPath, &ScriptSystem::setScriptPath, IPropertyDescriptor::FILE));
 }
 
 
@@ -410,7 +410,7 @@ void EditorServerImpl::addEntity()
 	Entity e = m_engine.getUniverse()->createEntity();
 	e.setPosition(m_camera_pos	+ m_camera_rot * Vec3(0, 0, -2));
 	selectEntity(e);
-	EditorIcon* er = new EditorIcon();
+	EditorIcon* er = LUX_NEW(EditorIcon)();
 	er->create(m_selected_entity, Component::INVALID);
 	m_editor_icons.push(er);
 	/*** this is here because camera render node does not exists untitle pipeline resource is loaded, do this properly*/
@@ -653,7 +653,7 @@ void EditorServerImpl::newUniverse()
 {
 	destroyUniverse();
 	createUniverse(false, "");
-	g_log_info.log("editor server", "new universe created");
+	g_log_info.log("editor server", "universe created");
 }
 
 
@@ -722,7 +722,7 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 	m_file_read_cb.bind<EditorServerImpl, &EditorServerImpl::loadMap>(this);
 	m_universe_mutex = MT::Mutex::create(false);
 	m_send_mutex = MT::Mutex::create(false);
-	m_message_task = new MessageTask();
+	m_message_task = LUX_NEW(MessageTask)();
 	m_message_task->m_server = this;
 	m_message_task->m_stream = NULL;
 	m_message_task->create("Message Task");
@@ -1074,7 +1074,7 @@ void EditorServerImpl::onComponentEvent(ComponentEvent& e)
 		if(m_editor_icons[i]->getEntity() == e.component.entity)
 		{
 			m_editor_icons[i]->destroy();
-			delete m_editor_icons[i];
+			LUX_DELETE(m_editor_icons[i]);
 			m_editor_icons.eraseFast(i);
 			break;
 		}
@@ -1093,7 +1093,7 @@ void EditorServerImpl::onComponentEvent(ComponentEvent& e)
 		}
 		if(!found)
 		{
-			EditorIcon* er = new EditorIcon();
+			EditorIcon* er = LUX_NEW(EditorIcon)();
 			er->create(e.component.entity, e.component);
 			m_editor_icons.push(er);
 		}
@@ -1102,7 +1102,7 @@ void EditorServerImpl::onComponentEvent(ComponentEvent& e)
 	{
 		if(e.component.entity.existsInUniverse() &&  e.component.entity.getComponents().empty())
 		{
-			EditorIcon* er = new EditorIcon();
+			EditorIcon* er = LUX_NEW(EditorIcon)();
 			er->create(e.component.entity, Component::INVALID);
 			m_editor_icons.push(er);
 		}
@@ -1128,7 +1128,7 @@ void EditorServerImpl::onEvent(Event& evt)
 			if(m_editor_icons[i]->getEntity() == e)
 			{
 				m_editor_icons[i]->destroy();
-				delete m_editor_icons[i];
+				LUX_DELETE(m_editor_icons[i]);
 				m_editor_icons.eraseFast(i);
 				break;
 			}
@@ -1142,7 +1142,7 @@ void EditorServerImpl::destroyUniverse()
 	for(int i = 0; i < m_editor_icons.size(); ++i)
 	{
 		m_editor_icons[i]->destroy();
-		delete m_editor_icons[i];
+		LUX_DELETE(m_editor_icons[i]);
 	}
 	selectEntity(Entity::INVALID);
 	m_editor_icons.clear();
@@ -1244,10 +1244,10 @@ void EditorServerImpl::onMessage(void* msgptr, int size)
 
 extern "C" LUX_ENGINE_API void* __stdcall luxServerInit(HWND hwnd, HWND game_hwnd, const char* base_path)
 {
-	EditorServer* server = new EditorServer();
+	EditorServer* server = LUX_NEW(EditorServer)();
 	if(!server->create(hwnd, game_hwnd, base_path))
 	{
-		delete server;
+		LUX_DELETE(server);
 		return NULL;
 	}
 

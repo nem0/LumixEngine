@@ -29,7 +29,7 @@ namespace Lux
 
 	bool InputSystem::create()
 	{
-		m_impl = new InputSystemImpl();
+		m_impl = LUX_NEW(InputSystemImpl)();
 		m_impl->m_mouse_rel_x = 0;
 		m_impl->m_mouse_rel_y = 0;
 		return true;
@@ -38,7 +38,8 @@ namespace Lux
 
 	void InputSystem::destroy()
 	{
-		delete m_impl;
+		LUX_DELETE(m_impl);
+		m_impl = NULL;
 	}
 
 

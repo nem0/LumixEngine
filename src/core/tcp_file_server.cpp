@@ -26,6 +26,7 @@ namespace Lux
 				m_acceptor.start("127.0.0.1", 10001);
 				Net::TCPStream* stream = m_acceptor.accept();
 
+				OsFile* file = LUX_NEW(OsFile)();
 				while(!quit)
 				{
 					int32_t op = 0;
@@ -167,12 +168,12 @@ namespace Lux
 
 		TCPFileServer::~TCPFileServer()
 		{
-			delete m_impl;
+			LUX_DELETE(m_impl);
 		}
 
 		void TCPFileServer::start()
 		{
-			m_impl = new TCPFileServerImpl;
+			m_impl = LUX_NEW(TCPFileServerImpl);
 			m_impl->m_task.create("TCP File Server Task");
 			m_impl->m_task.run();
 		}
@@ -181,7 +182,8 @@ namespace Lux
 		{
 			m_impl->m_task.stop();
 			m_impl->m_task.destroy();
-			delete m_impl;
+			LUX_DELETE(m_impl);
+			m_impl = NULL;
 		}
 	} // ~namespace FS
 } // ~namespace Lux

@@ -221,7 +221,7 @@ void Navigation::destroy()
 		rcFreePolyMesh(m_impl->m_polymesh);
 		dtFreeNavMeshQuery(m_impl->m_navquery);
 		dtFreeNavMesh(m_impl->m_navmesh);
-		delete m_impl;
+		LUX_DELETE(m_impl);
 		m_impl = NULL;
 	}
 }
@@ -247,7 +247,7 @@ void Navigation::draw()
 
 Navigation::Navigation()
 {
-	m_impl = new NavigationImpl;
+	m_impl = LUX_NEW(NavigationImpl);
 	m_impl->m_polymesh = 0;
 	m_impl->m_detail_mesh = 0;
 	m_impl->m_navmesh = 0;
@@ -396,7 +396,7 @@ bool Navigation::load(const char path[])
 	// Allocate array that can hold triangle area types.
 	// If you have multiple meshes you need to process, allocate
 	// and array which can hold the max number of triangles you need to process.
-	unsigned char* triareas = new unsigned char[ntris];
+	unsigned char* triareas = LUX_NEW_ARRAY(unsigned char, ntris);
 	if (!triareas)
 	{
 		ctx.log(RC_LOG_ERROR, "buildNavigation: Out of memory 'triareas' (%d).", ntris);
@@ -410,7 +410,7 @@ bool Navigation::load(const char path[])
 	rcMarkWalkableTriangles(&ctx, cfg.walkableSlopeAngle, verts, nverts, tris, ntris, triareas);
 	rcRasterizeTriangles(&ctx, verts, nverts, tris, triareas, ntris, *solid, cfg.walkableClimb);
 
-	delete [] triareas;
+	LUX_DELETE_ARRAY(triareas);
 	triareas = 0;
 	
 	//
@@ -647,7 +647,7 @@ bool Navigation::load(const char path[])
 
 extern "C" IPlugin* createPlugin()
 {
-	return new Navigation();
+	return LUX_NEW(Navigation)();
 }
 
 

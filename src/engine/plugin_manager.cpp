@@ -90,7 +90,7 @@ namespace Lux
 				IPlugin* plugin = creator();
 				if(!plugin->create(*m_impl->m_engine))
 				{
-					delete plugin;
+					LUX_DELETE(plugin);
 					ASSERT(false);
 					return false;
 				}
@@ -111,7 +111,7 @@ namespace Lux
 	
 	bool PluginManager::create(Engine& engine)
 	{
-		m_impl = new PluginManagerImpl();
+		m_impl = LUX_NEW(PluginManagerImpl)();
 		m_impl->m_engine = &engine;
 		return true;
 	}
@@ -122,10 +122,10 @@ namespace Lux
 		for(int i = 0; i < m_impl->m_plugins.size(); ++i)
 		{
 			m_impl->m_plugins[i]->destroy();
-			delete m_impl->m_plugins[i];
+			LUX_DELETE(m_impl->m_plugins[i]);
 		}
-		delete m_impl;
-		m_impl = 0;
+		LUX_DELETE(m_impl);
+		m_impl = NULL;
 	}
 
 

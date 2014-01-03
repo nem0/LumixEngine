@@ -2,7 +2,6 @@
 
 
 #include <cstdlib>
-#include <new>
 #include "core/default_allocator.h"
 
 
@@ -15,7 +14,7 @@ template <typename T, typename Allocator = DefaultAllocator>
 class PODArray
 {
 	public:
-		PODArray(const Allocator& allocator)
+		explicit PODArray(const Allocator& allocator)
 			: m_allocator(allocator)
 		{
 			m_data = NULL;
@@ -23,7 +22,7 @@ class PODArray
 			m_size = 0;
 		}
 
-		PODArray(const PODArray& rhs)
+		explicit PODArray(const PODArray& rhs)
 		{
 			m_data = NULL;
 			m_capacity = 0;

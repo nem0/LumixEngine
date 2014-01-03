@@ -20,7 +20,7 @@ namespace UI
 			bool create();
 			void destroy();
 
-			virtual TextureBase* loadImage(const char* name) LUX_OVERRIDE;
+			virtual TextureBase* loadImage(const char* name, FS::FileSystem& file_system) LUX_OVERRIDE;
 			virtual void loadFont(const char* path, FS::FileSystem& file_system) LUX_OVERRIDE;
 			virtual void beginRender(float w, float h) LUX_OVERRIDE;
 			virtual void renderImage(TextureBase* image, float* vertices, float* tex_coords, int vertex_count) LUX_OVERRIDE;

@@ -13,9 +13,9 @@ Notifications::Notifications(MainFrame& main_frame)
 
 void Notifications::showNotification(const char* text)
 {
-	Block* b = new Block(getGui(), this, "_box");
+	Block* b = LUX_NEW(Block)(getGui(), this, "_box");
 	b->setArea(1, -200, 1, -60 - m_notifications.size() * 60.0f, 1, -10, 1, -10 - m_notifications.size() * 60.0f);
-	Block* t = new Block(getGui(), b, "_text");
+	Block* t = LUX_NEW(Block)(getGui(), b, "_text");
 	t->setArea(0, 0, 0, 0, 1, 0, 1, 0);
 	t->setBlockText(text);
 	b->setZIndex(999);

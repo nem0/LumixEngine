@@ -25,12 +25,12 @@ namespace Lux
 
 		Mutex* Mutex::create(bool locked)
 		{
-			return new WinMutex(locked);
+			return LUX_NEW(WinMutex)(locked);
 		}
 
 		void Mutex::destroy(Mutex* mutex)
 		{
-			delete static_cast<WinMutex*>(mutex);
+			LUX_DELETE(static_cast<WinMutex*>(mutex));
 		}
 
 		void WinMutex::lock()

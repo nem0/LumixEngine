@@ -53,7 +53,7 @@ void ScriptCompiler::compile(const char path[])
         &si,
         &pi) == TRUE)
 	{
-		Process* p = new Process();
+		Process* p = LUX_NEW(Process)();
 		p->m_handle = pi.hProcess;
 		p->m_path = path;
 		p->m_pipe = read_pipe;
@@ -95,7 +95,7 @@ void ScriptCompiler::checkFinished()
 				}
 				CloseHandle(p->m_pipe);
 				CloseHandle(p->m_write_pipe);
-				delete p;
+				LUX_DELETE(p);
 			}
 		}
 	}

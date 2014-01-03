@@ -2,7 +2,9 @@
 
 
 #include "core/delegate.h"
+#include "core/delegate_list.h"
 #include "core/lux.h"
+#include "core/map.h"
 #include "core/pod_array.h"
 #include "core/string.h"
 
@@ -24,8 +26,7 @@ namespace UI
 	{
 		friend class Gui;
 		public:
-			typedef Delegate<void (Block&, void*)> EventCallback;
-
+			typedef DelegateList<void (Block&, void*)> EventCallback;
 			struct Area	
 			{
 				void merge(const Area& area);
@@ -77,9 +78,8 @@ namespace UI
 			void setTag(void* tag) { m_tag = tag; }
 			bool click(int x, int y);
 			bool mouseDown(int x, int y);
-			Block::EventCallback& getCallback(const char* type);
-			Block::EventCallback& getCallback(uint32_t type);
-			void registerEventHandler(const char* type, const char* callback);
+			EventCallback& onEvent(const char* type);
+			EventCallback& onEvent(uint32_t type);
 			void setZIndex(int z_index);
 			int getZIndex() const;
 			float getZ() const { return m_z; }
@@ -93,17 +93,8 @@ namespace UI
 			void deserializeWOChild(ISerializer& serializer);
 
 		private:
-			struct EventHandler
-			{
-				EventHandler() {}
-				uint32_t type;
-				EventCallback callback;
-			};
-
-		private:
 			void addChild(Block& block);
 			void removeChild(Block& block);
-			EventHandler* getEventHandler(uint32_t type);
 			void blur();
 			void focus();
 
@@ -111,7 +102,7 @@ namespace UI
 			DecoratorBase* m_decorator;
 			Block* m_parent;
 			PODArray<Block*> m_children; 
-			PODArray<EventHandler> m_event_handlers; 
+			map<uint32_t, EventCallback > m_event_handlers;
 			Area m_local_area;
 			Area m_global_area;
 			Area m_content_area;
