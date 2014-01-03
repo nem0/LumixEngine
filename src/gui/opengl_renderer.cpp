@@ -24,15 +24,19 @@ namespace UI
 		public:
 			OpenGLTexture(const char* name, float width, float height)
 				: TextureBase(name, width, height)
-			{}
+			{
+				m_image_loaded_cb.bind<OpenGLTexture, &OpenGLTexture::imageLoaded>(this);
+			}
 
 			GLuint getId() const { return m_gl_id; }
 			void setId(GLuint id) { m_gl_id = id; }
 
-			static void imageLoaded(FS::IFile* file, bool success, void* user_data);
+			void imageLoaded(FS::IFile* file, bool success);
+			FS::ReadCallback& getImageLoadedDeleagte() { return m_image_loaded_cb; }
 
 		private:
 			GLuint m_gl_id;
+			FS::ReadCallback m_image_loaded_cb;
 	};
 
 	struct OpenGLRendererImpl
@@ -118,11 +122,11 @@ namespace UI
 		}
 		img = LUX_NEW(OpenGLTexture)(name, (float)0, (float)0);
 		static_cast<OpenGLTexture*>(img)->setId(0);
-		file_system.openAsync(file_system.getDefaultDevice(), name, FS::Mode::OPEN | FS::Mode::READ, &OpenGLTexture::imageLoaded, img);
+		file_system.openAsync(file_system.getDefaultDevice(), name, FS::Mode::OPEN | FS::Mode::READ, static_cast<OpenGLTexture*>(img)->getImageLoadedDeleagte());
 		return img;
 	}
 
-	void OpenGLTexture::imageLoaded(FS::IFile* file, bool success, void* user_data)
+	void OpenGLTexture::imageLoaded(FS::IFile* file, bool success)
 	{
 		if(success)
 		{
@@ -193,10 +197,9 @@ namespace UI
 			LUX_DELETE_ARRAY(image_dest);
 			LUX_DELETE_ARRAY(buffer);
 	
-			OpenGLTexture* img = static_cast<OpenGLTexture*>(user_data);
-			img->setId(texture_id);
-			img->setSize((float)header.width, (float)header.height);
-			img->onLoaded().invoke(*img);
+			setId(texture_id);
+			setSize((float)header.width, (float)header.height);
+			onLoaded().invoke(*this);
 		}
 		else
 		{
@@ -380,7 +383,7 @@ namespace UI
 		strcpy_s(tmp, texture.getName().c_str());
 		int len = strlen(tmp);
 		strcpy_s(tmp + len - 4, 255 - len + 4, ".fnt");
-		m_file_system->openAsync(m_file_system->getDefaultDevice(), tmp, FS::Mode::OPEN | FS::Mode::READ, &OpenGLRendererImpl::fontLoaded, this);
+		m_file_system->openAsync(m_file_system->getDefaultDevice(), tmp, FS::Mode::OPEN | FS::Mode::READ, m_font_loaded_cb);
 	}
 
 	void OpenGLRendererImpl::fontLoaded(FS::IFile* file, bool success)

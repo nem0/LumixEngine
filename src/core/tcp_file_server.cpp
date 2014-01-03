@@ -44,7 +44,7 @@ namespace Lux
 							int32_t id = m_ids.alloc();
 							if(id > 0)
 							{
-								OsFile* file = new OsFile();
+								OsFile* file = LUX_NEW(OsFile)();
 								m_files[id] = file;
 
 								ret = file->open(m_buffer.data(), mode) ? id : -1;
