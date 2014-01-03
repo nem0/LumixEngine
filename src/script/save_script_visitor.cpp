@@ -10,7 +10,7 @@ namespace Lux
 		Lux::map<Lux::string, char*>::iterator iter = m_items.begin(), end = m_items.end();
 		for(; iter != end; ++iter)
 		{
-			delete[] iter.second();
+			LUX_DELETE_ARRAY(iter.second());
 		}
 	}
 
@@ -20,7 +20,7 @@ namespace Lux
 		/// TODO check if saved size == loaded size
 		if(m_mode == SAVE)
 		{
-			char* data = new char[sizeof(value)];
+			char* data = LUX_NEW_ARRAY(char, sizeof(value));
 			memcpy(data, &value, sizeof(value));
 			m_items.insert(string(name), data);
 		}

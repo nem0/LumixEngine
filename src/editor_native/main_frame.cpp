@@ -15,12 +15,12 @@
 MainFrame::MainFrame(Lux::EditorClient& client, Lux::UI::Gui& gui, Lux::UI::Block* parent)
 	: Block(gui, parent, NULL)
 {
-	m_script_compiler = new ScriptCompiler();
+	m_script_compiler = LUX_NEW(ScriptCompiler)();
 	m_editor_client = &client;
 	m_gui = &gui;
 
 	setArea(0, 0, 0, 0, 1, 0, 1, 0);
-	m_dockable = new Lux::UI::Dockable(gui, this);
+	m_dockable = LUX_NEW(Lux::UI::Dockable)(gui, this);
 	m_dockable->setArea(0, 0, 0, 20, 1, 0, 1, 0);
 
 	parent->setIsClickable(false);
@@ -28,10 +28,10 @@ MainFrame::MainFrame(Lux::EditorClient& client, Lux::UI::Gui& gui, Lux::UI::Bloc
 	m_dockable->setIsClickable(false);
 	m_dockable->getContent()->setIsClickable(false);
 
-	m_main_menu = new MainMenu(*this);
-	m_property_frame = new PropertyFrame(*this);
-	m_log_ui = new LogUI(*this);
-	m_notifications = new Notifications(*this);
+	m_main_menu = LUX_NEW(MainMenu)(*this);
+	m_property_frame = LUX_NEW(PropertyFrame)(*this);
+	m_log_ui = LUX_NEW(LogUI)(*this);
+	m_notifications = LUX_NEW(Notifications)(*this);
 
 	char path[MAX_PATH];
 	GetCurrentDirectory(MAX_PATH, path);

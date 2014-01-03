@@ -14,12 +14,18 @@ CheckBox::CheckBox(bool is_checked, Gui& gui, Block* parent)
 {
 	m_is_checked = is_checked;
 	setArea(0, 0, 0, 0, 1, 0, 1, 0);
-	registerEventHandler("click", "_checkbox_toggle");
+	onEvent("click").bind<CheckBox, &CheckBox::click>(this);
 }
 
 
 CheckBox::~CheckBox()
 {
+}
+
+
+void CheckBox::click(Block& block, void*)
+{
+	toggle();
 }
 
 

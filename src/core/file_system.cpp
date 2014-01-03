@@ -73,7 +73,7 @@ namespace Lux
 		public:
 			FileSystemImpl()
 			{
-				m_task = new FSTask(&m_transaction_queue);
+				m_task = LUX_NEW(FSTask)(&m_transaction_queue);
 				m_task->create("FSTask");
 				m_task->run();
 			}
@@ -82,7 +82,7 @@ namespace Lux
 			{
 				m_task->stop();
 				m_task->destroy();
-				delete m_task;
+				LUX_DELETE(m_task);
 			}
 
 			bool mount(IFileDevice* device) LUX_OVERRIDE
@@ -152,7 +152,7 @@ namespace Lux
 			void close(IFile* file) LUX_OVERRIDE
 			{
 				file->close();
-				delete file;
+				LUX_DELETE(file);
 			}
 
 			void closeAsync(IFile* file) LUX_OVERRIDE
@@ -251,7 +251,7 @@ namespace Lux
 
 			static void closeAsync(IFile* file, bool success)
 			{
-				delete file;
+				LUX_DELETE(file);
 			}
 
 			void destroy()
@@ -271,12 +271,12 @@ namespace Lux
 
 		FileSystem* FileSystem::create()
 		{
-			return new FileSystemImpl();
+			return LUX_NEW(FileSystemImpl)();
 		}
 
 		void FileSystem::destroy(FileSystem* fs)
 		{
-			delete fs;
+			LUX_DELETE(fs);
 		}
 	} // ~namespace FS
 } // ~namespace Lux

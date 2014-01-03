@@ -13,17 +13,33 @@ TextBox::TextBox(const char* text, Gui& gui, Block* parent)
 	: Block(gui, parent, "_box")
 {
 	setArea(0, 0, 0, 0, 0, 100, 0, 20);
-	Lux::UI::Block* label_ui = new Block(gui, this, "_text");
+	Lux::UI::Block* label_ui = LUX_NEW(Block)(gui, this, "_text");
 	label_ui->setBlockText(text);
 	label_ui->setArea(0, 3, 0, 0, 1, 0, 1, 0);
-	label_ui->registerEventHandler("key_down", "_tb_key_down");
+	label_ui->onEvent("key_down").bind<TextBox, &TextBox::keyDown>(this);
 	label_ui->setIsClipping(true);
 }
 
 
-void TextBox::setOnTextAccepted(const char* callback)
+void TextBox::keyDown(Block& block, void* user_data)
 {
-	getChild(0)->registerEventHandler("text_accepted", callback);
+	Lux::string s = block.getBlockText();
+	char c[2];
+	switch((int32_t)user_data)
+	{
+		case '\r':
+			block.emitEvent("text_accepted");
+			break;
+		case '\b':
+			s = s.substr(0, s.length() - 1);
+			break;
+		default:                        
+			c[0] = (char)user_data;
+			c[1] = '\0';
+			s += c;
+			break;
+	}
+	block.setBlockText(s.c_str());
 }
 
 

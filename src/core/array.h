@@ -15,7 +15,7 @@ template <typename T, typename Allocator = DefaultAllocator>
 class Array
 {
 	public:
-		Array(const Allocator& allocator)
+		explicit Array(const Allocator& allocator)
 			: m_allocator(allocator)
 		{
 			m_data = NULL;
@@ -23,7 +23,7 @@ class Array
 			m_size = 0;
 		}
 	
-		Array(const Array& rhs)
+		explicit Array(const Array& rhs)
 		{
 			m_data = NULL;
 			m_capacity = 0;

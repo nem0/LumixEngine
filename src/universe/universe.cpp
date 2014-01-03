@@ -13,7 +13,7 @@ namespace Lux
 
 Universe::~Universe()
 {
-	delete m_event_manager;
+	LUX_DELETE(m_event_manager);
 }
 
 
@@ -36,7 +36,7 @@ void Universe::create()
 
 Universe::Universe()
 {
-	m_event_manager = new EventManager;
+	m_event_manager = LUX_NEW(EventManager);
 	m_event_manager->addListener(ComponentEvent::type).bind<Universe, &Universe::onEvent>(this);
 }
 

@@ -25,12 +25,12 @@ namespace  Lux
 
 		Event* Event::create(EventFlags flags)
 		{
-			return new WinEvent(flags & EventFlags::SIGNALED ? true : false, flags & EventFlags::MANUAL_RESET ? true : false);
+			return LUX_NEW(WinEvent)(flags & EventFlags::SIGNALED ? true : false, flags & EventFlags::MANUAL_RESET ? true : false);
 		}
 
 		void Event::destroy(Event* event)
 		{
-			delete static_cast<WinEvent*>(event);
+			LUX_DELETE(static_cast<WinEvent*>(event));
 		}
 
 		void WinEvent::reset()

@@ -22,6 +22,11 @@ namespace UI
 
 			void addSubItem(MenuItem* item);
 			void showSubMenu();
+		
+		private:
+			void click(Block& block, void*);
+			void blurSubMenu(Block& block, void*);
+
 		private:
 			Lux::UI::Block* m_sub_container;
 			Lux::UI::Block* m_label;

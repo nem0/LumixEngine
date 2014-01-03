@@ -77,40 +77,36 @@ MainMenu::MainMenu(MainFrame& main_frame)
 {
 	m_main_frame = &main_frame;
 	// file
-	Lux::UI::MenuItem* file_item = new Lux::UI::MenuItem("File", getGui());
+	Lux::UI::MenuItem* file_item = LUX_NEW(Lux::UI::MenuItem)("File", getGui());
 	addItem(file_item);
 
 	// file -> open
-	Lux::UI::MenuItem* file_open_item = new Lux::UI::MenuItem("Open", getGui());
+	Lux::UI::MenuItem* file_open_item = LUX_NEW(Lux::UI::MenuItem)("Open", getGui());
 	file_item->addSubItem(file_open_item);
-	getGui().getCallback("MainMenu__openFile").bind<MainMenu, &MainMenu::openFileClicked>(this);
-	file_open_item->registerEventHandler("click", "MainMenu__openFile");
+	file_open_item->onEvent("click").bind<MainMenu, &MainMenu::openFileClicked>(this);
 
 	// file -> save
-	Lux::UI::MenuItem* file_save_item = new Lux::UI::MenuItem("Save", getGui());
+	Lux::UI::MenuItem* file_save_item = LUX_NEW(Lux::UI::MenuItem)("Save", getGui());
 	file_item->addSubItem(file_save_item);
-	getGui().getCallback("MainMenu__saveFile").bind<MainMenu, &MainMenu::saveFileClicked>(this);
-	file_save_item->registerEventHandler("click", "MainMenu__saveFile");
+	file_save_item->onEvent("click").bind<MainMenu, &MainMenu::saveFileClicked>(this);
 
 	// entity
-	Lux::UI::MenuItem* entity_item = new Lux::UI::MenuItem("Entity", getGui());
+	Lux::UI::MenuItem* entity_item = LUX_NEW(Lux::UI::MenuItem)("Entity", getGui());
 	addItem(entity_item);
 
 	// entity -> create
-	Lux::UI::MenuItem* entity_create_item = new Lux::UI::MenuItem("Create", getGui());
+	Lux::UI::MenuItem* entity_create_item = LUX_NEW(Lux::UI::MenuItem)("Create", getGui());
 	entity_item->addSubItem(entity_create_item);
-	getGui().getCallback("MainMenu__entityCreate").bind<MainMenu, &MainMenu::entityCreateClick>(this);
-	entity_create_item->registerEventHandler("click", "MainMenu__entityCreate");
+	entity_create_item->onEvent("click").bind<MainMenu, &MainMenu::entityCreateClick>(this);
 
 	// tools
-	Lux::UI::MenuItem* tools_item = new Lux::UI::MenuItem("Tools", getGui());
+	Lux::UI::MenuItem* tools_item = LUX_NEW(Lux::UI::MenuItem)("Tools", getGui());
 	addItem(tools_item);
 
 	// tools -> game mode
-	Lux::UI::MenuItem* tools_play_item = new Lux::UI::MenuItem("Play", getGui());
+	Lux::UI::MenuItem* tools_play_item = LUX_NEW(Lux::UI::MenuItem)("Play", getGui());
 	tools_item->addSubItem(tools_play_item);
-	getGui().getCallback("MainMenu__toolsPlay").bind<MainMenu, &MainMenu::toolsPlay>(this);
-	tools_play_item->registerEventHandler("click", "MainMenu__toolsPlay");
+	tools_play_item->onEvent("click").bind<MainMenu, &MainMenu::toolsPlay>(this);
 }
 
 
