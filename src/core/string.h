@@ -167,6 +167,15 @@ class base_string
 			return ret;
 		}
 
+		void erase(size_t pos)
+		{
+			if(pos >= 0 && pos < m_size)
+			{
+				base_string<T>::strcpy(m_cstr + pos, m_cstr + pos + 1);
+				--m_size;
+			}
+		}
+
 	public:
 		static const int npos = 0xffFFffFF;
 

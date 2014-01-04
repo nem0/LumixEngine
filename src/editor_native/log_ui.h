@@ -27,6 +27,7 @@ class LogUI : public Lux::UI::Dockable
 {
 	public:
 		LogUI(MainFrame& main_frame);
+		virtual void layout() LUX_OVERRIDE;
 
 	private:
 		void onLogMessage(Lux::Event& evt);

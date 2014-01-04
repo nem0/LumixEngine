@@ -1,12 +1,13 @@
-#include "gui/opengl_renderer.h"
 #include <cstdio>
 #include <Windows.h>
 #include <gl/GL.h>
+#include "gui/opengl_renderer.h"
 #include "core/array.h"
 #include "core/delegate_list.h"
 #include "core/file_system.h"
 #include "core/ifile.h"
 #include "core/map.h"
+#include "core/math_utils.h"
 #include "core/pod_array.h"
 #include "core/string.h"
 #include "core/vec3.h"
@@ -221,7 +222,74 @@ namespace UI
 		glLoadIdentity();
 	}
 
-	void OpenGLRenderer::measureText(const char* text, float* w, float* h)
+	Block::Area OpenGLRenderer::getCharArea(const char* text, int pos, float max_width)
+	{
+		Block::Area area;
+		if(text)
+		{
+			float width = 0;
+			float height = 0;
+			float prev_h = 0;
+			const char* c = text;
+			bool is_multiline = false;
+			OpenGLRendererImpl::Character character;
+			bool found = false;
+			bool is_some_char = false;
+			while(*c)
+			{
+				if(m_impl->m_characters.find(*c, character))
+				{
+					is_some_char = true;
+					if(c - text == pos)
+					{
+						found = true;
+						area.left = width;
+						area.top = prev_h + character.y_offset;
+						area.right = width + character.x_advance;
+						area.bottom = prev_h + character.pixel_h + character.y_offset;
+						area.rel_bottom = area.rel_left = area.rel_right = area.rel_top = 0;
+						break;
+					}
+					width += character.x_advance;
+					height = Math::max(height, character.pixel_h);
+					if(width > max_width || *c == '\n')
+					{
+						is_multiline = true;
+						width = 0;
+						prev_h += height;
+					}
+				}
+				else if(*c == '\n')
+				{
+					is_multiline = true;
+					width = 0;
+					prev_h += height;
+				}
+				++c;
+			}
+			if(!found)
+			{
+				if(is_some_char)
+				{
+					area.left = width;
+					area.top = prev_h + character.y_offset;
+					area.right = width + character.x_advance;
+					area.bottom = prev_h + character.pixel_h + character.y_offset;
+				}
+				else
+				{
+					area.left = 0;
+					area.right = 3;
+					area.top = 0;
+					area.bottom = 20;
+				}
+				area.rel_bottom = area.rel_left = area.rel_right = area.rel_top = 0;
+			}
+		}
+		return area;
+	}
+
+	void OpenGLRenderer::measureText(const char* text, float* w, float* h, float max_width)
 	{
 		if(!text)
 		{
@@ -231,7 +299,9 @@ namespace UI
 		}
 		float width = 0;
 		float height = 0;
+		float prev_h = 0;
 		const char* c = text;
+		bool is_multiline = false;
 		while(*c)
 		{
 			OpenGLRendererImpl::Character character;
@@ -239,11 +309,23 @@ namespace UI
 			{
 				width += character.x_advance;
 				height = Math::max(height, character.pixel_h);
+				if(width > max_width || *c == '\n')
+				{
+					is_multiline = true;
+					width = 0;
+					prev_h += height;
+				}
+			}
+			else if(*c == '\n')
+			{
+				is_multiline = true;
+				width = 0;
+				prev_h += height;
 			}
 			++c;
 		}
-		*w = width;
-		*h = height;
+		*w = is_multiline ? max_width : width;
+		*h = height + prev_h;
 	}
 
 	void OpenGLRenderer::pushScissorArea(float left, float top, float right, float bottom)
@@ -287,7 +369,7 @@ namespace UI
 		}
 	}
 
-	void OpenGLRenderer::renderText(const char* text, float x, float y, float z)
+	void OpenGLRenderer::renderText(const char* text, float x, float y, float z, float max_width)
 	{
 		if(!text)
 		{
@@ -306,13 +388,16 @@ namespace UI
 		uvs.resize(len * 6);
 		const char* c = text;
 		float cur_x = x;
+		float line_h = 0;
+		float line_base = y;
 		int i = 0;
 		while(*c)
 		{
 			OpenGLRendererImpl::Character character;
 			if(m_impl->m_characters.find(*c, character))
 			{
-				float cur_y = y + character.y_offset;
+				float cur_y = line_base + character.y_offset;
+				line_h = Math::max(line_h, character.pixel_h);
 				verts[i*6].set(cur_x, cur_y, z);
 				verts[i*6+1].set(cur_x, cur_y + character.pixel_h, z);
 				verts[i*6+2].set(cur_x + character.pixel_w, cur_y + character.pixel_h, z);
@@ -323,6 +408,12 @@ namespace UI
 			
 				cur_x += character.x_advance;
 
+				if(cur_x - x > max_width)
+				{
+					cur_x = x;
+					line_base += line_h;
+				}
+
 				uvs[i*6].set(character.left, character.top);
 				uvs[i*6+1].set(character.left, character.bottom);
 				uvs[i*6+2].set(character.right, character.bottom);
@@ -331,6 +422,11 @@ namespace UI
 				uvs[i*6+4].set(character.right, character.bottom);
 				uvs[i*6+5].set(character.right, character.top);
 				++i;
+			}
+			else if(*c == '\n')
+			{
+				cur_x = x;
+				line_base += line_h;
 			}
 			++c;
 		}
