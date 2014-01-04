@@ -37,13 +37,25 @@
     <ClCompile Include="..\..\src\core\pc\tcp_stream.cpp">
       <Filter>Net</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\core\pc\task.cpp" />
-    <ClCompile Include="..\..\src\core\pc\atomic.cpp" />
-    <ClCompile Include="..\..\src\core\pc\event.cpp" />
     <ClCompile Include="..\..\src\core\pc\input_system.cpp" />
-    <ClCompile Include="..\..\src\core\pc\mutex.cpp" />
-    <ClCompile Include="..\..\src\core\pc\semaphore.cpp" />
-    <ClCompile Include="..\..\src\core\pc\spin_mutex.cpp" />
+    <ClCompile Include="..\..\src\core\pc\atomic.cpp">
+      <Filter>MT</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\pc\event.cpp">
+      <Filter>MT</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\pc\mutex.cpp">
+      <Filter>MT</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\pc\semaphore.cpp">
+      <Filter>MT</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\pc\spin_mutex.cpp">
+      <Filter>MT</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\pc\task.cpp">
+      <Filter>MT</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\crc32.h" />
@@ -97,14 +109,8 @@
     <ClInclude Include="..\..\src\core\blob.h" />
     <ClInclude Include="..\..\src\core\delegate_list.h" />
     <ClInclude Include="..\..\src\core\default_allocator.h" />
-    <ClInclude Include="..\..\src\core\atomic.h" />
-    <ClInclude Include="..\..\src\core\event.h" />
     <ClInclude Include="..\..\src\core\input_system.h" />
-    <ClInclude Include="..\..\src\core\mutex.h" />
     <ClInclude Include="..\..\src\core\os_file.h" />
-    <ClInclude Include="..\..\src\core\semaphore.h" />
-    <ClInclude Include="..\..\src\core\spin_mutex.h" />
-    <ClInclude Include="..\..\src\core\task.h" />
     <ClInclude Include="..\..\src\core\tcp_acceptor.h">
       <Filter>Net</Filter>
     </ClInclude>
@@ -116,6 +122,24 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\pod_array.h" />
     <ClInclude Include="..\..\src\core\array.h" />
+    <ClInclude Include="..\..\src\core\event.h">
+      <Filter>MT</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\mutex.h">
+      <Filter>MT</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\task.h">
+      <Filter>MT</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\atomic.h">
+      <Filter>MT</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\spin_mutex.h">
+      <Filter>MT</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\semaphore.h">
+      <Filter>MT</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="FS">
