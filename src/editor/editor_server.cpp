@@ -754,10 +754,10 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 	{
 		g_log_info.log("plugins", "physics plugin has not been loaded");
 	}
-	if(!m_engine.loadPlugin("navigation.dll"))
+	/*if(!m_engine.loadPlugin("navigation.dll"))
 	{
 		g_log_info.log("plugins", "navigation plugin has not been loaded");
-	}
+	}*/
 
 	EditorIcon::createResources(base_path);
 

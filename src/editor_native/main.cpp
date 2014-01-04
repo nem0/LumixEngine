@@ -1,96 +1,63 @@
-#include "SDL.h"
+#include <SDL.h>
 #include <SDL_opengl.h>
-#include "core/blob.h"
-#include "core/crc32.h"
-#include "core/file_system.h"
-#include "core/json_serializer.h"
 #include "editor/editor_client.h"
 #include "editor/editor_server.h"
 #include "editor/server_message_types.h"
 #include "editor_native/main_frame.h"
-#include "editor_native/script_compiler.h"
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
 #include "graphics/renderer.h"
-#include "gui/block.h"
-#include "gui/decorators/box_decorator.h"
-#include "gui/decorators/cursor_decorator.h"
-#include "gui/decorators/check_box_decorator.h"
-#include "gui/decorators/dockable_decorator.h"
-#include "gui/decorators/text_decorator.h"
-#include "gui/decorators/scrollbar_decorator.h"
 #include "gui/gui.h"
 #include "gui/opengl_renderer.h"
 
-MainFrame* g_main_frame;
-
-
-void initGui(Lux::EditorClient& client, Lux::EditorServer& server)
+struct App
 {
-	Lux::UI::OpenGLRenderer* renderer = LUX_NEW(Lux::UI::OpenGLRenderer)();
-	renderer->create();
-	renderer->loadFont("gui/font.tga", server.getEngine().getFileSystem());
-	renderer->setWindowHeight(600);
-	Lux::UI::CursorDecorator* cursor_decorator = LUX_NEW(Lux::UI::CursorDecorator)("_cursor");
-	Lux::UI::CheckBoxDecorator* check_box_decorator = LUX_NEW(Lux::UI::CheckBoxDecorator)("_check_box");
-	Lux::UI::TextDecorator* text_decorator = LUX_NEW(Lux::UI::TextDecorator)("_text");
-	Lux::UI::TextDecorator* text_centered_decorator = LUX_NEW(Lux::UI::TextDecorator)("_text_centered");
-	text_centered_decorator->setTextCentered(true);
-	Lux::UI::DockableDecorator* dockable_decorator = LUX_NEW(Lux::UI::DockableDecorator)("_dockable");
-	Lux::UI::BoxDecorator* box_decorator = LUX_NEW(Lux::UI::BoxDecorator)("_box");
-	Lux::UI::ScrollbarDecorator* scrollbar_decorator = LUX_NEW(Lux::UI::ScrollbarDecorator)("_scrollbar"); 
-	server.getEngine().loadPlugin("gui.dll");
-	Lux::UI::Gui* gui = (Lux::UI::Gui*)server.getEngine().getPluginManager().getPlugin("gui");
-	gui->addDecorator(*cursor_decorator);
-	gui->addDecorator(*text_decorator);
-	gui->addDecorator(*text_centered_decorator);
-	gui->addDecorator(*box_decorator);
-	gui->addDecorator(*dockable_decorator);
-	gui->addDecorator(*scrollbar_decorator);
-	gui->addDecorator(*check_box_decorator);
-	gui->setRenderer(*renderer);
-	cursor_decorator->create(*gui, "gui/skin.atl");
-	check_box_decorator->create(*gui, "gui/skin.atl");
-	scrollbar_decorator->create(*gui, "gui/skin.atl");
-	box_decorator->create(*gui, "gui/skin.atl");
-	dockable_decorator->create(*gui, "gui/skin.atl");
-	g_main_frame = LUX_NEW(MainFrame)(client, *gui, gui->createTopLevelBlock(800, 600));
-	g_main_frame->getParent()->layout();
-}
-
-
-int main(int argc, char* argv[])
-{
-	SDL_Renderer* displayRenderer;
-	SDL_Window* displayWindow;
-	SDL_Init(SDL_INIT_VIDEO);
-    SDL_RendererInfo displayRendererInfo;
-    SDL_CreateWindowAndRenderer(800, 600, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE, &displayWindow, &displayRenderer);
-    SDL_GetRendererInfo(displayRenderer, &displayRendererInfo);
-	SDL_GLContext context = SDL_GL_CreateContext(displayWindow);
-    if ((displayRendererInfo.flags & SDL_RENDERER_ACCELERATED) == 0 || 
-        (displayRendererInfo.flags & SDL_RENDERER_TARGETTEXTURE) == 0) {
-			return -1;
-    }
-	SDL_GL_MakeCurrent(displayWindow, context);
-    SDL_GL_SetAttribute( SDL_GL_CONTEXT_MAJOR_VERSION, 3 );
-    SDL_GL_SetAttribute( SDL_GL_CONTEXT_MINOR_VERSION, 2 );
-    
-    char path[MAX_PATH];
-	GetCurrentDirectoryA(MAX_PATH, path);
-	GLenum glerr = glGetError();
-	const GLubyte* glstr = glGetString(GL_VENDOR);
-	Lux::EditorServer server;
-	server.create(NULL, NULL, path);
-	server.onResize(800, 600);
-	Lux::EditorClient client;
-	client.create();
-	initGui(client, server);
-	Lux::UI::Gui* gui = (Lux::UI::Gui*)server.getEngine().getPluginManager().getPlugin("gui");
-	SDL_Event evt;
-	bool finished = false;
-	while(!finished)
+	void initGui(Lux::EditorClient& client, Lux::EditorServer& server)
 	{
+		Lux::UI::OpenGLRenderer* renderer = LUX_NEW(Lux::UI::OpenGLRenderer)();
+		renderer->create();
+		renderer->loadFont("gui/font.tga", server.getEngine().getFileSystem());
+		renderer->setWindowHeight(600);
+		server.getEngine().loadPlugin("gui.dll");
+		Lux::UI::Gui* gui = (Lux::UI::Gui*)server.getEngine().getPluginManager().getPlugin("gui");
+		gui->setRenderer(*renderer);
+		gui->createBaseDecorators("gui/skin.atl");
+
+		m_main_frame = LUX_NEW(MainFrame)(client, *gui, gui->createTopLevelBlock(800, 600));
+		m_main_frame->getParent()->layout();
+		m_gui = gui;
+	}
+
+	bool create()
+	{
+		SDL_Renderer* displayRenderer;
+		SDL_Init(SDL_INIT_VIDEO);
+		SDL_RendererInfo displayRendererInfo;
+		SDL_CreateWindowAndRenderer(800, 600, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE, &m_display_window, &displayRenderer);
+		SDL_GetRendererInfo(displayRenderer, &displayRendererInfo);
+		SDL_GLContext context = SDL_GL_CreateContext(m_display_window);
+		if ((displayRendererInfo.flags & SDL_RENDERER_ACCELERATED) == 0 || 
+			(displayRendererInfo.flags & SDL_RENDERER_TARGETTEXTURE) == 0) {
+				return false;
+		}
+		SDL_GL_MakeCurrent(m_display_window, context);
+		SDL_GL_SetAttribute( SDL_GL_CONTEXT_MAJOR_VERSION, 3 );
+		SDL_GL_SetAttribute( SDL_GL_CONTEXT_MINOR_VERSION, 2 );
+    
+		char path[MAX_PATH];
+		GetCurrentDirectoryA(MAX_PATH, path);
+		m_server.create(NULL, NULL, path);
+		m_server.onResize(800, 600);
+		m_client.create();
+	
+		initGui(m_client, m_server);
+		Lux::UI::Gui* gui = (Lux::UI::Gui*)m_server.getEngine().getPluginManager().getPlugin("gui");
+		return true;
+	}
+
+	void handleEvents()
+	{
+		SDL_Event evt;
 		while(SDL_PollEvent(&evt))
 		{
 			switch(evt.type)
@@ -98,45 +65,45 @@ int main(int argc, char* argv[])
 				case SDL_WINDOWEVENT:
 					if(evt.window.event == SDL_WINDOWEVENT_RESIZED)
 					{
-						static_cast<Lux::UI::OpenGLRenderer&>(gui->getRenderer()).setWindowHeight(evt.window.data2);
-						server.onResize(evt.window.data1, evt.window.data2);
-						g_main_frame->getParent()->setArea(0, 0, 0, 0, 0, (float)evt.window.data1, 0, (float)evt.window.data2);
-						g_main_frame->getParent()->layout();
+						static_cast<Lux::UI::OpenGLRenderer&>(m_gui->getRenderer()).setWindowHeight(evt.window.data2);
+						m_server.onResize(evt.window.data1, evt.window.data2);
+						m_main_frame->getParent()->setArea(0, 0, 0, 0, 0, (float)evt.window.data1, 0, (float)evt.window.data2);
+						m_main_frame->getParent()->layout();
 					}
 					break;
 				case SDL_TEXTEDITING:
 					evt.text.text;
-					finished = false;
+					m_finished = false;
 					break;
 				case SDL_KEYDOWN:
-					gui->keyDown(evt.key.keysym.sym);
+					m_gui->keyDown(evt.key.keysym.sym);
 					if(evt.key.keysym.sym == SDLK_ESCAPE)
-						finished = true;
+						m_finished = true;
 					break;
 				case SDL_KEYUP:
 					break;
 				case SDL_MOUSEBUTTONDOWN:
-					gui->mouseDown(evt.button.x, evt.button.y);
-					if(!gui->click(evt.button.x, evt.button.y))
+					m_gui->mouseDown(evt.button.x, evt.button.y);
+					if(!m_gui->click(evt.button.x, evt.button.y))
 					{
-						client.mouseDown(evt.button.x, evt.button.y, evt.button.button == SDL_BUTTON_LEFT ? 0 : 2);
+						m_client.mouseDown(evt.button.x, evt.button.y, evt.button.button == SDL_BUTTON_LEFT ? 0 : 2);
 					}
 					break;
 				case SDL_MOUSEBUTTONUP:
-					gui->mouseUp(evt.button.x, evt.button.y);
-					client.mouseUp(evt.button.x, evt.button.y, evt.button.button == SDL_BUTTON_LEFT ? 0 : 2);
+					m_gui->mouseUp(evt.button.x, evt.button.y);
+					m_client.mouseUp(evt.button.x, evt.button.y, evt.button.button == SDL_BUTTON_LEFT ? 0 : 2);
 					break;
 				case SDL_MOUSEMOTION:
-					gui->mouseMove(evt.motion.x, evt.motion.y, evt.motion.xrel, evt.motion.yrel);
-					client.mouseMove(evt.motion.x, evt.motion.y, evt.motion.xrel, evt.motion.yrel);
+					m_gui->mouseMove(evt.motion.x, evt.motion.y, evt.motion.xrel, evt.motion.yrel);
+					m_client.mouseMove(evt.motion.x, evt.motion.y, evt.motion.xrel, evt.motion.yrel);
 					break;
 				case SDL_QUIT:
-					finished = true;
+					m_finished = true;
 					break;
 			}
 		}
 		const Uint8* keys = SDL_GetKeyboardState(NULL);
-		if(gui->getFocusedBlock() == NULL)
+		if(m_gui->getFocusedBlock() == NULL)
 		{
 
 			bool forward = keys[SDL_SCANCODE_W] != 0;
@@ -147,17 +114,58 @@ int main(int argc, char* argv[])
 			if (forward || backward || left || right)
 			{
 				float camera_speed = 1.0f;
-				client.navigate(forward ? camera_speed : (backward ? -camera_speed : 0.0f)
+				m_client.navigate(forward ? camera_speed : (backward ? -camera_speed : 0.0f)
 					, right ? camera_speed : (left ? -camera_speed : 0.0f)
 					, shift ? 1 : 0);
 			} 
 		}
-		g_main_frame->update();
-		server.tick(NULL, NULL);
-		gui->render();
-		SDL_GL_SwapWindow(displayWindow);
 	}
-	server.destroy();
-    SDL_Quit();
+
+
+	void mainLoop()
+	{
+		m_finished = false;
+		while(!m_finished)
+		{
+			handleEvents();
+			update();
+			render();
+		}
+	}
+
+	void update()
+	{
+		m_main_frame->update();
+		m_server.tick(NULL, NULL);
+	}
+
+	void render()
+	{
+		m_gui->render();
+		SDL_GL_SwapWindow(m_display_window);
+	}
+
+	void destroy()
+	{
+		m_server.destroy();
+	    SDL_Quit();
+	}
+
+	MainFrame* m_main_frame;
+	Lux::UI::Gui* m_gui;
+	Lux::EditorServer m_server;
+	Lux::EditorClient m_client;
+	SDL_Window* m_display_window;
+	bool m_finished;
+
+};
+
+
+int main(int argc, char* argv[])
+{
+	App app;
+	app.create();
+	app.mainLoop();
+	app.destroy();	
     return 0;
 }
