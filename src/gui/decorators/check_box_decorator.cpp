@@ -1,4 +1,6 @@
 #include "gui/decorators/check_box_decorator.h"
+#include "core/path.h"
+#include "engine/engine.h"
 #include "gui/atlas.h"
 #include "gui/block.h"
 #include "gui/controls/check_box.h"
@@ -46,7 +48,7 @@ namespace UI
 	{
 		m_parts[0] = NULL;
 		m_parts[1] = NULL;
-		m_atlas = gui.loadAtlas(atlas);
+		m_atlas = gui.loadAtlas(FS::Path(atlas, gui.getEngine()->getFileSystem()));
 		return m_atlas != NULL;
 	}
 

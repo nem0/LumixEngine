@@ -1,8 +1,9 @@
 #include "core/os_file.h"
 #include "core/lux.h"
+#include "core/path.h"
 
-#include <assert.h>
 #include <windows.h>
+
 
 namespace Lux
 {
@@ -22,13 +23,13 @@ namespace Lux
 			ASSERT(NULL == m_impl);
 		}
 
-		bool OsFile::open(const char* path, Mode mode)
+		bool OsFile::open(const Path& path, Mode mode)
 		{
 			//TODO: normalize path
 			HANDLE hnd = INVALID_HANDLE_VALUE;
 			if(Mode::OPEN & mode)
 			{
-				hnd = ::CreateFile(path, 
+				hnd = ::CreateFile(path.getCString(), 
 					Mode::WRITE & mode ? GENERIC_WRITE : 0 | Mode::READ & mode ? GENERIC_READ : 0,
 					Mode::WRITE & mode ? 0 : FILE_SHARE_READ,
 					NULL,
@@ -41,7 +42,7 @@ namespace Lux
 			}
 			else if(Mode::OPEN_OR_CREATE & mode)
 			{
-				hnd = ::CreateFile(path, 
+				hnd = ::CreateFile(path.getCString(), 
 					Mode::WRITE & mode ? GENERIC_WRITE : 0 | Mode::READ & mode ? GENERIC_READ : 0,
 					Mode::WRITE & mode ? 0 : FILE_SHARE_READ,
 					NULL,
@@ -51,7 +52,7 @@ namespace Lux
 			}
 			else if(Mode::RECREATE & mode)
 			{
-				hnd = ::CreateFile(path, 
+				hnd = ::CreateFile(path.getCString(), 
 					Mode::WRITE & mode ? GENERIC_WRITE : 0 | Mode::READ & mode ? GENERIC_READ : 0,
 					Mode::WRITE & mode ? 0 : FILE_SHARE_READ,
 					NULL,

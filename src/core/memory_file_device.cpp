@@ -27,7 +27,7 @@ namespace Lux
 				LUX_DELETE(m_file); 
 			}
 
-			virtual bool open(const char* path, Mode mode) LUX_OVERRIDE
+			virtual bool open(const Path& path, Mode mode) LUX_OVERRIDE
 			{
 				ASSERT(NULL == m_buffer); // reopen is not supported currently
 

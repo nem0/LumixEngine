@@ -1,6 +1,5 @@
 #include "core/log.h"
 #include "core/pod_array.h"
-#include "core/string.h"
 #include <cstdio>
 #include <cstdarg>
 

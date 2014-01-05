@@ -16,7 +16,7 @@ namespace Lux
 			DiskFile() {}
 			virtual ~DiskFile() {}
 
-			virtual bool open(const char* path, Mode mode) LUX_OVERRIDE
+			virtual bool open(const Path& path, Mode mode) LUX_OVERRIDE
 			{
 				return m_file.open(path, mode);
 			}

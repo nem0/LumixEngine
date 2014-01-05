@@ -99,6 +99,8 @@
     <ClCompile Include="..\..\src\core\matrix.cpp" />
     <ClCompile Include="..\..\src\core\memory_file_device.cpp" />
     <ClCompile Include="..\..\src\core\os_file.cpp" />
+    <ClCompile Include="..\..\src\core\path.cpp" />
+    <ClCompile Include="..\..\src\core\path_manager.cpp" />
     <ClCompile Include="..\..\src\core\pc\atomic.cpp" />
     <ClCompile Include="..\..\src\core\pc\event.cpp" />
     <ClCompile Include="..\..\src\core\pc\input_system.cpp" />
@@ -142,6 +144,8 @@
     <ClInclude Include="..\..\src\core\memory_file_device.h" />
     <ClInclude Include="..\..\src\core\mutex.h" />
     <ClInclude Include="..\..\src\core\os_file.h" />
+    <ClInclude Include="..\..\src\core\path.h" />
+    <ClInclude Include="..\..\src\core\path_manager.h" />
     <ClInclude Include="..\..\src\core\pod_array.h" />
     <ClInclude Include="..\..\src\core\quat.h" />
     <ClInclude Include="..\..\src\core\semaphore.h" />

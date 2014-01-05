@@ -1,11 +1,13 @@
 #include "core/file_system.h"
+#include <new>
 #include "core/disk_file_device.h"
 #include "core/ifile.h"
+#include "core/path.h"
+#include "core/path_manager.h"
 #include "core/pod_array.h"
 #include "core/string.h"
-#include "core/transaction_queue.h"
-
 #include "core/task.h"
+#include "core/transaction_queue.h"
 
 namespace Lux
 {
@@ -19,7 +21,7 @@ namespace Lux
 			void* m_user_data;
 			ReadCallback m_cb;
 			Mode m_mode;
-			char m_path[_MAX_PATH];
+			Path m_path;
 			bool m_result;
 
 		};
@@ -68,6 +70,7 @@ namespace Lux
 				m_task = LUX_NEW(FSTask)(&m_transaction_queue);
 				m_task->create("FSTask");
 				m_task->run();
+				m_path_manager = PathManager::create();
 			}
 
 			~FileSystemImpl()
@@ -75,6 +78,7 @@ namespace Lux
 				m_task->stop();
 				m_task->destroy();
 				LUX_DELETE(m_task);
+				PathManager::destroy(*m_path_manager);
 			}
 
 			bool mount(IFileDevice* device) LUX_OVERRIDE
@@ -105,7 +109,7 @@ namespace Lux
 				return false;
 			}
 
-			IFile* open(const char* device_list, const char* file, Mode mode) LUX_OVERRIDE
+			IFile* open(const char* device_list, const Path& file, Mode mode) LUX_OVERRIDE
 			{
 				IFile* prev = parseDeviceList(device_list);
 
@@ -124,7 +128,7 @@ namespace Lux
 				return NULL;
 			}
 
-			IFile* openAsync(const char* device_list, const char* file, int mode, ReadCallback call_back, void* user_data) LUX_OVERRIDE
+			IFile* openAsync(const char* device_list, const Path& file, int mode, ReadCallback call_back, void* user_data) LUX_OVERRIDE
 			{
 				IFile* prev = parseDeviceList(device_list);
 
@@ -133,11 +137,12 @@ namespace Lux
 					AsynTrans* tr = m_transaction_queue.alloc(true);
 					if(tr)
 					{
+						::new (&tr->data) AsyncItem();
 						tr->data.m_file = prev;
 						tr->data.m_user_data = user_data;
 						tr->data.m_cb = call_back;
 						tr->data.m_mode = mode;
-						strcpy(tr->data.m_path, file);
+						tr->data.m_path = file;
 						tr->data.m_result = false;
 						tr->reset();
 
@@ -159,6 +164,7 @@ namespace Lux
 				AsynTrans* tr = m_transaction_queue.alloc(true);
 				if(tr)
 				{
+					::new (&tr->data) AsyncItem();
 					tr->data.m_file = file;
 					tr->data.m_user_data = NULL;
 					tr->data.m_cb = closeAsync;
@@ -181,6 +187,7 @@ namespace Lux
 						m_in_progress.erase(i);
 
 						tr->data.m_cb(tr->data.m_file, tr->data.m_result, tr->data.m_user_data);
+						tr->data.~AsyncItem();
 						m_transaction_queue.dealoc(tr);
 
 						break;
@@ -190,6 +197,11 @@ namespace Lux
 
 			const char* getDefaultDevice() const LUX_OVERRIDE { return "memory:disk"; }
 			const char* getSaveGameDevice() const LUX_OVERRIDE { return "memory:disk"; }
+
+			PathManager& getPathManager() LUX_OVERRIDE
+			{
+				return *m_path_manager; 
+			}
 
 			IFileDevice* getDevice(const char* device)
 			{
@@ -243,6 +255,7 @@ namespace Lux
 			}
 
 		private:
+			PathManager* m_path_manager;
 			FSTask* m_task;
 			DevicesTable m_devices;
 

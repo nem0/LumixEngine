@@ -75,9 +75,9 @@ namespace editor_ng.FileServer
             m_buffer = new byte[1024];
             IPHostEntry ipHost = Dns.GetHostEntry("");
             IPAddress ip_addr = ipHost.AddressList[0];
-            IPEndPoint ip_end_point = new IPEndPoint(ip_addr, 10001);
+            IPEndPoint ip_end_point = new IPEndPoint(ip_addr, 10009);
             System.Threading.Thread.Sleep(1000); // waiting for native part /// TODO remove this hack
-            m_client = new TcpClient("127.0.0.1", 10001);
+            m_client = new TcpClient("127.0.0.1", 10009);
             m_client.GetStream().BeginRead(m_buffer, 0, 1024, new AsyncCallback(onReceive), this);
         }
     }

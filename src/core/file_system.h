@@ -9,6 +9,8 @@ namespace Lux
 	{
 		class IFile;
 		class IFileDevice;
+		class Path;
+		class PathManager;
 
 		class LUX_CORE_API FileSystem LUX_ABSTRACT
 		{
@@ -22,8 +24,8 @@ namespace Lux
 			virtual bool mount(IFileDevice* device) = 0;
 			virtual bool unMount(IFileDevice* device) = 0;
 
-			virtual IFile* open(const char* device_list, const char* file, Mode mode) = 0;
-			virtual IFile* openAsync(const char* device_list, const char* file, int mode, ReadCallback call_back, void* user_data) = 0;
+			virtual IFile* open(const char* device_list, const Path& file, Mode mode) = 0;
+			virtual IFile* openAsync(const char* device_list, const Path& file, int mode, ReadCallback call_back, void* user_data) = 0;
 			 
 			virtual void close(IFile* file) = 0;
 			virtual void closeAsync(IFile* file) = 0;
@@ -32,6 +34,7 @@ namespace Lux
 
 			virtual const char* getDefaultDevice() const = 0;
 			virtual const char* getSaveGameDevice() const = 0;
+			virtual PathManager& getPathManager() = 0;
 		};
 	} // ~namespace FS
 } // ~namespace Lux

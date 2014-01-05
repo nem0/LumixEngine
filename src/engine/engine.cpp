@@ -45,9 +45,9 @@ namespace Lux
 		m_file_system = FS::FileSystem::create();
 
 		FS::TCPFileServer* server = LUX_NEW(FS::TCPFileServer)();
-		server->start();
+		server->start(*m_file_system);
 
-		m_tcp_file_device.connect("127.0.0.1", 10001);
+		m_tcp_file_device.connect("127.0.0.1", 10009);
 
 		m_file_system->mount(&m_mem_file_device);
 		m_file_system->mount(&m_disk_file_device);

@@ -11,6 +11,7 @@ namespace Lux
 	namespace FS
 	{
 		class FileSystem;
+		class Path;
 	} // ~namespace FS
 
 	namespace UI
@@ -43,10 +44,10 @@ namespace Lux
 				bool create();
 				void destroy();
 
-				void load(IRenderer& renderer, Lux::FS::FileSystem& file_system, const char* filename);
+				void load(IRenderer& renderer, Lux::FS::FileSystem& file_system, const FS::Path& filename);
 				TextureBase* getTexture() const;
 				const Part* getPart(const char* name);
-				const string& getPath() const;
+				const FS::Path& getPath() const;
 
 			private:
 				struct AtlasImpl* m_impl;

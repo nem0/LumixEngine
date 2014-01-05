@@ -1,7 +1,8 @@
 #include "core/tcp_file_device.h"
+#include "core/file_system.h"
 #include "core/ifile.h"
 #include "core/ifile_system_defines.h"
-#include "core/file_system.h"
+#include "core/path.h"
 #include "core/tcp_connector.h"
 #include "core/tcp_stream.h"
 
@@ -16,14 +17,14 @@ namespace Lux
 			TCPFile(Net::TCPStream* stream) : m_stream(stream) {}
 			~TCPFile() {}
 
-			virtual bool open(const char* path, Mode mode) LUX_OVERRIDE
+			virtual bool open(const Path& path, Mode mode) LUX_OVERRIDE
 			{
 				int32_t op = TCPCommand::OpenFile;
 				int32_t ret = 0;
 
 				m_stream->write(op);
 				m_stream->write(mode);
-				m_stream->write(path);
+				m_stream->write(path.getCString());
 				m_stream->read(ret);
 
 				return 1 == ret;

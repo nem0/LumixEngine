@@ -9,6 +9,7 @@
 #include "core/ifile_system_defines.h"
 #include "core/json_serializer.h"
 #include "core/matrix.h"
+#include "core/path.h"
 #include "core/pod_array.h"
 #include "core/quat.h"
 #include "core/vec3.h"
@@ -168,7 +169,7 @@ void RendererImpl::loadResources()
 		LoadInfo* info = LUX_NEW(LoadInfo)();
 		info->m_renderer = this;
 		info->m_res = res;		
-		m_file_system->openAsync(m_file_system->getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, &resourceLoaded, info);
+		m_file_system->openAsync(m_file_system->getDefaultDevice(), FS::Path(path, *m_file_system), FS::Mode::OPEN | FS::Mode::READ, &resourceLoaded, info);
 	}
 }
 

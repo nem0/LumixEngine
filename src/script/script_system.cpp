@@ -6,6 +6,7 @@
 #include "core/ifile.h"
 #include "core/json_serializer.h"
 #include "core/log.h"
+#include "core/path.h"
 #include "core/pod_array.h"
 #include "engine/engine.h"
 #include "universe/universe.h"
@@ -23,13 +24,13 @@ namespace Lux
 	{
 		void postDeserialize();
 		void compile();
-		void getDll(const char* script_path, char* dll_path, int max_length);
+		void getDll(const FS::Path& path, char* dll_path, int max_length);
 		void getScriptDefaultPath(Entity e, char* path, int max_path, const char* ext);
 
 		PODArray<int> m_scripts;
 		PODArray<BaseScript*> m_script_objs;
 		PODArray<HMODULE> m_libs;
-		Array<string> m_paths;
+		Array<FS::Path> m_paths;
 		Universe* m_universe;
 		Engine* m_engine;
 		bool m_is_running;
@@ -78,7 +79,7 @@ namespace Lux
 		for(int i = 0; i < m_impl->m_scripts.size(); ++i)
 		{
 			Entity e(m_impl->m_universe, m_impl->m_scripts[i]);
-			m_impl->getDll(m_impl->m_paths[i].c_str(), path, MAX_PATH);
+			m_impl->getDll(m_impl->m_paths[i], path, MAX_PATH);
 			HMODULE h = LoadLibrary(path);
 			m_impl->m_libs.push(h);
 			if(h)
@@ -87,7 +88,7 @@ namespace Lux
 				BaseScript* script = f();
 				if(!f)
 				{
-					g_log_warning.log("script", "failed to create script %s", m_impl->m_paths[i].c_str());
+					g_log_warning.log("script", "failed to create script %s", m_impl->m_paths[i].getCString());
 					m_impl->m_script_objs.push(0);
 				}
 				else
@@ -98,7 +99,7 @@ namespace Lux
 			}
 			else
 			{
-				g_log_warning.log("script", "failed to load script %s", m_impl->m_paths[i].c_str());
+				g_log_warning.log("script", "failed to load script %s", m_impl->m_paths[i].getCString());
 				m_impl->m_script_objs.push(0);
 			}
 		}
@@ -110,12 +111,15 @@ namespace Lux
 		int count;
 		serializer.deserialize("count", count);
 		m_impl->m_scripts.resize(count);
-		m_impl->m_paths.resize(count);
+		m_impl->m_paths.clear();
+		m_impl->m_paths.reserve(count);
 		serializer.deserializeArrayBegin("scripts");
 		for(int i = 0; i < m_impl->m_scripts.size(); ++i)
 		{
 			serializer.deserializeArrayItem(m_impl->m_scripts[i]);
-			serializer.deserializeArrayItem(m_impl->m_paths[i]);
+			char tmp[FS::Path::MAX_LENGTH];
+			serializer.deserializeArrayItem(tmp, FS::Path::MAX_LENGTH);
+			m_impl->m_paths.push(FS::Path(tmp, m_impl->m_engine->getFileSystem()));
 		}
 		serializer.deserializeArrayEnd();		
 		m_impl->postDeserialize();
@@ -128,7 +132,7 @@ namespace Lux
 		for(int i = 0; i < m_impl->m_scripts.size(); ++i)
 		{
 			serializer.serializeArrayItem(m_impl->m_scripts[i]);
-			serializer.serializeArrayItem(m_impl->m_paths[i]);
+			serializer.serializeArrayItem(m_impl->m_paths[i].getCString());
 		}
 		serializer.endArray();
 	}
@@ -156,18 +160,18 @@ namespace Lux
 
 	void ScriptSystem::getScriptPath(Component cmp, string& str)
 	{
-		str = m_impl->m_paths[cmp.index];
+		str = m_impl->m_paths[cmp.index].getCString();
 	}
 
 	void ScriptSystem::setScriptPath(Component cmp, const string& str)
 	{
-		m_impl->m_paths[cmp.index] = str;
+		m_impl->m_paths[cmp.index] = FS::Path(str.c_str(), m_impl->m_engine->getFileSystem());
 	}
 	
-	void ScriptSystemImpl::getDll(const char* script_path, char* dll_path, int max_length)
+	void ScriptSystemImpl::getDll(const FS::Path& script_path, char* dll_path, int max_length)
 	{
-		strcpy_s(dll_path, max_length, script_path);
-		int len = strlen(script_path);
+		strcpy_s(dll_path, max_length, script_path.getCString());
+		int len = strlen(script_path.getCString());
 		if(len > 4)
 		{
 			strcpy_s(dll_path + len - 4, 5, ".dll"); 
@@ -194,11 +198,11 @@ namespace Lux
 		m_impl->getScriptDefaultPath(entity, path, MAX_PATH, "cpp");
 
 		FS::FileSystem& fs = m_impl->m_engine->getFileSystem();
-		FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::OPEN_OR_CREATE);
+		FS::IFile* file = fs.open(fs.getDefaultDevice(), FS::Path(path, m_impl->m_engine->getFileSystem()), FS::Mode::OPEN_OR_CREATE);
 		fs.close(file);
 
 		m_impl->m_scripts.push(entity.index);
-		m_impl->m_paths.push(string(path));
+		m_impl->m_paths.push(FS::Path(path, m_impl->m_engine->getFileSystem()));
 
 		Component cmp(entity, script_type, this, m_impl->m_scripts.size() - 1);
 		m_impl->m_universe->getEventManager()->emitEvent(ComponentEvent(cmp));

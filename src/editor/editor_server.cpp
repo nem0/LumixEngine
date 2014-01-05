@@ -5,17 +5,23 @@
 #include <Windows.h>
 #include "Horde3DUtils.h"
 
+#include "core/array.h"
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/file_system.h"
 #include "core/ifile.h"
+#include "core/input_system.h"
 #include "core/json_serializer.h"
 #include "core/log.h"
 #include "core/map.h"
 #include "core/matrix.h"
 #include "core/memory_file_device.h"
+#include "core/mutex.h"
+#include "core/path.h"
 #include "core/pod_array.h"
-#include "core/array.h"
+#include "core/task.h"
+#include "core/tcp_acceptor.h"
+#include "core/tcp_stream.h"
 #include "editor/editor_icon.h"
 #include "editor/gizmo.h"
 #include "editor/property_descriptor.h"
@@ -23,11 +29,6 @@
 #include "engine/iplugin.h"
 #include "engine/plugin_manager.h"
 #include "graphics/renderer.h"
-#include "core/input_system.h"
-#include "core/mutex.h"
-#include "core/task.h"
-#include "core/tcp_acceptor.h"
-#include "core/tcp_stream.h"
 #include "script\script_system.h"
 #include "universe/component_event.h"
 #include "universe/entity_destroyed_event.h"
@@ -133,8 +134,8 @@ struct EditorServerImpl
 		void createUniverse(bool create_scene, const char* base_path);
 		void renderScene(bool is_render_physics);
 		void renderPhysics();
-		void save(const char path[]);
-		void load(const char path[]);
+		void save(const FS::Path& path);
+		void load(const FS::Path& path);
 		void addComponent(uint32_t type_crc);
 		void sendComponent(uint32_t type_crc);
 		void removeComponent(uint32_t type_crc);
@@ -377,9 +378,9 @@ void EditorServerImpl::onPointerUp(int x, int y, MouseButton::Value button)
 }
 
 
-void EditorServerImpl::save(const char path[])
+void EditorServerImpl::save(const FS::Path& path)
 {
-	g_log_info.log("editor server", "saving universe %s...", path);
+	g_log_info.log("editor server", "saving universe %s...", path.getCString());
 	FS::FileSystem& fs = m_engine.getFileSystem();
 	FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
 	save(*file);
@@ -422,7 +423,8 @@ void EditorServerImpl::addEntity()
 int MessageTask::task()
 {
 	m_is_finished = false;
-	m_acceptor.start("127.0.0.1", 10002);
+	bool success = m_acceptor.start("127.0.0.1", 10008);
+	ASSERT(success);
 	m_stream = m_acceptor.accept();
 	PODArray<uint8_t> data;
 	data.resize(5);
@@ -452,7 +454,7 @@ void EditorServerImpl::toggleGameMode()
 	}
 	else
 	{
-		m_game_mode_file = m_engine.getFileSystem().open("memory", "", FS::Mode::WRITE);
+		m_game_mode_file = m_engine.getFileSystem().open("memory", FS::Path("", m_engine.getFileSystem()), FS::Mode::WRITE);
 		save(*m_game_mode_file);
 		m_engine.getScriptSystem().start();
 		m_is_game_mode = true;
@@ -624,9 +626,9 @@ void loadMap(FS::IFile* file, bool success, void* user_data)
 }
 
 
-void EditorServerImpl::load(const char path[])
+void EditorServerImpl::load(const FS::Path& path)
 {
-	g_log_info.log("editor server", "loading universe %s...", path);
+	g_log_info.log("editor server", "loading universe %s...", path.getCString());
 	FS::FileSystem& fs = m_engine.getFileSystem();
 	fs.openAsync(fs.getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, &loadMap, this);
 }
@@ -1178,10 +1180,10 @@ void EditorServerImpl::onMessage(void* msgptr, int size)
 			navigate(fmsg[1], fmsg[2], msg[3]);
 			break;
 		case ClientMessageType::SAVE:
-			save(reinterpret_cast<char*>(&msg[1]));
+			save(FS::Path(reinterpret_cast<char*>(&msg[1]), m_engine.getFileSystem()));
 			break;
 		case ClientMessageType::LOAD:
-			load(reinterpret_cast<char*>(&msg[1]));
+			load(FS::Path(reinterpret_cast<char*>(&msg[1]), m_engine.getFileSystem()));
 			break;
 		case ClientMessageType::ADD_COMPONENT:
 			addComponent(*reinterpret_cast<uint32_t*>(&msg[1]));
