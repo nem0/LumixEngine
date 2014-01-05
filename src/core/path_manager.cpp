@@ -58,6 +58,7 @@ namespace FS
 			if(path_string.m_references == 0)
 			{
 				LUX_DELETE_ARRAY(path_string.m_path);
+				path_string.m_path = NULL;
 				m_strings.erase(path_string.m_hash);
 			}
 		}

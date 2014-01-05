@@ -161,6 +161,7 @@ class map
 			if(!node || node->key != key)
 			{
 				Node* new_node = new ((Node*)m_allocator.allocate(sizeof(Node))) Node();
+				++m_size;
 				new_node->key = key;
 				insert(key, m_root, NULL, new_node);
 				return new_node->value;
@@ -172,10 +173,10 @@ class map
 		void insert(const Key& key, const Value& value)
 		{
 			Node* new_node = new ((Node*)m_allocator.allocate(sizeof(Node))) Node();
+			++m_size;
 			new_node->key = key;
 			new_node->value = value;
 			insert(key, m_root, 0, new_node);
-			++m_size;
 		}
 
 		void erase(const Key& key)
@@ -190,11 +191,13 @@ class map
 			{
 				clearNode(node->left);
 				clearNode(node->right);
+				--m_size;
+				node->value.~Value();
 				m_allocator.deallocate(node);
 			}
 		}
 
-		Node* rotateRight(Node*& node)
+		Node* rotateLeft(Node*& node)
 		{
 			Node* rightChild = node->right;
 			node->right = rightChild->left;
@@ -210,13 +213,8 @@ class map
 			return node;
 		}
 
-		void doubleRotateRight(Node*& node)
-		{
-			rotateLeft(node->right);
-			rotateRight(node);
-		}
 
-		Node* rotateLeft(Node*& node)
+		Node* rotateRight(Node*& node)
 		{
 			Node* leftChild = node->left;
 			node->left = leftChild->right;
@@ -226,52 +224,53 @@ class map
 			leftChild->parent = node->parent;
 			if(leftChild->right)
 				leftChild->right->parent = leftChild;
+
 			leftChild->height = Math::max(leftChild->getLeftHeight(), leftChild->getRightHeight()) + 1;
 			node->height = Math::max(node->getLeftHeight(), node->getRightHeight()) + 1;
+			
 			node = leftChild;
 			return node;
 		}
 
-		void doubleRotateLeft(Node*& node)
-		{
-			rotateRight(node->left);
-			rotateLeft(node);
-		}
 
-		void insert(const Key& key, Node*& node, Node* parent, Node* new_node)
+		Node* insert(const Key& key, Node*& node, Node* parent, Node* new_node)
 		{
+			Node* ret = node;
 			if(node == 0)
 			{
 				node = new_node;
 				node->parent = parent;
+				ret = node;
 			}
 			else if(key < node->key)
 			{
-				insert(key, node->left, node, new_node);
+				node->left = insert(key, node->left, node, new_node);
 				if(node->getLeftHeight() - node->getRightHeight() == 2)
 				{
 					if(key < node->left->key)
 					{
-						rotateLeft(node);
+						ret = rotateRight(node);
 					}
 					else
 					{
-						doubleRotateLeft(node);
+						node->left = rotateLeft(node->left);
+						ret = rotateRight(node);
 					}
 				}
 			}
 			else if(key > node->key)
 			{
-				insert(key, node->right, node, new_node);
+				node->right = insert(key, node->right, node, new_node);
 				if(node->getRightHeight() - node->getLeftHeight() == 2)
 				{
 					if(key > node->right->key)
 					{
-						rotateRight(node);
+						ret = rotateLeft(node);
 					}
 					else
 					{
-						doubleRotateRight(node);
+						node->right = rotateRight(node->right);
+						ret = rotateLeft(node);
 					}
 				}
 			}
@@ -279,7 +278,8 @@ class map
 			{
 				ASSERT(false); // key == node->key -> key already in tree
 			}
-			node->height = Math::max(node->getLeftHeight(), node->getRightHeight()) + 1;
+			ret->height = Math::max(node->getLeftHeight(), node->getRightHeight()) + 1;
+			return ret;
 		}
 
 
@@ -322,15 +322,32 @@ class map
 						root = NULL;
 					}
 					else 
-						*root = *temp;
+					{
+						temp->parent = root->parent;
+						if(root->parent)
+						{
+							if(root->parent->left == root)
+							{
+								root->parent->left = temp;
+							}
+							else
+							{
+								root->parent->right = temp;
+							}
+						}
+						Node* swap = temp;
+						temp = root;
+						root = swap;
+					}
 
 					--m_size; 
+					temp->value.~Value();
 					m_allocator.deallocate(temp);
 				}
 				else
 				{
 					Node* temp = getMinValueNode(root->right);
-					root->key = temp->key;
+					swap(temp, root);
 					root->right = deleteNode(temp->key, root->right);
 				}
 			}
@@ -342,17 +359,17 @@ class map
 
 			int balance = root->getLeftHeight() - root->getRightHeight();
 
-			int left_balance = (root->left->getLeftHeight() - root->left->getRightHeight());
+			int left_balance = root->left ? (root->left->getLeftHeight() - root->left->getRightHeight()) : 0;
 			if (balance > 1 && left_balance >= 0)
 				return rotateRight(root);
 
 			if (balance > 1 && left_balance < 0)
 			{
-				root->left =  rotateLeft(root->left);
+				root->left = rotateLeft(root->left);
 				return rotateRight(root);
 			}
 
-			int right_balance = (root->right->getLeftHeight() - root->right->getRightHeight());
+			int right_balance = root->right ? (root->right->getLeftHeight() - root->right->getRightHeight()) : 0;
 			if (balance < -1 && right_balance <= 0)
 				return rotateLeft(root);
 
@@ -365,6 +382,62 @@ class map
 
 			return root;
 		}	
+
+		void swap(Node*& a, Node*& b)
+		{
+			Node* tmp = a->left;
+			a->left = b->left;
+			b->left = tmp;
+			if(a->left)
+			{
+				a->left->parent = a;
+			}
+			if(b->left)
+			{
+				b->left->parent = b;
+			}
+
+			tmp = a->right;
+			a->right = b->right;
+			b->right = tmp;
+			if(a->right)
+			{
+				a->right->parent = a;
+			}
+			if(b->right)
+			{
+				b->right->parent = b;
+			}
+
+			tmp = a->parent;
+			a->parent = b->parent;
+			if(b->parent)
+			{
+				if(b->parent->left == b)
+				{
+					a->parent->left = a;
+				}
+				else
+				{
+					a->parent->right = a;
+				}
+			}
+			b->parent = tmp;
+			if(tmp)
+			{
+				if(tmp->left == a)
+				{
+					tmp->left = b;
+				}
+				else
+				{
+					tmp->right = b;
+				}
+			}
+			tmp = a;
+			a = b;
+			b = tmp;
+		}
 
 		Node* getMinValueNode(Node* node)
 		{

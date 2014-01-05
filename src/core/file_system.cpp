@@ -1,13 +1,13 @@
 #include "core/file_system.h"
+#include <new>
 #include "core/disk_file_device.h"
 #include "core/ifile.h"
 #include "core/path.h"
 #include "core/path_manager.h"
 #include "core/pod_array.h"
 #include "core/string.h"
-#include "core/transaction_queue.h"
-
 #include "core/task.h"
+#include "core/transaction_queue.h"
 
 namespace Lux
 {
@@ -137,6 +137,7 @@ namespace Lux
 					AsynTrans* tr = m_transaction_queue.alloc(true);
 					if(tr)
 					{
+						::new (&tr->data) AsyncItem();
 						tr->data.m_file = prev;
 						tr->data.m_user_data = user_data;
 						tr->data.m_cb = call_back;
@@ -163,6 +164,7 @@ namespace Lux
 				AsynTrans* tr = m_transaction_queue.alloc(true);
 				if(tr)
 				{
+					::new (&tr->data) AsyncItem();
 					tr->data.m_file = file;
 					tr->data.m_user_data = NULL;
 					tr->data.m_cb = closeAsync;
@@ -185,6 +187,7 @@ namespace Lux
 						m_in_progress.erase(i);
 
 						tr->data.m_cb(tr->data.m_file, tr->data.m_result, tr->data.m_user_data);
+						tr->data.~AsyncItem();
 						m_transaction_queue.dealoc(tr);
 
 						break;
