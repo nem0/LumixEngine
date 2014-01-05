@@ -190,7 +190,7 @@ class map
 			{
 				clearNode(node->left);
 				clearNode(node->right);
-				m_allocator.deallocate(node, sizeof(*node));
+				m_allocator.deallocate(node);
 			}
 		}
 
@@ -325,7 +325,7 @@ class map
 						*root = *temp;
 
 					--m_size; 
-					allocator.deallocate(temp);
+					m_allocator.deallocate(temp);
 				}
 				else
 				{

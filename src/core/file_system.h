@@ -9,6 +9,7 @@ namespace Lux
 	{
 		class IFile;
 		class IFileDevice;
+		class PathManager;
 
 		class LUX_CORE_API FileSystem LUX_ABSTRACT
 		{
@@ -32,6 +33,7 @@ namespace Lux
 
 			virtual const char* getDefaultDevice() const = 0;
 			virtual const char* getSaveGameDevice() const = 0;
+			virtual PathManager& getPathManager() = 0;
 		};
 	} // ~namespace FS
 } // ~namespace Lux

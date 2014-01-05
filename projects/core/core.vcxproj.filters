@@ -56,6 +56,10 @@
     <ClCompile Include="..\..\src\core\pc\task.cpp">
       <Filter>MT</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\path.cpp">
+      <Filter>FS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\path_manager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\crc32.h" />
@@ -139,6 +143,12 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\semaphore.h">
       <Filter>MT</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\path.h">
+      <Filter>FS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\path_manager.h">
+      <Filter>FS</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

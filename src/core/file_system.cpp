@@ -1,6 +1,7 @@
 #include "core/file_system.h"
 #include "core/disk_file_device.h"
 #include "core/ifile.h"
+#include "core/path_manager.h"
 #include "core/pod_array.h"
 #include "core/string.h"
 #include "core/transaction_queue.h"
@@ -68,6 +69,7 @@ namespace Lux
 				m_task = LUX_NEW(FSTask)(&m_transaction_queue);
 				m_task->create("FSTask");
 				m_task->run();
+				m_path_manager = PathManager::create();
 			}
 
 			~FileSystemImpl()
@@ -75,6 +77,7 @@ namespace Lux
 				m_task->stop();
 				m_task->destroy();
 				LUX_DELETE(m_task);
+				PathManager::destroy(*m_path_manager);
 			}
 
 			bool mount(IFileDevice* device) LUX_OVERRIDE
@@ -191,6 +194,11 @@ namespace Lux
 			const char* getDefaultDevice() const LUX_OVERRIDE { return "memory:disk"; }
 			const char* getSaveGameDevice() const LUX_OVERRIDE { return "memory:disk"; }
 
+			PathManager& getPathManager() LUX_OVERRIDE
+			{
+				return *m_path_manager; 
+			}
+
 			IFileDevice* getDevice(const char* device)
 			{
 				for(int i = 0; i < m_devices.size(); ++i)
@@ -243,6 +251,7 @@ namespace Lux
 			}
 
 		private:
+			PathManager* m_path_manager;
 			FSTask* m_task;
 			DevicesTable m_devices;
 
