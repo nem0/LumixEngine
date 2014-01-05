@@ -22,7 +22,6 @@ void ScriptCompiler::compileAll()
 
 void ScriptCompiler::compile(const char path[])
 {
-	DWORD err0 = GetLastError();
 	STARTUPINFO si;
     PROCESS_INFORMATION pi;
     ZeroMemory( &si, sizeof(si) );

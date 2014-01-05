@@ -83,7 +83,7 @@ void TextBox::keyDown(Block& block, void* user_data)
 		default:  
 			c[0] = (char)user_data;
 			c[1] = '\0';
-			s += c;
+			s.insert(m_cursor_pos, (char)user_data);
 			++m_cursor_pos;
 			break;
 	}
