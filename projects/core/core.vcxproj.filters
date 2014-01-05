@@ -59,7 +59,9 @@
     <ClCompile Include="..\..\src\core\path.cpp">
       <Filter>FS</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\core\path_manager.cpp" />
+    <ClCompile Include="..\..\src\core\path_manager.cpp">
+      <Filter>FS</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\crc32.h" />

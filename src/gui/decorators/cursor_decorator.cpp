@@ -1,5 +1,7 @@
 #include "gui/decorators/cursor_decorator.h"
 #include "core/crc32.h"
+#include "core/path.h"
+#include "engine/engine.h"
 #include "gui/atlas.h"
 #include "gui/block.h"
 #include "gui/controls/dockable.h"
@@ -45,7 +47,7 @@ namespace UI
 	bool CursorDecorator::create(Gui& gui, const char* atlas)
 	{
 		m_part = NULL;
-		m_atlas = gui.loadAtlas(atlas);
+		m_atlas = gui.loadAtlas(FS::Path(atlas, gui.getEngine()->getFileSystem()));
 		return m_atlas != NULL;
 	}
 

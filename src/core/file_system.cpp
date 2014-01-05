@@ -1,6 +1,7 @@
 #include "core/file_system.h"
 #include "core/disk_file_device.h"
 #include "core/ifile.h"
+#include "core/path.h"
 #include "core/path_manager.h"
 #include "core/pod_array.h"
 #include "core/string.h"
@@ -20,7 +21,7 @@ namespace Lux
 			void* m_user_data;
 			ReadCallback m_cb;
 			Mode m_mode;
-			char m_path[_MAX_PATH];
+			Path m_path;
 			bool m_result;
 
 		};
@@ -108,7 +109,7 @@ namespace Lux
 				return false;
 			}
 
-			IFile* open(const char* device_list, const char* file, Mode mode) LUX_OVERRIDE
+			IFile* open(const char* device_list, const Path& file, Mode mode) LUX_OVERRIDE
 			{
 				IFile* prev = parseDeviceList(device_list);
 
@@ -127,7 +128,7 @@ namespace Lux
 				return NULL;
 			}
 
-			IFile* openAsync(const char* device_list, const char* file, int mode, ReadCallback call_back, void* user_data) LUX_OVERRIDE
+			IFile* openAsync(const char* device_list, const Path& file, int mode, ReadCallback call_back, void* user_data) LUX_OVERRIDE
 			{
 				IFile* prev = parseDeviceList(device_list);
 
@@ -140,7 +141,7 @@ namespace Lux
 						tr->data.m_user_data = user_data;
 						tr->data.m_cb = call_back;
 						tr->data.m_mode = mode;
-						strcpy(tr->data.m_path, file);
+						tr->data.m_path = file;
 						tr->data.m_result = false;
 						tr->reset();
 

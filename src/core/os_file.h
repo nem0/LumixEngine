@@ -7,13 +7,15 @@ namespace Lux
 {
 	namespace FS
 	{
+		class Path;
+
 		class LUX_CORE_API OsFile
 		{
 		public:
 			OsFile();
 			~OsFile();
 
-			bool open(const char* path, Mode mode);
+			bool open(const Path& path, Mode mode);
 			void close();
 
 			bool write(const void* data, size_t size);

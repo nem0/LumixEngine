@@ -6,6 +6,7 @@ namespace Lux
 {
 	namespace FS
 	{
+		class FileSystem;
 		struct TCPFileServerImpl;
 		class LUX_CORE_API TCPFileServer
 		{
@@ -13,7 +14,7 @@ namespace Lux
 			TCPFileServer();
 			~TCPFileServer();
 
-			void start();
+			void start(FileSystem& file_system);
 			void stop();
 
 		private:

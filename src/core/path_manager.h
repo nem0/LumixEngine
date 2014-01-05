@@ -22,7 +22,8 @@ namespace FS
 			static void destroy(PathManager& manager);
 
 			virtual PathString* addReference(const char* path, uint32_t hash) = 0;
-			virtual void removeReference(uint32_t hash) = 0;
+			virtual PathString* addReference(PathString& path_string) = 0;
+			virtual void removeReference(PathString& path_string) = 0;
 
 		protected:
 			PathManager() {}

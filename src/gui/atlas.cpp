@@ -5,6 +5,7 @@
 #include "core/ifile.h"
 #include "core/json_serializer.h"
 #include "core/map.h"
+#include "core/path.h"
 #include "gui/irenderer.h"
 #include "gui/texture_base.h"
 
@@ -21,7 +22,7 @@ namespace Lux
 
 			map<uint32_t, Atlas::Part*> m_parts;
 			TextureBase* m_texture;
-			string m_path;
+			FS::Path m_path;
 			IRenderer* m_renderer;
 			Lux::FS::FileSystem* m_filesystem;
 		};
@@ -111,7 +112,7 @@ namespace Lux
 		}
 
 
-		void Atlas::load(IRenderer& renderer, Lux::FS::FileSystem& file_system, const char* filename)
+		void Atlas::load(IRenderer& renderer, Lux::FS::FileSystem& file_system, const FS::Path& filename)
 		{
 			m_impl->m_path = filename;
 			m_impl->m_renderer = &renderer;
@@ -126,7 +127,7 @@ namespace Lux
 		}
 
 
-		const string& Atlas::getPath() const
+		const FS::Path& Atlas::getPath() const
 		{
 			return m_impl->m_path;
 		}

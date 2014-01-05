@@ -2,6 +2,7 @@
 #include "core/crc32.h"
 #include "core/json_serializer.h"
 #include "core/map.h"
+#include "core/path.h"
 #include "engine/engine.h"
 #include "gui/atlas.h"
 #include "gui/block.h"
@@ -17,7 +18,6 @@
 #include "gui/decorators/dockable_decorator.h"
 #include "gui/decorators/text_decorator.h"
 #include "gui/decorators/scrollbar_decorator.h"
-
 
 
 namespace Lux
@@ -228,6 +228,12 @@ namespace UI
 	}
 
 
+	Engine* Gui::getEngine() const
+	{
+		return m_impl->m_engine;
+	}
+
+
 	Block* Gui::getBlock(int x, int y)
 	{
 		float fx = (float)x;
@@ -275,7 +281,7 @@ namespace UI
 	}
 
 
-	Atlas* Gui::loadAtlas(const char* path)
+	Atlas* Gui::loadAtlas(const FS::Path& path)
 	{
 		for(int i = 0; i < m_impl->m_atlases.size(); ++i)
 		{

@@ -1,4 +1,6 @@
 #include "gui/decorators/box_decorator.h"
+#include "core/path.h"
+#include "engine/engine.h"
 #include "gui/atlas.h"
 #include "gui/block.h"
 #include "gui/gui.h"
@@ -74,7 +76,7 @@ namespace UI
 		{
 			m_parts[i] = NULL;
 		}
-		m_atlas = gui.loadAtlas(atlas);
+		m_atlas = gui.loadAtlas(FS::Path(atlas, gui.getEngine()->getFileSystem()));
 		return m_atlas != NULL;
 	}
 

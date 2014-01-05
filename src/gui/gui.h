@@ -12,6 +12,7 @@ namespace Lux
 namespace FS
 {
 	class IFile;
+	class Path;
 }
 
 namespace UI
@@ -50,7 +51,7 @@ namespace UI
 			void keyDown(int32_t key);
 			DecoratorBase* getDecorator(const char* name);
 			void addDecorator(DecoratorBase& decorator);
-			Atlas* loadAtlas(const char* path);
+			Atlas* loadAtlas(const FS::Path& path);
 			Block* createGui(Lux::FS::IFile& file);
 			Block* createBlock(uint32_t type, Block* parent);
 			Block* getBlock(int x, int y);
@@ -58,6 +59,7 @@ namespace UI
 			MouseCallback& addMouseUpCallback();
 			void removeMouseMoveCallback(MouseMoveCallback& callback);
 			void removeMouseUpCallback(MouseCallback& callback);
+			Engine* getEngine() const;
 
 		private:
 			struct GuiImpl* m_impl;

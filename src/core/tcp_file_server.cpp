@@ -1,10 +1,12 @@
 #include "core/tcp_file_server.h"
-
-#include "core/tcp_file_device.h"
+#include "core/file_system.h"
+#include "core/os_file.h"
+#include "core/path.h"
 #include "core/task.h"
 #include "core/tcp_acceptor.h"
+#include "core/tcp_file_device.h"
 #include "core/tcp_stream.h"
-#include "core/os_file.h"
+
 
 namespace Lux
 {
@@ -13,7 +15,7 @@ namespace Lux
 		class TCPFileServerTask : public MT::Task
 		{
 		public:
-			TCPFileServerTask() {}
+			TCPFileServerTask(FileSystem& file_system) : m_file_system(file_system) {}
 			~TCPFileServerTask() {}
 
 			int task()
@@ -21,14 +23,16 @@ namespace Lux
 				char buffer[1024];
 				bool quit = false;
 
-				m_acceptor.start("127.0.0.1", 10001);
+				bool success = m_acceptor.start("127.0.0.1", 10009);
+				ASSERT(success);
 				Net::TCPStream* stream = m_acceptor.accept();
 
 				OsFile* file = LUX_NEW(OsFile)();
 				while(!quit)
 				{
 					int32_t op = 0;
-					stream->read(op);
+					bool b = stream->read(op);
+					ASSERT(b);
 					switch(op)
 					{
 					case TCPCommand::OpenFile:
@@ -38,7 +42,7 @@ namespace Lux
 							stream->read(mode);
 							stream->read(buffer, 1024);
 
-							int32_t ret = file->open(buffer, mode) ? 1 : 0;
+							int32_t ret = file->open(Path(buffer, m_file_system), mode) ? 1 : 0;
 							stream->write(ret);
 							//todo: return id as well
 						}
@@ -116,10 +120,12 @@ namespace Lux
 
 		private:
 			Net::TCPAcceptor m_acceptor;
+			FileSystem& m_file_system;
 		};
 
 		struct TCPFileServerImpl
 		{
+			TCPFileServerImpl(FileSystem& file_system) : m_task(file_system) {}
 			TCPFileServerTask m_task;
 		};
 
@@ -133,9 +139,9 @@ namespace Lux
 			LUX_DELETE(m_impl);
 		}
 
-		void TCPFileServer::start()
+		void TCPFileServer::start(FileSystem& file_system)
 		{
-			m_impl = LUX_NEW(TCPFileServerImpl);
+			m_impl = LUX_NEW(TCPFileServerImpl)(file_system);
 			m_impl->m_task.create("TCP File Server Task");
 			m_impl->m_task.run();
 		}

@@ -8,6 +8,7 @@
 #include "core/ifile.h"
 #include "core/map.h"
 #include "core/math_utils.h"
+#include "core/path.h"
 #include "core/pod_array.h"
 #include "core/string.h"
 #include "core/vec3.h"
@@ -117,7 +118,7 @@ namespace UI
 		}
 		img = LUX_NEW(OpenGLTexture)(name, (float)0, (float)0);
 		static_cast<OpenGLTexture*>(img)->setId(0);
-		file_system.openAsync(file_system.getDefaultDevice(), name, FS::Mode::OPEN | FS::Mode::READ, &OpenGLTexture::imageLoaded, img);
+		file_system.openAsync(file_system.getDefaultDevice(), FS::Path(name, file_system), FS::Mode::OPEN | FS::Mode::READ, &OpenGLTexture::imageLoaded, img);
 		return img;
 	}
 
@@ -474,7 +475,7 @@ namespace UI
 		strcpy_s(tmp, texture.getName().c_str());
 		int len = strlen(tmp);
 		strcpy_s(tmp + len - 4, 255 - len + 4, ".fnt");
-		m_file_system->openAsync(m_file_system->getDefaultDevice(), tmp, FS::Mode::OPEN | FS::Mode::READ, &OpenGLRendererImpl::fontLoaded, this);
+		m_file_system->openAsync(m_file_system->getDefaultDevice(), FS::Path(tmp, *m_file_system), FS::Mode::OPEN | FS::Mode::READ, &OpenGLRendererImpl::fontLoaded, this);
 	}
 
 

@@ -44,7 +44,8 @@ namespace Lux
 				to_receive -= received;
 				if(received <= 0)
 				{
-					if(WSAGetLastError() == WSAEWOULDBLOCK)
+					int err = WSAGetLastError();
+					if(err == WSAEWOULDBLOCK)
 					{
 						ptr -= received;
 						to_receive += received;
