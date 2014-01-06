@@ -15,6 +15,7 @@ namespace Lux
 
 		OsFile::OsFile()
 		{
+			m_impl = NULL;
 		}
 
 		OsFile::~OsFile()
@@ -35,9 +36,6 @@ namespace Lux
 					OPEN_EXISTING,
 					FILE_ATTRIBUTE_NORMAL,
 					NULL);
-								DWORD error = ::GetLastError();
-								error = ::GetLastError();
-
 			}
 			else if(Mode::OPEN_OR_CREATE & mode)
 			{
@@ -61,7 +59,6 @@ namespace Lux
 			}
 			else
 			{
-				ASSERT(false);
 				return false;
 			}
 
@@ -73,7 +70,7 @@ namespace Lux
 
 				return true;
 			}
-			ASSERT(false);
+
 			return false;
 		}
 
@@ -108,7 +105,7 @@ namespace Lux
 			return ::GetFileSize(m_impl->m_file, 0);
 		}
 
-		int OsFile::pos() const
+		int OsFile::pos()
 		{
 			ASSERT(NULL != m_impl);
 			return ::SetFilePointer(m_impl->m_file, 0, NULL, FILE_CURRENT);

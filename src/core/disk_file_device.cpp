@@ -51,7 +51,7 @@ namespace Lux
 				return m_file.seek(base, pos);
 			}
 
-			virtual size_t pos() const LUX_OVERRIDE
+			virtual size_t pos() LUX_OVERRIDE
 			{
 				return m_file.pos();
 			}

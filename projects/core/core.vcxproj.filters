@@ -107,6 +107,8 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\delegate.h" />
     <ClInclude Include="..\..\src\core\blob.h" />
+    <ClInclude Include="..\..\src\core\free_list.h" />
+    <ClInclude Include="..\..\src\core\array.h" />
     <ClInclude Include="..\..\src\core\delegate_list.h" />
     <ClInclude Include="..\..\src\core\default_allocator.h" />
     <ClInclude Include="..\..\src\core\input_system.h" />
@@ -121,7 +123,8 @@
       <Filter>Net</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\pod_array.h" />
-    <ClInclude Include="..\..\src\core\array.h" />
+    <ClInclude Include="..\..\src\core\static_array.h" />
+    <ClInclude Include="..\..\src\core\queue.h" />
     <ClInclude Include="..\..\src\core\event.h">
       <Filter>MT</Filter>
     </ClInclude>

@@ -28,7 +28,7 @@
 #include "core/task.h"
 #include "core/tcp_acceptor.h"
 #include "core/tcp_stream.h"
-#include "script\script_system.h"
+#include "script/script_system.h"
 #include "universe/component_event.h"
 #include "universe/entity_destroyed_event.h"
 #include "universe/entity_moved_event.h"
@@ -135,6 +135,7 @@ struct EditorServerImpl
 		void renderPhysics();
 		void save(const char path[]);
 		void load(const char path[]);
+		void loadMap(FS::IFile* file, bool success);
 		void addComponent(uint32_t type_crc);
 		void sendComponent(uint32_t type_crc);
 		void removeComponent(uint32_t type_crc);
@@ -612,23 +613,23 @@ void EditorServerImpl::removeComponent(uint32_t type_crc)
 	selectEntity(m_selected_entity);
 }
 
-
-void loadMap(FS::IFile* file, bool success, void* user_data)
-{
-	ASSERT(success);
-	if(success)
-	{
-		static_cast<EditorServerImpl*>(user_data)->load(*file);
-		file->close();
-	}
-}
-
-
 void EditorServerImpl::load(const char path[])
 {
 	g_log_info.log("editor server", "loading universe %s...", path);
 	FS::FileSystem& fs = m_engine.getFileSystem();
-	fs.openAsync(fs.getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, &loadMap, this);
+	FS::ReadCallback file_read_cb;
+	file_read_cb.bind<EditorServerImpl, &EditorServerImpl::loadMap>(this);
+	fs.openAsync(fs.getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, file_read_cb);
+}
+
+void EditorServerImpl::loadMap(FS::IFile* file, bool success)
+{
+	ASSERT(success);
+	if(success)
+	{
+		load(*file);
+		m_engine.getFileSystem().close(file);
+	}
 }
 
 void EditorServerImpl::newUniverse()
