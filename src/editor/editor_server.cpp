@@ -188,7 +188,6 @@ struct EditorServerImpl
 		MessageTask* m_message_task;
 		Engine m_engine;
 		EditorServer* m_owner;
-		FS::ReadCallback m_file_read_cb;
 };
 
 
@@ -636,7 +635,9 @@ void EditorServerImpl::load(const char path[])
 {
 	g_log_info.log("editor server", "loading universe %s...", path);
 	FS::FileSystem& fs = m_engine.getFileSystem();
-	fs.openAsync(fs.getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, m_file_read_cb);
+	FS::ReadCallback file_read_cb;
+	file_read_cb.bind<EditorServerImpl, &EditorServerImpl::loadMap>(this);
+	fs.openAsync(fs.getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, file_read_cb);
 }
 
 void EditorServerImpl::loadMap(FS::IFile* file, bool success)
@@ -719,7 +720,6 @@ HGLRC createGLContext(HWND hwnd)
 
 bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 {
-	m_file_read_cb.bind<EditorServerImpl, &EditorServerImpl::loadMap>(this);
 	m_universe_mutex = MT::Mutex::create(false);
 	m_send_mutex = MT::Mutex::create(false);
 	m_message_task = LUX_NEW(MessageTask)();

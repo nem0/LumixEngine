@@ -12,6 +12,13 @@ namespace Lux
 {
 	namespace FS
 	{
+		enum TransFlags
+		{
+			E_NONE = 0,
+			E_SUCCESS = 0x1,
+			E_IS_OPEN = E_SUCCESS << 1,
+		};
+
 		struct AsyncItem
 		{
 			AsyncItem() {}
@@ -46,9 +53,9 @@ namespace Lux
 					if(NULL == tr)
 						break;
 
-					if((tr->data.m_flags & 0x2) == 0x2)
+					if((tr->data.m_flags & E_IS_OPEN) == E_IS_OPEN)
 					{
-						tr->data.m_flags |= tr->data.m_file->open(tr->data.m_path, tr->data.m_mode) ? 0x1 : 0x0;
+						tr->data.m_flags |= tr->data.m_file->open(tr->data.m_path, tr->data.m_mode) ? E_SUCCESS : E_NONE;
 					}
 					else
 					{
@@ -132,7 +139,7 @@ namespace Lux
 				return NULL;
 			}
 
-			IFile* openAsync(const char* device_list, const char* file, int mode, const ReadCallback& call_back) LUX_OVERRIDE
+			bool openAsync(const char* device_list, const char* file, int mode, const ReadCallback& call_back) LUX_OVERRIDE
 			{
 				IFile* prev = parseDeviceList(device_list);
 
@@ -144,9 +151,10 @@ namespace Lux
 					item.m_cb = call_back;
 					item.m_mode = mode;
 					strcpy(item.m_path, file);
-					item.m_flags = 0x2;
+					item.m_flags = E_IS_OPEN;
 				}
-				return NULL;
+
+				return NULL != prev;
 			}
 
 			void close(IFile* file) LUX_OVERRIDE
@@ -162,19 +170,19 @@ namespace Lux
 				item.m_file = file;
 				item.m_cb.bind<closeAsync>();
 				item.m_mode = 0;
-				item.m_flags = 0;
+				item.m_flags = E_NONE;
 			}
 
 			void updateAsyncTransactions() LUX_OVERRIDE
 			{
-				for(; !m_in_progress.empty();)
+				while(!m_in_progress.empty())
 				{
 					AsynTrans* tr = m_in_progress.front();
 					if(tr->isCompleted())
 					{
 						m_in_progress.pop();
 
-						tr->data.m_cb.invoke(tr->data.m_file, !!tr->data.m_flags & 0x1);
+						tr->data.m_cb.invoke(tr->data.m_file, !!(tr->data.m_flags & E_SUCCESS));
 						m_transaction_queue.dealoc(tr);
 					}
 					else

@@ -23,7 +23,7 @@ namespace Lux
 			virtual bool unMount(IFileDevice* device) = 0;
 
 			virtual IFile* open(const char* device_list, const char* file, Mode mode) = 0;
-			virtual IFile* openAsync(const char* device_list, const char* file, int mode, const ReadCallback& call_back) = 0;
+			virtual bool openAsync(const char* device_list, const char* file, int mode, const ReadCallback& call_back) = 0;
 			 
 			virtual void close(IFile* file) = 0;
 			virtual void closeAsync(IFile* file) = 0;

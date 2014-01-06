@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/math_utils.h"
 #include <new>
 
 namespace Lux
@@ -10,13 +11,14 @@ namespace Lux
 	public:
 		Queue()
 		{
-			m_buffer = (T*)new char[sizeof(T) * count];
+			ASSERT(Math::isPowOfTwo(count));
+			m_buffer = (T*)(LUX_NEW_ARRAY(char, sizeof(T) * count)); // TODO: replace with LUX_ALLOC_T
 			m_wr = m_rd = 0;
 		}
 
 		~Queue()
 		{
-			delete [] m_buffer;
+			LUX_DELETE_ARRAY(m_buffer);
 		}
 
 		bool empty() const { return m_rd == m_wr; } 
