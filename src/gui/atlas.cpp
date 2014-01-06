@@ -22,7 +22,6 @@ namespace Lux
 			string m_path;
 			IRenderer* m_renderer;
 			Lux::FS::FileSystem* m_filesystem;
-			FS::ReadCallback m_atlas_loaded_cb;
 		};
 		
 		void AtlasImpl::atlasLoaded(Lux::FS::IFile* file, bool success)
@@ -84,7 +83,6 @@ namespace Lux
 			m_impl = LUX_NEW(AtlasImpl)();
 			m_impl->m_texture = NULL;
 			m_impl->m_renderer = NULL;
-			m_impl->m_atlas_loaded_cb.bind<AtlasImpl, &AtlasImpl::atlasLoaded>(m_impl);
 
 			return m_impl != NULL;
 		}
@@ -111,7 +109,10 @@ namespace Lux
 			m_impl->m_path = filename;
 			m_impl->m_renderer = &renderer;
 			m_impl->m_filesystem = &file_system;
-			file_system.openAsync(file_system.getDefaultDevice(), filename, Lux::FS::Mode::OPEN | Lux::FS::Mode::READ, m_impl->m_atlas_loaded_cb);
+
+			FS::ReadCallback atlas_loaded_cb;
+			atlas_loaded_cb.bind<AtlasImpl, &AtlasImpl::atlasLoaded>(m_impl);
+			file_system.openAsync(file_system.getDefaultDevice(), filename, Lux::FS::Mode::OPEN | Lux::FS::Mode::READ, atlas_loaded_cb);
 		}
 
 		TextureBase* Atlas::getTexture() const

@@ -83,7 +83,7 @@ namespace Lux
 
 			virtual bool write(const void* buffer, size_t size) LUX_OVERRIDE
 			{
- 				uint32_t pos = m_pos;
+				uint32_t pos = m_pos;
 				uint32_t cap = m_capacity;
 				uint32_t sz = m_size;
 				if(pos + size > cap)

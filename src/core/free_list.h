@@ -10,13 +10,18 @@ namespace Lux
 	public:
 		FreeList()
 		{
-			m_heap = static_cast<T*>(::new char[sizeof(T) * chunk_size]);
+			m_heap = static_cast<T*>(LUX_NEW_ARRAY(char, sizeof(T) * chunk_size));  // TODO: replace with LUX_ALLOC_T
 			m_pool_index = chunk_size;
 
 			for (int32_t i = 0; i < chunk_size; i++)
 			{
 				m_pool[i] = &m_heap[i];
 			}
+		}
+
+		~FreeList()
+		{
+			LUX_DELETE_ARRAY(m_heap);
 		}
 
 		LUX_FORCE_INLINE T* alloc(void)

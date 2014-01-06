@@ -42,7 +42,6 @@ struct LoadInfo
 {
 	void resourceLoaded(FS::IFile* file, bool success);
 
-	FS::ReadCallback m_res_loaded_cb;
 	RendererImpl* m_renderer_impl;
     H3DRes m_res;
 };
@@ -167,9 +166,11 @@ void RendererImpl::loadResources()
 		LoadInfo* info = LUX_NEW(LoadInfo)();
 		info->m_renderer_impl = this;
 		info->m_res = res;
-		info->m_res_loaded_cb.bind<LoadInfo, &LoadInfo::resourceLoaded>(info);
 
-		m_file_system->openAsync(m_file_system->getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, info->m_res_loaded_cb);
+		FS::ReadCallback res_loaded_cb;
+		res_loaded_cb.bind<LoadInfo, &LoadInfo::resourceLoaded>(info);
+
+		m_file_system->openAsync(m_file_system->getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, res_loaded_cb);
 	}
 }
 

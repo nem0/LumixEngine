@@ -36,10 +36,6 @@ namespace Lux
 					OPEN_EXISTING,
 					FILE_ATTRIBUTE_NORMAL,
 					NULL);
-				
-				DWORD error = ::GetLastError();
-				error = ::GetLastError();
-
 			}
 			else if(Mode::OPEN_OR_CREATE & mode)
 			{
