@@ -65,6 +65,7 @@ namespace Lux
 						break;
 					case TCPCommand::Read:
 						{
+							bool read_successful = true;
 							uint32_t id = -1;
 							stream->read(id);
 							OsFile* file = m_files[id];
@@ -75,28 +76,33 @@ namespace Lux
 							while(size > 0)
 							{
 								int32_t read = size > m_buffer.size() ? m_buffer.size() : size;
-								file->read((void*)m_buffer.data(), read);
+								read_successful &= file->read((void*)m_buffer.data(), read);
 								stream->write((const void*)m_buffer.data(), read);
 								size -= read;
 							}
+
+							stream->write(read_successful);
 						}
 						break;
 					case TCPCommand::Write:
 						{
+							bool write_successful = true;
 							uint32_t id = -1;
 							stream->read(id);
 							OsFile* file = m_files[id];
 
 							uint32_t size = 0;
 							stream->read(size);
-
+							
 							while(size > 0)
 							{
 								int32_t read = size > m_buffer.size() ? m_buffer.size() : size;
-								stream->read((void*)m_buffer.data(), read);
+								write_successful &= stream->read((void*)m_buffer.data(), read);
 								file->write(m_buffer.data(), read);
 								size -= read;
 							}
+
+							stream->write(write_successful);
 						}
 						break;
 					case TCPCommand::Size:

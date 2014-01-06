@@ -20,7 +20,7 @@ namespace Lux
 		{
 			for(size_type i = 0; i < Size; ++i)
 			{
-				_a[i] = val;
+				m_a[i] = val;
 			}
 		}
 
@@ -29,7 +29,7 @@ namespace Lux
 			return Size;
 		}
 
-		LUX_FORCE_INLINE size_type max_size() const 
+		LUX_FORCE_INLINE size_type maxSize() const 
 		{
 			return Size;
 		}
@@ -42,45 +42,45 @@ namespace Lux
 		value_type& at(size_type i) 
 		{
 			ASSERT(i >= 0 && i < Size);
-			return _a[i];
+			return m_a[i];
 		}
 
 		const value_type& at(size_type i) const 
 		{
 			ASSERT(i >= 0 && i < Size);
-			return _a[i];
+			return m_a[i];
 		}
 
 		value_type& operator[](size_type i) 
 		{
 			ASSERT(i >= 0 && i < Size);
-			return _a[i];
+			return m_a[i];
 		}
 
 		const value_type& operator[](size_type i) const 
 		{
 			ASSERT(i >= 0 && i < Size);
-			return _a[i];
+			return m_a[i];
 		}
 
 		value_type& front() 
 		{
-			return _a[0];
+			return m_a[0];
 		}
 
 		const value_type& front() const 
 		{
-			return _a[0];
+			return m_a[0];
 		}
 
 		value_type& back() 
 		{
-			return _a[Size - 1];
+			return m_a[Size - 1];
 		}
 
 		const value_type& back() const 
 		{
-			return _a[Size - 1];
+			return m_a[Size - 1];
 		}
 
 		size_type find(size_type from, size_type to, const value_type& val) const
@@ -88,7 +88,7 @@ namespace Lux
 			ASSERT(size() >= to);
 			for (size_type i = from; i < to; ++i)
 			{
-				if (_a[i] == val)
+				if (m_a[i] == val)
 					return i;
 			}
 
@@ -106,20 +106,20 @@ namespace Lux
 
 			if (idx1 != idx2)
 			{
-				value_type tmp = _a[idx1];
-				_a[idx1] = _a[idx2];
-				_a[idx2] = tmp;
+				value_type tmp = m_a[idx1];
+				m_a[idx1] = m_a[idx2];
+				m_a[idx2] = tmp;
 			}
 		}
 
 		value_type* data() 
 		{ 
-			return _a;
+			return m_a;
 		}
 
 		const value_type* data() const
 		{
-			return _a;
+			return m_a;
 		}
 
 	private:
@@ -129,7 +129,7 @@ namespace Lux
 				*ptr = val;
 		}
 
-		value_type _a[Size];
+		value_type m_a[Size];
 	};
 	// not supported
 	template <class T> class StaticArray<T, 0>;
