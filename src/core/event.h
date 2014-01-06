@@ -32,6 +32,9 @@ namespace  Lux
 
 			virtual void wait() = 0;
 			virtual bool poll() = 0;
+
+		protected:
+			virtual ~Event() {};
 		};
 	}; // ~namespace MT
 }; // ~namespace Lux

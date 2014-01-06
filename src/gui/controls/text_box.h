@@ -25,6 +25,13 @@ namespace UI
 
 		private:
 			void keyDown(Block& block, void* user_data);
+			void focused(Block& block, void* user_data);
+			void blurred(Block& block, void* user_data);
+			void setCursorArea();
+
+		private:
+			int m_cursor_pos;
+			Lux::UI::Block* m_cursor;
 	};
 
 

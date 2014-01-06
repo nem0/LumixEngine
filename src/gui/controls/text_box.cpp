@@ -1,6 +1,7 @@
 #include "gui/controls/text_box.h"
 #include "core/crc32.h"
 #include "core/iserializer.h"
+#include "gui/gui.h"
 
 
 namespace Lux
@@ -17,9 +18,42 @@ TextBox::TextBox(const char* text, Gui& gui, Block* parent)
 	label_ui->setBlockText(text);
 	label_ui->setArea(0, 3, 0, 0, 1, 0, 1, 0);
 	label_ui->onEvent("key_down").bind<TextBox, &TextBox::keyDown>(this);
+	label_ui->onEvent("focus").bind<TextBox, &TextBox::focused>(this);
+	label_ui->onEvent("blur").bind<TextBox, &TextBox::blurred>(this);
 	label_ui->setIsClipping(true);
+	m_cursor_pos = 0; 
+	m_cursor = LUX_NEW(Block)(gui, label_ui, "_cursor");
+	m_cursor->hide();
 }
 
+
+void TextBox::setCursorArea()
+{
+	Block::Area area = getGui().getRenderer().getCharArea(getChild(0)->getBlockText().c_str(), m_cursor_pos, getGlobalWidth());
+	m_cursor->setArea(area);
+	layout();
+}
+
+
+void TextBox::blurred(Block& block, void* user_data)
+{
+	m_cursor->hide();
+}
+
+
+void TextBox::focused(Block& block, void* user_data)
+{
+	m_cursor_pos = getChild(0)->getBlockText().length();
+	m_cursor->show();
+	setCursorArea();
+}
+
+static const int32_t KEY_RIGHT = 79 + (1 << 30);
+static const int32_t KEY_LEFT = 80 + (1 << 30);
+static const int32_t KEY_UP = 81 + (1 << 30);
+static const int32_t KEY_DOWN = 82 + (1 << 30);
+static const int32_t KEY_BACKSPACE = '\b';
+static const int32_t KEY_DELETE = '\177';
 
 void TextBox::keyDown(Block& block, void* user_data)
 {
@@ -27,19 +61,34 @@ void TextBox::keyDown(Block& block, void* user_data)
 	char c[2];
 	switch((int32_t)user_data)
 	{
+		case KEY_RIGHT:
+			m_cursor_pos = m_cursor_pos > s.length() - 1 ? s.length() : m_cursor_pos + 1;
+			break;
+		case KEY_LEFT:
+			m_cursor_pos = m_cursor_pos < 1 ? 0 : m_cursor_pos - 1;
+			break;
+		case KEY_UP:
+		case KEY_DOWN:
+			break;
 		case '\r':
 			block.emitEvent("text_accepted");
 			break;
-		case '\b':
-			s = s.substr(0, s.length() - 1);
+		case KEY_BACKSPACE:
+			s.erase(m_cursor_pos - 1);
+			if(m_cursor_pos > 0)
+			{
+				--m_cursor_pos;
+			}
 			break;
-		default:                        
+		default:  
 			c[0] = (char)user_data;
 			c[1] = '\0';
-			s += c;
+			s.insert(m_cursor_pos, (char)user_data);
+			++m_cursor_pos;
 			break;
 	}
 	block.setBlockText(s.c_str());
+	setCursorArea();
 }
 
 

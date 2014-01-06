@@ -18,15 +18,15 @@ namespace UI
 	
 	void TextDecorator::render(IRenderer& renderer, Block& block)
 	{
-		float w, h;
-		renderer.measureText(block.getBlockText().c_str(), &w, &h);
 		if(m_is_text_centered)
 		{
-			renderer.renderText(block.getBlockText().c_str(), (block.getGlobalRight() + block.getGlobalLeft() - w) / 2, (float)block.getGlobalTop(), block.getZ());
+			float w, h;
+			renderer.measureText(block.getBlockText().c_str(), &w, &h, block.getGlobalWidth());
+			renderer.renderText(block.getBlockText().c_str(), (block.getGlobalRight() + block.getGlobalLeft() - w) / 2, (float)block.getGlobalTop(), block.getZ(), block.getGlobalWidth());
 		}
 		else
 		{
-			renderer.renderText(block.getBlockText().c_str(), block.getGlobalLeft(), (float)block.getGlobalTop(), block.getZ());
+			renderer.renderText(block.getBlockText().c_str(), block.getGlobalLeft(), (float)block.getGlobalTop(), block.getZ(), block.getGlobalWidth());
 		}
 	}
 

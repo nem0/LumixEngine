@@ -11,6 +11,12 @@
 #include "gui/controls/menu_item.h"
 #include "gui/controls/text_box.h"
 #include "gui/decorator_base.h"
+#include "gui/decorators/box_decorator.h"
+#include "gui/decorators/cursor_decorator.h"
+#include "gui/decorators/check_box_decorator.h"
+#include "gui/decorators/dockable_decorator.h"
+#include "gui/decorators/text_decorator.h"
+#include "gui/decorators/scrollbar_decorator.h"
 
 
 
@@ -104,7 +110,7 @@ namespace UI
 
 	void GuiImpl::menuShowSubmenu(Block& block, void*)
 	{
-		static_cast<Lux::UI::MenuItem&>(block).showSubMenu();
+		static_cast<MenuItem&>(block).showSubMenu();
 	}
 
 	Block* createButton(Gui& gui, Block* parent)
@@ -328,6 +334,31 @@ namespace UI
 	IRenderer& Gui::getRenderer()
 	{
 		return *m_impl->m_renderer;
+	}
+
+
+	void Gui::createBaseDecorators(const char* atlas_path)
+	{
+		CursorDecorator* cursor_decorator = LUX_NEW(Lux::UI::CursorDecorator)("_cursor");
+		CheckBoxDecorator* check_box_decorator = LUX_NEW(CheckBoxDecorator)("_check_box");
+		TextDecorator* text_decorator = LUX_NEW(TextDecorator)("_text");
+		TextDecorator* text_centered_decorator = LUX_NEW(TextDecorator)("_text_centered");
+		text_centered_decorator->setTextCentered(true);
+		DockableDecorator* dockable_decorator = LUX_NEW(DockableDecorator)("_dockable");
+		BoxDecorator* box_decorator = LUX_NEW(BoxDecorator)("_box");
+		ScrollbarDecorator* scrollbar_decorator = LUX_NEW(ScrollbarDecorator)("_scrollbar"); 
+		addDecorator(*cursor_decorator);
+		addDecorator(*text_decorator);
+		addDecorator(*text_centered_decorator);
+		addDecorator(*box_decorator);
+		addDecorator(*dockable_decorator);
+		addDecorator(*scrollbar_decorator);
+		addDecorator(*check_box_decorator);
+		cursor_decorator->create(*this, atlas_path);
+		check_box_decorator->create(*this, atlas_path);
+		scrollbar_decorator->create(*this, atlas_path);
+		box_decorator->create(*this, atlas_path);
+		dockable_decorator->create(*this, atlas_path);
 	}
 
 	
