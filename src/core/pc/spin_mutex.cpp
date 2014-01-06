@@ -18,7 +18,7 @@ namespace Lux
 		private:
 			~WinSpinMutex();
 
-			LPCRITICAL_SECTION m_id;
+			CRITICAL_SECTION m_id;
 		};
 
 		SpinMutex* SpinMutex::create(bool locked)
@@ -33,22 +33,22 @@ namespace Lux
 
 		void WinSpinMutex::lock()
 		{
-			::EnterCriticalSection(m_id);
+			::EnterCriticalSection(&m_id);
 		}
 
 		bool WinSpinMutex::poll()
 		{
-			return TRUE == ::TryEnterCriticalSection(m_id);
+			return TRUE == ::TryEnterCriticalSection(&m_id);
 		}
 
 		void WinSpinMutex::unlock()
 		{
-			::LeaveCriticalSection(m_id);
+			::LeaveCriticalSection(&m_id);
 		}
 
 		WinSpinMutex::WinSpinMutex(bool locked)
 		{
-			::InitializeCriticalSectionAndSpinCount(m_id, 0x00000400);
+			::InitializeCriticalSectionAndSpinCount(&m_id, 0x00000400);
 			if(locked)
 			{
 				lock();
@@ -57,7 +57,7 @@ namespace Lux
 
 		WinSpinMutex::~WinSpinMutex()
 		{
-			::DeleteCriticalSection(m_id);
+			::DeleteCriticalSection(&m_id);
 		}
 	} // ~namespace MT
 } // ~namespace Lux

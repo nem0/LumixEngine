@@ -31,7 +31,7 @@ namespace Lux
 			{
 				ASSERT(NULL == m_buffer); // reopen is not supported currently
 
-				m_write = mode & Mode::WRITE ? true : false;
+				m_write = !!(mode & Mode::WRITE);
 				if(m_file)
 				{
 					if(m_file->open(path, mode))
@@ -138,7 +138,7 @@ namespace Lux
 				return m_pos;
 			}
 
-			virtual size_t pos() const LUX_OVERRIDE
+			virtual size_t pos() LUX_OVERRIDE
 			{
 				return m_pos;
 			}

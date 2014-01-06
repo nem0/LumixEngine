@@ -25,12 +25,13 @@ namespace UI
 		public:
 			OpenGLTexture(const char* name, float width, float height)
 				: TextureBase(name, width, height)
-			{}
+			{
+			}
 
 			GLuint getId() const { return m_gl_id; }
 			void setId(GLuint id) { m_gl_id = id; }
 
-			static void imageLoaded(FS::IFile* file, bool success, void* user_data);
+			void imageLoaded(FS::IFile* file, bool success);
 
 		private:
 			GLuint m_gl_id;
@@ -52,7 +53,7 @@ namespace UI
 		};
 
 		TextureBase* getImage(const char* name);
-		static void fontLoaded(FS::IFile* file, bool success, void* user_data);
+		void fontLoaded(FS::IFile* file, bool success);
 		void fontImageLoaded(TextureBase& img);
 
 		map<char, Character> m_characters;
@@ -117,11 +118,14 @@ namespace UI
 		}
 		img = LUX_NEW(OpenGLTexture)(name, (float)0, (float)0);
 		static_cast<OpenGLTexture*>(img)->setId(0);
-		file_system.openAsync(file_system.getDefaultDevice(), name, FS::Mode::OPEN | FS::Mode::READ, &OpenGLTexture::imageLoaded, img);
+
+		FS::ReadCallback image_loaded_cb;
+		image_loaded_cb.bind<OpenGLTexture, &OpenGLTexture::imageLoaded>(static_cast<OpenGLTexture*>(img));
+		file_system.openAsync(file_system.getDefaultDevice(), name, FS::Mode::OPEN | FS::Mode::READ, image_loaded_cb);
 		return img;
 	}
 
-	void OpenGLTexture::imageLoaded(FS::IFile* file, bool success, void* user_data)
+	void OpenGLTexture::imageLoaded(FS::IFile* file, bool success)
 	{
 		if(success)
 		{
@@ -192,10 +196,9 @@ namespace UI
 			LUX_DELETE_ARRAY(image_dest);
 			LUX_DELETE_ARRAY(buffer);
 	
-			OpenGLTexture* img = static_cast<OpenGLTexture*>(user_data);
-			img->setId(texture_id);
-			img->setSize((float)header.width, (float)header.height);
-			img->onLoaded().invoke(*img);
+			setId(texture_id);
+			setSize((float)header.width, (float)header.height);
+			onLoaded().invoke(*this);
 		}
 		else
 		{
@@ -467,23 +470,23 @@ namespace UI
 		return getFirstNumberPos(c);
 	}
 
-
 	void OpenGLRendererImpl::fontImageLoaded(TextureBase& texture)
 	{
 		char tmp[255];
 		strcpy_s(tmp, texture.getName().c_str());
 		int len = strlen(tmp);
 		strcpy_s(tmp + len - 4, 255 - len + 4, ".fnt");
-		m_file_system->openAsync(m_file_system->getDefaultDevice(), tmp, FS::Mode::OPEN | FS::Mode::READ, &OpenGLRendererImpl::fontLoaded, this);
+
+		FS::ReadCallback font_loaded_cb;
+		font_loaded_cb.bind<OpenGLRendererImpl, &OpenGLRendererImpl::fontLoaded>(this);
+		m_file_system->openAsync(m_file_system->getDefaultDevice(), tmp, FS::Mode::OPEN | FS::Mode::READ, font_loaded_cb);
 	}
 
-
-	void OpenGLRendererImpl::fontLoaded(FS::IFile* file, bool success, void* user_data)
+	void OpenGLRendererImpl::fontLoaded(FS::IFile* file, bool success)
 	{
 		if(success)
 		{
 			char line[255];
-			OpenGLRendererImpl* that = static_cast<OpenGLRendererImpl*>(user_data);
 			while(readLine(file, line, 255) && strncmp(line, "chars count", 11) != 0);
 			if(strncmp(line, "chars count", 11) == 0)
 			{
@@ -499,18 +502,18 @@ namespace UI
 					int tmp;
 					c = getNextNumberPos(c);
 					sscanf_s(c, "%d", &tmp);
-					character.left = (float)tmp / that->m_font_image->getWidth();
+					character.left = (float)tmp / m_font_image->getWidth();
 					c = getNextNumberPos(c);
 					sscanf_s(c, "%d", &tmp);
-					character.top = (float)tmp / that->m_font_image->getHeight();
+					character.top = (float)tmp / m_font_image->getHeight();
 					c = getNextNumberPos(c);
 					sscanf_s(c, "%d", &tmp);
 					character.pixel_w = (float)tmp;
 					c = getNextNumberPos(c);
 					sscanf_s(c, "%d", &tmp);
 					character.pixel_h = (float)tmp;
-					character.right = character.left + character.pixel_w / that->m_font_image->getWidth();
-					character.bottom = character.top + character.pixel_h / that->m_font_image->getHeight();
+					character.right = character.left + character.pixel_w / m_font_image->getWidth();
+					character.bottom = character.top + character.pixel_h / m_font_image->getHeight();
 					c = getNextNumberPos(c);
 					sscanf_s(c, "%d", &tmp);
 					character.x_offset = (float)tmp;
@@ -520,7 +523,7 @@ namespace UI
 					c = getNextNumberPos(c);
 					sscanf_s(c, "%d", &tmp);
 					character.x_advance = (float)tmp;
-					that->m_characters.insert((char)id, character);
+					m_characters.insert((char)id, character);
 				}
 			}
 		}

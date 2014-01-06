@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/lux.h"
+#include "core/delegate.h"
 
 namespace Lux
 {
@@ -8,7 +9,7 @@ namespace Lux
 	{
 		class IFile;
 
-		typedef void (*ReadCallback)(IFile* file, bool success, void* user_data);
+		typedef Delegate<void (IFile*, bool)> ReadCallback;
 		struct Mode
 		{
 			enum Value

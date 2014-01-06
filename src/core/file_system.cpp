@@ -1,32 +1,42 @@
 #include "core/file_system.h"
+
 #include "core/disk_file_device.h"
 #include "core/ifile.h"
 #include "core/pod_array.h"
 #include "core/string.h"
-#include "core/transaction_queue.h"
-
 #include "core/task.h"
+#include "core/transaction_queue.h"
+#include "core/queue.h"
 
 namespace Lux
 {
 	namespace FS
 	{
+		enum TransFlags
+		{
+			E_NONE = 0,
+			E_SUCCESS = 0x1,
+			E_IS_OPEN = E_SUCCESS << 1,
+		};
+
 		struct AsyncItem
 		{
 			AsyncItem() {}
 
 			IFile* m_file;
-			void* m_user_data;
 			ReadCallback m_cb;
 			Mode m_mode;
 			char m_path[_MAX_PATH];
-			bool m_result;
+			uint8_t m_flags;
 
 		};
 
+		static const int32_t C_MAX_TRANS = 16;
+
 		typedef MT::Transaction<AsyncItem> AsynTrans;
-		typedef MT::TransactionQueue<AsynTrans, 16> TransQueue;
-		typedef PODArray<AsynTrans*> TransTable;
+		typedef MT::TransactionQueue<AsynTrans, C_MAX_TRANS> TransQueue;
+		typedef Queue<AsynTrans*, C_MAX_TRANS> InProgressQueue;
+		typedef PODArray<AsyncItem> ItemsTable;
 		typedef PODArray<IFileDevice*> DevicesTable;
 
 		class FSTask : public MT::Task
@@ -43,9 +53,14 @@ namespace Lux
 					if(NULL == tr)
 						break;
 
-					tr->data.m_result = tr->data.m_user_data != NULL 
-						? tr->data.m_file->open(tr->data.m_path, tr->data.m_mode)
-						: (tr->data.m_file->close(), true);
+					if((tr->data.m_flags & E_IS_OPEN) == E_IS_OPEN)
+					{
+						tr->data.m_flags |= tr->data.m_file->open(tr->data.m_path, tr->data.m_mode) ? E_SUCCESS : E_NONE;
+					}
+					else
+					{
+						tr->data.m_file->close();
+					}
 					tr->setCompleted();
 				}
 				return 0;
@@ -124,28 +139,22 @@ namespace Lux
 				return NULL;
 			}
 
-			IFile* openAsync(const char* device_list, const char* file, int mode, ReadCallback call_back, void* user_data) LUX_OVERRIDE
+			bool openAsync(const char* device_list, const char* file, int mode, const ReadCallback& call_back) LUX_OVERRIDE
 			{
 				IFile* prev = parseDeviceList(device_list);
 
 				if(prev)
 				{
-					AsynTrans* tr = m_transaction_queue.alloc(true);
-					if(tr)
-					{
-						tr->data.m_file = prev;
-						tr->data.m_user_data = user_data;
-						tr->data.m_cb = call_back;
-						tr->data.m_mode = mode;
-						strcpy(tr->data.m_path, file);
-						tr->data.m_result = false;
-						tr->reset();
+					AsyncItem& item = m_pending.pushEmpty();
 
-						m_transaction_queue.push(tr, true);
-						m_in_progress.push(tr);
-					}
+					item.m_file = prev;
+					item.m_cb = call_back;
+					item.m_mode = mode;
+					strcpy(item.m_path, file);
+					item.m_flags = E_IS_OPEN;
 				}
-				return NULL;
+
+				return NULL != prev;
 			}
 
 			void close(IFile* file) LUX_OVERRIDE
@@ -156,39 +165,56 @@ namespace Lux
 
 			void closeAsync(IFile* file) LUX_OVERRIDE
 			{
-				AsynTrans* tr = m_transaction_queue.alloc(true);
-				if(tr)
-				{
-					tr->data.m_file = file;
-					tr->data.m_user_data = NULL;
-					tr->data.m_cb = closeAsync;
-					tr->data.m_mode = 0;
-					tr->data.m_result = false;
-					tr->reset();
+				AsyncItem& item = m_pending.pushEmpty();
 
-					m_transaction_queue.push(tr, true);
-					m_in_progress.push(tr);
-				}
+				item.m_file = file;
+				item.m_cb.bind<closeAsync>();
+				item.m_mode = 0;
+				item.m_flags = E_NONE;
 			}
 
 			void updateAsyncTransactions() LUX_OVERRIDE
 			{
-				for(int32_t i = 0; i < m_in_progress.size(); i++)
+				while(!m_in_progress.empty())
 				{
-					AsynTrans* tr = m_in_progress[i];
+					AsynTrans* tr = m_in_progress.front();
 					if(tr->isCompleted())
 					{
-						m_in_progress.erase(i);
+						m_in_progress.pop();
 
-						tr->data.m_cb(tr->data.m_file, tr->data.m_result, tr->data.m_user_data);
+						tr->data.m_cb.invoke(tr->data.m_file, !!(tr->data.m_flags & E_SUCCESS));
 						m_transaction_queue.dealoc(tr);
-
+					}
+					else
+					{
 						break;
 					}
 				}
+
+				int32_t can_add = C_MAX_TRANS - m_in_progress.size();
+				while(can_add && !m_pending.empty())
+				{
+					AsynTrans* tr = m_transaction_queue.alloc(false);
+					if(tr)
+					{
+						AsyncItem& item = m_pending[0];
+						tr->data.m_file = item.m_file;
+						tr->data.m_cb = item.m_cb;
+						tr->data.m_mode = item.m_mode;
+						strcpy(tr->data.m_path, item.m_path);
+						tr->data.m_flags = item.m_flags;
+						tr->reset();
+
+						m_transaction_queue.push(tr, true);
+						m_in_progress.push(tr);
+						m_pending.erase(0);
+					}
+					can_add--;
+				}
 			}
 
-			const char* getDefaultDevice() const LUX_OVERRIDE { return "memory:disk"; }
+
+			const char* getDefaultDevice() const LUX_OVERRIDE { return "memory:tcp"; }
 			const char* getSaveGameDevice() const LUX_OVERRIDE { return "memory:disk"; }
 
 			IFileDevice* getDevice(const char* device)
@@ -231,7 +257,7 @@ namespace Lux
 				return prev;
 			}
 
-			static void closeAsync(IFile* file, bool success, void* user_data)
+			static void closeAsync(IFile* file, bool success)
 			{
 				LUX_DELETE(file);
 			}
@@ -246,8 +272,9 @@ namespace Lux
 			FSTask* m_task;
 			DevicesTable m_devices;
 
-			TransQueue m_transaction_queue;
-			TransTable m_in_progress;
+			ItemsTable		m_pending;
+			TransQueue		m_transaction_queue;
+			InProgressQueue m_in_progress;
 		};
 
 		FileSystem* FileSystem::create()
