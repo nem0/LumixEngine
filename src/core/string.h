@@ -153,7 +153,7 @@ class base_string
 		{
 			size_t old_size = m_size;
 			m_size += rhs.m_size;
-			T* newStr = m_allocator.deallocate(m_cstr, m_size + 1);
+			T* newStr = (T*)m_allocator.allocate(m_size + 1);
 			base_string<T>::strcpy(newStr, m_cstr);
 			base_string<T>::strcat(newStr, rhs.m_cstr);
 			m_allocator.deallocate(m_cstr, old_size + 1);
@@ -165,6 +165,26 @@ class base_string
 			base_string<T> ret = *this;
 			ret += rhs;
 			return ret;
+		}
+
+		void insert(size_t pos, T value)
+		{
+			T* newStr = (T*)m_allocator.allocate(m_size + 2);
+			base_string<T>::strncpy(newStr, m_cstr, pos);
+			newStr[pos] = value;
+			base_string<T>::strcpy(newStr + pos + 1, m_cstr + pos);
+			m_allocator.deallocate(m_cstr, m_size + 1);
+			m_cstr = newStr;
+			++m_size;
+		}
+
+		void erase(size_t pos)
+		{
+			if(pos >= 0 && pos < m_size)
+			{
+				base_string<T>::strcpy(m_cstr + pos, m_cstr + pos + 1);
+				--m_size;
+			}
 		}
 
 	public:
@@ -200,6 +220,20 @@ class base_string
 			}
 			*d = 0;
 		}
+
+		static void strncpy(T* desc, const T* src, size_t max_size)
+		{
+			T* d = desc;
+			const T* s = src;
+			while(*s && (size_t)(s - src) < max_size)
+			{
+				*d = *s;
+				++s; 
+				++d;
+			}
+			*d = 0;
+		}
+
 
 		static int strlen(const T* rhs) 
 		{

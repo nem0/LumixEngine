@@ -15,6 +15,9 @@ namespace Lux
 			virtual bool poll() = 0;
 
 			virtual void unlock() = 0;
+
+		protected:
+			virtual ~Mutex() {}
 		};
 
 		class Lock

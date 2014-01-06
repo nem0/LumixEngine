@@ -14,9 +14,10 @@ namespace Lux
 			virtual void unlock() LUX_OVERRIDE;
 
 			WinSpinMutex(bool locked);
-			~WinSpinMutex();
 
 		private:
+			~WinSpinMutex();
+
 			CRITICAL_SECTION m_id;
 		};
 
@@ -27,7 +28,7 @@ namespace Lux
 
 		void SpinMutex::destroy(SpinMutex* spin_mutex)
 		{
-			LUX_DELETE(static_cast<WinSpinMutex*>(spin_mutex));
+			LUX_DELETE(spin_mutex);
 		}
 
 		void WinSpinMutex::lock()

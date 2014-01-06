@@ -59,7 +59,7 @@ struct ClientMessageType
 		SET_POSITION,			// 14
 		REMOVE_ENTITY,			// 15
 		SET_EDIT_MODE,			// 16
-		EDIT_SCRIPT,			// 17
+								// 17
 								// 18
 		NEW_UNIVERSE = 19,		// 19
 		LOOK_AT_SELECTED = 20,	// 20
@@ -145,7 +145,6 @@ struct EditorServerImpl
 		void removeEntity();
 		void toggleGameMode();
 		void stopGameMode();
-		void editScript();
 		void lookAtSelected();
 		void newUniverse();
 		void logMessage(int32_t type, const char* system, const char* msg);
@@ -580,23 +579,6 @@ void EditorServerImpl::lookAtSelected()
 }
 
 
-void EditorServerImpl::editScript()
-{
-	string path;
-	const Entity::ComponentList& cmps = m_selected_entity.getComponents();
-	for(int i = 0; i < cmps.size(); ++i)
-	{
-		if(cmps[i].type == script_type)
-		{
-			m_engine.getScriptSystem().getScriptPath(cmps[i], path);
-			break;
-		}
-	}
-	
-	ShellExecute(NULL, "open", path.c_str(), NULL, NULL, SW_SHOW);
-}
-
-
 void EditorServerImpl::removeEntity()
 {
 	m_engine.getUniverse()->destroyEntity(m_selected_entity);
@@ -755,10 +737,10 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 	{
 		g_log_info.log("plugins", "physics plugin has not been loaded");
 	}
-	if(!m_engine.loadPlugin("navigation.dll"))
+	/*if(!m_engine.loadPlugin("navigation.dll"))
 	{
 		g_log_info.log("plugins", "navigation plugin has not been loaded");
-	}
+	}*/
 
 	EditorIcon::createResources(base_path);
 
@@ -1225,9 +1207,6 @@ void EditorServerImpl::onMessage(void* msgptr, int size)
 			break;
 		case ClientMessageType::REMOVE_ENTITY:
 			removeEntity();
-			break;
-		case ClientMessageType::EDIT_SCRIPT:
-			editScript();
 			break;
 		case ClientMessageType::LOOK_AT_SELECTED:
 			lookAtSelected();

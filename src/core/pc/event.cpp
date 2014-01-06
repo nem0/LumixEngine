@@ -17,9 +17,10 @@ namespace  Lux
 			virtual bool poll() LUX_OVERRIDE;
 
 			WinEvent(bool signaled, bool manual_reset);
-			~WinEvent();
 
 		private:
+			~WinEvent();
+
 			HANDLE m_id;
 		};
 
@@ -30,7 +31,7 @@ namespace  Lux
 
 		void Event::destroy(Event* event)
 		{
-			LUX_DELETE(static_cast<WinEvent*>(event));
+			LUX_DELETE(event);
 		}
 
 		void WinEvent::reset()

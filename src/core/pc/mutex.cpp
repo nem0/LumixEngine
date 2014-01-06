@@ -16,9 +16,10 @@ namespace Lux
 			virtual void unlock() LUX_OVERRIDE;
 
 			WinMutex(bool locked);
-			~WinMutex();
 
 		private:
+			~WinMutex();
+
 			HANDLE m_id;
 			int m_locked;
 		};
@@ -30,7 +31,7 @@ namespace Lux
 
 		void Mutex::destroy(Mutex* mutex)
 		{
-			LUX_DELETE(static_cast<WinMutex*>(mutex));
+			LUX_DELETE(mutex);
 		}
 
 		void WinMutex::lock()
