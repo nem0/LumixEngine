@@ -11,7 +11,7 @@ namespace Lux
 	{
 		public:
 			void* allocate(size_t n);
-			void deallocate(void* p, size_t n);
+			void deallocate(void* p);
 	};
 
 

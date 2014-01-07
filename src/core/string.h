@@ -57,14 +57,14 @@ class base_string
 
 		~base_string()
 		{
-			m_allocator.deallocate(m_cstr, m_size + 1);
+			m_allocator.deallocate(m_cstr);
 		}
 
 		void operator = (const base_string<T, Allocator>& rhs) 
 		{
 			if(&rhs != this)
 			{
-				m_allocator.deallocate(m_cstr, m_size + 1);
+				m_allocator.deallocate(m_cstr);
 				m_cstr = (T*)m_allocator.allocate((rhs.m_size + 1) * sizeof(T));
 				m_size = rhs.m_size;
 				memcpy(m_cstr, rhs.m_cstr, sizeof(T) * (m_size + 1));
@@ -73,7 +73,7 @@ class base_string
 
 		void operator = (const T* rhs) 
 		{
-			m_allocator.deallocate(m_cstr, m_size + 1);
+			m_allocator.deallocate(m_cstr);
 			m_size = strlen(rhs);
 			m_cstr = (T*)m_allocator.allocate((m_size + 1) * sizeof(T));
 			memcpy(m_cstr, rhs, sizeof(T) * (m_size + 1));
@@ -137,7 +137,7 @@ class base_string
 				T* newStr = (T*)m_allocator.allocate(m_size + 1);
 				base_string<T>::strcpy(newStr, m_cstr);
 				base_string<T>::strcat(newStr, rhs);
-				m_allocator.deallocate(m_cstr, old_size + 1);
+				m_allocator.deallocate(m_cstr);
 				m_cstr = newStr;
 			}
 			else
@@ -156,7 +156,7 @@ class base_string
 			T* newStr = (T*)m_allocator.allocate(m_size + 1);
 			base_string<T>::strcpy(newStr, m_cstr);
 			base_string<T>::strcat(newStr, rhs.m_cstr);
-			m_allocator.deallocate(m_cstr, old_size + 1);
+			m_allocator.deallocate(m_cstr);
 			m_cstr = newStr;
 		}
 
@@ -173,7 +173,7 @@ class base_string
 			base_string<T>::strncpy(newStr, m_cstr, pos);
 			newStr[pos] = value;
 			base_string<T>::strcpy(newStr + pos + 1, m_cstr + pos);
-			m_allocator.deallocate(m_cstr, m_size + 1);
+			m_allocator.deallocate(m_cstr);
 			m_cstr = newStr;
 			++m_size;
 		}
