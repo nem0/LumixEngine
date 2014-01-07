@@ -26,8 +26,12 @@ namespace Lux
 			Engine() { m_impl = NULL; }
 			~Engine() { ASSERT(m_impl == NULL); }
 
-			bool create(int w, int h, const char* base_path, EditorServer* editor_server);
+			bool create(int w, int h, const char* base_path, FS::FileSystem* fs, EditorServer* editor_server);
 			void destroy();
+
+			Universe* createUniverse();
+			void destroyUniverse();
+
 			EditorServer* getEditorServer() const;
 			FS::FileSystem& getFileSystem();
 			Renderer& getRenderer();
@@ -36,8 +40,6 @@ namespace Lux
 			PluginManager& getPluginManager();
 			IPlugin* loadPlugin(const char* name);
 			Universe* getUniverse() const;
-			Universe* createUniverse();
-			void destroyUniverse();
 			void update();
 			void serialize(ISerializer& serializer);
 			void deserialize(ISerializer& serializer);

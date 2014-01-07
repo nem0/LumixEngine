@@ -213,9 +213,11 @@ namespace Lux
 				}
 			}
 
+			const char* getDefaultDevice() const LUX_OVERRIDE { return m_default_device.c_str(); }
+			const char* getSaveGameDevice() const LUX_OVERRIDE { return m_save_game_device.c_str(); }
 
-			const char* getDefaultDevice() const LUX_OVERRIDE { return "memory:tcp"; }
-			const char* getSaveGameDevice() const LUX_OVERRIDE { return "memory:disk"; }
+			void setDefaultDevice(const char* dev) LUX_OVERRIDE { m_default_device = dev; }
+			void setSaveGameDevice(const char* dev) LUX_OVERRIDE { m_save_game_device = dev; }
 
 			IFileDevice* getDevice(const char* device)
 			{
@@ -275,6 +277,9 @@ namespace Lux
 			ItemsTable		m_pending;
 			TransQueue		m_transaction_queue;
 			InProgressQueue m_in_progress;
+
+			string m_default_device;
+			string m_save_game_device;
 		};
 
 		FileSystem* FileSystem::create()

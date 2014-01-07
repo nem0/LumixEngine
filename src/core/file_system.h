@@ -32,6 +32,9 @@ namespace Lux
 
 			virtual const char* getDefaultDevice() const = 0;
 			virtual const char* getSaveGameDevice() const = 0;
+
+			virtual void setDefaultDevice(const char* dev) = 0;
+			virtual void setSaveGameDevice(const char* dev) = 0;
 		};
 	} // ~namespace FS
 } // ~namespace Lux
