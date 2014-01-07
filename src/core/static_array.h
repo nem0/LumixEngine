@@ -8,7 +8,6 @@ namespace Lux
 	class StaticArray
 	{
 	public:
-
 		typedef T								value_type;
 		typedef StaticArray<value_type, Size>	my_type;
 		typedef size_t							size_type;
@@ -123,12 +122,6 @@ namespace Lux
 		}
 
 	private:
-		void _fill(const value_type& val)
-		{
-			for(value_type* ptr = &front(); ptr < &back(); ++ptr)
-				*ptr = val;
-		}
-
 		value_type m_a[Size];
 	};
 	// not supported
