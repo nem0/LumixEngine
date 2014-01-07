@@ -11,7 +11,7 @@ namespace Lux
 	}
 
 
-	void DefaultAllocator::deallocate(void* p, size_t n)
+	void DefaultAllocator::deallocate(void* p)
 	{
 		LUX_DELETE_ARRAY((uint8_t*)p);
 	}
