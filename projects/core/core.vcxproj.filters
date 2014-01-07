@@ -3,11 +3,9 @@
   <ItemGroup>
     <ClCompile Include="..\..\src\core\crc32.cpp" />
     <ClCompile Include="..\..\src\core\event_manager.cpp" />
-    <ClCompile Include="..\..\src\core\istream.cpp" />
     <ClCompile Include="..\..\src\core\json_serializer.cpp" />
     <ClCompile Include="..\..\src\core\matrix.cpp" />
     <ClCompile Include="..\..\src\core\quat.cpp" />
-    <ClCompile Include="..\..\src\core\file_utils.cpp" />
     <ClCompile Include="..\..\src\core\math_utils.cpp" />
     <ClCompile Include="..\..\src\core\log.cpp" />
     <ClCompile Include="..\..\src\core\file_system.cpp">
@@ -60,7 +58,6 @@
   <ItemGroup>
     <ClInclude Include="..\..\src\core\crc32.h" />
     <ClInclude Include="..\..\src\core\event_manager.h" />
-    <ClInclude Include="..\..\src\core\istream.h" />
     <ClInclude Include="..\..\src\core\json_serializer.h" />
     <ClInclude Include="..\..\src\core\map.h" />
     <ClInclude Include="..\..\src\core\matrix.h" />
@@ -68,7 +65,6 @@
     <ClInclude Include="..\..\src\core\string.h" />
     <ClInclude Include="..\..\src\core\vec3.h" />
     <ClInclude Include="..\..\src\core\lux.h" />
-    <ClInclude Include="..\..\src\core\file_utils.h" />
     <ClInclude Include="..\..\src\core\math_utils.h" />
     <ClInclude Include="..\..\src\core\iserializer.h" />
     <ClInclude Include="..\..\src\core\log.h" />
