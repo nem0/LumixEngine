@@ -13,7 +13,6 @@ struct LUX_CORE_API Vec3
 {
 	Vec3() {}
 	Vec3(float a, float b, float c) : x(a), y(b), z(c) {}
-	Vec3(const Vec3& rhs) : x(rhs.x), y(rhs.y), z(rhs.z) {}
 
 	Vec3 operator +(const Vec3& rhs) const
 	{
