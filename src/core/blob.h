@@ -2,7 +2,6 @@
 
 
 #include "core/lux.h"
-#include "core/istream.h"
 #include "core/pod_array.h"
 
 
