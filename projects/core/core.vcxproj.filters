@@ -143,6 +143,7 @@
     <ClInclude Include="..\..\src\core\semaphore.h">
       <Filter>MT</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\stack_allocator.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="FS">
