@@ -3,6 +3,7 @@
 #include "core/disk_file_device.h"
 #include "core/ifile.h"
 #include "core/pod_array.h"
+#include "core/stack_allocator.h"
 #include "core/string.h"
 #include "core/task.h"
 #include "core/transaction_queue.h"
@@ -233,7 +234,7 @@ namespace Lux
 			IFile* parseDeviceList(const char* device_list)
 			{
 				IFile* prev = NULL;
-				string token, dev_list(device_list);
+				base_string<char, StackAllocator<128>> token, dev_list(device_list);
 				while(dev_list.length() > 0)
 				{
 					int pos = dev_list.rfind(':');

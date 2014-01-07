@@ -149,6 +149,7 @@
     <ClInclude Include="..\..\src\core\queue.h" />
     <ClInclude Include="..\..\src\core\semaphore.h" />
     <ClInclude Include="..\..\src\core\spin_mutex.h" />
+    <ClInclude Include="..\..\src\core\stack_allocator.h" />
     <ClInclude Include="..\..\src\core\static_array.h" />
     <ClInclude Include="..\..\src\core\string.h" />
     <ClInclude Include="..\..\src\core\task.h" />
