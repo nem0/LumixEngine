@@ -152,10 +152,7 @@ class PODArray
 		void grow()
 		{
 			int newCapacity = m_capacity == 0 ? 4 : m_capacity * 2;
-			T* newData = (T*)m_allocator.allocate(newCapacity * sizeof(T));
-			memmove(newData, m_data, sizeof(T) * m_size);
-			m_allocator.deallocate(m_data);
-			m_data = newData;
+			m_data = (T*)m_allocator.reallocate(m_data, newCapacity * sizeof(T));
 			m_capacity = newCapacity;
 		}
 
