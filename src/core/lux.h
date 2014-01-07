@@ -64,5 +64,14 @@
 #define LUX_MALLOC_ALIGNED(size, alignment) _aligned_malloc(size, alignment)
 #define LUX_FREE_ALIGNED(ptr) _aligned_free(ptr)
 
+#define USE_CPP11
+
+#ifdef USE_CPP11
+	#include <type_traits>	
+	#define STATIC_ASSERT_IS_TRIVIALLY_COPYABLE(T) static_assert(std::is_trivially_copyable<T>::value, "##T## must be trivially copyable")
+#else 
+	#define STATIC_ASSERT_IS_TRIVIALLY_COPYABLE(T) 
+#endif // USE_CPP11
+
 #pragma warning(disable : 4251)
 #pragma warning(disable : 4996)

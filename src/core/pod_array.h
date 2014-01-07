@@ -13,6 +13,7 @@ namespace Lux
 template <typename T, typename Allocator = DefaultAllocator>
 class PODArray
 {
+	STATIC_ASSERT_IS_TRIVIALLY_COPYABLE(T);
 	public:
 		explicit PODArray(const Allocator& allocator)
 			: m_allocator(allocator)
