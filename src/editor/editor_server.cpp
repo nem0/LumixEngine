@@ -8,6 +8,10 @@
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/file_system.h"
+#include "core/memory_file_device.h"
+#include "core/disk_file_device.h"
+#include "core/tcp_file_device.h"
+#include "core/tcp_file_server.h"
 #include "core/ifile.h"
 #include "core/json_serializer.h"
 #include "core/log.h"
@@ -187,6 +191,12 @@ struct EditorServerImpl
 		MessageTask* m_message_task;
 		Engine m_engine;
 		EditorServer* m_owner;
+
+		FS::FileSystem* m_file_system;
+		FS::TCPFileServer m_tpc_file_server;
+		FS::DiskFileDevice m_disk_file_device;
+		FS::MemoryFileDevice m_mem_file_device;
+		FS::TCPFileDevice m_tcp_file_device;
 };
 
 
@@ -709,7 +719,19 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 	m_message_task->m_stream = NULL;
 	m_message_task->create("Message Task");
 	m_message_task->run();
-		
+
+	m_file_system = FS::FileSystem::create();
+	m_tpc_file_server.start();
+
+	m_tcp_file_device.connect("127.0.0.1", 10001);
+
+	m_file_system->mount(&m_mem_file_device);
+	m_file_system->mount(&m_disk_file_device);
+	m_file_system->mount(&m_tcp_file_device);
+
+	m_file_system->setDefaultDevice("memory:tcp");
+	m_file_system->setSaveGameDevice("memory:tcp");
+
 	if(hwnd)
 	{
 		m_hglrc = createGLContext(hwnd);
@@ -726,7 +748,7 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 
 	RECT rect;
 	GetWindowRect(hwnd, &rect);
-	if(!m_engine.create(rect.right - rect.left, rect.bottom - rect.top, base_path, m_owner))
+	if(!m_engine.create(rect.right - rect.left, rect.bottom - rect.top, base_path, m_file_system, m_owner))
 	{
 		return false;
 	}
@@ -764,6 +786,9 @@ void EditorServerImpl::destroy()
 */ /// TODO destroy message task
 	m_engine.destroy();
 
+	m_tcp_file_device.disconnect();
+	m_tpc_file_server.stop();
+	FS::FileSystem::destroy(m_file_system);
 }
 
 
