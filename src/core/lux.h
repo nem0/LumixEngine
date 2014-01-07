@@ -3,7 +3,7 @@
 
 #include <cstdint>
 #include <cassert>
-
+#include <malloc.h>
 
 #ifndef ASSERT
 #define ASSERT(x) assert(x)
@@ -58,6 +58,20 @@
 #define LUX_NEW_ARRAY(T, count) new T[count]
 #define LUX_DELETE(ptr) delete (ptr);
 #define LUX_DELETE_ARRAY(ptr) delete[] (ptr)
+#define LUX_MALLOC(size) malloc(size)
+#define LUX_FREE(ptr) free(ptr)
+#define LUX_REALLOC(ptr, size) realloc(ptr, size)
+#define LUX_MALLOC_ALIGNED(size, alignment) _aligned_malloc(size, alignment)
+#define LUX_FREE_ALIGNED(ptr) _aligned_free(ptr)
+
+#define USE_CPP11
+
+#ifdef USE_CPP11
+	#include <type_traits>	
+	#define STATIC_ASSERT_IS_TRIVIALLY_COPYABLE(T) static_assert(std::is_trivially_copyable<T>::value, "##T## must be trivially copyable")
+#else 
+	#define STATIC_ASSERT_IS_TRIVIALLY_COPYABLE(T) 
+#endif // USE_CPP11
 
 #pragma warning(disable : 4251)
 #pragma warning(disable : 4996)

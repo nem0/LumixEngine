@@ -13,6 +13,7 @@ namespace Lux
 template <typename T, typename Allocator = DefaultAllocator>
 class PODArray
 {
+	STATIC_ASSERT_IS_TRIVIALLY_COPYABLE(T);
 	public:
 		explicit PODArray(const Allocator& allocator)
 			: m_allocator(allocator)
@@ -32,7 +33,7 @@ class PODArray
 
 		void operator =(const PODArray& rhs)
 		{
-			m_allocator.deallocate(m_data, sizeof(T) * m_capacity);
+			m_allocator.deallocate(m_data);
 			m_data = (T*)m_allocator.allocate(rhs.m_capacity * sizeof(T));
 			m_capacity = rhs.m_capacity;
 			m_size = rhs.m_size;
@@ -48,7 +49,7 @@ class PODArray
 
 		~PODArray()
 		{
-			m_allocator.deallocate(m_data, m_capacity * sizeof(T));
+			m_allocator.deallocate(m_data);
 		}
 
 		void eraseFast(int index)
@@ -135,7 +136,7 @@ class PODArray
 			{
 				T* newData = (T*)m_allocator.allocate(capacity * sizeof(T));
 				memmove(newData, m_data, sizeof(T) * m_size);
-				m_allocator.deallocate(m_data, m_capacity * sizeof(T));
+				m_allocator.deallocate(m_data);
 				m_data = newData;
 				m_capacity = capacity;			
 			}
@@ -152,10 +153,7 @@ class PODArray
 		void grow()
 		{
 			int newCapacity = m_capacity == 0 ? 4 : m_capacity * 2;
-			T* newData = (T*)m_allocator.allocate(newCapacity * sizeof(T));
-			memmove(newData, m_data, sizeof(T) * m_size);
-			m_allocator.deallocate(m_data, m_capacity * sizeof(T));
-			m_data = newData;
+			m_data = (T*)m_allocator.reallocate(m_data, newCapacity * sizeof(T));
 			m_capacity = newCapacity;
 		}
 
