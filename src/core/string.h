@@ -132,49 +132,44 @@ class base_string
 		{
 			if(m_cstr)
 			{
-				size_t old_size = m_size;
 				m_size += base_string<T>::strlen(rhs);
-				T* newStr = (T*)m_allocator.allocate(m_size + 1);
-				base_string<T>::strcpy(newStr, m_cstr);
-				base_string<T>::strcat(newStr, rhs);
-				m_allocator.deallocate(m_cstr);
-				m_cstr = newStr;
+				m_cstr = (T*)m_allocator.reallocate(m_cstr, m_size + 1);
+		        base_string<T>::strcat(m_cstr, rhs);			
 			}
 			else
 			{
 				m_size = base_string<T>::strlen(rhs);
-				T* newStr = (T*)m_allocator.allocate(m_size + 1);
-				base_string<T>::strcpy(newStr, rhs);
-				m_cstr = newStr;
+				m_cstr = (T*)m_allocator.allocate(m_size + 1);
+				base_string<T>::strcpy(m_cstr, rhs);
 			}
 		}
 
 		void operator += (const base_string<T, Allocator>& rhs)
 		{
-			size_t old_size = m_size;
-			m_size += rhs.m_size;
-			T* newStr = (T*)m_allocator.allocate(m_size + 1);
-			base_string<T>::strcpy(newStr, m_cstr);
-			base_string<T>::strcat(newStr, rhs.m_cstr);
-			m_allocator.deallocate(m_cstr);
-			m_cstr = newStr;
-		}
-
-		base_string<T> operator +(const base_string<T, Allocator>& rhs)
-		{
-			base_string<T> ret = *this;
-			ret += rhs;
-			return ret;
+			if(!rhs.m_cstr)
+			{
+				return;
+			}
+			if(m_cstr)
+			{
+				m_size += rhs.length();
+				m_cstr = (T*)m_allocator.reallocate(m_cstr, m_size + 1);
+				base_string<T>::strcat(m_cstr, rhs.m_cstr);
+			}
+			else
+			{
+				*this = rhs;
+			}
 		}
 
 		void insert(size_t pos, T value)
 		{
-			T* newStr = (T*)m_allocator.allocate(m_size + 2);
-			base_string<T>::strncpy(newStr, m_cstr, pos);
-			newStr[pos] = value;
-			base_string<T>::strcpy(newStr + pos + 1, m_cstr + pos);
-			m_allocator.deallocate(m_cstr);
-			m_cstr = newStr;
+			m_cstr = (T*)m_allocator.reallocate(m_cstr, m_size + 2);
+			for(size_t i = m_size; i > pos; ++i)
+			{
+				m_cstr[i] = m_cstr[i-1];
+			}
+			m_cstr[pos] = value;
 			++m_size;
 		}
 

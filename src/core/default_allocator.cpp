@@ -17,4 +17,9 @@ namespace Lux
 	}
 
 
+	void* DefaultAllocator::reallocate(void* p, size_t n)
+	{
+		return LUX_REALLOC(p, n);
+	}
+
 } // ~namespace Lux
