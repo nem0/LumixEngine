@@ -165,7 +165,7 @@ class base_string
 		void insert(size_t pos, T value)
 		{
 			m_cstr = (T*)m_allocator.reallocate(m_cstr, m_size + 2);
-			for(size_t i = m_size; i > pos; ++i)
+			for(size_t i = m_size + 1; i > pos; --i)
 			{
 				m_cstr[i] = m_cstr[i-1];
 			}
