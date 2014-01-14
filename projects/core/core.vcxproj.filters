@@ -140,6 +140,7 @@
       <Filter>MT</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\stack_allocator.h" />
+    <ClInclude Include="..\..\..\LuxEngine_master\src\core\hash_map.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="FS">
