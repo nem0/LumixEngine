@@ -40,6 +40,7 @@ namespace Lux
 			PluginManager& getPluginManager();
 			IPlugin* loadPlugin(const char* name);
 			Universe* getUniverse() const;
+			const char* getBasePath() const;
 			void update();
 			void serialize(ISerializer& serializer);
 			void deserialize(ISerializer& serializer);

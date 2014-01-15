@@ -176,7 +176,7 @@ namespace Lux
 
 	void ScriptSystemImpl::getScriptDefaultPath(Entity e, char* path, int max_path, const char* ext)
 	{
-		sprintf_s(path, max_path, "scripts\\e%d.%s", e.index, ext);
+		sprintf_s(path, max_path, "%s\\scripts\\e%d.%s", m_engine->getBasePath(), e.index, ext);
 	}
 
 	void ScriptSystemImpl::postDeserialize()
@@ -194,7 +194,7 @@ namespace Lux
 		m_impl->getScriptDefaultPath(entity, path, MAX_PATH, "cpp");
 
 		FS::FileSystem& fs = m_impl->m_engine->getFileSystem();
-		FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::OPEN_OR_CREATE);
+		FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
 		fs.close(file);
 
 		m_impl->m_scripts.push(entity.index);
