@@ -10,7 +10,7 @@
 #endif
 
 #ifndef NULL
-#define NULL 0
+#define NULL nullptr
 #endif
 
 #define LUX_INLINE __inline
