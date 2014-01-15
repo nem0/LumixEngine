@@ -38,6 +38,7 @@ namespace Lux
 	bool EngineImpl::create(int w, int h, const char* base_path, Engine& owner)
 	{
 		m_universe = 0;
+		m_base_path = base_path;
 
 		if(!m_renderer.create(m_file_system, w, h, base_path))
 		{
@@ -188,6 +189,11 @@ namespace Lux
 		return m_impl->m_input_system;
 	}
 
+
+	const char* Engine::getBasePath() const
+	{
+		return m_impl->m_base_path.c_str();
+	}
 
 
 	Universe* Engine::getUniverse() const
