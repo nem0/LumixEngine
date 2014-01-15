@@ -24,7 +24,7 @@ namespace Lux
 		void postDeserialize();
 		void compile();
 		void getDll(const char* script_path, char* dll_path, int max_length);
-		void getScriptDefaultPath(Entity e, char* path, int max_path, const char* ext);
+		void getScriptDefaultPath(Entity e, char* path, char* full_path, int max_path, const char* ext);
 
 		PODArray<int> m_scripts;
 		PODArray<BaseScript*> m_script_objs;
@@ -60,9 +60,16 @@ namespace Lux
 		m_impl->m_engine = &engine;
 	}
 
+
 	Universe* ScriptSystem::getUniverse() const
 	{
 		return m_impl->m_universe;
+	}
+
+
+	Engine* ScriptSystem::getEngine() const
+	{
+		return m_impl->m_engine;
 	}
 
 
@@ -174,9 +181,10 @@ namespace Lux
 		}
 	}
 
-	void ScriptSystemImpl::getScriptDefaultPath(Entity e, char* path, int max_path, const char* ext)
+	void ScriptSystemImpl::getScriptDefaultPath(Entity e, char* path, char* full_path, int max_path, const char* ext)
 	{
-		sprintf_s(path, max_path, "%s\\scripts\\e%d.%s", m_engine->getBasePath(), e.index, ext);
+		sprintf_s(full_path, max_path, "%s\\scripts\\e%d.%s", m_engine->getBasePath(), e.index, ext);
+		sprintf_s(path, max_path, "scripts\\e%d.%s", e.index, ext);
 	}
 
 	void ScriptSystemImpl::postDeserialize()
@@ -191,10 +199,11 @@ namespace Lux
 	Component ScriptSystem::createScript(Entity entity)
 	{
 		char path[MAX_PATH];
-		m_impl->getScriptDefaultPath(entity, path, MAX_PATH, "cpp");
+		char full_path[MAX_PATH];
+		m_impl->getScriptDefaultPath(entity, path, full_path, MAX_PATH, "cpp");
 
 		FS::FileSystem& fs = m_impl->m_engine->getFileSystem();
-		FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
+		FS::IFile* file = fs.open(fs.getDefaultDevice(), full_path, FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
 		fs.close(file);
 
 		m_impl->m_scripts.push(entity.index);
