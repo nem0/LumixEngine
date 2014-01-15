@@ -263,7 +263,7 @@ class map
 				node->right = insert(key, node->right, node, new_node);
 				if(node->getRightHeight() - node->getLeftHeight() == 2)
 				{
-					if(key > node->right->key)
+					if(key < node->right->key)
 					{
 						ret = rotateLeft(node);
 					}
