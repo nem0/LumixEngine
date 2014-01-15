@@ -24,6 +24,7 @@ namespace Lux
 			bool m_manual;
 			Component m_renderable;
 			float m_time;
+			uint16_t m_layers;
 		};
 
 		Array<Animable> m_animables;
@@ -100,6 +101,7 @@ namespace Lux
 		for(int i = 0; i < count; ++i)
 		{
 			m_impl->m_animables.pushEmpty();
+			m_impl->m_animables[i].m_layers = 0;
 			serializer.deserializeArrayItem(m_impl->m_animables[i].m_manual);
 			int entity_index;
 			serializer.deserializeArrayItem(entity_index);
@@ -149,6 +151,7 @@ namespace Lux
 		animable.m_manual = true;
 		animable.m_time = 0;
 		animable.m_renderable = Component::INVALID;
+		animable.m_layers = 0;
 
 		const Entity::ComponentList& cmps = entity.getComponents();
 		for(int i = 0; i < cmps.size(); ++i)
@@ -165,7 +168,7 @@ namespace Lux
 		return Component(entity, animable_type, this, m_impl->m_animables.size() - 1);
 	}
 
-	void AnimationSystem::playAnimation(const Component& cmp, const char* path)
+	void AnimationSystem::playAnimation(const Component& cmp, const char* path, int layer)
 	{
 		Component renderable = m_impl->m_animables[cmp.index].m_renderable;
 		if(renderable.isValid())
@@ -174,20 +177,21 @@ namespace Lux
 			H3DNode node = renderer->getMeshNode(renderable);
 			H3DRes animRes = h3dAddResource(H3DResTypes::Animation, path, 0);
 			h3dutLoadResourcesFromDisk(renderer->getBasePath());
-			h3dSetupModelAnimStage(node, 0, animRes, 0, "", false);
-			h3dSetModelAnimParams(node, 0, 0, 1.0f);
+			h3dSetupModelAnimStage(node, layer, animRes, layer, "", false);
+			h3dSetModelAnimParams(node, layer, 0, 1.0f);
 
 			m_impl->m_animables[cmp.index].m_manual = false;
+			m_impl->m_animables[cmp.index].m_layers |= 1 << layer;
 		}
 	}
 
 
-	void AnimationSystem::setAnimationTime(const Component& cmp, float time)
+	void AnimationSystem::setAnimationTime(const Component& cmp, float time, int layer)
 	{
 		Renderer* renderer = static_cast<Renderer*>(m_impl->m_animables[cmp.index].m_renderable.system);
 		H3DNode node = renderer->getMeshNode(m_impl->m_animables[cmp.index].m_renderable);
 		m_impl->m_animables[cmp.index].m_time = time;
-		h3dSetModelAnimParams(node, 0, time, 1.0f);
+		h3dSetModelAnimParams(node, layer, time, 1.0f);
 	}
 
 
@@ -203,7 +207,13 @@ namespace Lux
 				H3DNode node = renderer->getMeshNode(m_impl->m_animables[i].m_renderable);
 				float time = m_impl->m_animables[i].m_time;
 				time += time_delta;
-				h3dSetModelAnimParams(node, 0, time, 1.0f);
+				for(int j = 0; j < 16; ++j)
+				{
+					if(m_impl->m_animables[i].m_layers & (1 << j))
+					{
+						h3dSetModelAnimParams(node, j, time, 1.0f);
+					}
+				}
 				m_impl->m_animables[i].m_time = time;
 			}
 		}

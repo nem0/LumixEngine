@@ -29,6 +29,7 @@ class LUX_ENGINE_API ScriptSystem
 		Universe* getUniverse() const;
 		Component createScript(Entity entity);
 		void setEngine(Engine& engine);
+		Engine* getEngine() const;
 
 		void deserialize(ISerializer& serializer);
 		void serialize(ISerializer& serializer);
