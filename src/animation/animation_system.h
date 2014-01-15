@@ -29,8 +29,8 @@ namespace Lux
 
 			void destroy();
 			Component createAnimable(const Entity& entity);
-			void playAnimation(const Component& cmp, const char* path);
-			void setAnimationTime(const Component& cmp, float time);
+			void playAnimation(const Component& cmp, const char* path, int layer);
+			void setAnimationTime(const Component& cmp, float time, int layer);
 		
 
 		private:
