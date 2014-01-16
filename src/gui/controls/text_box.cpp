@@ -14,16 +14,22 @@ TextBox::TextBox(const char* text, Gui& gui, Block* parent)
 	: Block(gui, parent, "_box")
 {
 	setArea(0, 0, 0, 0, 0, 100, 0, 20);
-	Lux::UI::Block* label_ui = LUX_NEW(Block)(gui, this, "_text");
-	label_ui->setBlockText(text);
-	label_ui->setArea(0, 3, 0, 0, 1, 0, 1, 0);
-	label_ui->onEvent("key_down").bind<TextBox, &TextBox::keyDown>(this);
-	label_ui->onEvent("focus").bind<TextBox, &TextBox::focused>(this);
-	label_ui->onEvent("blur").bind<TextBox, &TextBox::blurred>(this);
-	label_ui->setIsClipping(true);
+	m_label_ui = LUX_NEW(Block)(gui, this, "_text");
+	m_label_ui->setBlockText(text);
+	m_label_ui->setArea(0, 3, 0, 0, 1, 0, 1, 0);
+	m_label_ui->onEvent("key_down").bind<TextBox, &TextBox::keyDown>(this);
+	m_label_ui->onEvent("focus").bind<TextBox, &TextBox::focused>(this);
+	m_label_ui->onEvent("blur").bind<TextBox, &TextBox::blurred>(this);
+	m_label_ui->setIsClipping(true);
 	m_cursor_pos = 0; 
-	m_cursor = LUX_NEW(Block)(gui, label_ui, "_cursor");
+	m_cursor = LUX_NEW(Block)(gui, m_label_ui, "_cursor");
 	m_cursor->hide();
+}
+
+
+Block::EventCallback& TextBox::onChange()
+{
+	return m_label_ui->onEvent("text_accepted");
 }
 
 

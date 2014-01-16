@@ -16,7 +16,7 @@ namespace Lux
 		typedef PODArray<Component> ComponentList;
 
 		Entity() {}
-		Entity(Universe* uni, int i) : index(i), universe(uni) {}
+		Entity(Universe* uni, int32_t i) : index(i), universe(uni) {}
 
 		Matrix getMatrix() const;
 		void getMatrix(Matrix& mtx) const;
@@ -36,7 +36,7 @@ namespace Lux
 
 		bool operator ==(const Entity& rhs) const;
 
-		int index;
+		int32_t index;
 		Universe* universe;
 
 		static const Entity INVALID;
