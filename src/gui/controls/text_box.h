@@ -18,6 +18,7 @@ namespace UI
 			virtual uint32_t getType() const LUX_OVERRIDE;
 			virtual void serialize(ISerializer& serializer) LUX_OVERRIDE;
 			virtual void deserialize(ISerializer& serializer) LUX_OVERRIDE;
+			EventCallback& onChange();
 
 			void setText(const string& text);
 			void setText(const char* text);
@@ -32,6 +33,7 @@ namespace UI
 		private:
 			int m_cursor_pos;
 			Lux::UI::Block* m_cursor;
+			Lux::UI::Block* m_label_ui;
 	};
 
 

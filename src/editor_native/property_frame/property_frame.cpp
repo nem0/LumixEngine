@@ -37,13 +37,13 @@ PropertyFrame::PropertyFrame(MainFrame& main_frame)
 
 	m_pos_x_box = LUX_NEW(Lux::UI::TextBox)("0", main_frame.getGui(), positions);
 	m_pos_x_box->setArea(0, 1, 0, 0, 0.33f, 0, 0, 20);
-	m_pos_x_box->onEvent("text_accepted").bind<PropertyFrame, &PropertyFrame::positionChanged>(this);
+	m_pos_x_box->onChange().bind<PropertyFrame, &PropertyFrame::positionChanged>(this);
 	m_pos_y_box = LUX_NEW(Lux::UI::TextBox)("0", main_frame.getGui(), positions);
 	m_pos_y_box->setArea(0.33f, 1, 0, 0, 0.66f, 0, 0, 20);
-	m_pos_y_box->onEvent("text_accepted").bind<PropertyFrame, &PropertyFrame::positionChanged>(this);
+	m_pos_y_box->onChange().bind<PropertyFrame, &PropertyFrame::positionChanged>(this);
 	m_pos_z_box = LUX_NEW(Lux::UI::TextBox)("0", main_frame.getGui(), positions);
 	m_pos_z_box->setArea(0.66f, 1, 0, 0, 1, 0, 0, 20);
-	m_pos_z_box->onEvent("text_accepted").bind<PropertyFrame, &PropertyFrame::positionChanged>(this);
+	m_pos_z_box->onChange().bind<PropertyFrame, &PropertyFrame::positionChanged>(this);
 	
 	m_component_container = LUX_NEW(Block)(main_frame.getGui(), root, NULL);
 	m_component_container->setArea(0, 0, 0, 24, 1, 0, 1, -30);
@@ -112,11 +112,14 @@ void PropertyFrame::newComponentClick(Lux::UI::Block& block, void*)
 
 void PropertyFrame::positionChanged(Lux::UI::Block& block, void*)
 {
-	Lux::Vec3 v;
-	sscanf_s(m_pos_x_box->getText().c_str(), "%f", &v.x);
-	sscanf_s(m_pos_y_box->getText().c_str(), "%f", &v.y);
-	sscanf_s(m_pos_z_box->getText().c_str(), "%f", &v.z);
-	ASSERT(false); // TODO
+	if(m_selected_entity != -1)
+	{
+		Lux::Vec3 v;
+		sscanf_s(m_pos_x_box->getText().c_str(), "%f", &v.x);
+		sscanf_s(m_pos_y_box->getText().c_str(), "%f", &v.y);
+		sscanf_s(m_pos_z_box->getText().c_str(), "%f", &v.z);
+		m_main_frame->getEditorClient()->setEntityPosition(m_selected_entity, v);
+	}
 }
 
 
@@ -128,6 +131,7 @@ void PropertyFrame::onEntitySelected(Lux::Event& evt)
 	}
 	m_component_uis.clear();
 	Lux::EntitySelectedEvent& e = static_cast<Lux::EntitySelectedEvent&>(evt);
+	m_selected_entity = e.index;
 	for(int i = 0; i < e.components.size(); ++i)
 	{
 		IComponentUI* ui = NULL;

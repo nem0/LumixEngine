@@ -7,8 +7,10 @@
 namespace Lux
 {
 
-        struct ServerMessage;
+		struct Entity;
 		class EventManager;
+        struct ServerMessage;
+		struct Vec3;
 
         class LUX_ENGINE_API EditorClient
         {
@@ -27,6 +29,7 @@ namespace Lux
                         void navigate(float forward, float right, int32_t fast);
 						void loadUniverse(const char* path);
 						void saveUniverse(const char* path);
+						void setEntityPosition(int32_t entity, const Vec3& position);
 						EventManager& getEventManager();
 
                 private:

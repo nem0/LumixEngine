@@ -206,7 +206,7 @@ namespace Lux
 			{
 				H3DNode node = renderer->getMeshNode(m_impl->m_animables[i].m_renderable);
 				float time = m_impl->m_animables[i].m_time;
-				time += time_delta;
+				time += time_delta * 15;
 				for(int j = 0; j < 16; ++j)
 				{
 					if(m_impl->m_animables[i].m_layers & (1 << j))
