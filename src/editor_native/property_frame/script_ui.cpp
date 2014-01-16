@@ -16,7 +16,7 @@ ScriptUI::ScriptUI(PropertyFrame& property_frame, Lux::UI::Block* parent, Lux::E
 	, m_property_frame(property_frame)
 {
 	m_client = &client;
-	setArea(0, 0, 0, 0, 1, 0, 0, 40);
+	setArea(0, 0, 0, 0, 1, 0, 0, 60);
 	Lux::UI::Block* label = LUX_NEW(Lux::UI::Block)(getGui(), this, "_text_centered");
 	label->setBlockText("Script");
 	label->setArea(0, 0, 0, 0, 1, 0, 0, 20);
