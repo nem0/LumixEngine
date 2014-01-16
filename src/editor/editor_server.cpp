@@ -795,18 +795,21 @@ void EditorServerImpl::destroy()
 void EditorServerImpl::onLogInfo(const char* system, const char* message)
 {
 	logMessage(0, system, message);
+	OutputDebugString(message);
 }
 
 
 void EditorServerImpl::onLogWarning(const char* system, const char* message)
 {
 	logMessage(1, system, message);
+	OutputDebugString(message);
 }
 
 
 void EditorServerImpl::onLogError(const char* system, const char* message)
 {
 	logMessage(2, system, message);
+	OutputDebugString(message);
 }
 
 
