@@ -73,10 +73,13 @@ class base_string
 
 		void operator = (const T* rhs) 
 		{
-			m_allocator.deallocate(m_cstr);
-			m_size = strlen(rhs);
-			m_cstr = (T*)m_allocator.allocate((m_size + 1) * sizeof(T));
-			memcpy(m_cstr, rhs, sizeof(T) * (m_size + 1));
+			if(rhs < m_cstr || rhs >= m_cstr + m_size)
+			{
+				m_allocator.deallocate(m_cstr);
+				m_size = strlen(rhs);
+				m_cstr = (T*)m_allocator.allocate((m_size + 1) * sizeof(T));
+				memcpy(m_cstr, rhs, sizeof(T) * (m_size + 1));
+			}
 		}
 
 		bool operator !=(const base_string<T, Allocator>& rhs) const
@@ -130,23 +133,26 @@ class base_string
 		
 		void operator += (const T* rhs)
 		{
-			if(m_cstr)
+			if(rhs < m_cstr || rhs >= m_cstr + m_size)
 			{
-				m_size += base_string<T>::strlen(rhs);
-				m_cstr = (T*)m_allocator.reallocate(m_cstr, m_size + 1);
-		        base_string<T>::strcat(m_cstr, rhs);			
-			}
-			else
-			{
-				m_size = base_string<T>::strlen(rhs);
-				m_cstr = (T*)m_allocator.allocate(m_size + 1);
-				base_string<T>::strcpy(m_cstr, rhs);
+				if(m_cstr)
+				{
+					m_size += base_string<T>::strlen(rhs);
+					m_cstr = (T*)m_allocator.reallocate(m_cstr, m_size + 1);
+					base_string<T>::strcat(m_cstr, rhs);			
+				}
+				else
+				{
+					m_size = base_string<T>::strlen(rhs);
+					m_cstr = (T*)m_allocator.allocate(m_size + 1);
+					base_string<T>::strcpy(m_cstr, rhs);
+				}
 			}
 		}
 
 		void operator += (const base_string<T, Allocator>& rhs)
 		{
-			if(!rhs.m_cstr)
+			if(!rhs.m_cstr || this == &rhs)
 			{
 				return;
 			}
