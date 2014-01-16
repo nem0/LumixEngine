@@ -48,6 +48,7 @@ class LUX_ENGINE_API Renderer
 		void setMesh(Component cmp, const string& str);
 		void getCastShadows(Component cmp, bool& cast_shadows);
 		void setCastShadows(Component cmp, const bool& cast_shadows);
+		bool getBonePosition(Component cmp, const char* bone_name, Vec3* out);
 
 		H3DNode getMeshNode(Component cmp);
 		void getLightFov(Component cmp, float& fov);
