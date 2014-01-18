@@ -1,5 +1,7 @@
 #include "core/spin_mutex.h"
+
 #include <Windows.h>
+#include <new.h>
 
 namespace Lux
 {
@@ -29,6 +31,21 @@ namespace Lux
 		void SpinMutex::destroy(SpinMutex* spin_mutex)
 		{
 			LUX_DELETE(spin_mutex);
+		}
+
+		size_t SpinMutex::getRequiredSize()
+		{
+			return sizeof(WinSpinMutex);
+		}
+
+		SpinMutex* SpinMutex::createOnMemory(bool locked, void* ptr)
+		{
+			return new(ptr) WinSpinMutex(locked);
+		}
+
+		void SpinMutex::destruct(SpinMutex* sm)
+		{
+			sm->~SpinMutex();
 		}
 
 		void WinSpinMutex::lock()

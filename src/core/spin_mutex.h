@@ -11,6 +11,13 @@ namespace Lux
 			static SpinMutex* create(bool locked);
 			static void destroy(SpinMutex* spin_mutex);
 
+			//hack
+			//todo: remove
+			static size_t getRequiredSize();
+			static SpinMutex* createOnMemory(bool locked, void* ptr);
+			static void destruct(SpinMutex* sm);
+			///////////////////////////////////////
+
 			virtual void lock() = 0;
 			virtual bool poll() = 0;
 
