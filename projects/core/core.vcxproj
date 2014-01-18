@@ -115,6 +115,7 @@
     <ClCompile Include="..\..\src\core\tcp_file_device.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\LuxEngine_master\src\core\hash_map.h" />
     <ClInclude Include="..\..\src\core\atomic.h" />
     <ClInclude Include="..\..\src\core\array.h" />
     <ClInclude Include="..\..\src\core\blob.h" />
