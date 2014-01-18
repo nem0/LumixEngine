@@ -5,19 +5,22 @@ namespace Lux
 {
 	namespace MT
 	{
-		class LUX_CORE_API Mutex LUX_ABSTRACT
+		typedef void* MutexHandle;
+
+		class LUX_CORE_API Mutex
 		{
 		public:
-			static Mutex* create(bool locked);
-			static void destroy(Mutex* mutex);
+			Mutex();
+			explicit Mutex(bool locked);
+			~Mutex();
 
-			virtual void lock() = 0;
-			virtual bool poll() = 0;
+			void lock();
+			bool poll();
 
-			virtual void unlock() = 0;
+			void unlock();
 
-		protected:
-			virtual ~Mutex() {}
+		private:
+			MutexHandle m_id;
 		};
 
 		class Lock
