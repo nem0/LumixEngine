@@ -411,19 +411,11 @@ namespace Lux
 			if(0 == m_size)
 				return &m_sentinel;
 
-			node_type* next = m_table;
-			if((NULL == next || &m_sentinel == next))
-			{
-				for(size_type i = 1; i < m_max_id; i++)
-					if(m_table[i].m_next != &m_sentinel)
-						return &m_table[i];
+			for(size_type i = 0; i < m_max_id; i++)
+				if(m_table[i].m_next != &m_sentinel)
+					return &m_table[i];
 
-				return &m_sentinel;
-			}
-			else
-			{
-				return next;
-			}
+			return &m_sentinel;
 		}
 
 		node_type* next(node_type* n)
