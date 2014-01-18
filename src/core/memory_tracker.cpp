@@ -32,7 +32,7 @@ namespace Lux
 	{
 		if(!p) return;
 
-		MT::SpinLock lock(*m_lock);
+		MT::SpinLock lock(m_spin_mutex);
 
 		m_map.insert(p, Entry(file, line, size));
 		m_allocated_memory += size;
@@ -44,7 +44,7 @@ namespace Lux
 	{
 		if(!p) return;
 		printf("rem %x\n", p);
-		MT::SpinLock lock(*m_lock);
+		MT::SpinLock lock(m_spin_mutex);
 
 		EntryTable::iterator it = m_map.find(p);
 		ASSERT(it != m_map.end() && "Allocated/Dealocataed from different places?");
@@ -65,7 +65,7 @@ namespace Lux
 		// Data: <               > CD CD CD CD CD CD CD CD CD CD CD CD CD CD CD CD
 		//    Object dump complete.
 
-		MT::SpinLock lock(*m_lock);
+		MT::SpinLock lock(m_spin_mutex);
 		int32_t count = m_map.size();
 
 		if (count)
@@ -126,7 +126,7 @@ namespace Lux
 		// Data: <               > CD CD CD CD CD CD CD CD CD CD CD CD CD CD CD CD
 		//    Object dump complete.
 
-		MT::SpinLock lock(*m_lock);
+		MT::SpinLock lock(m_spin_mutex);
 		int count = m_map.size();
 
 		if (count)
@@ -174,7 +174,7 @@ namespace Lux
 
 		file_line_map report_map;
 		{
-			MT::SpinLock lock(*m_lock);
+			MT::SpinLock lock(m_spin_mutex);
 			for (EntryTable::iterator it = m_map.begin(); it != m_map.end(); ++it)
 			{
 				Entry& entry = *it;
@@ -219,7 +219,7 @@ namespace Lux
 
 		file_map report_map;
 		{
-			MT::SpinLock lock(*m_lock);
+			MT::SpinLock lock(m_spin_mutex);
 			for (EntryTable::iterator it = m_map.begin(); it != m_map.end(); ++it)
 			{
 				Entry& entry = *it;
@@ -255,7 +255,7 @@ namespace Lux
 
 	void MemoryTracker::markAll()
 	{
-		MT::SpinLock lock(*m_lock);
+		MT::SpinLock lock(m_spin_mutex);
 
 		for (EntryTable::iterator it = m_map.begin(); it != m_map.end(); ++it)
 		{
@@ -276,7 +276,7 @@ namespace Lux
 
 		//	Lock lock(m_lock);
 
-		MT::SpinLock lock(*m_lock);
+		MT::SpinLock lock(m_spin_mutex);
 
 		std::size_t size = 0;
 
@@ -327,21 +327,15 @@ namespace Lux
 		}
 	}
 
-	MemoryTracker::MemoryTracker() 
-		: m_mark(0)
+	MemoryTracker::MemoryTracker()
+		: m_spin_mutex(false)
+		, m_mark(0)
 		, m_allocated_memory(0)
 	{
-		void* ptr = malloc(MT::SpinMutex::getRequiredSize());
-		m_lock = MT::SpinMutex::createOnMemory(false, ptr);
-		//MT::SpinMutex::create(false);
 	}
 
 	MemoryTracker::~MemoryTracker()
 	{
-		MT::SpinMutex::destruct(m_lock);
-		free(m_lock);
-
-		//MT::SpinMutex::destroy(m_lock);
 	}
 } //~namespace Lux
 

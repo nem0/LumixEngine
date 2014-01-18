@@ -24,7 +24,8 @@ namespace Lux
 
 			~MemoryFile() 
 			{ 
-				LUX_DELETE(m_file); 
+				LUX_DELETE(m_file);
+				LUX_DELETE_ARRAY(m_buffer);
 			}
 
 			virtual bool open(const char* path, Mode mode) LUX_OVERRIDE

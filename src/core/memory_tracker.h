@@ -134,7 +134,7 @@ namespace Lux
 
 		EntryTable m_map;
 
-		MT::SpinMutex* m_lock;
+		MT::SpinMutex m_spin_mutex;
 		uint32_t m_allocated_memory;
 		uint8_t m_mark;
 
