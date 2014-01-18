@@ -109,6 +109,7 @@
     <ClInclude Include="..\..\src\gui\opengl_renderer.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\core\new.cpp" />
     <ClCompile Include="..\..\src\gui\atlas.cpp" />
     <ClCompile Include="..\..\src\gui\block.cpp" />
     <ClCompile Include="..\..\src\gui\controls\button.cpp" />

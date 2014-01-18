@@ -22,6 +22,7 @@
     <ClCompile Include="..\..\src\editor_native\property_frame\script_ui.cpp">
       <Filter>property_frame</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\new.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\editor_native\main_frame.h" />
