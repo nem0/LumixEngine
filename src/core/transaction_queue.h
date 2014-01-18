@@ -11,6 +11,7 @@ namespace Lux
 	{
 		template <class T> struct Transaction 
 		{
+			STATIC_ASSERT_IS_TRIVIALLY_COPYABLE(T);
 			void setCompleted()		{ m_event.trigger();		}
 			bool isCompleted()		{ return m_event.poll();	}
 			void waitForCompletion() { return m_event.wait();	}
@@ -24,7 +25,6 @@ namespace Lux
 
 		template <class T, int32_t size> class TransactionQueue 
 		{
-			STATIC_ASSERT_IS_TRIVIALLY_COPYABLE(T);
 		public:
 			TransactionQueue();
 			~TransactionQueue();
