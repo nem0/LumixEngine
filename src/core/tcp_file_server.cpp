@@ -1,5 +1,8 @@
 #include "core/tcp_file_server.h"
 
+#include "core/array.h"
+#include "core/free_list.h"
+#include "core/static_array.h"
 #include "core/tcp_file_device.h"
 #include "core/task.h"
 #include "core/tcp_acceptor.h"
@@ -18,7 +21,6 @@ namespace Lux
 
 			int task()
 			{
-				char buffer[1024];
 				bool quit = false;
 
 				m_acceptor.start("127.0.0.1", 10001);
@@ -36,54 +38,89 @@ namespace Lux
 							int32_t mode = 0;
 							int32_t len = 0;
 							stream->read(mode);
-							stream->read(buffer, 1024);
+							stream->read(m_buffer.data(), m_buffer.size());
 
-							int32_t ret = file->open(buffer, mode) ? 1 : 0;
+							int32_t ret = -2;
+							int32_t id = m_ids.alloc();
+							if(id > 0)
+							{
+								OsFile* file = LUX_NEW(OsFile)();
+								m_files[id] = file;
+
+								ret = file->open(m_buffer.data(), mode) ? id : -1;
+							}
 							stream->write(ret);
-							//todo: return id as well
 						}
 						break;
 					case TCPCommand::Close:
 						{
+							uint32_t id = -1;
+							stream->read(id);
+							OsFile* file = m_files[id];
+							m_ids.release(id);
+
 							file->close();
+							delete file;
 						}
 						break;
 					case TCPCommand::Read:
 						{
+							bool read_successful = true;
+							uint32_t id = -1;
+							stream->read(id);
+							OsFile* file = m_files[id];
+
 							uint32_t size = 0;
 							stream->read(size);
 
 							while(size > 0)
 							{
-								int32_t read = size > 1024 ? 1024 : size;
-								file->read(buffer, read);
-								stream->write(buffer, read);
+								int32_t read = size > m_buffer.size() ? m_buffer.size() : size;
+								read_successful &= file->read((void*)m_buffer.data(), read);
+								stream->write((const void*)m_buffer.data(), read);
 								size -= read;
 							}
+
+							stream->write(read_successful);
 						}
 						break;
 					case TCPCommand::Write:
 						{
+							bool write_successful = true;
+							uint32_t id = -1;
+							stream->read(id);
+							OsFile* file = m_files[id];
+
 							uint32_t size = 0;
 							stream->read(size);
-
+							
 							while(size > 0)
 							{
-								int32_t read = size > 1024 ? 1024 : size;
-								stream->read((void*)buffer, read);
-								file->write((void*)buffer, read);
+								int32_t read = size > m_buffer.size() ? m_buffer.size() : size;
+								write_successful &= stream->read((void*)m_buffer.data(), read);
+								file->write(m_buffer.data(), read);
 								size -= read;
 							}
+
+							stream->write(write_successful);
 						}
 						break;
 					case TCPCommand::Size:
 						{
+							uint32_t id = -1;
+							stream->read(id);
+							OsFile* file = m_files[id];
+
 							uint32_t size = file->size();
 							stream->write(size);
 						}
 						break;
 					case TCPCommand::Seek:
 						{
+							uint32_t id = -1;
+							stream->read(id);
+							OsFile* file = m_files[id];
+
 							uint32_t base = 0;
 							int32_t offset = 0;
 							stream->read(base);
@@ -95,6 +132,10 @@ namespace Lux
 						break;
 					case TCPCommand::Pos:
 						{
+							uint32_t id = -1;
+							stream->read(id);
+							OsFile* file = m_files[id];
+
 							uint32_t pos = file->pos();
 							stream->write(pos);
 						}
@@ -115,7 +156,10 @@ namespace Lux
 			void stop() {} // TODO: implement stop 
 
 		private:
-			Net::TCPAcceptor m_acceptor;
+			Net::TCPAcceptor			m_acceptor;
+			StaticArray<char, 0x50000>	m_buffer;
+			StaticArray<OsFile*, 0x50000> m_files;
+			FreeList<int32_t, 0x50000>	m_ids;
 		};
 
 		struct TCPFileServerImpl

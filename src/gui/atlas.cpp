@@ -8,16 +8,14 @@
 #include "gui/irenderer.h"
 #include "gui/texture_base.h"
 
-
 namespace Lux
 {
-
 	namespace UI
 	{
-
 		struct AtlasImpl
 		{
 			void imageLoaded(TextureBase& img);
+			void atlasLoaded(Lux::FS::IFile* file, bool success);
 
 			map<uint32_t, Atlas::Part*> m_parts;
 			TextureBase* m_texture;
@@ -26,6 +24,38 @@ namespace Lux
 			Lux::FS::FileSystem* m_filesystem;
 		};
 		
+		void AtlasImpl::atlasLoaded(Lux::FS::IFile* file, bool success)
+		{
+			if(!success)
+			{
+				file->close();
+				return;
+			}
+
+			JsonSerializer serializer(*file, JsonSerializer::READ);
+			char tmp[260];
+			serializer.deserialize("image", tmp, 260);
+			m_texture = m_renderer->loadImage(tmp, *m_filesystem);
+			ASSERT(m_texture);
+			m_texture->onLoaded().bind<AtlasImpl, &AtlasImpl::imageLoaded>(this);
+			int count;
+			serializer.deserialize("part_count", count);
+			serializer.deserializeArrayBegin("parts");
+			for(int i = 0; i < count; ++i)
+			{
+				serializer.deserializeArrayItem(tmp, 260);
+				Atlas::Part* part = LUX_NEW(Atlas::Part)();
+				serializer.deserializeArrayItem(part->m_left);
+				serializer.deserializeArrayItem(part->m_top);
+				serializer.deserializeArrayItem(part->m_right);
+				serializer.deserializeArrayItem(part->m_bottom);
+				part->m_pixel_width = part->m_right - part->m_left;
+				part->m_pixel_height = part->m_bottom - part->m_top;
+				part->name = tmp;
+				m_parts.insert(crc32(tmp), part);
+			}
+			serializer.deserializeArrayEnd();
+		}
 
 		void Atlas::Part::getUvs(float* uvs) const
 		{
@@ -48,15 +78,14 @@ namespace Lux
 			uvs[11] = m_top;
 		}
 
-
 		bool Atlas::create()
 		{
 			m_impl = LUX_NEW(AtlasImpl)();
 			m_impl->m_texture = NULL;
 			m_impl->m_renderer = NULL;
-			return m_impl != 0;
-		}
 
+			return m_impl != NULL;
+		}
 
 		void Atlas::destroy()
 		{
@@ -75,50 +104,16 @@ namespace Lux
 			}
 		}
 
-
-		void atlasLoaded(Lux::FS::IFile* file, bool success, void* user_data)
-		{
-			if(!success)
-			{
-				file->close();
-				return;
-			}
-			AtlasImpl* atlas = static_cast<AtlasImpl*>(user_data);
-			ASSERT(atlas);
-			JsonSerializer serializer(*file, JsonSerializer::READ);
-			char tmp[260];
-			serializer.deserialize("image", tmp, 260);
-			atlas->m_texture = atlas->m_renderer->loadImage(tmp, *atlas->m_filesystem);
-			ASSERT(atlas->m_texture);
-			atlas->m_texture->onLoaded().bind<AtlasImpl, &AtlasImpl::imageLoaded>(atlas);
-			int count;
-			serializer.deserialize("part_count", count);
-			serializer.deserializeArrayBegin("parts");
-			for(int i = 0; i < count; ++i)
-			{
-				serializer.deserializeArrayItem(tmp, 260);
-				Atlas::Part* part = LUX_NEW(Atlas::Part)();
-				serializer.deserializeArrayItem(part->m_left);
-				serializer.deserializeArrayItem(part->m_top);
-				serializer.deserializeArrayItem(part->m_right);
-				serializer.deserializeArrayItem(part->m_bottom);
-				part->m_pixel_width = part->m_right - part->m_left;
-				part->m_pixel_height = part->m_bottom - part->m_top;
-				part->name = tmp;
-				atlas->m_parts.insert(crc32(tmp), part);
-			}
-			serializer.deserializeArrayEnd();
-		}
-
-
 		void Atlas::load(IRenderer& renderer, Lux::FS::FileSystem& file_system, const char* filename)
 		{
 			m_impl->m_path = filename;
 			m_impl->m_renderer = &renderer;
 			m_impl->m_filesystem = &file_system;
-			file_system.openAsync(file_system.getDefaultDevice(), filename, Lux::FS::Mode::OPEN | Lux::FS::Mode::READ, &atlasLoaded, m_impl);
-		}
 
+			FS::ReadCallback atlas_loaded_cb;
+			atlas_loaded_cb.bind<AtlasImpl, &AtlasImpl::atlasLoaded>(m_impl);
+			file_system.openAsync(file_system.getDefaultDevice(), filename, Lux::FS::Mode::OPEN | Lux::FS::Mode::READ, atlas_loaded_cb);
+		}
 
 		TextureBase* Atlas::getTexture() const
 		{
@@ -138,8 +133,5 @@ namespace Lux
 			m_impl->m_parts.find(crc32(name), part);
 			return part;
 		}
-
-
 	} // ~namespace Lux
-
 } // ~namespace Lux

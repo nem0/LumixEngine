@@ -23,7 +23,7 @@ namespace Lux
 			virtual bool unMount(IFileDevice* device) = 0;
 
 			virtual IFile* open(const char* device_list, const char* file, Mode mode) = 0;
-			virtual IFile* openAsync(const char* device_list, const char* file, int mode, ReadCallback call_back, void* user_data) = 0;
+			virtual bool openAsync(const char* device_list, const char* file, int mode, const ReadCallback& call_back) = 0;
 			 
 			virtual void close(IFile* file) = 0;
 			virtual void closeAsync(IFile* file) = 0;
@@ -32,6 +32,9 @@ namespace Lux
 
 			virtual const char* getDefaultDevice() const = 0;
 			virtual const char* getSaveGameDevice() const = 0;
+
+			virtual void setDefaultDevice(const char* dev) = 0;
+			virtual void setSaveGameDevice(const char* dev) = 0;
 		};
 	} // ~namespace FS
 } // ~namespace Lux

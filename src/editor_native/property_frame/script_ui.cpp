@@ -16,7 +16,7 @@ ScriptUI::ScriptUI(PropertyFrame& property_frame, Lux::UI::Block* parent, Lux::E
 	, m_property_frame(property_frame)
 {
 	m_client = &client;
-	setArea(0, 0, 0, 0, 1, 0, 0, 40);
+	setArea(0, 0, 0, 0, 1, 0, 0, 60);
 	Lux::UI::Block* label = LUX_NEW(Lux::UI::Block)(getGui(), this, "_text_centered");
 	label->setBlockText("Script");
 	label->setArea(0, 0, 0, 0, 1, 0, 0, 20);
@@ -32,6 +32,11 @@ ScriptUI::ScriptUI(PropertyFrame& property_frame, Lux::UI::Block* parent, Lux::E
 	Lux::UI::Button* browse_button = LUX_NEW(Lux::UI::Button)("...", getGui(), this);
 	browse_button->setArea(1, -20, 0, 20, 1, -1, 0, 40);
 	browse_button->onEvent("click").bind<ScriptUI, &ScriptUI::browseSource>(this);	
+
+	Lux::UI::Button* edit_button = LUX_NEW(Lux::UI::Button)("Edit script", getGui(), this);
+	edit_button->setArea(0.5f, -40, 0, 42, 0.5f, 40, 0, 62);
+	edit_button->onEvent("click").bind<ScriptUI, &ScriptUI::editScript>(this);	
+
 }
 
 
@@ -39,6 +44,12 @@ void ScriptUI::sourceChanged(Lux::UI::Block& block, void*)
 {
 	const Lux::string& s = m_source_box->getChild(0)->getBlockText();
 	m_client->setComponentProperty("script", "source", s.c_str(), s.length()+1);
+}
+
+
+void ScriptUI::editScript(Lux::UI::Block& block, void*)
+{
+	ShellExecute(NULL, "open", m_source_box->getText().c_str(), NULL, NULL, SW_SHOW);
 }
 
 

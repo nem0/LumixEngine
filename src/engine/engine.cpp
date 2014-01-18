@@ -12,9 +12,6 @@
 #include "core/file_system.h"
 #include "core/disk_file_device.h"
 #include "core/memory_file_device.h"
-#include "core/tcp_file_device.h"
-
-#include "core/tcp_file_server.h"
 
 namespace Lux
 {
@@ -25,9 +22,8 @@ namespace Lux
 
 		Renderer m_renderer;
 		FS::FileSystem* m_file_system; 
-		FS::MemoryFileDevice m_mem_file_device;
-		FS::DiskFileDevice m_disk_file_device;
-		FS::TCPFileDevice m_tcp_file_device;
+		FS::MemoryFileDevice* m_mem_file_device;
+		FS::DiskFileDevice* m_disk_file_device;
 
 		string m_base_path;
 		EditorServer* m_editor_server;
@@ -42,16 +38,7 @@ namespace Lux
 	bool EngineImpl::create(int w, int h, const char* base_path, Engine& owner)
 	{
 		m_universe = 0;
-		m_file_system = FS::FileSystem::create();
-
-		FS::TCPFileServer* server = LUX_NEW(FS::TCPFileServer)();
-		server->start();
-
-		m_tcp_file_device.connect("127.0.0.1", 10001);
-
-		m_file_system->mount(&m_mem_file_device);
-		m_file_system->mount(&m_disk_file_device);
-		m_file_system->mount(&m_tcp_file_device);
+		m_base_path = base_path;
 
 		if(!m_renderer.create(m_file_system, w, h, base_path))
 		{
@@ -77,10 +64,30 @@ namespace Lux
 	}
 
 
-	bool Engine::create(int w, int h, const char* base_path, EditorServer* editor_server)
+	bool Engine::create(int w, int h, const char* base_path, FS::FileSystem* file_system, EditorServer* editor_server)
 	{
 		m_impl = LUX_NEW(EngineImpl)(*this);
 		m_impl->m_editor_server = editor_server;
+
+		if(NULL == file_system)
+		{
+			m_impl->m_file_system = FS::FileSystem::create();
+
+			m_impl->m_mem_file_device = LUX_NEW(FS::MemoryFileDevice);
+			m_impl->m_disk_file_device = LUX_NEW(FS::DiskFileDevice);
+
+			m_impl->m_file_system->mount(m_impl->m_mem_file_device);
+			m_impl->m_file_system->mount(m_impl->m_disk_file_device);
+			m_impl->m_file_system->setDefaultDevice("memory:disk");
+			m_impl->m_file_system->setSaveGameDevice("memory:disk");
+		}
+		else
+		{
+			m_impl->m_file_system = file_system;
+			m_impl->m_mem_file_device = NULL;
+			m_impl->m_disk_file_device = NULL;
+		}
+
 		if(!m_impl->create(w, h, base_path, *this))
 		{
 			LUX_DELETE(m_impl);
@@ -96,13 +103,37 @@ namespace Lux
 		m_impl->m_plugin_manager.destroy();
 		m_impl->m_renderer.destroy();
 		
-		m_impl->m_tcp_file_device.disconnect();
-		FS::FileSystem::destroy(m_impl->m_file_system);
+		if(m_impl->m_disk_file_device)
+		{
+			FS::FileSystem::destroy(m_impl->m_file_system);
+			LUX_DELETE(m_impl->m_mem_file_device);
+			LUX_DELETE(m_impl->m_disk_file_device);
+		}
 
 		LUX_DELETE(m_impl);
 		m_impl = 0;
 	}
 
+	Universe* Engine::createUniverse()
+	{
+		m_impl->m_universe = LUX_NEW(Universe)();
+		m_impl->m_plugin_manager.onCreateUniverse(*m_impl->m_universe);
+		m_impl->m_script_system.setUniverse(m_impl->m_universe);
+		m_impl->m_universe->create();
+		m_impl->m_renderer.setUniverse(m_impl->m_universe);
+
+		return m_impl->m_universe;
+	}
+
+	void Engine::destroyUniverse()
+	{
+		m_impl->m_renderer.setUniverse(0);
+		m_impl->m_script_system.setUniverse(0);
+		m_impl->m_plugin_manager.onDestroyUniverse(*m_impl->m_universe);
+		m_impl->m_universe->destroy();
+		LUX_DELETE(m_impl->m_universe);
+		m_impl->m_universe = 0;
+	}
 
 	EditorServer* Engine::getEditorServer() const
 	{
@@ -145,28 +176,7 @@ namespace Lux
 		return m_impl->m_plugin_manager.load(name);
 	}
 
-
-	void Engine::destroyUniverse()
-	{
-		m_impl->m_renderer.setUniverse(0);
-		m_impl->m_script_system.setUniverse(0);
-		m_impl->m_plugin_manager.onDestroyUniverse(*m_impl->m_universe);
-		m_impl->m_universe->destroy();
-		LUX_DELETE(m_impl->m_universe);
-		m_impl->m_universe = 0;
-	}
-
-	Universe* Engine::createUniverse()
-	{
-		m_impl->m_universe = LUX_NEW(Universe)();
-		m_impl->m_plugin_manager.onCreateUniverse(*m_impl->m_universe);
-		m_impl->m_script_system.setUniverse(m_impl->m_universe);
-		m_impl->m_universe->create();
-		m_impl->m_renderer.setUniverse(m_impl->m_universe);
-
-		return m_impl->m_universe;
-	}
-
+	
 
 	ScriptSystem& Engine::getScriptSystem()
 	{
@@ -179,6 +189,11 @@ namespace Lux
 		return m_impl->m_input_system;
 	}
 
+
+	const char* Engine::getBasePath() const
+	{
+		return m_impl->m_base_path.c_str();
+	}
 
 
 	Universe* Engine::getUniverse() const
