@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/lux.h"
+#include "core/math_utils.h"
 #include "core/default_allocator.h"
 
 namespace Lux
@@ -28,13 +29,13 @@ namespace Lux
 	template<class Key> 
 	struct HashFunc
 	{
-		static size_t get(const Key& key);
+		static uint32_t get(const Key& key);
 	};
 
 	template<>
 	struct HashFunc<int32_t>
 	{
-		static size_t get(const int32_t& key)
+		static uint32_t get(const int32_t& key)
 		{
 			size_t x = ((key >> 16) ^ key) * 0x45d9f3b;
 			x = ((x >> 16) ^ x) * 0x45d9f3b;
@@ -46,7 +47,7 @@ namespace Lux
 	template<>
 	struct HashFunc<uint32_t>
 	{
-		static size_t get(const uint32_t& key)
+		static uint32_t get(const uint32_t& key)
 		{
 			size_t x = ((key >> 16) ^ key) * 0x45d9f3b;
 			x = ((x >> 16) ^ x) * 0x45d9f3b;
@@ -58,7 +59,7 @@ namespace Lux
 	template<>
 	struct HashFunc<char*>
 	{
-		static size_t get(const char* key)
+		static uint32_t get(const char* key)
 		{
 			size_t result = 0x55555555;
 
@@ -71,8 +72,6 @@ namespace Lux
 			return result;
 		}
 	};
-
-	struct Aloc {};
 
 	template<class K, class T, class Hasher = HashFunc<K>, class Allocator = DefaultAllocator>
 	class HashMap
@@ -148,12 +147,12 @@ namespace Lux
 
 			my_type& operator++()
 			{
-				return pre_inc();
+				return preInc();
 			}
 
 			my_type operator++(int)
 			{
-				return post_inc();
+				return postInc();
 			}
 
 			bool operator==(const my_type& it) const
@@ -167,13 +166,13 @@ namespace Lux
 			}
 
 		private:
-			my_type& pre_inc()
+			my_type& preInc()
 			{
 				m_current_node = m_hash_map->next(m_current_node);
 				return *this;
 			}
 
-			my_type post_inc()
+			my_type postInc()
 			{
 				my_type p = *this;
 				m_current_node = m_hash_map->next(m_current_node);
@@ -202,7 +201,7 @@ namespace Lux
 			: m_sentinel(&m_sentinel)
 		{
 			init(src.m_max_id);
-			copyTable(src.m_table, &src.m_sentinel, src.m_max_id);
+			copyTable_u(src.m_table, &src.m_sentinel, src.m_max_id);
 
 			m_mask = src.m_mask;
 			m_size = src.m_size;
@@ -227,7 +226,7 @@ namespace Lux
 			{
 				clear();
 				init(src.m_max_id);
-				copyTable(src.m_table, &src.m_sentinel, src.m_max_id);
+				copyTable_u(src.m_table, &src.m_sentinel, src.m_max_id);
 
 				m_mask = src.m_mask;
 				m_size = src.m_size;
@@ -239,6 +238,7 @@ namespace Lux
 		value_type& operator[](const key_type& key)
 		{
 			node_type* n = _find(key);
+			ASSERT(&m_sentinel != n);
 			return n->m_value;
 		}
 
@@ -311,8 +311,8 @@ namespace Lux
 				node_type* dest = n;
 				n = next(n);
 				destruct(dest);
-				if(dest < m_table || dest > &m_table[m_max_id])
-					delete dest;
+				if(dest < m_table || dest > &m_table[m_max_id - 1])
+					m_allocator.deallocate(dest);
 			}
 
 			m_allocator.deallocate(m_table);
@@ -352,6 +352,7 @@ namespace Lux
 
 		void init(size_type ids_count = s_default_ids_count)
 		{
+			ASSERT(Math::isPowOfTwo(ids_count));
 			m_table = (node_type*)m_allocator.allocate(sizeof(node_type) * ids_count);
 			for(node_type* i = m_table; i < &m_table[ids_count]; i++)
 				construct(i, &m_sentinel);
@@ -392,6 +393,11 @@ namespace Lux
 		void copy(node_type* src, node_type* dst)
 		{
 			memcpy(dst, src, sizeof(node_type));
+		}
+
+		void copy_u(node_type* src, node_type* dst)
+		{
+			construct(dst, src->m_key, src->m_value);
 		}
 
 		node_type* getEmptyNode(size_type pos)
@@ -479,6 +485,22 @@ namespace Lux
 					size_t pos = getPosition(n->m_key);
 					node_type* new_node = getEmptyNode(pos);
 					copy(n, new_node);
+					new_node->m_next = NULL;
+					n = n->m_next;
+				}
+			}
+		}
+
+		void copyTable_u(node_type* src, const node_type* src_sentinel, size_type ids_count)
+		{
+			for(size_type i = 0; i < ids_count; i++)
+			{
+				node_type* n = &src[i];
+				while(NULL != n && src_sentinel != n->m_next)
+				{
+					size_t pos = getPosition(n->m_key);
+					node_type* new_node = getEmptyNode(pos);
+					copy_u(n, new_node);
 					new_node->m_next = NULL;
 					n = n->m_next;
 				}
