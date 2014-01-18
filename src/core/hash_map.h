@@ -201,7 +201,7 @@ namespace Lux
 			: m_sentinel(&m_sentinel)
 		{
 			init(src.m_max_id);
-			copyTable_u(src.m_table, &src.m_sentinel, src.m_max_id);
+			copyTableUninitialized(src.m_table, &src.m_sentinel, src.m_max_id);
 
 			m_mask = src.m_mask;
 			m_size = src.m_size;
@@ -226,7 +226,7 @@ namespace Lux
 			{
 				clear();
 				init(src.m_max_id);
-				copyTable_u(src.m_table, &src.m_sentinel, src.m_max_id);
+				copyTableUninitialized(src.m_table, &src.m_sentinel, src.m_max_id);
 
 				m_mask = src.m_mask;
 				m_size = src.m_size;
@@ -395,7 +395,7 @@ namespace Lux
 			memcpy(dst, src, sizeof(node_type));
 		}
 
-		void copy_u(node_type* src, node_type* dst)
+		void copyUninitialized(node_type* src, node_type* dst)
 		{
 			construct(dst, src->m_key, src->m_value);
 		}
@@ -491,7 +491,7 @@ namespace Lux
 			}
 		}
 
-		void copyTable_u(node_type* src, const node_type* src_sentinel, size_type ids_count)
+		void copyTableUninitialized(node_type* src, const node_type* src_sentinel, size_type ids_count)
 		{
 			for(size_type i = 0; i < ids_count; i++)
 			{
@@ -500,7 +500,7 @@ namespace Lux
 				{
 					size_t pos = getPosition(n->m_key);
 					node_type* new_node = getEmptyNode(pos);
-					copy_u(n, new_node);
+					copyUninitialized(n, new_node);
 					new_node->m_next = NULL;
 					n = n->m_next;
 				}
