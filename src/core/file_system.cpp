@@ -133,7 +133,7 @@ namespace Lux
 					}
 					else
 					{
-						close(prev);
+						LUX_DELETE(prev);
 						return NULL;
 					}
 				}

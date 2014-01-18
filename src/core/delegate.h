@@ -40,7 +40,7 @@ namespace Lux
 			template <R (*Function)()>
 			void bind(void)
 			{
-				m_stub.first = nullptr;
+				m_stub.first = NULL;
 				m_stub.second = &FunctionStub<Function>;
 			}
 
@@ -96,7 +96,7 @@ namespace Lux
 			template <R (*Function)(A0)>
 			void bind(void)
 			{
-				m_stub.first = nullptr;
+				m_stub.first = NULL;
 				m_stub.second = &FunctionStub<Function>;
 			}
 
@@ -153,7 +153,7 @@ namespace Lux
 			template <R (*Function)(A0, A1)>
 			void bind(void)
 			{
-				m_stub.first = nullptr;
+				m_stub.first = NULL;
 				m_stub.second = &FunctionStub<Function>;
 			}
 
@@ -209,7 +209,7 @@ namespace Lux
 			template <R (*Function)(A0, A1, A2, A3)>
 			void bind(void)
 			{
-				m_stub.first = nullptr;
+				m_stub.first = NULL;
 				m_stub.second = &FunctionStub<Function>;
 			}
 

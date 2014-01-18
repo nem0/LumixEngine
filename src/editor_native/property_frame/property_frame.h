@@ -45,4 +45,5 @@ class PropertyFrame : public Lux::UI::Dockable
 		Lux::UI::Block* m_component_container;
 		MainFrame* m_main_frame;
 		Lux::PODArray<IComponentUI*> m_component_uis; 
+		int32_t m_selected_entity;
 };

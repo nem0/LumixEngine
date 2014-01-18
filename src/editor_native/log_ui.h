@@ -31,6 +31,7 @@ class LogUI : public Lux::UI::Dockable
 
 	private:
 		void onLogMessage(Lux::Event& evt);
+		void cleanButtonClick(Block&, void*);
 
 	private:
 		MainFrame& m_main_frame;

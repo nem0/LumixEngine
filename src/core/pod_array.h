@@ -33,11 +33,14 @@ class PODArray
 
 		void operator =(const PODArray& rhs)
 		{
-			m_allocator.deallocate(m_data);
-			m_data = (T*)m_allocator.allocate(rhs.m_capacity * sizeof(T));
-			m_capacity = rhs.m_capacity;
-			m_size = rhs.m_size;
-			memmove(m_data, rhs.m_data, sizeof(T) * m_size);
+			if(this != &rhs)
+			{
+				m_allocator.deallocate(m_data);
+				m_data = (T*)m_allocator.allocate(rhs.m_capacity * sizeof(T));
+				m_capacity = rhs.m_capacity;
+				m_size = rhs.m_size;
+				memmove(m_data, rhs.m_data, sizeof(T) * m_size);
+			}
 		}
 
 		PODArray()
