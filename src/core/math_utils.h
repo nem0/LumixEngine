@@ -42,5 +42,11 @@ namespace Lux
 		{
 			return min(max(value, min_value), max_value);
 		}
+
+		template <typename T>
+		bool isPowOfTwo(T n) 
+		{ 
+			return (n) && !(n & (n - 1));
+		}
 	}
 }

@@ -57,14 +57,14 @@ class base_string
 
 		~base_string()
 		{
-			m_allocator.deallocate(m_cstr, m_size + 1);
+			m_allocator.deallocate(m_cstr);
 		}
 
 		void operator = (const base_string<T, Allocator>& rhs) 
 		{
 			if(&rhs != this)
 			{
-				m_allocator.deallocate(m_cstr, m_size + 1);
+				m_allocator.deallocate(m_cstr);
 				m_cstr = (T*)m_allocator.allocate((rhs.m_size + 1) * sizeof(T));
 				m_size = rhs.m_size;
 				memcpy(m_cstr, rhs.m_cstr, sizeof(T) * (m_size + 1));
@@ -73,10 +73,13 @@ class base_string
 
 		void operator = (const T* rhs) 
 		{
-			m_allocator.deallocate(m_cstr, m_size + 1);
-			m_size = strlen(rhs);
-			m_cstr = (T*)m_allocator.allocate((m_size + 1) * sizeof(T));
-			memcpy(m_cstr, rhs, sizeof(T) * (m_size + 1));
+			if(rhs < m_cstr || rhs >= m_cstr + m_size)
+			{
+				m_allocator.deallocate(m_cstr);
+				m_size = strlen(rhs);
+				m_cstr = (T*)m_allocator.allocate((m_size + 1) * sizeof(T));
+				memcpy(m_cstr, rhs, sizeof(T) * (m_size + 1));
+			}
 		}
 
 		bool operator !=(const base_string<T, Allocator>& rhs) const
@@ -130,41 +133,59 @@ class base_string
 		
 		void operator += (const T* rhs)
 		{
-			if(m_cstr)
+			if(rhs < m_cstr || rhs >= m_cstr + m_size)
 			{
-				size_t old_size = m_size;
-				m_size += base_string<T>::strlen(rhs);
-				T* newStr = (T*)m_allocator.allocate(m_size + 1);
-				base_string<T>::strcpy(newStr, m_cstr);
-				base_string<T>::strcat(newStr, rhs);
-				m_allocator.deallocate(m_cstr, old_size + 1);
-				m_cstr = newStr;
-			}
-			else
-			{
-				m_size = base_string<T>::strlen(rhs);
-				T* newStr = (T*)m_allocator.allocate(m_size + 1);
-				base_string<T>::strcpy(newStr, rhs);
-				m_cstr = newStr;
+				if(m_cstr)
+				{
+					m_size += base_string<T>::strlen(rhs);
+					m_cstr = (T*)m_allocator.reallocate(m_cstr, m_size + 1);
+					base_string<T>::strcat(m_cstr, rhs);			
+				}
+				else
+				{
+					m_size = base_string<T>::strlen(rhs);
+					m_cstr = (T*)m_allocator.allocate(m_size + 1);
+					base_string<T>::strcpy(m_cstr, rhs);
+				}
 			}
 		}
 
 		void operator += (const base_string<T, Allocator>& rhs)
 		{
-			size_t old_size = m_size;
-			m_size += rhs.m_size;
-			T* newStr = m_allocator.deallocate(m_cstr, m_size + 1);
-			base_string<T>::strcpy(newStr, m_cstr);
-			base_string<T>::strcat(newStr, rhs.m_cstr);
-			m_allocator.deallocate(m_cstr, old_size + 1);
-			m_cstr = newStr;
+			if(!rhs.m_cstr || this == &rhs)
+			{
+				return;
+			}
+			if(m_cstr)
+			{
+				m_size += rhs.length();
+				m_cstr = (T*)m_allocator.reallocate(m_cstr, m_size + 1);
+				base_string<T>::strcat(m_cstr, rhs.m_cstr);
+			}
+			else
+			{
+				*this = rhs;
+			}
 		}
 
-		base_string<T> operator +(const base_string<T, Allocator>& rhs)
+		void insert(size_t pos, T value)
 		{
-			base_string<T> ret = *this;
-			ret += rhs;
-			return ret;
+			m_cstr = (T*)m_allocator.reallocate(m_cstr, m_size + 2);
+			for(size_t i = m_size + 1; i > pos; --i)
+			{
+				m_cstr[i] = m_cstr[i-1];
+			}
+			m_cstr[pos] = value;
+			++m_size;
+		}
+
+		void erase(size_t pos)
+		{
+			if(pos >= 0 && pos < m_size)
+			{
+				base_string<T>::strcpy(m_cstr + pos, m_cstr + pos + 1);
+				--m_size;
+			}
 		}
 
 	public:
@@ -200,6 +221,20 @@ class base_string
 			}
 			*d = 0;
 		}
+
+		static void strncpy(T* desc, const T* src, size_t max_size)
+		{
+			T* d = desc;
+			const T* s = src;
+			while(*s && (size_t)(s - src) < max_size)
+			{
+				*d = *s;
+				++s; 
+				++d;
+			}
+			*d = 0;
+		}
+
 
 		static int strlen(const T* rhs) 
 		{

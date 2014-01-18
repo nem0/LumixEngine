@@ -176,34 +176,35 @@ void Dockable::dividerMouseMove(int x, int y, int rel_x, int rel_y)
 	Block* block_next = m_divider != getContent()->getChild(1) && block_prev != getContent()->getChild(1) ?  getContent()->getChild(1) :  getContent()->getChild(2);
 	Block::Area& area_next = block_next->getLocalArea();
 	Block::Area& area_prev = block_prev->getLocalArea();
-	if(area.rel_left > 0.1f)
+	bool is_vertical_divider = area.rel_left > 0.001f;
+	if(is_vertical_divider)
 	{
-		area.left += rel_x;
-		area.right += rel_x;
+		area.rel_left += rel_x / getGlobalWidth();
+		area.rel_right += rel_x / getGlobalWidth();
 		if(area_prev.rel_left > 0.1f)
 		{
-			area_prev.left += rel_x;
-			area_next.right += rel_x;
+			area_prev.rel_left += rel_x / getGlobalWidth();
+			area_next.rel_right += rel_x / getGlobalWidth();
 		}
 		else
 		{
-			area_next.left += rel_x;
-			area_prev.right += rel_x;
+			area_next.rel_left += rel_x / getGlobalWidth();
+			area_prev.rel_right += rel_x / getGlobalWidth();
 		}
 	}
 	else
 	{
-		area.top += rel_y;
-		area.bottom += rel_y;
+		area.rel_top += rel_y / getGlobalHeight();
+		area.rel_bottom += rel_y / getGlobalHeight();
 		if(area_prev.rel_top > 0.1f)
 		{
-			area_prev.top += rel_y;
-			area_next.bottom += rel_y;
+			area_prev.rel_top += rel_y / getGlobalHeight();
+			area_next.rel_bottom += rel_y / getGlobalHeight();
 		}
 		else
 		{
-			area_next.top += rel_y;
-			area_prev.bottom += rel_y;
+			area_next.rel_top += rel_y / getGlobalHeight();
+			area_prev.rel_bottom += rel_y / getGlobalHeight();
 		}
 	}
 

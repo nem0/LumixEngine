@@ -1,12 +1,13 @@
-#include "gui/opengl_renderer.h"
 #include <cstdio>
 #include <Windows.h>
 #include <gl/GL.h>
+#include "gui/opengl_renderer.h"
 #include "core/array.h"
 #include "core/delegate_list.h"
 #include "core/file_system.h"
 #include "core/ifile.h"
 #include "core/map.h"
+#include "core/math_utils.h"
 #include "core/pod_array.h"
 #include "core/string.h"
 #include "core/vec3.h"
@@ -24,12 +25,13 @@ namespace UI
 		public:
 			OpenGLTexture(const char* name, float width, float height)
 				: TextureBase(name, width, height)
-			{}
+			{
+			}
 
 			GLuint getId() const { return m_gl_id; }
 			void setId(GLuint id) { m_gl_id = id; }
 
-			static void imageLoaded(FS::IFile* file, bool success, void* user_data);
+			void imageLoaded(FS::IFile* file, bool success);
 
 		private:
 			GLuint m_gl_id;
@@ -51,7 +53,7 @@ namespace UI
 		};
 
 		TextureBase* getImage(const char* name);
-		static void fontLoaded(FS::IFile* file, bool success, void* user_data);
+		void fontLoaded(FS::IFile* file, bool success);
 		void fontImageLoaded(TextureBase& img);
 
 		map<char, Character> m_characters;
@@ -116,11 +118,14 @@ namespace UI
 		}
 		img = LUX_NEW(OpenGLTexture)(name, (float)0, (float)0);
 		static_cast<OpenGLTexture*>(img)->setId(0);
-		file_system.openAsync(file_system.getDefaultDevice(), name, FS::Mode::OPEN | FS::Mode::READ, &OpenGLTexture::imageLoaded, img);
+
+		FS::ReadCallback image_loaded_cb;
+		image_loaded_cb.bind<OpenGLTexture, &OpenGLTexture::imageLoaded>(static_cast<OpenGLTexture*>(img));
+		file_system.openAsync(file_system.getDefaultDevice(), name, FS::Mode::OPEN | FS::Mode::READ, image_loaded_cb);
 		return img;
 	}
 
-	void OpenGLTexture::imageLoaded(FS::IFile* file, bool success, void* user_data)
+	void OpenGLTexture::imageLoaded(FS::IFile* file, bool success)
 	{
 		if(success)
 		{
@@ -191,10 +196,9 @@ namespace UI
 			LUX_DELETE_ARRAY(image_dest);
 			LUX_DELETE_ARRAY(buffer);
 	
-			OpenGLTexture* img = static_cast<OpenGLTexture*>(user_data);
-			img->setId(texture_id);
-			img->setSize((float)header.width, (float)header.height);
-			img->onLoaded().invoke(*img);
+			setId(texture_id);
+			setSize((float)header.width, (float)header.height);
+			onLoaded().invoke(*this);
 		}
 		else
 		{
@@ -221,7 +225,74 @@ namespace UI
 		glLoadIdentity();
 	}
 
-	void OpenGLRenderer::measureText(const char* text, float* w, float* h)
+	Block::Area OpenGLRenderer::getCharArea(const char* text, int pos, float max_width)
+	{
+		Block::Area area;
+		if(text)
+		{
+			float width = 0;
+			float height = 0;
+			float prev_h = 0;
+			const char* c = text;
+			bool is_multiline = false;
+			OpenGLRendererImpl::Character character;
+			bool found = false;
+			bool is_some_char = false;
+			while(*c)
+			{
+				if(m_impl->m_characters.find(*c, character))
+				{
+					is_some_char = true;
+					if(c - text == pos)
+					{
+						found = true;
+						area.left = width;
+						area.top = prev_h + character.y_offset;
+						area.right = width + character.x_advance;
+						area.bottom = prev_h + character.pixel_h + character.y_offset;
+						area.rel_bottom = area.rel_left = area.rel_right = area.rel_top = 0;
+						break;
+					}
+					width += character.x_advance;
+					height = Math::max(height, character.pixel_h);
+					if(width > max_width || *c == '\n')
+					{
+						is_multiline = true;
+						width = 0;
+						prev_h += height;
+					}
+				}
+				else if(*c == '\n')
+				{
+					is_multiline = true;
+					width = 0;
+					prev_h += height;
+				}
+				++c;
+			}
+			if(!found)
+			{
+				if(is_some_char)
+				{
+					area.left = width;
+					area.top = prev_h + character.y_offset;
+					area.right = width + character.x_advance;
+					area.bottom = prev_h + character.pixel_h + character.y_offset;
+				}
+				else
+				{
+					area.left = 0;
+					area.right = 3;
+					area.top = 0;
+					area.bottom = 20;
+				}
+				area.rel_bottom = area.rel_left = area.rel_right = area.rel_top = 0;
+			}
+		}
+		return area;
+	}
+
+	void OpenGLRenderer::measureText(const char* text, float* w, float* h, float max_width)
 	{
 		if(!text)
 		{
@@ -231,7 +302,9 @@ namespace UI
 		}
 		float width = 0;
 		float height = 0;
+		float prev_h = 0;
 		const char* c = text;
+		bool is_multiline = false;
 		while(*c)
 		{
 			OpenGLRendererImpl::Character character;
@@ -239,11 +312,23 @@ namespace UI
 			{
 				width += character.x_advance;
 				height = Math::max(height, character.pixel_h);
+				if(width > max_width || *c == '\n')
+				{
+					is_multiline = true;
+					width = 0;
+					prev_h += height;
+				}
+			}
+			else if(*c == '\n')
+			{
+				is_multiline = true;
+				width = 0;
+				prev_h += height;
 			}
 			++c;
 		}
-		*w = width;
-		*h = height;
+		*w = is_multiline ? max_width : width;
+		*h = height + prev_h;
 	}
 
 	void OpenGLRenderer::pushScissorArea(float left, float top, float right, float bottom)
@@ -287,7 +372,7 @@ namespace UI
 		}
 	}
 
-	void OpenGLRenderer::renderText(const char* text, float x, float y, float z)
+	void OpenGLRenderer::renderText(const char* text, float x, float y, float z, float max_width)
 	{
 		if(!text)
 		{
@@ -306,13 +391,16 @@ namespace UI
 		uvs.resize(len * 6);
 		const char* c = text;
 		float cur_x = x;
+		float line_h = 0;
+		float line_base = y;
 		int i = 0;
 		while(*c)
 		{
 			OpenGLRendererImpl::Character character;
 			if(m_impl->m_characters.find(*c, character))
 			{
-				float cur_y = y + character.y_offset;
+				float cur_y = line_base + character.y_offset;
+				line_h = Math::max(line_h, character.pixel_h);
 				verts[i*6].set(cur_x, cur_y, z);
 				verts[i*6+1].set(cur_x, cur_y + character.pixel_h, z);
 				verts[i*6+2].set(cur_x + character.pixel_w, cur_y + character.pixel_h, z);
@@ -323,6 +411,12 @@ namespace UI
 			
 				cur_x += character.x_advance;
 
+				if(cur_x - x > max_width)
+				{
+					cur_x = x;
+					line_base += line_h;
+				}
+
 				uvs[i*6].set(character.left, character.top);
 				uvs[i*6+1].set(character.left, character.bottom);
 				uvs[i*6+2].set(character.right, character.bottom);
@@ -331,6 +425,11 @@ namespace UI
 				uvs[i*6+4].set(character.right, character.bottom);
 				uvs[i*6+5].set(character.right, character.top);
 				++i;
+			}
+			else if(*c == '\n')
+			{
+				cur_x = x;
+				line_base += line_h;
 			}
 			++c;
 		}
@@ -371,23 +470,23 @@ namespace UI
 		return getFirstNumberPos(c);
 	}
 
-
 	void OpenGLRendererImpl::fontImageLoaded(TextureBase& texture)
 	{
 		char tmp[255];
 		strcpy_s(tmp, texture.getName().c_str());
 		int len = strlen(tmp);
 		strcpy_s(tmp + len - 4, 255 - len + 4, ".fnt");
-		m_file_system->openAsync(m_file_system->getDefaultDevice(), tmp, FS::Mode::OPEN | FS::Mode::READ, &OpenGLRendererImpl::fontLoaded, this);
+
+		FS::ReadCallback font_loaded_cb;
+		font_loaded_cb.bind<OpenGLRendererImpl, &OpenGLRendererImpl::fontLoaded>(this);
+		m_file_system->openAsync(m_file_system->getDefaultDevice(), tmp, FS::Mode::OPEN | FS::Mode::READ, font_loaded_cb);
 	}
 
-
-	void OpenGLRendererImpl::fontLoaded(FS::IFile* file, bool success, void* user_data)
+	void OpenGLRendererImpl::fontLoaded(FS::IFile* file, bool success)
 	{
 		if(success)
 		{
 			char line[255];
-			OpenGLRendererImpl* that = static_cast<OpenGLRendererImpl*>(user_data);
 			while(readLine(file, line, 255) && strncmp(line, "chars count", 11) != 0);
 			if(strncmp(line, "chars count", 11) == 0)
 			{
@@ -403,18 +502,18 @@ namespace UI
 					int tmp;
 					c = getNextNumberPos(c);
 					sscanf_s(c, "%d", &tmp);
-					character.left = (float)tmp / that->m_font_image->getWidth();
+					character.left = (float)tmp / m_font_image->getWidth();
 					c = getNextNumberPos(c);
 					sscanf_s(c, "%d", &tmp);
-					character.top = (float)tmp / that->m_font_image->getHeight();
+					character.top = (float)tmp / m_font_image->getHeight();
 					c = getNextNumberPos(c);
 					sscanf_s(c, "%d", &tmp);
 					character.pixel_w = (float)tmp;
 					c = getNextNumberPos(c);
 					sscanf_s(c, "%d", &tmp);
 					character.pixel_h = (float)tmp;
-					character.right = character.left + character.pixel_w / that->m_font_image->getWidth();
-					character.bottom = character.top + character.pixel_h / that->m_font_image->getHeight();
+					character.right = character.left + character.pixel_w / m_font_image->getWidth();
+					character.bottom = character.top + character.pixel_h / m_font_image->getHeight();
 					c = getNextNumberPos(c);
 					sscanf_s(c, "%d", &tmp);
 					character.x_offset = (float)tmp;
@@ -424,7 +523,7 @@ namespace UI
 					c = getNextNumberPos(c);
 					sscanf_s(c, "%d", &tmp);
 					character.x_advance = (float)tmp;
-					that->m_characters.insert((char)id, character);
+					m_characters.insert((char)id, character);
 				}
 			}
 		}

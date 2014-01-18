@@ -24,6 +24,7 @@ namespace Lux
 
 		template <class T, int32_t size> class TransactionQueue 
 		{
+			STATIC_ASSERT_IS_TRIVIALLY_COPYABLE(T);
 		public:
 			TransactionQueue();
 			~TransactionQueue();

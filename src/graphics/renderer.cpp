@@ -40,10 +40,11 @@ static const Component::Type point_light_type = crc32("point_light");
 
 struct LoadInfo
 {
-    RendererImpl* m_renderer;
+	void resourceLoaded(FS::IFile* file, bool success);
+
+	RendererImpl* m_renderer_impl;
     H3DRes m_res;
 };
-
 
 struct RenderNode
 {
@@ -79,6 +80,36 @@ struct RendererImpl
 	bool				m_is_pipeline_loaded;
 };
 
+void LoadInfo::resourceLoaded(FS::IFile* file, bool success)
+{
+	ASSERT(NULL != m_renderer_impl);
+	if(success)
+	{
+		m_renderer_impl->m_update_bb = true;
+		h3dLoadResource(m_res, (const char*)file->getBuffer(), file->size());
+		if(m_res == m_renderer_impl->m_pipeline_handle)
+		{
+			h3dResizePipelineBuffers(m_renderer_impl->m_pipeline_handle, m_renderer_impl->m_width, m_renderer_impl->m_height);
+	//		h3dSetOption( H3DOptions::DebugViewMode, 1 );
+			h3dSetOption( H3DOptions::LoadTextures, 1 );
+			h3dSetOption( H3DOptions::TexCompression, 0 );
+			h3dSetOption( H3DOptions::FastAnimation, 0 );
+			h3dSetOption( H3DOptions::MaxAnisotropy, 4 );
+			h3dSetOption( H3DOptions::ShadowMapSize, 512 );
+
+			m_renderer_impl->m_camera_node = h3dAddCameraNode(H3DRootNode, "", m_renderer_impl->m_pipeline_handle);
+			m_renderer_impl->onResize(m_renderer_impl->m_width, m_renderer_impl->m_height);
+			m_renderer_impl->m_is_pipeline_loaded = true;
+		}
+
+		m_renderer_impl->loadResources();
+		file->close();
+	}
+	else
+	{
+		h3dLoadResource(m_res, 0, 0);
+	}
+}
 
 Renderer::Renderer()
 {
@@ -103,39 +134,6 @@ void RendererImpl::onResize(int w, int h)
 	h3dSetNodeParamI(m_camera_node, H3DCamera::ViewportHeightI, m_height);
 	h3dSetupCameraView(m_camera_node, 45.0f, (float)m_width / m_height, 0.1f, 1000.0f);
 }
-
-
-void resourceLoaded(FS::IFile* file, bool success, void* user_data)
-{
-	LoadInfo* info = static_cast<LoadInfo*>(user_data);
-	RendererImpl* renderer = info->m_renderer;
-	if(success)
-	{
-		renderer->m_update_bb = true;
-		h3dLoadResource(info->m_res, (const char*)file->getBuffer(), file->size());
-		if(info->m_res == renderer->m_pipeline_handle)
-		{
-			h3dResizePipelineBuffers(renderer->m_pipeline_handle, renderer->m_width, renderer->m_height);
-	//		h3dSetOption( H3DOptions::DebugViewMode, 1 );
-			h3dSetOption( H3DOptions::LoadTextures, 1 );
-			h3dSetOption( H3DOptions::TexCompression, 0 );
-			h3dSetOption( H3DOptions::FastAnimation, 0 );
-			h3dSetOption( H3DOptions::MaxAnisotropy, 4 );
-			h3dSetOption( H3DOptions::ShadowMapSize, 512 );
-
-			renderer->m_camera_node = h3dAddCameraNode(H3DRootNode, "", renderer->m_pipeline_handle);
-			renderer->onResize(renderer->m_width, renderer->m_height);
-			renderer->m_is_pipeline_loaded = true;
-		}
-		renderer->loadResources();
-		file->close();
-	}
-	else
-	{
-		h3dLoadResource(info->m_res, 0, 0);
-	}
-}
-
 
 void Renderer::enableStage(const char* name, bool enable)
 {
@@ -166,9 +164,13 @@ void RendererImpl::loadResources()
 		h3dLoadResource(res, NULL, 0);
 		sprintf_s(path, "%s%s/%s", m_base_path.c_str(), h3dutGetResourcePath(h3dGetResType(res)), h3dGetResName(res));
 		LoadInfo* info = LUX_NEW(LoadInfo)();
-		info->m_renderer = this;
-		info->m_res = res;		
-		m_file_system->openAsync(m_file_system->getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, &resourceLoaded, info);
+		info->m_renderer_impl = this;
+		info->m_res = res;
+
+		FS::ReadCallback res_loaded_cb;
+		res_loaded_cb.bind<LoadInfo, &LoadInfo::resourceLoaded>(info);
+
+		m_file_system->openAsync(m_file_system->getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, res_loaded_cb);
 	}
 }
 
@@ -300,6 +302,18 @@ void Renderer::getVisible(Component cmp, bool& visible)
 void Renderer::getCastShadows(Component cmp, bool& cast_shadows)
 {
 	cast_shadows = !(h3dGetNodeFlags(m_impl->m_renderables[cmp.index].m_node) & H3DNodeFlags::NoCastShadow);
+}
+
+
+bool Renderer::getBonePosition(Component cmp, const char* bone_name, Vec3* out)
+{
+	if(h3dFindNodes(m_impl->m_renderables[cmp.index].m_node, bone_name, H3DNodeTypes::Undefined) > 0)
+	{
+		H3DNode node = h3dGetNodeFindResult(0);
+		h3dGetNodeTransform(node, &out->x, &out->y, &out->z, NULL, NULL, NULL, NULL, NULL, NULL);
+		return true;
+	}
+	return false;
 }
 
 

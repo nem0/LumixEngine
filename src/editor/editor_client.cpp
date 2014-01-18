@@ -3,11 +3,12 @@
 #include "core/crc32.h"
 #include "core/event_manager.h"
 #include "core/pod_array.h"
-#include "editor/client_message_types.h"
-#include "editor/server_message_types.h"
 #include "core/task.h"
 #include "core/tcp_connector.h"
 #include "core/tcp_stream.h"
+#include "editor/client_message_types.h"
+#include "editor/server_message_types.h"
+#include "universe/universe.h"
 
 namespace Lux
 {
@@ -171,6 +172,14 @@ namespace Lux
 	void EditorClient::loadUniverse(const char* path)
 	{
 		m_impl->sendMessage(ClientMessageType::LOAD, path, strlen(path)+1);
+	}
+
+	void EditorClient::setEntityPosition(int32_t entity, const Vec3& position)
+	{
+		uint8_t data[sizeof(entity) + sizeof(position)];
+		*(int32_t*)data = entity;
+		*(Vec3*)(data + sizeof(entity)) = position;
+		m_impl->sendMessage(ClientMessageType::SET_POSITION, data, sizeof(entity) + sizeof(position));
 	}
 
 	void EditorClient::saveUniverse(const char* path)

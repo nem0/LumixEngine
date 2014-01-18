@@ -8,6 +8,10 @@
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/file_system.h"
+#include "core/memory_file_device.h"
+#include "core/disk_file_device.h"
+#include "core/tcp_file_device.h"
+#include "core/tcp_file_server.h"
 #include "core/ifile.h"
 #include "core/json_serializer.h"
 #include "core/log.h"
@@ -28,7 +32,7 @@
 #include "core/task.h"
 #include "core/tcp_acceptor.h"
 #include "core/tcp_stream.h"
-#include "script\script_system.h"
+#include "script/script_system.h"
 #include "universe/component_event.h"
 #include "universe/entity_destroyed_event.h"
 #include "universe/entity_moved_event.h"
@@ -59,7 +63,7 @@ struct ClientMessageType
 		SET_POSITION,			// 14
 		REMOVE_ENTITY,			// 15
 		SET_EDIT_MODE,			// 16
-		EDIT_SCRIPT,			// 17
+								// 17
 								// 18
 		NEW_UNIVERSE = 19,		// 19
 		LOOK_AT_SELECTED = 20,	// 20
@@ -135,6 +139,7 @@ struct EditorServerImpl
 		void renderPhysics();
 		void save(const char path[]);
 		void load(const char path[]);
+		void loadMap(FS::IFile* file, bool success);
 		void addComponent(uint32_t type_crc);
 		void sendComponent(uint32_t type_crc);
 		void removeComponent(uint32_t type_crc);
@@ -144,7 +149,6 @@ struct EditorServerImpl
 		void removeEntity();
 		void toggleGameMode();
 		void stopGameMode();
-		void editScript();
 		void lookAtSelected();
 		void newUniverse();
 		void logMessage(int32_t type, const char* system, const char* msg);
@@ -187,6 +191,12 @@ struct EditorServerImpl
 		MessageTask* m_message_task;
 		Engine m_engine;
 		EditorServer* m_owner;
+
+		FS::FileSystem* m_file_system;
+		FS::TCPFileServer m_tpc_file_server;
+		FS::DiskFileDevice m_disk_file_device;
+		FS::MemoryFileDevice m_mem_file_device;
+		FS::TCPFileDevice m_tcp_file_device;
 };
 
 
@@ -579,23 +589,6 @@ void EditorServerImpl::lookAtSelected()
 }
 
 
-void EditorServerImpl::editScript()
-{
-	string path;
-	const Entity::ComponentList& cmps = m_selected_entity.getComponents();
-	for(int i = 0; i < cmps.size(); ++i)
-	{
-		if(cmps[i].type == script_type)
-		{
-			m_engine.getScriptSystem().getScriptPath(cmps[i], path);
-			break;
-		}
-	}
-	
-	ShellExecute(NULL, "open", path.c_str(), NULL, NULL, SW_SHOW);
-}
-
-
 void EditorServerImpl::removeEntity()
 {
 	m_engine.getUniverse()->destroyEntity(m_selected_entity);
@@ -630,23 +623,23 @@ void EditorServerImpl::removeComponent(uint32_t type_crc)
 	selectEntity(m_selected_entity);
 }
 
-
-void loadMap(FS::IFile* file, bool success, void* user_data)
-{
-	ASSERT(success);
-	if(success)
-	{
-		static_cast<EditorServerImpl*>(user_data)->load(*file);
-		file->close();
-	}
-}
-
-
 void EditorServerImpl::load(const char path[])
 {
 	g_log_info.log("editor server", "loading universe %s...", path);
 	FS::FileSystem& fs = m_engine.getFileSystem();
-	fs.openAsync(fs.getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, &loadMap, this);
+	FS::ReadCallback file_read_cb;
+	file_read_cb.bind<EditorServerImpl, &EditorServerImpl::loadMap>(this);
+	fs.openAsync(fs.getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, file_read_cb);
+}
+
+void EditorServerImpl::loadMap(FS::IFile* file, bool success)
+{
+	ASSERT(success);
+	if(success)
+	{
+		load(*file);
+		m_engine.getFileSystem().close(file);
+	}
 }
 
 void EditorServerImpl::newUniverse()
@@ -724,7 +717,19 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 	m_message_task->m_stream = NULL;
 	m_message_task->create("Message Task");
 	m_message_task->run();
-		
+
+	m_file_system = FS::FileSystem::create();
+	m_tpc_file_server.start();
+
+	m_tcp_file_device.connect("127.0.0.1", 10001);
+
+	m_file_system->mount(&m_mem_file_device);
+	m_file_system->mount(&m_disk_file_device);
+	m_file_system->mount(&m_tcp_file_device);
+
+	m_file_system->setDefaultDevice("memory:tcp");
+	m_file_system->setSaveGameDevice("memory:tcp");
+
 	if(hwnd)
 	{
 		m_hglrc = createGLContext(hwnd);
@@ -741,7 +746,7 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 
 	RECT rect;
 	GetWindowRect(hwnd, &rect);
-	if(!m_engine.create(rect.right - rect.left, rect.bottom - rect.top, base_path, m_owner))
+	if(!m_engine.create(rect.right - rect.left, rect.bottom - rect.top, base_path, m_file_system, m_owner))
 	{
 		return false;
 	}
@@ -752,10 +757,10 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 	{
 		g_log_info.log("plugins", "physics plugin has not been loaded");
 	}
-	if(!m_engine.loadPlugin("navigation.dll"))
+	/*if(!m_engine.loadPlugin("navigation.dll"))
 	{
 		g_log_info.log("plugins", "navigation plugin has not been loaded");
-	}
+	}*/
 
 	EditorIcon::createResources(base_path);
 
@@ -777,24 +782,30 @@ void EditorServerImpl::destroy()
 */ /// TODO destroy message task
 	m_engine.destroy();
 
+	m_tcp_file_device.disconnect();
+	m_tpc_file_server.stop();
+	FS::FileSystem::destroy(m_file_system);
 }
 
 
 void EditorServerImpl::onLogInfo(const char* system, const char* message)
 {
 	logMessage(0, system, message);
+	OutputDebugString(message);
 }
 
 
 void EditorServerImpl::onLogWarning(const char* system, const char* message)
 {
 	logMessage(1, system, message);
+	OutputDebugString(message);
 }
 
 
 void EditorServerImpl::onLogError(const char* system, const char* message)
 {
 	logMessage(2, system, message);
+	OutputDebugString(message);
 }
 
 
@@ -1222,9 +1233,6 @@ void EditorServerImpl::onMessage(void* msgptr, int size)
 			break;
 		case ClientMessageType::REMOVE_ENTITY:
 			removeEntity();
-			break;
-		case ClientMessageType::EDIT_SCRIPT:
-			editScript();
 			break;
 		case ClientMessageType::LOOK_AT_SELECTED:
 			lookAtSelected();
