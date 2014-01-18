@@ -24,7 +24,8 @@ namespace  Lux
 		class LUX_CORE_API Event
 		{
 		public:
-			Event(EventFlags flags);
+			Event();
+			explicit Event(EventFlags flags);
 			~Event();
 
 			void reset();

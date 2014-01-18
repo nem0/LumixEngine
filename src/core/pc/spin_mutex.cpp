@@ -5,9 +5,13 @@ namespace Lux
 {
 	namespace MT
 	{
+		SpinMutex::SpinMutex()
+			: m_id(0)
+		{ }
+
 		SpinMutex::SpinMutex(bool locked)
+			: m_id(0)
 		{
-			::InitializeCriticalSectionAndSpinCount((LPCRITICAL_SECTION)m_id, 0x00000400);
 			if(locked)
 			{
 				lock();
@@ -15,23 +19,40 @@ namespace Lux
 		}
 
 		SpinMutex::~SpinMutex()
-		{
-			::DeleteCriticalSection((LPCRITICAL_SECTION)m_id);
-		}
+		{ }
 
 		void SpinMutex::lock()
 		{
-			::EnterCriticalSection((LPCRITICAL_SECTION)m_id);
+			do
+			{
+				if(InterlockedCompareExchange((LONG*)&m_id, 1, 0) == 0)
+				{
+					::MemoryBarrier();
+					return;
+				}
+
+				while(m_id)
+				{
+					Sleep(0);
+				}
+			}
+			while(true);
 		}
 
 		bool SpinMutex::poll()
 		{
-			return TRUE == ::TryEnterCriticalSection((LPCRITICAL_SECTION)m_id);
+			if(InterlockedCompareExchange((LONG*)&m_id, 1, 0) == 0)
+			{
+				::MemoryBarrier();
+				return true;
+			}
+			return false;
 		}
 
 		void SpinMutex::unlock()
 		{
-			::LeaveCriticalSection((LPCRITICAL_SECTION)m_id);
+			::MemoryBarrier();
+			m_id = 0;
 		}
 	} // ~namespace MT
 } // ~namespace Lux

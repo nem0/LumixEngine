@@ -5,13 +5,13 @@ namespace Lux
 {
 	namespace MT
 	{
-		struct RTL_CRITICAL_SECTION;
-		typedef RTL_CRITICAL_SECTION* SpinMutexHandle;
+		typedef volatile int32_t SpinMutexHandle;
 
 		class LUX_CORE_API SpinMutex
 		{
 		public:
-			SpinMutex(bool locked);
+			SpinMutex();
+			explicit SpinMutex(bool locked);
 			~SpinMutex();
 
 			void lock();

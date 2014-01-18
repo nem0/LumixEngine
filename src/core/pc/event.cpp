@@ -6,6 +6,11 @@ namespace  Lux
 {
 	namespace MT
 	{
+		Event::Event()
+		{
+			m_id = ::CreateEvent(NULL, false, false, NULL);
+		}
+
 		Event::Event(EventFlags flags)
 		{
 			m_id = ::CreateEvent(NULL, !!(flags & EventFlags::MANUAL_RESET), !!(flags & EventFlags::SIGNALED), NULL);
