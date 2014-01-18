@@ -6,55 +6,29 @@ namespace Lux
 {
 	namespace MT
 	{
-		class WinSemaphore : public Semaphore
-		{
-		public:
-			virtual void signal() LUX_OVERRIDE;
-			
-			virtual void wait() LUX_OVERRIDE;
-			virtual bool poll() LUX_OVERRIDE;
-
-			WinSemaphore(int init_count, int max_count);
-
-		private:
-			~WinSemaphore();
-
-			HANDLE m_id;
-		};
-
-		Semaphore* Semaphore::create(int init_count, int max_count)
-		{
-			return LUX_NEW(WinSemaphore)(init_count, max_count);
-		}
-
-		void Semaphore::destroy(Semaphore* semaphore)
-		{
-			LUX_DELETE(semaphore);
-		}
-
-		void WinSemaphore::signal()
-		{
-			::ReleaseSemaphore(m_id, 1, NULL);
-		}
-
-		void WinSemaphore::wait()
-		{
-			::WaitForSingleObject(m_id, INFINITE);
-		}
-
-		bool WinSemaphore::poll()
-		{
-			return WAIT_OBJECT_0 == ::WaitForSingleObject(m_id, 0);
-		}
-
-		WinSemaphore::WinSemaphore(int init_count, int max_count)
+		Semaphore::Semaphore(int init_count, int max_count)
 		{
 			m_id = ::CreateSemaphore(NULL, init_count, max_count, NULL);
 		}
 
-		WinSemaphore::~WinSemaphore()
+		Semaphore::~Semaphore()
 		{
 			::CloseHandle(m_id);
+		}
+
+		void Semaphore::signal()
+		{
+			::ReleaseSemaphore(m_id, 1, NULL);
+		}
+
+		void Semaphore::wait()
+		{
+			::WaitForSingleObject(m_id, INFINITE);
+		}
+
+		bool Semaphore::poll()
+		{
+			return WAIT_OBJECT_0 == ::WaitForSingleObject(m_id, 0);
 		}
 	}; // ~namespac MT
 } // ~namespace Lux
