@@ -305,6 +305,18 @@ void Renderer::getCastShadows(Component cmp, bool& cast_shadows)
 }
 
 
+bool Renderer::getBonePosition(Component cmp, const char* bone_name, Vec3* out)
+{
+	if(h3dFindNodes(m_impl->m_renderables[cmp.index].m_node, bone_name, H3DNodeTypes::Undefined) > 0)
+	{
+		H3DNode node = h3dGetNodeFindResult(0);
+		h3dGetNodeTransform(node, &out->x, &out->y, &out->z, NULL, NULL, NULL, NULL, NULL, NULL);
+		return true;
+	}
+	return false;
+}
+
+
 void Renderer::setCastShadows(Component cmp, const bool& cast_shadows)
 {
 	H3DNode node = m_impl->m_renderables[cmp.index].m_node;

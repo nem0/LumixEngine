@@ -3,6 +3,7 @@
 #include "editor/editor_client.h"
 #include "editor/server_message_types.h"
 #include "editor_native/main_frame.h"
+#include "gui/controls/button.h"
 #include "gui/controls/scrollable.h"
 #include "gui/gui.h"
 
@@ -15,10 +16,22 @@ LogUI::LogUI(MainFrame& main_frame)
 	main_frame.getDockable().dock(*this, Dockable::BOTTOM);
 	main_frame.getEditorClient()->getEventManager().addListener(Lux::ServerMessageType::LOG_MESSAGE).bind<LogUI, &LogUI::onLogMessage>(this);
 	Lux::UI::Block* handle = LUX_NEW(Lux::UI::Block)(getGui(), this, "_box");
-	handle->setArea(0, 0, 0, 0, 1, 0, 0, 20);
+	handle->setArea(0, 0, 0, 0, 1, -50, 0, 20);
 	handle->onEvent("mouse_down").bind<Dockable, &Dockable::startDrag>(this);
+	Lux::UI::Button* clean = LUX_NEW(Lux::UI::Button)("Clean", getGui(), this);
+	clean->setArea(1, -50, 0, 0, 1, 0, 0, 20);
+	clean->onEvent("click").bind<LogUI, &LogUI::cleanButtonClick>(this);
 	m_scrollable = LUX_NEW(Lux::UI::Scrollable)(getGui(), this);
 	m_scrollable->setArea(0, 0, 0, 20, 1, 0, 1, 0);
+}
+
+
+void LogUI::cleanButtonClick(Block&, void*)
+{
+	while(m_scrollable->getContainer()->getChildCount() > 0)
+	{
+		m_scrollable->getContainer()->getChild(0)->destroy();
+	}
 }
 
 

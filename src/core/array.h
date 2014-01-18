@@ -33,14 +33,17 @@ class Array
 
 		void operator =(const Array& rhs)
 		{
-			callDestructors(m_data, m_data + m_size);
-			m_allocator.deallocate(m_data);
-			m_data = (T*)m_allocator.allocate(rhs.m_capacity * sizeof(T));
-			m_capacity = rhs.m_capacity;
-			m_size = rhs.m_size;
-			for(int i = 0; i < m_size; ++i)
+			if(this != &rhs)
 			{
-				new ((char*)(m_data + i)) T(rhs.m_data[i]);
+				callDestructors(m_data, m_data + m_size);
+				m_allocator.deallocate(m_data);
+				m_data = (T*)m_allocator.allocate(rhs.m_capacity * sizeof(T));
+				m_capacity = rhs.m_capacity;
+				m_size = rhs.m_size;
+				for(int i = 0; i < m_size; ++i)
+				{
+					new ((char*)(m_data + i)) T(rhs.m_data[i]);
+				}
 			}
 		}
 

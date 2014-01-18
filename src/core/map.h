@@ -258,12 +258,12 @@ class map
 					}
 				}
 			}
-			else if(key > node->key)
+			else if(node->key < key)
 			{
 				node->right = insert(key, node->right, node, new_node);
 				if(node->getRightHeight() - node->getLeftHeight() == 2)
 				{
-					if(key > node->right->key)
+					if(node->right->key < key)
 					{
 						ret = rotateLeft(node);
 					}
