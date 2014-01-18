@@ -5,59 +5,33 @@ namespace Lux
 {
 	namespace MT
 	{
-		class WinSpinMutex : public SpinMutex
+		SpinMutex::SpinMutex(bool locked)
 		{
-		public:
-			virtual void lock() LUX_OVERRIDE;
-			virtual bool poll() LUX_OVERRIDE;
-
-			virtual void unlock() LUX_OVERRIDE;
-
-			WinSpinMutex(bool locked);
-
-		private:
-			~WinSpinMutex();
-
-			LPCRITICAL_SECTION m_id;
-		};
-
-		SpinMutex* SpinMutex::create(bool locked)
-		{
-			return LUX_NEW(WinSpinMutex)(locked);
-		}
-
-		void SpinMutex::destroy(SpinMutex* spin_mutex)
-		{
-			LUX_DELETE(spin_mutex);
-		}
-
-		void WinSpinMutex::lock()
-		{
-			::EnterCriticalSection(m_id);
-		}
-
-		bool WinSpinMutex::poll()
-		{
-			return TRUE == ::TryEnterCriticalSection(m_id);
-		}
-
-		void WinSpinMutex::unlock()
-		{
-			::LeaveCriticalSection(m_id);
-		}
-
-		WinSpinMutex::WinSpinMutex(bool locked)
-		{
-			::InitializeCriticalSectionAndSpinCount(m_id, 0x00000400);
+			::InitializeCriticalSectionAndSpinCount((LPCRITICAL_SECTION)m_id, 0x00000400);
 			if(locked)
 			{
 				lock();
 			}
 		}
 
-		WinSpinMutex::~WinSpinMutex()
+		SpinMutex::~SpinMutex()
 		{
-			::DeleteCriticalSection(m_id);
+			::DeleteCriticalSection((LPCRITICAL_SECTION)m_id);
+		}
+
+		void SpinMutex::lock()
+		{
+			::EnterCriticalSection((LPCRITICAL_SECTION)m_id);
+		}
+
+		bool SpinMutex::poll()
+		{
+			return TRUE == ::TryEnterCriticalSection((LPCRITICAL_SECTION)m_id);
+		}
+
+		void SpinMutex::unlock()
+		{
+			::LeaveCriticalSection((LPCRITICAL_SECTION)m_id);
 		}
 	} // ~namespace MT
 } // ~namespace Lux

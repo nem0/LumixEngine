@@ -6,62 +6,34 @@ namespace  Lux
 {
 	namespace MT
 	{
-		class WinEvent : public Event 
+		Event::Event(EventFlags flags)
 		{
-		public:
-			virtual void reset() LUX_OVERRIDE;
-
-			virtual void trigger() LUX_OVERRIDE;
-
-			virtual void wait() LUX_OVERRIDE;
-			virtual bool poll() LUX_OVERRIDE;
-
-			WinEvent(bool signaled, bool manual_reset);
-
-		private:
-			~WinEvent();
-
-			HANDLE m_id;
-		};
-
-		Event* Event::create(EventFlags flags)
-		{
-			return LUX_NEW(WinEvent)(flags & EventFlags::SIGNALED ? true : false, flags & EventFlags::MANUAL_RESET ? true : false);
+			m_id = ::CreateEvent(NULL, !!(flags & EventFlags::MANUAL_RESET), !!(flags & EventFlags::SIGNALED), NULL);
 		}
 
-		void Event::destroy(Event* event)
+		Event::~Event()
 		{
-			LUX_DELETE(event);
+			::CloseHandle(m_id);
 		}
 
-		void WinEvent::reset()
+		void Event::reset()
 		{
 			::ResetEvent(m_id);
 		}
 
-		void WinEvent::trigger()
+		void Event::trigger()
 		{
 			::SetEvent(m_id);
 		}
 
-		void WinEvent::wait()
+		void Event::wait()
 		{
 			::WaitForSingleObject(m_id, INFINITE);
 		}
 
-		bool WinEvent::poll()
+		bool Event::poll()
 		{
 			return WAIT_OBJECT_0 == ::WaitForSingleObject(m_id, 0);
-		}
-
-		WinEvent::WinEvent(bool signaled, bool manual_reset)
-		{
-			m_id = ::CreateEvent(NULL, manual_reset, signaled, NULL);
-		}
-
-		WinEvent::~WinEvent()
-		{
-			::CloseHandle(m_id);
 		}
 	}; // ~namespace MT
 }; // ~namespace Lux
