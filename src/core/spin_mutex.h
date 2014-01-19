@@ -5,19 +5,21 @@ namespace Lux
 {
 	namespace MT
 	{
-		class LUX_CORE_API SpinMutex LUX_ABSTRACT
+		typedef volatile int32_t SpinMutexHandle;
+
+		class LUX_CORE_API SpinMutex
 		{
 		public:
-			static SpinMutex* create(bool locked);
-			static void destroy(SpinMutex* spin_mutex);
+			explicit SpinMutex(bool locked);
+			~SpinMutex();
 
-			virtual void lock() = 0;
-			virtual bool poll() = 0;
+			void lock();
+			bool poll();
 
-			virtual void unlock() = 0;
+			void unlock();
 
-		protected:
-			virtual ~SpinMutex() {}
+		private:
+			SpinMutexHandle m_id;
 		};
 
 		class SpinLock
