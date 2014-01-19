@@ -1,6 +1,8 @@
 #include "editor_native/script_compiler.h"
 #include <cstdio>
+#include "core/crc32.h"
 #include "core/log.h"
+
 
 void ScriptCompiler::compileAll()
 {
@@ -66,6 +68,14 @@ void ScriptCompiler::compile(const char path[])
 	}
 }
 
+
+ScriptCompiler::Status ScriptCompiler::getStatus(const char* path)
+{
+	Lux::map<uint32_t, Status>::iterator iter = m_status.find(crc32(path));
+	return iter == m_status.end() ? UNKNOWN : iter.second();
+}
+
+
 void ScriptCompiler::checkFinished()
 {
 	for(int i = m_processes.size() - 1; i >= 0; --i)
@@ -93,6 +103,7 @@ void ScriptCompiler::checkFinished()
 					while(read == 512);
 					Lux::g_log_info.log("compile script", text.c_str());
 				}
+				m_status[crc32(p->m_path.c_str())] = code == 0 ? SUCCESS : FAILURE;
 				CloseHandle(p->m_pipe);
 				CloseHandle(p->m_write_pipe);
 				delete p;

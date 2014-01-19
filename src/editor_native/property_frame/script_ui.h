@@ -32,6 +32,7 @@ class ScriptUI : public IComponentUI, public Lux::UI::Block
 
 	private:
 		Lux::UI::TextBox* m_source_box;
+		Lux::UI::Block* m_status_label;
 		Lux::EditorClient* m_client;
 		PropertyFrame& m_property_frame;
 };
