@@ -103,7 +103,7 @@ void LoadInfo::resourceLoaded(FS::IFile* file, bool success)
 		}
 
 		m_renderer_impl->loadResources();
-		file->close();
+		m_renderer_impl->m_file_system->close(file);
 	}
 	else
 	{
