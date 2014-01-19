@@ -7,25 +7,9 @@
 namespace Lux
 {
 	template <class K, class V>
-	struct HashNode
+	struct PODHashNode
 	{
-		typedef HashNode<K, V> my_node;
-
-		HashNode(const K& key, const V& value)
-			: m_key(key)
-			, m_value(value)
-			, m_next(NULL)
-		{}
-
-		explicit HashNode(const my_node& src)
-			: m_key(src.m_key)
-			, m_value(src.m_value)
-			, m_next(src.m_next)
-		{}
-
-		explicit HashNode(my_node* next)
-			: m_next(next)
-		{}
+		typedef PODHashNode<K, V> my_node;
 
 		K m_key;
 		V m_value;
@@ -33,13 +17,13 @@ namespace Lux
 	};
 
 	template<class Key> 
-	struct HashFunc
+	struct PODHashFunc
 	{
 		static uint32_t get(const Key& key);
 	};
 
 	template<>
-	struct HashFunc<int32_t>
+	struct PODHashFunc<int32_t>
 	{
 		static uint32_t get(const int32_t& key)
 		{
@@ -51,7 +35,7 @@ namespace Lux
 	};
 
 	template<>
-	struct HashFunc<uint32_t>
+	struct PODHashFunc<uint32_t>
 	{
 		static uint32_t get(const uint32_t& key)
 		{
@@ -63,7 +47,7 @@ namespace Lux
 	};
 
 	template<>
-	struct HashFunc<char*>
+	struct PODHashFunc<char*>
 	{
 		static uint32_t get(const char* key)
 		{
@@ -79,16 +63,16 @@ namespace Lux
 		}
 	};
 
-	template<class K, class T, class Hasher = HashFunc<K>, class Allocator = DefaultAllocator>
-	class HashMap
+	template<class K, class T, class Hasher = PODHashFunc<K>, class Allocator = DefaultAllocator>
+	class PODHashMap
 	{
 	public:
 		typedef T value_type;
 		typedef K key_type;
 		typedef Hasher hasher_type;
 		typedef Allocator allocator_type;
-		typedef HashMap<key_type, value_type, hasher_type, allocator_type> my_type;
-		typedef HashNode<key_type, value_type> node_type;
+		typedef PODHashMap<key_type, value_type, hasher_type, allocator_type> my_type;
+		typedef PODHashNode<key_type, value_type> node_type;
 		typedef uint32_t size_type;
 
 		friend class HashMapIterator;
@@ -103,8 +87,8 @@ namespace Lux
 			typedef S value_type;
 			typedef _Hasher hasher_type;
 			typedef _Allocator allocator_type;
-			typedef HashNode<key_type, value_type> node_type;
-			typedef HashMap<key_type, value_type, hasher_type, allocator_type> hm_type;
+			typedef PODHashNode<key_type, value_type> node_type;
+			typedef PODHashMap<key_type, value_type, hasher_type, allocator_type> hm_type;
 			typedef HashMapIterator<key_type, value_type, hasher_type, allocator_type> my_type;
 
 			friend class hm_type;
@@ -191,34 +175,35 @@ namespace Lux
 
 		typedef HashMapIterator<key_type, value_type, hasher_type, allocator_type> iterator;
 
-		HashMap()
-			: m_sentinel(&m_sentinel)
+		PODHashMap()
 		{
+			m_sentinel.m_next = &m_sentinel;
 			init();
 		}
 
-		explicit HashMap(size_type buckets)
-			: m_sentinel(&m_sentinel)
+		explicit PODHashMap(size_type buckets)
 		{
+			m_sentinel.m_next = &m_sentinel;
 			init(buckets);
 		}
 
-		HashMap(const my_type& src)
-			: m_sentinel(&m_sentinel)
+		PODHashMap(const my_type& src)
 		{
+			m_sentinel.m_next = &m_sentinel;
 			init(src.m_max_id);
-			copyTableUninitialized(src.m_table, &src.m_sentinel, src.m_max_id);
+			copyTable(src.m_table, &src.m_sentinel, src.m_max_id);
 
 			m_mask = src.m_mask;
 			m_size = src.m_size;
 		}
 
-		~HashMap()
+		~PODHashMap()
 		{
 			clear();
 		}
 
 		size_type size() const { return m_size; }
+
 		bool empty() const { return 0 == m_size; }
 
 		float loadFactor() const { return float(m_size / m_max_id); }
@@ -230,7 +215,7 @@ namespace Lux
 			{
 				clear();
 				init(src.m_max_id);
-				copyTableUninitialized(src.m_table, &src.m_sentinel, src.m_max_id);
+				copyTable(src.m_table, &src.m_sentinel, src.m_max_id);
 
 				m_mask = src.m_mask;
 				m_size = src.m_size;
@@ -327,6 +312,7 @@ namespace Lux
 		}
 
 		iterator begin() { return iterator(first(), this); }
+
 		iterator end() { return iterator(&m_sentinel, this); }
 
 		iterator find(const key_type& key) { return iterator(_find(key), this); }
@@ -367,14 +353,12 @@ namespace Lux
 
 		void grow(size_type ids_count)
 		{
-			size_type old_ids_count = m_max_id;
 			size_type old_size = m_size;
 			size_type new_ids_count = ids_count < 512 ? ids_count * 4 : ids_count * 2;
 			node_type* old = m_table;
 
 			init(new_ids_count);
-			copyTableUninitialized(old, &m_sentinel, ids_count);
-			destructTable(old, &m_sentinel, old_ids_count);
+			copyTable(old, &m_sentinel, ids_count);
 
 			m_size = old_size;
 			m_allocator.deallocate(old);
@@ -382,27 +366,25 @@ namespace Lux
 
 		node_type* construct(node_type* where, const key_type& key, const value_type& val)
 		{
-			return ::new(where) node_type(key, val);
+			where->m_key = key;
+			where->m_next = NULL;
+			memmove(&where->m_value, &val, sizeof(val));
+			return where;
 		}
 
 		node_type* construct(node_type* where, node_type* node)
 		{
-			return ::new(where) node_type(node);
-		}
-
-		node_type* construct(node_type* where, const node_type& node)
-		{
-			return ::new(where) node_type(node);
+			where->m_next = node;
+			return where;
 		}
 
 		void destruct(node_type* n)
 		{
-			n->~node_type();
 		}
 
-		void copyUninitialized(node_type* src, node_type* dst)
+		void copy(node_type* src, node_type* dst)
 		{
-			construct(dst, src->m_key, src->m_value);
+			memcpy(dst, src, sizeof(node_type));
 		}
 
 		node_type* getEmptyNode(size_type pos)
@@ -468,8 +450,7 @@ namespace Lux
 			{
 				node_type* next = n->m_next;
 				destruct(n);
-				construct(n, next ? *next : m_sentinel);
-				destruct(next);
+				memcpy(n, next ? next : &m_sentinel, sizeof(node_type));
 				m_allocator.deallocate(next);
 			}
 			else
@@ -481,7 +462,7 @@ namespace Lux
 			}
 		}
 
-		void copyTableUninitialized(node_type* src, const node_type* src_sentinel, size_type ids_count)
+		void copyTable(node_type* src, const node_type* src_sentinel, size_type ids_count)
 		{
 			for(size_type i = 0; i < ids_count; i++)
 			{
@@ -490,23 +471,9 @@ namespace Lux
 				{
 					size_t pos = getPosition(n->m_key);
 					node_type* new_node = getEmptyNode(pos);
-					copyUninitialized(n, new_node);
+					copy(n, new_node);
 					new_node->m_next = NULL;
 					n = n->m_next;
-				}
-			}
-		}
-
-		void destructTable(node_type* src, const node_type* src_sentinel, size_type ids_count)
-		{
-			for(size_type i = 0; i < ids_count; i++)
-			{
-				node_type* n = &src[i];
-				while(NULL != n && src_sentinel != n->m_next)
-				{
-					node_type* destr = n;
-					n = n->m_next;
-					destruct(destr);
 				}
 			}
 		}
