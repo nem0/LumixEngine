@@ -1,17 +1,17 @@
 #include "engine/engine.h"
-
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
 #include "animation/animation_system.h"
+#include "core/disk_file_device.h"
+#include "core/file_system.h"
+#include "core/input_system.h"
+#include "core/log.h"
+#include "core/memory_file_device.h"
 #include "engine/plugin_manager.h"
 #include "graphics/renderer.h"
-#include "core/input_system.h"
 #include "script/script_system.h"
 
-#include "core/file_system.h"
-#include "core/disk_file_device.h"
-#include "core/memory_file_device.h"
 
 namespace Lux
 {
@@ -33,6 +33,13 @@ namespace Lux
 		InputSystem m_input_system;
 		Engine& m_owner;
 	};
+
+
+	void showLogInVS(const char* system, const char* message)
+	{
+		OutputDebugString(message);
+	}
+
 
 
 	bool EngineImpl::create(int w, int h, const char* base_path, Engine& owner)
@@ -66,6 +73,10 @@ namespace Lux
 
 	bool Engine::create(int w, int h, const char* base_path, FS::FileSystem* file_system, EditorServer* editor_server)
 	{
+		g_log_info.getCallback().bind<showLogInVS>();
+		g_log_warning.getCallback().bind<showLogInVS>();
+		g_log_error.getCallback().bind<showLogInVS>();
+
 		m_impl = LUX_NEW(EngineImpl)(*this);
 		m_impl->m_editor_server = editor_server;
 
