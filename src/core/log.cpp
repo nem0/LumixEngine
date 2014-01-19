@@ -17,7 +17,7 @@ namespace Lux
 	{
 		void sendMessage();
 
-		PODArray<Log::Callback> m_callbacks;
+		Log::Callback m_callbacks;
 	};
 
 
@@ -40,17 +40,14 @@ namespace Lux
 		va_start(args, message);
 		vsnprintf(tmp, 1024, message, args);
 
-		for(int i = 0, c = m_impl->m_callbacks.size(); i < c; ++i)
-		{
-			m_impl->m_callbacks[i].invoke(system, tmp);
-		}
+		m_impl->m_callbacks.invoke(system, tmp);
 		va_end(args);
 	}
 
 
-	Log::Callback& Log::addCallback()
+	Log::Callback& Log::getCallback()
 	{
-		return m_impl->m_callbacks.pushEmpty();
+		return m_impl->m_callbacks;
 	}
 
 

@@ -740,9 +740,9 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 		}
 	}
 
-	g_log_info.addCallback().bind<EditorServerImpl, &EditorServerImpl::onLogInfo>(this);
-	g_log_warning.addCallback().bind<EditorServerImpl, &EditorServerImpl::onLogWarning>(this);
-	g_log_error.addCallback().bind<EditorServerImpl, &EditorServerImpl::onLogError>(this);
+	g_log_info.getCallback().bind<EditorServerImpl, &EditorServerImpl::onLogInfo>(this);
+	g_log_warning.getCallback().bind<EditorServerImpl, &EditorServerImpl::onLogWarning>(this);
+	g_log_error.getCallback().bind<EditorServerImpl, &EditorServerImpl::onLogError>(this);
 
 	RECT rect;
 	GetWindowRect(hwnd, &rect);
@@ -781,6 +781,9 @@ void EditorServerImpl::destroy()
 	m_message_task->destroy();
 */ /// TODO destroy message task
 	m_engine.destroy();
+	g_log_info.getCallback().unbind<EditorServerImpl, &EditorServerImpl::onLogInfo>(this);
+	g_log_warning.getCallback().unbind<EditorServerImpl, &EditorServerImpl::onLogWarning>(this);
+	g_log_error.getCallback().unbind<EditorServerImpl, &EditorServerImpl::onLogError>(this);
 
 	m_tcp_file_device.disconnect();
 	m_tpc_file_server.stop();
@@ -791,21 +794,18 @@ void EditorServerImpl::destroy()
 void EditorServerImpl::onLogInfo(const char* system, const char* message)
 {
 	logMessage(0, system, message);
-	OutputDebugString(message);
 }
 
 
 void EditorServerImpl::onLogWarning(const char* system, const char* message)
 {
 	logMessage(1, system, message);
-	OutputDebugString(message);
 }
 
 
 void EditorServerImpl::onLogError(const char* system, const char* message)
 {
 	logMessage(2, system, message);
-	OutputDebugString(message);
 }
 
 
