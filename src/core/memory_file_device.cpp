@@ -72,6 +72,7 @@ namespace Lux
 				}
 
 				LUX_DELETE_ARRAY(m_buffer);
+				m_buffer = NULL;
 			}
 
 			virtual bool read(void* buffer, size_t size) LUX_OVERRIDE

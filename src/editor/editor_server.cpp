@@ -780,6 +780,7 @@ void EditorServerImpl::destroy()
 	m_message_task->somehow_cancel_the_read_operation();
 	m_message_task->destroy();
 */ /// TODO destroy message task
+	destroyUniverse();
 	m_engine.destroy();
 	g_log_info.getCallback().unbind<EditorServerImpl, &EditorServerImpl::onLogInfo>(this);
 	g_log_warning.getCallback().unbind<EditorServerImpl, &EditorServerImpl::onLogWarning>(this);

@@ -5,12 +5,27 @@
 
 #include <new>
 #include <stdio.h>
+#include <vadefs.h>
+#include <Windows.h>
 
 #ifdef MEM_TRACK
-//todo: trace to VS or printf
+
+#undef min
 
 namespace Lux
 {
+	void memTrackerLog(const char* system, const char* message, ...)
+	{
+		char tmp[1024];
+		va_list args;
+		va_start(args, message);
+		vsnprintf(tmp, 1021, message, args);
+		va_end(args);
+
+		strcat(tmp, "\n");
+		OutputDebugString(tmp);
+	}
+
 	MemoryTracker* MemoryTracker::s_instance = NULL;
 	uint32_t MemoryTracker::s_alloc_counter = 0;
 
@@ -70,12 +85,12 @@ namespace Lux
 
 		if (count)
 		{
-			g_log_info.log("MemoryTracker", "MemoryTracker Detected memory leaks!");
-			g_log_info.log("MemoryTracker", "Dumping objects ->");
+			memTrackerLog("MemoryTracker", "MemoryTracker Detected memory leaks!");
+			memTrackerLog("MemoryTracker", "Dumping objects ->");
 		}
 		else
 		{
-			g_log_info.log("MemoryTracker", "MemoryTracker No leaks detected!");
+			memTrackerLog("MemoryTracker", "MemoryTracker No leaks detected!");
 		}
 
 		for (EntryTable::iterator it = m_map.begin(); it != m_map.end(); ++it)
@@ -93,7 +108,7 @@ namespace Lux
 			{
 				sprintf(string, "{%d} normal block at 0x%.8X, %d bytes long.", entry.allocID(), adr, entry.size());
 			}
-			g_log_info.log("MemoryTracker", "%s", string);
+			memTrackerLog("MemoryTracker", "%s", string);
 
 			int32_t str_len = Math::min(16, (int32_t)entry.size());
 			char asci_buf[17];
@@ -108,11 +123,11 @@ namespace Lux
 				sprintf(hex, " %.2X", *((uint8_t*)adr + j));
 				strcat(string, hex);
 			}
-			g_log_info.log("MemoryTracker", "%s", string);
+			memTrackerLog("MemoryTracker", "%s", string);
 		}
 		if(count)
 		{
-			g_log_info.log("MemoryTracker", "	  Object dump complete.");
+			memTrackerLog("MemoryTracker", "	  Object dump complete.");
 		}
 	}
 
@@ -131,12 +146,12 @@ namespace Lux
 
 		if (count)
 		{
-			g_log_info.log("MemoryTracker", "MemoryTracker Detected memory leaks!");
-			g_log_info.log("MemoryTracker", "Dumping objects ->");
+			memTrackerLog("MemoryTracker", "MemoryTracker Detected memory leaks!");
+			memTrackerLog("MemoryTracker", "Dumping objects ->");
 		}
 		else
 		{
-			g_log_info.log("MemoryTracker", "MemoryTracker No leaks detected!");
+			memTrackerLog("MemoryTracker", "MemoryTracker No leaks detected!");
 		}
 
 		map_alloc_order alloc_order_map;
@@ -159,18 +174,18 @@ namespace Lux
 				sprintf(string, "{%d} normal block, %d bytes long.", entry.allocID(), entry.size());
 			}
 
-			g_log_info.log("MemoryTracker", "%s", string);
+			memTrackerLog("MemoryTracker", "%s", string);
 		}
 
 		if(count)
 		{
-			g_log_info.log("MemoryTracker", "	  Object dump complete.");
+			memTrackerLog("MemoryTracker", "	  Object dump complete.");
 		}
 	}
 
 	void MemoryTracker::dumpTruncatedPerFileLine()
 	{
-		g_log_info.log("MemoryTracker", "Dumping objects ->");
+		memTrackerLog("MemoryTracker", "Dumping objects ->");
 
 		file_line_map report_map;
 		{
@@ -207,15 +222,15 @@ namespace Lux
 			else
 				sprintf(string, "%30s(%5d) : %10d", file, rep.line, size);
 
-			g_log_info.log("MemoryTracker", "%s", string);
+			memTrackerLog("MemoryTracker", "%s", string);
 		}
 
-		g_log_info.log("MemoryTracker", "Object dump complete.");
+		memTrackerLog("MemoryTracker", "Object dump complete.");
 	}
 
 	void MemoryTracker::dumpTruncatedPerFile()
 	{
-		g_log_info.log("MemoryTracker", "Dumping objects ->");
+		memTrackerLog("MemoryTracker", "Dumping objects ->");
 
 		file_map report_map;
 		{
@@ -247,10 +262,10 @@ namespace Lux
 			else
 				sprintf(string, "%30s : %10d", file, size);
 
-			g_log_info.log("MemoryTracker", "%s", string);
+			memTrackerLog("MemoryTracker", "%s", string);
 		}
 
-		g_log_info.log("MemoryTracker", "Object dump complete.");
+		memTrackerLog("MemoryTracker", "Object dump complete.");
 	}
 
 	void MemoryTracker::markAll()
@@ -280,7 +295,7 @@ namespace Lux
 
 		std::size_t size = 0;
 
-		g_log_info.log("MemoryTracker", "Dumping objects ->");
+		memTrackerLog("MemoryTracker", "Dumping objects ->");
 
 		for (EntryTable::iterator it = m_map.begin(); it != m_map.end(); ++it)
 		{
@@ -303,7 +318,7 @@ namespace Lux
 				sprintf(string, "{%d} normal block at 0x%.8X, %d bytes long.", entry.allocID(), adr, entry.size());
 			}
 
-			g_log_info.log("MemoryTracker", "%s", string);
+			memTrackerLog("MemoryTracker", "%s", string);
 
 			int str_len = Math::min(16, (int)entry.size());
 			char asci_buf[17];
@@ -319,11 +334,11 @@ namespace Lux
 				strcat(string, hex);
 			}
 
-			g_log_info.log("MemoryTracker", "%s", string);
+			memTrackerLog("MemoryTracker", "%s", string);
 		}
 
 		if (0 < size) {
-			g_log_info.log("MemoryTracker", "Size of all objects: %u", size);
+			memTrackerLog("MemoryTracker", "Size of all objects: %u", size);
 		}
 	}
 
