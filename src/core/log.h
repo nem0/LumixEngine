@@ -2,7 +2,7 @@
 
 
 #include "core/lux.h"
-#include "core/delegate.h"
+#include "core/delegate_list.h"
 
 
 namespace Lux
@@ -11,14 +11,14 @@ namespace Lux
 	class LUX_CORE_API Log
 	{
 		public:
-			typedef Delegate<void (const char*, const char*)> Callback;
+			typedef DelegateList<void (const char*, const char*)> Callback;
 
 		public:
 			Log();
 			~Log();
 
 			void log(const char* system, const char* message, ...);
-			Callback& addCallback();
+			Callback& getCallback();
 		
 		private:
 			struct LogImpl* m_impl;

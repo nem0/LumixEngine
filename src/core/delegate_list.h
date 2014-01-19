@@ -30,7 +30,7 @@ namespace Lux
 				{
 					if(m_delegates[i] == cb)
 					{
-						m_delegates.eraseFast(cb);
+						m_delegates.eraseFast(i);
 						break;
 					}
 				}
@@ -69,7 +69,7 @@ namespace Lux
 				{
 					if(m_delegates[i] == cb)
 					{
-						m_delegates.eraseFast(cb);
+						m_delegates.eraseFast(i);
 						break;
 					}
 				}
@@ -91,6 +91,14 @@ namespace Lux
 	class DelegateList<R (A0, A1)>
 	{
 		public:
+			template <R (Function)(A0, A1)>
+			void bind()
+			{
+				Delegate<R (A0, A1)> cb;
+				cb.bind<Function>();
+				m_delegates.push(cb);
+			}
+
 			template <typename C, R (C::*Function)(A0, A1)>
 			void bind(C* instance)
 			{
@@ -108,7 +116,7 @@ namespace Lux
 				{
 					if(m_delegates[i] == cb)
 					{
-						m_delegates.eraseFast(cb);
+						m_delegates.eraseFast(i);
 						break;
 					}
 				}
