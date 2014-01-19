@@ -10,7 +10,6 @@ namespace Lux
 		class LUX_CORE_API Mutex
 		{
 		public:
-			Mutex();
 			explicit Mutex(bool locked);
 			~Mutex();
 
