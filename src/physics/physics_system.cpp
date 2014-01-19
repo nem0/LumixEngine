@@ -4,6 +4,7 @@
 
 #include "cooking/PxCooking.h"
 #include "core/crc32.h"
+#include "core/log.h"
 #include "editor/editor_server.h"
 #include "editor/property_descriptor.h"
 #include "engine/engine.h"
@@ -157,7 +158,7 @@ bool PhysicsSystemImpl::connect2VisualDebugger()
 
 void CustomErrorCallback::reportError(physx::PxErrorCode::Enum code, const char* message, const char* file, int line)
 {
-	printf(message);
+	g_log_error.log("PhysX", message);
 }
 
 

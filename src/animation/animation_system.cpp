@@ -37,7 +37,10 @@ namespace Lux
 	{
 		m_impl = LUX_NEW(AnimationSystemImpl)();
 		m_impl->m_universe = 0;
-		engine.getEditorServer()->registerCreator(animable_type, *this);
+		if(engine.getEditorServer())
+		{
+			engine.getEditorServer()->registerCreator(animable_type, *this);
+		}
 		return m_impl != 0;
 	}
 

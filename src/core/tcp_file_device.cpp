@@ -134,6 +134,10 @@ namespace Lux
 
 		struct TCPImpl
 		{
+			TCPImpl()
+				: m_spin_mutex(false)
+			{}
+
 			Net::TCPConnector m_connector;
 			Net::TCPStream* m_stream;
 			MT::SpinMutex m_spin_mutex;

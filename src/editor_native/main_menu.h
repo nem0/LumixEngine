@@ -25,6 +25,7 @@ class MainMenu : public Lux::UI::MenuBar
 
 	private:
 		void toolsPlay(Lux::UI::Block& block, void*);
+		void toolsCompileScripts(Lux::UI::Block& block, void*);
 		void openFileClicked(Lux::UI::Block& block, void*);
 		void saveFileClicked(Lux::UI::Block& block, void*);
 		void entityCreateClick(Lux::UI::Block& block, void*);
