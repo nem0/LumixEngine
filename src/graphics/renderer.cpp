@@ -103,12 +103,13 @@ void LoadInfo::resourceLoaded(FS::IFile* file, bool success)
 		}
 
 		m_renderer_impl->loadResources();
-		m_renderer_impl->m_file_system->close(file);
 	}
 	else
 	{
 		h3dLoadResource(m_res, 0, 0);
 	}
+
+	m_renderer_impl->m_file_system->close(file);
 }
 
 Renderer::Renderer()

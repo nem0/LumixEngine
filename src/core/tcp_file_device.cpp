@@ -157,6 +157,7 @@ namespace Lux
 		void TCPFileDevice::disconnect()
 		{
 			m_impl->m_stream->write(TCPCommand::Disconnect);
+			LUX_DELETE(m_impl->m_stream);
 			LUX_DELETE(m_impl);
 		}
 	} // namespace FS

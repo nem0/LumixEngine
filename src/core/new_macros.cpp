@@ -92,29 +92,3 @@ namespace Lux
 		lux_delete_aligned(ptr); 
 	}
 }
-
-//TODO: PC only
-// Typedef for the function pointer
-typedef void (*_PVFV)(void);
-
-static void LastOnExitFunc()
-{
-	Lux::MemoryTracker::getInstance().dumpDetailed();
-	Lux::MemoryTracker::destruct();
-}
-
-static void CInit()
-{
-	atexit(&LastOnExitFunc);
-}
-
-// Define where our segment names
-#define SEGMENT_C_INIT      ".CRT$XIM"
-
-// Build our various function tables and insert them into the correct segments.
-#pragma data_seg(SEGMENT_C_INIT)
-#pragma data_seg() // Switch back to the default segment
-
-// Call create our call function pointer arrays and place them in the segments created above
-#define SEG_ALLOCATE(SEGMENT)   __declspec(allocate(SEGMENT))
-SEG_ALLOCATE(SEGMENT_C_INIT) _PVFV c_init_funcs[] = { &CInit };
