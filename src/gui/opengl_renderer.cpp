@@ -30,11 +30,14 @@ namespace UI
 
 			GLuint getId() const { return m_gl_id; }
 			void setId(GLuint id) { m_gl_id = id; }
+			void setFileSystem(FS::FileSystem& fs) { m_fs = &fs; }
 
 			void imageLoaded(FS::IFile* file, bool success);
 
 		private:
 			GLuint m_gl_id;
+			FS::FileSystem* m_fs;
+
 	};
 
 	struct OpenGLRendererImpl
@@ -118,6 +121,7 @@ namespace UI
 		}
 		img = LUX_NEW(OpenGLTexture)(name, (float)0, (float)0);
 		static_cast<OpenGLTexture*>(img)->setId(0);
+		static_cast<OpenGLTexture*>(img)->setFileSystem(file_system);
 
 		FS::ReadCallback image_loaded_cb;
 		image_loaded_cb.bind<OpenGLTexture, &OpenGLTexture::imageLoaded>(static_cast<OpenGLTexture*>(img));
@@ -132,7 +136,7 @@ namespace UI
 			size_t buffer_size = file->size();
 			char* buffer = LUX_NEW_ARRAY(char, buffer_size);
 			file->read(buffer, buffer_size);			
-			file->close();
+			
 
 			TGAHeader header;
 			memcpy(&header, buffer, sizeof(TGAHeader));
@@ -527,7 +531,7 @@ namespace UI
 				}
 			}
 		}
-		file->close();
+		m_file_system->close(file);
 	}
 
 

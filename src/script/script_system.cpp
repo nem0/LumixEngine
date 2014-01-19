@@ -155,9 +155,12 @@ namespace Lux
 
 	void ScriptSystem::update(float dt)
 	{
-		for(int i = 0; i < m_impl->m_scripts.size(); ++i)
+		if(m_impl->m_is_running)
 		{
-			m_impl->m_script_objs[i]->update(dt);
+			for(int i = 0; i < m_impl->m_scripts.size(); ++i)
+			{
+				m_impl->m_script_objs[i]->update(dt);
+			}
 		}
 	}
 
