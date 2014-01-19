@@ -60,7 +60,7 @@
 
 #ifdef USE_CPP11
 	#include <type_traits>	
-	#define STATIC_ASSERT_IS_TRIVIALLY_COPYABLE(T) static_assert(std::is_trivially_copyable<T>::value, "##T## must be trivially copyable")
+	#define STATIC_ASSERT_IS_TRIVIALLY_COPYABLE(T) static_assert(std::is_trivially_copyable<T>::value, "T must be trivially copyable")
 #else 
 	#define STATIC_ASSERT_IS_TRIVIALLY_COPYABLE(T) 
 #endif // USE_CPP11
