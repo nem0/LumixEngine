@@ -47,6 +47,18 @@ namespace Lux
 	};
 
 	template<>
+	struct PODHashFunc<void*>
+	{
+		static size_t get(const void* key)
+		{
+			size_t x = ((int32_t(key) >> 16) ^ int32_t(key)) * 0x45d9f3b;
+			x = ((x >> 16) ^ x) * 0x45d9f3b;
+			x = ((x >> 16) ^ x);
+			return x;
+		}
+	};
+
+	template<>
 	struct PODHashFunc<char*>
 	{
 		static uint32_t get(const char* key)
