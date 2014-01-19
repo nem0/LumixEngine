@@ -149,6 +149,8 @@ namespace Lux
 						break;
 					}
 				}
+
+				LUX_DELETE(stream);
 				return 0;
 			}
 

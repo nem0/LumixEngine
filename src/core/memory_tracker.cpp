@@ -26,6 +26,45 @@ namespace Lux
 		OutputDebugString(tmp);
 	}
 
+	// struct FILE_LINE_REPORT
+	struct FileLineReport
+	{
+		const char *file;
+		int32_t line;
+
+		LUX_FORCE_INLINE bool operator == (const FileLineReport &other) const { return file == other.file && line == other.line; }
+		LUX_FORCE_INLINE bool operator != (const FileLineReport &other) const { return !(*this == other); }
+
+		LUX_FORCE_INLINE bool operator < (const FileLineReport &other) const
+		{
+			if(file == NULL)
+				return other.file != NULL;
+			if(other.file == NULL)
+				return false;
+			int cmp = strcmp(file, other.file);
+			if(cmp != 0)
+				return cmp < 0;
+			return line < other.line;
+		}
+
+		LUX_FORCE_INLINE bool operator > (const FileLineReport &other) const
+		{
+			if(file == NULL)
+				return other.file != NULL;
+			if(other.file == NULL)
+				return false;
+			int cmp = strcmp(file, other.file);
+			if(cmp != 0)
+				return cmp > 0;
+			return line > other.line;
+		}
+	};
+
+	typedef map<uint32_t, MemoryTracker::Entry*, MemTrackAllocator> map_alloc_order;
+	typedef map<FileLineReport, int32_t, MemTrackAllocator> file_line_map;
+	typedef map<const char *, int32_t, MemTrackAllocator> file_map;
+	typedef map<FileLineReport, uint32_t, MemTrackAllocator> alloc_count_map;
+
 	MemoryTracker* MemoryTracker::s_instance = NULL;
 	uint32_t MemoryTracker::s_alloc_counter = 0;
 
@@ -352,6 +391,33 @@ namespace Lux
 	MemoryTracker::~MemoryTracker()
 	{
 	}
+
+	//TODO: PC only
+	// Typedef for the function pointer
+	typedef void (*_PVFV)(void);
+
+	static void LastOnExitFunc()
+	{
+		Lux::MemoryTracker::getInstance().dumpDetailed();
+		Lux::MemoryTracker::destruct();
+	}
+
+	static void CInit()
+	{
+		atexit(&LastOnExitFunc);
+	}
+
+	// Define where our segment names
+#define SEGMENT_C_INIT      ".CRT$XIM"
+
+	// Build our various function tables and insert them into the correct segments.
+#pragma data_seg(SEGMENT_C_INIT)
+#pragma data_seg() // Switch back to the default segment
+
+	// Call create our call function pointer arrays and place them in the segments created above
+#define SEG_ALLOCATE(SEGMENT)   __declspec(allocate(SEGMENT))
+	SEG_ALLOCATE(SEGMENT_C_INIT) _PVFV c_init_funcs[] = { &CInit };
+
 } //~namespace Lux
 
 #endif //~MEM_TRACK

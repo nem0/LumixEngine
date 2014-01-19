@@ -15,10 +15,15 @@ namespace Lux
 
 	class ReceiveTask : public MT::Task
 	{
-		public:	
-			virtual int task() LUX_OVERRIDE;
-			
-			struct EditorClientImpl* m_client;
+	public:
+		ReceiveTask() : m_finished(false) {}
+
+		virtual int task() LUX_OVERRIDE;
+		void stop() { m_finished = true; }
+
+		struct EditorClientImpl* m_client;
+	private:
+		volatile bool m_finished;
 	};
 
 
@@ -36,10 +41,9 @@ namespace Lux
 
 	int ReceiveTask::task()
 	{
-		bool finished = false;
 		PODArray<uint8_t> data;
 		data.resize(8);
-		while(!finished)
+		while(!m_finished)
 		{
 			if(m_client->m_stream->read(&data[0], 8))
 			{
@@ -68,6 +72,13 @@ namespace Lux
 		return success && m_impl->m_stream != NULL;
 	}
 
+	void EditorClient::destroy()
+	{
+		LUX_DELETE(m_impl->m_stream);
+		m_impl->m_task.stop();
+		m_impl->m_task.destroy();
+		LUX_DELETE(m_impl);
+	}
 
 	void EditorClientImpl::onMessage(uint8_t* data, int size)
 	{

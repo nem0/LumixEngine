@@ -3,7 +3,7 @@
 #ifdef MEM_TRACK
 
 #include "core/lux.h"
-#include "core/hash_map.h"
+#include "core/pod_hash_map.h"
 #include "core/map.h"
 #include "core/spin_mutex.h"
 
@@ -12,18 +12,6 @@
 
 namespace Lux
 {
-	template<>
-	struct HashFunc<void*>
-	{
-		static size_t get(const void* key)
-		{
-			size_t x = ((int32_t(key) >> 16) ^ int32_t(key)) * 0x45d9f3b;
-			x = ((x >> 16) ^ x) * 0x45d9f3b;
-			x = ((x >> 16) ^ x);
-			return x;
-		}
-	};
-
 	class MemTrackAllocator
 	{
 	public:
@@ -85,47 +73,7 @@ namespace Lux
 		static uint32_t getAllocID() { return s_alloc_counter++; }
 
 	private:
-		// struct FILE_LINE_REPORT
-		struct FileLineReport
-		{
-			const char *file;
-			int32_t line;
-
-			LUX_FORCE_INLINE bool operator == (const FileLineReport &other) const { return file == other.file && line == other.line; }
-			LUX_FORCE_INLINE bool operator != (const FileLineReport &other) const { return !(*this == other); }
-
-			LUX_FORCE_INLINE bool operator < (const FileLineReport &other) const
-			{
-				if(file == NULL)
-					return other.file != NULL;
-				if(other.file == NULL)
-					return false;
-				int cmp = strcmp(file, other.file);
-				if(cmp != 0)
-					return cmp < 0;
-				return line < other.line;
-			}
-
-			LUX_FORCE_INLINE bool operator > (const FileLineReport &other) const
-			{
-				if(file == NULL)
-					return other.file != NULL;
-				if(other.file == NULL)
-					return false;
-				int cmp = strcmp(file, other.file);
-				if(cmp != 0)
-					return cmp > 0;
-				return line > other.line;
-			}
-		};
-
-		typedef HashMap<void*, Entry, HashFunc<void*>, MemTrackAllocator> EntryTable;
-		typedef map<uint32_t, Entry*, MemTrackAllocator> map_alloc_order;
-
-		typedef map<FileLineReport, int32_t, MemTrackAllocator> file_line_map;
-		typedef map<const char *, int32_t, MemTrackAllocator> file_map;
-
-		typedef map<FileLineReport, uint32_t, MemTrackAllocator> alloc_count_map;
+		typedef PODHashMap<void*, Entry, PODHashFunc<void*>, MemTrackAllocator> EntryTable;
 
 		MemoryTracker();
 		~MemoryTracker();
