@@ -2,6 +2,7 @@
 #include <Windows.h>
 #include "editor/editor_client.h"
 #include "editor_native/main_frame.h"
+#include "editor_native/script_compiler.h"
 #include "gui/gui.h"
 #include "gui/controls/menu_item.h"
 
@@ -107,12 +108,22 @@ MainMenu::MainMenu(MainFrame& main_frame)
 	Lux::UI::MenuItem* tools_play_item = LUX_NEW(Lux::UI::MenuItem)("Play", getGui());
 	tools_item->addSubItem(tools_play_item);
 	tools_play_item->onEvent("click").bind<MainMenu, &MainMenu::toolsPlay>(this);
+
+	Lux::UI::MenuItem* tools_compile_item = LUX_NEW(Lux::UI::MenuItem)("Compile scripts", getGui());
+	tools_item->addSubItem(tools_compile_item);
+	tools_compile_item->onEvent("click").bind<MainMenu, &MainMenu::toolsCompileScripts>(this);
 }
 
 
 void MainMenu::toolsPlay(Lux::UI::Block& block, void*)
 {
 	m_main_frame->getEditorClient()->toggleGameMode();
+}
+
+
+void MainMenu::toolsCompileScripts(Lux::UI::Block& block, void*)
+{
+	m_main_frame->getScriptCompiler().compileAll();
 }
 
 

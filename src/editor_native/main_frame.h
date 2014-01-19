@@ -5,6 +5,9 @@
 #include "gui/controls/dockable.h"
 
 
+class ScriptCompiler;
+
+
 namespace Lux
 {
 
@@ -30,6 +33,7 @@ class MainFrame : public Lux::UI::Block
 		Lux::EditorClient* getEditorClient() const { return m_editor_client; }
 		Lux::string& getStartupDirectory() { return m_startup_directory; }
 		Lux::UI::Dockable& getDockable() { return *m_dockable; }
+		ScriptCompiler& getScriptCompiler() { return *m_script_compiler; }
 
 	private:
 		void scriptCompiled(const char* path, uint32_t exit_code);
@@ -41,7 +45,7 @@ class MainFrame : public Lux::UI::Block
 		class PropertyFrame* m_property_frame;
 		class MainMenu* m_main_menu;
 		class LogUI* m_log_ui;
-		class ScriptCompiler* m_script_compiler; 
+		ScriptCompiler* m_script_compiler; 
 		class Notifications* m_notifications;
 		Lux::UI::Dockable* m_dockable;
 };

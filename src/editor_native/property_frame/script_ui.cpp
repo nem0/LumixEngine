@@ -6,6 +6,7 @@
 #include "editor/server_message_types.h"
 #include "editor_native/main_frame.h"
 #include "editor_native/property_frame/property_frame.h"
+#include "editor_native/script_compiler.h"
 #include "gui/controls/button.h"
 #include "gui/controls/text_box.h"
 #include "gui/gui.h"
@@ -34,9 +35,12 @@ ScriptUI::ScriptUI(PropertyFrame& property_frame, Lux::UI::Block* parent, Lux::E
 	browse_button->onEvent("click").bind<ScriptUI, &ScriptUI::browseSource>(this);	
 
 	Lux::UI::Button* edit_button = LUX_NEW(Lux::UI::Button)("Edit script", getGui(), this);
-	edit_button->setArea(0.5f, -40, 0, 42, 0.5f, 40, 0, 62);
+	edit_button->setArea(0, 5, 0, 42, 0, 75, 0, 62);
 	edit_button->onEvent("click").bind<ScriptUI, &ScriptUI::editScript>(this);	
 
+	Lux::UI::Button* compile_button = LUX_NEW(Lux::UI::Button)("Compile", getGui(), this);
+	compile_button->setArea(0, 80, 0, 42, 0, 150, 0, 62);
+	compile_button->onEvent("click").bind<ScriptUI, &ScriptUI::compileScript>(this);	
 }
 
 
@@ -44,6 +48,12 @@ void ScriptUI::sourceChanged(Lux::UI::Block& block, void*)
 {
 	const Lux::string& s = m_source_box->getChild(0)->getBlockText();
 	m_client->setComponentProperty("script", "source", s.c_str(), s.length()+1);
+}
+
+
+void ScriptUI::compileScript(Lux::UI::Block& block, void*)
+{
+	m_property_frame.getMainFrame()->getScriptCompiler().compile(m_source_box->getText().c_str());
 }
 
 

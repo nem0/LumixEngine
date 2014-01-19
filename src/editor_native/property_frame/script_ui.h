@@ -28,6 +28,7 @@ class ScriptUI : public IComponentUI, public Lux::UI::Block
 		void sourceChanged(Lux::UI::Block& block, void*);
 		void browseSource(Lux::UI::Block& block, void*);
 		void editScript(Lux::UI::Block& block, void*);
+		void compileScript(Lux::UI::Block& block, void*);
 
 	private:
 		Lux::UI::TextBox* m_source_box;
