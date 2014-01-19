@@ -143,7 +143,8 @@
       <Filter>MT</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\stack_allocator.h" />
-    <ClInclude Include="..\..\..\LuxEngine_master\src\core\hash_map.h" />
+    <ClInclude Include="..\..\src\core\hash_map.h" />
+    <ClInclude Include="..\..\src\core\pod_hash_map.h" />
     <ClInclude Include="..\..\src\core\memory_tracker.h" />
     <ClInclude Include="..\..\src\core\new.h" />
     <ClInclude Include="..\..\src\core\new_macros.h" />
