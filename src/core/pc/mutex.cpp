@@ -7,11 +7,6 @@ namespace Lux
 {
 	namespace MT
 	{
-		Mutex::Mutex()
-		{
-			m_id = ::CreateMutex(NULL, false, NULL);
-		}
-
 		Mutex::Mutex(bool locked)
 		{
 			m_id = ::CreateMutex(NULL, locked, NULL);

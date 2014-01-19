@@ -10,7 +10,6 @@ namespace Lux
 		class LUX_CORE_API SpinMutex
 		{
 		public:
-			SpinMutex();
 			explicit SpinMutex(bool locked);
 			~SpinMutex();
 

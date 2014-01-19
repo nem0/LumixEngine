@@ -28,7 +28,7 @@ namespace Lux
 		{
 			if(!success)
 			{
-				file->close();
+				m_filesystem->close(file);
 				return;
 			}
 

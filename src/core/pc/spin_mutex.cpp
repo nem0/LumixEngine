@@ -5,10 +5,6 @@ namespace Lux
 {
 	namespace MT
 	{
-		SpinMutex::SpinMutex()
-			: m_id(0)
-		{ }
-
 		SpinMutex::SpinMutex(bool locked)
 			: m_id(0)
 		{
