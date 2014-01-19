@@ -19,22 +19,23 @@ namespace  Lux
 			int value;
 		};
 
+		typedef void* EventHandle;
 
-		class LUX_CORE_API Event LUX_ABSTRACT
+		class LUX_CORE_API Event
 		{
 		public:
-			static Event* create(EventFlags flags);
-			static void destroy(Event* event);
+			explicit Event(EventFlags flags);
+			~Event();
 
-			virtual void reset() = 0;
+			void reset();
 
-			virtual void trigger() = 0;
+			void trigger();
 
-			virtual void wait() = 0;
-			virtual bool poll() = 0;
+			void wait();
+			bool poll();
 
-		protected:
-			virtual ~Event() {};
+		private:
+			EventHandle m_id;
 		};
 	}; // ~namespace MT
 }; // ~namespace Lux

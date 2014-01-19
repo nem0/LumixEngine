@@ -11,20 +11,20 @@ namespace Lux
 	{
 		template <class T> struct Transaction 
 		{
-			void setCompleted()		{ m_event->trigger();		}
-			bool isCompleted()		{ return m_event->poll();	}
-			void waitForCompletion() { return m_event->wait();	}
-			void reset()	{ m_event->reset(); }
+			STATIC_ASSERT_IS_TRIVIALLY_COPYABLE(T);
+			void setCompleted()		{ m_event.trigger();		}
+			bool isCompleted()		{ return m_event.poll();	}
+			void waitForCompletion() { return m_event.wait();	}
+			void reset()	{ m_event.reset(); }
 
 			T			data;
 
-			Transaction() { m_event = MT::Event::create(MT::EventFlags::MANUAL_RESET); }
-			MT::Event*	m_event;
+			Transaction() : m_event(MT::EventFlags::MANUAL_RESET) { }
+			MT::Event	m_event;
 		};
 
 		template <class T, int32_t size> class TransactionQueue 
 		{
-			STATIC_ASSERT_IS_TRIVIALLY_COPYABLE(T);
 		public:
 			TransactionQueue();
 			~TransactionQueue();
@@ -66,7 +66,7 @@ namespace Lux
 				{}
 			};
 
-			Semaphore*				m_alloc_sema;
+			Semaphore				m_alloc_sema;
 			volatile int32_t		m_alloc_ptr;
 			volatile int32_t		m_free_ptr;
 			AllocNode				m_alloc[size];
@@ -76,10 +76,10 @@ namespace Lux
 
 		template <class T, int32_t size>
 		TransactionQueue<T,size>::TransactionQueue()
-			: m_alloc_ptr(0)
+			: m_alloc_sema(size, size)
+			, m_alloc_ptr(0)
 			, m_free_ptr(0)
 		{
-			m_alloc_sema = MT::Semaphore::create(size, size);
 			for (int32_t i = 0; i < size; i++) 
 			{
 				m_alloc[i].key = i;
@@ -91,13 +91,12 @@ namespace Lux
 		template <class T, int32_t size>
 		TransactionQueue<T,size>::~TransactionQueue()
 		{
-			MT::Semaphore::destroy(m_alloc_sema);
 		}
 
 		template <class T, int32_t size>
 		T* TransactionQueue<T,size>::allocTS(bool wait)
 		{
-			bool can_write = wait ? m_alloc_sema->wait(), true : m_alloc_sema->poll();
+			bool can_write = wait ? m_alloc_sema.wait(), true : m_alloc_sema.poll();
 			if (can_write)
 			{
 				while (true) 
@@ -139,7 +138,7 @@ namespace Lux
 				}
 			}
 
-			m_alloc_sema->signal();
+			m_alloc_sema.signal();
 		}
 
 		template <class T, int32_t size>
