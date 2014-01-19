@@ -173,8 +173,8 @@ struct EditorServerImpl
 
 		static void onEvent(void* data, Event& evt);
 
-		MT::Mutex* m_universe_mutex;
-		MT::Mutex* m_send_mutex;
+		MT::Mutex m_universe_mutex;
+		MT::Mutex m_send_mutex;
 		Gizmo m_gizmo;
 		Entity m_selected_entity;
 		Blob m_stream;
@@ -230,7 +230,7 @@ void EditorServer::tick(HWND hwnd, HWND game_hwnd)
 {
 	PAINTSTRUCT ps;
 	HDC hdc;
-	MT::Lock lock(*m_impl->m_universe_mutex);
+	MT::Lock lock(m_impl->m_universe_mutex);
 
 	if(m_impl->m_is_game_mode)
 	{
@@ -446,7 +446,7 @@ int MessageTask::task()
 			{
 				data.resize(length);
 				m_stream->read(&data[0], length);
-				MT::Lock lock(*m_server->m_universe_mutex);
+				MT::Lock lock(m_server->m_universe_mutex);
 				m_server->onMessage(&data[0], data.size());
 			}
 		}
@@ -712,8 +712,6 @@ HGLRC createGLContext(HWND hwnd)
 
 bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 {
-	m_universe_mutex = MT::Mutex::create(false);
-	m_send_mutex = MT::Mutex::create(false);
 	m_message_task = LUX_NEW(MessageTask)();
 	m_message_task->m_server = this;
 	m_message_task->m_stream = NULL;
@@ -778,8 +776,6 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 
 void EditorServerImpl::destroy()
 {
-	MT::Mutex::destroy(m_universe_mutex);
-	MT::Mutex::destroy(m_send_mutex);
 /*	m_message_task->m_is_finished = true;
 	m_message_task->somehow_cancel_the_read_operation();
 	m_message_task->destroy();
@@ -817,7 +813,7 @@ void EditorServerImpl::sendMessage(const uint8_t* data, int32_t length)
 {
 	if(m_message_task->m_stream)
 	{
-		MT::Lock lock(*m_send_mutex);
+		MT::Lock lock(m_send_mutex);
 		const uint32_t guard = 0x12345678;
 		m_message_task->m_stream->write(length);
 		m_message_task->m_stream->write(guard);
@@ -905,6 +901,8 @@ void EditorServerImpl::renderPhysics()
 
 
 EditorServerImpl::EditorServerImpl()
+	: m_universe_mutex(false)
+	, m_send_mutex(false)
 {
 	m_is_game_mode = false;
 	m_selected_entity = Entity::INVALID;

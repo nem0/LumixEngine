@@ -134,27 +134,29 @@ namespace Lux
 
 		struct TCPImpl
 		{
+			TCPImpl()
+				: m_spin_mutex(false)
+			{}
+
 			Net::TCPConnector m_connector;
 			Net::TCPStream* m_stream;
-			MT::SpinMutex* m_spin_mutex;
+			MT::SpinMutex m_spin_mutex;
 		};
 
 		IFile* TCPFileDevice::createFile(IFile* child)
 		{
-			return LUX_NEW(TCPFile)(m_impl->m_stream, *m_impl->m_spin_mutex);
+			return LUX_NEW(TCPFile)(m_impl->m_stream, m_impl->m_spin_mutex);
 		}
 
 		void TCPFileDevice::connect(const char* ip, uint16_t port)
 		{
 			m_impl = LUX_NEW(TCPImpl);
-			m_impl->m_spin_mutex = MT::SpinMutex::create(false);
 			m_impl->m_stream = m_impl->m_connector.connect(ip, port);
 		}
 
 		void TCPFileDevice::disconnect()
 		{
 			m_impl->m_stream->write(TCPCommand::Disconnect);
-			MT::SpinMutex::destroy(m_impl->m_spin_mutex);
 			LUX_DELETE(m_impl);
 		}
 	} // namespace FS

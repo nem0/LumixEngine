@@ -5,19 +5,21 @@ namespace Lux
 {
 	namespace MT
 	{
-		class LUX_CORE_API Semaphore LUX_ABSTRACT
+		typedef void* SemaphoreHandle;
+
+		class LUX_CORE_API Semaphore
 		{
 		public:
-			static Semaphore* create(int init_count, int max_count);
-			static void destroy(Semaphore*);
+			Semaphore(int init_count, int max_count);
+			~Semaphore();
 
-			virtual void signal() = 0;
+			void signal();
 
-			virtual void wait() = 0;
-			virtual bool poll() = 0;
+			void wait();
+			bool poll();
 
-		protected:
-			virtual ~Semaphore() {}
+		private:
+			SemaphoreHandle m_id;
 		};
 	}; // ~namespac MT
 }; //~namespace Lux

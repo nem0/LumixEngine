@@ -43,8 +43,8 @@ namespace Lux
 				{}
 			};
 
-			Semaphore*			m_wr_semaphore;
-			Semaphore*			m_rd_semaphore;
+			Semaphore			m_wr_semaphore;
+			Semaphore			m_rd_semaphore;
 			volatile int32_t	m_rd;
 			volatile int32_t	m_wr;
 			volatile bool		m_aborted;
@@ -52,13 +52,14 @@ namespace Lux
 		};
 
 		template <class T, int32_t size>		BlockingQueue<T,size>::BlockingQueue()
-			: m_rd(0)
+			: m_wr_semaphore(size, size)
+			, m_rd_semaphore(0, size)
+			, m_rd(0)
 			, m_wr(0)
 			, m_aborted(false)
 		{
 			ASSERT(size > 0);
-			m_wr_semaphore = MT::Semaphore::create(size, size);
-			m_rd_semaphore = MT::Semaphore::create(0, size);
+			
 
 			for (int32_t i = 0; i < size; ++i)
 			{
@@ -73,8 +74,8 @@ namespace Lux
 
 		template <class T, int32_t size> void	BlockingQueue<T,size>::abort()
 		{
-			m_wr_semaphore->wait();
-			m_rd_semaphore->signal();
+			m_wr_semaphore.wait();
+			m_rd_semaphore.signal();
 		}
 
 		template <class T, int32_t size> void	BlockingQueue<T,size>::abortFromService()
@@ -102,7 +103,7 @@ namespace Lux
 			}
 			
 			int32_t result = -1;
-			bool can_write = wait ? m_wr_semaphore->wait(), true : m_wr_semaphore->poll();
+			bool can_write = wait ? m_wr_semaphore.wait(), true : m_wr_semaphore.poll();
 			if (can_write) 
 			{
 				Node cur_node(0, NULL);
@@ -120,7 +121,7 @@ namespace Lux
 					{
 						atomicIncrement(&m_wr);
 						result = idx;
-						m_rd_semaphore->signal();
+						m_rd_semaphore.signal();
 						break;
 					}
 				}
@@ -131,7 +132,7 @@ namespace Lux
 		template <class T, int32_t size> int32_t BlockingQueue<T,size>::pop(T*& data, bool wait)
 		{
 			int32_t result = -1;
-			bool can_read = wait ? m_rd_semaphore->wait(), true : m_rd_semaphore->poll();
+			bool can_read = wait ? m_rd_semaphore.wait(), true : m_rd_semaphore.poll();
 			if (can_read) 
 			{
 				while (true)
@@ -147,7 +148,7 @@ namespace Lux
 						atomicIncrement(&m_rd);
 						data = cur_node.el;
 						result = idx;
-						m_wr_semaphore->signal();
+						m_wr_semaphore.signal();
 						break;
 					}
 				}
