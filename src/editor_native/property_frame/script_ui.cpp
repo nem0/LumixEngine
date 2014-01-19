@@ -17,7 +17,7 @@ ScriptUI::ScriptUI(PropertyFrame& property_frame, Lux::UI::Block* parent, Lux::E
 	, m_property_frame(property_frame)
 {
 	m_client = &client;
-	setArea(0, 0, 0, 0, 1, 0, 0, 60);
+	setArea(0, 0, 0, 0, 1, 0, 0, 83);
 	Lux::UI::Block* label = LUX_NEW(Lux::UI::Block)(getGui(), this, "_text_centered");
 	label->setBlockText("Script");
 	label->setArea(0, 0, 0, 0, 1, 0, 0, 20);
@@ -34,12 +34,20 @@ ScriptUI::ScriptUI(PropertyFrame& property_frame, Lux::UI::Block* parent, Lux::E
 	browse_button->setArea(1, -20, 0, 20, 1, -1, 0, 40);
 	browse_button->onEvent("click").bind<ScriptUI, &ScriptUI::browseSource>(this);	
 
+	label = LUX_NEW(Lux::UI::Block)(getGui(), this, "_text");
+	label->setBlockText("Status");
+	label->setArea(0, 0, 0, 42, 0, 50, 0, 62);
+
+	m_status_label = LUX_NEW(Lux::UI::Block)(getGui(), this, "_text");
+	m_status_label->setBlockText("not compiled");
+	m_status_label->setArea(0, 52, 0, 42, 1, 0, 0, 62);
+
 	Lux::UI::Button* edit_button = LUX_NEW(Lux::UI::Button)("Edit script", getGui(), this);
-	edit_button->setArea(0, 5, 0, 42, 0, 75, 0, 62);
+	edit_button->setArea(0, 5, 0, 63, 0, 75, 0, 83);
 	edit_button->onEvent("click").bind<ScriptUI, &ScriptUI::editScript>(this);	
 
 	Lux::UI::Button* compile_button = LUX_NEW(Lux::UI::Button)("Compile", getGui(), this);
-	compile_button->setArea(0, 80, 0, 42, 0, 150, 0, 62);
+	compile_button->setArea(0, 80, 0, 63, 0, 150, 0, 83);
 	compile_button->onEvent("click").bind<ScriptUI, &ScriptUI::compileScript>(this);	
 }
 
@@ -110,6 +118,21 @@ void ScriptUI::onEntityProperties(Lux::PropertyListEvent& evt)
 				if(evt.properties[i].data_size > 0)
 				{
 					m_source_box->setText((char*)evt.properties[i].data);
+					switch(m_property_frame.getMainFrame()->getScriptCompiler().getStatus((char*)evt.properties[i].data))
+					{
+						case ScriptCompiler::UNKNOWN:
+							m_status_label->setBlockText("unknown");
+							break;
+						case ScriptCompiler::FAILURE:
+							m_status_label->setBlockText("failed");
+							break;
+						case ScriptCompiler::SUCCESS:
+							m_status_label->setBlockText("compiled");
+							break;
+						default:
+							ASSERT(false);
+							break;
+					}
 				}
 			}
 		}
