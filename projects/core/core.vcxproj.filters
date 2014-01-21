@@ -140,6 +140,8 @@
       <Filter>MT</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\stack_allocator.h" />
+    <ClInclude Include="..\..\src\core\hash_map.h" />
+    <ClInclude Include="..\..\src\core\pod_hash_map.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="FS">
