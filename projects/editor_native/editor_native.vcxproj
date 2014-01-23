@@ -100,6 +100,7 @@
     <ClCompile Include="..\..\src\editor_native\notifications.cpp" />
     <ClCompile Include="..\..\src\editor_native\property_frame\animable_ui.cpp" />
     <ClCompile Include="..\..\src\editor_native\property_frame\box_rigid_actor_ui.cpp" />
+    <ClCompile Include="..\..\src\editor_native\property_frame\point_light_ui.cpp" />
     <ClCompile Include="..\..\src\editor_native\property_frame\property_frame.cpp" />
     <ClCompile Include="..\..\src\editor_native\property_frame\renderable_ui.cpp" />
     <ClCompile Include="..\..\src\editor_native\property_frame\script_ui.cpp" />
@@ -113,6 +114,7 @@
     <ClInclude Include="..\..\src\editor_native\property_frame\animable_ui.h" />
     <ClInclude Include="..\..\src\editor_native\property_frame\box_rigid_actor_ui.h" />
     <ClInclude Include="..\..\src\editor_native\property_frame\icomponent_ui.h" />
+    <ClInclude Include="..\..\src\editor_native\property_frame\point_light_ui.h" />
     <ClInclude Include="..\..\src\editor_native\property_frame\property_frame.h" />
     <ClInclude Include="..\..\src\editor_native\property_frame\renderable_ui.h" />
     <ClInclude Include="..\..\src\editor_native\property_frame\script_ui.h" />
