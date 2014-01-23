@@ -93,6 +93,7 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\core\new.cpp" />
     <ClCompile Include="..\..\src\editor_native\log_ui.cpp" />
     <ClCompile Include="..\..\src\editor_native\main.cpp" />
     <ClCompile Include="..\..\src\editor_native\main_frame.cpp" />

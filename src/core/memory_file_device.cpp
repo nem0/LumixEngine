@@ -24,7 +24,8 @@ namespace Lux
 
 			~MemoryFile() 
 			{ 
-				LUX_DELETE(m_file); 
+				LUX_DELETE(m_file);
+				LUX_DELETE_ARRAY(m_buffer);
 			}
 
 			virtual bool open(const char* path, Mode mode) LUX_OVERRIDE
@@ -71,6 +72,7 @@ namespace Lux
 				}
 
 				LUX_DELETE_ARRAY(m_buffer);
+				m_buffer = NULL;
 			}
 
 			virtual bool read(void* buffer, size_t size) LUX_OVERRIDE
