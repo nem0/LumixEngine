@@ -23,7 +23,7 @@ namespace Lux
 	{
 		void postDeserialize();
 		void compile();
-		void getDll(const char* script_path, char* dll_path, int max_length);
+		void getDll(const char* script_path, char* dll_path, char* full_path, int max_length);
 		void getScriptDefaultPath(Entity e, char* path, char* full_path, int max_path, const char* ext);
 
 		PODArray<int> m_scripts;
@@ -82,11 +82,12 @@ namespace Lux
 	void ScriptSystem::start()
 	{
 		char path[MAX_PATH];
+		char full_path[MAX_PATH];
 		for(int i = 0; i < m_impl->m_scripts.size(); ++i)
 		{
 			Entity e(m_impl->m_universe, m_impl->m_scripts[i]);
-			m_impl->getDll(m_impl->m_paths[i].c_str(), path, MAX_PATH);
-			HMODULE h = LoadLibrary(path);
+			m_impl->getDll(m_impl->m_paths[i].c_str(), path, full_path, MAX_PATH);
+			HMODULE h = LoadLibrary(full_path);
 			m_impl->m_libs.push(h);
 			if(h)
 			{
@@ -174,7 +175,7 @@ namespace Lux
 		m_impl->m_paths[cmp.index] = str;
 	}
 	
-	void ScriptSystemImpl::getDll(const char* script_path, char* dll_path, int max_length)
+	void ScriptSystemImpl::getDll(const char* script_path, char* dll_path, char* full_path, int max_length)
 	{
 		strcpy_s(dll_path, max_length, script_path);
 		int len = strlen(script_path);
@@ -182,6 +183,9 @@ namespace Lux
 		{
 			strcpy_s(dll_path + len - 4, 5, ".dll"); 
 		}
+		strcpy(full_path, m_engine->getBasePath());
+		strcat(full_path, "\\");
+		strcat(full_path, dll_path);
 	}
 
 	void ScriptSystemImpl::getScriptDefaultPath(Entity e, char* path, char* full_path, int max_path, const char* ext)

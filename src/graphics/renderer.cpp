@@ -17,7 +17,7 @@
 #include "universe/entity_destroyed_event.h"
 #include "universe/entity_moved_event.h"
 #include "universe/universe.h"
-
+#include "GL/gl.h"
 
 #pragma comment(lib, "Horde3D.lib")
 #pragma comment(lib, "Horde3DUtils.lib")
@@ -31,9 +31,11 @@ namespace Lux
 
 typedef void (APIENTRY * glActiveTextureEXT_func)(const GLenum prg);
 typedef void (APIENTRY * glUseProgramEXT_func)(const GLuint prg);
+typedef void (APIENTRY * wglSwapIntervalEXT_func)(const GLuint prg);
 
 static glUseProgramEXT_func glUseProgramEXT = NULL;
 static glActiveTextureEXT_func glActiveTextureEXT = NULL;
+static wglSwapIntervalEXT_func wglSwapIntervalEXT = NULL;
 static const Component::Type rend_type = crc32("renderable");
 static const Component::Type point_light_type = crc32("point_light");
 
@@ -204,6 +206,11 @@ bool Renderer::create(FS::FileSystem* fs, int w, int h, const char* base_path)
 	m_impl->loadResources();
 	glUseProgramEXT = (glUseProgramEXT_func)wglGetProcAddress("glUseProgram");
 	glActiveTextureEXT = (glActiveTextureEXT_func)wglGetProcAddress("glActiveTexture");
+	wglSwapIntervalEXT = (wglSwapIntervalEXT_func)wglGetProcAddress("wglSwapIntervalEXT");
+	if(wglSwapIntervalEXT)
+	{
+		wglSwapIntervalEXT(1);
+	}
 	return true;
 }
 
