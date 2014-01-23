@@ -104,6 +104,7 @@
     <ClCompile Include="..\..\src\gui\decorators\cursor_decorator.cpp">
       <Filter>decorators</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\new.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="decorators">
