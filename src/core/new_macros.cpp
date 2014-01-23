@@ -3,12 +3,27 @@
 
 namespace Lux 
 {
+#ifdef MEM_TRACK
+	void storePtr(void* ptr, size_t size, const char* file, int32_t line)
+	{
+		MemoryTracker::getInstance().add(ptr, size, file, line);
+	}
+
+	void removePtr(void* ptr)
+	{
+		MemoryTracker::getInstance().remove(ptr);
+	}
+#else
+	void storePtr(void* ptr, size_t size, const char* file, int32_t line) {}
+	void removePtr(void* ptr) {}
+#endif
+
 	LUX_FORCE_INLINE void* lux_new(size_t size, const char* file, int32_t line)
 	{
 		if(!size)size = 1;
 
 		void* p = malloc(size);
-		MemoryTracker::getInstance().add(p, size, file, line);
+		storePtr(p, size, file, line);
 		return p;
 	}
 
@@ -16,7 +31,7 @@ namespace Lux
 	{
 		if(!size)size = 1;
 		void* p = _aligned_malloc(size, alignment);
-		MemoryTracker::getInstance().add(p, size, file, line);
+		storePtr(p, size, file, line);
 		return p;
 	}
 	
@@ -25,7 +40,7 @@ namespace Lux
 		if(NULL == ptr && 0 < size)
 		{
 			void* p = malloc(size);
-			MemoryTracker::getInstance().add(p, size, file, line);
+			storePtr(p, size, file, line);
 			return p;
 		}
 
@@ -34,16 +49,16 @@ namespace Lux
 			if(!ptr)
 				return NULL;
 
-			Lux::MemoryTracker::getInstance().remove(ptr);
+			removePtr(ptr);
 			free(ptr);
 			return NULL;
 		}
 
 		if(NULL != ptr && 0 < size)
 		{
-			Lux::MemoryTracker::getInstance().remove(ptr);
+			removePtr(ptr);
 			void* p = realloc(ptr, size);
-			Lux::MemoryTracker::getInstance().add(p, size, file, line);
+			Lux::storePtr(p, size, file, line);
 			
 			return p;
 		}
@@ -55,7 +70,7 @@ namespace Lux
 	{
 		if(!ptr)return;
 
-		Lux::MemoryTracker::getInstance().remove(ptr);
+		removePtr(ptr);
 		free(ptr);
 	}
 
@@ -63,7 +78,7 @@ namespace Lux
 	{
 		if(!ptr)return;
 
-		Lux::MemoryTracker::getInstance().remove(ptr);
+		removePtr(ptr);
 		_aligned_free(ptr);
 	}
 
