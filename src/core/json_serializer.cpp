@@ -10,6 +10,7 @@ namespace Lux
 	: m_file(file)
 	, m_access_mode(access_mode)
 {
+	m_is_first_in_block = true;
 	if(m_access_mode == READ)
 	{
 		m_file.read(&m_buffer, 1);
