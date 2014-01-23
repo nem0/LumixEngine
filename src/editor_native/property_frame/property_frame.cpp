@@ -7,6 +7,7 @@
 #include "editor_native/main_frame.h"
 #include "editor_native/property_frame/animable_ui.h"
 #include "editor_native/property_frame/box_rigid_actor_ui.h"
+#include "editor_native/property_frame/point_light_ui.h"
 #include "editor_native/property_frame/renderable_ui.h"
 #include "editor_native/property_frame/script_ui.h"
 #include "gui/controls/button.h"
@@ -71,13 +72,20 @@ PropertyFrame::PropertyFrame(MainFrame& main_frame)
 	{
 		Lux::UI::Block* item = LUX_NEW(Block)(main_frame.getGui(), m_type_list_popup, "_text_centered");
 		item->setArea(0, 0, 0, 40, 1, 0, 0, 60);
+		item->setBlockText("Point light");
+		item->onEvent("click").bind<PropertyFrame, &PropertyFrame::newComponentClick>(this);
+		item->setTag((void*)crc32("point_light"));
+	}
+	{
+		Lux::UI::Block* item = LUX_NEW(Block)(main_frame.getGui(), m_type_list_popup, "_text_centered");
+		item->setArea(0, 0, 0, 60, 1, 0, 0, 80);
 		item->setBlockText("Renderable");
 		item->onEvent("click").bind<PropertyFrame, &PropertyFrame::newComponentClick>(this);
 		item->setTag((void*)crc32("renderable"));
 	}
 	{
 		Lux::UI::Block* item = LUX_NEW(Block)(main_frame.getGui(), m_type_list_popup, "_text_centered");
-		item->setArea(0, 0, 0, 60, 1, 0, 0, 80);
+		item->setArea(0, 0, 0, 80, 1, 0, 0, 100);
 		item->setBlockText("Script");
 		item->onEvent("click").bind<PropertyFrame, &PropertyFrame::newComponentClick>(this);
 		item->setTag((void*)crc32("script"));
@@ -151,6 +159,10 @@ void PropertyFrame::onEntitySelected(Lux::Event& evt)
 		else if(e.components[i] == crc32("script"))
 		{
 			ui = LUX_NEW(ScriptUI)(*this, m_component_container, *m_main_frame->getEditorClient());
+		}
+		else if(e.components[i] == crc32("point_light"))
+		{
+			ui = LUX_NEW(PointLightUI)(*this, m_component_container, *m_main_frame->getEditorClient());
 		}
 		else
 		{
