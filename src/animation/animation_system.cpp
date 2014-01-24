@@ -1,6 +1,4 @@
 #include "animation_system.h"
-#include "Horde3D.h"
-#include "Horde3DUtils.h"
 #include "core/crc32.h"
 #include "core/event_manager.h"
 #include "core/json_serializer.h"
@@ -41,7 +39,7 @@ namespace Lux
 		{
 			engine.getEditorServer()->registerCreator(animable_type, *this);
 		}
-		return m_impl != 0;
+		return true;
 	}
 
 
@@ -173,7 +171,7 @@ namespace Lux
 
 	void AnimationSystem::playAnimation(const Component& cmp, const char* path, int layer)
 	{
-		Component renderable = m_impl->m_animables[cmp.index].m_renderable;
+		/*Component renderable = m_impl->m_animables[cmp.index].m_renderable;
 		if(renderable.isValid())
 		{
 			Renderer* renderer = static_cast<Renderer*>(renderable.system);
@@ -185,22 +183,24 @@ namespace Lux
 
 			m_impl->m_animables[cmp.index].m_manual = false;
 			m_impl->m_animables[cmp.index].m_layers |= 1 << layer;
-		}
+		}*/
+		ASSERT(false);
 	}
 
 
 	void AnimationSystem::setAnimationTime(const Component& cmp, float time, int layer)
 	{
-		Renderer* renderer = static_cast<Renderer*>(m_impl->m_animables[cmp.index].m_renderable.system);
+		ASSERT(false);
+		/*Renderer* renderer = static_cast<Renderer*>(m_impl->m_animables[cmp.index].m_renderable.system);
 		H3DNode node = renderer->getMeshNode(m_impl->m_animables[cmp.index].m_renderable);
 		m_impl->m_animables[cmp.index].m_time = time;
-		h3dSetModelAnimParams(node, layer, time, 1.0f);
+		h3dSetModelAnimParams(node, layer, time, 1.0f);*/
 	}
 
 
 	void AnimationSystem::update(float time_delta)
 	{
-		if(m_impl->m_animables.empty())
+		/*if(m_impl->m_animables.empty())
 			return;
 		Renderer* renderer = static_cast<Renderer*>(m_impl->m_animables[0].m_renderable.system);
 		for(int i = 0, c = m_impl->m_animables.size(); i < c; ++i)
@@ -219,7 +219,8 @@ namespace Lux
 				}
 				m_impl->m_animables[i].m_time = time;
 			}
-		}
+		}*/
+		ASSERT(false);
 	}
 
 

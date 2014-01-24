@@ -1,34 +1,26 @@
 #pragma once
 
 #include "core/lux.h"
-#include "Horde3D.h"
 #include "core/string.h"
 #include "engine/iplugin.h"
-#include "universe/universe.h"
 
 
 namespace Lux
 {
 
 
-class Event;
-class ISerializer;
-struct Vec3;
-
-namespace FS
-{
-	class FileSystem;
-}
-
-class LUX_ENGINE_API Renderer
+class LUX_ENGINE_API Renderer : public IPlugin 
 {
 	public:
-		Renderer();
-		
-		bool create(FS::FileSystem* fs, int w, int h, const char* base_path);
-		void destroy();
+		static Renderer* createInstance();
+		static void destroyInstance(Renderer& renderer);
 
-		void renderScene();
+		virtual void render(class IRenderDevice& device) = 0;
+		virtual void setCameraActive(Component cmp, const bool& active) = 0;
+		virtual void getCameraActive(Component cmp, bool& active) = 0;
+		virtual void setCameraPipeline(Component cmp, const string& pipeline) = 0;
+
+/*		virtual void renderScene();
 		void endFrame();
 		void enableStage(const char* name, bool enable);
 		int getWidth() const;
@@ -63,10 +55,7 @@ class LUX_ENGINE_API Renderer
 		bool isReady() const;
 
 		void serialize(ISerializer& serializer);
-		void deserialize(ISerializer& serializer);
-	
-	private:
-		struct RendererImpl* m_impl;
+		void deserialize(ISerializer& serializer);*/
 };
 
 

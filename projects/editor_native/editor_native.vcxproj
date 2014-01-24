@@ -105,6 +105,7 @@
     <ClCompile Include="..\..\src\editor_native\property_frame\renderable_ui.cpp" />
     <ClCompile Include="..\..\src\editor_native\property_frame\script_ui.cpp" />
     <ClCompile Include="..\..\src\editor_native\script_compiler.cpp" />
+    <ClCompile Include="..\..\src\editor_native\sdl_render_device.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\editor_native\log_ui.h" />
@@ -119,6 +120,7 @@
     <ClInclude Include="..\..\src\editor_native\property_frame\renderable_ui.h" />
     <ClInclude Include="..\..\src\editor_native\property_frame\script_ui.h" />
     <ClInclude Include="..\..\src\editor_native\script_compiler.h" />
+    <ClInclude Include="..\..\src\editor_native\sdl_render_device.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

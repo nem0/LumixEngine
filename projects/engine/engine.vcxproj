@@ -61,7 +61,7 @@
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>..\..\external\horde3d\lib\$(Configuration);..\..\bin\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>core.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>glu32.lib;opengl32.lib;core.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
       <IgnoreSpecificDefaultLibraries>libcmt.lib</IgnoreSpecificDefaultLibraries>
     </Link>
@@ -98,7 +98,11 @@
     <ClCompile Include="..\..\src\engine\engine.cpp" />
     <ClCompile Include="..\..\src\engine\iplugin.cpp" />
     <ClCompile Include="..\..\src\engine\plugin_manager.cpp" />
+    <ClCompile Include="..\..\src\graphics\geometry.cpp" />
+    <ClCompile Include="..\..\src\graphics\gl_ext.cpp" />
+    <ClCompile Include="..\..\src\graphics\pipeline.cpp" />
     <ClCompile Include="..\..\src\graphics\renderer.cpp" />
+    <ClCompile Include="..\..\src\graphics\shader.cpp" />
     <ClCompile Include="..\..\src\script\get_property_visitor.cpp" />
     <ClCompile Include="..\..\src\script\save_script_visitor.cpp" />
     <ClCompile Include="..\..\src\script\script_system.cpp" />
@@ -122,7 +126,12 @@
     <ClInclude Include="..\..\src\engine\engine.h" />
     <ClInclude Include="..\..\src\engine\iplugin.h" />
     <ClInclude Include="..\..\src\engine\plugin_manager.h" />
+    <ClInclude Include="..\..\src\graphics\geometry.h" />
+    <ClInclude Include="..\..\src\graphics\gl_ext.h" />
+    <ClInclude Include="..\..\src\graphics\pipeline.h" />
     <ClInclude Include="..\..\src\graphics\renderer.h" />
+    <ClInclude Include="..\..\src\graphics\irender_device.h" />
+    <ClInclude Include="..\..\src\graphics\shader.h" />
     <ClInclude Include="..\..\src\script\base_script.h" />
     <ClInclude Include="..\..\src\script\get_property_visitor.h" />
     <ClInclude Include="..\..\src\script\save_script_visitor.h" />

@@ -81,6 +81,18 @@
     <ClCompile Include="..\..\src\editor\server_message_types.cpp">
       <Filter>editor</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\graphics\pipeline.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\graphics\geometry.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\graphics\gl_ext.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\graphics\shader.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\graphics\renderer.h">
@@ -154,6 +166,21 @@
     </ClInclude>
     <ClInclude Include="..\..\src\editor\server_message_types.h">
       <Filter>editor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\graphics\pipeline.h">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\graphics\irender_device.h">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\graphics\geometry.h">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\graphics\gl_ext.h">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\graphics\shader.h">
+      <Filter>graphics</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

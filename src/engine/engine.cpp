@@ -20,7 +20,7 @@ namespace Lux
 		EngineImpl(Engine& engine) : m_owner(engine) {}
 		bool create(int w, int h, const char* base_path, Engine& owner);
 
-		Renderer m_renderer;
+		Renderer* m_renderer;
 		FS::FileSystem* m_file_system; 
 		FS::MemoryFileDevice* m_mem_file_device;
 		FS::DiskFileDevice* m_disk_file_device;
@@ -47,8 +47,14 @@ namespace Lux
 		m_universe = 0;
 		m_base_path = base_path;
 
-		if(!m_renderer.create(m_file_system, w, h, base_path))
+		m_renderer = Renderer::createInstance();
+		if(!m_renderer)
 		{
+			return false;
+		}
+		if(!m_renderer->create(owner))
+		{
+			Renderer::destroyInstance(*m_renderer);
 			return false;
 		}
 		if(!m_plugin_manager.create(owner))
@@ -112,7 +118,7 @@ namespace Lux
 	void Engine::destroy()
 	{
 		m_impl->m_plugin_manager.destroy();
-		m_impl->m_renderer.destroy();
+		Renderer::destroyInstance(*m_impl->m_renderer);
 		
 		if(m_impl->m_disk_file_device)
 		{
@@ -131,14 +137,16 @@ namespace Lux
 		m_impl->m_plugin_manager.onCreateUniverse(*m_impl->m_universe);
 		m_impl->m_script_system.setUniverse(m_impl->m_universe);
 		m_impl->m_universe->create();
-		m_impl->m_renderer.setUniverse(m_impl->m_universe);
-
+		//m_impl->m_renderer.setUniverse(m_impl->m_universe);
+		//ASSERT(false);
+			
 		return m_impl->m_universe;
 	}
 
 	void Engine::destroyUniverse()
 	{
-		m_impl->m_renderer.setUniverse(0);
+		//m_impl->m_renderer.setUniverse(0);
+		ASSERT(false);
 		m_impl->m_script_system.setUniverse(0);
 		m_impl->m_plugin_manager.onDestroyUniverse(*m_impl->m_universe);
 		m_impl->m_universe->destroy();
@@ -166,7 +174,7 @@ namespace Lux
 
 	Renderer& Engine::getRenderer()
 	{
-		return m_impl->m_renderer;
+		return *m_impl->m_renderer;
 	}
 
 
@@ -216,7 +224,8 @@ namespace Lux
 	void Engine::serialize(ISerializer& serializer)
 	{
 		m_impl->m_universe->serialize(serializer);
-		m_impl->m_renderer.serialize(serializer);
+		//m_impl->m_renderer.serialize(serializer);
+		ASSERT(false);
 		m_impl->m_script_system.serialize(serializer);
 		m_impl->m_plugin_manager.serialize(serializer);
 	}
@@ -225,7 +234,8 @@ namespace Lux
 	void Engine::deserialize(ISerializer& serializer)
 	{
 		m_impl->m_universe->deserialize(serializer);
-		m_impl->m_renderer.deserialize(serializer);
+		//m_impl->m_renderer.deserialize(serializer);
+		ASSERT(false);
 		m_impl->m_script_system.deserialize(serializer);
 		m_impl->m_plugin_manager.deserialize(serializer);
 	}

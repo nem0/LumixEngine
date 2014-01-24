@@ -4,11 +4,13 @@
 #include "editor/editor_server.h"
 #include "editor/server_message_types.h"
 #include "editor_native/main_frame.h"
+#include "editor_native/sdl_render_device.h"
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
 #include "graphics/renderer.h"
 #include "gui/gui.h"
 #include "gui/opengl_renderer.h"
+
 
 struct App
 {
@@ -141,8 +143,9 @@ struct App
 
 	void render()
 	{
+		SDLRenderDevice device(m_display_window);
+		m_server.getEngine().getRenderer().render(device);
 		m_gui->render();
-		SDL_GL_SwapWindow(m_display_window);
 	}
 
 	void destroy()
