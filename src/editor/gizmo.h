@@ -1,7 +1,6 @@
 #pragma once
 
 
-#include "Horde3D.h"
 #include "core/vec3.h"
 #include "universe/universe.h"
 
@@ -85,7 +84,7 @@ class Gizmo
 		void setUniverse(Universe* universe);
 		void startTransform(int x, int y, TransformMode mode);
 		void transform(TransformOperation operation, int x, int y, int relx, int rely, int flags);
-		H3DNode getNode() const { return m_handle; }
+		//H3DNode getNode() const { return m_handle; }
 
 	private:
 		void onEvent(Event& evt);
@@ -93,7 +92,7 @@ class Gizmo
 
 	private:
 		Renderer* m_renderer;
-		H3DNode m_handle;
+		//H3DNode m_handle;
 		Entity m_selected_entity;
 		Universe* m_universe;
 		TransformMode m_transform_mode;

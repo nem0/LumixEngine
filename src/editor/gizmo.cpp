@@ -1,7 +1,6 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
 #include "gizmo.h"
-#include "Horde3DUtils.h"
 #include "core/matrix.h"
 #include "universe/universe.h"
 #include "core/math_utils.h"
@@ -17,7 +16,7 @@ namespace Lux
 
 Gizmo::Gizmo()
 {
-	m_handle = 0;
+//	m_handle = 0;
 	m_selected_entity.index = -1;
 }
 
@@ -29,54 +28,54 @@ Gizmo::~Gizmo()
 
 void Gizmo::create(const char* base_path, Renderer& renderer)
 {
-	m_renderer = &renderer;
+	/*m_renderer = &renderer;
 	H3DRes res = h3dAddResource(H3DResTypes::SceneGraph, "models/tgizmo/tgizmo.scene.xml", 0);
 	h3dutLoadResourcesFromDisk(base_path);
 	m_handle = h3dAddNodes(H3DRootNode, res);
 	int flags = h3dGetNodeFlags(m_handle);
-	h3dSetNodeFlags(m_handle, flags | H3DNodeFlags::NoCastShadow, true);
+	h3dSetNodeFlags(m_handle, flags | H3DNodeFlags::NoCastShadow, true);*/
 }
 
 
 void Gizmo::destroy()
 {
-	h3dRemoveNode(m_handle);
+	//h3dRemoveNode(m_handle);
 }
 
 
 void Gizmo::hide()
 {
-	h3dSetNodeFlags(m_handle, h3dGetNodeFlags(m_handle) | H3DNodeFlags::Inactive, true);
+	//h3dSetNodeFlags(m_handle, h3dGetNodeFlags(m_handle) | H3DNodeFlags::Inactive, true);
 }
 
 
 void Gizmo::show()
 {
-	h3dSetNodeFlags(m_handle, h3dGetNodeFlags(m_handle) & ~H3DNodeFlags::Inactive, true);
-	h3dSetNodeFlags(m_handle, h3dGetNodeFlags(m_handle) | H3DNodeFlags::NoCastShadow, true);	
+	/*h3dSetNodeFlags(m_handle, h3dGetNodeFlags(m_handle) & ~H3DNodeFlags::Inactive, true);
+	h3dSetNodeFlags(m_handle, h3dGetNodeFlags(m_handle) | H3DNodeFlags::NoCastShadow, true);	*/
 }
 
 
 void Gizmo::setMatrix(const Matrix& mtx)
 {
-	h3dSetNodeTransMat(m_handle, &mtx.m11);
+	//h3dSetNodeTransMat(m_handle, &mtx.m11);
 }
 
 
 void Gizmo::getMatrix(Matrix& mtx)
 {
-	const float* tmp;
+	/*const float* tmp;
 	h3dGetNodeTransMats(m_handle, 0, &tmp);
 	for(int i = 0; i < 16; ++i)
 	{
 		(&mtx.m11)[i] = tmp[i];
-	}
+	}*/
 }
 
 
 void Gizmo::updateScale()
 {
-	Matrix camera_mtx;
+	/*Matrix camera_mtx;
 	m_renderer->getCameraMatrix(camera_mtx);
 	Matrix mtx;
 	getMatrix(mtx);
@@ -87,13 +86,13 @@ void Gizmo::updateScale()
 	scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = scale;
 	mtx = scale_mtx * mtx;
 	mtx.setTranslation(pos);
-	setMatrix(mtx);
+	setMatrix(mtx);*/
 }
 
 
 void Gizmo::setEntity(Entity entity)
 {
-	h3dSetNodeFlags(m_handle, h3dGetNodeFlags(m_handle) | H3DNodeFlags::NoCastShadow, true);	
+	//h3dSetNodeFlags(m_handle, h3dGetNodeFlags(m_handle) | H3DNodeFlags::NoCastShadow, true);	
 	m_selected_entity = entity;
 	if(m_selected_entity.index != -1)
 	{
@@ -204,7 +203,9 @@ void Gizmo::transform(TransformOperation operation, int x, int y, int relx, int 
 
 Vec3 Gizmo::getMousePlaneIntersection(int x, int y)
 {
-	Vec3 origin, dir;
+	ASSERT(false);
+	return Vec3(0, 0, 0);
+	/*Vec3 origin, dir;
 	m_renderer->getRay(x, y, origin, dir);	
 	dir.normalize();
 	Matrix camera_mtx;
@@ -232,7 +233,7 @@ Vec3 Gizmo::getMousePlaneIntersection(int x, int y)
 	Vec3 pos = m_selected_entity.getPosition();
 	Vec3 normal = crossProduct(crossProduct(dir, axis), dir);
 	float d = dotProduct(origin - pos, normal) / dotProduct(axis, normal);
-	return axis * d + pos;
+	return axis * d + pos;*/
 }
 
 
