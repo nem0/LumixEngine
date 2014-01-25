@@ -10,12 +10,21 @@
 #include "engine/engine.h"
 #include "graphics/gl_ext.h"
 #include "graphics/irender_device.h"
+#include "graphics/model.h"
+#include "graphics/model_instance.h"
 #include "graphics/pipeline.h"
 #include "universe/universe.h"
 
 
 namespace Lux
 {
+
+
+struct Renderable
+{
+	ModelInstance* m_model;
+	Entity m_entity;
+};
 
 
 struct Camera
@@ -64,9 +73,10 @@ struct RendererImpl : public Renderer
 		loadGLExtensions();
 		
 		Lux::FS::ReadCallback cb;
-		Pipeline* pipeline = Pipeline::create();
+		Pipeline* pipeline = Pipeline::create(*this);
 		m_pipelines.push(pipeline);
 		pipeline->load("pipelines/main.json", engine.getFileSystem());
+		
 		return true;
 	}
 
@@ -91,6 +101,13 @@ struct RendererImpl : public Renderer
 			camera->m_entity = entity;
 			m_cameras.push(camera);
 			return Component(entity, type, this, m_cameras.size() - 1);
+		}
+		else if(type == crc32("renderable"))
+		{
+			Renderable& r = m_renderables.pushEmpty();
+			r.m_entity = entity;
+			r.m_model = NULL;
+			return Component(entity, type, this, m_renderables.size() - 1);
 		}
 		return Component::INVALID;
 	}
@@ -120,6 +137,26 @@ struct RendererImpl : public Renderer
 	}
 
 
+	virtual void setRenderablePath(Component cmp, const string& path) LUX_OVERRIDE
+	{
+		LUX_DELETE(m_renderables[cmp.index].m_model);
+		Renderable& r = m_renderables[cmp.index];
+		Model* model = LUX_NEW(Model);
+		model->load(path.c_str(), m_engine->getFileSystem());
+		r.m_model = LUX_NEW(ModelInstance)(*model);
+	}
+
+
+	virtual void getRenderableInfos(PODArray<RenderableInfo>& infos) LUX_OVERRIDE
+	{
+		for(int i = 0; i < m_renderables.size(); ++i)
+		{
+			RenderableInfo& info = infos.pushEmpty();
+			info.m_model_instance = m_renderables[i].m_model;	
+		}
+	}
+
+
 	virtual void setCameraPipeline(Component cmp, const string& pipeline) LUX_OVERRIDE
 	{
 		m_cameras[cmp.index]->m_pipeline = getPipeline(pipeline.c_str());
@@ -130,6 +167,7 @@ struct RendererImpl : public Renderer
 	{
 		active = m_cameras[cmp.index]->m_is_active;
 	}
+
 
 	Pipeline* getPipeline(const char* path)
 	{
@@ -143,10 +181,13 @@ struct RendererImpl : public Renderer
 		return NULL;
 	}
 
+
 	Engine* m_engine;
 	Array<Camera*> m_cameras;
 	PODArray<Camera*> m_active_cameras;
 	PODArray<Pipeline*> m_pipelines;
+	Array<Renderable> m_renderables;
+	PODArray<Model*> m_models;
 };
 
 

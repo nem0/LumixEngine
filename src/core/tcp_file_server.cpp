@@ -60,7 +60,7 @@ namespace Lux
 							m_ids.release(id);
 
 							file->close();
-							delete file;
+							LUX_DELETE(file);
 						}
 						break;
 					case TCPCommand::Read:

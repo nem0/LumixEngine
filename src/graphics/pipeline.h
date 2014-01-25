@@ -7,6 +7,7 @@ namespace Lux
 {
 	
 class ISerializer;
+class Renderer;
 namespace FS
 {
 	class FileSystem;
@@ -23,7 +24,7 @@ class LUX_ENGINE_API Pipeline LUX_ABSTRACT
 		virtual void load(const char* path, FS::FileSystem& file_system) = 0;
 		virtual const char* getPath() = 0;
 
-		static Pipeline* create();
+		static Pipeline* create(Renderer& renderer);
 		static void destroy(Pipeline* pipeline);
 };
 

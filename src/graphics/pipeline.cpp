@@ -7,6 +7,11 @@
 #include "core/json_serializer.h"
 #include "core/string.h"
 #include "gl/GL.h"
+#include "graphics/geometry.h"
+#include "graphics/material.h"
+#include "graphics/model.h"
+#include "graphics/model_instance.h"
+#include "graphics/renderer.h"
 
 
 namespace Lux
@@ -18,7 +23,7 @@ struct Command
 	enum Type
 	{
 		CLEAR,
-
+		RENDER_MODELS,
 	};
 
 	uint32_t m_type;
@@ -28,6 +33,11 @@ struct Command
 
 struct PipelineImpl : public Pipeline
 {
+	PipelineImpl(Renderer& renderer)
+		: m_renderer(renderer)
+	{
+	}
+
 	virtual void render() LUX_OVERRIDE
 	{
 		for(int i = 0; i < m_commands.size(); ++i)
@@ -52,7 +62,11 @@ struct PipelineImpl : public Pipeline
 				cmd.m_type = Command::CLEAR;
 				cmd.m_uint = GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT;
 			}
-			
+			else if(strcmp(tmp, "render_models") == 0)
+			{
+				cmd.m_type = Command::RENDER_MODELS;
+				cmd.m_uint = 0;
+			}
 		}
 		serializer.deserializeArrayEnd();
 		return true;
@@ -98,20 +112,44 @@ struct PipelineImpl : public Pipeline
 					glVertex3f(1, 1, 5);
 				glEnd();
 				break;
+			case Command::RENDER_MODELS:
+				renderModels();
+				break;
 			default:
 				ASSERT(false);
 				break;
 		}
 	}
 
+	void renderModels()
+	{
+		glPushMatrix();
+		static PODArray<RenderableInfo> infos;
+		infos.clear();
+		m_renderer.getRenderableInfos(infos);
+		int count = infos.size();
+		for(int i = 0; i < count; ++i)
+		{
+			glMultMatrixf(&infos[i].m_model_instance->getMatrix().m11);
+			Geometry* geom = infos[i].m_model_instance->getModel().getGeometry();
+			for(int j = 0; j < infos[i].m_model_instance->getModel().getMeshCount(); ++j)
+			{
+				Mesh& mesh = infos[i].m_model_instance->getModel().getMesh(j);
+				geom->draw(mesh.getStart(), mesh.getCount());
+			}
+		}
+		glPopMatrix();
+	}
+
 	Array<Command> m_commands;
 	string m_path;
+	Renderer& m_renderer;
 };
 
 
-Pipeline* Pipeline::create()
+Pipeline* Pipeline::create(Renderer& renderer)
 {
-	return LUX_NEW(PipelineImpl);
+	return LUX_NEW(PipelineImpl)(renderer);
 }
 
 
