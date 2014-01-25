@@ -7,9 +7,6 @@ namespace Lux
 {
 
 
-class Shader;
-
-
 class Geometry
 {
 	public:
@@ -17,7 +14,7 @@ class Geometry
 		~Geometry();
 
 		void copy(const void* data, int size);
-		void draw(int start, int count, Shader& shader);
+		void draw(int start, int count);
 
 	private:
 		GLuint m_id;

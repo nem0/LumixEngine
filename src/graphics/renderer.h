@@ -1,12 +1,22 @@
 #pragma once
 
 #include "core/lux.h"
+#include "core/pod_array.h"
 #include "core/string.h"
 #include "engine/iplugin.h"
 
 
 namespace Lux
 {
+
+
+class ModelInstance;
+
+
+struct RenderableInfo
+{
+	ModelInstance* m_model_instance;
+};
 
 
 class LUX_ENGINE_API Renderer : public IPlugin 
@@ -16,9 +26,13 @@ class LUX_ENGINE_API Renderer : public IPlugin
 		static void destroyInstance(Renderer& renderer);
 
 		virtual void render(class IRenderDevice& device) = 0;
+
 		virtual void setCameraActive(Component cmp, const bool& active) = 0;
 		virtual void getCameraActive(Component cmp, bool& active) = 0;
 		virtual void setCameraPipeline(Component cmp, const string& pipeline) = 0;
+
+		virtual void setRenderablePath(Component cmp, const string& path) = 0;
+		virtual void getRenderableInfos(PODArray<RenderableInfo>& infos) = 0;
 
 /*		virtual void renderScene();
 		void endFrame();

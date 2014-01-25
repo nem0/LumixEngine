@@ -34,14 +34,14 @@ GLuint Shader::attach(GLenum type, const char* shader)
 	fopen_s(&fp, shader, "rb");
 	fseek(fp, 0, SEEK_END);
 	GLint length = ftell(fp);
-	GLchar* src = new GLchar[length+1];
+	GLchar* src = LUX_NEW_ARRAY(GLchar, length+1);
 	fseek(fp, 0, SEEK_SET);
 	fread(src, 1, length, fp);
 	src[length] = 0;
-	/*glShaderSource(id, 1, (const GLchar**)&src, &length);
-	glCompileShader(id);*/
+	glShaderSource(id, 1, (const GLchar**)&src, &length);
+	glCompileShader(id);
 	glAttachShader(m_program_id, id);
-	delete[] src;
+	LUX_DELETE_ARRAY(src);
 	return id;
 }
 
