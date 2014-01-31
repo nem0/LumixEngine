@@ -54,7 +54,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinimalRebuild>false</MinimalRebuild>
       <ExceptionHandling>Sync</ExceptionHandling>
-      <PreprocessorDefinitions>BUILDING_CORE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MEM_TRACK;BUILDING_CORE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -96,6 +96,9 @@
     <ClCompile Include="..\..\src\core\math_utils.cpp" />
     <ClCompile Include="..\..\src\core\matrix.cpp" />
     <ClCompile Include="..\..\src\core\memory_file_device.cpp" />
+    <ClCompile Include="..\..\src\core\memory_tracker.cpp" />
+    <ClCompile Include="..\..\src\core\new.cpp" />
+    <ClCompile Include="..\..\src\core\new_macros.cpp" />
     <ClCompile Include="..\..\src\core\os_file.cpp" />
     <ClCompile Include="..\..\src\core\pc\atomic.cpp" />
     <ClCompile Include="..\..\src\core\pc\event.cpp" />
@@ -140,7 +143,10 @@
     <ClInclude Include="..\..\src\core\math_utils.h" />
     <ClInclude Include="..\..\src\core\matrix.h" />
     <ClInclude Include="..\..\src\core\memory_file_device.h" />
+    <ClInclude Include="..\..\src\core\memory_tracker.h" />
     <ClInclude Include="..\..\src\core\mutex.h" />
+    <ClInclude Include="..\..\src\core\new.h" />
+    <ClInclude Include="..\..\src\core\new_macros.h" />
     <ClInclude Include="..\..\src\core\os_file.h" />
     <ClInclude Include="..\..\src\core\pod_array.h" />
     <ClInclude Include="..\..\src\core\pod_hash_map.h" />

@@ -95,6 +95,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\ai\navigation.cpp" />
+    <ClCompile Include="..\..\src\core\new.cpp" />
     <ClCompile Include="..\..\src\detour\DebugDraw.cpp" />
     <ClCompile Include="..\..\src\detour\DetourAlloc.cpp" />
     <ClCompile Include="..\..\src\detour\DetourCommon.cpp" />

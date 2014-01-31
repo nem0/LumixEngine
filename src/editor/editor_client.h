@@ -18,6 +18,7 @@ namespace Lux
                         EditorClient() { m_impl = 0; }
 
                         bool create();
+						void destroy();
                         void addEntity();
                         void toggleGameMode();
                         void addComponent(uint32_t type);

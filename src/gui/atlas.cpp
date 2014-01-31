@@ -26,35 +26,34 @@ namespace Lux
 		
 		void AtlasImpl::atlasLoaded(Lux::FS::IFile* file, bool success)
 		{
-			if(!success)
+			if(success)
 			{
-				m_filesystem->close(file);
-				return;
+				JsonSerializer serializer(*file, JsonSerializer::READ);
+				char tmp[260];
+				serializer.deserialize("image", tmp, 260);
+				m_texture = m_renderer->loadImage(tmp, *m_filesystem);
+				ASSERT(m_texture);
+				m_texture->onLoaded().bind<AtlasImpl, &AtlasImpl::imageLoaded>(this);
+				int count;
+				serializer.deserialize("part_count", count);
+				serializer.deserializeArrayBegin("parts");
+				for(int i = 0; i < count; ++i)
+				{
+					serializer.deserializeArrayItem(tmp, 260);
+					Atlas::Part* part = LUX_NEW(Atlas::Part)();
+					serializer.deserializeArrayItem(part->m_left);
+					serializer.deserializeArrayItem(part->m_top);
+					serializer.deserializeArrayItem(part->m_right);
+					serializer.deserializeArrayItem(part->m_bottom);
+					part->m_pixel_width = part->m_right - part->m_left;
+					part->m_pixel_height = part->m_bottom - part->m_top;
+					part->name = tmp;
+					m_parts.insert(crc32(tmp), part);
+				}
+				serializer.deserializeArrayEnd();
 			}
 
-			JsonSerializer serializer(*file, JsonSerializer::READ);
-			char tmp[260];
-			serializer.deserialize("image", tmp, 260);
-			m_texture = m_renderer->loadImage(tmp, *m_filesystem);
-			ASSERT(m_texture);
-			m_texture->onLoaded().bind<AtlasImpl, &AtlasImpl::imageLoaded>(this);
-			int count;
-			serializer.deserialize("part_count", count);
-			serializer.deserializeArrayBegin("parts");
-			for(int i = 0; i < count; ++i)
-			{
-				serializer.deserializeArrayItem(tmp, 260);
-				Atlas::Part* part = LUX_NEW(Atlas::Part)();
-				serializer.deserializeArrayItem(part->m_left);
-				serializer.deserializeArrayItem(part->m_top);
-				serializer.deserializeArrayItem(part->m_right);
-				serializer.deserializeArrayItem(part->m_bottom);
-				part->m_pixel_width = part->m_right - part->m_left;
-				part->m_pixel_height = part->m_bottom - part->m_top;
-				part->name = tmp;
-				m_parts.insert(crc32(tmp), part);
-			}
-			serializer.deserializeArrayEnd();
+			m_filesystem->close(file);
 		}
 
 		void Atlas::Part::getUvs(float* uvs) const
