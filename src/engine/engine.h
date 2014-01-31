@@ -44,6 +44,7 @@ namespace Lux
 			void update();
 			void serialize(ISerializer& serializer);
 			void deserialize(ISerializer& serializer);
+			float getFPS() const;
 
 		private:
 			struct EngineImpl* m_impl;
