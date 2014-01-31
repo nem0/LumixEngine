@@ -90,6 +90,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\animation\animation_system.cpp" />
+    <ClCompile Include="..\..\src\core\new.cpp" />
     <ClCompile Include="..\..\src\editor\editor_client.cpp" />
     <ClCompile Include="..\..\src\editor\editor_icon.cpp" />
     <ClCompile Include="..\..\src\editor\editor_server.cpp" />

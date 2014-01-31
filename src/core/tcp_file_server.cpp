@@ -26,7 +26,6 @@ namespace Lux
 				m_acceptor.start("127.0.0.1", 10001);
 				Net::TCPStream* stream = m_acceptor.accept();
 
-				OsFile* file = LUX_NEW(OsFile)();
 				while(!quit)
 				{
 					int32_t op = 0;
@@ -150,6 +149,8 @@ namespace Lux
 						break;
 					}
 				}
+
+				LUX_DELETE(stream);
 				return 0;
 			}
 

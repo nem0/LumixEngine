@@ -78,6 +78,7 @@
     <ClCompile Include="..\..\src\detour\RecastRegion.cpp">
       <Filter>recast&amp;detour</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\new.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\ai\navigation.h">

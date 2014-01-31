@@ -11,7 +11,7 @@ namespace Lux
 		class LUX_CORE_API TCPConnector
 		{
 		public:
-			TCPConnector() {}
+			TCPConnector() : m_socket(0) {}
 			~TCPConnector();
 
 			TCPStream* connect(const char* ip, uint16_t port);

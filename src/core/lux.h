@@ -49,20 +49,12 @@
 #define LUX_GUI_API __declspec(dllimport)
 #endif
 
-
 #define LUX_FINAL final
 #define LUX_OVERRIDE override
 #define LUX_ABSTRACT abstract
 
-#define LUX_NEW(T) new T
-#define LUX_NEW_ARRAY(T, count) new T[count]
-#define LUX_DELETE(ptr) delete (ptr);
-#define LUX_DELETE_ARRAY(ptr) delete[] (ptr)
-#define LUX_MALLOC(size) malloc(size)
-#define LUX_FREE(ptr) free(ptr)
-#define LUX_REALLOC(ptr, size) realloc(ptr, size)
-#define LUX_MALLOC_ALIGNED(size, alignment) _aligned_malloc(size, alignment)
-#define LUX_FREE_ALIGNED(ptr) _aligned_free(ptr)
+#include "core/new.h"
+#include "core/new_macros.h"
 
 #define USE_CPP11
 

@@ -81,6 +81,7 @@
     <ClCompile Include="..\..\src\editor\server_message_types.cpp">
       <Filter>editor</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\new.cpp" />
     <ClCompile Include="..\..\src\graphics\pipeline.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
