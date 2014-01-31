@@ -95,6 +95,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\core\new.cpp" />
     <ClCompile Include="..\..\src\physics\physics_scene.cpp" />
     <ClCompile Include="..\..\src\physics\physics_system.cpp" />
   </ItemGroup>
