@@ -150,6 +150,7 @@ struct App
 
 	void destroy()
 	{
+		m_client.destroy();
 		m_server.destroy();
 	    SDL_Quit();
 	}

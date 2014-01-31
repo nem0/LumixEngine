@@ -8,6 +8,7 @@
 #include "core/input_system.h"
 #include "core/log.h"
 #include "core/memory_file_device.h"
+#include "core/timer.h"
 #include "engine/plugin_manager.h"
 #include "graphics/renderer.h"
 #include "script/script_system.h"
@@ -32,6 +33,10 @@ namespace Lux
 		ScriptSystem m_script_system;
 		InputSystem m_input_system;
 		Engine& m_owner;
+		Timer* m_timer;
+		Timer* m_fps_timer;
+		int	m_fps_frame;
+		float m_fps;
 	};
 
 
@@ -44,6 +49,9 @@ namespace Lux
 
 	bool EngineImpl::create(int w, int h, const char* base_path, Engine& owner)
 	{
+		m_timer = Timer::create();
+		m_fps_timer = Timer::create();
+		m_fps_frame = 0;
 		m_universe = 0;
 		m_base_path = base_path;
 
@@ -180,10 +188,13 @@ namespace Lux
 
 	void Engine::update()
 	{
-		static long last_tick = GetTickCount();
-		long tick = GetTickCount();
-		float dt = (tick - last_tick) / 1000.0f;
-		last_tick = tick;
+		++m_impl->m_fps_frame;
+		if(m_impl->m_fps_frame == 30)
+		{
+			m_impl->m_fps = 30.0f / m_impl->m_fps_timer->tick();
+			m_impl->m_fps_frame = 0;
+		}
+		float dt = m_impl->m_timer->tick();
 		m_impl->m_script_system.update(dt);
 		m_impl->m_plugin_manager.update(dt);
 		m_impl->m_input_system.update(dt);
@@ -218,6 +229,12 @@ namespace Lux
 	Universe* Engine::getUniverse() const
 	{
 		return m_impl->m_universe;
+	}
+
+
+	float Engine::getFPS() const
+	{
+		return m_impl->m_fps;
 	}
 
 

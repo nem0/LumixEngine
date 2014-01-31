@@ -54,6 +54,10 @@
     <ClCompile Include="..\..\src\core\pc\task.cpp">
       <Filter>MT</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\memory_tracker.cpp" />
+    <ClCompile Include="..\..\src\core\new.cpp" />
+    <ClCompile Include="..\..\src\core\new_macros.cpp" />
+    <ClCompile Include="..\..\src\core\timer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\crc32.h" />
@@ -142,6 +146,10 @@
     <ClInclude Include="..\..\src\core\stack_allocator.h" />
     <ClInclude Include="..\..\src\core\hash_map.h" />
     <ClInclude Include="..\..\src\core\pod_hash_map.h" />
+    <ClInclude Include="..\..\src\core\memory_tracker.h" />
+    <ClInclude Include="..\..\src\core\new.h" />
+    <ClInclude Include="..\..\src\core\new_macros.h" />
+    <ClInclude Include="..\..\src\core\timer.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="FS">

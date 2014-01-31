@@ -136,7 +136,7 @@ namespace UI
 			size_t buffer_size = file->size();
 			char* buffer = LUX_NEW_ARRAY(char, buffer_size);
 			file->read(buffer, buffer_size);			
-			
+			m_fs->close(file);
 
 			TGAHeader header;
 			memcpy(&header, buffer, sizeof(TGAHeader));
@@ -206,7 +206,7 @@ namespace UI
 		}
 		else
 		{
-			file->close();
+			m_fs->close(file);
 		}
 	}
 
