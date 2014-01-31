@@ -110,6 +110,7 @@
     <ClCompile Include="..\..\src\core\quat.cpp" />
     <ClCompile Include="..\..\src\core\tcp_file_server.cpp" />
     <ClCompile Include="..\..\src\core\tcp_file_device.cpp" />
+    <ClCompile Include="..\..\src\core\timer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\atomic.h" />
@@ -156,6 +157,7 @@
     <ClInclude Include="..\..\src\core\tcp_file_server.h" />
     <ClInclude Include="..\..\src\core\tcp_file_device.h" />
     <ClInclude Include="..\..\src\core\tcp_stream.h" />
+    <ClInclude Include="..\..\src\core\timer.h" />
     <ClInclude Include="..\..\src\core\transaction_queue.h" />
     <ClInclude Include="..\..\src\core\vec3.h" />
   </ItemGroup>

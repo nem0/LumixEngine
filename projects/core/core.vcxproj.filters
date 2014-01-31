@@ -54,6 +54,7 @@
     <ClCompile Include="..\..\src\core\pc\task.cpp">
       <Filter>MT</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\timer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\crc32.h" />
@@ -142,6 +143,7 @@
     <ClInclude Include="..\..\src\core\stack_allocator.h" />
     <ClInclude Include="..\..\src\core\hash_map.h" />
     <ClInclude Include="..\..\src\core\pod_hash_map.h" />
+    <ClInclude Include="..\..\src\core\timer.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="FS">
