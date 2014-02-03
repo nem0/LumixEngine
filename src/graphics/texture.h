@@ -1,12 +1,16 @@
 #pragma once
 
 
-namespace Lux
-{
-
-
 #include <Windows.h>
 #include <gl/GL.h>
+
+
+namespace Lux
+{
+namespace FS
+{
+	class FileSystem;
+}
 
 
 class Texture
@@ -16,8 +20,11 @@ class Texture
 		~Texture();
 
 		bool create(int w, int h);
-		bool load(const char* path);
+		bool load(const char* path, FS::FileSystem& file_system);
 		void apply(int unit = 0);
+
+	private:
+		void loaded(FS::IFile* file, bool success);
 
 	private:
 		GLuint m_id;
