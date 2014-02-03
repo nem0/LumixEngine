@@ -10,9 +10,11 @@
 #include "engine/engine.h"
 #include "graphics/gl_ext.h"
 #include "graphics/irender_device.h"
+#include "graphics/material.h"
 #include "graphics/model.h"
 #include "graphics/model_instance.h"
 #include "graphics/pipeline.h"
+#include "graphics/texture.h"
 #include "universe/universe.h"
 
 
@@ -141,7 +143,7 @@ struct RendererImpl : public Renderer
 	{
 		LUX_DELETE(m_renderables[cmp.index].m_model);
 		Renderable& r = m_renderables[cmp.index];
-		Model* model = LUX_NEW(Model);
+		Model* model = LUX_NEW(Model)(*this);
 		model->load(path.c_str(), m_engine->getFileSystem());
 		r.m_model = LUX_NEW(ModelInstance)(*model);
 	}
@@ -179,6 +181,24 @@ struct RendererImpl : public Renderer
 			}
 		}
 		return NULL;
+	}
+
+
+	virtual Material* loadMaterial(const char* path) LUX_OVERRIDE
+	{
+		/// TODO material manager
+		Material* material = LUX_NEW(Material)(*this);
+		material->load(path, m_engine->getFileSystem());
+		return material;
+	}
+
+
+	virtual Texture* loadTexture(const char* path) LUX_OVERRIDE
+	{
+		/// TODO texture manager
+		Texture* texture = LUX_NEW(Texture);
+		texture->load(path, m_engine->getFileSystem());
+		return texture;
 	}
 
 

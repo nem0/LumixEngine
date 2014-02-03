@@ -16,6 +16,8 @@ class Geometry;
 class Material;
 class Model;
 class Pose;
+class Renderer;
+
 namespace FS
 {
 	class FileSystem;
@@ -59,7 +61,7 @@ class Model
 		};
 
 	public:
-		Model() { m_geometry = NULL; }
+		Model(Renderer& renderer) : m_renderer(renderer) { m_geometry = NULL; }
 		~Model();
 
 		void load(const char* path, FS::FileSystem& file_system);
@@ -77,6 +79,7 @@ class Model
 		Geometry* m_geometry;
 		PODArray<Mesh> m_meshes;
 		Array<Bone> m_bones;
+		Renderer& m_renderer;
 };
 
 

@@ -12,6 +12,7 @@ namespace FS
 	class IFile;
 }
 
+class Renderer;
 class Shader;
 class Texture;
 
@@ -19,6 +20,8 @@ class Texture;
 class Material
 {
 	public:
+		Material(Renderer& renderer) : m_renderer(renderer) {}
+
 		void load(const char* path, FS::FileSystem& file_system);
 		void apply();
 		void setShader(Shader* shader) { m_shader = shader; }
@@ -31,6 +34,7 @@ class Material
 	private:
 		Shader*	m_shader;
 		PODArray<Texture*> m_textures;
+		Renderer& m_renderer;
 };
 
 

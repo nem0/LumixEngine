@@ -6,6 +6,7 @@
 #include "graphics/geometry.h"
 #include "graphics/material.h"
 #include "graphics/pose.h"
+#include "graphics/renderer.h"
 /*#include "graphics/vertex_buffer.h"
 #include "graphics/material.h"
 #include "common/manager.h"
@@ -73,11 +74,14 @@ void Model::loaded(FS::IFile* file, bool success)
 
 		int str_size;
 		file->read(&str_size, sizeof(str_size));
-		char path[MAX_PATH];
-		file->read(path, str_size);
-		path[str_size] = 0;
-		/// TODO material
-		//mesh.setMaterial(path);
+		char material_name[MAX_PATH];
+		file->read(material_name, str_size);
+		material_name[str_size] = 0;
+		char material_path[MAX_PATH];
+		strcpy(material_path, "materials/");
+		strcat(material_path, material_name);
+		strcat(material_path, ".mat");
+		mesh.setMaterial(m_renderer.loadMaterial(material_path));
 		m_meshes.push(mesh);
 		for(int i = 0; i < m_bones.size(); ++i)
 		{
