@@ -75,10 +75,14 @@ struct RendererImpl : public Renderer
 		loadGLExtensions();
 		
 		Lux::FS::ReadCallback cb;
+
+		/// TODO remove
 		Pipeline* pipeline = Pipeline::create(*this);
 		m_pipelines.push(pipeline);
 		pipeline->load("pipelines/main.json", engine.getFileSystem());
-		
+
+		glEnable(GL_DEPTH_TEST);
+
 		return true;
 	}
 
