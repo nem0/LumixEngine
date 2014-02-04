@@ -14,6 +14,7 @@
 #include "graphics/model.h"
 #include "graphics/model_instance.h"
 #include "graphics/pipeline.h"
+#include "graphics/shader.h"
 #include "graphics/texture.h"
 #include "universe/universe.h"
 
@@ -203,6 +204,15 @@ struct RendererImpl : public Renderer
 		Texture* texture = LUX_NEW(Texture);
 		texture->load(path, m_engine->getFileSystem());
 		return texture;
+	}
+
+
+	virtual Shader* loadShader(const char* path) LUX_OVERRIDE
+	{
+		/// TODO shader manager
+		Shader* shader = LUX_NEW(Shader);
+		shader->load(path, m_engine->getFileSystem());
+		return shader;
 	}
 
 

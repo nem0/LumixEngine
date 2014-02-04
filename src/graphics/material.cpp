@@ -11,13 +11,23 @@ namespace Lux
 {
 
 
+Material::Material(Renderer& renderer)
+	: m_renderer(renderer)
+{
+	m_is_ready = false;
+}
+
+
 void Material::apply()
 {
 	/// TODO shader
-	//m_shader->apply();
-	for(int i = 0, c = m_textures.size(); i < c; ++i)
+	if(m_is_ready)
 	{
-		m_textures[i]->apply(i);
+		m_shader->apply();
+		for(int i = 0, c = m_textures.size(); i < c; ++i)
+		{
+			m_textures[i]->apply(i);
+		}
 	}
 }
 
@@ -35,10 +45,14 @@ void Material::loaded(FS::IFile* file, bool success)
 	if(success)
 	{
 		JsonSerializer serializer(*file, JsonSerializer::READ);
-		char texture_path[MAX_PATH];
-		serializer.deserialize("texture", texture_path, MAX_PATH);
-		m_textures.push(m_renderer.loadTexture(texture_path));
+		char path[MAX_PATH];
+		serializer.deserialize("texture", path, MAX_PATH);
+		m_textures.push(m_renderer.loadTexture(path));
+		
+		serializer.deserialize("shader", path, MAX_PATH);
+		m_shader = m_renderer.loadShader(path);
 		//m_textures.push_back(res_manager.texture_manager->load(texture_path));
+		m_is_ready = true;
 	}
 	/// TODO close file somehow
 }

@@ -20,7 +20,7 @@ class Texture;
 class Material
 {
 	public:
-		Material(Renderer& renderer) : m_renderer(renderer) {}
+		Material(Renderer& renderer);
 
 		void load(const char* path, FS::FileSystem& file_system);
 		void apply();
@@ -35,6 +35,7 @@ class Material
 		Shader*	m_shader;
 		PODArray<Texture*> m_textures;
 		Renderer& m_renderer;
+		bool m_is_ready;
 };
 
 
