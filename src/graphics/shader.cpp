@@ -1,21 +1,49 @@
 #include "graphics/shader.h"
+#include "core/file_system.h"
+#include "core/ifile.h"
 #include "core/matrix.h"
 #include "core/vec3.h"
 #include "graphics/gl_ext.h"
-#include <cstdio>
 
 namespace Lux
 {
 
 
-Shader::Shader(const char* vertex, const char* fragment)
+Shader::Shader()
 {
 	m_program_id = glCreateProgram();
-	m_vertex_id = attach(GL_VERTEX_SHADER, vertex);
-	m_fragment_id = attach(GL_FRAGMENT_SHADER, fragment);
-	glLinkProgram(m_program_id);
-	m_vertex_attributes_ids[0] = glGetAttribLocation(m_program_id, "bone_weights");
-	m_vertex_attributes_ids[1] = glGetAttribLocation(m_program_id, "bone_indices");
+}
+
+
+void Shader::load(const char* path, FS::FileSystem& file_system)
+{
+	FS::ReadCallback cb;
+	cb.bind<Shader, &Shader::loaded>(this);
+	file_system.openAsync(file_system.getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, cb);
+}
+
+
+void Shader::loaded(FS::IFile* file, bool success)
+{
+	if(success)
+	{
+		size_t size = file->size();
+		char* buf = LUX_NEW_ARRAY(char, size);
+		file->read(buf, size);
+		
+		char* end = strstr(buf, "//~VS");		
+		ASSERT(end);
+		int vs_len = end - buf;
+		buf[vs_len-1] = 0;
+		m_vertex_id = attach(GL_VERTEX_SHADER, buf, vs_len);
+		m_fragment_id = attach(GL_FRAGMENT_SHADER, buf + vs_len, size - vs_len);
+		glLinkProgram(m_program_id);
+		m_vertex_attributes_ids[0] = glGetAttribLocation(m_program_id, "bone_weights");
+		m_vertex_attributes_ids[1] = glGetAttribLocation(m_program_id, "bone_indices");
+
+		LUX_DELETE_ARRAY(buf);
+	}
+	/// TODO close file somehow
 }
 
 
@@ -27,21 +55,12 @@ Shader::~Shader()
 }
 
 
-GLuint Shader::attach(GLenum type, const char* shader)
+GLuint Shader::attach(GLenum type, const char* src, int length)
 {
 	GLuint id = glCreateShader(type);
-	FILE* fp = 0;
-	fopen_s(&fp, shader, "rb");
-	fseek(fp, 0, SEEK_END);
-	GLint length = ftell(fp);
-	GLchar* src = LUX_NEW_ARRAY(GLchar, length+1);
-	fseek(fp, 0, SEEK_SET);
-	fread(src, 1, length, fp);
-	src[length] = 0;
 	glShaderSource(id, 1, (const GLchar**)&src, &length);
 	glCompileShader(id);
 	glAttachShader(m_program_id, id);
-	LUX_DELETE_ARRAY(src);
 	return id;
 }
 

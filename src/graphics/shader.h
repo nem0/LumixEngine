@@ -5,7 +5,11 @@
 
 namespace Lux
 {
-
+namespace FS
+{
+	class FileSystem;
+	class IFile;
+}
 
 struct Vec3;
 struct Matrix;
@@ -13,7 +17,7 @@ struct Matrix;
 class Shader
 {
 	public:
-		Shader(const char* vertex, const char* fragment);
+		Shader();
 		~Shader();
 
 		void apply();
@@ -24,9 +28,11 @@ class Shader
 		void setUniform(const char* name, const Matrix* matrices, int count);
 		void applyVertexAttributes();
 		void disableVertexAttributes();
+		void load(const char* path, FS::FileSystem& file_system);
 	
 	private:
-		GLuint attach(GLenum type, const char* shader);
+		GLuint attach(GLenum type, const char* src, int length);
+		void loaded(FS::IFile* file, bool success);
 
 	private:
 		enum 

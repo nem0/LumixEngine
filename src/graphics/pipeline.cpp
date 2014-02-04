@@ -104,13 +104,6 @@ struct PipelineImpl : public Pipeline
 		{
 			case Command::CLEAR:
 				glClear(command.m_uint);
-				glDisable(GL_CULL_FACE);
-				glBegin(GL_TRIANGLES);
-					glColor3f(1, 1, 1);
-					glVertex3f(0, 0, 5);
-					glVertex3f(1, 0, 5);
-					glVertex3f(1, 1, 5);
-				glEnd();
 				break;
 			case Command::RENDER_MODELS:
 				renderModels();
@@ -137,6 +130,18 @@ struct PipelineImpl : public Pipeline
 				Mesh& mesh = infos[i].m_model_instance->getModel().getMesh(j);
 				mesh.getMaterial()->apply();
 				geom->draw(mesh.getStart(), mesh.getCount());
+				/*
+				glDisable(GL_CULL_FACE);
+				glBegin(GL_QUADS);
+					glTexCoord2f(0, 0);
+					glVertex3f(0, 0, 1);
+					glTexCoord2f(0, 1);
+					glVertex3f(0, 1, 1);
+					glTexCoord2f(1, 1);
+					glVertex3f(1, 1, 1);
+					glTexCoord2f(1, 0);
+					glVertex3f(1, 0, 1);
+				glEnd();*/
 			}
 		}
 		glPopMatrix();
