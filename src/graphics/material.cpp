@@ -20,7 +20,6 @@ Material::Material(Renderer& renderer)
 
 void Material::apply()
 {
-	/// TODO shader
 	if(m_is_ready)
 	{
 		m_shader->apply();
@@ -51,7 +50,6 @@ void Material::loaded(FS::IFile* file, bool success)
 		
 		serializer.deserialize("shader", path, MAX_PATH);
 		m_shader = m_renderer.loadShader(path);
-		//m_textures.push_back(res_manager.texture_manager->load(texture_path));
 		m_is_ready = true;
 	}
 	/// TODO close file somehow

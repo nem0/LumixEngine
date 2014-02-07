@@ -38,6 +38,7 @@ struct PipelineImpl : public Pipeline
 	{
 	}
 
+
 	virtual void render() LUX_OVERRIDE
 	{
 		for(int i = 0; i < m_commands.size(); ++i)
@@ -130,18 +131,6 @@ struct PipelineImpl : public Pipeline
 				Mesh& mesh = infos[i].m_model_instance->getModel().getMesh(j);
 				mesh.getMaterial()->apply();
 				geom->draw(mesh.getStart(), mesh.getCount());
-				/*
-				glDisable(GL_CULL_FACE);
-				glBegin(GL_QUADS);
-					glTexCoord2f(0, 0);
-					glVertex3f(0, 0, 1);
-					glTexCoord2f(0, 1);
-					glVertex3f(0, 1, 1);
-					glTexCoord2f(1, 1);
-					glVertex3f(1, 1, 1);
-					glTexCoord2f(1, 0);
-					glVertex3f(1, 0, 1);
-				glEnd();*/
 			}
 		}
 		glPopMatrix();

@@ -1,6 +1,7 @@
 #pragma once
 #include <Windows.h>
 #include <gl/GL.h>
+#include "core/lux.h"
 
 
 namespace Lux
@@ -14,7 +15,7 @@ namespace FS
 struct Vec3;
 struct Matrix;
 
-class Shader
+class LUX_ENGINE_API Shader
 {
 	public:
 		Shader();

@@ -10,10 +10,12 @@ namespace Lux
 {
 
 
+class IRenderDevice;
 class Material;
 class ModelInstance;
 class Shader;
 class Texture;
+class Universe;
 
 
 struct RenderableInfo
@@ -28,11 +30,13 @@ class LUX_ENGINE_API Renderer : public IPlugin
 		static Renderer* createInstance();
 		static void destroyInstance(Renderer& renderer);
 
-		virtual void render(class IRenderDevice& device) = 0;
+		virtual void render(IRenderDevice& device) = 0;
+		virtual void setUniverse(Universe* universe) = 0;
 
 		virtual void setCameraActive(Component cmp, const bool& active) = 0;
 		virtual void getCameraActive(Component cmp, bool& active) = 0;
 		virtual void setCameraPipeline(Component cmp, const string& pipeline) = 0;
+		virtual void getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) = 0;
 
 		virtual void setRenderablePath(Component cmp, const string& path) = 0;
 		virtual void getRenderableInfos(PODArray<RenderableInfo>& infos) = 0;
