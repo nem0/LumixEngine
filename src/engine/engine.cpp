@@ -145,17 +145,15 @@ namespace Lux
 		m_impl->m_plugin_manager.onCreateUniverse(*m_impl->m_universe);
 		m_impl->m_script_system.setUniverse(m_impl->m_universe);
 		m_impl->m_universe->create();
-		//m_impl->m_renderer.setUniverse(m_impl->m_universe);
-		//ASSERT(false);
+		m_impl->m_renderer->setUniverse(m_impl->m_universe);
 			
 		return m_impl->m_universe;
 	}
 
 	void Engine::destroyUniverse()
 	{
-		//m_impl->m_renderer.setUniverse(0);
-		ASSERT(false);
-		m_impl->m_script_system.setUniverse(0);
+		m_impl->m_renderer->setUniverse(NULL);
+		m_impl->m_script_system.setUniverse(NULL);
 		m_impl->m_plugin_manager.onDestroyUniverse(*m_impl->m_universe);
 		m_impl->m_universe->destroy();
 		LUX_DELETE(m_impl->m_universe);

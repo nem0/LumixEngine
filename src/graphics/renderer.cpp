@@ -6,7 +6,9 @@
 #include "core/crc32.h"
 #include "core/file_system.h"
 #include "core/json_serializer.h"
+#include "core/math_utils.h"
 #include "core/pod_array.h"
+#include "core/vec4.h"
 #include "engine/engine.h"
 #include "graphics/gl_ext.h"
 #include "graphics/irender_device.h"
@@ -16,6 +18,7 @@
 #include "graphics/pipeline.h"
 #include "graphics/shader.h"
 #include "graphics/texture.h"
+#include "universe/component_event.h"
 #include "universe/universe.h"
 
 
@@ -35,6 +38,10 @@ struct Camera
 	Pipeline* m_pipeline;
 	Entity m_entity;
 	bool m_is_active;
+	float m_fov;
+	float m_aspect;
+	float m_near;
+	float m_far;
 };
 
 
@@ -47,7 +54,7 @@ struct RendererImpl : public Renderer
 		camera->m_entity.getMatrix(mtx);
 		glMatrixMode(GL_PROJECTION);
 		glLoadIdentity();
-		gluPerspective(90, 1, 0.1f, 100.0f);
+		gluPerspective(camera->m_fov, camera->m_aspect, camera->m_near, camera->m_far);
 
 		glMatrixMode(GL_MODELVIEW);
 		glLoadIdentity();
@@ -60,13 +67,32 @@ struct RendererImpl : public Renderer
 
 	virtual void render(IRenderDevice& device) LUX_OVERRIDE
 	{
+		// init
+		glEnable(GL_DEPTH_TEST);
+		
+		// render
 		for(int i = 0; i < m_active_cameras.size(); ++i)
 		{
 			Camera* camera = m_active_cameras[i];
 			applyCamera(camera);
 			camera->m_pipeline->render();
 		}
-		device.endFrame();
+
+		// cleanup
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glUseProgram(0);
+		for(int i = 0; i < 16; ++i)
+		{
+			glActiveTexture(GL_TEXTURE0 + i);
+			glDisable(GL_TEXTURE_2D);
+		}
+		glActiveTexture(GL_TEXTURE0); 
+	}
+
+
+	virtual void setUniverse(Universe* universe) LUX_OVERRIDE
+	{
+		m_universe = universe;
 	}
 
 
@@ -75,15 +101,6 @@ struct RendererImpl : public Renderer
 		m_engine = &engine;
 		loadGLExtensions();
 		
-		Lux::FS::ReadCallback cb;
-
-		/// TODO remove
-		Pipeline* pipeline = Pipeline::create(*this);
-		m_pipelines.push(pipeline);
-		pipeline->load("pipelines/main.json", engine.getFileSystem());
-
-		glEnable(GL_DEPTH_TEST);
-
 		return true;
 	}
 
@@ -106,7 +123,13 @@ struct RendererImpl : public Renderer
 			Camera* camera = LUX_NEW(Camera);
 			camera->m_is_active = false;
 			camera->m_entity = entity;
+			camera->m_fov = 90;
+			camera->m_aspect = 800.0f / 600.0f;
+			camera->m_near = 0.1f;
+			camera->m_far = 100.0f;
 			m_cameras.push(camera);
+			Component cmp(entity, type, this, m_cameras.size() - 1);
+			m_universe->getEventManager()->emitEvent(ComponentEvent(cmp));
 			return Component(entity, type, this, m_cameras.size() - 1);
 		}
 		else if(type == crc32("renderable"))
@@ -114,6 +137,8 @@ struct RendererImpl : public Renderer
 			Renderable& r = m_renderables.pushEmpty();
 			r.m_entity = entity;
 			r.m_model = NULL;
+			Component cmp(entity, type, this, m_renderables.size() - 1);
+			m_universe->getEventManager()->emitEvent(ComponentEvent(cmp));
 			return Component(entity, type, this, m_renderables.size() - 1);
 		}
 		return Component::INVALID;
@@ -170,6 +195,45 @@ struct RendererImpl : public Renderer
 	}
 
 
+	virtual void getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) LUX_OVERRIDE
+	{
+		Vec3 camera_pos = m_cameras[camera.index]->m_entity.getPosition();
+		float nx = 2 * x - 1;
+		float ny = 2 * y - 1;
+		Matrix projection_matrix = getProjectionMatrix(camera);
+		Matrix view_matrix = m_cameras[camera.index]->m_entity.getMatrix();
+
+		Matrix inverted = (projection_matrix * view_matrix);
+		inverted.inverse();
+		Vec4 p0 = inverted * Vec4(nx, ny, -1, 1);
+		Vec4 p1 = inverted * Vec4(nx, ny, 1, 1);
+		p0.x /= p0.w; p0.y /= p0.w; p0.z /= p0.w;
+		p1.x /= p1.w; p1.y /= p1.w; p1.z /= p1.w;
+
+		origin = camera_pos;
+		dir.x = p1.x - p0.x;
+		dir.y = p1.y - p0.y;
+		dir.z = p1.z - p0.z;
+	}
+
+
+	Matrix getProjectionMatrix(Component cmp)
+	{
+		const Camera* camera = m_cameras[cmp.index];
+		Matrix mtx;
+		mtx = Matrix::IDENTITY;
+		float f = 1 / tanf(Math::degreesToRadians(camera->m_fov) * 0.5f);
+		mtx.m11 = f / camera->m_aspect;
+		mtx.m22 = f;
+		mtx.m33 = (camera->m_far + camera->m_near) / (camera->m_near - camera->m_far);
+		mtx.m44 = 0;
+		mtx.m43 = (2 * camera->m_far * camera->m_near) / (camera->m_near - camera->m_far);
+		mtx.m34 = -1;
+
+		return mtx;
+	}
+
+
 	virtual void getCameraActive(Component cmp, bool& active) LUX_OVERRIDE
 	{
 		active = m_cameras[cmp.index]->m_is_active;
@@ -185,7 +249,10 @@ struct RendererImpl : public Renderer
 				return m_pipelines[i];
 			}
 		}
-		return NULL;
+		Pipeline* pipeline = Pipeline::create(*this);
+		m_pipelines.push(pipeline);
+		pipeline->load(path, m_engine->getFileSystem());
+		return pipeline;
 	}
 
 
@@ -222,6 +289,7 @@ struct RendererImpl : public Renderer
 	PODArray<Pipeline*> m_pipelines;
 	Array<Renderable> m_renderables;
 	PODArray<Model*> m_models;
+	Universe* m_universe;
 };
 
 

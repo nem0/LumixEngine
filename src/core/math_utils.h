@@ -17,6 +17,8 @@ namespace Lux
 {
 	namespace Math
 	{
+		static const float PI = 3.14159265f;
+
 		LUX_CORE_API Vec3 getRayPlaneIntersecion(const Vec3& origin, const Vec3& dir, const Vec3& plane_point, const Vec3& normal);
 
 		template <typename T>
@@ -47,6 +49,11 @@ namespace Lux
 		bool isPowOfTwo(T n) 
 		{ 
 			return (n) && !(n & (n - 1));
+		}
+
+		inline float degreesToRadians(float angle)
+		{
+			 return angle * PI / 180.0f;
 		}
 	}
 }

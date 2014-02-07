@@ -8,6 +8,7 @@
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
 #include "graphics/renderer.h"
+#include "graphics/shader.h"
 #include "gui/gui.h"
 #include "gui/opengl_renderer.h"
 
@@ -146,6 +147,7 @@ struct App
 		SDLRenderDevice device(m_display_window);
 		m_server.getEngine().getRenderer().render(device);
 		m_gui->render();
+		device.endFrame();
 	}
 
 	void destroy()

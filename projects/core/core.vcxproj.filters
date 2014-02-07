@@ -150,6 +150,7 @@
     <ClInclude Include="..\..\src\core\new.h" />
     <ClInclude Include="..\..\src\core\new_macros.h" />
     <ClInclude Include="..\..\src\core\timer.h" />
+    <ClInclude Include="..\..\src\core\vec4.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="FS">
