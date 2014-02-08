@@ -20,6 +20,7 @@ namespace Lux
 		static const float PI = 3.14159265f;
 
 		LUX_CORE_API Vec3 getRayPlaneIntersecion(const Vec3& origin, const Vec3& dir, const Vec3& plane_point, const Vec3& normal);
+		LUX_CORE_API bool getRaySphereIntersection(const Vec3& point, float radius, const Vec3& origin, const Vec3& dir, Vec3& out);
 
 		template <typename T>
 		LUX_FORCE_INLINE T min(T a, T b)
@@ -55,5 +56,6 @@ namespace Lux
 		{
 			 return angle * PI / 180.0f;
 		}
+
 	}
 }

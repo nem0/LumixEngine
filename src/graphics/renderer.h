@@ -24,6 +24,11 @@ struct RenderableInfo
 };
 
 
+struct RayCastHit
+{
+};
+
+
 class LUX_ENGINE_API Renderer : public IPlugin 
 {
 	public:
@@ -37,6 +42,7 @@ class LUX_ENGINE_API Renderer : public IPlugin
 		virtual void getCameraActive(Component cmp, bool& active) = 0;
 		virtual void setCameraPipeline(Component cmp, const string& pipeline) = 0;
 		virtual void getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) = 0;
+		virtual RayCastHit castRay(const Vec3& origin, const Vec3& dir) = 0;
 
 		virtual void setRenderablePath(Component cmp, const string& path) = 0;
 		virtual void getRenderableInfos(PODArray<RenderableInfo>& infos) = 0;

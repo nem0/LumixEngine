@@ -33,6 +33,13 @@ void Model::load(const char* path, FS::FileSystem& file_system)
 }
 
 
+float Model::getBoundingRadius() const
+{
+	//ASSERT(false);
+	return 1;
+}
+
+
 void Model::loaded(FS::IFile* file, bool success)
 {
 	if(success)
