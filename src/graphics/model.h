@@ -71,6 +71,7 @@ class Model
 		int	getBoneCount() const  { return m_bones.size(); }
 		Bone& getBone(int i) { return m_bones[i]; }
 		void getPose(Pose& pose);
+		float getBoundingRadius() const;
 
 	private:
 		void loaded(FS::IFile* file, bool success);

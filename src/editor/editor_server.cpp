@@ -1162,7 +1162,7 @@ void EditorServerImpl::createUniverse(bool create_scene, const char* base_path)
 	Universe* universe = m_engine.createUniverse();
 
 	m_camera = m_engine.getUniverse()->createEntity();
-	m_camera.setPosition(0, 0, 5);
+	m_camera.setPosition(0, 0, -5);
 	m_camera.setRotation(Quat(Vec3(0, 1, 0), -3.14159265f));
 	Component cmp = m_engine.getRenderer().createComponent(crc32("camera"), m_camera);
 	m_engine.getRenderer().setCameraPipeline(cmp, string("pipelines/main.json"));

@@ -59,9 +59,15 @@ struct RendererImpl : public Renderer
 		glMatrixMode(GL_MODELVIEW);
 		glLoadIdentity();
 		Vec3 pos = mtx.getTranslation();
-		Vec3 center = pos + mtx.getZVector();
+		Vec3 center = pos - mtx.getZVector();
 		Vec3 up = mtx.getYVector();
 		gluLookAt(pos.x, pos.y, pos.z, center.x, center.y, center.z, up.x, up.y, up.z);
+
+		ASSERT(false); /// TODO
+		Vec3 o, d;
+		getRay(Component(camera->m_entity, crc32("camera"), this, 0), 0.5f, 0.5f, o, d);
+		d.normalize();
+		castRay(o, d);
 	}
 
 
@@ -195,6 +201,23 @@ struct RendererImpl : public Renderer
 	}
 
 
+	virtual RayCastHit castRay(const Vec3& origin, const Vec3& dir) LUX_OVERRIDE
+	{
+		for(int i = 0; i < m_renderables.size(); ++i)
+		{
+			const Vec3& pos = m_renderables[i].m_entity.getPosition();
+			float radius = m_renderables[i].m_model->getModel().getBoundingRadius();
+			Vec3 intersection;
+			if(Math::getRaySphereIntersection(pos, radius, origin, dir, intersection))
+			{
+				ASSERT(false);
+				/// TODO
+			}
+		}
+		return RayCastHit();
+	}
+
+
 	virtual void getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) LUX_OVERRIDE
 	{
 		Vec3 camera_pos = m_cameras[camera.index]->m_entity.getPosition();
@@ -202,14 +225,24 @@ struct RendererImpl : public Renderer
 		float ny = 2 * y - 1;
 		Matrix projection_matrix = getProjectionMatrix(camera);
 		Matrix view_matrix = m_cameras[camera.index]->m_entity.getMatrix();
-
 		Matrix inverted = (projection_matrix * view_matrix);
+		float pp[16];
+		glGetFloatv(GL_PROJECTION_MATRIX, pp);
 		inverted.inverse();
 		Vec4 p0 = inverted * Vec4(nx, ny, -1, 1);
 		Vec4 p1 = inverted * Vec4(nx, ny, 1, 1);
 		p0.x /= p0.w; p0.y /= p0.w; p0.z /= p0.w;
 		p1.x /= p1.w; p1.y /= p1.w; p1.z /= p1.w;
-
+		double d[3];
+		int v[] = {0, 0, 800, 600};
+		double m[16];
+		double p[16];view_matrix.inverse();
+		for(int i = 0; i < 16; ++i)
+		{
+			m[i] = (&view_matrix.m11)[i];
+			p[i] = (&projection_matrix.m11)[i];
+		}
+		gluUnProject(400, 300, 1, m, p, v, d, d+1, d+2);
 		origin = camera_pos;
 		dir.x = p1.x - p0.x;
 		dir.y = p1.y - p0.y;
