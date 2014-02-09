@@ -7,6 +7,7 @@
 #include "core/quat.h"
 #include "core/string.h"
 #include "core/vec3.h"
+#include "graphics/ray_cast_model_hit.h"
 
 
 namespace Lux
@@ -71,7 +72,8 @@ class Model
 		int	getBoneCount() const  { return m_bones.size(); }
 		Bone& getBone(int i) { return m_bones[i]; }
 		void getPose(Pose& pose);
-		float getBoundingRadius() const;
+		float getBoundingRadius() const { return m_bounding_radius; }
+		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform);
 
 	private:
 		void loaded(FS::IFile* file, bool success);
@@ -81,6 +83,7 @@ class Model
 		PODArray<Mesh> m_meshes;
 		Array<Bone> m_bones;
 		Renderer& m_renderer;
+		float m_bounding_radius;
 };
 
 

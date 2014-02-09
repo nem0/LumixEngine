@@ -42,6 +42,8 @@ struct Camera
 	float m_aspect;
 	float m_near;
 	float m_far;
+	float m_width;
+	float m_height;
 };
 
 
@@ -62,12 +64,6 @@ struct RendererImpl : public Renderer
 		Vec3 center = pos - mtx.getZVector();
 		Vec3 up = mtx.getYVector();
 		gluLookAt(pos.x, pos.y, pos.z, center.x, center.y, center.z, up.x, up.y, up.z);
-
-		ASSERT(false); /// TODO
-		Vec3 o, d;
-		getRay(Component(camera->m_entity, crc32("camera"), this, 0), 0.5f, 0.5f, o, d);
-		d.normalize();
-		castRay(o, d);
 	}
 
 
@@ -130,6 +126,8 @@ struct RendererImpl : public Renderer
 			camera->m_is_active = false;
 			camera->m_entity = entity;
 			camera->m_fov = 90;
+			camera->m_width = 800;
+			camera->m_height = 600;
 			camera->m_aspect = 800.0f / 600.0f;
 			camera->m_near = 0.1f;
 			camera->m_far = 100.0f;
@@ -175,6 +173,12 @@ struct RendererImpl : public Renderer
 	}
 
 
+	virtual Pose& getPose(Component cmp) 
+	{
+		return m_renderables[cmp.index].m_model->getPose();
+	}
+
+
 	virtual void setRenderablePath(Component cmp, const string& path) LUX_OVERRIDE
 	{
 		LUX_DELETE(m_renderables[cmp.index].m_model);
@@ -201,8 +205,10 @@ struct RendererImpl : public Renderer
 	}
 
 
-	virtual RayCastHit castRay(const Vec3& origin, const Vec3& dir) LUX_OVERRIDE
+	virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir) LUX_OVERRIDE
 	{
+		RayCastModelHit hit;
+		hit.m_is_hit = false;
 		for(int i = 0; i < m_renderables.size(); ++i)
 		{
 			const Vec3& pos = m_renderables[i].m_entity.getPosition();
@@ -210,19 +216,25 @@ struct RendererImpl : public Renderer
 			Vec3 intersection;
 			if(Math::getRaySphereIntersection(pos, radius, origin, dir, intersection))
 			{
-				ASSERT(false);
-				/// TODO
+				RayCastModelHit new_hit = m_renderables[i].m_model->getModel().castRay(origin, dir, m_renderables[i].m_entity.getMatrix());
+				new_hit.m_renderable = Component(m_renderables[i].m_entity, crc32("renderable"), this, i);
+				if(!hit.m_is_hit || new_hit.m_t < hit.m_t)
+				{
+					hit = new_hit;
+					hit.m_is_hit = true;
+				}
 			}
 		}
-		return RayCastHit();
+		return hit;
 	}
 
 
 	virtual void getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) LUX_OVERRIDE
 	{
+		Camera* cam = m_cameras[camera.index];
 		Vec3 camera_pos = m_cameras[camera.index]->m_entity.getPosition();
-		float nx = 2 * x - 1;
-		float ny = 2 * y - 1;
+		float nx = 2 * (x / cam->m_width) - 1;
+		float ny = 2 * (y / cam->m_height) - 1;
 		Matrix projection_matrix = getProjectionMatrix(camera);
 		Matrix view_matrix = m_cameras[camera.index]->m_entity.getMatrix();
 		Matrix inverted = (projection_matrix * view_matrix);
@@ -247,6 +259,7 @@ struct RendererImpl : public Renderer
 		dir.x = p1.x - p0.x;
 		dir.y = p1.y - p0.y;
 		dir.z = p1.z - p0.z;
+		dir.normalize();
 	}
 
 

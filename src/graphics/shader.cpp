@@ -71,22 +71,6 @@ void Shader::apply()
 }
 
 
-void Shader::applyVertexAttributes()
-{
-	glEnableVertexAttribArray(m_vertex_attributes_ids[0]);
-	glEnableVertexAttribArray(m_vertex_attributes_ids[1]);
-	glVertexAttribPointer(m_vertex_attributes_ids[0], 4, GL_FLOAT, GL_FALSE, 16 * sizeof(GLfloat), 0);
-	glVertexAttribPointer(m_vertex_attributes_ids[1], 4, GL_INT, GL_FALSE, 16 * sizeof(GLint), (GLvoid*)(4 * sizeof(GLfloat)));
-}
-
-
-void Shader::disableVertexAttributes()
-{
-	glDisableVertexAttribArray(m_vertex_attributes_ids[0]);
-	glDisableVertexAttribArray(m_vertex_attributes_ids[1]);
-}
-
-
 void Shader::setUniform(const char* name, int value)
 {
 	GLint loc = glGetUniformLocation(m_program_id, name);

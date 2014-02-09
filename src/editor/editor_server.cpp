@@ -158,7 +158,6 @@ struct EditorServerImpl
 		void onMessage(void* msgptr, int size);
 
 		const IPropertyDescriptor& getPropertyDescriptor(uint32_t type, uint32_t name_hash);
-		//H3DNode castRay(int x, int y, Vec3& hit_pos, char* name, int max_name_size, H3DNode gizmo_node);
 		void registerProperties();
 		void rotateCamera(int x, int y);
 		void onEvent(Event& evt);
@@ -314,7 +313,16 @@ void EditorServerImpl::onPointerDown(int x, int y, MouseButton::Value button)
 	}
 	else if(button == MouseButton::LEFT)
 	{
-	/*	Vec3 hit_pos;
+		Vec3 origin, dir;
+		m_engine.getRenderer().getRay(m_camera.getComponent(crc32("camera")), (float)x, (float)y, origin, dir); 
+		RayCastModelHit hit = m_engine.getRenderer().castRay(origin, dir);
+		if(hit.m_is_hit)
+		{
+			selectEntity(hit.m_renderable.entity);
+			m_mouse_mode = EditorServerImpl::MouseMode::TRANSFORM;
+			m_gizmo.startTransform(m_camera.getComponent(crc32("camera")), x, y, Gizmo::TransformMode::CAMERA_XZ);
+		}
+		/*Vec3 hit_pos;
 		char node_name[20];
 		H3DNode node = castRay(x, y, hit_pos, node_name, 20, m_gizmo.getNode());
 		Component r = m_engine.getRenderer().getRenderable(*m_engine.getUniverse(), node);
@@ -374,7 +382,7 @@ void EditorServerImpl::onPointerMove(int x, int y, int relx, int rely)
 				
 				Gizmo::TransformOperation tmode = GetKeyState(VK_MENU) & 0x8000 ? Gizmo::TransformOperation::ROTATE : Gizmo::TransformOperation::TRANSLATE;
 				int flags = GetKeyState(VK_LCONTROL) & 0x8000 ? Gizmo::Flags::FIXED_STEP : 0;
-				m_gizmo.transform(tmode, x, y, relx, rely, flags);
+				m_gizmo.transform(m_camera.getComponent(crc32("camera")), tmode, x, y, relx, rely, flags);
 			}
 			break;
 	}
@@ -760,8 +768,6 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 	EditorIcon::createResources(base_path);
 
 	createUniverse(true, base_path);
-	m_gizmo.create(base_path, m_engine.getRenderer());
-	m_gizmo.hide();
 	registerProperties();
 	//m_navigation.load("models/level2/level2.pda");
 	
@@ -912,8 +918,8 @@ void EditorServerImpl::navigate(float forward, float right, int fast)
 	float navigation_speed = (fast ? 0.4f : 0.1f);
 	Vec3 pos = m_camera.getPosition();
 	Quat rot = m_camera.getRotation();;
-	pos += rot * Vec3(0, 0, 1) * forward * navigation_speed;
-	pos += rot * Vec3(-1, 0, 0) * right * navigation_speed;
+	pos += rot * Vec3(0, 0, -1) * forward * navigation_speed;
+	pos += rot * Vec3(1, 0, 0) * right * navigation_speed;
 	m_camera.setPosition(pos);
 }
 
@@ -972,7 +978,7 @@ void EditorServerImpl::rotateCamera(int x, int y)
 	rot.normalize();
 	
 	Vec3 axis = rot * Vec3(1, 0, 0);
-	Quat pitch_rot(axis, y / 200.0f);
+	Quat pitch_rot(axis, -y / 200.0f);
 	rot = rot * pitch_rot;
 	rot.normalize();
 
@@ -982,50 +988,6 @@ void EditorServerImpl::rotateCamera(int x, int y)
 	camera_mtx.setTranslation(pos);
 	m_camera.setMatrix(camera_mtx);
 }
-
-/*
-H3DNode EditorServerImpl::castRay(int x, int y, Vec3& hit_pos, char* name, int max_name_size, H3DNode gizmo_node)
-{
-	Vec3 origin, dir;
-	m_engine.getRenderer().getRay(x, y, origin, dir);
-	
-	if(h3dCastRay(H3DRootNode, origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, 0) == 0)
-	{
-		return 0;
-	}
-	else
-	{
-		H3DNode node = 0;
-		int i = 0;
-		while(h3dGetCastRayResult(i, &node, 0, &hit_pos.x))
-		{
-			H3DNode original_node = node;
-			while(node && h3dGetNodeType(node) != H3DNodeTypes::Model)
-			{
-				node = h3dGetNodeParent(node);
-			}
-			if(node == gizmo_node)
-			{
-				const char* node_name = h3dGetNodeParamStr(original_node, H3DNodeParams::NameStr);
-				strcpy_s(name, max_name_size, node_name);
-				return node;
-			}
-			++i;
-		}
-		if(h3dGetCastRayResult(0, &node, 0, &hit_pos.x))
-		{
-			const char* node_name = h3dGetNodeParamStr(node, H3DNodeParams::NameStr);
-			strcpy_s(name, max_name_size, node_name);
-			while(node && h3dGetNodeType(node) != H3DNodeTypes::Model)
-			{
-				node = h3dGetNodeParent(node);
-			}
-			return node;
-		}
-	}
-	ASSERT(false);
-	return 0;
-}*/
 
 
 void EditorServerImpl::writeString(const char* str)
@@ -1152,7 +1114,8 @@ void EditorServerImpl::destroyUniverse()
 	}
 	selectEntity(Entity::INVALID);
 	m_editor_icons.clear();
-	m_gizmo.setUniverse(0);
+	m_gizmo.setUniverse(NULL);
+	m_gizmo.destroy();
 	m_engine.destroyUniverse();
 }
 
@@ -1176,9 +1139,12 @@ void EditorServerImpl::createUniverse(bool create_scene, const char* base_path)
 	universe->getEventManager()->addListener(EntityDestroyedEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);
 
 	addEntity();
-
+	*/
+	m_gizmo.create(base_path, m_engine.getRenderer());
 	m_gizmo.setUniverse(universe);
-	m_selected_entity = Entity::INVALID;*/
+	m_gizmo.hide();
+
+	m_selected_entity = Entity::INVALID;
 }
 
 

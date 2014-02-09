@@ -89,6 +89,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\animation\animation.cpp" />
     <ClCompile Include="..\..\src\animation\animation_system.cpp" />
     <ClCompile Include="..\..\src\core\new.cpp" />
     <ClCompile Include="..\..\src\editor\editor_client.cpp" />
@@ -121,6 +122,7 @@
     <ClCompile Include="..\..\src\universe\universe.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\src\animation\animation.h" />
     <ClInclude Include="..\..\src\animation\animation_system.h" />
     <ClInclude Include="..\..\src\editor\client_message_types.h" />
     <ClInclude Include="..\..\src\editor\editor_client.h" />
@@ -139,6 +141,7 @@
     <ClInclude Include="..\..\src\graphics\model_instance.h" />
     <ClInclude Include="..\..\src\graphics\pipeline.h" />
     <ClInclude Include="..\..\src\graphics\pose.h" />
+    <ClInclude Include="..\..\src\graphics\ray_cast_model_hit.h" />
     <ClInclude Include="..\..\src\graphics\renderer.h" />
     <ClInclude Include="..\..\src\graphics\irender_device.h" />
     <ClInclude Include="..\..\src\graphics\shader.h" />

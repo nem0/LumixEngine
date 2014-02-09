@@ -1,13 +1,14 @@
-#define _USE_MATH_DEFINES
-#include <cmath>
-#include "gizmo.h"
-#include "core/matrix.h"
-#include "universe/universe.h"
-#include "core/math_utils.h"
-#include "graphics/renderer.h"
-#include "core/quat.h"
+//#define _USE_MATH_DEFINES
+//#include <cmath>
+#include "core/crc32.h"
 #include "core/event_manager.h"
+#include "core/math_utils.h"
+#include "core/matrix.h"
+#include "core/quat.h"
+#include "editor/gizmo.h"
+#include "graphics/renderer.h"
 #include "universe/entity_moved_event.h"
+#include "universe/universe.h"
 
 
 namespace Lux
@@ -26,20 +27,15 @@ Gizmo::~Gizmo()
 }
 
 
-void Gizmo::create(const char* base_path, Renderer& renderer)
-{
-	/*m_renderer = &renderer;
-	H3DRes res = h3dAddResource(H3DResTypes::SceneGraph, "models/tgizmo/tgizmo.scene.xml", 0);
-	h3dutLoadResourcesFromDisk(base_path);
-	m_handle = h3dAddNodes(H3DRootNode, res);
-	int flags = h3dGetNodeFlags(m_handle);
-	h3dSetNodeFlags(m_handle, flags | H3DNodeFlags::NoCastShadow, true);*/
-}
-
-
 void Gizmo::destroy()
 {
 	//h3dRemoveNode(m_handle);
+}
+
+
+void Gizmo::create(const char* base_path, Renderer& renderer)
+{
+	m_renderer = &renderer;
 }
 
 
@@ -112,6 +108,9 @@ void Gizmo::setUniverse(Universe* universe)
 	if(m_universe)
 	{
 		m_universe->getEventManager()->addListener(EntityMovedEvent::type).bind<Gizmo, &Gizmo::onEvent>(this);
+		m_gizmo_entity = m_universe->createEntity();
+		Component r = m_renderer->createComponent(crc32("renderable"), m_gizmo_entity);
+		m_renderer->setRenderablePath(r, string("models/new_renderer/gizmo.msh"));
 	}
 }
 
@@ -129,15 +128,15 @@ void Gizmo::onEvent(Event& evt)
 }
 
 
-void Gizmo::startTransform(int x, int y, TransformMode mode)
+void Gizmo::startTransform(Component camera, int x, int y, TransformMode mode)
 {
 	m_transform_mode = mode;
-	m_transform_point = getMousePlaneIntersection(x, y);
+	m_transform_point = getMousePlaneIntersection(camera, x, y);
 	m_relx_accum = m_rely_accum = 0;
 }
 
 
-void Gizmo::transform(TransformOperation operation, int x, int y, int relx, int rely, int flags)
+void Gizmo::transform(Component camera, TransformOperation operation, int x, int y, int relx, int rely, int flags)
 {
 	if(m_selected_entity.index != -1)
 	{
@@ -166,12 +165,12 @@ void Gizmo::transform(TransformOperation operation, int x, int y, int relx, int 
 				m_rely_accum += rely;
 				if(m_relx_accum + m_rely_accum > 50)
 				{
-					angle = (float)M_PI / 4;
+					angle = (float)Math::PI / 4;
 					m_relx_accum = m_rely_accum = 0;
 				}
 				else if(m_relx_accum + m_rely_accum < -50)
 				{
-					angle = -(float)M_PI / 4;
+					angle = -(float)Math::PI / 4;
 					m_relx_accum = m_rely_accum = 0;
 				}
 				else 
@@ -188,7 +187,7 @@ void Gizmo::transform(TransformOperation operation, int x, int y, int relx, int 
 		}
 		else
 		{
-			Vec3 intersection = getMousePlaneIntersection(x, y);
+			Vec3 intersection = getMousePlaneIntersection(camera, x, y);
 			Vec3 delta = intersection - m_transform_point;
 			m_transform_point = intersection;
 			Matrix mtx;
@@ -201,15 +200,13 @@ void Gizmo::transform(TransformOperation operation, int x, int y, int relx, int 
 }
 
 
-Vec3 Gizmo::getMousePlaneIntersection(int x, int y)
+Vec3 Gizmo::getMousePlaneIntersection(Component camera, int x, int y)
 {
-	ASSERT(false);
-	return Vec3(0, 0, 0);
-	/*Vec3 origin, dir;
-	m_renderer->getRay(x, y, origin, dir);	
+	Vec3 origin, dir;
+	m_renderer->getRay(camera, (float)x, (float)y, origin, dir);	
 	dir.normalize();
 	Matrix camera_mtx;
-	m_renderer->getCameraMatrix(camera_mtx);
+	camera.entity.getMatrix(camera_mtx);
 	if(m_transform_mode == TransformMode::CAMERA_XZ)
 	{
 		Vec3 a = crossProduct(Vec3(0, 1, 0), camera_mtx.getXVector());
@@ -233,7 +230,7 @@ Vec3 Gizmo::getMousePlaneIntersection(int x, int y)
 	Vec3 pos = m_selected_entity.getPosition();
 	Vec3 normal = crossProduct(crossProduct(dir, axis), dir);
 	float d = dotProduct(origin - pos, normal) / dotProduct(axis, normal);
-	return axis * d + pos;*/
+	return axis * d + pos;
 }
 
 

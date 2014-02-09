@@ -7,7 +7,13 @@
 
 namespace Lux
 {
+	namespace FS
+	{
+		class FileSystem;
+	};
 
+
+	class Animation;
 	class Engine;
 	struct Entity;
 	class ISerializer;
@@ -29,9 +35,9 @@ namespace Lux
 
 			void destroy();
 			Component createAnimable(const Entity& entity);
-			void playAnimation(const Component& cmp, const char* path, int layer);
-			void setAnimationTime(const Component& cmp, float time, int layer);
-		
+			void playAnimation(const Component& cmp, const char* path);
+			void setAnimationTime(const Component& cmp, float time);
+			Animation* loadAnimation(const char* path, FS::FileSystem& file_system);
 
 		private:
 			struct AnimationSystemImpl* m_impl;
