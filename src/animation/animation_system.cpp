@@ -1,4 +1,5 @@
 #include "animation_system.h"
+#include "animation/animation.h"
 #include "core/crc32.h"
 #include "core/event_manager.h"
 #include "core/json_serializer.h"
@@ -17,23 +18,26 @@ namespace Lux
 
 	struct AnimationSystemImpl
 	{
+		AnimationSystemImpl(Engine& engine) : m_engine(engine) {}
+
 		struct Animable
 		{
 			bool m_manual;
 			Component m_renderable;
 			float m_time;
-			uint16_t m_layers;
+			class Animation* m_animation;
 		};
 
 		Array<Animable> m_animables;
 		Universe* m_universe;
+		Engine& m_engine;
 
 		void onEvent(Event& event);
 	};
 
 	bool AnimationSystem::create(Engine& engine)
 	{
-		m_impl = LUX_NEW(AnimationSystemImpl)();
+		m_impl = LUX_NEW(AnimationSystemImpl)(engine);
 		m_impl->m_universe = 0;
 		if(engine.getEditorServer())
 		{
@@ -102,7 +106,6 @@ namespace Lux
 		for(int i = 0; i < count; ++i)
 		{
 			m_impl->m_animables.pushEmpty();
-			m_impl->m_animables[i].m_layers = 0;
 			serializer.deserializeArrayItem(m_impl->m_animables[i].m_manual);
 			int entity_index;
 			serializer.deserializeArrayItem(entity_index);
@@ -152,7 +155,6 @@ namespace Lux
 		animable.m_manual = true;
 		animable.m_time = 0;
 		animable.m_renderable = Component::INVALID;
-		animable.m_layers = 0;
 
 		const Entity::ComponentList& cmps = entity.getComponents();
 		for(int i = 0; i < cmps.size(); ++i)
@@ -169,58 +171,43 @@ namespace Lux
 		return Component(entity, animable_type, this, m_impl->m_animables.size() - 1);
 	}
 
-	void AnimationSystem::playAnimation(const Component& cmp, const char* path, int layer)
+	Animation* AnimationSystem::loadAnimation(const char* path, FS::FileSystem& file_system)
 	{
-		/*Component renderable = m_impl->m_animables[cmp.index].m_renderable;
-		if(renderable.isValid())
-		{
-			Renderer* renderer = static_cast<Renderer*>(renderable.system);
-			H3DNode node = renderer->getMeshNode(renderable);
-			H3DRes animRes = h3dAddResource(H3DResTypes::Animation, path, 0);
-			h3dutLoadResourcesFromDisk(renderer->getBasePath());
-			h3dSetupModelAnimStage(node, layer, animRes, layer, "", false);
-			h3dSetModelAnimParams(node, layer, 0, 1.0f);
+		/// TODO animation management
+		Animation* anim = LUX_NEW(Animation);
+		anim->load(path, file_system);
+		return anim;
+	}
 
-			m_impl->m_animables[cmp.index].m_manual = false;
-			m_impl->m_animables[cmp.index].m_layers |= 1 << layer;
-		}*/
-		ASSERT(false);
+	void AnimationSystem::playAnimation(const Component& cmp, const char* path)
+	{
+		/// TODO handle old animation
+		m_impl->m_animables[cmp.index].m_animation = loadAnimation(path, m_impl->m_engine.getFileSystem());
+		m_impl->m_animables[cmp.index].m_time = 0;
+		m_impl->m_animables[cmp.index].m_manual = false;
 	}
 
 
-	void AnimationSystem::setAnimationTime(const Component& cmp, float time, int layer)
+	void AnimationSystem::setAnimationTime(const Component& cmp, float time)
 	{
-		ASSERT(false);
-		/*Renderer* renderer = static_cast<Renderer*>(m_impl->m_animables[cmp.index].m_renderable.system);
-		H3DNode node = renderer->getMeshNode(m_impl->m_animables[cmp.index].m_renderable);
 		m_impl->m_animables[cmp.index].m_time = time;
-		h3dSetModelAnimParams(node, layer, time, 1.0f);*/
 	}
 
 
 	void AnimationSystem::update(float time_delta)
 	{
-		/*if(m_impl->m_animables.empty())
+		if(m_impl->m_animables.empty())
 			return;
 		Renderer* renderer = static_cast<Renderer*>(m_impl->m_animables[0].m_renderable.system);
 		for(int i = 0, c = m_impl->m_animables.size(); i < c; ++i)
 		{
-			if(!m_impl->m_animables[i].m_manual)
+			AnimationSystemImpl::Animable& animable = m_impl->m_animables[i];
+			if(!animable.m_manual)
 			{
-				H3DNode node = renderer->getMeshNode(m_impl->m_animables[i].m_renderable);
-				float time = m_impl->m_animables[i].m_time;
-				time += time_delta * 15;
-				for(int j = 0; j < 16; ++j)
-				{
-					if(m_impl->m_animables[i].m_layers & (1 << j))
-					{
-						h3dSetModelAnimParams(node, j, time, 1.0f);
-					}
-				}
-				m_impl->m_animables[i].m_time = time;
+				animable.m_animation->getPose(animable.m_time, renderer->getPose(animable.m_renderable));
+				animable.m_time += time_delta;
 			}
-		}*/
-		ASSERT(false);
+		}
 	}
 
 

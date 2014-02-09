@@ -18,7 +18,7 @@
 namespace Lux
 {
 
-
+	
 Model::~Model()
 {
 	LUX_DELETE(m_geometry);
@@ -33,15 +33,70 @@ void Model::load(const char* path, FS::FileSystem& file_system)
 }
 
 
-float Model::getBoundingRadius() const
+RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform)
 {
-	//ASSERT(false);
-	return 1;
+	RayCastModelHit hit;
+	hit.m_is_hit = false;
+
+	const PODArray<Vec3>& vertices = m_geometry->getVertices();
+
+	for(int i = 0; i < vertices.size(); i += 9)
+	{
+		Vec3 p0 = *(Vec3*)&vertices[i];
+		Vec3 p1 = *(Vec3*)&vertices[i+3];
+		Vec3 p2 = *(Vec3*)&vertices[i+6];
+		Vec3 normal = crossProduct(p1 - p0, p2 - p0);
+		float q = dotProduct(normal, dir);
+		if(q == 0)
+		{
+			continue;
+		}
+		float d = dotProduct(normal, p0);
+		float t = -(dotProduct(normal, origin) + d) / q;
+		if(t < 0)
+		{
+			continue;
+		}
+		Vec3 hit_point = origin + dir * t;
+
+		Vec3 edge0 = p1 - p0;
+		Vec3 VP0 = hit_point - p0;
+		if (dotProduct(normal, crossProduct(edge0, VP0)) < 0)
+		{
+			continue;
+		}
+
+		Vec3 edge1 = p2 - p1;
+		Vec3 VP1 = hit_point - p1;
+		if (dotProduct(normal, crossProduct(edge1, VP1)) < 0)
+		{
+			continue;
+		}
+ 
+		Vec3 edge2 = p0 - p2;
+		Vec3 VP2 = hit_point - p2;
+		if (dotProduct(normal, crossProduct(edge2, VP2)) < 0)
+		{
+			continue;
+		}
+
+		if(!hit.m_is_hit || hit.m_t > t)
+		{
+			hit.m_is_hit = true;
+			hit.m_t = t;
+		}
+	}
+
+	hit.m_origin = origin;
+	hit.m_dir = dir;
+	hit.m_mesh = &m_meshes[0];
+	return hit;
 }
 
 
 void Model::loaded(FS::IFile* file, bool success)
-{
+{ 
+	/// TODO refactor
 	if(success)
 	{
 		int object_count = 0;
@@ -50,16 +105,26 @@ void Model::loaded(FS::IFile* file, bool success)
 		{
 			return;
 		}
+		
+		VertexDef vertex_defition;
+		int vertex_def_size = 0;
+		file->read(&vertex_def_size, sizeof(vertex_def_size));
+		char tmp[16];
+		ASSERT(vertex_def_size < 16);
+		file->read(tmp, vertex_def_size);
+		vertex_defition.parse(tmp, vertex_def_size);
+		
 		int tri_count = 0;
 		file->read(&tri_count, sizeof(tri_count));
-		PODArray<float> data;
-		int data_size = 16 * sizeof(float) * tri_count * 3;
-		data.resize(data_size / sizeof(float));
+		PODArray<uint8_t> data;
+		int data_size = vertex_defition.getVertexSize() * tri_count * 3;
+		data.resize(data_size);
 		file->read(&data[0], data_size); 
 		Mesh mesh(NULL, 0, tri_count * 3);
 		m_geometry = LUX_NEW(Geometry);
-		m_geometry->copy(&data[0], data_size);
-	
+		m_geometry->copy(&data[0], data_size, vertex_defition);
+		m_bounding_radius = m_geometry->getBoundingRadius();
+
 		int bone_count;	
 		file->read(&bone_count, sizeof(bone_count));
 		for(int i = 0; i < bone_count; ++i)
@@ -90,6 +155,7 @@ void Model::loaded(FS::IFile* file, bool success)
 		strcat(material_path, ".mat");
 		mesh.setMaterial(m_renderer.loadMaterial(material_path));
 		m_meshes.push(mesh);
+		
 		for(int i = 0; i < m_bones.size(); ++i)
 		{
 			m_bones[i].rotation.toMatrix(m_bones[i].inv_bind_matrix);

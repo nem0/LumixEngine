@@ -27,10 +27,9 @@ class LUX_ENGINE_API Shader
 		void setUniform(const char* name, GLfloat value);
 		void setUniform(const char* name, const Matrix& mtx);
 		void setUniform(const char* name, const Matrix* matrices, int count);
-		void applyVertexAttributes();
-		void disableVertexAttributes();
 		void load(const char* path, FS::FileSystem& file_system);
-	
+		GLint getAttribId(int index) { return m_vertex_attributes_ids[index]; }
+
 	private:
 		GLuint attach(GLenum type, const char* src, int length);
 		void loaded(FS::IFile* file, bool success);

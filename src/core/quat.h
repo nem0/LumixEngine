@@ -34,7 +34,7 @@ struct LUX_CORE_API Quat
 };
 
 
-void nlerp(const Quat& q1, const Quat& q2, Quat* out, float t);
+LUX_CORE_API void nlerp(const Quat& q1, const Quat& q2, Quat* out, float t);
 
 
 Vec3 Quat::operator *(const Vec3& v) const

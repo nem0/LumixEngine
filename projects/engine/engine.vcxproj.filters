@@ -109,6 +109,9 @@
     <ClCompile Include="..\..\src\graphics\model_instance.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\animation\animation.cpp">
+      <Filter>animation</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\graphics\renderer.h">
@@ -212,6 +215,12 @@
     </ClInclude>
     <ClInclude Include="..\..\src\graphics\model_instance.h">
       <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\graphics\ray_cast_model_hit.h">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\animation\animation.h">
+      <Filter>animation</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

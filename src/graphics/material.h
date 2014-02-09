@@ -27,6 +27,7 @@ class Material
 		void setShader(Shader* shader) { m_shader = shader; }
 		void addTexture(Texture* texture) { m_textures.push(texture); }
 		Shader* getShader() { return m_shader; }
+		bool isReady() const { return m_is_ready; }
 
 	private:
 		void loaded(FS::IFile* file, bool success);

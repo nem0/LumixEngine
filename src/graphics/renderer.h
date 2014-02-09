@@ -4,6 +4,7 @@
 #include "core/pod_array.h"
 #include "core/string.h"
 #include "engine/iplugin.h"
+#include "graphics/ray_cast_model_hit.h"
 
 
 namespace Lux
@@ -13,6 +14,7 @@ namespace Lux
 class IRenderDevice;
 class Material;
 class ModelInstance;
+class Pose;
 class Shader;
 class Texture;
 class Universe;
@@ -21,11 +23,6 @@ class Universe;
 struct RenderableInfo
 {
 	ModelInstance* m_model_instance;
-};
-
-
-struct RayCastHit
-{
 };
 
 
@@ -42,8 +39,9 @@ class LUX_ENGINE_API Renderer : public IPlugin
 		virtual void getCameraActive(Component cmp, bool& active) = 0;
 		virtual void setCameraPipeline(Component cmp, const string& pipeline) = 0;
 		virtual void getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) = 0;
-		virtual RayCastHit castRay(const Vec3& origin, const Vec3& dir) = 0;
+		virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir) = 0;
 
+		virtual Pose& getPose(Component cmp) = 0;
 		virtual void setRenderablePath(Component cmp, const string& path) = 0;
 		virtual void getRenderableInfos(PODArray<RenderableInfo>& infos) = 0;
 		virtual Material* loadMaterial(const char* path) = 0;

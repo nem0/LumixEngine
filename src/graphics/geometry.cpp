@@ -5,19 +5,138 @@
 namespace Lux
 {
 
-void Geometry::draw(int start, int count)
+
+void VertexDef::parse(const char* data, int size)
 {
-	glBindBuffer(GL_ARRAY_BUFFER, m_id);         // for vertex coordinates
-	glEnableClientState(GL_VERTEX_ARRAY);             // activate vertex coords array
-	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-	glEnableClientState(GL_NORMAL_ARRAY);
+	m_vertex_size = 0;
+	int index = 0;
+	for(int i = 0; i < size; ++i)
+	{
+		ASSERT(index < 15);
+		switch(data[i])
+		{
+			case 'v':
+				++i;
+				if(data[i] == '4')
+				{
+					m_attributes[index] = VertexAttributeDef::VEC4;
+					m_vertex_size += 4 * sizeof(float);
+				}
+				else
+				{
+					ASSERT(false);
+				}
+				break;
+			case 'p':
+				m_attributes[index] = VertexAttributeDef::POSITION;
+				m_vertex_size += 3 * sizeof(float);
+				break;
+			case 'n':
+				m_attributes[index] = VertexAttributeDef::NORMAL;
+				m_vertex_size += 3 * sizeof(float);
+				break;
+			case 't':
+				m_attributes[index] = VertexAttributeDef::TEXTURE_COORDS;
+				m_vertex_size += 2 * sizeof(float);
+				break;
+			default:
+				ASSERT(false);
+				break;
+		}
+		++index;
+	}
+	m_attributes[index] = VertexAttributeDef::NONE;
+	m_attribute_count = index;
+}
+
+
+int VertexDef::getPositionOffset() const
+{
+	int offset = 0;
+	for(int i = 0; i < m_attribute_count; ++i)
+	{
+		switch(m_attributes[i])
+		{
+			case VertexAttributeDef::VEC4:
+				offset += 4 * sizeof(float);
+				break;
+			case VertexAttributeDef::POSITION:
+				return offset;
+				break;
+			case VertexAttributeDef::NORMAL:
+				offset += 3 * sizeof(float);
+				break;
+			case VertexAttributeDef::TEXTURE_COORDS:
+				offset += 2 * sizeof(float);
+				break;
+			default:
+				ASSERT(false);
+				break;
+		}
+	}
+	return -1;
+}
+
+
+void VertexDef::apply(Shader& shader)
+{
+	int offset = 0;
+	int shader_attrib_idx = 0;
+	for(int i = 0; i < m_attribute_count; ++i)
+	{
+		switch(m_attributes[i])
+		{
+			case VertexAttributeDef::POSITION:
+				glEnableClientState(GL_VERTEX_ARRAY);
+				glVertexPointer(3, GL_FLOAT, m_vertex_size, (GLvoid*)offset);
+				offset += sizeof(GLfloat) * 3;
+				break;
+			case VertexAttributeDef::NORMAL:
+				glEnableClientState(GL_NORMAL_ARRAY);
+				glNormalPointer(GL_FLOAT, m_vertex_size, (GLvoid*)offset);
+				offset += sizeof(GLfloat) * 3;
+				break;
+			case VertexAttributeDef::TEXTURE_COORDS:
+				glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+				glTexCoordPointer(2, GL_FLOAT, m_vertex_size, (GLvoid*)offset);
+				offset += sizeof(GLfloat) * 2;
+				break;
+			case VertexAttributeDef::VEC4:
+				glEnableVertexAttribArray(shader.getAttribId(shader_attrib_idx));
+				glVertexAttribPointer(shader.getAttribId(shader_attrib_idx), 4, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
+				offset += sizeof(GLfloat) * 4;
+				++shader_attrib_idx;
+				break;
+			default:
+				ASSERT(false);
+				break;
+		}
+	}
 	
-	const GLsizei stride = 16 * sizeof(GLfloat);
-	glVertexPointer(3, GL_FLOAT, stride, (GLvoid*)(8 * sizeof(GLfloat)));               // last param is offset, not ptr
-	glTexCoordPointer(2, GL_FLOAT, stride, (GLvoid*)(14 * sizeof(GLfloat)));
-	glNormalPointer(GL_FLOAT, stride, (GLvoid*)(11 * sizeof(GLfloat)));
-	
+}
+
+
+float Geometry::getBoundingRadius() const
+{
+	float d = 0;
+	for(int i = 0, c = m_vertices.size(); i < c; ++i)
+	{
+		float l = m_vertices[i].squaredLength();
+		if(l > d)
+		{
+			d = l;
+		}
+	}
+	return sqrtf(d);
+}
+
+
+void Geometry::draw(int start, int count, Shader& shader)
+{
+	glBindBuffer(GL_ARRAY_BUFFER, m_id);
+	m_vertex_definition.apply(shader);
 	glDrawArrays(GL_TRIANGLES, start, count);
+
 	glDisableClientState(GL_VERTEX_ARRAY);            // deactivate vertex array
 	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 	glDisableClientState(GL_NORMAL_ARRAY);
@@ -36,8 +155,16 @@ Geometry::~Geometry()
 }
 
 
-void Geometry::copy(const void* data, int size)
+void Geometry::copy(const uint8_t* data, int size, VertexDef vertex_definition)
 {
+	m_vertex_definition = vertex_definition;
+	int vertex_size = m_vertex_definition.getVertexSize();
+	m_vertices.resize(size / vertex_size);
+	int pos_offset = m_vertex_definition.getPositionOffset();
+	for(int i = 0, c = m_vertices.size(); i < c; ++i)
+	{
+		m_vertices[i] = *(Vec3*)(data + vertex_size * i + pos_offset);
+	}
 	glBindBuffer(GL_ARRAY_BUFFER, m_id);
 	glBufferData(GL_ARRAY_BUFFER, size, data, GL_STATIC_DRAW);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
