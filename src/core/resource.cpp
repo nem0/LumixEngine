@@ -1,58 +1,44 @@
-#pragma once
+#include "core/lux.h"
+#include "core/resource.h"
 
-#include "core/delegate_list.h"
 #include "core/path.h"
 
 namespace Lux
 {
-	class Resource LUX_ABSTRACT
+	Resource::Resource(const Path& path)
+		: m_path(path)
+		, m_ref_count(0)
+		, m_state(State::EMPTY)
+	{ }
+
+	Resource::~Resource()
+	{ }
+
+	void Resource::onEmpty(void)
 	{
-	public:
-		friend class ResourceManagerBase;
+		m_state = State::EMPTY;
+	}
 
-		struct State
-		{
-			enum Value
-			{
-				EMPTY = 0,
-				LOADING,
-				READY,
-				UNLOADING,
-				ERROR_
-			};
+	void Resource::onLoading(void)
+	{
+		m_state = State::LOADING;
+	}
 
-			State() : value(0) { }
-			State(Value _value) : value(_value) { }
-			State(int32_t _value) : value(_value) { }
-			operator Value() const { return (Value)value; }
-			uint16_t value;
-		};
+	void Resource::onReady(void)
+	{
+		m_state = State::READY;
+		m_cb.invoke(State::READY);
+	}
 
-		typedef DelegateList<void (State)> ObserverCallback;
+	void Resource::onUnloading(void)
+	{
+		m_state = State::UNLOADING;
+		m_cb.invoke(State::UNLOADING);
+	}
 
-	protected:
-		Resource(const Path& path);
-		~Resource();
-
-		//events
-		virtual void onEmpty(void);
-		virtual void onLoading(void);
-		virtual void onReady(void);
-		virtual void onUnloading(void);
-		virtual void onReloading(void);
-		// every resource has to handle error state
-		virtual void onError(void) = 0;
-
-		virtual void doLoad(void) = 0;
-		virtual void doUnload(void) = 0;
-		virtual void doReload(void) = 0;
-
-		uint32_t addRef(void) { return ++m_ref_count; }
-		uint32_t remRef(void) { return --m_ref_count; }
-	private:
-		Path m_path;
-		uint16_t m_ref_count;
-		State m_state;
-		ObserverCallback m_cb;
-	};
+	void Resource::onReloading(void)
+	{
+		m_state = State::UNLOADING;
+		m_cb.invoke(State::UNLOADING);
+	}
 } // ~namespace Lux
