@@ -5,6 +5,8 @@
 #include <cassert>
 #include <malloc.h>
 
+static const uint32_t LUX_MAX_PATH = 260;
+
 #ifndef ASSERT
 #define ASSERT(x) assert(x)
 #endif
