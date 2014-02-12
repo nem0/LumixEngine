@@ -4,6 +4,8 @@
 #include "core/math_utils.h"
 #include "core/default_allocator.h"
 
+#include <string.h>
+
 namespace Lux
 {
 	template <class K, class V>
