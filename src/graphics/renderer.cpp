@@ -19,11 +19,15 @@
 #include "graphics/shader.h"
 #include "graphics/texture.h"
 #include "universe/component_event.h"
+#include "universe/entity_moved_event.h"
 #include "universe/universe.h"
 
 
 namespace Lux
 {
+
+
+static const uint32_t renderable_hash = crc32("renderable");
 
 
 struct Renderable
@@ -91,9 +95,25 @@ struct RendererImpl : public Renderer
 	}
 
 
+	void onEntityMoved(Event& evt)
+	{
+		EntityMovedEvent e = static_cast<EntityMovedEvent&>(evt);
+		const Entity::ComponentList& cmps = e.entity.getComponents();
+		for(int i = 0; i < cmps.size(); ++i)
+		{
+			if(cmps[i].type == renderable_hash)
+			{
+				m_renderables[cmps[i].index].m_model->setMatrix(e.entity.getMatrix());
+				break;	
+			}
+		}
+	}
+
+
 	virtual void setUniverse(Universe* universe) LUX_OVERRIDE
 	{
 		m_universe = universe;
+		m_universe->getEventManager()->addListener(EntityMovedEvent::type).bind<RendererImpl, &RendererImpl::onEntityMoved>(this);
 	}
 
 
@@ -210,12 +230,12 @@ struct RendererImpl : public Renderer
 		hit.m_is_hit = false;
 		for(int i = 0; i < m_renderables.size(); ++i)
 		{
-			const Vec3& pos = m_renderables[i].m_entity.getPosition();
+			const Vec3& pos = m_renderables[i].m_model->getMatrix().getTranslation();
 			float radius = m_renderables[i].m_model->getModel().getBoundingRadius();
 			Vec3 intersection;
 			if(Math::getRaySphereIntersection(pos, radius, origin, dir, intersection))
 			{
-				RayCastModelHit new_hit = m_renderables[i].m_model->getModel().castRay(origin, dir, m_renderables[i].m_entity.getMatrix());
+				RayCastModelHit new_hit = m_renderables[i].m_model->getModel().castRay(origin, dir, m_renderables[i].m_model->getMatrix());
 				new_hit.m_renderable = Component(m_renderables[i].m_entity, crc32("renderable"), this, i);
 				if(new_hit.m_is_hit && (!hit.m_is_hit || new_hit.m_t < hit.m_t))
 				{
@@ -324,6 +344,7 @@ struct RendererImpl : public Renderer
 	Array<Renderable> m_renderables;
 	PODArray<Model*> m_models;
 	Universe* m_universe;
+
 };
 
 

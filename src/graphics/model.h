@@ -84,6 +84,7 @@ class Model
 		Array<Bone> m_bones;
 		Renderer& m_renderer;
 		float m_bounding_radius;
+		string m_path;
 };
 
 

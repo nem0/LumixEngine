@@ -29,6 +29,7 @@ void Model::load(const char* path, FS::FileSystem& file_system)
 {
 	FS::ReadCallback cb;
 	cb.bind<Model, &Model::loaded>(this);
+	m_path = path;
 	file_system.openAsync(file_system.getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, cb);
 }
 
@@ -110,11 +111,7 @@ void Model::loaded(FS::IFile* file, bool success)
 	{
 		int object_count = 0;
 		file->read(&object_count, sizeof(object_count));
-		if(object_count != 1)
-		{
-			return;
-		}
-		
+
 		VertexDef vertex_defition;
 		int vertex_def_size = 0;
 		file->read(&vertex_def_size, sizeof(vertex_def_size));
@@ -122,14 +119,13 @@ void Model::loaded(FS::IFile* file, bool success)
 		ASSERT(vertex_def_size < 16);
 		file->read(tmp, vertex_def_size);
 		vertex_defition.parse(tmp, vertex_def_size);
-		
+
 		int tri_count = 0;
 		file->read(&tri_count, sizeof(tri_count));
 		PODArray<uint8_t> data;
 		int data_size = vertex_defition.getVertexSize() * tri_count * 3;
 		data.resize(data_size);
 		file->read(&data[0], data_size); 
-		Mesh mesh(NULL, 0, tri_count * 3);
 		m_geometry = LUX_NEW(Geometry);
 		m_geometry->copy(&data[0], data_size, vertex_defition);
 		m_bounding_radius = m_geometry->getBoundingRadius();
@@ -152,19 +148,6 @@ void Model::loaded(FS::IFile* file, bool success)
 			file->read(&b.position.x, sizeof(float) * 3);
 			file->read(&b.rotation.x, sizeof(float) * 4);
 		}
-
-		int str_size;
-		file->read(&str_size, sizeof(str_size));
-		char material_name[MAX_PATH];
-		file->read(material_name, str_size);
-		material_name[str_size] = 0;
-		char material_path[MAX_PATH];
-		strcpy(material_path, "materials/");
-		strcat(material_path, material_name);
-		strcat(material_path, ".mat");
-		mesh.setMaterial(m_renderer.loadMaterial(material_path));
-		m_meshes.push(mesh);
-		
 		for(int i = 0; i < m_bones.size(); ++i)
 		{
 			m_bones[i].rotation.toMatrix(m_bones[i].inv_bind_matrix);
@@ -173,6 +156,24 @@ void Model::loaded(FS::IFile* file, bool success)
 		for(int i = 0; i < m_bones.size(); ++i)
 		{
 			m_bones[i].inv_bind_matrix.fastInverse();
+		}
+		int32_t mesh_vertex_offset = 0;
+		for(int i = 0; i < object_count; ++i)
+		{
+			int32_t str_size;
+			file->read(&str_size, sizeof(str_size));
+			char material_name[MAX_PATH];
+			file->read(material_name, str_size);
+			material_name[str_size] = 0;
+			char material_path[MAX_PATH];
+			strcpy(material_path, "materials/");
+			strcat(material_path, material_name);
+			strcat(material_path, ".mat");
+			int32_t mesh_tri_count = 0;
+			file->read(&mesh_tri_count, sizeof(mesh_tri_count));
+			Mesh mesh(m_renderer.loadMaterial(material_path), mesh_vertex_offset, mesh_tri_count * 3);
+			mesh_vertex_offset += mesh_tri_count * 3;
+			m_meshes.push(mesh);
 		}
 	}
 	/// TODO close file somehow
