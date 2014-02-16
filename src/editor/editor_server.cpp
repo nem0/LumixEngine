@@ -1132,7 +1132,7 @@ void EditorServerImpl::createUniverse(bool create_scene, const char* base_path)
 	m_engine.getRenderer().setCameraActive(cmp, true);
 
 	Component cmp2 = m_engine.getRenderer().createComponent(crc32("renderable"), m_engine.getUniverse()->createEntity());
-	m_engine.getRenderer().setRenderablePath(cmp2, string("models/new_renderer/untitled.msh"));
+	m_engine.getRenderer().setRenderablePath(cmp2, string("models/blender.msh"));
 /*	
 	universe->getEventManager()->addListener(EntityMovedEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);
 	universe->getEventManager()->addListener(ComponentEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);
