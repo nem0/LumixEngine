@@ -37,14 +37,23 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 {
 	RayCastModelHit hit;
 	hit.m_is_hit = false;
+	if(!m_geometry)
+	{
+		return hit;
+	}
+	
+	Matrix inv = model_transform;
+	inv.fastInverse();
+	Vec3 local_origin = inv.mutliplyPosition(origin);
+	Vec3 local_dir = static_cast<Vec3>(inv * Vec4(dir.x, dir.y, dir.z, 0));
 
 	const PODArray<Vec3>& vertices = m_geometry->getVertices();
 
-	for(int i = 0; i < vertices.size(); i += 9)
+	for(int i = 0; i < vertices.size(); i += 3)
 	{
-		Vec3 p0 = *(Vec3*)&vertices[i];
-		Vec3 p1 = *(Vec3*)&vertices[i+3];
-		Vec3 p2 = *(Vec3*)&vertices[i+6];
+		Vec3 p0 = vertices[i];
+		Vec3 p1 = vertices[i+1];
+		Vec3 p2 = vertices[i+2];
 		Vec3 normal = crossProduct(p1 - p0, p2 - p0);
 		float q = dotProduct(normal, dir);
 		if(q == 0)
@@ -52,12 +61,12 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 			continue;
 		}
 		float d = dotProduct(normal, p0);
-		float t = -(dotProduct(normal, origin) + d) / q;
+		float t = -(dotProduct(normal, local_origin) + d) / q;
 		if(t < 0)
 		{
 			continue;
 		}
-		Vec3 hit_point = origin + dir * t;
+		Vec3 hit_point = local_origin + dir * t;
 
 		Vec3 edge0 = p1 - p0;
 		Vec3 VP0 = hit_point - p0;
