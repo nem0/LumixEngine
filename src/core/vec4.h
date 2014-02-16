@@ -3,6 +3,7 @@
 
 #include "core/lux.h"
 #include <cmath>
+#include "core/vec3.h"
 
 
 namespace Lux
@@ -120,6 +121,11 @@ struct LUX_CORE_API Vec4
 		float z = this->z;
 		float w = this->w;
 		return x * x + y * y + z * z + w * w;  
+	}
+
+	operator Vec3()
+	{
+		return Vec3(x, y, z);
 	}
 
 	float x, y, z, w;

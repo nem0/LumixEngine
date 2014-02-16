@@ -57,7 +57,6 @@ struct RendererImpl : public Renderer
 		glMatrixMode(GL_PROJECTION);
 		glLoadIdentity();
 		gluPerspective(camera->m_fov, camera->m_aspect, camera->m_near, camera->m_far);
-
 		glMatrixMode(GL_MODELVIEW);
 		glLoadIdentity();
 		Vec3 pos = mtx.getTranslation();
@@ -218,7 +217,7 @@ struct RendererImpl : public Renderer
 			{
 				RayCastModelHit new_hit = m_renderables[i].m_model->getModel().castRay(origin, dir, m_renderables[i].m_entity.getMatrix());
 				new_hit.m_renderable = Component(m_renderables[i].m_entity, crc32("renderable"), this, i);
-				if(!hit.m_is_hit || new_hit.m_t < hit.m_t)
+				if(new_hit.m_is_hit && (!hit.m_is_hit || new_hit.m_t < hit.m_t))
 				{
 					hit = new_hit;
 					hit.m_is_hit = true;
@@ -234,27 +233,16 @@ struct RendererImpl : public Renderer
 		Camera* cam = m_cameras[camera.index];
 		Vec3 camera_pos = m_cameras[camera.index]->m_entity.getPosition();
 		float nx = 2 * (x / cam->m_width) - 1;
-		float ny = 2 * (y / cam->m_height) - 1;
+		float ny = 2 * ((cam->m_height - y) / cam->m_height) - 1;
 		Matrix projection_matrix = getProjectionMatrix(camera);
 		Matrix view_matrix = m_cameras[camera.index]->m_entity.getMatrix();
+		view_matrix.inverse();
 		Matrix inverted = (projection_matrix * view_matrix);
-		float pp[16];
-		glGetFloatv(GL_PROJECTION_MATRIX, pp);
 		inverted.inverse();
 		Vec4 p0 = inverted * Vec4(nx, ny, -1, 1);
 		Vec4 p1 = inverted * Vec4(nx, ny, 1, 1);
 		p0.x /= p0.w; p0.y /= p0.w; p0.z /= p0.w;
 		p1.x /= p1.w; p1.y /= p1.w; p1.z /= p1.w;
-		double d[3];
-		int v[] = {0, 0, 800, 600};
-		double m[16];
-		double p[16];view_matrix.inverse();
-		for(int i = 0; i < 16; ++i)
-		{
-			m[i] = (&view_matrix.m11)[i];
-			p[i] = (&projection_matrix.m11)[i];
-		}
-		gluUnProject(400, 300, 1, m, p, v, d, d+1, d+2);
 		origin = camera_pos;
 		dir.x = p1.x - p0.x;
 		dir.y = p1.y - p0.y;
