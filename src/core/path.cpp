@@ -12,14 +12,12 @@ namespace Lux
 		: m_id(rhs.m_id)
 	{
 		uint32_t len = strlen(rhs.m_path);
-		m_path = LUX_NEW_ARRAY(char, len + 1);
 		strcpy(m_path, rhs.m_path);
 	}
 
 	Path::Path(const char* path)
 	{
 		uint32_t len = strlen(path);
-		m_path = LUX_NEW_ARRAY(char, len + 1);
 		PathUtils::normalize(path, m_path, len + 1);
 		m_id = crc32(m_path);
 	}
@@ -28,12 +26,10 @@ namespace Lux
 		: m_id(id)
 	{
 		uint32_t len = strlen(path);
-		m_path = LUX_NEW_ARRAY(char, len + 1);
 		strcpy(m_path, path);
 	}
 
 	Path::~Path()
 	{
-		LUX_DELETE_ARRAY(m_path);
 	}
 }

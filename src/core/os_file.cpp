@@ -64,7 +64,7 @@ namespace Lux
 
 			if(INVALID_HANDLE_VALUE != hnd)
 			{
-				OsFileImpl* impl = LUX_NEW(OsFileImpl)(); //TODO: lock-free free list
+				OsFileImpl* impl = LUX_NEW(OsFileImpl); //TODO: lock-free free list
 				impl->m_file = hnd;
 				m_impl = impl;
 

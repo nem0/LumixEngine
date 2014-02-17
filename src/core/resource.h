@@ -18,10 +18,10 @@ namespace Lux
 				LOADING,
 				READY,
 				UNLOADING,
-				ERROR_
+				ERROR
 			};
 
-			State() : value(0) { }
+			State() : value(EMPTY) { }
 			State(Value _value) : value(_value) { }
 			State(int32_t _value) : value(_value) { }
 			operator Value() const { return (Value)value; }

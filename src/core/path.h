@@ -6,9 +6,10 @@ namespace Lux
 	{
 	public:
 		LUX_FORCE_INLINE Path()
-			: m_path(NULL)
-			, m_id(0)
-		{ }
+			: m_id(0)
+		{
+			m_path[0] = '\0';
+		}
 
 		Path(const Path& rhs);
 		Path(const char* path);
@@ -26,7 +27,7 @@ namespace Lux
 		bool isValid() { return NULL != m_path; }
 
 	private:
-		char*		m_path;
+		char		m_path[LUX_MAX_PATH];
 		uint32_t	m_id;
 	};
 }
