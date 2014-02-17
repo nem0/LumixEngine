@@ -166,7 +166,7 @@ void RendererImpl::loadResources()
 	{
 		h3dLoadResource(res, NULL, 0);
 		sprintf_s(path, "%s%s/%s", m_base_path.c_str(), h3dutGetResourcePath(h3dGetResType(res)), h3dGetResName(res));
-		LoadInfo* info = LUX_NEW(LoadInfo)();
+		LoadInfo* info = LUX_NEW(LoadInfo);
 		info->m_renderer_impl = this;
 		info->m_res = res;
 

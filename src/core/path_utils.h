@@ -10,7 +10,7 @@ namespace Lux
 			while (*path != '\0' && i < max_size)
 			{
 				*out = *path == '/' ? '\\' : *path;
-				*out = *path >= 'A' && *path <= 'Z' ? *path - 'a' : *path;
+				*out = *path >= 'A' && *path <= 'Z' ? *path - 'A' + 'a' : *out;
 
 				path++;
 				out++;
