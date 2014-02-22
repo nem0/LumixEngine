@@ -85,7 +85,7 @@ void Texture::loaded(FS::IFile* file, bool success)
 		for (long y = 0; y < header.height; y++)
 		{
 			long read_index = y * header.width * color_mode;
-			long write_index = ((header.imageDescriptor & 32) != 0) ? read_index : (header.height - y - 1) * header.width * color_mode;
+			long write_index = read_index;//((header.imageDescriptor & 32) != 0) ? read_index : (header.height - y - 1) * header.width * color_mode;
 			for (long x = 0; x < header.width; x++)
 			{
 				image_dest[write_index] = image_src[read_index+2];

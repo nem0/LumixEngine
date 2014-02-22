@@ -175,6 +175,7 @@ void Model::loaded(FS::IFile* file, bool success)
 			mesh_vertex_offset += mesh_tri_count * 3;
 			m_meshes.push(mesh);
 		}
+		m_on_loaded.invoke();
 	}
 	/// TODO close file somehow
 }
