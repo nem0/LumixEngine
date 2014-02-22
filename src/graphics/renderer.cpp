@@ -54,6 +54,11 @@ struct Camera
 struct RendererImpl : public Renderer
 {
 
+	RendererImpl()
+	{
+		m_universe = NULL;
+	}
+
 	void applyCamera(Camera* camera)
 	{
 		Matrix mtx;
@@ -112,8 +117,17 @@ struct RendererImpl : public Renderer
 
 	virtual void setUniverse(Universe* universe) LUX_OVERRIDE
 	{
+		if(m_universe)
+		{
+			EventManager::Listener cb;
+			cb.bind<RendererImpl, &RendererImpl::onEntityMoved>(this);
+			m_universe->getEventManager()->removeListener(EntityMovedEvent::type, cb);
+		}
 		m_universe = universe;
-		m_universe->getEventManager()->addListener(EntityMovedEvent::type).bind<RendererImpl, &RendererImpl::onEntityMoved>(this);
+		if(m_universe)
+		{
+			m_universe->getEventManager()->addListener(EntityMovedEvent::type).bind<RendererImpl, &RendererImpl::onEntityMoved>(this);
+		}
 	}
 
 
@@ -203,8 +217,8 @@ struct RendererImpl : public Renderer
 		LUX_DELETE(m_renderables[cmp.index].m_model);
 		Renderable& r = m_renderables[cmp.index];
 		Model* model = LUX_NEW(Model)(*this);
-		model->load(path.c_str(), m_engine->getFileSystem());
 		r.m_model = LUX_NEW(ModelInstance)(*model);
+		model->load(path.c_str(), m_engine->getFileSystem());
 	}
 
 

@@ -2,6 +2,7 @@
 
 
 #include "core/array.h"
+#include "core/delegate_list.h"
 #include "core/matrix.h"
 #include "core/pod_array.h"
 #include "core/quat.h"
@@ -74,6 +75,7 @@ class Model
 		void getPose(Pose& pose);
 		float getBoundingRadius() const { return m_bounding_radius; }
 		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform);
+		DelegateList<void ()>& onLoaded() { return m_on_loaded; }
 
 	private:
 		void loaded(FS::IFile* file, bool success);
@@ -85,6 +87,7 @@ class Model
 		Renderer& m_renderer;
 		float m_bounding_radius;
 		string m_path;
+		DelegateList<void ()> m_on_loaded;
 };
 
 

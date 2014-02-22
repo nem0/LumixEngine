@@ -3,15 +3,18 @@
 #include "core/array.h"
 #include "core/crc32.h"
 #include "core/file_system.h"
+#include "core/input_system.h"
 #include "core/iserializer.h"
 #include "core/json_serializer.h"
 #include "core/string.h"
 #include "gl/GL.h"
+#include "engine/engine.h"
 #include "graphics/geometry.h"
 #include "graphics/material.h"
 #include "graphics/model.h"
 #include "graphics/model_instance.h"
 #include "graphics/renderer.h"
+#include "graphics/shader.h"
 
 
 namespace Lux
@@ -117,26 +120,37 @@ struct PipelineImpl : public Pipeline
 
 	void renderModels()
 	{
-		glPushMatrix();
+		/// TODO clean this and optimize
 		static PODArray<RenderableInfo> infos;
 		infos.clear();
 		m_renderer.getRenderableInfos(infos);
 		int count = infos.size();
 		for(int i = 0; i < count; ++i)
 		{
-			glMultMatrixf(&infos[i].m_model_instance->getMatrix().m11);
-			Geometry* geom = infos[i].m_model_instance->getModel().getGeometry();
-			for(int j = 0; j < infos[i].m_model_instance->getModel().getMeshCount(); ++j)
+			Model& model = infos[i].m_model_instance->getModel();
+			Geometry* geom = model.getGeometry();
+			for(int j = 0; j < model.getMeshCount(); ++j)
 			{
-				Mesh& mesh = infos[i].m_model_instance->getModel().getMesh(j);
+				Mesh& mesh = model.getMesh(j);
 				if(mesh.getMaterial()->isReady())
 				{
 					mesh.getMaterial()->apply();
+					static Matrix bone_mtx[64];
+					Pose& pose = infos[i].m_model_instance->getPose();
+					Vec3* poss = pose.getPositions();
+					Quat* rots = pose.getRotations();
+					for(int bone_index = 0, bone_count = pose.getCount(); bone_index < bone_count; ++bone_index)
+					{
+						rots[bone_index].toMatrix(bone_mtx[bone_index]);
+						bone_mtx[bone_index].translate(poss[bone_index]);
+						bone_mtx[bone_index] = bone_mtx[bone_index] * model.getBone(bone_index).inv_bind_matrix;
+					}
+					/// TODO do not hardcode "bone_matrices" 
+					mesh.getMaterial()->getShader()->setUniform("bone_matrices", bone_mtx, pose.getCount());
 					geom->draw(mesh.getStart(), mesh.getCount(), *mesh.getMaterial()->getShader());
 				}
 			}
 		}
-		glPopMatrix();
 	}
 
 	Array<Command> m_commands;

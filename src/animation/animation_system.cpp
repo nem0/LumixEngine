@@ -205,7 +205,13 @@ namespace Lux
 			if(!animable.m_manual)
 			{
 				animable.m_animation->getPose(animable.m_time, renderer->getPose(animable.m_renderable));
-				animable.m_time += time_delta;
+				float t = animable.m_time + time_delta;
+				float l = animable.m_animation->getLength();
+				while(t > l)
+				{
+					t -= l;
+				}
+				animable.m_time = t;
 			}
 		}
 	}

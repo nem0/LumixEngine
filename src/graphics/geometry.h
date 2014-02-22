@@ -16,7 +16,8 @@ struct VertexAttributeDef
 {
 	enum Type
 	{
-		VEC4,
+		FLOAT4,
+		INT4,
 		POSITION,
 		NORMAL,
 		TEXTURE_COORDS,

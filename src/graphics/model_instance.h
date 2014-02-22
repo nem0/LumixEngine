@@ -20,7 +20,10 @@ class ModelInstance
 		Matrix& getMatrix() { return m_matrix; }
 		Model& getModel() { return m_model; }
 		Pose& getPose() { return m_pose; }
-		void setMatrix(const Matrix& mtx) { m_matrix = mtx; }
+		void setMatrix(const Matrix& mtx);
+
+	private:
+		void modelLoaded();
 
 	private:
 		Pose		m_pose;

@@ -15,12 +15,24 @@ void VertexDef::parse(const char* data, int size)
 		ASSERT(index < 15);
 		switch(data[i])
 		{
-			case 'v':
+			case 'f':
 				++i;
 				if(data[i] == '4')
 				{
-					m_attributes[index] = VertexAttributeDef::VEC4;
+					m_attributes[index] = VertexAttributeDef::FLOAT4;
 					m_vertex_size += 4 * sizeof(float);
+				}
+				else
+				{
+					ASSERT(false);
+				}
+				break;
+			case 'i':
+				++i;
+				if(data[i] == '4')
+				{
+					m_attributes[index] = VertexAttributeDef::INT4;
+					m_vertex_size += 4 * sizeof(int);
 				}
 				else
 				{
@@ -57,8 +69,11 @@ int VertexDef::getPositionOffset() const
 	{
 		switch(m_attributes[i])
 		{
-			case VertexAttributeDef::VEC4:
+			case VertexAttributeDef::FLOAT4:
 				offset += 4 * sizeof(float);
+				break;
+			case VertexAttributeDef::INT4:
+				offset += 4 * sizeof(int);
 				break;
 			case VertexAttributeDef::POSITION:
 				return offset;
@@ -101,10 +116,16 @@ void VertexDef::apply(Shader& shader)
 				glTexCoordPointer(2, GL_FLOAT, m_vertex_size, (GLvoid*)offset);
 				offset += sizeof(GLfloat) * 2;
 				break;
-			case VertexAttributeDef::VEC4:
+			case VertexAttributeDef::FLOAT4:
 				glEnableVertexAttribArray(shader.getAttribId(shader_attrib_idx));
 				glVertexAttribPointer(shader.getAttribId(shader_attrib_idx), 4, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
 				offset += sizeof(GLfloat) * 4;
+				++shader_attrib_idx;
+				break;
+			case VertexAttributeDef::INT4:
+				glEnableVertexAttribArray(shader.getAttribId(shader_attrib_idx));
+				glVertexAttribPointer(shader.getAttribId(shader_attrib_idx), 4, GL_INT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
+				offset += sizeof(GLint) * 4;
 				++shader_attrib_idx;
 				break;
 			default:
