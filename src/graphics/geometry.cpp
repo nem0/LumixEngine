@@ -93,7 +93,7 @@ int VertexDef::getPositionOffset() const
 }
 
 
-void VertexDef::apply(Shader& shader)
+void VertexDef::begin(Shader& shader)
 {
 	int offset = 0;
 	int shader_attrib_idx = 0;
@@ -137,6 +137,39 @@ void VertexDef::apply(Shader& shader)
 }
 
 
+void VertexDef::end(Shader& shader)
+{
+	int shader_attrib_idx = 0;
+	for(int i = 0; i < m_attribute_count; ++i)
+	{
+		switch(m_attributes[i])
+		{
+			case VertexAttributeDef::POSITION:
+				glDisableClientState(GL_VERTEX_ARRAY);
+				break;
+			case VertexAttributeDef::NORMAL:
+				glDisableClientState(GL_NORMAL_ARRAY);
+				break;
+			case VertexAttributeDef::TEXTURE_COORDS:
+				glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+				break;
+			case VertexAttributeDef::FLOAT4:
+				glDisableVertexAttribArray(shader.getAttribId(shader_attrib_idx));
+				++shader_attrib_idx;
+				break;
+			case VertexAttributeDef::INT4:
+				glDisableVertexAttribArray(shader.getAttribId(shader_attrib_idx));
+				++shader_attrib_idx;
+				break;
+			default:
+				ASSERT(false);
+				break;
+		}
+	}
+	
+}
+
+
 float Geometry::getBoundingRadius() const
 {
 	float d = 0;
@@ -155,12 +188,9 @@ float Geometry::getBoundingRadius() const
 void Geometry::draw(int start, int count, Shader& shader)
 {
 	glBindBuffer(GL_ARRAY_BUFFER, m_id);
-	m_vertex_definition.apply(shader);
+	m_vertex_definition.begin(shader);
 	glDrawArrays(GL_TRIANGLES, start, count);
-
-	glDisableClientState(GL_VERTEX_ARRAY);            // deactivate vertex array
-	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-	glDisableClientState(GL_NORMAL_ARRAY);
+	m_vertex_definition.end(shader);
 }
 
 

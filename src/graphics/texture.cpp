@@ -1,6 +1,7 @@
 #include "graphics/gl_ext.h"
 #include "core/file_system.h"
 #include "core/ifile.h"
+#include "core/log.h"
 #include "graphics/texture.h"
 
 
@@ -68,24 +69,25 @@ void Texture::loaded(FS::IFile* file, bool success)
 		if (header.dataType != 2)
 		{
 			LUX_DELETE_ARRAY(buffer);
+			g_log_warning.log("renderer", "Unsupported texture format %s", m_path.c_str());
 			return;
 		}
 	
 		if (color_mode < 3)
 		{
 			LUX_DELETE_ARRAY(buffer);
+			g_log_warning.log("renderer", "Unsupported color mode %s", m_path.c_str());
 			return;
 		}
 	
 		const char* image_src = buffer + sizeof(TGAHeader);
 		unsigned char* image_dest = LUX_NEW_ARRAY(unsigned char, image_size);
-	
 
-		// Targa is BGR, swap to RGB and flip Y axis
+		// Targa is BGR, swap to RGB, add alpha and flip Y axis
 		for (long y = 0; y < header.height; y++)
 		{
 			long read_index = y * header.width * color_mode;
-			long write_index = read_index;//((header.imageDescriptor & 32) != 0) ? read_index : (header.height - y - 1) * header.width * color_mode;
+			long write_index = ((header.imageDescriptor & 32) != 0) ? read_index : y * header.width * 4;
 			for (long x = 0; x < header.width; x++)
 			{
 				image_dest[write_index] = image_src[read_index+2];
@@ -110,7 +112,7 @@ void Texture::loaded(FS::IFile* file, bool success)
 
 		glBindTexture(GL_TEXTURE_2D, m_id);
 
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, header.width, header.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_dest);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, header.width, header.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_dest);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -120,6 +122,10 @@ void Texture::loaded(FS::IFile* file, bool success)
 		LUX_DELETE_ARRAY(image_dest);
 		LUX_DELETE_ARRAY(buffer);
 	}
+	else
+	{
+		g_log_warning.log("renderer", "Error loading texture %s\n", m_path.c_str());
+	}
 /// TODO close file somehow
 }
 
@@ -128,6 +134,7 @@ bool Texture::load(const char* path, FS::FileSystem& file_system)
 {
 	FS::ReadCallback cb;
 	cb.bind<Texture, &Texture::loaded>(this);
+	m_path = path;
 	file_system.openAsync(file_system.getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, cb);
 	return true;
 }
