@@ -3,6 +3,7 @@
 
 #include "core/lux.h"
 #include "core/vec3.h"
+#include "core/vec4.h"
 
 
 namespace Lux
@@ -48,6 +49,16 @@ struct LUX_CORE_API Matrix
 		);
 	}
 
+	Vec4 operator *(const Vec4& rhs) const
+	{
+		return Vec4(
+			m11 * rhs.x + m21 * rhs.y + m31 * rhs.z + m41 * rhs.w,	
+			m12 * rhs.x + m22 * rhs.y + m32 * rhs.z + m42 * rhs.w,	
+			m13 * rhs.x + m23 * rhs.y + m33 * rhs.z + m43 * rhs.w,
+			m14 * rhs.x + m24 * rhs.y + m34 * rhs.z + m44 * rhs.w
+		);
+	}
+
 	Vec3 getZVector() const
 	{
 		return Vec3(m31, m32, m33);
@@ -63,6 +74,47 @@ struct LUX_CORE_API Matrix
 		return Vec3(m11, m12, m13);
 	}
 
+	
+	float determinant()
+	{
+		return 
+			m14*m23*m32*m41 - m13*m24*m32*m41 - m14*m22*m33*m41 + m12*m24*m33*m41 +
+			m13*m22*m34*m41 - m12*m23*m34*m41 - m14*m23*m31*m42 + m13*m24*m31*m42 +
+			m14*m21*m33*m42 - m11*m24*m33*m42 - m13*m21*m34*m42 + m11*m23*m34*m42 +
+			m14*m22*m31*m43 - m12*m24*m31*m43 - m14*m21*m32*m43 + m11*m24*m32*m43 +
+			m12*m21*m34*m43 - m11*m22*m34*m43 - m13*m22*m31*m44 + m12*m23*m31*m44 +
+			m13*m21*m32*m44 - m11*m23*m32*m44 - m12*m21*m33*m44 + m11*m22*m33*m44;
+	}
+
+
+	void inverse()
+	{
+		Matrix mtx;
+		float d = determinant();
+		if( d == 0 ) return;
+		d = 1.0f / d;
+
+		mtx.m11 = d * (m23*m34*m42 - m24*m33*m42 + m24*m32*m43 - m22*m34*m43 - m23*m32*m44 + m22*m33*m44);
+		mtx.m12 = d * (m14*m33*m42 - m13*m34*m42 - m14*m32*m43 + m12*m34*m43 + m13*m32*m44 - m12*m33*m44);
+		mtx.m13 = d * (m13*m24*m42 - m14*m23*m42 + m14*m22*m43 - m12*m24*m43 - m13*m22*m44 + m12*m23*m44);
+		mtx.m14 = d * (m14*m23*m32 - m13*m24*m32 - m14*m22*m33 + m12*m24*m33 + m13*m22*m34 - m12*m23*m34);
+		mtx.m21 = d * (m24*m33*m41 - m23*m34*m41 - m24*m31*m43 + m21*m34*m43 + m23*m31*m44 - m21*m33*m44);
+		mtx.m22 = d * (m13*m34*m41 - m14*m33*m41 + m14*m31*m43 - m11*m34*m43 - m13*m31*m44 + m11*m33*m44);
+		mtx.m23 = d * (m14*m23*m41 - m13*m24*m41 - m14*m21*m43 + m11*m24*m43 + m13*m21*m44 - m11*m23*m44);
+		mtx.m24 = d * (m13*m24*m31 - m14*m23*m31 + m14*m21*m33 - m11*m24*m33 - m13*m21*m34 + m11*m23*m34);
+		mtx.m31 = d * (m22*m34*m41 - m24*m32*m41 + m24*m31*m42 - m21*m34*m42 - m22*m31*m44 + m21*m32*m44);
+		mtx.m32 = d * (m14*m32*m41 - m12*m34*m41 - m14*m31*m42 + m11*m34*m42 + m12*m31*m44 - m11*m32*m44);
+		mtx.m33 = d * (m12*m24*m41 - m14*m22*m41 + m14*m21*m42 - m11*m24*m42 - m12*m21*m44 + m11*m22*m44);
+		mtx.m34 = d * (m14*m22*m31 - m12*m24*m31 - m14*m21*m32 + m11*m24*m32 + m12*m21*m34 - m11*m22*m34);
+		mtx.m41 = d * (m23*m32*m41 - m22*m33*m41 - m23*m31*m42 + m21*m33*m42 + m22*m31*m43 - m21*m32*m43);
+		mtx.m42 = d * (m12*m33*m41 - m13*m32*m41 + m13*m31*m42 - m11*m33*m42 - m12*m31*m43 + m11*m32*m43);
+		mtx.m43 = d * (m13*m22*m41 - m12*m23*m41 - m13*m21*m42 + m11*m23*m42 + m12*m21*m43 - m11*m22*m43);
+		mtx.m44 = d * (m12*m23*m31 - m13*m22*m31 + m13*m21*m32 - m11*m23*m32 - m12*m21*m33 + m11*m22*m33);
+
+		*this = mtx;
+	}
+
+	// orthonormal
 	void fastInverse()
 	{
 		float tmp = m21;

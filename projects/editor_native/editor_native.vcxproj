@@ -60,7 +60,7 @@
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>..\..\bin\$(Configuration)\;..\..\external\sdl\lib\;..\..\external\cegui\lib\$(Configuration)\</AdditionalLibraryDirectories>
-      <AdditionalDependencies>gui.lib;opengl32.lib;core.lib;engine.lib;SDL2main.lib;SDL2.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>glu32.lib;gui.lib;opengl32.lib;core.lib;engine.lib;SDL2main.lib;SDL2.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SubSystem>Console</SubSystem>
     </Link>
     <PostBuildEvent>
@@ -106,6 +106,7 @@
     <ClCompile Include="..\..\src\editor_native\property_frame\renderable_ui.cpp" />
     <ClCompile Include="..\..\src\editor_native\property_frame\script_ui.cpp" />
     <ClCompile Include="..\..\src\editor_native\script_compiler.cpp" />
+    <ClCompile Include="..\..\src\editor_native\sdl_render_device.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\editor_native\log_ui.h" />
@@ -120,6 +121,7 @@
     <ClInclude Include="..\..\src\editor_native\property_frame\renderable_ui.h" />
     <ClInclude Include="..\..\src\editor_native\property_frame\script_ui.h" />
     <ClInclude Include="..\..\src\editor_native\script_compiler.h" />
+    <ClInclude Include="..\..\src\editor_native\sdl_render_device.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

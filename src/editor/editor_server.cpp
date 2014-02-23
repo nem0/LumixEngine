@@ -3,7 +3,6 @@
 #include <gl/GL.h>
 #include <shellapi.h>
 #include <Windows.h>
-#include "Horde3DUtils.h"
 
 #include "core/blob.h"
 #include "core/crc32.h"
@@ -159,7 +158,6 @@ struct EditorServerImpl
 		void onMessage(void* msgptr, int size);
 
 		const IPropertyDescriptor& getPropertyDescriptor(uint32_t type, uint32_t name_hash);
-		H3DNode castRay(int x, int y, Vec3& hit_pos, char* name, int max_name_size, H3DNode gizmo_node);
 		void registerProperties();
 		void rotateCamera(int x, int y);
 		void onEvent(Event& evt);
@@ -185,12 +183,11 @@ struct EditorServerImpl
 		HGLRC m_hglrc;
 		HGLRC m_game_hglrc;
 		bool m_is_game_mode;
-		Quat m_camera_rot;
-		Vec3 m_camera_pos;
 		FS::IFile* m_game_mode_file;
 		MessageTask* m_message_task;
 		Engine m_engine;
 		EditorServer* m_owner;
+		Entity m_camera;
 
 		FS::FileSystem* m_file_system;
 		FS::TCPFileServer m_tpc_file_server;
@@ -228,16 +225,16 @@ void EditorServer::registerCreator(uint32_t type, IPlugin& creator)
 
 void EditorServer::tick(HWND hwnd, HWND game_hwnd)
 {
-	PAINTSTRUCT ps;
+	/*PAINTSTRUCT ps;
 	HDC hdc;
 	MT::Lock lock(m_impl->m_universe_mutex);
 
 	if(m_impl->m_is_game_mode)
 	{
 		m_impl->m_engine.update();
-	}
+	}*/
 	m_impl->m_engine.getFileSystem().updateAsyncTransactions();
-
+	/*
 	if(hwnd)
 	{
 		m_impl->m_engine.getRenderer().enableStage("Gizmo", true);
@@ -262,13 +259,14 @@ void EditorServer::tick(HWND hwnd, HWND game_hwnd)
 		m_impl->renderScene(false);
 		wglSwapLayerBuffers(hdc, WGL_SWAP_MAIN_PLANE);
 		EndPaint(game_hwnd, &ps);
-	}
+	}*/
+
 }
 
 
 void EditorServer::onResize(int w, int h)
 {
-	m_impl->m_engine.getRenderer().onResize(w, h);
+	//m_impl->m_engine.getRenderer().onResize(w, h);
 }
 
 
@@ -298,12 +296,12 @@ void EditorServer::destroy()
 
 void EditorServerImpl::registerProperties()
 {
-	m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("source"), &Renderer::getMesh, &Renderer::setMesh, IPropertyDescriptor::FILE));
+	/*	m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("source"), &Renderer::getMesh, &Renderer::setMesh, IPropertyDescriptor::FILE));
 	m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("visible"), &Renderer::getVisible, &Renderer::setVisible));
 	m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("cast shadows"), &Renderer::getCastShadows, &Renderer::setCastShadows));
 	m_component_properties[point_light_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("fov"), &Renderer::getLightFov, &Renderer::setLightFov));
 	m_component_properties[point_light_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("radius"), &Renderer::getLightRadius, &Renderer::setLightRadius));
-	m_component_properties[script_type].push(LUX_NEW(PropertyDescriptor<ScriptSystem>)(crc32("source"), &ScriptSystem::getScriptPath, &ScriptSystem::setScriptPath, IPropertyDescriptor::FILE));
+	m_component_properties[script_type].push(LUX_NEW(PropertyDescriptor<ScriptSystem>)(crc32("source"), &ScriptSystem::getScriptPath, &ScriptSystem::setScriptPath, IPropertyDescriptor::FILE));*/
 }
 
 
@@ -315,11 +313,20 @@ void EditorServerImpl::onPointerDown(int x, int y, MouseButton::Value button)
 	}
 	else if(button == MouseButton::LEFT)
 	{
-		Vec3 hit_pos;
+		Vec3 origin, dir;
+		m_engine.getRenderer().getRay(m_camera.getComponent(crc32("camera")), (float)x, (float)y, origin, dir); 
+		RayCastModelHit hit = m_engine.getRenderer().castRay(origin, dir);
+		if(hit.m_is_hit)
+		{
+			selectEntity(hit.m_renderable.entity);
+			m_mouse_mode = EditorServerImpl::MouseMode::TRANSFORM;
+			m_gizmo.startTransform(m_camera.getComponent(crc32("camera")), x, y, Gizmo::TransformMode::CAMERA_XZ);
+		}
+		/*Vec3 hit_pos;
 		char node_name[20];
 		H3DNode node = castRay(x, y, hit_pos, node_name, 20, m_gizmo.getNode());
 		Component r = m_engine.getRenderer().getRenderable(*m_engine.getUniverse(), node);
-		if(node == m_gizmo.getNode() && m_selected_entity.isValid())
+		/*if(node == m_gizmo.getNode() && m_selected_entity.isValid())
 		{
 			m_mouse_mode = EditorServerImpl::MouseMode::TRANSFORM;
 			if(node_name[0] == 'x')
@@ -356,7 +363,7 @@ void EditorServerImpl::onPointerDown(int x, int y, MouseButton::Value button)
 				m_mouse_mode = EditorServerImpl::MouseMode::TRANSFORM;
 				m_gizmo.startTransform(x, y, Gizmo::TransformMode::CAMERA_XZ);
 			}
-		}
+		}*/
 	}
 }
 
@@ -375,7 +382,7 @@ void EditorServerImpl::onPointerMove(int x, int y, int relx, int rely)
 				
 				Gizmo::TransformOperation tmode = GetKeyState(VK_MENU) & 0x8000 ? Gizmo::TransformOperation::ROTATE : Gizmo::TransformOperation::TRANSLATE;
 				int flags = GetKeyState(VK_LCONTROL) & 0x8000 ? Gizmo::Flags::FIXED_STEP : 0;
-				m_gizmo.transform(tmode, x, y, relx, rely, flags);
+				m_gizmo.transform(m_camera.getComponent(crc32("camera")), tmode, x, y, relx, rely, flags);
 			}
 			break;
 	}
@@ -402,30 +409,23 @@ void EditorServerImpl::save(FS::IFile& file)
 {
 	JsonSerializer serializer(file, JsonSerializer::WRITE);
 	m_engine.serialize(serializer);
-	serializer.serialize("cam_pos_x", m_camera_pos.x);
-	serializer.serialize("cam_pos_y", m_camera_pos.y);
-	serializer.serialize("cam_pos_z", m_camera_pos.z);
-	serializer.serialize("cam_rot_x", m_camera_rot.x);
-	serializer.serialize("cam_rot_y", m_camera_rot.y);
-	serializer.serialize("cam_rot_z", m_camera_rot.z);
-	serializer.serialize("cam_rot_w", m_camera_rot.w);
 	g_log_info.log("editor server", "universe saved");
 }
 
 
 void EditorServerImpl::addEntity()
 {
-	Entity e = m_engine.getUniverse()->createEntity();
+	/*Entity e = m_engine.getUniverse()->createEntity();
 	e.setPosition(m_camera_pos	+ m_camera_rot * Vec3(0, 0, -2));
 	selectEntity(e);
 	EditorIcon* er = LUX_NEW(EditorIcon)();
 	er->create(m_selected_entity, Component::INVALID);
 	m_editor_icons.push(er);
-	/*** this is here because camera render node does not exists untitle pipeline resource is loaded, do this properly*/
+	/*** TODO this is here because camera render node does not exists untitle pipeline resource is loaded, do this properly*//*
 	Matrix mtx;
 	m_camera_rot.toMatrix(mtx);
 	mtx.setTranslation(m_camera_pos);
-	m_engine.getRenderer().setCameraMatrix(mtx);	
+	m_engine.getRenderer().setCameraMatrix(mtx);*/
 	/***/
 }
 
@@ -433,7 +433,7 @@ void EditorServerImpl::addEntity()
 int MessageTask::task()
 {
 	m_is_finished = false;
-	m_acceptor.start("127.0.0.1", 10002);
+	m_acceptor.start("127.0.0.1", 10013);
 	m_stream = m_acceptor.accept();
 	PODArray<uint8_t> data;
 	data.resize(5);
@@ -473,7 +473,7 @@ void EditorServerImpl::toggleGameMode()
 
 void EditorServerImpl::stopGameMode()
 {
-	m_is_game_mode = false;
+	/*m_is_game_mode = false;
 	m_engine.getScriptSystem().stop();
 	Matrix mtx;
 	m_camera_rot.toMatrix(mtx);
@@ -482,7 +482,7 @@ void EditorServerImpl::stopGameMode()
 	m_game_mode_file->seek(FS::SeekMode::BEGIN, 0);
 	load(*m_game_mode_file);
 	m_engine.getFileSystem().close(m_game_mode_file);
-	m_game_mode_file = NULL;
+	m_game_mode_file = NULL;*/
 }
 
 
@@ -538,7 +538,7 @@ void EditorServerImpl::sendEntityPosition(int uid)
 
 void EditorServerImpl::addComponent(uint32_t type_crc)
 {
-	if(m_selected_entity.isValid())
+	/*if(m_selected_entity.isValid())
 	{
 		const Entity::ComponentList& cmps = m_selected_entity.getComponents();
 		for(int i = 0; i < cmps.size(); ++i)
@@ -571,13 +571,13 @@ void EditorServerImpl::addComponent(uint32_t type_crc)
 			ASSERT(false);
 		}
 		selectEntity(m_selected_entity);
-	}
+	}*/
 }
 
 
 void EditorServerImpl::lookAtSelected()
 {
-	if(m_selected_entity.isValid())
+	/*if(m_selected_entity.isValid())
 	{
 		Vec3 dir = m_camera_rot * Vec3(0, 0, 1);
 		m_camera_pos = m_selected_entity.getPosition() + dir * 10;
@@ -585,7 +585,7 @@ void EditorServerImpl::lookAtSelected()
 		m_camera_rot.toMatrix(mtx);
 		mtx.setTranslation(m_camera_pos);
 		m_engine.getRenderer().setCameraMatrix(mtx);
-	}
+	}*/
 }
 
 
@@ -598,7 +598,7 @@ void EditorServerImpl::removeEntity()
 
 void EditorServerImpl::removeComponent(uint32_t type_crc)
 {
-	const Entity::ComponentList& cmps = m_selected_entity.getComponents();
+	/*const Entity::ComponentList& cmps = m_selected_entity.getComponents();
 	Component cmp;
 	for(int i = 0; i < cmps.size(); ++i)
 	{
@@ -620,7 +620,7 @@ void EditorServerImpl::removeComponent(uint32_t type_crc)
 	{
 		ASSERT(false);
 	}
-	selectEntity(m_selected_entity);
+	selectEntity(m_selected_entity);*/
 }
 
 void EditorServerImpl::load(const char path[])
@@ -652,7 +652,7 @@ void EditorServerImpl::newUniverse()
 
 void EditorServerImpl::load(FS::IFile& file)
 {
-	g_log_info.log("editor server", "parsing universe...");
+	/*g_log_info.log("editor server", "parsing universe...");
 	int selected_idx = m_selected_entity.index;
 	destroyUniverse();
 	createUniverse(false, "");
@@ -671,13 +671,14 @@ void EditorServerImpl::load(FS::IFile& file)
 	m_camera_rot.toMatrix(mtx);
 	mtx.setTranslation(m_camera_pos);
 	m_engine.getRenderer().setCameraMatrix(mtx);
-	g_log_info.log("editor server", "universe parsed");
+	g_log_info.log("editor server", "universe parsed");*/
+	ASSERT(false);
 }
 
 
 HGLRC createGLContext(HWND hwnd)
 {
-	PAINTSTRUCT ps;
+	/*PAINTSTRUCT ps;
 	HDC hdc;
 	hdc = BeginPaint(hwnd, &ps);
 	PIXELFORMATDESCRIPTOR pfd = { 
@@ -706,7 +707,9 @@ HGLRC createGLContext(HWND hwnd)
 	wglMakeCurrent(hdc, hglrc);
 	EndPaint(hwnd, &ps);
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
-	return hglrc;
+	return hglrc;*/
+	ASSERT(false);
+	return NULL;
 }
 
 
@@ -729,7 +732,7 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 
 	m_file_system->setDefaultDevice("memory:tcp");
 	m_file_system->setSaveGameDevice("memory:tcp");
-
+	/*
 	if(hwnd)
 	{
 		m_hglrc = createGLContext(hwnd);
@@ -738,7 +741,7 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 			m_game_hglrc = createGLContext(game_hwnd);
 			wglShareLists(m_hglrc, m_game_hglrc);
 		}
-	}
+	}*/
 
 	g_log_info.getCallback().bind<EditorServerImpl, &EditorServerImpl::onLogInfo>(this);
 	g_log_warning.getCallback().bind<EditorServerImpl, &EditorServerImpl::onLogWarning>(this);
@@ -751,7 +754,7 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 		return false;
 	}
 
-	glPopAttrib();
+	//glPopAttrib();
 	
 	if(!m_engine.loadPlugin("physics.dll"))
 	{
@@ -765,8 +768,6 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 	EditorIcon::createResources(base_path);
 
 	createUniverse(true, base_path);
-	m_gizmo.create(base_path, m_engine.getRenderer());
-	m_gizmo.hide();
 	registerProperties();
 	//m_navigation.load("models/level2/level2.pda");
 	
@@ -825,7 +826,8 @@ void EditorServerImpl::sendMessage(const uint8_t* data, int32_t length)
 
 void EditorServerImpl::renderScene(bool is_render_physics)
 {
-	if(m_engine.getRenderer().isReady())
+	ASSERT(false);
+	/*if(m_engine.getRenderer().isReady())
 	{
 		if(m_selected_entity.isValid())
 		{
@@ -845,13 +847,14 @@ void EditorServerImpl::renderScene(bool is_render_physics)
 		m_engine.getRenderer().endFrame();
 		
 		//m_navigation.draw();
-	}
+	}*/
 }
 
 
 void EditorServerImpl::renderPhysics()
 {
-	glMatrixMode(GL_PROJECTION);
+	ASSERT(false);
+	/*glMatrixMode(GL_PROJECTION);
 	float proj[16];
 	h3dGetCameraProjMat(m_engine.getRenderer().getRawCameraNode(), proj);
 	glLoadMatrixf(proj);
@@ -913,12 +916,11 @@ EditorServerImpl::EditorServerImpl()
 void EditorServerImpl::navigate(float forward, float right, int fast)
 {
 	float navigation_speed = (fast ? 0.4f : 0.1f);
-	m_camera_pos += m_camera_rot * Vec3(0, 0, 1) * -forward * navigation_speed;
-	m_camera_pos += m_camera_rot * Vec3(1, 0, 0) * right * navigation_speed;
-	Matrix mtx;
-	m_camera_rot.toMatrix(mtx);
-	mtx.setTranslation(m_camera_pos);
-	m_engine.getRenderer().setCameraMatrix(mtx);
+	Vec3 pos = m_camera.getPosition();
+	Quat rot = m_camera.getRotation();;
+	pos += rot * Vec3(0, 0, -1) * forward * navigation_speed;
+	pos += rot * Vec3(1, 0, 0) * right * navigation_speed;
+	m_camera.setPosition(pos);
 }
 
 
@@ -968,66 +970,23 @@ void EditorServerImpl::setProperty(void* data, int size)
 
 void EditorServerImpl::rotateCamera(int x, int y)
 {
-	Quat yaw_rot(Vec3(0, 1, 0), -x / 200.0f);
-	m_camera_rot = m_camera_rot * yaw_rot;
-	m_camera_rot.normalize();
+	Vec3 pos = m_camera.getPosition();
+	Quat rot = m_camera.getRotation();
 
-	Matrix mtx;
-	m_camera_rot.toMatrix(mtx);
-	Vec3 axis = mtx.getXVector();
-	axis.y = 0;
-	axis.normalize();
+	Quat yaw_rot(Vec3(0, 1, 0), -x / 200.0f);
+	rot = rot * yaw_rot;
+	rot.normalize();
+	
+	Vec3 axis = rot * Vec3(1, 0, 0);
 	Quat pitch_rot(axis, -y / 200.0f);
-	m_camera_rot = m_camera_rot * pitch_rot;
-	m_camera_rot.normalize();
+	rot = rot * pitch_rot;
+	rot.normalize();
 
 	Matrix camera_mtx;
-	m_camera_rot.toMatrix(camera_mtx);
-	camera_mtx.setTranslation(m_camera_pos);
-	m_engine.getRenderer().setCameraMatrix(camera_mtx);
-}
+	rot.toMatrix(camera_mtx);
 
-
-H3DNode EditorServerImpl::castRay(int x, int y, Vec3& hit_pos, char* name, int max_name_size, H3DNode gizmo_node)
-{
-	Vec3 origin, dir;
-	m_engine.getRenderer().getRay(x, y, origin, dir);
-	
-	if(h3dCastRay(H3DRootNode, origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, 0) == 0)
-	{
-		return 0;
-	}
-	else
-	{
-		H3DNode node = 0;
-		int i = 0;
-		while(h3dGetCastRayResult(i, &node, 0, &hit_pos.x))
-		{
-			H3DNode original_node = node;
-			while(node && h3dGetNodeType(node) != H3DNodeTypes::Model)
-			{
-				node = h3dGetNodeParent(node);
-			}
-			if(node == gizmo_node)
-			{
-				const char* node_name = h3dGetNodeParamStr(original_node, H3DNodeParams::NameStr);
-				strcpy_s(name, max_name_size, node_name);
-				return node;
-			}
-			++i;
-		}
-		if(h3dGetCastRayResult(0, &node, 0, &hit_pos.x))
-		{
-			const char* node_name = h3dGetNodeParamStr(node, H3DNodeParams::NameStr);
-			strcpy_s(name, max_name_size, node_name);
-			while(node && h3dGetNodeType(node) != H3DNodeTypes::Model)
-			{
-				node = h3dGetNodeParent(node);
-			}
-			return node;
-		}
-	}
-	return 0;
+	camera_mtx.setTranslation(pos);
+	m_camera.setMatrix(camera_mtx);
 }
 
 
@@ -1155,7 +1114,8 @@ void EditorServerImpl::destroyUniverse()
 	}
 	selectEntity(Entity::INVALID);
 	m_editor_icons.clear();
-	m_gizmo.setUniverse(0);
+	m_gizmo.setUniverse(NULL);
+	m_gizmo.destroy();
 	m_engine.destroyUniverse();
 }
 
@@ -1163,22 +1123,27 @@ void EditorServerImpl::destroyUniverse()
 void EditorServerImpl::createUniverse(bool create_scene, const char* base_path)
 {
 	Universe* universe = m_engine.createUniverse();
-	
+
+	m_camera = m_engine.getUniverse()->createEntity();
+	m_camera.setPosition(0, 0, -5);
+	m_camera.setRotation(Quat(Vec3(0, 1, 0), -3.14159265f));
+	Component cmp = m_engine.getRenderer().createComponent(crc32("camera"), m_camera);
+	m_engine.getRenderer().setCameraPipeline(cmp, string("pipelines/main.json"));
+	m_engine.getRenderer().setCameraActive(cmp, true);
+
+	Component cmp2 = m_engine.getRenderer().createComponent(crc32("renderable"), m_engine.getUniverse()->createEntity());
+	m_engine.getRenderer().setRenderablePath(cmp2, string("models/blender.msh"));
+/*	
 	universe->getEventManager()->addListener(EntityMovedEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);
 	universe->getEventManager()->addListener(ComponentEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);
 	universe->getEventManager()->addListener(EntityDestroyedEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);
 
-	Quat q(0, 0, 0, 1);
-	m_camera_pos.set(0, 0, 0);
-	m_camera_rot = Quat(0, 0, 0, 1);
-	Matrix mtx;
-	m_camera_rot.toMatrix(mtx);
-	mtx.setTranslation(m_camera_pos);
-	m_engine.getRenderer().setCameraMatrix(mtx);
-
 	addEntity();
-
+	*/
+	m_gizmo.create(base_path, m_engine.getRenderer());
 	m_gizmo.setUniverse(universe);
+	m_gizmo.hide();
+
 	m_selected_entity = Entity::INVALID;
 }
 

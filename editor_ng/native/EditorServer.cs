@@ -56,7 +56,7 @@ namespace editor_ng.native
 
             m_buffer = new byte[1024*256];
             System.Threading.Thread.Sleep(1000); // waiting for native part /// TODO remove this hack
-            m_client = new TcpClient("127.0.0.1", 10002);
+            m_client = new TcpClient("127.0.0.1", 10013);
             m_client.GetStream().BeginRead(m_buffer, 0, 1024*256, new AsyncCallback(onReceive), this);
         }
 
