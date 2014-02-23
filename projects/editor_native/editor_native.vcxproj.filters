@@ -26,6 +26,7 @@
     <ClCompile Include="..\..\src\editor_native\property_frame\point_light_ui.cpp">
       <Filter>property_frame</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\editor_native\sdl_render_device.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\editor_native\main_frame.h" />
@@ -54,6 +55,7 @@
     <ClInclude Include="..\..\src\editor_native\property_frame\point_light_ui.h">
       <Filter>property_frame</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\editor_native\sdl_render_device.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="property_frame">

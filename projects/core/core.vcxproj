@@ -166,6 +166,7 @@
     <ClInclude Include="..\..\src\core\timer.h" />
     <ClInclude Include="..\..\src\core\transaction_queue.h" />
     <ClInclude Include="..\..\src\core\vec3.h" />
+    <ClInclude Include="..\..\src\core\vec4.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
