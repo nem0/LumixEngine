@@ -32,7 +32,8 @@ struct VertexDef
 		void parse(const char* data, int size);
 		int getVertexSize() const { return m_vertex_size; }
 		int getPositionOffset() const;
-		void apply(Shader& shader);
+		void begin(Shader& shader);
+		void end(Shader& shader);
 
 	private:
 		VertexAttributeDef::Type m_attributes[16];
