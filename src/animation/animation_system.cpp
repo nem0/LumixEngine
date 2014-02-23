@@ -173,7 +173,6 @@ namespace Lux
 
 	Animation* AnimationSystem::loadAnimation(const char* path, FS::FileSystem& file_system)
 	{
-		/// TODO animation management
 		Animation* anim = LUX_NEW(Animation);
 		anim->load(path, file_system);
 		return anim;
@@ -181,7 +180,6 @@ namespace Lux
 
 	void AnimationSystem::playAnimation(const Component& cmp, const char* path)
 	{
-		/// TODO handle old animation
 		m_impl->m_animables[cmp.index].m_animation = loadAnimation(path, m_impl->m_engine.getFileSystem());
 		m_impl->m_animables[cmp.index].m_time = 0;
 		m_impl->m_animables[cmp.index].m_manual = false;

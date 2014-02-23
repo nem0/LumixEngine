@@ -3,6 +3,7 @@
 
 #include <Windows.h>
 #include <gl/GL.h>
+#include "core/string.h"
 
 
 namespace Lux
@@ -28,6 +29,7 @@ class Texture
 
 	private:
 		GLuint m_id;
+		string m_path;
 };
 
 
