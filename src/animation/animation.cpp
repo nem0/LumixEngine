@@ -55,15 +55,18 @@ void Animation::loaded(FS::IFile* file, bool success)
 }
 
 
+static const float ANIMATION_FPS = 30.0f;
+
+
 void Animation::getPose(float time, Pose& pose) const
 {
-	int frame = (int)(time * 30.0f);
+	int frame = (int)(time * ANIMATION_FPS);
 	frame = frame >= m_frame_count ? m_frame_count - 1 : frame;
 	Vec3* pos = pose.getPositions();
 	Quat* rot = pose.getRotations();
 	int off = frame * m_bone_count;
 	int off2 = off + m_bone_count;
-	float t = (time - frame / 30.0f) / (1 / 30.0f);
+	float t = (time - frame / ANIMATION_FPS) / (1 / ANIMATION_FPS);
 	
 	if(frame < m_frame_count - 1)
 	{

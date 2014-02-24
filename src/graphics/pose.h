@@ -1,6 +1,9 @@
 #pragma once
 
 
+#include "core/lux.h"
+
+
 namespace Lux
 {
 
@@ -23,7 +26,7 @@ class Pose
 		Quat* getRotations() const { return m_rotations; }
 
 	private:
-		int	  m_count;
+		int32_t m_count;
 		Vec3* m_positions;
 		Quat* m_rotations;
 };

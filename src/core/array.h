@@ -80,7 +80,7 @@ class Array
 				m_data[index].~T();
 				for(int i = index + 1; i < m_size; ++i)
 				{
-					new ((char*)(m_data+i-1)) T(m_data[i]);
+					new ((char*)(m_data + i - 1)) T(m_data[i]);
 					m_data[i].~T();
 				}
 				--m_size;
@@ -111,21 +111,20 @@ class Array
 			{
 				grow();
 			}
-			new ((char*)(m_data+m_size)) T;
+			new ((char*)(m_data + m_size)) T;
 			++m_size;
-			return m_data[m_size-1];
+			return m_data[m_size - 1];
 		}
-
 
 		const T& back() const
 		{
-			return m_data[m_size-1];
+			return m_data[m_size - 1];
 		}
 
 
 		T& back()
 		{
-			return m_data[m_size-1];
+			return m_data[m_size - 1];
 		}
 
 
@@ -133,7 +132,7 @@ class Array
 		{
 			if(m_size > 0)
 			{
-				m_data[m_size-1].~T();
+				m_data[m_size - 1].~T();
 				--m_size;
 			}
 		}
@@ -146,7 +145,7 @@ class Array
 			}
 			for(int i = m_size; i < size; ++i)
 			{
-				new ((char*)(m_data+i)) T();
+				new ((char*)(m_data + i)) T();
 			}
 			callDestructors(m_data + size, m_data + m_size);
 			m_size = size;
@@ -159,7 +158,7 @@ class Array
 				T* newData = (T*)m_allocator.allocate(capacity * sizeof(T));
 				for(int i = 0; i < m_size; ++i)
 				{
-					new ((char*)(newData+i)) T(m_data[i]);
+					new ((char*)(newData + i)) T(m_data[i]);
 				}
 				callDestructors(m_data, m_data + m_size);
 				m_allocator.deallocate(m_data);
