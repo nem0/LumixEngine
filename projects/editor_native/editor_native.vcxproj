@@ -95,13 +95,13 @@
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>..\..\bin\$(Platform)_$(Configuration)\;..\..\external\sdl\lib\;..\..\external\cegui\lib\$(Configuration)\</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\..\bin\$(Platform)_$(Configuration)\;..\..\external\sdl\lib\x86</AdditionalLibraryDirectories>
       <AdditionalDependencies>glu32.lib;gui.lib;opengl32.lib;core.lib;engine.lib;SDL2main.lib;SDL2.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SubSystem>Console</SubSystem>
     </Link>
     <PostBuildEvent>
-      <Command>copy $(SolutionDir)external\sdl\lib\*.dll $(SolutionDir)\bin\$(Configuration)\
-</Command>
+      <Command>copy /Y "$(SolutionDir)external\sdl\lib\x86\*.dll" "$(SolutionDir)\bin\$(Platform)_$(Configuration)\"
+copy /Y "$(SolutionDir)external\physx\dll\x86\*.dll" "$(SolutionDir)\bin\$(Platform)_$(Configuration)\"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -116,13 +116,13 @@
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>..\..\bin\$(Platform)_$(Configuration)\;..\..\external\sdl\lib\;..\..\external\cegui\lib\$(Configuration)\</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\..\bin\$(Platform)_$(Configuration)\;..\..\external\sdl\lib\x64;$(Configuration)\</AdditionalLibraryDirectories>
       <AdditionalDependencies>glu32.lib;gui.lib;opengl32.lib;core.lib;engine.lib;SDL2main.lib;SDL2.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SubSystem>Console</SubSystem>
     </Link>
     <PostBuildEvent>
-      <Command>copy $(SolutionDir)external\sdl\lib\*.dll $(SolutionDir)\bin\$(Configuration)\
-</Command>
+      <Command>copy /Y "$(SolutionDir)external\sdl\lib\x64\*.dll" "$(SolutionDir)\bin\$(Platform)_$(Configuration)\"
+copy /Y "$(SolutionDir)external\physx\dll\x64\*.dll" "$(SolutionDir)\bin\$(Platform)_$(Configuration)\"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -141,12 +141,11 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <SubSystem>Console</SubSystem>
-      <AdditionalLibraryDirectories>..\..\bin\$(Platform)_$(Configuration)\;..\..\external\sdl\lib\</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\..\bin\$(Platform)_$(Configuration)\;..\..\external\sdl\lib\x86</AdditionalLibraryDirectories>
       <AdditionalDependencies>gui.lib;opengl32.lib;core.lib;engine.lib;SDL2main.lib;SDL2.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>copy $(SolutionDir)external\sdl\lib\*.dll $(SolutionDir)\bin\$(Configuration)\
-</Command>
+      <Command>copy /Y "$(SolutionDir)external\sdl\lib\x86\*.dll" "$(SolutionDir)\bin\$(Platform)_$(Configuration)\"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -165,12 +164,11 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <SubSystem>Console</SubSystem>
-      <AdditionalLibraryDirectories>..\..\bin\$(Platform)_$(Configuration)\;..\..\external\sdl\lib\</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\..\bin\$(Platform)_$(Configuration)\;..\..\external\sdl\lib\x64</AdditionalLibraryDirectories>
       <AdditionalDependencies>gui.lib;opengl32.lib;core.lib;engine.lib;SDL2main.lib;SDL2.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>copy $(SolutionDir)external\sdl\lib\*.dll $(SolutionDir)\bin\$(Configuration)\
-</Command>
+      <Command>copy /Y "$(SolutionDir)external\sdl\lib\x64\*.dll" "$(SolutionDir)\bin\$(Platform)_$(Configuration)\"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
