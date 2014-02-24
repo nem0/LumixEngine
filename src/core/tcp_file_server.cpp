@@ -37,7 +37,7 @@ namespace Lux
 							int32_t mode = 0;
 							int32_t len = 0;
 							stream->read(mode);
-							stream->read(m_buffer.data(), m_buffer.size());
+							stream->readString(m_buffer.data(), m_buffer.size());
 
 							int32_t ret = -2;
 							int32_t id = m_ids.alloc();
