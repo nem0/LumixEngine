@@ -27,7 +27,7 @@ namespace Lux
 	{
 		static uint32_t get(const int32_t& key)
 		{
-			size_t x = ((key >> 16) ^ key) * 0x45d9f3b;
+			uint32_t x = ((key >> 16) ^ key) * 0x45d9f3b;
 			x = ((x >> 16) ^ x) * 0x45d9f3b;
 			x = ((x >> 16) ^ x);
 			return x;
@@ -39,7 +39,7 @@ namespace Lux
 	{
 		static uint32_t get(const uint32_t& key)
 		{
-			size_t x = ((key >> 16) ^ key) * 0x45d9f3b;
+			uint32_t x = ((key >> 16) ^ key) * 0x45d9f3b;
 			x = ((x >> 16) ^ x) * 0x45d9f3b;
 			x = ((x >> 16) ^ x);
 			return x;
@@ -63,7 +63,7 @@ namespace Lux
 	{
 		static uint32_t get(const char* key)
 		{
-			size_t result = 0x55555555;
+			uint32_t result = 0x55555555;
 
 			while (*key) 
 			{ 
@@ -246,7 +246,7 @@ namespace Lux
 		// modifiers
 		void insert(const key_type& key, const value_type& val)
 		{
-			size_t pos = getPosition(key);
+			size_type pos = getPosition(key);
 			construct(getEmptyNode(pos), key, val);
 			m_size++;
 			checkSize();
@@ -481,7 +481,7 @@ namespace Lux
 				node_type* n = &src[i];
 				while(NULL != n && src_sentinel != n->m_next)
 				{
-					size_t pos = getPosition(n->m_key);
+					int32_t pos = getPosition(n->m_key);
 					node_type* new_node = getEmptyNode(pos);
 					copy(n, new_node);
 					new_node->m_next = NULL;

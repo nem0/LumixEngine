@@ -178,7 +178,7 @@ namespace Lux
 	void ScriptSystemImpl::getDll(const char* script_path, char* dll_path, char* full_path, int max_length)
 	{
 		strcpy_s(dll_path, max_length, script_path);
-		int len = strlen(script_path);
+		int32_t len = (int32_t)strlen(script_path);
 		if(len > 4)
 		{
 			strcpy_s(dll_path + len - 4, 5, ".dll"); 

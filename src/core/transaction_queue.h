@@ -150,7 +150,7 @@ namespace Lux
 		template <class T, int32_t size>
 		void TransactionQueue<T,size>::dealoc(T* tr)
 		{
-			int32_t tid = tr - &m_trans[0];
+			int32_t tid = (int32_t)(tr - &m_trans[0]);
 			ASSERT(tid >= 0 && tid < size);
 			freeTS(tr);
 		}
@@ -158,7 +158,7 @@ namespace Lux
 		template <class T, int32_t size>
 		bool TransactionQueue<T,size>::push(T* tr, bool wait)
 		{
-			int32_t tid = tr - &m_trans[0];
+			int32_t tid = (int32_t)(tr - &m_trans[0]);
 			ASSERT(tid >= 0 && tid < size);
 			return m_queue.push(tr, wait) >= 0;
 		}

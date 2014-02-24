@@ -16,14 +16,14 @@ namespace Lux
 			virtual bool open(const char* path, Mode mode) = 0;
 			virtual void close() = 0;
 
-			virtual bool read(void* buffer, size_t size) = 0;
-			virtual bool write(const void* buffer, size_t size) = 0;
+			virtual bool read(void* buffer, intptr_t size) = 0;
+			virtual bool write(const void* buffer, intptr_t size) = 0;
 
 			virtual const void* getBuffer() const = 0;
-			virtual size_t size() = 0;
+			virtual intptr_t size() = 0;
 
-			virtual size_t seek(SeekMode base, int32_t pos) = 0;
-			virtual size_t pos() = 0;
+			virtual intptr_t seek(SeekMode base, intptr_t pos) = 0;
+			virtual intptr_t pos() = 0;
 		};
 
 	} // ~namespace FS

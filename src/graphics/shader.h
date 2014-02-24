@@ -31,7 +31,7 @@ class LUX_ENGINE_API Shader
 		GLint getAttribId(int index) { return m_vertex_attributes_ids[index]; }
 
 	private:
-		GLuint attach(GLenum type, const char* src, int length);
+		GLuint attach(GLenum type, const char* src, int32_t length);
 		void loaded(FS::IFile* file, bool success);
 
 	private:

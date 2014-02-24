@@ -30,7 +30,7 @@ namespace Lux
 				MT::SpinLock lock(m_spin_mutex);
 				m_stream->write(op);
 				m_stream->write(mode);
-				m_stream->write(path);
+				m_stream->writeString(path);
 				m_stream->read(m_file);
 
 				return -1 != m_file;
@@ -45,7 +45,7 @@ namespace Lux
 				m_stream->write(m_file);
 			}
 
-			virtual bool read(void* buffer, size_t size) LUX_OVERRIDE
+			virtual bool read(void* buffer, intptr_t size) LUX_OVERRIDE
 			{
 				int32_t op = TCPCommand::Read;
 
@@ -61,7 +61,7 @@ namespace Lux
 				return successful;
 			}
 
-			virtual bool write(const void* buffer, size_t size) LUX_OVERRIDE
+			virtual bool write(const void* buffer, intptr_t size) LUX_OVERRIDE
 			{
 				int32_t op = TCPCommand::Write;
 
@@ -82,7 +82,7 @@ namespace Lux
 				return NULL;
 			}
 
-			virtual size_t size() LUX_OVERRIDE
+			virtual intptr_t size() LUX_OVERRIDE
 			{
 				int32_t op = TCPCommand::Size;
 				uint32_t size = 0;
@@ -93,10 +93,10 @@ namespace Lux
 
 				m_stream->read(size);
 
-				return size;
+				return (intptr_t)size;
 			}
 
-			virtual size_t seek(SeekMode base, int32_t pos) LUX_OVERRIDE
+			virtual intptr_t seek(SeekMode base, intptr_t pos) LUX_OVERRIDE
 			{
 				int32_t op = TCPCommand::Seek;
 
@@ -106,16 +106,16 @@ namespace Lux
 				m_stream->write(base);
 				m_stream->write(pos);
 
-				size_t ret = 0;
+				int32_t ret = 0;
 				m_stream->read(ret);
 
-				return ret;
+				return (intptr_t)ret;
 			}
 
-			virtual size_t pos() LUX_OVERRIDE
+			virtual intptr_t pos() LUX_OVERRIDE
 			{
 				int32_t op = TCPCommand::Seek;
-				size_t pos = 0;
+				int32_t pos = 0;
 
 				MT::SpinLock lock(m_spin_mutex);
 				m_stream->write(op);
@@ -123,7 +123,7 @@ namespace Lux
 
 				m_stream->read(pos);
 
-				return pos;
+				return (intptr_t)pos;
 			}
 
 		private:
