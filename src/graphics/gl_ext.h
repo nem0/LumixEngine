@@ -2,16 +2,16 @@
 #include <Windows.h>
 #include <gl/GL.h>
 
-#define GL_ARRAY_BUFFER                   0x8892
-#define GL_FRAGMENT_SHADER                0x8B30
-#define GL_STATIC_DRAW                    0x88E4
-#define GL_VERTEX_SHADER                  0x8B31
-#define GL_CLAMP_TO_EDGE                  0x812F
-#define GL_TEXTURE0                       0x84C0
-#define GL_TEXTURE1                       0x84C1
-#define GL_TEXTURE2                       0x84C2
-#define GL_TEXTURE3                       0x84C3
-#define GL_TEXTURE4                       0x84C4
+const GLuint GL_ARRAY_BUFFER = 0x8892;
+const GLuint GL_FRAGMENT_SHADER = 0x8B30;
+const GLuint GL_STATIC_DRAW = 0x88E4;
+const GLuint GL_VERTEX_SHADER = 0x8B31;
+const GLuint GL_CLAMP_TO_EDGE = 0x812F;
+const GLuint GL_TEXTURE0 = 0x84C0;
+const GLuint GL_TEXTURE1 = 0x84C1;
+const GLuint GL_TEXTURE2 = 0x84C2;
+const GLuint GL_TEXTURE3 = 0x84C3;
+const GLuint GL_TEXTURE4 = 0x84C4;
 
 typedef ptrdiff_t GLsizeiptr;
 typedef char GLchar;

@@ -52,7 +52,7 @@ namespace Lux
 			return (n) && !(n & (n - 1));
 		}
 
-		inline float degreesToRadians(float angle)
+		LUX_FORCE_INLINE float degreesToRadians(float angle)
 		{
 			 return angle * PI / 180.0f;
 		}

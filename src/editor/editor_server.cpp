@@ -314,13 +314,13 @@ void EditorServerImpl::onPointerDown(int x, int y, MouseButton::Value button)
 	else if(button == MouseButton::LEFT)
 	{
 		Vec3 origin, dir;
-		m_engine.getRenderer().getRay(m_camera.getComponent(crc32("camera")), (float)x, (float)y, origin, dir); 
+		m_engine.getRenderer().getRay(m_camera.getComponent(camera_type), (float)x, (float)y, origin, dir); 
 		RayCastModelHit hit = m_engine.getRenderer().castRay(origin, dir);
 		if(hit.m_is_hit)
 		{
 			selectEntity(hit.m_renderable.entity);
 			m_mouse_mode = EditorServerImpl::MouseMode::TRANSFORM;
-			m_gizmo.startTransform(m_camera.getComponent(crc32("camera")), x, y, Gizmo::TransformMode::CAMERA_XZ);
+			m_gizmo.startTransform(m_camera.getComponent(camera_type), x, y, Gizmo::TransformMode::CAMERA_XZ);
 		}
 		/*Vec3 hit_pos;
 		char node_name[20];
@@ -382,7 +382,7 @@ void EditorServerImpl::onPointerMove(int x, int y, int relx, int rely)
 				
 				Gizmo::TransformOperation tmode = GetKeyState(VK_MENU) & 0x8000 ? Gizmo::TransformOperation::ROTATE : Gizmo::TransformOperation::TRANSLATE;
 				int flags = GetKeyState(VK_LCONTROL) & 0x8000 ? Gizmo::Flags::FIXED_STEP : 0;
-				m_gizmo.transform(m_camera.getComponent(crc32("camera")), tmode, x, y, relx, rely, flags);
+				m_gizmo.transform(m_camera.getComponent(camera_type), tmode, x, y, relx, rely, flags);
 			}
 			break;
 	}
@@ -1126,12 +1126,12 @@ void EditorServerImpl::createUniverse(bool create_scene, const char* base_path)
 
 	m_camera = m_engine.getUniverse()->createEntity();
 	m_camera.setPosition(0, 0, -5);
-	m_camera.setRotation(Quat(Vec3(0, 1, 0), -3.14159265f));
-	Component cmp = m_engine.getRenderer().createComponent(crc32("camera"), m_camera);
+	m_camera.setRotation(Quat(Vec3(0, 1, 0), -Math::PI));
+	Component cmp = m_engine.getRenderer().createComponent(camera_type, m_camera);
 	m_engine.getRenderer().setCameraPipeline(cmp, string("pipelines/main.json"));
 	m_engine.getRenderer().setCameraActive(cmp, true);
 
-	Component cmp2 = m_engine.getRenderer().createComponent(crc32("renderable"), m_engine.getUniverse()->createEntity());
+	Component cmp2 = m_engine.getRenderer().createComponent(renderable_type, m_engine.getUniverse()->createEntity());
 	m_engine.getRenderer().setRenderablePath(cmp2, string("models/blender.msh"));
 /*	
 	universe->getEventManager()->addListener(EntityMovedEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);

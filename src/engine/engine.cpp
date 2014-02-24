@@ -240,7 +240,7 @@ namespace Lux
 	{
 		m_impl->m_universe->serialize(serializer);
 		//m_impl->m_renderer.serialize(serializer);
-		ASSERT(false);
+		//ASSERT(false);
 		m_impl->m_script_system.serialize(serializer);
 		m_impl->m_plugin_manager.serialize(serializer);
 	}
@@ -250,7 +250,7 @@ namespace Lux
 	{
 		m_impl->m_universe->deserialize(serializer);
 		//m_impl->m_renderer.deserialize(serializer);
-		ASSERT(false);
+		//ASSERT(false);
 		m_impl->m_script_system.deserialize(serializer);
 		m_impl->m_plugin_manager.deserialize(serializer);
 	}

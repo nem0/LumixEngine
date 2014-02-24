@@ -30,10 +30,10 @@ class Animation
 		void loaded(FS::IFile* file, bool success);
 
 	private:
-		int		m_frame_count;
-		int		m_bone_count;
-		Vec3*	m_positions;
-		Quat*	m_rotations;
+		int	m_frame_count;
+		int	m_bone_count;
+		Vec3* m_positions;
+		Quat* m_rotations;
 };
 
 
