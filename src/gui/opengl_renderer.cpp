@@ -393,7 +393,7 @@ namespace UI
 		};
 		static PODArray<Vec3> verts;
 		static PODArray<Vec2> uvs;
-		int len = strlen(text);
+		int len = (int)strlen(text);
 		verts.resize(len * 6);
 		uvs.resize(len * 6);
 		const char* c = text;
@@ -481,7 +481,7 @@ namespace UI
 	{
 		char tmp[255];
 		strcpy_s(tmp, texture.getName().c_str());
-		int len = strlen(tmp);
+		int len = (int)strlen(tmp);
 		strcpy_s(tmp + len - 4, 255 - len + 4, ".fnt");
 
 		FS::ReadCallback font_loaded_cb;

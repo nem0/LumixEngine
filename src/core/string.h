@@ -32,7 +32,7 @@ class base_string
 			m_size = 0;
 		}
 
-		base_string(const base_string<T, Allocator>& rhs, int start, size_t length)
+		base_string(const base_string<T, Allocator>& rhs, int start, int32_t length)
 		{
 			m_size = length - start <= rhs.m_size ? length : rhs.m_size - start;
 			m_cstr = (T*)m_allocator.allocate((m_size + 1) * sizeof(T));
@@ -114,7 +114,7 @@ class base_string
 		
 		int rfind(T c) const
 		{
-			int i = m_size - 1;
+			int32_t i = m_size - 1;
 			while(i >= 0 && m_cstr[i] != c)
 			{
 				--i;
@@ -168,10 +168,10 @@ class base_string
 			}
 		}
 
-		void insert(size_t pos, T value)
+		void insert(int32_t pos, T value)
 		{
 			m_cstr = (T*)m_allocator.reallocate(m_cstr, m_size + 2);
-			for(size_t i = m_size + 1; i > pos; --i)
+			for(int32_t i = m_size + 1; i > pos; --i)
 			{
 				m_cstr[i] = m_cstr[i-1];
 			}
@@ -179,7 +179,7 @@ class base_string
 			++m_size;
 		}
 
-		void erase(size_t pos)
+		void erase(int32_t pos)
 		{
 			if(pos >= 0 && pos < m_size)
 			{
@@ -236,14 +236,14 @@ class base_string
 		}
 
 
-		static int strlen(const T* rhs) 
+		static int32_t strlen(const T* rhs) 
 		{
 			const T* c = rhs;
 			while(*c)
 			{
 				++c;
 			}
-			return c - rhs;
+			return (int32_t)(c - rhs);
 		}
 
 		int strcmp(const T* rhs) const
@@ -265,7 +265,7 @@ class base_string
 
 
 	private:
-		size_t m_size;
+		int32_t m_size;
 		T*	m_cstr;
 		Allocator m_allocator;
 };

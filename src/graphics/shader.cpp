@@ -27,13 +27,13 @@ void Shader::loaded(FS::IFile* file, bool success)
 {
 	if(success)
 	{
-		size_t size = file->size();
+		int32_t size = (int32_t)file->size();
 		char* buf = LUX_NEW_ARRAY(char, size);
 		file->read(buf, size);
 		
 		char* end = strstr(buf, "//~VS");		
 		ASSERT(end);
-		int vs_len = end - buf;
+		int32_t vs_len = (int32_t)(end - buf);
 		buf[vs_len-1] = 0;
 		m_vertex_id = attach(GL_VERTEX_SHADER, buf, vs_len);
 		m_fragment_id = attach(GL_FRAGMENT_SHADER, buf + vs_len, size - vs_len);
@@ -55,7 +55,7 @@ Shader::~Shader()
 }
 
 
-GLuint Shader::attach(GLenum type, const char* src, int length)
+GLuint Shader::attach(GLenum type, const char* src, int32_t length)
 {
 	GLuint id = glCreateShader(type);
 	glShaderSource(id, 1, (const GLchar**)&src, &length);

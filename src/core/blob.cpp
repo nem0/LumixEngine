@@ -10,7 +10,7 @@ namespace Lux
 	}
 
 
-	void Blob::write(const void* data, size_t size)
+	void Blob::write(const void* data, int32_t size)
 	{
 		if(m_size + (int)size > m_buffer.size())
 		{
@@ -21,11 +21,11 @@ namespace Lux
 	}
 
 
-	bool Blob::read(void* data, size_t size)
+	bool Blob::read(void* data, int32_t size)
 	{
 		if(m_pos + (int)size > m_size)
 		{
-			for(size_t i = 0; i < size; ++i)
+			for(int32_t i = 0; i < size; ++i)
 				((unsigned char*)data)[i] = 0;	
 			return false;
 		}
@@ -36,7 +36,7 @@ namespace Lux
 
 	void Blob::write(const char* string)
 	{
-		int32_t size = strlen(string) + 1;
+		int32_t size = (int32_t)strlen(string) + 1;
 
 		write(size);
 		write(string, size);

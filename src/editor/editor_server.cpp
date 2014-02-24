@@ -992,7 +992,7 @@ void EditorServerImpl::rotateCamera(int x, int y)
 
 void EditorServerImpl::writeString(const char* str)
 {
-	int len = strlen(str);
+	int32_t len = (int32_t)strlen(str);
 	m_stream.write(len);
 	m_stream.write(str, len);
 }

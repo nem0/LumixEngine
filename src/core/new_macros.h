@@ -4,10 +4,10 @@
 
 namespace Lux 
 {
-	LUX_CORE_API void* dll_lux_new(size_t size, const char* file, int32_t line);
-	LUX_CORE_API void* dll_lux_new(size_t size, const char* file, int32_t line);
-	LUX_CORE_API void* dll_lux_new_aligned(size_t size, size_t alignment, const char* file, int32_t line);
-	LUX_CORE_API void* dll_lux_realloc(void* ptr, size_t size, const char* file, int32_t line);
+	LUX_CORE_API void* dll_lux_new(intptr_t size, const char* file, int32_t line);
+	LUX_CORE_API void* dll_lux_new(intptr_t size, const char* file, int32_t line);
+	LUX_CORE_API void* dll_lux_new_aligned(intptr_t size, intptr_t alignment, const char* file, int32_t line);
+	LUX_CORE_API void* dll_lux_realloc(void* ptr, intptr_t size, const char* file, int32_t line);
 	LUX_CORE_API void dll_lux_delete(void* ptr);
 	LUX_CORE_API void dll_lux_delete_aligned(void* ptr);
 }

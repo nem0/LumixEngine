@@ -12,7 +12,7 @@ namespace Lux
 			::closesocket(m_socket);
 		}
 
-		bool TCPStream::read(char* string, uint32_t max_size)
+		bool TCPStream::readString(char* string, uint32_t max_size)
 		{
 			uint32_t len = 0;
 			bool ret = true;
@@ -23,18 +23,18 @@ namespace Lux
 			return ret;
 		}
 
-		bool TCPStream::write(const char* string)
+		bool TCPStream::writeString(const char* string)
 		{
-			uint32_t len = strlen(string) + 1;
+			uint32_t len = (uint32_t)strlen(string) + 1;
 			bool ret = write(len);
 			ret &= write((const void*)string, len);
 
 			return ret;
 		}
 
-		bool TCPStream::read(void* buffer, size_t size)
+		bool TCPStream::read(void* buffer, intptr_t size)
 		{
-			int to_receive = size;
+			int32_t to_receive = (int32_t)size;
 			char* ptr = static_cast<char*>(buffer);
 
 			do
@@ -58,9 +58,9 @@ namespace Lux
 			return true;
 		}
 
-		bool TCPStream::write(const void* buffer, size_t size)
+		bool TCPStream::write(const void* buffer, intptr_t size)
 		{
-			int send = ::send(m_socket, static_cast<const char*>(buffer), size, 0);
+			int send = ::send(m_socket, static_cast<const char*>(buffer), (int)size, 0);
 
 			//todo: handle errors
 

@@ -75,22 +75,22 @@ namespace Lux
 				m_buffer = NULL;
 			}
 
-			virtual bool read(void* buffer, size_t size) LUX_OVERRIDE
+			virtual bool read(void* buffer, intptr_t size) LUX_OVERRIDE
 			{
-				size_t amount = m_pos + size < m_size ? size : m_size - m_pos;
+				intptr_t amount = m_pos + size < m_size ? size : m_size - m_pos;
 				memcpy(buffer, m_buffer + m_pos, amount);
 				m_pos += amount;
 				return amount == size;
 			}
 
-			virtual bool write(const void* buffer, size_t size) LUX_OVERRIDE
+			virtual bool write(const void* buffer, intptr_t size) LUX_OVERRIDE
 			{
-				uint32_t pos = m_pos;
-				uint32_t cap = m_capacity;
-				uint32_t sz = m_size;
+				intptr_t pos = m_pos;
+				intptr_t cap = m_capacity;
+				intptr_t sz = m_size;
 				if(pos + size > cap)
 				{
-					uint32_t new_cap = 0 != cap ? cap << 1 : 0x8000;
+					intptr_t new_cap = 0 != cap ? cap << 1 : 0x8000;
 					uint8_t* new_data = LUX_NEW_ARRAY(uint8_t, new_cap);
 					memcpy(new_data, m_buffer, sz);
 					LUX_DELETE_ARRAY(m_buffer);
@@ -110,12 +110,12 @@ namespace Lux
 				return m_buffer;
 			}
 
-			virtual size_t size() LUX_OVERRIDE
+			virtual intptr_t size() LUX_OVERRIDE
 			{
 				return m_size;
 			}
 
-			virtual size_t seek(SeekMode base, int32_t pos) LUX_OVERRIDE
+			virtual intptr_t seek(SeekMode base, intptr_t pos) LUX_OVERRIDE
 			{
 				switch(base)
 				{
@@ -140,16 +140,16 @@ namespace Lux
 				return m_pos;
 			}
 
-			virtual size_t pos() LUX_OVERRIDE
+			virtual intptr_t pos() LUX_OVERRIDE
 			{
 				return m_pos;
 			}
 
 		private:
 			uint8_t* m_buffer;
-			uint32_t m_size;
-			uint32_t m_capacity;
-			uint32_t m_pos;
+			intptr_t m_size;
+			intptr_t m_capacity;
+			intptr_t m_pos;
 			IFile* m_file;
 			bool m_write;
 		};
