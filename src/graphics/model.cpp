@@ -50,6 +50,7 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 
 	const PODArray<Vec3>& vertices = m_geometry->getVertices();
 
+	int32_t last_hit_index = -1;
 	for(int i = 0; i < vertices.size(); i += 3)
 	{
 		Vec3 p0 = vertices[i];
@@ -61,7 +62,7 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 		{
 			continue;
 		}
-		float d = dotProduct(normal, p0);
+		float d = -dotProduct(normal, p0);
 		float t = -(dotProduct(normal, local_origin) + d) / q;
 		if(t < 0)
 		{
@@ -94,12 +95,23 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 		{
 			hit.m_is_hit = true;
 			hit.m_t = t;
+			last_hit_index = i;
 		}
 	}
 
+	if(last_hit_index != -1)
+	{
+		for(int i = 0; i < m_meshes.size(); ++i)
+		{
+			if(last_hit_index < m_meshes[i].getStart() + m_meshes[i].getCount())
+			{
+				hit.m_mesh = &m_meshes[i];
+				break;
+			}
+		}
+	}
 	hit.m_origin = origin;
 	hit.m_dir = dir;
-	hit.m_mesh = &m_meshes[0];
 	return hit;
 }
 
@@ -171,7 +183,11 @@ void Model::loaded(FS::IFile* file, bool success)
 			strcat(material_path, ".mat");
 			int32_t mesh_tri_count = 0;
 			file->read(&mesh_tri_count, sizeof(mesh_tri_count));
-			Mesh mesh(m_renderer.loadMaterial(material_path), mesh_vertex_offset, mesh_tri_count * 3);
+			file->read(&str_size, sizeof(str_size));
+			char mesh_name[MAX_PATH];
+			mesh_name[str_size] = 0;
+			file->read(mesh_name, str_size);
+			Mesh mesh(m_renderer.loadMaterial(material_path), mesh_vertex_offset, mesh_tri_count * 3, mesh_name);
 			mesh_vertex_offset += mesh_tri_count * 3;
 			m_meshes.push(mesh);
 		}

@@ -19,7 +19,7 @@ namespace Lux
 
 		uint32_t getProccessAffinityMask()
 		{ 
-			uint32_t process, system;
+			DWORD_PTR process, system;
 			::GetProcessAffinityMask(::GetCurrentProcess(), (PDWORD_PTR)&process, (PDWORD_PTR)&system);
 			return process;
 		}

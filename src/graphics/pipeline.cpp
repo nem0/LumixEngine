@@ -127,7 +127,9 @@ struct PipelineImpl : public Pipeline
 		int count = infos.size();
 		for(int i = 0; i < count; ++i)
 		{
+			glPushMatrix();
 			Model& model = infos[i].m_model_instance->getModel();
+			glMultMatrixf(&infos[i].m_model_instance->getMatrix().m11);
 			Geometry* geom = model.getGeometry();
 			for(int j = 0; j < model.getMeshCount(); ++j)
 			{
@@ -150,6 +152,7 @@ struct PipelineImpl : public Pipeline
 					geom->draw(mesh.getStart(), mesh.getCount(), *mesh.getMaterial()->getShader());
 				}
 			}
+			glPopMatrix();
 		}
 	}
 

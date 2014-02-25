@@ -30,7 +30,7 @@ namespace Lux
 		void setRotation(const Quat& rot);
 		void translate(const Vec3& t);
 		bool isValid() const { return index >= 0; }
-		const Component& getComponent(uint32_t type);
+		const Component& getComponent(uint32_t type) const;
 		const ComponentList& getComponents() const;
 		bool existsInUniverse() const;
 

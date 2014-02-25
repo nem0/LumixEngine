@@ -25,6 +25,7 @@
 #include "engine/engine.h"
 #include "engine/iplugin.h"
 #include "engine/plugin_manager.h"
+#include "graphics/model.h"
 #include "graphics/renderer.h"
 #include "core/input_system.h"
 #include "core/mutex.h"
@@ -228,11 +229,11 @@ void EditorServer::tick(HWND hwnd, HWND game_hwnd)
 	/*PAINTSTRUCT ps;
 	HDC hdc;
 	MT::Lock lock(m_impl->m_universe_mutex);
-
+	*/
 	if(m_impl->m_is_game_mode)
 	{
 		m_impl->m_engine.update();
-	}*/
+	}
 	m_impl->m_engine.getFileSystem().updateAsyncTransactions();
 	/*
 	if(hwnd)
@@ -314,13 +315,36 @@ void EditorServerImpl::onPointerDown(int x, int y, MouseButton::Value button)
 	else if(button == MouseButton::LEFT)
 	{
 		Vec3 origin, dir;
-		m_engine.getRenderer().getRay(m_camera.getComponent(camera_type), (float)x, (float)y, origin, dir); 
+		Component camera_cmp = m_camera.getComponent(camera_type);
+		m_engine.getRenderer().getRay(camera_cmp, (float)x, (float)y, origin, dir); 
 		RayCastModelHit hit = m_engine.getRenderer().castRay(origin, dir);
 		if(hit.m_is_hit)
 		{
-			selectEntity(hit.m_renderable.entity);
-			m_mouse_mode = EditorServerImpl::MouseMode::TRANSFORM;
-			m_gizmo.startTransform(m_camera.getComponent(camera_type), x, y, Gizmo::TransformMode::CAMERA_XZ);
+			if(hit.m_renderable == m_gizmo.getRenderable())
+			{
+				if(m_selected_entity.isValid())
+				{
+					m_mouse_mode = EditorServerImpl::MouseMode::TRANSFORM;
+					if(hit.m_mesh->getNameHash() == crc32("x_axis"))
+					{
+						m_gizmo.startTransform(camera_cmp, x, y, Gizmo::TransformMode::X);
+					}
+					else if(hit.m_mesh->getNameHash() == crc32("y_axis"))
+					{
+						m_gizmo.startTransform(camera_cmp, x, y, Gizmo::TransformMode::Y);
+					}
+					else 
+					{
+						m_gizmo.startTransform(camera_cmp, x, y, Gizmo::TransformMode::Z);
+					}
+				}
+			}
+			else
+			{
+				selectEntity(hit.m_renderable.entity);
+				m_mouse_mode = EditorServerImpl::MouseMode::TRANSFORM;
+				m_gizmo.startTransform(m_camera.getComponent(camera_type), x, y, Gizmo::TransformMode::CAMERA_XZ);
+			}
 		}
 		/*Vec3 hit_pos;
 		char node_name[20];
