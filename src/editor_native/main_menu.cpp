@@ -76,6 +76,7 @@ void MainMenu::saveFileClicked(Lux::UI::Block& block, void*)
 MainMenu::MainMenu(MainFrame& main_frame)
 	: MenuBar(main_frame.getGui(), &main_frame)
 {
+	setZIndex(2);
 	m_main_frame = &main_frame;
 	// file
 	Lux::UI::MenuItem* file_item = LUX_NEW(Lux::UI::MenuItem)("File", getGui());

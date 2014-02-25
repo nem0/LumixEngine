@@ -2,6 +2,7 @@
 
 
 #include "core/array.h"
+#include "core/crc32.h"
 #include "core/delegate_list.h"
 #include "core/matrix.h"
 #include "core/pod_array.h"
@@ -30,21 +31,24 @@ namespace FS
 class Mesh
 {
 	public:
-		Mesh(Material* mat, int start, int count)
+		Mesh(Material* mat, int start, int count, const char* name)
 		{
 			m_material = mat;
 			m_start = start;
 			m_count = count;
+			m_name_hash = crc32(name);
 		}
 
 		Material* getMaterial() const { return m_material; }
 		void setMaterial(Material* material) { m_material = material; }
 		int getCount() const { return m_count; }
 		int getStart() const { return m_start; }
+		uint32_t getNameHash() const { return m_name_hash; }
 
 	private:
-		int	m_start;
-		int	m_count;
+		int32_t	m_start;
+		int32_t	m_count;
+		uint32_t m_name_hash;
 		Material* m_material;
 };
 

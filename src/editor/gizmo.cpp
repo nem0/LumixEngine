@@ -54,12 +54,14 @@ void Gizmo::show()
 
 void Gizmo::setMatrix(const Matrix& mtx)
 {
+	m_gizmo_entity.setMatrix(mtx);
 	//h3dSetNodeTransMat(m_handle, &mtx.m11);
 }
 
 
 void Gizmo::getMatrix(Matrix& mtx)
 {
+	m_gizmo_entity.getMatrix(mtx);
 	/*const float* tmp;
 	h3dGetNodeTransMats(m_handle, 0, &tmp);
 	for(int i = 0; i < 16; ++i)
@@ -110,7 +112,7 @@ void Gizmo::setUniverse(Universe* universe)
 		m_universe->getEventManager()->addListener(EntityMovedEvent::type).bind<Gizmo, &Gizmo::onEvent>(this);
 		m_gizmo_entity = m_universe->createEntity();
 		Component r = m_renderer->createComponent(crc32("renderable"), m_gizmo_entity);
-		m_renderer->setRenderablePath(r, string("models/new_renderer/gizmo.msh"));
+		m_renderer->setRenderablePath(r, string("models/gizmo.msh"));
 	}
 }
 
@@ -133,6 +135,12 @@ void Gizmo::startTransform(Component camera, int x, int y, TransformMode mode)
 	m_transform_mode = mode;
 	m_transform_point = getMousePlaneIntersection(camera, x, y);
 	m_relx_accum = m_rely_accum = 0;
+}
+
+
+Component Gizmo::getRenderable() const
+{
+	return m_gizmo_entity.getComponent(crc32("renderable"));
 }
 
 

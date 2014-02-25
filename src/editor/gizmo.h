@@ -84,6 +84,7 @@ class Gizmo
 		void setUniverse(Universe* universe);
 		void startTransform(Component camera, int x, int y, TransformMode mode);
 		void transform(Component camera, TransformOperation operation, int x, int y, int relx, int rely, int flags);
+		Component getRenderable() const;
 		//H3DNode getNode() const { return m_handle; }
 
 	private:
