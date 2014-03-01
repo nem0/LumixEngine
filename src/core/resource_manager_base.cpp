@@ -39,6 +39,7 @@ namespace Lux
 			resource->doLoad();
 		}
 
+		resource->addRef();
 		return resource;
 	}
 
@@ -73,6 +74,7 @@ namespace Lux
 	{
 		resource.onUnloading();
 		resource.doUnload();
+		resource.m_ref_count = 0;
 	}
 
 	void ResourceManagerBase::reload(const Path& path)

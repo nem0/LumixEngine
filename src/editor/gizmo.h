@@ -1,7 +1,6 @@
 #pragma once
 
 
-#include "Horde3D.h"
 #include "core/vec3.h"
 #include "universe/universe.h"
 
@@ -83,17 +82,18 @@ class Gizmo
 		void updateScale();
 		void setEntity(Entity entity);
 		void setUniverse(Universe* universe);
-		void startTransform(int x, int y, TransformMode mode);
-		void transform(TransformOperation operation, int x, int y, int relx, int rely, int flags);
-		H3DNode getNode() const { return m_handle; }
+		void startTransform(Component camera, int x, int y, TransformMode mode);
+		void transform(Component camera, TransformOperation operation, int x, int y, int relx, int rely, int flags);
+		Component getRenderable() const;
+		//H3DNode getNode() const { return m_handle; }
 
 	private:
 		void onEvent(Event& evt);
-		Vec3 getMousePlaneIntersection(int x, int y);
+		Vec3 getMousePlaneIntersection(Component camera, int x, int y);
 
 	private:
 		Renderer* m_renderer;
-		H3DNode m_handle;
+		Entity m_gizmo_entity;
 		Entity m_selected_entity;
 		Universe* m_universe;
 		TransformMode m_transform_mode;

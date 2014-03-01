@@ -40,7 +40,7 @@ namespace Lux
 	}
 
 
-	const Component& Entity::getComponent(uint32_t type)
+	const Component& Entity::getComponent(uint32_t type) const
 	{
 		const Entity::ComponentList& cmps = getComponents();
 		for(int i = 0, c = cmps.size(); i < c; ++i)

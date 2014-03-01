@@ -103,11 +103,11 @@ namespace Lux
 				return write(&val, sizeof(val));
 			}
 
-			bool read(char* string, uint32_t max_size);
-			bool write(const char* string);
+			bool readString(char* string, uint32_t max_size);
+			bool writeString(const char* string);
 
-			bool read(void* buffer, size_t size);
-			bool write(const void* buffer, size_t size);
+			bool read(void* buffer, intptr_t size);
+			bool write(const void* buffer, intptr_t size);
 
 		private:
 			TCPStream();

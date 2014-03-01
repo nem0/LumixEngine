@@ -10,6 +10,8 @@ namespace Lux
 		FontManager() : ResourceManagerBase() {}
 		~FontManager() {}
 
+		void create(FS::FileSystem& fs);
+
 	protected:
 		virtual Resource* createResource(const Path& path) LUX_OVERRIDE;
 		virtual void destroyResource(Resource& resource) LUX_OVERRIDE;

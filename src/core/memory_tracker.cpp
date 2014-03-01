@@ -61,8 +61,8 @@ namespace Lux
 	};
 
 	typedef map<uint32_t, MemoryTracker::Entry*, MemTrackAllocator> map_alloc_order;
-	typedef map<FileLineReport, int32_t, MemTrackAllocator> file_line_map;
-	typedef map<const char *, int32_t, MemTrackAllocator> file_map;
+	typedef map<FileLineReport, intptr_t, MemTrackAllocator> file_line_map;
+	typedef map<const char *, intptr_t, MemTrackAllocator> file_map;
 	typedef map<FileLineReport, uint32_t, MemTrackAllocator> alloc_count_map;
 
 	MemoryTracker* MemoryTracker::s_instance = NULL;
@@ -82,7 +82,7 @@ namespace Lux
 		s_instance = NULL;
 	}
 
-	void MemoryTracker::add(void* p, const size_t size, const char* file, const int line)
+	void MemoryTracker::add(void* p, const intptr_t size, const char* file, const int line)
 	{
 		if(!p) return;
 
@@ -91,13 +91,13 @@ namespace Lux
 		m_map.insert(p, Entry(file, line, size));
 		m_allocated_memory += size;
 
-		printf("add %x\n", p);
+		printf("add %p\n", p);
 	}
 
 	void MemoryTracker::remove(void* p)
 	{
 		if(!p) return;
-		printf("rem %x\n", p);
+		printf("rem %p\n", p);
 		MT::SpinLock lock(m_spin_mutex);
 
 		EntryTable::iterator it = m_map.find(p);
@@ -141,11 +141,11 @@ namespace Lux
 
 			if (entry.file() != NULL)
 			{
-				sprintf(string, "%s(%d): {%d} normal block at 0x%.8X, %d bytes long.", entry.file(), entry.line(), entry.allocID(), adr, entry.size());
+				sprintf(string, "%s(%d): {%d} normal block at %p, %d bytes long.", entry.file(), entry.line(), entry.allocID(), adr, entry.size());
 			}
 			else
 			{
-				sprintf(string, "{%d} normal block at 0x%.8X, %d bytes long.", entry.allocID(), adr, entry.size());
+				sprintf(string, "{%d} normal block at %p, %d bytes long.", entry.allocID(), adr, entry.size());
 			}
 			memTrackerLog("MemoryTracker", "%s", string);
 
@@ -206,7 +206,7 @@ namespace Lux
 			Entry& entry = *(it.second());
 			if (entry.file() != NULL)
 			{
-				sprintf(string, "%s(%d): \"%s\" normal block, %d bytes long.", entry.file(), entry.line(), entry.allocID(), entry.size());
+				sprintf(string, "%s(%d): {%d} normal block, %d bytes long.", entry.file(), entry.line(), entry.allocID(), entry.size());
 			}
 			else
 			{
@@ -250,7 +250,7 @@ namespace Lux
 			char string[512];
 
 			const FileLineReport &rep = it.first();
-			int32_t size = it.second();
+			intptr_t size = it.second();
 
 			const char *file = rep.file ? rep.file : "unknown";
 
@@ -291,7 +291,7 @@ namespace Lux
 		{
 			char string[512];
 
-			int32_t size = it.second();
+			intptr_t size = it.second();
 			const char *file = it.first();
 
 			if(size >= 1000000)
@@ -350,11 +350,11 @@ namespace Lux
 
 			if (entry.file() != NULL)
 			{
-				sprintf(string, "%s(%d) : {%d} normal block at 0x%.8X, %d bytes long.", entry.file(), entry.line(), entry.allocID(), adr, entry.size());
+				sprintf(string, "%s(%d) : {%d} normal block at %p, %d bytes long.", entry.file(), entry.line(), entry.allocID(), adr, entry.size());
 			}
 			else
 			{
-				sprintf(string, "{%d} normal block at 0x%.8X, %d bytes long.", entry.allocID(), adr, entry.size());
+				sprintf(string, "{%d} normal block at %p, %d bytes long.", entry.allocID(), adr, entry.size());
 			}
 
 			memTrackerLog("MemoryTracker", "%s", string);

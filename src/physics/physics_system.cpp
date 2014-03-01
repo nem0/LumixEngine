@@ -14,14 +14,6 @@
 #include "universe/entity_moved_event.h"
 
 
-#pragma comment(lib, "PhysXVisualDebuggerSDKCHECKED.lib")
-#pragma comment(lib, "PhysX3CHECKED_x86.lib")
-#pragma comment(lib, "PhysX3CommonCHECKED_x86.lib")
-#pragma comment(lib, "PhysX3ExtensionsCHECKED.lib")
-#pragma comment(lib, "PhysX3CharacterKinematicCHECKED_x86.lib")
-#pragma comment(lib, "PhysX3CookingCHECKED_x86.lib")
-
-
 namespace Lux
 {
 

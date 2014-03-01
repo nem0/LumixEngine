@@ -166,6 +166,7 @@
     <ClInclude Include="..\..\src\core\hash_map.h" />
     <ClInclude Include="..\..\src\core\pod_hash_map.h" />
     <ClInclude Include="..\..\src\core\timer.h" />
+    <ClInclude Include="..\..\src\core\vec4.h" />
     <ClInclude Include="..\..\src\core\path_utils.h" />
     <ClInclude Include="..\..\src\core\os_file.h">
       <Filter>FS</Filter>
