@@ -95,7 +95,7 @@ namespace Lux
 					return false;
 				}
 				m_impl->m_plugins.push(plugin);
-				g_log_info.log("plugins", "plugin laoded");
+				g_log_info.log("plugins", "plugin loaded");
 				return plugin;
 			}
 		}

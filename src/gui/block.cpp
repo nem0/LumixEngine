@@ -157,7 +157,7 @@ namespace UI
 		m_children.push(&child);
 		for(int i = m_children.size() - 1; i > 0; --i)
 		{
-			if(m_children[i]->getZ() < m_children[i-1]->getZ())
+			if(m_children[i]->getZ() > m_children[i-1]->getZ())
 			{
 				Lux::UI::Block* tmp = m_children[i];
 				m_children[i] = m_children[i-1];
@@ -177,7 +177,7 @@ namespace UI
 		{
 			if(m_children[i] == &child)
 			{
-				m_children.eraseFast(i);
+				m_children.erase(i);
 				break;
 			}
 		}
@@ -232,7 +232,7 @@ namespace UI
 			{
 				m_decorator->render(renderer, *this);
 			}
-			for(int i = 0, c = m_children.size(); i < c; ++i)
+			for(int i = m_children.size() - 1; i >= 0; --i)
 			{
 				m_children[i]->render(renderer);
 			}
