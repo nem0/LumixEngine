@@ -37,7 +37,7 @@ namespace Lux
 							int32_t mode = 0;
 							int32_t len = 0;
 							stream->read(mode);
-							stream->read(m_buffer.data(), m_buffer.size());
+							stream->readString(m_buffer.data(), m_buffer.size());
 
 							int32_t ret = -2;
 							int32_t id = m_ids.alloc();
@@ -59,7 +59,7 @@ namespace Lux
 							m_ids.release(id);
 
 							file->close();
-							delete file;
+							LUX_DELETE(file);
 						}
 						break;
 					case TCPCommand::Read:
@@ -74,7 +74,7 @@ namespace Lux
 
 							while(size > 0)
 							{
-								int32_t read = size > m_buffer.size() ? m_buffer.size() : size;
+								int32_t read = (int32_t)size > m_buffer.size() ? m_buffer.size() : (int32_t)size;
 								read_successful &= file->read((void*)m_buffer.data(), read);
 								stream->write((const void*)m_buffer.data(), read);
 								size -= read;
@@ -95,7 +95,7 @@ namespace Lux
 							
 							while(size > 0)
 							{
-								int32_t read = size > m_buffer.size() ? m_buffer.size() : size;
+								int32_t read = (int32_t)size > m_buffer.size() ? m_buffer.size() : (int32_t)size;
 								write_successful &= stream->read((void*)m_buffer.data(), read);
 								file->write(m_buffer.data(), read);
 								size -= read;
@@ -110,7 +110,7 @@ namespace Lux
 							stream->read(id);
 							OsFile* file = m_files[id];
 
-							uint32_t size = file->size();
+							uint32_t size = (uint32_t)file->size();
 							stream->write(size);
 						}
 						break;
@@ -125,7 +125,7 @@ namespace Lux
 							stream->read(base);
 							stream->read(offset);
 							
-							uint32_t pos = file->seek((SeekMode)base, offset);
+							uint32_t pos = (uint32_t)file->seek((SeekMode)base, offset);
 							stream->write(pos);
 						}
 						break;
@@ -135,7 +135,7 @@ namespace Lux
 							stream->read(id);
 							OsFile* file = m_files[id];
 
-							uint32_t pos = file->pos();
+							uint32_t pos = (uint32_t)file->pos();
 							stream->write(pos);
 						}
 						break;

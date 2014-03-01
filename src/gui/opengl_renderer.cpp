@@ -11,6 +11,7 @@
 #include "core/pod_array.h"
 #include "core/string.h"
 #include "core/vec3.h"
+#include "graphics/shader.h"
 #include "gui/block.h"
 #include "gui/texture_base.h"
 
@@ -219,9 +220,11 @@ namespace UI
 
 	void OpenGLRenderer::beginRender(float w, float h)
 	{
+		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_BLEND);
 		m_impl->m_scissors_areas.clear();
 		glColor3f(1, 1, 1);
-		glEnable(GL_SCISSOR_TEST);
+		glDisable(GL_SCISSOR_TEST);
 		glMatrixMode(GL_PROJECTION);
 		glLoadIdentity();
 		glOrtho(0, w, h, 0, -1, 1);
@@ -390,7 +393,7 @@ namespace UI
 		};
 		static PODArray<Vec3> verts;
 		static PODArray<Vec2> uvs;
-		int len = strlen(text);
+		int len = (int)strlen(text);
 		verts.resize(len * 6);
 		uvs.resize(len * 6);
 		const char* c = text;
@@ -478,7 +481,7 @@ namespace UI
 	{
 		char tmp[255];
 		strcpy_s(tmp, texture.getName().c_str());
-		int len = strlen(tmp);
+		int len = (int)strlen(tmp);
 		strcpy_s(tmp + len - 4, 255 - len + 4, ".fnt");
 
 		FS::ReadCallback font_loaded_cb;
@@ -558,7 +561,6 @@ namespace UI
 
 		glDrawArrays(GL_TRIANGLES, 0, vertex_count);
 
-		glDisableClientState(GL_VERTEX_ARRAY);
 		glDisable(GL_TEXTURE_2D);
 		glDisableClientState(GL_VERTEX_ARRAY);
 		glDisableClientState(GL_TEXTURE_COORD_ARRAY);

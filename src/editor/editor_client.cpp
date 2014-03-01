@@ -65,7 +65,7 @@ namespace Lux
 	bool EditorClient::create()
 	{
 		m_impl = LUX_NEW(EditorClientImpl);
-		m_impl->m_stream = m_impl->m_connector.connect("127.0.0.1", 10002);
+		m_impl->m_stream = m_impl->m_connector.connect("127.0.0.1", 10013);
 		m_impl->m_task.m_client = m_impl;
 		bool success = m_impl->m_task.create("ClientReceiver");
 		success = success && m_impl->m_task.run();
@@ -182,7 +182,7 @@ namespace Lux
 
 	void EditorClient::loadUniverse(const char* path)
 	{
-		m_impl->sendMessage(ClientMessageType::LOAD, path, strlen(path)+1);
+		m_impl->sendMessage(ClientMessageType::LOAD, path, (int32_t)strlen(path)+1);
 	}
 
 	void EditorClient::setEntityPosition(int32_t entity, const Vec3& position)
@@ -195,7 +195,7 @@ namespace Lux
 
 	void EditorClient::saveUniverse(const char* path)
 	{
-		m_impl->sendMessage(ClientMessageType::SAVE, path, strlen(path)+1);
+		m_impl->sendMessage(ClientMessageType::SAVE, path, (int32_t)strlen(path)+1);
 	}
 
 	void EditorClient::navigate(float forward, float right, int32_t fast)

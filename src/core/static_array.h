@@ -10,7 +10,7 @@ namespace Lux
 	public:
 		typedef T								value_type;
 		typedef StaticArray<value_type, Size>	my_type;
-		typedef size_t							size_type;
+		typedef int32_t							size_type;
 
 	public:
 		enum { elementSize = sizeof(value_type) };

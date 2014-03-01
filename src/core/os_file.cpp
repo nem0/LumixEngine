@@ -83,35 +83,35 @@ namespace Lux
 			m_impl = NULL;
 		}
 
-		bool OsFile::write(const void* data, size_t size)
+		bool OsFile::write(const void* data, intptr_t size)
 		{
 			ASSERT(NULL != m_impl);
 			size_t written = 0;
-			::WriteFile(m_impl->m_file, data, size, (LPDWORD)&written, NULL);
+			::WriteFile(m_impl->m_file, data, (DWORD)size, (LPDWORD)&written, NULL);
 			return size == written;
 		}
 
-		bool OsFile::read(void* data, size_t size)
+		bool OsFile::read(void* data, intptr_t size)
 		{
 			ASSERT(NULL != m_impl);
 			size_t readed = 0;
-			::ReadFile(m_impl->m_file, data, size, (LPDWORD)&readed, NULL);
+			::ReadFile(m_impl->m_file, data, (DWORD)size, (LPDWORD)&readed, NULL);
 			return size == readed;
 		}
 
-		int OsFile::size()
+		intptr_t OsFile::size()
 		{
 			ASSERT(NULL != m_impl);
 			return ::GetFileSize(m_impl->m_file, 0);
 		}
 
-		int OsFile::pos()
+		intptr_t OsFile::pos()
 		{
 			ASSERT(NULL != m_impl);
 			return ::SetFilePointer(m_impl->m_file, 0, NULL, FILE_CURRENT);
 		}
 
-		int OsFile::seek(SeekMode base, int pos)
+		intptr_t OsFile::seek(SeekMode base, intptr_t pos)
 		{
 			ASSERT(NULL != m_impl);
 			int dir = 0;
@@ -128,7 +128,7 @@ namespace Lux
 				break;
 			}
 
-			return ::SetFilePointer(m_impl->m_file, pos, NULL, dir);
+			return ::SetFilePointer(m_impl->m_file, (DWORD)pos, NULL, dir);
 		}
 
 		void OsFile::writeEOF()

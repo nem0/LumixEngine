@@ -17,9 +17,9 @@ namespace Lux
 
 		uint32_t getCurrentThreadID() { return ::GetCurrentThreadId(); }
 
-		uint32_t getProccessAffinityMask() 
+		uint32_t getProccessAffinityMask()
 		{ 
-			uint32_t process, system;
+			DWORD_PTR process, system;
 			::GetProcessAffinityMask(::GetCurrentProcess(), (PDWORD_PTR)&process, (PDWORD_PTR)&system);
 			return process;
 		}
@@ -57,7 +57,7 @@ namespace Lux
 
 		Task::Task()
 		{
-			TaskImpl* impl = LUX_NEW(TaskImpl)();
+			TaskImpl* impl = LUX_NEW(TaskImpl);
 			impl->m_handle = NULL;
 			impl->m_affinity_mask = getProccessAffinityMask();
 			impl->m_priority = ::GetThreadPriority(GetCurrentThread());
