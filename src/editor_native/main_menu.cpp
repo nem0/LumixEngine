@@ -76,7 +76,6 @@ void MainMenu::saveFileClicked(Lux::UI::Block& block, void*)
 MainMenu::MainMenu(MainFrame& main_frame)
 	: MenuBar(main_frame.getGui(), &main_frame)
 {
-	setZIndex(2);
 	m_main_frame = &main_frame;
 	// file
 	Lux::UI::MenuItem* file_item = LUX_NEW(Lux::UI::MenuItem)("File", getGui());
@@ -113,6 +112,8 @@ MainMenu::MainMenu(MainFrame& main_frame)
 	Lux::UI::MenuItem* tools_compile_item = LUX_NEW(Lux::UI::MenuItem)("Compile scripts", getGui());
 	tools_item->addSubItem(tools_compile_item);
 	tools_compile_item->onEvent("click").bind<MainMenu, &MainMenu::toolsCompileScripts>(this);
+
+	setZIndex(2);
 }
 
 
