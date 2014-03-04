@@ -39,7 +39,7 @@ void Material::load(const char* path, FS::FileSystem& file_system)
 }
 
 
-void Material::loaded(FS::IFile* file, bool success)
+void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 {
 	if(success)
 	{
@@ -51,8 +51,10 @@ void Material::loaded(FS::IFile* file, bool success)
 		serializer.deserialize("shader", path, MAX_PATH);
 		m_shader = m_renderer.loadShader(path);
 		m_is_ready = true;
+
 	}
-	/// TODO close file somehow
+
+	fs.close(file);
 }
 
 

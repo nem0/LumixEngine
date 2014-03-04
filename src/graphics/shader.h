@@ -32,7 +32,7 @@ class LUX_ENGINE_API Shader
 
 	private:
 		GLuint attach(GLenum type, const char* src, int32_t length);
-		void loaded(FS::IFile* file, bool success);
+		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 
 	private:
 		enum 

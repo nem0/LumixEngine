@@ -27,7 +27,7 @@ class Animation
 		float getLength() const { return m_frame_count / 30.0f; }
 
 	private:
-		void loaded(FS::IFile* file, bool success);
+		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 
 	private:
 		int	m_frame_count;
