@@ -179,7 +179,7 @@ namespace Lux
 			Stub m_stub;
 	}; 
 
-		template <typename R, typename A0, typename A1, typename A2>
+	template <typename R, typename A0, typename A1, typename A2>
 	class Delegate<R (A0, A1, A2)> 
 	{
 		private:
