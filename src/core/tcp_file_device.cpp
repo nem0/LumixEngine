@@ -38,11 +38,14 @@ namespace Lux
 
 			virtual void close() LUX_OVERRIDE
 			{
-				int32_t op = TCPCommand::Close;
+				if(-1 != m_file)
+				{
+					int32_t op = TCPCommand::Close;
 
-				MT::SpinLock lock(m_spin_mutex);
-				m_stream->write(op);
-				m_stream->write(m_file);
+					MT::SpinLock lock(m_spin_mutex);
+					m_stream->write(op);
+					m_stream->write(m_file);
+				}
 			}
 
 			virtual bool read(void* buffer, intptr_t size) LUX_OVERRIDE

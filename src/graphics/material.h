@@ -30,7 +30,7 @@ class Material
 		bool isReady() const { return m_is_ready; }
 
 	private:
-		void loaded(FS::IFile* file, bool success);
+		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 
 	private:
 		Shader*	m_shader;

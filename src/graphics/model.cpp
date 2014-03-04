@@ -116,7 +116,7 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 }
 
 
-void Model::loaded(FS::IFile* file, bool success)
+void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 { 
 	/// TODO refactor
 	if(success)
@@ -193,7 +193,8 @@ void Model::loaded(FS::IFile* file, bool success)
 		}
 		m_on_loaded.invoke();
 	}
-	/// TODO close file somehow
+
+	fs.close(file);
 }
 
 

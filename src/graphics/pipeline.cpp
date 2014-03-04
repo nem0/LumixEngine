@@ -92,14 +92,15 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void loaded(FS::IFile* file, bool success) 
+	void loaded(FS::IFile* file, bool success, FS::FileSystem& fs) 
 	{
 		if(success)
 		{
 			JsonSerializer serializer(*file, JsonSerializer::READ);
 			deserialize(serializer);
 		}
-		// TODO close file somehow
+
+		fs.close(file);
 	}
 
 	void executeCommand(const Command& command)
