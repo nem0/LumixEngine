@@ -139,7 +139,7 @@ struct EditorServerImpl
 		void renderPhysics();
 		void save(const char path[]);
 		void load(const char path[]);
-		void loadMap(FS::IFile* file, bool success);
+		void loadMap(FS::IFile* file, bool success, FS::FileSystem& fs);
 		void addComponent(uint32_t type_crc);
 		void sendComponent(uint32_t type_crc);
 		void removeComponent(uint32_t type_crc);
@@ -656,14 +656,15 @@ void EditorServerImpl::load(const char path[])
 	fs.openAsync(fs.getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, file_read_cb);
 }
 
-void EditorServerImpl::loadMap(FS::IFile* file, bool success)
+void EditorServerImpl::loadMap(FS::IFile* file, bool success, FS::FileSystem& fs)
 {
 	ASSERT(success);
 	if(success)
 	{
 		load(*file);
-		m_engine.getFileSystem().close(file);
 	}
+
+	fs.close(file);
 }
 
 void EditorServerImpl::newUniverse()

@@ -23,7 +23,7 @@ void Shader::load(const char* path, FS::FileSystem& file_system)
 }
 
 
-void Shader::loaded(FS::IFile* file, bool success)
+void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 {
 	if(success)
 	{
@@ -43,7 +43,8 @@ void Shader::loaded(FS::IFile* file, bool success)
 
 		LUX_DELETE_ARRAY(buf);
 	}
-	/// TODO close file somehow
+
+	fs.close(file);
 }
 
 

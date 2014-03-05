@@ -25,7 +25,7 @@ class Texture
 		void apply(int unit = 0);
 
 	private:
-		void loaded(FS::IFile* file, bool success);
+		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 
 	private:
 		GLuint m_id;
