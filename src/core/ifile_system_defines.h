@@ -8,8 +8,9 @@ namespace Lux
 	namespace FS
 	{
 		class IFile;
+		class FileSystem;
 
-		typedef Delegate<void (IFile*, bool)> ReadCallback;
+		typedef Delegate<void (IFile*, bool, FileSystem&)> ReadCallback;
 		struct Mode
 		{
 			enum Value

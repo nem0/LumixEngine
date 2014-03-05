@@ -90,14 +90,12 @@ namespace Lux
 
 		m_map.insert(p, Entry(file, line, size));
 		m_allocated_memory += size;
-
-		printf("add %p\n", p);
 	}
 
 	void MemoryTracker::remove(void* p)
 	{
 		if(!p) return;
-		printf("rem %p\n", p);
+
 		MT::SpinLock lock(m_spin_mutex);
 
 		EntryTable::iterator it = m_map.find(p);

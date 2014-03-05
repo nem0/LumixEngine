@@ -33,7 +33,7 @@ namespace UI
 			void setId(GLuint id) { m_gl_id = id; }
 			void setFileSystem(FS::FileSystem& fs) { m_fs = &fs; }
 
-			void imageLoaded(FS::IFile* file, bool success);
+			void imageLoaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 
 		private:
 			GLuint m_gl_id;
@@ -57,7 +57,7 @@ namespace UI
 		};
 
 		TextureBase* getImage(const char* name);
-		void fontLoaded(FS::IFile* file, bool success);
+		void fontLoaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 		void fontImageLoaded(TextureBase& img);
 
 		map<char, Character> m_characters;
@@ -130,7 +130,7 @@ namespace UI
 		return img;
 	}
 
-	void OpenGLTexture::imageLoaded(FS::IFile* file, bool success)
+	void OpenGLTexture::imageLoaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	{
 		if(success)
 		{
@@ -489,7 +489,7 @@ namespace UI
 		m_file_system->openAsync(m_file_system->getDefaultDevice(), tmp, FS::Mode::OPEN | FS::Mode::READ, font_loaded_cb);
 	}
 
-	void OpenGLRendererImpl::fontLoaded(FS::IFile* file, bool success)
+	void OpenGLRendererImpl::fontLoaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	{
 		if(success)
 		{
@@ -534,7 +534,8 @@ namespace UI
 				}
 			}
 		}
-		m_file_system->close(file);
+
+		fs.close(file);
 	}
 
 

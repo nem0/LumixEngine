@@ -33,25 +33,28 @@ void Animation::load(const char* filename, FS::FileSystem& file_system)
 }
 
 
-void Animation::loaded(FS::IFile* file, bool success)
+void Animation::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 {
-	LUX_DELETE_ARRAY(m_positions);
-	LUX_DELETE_ARRAY(m_rotations);
-	file->read(&m_frame_count, sizeof(m_frame_count));
-	file->read(&m_bone_count, sizeof(m_bone_count));
-	m_positions = new Vec3[m_frame_count * m_bone_count];
-	m_rotations = new Quat[m_frame_count * m_bone_count];
-	for(int i = 0; i < m_frame_count; ++i)
+	if(success)
 	{
-		for(int j = 0; j < m_bone_count; ++j)
+		LUX_DELETE_ARRAY(m_positions);
+		LUX_DELETE_ARRAY(m_rotations);
+		file->read(&m_frame_count, sizeof(m_frame_count));
+		file->read(&m_bone_count, sizeof(m_bone_count));
+		m_positions = new Vec3[m_frame_count * m_bone_count];
+		m_rotations = new Quat[m_frame_count * m_bone_count];
+		for(int i = 0; i < m_frame_count; ++i)
 		{
-			/// TODO positions (rotations) in a row
-			file->read(&m_positions[i * m_bone_count + j], sizeof(Vec3));
-			file->read(&m_rotations[i * m_bone_count + j], sizeof(Quat));
+			for(int j = 0; j < m_bone_count; ++j)
+			{
+				/// TODO positions (rotations) in a row
+				file->read(&m_positions[i * m_bone_count + j], sizeof(Vec3));
+				file->read(&m_rotations[i * m_bone_count + j], sizeof(Quat));
+			}
 		}
 	}
 
-	/// TODO close file somehow
+	fs.close(file);
 }
 
 
