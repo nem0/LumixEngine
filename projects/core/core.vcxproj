@@ -193,6 +193,7 @@
     <ClCompile Include="..\..\src\core\pc\tcp_stream.cpp" />
     <ClCompile Include="..\..\src\core\quat.cpp" />
     <ClCompile Include="..\..\src\core\resource.cpp" />
+    <ClCompile Include="..\..\src\core\resource_manager.cpp" />
     <ClCompile Include="..\..\src\core\resource_manager_base.cpp" />
     <ClCompile Include="..\..\src\core\tcp_file_server.cpp" />
     <ClCompile Include="..\..\src\core\tcp_file_device.cpp" />
@@ -239,6 +240,7 @@
     <ClInclude Include="..\..\src\core\quat.h" />
     <ClInclude Include="..\..\src\core\queue.h" />
     <ClInclude Include="..\..\src\core\resource.h" />
+    <ClInclude Include="..\..\src\core\resource_manager.h" />
     <ClInclude Include="..\..\src\core\resource_manager_base.h" />
     <ClInclude Include="..\..\src\core\semaphore.h" />
     <ClInclude Include="..\..\src\core\spin_mutex.h" />

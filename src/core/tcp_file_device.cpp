@@ -38,6 +38,7 @@ namespace Lux
 
 			virtual void close() LUX_OVERRIDE
 			{
+				ASSERT(-1 != m_file);
 				int32_t op = TCPCommand::Close;
 
 				MT::SpinLock lock(m_spin_mutex);

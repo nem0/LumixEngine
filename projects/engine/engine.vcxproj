@@ -176,6 +176,7 @@
     <ClCompile Include="..\..\src\editor\server_message_types.cpp" />
     <ClCompile Include="..\..\src\engine\engine.cpp" />
     <ClCompile Include="..\..\src\engine\iplugin.cpp" />
+    <ClCompile Include="..\..\src\engine\material_manager.cpp" />
     <ClCompile Include="..\..\src\engine\plugin_manager.cpp" />
     <ClCompile Include="..\..\src\graphics\geometry.cpp" />
     <ClCompile Include="..\..\src\graphics\gl_ext.cpp" />
@@ -210,6 +211,7 @@
     <ClInclude Include="..\..\src\editor\server_message_types.h" />
     <ClInclude Include="..\..\src\engine\engine.h" />
     <ClInclude Include="..\..\src\engine\iplugin.h" />
+    <ClInclude Include="..\..\src\engine\material_manager.h" />
     <ClInclude Include="..\..\src\engine\plugin_manager.h" />
     <ClInclude Include="..\..\src\graphics\geometry.h" />
     <ClInclude Include="..\..\src\graphics\gl_ext.h" />

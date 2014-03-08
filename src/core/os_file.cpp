@@ -25,7 +25,7 @@ namespace Lux
 
 		bool OsFile::open(const char* path, Mode mode)
 		{
-			//TODO: normalize path
+			TODO("normalize path");
 			HANDLE hnd = INVALID_HANDLE_VALUE;
 			if(Mode::OPEN & mode)
 			{
@@ -64,7 +64,8 @@ namespace Lux
 
 			if(INVALID_HANDLE_VALUE != hnd)
 			{
-				OsFileImpl* impl = LUX_NEW(OsFileImpl); //TODO: lock-free free list
+				TODO("lock-free free list");
+				OsFileImpl* impl = LUX_NEW(OsFileImpl); 
 				impl->m_file = hnd;
 				m_impl = impl;
 

@@ -68,7 +68,7 @@ GLuint Shader::attach(GLenum type, const char* src, int32_t length)
 void Shader::apply()
 {
 	glUseProgram(m_program_id);
-}
+}	
 
 
 void Shader::setUniform(const char* name, int value)
@@ -101,7 +101,8 @@ void Shader::setUniform(const char* name, const Matrix& mtx)
 void Shader::setUniform(const char* name, const Matrix* matrices, int count)
 {
 	GLint loc = glGetUniformLocation(m_program_id, name);
-	glProgramUniformMatrix4fv(m_program_id, loc, count, false, &matrices[0].m11);
+	if(loc != -1)
+		glProgramUniformMatrix4fv(m_program_id, loc, count, false, &matrices[0].m11);
 }
 
 

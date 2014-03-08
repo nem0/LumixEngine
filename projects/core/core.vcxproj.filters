@@ -78,6 +78,9 @@
     <ClCompile Include="..\..\src\core\resource.cpp">
       <Filter>RM</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\core\resource_manager.cpp">
+      <Filter>RM</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\core\crc32.h" />
@@ -190,6 +193,9 @@
       <Filter>RM</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\resource.h">
+      <Filter>RM</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\resource_manager.h">
       <Filter>RM</Filter>
     </ClInclude>
   </ItemGroup>

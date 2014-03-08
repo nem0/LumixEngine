@@ -2,12 +2,6 @@
 
 #include "core/pod_hash_map.h"
 
-//class ResourceBase()
-//{
-//		ResourceBase();
-//	~ResourceBase();
-//};
-
 namespace Lux 
 {
 	namespace FS
@@ -17,11 +11,14 @@ namespace Lux
 
 	class Path;
 	class Resource;
+	class ResourceManager;
 
 	class LUX_CORE_API ResourceManagerBase LUX_ABSTRACT
 	{
+		typedef PODHashMap<uint32_t, Resource*> ResourceTable;
+
 	public:
-		void create(FS::FileSystem& fs);
+		void create(uint32_t id, ResourceManager& owner);
 		void destroy(void);
 
 		Resource* get(const Path& path);
@@ -44,11 +41,11 @@ namespace Lux
 		virtual Resource* createResource(const Path& path) = 0;
 		virtual void destroyResource(Resource& resource) = 0;
 
+		ResourceManager& getOwner() const { return *m_owner; }
 	private:
-		typedef PODHashMap<uint32_t, Resource*> ResourceTable;
 
 		uint32_t m_size;
 		ResourceTable m_resources;
-		FS::FileSystem* m_file_system;
+		ResourceManager* m_owner;
 	};
 }

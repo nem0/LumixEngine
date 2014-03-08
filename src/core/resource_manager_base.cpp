@@ -5,12 +5,14 @@
 #include "core/path.h"
 #include "core/path_utils.h"
 #include "core/resource.h"
+#include "core/resource_manager.h"
 
 namespace Lux
 {
-	void ResourceManagerBase::create(FS::FileSystem& fs)
+	void ResourceManagerBase::create(uint32_t id, ResourceManager& owner)
 	{
-		m_file_system = &fs;
+		owner.add(id, this);
+		m_owner = &owner;
 	}
 
 	void ResourceManagerBase::destroy(void)
@@ -103,7 +105,6 @@ namespace Lux
 
 	ResourceManagerBase::ResourceManagerBase()
 		: m_size(0)
-		, m_file_system(NULL)
 	{ }
 
 	ResourceManagerBase::~ResourceManagerBase()

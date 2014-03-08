@@ -5,7 +5,7 @@
 
 namespace Lux
 {
-	class Resource LUX_ABSTRACT
+	class LUX_CORE_API Resource LUX_ABSTRACT
 	{
 	public:
 		friend class ResourceManagerBase;
@@ -18,7 +18,7 @@ namespace Lux
 				LOADING,
 				READY,
 				UNLOADING,
-				ERROR
+				FAILURE,
 			};
 
 			State() : value(EMPTY) { }
@@ -30,18 +30,27 @@ namespace Lux
 
 		typedef DelegateList<void (State)> ObserverCallback;
 
+		State getState() const { return m_state; }
+
+		bool isEmpty()		const { return State::EMPTY		== m_state; }
+		bool isLoading()	const { return State::LOADING	== m_state; }
+		bool isReady()		const { return State::READY		== m_state; }
+		bool isUnloading()	const { return State::LOADING	== m_state; }
+		bool isFailure()	const { return State::FAILURE	== m_state; }
+
+		ObserverCallback& getObserverCb() { return m_cb; }
+
 	protected:
 		Resource(const Path& path);
 		~Resource();
 
 		//events
-		virtual void onEmpty(void);
-		virtual void onLoading(void);
-		virtual void onReady(void);
-		virtual void onUnloading(void);
-		virtual void onReloading(void);
-		// every resource has to handle error state
-		virtual void onError(void) = 0;
+		void onEmpty(void);
+		void onLoading(void);
+		void onReady(void);
+		void onUnloading(void);
+		void onReloading(void);
+		void onFailure(void);
 
 		virtual void doLoad(void) = 0;
 		virtual void doUnload(void) = 0;
@@ -49,8 +58,11 @@ namespace Lux
 
 		uint32_t addRef(void) { return ++m_ref_count; }
 		uint32_t remRef(void) { return --m_ref_count; }
-	private:
+
+	protected:
 		Path m_path;
+
+	private:
 		uint16_t m_ref_count;
 		State m_state;
 		ObserverCallback m_cb;
