@@ -52,7 +52,7 @@ bool Texture::create(int w, int h)
 }
 
 
-void Texture::loaded(FS::IFile* file, bool success)
+void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 {
 	if(success)
 	{
@@ -126,7 +126,8 @@ void Texture::loaded(FS::IFile* file, bool success)
 	{
 		g_log_warning.log("renderer", "Error loading texture %s\n", m_path.c_str());
 	}
-/// TODO close file somehow
+	
+	fs.close(file);
 }
 
 

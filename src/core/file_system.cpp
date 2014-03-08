@@ -183,7 +183,7 @@ namespace Lux
 					{
 						m_in_progress.pop();
 
-						tr->data.m_cb.invoke(tr->data.m_file, !!(tr->data.m_flags & E_SUCCESS));
+						tr->data.m_cb.invoke(tr->data.m_file, !!(tr->data.m_flags & E_SUCCESS), *this);
 						m_transaction_queue.dealoc(tr);
 					}
 					else
@@ -260,7 +260,7 @@ namespace Lux
 				return prev;
 			}
 
-			static void closeAsync(IFile* file, bool success)
+			static void closeAsync(IFile* file, bool success, FileSystem& fs)
 			{
 				LUX_DELETE(file);
 			}

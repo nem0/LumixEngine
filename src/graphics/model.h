@@ -82,7 +82,7 @@ class Model
 		DelegateList<void ()>& onLoaded() { return m_on_loaded; }
 
 	private:
-		void loaded(FS::IFile* file, bool success);
+		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 
 	private:
 		Geometry* m_geometry;

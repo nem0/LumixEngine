@@ -15,7 +15,7 @@ namespace Lux
 		struct AtlasImpl
 		{
 			void imageLoaded(TextureBase& img);
-			void atlasLoaded(Lux::FS::IFile* file, bool success);
+			void atlasLoaded(Lux::FS::IFile* file, bool success, FS::FileSystem& fs);
 
 			map<uint32_t, Atlas::Part*> m_parts;
 			TextureBase* m_texture;
@@ -24,7 +24,7 @@ namespace Lux
 			Lux::FS::FileSystem* m_filesystem;
 		};
 		
-		void AtlasImpl::atlasLoaded(Lux::FS::IFile* file, bool success)
+		void AtlasImpl::atlasLoaded(Lux::FS::IFile* file, bool success, FS::FileSystem& fs)
 		{
 			if(success)
 			{
