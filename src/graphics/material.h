@@ -35,6 +35,8 @@ protected:
 		, m_resource_manager(resource_manager)
 	{ }
 
+	private:
+		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 	~Material()
 	{ }
 

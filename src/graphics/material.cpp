@@ -42,7 +42,7 @@ void Material::doReload(void)
 	TODO("Implement Material Reload");
 }
 
-void Material::loaded(FS::IFile* file, bool success)
+void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 {
 	if(success)
 	{
@@ -55,8 +55,10 @@ void Material::loaded(FS::IFile* file, bool success)
 //		m_shader = m_renderer.loadShader(path);
 
 		onReady();
+
 	}
-	/// TODO close file somehow
+
+	fs.close(file);
 }
 
 
