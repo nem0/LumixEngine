@@ -1,7 +1,11 @@
+#include "core/lux.h"
 #include "graphics/model.h"
+
 #include "core/file_system.h"
 #include "core/ifile.h"
 #include "core/pod_array.h"
+#include "core/resource_manager.h"
+#include "core/resource_manager_base.h"
 #include "core/vec3.h"
 #include "graphics/geometry.h"
 #include "graphics/material.h"
@@ -187,7 +191,9 @@ void Model::loaded(FS::IFile* file, bool success)
 			char mesh_name[MAX_PATH];
 			mesh_name[str_size] = 0;
 			file->read(mesh_name, str_size);
-			Mesh mesh(m_renderer.loadMaterial(material_path), mesh_vertex_offset, mesh_tri_count * 3, mesh_name);
+
+			Material* material = static_cast<Material*>(m_resource_manager.get(ResourceManager::MATERIAL_MANAGER)->load(material_path));
+			Mesh mesh(material, mesh_vertex_offset, mesh_tri_count * 3, mesh_name);
 			mesh_vertex_offset += mesh_tri_count * 3;
 			m_meshes.push(mesh);
 		}

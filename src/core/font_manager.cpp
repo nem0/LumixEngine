@@ -16,11 +16,6 @@ namespace Lux
 		~FontResource()
 		{ }
 
-		// handle errors here
-		virtual void onError(void) LUX_OVERRIDE
-		{
-		}
-
 		virtual void doLoad(void) LUX_OVERRIDE
 		{
 //			m_impl->m_font_image = static_cast<OpenGLTexture*>(loadImage(path, file_system));

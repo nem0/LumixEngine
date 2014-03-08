@@ -20,6 +20,8 @@ namespace Lux
 	class ScriptSystem;
 	class Universe;
 
+	class ResourceManager;
+
 	class LUX_ENGINE_API Engine
 	{
 		public:
@@ -40,6 +42,9 @@ namespace Lux
 			PluginManager& getPluginManager();
 			IPlugin* loadPlugin(const char* name);
 			Universe* getUniverse() const;
+
+			ResourceManager& getResourceManager() const;
+
 			const char* getBasePath() const;
 			void update();
 			void serialize(ISerializer& serializer);

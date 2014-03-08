@@ -17,11 +17,13 @@ namespace Lux
 	void Resource::onEmpty(void)
 	{
 		m_state = State::EMPTY;
+		m_cb.invoke(State::EMPTY);
 	}
 
 	void Resource::onLoading(void)
 	{
 		m_state = State::LOADING;
+		m_cb.invoke(State::LOADING);
 	}
 
 	void Resource::onReady(void)

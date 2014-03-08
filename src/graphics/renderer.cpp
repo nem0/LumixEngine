@@ -216,7 +216,7 @@ struct RendererImpl : public Renderer
 	{
 		LUX_DELETE(m_renderables[cmp.index].m_model);
 		Renderable& r = m_renderables[cmp.index];
-		Model* model = LUX_NEW(Model)(*this);
+		Model* model = LUX_NEW(Model)(m_engine->getResourceManager());
 		r.m_model = LUX_NEW(ModelInstance)(*model);
 		model->load(path.c_str(), m_engine->getFileSystem());
 	}
@@ -322,16 +322,6 @@ struct RendererImpl : public Renderer
 		pipeline->load(path, m_engine->getFileSystem());
 		return pipeline;
 	}
-
-
-	virtual Material* loadMaterial(const char* path) LUX_OVERRIDE
-	{
-		/// TODO material manager
-		Material* material = LUX_NEW(Material)(*this);
-		material->load(path, m_engine->getFileSystem());
-		return material;
-	}
-
 
 	virtual Texture* loadTexture(const char* path) LUX_OVERRIDE
 	{

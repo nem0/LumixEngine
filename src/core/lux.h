@@ -1,5 +1,19 @@
 #pragma once
 
+// usefull compile time messages
+
+#define STRINGIZE_2( _ ) #_
+#define STRINGIZE( _ ) STRINGIZE_2( _ )
+
+#define NOTE(msg)\
+	__pragma(message(__FILE__ "(" STRINGIZE(__LINE__) ") : NOTE: " msg))
+
+#define TODO(msg)\
+	__pragma(message(__FILE__ "(" STRINGIZE(__LINE__) ") : TODO: " msg))
+
+#define WARN(msg)\
+	__pragma(message(__FILE__ "(" STRINGIZE(__LINE__) ") : WARNING: " msg))
+
 
 #include <cstdint>
 #include <cassert>

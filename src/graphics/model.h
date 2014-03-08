@@ -19,7 +19,7 @@ class Geometry;
 class Material;
 class Model;
 class Pose;
-class Renderer;
+class ResourceManager;
 
 namespace FS
 {
@@ -67,7 +67,7 @@ class Model
 		};
 
 	public:
-		Model(Renderer& renderer) : m_renderer(renderer) { m_geometry = NULL; }
+		Model(ResourceManager& resource_manager) : m_resource_manager(resource_manager) { m_geometry = NULL; }
 		~Model();
 
 		void load(const char* path, FS::FileSystem& file_system);
@@ -88,7 +88,7 @@ class Model
 		Geometry* m_geometry;
 		PODArray<Mesh> m_meshes;
 		Array<Bone> m_bones;
-		Renderer& m_renderer;
+		ResourceManager& m_resource_manager;
 		float m_bounding_radius;
 		string m_path;
 		DelegateList<void ()> m_on_loaded;

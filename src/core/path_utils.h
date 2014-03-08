@@ -16,6 +16,7 @@ namespace Lux
 				out++;
 				i++;
 			}
+			(i < max_size ? *out : *(out - 1)) = '\0';
 		}
 
 	private:
