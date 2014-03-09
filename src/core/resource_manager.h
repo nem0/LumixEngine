@@ -17,6 +17,7 @@ namespace Lux
 	public:
 		static const uint32_t MATERIAL	= 0xba8de9d9; //MATERIAL
 		static const uint32_t SHADER	= 0x0f0b59ae; //SHADER
+		static const uint32_t TEXTURE	= 0xbd23f368; //TEXTURE
 
 		ResourceManager();
 		~ResourceManager();

@@ -189,6 +189,7 @@
     <ClCompile Include="..\..\src\graphics\shader.cpp" />
     <ClCompile Include="..\..\src\graphics\shader_manager.cpp" />
     <ClCompile Include="..\..\src\graphics\texture.cpp" />
+    <ClCompile Include="..\..\src\graphics\texture_manager.cpp" />
     <ClCompile Include="..\..\src\script\get_property_visitor.cpp" />
     <ClCompile Include="..\..\src\script\save_script_visitor.cpp" />
     <ClCompile Include="..\..\src\script\script_system.cpp" />
@@ -227,6 +228,7 @@
     <ClInclude Include="..\..\src\graphics\shader.h" />
     <ClInclude Include="..\..\src\graphics\shader_manager.h" />
     <ClInclude Include="..\..\src\graphics\texture.h" />
+    <ClInclude Include="..\..\src\graphics\texture_manager.h" />
     <ClInclude Include="..\..\src\script\base_script.h" />
     <ClInclude Include="..\..\src\script\get_property_visitor.h" />
     <ClInclude Include="..\..\src\script\save_script_visitor.h" />

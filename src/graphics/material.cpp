@@ -48,7 +48,7 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		JsonSerializer serializer(*file, JsonSerializer::READ);
 		char path[MAX_PATH];
 		serializer.deserialize("texture", path, MAX_PATH);
-//		m_textures.push(m_renderer.loadTexture(path));
+		m_textures.push(static_cast<Texture*>(m_resource_manager.get(ResourceManager::TEXTURE)->load(path)));
 		
 		serializer.deserialize("shader", path, MAX_PATH);
 		m_shader = static_cast<Shader*>(m_resource_manager.get(ResourceManager::SHADER)->load(path));
