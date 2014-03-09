@@ -15,7 +15,8 @@ namespace Lux
 	{
 		typedef PODHashMap<uint32_t, ResourceManagerBase*> ResourceManagerTable;
 	public:
-		static const uint32_t MATERIAL_MANAGER = 0xd55d4e03; //MATERIAL_MANAGER
+		static const uint32_t MATERIAL	= 0xba8de9d9; //MATERIAL
+		static const uint32_t SHADER	= 0x0f0b59ae; //SHADER
 
 		ResourceManager();
 		~ResourceManager();

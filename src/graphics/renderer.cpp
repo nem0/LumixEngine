@@ -331,16 +331,6 @@ struct RendererImpl : public Renderer
 		return texture;
 	}
 
-
-	virtual Shader* loadShader(const char* path) LUX_OVERRIDE
-	{
-		/// TODO shader manager
-		Shader* shader = LUX_NEW(Shader);
-		shader->load(path, m_engine->getFileSystem());
-		return shader;
-	}
-
-
 	Engine* m_engine;
 	Array<Camera*> m_cameras;
 	PODArray<Camera*> m_active_cameras;

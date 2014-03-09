@@ -1,14 +1,18 @@
 #include "core/lux.h"
 #include "core/resource.h"
 
+#include "core/file_system.h"
 #include "core/path.h"
+#include "core/resource_manager.h"
 
 namespace Lux
 {
-	Resource::Resource(const Path& path)
-		: m_path(path)
-		, m_ref_count(0)
+	Resource::Resource(const Path& path, ResourceManager& resource_manager)
+		: m_ref_count(0)
 		, m_state(State::EMPTY)
+		, m_path(path)
+		, m_cb()
+		, m_resource_manager(resource_manager)
 	{ }
 
 	Resource::~Resource()
@@ -42,5 +46,17 @@ namespace Lux
 	{
 		m_state = State::UNLOADING;
 		m_cb.invoke(State::UNLOADING);
+	}
+
+	void Resource::onFailure(void)
+	{
+		m_state = State::FAILURE;
+		m_cb.invoke(State::FAILURE);
+	}
+
+	void Resource::doLoad(void)
+	{
+		FS::FileSystem& fs = m_resource_manager.getFileSystem();
+		fs.openAsync(fs.getDefaultDevice(), m_path, FS::Mode::OPEN | FS::Mode::READ, getReadCallback());
 	}
 } // ~namespace Lux

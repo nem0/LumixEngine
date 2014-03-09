@@ -3,6 +3,7 @@
 #include "core/ifile.h"
 #include "core/json_serializer.h"
 #include "core/resource_manager.h"
+#include "core/resource_manager_base.h"
 #include "graphics/renderer.h"
 #include "graphics/shader.h"
 #include "graphics/texture.h"
@@ -23,15 +24,6 @@ void Material::apply()
 	}
 }
 
-void Material::doLoad(void)
-{
-	FS::ReadCallback cb;
-	cb.bind<Material, &Material::loaded>(this);
-
-	FS::FileSystem& fs = m_resource_manager.getFileSystem();
-	fs.openAsync(fs.getDefaultDevice(), m_path, FS::Mode::OPEN | FS::Mode::READ, cb);
-}
-
 void Material::doUnload(void)
 {
 	TODO("Implement Material Unload");
@@ -40,6 +32,13 @@ void Material::doUnload(void)
 void Material::doReload(void)
 {
 	TODO("Implement Material Reload");
+}
+
+FS::ReadCallback Material::getReadCallback()
+{
+	FS::ReadCallback rc;
+	rc.bind<Material, &Material::loaded>(this);
+	return rc;
 }
 
 void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
@@ -52,10 +51,9 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 //		m_textures.push(m_renderer.loadTexture(path));
 		
 		serializer.deserialize("shader", path, MAX_PATH);
-//		m_shader = m_renderer.loadShader(path);
+		m_shader = static_cast<Shader*>(m_resource_manager.get(ResourceManager::SHADER)->load(path));
 
 		onReady();
-
 	}
 
 	fs.close(file);

@@ -14,7 +14,8 @@
 #include "graphics/renderer.h"
 #include "script/script_system.h"
 
-#include "engine/material_manager.h"
+#include "graphics/material_manager.h"
+#include "graphics/shader_manager.h"
 
 namespace Lux
 {
@@ -30,6 +31,7 @@ namespace Lux
 
 		ResourceManager m_resource_manager;
 		MaterialManager m_material_manager;
+		ShaderManager	m_shader_manager;
 
 		string m_base_path;
 		EditorServer* m_editor_server;
@@ -126,7 +128,8 @@ namespace Lux
 		}
 
 		m_impl->m_resource_manager.create(*m_impl->m_file_system);
-		m_impl->m_material_manager.create(ResourceManager::MATERIAL_MANAGER, m_impl->m_resource_manager);
+		m_impl->m_material_manager.create(ResourceManager::MATERIAL, m_impl->m_resource_manager);
+		m_impl->m_shader_manager.create(ResourceManager::SHADER, m_impl->m_resource_manager);
 
 		return true;
 	}
