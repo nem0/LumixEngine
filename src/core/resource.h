@@ -1,10 +1,14 @@
 #pragma once
 
+#include "core/ifile_system_defines.h"
 #include "core/delegate_list.h"
 #include "core/path.h"
 
 namespace Lux
 {
+	// forward declarations
+	class ResourceManager;
+
 	class LUX_CORE_API Resource LUX_ABSTRACT
 	{
 	public:
@@ -41,7 +45,7 @@ namespace Lux
 		ObserverCallback& getObserverCb() { return m_cb; }
 
 	protected:
-		Resource(const Path& path);
+		Resource(const Path& path, ResourceManager& resource_manager);
 		~Resource();
 
 		//events
@@ -52,19 +56,21 @@ namespace Lux
 		void onReloading(void);
 		void onFailure(void);
 
-		virtual void doLoad(void) = 0;
+		void doLoad(void);
 		virtual void doUnload(void) = 0;
 		virtual void doReload(void) = 0;
+		virtual FS::ReadCallback getReadCallback(void) = 0;
 
 		uint32_t addRef(void) { return ++m_ref_count; }
 		uint32_t remRef(void) { return --m_ref_count; }
 
-	protected:
-		Path m_path;
-
 	private:
 		uint16_t m_ref_count;
 		State m_state;
+
+	protected:
+		Path m_path;
 		ObserverCallback m_cb;
+		ResourceManager& m_resource_manager;
 	};
 } // ~namespace Lux

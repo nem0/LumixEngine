@@ -4,16 +4,14 @@
 
 namespace Lux
 {
-	class LUX_ENGINE_API MaterialManager : public ResourceManagerBase
+	class LUX_ENGINE_API ShaderManager : public ResourceManagerBase
 	{
 	public:
-		MaterialManager() : ResourceManagerBase() {}
-		~MaterialManager() {}
+		ShaderManager() : ResourceManagerBase() {}
+		~ShaderManager() {}
 
 	protected:
 		virtual Resource* createResource(const Path& path) LUX_OVERRIDE;
 		virtual void destroyResource(Resource& resource) LUX_OVERRIDE;
-
-		struct MaterialManagerImpl* m_impl;
 	};
 }

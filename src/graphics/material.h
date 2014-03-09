@@ -27,30 +27,24 @@ public:
 	void addTexture(Texture* texture) { m_textures.push(texture); }
 	Shader* getShader() { return m_shader; }
 
-protected:
+private:
 	Material(const Path& path, ResourceManager& resource_manager)
-		: Resource(path)
+		: Resource(path, resource_manager)
 		, m_shader()
 		, m_textures()
-		, m_resource_manager(resource_manager)
 	{ }
 
-	private:
-		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 	~Material()
 	{ }
 
-	virtual void doLoad(void) LUX_OVERRIDE;
 	virtual void doUnload(void) LUX_OVERRIDE;
 	virtual void doReload(void) LUX_OVERRIDE;
+	virtual FS::ReadCallback getReadCallback() LUX_OVERRIDE;
 
-private:
-	void loaded(FS::IFile* file, bool success);
-
+	void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 private:
 	Shader*	m_shader;
 	PODArray<Texture*> m_textures;
-	ResourceManager& m_resource_manager;
 };
 
 } // ~namespace Lux

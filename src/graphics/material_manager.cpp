@@ -1,5 +1,5 @@
 #include "core/lux.h"
-#include "engine/material_manager.h"
+#include "graphics/material_manager.h"
 
 #include "core/resource.h"
 #include "graphics/material.h"

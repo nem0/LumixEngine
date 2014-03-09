@@ -37,6 +37,10 @@ namespace Lux
 		if(NULL == resource)
 		{
 			resource = createResource(path);
+		}
+		
+		if(resource->isEmpty())
+		{
 			resource->onLoading();
 			resource->doLoad();
 		}

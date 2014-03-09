@@ -1,7 +1,7 @@
 #pragma once
 #include <Windows.h>
 #include <gl/GL.h>
-#include "core/lux.h"
+#include "core/resource.h"
 
 
 namespace Lux
@@ -15,10 +15,10 @@ namespace FS
 struct Vec3;
 struct Matrix;
 
-class LUX_ENGINE_API Shader
+class LUX_ENGINE_API Shader : public Resource
 {
 	public:
-		Shader();
+		Shader(const Path& path, ResourceManager& resource_manager);
 		~Shader();
 
 		void apply();
@@ -27,12 +27,15 @@ class LUX_ENGINE_API Shader
 		void setUniform(const char* name, GLfloat value);
 		void setUniform(const char* name, const Matrix& mtx);
 		void setUniform(const char* name, const Matrix* matrices, int count);
-		void load(const char* path, FS::FileSystem& file_system);
 		GLint getAttribId(int index) { return m_vertex_attributes_ids[index]; }
 
 	private:
 		GLuint attach(GLenum type, const char* src, int32_t length);
 		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
+
+		virtual void doUnload(void) LUX_OVERRIDE;
+		virtual void doReload(void) LUX_OVERRIDE;
+		virtual FS::ReadCallback getReadCallback() LUX_OVERRIDE;
 
 	private:
 		enum 
