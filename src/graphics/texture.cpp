@@ -28,17 +28,16 @@ struct TGAHeader
 #pragma pack()
 
 
-Texture::Texture()
+Texture::Texture(const Path& path, ResourceManager& resource_manager)
+	: Resource(path, resource_manager)
 {
 	glGenTextures(1, &m_id);
 }
-
 
 Texture::~Texture()
 {
 	glDeleteTextures(1, &m_id);
 }
-
 
 bool Texture::create(int w, int h)
 {
@@ -51,6 +50,12 @@ bool Texture::create(int w, int h)
 	return true;
 }
 
+void Texture::apply(int unit)
+{
+	glActiveTexture(GL_TEXTURE0 + unit); 
+	glBindTexture(GL_TEXTURE_2D, m_id);
+	glEnable(GL_TEXTURE_2D);
+}
 
 void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 {
@@ -69,14 +74,14 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		if (header.dataType != 2)
 		{
 			LUX_DELETE_ARRAY(buffer);
-			g_log_warning.log("renderer", "Unsupported texture format %s", m_path.c_str());
+			g_log_warning.log("renderer", "Unsupported texture format %s", m_path);
 			return;
 		}
 	
 		if (color_mode < 3)
 		{
 			LUX_DELETE_ARRAY(buffer);
-			g_log_warning.log("renderer", "Unsupported color mode %s", m_path.c_str());
+			g_log_warning.log("renderer", "Unsupported color mode %s", m_path);
 			return;
 		}
 	
@@ -130,23 +135,21 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	fs.close(file);
 }
 
+void Texture::doUnload(void)
+{
+	TODO("Implement Shader Unload");
+}
 
-bool Texture::load(const char* path, FS::FileSystem& file_system)
+void Texture::doReload(void)
+{
+	TODO("Implement Shader Reload");
+}
+
+FS::ReadCallback Texture::getReadCallback()
 {
 	FS::ReadCallback cb;
 	cb.bind<Texture, &Texture::loaded>(this);
-	m_path = path;
-	file_system.openAsync(file_system.getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, cb);
-	return true;
+	return cb;
 }
-
-
-void Texture::apply(int unit)
-{
-	glActiveTexture(GL_TEXTURE0 + unit); 
-	glBindTexture(GL_TEXTURE_2D, m_id);
-	glEnable(GL_TEXTURE_2D);
-}
-
 
 } // ~namespace Lux

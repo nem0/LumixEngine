@@ -20,6 +20,8 @@ namespace Lux
 		operator const char*() const { return m_path; }
 		operator uint32_t() const { return m_id; }
 
+		const char* c_str() const { return m_path; }
+
 		bool operator == (const Path& rhs) const { return m_id == rhs.m_id; }
 		bool operator == (const char* rhs) const { Path path(rhs); return m_id == path.m_id; }
 		bool operator == (uint32_t rhs) const { return m_id == rhs; }

@@ -4,7 +4,7 @@
 #include <Windows.h>
 #include <gl/GL.h>
 #include "core/string.h"
-
+#include "core/resource.h"
 
 namespace Lux
 {
@@ -14,22 +14,24 @@ namespace FS
 }
 
 
-class Texture
+class Texture : public Resource
 {
 	public:
-		Texture();
+		Texture(const Path& path, ResourceManager& resource_manager);
 		~Texture();
 
 		bool create(int w, int h);
-		bool load(const char* path, FS::FileSystem& file_system);
 		void apply(int unit = 0);
 
 	private:
 		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 
+		virtual void doUnload(void) LUX_OVERRIDE;
+		virtual void doReload(void) LUX_OVERRIDE;
+		virtual FS::ReadCallback getReadCallback() LUX_OVERRIDE;
+
 	private:
 		GLuint m_id;
-		string m_path;
 };
 
 

@@ -323,14 +323,6 @@ struct RendererImpl : public Renderer
 		return pipeline;
 	}
 
-	virtual Texture* loadTexture(const char* path) LUX_OVERRIDE
-	{
-		/// TODO texture manager
-		Texture* texture = LUX_NEW(Texture);
-		texture->load(path, m_engine->getFileSystem());
-		return texture;
-	}
-
 	Engine* m_engine;
 	Array<Camera*> m_cameras;
 	PODArray<Camera*> m_active_cameras;
