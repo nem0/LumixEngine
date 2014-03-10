@@ -9,6 +9,8 @@
 #include "core/math_utils.h"
 #include "core/pod_array.h"
 #include "core/vec4.h"
+#include "core/resource_manager.h"
+#include "core/resource_manager_base.h"
 #include "engine/engine.h"
 #include "graphics/gl_ext.h"
 #include "graphics/irender_device.h"
@@ -216,9 +218,8 @@ struct RendererImpl : public Renderer
 	{
 		LUX_DELETE(m_renderables[cmp.index].m_model);
 		Renderable& r = m_renderables[cmp.index];
-		Model* model = LUX_NEW(Model)(m_engine->getResourceManager());
+		Model* model = static_cast<Model*>(m_engine->getResourceManager().get(ResourceManager::MODEL)->load(path));
 		r.m_model = LUX_NEW(ModelInstance)(*model);
-		model->load(path.c_str(), m_engine->getFileSystem());
 	}
 
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/string.h"
+
 namespace Lux
 {
 	class LUX_CORE_API Path
@@ -13,12 +15,14 @@ namespace Lux
 
 		Path(const Path& rhs);
 		Path(const char* path);
+		Path(const string& path);
 		Path(uint32_t id, const char* path);
 
 		~Path();
 
 		operator const char*() const { return m_path; }
 		operator uint32_t() const { return m_id; }
+		operator string() const { return string(m_path); }
 
 		const char* c_str() const { return m_path; }
 

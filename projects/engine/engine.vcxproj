@@ -183,6 +183,7 @@
     <ClCompile Include="..\..\src\graphics\material_manager.cpp" />
     <ClCompile Include="..\..\src\graphics\model.cpp" />
     <ClCompile Include="..\..\src\graphics\model_instance.cpp" />
+    <ClCompile Include="..\..\src\graphics\model_manager.cpp" />
     <ClCompile Include="..\..\src\graphics\pipeline.cpp" />
     <ClCompile Include="..\..\src\graphics\pose.cpp" />
     <ClCompile Include="..\..\src\graphics\renderer.cpp" />
@@ -220,6 +221,7 @@
     <ClInclude Include="..\..\src\graphics\material_manager.h" />
     <ClInclude Include="..\..\src\graphics\model.h" />
     <ClInclude Include="..\..\src\graphics\model_instance.h" />
+    <ClInclude Include="..\..\src\graphics\model_manager.h" />
     <ClInclude Include="..\..\src\graphics\pipeline.h" />
     <ClInclude Include="..\..\src\graphics\pose.h" />
     <ClInclude Include="..\..\src\graphics\ray_cast_model_hit.h" />

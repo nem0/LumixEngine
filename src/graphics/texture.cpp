@@ -126,6 +126,8 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 
 		LUX_DELETE_ARRAY(image_dest);
 		LUX_DELETE_ARRAY(buffer);
+
+		onReady();
 	}
 	else
 	{
