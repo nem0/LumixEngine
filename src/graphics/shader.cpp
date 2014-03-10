@@ -78,6 +78,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	if(success)
 	{
 		int32_t size = (int32_t)file->size();
+		TODO("Use here some shared buffer")
 		char* buf = LUX_NEW_ARRAY(char, size);
 		file->read(buf, size);
 		
@@ -92,6 +93,8 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		m_vertex_attributes_ids[1] = glGetAttribLocation(m_program_id, "bone_indices");
 
 		LUX_DELETE_ARRAY(buf);
+
+		onReady();
 	}
 
 	fs.close(file);

@@ -124,6 +124,9 @@
     <ClCompile Include="..\..\src\graphics\texture_manager.cpp">
       <Filter>graphics\RM</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\graphics\model_manager.cpp">
+      <Filter>graphics\RM</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\graphics\renderer.h">
@@ -241,6 +244,9 @@
       <Filter>graphics\RM</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\graphics\texture_manager.h">
+      <Filter>graphics\RM</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\graphics\model_manager.h">
       <Filter>graphics\RM</Filter>
     </ClInclude>
   </ItemGroup>

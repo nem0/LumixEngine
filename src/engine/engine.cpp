@@ -15,6 +15,7 @@
 #include "script/script_system.h"
 
 #include "graphics/material_manager.h"
+#include "graphics/model_manager.h"
 #include "graphics/shader_manager.h"
 #include "graphics/texture_manager.h"
 
@@ -32,6 +33,7 @@ namespace Lux
 
 		ResourceManager m_resource_manager;
 		MaterialManager m_material_manager;
+		ModelManager	m_model_manager;
 		ShaderManager	m_shader_manager;
 		TextureManager	m_texture_manager;
 
@@ -131,6 +133,7 @@ namespace Lux
 
 		m_impl->m_resource_manager.create(*m_impl->m_file_system);
 		m_impl->m_material_manager.create(ResourceManager::MATERIAL, m_impl->m_resource_manager);
+		m_impl->m_model_manager.create(ResourceManager::MODEL, m_impl->m_resource_manager);
 		m_impl->m_shader_manager.create(ResourceManager::SHADER, m_impl->m_resource_manager);
 		m_impl->m_texture_manager.create(ResourceManager::TEXTURE, m_impl->m_resource_manager);
 
