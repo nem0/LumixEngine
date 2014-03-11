@@ -26,12 +26,18 @@ void Material::apply()
 
 void Material::doUnload(void)
 {
-	TODO("Implement Material Unload");
-}
+	m_resource_manager.get(ResourceManager::SHADER)->unload(*m_shader);
+	m_shader = NULL;
 
-void Material::doReload(void)
-{
-	TODO("Implement Material Reload");
+	ResourceManagerBase* texture_manager = m_resource_manager.get(ResourceManager::TEXTURE);
+	for(int i = 0; i < m_textures.size(); i++)
+	{
+		texture_manager->unload(*m_textures[i]);
+	}
+	m_textures.clear();
+
+	m_size = 0;
+	onEmpty();
 }
 
 FS::ReadCallback Material::getReadCallback()
@@ -53,6 +59,7 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		serializer.deserialize("shader", path, MAX_PATH);
 		m_shader = static_cast<Shader*>(m_resource_manager.get(ResourceManager::SHADER)->load(path));
 
+		m_size = file->size();
 		onReady();
 	}
 

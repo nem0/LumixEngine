@@ -59,6 +59,7 @@ void Texture::apply(int unit)
 
 void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 {
+	TODO("Optimize it! Buffer is not necesary at all and image_dest might be shared.");
 	if(success)
 	{
 		size_t buffer_size = file->size();
@@ -127,6 +128,7 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		LUX_DELETE_ARRAY(image_dest);
 		LUX_DELETE_ARRAY(buffer);
 
+		m_size = file->size();
 		onReady();
 	}
 	else
@@ -140,11 +142,9 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 void Texture::doUnload(void)
 {
 	TODO("Implement Shader Unload");
-}
 
-void Texture::doReload(void)
-{
-	TODO("Implement Shader Reload");
+	m_size = 0;
+	onEmpty();
 }
 
 FS::ReadCallback Texture::getReadCallback()

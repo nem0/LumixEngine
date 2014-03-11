@@ -203,6 +203,7 @@ void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			m_meshes.push(mesh);
 		}
 
+		m_size = file->size();
 		onReady();
 	}
 
@@ -212,11 +213,9 @@ void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 void Model::doUnload(void)
 {
 	TODO("Implement Material Unload");
-}
 
-void Model::doReload(void)
-{
-	TODO("Implement Material Reload");
+	m_size = 0;
+	onEmpty();
 }
 
 FS::ReadCallback Model::getReadCallback()

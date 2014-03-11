@@ -49,6 +49,17 @@ namespace Lux
 		return resource;
 	}
 
+	void ResourceManagerBase::load(Resource& resource)
+	{
+		if(resource.isEmpty())
+		{
+			resource.onLoading();
+			resource.doLoad();
+		}
+
+		resource.addRef();
+	}
+
 	void ResourceManagerBase::unload(const Path& path)
 	{
 		Resource* resource = get(path);
@@ -95,7 +106,8 @@ namespace Lux
 	void ResourceManagerBase::reload(Resource& resource)
 	{
 		resource.onReloading();
-		resource.doReload();
+		resource.doUnload();
+		resource.doLoad();
 	}
 
 	void ResourceManagerBase::releaseAll(void)
