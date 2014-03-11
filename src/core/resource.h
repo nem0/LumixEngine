@@ -60,7 +60,6 @@ namespace Lux
 
 		void doLoad(void);
 		virtual void doUnload(void) = 0;
-		virtual void doReload(void) = 0;
 		virtual FS::ReadCallback getReadCallback(void) = 0;
 
 		uint32_t addRef(void) { return ++m_ref_count; }

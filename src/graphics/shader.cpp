@@ -94,6 +94,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 
 		LUX_DELETE_ARRAY(buf);
 
+		m_size = file->size();
 		onReady();
 	}
 
@@ -103,11 +104,9 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 void Shader::doUnload(void)
 {
 	TODO("Implement Shader Unload");
-}
 
-void Shader::doReload(void)
-{
-	TODO("Implement Shader Reload");
+	m_size = 0;
+	onEmpty();
 }
 
 FS::ReadCallback Shader::getReadCallback()

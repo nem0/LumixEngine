@@ -15,6 +15,7 @@ namespace Lux
 
 	class LUX_CORE_API ResourceManagerBase LUX_ABSTRACT
 	{
+		friend class Resource;
 		typedef PODHashMap<uint32_t, Resource*> ResourceTable;
 
 	public:
@@ -23,6 +24,7 @@ namespace Lux
 
 		Resource* get(const Path& path);
 		Resource* load(const Path& path);
+		void load(Resource& resource);
 
 		void unload(const Path& path);
 		void unload(Resource& resource);
@@ -37,6 +39,7 @@ namespace Lux
 
 		ResourceManagerBase(void);
 		~ResourceManagerBase(void);
+
 	protected:
 		virtual Resource* createResource(const Path& path) = 0;
 		virtual void destroyResource(Resource& resource) = 0;

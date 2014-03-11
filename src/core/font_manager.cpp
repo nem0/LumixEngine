@@ -27,10 +27,6 @@ namespace Lux
 		{
 		}
 
-		virtual void doReload(void) LUX_OVERRIDE
-		{
-		}
-
 		FS::ReadCallback getReadCallback() { return FS::ReadCallback(); }
 	};
 
