@@ -2,6 +2,7 @@
 #include "core/file_system.h"
 #include "core/ifile.h"
 #include "core/json_serializer.h"
+#include "core/log.h"
 #include "graphics/renderer.h"
 #include "graphics/shader.h"
 #include "graphics/texture.h"
@@ -46,14 +47,20 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		JsonSerializer serializer(*file, JsonSerializer::READ);
 		char path[MAX_PATH];
 		serializer.deserialize("texture", path, MAX_PATH);
-		m_textures.push(m_renderer.loadTexture(path));
+		if(path[0] != '\0')
+		{
+			m_textures.push(m_renderer.loadTexture(path));
+		}
 		
 		serializer.deserialize("shader", path, MAX_PATH);
 		m_shader = m_renderer.loadShader(path);
 		m_is_ready = true;
 
 	}
-
+	else
+	{
+		g_log_info.log("loading", "Error loading material.");
+	}
 	fs.close(file);
 }
 

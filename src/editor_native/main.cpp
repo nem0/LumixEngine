@@ -144,9 +144,9 @@ struct App
 
 	void render()
 	{
-		SDLRenderDevice device(m_display_window);
-		m_server.getEngine().getRenderer().render(device);
-		m_gui->render();
+		SDLRenderDevice device(m_display_window, &m_server.getEngine().getRenderer());
+		m_server.render(device);
+		//m_gui->render();
 		device.endFrame();
 	}
 

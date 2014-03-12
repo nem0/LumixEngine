@@ -73,6 +73,18 @@ struct LUX_CORE_API Vec3
 		this->z = z;
 	}
 
+	Vec3 normalized() const
+	{
+		float x = this->x;
+		float y = this->y;
+		float z = this->z;
+		float inv_len = 1 / sqrt(x * x + y * y + z * z);
+		x *= inv_len;
+		y *= inv_len;
+		z *= inv_len;
+		return Vec3(x, y, z);
+	}
+
 	void normalize()
 	{
 		float x = this->x;

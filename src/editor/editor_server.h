@@ -16,6 +16,7 @@ namespace Lux
 
 
 	class IPlugin;
+	class IRenderDevice;
 	class Engine;
 
 
@@ -31,6 +32,7 @@ namespace Lux
 			void registerCreator(uint32_t type, IPlugin& creator);
 			void registerProperty(const char* component_type, IPropertyDescriptor* descriptor);
 			Engine& getEngine();
+			void render(IRenderDevice& render_device);
 
 		private:
 			struct EditorServerImpl* m_impl;
