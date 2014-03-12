@@ -1,8 +1,12 @@
 #include "editor_icon.h"
-#include "core/matrix.h"
-#include "graphics/renderer.h"
 #include "core/crc32.h"
+#include "core/matrix.h"
+#include "graphics/irender_device.h"
+#include "graphics/pipeline.h"
+#include "graphics/renderer.h"
 
+#include <Windows.h>
+#include <gl/GL.h>
 
 namespace Lux
 {
@@ -14,15 +18,15 @@ static const uint32_t point_light_type = crc32("point_light");
 */
 void EditorIcon::create(Entity& entity, const Component& cmp)
 {
-	/*m_entity = entity;
-	m_handle = h3dAddModelNode(H3DRootNode, "DynGeoModelNode", s_geom);
+	m_entity = entity;
+	/*m_handle = h3dAddModelNode(H3DRootNode, "DynGeoModelNode", s_geom);
 	int index = 0;
 	if(cmp.type == point_light_type)
 	{
 		index = 1;
 	}
 	h3dAddMeshNode(m_handle, "DynGeoMesh", s_materials[index], 0, 6, 0, 3);*/
-	ASSERT(false);
+	//ASSERT(false);
 
 }
 
@@ -48,20 +52,27 @@ void EditorIcon::hide()
 }
 
 
-void EditorIcon::update(Renderer* renderer)
+void EditorIcon::render(Renderer* renderer, IRenderDevice& render_device)
 {
-	ASSERT(false);
-	/*Matrix mtx;
-	renderer->getCameraMatrix(mtx);
-
-	float scale = renderer->getHalfFovTan() * (m_entity.getPosition() - mtx.getTranslation()).length() * 2;
-	scale /= 3;
-	Matrix scale_mtx = Matrix::IDENTITY;
-	scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = scale;
-	mtx = scale_mtx * mtx;
+	Component camera = render_device.getPipeline().getCamera(0);
+	Lux::Matrix mtx = camera.entity.getMatrix();
+	
+	float scale = /*renderer->getHalfFovTan()*/ 0.0333f * (m_entity.getPosition() - mtx.getTranslation()).length() * 2;
 
 	mtx.setTranslation(m_entity.getPosition());
-	h3dSetNodeTransMat(m_handle, &mtx.m11);*/
+	Matrix scale_mtx = Matrix::IDENTITY;
+	scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = scale;
+	mtx = mtx * scale_mtx;
+
+	glPushMatrix();
+	glMultMatrixf(&mtx.m11);
+	glBegin(GL_QUADS);
+		glVertex3f(0, 0, 0);
+		glVertex3f(0, 1, 0);
+		glVertex3f(1, 1, 0);
+		glVertex3f(1, 0, 0);
+	glEnd();
+	glPopMatrix();
 }
 
 

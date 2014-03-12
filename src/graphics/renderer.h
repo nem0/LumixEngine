@@ -14,6 +14,7 @@ namespace Lux
 class IRenderDevice;
 class Material;
 class ModelInstance;
+class Pipeline;
 class Pose;
 class Shader;
 class Texture;
@@ -35,10 +36,9 @@ class LUX_ENGINE_API Renderer : public IPlugin
 		virtual void render(IRenderDevice& device) = 0;
 		virtual void setUniverse(Universe* universe) = 0;
 
-		virtual void setCameraActive(Component cmp, const bool& active) = 0;
-		virtual void getCameraActive(Component cmp, bool& active) = 0;
-		virtual void setCameraPipeline(Component cmp, const string& pipeline) = 0;
+		virtual void applyCamera(Component camera) = 0;
 		virtual void getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) = 0;
+		virtual Component getLight(int index) = 0;
 		virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir) = 0;
 
 		virtual Pose& getPose(Component cmp) = 0;
@@ -47,6 +47,7 @@ class LUX_ENGINE_API Renderer : public IPlugin
 		virtual Material* loadMaterial(const char* path) = 0;
 		virtual Texture* loadTexture(const char* path) = 0;
 		virtual Shader* loadShader(const char* path) = 0;
+		virtual Pipeline* loadPipeline(const char* path) = 0;
 
 /*		virtual void renderScene();
 		void endFrame();

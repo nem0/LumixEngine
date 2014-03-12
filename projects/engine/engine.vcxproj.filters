@@ -112,6 +112,9 @@
     <ClCompile Include="..\..\src\animation\animation.cpp">
       <Filter>animation</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\graphics\frame_buffer.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\graphics\renderer.h">
@@ -221,6 +224,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\animation\animation.h">
       <Filter>animation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\graphics\frame_buffer.h">
+      <Filter>graphics</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
