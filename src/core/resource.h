@@ -65,8 +65,17 @@ namespace Lux
 		uint32_t addRef(void) { return ++m_ref_count; }
 		uint32_t remRef(void) { return --m_ref_count; }
 
+		// this method should be called only from method, which parses the file. Otherwise this method
+		// should be reimplemented.
+		void addResDependency(Resource& dependent_resource);
+		void remResDependency(Resource& dependent_resource);
+
+		void onResourceUpdated(uint32_t new_state);
+		void decrementDepCount();
+
 	private:
 		uint16_t m_ref_count;
+		uint16_t m_dep_count;
 		State m_state;
 
 	protected:

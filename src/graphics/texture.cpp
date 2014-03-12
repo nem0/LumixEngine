@@ -129,7 +129,7 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		LUX_DELETE_ARRAY(buffer);
 
 		m_size = file->size();
-		onReady();
+		decrementDepCount();
 	}
 	else
 	{
