@@ -196,15 +196,15 @@ void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			char mesh_name[MAX_PATH];
 			mesh_name[str_size] = 0;
 			file->read(mesh_name, str_size);
-
 			Material* material = static_cast<Material*>(m_resource_manager.get(ResourceManager::MATERIAL)->load(material_path));
 			Mesh mesh(material, mesh_vertex_offset, mesh_tri_count * 3, mesh_name);
 			mesh_vertex_offset += mesh_tri_count * 3;
 			m_meshes.push(mesh);
+			addResDependency(*material);
 		}
 
 		m_size = file->size();
-		onReady();
+		decrementDepCount();
 	}
 
 	fs.close(file);

@@ -95,7 +95,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		LUX_DELETE_ARRAY(buf);
 
 		m_size = file->size();
-		onReady();
+		decrementDepCount();
 	}
 
 	fs.close(file);
