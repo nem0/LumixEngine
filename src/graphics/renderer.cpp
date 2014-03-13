@@ -91,7 +91,8 @@ struct RendererImpl : public Renderer
 	{
 		// init
 		glEnable(GL_DEPTH_TEST);
-		
+		glDisable(GL_BLEND);		
+
 		// render
 		device.getPipeline().render();
 
@@ -200,6 +201,19 @@ struct RendererImpl : public Renderer
 	}
 
 
+	virtual void getRenderablePath(Component cmp, string& path) LUX_OVERRIDE
+	{
+		if(m_renderables[cmp.index].m_model)
+		{
+			path = m_renderables[cmp.index].m_model->getModel().getPath();
+		}
+		else
+		{
+			path = "";
+		}
+	}
+
+
 	virtual void setRenderablePath(Component cmp, const string& path) LUX_OVERRIDE
 	{
 		LUX_DELETE(m_renderables[cmp.index].m_model);
@@ -212,10 +226,14 @@ struct RendererImpl : public Renderer
 
 	virtual void getRenderableInfos(PODArray<RenderableInfo>& infos) LUX_OVERRIDE
 	{
+		infos.reserve(m_renderables.size());
 		for(int i = 0; i < m_renderables.size(); ++i)
 		{
-			RenderableInfo& info = infos.pushEmpty();
-			info.m_model_instance = m_renderables[i].m_model;	
+			if(m_renderables[i].m_model != NULL)
+			{
+				RenderableInfo& info = infos.pushEmpty();
+				info.m_model_instance = m_renderables[i].m_model;	
+			}
 		}
 	}
 

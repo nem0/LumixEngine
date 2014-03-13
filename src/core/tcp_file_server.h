@@ -13,7 +13,7 @@ namespace Lux
 			TCPFileServer();
 			~TCPFileServer();
 
-			void start();
+			void start(const char* base_path);
 			void stop();
 
 		private:

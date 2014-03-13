@@ -49,7 +49,7 @@ void RenderableUI::browseSource(Lux::UI::Block& block, void*)
 
 	ofn.lStructSize = sizeof(ofn);
 	ofn.hwndOwner = NULL;
-	ofn.lpstrFilter = "models\0*.scene.xml\0";
+	ofn.lpstrFilter = "models\0*.msh\0";
 	char buf[MAX_PATH];
 	buf[0] = 0;
 	ofn.lpstrFile = buf;
@@ -68,6 +68,16 @@ void RenderableUI::browseSource(Lux::UI::Block& block, void*)
 			{
 				strcpy_s(buf, buf + s.length());
 			}
+		}
+		/// TODO make this function
+		char* c = buf;
+		while(*c)
+		{
+			if(*c == '\\')
+			{
+				*c = '/';
+			}
+			++c;
 		}
 		m_source_box->getChild(0)->setBlockText(buf);
 		m_source_box->getChild(0)->emitEvent("text_accepted");
