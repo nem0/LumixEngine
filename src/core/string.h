@@ -60,6 +60,12 @@ class base_string
 			m_allocator.deallocate(m_cstr);
 		}
 
+		T operator[](int index)
+		{
+			ASSERT(index >= 0 && index < m_size);
+			return m_cstr[index];
+		}
+
 		void operator = (const base_string<T, Allocator>& rhs) 
 		{
 			if(&rhs != this)

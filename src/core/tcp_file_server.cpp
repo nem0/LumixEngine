@@ -48,8 +48,15 @@ namespace Lux
 								m_files[id] = file;
 
 								string path;
-//#error todo
-								path = m_buffer.data();
+								if (strncmp(m_buffer.data(), m_base_path.c_str(), m_base_path.length()) != 0)
+								{
+									path = m_base_path;
+									path += m_buffer.data();
+								}
+								else
+								{
+									path = m_buffer.data();
+								}
 								ret = file->open(path.c_str(), mode) ? id : -1;
 							}
 							stream->write(ret);
@@ -159,7 +166,14 @@ namespace Lux
 			}
 
 			void stop() {} // TODO: implement stop 
-			void setBasePath(const char* base_path) { m_base_path = base_path; }
+			void setBasePath(const char* base_path) 
+			{
+				m_base_path = base_path;
+				if (m_base_path[m_base_path.length() - 1] != '/')
+				{
+					m_base_path += "/";
+				}
+			}
 
 		private:
 			Net::TCPAcceptor			m_acceptor;
