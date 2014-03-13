@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
       <Configuration>Debug</Configuration>
@@ -19,33 +19,33 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{8EB8C1E2-F4FB-4703-9E3A-9115B6F4B8C8}</ProjectGuid>
+    <ProjectGuid>{05863FC7-C3C9-4542-8E50-91663C6864F5}</ProjectGuid>
     <RootNamespace>editor_native</RootNamespace>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v110</PlatformToolset>
+    <PlatformToolset>v120</PlatformToolset>
     <CharacterSet>NotSet</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v110</PlatformToolset>
+    <PlatformToolset>v120</PlatformToolset>
     <CharacterSet>NotSet</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v110</PlatformToolset>
+    <PlatformToolset>v120</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>NotSet</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v110</PlatformToolset>
+    <PlatformToolset>v120</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>NotSet</CharacterSet>
   </PropertyGroup>
@@ -66,22 +66,20 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <OutDir>$(SolutionDir)bin\$(Platform)_$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)tmp\$(Platform)_$(Configuration)\$(ProjectName)\</IntDir>
-    <TargetExt>.exe</TargetExt>
+    <OutDir>$(SolutionDir)\..\..\bin\$(Platform)_$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)\..\..\tmp\$(Platform)_$(Configuration)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <TargetExt>.exe</TargetExt>
-    <OutDir>$(SolutionDir)bin\$(Platform)_$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)tmp\$(Platform)_$(Configuration)\$(ProjectName)\</IntDir>
+    <OutDir>$(SolutionDir)\..\..\bin\$(Platform)_$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)\..\..\tmp\$(Platform)_$(Configuration)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <OutDir>$(SolutionDir)bin\$(Platform)_$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)tmp\$(Platform)_$(Configuration)\$(ProjectName)\</IntDir>
+    <OutDir>$(SolutionDir)\..\..\bin\$(Platform)_$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)\..\..\tmp\$(Platform)_$(Configuration)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IntDir>$(SolutionDir)tmp\$(Platform)_$(Configuration)\$(ProjectName)\</IntDir>
-    <OutDir>$(SolutionDir)bin\$(Platform)_$(Configuration)\</OutDir>
+    <OutDir>$(SolutionDir)\..\..\bin\$(Platform)_$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)\..\..\tmp\$(Platform)_$(Configuration)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -89,19 +87,18 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>
       </SDLCheck>
-      <AdditionalIncludeDirectories>..\..\external\cegui\include;..\..\src;..\..\external\sdl\include;..\..\external\horde3d\include</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalIncludeDirectories>..\..\..\src;..\..\..\external\sdl\include</AdditionalIncludeDirectories>
       <MinimalRebuild>false</MinimalRebuild>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>..\..\bin\$(Platform)_$(Configuration)\;..\..\external\sdl\lib\x86</AdditionalLibraryDirectories>
       <AdditionalDependencies>glu32.lib;gui.lib;opengl32.lib;core.lib;engine.lib;SDL2main.lib;SDL2.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\..\..\external\sdl\lib\x86;..\..\..\bin\$(Platform)_$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <SubSystem>Console</SubSystem>
     </Link>
     <PostBuildEvent>
-      <Command>copy /Y "$(SolutionDir)external\sdl\lib\x86\*.dll" "$(SolutionDir)\bin\$(Platform)_$(Configuration)\"
-copy /Y "$(SolutionDir)external\physx\dll\x86\*.dll" "$(SolutionDir)\bin\$(Platform)_$(Configuration)\"</Command>
+      <Command>copy /Y "$(SolutionDir)\..\..\external\sdl\lib\x86\*.dll" "$(SolutionDir)\..\..\bin\$(Platform)_$(Configuration)\"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -110,19 +107,18 @@ copy /Y "$(SolutionDir)external\physx\dll\x86\*.dll" "$(SolutionDir)\bin\$(Platf
       <Optimization>Disabled</Optimization>
       <SDLCheck>
       </SDLCheck>
-      <AdditionalIncludeDirectories>..\..\external\cegui\include;..\..\src;..\..\external\sdl\include;..\..\external\horde3d\include</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalIncludeDirectories>..\..\..\src;..\..\..\external\sdl\include</AdditionalIncludeDirectories>
       <MinimalRebuild>false</MinimalRebuild>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>..\..\bin\$(Platform)_$(Configuration)\;..\..\external\sdl\lib\x64;$(Configuration)\</AdditionalLibraryDirectories>
       <AdditionalDependencies>glu32.lib;gui.lib;opengl32.lib;core.lib;engine.lib;SDL2main.lib;SDL2.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\..\..\external\sdl\lib\x64;..\..\..\bin\$(Platform)_$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <SubSystem>Console</SubSystem>
     </Link>
     <PostBuildEvent>
-      <Command>copy /Y "$(SolutionDir)external\sdl\lib\x64\*.dll" "$(SolutionDir)\bin\$(Platform)_$(Configuration)\"
-copy /Y "$(SolutionDir)external\physx\dll\x64\*.dll" "$(SolutionDir)\bin\$(Platform)_$(Configuration)\"</Command>
+      <Command>copy /Y "$(SolutionDir)\..\..\external\sdl\lib\x64\*.dll" "$(SolutionDir)\..\..\bin\$(Platform)_$(Configuration)\"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -133,19 +129,19 @@ copy /Y "$(SolutionDir)external\physx\dll\x64\*.dll" "$(SolutionDir)\bin\$(Platf
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>
       </SDLCheck>
-      <AdditionalIncludeDirectories>..\..\external\cegui\include;..\..\src;..\..\external\sdl\include;..\..\external\horde3d\include</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalIncludeDirectories>..\..\..\src;..\..\..\external\sdl\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>glu32.lib;gui.lib;opengl32.lib;core.lib;engine.lib;SDL2main.lib;SDL2.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\..\..\external\sdl\lib\x86;..\..\..\bin\$(Platform)_$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <SubSystem>Console</SubSystem>
-      <AdditionalLibraryDirectories>..\..\bin\$(Platform)_$(Configuration)\;..\..\external\sdl\lib\x86</AdditionalLibraryDirectories>
-      <AdditionalDependencies>gui.lib;opengl32.lib;core.lib;engine.lib;SDL2main.lib;SDL2.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>copy /Y "$(SolutionDir)external\sdl\lib\x86\*.dll" "$(SolutionDir)\bin\$(Platform)_$(Configuration)\"</Command>
+      <Command>copy /Y "$(SolutionDir)\..\..\external\sdl\lib\x86\*.dll" "$(SolutionDir)\..\..\bin\$(Platform)_$(Configuration)\"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -156,51 +152,51 @@ copy /Y "$(SolutionDir)external\physx\dll\x64\*.dll" "$(SolutionDir)\bin\$(Platf
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>
       </SDLCheck>
-      <AdditionalIncludeDirectories>..\..\external\cegui\include;..\..\src;..\..\external\sdl\include;..\..\external\horde3d\include</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalIncludeDirectories>..\..\..\src;..\..\..\external\sdl\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>glu32.lib;gui.lib;opengl32.lib;core.lib;engine.lib;SDL2main.lib;SDL2.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\..\..\external\sdl\lib\x64;..\..\..\bin\$(Platform)_$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <SubSystem>Console</SubSystem>
-      <AdditionalLibraryDirectories>..\..\bin\$(Platform)_$(Configuration)\;..\..\external\sdl\lib\x64</AdditionalLibraryDirectories>
-      <AdditionalDependencies>gui.lib;opengl32.lib;core.lib;engine.lib;SDL2main.lib;SDL2.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>copy /Y "$(SolutionDir)external\sdl\lib\x64\*.dll" "$(SolutionDir)\bin\$(Platform)_$(Configuration)\"</Command>
+      <Command>copy /Y "$(SolutionDir)\..\..\external\sdl\lib\x64\*.dll" "$(SolutionDir)\..\..\bin\$(Platform)_$(Configuration)\"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\src\core\new.cpp" />
-    <ClCompile Include="..\..\src\editor_native\log_ui.cpp" />
-    <ClCompile Include="..\..\src\editor_native\main.cpp" />
-    <ClCompile Include="..\..\src\editor_native\main_frame.cpp" />
-    <ClCompile Include="..\..\src\editor_native\main_menu.cpp" />
-    <ClCompile Include="..\..\src\editor_native\notifications.cpp" />
-    <ClCompile Include="..\..\src\editor_native\property_frame\animable_ui.cpp" />
-    <ClCompile Include="..\..\src\editor_native\property_frame\box_rigid_actor_ui.cpp" />
-    <ClCompile Include="..\..\src\editor_native\property_frame\point_light_ui.cpp" />
-    <ClCompile Include="..\..\src\editor_native\property_frame\property_frame.cpp" />
-    <ClCompile Include="..\..\src\editor_native\property_frame\renderable_ui.cpp" />
-    <ClCompile Include="..\..\src\editor_native\property_frame\script_ui.cpp" />
-    <ClCompile Include="..\..\src\editor_native\script_compiler.cpp" />
-    <ClCompile Include="..\..\src\editor_native\sdl_render_device.cpp" />
+    <ClCompile Include="..\..\..\src\core\new.cpp" />
+    <ClCompile Include="..\..\..\src\editor_native\log_ui.cpp" />
+    <ClCompile Include="..\..\..\src\editor_native\main.cpp" />
+    <ClCompile Include="..\..\..\src\editor_native\main_frame.cpp" />
+    <ClCompile Include="..\..\..\src\editor_native\main_menu.cpp" />
+    <ClCompile Include="..\..\..\src\editor_native\notifications.cpp" />
+    <ClCompile Include="..\..\..\src\editor_native\property_frame\animable_ui.cpp" />
+    <ClCompile Include="..\..\..\src\editor_native\property_frame\box_rigid_actor_ui.cpp" />
+    <ClCompile Include="..\..\..\src\editor_native\property_frame\point_light_ui.cpp" />
+    <ClCompile Include="..\..\..\src\editor_native\property_frame\property_frame.cpp" />
+    <ClCompile Include="..\..\..\src\editor_native\property_frame\renderable_ui.cpp" />
+    <ClCompile Include="..\..\..\src\editor_native\property_frame\script_ui.cpp" />
+    <ClCompile Include="..\..\..\src\editor_native\script_compiler.cpp" />
+    <ClCompile Include="..\..\..\src\editor_native\sdl_render_device.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\src\editor_native\log_ui.h" />
-    <ClInclude Include="..\..\src\editor_native\main_frame.h" />
-    <ClInclude Include="..\..\src\editor_native\main_menu.h" />
-    <ClInclude Include="..\..\src\editor_native\notifications.h" />
-    <ClInclude Include="..\..\src\editor_native\property_frame\animable_ui.h" />
-    <ClInclude Include="..\..\src\editor_native\property_frame\box_rigid_actor_ui.h" />
-    <ClInclude Include="..\..\src\editor_native\property_frame\icomponent_ui.h" />
-    <ClInclude Include="..\..\src\editor_native\property_frame\point_light_ui.h" />
-    <ClInclude Include="..\..\src\editor_native\property_frame\property_frame.h" />
-    <ClInclude Include="..\..\src\editor_native\property_frame\renderable_ui.h" />
-    <ClInclude Include="..\..\src\editor_native\property_frame\script_ui.h" />
-    <ClInclude Include="..\..\src\editor_native\script_compiler.h" />
-    <ClInclude Include="..\..\src\editor_native\sdl_render_device.h" />
+    <ClInclude Include="..\..\..\src\editor_native\log_ui.h" />
+    <ClInclude Include="..\..\..\src\editor_native\main_frame.h" />
+    <ClInclude Include="..\..\..\src\editor_native\main_menu.h" />
+    <ClInclude Include="..\..\..\src\editor_native\notifications.h" />
+    <ClInclude Include="..\..\..\src\editor_native\property_frame\animable_ui.h" />
+    <ClInclude Include="..\..\..\src\editor_native\property_frame\box_rigid_actor_ui.h" />
+    <ClInclude Include="..\..\..\src\editor_native\property_frame\icomponent_ui.h" />
+    <ClInclude Include="..\..\..\src\editor_native\property_frame\point_light_ui.h" />
+    <ClInclude Include="..\..\..\src\editor_native\property_frame\property_frame.h" />
+    <ClInclude Include="..\..\..\src\editor_native\property_frame\renderable_ui.h" />
+    <ClInclude Include="..\..\..\src\editor_native\property_frame\script_ui.h" />
+    <ClInclude Include="..\..\..\src\editor_native\script_compiler.h" />
+    <ClInclude Include="..\..\..\src\editor_native\sdl_render_device.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

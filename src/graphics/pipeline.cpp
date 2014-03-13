@@ -297,10 +297,10 @@ struct PipelineImpl : public Pipeline
 		glPushMatrix();
 		glLoadIdentity();
 		Matrix projection_matrix;
+		/// TODO bouding box
 		getOrthoMatrix(-10, 10, -10, 10, 0, 100, &projection_matrix);
 		glMultMatrixf(&projection_matrix.m11);
 		
-
 		Matrix mtx = light_cmp.entity.getMatrix();
 		glMatrixMode(GL_MODELVIEW);
 		glLoadIdentity();

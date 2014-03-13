@@ -2,12 +2,13 @@
 
 #include "core/array.h"
 #include "core/free_list.h"
+#include "core/os_file.h"
 #include "core/static_array.h"
+#include "core/string.h"
 #include "core/tcp_file_device.h"
 #include "core/task.h"
 #include "core/tcp_acceptor.h"
 #include "core/tcp_stream.h"
-#include "core/os_file.h"
 
 namespace Lux
 {
@@ -46,7 +47,10 @@ namespace Lux
 								OsFile* file = LUX_NEW(OsFile)();
 								m_files[id] = file;
 
-								ret = file->open(m_buffer.data(), mode) ? id : -1;
+								string path;
+//#error todo
+								path = m_buffer.data();
+								ret = file->open(path.c_str(), mode) ? id : -1;
 							}
 							stream->write(ret);
 						}
@@ -155,12 +159,14 @@ namespace Lux
 			}
 
 			void stop() {} // TODO: implement stop 
+			void setBasePath(const char* base_path) { m_base_path = base_path; }
 
 		private:
 			Net::TCPAcceptor			m_acceptor;
 			StaticArray<char, 0x50000>	m_buffer;
 			StaticArray<OsFile*, 0x50000> m_files;
 			FreeList<int32_t, 0x50000>	m_ids;
+			string m_base_path;
 		};
 
 		struct TCPFileServerImpl
@@ -178,9 +184,10 @@ namespace Lux
 			LUX_DELETE(m_impl);
 		}
 
-		void TCPFileServer::start()
+		void TCPFileServer::start(const char* base_path)
 		{
 			m_impl = LUX_NEW(TCPFileServerImpl);
+			m_impl->m_task.setBasePath(base_path);
 			m_impl->m_task.create("TCP File Server Task");
 			m_impl->m_task.run();
 		}

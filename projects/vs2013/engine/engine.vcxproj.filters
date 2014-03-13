@@ -1,0 +1,232 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="script">
+      <UniqueIdentifier>{af898ef8-401c-4aae-972c-8a5da5ead331}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="universe">
+      <UniqueIdentifier>{17bfcc99-db07-4e7b-a65c-f59f818f4c83}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine">
+      <UniqueIdentifier>{e33fbdba-3094-4874-83f2-51e668c3cb2d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="editor">
+      <UniqueIdentifier>{856cefc3-62cd-4d97-b5d9-e40487b51da9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="graphics">
+      <UniqueIdentifier>{4958eded-acc7-41f8-ac9b-6f6bc47bd0ae}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="animation">
+      <UniqueIdentifier>{240998ba-942c-45cf-a31c-06007274bd82}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\src\animation\animation.cpp">
+      <Filter>animation</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\animation\animation_system.cpp">
+      <Filter>animation</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\graphics\frame_buffer.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\graphics\geometry.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\graphics\gl_ext.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\graphics\material.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\graphics\model.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\graphics\model_instance.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\graphics\pipeline.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\graphics\pose.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\graphics\renderer.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\graphics\shader.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\graphics\texture.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\engine\engine.cpp">
+      <Filter>engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\engine\iplugin.cpp">
+      <Filter>engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\engine\plugin_manager.cpp">
+      <Filter>engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\editor\editor_client.cpp">
+      <Filter>editor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\editor\editor_icon.cpp">
+      <Filter>editor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\editor\editor_server.cpp">
+      <Filter>editor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\editor\gizmo.cpp">
+      <Filter>editor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\editor\server_message_types.cpp">
+      <Filter>editor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\script\get_property_visitor.cpp">
+      <Filter>script</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\script\save_script_visitor.cpp">
+      <Filter>script</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\script\script_system.cpp">
+      <Filter>script</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\script\set_property_visitor.cpp">
+      <Filter>script</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\universe\component.cpp">
+      <Filter>universe</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\universe\component_event.cpp">
+      <Filter>universe</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\universe\entity.cpp">
+      <Filter>universe</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\universe\entity_destroyed_event.cpp">
+      <Filter>universe</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\universe\entity_moved_event.cpp">
+      <Filter>universe</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\universe\universe.cpp">
+      <Filter>universe</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\core\new.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\src\animation\animation.h">
+      <Filter>animation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\animation\animation_system.h">
+      <Filter>animation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\graphics\frame_buffer.h">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\graphics\geometry.h">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\graphics\gl_ext.h">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\graphics\irender_device.h">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\graphics\material.h">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\graphics\model.h">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\graphics\model_instance.h">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\graphics\pipeline.h">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\graphics\pose.h">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\graphics\ray_cast_model_hit.h">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\graphics\renderer.h">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\graphics\shader.h">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\graphics\texture.h">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\engine\engine.h">
+      <Filter>engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\engine\iplugin.h">
+      <Filter>engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\engine\plugin_manager.h">
+      <Filter>engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\editor\client_message_types.h">
+      <Filter>editor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\editor\editor_client.h">
+      <Filter>editor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\editor\editor_icon.h">
+      <Filter>editor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\editor\editor_server.h">
+      <Filter>editor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\editor\gizmo.h">
+      <Filter>editor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\editor\property_descriptor.h">
+      <Filter>editor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\editor\server_message_types.h">
+      <Filter>editor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\script\base_script.h">
+      <Filter>script</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\script\get_property_visitor.h">
+      <Filter>script</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\script\save_script_visitor.h">
+      <Filter>script</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\script\script_system.h">
+      <Filter>script</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\script\script_visitor.h">
+      <Filter>script</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\script\set_property_visitor.h">
+      <Filter>script</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\universe\component.h">
+      <Filter>universe</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\universe\component_event.h">
+      <Filter>universe</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\universe\entity.h">
+      <Filter>universe</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\universe\entity_destroyed_event.h">
+      <Filter>universe</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\universe\entity_moved_event.h">
+      <Filter>universe</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\universe\universe.h">
+      <Filter>universe</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

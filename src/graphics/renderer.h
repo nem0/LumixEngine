@@ -43,6 +43,7 @@ class LUX_ENGINE_API Renderer : public IPlugin
 
 		virtual Pose& getPose(Component cmp) = 0;
 		virtual void setRenderablePath(Component cmp, const string& path) = 0;
+		virtual void getRenderablePath(Component cmp, string& path) = 0;
 		virtual void getRenderableInfos(PODArray<RenderableInfo>& infos) = 0;
 		virtual Material* loadMaterial(const char* path) = 0;
 		virtual Texture* loadTexture(const char* path) = 0;

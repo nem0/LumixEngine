@@ -381,7 +381,7 @@ namespace UI
 
 	void OpenGLRenderer::renderText(const char* text, float x, float y, float z, float max_width)
 	{
-		if(!text)
+		if(!text || text[0] == '\0')
 		{
 			return;
 		}
@@ -443,7 +443,6 @@ namespace UI
 		glEnable(GL_BLEND);
 		glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		renderImage(m_impl->m_font_image, &verts[0].x, &uvs[0].x, verts.size());
-		
 	}
 
 	bool readLine(FS::IFile* file, char buffer[], int max_size)

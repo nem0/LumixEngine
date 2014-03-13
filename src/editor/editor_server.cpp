@@ -311,8 +311,8 @@ void EditorServer::destroy()
 
 void EditorServerImpl::registerProperties()
 {
-	/*	m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("source"), &Renderer::getMesh, &Renderer::setMesh, IPropertyDescriptor::FILE));
-	m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("visible"), &Renderer::getVisible, &Renderer::setVisible));
+	m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("source"), &Renderer::getRenderablePath, &Renderer::setRenderablePath, IPropertyDescriptor::FILE));
+	/*m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("visible"), &Renderer::getVisible, &Renderer::setVisible));
 	m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("cast shadows"), &Renderer::getCastShadows, &Renderer::setCastShadows));
 	m_component_properties[point_light_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("fov"), &Renderer::getLightFov, &Renderer::setLightFov));
 	m_component_properties[point_light_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("radius"), &Renderer::getLightRadius, &Renderer::setLightRadius));
@@ -570,7 +570,7 @@ void EditorServerImpl::sendEntityPosition(int uid)
 
 void EditorServerImpl::addComponent(uint32_t type_crc)
 {
-	/*if(m_selected_entity.isValid())
+	if(m_selected_entity.isValid())
 	{
 		const Entity::ComponentList& cmps = m_selected_entity.getComponents();
 		for(int i = 0; i < cmps.size(); ++i)
@@ -588,11 +588,12 @@ void EditorServerImpl::addComponent(uint32_t type_crc)
 		}
 		else if(type_crc == renderable_type)
 		{
-			m_engine.getRenderer().createRenderable(m_selected_entity);
+			m_engine.getRenderer().createComponent(crc32("renderable"), m_selected_entity);
 		}
 		else if(type_crc == point_light_type)
 		{
-			m_engine.getRenderer().createPointLight(m_selected_entity);
+			ASSERT(false);
+		//	m_engine.getRenderer().createPointLight(m_selected_entity);
 		}
 		else if(type_crc == script_type)
 		{
@@ -603,7 +604,7 @@ void EditorServerImpl::addComponent(uint32_t type_crc)
 			ASSERT(false);
 		}
 		selectEntity(m_selected_entity);
-	}*/
+	}
 }
 
 
@@ -755,7 +756,7 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 	m_message_task->run();
 
 	m_file_system = FS::FileSystem::create();
-	m_tpc_file_server.start();
+	m_tpc_file_server.start(base_path);
 
 	m_tcp_file_device.connect("127.0.0.1", 10001);
 
