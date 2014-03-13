@@ -220,6 +220,7 @@ struct RendererImpl : public Renderer
 		Renderable& r = m_renderables[cmp.index];
 		Model* model = LUX_NEW(Model)(*this);
 		r.m_model = LUX_NEW(ModelInstance)(*model);
+		r.m_model->setMatrix(r.m_entity.getMatrix());
 		model->load(path.c_str(), m_engine->getFileSystem());
 	}
 

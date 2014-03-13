@@ -1,6 +1,7 @@
 #include "graphics/model.h"
 #include "core/file_system.h"
 #include "core/ifile.h"
+#include "core/log.h"
 #include "core/pod_array.h"
 #include "core/vec3.h"
 #include "graphics/geometry.h"
@@ -192,6 +193,10 @@ void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			m_meshes.push(mesh);
 		}
 		m_on_loaded.invoke();
+	}
+	else
+	{
+		g_log_info.log("renderer", "Error loading model %s", m_path.c_str());
 	}
 
 	fs.close(file);
