@@ -23,41 +23,141 @@
 namespace Lux
 {
 
+
+struct PipelineImpl;
+
 	
 struct Command
 {
-	enum Type
-	{
-		CLEAR,
-		RENDER_MODELS,
-		APPLY_CAMERA,
-		BIND_FRAMEBUFFER,
-		UNBIND_FRAMEBUFFER,
-		DRAW_FULLSCREEN_QUAD,
-		BIND_FRAMEBUFFER_TEXTURE,
-		RENDER_SHADOWMAP,
-		BIND_SHADOWMAP
-	};
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) = 0;
+	virtual void execute(PipelineImpl& pipeline) = 0;
+};
 
-	uint32_t m_type;
-	uint32_t m_uint;
-	uint32_t m_uint2;
-	uint32_t m_uint3;
+
+struct ClearCommand : public Command
+{
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) LUX_OVERRIDE;
+	virtual void execute(PipelineImpl& pipeline) LUX_OVERRIDE;
+	uint32_t m_buffers;
+};
+
+
+struct RenderModelsCommand : public Command
+{
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) LUX_OVERRIDE {}
+	virtual void execute(PipelineImpl& pipeline) LUX_OVERRIDE;
+};
+
+
+struct ApplyCameraCommand : public Command
+{
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) LUX_OVERRIDE;
+	virtual void execute(PipelineImpl& pipeline) LUX_OVERRIDE;
+	uint32_t m_camera_idx;
+};
+
+
+struct BindFramebufferCommand : public Command
+{
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) LUX_OVERRIDE;
+	virtual void execute(PipelineImpl& pipeline) LUX_OVERRIDE;
+	uint32_t m_buffer_index;
+};
+
+
+struct UnbindFramebufferCommand : public Command
+{
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) LUX_OVERRIDE {}
+	virtual void execute(PipelineImpl& pipeline) LUX_OVERRIDE;
+};
+
+
+struct DrawFullscreenQuadCommand : public Command
+{
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) LUX_OVERRIDE;
+	virtual void execute(PipelineImpl& pipeline) LUX_OVERRIDE;
 	Material* m_material;
+};
+
+
+struct BindFramebufferTextureCommand : public Command
+{
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) LUX_OVERRIDE;
+	virtual void execute(PipelineImpl& pipeline) LUX_OVERRIDE;
+	uint32_t m_framebuffer_index;
+	uint32_t m_renderbuffer_index;
+	uint32_t m_texture_uint;
+};
+
+
+struct RenderShadowmapCommand : public Command
+{
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) LUX_OVERRIDE {}
+	virtual void execute(PipelineImpl& pipeline) LUX_OVERRIDE;
+};
+
+
+struct BindShadowmapCommand : public Command
+{
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) LUX_OVERRIDE {}
+	virtual void execute(PipelineImpl& pipeline) LUX_OVERRIDE;
 };
 
 
 struct PipelineImpl : public Pipeline
 {
+	struct CommandCreator
+	{
+		typedef Delegate<Command*> Creator;
+		Creator m_creator;
+		uint32_t m_type_hash;
+	};
+
+	
+	template <typename T>
+	static Command* CreateCommand()
+	{
+		return LUX_NEW(T);
+	}
+
+
 	PipelineImpl(Renderer& renderer)
 		: m_renderer(renderer)
 	{
+		addCommandCreator("clear").bind<&CreateCommand<ClearCommand> >();
+		addCommandCreator("render_models").bind<&CreateCommand<RenderModelsCommand> >();
+		addCommandCreator("apply_camera").bind<&CreateCommand<ApplyCameraCommand> >();
+		addCommandCreator("bind_framebuffer").bind<&CreateCommand<BindFramebufferCommand> >();
+		addCommandCreator("unbind_framebuffer").bind<&CreateCommand<UnbindFramebufferCommand> >();
+		addCommandCreator("draw_fullscreen_quad").bind<&CreateCommand<DrawFullscreenQuadCommand> >();
+		addCommandCreator("bind_framebuffer_texture").bind<&CreateCommand<BindFramebufferTextureCommand> >();
+		addCommandCreator("render_shadowmap").bind<&CreateCommand<RenderShadowmapCommand> >();
+		addCommandCreator("bind_shadowmap").bind<&CreateCommand<BindShadowmapCommand> >();
 	}
 
 
 	~PipelineImpl()
 	{
-		/// TODO
+		for (int i = 0; i < m_commands.size(); ++i)
+		{
+			LUX_DELETE(m_commands[i]);
+		}
+		for (int i = 0; i < m_framebuffers.size(); ++i)
+		{
+			LUX_DELETE(m_framebuffers[i]);
+		}
+		if (m_shadowmap_framebuffer)
+		{
+			LUX_DELETE(m_shadowmap_framebuffer);
+		}
+	}
+
+
+	CommandCreator::Creator& addCommandCreator(const char* type)
+	{
+		CommandCreator& creator = m_command_creators.pushEmpty();
+		creator.m_type_hash = crc32(type);
+		return creator.m_creator;
 	}
 
 
@@ -87,8 +187,21 @@ struct PipelineImpl : public Pipeline
 	{
 		for(int i = 0; i < m_commands.size(); ++i)
 		{
-			executeCommand(m_commands[i]);
+			m_commands[i]->execute(*this);
 		}
+	}
+
+
+	Command* createCommand(uint32_t type_hash)
+	{
+		for (int i = 0; i < m_command_creators.size(); ++i)
+		{
+			if (m_command_creators[i].m_type_hash == type_hash)
+			{
+				return m_command_creators[i].m_creator.invoke();
+			}
+		}
+		return NULL;
 	}
 
 
@@ -100,7 +213,6 @@ struct PipelineImpl : public Pipeline
 		m_framebuffers.resize(count);
 		for(int i = 0; i < count; ++i)
 		{
-			/// TODO framebuffer resolution
 			int32_t render_buffer_count;
 			serializer.deserializeArrayItem(render_buffer_count);
 			int mask = 0;
@@ -117,70 +229,26 @@ struct PipelineImpl : public Pipeline
 					ASSERT(false);
 				}
 			}
-			/// TODO framebuffer resolution
-			m_framebuffers[i] = LUX_NEW(FrameBuffer)(800, 600, mask);
+			int width, height;
+			serializer.deserializeArrayItem(width);
+			serializer.deserializeArrayItem(height);
+			m_framebuffers[i] = LUX_NEW(FrameBuffer)(width, height, mask);
 		}
-		m_shadowmap_framebuffer = LUX_NEW(FrameBuffer)(800, 600, FrameBuffer::DEPTH_BIT);
+		serializer.deserializeArrayEnd();
+		int shadowmap_width, shadowmap_height;
+		serializer.deserialize("shadowmap_width", shadowmap_width);
+		serializer.deserialize("shadowmap_height", shadowmap_height);
+		m_shadowmap_framebuffer = LUX_NEW(FrameBuffer)(shadowmap_width, shadowmap_height, FrameBuffer::DEPTH_BIT);
 		serializer.deserialize("command_count", count);
 		serializer.deserializeArrayBegin("commands");
 		for(int i = 0; i < count; ++i)
 		{
-			Command& cmd = m_commands.pushEmpty();
 			char tmp[255];
 			serializer.deserializeArrayItem(tmp, 255);
-			/// TODO do this in a normal way
-			if(strcmp(tmp, "clear") == 0)
-			{
-				cmd.m_type = Command::CLEAR;
-				cmd.m_uint = GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT;
-			}
-			else if(strcmp(tmp, "render_models") == 0)
-			{
-				cmd.m_type = Command::RENDER_MODELS;
-				cmd.m_uint = 0;
-			}
-			else if(strcmp(tmp, "apply_camera") == 0)
-			{
-				cmd.m_type = Command::APPLY_CAMERA;
-				serializer.deserializeArrayItem(cmd.m_uint);
-			}
-			else if(strcmp(tmp, "bind_framebuffer") == 0)
-			{
-				cmd.m_type = Command::BIND_FRAMEBUFFER;
-				serializer.deserializeArrayItem(cmd.m_uint);
-				ASSERT(cmd.m_uint < (uint32_t)m_framebuffers.size());
-			}
-			else if(strcmp(tmp, "unbind_framebuffer") == 0)
-			{
-				cmd.m_type = Command::UNBIND_FRAMEBUFFER;
-			}
-			else if(strcmp(tmp, "draw_fullscreen_quad") == 0)
-			{
-				cmd.m_type = Command::DRAW_FULLSCREEN_QUAD;
-				char material[100];
-				serializer.deserializeArrayItem(material, 100);
-				char material_path[MAX_PATH];
-				strcpy(material_path, "materials/");
-				strcat(material_path, material);
-				strcat(material_path, ".mat");
-				cmd.m_material = m_renderer.loadMaterial(material_path);
-			}
-			else if(strcmp(tmp, "bind_framebuffer_texture") == 0)
-			{
-				cmd.m_type = Command::BIND_FRAMEBUFFER_TEXTURE;
-				/// TODO map names to indices
-				serializer.deserializeArrayItem(cmd.m_uint); // framebuffer index
-				serializer.deserializeArrayItem(cmd.m_uint2); // renderbuffer index
-				serializer.deserializeArrayItem(cmd.m_uint3); // texture unit
-			}
-			else if(strcmp(tmp, "render_shadowmap") == 0)
-			{
-				cmd.m_type = Command::RENDER_SHADOWMAP;
-			}
-			else if(strcmp(tmp, "bind_shadowmap") == 0)
-			{
-				cmd.m_type = Command::BIND_SHADOWMAP;
-			}
+			uint32_t command_type_hash = crc32(tmp);
+			Command* cmd = createCommand(command_type_hash);
+			cmd->deserialize(*this, serializer);
+			m_commands.push(cmd);
 		}
 		serializer.deserializeArrayEnd();
 		return true;
@@ -211,47 +279,6 @@ struct PipelineImpl : public Pipeline
 		}
 
 		fs.close(file);
-	}
-
-	void executeCommand(const Command& command)
-	{
-		switch(command.m_type)
-		{
-			case Command::CLEAR:
-				glClear(command.m_uint);
-				break;
-			case Command::RENDER_MODELS:
-				renderModels();
-				break;
-			case Command::APPLY_CAMERA:
-				m_renderer.applyCamera(m_cameras[command.m_uint]);
-				break;
-			case Command::BIND_FRAMEBUFFER:
-				m_framebuffers[command.m_uint]->bind();
-				break;
-			case Command::UNBIND_FRAMEBUFFER:
-				FrameBuffer::unbind();
-				break;
-			case Command::DRAW_FULLSCREEN_QUAD:
-				drawFullscreenQuad(command.m_material);
-				break;
-			case Command::BIND_SHADOWMAP:
-				glActiveTexture(GL_TEXTURE0 + 1);
-				glEnable(GL_TEXTURE_2D);
-				glBindTexture(GL_TEXTURE_2D, m_shadowmap_framebuffer->getDepthTexture());
-				break;
-			case Command::BIND_FRAMEBUFFER_TEXTURE:
-				glActiveTexture(GL_TEXTURE0 + command.m_uint3);
-				glEnable(GL_TEXTURE_2D);
-				glBindTexture(GL_TEXTURE_2D, m_framebuffers[command.m_uint]->getTexture((FrameBuffer::RenderBuffers)command.m_uint2));
-				break;
-			case Command::RENDER_SHADOWMAP:
-				renderShadowmap();
-				break;
-			default:
-				ASSERT(false);
-				break;
-		}
 	}
 
 
@@ -399,13 +426,14 @@ struct PipelineImpl : public Pipeline
 		}
 	}
 
-	Array<Command> m_commands;
+	PODArray<Command*> m_commands;
 	string m_path;
 	Renderer& m_renderer;
 	PODArray<Component> m_cameras;
 	PODArray<FrameBuffer*> m_framebuffers;
 	FrameBuffer* m_shadowmap_framebuffer;
 	Matrix m_shadow_modelviewprojection;
+	Array<CommandCreator> m_command_creators;
 };
 
 
@@ -418,6 +446,105 @@ Pipeline* Pipeline::create(Renderer& renderer)
 void Pipeline::destroy(Pipeline* pipeline)
 {
 	LUX_DELETE(pipeline);
+}
+
+
+
+void ClearCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer)
+{
+	m_buffers = GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT;
+}
+
+
+void ClearCommand::execute(PipelineImpl& pipeline)
+{
+	glClear(m_buffers);
+}
+
+
+void RenderModelsCommand::execute(PipelineImpl& pipeline)
+{
+	pipeline.renderModels();
+}
+
+
+void ApplyCameraCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer)
+{
+	serializer.deserializeArrayItem(m_camera_idx);
+}
+
+
+void ApplyCameraCommand::execute(PipelineImpl& pipeline)
+{
+	pipeline.m_renderer.applyCamera(pipeline.m_cameras[m_camera_idx]);
+
+}
+
+
+void BindFramebufferCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer)
+{
+	serializer.deserializeArrayItem(m_buffer_index);
+}
+
+
+void BindFramebufferCommand::execute(PipelineImpl& pipeline)
+{
+	pipeline.m_framebuffers[m_buffer_index]->bind();
+}
+
+	
+void UnbindFramebufferCommand::execute(PipelineImpl& pipeline)
+{
+	FrameBuffer::unbind();
+}
+
+
+void DrawFullscreenQuadCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer)
+{
+	char material[100];
+	serializer.deserializeArrayItem(material, 100);
+	char material_path[MAX_PATH];
+	strcpy(material_path, "materials/");
+	strcat(material_path, material);
+	strcat(material_path, ".mat");
+	m_material = pipeline.m_renderer.loadMaterial(material_path);
+}
+
+
+void DrawFullscreenQuadCommand::execute(PipelineImpl& pipeline)
+{
+	pipeline.drawFullscreenQuad(m_material);
+}
+
+
+void BindFramebufferTextureCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer)
+{
+	/// TODO map names to indices
+	serializer.deserializeArrayItem(m_framebuffer_index);
+	serializer.deserializeArrayItem(m_renderbuffer_index);
+	serializer.deserializeArrayItem(m_texture_uint);
+}
+
+
+void BindFramebufferTextureCommand::execute(PipelineImpl& pipeline)
+{
+	glActiveTexture(GL_TEXTURE0 + m_texture_uint);
+	glEnable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, pipeline.m_framebuffers[m_framebuffer_index]->getTexture((FrameBuffer::RenderBuffers)m_renderbuffer_index));
+}
+
+
+void RenderShadowmapCommand::execute(PipelineImpl& pipeline)
+{
+	pipeline.renderShadowmap();
+}
+
+
+void BindShadowmapCommand::execute(PipelineImpl& pipeline)
+{
+	glActiveTexture(GL_TEXTURE0 + 1);
+	glEnable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, pipeline.m_shadowmap_framebuffer->getDepthTexture());
 }
 
 
