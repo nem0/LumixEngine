@@ -62,22 +62,22 @@ namespace Lux
 		fs.openAsync(fs.getDefaultDevice(), m_path, FS::Mode::OPEN | FS::Mode::READ, getReadCallback());
 	}
 
-	void Resource::addResDependency(Resource& dependent_resource)
+	void Resource::addDependency(Resource& dependent_resource)
 	{
-		dependent_resource.m_cb.bind<Resource, &Resource::onResourceUpdated>(this);
+		dependent_resource.m_cb.bind<Resource, &Resource::onStateChanged>(this);
 		m_dep_count += (dependent_resource.isReady() ? 0 : 1);
 	}
 
-	void Resource::remResDependency(Resource& dependent_resource)
+	void Resource::removeDependency(Resource& dependent_resource)
 	{
-		dependent_resource.m_cb.unbind<Resource, &Resource::onResourceUpdated>(this);
+		dependent_resource.m_cb.unbind<Resource, &Resource::onStateChanged>(this);
 		if(dependent_resource.isReady())
 		{
 			decrementDepCount();
 		}
 	}
 
-	void Resource::onResourceUpdated(uint32_t new_state)
+	void Resource::onStateChanged(uint32_t new_state)
 	{
 		if(State::READY == new_state)
 		{
