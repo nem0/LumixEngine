@@ -200,7 +200,7 @@ void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			Mesh mesh(material, mesh_vertex_offset, mesh_tri_count * 3, mesh_name);
 			mesh_vertex_offset += mesh_tri_count * 3;
 			m_meshes.push(mesh);
-			addResDependency(*material);
+			addDependency(*material);
 		}
 
 		m_size = file->size();

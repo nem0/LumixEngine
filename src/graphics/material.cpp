@@ -60,8 +60,8 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		serializer.deserialize("shader", path, MAX_PATH);
 		m_shader = static_cast<Shader*>(m_resource_manager.get(ResourceManager::SHADER)->load(path));
 
-		addResDependency(*texture);
-		addResDependency(*m_shader);
+		addDependency(*texture);
+		addDependency(*m_shader);
 		m_size = file->size();
 		decrementDepCount();
 	}

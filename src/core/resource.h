@@ -67,10 +67,10 @@ namespace Lux
 
 		// this method should be called only from method, which parses the file. Otherwise this method
 		// should be reimplemented.
-		void addResDependency(Resource& dependent_resource);
-		void remResDependency(Resource& dependent_resource);
+		void addDependency(Resource& dependent_resource);
+		void removeDependency(Resource& dependent_resource);
 
-		void onResourceUpdated(uint32_t new_state);
+		void onStateChanged(uint32_t new_state);
 		void decrementDepCount();
 
 	private:
