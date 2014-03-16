@@ -25,7 +25,9 @@
 #include "engine/engine.h"
 #include "engine/iplugin.h"
 #include "engine/plugin_manager.h"
+#include "graphics/irender_device.h"
 #include "graphics/model.h"
+#include "graphics/pipeline.h"
 #include "graphics/renderer.h"
 #include "core/input_system.h"
 #include "core/mutex.h"
@@ -135,7 +137,7 @@ struct EditorServerImpl
 		void writeString(const char* str);
 		void setProperty(void* data, int size);
 		void createUniverse(bool create_scene, const char* base_path);
-		void renderScene(bool is_render_physics);
+		void renderScene(IRenderDevice& render_device);
 		void renderPhysics();
 		void save(const char path[]);
 		void load(const char path[]);
@@ -203,6 +205,18 @@ static const uint32_t camera_type = crc32("camera");
 static const uint32_t point_light_type = crc32("point_light");
 static const uint32_t script_type = crc32("script");
 static const uint32_t animable_type = crc32("animable");
+
+
+void EditorServer::render(IRenderDevice& render_device)
+{
+	/// TODO do this proper way
+	if(render_device.getPipeline().getCameraCount() <= 0)
+	{
+		render_device.getPipeline().setCamera(0, m_impl->m_camera.getComponent(camera_type));
+	}
+
+	m_impl->renderScene(render_device);
+}
 
 
 Engine& EditorServer::getEngine()
@@ -297,8 +311,8 @@ void EditorServer::destroy()
 
 void EditorServerImpl::registerProperties()
 {
-	/*	m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("source"), &Renderer::getMesh, &Renderer::setMesh, IPropertyDescriptor::FILE));
-	m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("visible"), &Renderer::getVisible, &Renderer::setVisible));
+	m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("source"), &Renderer::getRenderablePath, &Renderer::setRenderablePath, IPropertyDescriptor::FILE));
+	/*m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("visible"), &Renderer::getVisible, &Renderer::setVisible));
 	m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("cast shadows"), &Renderer::getCastShadows, &Renderer::setCastShadows));
 	m_component_properties[point_light_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("fov"), &Renderer::getLightFov, &Renderer::setLightFov));
 	m_component_properties[point_light_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("radius"), &Renderer::getLightRadius, &Renderer::setLightRadius));
@@ -439,18 +453,12 @@ void EditorServerImpl::save(FS::IFile& file)
 
 void EditorServerImpl::addEntity()
 {
-	/*Entity e = m_engine.getUniverse()->createEntity();
-	e.setPosition(m_camera_pos	+ m_camera_rot * Vec3(0, 0, -2));
+	Entity e = m_engine.getUniverse()->createEntity();
+	e.setPosition(m_camera.getPosition() + m_camera.getRotation() * Vec3(0, 0, -2));
 	selectEntity(e);
 	EditorIcon* er = LUX_NEW(EditorIcon)();
 	er->create(m_selected_entity, Component::INVALID);
 	m_editor_icons.push(er);
-	/*** TODO this is here because camera render node does not exists untitle pipeline resource is loaded, do this properly*//*
-	Matrix mtx;
-	m_camera_rot.toMatrix(mtx);
-	mtx.setTranslation(m_camera_pos);
-	m_engine.getRenderer().setCameraMatrix(mtx);*/
-	/***/
 }
 
 
@@ -562,7 +570,7 @@ void EditorServerImpl::sendEntityPosition(int uid)
 
 void EditorServerImpl::addComponent(uint32_t type_crc)
 {
-	/*if(m_selected_entity.isValid())
+	if(m_selected_entity.isValid())
 	{
 		const Entity::ComponentList& cmps = m_selected_entity.getComponents();
 		for(int i = 0; i < cmps.size(); ++i)
@@ -580,11 +588,12 @@ void EditorServerImpl::addComponent(uint32_t type_crc)
 		}
 		else if(type_crc == renderable_type)
 		{
-			m_engine.getRenderer().createRenderable(m_selected_entity);
+			m_engine.getRenderer().createComponent(crc32("renderable"), m_selected_entity);
 		}
 		else if(type_crc == point_light_type)
 		{
-			m_engine.getRenderer().createPointLight(m_selected_entity);
+			ASSERT(false);
+		//	m_engine.getRenderer().createPointLight(m_selected_entity);
 		}
 		else if(type_crc == script_type)
 		{
@@ -595,7 +604,7 @@ void EditorServerImpl::addComponent(uint32_t type_crc)
 			ASSERT(false);
 		}
 		selectEntity(m_selected_entity);
-	}*/
+	}
 }
 
 
@@ -747,7 +756,7 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 	m_message_task->run();
 
 	m_file_system = FS::FileSystem::create();
-	m_tpc_file_server.start();
+	m_tpc_file_server.start(base_path);
 
 	m_tcp_file_device.connect("127.0.0.1", 10001);
 
@@ -849,30 +858,27 @@ void EditorServerImpl::sendMessage(const uint8_t* data, int32_t length)
 }
 
 
-void EditorServerImpl::renderScene(bool is_render_physics)
+void EditorServerImpl::renderScene(IRenderDevice& render_device)
 {
-	ASSERT(false);
-	/*if(m_engine.getRenderer().isReady())
+	if(m_selected_entity.isValid())
 	{
-		if(m_selected_entity.isValid())
-		{
-			m_gizmo.updateScale();
-		}
-		for(int i = 0, c = m_editor_icons.size(); i < c; ++i)
-		{
-			m_editor_icons[i]->update(&m_engine.getRenderer());
-		}
-		m_engine.getRenderer().renderScene();
+		//m_gizmo.updateScale();
+	}
+	m_engine.getRenderer().render(render_device);
+	for(int i = 0, c = m_editor_icons.size(); i < c; ++i)
+	{
+		m_editor_icons[i]->render(&m_engine.getRenderer(), render_device);
+	}
 
-		if(is_render_physics)
-		{
-			renderPhysics();
-		}
 
-		m_engine.getRenderer().endFrame();
+/*	if(is_render_physics)
+	{
+		renderPhysics();
+	}
+
+	m_engine.getRenderer().endFrame();*/
 		
-		//m_navigation.draw();
-	}*/
+	//m_navigation.draw();
 }
 
 
@@ -1153,12 +1159,26 @@ void EditorServerImpl::createUniverse(bool create_scene, const char* base_path)
 	m_camera.setPosition(0, 0, -5);
 	m_camera.setRotation(Quat(Vec3(0, 1, 0), -Math::PI));
 	Component cmp = m_engine.getRenderer().createComponent(camera_type, m_camera);
-	m_engine.getRenderer().setCameraPipeline(cmp, string("pipelines/main.json"));
-	m_engine.getRenderer().setCameraActive(cmp, true);
+
+	/*Entity light = m_engine.getUniverse()->createEntity();
+	Matrix mtx = Matrix::IDENTITY;
+	mtx.setXVector(Vec3(1, 0, 0));
+	mtx.setYVector(Vec3(0, -1, 1).normalized());
+	mtx.setZVector(Vec3(0, -1, -1).normalized());
+	mtx.setTranslation(Vec3(0, 20, 20));
+	light.setMatrix(mtx);
+	m_engine.getRenderer().createComponent(crc32("light"), light);
+
+	/*m_engine.getRenderer().setCameraPipeline(cmp, string("pipelines/main.json"));
+	m_engine.getRenderer().setCameraActive(cmp, true);*/
 
 	Component cmp2 = m_engine.getRenderer().createComponent(renderable_type, m_engine.getUniverse()->createEntity());
-	m_engine.getRenderer().setRenderablePath(cmp2, string("models/blender.msh"));
-/*	
+	m_engine.getRenderer().setRenderablePath(cmp2, string("models/horse.msh"));
+
+	Component cmp3 = m_engine.getRenderer().createComponent(renderable_type, m_engine.getUniverse()->createEntity());
+	m_engine.getRenderer().setRenderablePath(cmp3, string("models/plane.msh"));
+	
+	/*	
 	universe->getEventManager()->addListener(EntityMovedEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);
 	universe->getEventManager()->addListener(ComponentEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);
 	universe->getEventManager()->addListener(EntityDestroyedEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);

@@ -1,0 +1,246 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{E1A0C677-DE71-4AD8-B802-AA7A3332D822}</ProjectGuid>
+    <RootNamespace>engine</RootNamespace>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v120</PlatformToolset>
+    <CharacterSet>NotSet</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v120</PlatformToolset>
+    <CharacterSet>NotSet</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v120</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>NotSet</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v120</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>NotSet</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <OutDir>$(SolutionDir)\..\..\bin\$(Platform)_$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)\..\..\tmp\$(Platform)_$(Configuration)\$(ProjectName)\</IntDir>
+    <TargetExt>.dll</TargetExt>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <OutDir>$(SolutionDir)\..\..\bin\$(Platform)_$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)\..\..\tmp\$(Platform)_$(Configuration)\$(ProjectName)\</IntDir>
+    <TargetExt>.dll</TargetExt>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <OutDir>$(SolutionDir)\..\..\bin\$(Platform)_$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)\..\..\tmp\$(Platform)_$(Configuration)\$(ProjectName)\</IntDir>
+    <TargetExt>.dll</TargetExt>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <OutDir>$(SolutionDir)\..\..\bin\$(Platform)_$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)\..\..\tmp\$(Platform)_$(Configuration)\$(ProjectName)\</IntDir>
+    <TargetExt>.dll</TargetExt>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>
+      </SDLCheck>
+      <AdditionalIncludeDirectories>..\..\..\external\physx\include;..\..\..\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PreprocessorDefinitions>WIN32;BUILDING_ENGINE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MinimalRebuild>false</MinimalRebuild>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>..\..\..\bin\$(Platform)_$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glu32.lib;opengl32.lib;core.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>
+      </SDLCheck>
+      <AdditionalIncludeDirectories>..\..\..\external\physx\include;..\..\..\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PreprocessorDefinitions>WIN32;BUILDING_ENGINE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MinimalRebuild>false</MinimalRebuild>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>..\..\..\bin\$(Platform)_$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glu32.lib;opengl32.lib;core.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>
+      </SDLCheck>
+      <AdditionalIncludeDirectories>..\..\..\external\physx\include;..\..\..\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PreprocessorDefinitions>WIN32;BUILDING_ENGINE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalLibraryDirectories>..\..\..\bin\$(Platform)_$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glu32.lib;opengl32.lib;core.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>
+      </SDLCheck>
+      <AdditionalIncludeDirectories>..\..\..\external\physx\include;..\..\..\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PreprocessorDefinitions>WIN32;BUILDING_ENGINE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalLibraryDirectories>..\..\..\bin\$(Platform)_$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glu32.lib;opengl32.lib;core.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\src\animation\animation.cpp" />
+    <ClCompile Include="..\..\..\src\animation\animation_system.cpp" />
+    <ClCompile Include="..\..\..\src\core\new.cpp" />
+    <ClCompile Include="..\..\..\src\editor\editor_client.cpp" />
+    <ClCompile Include="..\..\..\src\editor\editor_icon.cpp" />
+    <ClCompile Include="..\..\..\src\editor\editor_server.cpp" />
+    <ClCompile Include="..\..\..\src\editor\gizmo.cpp" />
+    <ClCompile Include="..\..\..\src\editor\server_message_types.cpp" />
+    <ClCompile Include="..\..\..\src\engine\engine.cpp" />
+    <ClCompile Include="..\..\..\src\engine\iplugin.cpp" />
+    <ClCompile Include="..\..\..\src\engine\plugin_manager.cpp" />
+    <ClCompile Include="..\..\..\src\graphics\frame_buffer.cpp" />
+    <ClCompile Include="..\..\..\src\graphics\geometry.cpp" />
+    <ClCompile Include="..\..\..\src\graphics\gl_ext.cpp" />
+    <ClCompile Include="..\..\..\src\graphics\material.cpp" />
+    <ClCompile Include="..\..\..\src\graphics\material_manager.cpp" />
+    <ClCompile Include="..\..\..\src\graphics\model.cpp" />
+    <ClCompile Include="..\..\..\src\graphics\model_instance.cpp" />
+    <ClCompile Include="..\..\..\src\graphics\model_manager.cpp" />
+    <ClCompile Include="..\..\..\src\graphics\pipeline.cpp" />
+    <ClCompile Include="..\..\..\src\graphics\pose.cpp" />
+    <ClCompile Include="..\..\..\src\graphics\renderer.cpp" />
+    <ClCompile Include="..\..\..\src\graphics\shader.cpp" />
+    <ClCompile Include="..\..\..\src\graphics\shader_manager.cpp" />
+    <ClCompile Include="..\..\..\src\graphics\texture.cpp" />
+    <ClCompile Include="..\..\..\src\graphics\texture_manager.cpp" />
+    <ClCompile Include="..\..\..\src\script\get_property_visitor.cpp" />
+    <ClCompile Include="..\..\..\src\script\save_script_visitor.cpp" />
+    <ClCompile Include="..\..\..\src\script\script_system.cpp" />
+    <ClCompile Include="..\..\..\src\script\set_property_visitor.cpp" />
+    <ClCompile Include="..\..\..\src\universe\component.cpp" />
+    <ClCompile Include="..\..\..\src\universe\component_event.cpp" />
+    <ClCompile Include="..\..\..\src\universe\entity.cpp" />
+    <ClCompile Include="..\..\..\src\universe\entity_destroyed_event.cpp" />
+    <ClCompile Include="..\..\..\src\universe\entity_moved_event.cpp" />
+    <ClCompile Include="..\..\..\src\universe\universe.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\src\animation\animation.h" />
+    <ClInclude Include="..\..\..\src\animation\animation_system.h" />
+    <ClInclude Include="..\..\..\src\editor\client_message_types.h" />
+    <ClInclude Include="..\..\..\src\editor\editor_client.h" />
+    <ClInclude Include="..\..\..\src\editor\editor_icon.h" />
+    <ClInclude Include="..\..\..\src\editor\editor_server.h" />
+    <ClInclude Include="..\..\..\src\editor\gizmo.h" />
+    <ClInclude Include="..\..\..\src\editor\property_descriptor.h" />
+    <ClInclude Include="..\..\..\src\editor\server_message_types.h" />
+    <ClInclude Include="..\..\..\src\engine\engine.h" />
+    <ClInclude Include="..\..\..\src\engine\iplugin.h" />
+    <ClInclude Include="..\..\..\src\engine\plugin_manager.h" />
+    <ClInclude Include="..\..\..\src\graphics\frame_buffer.h" />
+    <ClInclude Include="..\..\..\src\graphics\geometry.h" />
+    <ClInclude Include="..\..\..\src\graphics\gl_ext.h" />
+    <ClInclude Include="..\..\..\src\graphics\irender_device.h" />
+    <ClInclude Include="..\..\..\src\graphics\material.h" />
+    <ClInclude Include="..\..\..\src\graphics\material_manager.h" />
+    <ClInclude Include="..\..\..\src\graphics\model.h" />
+    <ClInclude Include="..\..\..\src\graphics\model_instance.h" />
+    <ClInclude Include="..\..\..\src\graphics\model_manager.h" />
+    <ClInclude Include="..\..\..\src\graphics\pipeline.h" />
+    <ClInclude Include="..\..\..\src\graphics\pose.h" />
+    <ClInclude Include="..\..\..\src\graphics\ray_cast_model_hit.h" />
+    <ClInclude Include="..\..\..\src\graphics\renderer.h" />
+    <ClInclude Include="..\..\..\src\graphics\shader.h" />
+    <ClInclude Include="..\..\..\src\graphics\shader_manager.h" />
+    <ClInclude Include="..\..\..\src\graphics\texture.h" />
+    <ClInclude Include="..\..\..\src\graphics\texture_manager.h" />
+    <ClInclude Include="..\..\..\src\script\base_script.h" />
+    <ClInclude Include="..\..\..\src\script\get_property_visitor.h" />
+    <ClInclude Include="..\..\..\src\script\save_script_visitor.h" />
+    <ClInclude Include="..\..\..\src\script\script_system.h" />
+    <ClInclude Include="..\..\..\src\script\script_visitor.h" />
+    <ClInclude Include="..\..\..\src\script\set_property_visitor.h" />
+    <ClInclude Include="..\..\..\src\universe\component.h" />
+    <ClInclude Include="..\..\..\src\universe\component_event.h" />
+    <ClInclude Include="..\..\..\src\universe\entity.h" />
+    <ClInclude Include="..\..\..\src\universe\entity_destroyed_event.h" />
+    <ClInclude Include="..\..\..\src\universe\entity_moved_event.h" />
+    <ClInclude Include="..\..\..\src\universe\universe.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

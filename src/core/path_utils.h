@@ -9,7 +9,7 @@ namespace Lux
 			uint32_t i = 0;
 			while (*path != '\0' && i < max_size)
 			{
-				*out = *path == '/' ? '\\' : *path;
+				*out = *path == '\\' ? '/' : *path;
 				*out = *path >= 'A' && *path <= 'Z' ? *path - 'A' + 'a' : *out;
 
 				path++;

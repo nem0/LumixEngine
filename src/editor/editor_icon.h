@@ -8,8 +8,9 @@ namespace Lux
 {
 
 
-struct Entity;
 struct Component;
+struct Entity;
+class IRenderDevice;
 class Renderer;
 
 
@@ -19,7 +20,7 @@ class EditorIcon
 	public:
 		void create(Entity& entity, const Component& cmp);
 		void destroy();
-		void update(Renderer* renderer);
+		void render(Renderer* renderer, IRenderDevice& render_device);
 		void show();
 		void hide();
 		//H3DNode getHandle() const { return m_handle; }
