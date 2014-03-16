@@ -9,6 +9,8 @@
 #include "core/math_utils.h"
 #include "core/pod_array.h"
 #include "core/vec4.h"
+#include "core/resource_manager.h"
+#include "core/resource_manager_base.h"
 #include "engine/engine.h"
 #include "graphics/gl_ext.h"
 #include "graphics/irender_device.h"
@@ -216,9 +218,8 @@ struct RendererImpl : public Renderer
 	{
 		LUX_DELETE(m_renderables[cmp.index].m_model);
 		Renderable& r = m_renderables[cmp.index];
-		Model* model = LUX_NEW(Model)(*this);
+		Model* model = static_cast<Model*>(m_engine->getResourceManager().get(ResourceManager::MODEL)->load(path));
 		r.m_model = LUX_NEW(ModelInstance)(*model);
-		model->load(path.c_str(), m_engine->getFileSystem());
 	}
 
 
@@ -322,34 +323,6 @@ struct RendererImpl : public Renderer
 		pipeline->load(path, m_engine->getFileSystem());
 		return pipeline;
 	}
-
-
-	virtual Material* loadMaterial(const char* path) LUX_OVERRIDE
-	{
-		/// TODO material manager
-		Material* material = LUX_NEW(Material)(*this);
-		material->load(path, m_engine->getFileSystem());
-		return material;
-	}
-
-
-	virtual Texture* loadTexture(const char* path) LUX_OVERRIDE
-	{
-		/// TODO texture manager
-		Texture* texture = LUX_NEW(Texture);
-		texture->load(path, m_engine->getFileSystem());
-		return texture;
-	}
-
-
-	virtual Shader* loadShader(const char* path) LUX_OVERRIDE
-	{
-		/// TODO shader manager
-		Shader* shader = LUX_NEW(Shader);
-		shader->load(path, m_engine->getFileSystem());
-		return shader;
-	}
-
 
 	Engine* m_engine;
 	Array<Camera*> m_cameras;

@@ -23,7 +23,7 @@ class ModelInstance
 		void setMatrix(const Matrix& mtx);
 
 	private:
-		void modelLoaded();
+		void modelUpdate(uint32_t state);
 
 	private:
 		Pose		m_pose;

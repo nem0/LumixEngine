@@ -19,6 +19,9 @@
     <Filter Include="engine">
       <UniqueIdentifier>{a05964d9-bc93-4b17-8bae-42733a26b9a9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="graphics\RM">
+      <UniqueIdentifier>{a9c59ccd-9ae9-4c3b-8043-9707dfa24654}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\graphics\renderer.cpp">
@@ -111,6 +114,18 @@
     </ClCompile>
     <ClCompile Include="..\..\src\animation\animation.cpp">
       <Filter>animation</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\graphics\material_manager.cpp">
+      <Filter>graphics\RM</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\graphics\shader_manager.cpp">
+      <Filter>graphics\RM</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\graphics\texture_manager.cpp">
+      <Filter>graphics\RM</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\graphics\model_manager.cpp">
+      <Filter>graphics\RM</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -221,6 +236,18 @@
     </ClInclude>
     <ClInclude Include="..\..\src\animation\animation.h">
       <Filter>animation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\graphics\material_manager.h">
+      <Filter>graphics\RM</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\graphics\shader_manager.h">
+      <Filter>graphics\RM</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\graphics\texture_manager.h">
+      <Filter>graphics\RM</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\graphics\model_manager.h">
+      <Filter>graphics\RM</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

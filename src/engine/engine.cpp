@@ -8,11 +8,16 @@
 #include "core/input_system.h"
 #include "core/log.h"
 #include "core/memory_file_device.h"
+#include "core/resource_manager.h"
 #include "core/timer.h"
 #include "engine/plugin_manager.h"
 #include "graphics/renderer.h"
 #include "script/script_system.h"
 
+#include "graphics/material_manager.h"
+#include "graphics/model_manager.h"
+#include "graphics/shader_manager.h"
+#include "graphics/texture_manager.h"
 
 namespace Lux
 {
@@ -25,6 +30,12 @@ namespace Lux
 		FS::FileSystem* m_file_system; 
 		FS::MemoryFileDevice* m_mem_file_device;
 		FS::DiskFileDevice* m_disk_file_device;
+
+		ResourceManager m_resource_manager;
+		MaterialManager m_material_manager;
+		ModelManager	m_model_manager;
+		ShaderManager	m_shader_manager;
+		TextureManager	m_texture_manager;
 
 		string m_base_path;
 		EditorServer* m_editor_server;
@@ -119,6 +130,13 @@ namespace Lux
 			m_impl = NULL;
 			return false;
 		}
+
+		m_impl->m_resource_manager.create(*m_impl->m_file_system);
+		m_impl->m_material_manager.create(ResourceManager::MATERIAL, m_impl->m_resource_manager);
+		m_impl->m_model_manager.create(ResourceManager::MODEL, m_impl->m_resource_manager);
+		m_impl->m_shader_manager.create(ResourceManager::SHADER, m_impl->m_resource_manager);
+		m_impl->m_texture_manager.create(ResourceManager::TEXTURE, m_impl->m_resource_manager);
+
 		return true;
 	}
 
@@ -127,6 +145,8 @@ namespace Lux
 	{
 		m_impl->m_plugin_manager.destroy();
 		Renderer::destroyInstance(*m_impl->m_renderer);
+
+		m_impl->m_material_manager.destroy();
 		
 		if(m_impl->m_disk_file_device)
 		{
@@ -229,6 +249,10 @@ namespace Lux
 		return m_impl->m_universe;
 	}
 
+	ResourceManager& Engine::getResourceManager() const
+	{
+		return m_impl->m_resource_manager;
+	}
 
 	float Engine::getFPS() const
 	{
