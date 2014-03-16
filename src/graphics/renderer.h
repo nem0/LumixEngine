@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/lux.h"
-#include "core/pod_array.h"
+#include "core/array.h"
 #include "core/string.h"
 #include "engine/iplugin.h"
 #include "graphics/ray_cast_model_hit.h"
@@ -45,7 +45,7 @@ class LUX_ENGINE_API Renderer : public IPlugin
 		virtual Pose& getPose(Component cmp) = 0;
 		virtual void setRenderablePath(Component cmp, const string& path) = 0;
 		virtual void getRenderablePath(Component cmp, string& path) = 0;
-		virtual void getRenderableInfos(PODArray<RenderableInfo>& infos) = 0;
+		virtual void getRenderableInfos(Array<RenderableInfo>& infos) = 0;
 		virtual void getCameraFov(Component cmp, float& fov) = 0;
 		virtual Pipeline* loadPipeline(const char* path) = 0;
 		virtual Engine& getEngine() = 0;

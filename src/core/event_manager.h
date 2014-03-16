@@ -3,7 +3,7 @@
 
 #include "core/lux.h"
 #include "core/delegate.h"
-#include "core/pod_array.h"
+#include "core/array.h"
 #include "core/map.h"
 
 
@@ -35,7 +35,7 @@ class LUX_CORE_API EventManager
 		void emitEvent(Event& event);
 
 	private:
-		typedef map<Event::Type, PODArray<Listener> > ListenerMap;
+		typedef map<Event::Type, Array<Listener> > ListenerMap;
 
 	private:
 		ListenerMap m_listeners;

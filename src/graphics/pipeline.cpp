@@ -393,7 +393,7 @@ struct PipelineImpl : public Pipeline
 	void renderModels()
 	{
 		/// TODO clean this and optimize
-		static PODArray<RenderableInfo> infos;
+		static Array<RenderableInfo> infos;
 		infos.clear();
 		m_renderer.getRenderableInfos(infos);
 		int count = infos.size();
@@ -432,11 +432,11 @@ struct PipelineImpl : public Pipeline
 		}
 	}
 
-	PODArray<Command*> m_commands;
+	Array<Command*> m_commands;
 	string m_path;
 	Renderer& m_renderer;
-	PODArray<Component> m_cameras;
-	PODArray<FrameBuffer*> m_framebuffers;
+	Array<Component> m_cameras;
+	Array<FrameBuffer*> m_framebuffers;
 	FrameBuffer* m_shadowmap_framebuffer;
 	Matrix m_shadow_modelviewprojection;
 	Array<CommandCreator> m_command_creators;

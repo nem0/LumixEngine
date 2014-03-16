@@ -4,7 +4,7 @@
 #include <Windows.h>
 #include "core/delegate_list.h"
 #include "core/map.h"
-#include "core/pod_array.h"
+#include "core/array.h"
 #include "core/string.h"
 
 
@@ -41,6 +41,6 @@ class ScriptCompiler
 	private:
 		CompileCallbacks m_delegates;
 		Lux::string m_base_path;
-		Lux::PODArray<Process*> m_processes;
+		Lux::Array<Process*> m_processes;
 		Lux::map<uint32_t, Status> m_status;
 };

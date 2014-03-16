@@ -3,7 +3,7 @@
 
 #include "core/lux.h"
 #include "core/matrix.h"
-#include "core/pod_array.h"
+#include "core/array.h"
 
 
 namespace Lux
@@ -13,7 +13,7 @@ namespace Lux
 
 	struct LUX_ENGINE_API Entity LUX_FINAL
 	{
-		typedef PODArray<Component> ComponentList;
+		typedef Array<Component, DefaultAllocator, true> ComponentList;
 
 		Entity() {}
 		Entity(Universe* uni, int32_t i) : index(i), universe(uni) {}

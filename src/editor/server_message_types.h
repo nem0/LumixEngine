@@ -2,7 +2,7 @@
 
 
 #include "core/map.h"
-#include "core/pod_array.h"
+#include "core/array.h"
 #include "core/string.h"
 #include "core/event_manager.h"
 
@@ -48,7 +48,7 @@ struct LUX_ENGINE_API EntitySelectedEvent : public Event
 	void read(Blob& stream);
 	
 	int32_t index;
-	PODArray<uint32_t> components;
+	Array<uint32_t> components;
 };
 
 
@@ -81,7 +81,7 @@ struct LUX_ENGINE_API PropertyListEvent : public Event
 	void read(Blob& stream);
 	
 	uint32_t type_hash;
-	PODArray<Property> properties;
+	Array<Property> properties;
 };
 
 

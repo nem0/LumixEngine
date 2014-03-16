@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "core/pod_array.h"
+#include "core/array.h"
 #include "gui/block.h"
 
 
@@ -22,5 +22,5 @@ class Notifications : public Lux::UI::Block
 			uint32_t m_time;
 		};
 
-		Lux::PODArray<Notification> m_notifications;
+		Lux::Array<Notification> m_notifications;
 };

@@ -26,7 +26,7 @@ EventManager::Listener& EventManager::addListener(Event::Type type)
 
 void EventManager::removeListener(Event::Type type, const Listener& listener)
 {
-	PODArray<Listener>& listeners = m_listeners[type];
+	Array<Listener>& listeners = m_listeners[type];
 	for(int i = 0; i < listeners.size(); ++i)
 	{
 		if(listeners[i] == listener)
