@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <Windows.h>
 #include "core/crc32.h"
+#include "core/path_utils.h"
 #include "editor/editor_client.h"
 #include "editor/server_message_types.h"
 #include "editor_native/main_frame.h"
@@ -69,16 +70,7 @@ void RenderableUI::browseSource(Lux::UI::Block& block, void*)
 				strcpy_s(buf, buf + s.length());
 			}
 		}
-		/// TODO make this function
-		char* c = buf;
-		while(*c)
-		{
-			if(*c == '\\')
-			{
-				*c = '/';
-			}
-			++c;
-		}
+		Lux::PathUtils::normalize(buf, buf, MAX_PATH);
 		m_source_box->getChild(0)->setBlockText(buf);
 		m_source_box->getChild(0)->emitEvent("text_accepted");
 	}
