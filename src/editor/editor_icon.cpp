@@ -57,7 +57,9 @@ void EditorIcon::render(Renderer* renderer, IRenderDevice& render_device)
 	Component camera = render_device.getPipeline().getCamera(0);
 	Lux::Matrix mtx = camera.entity.getMatrix();
 	
-	float scale = /*renderer->getHalfFovTan()*/ 0.0333f * (m_entity.getPosition() - mtx.getTranslation()).length() * 2;
+	float fov;
+	renderer->getCameraFov(camera, fov);
+	float scale = tan(fov * 0.5f) * (m_entity.getPosition() - mtx.getTranslation()).length() * 2;
 
 	mtx.setTranslation(m_entity.getPosition());
 	Matrix scale_mtx = Matrix::IDENTITY;
@@ -67,10 +69,10 @@ void EditorIcon::render(Renderer* renderer, IRenderDevice& render_device)
 	glPushMatrix();
 	glMultMatrixf(&mtx.m11);
 	glBegin(GL_QUADS);
-		glVertex3f(0, 0, 0);
-		glVertex3f(0, 1, 0);
-		glVertex3f(1, 1, 0);
-		glVertex3f(1, 0, 0);
+		glVertex3f(-0.015f, -0.015f, 0);
+		glVertex3f(-0.015f, 0.015f, 0);
+		glVertex3f(0.015f, 0.015f, 0);
+		glVertex3f(0.015f, -0.015f, 0);
 	glEnd();
 	glPopMatrix();
 }

@@ -46,6 +46,7 @@ class LUX_ENGINE_API Renderer : public IPlugin
 		virtual void setRenderablePath(Component cmp, const string& path) = 0;
 		virtual void getRenderablePath(Component cmp, string& path) = 0;
 		virtual void getRenderableInfos(PODArray<RenderableInfo>& infos) = 0;
+		virtual void getCameraFov(Component cmp, float& fov) = 0;
 		virtual Pipeline* loadPipeline(const char* path) = 0;
 		virtual Engine& getEngine() = 0;
 

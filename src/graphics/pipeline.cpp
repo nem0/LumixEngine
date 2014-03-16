@@ -318,10 +318,14 @@ struct PipelineImpl : public Pipeline
 
 	void renderShadowmap()
 	{
+		Component light_cmp = m_renderer.getLight(0);
+		if (!light_cmp.isValid())
+		{
+			return;
+		}
 		glEnable(GL_CULL_FACE);
 		m_shadowmap_framebuffer->bind();
 		glClear(GL_DEPTH_BUFFER_BIT);
-		Component light_cmp = m_renderer.getLight(0);
 		glMatrixMode(GL_PROJECTION);
 		glPushMatrix();
 		glLoadIdentity();
@@ -503,8 +507,9 @@ void UnbindFramebufferCommand::execute(PipelineImpl& pipeline)
 
 void DrawFullscreenQuadCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer)
 {
-	char material[100];
-	serializer.deserializeArrayItem(material, 100);
+	const int MATERIAL_NAME_MAX_LENGTH = 100;
+	char material[MATERIAL_NAME_MAX_LENGTH];
+	serializer.deserializeArrayItem(material, MATERIAL_NAME_MAX_LENGTH);
 	char material_path[MAX_PATH];
 	strcpy(material_path, "materials/");
 	strcat(material_path, material);

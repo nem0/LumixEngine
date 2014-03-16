@@ -867,7 +867,7 @@ void EditorServerImpl::renderScene(IRenderDevice& render_device)
 	m_engine.getRenderer().render(render_device);
 	for(int i = 0, c = m_editor_icons.size(); i < c; ++i)
 	{
-	//	m_editor_icons[i]->render(&m_engine.getRenderer(), render_device);
+		m_editor_icons[i]->render(&m_engine.getRenderer(), render_device);
 	}
 
 
@@ -1160,7 +1160,7 @@ void EditorServerImpl::createUniverse(bool create_scene, const char* base_path)
 	m_camera.setRotation(Quat(Vec3(0, 1, 0), -Math::PI));
 	Component cmp = m_engine.getRenderer().createComponent(camera_type, m_camera);
 
-	Entity light = m_engine.getUniverse()->createEntity();
+	/*Entity light = m_engine.getUniverse()->createEntity();
 	Matrix mtx = Matrix::IDENTITY;
 	mtx.setXVector(Vec3(1, 0, 0));
 	mtx.setYVector(Vec3(0, -1, 1).normalized());

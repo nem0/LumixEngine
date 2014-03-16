@@ -25,6 +25,7 @@ namespace Lux
 		operator string() const { return string(m_path); }
 
 		const char* c_str() const { return m_path; }
+		int length() const { return strlen(m_path); }
 
 		bool operator == (const Path& rhs) const { return m_id == rhs.m_id; }
 		bool operator == (const char* rhs) const { Path path(rhs); return m_id == path.m_id; }

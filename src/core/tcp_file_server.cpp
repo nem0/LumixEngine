@@ -3,6 +3,7 @@
 #include "core/array.h"
 #include "core/free_list.h"
 #include "core/os_file.h"
+#include "core/path.h"
 #include "core/static_array.h"
 #include "core/string.h"
 #include "core/tcp_file_device.h"
@@ -50,7 +51,7 @@ namespace Lux
 								string path;
 								if (strncmp(m_buffer.data(), m_base_path.c_str(), m_base_path.length()) != 0)
 								{
-									path = m_base_path;
+									path = m_base_path.c_str();
 									path += m_buffer.data();
 								}
 								else
@@ -168,11 +169,12 @@ namespace Lux
 			void stop() {} // TODO: implement stop 
 			void setBasePath(const char* base_path) 
 			{
-				m_base_path = base_path;
-				if (m_base_path[m_base_path.length() - 1] != '/')
+				string base_path_str(base_path);
+				if (base_path_str[base_path_str.length() - 1] != '/')
 				{
-					m_base_path += "/";
+					base_path_str += "/";
 				}
+				m_base_path = base_path_str;
 			}
 
 		private:
@@ -180,7 +182,7 @@ namespace Lux
 			StaticArray<char, 0x50000>	m_buffer;
 			StaticArray<OsFile*, 0x50000> m_files;
 			FreeList<int32_t, 0x50000>	m_ids;
-			string m_base_path;
+			Path m_base_path;
 		};
 
 		struct TCPFileServerImpl

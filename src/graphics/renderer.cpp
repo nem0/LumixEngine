@@ -203,6 +203,12 @@ struct RendererImpl : public Renderer
 	}
 
 
+	virtual void getCameraFov(Component cmp, float& fov) LUX_OVERRIDE
+	{
+		fov = m_cameras[cmp.index]->m_fov;
+	}
+
+
 	virtual void getRenderablePath(Component cmp, string& path) LUX_OVERRIDE
 	{
 		if(m_renderables[cmp.index].m_model)
@@ -266,6 +272,10 @@ struct RendererImpl : public Renderer
 
 	virtual Component getLight(int index) LUX_OVERRIDE
 	{
+		if (index >= m_lights.size())
+		{
+			return Component::INVALID;
+		}
 		return Component(m_lights[index].m_entity, crc32("light"), this, index);
 	};
 
