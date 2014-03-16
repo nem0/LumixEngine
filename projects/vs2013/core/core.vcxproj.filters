@@ -92,6 +92,11 @@
     <ClInclude Include="..\..\..\src\core\tcp_stream.h">
       <Filter>Net</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\core\resource_manager.h" />
+    <ClInclude Include="..\..\..\src\core\resource_manager_base.h" />
+    <ClInclude Include="..\..\..\src\core\path.h" />
+    <ClInclude Include="..\..\..\src\core\path_utils.h" />
+    <ClInclude Include="..\..\..\src\core\resource.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\core\blob.cpp" />
@@ -151,6 +156,10 @@
       <Filter>Net</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\core\pc\input_system.cpp" />
+    <ClCompile Include="..\..\..\src\core\resource_manager.cpp" />
+    <ClCompile Include="..\..\..\src\core\resource_manager_base.cpp" />
+    <ClCompile Include="..\..\..\src\core\path.cpp" />
+    <ClCompile Include="..\..\..\src\core\resource.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="FS">

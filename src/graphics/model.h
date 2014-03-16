@@ -9,6 +9,7 @@
 #include "core/quat.h"
 #include "core/string.h"
 #include "core/vec3.h"
+#include "core/resource.h"
 #include "graphics/ray_cast_model_hit.h"
 
 
@@ -19,7 +20,7 @@ class Geometry;
 class Material;
 class Model;
 class Pose;
-class Renderer;
+class ResourceManager;
 
 namespace FS
 {
@@ -54,7 +55,7 @@ class Mesh
 
 
 // group of meshes
-class Model
+class Model : public Resource
 {
 	public:
 		struct Bone
@@ -67,32 +68,37 @@ class Model
 		};
 
 	public:
-		Model(Renderer& renderer) : m_renderer(renderer) { m_geometry = NULL; }
+		Model(const Path& path, ResourceManager& resource_manager) 
+			: Resource(path, resource_manager) 
+			, m_geometry()
+			, m_bounding_radius()
+		{ }
+
 		~Model();
 
-		void load(const char* path, FS::FileSystem& file_system);
-		Geometry* getGeometry() const { return m_geometry; }
-		Mesh& getMesh(int index) { return m_meshes[index]; }
-		int getMeshCount() const { return m_meshes.size(); }
-		int	getBoneCount() const  { return m_bones.size(); }
-		Bone& getBone(int i) { return m_bones[i]; }
-		void getPose(Pose& pose);
-		float getBoundingRadius() const { return m_bounding_radius; }
+		Geometry*	getGeometry() const		{ return m_geometry; }
+		Mesh&		getMesh(int index)		{ return m_meshes[index]; }
+		int			getMeshCount() const	{ return m_meshes.size(); }
+		int			getBoneCount() const	{ return m_bones.size(); }
+		Bone&		getBone(int i)			{ return m_bones[i]; }
+		void		getPose(Pose& pose);
+		float		getBoundingRadius() const { return m_bounding_radius; }
 		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform);
-		DelegateList<void ()>& onLoaded() { return m_on_loaded; }
 		const char* getPath() const { return m_path.c_str(); }
 
 	private:
 		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 
+		virtual void doUnload(void) LUX_OVERRIDE;
+		virtual FS::ReadCallback getReadCallback() LUX_OVERRIDE;
+
 	private:
 		Geometry* m_geometry;
 		PODArray<Mesh> m_meshes;
 		Array<Bone> m_bones;
-		Renderer& m_renderer;
 		float m_bounding_radius;
-		string m_path;
-		DelegateList<void ()> m_on_loaded;
+//		DelegateList<void ()> m_on_loaded;
+
 };
 
 

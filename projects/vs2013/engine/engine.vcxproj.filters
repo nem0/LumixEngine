@@ -115,6 +115,18 @@
       <Filter>universe</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\core\new.cpp" />
+    <ClCompile Include="..\..\..\src\graphics\material_manager.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\graphics\model_manager.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\graphics\shader_manager.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\graphics\texture_manager.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\animation\animation.h">
@@ -227,6 +239,18 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\universe\universe.h">
       <Filter>universe</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\graphics\material_manager.h">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\graphics\model_manager.h">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\graphics\shader_manager.h">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\graphics\texture_manager.h">
+      <Filter>graphics</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
