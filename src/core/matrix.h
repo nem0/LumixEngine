@@ -74,6 +74,20 @@ struct LUX_CORE_API Matrix
 		return Vec3(m11, m12, m13);
 	}
 
+	void setXVector(const Vec3& v)
+	{
+		m11 = v.x; m12 = v.y; m13 = v.z;
+	}
+
+	void setYVector(const Vec3& v)
+	{
+		m21 = v.x; m22 = v.y; m23 = v.z;
+	}
+
+	void setZVector(const Vec3& v)
+	{
+		m31 = v.x; m32 = v.y; m33 = v.z;
+	}
 	
 	float determinant()
 	{

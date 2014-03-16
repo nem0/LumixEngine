@@ -84,6 +84,7 @@ class Model : public Resource
 		void		getPose(Pose& pose);
 		float		getBoundingRadius() const { return m_bounding_radius; }
 		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform);
+		const char* getPath() const { return m_path.c_str(); }
 
 	private:
 		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);

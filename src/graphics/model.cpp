@@ -3,6 +3,7 @@
 
 #include "core/file_system.h"
 #include "core/ifile.h"
+#include "core/log.h"
 #include "core/pod_array.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
@@ -205,6 +206,10 @@ void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 
 		m_size = file->size();
 		decrementDepCount();
+	}
+	else
+	{
+		g_log_info.log("renderer", "Error loading model %s", m_path.c_str());
 	}
 
 	fs.close(file);

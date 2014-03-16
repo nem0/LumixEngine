@@ -39,9 +39,20 @@ struct Renderable
 };
 
 
+struct Light
+{
+	enum Type
+	{
+		GLOBAL
+	};
+
+	Type m_type;
+	Entity m_entity;
+};
+
+
 struct Camera
 {
-	Pipeline* m_pipeline;
 	Entity m_entity;
 	bool m_is_active;
 	float m_fov;
@@ -61,8 +72,9 @@ struct RendererImpl : public Renderer
 		m_universe = NULL;
 	}
 
-	void applyCamera(Camera* camera)
+	virtual void applyCamera(Component camera_component) LUX_OVERRIDE
 	{
+		Camera* camera = m_cameras[camera_component.index];
 		Matrix mtx;
 		camera->m_entity.getMatrix(mtx);
 		glMatrixMode(GL_PROJECTION);
@@ -81,14 +93,10 @@ struct RendererImpl : public Renderer
 	{
 		// init
 		glEnable(GL_DEPTH_TEST);
-		
+		glDisable(GL_BLEND);		
+
 		// render
-		for(int i = 0; i < m_active_cameras.size(); ++i)
-		{
-			Camera* camera = m_active_cameras[i];
-			applyCamera(camera);
-			camera->m_pipeline->render();
-		}
+		device.getPipeline().render();
 
 		// cleanup
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -137,7 +145,6 @@ struct RendererImpl : public Renderer
 	{
 		m_engine = &engine;
 		loadGLExtensions();
-		
 		return true;
 	}
 
@@ -155,7 +162,13 @@ struct RendererImpl : public Renderer
 
 	virtual Component createComponent(uint32_t type, const Entity& entity) LUX_OVERRIDE
 	{
-		if(type == crc32("camera"))
+		if(type == crc32("light"))
+		{
+			Light& light = m_lights.pushEmpty();
+			light.m_type = Light::GLOBAL;
+			light.m_entity = entity;
+		}
+		else if(type == crc32("camera"))
 		{
 			Camera* camera = LUX_NEW(Camera);
 			camera->m_is_active = false;
@@ -184,33 +197,28 @@ struct RendererImpl : public Renderer
 	}
 
 
-	virtual void setCameraActive(Component cmp, const bool& active) LUX_OVERRIDE
-	{
-		if(m_cameras[cmp.index]->m_is_active != active)
-		{
-			m_cameras[cmp.index]->m_is_active = active;
-			if(active)
-			{
-				m_active_cameras.push(m_cameras[cmp.index]);
-			}
-			else
-			{
-				for(int i = 0; i < m_active_cameras.size(); ++i)
-				{
-					if(m_active_cameras[i] == m_cameras[cmp.index])
-					{
-						m_active_cameras.eraseFast(i);
-						break;
-					}
-				}
-			}
-		}
-	}
-
-
 	virtual Pose& getPose(Component cmp) 
 	{
 		return m_renderables[cmp.index].m_model->getPose();
+	}
+
+
+	virtual void getCameraFov(Component cmp, float& fov) LUX_OVERRIDE
+	{
+		fov = m_cameras[cmp.index]->m_fov;
+	}
+
+
+	virtual void getRenderablePath(Component cmp, string& path) LUX_OVERRIDE
+	{
+		if(m_renderables[cmp.index].m_model)
+		{
+			path = m_renderables[cmp.index].m_model->getModel().getPath();
+		}
+		else
+		{
+			path = "";
+		}
 	}
 
 
@@ -220,22 +228,21 @@ struct RendererImpl : public Renderer
 		Renderable& r = m_renderables[cmp.index];
 		Model* model = static_cast<Model*>(m_engine->getResourceManager().get(ResourceManager::MODEL)->load(path));
 		r.m_model = LUX_NEW(ModelInstance)(*model);
+		r.m_model->setMatrix(r.m_entity.getMatrix());
 	}
 
 
 	virtual void getRenderableInfos(PODArray<RenderableInfo>& infos) LUX_OVERRIDE
 	{
+		infos.reserve(m_renderables.size());
 		for(int i = 0; i < m_renderables.size(); ++i)
 		{
-			RenderableInfo& info = infos.pushEmpty();
-			info.m_model_instance = m_renderables[i].m_model;	
+			if(m_renderables[i].m_model != NULL)
+			{
+				RenderableInfo& info = infos.pushEmpty();
+				info.m_model_instance = m_renderables[i].m_model;	
+			}
 		}
-	}
-
-
-	virtual void setCameraPipeline(Component cmp, const string& pipeline) LUX_OVERRIDE
-	{
-		m_cameras[cmp.index]->m_pipeline = getPipeline(pipeline.c_str());
 	}
 
 
@@ -261,6 +268,16 @@ struct RendererImpl : public Renderer
 		}
 		return hit;
 	}
+
+
+	virtual Component getLight(int index) LUX_OVERRIDE
+	{
+		if (index >= m_lights.size())
+		{
+			return Component::INVALID;
+		}
+		return Component(m_lights[index].m_entity, crc32("light"), this, index);
+	};
 
 
 	virtual void getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) LUX_OVERRIDE
@@ -303,12 +320,6 @@ struct RendererImpl : public Renderer
 	}
 
 
-	virtual void getCameraActive(Component cmp, bool& active) LUX_OVERRIDE
-	{
-		active = m_cameras[cmp.index]->m_is_active;
-	}
-
-
 	Pipeline* getPipeline(const char* path)
 	{
 		for(int i = 0; i < m_pipelines.size(); ++i)
@@ -324,14 +335,27 @@ struct RendererImpl : public Renderer
 		return pipeline;
 	}
 
+	virtual Engine& getEngine() LUX_OVERRIDE
+	{
+		return *m_engine;
+	}
+
+	virtual Pipeline* loadPipeline(const char* path) LUX_OVERRIDE
+	{
+		/// TODO pipeline manager
+		Pipeline* pipeline = Pipeline::create(*this);
+		pipeline->load(path, m_engine->getFileSystem());
+		return pipeline;
+	}
+
+
 	Engine* m_engine;
-	Array<Camera*> m_cameras;
-	PODArray<Camera*> m_active_cameras;
+	PODArray<Camera*> m_cameras;
+	PODArray<Light> m_lights;
 	PODArray<Pipeline*> m_pipelines;
 	Array<Renderable> m_renderables;
 	PODArray<Model*> m_models;
 	Universe* m_universe;
-
 };
 
 
