@@ -8,6 +8,8 @@
 #include "core/input_system.h"
 #include "core/iserializer.h"
 #include "core/json_serializer.h"
+#include "core/resource_manager.h"
+#include "core/resource_manager_base.h"
 #include "core/string.h"
 #include "engine/engine.h"
 #include "graphics/frame_buffer.h"
@@ -507,7 +509,7 @@ void DrawFullscreenQuadCommand::deserialize(PipelineImpl& pipeline, ISerializer&
 	strcpy(material_path, "materials/");
 	strcat(material_path, material);
 	strcat(material_path, ".mat");
-	m_material = pipeline.m_renderer.loadMaterial(material_path);
+	m_material = static_cast<Material*>(pipeline.m_renderer.getEngine().getResourceManager().get(ResourceManager::MATERIAL)->load(material_path));
 }
 
 

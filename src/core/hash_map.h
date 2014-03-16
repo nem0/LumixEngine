@@ -394,17 +394,17 @@ namespace Lux
 
 		node_type* construct(node_type* where, const key_type& key, const value_type& val)
 		{
-			return ::new(where) node_type(key, val);
+			return new(where) node_type(key, val);
 		}
 
 		node_type* construct(node_type* where, node_type* node)
 		{
-			return ::new(where) node_type(node);
+			return new(where) node_type(node);
 		}
 
 		node_type* construct(node_type* where, const node_type& node)
 		{
-			return ::new(where) node_type(node);
+			return new(where) node_type(node);
 		}
 
 		void destruct(node_type* n)

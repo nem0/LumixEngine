@@ -8,25 +8,31 @@ namespace Lux
 
 ModelInstance::ModelInstance(Model& model)
 	: m_model(model)
+	, m_matrix(Matrix::IDENTITY)
 {
-	model.onLoaded().bind<ModelInstance, &ModelInstance::modelLoaded>(this);
-	m_matrix = Matrix::IDENTITY;
+	model.getObserverCb().bind<ModelInstance, &ModelInstance::modelUpdate>(this);
 	m_pose.resize(model.getBoneCount());
 	model.getPose(m_pose);
 }
 
 
-void ModelInstance::modelLoaded()
+void ModelInstance::modelUpdate(uint32_t new_state)
 {
-	m_pose.resize(m_model.getBoneCount());
-	m_model.getPose(m_pose);
+	if(new_state == Resource::State::READY)
+	{
+		m_pose.resize(m_model.getBoneCount());
+		m_model.getPose(m_pose);
+	}
+	else if(new_state == Resource::State::UNLOADING)
+	{
+		TODO("Implement unloading stuff");
+	}
 }
 
 
 void ModelInstance::setMatrix(const Matrix& mtx)
 {
 	m_matrix = mtx;
-
 }
 
 
