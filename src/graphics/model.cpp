@@ -1,7 +1,11 @@
+#include "core/lux.h"
 #include "graphics/model.h"
+
 #include "core/file_system.h"
 #include "core/ifile.h"
 #include "core/pod_array.h"
+#include "core/resource_manager.h"
+#include "core/resource_manager_base.h"
 #include "core/vec3.h"
 #include "graphics/geometry.h"
 #include "graphics/material.h"
@@ -22,15 +26,6 @@ namespace Lux
 Model::~Model()
 {
 	LUX_DELETE(m_geometry);
-}
-
-	
-void Model::load(const char* path, FS::FileSystem& file_system)
-{
-	FS::ReadCallback cb;
-	cb.bind<Model, &Model::loaded>(this);
-	m_path = path;
-	file_system.openAsync(file_system.getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, cb);
 }
 
 
@@ -115,6 +110,20 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 	return hit;
 }
 
+void Model::getPose(Pose& pose)
+{
+	ASSERT(pose.getCount() == getBoneCount());
+	Vec3* pos =	pose.getPositions();
+	Quat* rot = pose.getRotations();
+	Matrix mtx;
+	for(int i = 0, c = getBoneCount(); i < c; ++i) 
+	{
+		mtx = m_bones[i].inv_bind_matrix;
+		mtx.fastInverse();
+		mtx.getTranslation(pos[i]);
+		mtx.getRotation(rot[i]);
+	}
+}
 
 void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 { 
@@ -187,31 +196,35 @@ void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			char mesh_name[MAX_PATH];
 			mesh_name[str_size] = 0;
 			file->read(mesh_name, str_size);
-			Mesh mesh(m_renderer.loadMaterial(material_path), mesh_vertex_offset, mesh_tri_count * 3, mesh_name);
+			Material* material = static_cast<Material*>(m_resource_manager.get(ResourceManager::MATERIAL)->load(material_path));
+			Mesh mesh(material, mesh_vertex_offset, mesh_tri_count * 3, mesh_name);
 			mesh_vertex_offset += mesh_tri_count * 3;
 			m_meshes.push(mesh);
+			addDependency(*material);
 		}
-		m_on_loaded.invoke();
+
+		m_size = file->size();
+		decrementDepCount();
 	}
 
 	fs.close(file);
 }
 
-
-void Model::getPose(Pose& pose)
+void Model::doUnload(void)
 {
-	ASSERT(pose.getCount() == getBoneCount());
-	Vec3* pos =	pose.getPositions();
-	Quat* rot = pose.getRotations();
-	Matrix mtx;
-	for(int i = 0, c = getBoneCount(); i < c; ++i) 
-	{
-		mtx = m_bones[i].inv_bind_matrix;
-		mtx.fastInverse();
-		mtx.getTranslation(pos[i]);
-		mtx.getRotation(rot[i]);
-	}
+	TODO("Implement Material Unload");
+
+	m_size = 0;
+	onEmpty();
 }
+
+FS::ReadCallback Model::getReadCallback()
+{
+	FS::ReadCallback rc;
+	rc.bind<Model, &Model::loaded>(this);
+	return rc;
+}
+
 
 
 } // ~namespace Lux

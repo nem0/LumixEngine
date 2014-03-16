@@ -9,44 +9,13 @@ namespace Lux
 {
 
 
-Shader::Shader()
+Shader::Shader(const Path& path, ResourceManager& resource_manager)
+	: Resource(path, resource_manager)
+	, m_vertex_id()
+	, m_fragment_id()
 {
 	m_program_id = glCreateProgram();
 }
-
-
-void Shader::load(const char* path, FS::FileSystem& file_system)
-{
-	FS::ReadCallback cb;
-	cb.bind<Shader, &Shader::loaded>(this);
-	file_system.openAsync(file_system.getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, cb);
-}
-
-
-void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
-{
-	if(success)
-	{
-		int32_t size = (int32_t)file->size();
-		char* buf = LUX_NEW_ARRAY(char, size);
-		file->read(buf, size);
-		
-		char* end = strstr(buf, "//~VS");		
-		ASSERT(end);
-		int32_t vs_len = (int32_t)(end - buf);
-		buf[vs_len-1] = 0;
-		m_vertex_id = attach(GL_VERTEX_SHADER, buf, vs_len);
-		m_fragment_id = attach(GL_FRAGMENT_SHADER, buf + vs_len, size - vs_len);
-		glLinkProgram(m_program_id);
-		m_vertex_attributes_ids[0] = glGetAttribLocation(m_program_id, "bone_weights");
-		m_vertex_attributes_ids[1] = glGetAttribLocation(m_program_id, "bone_indices");
-
-		LUX_DELETE_ARRAY(buf);
-	}
-
-	fs.close(file);
-}
-
 
 Shader::~Shader()
 {
@@ -55,21 +24,10 @@ Shader::~Shader()
 	glDeleteShader(m_fragment_id);
 }
 
-
-GLuint Shader::attach(GLenum type, const char* src, int32_t length)
-{
-	GLuint id = glCreateShader(type);
-	glShaderSource(id, 1, (const GLchar**)&src, &length);
-	glCompileShader(id);
-	glAttachShader(m_program_id, id);
-	return id;
-}
-
-
 void Shader::apply()
 {
 	glUseProgram(m_program_id);
-}
+}	
 
 
 void Shader::setUniform(const char* name, int value)
@@ -102,7 +60,60 @@ void Shader::setUniform(const char* name, const Matrix& mtx)
 void Shader::setUniform(const char* name, const Matrix* matrices, int count)
 {
 	GLint loc = glGetUniformLocation(m_program_id, name);
-	glProgramUniformMatrix4fv(m_program_id, loc, count, false, &matrices[0].m11);
+	if(loc != -1)
+		glProgramUniformMatrix4fv(m_program_id, loc, count, false, &matrices[0].m11);
+}
+
+GLuint Shader::attach(GLenum type, const char* src, int32_t length)
+{
+	GLuint id = glCreateShader(type);
+	glShaderSource(id, 1, (const GLchar**)&src, &length);
+	glCompileShader(id);
+	glAttachShader(m_program_id, id);
+	return id;
+}
+
+void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
+{
+	if(success)
+	{
+		int32_t size = (int32_t)file->size();
+		TODO("Use here some shared buffer")
+		char* buf = LUX_NEW_ARRAY(char, size);
+		file->read(buf, size);
+		
+		char* end = strstr(buf, "//~VS");		
+		ASSERT(end);
+		int32_t vs_len = (int32_t)(end - buf);
+		buf[vs_len-1] = 0;
+		m_vertex_id = attach(GL_VERTEX_SHADER, buf, vs_len);
+		m_fragment_id = attach(GL_FRAGMENT_SHADER, buf + vs_len, size - vs_len);
+		glLinkProgram(m_program_id);
+		m_vertex_attributes_ids[0] = glGetAttribLocation(m_program_id, "bone_weights");
+		m_vertex_attributes_ids[1] = glGetAttribLocation(m_program_id, "bone_indices");
+
+		LUX_DELETE_ARRAY(buf);
+
+		m_size = file->size();
+		decrementDepCount();
+	}
+
+	fs.close(file);
+}
+
+void Shader::doUnload(void)
+{
+	TODO("Implement Shader Unload");
+
+	m_size = 0;
+	onEmpty();
+}
+
+FS::ReadCallback Shader::getReadCallback()
+{
+	FS::ReadCallback cb;
+	cb.bind<Shader, &Shader::loaded>(this);
+	return cb;
 }
 
 
