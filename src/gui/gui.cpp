@@ -38,14 +38,14 @@ namespace UI
 		void checkBoxToggle(Block& block, void*);
 
 		Engine* m_engine;
-		PODArray<Block*> m_blocks;
+		Array<Block*> m_blocks;
 		map<uint32_t, DecoratorBase*> m_decorators;
 		Block* m_focus;
 		IRenderer* m_renderer;
-		PODArray<Atlas*> m_atlases;
+		Array<Atlas*> m_atlases;
 		map<uint32_t, BlockCreator> m_block_creators;
-		PODArray<Gui::MouseMoveCallback> m_mouse_move_callbacks;
-		PODArray<Gui::MouseCallback> m_mouse_up_callbacks;
+		Array<Gui::MouseMoveCallback> m_mouse_move_callbacks;
+		Array<Gui::MouseCallback> m_mouse_up_callbacks;
 	};
 
 

@@ -2,7 +2,7 @@
 
 
 #include "core/delegate.h"
-#include "core/pod_array.h"
+#include "core/array.h"
 
 
 namespace Lux
@@ -45,7 +45,7 @@ namespace Lux
 			}
 
 		private:
-			PODArray<Delegate<R> > m_delegates;
+			Array<Delegate<R> > m_delegates;
 	};
 
 	template <typename R, typename A0>
@@ -84,7 +84,7 @@ namespace Lux
 			}
 
 		private:
-			PODArray<Delegate<R (A0)> > m_delegates;
+			Array<Delegate<R (A0)> > m_delegates;
 	};
 
 	template <typename R, typename A0, typename A1>
@@ -131,6 +131,6 @@ namespace Lux
 			}
 
 		private:
-			PODArray<Delegate<R (A0, A1)> > m_delegates;
+			Array<Delegate<R (A0, A1)> > m_delegates;
 	};
 } // ~namespace Lux

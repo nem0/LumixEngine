@@ -2,7 +2,7 @@
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/event_manager.h"
-#include "core/pod_array.h"
+#include "core/array.h"
 #include "core/task.h"
 #include "core/tcp_connector.h"
 #include "core/tcp_stream.h"
@@ -41,7 +41,7 @@ namespace Lux
 
 	int ReceiveTask::task()
 	{
-		PODArray<uint8_t> data;
+		Array<uint8_t> data;
 		data.resize(8);
 		while(!m_finished)
 		{

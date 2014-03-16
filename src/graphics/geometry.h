@@ -1,7 +1,7 @@
 #pragma once
 #include <Windows.h>
 #include <gl/GL.h>
-#include "core/pod_array.h"
+#include "core/array.h"
 #include "core/vec3.h"
 
 
@@ -51,13 +51,13 @@ class Geometry
 
 		void copy(const uint8_t* data, int size, VertexDef vertex_definition);
 		void draw(int start, int count, Shader& shader);
-		const PODArray<Vec3>& getVertices() const { return m_vertices; }
+		const Array<Vec3>& getVertices() const { return m_vertices; }
 		float getBoundingRadius() const; 
 
 	private:
 		GLuint m_id;
 		VertexDef m_vertex_definition;
-		PODArray<Vec3> m_vertices;
+		Array<Vec3> m_vertices;
 };
 
 

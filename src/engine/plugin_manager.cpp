@@ -1,7 +1,7 @@
 #include "engine/plugin_manager.h"
 #include "engine/iplugin.h"
 #include "core/log.h"
-#include "core/pod_array.h"
+#include "core/array.h"
 #include <Windows.h>
 
 
@@ -9,7 +9,7 @@ namespace Lux
 {
 	struct PluginManagerImpl
 	{
-		typedef PODArray<IPlugin*> PluginList;
+		typedef Array<IPlugin*> PluginList;
 
 		Engine* m_engine;
 		PluginList m_plugins;

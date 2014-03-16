@@ -88,7 +88,7 @@ void Universe::onEvent(Event& evt)
 		}
 		else
 		{
-			PODArray<Component>& list = m_component_list[e.component.entity.index];
+			Array<Component>& list = m_component_list[e.component.entity.index];
 			for(int i = 0, c = list.size(); i < c; ++i)
 			{
 				if(list[i] == e.component)

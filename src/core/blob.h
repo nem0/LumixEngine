@@ -2,7 +2,7 @@
 
 
 #include "core/lux.h"
-#include "core/pod_array.h"
+#include "core/array.h"
 
 
 namespace Lux
@@ -32,7 +32,7 @@ namespace Lux
 
 
 		private:
-			PODArray<uint8_t> m_buffer;
+			Array<uint8_t> m_buffer;
 			int m_pos;
 			int m_size;
 			void* m_data; 

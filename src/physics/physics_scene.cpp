@@ -48,12 +48,12 @@ struct PhysicsSceneImpl
 	physx::PxScene*					m_scene;
 	PhysicsSystem*					m_system;
 	physx::PxMaterial*				m_default_material;
-	PODArray<physx::PxRigidActor*>	m_actors;
+	Array<physx::PxRigidActor*>	m_actors;
 	Array<string>					m_shape_sources;
-	PODArray<bool>					m_is_dynamic;
-	PODArray<Entity>				m_entities;
-	PODArray<int>					m_index_map;
-	PODArray<Controller>			m_controllers;
+	Array<bool>					m_is_dynamic;
+	Array<Entity>				m_entities;
+	Array<int>					m_index_map;
+	Array<Controller>			m_controllers;
 	PhysicsScene*					m_owner;
 };
 
@@ -400,9 +400,9 @@ void PhysicsSceneImpl::createTriMesh(const char* path, physx::PxTriangleMeshGeom
 	fopen_s(&fp, path, "rb");
 	if(fp)
 	{
-		PODArray<Vec3> verts;
+		Array<Vec3> verts;
 		int num_verts, num_indices;
-		PODArray<uint32_t> tris;
+		Array<uint32_t> tris;
 
 		fread(&num_verts, sizeof(num_verts), 1, fp);
 		verts.resize(num_verts);
@@ -438,7 +438,7 @@ void PhysicsSceneImpl::createConvexGeom(const char* path, physx::PxConvexMeshGeo
 		fseek(fp, 0, SEEK_END);
 		long size = ftell(fp);
 		fseek(fp, 0, SEEK_SET);
-		PODArray<Vec3> vertices;
+		Array<Vec3> vertices;
 		vertices.resize(size / sizeof(Vec3));
 		fread(&vertices[0], size, 1, fp);
 		fclose(fp);

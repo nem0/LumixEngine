@@ -22,7 +22,6 @@
     <ClInclude Include="..\..\..\src\core\new.h" />
     <ClInclude Include="..\..\..\src\core\new_macros.h" />
     <ClInclude Include="..\..\..\src\core\os_file.h" />
-    <ClInclude Include="..\..\..\src\core\pod_array.h" />
     <ClInclude Include="..\..\..\src\core\pod_hash_map.h" />
     <ClInclude Include="..\..\..\src\core\quat.h" />
     <ClInclude Include="..\..\..\src\core\queue.h" />

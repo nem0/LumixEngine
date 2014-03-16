@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "core/pod_array.h"
+#include "core/array.h"
 #include "core/resource.h"
 
 
@@ -43,7 +43,7 @@ private:
 	void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 private:
 	Shader*	m_shader;
-	PODArray<Texture*> m_textures;
+	Array<Texture*> m_textures;
 };
 
 } // ~namespace Lux

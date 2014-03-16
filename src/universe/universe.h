@@ -2,7 +2,7 @@
 
 
 #include "core/lux.h"
-#include "core/pod_array.h"
+#include "core/array.h"
 #include "core/quat.h"
 #include "core/array.h"
 #include "core/vec3.h"
@@ -49,9 +49,9 @@ class LUX_ENGINE_API Universe LUX_FINAL
 		void onEvent(Event& event);
 	
 	private:
-		PODArray<Vec3>		m_positions;		//< entity positions
-		PODArray<Quat>		m_rotations;		//< entity rotations
-		PODArray<int>		m_free_slots;
+		Array<Vec3>		m_positions;		//< entity positions
+		Array<Quat>		m_rotations;		//< entity rotations
+		Array<int>		m_free_slots;
 		ComponentList		m_component_list;
 		EventManager*		m_event_manager;
 };

@@ -15,6 +15,7 @@
 	__pragma(message(__FILE__ "(" STRINGIZE(__LINE__) ") : WARNING: " msg))
 
 
+#include <type_traits>	
 #include <cstdint>
 #include <cassert>
 #include <malloc.h>
@@ -71,15 +72,6 @@ const uint32_t LUX_MAX_PATH = 260;
 
 #include "core/new.h"
 #include "core/new_macros.h"
-
-#define USE_CPP11
-
-#ifdef USE_CPP11
-	#include <type_traits>	
-	#define STATIC_ASSERT_IS_TRIVIALLY_COPYABLE(T) static_assert(std::is_trivially_copyable<T>::value, "T must be trivially copyable")
-#else 
-	#define STATIC_ASSERT_IS_TRIVIALLY_COPYABLE(T) 
-#endif // USE_CPP11
 
 #pragma warning(disable : 4251)
 #pragma warning(disable : 4996)

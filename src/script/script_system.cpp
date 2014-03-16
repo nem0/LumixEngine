@@ -6,7 +6,7 @@
 #include "core/ifile.h"
 #include "core/json_serializer.h"
 #include "core/log.h"
-#include "core/pod_array.h"
+#include "core/array.h"
 #include "engine/engine.h"
 #include "universe/universe.h"
 #include "universe/component_event.h"
@@ -26,9 +26,9 @@ namespace Lux
 		void getDll(const char* script_path, char* dll_path, char* full_path, int max_length);
 		void getScriptDefaultPath(Entity e, char* path, char* full_path, int max_path, const char* ext);
 
-		PODArray<int> m_scripts;
-		PODArray<BaseScript*> m_script_objs;
-		PODArray<HMODULE> m_libs;
+		Array<int> m_scripts;
+		Array<BaseScript*> m_script_objs;
+		Array<HMODULE> m_libs;
 		Array<string> m_paths;
 		Universe* m_universe;
 		Engine* m_engine;

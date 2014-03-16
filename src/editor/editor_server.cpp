@@ -17,7 +17,7 @@
 #include "core/map.h"
 #include "core/matrix.h"
 #include "core/memory_file_device.h"
-#include "core/pod_array.h"
+#include "core/array.h"
 #include "core/array.h"
 #include "editor/editor_icon.h"
 #include "editor/gizmo.h"
@@ -179,10 +179,10 @@ struct EditorServerImpl
 		Gizmo m_gizmo;
 		Entity m_selected_entity;
 		Blob m_stream;
-		map<uint32_t, PODArray<IPropertyDescriptor*> > m_component_properties;
+		map<uint32_t, Array<IPropertyDescriptor*> > m_component_properties;
 		map<uint32_t, IPlugin*> m_creators;
 		MouseMode::Value m_mouse_mode;
-		PODArray<EditorIcon*> m_editor_icons;
+		Array<EditorIcon*> m_editor_icons;
 		HGLRC m_hglrc;
 		HGLRC m_game_hglrc;
 		bool m_is_game_mode;
@@ -467,7 +467,7 @@ int MessageTask::task()
 	m_is_finished = false;
 	m_acceptor.start("127.0.0.1", 10013);
 	m_stream = m_acceptor.accept();
-	PODArray<uint8_t> data;
+	Array<uint8_t> data;
 	data.resize(5);
 	while(!m_is_finished)
 	{
@@ -529,7 +529,7 @@ void EditorServerImpl::sendComponent(uint32_t type_crc)
 		{
 			if(cmps[i].type == type_crc)
 			{
-				PODArray<IPropertyDescriptor*>& props = m_component_properties[cmps[i].type];
+				Array<IPropertyDescriptor*>& props = m_component_properties[cmps[i].type];
 				m_stream.write(props.size());
 				m_stream.write(type_crc);
 				for(int j = 0; j < props.size(); ++j)
@@ -957,7 +957,7 @@ void EditorServerImpl::navigate(float forward, float right, int fast)
 
 const IPropertyDescriptor& EditorServerImpl::getPropertyDescriptor(uint32_t type, uint32_t name_hash)
 {
-	PODArray<IPropertyDescriptor*>& props = m_component_properties[type];
+	Array<IPropertyDescriptor*>& props = m_component_properties[type];
 	for(int i = 0; i < props.size(); ++i)
 	{
 		if(props[i]->getNameHash() == name_hash)

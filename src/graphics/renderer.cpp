@@ -7,7 +7,7 @@
 #include "core/file_system.h"
 #include "core/json_serializer.h"
 #include "core/math_utils.h"
-#include "core/pod_array.h"
+#include "core/array.h"
 #include "core/vec4.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
@@ -232,7 +232,7 @@ struct RendererImpl : public Renderer
 	}
 
 
-	virtual void getRenderableInfos(PODArray<RenderableInfo>& infos) LUX_OVERRIDE
+	virtual void getRenderableInfos(Array<RenderableInfo>& infos) LUX_OVERRIDE
 	{
 		infos.reserve(m_renderables.size());
 		for(int i = 0; i < m_renderables.size(); ++i)
@@ -350,11 +350,11 @@ struct RendererImpl : public Renderer
 
 
 	Engine* m_engine;
-	PODArray<Camera*> m_cameras;
-	PODArray<Light> m_lights;
-	PODArray<Pipeline*> m_pipelines;
+	Array<Camera*> m_cameras;
+	Array<Light> m_lights;
+	Array<Pipeline*> m_pipelines;
 	Array<Renderable> m_renderables;
-	PODArray<Model*> m_models;
+	Array<Model*> m_models;
 	Universe* m_universe;
 };
 

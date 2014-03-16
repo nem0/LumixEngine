@@ -5,7 +5,7 @@
 #include "core/crc32.h"
 #include "core/delegate_list.h"
 #include "core/matrix.h"
-#include "core/pod_array.h"
+#include "core/array.h"
 #include "core/quat.h"
 #include "core/string.h"
 #include "core/vec3.h"
@@ -94,7 +94,7 @@ class Model : public Resource
 
 	private:
 		Geometry* m_geometry;
-		PODArray<Mesh> m_meshes;
+		Array<Mesh> m_meshes;
 		Array<Bone> m_bones;
 		float m_bounding_radius;
 //		DelegateList<void ()> m_on_loaded;

@@ -4,7 +4,7 @@
 #include "core/file_system.h"
 #include "core/ifile.h"
 #include "core/log.h"
-#include "core/pod_array.h"
+#include "core/array.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "core/vec3.h"
@@ -44,7 +44,7 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 	Vec3 local_origin = inv.mutliplyPosition(origin);
 	Vec3 local_dir = static_cast<Vec3>(inv * Vec4(dir.x, dir.y, dir.z, 0));
 
-	const PODArray<Vec3>& vertices = m_geometry->getVertices();
+	const Array<Vec3>& vertices = m_geometry->getVertices();
 
 	int32_t last_hit_index = -1;
 	for(int i = 0; i < vertices.size(); i += 3)
@@ -144,7 +144,7 @@ void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 
 		int tri_count = 0;
 		file->read(&tri_count, sizeof(tri_count));
-		PODArray<uint8_t> data;
+		Array<uint8_t> data;
 		int data_size = vertex_defition.getVertexSize() * tri_count * 3;
 		data.resize(data_size);
 		file->read(&data[0], data_size); 

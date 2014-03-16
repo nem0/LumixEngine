@@ -8,7 +8,7 @@
 #include "core/ifile.h"
 #include "core/map.h"
 #include "core/math_utils.h"
-#include "core/pod_array.h"
+#include "core/array.h"
 #include "core/string.h"
 #include "core/vec3.h"
 #include "graphics/shader.h"
@@ -61,10 +61,10 @@ namespace UI
 		void fontImageLoaded(TextureBase& img);
 
 		map<char, Character> m_characters;
-		PODArray<TextureBase*> m_images;
+		Array<TextureBase*> m_images;
 		OpenGLTexture* m_font_image;
 		int m_window_height;
-		PODArray<Block::Area> m_scissors_areas;
+		Array<Block::Area> m_scissors_areas;
 		FS::FileSystem* m_file_system;
 	};
 
@@ -391,8 +391,8 @@ namespace UI
 			void set(float _x, float _y) { x = _x; y = _y; }
 			float x, y;
 		};
-		static PODArray<Vec3> verts;
-		static PODArray<Vec2> uvs;
+		static Array<Vec3> verts;
+		static Array<Vec2> uvs;
 		int len = (int)strlen(text);
 		verts.resize(len * 6);
 		uvs.resize(len * 6);

@@ -2,7 +2,7 @@
 
 #include "core/disk_file_device.h"
 #include "core/ifile.h"
-#include "core/pod_array.h"
+#include "core/array.h"
 #include "core/stack_allocator.h"
 #include "core/string.h"
 #include "core/task.h"
@@ -37,8 +37,8 @@ namespace Lux
 		typedef MT::Transaction<AsyncItem> AsynTrans;
 		typedef MT::TransactionQueue<AsynTrans, C_MAX_TRANS> TransQueue;
 		typedef Queue<AsynTrans*, C_MAX_TRANS> InProgressQueue;
-		typedef PODArray<AsyncItem> ItemsTable;
-		typedef PODArray<IFileDevice*> DevicesTable;
+		typedef Array<AsyncItem> ItemsTable;
+		typedef Array<IFileDevice*> DevicesTable;
 
 		class FSTask : public MT::Task
 		{

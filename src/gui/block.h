@@ -5,7 +5,7 @@
 #include "core/delegate_list.h"
 #include "core/lux.h"
 #include "core/map.h"
-#include "core/pod_array.h"
+#include "core/array.h"
 #include "core/string.h"
 
 
@@ -101,7 +101,7 @@ namespace UI
 		private:
 			DecoratorBase* m_decorator;
 			Block* m_parent;
-			PODArray<Block*> m_children; 
+			Array<Block*> m_children; 
 			map<uint32_t, EventCallback > m_event_handlers;
 			Area m_local_area;
 			Area m_global_area;
