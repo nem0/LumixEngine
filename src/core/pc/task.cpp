@@ -18,10 +18,11 @@ namespace Lux
 		uint32_t getCurrentThreadID() { return ::GetCurrentThreadId(); }
 
 		uint32_t getProccessAffinityMask()
-		{ 
-			DWORD_PTR process, system;
-			::GetProcessAffinityMask(::GetCurrentProcess(), (PDWORD_PTR)&process, (PDWORD_PTR)&system);
-			return process;
+		{
+			PROCESSOR_NUMBER proc_number;
+			BOOL ret = ::GetThreadIdealProcessorEx(::GetCurrentThread(), &proc_number);
+			ASSERT(ret);
+			return proc_number.Number;
 		}
 
 		bool isMainThread() { return s_main_thread_id == ::GetCurrentThreadId(); }
@@ -110,7 +111,7 @@ namespace Lux
 			m_implementation->m_affinity_mask = affinity_mask;
 			if(m_implementation->m_handle)
 			{
-				::SetThreadAffinityMask(m_implementation->m_handle, affinity_mask);
+				::SetThreadIdealProcessor(m_implementation->m_handle, affinity_mask);
 			}
 		}
 
