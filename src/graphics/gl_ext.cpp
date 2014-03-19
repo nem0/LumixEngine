@@ -1,4 +1,5 @@
 #include "graphics/gl_ext.h"
+#include <cstdio>
 
 PFNGLBINDBUFFERPROC glBindBuffer;
 PFNGLDELETEBUFFERSPROC glDeleteBuffers;
@@ -33,8 +34,24 @@ PFNGLBINDRENDERBUFFERPROC glBindRenderbuffer;
 PFNGLDELETEFRAMEBUFFERSPROC glDeleteFramebuffers;
 
 
+PROC loadGLExtension(const char* name, float gl_version)
+{
+	if (gl_version >= 3.0f)
+	{
+		return wglGetProcAddress(name);
+	}
+	else
+	{
+		char tmp[200];
+		sprintf_s(tmp, "%sEXT", name);
+		return wglGetProcAddress(tmp);
+	}
+}
+
 void loadGLExtensions()
 {
+	const char* gl_version_str = reinterpret_cast<const char*>(glGetString(GL_VERSION));
+	float gl_version = (float)atof(gl_version_str);
 	glBindBuffer = (PFNGLBINDBUFFERPROC)wglGetProcAddress("glBindBuffer");
 	glDeleteBuffers = (PFNGLDELETEBUFFERSPROC)wglGetProcAddress("glDeleteBuffers");
 	glGenBuffers = (PFNGLGENBUFFERSPROC)wglGetProcAddress("glGenBuffers");
@@ -44,10 +61,6 @@ void loadGLExtensions()
 	glGetAttribLocation = (PFNGLGETATTRIBLOCATION)wglGetProcAddress("glGetAttribLocation");
 	glUseProgram = (PFNGLUSEPROGRAMPROC)wglGetProcAddress("glUseProgram");
 	glGetUniformLocation = (PFNGLGETUNIFORMLOCATIONPROC)wglGetProcAddress("glGetUniformLocation");
-	glProgramUniform1i = (PFNGLPROGRAMUNIFORM1IPROC)wglGetProcAddress("glProgramUniform1i");
-	glProgramUniform1f = (PFNGLPROGRAMUNIFORM1FPROC)wglGetProcAddress("glProgramUniform1f");
-	glProgramUniform3f = (PFNGLPROGRAMUNIFORM3FPROC)wglGetProcAddress("glProgramUniform3f");
-	glProgramUniformMatrix4fv = (PFNGLPROGRAMUNIFORMMATRIX4FVPROC)wglGetProcAddress("glProgramUniformMatrix4fv");
 	glEnableVertexAttribArray = (PFNGLENABLEVERTEXATTRIBARRAYPROC)wglGetProcAddress("glEnableVertexAttribArray");
 	glDisableVertexAttribArray = (PFNGLDISABLEVERTEXATTRIBARRAYPROC)wglGetProcAddress("glDisableVertexAttribArray");
 	glVertexAttribPointer = (PFNGLVERTEXATTRIBPOINTERPROC)wglGetProcAddress("glVertexAttribPointer");
@@ -58,12 +71,19 @@ void loadGLExtensions()
 	glShaderSource = (PFNGLSHADERSOURCEPROC)wglGetProcAddress("glShaderSource");
 	glCompileShader = (PFNGLCOMPILESHADERPROC)wglGetProcAddress("glCompileShader");
 	glActiveTexture = (PFNGLACTIVETEXTUREPROC)wglGetProcAddress("glActiveTexture");
-	glGenFramebuffers = (PFNGLGENFRAMEBUFFERSPROC)wglGetProcAddress("glGenFramebuffers");
-	glGenRenderbuffers = (PFNGLGENRENDERBUFFERSPROC)wglGetProcAddress("glGenRenderbuffers");
-	glBindFramebuffer = (PFNGLBINDFRAMEBUFFERPROC)wglGetProcAddress("glBindFramebuffer");
-	glFramebufferRenderbuffer = (PFNGLFRAMEBUFFERRENDERBUFFERPROC)wglGetProcAddress("glFramebufferRenderbuffer");
-	glFramebufferTexture2D = (PFNGLFRAMEBUFFERTEXTURE2DPROC)wglGetProcAddress("glFramebufferTexture2D");
-	glRenderbufferStorage = (PFNGLRENDERBUFFERSTORAGEPROC)wglGetProcAddress("glRenderbufferStorage");
-	glBindRenderbuffer = (PFNGLBINDRENDERBUFFERPROC)wglGetProcAddress("glBindRenderbuffer");
-	glDeleteFramebuffers = (PFNGLDELETEFRAMEBUFFERSPROC)wglGetProcAddress("glDeleteFramebuffers");
+	
+	
+	glGenFramebuffers = (PFNGLGENFRAMEBUFFERSPROC)loadGLExtension("glGenFramebuffers", gl_version); 
+	glGenRenderbuffers = (PFNGLGENRENDERBUFFERSPROC)loadGLExtension("glGenRenderbuffers", gl_version);
+	glBindFramebuffer = (PFNGLBINDFRAMEBUFFERPROC)loadGLExtension("glBindFramebuffer", gl_version);
+	glFramebufferRenderbuffer = (PFNGLFRAMEBUFFERRENDERBUFFERPROC)loadGLExtension("glFramebufferRenderbuffer", gl_version);
+	glFramebufferTexture2D = (PFNGLFRAMEBUFFERTEXTURE2DPROC)loadGLExtension("glFramebufferTexture2D", gl_version);
+	glRenderbufferStorage = (PFNGLRENDERBUFFERSTORAGEPROC)loadGLExtension("glRenderbufferStorage", gl_version);
+	glBindRenderbuffer = (PFNGLBINDRENDERBUFFERPROC)loadGLExtension("glBindRenderbuffer", gl_version);
+	glDeleteFramebuffers = (PFNGLDELETEFRAMEBUFFERSPROC)loadGLExtension("glDeleteFramebuffers", gl_version);
+	glProgramUniformMatrix4fv = (PFNGLPROGRAMUNIFORMMATRIX4FVPROC)loadGLExtension("glProgramUniformMatrix4fv", gl_version);
+	glProgramUniform1i = (PFNGLPROGRAMUNIFORM1IPROC)loadGLExtension("glProgramUniform1i", gl_version);
+	glProgramUniform1f = (PFNGLPROGRAMUNIFORM1FPROC)loadGLExtension("glProgramUniform1f", gl_version);
+	glProgramUniform3f = (PFNGLPROGRAMUNIFORM3FPROC)loadGLExtension("glProgramUniform3f", gl_version);
+
 }
