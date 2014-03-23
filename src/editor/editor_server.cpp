@@ -712,9 +712,8 @@ void EditorServerImpl::load(FS::IFile& file)
 
 HGLRC createGLContext(HWND hwnd)
 {
-	/*PAINTSTRUCT ps;
 	HDC hdc;
-	hdc = BeginPaint(hwnd, &ps);
+	hdc = GetDC(hwnd);
 	PIXELFORMATDESCRIPTOR pfd = { 
 	sizeof(PIXELFORMATDESCRIPTOR),  //  size of this pfd  
 	1,                     // version number  
@@ -739,11 +738,8 @@ HGLRC createGLContext(HWND hwnd)
 	SetPixelFormat(hdc, pixelformat, &pfd);
 	HGLRC hglrc = wglCreateContext(hdc);
 	wglMakeCurrent(hdc, hglrc);
-	EndPaint(hwnd, &ps);
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
-	return hglrc;*/
-	ASSERT(false);
-	return NULL;
+	return hglrc;
 }
 
 
@@ -766,7 +762,7 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 
 	m_file_system->setDefaultDevice("memory:tcp");
 	m_file_system->setSaveGameDevice("memory:tcp");
-	/*
+	
 	if(hwnd)
 	{
 		m_hglrc = createGLContext(hwnd);
@@ -775,7 +771,7 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 			m_game_hglrc = createGLContext(game_hwnd);
 			wglShareLists(m_hglrc, m_game_hglrc);
 		}
-	}*/
+	}
 
 	g_log_info.getCallback().bind<EditorServerImpl, &EditorServerImpl::onLogInfo>(this);
 	g_log_warning.getCallback().bind<EditorServerImpl, &EditorServerImpl::onLogWarning>(this);

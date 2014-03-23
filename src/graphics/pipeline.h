@@ -31,6 +31,7 @@ class LUX_ENGINE_API Pipeline LUX_ABSTRACT
 		virtual const Component& getCamera(int index) = 0;
 		virtual void setCamera(int index, const Component& camera) = 0;
 		virtual int getCameraCount() const = 0;
+		virtual void resize(int w, int h) = 0;
 
 		static Pipeline* create(Renderer& renderer);
 		static void destroy(Pipeline* pipeline);
