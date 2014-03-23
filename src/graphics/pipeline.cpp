@@ -169,6 +169,15 @@ struct PipelineImpl : public Pipeline
 	}
 
 
+	virtual void resize(int w, int h) LUX_OVERRIDE
+	{
+		for (int i = 0; i < m_cameras.size(); ++i)
+		{
+			m_renderer.setCameraSize(m_cameras[i], w, h);
+		}
+	}
+
+
 	virtual void setCamera(int index, const Component& camera) LUX_OVERRIDE
 	{
 		if(m_cameras.size() <= index)

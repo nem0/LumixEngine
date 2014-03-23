@@ -77,6 +77,7 @@ struct RendererImpl : public Renderer
 		Camera* camera = m_cameras[camera_component.index];
 		Matrix mtx;
 		camera->m_entity.getMatrix(mtx);
+		glViewport(0, 0, (GLsizei)camera->m_width, (GLsizei)camera->m_height);
 		glMatrixMode(GL_PROJECTION);
 		glLoadIdentity();
 		gluPerspective(camera->m_fov, camera->m_aspect, camera->m_near, camera->m_far);
@@ -86,6 +87,14 @@ struct RendererImpl : public Renderer
 		Vec3 center = pos - mtx.getZVector();
 		Vec3 up = mtx.getYVector();
 		gluLookAt(pos.x, pos.y, pos.z, center.x, center.y, center.z, up.x, up.y, up.z);
+	}
+
+
+	virtual void setCameraSize(Component camera, int w, int h) LUX_OVERRIDE
+	{
+		m_cameras[camera.index]->m_width = (float)w;
+		m_cameras[camera.index]->m_height = (float)h;
+		m_cameras[camera.index]->m_aspect = w / (float)h;
 	}
 
 
