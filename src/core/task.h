@@ -30,12 +30,14 @@ namespace Lux
 
 			uint32_t getAffinityMask() const;
 			uint32_t getPriority() const;
+			uint32_t getExitCode() const;
 
 			bool isRunning() const;
 			bool isFinished() const;
 			bool isForceExit() const;
 
 			void forceExit(bool wait);
+			void exit(int32_t exitCode);
 
 		private:
 			struct TaskImpl* m_implementation;
