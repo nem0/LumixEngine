@@ -1,0 +1,29 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="..\..\..\src\unit_tests\main.cpp" />
+    <ClCompile Include="..\..\..\src\unit_tests\unit_test_app.cpp" />
+    <ClCompile Include="..\..\..\src\unit_tests\unit_test_manager.cpp" />
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_hash_map.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_path.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\core\new.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\src\unit_tests\platform_defines.h" />
+    <ClInclude Include="..\..\..\src\unit_tests\unit_test.h" />
+    <ClInclude Include="..\..\..\src\unit_tests\unit_test_app.h" />
+    <ClInclude Include="..\..\..\src\unit_tests\unit_test_manager.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="core">
+      <UniqueIdentifier>{b9f6c517-4531-4e3d-abc6-424522b1d015}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine">
+      <UniqueIdentifier>{06f864c7-5b4b-422e-a990-c285f7bd8b31}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
