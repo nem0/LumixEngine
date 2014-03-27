@@ -53,7 +53,7 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 		Vec3 p1 = vertices[i+1];
 		Vec3 p2 = vertices[i+2];
 		Vec3 normal = crossProduct(p1 - p0, p2 - p0);
-		float q = dotProduct(normal, dir);
+		float q = dotProduct(normal, local_dir);
 		if(q == 0)
 		{
 			continue;
@@ -64,7 +64,7 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 		{
 			continue;
 		}
-		Vec3 hit_point = local_origin + dir * t;
+		Vec3 hit_point = local_origin + local_dir * t;
 
 		Vec3 edge0 = p1 - p0;
 		Vec3 VP0 = hit_point - p0;

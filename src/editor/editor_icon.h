@@ -23,6 +23,7 @@ class EditorIcon
 		void render(Renderer* renderer, IRenderDevice& render_device);
 		void show();
 		void hide();
+		float hit(Renderer& renderer, Component camera, const Vec3& origin, const Vec3& dir) const;
 		//H3DNode getHandle() const { return m_handle; }
 		Entity getEntity() const { return m_entity; }
 

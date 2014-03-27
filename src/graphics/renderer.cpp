@@ -134,6 +134,22 @@ struct RendererImpl : public Renderer
 	}
 
 
+	void clearScene()
+	{
+		m_lights.clear();
+		for (int i = 0; i < m_cameras.size(); ++i)
+		{
+			LUX_DELETE(m_cameras[i]);
+		}
+		m_cameras.clear();
+		for (int i = 0; i < m_renderables.size(); ++i)
+		{
+			LUX_DELETE(m_renderables[i].m_model);
+		}
+		m_renderables.clear();
+	}
+
+
 	virtual void setUniverse(Universe* universe) LUX_OVERRIDE
 	{
 		if(m_universe)
@@ -141,6 +157,7 @@ struct RendererImpl : public Renderer
 			EventManager::Listener cb;
 			cb.bind<RendererImpl, &RendererImpl::onEntityMoved>(this);
 			m_universe->getEventManager()->removeListener(EntityMovedEvent::type, cb);
+			clearScene();
 		}
 		m_universe = universe;
 		if(m_universe)
@@ -182,7 +199,7 @@ struct RendererImpl : public Renderer
 			Camera* camera = LUX_NEW(Camera);
 			camera->m_is_active = false;
 			camera->m_entity = entity;
-			camera->m_fov = 90;
+			camera->m_fov = 60;
 			camera->m_width = 800;
 			camera->m_height = 600;
 			camera->m_aspect = 800.0f / 600.0f;
@@ -357,6 +374,75 @@ struct RendererImpl : public Renderer
 		return pipeline;
 	}
 
+
+	virtual void serialize(ISerializer& serializer) LUX_OVERRIDE
+	{
+		serializer.serialize("camera_count", m_cameras.size());
+		serializer.beginArray("cameras");
+		for (int i = 0; i < m_cameras.size(); ++i)
+		{
+			serializer.serializeArrayItem(m_cameras[i]->m_far);
+			serializer.serializeArrayItem(m_cameras[i]->m_near);
+			serializer.serializeArrayItem(m_cameras[i]->m_fov);
+			serializer.serializeArrayItem(m_cameras[i]->m_is_active);
+			serializer.serializeArrayItem(m_cameras[i]->m_width);
+			serializer.serializeArrayItem(m_cameras[i]->m_height);
+			serializer.serializeArrayItem(m_cameras[i]->m_entity.index);
+		}
+		serializer.endArray();
+		serializer.serialize("renderable_count", m_renderables.size());
+		serializer.beginArray("renderables");
+		for (int i = 0; i < m_renderables.size(); ++i)
+		{
+			serializer.serializeArrayItem(m_renderables[i].m_entity.index);
+			serializer.serializeArrayItem(m_renderables[i].m_model->getModel().getPath());
+			Matrix mtx = m_renderables[i].m_model->getMatrix();
+			for (int j = 0; j < 16; ++j)
+			{
+				serializer.serializeArrayItem((&mtx.m11)[j]);
+			}
+		}
+		serializer.endArray();
+	}
+
+
+	virtual void deserialize(ISerializer& serializer) LUX_OVERRIDE
+	{
+		clearScene();
+		int size;
+		serializer.deserialize("camera_count", size);
+		serializer.deserializeArrayBegin("cameras");
+		for (int i = 0; i < size; ++i)
+		{
+			m_cameras.push(LUX_NEW(Camera));
+			serializer.deserializeArrayItem(m_cameras[i]->m_far);
+			serializer.deserializeArrayItem(m_cameras[i]->m_near);
+			serializer.deserializeArrayItem(m_cameras[i]->m_fov);
+			serializer.deserializeArrayItem(m_cameras[i]->m_is_active);
+			serializer.deserializeArrayItem(m_cameras[i]->m_width);
+			serializer.deserializeArrayItem(m_cameras[i]->m_height);
+			m_cameras[i]->m_aspect = m_cameras[i]->m_width / m_cameras[i]->m_height;
+			serializer.deserializeArrayItem(m_cameras[i]->m_entity.index);
+			m_cameras[i]->m_entity.universe = m_universe;
+		}
+		serializer.deserializeArrayEnd();
+		serializer.deserialize("renderable_count", size);
+		serializer.deserializeArrayBegin("renderables");
+		for (int i = 0; i < size; ++i)
+		{
+			m_renderables.pushEmpty();
+			serializer.deserializeArrayItem(m_renderables[i].m_entity.index);
+			m_renderables[i].m_entity.universe = m_universe;
+			char path[MAX_PATH];
+			serializer.deserializeArrayItem(path, MAX_PATH);
+			m_renderables[i].m_model = LUX_NEW(ModelInstance)(static_cast<Model&>(*m_engine->getResourceManager().get(ResourceManager::MODEL)->load(path)));
+			for (int j = 0; j < 16; ++j)
+			{
+				serializer.deserializeArrayItem((&m_renderables[i].m_model->getMatrix().m11)[j]);
+			}
+		}
+		serializer.deserializeArrayEnd();
+	}
 
 	Engine* m_engine;
 	Array<Camera*> m_cameras;

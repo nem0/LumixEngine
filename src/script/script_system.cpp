@@ -211,7 +211,10 @@ namespace Lux
 
 		FS::FileSystem& fs = m_impl->m_engine->getFileSystem();
 		FS::IFile* file = fs.open(fs.getDefaultDevice(), full_path, FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
-		fs.close(file);
+		if (file)
+		{
+			fs.close(file);
+		}
 
 		m_impl->m_scripts.push(entity.index);
 		m_impl->m_paths.push(string(path));

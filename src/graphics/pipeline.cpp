@@ -327,6 +327,7 @@ struct PipelineImpl : public Pipeline
 
 	void renderShadowmap()
 	{
+		glViewport(0, 0, 800, 600); /// TODO
 		Component light_cmp = m_renderer.getLight(0);
 		if (!light_cmp.isValid())
 		{
