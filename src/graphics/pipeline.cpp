@@ -319,10 +319,13 @@ struct PipelineImpl : public Pipeline
 		mtx->setXVector(r);
 		mtx->setYVector(u);
 		mtx->setZVector(-f);
-		mtx->setTranslation(Vec3(dotProduct(r, pos), dotProduct(-u, pos), dotProduct(f, pos)));
-/*		gluLookAt(pos.x, pos.y, pos.z, center.x, center.y, center.z, up.x, up.y, up.z);
-		glGetFloatv(GL_MODELVIEW_MATRIX, &mtx->m11);
-*/		
+		mtx->transpose();
+		mtx->setTranslation(Vec3(-dotProduct(r, pos), -dotProduct(u, pos), dotProduct(f, pos)));
+		/*glPushMatrix();
+		float m[16];
+		gluLookAt(pos.x, pos.y, pos.z, center.x, center.y, center.z, up.x, up.y, up.z);
+		glGetFloatv(GL_MODELVIEW_MATRIX, m);
+		glPopMatrix();*/
 	}
 
 	void renderShadowmap()
