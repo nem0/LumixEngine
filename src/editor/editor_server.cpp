@@ -45,6 +45,13 @@ namespace Lux
 {
 
 
+struct EditorIconHit
+{
+	EditorIcon* m_icon;
+	float m_t;
+};
+
+
 struct ClientMessageType
 {
 	enum 
@@ -159,6 +166,7 @@ struct EditorServerImpl
 		void save(FS::IFile& file);
 		void load(FS::IFile& file);
 		void onMessage(void* msgptr, int size);
+		EditorIconHit raycastEditorIcons(Component camera, const Vec3& origin, const Vec3& dir);
 
 		const IPropertyDescriptor& getPropertyDescriptor(uint32_t type, uint32_t name_hash);
 		void registerProperties();
@@ -171,8 +179,6 @@ struct EditorServerImpl
 		void onLogWarning(const char* system, const char* message);
 		void onLogError(const char* system, const char* message);
 		void sendMessage(const uint8_t* data, int32_t length);
-
-		static void onEvent(void* data, Event& evt);
 
 		MT::Mutex m_universe_mutex;
 		MT::Mutex m_send_mutex;
@@ -202,7 +208,7 @@ struct EditorServerImpl
 
 static const uint32_t renderable_type = crc32("renderable");
 static const uint32_t camera_type = crc32("camera");
-static const uint32_t point_light_type = crc32("point_light");
+static const uint32_t light_type = crc32("light");
 static const uint32_t script_type = crc32("script");
 static const uint32_t animable_type = crc32("animable");
 
@@ -316,7 +322,25 @@ void EditorServerImpl::registerProperties()
 	m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("cast shadows"), &Renderer::getCastShadows, &Renderer::setCastShadows));
 	m_component_properties[point_light_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("fov"), &Renderer::getLightFov, &Renderer::setLightFov));
 	m_component_properties[point_light_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("radius"), &Renderer::getLightRadius, &Renderer::setLightRadius));
-	m_component_properties[script_type].push(LUX_NEW(PropertyDescriptor<ScriptSystem>)(crc32("source"), &ScriptSystem::getScriptPath, &ScriptSystem::setScriptPath, IPropertyDescriptor::FILE));*/
+	*/m_component_properties[script_type].push(LUX_NEW(PropertyDescriptor<ScriptSystem>)(crc32("source"), &ScriptSystem::getScriptPath, &ScriptSystem::setScriptPath, IPropertyDescriptor::FILE));
+}
+
+
+EditorIconHit EditorServerImpl::raycastEditorIcons(Component camera, const Vec3& origin, const Vec3& dir)
+{
+	EditorIconHit hit;
+	hit.m_t = -1;
+	for (int i = 0; i < m_editor_icons.size(); ++i)
+	{
+		float t = m_editor_icons[i]->hit(m_engine.getRenderer(), camera, origin, dir);
+		if (t >= 0)
+		{
+			hit.m_icon = m_editor_icons[i];
+			hit.m_t = t;
+			return hit;
+		}
+	}
+	return hit;
 }
 
 
@@ -332,7 +356,12 @@ void EditorServerImpl::onPointerDown(int x, int y, MouseButton::Value button)
 		Component camera_cmp = m_camera.getComponent(camera_type);
 		m_engine.getRenderer().getRay(camera_cmp, (float)x, (float)y, origin, dir); 
 		RayCastModelHit hit = m_engine.getRenderer().castRay(origin, dir);
-		if(hit.m_is_hit)
+		EditorIconHit icon_hit = raycastEditorIcons(camera_cmp, origin, dir);
+		if (icon_hit.m_t >= 0 && (!hit.m_is_hit || hit.m_t > icon_hit.m_t))
+		{
+			selectEntity(icon_hit.m_icon->getEntity());
+		}
+		else if(hit.m_is_hit)
 		{
 			if(hit.m_renderable == m_gizmo.getRenderable())
 			{
@@ -588,12 +617,11 @@ void EditorServerImpl::addComponent(uint32_t type_crc)
 		}
 		else if(type_crc == renderable_type)
 		{
-			m_engine.getRenderer().createComponent(crc32("renderable"), m_selected_entity);
+			m_engine.getRenderer().createComponent(renderable_type, m_selected_entity);
 		}
-		else if(type_crc == point_light_type)
+		else if(type_crc == light_type)
 		{
-			ASSERT(false);
-		//	m_engine.getRenderer().createPointLight(m_selected_entity);
+			m_engine.getRenderer().createComponent(light_type, m_selected_entity);
 		}
 		else if(type_crc == script_type)
 		{
@@ -686,27 +714,12 @@ void EditorServerImpl::newUniverse()
 
 void EditorServerImpl::load(FS::IFile& file)
 {
-	/*g_log_info.log("editor server", "parsing universe...");
-	int selected_idx = m_selected_entity.index;
+	g_log_info.log("editor server", "parsing universe...");
 	destroyUniverse();
 	createUniverse(false, "");
 	JsonSerializer serializer(file, JsonSerializer::READ);
-	
 	m_engine.deserialize(serializer);
-	serializer.deserialize("cam_pos_x", m_camera_pos.x);
-	serializer.deserialize("cam_pos_y", m_camera_pos.y);
-	serializer.deserialize("cam_pos_z", m_camera_pos.z);
-	serializer.deserialize("cam_rot_x", m_camera_rot.x);
-	serializer.deserialize("cam_rot_y", m_camera_rot.y);
-	serializer.deserialize("cam_rot_z", m_camera_rot.z);
-	serializer.deserialize("cam_rot_w", m_camera_rot.w);
-	selectEntity(Entity(m_engine.getUniverse(), selected_idx));
-	Matrix mtx;
-	m_camera_rot.toMatrix(mtx);
-	mtx.setTranslation(m_camera_pos);
-	m_engine.getRenderer().setCameraMatrix(mtx);
-	g_log_info.log("editor server", "universe parsed");*/
-	ASSERT(false);
+	g_log_info.log("editor server", "universe parsed");
 }
 
 
@@ -786,7 +799,7 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 
 	//glPopAttrib();
 	
-	if(!m_engine.loadPlugin("physics.dll"))
+	/*if(!m_engine.loadPlugin("physics.dll"))
 	{
 		g_log_info.log("plugins", "physics plugin has not been loaded");
 	}
@@ -802,6 +815,12 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 	//m_navigation.load("models/level2/level2.pda");
 	
 	return true;
+}
+
+
+Component EditorServer::getCamera() const
+{
+	return m_impl->m_camera.getComponent(camera_type);
 }
 
 
@@ -1056,12 +1075,6 @@ void EditorServerImpl::selectEntity(Entity e)
 }
 
 
-void EditorServerImpl::onEvent(void* data, Event& evt)
-{
-	static_cast<EditorServerImpl*>(data)->onEvent(evt);
-}
-
-
 void EditorServerImpl::onComponentEvent(ComponentEvent& e)
 {
 	for(int i = 0; i < m_editor_icons.size(); ++i)
@@ -1155,13 +1168,13 @@ void EditorServerImpl::createUniverse(bool create_scene, const char* base_path)
 	m_camera.setPosition(0, 0, -5);
 	m_camera.setRotation(Quat(Vec3(0, 1, 0), -Math::PI));
 	Component cmp = m_engine.getRenderer().createComponent(camera_type, m_camera);
-
-	/*Entity light = m_engine.getUniverse()->createEntity();
+/*
+	Entity light = m_engine.getUniverse()->createEntity();
 	Matrix mtx = Matrix::IDENTITY;
 	mtx.setXVector(Vec3(1, 0, 0));
-	mtx.setYVector(Vec3(0, -1, 1).normalized());
-	mtx.setZVector(Vec3(0, -1, -1).normalized());
-	mtx.setTranslation(Vec3(0, 20, 20));
+	mtx.setYVector(Vec3(0, 0, 1).normalized());
+	mtx.setZVector(Vec3(0, -1, 0).normalized());
+	mtx.setTranslation(Vec3(0, 20, 0));
 	light.setMatrix(mtx);
 	m_engine.getRenderer().createComponent(crc32("light"), light);
 
@@ -1174,16 +1187,14 @@ void EditorServerImpl::createUniverse(bool create_scene, const char* base_path)
 	Component cmp3 = m_engine.getRenderer().createComponent(renderable_type, m_engine.getUniverse()->createEntity());
 	m_engine.getRenderer().setRenderablePath(cmp3, string("models/plane.msh"));
 	
-	/*	
-	universe->getEventManager()->addListener(EntityMovedEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);
-	universe->getEventManager()->addListener(ComponentEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);
-	universe->getEventManager()->addListener(EntityDestroyedEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);
-
-	addEntity();
-	*/
+	
 	m_gizmo.create(base_path, m_engine.getRenderer());
 	m_gizmo.setUniverse(universe);
 	m_gizmo.hide();
+
+	universe->getEventManager()->addListener(EntityMovedEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);
+	universe->getEventManager()->addListener(ComponentEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);
+	universe->getEventManager()->addListener(EntityDestroyedEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);
 
 	m_selected_entity = Entity::INVALID;
 }

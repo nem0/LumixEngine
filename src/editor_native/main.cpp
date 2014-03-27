@@ -51,7 +51,7 @@ struct App
 		GetCurrentDirectoryA(MAX_PATH, path);
 		m_server.create(NULL, NULL, path);
 		m_server.onResize(800, 600);
-		m_client.create();
+		m_client.create(m_server.getEngine().getBasePath());
 	
 		initGui(m_client, m_server);
 		Lux::UI::Gui* gui = (Lux::UI::Gui*)m_server.getEngine().getPluginManager().getPlugin("gui");

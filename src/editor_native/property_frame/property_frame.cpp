@@ -160,7 +160,7 @@ void PropertyFrame::onEntitySelected(Lux::Event& evt)
 		{
 			ui = LUX_NEW(ScriptUI)(*this, m_component_container, *m_main_frame->getEditorClient());
 		}
-		else if(e.components[i] == crc32("point_light"))
+		else if(e.components[i] == crc32("light"))
 		{
 			ui = LUX_NEW(PointLightUI)(*this, m_component_container, *m_main_frame->getEditorClient());
 		}
