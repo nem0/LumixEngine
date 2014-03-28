@@ -38,7 +38,7 @@ int main(int argc, char *argv[])
 	QApplication a(argc, argv);
 	MainWindow w;
 	w.show();
-	HWND hwnd = (HWND)w.getSceneView()->winId();
+	HWND hwnd = (HWND)w.getSceneView()->widget()->winId();
 	Lux::EditorServer server;
 	Lux::EditorClient client;
 	server.create(hwnd, NULL, QDir::currentPath().toLocal8Bit().data());

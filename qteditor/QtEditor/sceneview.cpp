@@ -8,6 +8,7 @@ SceneView::SceneView(QWidget *parent) :
 	QDockWidget(parent)
 {
 	m_pipeline = NULL;
+	setWidget(new QWidget());
 }
 
 

@@ -21,7 +21,6 @@
 #include <QtWidgets/QStatusBar>
 #include <QtWidgets/QToolBar>
 #include <QtWidgets/QWidget>
-#include "sceneview.h"
 
 QT_BEGIN_NAMESPACE
 
@@ -40,7 +39,6 @@ public:
     QAction *actionProperties;
     QWidget *centralWidget;
     QGridLayout *gridLayout;
-    SceneView *widget;
     QMenuBar *menuBar;
     QMenu *menuView;
     QMenu *menuFile;
@@ -54,6 +52,7 @@ public:
         if (MainWindow->objectName().isEmpty())
             MainWindow->setObjectName(QStringLiteral("MainWindow"));
         MainWindow->resize(892, 658);
+        MainWindow->setDockNestingEnabled(true);
         actionLog = new QAction(MainWindow);
         actionLog->setObjectName(QStringLiteral("actionLog"));
         actionNew = new QAction(MainWindow);
@@ -76,15 +75,17 @@ public:
         actionProperties->setObjectName(QStringLiteral("actionProperties"));
         centralWidget = new QWidget(MainWindow);
         centralWidget->setObjectName(QStringLiteral("centralWidget"));
+        centralWidget->setEnabled(true);
+        QSizePolicy sizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
+        sizePolicy.setHorizontalStretch(0);
+        sizePolicy.setVerticalStretch(0);
+        sizePolicy.setHeightForWidth(centralWidget->sizePolicy().hasHeightForWidth());
+        centralWidget->setSizePolicy(sizePolicy);
+        centralWidget->setMaximumSize(QSize(0, 0));
         gridLayout = new QGridLayout(centralWidget);
         gridLayout->setSpacing(6);
         gridLayout->setContentsMargins(11, 11, 11, 11);
         gridLayout->setObjectName(QStringLiteral("gridLayout"));
-        widget = new SceneView(centralWidget);
-        widget->setObjectName(QStringLiteral("widget"));
-
-        gridLayout->addWidget(widget, 0, 0, 1, 1);
-
         MainWindow->setCentralWidget(centralWidget);
         menuBar = new QMenuBar(MainWindow);
         menuBar->setObjectName(QStringLiteral("menuBar"));
