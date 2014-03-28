@@ -41,6 +41,7 @@ private:
 	Lux::EditorClient* m_client;
 	class LogWidget* m_log;
 	class PropertyView* m_property_view;
+	class SceneView* m_scene_view;
 };
 
 #endif // MAINWINDOW_H

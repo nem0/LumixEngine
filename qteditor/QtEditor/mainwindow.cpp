@@ -4,6 +4,7 @@
 #include "editor/editor_client.h"
 #include "log_widget.h"
 #include "property_view.h"
+#include "sceneview.h"
 
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -12,16 +13,21 @@ MainWindow::MainWindow(QWidget *parent) :
 {
 	m_client = NULL;
     ui->setupUi(this);
+	ui->centralWidget->hide();
 	m_log = new LogWidget;
 	m_property_view = new PropertyView;
+	m_scene_view = new SceneView;
 	addDockWidget(static_cast<Qt::DockWidgetArea>(8), m_log);
 	addDockWidget(static_cast<Qt::DockWidgetArea>(1), m_property_view);
+	addDockWidget(static_cast<Qt::DockWidgetArea>(2), m_scene_view);
 }
 
 MainWindow::~MainWindow()
 {
 	delete m_log;
     delete ui;
+	delete m_scene_view;
+	delete m_property_view;
 }
 
 
@@ -29,12 +35,12 @@ void MainWindow::setEditorClient(Lux::EditorClient& client)
 {
 	m_client = &client;
 	m_property_view->setEditorClient(client);
-	ui->widget->setClient(&client);
+	m_scene_view->setClient(&client);
 }
 
 SceneView* MainWindow::getSceneView()
 {
-	return ui->widget;
+	return m_scene_view;
 }
 
 void MainWindow::on_actionLog_triggered()
