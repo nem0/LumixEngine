@@ -818,6 +818,18 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 }
 
 
+HGLRC EditorServer::getHGLRC()
+{
+	return m_impl->m_hglrc;
+}
+
+
+HGLRC EditorServer::getGameHGLRC()
+{
+	return m_impl->m_hglrc;
+}
+
+
 Component EditorServer::getCamera() const
 {
 	return m_impl->m_camera.getComponent(camera_type);

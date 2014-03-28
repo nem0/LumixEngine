@@ -21,7 +21,8 @@ public:
     ~MainWindow();
 
 	void setEditorClient(Lux::EditorClient& client);
-	class SceneView* getSceneView();
+	class SceneView* getSceneView() const;
+	class GameView* getGameView() const;
 
 private slots:
     void on_actionLog_triggered();
@@ -36,12 +37,15 @@ private slots:
 
     void on_actionE_xit_triggered();
 
+    void on_actionGame_view_triggered();
+
 private:
     Ui::MainWindow *ui;
 	Lux::EditorClient* m_client;
 	class LogWidget* m_log;
 	class PropertyView* m_property_view;
 	class SceneView* m_scene_view;
+	class GameView* m_game_view;
 };
 
 #endif // MAINWINDOW_H
