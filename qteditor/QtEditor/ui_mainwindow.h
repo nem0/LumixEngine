@@ -37,6 +37,7 @@ public:
     QAction *actionCompile_scripts;
     QAction *actionCreate;
     QAction *actionProperties;
+    QAction *actionGame_view;
     QWidget *centralWidget;
     QGridLayout *gridLayout;
     QMenuBar *menuBar;
@@ -73,6 +74,8 @@ public:
         actionCreate->setObjectName(QStringLiteral("actionCreate"));
         actionProperties = new QAction(MainWindow);
         actionProperties->setObjectName(QStringLiteral("actionProperties"));
+        actionGame_view = new QAction(MainWindow);
+        actionGame_view->setObjectName(QStringLiteral("actionGame_view"));
         centralWidget = new QWidget(MainWindow);
         centralWidget->setObjectName(QStringLiteral("centralWidget"));
         centralWidget->setEnabled(true);
@@ -112,6 +115,7 @@ public:
         menuBar->addAction(menuEntity->menuAction());
         menuView->addAction(actionLog);
         menuView->addAction(actionProperties);
+        menuView->addAction(actionGame_view);
         menuFile->addAction(actionNew);
         menuFile->addAction(actionOpen);
         menuFile->addAction(actionSave);
@@ -139,6 +143,7 @@ public:
         actionCompile_scripts->setText(QApplication::translate("MainWindow", "Compile scripts", 0));
         actionCreate->setText(QApplication::translate("MainWindow", "Create", 0));
         actionProperties->setText(QApplication::translate("MainWindow", "Properties", 0));
+        actionGame_view->setText(QApplication::translate("MainWindow", "Game view", 0));
         menuView->setTitle(QApplication::translate("MainWindow", "View", 0));
         menuFile->setTitle(QApplication::translate("MainWindow", "File", 0));
         menuTools->setTitle(QApplication::translate("MainWindow", "Tools", 0));

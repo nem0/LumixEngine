@@ -8,6 +8,7 @@
 #include "engine/engine.h"
 #include <qdir.h>
 #include "sceneview.h"
+#include "gameview.h"
 
 
 class MyRenderDevice : public Lux::IRenderDevice
@@ -39,20 +40,30 @@ int main(int argc, char *argv[])
 	MainWindow w;
 	w.show();
 	HWND hwnd = (HWND)w.getSceneView()->widget()->winId();
+	HWND game_hwnd = (HWND)w.getGameView()->getContentWidget()->winId();
 	Lux::EditorServer server;
 	Lux::EditorClient client;
-	server.create(hwnd, NULL, QDir::currentPath().toLocal8Bit().data());
+	server.create(hwnd, game_hwnd, QDir::currentPath().toLocal8Bit().data());
 	server.tick(hwnd, NULL);
 	client.create(server.getEngine().getBasePath());
 	w.setEditorClient(client);
 	w.getSceneView()->setServer(&server);
 	MyRenderDevice rd(server.getEngine().getRenderer());
+	MyRenderDevice rd2(server.getEngine().getRenderer());
 	rd.m_hdc = GetDC(hwnd);
+	rd2.m_hdc = GetDC(game_hwnd);
 	while (w.isVisible())
 	{
 		rd.getPipeline().setCamera(0, server.getCamera()); TODO("when universe is loaded, old camera is destroyed, handle this in a normal way");
+		rd2.getPipeline().setCamera(0, server.getCamera()); TODO("when universe is loaded, old camera is destroyed, handle this in a normal way");
 		w.getSceneView()->setPipeline(rd.getPipeline());
+		w.getGameView()->setPipeline(rd2.getPipeline());
+		wglMakeCurrent(rd.m_hdc, server.getHGLRC());
 		server.render(rd);
+		rd.endFrame();
+		wglMakeCurrent(rd2.m_hdc, server.getHGLRC());
+		server.render(rd2);
+		rd2.endFrame();
 		server.tick(hwnd, NULL);
 		client.processMessages();
 		a.processEvents();
@@ -69,7 +80,6 @@ int main(int argc, char *argv[])
 				client.navigate(-1, 0, 0);
 			}
 		}
-		rd.endFrame();
 	}
 	return 0;
 }

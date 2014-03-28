@@ -34,6 +34,8 @@ namespace Lux
 			Engine& getEngine();
 			void render(IRenderDevice& render_device);
 			Component getCamera() const;
+			HGLRC getHGLRC();
+			HGLRC getGameHGLRC();
 
 		private:
 			struct EditorServerImpl* m_impl;

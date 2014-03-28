@@ -37,6 +37,9 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="gameview.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="log_widget.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -63,6 +66,9 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <CustomBuild Include="gameview.h">
+      <Filter>Header Files</Filter>
+    </CustomBuild>
     <CustomBuild Include="log_widget.h">
       <Filter>Header Files</Filter>
     </CustomBuild>
@@ -86,6 +92,12 @@
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="debug\moc_gameview.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="release\moc_gameview.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
     <ClCompile Include="debug\moc_log_widget.cpp">
       <Filter>Generated Files</Filter>
     </ClCompile>
@@ -128,6 +140,9 @@
     <ClCompile Include="release\moc_script_widget.cpp">
       <Filter>Generated Files</Filter>
     </ClCompile>
+    <ClInclude Include="ui_gameview.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
     <ClInclude Include="ui_logwidget.h">
       <Filter>Generated Files</Filter>
     </ClInclude>
@@ -148,6 +163,9 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <CustomBuild Include="gameview.ui">
+      <Filter>Form Files</Filter>
+    </CustomBuild>
     <CustomBuild Include="logwidget.ui">
       <Filter>Form Files</Filter>
     </CustomBuild>

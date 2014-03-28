@@ -49,6 +49,7 @@
     </property>
     <addaction name="actionLog"/>
     <addaction name="actionProperties"/>
+    <addaction name="actionGame_view"/>
    </widget>
    <widget class="QMenu" name="menuFile">
     <property name="title">
@@ -135,6 +136,11 @@
   <action name="actionProperties">
    <property name="text">
     <string>Properties</string>
+   </property>
+  </action>
+  <action name="actionGame_view">
+   <property name="text">
+    <string>Game view</string>
    </property>
   </action>
  </widget>
