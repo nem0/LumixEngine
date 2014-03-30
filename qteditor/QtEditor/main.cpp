@@ -17,6 +17,7 @@ class MyRenderDevice : public Lux::IRenderDevice
 	MyRenderDevice(Lux::Renderer& renderer)
 	{
 		m_renderer = &renderer;
+		m_pipeline = Lux::PipelineInstance::create(*m_renderer->loadPipeline("pipelines/main.json"));
 	}
 
 	virtual void endFrame()
@@ -24,12 +25,12 @@ class MyRenderDevice : public Lux::IRenderDevice
 		wglSwapLayerBuffers(m_hdc, WGL_SWAP_MAIN_PLANE);
 	}
 
-	virtual Lux::Pipeline& getPipeline()
+	virtual Lux::PipelineInstance& getPipeline()
 	{
-		static Lux::Pipeline* p = m_renderer->loadPipeline("pipelines/main.json");
-		return *p;
+		return *m_pipeline;
 	}
 
+	Lux::PipelineInstance* m_pipeline;
 	HDC m_hdc;
 	Lux::Renderer* m_renderer;
 };

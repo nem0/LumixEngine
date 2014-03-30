@@ -6,7 +6,7 @@
 
 namespace Lux
 {
-	class Pipeline;
+	class PipelineInstance;
 }
 
 namespace Ui {
@@ -22,14 +22,14 @@ public:
     ~GameView();
 
 	QWidget* getContentWidget() const;
-	void setPipeline(Lux::Pipeline& pipeline) { m_pipeline = &pipeline; }
+	void setPipeline(Lux::PipelineInstance& pipeline) { m_pipeline = &pipeline; }
 
 private:
 	virtual void resizeEvent(QResizeEvent *) override;
 
 private:
     Ui::GameView *ui;
-	Lux::Pipeline* m_pipeline;
+	Lux::PipelineInstance* m_pipeline;
 };
 
 #endif // GAMEVIEW_H

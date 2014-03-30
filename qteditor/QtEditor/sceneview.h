@@ -7,7 +7,7 @@ namespace Lux
 {
 	class EditorClient;
 	class EditorServer;
-	class Pipeline;
+	class PipelineInstance;
 }
 
 class SceneView : public QDockWidget
@@ -17,7 +17,7 @@ public:
     explicit SceneView(QWidget* parent = 0);
 	void setClient(Lux::EditorClient* client) { m_client = client; }
 	void setServer(Lux::EditorServer* server) { m_server = server; }
-	void setPipeline(Lux::Pipeline& pipeline) { m_pipeline = &pipeline; }
+	void setPipeline(Lux::PipelineInstance& pipeline) { m_pipeline = &pipeline; }
 
 private:
 	virtual void mousePressEvent(QMouseEvent* event) override;
@@ -28,7 +28,7 @@ private:
 private:	
 	Lux::EditorClient* m_client;
 	Lux::EditorServer* m_server;
-	Lux::Pipeline* m_pipeline;
+	Lux::PipelineInstance* m_pipeline;
 	int m_last_x;
 	int m_last_y;
 
