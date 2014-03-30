@@ -1,9 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Express 2013 for Windows Desktop
-VisualStudioVersion = 12.0.21005.1
-MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "QtEditor", "QtEditor.vcxproj", "{AEFFED0B-7F38-3DEE-876F-683617EBCCE7}"
+# Visual Studio Express 2012 for Windows Desktop
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "QtEditor", "QtEditor.vcxproj", "{48317DDC-BD1C-3CA5-8639-57795EF05430}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -11,10 +9,10 @@ Global
 		Release|Win32 = Release|Win32
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{AEFFED0B-7F38-3DEE-876F-683617EBCCE7}.Debug|Win32.ActiveCfg = Debug|Win32
-		{AEFFED0B-7F38-3DEE-876F-683617EBCCE7}.Debug|Win32.Build.0 = Debug|Win32
-		{AEFFED0B-7F38-3DEE-876F-683617EBCCE7}.Release|Win32.ActiveCfg = Release|Win32
-		{AEFFED0B-7F38-3DEE-876F-683617EBCCE7}.Release|Win32.Build.0 = Release|Win32
+		{48317DDC-BD1C-3CA5-8639-57795EF05430}.Debug|Win32.ActiveCfg = Debug|Win32
+		{48317DDC-BD1C-3CA5-8639-57795EF05430}.Debug|Win32.Build.0 = Debug|Win32
+		{48317DDC-BD1C-3CA5-8639-57795EF05430}.Release|Win32.ActiveCfg = Release|Win32
+		{48317DDC-BD1C-3CA5-8639-57795EF05430}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
