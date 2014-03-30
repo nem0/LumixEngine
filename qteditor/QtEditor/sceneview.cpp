@@ -10,6 +10,7 @@ SceneView::SceneView(QWidget *parent) :
 	m_pipeline = NULL;
 	setWidget(new QWidget());
 	setWindowTitle("Scene");
+	setObjectName("sceneView");
 }
 
 
