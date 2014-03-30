@@ -55,8 +55,8 @@ int main(int argc, char *argv[])
 	rd2.m_hdc = GetDC(game_hwnd);
 	while (w.isVisible())
 	{
-		rd.getPipeline().setCamera(0, server.getCamera()); TODO("when universe is loaded, old camera is destroyed, handle this in a normal way");
-		rd2.getPipeline().setCamera(0, server.getCamera()); TODO("when universe is loaded, old camera is destroyed, handle this in a normal way");
+		rd.getPipeline().setCamera(0, server.getCamera(0)); TODO("when universe is loaded, old camera is destroyed, handle this in a normal way");
+		rd2.getPipeline().setCamera(0, server.getCamera(1)); TODO("when universe is loaded, old camera is destroyed, handle this in a normal way");
 		w.getSceneView()->setPipeline(rd.getPipeline());
 		w.getGameView()->setPipeline(rd2.getPipeline());
 		wglMakeCurrent(rd.m_hdc, server.getHGLRC());

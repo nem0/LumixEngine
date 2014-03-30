@@ -33,7 +33,7 @@ namespace Lux
 			void registerProperty(const char* component_type, IPropertyDescriptor* descriptor);
 			Engine& getEngine();
 			void render(IRenderDevice& render_device);
-			Component getCamera() const;
+			Component getCamera(int index) const;
 			HGLRC getHGLRC();
 
 		private:

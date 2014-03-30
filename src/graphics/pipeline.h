@@ -28,6 +28,7 @@ class LUX_ENGINE_API Pipeline LUX_ABSTRACT
 		virtual void load(const char* path, FS::FileSystem& file_system) = 0;
 		virtual const char* getPath() = 0;
 		virtual DelegateList<void(Pipeline&)>& onLoaded() = 0;
+		virtual bool isReady() const = 0;
 
 		static Pipeline* create(Renderer& renderer);
 		static void destroy(Pipeline* pipeline);
