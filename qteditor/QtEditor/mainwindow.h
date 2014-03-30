@@ -32,6 +32,7 @@ private slots:
 	void on_actionProperties_triggered();
 	void on_actionE_xit_triggered();
 	void on_actionGame_view_triggered();
+	virtual void closeEvent(QCloseEvent *event) override;
 
 private:
 	Ui::MainWindow *ui;
