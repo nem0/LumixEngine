@@ -134,6 +134,7 @@ struct PipelineImpl : public Pipeline
 	PipelineImpl(Renderer& renderer)
 		: m_renderer(renderer)
 	{
+		m_is_ready = false;
 		addCommandCreator("clear").bind<&CreateCommand<ClearCommand> >();
 		addCommandCreator("render_models").bind<&CreateCommand<RenderModelsCommand> >();
 		addCommandCreator("apply_camera").bind<&CreateCommand<ApplyCameraCommand> >();
@@ -228,6 +229,7 @@ struct PipelineImpl : public Pipeline
 
 	virtual void load(const char* path, FS::FileSystem& file_system) 
 	{
+		m_is_ready = false;
 		m_path = path;
 		FS::ReadCallback cb;
 		cb.bind<PipelineImpl, &PipelineImpl::loaded>(this);
@@ -250,6 +252,7 @@ struct PipelineImpl : public Pipeline
 		}
 
 		fs.close(file);
+		m_is_ready = true;
 		m_on_loaded.invoke(*this);
 	}
 
@@ -259,6 +262,13 @@ struct PipelineImpl : public Pipeline
 	}
 
 
+	virtual bool isReady() const LUX_OVERRIDE
+	{
+		return m_is_ready;
+	}
+
+
+	bool m_is_ready;
 	DelegateList<void(Pipeline&)> m_on_loaded;
 	Array<Command*> m_commands;
 	string m_path;
@@ -274,7 +284,15 @@ struct PipelineInstanceImpl : public PipelineInstance
 	PipelineInstanceImpl(Pipeline& pipeline)
 		: m_source(static_cast<PipelineImpl&>(pipeline))
 	{
-		pipeline.onLoaded().bind<PipelineInstanceImpl, &PipelineInstanceImpl::sourceLoaded>(this);
+		m_shadowmap_framebuffer = NULL;
+		if(pipeline.isReady())
+		{
+			sourceLoaded(pipeline);
+		}
+		else
+		{
+			pipeline.onLoaded().bind<PipelineInstanceImpl, &PipelineInstanceImpl::sourceLoaded>(this);
+		}
 	}
 
 	~PipelineInstanceImpl()
@@ -293,12 +311,12 @@ struct PipelineInstanceImpl : public PipelineInstance
 	void sourceLoaded(Pipeline& pipeline)
 	{
 		PipelineImpl::FrameBufferDeclaration fb = m_source.m_shadowmap_framebuffer;
-		m_shadowmap_framebuffer = LUX_NEW(FrameBuffer)(fb.m_mask, fb.m_width, fb.m_height);
+		m_shadowmap_framebuffer = LUX_NEW(FrameBuffer)(fb.m_width, fb.m_height, fb.m_mask);
 		m_framebuffers.reserve(m_source.m_framebuffers.size());
 		for (int i = 0; i < m_source.m_framebuffers.size(); ++i)
 		{
 			fb = m_source.m_framebuffers[i];
-			m_framebuffers.push(LUX_NEW(FrameBuffer)(fb.m_mask, fb.m_width, fb.m_height));
+			m_framebuffers.push(LUX_NEW(FrameBuffer)(fb.m_width, fb.m_height, fb.m_mask));
 		}
 	}
 

@@ -197,6 +197,7 @@ struct EditorServerImpl
 		Engine m_engine;
 		EditorServer* m_owner;
 		Entity m_camera;
+		Entity m_game_camera;
 
 		FS::FileSystem* m_file_system;
 		FS::TCPFileServer m_tpc_file_server;
@@ -830,9 +831,21 @@ HGLRC EditorServer::getHGLRC()
 }
 
 
-Component EditorServer::getCamera() const
+Component EditorServer::getCamera(int index) const
 {
-	return m_impl->m_camera.getComponent(camera_type);
+	if (index == 0)
+	{
+		return m_impl->m_camera.getComponent(camera_type);
+	}
+	else if (index == 1)
+	{
+		return m_impl->m_game_camera.getComponent(camera_type);
+	}
+	else
+	{
+		ASSERT(false);
+		return Component::INVALID;
+	}
 }
 
 
@@ -1180,7 +1193,13 @@ void EditorServerImpl::createUniverse(bool create_scene, const char* base_path)
 	m_camera.setPosition(0, 0, -5);
 	m_camera.setRotation(Quat(Vec3(0, 1, 0), -Math::PI));
 	Component cmp = m_engine.getRenderer().createComponent(camera_type, m_camera);
-/*
+
+	m_game_camera = m_engine.getUniverse()->createEntity();
+	m_game_camera.setPosition(0, 0, -5);
+	m_game_camera.setRotation(Quat(Vec3(0, 1, 0), -Math::PI));
+	m_engine.getRenderer().createComponent(camera_type, m_game_camera);
+	
+	/*
 	Entity light = m_engine.getUniverse()->createEntity();
 	Matrix mtx = Matrix::IDENTITY;
 	mtx.setXVector(Vec3(1, 0, 0));
