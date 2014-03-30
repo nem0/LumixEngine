@@ -41,6 +41,7 @@ private:
 	class PropertyView* m_property_view;
 	class SceneView* m_scene_view;
 	class GameView* m_game_view;
+	class AssetBrowser* m_asset_browser;
 };
 
 #endif // MAINWINDOW_H

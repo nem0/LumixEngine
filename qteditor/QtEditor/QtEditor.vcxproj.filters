@@ -37,6 +37,9 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="assetbrowser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="gameview.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -66,6 +69,9 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <CustomBuild Include="assetbrowser.h">
+      <Filter>Header Files</Filter>
+    </CustomBuild>
     <CustomBuild Include="gameview.h">
       <Filter>Header Files</Filter>
     </CustomBuild>
@@ -92,6 +98,12 @@
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="debug\moc_assetbrowser.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="release\moc_assetbrowser.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
     <ClCompile Include="debug\moc_gameview.cpp">
       <Filter>Generated Files</Filter>
     </ClCompile>
@@ -140,6 +152,9 @@
     <ClCompile Include="release\moc_script_widget.cpp">
       <Filter>Generated Files</Filter>
     </ClCompile>
+    <ClInclude Include="ui_assetbrowser.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
     <ClInclude Include="ui_gameview.h">
       <Filter>Generated Files</Filter>
     </ClInclude>
@@ -163,6 +178,9 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <CustomBuild Include="assetbrowser.ui">
+      <Filter>Form Files</Filter>
+    </CustomBuild>
     <CustomBuild Include="gameview.ui">
       <Filter>Form Files</Filter>
     </CustomBuild>

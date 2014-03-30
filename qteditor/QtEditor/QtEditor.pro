@@ -20,7 +20,8 @@ SOURCES += main.cpp\
     renderable_widget.cpp \
     property_widget_base.cpp \
     script_widget.cpp \
-    gameview.cpp
+    gameview.cpp \
+    assetbrowser.cpp
 
 HEADERS  += mainwindow.h \
     sceneview.h \ 
@@ -29,7 +30,8 @@ HEADERS  += mainwindow.h \
     renderable_widget.h \
     property_widget_base.h \
     script_widget.h \
-    gameview.h
+    gameview.h \
+    assetbrowser.h
 
 FORMS    += mainwindow.ui \
     logwidget.ui \
@@ -37,7 +39,8 @@ FORMS    += mainwindow.ui \
     renderable_widget.ui \
     property_widget_base.ui \
     script_widget.ui \
-    gameview.ui
+    gameview.ui \
+    assetbrowser.ui
 
 win32
 {

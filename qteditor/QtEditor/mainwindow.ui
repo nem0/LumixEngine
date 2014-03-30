@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>Lux Editor</string>
   </property>
   <property name="dockNestingEnabled">
    <bool>true</bool>
@@ -79,15 +79,6 @@
    <addaction name="menuTools"/>
    <addaction name="menuEntity"/>
   </widget>
-  <widget class="QToolBar" name="mainToolBar">
-   <attribute name="toolBarArea">
-    <enum>TopToolBarArea</enum>
-   </attribute>
-   <attribute name="toolBarBreak">
-    <bool>false</bool>
-   </attribute>
-  </widget>
-  <widget class="QStatusBar" name="statusBar"/>
   <action name="actionLog">
    <property name="text">
     <string>Log</string>

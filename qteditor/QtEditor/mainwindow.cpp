@@ -1,12 +1,13 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include <qfiledialog.h>
+#include <qsettings.h>
 #include "editor/editor_client.h"
 #include "log_widget.h"
 #include "property_view.h"
 #include "sceneview.h"
 #include "gameview.h"
-#include <qsettings.h>
+#include "assetbrowser.h"
 
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -20,12 +21,14 @@ MainWindow::MainWindow(QWidget *parent) :
 	m_property_view = new PropertyView;
 	m_scene_view = new SceneView;
 	m_game_view = new GameView;
+	m_asset_browser = new AssetBrowser;
 	QSettings settings("Lux", "QtEditor");
 	restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
 	addDockWidget(static_cast<Qt::DockWidgetArea>(1), m_game_view);
 	addDockWidget(static_cast<Qt::DockWidgetArea>(8), m_log);
 	addDockWidget(static_cast<Qt::DockWidgetArea>(1), m_property_view);
 	addDockWidget(static_cast<Qt::DockWidgetArea>(2), m_scene_view);
+	addDockWidget(static_cast<Qt::DockWidgetArea>(2), m_asset_browser);
 
 	restoreState(settings.value("mainWindowState").toByteArray());
 }
@@ -36,8 +39,6 @@ void MainWindow::closeEvent(QCloseEvent *event)
 	QSettings settings("Lux", "QtEditor");
 	settings.setValue("mainWindowGeometry", saveGeometry());
 	settings.setValue("mainWindowState", saveState());
-	QByteArray a = settings.fileName().toLatin1();
-	const char* c = a.data();
 	QMainWindow::closeEvent(event);
 }
 
@@ -55,7 +56,8 @@ void MainWindow::setEditorClient(Lux::EditorClient& client)
 {
 	m_client = &client;
 	m_property_view->setEditorClient(client);
-	m_scene_view->setClient(&client);
+	m_scene_view->setEditorClient(client);
+	m_asset_browser->setEditorClient(client);
 }
 
 

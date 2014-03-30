@@ -16,6 +16,12 @@ ModelInstance::ModelInstance(Model& model)
 }
 
 
+ModelInstance::~ModelInstance()
+{
+	m_model.getObserverCb().unbind<ModelInstance, &ModelInstance::modelUpdate>(this);
+}
+
+
 void ModelInstance::modelUpdate(uint32_t new_state)
 {
 	if(new_state == Resource::State::READY)
