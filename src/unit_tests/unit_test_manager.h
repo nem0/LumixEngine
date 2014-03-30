@@ -1,11 +1,3 @@
-//
-//  unit_test_manager.h
-//  UnitTest
-//
-//  Created by Lukas Jagelka on 14/03/14.
-//  Copyright (c) 2014 LuxEngine. All rights reserved.
-//
-
 #pragma once
 
 namespace Lux
@@ -27,7 +19,7 @@ namespace Lux
 				return *s_instance;
 			}
 
-			static void release() { LUX_DELETE(s_instance); }
+			static void release() { LUX_DELETE(s_instance); s_instance = NULL; }
 
 
 			void registerFunction(const char* name, unitTestFunc func, const char* params);
@@ -65,4 +57,7 @@ namespace Lux
 #define REGISTER_TEST(name, method, params) \
 namespace { extern "C" Lux::UnitTest::Helper test_register_ ## method(name, method, params); } \
 	LUX_FORCE_SYMBOL(test_register_ ## method)
+
+TODO("Count error messages.");
+TODO("Count warning messages.");
 

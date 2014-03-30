@@ -1,11 +1,3 @@
-//
-//  main.cpp
-//  UnitTest
-//
-//  Created by Lukas Jagelka on 14/03/14.
-//  Copyright (c) 2014 LuxEngine. All rights reserved.
-//
-
 #include "core/lux.h"
 #include <iostream>
 #include "unit_tests/unit_test_app.h"

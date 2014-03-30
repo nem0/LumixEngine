@@ -11,9 +11,9 @@ void UT_path(const char* params)
 {
 	Lux::Path path(src_path);
 
-	LUX_EXPECT_STRING(path, res_path);
+	LUX_EXPECT_EQ((const char*)path, res_path);
 
-	LUX_EXPECT(uint32_t(path), crc32(res_path));
+	LUX_EXPECT_EQ(uint32_t(path), crc32(res_path));
 }
 
 REGISTER_TEST("unit_tests/core/path/path", UT_path, "")
