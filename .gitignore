@@ -7,3 +7,5 @@ obj/
 *.user
 evona_test/
 *.orig
+debug/
+release/
