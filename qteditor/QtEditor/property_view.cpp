@@ -10,10 +10,10 @@
 
 
 PropertyView::PropertyView(QWidget *parent) :
-    QDockWidget(parent),
-    ui(new Ui::PropertyView)
+	QDockWidget(parent),
+	ui(new Ui::PropertyView)
 {
-    ui->setupUi(this);
+	ui->setupUi(this);
 }
 
 
@@ -82,7 +82,7 @@ void PropertyView::onEntitySelected(Lux::Event& event)
 
 PropertyView::~PropertyView()
 {
-    delete ui;
+	delete ui;
 }
 
 void PropertyView::on_addComponentButton_clicked()

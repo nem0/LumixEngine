@@ -4,11 +4,14 @@
 
 
 LogWidget::LogWidget(QWidget *parent) :
-    QDockWidget(parent),
-    ui(new Ui::LogWidget)
+	QDockWidget(parent),
+	ui(new Ui::LogWidget)
 {
-    ui->setupUi(this);
+	ui->setupUi(this);
 	Lux::g_log_info.getCallback().bind<LogWidget, &LogWidget::onInfo>(this);
+	Lux::g_log_warning.getCallback().bind<LogWidget, &LogWidget::onInfo>(this);
+	Lux::g_log_error.getCallback().bind<LogWidget, &LogWidget::onInfo>(this);
+
 }
 
 
@@ -27,7 +30,7 @@ void LogWidget::onInfo(const char* system, const char* message)
 
 LogWidget::~LogWidget()
 {
-    delete ui;
+	delete ui;
 }
 
 void LogWidget::on_clearButton_clicked()

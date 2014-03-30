@@ -2,13 +2,13 @@
 #include "ui_property_widget_base.h"
 
 PropertyWidgetBase::PropertyWidgetBase(QWidget *parent) :
-    QFrame(parent),
-    ui(new Ui::PropertyWidgetBase)
+	QFrame(parent),
+	ui(new Ui::PropertyWidgetBase)
 {
-    ui->setupUi(this);
+	ui->setupUi(this);
 }
 
 PropertyWidgetBase::~PropertyWidgetBase()
 {
-    delete ui;
+	delete ui;
 }

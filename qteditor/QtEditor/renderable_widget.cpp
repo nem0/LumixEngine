@@ -7,15 +7,15 @@
 
 RenderableWidget::RenderableWidget(QWidget *parent) :
 	PropertyWidgetBase(parent),
-    ui(new Ui::RenderableWidget)
+	ui(new Ui::RenderableWidget)
 {
-    ui->setupUi(this);
+	ui->setupUi(this);
 }
 
 
 RenderableWidget::~RenderableWidget()
 {
-    delete ui;
+	delete ui;
 }
 
 
