@@ -38,6 +38,9 @@ class MyRenderDevice : public Lux::IRenderDevice
 int main(int argc, char *argv[])
 {
 	QApplication a(argc, argv);
+	QFile file("editor/stylesheet.qss");
+	file.open(QFile::ReadOnly);
+	a.setStyleSheet(QLatin1String(file.readAll()));
 	MainWindow w;
 	w.show();
 	HWND hwnd = (HWND)w.getSceneView()->widget()->winId();
