@@ -1,11 +1,3 @@
-//
-//  unit_test_manager.cpp
-//  UnitTest
-//
-//  Created by Lukas Jagelka on 14/03/14.
-//  Copyright (c) 2014 LuxEngine. All rights reserved.
-//
-
 #include "core/lux.h"
 #include "unit_tests/unit_test_manager.h"
 #include "unit_tests/platform_defines.h"
