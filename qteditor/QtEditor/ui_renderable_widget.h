@@ -52,7 +52,9 @@ public:
         source = new QWidget(RenderableWidget);
         source->setObjectName(QStringLiteral("source"));
         horizontalLayout = new QHBoxLayout(source);
+        horizontalLayout->setSpacing(6);
         horizontalLayout->setObjectName(QStringLiteral("horizontalLayout"));
+        horizontalLayout->setContentsMargins(0, 0, 0, 0);
         sourceEdit = new QLineEdit(source);
         sourceEdit->setObjectName(QStringLiteral("sourceEdit"));
 

@@ -45,16 +45,18 @@ public:
         dockWidgetContents = new QWidget();
         dockWidgetContents->setObjectName(QStringLiteral("dockWidgetContents"));
         verticalLayout = new QVBoxLayout(dockWidgetContents);
+        verticalLayout->setSpacing(0);
         verticalLayout->setObjectName(QStringLiteral("verticalLayout"));
+        verticalLayout->setContentsMargins(0, 0, 0, 0);
         components = new QToolBox(dockWidgetContents);
         components->setObjectName(QStringLiteral("components"));
         componentA = new QWidget();
         componentA->setObjectName(QStringLiteral("componentA"));
-        componentA->setGeometry(QRect(0, 0, 98, 28));
+        componentA->setGeometry(QRect(0, 0, 251, 339));
         components->addItem(componentA, QStringLiteral("Page 1"));
         componentB = new QWidget();
         componentB->setObjectName(QStringLiteral("componentB"));
-        componentB->setGeometry(QRect(0, 0, 233, 315));
+        componentB->setGeometry(QRect(0, 0, 251, 357));
         components->addItem(componentB, QStringLiteral("Page 2"));
 
         verticalLayout->addWidget(components);
@@ -63,6 +65,7 @@ public:
         widget->setObjectName(QStringLiteral("widget"));
         horizontalLayout = new QHBoxLayout(widget);
         horizontalLayout->setObjectName(QStringLiteral("horizontalLayout"));
+        horizontalLayout->setContentsMargins(0, 0, 0, 0);
         componentTypeCombo = new QComboBox(widget);
         componentTypeCombo->setObjectName(QStringLiteral("componentTypeCombo"));
         QSizePolicy sizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);

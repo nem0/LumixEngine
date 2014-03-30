@@ -15,7 +15,7 @@ class SceneView : public QDockWidget
 	Q_OBJECT
 public:
 	explicit SceneView(QWidget* parent = 0);
-	void setClient(Lux::EditorClient* client) { m_client = client; }
+	void setEditorClient(Lux::EditorClient& client) { m_client = &client; }
 	void setServer(Lux::EditorServer* server) { m_server = server; }
 	void setPipeline(Lux::PipelineInstance& pipeline) { m_pipeline = &pipeline; }
 

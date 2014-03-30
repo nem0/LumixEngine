@@ -16,6 +16,7 @@ class ModelInstance
 {
 	public:
 		ModelInstance(Model& model);
+		~ModelInstance();
 
 		Matrix& getMatrix() { return m_matrix; }
 		Model& getModel() { return m_model; }
