@@ -11,20 +11,20 @@ class RenderableWidget;
 
 class RenderableWidget : public PropertyWidgetBase
 {
-    Q_OBJECT
+	Q_OBJECT
 
 public:
-    explicit RenderableWidget(QWidget *parent = 0);
-    ~RenderableWidget();
+	explicit RenderableWidget(QWidget *parent = 0);
+	~RenderableWidget();
 	virtual const char* getTitle() const override { return "Renderable"; }
 	virtual void onEntityProperties(Lux::PropertyListEvent& event) override;
 
 private slots:
-    void on_browseSource_clicked();
-    void on_sourceEdit_editingFinished();
+	void on_browseSource_clicked();
+	void on_sourceEdit_editingFinished();
 
 private:
-    Ui::RenderableWidget *ui;
+	Ui::RenderableWidget *ui;
 };
 
 #endif // RENDERABLE_WIDGET_H

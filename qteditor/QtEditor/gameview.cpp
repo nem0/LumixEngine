@@ -5,16 +5,16 @@
 
 
 GameView::GameView(QWidget *parent) :
-    QDockWidget(parent),
-    ui(new Ui::GameView)
+	QDockWidget(parent),
+	ui(new Ui::GameView)
 {
-    ui->setupUi(this);
+	ui->setupUi(this);
 	m_pipeline = NULL;
 }
 
 GameView::~GameView()
 {
-    delete ui;
+	delete ui;
 }
 
 

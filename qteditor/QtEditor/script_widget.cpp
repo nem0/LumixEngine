@@ -7,14 +7,14 @@
 
 ScriptWidget::ScriptWidget(QWidget *parent) :
 	PropertyWidgetBase(parent),
-    ui(new Ui::ScriptWidget)
+	ui(new Ui::ScriptWidget)
 {
-    ui->setupUi(this);
+	ui->setupUi(this);
 }
 
 ScriptWidget::~ScriptWidget()
 {
-    delete ui;
+	delete ui;
 }
 
 

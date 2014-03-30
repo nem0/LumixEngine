@@ -9,11 +9,11 @@
 
 
 MainWindow::MainWindow(QWidget *parent) :
-    QMainWindow(parent),
-    ui(new Ui::MainWindow)
+	QMainWindow(parent),
+	ui(new Ui::MainWindow)
 {
 	m_client = NULL;
-    ui->setupUi(this);
+	ui->setupUi(this);
 	ui->centralWidget->hide();
 	m_log = new LogWidget;
 	m_property_view = new PropertyView;
@@ -29,7 +29,7 @@ MainWindow::MainWindow(QWidget *parent) :
 MainWindow::~MainWindow()
 {
 	delete m_log;
-    delete ui;
+	delete ui;
 	delete m_scene_view;
 	delete m_property_view;
 	delete m_game_view;

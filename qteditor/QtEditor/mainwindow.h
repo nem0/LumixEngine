@@ -14,33 +14,27 @@ class MainWindow;
 
 class MainWindow : public QMainWindow
 {
-    Q_OBJECT
+	Q_OBJECT
 
 public:
-    explicit MainWindow(QWidget *parent = 0);
-    ~MainWindow();
+	explicit MainWindow(QWidget *parent = 0);
+	~MainWindow();
 
 	void setEditorClient(Lux::EditorClient& client);
 	class SceneView* getSceneView() const;
 	class GameView* getGameView() const;
 
 private slots:
-    void on_actionLog_triggered();
-
-    void on_actionOpen_triggered();
-
-    void on_actionSave_As_triggered();
-
-    void on_actionCreate_triggered();
-
-    void on_actionProperties_triggered();
-
-    void on_actionE_xit_triggered();
-
-    void on_actionGame_view_triggered();
+	void on_actionLog_triggered();
+	void on_actionOpen_triggered();
+	void on_actionSave_As_triggered();
+	void on_actionCreate_triggered();
+	void on_actionProperties_triggered();
+	void on_actionE_xit_triggered();
+	void on_actionGame_view_triggered();
 
 private:
-    Ui::MainWindow *ui;
+	Ui::MainWindow *ui;
 	Lux::EditorClient* m_client;
 	class LogWidget* m_log;
 	class PropertyView* m_property_view;
