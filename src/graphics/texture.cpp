@@ -227,6 +227,79 @@ void Texture::apply(int unit)
 	glEnable(GL_TEXTURE_2D);
 }
 
+
+bool Texture::loadTGA(FS::IFile* file)
+{
+	int buffer_size = file->size();
+	char* buffer = LUX_NEW_ARRAY(char, buffer_size);
+	file->read(buffer, buffer_size);
+
+	TGAHeader header;
+	memcpy(&header, buffer, sizeof(TGAHeader));
+
+	int color_mode = header.bitsPerPixel / 8;
+	int image_size = header.width * header.height * 4;
+
+	if (header.dataType != 2)
+	{
+		LUX_DELETE_ARRAY(buffer);
+		g_log_error.log("renderer", "Unsupported texture format %s", m_path);
+		return false;
+	}
+
+	if (color_mode < 3)
+	{
+		LUX_DELETE_ARRAY(buffer);
+		g_log_error.log("renderer", "Unsupported color mode %s", m_path);
+		return false;
+	}
+
+	const char* image_src = buffer + sizeof(TGAHeader);
+	unsigned char* image_dest = LUX_NEW_ARRAY(unsigned char, image_size);
+
+	// Targa is BGR, swap to RGB, add alpha and flip Y axis
+	for (long y = 0; y < header.height; y++)
+	{
+		long read_index = y * header.width * color_mode;
+		long write_index = ((header.imageDescriptor & 32) != 0) ? read_index : y * header.width * 4;
+		for (long x = 0; x < header.width; x++)
+		{
+			image_dest[write_index] = image_src[read_index + 2];
+			image_dest[write_index + 1] = image_src[read_index + 1];
+			image_dest[write_index + 2] = image_src[read_index];
+			if (color_mode == 4)
+				image_dest[write_index + 3] = image_src[read_index + 3];
+			else
+				image_dest[write_index + 3] = 255;
+
+			write_index += 4;
+			read_index += color_mode;
+		}
+	}
+
+	glGenTextures(1, &m_id);
+	if (m_id == 0)
+	{
+		LUX_DELETE_ARRAY(buffer);
+		LUX_DELETE_ARRAY(image_dest);
+		return false;
+	}
+
+	glBindTexture(GL_TEXTURE_2D, m_id);
+
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, header.width, header.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_dest);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	/*glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);*/
+
+	LUX_DELETE_ARRAY(image_dest);
+	LUX_DELETE_ARRAY(buffer);
+	return true;
+}
+
+
 bool Texture::loadDDS(FS::IFile* file)
 {
 	DDS::Header hdr;
@@ -241,7 +314,7 @@ bool Texture::loadDDS(FS::IFile* file)
 	if (hdr.dwMagic != DDS::DDS_MAGIC || hdr.dwSize != 124 ||
 		!(hdr.dwFlags & DDS::DDSD_PIXELFORMAT) || !(hdr.dwFlags & DDS::DDSD_CAPS))
 	{
-		g_log_warning.log("renderer", "Corrupted DDS %s\n", m_path.c_str());
+		g_log_error.log("renderer", "Wrong dds format or corrupted dds %s", m_path.c_str());
 		return false;
 	}
 
@@ -286,14 +359,14 @@ bool Texture::loadDDS(FS::IFile* file)
 	}
 	else
 	{
-		g_log_warning.log("renderer", "Unsupported DDS format %s\n", m_path.c_str());
+		g_log_error.log("renderer", "Unsupported DDS format %s", m_path.c_str());
 		return false;
 	}
 
 	glGenTextures(1, &m_id);
 	if (m_id == 0)
 	{
-		g_log_warning.log("renderer", "Error generating OpenGL texture %s\n", m_path.c_str());
+		g_log_error.log("renderer", "Error generating OpenGL texture %s", m_path.c_str());
 		return false;
 	}
 
@@ -322,6 +395,10 @@ bool Texture::loadDDS(FS::IFile* file)
 	{
 		ASSERT(hdr.dwFlags & DDS::DDSD_PITCH);
 		ASSERT(hdr.pixelFormat.dwRGBBitCount == 8);
+		if ((hdr.dwFlags & DDS::DDSD_PITCH) == 0 || hdr.pixelFormat.dwRGBBitCount != 8)
+		{
+			return false;
+		}
 		uint32_t size = hdr.dwPitchOrLinearSize * height;
 		ASSERT(size == width * height * li->blockBytes);
 		unsigned char * data = LUX_NEW_ARRAY(unsigned char, size);
@@ -383,71 +460,7 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		}
 		else
 		{
-			int buffer_size = file->size();
-			char* buffer = LUX_NEW_ARRAY(char, buffer_size);
-			file->read(buffer, buffer_size);
-
-			TGAHeader header;
-			memcpy(&header, buffer, sizeof(TGAHeader));
-
-			int color_mode = header.bitsPerPixel / 8;
-			int image_size = header.width * header.height * 4;
-
-			if (header.dataType != 2)
-			{
-				LUX_DELETE_ARRAY(buffer);
-				g_log_warning.log("renderer", "Unsupported texture format %s", m_path);
-				return;
-			}
-
-			if (color_mode < 3)
-			{
-				LUX_DELETE_ARRAY(buffer);
-				g_log_warning.log("renderer", "Unsupported color mode %s", m_path);
-				return;
-			}
-
-			const char* image_src = buffer + sizeof(TGAHeader);
-			unsigned char* image_dest = LUX_NEW_ARRAY(unsigned char, image_size);
-
-			// Targa is BGR, swap to RGB, add alpha and flip Y axis
-			for (long y = 0; y < header.height; y++)
-			{
-				long read_index = y * header.width * color_mode;
-				long write_index = ((header.imageDescriptor & 32) != 0) ? read_index : y * header.width * 4;
-				for (long x = 0; x < header.width; x++)
-				{
-					image_dest[write_index] = image_src[read_index + 2];
-					image_dest[write_index + 1] = image_src[read_index + 1];
-					image_dest[write_index + 2] = image_src[read_index];
-					if (color_mode == 4)
-						image_dest[write_index + 3] = image_src[read_index + 3];
-					else
-						image_dest[write_index + 3] = 255;
-
-					write_index += 4;
-					read_index += color_mode;
-				}
-			}
-
-			glGenTextures(1, &m_id);
-			if (m_id == 0)
-			{
-				LUX_DELETE_ARRAY(buffer);
-				return;
-			}
-
-			glBindTexture(GL_TEXTURE_2D, m_id);
-
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, header.width, header.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_dest);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-			/*glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);*/
-
-			LUX_DELETE_ARRAY(image_dest);
-			LUX_DELETE_ARRAY(buffer);
+			bool loaded = loadTGA(file);
 		}
 
 		m_size = file->size();
@@ -455,11 +468,12 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	}
 	else
 	{
-		g_log_warning.log("renderer", "Error loading texture %s\n", m_path.c_str());
+		g_log_error.log("renderer", "Error loading texture %s", m_path.c_str());
 	}
 	
 	fs.close(file);
 }
+
 
 void Texture::doUnload(void)
 {
