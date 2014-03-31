@@ -75,14 +75,14 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		if (header.dataType != 2)
 		{
 			LUX_DELETE_ARRAY(buffer);
-			g_log_warning.log("renderer", "Unsupported texture format %s", m_path);
+			g_log_warning.log("renderer", "Unsupported texture format %s", m_path.c_str());
 			return;
 		}
 	
 		if (color_mode < 3)
 		{
 			LUX_DELETE_ARRAY(buffer);
-			g_log_warning.log("renderer", "Unsupported color mode %s", m_path);
+			g_log_warning.log("renderer", "Unsupported color mode %s", m_path.c_str());
 			return;
 		}
 	
