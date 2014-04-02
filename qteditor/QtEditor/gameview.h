@@ -18,7 +18,7 @@ class GameView : public QDockWidget
 	Q_OBJECT
 
 public:
-	explicit GameView(QWidget *parent = 0);
+	explicit GameView(QWidget *parent = NULL);
 	virtual ~GameView();
 
 	QWidget* getContentWidget() const;
