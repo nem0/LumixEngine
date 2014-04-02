@@ -1,5 +1,5 @@
-#ifndef SCENEVIEW_H
-#define SCENEVIEW_H
+#pragma once
+
 
 #include <QDockWidget>
 
@@ -38,4 +38,3 @@ public slots:
 
 };
 
-#endif // SCENEVIEW_H

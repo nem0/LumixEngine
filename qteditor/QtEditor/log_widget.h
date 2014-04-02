@@ -1,5 +1,4 @@
-#ifndef LOG_WIDGET_H
-#define LOG_WIDGET_H
+#pragma once
 
 #include <QDockWidget>
 
@@ -22,7 +21,6 @@ private:
 	void onInfo(const char* system, const char* message);
 
 private:
-	Ui::LogWidget *ui;
+	Ui::LogWidget *m_ui;
 };
 
-#endif // LOG_WIDGET_H

@@ -11,9 +11,9 @@
 
 PropertyView::PropertyView(QWidget *parent) :
 	QDockWidget(parent),
-	ui(new Ui::PropertyView)
+	m_ui(new Ui::PropertyView)
 {
-	ui->setupUi(this);
+	m_ui->setupUi(this);
 }
 
 
@@ -38,9 +38,9 @@ void PropertyView::onPropertyList(Lux::Event& event)
 void PropertyView::onEntitySelected(Lux::Event& event)
 {
 	m_component_uis.clear();
-	while (ui->components->count() > 0)
+	while (m_ui->components->count() > 0)
 	{
-		ui->components->removeItem(0);
+		m_ui->components->removeItem(0);
 	}
 	Lux::EntitySelectedEvent& e = static_cast<Lux::EntitySelectedEvent&>(event);
 	//m_selected_entity = e.index;
@@ -51,7 +51,7 @@ void PropertyView::onEntitySelected(Lux::Event& event)
 		PropertyWidgetBase* widget = NULL;
 		if (e.components[i] == crc32("box_rigid_actor"))
 		{
-			ui->components->addItem(new QFrame(), "Box Rigid Actor");
+			m_ui->components->addItem(new QFrame(), "Box Rigid Actor");
 		}
 		else if (e.components[i] == crc32("renderable"))
 		{
@@ -59,7 +59,7 @@ void PropertyView::onEntitySelected(Lux::Event& event)
 		}
 		else if (e.components[i] == crc32("animable"))
 		{
-			ui->components->addItem(new QFrame(), "Animable");
+			m_ui->components->addItem(new QFrame(), "Animable");
 		}
 		else if (e.components[i] == crc32("script"))
 		{
@@ -67,14 +67,14 @@ void PropertyView::onEntitySelected(Lux::Event& event)
 		}
 		else if (e.components[i] == crc32("light"))
 		{
-			ui->components->addItem(new QFrame(), "Point Light");
+			m_ui->components->addItem(new QFrame(), "Point Light");
 		}
 		else
 		{
 			assert(false);
 		}
 		widget->setEditorClient(*m_client);
-		ui->components->addItem(widget, widget->getTitle());
+		m_ui->components->addItem(widget, widget->getTitle());
 		m_component_uis.push(widget);
 	}
 }
@@ -82,12 +82,12 @@ void PropertyView::onEntitySelected(Lux::Event& event)
 
 PropertyView::~PropertyView()
 {
-	delete ui;
+	delete m_ui;
 }
 
 void PropertyView::on_addComponentButton_clicked()
 {
-	QByteArray s = ui->componentTypeCombo->currentText().toLocal8Bit();
+	QByteArray s = m_ui->componentTypeCombo->currentText().toLocal8Bit();
 	const char* c = s.data();
 	/// TODO
 	if (strcmp(c, "Script") == 0)

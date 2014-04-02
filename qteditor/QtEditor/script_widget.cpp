@@ -7,14 +7,14 @@
 
 ScriptWidget::ScriptWidget(QWidget *parent) :
 	PropertyWidgetBase(parent),
-	ui(new Ui::ScriptWidget)
+	m_ui(new Ui::ScriptWidget)
 {
-	ui->setupUi(this);
+	m_ui->setupUi(this);
 }
 
 ScriptWidget::~ScriptWidget()
 {
-	delete ui;
+	delete m_ui;
 }
 
 
@@ -28,7 +28,7 @@ void ScriptWidget::onEntityProperties(Lux::PropertyListEvent& event)
 			{
 				if (event.properties[i].data_size > 0)
 				{
-					ui->sourceEdit->setText((char*)event.properties[i].data);
+					m_ui->sourceEdit->setText((char*)event.properties[i].data);
 				}
 			}
 		}
@@ -42,16 +42,16 @@ void ScriptWidget::on_browseSourceButton_clicked()
 	int len = (int)strlen(getClient()->getBasePath());
 	if (strncmp(str.toLocal8Bit().data(), getClient()->getBasePath(), len) == 0)
 	{
-		ui->sourceEdit->setText(str.toLocal8Bit().data() + len);
+		m_ui->sourceEdit->setText(str.toLocal8Bit().data() + len);
 	}
 	else
 	{
-		ui->sourceEdit->setText(str);
+		m_ui->sourceEdit->setText(str);
 	}
-	getClient()->setComponentProperty("script", "source", ui->sourceEdit->text().toLocal8Bit().data(), ui->sourceEdit->text().size());
+	getClient()->setComponentProperty("script", "source", m_ui->sourceEdit->text().toLocal8Bit().data(), m_ui->sourceEdit->text().size());
 }
 
 void ScriptWidget::on_sourceEdit_editingFinished()
 {
-	getClient()->setComponentProperty("script", "source", ui->sourceEdit->text().toLocal8Bit().data(), ui->sourceEdit->text().size());
+	getClient()->setComponentProperty("script", "source", m_ui->sourceEdit->text().toLocal8Bit().data(), m_ui->sourceEdit->text().size());
 }

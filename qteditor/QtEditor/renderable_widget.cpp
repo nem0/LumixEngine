@@ -7,15 +7,15 @@
 
 RenderableWidget::RenderableWidget(QWidget *parent) :
 	PropertyWidgetBase(parent),
-	ui(new Ui::RenderableWidget)
+	m_ui(new Ui::RenderableWidget)
 {
-	ui->setupUi(this);
+	m_ui->setupUi(this);
 }
 
 
 RenderableWidget::~RenderableWidget()
 {
-	delete ui;
+	delete m_ui;
 }
 
 
@@ -29,7 +29,7 @@ void RenderableWidget::onEntityProperties(Lux::PropertyListEvent& event)
 			{
 				if (event.properties[i].data_size > 0)
 				{
-					ui->sourceEdit->setText((char*)event.properties[i].data);
+					m_ui->sourceEdit->setText((char*)event.properties[i].data);
 				}
 			}
 		}
@@ -43,18 +43,18 @@ void RenderableWidget::on_browseSource_clicked()
 	int len = (int)strlen(getClient()->getBasePath());
 	if (strncmp(str.toLocal8Bit().data(), getClient()->getBasePath(), len) == 0)
 	{
-		ui->sourceEdit->setText(str.toLocal8Bit().data() + len);
+		m_ui->sourceEdit->setText(str.toLocal8Bit().data() + len);
 	}
 	else
 	{
-		ui->sourceEdit->setText(str);
+		m_ui->sourceEdit->setText(str);
 	}
-	getClient()->setComponentProperty("renderable", "source", ui->sourceEdit->text().toLocal8Bit().data(), ui->sourceEdit->text().size());
+	getClient()->setComponentProperty("renderable", "source", m_ui->sourceEdit->text().toLocal8Bit().data(), m_ui->sourceEdit->text().size());
 }
 
 
 void RenderableWidget::on_sourceEdit_editingFinished()
 {
-	getClient()->setComponentProperty("renderable", "source", ui->sourceEdit->text().toLocal8Bit().data(), ui->sourceEdit->text().size());
+	getClient()->setComponentProperty("renderable", "source", m_ui->sourceEdit->text().toLocal8Bit().data(), m_ui->sourceEdit->text().size());
 }
 

@@ -6,21 +6,21 @@
 
 GameView::GameView(QWidget *parent) :
 	QDockWidget(parent),
-	ui(new Ui::GameView)
+	m_ui(new Ui::GameView)
 {
-	ui->setupUi(this);
+	m_ui->setupUi(this);
 	m_pipeline = NULL;
 }
 
 GameView::~GameView()
 {
-	delete ui;
+	delete m_ui;
 }
 
 
 QWidget* GameView::getContentWidget() const
 {
-	return ui->viewFrame;
+	return m_ui->viewFrame;
 }
 
 

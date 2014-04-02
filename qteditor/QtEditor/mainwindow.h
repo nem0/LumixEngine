@@ -1,5 +1,4 @@
-#ifndef MAINWINDOW_H
-#define MAINWINDOW_H
+#pragma once
 
 #include <QMainWindow>
 
@@ -17,7 +16,7 @@ class MainWindow : public QMainWindow
 	Q_OBJECT
 
 public:
-	explicit MainWindow(QWidget *parent = 0);
+	explicit MainWindow(QWidget *parent = NULL);
 	~MainWindow();
 
 	void setEditorClient(Lux::EditorClient& client);
@@ -35,7 +34,7 @@ private slots:
 	virtual void closeEvent(QCloseEvent *event) override;
 
 private:
-	Ui::MainWindow *ui;
+	Ui::MainWindow *m_ui;
 	Lux::EditorClient* m_client;
 	class LogWidget* m_log;
 	class PropertyView* m_property_view;
@@ -44,4 +43,3 @@ private:
 	class AssetBrowser* m_asset_browser;
 };
 
-#endif // MAINWINDOW_H

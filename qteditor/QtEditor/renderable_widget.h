@@ -1,5 +1,4 @@
-#ifndef RENDERABLE_WIDGET_H
-#define RENDERABLE_WIDGET_H
+#pragma once
 
 #include <QFrame>
 #include "property_widget_base.h"
@@ -24,7 +23,5 @@ private slots:
 	void on_sourceEdit_editingFinished();
 
 private:
-	Ui::RenderableWidget *ui;
+	Ui::RenderableWidget *m_ui;
 };
-
-#endif // RENDERABLE_WIDGET_H

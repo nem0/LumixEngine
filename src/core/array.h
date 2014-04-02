@@ -112,7 +112,7 @@ class Array<T, Allocator, false>
 			{
 				grow();
 			}
-			new ((char*)(m_data + m_size)) T;
+			new ((char*)(m_data + m_size)) T();
 			++m_size;
 			return m_data[m_size - 1];
 		}

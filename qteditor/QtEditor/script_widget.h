@@ -1,5 +1,4 @@
-#ifndef SCRIPT_WIDGET_H
-#define SCRIPT_WIDGET_H
+#pragma once
 
 #include <QFrame>
 #include "property_widget_base.h"
@@ -23,7 +22,6 @@ private slots:
 	void on_sourceEdit_editingFinished();
 
 private:
-	Ui::ScriptWidget *ui;
+	Ui::ScriptWidget *m_ui;
 };
 
-#endif // SCRIPT_WIDGET_H
