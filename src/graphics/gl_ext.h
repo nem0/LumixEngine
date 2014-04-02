@@ -19,6 +19,15 @@ const GLuint GL_RGB32F = 0x8815;
 const GLuint GL_COLOR_ATTACHMENT0 = 0x8CE0;
 const GLuint GL_DEPTH_COMPONENT24 = 0x81A6;
 const GLuint GL_DEPTH_ATTACHMENT = 0x8D00;
+const GLuint GL_COMPRESSED_RGBA_S3TC_DXT1 = 0x83F1;
+const GLuint GL_COMPRESSED_RGBA_S3TC_DXT3 = 0x83F2;
+const GLuint GL_COMPRESSED_RGBA_S3TC_DXT5 = 0x83F3;
+const GLuint GL_BGR = 0x80E0;
+const GLuint GL_BGRA = 0x80E1;
+const GLuint GL_UNSIGNED_SHORT_5_6_5 = 0x8363;
+const GLuint GL_UNSIGNED_SHORT_1_5_5_5_REV = 0x8366;
+const GLuint GL_GENERATE_MIPMAP = 0x8191;
+const GLuint GL_TEXTURE_MAX_LEVEL = 0x813D;
 
 
 typedef ptrdiff_t GLsizeiptr;
@@ -56,7 +65,7 @@ typedef void (WINAPI* PFNGLFRAMEBUFFERTEXTURE2DPROC)(GLenum target, GLenum attac
 typedef void (WINAPI* PFNGLRENDERBUFFERSTORAGEPROC)(GLenum target, GLenum internalformat, GLsizei width, GLsizei height);
 typedef void (WINAPI* PFNGLBINDRENDERBUFFERPROC)(GLenum target, GLuint renderbuffer);
 typedef void (WINAPI* PFNGLDELETEFRAMEBUFFERSPROC)(GLsizei n, const GLuint *framebuffers);
-
+typedef void (WINAPI* PFNGLCOMPRESSEDTEXIMAGE2D)(GLenum target, GLint level, GLenum internalformat, GLsizei width, GLsizei height, GLint border, GLsizei imageSize, const GLvoid *data);
 
 extern PFNGLBINDBUFFERPROC glBindBuffer;
 extern PFNGLDELETEBUFFERSPROC glDeleteBuffers;
@@ -89,6 +98,7 @@ extern PFNGLFRAMEBUFFERTEXTURE2DPROC glFramebufferTexture2D;
 extern PFNGLRENDERBUFFERSTORAGEPROC glRenderbufferStorage;
 extern PFNGLBINDRENDERBUFFERPROC glBindRenderbuffer;
 extern PFNGLDELETEFRAMEBUFFERSPROC glDeleteFramebuffers;
+extern PFNGLCOMPRESSEDTEXIMAGE2D glCompressedTexImage2D;
 
 
 void loadGLExtensions();
