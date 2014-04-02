@@ -10,6 +10,7 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 TARGET = ../../../bin/Win32_Debug/QtEditor
 TEMPLATE = app
+CONFIG -= flat
 
 
 SOURCES += main.cpp\
@@ -21,7 +22,9 @@ SOURCES += main.cpp\
     property_widget_base.cpp \
     script_widget.cpp \
     gameview.cpp \
-    assetbrowser.cpp
+    assetbrowser.cpp \
+    scripts/scriptcompiler.cpp \
+    scripts/scriptcompilerwidget.cpp
 
 HEADERS  += mainwindow.h \
     sceneview.h \ 
@@ -31,7 +34,9 @@ HEADERS  += mainwindow.h \
     property_widget_base.h \
     script_widget.h \
     gameview.h \
-    assetbrowser.h
+    assetbrowser.h \
+    scripts/scriptcompiler.h \
+    scripts/scriptcompilerwidget.h
 
 FORMS    += mainwindow.ui \
     logwidget.ui \
@@ -40,7 +45,8 @@ FORMS    += mainwindow.ui \
     property_widget_base.ui \
     script_widget.ui \
     gameview.ui \
-    assetbrowser.ui
+    assetbrowser.ui \
+    scripts/scriptcompilerwidget.ui
 
 win32
 {

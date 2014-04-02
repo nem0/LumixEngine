@@ -1,6 +1,7 @@
 #include "scriptcompiler.h"
 #include <qdiriterator.h>
 #include <qprocess.h>
+#include <qtextstream.h>
 #include "core/crc32.h"
 #include "core/log.h"
 
@@ -73,6 +74,10 @@ void ScriptCompiler::compilerFinish(int exitCode)
 			uint32_t hash = crc32(m_processes[i].m_path.c_str());
 			m_log[hash] = s.toLatin1().data();
 			m_status[hash] = exitCode == 0 ? SUCCESS : FAILURE;
+			
+			QString msg;
+			msg.sprintf("Script %s compiled", m_processes[i].m_path.c_str());
+			emit messageLogged(msg);
 			break;
 		}
 	}

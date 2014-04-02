@@ -8,6 +8,7 @@
 #include "sceneview.h"
 #include "gameview.h"
 #include "assetbrowser.h"
+#include "scripts/scriptcompilerwidget.h"
 
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -22,13 +23,16 @@ MainWindow::MainWindow(QWidget *parent) :
 	m_scene_view = new SceneView;
 	m_game_view = new GameView;
 	m_asset_browser = new AssetBrowser;
+	m_script_compiler_ui = new ScriptCompilerWidget;
 	QSettings settings("Lux", "QtEditor");
 	restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
 	addDockWidget(static_cast<Qt::DockWidgetArea>(1), m_game_view);
 	addDockWidget(static_cast<Qt::DockWidgetArea>(8), m_log);
+	addDockWidget(static_cast<Qt::DockWidgetArea>(8), m_script_compiler_ui);
 	addDockWidget(static_cast<Qt::DockWidgetArea>(1), m_property_view);
 	addDockWidget(static_cast<Qt::DockWidgetArea>(2), m_scene_view);
 	addDockWidget(static_cast<Qt::DockWidgetArea>(2), m_asset_browser);
+
 
 	restoreState(settings.value("mainWindowState").toByteArray());
 }

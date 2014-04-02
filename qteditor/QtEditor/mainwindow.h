@@ -41,5 +41,6 @@ private:
 	class SceneView* m_scene_view;
 	class GameView* m_game_view;
 	class AssetBrowser* m_asset_browser;
+	class ScriptCompilerWidget* m_script_compiler_ui;
 };
 
