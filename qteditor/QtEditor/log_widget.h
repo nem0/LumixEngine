@@ -11,7 +11,7 @@ class LogWidget : public QDockWidget
 	Q_OBJECT
 
 public:
-	explicit LogWidget(QWidget *parent = 0);
+	explicit LogWidget(QWidget *parent = NULL);
 	~LogWidget();
 
 private slots:
