@@ -32,6 +32,7 @@ PFNGLFRAMEBUFFERTEXTURE2DPROC glFramebufferTexture2D;
 PFNGLRENDERBUFFERSTORAGEPROC glRenderbufferStorage;
 PFNGLBINDRENDERBUFFERPROC glBindRenderbuffer;
 PFNGLDELETEFRAMEBUFFERSPROC glDeleteFramebuffers;
+PFNGLCOMPRESSEDTEXIMAGE2D glCompressedTexImage2D;
 
 
 PROC loadGLExtension(const char* name, float gl_version)
@@ -85,5 +86,5 @@ void loadGLExtensions()
 	glProgramUniform1i = (PFNGLPROGRAMUNIFORM1IPROC)loadGLExtension("glProgramUniform1i", gl_version);
 	glProgramUniform1f = (PFNGLPROGRAMUNIFORM1FPROC)loadGLExtension("glProgramUniform1f", gl_version);
 	glProgramUniform3f = (PFNGLPROGRAMUNIFORM3FPROC)loadGLExtension("glProgramUniform3f", gl_version);
-
+	glCompressedTexImage2D = (PFNGLCOMPRESSEDTEXIMAGE2D)loadGLExtension("glCompressedTexImage2D", gl_version);
 }

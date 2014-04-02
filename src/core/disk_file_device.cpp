@@ -26,12 +26,12 @@ namespace Lux
 				m_file.close();
 			}
 
-			virtual bool read(void* buffer, intptr_t size) LUX_OVERRIDE
+			virtual bool read(void* buffer, size_t size) LUX_OVERRIDE
 			{
 				return m_file.read(buffer, size);
 			}
 
-			virtual bool write(const void* buffer, intptr_t size) LUX_OVERRIDE
+			virtual bool write(const void* buffer, size_t size) LUX_OVERRIDE
 			{
 				return m_file.write(buffer, size);
 			}
@@ -41,17 +41,17 @@ namespace Lux
 				return NULL;
 			}
 
-			virtual intptr_t size() LUX_OVERRIDE
+			virtual size_t size() LUX_OVERRIDE
 			{
 				return m_file.size();
 			}
 
-			virtual intptr_t seek(SeekMode base, intptr_t pos) LUX_OVERRIDE
+			virtual size_t seek(SeekMode base, size_t pos) LUX_OVERRIDE
 			{
 				return m_file.seek(base, pos);
 			}
 
-			virtual intptr_t pos() LUX_OVERRIDE
+			virtual size_t pos() LUX_OVERRIDE
 			{
 				return m_file.pos();
 			}
