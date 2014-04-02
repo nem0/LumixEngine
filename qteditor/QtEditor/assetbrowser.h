@@ -1,5 +1,4 @@
-#ifndef ASSETBROWSER_H
-#define ASSETBROWSER_H
+#pragma once
 
 #include <QDockWidget>
 
@@ -25,9 +24,7 @@ private slots:
 	void on_treeView_doubleClicked(const QModelIndex &index);
 
 private:
-	Ui::AssetBrowser *ui;
+	Ui::AssetBrowser *m_ui;
 	class QFileSystemModel* m_model;
 	Lux::EditorClient* m_client;
 };
-
-#endif // ASSETBROWSER_H

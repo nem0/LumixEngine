@@ -331,7 +331,7 @@ EditorIconHit EditorServerImpl::raycastEditorIcons(Component camera, const Vec3&
 {
 	EditorIconHit hit;
 	hit.m_t = -1;
-	for (int i = 0; i < m_editor_icons.size(); ++i)
+	for (int i = 0, c = m_editor_icons.size(); i < c;  ++i)
 	{
 		float t = m_editor_icons[i]->hit(m_engine.getRenderer(), camera, origin, dir);
 		if (t >= 0)

@@ -15,7 +15,7 @@ namespace Lux
 	class LUX_ENGINE_API EditorClient
 	{
 		public:
-			EditorClient() { m_impl = 0; }
+			EditorClient() { m_impl = NULL; }
 
 			bool create(const char* base_path);
 			void destroy();

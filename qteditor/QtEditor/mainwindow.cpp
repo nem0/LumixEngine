@@ -12,11 +12,11 @@
 
 MainWindow::MainWindow(QWidget *parent) :
 	QMainWindow(parent),
-	ui(new Ui::MainWindow)
+	m_ui(new Ui::MainWindow)
 {
 	m_client = NULL;
-	ui->setupUi(this);
-	ui->centralWidget->hide();
+	m_ui->setupUi(this);
+	m_ui->centralWidget->hide();
 	m_log = new LogWidget;
 	m_property_view = new PropertyView;
 	m_scene_view = new SceneView;
@@ -45,7 +45,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
 MainWindow::~MainWindow()
 {
 	delete m_log;
-	delete ui;
+	delete m_ui;
 	delete m_scene_view;
 	delete m_property_view;
 	delete m_game_view;

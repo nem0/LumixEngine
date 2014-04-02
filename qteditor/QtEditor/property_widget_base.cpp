@@ -3,12 +3,12 @@
 
 PropertyWidgetBase::PropertyWidgetBase(QWidget *parent) :
 	QFrame(parent),
-	ui(new Ui::PropertyWidgetBase)
+	m_ui(new Ui::PropertyWidgetBase)
 {
-	ui->setupUi(this);
+	m_ui->setupUi(this);
 }
 
 PropertyWidgetBase::~PropertyWidgetBase()
 {
-	delete ui;
+	delete m_ui;
 }

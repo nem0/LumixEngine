@@ -11,10 +11,11 @@
 #include "gameview.h"
 
 
+/// TODO refactor this
 class MyRenderDevice : public Lux::IRenderDevice
 {
 	public:
-	MyRenderDevice(Lux::Renderer& renderer)
+	explicit MyRenderDevice(Lux::Renderer& renderer)
 	{
 		m_renderer = &renderer;
 		m_pipeline = Lux::PipelineInstance::create(*m_renderer->loadPipeline("pipelines/main.json"));
@@ -75,6 +76,7 @@ int main(int argc, char *argv[])
 		GetKeyboardState(keys);
 		if (w.getSceneView()->hasFocus())
 		{
+			 /// TODO refactor
 			if (keys['W'] >> 7)
 			{
 				client.navigate(1, 0, 0);
@@ -82,6 +84,14 @@ int main(int argc, char *argv[])
 			else if (keys['S'] >> 7)
 			{
 				client.navigate(-1, 0, 0);
+			}
+			if (keys['A'] >> 7)
+			{
+				client.navigate(0, -1, 0);
+			}
+			else if (keys['D'] >> 7)
+			{
+				client.navigate(0, 1, 0);
 			}
 		}
 	}

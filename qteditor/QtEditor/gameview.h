@@ -1,5 +1,5 @@
-#ifndef GAMEVIEW_H
-#define GAMEVIEW_H
+#pragma once
+
 
 #include <QDockWidget>
 
@@ -19,7 +19,7 @@ class GameView : public QDockWidget
 
 public:
 	explicit GameView(QWidget *parent = 0);
-	~GameView();
+	virtual ~GameView();
 
 	QWidget* getContentWidget() const;
 	void setPipeline(Lux::PipelineInstance& pipeline) { m_pipeline = &pipeline; }
@@ -28,8 +28,7 @@ private:
 	virtual void resizeEvent(QResizeEvent *) override;
 
 private:
-	Ui::GameView *ui;
+	Ui::GameView *m_ui;
 	Lux::PipelineInstance* m_pipeline;
 };
 
-#endif // GAMEVIEW_H
