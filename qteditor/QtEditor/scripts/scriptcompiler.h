@@ -32,6 +32,7 @@ public:
 	const char* getLog(const char* path);
 
 signals:
+	void messageLogged(const QString& message);
 
 public slots:
 	void compilerFinish(int exitCode);

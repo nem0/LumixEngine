@@ -18,6 +18,7 @@
 #include <QtWidgets/QHeaderView>
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QListView>
+#include <QtWidgets/QListWidget>
 #include <QtWidgets/QPushButton>
 #include <QtWidgets/QSpacerItem>
 #include <QtWidgets/QSplitter>
@@ -37,6 +38,10 @@ public:
     QVBoxLayout *verticalLayout;
     QLabel *label;
     QListView *scriptListView;
+    QWidget *widget_2;
+    QVBoxLayout *verticalLayout_4;
+    QLabel *label_2;
+    QListWidget *logView;
     QWidget *widget_3;
     QVBoxLayout *verticalLayout_3;
     QLabel *label_3;
@@ -55,14 +60,8 @@ public:
         dockWidgetContents->setObjectName(QStringLiteral("dockWidgetContents"));
         verticalLayout_2 = new QVBoxLayout(dockWidgetContents);
         verticalLayout_2->setObjectName(QStringLiteral("verticalLayout_2"));
-        verticalLayout_2->setContentsMargins(0, 0, 0, 0);
         splitter = new QSplitter(dockWidgetContents);
         splitter->setObjectName(QStringLiteral("splitter"));
-        QSizePolicy sizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-        sizePolicy.setHorizontalStretch(0);
-        sizePolicy.setVerticalStretch(0);
-        sizePolicy.setHeightForWidth(splitter->sizePolicy().hasHeightForWidth());
-        splitter->setSizePolicy(sizePolicy);
         splitter->setOrientation(Qt::Horizontal);
         widget = new QWidget(splitter);
         widget->setObjectName(QStringLiteral("widget"));
@@ -80,6 +79,22 @@ public:
         verticalLayout->addWidget(scriptListView);
 
         splitter->addWidget(widget);
+        widget_2 = new QWidget(splitter);
+        widget_2->setObjectName(QStringLiteral("widget_2"));
+        verticalLayout_4 = new QVBoxLayout(widget_2);
+        verticalLayout_4->setObjectName(QStringLiteral("verticalLayout_4"));
+        verticalLayout_4->setContentsMargins(0, 0, 0, 0);
+        label_2 = new QLabel(widget_2);
+        label_2->setObjectName(QStringLiteral("label_2"));
+
+        verticalLayout_4->addWidget(label_2);
+
+        logView = new QListWidget(widget_2);
+        logView->setObjectName(QStringLiteral("logView"));
+
+        verticalLayout_4->addWidget(logView);
+
+        splitter->addWidget(widget_2);
         widget_3 = new QWidget(splitter);
         widget_3->setObjectName(QStringLiteral("widget_3"));
         verticalLayout_3 = new QVBoxLayout(widget_3);
@@ -102,6 +117,11 @@ public:
 
         widget_4 = new QWidget(dockWidgetContents);
         widget_4->setObjectName(QStringLiteral("widget_4"));
+        QSizePolicy sizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
+        sizePolicy.setHorizontalStretch(0);
+        sizePolicy.setVerticalStretch(0);
+        sizePolicy.setHeightForWidth(widget_4->sizePolicy().hasHeightForWidth());
+        widget_4->setSizePolicy(sizePolicy);
         horizontalLayout = new QHBoxLayout(widget_4);
         horizontalLayout->setObjectName(QStringLiteral("horizontalLayout"));
         horizontalLayout->setContentsMargins(0, 0, 0, 0);
@@ -128,6 +148,7 @@ public:
     {
         ScriptCompilerWidget->setWindowTitle(QApplication::translate("ScriptCompilerWidget", "Script compiler", 0));
         label->setText(QApplication::translate("ScriptCompilerWidget", "Scripts", 0));
+        label_2->setText(QApplication::translate("ScriptCompilerWidget", "Log", 0));
         label_3->setText(QApplication::translate("ScriptCompilerWidget", "Compiler output", 0));
         compileAllButton->setText(QApplication::translate("ScriptCompilerWidget", "Compile All", 0));
     } // retranslateUi
