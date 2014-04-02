@@ -84,7 +84,7 @@ namespace Lux
 			m_impl = NULL;
 		}
 
-		bool OsFile::write(const void* data, intptr_t size)
+		bool OsFile::write(const void* data, size_t size)
 		{
 			ASSERT(NULL != m_impl);
 			size_t written = 0;
@@ -92,7 +92,7 @@ namespace Lux
 			return size == written;
 		}
 
-		bool OsFile::read(void* data, intptr_t size)
+		bool OsFile::read(void* data, size_t size)
 		{
 			ASSERT(NULL != m_impl);
 			size_t readed = 0;
@@ -100,19 +100,19 @@ namespace Lux
 			return size == readed;
 		}
 
-		intptr_t OsFile::size()
+		size_t OsFile::size()
 		{
 			ASSERT(NULL != m_impl);
 			return ::GetFileSize(m_impl->m_file, 0);
 		}
 
-		intptr_t OsFile::pos()
+		size_t OsFile::pos()
 		{
 			ASSERT(NULL != m_impl);
 			return ::SetFilePointer(m_impl->m_file, 0, NULL, FILE_CURRENT);
 		}
 
-		intptr_t OsFile::seek(SeekMode base, intptr_t pos)
+		size_t OsFile::seek(SeekMode base, size_t pos)
 		{
 			ASSERT(NULL != m_impl);
 			int dir = 0;
