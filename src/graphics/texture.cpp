@@ -322,6 +322,11 @@ bool Texture::loadDDS(FS::IFile* file)
 	height = hdr.dwHeight;
 	ASSERT(!(width & (width - 1)));
 	ASSERT(!(height & (height - 1)));
+	if ((width & (width - 1)) || (height & (height - 1)))
+	{
+		g_log_error.log("renderer", "Wrong dds format %s", m_path.c_str());
+		return false;
+	}
 
 	DDS::LoadInfo* li;
 
@@ -379,7 +384,7 @@ bool Texture::loadDDS(FS::IFile* file)
 		uint32_t size = max(li->divSize, width) / li->divSize * max(li->divSize, height) / li->divSize * li->blockBytes;
 		ASSERT(size == hdr.dwPitchOrLinearSize);
 		ASSERT(hdr.dwFlags & DDS::DDSD_LINEARSIZE);
-		if (size != hdr.dwPitchOrLinearSize || hdr.dwFlags & DDS::DDSD_LINEARSIZE)
+		if (size != hdr.dwPitchOrLinearSize || (hdr.dwFlags & DDS::DDSD_LINEARSIZE) == 0)
 		{
 			glDeleteTextures(1, &m_id);
 			g_log_error.log("renderer", "Unsupported DDS format %s", m_path.c_str());
@@ -409,6 +414,12 @@ bool Texture::loadDDS(FS::IFile* file)
 		}
 		uint32_t size = hdr.dwPitchOrLinearSize * height;
 		ASSERT(size == width * height * li->blockBytes);
+		if (size != width * height * li->blockBytes)
+		{
+			glDeleteTextures(1, &m_id);
+			g_log_error.log("renderer", "Unsupported DDS format or corrupted DDS %s", m_path.c_str());
+			return false;
+		}
 		unsigned char * data = LUX_NEW_ARRAY(unsigned char, size);
 		uint32_t palette[256];
 		uint32_t * unpacked = LUX_NEW_ARRAY(uint32_t, size);
