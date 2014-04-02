@@ -16,13 +16,13 @@ namespace Lux
 			bool open(const char* path, Mode mode);
 			void close();
 
-			bool write(const void* data, intptr_t size);
-			bool read(void* data, intptr_t size);
+			bool write(const void* data, size_t size);
+			bool read(void* data, size_t size);
 
-			intptr_t size();
-			intptr_t pos();
+			size_t size();
+			size_t pos();
 
-			intptr_t seek(SeekMode base, intptr_t pos);
+			size_t seek(SeekMode base, size_t pos);
 			void writeEOF();
 
 		private:

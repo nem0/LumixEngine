@@ -134,6 +134,13 @@ namespace Lux
 			return m_implementation->m_priority;
 		}
 
+		uint32_t Task::getExitCode() const
+		{
+			uint32_t exit_code = -1;
+			::GetExitCodeThread(m_implementation->m_handle, (LPDWORD)&exit_code);
+			return exit_code;
+		}
+
 		bool Task::isRunning() const
 		{
 			return m_implementation->m_is_running;
@@ -157,6 +164,13 @@ namespace Lux
 			{
 				Sleep(0);
 			}
+		}
+
+		void Task::exit(int32_t exitCode)
+		{
+			m_implementation->m_exited = true;
+			m_implementation->m_is_running = false;
+			::ExitThread(exitCode);
 		}
 
 		static const DWORD MS_VC_EXCEPTION=0x406D1388;

@@ -25,6 +25,8 @@ class Texture : public Resource
 
 	private:
 		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
+		bool loadDDS(FS::IFile* file);
+		bool loadTGA(FS::IFile* file);
 
 		virtual void doUnload(void) LUX_OVERRIDE;
 		virtual FS::ReadCallback getReadCallback() LUX_OVERRIDE;
