@@ -12,7 +12,7 @@ class ScriptWidget : public PropertyWidgetBase
 	Q_OBJECT
 
 public:
-	explicit ScriptWidget(QWidget *parent = 0);
+	explicit ScriptWidget(QWidget *parent = NULL);
 	~ScriptWidget();
 	virtual const char* getTitle() const override { return "Script"; }
 	virtual void onEntityProperties(Lux::PropertyListEvent& event) override;
