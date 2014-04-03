@@ -46,8 +46,10 @@ struct ClearCommand : public Command
 
 struct RenderModelsCommand : public Command
 {
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override {}
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
+	
+	int64_t m_layer_mask;
 };
 
 
@@ -94,8 +96,10 @@ struct BindFramebufferTextureCommand : public Command
 
 struct RenderShadowmapCommand : public Command
 {
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override {}
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
+
+	int64_t m_layer_mask;
 };
 
 
@@ -355,7 +359,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		glPopMatrix();*/
 	}
 
-	void renderShadowmap()
+	void renderShadowmap(int64_t layer_mask)
 	{
 		glViewport(0, 0, 800, 600); /// TODO
 		Component light_cmp = m_source.m_renderer.getLight(0);
@@ -388,7 +392,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 			);
 		m_shadow_modelviewprojection = biasMatrix * (projection_matrix * modelview_matrix);
 
-		renderModels();
+		renderModels(layer_mask);
 
 		glMatrixMode(GL_PROJECTION);
 		glPopMatrix();
@@ -408,7 +412,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		glOrtho(-1, 1, -1, 1, 0, 30);
 		glMatrixMode(GL_MODELVIEW);
 
-		material->apply();
+		material->apply(m_source.m_renderer);
 		glPushMatrix();
 		glLoadIdentity();
 		glDisable(GL_CULL_FACE);
@@ -430,12 +434,12 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void renderModels()
+	void renderModels(int64_t layer_mask)
 	{
 		/// TODO clean this and optimize
 		static Array<RenderableInfo> infos;
 		infos.clear();
-		m_source.m_renderer.getRenderableInfos(infos);
+		m_source.m_renderer.getRenderableInfos(infos, layer_mask);
 		int count = infos.size();
 		for (int i = 0; i < count; ++i)
 		{
@@ -450,7 +454,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 				Mesh& mesh = model.getMesh(j);
 				if (mesh.getMaterial()->isReady())
 				{
-					mesh.getMaterial()->apply();
+					mesh.getMaterial()->apply(m_source.m_renderer);
 
 					static Matrix bone_mtx[64];
 					Pose& pose = infos[i].m_model_instance->getPose();
@@ -549,7 +553,16 @@ void Pipeline::destroy(Pipeline* pipeline)
 
 void ClearCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer)
 {
-	m_buffers = GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT;
+	char tmp[256];
+	serializer.deserializeArrayItem(tmp, 255);
+	if (strcmp(tmp, "all") == 0)
+	{
+		m_buffers = GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT;
+	}
+	else if (strcmp(tmp, "depth") == 0)
+	{
+		m_buffers = GL_DEPTH_BUFFER_BIT;
+	}
 }
 
 
@@ -559,9 +572,15 @@ void ClearCommand::execute(PipelineInstanceImpl& pipeline)
 }
 
 
+void RenderModelsCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer) 
+{
+	serializer.deserializeArrayItem(m_layer_mask);
+}
+
+
 void RenderModelsCommand::execute(PipelineInstanceImpl& pipeline)
 {
-	pipeline.renderModels();
+	pipeline.renderModels(m_layer_mask);
 }
 
 
@@ -631,9 +650,15 @@ void BindFramebufferTextureCommand::execute(PipelineInstanceImpl& pipeline)
 }
 
 
+void RenderShadowmapCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer)
+{
+	serializer.deserializeArrayItem(m_layer_mask);
+}
+
+
 void RenderShadowmapCommand::execute(PipelineInstanceImpl& pipeline)
 {
-	pipeline.renderShadowmap();
+	pipeline.renderShadowmap(m_layer_mask);
 }
 
 

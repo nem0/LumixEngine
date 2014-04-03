@@ -16,10 +16,10 @@
 class MyRenderDevice : public Lux::IRenderDevice
 {
 	public:
-	explicit MyRenderDevice(Lux::Renderer& renderer)
+	explicit MyRenderDevice(Lux::Renderer& renderer, const char* pipeline)
 	{
 		m_renderer = &renderer;
-		m_pipeline = Lux::PipelineInstance::create(*m_renderer->loadPipeline("pipelines/main.json"));
+		m_pipeline = Lux::PipelineInstance::create(*m_renderer->loadPipeline(pipeline));
 	}
 
 	virtual void endFrame()
@@ -54,8 +54,8 @@ int main(int argc, char *argv[])
 	client.create(server.getEngine().getBasePath());
 	w.setEditorClient(client);
 	w.getSceneView()->setServer(&server);
-	MyRenderDevice rd(server.getEngine().getRenderer());
-	MyRenderDevice rd2(server.getEngine().getRenderer());
+	MyRenderDevice rd(server.getEngine().getRenderer(), "pipelines/main.json");
+	MyRenderDevice rd2(server.getEngine().getRenderer(), "pipelines/game_view.json");
 	rd.m_hdc = GetDC(hwnd);
 	rd2.m_hdc = GetDC(game_hwnd);
 	while (w.isVisible())

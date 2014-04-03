@@ -13,6 +13,7 @@ namespace FS
 	class IFile;
 }
 
+class Renderer;
 class ResourceManager;
 class Shader;
 class Texture;
@@ -22,16 +23,18 @@ class Material : public Resource
 {
 	friend class MaterialManager;
 public:
-	void apply();
+	void apply(Renderer& renderer);
 	void setShader(Shader* shader) { m_shader = shader; }
 	void addTexture(Texture* texture) { m_textures.push(texture); }
 	Shader* getShader() { return m_shader; }
+	bool isZTest() const { return m_is_z_test; }
 
 private:
 	Material(const Path& path, ResourceManager& resource_manager)
 		: Resource(path, resource_manager)
 		, m_shader()
 		, m_textures()
+		, m_is_z_test(true)
 	{ }
 
 	~Material()
@@ -44,6 +47,7 @@ private:
 private:
 	Shader*	m_shader;
 	Array<Texture*> m_textures;
+	bool m_is_z_test;
 };
 
 } // ~namespace Lux

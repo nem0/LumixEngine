@@ -111,6 +111,7 @@ void Gizmo::setUniverse(Universe* universe)
 		m_gizmo_entity = m_universe->createEntity();
 		Component r = m_renderer->createComponent(crc32("renderable"), m_gizmo_entity);
 		m_renderer->setRenderablePath(r, string("models/gizmo.msh"));
+		m_renderer->setRenderableLayer(r, 1);
 	}
 }
 

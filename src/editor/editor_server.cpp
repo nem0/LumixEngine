@@ -216,12 +216,6 @@ static const uint32_t animable_type = crc32("animable");
 
 void EditorServer::render(IRenderDevice& render_device)
 {
-	/// TODO do this proper way
-	if(render_device.getPipeline().getCameraCount() <= 0)
-	{
-		render_device.getPipeline().setCamera(0, m_impl->m_camera.getComponent(camera_type));
-	}
-
 	m_impl->renderScene(render_device);
 }
 
@@ -355,7 +349,8 @@ void EditorServerImpl::onPointerDown(int x, int y, MouseButton::Value button)
 	{
 		Vec3 origin, dir;
 		Component camera_cmp = m_camera.getComponent(camera_type);
-		m_engine.getRenderer().getRay(camera_cmp, (float)x, (float)y, origin, dir); 
+		m_engine.getRenderer().getRay(camera_cmp, (float)x, (float)y, origin, dir);
+		TODO("hit gizmo even \"behind\" other objects");
 		RayCastModelHit hit = m_engine.getRenderer().castRay(origin, dir);
 		EditorIconHit icon_hit = raycastEditorIcons(camera_cmp, origin, dir);
 		if (icon_hit.m_t >= 0 && (!hit.m_is_hit || hit.m_t > icon_hit.m_t))
@@ -1219,7 +1214,6 @@ void EditorServerImpl::createUniverse(bool create_scene, const char* base_path)
 
 	Component cmp3 = m_engine.getRenderer().createComponent(renderable_type, m_engine.getUniverse()->createEntity());
 	m_engine.getRenderer().setRenderablePath(cmp3, string("models/plane.msh"));
-	m_engine.getRenderer().setRenderableScale(cmp3, 2);
 
 	
 	m_gizmo.create(base_path, m_engine.getRenderer());
