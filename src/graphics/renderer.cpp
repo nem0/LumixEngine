@@ -37,6 +37,7 @@ struct Renderable
 	ModelInstance* m_model;
 	Entity m_entity;
 	float m_scale;
+	int64_t m_layer_mask;
 };
 
 
@@ -217,6 +218,7 @@ struct RendererImpl : public Renderer
 			r.m_entity = entity;
 			r.m_model = NULL;
 			r.m_scale = 1.0f;
+			r.m_layer_mask = 1;
 			Component cmp(entity, type, this, m_renderables.size() - 1);
 			m_universe->getEventManager()->emitEvent(ComponentEvent(cmp));
 			return Component(entity, type, this, m_renderables.size() - 1);
@@ -250,6 +252,12 @@ struct RendererImpl : public Renderer
 	}
 
 
+	virtual void setRenderableLayer(Component cmp, const int32_t& layer) override
+	{
+		m_renderables[cmp.index].m_layer_mask = ((int64_t)1 << (int64_t)layer);
+	}
+
+
 	virtual void setRenderableScale(Component cmp, const float& scale) override
 	{
 		m_renderables[cmp.index].m_scale = scale;
@@ -266,17 +274,30 @@ struct RendererImpl : public Renderer
 	}
 
 
-	virtual void getRenderableInfos(Array<RenderableInfo>& infos) override
+	virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) override
 	{
 		infos.reserve(m_renderables.size());
 		for(int i = 0; i < m_renderables.size(); ++i)
 		{
-			if(m_renderables[i].m_model != NULL)
+			if(m_renderables[i].m_model != NULL && (m_renderables[i].m_layer_mask & layer_mask) != 0)
 			{
 				RenderableInfo& info = infos.pushEmpty();
 				info.m_scale = m_renderables[i].m_scale;
 				info.m_model_instance = m_renderables[i].m_model;	
 			}
+		}
+	}
+
+
+	virtual void enableZTest(bool enable) override
+	{
+		if (enable)
+		{
+			glEnable(GL_DEPTH_TEST);
+		}
+		else
+		{
+			glDisable(GL_DEPTH_TEST);
 		}
 	}
 
@@ -287,18 +308,21 @@ struct RendererImpl : public Renderer
 		hit.m_is_hit = false;
 		for(int i = 0; i < m_renderables.size(); ++i)
 		{
-			const Vec3& pos = m_renderables[i].m_model->getMatrix().getTranslation();
-			float radius = m_renderables[i].m_model->getModel().getBoundingRadius();
-			float scale = m_renderables[i].m_scale;
-			Vec3 intersection;
-			if(Math::getRaySphereIntersection(pos, radius * scale, origin, dir, intersection))
+			if(m_renderables[i].m_model)
 			{
-				RayCastModelHit new_hit = m_renderables[i].m_model->getModel().castRay(origin, dir, m_renderables[i].m_model->getMatrix(), scale);
-				if(new_hit.m_is_hit && (!hit.m_is_hit || new_hit.m_t < hit.m_t))
+				const Vec3& pos = m_renderables[i].m_model->getMatrix().getTranslation();
+				float radius = m_renderables[i].m_model->getModel().getBoundingRadius();
+				float scale = m_renderables[i].m_scale;
+				Vec3 intersection;
+				if(Math::getRaySphereIntersection(pos, radius * scale, origin, dir, intersection))
 				{
-					new_hit.m_renderable = Component(m_renderables[i].m_entity, crc32("renderable"), this, i);
-					hit = new_hit;
-					hit.m_is_hit = true;
+					RayCastModelHit new_hit = m_renderables[i].m_model->getModel().castRay(origin, dir, m_renderables[i].m_model->getMatrix(), scale);
+					if(new_hit.m_is_hit && (!hit.m_is_hit || new_hit.m_t < hit.m_t))
+					{
+						new_hit.m_renderable = Component(m_renderables[i].m_entity, crc32("renderable"), this, i);
+						hit = new_hit;
+						hit.m_is_hit = true;
+					}
 				}
 			}
 		}

@@ -13,7 +13,7 @@
 namespace Lux
 {
 
-void Material::apply()
+void Material::apply(Renderer& renderer)
 {
 	if(getState() == State::READY)
 	{
@@ -22,6 +22,7 @@ void Material::apply()
 		{
 			m_textures[i]->apply(i);
 		}
+		renderer.enableZTest(m_is_z_test);
 	}
 }
 
@@ -65,6 +66,8 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		serializer.deserialize("shader", path, MAX_PATH);
 		m_shader = static_cast<Shader*>(m_resource_manager.get(ResourceManager::SHADER)->load(path));
 		addDependency(*m_shader);
+
+		serializer.deserialize("z_test", m_is_z_test);
 
 		m_size = file->size();
 		decrementDepCount();

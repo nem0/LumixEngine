@@ -37,21 +37,24 @@ class LUX_ENGINE_API Renderer : public IPlugin
 
 		virtual void render(IRenderDevice& device) = 0;
 		virtual void setUniverse(Universe* universe) = 0;
+		virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir) = 0;
+		virtual void enableZTest(bool enable) = 0;
 
 		virtual void applyCamera(Component camera) = 0;
 		virtual void setCameraSize(Component camera, int w, int h) = 0;
 		virtual void getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) = 0;
 		virtual Component getLight(int index) = 0;
-		virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir) = 0;
 
 		virtual Pose& getPose(Component cmp) = 0;
+		virtual void setRenderableLayer(Component cmp, const int32_t& layer) = 0;
 		virtual void setRenderablePath(Component cmp, const string& path) = 0;
 		virtual void setRenderableScale(Component cmp, const float& scale) = 0;
 		virtual void getRenderablePath(Component cmp, string& path) = 0;
-		virtual void getRenderableInfos(Array<RenderableInfo>& infos) = 0;
+		virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) = 0;
 		virtual void getCameraFov(Component cmp, float& fov) = 0;
 		virtual Pipeline* loadPipeline(const char* path) = 0;
 		virtual Engine& getEngine() = 0;
+		
 
 /*		virtual void renderScene();
 		void endFrame();

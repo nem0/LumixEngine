@@ -35,6 +35,7 @@ namespace Lux
 			virtual void deserializeArrayEnd() = 0;
 			virtual void deserializeArrayItem(uint32_t& value) = 0;
 			virtual void deserializeArrayItem(int32_t& value) = 0;
+			virtual void deserializeArrayItem(int64_t& value) = 0;
 			virtual void deserializeArrayItem(float& value) = 0;
 			virtual void deserializeArrayItem(bool& value) = 0;
 			virtual void deserializeArrayItem(char* value, int max_length) = 0;

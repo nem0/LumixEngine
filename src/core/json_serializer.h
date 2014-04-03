@@ -50,6 +50,7 @@ namespace Lux
 			virtual void deserializeArrayEnd() override { skipControl(); }
 			virtual void deserializeArrayItem(uint32_t& value) override;
 			virtual void deserializeArrayItem(int32_t& value) override;
+			virtual void deserializeArrayItem(int64_t& value) override;
 			virtual void deserializeArrayItem(float& value) override;
 			virtual void deserializeArrayItem(bool& value) override;
 			virtual void deserializeArrayItem(char* value, int max_length) override;
