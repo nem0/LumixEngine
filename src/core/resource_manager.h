@@ -11,7 +11,7 @@ namespace Lux
 
 	class ResourceManagerBase;
 
-	class LUX_CORE_API ResourceManager LUX_FINAL
+	class LUX_CORE_API ResourceManager final
 	{
 		typedef PODHashMap<uint32_t, ResourceManagerBase*> ResourceManagerTable;
 	public:

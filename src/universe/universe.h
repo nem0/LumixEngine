@@ -23,7 +23,7 @@ class Universe;
 struct Vec3;
 
 
-class LUX_ENGINE_API Universe LUX_FINAL
+class LUX_ENGINE_API Universe final
 {
 	friend struct Entity;
 	public:

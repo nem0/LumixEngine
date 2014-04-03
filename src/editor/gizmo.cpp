@@ -71,20 +71,18 @@ void Gizmo::getMatrix(Matrix& mtx)
 }
 
 
-void Gizmo::updateScale()
+void Gizmo::updateScale(Component camera)
 {
-	/*Matrix camera_mtx;
-	m_renderer->getCameraMatrix(camera_mtx);
+	Matrix camera_mtx;
+	camera.entity.getMatrix(camera_mtx);
 	Matrix mtx;
 	getMatrix(mtx);
 	Vec3 pos = mtx.getTranslation();
-	float scale = m_renderer->getHalfFovTan() * (mtx.getTranslation() - camera_mtx.getTranslation()).length() * 2;
+	float fov;
+	m_renderer->getCameraFov(camera, fov);
+	float scale = tanf(fov * Math::PI / 180 * 0.5f) * (mtx.getTranslation() - camera_mtx.getTranslation()).length() * 2;
 	scale /= 20 * mtx.getXVector().length();
-	Matrix scale_mtx = Matrix::IDENTITY;
-	scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = scale;
-	mtx = scale_mtx * mtx;
-	mtx.setTranslation(pos);
-	setMatrix(mtx);*/
+	m_renderer->setRenderableScale(m_gizmo_entity.getComponent(crc32("renderable")), scale);
 }
 
 

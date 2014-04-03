@@ -43,7 +43,7 @@ namespace Lux
 			{
 			}
 
-			virtual int task() LUX_OVERRIDE
+			virtual int task() override
 			{
 				while(!m_tests_todo->isAborted())
 				{

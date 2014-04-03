@@ -9,7 +9,7 @@ namespace Lux
 	// forward declarations
 	class ResourceManager;
 
-	class LUX_CORE_API Resource LUX_ABSTRACT
+	class LUX_CORE_API Resource abstract
 	{
 	public:
 		friend class ResourceManagerBase;

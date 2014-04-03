@@ -19,7 +19,7 @@ namespace Lux
 	public:
 		ReceiveTask() : m_finished(false) {}
 
-		virtual int task() LUX_OVERRIDE;
+		virtual int task() override;
 		void stop() { m_finished = true; }
 
 		struct EditorClientImpl* m_client;

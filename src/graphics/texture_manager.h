@@ -11,7 +11,7 @@ namespace Lux
 		~TextureManager() {}
 
 	protected:
-		virtual Resource* createResource(const Path& path) LUX_OVERRIDE;
-		virtual void destroyResource(Resource& resource) LUX_OVERRIDE;
+		virtual Resource* createResource(const Path& path) override;
+		virtual void destroyResource(Resource& resource) override;
 	};
 }

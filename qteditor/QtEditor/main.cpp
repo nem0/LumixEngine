@@ -2,6 +2,7 @@
 #include <QApplication>
 #include "editor/editor_client.h"
 #include "editor/editor_server.h"
+#include "editor/gizmo.h"
 #include "graphics/irender_device.h"
 #include "graphics/pipeline.h"
 #include "graphics/renderer.h"
@@ -65,6 +66,7 @@ int main(int argc, char *argv[])
 		w.getGameView()->setPipeline(rd2.getPipeline());
 		wglMakeCurrent(rd.m_hdc, server.getHGLRC());
 		server.render(rd);
+		server.getGizmo().updateScale(server.getCamera(0));
 		rd.endFrame();
 		wglMakeCurrent(rd2.m_hdc, server.getHGLRC());
 		server.render(rd2);

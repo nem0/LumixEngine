@@ -41,3 +41,8 @@ void ScriptCompilerWidget::on_scriptListView_clicked(const QModelIndex &index)
 	const char* c = m_compiler->getLog(path.toLatin1().data());
 	m_ui->compilerOutputView->setText(c);
 }
+
+void ScriptCompilerWidget::on_compileAllButton_clicked()
+{
+	m_compiler->compileAll();
+}

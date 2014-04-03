@@ -25,6 +25,7 @@ class Universe;
 struct RenderableInfo
 {
 	ModelInstance* m_model_instance;
+	float m_scale;
 };
 
 
@@ -45,6 +46,7 @@ class LUX_ENGINE_API Renderer : public IPlugin
 
 		virtual Pose& getPose(Component cmp) = 0;
 		virtual void setRenderablePath(Component cmp, const string& path) = 0;
+		virtual void setRenderableScale(Component cmp, const float& scale) = 0;
 		virtual void getRenderablePath(Component cmp, string& path) = 0;
 		virtual void getRenderableInfos(Array<RenderableInfo>& infos) = 0;
 		virtual void getCameraFov(Component cmp, float& fov) = 0;

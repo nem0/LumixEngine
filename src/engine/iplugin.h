@@ -12,7 +12,7 @@ namespace Lux
 	class Universe;
 
 
-	class LUX_ENGINE_API IPlugin LUX_ABSTRACT
+	class LUX_ENGINE_API IPlugin abstract
 	{
 		public:
 			virtual ~IPlugin();

@@ -93,7 +93,7 @@ namespace Lux
 				LUX_DELETE(m_task);
 			}
 
-			bool mount(IFileDevice* device) LUX_OVERRIDE
+			bool mount(IFileDevice* device) override
 			{
 				for(int i = 0; i < m_devices.size(); i++)
 				{
@@ -107,7 +107,7 @@ namespace Lux
 				return true;
 			}
 
-			bool unMount(IFileDevice* device) LUX_OVERRIDE
+			bool unMount(IFileDevice* device) override
 			{
 				for(int i = 0; i < m_devices.size(); i++)
 				{
@@ -121,7 +121,7 @@ namespace Lux
 				return false;
 			}
 
-			IFile* open(const char* device_list, const char* file, Mode mode) LUX_OVERRIDE
+			IFile* open(const char* device_list, const char* file, Mode mode) override
 			{
 				IFile* prev = parseDeviceList(device_list);
 
@@ -140,7 +140,7 @@ namespace Lux
 				return NULL;
 			}
 
-			bool openAsync(const char* device_list, const char* file, int mode, const ReadCallback& call_back) LUX_OVERRIDE
+			bool openAsync(const char* device_list, const char* file, int mode, const ReadCallback& call_back) override
 			{
 				IFile* prev = parseDeviceList(device_list);
 
@@ -158,13 +158,13 @@ namespace Lux
 				return NULL != prev;
 			}
 
-			void close(IFile* file) LUX_OVERRIDE
+			void close(IFile* file) override
 			{
 				file->close();
 				LUX_DELETE(file);
 			}
 
-			void closeAsync(IFile* file) LUX_OVERRIDE
+			void closeAsync(IFile* file) override
 			{
 				AsyncItem& item = m_pending.pushEmpty();
 
@@ -174,7 +174,7 @@ namespace Lux
 				item.m_flags = E_NONE;
 			}
 
-			void updateAsyncTransactions() LUX_OVERRIDE
+			void updateAsyncTransactions() override
 			{
 				while(!m_in_progress.empty())
 				{
@@ -214,11 +214,11 @@ namespace Lux
 				}
 			}
 
-			const char* getDefaultDevice() const LUX_OVERRIDE { return m_default_device.c_str(); }
-			const char* getSaveGameDevice() const LUX_OVERRIDE { return m_save_game_device.c_str(); }
+			const char* getDefaultDevice() const override { return m_default_device.c_str(); }
+			const char* getSaveGameDevice() const override { return m_save_game_device.c_str(); }
 
-			void setDefaultDevice(const char* dev) LUX_OVERRIDE { m_default_device = dev; }
-			void setSaveGameDevice(const char* dev) LUX_OVERRIDE { m_save_game_device = dev; }
+			void setDefaultDevice(const char* dev) override { m_default_device = dev; }
+			void setSaveGameDevice(const char* dev) override { m_save_game_device = dev; }
 
 			IFileDevice* getDevice(const char* device)
 			{

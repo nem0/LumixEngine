@@ -7,7 +7,7 @@ namespace Lux
 {
 	namespace FS
 	{
-		class IFile LUX_ABSTRACT
+		class IFile abstract
 		{
 		public:
 			IFile() {}

@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include "core/lux.h"
 #include "core/vec3.h"
 #include "universe/universe.h"
 
@@ -15,7 +16,7 @@ class Event;
 class Renderer;
 
 
-class Gizmo
+class LUX_ENGINE_API Gizmo
 {
 	public:
 		struct Flags
@@ -79,7 +80,7 @@ class Gizmo
 		void show();
 		void setMatrix(const Matrix& mtx);
 		void getMatrix(Matrix& mtx);
-		void updateScale();
+		void updateScale(Component camera);
 		void setEntity(Entity entity);
 		void setUniverse(Universe* universe);
 		void startTransform(Component camera, int x, int y, TransformMode mode);

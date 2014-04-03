@@ -108,7 +108,7 @@ struct MouseButton
 class MessageTask : public MT::Task
 {
 	public:
-		virtual int task() LUX_OVERRIDE;
+		virtual int task() override;
 
 		struct EditorServerImpl* m_server;
 		Net::TCPAcceptor m_acceptor;
@@ -825,6 +825,12 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 }
 
 
+Gizmo& EditorServer::getGizmo()
+{
+	return m_impl->m_gizmo;
+}
+
+
 HGLRC EditorServer::getHGLRC()
 {
 	return m_impl->m_hglrc;
@@ -900,10 +906,6 @@ void EditorServerImpl::sendMessage(const uint8_t* data, int32_t length)
 
 void EditorServerImpl::renderScene(IRenderDevice& render_device)
 {
-	if(m_selected_entity.isValid())
-	{
-		//m_gizmo.updateScale();
-	}
 	m_engine.getRenderer().render(render_device);
 	for(int i = 0, c = m_editor_icons.size(); i < c; ++i)
 	{
@@ -1217,7 +1219,8 @@ void EditorServerImpl::createUniverse(bool create_scene, const char* base_path)
 
 	Component cmp3 = m_engine.getRenderer().createComponent(renderable_type, m_engine.getUniverse()->createEntity());
 	m_engine.getRenderer().setRenderablePath(cmp3, string("models/plane.msh"));
-	
+	m_engine.getRenderer().setRenderableScale(cmp3, 2);
+
 	
 	m_gizmo.create(base_path, m_engine.getRenderer());
 	m_gizmo.setUniverse(universe);
