@@ -15,7 +15,7 @@ namespace UI
 	class IRenderer;
 
 
-	class LUX_GUI_API DecoratorBase LUX_ABSTRACT
+	class LUX_GUI_API DecoratorBase abstract
 	{
 		public:
 			DecoratorBase(const char* name) : m_name(name) {}

@@ -19,7 +19,7 @@ class IFile;
 }
 
 
-class LUX_ENGINE_API Pipeline LUX_ABSTRACT
+class LUX_ENGINE_API Pipeline abstract
 {
 	public:
 		virtual ~Pipeline() {}
@@ -35,7 +35,7 @@ class LUX_ENGINE_API Pipeline LUX_ABSTRACT
 };
 
 
-class LUX_ENGINE_API PipelineInstance LUX_ABSTRACT
+class LUX_ENGINE_API PipelineInstance abstract
 {
 	public:
 		virtual ~PipelineInstance() {}

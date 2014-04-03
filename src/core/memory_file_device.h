@@ -12,7 +12,7 @@ namespace Lux
 		class LUX_CORE_API MemoryFileDevice : public IFileDevice
 		{
 		public:
-			virtual IFile* createFile(IFile* child) LUX_OVERRIDE;
+			virtual IFile* createFile(IFile* child) override;
 
 			const char* name() const { return "memory"; }
 		};

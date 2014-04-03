@@ -20,7 +20,7 @@ namespace UI
 	class TextureBase;
 
 
-	class IRenderer LUX_ABSTRACT
+	class IRenderer abstract
 	{
 		public:
 			virtual void loadFont(const char* path, FS::FileSystem& file_system) = 0;

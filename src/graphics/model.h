@@ -83,14 +83,14 @@ class Model : public Resource
 		Bone&		getBone(int i)			{ return m_bones[i]; }
 		void		getPose(Pose& pose);
 		float		getBoundingRadius() const { return m_bounding_radius; }
-		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform);
+		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform, float scale);
 		const char* getPath() const { return m_path.c_str(); }
 
 	private:
 		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 
-		virtual void doUnload(void) LUX_OVERRIDE;
-		virtual FS::ReadCallback getReadCallback() LUX_OVERRIDE;
+		virtual void doUnload(void) override;
+		virtual FS::ReadCallback getReadCallback() override;
 
 	private:
 		Geometry* m_geometry;

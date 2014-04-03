@@ -22,7 +22,7 @@ namespace Lux
 
 			~TCPFile() {}
 
-			virtual bool open(const char* path, Mode mode) LUX_OVERRIDE
+			virtual bool open(const char* path, Mode mode) override
 			{
 				int32_t op = TCPCommand::OpenFile;
 				int32_t ret = 0;
@@ -36,7 +36,7 @@ namespace Lux
 				return -1 != m_file;
 			}
 
-			virtual void close() LUX_OVERRIDE
+			virtual void close() override
 			{
 				if(-1 != m_file)
 				{
@@ -48,7 +48,7 @@ namespace Lux
 				}
 			}
 
-			virtual bool read(void* buffer, size_t size) LUX_OVERRIDE
+			virtual bool read(void* buffer, size_t size) override
 			{
 				int32_t op = TCPCommand::Read;
 
@@ -64,7 +64,7 @@ namespace Lux
 				return successful;
 			}
 
-			virtual bool write(const void* buffer, size_t size) LUX_OVERRIDE
+			virtual bool write(const void* buffer, size_t size) override
 			{
 				int32_t op = TCPCommand::Write;
 
@@ -80,12 +80,12 @@ namespace Lux
 				return successful;
 			}
 
-			virtual const void* getBuffer() const LUX_OVERRIDE
+			virtual const void* getBuffer() const override
 			{
 				return NULL;
 			}
 
-			virtual size_t size() LUX_OVERRIDE
+			virtual size_t size() override
 			{
 				int32_t op = TCPCommand::Size;
 				uint32_t size = 0;
@@ -99,7 +99,7 @@ namespace Lux
 				return (size_t)size;
 			}
 
-			virtual size_t seek(SeekMode base, size_t pos) LUX_OVERRIDE
+			virtual size_t seek(SeekMode base, size_t pos) override
 			{
 				int32_t op = TCPCommand::Seek;
 
@@ -115,7 +115,7 @@ namespace Lux
 				return (size_t)ret;
 			}
 
-			virtual size_t pos() LUX_OVERRIDE
+			virtual size_t pos() override
 			{
 				int32_t op = TCPCommand::Seek;
 				int32_t pos = 0;

@@ -37,8 +37,8 @@ private:
 	~Material()
 	{ }
 
-	virtual void doUnload(void) LUX_OVERRIDE;
-	virtual FS::ReadCallback getReadCallback() LUX_OVERRIDE;
+	virtual void doUnload(void) override;
+	virtual FS::ReadCallback getReadCallback() override;
 
 	void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 private:

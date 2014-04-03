@@ -35,6 +35,7 @@ namespace Lux
 			void render(IRenderDevice& render_device);
 			Component getCamera(int index) const;
 			HGLRC getHGLRC();
+			class Gizmo& getGizmo();
 
 		private:
 			struct EditorServerImpl* m_impl;

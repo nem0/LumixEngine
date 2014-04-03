@@ -10,7 +10,7 @@ namespace Lux
 class PipelineInstance;
 
 
-class LUX_ENGINE_API IRenderDevice LUX_ABSTRACT
+class LUX_ENGINE_API IRenderDevice abstract
 {
 	public:
 		virtual ~IRenderDevice() {}

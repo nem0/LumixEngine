@@ -5,7 +5,6 @@
 #include "core/array.h"
 #include "core/crc32.h"
 #include "core/file_system.h"
-#include "core/input_system.h"
 #include "core/iserializer.h"
 #include "core/json_serializer.h"
 #include "core/resource_manager.h"
@@ -39,54 +38,54 @@ struct Command
 
 struct ClearCommand : public Command
 {
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) LUX_OVERRIDE;
-	virtual void execute(PipelineInstanceImpl& pipeline) LUX_OVERRIDE;
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
+	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	uint32_t m_buffers;
 };
 
 
 struct RenderModelsCommand : public Command
 {
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) LUX_OVERRIDE {}
-	virtual void execute(PipelineInstanceImpl& pipeline) LUX_OVERRIDE;
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override {}
+	virtual void execute(PipelineInstanceImpl& pipeline) override;
 };
 
 
 struct ApplyCameraCommand : public Command
 {
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) LUX_OVERRIDE;
-	virtual void execute(PipelineInstanceImpl& pipeline) LUX_OVERRIDE;
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
+	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	uint32_t m_camera_idx;
 };
 
 
 struct BindFramebufferCommand : public Command
 {
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) LUX_OVERRIDE;
-	virtual void execute(PipelineInstanceImpl& pipeline) LUX_OVERRIDE;
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
+	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	uint32_t m_buffer_index;
 };
 
 
 struct UnbindFramebufferCommand : public Command
 {
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) LUX_OVERRIDE {}
-	virtual void execute(PipelineInstanceImpl& pipeline) LUX_OVERRIDE;
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override {}
+	virtual void execute(PipelineInstanceImpl& pipeline) override;
 };
 
 
 struct DrawFullscreenQuadCommand : public Command
 {
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) LUX_OVERRIDE;
-	virtual void execute(PipelineInstanceImpl& pipeline) LUX_OVERRIDE;
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
+	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	Material* m_material;
 };
 
 
 struct BindFramebufferTextureCommand : public Command
 {
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) LUX_OVERRIDE;
-	virtual void execute(PipelineInstanceImpl& pipeline) LUX_OVERRIDE;
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
+	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	uint32_t m_framebuffer_index;
 	uint32_t m_renderbuffer_index;
 	uint32_t m_texture_uint;
@@ -95,15 +94,15 @@ struct BindFramebufferTextureCommand : public Command
 
 struct RenderShadowmapCommand : public Command
 {
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) LUX_OVERRIDE {}
-	virtual void execute(PipelineInstanceImpl& pipeline) LUX_OVERRIDE;
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override {}
+	virtual void execute(PipelineInstanceImpl& pipeline) override;
 };
 
 
 struct BindShadowmapCommand : public Command
 {
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) LUX_OVERRIDE {}
-	virtual void execute(PipelineInstanceImpl& pipeline) LUX_OVERRIDE;
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override {}
+	virtual void execute(PipelineInstanceImpl& pipeline) override;
 };
 
 
@@ -178,7 +177,7 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	virtual bool deserialize(ISerializer& serializer) LUX_OVERRIDE
+	virtual bool deserialize(ISerializer& serializer) override
 	{
 		int32_t count;
 		serializer.deserialize("frame_buffer_count", count);
@@ -256,13 +255,13 @@ struct PipelineImpl : public Pipeline
 		m_on_loaded.invoke(*this);
 	}
 
-	virtual DelegateList<void(Pipeline&)>& onLoaded() LUX_OVERRIDE
+	virtual DelegateList<void(Pipeline&)>& onLoaded() override
 	{
 		return m_on_loaded;
 	}
 
 
-	virtual bool isReady() const LUX_OVERRIDE
+	virtual bool isReady() const override
 	{
 		return m_is_ready;
 	}
@@ -442,7 +441,9 @@ struct PipelineInstanceImpl : public PipelineInstance
 		{
 			glPushMatrix();
 			Model& model = infos[i].m_model_instance->getModel();
-			glMultMatrixf(&infos[i].m_model_instance->getMatrix().m11);
+			Matrix mtx = infos[i].m_model_instance->getMatrix();
+			mtx.multiply3x3(infos[i].m_scale);
+			glMultMatrixf(&mtx.m11);
 			Geometry* geom = model.getGeometry();
 			for (int j = 0; j < model.getMeshCount(); ++j)
 			{
@@ -474,13 +475,13 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	virtual int getCameraCount() const LUX_OVERRIDE
+	virtual int getCameraCount() const override
 	{
 		return m_cameras.size();
 	}
 
 
-	virtual void resize(int w, int h) LUX_OVERRIDE
+	virtual void resize(int w, int h) override
 	{
 		for (int i = 0; i < m_cameras.size(); ++i)
 		{
@@ -489,7 +490,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	virtual void setCamera(int index, const Component& camera) LUX_OVERRIDE
+	virtual void setCamera(int index, const Component& camera) override
 	{
 		if (m_cameras.size() <= index)
 		{
@@ -499,13 +500,13 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	virtual const Component& getCamera(int index) LUX_OVERRIDE
+	virtual const Component& getCamera(int index) override
 	{
 		return m_cameras[index];
 	}
 
 
-	virtual void render() LUX_OVERRIDE
+	virtual void render() override
 	{
 		for (int i = 0; i < m_source.m_commands.size(); ++i)
 		{
@@ -573,7 +574,6 @@ void ApplyCameraCommand::deserialize(PipelineImpl& pipeline, ISerializer& serial
 void ApplyCameraCommand::execute(PipelineInstanceImpl& pipeline)
 {
 	pipeline.m_source.m_renderer.applyCamera(pipeline.m_cameras[m_camera_idx]);
-
 }
 
 
