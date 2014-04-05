@@ -18,6 +18,7 @@
 #include "graphics/model_manager.h"
 #include "graphics/shader_manager.h"
 #include "graphics/texture_manager.h"
+#include "graphics/pipeline.h"
 
 namespace Lux
 {
@@ -36,6 +37,7 @@ namespace Lux
 		ModelManager	m_model_manager;
 		ShaderManager	m_shader_manager;
 		TextureManager	m_texture_manager;
+		PipelineManager m_pipeline_manager;
 
 		string m_base_path;
 		EditorServer* m_editor_server;
@@ -136,6 +138,7 @@ namespace Lux
 		m_impl->m_model_manager.create(ResourceManager::MODEL, m_impl->m_resource_manager);
 		m_impl->m_shader_manager.create(ResourceManager::SHADER, m_impl->m_resource_manager);
 		m_impl->m_texture_manager.create(ResourceManager::TEXTURE, m_impl->m_resource_manager);
+		m_impl->m_pipeline_manager.create(ResourceManager::PIPELINE, m_impl->m_resource_manager);
 
 		return true;
 	}

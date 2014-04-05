@@ -5,6 +5,12 @@
 #define STRINGIZE_2( _ ) #_
 #define STRINGIZE( _ ) STRINGIZE_2( _ )
 
+#define JOIN_STRINGS_2(A, B) A ## B
+#define JOIN_STRINGS(A, B) JOIN_STRINGS_2(A, B)
+
+#define LUX_FORCE_SYMBOL(symbol) \
+	__pragma(comment(linker, "/INCLUDE:_" STRINGIZE(symbol)))
+
 #define NOTE(msg)\
 	__pragma(message(__FILE__ "(" STRINGIZE(__LINE__) ") : NOTE: " msg))
 

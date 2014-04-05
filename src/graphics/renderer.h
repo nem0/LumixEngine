@@ -17,6 +17,7 @@ class Material;
 class ModelInstance;
 class Pipeline;
 class Pose;
+class ResourceManager;
 class Shader;
 class Texture;
 class Universe;
