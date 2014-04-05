@@ -37,6 +37,7 @@ namespace Lux
 		if(NULL == resource)
 		{
 			resource = createResource(path);
+			m_resources.insert(path, resource);
 		}
 		
 		if(resource->isEmpty())

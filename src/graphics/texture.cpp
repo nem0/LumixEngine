@@ -76,6 +76,7 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		{
 			LUX_DELETE_ARRAY(buffer);
 			g_log_warning.log("renderer", "Unsupported texture format %s", m_path);
+			onFailure();
 			return;
 		}
 	
@@ -83,6 +84,7 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		{
 			LUX_DELETE_ARRAY(buffer);
 			g_log_warning.log("renderer", "Unsupported color mode %s", m_path);
+			onFailure();
 			return;
 		}
 	
@@ -113,6 +115,7 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		if (m_id == 0)
 		{
 			LUX_DELETE_ARRAY(buffer);
+			onFailure();
 			return;
 		}
 
@@ -134,6 +137,7 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	else
 	{
 		g_log_warning.log("renderer", "Error loading texture %s\n", m_path.c_str());
+		onFailure();
 	}
 	
 	fs.close(file);

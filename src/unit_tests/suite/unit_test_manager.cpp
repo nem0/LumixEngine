@@ -1,6 +1,4 @@
-#include "core/lux.h"
-#include "unit_tests/unit_test_manager.h"
-#include "unit_tests/platform_defines.h"
+#include "unit_tests/suite/lux_unit_tests.h"
 
 #include "core/log.h"
 #include "core/task.h"

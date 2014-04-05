@@ -2,8 +2,6 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="..\..\..\src\unit_tests\main.cpp" />
-    <ClCompile Include="..\..\..\src\unit_tests\unit_test_app.cpp" />
-    <ClCompile Include="..\..\..\src\unit_tests\unit_test_manager.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_hash_map.cpp">
       <Filter>core</Filter>
     </ClCompile>
@@ -11,12 +9,32 @@
       <Filter>core</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\core\new.cpp" />
+    <ClCompile Include="..\..\..\src\unit_tests\engine\ut_resource_managers.cpp">
+      <Filter>engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\unit_tests\suite\unit_test_app.cpp">
+      <Filter>suite</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\unit_tests\suite\unit_test_manager.cpp">
+      <Filter>suite</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\src\unit_tests\platform_defines.h" />
-    <ClInclude Include="..\..\..\src\unit_tests\unit_test.h" />
-    <ClInclude Include="..\..\..\src\unit_tests\unit_test_app.h" />
-    <ClInclude Include="..\..\..\src\unit_tests\unit_test_manager.h" />
+    <ClInclude Include="..\..\..\src\unit_tests\suite\unit_test.h">
+      <Filter>suite</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\unit_tests\suite\unit_test_app.h">
+      <Filter>suite</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\unit_tests\suite\unit_test_manager.h">
+      <Filter>suite</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\unit_tests\suite\lux_unit_tests.h">
+      <Filter>suite</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\unit_tests\suite\platform_defines.h">
+      <Filter>suite</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="core">
@@ -24,6 +42,9 @@
     </Filter>
     <Filter Include="engine">
       <UniqueIdentifier>{06f864c7-5b4b-422e-a990-c285f7bd8b31}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="suite">
+      <UniqueIdentifier>{7613b27e-0d3f-4a31-95a1-a9a7419adb9b}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>
