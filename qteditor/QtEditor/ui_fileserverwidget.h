@@ -13,6 +13,7 @@
 #include <QtWidgets/QAction>
 #include <QtWidgets/QApplication>
 #include <QtWidgets/QButtonGroup>
+#include <QtWidgets/QCheckBox>
 #include <QtWidgets/QDockWidget>
 #include <QtWidgets/QHBoxLayout>
 #include <QtWidgets/QHeaderView>
@@ -33,6 +34,7 @@ public:
     QWidget *widget;
     QHBoxLayout *horizontalLayout;
     QPushButton *pushButton;
+    QCheckBox *checkBox;
     QSpacerItem *horizontalSpacer;
 
     void setupUi(QDockWidget *FileServerWidget)
@@ -72,7 +74,13 @@ public:
 
         horizontalLayout->addWidget(pushButton);
 
-        horizontalSpacer = new QSpacerItem(312, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
+        checkBox = new QCheckBox(widget);
+        checkBox->setObjectName(QStringLiteral("checkBox"));
+        checkBox->setChecked(true);
+
+        horizontalLayout->addWidget(checkBox);
+
+        horizontalSpacer = new QSpacerItem(245, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
 
         horizontalLayout->addItem(horizontalSpacer);
 
@@ -96,6 +104,7 @@ public:
         QTableWidgetItem *___qtablewidgetitem2 = tableWidget->horizontalHeaderItem(2);
         ___qtablewidgetitem2->setText(QApplication::translate("FileServerWidget", "Status", 0));
         pushButton->setText(QApplication::translate("FileServerWidget", "Clear", 0));
+        checkBox->setText(QApplication::translate("FileServerWidget", "Enabled", 0));
     } // retranslateUi
 
 };
