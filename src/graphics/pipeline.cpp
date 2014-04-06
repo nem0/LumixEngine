@@ -262,21 +262,6 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	//virtual void load(const char* path, FS::FileSystem& file_system) 
-	//{
-	//	m_path = path;
-	//	FS::ReadCallback cb;
-	//	cb.bind<PipelineImpl, &PipelineImpl::loaded>(this);
-	//	file_system.openAsync(file_system.getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, cb);
-	//}
-
-
-	//virtual const char* getPath() 
-	//{
-	//	return m_path.c_str();
-	//}
-
-
 	void loaded(FS::IFile* file, bool success, FS::FileSystem& fs) 
 	{
 		if(success)
@@ -323,6 +308,7 @@ struct PipelineImpl : public Pipeline
 
 	void renderShadowmap()
 	{
+		ASSERT(m_renderer != NULL);
 		Component light_cmp = m_renderer->getLight(0);
 		if (!light_cmp.isValid())
 		{
@@ -397,6 +383,7 @@ struct PipelineImpl : public Pipeline
 
 	void renderModels()
 	{
+		ASSERT(m_renderer != NULL);
 		/// TODO clean this and optimize
 		static Array<RenderableInfo> infos;
 		infos.clear();
@@ -462,19 +449,8 @@ struct PipelineImpl : public Pipeline
 
 Pipeline::Pipeline(const Path& path, ResourceManager& resource_manager)
 	: Resource(path, resource_manager)
-{ }
-
-//Pipeline* Pipeline::create(Renderer& renderer)
-//{
-//	return LUX_NEW(PipelineImpl)(renderer);
-//}
-//
-//
-//void Pipeline::destroy(Pipeline* pipeline)
-//{
-//	LUX_DELETE(pipeline);
-//}
-
+{
+}
 
 
 void ClearCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer)
@@ -504,7 +480,6 @@ void ApplyCameraCommand::deserialize(PipelineImpl& pipeline, ISerializer& serial
 void ApplyCameraCommand::execute(PipelineImpl& pipeline)
 {
 	pipeline.m_renderer->applyCamera(pipeline.m_cameras[m_camera_idx]);
-
 }
 
 
