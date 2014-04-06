@@ -87,3 +87,9 @@ void FileServerWidget::on_pushButton_clicked()
 		m_ui->tableWidget->removeRow(0);
 	}
 }
+
+void FileServerWidget::on_checkBox_stateChanged(int)
+{
+	ASSERT(m_server);
+	m_server->getTCPFileServer().setWatcher(m_ui->checkBox->isChecked() ? m_watcher : NULL);
+}
