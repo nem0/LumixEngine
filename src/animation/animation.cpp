@@ -91,6 +91,7 @@ void Animation::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			}
 		}
 
+		m_size = file->size();
 		onReady();
 	}
 	else
@@ -105,6 +106,8 @@ void Animation::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 void Animation::doUnload(void)
 {
 	TODO("Implement!");
+	onEmpty();
+	m_size = 0;
 }
 
 
