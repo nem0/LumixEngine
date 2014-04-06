@@ -20,6 +20,7 @@ class IFile;
 
 }
 
+
 class LUX_ENGINE_API PipelineManager : public ResourceManagerBase
 {
 public:

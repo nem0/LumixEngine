@@ -20,6 +20,7 @@ namespace Lux
 		static const uint32_t SHADER	= 0x0f0b59ae; //SHADER
 		static const uint32_t TEXTURE	= 0xbd23f368; //TEXTURE
 		static const uint32_t PIPELINE	= 0xbbcf4595; //PIPELINE
+		static const uint32_t ANIMATION = 0xc9909a33; //ANIMATION
 
 		ResourceManager();
 		~ResourceManager();

@@ -10,7 +10,20 @@ namespace Lux
 {
 
 
-Animation::Animation()
+Resource* AnimationManager::createResource(const Path& path)
+{
+	return LUX_NEW(Animation)(path, getOwner());
+}
+
+
+void AnimationManager::destroyResource(Resource& resource)
+{
+	LUX_DELETE(static_cast<Animation*>(&resource));
+}
+
+
+Animation::Animation(const Path& path, ResourceManager& resource_manager)
+	: Resource(path, resource_manager)
 {
 	m_rotations = NULL;
 	m_positions = NULL;
@@ -22,39 +35,6 @@ Animation::~Animation()
 {
 	LUX_DELETE_ARRAY(m_positions);
 	LUX_DELETE_ARRAY(m_rotations);
-}
-
-
-void Animation::load(const char* filename, FS::FileSystem& file_system)
-{
-	FS::ReadCallback cb;
-	cb.bind<Animation, &Animation::loaded>(this);
-	file_system.openAsync(file_system.getDefaultDevice(), filename, FS::Mode::OPEN | FS::Mode::READ, cb);
-}
-
-
-void Animation::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
-{
-	if(success)
-	{
-		LUX_DELETE_ARRAY(m_positions);
-		LUX_DELETE_ARRAY(m_rotations);
-		file->read(&m_frame_count, sizeof(m_frame_count));
-		file->read(&m_bone_count, sizeof(m_bone_count));
-		m_positions = new Vec3[m_frame_count * m_bone_count];
-		m_rotations = new Quat[m_frame_count * m_bone_count];
-		for(int i = 0; i < m_frame_count; ++i)
-		{
-			for(int j = 0; j < m_bone_count; ++j)
-			{
-				/// TODO positions (rotations) in a row
-				file->read(&m_positions[i * m_bone_count + j], sizeof(Vec3));
-				file->read(&m_rotations[i * m_bone_count + j], sizeof(Quat));
-			}
-		}
-	}
-
-	fs.close(file);
 }
 
 
@@ -89,5 +69,50 @@ void Animation::getPose(float time, Pose& pose) const
 	}
 }
 
+
+void Animation::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
+{
+	if (success)
+	{
+		TODO("Add same header to the animation file and check it.");
+		LUX_DELETE_ARRAY(m_positions);
+		LUX_DELETE_ARRAY(m_rotations);
+		file->read(&m_frame_count, sizeof(m_frame_count));
+		file->read(&m_bone_count, sizeof(m_bone_count));
+		m_positions = LUX_NEW_ARRAY(Vec3, m_frame_count * m_bone_count);
+		m_rotations = LUX_NEW_ARRAY(Quat, m_frame_count * m_bone_count);
+		for (int i = 0; i < m_frame_count; ++i)
+		{
+			for (int j = 0; j < m_bone_count; ++j)
+			{
+				TODO("positions(rotations) in a row");
+				file->read(&m_positions[i * m_bone_count + j], sizeof(Vec3));
+				file->read(&m_rotations[i * m_bone_count + j], sizeof(Quat));
+			}
+		}
+
+		onReady();
+	}
+	else
+	{
+		onFailure();
+	}
+
+	fs.close(file);
+}
+
+
+void Animation::doUnload(void)
+{
+	TODO("Implement!");
+}
+
+
+FS::ReadCallback Animation::getReadCallback(void)
+{
+	FS::ReadCallback cb;
+	cb.bind<Animation, &Animation::loaded>(this);
+	return cb;
+}
 
 } // ~namespace Lux
