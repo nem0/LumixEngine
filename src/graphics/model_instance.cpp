@@ -31,7 +31,7 @@ void ModelInstance::modelUpdate(uint32_t new_state)
 	}
 	else if(new_state == Resource::State::UNLOADING)
 	{
-		TODO("Implement unloading stuff");
+		m_pose.resize(0);
 	}
 }
 

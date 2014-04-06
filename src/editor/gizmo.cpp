@@ -6,6 +6,7 @@
 #include "core/matrix.h"
 #include "core/quat.h"
 #include "editor/gizmo.h"
+#include "graphics/model.h"
 #include "graphics/renderer.h"
 #include "universe/entity_moved_event.h"
 #include "universe/universe.h"
@@ -35,7 +36,9 @@ void Gizmo::destroy()
 
 void Gizmo::create(const char* base_path, Renderer& renderer)
 {
+	m_scale = 1;
 	m_renderer = &renderer;
+	m_model = renderer.getModel("models/gizmo.msh");
 }
 
 
@@ -52,37 +55,27 @@ void Gizmo::show()
 }
 
 
-void Gizmo::setMatrix(const Matrix& mtx)
-{
-	m_gizmo_entity.setMatrix(mtx);
-	//h3dSetNodeTransMat(m_handle, &mtx.m11);
-}
-
-
 void Gizmo::getMatrix(Matrix& mtx)
 {
-	m_gizmo_entity.getMatrix(mtx);
-	/*const float* tmp;
-	h3dGetNodeTransMats(m_handle, 0, &tmp);
-	for(int i = 0; i < 16; ++i)
-	{
-		(&mtx.m11)[i] = tmp[i];
-	}*/
+	m_selected_entity.getMatrix(mtx);
 }
 
 
 void Gizmo::updateScale(Component camera)
 {
-	Matrix camera_mtx;
-	camera.entity.getMatrix(camera_mtx);
-	Matrix mtx;
-	getMatrix(mtx);
-	Vec3 pos = mtx.getTranslation();
-	float fov;
-	m_renderer->getCameraFov(camera, fov);
-	float scale = tanf(fov * Math::PI / 180 * 0.5f) * (mtx.getTranslation() - camera_mtx.getTranslation()).length() * 2;
-	scale /= 20 * mtx.getXVector().length();
-	m_renderer->setRenderableScale(m_gizmo_entity.getComponent(crc32("renderable")), scale);
+	if (m_selected_entity.isValid())
+	{
+		Matrix camera_mtx;
+		camera.entity.getMatrix(camera_mtx);
+		Matrix mtx;
+		getMatrix(mtx);
+		Vec3 pos = mtx.getTranslation();
+		float fov;
+		m_renderer->getCameraFov(camera, fov);
+		float scale = tanf(fov * Math::PI / 180 * 0.5f) * (mtx.getTranslation() - camera_mtx.getTranslation()).length() * 2;
+		scale /= 20 * mtx.getXVector().length();
+		m_scale = scale;
+	}
 }
 
 
@@ -92,7 +85,6 @@ void Gizmo::setEntity(Entity entity)
 	m_selected_entity = entity;
 	if(m_selected_entity.index != -1)
 	{
-		setMatrix(m_selected_entity.getMatrix());
 		show();
 	}
 	else
@@ -105,26 +97,29 @@ void Gizmo::setEntity(Entity entity)
 void Gizmo::setUniverse(Universe* universe)
 {
 	m_universe = universe;
-	if(m_universe)
-	{
-		m_universe->getEventManager()->addListener(EntityMovedEvent::type).bind<Gizmo, &Gizmo::onEvent>(this);
-		m_gizmo_entity = m_universe->createEntity();
-		Component r = m_renderer->createComponent(crc32("renderable"), m_gizmo_entity);
-		m_renderer->setRenderablePath(r, string("models/gizmo.msh"));
-		m_renderer->setRenderableLayer(r, 1);
-	}
 }
 
 
-void Gizmo::onEvent(Event& evt)
+RayCastModelHit Gizmo::castRay(const Vec3& origin, const Vec3& dir)
 {
-	if(evt.getType() == EntityMovedEvent::type)
+	if (m_selected_entity.isValid())
 	{
-		Entity e = static_cast<EntityMovedEvent&>(evt).entity;
-		if(e == m_selected_entity)
-		{
-			setMatrix(e.getMatrix());
-		}
+		return m_model->castRay(origin, dir, m_selected_entity.getMatrix(), m_scale);
+	}
+	RayCastModelHit hit;
+	hit.m_is_hit = false;
+	return hit;
+}
+
+
+void Gizmo::render(Renderer& renderer)
+{
+	if(m_selected_entity.isValid())
+	{
+		Matrix scale_mtx = Matrix::IDENTITY;
+		scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = m_scale;
+		Matrix mtx = m_selected_entity.getMatrix() * scale_mtx;
+		renderer.renderModel(*m_model, mtx);
 	}
 }
 
@@ -134,12 +129,6 @@ void Gizmo::startTransform(Component camera, int x, int y, TransformMode mode)
 	m_transform_mode = mode;
 	m_transform_point = getMousePlaneIntersection(camera, x, y);
 	m_relx_accum = m_rely_accum = 0;
-}
-
-
-Component Gizmo::getRenderable() const
-{
-	return m_gizmo_entity.getComponent(crc32("renderable"));
 }
 
 
@@ -201,7 +190,6 @@ void Gizmo::transform(Component camera, TransformOperation operation, int x, int
 			m_selected_entity.getMatrix(mtx);
 			mtx.translate(delta);
 			m_selected_entity.setMatrix(mtx);
-			setMatrix(mtx);
 		}
 	}
 }

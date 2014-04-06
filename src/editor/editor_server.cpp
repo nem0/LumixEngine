@@ -144,6 +144,7 @@ struct EditorServerImpl
 		void writeString(const char* str);
 		void setProperty(void* data, int size);
 		void createUniverse(bool create_scene, const char* base_path);
+		void renderIcons(IRenderDevice& render_device);
 		void renderScene(IRenderDevice& render_device);
 		void renderPhysics();
 		void save(const char path[]);
@@ -218,6 +219,13 @@ void EditorServer::render(IRenderDevice& render_device)
 {
 	m_impl->renderScene(render_device);
 }
+
+
+void EditorServer::renderIcons(IRenderDevice& render_device)
+{
+	m_impl->renderIcons(render_device);
+}
+
 
 
 Engine& EditorServer::getEngine()
@@ -352,38 +360,36 @@ void EditorServerImpl::onPointerDown(int x, int y, MouseButton::Value button)
 		m_engine.getRenderer().getRay(camera_cmp, (float)x, (float)y, origin, dir);
 		TODO("hit gizmo even \"behind\" other objects");
 		RayCastModelHit hit = m_engine.getRenderer().castRay(origin, dir);
+		RayCastModelHit gizmo_hit = m_gizmo.castRay(origin, dir);
 		EditorIconHit icon_hit = raycastEditorIcons(camera_cmp, origin, dir);
-		if (icon_hit.m_t >= 0 && (!hit.m_is_hit || hit.m_t > icon_hit.m_t))
+		if (gizmo_hit.m_is_hit && (icon_hit.m_t < 0 || gizmo_hit.m_t < icon_hit.m_t))
+		{
+			if (m_selected_entity.isValid())
+			{
+				m_mouse_mode = EditorServerImpl::MouseMode::TRANSFORM;
+				if (gizmo_hit.m_mesh->getNameHash() == crc32("x_axis"))
+				{
+					m_gizmo.startTransform(camera_cmp, x, y, Gizmo::TransformMode::X);
+				}
+				else if (gizmo_hit.m_mesh->getNameHash() == crc32("y_axis"))
+				{
+					m_gizmo.startTransform(camera_cmp, x, y, Gizmo::TransformMode::Y);
+				}
+				else
+				{
+					m_gizmo.startTransform(camera_cmp, x, y, Gizmo::TransformMode::Z);
+				}
+			}
+		}
+		else if (icon_hit.m_t >= 0)
 		{
 			selectEntity(icon_hit.m_icon->getEntity());
 		}
 		else if(hit.m_is_hit)
 		{
-			if(hit.m_renderable == m_gizmo.getRenderable())
-			{
-				if(m_selected_entity.isValid())
-				{
-					m_mouse_mode = EditorServerImpl::MouseMode::TRANSFORM;
-					if(hit.m_mesh->getNameHash() == crc32("x_axis"))
-					{
-						m_gizmo.startTransform(camera_cmp, x, y, Gizmo::TransformMode::X);
-					}
-					else if(hit.m_mesh->getNameHash() == crc32("y_axis"))
-					{
-						m_gizmo.startTransform(camera_cmp, x, y, Gizmo::TransformMode::Y);
-					}
-					else 
-					{
-						m_gizmo.startTransform(camera_cmp, x, y, Gizmo::TransformMode::Z);
-					}
-				}
-			}
-			else
-			{
-				selectEntity(hit.m_renderable.entity);
-				m_mouse_mode = EditorServerImpl::MouseMode::TRANSFORM;
-				m_gizmo.startTransform(m_camera.getComponent(camera_type), x, y, Gizmo::TransformMode::CAMERA_XZ);
-			}
+			selectEntity(hit.m_renderable.entity);
+			m_mouse_mode = EditorServerImpl::MouseMode::TRANSFORM;
+			m_gizmo.startTransform(m_camera.getComponent(camera_type), x, y, Gizmo::TransformMode::CAMERA_XZ);
 		}
 		/*Vec3 hit_pos;
 		char node_name[20];
@@ -482,7 +488,7 @@ void EditorServerImpl::addEntity()
 	e.setPosition(m_camera.getPosition() + m_camera.getRotation() * Vec3(0, 0, -2));
 	selectEntity(e);
 	EditorIcon* er = LUX_NEW(EditorIcon)();
-	er->create(m_selected_entity, Component::INVALID);
+	er->create(m_engine.getRenderer(), m_selected_entity, Component::INVALID);
 	m_editor_icons.push(er);
 }
 
@@ -899,14 +905,18 @@ void EditorServerImpl::sendMessage(const uint8_t* data, int32_t length)
 }
 
 
-void EditorServerImpl::renderScene(IRenderDevice& render_device)
+void EditorServerImpl::renderIcons(IRenderDevice& render_device)
 {
-	m_engine.getRenderer().render(render_device);
 	for(int i = 0, c = m_editor_icons.size(); i < c; ++i)
 	{
 		m_editor_icons[i]->render(&m_engine.getRenderer(), render_device);
 	}
 
+}
+
+void EditorServerImpl::renderScene(IRenderDevice& render_device)
+{
+	m_engine.getRenderer().render(render_device);
 
 /*	if(is_render_physics)
 	{
@@ -1124,7 +1134,7 @@ void EditorServerImpl::onComponentEvent(ComponentEvent& e)
 		if(!found)
 		{
 			EditorIcon* er = LUX_NEW(EditorIcon)();
-			er->create(e.component.entity, e.component);
+			er->create(m_engine.getRenderer(), e.component.entity, e.component);
 			m_editor_icons.push(er);
 		}
 	}
@@ -1133,7 +1143,7 @@ void EditorServerImpl::onComponentEvent(ComponentEvent& e)
 		if(e.component.entity.existsInUniverse() &&  e.component.entity.getComponents().empty())
 		{
 			EditorIcon* er = LUX_NEW(EditorIcon)();
-			er->create(e.component.entity, Component::INVALID);
+			er->create(m_engine.getRenderer(), e.component.entity, Component::INVALID);
 			m_editor_icons.push(er);
 		}
 	}

@@ -77,8 +77,9 @@ class Model : public Resource
 		~Model();
 
 		Geometry*	getGeometry() const		{ return m_geometry; }
-		Mesh&		getMesh(int index)		{ return m_meshes[index]; }
-		int			getMeshCount() const	{ return m_meshes.size(); }
+		Mesh&		getMesh(int index) { return m_meshes[index]; }
+		const Mesh&	getMesh(int index) const { return m_meshes[index]; }
+		int			getMeshCount() const { return m_meshes.size(); }
 		int			getBoneCount() const	{ return m_bones.size(); }
 		Bone&		getBone(int i)			{ return m_bones[i]; }
 		void		getPose(Pose& pose);
@@ -97,8 +98,6 @@ class Model : public Resource
 		Array<Mesh> m_meshes;
 		Array<Bone> m_bones;
 		float m_bounding_radius;
-//		DelegateList<void ()> m_on_loaded;
-
 };
 
 

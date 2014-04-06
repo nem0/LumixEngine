@@ -14,6 +14,7 @@ namespace Lux
 class Engine;
 class IRenderDevice;
 class Material;
+class Model;
 class ModelInstance;
 class Pipeline;
 class Pose;
@@ -55,8 +56,10 @@ class LUX_ENGINE_API Renderer : public IPlugin
 		virtual Pipeline* loadPipeline(const char* path) = 0;
 		virtual Engine& getEngine() = 0;
 		
-
-/*		virtual void renderScene();
+		/// "immediate mode"
+		virtual void renderModel(const Model& model, const Matrix& transform) = 0;
+		virtual Model* getModel(const char* path) = 0;
+		/*		virtual void renderScene();
 		void endFrame();
 		void enableStage(const char* name, bool enable);
 		int getWidth() const;

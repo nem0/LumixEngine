@@ -12,12 +12,6 @@
 #include "graphics/material.h"
 #include "graphics/pose.h"
 #include "graphics/renderer.h"
-/*#include "graphics/vertex_buffer.h"
-#include "graphics/material.h"
-#include "common/manager.h"
-#include "graphics/shader.h"
-#include "graphics/pose.h"
-#include "system/resource_manager_bucket.h"*/
 
 
 namespace Lux
@@ -218,7 +212,14 @@ void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 
 void Model::doUnload(void)
 {
-	TODO("Implement Material Unload");
+	for (int i = 0; i < m_meshes.size(); ++i)
+	{
+		m_resource_manager.get(ResourceManager::MATERIAL)->unload(*m_meshes[i].getMaterial());
+	}
+	m_meshes.clear();
+	m_bones.clear();
+	LUX_DELETE(m_geometry);
+	m_geometry = NULL;
 
 	m_size = 0;
 	onEmpty();
