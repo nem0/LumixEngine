@@ -496,7 +496,7 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 
 void Texture::doUnload(void)
 {
-	TODO("Implement Shader Unload");
+	glDeleteTextures(1, &m_id);
 
 	m_size = 0;
 	onEmpty();

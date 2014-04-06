@@ -12,6 +12,7 @@
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "engine/engine.h"
+#include "graphics/geometry.h"
 #include "graphics/gl_ext.h"
 #include "graphics/irender_device.h"
 #include "graphics/material.h"
@@ -399,6 +400,27 @@ struct RendererImpl : public Renderer
 	{
 		return *m_engine;
 	}
+
+
+	virtual void renderModel(const Model& model, const Matrix& transform) override
+	{
+		glPushMatrix();
+		glMultMatrixf(&transform.m11);
+		for (int i = 0, c = model.getMeshCount(); i < c;  ++i)
+		{
+			const Mesh& mesh = model.getMesh(i);
+			mesh.getMaterial()->apply(*this);
+			model.getGeometry()->draw(mesh.getStart(), mesh.getCount(), *mesh.getMaterial()->getShader());
+		}
+		glPopMatrix();
+	}
+
+
+	virtual Model* getModel(const char* path) override
+	{
+		return static_cast<Model*>(m_engine->getResourceManager().get(ResourceManager::MODEL)->load(path));
+	}
+
 
 	virtual Pipeline* loadPipeline(const char* path) override
 	{

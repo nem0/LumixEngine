@@ -21,7 +21,7 @@ class MyRenderDevice : public Lux::IRenderDevice
 		m_renderer = &renderer;
 		m_pipeline = Lux::PipelineInstance::create(*m_renderer->loadPipeline(pipeline));
 	}
-
+	
 	virtual void endFrame()
 	{
 		wglSwapLayerBuffers(m_hdc, WGL_SWAP_MAIN_PLANE);
@@ -66,7 +66,9 @@ int main(int argc, char *argv[])
 		w.getGameView()->setPipeline(rd2.getPipeline());
 		wglMakeCurrent(rd.m_hdc, server.getHGLRC());
 		server.render(rd);
+		server.renderIcons(rd);
 		server.getGizmo().updateScale(server.getCamera(0));
+		server.getGizmo().render(server.getEngine().getRenderer());
 		rd.endFrame();
 		wglMakeCurrent(rd2.m_hdc, server.getHGLRC());
 		server.render(rd2);
