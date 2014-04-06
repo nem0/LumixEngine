@@ -48,7 +48,7 @@ namespace Lux
 				}
 			}
 
-			virtual bool read(void* buffer, intptr_t size) LUX_OVERRIDE
+			virtual bool read(void* buffer, size_t size) LUX_OVERRIDE
 			{
 				int32_t op = TCPCommand::Read;
 
@@ -64,7 +64,7 @@ namespace Lux
 				return successful;
 			}
 
-			virtual bool write(const void* buffer, intptr_t size) LUX_OVERRIDE
+			virtual bool write(const void* buffer, size_t size) LUX_OVERRIDE
 			{
 				int32_t op = TCPCommand::Write;
 
@@ -85,7 +85,7 @@ namespace Lux
 				return NULL;
 			}
 
-			virtual intptr_t size() LUX_OVERRIDE
+			virtual size_t size() LUX_OVERRIDE
 			{
 				int32_t op = TCPCommand::Size;
 				uint32_t size = 0;
@@ -96,10 +96,10 @@ namespace Lux
 
 				m_stream->read(size);
 
-				return (intptr_t)size;
+				return (size_t)size;
 			}
 
-			virtual intptr_t seek(SeekMode base, intptr_t pos) LUX_OVERRIDE
+			virtual size_t seek(SeekMode base, size_t pos) LUX_OVERRIDE
 			{
 				int32_t op = TCPCommand::Seek;
 
@@ -112,10 +112,10 @@ namespace Lux
 				int32_t ret = 0;
 				m_stream->read(ret);
 
-				return (intptr_t)ret;
+				return (size_t)ret;
 			}
 
-			virtual intptr_t pos() LUX_OVERRIDE
+			virtual size_t pos() LUX_OVERRIDE
 			{
 				int32_t op = TCPCommand::Seek;
 				int32_t pos = 0;
@@ -126,7 +126,7 @@ namespace Lux
 
 				m_stream->read(pos);
 
-				return (intptr_t)pos;
+				return (size_t)pos;
 			}
 
 		private:

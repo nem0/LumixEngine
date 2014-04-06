@@ -32,7 +32,7 @@ namespace Lux
 			return ret;
 		}
 
-		bool TCPStream::read(void* buffer, intptr_t size)
+		bool TCPStream::read(void* buffer, size_t size)
 		{
 			int32_t to_receive = (int32_t)size;
 			char* ptr = static_cast<char*>(buffer);
@@ -58,7 +58,7 @@ namespace Lux
 			return true;
 		}
 
-		bool TCPStream::write(const void* buffer, intptr_t size)
+		bool TCPStream::write(const void* buffer, size_t size)
 		{
 			int send = ::send(m_socket, static_cast<const char*>(buffer), (int)size, 0);
 
