@@ -24,7 +24,8 @@ SOURCES += main.cpp\
     gameview.cpp \
     assetbrowser.cpp \
     scripts/scriptcompiler.cpp \
-    scripts/scriptcompilerwidget.cpp
+    scripts/scriptcompilerwidget.cpp \
+    fileserverwidget.cpp
 
 HEADERS  += mainwindow.h \
     sceneview.h \ 
@@ -36,7 +37,8 @@ HEADERS  += mainwindow.h \
     gameview.h \
     assetbrowser.h \
     scripts/scriptcompiler.h \
-    scripts/scriptcompilerwidget.h
+    scripts/scriptcompilerwidget.h \
+    fileserverwidget.h
 
 FORMS    += mainwindow.ui \
     logwidget.ui \
@@ -46,7 +48,8 @@ FORMS    += mainwindow.ui \
     script_widget.ui \
     gameview.ui \
     assetbrowser.ui \
-    scripts/scriptcompilerwidget.ui
+    scripts/scriptcompilerwidget.ui \
+    fileserverwidget.ui
 
 win32
 {

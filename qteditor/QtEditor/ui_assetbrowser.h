@@ -36,9 +36,9 @@ public:
         dockWidgetContents = new QWidget();
         dockWidgetContents->setObjectName(QStringLiteral("dockWidgetContents"));
         verticalLayout = new QVBoxLayout(dockWidgetContents);
-        verticalLayout->setSpacing(0);
+        verticalLayout->setSpacing(9);
         verticalLayout->setObjectName(QStringLiteral("verticalLayout"));
-        verticalLayout->setContentsMargins(0, 0, 0, 0);
+        verticalLayout->setContentsMargins(2, 2, 2, 2);
         treeView = new QTreeView(dockWidgetContents);
         treeView->setObjectName(QStringLiteral("treeView"));
         treeView->setEditTriggers(QAbstractItemView::NoEditTriggers);

@@ -53,6 +53,7 @@ int main(int argc, char *argv[])
 	server.tick(hwnd, NULL);
 	client.create(server.getEngine().getBasePath());
 	w.setEditorClient(client);
+	w.setEditorServer(server);
 	w.getSceneView()->setServer(&server);
 	MyRenderDevice rd(server.getEngine().getRenderer(), "pipelines/main.json");
 	MyRenderDevice rd2(server.getEngine().getRenderer(), "pipelines/game_view.json");

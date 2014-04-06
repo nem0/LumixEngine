@@ -45,18 +45,18 @@ public:
         dockWidgetContents = new QWidget();
         dockWidgetContents->setObjectName(QStringLiteral("dockWidgetContents"));
         verticalLayout = new QVBoxLayout(dockWidgetContents);
-        verticalLayout->setSpacing(0);
+        verticalLayout->setSpacing(9);
         verticalLayout->setObjectName(QStringLiteral("verticalLayout"));
-        verticalLayout->setContentsMargins(0, 0, 0, 0);
+        verticalLayout->setContentsMargins(2, 2, 2, 2);
         components = new QToolBox(dockWidgetContents);
         components->setObjectName(QStringLiteral("components"));
         componentA = new QWidget();
         componentA->setObjectName(QStringLiteral("componentA"));
-        componentA->setGeometry(QRect(0, 0, 251, 339));
+        componentA->setGeometry(QRect(0, 0, 247, 344));
         components->addItem(componentA, QStringLiteral("Page 1"));
         componentB = new QWidget();
         componentB->setObjectName(QStringLiteral("componentB"));
-        componentB->setGeometry(QRect(0, 0, 251, 357));
+        componentB->setGeometry(QRect(0, 0, 247, 344));
         components->addItem(componentB, QStringLiteral("Page 2"));
 
         verticalLayout->addWidget(components);
@@ -93,7 +93,7 @@ public:
 
         retranslateUi(PropertyView);
 
-        components->setCurrentIndex(1);
+        components->setCurrentIndex(0);
         components->layout()->setSpacing(1);
 
 

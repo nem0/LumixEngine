@@ -2,12 +2,13 @@
 #include "ui_mainwindow.h"
 #include <qfiledialog.h>
 #include <qsettings.h>
+#include "assetbrowser.h"
 #include "editor/editor_client.h"
+#include "fileserverwidget.h"
+#include "gameview.h"
 #include "log_widget.h"
 #include "property_view.h"
 #include "sceneview.h"
-#include "gameview.h"
-#include "assetbrowser.h"
 #include "scripts/scriptcompilerwidget.h"
 
 
@@ -18,21 +19,25 @@ MainWindow::MainWindow(QWidget *parent) :
 	m_client = NULL;
 	m_ui->setupUi(this);
 	m_ui->centralWidget->hide();
+	
 	m_log = new LogWidget;
 	m_property_view = new PropertyView;
 	m_scene_view = new SceneView;
 	m_game_view = new GameView;
 	m_asset_browser = new AssetBrowser;
 	m_script_compiler_ui = new ScriptCompilerWidget;
+	m_file_server_ui = new FileServerWidget;
+	
 	QSettings settings("Lux", "QtEditor");
 	restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
+	
 	addDockWidget(static_cast<Qt::DockWidgetArea>(1), m_game_view);
 	addDockWidget(static_cast<Qt::DockWidgetArea>(8), m_log);
+	addDockWidget(static_cast<Qt::DockWidgetArea>(8), m_file_server_ui);
 	addDockWidget(static_cast<Qt::DockWidgetArea>(8), m_script_compiler_ui);
 	addDockWidget(static_cast<Qt::DockWidgetArea>(1), m_property_view);
 	addDockWidget(static_cast<Qt::DockWidgetArea>(2), m_scene_view);
 	addDockWidget(static_cast<Qt::DockWidgetArea>(2), m_asset_browser);
-
 
 	restoreState(settings.value("mainWindowState").toByteArray());
 }
@@ -55,6 +60,11 @@ MainWindow::~MainWindow()
 	delete m_game_view;
 }
 
+
+void MainWindow::setEditorServer(Lux::EditorServer& server)
+{
+	m_file_server_ui->setEditorServer(server);
+}
 
 void MainWindow::setEditorClient(Lux::EditorClient& client)
 {

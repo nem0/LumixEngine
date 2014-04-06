@@ -44,6 +44,7 @@ public:
         formLayout = new QFormLayout(RenderableWidget);
         formLayout->setObjectName(QStringLiteral("formLayout"));
         formLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+        formLayout->setContentsMargins(2, 2, 2, 2);
         label = new QLabel(RenderableWidget);
         label->setObjectName(QStringLiteral("label"));
 

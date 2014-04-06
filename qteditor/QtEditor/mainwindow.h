@@ -5,6 +5,7 @@
 namespace Lux
 {
 	class EditorClient;
+	class EditorServer;
 }
 
 namespace Ui {
@@ -20,6 +21,7 @@ public:
 	~MainWindow();
 
 	void setEditorClient(Lux::EditorClient& client);
+	void setEditorServer(Lux::EditorServer& server);
 	class SceneView* getSceneView() const;
 	class GameView* getGameView() const;
 
@@ -42,5 +44,6 @@ private:
 	class GameView* m_game_view;
 	class AssetBrowser* m_asset_browser;
 	class ScriptCompilerWidget* m_script_compiler_ui;
+	class FileServerWidget* m_file_server_ui;
 };
 
