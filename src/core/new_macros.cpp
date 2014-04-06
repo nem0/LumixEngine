@@ -4,7 +4,7 @@
 namespace Lux 
 {
 #ifdef MEM_TRACK
-	void storePtr(void* ptr, intptr_t size, const char* file, int32_t line)
+	void storePtr(void* ptr, size_t size, const char* file, int32_t line)
 	{
 		MemoryTracker::getInstance().add(ptr, size, file, line);
 	}
@@ -14,11 +14,11 @@ namespace Lux
 		MemoryTracker::getInstance().remove(ptr);
 	}
 #else
-	void storePtr(void* ptr, intptr_t size, const char* file, int32_t line) {}
+	void storePtr(void* ptr, size_t size, const char* file, int32_t line) {}
 	void removePtr(void* ptr) {}
 #endif
 
-	LUX_FORCE_INLINE void* lux_new(intptr_t size, const char* file, int32_t line)
+	LUX_FORCE_INLINE void* lux_new(size_t size, const char* file, int32_t line)
 	{
 		if(!size)size = 1;
 
@@ -27,7 +27,7 @@ namespace Lux
 		return p;
 	}
 
-	LUX_FORCE_INLINE void* lux_new_aligned(intptr_t size, intptr_t alignment, const char* file, int32_t line)
+	LUX_FORCE_INLINE void* lux_new_aligned(size_t size, size_t alignment, const char* file, int32_t line)
 	{
 		if(!size)size = 1;
 		void* p = _aligned_malloc(size, alignment);
@@ -35,7 +35,7 @@ namespace Lux
 		return p;
 	}
 	
-	LUX_FORCE_INLINE void* lux_realloc(void* ptr, intptr_t size, const char* file, int32_t line)
+	LUX_FORCE_INLINE void* lux_realloc(void* ptr, size_t size, const char* file, int32_t line)
 	{
 		if(NULL == ptr && 0 < size)
 		{
@@ -82,17 +82,17 @@ namespace Lux
 		_aligned_free(ptr);
 	}
 
-	void* dll_lux_new(intptr_t size, const char* file, int32_t line)
+	void* dll_lux_new(size_t size, const char* file, int32_t line)
 	{ 
 		return lux_new(size, file, line); 
 	}
 
-	void* dll_lux_new_aligned(intptr_t size, intptr_t alignment, const char* file, int32_t line)
+	void* dll_lux_new_aligned(size_t size, size_t alignment, const char* file, int32_t line)
 	{ 
 		return lux_new_aligned(size, alignment, file, line); 
 	}
 
-	void* dll_lux_realloc(void* ptr, intptr_t size, const char* file, int32_t line)
+	void* dll_lux_realloc(void* ptr, size_t size, const char* file, int32_t line)
 	{ 
 		return lux_realloc(ptr, size, file, line); 
 	}
