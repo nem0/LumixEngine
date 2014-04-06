@@ -184,8 +184,8 @@ namespace
 		animation_manager.create(Lux::ResourceManager::ANIMATION, resource_manager);
 
 		Lux::g_log_info.log("unit", "loading ...");
-		Lux::Resource* animation_1 = animation_manager.load(texture_test_tga);
-		Lux::Resource* animation_2 = animation_manager.get(texture_test_tga);
+		Lux::Resource* animation_1 = animation_manager.load(anim_test);
+		Lux::Resource* animation_2 = animation_manager.get(anim_test);
 
 		LUX_EXPECT_NOT_NULL(animation_1);
 		LUX_EXPECT_NOT_NULL(animation_2);
@@ -215,14 +215,6 @@ namespace
 		LUX_EXPECT_EQ(anim_test_size, animation_2->size());
 
 		Lux::g_log_info.log("unit", "unloading ...");
-
-		animation_manager.unload(texture_test_tga);
-
-		LUX_EXPECT_FALSE(animation_1->isEmpty());
-		LUX_EXPECT_FALSE(animation_1->isLoading());
-		LUX_EXPECT_TRUE(animation_1->isReady());
-		LUX_EXPECT_FALSE(animation_1->isUnloading());
-		LUX_EXPECT_FALSE(animation_1->isFailure());
 
 		animation_manager.unload(*animation_2);
 
