@@ -18,7 +18,10 @@ namespace Lux
 	class IPlugin;
 	class IRenderDevice;
 	class Engine;
-
+	namespace FS
+	{
+		class TCPFileServer;
+	}
 
 	class LUX_ENGINE_API EditorServer
 	{
@@ -37,6 +40,7 @@ namespace Lux
 			Component getCamera(int index) const;
 			HGLRC getHGLRC();
 			class Gizmo& getGizmo();
+			class FS::TCPFileServer& getTCPFileServer();
 
 		private:
 			struct EditorServerImpl* m_impl;

@@ -55,6 +55,11 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="fileserverwidget.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
     <ClCompile Include="gameview.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -118,6 +123,11 @@
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
+    <CustomBuild Include="fileserverwidget.h">
+      <Filter>Header Files</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
     <CustomBuild Include="gameview.h">
       <Filter>Header Files</Filter>
     </CustomBuild>
@@ -162,6 +172,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="debug\moc_assetbrowser.cpp">
+      <Filter>Generated Files\debug</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="debug\moc_fileserverwidget.cpp">
       <Filter>Generated Files\debug</Filter>
     </ClCompile>
   </ItemGroup>
@@ -224,6 +239,11 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="release\moc_fileserverwidget.cpp">
+      <Filter>Generated Files\release</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
     <ClCompile Include="release\moc_gameview.cpp">
       <Filter>Generated Files\release</Filter>
     </ClCompile>
@@ -279,6 +299,11 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ui_fileserverwidget.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
     <ClInclude Include="ui_gameview.h">
       <Filter>Generated Files</Filter>
     </ClInclude>
@@ -328,6 +353,11 @@
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="assetbrowser.ui">
+      <Filter>Form Files</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="fileserverwidget.ui">
       <Filter>Form Files</Filter>
     </CustomBuild>
   </ItemGroup>

@@ -832,6 +832,12 @@ Gizmo& EditorServer::getGizmo()
 }
 
 
+FS::TCPFileServer& EditorServer::getTCPFileServer()
+{
+	return m_impl->m_tpc_file_server;
+}
+
+
 HGLRC EditorServer::getHGLRC()
 {
 	return m_impl->m_hglrc;

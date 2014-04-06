@@ -39,7 +39,7 @@ public:
         dockWidgetContents->setObjectName(QStringLiteral("dockWidgetContents"));
         horizontalLayout = new QHBoxLayout(dockWidgetContents);
         horizontalLayout->setObjectName(QStringLiteral("horizontalLayout"));
-        horizontalLayout->setContentsMargins(0, 0, 0, 0);
+        horizontalLayout->setContentsMargins(2, 2, 2, 2);
         tableWidget = new QTableWidget(dockWidgetContents);
         if (tableWidget->columnCount() < 2)
             tableWidget->setColumnCount(2);
