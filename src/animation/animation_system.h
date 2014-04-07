@@ -37,7 +37,7 @@ namespace Lux
 			Component createAnimable(const Entity& entity);
 			void playAnimation(const Component& cmp, const char* path);
 			void setAnimationTime(const Component& cmp, float time);
-			Animation* loadAnimation(const char* path, FS::FileSystem& file_system);
+			Animation* loadAnimation(const char* path);
 
 		private:
 			struct AnimationSystemImpl* m_impl;

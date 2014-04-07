@@ -388,6 +388,7 @@ bool Texture::loadDDS(FS::IFile* file)
 		{
 			glDeleteTextures(1, &m_id);
 			g_log_error.log("renderer", "Unsupported DDS format %s", m_path.c_str());
+			onFailure();
 			return false;
 		}
 		unsigned char * data = LUX_NEW_ARRAY(unsigned char, size);
@@ -488,6 +489,7 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	else
 	{
 		g_log_error.log("renderer", "Error loading texture %s", m_path.c_str());
+		onFailure();
 	}
 	
 	fs.close(file);

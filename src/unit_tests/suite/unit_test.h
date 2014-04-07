@@ -7,8 +7,8 @@ namespace Lux
 {
 	namespace UnitTest
 	{
-		template<typename T>
-		LUX_FORCE_INLINE void expectEq(T p1, T p2, const char* file, uint32_t line)
+		template<typename T1, typename T2>
+		LUX_FORCE_INLINE void expectEq(T1 p1, T2 p2, const char* file, uint32_t line)
 		{
 			if(p1 != p2)
 			{
@@ -25,8 +25,8 @@ namespace Lux
 			}
 		}
 
-		template<typename T>
-		LUX_FORCE_INLINE void expectNe(T p1, T p2, const char* file, uint32_t line)
+		template<typename T1, typename T2>
+		LUX_FORCE_INLINE void expectNe(T1 p1, T2 p2, const char* file, uint32_t line)
 		{
 			if(p1 == p2)
 			{
@@ -43,8 +43,8 @@ namespace Lux
 			}
 		}
 
-		template<typename T>
-		LUX_FORCE_INLINE void expectLt(T p1, T p2, const char* file, uint32_t line)
+		template<typename T1, typename T2>
+		LUX_FORCE_INLINE void expectLt(T1 p1, T2 p2, const char* file, uint32_t line)
 		{
 			if(p1 >= p2)
 			{
@@ -61,8 +61,8 @@ namespace Lux
 			}
 		}
 
-		template<typename T>
-		LUX_FORCE_INLINE void expectGt(T p1, T p2, const char* file, uint32_t line)
+		template<typename T1, typename T2>
+		LUX_FORCE_INLINE void expectGt(T1 p1, T2 p2, const char* file, uint32_t line)
 		{
 			if(p1 <= p2)
 			{
@@ -79,8 +79,8 @@ namespace Lux
 			}
 		}
 
-		template<typename T>
-		LUX_FORCE_INLINE void expectLe(T p1, T p2, const char* file, uint32_t line)
+		template<typename T1, typename T2>
+		LUX_FORCE_INLINE void expectLe(T1 p1, T2 p2, const char* file, uint32_t line)
 		{
 			if(p1 > p2)
 			{
@@ -97,8 +97,8 @@ namespace Lux
 			}
 		}
 
-		template<typename T>
-		LUX_FORCE_INLINE void expectGe(T p1, T p2, const char* file, uint32_t line)
+		template<typename T1, typename T2>
+		LUX_FORCE_INLINE void expectGe(T1 p1, T2 p2, const char* file, uint32_t line)
 		{
 			if(p1 < p2)
 			{
@@ -161,3 +161,5 @@ namespace Lux
 #define LUX_EXPECT_CLOSE_NE(p1, p2)	Lux::UnitTest::expectCloseNe(p1, p2, __FILE__, __LINE__)
 #define LUX_EXPECT_TRUE(p1)		Lux::UnitTest::expectTrue(p1, __FILE__, __LINE__)
 #define LUX_EXPECT_FALSE(p1)	Lux::UnitTest::expectFalse(p1, __FILE__, __LINE__)
+#define LUX_EXPECT_NULL(p1)		Lux::UnitTest::expectTrue(p1 == NULL, __FILE__, __LINE__)
+#define LUX_EXPECT_NOT_NULL(p1)	Lux::UnitTest::expectTrue(p1 != NULL, __FILE__, __LINE__)
