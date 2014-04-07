@@ -28,8 +28,8 @@ public:
 	~PipelineManager() {}
 
 protected:
-	virtual Resource* createResource(const Path& path) LUX_OVERRIDE;
-	virtual void destroyResource(Resource& resource) LUX_OVERRIDE;
+	virtual Resource* createResource(const Path& path) override;
+	virtual void destroyResource(Resource& resource) override;
 };
 
 
@@ -62,6 +62,8 @@ class LUX_ENGINE_API PipelineInstance abstract
 
 		static PipelineInstance* create(Pipeline& src);
 		static void destroy(PipelineInstance* pipeline);
+
+		virtual void setRenderer(Renderer& renderer) = 0;
 };
 
 

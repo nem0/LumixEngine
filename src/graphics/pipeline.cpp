@@ -134,7 +134,6 @@ struct PipelineImpl : public Pipeline
 
 	PipelineImpl(const Path& path, ResourceManager& resource_manager)
 		: Pipeline(path, resource_manager)
-		, m_renderer(NULL)
 	{
 		m_is_ready = false;
 		addCommandCreator("clear").bind<&CreateCommand<ClearCommand> >();
@@ -158,44 +157,25 @@ struct PipelineImpl : public Pipeline
 	}
 
 
+	virtual void doUnload(void) override
+	{
+		TODO("Implement!");
+	}
+
+
+	virtual FS::ReadCallback getReadCallback() override
+	{
+		FS::ReadCallback cb;
+		cb.bind<PipelineImpl, &PipelineImpl::loaded>(this);
+		return cb;
+	}
+
+
 	CommandCreator::Creator& addCommandCreator(const char* type)
 	{
 		CommandCreator& creator = m_command_creators.pushEmpty();
 		creator.m_type_hash = crc32(type);
 		return creator.m_creator;
-	}
-
-
-
-
-	virtual void setRenderer(Renderer& renderer) LUX_OVERRIDE
-	{
-		m_renderer = &renderer;
-	}
-
-
-	virtual void setCamera(int index, const Component& camera) LUX_OVERRIDE
-	{
-		if(m_cameras.size() <= index)
-		{
-			m_cameras.resize(index + 1);
-		}
-		m_cameras[index] = camera;
-	}
-
-
-	virtual const Component& getCamera(int index) LUX_OVERRIDE
-	{
-		return m_cameras[index];
-	}
-
-
-	virtual void render() LUX_OVERRIDE
-	{
-		for(int i = 0; i < m_commands.size(); ++i)
-		{
-			m_commands[i]->execute(*this);
-		}
 	}
 
 
@@ -290,7 +270,6 @@ struct PipelineImpl : public Pipeline
 	DelegateList<void(Pipeline&)> m_on_loaded;
 	Array<Command*> m_commands;
 	string m_path;
-	Renderer& m_renderer;
 	Array<CommandCreator> m_command_creators;
 	Array<FrameBufferDeclaration> m_framebuffers;
 	FrameBufferDeclaration m_shadowmap_framebuffer;
@@ -323,6 +302,12 @@ struct PipelineInstanceImpl : public PipelineInstance
 		{
 			LUX_DELETE(m_shadowmap_framebuffer);
 		}
+	}
+
+
+	void setRenderer(Renderer& renderer)
+	{
+		m_renderer = &renderer;
 	}
 
 
@@ -378,7 +363,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	{
 		ASSERT(m_renderer != NULL);
 		glViewport(0, 0, 800, 600); /// TODO
-		Component light_cmp = m_source.m_renderer.getLight(0);
+		Component light_cmp = m_renderer->getLight(0);
 		if (!light_cmp.isValid())
 		{
 			return;
@@ -428,7 +413,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 		glOrtho(-1, 1, -1, 1, 0, 30);
 		glMatrixMode(GL_MODELVIEW);
 
-		material->apply(m_source.m_renderer);
+		ASSERT(m_renderer != NULL);
+		material->apply(*m_renderer);
 		glPushMatrix();
 		glLoadIdentity();
 		glDisable(GL_CULL_FACE);
@@ -456,7 +442,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		/// TODO clean this and optimize
 		static Array<RenderableInfo> infos;
 		infos.clear();
-		m_source.m_renderer.getRenderableInfos(infos, layer_mask);
+		m_renderer->getRenderableInfos(infos, layer_mask);
 		int count = infos.size();
 		for (int i = 0; i < count; ++i)
 		{
@@ -471,7 +457,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 				Mesh& mesh = model.getMesh(j);
 				if (mesh.getMaterial()->isReady())
 				{
-					mesh.getMaterial()->apply(m_source.m_renderer);
+					mesh.getMaterial()->apply(*m_renderer);
 
 					static Matrix bone_mtx[64];
 					Pose& pose = infos[i].m_model_instance->getPose();
@@ -499,25 +485,15 @@ struct PipelineInstanceImpl : public PipelineInstance
 	virtual int getCameraCount() const override
 	{
 		return m_cameras.size();
-	virtual void doUnload(void) LUX_OVERRIDE
-	{
-		TODO("Implement!");
-	}
 	}
 
 
 	virtual void resize(int w, int h) override
 	{
+		ASSERT(m_renderer != NULL);
 		for (int i = 0; i < m_cameras.size(); ++i)
 		{
-
-	virtual FS::ReadCallback getReadCallback() LUX_OVERRIDE
-	{
-		FS::ReadCallback cb;
-		cb.bind<PipelineImpl, &PipelineImpl::loaded>(this);
-		return cb;
-	}
-			m_source.m_renderer.setCameraSize(m_cameras[i], w, h);
+			m_renderer->setCameraSize(m_cameras[i], w, h);
 		}
 	}
 
@@ -551,12 +527,25 @@ struct PipelineInstanceImpl : public PipelineInstance
 	FrameBuffer* m_shadowmap_framebuffer;
 	Matrix m_shadow_modelviewprojection;
 	Array<Component> m_cameras;
+	Renderer* m_renderer;
 };
 
 
 Pipeline::Pipeline(const Path& path, ResourceManager& resource_manager)
 	: Resource(path, resource_manager)
 {
+}
+
+
+PipelineInstance* PipelineInstance::create(Pipeline& pipeline)
+{
+	return LUX_NEW(PipelineInstanceImpl)(pipeline);
+}
+
+
+void PipelineInstance::destroy(PipelineInstance* pipeline)
+{
+	LUX_DELETE(pipeline);
 }
 
 
@@ -601,7 +590,8 @@ void ApplyCameraCommand::deserialize(PipelineImpl& pipeline, ISerializer& serial
 
 void ApplyCameraCommand::execute(PipelineInstanceImpl& pipeline)
 {
-	pipeline.m_source.m_renderer.applyCamera(pipeline.m_cameras[m_camera_idx]);
+	ASSERT(pipeline.m_renderer != NULL);
+	pipeline.m_renderer->applyCamera(pipeline.m_cameras[m_camera_idx]);
 }
 
 
@@ -632,7 +622,7 @@ void DrawFullscreenQuadCommand::deserialize(PipelineImpl& pipeline, ISerializer&
 	strcpy(material_path, "materials/");
 	strcat(material_path, material);
 	strcat(material_path, ".mat");
-	m_material = static_cast<Material*>(pipeline.m_renderer->getEngine().getResourceManager().get(ResourceManager::MATERIAL)->load(material_path));
+	m_material = static_cast<Material*>(pipeline.getResourceManager().get(ResourceManager::MATERIAL)->load(material_path));
 }
 
 

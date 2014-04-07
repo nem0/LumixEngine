@@ -20,6 +20,7 @@ class MyRenderDevice : public Lux::IRenderDevice
 	{
 		m_renderer = &renderer;
 		m_pipeline = Lux::PipelineInstance::create(*m_renderer->loadPipeline(pipeline));
+		m_pipeline->setRenderer(renderer);
 	}
 	
 	virtual void endFrame()
