@@ -135,7 +135,6 @@ struct PipelineImpl : public Pipeline
 	PipelineImpl(const Path& path, ResourceManager& resource_manager)
 		: Pipeline(path, resource_manager)
 	{
-		m_is_ready = false;
 		addCommandCreator("clear").bind<&CreateCommand<ClearCommand> >();
 		addCommandCreator("render_models").bind<&CreateCommand<RenderModelsCommand> >();
 		addCommandCreator("apply_camera").bind<&CreateCommand<ApplyCameraCommand> >();
@@ -159,7 +158,12 @@ struct PipelineImpl : public Pipeline
 
 	virtual void doUnload(void) override
 	{
-		TODO("Implement!");
+		for (int i = 0; i < m_commands.size(); ++i)
+		{
+			LUX_DELETE(m_commands[i]);
+		}
+		m_commands.clear();
+		onEmpty();
 	}
 
 
@@ -247,29 +251,18 @@ struct PipelineImpl : public Pipeline
 		{
 			JsonSerializer serializer(*file, JsonSerializer::READ);
 			deserialize(serializer);
+			onReady();
+		}
+		else
+		{
+			onFailure();
 		}
 
 		fs.close(file);
-		m_is_ready = true;
-		m_on_loaded.invoke(*this);
-	}
-
-	virtual DelegateList<void(Pipeline&)>& onLoaded() override
-	{
-		return m_on_loaded;
 	}
 
 
-	virtual bool isReady() const override
-	{
-		return m_is_ready;
-	}
-
-
-	bool m_is_ready;
-	DelegateList<void(Pipeline&)> m_on_loaded;
 	Array<Command*> m_commands;
-	string m_path;
 	Array<CommandCreator> m_command_creators;
 	Array<FrameBufferDeclaration> m_framebuffers;
 	FrameBufferDeclaration m_shadowmap_framebuffer;
@@ -284,11 +277,11 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_shadowmap_framebuffer = NULL;
 		if(pipeline.isReady())
 		{
-			sourceLoaded(pipeline);
+			sourceLoaded(Resource::State::READY);
 		}
 		else
 		{
-			pipeline.onLoaded().bind<PipelineInstanceImpl, &PipelineInstanceImpl::sourceLoaded>(this);
+			pipeline.getObserverCb().bind<PipelineInstanceImpl, &PipelineInstanceImpl::sourceLoaded>(this);
 		}
 	}
 
@@ -311,15 +304,18 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void sourceLoaded(Pipeline& pipeline)
+	void sourceLoaded(uint32_t status)
 	{
-		PipelineImpl::FrameBufferDeclaration fb = m_source.m_shadowmap_framebuffer;
-		m_shadowmap_framebuffer = LUX_NEW(FrameBuffer)(fb.m_width, fb.m_height, fb.m_mask);
-		m_framebuffers.reserve(m_source.m_framebuffers.size());
-		for (int i = 0; i < m_source.m_framebuffers.size(); ++i)
+		if (status == Resource::State::READY)
 		{
-			fb = m_source.m_framebuffers[i];
-			m_framebuffers.push(LUX_NEW(FrameBuffer)(fb.m_width, fb.m_height, fb.m_mask));
+			PipelineImpl::FrameBufferDeclaration fb = m_source.m_shadowmap_framebuffer;
+			m_shadowmap_framebuffer = LUX_NEW(FrameBuffer)(fb.m_width, fb.m_height, fb.m_mask);
+			m_framebuffers.reserve(m_source.m_framebuffers.size());
+			for (int i = 0; i < m_source.m_framebuffers.size(); ++i)
+			{
+				fb = m_source.m_framebuffers[i];
+				m_framebuffers.push(LUX_NEW(FrameBuffer)(fb.m_width, fb.m_height, fb.m_mask));
+			}
 		}
 	}
 

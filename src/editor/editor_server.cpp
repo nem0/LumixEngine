@@ -358,7 +358,6 @@ void EditorServerImpl::onPointerDown(int x, int y, MouseButton::Value button)
 		Vec3 origin, dir;
 		Component camera_cmp = m_camera.getComponent(camera_type);
 		m_engine.getRenderer().getRay(camera_cmp, (float)x, (float)y, origin, dir);
-		TODO("hit gizmo even \"behind\" other objects");
 		RayCastModelHit hit = m_engine.getRenderer().castRay(origin, dir);
 		RayCastModelHit gizmo_hit = m_gizmo.castRay(origin, dir);
 		EditorIconHit icon_hit = raycastEditorIcons(camera_cmp, origin, dir);
