@@ -46,6 +46,8 @@ namespace Lux
 
 		uint32_t size() const { return m_size; }
 
+		ResourceManager& getResourceManager() { return m_resource_manager; }
+
 	protected:
 		Resource(const Path& path, ResourceManager& resource_manager);
 		~Resource();
