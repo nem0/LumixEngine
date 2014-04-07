@@ -41,9 +41,6 @@ class LUX_ENGINE_API Pipeline : public Resource
 
 		virtual bool deserialize(ISerializer& serializer) = 0;
 
-		virtual DelegateList<void(Pipeline&)>& onLoaded() = 0;
-		virtual bool isReady() const = 0;
-
 		static Pipeline* create(Renderer& renderer);
 		static void destroy(Pipeline* pipeline);
 };
