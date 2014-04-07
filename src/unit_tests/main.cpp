@@ -1,6 +1,6 @@
 #include "core/lux.h"
 #include <iostream>
-#include "unit_tests/unit_test_app.h"
+#include "unit_tests/suite/unit_test_app.h"
 
 int main(int argc, const char * argv[])
 {

@@ -6,12 +6,12 @@ namespace Lux
 {
 	namespace MT
 	{
-		void sleep(uint32_t miliseconds);
+		LUX_CORE_API void sleep(uint32_t miliseconds);
 		
-		uint32_t getCurrentThreadID();
-		uint32_t getProccessAffinityMask();
-		bool isMainThread();
-		void setMainThread();
+		LUX_CORE_API uint32_t getCurrentThreadID();
+		LUX_CORE_API uint32_t getProccessAffinityMask();
+		LUX_CORE_API bool isMainThread();
+		LUX_CORE_API void setMainThread();
 
 		class LUX_CORE_API Task
 		{

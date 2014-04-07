@@ -8,6 +8,7 @@
 #include "graphics/renderer.h"
 #include "universe/component_event.h"
 #include "universe/universe.h"
+#include "core/resource_manager.h"
 
 namespace Lux
 {
@@ -171,16 +172,17 @@ namespace Lux
 		return Component(entity, animable_type, this, m_impl->m_animables.size() - 1);
 	}
 
-	Animation* AnimationSystem::loadAnimation(const char* path, FS::FileSystem& file_system)
+
+	Animation* AnimationSystem::loadAnimation(const char* path)
 	{
-		Animation* anim = LUX_NEW(Animation);
-		anim->load(path, file_system);
-		return anim;
+		ResourceManager& rm = m_impl->m_engine.getResourceManager();
+		return static_cast<Animation*>(rm.get(ResourceManager::ANIMATION)->load(path));
 	}
+
 
 	void AnimationSystem::playAnimation(const Component& cmp, const char* path)
 	{
-		m_impl->m_animables[cmp.index].m_animation = loadAnimation(path, m_impl->m_engine.getFileSystem());
+		m_impl->m_animables[cmp.index].m_animation = loadAnimation(path);
 		m_impl->m_animables[cmp.index].m_time = 0;
 		m_impl->m_animables[cmp.index].m_manual = false;
 	}

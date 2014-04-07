@@ -12,17 +12,21 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\core\new.cpp" />
-    <ClCompile Include="..\..\..\src\unit_tests\core\ut_hash_map.cpp" />
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_hash_map.cpp">
+      <PreprocessToFile Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</PreprocessToFile>
+    </ClCompile>
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_path.cpp" />
+    <ClCompile Include="..\..\..\src\unit_tests\engine\ut_resource_managers.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\main.cpp" />
-    <ClCompile Include="..\..\..\src\unit_tests\unit_test_app.cpp" />
-    <ClCompile Include="..\..\..\src\unit_tests\unit_test_manager.cpp" />
+    <ClCompile Include="..\..\..\src\unit_tests\suite\unit_test_app.cpp" />
+    <ClCompile Include="..\..\..\src\unit_tests\suite\unit_test_manager.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\src\unit_tests\platform_defines.h" />
-    <ClInclude Include="..\..\..\src\unit_tests\unit_test.h" />
-    <ClInclude Include="..\..\..\src\unit_tests\unit_test_app.h" />
-    <ClInclude Include="..\..\..\src\unit_tests\unit_test_manager.h" />
+    <ClInclude Include="..\..\..\src\unit_tests\suite\lux_unit_tests.h" />
+    <ClInclude Include="..\..\..\src\unit_tests\suite\platform_defines.h" />
+    <ClInclude Include="..\..\..\src\unit_tests\suite\unit_test.h" />
+    <ClInclude Include="..\..\..\src\unit_tests\suite\unit_test_app.h" />
+    <ClInclude Include="..\..\..\src\unit_tests\suite\unit_test_manager.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{B9B67659-001C-4E9A-823D-49C7EF3F49C2}</ProjectGuid>

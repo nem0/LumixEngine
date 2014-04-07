@@ -37,6 +37,7 @@ namespace Lux
 		if(NULL == resource)
 		{
 			resource = createResource(path);
+			m_resources.insert(path, resource);
 		}
 		
 		if(resource->isEmpty())
@@ -114,7 +115,6 @@ namespace Lux
 	{
 		for(ResourceTable::iterator it = m_resources.begin(); m_resources.end() != it; ++it)
 		{
-			ASSERT((*it)->m_ref_count == 0);
 			LUX_DELETE(*it);
 		}
 	}

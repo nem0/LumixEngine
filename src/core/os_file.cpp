@@ -77,11 +77,12 @@ namespace Lux
 
 		void OsFile::close()
 		{
-			ASSERT(NULL != m_impl);
-
-			::CloseHandle(m_impl->m_file);
-			LUX_DELETE(m_impl);
-			m_impl = NULL;
+			if (NULL != m_impl)
+			{
+				::CloseHandle(m_impl->m_file);
+				LUX_DELETE(m_impl);
+				m_impl = NULL;
+			}
 		}
 
 		bool OsFile::write(const void* data, size_t size)
