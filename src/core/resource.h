@@ -39,7 +39,7 @@ namespace Lux
 		bool isEmpty()		const { return State::EMPTY		== m_state; }
 		bool isLoading()	const { return State::LOADING	== m_state; }
 		bool isReady()		const { return State::READY		== m_state; }
-		bool isUnloading()	const { return State::LOADING	== m_state; }
+		bool isUnloading()	const { return State::UNLOADING	== m_state; }
 		bool isFailure()	const { return State::FAILURE	== m_state; }
 
 		ObserverCallback& getObserverCb() { return m_cb; }

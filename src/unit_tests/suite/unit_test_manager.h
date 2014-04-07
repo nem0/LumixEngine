@@ -51,12 +51,9 @@ namespace Lux
 	} //~UnitTest
 } //~UnitTest
 
-#define LUX_FORCE_SYMBOL(symbol) \
-	__pragma(comment(linker, "/INCLUDE:_" #symbol))
-
 #define REGISTER_TEST(name, method, params) \
-namespace { extern "C" Lux::UnitTest::Helper test_register_ ## method(name, method, params); } \
-	LUX_FORCE_SYMBOL(test_register_ ## method)
+namespace { extern "C" Lux::UnitTest::Helper JOIN_STRINGS(JOIN_STRINGS(test_register_, method), __LINE__)(name, method, params); } \
+	LUX_FORCE_SYMBOL(JOIN_STRINGS(test_register_ ,JOIN_STRINGS(method, __LINE__)))
 
 TODO("Count error messages.");
 TODO("Count warning messages.");

@@ -1,7 +1,4 @@
-#include "core/lux.h"
-#include "unit_tests/platform_defines.h"
-#include "unit_tests/unit_test_app.h"
-#include "unit_tests/unit_test_manager.h"
+#include "unit_tests/suite/lux_unit_tests.h"
 
 #include <Windows.h>
 #include <stdio.h>
@@ -20,11 +17,20 @@ namespace Lux
 			OutputDebugString(tmp);
 		}
 
+		void outputToConsole(const char* system, const char* message)
+		{
+			printf("%s: %s\n", system, message);
+		}
+
 		void App::init()
 		{
 			g_log_info.getCallback().bind<outputToVS>();
 			g_log_warning.getCallback().bind<outputToVS>();
 			g_log_error.getCallback().bind<outputToVS>();
+
+			g_log_info.getCallback().bind<outputToConsole>();
+			g_log_warning.getCallback().bind<outputToConsole>();
+			g_log_error.getCallback().bind<outputToConsole>();
 		}
 
 		void App::run(int argc, const char *argv[])

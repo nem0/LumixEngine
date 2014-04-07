@@ -381,21 +381,6 @@ struct RendererImpl : public Renderer
 	}
 
 
-	Pipeline* getPipeline(const char* path)
-	{
-		for(int i = 0; i < m_pipelines.size(); ++i)
-		{
-			if(strcmp(m_pipelines[i]->getPath(), path) == 0)
-			{
-				return m_pipelines[i];
-			}
-		}
-		Pipeline* pipeline = Pipeline::create(*this);
-		m_pipelines.push(pipeline);
-		pipeline->load(path, m_engine->getFileSystem());
-		return pipeline;
-	}
-
 	virtual Engine& getEngine() override
 	{
 		return *m_engine;
@@ -424,10 +409,7 @@ struct RendererImpl : public Renderer
 
 	virtual Pipeline* loadPipeline(const char* path) override
 	{
-		/// TODO pipeline manager
-		Pipeline* pipeline = Pipeline::create(*this);
-		pipeline->load(path, m_engine->getFileSystem());
-		return pipeline;
+		return static_cast<Pipeline*>(m_engine->getResourceManager().get(ResourceManager::PIPELINE)->load(path));
 	}
 
 

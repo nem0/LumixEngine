@@ -2,6 +2,8 @@
 
 #include "core/lux.h"
 #include "core/delegate_list.h"
+#include "core/resource.h"
+#include "core/resource_manager_base.h"
 
 namespace Lux
 {
@@ -19,14 +21,26 @@ class IFile;
 }
 
 
-class LUX_ENGINE_API Pipeline abstract
+class LUX_ENGINE_API PipelineManager : public ResourceManagerBase
+{
+public:
+	PipelineManager() : ResourceManagerBase() {}
+	~PipelineManager() {}
+
+protected:
+	virtual Resource* createResource(const Path& path) LUX_OVERRIDE;
+	virtual void destroyResource(Resource& resource) LUX_OVERRIDE;
+};
+
+
+class LUX_ENGINE_API Pipeline : public Resource
 {
 	public:
+		Pipeline(const Path& path, ResourceManager& resource_manager);
 		virtual ~Pipeline() {}
 
 		virtual bool deserialize(ISerializer& serializer) = 0;
-		virtual void load(const char* path, FS::FileSystem& file_system) = 0;
-		virtual const char* getPath() = 0;
+
 		virtual DelegateList<void(Pipeline&)>& onLoaded() = 0;
 		virtual bool isReady() const = 0;
 

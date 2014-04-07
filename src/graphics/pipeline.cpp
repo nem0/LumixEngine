@@ -24,11 +24,9 @@
 namespace Lux
 {
 
-
 struct PipelineImpl;
 struct PipelineInstanceImpl;
 
-	
 struct Command
 {
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) = 0;
@@ -134,8 +132,9 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	PipelineImpl(Renderer& renderer)
-		: m_renderer(renderer)
+	PipelineImpl(const Path& path, ResourceManager& resource_manager)
+		: Pipeline(path, resource_manager)
+		, m_renderer(NULL)
 	{
 		m_is_ready = false;
 		addCommandCreator("clear").bind<&CreateCommand<ClearCommand> >();
@@ -166,6 +165,38 @@ struct PipelineImpl : public Pipeline
 		return creator.m_creator;
 	}
 
+
+
+
+	virtual void setRenderer(Renderer& renderer) LUX_OVERRIDE
+	{
+		m_renderer = &renderer;
+	}
+
+
+	virtual void setCamera(int index, const Component& camera) LUX_OVERRIDE
+	{
+		if(m_cameras.size() <= index)
+		{
+			m_cameras.resize(index + 1);
+		}
+		m_cameras[index] = camera;
+	}
+
+
+	virtual const Component& getCamera(int index) LUX_OVERRIDE
+	{
+		return m_cameras[index];
+	}
+
+
+	virtual void render() LUX_OVERRIDE
+	{
+		for(int i = 0; i < m_commands.size(); ++i)
+		{
+			m_commands[i]->execute(*this);
+		}
+	}
 
 
 	Command* createCommand(uint32_t type_hash)
@@ -227,22 +258,6 @@ struct PipelineImpl : public Pipeline
 		}
 		serializer.deserializeArrayEnd();
 		return true;
-	}
-
-
-	virtual void load(const char* path, FS::FileSystem& file_system) 
-	{
-		m_is_ready = false;
-		m_path = path;
-		FS::ReadCallback cb;
-		cb.bind<PipelineImpl, &PipelineImpl::loaded>(this);
-		file_system.openAsync(file_system.getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, cb);
-	}
-
-
-	virtual const char* getPath() 
-	{
-		return m_path.c_str();
 	}
 
 
@@ -361,6 +376,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void renderShadowmap(int64_t layer_mask)
 	{
+		ASSERT(m_renderer != NULL);
 		glViewport(0, 0, 800, 600); /// TODO
 		Component light_cmp = m_source.m_renderer.getLight(0);
 		if (!light_cmp.isValid())
@@ -436,6 +452,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void renderModels(int64_t layer_mask)
 	{
+		ASSERT(m_renderer != NULL);
 		/// TODO clean this and optimize
 		static Array<RenderableInfo> infos;
 		infos.clear();
@@ -482,6 +499,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 	virtual int getCameraCount() const override
 	{
 		return m_cameras.size();
+	virtual void doUnload(void) LUX_OVERRIDE
+	{
+		TODO("Implement!");
+	}
 	}
 
 
@@ -489,6 +510,13 @@ struct PipelineInstanceImpl : public PipelineInstance
 	{
 		for (int i = 0; i < m_cameras.size(); ++i)
 		{
+
+	virtual FS::ReadCallback getReadCallback() LUX_OVERRIDE
+	{
+		FS::ReadCallback cb;
+		cb.bind<PipelineImpl, &PipelineImpl::loaded>(this);
+		return cb;
+	}
 			m_source.m_renderer.setCameraSize(m_cameras[i], w, h);
 		}
 	}
@@ -526,29 +554,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 };
 
 
-PipelineInstance* PipelineInstance::create(Pipeline& pipeline)
+Pipeline::Pipeline(const Path& path, ResourceManager& resource_manager)
+	: Resource(path, resource_manager)
 {
-	return LUX_NEW(PipelineInstanceImpl)(pipeline);
 }
-
-
-void PipelineInstance::destroy(PipelineInstance* pipeline)
-{
-	LUX_DELETE(pipeline);
-}
-
-
-Pipeline* Pipeline::create(Renderer& renderer)
-{
-	return LUX_NEW(PipelineImpl)(renderer);
-}
-
-
-void Pipeline::destroy(Pipeline* pipeline)
-{
-	LUX_DELETE(pipeline);
-}
-
 
 
 void ClearCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer)
@@ -623,7 +632,7 @@ void DrawFullscreenQuadCommand::deserialize(PipelineImpl& pipeline, ISerializer&
 	strcpy(material_path, "materials/");
 	strcat(material_path, material);
 	strcat(material_path, ".mat");
-	m_material = static_cast<Material*>(pipeline.m_renderer.getEngine().getResourceManager().get(ResourceManager::MATERIAL)->load(material_path));
+	m_material = static_cast<Material*>(pipeline.m_renderer->getEngine().getResourceManager().get(ResourceManager::MATERIAL)->load(material_path));
 }
 
 
@@ -667,6 +676,18 @@ void BindShadowmapCommand::execute(PipelineInstanceImpl& pipeline)
 	glActiveTexture(GL_TEXTURE0 + 1);
 	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, pipeline.m_shadowmap_framebuffer->getDepthTexture());
+}
+
+
+Resource* PipelineManager::createResource(const Path& path)
+{
+	return LUX_NEW(PipelineImpl)(path, getOwner());
+}
+
+
+void PipelineManager::destroyResource(Resource& resource)
+{
+	LUX_DELETE(static_cast<PipelineImpl*>(&resource));
 }
 
 

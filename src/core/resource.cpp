@@ -12,6 +12,7 @@ namespace Lux
 		, m_dep_count(1)
 		, m_state(State::EMPTY)
 		, m_path(path)
+		, m_size()
 		, m_cb()
 		, m_resource_manager(resource_manager)
 	{ }
