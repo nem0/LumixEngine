@@ -25,10 +25,8 @@
 namespace Lux
 {
 
-
 struct PipelineImpl;
 
-	
 struct Command
 {
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) = 0;
@@ -123,8 +121,9 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	PipelineImpl(Renderer& renderer)
-		: m_renderer(renderer)
+	PipelineImpl(const Path& path, ResourceManager& resource_manager)
+		: Pipeline(path, resource_manager)
+		, m_renderer(NULL)
 	{
 		addCommandCreator("clear").bind<&CreateCommand<ClearCommand> >();
 		addCommandCreator("render_models").bind<&CreateCommand<RenderModelsCommand> >();
@@ -166,6 +165,12 @@ struct PipelineImpl : public Pipeline
 	virtual int getCameraCount() const LUX_OVERRIDE
 	{
 		return m_cameras.size();
+	}
+
+
+	virtual void setRenderer(Renderer& renderer) LUX_OVERRIDE
+	{
+		m_renderer = &renderer;
 	}
 
 
@@ -257,21 +262,6 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	virtual void load(const char* path, FS::FileSystem& file_system) 
-	{
-		m_path = path;
-		FS::ReadCallback cb;
-		cb.bind<PipelineImpl, &PipelineImpl::loaded>(this);
-		file_system.openAsync(file_system.getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, cb);
-	}
-
-
-	virtual const char* getPath() 
-	{
-		return m_path.c_str();
-	}
-
-
 	void loaded(FS::IFile* file, bool success, FS::FileSystem& fs) 
 	{
 		if(success)
@@ -318,7 +308,8 @@ struct PipelineImpl : public Pipeline
 
 	void renderShadowmap()
 	{
-		Component light_cmp = m_renderer.getLight(0);
+		ASSERT(m_renderer != NULL);
+		Component light_cmp = m_renderer->getLight(0);
 		if (!light_cmp.isValid())
 		{
 			return;
@@ -392,10 +383,11 @@ struct PipelineImpl : public Pipeline
 
 	void renderModels()
 	{
+		ASSERT(m_renderer != NULL);
 		/// TODO clean this and optimize
 		static Array<RenderableInfo> infos;
 		infos.clear();
-		m_renderer.getRenderableInfos(infos);
+		m_renderer->getRenderableInfos(infos);
 		int count = infos.size();
 		for(int i = 0; i < count; ++i)
 		{
@@ -432,9 +424,21 @@ struct PipelineImpl : public Pipeline
 		}
 	}
 
+	virtual void doUnload(void) LUX_OVERRIDE
+	{
+		TODO("Implement!");
+	}
+
+	virtual FS::ReadCallback getReadCallback() LUX_OVERRIDE
+	{
+		FS::ReadCallback cb;
+		cb.bind<PipelineImpl, &PipelineImpl::loaded>(this);
+		return cb;
+	}
+
 	Array<Command*> m_commands;
 	string m_path;
-	Renderer& m_renderer;
+	Renderer* m_renderer;
 	Array<Component> m_cameras;
 	Array<FrameBuffer*> m_framebuffers;
 	FrameBuffer* m_shadowmap_framebuffer;
@@ -443,17 +447,10 @@ struct PipelineImpl : public Pipeline
 };
 
 
-Pipeline* Pipeline::create(Renderer& renderer)
+Pipeline::Pipeline(const Path& path, ResourceManager& resource_manager)
+	: Resource(path, resource_manager)
 {
-	return LUX_NEW(PipelineImpl)(renderer);
 }
-
-
-void Pipeline::destroy(Pipeline* pipeline)
-{
-	LUX_DELETE(pipeline);
-}
-
 
 
 void ClearCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer)
@@ -482,8 +479,7 @@ void ApplyCameraCommand::deserialize(PipelineImpl& pipeline, ISerializer& serial
 
 void ApplyCameraCommand::execute(PipelineImpl& pipeline)
 {
-	pipeline.m_renderer.applyCamera(pipeline.m_cameras[m_camera_idx]);
-
+	pipeline.m_renderer->applyCamera(pipeline.m_cameras[m_camera_idx]);
 }
 
 
@@ -514,7 +510,7 @@ void DrawFullscreenQuadCommand::deserialize(PipelineImpl& pipeline, ISerializer&
 	strcpy(material_path, "materials/");
 	strcat(material_path, material);
 	strcat(material_path, ".mat");
-	m_material = static_cast<Material*>(pipeline.m_renderer.getEngine().getResourceManager().get(ResourceManager::MATERIAL)->load(material_path));
+	m_material = static_cast<Material*>(pipeline.m_renderer->getEngine().getResourceManager().get(ResourceManager::MATERIAL)->load(material_path));
 }
 
 
@@ -552,6 +548,18 @@ void BindShadowmapCommand::execute(PipelineImpl& pipeline)
 	glActiveTexture(GL_TEXTURE0 + 1);
 	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, pipeline.m_shadowmap_framebuffer->getDepthTexture());
+}
+
+
+Resource* PipelineManager::createResource(const Path& path)
+{
+	return LUX_NEW(PipelineImpl)(path, getOwner());
+}
+
+
+void PipelineManager::destroyResource(Resource& resource)
+{
+	LUX_DELETE(static_cast<PipelineImpl*>(&resource));
 }
 
 
