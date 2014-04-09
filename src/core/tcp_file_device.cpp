@@ -25,7 +25,6 @@ namespace Lux
 			virtual bool open(const char* path, Mode mode) override
 			{
 				int32_t op = TCPCommand::OpenFile;
-				int32_t ret = 0;
 
 				MT::SpinLock lock(m_spin_mutex);
 				m_stream->write(op);
@@ -130,6 +129,8 @@ namespace Lux
 			}
 
 		private:
+			void operator=(const TCPFile&);
+
 			Net::TCPStream* m_stream;
 			MT::SpinMutex& m_spin_mutex;
 			uint32_t m_file;
@@ -146,7 +147,7 @@ namespace Lux
 			MT::SpinMutex m_spin_mutex;
 		};
 
-		IFile* TCPFileDevice::createFile(IFile* child)
+		IFile* TCPFileDevice::createFile(IFile*)
 		{
 			return LUX_NEW(TCPFile)(m_impl->m_stream, m_impl->m_spin_mutex);
 		}

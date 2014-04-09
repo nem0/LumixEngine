@@ -60,7 +60,7 @@ namespace Lux
 			OsFile m_file;
 		};
 
-		IFile* DiskFileDevice::createFile(IFile* child)
+		IFile* DiskFileDevice::createFile(IFile*)
 		{
 			return LUX_NEW(DiskFile)();
 		}

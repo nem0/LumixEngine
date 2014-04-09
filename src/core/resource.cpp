@@ -79,7 +79,7 @@ namespace Lux
 		}
 	}
 
-	void Resource::onStateChanged(uint32_t new_state)
+	void Resource::onStateChanged(State new_state)
 	{
 		if(State::READY == new_state)
 		{

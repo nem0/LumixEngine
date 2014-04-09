@@ -304,7 +304,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void sourceLoaded(uint32_t status)
+	void sourceLoaded(Resource::State status)
 	{
 		if (status == Resource::State::READY)
 		{
@@ -358,7 +358,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	void renderShadowmap(int64_t layer_mask)
 	{
 		ASSERT(m_renderer != NULL);
-		glViewport(0, 0, 800, 600); /// TODO
+		glViewport(0, 0, m_shadowmap_framebuffer->getWidth(), m_shadowmap_framebuffer->getHeight());
 		Component light_cmp = m_renderer->getLight(0);
 		if (!light_cmp.isValid())
 		{
@@ -371,7 +371,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 		glPushMatrix();
 		glLoadIdentity();
 		Matrix projection_matrix;
-		/// TODO bouding box
 		getOrthoMatrix(-10, 10, -10, 10, 0, 100, &projection_matrix);
 		glMultMatrixf(&projection_matrix.m11);
 
@@ -435,7 +434,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 	void renderModels(int64_t layer_mask)
 	{
 		ASSERT(m_renderer != NULL);
-		/// TODO clean this and optimize
 		static Array<RenderableInfo> infos;
 		infos.clear();
 		m_renderer->getRenderableInfos(infos, layer_mask);
@@ -465,7 +463,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 						bone_mtx[bone_index].translate(poss[bone_index]);
 						bone_mtx[bone_index] = bone_mtx[bone_index] * model.getBone(bone_index).inv_bind_matrix;
 					}
-					/// TODO do not hardcode following
 					mesh.getMaterial()->getShader()->setUniform("bone_matrices", bone_mtx, pose.getCount());
 					mesh.getMaterial()->getShader()->setUniform("shadowmap", 1);
 					mesh.getMaterial()->getShader()->setUniform("shadowmap_matrix", m_shadow_modelviewprojection);

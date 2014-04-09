@@ -86,6 +86,7 @@ namespace Lux
 			}
 
 		private:
+			void operator=(const JsonSerializer&);
 			AccessMode m_access_mode;
 			unsigned char m_buffer;
 			bool m_is_first_in_block;

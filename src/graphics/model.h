@@ -5,7 +5,6 @@
 #include "core/crc32.h"
 #include "core/delegate_list.h"
 #include "core/matrix.h"
-#include "core/array.h"
 #include "core/quat.h"
 #include "core/string.h"
 #include "core/vec3.h"
@@ -21,6 +20,7 @@ class Material;
 class Model;
 class Pose;
 class ResourceManager;
+struct VertexDef;
 
 namespace FS
 {
@@ -89,10 +89,14 @@ class Model : public Resource
 
 	private:
 		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
+		bool parseVertexDef(FS::IFile* file, VertexDef* vertex_definition);
+		bool parseGeometry(FS::IFile* file, const VertexDef& vertex_definition);
+		bool parseBones(FS::IFile* file, Array<Model::Bone>& bones);
+		bool parseMeshes(FS::IFile* file);
 
 		virtual void doUnload(void) override;
 		virtual FS::ReadCallback getReadCallback() override;
-
+		
 	private:
 		Geometry* m_geometry;
 		Array<Mesh> m_meshes;

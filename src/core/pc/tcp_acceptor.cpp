@@ -35,7 +35,6 @@ namespace Lux
 			sin.sin_addr.s_addr = ip ? ::inet_addr(ip) : INADDR_ANY;
 
 			int retVal = ::bind(socket, (LPSOCKADDR)&sin, sizeof(sin));
-			int err = ::WSAGetLastError();
 			if(retVal == SOCKET_ERROR)
 			{
 				return false;

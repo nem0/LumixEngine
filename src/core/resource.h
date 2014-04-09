@@ -14,25 +14,16 @@ namespace Lux
 	public:
 		friend class ResourceManagerBase;
 
-		struct State
+		enum class State : uint32_t
 		{
-			enum Value
-			{
-				EMPTY = 0,
-				LOADING,
-				READY,
-				UNLOADING,
-				FAILURE,
-			};
-
-			State() : value(EMPTY) { }
-			State(Value _value) : value(_value) { }
-			State(int32_t _value) : value(_value) { }
-			operator Value() const { return (Value)value; }
-			uint16_t value;
+			EMPTY = 0,
+			LOADING,
+			READY,
+			UNLOADING,
+			FAILURE,
 		};
 
-		typedef DelegateList<void (uint32_t)> ObserverCallback;
+		typedef DelegateList<void (State)> ObserverCallback;
 
 		State getState() const { return m_state; }
 
@@ -72,10 +63,11 @@ namespace Lux
 		void addDependency(Resource& dependent_resource);
 		void removeDependency(Resource& dependent_resource);
 
-		void onStateChanged(uint32_t new_state);
+		void onStateChanged(State new_state);
 		void decrementDepCount();
 
 	private:
+		void operator=(const Resource&);
 		uint16_t m_ref_count;
 		uint16_t m_dep_count;
 		State m_state;

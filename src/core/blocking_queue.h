@@ -109,7 +109,7 @@ namespace Lux
 				Node cur_node(0, NULL);
 				Node new_node(0, data);
 
-				while (true)
+				for (;;)
 				{
 					int32_t cur_write_idx = m_wr;
 					int32_t idx = cur_write_idx & (size - 1);
@@ -135,7 +135,7 @@ namespace Lux
 			bool can_read = wait ? m_rd_semaphore.wait(), true : m_rd_semaphore.poll();
 			if (can_read) 
 			{
-				while (true)
+				for (;;)
 				{
 					int cur_read_idx = m_rd;
 					int32_t idx = cur_read_idx & (size - 1);
