@@ -210,7 +210,8 @@ struct RendererImpl : public Renderer
 			camera->m_far = 100.0f;
 			m_cameras.push(camera);
 			Component cmp(entity, type, this, m_cameras.size() - 1);
-			m_universe->getEventManager()->emitEvent(ComponentEvent(cmp));
+			ComponentEvent evt(cmp);
+			m_universe->getEventManager()->emitEvent(evt);
 			return Component(entity, type, this, m_cameras.size() - 1);
 		}
 		else if(type == crc32("renderable"))
@@ -221,7 +222,8 @@ struct RendererImpl : public Renderer
 			r.m_scale = 1.0f;
 			r.m_layer_mask = 1;
 			Component cmp(entity, type, this, m_renderables.size() - 1);
-			m_universe->getEventManager()->emitEvent(ComponentEvent(cmp));
+			ComponentEvent evt(cmp);
+			m_universe->getEventManager()->emitEvent(evt);
 			return Component(entity, type, this, m_renderables.size() - 1);
 		}
 		return Component::INVALID;

@@ -34,6 +34,9 @@ namespace Lux
 		Engine& m_engine;
 
 		void onEvent(Event& event);
+		
+		private:
+			void operator=(const AnimationSystemImpl&);
 	};
 
 	bool AnimationSystem::create(Engine& engine)
@@ -63,7 +66,7 @@ namespace Lux
 	}
 
 
-	void AnimationSystem::onDestroyUniverse(Universe& universe)
+	void AnimationSystem::onDestroyUniverse(Universe&)
 	{
 		ASSERT(m_impl->m_universe);
 		m_impl->m_animables.clear();
@@ -123,7 +126,8 @@ namespace Lux
 			}
 			serializer.deserializeArrayItem(m_impl->m_animables[i].m_time);
 			Component cmp(e, animable_type, this, i);
-			m_impl->m_universe->getEventManager()->emitEvent(ComponentEvent(cmp));
+			ComponentEvent evt(cmp);
+			m_impl->m_universe->getEventManager()->emitEvent(evt);
 		}
 		serializer.deserializeArrayEnd();
 	}
@@ -168,7 +172,8 @@ namespace Lux
 		}
 
 		Component cmp(entity, animable_type, this, m_impl->m_animables.size() - 1);
-		m_impl->m_universe->getEventManager()->emitEvent(ComponentEvent(cmp));
+		ComponentEvent evt(cmp);
+		m_impl->m_universe->getEventManager()->emitEvent(evt);
 		return Component(entity, animable_type, this, m_impl->m_animables.size() - 1);
 	}
 

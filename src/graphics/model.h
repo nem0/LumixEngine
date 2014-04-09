@@ -91,7 +91,7 @@ class Model : public Resource
 		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 		bool parseVertexDef(FS::IFile* file, VertexDef* vertex_definition);
 		bool parseGeometry(FS::IFile* file, const VertexDef& vertex_definition);
-		bool parseBones(FS::IFile* file, Array<Model::Bone>& bones);
+		bool parseBones(FS::IFile* file);
 		bool parseMeshes(FS::IFile* file);
 
 		virtual void doUnload(void) override;

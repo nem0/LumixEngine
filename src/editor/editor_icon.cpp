@@ -20,7 +20,7 @@ H3DRes EditorIcon::s_geom;
 H3DRes EditorIcon::s_materials[2];
 static const uint32_t point_light_type = crc32("point_light");
 */
-void EditorIcon::create(Renderer& renderer, Entity& entity, const Component& cmp)
+void EditorIcon::create(Renderer& renderer, Entity& entity, const Component&)
 {
 	m_entity = entity;
 	m_model = renderer.getModel("models/icon.msh");
@@ -56,7 +56,7 @@ void EditorIcon::hide()
 
 
 
-float EditorIcon::hit(Renderer& renderer, Component camera, const Vec3& origin, const Vec3& dir) const
+float EditorIcon::hit(const Vec3& origin, const Vec3& dir) const
 {
 	RayCastModelHit hit = m_model->castRay(origin, dir, m_matrix, m_scale);
 	if (hit.m_is_hit)
@@ -87,36 +87,6 @@ void EditorIcon::render(Renderer* renderer, IRenderDevice& render_device)
 	{
 		renderer->renderModel(*m_model, mtx);
 	}
-}
-
-
-void EditorIcon::createResources(const char* base_path)
-{
-	/*float posData[] = {
-		-0.1f,  -0.1f, 0,
-		0.1f,  -0.1f, 0,
-		-0.1f, 0.1f, 0,
-		0.1f, 0.1f, 0
-	};
- 
-	unsigned int indexData[] = { 0, 1, 2, 2, 1, 3 };
-	short normalData[] = {
-		0, 0, 1,
-		0, 0, 1,
-		0, 0, 1,
-		0, 0, 1
-	};
- 
-	float uvData[] = {
-		0, 0,
-		1, 0,
-		0, 1,
-		1, 1
-	};
-	s_geom = h3dutCreateGeometryRes("EditoRenderableGeom", 4, 6, posData, indexData, normalData, 0, 0, uvData, 0 );
-	s_materials[0] = h3dAddResource(H3DResTypes::Material, "materials\\entity.material.xml", 0);
-	s_materials[1] = h3dAddResource(H3DResTypes::Material, "materials\\point_light.material.xml", 0);
-	h3dutLoadResourcesFromDisk(base_path);*/
 }
 
 

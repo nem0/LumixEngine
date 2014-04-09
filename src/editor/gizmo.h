@@ -75,7 +75,7 @@ class LUX_ENGINE_API Gizmo
 		Gizmo();
 		~Gizmo();
 
-		void create(const char* base_path, Renderer& renderer);
+		void create(Renderer& renderer);
 		void destroy();
 		void hide();
 		void show();

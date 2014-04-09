@@ -143,7 +143,7 @@ struct EditorServerImpl
 		void navigate(float forward, float right, int fast);
 		void writeString(const char* str);
 		void setProperty(void* data, int size);
-		void createUniverse(bool create_scene, const char* base_path);
+		void createUniverse(bool create_scene);
 		void renderIcons(IRenderDevice& render_device);
 		void renderScene(IRenderDevice& render_device);
 		void renderPhysics();
@@ -167,7 +167,7 @@ struct EditorServerImpl
 		void save(FS::IFile& file);
 		void load(FS::IFile& file);
 		void onMessage(void* msgptr, int size);
-		EditorIconHit raycastEditorIcons(Component camera, const Vec3& origin, const Vec3& dir);
+		EditorIconHit raycastEditorIcons(const Vec3& origin, const Vec3& dir);
 
 		const IPropertyDescriptor& getPropertyDescriptor(uint32_t type, uint32_t name_hash);
 		void registerProperties();
@@ -247,7 +247,7 @@ void EditorServer::registerCreator(uint32_t type, IPlugin& creator)
 }
 
 
-void EditorServer::tick(HWND hwnd, HWND game_hwnd)
+void EditorServer::tick()
 {
 	/*PAINTSTRUCT ps;
 	HDC hdc;
@@ -288,12 +288,6 @@ void EditorServer::tick(HWND hwnd, HWND game_hwnd)
 }
 
 
-void EditorServer::onResize(int w, int h)
-{
-	//m_impl->m_engine.getRenderer().onResize(w, h);
-}
-
-
 bool EditorServer::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 {
 	m_impl = LUX_NEW(EditorServerImpl)();
@@ -329,13 +323,13 @@ void EditorServerImpl::registerProperties()
 }
 
 
-EditorIconHit EditorServerImpl::raycastEditorIcons(Component camera, const Vec3& origin, const Vec3& dir)
+EditorIconHit EditorServerImpl::raycastEditorIcons(const Vec3& origin, const Vec3& dir)
 {
 	EditorIconHit hit;
 	hit.m_t = -1;
 	for (int i = 0, c = m_editor_icons.size(); i < c;  ++i)
 	{
-		float t = m_editor_icons[i]->hit(m_engine.getRenderer(), camera, origin, dir);
+		float t = m_editor_icons[i]->hit(origin, dir);
 		if (t >= 0)
 		{
 			hit.m_icon = m_editor_icons[i];
@@ -360,7 +354,7 @@ void EditorServerImpl::onPointerDown(int x, int y, MouseButton::Value button)
 		m_engine.getRenderer().getRay(camera_cmp, (float)x, (float)y, origin, dir);
 		RayCastModelHit hit = m_engine.getRenderer().castRay(origin, dir);
 		RayCastModelHit gizmo_hit = m_gizmo.castRay(origin, dir);
-		EditorIconHit icon_hit = raycastEditorIcons(camera_cmp, origin, dir);
+		EditorIconHit icon_hit = raycastEditorIcons(origin, dir);
 		if (gizmo_hit.m_is_hit && (icon_hit.m_t < 0 || gizmo_hit.m_t < icon_hit.m_t))
 		{
 			if (m_selected_entity.isValid())
@@ -457,7 +451,7 @@ void EditorServerImpl::onPointerMove(int x, int y, int relx, int rely)
 }
 
 
-void EditorServerImpl::onPointerUp(int x, int y, MouseButton::Value button)
+void EditorServerImpl::onPointerUp(int, int, MouseButton::Value)
 {
 	m_mouse_mode = EditorServerImpl::MouseMode::NONE;
 }
@@ -658,7 +652,7 @@ void EditorServerImpl::removeEntity()
 }
 
 
-void EditorServerImpl::removeComponent(uint32_t type_crc)
+void EditorServerImpl::removeComponent(uint32_t)
 {
 	/*const Entity::ComponentList& cmps = m_selected_entity.getComponents();
 	Component cmp;
@@ -708,7 +702,7 @@ void EditorServerImpl::loadMap(FS::IFile* file, bool success, FS::FileSystem& fs
 void EditorServerImpl::newUniverse()
 {
 	destroyUniverse();
-	createUniverse(false, "");
+	createUniverse(false);
 	g_log_info.log("editor server", "universe created");
 }
 
@@ -717,7 +711,7 @@ void EditorServerImpl::load(FS::IFile& file)
 {
 	g_log_info.log("editor server", "parsing universe...");
 	destroyUniverse();
-	createUniverse(false, "");
+	createUniverse(false);
 	JsonSerializer serializer(file, JsonSerializer::READ);
 	m_engine.deserialize(serializer);
 	g_log_info.log("editor server", "universe parsed");
@@ -797,9 +791,7 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 	g_log_warning.getCallback().bind<EditorServerImpl, &EditorServerImpl::onLogWarning>(this);
 	g_log_error.getCallback().bind<EditorServerImpl, &EditorServerImpl::onLogError>(this);
 
-	RECT rect;
-	GetWindowRect(hwnd, &rect);
-	if(!m_engine.create(rect.right - rect.left, rect.bottom - rect.top, base_path, m_file_system, m_owner))
+	if(!m_engine.create(base_path, m_file_system, m_owner))
 	{
 		return false;
 	}
@@ -815,9 +807,7 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 		g_log_info.log("plugins", "navigation plugin has not been loaded");
 	}*/
 
-	EditorIcon::createResources(base_path);
-
-	createUniverse(true, base_path);
+	createUniverse(true);
 	registerProperties();
 	//m_navigation.load("models/level2/level2.pda");
 	
@@ -1197,7 +1187,7 @@ void EditorServerImpl::destroyUniverse()
 }
 
 
-void EditorServerImpl::createUniverse(bool create_scene, const char* base_path)
+void EditorServerImpl::createUniverse(bool)
 {
 	Universe* universe = m_engine.createUniverse();
 
@@ -1231,7 +1221,7 @@ void EditorServerImpl::createUniverse(bool create_scene, const char* base_path)
 	m_engine.getRenderer().setRenderablePath(cmp3, string("models/plane.msh"));
 
 	
-	m_gizmo.create(base_path, m_engine.getRenderer());
+	m_gizmo.create(m_engine.getRenderer());
 	m_gizmo.setUniverse(universe);
 	m_gizmo.hide();
 
@@ -1245,7 +1235,6 @@ void EditorServerImpl::createUniverse(bool create_scene, const char* base_path)
 
 void EditorServerImpl::onMessage(void* msgptr, int size)
 {
-	bool locked = false;
 	int* msg = static_cast<int*>(msgptr);
 	float* fmsg = static_cast<float*>(msgptr); 
 	switch(msg[0])
@@ -1307,34 +1296,6 @@ void EditorServerImpl::onMessage(void* msgptr, int size)
 	}
 }
 
-
-extern "C" LUX_ENGINE_API void* __stdcall luxServerInit(HWND hwnd, HWND game_hwnd, const char* base_path)
-{
-	EditorServer* server = LUX_NEW(EditorServer)();
-	if(!server->create(hwnd, game_hwnd, base_path))
-	{
-		LUX_DELETE(server);
-		return NULL;
-	}
-
-	return server;
-}
-
-
-extern "C" LUX_ENGINE_API void __stdcall luxServerResize(HWND hwnd, void* ptr)
-{
-	EditorServer* server = static_cast<EditorServer*>(ptr);
-	RECT rect;
-	GetWindowRect(hwnd, &rect);
-	server->onResize(rect.right - rect.left, rect.bottom - rect.top);
-}
-
-
-extern "C" LUX_ENGINE_API void __stdcall luxServerTick(HWND hwnd, HWND game_hwnd, void* ptr)
-{
-	EditorServer* server = static_cast<EditorServer*>(ptr);
-	server->tick(hwnd, game_hwnd);
-}
 
 
 } // !namespace Lux

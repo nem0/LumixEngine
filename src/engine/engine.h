@@ -28,7 +28,7 @@ namespace Lux
 			Engine() { m_impl = NULL; }
 			~Engine() { ASSERT(m_impl == NULL); }
 
-			bool create(int w, int h, const char* base_path, FS::FileSystem* fs, EditorServer* editor_server);
+			bool create(const char* base_path, FS::FileSystem* fs, EditorServer* editor_server);
 			void destroy();
 
 			Universe* createUniverse();
