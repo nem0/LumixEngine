@@ -66,8 +66,10 @@ namespace Lux
 					uint8_t* msg = LUX_NEW_ARRAY(uint8_t, length + 4);
 					m_client->m_stream->read(msg + 4, length);
 					((int32_t*)msg)[0] = length;
-					MT::Lock lock(m_client->m_mutex);
-					m_client->m_messages.push(msg);
+					{
+						MT::Lock lock(m_client->m_mutex);
+						m_client->m_messages.push(msg);
+					}
 				}
 			}
 		}
