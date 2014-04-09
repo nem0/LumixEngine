@@ -21,6 +21,7 @@ void LogWidget::onInfo(const char* system, const char* message)
 	emit infoReceived(system, message);
 }
 
+
 void LogWidget::onInfoReceived(const QString& system, const QString& message)
 {
 	int row = m_ui->tableWidget->rowCount();
