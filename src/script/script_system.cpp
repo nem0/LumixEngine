@@ -199,7 +199,8 @@ namespace Lux
 		for(int i = 0; i < m_scripts.size(); ++i)
 		{
 			Entity e(m_universe, m_scripts[i]);
-			m_universe->getEventManager()->emitEvent(ComponentEvent(Component(e, script_type, m_owner, i)));
+			ComponentEvent evt(Component(e, script_type, m_owner, i));
+			m_universe->getEventManager()->emitEvent(evt);
 		}
 	}
 
@@ -220,7 +221,8 @@ namespace Lux
 		m_impl->m_paths.push(string(path));
 
 		Component cmp(entity, script_type, this, m_impl->m_scripts.size() - 1);
-		m_impl->m_universe->getEventManager()->emitEvent(ComponentEvent(cmp));
+		ComponentEvent evt(cmp);
+		m_impl->m_universe->getEventManager()->emitEvent(evt);
 
 		return cmp;
 	}

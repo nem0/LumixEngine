@@ -24,10 +24,8 @@ class EditorIcon
 		void render(Renderer* renderer, IRenderDevice& render_device);
 		void show();
 		void hide();
-		float hit(Renderer& renderer, Component camera, const Vec3& origin, const Vec3& dir) const;
+		float hit(const Vec3& origin, const Vec3& dir) const;
 		Entity getEntity() const { return m_entity; }
-
-		static void createResources(const char* base_path);
 
 	private:
 		Entity m_entity;

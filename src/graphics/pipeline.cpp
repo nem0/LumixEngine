@@ -69,7 +69,7 @@ struct BindFramebufferCommand : public Command
 
 struct UnbindFramebufferCommand : public Command
 {
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override {}
+	virtual void deserialize(PipelineImpl&, ISerializer&) override {}
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 };
 
@@ -103,7 +103,7 @@ struct RenderShadowmapCommand : public Command
 
 struct BindShadowmapCommand : public Command
 {
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override {}
+	virtual void deserialize(PipelineImpl&, ISerializer&) override {}
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 };
 
@@ -521,6 +521,9 @@ struct PipelineInstanceImpl : public PipelineInstance
 	Matrix m_shadow_modelviewprojection;
 	Array<Component> m_cameras;
 	Renderer* m_renderer;
+
+	private:
+		void operator=(const PipelineInstanceImpl&);
 };
 
 
@@ -542,7 +545,7 @@ void PipelineInstance::destroy(PipelineInstance* pipeline)
 }
 
 
-void ClearCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer)
+void ClearCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
 	char tmp[256];
 	serializer.deserializeArrayItem(tmp, 255);
@@ -557,13 +560,13 @@ void ClearCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer)
 }
 
 
-void ClearCommand::execute(PipelineInstanceImpl& pipeline)
+void ClearCommand::execute(PipelineInstanceImpl&)
 {
 	glClear(m_buffers);
 }
 
 
-void RenderModelsCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer) 
+void RenderModelsCommand::deserialize(PipelineImpl&, ISerializer& serializer) 
 {
 	serializer.deserializeArrayItem(m_layer_mask);
 }
@@ -575,7 +578,7 @@ void RenderModelsCommand::execute(PipelineInstanceImpl& pipeline)
 }
 
 
-void ApplyCameraCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer)
+void ApplyCameraCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
 	serializer.deserializeArrayItem(m_camera_idx);
 }
@@ -588,7 +591,7 @@ void ApplyCameraCommand::execute(PipelineInstanceImpl& pipeline)
 }
 
 
-void BindFramebufferCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer)
+void BindFramebufferCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
 	serializer.deserializeArrayItem(m_buffer_index);
 }
@@ -600,7 +603,7 @@ void BindFramebufferCommand::execute(PipelineInstanceImpl& pipeline)
 }
 
 	
-void UnbindFramebufferCommand::execute(PipelineInstanceImpl& pipeline)
+void UnbindFramebufferCommand::execute(PipelineInstanceImpl&)
 {
 	FrameBuffer::unbind();
 }
@@ -625,7 +628,7 @@ void DrawFullscreenQuadCommand::execute(PipelineInstanceImpl& pipeline)
 }
 
 
-void BindFramebufferTextureCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer)
+void BindFramebufferTextureCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
 	/// TODO map names to indices
 	serializer.deserializeArrayItem(m_framebuffer_index);
@@ -642,7 +645,7 @@ void BindFramebufferTextureCommand::execute(PipelineInstanceImpl& pipeline)
 }
 
 
-void RenderShadowmapCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer)
+void RenderShadowmapCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
 	serializer.deserializeArrayItem(m_layer_mask);
 }

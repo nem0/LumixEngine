@@ -59,23 +59,20 @@ namespace DDS
 	};
 
 	union Header {
-		struct {
-			uint32_t dwMagic;
-			uint32_t dwSize;
-			uint32_t dwFlags;
-			uint32_t dwHeight;
-			uint32_t dwWidth;
-			uint32_t dwPitchOrLinearSize;
-			uint32_t dwDepth;
-			uint32_t dwMipMapCount;
-			uint32_t dwReserved1[11];
+		uint32_t dwMagic;
+		uint32_t dwSize;
+		uint32_t dwFlags;
+		uint32_t dwHeight;
+		uint32_t dwWidth;
+		uint32_t dwPitchOrLinearSize;
+		uint32_t dwDepth;
+		uint32_t dwMipMapCount;
+		uint32_t dwReserved1[11];
 
-			PixelFormat pixelFormat;
-			Caps2 caps2;
+		PixelFormat pixelFormat;
+		Caps2 caps2;
 
-			uint32_t dwReserved2;
-		};
-		char data[128];
+		uint32_t dwReserved2;
 	};
 
 	struct LoadInfo {
@@ -481,6 +478,7 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		else
 		{
 			bool loaded = loadTGA(file);
+			ASSERT(loaded);
 		}
 
 		m_size = file->size();

@@ -34,7 +34,7 @@ void Gizmo::destroy()
 }
 
 
-void Gizmo::create(const char* base_path, Renderer& renderer)
+void Gizmo::create(Renderer& renderer)
 {
 	m_scale = 1;
 	m_renderer = &renderer;

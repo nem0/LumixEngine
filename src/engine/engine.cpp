@@ -26,7 +26,7 @@ namespace Lux
 	struct EngineImpl
 	{
 		EngineImpl(Engine& engine) : m_owner(engine) {}
-		bool create(int w, int h, const char* base_path, Engine& owner);
+		bool create(const char* base_path, Engine& owner);
 
 		Renderer* m_renderer;
 		FS::FileSystem* m_file_system; 
@@ -52,17 +52,20 @@ namespace Lux
 		Timer* m_fps_timer;
 		int	m_fps_frame;
 		float m_fps;
+
+		private:
+			void operator=(const EngineImpl&);
 	};
 
 
-	void showLogInVS(const char* system, const char* message)
+	void showLogInVS(const char*, const char* message)
 	{
 		OutputDebugString(message);
 	}
 
 
 
-	bool EngineImpl::create(int w, int h, const char* base_path, Engine& owner)
+	bool EngineImpl::create(const char* base_path, Engine& owner)
 	{
 		m_timer = Timer::create();
 		m_fps_timer = Timer::create();
@@ -100,7 +103,7 @@ namespace Lux
 	}
 
 
-	bool Engine::create(int w, int h, const char* base_path, FS::FileSystem* file_system, EditorServer* editor_server)
+	bool Engine::create(const char* base_path, FS::FileSystem* file_system, EditorServer* editor_server)
 	{
 		g_log_info.getCallback().bind<showLogInVS>();
 		g_log_warning.getCallback().bind<showLogInVS>();
@@ -128,7 +131,7 @@ namespace Lux
 			m_impl->m_disk_file_device = NULL;
 		}
 
-		if(!m_impl->create(w, h, base_path, *this))
+		if(!m_impl->create(base_path, *this))
 		{
 			LUX_DELETE(m_impl);
 			m_impl = NULL;

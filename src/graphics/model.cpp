@@ -159,7 +159,7 @@ bool Model::parseGeometry(FS::IFile* file, const VertexDef& vertex_definition)
 	return true;
 }
 
-bool Model::parseBones(FS::IFile* file, Array<Model::Bone>& bones)
+bool Model::parseBones(FS::IFile* file)
 {
 	int bone_count;
 	file->read(&bone_count, sizeof(bone_count));
@@ -259,7 +259,7 @@ void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		VertexDef vertex_definition;
 		if (parseVertexDef(file, &vertex_definition) 
 			&& parseGeometry(file, vertex_definition)
-			&& parseBones(file, m_bones)
+			&& parseBones(file)
 			&& parseMeshes(file))
 		{
 			m_bounding_radius = m_geometry->getBoundingRadius();
