@@ -1,5 +1,7 @@
 #include "core/lux.h"
+#include "core/path.h"
 #include "core/resource_manager.h"
+#include "core/resource_manager_base.h"
 
 namespace Lux
 {
@@ -33,5 +35,13 @@ namespace Lux
 	void ResourceManager::remove(uint32_t id) 
 	{ 
 		m_resource_managers.erase(id); 
+	}
+
+	void ResourceManager::reload(const char* path)
+	{
+		for (auto iter = m_resource_managers.begin(), end = m_resource_managers.end(); iter != end; ++iter)
+		{
+			iter.value()->reload(Path(path));
+		}
 	}
 }

@@ -110,8 +110,8 @@ void Animation::doUnload(void)
 	m_rotations = NULL;
 	m_positions = NULL;
 	m_frame_count = 0;
-	onEmpty();
 	m_size = 0;
+	onEmpty();
 }
 
 

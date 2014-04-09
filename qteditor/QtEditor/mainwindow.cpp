@@ -64,6 +64,7 @@ MainWindow::~MainWindow()
 void MainWindow::setEditorServer(Lux::EditorServer& server)
 {
 	m_file_server_ui->setEditorServer(server);
+	m_asset_browser->setEditorServer(server);
 }
 
 void MainWindow::setEditorClient(Lux::EditorClient& client)

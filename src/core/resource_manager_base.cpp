@@ -106,9 +106,13 @@ namespace Lux
 
 	void ResourceManagerBase::reload(Resource& resource)
 	{
-		resource.onReloading();
-		resource.doUnload();
-		resource.doLoad();
+		if (resource.isReady() || resource.isFailure() || resource.isEmpty())
+		{
+			resource.onReloading();
+			resource.doUnload();
+			resource.onLoading();
+			resource.doLoad();
+		}
 	}
 
 	void ResourceManagerBase::releaseAll(void)

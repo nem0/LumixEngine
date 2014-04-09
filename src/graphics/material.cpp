@@ -28,12 +28,17 @@ void Material::apply(Renderer& renderer)
 
 void Material::doUnload(void)
 {
-	m_resource_manager.get(ResourceManager::SHADER)->unload(*m_shader);
-	m_shader = NULL;
+	if(m_shader)
+	{
+		removeDependency(*m_shader);
+		m_resource_manager.get(ResourceManager::SHADER)->unload(*m_shader);
+		m_shader = NULL;
+	}
 
 	ResourceManagerBase* texture_manager = m_resource_manager.get(ResourceManager::TEXTURE);
 	for(int i = 0; i < m_textures.size(); i++)
 	{
+		removeDependency(*m_textures[i]);
 		texture_manager->unload(*m_textures[i]);
 	}
 	m_textures.clear();

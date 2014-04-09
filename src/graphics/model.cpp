@@ -214,6 +214,7 @@ void Model::doUnload(void)
 {
 	for (int i = 0; i < m_meshes.size(); ++i)
 	{
+		removeDependency(*m_meshes[i].getMaterial());
 		m_resource_manager.get(ResourceManager::MATERIAL)->unload(*m_meshes[i].getMaterial());
 	}
 	m_meshes.clear();
