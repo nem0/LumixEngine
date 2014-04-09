@@ -48,6 +48,7 @@ namespace Lux
 	void Resource::onReloading(void)
 	{
 		m_state = State::UNLOADING;
+		++m_dep_count;
 		m_cb.invoke(State::UNLOADING);
 	}
 
@@ -72,7 +73,7 @@ namespace Lux
 	void Resource::removeDependency(Resource& dependent_resource)
 	{
 		dependent_resource.m_cb.unbind<Resource, &Resource::onStateChanged>(this);
-		if(dependent_resource.isReady())
+		if(!dependent_resource.isReady())
 		{
 			decrementDepCount();
 		}
