@@ -8,6 +8,7 @@ LogWidget::LogWidget(QWidget *parent) :
 	m_ui(new Ui::LogWidget)
 {
 	m_ui->setupUi(this);
+	connect(this, SIGNAL(infoReceived(const QString&, const QString&)), this, SLOT(onInfoReceived(const QString&, const QString&)));
 	Lux::g_log_info.getCallback().bind<LogWidget, &LogWidget::onInfo>(this);
 	Lux::g_log_warning.getCallback().bind<LogWidget, &LogWidget::onInfo>(this);
 	Lux::g_log_error.getCallback().bind<LogWidget, &LogWidget::onInfo>(this);
@@ -16,6 +17,11 @@ LogWidget::LogWidget(QWidget *parent) :
 
 
 void LogWidget::onInfo(const char* system, const char* message)
+{
+	emit infoReceived(system, message);
+}
+
+void LogWidget::onInfoReceived(const QString& system, const QString& message)
 {
 	int row = m_ui->tableWidget->rowCount();
 	m_ui->tableWidget->insertRow(row);
