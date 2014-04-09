@@ -260,7 +260,7 @@ namespace Lux
 				return prev;
 			}
 
-			static void closeAsync(IFile* file, bool success, FileSystem& fs)
+			static void closeAsync(IFile* file, bool, FileSystem&)
 			{
 				LUX_DELETE(file);
 			}

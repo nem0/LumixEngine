@@ -43,7 +43,7 @@ namespace Lux
 
 		static DWORD WINAPI threadFunction(LPVOID ptr)
 		{
-			uint32_t ret = -1;
+			uint32_t ret = 0xffffFFFF;
 			struct TaskImpl* impl = reinterpret_cast<TaskImpl*>(ptr);
 			if(!impl->m_force_exit)
 			{
@@ -136,7 +136,7 @@ namespace Lux
 
 		uint32_t Task::getExitCode() const
 		{
-			uint32_t exit_code = -1;
+			uint32_t exit_code = 0xffffFFFF;
 			::GetExitCodeThread(m_implementation->m_handle, (LPDWORD)&exit_code);
 			return exit_code;
 		}

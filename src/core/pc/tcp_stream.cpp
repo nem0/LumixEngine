@@ -64,7 +64,7 @@ namespace Lux
 
 			//todo: handle errors
 
-			return send == size;
+			return (size_t)send == size;
 		}
 	} // ~namespace Net
 } // ~namespace Lux

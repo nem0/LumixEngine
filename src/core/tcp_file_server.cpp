@@ -46,7 +46,6 @@ namespace Lux
 					case TCPCommand::OpenFile:
 						{
 							int32_t mode = 0;
-							int32_t len = 0;
 							stream->read(mode);
 							stream->readString(m_buffer.data(), m_buffer.size());
 
@@ -78,7 +77,7 @@ namespace Lux
 						break;
 					case TCPCommand::Close:
 						{
-							uint32_t id = -1;
+							uint32_t id = 0xffffFFFF;
 							stream->read(id);
 							OsFile* file = m_files[id];
 							m_ids.release(id);
@@ -90,7 +89,7 @@ namespace Lux
 					case TCPCommand::Read:
 						{
 							bool read_successful = true;
-							uint32_t id = -1;
+							uint32_t id = 0xffffFFFF;
 							stream->read(id);
 							OsFile* file = m_files[id];
 
@@ -111,7 +110,7 @@ namespace Lux
 					case TCPCommand::Write:
 						{
 							bool write_successful = true;
-							uint32_t id = -1;
+							uint32_t id = 0xffffFFFF;
 							stream->read(id);
 							OsFile* file = m_files[id];
 
@@ -131,7 +130,7 @@ namespace Lux
 						break;
 					case TCPCommand::Size:
 						{
-							uint32_t id = -1;
+							uint32_t id = 0xffffFFFF;
 							stream->read(id);
 							OsFile* file = m_files[id];
 
@@ -141,7 +140,7 @@ namespace Lux
 						break;
 					case TCPCommand::Seek:
 						{
-							uint32_t id = -1;
+							uint32_t id = 0xffffFFFF;
 							stream->read(id);
 							OsFile* file = m_files[id];
 
@@ -156,7 +155,7 @@ namespace Lux
 						break;
 					case TCPCommand::Pos:
 						{
-							uint32_t id = -1;
+							uint32_t id = 0xffffFFFF;
 							stream->read(id);
 							OsFile* file = m_files[id];
 

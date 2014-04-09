@@ -29,6 +29,7 @@ namespace Lux
 			~Lock() { m_mutex.unlock(); }
 
 		private:
+			void operator=(const Lock&);
 			Mutex& m_mutex;
 		};
 	} // ~namespace MT

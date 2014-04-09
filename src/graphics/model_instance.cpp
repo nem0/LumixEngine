@@ -22,7 +22,7 @@ ModelInstance::~ModelInstance()
 }
 
 
-void ModelInstance::modelUpdate(uint32_t new_state)
+void ModelInstance::modelUpdate(Resource::State new_state)
 {
 	if(new_state == Resource::State::READY)
 	{

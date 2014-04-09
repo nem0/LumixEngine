@@ -20,7 +20,7 @@ namespace Lux
 	};
 
 
-	void InputSystem::update(float dt)
+	void InputSystem::update(float)
 	{
 		m_impl->m_mouse_rel_x = 0;
 		m_impl->m_mouse_rel_y = 0;
