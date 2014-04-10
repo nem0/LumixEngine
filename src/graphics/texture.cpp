@@ -58,7 +58,7 @@ namespace DDS
 		uint32_t dwReserved;
 	};
 
-	union Header {
+	struct Header {
 		uint32_t dwMagic;
 		uint32_t dwSize;
 		uint32_t dwFlags;
@@ -394,6 +394,8 @@ bool Texture::loadDDS(FS::IFile* file)
 		{
 			file->read(data, size);
 			glCompressedTexImage2D(GL_TEXTURE_2D, ix, li->internalFormat, width, height, 0, size, data);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 			width = (width + 1) >> 1;
 			height = (height + 1) >> 1;
 			size = max(li->divSize, width) / li->divSize * max(li->divSize, height) / li->divSize * li->blockBytes;
