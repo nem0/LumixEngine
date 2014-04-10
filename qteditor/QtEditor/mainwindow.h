@@ -8,8 +8,9 @@ namespace Lux
 	class EditorServer;
 }
 
-namespace Ui {
-class MainWindow;
+namespace Ui 
+{
+	class MainWindow;
 }
 
 class MainWindow : public QMainWindow

@@ -4,8 +4,9 @@
 #include "property_widget_base.h"
 
 
-namespace Ui {
-class RenderableWidget;
+namespace Ui 
+{
+	class RenderableWidget;
 }
 
 class RenderableWidget : public PropertyWidgetBase

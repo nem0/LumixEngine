@@ -3,8 +3,9 @@
 #include <QFrame>
 #include "property_widget_base.h"
 
-namespace Ui {
-class ScriptWidget;
+namespace Ui 
+{
+	class ScriptWidget;
 }
 
 class ScriptWidget : public PropertyWidgetBase
