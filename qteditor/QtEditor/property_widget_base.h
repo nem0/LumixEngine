@@ -31,6 +31,6 @@ protected:
 	Lux::EditorClient* getClient() { return m_client; }
 
 private:
-	Ui::PropertyWidgetBase *m_ui;
+	Ui::PropertyWidgetBase* m_ui;
 	Lux::EditorClient* m_client;
 };

@@ -39,7 +39,6 @@ void SceneView::resizeEvent(QResizeEvent* event)
 {
 	int w = event->size().width();
 	int h = event->size().height();
-	m_server->onResize(w, h);
 	if (m_pipeline)
 	{
 		m_pipeline->resize(w, h);

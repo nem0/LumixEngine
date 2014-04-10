@@ -25,6 +25,6 @@ private:
 	void onInfo(const char* system, const char* message);
 
 private:
-	Ui::LogWidget *m_ui;
+	Ui::LogWidget* m_ui;
 };
 

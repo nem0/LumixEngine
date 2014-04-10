@@ -34,7 +34,7 @@ private slots:
     void on_checkBox_stateChanged(int arg1);
 
 private:
-	Ui::FileServerWidget *m_ui;
+	Ui::FileServerWidget* m_ui;
 	Lux::EditorServer* m_server;
 	class FileServerWatcher* m_watcher;
 };

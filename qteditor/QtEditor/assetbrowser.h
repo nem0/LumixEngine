@@ -31,7 +31,7 @@ private slots:
 	void onFileChanged(const QString& path);
 
 private:
-	Ui::AssetBrowser *m_ui;
+	Ui::AssetBrowser* m_ui;
 	class QFileSystemModel* m_model;
 	class FileSystemWatcher* m_watcher;
 	Lux::EditorClient* m_client;

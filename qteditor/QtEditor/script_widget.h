@@ -22,6 +22,6 @@ private slots:
 	void on_sourceEdit_editingFinished();
 
 private:
-	Ui::ScriptWidget *m_ui;
+	Ui::ScriptWidget* m_ui;
 };
 
