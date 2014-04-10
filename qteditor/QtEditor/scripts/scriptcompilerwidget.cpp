@@ -5,10 +5,10 @@
 
 
 ScriptCompilerWidget::ScriptCompilerWidget(QWidget* parent) :
-    QDockWidget(parent),
-    m_ui(new Ui::ScriptCompilerWidget)
+	QDockWidget(parent),
+	m_ui(new Ui::ScriptCompilerWidget)
 {
-    m_ui->setupUi(this);
+	m_ui->setupUi(this);
 	m_model = new QFileSystemModel;
 	m_model->setRootPath(QDir::currentPath() + "/scripts/");
 	m_base_path = QDir::currentPath().toLatin1().data();
@@ -26,7 +26,7 @@ ScriptCompilerWidget::ScriptCompilerWidget(QWidget* parent) :
 
 ScriptCompilerWidget::~ScriptCompilerWidget()
 {
-    delete m_ui;
+	delete m_ui;
 	delete m_model;
 }
 

@@ -26,19 +26,6 @@ void ScriptCompiler::compileAll()
 			}
 		}
 	}
-	/*	WIN32_FIND_DATA find_data;
-	HANDLE h = FindFirstFile("scripts\\*.cpp", &find_data);
-	if(h == INVALID_HANDLE_VALUE)
-	{
-		return;
-	}
-	do
-	{
-		char path[260];
-		sprintf(path, "scripts\\%s", find_data.cFileName);
-		compile(path);
-	}
-	while(FindNextFile(h, &find_data));*/
 }
 
 

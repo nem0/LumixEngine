@@ -9,7 +9,7 @@
 
 class ScriptCompiler : public QObject
 {
-    Q_OBJECT
+	Q_OBJECT
 public:
 	typedef Lux::DelegateList<void (const char*, uint32_t)> CompileCallbacks;
 	enum Status
@@ -21,7 +21,7 @@ public:
 	};
 
 public:
-    explicit ScriptCompiler(QObject* parent = NULL);
+	explicit ScriptCompiler(QObject* parent = NULL);
 	void compile(const char path[]);
 	CompileCallbacks& onCompile() { return m_delegates; }
 	void compileAll();
