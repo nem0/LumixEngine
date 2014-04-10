@@ -1,8 +1,8 @@
 #include "gameview.h"
 #include "ui_gameview.h"
 #include <QMouseEvent>
+#include "editor/editor_client.h"
 #include "graphics/pipeline.h"
-
 
 GameView::GameView(QWidget* parent) :
 	QDockWidget(parent),
@@ -10,6 +10,7 @@ GameView::GameView(QWidget* parent) :
 {
 	m_ui->setupUi(this);
 	m_pipeline = NULL;
+	m_client = NULL;
 }
 
 GameView::~GameView()
@@ -32,4 +33,9 @@ void GameView::resizeEvent(QResizeEvent* event)
 	{
 		m_pipeline->resize(w, h);
 	}
+}
+
+void GameView::on_playButton_clicked()
+{
+	m_client->toggleGameMode();
 }

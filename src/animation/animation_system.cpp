@@ -208,7 +208,7 @@ namespace Lux
 		for(int i = 0, c = m_impl->m_animables.size(); i < c; ++i)
 		{
 			AnimationSystemImpl::Animable& animable = m_impl->m_animables[i];
-			if(!animable.m_manual)
+			if(!animable.m_manual && animable.m_animation->isReady())
 			{
 				animable.m_animation->getPose(animable.m_time, renderer->getPose(animable.m_renderable));
 				float t = animable.m_time + time_delta;

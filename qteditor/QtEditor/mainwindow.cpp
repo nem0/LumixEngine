@@ -73,6 +73,7 @@ void MainWindow::setEditorClient(Lux::EditorClient& client)
 	m_property_view->setEditorClient(client);
 	m_scene_view->setEditorClient(client);
 	m_asset_browser->setEditorClient(client);
+	m_game_view->setEditorClient(client);
 }
 
 
