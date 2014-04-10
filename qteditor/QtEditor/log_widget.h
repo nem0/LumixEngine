@@ -2,7 +2,7 @@
 
 #include <QDockWidget>
 
-namespace Ui 
+namespace Ui
 {
 	class LogWidget;
 }

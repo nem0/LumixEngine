@@ -50,6 +50,11 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="animable_widget.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
     <ClCompile Include="assetbrowser.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -118,6 +123,11 @@
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
+    <CustomBuild Include="animable_widget.h">
+      <Filter>Header Files</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
     <CustomBuild Include="assetbrowser.h">
       <Filter>Header Files</Filter>
     </CustomBuild>
@@ -169,6 +179,11 @@
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Generated Files\debug" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="debug\moc_animable_widget.cpp">
+      <Filter>Generated Files\debug</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="debug\moc_assetbrowser.cpp">
@@ -234,6 +249,11 @@
     <Filter Include="Generated Files\release" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="release\moc_animable_widget.cpp">
+      <Filter>Generated Files\release</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
     <ClCompile Include="release\moc_assetbrowser.cpp">
       <Filter>Generated Files\release</Filter>
     </ClCompile>
@@ -294,6 +314,11 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ui_animable_widget.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
     <ClInclude Include="ui_assetbrowser.h">
       <Filter>Generated Files</Filter>
     </ClInclude>
@@ -349,6 +374,11 @@
   <ItemGroup>
     <CustomBuild Include="scripts\scriptcompilerwidget.ui">
       <Filter>Form Files\scripts</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="animable_widget.ui">
+      <Filter>Form Files</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>

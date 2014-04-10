@@ -11,7 +11,7 @@ namespace Lux
 }
 
 
-namespace Ui 
+namespace Ui
 {
 	class PropertyWidgetBase;
 }

@@ -7,7 +7,7 @@
 
 
 ScriptCompiler::ScriptCompiler(QObject* parent) :
-    QObject(parent)
+	QObject(parent)
 {
 }
 

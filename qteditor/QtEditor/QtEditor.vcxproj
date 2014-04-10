@@ -140,6 +140,9 @@
     <ClCompile Include="scripts\scriptcompilerwidget.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="animable_widget.cpp" />
+  </ItemGroup>
+  <ItemGroup>
     <ClCompile Include="assetbrowser.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -194,6 +197,18 @@
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"debug" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 scripts\scriptcompilerwidget.h -o debug\moc_scriptcompilerwidget.cpp</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">MOC scripts\scriptcompilerwidget.h</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">debug\moc_scriptcompilerwidget.cpp;%(Outputs)</Outputs>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="animable_widget.h">
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">animable_widget.h;%(AdditionalInputs)</AdditionalInputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"release" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 animable_widget.h -o release\moc_animable_widget.cpp</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">MOC animable_widget.h</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">release\moc_animable_widget.cpp;%(Outputs)</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">animable_widget.h;%(AdditionalInputs)</AdditionalInputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"debug" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 animable_widget.h -o debug\moc_animable_widget.cpp</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">MOC animable_widget.h</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">debug\moc_animable_widget.cpp;%(Outputs)</Outputs>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
@@ -317,6 +332,11 @@
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="debug\moc_animable_widget.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
     <ClCompile Include="debug\moc_assetbrowser.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
     </ClCompile>
@@ -374,6 +394,11 @@
   <ItemGroup>
     <ClCompile Include="debug\moc_scriptcompilerwidget.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="release\moc_animable_widget.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -437,6 +462,9 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ui_animable_widget.h" />
+  </ItemGroup>
+  <ItemGroup>
     <ClInclude Include="ui_assetbrowser.h" />
   </ItemGroup>
   <ItemGroup>
@@ -477,6 +505,19 @@
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\uic.exe scripts\scriptcompilerwidget.ui -o ui_scriptcompilerwidget.h</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">UIC scripts\scriptcompilerwidget.ui</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">ui_scriptcompilerwidget.h;%(Outputs)</Outputs>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="animable_widget.ui">
+      <FileType>Document</FileType>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">animable_widget.ui;%(AdditionalInputs)</AdditionalInputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">F:\Qt\5.2.1\msvc2012\bin\uic.exe animable_widget.ui -o ui_animable_widget.h</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">UIC animable_widget.ui</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">ui_animable_widget.h;%(Outputs)</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">animable_widget.ui;%(AdditionalInputs)</AdditionalInputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\uic.exe animable_widget.ui -o ui_animable_widget.h</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">UIC animable_widget.ui</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">ui_animable_widget.h;%(Outputs)</Outputs>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
