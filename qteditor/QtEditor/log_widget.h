@@ -2,8 +2,9 @@
 
 #include <QDockWidget>
 
-namespace Ui {
-class LogWidget;
+namespace Ui 
+{
+	class LogWidget;
 }
 
 class LogWidget : public QDockWidget

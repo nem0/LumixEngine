@@ -8,8 +8,9 @@ namespace Lux
 	class EditorServer;
 }
 
-namespace Ui {
-class AssetBrowser;
+namespace Ui 
+{
+	class AssetBrowser;
 }
 
 class AssetBrowser : public QDockWidget

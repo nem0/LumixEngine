@@ -7,8 +7,9 @@ namespace Lux
 	class EditorServer;
 }
 
-namespace Ui {
-class FileServerWidget;
+namespace Ui 
+{
+	class FileServerWidget;
 }
 
 class FileServerWidget : public QDockWidget

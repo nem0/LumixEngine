@@ -11,8 +11,9 @@ namespace Lux
 	class Event;
 }
 
-namespace Ui {
-class PropertyView;
+namespace Ui 
+{
+	class PropertyView;
 }
 
 class PropertyView : public QDockWidget

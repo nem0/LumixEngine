@@ -3,8 +3,9 @@
 #include <QDockWidget>
 #include "core/string.h"
 
-namespace Ui {
-class ScriptCompilerWidget;
+namespace Ui 
+{
+	class ScriptCompilerWidget;
 }
 
 class ScriptCompilerWidget : public QDockWidget

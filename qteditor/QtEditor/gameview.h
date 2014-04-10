@@ -9,8 +9,9 @@ namespace Lux
 	class PipelineInstance;
 }
 
-namespace Ui {
-class GameView;
+namespace Ui 
+{
+	class GameView;
 }
 
 class GameView : public QDockWidget
