@@ -23,7 +23,7 @@ class FileServerWatcher : public Lux::FS::TCPFileServer::IWatcher
 		FileServerWidget& m_widget;
 };
 
-FileServerWidget::FileServerWidget(QWidget *parent) 
+FileServerWidget::FileServerWidget(QWidget* parent) 
 	: QDockWidget(parent)
 	, m_ui(new Ui::FileServerWidget)
 {

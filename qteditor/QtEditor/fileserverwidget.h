@@ -16,7 +16,7 @@ class FileServerWidget : public QDockWidget
 	Q_OBJECT
 
 public:
-	explicit FileServerWidget(QWidget *parent = NULL);
+	explicit FileServerWidget(QWidget* parent = NULL);
 	~FileServerWidget();
 	
 	void setEditorServer(Lux::EditorServer& server);

@@ -12,7 +12,7 @@
 #include "scripts/scriptcompilerwidget.h"
 
 
-MainWindow::MainWindow(QWidget *parent) :
+MainWindow::MainWindow(QWidget* parent) :
 	QMainWindow(parent),
 	m_ui(new Ui::MainWindow)
 {

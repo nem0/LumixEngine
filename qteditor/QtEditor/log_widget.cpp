@@ -3,7 +3,7 @@
 #include "core/log.h"
 
 
-LogWidget::LogWidget(QWidget *parent) :
+LogWidget::LogWidget(QWidget* parent) :
 	QDockWidget(parent),
 	m_ui(new Ui::LogWidget)
 {
@@ -26,10 +26,10 @@ void LogWidget::onInfoReceived(const QString& system, const QString& message)
 {
 	int row = m_ui->tableWidget->rowCount();
 	m_ui->tableWidget->insertRow(row);
-	QTableWidgetItem *item1 = new QTableWidgetItem;
+	QTableWidgetItem* item1 = new QTableWidgetItem;
 	item1->setText(system);
 	m_ui->tableWidget->setItem(row, 0, item1);
-	QTableWidgetItem *item2 = new QTableWidgetItem;
+	QTableWidgetItem* item2 = new QTableWidgetItem;
 	item2->setText(message);
 	m_ui->tableWidget->setItem(row, 1, item2);
 }

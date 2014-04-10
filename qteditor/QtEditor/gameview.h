@@ -18,14 +18,14 @@ class GameView : public QDockWidget
 	Q_OBJECT
 
 public:
-	explicit GameView(QWidget *parent = NULL);
+	explicit GameView(QWidget* parent = NULL);
 	virtual ~GameView();
 
 	QWidget* getContentWidget() const;
 	void setPipeline(Lux::PipelineInstance& pipeline) { m_pipeline = &pipeline; }
 
 private:
-	virtual void resizeEvent(QResizeEvent *) override;
+	virtual void resizeEvent(QResizeEvent*) override;
 
 private:
 	Ui::GameView* m_ui;

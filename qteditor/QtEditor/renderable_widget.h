@@ -13,7 +13,7 @@ class RenderableWidget : public PropertyWidgetBase
 	Q_OBJECT
 
 public:
-	explicit RenderableWidget(QWidget *parent = NULL);
+	explicit RenderableWidget(QWidget* parent = NULL);
 	~RenderableWidget();
 	virtual const char* getTitle() const override { return "Renderable"; }
 	virtual void onEntityProperties(Lux::PropertyListEvent& event) override;

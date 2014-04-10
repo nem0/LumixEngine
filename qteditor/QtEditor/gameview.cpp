@@ -4,7 +4,7 @@
 #include "graphics/pipeline.h"
 
 
-GameView::GameView(QWidget *parent) :
+GameView::GameView(QWidget* parent) :
 	QDockWidget(parent),
 	m_ui(new Ui::GameView)
 {

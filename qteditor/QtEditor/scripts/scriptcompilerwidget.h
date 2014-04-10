@@ -12,7 +12,7 @@ class ScriptCompilerWidget : public QDockWidget
     Q_OBJECT
 
 public:
-    explicit ScriptCompilerWidget(QWidget *parent = 0);
+    explicit ScriptCompilerWidget(QWidget* parent = 0);
     ~ScriptCompilerWidget();
 
 private slots:

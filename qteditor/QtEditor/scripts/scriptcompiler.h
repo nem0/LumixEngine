@@ -21,7 +21,7 @@ public:
 	};
 
 public:
-    explicit ScriptCompiler(QObject *parent = 0);
+    explicit ScriptCompiler(QObject* parent = NULL);
 	void compile(const char path[]);
 	CompileCallbacks& onCompile() { return m_delegates; }
 	void compileAll();

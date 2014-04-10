@@ -17,7 +17,7 @@ class MainWindow : public QMainWindow
 	Q_OBJECT
 
 public:
-	explicit MainWindow(QWidget *parent = NULL);
+	explicit MainWindow(QWidget* parent = NULL);
 	~MainWindow();
 
 	void setEditorClient(Lux::EditorClient& client);
@@ -33,7 +33,7 @@ private slots:
 	void on_actionProperties_triggered();
 	void on_actionE_xit_triggered();
 	void on_actionGame_view_triggered();
-	virtual void closeEvent(QCloseEvent *event) override;
+	virtual void closeEvent(QCloseEvent* event) override;
 
 private:
 	Ui::MainWindow* m_ui;

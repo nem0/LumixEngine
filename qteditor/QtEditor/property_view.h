@@ -20,7 +20,7 @@ class PropertyView : public QDockWidget
 	Q_OBJECT
 
 public:
-	explicit PropertyView(QWidget *parent = NULL);
+	explicit PropertyView(QWidget* parent = NULL);
 	~PropertyView();
 	void setEditorClient(Lux::EditorClient& client);
 

@@ -306,9 +306,12 @@ bool EditorServer::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 
 void EditorServer::destroy()
 {
-	m_impl->destroy();
-	LUX_DELETE(m_impl);
-	m_impl = NULL;
+	if (m_impl)
+	{
+		m_impl->destroy();
+		LUX_DELETE(m_impl);
+		m_impl = NULL;
+	}
 }
 
 

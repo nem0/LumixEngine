@@ -5,7 +5,7 @@
 #include "editor/editor_client.h"
 #include "editor/server_message_types.h"
 
-RenderableWidget::RenderableWidget(QWidget *parent) :
+RenderableWidget::RenderableWidget(QWidget* parent) :
 	PropertyWidgetBase(parent),
 	m_ui(new Ui::RenderableWidget)
 {
