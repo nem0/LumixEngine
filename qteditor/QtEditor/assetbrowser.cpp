@@ -11,7 +11,7 @@
 
 
 // http://qualapps.blogspot.sk/2010/05/understanding-readdirectorychangesw_19.html
-class  FileSystemWatcher
+class FileSystemWatcher
 {
 	public:
 		static void wcharToCharArray(const WCHAR* src, char* dest, int len)
@@ -26,7 +26,7 @@ class  FileSystemWatcher
 		void start(LPCWSTR path)
 		{
 			m_overlapped.hEvent = this;
-			m_handle = CreateFile(path, FILE_LIST_DIRECTORY, FILE_SHARE_DELETE | FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING,  FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, NULL);
+			m_handle = CreateFile(path, FILE_LIST_DIRECTORY, FILE_SHARE_DELETE | FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, NULL);
 			ReadDirectoryChangesW(m_handle, m_info, sizeof(m_info), TRUE, FILE_NOTIFY_CHANGE_LAST_WRITE, &m_received, &m_overlapped, callback);
 		}
 
