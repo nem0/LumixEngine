@@ -5,6 +5,7 @@
 #include "core/event_manager.h"
 #include "editor/editor_client.h"
 #include "editor/server_message_types.h"
+#include "animable_widget.h"
 #include "renderable_widget.h"
 #include "script_widget.h"
 
@@ -59,7 +60,7 @@ void PropertyView::onEntitySelected(Lux::Event& event)
 		}
 		else if (e.components[i] == crc32("animable"))
 		{
-			m_ui->components->addItem(new QFrame(), "Animable");
+			widget = new AnimableWidget;
 		}
 		else if (e.components[i] == crc32("script"))
 		{
@@ -101,5 +102,9 @@ void PropertyView::on_addComponentButton_clicked()
 	else if (strcmp(c, "Point Light") == 0)
 	{
 		m_client->addComponent(crc32("light"));
+	}
+	else if (strcmp(c, "Animable") == 0)
+	{
+		m_client->addComponent(crc32("animable"));
 	}
 }

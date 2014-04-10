@@ -9,7 +9,7 @@ namespace Lux
 		struct TCPFileServerImpl;
 		class LUX_CORE_API TCPFileServer
 		{
-		public: 
+		public:
 			class IWatcher abstract
 			{
 				public:

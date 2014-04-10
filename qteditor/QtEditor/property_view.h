@@ -11,7 +11,7 @@ namespace Lux
 	class Event;
 }
 
-namespace Ui 
+namespace Ui
 {
 	class PropertyView;
 }

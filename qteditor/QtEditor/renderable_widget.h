@@ -4,7 +4,7 @@
 #include "property_widget_base.h"
 
 
-namespace Ui 
+namespace Ui
 {
 	class RenderableWidget;
 }

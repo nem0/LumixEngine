@@ -7,7 +7,7 @@ namespace Lux
 	class EditorServer;
 }
 
-namespace Ui 
+namespace Ui
 {
 	class FileServerWidget;
 }
@@ -30,9 +30,9 @@ public slots:
 	void onFileOpen(const QString& path, bool success, qint64 time);
 
 private slots:
-    void on_pushButton_clicked();
+	void on_pushButton_clicked();
 
-    void on_checkBox_stateChanged(int arg1);
+	void on_checkBox_stateChanged(int arg1);
 
 private:
 	Ui::FileServerWidget* m_ui;

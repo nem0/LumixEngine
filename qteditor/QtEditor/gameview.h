@@ -9,7 +9,7 @@ namespace Lux
 	class PipelineInstance;
 }
 
-namespace Ui 
+namespace Ui
 {
 	class GameView;
 }

@@ -8,7 +8,7 @@ namespace Lux
 	class EditorServer;
 }
 
-namespace Ui 
+namespace Ui
 {
 	class AssetBrowser;
 }
