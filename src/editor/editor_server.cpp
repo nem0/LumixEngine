@@ -532,16 +532,12 @@ void EditorServerImpl::toggleGameMode()
 
 void EditorServerImpl::stopGameMode()
 {
-	/*m_is_game_mode = false;
+	m_is_game_mode = false;
 	m_engine.getScriptSystem().stop();
-	Matrix mtx;
-	m_camera_rot.toMatrix(mtx);
-	mtx.setTranslation(m_camera_pos);
-	m_engine.getRenderer().setCameraMatrix(mtx);
 	m_game_mode_file->seek(FS::SeekMode::BEGIN, 0);
 	load(*m_game_mode_file);
 	m_engine.getFileSystem().close(m_game_mode_file);
-	m_game_mode_file = NULL;*/
+	m_game_mode_file = NULL;
 }
 
 
