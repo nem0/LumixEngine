@@ -9,7 +9,7 @@
 #include "script_widget.h"
 
 
-PropertyView::PropertyView(QWidget *parent) :
+PropertyView::PropertyView(QWidget* parent) :
 	QDockWidget(parent),
 	m_ui(new Ui::PropertyView)
 {

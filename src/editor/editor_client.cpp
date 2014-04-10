@@ -102,10 +102,13 @@ namespace Lux
 
 	void EditorClient::destroy()
 	{
-		LUX_DELETE(m_impl->m_stream);
-		m_impl->m_task.stop();
-		m_impl->m_task.destroy();
-		LUX_DELETE(m_impl);
+		if (m_impl)
+		{
+			LUX_DELETE(m_impl->m_stream);
+			m_impl->m_task.stop();
+			m_impl->m_task.destroy();
+			LUX_DELETE(m_impl);
+		}
 	}
 
 	void EditorClientImpl::onMessage(uint8_t* data, int size)

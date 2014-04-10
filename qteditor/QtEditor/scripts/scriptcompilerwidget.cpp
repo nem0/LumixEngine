@@ -4,7 +4,7 @@
 #include "scriptcompiler.h"
 
 
-ScriptCompilerWidget::ScriptCompilerWidget(QWidget *parent) :
+ScriptCompilerWidget::ScriptCompilerWidget(QWidget* parent) :
     QDockWidget(parent),
     m_ui(new Ui::ScriptCompilerWidget)
 {

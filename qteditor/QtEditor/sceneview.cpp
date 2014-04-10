@@ -4,7 +4,7 @@
 #include <QMouseEvent>
 #include "graphics/pipeline.h"
 
-SceneView::SceneView(QWidget *parent) :
+SceneView::SceneView(QWidget* parent) :
 	QDockWidget(parent)
 {
 	m_pipeline = NULL;

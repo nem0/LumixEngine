@@ -11,7 +11,7 @@ class LogWidget : public QDockWidget
 	Q_OBJECT
 
 public:
-	explicit LogWidget(QWidget *parent = NULL);
+	explicit LogWidget(QWidget* parent = NULL);
 	~LogWidget();
 
 signals:

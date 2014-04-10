@@ -1,7 +1,7 @@
 #include "property_widget_base.h"
 #include "ui_property_widget_base.h"
 
-PropertyWidgetBase::PropertyWidgetBase(QWidget *parent) :
+PropertyWidgetBase::PropertyWidgetBase(QWidget* parent) :
 	QFrame(parent),
 	m_ui(new Ui::PropertyWidgetBase)
 {

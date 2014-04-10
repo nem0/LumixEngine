@@ -57,7 +57,7 @@ class  FileSystemWatcher
 		AssetBrowser* m_asset_browser;
 };
 
-AssetBrowser::AssetBrowser(QWidget *parent) :
+AssetBrowser::AssetBrowser(QWidget* parent) :
 	QDockWidget(parent),
 	m_ui(new Ui::AssetBrowser)
 {

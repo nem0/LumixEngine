@@ -6,7 +6,7 @@
 #include "core/log.h"
 
 
-ScriptCompiler::ScriptCompiler(QObject *parent) :
+ScriptCompiler::ScriptCompiler(QObject* parent) :
     QObject(parent)
 {
 }

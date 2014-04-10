@@ -38,68 +38,105 @@ public:
 	Lux::Renderer* m_renderer;
 };
 
-int main(int argc, char *argv[])
+class App
 {
-	QApplication a(argc, argv);
-	QFile file("editor/stylesheet.qss");
-	file.open(QFile::ReadOnly);
-	a.setStyleSheet(QLatin1String(file.readAll()));
-	MainWindow w;
-	w.show();
-	HWND hwnd = (HWND)w.getSceneView()->widget()->winId();
-	HWND game_hwnd = (HWND)w.getGameView()->getContentWidget()->winId();
-	Lux::EditorServer server;
-	Lux::EditorClient client;
-	server.create(hwnd, game_hwnd, QDir::currentPath().toLocal8Bit().data());
-	server.tick();
-	client.create(server.getEngine().getBasePath());
-	w.setEditorClient(client);
-	w.setEditorServer(server);
-	w.getSceneView()->setServer(&server);
-	MyRenderDevice rd(server.getEngine().getRenderer(), "pipelines/main.json");
-	MyRenderDevice rd2(server.getEngine().getRenderer(), "pipelines/game_view.json");
-	rd.m_hdc = GetDC(hwnd);
-	rd2.m_hdc = GetDC(game_hwnd);
-	while (w.isVisible())
-	{
-		rd.getPipeline().setCamera(0, server.getCamera(0)); TODO("when universe is loaded, old camera is destroyed, handle this in a normal way");
-		rd2.getPipeline().setCamera(0, server.getCamera(1)); TODO("when universe is loaded, old camera is destroyed, handle this in a normal way");
-		w.getSceneView()->setPipeline(rd.getPipeline());
-		w.getGameView()->setPipeline(rd2.getPipeline());
-		wglMakeCurrent(rd.m_hdc, server.getHGLRC());
-		server.render(rd);
-		server.renderIcons(rd);
-		server.getGizmo().updateScale(server.getCamera(0));
-		server.getGizmo().render(server.getEngine().getRenderer());
-		rd.endFrame();
-		wglMakeCurrent(rd2.m_hdc, server.getHGLRC());
-		server.render(rd2);
-		rd2.endFrame();
-		server.tick();
-		client.processMessages();
-		a.processEvents();
-		BYTE keys[256];
-		GetKeyboardState(keys);
-		if (w.getSceneView()->hasFocus())
+	public:
+		App()
 		{
-			 /// TODO refactor
-			if (keys['W'] >> 7)
+			m_game_render_device = NULL;
+			m_edit_render_device = NULL;
+			m_qt_app = NULL;
+			m_main_window = NULL;
+		}
+
+		~App()
+		{
+			delete m_main_window;
+			delete m_qt_app;
+			m_client.destroy();
+			m_server.destroy();
+		}
+
+		void init(int argc, char* argv[])
+		{
+			m_qt_app = new QApplication(argc, argv);
+			QFile file("editor/stylesheet.qss");
+			file.open(QFile::ReadOnly);
+			m_qt_app->setStyleSheet(QLatin1String(file.readAll()));
+			m_main_window = new MainWindow();
+			m_main_window->show();
+			HWND hwnd = (HWND)m_main_window->getSceneView()->widget()->winId();
+			HWND game_hwnd = (HWND)m_main_window->getGameView()->getContentWidget()->winId();
+			m_server.create(hwnd, game_hwnd, QDir::currentPath().toLocal8Bit().data());
+			m_server.tick();
+			m_client.create(m_server.getEngine().getBasePath());
+			m_main_window->setEditorClient(m_client);
+			m_main_window->setEditorServer(m_server);
+			m_main_window->getSceneView()->setServer(&m_server);
+			m_edit_render_device = new MyRenderDevice(m_server.getEngine().getRenderer(), "pipelines/main.json");
+			m_game_render_device = new	MyRenderDevice(m_server.getEngine().getRenderer(), "pipelines/game_view.json");
+			m_edit_render_device->m_hdc = GetDC(hwnd);
+			m_game_render_device->m_hdc = GetDC(game_hwnd);
+		}
+
+		void run()
+		{
+			while (m_main_window->isVisible())
 			{
-				client.navigate(1, 0, 0);
-			}
-			else if (keys['S'] >> 7)
-			{
-				client.navigate(-1, 0, 0);
-			}
-			if (keys['A'] >> 7)
-			{
-				client.navigate(0, -1, 0);
-			}
-			else if (keys['D'] >> 7)
-			{
-				client.navigate(0, 1, 0);
+				m_edit_render_device->getPipeline().setCamera(0, m_server.getCamera(0)); TODO("when universe is loaded, old camera is destroyed, handle this in a normal way");
+				m_game_render_device->getPipeline().setCamera(0, m_server.getCamera(1)); TODO("when universe is loaded, old camera is destroyed, handle this in a normal way");
+				m_main_window->getSceneView()->setPipeline(m_edit_render_device->getPipeline());
+				m_main_window->getGameView()->setPipeline(m_game_render_device->getPipeline());
+				wglMakeCurrent(m_edit_render_device->m_hdc, m_server.getHGLRC());
+				m_server.render(*m_edit_render_device);
+				m_server.renderIcons(*m_edit_render_device);
+				m_server.getGizmo().updateScale(m_server.getCamera(0));
+				m_server.getGizmo().render(m_server.getEngine().getRenderer());
+				m_edit_render_device->endFrame();
+				wglMakeCurrent(m_game_render_device->m_hdc, m_server.getHGLRC());
+				m_server.render(*m_game_render_device);
+				m_game_render_device->endFrame();
+				m_server.tick();
+				m_client.processMessages();
+				m_qt_app->processEvents();
+				BYTE keys[256];
+				GetKeyboardState(keys);
+				if (m_main_window->getSceneView()->hasFocus())
+				{
+					 /// TODO refactor
+					if (keys['W'] >> 7)
+					{
+						m_client.navigate(1, 0, 0);
+					}
+					else if (keys['S'] >> 7)
+					{
+						m_client.navigate(-1, 0, 0);
+					}
+					if (keys['A'] >> 7)
+					{
+						m_client.navigate(0, -1, 0);
+					}
+					else if (keys['D'] >> 7)
+					{
+						m_client.navigate(0, 1, 0);
+					}
+				}
 			}
 		}
-	}
+
+	private:
+		MyRenderDevice* m_edit_render_device;
+		MyRenderDevice* m_game_render_device;
+		MainWindow* m_main_window;
+		Lux::EditorServer m_server;
+		Lux::EditorClient m_client;
+		QApplication* m_qt_app;
+};
+
+int main(int argc, char* argv[])
+{
+	App app;
+	app.init(argc, argv);
+	app.run();
 	return 0;
 }

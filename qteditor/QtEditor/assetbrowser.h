@@ -17,7 +17,7 @@ class AssetBrowser : public QDockWidget
 	Q_OBJECT
 
 public:
-	explicit AssetBrowser(QWidget *parent = NULL);
+	explicit AssetBrowser(QWidget* parent = NULL);
 	~AssetBrowser();
 	void setEditorClient(Lux::EditorClient& client) { m_client = &client; }
 	void setEditorServer(Lux::EditorServer& server) { m_server = &server; }

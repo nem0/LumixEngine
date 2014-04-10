@@ -21,7 +21,7 @@ class PropertyWidgetBase : public QFrame
 	Q_OBJECT
 
 public:
-	explicit PropertyWidgetBase(QWidget *parent = NULL);
+	explicit PropertyWidgetBase(QWidget* parent = NULL);
 	~PropertyWidgetBase();
 	void setEditorClient(Lux::EditorClient& client) { m_client = &client; }
 	virtual const char* getTitle() const = 0;
