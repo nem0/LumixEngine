@@ -19,21 +19,22 @@ namespace Lux
 
 	struct AnimationSystemImpl
 	{
-		AnimationSystemImpl(Engine& engine) : m_engine(engine) {}
+		public:
+			AnimationSystemImpl(Engine& engine) : m_engine(engine) {}
 
-		struct Animable
-		{
-			bool m_manual;
-			Component m_renderable;
-			float m_time;
-			class Animation* m_animation;
-		};
+			struct Animable
+			{
+				bool m_manual;
+				Component m_renderable;
+				float m_time;
+				class Animation* m_animation;
+			};
 
-		Array<Animable> m_animables;
-		Universe* m_universe;
-		Engine& m_engine;
+			Array<Animable> m_animables;
+			Universe* m_universe;
+			Engine& m_engine;
 
-		void onEvent(Event& event);
+			void onEvent(Event& event);
 		
 		private:
 			void operator=(const AnimationSystemImpl&);

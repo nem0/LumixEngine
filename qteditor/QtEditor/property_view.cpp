@@ -71,7 +71,7 @@ void PropertyView::onEntitySelected(Lux::Event& event)
 		}
 		else
 		{
-			assert(false);
+			ASSERT(false);
 		}
 		widget->setEditorClient(*m_client);
 		m_ui->components->addItem(widget, widget->getTitle());
