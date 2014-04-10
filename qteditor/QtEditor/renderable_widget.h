@@ -23,5 +23,5 @@ private slots:
 	void on_sourceEdit_editingFinished();
 
 private:
-	Ui::RenderableWidget *m_ui;
+	Ui::RenderableWidget* m_ui;
 };

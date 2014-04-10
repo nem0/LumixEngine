@@ -15,7 +15,7 @@
 /// TODO refactor this
 class MyRenderDevice : public Lux::IRenderDevice
 {
-	public:
+public:
 	explicit MyRenderDevice(Lux::Renderer& renderer, const char* pipeline)
 	{
 		m_renderer = &renderer;
@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
 	Lux::EditorServer server;
 	Lux::EditorClient client;
 	server.create(hwnd, game_hwnd, QDir::currentPath().toLocal8Bit().data());
-	server.tick(hwnd, NULL);
+	server.tick();
 	client.create(server.getEngine().getBasePath());
 	w.setEditorClient(client);
 	w.setEditorServer(server);
@@ -75,7 +75,7 @@ int main(int argc, char *argv[])
 		wglMakeCurrent(rd2.m_hdc, server.getHGLRC());
 		server.render(rd2);
 		rd2.endFrame();
-		server.tick(hwnd, NULL);
+		server.tick();
 		client.processMessages();
 		a.processEvents();
 		BYTE keys[256];

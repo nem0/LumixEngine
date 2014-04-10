@@ -32,7 +32,7 @@ private:
 	void onEntitySelected(Lux::Event& event);
 
 private:
-	Ui::PropertyView *m_ui;
+	Ui::PropertyView* m_ui;
 	Lux::EditorClient* m_client;
 	Lux::Array<class PropertyWidgetBase*> m_component_uis;
 };

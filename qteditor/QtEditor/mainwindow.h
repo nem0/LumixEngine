@@ -36,7 +36,7 @@ private slots:
 	virtual void closeEvent(QCloseEvent *event) override;
 
 private:
-	Ui::MainWindow *m_ui;
+	Ui::MainWindow* m_ui;
 	Lux::EditorClient* m_client;
 	class LogWidget* m_log;
 	class PropertyView* m_property_view;

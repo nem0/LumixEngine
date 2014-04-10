@@ -28,7 +28,7 @@ private:
 	virtual void resizeEvent(QResizeEvent *) override;
 
 private:
-	Ui::GameView *m_ui;
+	Ui::GameView* m_ui;
 	Lux::PipelineInstance* m_pipeline;
 };
 

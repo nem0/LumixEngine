@@ -22,7 +22,7 @@ private slots:
     void on_compileAllButton_clicked();
 
 private:
-    Ui::ScriptCompilerWidget *m_ui;
+    Ui::ScriptCompilerWidget* m_ui;
 	class QFileSystemModel* m_model;
 	class ScriptCompiler* m_compiler;
 	Lux::string m_base_path;
