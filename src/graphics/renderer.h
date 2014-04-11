@@ -38,12 +38,16 @@ class LUX_ENGINE_API Renderer : public IPlugin
 		static void destroyInstance(Renderer& renderer);
 
 		virtual void render(IRenderDevice& device) = 0;
+		virtual void renderGame() = 0;
 		virtual void setUniverse(Universe* universe) = 0;
 		virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir) = 0;
 		virtual void enableZTest(bool enable) = 0;
+		virtual void setRenderDevice(IRenderDevice& device) = 0;
 
 		virtual void applyCamera(Component camera) = 0;
 		virtual void setCameraSize(Component camera, int w, int h) = 0;
+		virtual void setCameraPriority(Component camera, const int& priority) = 0;
+		virtual void getCameraPriority(Component camera, int& priority) = 0;
 		virtual void getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) = 0;
 		virtual Component getLight(int index) = 0;
 

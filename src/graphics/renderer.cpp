@@ -31,6 +31,7 @@ namespace Lux
 
 
 static const uint32_t renderable_hash = crc32("renderable");
+static const uint32_t camera_hash = crc32("camera");
 
 
 struct Renderable
@@ -57,13 +58,14 @@ struct Light
 struct Camera
 {
 	Entity m_entity;
-	bool m_is_active;
 	float m_fov;
 	float m_aspect;
 	float m_near;
 	float m_far;
 	float m_width;
 	float m_height;
+	int m_priority;
+	bool m_is_active;
 };
 
 
@@ -93,11 +95,47 @@ struct RendererImpl : public Renderer
 	}
 
 
+	virtual void setCameraPriority(Component camera, const int& priority) override
+	{
+		ASSERT(m_render_device);
+		m_cameras[camera.index]->m_priority = priority;
+		m_render_device->getPipeline().removeCamera(camera);
+		m_render_device->getPipeline().addCamera(camera);
+	}
+
+
+	virtual void getCameraPriority(Component camera, int& priority) override
+	{
+		priority = m_cameras[camera.index]->m_priority;
+	}
+
+	
 	virtual void setCameraSize(Component camera, int w, int h) override
 	{
 		m_cameras[camera.index]->m_width = (float)w;
 		m_cameras[camera.index]->m_height = (float)h;
 		m_cameras[camera.index]->m_aspect = w / (float)h;
+	}
+
+
+	virtual void setRenderDevice(IRenderDevice& device) override
+	{
+		m_render_device = &device;
+		for (int i = 0; i < m_cameras.size(); ++i)
+		{
+			ASSERT(m_cameras[i]->m_priority < 0);
+		}
+	}
+
+
+	virtual void renderGame() override
+	{
+		if (m_render_device && m_render_device->getPipeline().getCameraCount() > 0)
+		{
+			m_render_device->beginFrame();
+			render(*m_render_device);
+			m_render_device->endFrame();
+		}
 	}
 
 
@@ -208,6 +246,7 @@ struct RendererImpl : public Renderer
 			camera->m_aspect = 800.0f / 600.0f;
 			camera->m_near = 0.1f;
 			camera->m_far = 100.0f;
+			camera->m_priority = -1;
 			m_cameras.push(camera);
 			Component cmp(entity, type, this, m_cameras.size() - 1);
 			ComponentEvent evt(cmp);
@@ -428,6 +467,7 @@ struct RendererImpl : public Renderer
 			serializer.serializeArrayItem(m_cameras[i]->m_width);
 			serializer.serializeArrayItem(m_cameras[i]->m_height);
 			serializer.serializeArrayItem(m_cameras[i]->m_entity.index);
+			serializer.serializeArrayItem(m_cameras[i]->m_priority);
 		}
 		serializer.endArray();
 		serializer.serialize("renderable_count", m_renderables.size());
@@ -465,6 +505,9 @@ struct RendererImpl : public Renderer
 			m_cameras[i]->m_aspect = m_cameras[i]->m_width / m_cameras[i]->m_height;
 			serializer.deserializeArrayItem(m_cameras[i]->m_entity.index);
 			m_cameras[i]->m_entity.universe = m_universe;
+			serializer.deserializeArrayItem(m_cameras[i]->m_priority);
+			ComponentEvent evt(Component(m_cameras[i]->m_entity, camera_hash, this, i));
+			m_universe->getEventManager()->emitEvent(evt);
 		}
 		serializer.deserializeArrayEnd();
 		serializer.deserialize("renderable_count", size);
@@ -482,6 +525,8 @@ struct RendererImpl : public Renderer
 			{
 				serializer.deserializeArrayItem((&m_renderables[i].m_model->getMatrix().m11)[j]);
 			}
+			ComponentEvent evt(Component(m_renderables[i].m_entity, renderable_hash, this, i));
+			m_universe->getEventManager()->emitEvent(evt);
 		}
 		serializer.deserializeArrayEnd();
 	}
@@ -493,6 +538,7 @@ struct RendererImpl : public Renderer
 	Array<Renderable> m_renderables;
 	Array<Model*> m_models;
 	Universe* m_universe;
+	IRenderDevice* m_render_device;
 };
 
 

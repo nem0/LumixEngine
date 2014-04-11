@@ -134,6 +134,9 @@
     </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="propertywidgets\camerawidget.cpp" />
+  </ItemGroup>
+  <ItemGroup>
     <ClCompile Include="scripts\scriptcompiler.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -174,6 +177,18 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="script_widget.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="propertywidgets\camerawidget.h">
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">propertywidgets\camerawidget.h;%(AdditionalInputs)</AdditionalInputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"release" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 propertywidgets\camerawidget.h -o release\moc_camerawidget.cpp</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">MOC propertywidgets\camerawidget.h</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">release\moc_camerawidget.cpp;%(Outputs)</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">propertywidgets\camerawidget.h;%(AdditionalInputs)</AdditionalInputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"debug" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 propertywidgets\camerawidget.h -o debug\moc_camerawidget.cpp</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">MOC propertywidgets\camerawidget.h</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">debug\moc_camerawidget.cpp;%(Outputs)</Outputs>
+    </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="scripts\scriptcompiler.h">
@@ -342,6 +357,11 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="debug\moc_camerawidget.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
     <ClCompile Include="debug\moc_fileserverwidget.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
     </ClCompile>
@@ -407,6 +427,11 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="release\moc_camerawidget.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
     <ClCompile Include="release\moc_fileserverwidget.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
     </ClCompile>
@@ -468,6 +493,9 @@
     <ClInclude Include="ui_assetbrowser.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ui_camerawidget.h" />
+  </ItemGroup>
+  <ItemGroup>
     <ClInclude Include="ui_fileserverwidget.h" />
   </ItemGroup>
   <ItemGroup>
@@ -493,6 +521,19 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ui_scriptcompilerwidget.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="propertywidgets\camerawidget.ui">
+      <FileType>Document</FileType>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">propertywidgets\camerawidget.ui;%(AdditionalInputs)</AdditionalInputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">F:\Qt\5.2.1\msvc2012\bin\uic.exe propertywidgets\camerawidget.ui -o ui_camerawidget.h</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">UIC propertywidgets\camerawidget.ui</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">ui_camerawidget.h;%(Outputs)</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">propertywidgets\camerawidget.ui;%(AdditionalInputs)</AdditionalInputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\uic.exe propertywidgets\camerawidget.ui -o ui_camerawidget.h</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">UIC propertywidgets\camerawidget.ui</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">ui_camerawidget.h;%(Outputs)</Outputs>
+    </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="scripts\scriptcompilerwidget.ui">
