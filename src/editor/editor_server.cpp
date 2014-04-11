@@ -173,7 +173,7 @@ struct EditorServerImpl
 		void registerProperties();
 		void rotateCamera(int x, int y);
 		void onEvent(Event& evt);
-		void onComponentEvent(ComponentEvent& e);
+		void onComponentEvent(Event& e);
 		void destroyUniverse();
 		bool loadPlugin(const char* plugin_name);
 		void onLogInfo(const char* system, const char* message);
@@ -198,13 +198,13 @@ struct EditorServerImpl
 		Engine m_engine;
 		EditorServer* m_owner;
 		Entity m_camera;
-		Entity m_game_camera;
 
 		FS::FileSystem* m_file_system;
 		FS::TCPFileServer m_tpc_file_server;
 		FS::DiskFileDevice m_disk_file_device;
 		FS::MemoryFileDevice m_mem_file_device;
 		FS::TCPFileDevice m_tcp_file_device;
+		IRenderDevice* m_edit_view_render_device;
 };
 
 
@@ -317,6 +317,7 @@ void EditorServer::destroy()
 
 void EditorServerImpl::registerProperties()
 {
+	m_component_properties[camera_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("priority"), &Renderer::getCameraPriority, &Renderer::setCameraPriority));
 	m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("source"), &Renderer::getRenderablePath, &Renderer::setRenderablePath, IPropertyDescriptor::FILE));
 	/*m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("visible"), &Renderer::getVisible, &Renderer::setVisible));
 	m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("cast shadows"), &Renderer::getCastShadows, &Renderer::setCastShadows));
@@ -387,48 +388,6 @@ void EditorServerImpl::onPointerDown(int x, int y, MouseButton::Value button)
 			m_mouse_mode = EditorServerImpl::MouseMode::TRANSFORM;
 			m_gizmo.startTransform(m_camera.getComponent(camera_type), x, y, Gizmo::TransformMode::CAMERA_XZ);
 		}
-		/*Vec3 hit_pos;
-		char node_name[20];
-		H3DNode node = castRay(x, y, hit_pos, node_name, 20, m_gizmo.getNode());
-		Component r = m_engine.getRenderer().getRenderable(*m_engine.getUniverse(), node);
-		/*if(node == m_gizmo.getNode() && m_selected_entity.isValid())
-		{
-			m_mouse_mode = EditorServerImpl::MouseMode::TRANSFORM;
-			if(node_name[0] == 'x')
-			{
-				m_gizmo.startTransform(x, y, Gizmo::TransformMode::X);
-			}
-			else if(node_name[0] == 'y')
-			{
-				m_gizmo.startTransform(x, y, Gizmo::TransformMode::Y);
-			}
-			else if(node_name[0] == 'z')
-			{
-				m_gizmo.startTransform(x, y, Gizmo::TransformMode::Z);
-			}
-		}
-		else
-		{
-			if(!r.isValid())
-			{
-				for(int i = 0, c = m_editor_icons.size(); i < c; ++i)
-				{
-					if(m_editor_icons[i]->getHandle() == node)
-					{
-						selectEntity(m_editor_icons[i]->getEntity());
-						m_mouse_mode = EditorServerImpl::MouseMode::TRANSFORM;
-						m_gizmo.startTransform(x, y, Gizmo::TransformMode::CAMERA_XZ);
-						break;
-					}
-				}
-			}
-			else
-			{
-				selectEntity(r.entity);
-				m_mouse_mode = EditorServerImpl::MouseMode::TRANSFORM;
-				m_gizmo.startTransform(x, y, Gizmo::TransformMode::CAMERA_XZ);
-			}
-		}*/
 	}
 }
 
@@ -621,6 +580,10 @@ void EditorServerImpl::addComponent(uint32_t type_crc)
 		{
 			m_engine.getScriptSystem().createScript(m_selected_entity);
 		}
+		else if (type_crc == camera_type)
+		{
+			m_engine.getRenderer().createComponent(camera_type, m_selected_entity);
+		}
 		else
 		{
 			ASSERT(false);
@@ -722,39 +685,39 @@ HGLRC createGLContext(HWND hwnd[], int count)
 	ASSERT(count > 0);
 	HDC hdc;
 	hdc = GetDC(hwnd[0]);
-	PIXELFORMATDESCRIPTOR pfd = { 
-	sizeof(PIXELFORMATDESCRIPTOR),  //  size of this pfd  
-	1,                     // version number  
-	PFD_DRAW_TO_WINDOW |   // support window  
-	PFD_SUPPORT_OPENGL |   // support OpenGL  
-	PFD_DOUBLEBUFFER,      // double buffered  
-	PFD_TYPE_RGBA,         // RGBA type  
-	24,                    // 24-bit color depth  
-	0, 0, 0, 0, 0, 0,      // color bits ignored  
-	0,                     // no alpha buffer  
-	0,                     // shift bit ignored  
-	0,                     // no accumulation buffer  
-	0, 0, 0, 0,            // accum bits ignored  
-	32,                    // 32-bit z-buffer      
-	0,                     // no stencil buffer  
-	0,                     // no auxiliary buffer  
-	PFD_MAIN_PLANE,        // main layer  
-	0,                     // reserved  
-	0, 0, 0                // layer masks ignored  
+	PIXELFORMATDESCRIPTOR pfd = 
+	{ 
+		sizeof(PIXELFORMATDESCRIPTOR),  //  size of this pfd  
+		1,                     // version number  
+		PFD_DRAW_TO_WINDOW |   // support window  
+		PFD_SUPPORT_OPENGL |   // support OpenGL  
+		PFD_DOUBLEBUFFER,      // double buffered  
+		PFD_TYPE_RGBA,         // RGBA type  
+		24,                    // 24-bit color depth  
+		0, 0, 0, 0, 0, 0,      // color bits ignored  
+		0,                     // no alpha buffer  
+		0,                     // shift bit ignored  
+		0,                     // no accumulation buffer  
+		0, 0, 0, 0,            // accum bits ignored  
+		32,                    // 32-bit z-buffer      
+		0,                     // no stencil buffer  
+		0,                     // no auxiliary buffer  
+		PFD_MAIN_PLANE,        // main layer  
+		0,                     // reserved  
+		0, 0, 0                // layer masks ignored  
 	}; 
 	int pixelformat = ChoosePixelFormat(hdc, &pfd);
 	SetPixelFormat(hdc, pixelformat, &pfd);
-	HGLRC hglrc = wglCreateContext(hdc);
-	wglMakeCurrent(hdc, hglrc);
 	for (int i = 1; i < count; ++i)
 	{
 		if (hwnd[i])
 		{
 			HDC hdc2 = GetDC(hwnd[i]);
 			SetPixelFormat(hdc2, pixelformat, &pfd);
-			wglMakeCurrent(hdc2, hglrc);
 		}
 	}
+	HGLRC hglrc = wglCreateContext(hdc);
+	wglMakeCurrent(hdc, hglrc);
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	return hglrc;
 }
@@ -806,10 +769,9 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 		g_log_info.log("plugins", "navigation plugin has not been loaded");
 	}*/
 
-	createUniverse(true);
 	registerProperties();
-	//m_navigation.load("models/level2/level2.pda");
-	
+	createUniverse(true);
+
 	return true;
 }
 
@@ -832,21 +794,9 @@ HGLRC EditorServer::getHGLRC()
 }
 
 
-Component EditorServer::getCamera(int index) const
+Component EditorServer::getEditCamera() const
 {
-	if (index == 0)
-	{
-		return m_impl->m_camera.getComponent(camera_type);
-	}
-	else if (index == 1)
-	{
-		return m_impl->m_game_camera.getComponent(camera_type);
-	}
-	else
-	{
-		ASSERT(false);
-		return Component::INVALID;
-	}
+	return m_impl->m_camera.getComponent(camera_type);
 }
 
 
@@ -911,15 +861,6 @@ void EditorServerImpl::renderIcons(IRenderDevice& render_device)
 void EditorServerImpl::renderScene(IRenderDevice& render_device)
 {
 	m_engine.getRenderer().render(render_device);
-
-/*	if(is_render_physics)
-	{
-		renderPhysics();
-	}
-
-	m_engine.getRenderer().endFrame();*/
-		
-	//m_navigation.draw();
 }
 
 
@@ -982,6 +923,7 @@ EditorServerImpl::EditorServerImpl()
 {
 	m_is_game_mode = false;
 	m_selected_entity = Entity::INVALID;
+	m_edit_view_render_device = NULL;
 }
 
 
@@ -1101,8 +1043,10 @@ void EditorServerImpl::selectEntity(Entity e)
 }
 
 
-void EditorServerImpl::onComponentEvent(ComponentEvent& e)
+void EditorServerImpl::onComponentEvent(Event& event)
 {
+	ASSERT(event.getType() == ComponentEvent::type);
+	ComponentEvent& e = static_cast<ComponentEvent&>(event);
 	for(int i = 0; i < m_editor_icons.size(); ++i)
 	{
 		if(m_editor_icons[i]->getEntity() == e.component.entity)
@@ -1146,11 +1090,7 @@ void EditorServerImpl::onComponentEvent(ComponentEvent& e)
 
 void EditorServerImpl::onEvent(Event& evt)
 {
-	if(evt.getType() == ComponentEvent::type)
-	{
-		onComponentEvent(static_cast<ComponentEvent&>(evt));
-	}
-	else if(evt.getType() == EntityMovedEvent::type)
+	if(evt.getType() == EntityMovedEvent::type)
 	{
 		sendEntityPosition(static_cast<EntityMovedEvent&>(evt).entity.index);
 	}
@@ -1173,7 +1113,8 @@ void EditorServerImpl::onEvent(Event& evt)
 
 void EditorServerImpl::destroyUniverse()
 {
-	for(int i = 0; i < m_editor_icons.size(); ++i)
+	m_edit_view_render_device->getPipeline().clearCameras();
+	for (int i = 0; i < m_editor_icons.size(); ++i)
 	{
 		m_editor_icons[i]->destroy();
 		LUX_DELETE(m_editor_icons[i]);
@@ -1186,6 +1127,13 @@ void EditorServerImpl::destroyUniverse()
 }
 
 
+void EditorServer::setEditViewRenderDevice(IRenderDevice& render_device)
+{
+	m_impl->m_edit_view_render_device = &render_device;
+	m_impl->m_edit_view_render_device->getPipeline().addCamera(m_impl->m_camera.getComponent(camera_type));
+}
+
+
 void EditorServerImpl::createUniverse(bool)
 {
 	Universe* universe = m_engine.createUniverse();
@@ -1194,38 +1142,17 @@ void EditorServerImpl::createUniverse(bool)
 	m_camera.setPosition(0, 0, -5);
 	m_camera.setRotation(Quat(Vec3(0, 1, 0), -Math::PI));
 	Component cmp = m_engine.getRenderer().createComponent(camera_type, m_camera);
+	if (m_edit_view_render_device)
+	{
+		m_edit_view_render_device->getPipeline().addCamera(cmp);
+	}
 
-	m_game_camera = m_engine.getUniverse()->createEntity();
-	m_game_camera.setPosition(0, 0, -5);
-	m_game_camera.setRotation(Quat(Vec3(0, 1, 0), -Math::PI));
-	m_engine.getRenderer().createComponent(camera_type, m_game_camera);
-	
-	/*
-	Entity light = m_engine.getUniverse()->createEntity();
-	Matrix mtx = Matrix::IDENTITY;
-	mtx.setXVector(Vec3(1, 0, 0));
-	mtx.setYVector(Vec3(0, 0, 1).normalized());
-	mtx.setZVector(Vec3(0, -1, 0).normalized());
-	mtx.setTranslation(Vec3(0, 20, 0));
-	light.setMatrix(mtx);
-	m_engine.getRenderer().createComponent(crc32("light"), light);
-
-	/*m_engine.getRenderer().setCameraPipeline(cmp, string("pipelines/main.json"));
-	m_engine.getRenderer().setCameraActive(cmp, true);*/
-
-	Component cmp2 = m_engine.getRenderer().createComponent(renderable_type, m_engine.getUniverse()->createEntity());
-	m_engine.getRenderer().setRenderablePath(cmp2, string("models/horse.msh"));
-
-	Component cmp3 = m_engine.getRenderer().createComponent(renderable_type, m_engine.getUniverse()->createEntity());
-	m_engine.getRenderer().setRenderablePath(cmp3, string("models/plane.msh"));
-
-	
 	m_gizmo.create(m_engine.getRenderer());
 	m_gizmo.setUniverse(universe);
 	m_gizmo.hide();
 
 	universe->getEventManager()->addListener(EntityMovedEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);
-	universe->getEventManager()->addListener(ComponentEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);
+	universe->getEventManager()->addListener(ComponentEvent::type).bind<EditorServerImpl, &EditorServerImpl::onComponentEvent>(this);
 	universe->getEventManager()->addListener(EntityDestroyedEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);
 
 	m_selected_entity = Entity::INVALID;

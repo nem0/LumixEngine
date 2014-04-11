@@ -31,10 +31,11 @@ namespace Lux
 			Engine& getEngine();
 			void render(IRenderDevice& render_device);
 			void renderIcons(IRenderDevice& render_device);
-			Component getCamera(int index) const;
+			Component getEditCamera() const;
 			HGLRC getHGLRC();
 			class Gizmo& getGizmo();
 			class FS::TCPFileServer& getTCPFileServer();
+			void setEditViewRenderDevice(IRenderDevice& render_device);
 
 		private:
 			struct EditorServerImpl* m_impl;
