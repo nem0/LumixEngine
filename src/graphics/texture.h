@@ -28,8 +28,8 @@ class Texture : public Resource
 		bool loadDDS(FS::IFile* file);
 		bool loadTGA(FS::IFile* file);
 
-		virtual void doUnload(void) LUX_OVERRIDE;
-		virtual FS::ReadCallback getReadCallback() LUX_OVERRIDE;
+		virtual void doUnload(void) override;
+		virtual FS::ReadCallback getReadCallback() override;
 
 	private:
 		GLuint m_id;

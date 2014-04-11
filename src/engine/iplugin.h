@@ -12,7 +12,7 @@ namespace Lux
 	class Universe;
 
 
-	class LUX_ENGINE_API IPlugin LUX_ABSTRACT
+	class LUX_ENGINE_API IPlugin abstract
 	{
 		public:
 			virtual ~IPlugin();
@@ -26,7 +26,7 @@ namespace Lux
 			virtual void update(float) {}
 			virtual Component createComponent(uint32_t, const Entity&) = 0;
 			virtual const char* getName() const = 0;
-			virtual void sendMessage(const char* message) {};
+			virtual void sendMessage(const char*) {};
 	};
 
 

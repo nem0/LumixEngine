@@ -24,7 +24,7 @@ namespace UI
 			CursorDecorator(const char* name) : DecoratorBase(name) {}
 
 			bool create(Gui& gui, const char* atlas);
-			virtual void render(IRenderer& renderer, Block& block) LUX_OVERRIDE;
+			virtual void render(IRenderer& renderer, Block& block) override;
 
 		private:
 			void setVertices(Vec3* verts, float left, float top, float right, float bottom, float z) const;

@@ -28,7 +28,7 @@ namespace Lux
 				LUX_DELETE_ARRAY(m_buffer);
 			}
 
-			virtual bool open(const char* path, Mode mode) LUX_OVERRIDE
+			virtual bool open(const char* path, Mode mode) override
 			{
 				ASSERT(NULL == m_buffer); // reopen is not supported currently
 
@@ -59,7 +59,7 @@ namespace Lux
 				return false;
 			}
 
-			virtual void close() LUX_OVERRIDE
+			virtual void close() override
 			{
 				if(m_file)
 				{
@@ -75,7 +75,7 @@ namespace Lux
 				m_buffer = NULL;
 			}
 
-			virtual bool read(void* buffer, size_t size) LUX_OVERRIDE
+			virtual bool read(void* buffer, size_t size) override
 			{
 				size_t amount = m_pos + size < m_size ? size : m_size - m_pos;
 				memcpy(buffer, m_buffer + m_pos, amount);
@@ -83,7 +83,7 @@ namespace Lux
 				return amount == size;
 			}
 
-			virtual bool write(const void* buffer, size_t size) LUX_OVERRIDE
+			virtual bool write(const void* buffer, size_t size) override
 			{
 				size_t pos = m_pos;
 				size_t cap = m_capacity;
@@ -105,17 +105,17 @@ namespace Lux
 				return true;
 			}
 
-			virtual const void* getBuffer() const LUX_OVERRIDE
+			virtual const void* getBuffer() const override
 			{
 				return m_buffer;
 			}
 
-			virtual size_t size() LUX_OVERRIDE
+			virtual size_t size() override
 			{
 				return m_size;
 			}
 
-			virtual size_t seek(SeekMode base, size_t pos) LUX_OVERRIDE
+			virtual size_t seek(SeekMode base, size_t pos) override
 			{
 				switch(base)
 				{
@@ -140,7 +140,7 @@ namespace Lux
 				return m_pos;
 			}
 
-			virtual size_t pos() LUX_OVERRIDE
+			virtual size_t pos() override
 			{
 				return m_pos;
 			}

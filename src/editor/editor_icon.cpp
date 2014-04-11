@@ -1,7 +1,11 @@
 #include "editor_icon.h"
 #include "core/crc32.h"
+#include "core/math_utils.h"
 #include "core/matrix.h"
 #include "graphics/irender_device.h"
+#include "graphics/geometry.h"
+#include "graphics/material.h"
+#include "graphics/model.h"
 #include "graphics/pipeline.h"
 #include "graphics/renderer.h"
 
@@ -16,9 +20,10 @@ H3DRes EditorIcon::s_geom;
 H3DRes EditorIcon::s_materials[2];
 static const uint32_t point_light_type = crc32("point_light");
 */
-void EditorIcon::create(Entity& entity, const Component& cmp)
+void EditorIcon::create(Renderer& renderer, Entity& entity, const Component&)
 {
 	m_entity = entity;
+	m_model = renderer.getModel("models/icon.msh");
 	/*m_handle = h3dAddModelNode(H3DRootNode, "DynGeoModelNode", s_geom);
 	int index = 0;
 	if(cmp.type == point_light_type)
@@ -33,8 +38,6 @@ void EditorIcon::create(Entity& entity, const Component& cmp)
 
 void EditorIcon::destroy()
 {
-	//h3dRemoveNode(m_handle);
-	ASSERT(false);
 }
 
 
@@ -52,6 +55,14 @@ void EditorIcon::hide()
 }
 
 
+
+float EditorIcon::hit(const Vec3& origin, const Vec3& dir) const
+{
+	RayCastModelHit hit = m_model->castRay(origin, dir, m_matrix, m_scale);
+	return hit.m_is_hit ? hit.m_t : -1;
+}
+
+
 void EditorIcon::render(Renderer* renderer, IRenderDevice& render_device)
 {
 	Component camera = render_device.getPipeline().getCamera(0);
@@ -59,52 +70,19 @@ void EditorIcon::render(Renderer* renderer, IRenderDevice& render_device)
 	
 	float fov;
 	renderer->getCameraFov(camera, fov);
-	float scale = tan(fov * 0.5f) * (m_entity.getPosition() - mtx.getTranslation()).length() * 2;
+	float scale = tan(fov * Math::PI / 180 * 0.5f) * (m_entity.getPosition() - mtx.getTranslation()).length() / 20;
 
 	mtx.setTranslation(m_entity.getPosition());
 	Matrix scale_mtx = Matrix::IDENTITY;
+	m_matrix = mtx;
 	scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = scale;
 	mtx = mtx * scale_mtx;
+	m_scale = scale;
 
-	glPushMatrix();
-	glMultMatrixf(&mtx.m11);
-	glBegin(GL_QUADS);
-		glVertex3f(-0.015f, -0.015f, 0);
-		glVertex3f(-0.015f, 0.015f, 0);
-		glVertex3f(0.015f, 0.015f, 0);
-		glVertex3f(0.015f, -0.015f, 0);
-	glEnd();
-	glPopMatrix();
-}
-
-
-void EditorIcon::createResources(const char* base_path)
-{
-	/*float posData[] = {
-		-0.1f,  -0.1f, 0,
-		0.1f,  -0.1f, 0,
-		-0.1f, 0.1f, 0,
-		0.1f, 0.1f, 0
-	};
- 
-	unsigned int indexData[] = { 0, 1, 2, 2, 1, 3 };
-	short normalData[] = {
-		0, 0, 1,
-		0, 0, 1,
-		0, 0, 1,
-		0, 0, 1
-	};
- 
-	float uvData[] = {
-		0, 0,
-		1, 0,
-		0, 1,
-		1, 1
-	};
-	s_geom = h3dutCreateGeometryRes("EditoRenderableGeom", 4, 6, posData, indexData, normalData, 0, 0, uvData, 0 );
-	s_materials[0] = h3dAddResource(H3DResTypes::Material, "materials\\entity.material.xml", 0);
-	s_materials[1] = h3dAddResource(H3DResTypes::Material, "materials\\point_light.material.xml", 0);
-	h3dutLoadResourcesFromDisk(base_path);*/
+	if (m_model->isReady())
+	{
+		renderer->renderModel(*m_model, mtx);
+	}
 }
 
 

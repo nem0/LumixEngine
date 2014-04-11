@@ -14,7 +14,7 @@
 
 namespace Lux
 {
-	void memTrackerLog(const char* system, const char* message, ...)
+	void memTrackerLog(const char*, const char* message, ...)
 	{
 		char tmp[1024];
 		va_list args;

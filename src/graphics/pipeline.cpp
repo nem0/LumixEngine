@@ -5,7 +5,6 @@
 #include "core/array.h"
 #include "core/crc32.h"
 #include "core/file_system.h"
-#include "core/input_system.h"
 #include "core/iserializer.h"
 #include "core/json_serializer.h"
 #include "core/resource_manager.h"
@@ -26,64 +25,67 @@ namespace Lux
 {
 
 struct PipelineImpl;
+struct PipelineInstanceImpl;
 
 struct Command
 {
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) = 0;
-	virtual void execute(PipelineImpl& pipeline) = 0;
+	virtual void execute(PipelineInstanceImpl& pipeline) = 0;
 };
 
 
 struct ClearCommand : public Command
 {
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) LUX_OVERRIDE;
-	virtual void execute(PipelineImpl& pipeline) LUX_OVERRIDE;
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
+	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	uint32_t m_buffers;
 };
 
 
 struct RenderModelsCommand : public Command
 {
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) LUX_OVERRIDE {}
-	virtual void execute(PipelineImpl& pipeline) LUX_OVERRIDE;
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
+	virtual void execute(PipelineInstanceImpl& pipeline) override;
+	
+	int64_t m_layer_mask;
 };
 
 
 struct ApplyCameraCommand : public Command
 {
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) LUX_OVERRIDE;
-	virtual void execute(PipelineImpl& pipeline) LUX_OVERRIDE;
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
+	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	uint32_t m_camera_idx;
 };
 
 
 struct BindFramebufferCommand : public Command
 {
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) LUX_OVERRIDE;
-	virtual void execute(PipelineImpl& pipeline) LUX_OVERRIDE;
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
+	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	uint32_t m_buffer_index;
 };
 
 
 struct UnbindFramebufferCommand : public Command
 {
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) LUX_OVERRIDE {}
-	virtual void execute(PipelineImpl& pipeline) LUX_OVERRIDE;
+	virtual void deserialize(PipelineImpl&, ISerializer&) override {}
+	virtual void execute(PipelineInstanceImpl& pipeline) override;
 };
 
 
 struct DrawFullscreenQuadCommand : public Command
 {
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) LUX_OVERRIDE;
-	virtual void execute(PipelineImpl& pipeline) LUX_OVERRIDE;
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
+	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	Material* m_material;
 };
 
 
 struct BindFramebufferTextureCommand : public Command
 {
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) LUX_OVERRIDE;
-	virtual void execute(PipelineImpl& pipeline) LUX_OVERRIDE;
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
+	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	uint32_t m_framebuffer_index;
 	uint32_t m_renderbuffer_index;
 	uint32_t m_texture_uint;
@@ -92,20 +94,29 @@ struct BindFramebufferTextureCommand : public Command
 
 struct RenderShadowmapCommand : public Command
 {
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) LUX_OVERRIDE {}
-	virtual void execute(PipelineImpl& pipeline) LUX_OVERRIDE;
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
+	virtual void execute(PipelineInstanceImpl& pipeline) override;
+
+	int64_t m_layer_mask;
 };
 
 
 struct BindShadowmapCommand : public Command
 {
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) LUX_OVERRIDE {}
-	virtual void execute(PipelineImpl& pipeline) LUX_OVERRIDE;
+	virtual void deserialize(PipelineImpl&, ISerializer&) override {}
+	virtual void execute(PipelineInstanceImpl& pipeline) override;
 };
 
 
 struct PipelineImpl : public Pipeline
 {
+	struct FrameBufferDeclaration
+	{
+		int32_t m_width;
+		int32_t m_height;
+		int32_t m_mask;
+	};
+	
 	struct CommandCreator
 	{
 		typedef Delegate<Command*> Creator;
@@ -123,7 +134,6 @@ struct PipelineImpl : public Pipeline
 
 	PipelineImpl(const Path& path, ResourceManager& resource_manager)
 		: Pipeline(path, resource_manager)
-		, m_renderer(NULL)
 	{
 		addCommandCreator("clear").bind<&CreateCommand<ClearCommand> >();
 		addCommandCreator("render_models").bind<&CreateCommand<RenderModelsCommand> >();
@@ -143,14 +153,25 @@ struct PipelineImpl : public Pipeline
 		{
 			LUX_DELETE(m_commands[i]);
 		}
-		for (int i = 0; i < m_framebuffers.size(); ++i)
+	}
+
+
+	virtual void doUnload(void) override
+	{
+		for (int i = 0; i < m_commands.size(); ++i)
 		{
-			LUX_DELETE(m_framebuffers[i]);
+			LUX_DELETE(m_commands[i]);
 		}
-		if (m_shadowmap_framebuffer)
-		{
-			LUX_DELETE(m_shadowmap_framebuffer);
-		}
+		m_commands.clear();
+		onEmpty();
+	}
+
+
+	virtual FS::ReadCallback getReadCallback() override
+	{
+		FS::ReadCallback cb;
+		cb.bind<PipelineImpl, &PipelineImpl::loaded>(this);
+		return cb;
 	}
 
 
@@ -159,43 +180,6 @@ struct PipelineImpl : public Pipeline
 		CommandCreator& creator = m_command_creators.pushEmpty();
 		creator.m_type_hash = crc32(type);
 		return creator.m_creator;
-	}
-
-
-	virtual int getCameraCount() const LUX_OVERRIDE
-	{
-		return m_cameras.size();
-	}
-
-
-	virtual void setRenderer(Renderer& renderer) LUX_OVERRIDE
-	{
-		m_renderer = &renderer;
-	}
-
-
-	virtual void setCamera(int index, const Component& camera) LUX_OVERRIDE
-	{
-		if(m_cameras.size() <= index)
-		{
-			m_cameras.resize(index + 1);
-		}
-		m_cameras[index] = camera;
-	}
-
-
-	virtual const Component& getCamera(int index) LUX_OVERRIDE
-	{
-		return m_cameras[index];
-	}
-
-
-	virtual void render() LUX_OVERRIDE
-	{
-		for(int i = 0; i < m_commands.size(); ++i)
-		{
-			m_commands[i]->execute(*this);
-		}
 	}
 
 
@@ -212,7 +196,7 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	virtual bool deserialize(ISerializer& serializer) LUX_OVERRIDE
+	virtual bool deserialize(ISerializer& serializer) override
 	{
 		int32_t count;
 		serializer.deserialize("frame_buffer_count", count);
@@ -236,16 +220,15 @@ struct PipelineImpl : public Pipeline
 					ASSERT(false);
 				}
 			}
-			int width, height;
-			serializer.deserializeArrayItem(width);
-			serializer.deserializeArrayItem(height);
-			m_framebuffers[i] = LUX_NEW(FrameBuffer)(width, height, mask);
+			serializer.deserializeArrayItem(m_framebuffers[i].m_width);
+			serializer.deserializeArrayItem(m_framebuffers[i].m_height);
+			m_framebuffers[i].m_mask = mask;
 		}
 		serializer.deserializeArrayEnd();
-		int shadowmap_width, shadowmap_height;
-		serializer.deserialize("shadowmap_width", shadowmap_width);
-		serializer.deserialize("shadowmap_height", shadowmap_height);
-		m_shadowmap_framebuffer = LUX_NEW(FrameBuffer)(shadowmap_width, shadowmap_height, FrameBuffer::DEPTH_BIT);
+		serializer.deserialize("shadowmap_width", m_shadowmap_framebuffer.m_width);
+		serializer.deserialize("shadowmap_height", m_shadowmap_framebuffer.m_height);
+		m_shadowmap_framebuffer.m_mask = FrameBuffer::DEPTH_BIT;
+		
 		serializer.deserialize("command_count", count);
 		serializer.deserializeArrayBegin("commands");
 		for(int i = 0; i < count; ++i)
@@ -268,9 +251,72 @@ struct PipelineImpl : public Pipeline
 		{
 			JsonSerializer serializer(*file, JsonSerializer::READ);
 			deserialize(serializer);
+			onReady();
+		}
+		else
+		{
+			onFailure();
 		}
 
 		fs.close(file);
+	}
+
+
+	Array<Command*> m_commands;
+	Array<CommandCreator> m_command_creators;
+	Array<FrameBufferDeclaration> m_framebuffers;
+	FrameBufferDeclaration m_shadowmap_framebuffer;
+};
+
+
+struct PipelineInstanceImpl : public PipelineInstance
+{
+	PipelineInstanceImpl(Pipeline& pipeline)
+		: m_source(static_cast<PipelineImpl&>(pipeline))
+	{
+		m_shadowmap_framebuffer = NULL;
+		if(pipeline.isReady())
+		{
+			sourceLoaded(Resource::State::READY);
+		}
+		else
+		{
+			pipeline.getObserverCb().bind<PipelineInstanceImpl, &PipelineInstanceImpl::sourceLoaded>(this);
+		}
+	}
+
+	~PipelineInstanceImpl()
+	{
+		for (int i = 0; i < m_framebuffers.size(); ++i)
+		{
+			LUX_DELETE(m_framebuffers[i]);
+		}
+		if (m_shadowmap_framebuffer)
+		{
+			LUX_DELETE(m_shadowmap_framebuffer);
+		}
+	}
+
+
+	void setRenderer(Renderer& renderer)
+	{
+		m_renderer = &renderer;
+	}
+
+
+	void sourceLoaded(Resource::State status)
+	{
+		if (status == Resource::State::READY)
+		{
+			PipelineImpl::FrameBufferDeclaration fb = m_source.m_shadowmap_framebuffer;
+			m_shadowmap_framebuffer = LUX_NEW(FrameBuffer)(fb.m_width, fb.m_height, fb.m_mask);
+			m_framebuffers.reserve(m_source.m_framebuffers.size());
+			for (int i = 0; i < m_source.m_framebuffers.size(); ++i)
+			{
+				fb = m_source.m_framebuffers[i];
+				m_framebuffers.push(LUX_NEW(FrameBuffer)(fb.m_width, fb.m_height, fb.m_mask));
+			}
+		}
 	}
 
 
@@ -283,9 +329,9 @@ struct PipelineImpl : public Pipeline
 		mtx->m41 = -(right + left) / (right - left);
 		mtx->m42 = -(top + bottom) / (top - bottom);
 		mtx->m43 = -(z_far + z_near) / (z_far - z_near);
-/*		glOrtho(left, right, bottom, top, z_near, z_far);
+		/*		glOrtho(left, right, bottom, top, z_near, z_far);
 		glGetFloatv(GL_PROJECTION_MATRIX, &mtx->m11);
-	*/
+		*/
 	}
 
 
@@ -300,15 +346,19 @@ struct PipelineImpl : public Pipeline
 		mtx->setXVector(r);
 		mtx->setYVector(u);
 		mtx->setZVector(-f);
-		mtx->setTranslation(Vec3(dotProduct(r, pos), dotProduct(-u, pos), dotProduct(f, pos)));
-/*		gluLookAt(pos.x, pos.y, pos.z, center.x, center.y, center.z, up.x, up.y, up.z);
-		glGetFloatv(GL_MODELVIEW_MATRIX, &mtx->m11);
-*/		
+		mtx->transpose();
+		mtx->setTranslation(Vec3(-dotProduct(r, pos), -dotProduct(u, pos), dotProduct(f, pos)));
+		/*glPushMatrix();
+		float m[16];
+		gluLookAt(pos.x, pos.y, pos.z, center.x, center.y, center.z, up.x, up.y, up.z);
+		glGetFloatv(GL_MODELVIEW_MATRIX, m);
+		glPopMatrix();*/
 	}
 
-	void renderShadowmap()
+	void renderShadowmap(int64_t layer_mask)
 	{
 		ASSERT(m_renderer != NULL);
+		glViewport(0, 0, m_shadowmap_framebuffer->getWidth(), m_shadowmap_framebuffer->getHeight());
 		Component light_cmp = m_renderer->getLight(0);
 		if (!light_cmp.isValid())
 		{
@@ -321,10 +371,9 @@ struct PipelineImpl : public Pipeline
 		glPushMatrix();
 		glLoadIdentity();
 		Matrix projection_matrix;
-		/// TODO bouding box
 		getOrthoMatrix(-10, 10, -10, 10, 0, 100, &projection_matrix);
 		glMultMatrixf(&projection_matrix.m11);
-		
+
 		Matrix mtx = light_cmp.entity.getMatrix();
 		glMatrixMode(GL_MODELVIEW);
 		glLoadIdentity();
@@ -336,10 +385,10 @@ struct PipelineImpl : public Pipeline
 			0.0, 0.5, 0.0, 0.0,
 			0.0, 0.0, 0.5, 0.0,
 			0.5, 0.5, 0.5, 1.0
-		);
+			);
 		m_shadow_modelviewprojection = biasMatrix * (projection_matrix * modelview_matrix);
 
-		renderModels();
+		renderModels(layer_mask);
 
 		glMatrixMode(GL_PROJECTION);
 		glPopMatrix();
@@ -356,22 +405,23 @@ struct PipelineImpl : public Pipeline
 		glMatrixMode(GL_PROJECTION);
 		glPushMatrix();
 		glLoadIdentity();
-		glOrtho(-1, 1, -1, 1, 0, 30); 
+		glOrtho(-1, 1, -1, 1, 0, 30);
 		glMatrixMode(GL_MODELVIEW);
 
-		material->apply();
+		ASSERT(m_renderer != NULL);
+		material->apply(*m_renderer);
 		glPushMatrix();
 		glLoadIdentity();
 		glDisable(GL_CULL_FACE);
 		glBegin(GL_QUADS);
-			glTexCoord2f(0, 0);
-			glVertex3f(-1, -1, -1);
-			glTexCoord2f(0, 1);
-			glVertex3f(-1, 1, -1);
-			glTexCoord2f(1, 1);
-			glVertex3f(1, 1, -1);
-			glTexCoord2f(1, 0);
-			glVertex3f(1, -1, -1);
+		glTexCoord2f(0, 0);
+		glVertex3f(-1, -1, -1);
+		glTexCoord2f(0, 1);
+		glVertex3f(-1, 1, -1);
+		glTexCoord2f(1, 1);
+		glVertex3f(1, 1, -1);
+		glTexCoord2f(1, 0);
+		glVertex3f(1, -1, -1);
 		glEnd();
 		glPopMatrix();
 		glEnable(GL_DEPTH_TEST);
@@ -381,38 +431,38 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void renderModels()
+	void renderModels(int64_t layer_mask)
 	{
 		ASSERT(m_renderer != NULL);
-		/// TODO clean this and optimize
 		static Array<RenderableInfo> infos;
 		infos.clear();
-		m_renderer->getRenderableInfos(infos);
+		m_renderer->getRenderableInfos(infos, layer_mask);
 		int count = infos.size();
-		for(int i = 0; i < count; ++i)
+		for (int i = 0; i < count; ++i)
 		{
 			glPushMatrix();
 			Model& model = infos[i].m_model_instance->getModel();
-			glMultMatrixf(&infos[i].m_model_instance->getMatrix().m11);
+			Matrix mtx = infos[i].m_model_instance->getMatrix();
+			mtx.multiply3x3(infos[i].m_scale);
+			glMultMatrixf(&mtx.m11);
 			Geometry* geom = model.getGeometry();
-			for(int j = 0; j < model.getMeshCount(); ++j)
+			for (int j = 0; j < model.getMeshCount(); ++j)
 			{
 				Mesh& mesh = model.getMesh(j);
-				if(mesh.getMaterial()->isReady())
+				if (mesh.getMaterial()->isReady())
 				{
-					mesh.getMaterial()->apply();
+					mesh.getMaterial()->apply(*m_renderer);
 
 					static Matrix bone_mtx[64];
 					Pose& pose = infos[i].m_model_instance->getPose();
 					Vec3* poss = pose.getPositions();
 					Quat* rots = pose.getRotations();
-					for(int bone_index = 0, bone_count = pose.getCount(); bone_index < bone_count; ++bone_index)
+					for (int bone_index = 0, bone_count = pose.getCount(); bone_index < bone_count; ++bone_index)
 					{
 						rots[bone_index].toMatrix(bone_mtx[bone_index]);
 						bone_mtx[bone_index].translate(poss[bone_index]);
 						bone_mtx[bone_index] = bone_mtx[bone_index] * model.getBone(bone_index).inv_bind_matrix;
 					}
-					/// TODO do not hardcode following
 					mesh.getMaterial()->getShader()->setUniform("bone_matrices", bone_mtx, pose.getCount());
 					mesh.getMaterial()->getShader()->setUniform("shadowmap", 1);
 					mesh.getMaterial()->getShader()->setUniform("shadowmap_matrix", m_shadow_modelviewprojection);
@@ -424,26 +474,56 @@ struct PipelineImpl : public Pipeline
 		}
 	}
 
-	virtual void doUnload(void) LUX_OVERRIDE
+
+	virtual int getCameraCount() const override
 	{
-		TODO("Implement!");
+		return m_cameras.size();
 	}
 
-	virtual FS::ReadCallback getReadCallback() LUX_OVERRIDE
+
+	virtual void resize(int w, int h) override
 	{
-		FS::ReadCallback cb;
-		cb.bind<PipelineImpl, &PipelineImpl::loaded>(this);
-		return cb;
+		ASSERT(m_renderer != NULL);
+		for (int i = 0; i < m_cameras.size(); ++i)
+		{
+			m_renderer->setCameraSize(m_cameras[i], w, h);
+		}
 	}
 
-	Array<Command*> m_commands;
-	string m_path;
-	Renderer* m_renderer;
-	Array<Component> m_cameras;
+
+	virtual void setCamera(int index, const Component& camera) override
+	{
+		if (m_cameras.size() <= index)
+		{
+			m_cameras.resize(index + 1);
+		}
+		m_cameras[index] = camera;
+	}
+
+
+	virtual const Component& getCamera(int index) override
+	{
+		return m_cameras[index];
+	}
+
+
+	virtual void render() override
+	{
+		for (int i = 0; i < m_source.m_commands.size(); ++i)
+		{
+			m_source.m_commands[i]->execute(*this);
+		}
+	}
+
+	PipelineImpl& m_source;
 	Array<FrameBuffer*> m_framebuffers;
 	FrameBuffer* m_shadowmap_framebuffer;
 	Matrix m_shadow_modelviewprojection;
-	Array<CommandCreator> m_command_creators;
+	Array<Component> m_cameras;
+	Renderer* m_renderer;
+
+	private:
+		void operator=(const PipelineInstanceImpl&);
 };
 
 
@@ -453,49 +533,77 @@ Pipeline::Pipeline(const Path& path, ResourceManager& resource_manager)
 }
 
 
-void ClearCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer)
+PipelineInstance* PipelineInstance::create(Pipeline& pipeline)
 {
-	m_buffers = GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT;
+	return LUX_NEW(PipelineInstanceImpl)(pipeline);
 }
 
 
-void ClearCommand::execute(PipelineImpl& pipeline)
+void PipelineInstance::destroy(PipelineInstance* pipeline)
+{
+	LUX_DELETE(pipeline);
+}
+
+
+void ClearCommand::deserialize(PipelineImpl&, ISerializer& serializer)
+{
+	char tmp[256];
+	serializer.deserializeArrayItem(tmp, 255);
+	if (strcmp(tmp, "all") == 0)
+	{
+		m_buffers = GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT;
+	}
+	else if (strcmp(tmp, "depth") == 0)
+	{
+		m_buffers = GL_DEPTH_BUFFER_BIT;
+	}
+}
+
+
+void ClearCommand::execute(PipelineInstanceImpl&)
 {
 	glClear(m_buffers);
 }
 
 
-void RenderModelsCommand::execute(PipelineImpl& pipeline)
+void RenderModelsCommand::deserialize(PipelineImpl&, ISerializer& serializer) 
 {
-	pipeline.renderModels();
+	serializer.deserializeArrayItem(m_layer_mask);
 }
 
 
-void ApplyCameraCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer)
+void RenderModelsCommand::execute(PipelineInstanceImpl& pipeline)
+{
+	pipeline.renderModels(m_layer_mask);
+}
+
+
+void ApplyCameraCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
 	serializer.deserializeArrayItem(m_camera_idx);
 }
 
 
-void ApplyCameraCommand::execute(PipelineImpl& pipeline)
+void ApplyCameraCommand::execute(PipelineInstanceImpl& pipeline)
 {
+	ASSERT(pipeline.m_renderer != NULL);
 	pipeline.m_renderer->applyCamera(pipeline.m_cameras[m_camera_idx]);
 }
 
 
-void BindFramebufferCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer)
+void BindFramebufferCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
 	serializer.deserializeArrayItem(m_buffer_index);
 }
 
 
-void BindFramebufferCommand::execute(PipelineImpl& pipeline)
+void BindFramebufferCommand::execute(PipelineInstanceImpl& pipeline)
 {
 	pipeline.m_framebuffers[m_buffer_index]->bind();
 }
 
 	
-void UnbindFramebufferCommand::execute(PipelineImpl& pipeline)
+void UnbindFramebufferCommand::execute(PipelineInstanceImpl&)
 {
 	FrameBuffer::unbind();
 }
@@ -510,17 +618,17 @@ void DrawFullscreenQuadCommand::deserialize(PipelineImpl& pipeline, ISerializer&
 	strcpy(material_path, "materials/");
 	strcat(material_path, material);
 	strcat(material_path, ".mat");
-	m_material = static_cast<Material*>(pipeline.m_renderer->getEngine().getResourceManager().get(ResourceManager::MATERIAL)->load(material_path));
+	m_material = static_cast<Material*>(pipeline.getResourceManager().get(ResourceManager::MATERIAL)->load(material_path));
 }
 
 
-void DrawFullscreenQuadCommand::execute(PipelineImpl& pipeline)
+void DrawFullscreenQuadCommand::execute(PipelineInstanceImpl& pipeline)
 {
 	pipeline.drawFullscreenQuad(m_material);
 }
 
 
-void BindFramebufferTextureCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer)
+void BindFramebufferTextureCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
 	/// TODO map names to indices
 	serializer.deserializeArrayItem(m_framebuffer_index);
@@ -529,7 +637,7 @@ void BindFramebufferTextureCommand::deserialize(PipelineImpl& pipeline, ISeriali
 }
 
 
-void BindFramebufferTextureCommand::execute(PipelineImpl& pipeline)
+void BindFramebufferTextureCommand::execute(PipelineInstanceImpl& pipeline)
 {
 	glActiveTexture(GL_TEXTURE0 + m_texture_uint);
 	glEnable(GL_TEXTURE_2D);
@@ -537,13 +645,19 @@ void BindFramebufferTextureCommand::execute(PipelineImpl& pipeline)
 }
 
 
-void RenderShadowmapCommand::execute(PipelineImpl& pipeline)
+void RenderShadowmapCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
-	pipeline.renderShadowmap();
+	serializer.deserializeArrayItem(m_layer_mask);
 }
 
 
-void BindShadowmapCommand::execute(PipelineImpl& pipeline)
+void RenderShadowmapCommand::execute(PipelineInstanceImpl& pipeline)
+{
+	pipeline.renderShadowmap(m_layer_mask);
+}
+
+
+void BindShadowmapCommand::execute(PipelineInstanceImpl& pipeline)
 {
 	glActiveTexture(GL_TEXTURE0 + 1);
 	glEnable(GL_TEXTURE_2D);

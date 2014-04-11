@@ -19,21 +19,25 @@ namespace Lux
 
 	struct AnimationSystemImpl
 	{
-		AnimationSystemImpl(Engine& engine) : m_engine(engine) {}
+		public:
+			AnimationSystemImpl(Engine& engine) : m_engine(engine) {}
 
-		struct Animable
-		{
-			bool m_manual;
-			Component m_renderable;
-			float m_time;
-			class Animation* m_animation;
-		};
+			struct Animable
+			{
+				bool m_manual;
+				Component m_renderable;
+				float m_time;
+				class Animation* m_animation;
+			};
 
-		Array<Animable> m_animables;
-		Universe* m_universe;
-		Engine& m_engine;
+			Array<Animable> m_animables;
+			Universe* m_universe;
+			Engine& m_engine;
 
-		void onEvent(Event& event);
+			void onEvent(Event& event);
+		
+		private:
+			void operator=(const AnimationSystemImpl&);
 	};
 
 	bool AnimationSystem::create(Engine& engine)
@@ -63,7 +67,7 @@ namespace Lux
 	}
 
 
-	void AnimationSystem::onDestroyUniverse(Universe& universe)
+	void AnimationSystem::onDestroyUniverse(Universe&)
 	{
 		ASSERT(m_impl->m_universe);
 		m_impl->m_animables.clear();
@@ -123,7 +127,8 @@ namespace Lux
 			}
 			serializer.deserializeArrayItem(m_impl->m_animables[i].m_time);
 			Component cmp(e, animable_type, this, i);
-			m_impl->m_universe->getEventManager()->emitEvent(ComponentEvent(cmp));
+			ComponentEvent evt(cmp);
+			m_impl->m_universe->getEventManager()->emitEvent(evt);
 		}
 		serializer.deserializeArrayEnd();
 	}
@@ -168,7 +173,8 @@ namespace Lux
 		}
 
 		Component cmp(entity, animable_type, this, m_impl->m_animables.size() - 1);
-		m_impl->m_universe->getEventManager()->emitEvent(ComponentEvent(cmp));
+		ComponentEvent evt(cmp);
+		m_impl->m_universe->getEventManager()->emitEvent(evt);
 		return Component(entity, animable_type, this, m_impl->m_animables.size() - 1);
 	}
 
@@ -202,7 +208,7 @@ namespace Lux
 		for(int i = 0, c = m_impl->m_animables.size(); i < c; ++i)
 		{
 			AnimationSystemImpl::Animable& animable = m_impl->m_animables[i];
-			if(!animable.m_manual)
+			if(!animable.m_manual && animable.m_animation->isReady())
 			{
 				animable.m_animation->getPose(animable.m_time, renderer->getPose(animable.m_renderable));
 				float t = animable.m_time + time_delta;

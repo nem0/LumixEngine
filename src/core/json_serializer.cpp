@@ -325,6 +325,28 @@ void JsonSerializer::deserializeArrayItem(int& value)
 }
 
 
+void JsonSerializer::deserializeArrayItem(int64_t& value)
+{
+	unsigned char c = m_buffer;
+	value = 0;
+	int64_t sign = 1;
+	if (c == '-')
+	{
+		sign = -1;
+		m_file.read(&c, 1);
+	}
+	while (c >= '0' && c <= '9')
+	{
+		value *= 10;
+		value += c - '0';
+		m_file.read(&c, 1);
+	}
+	value *= sign;
+	m_buffer = c;
+	skipControl();
+}
+
+
 void JsonSerializer::deserializeArrayItem(float& value)
 {
 	unsigned char c = m_buffer;

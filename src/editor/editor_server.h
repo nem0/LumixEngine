@@ -6,11 +6,6 @@
 #include "editor/property_descriptor.h"
 
 
-extern "C" LUX_ENGINE_API void* __stdcall luxServerInit(HWND hwnd, HWND game_hwnd, const char* base_path);
-extern "C" LUX_ENGINE_API void __stdcall luxServerTick(HWND hwnd, HWND game_hwnd, void* ptr);
-extern "C" LUX_ENGINE_API void __stdcall luxServerResize(HWND hwnd, void* ptr);
-
-
 namespace Lux
 {
 
@@ -18,7 +13,10 @@ namespace Lux
 	class IPlugin;
 	class IRenderDevice;
 	class Engine;
-
+	namespace FS
+	{
+		class TCPFileServer;
+	}
 
 	class LUX_ENGINE_API EditorServer
 	{
@@ -27,12 +25,16 @@ namespace Lux
 
 			bool create(HWND hwnd, HWND game_hwnd, const char* base_path);
 			void destroy();
-			void onResize(int w, int h);
-			void tick(HWND hwnd, HWND game_hwnd);
+			void tick();
 			void registerCreator(uint32_t type, IPlugin& creator);
 			void registerProperty(const char* component_type, IPropertyDescriptor* descriptor);
 			Engine& getEngine();
 			void render(IRenderDevice& render_device);
+			void renderIcons(IRenderDevice& render_device);
+			Component getCamera(int index) const;
+			HGLRC getHGLRC();
+			class Gizmo& getGizmo();
+			class FS::TCPFileServer& getTCPFileServer();
 
 		private:
 			struct EditorServerImpl* m_impl;

@@ -15,9 +15,9 @@ namespace UI
 		public:
 			TabBlock(Gui& gui, Block* parent);
 			virtual ~TabBlock();
-			virtual uint32_t getType() const LUX_OVERRIDE;
-			virtual void serialize(ISerializer& serializer) LUX_OVERRIDE;
-			virtual void deserialize(ISerializer& serializer) LUX_OVERRIDE;
+			virtual uint32_t getType() const override;
+			virtual void serialize(ISerializer& serializer) override;
+			virtual void deserialize(ISerializer& serializer) override;
 
 			Lux::UI::Block& addPage(const char* title);
 			Lux::UI::Block* getPageContent(int index);

@@ -58,24 +58,21 @@ namespace DDS
 		uint32_t dwReserved;
 	};
 
-	union Header {
-		struct {
-			uint32_t dwMagic;
-			uint32_t dwSize;
-			uint32_t dwFlags;
-			uint32_t dwHeight;
-			uint32_t dwWidth;
-			uint32_t dwPitchOrLinearSize;
-			uint32_t dwDepth;
-			uint32_t dwMipMapCount;
-			uint32_t dwReserved1[11];
+	struct Header {
+		uint32_t dwMagic;
+		uint32_t dwSize;
+		uint32_t dwFlags;
+		uint32_t dwHeight;
+		uint32_t dwWidth;
+		uint32_t dwPitchOrLinearSize;
+		uint32_t dwDepth;
+		uint32_t dwMipMapCount;
+		uint32_t dwReserved1[11];
 
-			PixelFormat pixelFormat;
-			Caps2 caps2;
+		PixelFormat pixelFormat;
+		Caps2 caps2;
 
-			uint32_t dwReserved2;
-		};
-		char data[128];
+		uint32_t dwReserved2;
 	};
 
 	struct LoadInfo {
@@ -397,6 +394,8 @@ bool Texture::loadDDS(FS::IFile* file)
 		{
 			file->read(data, size);
 			glCompressedTexImage2D(GL_TEXTURE_2D, ix, li->internalFormat, width, height, 0, size, data);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 			width = (width + 1) >> 1;
 			height = (height + 1) >> 1;
 			size = max(li->divSize, width) / li->divSize * max(li->divSize, height) / li->divSize * li->blockBytes;
@@ -481,6 +480,7 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		else
 		{
 			bool loaded = loadTGA(file);
+			ASSERT(loaded);
 		}
 
 		m_size = file->size();
@@ -498,7 +498,7 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 
 void Texture::doUnload(void)
 {
-	TODO("Implement Shader Unload");
+	glDeleteTextures(1, &m_id);
 
 	m_size = 0;
 	onEmpty();

@@ -26,7 +26,7 @@ namespace UI
 		public:
 			TextDecorator(const char* name);
 
-			virtual void render(IRenderer& renderer, Block& block) LUX_OVERRIDE;
+			virtual void render(IRenderer& renderer, Block& block) override;
 			void setTextCentered(bool is_centered) { m_is_text_centered = is_centered; }
 		
 		private:

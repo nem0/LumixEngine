@@ -199,7 +199,8 @@ namespace Lux
 		for(int i = 0; i < m_scripts.size(); ++i)
 		{
 			Entity e(m_universe, m_scripts[i]);
-			m_universe->getEventManager()->emitEvent(ComponentEvent(Component(e, script_type, m_owner, i)));
+			ComponentEvent evt(Component(e, script_type, m_owner, i));
+			m_universe->getEventManager()->emitEvent(evt);
 		}
 	}
 
@@ -211,13 +212,17 @@ namespace Lux
 
 		FS::FileSystem& fs = m_impl->m_engine->getFileSystem();
 		FS::IFile* file = fs.open(fs.getDefaultDevice(), full_path, FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
-		fs.close(file);
+		if (file)
+		{
+			fs.close(file);
+		}
 
 		m_impl->m_scripts.push(entity.index);
 		m_impl->m_paths.push(string(path));
 
 		Component cmp(entity, script_type, this, m_impl->m_scripts.size() - 1);
-		m_impl->m_universe->getEventManager()->emitEvent(ComponentEvent(cmp));
+		ComponentEvent evt(cmp);
+		m_impl->m_universe->getEventManager()->emitEvent(evt);
 
 		return cmp;
 	}
