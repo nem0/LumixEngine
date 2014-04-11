@@ -6,7 +6,10 @@ namespace Lux
 	{
 		static void normalize(const char* path, char* out, uint32_t max_size)
 		{
+			ASSERT(max_size > 0);
 			uint32_t i = 0;
+			if (path[0] == '\\' || path[0] == '/')
+				++path;
 			while (*path != '\0' && i < max_size)
 			{
 				*out = *path == '\\' ? '/' : *path;

@@ -1,9 +1,9 @@
 #pragma once
 
 #include "core/lux.h"
+#include "core/delegate_list.h"
 #include "core/resource.h"
 #include "core/resource_manager_base.h"
-
 
 namespace Lux
 {
@@ -28,8 +28,8 @@ public:
 	~PipelineManager() {}
 
 protected:
-	virtual Resource* createResource(const Path& path) LUX_OVERRIDE;
-	virtual void destroyResource(Resource& resource) LUX_OVERRIDE;
+	virtual Resource* createResource(const Path& path) override;
+	virtual void destroyResource(Resource& resource) override;
 };
 
 
@@ -39,12 +39,26 @@ class LUX_ENGINE_API Pipeline : public Resource
 		Pipeline(const Path& path, ResourceManager& resource_manager);
 		virtual ~Pipeline() {}
 
-		virtual void render() = 0;
 		virtual bool deserialize(ISerializer& serializer) = 0;
 
+		static Pipeline* create(Renderer& renderer);
+		static void destroy(Pipeline* pipeline);
+};
+
+
+class LUX_ENGINE_API PipelineInstance abstract
+{
+	public:
+		virtual ~PipelineInstance() {}
+
+		virtual void render() = 0;
 		virtual const Component& getCamera(int index) = 0;
 		virtual void setCamera(int index, const Component& camera) = 0;
 		virtual int getCameraCount() const = 0;
+		virtual void resize(int w, int h) = 0;
+
+		static PipelineInstance* create(Pipeline& src);
+		static void destroy(PipelineInstance* pipeline);
 
 		virtual void setRenderer(Renderer& renderer) = 0;
 };

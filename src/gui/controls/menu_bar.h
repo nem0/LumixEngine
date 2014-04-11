@@ -15,7 +15,7 @@ namespace UI
 		public:
 			MenuBar(Gui& gui, Block* parent);
 			virtual ~MenuBar();
-			virtual uint32_t getType() const LUX_OVERRIDE;
+			virtual uint32_t getType() const override;
 
 			void addItem(class MenuItem* item);
 

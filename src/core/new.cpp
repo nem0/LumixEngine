@@ -56,12 +56,12 @@ void operator delete[] (void* p)
 	Lux::dll_lux_delete(p); 
 }
 
-void operator delete (void* p, size_t alignment)
+void operator delete (void* p, size_t)
 { 
 	Lux::dll_lux_delete_aligned(p); 
 }
 
-void operator delete[]	(void* p, size_t alignment) 
+void operator delete[]	(void* p, size_t) 
 { 
 	Lux::dll_lux_delete_aligned(p); 
 }
@@ -69,22 +69,22 @@ void operator delete[]	(void* p, size_t alignment)
 //void operator delete	(void* p, const std::nothrow_t&)							{ lux_delete(p); }
 //void operator delete[](void* p, const std::nothrow_t&)							{ lux_delete(p); }
 
-void operator delete (void* p, const char* file, int line)
+void operator delete (void* p, const char*, int)
 { 
 	Lux::dll_lux_delete(p); 
 }
 
-void operator delete[] (void* p, const char* file, int line)
+void operator delete[] (void* p, const char*, int)
 { 
 	Lux::dll_lux_delete(p); 
 }
 
-void operator delete (void* p, size_t alignment, const char* file, int line)
+void operator delete (void* p, size_t, const char*, int)
 { 
 	Lux::dll_lux_delete_aligned(p); 
 }
 
-void operator delete[] (void* p, size_t alignment, const char* file, int line)
+void operator delete[] (void* p, size_t, const char*, int)
 { 
 	Lux::dll_lux_delete_aligned(p); 
 }

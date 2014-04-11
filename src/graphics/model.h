@@ -5,7 +5,6 @@
 #include "core/crc32.h"
 #include "core/delegate_list.h"
 #include "core/matrix.h"
-#include "core/array.h"
 #include "core/quat.h"
 #include "core/string.h"
 #include "core/vec3.h"
@@ -21,6 +20,7 @@ class Material;
 class Model;
 class Pose;
 class ResourceManager;
+struct VertexDef;
 
 namespace FS
 {
@@ -77,28 +77,31 @@ class Model : public Resource
 		~Model();
 
 		Geometry*	getGeometry() const		{ return m_geometry; }
-		Mesh&		getMesh(int index)		{ return m_meshes[index]; }
-		int			getMeshCount() const	{ return m_meshes.size(); }
+		Mesh&		getMesh(int index) { return m_meshes[index]; }
+		const Mesh&	getMesh(int index) const { return m_meshes[index]; }
+		int			getMeshCount() const { return m_meshes.size(); }
 		int			getBoneCount() const	{ return m_bones.size(); }
 		Bone&		getBone(int i)			{ return m_bones[i]; }
 		void		getPose(Pose& pose);
 		float		getBoundingRadius() const { return m_bounding_radius; }
-		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform);
+		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform, float scale);
 		const char* getPath() const { return m_path.c_str(); }
 
 	private:
 		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
+		bool parseVertexDef(FS::IFile* file, VertexDef* vertex_definition);
+		bool parseGeometry(FS::IFile* file, const VertexDef& vertex_definition);
+		bool parseBones(FS::IFile* file);
+		bool parseMeshes(FS::IFile* file);
 
-		virtual void doUnload(void) LUX_OVERRIDE;
-		virtual FS::ReadCallback getReadCallback() LUX_OVERRIDE;
-
+		virtual void doUnload(void) override;
+		virtual FS::ReadCallback getReadCallback() override;
+		
 	private:
 		Geometry* m_geometry;
 		Array<Mesh> m_meshes;
 		Array<Bone> m_bones;
 		float m_bounding_radius;
-//		DelegateList<void ()> m_on_loaded;
-
 };
 
 

@@ -41,7 +41,9 @@ class FrameBuffer
 		GLuint getDepthTexture() const { return m_textures[DEPTH]; }
 		GLuint getTexture(RenderBuffers render_buffer) { return m_textures[render_buffer]; }
 		void bind();
-		
+		int getWidth() const { return m_width; }
+		int getHeight() const { return m_height; }
+
 		static void unbind();
 
 	private:
@@ -49,6 +51,8 @@ class FrameBuffer
 		GLuint m_renderbuffers[RENDERBUFFERS_COUNT];
 		GLuint m_id;
 		int m_render_buffers;
+		int m_width;
+		int m_height;
 };
 
 

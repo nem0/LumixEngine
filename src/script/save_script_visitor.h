@@ -17,7 +17,7 @@ namespace Lux
 			void startSaving();
 			void startLoading();
 
-			virtual void visit(const char* name, float& value) LUX_OVERRIDE;
+			virtual void visit(const char* name, float& value) override;
 		
 		private:
 			enum Mode

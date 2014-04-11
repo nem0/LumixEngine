@@ -16,10 +16,10 @@ namespace UI
 		public:
 			Scrollable(Gui& gui, Block* parent);
 			virtual ~Scrollable();
-			virtual uint32_t getType() const LUX_OVERRIDE;
-			virtual void serialize(ISerializer& serializer) LUX_OVERRIDE;
-			virtual void deserialize(ISerializer& serializer) LUX_OVERRIDE;
-			virtual void layout() LUX_OVERRIDE;
+			virtual uint32_t getType() const override;
+			virtual void serialize(ISerializer& serializer) override;
+			virtual void deserialize(ISerializer& serializer) override;
+			virtual void layout() override;
 			Lux::UI::Block* getContainer() const { return m_container; } 
 
 		private:

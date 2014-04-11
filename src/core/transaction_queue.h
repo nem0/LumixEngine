@@ -99,7 +99,7 @@ namespace Lux
 			bool can_write = wait ? m_alloc_sema.wait(), true : m_alloc_sema.poll();
 			if (can_write)
 			{
-				while (true) 
+				for (;;)
 				{
 					const int32_t alloc_ptr = m_alloc_ptr;
 					int32_t alloc_idx = alloc_ptr & (size - 1);
@@ -124,7 +124,7 @@ namespace Lux
 			AllocNode cur_val(0, NULL);
 			AllocNode new_val(0, ptr);
 
-			while(true) 
+			for (;;)
 			{
 				const int32_t free_ptr = m_free_ptr;
 				int32_t free_idx = free_ptr & (size - 1);

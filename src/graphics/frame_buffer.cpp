@@ -9,6 +9,8 @@ namespace Lux
 
 FrameBuffer::FrameBuffer(int width, int height, int render_buffers)
 {
+	m_width = width;
+	m_height = height;
 	glGenFramebuffers(1, &m_id);
 	glGenRenderbuffers(RENDERBUFFERS_COUNT, m_renderbuffers);
 	glGenTextures(RENDERBUFFERS_COUNT, m_textures);

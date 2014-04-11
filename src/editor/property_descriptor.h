@@ -56,8 +56,8 @@ class PropertyDescriptor : public IPropertyDescriptor
 		PropertyDescriptor(uint32_t _name_hash, BoolGetter _getter, BoolSetter _setter) { m_name_hash = _name_hash; m_bool_getter = _getter; m_bool_setter = _setter; m_type = BOOL; }
 		PropertyDescriptor(uint32_t _name_hash, DecimalGetter _getter, DecimalSetter _setter) { m_name_hash = _name_hash; m_decimal_getter = _getter; m_decimal_setter = _setter; m_type = DECIMAL; }
 		PropertyDescriptor(uint32_t _name_hash, Vec3Getter _getter, Vec3Setter _setter) { m_name_hash = _name_hash; m_vec3_getter = _getter; m_vec3_setter = _setter; m_type = VEC3; }
-		virtual void set(Component cmp, Blob& stream) const LUX_OVERRIDE;
-		virtual void get(Component cmp, Blob& stream) const LUX_OVERRIDE;
+		virtual void set(Component cmp, Blob& stream) const override;
+		virtual void get(Component cmp, Blob& stream) const override;
 
 	private:
 		union

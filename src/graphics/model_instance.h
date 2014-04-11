@@ -2,6 +2,7 @@
 
 
 #include "core/matrix.h"
+#include "core/resource.h"
 #include "graphics/pose.h"
 
 
@@ -16,6 +17,7 @@ class ModelInstance
 {
 	public:
 		ModelInstance(Model& model);
+		~ModelInstance();
 
 		Matrix& getMatrix() { return m_matrix; }
 		Model& getModel() { return m_model; }
@@ -23,7 +25,8 @@ class ModelInstance
 		void setMatrix(const Matrix& mtx);
 
 	private:
-		void modelUpdate(uint32_t state);
+		void modelUpdate(Resource::State state);
+		void operator=(const ModelInstance&);
 
 	private:
 		Pose		m_pose;

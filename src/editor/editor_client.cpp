@@ -1,8 +1,9 @@
 #include "editor_client.h"
+#include "core/array.h"
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/event_manager.h"
-#include "core/array.h"
+#include "core/mutex.h"
 #include "core/task.h"
 #include "core/tcp_connector.h"
 #include "core/tcp_stream.h"
@@ -18,7 +19,7 @@ namespace Lux
 	public:
 		ReceiveTask() : m_finished(false) {}
 
-		virtual int task() LUX_OVERRIDE;
+		virtual int task() override;
 		void stop() { m_finished = true; }
 
 		struct EditorClientImpl* m_client;
@@ -29,6 +30,11 @@ namespace Lux
 
 	struct EditorClientImpl
 	{
+		EditorClientImpl()
+			: m_mutex(false)
+		{
+		}
+
 		void sendMessage(uint32_t type, const void* data, int32_t size);
 		void onMessage(uint8_t* data, int size);
 
@@ -36,6 +42,9 @@ namespace Lux
 		Net::TCPStream* m_stream;
 		ReceiveTask m_task;
 		EventManager m_event_manager;
+		MT::Mutex m_mutex;
+		Array<uint8_t*> m_messages;
+		string m_base_path;
 	};
 
 
@@ -47,14 +56,20 @@ namespace Lux
 		{
 			if(m_client->m_stream->read(&data[0], 8))
 			{
-				int length = *(int*)&data[0];
-				int guard = *(int*)&data[4];
+				int32_t length = *(int32_t*)&data[0];
+				int32_t guard = *(int32_t*)&data[4];
 				ASSERT(guard == 0x12345678);
 				if(length > 0)
 				{
 					data.resize(length);
-					m_client->m_stream->read(&data[0], length);
-					m_client->onMessage(&data[0], data.size());
+					/// TODO "stack" allocator
+					uint8_t* msg = LUX_NEW_ARRAY(uint8_t, length + 4);
+					m_client->m_stream->read(msg + 4, length);
+					((int32_t*)msg)[0] = length;
+					{
+						MT::Lock lock(m_client->m_mutex);
+						m_client->m_messages.push(msg);
+					}
 				}
 			}
 		}
@@ -62,9 +77,22 @@ namespace Lux
 	}
 
 
-	bool EditorClient::create()
+	void EditorClient::processMessages()
+	{
+		MT::Lock lock(m_impl->m_mutex);
+		for (int i = 0; i < m_impl->m_messages.size(); ++i)
+		{
+			m_impl->onMessage(m_impl->m_messages[i] + 4, *(int32_t*)m_impl->m_messages[i]);
+			LUX_DELETE_ARRAY(m_impl->m_messages[i]);
+		}
+		m_impl->m_messages.clear();
+	}
+
+
+	bool EditorClient::create(const char* base_path)
 	{
 		m_impl = LUX_NEW(EditorClientImpl);
+		m_impl->m_base_path = base_path;
 		m_impl->m_stream = m_impl->m_connector.connect("127.0.0.1", 10013);
 		m_impl->m_task.m_client = m_impl;
 		bool success = m_impl->m_task.create("ClientReceiver");
@@ -74,10 +102,13 @@ namespace Lux
 
 	void EditorClient::destroy()
 	{
-		LUX_DELETE(m_impl->m_stream);
-		m_impl->m_task.stop();
-		m_impl->m_task.destroy();
-		LUX_DELETE(m_impl);
+		if (m_impl)
+		{
+			LUX_DELETE(m_impl->m_stream);
+			m_impl->m_task.stop();
+			m_impl->m_task.destroy();
+			LUX_DELETE(m_impl);
+		}
 	}
 
 	void EditorClientImpl::onMessage(uint8_t* data, int size)
@@ -133,6 +164,12 @@ namespace Lux
 		{
 			m_stream->write(data, size);
 		}
+	}
+
+
+	const char* EditorClient::getBasePath() const
+	{
+		return m_impl->m_base_path.c_str();
 	}
 
 
