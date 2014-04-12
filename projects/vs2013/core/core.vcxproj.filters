@@ -96,6 +96,9 @@
     <ClInclude Include="..\..\..\src\core\path.h" />
     <ClInclude Include="..\..\..\src\core\path_utils.h" />
     <ClInclude Include="..\..\..\src\core\resource.h" />
+    <ClInclude Include="..\..\..\src\core\file_events_device.h">
+      <Filter>FS</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\core\blob.cpp" />
@@ -159,6 +162,9 @@
     <ClCompile Include="..\..\..\src\core\resource_manager_base.cpp" />
     <ClCompile Include="..\..\..\src\core\path.cpp" />
     <ClCompile Include="..\..\..\src\core\resource.cpp" />
+    <ClCompile Include="..\..\..\src\core\file_events_device.cpp">
+      <Filter>FS</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="FS">

@@ -12,6 +12,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\core\new.cpp" />
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_file_system.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_hash_map.cpp">
       <PreprocessToFile Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</PreprocessToFile>
     </ClCompile>
