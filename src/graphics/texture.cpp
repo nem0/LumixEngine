@@ -2,7 +2,10 @@
 #include "core/file_system.h"
 #include "core/ifile.h"
 #include "core/log.h"
+#include "core/resource_manager.h"
+#include "core/resource_manager_base.h"
 #include "graphics/texture.h"
+#include "graphics/texture_manager.h"
 
 namespace Lux
 {
@@ -227,33 +230,26 @@ void Texture::apply(int unit)
 
 bool Texture::loadTGA(FS::IFile* file)
 {
-	TODO("Optimize it! Buffer is not necesary at all and image_dest might be shared.");
-	int buffer_size = file->size();
-	char* buffer = LUX_NEW_ARRAY(char, buffer_size);
-	file->read(buffer, buffer_size);
-
 	TGAHeader header;
-	memcpy(&header, buffer, sizeof(TGAHeader));
+	file->read(&header, sizeof(header));
 
 	int color_mode = header.bitsPerPixel / 8;
 	int image_size = header.width * header.height * 4;
 
 	if (header.dataType != 2)
 	{
-		LUX_DELETE_ARRAY(buffer);
 		g_log_error.log("renderer", "Unsupported texture format %s", m_path);
 		return false;
 	}
 
 	if (color_mode < 3)
 	{
-		LUX_DELETE_ARRAY(buffer);
 		g_log_error.log("renderer", "Unsupported color mode %s", m_path);
 		return false;
 	}
 
-	const char* image_src = buffer + sizeof(TGAHeader);
-	unsigned char* image_dest = LUX_NEW_ARRAY(unsigned char, image_size);
+	TextureManager* manager = static_cast<TextureManager*>(getResourceManager().get(ResourceManager::TEXTURE));
+	uint8_t* image_dest = (uint8_t*)manager->getBuffer(image_size);
 
 	// Targa is BGR, swap to RGB, add alpha and flip Y axis
 	for (long y = 0; y < header.height; y++)
@@ -262,24 +258,20 @@ bool Texture::loadTGA(FS::IFile* file)
 		long write_index = ((header.imageDescriptor & 32) != 0) ? read_index : y * header.width * 4;
 		for (long x = 0; x < header.width; x++)
 		{
-			image_dest[write_index] = image_src[read_index + 2];
-			image_dest[write_index + 1] = image_src[read_index + 1];
-			image_dest[write_index + 2] = image_src[read_index];
+			file->read(&image_dest[write_index + 2], sizeof(uint8_t));
+			file->read(&image_dest[write_index + 1], sizeof(uint8_t));
+			file->read(&image_dest[write_index + 0], sizeof(uint8_t));
 			if (color_mode == 4)
-				image_dest[write_index + 3] = image_src[read_index + 3];
+				file->read(&image_dest[write_index + 3], sizeof(uint8_t));
 			else
 				image_dest[write_index + 3] = 255;
-
 			write_index += 4;
-			read_index += color_mode;
 		}
 	}
 
 	glGenTextures(1, &m_id);
 	if (m_id == 0)
 	{
-		LUX_DELETE_ARRAY(buffer);
-		LUX_DELETE_ARRAY(image_dest);
 		return false;
 	}
 
@@ -289,8 +281,6 @@ bool Texture::loadTGA(FS::IFile* file)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-	LUX_DELETE_ARRAY(image_dest);
-	LUX_DELETE_ARRAY(buffer);
 	return true;
 }
 
@@ -368,15 +358,14 @@ bool Texture::loadDDS(FS::IFile* file)
 		return false;
 	}
 
+	TextureManager* manager = static_cast<TextureManager*>(getResourceManager().get(ResourceManager::TEXTURE));
 	glBindTexture(GL_TEXTURE_2D, m_id);
 
 	glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_FALSE);
 	mipMapCount = (hdr.dwFlags & DDS::DDSD_MIPMAPCOUNT) ? hdr.dwMipMapCount : 1;
 	if (li->compressed)
 	{
-		uint32_t size = max(li->divSize, width) / li->divSize * max(li->divSize, height) / li->divSize * li->blockBytes;
-		ASSERT(size == hdr.dwPitchOrLinearSize);
-		ASSERT(hdr.dwFlags & DDS::DDSD_LINEARSIZE);
+		uint32_t size = Math::max(li->divSize, width) / li->divSize * Math::max(li->divSize, height) / li->divSize * li->blockBytes;
 		if (size != hdr.dwPitchOrLinearSize || (hdr.dwFlags & DDS::DDSD_LINEARSIZE) == 0)
 		{
 			glDeleteTextures(1, &m_id);
@@ -384,7 +373,7 @@ bool Texture::loadDDS(FS::IFile* file)
 			onFailure();
 			return false;
 		}
-		unsigned char * data = LUX_NEW_ARRAY(unsigned char, size);
+		uint8_t* data = (uint8_t*)manager->getBuffer(size);
 		ASSERT(data);
 		for (uint32_t ix = 0; ix < mipMapCount; ++ix)
 		{
@@ -394,14 +383,11 @@ bool Texture::loadDDS(FS::IFile* file)
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 			width = (width + 1) >> 1;
 			height = (height + 1) >> 1;
-			size = max(li->divSize, width) / li->divSize * max(li->divSize, height) / li->divSize * li->blockBytes;
+			size = Math::max(li->divSize, width) / li->divSize * Math::max(li->divSize, height) / li->divSize * li->blockBytes;
 		}
-		LUX_DELETE_ARRAY(data);
 	}
 	else if (li->palette)
 	{
-		ASSERT(hdr.dwFlags & DDS::DDSD_PITCH);
-		ASSERT(hdr.pixelFormat.dwRGBBitCount == 8);
 		if ((hdr.dwFlags & DDS::DDSD_PITCH) == 0 || hdr.pixelFormat.dwRGBBitCount != 8)
 		{
 			glDeleteTextures(1, &m_id);
@@ -409,7 +395,6 @@ bool Texture::loadDDS(FS::IFile* file)
 			return false;
 		}
 		uint32_t size = hdr.dwPitchOrLinearSize * height;
-		ASSERT(size == width * height * li->blockBytes);
 		if (size != width * height * li->blockBytes)
 		{
 			glDeleteTextures(1, &m_id);
@@ -418,7 +403,7 @@ bool Texture::loadDDS(FS::IFile* file)
 		}
 		unsigned char * data = LUX_NEW_ARRAY(unsigned char, size);
 		uint32_t palette[256];
-		uint32_t * unpacked = LUX_NEW_ARRAY(uint32_t, size);
+		uint32_t* unpacked = (uint32_t*)manager->getBuffer(size * sizeof(uint32_t));
 		file->read(palette, 4 * 256);
 		for (uint32_t ix = 0; ix < mipMapCount; ++ix)
 		{
@@ -434,7 +419,6 @@ bool Texture::loadDDS(FS::IFile* file)
 			size = width * height * li->blockBytes;
 		}
 		LUX_DELETE_ARRAY(data);
-		LUX_DELETE_ARRAY(unpacked);
 	}
 	else
 	{
@@ -443,7 +427,7 @@ bool Texture::loadDDS(FS::IFile* file)
 			glPixelStorei(GL_UNPACK_SWAP_BYTES, GL_TRUE);
 		}
 		uint32_t size = width * height * li->blockBytes;
-		unsigned char * data = LUX_NEW_ARRAY(unsigned char, size);
+		uint8_t* data = (uint8_t*)manager->getBuffer(size);
 		for (uint32_t ix = 0; ix < mipMapCount; ++ix)
 		{
 			file->read(data, size);
@@ -453,7 +437,6 @@ bool Texture::loadDDS(FS::IFile* file)
 			height = (height + 1) >> 1;
 			size = width * height * li->blockBytes;
 		}
-		LUX_DELETE_ARRAY(data);
 		glPixelStorei(GL_UNPACK_SWAP_BYTES, GL_FALSE);
 	}
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, mipMapCount - 1);
