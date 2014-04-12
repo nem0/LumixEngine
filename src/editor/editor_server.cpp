@@ -249,42 +249,11 @@ void EditorServer::registerCreator(uint32_t type, IPlugin& creator)
 
 void EditorServer::tick()
 {
-	/*PAINTSTRUCT ps;
-	HDC hdc;
-	MT::Lock lock(m_impl->m_universe_mutex);
-	*/
 	if(m_impl->m_is_game_mode)
 	{
 		m_impl->m_engine.update();
 	}
 	m_impl->m_engine.getFileSystem().updateAsyncTransactions();
-	/*
-	if(hwnd)
-	{
-		m_impl->m_engine.getRenderer().enableStage("Gizmo", true);
-		hdc = BeginPaint(hwnd, &ps);
-		ASSERT(hdc);
-		wglMakeCurrent(hdc, m_impl->m_hglrc);
-		m_impl->renderScene(true);
-		wglSwapLayerBuffers(hdc, WGL_SWAP_MAIN_PLANE);
-		EndPaint(hwnd, &ps);
-	}
-	else
-	{
-		m_impl->renderScene(true);
-	}
-
-	if(game_hwnd)
-	{
-		m_impl->m_engine.getRenderer().enableStage("Gizmo", false);
-		hdc = BeginPaint(game_hwnd, &ps);
-		ASSERT(hdc);
-		wglMakeCurrent(hdc, m_impl->m_game_hglrc);
-		m_impl->renderScene(false);
-		wglSwapLayerBuffers(hdc, WGL_SWAP_MAIN_PLANE);
-		EndPaint(game_hwnd, &ps);
-	}*/
-
 }
 
 
@@ -688,6 +657,12 @@ HGLRC createGLContext(HWND hwnd[], int count)
 	ASSERT(count > 0);
 	HDC hdc;
 	hdc = GetDC(hwnd[0]);
+	ASSERT(hdc != NULL);
+	if (hdc == NULL)
+	{
+		g_log_error.log("renderer", "Could not get the device context");
+		return NULL;
+	}
 	PIXELFORMATDESCRIPTOR pfd = 
 	{ 
 		sizeof(PIXELFORMATDESCRIPTOR),  //  size of this pfd  
@@ -710,17 +685,53 @@ HGLRC createGLContext(HWND hwnd[], int count)
 		0, 0, 0                // layer masks ignored  
 	}; 
 	int pixelformat = ChoosePixelFormat(hdc, &pfd);
-	SetPixelFormat(hdc, pixelformat, &pfd);
+	if (pixelformat == 0)
+	{
+		ASSERT(false);
+		g_log_error.log("renderer", "Could not choose a pixel format");
+		return NULL;
+	}
+	BOOL success = SetPixelFormat(hdc, pixelformat, &pfd);
+	if (success == FALSE)
+	{
+		ASSERT(false);
+		g_log_error.log("renderer", "Could not set a pixel format");
+		return NULL;
+	}
 	for (int i = 1; i < count; ++i)
 	{
 		if (hwnd[i])
 		{
 			HDC hdc2 = GetDC(hwnd[i]);
-			SetPixelFormat(hdc2, pixelformat, &pfd);
+			if (hdc2 == NULL)
+			{
+				ASSERT(false);
+				g_log_error.log("renderer", "Could not get the device context");
+				return NULL;
+			}
+			BOOL success = SetPixelFormat(hdc2, pixelformat, &pfd);
+			if (success == FALSE)
+			{
+				ASSERT(false);
+				g_log_error.log("renderer", "Could not set a pixel format");
+				return NULL;
+			}
 		}
 	}
 	HGLRC hglrc = wglCreateContext(hdc);
-	wglMakeCurrent(hdc, hglrc);
+	if (hglrc == NULL)
+	{
+		ASSERT(false);
+		g_log_error.log("renderer", "Could not create an opengl context");
+		return NULL;
+	}
+	success = wglMakeCurrent(hdc, hglrc);
+	if (success == FALSE)
+	{
+		ASSERT(false);
+		g_log_error.log("renderer", "Could not make the opengl context current rendering context");
+		return NULL;
+	}
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	return hglrc;
 }
