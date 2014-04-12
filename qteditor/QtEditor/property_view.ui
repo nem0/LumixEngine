@@ -56,8 +56,8 @@
         <rect>
          <x>0</x>
          <y>0</y>
-         <width>247</width>
-         <height>344</height>
+         <width>98</width>
+         <height>28</height>
         </rect>
        </property>
        <attribute name="label">
@@ -91,17 +91,22 @@
          </property>
          <item>
           <property name="text">
-           <string>Renderable</string>
-          </property>
-         </item>
-         <item>
-          <property name="text">
            <string>Animable</string>
           </property>
          </item>
          <item>
           <property name="text">
+           <string>Camera</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
            <string>Point Light</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Renderable</string>
           </property>
          </item>
          <item>

@@ -7,6 +7,7 @@
 #include "core/file_system.h"
 #include "core/input_system.h"
 #include "core/log.h"
+#include "core/event_manager.h"
 #include "core/memory_file_device.h"
 #include "core/resource_manager.h"
 #include "core/timer.h"
@@ -40,6 +41,7 @@ namespace Lux
 		TextureManager	m_texture_manager;
 		PipelineManager m_pipeline_manager;
 		AnimationManager m_animation_manager;
+		EventManager m_event_manager;
 
 		string m_base_path;
 		EditorServer* m_editor_server;
@@ -100,6 +102,12 @@ namespace Lux
 		}
 		m_script_system.setEngine(m_owner);
 		return true;
+	}
+
+
+	EventManager& Engine::getEventManager() const
+	{
+		return m_impl->m_event_manager;
 	}
 
 

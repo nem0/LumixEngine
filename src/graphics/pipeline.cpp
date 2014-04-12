@@ -475,6 +475,12 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
+	virtual void clearCameras() override
+	{
+		m_cameras.clear();
+	}
+
+
 	virtual int getCameraCount() const override
 	{
 		return m_cameras.size();
@@ -490,14 +496,44 @@ struct PipelineInstanceImpl : public PipelineInstance
 		}
 	}
 
-
-	virtual void setCamera(int index, const Component& camera) override
+	virtual void addCamera(const Component& camera) override
 	{
-		if (m_cameras.size() <= index)
+		int priority;
+		m_renderer->getCameraPriority(camera, priority);
+		if (m_cameras.empty())
 		{
-			m_cameras.resize(index + 1);
+			m_cameras.push(camera);
+			return;
 		}
-		m_cameras[index] = camera;
+		m_cameras.pushEmpty();
+		for (int i = m_cameras.size() - 2; i >= 0; --i)
+		{
+			int existing_priority;
+			m_renderer->getCameraPriority(m_cameras[i], existing_priority);
+			if (existing_priority < priority)
+			{
+				m_cameras[i + 1] = m_cameras[i];
+				m_cameras[i] = camera;
+			}
+			else
+			{
+				m_cameras[i + 1] = camera;
+				break;
+			}
+		}
+	}
+
+
+	virtual void removeCamera(const Component& camera) override
+	{
+		for (int i = 0, c = m_cameras.size(); i < c; ++i)
+		{
+			if (m_cameras[i].index == camera.index)
+			{
+				m_cameras.erase(i);
+				return;
+			}
+		}
 	}
 
 
