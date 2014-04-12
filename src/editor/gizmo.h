@@ -1,8 +1,10 @@
 #pragma once
 
 
+#include "core/lux.h"
 #include "core/vec3.h"
 #include "universe/universe.h"
+#include "graphics/model.h"
 
 
 namespace Lux
@@ -15,7 +17,7 @@ class Event;
 class Renderer;
 
 
-class Gizmo
+class LUX_ENGINE_API Gizmo
 {
 	public:
 		struct Flags
@@ -73,33 +75,32 @@ class Gizmo
 		Gizmo();
 		~Gizmo();
 
-		void create(const char* base_path, Renderer& renderer);
+		void create(Renderer& renderer);
 		void destroy();
 		void hide();
 		void show();
-		void setMatrix(const Matrix& mtx);
-		void getMatrix(Matrix& mtx);
-		void updateScale();
+		void updateScale(Component camera);
 		void setEntity(Entity entity);
 		void setUniverse(Universe* universe);
 		void startTransform(Component camera, int x, int y, TransformMode mode);
 		void transform(Component camera, TransformOperation operation, int x, int y, int relx, int rely, int flags);
-		Component getRenderable() const;
-		//H3DNode getNode() const { return m_handle; }
+		void render(Renderer& renderer);
+		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir);
 
 	private:
-		void onEvent(Event& evt);
+		void getMatrix(Matrix& mtx);
 		Vec3 getMousePlaneIntersection(Component camera, int x, int y);
 
 	private:
 		Renderer* m_renderer;
-		Entity m_gizmo_entity;
 		Entity m_selected_entity;
 		Universe* m_universe;
 		TransformMode m_transform_mode;
 		Vec3 m_transform_point;
 		int m_relx_accum;
 		int m_rely_accum;
+		class Model* m_model;
+		float m_scale;
 };
 
 

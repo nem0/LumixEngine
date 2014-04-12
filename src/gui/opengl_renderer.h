@@ -20,15 +20,15 @@ namespace UI
 			bool create();
 			void destroy();
 
-			virtual TextureBase* loadImage(const char* name, FS::FileSystem& file_system) LUX_OVERRIDE;
-			virtual void loadFont(const char* path, FS::FileSystem& file_system) LUX_OVERRIDE;
-			virtual void beginRender(float w, float h) LUX_OVERRIDE;
-			virtual void renderImage(TextureBase* image, float* vertices, float* tex_coords, int vertex_count) LUX_OVERRIDE;
-			virtual Block::Area getCharArea(const char* text, int pos, float max_width) LUX_OVERRIDE;
-			virtual void measureText(const char* text, float* w, float* h, float max_width) LUX_OVERRIDE;
-			virtual void renderText(const char* text, float x, float y, float z, float max_width) LUX_OVERRIDE;
-			virtual void pushScissorArea(float left, float top, float right, float bottom) LUX_OVERRIDE;
-			virtual void popScissorArea() LUX_OVERRIDE;
+			virtual TextureBase* loadImage(const char* name, FS::FileSystem& file_system) override;
+			virtual void loadFont(const char* path, FS::FileSystem& file_system) override;
+			virtual void beginRender(float w, float h) override;
+			virtual void renderImage(TextureBase* image, float* vertices, float* tex_coords, int vertex_count) override;
+			virtual Block::Area getCharArea(const char* text, int pos, float max_width) override;
+			virtual void measureText(const char* text, float* w, float* h, float max_width) override;
+			virtual void renderText(const char* text, float x, float y, float z, float max_width) override;
+			virtual void pushScissorArea(float left, float top, float right, float bottom) override;
+			virtual void popScissorArea() override;
 			void setWindowHeight(int height);
 
 		private:

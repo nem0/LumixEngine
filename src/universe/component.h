@@ -10,7 +10,7 @@ namespace Lux
 	struct Entity;
 
 
-	struct LUX_ENGINE_API Component LUX_FINAL
+	struct LUX_ENGINE_API Component final
 	{
 
 		typedef uint32_t Type;

@@ -139,19 +139,19 @@ struct LUX_CORE_API Vec3
 };
 
 
-static Vec3 operator *(const Vec3& v, float s)
+inline Vec3 operator *(const Vec3& v, float s)
 {
 	return Vec3(v.x * s, v.y * s, v.z* s);
 }
 
 
-static float dotProduct(const Vec3& op1, const Vec3& op2)
+inline float dotProduct(const Vec3& op1, const Vec3& op2)
 {
 	return op1.x * op2.x + op1.y * op2.y + op1.z * op2.z;
 }
 
 
-static Vec3 crossProduct(const Vec3& op1, const Vec3& op2)
+inline Vec3 crossProduct(const Vec3& op1, const Vec3& op2)
 {
 	float x1 = op1.x;
 	float x2 = op2.x;
@@ -162,7 +162,7 @@ static Vec3 crossProduct(const Vec3& op1, const Vec3& op2)
 	);
 }
 
-static void lerp(const Vec3& op1, const Vec3& op2, Vec3* out, float t)
+inline void lerp(const Vec3& op1, const Vec3& op2, Vec3* out, float t)
 {
 	float invt = 1.0f - t;
 	out->x = op1.x * invt + op2.x * t;

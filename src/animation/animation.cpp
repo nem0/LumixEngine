@@ -105,9 +105,13 @@ void Animation::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 
 void Animation::doUnload(void)
 {
-	TODO("Implement!");
-	onEmpty();
+	LUX_DELETE_ARRAY(m_positions);
+	LUX_DELETE_ARRAY(m_rotations);
+	m_rotations = NULL;
+	m_positions = NULL;
+	m_frame_count = 0;
 	m_size = 0;
+	onEmpty();
 }
 
 

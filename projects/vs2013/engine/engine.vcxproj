@@ -87,7 +87,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>
       </SDLCheck>
@@ -104,7 +104,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>
       </SDLCheck>
@@ -121,7 +121,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -141,7 +141,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -167,6 +167,7 @@
     <ClCompile Include="..\..\..\src\editor\editor_icon.cpp" />
     <ClCompile Include="..\..\..\src\editor\editor_server.cpp" />
     <ClCompile Include="..\..\..\src\editor\gizmo.cpp" />
+    <ClCompile Include="..\..\..\src\editor\script_compiler.cpp" />
     <ClCompile Include="..\..\..\src\editor\server_message_types.cpp" />
     <ClCompile Include="..\..\..\src\engine\engine.cpp" />
     <ClCompile Include="..\..\..\src\engine\iplugin.cpp" />
@@ -206,6 +207,7 @@
     <ClInclude Include="..\..\..\src\editor\editor_server.h" />
     <ClInclude Include="..\..\..\src\editor\gizmo.h" />
     <ClInclude Include="..\..\..\src\editor\property_descriptor.h" />
+    <ClInclude Include="..\..\..\src\editor\script_compiler.h" />
     <ClInclude Include="..\..\..\src\editor\server_message_types.h" />
     <ClInclude Include="..\..\..\src\engine\engine.h" />
     <ClInclude Include="..\..\..\src\engine\iplugin.h" />

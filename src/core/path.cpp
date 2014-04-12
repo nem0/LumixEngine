@@ -36,7 +36,6 @@ namespace Lux
 	Path::Path(uint32_t id, const char* path)
 		: m_id(id)
 	{
-		uint32_t len = strlen(path);
 		strcpy(m_path, path);
 	}
 

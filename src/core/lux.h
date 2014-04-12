@@ -72,10 +72,6 @@ const uint32_t LUX_MAX_PATH = 260;
 #define LUX_GUI_API __declspec(dllimport)
 #endif
 
-#define LUX_FINAL final
-#define LUX_OVERRIDE override
-#define LUX_ABSTRACT abstract
-
 #include "core/new.h"
 #include "core/new_macros.h"
 

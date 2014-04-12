@@ -15,9 +15,9 @@ namespace UI
 		public:
 			CheckBox(bool is_checked, Gui& gui, Block* parent);
 			virtual ~CheckBox();
-			virtual uint32_t getType() const LUX_OVERRIDE;
-			virtual void serialize(ISerializer& serializer) LUX_OVERRIDE;
-			virtual void deserialize(ISerializer& serializer) LUX_OVERRIDE;
+			virtual uint32_t getType() const override;
+			virtual void serialize(ISerializer& serializer) override;
+			virtual void deserialize(ISerializer& serializer) override;
 
 			void toggle() { m_is_checked = !m_is_checked; }
 			void setIsChecked(bool is_checked) { m_is_checked = is_checked; }

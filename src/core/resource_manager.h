@@ -4,6 +4,7 @@
 
 namespace Lux
 {
+	class Resource;
 	namespace FS
 	{
 		class FileSystem;
@@ -11,7 +12,7 @@ namespace Lux
 
 	class ResourceManagerBase;
 
-	class LUX_CORE_API ResourceManager LUX_FINAL
+	class LUX_CORE_API ResourceManager final
 	{
 		typedef PODHashMap<uint32_t, ResourceManagerBase*> ResourceManagerTable;
 	public:
@@ -32,6 +33,7 @@ namespace Lux
 
 		void add(uint32_t id, ResourceManagerBase* rm);
 		void remove(uint32_t id);
+		void reload(const char* path);
 
 		FS::FileSystem& getFileSystem() { return *m_file_system; }
 

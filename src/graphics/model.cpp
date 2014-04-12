@@ -12,12 +12,6 @@
 #include "graphics/material.h"
 #include "graphics/pose.h"
 #include "graphics/renderer.h"
-/*#include "graphics/vertex_buffer.h"
-#include "graphics/material.h"
-#include "common/manager.h"
-#include "graphics/shader.h"
-#include "graphics/pose.h"
-#include "system/resource_manager_bucket.h"*/
 
 
 namespace Lux
@@ -30,7 +24,7 @@ Model::~Model()
 }
 
 
-RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform)
+RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform, float scale)
 {
 	RayCastModelHit hit;
 	hit.m_is_hit = false;
@@ -40,7 +34,8 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 	}
 	
 	Matrix inv = model_transform;
-	inv.fastInverse();
+	inv.multiply3x3(scale);
+	inv.inverse();
 	Vec3 local_origin = inv.mutliplyPosition(origin);
 	Vec3 local_dir = static_cast<Vec3>(inv * Vec4(dir.x, dir.y, dir.z, 0));
 
@@ -53,7 +48,7 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 		Vec3 p1 = vertices[i+1];
 		Vec3 p2 = vertices[i+2];
 		Vec3 normal = crossProduct(p1 - p0, p2 - p0);
-		float q = dotProduct(normal, dir);
+		float q = dotProduct(normal, local_dir);
 		if(q == 0)
 		{
 			continue;
@@ -64,7 +59,7 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 		{
 			continue;
 		}
-		Vec3 hit_point = local_origin + dir * t;
+		Vec3 hit_point = local_origin + local_dir * t;
 
 		Vec3 edge0 = p1 - p0;
 		Vec3 VP0 = hit_point - p0;
@@ -126,90 +121,162 @@ void Model::getPose(Pose& pose)
 	}
 }
 
+
+bool Model::parseVertexDef(FS::IFile* file, VertexDef* vertex_definition)
+{
+	ASSERT(vertex_definition);
+	int vertex_def_size = 0;
+	file->read(&vertex_def_size, sizeof(vertex_def_size));
+	char tmp[16];
+	ASSERT(vertex_def_size < 16);
+	if (vertex_def_size >= 16)
+	{
+		g_log_error.log("renderer", "Model file corrupted %s", getPath());
+		return false;
+	}
+	file->read(tmp, vertex_def_size);
+	vertex_definition->parse(tmp, vertex_def_size);
+	return true;
+}
+
+bool Model::parseGeometry(FS::IFile* file, const VertexDef& vertex_definition)
+{
+	int tri_count = 0;
+	file->read(&tri_count, sizeof(tri_count));
+	if (tri_count <= 0)
+	{
+		return false;
+	}
+	Array<uint8_t> data;
+	int data_size = vertex_definition.getVertexSize() * tri_count * 3;
+	data.resize(data_size);
+	if (!file->read(&data[0], data_size))
+	{
+		return false;
+	}
+	m_geometry = LUX_NEW(Geometry);
+	m_geometry->copy(&data[0], data_size, vertex_definition);
+	return true;
+}
+
+bool Model::parseBones(FS::IFile* file)
+{
+	int bone_count;
+	file->read(&bone_count, sizeof(bone_count));
+	if (bone_count < 0)
+	{
+		return false;
+	}
+	m_bones.reserve(bone_count);
+	for (int i = 0; i < bone_count; ++i)
+	{
+		Model::Bone& b = m_bones.pushEmpty();
+		int len;
+		file->read(&len, sizeof(len));
+		char tmp[MAX_PATH];
+		if (len >= MAX_PATH)
+		{
+			return false;
+		}
+		file->read(tmp, len);
+		tmp[len] = 0;
+		b.name = tmp;
+		file->read(&len, sizeof(len));
+		if (len >= MAX_PATH)
+		{
+			return false;
+		}
+		file->read(tmp, len);
+		tmp[len] = 0;
+		b.parent = tmp;
+		file->read(&b.position.x, sizeof(float)* 3);
+		file->read(&b.rotation.x, sizeof(float)* 4);
+	}
+	for (int i = 0; i < m_bones.size(); ++i)
+	{
+		m_bones[i].rotation.toMatrix(m_bones[i].inv_bind_matrix);
+		m_bones[i].inv_bind_matrix.translate(m_bones[i].position);
+	}
+	for (int i = 0; i < m_bones.size(); ++i)
+	{
+		m_bones[i].inv_bind_matrix.fastInverse();
+	}
+	return true;
+}
+
+bool Model::parseMeshes(FS::IFile* file)
+{
+	int object_count = 0;
+	file->read(&object_count, sizeof(object_count));
+	ASSERT(object_count > 0);
+	if (object_count <= 0)
+	{
+		return false;
+	}
+	int32_t mesh_vertex_offset = 0;
+	m_meshes.reserve(object_count);
+	for (int i = 0; i < object_count; ++i)
+	{
+		int32_t str_size;
+		file->read(&str_size, sizeof(str_size));
+		char material_name[MAX_PATH];
+		file->read(material_name, str_size);
+		if (str_size >= MAX_PATH)
+		{
+			return false;
+		}
+		material_name[str_size] = 0;
+		char material_path[MAX_PATH];
+		strcpy(material_path, "materials/");
+		strcat(material_path, material_name);
+		strcat(material_path, ".mat");
+
+		int32_t mesh_tri_count = 0;
+		file->read(&mesh_tri_count, sizeof(mesh_tri_count));
+
+		file->read(&str_size, sizeof(str_size));
+		if (str_size >= MAX_PATH)
+		{
+			return false;
+		}
+		char mesh_name[MAX_PATH];
+		mesh_name[str_size] = 0;
+		file->read(mesh_name, str_size);
+
+		Material* material = static_cast<Material*>(m_resource_manager.get(ResourceManager::MATERIAL)->load(material_path));
+		Mesh mesh(material, mesh_vertex_offset, mesh_tri_count * 3, mesh_name);
+		mesh_vertex_offset += mesh_tri_count * 3;
+		m_meshes.push(mesh);
+		addDependency(*material);
+	}
+	return true;
+}
+
 void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 { 
-	/// TODO refactor
 	if(success)
 	{
-		int object_count = 0;
-		file->read(&object_count, sizeof(object_count));
-
-		VertexDef vertex_defition;
-		int vertex_def_size = 0;
-		file->read(&vertex_def_size, sizeof(vertex_def_size));
-		char tmp[16];
-		ASSERT(vertex_def_size < 16);
-		file->read(tmp, vertex_def_size);
-		vertex_defition.parse(tmp, vertex_def_size);
-
-		int tri_count = 0;
-		file->read(&tri_count, sizeof(tri_count));
-		Array<uint8_t> data;
-		int data_size = vertex_defition.getVertexSize() * tri_count * 3;
-		data.resize(data_size);
-		file->read(&data[0], data_size); 
-		m_geometry = LUX_NEW(Geometry);
-		m_geometry->copy(&data[0], data_size, vertex_defition);
-		m_bounding_radius = m_geometry->getBoundingRadius();
-
-		int bone_count;	
-		file->read(&bone_count, sizeof(bone_count));
-		for(int i = 0; i < bone_count; ++i)
+		VertexDef vertex_definition;
+		if (parseVertexDef(file, &vertex_definition) 
+			&& parseGeometry(file, vertex_definition)
+			&& parseBones(file)
+			&& parseMeshes(file))
 		{
-			Bone& b = m_bones.pushEmpty();
-			int len;
-			file->read(&len, sizeof(len));
-			char tmp[MAX_PATH];
-			file->read(tmp, len);
-			tmp[len] = 0;
-			b.name = tmp;
-			file->read(&len, sizeof(len));
-			file->read(tmp, len);
-			tmp[len] = 0;
-			b.parent = tmp;
-			file->read(&b.position.x, sizeof(float) * 3);
-			file->read(&b.rotation.x, sizeof(float) * 4);
+			m_bounding_radius = m_geometry->getBoundingRadius();
+			m_size = file->size();
+			decrementDepCount();
 		}
-		for(int i = 0; i < m_bones.size(); ++i)
+		else
 		{
-			m_bones[i].rotation.toMatrix(m_bones[i].inv_bind_matrix);
-			m_bones[i].inv_bind_matrix.translate(m_bones[i].position);
+			onFailure();
+			fs.close(file);
+			return;
 		}
-		for(int i = 0; i < m_bones.size(); ++i)
-		{
-			m_bones[i].inv_bind_matrix.fastInverse();
-		}
-		int32_t mesh_vertex_offset = 0;
-		for(int i = 0; i < object_count; ++i)
-		{
-			int32_t str_size;
-			file->read(&str_size, sizeof(str_size));
-			char material_name[MAX_PATH];
-			file->read(material_name, str_size);
-			material_name[str_size] = 0;
-			char material_path[MAX_PATH];
-			strcpy(material_path, "materials/");
-			strcat(material_path, material_name);
-			strcat(material_path, ".mat");
-			int32_t mesh_tri_count = 0;
-			file->read(&mesh_tri_count, sizeof(mesh_tri_count));
-			file->read(&str_size, sizeof(str_size));
-			char mesh_name[MAX_PATH];
-			mesh_name[str_size] = 0;
-			file->read(mesh_name, str_size);
-			Material* material = static_cast<Material*>(m_resource_manager.get(ResourceManager::MATERIAL)->load(material_path));
-			Mesh mesh(material, mesh_vertex_offset, mesh_tri_count * 3, mesh_name);
-			mesh_vertex_offset += mesh_tri_count * 3;
-			m_meshes.push(mesh);
-			addDependency(*material);
-		}
-
-		m_size = file->size();
-		decrementDepCount();
 	}
 	else
 	{
 		g_log_info.log("renderer", "Error loading model %s", m_path.c_str());
+		onFailure();
 	}
 
 	fs.close(file);
@@ -217,7 +284,15 @@ void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 
 void Model::doUnload(void)
 {
-	TODO("Implement Material Unload");
+	for (int i = 0; i < m_meshes.size(); ++i)
+	{
+		removeDependency(*m_meshes[i].getMaterial());
+		m_resource_manager.get(ResourceManager::MATERIAL)->unload(*m_meshes[i].getMaterial());
+	}
+	m_meshes.clear();
+	m_bones.clear();
+	LUX_DELETE(m_geometry);
+	m_geometry = NULL;
 
 	m_size = 0;
 	onEmpty();

@@ -7,16 +7,16 @@ namespace Lux
 {
 
 
-class Pipeline;
+class PipelineInstance;
 
 
-class LUX_ENGINE_API IRenderDevice LUX_ABSTRACT
+class LUX_ENGINE_API IRenderDevice abstract
 {
 	public:
 		virtual ~IRenderDevice() {}
 
 		virtual void endFrame() = 0;
-		virtual Pipeline& getPipeline() = 0;
+		virtual PipelineInstance& getPipeline() = 0;
 };
 
 

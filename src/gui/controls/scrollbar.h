@@ -21,10 +21,10 @@ namespace UI
 		public:
 			Scrollbar(Gui& gui, Block* parent);
 			virtual ~Scrollbar();
-			virtual uint32_t getType() const LUX_OVERRIDE;
-			virtual void serialize(ISerializer& serializer) LUX_OVERRIDE;
-			virtual void deserialize(ISerializer& serializer) LUX_OVERRIDE;
-			virtual void layout() LUX_OVERRIDE;
+			virtual uint32_t getType() const override;
+			virtual void serialize(ISerializer& serializer) override;
+			virtual void deserialize(ISerializer& serializer) override;
+			virtual void layout() override;
 			Block& getSliderUI() { return *m_slider; }
 
 			float getMin() const { return m_min; }

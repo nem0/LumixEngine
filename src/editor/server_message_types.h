@@ -30,7 +30,7 @@ struct LUX_ENGINE_API EntityPositionEvent : public Event
 {
 	EntityPositionEvent() { m_type = ServerMessageType::ENTITY_POSITION; }
 	
-	//virtual void write(IStream& stream) LUX_OVERRIDE;
+	//virtual void write(IStream& stream) override;
 	void read(Blob& stream);
 	
 	int32_t index;
@@ -44,7 +44,7 @@ struct LUX_ENGINE_API EntitySelectedEvent : public Event
 {
 	EntitySelectedEvent() { m_type = ServerMessageType::ENTITY_SELECTED; }
 	
-	//virtual void write(IStream& stream) LUX_OVERRIDE;
+	//virtual void write(IStream& stream) override;
 	void read(Blob& stream);
 	
 	int32_t index;
@@ -56,7 +56,7 @@ struct LUX_ENGINE_API LogEvent : public Event
 {
 	LogEvent() { m_type = ServerMessageType::LOG_MESSAGE; }
 	
-	//virtual void write(IStream& stream) LUX_OVERRIDE;
+	//virtual void write(IStream& stream) override;
 	void read(Blob& stream);
 	
 	int32_t type;
@@ -77,7 +77,7 @@ struct LUX_ENGINE_API PropertyListEvent : public Event
 
 	PropertyListEvent() { m_type = ServerMessageType::PROPERTY_LIST; }
 	
-	//virtual void write(IStream& stream) LUX_OVERRIDE;
+	//virtual void write(IStream& stream) override;
 	void read(Blob& stream);
 	
 	uint32_t type_hash;

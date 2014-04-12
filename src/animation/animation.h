@@ -24,8 +24,8 @@ public:
 	~AnimationManager() {}
 
 protected:
-	virtual Resource* createResource(const Path& path) LUX_OVERRIDE;
-	virtual void destroyResource(Resource& resource) LUX_OVERRIDE;
+	virtual Resource* createResource(const Path& path) override;
+	virtual void destroyResource(Resource& resource) override;
 };
 
 
@@ -42,8 +42,8 @@ class Animation : public Resource
 	private:
 		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 
-		virtual void doUnload(void) LUX_OVERRIDE;
-		virtual FS::ReadCallback getReadCallback(void) LUX_OVERRIDE;
+		virtual void doUnload(void) override;
+		virtual FS::ReadCallback getReadCallback(void) override;
 
 	private:
 		int	m_frame_count;

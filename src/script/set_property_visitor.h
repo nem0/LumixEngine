@@ -15,7 +15,7 @@ namespace Lux
 			SetPropertyVisitor(const char* name, void* value, int value_size);
 			virtual ~SetPropertyVisitor();
 
-			virtual void visit(const char* name, float& value) LUX_OVERRIDE;
+			virtual void visit(const char* name, float& value) override;
 		
 		private:
 			Lux::string m_property_name;

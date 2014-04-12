@@ -11,7 +11,7 @@ namespace Lux
 	class  Universe;
 	struct Component;
 
-	struct LUX_ENGINE_API Entity LUX_FINAL
+	struct LUX_ENGINE_API Entity final
 	{
 		typedef Array<Component, DefaultAllocator, true> ComponentList;
 

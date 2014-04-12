@@ -12,6 +12,7 @@
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "engine/engine.h"
+#include "graphics/geometry.h"
 #include "graphics/gl_ext.h"
 #include "graphics/irender_device.h"
 #include "graphics/material.h"
@@ -36,6 +37,8 @@ struct Renderable
 {
 	ModelInstance* m_model;
 	Entity m_entity;
+	float m_scale;
+	int64_t m_layer_mask;
 };
 
 
@@ -72,11 +75,12 @@ struct RendererImpl : public Renderer
 		m_universe = NULL;
 	}
 
-	virtual void applyCamera(Component camera_component) LUX_OVERRIDE
+	virtual void applyCamera(Component camera_component) override
 	{
 		Camera* camera = m_cameras[camera_component.index];
 		Matrix mtx;
 		camera->m_entity.getMatrix(mtx);
+		glViewport(0, 0, (GLsizei)camera->m_width, (GLsizei)camera->m_height);
 		glMatrixMode(GL_PROJECTION);
 		glLoadIdentity();
 		gluPerspective(camera->m_fov, camera->m_aspect, camera->m_near, camera->m_far);
@@ -89,7 +93,15 @@ struct RendererImpl : public Renderer
 	}
 
 
-	virtual void render(IRenderDevice& device) LUX_OVERRIDE
+	virtual void setCameraSize(Component camera, int w, int h) override
+	{
+		m_cameras[camera.index]->m_width = (float)w;
+		m_cameras[camera.index]->m_height = (float)h;
+		m_cameras[camera.index]->m_aspect = w / (float)h;
+	}
+
+
+	virtual void render(IRenderDevice& device) override
 	{
 		// init
 		glEnable(GL_DEPTH_TEST);
@@ -125,13 +137,30 @@ struct RendererImpl : public Renderer
 	}
 
 
-	virtual void setUniverse(Universe* universe) LUX_OVERRIDE
+	void clearScene()
+	{
+		m_lights.clear();
+		for (int i = 0; i < m_cameras.size(); ++i)
+		{
+			LUX_DELETE(m_cameras[i]);
+		}
+		m_cameras.clear();
+		for (int i = 0; i < m_renderables.size(); ++i)
+		{
+			LUX_DELETE(m_renderables[i].m_model);
+		}
+		m_renderables.clear();
+	}
+
+
+	virtual void setUniverse(Universe* universe) override
 	{
 		if(m_universe)
 		{
 			EventManager::Listener cb;
 			cb.bind<RendererImpl, &RendererImpl::onEntityMoved>(this);
 			m_universe->getEventManager()->removeListener(EntityMovedEvent::type, cb);
+			clearScene();
 		}
 		m_universe = universe;
 		if(m_universe)
@@ -141,7 +170,7 @@ struct RendererImpl : public Renderer
 	}
 
 
-	virtual bool create(Engine& engine) LUX_OVERRIDE
+	virtual bool create(Engine& engine) override
 	{
 		m_engine = &engine;
 		loadGLExtensions();
@@ -149,18 +178,18 @@ struct RendererImpl : public Renderer
 	}
 
 
-	virtual void destroy() LUX_OVERRIDE
+	virtual void destroy() override
 	{
 	}
 
 
-	virtual const char* getName() const LUX_OVERRIDE
+	virtual const char* getName() const override
 	{
 		return "renderer";
 	}
 
 
-	virtual Component createComponent(uint32_t type, const Entity& entity) LUX_OVERRIDE
+	virtual Component createComponent(uint32_t type, const Entity& entity) override
 	{
 		if(type == crc32("light"))
 		{
@@ -173,7 +202,7 @@ struct RendererImpl : public Renderer
 			Camera* camera = LUX_NEW(Camera);
 			camera->m_is_active = false;
 			camera->m_entity = entity;
-			camera->m_fov = 90;
+			camera->m_fov = 60;
 			camera->m_width = 800;
 			camera->m_height = 600;
 			camera->m_aspect = 800.0f / 600.0f;
@@ -181,7 +210,8 @@ struct RendererImpl : public Renderer
 			camera->m_far = 100.0f;
 			m_cameras.push(camera);
 			Component cmp(entity, type, this, m_cameras.size() - 1);
-			m_universe->getEventManager()->emitEvent(ComponentEvent(cmp));
+			ComponentEvent evt(cmp);
+			m_universe->getEventManager()->emitEvent(evt);
 			return Component(entity, type, this, m_cameras.size() - 1);
 		}
 		else if(type == crc32("renderable"))
@@ -189,8 +219,11 @@ struct RendererImpl : public Renderer
 			Renderable& r = m_renderables.pushEmpty();
 			r.m_entity = entity;
 			r.m_model = NULL;
+			r.m_scale = 1.0f;
+			r.m_layer_mask = 1;
 			Component cmp(entity, type, this, m_renderables.size() - 1);
-			m_universe->getEventManager()->emitEvent(ComponentEvent(cmp));
+			ComponentEvent evt(cmp);
+			m_universe->getEventManager()->emitEvent(evt);
 			return Component(entity, type, this, m_renderables.size() - 1);
 		}
 		return Component::INVALID;
@@ -203,13 +236,13 @@ struct RendererImpl : public Renderer
 	}
 
 
-	virtual void getCameraFov(Component cmp, float& fov) LUX_OVERRIDE
+	virtual void getCameraFov(Component cmp, float& fov) override
 	{
 		fov = m_cameras[cmp.index]->m_fov;
 	}
 
 
-	virtual void getRenderablePath(Component cmp, string& path) LUX_OVERRIDE
+	virtual void getRenderablePath(Component cmp, string& path) override
 	{
 		if(m_renderables[cmp.index].m_model)
 		{
@@ -222,7 +255,19 @@ struct RendererImpl : public Renderer
 	}
 
 
-	virtual void setRenderablePath(Component cmp, const string& path) LUX_OVERRIDE
+	virtual void setRenderableLayer(Component cmp, const int32_t& layer) override
+	{
+		m_renderables[cmp.index].m_layer_mask = ((int64_t)1 << (int64_t)layer);
+	}
+
+
+	virtual void setRenderableScale(Component cmp, const float& scale) override
+	{
+		m_renderables[cmp.index].m_scale = scale;
+	}
+
+
+	virtual void setRenderablePath(Component cmp, const string& path) override
 	{
 		LUX_DELETE(m_renderables[cmp.index].m_model);
 		Renderable& r = m_renderables[cmp.index];
@@ -232,37 +277,55 @@ struct RendererImpl : public Renderer
 	}
 
 
-	virtual void getRenderableInfos(Array<RenderableInfo>& infos) LUX_OVERRIDE
+	virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) override
 	{
 		infos.reserve(m_renderables.size());
 		for(int i = 0; i < m_renderables.size(); ++i)
 		{
-			if(m_renderables[i].m_model != NULL)
+			if(m_renderables[i].m_model != NULL && (m_renderables[i].m_layer_mask & layer_mask) != 0)
 			{
 				RenderableInfo& info = infos.pushEmpty();
+				info.m_scale = m_renderables[i].m_scale;
 				info.m_model_instance = m_renderables[i].m_model;	
 			}
 		}
 	}
 
 
-	virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir) LUX_OVERRIDE
+	virtual void enableZTest(bool enable) override
+	{
+		if (enable)
+		{
+			glEnable(GL_DEPTH_TEST);
+		}
+		else
+		{
+			glDisable(GL_DEPTH_TEST);
+		}
+	}
+
+
+	virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir) override
 	{
 		RayCastModelHit hit;
 		hit.m_is_hit = false;
 		for(int i = 0; i < m_renderables.size(); ++i)
 		{
-			const Vec3& pos = m_renderables[i].m_model->getMatrix().getTranslation();
-			float radius = m_renderables[i].m_model->getModel().getBoundingRadius();
-			Vec3 intersection;
-			if(Math::getRaySphereIntersection(pos, radius, origin, dir, intersection))
+			if(m_renderables[i].m_model)
 			{
-				RayCastModelHit new_hit = m_renderables[i].m_model->getModel().castRay(origin, dir, m_renderables[i].m_model->getMatrix());
-				new_hit.m_renderable = Component(m_renderables[i].m_entity, crc32("renderable"), this, i);
-				if(new_hit.m_is_hit && (!hit.m_is_hit || new_hit.m_t < hit.m_t))
+				const Vec3& pos = m_renderables[i].m_model->getMatrix().getTranslation();
+				float radius = m_renderables[i].m_model->getModel().getBoundingRadius();
+				float scale = m_renderables[i].m_scale;
+				Vec3 intersection;
+				if(Math::getRaySphereIntersection(pos, radius * scale, origin, dir, intersection))
 				{
-					hit = new_hit;
-					hit.m_is_hit = true;
+					RayCastModelHit new_hit = m_renderables[i].m_model->getModel().castRay(origin, dir, m_renderables[i].m_model->getMatrix(), scale);
+					if(new_hit.m_is_hit && (!hit.m_is_hit || new_hit.m_t < hit.m_t))
+					{
+						new_hit.m_renderable = Component(m_renderables[i].m_entity, crc32("renderable"), this, i);
+						hit = new_hit;
+						hit.m_is_hit = true;
+					}
 				}
 			}
 		}
@@ -270,7 +333,7 @@ struct RendererImpl : public Renderer
 	}
 
 
-	virtual Component getLight(int index) LUX_OVERRIDE
+	virtual Component getLight(int index) override
 	{
 		if (index >= m_lights.size())
 		{
@@ -280,7 +343,7 @@ struct RendererImpl : public Renderer
 	};
 
 
-	virtual void getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) LUX_OVERRIDE
+	virtual void getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) override
 	{
 		Camera* cam = m_cameras[camera.index];
 		Vec3 camera_pos = m_cameras[camera.index]->m_entity.getPosition();
@@ -320,16 +383,108 @@ struct RendererImpl : public Renderer
 	}
 
 
-	virtual Engine& getEngine() LUX_OVERRIDE
+	virtual Engine& getEngine() override
 	{
 		return *m_engine;
 	}
 
-	virtual Pipeline* loadPipeline(const char* path) LUX_OVERRIDE
+
+	virtual void renderModel(const Model& model, const Matrix& transform) override
+	{
+		glPushMatrix();
+		glMultMatrixf(&transform.m11);
+		for (int i = 0, c = model.getMeshCount(); i < c;  ++i)
+		{
+			const Mesh& mesh = model.getMesh(i);
+			mesh.getMaterial()->apply(*this);
+			model.getGeometry()->draw(mesh.getStart(), mesh.getCount(), *mesh.getMaterial()->getShader());
+		}
+		glPopMatrix();
+	}
+
+
+	virtual Model* getModel(const char* path) override
+	{
+		return static_cast<Model*>(m_engine->getResourceManager().get(ResourceManager::MODEL)->load(path));
+	}
+
+
+	virtual Pipeline* loadPipeline(const char* path) override
 	{
 		return static_cast<Pipeline*>(m_engine->getResourceManager().get(ResourceManager::PIPELINE)->load(path));
 	}
 
+
+	virtual void serialize(ISerializer& serializer) override
+	{
+		serializer.serialize("camera_count", m_cameras.size());
+		serializer.beginArray("cameras");
+		for (int i = 0; i < m_cameras.size(); ++i)
+		{
+			serializer.serializeArrayItem(m_cameras[i]->m_far);
+			serializer.serializeArrayItem(m_cameras[i]->m_near);
+			serializer.serializeArrayItem(m_cameras[i]->m_fov);
+			serializer.serializeArrayItem(m_cameras[i]->m_is_active);
+			serializer.serializeArrayItem(m_cameras[i]->m_width);
+			serializer.serializeArrayItem(m_cameras[i]->m_height);
+			serializer.serializeArrayItem(m_cameras[i]->m_entity.index);
+		}
+		serializer.endArray();
+		serializer.serialize("renderable_count", m_renderables.size());
+		serializer.beginArray("renderables");
+		for (int i = 0; i < m_renderables.size(); ++i)
+		{
+			serializer.serializeArrayItem(m_renderables[i].m_entity.index);
+			serializer.serializeArrayItem(m_renderables[i].m_model->getModel().getPath());
+			serializer.serializeArrayItem(m_renderables[i].m_scale);
+			Matrix mtx = m_renderables[i].m_model->getMatrix();
+			for (int j = 0; j < 16; ++j)
+			{
+				serializer.serializeArrayItem((&mtx.m11)[j]);
+			}
+		}
+		serializer.endArray();
+	}
+
+
+	virtual void deserialize(ISerializer& serializer) override
+	{
+		clearScene();
+		int size;
+		serializer.deserialize("camera_count", size);
+		serializer.deserializeArrayBegin("cameras");
+		for (int i = 0; i < size; ++i)
+		{
+			m_cameras.push(LUX_NEW(Camera));
+			serializer.deserializeArrayItem(m_cameras[i]->m_far);
+			serializer.deserializeArrayItem(m_cameras[i]->m_near);
+			serializer.deserializeArrayItem(m_cameras[i]->m_fov);
+			serializer.deserializeArrayItem(m_cameras[i]->m_is_active);
+			serializer.deserializeArrayItem(m_cameras[i]->m_width);
+			serializer.deserializeArrayItem(m_cameras[i]->m_height);
+			m_cameras[i]->m_aspect = m_cameras[i]->m_width / m_cameras[i]->m_height;
+			serializer.deserializeArrayItem(m_cameras[i]->m_entity.index);
+			m_cameras[i]->m_entity.universe = m_universe;
+		}
+		serializer.deserializeArrayEnd();
+		serializer.deserialize("renderable_count", size);
+		serializer.deserializeArrayBegin("renderables");
+		for (int i = 0; i < size; ++i)
+		{
+			m_renderables.pushEmpty();
+			serializer.deserializeArrayItem(m_renderables[i].m_entity.index);
+			m_renderables[i].m_entity.universe = m_universe;
+			char path[MAX_PATH];
+			serializer.deserializeArrayItem(path, MAX_PATH);
+			serializer.deserializeArrayItem(m_renderables[i].m_scale);
+			m_renderables[i].m_model = LUX_NEW(ModelInstance)(static_cast<Model&>(*m_engine->getResourceManager().get(ResourceManager::MODEL)->load(path)));
+			for (int j = 0; j < 16; ++j)
+			{
+				serializer.deserializeArrayItem((&m_renderables[i].m_model->getMatrix().m11)[j]);
+			}
+		}
+		serializer.deserializeArrayEnd();
+	}
 
 	Engine* m_engine;
 	Array<Camera*> m_cameras;

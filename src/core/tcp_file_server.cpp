@@ -18,8 +18,17 @@ namespace Lux
 		class TCPFileServerTask : public MT::Task
 		{
 		public:
-			TCPFileServerTask() {}
+			TCPFileServerTask() 
+			{
+				m_watcher = NULL;
+			}
+
 			~TCPFileServerTask() {}
+
+			void setWatcher(TCPFileServer::IWatcher* watcher)
+			{
+				m_watcher = watcher;
+			}
 
 			int task()
 			{
@@ -37,7 +46,6 @@ namespace Lux
 					case TCPCommand::OpenFile:
 						{
 							int32_t mode = 0;
-							int32_t len = 0;
 							stream->read(mode);
 							stream->readString(m_buffer.data(), m_buffer.size());
 
@@ -59,13 +67,17 @@ namespace Lux
 									path = m_buffer.data();
 								}
 								ret = file->open(path.c_str(), mode) ? id : -1;
+								if (m_watcher)
+								{
+									m_watcher->onFileOpen(path.c_str(), ret >= 0);
+								}
 							}
 							stream->write(ret);
 						}
 						break;
 					case TCPCommand::Close:
 						{
-							uint32_t id = -1;
+							uint32_t id = 0xffffFFFF;
 							stream->read(id);
 							OsFile* file = m_files[id];
 							m_ids.release(id);
@@ -77,7 +89,7 @@ namespace Lux
 					case TCPCommand::Read:
 						{
 							bool read_successful = true;
-							uint32_t id = -1;
+							uint32_t id = 0xffffFFFF;
 							stream->read(id);
 							OsFile* file = m_files[id];
 
@@ -98,7 +110,7 @@ namespace Lux
 					case TCPCommand::Write:
 						{
 							bool write_successful = true;
-							uint32_t id = -1;
+							uint32_t id = 0xffffFFFF;
 							stream->read(id);
 							OsFile* file = m_files[id];
 
@@ -118,7 +130,7 @@ namespace Lux
 						break;
 					case TCPCommand::Size:
 						{
-							uint32_t id = -1;
+							uint32_t id = 0xffffFFFF;
 							stream->read(id);
 							OsFile* file = m_files[id];
 
@@ -128,7 +140,7 @@ namespace Lux
 						break;
 					case TCPCommand::Seek:
 						{
-							uint32_t id = -1;
+							uint32_t id = 0xffffFFFF;
 							stream->read(id);
 							OsFile* file = m_files[id];
 
@@ -143,7 +155,7 @@ namespace Lux
 						break;
 					case TCPCommand::Pos:
 						{
-							uint32_t id = -1;
+							uint32_t id = 0xffffFFFF;
 							stream->read(id);
 							OsFile* file = m_files[id];
 
@@ -177,12 +189,18 @@ namespace Lux
 				m_base_path = base_path_str;
 			}
 
+			const char* getBasePath() const
+			{
+				return m_base_path.c_str();
+			}
+
 		private:
 			Net::TCPAcceptor			m_acceptor;
 			StaticArray<char, 0x50000>	m_buffer;
 			StaticArray<OsFile*, 0x50000> m_files;
 			FreeList<int32_t, 0x50000>	m_ids;
 			Path m_base_path;
+			TCPFileServer::IWatcher* m_watcher;
 		};
 
 		struct TCPFileServerImpl
@@ -215,5 +233,19 @@ namespace Lux
 			LUX_DELETE(m_impl);
 			m_impl = NULL;
 		}
+
+		void TCPFileServer::setWatcher(IWatcher* watcher)
+		{
+			ASSERT(m_impl);
+			m_impl->m_task.setWatcher(watcher);
+		}
+
+		const char* TCPFileServer::getBasePath() const
+		{
+			ASSERT(m_impl);
+			return m_impl->m_task.getBasePath();
+		}
+
+
 	} // ~namespace FS
 } // ~namespace Lux
