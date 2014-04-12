@@ -1,6 +1,7 @@
 #include "assetbrowser.h"
 #include "ui_assetbrowser.h"
 #include <qfilesystemmodel.h>
+#include <qlistwidget.h>
 #include "core/crc32.h"
 #include "core/resource.h"
 #include "core/resource_manager.h"
@@ -58,6 +59,13 @@ class FileSystemWatcher
 		AssetBrowser* m_asset_browser;
 };
 
+
+void getDefaultFilters(QStringList& filters)
+{
+	filters << "*.msh" << "*.unv" << "*.ani";
+}
+
+
 AssetBrowser::AssetBrowser(QWidget* parent) :
 	QDockWidget(parent),
 	m_ui(new Ui::AssetBrowser)
@@ -72,15 +80,16 @@ AssetBrowser::AssetBrowser(QWidget* parent) :
 	m_model = new QFileSystemModel;
 	m_model->setRootPath(QDir::currentPath());
 	QStringList filters;
-	filters << "*.msh" << "*.unv" << "*.ani";
-	m_model->setNameFilterDisables(false);
+	getDefaultFilters(filters);
 	m_model->setNameFilters(filters);
+	m_model->setNameFilterDisables(false);
 	m_ui->treeView->setModel(m_model);
 	m_ui->treeView->setRootIndex(m_model->index(QDir::currentPath()));
 	m_ui->treeView->hideColumn(1);
 	m_ui->treeView->hideColumn(2);
 	m_ui->treeView->hideColumn(3);
 	m_ui->treeView->hideColumn(4);
+	m_ui->listWidget->hide();
 	connect(this, SIGNAL(fileChanged(const QString&)), this, SLOT(onFileChanged(const QString&)));
 }
 
@@ -97,11 +106,11 @@ void AssetBrowser::emitFileChanged(const char* path)
 }
 
 
-void AssetBrowser::on_treeView_doubleClicked(const QModelIndex &index)
+void AssetBrowser::handleDoubleClick(const QFileInfo& file_info)
 {
-	ASSERT(m_client && m_model);
-	const QString& suffix = m_model->fileInfo(index).suffix();
-	QString file = m_model->filePath(index).toLower();
+	ASSERT(m_client);
+	const QString& suffix = file_info.suffix();
+	QString file =file_info.filePath().toLower();
 	if(suffix == "unv")
 	{
 		m_client->loadUniverse(file.toLatin1().data());
@@ -120,6 +129,13 @@ void AssetBrowser::on_treeView_doubleClicked(const QModelIndex &index)
 }
 
 
+void AssetBrowser::on_treeView_doubleClicked(const QModelIndex &index)
+{
+	ASSERT(m_model);
+	handleDoubleClick(m_model->fileInfo(index));
+}
+
+
 void AssetBrowser::onFileChanged(const QString& path)
 {
 	if(m_server)
@@ -128,3 +144,52 @@ void AssetBrowser::onFileChanged(const QString& path)
 	}
 }
 
+
+void fillList(QListWidget& widget, const QDir& dir, const QStringList& filters)
+{
+	QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoDotAndDotDot, QDir::NoSort);
+
+	for(int i = 0, c = list.size(); i < c; ++i)
+	{
+		QString filename = list[i].fileName();
+		QListWidgetItem* item = new QListWidgetItem(list[i].fileName());
+		widget.addItem(item);
+		item->setData(Qt::UserRole, list[i].filePath());
+	}
+	
+	list = dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::NoSort);
+
+	for(int i = 0, c = list.size(); i < c; ++i)
+	{
+		QString filename = list[i].fileName();
+		fillList(widget, QDir(list[i].filePath()), filters);
+	}
+}
+
+
+void AssetBrowser::on_searchInput_textEdited(const QString &arg1)
+{
+	if(arg1 == "")
+	{
+		m_ui->listWidget->hide();
+		m_ui->treeView->show();
+	}
+	else
+	{
+		QStringList filters;
+		filters << QString("*") + arg1 + "*";
+		m_ui->listWidget->show();
+		m_ui->treeView->hide();
+		QDir dir(QDir::currentPath());
+		m_ui->listWidget->clear();
+		fillList(*m_ui->listWidget, dir, filters);
+	}
+}
+
+
+void AssetBrowser::on_listWidget_activated(const QModelIndex &index)
+{
+	QVariant user_data = m_ui->listWidget->item(index.row())->data(Qt::UserRole);
+	QFileInfo info(user_data.toString());
+	handleDoubleClick(info);
+}
