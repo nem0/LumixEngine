@@ -1,6 +1,7 @@
 #include "animation/animation.h"
 #include "core/file_system.h"
 #include "core/ifile.h"
+#include "core/log.h"
 #include "core/quat.h"
 #include "core/vec3.h"
 #include "graphics/pose.h"
@@ -8,6 +9,16 @@
 
 namespace Lux
 {
+
+
+static const uint32_t ANIMATION_HEADER_MAGIC = 0x5f4c4146; // '_LAF'
+
+
+struct AnimationHeader
+{
+	uint32_t magic;
+	uint32_t version;
+};
 
 
 Resource* AnimationManager::createResource(const Path& path)
@@ -74,9 +85,25 @@ void Animation::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 {
 	if (success)
 	{
-		TODO("Add same header to the animation file and check it.");
 		LUX_DELETE_ARRAY(m_positions);
 		LUX_DELETE_ARRAY(m_rotations);
+		m_positions = NULL;
+		m_rotations = NULL;
+		m_frame_count = m_bone_count = 0;
+		AnimationHeader header;
+		file->read(&header, sizeof(header));
+		if (header.magic != ANIMATION_HEADER_MAGIC)
+		{
+			onFailure();
+			g_log_error.log("animation", "%s is not an animation file", m_path.c_str());
+			return;
+		}
+		if (header.version > 1)
+		{
+			onFailure();
+			g_log_error.log("animation", "Unsupported animation version %d (%s)", header.version, m_path.c_str());
+			return;
+		}
 		file->read(&m_frame_count, sizeof(m_frame_count));
 		file->read(&m_bone_count, sizeof(m_bone_count));
 		m_positions = LUX_NEW_ARRAY(Vec3, m_frame_count * m_bone_count);
