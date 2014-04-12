@@ -13,6 +13,7 @@
 #include <QtWidgets/QAction>
 #include <QtWidgets/QApplication>
 #include <QtWidgets/QButtonGroup>
+#include <QtWidgets/QDoubleSpinBox>
 #include <QtWidgets/QFormLayout>
 #include <QtWidgets/QFrame>
 #include <QtWidgets/QHeaderView>
@@ -27,6 +28,12 @@ public:
     QFormLayout *formLayout;
     QLabel *label;
     QSpinBox *priorityInput;
+    QLabel *label_2;
+    QLabel *label_3;
+    QLabel *label_4;
+    QDoubleSpinBox *nearInput;
+    QDoubleSpinBox *fovInput;
+    QDoubleSpinBox *farInput;
 
     void setupUi(QFrame *CameraWidget)
     {
@@ -37,6 +44,7 @@ public:
         CameraWidget->setFrameShadow(QFrame::Raised);
         formLayout = new QFormLayout(CameraWidget);
         formLayout->setObjectName(QStringLiteral("formLayout"));
+        formLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
         label = new QLabel(CameraWidget);
         label->setObjectName(QStringLiteral("label"));
 
@@ -50,6 +58,40 @@ public:
 
         formLayout->setWidget(0, QFormLayout::FieldRole, priorityInput);
 
+        label_2 = new QLabel(CameraWidget);
+        label_2->setObjectName(QStringLiteral("label_2"));
+
+        formLayout->setWidget(1, QFormLayout::LabelRole, label_2);
+
+        label_3 = new QLabel(CameraWidget);
+        label_3->setObjectName(QStringLiteral("label_3"));
+
+        formLayout->setWidget(2, QFormLayout::LabelRole, label_3);
+
+        label_4 = new QLabel(CameraWidget);
+        label_4->setObjectName(QStringLiteral("label_4"));
+
+        formLayout->setWidget(3, QFormLayout::LabelRole, label_4);
+
+        nearInput = new QDoubleSpinBox(CameraWidget);
+        nearInput->setObjectName(QStringLiteral("nearInput"));
+        nearInput->setMinimum(-1e+09);
+        nearInput->setMaximum(1e+09);
+
+        formLayout->setWidget(1, QFormLayout::FieldRole, nearInput);
+
+        fovInput = new QDoubleSpinBox(CameraWidget);
+        fovInput->setObjectName(QStringLiteral("fovInput"));
+
+        formLayout->setWidget(3, QFormLayout::FieldRole, fovInput);
+
+        farInput = new QDoubleSpinBox(CameraWidget);
+        farInput->setObjectName(QStringLiteral("farInput"));
+        farInput->setMinimum(-1e+09);
+        farInput->setMaximum(1e+09);
+
+        formLayout->setWidget(2, QFormLayout::FieldRole, farInput);
+
 
         retranslateUi(CameraWidget);
 
@@ -60,6 +102,9 @@ public:
     {
         CameraWidget->setWindowTitle(QApplication::translate("CameraWidget", "Frame", 0));
         label->setText(QApplication::translate("CameraWidget", "Priority", 0));
+        label_2->setText(QApplication::translate("CameraWidget", "Near", 0));
+        label_3->setText(QApplication::translate("CameraWidget", "Far", 0));
+        label_4->setText(QApplication::translate("CameraWidget", "Field of view", 0));
     } // retranslateUi
 
 };

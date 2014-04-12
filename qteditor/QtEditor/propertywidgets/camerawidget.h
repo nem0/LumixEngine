@@ -22,6 +22,9 @@ class CameraWidget : public PropertyWidgetBase
 
 private slots:
 	void on_priorityInput_valueChanged(int arg1);
+	void on_fovInput_valueChanged(double arg1);
+	void on_farInput_valueChanged(double arg1);
+	void on_nearInput_valueChanged(double arg1);
 
 private:
 		Ui::CameraWidget* m_ui;

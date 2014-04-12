@@ -34,15 +34,11 @@ private slots:
 	void on_actionProperties_triggered();
 	void on_actionE_xit_triggered();
 	void on_actionGame_view_triggered();
+	void on_actionScript_compiler_triggered();
+	void on_actionFile_server_triggered();
+	void on_actionAsset_Browser_triggered();
+	void on_actionScene_View_triggered();
 	virtual void closeEvent(QCloseEvent* event) override;
-
-    void on_actionScript_compiler_triggered();
-
-    void on_actionFile_server_triggered();
-
-    void on_actionAsset_Browser_triggered();
-
-    void on_actionScene_View_triggered();
 
 private:
 	Ui::MainWindow* m_ui;

@@ -1,7 +1,10 @@
 #include "sceneview.h"
 #include "editor/editor_client.h"
 #include "editor/editor_server.h"
+#include <QDragEnterEvent>
+#include <QMimeData>
 #include <QMouseEvent>
+#include "core/crc32.h"
 #include "graphics/pipeline.h"
 
 SceneView::SceneView(QWidget* parent) :
@@ -11,6 +14,37 @@ SceneView::SceneView(QWidget* parent) :
 	setWidget(new QWidget());
 	setWindowTitle("Scene");
 	setObjectName("sceneView");
+	setAcceptDrops(true);
+}
+
+
+void SceneView::dragEnterEvent(QDragEnterEvent *event)
+{
+	if (event->mimeData()->hasUrls())
+	{
+		event->acceptProposedAction();
+	}
+}
+
+
+void SceneView::dropEvent(QDropEvent *event)
+{
+	const QList<QUrl>& list = event->mimeData()->urls();
+	if(!list.empty())
+	{
+		QString file = list[0].toLocalFile();
+		if(file.endsWith(".msh"))
+		{
+			m_client->addEntity();
+			m_client->addComponent(crc32("renderable"));
+			QString base_path = m_client->getBasePath();
+			if(file.startsWith(base_path))
+			{
+				file.remove(0, base_path.length());
+			}
+			m_client->setComponentProperty("renderable", "source", file.toLatin1().data(), file.length());
+		}
+	}
 }
 
 
