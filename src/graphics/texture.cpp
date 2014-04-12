@@ -227,6 +227,7 @@ void Texture::apply(int unit)
 
 bool Texture::loadTGA(FS::IFile* file)
 {
+	TODO("Optimize it! Buffer is not necesary at all and image_dest might be shared.");
 	int buffer_size = file->size();
 	char* buffer = LUX_NEW_ARRAY(char, buffer_size);
 	file->read(buffer, buffer_size);
@@ -288,9 +289,6 @@ bool Texture::loadTGA(FS::IFile* file)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-	/*glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);*/
-
 	LUX_DELETE_ARRAY(image_dest);
 	LUX_DELETE_ARRAY(buffer);
 	return true;
@@ -305,22 +303,20 @@ bool Texture::loadDDS(FS::IFile* file)
 	uint32_t mipMapCount = 0;
 
 	file->read(&hdr, sizeof(hdr));
-	ASSERT(hdr.dwMagic == DDS::DDS_MAGIC);
-	ASSERT(hdr.dwSize == 124);
 
 	if (hdr.dwMagic != DDS::DDS_MAGIC || hdr.dwSize != 124 ||
 		!(hdr.dwFlags & DDS::DDSD_PIXELFORMAT) || !(hdr.dwFlags & DDS::DDSD_CAPS))
 	{
+		ASSERT(false);
 		g_log_error.log("renderer", "Wrong dds format or corrupted dds %s", m_path.c_str());
 		return false;
 	}
 
 	width = hdr.dwWidth;
 	height = hdr.dwHeight;
-	ASSERT(!(width & (width - 1)));
-	ASSERT(!(height & (height - 1)));
 	if ((width & (width - 1)) || (height & (height - 1)))
 	{
+		ASSERT(false);
 		g_log_error.log("renderer", "Wrong dds format %s", m_path.c_str());
 		return false;
 	}
@@ -467,7 +463,6 @@ bool Texture::loadDDS(FS::IFile* file)
 
 void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 {
-	TODO("Optimize it! Buffer is not necesary at all and image_dest might be shared.");
 	if (success)
 	{
 		const char* path = m_path.c_str();

@@ -40,7 +40,22 @@
     <Filter Include="Source Files\propertywidgets" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="propertywidgets\animable_widget.cpp">
+      <Filter>Source Files\propertywidgets</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
     <ClCompile Include="propertywidgets\camerawidget.cpp">
+      <Filter>Source Files\propertywidgets</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="propertywidgets\renderable_widget.cpp">
+      <Filter>Source Files\propertywidgets</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="propertywidgets\script_widget.cpp">
       <Filter>Source Files\propertywidgets</Filter>
     </ClCompile>
   </ItemGroup>
@@ -55,11 +70,6 @@
   <ItemGroup>
     <ClCompile Include="scripts\scriptcompilerwidget.cpp">
       <Filter>Source Files\scripts</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="animable_widget.cpp">
-      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -103,17 +113,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="renderable_widget.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
     <ClCompile Include="sceneview.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="script_widget.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -121,7 +121,22 @@
     <Filter Include="Header Files\propertywidgets" />
   </ItemGroup>
   <ItemGroup>
+    <CustomBuild Include="propertywidgets\animable_widget.h">
+      <Filter>Header Files\propertywidgets</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
     <CustomBuild Include="propertywidgets\camerawidget.h">
+      <Filter>Header Files\propertywidgets</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="propertywidgets\renderable_widget.h">
+      <Filter>Header Files\propertywidgets</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="propertywidgets\script_widget.h">
       <Filter>Header Files\propertywidgets</Filter>
     </CustomBuild>
   </ItemGroup>
@@ -136,11 +151,6 @@
   <ItemGroup>
     <CustomBuild Include="scripts\scriptcompilerwidget.h">
       <Filter>Header Files\scripts</Filter>
-    </CustomBuild>
-  </ItemGroup>
-  <ItemGroup>
-    <CustomBuild Include="animable_widget.h">
-      <Filter>Header Files</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
@@ -179,17 +189,7 @@
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="renderable_widget.h">
-      <Filter>Header Files</Filter>
-    </CustomBuild>
-  </ItemGroup>
-  <ItemGroup>
     <CustomBuild Include="sceneview.h">
-      <Filter>Header Files</Filter>
-    </CustomBuild>
-  </ItemGroup>
-  <ItemGroup>
-    <CustomBuild Include="script_widget.h">
       <Filter>Header Files</Filter>
     </CustomBuild>
   </ItemGroup>
@@ -403,7 +403,22 @@
     <Filter Include="Form Files\propertywidgets" />
   </ItemGroup>
   <ItemGroup>
+    <CustomBuild Include="propertywidgets\animable_widget.ui">
+      <Filter>Form Files\propertywidgets</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
     <CustomBuild Include="propertywidgets\camerawidget.ui">
+      <Filter>Form Files\propertywidgets</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="propertywidgets\renderable_widget.ui">
+      <Filter>Form Files\propertywidgets</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="propertywidgets\script_widget.ui">
       <Filter>Form Files\propertywidgets</Filter>
     </CustomBuild>
   </ItemGroup>
@@ -413,11 +428,6 @@
   <ItemGroup>
     <CustomBuild Include="scripts\scriptcompilerwidget.ui">
       <Filter>Form Files\scripts</Filter>
-    </CustomBuild>
-  </ItemGroup>
-  <ItemGroup>
-    <CustomBuild Include="animable_widget.ui">
-      <Filter>Form Files</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
@@ -452,16 +462,6 @@
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="property_widget_base.ui">
-      <Filter>Form Files</Filter>
-    </CustomBuild>
-  </ItemGroup>
-  <ItemGroup>
-    <CustomBuild Include="renderable_widget.ui">
-      <Filter>Form Files</Filter>
-    </CustomBuild>
-  </ItemGroup>
-  <ItemGroup>
-    <CustomBuild Include="script_widget.ui">
       <Filter>Form Files</Filter>
     </CustomBuild>
   </ItemGroup>
