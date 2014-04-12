@@ -5,10 +5,10 @@
 #include "core/event_manager.h"
 #include "editor/editor_client.h"
 #include "editor/server_message_types.h"
-#include "animable_widget.h"
-#include "renderable_widget.h"
-#include "script_widget.h"
+#include "propertywidgets/animable_widget.h"
 #include "propertywidgets/camerawidget.h"
+#include "propertywidgets/renderable_widget.h"
+#include "propertywidgets/script_widget.h"
 
 
 PropertyView::PropertyView(QWidget* parent) :
