@@ -19,7 +19,7 @@ namespace Lux
 
 		void SpinMutex::lock()
 		{
-			do
+			for (;;)
 			{
 				if(InterlockedCompareExchange((LONG*)&m_id, 1, 0) == 0)
 				{
@@ -32,7 +32,6 @@ namespace Lux
 					Sleep(0);
 				}
 			}
-			while(true);
 		}
 
 		bool SpinMutex::poll()

@@ -10,7 +10,7 @@ namespace Lux
 		class IFile;
 		class IFileDevice;
 
-		class LUX_CORE_API FileSystem LUX_ABSTRACT
+		class LUX_CORE_API FileSystem abstract
 		{
 		public:
 			static FileSystem* create();

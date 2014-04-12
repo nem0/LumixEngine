@@ -18,7 +18,7 @@ class BaseScript
 		virtual ~BaseScript() {}
 
 		virtual void create(ScriptSystem& ctx, Entity e) = 0;
-		virtual void update(float dt) {}
+		virtual void update(float) {}
 		virtual void visit(ScriptVisitor&) {}
 };
 

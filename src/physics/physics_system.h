@@ -16,16 +16,16 @@ class LUX_PHYSICS_API PhysicsSystem : public IPlugin
 	public:
 		PhysicsSystem() { m_impl = 0; }
 		
-		virtual bool create(Engine& engine) LUX_OVERRIDE;
-		virtual void destroy() LUX_OVERRIDE;
-		virtual void onCreateUniverse(Universe& universe) LUX_OVERRIDE;
-		virtual void onDestroyUniverse(Universe& universe) LUX_OVERRIDE;
-		virtual void serialize(ISerializer& serializer) LUX_OVERRIDE;
-		virtual void deserialize(ISerializer& serializer) LUX_OVERRIDE;
-		virtual void update(float dt) LUX_OVERRIDE;
-		virtual Component createComponent(uint32_t component_type, const Entity& entity) LUX_OVERRIDE;
-		virtual const char* getName() const LUX_OVERRIDE { return "physics"; }
-		virtual void sendMessage(const char* message) LUX_OVERRIDE;
+		virtual bool create(Engine& engine) override;
+		virtual void destroy() override;
+		virtual void onCreateUniverse(Universe& universe) override;
+		virtual void onDestroyUniverse(Universe& universe) override;
+		virtual void serialize(ISerializer& serializer) override;
+		virtual void deserialize(ISerializer& serializer) override;
+		virtual void update(float dt) override;
+		virtual Component createComponent(uint32_t component_type, const Entity& entity) override;
+		virtual const char* getName() const override { return "physics"; }
+		virtual void sendMessage(const char* message) override;
 
 	private:
 		struct PhysicsSystemImpl* m_impl;

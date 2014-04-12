@@ -27,9 +27,9 @@ namespace UI
 		public:
 			Dockable(Gui& gui, Block* parent);
 			virtual ~Dockable();
-			virtual uint32_t getType() const LUX_OVERRIDE;
-			virtual void serialize(ISerializer& serializer) LUX_OVERRIDE;
-			virtual void deserialize(ISerializer& serializer) LUX_OVERRIDE;
+			virtual uint32_t getType() const override;
+			virtual void serialize(ISerializer& serializer) override;
+			virtual void deserialize(ISerializer& serializer) override;
 
 			void startDrag();
 			Block* getContent() const { return m_content; }

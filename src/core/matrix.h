@@ -177,6 +177,7 @@ struct LUX_CORE_API Matrix
 	void getRotation(Quat& rot) const;
 	void transpose();
 	Vec3 mutliplyPosition(const Vec3& pos);
+	void multiply3x3(float scale);
 	static void setIdentity(Matrix& mtx);
 
 	float m11, m12, m13, m14;

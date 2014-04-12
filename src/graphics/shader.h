@@ -33,8 +33,8 @@ class LUX_ENGINE_API Shader : public Resource
 		GLuint attach(GLenum type, const char* src, int32_t length);
 		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 
-		virtual void doUnload(void) LUX_OVERRIDE;
-		virtual FS::ReadCallback getReadCallback() LUX_OVERRIDE;
+		virtual void doUnload(void) override;
+		virtual FS::ReadCallback getReadCallback() override;
 
 	private:
 		enum 

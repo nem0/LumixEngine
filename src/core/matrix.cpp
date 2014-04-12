@@ -150,6 +150,20 @@ void Matrix::transpose()
 }
 
 
+void Matrix::multiply3x3(float scale)
+{
+	m11 *= scale;
+	m12 *= scale;
+	m13 *= scale;
+	m21 *= scale;
+	m22 *= scale;
+	m23 *= scale;
+	m31 *= scale;
+	m32 *= scale;
+	m33 *= scale;
+}
+
+
 Vec3 Matrix::mutliplyPosition(const Vec3& rhs)
 {
 	return Vec3(

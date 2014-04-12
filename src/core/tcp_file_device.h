@@ -40,8 +40,8 @@ namespace Lux
 		class LUX_CORE_API TCPFileDevice : public IFileDevice
 		{
 		public:
-			virtual IFile* createFile(IFile* child) LUX_OVERRIDE;
-			virtual const char* name() const LUX_OVERRIDE { return "tcp"; }
+			virtual IFile* createFile(IFile* child) override;
+			virtual const char* name() const override { return "tcp"; }
 
 			void connect(const char* ip, uint16_t port);
 			void disconnect();

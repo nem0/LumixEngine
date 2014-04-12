@@ -313,7 +313,6 @@ namespace Lux
 			{
 				node_type* dest = n;
 				n = next(n);
-				destruct(dest);
 				if(dest < m_table || dest > &m_table[m_max_id - 1])
 					m_allocator.deallocate(dest);
 			}
@@ -392,10 +391,6 @@ namespace Lux
 			return where;
 		}
 
-		void destruct(node_type* n)
-		{
-		}
-
 		void copy(node_type* src, node_type* dst)
 		{
 			memcpy(dst, src, sizeof(node_type));
@@ -463,14 +458,12 @@ namespace Lux
 			if(NULL == prev)
 			{
 				node_type* next = n->m_next;
-				destruct(n);
 				memcpy(n, next ? next : &m_sentinel, sizeof(node_type));
 				m_allocator.deallocate(next);
 			}
 			else
 			{
 				prev->m_next = n->m_next;
-				destruct(n);
 				m_allocator.deallocate(n);
 				n = prev->m_next;
 			}

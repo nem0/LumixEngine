@@ -16,7 +16,13 @@ ModelInstance::ModelInstance(Model& model)
 }
 
 
-void ModelInstance::modelUpdate(uint32_t new_state)
+ModelInstance::~ModelInstance()
+{
+	m_model.getObserverCb().unbind<ModelInstance, &ModelInstance::modelUpdate>(this);
+}
+
+
+void ModelInstance::modelUpdate(Resource::State new_state)
 {
 	if(new_state == Resource::State::READY)
 	{
@@ -25,7 +31,7 @@ void ModelInstance::modelUpdate(uint32_t new_state)
 	}
 	else if(new_state == Resource::State::UNLOADING)
 	{
-		TODO("Implement unloading stuff");
+		m_pose.resize(0);
 	}
 }
 

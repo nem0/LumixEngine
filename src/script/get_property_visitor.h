@@ -15,7 +15,7 @@ namespace Lux
 			GetPropertyVisitor(const char* name);
 			virtual ~GetPropertyVisitor();
 
-			virtual void visit(const char* name, float& value) LUX_OVERRIDE;
+			virtual void visit(const char* name, float& value) override;
 
 		public:
 			enum PropertyType

@@ -71,7 +71,8 @@ void Universe::destroyEntity(const Entity& entity)
 	if(entity.isValid())
 	{
 		m_free_slots.push(entity.index);
-		m_event_manager->emitEvent(EntityDestroyedEvent(entity));
+		EntityDestroyedEvent evt(entity);
+		m_event_manager->emitEvent(evt);
 		m_component_list[entity.index].clear();
 	}
 }
