@@ -1,9 +1,14 @@
 #include "graphics/shader.h"
 #include "core/file_system.h"
 #include "core/ifile.h"
+#include "core/log.h"
 #include "core/matrix.h"
+#include "core/resource_manager.h"
+#include "core/resource_manager_base.h"
 #include "core/vec3.h"
 #include "graphics/gl_ext.h"
+#include "graphics/shader_manager.h"
+
 
 namespace Lux
 {
@@ -92,12 +97,17 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	if(success)
 	{
 		int32_t size = (int32_t)file->size();
-		TODO("Use here some shared buffer")
-		char* buf = LUX_NEW_ARRAY(char, size);
+		ShaderManager* manager = static_cast<ShaderManager*>(getResourceManager().get(ResourceManager::SHADER));
+		char* buf = manager->getBuffer(size);
 		file->read(buf, size);
 		
 		char* end = strstr(buf, "//~VS");		
-		ASSERT(end);
+		if (!end)
+		{
+			g_log_error.log("renderer", "Could not process shader file %s", m_path.c_str());
+			onFailure();
+			return;
+		}
 		int32_t vs_len = (int32_t)(end - buf);
 		buf[vs_len-1] = 0;
 		m_vertex_id = attach(GL_VERTEX_SHADER, buf, vs_len);
@@ -106,10 +116,12 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		m_vertex_attributes_ids[0] = glGetAttribLocation(m_program_id, "bone_weights");
 		m_vertex_attributes_ids[1] = glGetAttribLocation(m_program_id, "bone_indices");
 
-		LUX_DELETE_ARRAY(buf);
-
 		m_size = file->size();
 		decrementDepCount();
+	}
+	else
+	{
+		onFailure();
 	}
 
 	fs.close(file);
