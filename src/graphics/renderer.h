@@ -48,6 +48,12 @@ class LUX_ENGINE_API Renderer : public IPlugin
 		virtual void setCameraSize(Component camera, int w, int h) = 0;
 		virtual void setCameraPriority(Component camera, const int& priority) = 0;
 		virtual void getCameraPriority(Component camera, int& priority) = 0;
+		virtual void getCameraFOV(Component camera, float& fov) = 0;
+		virtual void setCameraFOV(Component camera, const float& fov) = 0;
+		virtual void setCameraFarPlane(Component camera, const float& far) = 0;
+		virtual void setCameraNearPlane(Component camera, const float& near) = 0;
+		virtual void getCameraFarPlane(Component camera, float& far) = 0;
+		virtual void getCameraNearPlane(Component camera, float& near) = 0;
 		virtual void getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) = 0;
 		virtual Component getLight(int index) = 0;
 

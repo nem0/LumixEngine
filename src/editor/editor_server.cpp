@@ -318,6 +318,9 @@ void EditorServer::destroy()
 void EditorServerImpl::registerProperties()
 {
 	m_component_properties[camera_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("priority"), &Renderer::getCameraPriority, &Renderer::setCameraPriority));
+	m_component_properties[camera_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("fov"), &Renderer::getCameraFOV, &Renderer::setCameraFOV));
+	m_component_properties[camera_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("near"), &Renderer::getCameraNearPlane, &Renderer::setCameraNearPlane));
+	m_component_properties[camera_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("far"), &Renderer::getCameraFarPlane, &Renderer::setCameraFarPlane));
 	m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("source"), &Renderer::getRenderablePath, &Renderer::setRenderablePath, IPropertyDescriptor::FILE));
 	/*m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("visible"), &Renderer::getVisible, &Renderer::setVisible));
 	m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("cast shadows"), &Renderer::getCastShadows, &Renderer::setCastShadows));

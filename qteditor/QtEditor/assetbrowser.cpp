@@ -1,6 +1,7 @@
 #include "assetbrowser.h"
 #include "ui_assetbrowser.h"
 #include <qfilesystemmodel.h>
+#include "core/crc32.h"
 #include "core/resource.h"
 #include "core/resource_manager.h"
 #include "editor/editor_client.h"
@@ -99,9 +100,22 @@ void AssetBrowser::emitFileChanged(const char* path)
 void AssetBrowser::on_treeView_doubleClicked(const QModelIndex &index)
 {
 	ASSERT(m_client && m_model);
-	if(m_model->fileInfo(index).suffix() == "unv")
+	const QString& suffix = m_model->fileInfo(index).suffix();
+	QString file = m_model->filePath(index).toLower();
+	if(suffix == "unv")
 	{
-		m_client->loadUniverse(m_model->filePath(index).toLower().toLatin1().data());
+		m_client->loadUniverse(file.toLatin1().data());
+	}
+	else if(suffix == "msh")
+	{
+		m_client->addEntity();
+		m_client->addComponent(crc32("renderable"));
+		QString base_path = m_client->getBasePath();
+		if(file.startsWith(base_path))
+		{
+			file.remove(0, base_path.length());
+		}
+		m_client->setComponentProperty("renderable", "source", file.toLatin1().data(), file.length());
 	}
 }
 

@@ -104,6 +104,42 @@ struct RendererImpl : public Renderer
 	}
 
 
+	virtual void getCameraFOV(Component camera, float& fov) override
+	{
+		fov = m_cameras[camera.index]->m_fov;
+	}
+
+
+	virtual void setCameraFOV(Component camera, const float& fov) override
+	{
+		m_cameras[camera.index]->m_fov = fov;
+	}
+
+
+	virtual void setCameraNearPlane(Component camera, const float& near_plane) override
+	{
+		m_cameras[camera.index]->m_near = near_plane;
+	}
+
+
+	virtual void getCameraNearPlane(Component camera, float& near_plane) override
+	{
+		near_plane = m_cameras[camera.index]->m_near;
+	}
+
+
+	virtual void setCameraFarPlane(Component camera, const float& far_plane) override
+	{
+		m_cameras[camera.index]->m_far = far_plane;
+	}
+
+
+	virtual void getCameraFarPlane(Component camera, float& far_plane) override
+	{
+		far_plane = m_cameras[camera.index]->m_far;
+	}
+
+
 	virtual void getCameraPriority(Component camera, int& priority) override
 	{
 		priority = m_cameras[camera.index]->m_priority;
@@ -245,7 +281,7 @@ struct RendererImpl : public Renderer
 			camera->m_height = 600;
 			camera->m_aspect = 800.0f / 600.0f;
 			camera->m_near = 0.1f;
-			camera->m_far = 100.0f;
+			camera->m_far = 1000.0f;
 			camera->m_priority = -1;
 			m_cameras.push(camera);
 			Component cmp(entity, type, this, m_cameras.size() - 1);
