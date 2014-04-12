@@ -147,3 +147,23 @@ void MainWindow::on_actionGame_view_triggered()
 {
 	m_game_view->show();
 }
+
+void MainWindow::on_actionScript_compiler_triggered()
+{
+    m_script_compiler_ui->show();
+}
+
+void MainWindow::on_actionFile_server_triggered()
+{
+    m_file_server_ui->show();
+}
+
+void MainWindow::on_actionAsset_Browser_triggered()
+{
+    m_asset_browser->show();
+}
+
+void MainWindow::on_actionScene_View_triggered()
+{
+    m_scene_view->show();
+}

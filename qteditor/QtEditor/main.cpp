@@ -115,22 +115,30 @@ class App
 			GetKeyboardState(keys);
 			if (m_main_window->getSceneView()->hasFocus())
 			{
-					/// TODO refactor
-				if (keys['W'] >> 7)
+				/// TODO refactor
+				if(keys[VK_CONTROL] >> 7 == 0)
 				{
-					m_client.navigate(1, 0, 0);
-				}
-				else if (keys['S'] >> 7)
-				{
-					m_client.navigate(-1, 0, 0);
-				}
-				if (keys['A'] >> 7)
-				{
-					m_client.navigate(0, -1, 0);
-				}
-				else if (keys['D'] >> 7)
-				{
-					m_client.navigate(0, 1, 0);
+					int speed = 0;
+					if (keys[VK_LSHIFT] >> 7)
+					{
+						speed = 1;
+					}
+					if (keys['W'] >> 7)
+					{
+						m_client.navigate(1, 0, speed);
+					}
+					else if (keys['S'] >> 7)
+					{
+						m_client.navigate(-1, 0, speed);
+					}
+					if (keys['A'] >> 7)
+					{
+						m_client.navigate(0, -1, speed);
+					}
+					else if (keys['D'] >> 7)
+					{
+						m_client.navigate(0, 1, speed);
+					}
 				}
 			}
 		}
