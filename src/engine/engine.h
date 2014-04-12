@@ -12,6 +12,7 @@ namespace Lux
 	}
 
 	class EditorServer;
+	class EventManager;
 	class InputSystem;
 	class IPlugin;
 	class ISerializer;
@@ -40,6 +41,7 @@ namespace Lux
 			ScriptSystem& getScriptSystem();
 			InputSystem& getInputSystem();
 			PluginManager& getPluginManager();
+			EventManager& getEventManager() const;
 			IPlugin* loadPlugin(const char* name);
 			Universe* getUniverse() const;
 

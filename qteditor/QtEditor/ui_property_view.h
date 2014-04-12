@@ -56,7 +56,7 @@ public:
         components->addItem(componentA, QStringLiteral("Page 1"));
         componentB = new QWidget();
         componentB->setObjectName(QStringLiteral("componentB"));
-        componentB->setGeometry(QRect(0, 0, 247, 344));
+        componentB->setGeometry(QRect(0, 0, 98, 28));
         components->addItem(componentB, QStringLiteral("Page 2"));
 
         verticalLayout->addWidget(components);
@@ -107,9 +107,10 @@ public:
         components->setItemText(components->indexOf(componentB), QApplication::translate("PropertyView", "Page 2", 0));
         componentTypeCombo->clear();
         componentTypeCombo->insertItems(0, QStringList()
-         << QApplication::translate("PropertyView", "Renderable", 0)
          << QApplication::translate("PropertyView", "Animable", 0)
+         << QApplication::translate("PropertyView", "Camera", 0)
          << QApplication::translate("PropertyView", "Point Light", 0)
+         << QApplication::translate("PropertyView", "Renderable", 0)
          << QApplication::translate("PropertyView", "Script", 0)
         );
         addComponentButton->setText(QApplication::translate("PropertyView", "Add", 0));

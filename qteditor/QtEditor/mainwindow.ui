@@ -47,9 +47,13 @@
     <property name="title">
      <string>View</string>
     </property>
+    <addaction name="actionAsset_Browser"/>
+    <addaction name="actionFile_server"/>
+    <addaction name="actionGame_view"/>
     <addaction name="actionLog"/>
     <addaction name="actionProperties"/>
-    <addaction name="actionGame_view"/>
+    <addaction name="actionScene_View"/>
+    <addaction name="actionScript_compiler"/>
    </widget>
    <widget class="QMenu" name="menuFile">
     <property name="title">
@@ -88,30 +92,48 @@
    <property name="text">
     <string>&amp;New</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+N</string>
+   </property>
   </action>
   <action name="actionOpen">
    <property name="text">
     <string>&amp;Open</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+O</string>
    </property>
   </action>
   <action name="actionSave">
    <property name="text">
     <string>&amp;Save</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+S</string>
+   </property>
   </action>
   <action name="actionE_xit">
    <property name="text">
     <string>E&amp;xit</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+X</string>
    </property>
   </action>
   <action name="actionSave_As">
    <property name="text">
     <string>Save As</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+S</string>
+   </property>
   </action>
   <action name="actionGame_mode">
    <property name="text">
     <string>Game mode</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+P</string>
    </property>
   </action>
   <action name="actionCompile_scripts">
@@ -123,6 +145,9 @@
    <property name="text">
     <string>Create</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+E</string>
+   </property>
   </action>
   <action name="actionProperties">
    <property name="text">
@@ -132,6 +157,26 @@
   <action name="actionGame_view">
    <property name="text">
     <string>Game view</string>
+   </property>
+  </action>
+  <action name="actionScene_View">
+   <property name="text">
+    <string>Scene View</string>
+   </property>
+  </action>
+  <action name="actionAsset_Browser">
+   <property name="text">
+    <string>Asset browser</string>
+   </property>
+  </action>
+  <action name="actionFile_server">
+   <property name="text">
+    <string>File server</string>
+   </property>
+  </action>
+  <action name="actionScript_compiler">
+   <property name="text">
+    <string>Script compiler</string>
    </property>
   </action>
  </widget>

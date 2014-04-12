@@ -24,6 +24,8 @@ private:
 	virtual void mouseMoveEvent(QMouseEvent* event) override;
 	virtual void mouseReleaseEvent(QMouseEvent* event) override;
 	virtual void resizeEvent(QResizeEvent*) override;
+	virtual void dragEnterEvent(QDragEnterEvent *event) override;
+	virtual void dropEvent(QDropEvent *event) override;
 
 private:	
 	Lux::EditorClient* m_client;
