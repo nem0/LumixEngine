@@ -18,41 +18,44 @@ SOURCES += main.cpp\
     sceneview.cpp \ 
     log_widget.cpp \
     property_view.cpp \
-    renderable_widget.cpp \
+    propertywidgets/renderable_widget.cpp \
     property_widget_base.cpp \
-    script_widget.cpp \
+    propertywidgets/script_widget.cpp \
     gameview.cpp \
     assetbrowser.cpp \
     scripts/scriptcompiler.cpp \
     scripts/scriptcompilerwidget.cpp \
     fileserverwidget.cpp \
-    animable_widget.cpp
+    propertywidgets/animable_widget.cpp \
+    propertywidgets/camerawidget.cpp
 
 HEADERS  += mainwindow.h \
     sceneview.h \ 
     log_widget.h \
     property_view.h \
-    renderable_widget.h \
+    propertywidgets/renderable_widget.h \
     property_widget_base.h \
-    script_widget.h \
+    propertywidgets/script_widget.h \
     gameview.h \
     assetbrowser.h \
     scripts/scriptcompiler.h \
     scripts/scriptcompilerwidget.h \
     fileserverwidget.h \
-    animable_widget.h
+    propertywidgets/animable_widget.h \
+    propertywidgets/camerawidget.h
 
 FORMS    += mainwindow.ui \
     logwidget.ui \
     property_view.ui \
-    renderable_widget.ui \
+    propertywidgets/renderable_widget.ui \
     property_widget_base.ui \
-    script_widget.ui \
+    propertywidgets/script_widget.ui \
     gameview.ui \
     assetbrowser.ui \
     scripts/scriptcompilerwidget.ui \
     fileserverwidget.ui \
-    animable_widget.ui
+    propertywidgets/animable_widget.ui \
+    propertywidgets/camerawidget.ui
 
 win32
 {

@@ -5,9 +5,10 @@
 #include "core/event_manager.h"
 #include "editor/editor_client.h"
 #include "editor/server_message_types.h"
-#include "animable_widget.h"
-#include "renderable_widget.h"
-#include "script_widget.h"
+#include "propertywidgets/animable_widget.h"
+#include "propertywidgets/camerawidget.h"
+#include "propertywidgets/renderable_widget.h"
+#include "propertywidgets/script_widget.h"
 
 
 PropertyView::PropertyView(QWidget* parent) :
@@ -70,6 +71,10 @@ void PropertyView::onEntitySelected(Lux::Event& event)
 		{
 			m_ui->components->addItem(new QFrame(), "Point Light");
 		}
+		else if (e.components[i] == crc32("camera"))
+		{
+			widget = widget = new CameraWidget;
+		}
 		else
 		{
 			ASSERT(false);
@@ -106,5 +111,9 @@ void PropertyView::on_addComponentButton_clicked()
 	else if (strcmp(c, "Animable") == 0)
 	{
 		m_client->addComponent(crc32("animable"));
+	}
+	else if (strcmp(c, "Camera") == 0)
+	{
+		m_client->addComponent(crc32("camera"));
 	}
 }

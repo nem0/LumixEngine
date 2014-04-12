@@ -23,7 +23,12 @@ public:
 		m_pipeline->setRenderer(renderer);
 	}
 	
-	virtual void endFrame()
+	virtual void beginFrame() override
+	{
+		wglMakeCurrent(m_hdc, m_opengl_context);
+	}
+
+	virtual void endFrame() override
 	{
 		wglSwapLayerBuffers(m_hdc, WGL_SWAP_MAIN_PLANE);
 	}
@@ -35,6 +40,7 @@ public:
 
 	Lux::PipelineInstance* m_pipeline;
 	HDC m_hdc;
+	HGLRC m_opengl_context;
 	Lux::Renderer* m_renderer;
 };
 
@@ -63,64 +69,88 @@ class App
 			QFile file("editor/stylesheet.qss");
 			file.open(QFile::ReadOnly);
 			m_qt_app->setStyleSheet(QLatin1String(file.readAll()));
+
 			m_main_window = new MainWindow();
 			m_main_window->show();
+
 			HWND hwnd = (HWND)m_main_window->getSceneView()->widget()->winId();
 			HWND game_hwnd = (HWND)m_main_window->getGameView()->getContentWidget()->winId();
 			m_server.create(hwnd, game_hwnd, QDir::currentPath().toLocal8Bit().data());
 			m_server.tick();
 			m_client.create(m_server.getEngine().getBasePath());
+
 			m_main_window->setEditorClient(m_client);
 			m_main_window->setEditorServer(m_server);
 			m_main_window->getSceneView()->setServer(&m_server);
+
 			m_edit_render_device = new MyRenderDevice(m_server.getEngine().getRenderer(), "pipelines/main.json");
-			m_game_render_device = new	MyRenderDevice(m_server.getEngine().getRenderer(), "pipelines/game_view.json");
 			m_edit_render_device->m_hdc = GetDC(hwnd);
+			m_edit_render_device->m_opengl_context = m_server.getHGLRC();
+			m_server.setEditViewRenderDevice(*m_edit_render_device);
+
+			m_game_render_device = new	MyRenderDevice(m_server.getEngine().getRenderer(), "pipelines/game_view.json");
 			m_game_render_device->m_hdc = GetDC(game_hwnd);
+			m_game_render_device->m_opengl_context = m_server.getHGLRC();
+			m_server.getEngine().getRenderer().setRenderDevice(*m_game_render_device);
+
+			m_main_window->getSceneView()->setPipeline(m_edit_render_device->getPipeline());
+			m_main_window->getGameView()->setPipeline(m_game_render_device->getPipeline());
+		}
+
+		void renderEditView()
+		{
+			m_edit_render_device->beginFrame();
+			m_server.render(*m_edit_render_device);
+			m_server.renderIcons(*m_edit_render_device);
+			m_server.getGizmo().updateScale(m_server.getEditCamera());
+			m_server.getGizmo().render(m_server.getEngine().getRenderer());
+			m_edit_render_device->endFrame();
+		}
+
+		void handleEvents()
+		{
+			m_client.processMessages();
+			m_qt_app->processEvents();
+			BYTE keys[256];
+			GetKeyboardState(keys);
+			if (m_main_window->getSceneView()->hasFocus())
+			{
+				/// TODO refactor
+				if(keys[VK_CONTROL] >> 7 == 0)
+				{
+					int speed = 0;
+					if (keys[VK_LSHIFT] >> 7)
+					{
+						speed = 1;
+					}
+					if (keys['W'] >> 7)
+					{
+						m_client.navigate(1, 0, speed);
+					}
+					else if (keys['S'] >> 7)
+					{
+						m_client.navigate(-1, 0, speed);
+					}
+					if (keys['A'] >> 7)
+					{
+						m_client.navigate(0, -1, speed);
+					}
+					else if (keys['D'] >> 7)
+					{
+						m_client.navigate(0, 1, speed);
+					}
+				}
+			}
 		}
 
 		void run()
 		{
 			while (m_main_window->isVisible())
 			{
-				m_edit_render_device->getPipeline().setCamera(0, m_server.getCamera(0)); TODO("when universe is loaded, old camera is destroyed, handle this in a normal way");
-				m_game_render_device->getPipeline().setCamera(0, m_server.getCamera(1)); TODO("when universe is loaded, old camera is destroyed, handle this in a normal way");
-				m_main_window->getSceneView()->setPipeline(m_edit_render_device->getPipeline());
-				m_main_window->getGameView()->setPipeline(m_game_render_device->getPipeline());
-				wglMakeCurrent(m_edit_render_device->m_hdc, m_server.getHGLRC());
-				m_server.render(*m_edit_render_device);
-				m_server.renderIcons(*m_edit_render_device);
-				m_server.getGizmo().updateScale(m_server.getCamera(0));
-				m_server.getGizmo().render(m_server.getEngine().getRenderer());
-				m_edit_render_device->endFrame();
-				wglMakeCurrent(m_game_render_device->m_hdc, m_server.getHGLRC());
-				m_server.render(*m_game_render_device);
-				m_game_render_device->endFrame();
+				renderEditView();
+				m_server.getEngine().getRenderer().renderGame();
 				m_server.tick();
-				m_client.processMessages();
-				m_qt_app->processEvents();
-				BYTE keys[256];
-				GetKeyboardState(keys);
-				if (m_main_window->getSceneView()->hasFocus())
-				{
-					 /// TODO refactor
-					if (keys['W'] >> 7)
-					{
-						m_client.navigate(1, 0, 0);
-					}
-					else if (keys['S'] >> 7)
-					{
-						m_client.navigate(-1, 0, 0);
-					}
-					if (keys['A'] >> 7)
-					{
-						m_client.navigate(0, -1, 0);
-					}
-					else if (keys['D'] >> 7)
-					{
-						m_client.navigate(0, 1, 0);
-					}
-				}
+				handleEvents();
 			}
 		}
 
