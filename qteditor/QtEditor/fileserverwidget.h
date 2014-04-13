@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QDockWidget>
+#include "core/file_events_device.h"
 
 namespace Lux
 {
@@ -21,13 +22,14 @@ public:
 	~FileServerWidget();
 	
 	void setEditorServer(Lux::EditorServer& server);
-	void emitFileOpen(const char* path, bool success, qint64 time);
+	void fsEventCb(const Lux::FS::Event& event, int32_t param);
+	void emitFileEvent(const Lux::FS::Event& event, qint64 time);
 
 signals:
-	void fileOpened(const QString& path, bool success, qint64 time);
+	void fileEvent(qint32 event, qint64 handle, const QString& path, qint32 ret, qint32 param, qint64 time);
 
 public slots:
-	void onFileOpen(const QString& path, bool success, qint64 time);
+	void onFileEvent(qint32 event, qint64 handle, const QString& path, qint32 ret, qint32 param, qint64 time);
 
 private slots:
 	void on_pushButton_clicked();
