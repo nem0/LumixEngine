@@ -134,6 +134,12 @@ void FileServerWidget::on_pushButton_clicked()
 void FileServerWidget::on_checkBox_stateChanged(int)
 {
 	ASSERT(m_server);
-// TODO:
-//	m_server->getTCPFileServer().setWatcher(m_ui->checkBox->isChecked() ? m_watcher : NULL);
+	if (m_ui->checkBox->isChecked())
+	{
+		m_server->getEngine().getFileSystem().setDefaultDevice("memory:events:tcp");
+	}
+	else
+	{
+		m_server->getEngine().getFileSystem().setDefaultDevice("memory:tcp");
+	}
 }
