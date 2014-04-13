@@ -19,11 +19,11 @@ namespace Lux
 		{
 		public:
 			TCPFileServerTask() 
-			{
-			}
+			{}
 
 
-			~TCPFileServerTask() {}
+			~TCPFileServerTask() 
+			{}
 
 
 			int task()
