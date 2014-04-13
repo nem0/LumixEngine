@@ -160,6 +160,7 @@
     <ClInclude Include="..\..\..\src\core\disk_file_device.h" />
     <ClInclude Include="..\..\..\src\core\event.h" />
     <ClInclude Include="..\..\..\src\core\event_manager.h" />
+    <ClInclude Include="..\..\..\src\core\fifo_allocator.h" />
     <ClInclude Include="..\..\..\src\core\file_system.h" />
     <ClInclude Include="..\..\..\src\core\free_list.h" />
     <ClInclude Include="..\..\..\src\core\hash_map.h" />
@@ -211,6 +212,7 @@
     <ClCompile Include="..\..\..\src\core\default_allocator.cpp" />
     <ClCompile Include="..\..\..\src\core\disk_file_device.cpp" />
     <ClCompile Include="..\..\..\src\core\event_manager.cpp" />
+    <ClCompile Include="..\..\..\src\core\fifo_allocator.cpp" />
     <ClCompile Include="..\..\..\src\core\file_system.cpp" />
     <ClCompile Include="..\..\..\src\core\json_serializer.cpp" />
     <ClCompile Include="..\..\..\src\core\log.cpp" />
