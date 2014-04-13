@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>400</width>
+    <width>593</width>
     <height>300</height>
    </rect>
   </property>
@@ -48,12 +48,27 @@
       </column>
       <column>
        <property name="text">
+        <string>Event</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>Handle</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
         <string>Filename</string>
        </property>
       </column>
       <column>
        <property name="text">
-        <string>Status</string>
+        <string>Parameter</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>Return</string>
        </property>
       </column>
      </widget>

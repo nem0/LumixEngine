@@ -12,25 +12,34 @@ namespace Lux
 {
 	namespace FS
 	{
-		enum class Event
+		enum class EventType
 		{
 			OPEN_BEGIN = 0,
-			OPEN_END,
+			OPEN_FINISHED,
 			CLOSE_BEGIN,
-			CLOSE_END,
+			CLOSE_FINISHED,
 			READ_BEGIN,
-			READ_END,
+			READ_FINISHED,
 			WRITE_BEGIN,
-			WRITE_END,
+			WRITE_FINISHED,
 			SIZE_BEGIN,
-			SIZE_END,
+			SIZE_FINISHED,
 			SEEK_BEGIN,
-			SEEK_END,
+			SEEK_FINISHED,
 			POS_BEGIN,
-			POS_END
+			POS_FINISHED
 		};
 
-		typedef Delegate<void(Event, const char*, int32_t)>  EventCallback;
+		struct Event
+		{
+			EventType type;
+			uintptr_t handle;
+			const char* path;
+			int32_t ret;
+			int32_t param;
+		};
+
+		typedef Delegate<void(const Event&)>  EventCallback;
 
 		class LUX_CORE_API FileEventsDevice : public IFileDevice
 		{

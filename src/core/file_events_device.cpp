@@ -23,63 +23,139 @@ namespace Lux
 			{
 			}
 
-			virtual bool open(const char* path, Mode mode) LUX_OVERRIDE
+			virtual bool open(const char* path, Mode mode) override
 			{
-				m_cb.invoke(Event::OPEN_BEGIN, path, 0);
+				Event event;
+				event.type = EventType::OPEN_BEGIN;
+				event.handle = uintptr_t(this);
+				event.path = path;
+				event.ret = -1;
+				event.param = -1;
+
+				m_cb.invoke(event);
 				bool ret = m_file.open(path, mode);
-				m_cb.invoke(Event::OPEN_END, path, ret ? 1 : 0);
+
+				event.type = EventType::OPEN_FINISHED;
+				event.ret = ret ? 1 : 0;
+				event.param = -1;
+				m_cb.invoke(event);
 				return ret;
 			}
 
-			virtual void close() LUX_OVERRIDE
+			virtual void close() override
 			{
-				m_cb.invoke(Event::CLOSE_BEGIN, NULL, 0);
+				Event event;
+				event.type = EventType::CLOSE_BEGIN;
+				event.handle = uintptr_t(this);
+				event.path = "";
+				event.ret = -1;
+				event.param = -1;
+
+				m_cb.invoke(event);
 				m_file.close();
-				m_cb.invoke(Event::CLOSE_END, NULL, 0);
+
+				event.type = EventType::CLOSE_FINISHED;
+				m_cb.invoke(event);
 			}
 
-			virtual bool read(void* buffer, size_t size) LUX_OVERRIDE
+			virtual bool read(void* buffer, size_t size) override
 			{
-				m_cb.invoke(Event::READ_BEGIN, NULL, 0);
+				Event event;
+				event.type = EventType::READ_BEGIN;
+				event.handle = uintptr_t(this);
+				event.path = "";
+				event.ret = -1;
+				event.param = size;
+
+				m_cb.invoke(event);
 				bool ret = m_file.read(buffer, size);
-				m_cb.invoke(Event::READ_END, NULL, ret ? 1 : 0);
+
+				event.type = EventType::READ_FINISHED;
+				event.ret = ret ? 1 : 0;
+
+				m_cb.invoke(event);
 				return ret;
 			}
 
-			virtual bool write(const void* buffer, size_t size) LUX_OVERRIDE
+			virtual bool write(const void* buffer, size_t size) override
 			{
-				m_cb.invoke(Event::WRITE_BEGIN, NULL, 0);
+				Event event;
+				event.type = EventType::WRITE_BEGIN;
+				event.handle = uintptr_t(this);
+				event.path = "";
+				event.ret = -1;
+				event.param = size;
+
+				m_cb.invoke(event);
 				bool ret = m_file.write(buffer, size);
-				m_cb.invoke(Event::WRITE_END, NULL, ret ? 1 : 0);
+
+				event.type = EventType::WRITE_FINISHED;
+				event.ret = ret ? 1 : 0;
+
+				m_cb.invoke(event);
 				return ret;
 			}
 
-			virtual const void* getBuffer() const LUX_OVERRIDE
+			virtual const void* getBuffer() const override
 			{
 				return NULL;
 			}
 
-			virtual size_t size() LUX_OVERRIDE
+			virtual size_t size() override
 			{
-				m_cb.invoke(Event::SIZE_BEGIN, NULL, 0);
+				Event event;
+				event.type = EventType::SIZE_BEGIN;
+				event.handle = uintptr_t(this);
+				event.path = "";
+				event.ret = -1;
+				event.param = -1;
+
+				m_cb.invoke(event);
 				size_t ret = m_file.size();
-				m_cb.invoke(Event::SIZE_END, NULL, ret);
+
+				event.type = EventType::SIZE_FINISHED;
+				event.ret = ret;
+
+				m_cb.invoke(event);
 				return ret;
 			}
 
-			virtual size_t seek(SeekMode base, size_t pos) LUX_OVERRIDE
+			virtual size_t seek(SeekMode base, size_t pos) override
 			{
-				m_cb.invoke(Event::SEEK_BEGIN, NULL, 0);
+				Event event;
+				event.type = EventType::SEEK_BEGIN;
+				event.handle = uintptr_t(this);
+				event.path = "";
+				event.ret = pos;
+				event.param = base;
+
+				m_cb.invoke(event);
 				size_t ret = m_file.seek(base, pos);
-				m_cb.invoke(Event::SEEK_END, NULL, ret);
+
+
+				event.type = EventType::SEEK_FINISHED;
+				event.ret = ret;
+
+				m_cb.invoke(event);
 				return ret;
 			}
 
-			virtual size_t pos() LUX_OVERRIDE
+			virtual size_t pos() override
 			{
-				m_cb.invoke(Event::POS_BEGIN, NULL, 0);
+				Event event;
+				event.type = EventType::POS_BEGIN;
+				event.handle = uintptr_t(this);
+				event.path = "";
+				event.ret = -1;
+				event.param = -1;
+
+				m_cb.invoke(event);
 				size_t ret = m_file.pos();
-				m_cb.invoke(Event::POS_END, NULL, ret);
+
+				event.type = EventType::POS_FINISHED;
+				event.ret = ret;
+
+				m_cb.invoke(event);
 				return ret;
 			}
 
