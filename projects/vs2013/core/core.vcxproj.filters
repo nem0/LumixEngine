@@ -96,6 +96,7 @@
     <ClInclude Include="..\..\..\src\core\path.h" />
     <ClInclude Include="..\..\..\src\core\path_utils.h" />
     <ClInclude Include="..\..\..\src\core\resource.h" />
+    <ClInclude Include="..\..\..\src\core\fifo_allocator.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\core\blob.cpp" />
@@ -159,6 +160,7 @@
     <ClCompile Include="..\..\..\src\core\resource_manager_base.cpp" />
     <ClCompile Include="..\..\..\src\core\path.cpp" />
     <ClCompile Include="..\..\..\src\core\resource.cpp" />
+    <ClCompile Include="..\..\..\src\core\fifo_allocator.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="FS">
