@@ -274,6 +274,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	PipelineInstanceImpl(Pipeline& pipeline)
 		: m_source(static_cast<PipelineImpl&>(pipeline))
 	{
+		m_width = m_height = -1;
 		m_shadowmap_framebuffer = NULL;
 		if(pipeline.isReady())
 		{
@@ -489,6 +490,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	virtual void resize(int w, int h) override
 	{
+		m_width = w;
+		m_height = h;
 		ASSERT(m_renderer != NULL);
 		for (int i = 0; i < m_cameras.size(); ++i)
 		{
@@ -499,6 +502,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	virtual void addCamera(const Component& camera) override
 	{
 		int priority;
+		m_renderer->setCameraSize(camera, m_width, m_height);
 		m_renderer->getCameraPriority(camera, priority);
 		if (m_cameras.empty())
 		{
@@ -557,6 +561,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 	Matrix m_shadow_modelviewprojection;
 	Array<Component> m_cameras;
 	Renderer* m_renderer;
+	int m_width;
+	int m_height;
 
 	private:
 		void operator=(const PipelineInstanceImpl&);
