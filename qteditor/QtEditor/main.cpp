@@ -75,7 +75,8 @@ class App
 
 			HWND hwnd = (HWND)m_main_window->getSceneView()->widget()->winId();
 			HWND game_hwnd = (HWND)m_main_window->getGameView()->getContentWidget()->winId();
-			m_server.create(hwnd, game_hwnd, QDir::currentPath().toLocal8Bit().data());
+			bool server_created = m_server.create(hwnd, game_hwnd, QDir::currentPath().toLocal8Bit().data());
+			ASSERT(server_created);
 			m_server.tick();
 			m_client.create(m_server.getEngine().getBasePath());
 

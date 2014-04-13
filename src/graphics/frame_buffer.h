@@ -1,9 +1,7 @@
 #pragma once
 
 
-#include <Windows.h>
-#include <gl/GL.h>
-#include "shader.h"
+#include "graphics/gl_ext.h"
 
 
 namespace Lux

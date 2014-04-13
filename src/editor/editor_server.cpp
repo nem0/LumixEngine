@@ -1,9 +1,8 @@
 #include "editor_server.h"
 
 #include <gl/GL.h>
-#include <shellapi.h>
-#include <Windows.h>
 
+#include "core/array.h"
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/file_system.h"
@@ -12,13 +11,16 @@
 #include "core/tcp_file_device.h"
 #include "core/tcp_file_server.h"
 #include "core/ifile.h"
+#include "core/input_system.h"
 #include "core/json_serializer.h"
 #include "core/log.h"
 #include "core/map.h"
 #include "core/matrix.h"
 #include "core/memory_file_device.h"
-#include "core/array.h"
-#include "core/array.h"
+#include "core/mutex.h"
+#include "core/task.h"
+#include "core/tcp_acceptor.h"
+#include "core/tcp_stream.h"
 #include "editor/editor_icon.h"
 #include "editor/gizmo.h"
 #include "editor/property_descriptor.h"
@@ -29,11 +31,6 @@
 #include "graphics/model.h"
 #include "graphics/pipeline.h"
 #include "graphics/renderer.h"
-#include "core/input_system.h"
-#include "core/mutex.h"
-#include "core/task.h"
-#include "core/tcp_acceptor.h"
-#include "core/tcp_stream.h"
 #include "script/script_system.h"
 #include "universe/component_event.h"
 #include "universe/entity_destroyed_event.h"
