@@ -48,8 +48,7 @@ namespace Lux
 
 	int ReceiveTask::task()
 	{
-		Array<uint8_t> data;
-		data.resize(8);
+		uint8_t data[8];
 		while(!m_finished)
 		{
 			if(m_client->m_stream->read(&data[0], 8))
@@ -59,9 +58,11 @@ namespace Lux
 				ASSERT(guard == 0x12345678);
 				if(length > 0)
 				{
-					data.resize(length);
-					/// TODO "stack" allocator
-					uint8_t* msg = (uint8_t*)m_allocator.allocate(length + 4);
+					uint8_t* msg = NULL;
+					while (msg == NULL)
+					{
+						msg = (uint8_t*)m_allocator.allocate(length + 4);
+					}
 					m_client->m_stream->read(msg + 4, length);
 					((int32_t*)msg)[0] = length;
 					{
