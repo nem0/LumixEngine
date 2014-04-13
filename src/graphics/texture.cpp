@@ -153,13 +153,13 @@ namespace DDS
 	}
 
 	static LoadInfo loadInfoDXT1 = {
-		true, false, false, 4, 8, GL_COMPRESSED_RGBA_S3TC_DXT1
+		true, false, false, 4, 8, GL_COMPRESSED_RGBA_S3TC_DXT1_EXT
 	};
 	static LoadInfo loadInfoDXT3 = {
-		true, false, false, 4, 16, GL_COMPRESSED_RGBA_S3TC_DXT3
+		true, false, false, 4, 16, GL_COMPRESSED_RGBA_S3TC_DXT3_EXT
 	};
 	static LoadInfo loadInfoDXT5 = {
-		true, false, false, 4, 16, GL_COMPRESSED_RGBA_S3TC_DXT5
+		true, false, false, 4, 16, GL_COMPRESSED_RGBA_S3TC_DXT5_EXT
 	};
 	static LoadInfo loadInfoBGRA8 = {
 		false, false, false, 1, 4, GL_RGBA8, GL_BGRA, GL_UNSIGNED_BYTE

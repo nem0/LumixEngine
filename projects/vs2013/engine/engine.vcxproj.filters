@@ -33,9 +33,6 @@
     <ClCompile Include="..\..\..\src\graphics\geometry.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\graphics\gl_ext.cpp">
-      <Filter>graphics</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\graphics\material.cpp">
       <Filter>graphics</Filter>
     </ClCompile>

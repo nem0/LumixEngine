@@ -9,7 +9,6 @@
 #include "graphics/pipeline.h"
 #include "graphics/renderer.h"
 
-#include <Windows.h>
 #include <gl/GL.h>
 
 namespace Lux

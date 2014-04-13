@@ -1,7 +1,4 @@
 #include "graphics/renderer.h"
-#include <Windows.h>
-#include <gl/GL.h>
-#include <gl/GLU.h>
 #include "core/array.h"
 #include "core/crc32.h"
 #include "core/file_system.h"
@@ -250,8 +247,7 @@ struct RendererImpl : public Renderer
 	virtual bool create(Engine& engine) override
 	{
 		m_engine = &engine;
-		loadGLExtensions();
-		return true;
+		return glewInit() == GLEW_OK;
 	}
 
 

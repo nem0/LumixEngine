@@ -1,7 +1,5 @@
 #include "graphics/pipeline.h"
-#include <Windows.h>
-#include <gl/GL.h>
-#include <gl/GLU.h>
+#include "graphics/gl_ext.h"
 #include "core/array.h"
 #include "core/crc32.h"
 #include "core/file_system.h"
