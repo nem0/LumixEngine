@@ -106,17 +106,11 @@ void Animation::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		}
 		file->read(&m_frame_count, sizeof(m_frame_count));
 		file->read(&m_bone_count, sizeof(m_bone_count));
+
 		m_positions = LUX_NEW_ARRAY(Vec3, m_frame_count * m_bone_count);
 		m_rotations = LUX_NEW_ARRAY(Quat, m_frame_count * m_bone_count);
-		for (int i = 0; i < m_frame_count; ++i)
-		{
-			for (int j = 0; j < m_bone_count; ++j)
-			{
-				TODO("positions(rotations) in a row");
-				file->read(&m_positions[i * m_bone_count + j], sizeof(Vec3));
-				file->read(&m_rotations[i * m_bone_count + j], sizeof(Quat));
-			}
-		}
+		file->read(&m_positions[0], sizeof(Vec3)* m_bone_count * m_frame_count);
+		file->read(&m_rotations[0], sizeof(Quat)* m_bone_count * m_frame_count);
 
 		m_size = file->size();
 		onReady();
