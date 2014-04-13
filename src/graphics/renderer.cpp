@@ -100,7 +100,10 @@ struct RendererImpl : public Renderer
 		ASSERT(m_render_device);
 		m_cameras[camera.index]->m_priority = priority;
 		m_render_device->getPipeline().removeCamera(camera);
-		m_render_device->getPipeline().addCamera(camera);
+		if (priority >= 0)
+		{
+			m_render_device->getPipeline().addCamera(camera);
+		}
 	}
 
 
@@ -392,7 +395,7 @@ struct RendererImpl : public Renderer
 				float radius = m_renderables[i].m_model->getModel().getBoundingRadius();
 				float scale = m_renderables[i].m_scale;
 				Vec3 intersection;
-				if(Math::getRaySphereIntersection(pos, radius * scale, origin, dir, intersection))
+				if(dotProduct(pos - origin, pos - origin) < radius * radius || Math::getRaySphereIntersection(pos, radius * scale, origin, dir, intersection))
 				{
 					RayCastModelHit new_hit = m_renderables[i].m_model->getModel().castRay(origin, dir, m_renderables[i].m_model->getMatrix(), scale);
 					if(new_hit.m_is_hit && (!hit.m_is_hit || new_hit.m_t < hit.m_t))
@@ -525,6 +528,7 @@ struct RendererImpl : public Renderer
 
 	virtual void deserialize(ISerializer& serializer) override
 	{
+		ASSERT(m_render_device);
 		clearScene();
 		int size;
 		serializer.deserialize("camera_count", size);
@@ -544,6 +548,11 @@ struct RendererImpl : public Renderer
 			serializer.deserializeArrayItem(m_cameras[i]->m_priority);
 			ComponentEvent evt(Component(m_cameras[i]->m_entity, camera_hash, this, i));
 			m_universe->getEventManager()->emitEvent(evt);
+			if (m_cameras.back()->m_priority >= 0)
+			{
+				Component cmp(m_cameras.back()->m_entity, camera_hash, this, m_cameras.size() - 1);
+				m_render_device->getPipeline().addCamera(cmp);
+			}
 		}
 		serializer.deserializeArrayEnd();
 		serializer.deserialize("renderable_count", size);
