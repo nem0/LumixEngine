@@ -18,6 +18,9 @@
     <ClCompile Include="..\..\..\src\unit_tests\suite\unit_test_manager.cpp">
       <Filter>suite</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_file_system.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\unit_tests\suite\unit_test.h">

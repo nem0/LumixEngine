@@ -3,12 +3,12 @@
 #include <Windows.h>
 
 #include "animation/animation_system.h"
-#include "core/disk_file_device.h"
-#include "core/file_system.h"
+#include "core/fs/disk_file_device.h"
+#include "core/fs/file_system.h"
 #include "core/input_system.h"
 #include "core/log.h"
 #include "core/event_manager.h"
-#include "core/memory_file_device.h"
+#include "core/fs/memory_file_device.h"
 #include "core/resource_manager.h"
 #include "core/timer.h"
 #include "engine/plugin_manager.h"

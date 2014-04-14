@@ -2,8 +2,8 @@
 #include <Windows.h>
 #include <cstdio>
 #include "core/crc32.h"
-#include "core/file_system.h"
-#include "core/ifile.h"
+#include "core/fs/file_system.h"
+#include "core/fs/ifile.h"
 #include "core/json_serializer.h"
 #include "core/log.h"
 #include "core/array.h"

@@ -4,7 +4,7 @@
 #include <gl/GLU.h>
 #include "core/array.h"
 #include "core/crc32.h"
-#include "core/file_system.h"
+#include "core/fs/file_system.h"
 #include "core/json_serializer.h"
 #include "core/math_utils.h"
 #include "core/array.h"

@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>400</width>
+    <width>593</width>
     <height>300</height>
    </rect>
   </property>
@@ -45,6 +45,19 @@
        <property name="text">
         <string>Time</string>
        </property>
+       <property name="toolTip">
+        <string extracomment="Time since start of the application (ms)"/>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>Event</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>Handle</string>
+       </property>
       </column>
       <column>
        <property name="text">
@@ -53,7 +66,12 @@
       </column>
       <column>
        <property name="text">
-        <string>Status</string>
+        <string>Parameter</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>Return</string>
        </property>
       </column>
      </widget>
@@ -84,6 +102,19 @@
         <widget class="QCheckBox" name="checkBox">
          <property name="text">
           <string>Enabled</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="filter"/>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="filterCB">
+         <property name="text">
+          <string>Filter</string>
          </property>
          <property name="checked">
           <bool>true</bool>
