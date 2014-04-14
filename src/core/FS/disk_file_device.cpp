@@ -1,8 +1,8 @@
-#include "core/disk_file_device.h"
+#include "core/fs/disk_file_device.h"
 
-#include "core/file_system.h"
-#include "core/ifile.h"
-#include "core/ifile_system_defines.h"
+#include "core/fs/file_system.h"
+#include "core/fs/ifile.h"
+#include "core/fs/ifile_system_defines.h"
 #include "core/os_file.h"
 
 

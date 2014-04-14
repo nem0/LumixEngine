@@ -1,6 +1,6 @@
 #include "graphics/shader.h"
-#include "core/file_system.h"
-#include "core/ifile.h"
+#include "core/fs/file_system.h"
+#include "core/fs/ifile.h"
 #include "core/matrix.h"
 #include "core/vec3.h"
 #include "graphics/gl_ext.h"

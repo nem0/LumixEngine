@@ -1,4 +1,4 @@
-#include "core/tcp_file_server.h"
+#include "core/fs/tcp_file_server.h"
 
 #include "core/array.h"
 #include "core/free_list.h"
@@ -6,7 +6,7 @@
 #include "core/path.h"
 #include "core/static_array.h"
 #include "core/string.h"
-#include "core/tcp_file_device.h"
+#include "core/fs/tcp_file_device.h"
 #include "core/task.h"
 #include "core/tcp_acceptor.h"
 #include "core/tcp_stream.h"
@@ -19,16 +19,12 @@ namespace Lux
 		{
 		public:
 			TCPFileServerTask() 
-			{
-				m_watcher = NULL;
-			}
+			{}
 
-			~TCPFileServerTask() {}
 
-			void setWatcher(TCPFileServer::IWatcher* watcher)
-			{
-				m_watcher = watcher;
-			}
+			~TCPFileServerTask() 
+			{}
+
 
 			int task()
 			{
@@ -67,10 +63,6 @@ namespace Lux
 									path = m_buffer.data();
 								}
 								ret = file->open(path.c_str(), mode) ? id : -1;
-								if (m_watcher)
-								{
-									m_watcher->onFileOpen(path.c_str(), ret >= 0);
-								}
 							}
 							stream->write(ret);
 						}
@@ -178,7 +170,10 @@ namespace Lux
 				return 0;
 			}
 
+
 			void stop() {} // TODO: implement stop 
+
+
 			void setBasePath(const char* base_path) 
 			{
 				string base_path_str(base_path);
@@ -188,6 +183,7 @@ namespace Lux
 				}
 				m_base_path = base_path_str;
 			}
+
 
 			const char* getBasePath() const
 			{
@@ -200,23 +196,26 @@ namespace Lux
 			StaticArray<OsFile*, 0x50000> m_files;
 			FreeList<int32_t, 0x50000>	m_ids;
 			Path m_base_path;
-			TCPFileServer::IWatcher* m_watcher;
 		};
+
 
 		struct TCPFileServerImpl
 		{
 			TCPFileServerTask m_task;
 		};
 
+
 		TCPFileServer::TCPFileServer()
 		{
 			m_impl = NULL;
 		}
 
+
 		TCPFileServer::~TCPFileServer()
 		{
 			LUX_DELETE(m_impl);
 		}
+
 
 		void TCPFileServer::start(const char* base_path)
 		{
@@ -226,18 +225,13 @@ namespace Lux
 			m_impl->m_task.run();
 		}
 
+
 		void TCPFileServer::stop()
 		{
 			m_impl->m_task.stop();
 			m_impl->m_task.destroy();
 			LUX_DELETE(m_impl);
 			m_impl = NULL;
-		}
-
-		void TCPFileServer::setWatcher(IWatcher* watcher)
-		{
-			ASSERT(m_impl);
-			m_impl->m_task.setWatcher(watcher);
 		}
 
 		const char* TCPFileServer::getBasePath() const
