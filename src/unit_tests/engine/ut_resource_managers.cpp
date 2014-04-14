@@ -1,8 +1,8 @@
 #include "unit_tests/suite/lux_unit_tests.h"
 
-#include "core/file_system.h"
-#include "core/memory_file_device.h"
-#include "core/disk_file_device.h"
+#include "core/fs/file_system.h"
+#include "core/fs/memory_file_device.h"
+#include "core/fs/disk_file_device.h"
 
 #include "core/resource_manager.h"
 #include "core/resource.h"

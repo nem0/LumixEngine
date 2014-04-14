@@ -4,7 +4,7 @@
 #ifdef FILE_EVENT_DEVICE
 
 #include "core/lux.h"
-#include "core/ifile_device.h"
+#include "core/fs/ifile_device.h"
 
 #include "core/delegate.h"
 
@@ -37,13 +37,13 @@ namespace Lux
 			const char* path;
 			int32_t ret;
 			int32_t param;
-		};
-
-		typedef Delegate<void(const Event&)>  EventCallback;
+		};	
 
 		class LUX_CORE_API FileEventsDevice : public IFileDevice
 		{
 		public:
+			typedef Delegate<void(const Event&)>  EventCallback;
+
 			EventCallback OnEvent;
 
 			virtual IFile* createFile(IFile* child) override;

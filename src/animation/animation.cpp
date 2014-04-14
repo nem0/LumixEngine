@@ -1,6 +1,6 @@
 #include "animation/animation.h"
-#include "core/file_system.h"
-#include "core/ifile.h"
+#include "core/fs/file_system.h"
+#include "core/fs/ifile.h"
 #include "core/log.h"
 #include "core/quat.h"
 #include "core/vec3.h"

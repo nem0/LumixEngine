@@ -1,8 +1,8 @@
-#include "core/file_events_device.h"
+#include "core/fs/file_events_device.h"
 
-#include "core/file_system.h"
-#include "core/ifile.h"
-#include "core/ifile_system_defines.h"
+#include "core/fs/file_system.h"
+#include "core/fs/ifile.h"
+#include "core/fs/ifile_system_defines.h"
 
 #ifdef FILE_EVENT_DEVICE
 
@@ -13,7 +13,7 @@ namespace Lux
 		class EventsFile : public IFile
 		{
 		public:
-			EventsFile(IFile& file, EventCallback& cb)
+			EventsFile(IFile& file, FileEventsDevice::EventCallback& cb)
 				: m_file(file)
 				, m_cb(cb)
 			{
@@ -115,7 +115,7 @@ namespace Lux
 
 
 			IFile& m_file;
-			EventCallback& m_cb;
+			FileEventsDevice::EventCallback& m_cb;
 		};
 
 

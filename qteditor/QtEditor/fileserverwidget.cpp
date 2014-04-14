@@ -2,27 +2,31 @@
 #include "ui_fileserverwidget.h"
 #include <QElapsedTimer>
 #include "engine/engine.h"
-#include "core/file_system.h"
-#include "core/tcp_file_server.h"
-#include "core/file_events_device.h"
+#include "core/fs/file_system.h"
+#include "core/fs/tcp_file_server.h"
+#include "core/fs/file_events_device.h"
 #include "editor/editor_server.h"
 
-const QString eventNames[] = {
-			"OPEN_BEGIN",
-			"OPEN_FINISHED",
-			"CLOSE_BEGIN",
-			"CLOSE_FINISHED",
-			"READ_BEGIN",
-			"READ_FINISHED",
-			"WRITE_BEGIN",
-			"WRITE_FINISHED",
-			"SIZE_BEGIN",
-			"SIZE_FINISHED",
-			"SEEK_BEGIN",
-			"SEEK_FINISHED",
-			"POS_BEGIN",
-			"POS_FINISHED"
-};
+namespace
+{
+	const QString eventNames[] = 
+	{
+		"Started Opening",
+		"Finished Opening",
+		"Started Closing",
+		"Finished Closing",
+		"Started Reading",
+		"Finished Reading",
+		"Started Writing",
+		"Finished Writing",
+		"Started Getting Size",
+		"Finished Getting Size",
+		"Started Seeking",
+		"Finished Seeking",
+		"Started Getting Position",
+		"Finished Getting Position"
+	};
+}
 
 
 class FileServerWatcher
@@ -51,6 +55,7 @@ private:
 		FileServerWidget& m_widget;
 };
 
+
 FileServerWidget::FileServerWidget(QWidget* parent) 
 	: QDockWidget(parent)
 	, m_ui(new Ui::FileServerWidget)
@@ -63,12 +68,12 @@ FileServerWidget::FileServerWidget(QWidget* parent)
 	connect(this, SIGNAL(fileEvent(qint32, qint64, const QString&, qint32, qint32, qint64)), this, SLOT(onFileEvent(qint32, qint64, const QString&, qint32, qint32, qint64)));
 }
 
+
 FileServerWidget::~FileServerWidget()
 {
 	delete m_ui;
 	delete m_watcher;
 }
-
 
 
 void FileServerWidget::onFileEvent(qint32 event, qint64 handle, const QString& path, qint32 ret, qint32 param, qint64 time)
@@ -81,7 +86,7 @@ void FileServerWidget::onFileEvent(qint32 event, qint64 handle, const QString& p
 	QTableWidgetItem* new_item = new QTableWidgetItem(QString::number(double(time / 1000000.0)));
 	m_ui->tableWidget->setItem(row, 0, new_item);
 
-	QTableWidgetItem* event_item = new QTableWidgetItem(eventNames[qint32(event)]);
+	QTableWidgetItem* event_item = new QTableWidgetItem(eventNames[event]);
 	m_ui->tableWidget->setItem(row, 1, event_item);
 
 	QTableWidgetItem* handle_item = new QTableWidgetItem(QString::number(handle));
@@ -104,6 +109,8 @@ void FileServerWidget::onFileEvent(qint32 event, qint64 handle, const QString& p
 
 	QTableWidgetItem* return_item = new QTableWidgetItem(QString::number(ret));
 	m_ui->tableWidget->setItem(row, 5, return_item);
+
+	filterRow(row);
 }
 
 
@@ -123,6 +130,7 @@ void FileServerWidget::setEditorServer(Lux::EditorServer& server)
 	fs.setDefaultDevice("memory:events:tcp");
 }
 
+
 void FileServerWidget::on_pushButton_clicked()
 {
 	while (m_ui->tableWidget->rowCount() > 0)
@@ -130,6 +138,19 @@ void FileServerWidget::on_pushButton_clicked()
 		m_ui->tableWidget->removeRow(0);
 	}
 }
+
+
+void FileServerWidget::on_filterCB_clicked()
+{
+	filterTable();
+}
+
+
+void FileServerWidget::on_filter_returnPressed()
+{
+    filterTable();
+}
+
 
 void FileServerWidget::on_checkBox_stateChanged(int)
 {
@@ -141,5 +162,36 @@ void FileServerWidget::on_checkBox_stateChanged(int)
 	else
 	{
 		m_server->getEngine().getFileSystem().setDefaultDevice("memory:tcp");
+	}
+}
+
+
+void FileServerWidget::filterRow(int row)
+{
+	QString filter = m_ui->filter->text();
+
+	bool match = false;
+	for (int j = 0, c = m_ui->tableWidget->columnCount(); j < c; ++j)
+	{
+		QTableWidgetItem* item = m_ui->tableWidget->item(row, j);
+		match |= item->text().contains(filter) ? true : false;
+	}
+
+	m_ui->tableWidget->setRowHidden(row, !match);
+}
+
+
+void FileServerWidget::filterTable()
+{
+	for (int i = 0, c = m_ui->tableWidget->rowCount(); i < c; ++i)
+	{
+		if (m_ui->filterCB->isChecked())
+		{
+			filterRow(i);
+		}
+		else
+		{
+			m_ui->tableWidget->setRowHidden(i, false);
+		}
 	}
 }
