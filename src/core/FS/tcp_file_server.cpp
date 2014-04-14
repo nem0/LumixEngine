@@ -1,4 +1,4 @@
-#include "core/tcp_file_server.h"
+#include "core/fs/tcp_file_server.h"
 
 #include "core/array.h"
 #include "core/free_list.h"
@@ -6,7 +6,7 @@
 #include "core/path.h"
 #include "core/static_array.h"
 #include "core/string.h"
-#include "core/tcp_file_device.h"
+#include "core/fs/tcp_file_device.h"
 #include "core/task.h"
 #include "core/tcp_acceptor.h"
 #include "core/tcp_stream.h"

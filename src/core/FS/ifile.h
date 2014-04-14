@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/ifile_system_defines.h"
+#include "core/fs/ifile_system_defines.h"
 #include "core/lux.h"
 
 namespace Lux

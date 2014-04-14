@@ -17,6 +17,7 @@
 #include <QtWidgets/QDockWidget>
 #include <QtWidgets/QHBoxLayout>
 #include <QtWidgets/QHeaderView>
+#include <QtWidgets/QLineEdit>
 #include <QtWidgets/QPushButton>
 #include <QtWidgets/QSpacerItem>
 #include <QtWidgets/QTableWidget>
@@ -35,6 +36,8 @@ public:
     QHBoxLayout *horizontalLayout;
     QPushButton *pushButton;
     QCheckBox *checkBox;
+    QLineEdit *filter;
+    QCheckBox *filterCB;
     QSpacerItem *horizontalSpacer;
 
     void setupUi(QDockWidget *FileServerWidget)
@@ -86,6 +89,17 @@ public:
 
         horizontalLayout->addWidget(checkBox);
 
+        filter = new QLineEdit(widget);
+        filter->setObjectName(QStringLiteral("filter"));
+
+        horizontalLayout->addWidget(filter);
+
+        filterCB = new QCheckBox(widget);
+        filterCB->setObjectName(QStringLiteral("filterCB"));
+        filterCB->setChecked(true);
+
+        horizontalLayout->addWidget(filterCB);
+
         horizontalSpacer = new QSpacerItem(245, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
 
         horizontalLayout->addItem(horizontalSpacer);
@@ -117,6 +131,7 @@ public:
         ___qtablewidgetitem5->setText(QApplication::translate("FileServerWidget", "Return", 0));
         pushButton->setText(QApplication::translate("FileServerWidget", "Clear", 0));
         checkBox->setText(QApplication::translate("FileServerWidget", "Enabled", 0));
+        filterCB->setText(QApplication::translate("FileServerWidget", "Filter", 0));
     } // retranslateUi
 
 };
