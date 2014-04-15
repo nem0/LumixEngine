@@ -17,7 +17,6 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
-    <PlatformToolSet>v110</PlatformToolSet>
     <OutputDirectory>..\..\bin\Win32_Debug\</OutputDirectory>
     <ATLMinimizesCRunTimeLibraryUsage>false</ATLMinimizesCRunTimeLibraryUsage>
     <CharacterSet>NotSet</CharacterSet>
@@ -26,13 +25,13 @@
     <PrimaryOutput>QtEditor</PrimaryOutput>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
-    <PlatformToolSet>v110</PlatformToolSet>
     <OutputDirectory>..\..\bin\Win32_Debug\</OutputDirectory>
     <ATLMinimizesCRunTimeLibraryUsage>false</ATLMinimizesCRunTimeLibraryUsage>
     <CharacterSet>NotSet</CharacterSet>
     <ConfigurationType>Application</ConfigurationType>
     <IntermediateDirectory>debug\</IntermediateDirectory>
     <PrimaryOutput>QtEditor</PrimaryOutput>
+    <PlatformToolset>v110</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings" />
@@ -56,11 +55,10 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
-      <AdditionalIncludeDirectories>"..\..\src";"..\..\..\..\Qt\5.2.1\msvc2012\include";"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets";"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui";"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE";"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore";"release";".";..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>"..\..\src";"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include";"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtWidgets";"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtGui";"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtANGLE";"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtCore";"release";".";..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\mkspecs\win32-msvc2012;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>-Zm200 -w34100 -w34189 %(AdditionalOptions)</AdditionalOptions>
       <AssemblerListingLocation>release\</AssemblerListingLocation>
       <BrowseInformation>false</BrowseInformation>
-      <DebugInformationFormat>None</DebugInformationFormat>
       <ExceptionHandling>Sync</ExceptionHandling>
       <ObjectFileName>release\</ObjectFileName>
       <Optimization>MaxSpeed</Optimization>
@@ -73,8 +71,8 @@
       <WarningLevel>Level3</WarningLevel>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>qtmain.lib;..\..\bin\Win32_Debug\core.lib;..\..\bin\Win32_Debug\engine.lib;opengl32.lib;F:\Qt\5.2.1\msvc2012\lib\Qt5Widgets.lib;F:\Qt\5.2.1\msvc2012\lib\Qt5Gui.lib;F:\Qt\5.2.1\msvc2012\lib\Qt5Core.lib;libEGL.lib;libGLESv2.lib;gdi32.lib;user32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>..\..\bin\Win32_Debug;F:\Qt\5.2.1\msvc2012\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>qtmain.lib;..\..\bin\Win32_Debug\core.lib;..\..\bin\Win32_Debug\engine.lib;opengl32.lib;D:\Qt\Qt5.2.1\5.2.1\msvc2012\lib\Qt5Widgets.lib;D:\Qt\Qt5.2.1\5.2.1\msvc2012\lib\Qt5Gui.lib;D:\Qt\Qt5.2.1\5.2.1\msvc2012\lib\Qt5Core.lib;libEGL.lib;libGLESv2.lib;gdi32.lib;user32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\..\bin\Win32_Debug;D:\Qt\Qt5.2.1\5.2.1\msvc2012\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalOptions>"/MANIFESTDEPENDENCY:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' publicKeyToken='6595b64144ccf1df' language='*' processorArchitecture='*'" %(AdditionalOptions)</AdditionalOptions>
       <DataExecutionPrevention>true</DataExecutionPrevention>
       <GenerateDebugInformation>false</GenerateDebugInformation>
@@ -96,7 +94,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
-      <AdditionalIncludeDirectories>"..\..\src";"..\..\..\..\Qt\5.2.1\msvc2012\include";"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets";"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui";"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE";"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore";"debug";".";..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>"..\..\src";"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include";"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtWidgets";"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtGui";"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtANGLE";"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtCore";"debug";".";..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\mkspecs\win32-msvc2012;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>-Zm200 -w34100 -w34189 %(AdditionalOptions)</AdditionalOptions>
       <AssemblerListingLocation>debug\</AssemblerListingLocation>
       <BrowseInformation>false</BrowseInformation>
@@ -113,8 +111,8 @@
       <WarningLevel>Level3</WarningLevel>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>qtmaind.lib;..\..\bin\Win32_Debug\core.lib;..\..\bin\Win32_Debug\engine.lib;opengl32.lib;F:\Qt\5.2.1\msvc2012\lib\Qt5Widgetsd.lib;F:\Qt\5.2.1\msvc2012\lib\Qt5Guid.lib;F:\Qt\5.2.1\msvc2012\lib\Qt5Cored.lib;libEGLd.lib;libGLESv2d.lib;gdi32.lib;user32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>..\..\bin\Win32_Debug;F:\Qt\5.2.1\msvc2012\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>qtmaind.lib;..\..\bin\Win32_Debug\core.lib;..\..\bin\Win32_Debug\engine.lib;opengl32.lib;D:\Qt\Qt5.2.1\5.2.1\msvc2012\lib\Qt5Widgetsd.lib;D:\Qt\Qt5.2.1\5.2.1\msvc2012\lib\Qt5Guid.lib;D:\Qt\Qt5.2.1\5.2.1\msvc2012\lib\Qt5Cored.lib;libEGLd.lib;libGLESv2d.lib;gdi32.lib;user32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\..\bin\Win32_Debug;D:\Qt\Qt5.2.1\5.2.1\msvc2012\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalOptions>"/MANIFESTDEPENDENCY:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' publicKeyToken='6595b64144ccf1df' language='*' processorArchitecture='*'" %(AdditionalOptions)</AdditionalOptions>
       <DataExecutionPrevention>true</DataExecutionPrevention>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -181,11 +179,11 @@
   <ItemGroup>
     <CustomBuild Include="propertywidgets\animable_widget.h">
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">propertywidgets\animable_widget.h;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"release" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 propertywidgets\animable_widget.h -o release\moc_animable_widget.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtCore" -I"release" -I"." -I..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\mkspecs\win32-msvc2012 propertywidgets\animable_widget.h -o release\moc_animable_widget.cpp</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">MOC propertywidgets\animable_widget.h</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">release\moc_animable_widget.cpp;%(Outputs)</Outputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">propertywidgets\animable_widget.h;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"debug" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 propertywidgets\animable_widget.h -o debug\moc_animable_widget.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtCore" -I"debug" -I"." -I..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\mkspecs\win32-msvc2012 propertywidgets\animable_widget.h -o debug\moc_animable_widget.cpp</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">MOC propertywidgets\animable_widget.h</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">debug\moc_animable_widget.cpp;%(Outputs)</Outputs>
     </CustomBuild>
@@ -193,11 +191,11 @@
   <ItemGroup>
     <CustomBuild Include="propertywidgets\camerawidget.h">
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">propertywidgets\camerawidget.h;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"release" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 propertywidgets\camerawidget.h -o release\moc_camerawidget.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtCore" -I"release" -I"." -I..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\mkspecs\win32-msvc2012 propertywidgets\camerawidget.h -o release\moc_camerawidget.cpp</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">MOC propertywidgets\camerawidget.h</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">release\moc_camerawidget.cpp;%(Outputs)</Outputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">propertywidgets\camerawidget.h;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"debug" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 propertywidgets\camerawidget.h -o debug\moc_camerawidget.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtCore" -I"debug" -I"." -I..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\mkspecs\win32-msvc2012 propertywidgets\camerawidget.h -o debug\moc_camerawidget.cpp</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">MOC propertywidgets\camerawidget.h</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">debug\moc_camerawidget.cpp;%(Outputs)</Outputs>
     </CustomBuild>
@@ -205,11 +203,11 @@
   <ItemGroup>
     <CustomBuild Include="propertywidgets\renderable_widget.h">
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">propertywidgets\renderable_widget.h;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"release" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 propertywidgets\renderable_widget.h -o release\moc_renderable_widget.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtCore" -I"release" -I"." -I..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\mkspecs\win32-msvc2012 propertywidgets\renderable_widget.h -o release\moc_renderable_widget.cpp</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">MOC propertywidgets\renderable_widget.h</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">release\moc_renderable_widget.cpp;%(Outputs)</Outputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">propertywidgets\renderable_widget.h;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"debug" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 propertywidgets\renderable_widget.h -o debug\moc_renderable_widget.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtCore" -I"debug" -I"." -I..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\mkspecs\win32-msvc2012 propertywidgets\renderable_widget.h -o debug\moc_renderable_widget.cpp</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">MOC propertywidgets\renderable_widget.h</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">debug\moc_renderable_widget.cpp;%(Outputs)</Outputs>
     </CustomBuild>
@@ -217,11 +215,11 @@
   <ItemGroup>
     <CustomBuild Include="propertywidgets\script_widget.h">
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">propertywidgets\script_widget.h;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"release" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 propertywidgets\script_widget.h -o release\moc_script_widget.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtCore" -I"release" -I"." -I..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\mkspecs\win32-msvc2012 propertywidgets\script_widget.h -o release\moc_script_widget.cpp</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">MOC propertywidgets\script_widget.h</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">release\moc_script_widget.cpp;%(Outputs)</Outputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">propertywidgets\script_widget.h;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"debug" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 propertywidgets\script_widget.h -o debug\moc_script_widget.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtCore" -I"debug" -I"." -I..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\mkspecs\win32-msvc2012 propertywidgets\script_widget.h -o debug\moc_script_widget.cpp</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">MOC propertywidgets\script_widget.h</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">debug\moc_script_widget.cpp;%(Outputs)</Outputs>
     </CustomBuild>
@@ -229,11 +227,11 @@
   <ItemGroup>
     <CustomBuild Include="scripts\scriptcompiler.h">
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">scripts\scriptcompiler.h;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"release" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 scripts\scriptcompiler.h -o release\moc_scriptcompiler.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtCore" -I"release" -I"." -I..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\mkspecs\win32-msvc2012 scripts\scriptcompiler.h -o release\moc_scriptcompiler.cpp</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">MOC scripts\scriptcompiler.h</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">release\moc_scriptcompiler.cpp;%(Outputs)</Outputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">scripts\scriptcompiler.h;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"debug" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 scripts\scriptcompiler.h -o debug\moc_scriptcompiler.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtCore" -I"debug" -I"." -I..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\mkspecs\win32-msvc2012 scripts\scriptcompiler.h -o debug\moc_scriptcompiler.cpp</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">MOC scripts\scriptcompiler.h</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">debug\moc_scriptcompiler.cpp;%(Outputs)</Outputs>
     </CustomBuild>
@@ -241,11 +239,11 @@
   <ItemGroup>
     <CustomBuild Include="scripts\scriptcompilerwidget.h">
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">scripts\scriptcompilerwidget.h;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"release" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 scripts\scriptcompilerwidget.h -o release\moc_scriptcompilerwidget.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtCore" -I"release" -I"." -I..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\mkspecs\win32-msvc2012 scripts\scriptcompilerwidget.h -o release\moc_scriptcompilerwidget.cpp</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">MOC scripts\scriptcompilerwidget.h</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">release\moc_scriptcompilerwidget.cpp;%(Outputs)</Outputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">scripts\scriptcompilerwidget.h;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"debug" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 scripts\scriptcompilerwidget.h -o debug\moc_scriptcompilerwidget.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtCore" -I"debug" -I"." -I..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\mkspecs\win32-msvc2012 scripts\scriptcompilerwidget.h -o debug\moc_scriptcompilerwidget.cpp</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">MOC scripts\scriptcompilerwidget.h</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">debug\moc_scriptcompilerwidget.cpp;%(Outputs)</Outputs>
     </CustomBuild>
@@ -253,11 +251,11 @@
   <ItemGroup>
     <CustomBuild Include="assetbrowser.h">
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">assetbrowser.h;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"release" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 assetbrowser.h -o release\moc_assetbrowser.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtCore" -I"release" -I"." -I..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\mkspecs\win32-msvc2012 assetbrowser.h -o release\moc_assetbrowser.cpp</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">MOC assetbrowser.h</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">release\moc_assetbrowser.cpp;%(Outputs)</Outputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">assetbrowser.h;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"debug" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 assetbrowser.h -o debug\moc_assetbrowser.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtCore" -I"debug" -I"." -I..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\mkspecs\win32-msvc2012 assetbrowser.h -o debug\moc_assetbrowser.cpp</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">MOC assetbrowser.h</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">debug\moc_assetbrowser.cpp;%(Outputs)</Outputs>
     </CustomBuild>
@@ -265,11 +263,11 @@
   <ItemGroup>
     <CustomBuild Include="fileserverwidget.h">
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">fileserverwidget.h;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"release" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 fileserverwidget.h -o release\moc_fileserverwidget.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtCore" -I"release" -I"." -I..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\mkspecs\win32-msvc2012 fileserverwidget.h -o release\moc_fileserverwidget.cpp</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">MOC fileserverwidget.h</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">release\moc_fileserverwidget.cpp;%(Outputs)</Outputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">fileserverwidget.h;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"debug" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 fileserverwidget.h -o debug\moc_fileserverwidget.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtCore" -I"debug" -I"." -I..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\mkspecs\win32-msvc2012 fileserverwidget.h -o debug\moc_fileserverwidget.cpp</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">MOC fileserverwidget.h</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">debug\moc_fileserverwidget.cpp;%(Outputs)</Outputs>
     </CustomBuild>
@@ -277,11 +275,11 @@
   <ItemGroup>
     <CustomBuild Include="gameview.h">
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">gameview.h;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"release" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 gameview.h -o release\moc_gameview.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtCore" -I"release" -I"." -I..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\mkspecs\win32-msvc2012 gameview.h -o release\moc_gameview.cpp</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">MOC gameview.h</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">release\moc_gameview.cpp;%(Outputs)</Outputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">gameview.h;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"debug" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 gameview.h -o debug\moc_gameview.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtCore" -I"debug" -I"." -I..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\mkspecs\win32-msvc2012 gameview.h -o debug\moc_gameview.cpp</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">MOC gameview.h</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">debug\moc_gameview.cpp;%(Outputs)</Outputs>
     </CustomBuild>
@@ -289,11 +287,11 @@
   <ItemGroup>
     <CustomBuild Include="log_widget.h">
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">log_widget.h;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"release" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 log_widget.h -o release\moc_log_widget.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtCore" -I"release" -I"." -I..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\mkspecs\win32-msvc2012 log_widget.h -o release\moc_log_widget.cpp</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">MOC log_widget.h</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">release\moc_log_widget.cpp;%(Outputs)</Outputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">log_widget.h;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"debug" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 log_widget.h -o debug\moc_log_widget.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtCore" -I"debug" -I"." -I..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\mkspecs\win32-msvc2012 log_widget.h -o debug\moc_log_widget.cpp</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">MOC log_widget.h</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">debug\moc_log_widget.cpp;%(Outputs)</Outputs>
     </CustomBuild>
@@ -301,11 +299,11 @@
   <ItemGroup>
     <CustomBuild Include="mainwindow.h">
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">mainwindow.h;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"release" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 mainwindow.h -o release\moc_mainwindow.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtCore" -I"release" -I"." -I..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\mkspecs\win32-msvc2012 mainwindow.h -o release\moc_mainwindow.cpp</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">MOC mainwindow.h</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">release\moc_mainwindow.cpp;%(Outputs)</Outputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">mainwindow.h;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"debug" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 mainwindow.h -o debug\moc_mainwindow.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtCore" -I"debug" -I"." -I..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\mkspecs\win32-msvc2012 mainwindow.h -o debug\moc_mainwindow.cpp</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">MOC mainwindow.h</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">debug\moc_mainwindow.cpp;%(Outputs)</Outputs>
     </CustomBuild>
@@ -313,11 +311,11 @@
   <ItemGroup>
     <CustomBuild Include="property_view.h">
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">property_view.h;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"release" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 property_view.h -o release\moc_property_view.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtCore" -I"release" -I"." -I..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\mkspecs\win32-msvc2012 property_view.h -o release\moc_property_view.cpp</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">MOC property_view.h</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">release\moc_property_view.cpp;%(Outputs)</Outputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">property_view.h;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"debug" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 property_view.h -o debug\moc_property_view.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtCore" -I"debug" -I"." -I..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\mkspecs\win32-msvc2012 property_view.h -o debug\moc_property_view.cpp</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">MOC property_view.h</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">debug\moc_property_view.cpp;%(Outputs)</Outputs>
     </CustomBuild>
@@ -325,11 +323,11 @@
   <ItemGroup>
     <CustomBuild Include="property_widget_base.h">
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">property_widget_base.h;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"release" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 property_widget_base.h -o release\moc_property_widget_base.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtCore" -I"release" -I"." -I..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\mkspecs\win32-msvc2012 property_widget_base.h -o release\moc_property_widget_base.cpp</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">MOC property_widget_base.h</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">release\moc_property_widget_base.cpp;%(Outputs)</Outputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">property_widget_base.h;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"debug" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 property_widget_base.h -o debug\moc_property_widget_base.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtCore" -I"debug" -I"." -I..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\mkspecs\win32-msvc2012 property_widget_base.h -o debug\moc_property_widget_base.cpp</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">MOC property_widget_base.h</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">debug\moc_property_widget_base.cpp;%(Outputs)</Outputs>
     </CustomBuild>
@@ -337,11 +335,11 @@
   <ItemGroup>
     <CustomBuild Include="sceneview.h">
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">sceneview.h;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"release" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 sceneview.h -o release\moc_sceneview.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtCore" -I"release" -I"." -I..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\mkspecs\win32-msvc2012 sceneview.h -o release\moc_sceneview.cpp</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">MOC sceneview.h</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">release\moc_sceneview.cpp;%(Outputs)</Outputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">sceneview.h;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\5.2.1\msvc2012\include\QtCore" -I"debug" -I"." -I..\..\..\..\Qt\5.2.1\msvc2012\mkspecs\win32-msvc2012 sceneview.h -o debug\moc_sceneview.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\moc.exe  -DUNICODE -DWIN32 -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -D_MSC_VER=1700 -D_WIN32 -I"..\..\src" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtWidgets" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtGui" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtANGLE" -I"..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\include\QtCore" -I"debug" -I"." -I..\..\..\..\Qt\Qt5.2.1\5.2.1\msvc2012\mkspecs\win32-msvc2012 sceneview.h -o debug\moc_sceneview.cpp</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">MOC sceneview.h</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">debug\moc_sceneview.cpp;%(Outputs)</Outputs>
     </CustomBuild>
@@ -526,11 +524,11 @@
     <CustomBuild Include="propertywidgets\animable_widget.ui">
       <FileType>Document</FileType>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">propertywidgets\animable_widget.ui;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">F:\Qt\5.2.1\msvc2012\bin\uic.exe propertywidgets\animable_widget.ui -o ui_animable_widget.h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\uic.exe propertywidgets\animable_widget.ui -o ui_animable_widget.h</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">UIC propertywidgets\animable_widget.ui</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">ui_animable_widget.h;%(Outputs)</Outputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">propertywidgets\animable_widget.ui;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\uic.exe propertywidgets\animable_widget.ui -o ui_animable_widget.h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\uic.exe propertywidgets\animable_widget.ui -o ui_animable_widget.h</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">UIC propertywidgets\animable_widget.ui</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">ui_animable_widget.h;%(Outputs)</Outputs>
     </CustomBuild>
@@ -539,11 +537,11 @@
     <CustomBuild Include="propertywidgets\camerawidget.ui">
       <FileType>Document</FileType>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">propertywidgets\camerawidget.ui;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">F:\Qt\5.2.1\msvc2012\bin\uic.exe propertywidgets\camerawidget.ui -o ui_camerawidget.h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\uic.exe propertywidgets\camerawidget.ui -o ui_camerawidget.h</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">UIC propertywidgets\camerawidget.ui</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">ui_camerawidget.h;%(Outputs)</Outputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">propertywidgets\camerawidget.ui;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\uic.exe propertywidgets\camerawidget.ui -o ui_camerawidget.h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\uic.exe propertywidgets\camerawidget.ui -o ui_camerawidget.h</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">UIC propertywidgets\camerawidget.ui</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">ui_camerawidget.h;%(Outputs)</Outputs>
     </CustomBuild>
@@ -552,11 +550,11 @@
     <CustomBuild Include="propertywidgets\renderable_widget.ui">
       <FileType>Document</FileType>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">propertywidgets\renderable_widget.ui;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">F:\Qt\5.2.1\msvc2012\bin\uic.exe propertywidgets\renderable_widget.ui -o ui_renderable_widget.h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\uic.exe propertywidgets\renderable_widget.ui -o ui_renderable_widget.h</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">UIC propertywidgets\renderable_widget.ui</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">ui_renderable_widget.h;%(Outputs)</Outputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">propertywidgets\renderable_widget.ui;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\uic.exe propertywidgets\renderable_widget.ui -o ui_renderable_widget.h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\uic.exe propertywidgets\renderable_widget.ui -o ui_renderable_widget.h</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">UIC propertywidgets\renderable_widget.ui</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">ui_renderable_widget.h;%(Outputs)</Outputs>
     </CustomBuild>
@@ -565,11 +563,11 @@
     <CustomBuild Include="propertywidgets\script_widget.ui">
       <FileType>Document</FileType>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">propertywidgets\script_widget.ui;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">F:\Qt\5.2.1\msvc2012\bin\uic.exe propertywidgets\script_widget.ui -o ui_script_widget.h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\uic.exe propertywidgets\script_widget.ui -o ui_script_widget.h</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">UIC propertywidgets\script_widget.ui</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">ui_script_widget.h;%(Outputs)</Outputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">propertywidgets\script_widget.ui;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\uic.exe propertywidgets\script_widget.ui -o ui_script_widget.h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\uic.exe propertywidgets\script_widget.ui -o ui_script_widget.h</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">UIC propertywidgets\script_widget.ui</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">ui_script_widget.h;%(Outputs)</Outputs>
     </CustomBuild>
@@ -578,11 +576,11 @@
     <CustomBuild Include="scripts\scriptcompilerwidget.ui">
       <FileType>Document</FileType>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">scripts\scriptcompilerwidget.ui;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">F:\Qt\5.2.1\msvc2012\bin\uic.exe scripts\scriptcompilerwidget.ui -o ui_scriptcompilerwidget.h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\uic.exe scripts\scriptcompilerwidget.ui -o ui_scriptcompilerwidget.h</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">UIC scripts\scriptcompilerwidget.ui</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">ui_scriptcompilerwidget.h;%(Outputs)</Outputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">scripts\scriptcompilerwidget.ui;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\uic.exe scripts\scriptcompilerwidget.ui -o ui_scriptcompilerwidget.h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\uic.exe scripts\scriptcompilerwidget.ui -o ui_scriptcompilerwidget.h</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">UIC scripts\scriptcompilerwidget.ui</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">ui_scriptcompilerwidget.h;%(Outputs)</Outputs>
     </CustomBuild>
@@ -591,11 +589,11 @@
     <CustomBuild Include="assetbrowser.ui">
       <FileType>Document</FileType>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">assetbrowser.ui;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">F:\Qt\5.2.1\msvc2012\bin\uic.exe assetbrowser.ui -o ui_assetbrowser.h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\uic.exe assetbrowser.ui -o ui_assetbrowser.h</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">UIC assetbrowser.ui</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">ui_assetbrowser.h;%(Outputs)</Outputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">assetbrowser.ui;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\uic.exe assetbrowser.ui -o ui_assetbrowser.h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\uic.exe assetbrowser.ui -o ui_assetbrowser.h</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">UIC assetbrowser.ui</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">ui_assetbrowser.h;%(Outputs)</Outputs>
     </CustomBuild>
@@ -604,11 +602,11 @@
     <CustomBuild Include="fileserverwidget.ui">
       <FileType>Document</FileType>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">fileserverwidget.ui;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">F:\Qt\5.2.1\msvc2012\bin\uic.exe fileserverwidget.ui -o ui_fileserverwidget.h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\uic.exe fileserverwidget.ui -o ui_fileserverwidget.h</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">UIC fileserverwidget.ui</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">ui_fileserverwidget.h;%(Outputs)</Outputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">fileserverwidget.ui;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\uic.exe fileserverwidget.ui -o ui_fileserverwidget.h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\uic.exe fileserverwidget.ui -o ui_fileserverwidget.h</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">UIC fileserverwidget.ui</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">ui_fileserverwidget.h;%(Outputs)</Outputs>
     </CustomBuild>
@@ -617,11 +615,11 @@
     <CustomBuild Include="gameview.ui">
       <FileType>Document</FileType>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">gameview.ui;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">F:\Qt\5.2.1\msvc2012\bin\uic.exe gameview.ui -o ui_gameview.h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\uic.exe gameview.ui -o ui_gameview.h</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">UIC gameview.ui</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">ui_gameview.h;%(Outputs)</Outputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">gameview.ui;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\uic.exe gameview.ui -o ui_gameview.h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\uic.exe gameview.ui -o ui_gameview.h</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">UIC gameview.ui</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">ui_gameview.h;%(Outputs)</Outputs>
     </CustomBuild>
@@ -630,11 +628,11 @@
     <CustomBuild Include="logwidget.ui">
       <FileType>Document</FileType>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">logwidget.ui;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">F:\Qt\5.2.1\msvc2012\bin\uic.exe logwidget.ui -o ui_logwidget.h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\uic.exe logwidget.ui -o ui_logwidget.h</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">UIC logwidget.ui</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">ui_logwidget.h;%(Outputs)</Outputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">logwidget.ui;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\uic.exe logwidget.ui -o ui_logwidget.h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\uic.exe logwidget.ui -o ui_logwidget.h</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">UIC logwidget.ui</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">ui_logwidget.h;%(Outputs)</Outputs>
     </CustomBuild>
@@ -643,11 +641,11 @@
     <CustomBuild Include="mainwindow.ui">
       <FileType>Document</FileType>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">mainwindow.ui;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">F:\Qt\5.2.1\msvc2012\bin\uic.exe mainwindow.ui -o ui_mainwindow.h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\uic.exe mainwindow.ui -o ui_mainwindow.h</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">UIC mainwindow.ui</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">ui_mainwindow.h;%(Outputs)</Outputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">mainwindow.ui;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\uic.exe mainwindow.ui -o ui_mainwindow.h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\uic.exe mainwindow.ui -o ui_mainwindow.h</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">UIC mainwindow.ui</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">ui_mainwindow.h;%(Outputs)</Outputs>
     </CustomBuild>
@@ -656,11 +654,11 @@
     <CustomBuild Include="property_view.ui">
       <FileType>Document</FileType>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">property_view.ui;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">F:\Qt\5.2.1\msvc2012\bin\uic.exe property_view.ui -o ui_property_view.h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\uic.exe property_view.ui -o ui_property_view.h</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">UIC property_view.ui</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">ui_property_view.h;%(Outputs)</Outputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">property_view.ui;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\uic.exe property_view.ui -o ui_property_view.h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\uic.exe property_view.ui -o ui_property_view.h</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">UIC property_view.ui</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">ui_property_view.h;%(Outputs)</Outputs>
     </CustomBuild>
@@ -669,11 +667,11 @@
     <CustomBuild Include="property_widget_base.ui">
       <FileType>Document</FileType>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">property_widget_base.ui;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">F:\Qt\5.2.1\msvc2012\bin\uic.exe property_widget_base.ui -o ui_property_widget_base.h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\uic.exe property_widget_base.ui -o ui_property_widget_base.h</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">UIC property_widget_base.ui</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">ui_property_widget_base.h;%(Outputs)</Outputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">property_widget_base.ui;%(AdditionalInputs)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">F:\Qt\5.2.1\msvc2012\bin\uic.exe property_widget_base.ui -o ui_property_widget_base.h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\Qt\Qt5.2.1\5.2.1\msvc2012\bin\uic.exe property_widget_base.ui -o ui_property_widget_base.h</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">UIC property_widget_base.ui</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">ui_property_widget_base.h;%(Outputs)</Outputs>
     </CustomBuild>

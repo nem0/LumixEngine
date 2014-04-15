@@ -1,6 +1,6 @@
 #include "graphics/shader.h"
-#include "core/file_system.h"
-#include "core/ifile.h"
+#include "core/fs/file_system.h"
+#include "core/fs/ifile.h"
 #include "core/log.h"
 #include "core/matrix.h"
 #include "core/resource_manager.h"
@@ -115,6 +115,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		glLinkProgram(m_program_id);
 		m_vertex_attributes_ids[0] = glGetAttribLocation(m_program_id, "bone_weights");
 		m_vertex_attributes_ids[1] = glGetAttribLocation(m_program_id, "bone_indices");
+
 
 		m_size = file->size();
 		decrementDepCount();

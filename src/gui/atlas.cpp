@@ -1,8 +1,8 @@
 #include "atlas.h"
 #include <cstring>
 #include "core/crc32.h"
-#include "core/file_system.h"
-#include "core/ifile.h"
+#include "core/fs/file_system.h"
+#include "core/fs/ifile.h"
 #include "core/json_serializer.h"
 #include "core/map.h"
 #include "gui/irenderer.h"

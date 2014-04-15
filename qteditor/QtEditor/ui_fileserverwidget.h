@@ -17,6 +17,7 @@
 #include <QtWidgets/QDockWidget>
 #include <QtWidgets/QHBoxLayout>
 #include <QtWidgets/QHeaderView>
+#include <QtWidgets/QLineEdit>
 #include <QtWidgets/QPushButton>
 #include <QtWidgets/QSpacerItem>
 #include <QtWidgets/QTableWidget>
@@ -35,27 +36,35 @@ public:
     QHBoxLayout *horizontalLayout;
     QPushButton *pushButton;
     QCheckBox *checkBox;
+    QLineEdit *filter;
+    QCheckBox *filterCB;
     QSpacerItem *horizontalSpacer;
 
     void setupUi(QDockWidget *FileServerWidget)
     {
         if (FileServerWidget->objectName().isEmpty())
             FileServerWidget->setObjectName(QStringLiteral("FileServerWidget"));
-        FileServerWidget->resize(400, 300);
+        FileServerWidget->resize(593, 300);
         dockWidgetContents = new QWidget();
         dockWidgetContents->setObjectName(QStringLiteral("dockWidgetContents"));
         verticalLayout = new QVBoxLayout(dockWidgetContents);
         verticalLayout->setObjectName(QStringLiteral("verticalLayout"));
         verticalLayout->setContentsMargins(2, 2, 2, 2);
         tableWidget = new QTableWidget(dockWidgetContents);
-        if (tableWidget->columnCount() < 3)
-            tableWidget->setColumnCount(3);
+        if (tableWidget->columnCount() < 6)
+            tableWidget->setColumnCount(6);
         QTableWidgetItem *__qtablewidgetitem = new QTableWidgetItem();
         tableWidget->setHorizontalHeaderItem(0, __qtablewidgetitem);
         QTableWidgetItem *__qtablewidgetitem1 = new QTableWidgetItem();
         tableWidget->setHorizontalHeaderItem(1, __qtablewidgetitem1);
         QTableWidgetItem *__qtablewidgetitem2 = new QTableWidgetItem();
         tableWidget->setHorizontalHeaderItem(2, __qtablewidgetitem2);
+        QTableWidgetItem *__qtablewidgetitem3 = new QTableWidgetItem();
+        tableWidget->setHorizontalHeaderItem(3, __qtablewidgetitem3);
+        QTableWidgetItem *__qtablewidgetitem4 = new QTableWidgetItem();
+        tableWidget->setHorizontalHeaderItem(4, __qtablewidgetitem4);
+        QTableWidgetItem *__qtablewidgetitem5 = new QTableWidgetItem();
+        tableWidget->setHorizontalHeaderItem(5, __qtablewidgetitem5);
         tableWidget->setObjectName(QStringLiteral("tableWidget"));
         tableWidget->setSortingEnabled(true);
         tableWidget->horizontalHeader()->setDefaultSectionSize(150);
@@ -80,6 +89,17 @@ public:
 
         horizontalLayout->addWidget(checkBox);
 
+        filter = new QLineEdit(widget);
+        filter->setObjectName(QStringLiteral("filter"));
+
+        horizontalLayout->addWidget(filter);
+
+        filterCB = new QCheckBox(widget);
+        filterCB->setObjectName(QStringLiteral("filterCB"));
+        filterCB->setChecked(true);
+
+        horizontalLayout->addWidget(filterCB);
+
         horizontalSpacer = new QSpacerItem(245, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
 
         horizontalLayout->addItem(horizontalSpacer);
@@ -100,11 +120,18 @@ public:
         QTableWidgetItem *___qtablewidgetitem = tableWidget->horizontalHeaderItem(0);
         ___qtablewidgetitem->setText(QApplication::translate("FileServerWidget", "Time", 0));
         QTableWidgetItem *___qtablewidgetitem1 = tableWidget->horizontalHeaderItem(1);
-        ___qtablewidgetitem1->setText(QApplication::translate("FileServerWidget", "Filename", 0));
+        ___qtablewidgetitem1->setText(QApplication::translate("FileServerWidget", "Event", 0));
         QTableWidgetItem *___qtablewidgetitem2 = tableWidget->horizontalHeaderItem(2);
-        ___qtablewidgetitem2->setText(QApplication::translate("FileServerWidget", "Status", 0));
+        ___qtablewidgetitem2->setText(QApplication::translate("FileServerWidget", "Handle", 0));
+        QTableWidgetItem *___qtablewidgetitem3 = tableWidget->horizontalHeaderItem(3);
+        ___qtablewidgetitem3->setText(QApplication::translate("FileServerWidget", "Filename", 0));
+        QTableWidgetItem *___qtablewidgetitem4 = tableWidget->horizontalHeaderItem(4);
+        ___qtablewidgetitem4->setText(QApplication::translate("FileServerWidget", "Parameter", 0));
+        QTableWidgetItem *___qtablewidgetitem5 = tableWidget->horizontalHeaderItem(5);
+        ___qtablewidgetitem5->setText(QApplication::translate("FileServerWidget", "Return", 0));
         pushButton->setText(QApplication::translate("FileServerWidget", "Clear", 0));
         checkBox->setText(QApplication::translate("FileServerWidget", "Enabled", 0));
+        filterCB->setText(QApplication::translate("FileServerWidget", "Filter", 0));
     } // retranslateUi
 
 };

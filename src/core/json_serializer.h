@@ -5,7 +5,7 @@
 #include <map>
 #include <vector>
 #include "core/iserializer.h"
-#include "core/ifile.h"
+#include "core/fs/ifile.h"
 #include "core/string.h"
 
 
