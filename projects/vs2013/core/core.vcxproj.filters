@@ -31,30 +31,6 @@
     <ClInclude Include="..\..\..\src\core\timer.h" />
     <ClInclude Include="..\..\..\src\core\vec3.h" />
     <ClInclude Include="..\..\..\src\core\vec4.h" />
-    <ClInclude Include="..\..\..\src\core\disk_file_device.h">
-      <Filter>FS</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\core\ifile.h">
-      <Filter>FS</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\core\ifile_device.h">
-      <Filter>FS</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\core\file_system.h">
-      <Filter>FS</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\core\ifile_system_defines.h">
-      <Filter>FS</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\core\memory_file_device.h">
-      <Filter>FS</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\core\tcp_file_device.h">
-      <Filter>FS</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\core\tcp_file_server.h">
-      <Filter>FS</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\core\atomic.h">
       <Filter>MT</Filter>
     </ClInclude>
@@ -97,6 +73,33 @@
     <ClInclude Include="..\..\..\src\core\path_utils.h" />
     <ClInclude Include="..\..\..\src\core\resource.h" />
     <ClInclude Include="..\..\..\src\core\fifo_allocator.h" />
+    <ClInclude Include="..\..\..\src\core\FS\disk_file_device.h">
+      <Filter>FS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\core\FS\file_events_device.h">
+      <Filter>FS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\core\FS\file_system.h">
+      <Filter>FS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\core\FS\ifile.h">
+      <Filter>FS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\core\FS\ifile_device.h">
+      <Filter>FS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\core\FS\ifile_system_defines.h">
+      <Filter>FS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\core\FS\memory_file_device.h">
+      <Filter>FS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\core\FS\tcp_file_device.h">
+      <Filter>FS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\core\FS\tcp_file_server.h">
+      <Filter>FS</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\core\blob.cpp" />
@@ -113,21 +116,6 @@
     <ClCompile Include="..\..\..\src\core\os_file.cpp" />
     <ClCompile Include="..\..\..\src\core\quat.cpp" />
     <ClCompile Include="..\..\..\src\core\timer.cpp" />
-    <ClCompile Include="..\..\..\src\core\disk_file_device.cpp">
-      <Filter>FS</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\core\file_system.cpp">
-      <Filter>FS</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\core\memory_file_device.cpp">
-      <Filter>FS</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\core\tcp_file_device.cpp">
-      <Filter>FS</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\core\tcp_file_server.cpp">
-      <Filter>FS</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\core\pc\atomic.cpp">
       <Filter>MT</Filter>
     </ClCompile>
@@ -161,6 +149,24 @@
     <ClCompile Include="..\..\..\src\core\path.cpp" />
     <ClCompile Include="..\..\..\src\core\resource.cpp" />
     <ClCompile Include="..\..\..\src\core\fifo_allocator.cpp" />
+    <ClCompile Include="..\..\..\src\core\FS\disk_file_device.cpp">
+      <Filter>FS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\core\FS\file_events_device.cpp">
+      <Filter>FS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\core\FS\file_system.cpp">
+      <Filter>FS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\core\FS\memory_file_device.cpp">
+      <Filter>FS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\core\FS\tcp_file_device.cpp">
+      <Filter>FS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\core\FS\tcp_file_server.cpp">
+      <Filter>FS</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="FS">

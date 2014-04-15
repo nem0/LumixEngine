@@ -1,8 +1,8 @@
 #include "unit_tests/suite/lux_unit_tests.h"
 
-#include "core/file_system.h"
-#include "core/memory_file_device.h"
-#include "core/disk_file_device.h"
+#include "core/fs/file_system.h"
+#include "core/fs/memory_file_device.h"
+#include "core/fs/disk_file_device.h"
 
 #include "core/resource_manager.h"
 #include "core/resource.h"
@@ -164,7 +164,7 @@ namespace
 	}
 
 	const char anim_test[] = "unit_tests/resource_managers/blender.ani";
-	const size_t anim_test_size = 3424;
+	const size_t anim_test_size = 65872;
 	const char anim_test_failure[] = "unit_tests/resource_managers/_non_exist.dds";
 
 	void UT_animation_manager(const char* params)

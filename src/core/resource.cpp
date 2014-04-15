@@ -1,7 +1,7 @@
 #include "core/lux.h"
 #include "core/resource.h"
 
-#include "core/file_system.h"
+#include "core/fs/file_system.h"
 #include "core/path.h"
 #include "core/resource_manager.h"
 
