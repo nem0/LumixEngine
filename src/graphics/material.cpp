@@ -58,28 +58,51 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 {
 	if(success)
 	{
-		JsonSerializer serializer(*file, JsonSerializer::READ);
+		JsonSerializer serializer(*file, JsonSerializer::READ, m_path.c_str());
+		serializer.deserializeObjectBegin();
 		char path[MAX_PATH];
-		serializer.deserialize("texture", path, MAX_PATH);
-		if(path[0] != '\0')
+		char label[256];
+		while(!serializer.isObjectEnd())
 		{
-			Texture* texture = static_cast<Texture*>(m_resource_manager.get(ResourceManager::TEXTURE)->load(path));
-			m_textures.push(texture);
-			addDependency(*texture);
+			serializer.deserializeLabel(label, 255);
+			if (strcmp(label, "texture") == 0)
+			{
+				serializer.deserialize(path, MAX_PATH);
+				if (path[0] != '\0')
+				{
+					Texture* texture = static_cast<Texture*>(m_resource_manager.get(ResourceManager::TEXTURE)->load(path));
+					m_textures.push(texture);
+					addDependency(*texture);
+				}
+			}
+			else if (strcmp(label, "shader") == 0)
+			{
+				serializer.deserialize(path, MAX_PATH);
+				m_shader = static_cast<Shader*>(m_resource_manager.get(ResourceManager::SHADER)->load(path));
+				addDependency(*m_shader);
+			}
+			else if (strcmp(label, "z_test") == 0)
+			{
+				serializer.deserialize(m_is_z_test);
+			}
 		}
-		
-		serializer.deserialize("shader", path, MAX_PATH);
-		m_shader = static_cast<Shader*>(m_resource_manager.get(ResourceManager::SHADER)->load(path));
-		addDependency(*m_shader);
+		serializer.deserializeObjectEnd();
 
-		serializer.deserialize("z_test", m_is_z_test);
+		if (!m_shader)
+		{
+			g_log_error.log("renderer", "Material %s without a shader", m_path.c_str());
+			onFailure();
+			fs.close(file);
+			return;
+		}
 
 		m_size = file->size();
 		decrementDepCount();
 	}
 	else
 	{
-		g_log_info.log("loading", "Error loading material.");
+		g_log_info.log("loading", "Error loading material %s.", m_path.c_str());
+		onFailure();
 	}
 	fs.close(file);
 }

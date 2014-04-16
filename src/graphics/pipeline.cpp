@@ -197,6 +197,7 @@ struct PipelineImpl : public Pipeline
 	virtual bool deserialize(ISerializer& serializer) override
 	{
 		int32_t count;
+		serializer.deserializeObjectBegin();
 		serializer.deserialize("frame_buffer_count", count);
 		serializer.deserializeArrayBegin("frame_buffers");
 		m_framebuffers.resize(count);
@@ -239,6 +240,7 @@ struct PipelineImpl : public Pipeline
 			m_commands.push(cmd);
 		}
 		serializer.deserializeArrayEnd();
+		serializer.deserializeObjectEnd();
 		return true;
 	}
 
@@ -247,7 +249,7 @@ struct PipelineImpl : public Pipeline
 	{
 		if(success)
 		{
-			JsonSerializer serializer(*file, JsonSerializer::READ);
+			JsonSerializer serializer(*file, JsonSerializer::READ, m_path.c_str());
 			deserialize(serializer);
 			onReady();
 		}
