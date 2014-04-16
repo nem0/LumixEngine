@@ -10,3 +10,5 @@ evona_test/
 debug/
 release/
 qteditor/qteditor/QtEditor.vcxproj
+qteditor/qteditor/QtEditor.sln
+qteditor/qteditor/QtEditor.vcxproj.filters
