@@ -161,8 +161,8 @@ struct EditorServerImpl
 		void logMessage(int32_t type, const char* system, const char* msg);
 		Entity& getSelectedEntity() { return m_selected_entity; }
 		bool isGameMode() const { return m_is_game_mode; }
-		void save(FS::IFile& file);
-		void load(FS::IFile& file);
+		void save(FS::IFile& file, const char path[]);
+		void load(FS::IFile& file, const char path[]);
 		void onMessage(void* msgptr, int size);
 		EditorIconHit raycastEditorIcons(const Vec3& origin, const Vec3& dir);
 
@@ -393,14 +393,14 @@ void EditorServerImpl::save(const char path[])
 	g_log_info.log("editor server", "saving universe %s...", path);
 	FS::FileSystem& fs = m_engine.getFileSystem();
 	FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
-	save(*file);
+	save(*file, path);
 	fs.close(file);
 }
 
 
-void EditorServerImpl::save(FS::IFile& file)
+void EditorServerImpl::save(FS::IFile& file, const char path[])
 {
-	JsonSerializer serializer(file, JsonSerializer::WRITE);
+	JsonSerializer serializer(file, JsonSerializer::WRITE, path);
 	m_engine.serialize(serializer);
 	g_log_info.log("editor server", "universe saved");
 }
@@ -451,7 +451,7 @@ void EditorServerImpl::toggleGameMode()
 	else
 	{
 		m_game_mode_file = m_engine.getFileSystem().open("memory", "", FS::Mode::WRITE);
-		save(*m_game_mode_file);
+		save(*m_game_mode_file, "GameMode");
 		m_engine.getScriptSystem().start();
 		m_is_game_mode = true;
 	}
@@ -463,7 +463,7 @@ void EditorServerImpl::stopGameMode()
 	m_is_game_mode = false;
 	m_engine.getScriptSystem().stop();
 	m_game_mode_file->seek(FS::SeekMode::BEGIN, 0);
-	load(*m_game_mode_file);
+	load(*m_game_mode_file, "GameMode");
 	m_engine.getFileSystem().close(m_game_mode_file);
 	m_game_mode_file = NULL;
 }
@@ -624,7 +624,7 @@ void EditorServerImpl::loadMap(FS::IFile* file, bool success, FS::FileSystem& fs
 	ASSERT(success);
 	if(success)
 	{
-		load(*file);
+		load(*file, "unknown map"); /// TODO file path
 	}
 
 	fs.close(file);
@@ -638,12 +638,12 @@ void EditorServerImpl::newUniverse()
 }
 
 
-void EditorServerImpl::load(FS::IFile& file)
+void EditorServerImpl::load(FS::IFile& file, const char path[])
 {
 	g_log_info.log("editor server", "parsing universe...");
 	destroyUniverse();
 	createUniverse(false);
-	JsonSerializer serializer(file, JsonSerializer::READ);
+	JsonSerializer serializer(file, JsonSerializer::READ, path);
 	m_engine.deserialize(serializer);
 	g_log_info.log("editor server", "universe parsed");
 }
