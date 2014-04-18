@@ -7,6 +7,7 @@
 #include "editor/server_message_types.h"
 #include "propertywidgets/animable_widget.h"
 #include "propertywidgets/camerawidget.h"
+#include "propertywidgets/lightwidget.h"
 #include "propertywidgets/renderable_widget.h"
 #include "propertywidgets/script_widget.h"
 
@@ -69,11 +70,11 @@ void PropertyView::onEntitySelected(Lux::Event& event)
 		}
 		else if (e.components[i] == crc32("light"))
 		{
-			m_ui->components->addItem(new QFrame(), "Point Light");
+			widget = new LightWidget;
 		}
 		else if (e.components[i] == crc32("camera"))
 		{
-			widget = widget = new CameraWidget;
+			widget = new CameraWidget;
 		}
 		else
 		{

@@ -27,6 +27,7 @@ namespace Lux
 {
 
 
+static const uint32_t light_hash = crc32("light");
 static const uint32_t renderable_hash = crc32("renderable");
 static const uint32_t camera_hash = crc32("camera");
 
@@ -42,9 +43,9 @@ struct Renderable
 
 struct Light
 {
-	enum Type
+	enum class Type : int32_t
 	{
-		GLOBAL
+		DIRECTIONAL
 	};
 
 	Type m_type;
@@ -267,8 +268,12 @@ struct RendererImpl : public Renderer
 		if(type == crc32("light"))
 		{
 			Light& light = m_lights.pushEmpty();
-			light.m_type = Light::GLOBAL;
+			light.m_type = Light::Type::DIRECTIONAL;
 			light.m_entity = entity;
+			Component cmp(entity, type, this, m_lights.size() - 1);
+			ComponentEvent evt(cmp);
+			m_universe->getEventManager()->emitEvent(evt);
+			return Component(entity, type, this, m_lights.size() - 1);
 		}
 		else if(type == crc32("camera"))
 		{
@@ -489,7 +494,7 @@ struct RendererImpl : public Renderer
 	}
 
 
-	virtual void serialize(ISerializer& serializer) override
+	void serializeCameras(ISerializer& serializer)
 	{
 		serializer.serialize("camera_count", m_cameras.size());
 		serializer.beginArray("cameras");
@@ -505,6 +510,10 @@ struct RendererImpl : public Renderer
 			serializer.serializeArrayItem(m_cameras[i]->m_priority);
 		}
 		serializer.endArray();
+	}
+
+	void serializeRenderables(ISerializer& serializer)
+	{
 		serializer.serialize("renderable_count", m_renderables.size());
 		serializer.beginArray("renderables");
 		for (int i = 0; i < m_renderables.size(); ++i)
@@ -522,11 +531,30 @@ struct RendererImpl : public Renderer
 	}
 
 
-	virtual void deserialize(ISerializer& serializer) override
+	void serializeLights(ISerializer& serializer)
 	{
-		ASSERT(m_render_device);
-		clearScene();
-		int size;
+		serializer.serialize("light_count", m_lights.size());
+		serializer.beginArray("lights");
+		for (int i = 0; i < m_lights.size(); ++i)
+		{
+			serializer.serializeArrayItem(m_lights[i].m_entity.index);
+			serializer.serializeArrayItem((int32_t)m_lights[i].m_type);
+		}
+		serializer.endArray();
+	}
+
+
+	virtual void serialize(ISerializer& serializer) override
+	{
+		serializeCameras(serializer);
+		serializeRenderables(serializer);
+		serializeLights(serializer);
+	}
+
+
+	void deserializeCameras(ISerializer& serializer)
+	{
+		int32_t size;
 		serializer.deserialize("camera_count", size);
 		serializer.deserializeArrayBegin("cameras");
 		for (int i = 0; i < size; ++i)
@@ -551,6 +579,12 @@ struct RendererImpl : public Renderer
 			}
 		}
 		serializer.deserializeArrayEnd();
+	}
+
+
+	void deserializeRenderables(ISerializer& serializer)
+	{
+		int32_t size;
 		serializer.deserialize("renderable_count", size);
 		serializer.deserializeArrayBegin("renderables");
 		for (int i = 0; i < size; ++i)
@@ -570,6 +604,34 @@ struct RendererImpl : public Renderer
 			m_universe->getEventManager()->emitEvent(evt);
 		}
 		serializer.deserializeArrayEnd();
+	}
+
+
+	void deserializeLights(ISerializer& serializer)
+	{
+		int32_t size;
+		serializer.deserialize("light_count", size);
+		serializer.deserializeArrayBegin("lights");
+		for (int i = 0; i < size; ++i)
+		{
+			m_lights.pushEmpty();
+			serializer.deserializeArrayItem(m_lights[i].m_entity.index);
+			m_lights[i].m_entity.universe = m_universe;
+			serializer.deserializeArrayItem((int32_t&)m_lights[i].m_type);
+			ComponentEvent evt(Component(m_lights[i].m_entity, light_hash, this, i));
+			m_universe->getEventManager()->emitEvent(evt);
+		}
+		serializer.deserializeArrayEnd();
+	}
+
+
+	virtual void deserialize(ISerializer& serializer) override
+	{
+		ASSERT(m_render_device);
+		clearScene();
+		deserializeCameras(serializer);
+		deserializeRenderables(serializer);
+		deserializeLights(serializer);
 	}
 
 	Engine* m_engine;
