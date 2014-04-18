@@ -358,6 +358,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void renderShadowmap(int64_t layer_mask)
 	{
+		glEnable(GL_CULL_FACE);
+		glCullFace(GL_FRONT);
 		ASSERT(m_renderer != NULL);
 		glViewport(0, 0, m_shadowmap_framebuffer->getWidth(), m_shadowmap_framebuffer->getHeight());
 		Component light_cmp = m_renderer->getLight(0);
@@ -365,7 +367,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 		{
 			return;
 		}
-		glEnable(GL_CULL_FACE);
 		m_shadowmap_framebuffer->bind();
 		glClear(GL_DEPTH_BUFFER_BIT);
 		glMatrixMode(GL_PROJECTION);
@@ -376,6 +377,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		glMultMatrixf(&projection_matrix.m11);
 
 		Matrix mtx = light_cmp.entity.getMatrix();
+		m_light_dir = mtx.getZVector();
 		glMatrixMode(GL_MODELVIEW);
 		glLoadIdentity();
 		Matrix modelview_matrix;
@@ -395,7 +397,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		glPopMatrix();
 		glMatrixMode(GL_MODELVIEW);
 		FrameBuffer::unbind();
-		glDisable(GL_CULL_FACE);
+		glCullFace(GL_BACK);
 	}
 
 
@@ -413,7 +415,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 		material->apply(*m_renderer, *this);
 		glPushMatrix();
 		glLoadIdentity();
-		glDisable(GL_CULL_FACE);
 		glBegin(GL_QUADS);
 		glTexCoord2f(0, 0);
 		glVertex3f(-1, -1, -1);
@@ -454,6 +455,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 				if (mesh.getMaterial()->isReady())
 				{
 					mesh.getMaterial()->apply(*m_renderer, *this);
+					mesh.getMaterial()->getShader()->setUniform("light_dir", m_light_dir);
 					mesh.getMaterial()->getShader()->setUniform("shadowmap_matrix", m_shadow_modelviewprojection);
 					mesh.getMaterial()->getShader()->setUniform("world_matrix", infos[i].m_model_instance->getMatrix());
 
@@ -570,6 +572,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	Matrix m_shadow_modelviewprojection;
 	Array<Component> m_cameras;
 	Renderer* m_renderer;
+	Vec3 m_light_dir;
 	int m_width;
 	int m_height;
 
