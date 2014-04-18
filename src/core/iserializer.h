@@ -33,8 +33,12 @@ namespace Lux
 			virtual void deserialize(const char* label, bool& value) = 0;
 			virtual void deserialize(char* value, int max_length) = 0;
 			virtual void deserialize(bool& value) = 0;
+			virtual void deserialize(float& value) = 0;
+			virtual void deserialize(int32_t& value) = 0;
 			virtual void deserializeArrayBegin(const char* label) = 0;
+			virtual void deserializeArrayBegin() = 0;
 			virtual void deserializeArrayEnd() = 0;
+			virtual bool isArrayEnd() const = 0;
 			virtual void deserializeArrayItem(uint32_t& value) = 0;
 			virtual void deserializeArrayItem(int32_t& value) = 0;
 			virtual void deserializeArrayItem(int64_t& value) = 0;
@@ -45,6 +49,8 @@ namespace Lux
 			virtual void deserializeObjectBegin() = 0;
 			virtual void deserializeObjectEnd() = 0;
 			virtual void deserializeLabel(char* label, int max_length) = 0;
+			virtual void deserializeRawString(char* buffer, int max_length) = 0;
+			virtual void nextArrayItem() = 0;
 			virtual bool isObjectEnd() const = 0;
 	};
 

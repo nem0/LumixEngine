@@ -6,6 +6,7 @@
 #include "core/matrix.h"
 #include "core/quat.h"
 #include "editor/gizmo.h"
+#include "graphics/irender_device.h"
 #include "graphics/model.h"
 #include "graphics/renderer.h"
 #include "universe/entity_moved_event.h"
@@ -112,14 +113,14 @@ RayCastModelHit Gizmo::castRay(const Vec3& origin, const Vec3& dir)
 }
 
 
-void Gizmo::render(Renderer& renderer)
+void Gizmo::render(Renderer& renderer, IRenderDevice& render_device)
 {
 	if(m_selected_entity.isValid())
 	{
 		Matrix scale_mtx = Matrix::IDENTITY;
 		scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = m_scale;
 		Matrix mtx = m_selected_entity.getMatrix() * scale_mtx;
-		renderer.renderModel(*m_model, mtx);
+		renderer.renderModel(*m_model, mtx, render_device.getPipeline());
 	}
 }
 

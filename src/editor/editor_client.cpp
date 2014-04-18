@@ -66,7 +66,7 @@ namespace Lux
 					m_client->m_stream->read(msg + 4, length);
 					((int32_t*)msg)[0] = length;
 					{
-						m_client->m_messages.push(msg);
+						while(!m_client->m_messages.push(msg));
 					}
 				}
 			}

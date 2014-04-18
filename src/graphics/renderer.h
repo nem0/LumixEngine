@@ -17,6 +17,7 @@ class Material;
 class Model;
 class ModelInstance;
 class Pipeline;
+class PipelineInstance;
 class Pose;
 class ResourceManager;
 class Shader;
@@ -68,7 +69,7 @@ class LUX_ENGINE_API Renderer : public IPlugin
 		virtual Engine& getEngine() = 0;
 		
 		/// "immediate mode"
-		virtual void renderModel(const Model& model, const Matrix& transform) = 0;
+		virtual void renderModel(const Model& model, const Matrix& transform, PipelineInstance& pipeline) = 0;
 		virtual Model* getModel(const char* path) = 0;
 		/*		virtual void renderScene();
 		void endFrame();

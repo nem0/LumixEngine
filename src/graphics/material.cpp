@@ -5,6 +5,8 @@
 #include "core/log.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
+#include "graphics/frame_buffer.h"
+#include "graphics/pipeline.h"
 #include "graphics/renderer.h"
 #include "graphics/shader.h"
 #include "graphics/texture.h"
@@ -13,7 +15,7 @@
 namespace Lux
 {
 
-void Material::apply(Renderer& renderer)
+void Material::apply(Renderer& renderer, PipelineInstance& pipeline)
 {
 	if(getState() == State::READY)
 	{
@@ -23,6 +25,34 @@ void Material::apply(Renderer& renderer)
 			m_textures[i]->apply(i);
 		}
 		renderer.enableZTest(m_is_z_test);
+		for (int i = 0, c = m_uniforms.size(); i < c; ++i)
+		{
+			const Uniform& uniform = m_uniforms[i];
+			switch (uniform.m_type)
+			{
+				case Uniform::FLOAT:
+					m_shader->setUniform(uniform.m_name, uniform.m_float);
+					break;
+				case Uniform::INT:
+					m_shader->setUniform(uniform.m_name, uniform.m_int);
+					break;
+				case Uniform::MATRIX:
+					m_shader->setUniform(uniform.m_name, uniform.m_matrix);
+					break;
+				default:
+					ASSERT(false);
+					break;
+			}
+		}
+		
+		if (m_shader->isShadowmapRequired())
+		{
+			glActiveTexture(GL_TEXTURE0 + m_textures.size());
+			glEnable(GL_TEXTURE_2D);
+			glBindTexture(GL_TEXTURE_2D, pipeline.getShadowmapFramebuffer()->getDepthTexture());
+			m_shader->setUniform("shadowmap", m_textures.size());
+		}
+
 	}
 }
 
@@ -54,6 +84,53 @@ FS::ReadCallback Material::getReadCallback()
 	return rc;
 }
 
+void Material::deserializeUniforms(ISerializer& serializer)
+{
+	serializer.deserializeArrayBegin();
+	while (!serializer.isArrayEnd())
+	{
+		Uniform& uniform = m_uniforms.pushEmpty();
+		serializer.nextArrayItem();
+		serializer.deserializeObjectBegin();
+		char label[256];
+		while (!serializer.isObjectEnd())
+		{
+			serializer.deserializeLabel(label, 255);
+			if (strcmp(label, "name") == 0)
+			{
+				serializer.deserialize(uniform.m_name, Uniform::MAX_NAME_LENGTH);
+			}
+			else if (strcmp(label, "int_value") == 0)
+			{
+				uniform.m_type = Uniform::INT;
+				serializer.deserialize(uniform.m_int);
+			}
+			else if (strcmp(label, "float_value") == 0)
+			{
+				uniform.m_type = Uniform::FLOAT;
+				serializer.deserialize(uniform.m_float);
+			}
+			else if (strcmp(label, "matrix_value") == 0)
+			{
+				uniform.m_type = Uniform::MATRIX;
+				serializer.deserializeArrayBegin();
+				for (int i = 0; i < 16; ++i)
+				{
+					serializer.deserializeArrayItem(uniform.m_matrix[i]);
+					ASSERT(i == 15 || !serializer.isArrayEnd());
+				}
+				serializer.deserializeArrayEnd();
+			}
+			else
+			{
+				ASSERT(false);
+			}
+		}
+		serializer.deserializeObjectEnd();
+	}
+	serializer.deserializeArrayEnd();
+}
+
 void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 {
 	if(success)
@@ -65,7 +142,11 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		while(!serializer.isObjectEnd())
 		{
 			serializer.deserializeLabel(label, 255);
-			if (strcmp(label, "texture") == 0)
+			if (strcmp(label, "uniforms") == 0)
+			{
+				deserializeUniforms(serializer);
+			}
+			else if (strcmp(label, "texture") == 0)
 			{
 				serializer.deserialize(path, MAX_PATH);
 				if (path[0] != '\0')
