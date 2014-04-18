@@ -23,7 +23,7 @@ namespace Lux
 			FAILURE,
 		};
 
-		typedef DelegateList<void (State)> ObserverCallback;
+		typedef DelegateList<void (State, State)> ObserverCallback;
 
 		State getState() const { return m_state; }
 
@@ -63,7 +63,7 @@ namespace Lux
 		void addDependency(Resource& dependent_resource);
 		void removeDependency(Resource& dependent_resource);
 
-		void onStateChanged(State new_state);
+		void onStateChanged(State old_state, State new_state);
 		void decrementDepCount();
 
 	private:

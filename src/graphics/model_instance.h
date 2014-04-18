@@ -25,7 +25,7 @@ class ModelInstance
 		void setMatrix(const Matrix& mtx);
 
 	private:
-		void modelUpdate(Resource::State state);
+		void modelUpdate(Resource::State old_state, Resource::State state);
 		void operator=(const ModelInstance&);
 
 	private:
