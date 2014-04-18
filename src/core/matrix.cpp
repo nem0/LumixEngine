@@ -85,17 +85,18 @@ Vec3 Matrix::getTranslation() const
 
 void Matrix::getRotation(Quat& rot) const
 {
-	float tr = 1 + m11 + m22 + m33;
+	float tr = m11 + m22 + m33;
 
 	if (tr > 0)
 	{ 
-		float S = sqrt(tr) * 2;
-		rot.w = 0.25f * S;
-		rot.x = (m23 - m32) / S;
-		rot.y = (m31 - m13) / S; 
-		rot.z = (m12 - m21) / S; 
+		float S = sqrt(tr + 1.0f);
+		rot.w = 0.5f * S;
+		S = 0.5f / S;
+		rot.x = (m23 - m32) * S;
+		rot.y = (m31 - m13) * S; 
+		rot.z = (m12 - m21) * S; 
 	} 
-	else if ((m11 > m22)&(m11 > m33))
+	else if ((m11 > m22) && (m11 > m33))
 	{ 
 		float S = sqrt(1.0f + m11 - m22 - m33) * 2; 
 		rot.w = (m32 - m23) / S;
