@@ -410,7 +410,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		glMatrixMode(GL_MODELVIEW);
 
 		ASSERT(m_renderer != NULL);
-		material->apply(*m_renderer);
+		material->apply(*m_renderer, *this);
 		glPushMatrix();
 		glLoadIdentity();
 		glDisable(GL_CULL_FACE);
@@ -446,28 +446,32 @@ struct PipelineInstanceImpl : public PipelineInstance
 			Matrix mtx = infos[i].m_model_instance->getMatrix();
 			mtx.multiply3x3(infos[i].m_scale);
 			glMultMatrixf(&mtx.m11);
+			
 			Geometry* geom = model.getGeometry();
 			for (int j = 0; j < model.getMeshCount(); ++j)
 			{
 				Mesh& mesh = model.getMesh(j);
 				if (mesh.getMaterial()->isReady())
 				{
-					mesh.getMaterial()->apply(*m_renderer);
+					mesh.getMaterial()->apply(*m_renderer, *this);
+					mesh.getMaterial()->getShader()->setUniform("shadowmap_matrix", m_shadow_modelviewprojection);
+					mesh.getMaterial()->getShader()->setUniform("world_matrix", infos[i].m_model_instance->getMatrix());
 
 					static Matrix bone_mtx[64];
 					Pose& pose = infos[i].m_model_instance->getPose();
-					Vec3* poss = pose.getPositions();
-					Quat* rots = pose.getRotations();
-					for (int bone_index = 0, bone_count = pose.getCount(); bone_index < bone_count; ++bone_index)
+					if (pose.getCount() > 0)
 					{
-						rots[bone_index].toMatrix(bone_mtx[bone_index]);
-						bone_mtx[bone_index].translate(poss[bone_index]);
-						bone_mtx[bone_index] = bone_mtx[bone_index] * model.getBone(bone_index).inv_bind_matrix;
+						Vec3* poss = pose.getPositions();
+						Quat* rots = pose.getRotations();
+						for (int bone_index = 0, bone_count = pose.getCount(); bone_index < bone_count; ++bone_index)
+						{
+							rots[bone_index].toMatrix(bone_mtx[bone_index]);
+							bone_mtx[bone_index].translate(poss[bone_index]);
+							bone_mtx[bone_index] = bone_mtx[bone_index] * model.getBone(bone_index).inv_bind_matrix;
+						}
+						mesh.getMaterial()->getShader()->setUniform("bone_matrices", bone_mtx, pose.getCount());
 					}
-					mesh.getMaterial()->getShader()->setUniform("bone_matrices", bone_mtx, pose.getCount());
-					mesh.getMaterial()->getShader()->setUniform("shadowmap", 1);
-					mesh.getMaterial()->getShader()->setUniform("shadowmap_matrix", m_shadow_modelviewprojection);
-					mesh.getMaterial()->getShader()->setUniform("world_matrix", infos[i].m_model_instance->getMatrix());
+
 					geom->draw(mesh.getStart(), mesh.getCount(), *mesh.getMaterial()->getShader());
 				}
 			}
@@ -553,6 +557,11 @@ struct PipelineInstanceImpl : public PipelineInstance
 		{
 			m_source.m_commands[i]->execute(*this);
 		}
+	}
+
+	virtual FrameBuffer* getShadowmapFramebuffer() override
+	{
+		return m_shadowmap_framebuffer;
 	}
 
 	PipelineImpl& m_source;

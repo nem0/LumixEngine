@@ -80,7 +80,7 @@ void EditorIcon::render(Renderer* renderer, IRenderDevice& render_device)
 
 	if (m_model->isReady())
 	{
-		renderer->renderModel(*m_model, mtx);
+		renderer->renderModel(*m_model, mtx, render_device.getPipeline());
 	}
 }
 

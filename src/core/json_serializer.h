@@ -51,8 +51,12 @@ namespace Lux
 			virtual void deserialize(const char* label, bool& value) override;
 			virtual void deserialize(char* value, int max_length) override;
 			virtual void deserialize(bool& value) override;
+			virtual void deserialize(float& value) override;
+			virtual void deserialize(int32_t& value) override;
 			virtual void deserializeArrayBegin(const char* label) override;
+			virtual void deserializeArrayBegin() override;
 			virtual void deserializeArrayEnd() override;
+			virtual bool isArrayEnd() const override;
 			virtual void deserializeArrayItem(uint32_t& value) override;
 			virtual void deserializeArrayItem(int32_t& value) override;
 			virtual void deserializeArrayItem(int64_t& value) override;
@@ -63,6 +67,8 @@ namespace Lux
 			virtual void deserializeObjectBegin() override;
 			virtual void deserializeObjectEnd() override;
 			virtual void deserializeLabel(char* label, int max_length) override;
+			virtual void deserializeRawString(char* buffer, int max_length) override;
+			virtual void nextArrayItem() override;
 			virtual bool isObjectEnd() const override;
 
 		private:

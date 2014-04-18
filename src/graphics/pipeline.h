@@ -9,6 +9,7 @@ namespace Lux
 {
 	
 struct Component;
+class FrameBuffer;
 class ISerializer;
 class Renderer;
 
@@ -58,6 +59,7 @@ class LUX_ENGINE_API PipelineInstance abstract
 		virtual int getCameraCount() const = 0;
 		virtual void clearCameras() = 0;
 		virtual void resize(int w, int h) = 0;
+		virtual FrameBuffer* getShadowmapFramebuffer() = 0;
 
 		static PipelineInstance* create(Pipeline& src);
 		static void destroy(PipelineInstance* pipeline);

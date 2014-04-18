@@ -104,7 +104,7 @@ class App
 			m_server.render(*m_edit_render_device);
 			m_server.renderIcons(*m_edit_render_device);
 			m_server.getGizmo().updateScale(m_server.getEditCamera());
-			m_server.getGizmo().render(m_server.getEngine().getRenderer());
+			m_server.getGizmo().render(m_server.getEngine().getRenderer(), *m_edit_render_device);
 			m_edit_render_device->endFrame();
 		}
 

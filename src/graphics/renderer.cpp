@@ -463,14 +463,14 @@ struct RendererImpl : public Renderer
 	}
 
 
-	virtual void renderModel(const Model& model, const Matrix& transform) override
+	virtual void renderModel(const Model& model, const Matrix& transform, PipelineInstance& pipeline) override
 	{
 		glPushMatrix();
 		glMultMatrixf(&transform.m11);
 		for (int i = 0, c = model.getMeshCount(); i < c;  ++i)
 		{
 			const Mesh& mesh = model.getMesh(i);
-			mesh.getMaterial()->apply(*this);
+			mesh.getMaterial()->apply(*this, pipeline);
 			model.getGeometry()->draw(mesh.getStart(), mesh.getCount(), *mesh.getMaterial()->getShader());
 		}
 		glPopMatrix();

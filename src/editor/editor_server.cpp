@@ -144,8 +144,8 @@ struct EditorServerImpl
 		void renderIcons(IRenderDevice& render_device);
 		void renderScene(IRenderDevice& render_device);
 		void renderPhysics();
-		void save(const char path[]);
-		void load(const char path[]);
+		void save(const char* path);
+		void load(const char* path);
 		void loadMap(FS::IFile* file, bool success, FS::FileSystem& fs);
 		void addComponent(uint32_t type_crc);
 		void sendComponent(uint32_t type_crc);
@@ -161,8 +161,8 @@ struct EditorServerImpl
 		void logMessage(int32_t type, const char* system, const char* msg);
 		Entity& getSelectedEntity() { return m_selected_entity; }
 		bool isGameMode() const { return m_is_game_mode; }
-		void save(FS::IFile& file, const char path[]);
-		void load(FS::IFile& file, const char path[]);
+		void save(FS::IFile& file, const char* path);
+		void load(FS::IFile& file, const char* path);
 		void onMessage(void* msgptr, int size);
 		EditorIconHit raycastEditorIcons(const Vec3& origin, const Vec3& dir);
 
@@ -388,7 +388,7 @@ void EditorServerImpl::onPointerUp(int, int, MouseButton::Value)
 }
 
 
-void EditorServerImpl::save(const char path[])
+void EditorServerImpl::save(const char* path)
 {
 	g_log_info.log("editor server", "saving universe %s...", path);
 	FS::FileSystem& fs = m_engine.getFileSystem();
@@ -398,7 +398,7 @@ void EditorServerImpl::save(const char path[])
 }
 
 
-void EditorServerImpl::save(FS::IFile& file, const char path[])
+void EditorServerImpl::save(FS::IFile& file, const char* path)
 {
 	JsonSerializer serializer(file, JsonSerializer::WRITE, path);
 	m_engine.serialize(serializer);
@@ -610,7 +610,7 @@ void EditorServerImpl::removeComponent(uint32_t)
 	selectEntity(m_selected_entity);*/
 }
 
-void EditorServerImpl::load(const char path[])
+void EditorServerImpl::load(const char* path)
 {
 	g_log_info.log("editor server", "loading universe %s...", path);
 	FS::FileSystem& fs = m_engine.getFileSystem();
@@ -638,7 +638,7 @@ void EditorServerImpl::newUniverse()
 }
 
 
-void EditorServerImpl::load(FS::IFile& file, const char path[])
+void EditorServerImpl::load(FS::IFile& file, const char* path)
 {
 	g_log_info.log("editor server", "parsing universe...");
 	destroyUniverse();

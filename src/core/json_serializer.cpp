@@ -154,7 +154,27 @@ void JsonSerializer::serializeArrayItem(bool value)
 
 void JsonSerializer::deserialize(bool& value)
 {
+	logErrorIfNot(!m_is_string_token);
 	value = strcmp(m_token, "true") == 0;
+	deserializeToken();
+}
+
+
+void JsonSerializer::deserialize(float& value)
+{
+	logErrorIfNot(!m_is_string_token);
+	int i = sscanf(m_token, "%f", &value);
+	logErrorIfNot(i == 1);
+	deserializeToken();
+}
+
+
+
+void JsonSerializer::deserialize(int32_t& value)
+{
+	logErrorIfNot(!m_is_string_token);
+	int i = sscanf(m_token, "%" PRIi32, &value);
+	logErrorIfNot(i == 1);
 	deserializeToken();
 }
 
@@ -215,6 +235,38 @@ void JsonSerializer::deserializeArrayBegin(const char* label)
 	logErrorIfNot(!m_is_string_token && m_token[0] == '[' && m_token[1] == '\0');
 	m_is_first_in_block = true;
 	deserializeToken();
+}
+
+
+void JsonSerializer::deserializeArrayBegin()
+{
+	logErrorIfNot(!m_is_string_token && m_token[0] == '[' && m_token[1] == '\0');
+	m_is_first_in_block = true;
+	deserializeToken();
+}
+
+
+
+void JsonSerializer::deserializeRawString(char* buffer, int max_length)
+{
+	buffer[0] = m_buffer;
+	m_file.read(buffer + 1, max_length);
+}
+
+
+void JsonSerializer::nextArrayItem()
+{
+	if (!m_is_first_in_block)
+	{
+		logErrorIfNot(!m_is_string_token && m_token[0] == ',' && m_token[1] == '\0');
+		deserializeToken();
+	}
+}
+
+
+bool JsonSerializer::isArrayEnd() const
+{
+	return !m_is_string_token && m_token[0] == ']' && m_token[1] == '\0';
 }
 
 
