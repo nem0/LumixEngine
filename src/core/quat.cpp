@@ -106,6 +106,9 @@ void Quat::toMatrix(Matrix& mtx) const
 	mtx.m13 = fxz - fwy;
 	mtx.m23 = fyz + fwx;
 	mtx.m33 = 1.0f - (fxx + fyy);
+
+	mtx.m41 = mtx.m42 = mtx.m43 = mtx.m14 = mtx.m24 = mtx.m34 = 0;
+	mtx.m44 = 1;
 }
 
 
