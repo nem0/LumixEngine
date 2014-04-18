@@ -27,7 +27,8 @@ SOURCES += main.cpp\
     scripts/scriptcompilerwidget.cpp \
     fileserverwidget.cpp \
     propertywidgets/animable_widget.cpp \
-    propertywidgets/camerawidget.cpp
+    propertywidgets/camerawidget.cpp \
+    propertywidgets/lightwidget.cpp
 
 HEADERS  += mainwindow.h \
     sceneview.h \ 
@@ -42,7 +43,8 @@ HEADERS  += mainwindow.h \
     scripts/scriptcompilerwidget.h \
     fileserverwidget.h \
     propertywidgets/animable_widget.h \
-    propertywidgets/camerawidget.h
+    propertywidgets/camerawidget.h \
+    propertywidgets/lightwidget.h
 
 FORMS    += mainwindow.ui \
     logwidget.ui \
@@ -55,7 +57,8 @@ FORMS    += mainwindow.ui \
     scripts/scriptcompilerwidget.ui \
     fileserverwidget.ui \
     propertywidgets/animable_widget.ui \
-    propertywidgets/camerawidget.ui
+    propertywidgets/camerawidget.ui \
+    propertywidgets/lightwidget.ui
 
 win32
 {

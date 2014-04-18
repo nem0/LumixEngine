@@ -32,6 +32,7 @@ class EditorIcon
 		Model* m_model;
 		Matrix m_matrix;
 		float m_scale;
+		bool m_is_visible;
 };
 
 
