@@ -176,6 +176,208 @@ namespace DDS
 	static LoadInfo loadInfoIndex8 = {
 		false, false, true, 1, 1, GL_RGB8, GL_BGRA, GL_UNSIGNED_BYTE
 	};
+
+	struct DXTColBlock
+	{
+		uint16_t col0;
+		uint16_t col1;
+		uint8_t row[4];
+	};
+
+	struct DXT3AlphaBlock
+	{
+		uint16_t row[4];
+	};
+
+	struct DXT5AlphaBlock
+	{
+		uint8_t alpha0;
+		uint8_t alpha1;
+		uint8_t row[6];
+	};
+
+	static LUX_FORCE_INLINE void swapMemory(void* mem1, void* mem2, size_t size)
+	{
+		if(size < 2048)
+		{
+			uint8_t tmp[2048];
+			memcpy(tmp, mem1, size);
+			memcpy(mem1, mem2, size);
+			memcpy(mem2, tmp, size);
+		}
+		else
+		{
+			uint8_t* tmp = LUX_NEW_ARRAY(uint8_t, size);
+			memcpy(tmp, mem1, size);
+			memcpy(mem1, mem2, size);
+			memcpy(mem2, tmp, size);
+			LUX_DELETE_ARRAY(tmp);
+		}
+	}
+
+	static void flipBlockDXTC1(DXTColBlock *line, int numBlocks)
+	{
+		DXTColBlock *curblock = line;
+
+		for (int i = 0; i < numBlocks; i++)
+		{
+			swapMemory(&curblock->row[0], &curblock->row[3], sizeof(uint8_t));
+			swapMemory(&curblock->row[1], &curblock->row[2], sizeof(uint8_t));
+			++curblock;
+		}
+	}
+
+	static void flipBlockDXTC3(DXTColBlock *line, int numBlocks)
+	{
+		DXTColBlock *curblock = line;
+		DXT3AlphaBlock *alphablock;
+
+		for (int i = 0; i < numBlocks; i++)
+		{
+			alphablock = (DXT3AlphaBlock*)curblock;
+
+			swapMemory(&alphablock->row[0], &alphablock->row[3], sizeof(uint16_t));
+			swapMemory(&alphablock->row[1], &alphablock->row[2], sizeof(uint16_t));
+			++curblock;
+
+			swapMemory(&curblock->row[0], &curblock->row[3], sizeof(uint8_t));
+			swapMemory(&curblock->row[1], &curblock->row[2], sizeof(uint8_t));
+			++curblock;
+		}
+	}
+
+	static void flipDXT5Alpha(DXT5AlphaBlock *block)
+	{
+		uint8_t tmp_bits[4][4];
+
+		const uint32_t mask = 0x00000007;
+		uint32_t bits = 0;
+		memcpy(&bits, &block->row[0], sizeof(uint8_t) * 3);
+
+		tmp_bits[0][0] = (uint8_t)(bits & mask);
+		bits >>= 3;
+		tmp_bits[0][1] = (uint8_t)(bits & mask);
+		bits >>= 3;
+		tmp_bits[0][2] = (uint8_t)(bits & mask);
+		bits >>= 3;
+		tmp_bits[0][3] = (uint8_t)(bits & mask);
+		bits >>= 3;
+		tmp_bits[1][0] = (uint8_t)(bits & mask);
+		bits >>= 3;
+		tmp_bits[1][1] = (uint8_t)(bits & mask);
+		bits >>= 3;
+		tmp_bits[1][2] = (uint8_t)(bits & mask);
+		bits >>= 3;
+		tmp_bits[1][3] = (uint8_t)(bits & mask);
+
+		bits = 0;
+		memcpy(&bits, &block->row[3], sizeof(uint8_t) * 3);
+
+		tmp_bits[2][0] = (uint8_t)(bits & mask);
+		bits >>= 3;
+		tmp_bits[2][1] = (uint8_t)(bits & mask);
+		bits >>= 3;
+		tmp_bits[2][2] = (uint8_t)(bits & mask);
+		bits >>= 3;
+		tmp_bits[2][3] = (uint8_t)(bits & mask);
+		bits >>= 3;
+		tmp_bits[3][0] = (uint8_t)(bits & mask);
+		bits >>= 3;
+		tmp_bits[3][1] = (uint8_t)(bits & mask);
+		bits >>= 3;
+		tmp_bits[3][2] = (uint8_t)(bits & mask);
+		bits >>= 3;
+		tmp_bits[3][3] = (uint8_t)(bits & mask);
+
+		uint32_t *out_bits = (uint32_t*)&block->row[0];
+
+		*out_bits = *out_bits | (tmp_bits[3][0] << 0);
+		*out_bits = *out_bits | (tmp_bits[3][1] << 3);
+		*out_bits = *out_bits | (tmp_bits[3][2] << 6);
+		*out_bits = *out_bits | (tmp_bits[3][3] << 9);
+
+		*out_bits = *out_bits | (tmp_bits[2][0] << 12);
+		*out_bits = *out_bits | (tmp_bits[2][1] << 15);
+		*out_bits = *out_bits | (tmp_bits[2][2] << 18);
+		*out_bits = *out_bits | (tmp_bits[2][3] << 21);
+
+		out_bits = (uint32_t*)&block->row[3];
+
+		*out_bits &= 0xff000000;
+
+		*out_bits = *out_bits | (tmp_bits[1][0] << 0);
+		*out_bits = *out_bits | (tmp_bits[1][1] << 3);
+		*out_bits = *out_bits | (tmp_bits[1][2] << 6);
+		*out_bits = *out_bits | (tmp_bits[1][3] << 9);
+
+		*out_bits = *out_bits | (tmp_bits[0][0] << 12);
+		*out_bits = *out_bits | (tmp_bits[0][1] << 15);
+		*out_bits = *out_bits | (tmp_bits[0][2] << 18);
+		*out_bits = *out_bits | (tmp_bits[0][3] << 21);
+	}
+
+	static void flipBlockDXTC5(DXTColBlock *line, int numBlocks)
+	{
+		DXTColBlock *curblock = line;
+		DXT5AlphaBlock *alphablock;
+
+		for (int i = 0; i < numBlocks; i++)
+		{
+			alphablock = (DXT5AlphaBlock*)curblock;
+
+			flipDXT5Alpha(alphablock);
+
+			++curblock;
+
+			swapMemory(&curblock->row[0], &curblock->row[3], sizeof(uint8_t));
+			swapMemory(&curblock->row[1], &curblock->row[2], sizeof(uint8_t));
+
+			++curblock;
+		}
+	}
+
+	/// from gpu gems
+	static void flipCompressedTexture(int w, int h, int format, void* surface)
+	{
+		void (*flipBlocksFunction)(DXTColBlock*, int);
+		int xblocks = w >> 2;
+		int yblocks = h >> 2;
+		int blocksize;
+
+		switch (format)
+		{
+			case GL_COMPRESSED_RGBA_S3TC_DXT1_EXT:
+				blocksize = 8;
+				flipBlocksFunction = &flipBlockDXTC1;
+				break;
+			case GL_COMPRESSED_RGBA_S3TC_DXT3_EXT:
+				blocksize = 16;
+				flipBlocksFunction = &flipBlockDXTC3;
+				break;
+			case GL_COMPRESSED_RGBA_S3TC_DXT5_EXT:
+				blocksize = 16;
+				flipBlocksFunction = &flipBlockDXTC5;
+				break;
+			default:
+				ASSERT(false);
+				return;
+		}
+
+		int linesize = xblocks * blocksize;
+
+		DXTColBlock *top = (DXTColBlock*)surface;
+		DXTColBlock *bottom = (DXTColBlock*)((uint8_t*)surface + ((yblocks - 1) * linesize));
+
+		while (top < bottom)
+		{
+			(*flipBlocksFunction)(top, xblocks);
+			(*flipBlocksFunction)(bottom, xblocks);
+			swapMemory(bottom, top, linesize);
+
+			top = (DXTColBlock*)((uint8_t*)top + linesize);
+			bottom = (DXTColBlock*)((uint8_t*)bottom - linesize);
+		}
+	}
 }
 
 
@@ -378,6 +580,7 @@ bool Texture::loadDDS(FS::IFile* file)
 		for (uint32_t ix = 0; ix < mipMapCount; ++ix)
 		{
 			file->read(data, size);
+			DDS::flipCompressedTexture(width, height, li->internalFormat, data);
 			glCompressedTexImage2D(GL_TEXTURE_2D, ix, li->internalFormat, width, height, 0, size, data);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
