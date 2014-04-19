@@ -61,7 +61,7 @@ struct BindFramebufferCommand : public Command
 {
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
-	uint32_t m_buffer_index;
+	string m_buffer_name;
 };
 
 
@@ -84,7 +84,7 @@ struct BindFramebufferTextureCommand : public Command
 {
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
-	uint32_t m_framebuffer_index;
+	string m_framebuffer_name;
 	uint32_t m_renderbuffer_index;
 	uint32_t m_texture_uint;
 };
@@ -113,6 +113,7 @@ struct PipelineImpl : public Pipeline
 		int32_t m_width;
 		int32_t m_height;
 		int32_t m_mask;
+		string m_name;
 	};
 	
 	struct CommandCreator
@@ -204,6 +205,10 @@ struct PipelineImpl : public Pipeline
 		for(int i = 0; i < count; ++i)
 		{
 			int32_t render_buffer_count;
+			char fb_name[31];
+			serializer.deserializeArrayItem(fb_name, 30);
+			m_framebuffers[i].m_name = fb_name;
+
 			serializer.deserializeArrayItem(render_buffer_count);
 			int mask = 0;
 			char rb_name[30];
@@ -299,6 +304,19 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
+	FrameBuffer* getFrameBuffer(const char* name)
+	{
+		for (int i = 0, c = m_framebuffers.size(); i < c;  ++i)
+		{
+			if (strcmp(m_framebuffers[i]->getName(), name) == 0)
+			{
+				return m_framebuffers[i];
+			}
+		}
+		return NULL;
+	}
+
+
 	void setRenderer(Renderer& renderer)
 	{
 		m_renderer = &renderer;
@@ -310,12 +328,12 @@ struct PipelineInstanceImpl : public PipelineInstance
 		if (status == Resource::State::READY)
 		{
 			PipelineImpl::FrameBufferDeclaration fb = m_source.m_shadowmap_framebuffer;
-			m_shadowmap_framebuffer = LUX_NEW(FrameBuffer)(fb.m_width, fb.m_height, fb.m_mask);
+			m_shadowmap_framebuffer = LUX_NEW(FrameBuffer)(fb.m_width, fb.m_height, fb.m_mask, fb.m_name.c_str());
 			m_framebuffers.reserve(m_source.m_framebuffers.size());
 			for (int i = 0; i < m_source.m_framebuffers.size(); ++i)
 			{
 				fb = m_source.m_framebuffers[i];
-				m_framebuffers.push(LUX_NEW(FrameBuffer)(fb.m_width, fb.m_height, fb.m_mask));
+				m_framebuffers.push(LUX_NEW(FrameBuffer)(fb.m_width, fb.m_height, fb.m_mask, fb.m_name.c_str()));
 			}
 		}
 	}
@@ -647,13 +665,17 @@ void ApplyCameraCommand::execute(PipelineInstanceImpl& pipeline)
 
 void BindFramebufferCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
-	serializer.deserializeArrayItem(m_buffer_index);
+	serializer.deserializeArrayItem(m_buffer_name);
 }
 
 
 void BindFramebufferCommand::execute(PipelineInstanceImpl& pipeline)
 {
-	pipeline.m_framebuffers[m_buffer_index]->bind();
+	FrameBuffer* fb = pipeline.getFrameBuffer(m_buffer_name.c_str());
+	if (fb)
+	{
+		fb->bind();
+	}
 }
 
 	
@@ -684,18 +706,38 @@ void DrawFullscreenQuadCommand::execute(PipelineInstanceImpl& pipeline)
 
 void BindFramebufferTextureCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
-	/// TODO map names to indices
-	serializer.deserializeArrayItem(m_framebuffer_index);
-	serializer.deserializeArrayItem(m_renderbuffer_index);
+	serializer.deserializeArrayItem(m_framebuffer_name);
+	char rb_name[31];
+	serializer.deserializeArrayItem(rb_name, 30);
+	if (stricmp(rb_name, "position") == 0)
+	{
+		m_renderbuffer_index = FrameBuffer::POSITION;
+	}
+	else if (stricmp(rb_name, "diffuse") == 0)
+	{
+		m_renderbuffer_index = FrameBuffer::DIFFUSE;
+	}
+	else if (stricmp(rb_name, "normal") == 0)
+	{
+		m_renderbuffer_index = FrameBuffer::NORMAL;
+	}
+	else if (stricmp(rb_name, "depth") == 0)
+	{
+		m_renderbuffer_index = FrameBuffer::DEPTH;
+	}
 	serializer.deserializeArrayItem(m_texture_uint);
 }
 
 
 void BindFramebufferTextureCommand::execute(PipelineInstanceImpl& pipeline)
 {
-	glActiveTexture(GL_TEXTURE0 + m_texture_uint);
-	glEnable(GL_TEXTURE_2D);
-	glBindTexture(GL_TEXTURE_2D, pipeline.m_framebuffers[m_framebuffer_index]->getTexture((FrameBuffer::RenderBuffers)m_renderbuffer_index));
+	FrameBuffer* fb = pipeline.getFrameBuffer(m_framebuffer_name.c_str());
+	if (fb)
+	{
+		glActiveTexture(GL_TEXTURE0 + m_texture_uint);
+		glEnable(GL_TEXTURE_2D);
+		glBindTexture(GL_TEXTURE_2D, fb->getTexture((FrameBuffer::RenderBuffers)m_renderbuffer_index));
+	}
 }
 
 
