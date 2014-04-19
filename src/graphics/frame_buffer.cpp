@@ -7,8 +7,9 @@ namespace Lux
 {
 
 
-FrameBuffer::FrameBuffer(int width, int height, int render_buffers)
+FrameBuffer::FrameBuffer(int width, int height, int render_buffers, const char* name)
 {
+	m_name = name;
 	m_width = width;
 	m_height = height;
 	glGenFramebuffers(1, &m_id);
