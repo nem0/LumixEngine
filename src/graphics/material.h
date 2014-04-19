@@ -36,6 +36,7 @@ private:
 		, m_shader()
 		, m_textures()
 		, m_is_z_test(true)
+		, m_is_backface_culling(true)
 	{ }
 
 	~Material()
@@ -74,6 +75,7 @@ private:
 	Array<Texture*> m_textures;
 	Array<Uniform> m_uniforms;
 	bool m_is_z_test;
+	bool m_is_backface_culling;
 };
 
 } // ~namespace Lux

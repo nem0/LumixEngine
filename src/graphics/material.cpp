@@ -20,6 +20,14 @@ void Material::apply(Renderer& renderer, PipelineInstance& pipeline)
 	if(getState() == State::READY)
 	{
 		m_shader->apply();
+		if (m_is_backface_culling)
+		{
+			glEnable(GL_CULL_FACE);
+		}
+		else
+		{
+			glDisable(GL_CULL_FACE);
+		}
 		for(int i = 0, c = m_textures.size(); i < c; ++i)
 		{
 			m_textures[i]->apply(i);
@@ -165,6 +173,14 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			else if (strcmp(label, "z_test") == 0)
 			{
 				serializer.deserialize(m_is_z_test);
+			}
+			else if (strcmp(label, "backface_culling") == 0)
+			{
+				serializer.deserialize(m_is_backface_culling);
+			}
+			else
+			{
+				g_log_warning.log("Unknown parameter %s in material %s", label, m_path.c_str());
 			}
 		}
 		serializer.deserializeObjectEnd();
