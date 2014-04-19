@@ -187,10 +187,9 @@ void Gizmo::transform(Component camera, TransformOperation operation, int x, int
 			Vec3 intersection = getMousePlaneIntersection(camera, x, y);
 			Vec3 delta = intersection - m_transform_point;
 			m_transform_point = intersection;
-			Matrix mtx;
-			m_selected_entity.getMatrix(mtx);
-			mtx.translate(delta);
-			m_selected_entity.setMatrix(mtx);
+			Vec3 pos = m_selected_entity.getPosition();
+			pos += delta;
+			m_selected_entity.setPosition(pos);
 		}
 	}
 }
