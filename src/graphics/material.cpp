@@ -28,7 +28,7 @@ void Material::apply(Renderer& renderer, PipelineInstance& pipeline)
 		{
 			glDisable(GL_CULL_FACE);
 		}
-		for(int i = 0, c = m_textures.size(); i < c; ++i)
+		for (int i = 0, c = m_textures.size(); i < c; ++i)
 		{
 			m_textures[i]->apply(i);
 		}
