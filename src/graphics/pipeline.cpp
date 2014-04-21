@@ -279,6 +279,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	PipelineInstanceImpl(Pipeline& pipeline)
 		: m_source(static_cast<PipelineImpl&>(pipeline))
 	{
+		m_light_dir.set(0, -1, 0);
 		m_width = m_height = -1;
 		m_shadowmap_framebuffer = NULL;
 		if(pipeline.isReady())
@@ -376,15 +377,15 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void renderShadowmap(int64_t layer_mask)
 	{
-		glEnable(GL_CULL_FACE);
-		glCullFace(GL_FRONT);
 		ASSERT(m_renderer != NULL);
-		glViewport(0, 0, m_shadowmap_framebuffer->getWidth(), m_shadowmap_framebuffer->getHeight());
 		Component light_cmp = m_renderer->getLight(0);
 		if (!light_cmp.isValid())
 		{
 			return;
 		}
+		glEnable(GL_CULL_FACE);
+		glCullFace(GL_FRONT);
+		glViewport(0, 0, m_shadowmap_framebuffer->getWidth(), m_shadowmap_framebuffer->getHeight());
 		m_shadowmap_framebuffer->bind();
 		glClear(GL_DEPTH_BUFFER_BIT);
 		glMatrixMode(GL_PROJECTION);
