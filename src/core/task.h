@@ -7,6 +7,7 @@ namespace Lux
 	namespace MT
 	{
 		LUX_CORE_API void sleep(uint32_t miliseconds);
+		LUX_CORE_API inline void yeld() { sleep(0); }
 		
 		LUX_CORE_API uint32_t getCurrentThreadID();
 		LUX_CORE_API uint32_t getProccessAffinityMask();
