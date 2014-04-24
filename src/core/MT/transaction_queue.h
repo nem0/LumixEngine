@@ -165,7 +165,7 @@ namespace Lux
 
 			bool isEmpty() const
 			{
-				return m_al == m_fr;
+				return m_rd == m_wr;
 			}
 
 			void abort()
