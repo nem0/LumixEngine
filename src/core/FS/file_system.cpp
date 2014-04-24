@@ -5,8 +5,8 @@
 #include "core/array.h"
 #include "core/stack_allocator.h"
 #include "core/string.h"
-#include "core/task.h"
-#include "core/transaction_queue.h"
+#include "core/MT/task.h"
+#include "core/MT/transaction_queue.h"
 #include "core/queue.h"
 
 namespace Lux

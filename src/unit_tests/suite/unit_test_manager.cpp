@@ -1,8 +1,8 @@
 #include "unit_tests/suite/lux_unit_tests.h"
 
 #include "core/log.h"
-#include "core/task.h"
-#include "core/transaction_queue.h"
+#include "core/MT/task.h"
+#include "core/MT/transaction_queue.h"
 #include "core/queue.h"
 #include "core/array.h"
 

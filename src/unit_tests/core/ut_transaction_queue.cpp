@@ -1,7 +1,7 @@
 #include "unit_tests/suite/lux_unit_tests.h"
 
-#include "core/transaction_queue.h"
-#include "core/task.h"
+#include "core/MT/transaction_queue.h"
+#include "core/MT/task.h"
 
 namespace
 {
