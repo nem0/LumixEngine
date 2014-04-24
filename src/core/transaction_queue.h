@@ -1,6 +1,5 @@
 #pragma once
 
-#include "core/blocking_queue.h"
 #include "core/atomic.h"
 #include "core/event.h"
 #include "core/semaphore.h"
@@ -17,184 +16,198 @@ namespace Lux
 			void waitForCompletion() { return m_event.wait();	}
 			void reset()	{ m_event.reset(); }
 
-			T			data;
-
 			Transaction() : m_event(MT::EventFlags::MANUAL_RESET) { }
+
 			MT::Event	m_event;
+			T			data;
 		};
 
 		template <class T, int32_t size> class TransactionQueue 
 		{
 		public:
-			TransactionQueue();
-			~TransactionQueue();
+			TransactionQueue()
+				: m_al(0)
+				, m_fr(0)
+				, m_rd(0)
+				, m_wr(0)
+				, m_aborted(false)
+				, m_data_signal(0, size)
+			{
+				for (int32_t i = 0; i < size; i++)
+				{
+					m_alloc[i].key = i;
+					m_alloc[i].el = i;
+					m_queue[i].key = i;
+					m_queue[i].el = -1;
+				}
+			}
 
-			T*						alloc(bool wait);
-			void					dealoc(T* tr);
+			~TransactionQueue()
+			{
+			}
 
-			bool					push(T* tr, bool wait);
-			T*						pop(bool wait);
+			T* alloc(bool wait)
+			{
+				do
+				{
+					int32_t alloc_ptr = m_al;
+					int32_t alloc_idx = alloc_ptr & (size - 1);
 
-			bool					isAborted();
-			void					abort();
-			void					abortFromService();
-			bool					isEmpty();
+					Node cur_val(alloc_ptr, m_alloc[alloc_idx].el);
+
+					if (cur_val.el > -1)
+					{
+						Node new_val(alloc_ptr, -1);
+
+						if (compareAndExchange64(&m_alloc[alloc_idx].val, new_val.val, cur_val.val))
+						{
+							atomicIncrement(&m_al);
+							return &m_pool[cur_val.el];
+						}
+					}
+				} while (wait);
+
+				return NULL;
+			}
+
+			void dealoc(T* tr, bool wait)
+			{
+				int32_t idx = int32_t(tr - m_pool);
+				ASSERT(idx >= 0 && idx < size);
+
+				Node cur_val(0, -1);
+				Node new_val(0, idx);
+
+				do
+				{
+					int32_t free_ptr = m_fr;
+					int32_t free_idx = free_ptr & (size - 1);
+
+					cur_val.key = free_ptr;
+					new_val.key = free_ptr + size;
+					if (compareAndExchange64(&m_alloc[free_idx].val, new_val.val, cur_val.val))
+					{
+						atomicIncrement(&m_fr);
+						break;
+					}
+				} while (wait);
+
+			}
+
+			bool push(const T* tr, bool wait)
+			{
+				int32_t idx = int32_t(tr - m_pool);
+				ASSERT(idx >= 0 && idx < size);
+
+				do
+				{
+					Node cur_node(0, -1);
+					Node new_node(0, idx);
+
+					int32_t cur_write_idx = m_wr;
+					int32_t idx = cur_write_idx & (size - 1);
+
+					cur_node.key = cur_write_idx;
+					new_node.key = cur_write_idx;
+
+					if (compareAndExchange64(&m_queue[idx].val, new_node.val, cur_node.val))
+					{
+						atomicIncrement(&m_wr);
+						m_data_signal.signal();
+						return true;
+					}
+				} while (wait);
+
+				return false;
+			}
+
+			T* pop(bool wait)
+			{
+				do
+				{
+					if (wait)
+					{
+						m_data_signal.wait();
+						if (isAborted())
+						{
+							return NULL;
+						}
+					}
+
+					while (m_rd != m_wr)
+					{
+						int cur_read_idx = m_rd;
+						int32_t idx = cur_read_idx & (size - 1);
+
+						Node cur_node(cur_read_idx, m_queue[idx].el);
+
+						if (cur_node.el > -1)
+						{
+							Node new_node(cur_read_idx + size, -1);
+
+							if (compareAndExchange64(&m_queue[idx].val, new_node.val, cur_node.val))
+							{
+								atomicIncrement(&m_rd);
+								return &m_pool[cur_node.el];
+							}
+						}
+					}
+				} while (wait);
+
+				return NULL;
+			}
+
+
+			bool isAborted() const
+			{
+				return m_aborted;
+			}
+
+			bool isEmpty() const
+			{
+				return m_al == m_fr;
+			}
+
+			void abort()
+			{
+				m_aborted = true;
+				m_data_signal.signal();
+			}
 
 		private:
 
-			T*						allocTS(bool wait);
-			void					freeTS(T* ptr);
-
-			struct AllocNode
+			struct Node
 			{
 				union
 				{
 					struct
 					{
 						int32_t key;
-						T*		el;
+						int32_t	el;
 					};
 					int64_t		val;
 				};
 
-				AllocNode()
-				{}
+				Node()
+				{
+				}
 
-				AllocNode(int32_t k, T* v)
+				Node(int32_t k, int32_t i)
 					: key(k)
-					, el(v)
-				{}
+					, el(i)
+				{
+				}
 			};
 
-			Semaphore				m_alloc_sema;
-			volatile int32_t		m_alloc_ptr;
-			volatile int32_t		m_free_ptr;
-			AllocNode				m_alloc[size];
-			T						m_trans[size];
-			BlockingQueue<T, size>	m_queue;
+			volatile int32_t	m_al;
+			volatile int32_t	m_fr;
+			volatile int32_t	m_rd;
+			volatile int32_t	m_wr;
+			Node				m_alloc[size];
+			Node				m_queue[size];
+			T					m_pool[size];
+			volatile bool		m_aborted;
+			MT::Semaphore		m_data_signal;
 		};
-
-		template <class T, int32_t size>
-		TransactionQueue<T,size>::TransactionQueue()
-			: m_alloc_sema(size, size)
-			, m_alloc_ptr(0)
-			, m_free_ptr(0)
-		{
-			for (int32_t i = 0; i < size; i++) 
-			{
-				m_alloc[i].key = i;
-				m_alloc[i].el = &m_trans[i];
-			}
-		}
-
-
-		template <class T, int32_t size>
-		TransactionQueue<T,size>::~TransactionQueue()
-		{
-		}
-
-		template <class T, int32_t size>
-		T* TransactionQueue<T,size>::allocTS(bool wait)
-		{
-			bool can_write = wait ? m_alloc_sema.wait(), true : m_alloc_sema.poll();
-			if (can_write)
-			{
-				for (;;)
-				{
-					const int32_t alloc_ptr = m_alloc_ptr;
-					int32_t alloc_idx = alloc_ptr & (size - 1);
-
-					AllocNode new_val(alloc_ptr, NULL);
-					AllocNode cur_val(alloc_ptr, m_alloc[alloc_idx].el);
-
-					if (compareAndExchange64(&m_alloc[alloc_idx].val, new_val.val, cur_val.val)) 
-					{
-						atomicIncrement(&m_alloc_ptr);
-						return cur_val.el;
-					}
-				}
-			}
-
-			return NULL;
-		}
-
-		template <class T, int32_t size>
-		void TransactionQueue<T,size>::freeTS(T* ptr)
-		{
-			AllocNode cur_val(0, NULL);
-			AllocNode new_val(0, ptr);
-
-			for (;;)
-			{
-				const int32_t free_ptr = m_free_ptr;
-				int32_t free_idx = free_ptr & (size - 1);
-
-				cur_val.key = free_ptr;
-				new_val.key = free_ptr + size;
-				if (compareAndExchange64(&m_alloc[free_idx].val, new_val.val, cur_val.val))
-				{
-					atomicIncrement(&m_free_ptr);
-					break;
-				}
-			}
-
-			m_alloc_sema.signal();
-		}
-
-		template <class T, int32_t size>
-		T* TransactionQueue<T,size>::alloc(bool wait)
-		{
-			return allocTS(wait);
-		}
-
-		template <class T, int32_t size>
-		void TransactionQueue<T,size>::dealoc(T* tr)
-		{
-			int32_t tid = (int32_t)(tr - &m_trans[0]);
-			ASSERT(tid >= 0 && tid < size);
-			freeTS(tr);
-		}
-
-		template <class T, int32_t size>
-		bool TransactionQueue<T,size>::push(T* tr, bool wait)
-		{
-			int32_t tid = (int32_t)(tr - &m_trans[0]);
-			ASSERT(tid >= 0 && tid < size);
-			return m_queue.push(tr, wait) >= 0;
-		}
-
-		template <class T, int32_t size>
-		T* TransactionQueue<T,size>::pop(bool wait)
-		{
-			T* tr = NULL;
-			if (m_queue.pop(tr, wait) < 0) {
-				return NULL;
-			}
-			return tr;
-		}
-
-		template <class T, int32_t size>
-		bool TransactionQueue<T,size>::isAborted()
-		{
-			return m_queue.isAborted();
-		}
-
-		template <class T, int32_t size>
-		void TransactionQueue<T,size>::abort()
-		{
-			m_queue.abort();
-		}
-
-		template <class T, int32_t size>
-		void TransactionQueue<T,size>::abortFromService()
-		{
-			m_queue.abortFromService();
-		}
-
-		template <class T, int32_t size>
-		bool TransactionQueue<T,size>::isEmpty()
-		{
-			return m_alloc_ptr == m_free_ptr;
-		}
 	} // ~namespace MT
 } // ~namespace Lux

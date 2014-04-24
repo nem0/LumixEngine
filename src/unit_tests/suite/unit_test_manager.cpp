@@ -105,14 +105,14 @@ namespace Lux
 						if(test->isCompleted())
 						{
 							m_in_progress.pop();
-							m_trans_queue.dealoc(test);
+							m_trans_queue.dealoc(test, true);
 						}
 					}
 
 					if(i < c)
 					{
 						UnitTestPair& pair = m_unit_tests[i];
-						AsynTest* test = m_trans_queue.alloc(false);
+						AsynTest* test = m_trans_queue.alloc(true);
 						test->data.name = pair.name;
 						test->data.func = pair.func;
 						test->data.parameters = pair.parameters;
@@ -127,7 +127,7 @@ namespace Lux
 						// test failed, remove it from the queue and spawn new thread
 						AsynTest* test = m_in_progress.front();
 						m_in_progress.pop();
-							m_trans_queue.dealoc(test);
+							m_trans_queue.dealoc(test, true);
 
 						m_task.destroy();
 						spawnWorkerTask();
