@@ -16,6 +16,7 @@
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_hash_map.cpp">
       <PreprocessToFile Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</PreprocessToFile>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_mtjd_framework.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_path.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_transaction_queue.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\engine\ut_resource_managers.cpp" />

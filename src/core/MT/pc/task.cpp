@@ -15,6 +15,17 @@ namespace Lux
 
 		void sleep(uint32_t miliseconds) { ::Sleep(miliseconds); }
 
+		uint32_t getCPUsCount()
+		{
+			SYSTEM_INFO sys_info;
+			GetSystemInfo(&sys_info);
+
+			uint32_t num = sys_info.dwNumberOfProcessors;
+			num = num > 0 ? num : 1;
+
+			return num;
+		}
+
 		uint32_t getCurrentThreadID() { return ::GetCurrentThreadId(); }
 
 		uint32_t getProccessAffinityMask()
@@ -98,7 +109,7 @@ namespace Lux
 		{
 			while(m_implementation->m_is_running)
 			{
-				Sleep(0);
+				yield();
 			}
 
 			::CloseHandle(m_implementation->m_handle);
@@ -162,7 +173,7 @@ namespace Lux
 
 			while(!isFinished() && wait)
 			{
-				Sleep(0);
+				yield();
 			}
 		}
 

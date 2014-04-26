@@ -58,7 +58,7 @@ namespace
 		do 
 		{
 			file_system->updateAsyncTransactions();
-			Lux::MT::sleep(0);
+			Lux::MT::yield();
 		} while (texture_tga1->isLoading());
 
 		LUX_EXPECT_FALSE(texture_tga1->isEmpty());
@@ -105,7 +105,7 @@ namespace
 		do
 		{
 			file_system->updateAsyncTransactions();
-			Lux::MT::sleep(0);
+			Lux::MT::yield();
 		} while (texture_tga1->isLoading());
 
 		LUX_EXPECT_FALSE(texture_tga1->isEmpty());
@@ -144,7 +144,7 @@ namespace
 		do
 		{
 			file_system->updateAsyncTransactions();
-			Lux::MT::sleep(0);
+			Lux::MT::yield();
 		} while (texture_fail->isLoading());
 
 		LUX_EXPECT_FALSE(texture_fail->isEmpty());
@@ -203,7 +203,7 @@ namespace
 		do
 		{
 			file_system->updateAsyncTransactions();
-			Lux::MT::sleep(0);
+			Lux::MT::yield();
 		} while (animation_1->isLoading());
 
 		LUX_EXPECT_FALSE(animation_2->isEmpty());
@@ -241,7 +241,7 @@ namespace
 		do
 		{
 			file_system->updateAsyncTransactions();
-			Sleep(0);
+			Lux::MT::yield();
 		} while (animation_1->isLoading());
 
 		LUX_EXPECT_FALSE(animation_1->isEmpty());
@@ -279,7 +279,7 @@ namespace
 		do
 		{
 			file_system->updateAsyncTransactions();
-			Lux::MT::sleep(0);
+			Lux::MT::yield();
 		} while (animation_fail->isLoading());
 
 		LUX_EXPECT_FALSE(animation_fail->isEmpty());

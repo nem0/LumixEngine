@@ -96,6 +96,30 @@
     <ClInclude Include="..\..\..\src\core\MT\transaction_queue.h">
       <Filter>MT</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\core\MTJD\base_entry.h">
+      <Filter>MTJD</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\core\MTJD\worker_thread.h">
+      <Filter>MTJD</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\core\MTJD\enums.h">
+      <Filter>MTJD</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\core\MTJD\group.h">
+      <Filter>MTJD</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\core\MTJD\job.h">
+      <Filter>MTJD</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\core\MTJD\manager.h">
+      <Filter>MTJD</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\core\MTJD\scheduler.h">
+      <Filter>MTJD</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\core\MTJD\framework.h">
+      <Filter>MTJD</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\core\blob.cpp" />
@@ -162,6 +186,24 @@
     <ClCompile Include="..\..\..\src\core\MT\pc\task.cpp">
       <Filter>MT</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\core\MTJD\base_entry.cpp">
+      <Filter>MTJD</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\core\MTJD\worker_thread.cpp">
+      <Filter>MTJD</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\core\MTJD\group.cpp">
+      <Filter>MTJD</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\core\MTJD\job.cpp">
+      <Filter>MTJD</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\core\MTJD\manager.cpp">
+      <Filter>MTJD</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\core\MTJD\scheduler.cpp">
+      <Filter>MTJD</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="FS">
@@ -172,6 +214,9 @@
     </Filter>
     <Filter Include="Net">
       <UniqueIdentifier>{129b26b9-e5b8-4ef9-b3f8-e886c1337601}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="MTJD">
+      <UniqueIdentifier>{ce2d1d5a-45d2-4b29-a646-769605372872}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

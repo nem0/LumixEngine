@@ -32,6 +32,10 @@ const uint32_t LUX_MAX_PATH = 260;
 #define ASSERT(x) assert(x)
 #endif
 
+#ifndef STATIC_ASSERT
+#define STATIC_ASSERT static_assert
+#endif
+
 #ifndef NULL
 #define NULL nullptr
 #endif
