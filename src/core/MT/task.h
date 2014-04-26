@@ -8,9 +8,12 @@ namespace Lux
 	{
 		LUX_CORE_API void sleep(uint32_t miliseconds);
 		LUX_CORE_API inline void yield() { sleep(0); }
+
+		LUX_CORE_API uint32_t getCPUsCount();
 		
 		LUX_CORE_API uint32_t getCurrentThreadID();
 		LUX_CORE_API uint32_t getProccessAffinityMask();
+
 		LUX_CORE_API bool isMainThread();
 		LUX_CORE_API void setMainThread();
 

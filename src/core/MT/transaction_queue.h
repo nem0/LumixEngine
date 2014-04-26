@@ -10,7 +10,7 @@ namespace Lux
 	{
 		template <class T> struct Transaction 
 		{
-			static_assert(std::is_trivially_copyable<T>::value, "T must be trivially copyable");
+			STATIC_ASSERT(std::is_trivially_copyable<T>::value, "T must be trivially copyable");
 			void setCompleted()		{ m_event.trigger();		}
 			bool isCompleted()		{ return m_event.poll();	}
 			void waitForCompletion() { return m_event.wait();	}
@@ -24,6 +24,7 @@ namespace Lux
 
 		template <class T, int32_t size> class TransactionQueue 
 		{
+			STATIC_ASSERT(std::is_trivially_copyable<T>::value, "T must be trivially copyable");
 		public:
 			TransactionQueue()
 				: m_al(0)
@@ -35,10 +36,10 @@ namespace Lux
 			{
 				for (int32_t i = 0; i < size; i++)
 				{
-					m_alloc[i].key = i;
-					m_alloc[i].el = i;
-					m_queue[i].key = i;
-					m_queue[i].el = -1;
+					m_alloc[i].data.pair.key = i;
+					m_alloc[i].data.pair.el = i;
+					m_queue[i].data.pair.key = i;
+					m_queue[i].data.pair.el = -1;
 				}
 			}
 
@@ -53,16 +54,16 @@ namespace Lux
 					int32_t alloc_ptr = m_al;
 					int32_t alloc_idx = alloc_ptr & (size - 1);
 
-					Node cur_val(alloc_ptr, m_alloc[alloc_idx].el);
+					Node cur_val(alloc_ptr, m_alloc[alloc_idx].data.pair.el);
 
-					if (cur_val.el > -1)
+					if (cur_val.data.pair.el > -1)
 					{
 						Node new_val(alloc_ptr, -1);
 
-						if (compareAndExchange64(&m_alloc[alloc_idx].val, new_val.val, cur_val.val))
+						if (compareAndExchange64(&m_alloc[alloc_idx].data.val, new_val.data.val, cur_val.data.val))
 						{
 							atomicIncrement(&m_al);
-							return &m_pool[cur_val.el];
+							return &m_pool[cur_val.data.pair.el];
 						}
 					}
 				} while (wait);
@@ -83,9 +84,9 @@ namespace Lux
 					int32_t free_ptr = m_fr;
 					int32_t free_idx = free_ptr & (size - 1);
 
-					cur_val.key = free_ptr;
-					new_val.key = free_ptr + size;
-					if (compareAndExchange64(&m_alloc[free_idx].val, new_val.val, cur_val.val))
+					cur_val.data.pair.key = free_ptr;
+					new_val.data.pair.key = free_ptr + size;
+					if (compareAndExchange64(&m_alloc[free_idx].data.val, new_val.data.val, cur_val.data.val))
 					{
 						atomicIncrement(&m_fr);
 						break;
@@ -107,10 +108,10 @@ namespace Lux
 					int32_t cur_write_idx = m_wr;
 					int32_t idx = cur_write_idx & (size - 1);
 
-					cur_node.key = cur_write_idx;
-					new_node.key = cur_write_idx;
+					cur_node.data.pair.key = cur_write_idx;
+					new_node.data.pair.key = cur_write_idx;
 
-					if (compareAndExchange64(&m_queue[idx].val, new_node.val, cur_node.val))
+					if (compareAndExchange64(&m_queue[idx].data.val, new_node.data.val, cur_node.data.val))
 					{
 						atomicIncrement(&m_wr);
 						m_data_signal.signal();
@@ -139,16 +140,16 @@ namespace Lux
 						int cur_read_idx = m_rd;
 						int32_t idx = cur_read_idx & (size - 1);
 
-						Node cur_node(cur_read_idx, m_queue[idx].el);
+						Node cur_node(cur_read_idx, m_queue[idx].data.pair.el);
 
-						if (cur_node.el > -1)
+						if (cur_node.data.pair.el > -1)
 						{
 							Node new_node(cur_read_idx + size, -1);
 
-							if (compareAndExchange64(&m_queue[idx].val, new_node.val, cur_node.val))
+							if (compareAndExchange64(&m_queue[idx].data.val, new_node.data.val, cur_node.data.val))
 							{
 								atomicIncrement(&m_rd);
-								return &m_pool[cur_node.el];
+								return &m_pool[cur_node.data.pair.el];
 							}
 						}
 					}
@@ -184,18 +185,18 @@ namespace Lux
 					{
 						int32_t key;
 						int32_t	el;
-					};
+					} pair;
 					int64_t		val;
-				};
+				} data;
 
 				Node()
 				{
 				}
 
 				Node(int32_t k, int32_t i)
-					: key(k)
-					, el(i)
 				{
+					data.pair.key = k;
+					data.pair.el = i;
 				}
 			};
 

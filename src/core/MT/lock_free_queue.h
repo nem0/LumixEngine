@@ -25,7 +25,7 @@ namespace Lux
 					struct
 					{
 						int32_t key;
-						int32_t	el;
+						T*	el;
 					};
 					int64_t		val;
 				};
@@ -33,7 +33,7 @@ namespace Lux
 				Node()
 				{}
 
-				Node(int32_t k, int32_t el)
+				Node(int32_t k, T* el)
 					: key(k)
 					, el(el)
 				{}

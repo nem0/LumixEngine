@@ -22,7 +22,9 @@ namespace
 			: m_trans_queue(queue) 
 			, m_array(array)
 		{}
-		~TestTaskConsumer() {}
+
+		~TestTaskConsumer() 
+		{}
 
 		int task()
 		{
@@ -56,7 +58,8 @@ namespace
 			, m_size(size)
 		{}
 
-		~TestTaskProducer() {}
+		~TestTaskProducer() 
+		{}
 
 		int task()
 		{
@@ -126,7 +129,7 @@ namespace
 			|| !prod2->isFinished()
 			|| !prod3->isFinished()
 			|| !prod4->isFinished())
-			Lux::MT::sleep(0);
+			Lux::MT::yield();
 
 		prod1->destroy();
 		prod2->destroy();
@@ -134,7 +137,7 @@ namespace
 		prod4->destroy();
 
 		while (!transQueue.isEmpty())
-			Lux::MT::sleep(0);
+			Lux::MT::yield();
 
 		transQueue.abort();
 		transQueue.abort();
