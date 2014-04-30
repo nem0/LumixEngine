@@ -53,7 +53,7 @@ struct ApplyCameraCommand : public Command
 {
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
-	uint32_t m_camera_idx;
+	string m_camera_slot;
 };
 
 
@@ -96,6 +96,7 @@ struct RenderShadowmapCommand : public Command
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 
 	int64_t m_layer_mask;
+	string m_camera_slot;
 };
 
 
@@ -279,6 +280,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	PipelineInstanceImpl(Pipeline& pipeline)
 		: m_source(static_cast<PipelineImpl&>(pipeline))
 	{
+		m_scene = NULL;
 		m_light_dir.set(0, -1, 0);
 		m_width = m_height = -1;
 		m_shadowmap_framebuffer = NULL;
@@ -375,10 +377,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 		glPopMatrix();*/
 	}
 
-	void renderShadowmap(int64_t layer_mask)
+	void renderShadowmap(Component camera, int64_t layer_mask)
 	{
 		ASSERT(m_renderer != NULL);
-		Component light_cmp = m_renderer->getLight(0);
+		Component light_cmp = m_scene->getLight(0);
 		if (!light_cmp.isValid())
 		{
 			return;
@@ -400,7 +402,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 		glMatrixMode(GL_MODELVIEW);
 		glLoadIdentity();
 		Matrix modelview_matrix;
-		getLookAtMatrix(mtx.getTranslation(), mtx.getTranslation() + mtx.getZVector(), mtx.getYVector(), &modelview_matrix);
+		Vec3 pos = camera.entity.getPosition();
+		Vec3 cam_forward = camera.entity.getRotation() * Vec3(0, 0, 1);
+		pos -= mtx.getZVector() * 10 + cam_forward * 10 * -dotProduct(mtx.getZVector(), cam_forward);
+		getLookAtMatrix(pos, pos + mtx.getZVector(), mtx.getYVector(), &modelview_matrix);
 		glMultMatrixf(&modelview_matrix.m11);
 		static const Matrix biasMatrix(
 			0.5, 0.0, 0.0, 0.0,
@@ -457,7 +462,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		ASSERT(m_renderer != NULL);
 		static Array<RenderableInfo> infos;
 		infos.clear();
-		m_renderer->getRenderableInfos(infos, layer_mask);
+		m_scene->getRenderableInfos(infos, layer_mask);
 		int count = infos.size();
 		for (int i = 0; i < count; ++i)
 		{
@@ -500,83 +505,20 @@ struct PipelineInstanceImpl : public PipelineInstance
 		}
 	}
 
-
-	virtual void clearCameras() override
-	{
-		m_cameras.clear();
-	}
-
-
-	virtual int getCameraCount() const override
-	{
-		return m_cameras.size();
-	}
-
-
 	virtual void resize(int w, int h) override
 	{
 		m_width = w;
 		m_height = h;
-		ASSERT(m_renderer != NULL);
-		for (int i = 0; i < m_cameras.size(); ++i)
-		{
-			m_renderer->setCameraSize(m_cameras[i], w, h);
-		}
 	}
-
-	virtual void addCamera(const Component& camera) override
-	{
-		int priority;
-		m_renderer->setCameraSize(camera, m_width, m_height);
-		m_renderer->getCameraPriority(camera, priority);
-		if (m_cameras.empty())
-		{
-			m_cameras.push(camera);
-			return;
-		}
-		m_cameras.pushEmpty();
-		for (int i = m_cameras.size() - 2; i >= 0; --i)
-		{
-			int existing_priority;
-			m_renderer->getCameraPriority(m_cameras[i], existing_priority);
-			if (existing_priority < priority)
-			{
-				m_cameras[i + 1] = m_cameras[i];
-				m_cameras[i] = camera;
-			}
-			else
-			{
-				m_cameras[i + 1] = camera;
-				break;
-			}
-		}
-	}
-
-
-	virtual void removeCamera(const Component& camera) override
-	{
-		for (int i = 0, c = m_cameras.size(); i < c; ++i)
-		{
-			if (m_cameras[i].index == camera.index)
-			{
-				m_cameras.erase(i);
-				return;
-			}
-		}
-	}
-
-
-	virtual const Component& getCamera(int index) override
-	{
-		return m_cameras[index];
-	}
-
 
 	virtual void render() override
 	{
-		for (int i = 0; i < m_source.m_commands.size(); ++i)
+		if (m_scene)
 		{
-			m_source.m_commands[i]->execute(*this);
+			for (int i = 0; i < m_source.m_commands.size(); ++i)
+			{
+				m_source.m_commands[i]->execute(*this);
+			}
 		}
 	}
 
@@ -585,11 +527,21 @@ struct PipelineInstanceImpl : public PipelineInstance
 		return m_shadowmap_framebuffer;
 	}
 
+	virtual void setScene(RenderScene* scene) override
+	{
+		m_scene = scene;
+	}
+
+	virtual RenderScene* getScene() override
+	{
+		return m_scene;
+	}
+
 	PipelineImpl& m_source;
+	RenderScene* m_scene;
 	Array<FrameBuffer*> m_framebuffers;
 	FrameBuffer* m_shadowmap_framebuffer;
 	Matrix m_shadow_modelviewprojection;
-	Array<Component> m_cameras;
 	Renderer* m_renderer;
 	Vec3 m_light_dir;
 	int m_width;
@@ -653,14 +605,19 @@ void RenderModelsCommand::execute(PipelineInstanceImpl& pipeline)
 
 void ApplyCameraCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
-	serializer.deserializeArrayItem(m_camera_idx);
+	serializer.deserializeArrayItem(m_camera_slot);
 }
 
 
 void ApplyCameraCommand::execute(PipelineInstanceImpl& pipeline)
 {
 	ASSERT(pipeline.m_renderer != NULL);
-	pipeline.m_renderer->applyCamera(pipeline.m_cameras[m_camera_idx]);
+	Component cmp = pipeline.m_scene->getCameraInSlot(m_camera_slot.c_str()); 
+	if (cmp.isValid())
+	{
+		pipeline.m_scene->setCameraSize(cmp, pipeline.m_width, pipeline.m_height);
+		pipeline.m_scene->applyCamera(cmp);
+	}
 }
 
 
@@ -745,12 +702,13 @@ void BindFramebufferTextureCommand::execute(PipelineInstanceImpl& pipeline)
 void RenderShadowmapCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
 	serializer.deserializeArrayItem(m_layer_mask);
+	serializer.deserializeArrayItem(m_camera_slot);
 }
 
 
 void RenderShadowmapCommand::execute(PipelineInstanceImpl& pipeline)
 {
-	pipeline.renderShadowmap(m_layer_mask);
+	pipeline.renderShadowmap(pipeline.getScene()->getCameraInSlot(m_camera_slot.c_str()), m_layer_mask);
 }
 
 

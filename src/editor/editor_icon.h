@@ -9,17 +9,19 @@ namespace Lux
 
 
 struct Component;
+class Engine;
 struct Entity;
 class IRenderDevice;
 class Model;
 class Renderer;
+class RenderScene;
 
 
 class EditorIcon
 {
 	friend class EditorApp;
 	public:
-		void create(Renderer& renderer, Entity& entity, const Component& cmp);
+		void create(Engine& engine, RenderScene& scene, Entity& entity, const Component& cmp);
 		void destroy();
 		void render(Renderer* renderer, IRenderDevice& render_device);
 		void show();
@@ -28,6 +30,7 @@ class EditorIcon
 		Entity getEntity() const { return m_entity; }
 
 	private:
+		RenderScene* m_scene;
 		Entity m_entity;
 		Model* m_model;
 		Matrix m_matrix;

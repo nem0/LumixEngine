@@ -283,11 +283,11 @@ void EditorServer::destroy()
 
 void EditorServerImpl::registerProperties()
 {
-	m_component_properties[camera_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("priority"), &Renderer::getCameraPriority, &Renderer::setCameraPriority));
-	m_component_properties[camera_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("fov"), &Renderer::getCameraFOV, &Renderer::setCameraFOV));
-	m_component_properties[camera_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("near"), &Renderer::getCameraNearPlane, &Renderer::setCameraNearPlane));
-	m_component_properties[camera_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("far"), &Renderer::getCameraFarPlane, &Renderer::setCameraFarPlane));
-	m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("source"), &Renderer::getRenderablePath, &Renderer::setRenderablePath, IPropertyDescriptor::FILE));
+	m_component_properties[camera_type].push(LUX_NEW(PropertyDescriptor<RenderScene>)(crc32("slot"), &RenderScene::getCameraSlot, &RenderScene::setCameraSlot, IPropertyDescriptor::STRING));
+	m_component_properties[camera_type].push(LUX_NEW(PropertyDescriptor<RenderScene>)(crc32("fov"), &RenderScene::getCameraFOV, &RenderScene::setCameraFOV));
+	m_component_properties[camera_type].push(LUX_NEW(PropertyDescriptor<RenderScene>)(crc32("near"), &RenderScene::getCameraNearPlane, &RenderScene::setCameraNearPlane));
+	m_component_properties[camera_type].push(LUX_NEW(PropertyDescriptor<RenderScene>)(crc32("far"), &RenderScene::getCameraFarPlane, &RenderScene::setCameraFarPlane));
+	m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<RenderScene>)(crc32("source"), &RenderScene::getRenderablePath, &RenderScene::setRenderablePath, IPropertyDescriptor::FILE));
 	/*m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("visible"), &Renderer::getVisible, &Renderer::setVisible));
 	m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("cast shadows"), &Renderer::getCastShadows, &Renderer::setCastShadows));
 	m_component_properties[point_light_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("fov"), &Renderer::getLightFov, &Renderer::setLightFov));
@@ -324,8 +324,9 @@ void EditorServerImpl::onPointerDown(int x, int y, MouseButton::Value button)
 	{
 		Vec3 origin, dir;
 		Component camera_cmp = m_camera.getComponent(camera_type);
-		m_engine.getRenderer().getRay(camera_cmp, (float)x, (float)y, origin, dir);
-		RayCastModelHit hit = m_engine.getRenderer().castRay(origin, dir);
+		RenderScene* scene = static_cast<RenderScene*>(camera_cmp.system);
+		scene->getRay(camera_cmp, (float)x, (float)y, origin, dir);
+		RayCastModelHit hit = scene->castRay(origin, dir);
 		RayCastModelHit gizmo_hit = m_gizmo.castRay(origin, dir);
 		EditorIconHit icon_hit = raycastEditorIcons(origin, dir);
 		if (gizmo_hit.m_is_hit && (icon_hit.m_t < 0 || gizmo_hit.m_t < icon_hit.m_t))
@@ -412,7 +413,7 @@ void EditorServerImpl::addEntity()
 	e.setPosition(m_camera.getPosition() + m_camera.getRotation() * Vec3(0, 0, -2));
 	selectEntity(e);
 	EditorIcon* er = LUX_NEW(EditorIcon)();
-	er->create(m_engine.getRenderer(), m_selected_entity, Component::INVALID);
+	er->create(m_engine, *m_engine.getRenderScene(), m_selected_entity, Component::INVALID);
 	m_editor_icons.push(er);
 }
 
@@ -539,11 +540,11 @@ void EditorServerImpl::addComponent(uint32_t type_crc)
 		}
 		else if(type_crc == renderable_type)
 		{
-			m_engine.getRenderer().createComponent(renderable_type, m_selected_entity);
+			m_engine.getRenderScene()->createComponent(renderable_type, m_selected_entity);
 		}
 		else if(type_crc == light_type)
 		{
-			m_engine.getRenderer().createComponent(light_type, m_selected_entity);
+			m_engine.getRenderScene()->createComponent(light_type, m_selected_entity);
 		}
 		else if(type_crc == script_type)
 		{
@@ -551,7 +552,7 @@ void EditorServerImpl::addComponent(uint32_t type_crc)
 		}
 		else if (type_crc == camera_type)
 		{
-			m_engine.getRenderer().createComponent(camera_type, m_selected_entity);
+			m_engine.getRenderScene()->createComponent(camera_type, m_selected_entity);
 		}
 		else
 		{
@@ -1083,7 +1084,7 @@ void EditorServerImpl::onComponentEvent(Event& event)
 		if(!found)
 		{
 			EditorIcon* er = LUX_NEW(EditorIcon)();
-			er->create(m_engine.getRenderer(), e.component.entity, e.component);
+			er->create(m_engine, *m_engine.getRenderScene(), e.component.entity, e.component);
 			m_editor_icons.push(er);
 		}
 	}
@@ -1092,7 +1093,7 @@ void EditorServerImpl::onComponentEvent(Event& event)
 		if(e.component.entity.existsInUniverse() &&  e.component.entity.getComponents().empty())
 		{
 			EditorIcon* er = LUX_NEW(EditorIcon)();
-			er->create(m_engine.getRenderer(), e.component.entity, Component::INVALID);
+			er->create(m_engine, *m_engine.getRenderScene(), e.component.entity, Component::INVALID);
 			m_editor_icons.push(er);
 		}
 	}
@@ -1124,7 +1125,6 @@ void EditorServerImpl::onEvent(Event& evt)
 
 void EditorServerImpl::destroyUniverse()
 {
-	m_edit_view_render_device->getPipeline().clearCameras();
 	for (int i = 0; i < m_editor_icons.size(); ++i)
 	{
 		m_editor_icons[i]->destroy();
@@ -1141,30 +1141,28 @@ void EditorServerImpl::destroyUniverse()
 void EditorServer::setEditViewRenderDevice(IRenderDevice& render_device)
 {
 	m_impl->m_edit_view_render_device = &render_device;
-	m_impl->m_edit_view_render_device->getPipeline().addCamera(m_impl->m_camera.getComponent(camera_type));
 }
 
 
-void EditorServerImpl::createUniverse(bool)
+void EditorServerImpl::createUniverse(bool create_basic_entities)
 {
 	Universe* universe = m_engine.createUniverse();
-
-	m_camera = m_engine.getUniverse()->createEntity();
-	m_camera.setPosition(0, 0, -5);
-	m_camera.setRotation(Quat(Vec3(0, 1, 0), -Math::PI));
-	Component cmp = m_engine.getRenderer().createComponent(camera_type, m_camera);
-	if (m_edit_view_render_device)
+	if (create_basic_entities)
 	{
-		m_edit_view_render_device->getPipeline().addCamera(cmp);
+		m_camera = m_engine.getUniverse()->createEntity();
+		m_camera.setPosition(0, 0, -5);
+		m_camera.setRotation(Quat(Vec3(0, 1, 0), -Math::PI));
+		Component cmp = m_engine.getRenderScene()->createComponent(camera_type, m_camera);
+		RenderScene* scene = static_cast<RenderScene*>(cmp.system);
+		scene->setCameraSlot(cmp, string("editor"));
 	}
-
 	m_gizmo.create(m_engine.getRenderer());
 	m_gizmo.setUniverse(universe);
 	m_gizmo.hide();
 
-	universe->getEventManager()->addListener(EntityMovedEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);
-	universe->getEventManager()->addListener(ComponentEvent::type).bind<EditorServerImpl, &EditorServerImpl::onComponentEvent>(this);
-	universe->getEventManager()->addListener(EntityDestroyedEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);
+	universe->getEventManager().addListener(EntityMovedEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);
+	universe->getEventManager().addListener(ComponentEvent::type).bind<EditorServerImpl, &EditorServerImpl::onComponentEvent>(this);
+	universe->getEventManager().addListener(EntityDestroyedEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);
 
 	m_selected_entity = Entity::INVALID;
 }

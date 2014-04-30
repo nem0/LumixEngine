@@ -297,6 +297,7 @@ void JsonSerializer::deserializeArrayItem(string& value)
 	{
 		value += tmp;
 	}
+	value += tmp;
 }
 
 
@@ -369,12 +370,16 @@ bool JsonSerializer::readStringTokenPart(char* tmp, int max_len)
 {
 	logErrorIfNot(m_is_string_token);
 	int i = 0;
-	while (m_file.read(tmp + i, 1) && tmp[i] != '"')
+	bool read_status = m_file.read(tmp + i, 1);
+	while (i < max_len && read_status && tmp[i] != '"')
 	{
 		++i;
-		logErrorIfNot(i < max_len);
+		if (i < max_len)
+		{
+			read_status = m_file.read(tmp + i, 1);
+		}
 	}
-	bool is_end = tmp[i] == '"';
+	bool is_end = i < max_len || !read_status;
 	tmp[i] = '\0';
 	if (is_end)
 	{

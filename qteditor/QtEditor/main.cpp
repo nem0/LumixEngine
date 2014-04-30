@@ -1,13 +1,15 @@
 #include "mainwindow.h"
 #include <QApplication>
+#include <qdir.h>
+#include "core/resource_manager.h"
+#include "core/resource_manager_base.h"
 #include "editor/editor_client.h"
 #include "editor/editor_server.h"
 #include "editor/gizmo.h"
+#include "engine/engine.h"
 #include "graphics/irender_device.h"
 #include "graphics/pipeline.h"
 #include "graphics/renderer.h"
-#include "engine/engine.h"
-#include <qdir.h>
 #include "sceneview.h"
 #include "gameview.h"
 
@@ -16,11 +18,16 @@
 class MyRenderDevice : public Lux::IRenderDevice
 {
 public:
-	explicit MyRenderDevice(Lux::Renderer& renderer, const char* pipeline)
+	MyRenderDevice(Lux::Engine& engine, const char* pipeline_path)
 	{
-		m_renderer = &renderer;
-		m_pipeline = Lux::PipelineInstance::create(*m_renderer->loadPipeline(pipeline));
-		m_pipeline->setRenderer(renderer);
+		Lux::Pipeline* pipeline_object = static_cast<Lux::Pipeline*>(engine.getResourceManager().get(Lux::ResourceManager::PIPELINE)->load(pipeline_path));
+		ASSERT(pipeline_object);
+		if(pipeline_object)
+		{
+			m_pipeline = Lux::PipelineInstance::create(*pipeline_object);
+			m_pipeline->setRenderer(engine.getRenderer());
+		}
+
 	}
 	
 	virtual void beginFrame() override
@@ -41,7 +48,6 @@ public:
 	Lux::PipelineInstance* m_pipeline;
 	HDC m_hdc;
 	HGLRC m_opengl_context;
-	Lux::Renderer* m_renderer;
 };
 
 class App
@@ -61,6 +67,19 @@ class App
 			delete m_qt_app;
 			m_client.destroy();
 			m_server.destroy();
+		}
+
+		void onUniverseCreated(Lux::Event&)
+		{
+			m_edit_render_device->getPipeline().setScene(m_server.getEngine().getRenderScene()); 
+			m_game_render_device->getPipeline().setScene(m_server.getEngine().getRenderScene()); 
+		}
+
+		void onUniverseDestroyed(Lux::Event&)
+		{
+			m_edit_render_device->getPipeline().setScene(NULL); 
+			m_game_render_device->getPipeline().setScene(NULL); 
+			
 		}
 
 		void init(int argc, char* argv[])
@@ -84,15 +103,20 @@ class App
 			m_main_window->setEditorServer(m_server);
 			m_main_window->getSceneView()->setServer(&m_server);
 
-			m_edit_render_device = new MyRenderDevice(m_server.getEngine().getRenderer(), "pipelines/main.json");
+			m_edit_render_device = new MyRenderDevice(m_server.getEngine(), "pipelines/main.json");
 			m_edit_render_device->m_hdc = GetDC(hwnd);
 			m_edit_render_device->m_opengl_context = m_server.getHGLRC();
+			m_edit_render_device->getPipeline().setScene(m_server.getEngine().getRenderScene()); /// TODO manage scene properly
 			m_server.setEditViewRenderDevice(*m_edit_render_device);
 
-			m_game_render_device = new	MyRenderDevice(m_server.getEngine().getRenderer(), "pipelines/game_view.json");
+			m_game_render_device = new	MyRenderDevice(m_server.getEngine(), "pipelines/game_view.json");
 			m_game_render_device->m_hdc = GetDC(game_hwnd);
 			m_game_render_device->m_opengl_context = m_server.getHGLRC();
+			m_game_render_device->getPipeline().setScene(m_server.getEngine().getRenderScene()); /// TODO manage scene properly
 			m_server.getEngine().getRenderer().setRenderDevice(*m_game_render_device);
+
+			m_server.getEngine().getEventManager().addListener(Lux::Engine::UniverseCreatedEvent::s_type).bind<App, &App::onUniverseCreated>(this);
+			m_server.getEngine().getEventManager().addListener(Lux::Engine::UniverseDestroyedEvent::s_type).bind<App, &App::onUniverseDestroyed>(this);
 
 			m_main_window->getSceneView()->setPipeline(m_edit_render_device->getPipeline());
 			m_main_window->getGameView()->setPipeline(m_game_render_device->getPipeline());

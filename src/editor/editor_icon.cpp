@@ -2,6 +2,9 @@
 #include "core/crc32.h"
 #include "core/math_utils.h"
 #include "core/matrix.h"
+#include "core/resource_manager.h"
+#include "core/resource_manager_base.h"
+#include "engine/engine.h"
 #include "graphics/irender_device.h"
 #include "graphics/geometry.h"
 #include "graphics/material.h"
@@ -15,10 +18,11 @@ namespace Lux
 {
 
 
-	void EditorIcon::create(Renderer& renderer, Entity& entity, const Component&)
+void EditorIcon::create(Engine& engine, RenderScene& scene, Entity& entity, const Component&)
 {
+	m_scene = &scene;
 	m_entity = entity;
-	m_model = renderer.getModel("models/icon.msh");
+	m_model = static_cast<Model*>(engine.getResourceManager().get(ResourceManager::MODEL)->load("models/icon.msh"));
 	m_is_visible = true;
 }
 
@@ -59,11 +63,11 @@ void EditorIcon::render(Renderer* renderer, IRenderDevice& render_device)
 {
 	if (m_is_visible)
 	{
-		Component camera = render_device.getPipeline().getCamera(0);
+		Component camera = m_scene->getCameraInSlot("editor");
 		Lux::Matrix mtx = camera.entity.getMatrix();
 
 		float fov;
-		renderer->getCameraFov(camera, fov);
+		static_cast<RenderScene*>(camera.system)->getCameraFOV(camera, fov);
 		float scale = tan(fov * Math::PI / 180 * 0.5f) * (m_entity.getPosition() - mtx.getTranslation()).length() / 20;
 
 		mtx.setTranslation(m_entity.getPosition());

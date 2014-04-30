@@ -2,6 +2,7 @@
 
 
 #include "core/lux.h"
+#include "core/event_manager.h"
 
 
 namespace Lux
@@ -18,13 +19,18 @@ namespace Lux
 	class ISerializer;
 	class PluginManager;
 	class Renderer;
+	class RenderScene;
+	class ResourceManager;
 	class ScriptSystem;
 	class Universe;
 
-	class ResourceManager;
 
 	class LUX_ENGINE_API Engine
 	{
+		public:
+			class UniverseCreatedEvent;
+			class UniverseDestroyedEvent;
+
 		public:
 			Engine() { m_impl = NULL; }
 			~Engine() { ASSERT(m_impl == NULL); }
@@ -44,6 +50,7 @@ namespace Lux
 			EventManager& getEventManager() const;
 			IPlugin* loadPlugin(const char* name);
 			Universe* getUniverse() const;
+			RenderScene* getRenderScene() const;
 
 			ResourceManager& getResourceManager() const;
 
@@ -56,5 +63,42 @@ namespace Lux
 		private:
 			struct EngineImpl* m_impl;
 	};
+
+	class LUX_ENGINE_API Engine::UniverseCreatedEvent : public Event
+	{
+		public:
+			static const Event::Type s_type;
+
+		public:
+			UniverseCreatedEvent(Universe& universe)
+				: m_universe(universe)
+			{
+				m_type = s_type;
+			}
+
+			Universe& getUniverse() { return m_universe; }
+
+		private:
+			Universe& m_universe;
+	};
+
+	class LUX_ENGINE_API Engine::UniverseDestroyedEvent : public Event
+	{
+		public:
+			static const Event::Type s_type;
+
+		public:
+			UniverseDestroyedEvent(Universe& universe)
+				: m_universe(universe)
+			{
+				m_type = s_type;
+			}
+
+			Universe& getUniverse() { return m_universe; }
+
+		private:
+			Universe& m_universe;
+	};
+
 
 } // ~namespace Lux
