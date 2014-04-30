@@ -95,6 +95,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <PreprocessorDefinitions>WIN32;BUILDING_ENGINE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
+      <DisableSpecificWarnings>4512</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -182,6 +183,7 @@
     <ClCompile Include="..\..\..\src\graphics\pipeline.cpp" />
     <ClCompile Include="..\..\..\src\graphics\pose.cpp" />
     <ClCompile Include="..\..\..\src\graphics\renderer.cpp" />
+    <ClCompile Include="..\..\..\src\graphics\render_scene.cpp" />
     <ClCompile Include="..\..\..\src\graphics\shader.cpp" />
     <ClCompile Include="..\..\..\src\graphics\shader_manager.cpp" />
     <ClCompile Include="..\..\..\src\graphics\texture.cpp" />
@@ -224,6 +226,7 @@
     <ClInclude Include="..\..\..\src\graphics\pose.h" />
     <ClInclude Include="..\..\..\src\graphics\ray_cast_model_hit.h" />
     <ClInclude Include="..\..\..\src\graphics\renderer.h" />
+    <ClInclude Include="..\..\..\src\graphics\render_scene.h" />
     <ClInclude Include="..\..\..\src\graphics\shader.h" />
     <ClInclude Include="..\..\..\src\graphics\shader_manager.h" />
     <ClInclude Include="..\..\..\src\graphics\texture.h" />

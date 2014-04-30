@@ -3,6 +3,7 @@
 #include <Windows.h>
 
 #include "animation/animation_system.h"
+#include "core/crc32.h"
 #include "core/fs/disk_file_device.h"
 #include "core/fs/file_system.h"
 #include "core/input_system.h"
@@ -24,6 +25,10 @@
 
 namespace Lux
 {
+
+	const Event::Type Engine::UniverseCreatedEvent::s_type = crc32("engine_universe_created_event");
+	const Event::Type Engine::UniverseDestroyedEvent::s_type = crc32("engine_universe_destroyed_event");
+
 	struct EngineImpl
 	{
 		EngineImpl(Engine& engine) : m_owner(engine) {}
@@ -47,6 +52,7 @@ namespace Lux
 		EditorServer* m_editor_server;
 		PluginManager m_plugin_manager;
 		Universe* m_universe;
+		RenderScene* m_render_scene;
 		ScriptSystem m_script_system;
 		InputSystem m_input_system;
 		Engine& m_owner;
@@ -179,22 +185,31 @@ namespace Lux
 	Universe* Engine::createUniverse()
 	{
 		m_impl->m_universe = LUX_NEW(Universe)();
+		m_impl->m_render_scene = RenderScene::createInstance(*this, *m_impl->m_universe);
 		m_impl->m_plugin_manager.onCreateUniverse(*m_impl->m_universe);
 		m_impl->m_script_system.setUniverse(m_impl->m_universe);
 		m_impl->m_universe->create();
-		m_impl->m_renderer->setUniverse(m_impl->m_universe);
-			
+		
+		UniverseCreatedEvent evt(*m_impl->m_universe);
+		m_impl->m_event_manager.emitEvent(evt);
 		return m_impl->m_universe;
 	}
 
 	void Engine::destroyUniverse()
 	{
-		m_impl->m_renderer->setUniverse(NULL);
-		m_impl->m_script_system.setUniverse(NULL);
-		m_impl->m_plugin_manager.onDestroyUniverse(*m_impl->m_universe);
-		m_impl->m_universe->destroy();
-		LUX_DELETE(m_impl->m_universe);
-		m_impl->m_universe = 0;
+		ASSERT(m_impl->m_universe);
+		if (m_impl->m_universe)
+		{
+			UniverseDestroyedEvent evt(*m_impl->m_universe);
+			m_impl->m_event_manager.emitEvent(evt);
+			m_impl->m_script_system.setUniverse(NULL);
+			m_impl->m_plugin_manager.onDestroyUniverse(*m_impl->m_universe);
+			m_impl->m_universe->destroy();
+			RenderScene::destroyInstance(m_impl->m_render_scene);
+			m_impl->m_render_scene = NULL;
+			LUX_DELETE(m_impl->m_universe);
+			m_impl->m_universe = 0;
+		}
 	}
 
 	EditorServer* Engine::getEditorServer() const
@@ -266,6 +281,12 @@ namespace Lux
 		return m_impl->m_universe;
 	}
 
+	RenderScene* Engine::getRenderScene() const
+	{
+		return m_impl->m_render_scene;
+	}
+
+
 	ResourceManager& Engine::getResourceManager() const
 	{
 		return m_impl->m_resource_manager;
@@ -281,6 +302,7 @@ namespace Lux
 	{
 		m_impl->m_universe->serialize(serializer);
 		m_impl->m_renderer->serialize(serializer);
+		m_impl->m_render_scene->serialize(serializer);
 		m_impl->m_script_system.serialize(serializer);
 		m_impl->m_plugin_manager.serialize(serializer);
 	}
@@ -290,6 +312,7 @@ namespace Lux
 	{
 		m_impl->m_universe->deserialize(serializer);
 		m_impl->m_renderer->deserialize(serializer);
+		m_impl->m_render_scene->deserialize(serializer);
 		m_impl->m_script_system.deserialize(serializer);
 		m_impl->m_plugin_manager.deserialize(serializer);
 	}
