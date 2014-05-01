@@ -16,11 +16,9 @@ namespace Lux
 			WorkerTask();
 			~WorkerTask();
 
-			bool create(const char* name, Manager* manager);
+			bool create(const char* name, Manager* manager, Manager::JobTransQueue* trans_queue);
 
 			virtual int task();
-
-			void setTransQueue(Manager::JobTransQueue* trans_queue) { m_trans_queue = trans_queue; }
 
 		private:
 			Manager::JobTransQueue*	m_trans_queue;

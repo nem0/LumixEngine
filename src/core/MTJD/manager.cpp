@@ -11,7 +11,7 @@ namespace Lux
 	{
 		Manager::Manager()
 			: m_scheduling_counter(0)
-			, m_scheduler(this)
+			, m_scheduler(*this)
 		{
 #if TYPE == MULTI_THREAD
 			uint32_t threads_num = getCpuThreadsCount();
@@ -22,8 +22,7 @@ namespace Lux
 			m_worker_tasks = LUX_NEW_ARRAY(WorkerTask, threads_num);
 			for (uint32_t i = 0; i < threads_num; ++i)
 			{
-				m_worker_tasks[i].create("MTJD::WorkerTask", this);
-				m_worker_tasks[i].setTransQueue(&m_trans_queue);
+				m_worker_tasks[i].create("MTJD::WorkerTask", this, &m_trans_queue);
 				m_worker_tasks[i].setAffinityMask(getAffinityMask(i));
 				m_worker_tasks[i].run();
 			}
@@ -79,7 +78,7 @@ namespace Lux
 
 			if (1 == job->getDependenceCount())
 			{
-				pushBackReadyJob(job);
+				pushReadyJob(job);
 
 				job->m_scheduled = true;
 				m_scheduler.dataSignal();
@@ -102,7 +101,7 @@ namespace Lux
 				if (!m_trans_queue.push(tr, false))
 				{
 					m_trans_queue.dealoc(tr, true);
-					pushFrontReadyJob(job);
+					pushReadyJob(job);
 				}
 				else
 				{
@@ -152,11 +151,15 @@ namespace Lux
 		{
 #if TYPE == MULTI_THREAD
 
-			for (int32_t i = 0; i < Priority::Count; ++i)
+			for (int32_t i = 0; i < (int32_t)Priority::Count; ++i)
 			{
 				if (!m_ready_to_execute[i].isEmpty())
 				{
-					return m_ready_to_execute[i].pop();
+					Job** entry = m_ready_to_execute[i].pop(true);
+					Job* ret = *entry;
+					m_ready_to_execute[i].dealoc(entry, true);
+
+					return ret;
 				}
 			}
 
@@ -165,28 +168,22 @@ namespace Lux
 			return NULL;
 		}
 
-		void Manager::pushFrontReadyJob(Job* job)
+		void Manager::pushReadyJob(Job* job)
 		{
 			ASSERT(NULL != job);
 
 #if TYPE == MULTI_THREAD
 
-			int32_t idx = -1;
-			while (-1 == idx)
-				idx = m_ready_to_execute[job->getPriority()].push(job);
+			Job** jobEntry = m_ready_to_execute[(int32_t)job->getPriority()].alloc(true);
+			if (jobEntry)
+			{
+				*jobEntry = job;
+				m_ready_to_execute[(int32_t)job->getPriority()].push(jobEntry, true);
+			}
 
-#endif //TYPE == MULTI_THREAD
-		}
-
-		void Manager::pushBackReadyJob(Job* job)
-		{
-			ASSERT(NULL != job);
-
-#if TYPE == MULTI_THREAD
-
-			int32_t idx = -1;
-			while (-1 == idx)
-				idx = m_ready_to_execute[job->getPriority()].push(job);
+			//int32_t idx = -1;
+			//while (-1 == idx)
+			//	idx = m_ready_to_execute[(int32_t)job->getPriority()].push(job);
 
 #endif //TYPE == MULTI_THREAD
 		}

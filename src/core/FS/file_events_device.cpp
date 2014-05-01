@@ -101,6 +101,8 @@ namespace Lux
 
 
 		private:
+			EventsFile& operator= (const EventsFile& rhs);
+
 			void invokeEvent(EventType type, const char* path, int32_t ret, int32_t param)
 			{
 				Event event;

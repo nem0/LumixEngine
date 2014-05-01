@@ -21,10 +21,14 @@ namespace Lux
 		{
 		}
 
-		bool WorkerTask::create(const char* name, Manager* manager)
+		bool WorkerTask::create(const char* name, Manager* manager, Manager::JobTransQueue* trans_queue)
 		{
 			ASSERT(NULL != manager);
+			ASSERT(NULL != trans_queue);
+
 			m_manager = manager;
+			m_trans_queue = trans_queue;
+
 			return Task::create(name);
 		}
 

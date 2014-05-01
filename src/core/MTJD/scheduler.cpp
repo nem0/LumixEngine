@@ -7,7 +7,7 @@ namespace Lux
 {
 	namespace MTJD
 	{
-		Scheduler::Scheduler(Manager* manager)
+		Scheduler::Scheduler(Manager& manager)
 			: m_data_event(0)
 			, m_abort_event(0)
 			, m_manager(manager)
@@ -24,7 +24,7 @@ namespace Lux
 			{
 				m_data_event.wait();
 
-				m_manager->doScheduling();
+				m_manager.doScheduling();
 			}
 
 			return 0;

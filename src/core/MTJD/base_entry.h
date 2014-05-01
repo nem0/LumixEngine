@@ -8,10 +8,10 @@ namespace Lux
 {
 	namespace MTJD
 	{
-		class LUX_CORE_API BaseEntry
+		class LUX_CORE_API BaseEntry abstract
 		{
 		public:
-			typedef Array<BaseEntry*> TDependencyTable;
+			typedef Array<BaseEntry*> DependencyTable;
 
 			BaseEntry(int32_t depend_count, bool sync_event);
 			virtual ~BaseEntry();
@@ -31,7 +31,7 @@ namespace Lux
 
 			MT::Event*			m_sync_event;
 			volatile int32_t	m_dependency_count;
-			TDependencyTable	m_dependency_table;
+			DependencyTable		m_dependency_table;
 		};
 	} // ~namepsace MTJD
 } // ~namepsace Lux
