@@ -93,7 +93,8 @@ struct RendererImpl : public Renderer
 	virtual bool create(Engine& engine) override
 	{
 		m_engine = &engine;
-		return glewInit() == GLEW_OK;
+		GLenum err = glewInit();
+		return err == GLEW_OK;
 	}
 
 

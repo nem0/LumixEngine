@@ -34,10 +34,9 @@ namespace Lux
 		bool isFailure()	const { return State::FAILURE	== m_state; }
 
 		ObserverCallback& getObserverCb() { return m_cb; }
-
 		uint32_t size() const { return m_size; }
-
 		ResourceManager& getResourceManager() { return m_resource_manager; }
+		const Path& getPath() const { return m_path; }
 
 	protected:
 		Resource(const Path& path, ResourceManager& resource_manager);
