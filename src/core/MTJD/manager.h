@@ -28,7 +28,7 @@ namespace Lux
 
 		public:
 
-			typedef MT::LockFreeQueue<Job, 512>		JobsTable;
+			typedef MT::TransactionQueue<Job*, 512>	JobsTable;
 			typedef MT::Transaction<Job*>			JobTrans;
 			typedef MT::TransactionQueue<JobTrans, 32>  JobTransQueue;
 			typedef Array<JobTrans*>					TransTable;
@@ -47,8 +47,7 @@ namespace Lux
 
 			Job* getNextReadyJob();
 
-			void pushFrontReadyJob(Job* job);
-			void pushBackReadyJob(Job* job);
+			void pushReadyJob(Job* job);
 
 			uint32_t getAffinityMask(uint32_t idx) const;
 

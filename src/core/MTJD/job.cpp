@@ -7,7 +7,7 @@ namespace Lux
 {
 	namespace MTJD
 	{
-		Job::Job(bool auto_destroy, Priority priority, bool sync_event, Manager* manager)
+		Job::Job(bool auto_destroy, Priority priority, bool sync_event, Manager& manager)
 			: BaseEntry(1, sync_event)
 			, m_manager(manager)
 			, m_priority(priority)
@@ -15,7 +15,6 @@ namespace Lux
 			, m_scheduled(false)
 			, m_executed(false)
 		{
-			ASSERT(NULL != manager);
 			setJobName("Unknown Job");
 		}
 
@@ -40,7 +39,7 @@ namespace Lux
 			uint32_t count = MT::atomicDecrement(&m_dependency_count);
 			if (1 == count)
 			{
-				m_manager->schedule(this);
+				m_manager.schedule(this);
 			}
 
 #endif //TYPE == MULTI_THREAD
@@ -50,12 +49,12 @@ namespace Lux
 		{
 			BaseEntry::dependencyReady();
 
+			m_executed = true;
+
 			if (m_auto_destroy)
 			{
 				LUX_DELETE(this);
 			}
-
-			m_executed = true;
 		}
 	} // ~namepsace MTJD
 } // ~namepsace Lux

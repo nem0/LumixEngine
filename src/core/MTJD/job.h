@@ -15,11 +15,11 @@ namespace Lux
 			friend class WorkerTask;
 
 		public:
-			Job(bool auto_destroy, Priority priority, bool sync_event, Manager* manager);
+			Job(bool auto_destroy, Priority priority, bool sync_event, Manager& manager);
 			virtual ~Job();
 
-			virtual void incrementDependency();
-			virtual void decrementDependency();
+			virtual void incrementDependency() override;
+			virtual void decrementDependency() override;
 
 			Priority	getPriority() { return m_priority; }
 
@@ -28,11 +28,14 @@ namespace Lux
 			virtual void execute() = 0;
 			virtual void onExecuted();
 
-			Manager*	m_manager;
+			Manager&	m_manager;
 			Priority	m_priority;
 			bool		m_auto_destroy;
 			bool		m_scheduled;
 			bool		m_executed;
+
+		private:
+			Job& operator= (const Job& rhs);
 
 #ifndef __SOME_MASTER_VERSION
 

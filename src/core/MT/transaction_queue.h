@@ -10,7 +10,7 @@ namespace Lux
 	{
 		template <class T> struct Transaction 
 		{
-			STATIC_ASSERT(std::is_trivially_copyable<T>::value, "T must be trivially copyable");
+			static_assert(std::is_trivially_copyable<T>::value, "T must be trivially copyable");
 			void setCompleted()		{ m_event.trigger();		}
 			bool isCompleted()		{ return m_event.poll();	}
 			void waitForCompletion() { return m_event.wait();	}
@@ -24,7 +24,7 @@ namespace Lux
 
 		template <class T, int32_t size> class TransactionQueue 
 		{
-			STATIC_ASSERT(std::is_trivially_copyable<T>::value, "T must be trivially copyable");
+			static_assert(std::is_trivially_copyable<T>::value, "T must be trivially copyable");
 		public:
 			TransactionQueue()
 				: m_al(0)

@@ -53,7 +53,7 @@ namespace Lux
 		void BaseEntry::dependencyReady()
 		{
 #if TYPE == MULTI_THREAD
-			TDependencyTable dependency_table(m_dependency_table);
+			DependencyTable dependency_table(m_dependency_table);
 			m_dependency_table.clear();
 
 			for (uint32_t i = 0, c = dependency_table.size(); c > i; ++i)
