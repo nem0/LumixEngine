@@ -131,7 +131,7 @@ struct EditorServerImpl
 
 		EditorServerImpl();
 
-		bool create(HWND hwnd, HWND game_hwnd, const char* base_path);
+		bool create(const char* base_path);
 		void destroy();
 		void onPointerDown(int x, int y, MouseButton::Value button);
 		void onPointerMove(int x, int y, int relx, int rely);
@@ -187,8 +187,6 @@ struct EditorServerImpl
 		map<uint32_t, IPlugin*> m_creators;
 		MouseMode::Value m_mouse_mode;
 		Array<EditorIcon*> m_editor_icons;
-		HGLRC m_hglrc;
-		HGLRC m_game_hglrc;
 		bool m_is_game_mode;
 		FS::IFile* m_game_mode_file;
 		MessageTask* m_message_task;
@@ -254,12 +252,12 @@ void EditorServer::tick()
 }
 
 
-bool EditorServer::create(HWND hwnd, HWND game_hwnd, const char* base_path)
+bool EditorServer::create(const char* base_path)
 {
 	m_impl = LUX_NEW(EditorServerImpl)();
 	m_impl->m_owner = this;
 	
-	if(!m_impl->create(hwnd, game_hwnd, base_path))
+	if(!m_impl->create(base_path))
 	{
 		LUX_DELETE(m_impl);
 		m_impl = NULL;
@@ -650,92 +648,7 @@ void EditorServerImpl::load(FS::IFile& file, const char* path)
 }
 
 
-HGLRC createGLContext(HWND hwnd[], int count)
-{
-	ASSERT(count > 0);
-	HDC hdc;
-	hdc = GetDC(hwnd[0]);
-	ASSERT(hdc != NULL);
-	if (hdc == NULL)
-	{
-		g_log_error.log("renderer", "Could not get the device context");
-		return NULL;
-	}
-	PIXELFORMATDESCRIPTOR pfd = 
-	{ 
-		sizeof(PIXELFORMATDESCRIPTOR),  //  size of this pfd  
-		1,                     // version number  
-		PFD_DRAW_TO_WINDOW |   // support window  
-		PFD_SUPPORT_OPENGL |   // support OpenGL  
-		PFD_DOUBLEBUFFER,      // double buffered  
-		PFD_TYPE_RGBA,         // RGBA type  
-		24,                    // 24-bit color depth  
-		0, 0, 0, 0, 0, 0,      // color bits ignored  
-		0,                     // no alpha buffer  
-		0,                     // shift bit ignored  
-		0,                     // no accumulation buffer  
-		0, 0, 0, 0,            // accum bits ignored  
-		32,                    // 32-bit z-buffer      
-		0,                     // no stencil buffer  
-		0,                     // no auxiliary buffer  
-		PFD_MAIN_PLANE,        // main layer  
-		0,                     // reserved  
-		0, 0, 0                // layer masks ignored  
-	}; 
-	int pixelformat = ChoosePixelFormat(hdc, &pfd);
-	if (pixelformat == 0)
-	{
-		ASSERT(false);
-		g_log_error.log("renderer", "Could not choose a pixel format");
-		return NULL;
-	}
-	BOOL success = SetPixelFormat(hdc, pixelformat, &pfd);
-	if (success == FALSE)
-	{
-		ASSERT(false);
-		g_log_error.log("renderer", "Could not set a pixel format");
-		return NULL;
-	}
-	for (int i = 1; i < count; ++i)
-	{
-		if (hwnd[i])
-		{
-			HDC hdc2 = GetDC(hwnd[i]);
-			if (hdc2 == NULL)
-			{
-				ASSERT(false);
-				g_log_error.log("renderer", "Could not get the device context");
-				return NULL;
-			}
-			BOOL success = SetPixelFormat(hdc2, pixelformat, &pfd);
-			if (success == FALSE)
-			{
-				ASSERT(false);
-				g_log_error.log("renderer", "Could not set a pixel format");
-				return NULL;
-			}
-		}
-	}
-	HGLRC hglrc = wglCreateContext(hdc);
-	if (hglrc == NULL)
-	{
-		ASSERT(false);
-		g_log_error.log("renderer", "Could not create an opengl context");
-		return NULL;
-	}
-	success = wglMakeCurrent(hdc, hglrc);
-	if (success == FALSE)
-	{
-		ASSERT(false);
-		g_log_error.log("renderer", "Could not make the opengl context current rendering context");
-		return NULL;
-	}
-	glPushAttrib(GL_ALL_ATTRIB_BITS);
-	return hglrc;
-}
-
-
-bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
+bool EditorServerImpl::create(const char* base_path)
 {
 	m_message_task = LUX_NEW(MessageTask)();
 	m_message_task->m_server = this;
@@ -755,12 +668,6 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 	m_file_system->setDefaultDevice("memory:tcp");
 	m_file_system->setSaveGameDevice("memory:tcp");
 	
-	if(hwnd)
-	{
-		HWND hwnds[] = { hwnd, game_hwnd };
-		m_hglrc = createGLContext(hwnds, 2);
-	}
-
 	g_log_info.getCallback().bind<EditorServerImpl, &EditorServerImpl::onLogInfo>(this);
 	g_log_warning.getCallback().bind<EditorServerImpl, &EditorServerImpl::onLogWarning>(this);
 	g_log_error.getCallback().bind<EditorServerImpl, &EditorServerImpl::onLogError>(this);
@@ -797,12 +704,6 @@ Gizmo& EditorServer::getGizmo()
 FS::TCPFileServer& EditorServer::getTCPFileServer()
 {
 	return m_impl->m_tpc_file_server;
-}
-
-
-HGLRC EditorServer::getHGLRC()
-{
-	return m_impl->m_hglrc;
 }
 
 

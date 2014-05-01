@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 #include <QApplication>
 #include <qdir.h>
+#include "core/log.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "editor/editor_client.h"
@@ -12,43 +13,9 @@
 #include "graphics/renderer.h"
 #include "sceneview.h"
 #include "gameview.h"
+#include "wgl_render_device.h"
+#include "materialmanager.h"
 
-
-/// TODO refactor this
-class MyRenderDevice : public Lux::IRenderDevice
-{
-public:
-	MyRenderDevice(Lux::Engine& engine, const char* pipeline_path)
-	{
-		Lux::Pipeline* pipeline_object = static_cast<Lux::Pipeline*>(engine.getResourceManager().get(Lux::ResourceManager::PIPELINE)->load(pipeline_path));
-		ASSERT(pipeline_object);
-		if(pipeline_object)
-		{
-			m_pipeline = Lux::PipelineInstance::create(*pipeline_object);
-			m_pipeline->setRenderer(engine.getRenderer());
-		}
-
-	}
-	
-	virtual void beginFrame() override
-	{
-		wglMakeCurrent(m_hdc, m_opengl_context);
-	}
-
-	virtual void endFrame() override
-	{
-		wglSwapLayerBuffers(m_hdc, WGL_SWAP_MAIN_PLANE);
-	}
-
-	virtual Lux::PipelineInstance& getPipeline()
-	{
-		return *m_pipeline;
-	}
-
-	Lux::PipelineInstance* m_pipeline;
-	HDC m_hdc;
-	HGLRC m_opengl_context;
-};
 
 class App
 {
@@ -82,6 +49,91 @@ class App
 			
 		}
 
+		HGLRC createGLContext(HWND hwnd[], int count)
+		{
+
+			ASSERT(count > 0);
+			HDC hdc;
+			hdc = GetDC(hwnd[0]);
+			ASSERT(hdc != NULL);
+			if (hdc == NULL)
+			{
+				Lux::g_log_error.log("renderer", "Could not get the device context");
+				return NULL;
+			}
+			PIXELFORMATDESCRIPTOR pfd = 
+			{ 
+				sizeof(PIXELFORMATDESCRIPTOR),  //  size of this pfd  
+				1,                     // version number  
+				PFD_DRAW_TO_WINDOW |   // support window  
+				PFD_SUPPORT_OPENGL |   // support OpenGL  
+				PFD_DOUBLEBUFFER,      // double buffered  
+				PFD_TYPE_RGBA,         // RGBA type  
+				24,                    // 24-bit color depth  
+				0, 0, 0, 0, 0, 0,      // color bits ignored  
+				0,                     // no alpha buffer  
+				0,                     // shift bit ignored  
+				0,                     // no accumulation buffer  
+				0, 0, 0, 0,            // accum bits ignored  
+				32,                    // 32-bit z-buffer      
+				0,                     // no stencil buffer  
+				0,                     // no auxiliary buffer  
+				PFD_MAIN_PLANE,        // main layer  
+				0,                     // reserved  
+				0, 0, 0                // layer masks ignored  
+			}; 
+			int pixelformat = ChoosePixelFormat(hdc, &pfd);
+			if (pixelformat == 0)
+			{
+				ASSERT(false);
+				Lux::g_log_error.log("renderer", "Could not choose a pixel format");
+				return NULL;
+			}
+			BOOL success = SetPixelFormat(hdc, pixelformat, &pfd);
+			if (success == FALSE)
+			{
+				ASSERT(false);
+				Lux::g_log_error.log("renderer", "Could not set a pixel format");
+				return NULL;
+			}
+			for (int i = 1; i < count; ++i)
+			{
+				if (hwnd[i])
+				{
+					HDC hdc2 = GetDC(hwnd[i]);
+					if (hdc2 == NULL)
+					{
+						ASSERT(false);
+						Lux::g_log_error.log("renderer", "Could not get the device context");
+						return NULL;
+					}
+					BOOL success = SetPixelFormat(hdc2, pixelformat, &pfd);
+					if (success == FALSE)
+					{
+						ASSERT(false);
+						Lux::g_log_error.log("renderer", "Could not set a pixel format");
+						return NULL;
+					}
+				}
+			}
+			HGLRC hglrc = wglCreateContext(hdc);
+			if (hglrc == NULL)
+			{
+				ASSERT(false);
+				Lux::g_log_error.log("renderer", "Could not create an opengl context");
+				return NULL;
+			}
+			success = wglMakeCurrent(hdc, hglrc);
+			if (success == FALSE)
+			{
+				ASSERT(false);
+				Lux::g_log_error.log("renderer", "Could not make the opengl context current rendering context");
+				return NULL;
+			}
+			return hglrc;
+		}	
+
+
 		void init(int argc, char* argv[])
 		{
 			m_qt_app = new QApplication(argc, argv);
@@ -94,24 +146,28 @@ class App
 
 			HWND hwnd = (HWND)m_main_window->getSceneView()->widget()->winId();
 			HWND game_hwnd = (HWND)m_main_window->getGameView()->getContentWidget()->winId();
-			bool server_created = m_server.create(hwnd, game_hwnd, QDir::currentPath().toLocal8Bit().data());
+			HWND hwnds[] = {hwnd, game_hwnd};
+			HGLRC hglrc = createGLContext(hwnds, 2);
+
+			bool server_created = m_server.create(QDir::currentPath().toLocal8Bit().data());
 			ASSERT(server_created);
 			m_server.tick();
-			m_client.create(m_server.getEngine().getBasePath());
+			bool client_created = m_client.create(m_server.getEngine().getBasePath());
+			ASSERT(client_created);
 
 			m_main_window->setEditorClient(m_client);
 			m_main_window->setEditorServer(m_server);
 			m_main_window->getSceneView()->setServer(&m_server);
 
-			m_edit_render_device = new MyRenderDevice(m_server.getEngine(), "pipelines/main.json");
+			m_edit_render_device = new WGLRenderDevice(m_server.getEngine(), "pipelines/main.json");
 			m_edit_render_device->m_hdc = GetDC(hwnd);
-			m_edit_render_device->m_opengl_context = m_server.getHGLRC();
+			m_edit_render_device->m_opengl_context = hglrc;
 			m_edit_render_device->getPipeline().setScene(m_server.getEngine().getRenderScene()); /// TODO manage scene properly
 			m_server.setEditViewRenderDevice(*m_edit_render_device);
 
-			m_game_render_device = new	MyRenderDevice(m_server.getEngine(), "pipelines/game_view.json");
+			m_game_render_device = new	WGLRenderDevice(m_server.getEngine(), "pipelines/game_view.json");
 			m_game_render_device->m_hdc = GetDC(game_hwnd);
-			m_game_render_device->m_opengl_context = m_server.getHGLRC();
+			m_game_render_device->m_opengl_context = hglrc;
 			m_game_render_device->getPipeline().setScene(m_server.getEngine().getRenderScene()); /// TODO manage scene properly
 			m_server.getEngine().getRenderer().setRenderDevice(*m_game_render_device);
 
@@ -130,6 +186,8 @@ class App
 			m_server.getGizmo().updateScale(m_server.getEditCamera());
 			m_server.getGizmo().render(m_server.getEngine().getRenderer(), *m_edit_render_device);
 			m_edit_render_device->endFrame();
+
+			m_main_window->getMaterialManager()->updatePreview();
 		}
 
 		void handleEvents()
@@ -180,8 +238,8 @@ class App
 		}
 
 	private:
-		MyRenderDevice* m_edit_render_device;
-		MyRenderDevice* m_game_render_device;
+		WGLRenderDevice* m_edit_render_device;
+		WGLRenderDevice* m_game_render_device;
 		MainWindow* m_main_window;
 		Lux::EditorServer m_server;
 		Lux::EditorClient m_client;

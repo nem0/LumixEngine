@@ -25,6 +25,7 @@ public:
 	void setEditorServer(Lux::EditorServer& server);
 	class SceneView* getSceneView() const;
 	class GameView* getGameView() const;
+	class MaterialManager* getMaterialManager() const { return m_material_manager_ui; }
 
 private slots:
 	void on_actionLog_triggered();
@@ -50,5 +51,6 @@ private:
 	class AssetBrowser* m_asset_browser;
 	class ScriptCompilerWidget* m_script_compiler_ui;
 	class FileServerWidget* m_file_server_ui;
+	class MaterialManager* m_material_manager_ui;
 };
 

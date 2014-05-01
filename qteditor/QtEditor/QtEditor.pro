@@ -4,7 +4,7 @@
 #
 #-------------------------------------------------
 
-QT       += core gui
+QT       += core gui opengl
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -28,7 +28,8 @@ SOURCES += main.cpp\
     fileserverwidget.cpp \
     propertywidgets/animable_widget.cpp \
     propertywidgets/camerawidget.cpp \
-    propertywidgets/lightwidget.cpp
+    propertywidgets/lightwidget.cpp \
+    materialmanager.cpp
 
 HEADERS  += mainwindow.h \
     sceneview.h \ 
@@ -44,7 +45,10 @@ HEADERS  += mainwindow.h \
     fileserverwidget.h \
     propertywidgets/animable_widget.h \
     propertywidgets/camerawidget.h \
-    propertywidgets/lightwidget.h
+    propertywidgets/lightwidget.h \
+    materialmanager.h \
+    wgl_render_device.h \
+    renderdevicewidget.h
 
 FORMS    += mainwindow.ui \
     logwidget.ui \
@@ -58,7 +62,8 @@ FORMS    += mainwindow.ui \
     fileserverwidget.ui \
     propertywidgets/animable_widget.ui \
     propertywidgets/camerawidget.ui \
-    propertywidgets/lightwidget.ui
+    propertywidgets/lightwidget.ui \
+    materialmanager.ui
 
 win32
 {
