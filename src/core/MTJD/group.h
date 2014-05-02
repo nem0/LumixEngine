@@ -9,7 +9,7 @@ namespace Lux
 		class LUX_CORE_API Group : public BaseEntry
 		{
 		public:
-			Group(bool sync_event);
+			explicit Group(bool sync_event);
 			~Group();
 
 			void addStaticDependency(BaseEntry* entry);

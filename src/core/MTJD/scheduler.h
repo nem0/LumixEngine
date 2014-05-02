@@ -13,10 +13,10 @@ namespace Lux
 		class LUX_CORE_API Scheduler : public MT::Task
 		{
 		public:
-			Scheduler(Manager& manager);
+			explicit Scheduler(Manager& manager);
 			~Scheduler();
 
-			virtual int task();
+			virtual int task() override;
 
 			void dataSignal();
 

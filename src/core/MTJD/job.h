@@ -21,7 +21,7 @@ namespace Lux
 			virtual void incrementDependency() override;
 			virtual void decrementDependency() override;
 
-			Priority	getPriority() { return m_priority; }
+			Priority getPriority() const { return m_priority; }
 
 		protected:
 
