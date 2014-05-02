@@ -3,8 +3,8 @@
 #include "core/fs/ifile.h"
 #include "core/fs/ifile_system_defines.h"
 #include "core/fs/file_system.h"
-#include "core/tcp_connector.h"
-#include "core/tcp_stream.h"
+#include "core/net/tcp_connector.h"
+#include "core/net/tcp_stream.h"
 #include "core/MT/spin_mutex.h"
 
 

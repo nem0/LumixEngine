@@ -8,8 +8,8 @@
 #include "core/string.h"
 #include "core/fs/tcp_file_device.h"
 #include "core/MT/task.h"
-#include "core/tcp_acceptor.h"
-#include "core/tcp_stream.h"
+#include "core/net/tcp_acceptor.h"
+#include "core/net/tcp_stream.h"
 
 namespace Lux
 {
