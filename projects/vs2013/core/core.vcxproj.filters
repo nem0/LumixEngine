@@ -31,15 +31,6 @@
     <ClInclude Include="..\..\..\src\core\timer.h" />
     <ClInclude Include="..\..\..\src\core\vec3.h" />
     <ClInclude Include="..\..\..\src\core\vec4.h" />
-    <ClInclude Include="..\..\..\src\core\tcp_acceptor.h">
-      <Filter>Net</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\core\tcp_connector.h">
-      <Filter>Net</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\core\tcp_stream.h">
-      <Filter>Net</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\core\resource_manager.h" />
     <ClInclude Include="..\..\..\src\core\resource_manager_base.h" />
     <ClInclude Include="..\..\..\src\core\path.h" />
@@ -120,6 +111,15 @@
     <ClInclude Include="..\..\..\src\core\MTJD\framework.h">
       <Filter>MTJD</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\core\Net\tcp_acceptor.h">
+      <Filter>Net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\core\Net\tcp_connector.h">
+      <Filter>Net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\core\Net\tcp_stream.h">
+      <Filter>Net</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\core\blob.cpp" />
@@ -136,15 +136,6 @@
     <ClCompile Include="..\..\..\src\core\os_file.cpp" />
     <ClCompile Include="..\..\..\src\core\quat.cpp" />
     <ClCompile Include="..\..\..\src\core\timer.cpp" />
-    <ClCompile Include="..\..\..\src\core\pc\tcp_acceptor.cpp">
-      <Filter>Net</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\core\pc\tcp_connector.cpp">
-      <Filter>Net</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\core\pc\tcp_stream.cpp">
-      <Filter>Net</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\core\pc\input_system.cpp" />
     <ClCompile Include="..\..\..\src\core\resource_manager.cpp" />
     <ClCompile Include="..\..\..\src\core\resource_manager_base.cpp" />
@@ -203,6 +194,15 @@
     </ClCompile>
     <ClCompile Include="..\..\..\src\core\MTJD\scheduler.cpp">
       <Filter>MTJD</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\core\Net\pc\tcp_acceptor.cpp">
+      <Filter>Net</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\core\Net\pc\tcp_connector.cpp">
+      <Filter>Net</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\core\Net\pc\tcp_stream.cpp">
+      <Filter>Net</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

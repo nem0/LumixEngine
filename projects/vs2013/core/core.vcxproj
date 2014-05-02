@@ -192,6 +192,9 @@
     <ClInclude Include="..\..\..\src\core\MT\spin_mutex.h" />
     <ClInclude Include="..\..\..\src\core\MT\task.h" />
     <ClInclude Include="..\..\..\src\core\MT\transaction_queue.h" />
+    <ClInclude Include="..\..\..\src\core\Net\tcp_acceptor.h" />
+    <ClInclude Include="..\..\..\src\core\Net\tcp_connector.h" />
+    <ClInclude Include="..\..\..\src\core\Net\tcp_stream.h" />
     <ClInclude Include="..\..\..\src\core\new.h" />
     <ClInclude Include="..\..\..\src\core\new_macros.h" />
     <ClInclude Include="..\..\..\src\core\os_file.h" />
@@ -206,9 +209,6 @@
     <ClInclude Include="..\..\..\src\core\stack_allocator.h" />
     <ClInclude Include="..\..\..\src\core\static_array.h" />
     <ClInclude Include="..\..\..\src\core\string.h" />
-    <ClInclude Include="..\..\..\src\core\tcp_acceptor.h" />
-    <ClInclude Include="..\..\..\src\core\tcp_connector.h" />
-    <ClInclude Include="..\..\..\src\core\tcp_stream.h" />
     <ClInclude Include="..\..\..\src\core\timer.h" />
     <ClInclude Include="..\..\..\src\core\vec3.h" />
     <ClInclude Include="..\..\..\src\core\vec4.h" />
@@ -241,14 +241,14 @@
     <ClCompile Include="..\..\..\src\core\MT\pc\semaphore.cpp" />
     <ClCompile Include="..\..\..\src\core\MT\pc\spin_mutex.cpp" />
     <ClCompile Include="..\..\..\src\core\MT\pc\task.cpp" />
+    <ClCompile Include="..\..\..\src\core\Net\pc\tcp_acceptor.cpp" />
+    <ClCompile Include="..\..\..\src\core\Net\pc\tcp_connector.cpp" />
+    <ClCompile Include="..\..\..\src\core\Net\pc\tcp_stream.cpp" />
     <ClCompile Include="..\..\..\src\core\new.cpp" />
     <ClCompile Include="..\..\..\src\core\new_macros.cpp" />
     <ClCompile Include="..\..\..\src\core\os_file.cpp" />
     <ClCompile Include="..\..\..\src\core\path.cpp" />
     <ClCompile Include="..\..\..\src\core\pc\input_system.cpp" />
-    <ClCompile Include="..\..\..\src\core\pc\tcp_acceptor.cpp" />
-    <ClCompile Include="..\..\..\src\core\pc\tcp_connector.cpp" />
-    <ClCompile Include="..\..\..\src\core\pc\tcp_stream.cpp" />
     <ClCompile Include="..\..\..\src\core\quat.cpp" />
     <ClCompile Include="..\..\..\src\core\resource.cpp" />
     <ClCompile Include="..\..\..\src\core\resource_manager.cpp" />
