@@ -27,8 +27,14 @@ public:
 	void apply(Renderer& renderer, PipelineInstance& pipeline);
 	void setShader(Shader* shader) { m_shader = shader; }
 	void addTexture(Texture* texture) { m_textures.push(texture); }
-	Shader* getShader() { return m_shader; }
+	Shader* getShader() const { return m_shader; }
 	bool isZTest() const { return m_is_z_test; }
+	void enableZTest(bool enable) { m_is_z_test = enable; }
+	bool isBackfaceCulling() const { return m_is_backface_culling; }
+	void enableBackfaceCulling(bool enable) { m_is_backface_culling = enable; }
+	int getTextureCount() const { return m_textures.size(); }
+	Texture* getTexture(int i) { return m_textures[i]; }
+	void setTexture(int i, Texture* texture) { m_textures[i] = texture; }
 
 private:
 	Material(const Path& path, ResourceManager& resource_manager)

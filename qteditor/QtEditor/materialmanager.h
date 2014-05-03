@@ -28,11 +28,14 @@ class MaterialManager : public QDockWidget
 	private:
 		void onPropertyList(Lux::Event& event);
 		void fillObjectMaterials();
+		void selectMaterial(const char* path);
 
 	private slots:
-		void on_fileListView_doubleClicked(const QModelIndex &index);
-
-		void on_objectMaterialList_doubleClicked(const QModelIndex &index);
+		void on_fileListView_doubleClicked(const QModelIndex& index);
+		void on_objectMaterialList_doubleClicked(const QModelIndex& index);
+		void onBoolPropertyStateChanged(int state);
+		void onShaderChanged();
+		void onTextureChanged();
 
 	private:
 		Ui::MaterialManager* m_ui;

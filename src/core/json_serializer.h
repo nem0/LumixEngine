@@ -34,6 +34,9 @@ namespace Lux
 			virtual void serialize(const char* label, int32_t value) override;
 			virtual void serialize(const char* label, const char* value) override;
 			virtual void serialize(const char* label, bool value) override;
+			virtual void beginObject() override;
+			virtual void beginObject(const char* label) override;
+			virtual void endObject() override;
 			virtual void beginArray(const char* label) override;
 			virtual void endArray() override;
 			virtual void serializeArrayItem(uint32_t value) override;
