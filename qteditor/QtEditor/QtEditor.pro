@@ -67,6 +67,6 @@ FORMS    += mainwindow.ui \
 
 win32
 {
-    INCLUDEPATH = ../../src
+    INCLUDEPATH = ../../src;../../external/glew/include
     LIBS = -L../../bin/Win32_Debug -lcore -lengine -lopengl32
 }

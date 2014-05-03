@@ -14,9 +14,11 @@
 #include <QtWidgets/QApplication>
 #include <QtWidgets/QButtonGroup>
 #include <QtWidgets/QDockWidget>
+#include <QtWidgets/QFormLayout>
 #include <QtWidgets/QHeaderView>
 #include <QtWidgets/QListView>
 #include <QtWidgets/QListWidget>
+#include <QtWidgets/QPushButton>
 #include <QtWidgets/QSplitter>
 #include <QtWidgets/QTabWidget>
 #include <QtWidgets/QVBoxLayout>
@@ -39,13 +41,16 @@ public:
     QVBoxLayout *verticalLayout_3;
     QListWidget *objectMaterialList;
     RenderDeviceWidget *previewWidget;
-    QWidget *widget_2;
+    QWidget *materialProperties;
+    QVBoxLayout *verticalLayout_4;
+    QFormLayout *materialPropertiesLayout;
+    QPushButton *saveMaterialButton;
 
     void setupUi(QDockWidget *MaterialManager)
     {
         if (MaterialManager->objectName().isEmpty())
             MaterialManager->setObjectName(QStringLiteral("MaterialManager"));
-        MaterialManager->resize(400, 300);
+        MaterialManager->resize(680, 422);
         dockWidgetContents = new QWidget();
         dockWidgetContents->setObjectName(QStringLiteral("dockWidgetContents"));
         verticalLayout = new QVBoxLayout(dockWidgetContents);
@@ -81,9 +86,22 @@ public:
         previewWidget = new RenderDeviceWidget(splitter);
         previewWidget->setObjectName(QStringLiteral("previewWidget"));
         splitter->addWidget(previewWidget);
-        widget_2 = new QWidget(splitter);
-        widget_2->setObjectName(QStringLiteral("widget_2"));
-        splitter->addWidget(widget_2);
+        materialProperties = new QWidget(splitter);
+        materialProperties->setObjectName(QStringLiteral("materialProperties"));
+        verticalLayout_4 = new QVBoxLayout(materialProperties);
+        verticalLayout_4->setObjectName(QStringLiteral("verticalLayout_4"));
+        verticalLayout_4->setContentsMargins(2, 2, 2, 2);
+        materialPropertiesLayout = new QFormLayout();
+        materialPropertiesLayout->setObjectName(QStringLiteral("materialPropertiesLayout"));
+
+        verticalLayout_4->addLayout(materialPropertiesLayout);
+
+        saveMaterialButton = new QPushButton(materialProperties);
+        saveMaterialButton->setObjectName(QStringLiteral("saveMaterialButton"));
+
+        verticalLayout_4->addWidget(saveMaterialButton);
+
+        splitter->addWidget(materialProperties);
 
         verticalLayout->addWidget(splitter);
 
@@ -102,6 +120,7 @@ public:
         MaterialManager->setWindowTitle(QApplication::translate("MaterialManager", "Material manager", 0));
         tabWidget->setTabText(tabWidget->indexOf(tab), QApplication::translate("MaterialManager", "Files", 0));
         tabWidget->setTabText(tabWidget->indexOf(tab_2), QApplication::translate("MaterialManager", "Object", 0));
+        saveMaterialButton->setText(QApplication::translate("MaterialManager", "Save material", 0));
     } // retranslateUi
 
 };

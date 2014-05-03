@@ -17,6 +17,9 @@ namespace Lux
 			virtual void serialize(const char* label, int32_t value) = 0;
 			virtual void serialize(const char* label, const char* value) = 0;
 			virtual void serialize(const char* label, bool value) = 0;
+			virtual void beginObject() = 0;
+			virtual void beginObject(const char* label) = 0;
+			virtual void endObject() = 0;
 			virtual void beginArray(const char* label) = 0;
 			virtual void endArray() = 0;
 			virtual void serializeArrayItem(uint32_t value) = 0;

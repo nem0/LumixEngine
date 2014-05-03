@@ -83,6 +83,30 @@ void JsonSerializer::serialize(const char* label, bool value)
 }
 
 
+void JsonSerializer::beginObject()
+{
+	writeBlockComma();
+	m_file.write("{", 4);
+	m_is_first_in_block = true;
+}
+
+
+void JsonSerializer::beginObject(const char* label)
+{
+	writeBlockComma();
+	writeString(label);
+	m_file.write(" : {", 4);
+	m_is_first_in_block = true;
+}
+
+void JsonSerializer::endObject()
+{
+	m_file.write("}", 1);
+	m_is_first_in_block = false;
+}
+
+
+
 void JsonSerializer::beginArray(const char* label)
 {
 	writeBlockComma();

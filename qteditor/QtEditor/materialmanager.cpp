@@ -1,7 +1,12 @@
 #include "materialmanager.h"
 #include "ui_materialmanager.h"
+#include <qboxlayout.h>
+#include <qcheckbox.h>
 #include <qfilesystemmodel.h>
+#include <qformlayout.h>
+#include <qlineedit.h>
 #include <qpainter.h>
+#include <qpushbutton.h>
 #include "core/crc32.h"
 #include "editor/editor_server.h"
 #include "editor/editor_client.h"
@@ -12,8 +17,21 @@
 #include "graphics/pipeline.h"
 #include "graphics/renderer.h"
 #include "graphics/render_scene.h"
+#include "graphics/shader.h"
+#include "graphics/texture.h"
 #include "universe/universe.h"
 #include "wgl_render_device.h"
+
+
+struct CheckboxWithUserData : public QCheckBox
+{
+	void* m_user_data;
+};
+
+struct LineEditWithUserData : public QLineEdit
+{
+	void* m_user_data;
+};
 
 
 class MaterialManagerUI
@@ -25,6 +43,7 @@ class MaterialManagerUI
 		WGLRenderDevice* m_render_device;
 		Lux::Model* m_selected_object_model;
 		QFileSystemModel* m_fs_model;
+		Lux::Material* m_material;
 };
 
 
@@ -166,21 +185,162 @@ MaterialManager::~MaterialManager()
 	delete m_ui;
 }
 
+class ICppObjectProperty
+{
+	public:
+		enum Type
+		{
+			BOOL,
+			SHADER,
+			UNKNOWN
+		};
+
+	public:
+		Type getType() const { return m_type; }
+		const char* getName() const { return m_name.c_str(); }
+
+		template <class T>
+		static Type getType();
+
+		template <> static Type getType<bool>() { return BOOL; }
+		template <> static Type getType<Lux::Shader*>() { return SHADER; }
+
+	protected:
+		Type m_type;
+		Lux::string m_name;
+
+};
+
+template <typename V, class T>
+class CppObjectProperty : public ICppObjectProperty
+{
+
+	public:
+		typedef V (T::*Getter)() const;
+		typedef void (T::*Setter)(V);
+
+
+	public:
+		CppObjectProperty(const char* name, Getter getter, Setter setter)
+		{
+			m_name = name;
+			m_type = ICppObjectProperty::getType<V>();
+			m_getter = getter;
+			m_setter = setter;
+		}
+
+		V get(const T& t)
+		{
+			return (t.*m_getter)();
+		}
+
+		void set(T& t, const V& v)
+		{
+			(t.*m_setter)(v);
+		}
+
+	private:
+		Getter m_getter;
+		Setter m_setter;
+};
+
+void MaterialManager::onBoolPropertyStateChanged(int)
+{
+	CheckboxWithUserData* obj = static_cast<CheckboxWithUserData*>(QObject::sender());
+	CppObjectProperty<bool, Lux::Material>* prop = static_cast<CppObjectProperty<bool, Lux::Material>*>(obj->m_user_data);
+	prop->set(*m_impl->m_material, obj->isChecked());
+}
+
+void MaterialManager::onTextureChanged()
+{
+	LineEditWithUserData* edit = static_cast<LineEditWithUserData*>(QObject::sender());
+	int i = (intptr_t)edit->m_user_data;
+	m_impl->m_material->setTexture(i, static_cast<Lux::Texture*>(m_impl->m_engine->getResourceManager().get(Lux::ResourceManager::TEXTURE)->load(edit->text().toLatin1().data())));
+}
+
+void MaterialManager::onShaderChanged()
+{
+	QLineEdit* edit = static_cast<QLineEdit*>(QObject::sender());
+	m_impl->m_material->setShader(static_cast<Lux::Shader*>(m_impl->m_engine->getResourceManager().get(Lux::ResourceManager::SHADER)->load(edit->text().toLatin1().data())));
+}
+
+void MaterialManager::selectMaterial(const char* path)
+{
+	ICppObjectProperty* properties[] = 
+	{
+		new CppObjectProperty<bool, Lux::Material>("Z test", &Lux::Material::isZTest, &Lux::Material::enableZTest),
+		new CppObjectProperty<bool, Lux::Material>("Backface culling", &Lux::Material::isBackfaceCulling, &Lux::Material::enableBackfaceCulling),
+		new CppObjectProperty<Lux::Shader*, Lux::Material>("Shader", &Lux::Material::getShader, &Lux::Material::setShader)
+	};
+
+	Lux::Model* model = static_cast<Lux::Model*>(m_impl->m_engine->getResourceManager().get(Lux::ResourceManager::MODEL)->get("models/material_sphere.msh"));
+	Lux::Material* material = static_cast<Lux::Material*>(m_impl->m_engine->getResourceManager().get(Lux::ResourceManager::MATERIAL)->load(path));
+	m_impl->m_material = material;
+	model->getMesh(0).setMaterial(material);
+
+
+	QFormLayout* layout = m_ui->materialPropertiesLayout;
+	QLayoutItem* item;
+	while((item = layout->takeAt(0)) != NULL)
+	{
+		delete item;
+	}
+	for(int i = 0; i < sizeof(properties) / sizeof(ICppObjectProperty*); ++i)
+	{
+		switch(properties[i]->getType())
+		{
+			case ICppObjectProperty::BOOL:
+				{
+					CheckboxWithUserData* checkbox = new CheckboxWithUserData();
+					checkbox->setChecked(static_cast<CppObjectProperty<bool, Lux::Material>*>(properties[i])->get(*material));
+					layout->addRow(properties[i]->getName(), checkbox);
+					checkbox->m_user_data = properties[i];
+					connect(checkbox, SIGNAL(stateChanged(int)), this, SLOT(onBoolPropertyStateChanged(int)));
+				}
+				break;
+			case ICppObjectProperty::SHADER:
+				{
+					QLineEdit* edit = new QLineEdit();
+					Lux::Shader* shader = static_cast<CppObjectProperty<Lux::Shader*, Lux::Material>*>(properties[i])->get(*material);
+					if(shader)
+					{
+						edit->setText(shader->getPath().c_str());
+					}
+					connect(edit, SIGNAL(editingFinished()), this, SLOT(onShaderChanged()));
+					layout->addRow(properties[i]->getName(), edit);
+				}
+				break;
+			default: 
+				ASSERT(false);
+				break;
+		}
+	}
+	for(int i = 0; i < material->getTextureCount(); ++i)
+	{
+		LineEditWithUserData* edit = new LineEditWithUserData;
+		QBoxLayout* inner_layout = new QBoxLayout(QBoxLayout::Direction::LeftToRight);
+		QPushButton* button = new QPushButton();
+		button->setText("Remove");
+		inner_layout->addWidget(edit);
+		inner_layout->addWidget(button);
+		edit->setText(material->getTexture(i)->getPath().c_str());
+		edit->m_user_data = (void*)(intptr_t)i;
+		layout->addRow("Texture", inner_layout);
+		connect(edit, SIGNAL(editingFinished()), this, SLOT(onTextureChanged()));
+	}
+	QPushButton* button = new QPushButton();
+	button->setText("Add Texture");
+	layout->addRow("", button);
+}
+
 void MaterialManager::on_fileListView_doubleClicked(const QModelIndex &index)
 {
-	Lux::Model* model = static_cast<Lux::Model*>(m_impl->m_engine->getResourceManager().get(Lux::ResourceManager::MODEL)->get("models/material_sphere.msh"));
 	QString file_path = m_impl->m_fs_model->fileInfo(index).filePath().toLower();
-
-	Lux::Material* material = static_cast<Lux::Material*>(m_impl->m_engine->getResourceManager().get(Lux::ResourceManager::MATERIAL)->load(file_path.toLatin1().data()));
-	model->getMesh(0).setMaterial(material);
+	selectMaterial(file_path.toLatin1().data());
 }
 
 void MaterialManager::on_objectMaterialList_doubleClicked(const QModelIndex &index)
 {
-	Lux::Model* model = static_cast<Lux::Model*>(m_impl->m_engine->getResourceManager().get(Lux::ResourceManager::MODEL)->get("models/material_sphere.msh"));
 	QListWidgetItem* item = m_ui->objectMaterialList->item(index.row());
-	
-	Lux::Material* material = static_cast<Lux::Material*>(m_impl->m_engine->getResourceManager().get(Lux::ResourceManager::MATERIAL)->load(item->text().toLatin1().data()));
-	model->getMesh(0).setMaterial(material);
-
+	selectMaterial(item->text().toLatin1().data());
 }
