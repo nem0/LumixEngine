@@ -22,6 +22,7 @@ namespace Lux
 
 			virtual ~EventsFile() 
 			{
+				LUX_DELETE(&m_file);
 			}
 
 

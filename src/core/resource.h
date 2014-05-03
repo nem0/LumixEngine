@@ -41,7 +41,7 @@ namespace Lux
 
 	protected:
 		Resource(const Path& path, ResourceManager& resource_manager);
-		~Resource();
+		virtual ~Resource();
 
 		//events
 		void onEmpty(void);

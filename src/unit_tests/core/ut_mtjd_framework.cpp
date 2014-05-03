@@ -154,5 +154,5 @@ void UT_MTJDFrameworkDependencyTest(const char* params)
 	LUX_DELETE_ARRAY(jobs);
 }
 
-REGISTER_TEST("unit_tests/core/MTJD/frameworkTest", UT_MTJDFrameworkTest, "")
-REGISTER_TEST("unit_tests/core/MTJD/frameworkDependencyTest", UT_MTJDFrameworkDependencyTest, "")
+//REGISTER_TEST("unit_tests/core/MTJD/frameworkTest", UT_MTJDFrameworkTest, "")
+//REGISTER_TEST("unit_tests/core/MTJD/frameworkDependencyTest", UT_MTJDFrameworkDependencyTest, "")
