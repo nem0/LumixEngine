@@ -131,13 +131,13 @@ namespace
 			|| !prod4->isFinished())
 			Lux::MT::yield();
 
+		while (!transQueue.isEmpty())
+			Lux::MT::yield();
+
 		prod1->destroy();
 		prod2->destroy();
 		prod3->destroy();
 		prod4->destroy();
-
-		while (!transQueue.isEmpty())
-			Lux::MT::yield();
 
 		transQueue.abort();
 		transQueue.abort();
