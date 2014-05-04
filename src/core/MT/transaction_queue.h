@@ -51,19 +51,22 @@ namespace Lux
 			{
 				do
 				{
-					int32_t alloc_ptr = m_al;
-					int32_t alloc_idx = alloc_ptr & (size - 1);
-
-					Node cur_val(alloc_ptr, m_alloc[alloc_idx].data.pair.el);
-
-					if (cur_val.data.pair.el > -1)
+					while ((m_al - m_fr) < size)
 					{
-						Node new_val(alloc_ptr, -1);
+						int32_t alloc_ptr = m_al;
+						int32_t alloc_idx = alloc_ptr & (size - 1);
 
-						if (compareAndExchange64(&m_alloc[alloc_idx].data.val, new_val.data.val, cur_val.data.val))
+						Node cur_val(alloc_ptr, m_alloc[alloc_idx].data.pair.el);
+
+						if (cur_val.data.pair.el > -1)
 						{
-							atomicIncrement(&m_al);
-							return &m_pool[cur_val.data.pair.el];
+							Node new_val(alloc_ptr, -1);
+
+							if (compareAndExchange64(&m_alloc[alloc_idx].data.val, new_val.data.val, cur_val.data.val))
+							{
+								atomicIncrement(&m_al);
+								return &m_pool[cur_val.data.pair.el];
+							}
 						}
 					}
 				} while (wait);
@@ -102,6 +105,8 @@ namespace Lux
 
 				do
 				{
+					ASSERT((m_wr - m_rd) < size);
+
 					Node cur_node(0, -1);
 					Node new_node(0, idx);
 
@@ -124,17 +129,15 @@ namespace Lux
 
 			T* pop(bool wait)
 			{
-				do
-				{
-					if (wait)
-					{
-						m_data_signal.wait();
-						if (isAborted())
-						{
-							return NULL;
-						}
-					}
+				bool can_read = wait ? m_data_signal.wait(), wait : m_data_signal.poll();
 
+				if (isAborted())
+				{
+					return NULL;
+				}
+
+				for (; can_read;)
+				{
 					while (m_rd != m_wr)
 					{
 						int cur_read_idx = m_rd;
@@ -153,7 +156,7 @@ namespace Lux
 							}
 						}
 					}
-				} while (wait);
+				}
 
 				return NULL;
 			}
