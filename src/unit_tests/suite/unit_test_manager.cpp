@@ -9,6 +9,8 @@
 
 #include <Windows.h>
 
+//#define ASSERT_HANDLE_FAIL
+
 namespace Lux
 {
 	namespace UnitTest
@@ -143,7 +145,8 @@ namespace Lux
 				if (m_fails > 0)
 				{
 					g_log_info.log("unit", "----------Fails----------");
-					for (int i = 0; i < m_failed_tests.size(); i++) {
+					for (int i = 0; i < m_failed_tests.size(); i++) 
+					{
 						g_log_info.log("unit", "%s(%d)", m_failed_tests[i].m_file_name, m_failed_tests[i].m_line);
 					}
 				}
@@ -158,6 +161,10 @@ namespace Lux
 				fi.m_file_name = file_name;
 				fi.m_line = line;
 				m_fails++;
+
+#if ASSERT_HANDLE_FAIL
+				ASSERT(false);
+#endif //ASSERT_HANDLE_FAIL
 
 				m_task.exit(10);
 			}
