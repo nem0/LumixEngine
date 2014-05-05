@@ -251,7 +251,7 @@ struct PipelineImpl : public Pipeline
 		{
 			JsonSerializer serializer(*file, JsonSerializer::READ);
 			deserialize(serializer);
-			onReady();
+			decrementDepCount();
 		}
 		else
 		{

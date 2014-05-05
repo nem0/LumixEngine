@@ -35,13 +35,13 @@ namespace Lux
 
 		ObserverCallback& getObserverCb() { return m_cb; }
 
-		uint32_t size() const { return m_size; }
+		size_t size() const { return m_size; }
 
 		ResourceManager& getResourceManager() { return m_resource_manager; }
 
 	protected:
 		Resource(const Path& path, ResourceManager& resource_manager);
-		~Resource();
+		virtual ~Resource();
 
 		//events
 		void onEmpty(void);
@@ -74,7 +74,7 @@ namespace Lux
 
 	protected:
 		Path m_path;
-		uint32_t m_size;
+		size_t m_size;
 		ObserverCallback m_cb;
 		ResourceManager& m_resource_manager;
 	};
