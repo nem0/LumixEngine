@@ -1,6 +1,7 @@
 #include "unit_tests/suite/lux_unit_tests.h"
 
-#include "core/MT/transaction_queue.h"
+#include "core/MT/lock_free_fixed_queue.h"
+#include "core/MT/transaction.h"
 #include "core/MT/task.h"
 
 namespace
@@ -13,7 +14,7 @@ namespace
 	};
 
 	typedef Lux::MT::Transaction<Test> AsynTrans;
-	typedef Lux::MT::TransactionQueue<AsynTrans, 16> TransQueue;
+	typedef Lux::MT::LockFreeFixedQueue<AsynTrans, 16> TransQueue;
 
 	class TestTaskConsumer : public Lux::MT::Task
 	{

@@ -84,9 +84,6 @@
     <ClInclude Include="..\..\..\src\core\MT\task.h">
       <Filter>MT</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\core\MT\transaction_queue.h">
-      <Filter>MT</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\core\MTJD\base_entry.h">
       <Filter>MTJD</Filter>
     </ClInclude>
@@ -119,6 +116,12 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\Net\tcp_stream.h">
       <Filter>Net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\core\MT\transaction.h">
+      <Filter>MT</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\core\MT\lock_free_fixed_queue.h">
+      <Filter>MT</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

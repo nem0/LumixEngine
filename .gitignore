@@ -9,3 +9,4 @@ evona_test/
 *.orig
 debug/
 release/
+/qteditor/QtEditor/Makefile
