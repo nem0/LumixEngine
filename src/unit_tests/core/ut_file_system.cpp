@@ -83,7 +83,7 @@ namespace
 		LUX_EXPECT_FALSE(!!(1 << (uint32_t)Lux::FS::EventType::CLOSE_BEGIN & occured_event));
 		LUX_EXPECT_FALSE(!!(1 << (uint32_t)Lux::FS::EventType::CLOSE_FINISHED & occured_event));
 
-		file->close();
+		file_system->close(file);
 
 		LUX_EXPECT_TRUE(!!(1 << (uint32_t)Lux::FS::EventType::CLOSE_BEGIN & occured_event));
 		LUX_EXPECT_TRUE(!!(1 << (uint32_t)Lux::FS::EventType::CLOSE_FINISHED & occured_event));
@@ -112,10 +112,15 @@ namespace
 		LUX_EXPECT_FALSE(!!(1 << (uint32_t)Lux::FS::EventType::CLOSE_BEGIN & occured_event));
 		LUX_EXPECT_FALSE(!!(1 << (uint32_t)Lux::FS::EventType::CLOSE_FINISHED & occured_event));
 
-		file->close();
+		file_system->close(file);
 
 		LUX_EXPECT_TRUE(!!(1 << (uint32_t)Lux::FS::EventType::CLOSE_BEGIN & occured_event));
 		LUX_EXPECT_TRUE(!!(1 << (uint32_t)Lux::FS::EventType::CLOSE_FINISHED & occured_event));
+
+		LUX_DELETE(disk_file_device);
+		LUX_DELETE(file_event_device);
+
+		Lux::FS::FileSystem::destroy(file_system);
 	};
 }
 

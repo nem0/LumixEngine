@@ -1,8 +1,9 @@
 #include "unit_tests/suite/lux_unit_tests.h"
 
 #include "core/log.h"
-#include "core/task.h"
-#include "core/transaction_queue.h"
+#include "core/MT/lock_free_fixed_queue.h"
+#include "core/MT/task.h"
+#include "core/MT/transaction.h"
 #include "core/queue.h"
 #include "core/array.h"
 
@@ -30,7 +31,7 @@ namespace Lux
 		};
 
 		typedef MT::Transaction<UnitTestPair> AsynTest;
-		typedef MT::TransactionQueue<AsynTest, C_MAX_TRANS> TransQueue;
+		typedef MT::LockFreeFixedQueue<AsynTest, C_MAX_TRANS> TransQueue;
 		typedef Queue<AsynTest*, C_MAX_TRANS> InProgressQueue;
 
 		class WorkerTask : public MT::Task
@@ -105,14 +106,14 @@ namespace Lux
 						if(test->isCompleted())
 						{
 							m_in_progress.pop();
-							m_trans_queue.dealoc(test);
+							m_trans_queue.dealoc(test, true);
 						}
 					}
 
 					if(i < c)
 					{
 						UnitTestPair& pair = m_unit_tests[i];
-						AsynTest* test = m_trans_queue.alloc(false);
+						AsynTest* test = m_trans_queue.alloc(true);
 						test->data.name = pair.name;
 						test->data.func = pair.func;
 						test->data.parameters = pair.parameters;
@@ -127,7 +128,7 @@ namespace Lux
 						// test failed, remove it from the queue and spawn new thread
 						AsynTest* test = m_in_progress.front();
 						m_in_progress.pop();
-							m_trans_queue.dealoc(test);
+							m_trans_queue.dealoc(test, true);
 
 						m_task.destroy();
 						spawnWorkerTask();

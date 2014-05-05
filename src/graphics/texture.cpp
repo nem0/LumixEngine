@@ -228,7 +228,7 @@ void Texture::apply(int unit)
 bool Texture::loadTGA(FS::IFile* file)
 {
 	TODO("Optimize it! Buffer is not necesary at all and image_dest might be shared.");
-	int buffer_size = file->size();
+	size_t buffer_size = file->size();
 	char* buffer = LUX_NEW_ARRAY(char, buffer_size);
 	file->read(buffer, buffer_size);
 
@@ -466,7 +466,7 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	if (success)
 	{
 		const char* path = m_path.c_str();
-		int len = m_path.length();
+		size_t len = m_path.length();
 		if (len > 3 && strcmp(path + len - 4, ".dds") == 0)
 		{
 			bool loaded = loadDDS(file);

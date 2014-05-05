@@ -47,8 +47,10 @@ namespace Lux
 
 	void Resource::onReloading(void)
 	{
+		if (State::READY == m_state)
+			++m_dep_count;
+
 		m_state = State::UNLOADING;
-		++m_dep_count;
 		m_cb.invoke(State::UNLOADING);
 	}
 
