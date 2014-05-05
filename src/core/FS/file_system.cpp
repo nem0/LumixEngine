@@ -5,8 +5,9 @@
 #include "core/array.h"
 #include "core/stack_allocator.h"
 #include "core/string.h"
+#include "core/MT/lock_free_fixed_queue.h"
 #include "core/MT/task.h"
-#include "core/MT/transaction_queue.h"
+#include "core/MT/transaction.h"
 #include "core/queue.h"
 
 namespace Lux
@@ -35,7 +36,7 @@ namespace Lux
 		static const int32_t C_MAX_TRANS = 16;
 
 		typedef MT::Transaction<AsyncItem> AsynTrans;
-		typedef MT::TransactionQueue<AsynTrans, C_MAX_TRANS> TransQueue;
+		typedef MT::LockFreeFixedQueue<AsynTrans, C_MAX_TRANS> TransQueue;
 		typedef Queue<AsynTrans*, C_MAX_TRANS> InProgressQueue;
 		typedef Array<AsyncItem> ItemsTable;
 		typedef Array<IFileDevice*> DevicesTable;

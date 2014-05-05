@@ -86,7 +86,7 @@ namespace Lux
 		intptr_t m_allocated_memory;
 		uint8_t m_mark;
 
-		static MemoryTracker* s_instance;
+		static MemoryTracker s_instance;
 		static uint32_t s_alloc_counter;
 	};
 } //~namespace Lux

@@ -1,8 +1,9 @@
 #include "unit_tests/suite/lux_unit_tests.h"
 
 #include "core/log.h"
+#include "core/MT/lock_free_fixed_queue.h"
 #include "core/MT/task.h"
-#include "core/MT/transaction_queue.h"
+#include "core/MT/transaction.h"
 #include "core/queue.h"
 #include "core/array.h"
 
@@ -30,7 +31,7 @@ namespace Lux
 		};
 
 		typedef MT::Transaction<UnitTestPair> AsynTest;
-		typedef MT::TransactionQueue<AsynTest, C_MAX_TRANS> TransQueue;
+		typedef MT::LockFreeFixedQueue<AsynTest, C_MAX_TRANS> TransQueue;
 		typedef Queue<AsynTest*, C_MAX_TRANS> InProgressQueue;
 
 		class WorkerTask : public MT::Task

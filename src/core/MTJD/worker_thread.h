@@ -2,7 +2,7 @@
 
 
 #include "core/MT/task.h"
-#include "core/MT/transaction_queue.h"
+#include "core/MT/lock_free_fixed_queue.h"
 
 #include "core/MTJD/manager.h"
 

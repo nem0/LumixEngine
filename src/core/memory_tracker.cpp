@@ -65,21 +65,13 @@ namespace Lux
 	typedef map<const char *, intptr_t, MemTrackAllocator> file_map;
 	typedef map<FileLineReport, uint32_t, MemTrackAllocator> alloc_count_map;
 
-	MemoryTracker* MemoryTracker::s_instance = NULL;
+#pragma init_seg(compiler)
+	MemoryTracker MemoryTracker::s_instance;
 	uint32_t MemoryTracker::s_alloc_counter = 0;
 
 	MemoryTracker& MemoryTracker::getInstance()
 	{
-		_CrtSetDbgFlag(_CRTDBG_CHECK_DEFAULT_DF); // TODO: pc only
-		s_instance = NULL != s_instance ? s_instance : new(malloc(sizeof(MemoryTracker))) MemoryTracker();
-		return *s_instance;
-	}
-
-	void MemoryTracker::destruct()
-	{
-		s_instance->~MemoryTracker();
-		free(s_instance);
-		s_instance = NULL;
+		return s_instance;
 	}
 
 	void MemoryTracker::add(void* p, const intptr_t size, const char* file, const int line)
@@ -388,34 +380,8 @@ namespace Lux
 
 	MemoryTracker::~MemoryTracker()
 	{
-	}
-
-	//TODO: PC only
-	// Typedef for the function pointer
-	typedef void (*_PVFV)(void);
-
-	static void LastOnExitFunc()
-	{
 		Lux::MemoryTracker::getInstance().dumpDetailed();
-		Lux::MemoryTracker::destruct();
 	}
-
-	static void CInit()
-	{
-		atexit(&LastOnExitFunc);
-	}
-
-	// Define where our segment names
-#define SEGMENT_C_INIT      ".CRT$XIM"
-
-	// Build our various function tables and insert them into the correct segments.
-#pragma data_seg(SEGMENT_C_INIT)
-#pragma data_seg() // Switch back to the default segment
-
-	// Call create our call function pointer arrays and place them in the segments created above
-#define SEG_ALLOCATE(SEGMENT)   __declspec(allocate(SEGMENT))
-	SEG_ALLOCATE(SEGMENT_C_INIT) _PVFV c_init_funcs[] = { &CInit };
-
 } //~namespace Lux
 
 #endif //~MEM_TRACK

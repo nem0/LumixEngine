@@ -6,11 +6,11 @@
 
 #define TYPE MULTI_THREAD
 
-#include "core/MT/lock_free_queue.h"
 #include "core/MTJD/enums.h"
 #include "core/MTJD/scheduler.h"
-#include "core/MT/Task.h"
-#include "core/MT/transaction_queue.h"
+#include "core/MT/lock_free_fixed_queue.h"
+#include "core/MT/task.h"
+#include "core/MT/transaction.h"
 #include "core/Array.h"
 
 namespace Lux
@@ -28,9 +28,9 @@ namespace Lux
 
 		public:
 
-			typedef MT::TransactionQueue<Job*, 512>	JobsTable;
-			typedef MT::Transaction<Job*>			JobTrans;
-			typedef MT::TransactionQueue<JobTrans, 32>  JobTransQueue;
+			typedef MT::LockFreeFixedQueue<Job*, 512>	JobsTable;
+			typedef MT::Transaction<Job*>				JobTrans;
+			typedef MT::LockFreeFixedQueue<JobTrans, 32>  JobTransQueue;
 			typedef Array<JobTrans*>					TransTable;
 
 			Manager();

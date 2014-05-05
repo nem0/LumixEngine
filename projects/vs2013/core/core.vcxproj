@@ -191,7 +191,8 @@
     <ClInclude Include="..\..\..\src\core\MT\semaphore.h" />
     <ClInclude Include="..\..\..\src\core\MT\spin_mutex.h" />
     <ClInclude Include="..\..\..\src\core\MT\task.h" />
-    <ClInclude Include="..\..\..\src\core\MT\transaction_queue.h" />
+    <ClInclude Include="..\..\..\src\core\MT\transaction.h" />
+    <ClInclude Include="..\..\..\src\core\MT\lock_free_fixed_queue.h" />
     <ClInclude Include="..\..\..\src\core\Net\tcp_acceptor.h" />
     <ClInclude Include="..\..\..\src\core\Net\tcp_connector.h" />
     <ClInclude Include="..\..\..\src\core\Net\tcp_stream.h" />

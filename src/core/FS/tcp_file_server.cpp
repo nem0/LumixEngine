@@ -171,7 +171,7 @@ namespace Lux
 			}
 
 
-			void stop() {} // TODO: implement stop 
+			void stop() {}
 
 
 			void setBasePath(const char* base_path) 
