@@ -23,7 +23,8 @@ class IPropertyDescriptor
 			DECIMAL,
 			BOOL,
 			VEC3,
-			INTEGER
+			INTEGER,
+			STRING
 		};
 
 	public:

@@ -1,9 +1,8 @@
 #pragma once
 
 
-#include <Windows.h>
-#include <gl/GL.h>
-#include "shader.h"
+#include "core/string.h"
+#include "graphics/gl_ext.h"
 
 
 namespace Lux
@@ -31,7 +30,7 @@ class FrameBuffer
 		};
 
 	public:
-		FrameBuffer(int width, int height, int render_buffers);
+		FrameBuffer(int width, int height, int render_buffers, const char* name);
 		~FrameBuffer();
 		
 		GLuint getId() const { return m_id; }
@@ -43,10 +42,11 @@ class FrameBuffer
 		void bind();
 		int getWidth() const { return m_width; }
 		int getHeight() const { return m_height; }
-
+		const char* getName() { return m_name.c_str(); }
 		static void unbind();
 
 	private:
+		string m_name;
 		GLuint m_textures[RENDERBUFFERS_COUNT];
 		GLuint m_renderbuffers[RENDERBUFFERS_COUNT];
 		GLuint m_id;

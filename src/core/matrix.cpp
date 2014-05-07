@@ -85,39 +85,44 @@ Vec3 Matrix::getTranslation() const
 
 void Matrix::getRotation(Quat& rot) const
 {
-	float tr = 1 + m11 + m22 + m33;
+	float tr = m11 + m22 + m33;
 
 	if (tr > 0)
 	{ 
-		float S = sqrt(tr) * 2;
-		rot.w = 0.25f * S;
-		rot.x = (m23 - m32) / S;
-		rot.y = (m31 - m13) / S; 
-		rot.z = (m12 - m21) / S; 
+		float t = tr + 1.0f;
+		float s = 1 / sqrt(t) * 0.5f;
+
+		rot.w = s * t;
+		rot.z = (m12 - m21) * s;
+		rot.y = (m31 - m13) * s;
+		rot.x = (m23 - m32) * s;
 	} 
-	else if ((m11 > m22)&(m11 > m33))
+	else if ((m11 > m22) && (m11 > m33))
 	{ 
-		float S = sqrt(1.0f + m11 - m22 - m33) * 2; 
-		rot.w = (m32 - m23) / S;
-		rot.x = 0.25f * S;
-		rot.y = (m12 + m21) / S; 
-		rot.z = (m13 + m31) / S; 
+		float t = 1.0f + m11 - m22 - m33;
+		float s = 1 / sqrt(t) * 0.5f;
+		rot.x = s * t;
+		rot.y = (m12 + m21) * s; 
+		rot.z = (m13 + m31) * s; 
+		rot.w = (m23 - m32) * s;
 	}
 	else if (m22 > m33)
 	{ 
-		float S = sqrt(1.0f + m22 - m11 - m33) * 2; 
-		rot.w = (m13 - m31) / S;
-		rot.x = (m12 + m21) / S; 
-		rot.y = 0.25f * S;
-		rot.z = (m23 + m32) / S; 
+		float t = 1.0f + m22 - m11 - m33;
+		float s = 1 / sqrt(t) * 0.5f; 
+		rot.w = (m31 - m13) * s;
+		rot.x = (m12 + m21) * s; 
+		rot.y = s * t;
+		rot.z = (m23 + m32) * s; 
 	}
 	else
 	{ 
-		float S = sqrt(1.0f + m33 - m11 - m22) * 2; 
-		rot.w = (m21 - m21) / S;
-		rot.x = (m31 + m13) / S;
-		rot.y = (m32 + m23) / S;
-		rot.z = 0.25f * S;
+		float t = 1.0f + m33 - m11 - m22;
+		float s = 1 / sqrt(t) * 0.5f; 
+		rot.w = (m12 - m21) * s;
+		rot.x = (m31 + m13) * s;
+		rot.y = (m32 + m23) * s;
+		rot.z = s * t;
 	}
 }
 

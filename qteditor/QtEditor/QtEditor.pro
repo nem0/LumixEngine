@@ -4,7 +4,7 @@
 #
 #-------------------------------------------------
 
-QT       += core gui
+QT       += core gui opengl
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -27,7 +27,9 @@ SOURCES += main.cpp\
     scripts/scriptcompilerwidget.cpp \
     fileserverwidget.cpp \
     propertywidgets/animable_widget.cpp \
-    propertywidgets/camerawidget.cpp
+    propertywidgets/camerawidget.cpp \
+    propertywidgets/lightwidget.cpp \
+    materialmanager.cpp
 
 HEADERS  += mainwindow.h \
     sceneview.h \ 
@@ -42,7 +44,11 @@ HEADERS  += mainwindow.h \
     scripts/scriptcompilerwidget.h \
     fileserverwidget.h \
     propertywidgets/animable_widget.h \
-    propertywidgets/camerawidget.h
+    propertywidgets/camerawidget.h \
+    propertywidgets/lightwidget.h \
+    materialmanager.h \
+    wgl_render_device.h \
+    renderdevicewidget.h
 
 FORMS    += mainwindow.ui \
     logwidget.ui \
@@ -55,10 +61,12 @@ FORMS    += mainwindow.ui \
     scripts/scriptcompilerwidget.ui \
     fileserverwidget.ui \
     propertywidgets/animable_widget.ui \
-    propertywidgets/camerawidget.ui
+    propertywidgets/camerawidget.ui \
+    propertywidgets/lightwidget.ui \
+    materialmanager.ui
 
 win32
 {
-    INCLUDEPATH = ../../src
+    INCLUDEPATH = ../../src;../../external/glew/include
     LIBS = -L../../bin/Win32_Debug -lcore -lengine -lopengl32
 }

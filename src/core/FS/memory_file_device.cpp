@@ -90,7 +90,7 @@ namespace Lux
 				size_t sz = m_size;
 				if(pos + size > cap)
 				{
-					size_t new_cap = 0 != cap ? cap << 1 : pos + size;
+					size_t new_cap = pos + size;
 					uint8_t* new_data = LUX_NEW_ARRAY(uint8_t, new_cap);
 					memcpy(new_data, m_buffer, sz);
 					LUX_DELETE_ARRAY(m_buffer);

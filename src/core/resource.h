@@ -36,7 +36,7 @@ namespace Lux
 		ObserverCallback& getObserverCb() { return m_cb; }
 
 		size_t size() const { return m_size; }
-
+		const Path& getPath() const { return m_path; }
 		ResourceManager& getResourceManager() { return m_resource_manager; }
 
 	protected:

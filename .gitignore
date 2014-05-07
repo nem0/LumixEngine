@@ -9,4 +9,7 @@ evona_test/
 *.orig
 debug/
 release/
-/qteditor/QtEditor/Makefile
+qteditor/qteditor/QtEditor.vcxproj
+qteditor/qteditor/QtEditor.sln
+qteditor/qteditor/QtEditor.vcxproj.filters
+qteditor/QtEditor/Makefile

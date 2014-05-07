@@ -91,6 +91,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinimalRebuild>false</MinimalRebuild>
       <PreprocessorDefinitions>MEM_TRACK;BUILDING_CORE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DisableSpecificWarnings>4512</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -156,6 +157,7 @@
     <ClInclude Include="..\..\..\src\core\delegate.h" />
     <ClInclude Include="..\..\..\src\core\delegate_list.h" />
     <ClInclude Include="..\..\..\src\core\event_manager.h" />
+    <ClInclude Include="..\..\..\src\core\fifo_allocator.h" />
     <ClInclude Include="..\..\..\src\core\free_list.h" />
     <ClInclude Include="..\..\..\src\core\FS\disk_file_device.h" />
     <ClInclude Include="..\..\..\src\core\FS\file_events_device.h" />
@@ -219,6 +221,7 @@
     <ClCompile Include="..\..\..\src\core\crc32.cpp" />
     <ClCompile Include="..\..\..\src\core\default_allocator.cpp" />
     <ClCompile Include="..\..\..\src\core\event_manager.cpp" />
+    <ClCompile Include="..\..\..\src\core\fifo_allocator.cpp" />
     <ClCompile Include="..\..\..\src\core\FS\disk_file_device.cpp" />
     <ClCompile Include="..\..\..\src\core\FS\file_events_device.cpp" />
     <ClCompile Include="..\..\..\src\core\FS\file_system.cpp" />

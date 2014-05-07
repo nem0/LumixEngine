@@ -1,0 +1,63 @@
+#pragma once
+
+#include "core/lux.h"
+#include "core/string.h"
+#include "graphics/ray_cast_model_hit.h"
+#include "universe/component.h"
+
+namespace Lux
+{
+
+	class Engine;
+	class IRenderDevice;
+	class ISerializer;
+	class ModelInstance;
+	class Pose;
+	class Universe;
+
+	struct RenderableInfo
+	{
+		ModelInstance* m_model_instance;
+		float m_scale;
+	};
+
+	class LUX_ENGINE_API RenderScene
+	{
+		public:
+			static RenderScene* createInstance(Engine& engine, Universe& universe);
+			static void destroyInstance(RenderScene* scene);
+
+			virtual void serialize(ISerializer& serializer) = 0;
+			virtual void deserialize(ISerializer& serializer) = 0;
+			virtual Component createComponent(uint32_t type, const Entity& entity) = 0;
+			virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir) = 0;
+			virtual void getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) = 0;
+			virtual void applyCamera(Component camera) = 0;
+
+			virtual Pose& getPose(const Component& cmp) = 0;
+			virtual Component getLight(int index) = 0;
+
+			virtual Component getCameraInSlot(const char* slot) = 0;
+			virtual void getCameraFOV(Component camera, float& fov) = 0;
+			virtual void setCameraFOV(Component camera, const float& fov) = 0;
+			virtual void setCameraFarPlane(Component camera, const float& far) = 0;
+			virtual void setCameraNearPlane(Component camera, const float& near) = 0;
+			virtual void getCameraFarPlane(Component camera, float& far) = 0;
+			virtual void getCameraNearPlane(Component camera, float& near) = 0;
+			virtual void getCameraWidth(Component camera, float& width) = 0;
+			virtual void getCameraHeight(Component camera, float& height) = 0;
+			virtual void setCameraSlot(Component camera, const string& slot) = 0;
+			virtual void getCameraSlot(Component camera, string& slot) = 0;
+			virtual void setCameraSize(Component camera, int w, int h) = 0;
+			virtual void getRenderablePath(Component cmp, string& path) = 0;
+			virtual void setRenderableLayer(Component cmp, const int32_t& layer) = 0;
+			virtual void setRenderablePath(Component cmp, const string& path) = 0;
+			virtual void setRenderableScale(Component cmp, const float& scale) = 0;
+			virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) = 0;
+
+		protected:
+			virtual ~RenderScene() {}
+	};
+
+
+}

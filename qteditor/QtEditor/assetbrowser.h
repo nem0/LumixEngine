@@ -24,12 +24,17 @@ public:
 	void setEditorServer(Lux::EditorServer& server) { m_server = &server; }
 	void emitFileChanged(const char* path);
 
+private:
+	void handleDoubleClick(const class QFileInfo& file_info);
+
 signals:
 	void fileChanged(const QString& string);
 
 private slots:
 	void on_treeView_doubleClicked(const QModelIndex &index);
 	void onFileChanged(const QString& path);
+	void on_searchInput_textEdited(const QString &arg1);
+	void on_listWidget_activated(const QModelIndex &index);
 
 private:
 	Ui::AssetBrowser* m_ui;

@@ -21,6 +21,9 @@
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_file_system.cpp">
       <Filter>core</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_quat.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_transaction_queue.cpp">
       <Filter>core</Filter>
     </ClCompile>

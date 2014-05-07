@@ -11,10 +11,11 @@ namespace Lux
 {
 
 
-struct Matrix;
-class Universe;
 class Event;
+class IRenderDevice;
+struct Matrix;
 class Renderer;
+class Universe;
 
 
 class LUX_ENGINE_API Gizmo
@@ -84,7 +85,7 @@ class LUX_ENGINE_API Gizmo
 		void setUniverse(Universe* universe);
 		void startTransform(Component camera, int x, int y, TransformMode mode);
 		void transform(Component camera, TransformOperation operation, int x, int y, int relx, int rely, int flags);
-		void render(Renderer& renderer);
+		void render(Renderer& renderer, IRenderDevice& render_device);
 		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir);
 
 	private:

@@ -4,12 +4,14 @@
 #include <qsettings.h>
 #include "assetbrowser.h"
 #include "editor/editor_client.h"
+#include "editor/editor_server.h"
 #include "fileserverwidget.h"
 #include "gameview.h"
 #include "log_widget.h"
 #include "property_view.h"
 #include "sceneview.h"
 #include "scripts/scriptcompilerwidget.h"
+#include "materialmanager.h"
 
 
 MainWindow::MainWindow(QWidget* parent) :
@@ -27,7 +29,8 @@ MainWindow::MainWindow(QWidget* parent) :
 	m_asset_browser = new AssetBrowser;
 	m_script_compiler_ui = new ScriptCompilerWidget;
 	m_file_server_ui = new FileServerWidget;
-	
+	m_material_manager_ui = new MaterialManager;
+
 	QSettings settings("Lux", "QtEditor");
 	restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
 	
@@ -38,12 +41,13 @@ MainWindow::MainWindow(QWidget* parent) :
 	addDockWidget(static_cast<Qt::DockWidgetArea>(1), m_property_view);
 	addDockWidget(static_cast<Qt::DockWidgetArea>(2), m_scene_view);
 	addDockWidget(static_cast<Qt::DockWidgetArea>(2), m_asset_browser);
+	addDockWidget(static_cast<Qt::DockWidgetArea>(8), m_material_manager_ui);
 
 	restoreState(settings.value("mainWindowState").toByteArray());
 }
 
 
-void MainWindow::closeEvent(QCloseEvent *event) 
+void MainWindow::closeEvent(QCloseEvent *event)
 {
 	QSettings settings("Lux", "QtEditor");
 	settings.setValue("mainWindowGeometry", saveGeometry());
@@ -58,6 +62,10 @@ MainWindow::~MainWindow()
 	delete m_scene_view;
 	delete m_property_view;
 	delete m_game_view;
+	delete m_asset_browser;
+	delete m_script_compiler_ui;
+	delete m_file_server_ui;
+	delete m_material_manager_ui;
 }
 
 
@@ -65,6 +73,7 @@ void MainWindow::setEditorServer(Lux::EditorServer& server)
 {
 	m_file_server_ui->setEditorServer(server);
 	m_asset_browser->setEditorServer(server);
+	m_material_manager_ui->setEditorServer(server);
 }
 
 void MainWindow::setEditorClient(Lux::EditorClient& client)
@@ -74,6 +83,7 @@ void MainWindow::setEditorClient(Lux::EditorClient& client)
 	m_scene_view->setEditorClient(client);
 	m_asset_browser->setEditorClient(client);
 	m_game_view->setEditorClient(client);
+	m_material_manager_ui->setEditorClient(client);
 }
 
 

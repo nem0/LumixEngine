@@ -6,6 +6,7 @@
 #include <vector>
 #include "core/iserializer.h"
 #include "core/fs/ifile.h"
+#include "core/path.h"
 #include "core/string.h"
 
 
@@ -21,9 +22,11 @@ namespace Lux
 				READ,
 				WRITE
 			};
+			
+			static const int TOKEN_MAX_SIZE = 256;
 
 		public:
-			JsonSerializer(FS::IFile& file, AccessMode access_mode);
+			JsonSerializer(FS::IFile& file, AccessMode access_mode, const char* path);
 
 			// serialize
 			virtual void serialize(const char* label, uint32_t value) override;
@@ -31,6 +34,9 @@ namespace Lux
 			virtual void serialize(const char* label, int32_t value) override;
 			virtual void serialize(const char* label, const char* value) override;
 			virtual void serialize(const char* label, bool value) override;
+			virtual void beginObject() override;
+			virtual void beginObject(const char* label) override;
+			virtual void endObject() override;
 			virtual void beginArray(const char* label) override;
 			virtual void endArray() override;
 			virtual void serializeArrayItem(uint32_t value) override;
@@ -46,8 +52,14 @@ namespace Lux
 			virtual void deserialize(const char* label, int32_t& value) override;
 			virtual void deserialize(const char* label, char* value, int max_length) override;
 			virtual void deserialize(const char* label, bool& value) override;
+			virtual void deserialize(char* value, int max_length) override;
+			virtual void deserialize(bool& value) override;
+			virtual void deserialize(float& value) override;
+			virtual void deserialize(int32_t& value) override;
 			virtual void deserializeArrayBegin(const char* label) override;
-			virtual void deserializeArrayEnd() override { skipControl(); }
+			virtual void deserializeArrayBegin() override;
+			virtual void deserializeArrayEnd() override;
+			virtual bool isArrayEnd() const override;
 			virtual void deserializeArrayItem(uint32_t& value) override;
 			virtual void deserializeArrayItem(int32_t& value) override;
 			virtual void deserializeArrayItem(int64_t& value) override;
@@ -55,9 +67,20 @@ namespace Lux
 			virtual void deserializeArrayItem(bool& value) override;
 			virtual void deserializeArrayItem(char* value, int max_length) override;
 			virtual void deserializeArrayItem(string& value) override;
-		
+			virtual void deserializeObjectBegin() override;
+			virtual void deserializeObjectEnd() override;
+			virtual void deserializeLabel(char* label, int max_length) override;
+			virtual void deserializeRawString(char* buffer, int max_length) override;
+			virtual void nextArrayItem() override;
+			virtual bool isObjectEnd() const override;
+
 		private:
 			void deserializeLabel(const char* label);
+			void deserializeToken();
+			void readStringToken(char* tmp, int max_len);
+			bool readStringTokenPart(char* tmp, int max_len);
+			void deserializeArrayComma();
+			void logErrorIfNot(bool condition);
 
 			inline void writeString(const char* str)
 			{
@@ -74,16 +97,12 @@ namespace Lux
 				}
 			}
 
-			inline void skipControl()
+		private:
+			enum DeserializePosition
 			{
-				unsigned char c = m_buffer;
-				while(c == ','|| c == ' ' || c == '\t' || c == '{' || c == '[' || c == '\n' || c == '\r' || c == ':' || c == ']' || c == '}')
-				{
-					if(!m_file.read(&c, 1))
-						return;
-				}
-				m_buffer = c;
-			}
+				IN_OBJECT,
+				IN_ARRAY
+			};
 
 		private:
 			void operator=(const JsonSerializer&);
@@ -92,6 +111,9 @@ namespace Lux
 			bool m_is_first_in_block;
 			unsigned char* m_data;
 			FS::IFile& m_file;
+			char m_token[TOKEN_MAX_SIZE];
+			bool m_is_string_token;
+			Path m_path;
 	};
 
 

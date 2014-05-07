@@ -142,7 +142,7 @@ bool PhysicsScene::create(PhysicsSystem& system, Universe& universe)
 	m_impl = LUX_NEW(PhysicsSceneImpl);
 	m_impl->m_owner = this;
 	m_impl->m_universe = &universe;
-	m_impl->m_universe->getEventManager()->addListener(EntityMovedEvent::type).bind<PhysicsSceneImpl, &PhysicsSceneImpl::handleEvent>(m_impl);
+	m_impl->m_universe->getEventManager().addListener(EntityMovedEvent::type).bind<PhysicsSceneImpl, &PhysicsSceneImpl::handleEvent>(m_impl);
 	physx::PxSceneDesc sceneDesc(system.m_impl->m_physics->getTolerancesScale());
 	sceneDesc.gravity = physx::PxVec3(0.0f, -9.8f, 0.0f);
 	if(!sceneDesc.cpuDispatcher) {
@@ -194,7 +194,7 @@ void PhysicsScene::destroyActor(Component cmp)
 	int inner_index = m_impl->m_index_map[cmp.index];
 	m_impl->m_scene->removeActor(*m_impl->m_actors[inner_index]);
 	m_impl->m_actors[inner_index]->release();
-	m_impl->m_universe->getEventManager()->emitEvent(ComponentEvent(cmp, false));
+	m_impl->m_universe->getEventManager().emitEvent(ComponentEvent(cmp, false));
 	m_impl->m_actors.eraseFast(inner_index);
 	m_impl->m_shape_sources.eraseFast(inner_index);
 	m_impl->m_is_dynamic.eraseFast(inner_index);
@@ -208,7 +208,7 @@ void PhysicsScene::destroyActor(Component cmp)
 		}
 	}
 	m_impl->m_index_map[cmp.index] = -1;
-	m_impl->m_universe->getEventManager()->emitEvent(ComponentEvent(cmp, false));
+	m_impl->m_universe->getEventManager().emitEvent(ComponentEvent(cmp, false));
 }
 
 
@@ -232,7 +232,7 @@ Component PhysicsScene::createController(Entity entity)
 	m_impl->m_controllers.push(c);
 	
 	Component cmp(entity, controller_type, this, m_impl->m_controllers.size() - 1);
-	m_impl->m_universe->getEventManager()->emitEvent(ComponentEvent(cmp));
+	m_impl->m_universe->getEventManager().emitEvent(ComponentEvent(cmp));
 	return cmp;
 }
 
@@ -281,7 +281,7 @@ Component PhysicsScene::createBoxRigidActor(Entity entity)
 	actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
 
 	Component cmp(entity, box_rigid_actor_type, this, m_impl->m_actors.size() - 1);
-	m_impl->m_universe->getEventManager()->emitEvent(ComponentEvent(cmp));
+	m_impl->m_universe->getEventManager().emitEvent(ComponentEvent(cmp));
 	return cmp;
 }
 
@@ -717,7 +717,7 @@ void PhysicsSceneImpl::deserializeActor(ISerializer& serializer, int idx)
 	actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
 
 	Component cmp(m_entities[idx], box_rigid_actor_type, m_owner, idx);
-	m_universe->getEventManager()->emitEvent(ComponentEvent(cmp));
+	m_universe->getEventManager().emitEvent(ComponentEvent(cmp));
 }
 
 

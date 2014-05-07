@@ -23,7 +23,7 @@ namespace Lux
 		public:
 			EditorServer() { m_impl = 0; }
 
-			bool create(HWND hwnd, HWND game_hwnd, const char* base_path);
+			bool create(const char* base_path);
 			void destroy();
 			void tick();
 			void registerCreator(uint32_t type, IPlugin& creator);
@@ -32,7 +32,6 @@ namespace Lux
 			void render(IRenderDevice& render_device);
 			void renderIcons(IRenderDevice& render_device);
 			Component getEditCamera() const;
-			HGLRC getHGLRC();
 			class Gizmo& getGizmo();
 			class FS::TCPFileServer& getTCPFileServer();
 			void setEditViewRenderDevice(IRenderDevice& render_device);
