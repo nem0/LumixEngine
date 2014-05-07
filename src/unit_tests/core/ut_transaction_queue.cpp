@@ -146,8 +146,8 @@ namespace
 		cons3.destroy();
 		cons4.destroy();
 
-		Lux::g_log_info.log("Unit", "UT_tq_heavy_usage is finishing ...");
-		Lux::g_log_info.log("Unit", "UT_tq_heavy_usage is checking results ...");
+		Lux::g_log_info.log("unit", "UT_tq_heavy_usage is finishing ...");
+		Lux::g_log_info.log("unit", "UT_tq_heavy_usage is checking results ...");
 
 		for (size_t i = 0; i < itemsCount; i++)
 		{
@@ -158,7 +158,7 @@ namespace
 
 		LUX_DELETE_ARRAY(testItems);
 
-		Lux::g_log_info.log("Unit", "UT_tq_heavy_usage finished ...");
+		Lux::g_log_info.log("unit", "UT_tq_heavy_usage finished ...");
 	};
 
 	void UT_tq_push(const char* params)
@@ -192,8 +192,8 @@ namespace
 		prod.destroy();
 		cons.destroy();
 
-		Lux::g_log_info.log("Unit", "UT_tq_push is finishing ...");
-		Lux::g_log_info.log("Unit", "UT_tq_push is checking results ...");
+		Lux::g_log_info.log("unit", "UT_tq_push is finishing ...");
+		Lux::g_log_info.log("unit", "UT_tq_push is checking results ...");
 
 		for (size_t i = 0; i < itemsCount; i++)
 		{
@@ -204,7 +204,7 @@ namespace
 
 		LUX_DELETE_ARRAY(testItems);
 
-		Lux::g_log_info.log("Unit", "UT_tq_heavy_usage finished ...");
+		Lux::g_log_info.log("unit", "UT_tq_heavy_usage finished ...");
 	}
 }
 
