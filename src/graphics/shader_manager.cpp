@@ -30,7 +30,7 @@ namespace Lux
 		LUX_DELETE(static_cast<Shader*>(&resource));
 	}
 
-	char* ShaderManager::getBuffer(int32_t size)
+	uint8_t* ShaderManager::getBuffer(int32_t size)
 	{
 		if (m_buffer_size < size)
 		{
@@ -43,6 +43,6 @@ namespace Lux
 			m_buffer = LUX_NEW_ARRAY(uint8_t, size);
 			m_buffer_size = size;
 		}
-		return (char*)m_buffer;
+		return m_buffer;
 	}
 }

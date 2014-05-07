@@ -34,6 +34,8 @@ namespace Lux
 
 	struct EditorClientImpl
 	{
+		typedef MT::LockFreeQueue<uint8_t, 32> MessageQueue;
+
 		void sendMessage(uint32_t type, const void* data, int32_t size);
 		void onMessage(uint8_t* data, int size);
 
@@ -41,7 +43,7 @@ namespace Lux
 		Net::TCPStream* m_stream;
 		ReceiveTask m_task;
 		EventManager m_event_manager;
-		MT::LockFreeQueue<uint8_t, 32> m_messages;
+		MessageQueue m_messages;
 		string m_base_path;
 	};
 

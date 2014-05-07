@@ -169,7 +169,7 @@ void fillList(QListWidget& widget, const QDir& dir, const QStringList& filters)
 
 void AssetBrowser::on_searchInput_textEdited(const QString &arg1)
 {
-	if(arg1 == "")
+	if(arg1.length() == 0)
 	{
 		m_ui->listWidget->hide();
 		m_ui->treeView->show();

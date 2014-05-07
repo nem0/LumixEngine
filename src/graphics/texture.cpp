@@ -430,10 +430,10 @@ void Texture::apply(int unit)
 }
 
 
-bool Texture::loadTGA(FS::IFile* file)
+bool Texture::loadTGA(FS::IFile& file)
 {
 	TGAHeader header;
-	file->read(&header, sizeof(header));
+	file.read(&header, sizeof(header));
 
 	int color_mode = header.bitsPerPixel / 8;
 	int image_size = header.width * header.height * 4;
@@ -460,11 +460,11 @@ bool Texture::loadTGA(FS::IFile* file)
 		long write_index = ((header.imageDescriptor & 32) != 0) ? read_index : y * header.width * 4;
 		for (long x = 0; x < header.width; x++)
 		{
-			file->read(&image_dest[write_index + 2], sizeof(uint8_t));
-			file->read(&image_dest[write_index + 1], sizeof(uint8_t));
-			file->read(&image_dest[write_index + 0], sizeof(uint8_t));
+			file.read(&image_dest[write_index + 2], sizeof(uint8_t));
+			file.read(&image_dest[write_index + 1], sizeof(uint8_t));
+			file.read(&image_dest[write_index + 0], sizeof(uint8_t));
 			if (color_mode == 4)
-				file->read(&image_dest[write_index + 3], sizeof(uint8_t));
+				file.read(&image_dest[write_index + 3], sizeof(uint8_t));
 			else
 				image_dest[write_index + 3] = 255;
 			write_index += 4;
@@ -487,14 +487,14 @@ bool Texture::loadTGA(FS::IFile* file)
 }
 
 
-bool Texture::loadDDS(FS::IFile* file)
+bool Texture::loadDDS(FS::IFile& file)
 {
 	DDS::Header hdr;
 	uint32_t width = 0;
 	uint32_t height = 0;
 	uint32_t mipMapCount = 0;
 
-	file->read(&hdr, sizeof(hdr));
+	file.read(&hdr, sizeof(hdr));
 
 	if (hdr.dwMagic != DDS::DDS_MAGIC || hdr.dwSize != 124 ||
 		!(hdr.dwFlags & DDS::DDSD_PIXELFORMAT) || !(hdr.dwFlags & DDS::DDSD_CAPS))
@@ -579,7 +579,7 @@ bool Texture::loadDDS(FS::IFile* file)
 		ASSERT(data);
 		for (uint32_t ix = 0; ix < mipMapCount; ++ix)
 		{
-			file->read(data, size);
+			file.read(data, size);
 			DDS::flipCompressedTexture(width, height, li->internalFormat, data);
 			glCompressedTexImage2D(GL_TEXTURE_2D, ix, li->internalFormat, width, height, 0, size, data);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
@@ -607,10 +607,10 @@ bool Texture::loadDDS(FS::IFile* file)
 		unsigned char * data = LUX_NEW_ARRAY(unsigned char, size);
 		uint32_t palette[256];
 		uint32_t* unpacked = (uint32_t*)manager->getBuffer(size * sizeof(uint32_t));
-		file->read(palette, 4 * 256);
+		file.read(palette, 4 * 256);
 		for (uint32_t ix = 0; ix < mipMapCount; ++ix)
 		{
-			file->read(data, size);
+			file.read(data, size);
 			for (uint32_t zz = 0; zz < size; ++zz)
 			{
 				unpacked[zz] = palette[data[zz]];
@@ -633,7 +633,7 @@ bool Texture::loadDDS(FS::IFile* file)
 		uint8_t* data = (uint8_t*)manager->getBuffer(size);
 		for (uint32_t ix = 0; ix < mipMapCount; ++ix)
 		{
-			file->read(data, size);
+			file.read(data, size);
 			glPixelStorei(GL_UNPACK_ROW_LENGTH, height);
 			glTexImage2D(GL_TEXTURE_2D, ix, li->internalFormat, width, height, 0, li->externalFormat, li->type, data);
 			width = (width+ 1) >> 1;
@@ -649,18 +649,19 @@ bool Texture::loadDDS(FS::IFile* file)
 
 void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 {
+	ASSERT(file);
 	if (success)
 	{
 		const char* path = m_path.c_str();
 		size_t len = m_path.length();
 		if (len > 3 && strcmp(path + len - 4, ".dds") == 0)
 		{
-			bool loaded = loadDDS(file);
+			bool loaded = loadDDS(*file);
 			ASSERT(loaded);
 		}
 		else
 		{
-			bool loaded = loadTGA(file);
+			bool loaded = loadTGA(*file);
 			ASSERT(loaded);
 		}
 
