@@ -2,7 +2,7 @@
 
 
 #include "core/lux.h"
-#include "core/spin_mutex.h"
+#include "core/MT/spin_mutex.h"
 
 
 namespace Lux

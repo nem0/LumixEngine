@@ -302,7 +302,6 @@ void JsonSerializer::deserializeArrayEnd()
 }
 
 
-
 void JsonSerializer::deserializeArrayItem(char* value, int max_length)
 {
 	deserializeArrayComma();

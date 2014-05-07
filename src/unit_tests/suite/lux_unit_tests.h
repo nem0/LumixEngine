@@ -2,7 +2,7 @@
 
 #include "core/lux.h"
 #include "core/log.h"
-#include "core/task.h"
+#include "core/MT/task.h"
 
 #include "unit_tests/suite/unit_test_manager.h"
 #include "unit_tests/suite/platform_defines.h"

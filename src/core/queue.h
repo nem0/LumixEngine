@@ -12,7 +12,7 @@ namespace Lux
 		Queue()
 		{
 			ASSERT(Math::isPowOfTwo(count));
-			m_buffer = (T*)(LUX_NEW_ARRAY(char, sizeof(T) * count)); // TODO: replace with LUX_ALLOC_T
+			m_buffer = (T*)(LUX_NEW_ARRAY(char, sizeof(T) * count));
 			m_wr = m_rd = 0;
 		}
 

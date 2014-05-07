@@ -652,7 +652,7 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	if (success)
 	{
 		const char* path = m_path.c_str();
-		int len = m_path.length();
+		size_t len = m_path.length();
 		if (len > 3 && strcmp(path + len - 4, ".dds") == 0)
 		{
 			bool loaded = loadDDS(file);

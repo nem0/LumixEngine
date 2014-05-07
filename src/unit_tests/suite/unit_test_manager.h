@@ -55,6 +55,3 @@ namespace Lux
 namespace { extern "C" Lux::UnitTest::Helper JOIN_STRINGS(JOIN_STRINGS(test_register_, method), __LINE__)(name, method, params); } \
 	LUX_FORCE_SYMBOL(JOIN_STRINGS(test_register_ ,JOIN_STRINGS(method, __LINE__)))
 
-TODO("Count error messages.");
-TODO("Count warning messages.");
-

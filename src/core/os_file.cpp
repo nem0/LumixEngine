@@ -25,7 +25,6 @@ namespace Lux
 
 		bool OsFile::open(const char* path, Mode mode)
 		{
-			TODO("normalize path");
 			HANDLE hnd = INVALID_HANDLE_VALUE;
 			if(Mode::OPEN & mode)
 			{
