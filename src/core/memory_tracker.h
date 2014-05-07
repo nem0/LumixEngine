@@ -5,7 +5,7 @@
 #include "core/lux.h"
 #include "core/pod_hash_map.h"
 #include "core/map.h"
-#include "core/spin_mutex.h"
+#include "core/MT/spin_mutex.h"
 
 #include <crtdbg.h>
 #include <stdlib.h>
@@ -86,7 +86,7 @@ namespace Lux
 		intptr_t m_allocated_memory;
 		uint8_t m_mark;
 
-		static MemoryTracker* s_instance;
+		static MemoryTracker s_instance;
 		static uint32_t s_alloc_counter;
 	};
 } //~namespace Lux

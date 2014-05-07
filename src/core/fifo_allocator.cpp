@@ -1,5 +1,5 @@
 #include "core/fifo_allocator.h"
-#include "core/atomic.h"
+#include "core/MT/atomic.h"
 
 namespace Lux
 {

@@ -10,7 +10,7 @@ namespace Lux
 	public:
 		FreeList()
 		{
-			m_heap = static_cast<T*>(LUX_NEW_ARRAY(char, sizeof(T) * chunk_size));  // TODO: replace with LUX_ALLOC_T
+			m_heap = static_cast<T*>(LUX_NEW_ARRAY(char, sizeof(T) * chunk_size));
 			m_pool_index = chunk_size;
 
 			for (int32_t i = 0; i < chunk_size; i++)

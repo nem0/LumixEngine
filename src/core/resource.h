@@ -23,7 +23,7 @@ namespace Lux
 			FAILURE,
 		};
 
-		typedef DelegateList<void (State, State)> ObserverCallback;
+		typedef DelegateList<void (State)> ObserverCallback;
 
 		State getState() const { return m_state; }
 
@@ -34,13 +34,14 @@ namespace Lux
 		bool isFailure()	const { return State::FAILURE	== m_state; }
 
 		ObserverCallback& getObserverCb() { return m_cb; }
-		uint32_t size() const { return m_size; }
-		ResourceManager& getResourceManager() { return m_resource_manager; }
+
+		size_t size() const { return m_size; }
 		const Path& getPath() const { return m_path; }
+		ResourceManager& getResourceManager() { return m_resource_manager; }
 
 	protected:
 		Resource(const Path& path, ResourceManager& resource_manager);
-		~Resource();
+		virtual ~Resource();
 
 		//events
 		void onEmpty(void);
@@ -62,7 +63,7 @@ namespace Lux
 		void addDependency(Resource& dependent_resource);
 		void removeDependency(Resource& dependent_resource);
 
-		void onStateChanged(State old_state, State new_state);
+		void onStateChanged(State new_state);
 		void decrementDepCount();
 
 	private:
@@ -73,7 +74,7 @@ namespace Lux
 
 	protected:
 		Path m_path;
-		uint32_t m_size;
+		size_t m_size;
 		ObserverCallback m_cb;
 		ResourceManager& m_resource_manager;
 	};
