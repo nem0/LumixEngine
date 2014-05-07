@@ -200,7 +200,7 @@ namespace Lux
 		{
 			Entity e(m_universe, m_scripts[i]);
 			ComponentEvent evt(Component(e, script_type, m_owner, i));
-			m_universe->getEventManager()->emitEvent(evt);
+			m_universe->getEventManager().emitEvent(evt);
 		}
 	}
 
@@ -222,7 +222,7 @@ namespace Lux
 
 		Component cmp(entity, script_type, this, m_impl->m_scripts.size() - 1);
 		ComponentEvent evt(cmp);
-		m_impl->m_universe->getEventManager()->emitEvent(evt);
+		m_impl->m_universe->getEventManager().emitEvent(evt);
 
 		return cmp;
 	}

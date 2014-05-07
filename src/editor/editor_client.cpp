@@ -3,6 +3,8 @@
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/event_manager.h"
+#include "core/fifo_allocator.h"
+#include "core/MT/lock_free_queue.h"
 #include "core/MT/mutex.h"
 #include "core/MT/task.h"
 #include "core/net/tcp_connector.h"
@@ -17,12 +19,14 @@ namespace Lux
 	class ReceiveTask : public MT::Task
 	{
 	public:
-		ReceiveTask() : m_finished(false) {}
+		ReceiveTask() : m_finished(false), m_allocator(10*1024) {}
 
 		virtual int task() override;
 		void stop() { m_finished = true; }
 
 		struct EditorClientImpl* m_client;
+		FIFOAllocator m_allocator;
+
 	private:
 		volatile bool m_finished;
 	};
@@ -30,10 +34,7 @@ namespace Lux
 
 	struct EditorClientImpl
 	{
-		EditorClientImpl()
-			: m_mutex(false)
-		{
-		}
+		typedef MT::LockFreeQueue<uint8_t, 32> MessageQueue;
 
 		void sendMessage(uint32_t type, const void* data, int32_t size);
 		void onMessage(uint8_t* data, int size);
@@ -42,16 +43,14 @@ namespace Lux
 		Net::TCPStream* m_stream;
 		ReceiveTask m_task;
 		EventManager m_event_manager;
-		MT::Mutex m_mutex;
-		Array<uint8_t*> m_messages;
+		MessageQueue m_messages;
 		string m_base_path;
 	};
 
 
 	int ReceiveTask::task()
 	{
-		Array<uint8_t> data;
-		data.resize(8);
+		uint8_t data[8];
 		while(!m_finished)
 		{
 			if(m_client->m_stream->read(&data[0], 8))
@@ -61,14 +60,15 @@ namespace Lux
 				ASSERT(guard == 0x12345678);
 				if(length > 0)
 				{
-					data.resize(length);
-					/// TODO "stack" allocator
-					uint8_t* msg = LUX_NEW_ARRAY(uint8_t, length + 4);
+					uint8_t* msg = NULL;
+					while (msg == NULL)
+					{
+						msg = (uint8_t*)m_allocator.allocate(length + 4);
+					}
 					m_client->m_stream->read(msg + 4, length);
 					((int32_t*)msg)[0] = length;
 					{
-						MT::Lock lock(m_client->m_mutex);
-						m_client->m_messages.push(msg);
+						while(!m_client->m_messages.push(msg));
 					}
 				}
 			}
@@ -79,13 +79,13 @@ namespace Lux
 
 	void EditorClient::processMessages()
 	{
-		MT::Lock lock(m_impl->m_mutex);
-		for (int i = 0; i < m_impl->m_messages.size(); ++i)
+		
+		while (!m_impl->m_messages.isEmpty())
 		{
-			m_impl->onMessage(m_impl->m_messages[i] + 4, *(int32_t*)m_impl->m_messages[i]);
-			LUX_DELETE_ARRAY(m_impl->m_messages[i]);
+			uint8_t* msg = m_impl->m_messages.pop();
+			m_impl->onMessage(msg + 4, *(int32_t*)msg);
+			m_impl->m_task.m_allocator.deallocate(msg);
 		}
-		m_impl->m_messages.clear();
 	}
 
 

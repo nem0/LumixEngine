@@ -63,7 +63,7 @@ namespace Lux
 	{
 		ASSERT(!m_impl->m_universe);
 		m_impl->m_universe = &universe;
-		m_impl->m_universe->getEventManager()->addListener(ComponentEvent::type).bind<AnimationSystemImpl, &AnimationSystemImpl::onEvent>(m_impl);
+		m_impl->m_universe->getEventManager().addListener(ComponentEvent::type).bind<AnimationSystemImpl, &AnimationSystemImpl::onEvent>(m_impl);
 	}
 
 
@@ -73,7 +73,7 @@ namespace Lux
 		m_impl->m_animables.clear();
 		EventManager::Listener cb;
 		cb.bind<AnimationSystemImpl, &AnimationSystemImpl::onEvent>(m_impl);
-		m_impl->m_universe->getEventManager()->removeListener(ComponentEvent::type, cb);
+		m_impl->m_universe->getEventManager().removeListener(ComponentEvent::type, cb);
 		m_impl->m_universe = 0;
 	}
 
@@ -128,7 +128,7 @@ namespace Lux
 			serializer.deserializeArrayItem(m_impl->m_animables[i].m_time);
 			Component cmp(e, animable_type, this, i);
 			ComponentEvent evt(cmp);
-			m_impl->m_universe->getEventManager()->emitEvent(evt);
+			m_impl->m_universe->getEventManager().emitEvent(evt);
 		}
 		serializer.deserializeArrayEnd();
 	}
@@ -174,7 +174,7 @@ namespace Lux
 
 		Component cmp(entity, animable_type, this, m_impl->m_animables.size() - 1);
 		ComponentEvent evt(cmp);
-		m_impl->m_universe->getEventManager()->emitEvent(evt);
+		m_impl->m_universe->getEventManager().emitEvent(evt);
 		return Component(entity, animable_type, this, m_impl->m_animables.size() - 1);
 	}
 
@@ -204,13 +204,13 @@ namespace Lux
 	{
 		if(m_impl->m_animables.empty())
 			return;
-		Renderer* renderer = static_cast<Renderer*>(m_impl->m_animables[0].m_renderable.system);
 		for(int i = 0, c = m_impl->m_animables.size(); i < c; ++i)
 		{
 			AnimationSystemImpl::Animable& animable = m_impl->m_animables[i];
 			if(!animable.m_manual && animable.m_animation->isReady())
 			{
-				animable.m_animation->getPose(animable.m_time, renderer->getPose(animable.m_renderable));
+				RenderScene* scene = static_cast<RenderScene*>(animable.m_renderable.system);
+				animable.m_animation->getPose(animable.m_time, scene->getPose(animable.m_renderable));
 				float t = animable.m_time + time_delta;
 				float l = animable.m_animation->getLength();
 				while(t > l)

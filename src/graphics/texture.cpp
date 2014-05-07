@@ -2,7 +2,10 @@
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
 #include "core/log.h"
+#include "core/resource_manager.h"
+#include "core/resource_manager_base.h"
 #include "graphics/texture.h"
+#include "graphics/texture_manager.h"
 
 namespace Lux
 {
@@ -150,13 +153,13 @@ namespace DDS
 	}
 
 	static LoadInfo loadInfoDXT1 = {
-		true, false, false, 4, 8, GL_COMPRESSED_RGBA_S3TC_DXT1
+		true, false, false, 4, 8, GL_COMPRESSED_RGBA_S3TC_DXT1_EXT
 	};
 	static LoadInfo loadInfoDXT3 = {
-		true, false, false, 4, 16, GL_COMPRESSED_RGBA_S3TC_DXT3
+		true, false, false, 4, 16, GL_COMPRESSED_RGBA_S3TC_DXT3_EXT
 	};
 	static LoadInfo loadInfoDXT5 = {
-		true, false, false, 4, 16, GL_COMPRESSED_RGBA_S3TC_DXT5
+		true, false, false, 4, 16, GL_COMPRESSED_RGBA_S3TC_DXT5_EXT
 	};
 	static LoadInfo loadInfoBGRA8 = {
 		false, false, false, 1, 4, GL_RGBA8, GL_BGRA, GL_UNSIGNED_BYTE
@@ -173,6 +176,208 @@ namespace DDS
 	static LoadInfo loadInfoIndex8 = {
 		false, false, true, 1, 1, GL_RGB8, GL_BGRA, GL_UNSIGNED_BYTE
 	};
+
+	struct DXTColBlock
+	{
+		uint16_t col0;
+		uint16_t col1;
+		uint8_t row[4];
+	};
+
+	struct DXT3AlphaBlock
+	{
+		uint16_t row[4];
+	};
+
+	struct DXT5AlphaBlock
+	{
+		uint8_t alpha0;
+		uint8_t alpha1;
+		uint8_t row[6];
+	};
+
+	static LUX_FORCE_INLINE void swapMemory(void* mem1, void* mem2, size_t size)
+	{
+		if(size < 2048)
+		{
+			uint8_t tmp[2048];
+			memcpy(tmp, mem1, size);
+			memcpy(mem1, mem2, size);
+			memcpy(mem2, tmp, size);
+		}
+		else
+		{
+			uint8_t* tmp = LUX_NEW_ARRAY(uint8_t, size);
+			memcpy(tmp, mem1, size);
+			memcpy(mem1, mem2, size);
+			memcpy(mem2, tmp, size);
+			LUX_DELETE_ARRAY(tmp);
+		}
+	}
+
+	static void flipBlockDXTC1(DXTColBlock *line, int numBlocks)
+	{
+		DXTColBlock *curblock = line;
+
+		for (int i = 0; i < numBlocks; i++)
+		{
+			swapMemory(&curblock->row[0], &curblock->row[3], sizeof(uint8_t));
+			swapMemory(&curblock->row[1], &curblock->row[2], sizeof(uint8_t));
+			++curblock;
+		}
+	}
+
+	static void flipBlockDXTC3(DXTColBlock *line, int numBlocks)
+	{
+		DXTColBlock *curblock = line;
+		DXT3AlphaBlock *alphablock;
+
+		for (int i = 0; i < numBlocks; i++)
+		{
+			alphablock = (DXT3AlphaBlock*)curblock;
+
+			swapMemory(&alphablock->row[0], &alphablock->row[3], sizeof(uint16_t));
+			swapMemory(&alphablock->row[1], &alphablock->row[2], sizeof(uint16_t));
+			++curblock;
+
+			swapMemory(&curblock->row[0], &curblock->row[3], sizeof(uint8_t));
+			swapMemory(&curblock->row[1], &curblock->row[2], sizeof(uint8_t));
+			++curblock;
+		}
+	}
+
+	static void flipDXT5Alpha(DXT5AlphaBlock *block)
+	{
+		uint8_t tmp_bits[4][4];
+
+		const uint32_t mask = 0x00000007;
+		uint32_t bits = 0;
+		memcpy(&bits, &block->row[0], sizeof(uint8_t) * 3);
+
+		tmp_bits[0][0] = (uint8_t)(bits & mask);
+		bits >>= 3;
+		tmp_bits[0][1] = (uint8_t)(bits & mask);
+		bits >>= 3;
+		tmp_bits[0][2] = (uint8_t)(bits & mask);
+		bits >>= 3;
+		tmp_bits[0][3] = (uint8_t)(bits & mask);
+		bits >>= 3;
+		tmp_bits[1][0] = (uint8_t)(bits & mask);
+		bits >>= 3;
+		tmp_bits[1][1] = (uint8_t)(bits & mask);
+		bits >>= 3;
+		tmp_bits[1][2] = (uint8_t)(bits & mask);
+		bits >>= 3;
+		tmp_bits[1][3] = (uint8_t)(bits & mask);
+
+		bits = 0;
+		memcpy(&bits, &block->row[3], sizeof(uint8_t) * 3);
+
+		tmp_bits[2][0] = (uint8_t)(bits & mask);
+		bits >>= 3;
+		tmp_bits[2][1] = (uint8_t)(bits & mask);
+		bits >>= 3;
+		tmp_bits[2][2] = (uint8_t)(bits & mask);
+		bits >>= 3;
+		tmp_bits[2][3] = (uint8_t)(bits & mask);
+		bits >>= 3;
+		tmp_bits[3][0] = (uint8_t)(bits & mask);
+		bits >>= 3;
+		tmp_bits[3][1] = (uint8_t)(bits & mask);
+		bits >>= 3;
+		tmp_bits[3][2] = (uint8_t)(bits & mask);
+		bits >>= 3;
+		tmp_bits[3][3] = (uint8_t)(bits & mask);
+
+		uint32_t *out_bits = (uint32_t*)&block->row[0];
+
+		*out_bits = *out_bits | (tmp_bits[3][0] << 0);
+		*out_bits = *out_bits | (tmp_bits[3][1] << 3);
+		*out_bits = *out_bits | (tmp_bits[3][2] << 6);
+		*out_bits = *out_bits | (tmp_bits[3][3] << 9);
+
+		*out_bits = *out_bits | (tmp_bits[2][0] << 12);
+		*out_bits = *out_bits | (tmp_bits[2][1] << 15);
+		*out_bits = *out_bits | (tmp_bits[2][2] << 18);
+		*out_bits = *out_bits | (tmp_bits[2][3] << 21);
+
+		out_bits = (uint32_t*)&block->row[3];
+
+		*out_bits &= 0xff000000;
+
+		*out_bits = *out_bits | (tmp_bits[1][0] << 0);
+		*out_bits = *out_bits | (tmp_bits[1][1] << 3);
+		*out_bits = *out_bits | (tmp_bits[1][2] << 6);
+		*out_bits = *out_bits | (tmp_bits[1][3] << 9);
+
+		*out_bits = *out_bits | (tmp_bits[0][0] << 12);
+		*out_bits = *out_bits | (tmp_bits[0][1] << 15);
+		*out_bits = *out_bits | (tmp_bits[0][2] << 18);
+		*out_bits = *out_bits | (tmp_bits[0][3] << 21);
+	}
+
+	static void flipBlockDXTC5(DXTColBlock *line, int numBlocks)
+	{
+		DXTColBlock *curblock = line;
+		DXT5AlphaBlock *alphablock;
+
+		for (int i = 0; i < numBlocks; i++)
+		{
+			alphablock = (DXT5AlphaBlock*)curblock;
+
+			flipDXT5Alpha(alphablock);
+
+			++curblock;
+
+			swapMemory(&curblock->row[0], &curblock->row[3], sizeof(uint8_t));
+			swapMemory(&curblock->row[1], &curblock->row[2], sizeof(uint8_t));
+
+			++curblock;
+		}
+	}
+
+	/// from gpu gems
+	static void flipCompressedTexture(int w, int h, int format, void* surface)
+	{
+		void (*flipBlocksFunction)(DXTColBlock*, int);
+		int xblocks = w >> 2;
+		int yblocks = h >> 2;
+		int blocksize;
+
+		switch (format)
+		{
+			case GL_COMPRESSED_RGBA_S3TC_DXT1_EXT:
+				blocksize = 8;
+				flipBlocksFunction = &flipBlockDXTC1;
+				break;
+			case GL_COMPRESSED_RGBA_S3TC_DXT3_EXT:
+				blocksize = 16;
+				flipBlocksFunction = &flipBlockDXTC3;
+				break;
+			case GL_COMPRESSED_RGBA_S3TC_DXT5_EXT:
+				blocksize = 16;
+				flipBlocksFunction = &flipBlockDXTC5;
+				break;
+			default:
+				ASSERT(false);
+				return;
+		}
+
+		int linesize = xblocks * blocksize;
+
+		DXTColBlock *top = (DXTColBlock*)surface;
+		DXTColBlock *bottom = (DXTColBlock*)((uint8_t*)surface + ((yblocks - 1) * linesize));
+
+		while (top < bottom)
+		{
+			(*flipBlocksFunction)(top, xblocks);
+			(*flipBlocksFunction)(bottom, xblocks);
+			swapMemory(bottom, top, linesize);
+
+			top = (DXTColBlock*)((uint8_t*)top + linesize);
+			bottom = (DXTColBlock*)((uint8_t*)bottom - linesize);
+		}
+	}
 }
 
 
@@ -225,35 +430,28 @@ void Texture::apply(int unit)
 }
 
 
-bool Texture::loadTGA(FS::IFile* file)
+bool Texture::loadTGA(FS::IFile& file)
 {
-	TODO("Optimize it! Buffer is not necesary at all and image_dest might be shared.");
-	size_t buffer_size = file->size();
-	char* buffer = LUX_NEW_ARRAY(char, buffer_size);
-	file->read(buffer, buffer_size);
-
 	TGAHeader header;
-	memcpy(&header, buffer, sizeof(TGAHeader));
+	file.read(&header, sizeof(header));
 
 	int color_mode = header.bitsPerPixel / 8;
 	int image_size = header.width * header.height * 4;
 
 	if (header.dataType != 2)
 	{
-		LUX_DELETE_ARRAY(buffer);
 		g_log_error.log("renderer", "Unsupported texture format %s", m_path);
 		return false;
 	}
 
 	if (color_mode < 3)
 	{
-		LUX_DELETE_ARRAY(buffer);
 		g_log_error.log("renderer", "Unsupported color mode %s", m_path);
 		return false;
 	}
 
-	const char* image_src = buffer + sizeof(TGAHeader);
-	unsigned char* image_dest = LUX_NEW_ARRAY(unsigned char, image_size);
+	TextureManager* manager = static_cast<TextureManager*>(getResourceManager().get(ResourceManager::TEXTURE));
+	uint8_t* image_dest = (uint8_t*)manager->getBuffer(image_size);
 
 	// Targa is BGR, swap to RGB, add alpha and flip Y axis
 	for (long y = 0; y < header.height; y++)
@@ -262,24 +460,20 @@ bool Texture::loadTGA(FS::IFile* file)
 		long write_index = ((header.imageDescriptor & 32) != 0) ? read_index : y * header.width * 4;
 		for (long x = 0; x < header.width; x++)
 		{
-			image_dest[write_index] = image_src[read_index + 2];
-			image_dest[write_index + 1] = image_src[read_index + 1];
-			image_dest[write_index + 2] = image_src[read_index];
+			file.read(&image_dest[write_index + 2], sizeof(uint8_t));
+			file.read(&image_dest[write_index + 1], sizeof(uint8_t));
+			file.read(&image_dest[write_index + 0], sizeof(uint8_t));
 			if (color_mode == 4)
-				image_dest[write_index + 3] = image_src[read_index + 3];
+				file.read(&image_dest[write_index + 3], sizeof(uint8_t));
 			else
 				image_dest[write_index + 3] = 255;
-
 			write_index += 4;
-			read_index += color_mode;
 		}
 	}
 
 	glGenTextures(1, &m_id);
 	if (m_id == 0)
 	{
-		LUX_DELETE_ARRAY(buffer);
-		LUX_DELETE_ARRAY(image_dest);
 		return false;
 	}
 
@@ -289,20 +483,18 @@ bool Texture::loadTGA(FS::IFile* file)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-	LUX_DELETE_ARRAY(image_dest);
-	LUX_DELETE_ARRAY(buffer);
 	return true;
 }
 
 
-bool Texture::loadDDS(FS::IFile* file)
+bool Texture::loadDDS(FS::IFile& file)
 {
 	DDS::Header hdr;
 	uint32_t width = 0;
 	uint32_t height = 0;
 	uint32_t mipMapCount = 0;
 
-	file->read(&hdr, sizeof(hdr));
+	file.read(&hdr, sizeof(hdr));
 
 	if (hdr.dwMagic != DDS::DDS_MAGIC || hdr.dwSize != 124 ||
 		!(hdr.dwFlags & DDS::DDSD_PIXELFORMAT) || !(hdr.dwFlags & DDS::DDSD_CAPS))
@@ -368,15 +560,14 @@ bool Texture::loadDDS(FS::IFile* file)
 		return false;
 	}
 
+	TextureManager* manager = static_cast<TextureManager*>(getResourceManager().get(ResourceManager::TEXTURE));
 	glBindTexture(GL_TEXTURE_2D, m_id);
 
 	glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_FALSE);
 	mipMapCount = (hdr.dwFlags & DDS::DDSD_MIPMAPCOUNT) ? hdr.dwMipMapCount : 1;
 	if (li->compressed)
 	{
-		uint32_t size = max(li->divSize, width) / li->divSize * max(li->divSize, height) / li->divSize * li->blockBytes;
-		ASSERT(size == hdr.dwPitchOrLinearSize);
-		ASSERT(hdr.dwFlags & DDS::DDSD_LINEARSIZE);
+		uint32_t size = Math::max(li->divSize, width) / li->divSize * Math::max(li->divSize, height) / li->divSize * li->blockBytes;
 		if (size != hdr.dwPitchOrLinearSize || (hdr.dwFlags & DDS::DDSD_LINEARSIZE) == 0)
 		{
 			glDeleteTextures(1, &m_id);
@@ -384,24 +575,22 @@ bool Texture::loadDDS(FS::IFile* file)
 			onFailure();
 			return false;
 		}
-		unsigned char * data = LUX_NEW_ARRAY(unsigned char, size);
+		uint8_t* data = (uint8_t*)manager->getBuffer(size);
 		ASSERT(data);
 		for (uint32_t ix = 0; ix < mipMapCount; ++ix)
 		{
-			file->read(data, size);
+			file.read(data, size);
+			DDS::flipCompressedTexture(width, height, li->internalFormat, data);
 			glCompressedTexImage2D(GL_TEXTURE_2D, ix, li->internalFormat, width, height, 0, size, data);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 			width = (width + 1) >> 1;
 			height = (height + 1) >> 1;
-			size = max(li->divSize, width) / li->divSize * max(li->divSize, height) / li->divSize * li->blockBytes;
+			size = Math::max(li->divSize, width) / li->divSize * Math::max(li->divSize, height) / li->divSize * li->blockBytes;
 		}
-		LUX_DELETE_ARRAY(data);
 	}
 	else if (li->palette)
 	{
-		ASSERT(hdr.dwFlags & DDS::DDSD_PITCH);
-		ASSERT(hdr.pixelFormat.dwRGBBitCount == 8);
 		if ((hdr.dwFlags & DDS::DDSD_PITCH) == 0 || hdr.pixelFormat.dwRGBBitCount != 8)
 		{
 			glDeleteTextures(1, &m_id);
@@ -409,7 +598,6 @@ bool Texture::loadDDS(FS::IFile* file)
 			return false;
 		}
 		uint32_t size = hdr.dwPitchOrLinearSize * height;
-		ASSERT(size == width * height * li->blockBytes);
 		if (size != width * height * li->blockBytes)
 		{
 			glDeleteTextures(1, &m_id);
@@ -418,11 +606,11 @@ bool Texture::loadDDS(FS::IFile* file)
 		}
 		unsigned char * data = LUX_NEW_ARRAY(unsigned char, size);
 		uint32_t palette[256];
-		uint32_t * unpacked = LUX_NEW_ARRAY(uint32_t, size);
-		file->read(palette, 4 * 256);
+		uint32_t* unpacked = (uint32_t*)manager->getBuffer(size * sizeof(uint32_t));
+		file.read(palette, 4 * 256);
 		for (uint32_t ix = 0; ix < mipMapCount; ++ix)
 		{
-			file->read(data, size);
+			file.read(data, size);
 			for (uint32_t zz = 0; zz < size; ++zz)
 			{
 				unpacked[zz] = palette[data[zz]];
@@ -434,7 +622,6 @@ bool Texture::loadDDS(FS::IFile* file)
 			size = width * height * li->blockBytes;
 		}
 		LUX_DELETE_ARRAY(data);
-		LUX_DELETE_ARRAY(unpacked);
 	}
 	else
 	{
@@ -443,17 +630,16 @@ bool Texture::loadDDS(FS::IFile* file)
 			glPixelStorei(GL_UNPACK_SWAP_BYTES, GL_TRUE);
 		}
 		uint32_t size = width * height * li->blockBytes;
-		unsigned char * data = LUX_NEW_ARRAY(unsigned char, size);
+		uint8_t* data = (uint8_t*)manager->getBuffer(size);
 		for (uint32_t ix = 0; ix < mipMapCount; ++ix)
 		{
-			file->read(data, size);
+			file.read(data, size);
 			glPixelStorei(GL_UNPACK_ROW_LENGTH, height);
 			glTexImage2D(GL_TEXTURE_2D, ix, li->internalFormat, width, height, 0, li->externalFormat, li->type, data);
 			width = (width+ 1) >> 1;
 			height = (height + 1) >> 1;
 			size = width * height * li->blockBytes;
 		}
-		LUX_DELETE_ARRAY(data);
 		glPixelStorei(GL_UNPACK_SWAP_BYTES, GL_FALSE);
 	}
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, mipMapCount - 1);
@@ -463,18 +649,19 @@ bool Texture::loadDDS(FS::IFile* file)
 
 void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 {
+	ASSERT(file);
 	if (success)
 	{
 		const char* path = m_path.c_str();
 		size_t len = m_path.length();
 		if (len > 3 && strcmp(path + len - 4, ".dds") == 0)
 		{
-			bool loaded = loadDDS(file);
+			bool loaded = loadDDS(*file);
 			ASSERT(loaded);
 		}
 		else
 		{
-			bool loaded = loadTGA(file);
+			bool loaded = loadTGA(*file);
 			ASSERT(loaded);
 		}
 

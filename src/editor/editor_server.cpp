@@ -1,9 +1,8 @@
 #include "editor_server.h"
 
 #include <gl/GL.h>
-#include <shellapi.h>
-#include <Windows.h>
 
+#include "core/array.h"
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/fs/file_system.h"
@@ -12,12 +11,16 @@
 #include "core/fs/tcp_file_device.h"
 #include "core/fs/tcp_file_server.h"
 #include "core/fs/ifile.h"
+#include "core/input_system.h"
 #include "core/json_serializer.h"
 #include "core/log.h"
 #include "core/map.h"
 #include "core/matrix.h"
 #include "core/array.h"
-#include "core/array.h"
+#include "core/MT/mutex.h"
+#include "core/MT/task.h"
+#include "core/Net/tcp_acceptor.h"
+#include "core/Net/tcp_stream.h"
 #include "editor/editor_icon.h"
 #include "editor/gizmo.h"
 #include "editor/property_descriptor.h"
@@ -133,7 +136,7 @@ struct EditorServerImpl
 
 		EditorServerImpl();
 
-		bool create(HWND hwnd, HWND game_hwnd, const char* base_path);
+		bool create(const char* base_path);
 		void destroy();
 		void onPointerDown(int x, int y, MouseButton::Value button);
 		void onPointerMove(int x, int y, int relx, int rely);
@@ -146,8 +149,8 @@ struct EditorServerImpl
 		void renderIcons(IRenderDevice& render_device);
 		void renderScene(IRenderDevice& render_device);
 		void renderPhysics();
-		void save(const char path[]);
-		void load(const char path[]);
+		void save(const char* path);
+		void load(const char* path);
 		void loadMap(FS::IFile* file, bool success, FS::FileSystem& fs);
 		void addComponent(uint32_t type_crc);
 		void sendComponent(uint32_t type_crc);
@@ -163,8 +166,8 @@ struct EditorServerImpl
 		void logMessage(int32_t type, const char* system, const char* msg);
 		Entity& getSelectedEntity() { return m_selected_entity; }
 		bool isGameMode() const { return m_is_game_mode; }
-		void save(FS::IFile& file);
-		void load(FS::IFile& file);
+		void save(FS::IFile& file, const char* path);
+		void load(FS::IFile& file, const char* path);
 		void onMessage(void* msgptr, int size);
 		EditorIconHit raycastEditorIcons(const Vec3& origin, const Vec3& dir);
 
@@ -189,8 +192,6 @@ struct EditorServerImpl
 		map<uint32_t, IPlugin*> m_creators;
 		MouseMode::Value m_mouse_mode;
 		Array<EditorIcon*> m_editor_icons;
-		HGLRC m_hglrc;
-		HGLRC m_game_hglrc;
 		bool m_is_game_mode;
 		FS::IFile* m_game_mode_file;
 		MessageTask* m_message_task;
@@ -256,12 +257,12 @@ void EditorServer::tick()
 }
 
 
-bool EditorServer::create(HWND hwnd, HWND game_hwnd, const char* base_path)
+bool EditorServer::create(const char* base_path)
 {
 	m_impl = LUX_NEW(EditorServerImpl)();
 	m_impl->m_owner = this;
 	
-	if(!m_impl->create(hwnd, game_hwnd, base_path))
+	if(!m_impl->create(base_path))
 	{
 		LUX_DELETE(m_impl);
 		m_impl = NULL;
@@ -285,11 +286,11 @@ void EditorServer::destroy()
 
 void EditorServerImpl::registerProperties()
 {
-	m_component_properties[camera_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("priority"), &Renderer::getCameraPriority, &Renderer::setCameraPriority));
-	m_component_properties[camera_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("fov"), &Renderer::getCameraFOV, &Renderer::setCameraFOV));
-	m_component_properties[camera_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("near"), &Renderer::getCameraNearPlane, &Renderer::setCameraNearPlane));
-	m_component_properties[camera_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("far"), &Renderer::getCameraFarPlane, &Renderer::setCameraFarPlane));
-	m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("source"), &Renderer::getRenderablePath, &Renderer::setRenderablePath, IPropertyDescriptor::FILE));
+	m_component_properties[camera_type].push(LUX_NEW(PropertyDescriptor<RenderScene>)(crc32("slot"), &RenderScene::getCameraSlot, &RenderScene::setCameraSlot, IPropertyDescriptor::STRING));
+	m_component_properties[camera_type].push(LUX_NEW(PropertyDescriptor<RenderScene>)(crc32("fov"), &RenderScene::getCameraFOV, &RenderScene::setCameraFOV));
+	m_component_properties[camera_type].push(LUX_NEW(PropertyDescriptor<RenderScene>)(crc32("near"), &RenderScene::getCameraNearPlane, &RenderScene::setCameraNearPlane));
+	m_component_properties[camera_type].push(LUX_NEW(PropertyDescriptor<RenderScene>)(crc32("far"), &RenderScene::getCameraFarPlane, &RenderScene::setCameraFarPlane));
+	m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<RenderScene>)(crc32("source"), &RenderScene::getRenderablePath, &RenderScene::setRenderablePath, IPropertyDescriptor::FILE));
 	/*m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("visible"), &Renderer::getVisible, &Renderer::setVisible));
 	m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("cast shadows"), &Renderer::getCastShadows, &Renderer::setCastShadows));
 	m_component_properties[point_light_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("fov"), &Renderer::getLightFov, &Renderer::setLightFov));
@@ -326,8 +327,9 @@ void EditorServerImpl::onPointerDown(int x, int y, MouseButton::Value button)
 	{
 		Vec3 origin, dir;
 		Component camera_cmp = m_camera.getComponent(camera_type);
-		m_engine.getRenderer().getRay(camera_cmp, (float)x, (float)y, origin, dir);
-		RayCastModelHit hit = m_engine.getRenderer().castRay(origin, dir);
+		RenderScene* scene = static_cast<RenderScene*>(camera_cmp.system);
+		scene->getRay(camera_cmp, (float)x, (float)y, origin, dir);
+		RayCastModelHit hit = scene->castRay(origin, dir);
 		RayCastModelHit gizmo_hit = m_gizmo.castRay(origin, dir);
 		EditorIconHit icon_hit = raycastEditorIcons(origin, dir);
 		if (gizmo_hit.m_is_hit && (icon_hit.m_t < 0 || gizmo_hit.m_t < icon_hit.m_t))
@@ -390,19 +392,19 @@ void EditorServerImpl::onPointerUp(int, int, MouseButton::Value)
 }
 
 
-void EditorServerImpl::save(const char path[])
+void EditorServerImpl::save(const char* path)
 {
 	g_log_info.log("editor server", "saving universe %s...", path);
 	FS::FileSystem& fs = m_engine.getFileSystem();
 	FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
-	save(*file);
+	save(*file, path);
 	fs.close(file);
 }
 
 
-void EditorServerImpl::save(FS::IFile& file)
+void EditorServerImpl::save(FS::IFile& file, const char* path)
 {
-	JsonSerializer serializer(file, JsonSerializer::WRITE);
+	JsonSerializer serializer(file, JsonSerializer::WRITE, path);
 	m_engine.serialize(serializer);
 	g_log_info.log("editor server", "universe saved");
 }
@@ -414,7 +416,7 @@ void EditorServerImpl::addEntity()
 	e.setPosition(m_camera.getPosition() + m_camera.getRotation() * Vec3(0, 0, -2));
 	selectEntity(e);
 	EditorIcon* er = LUX_NEW(EditorIcon)();
-	er->create(m_engine.getRenderer(), m_selected_entity, Component::INVALID);
+	er->create(m_engine, *m_engine.getRenderScene(), m_selected_entity, Component::INVALID);
 	m_editor_icons.push(er);
 }
 
@@ -453,7 +455,7 @@ void EditorServerImpl::toggleGameMode()
 	else
 	{
 		m_game_mode_file = m_engine.getFileSystem().open("memory", "", FS::Mode::WRITE);
-		save(*m_game_mode_file);
+		save(*m_game_mode_file, "GameMode");
 		m_engine.getScriptSystem().start();
 		m_is_game_mode = true;
 	}
@@ -465,7 +467,7 @@ void EditorServerImpl::stopGameMode()
 	m_is_game_mode = false;
 	m_engine.getScriptSystem().stop();
 	m_game_mode_file->seek(FS::SeekMode::BEGIN, 0);
-	load(*m_game_mode_file);
+	load(*m_game_mode_file, "GameMode");
 	m_engine.getFileSystem().close(m_game_mode_file);
 	m_game_mode_file = NULL;
 }
@@ -541,11 +543,11 @@ void EditorServerImpl::addComponent(uint32_t type_crc)
 		}
 		else if(type_crc == renderable_type)
 		{
-			m_engine.getRenderer().createComponent(renderable_type, m_selected_entity);
+			m_engine.getRenderScene()->createComponent(renderable_type, m_selected_entity);
 		}
 		else if(type_crc == light_type)
 		{
-			m_engine.getRenderer().createComponent(light_type, m_selected_entity);
+			m_engine.getRenderScene()->createComponent(light_type, m_selected_entity);
 		}
 		else if(type_crc == script_type)
 		{
@@ -553,7 +555,7 @@ void EditorServerImpl::addComponent(uint32_t type_crc)
 		}
 		else if (type_crc == camera_type)
 		{
-			m_engine.getRenderer().createComponent(camera_type, m_selected_entity);
+			m_engine.getRenderScene()->createComponent(camera_type, m_selected_entity);
 		}
 		else
 		{
@@ -612,7 +614,7 @@ void EditorServerImpl::removeComponent(uint32_t)
 	selectEntity(m_selected_entity);*/
 }
 
-void EditorServerImpl::load(const char path[])
+void EditorServerImpl::load(const char* path)
 {
 	g_log_info.log("editor server", "loading universe %s...", path);
 	FS::FileSystem& fs = m_engine.getFileSystem();
@@ -626,7 +628,7 @@ void EditorServerImpl::loadMap(FS::IFile* file, bool success, FS::FileSystem& fs
 	ASSERT(success);
 	if(success)
 	{
-		load(*file);
+		load(*file, "unknown map"); /// TODO file path
 	}
 
 	fs.close(file);
@@ -640,103 +642,18 @@ void EditorServerImpl::newUniverse()
 }
 
 
-void EditorServerImpl::load(FS::IFile& file)
+void EditorServerImpl::load(FS::IFile& file, const char* path)
 {
 	g_log_info.log("editor server", "parsing universe...");
 	destroyUniverse();
 	createUniverse(false);
-	JsonSerializer serializer(file, JsonSerializer::READ);
+	JsonSerializer serializer(file, JsonSerializer::READ, path);
 	m_engine.deserialize(serializer);
 	g_log_info.log("editor server", "universe parsed");
 }
 
 
-HGLRC createGLContext(HWND hwnd[], int count)
-{
-	ASSERT(count > 0);
-	HDC hdc;
-	hdc = GetDC(hwnd[0]);
-	ASSERT(hdc != NULL);
-	if (hdc == NULL)
-	{
-		g_log_error.log("renderer", "Could not get the device context");
-		return NULL;
-	}
-	PIXELFORMATDESCRIPTOR pfd = 
-	{ 
-		sizeof(PIXELFORMATDESCRIPTOR),  //  size of this pfd  
-		1,                     // version number  
-		PFD_DRAW_TO_WINDOW |   // support window  
-		PFD_SUPPORT_OPENGL |   // support OpenGL  
-		PFD_DOUBLEBUFFER,      // double buffered  
-		PFD_TYPE_RGBA,         // RGBA type  
-		24,                    // 24-bit color depth  
-		0, 0, 0, 0, 0, 0,      // color bits ignored  
-		0,                     // no alpha buffer  
-		0,                     // shift bit ignored  
-		0,                     // no accumulation buffer  
-		0, 0, 0, 0,            // accum bits ignored  
-		32,                    // 32-bit z-buffer      
-		0,                     // no stencil buffer  
-		0,                     // no auxiliary buffer  
-		PFD_MAIN_PLANE,        // main layer  
-		0,                     // reserved  
-		0, 0, 0                // layer masks ignored  
-	}; 
-	int pixelformat = ChoosePixelFormat(hdc, &pfd);
-	if (pixelformat == 0)
-	{
-		ASSERT(false);
-		g_log_error.log("renderer", "Could not choose a pixel format");
-		return NULL;
-	}
-	BOOL success = SetPixelFormat(hdc, pixelformat, &pfd);
-	if (success == FALSE)
-	{
-		ASSERT(false);
-		g_log_error.log("renderer", "Could not set a pixel format");
-		return NULL;
-	}
-	for (int i = 1; i < count; ++i)
-	{
-		if (hwnd[i])
-		{
-			HDC hdc2 = GetDC(hwnd[i]);
-			if (hdc2 == NULL)
-			{
-				ASSERT(false);
-				g_log_error.log("renderer", "Could not get the device context");
-				return NULL;
-			}
-			BOOL success = SetPixelFormat(hdc2, pixelformat, &pfd);
-			if (success == FALSE)
-			{
-				ASSERT(false);
-				g_log_error.log("renderer", "Could not set a pixel format");
-				return NULL;
-			}
-		}
-	}
-	HGLRC hglrc = wglCreateContext(hdc);
-	if (hglrc == NULL)
-	{
-		ASSERT(false);
-		g_log_error.log("renderer", "Could not create an opengl context");
-		return NULL;
-	}
-	success = wglMakeCurrent(hdc, hglrc);
-	if (success == FALSE)
-	{
-		ASSERT(false);
-		g_log_error.log("renderer", "Could not make the opengl context current rendering context");
-		return NULL;
-	}
-	glPushAttrib(GL_ALL_ATTRIB_BITS);
-	return hglrc;
-}
-
-
-bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
+bool EditorServerImpl::create(const char* base_path)
 {
 	m_message_task = LUX_NEW(MessageTask)();
 	m_message_task->m_server = this;
@@ -756,12 +673,6 @@ bool EditorServerImpl::create(HWND hwnd, HWND game_hwnd, const char* base_path)
 	m_file_system->setDefaultDevice("memory:tcp");
 	m_file_system->setSaveGameDevice("memory:tcp");
 	
-	if(hwnd)
-	{
-		HWND hwnds[] = { hwnd, game_hwnd };
-		m_hglrc = createGLContext(hwnds, 2);
-	}
-
 	g_log_info.getCallback().bind<EditorServerImpl, &EditorServerImpl::onLogInfo>(this);
 	g_log_warning.getCallback().bind<EditorServerImpl, &EditorServerImpl::onLogWarning>(this);
 	g_log_error.getCallback().bind<EditorServerImpl, &EditorServerImpl::onLogError>(this);
@@ -798,12 +709,6 @@ Gizmo& EditorServer::getGizmo()
 FS::TCPFileServer& EditorServer::getTCPFileServer()
 {
 	return m_impl->m_tpc_file_server;
-}
-
-
-HGLRC EditorServer::getHGLRC()
-{
-	return m_impl->m_hglrc;
 }
 
 
@@ -1085,7 +990,7 @@ void EditorServerImpl::onComponentEvent(Event& event)
 		if(!found)
 		{
 			EditorIcon* er = LUX_NEW(EditorIcon)();
-			er->create(m_engine.getRenderer(), e.component.entity, e.component);
+			er->create(m_engine, *m_engine.getRenderScene(), e.component.entity, e.component);
 			m_editor_icons.push(er);
 		}
 	}
@@ -1094,7 +999,7 @@ void EditorServerImpl::onComponentEvent(Event& event)
 		if(e.component.entity.existsInUniverse() &&  e.component.entity.getComponents().empty())
 		{
 			EditorIcon* er = LUX_NEW(EditorIcon)();
-			er->create(m_engine.getRenderer(), e.component.entity, Component::INVALID);
+			er->create(m_engine, *m_engine.getRenderScene(), e.component.entity, Component::INVALID);
 			m_editor_icons.push(er);
 		}
 	}
@@ -1126,7 +1031,6 @@ void EditorServerImpl::onEvent(Event& evt)
 
 void EditorServerImpl::destroyUniverse()
 {
-	m_edit_view_render_device->getPipeline().clearCameras();
 	for (int i = 0; i < m_editor_icons.size(); ++i)
 	{
 		m_editor_icons[i]->destroy();
@@ -1143,30 +1047,28 @@ void EditorServerImpl::destroyUniverse()
 void EditorServer::setEditViewRenderDevice(IRenderDevice& render_device)
 {
 	m_impl->m_edit_view_render_device = &render_device;
-	m_impl->m_edit_view_render_device->getPipeline().addCamera(m_impl->m_camera.getComponent(camera_type));
 }
 
 
-void EditorServerImpl::createUniverse(bool)
+void EditorServerImpl::createUniverse(bool create_basic_entities)
 {
 	Universe* universe = m_engine.createUniverse();
-
-	m_camera = m_engine.getUniverse()->createEntity();
-	m_camera.setPosition(0, 0, -5);
-	m_camera.setRotation(Quat(Vec3(0, 1, 0), -Math::PI));
-	Component cmp = m_engine.getRenderer().createComponent(camera_type, m_camera);
-	if (m_edit_view_render_device)
+	if (create_basic_entities)
 	{
-		m_edit_view_render_device->getPipeline().addCamera(cmp);
+		m_camera = m_engine.getUniverse()->createEntity();
+		m_camera.setPosition(0, 0, -5);
+		m_camera.setRotation(Quat(Vec3(0, 1, 0), -Math::PI));
+		Component cmp = m_engine.getRenderScene()->createComponent(camera_type, m_camera);
+		RenderScene* scene = static_cast<RenderScene*>(cmp.system);
+		scene->setCameraSlot(cmp, string("editor"));
 	}
-
 	m_gizmo.create(m_engine.getRenderer());
 	m_gizmo.setUniverse(universe);
 	m_gizmo.hide();
 
-	universe->getEventManager()->addListener(EntityMovedEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);
-	universe->getEventManager()->addListener(ComponentEvent::type).bind<EditorServerImpl, &EditorServerImpl::onComponentEvent>(this);
-	universe->getEventManager()->addListener(EntityDestroyedEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);
+	universe->getEventManager().addListener(EntityMovedEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);
+	universe->getEventManager().addListener(ComponentEvent::type).bind<EditorServerImpl, &EditorServerImpl::onComponentEvent>(this);
+	universe->getEventManager().addListener(EntityDestroyedEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);
 
 	m_selected_entity = Entity::INVALID;
 }

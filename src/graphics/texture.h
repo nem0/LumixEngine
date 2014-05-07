@@ -1,10 +1,10 @@
 #pragma once
 
 
-#include <Windows.h>
-#include <gl/GL.h>
 #include "core/string.h"
 #include "core/resource.h"
+#include "graphics/gl_ext.h"
+
 
 namespace Lux
 {
@@ -25,8 +25,8 @@ class Texture : public Resource
 
 	private:
 		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
-		bool loadDDS(FS::IFile* file);
-		bool loadTGA(FS::IFile* file);
+		bool loadDDS(FS::IFile& file);
+		bool loadTGA(FS::IFile& file);
 
 		virtual void doUnload(void) override;
 		virtual FS::ReadCallback getReadCallback() override;

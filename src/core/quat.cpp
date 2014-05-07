@@ -84,22 +84,31 @@ Quat Quat::operator -() const
 
 void Quat::toMatrix(Matrix& mtx) const
 {
-	mtx.m11 = 1 - 2 * y * y - 2 * z * z;
-	mtx.m21 = 2 * x * y - 2 * z * w;
-	mtx.m31 = 2 * x * z + 2 * y * w;
-	mtx.m41 = 0;
-	mtx.m12 = 2 * x * y + 2 * z * w;
-	mtx.m22 = 1 - 2 * x * x - 2 * z * z;
-	mtx.m32 = 2 * y * z - 2 * x * w;
-	mtx.m42 = 0;
-	mtx.m13 = 2 * x * z - 2 * y * w;
-	mtx.m23 = 2 * y * z + 2 * x * w;
-	mtx.m33 = 1 - 2 * x * x - 2 * y * y;
-	mtx.m43 = 0;
-	mtx.m14 = 0;
-	mtx.m24 = 0;
-	mtx.m34 = 0;
-	mtx.m44 = 1.0f;
+	float fx = x + x;
+	float fy = y + y;
+	float fz = z + z;
+	float fwx = fx*w;
+	float fwy = fy*w;
+	float fwz = fz*w;
+	float fxx = fx*x;
+	float fxy = fy*x;
+	float fxz = fz*x;
+	float fyy = fy*y;
+	float fyz = fz*y;
+	float fzz = fz*z;
+
+	mtx.m11 = 1.0f - (fyy + fzz);
+	mtx.m21 = fxy - fwz;
+	mtx.m31 = fxz + fwy;
+	mtx.m12 = fxy + fwz;
+	mtx.m22 = 1.0f - (fxx + fzz);
+	mtx.m32 = fyz - fwx;
+	mtx.m13 = fxz - fwy;
+	mtx.m23 = fyz + fwx;
+	mtx.m33 = 1.0f - (fxx + fyy);
+
+	mtx.m41 = mtx.m42 = mtx.m43 = mtx.m14 = mtx.m24 = mtx.m34 = 0;
+	mtx.m44 = 1;
 }
 
 

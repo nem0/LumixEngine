@@ -6,6 +6,7 @@
 #include "core/matrix.h"
 #include "core/quat.h"
 #include "editor/gizmo.h"
+#include "graphics/irender_device.h"
 #include "graphics/model.h"
 #include "graphics/renderer.h"
 #include "universe/entity_moved_event.h"
@@ -71,7 +72,7 @@ void Gizmo::updateScale(Component camera)
 		getMatrix(mtx);
 		Vec3 pos = mtx.getTranslation();
 		float fov;
-		m_renderer->getCameraFov(camera, fov);
+		static_cast<RenderScene*>(camera.system)->getCameraFOV(camera, fov);
 		float scale = tanf(fov * Math::PI / 180 * 0.5f) * (mtx.getTranslation() - camera_mtx.getTranslation()).length() * 2;
 		scale /= 20 * mtx.getXVector().length();
 		m_scale = scale;
@@ -112,14 +113,14 @@ RayCastModelHit Gizmo::castRay(const Vec3& origin, const Vec3& dir)
 }
 
 
-void Gizmo::render(Renderer& renderer)
+void Gizmo::render(Renderer& renderer, IRenderDevice& render_device)
 {
 	if(m_selected_entity.isValid())
 	{
 		Matrix scale_mtx = Matrix::IDENTITY;
 		scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = m_scale;
 		Matrix mtx = m_selected_entity.getMatrix() * scale_mtx;
-		renderer.renderModel(*m_model, mtx);
+		renderer.renderModel(*m_model, mtx, render_device.getPipeline());
 	}
 }
 
@@ -186,10 +187,9 @@ void Gizmo::transform(Component camera, TransformOperation operation, int x, int
 			Vec3 intersection = getMousePlaneIntersection(camera, x, y);
 			Vec3 delta = intersection - m_transform_point;
 			m_transform_point = intersection;
-			Matrix mtx;
-			m_selected_entity.getMatrix(mtx);
-			mtx.translate(delta);
-			m_selected_entity.setMatrix(mtx);
+			Vec3 pos = m_selected_entity.getPosition();
+			pos += delta;
+			m_selected_entity.setPosition(pos);
 		}
 	}
 }
@@ -198,7 +198,8 @@ void Gizmo::transform(Component camera, TransformOperation operation, int x, int
 Vec3 Gizmo::getMousePlaneIntersection(Component camera, int x, int y)
 {
 	Vec3 origin, dir;
-	m_renderer->getRay(camera, (float)x, (float)y, origin, dir);	
+	RenderScene* scene = static_cast<RenderScene*>(camera.system);
+	scene->getRay(camera, (float)x, (float)y, origin, dir);
 	dir.normalize();
 	Matrix camera_mtx;
 	camera.entity.getMatrix(camera_mtx);

@@ -15,6 +15,8 @@
 #include <QtWidgets/QButtonGroup>
 #include <QtWidgets/QDockWidget>
 #include <QtWidgets/QHeaderView>
+#include <QtWidgets/QLineEdit>
+#include <QtWidgets/QListWidget>
 #include <QtWidgets/QTreeView>
 #include <QtWidgets/QVBoxLayout>
 #include <QtWidgets/QWidget>
@@ -26,7 +28,9 @@ class Ui_AssetBrowser
 public:
     QWidget *dockWidgetContents;
     QVBoxLayout *verticalLayout;
+    QLineEdit *searchInput;
     QTreeView *treeView;
+    QListWidget *listWidget;
 
     void setupUi(QDockWidget *AssetBrowser)
     {
@@ -36,9 +40,14 @@ public:
         dockWidgetContents = new QWidget();
         dockWidgetContents->setObjectName(QStringLiteral("dockWidgetContents"));
         verticalLayout = new QVBoxLayout(dockWidgetContents);
-        verticalLayout->setSpacing(9);
+        verticalLayout->setSpacing(2);
         verticalLayout->setObjectName(QStringLiteral("verticalLayout"));
         verticalLayout->setContentsMargins(2, 2, 2, 2);
+        searchInput = new QLineEdit(dockWidgetContents);
+        searchInput->setObjectName(QStringLiteral("searchInput"));
+
+        verticalLayout->addWidget(searchInput);
+
         treeView = new QTreeView(dockWidgetContents);
         treeView->setObjectName(QStringLiteral("treeView"));
         treeView->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -49,6 +58,12 @@ public:
         treeView->header()->setVisible(false);
 
         verticalLayout->addWidget(treeView);
+
+        listWidget = new QListWidget(dockWidgetContents);
+        listWidget->setObjectName(QStringLiteral("listWidget"));
+        listWidget->setDragEnabled(true);
+
+        verticalLayout->addWidget(listWidget);
 
         AssetBrowser->setWidget(dockWidgetContents);
 

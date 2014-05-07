@@ -33,9 +33,6 @@
     <ClCompile Include="..\..\..\src\graphics\geometry.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\graphics\gl_ext.cpp">
-      <Filter>graphics</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\graphics\material.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
@@ -129,6 +126,9 @@
     </ClCompile>
     <ClCompile Include="..\..\..\src\editor\script_compiler.cpp">
       <Filter>editor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\graphics\render_scene.cpp">
+      <Filter>graphics</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -257,6 +257,9 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\editor\script_compiler.h">
       <Filter>editor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\graphics\render_scene.h">
+      <Filter>graphics</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

@@ -75,7 +75,7 @@ namespace Lux
 		universe->m_positions[index] = pos;
 		universe->m_rotations[index] = rot;
 		EntityMovedEvent evt(*this);
-		universe->getEventManager()->emitEvent(evt);
+		universe->getEventManager().emitEvent(evt);
 	}
 
 
@@ -86,7 +86,7 @@ namespace Lux
 		universe->m_positions[index] = mtx.getTranslation();
 		universe->m_rotations[index] = rot;
 		EntityMovedEvent evt(*this);
-		universe->getEventManager()->emitEvent(evt);
+		universe->getEventManager().emitEvent(evt);
 	}
 
 
@@ -94,7 +94,7 @@ namespace Lux
 	{
 		universe->m_positions[index].set(x, y, z);
 		EntityMovedEvent evt(*this);
-		universe->getEventManager()->emitEvent(evt);
+		universe->getEventManager().emitEvent(evt);
 	}
 
 
@@ -102,7 +102,7 @@ namespace Lux
 	{
 		universe->m_positions[index] = pos;
 		EntityMovedEvent evt(*this);
-		universe->getEventManager()->emitEvent(evt);
+		universe->getEventManager().emitEvent(evt);
 	}
 
 
@@ -122,7 +122,7 @@ namespace Lux
 	{
 		universe->m_rotations[index].set(x, y, z, w);
 		EntityMovedEvent evt(*this);
-		universe->getEventManager()->emitEvent(evt);
+		universe->getEventManager().emitEvent(evt);
 	}
 
 
@@ -130,7 +130,7 @@ namespace Lux
 	{
 		universe->m_rotations[index] = rot;
 		EntityMovedEvent evt(*this);
-		universe->getEventManager()->emitEvent(evt);
+		universe->getEventManager().emitEvent(evt);
 	} 
 
 
