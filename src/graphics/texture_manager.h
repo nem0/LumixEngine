@@ -10,7 +10,7 @@ namespace Lux
 		TextureManager();
 		~TextureManager();
 
-		char* getBuffer(int32_t size);
+		uint8_t* getBuffer(int32_t size);
 
 	protected:
 		virtual Resource* createResource(const Path& path) override;
