@@ -92,6 +92,18 @@ FS::ReadCallback Material::getReadCallback()
 	return rc;
 }
 
+bool Material::save(ISerializer& serializer)
+{
+	serializer.beginObject();
+	serializer.serialize("shader", m_shader->getPath().c_str());
+	for (int i = 0; i < m_textures.size(); ++i)
+	{
+		serializer.serialize("texture", m_textures[i]->getPath().c_str());
+	}
+	serializer.endObject();
+	return false;
+}
+
 void Material::deserializeUniforms(ISerializer& serializer)
 {
 	serializer.deserializeArrayBegin();
