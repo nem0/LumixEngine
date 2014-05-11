@@ -13,6 +13,7 @@ namespace FS
 	class IFile;
 }
 
+class ISerializer;
 class PipelineInstance;
 class Renderer;
 class ResourceManager;
@@ -20,7 +21,7 @@ class Shader;
 class Texture;
 
 
-class Material : public Resource
+class LUX_ENGINE_API Material : public Resource
 {
 	friend class MaterialManager;
 public:
@@ -35,7 +36,7 @@ public:
 	int getTextureCount() const { return m_textures.size(); }
 	Texture* getTexture(int i) { return m_textures[i]; }
 	void setTexture(int i, Texture* texture) { m_textures[i] = texture; }
-
+	void removeTexture(int i) { m_textures.erase(i); }
 private:
 	Material(const Path& path, ResourceManager& resource_manager)
 		: Resource(path, resource_manager)
@@ -48,6 +49,7 @@ private:
 	~Material()
 	{ }
 
+	bool save(ISerializer& serializer);
 	virtual void doUnload(void) override;
 	virtual FS::ReadCallback getReadCallback() override;
 
@@ -74,7 +76,7 @@ private:
 	};
 
 private:
-	void deserializeUniforms(class ISerializer& serializer);
+	void deserializeUniforms(ISerializer& serializer);
 
 private:
 	Shader*	m_shader;
