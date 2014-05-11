@@ -96,8 +96,7 @@ struct RendererImpl : public Renderer
 		glewExperimental = GL_TRUE;
 		GLenum err = glewInit();
 		return err == GLEW_OK
-			&& GLEW_EXT_framebuffer_object
-			&& GLEW_ARB_framebuffer_object
+			&& (GLEW_EXT_framebuffer_object || GLEW_ARB_framebuffer_object)
 			&& GLEW_ARB_shader_objects
 			&& GLEW_ARB_fragment_shader
 			&& GLEW_ARB_vertex_shader
