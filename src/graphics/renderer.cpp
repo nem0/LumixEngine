@@ -93,6 +93,7 @@ struct RendererImpl : public Renderer
 	virtual bool create(Engine& engine) override
 	{
 		m_engine = &engine;
+		glewExperimental = GL_TRUE;
 		GLenum err = glewInit();
 		return err == GLEW_OK
 			&& GLEW_EXT_framebuffer_object
