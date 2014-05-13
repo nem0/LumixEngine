@@ -21,12 +21,12 @@ class CameraWidget : public PropertyWidgetBase
 		virtual void onEntityProperties(Lux::PropertyListEvent& event) override;
 
 private slots:
-	void on_priorityInput_valueChanged(int arg1);
 	void on_fovInput_valueChanged(double arg1);
 	void on_farInput_valueChanged(double arg1);
 	void on_nearInput_valueChanged(double arg1);
+	void on_slotEdit_editingFinished();
 
-private:
+	private:
 		Ui::CameraWidget* m_ui;
 };
 
