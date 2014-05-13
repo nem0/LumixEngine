@@ -8,6 +8,9 @@
 #include <qpainter.h>
 #include <qpushbutton.h>
 #include "core/crc32.h"
+#include "core/FS/file_system.h"
+#include "core/json_serializer.h"
+#include "core/log.h"
 #include "editor/editor_server.h"
 #include "editor/editor_client.h"
 #include "editor/server_message_types.h"
@@ -259,8 +262,20 @@ void MaterialManager::onShaderChanged()
 	m_impl->m_material->setShader(static_cast<Lux::Shader*>(m_impl->m_engine->getResourceManager().get(Lux::ResourceManager::SHADER)->load(edit->text().toLatin1().data())));
 }
 
+void MaterialManager::onTextureAdded()
+{
+	m_impl->m_material->addTexture(static_cast<Lux::Texture*>(m_impl->m_engine->getResourceManager().get(Lux::ResourceManager::TEXTURE)->load("textures/default.dds")));
+	selectMaterial(m_impl->m_material->getPath().c_str());
+}
 
 void MaterialManager::selectMaterial(const char* path)
+{
+	Lux::Material* material = static_cast<Lux::Material*>(m_impl->m_engine->getResourceManager().get(Lux::ResourceManager::MATERIAL)->load(path));
+	material->getObserverCb().bind<MaterialManager, &MaterialManager::onMaterialLoaded>(this);
+	m_impl->m_material = material;
+}
+
+void MaterialManager::onMaterialLoaded(Lux::Resource::State)
 {
 	ICppObjectProperty* properties[] = 
 	{
@@ -270,14 +285,15 @@ void MaterialManager::selectMaterial(const char* path)
 	};
 
 	Lux::Model* model = static_cast<Lux::Model*>(m_impl->m_engine->getResourceManager().get(Lux::ResourceManager::MODEL)->get("models/material_sphere.msh"));
-	Lux::Material* material = static_cast<Lux::Material*>(m_impl->m_engine->getResourceManager().get(Lux::ResourceManager::MATERIAL)->load(path));
-	m_impl->m_material = material;
+	Lux::Material* material = m_impl->m_material;
+	material->getObserverCb().unbind<MaterialManager, &MaterialManager::onMaterialLoaded>(this);
 	model->getMesh(0).setMaterial(material);
 
 	QFormLayout* layout = m_ui->materialPropertiesLayout;
 	QLayoutItem* item;
 	while((item = layout->takeAt(0)) != NULL)
 	{
+		delete item->widget();
 		delete item;
 	}
 
@@ -324,10 +340,21 @@ void MaterialManager::selectMaterial(const char* path)
 		edit->setProperty("texture_index", i);
 		layout->addRow("Texture", inner_layout);
 		connect(edit, SIGNAL(editingFinished()), this, SLOT(onTextureChanged()));
+		connect(button, SIGNAL(clicked()), this, SLOT(onTextureRemoved()));
+		button->setProperty("texture_id", i);
 	}
 	QPushButton* button = new QPushButton();
 	button->setText("Add Texture");
+	connect(button, SIGNAL(clicked()), this, SLOT(onTextureAdded()));
 	layout->addRow("", button);
+}
+
+void MaterialManager::onTextureRemoved()
+{
+	QPushButton* button = static_cast<QPushButton*>(QObject::sender());
+	int i = button->property("texture_id").toInt();
+	m_impl->m_material->removeTexture(i);
+	selectMaterial(m_impl->m_material->getPath().c_str());
 }
 
 void MaterialManager::on_fileListView_doubleClicked(const QModelIndex &index)
@@ -340,4 +367,20 @@ void MaterialManager::on_objectMaterialList_doubleClicked(const QModelIndex &ind
 {
 	QListWidgetItem* item = m_ui->objectMaterialList->item(index.row());
 	selectMaterial(item->text().toLatin1().data());
+}
+
+void MaterialManager::on_saveMaterialButton_clicked()
+{
+	Lux::FS::FileSystem& fs = m_impl->m_engine->getFileSystem();
+	Lux::FS::IFile* file = fs.open(fs.getDefaultDevice(), m_impl->m_material->getPath().c_str(), Lux::FS::Mode::RECREATE | Lux::FS::Mode::WRITE);
+	if(file)
+	{
+		Lux::JsonSerializer serializer(*file, Lux::JsonSerializer::AccessMode::WRITE, m_impl->m_material->getPath().c_str());
+		m_impl->m_material->save(serializer);
+		fs.close(file);
+	}
+	else
+	{
+		Lux::g_log_error.log("Material manager", "Could not save file %s", m_impl->m_material->getPath().c_str());
+	}
 }
