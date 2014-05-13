@@ -23,17 +23,6 @@
 #include "wgl_render_device.h"
 
 
-struct CheckboxWithUserData : public QCheckBox
-{
-	void* m_user_data;
-};
-
-struct LineEditWithUserData : public QLineEdit
-{
-	void* m_user_data;
-};
-
-
 class MaterialManagerUI
 {
 	public:
@@ -246,16 +235,22 @@ class CppObjectProperty : public ICppObjectProperty
 
 void MaterialManager::onBoolPropertyStateChanged(int)
 {
-	CheckboxWithUserData* obj = static_cast<CheckboxWithUserData*>(QObject::sender());
-	CppObjectProperty<bool, Lux::Material>* prop = static_cast<CppObjectProperty<bool, Lux::Material>*>(obj->m_user_data);
-	prop->set(*m_impl->m_material, obj->isChecked());
+	QCheckBox* obj = qobject_cast<QCheckBox*>(QObject::sender());
+	if(obj)
+	{
+		CppObjectProperty<bool, Lux::Material>* prop = static_cast<CppObjectProperty<bool, Lux::Material>*>(obj->property("cpp_property").data());
+		prop->set(*m_impl->m_material, obj->isChecked());
+	}
 }
 
 void MaterialManager::onTextureChanged()
 {
-	LineEditWithUserData* edit = static_cast<LineEditWithUserData*>(QObject::sender());
-	int i = (intptr_t)edit->m_user_data;
-	m_impl->m_material->setTexture(i, static_cast<Lux::Texture*>(m_impl->m_engine->getResourceManager().get(Lux::ResourceManager::TEXTURE)->load(edit->text().toLatin1().data())));
+	QLineEdit* edit = qobject_cast<QLineEdit*>(QObject::sender());
+	if(edit)
+	{
+		int i = edit->property("texture_index").toInt();
+		m_impl->m_material->setTexture(i, static_cast<Lux::Texture*>(m_impl->m_engine->getResourceManager().get(Lux::ResourceManager::TEXTURE)->load(edit->text().toLatin1().data())));
+	}
 }
 
 void MaterialManager::onShaderChanged()
@@ -263,6 +258,7 @@ void MaterialManager::onShaderChanged()
 	QLineEdit* edit = static_cast<QLineEdit*>(QObject::sender());
 	m_impl->m_material->setShader(static_cast<Lux::Shader*>(m_impl->m_engine->getResourceManager().get(Lux::ResourceManager::SHADER)->load(edit->text().toLatin1().data())));
 }
+
 
 void MaterialManager::selectMaterial(const char* path)
 {
@@ -278,23 +274,24 @@ void MaterialManager::selectMaterial(const char* path)
 	m_impl->m_material = material;
 	model->getMesh(0).setMaterial(material);
 
-
 	QFormLayout* layout = m_ui->materialPropertiesLayout;
 	QLayoutItem* item;
 	while((item = layout->takeAt(0)) != NULL)
 	{
 		delete item;
 	}
+
 	for(int i = 0; i < sizeof(properties) / sizeof(ICppObjectProperty*); ++i)
 	{
 		switch(properties[i]->getType())
 		{
 			case ICppObjectProperty::BOOL:
 				{
-					CheckboxWithUserData* checkbox = new CheckboxWithUserData();
+					QCheckBox* checkbox = new QCheckBox();
+					checkbox->setProperty("cpp_property", qVariantFromValue((void*)properties[i]));
+					
 					checkbox->setChecked(static_cast<CppObjectProperty<bool, Lux::Material>*>(properties[i])->get(*material));
 					layout->addRow(properties[i]->getName(), checkbox);
-					checkbox->m_user_data = properties[i];
 					connect(checkbox, SIGNAL(stateChanged(int)), this, SLOT(onBoolPropertyStateChanged(int)));
 				}
 				break;
@@ -317,14 +314,14 @@ void MaterialManager::selectMaterial(const char* path)
 	}
 	for(int i = 0; i < material->getTextureCount(); ++i)
 	{
-		LineEditWithUserData* edit = new LineEditWithUserData;
+		QLineEdit* edit = new QLineEdit;
 		QBoxLayout* inner_layout = new QBoxLayout(QBoxLayout::Direction::LeftToRight);
 		QPushButton* button = new QPushButton();
 		button->setText("Remove");
 		inner_layout->addWidget(edit);
 		inner_layout->addWidget(button);
 		edit->setText(material->getTexture(i)->getPath().c_str());
-		edit->m_user_data = (void*)(intptr_t)i;
+		edit->setProperty("texture_index", i);
 		layout->addRow("Texture", inner_layout);
 		connect(edit, SIGNAL(editingFinished()), this, SLOT(onTextureChanged()));
 	}
