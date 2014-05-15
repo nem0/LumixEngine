@@ -42,7 +42,9 @@ void Shader::setUniform(const char* name, int value)
 	GLint loc = glGetUniformLocation(m_program_id, name);
 	if(loc >= 0)
 	{
-		glProgramUniform1i(m_program_id, loc, value);
+		//glProgramUniform1i(m_program_id, loc, value);
+		glUseProgram(m_program_id);
+		glUniform1i(loc, value);
 	}
 }
 
@@ -52,7 +54,9 @@ void Shader::setUniform(const char* name, const Vec3& value)
 	GLint loc = glGetUniformLocation(m_program_id, name);
 	if(loc >= 0)
 	{
-		glProgramUniform3f(m_program_id, loc, value.x, value.y, value.z);
+		//glProgramUniform3f(m_program_id, loc, value.x, value.y, value.z);
+		glUseProgram(m_program_id);
+		glUniform3f(loc, value.x, value.y, value.z);
 	}
 }
 
@@ -62,7 +66,9 @@ void Shader::setUniform(const char* name, GLfloat value)
 	GLint loc = glGetUniformLocation(m_program_id, name);
 	if(loc >= 0)
 	{
-		glProgramUniform1f(m_program_id, loc, value);
+		//glProgramUniform1f(m_program_id, loc, value);
+		glUseProgram(m_program_id);
+		glUniform1f(loc, value);
 	}
 }
 
@@ -72,7 +78,9 @@ void Shader::setUniform(const char* name, const Matrix& mtx)
 	GLint loc = glGetUniformLocation(m_program_id, name);
 	if(loc >= 0)
 	{
-		glProgramUniformMatrix4fv(m_program_id, loc, 1, false, &mtx.m11);
+		//glProgramUniformMatrix4fv(m_program_id, loc, 1, false, &mtx.m11);
+		glUseProgram(m_program_id);
+		glUniformMatrix4fv(loc, 1, false, &mtx.m11);
 	}
 }
 
@@ -81,7 +89,9 @@ void Shader::setUniform(const char* name, const Matrix* matrices, int count)
 	GLint loc = glGetUniformLocation(m_program_id, name);
 	if(loc >= 0) // this is here because of bug in some gl implementations
 	{
-		glProgramUniformMatrix4fv(m_program_id, loc, count, false, &matrices[0].m11);
+		//glProgramUniformMatrix4fv(m_program_id, loc, count, false, &matrices[0].m11);
+		glUseProgram(m_program_id);
+		glUniformMatrix4fv(loc, count, false, &matrices[0].m11);	
 	}
 }
 
