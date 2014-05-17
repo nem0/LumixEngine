@@ -89,7 +89,6 @@ namespace Lux
 		}
 		else
 		{
-			m_dep_count++;
 			if(isReady())
 			{
 				onUnloading();

@@ -395,36 +395,42 @@ struct PipelineInstanceImpl : public PipelineInstance
 		}
 		glEnable(GL_CULL_FACE);
 		glCullFace(GL_FRONT);
-		glViewport(0, 0, m_shadowmap_framebuffer->getWidth(), m_shadowmap_framebuffer->getHeight());
 		m_shadowmap_framebuffer->bind();
 		glClear(GL_DEPTH_BUFFER_BIT);
 		glMatrixMode(GL_PROJECTION);
 		glPushMatrix();
-		glLoadIdentity();
-		Matrix projection_matrix;
-		getOrthoMatrix(-10, 10, -10, 10, 0, 100, &projection_matrix);
-		glMultMatrixf(&projection_matrix.m11);
+		
+		for(int split_index = 0; split_index < 4; ++split_index)
+		{
+			glViewport(1, split_index * m_shadowmap_framebuffer->getHeight() * 0.25f, m_shadowmap_framebuffer->getWidth() - 2, m_shadowmap_framebuffer->getHeight() * 0.25f);
+			glMatrixMode(GL_PROJECTION);
+			glLoadIdentity();
+			Matrix projection_matrix;
+			float bb_size = 2 * ((split_index + 1) * (split_index + 1) * (split_index + 1));
+			getOrthoMatrix(-bb_size, bb_size, -bb_size, bb_size, 0, 100, &projection_matrix);
+			glMultMatrixf(&projection_matrix.m11);
 
-		Matrix mtx = light_cmp.entity.getMatrix();
-		m_light_dir = mtx.getZVector();
-		glMatrixMode(GL_MODELVIEW);
-		glLoadIdentity();
-		Matrix modelview_matrix;
-		Vec3 pos = camera.entity.getPosition();
-		Vec3 cam_forward = camera.entity.getRotation() * Vec3(0, 0, 1);
-		pos -= mtx.getZVector() * 10 + cam_forward * 10 * -dotProduct(mtx.getZVector(), cam_forward);
-		getLookAtMatrix(pos, pos + mtx.getZVector(), mtx.getYVector(), &modelview_matrix);
-		glMultMatrixf(&modelview_matrix.m11);
-		static const Matrix biasMatrix(
-			0.5, 0.0, 0.0, 0.0,
-			0.0, 0.5, 0.0, 0.0,
-			0.0, 0.0, 0.5, 0.0,
-			0.5, 0.5, 0.5, 1.0
-			);
-		m_shadow_modelviewprojection = biasMatrix * (projection_matrix * modelview_matrix);
+			Matrix light_mtx = light_cmp.entity.getMatrix();
+			m_light_dir = light_mtx.getZVector();
+			glMatrixMode(GL_MODELVIEW);
+			glLoadIdentity();
+			Matrix modelview_matrix;
+			Vec3 pos = camera.entity.getPosition();
+			Vec3 cam_forward = camera.entity.getRotation() * Vec3(0, 0, 1);
+			pos -= light_mtx.getZVector() * 10;
+			Vec3 up = camera.entity.getMatrix().getXVector();
+			getLookAtMatrix(pos, pos + light_mtx.getZVector(), light_mtx.getYVector(), &modelview_matrix);
+			glMultMatrixf(&modelview_matrix.m11);
+			static const Matrix biasMatrix(
+				0.5, 0.0, 0.0, 0.0,
+				0.0, 0.5, 0.0, 0.0,
+				0.0, 0.0, 0.5, 0.0,
+				0.5, 0.5, 0.5, 1.0
+				);
+			m_shadow_modelviewprojection[split_index] = biasMatrix * (projection_matrix * modelview_matrix);
 
-		renderModels(layer_mask);
-
+			renderModels(layer_mask);
+		}
 		glMatrixMode(GL_PROJECTION);
 		glPopMatrix();
 		glMatrixMode(GL_MODELVIEW);
@@ -512,7 +518,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 				{
 					mesh.getMaterial()->apply(*m_renderer, *this);
 					mesh.getMaterial()->getShader()->setUniform("light_dir", m_light_dir);
-					mesh.getMaterial()->getShader()->setUniform("shadowmap_matrix", m_shadow_modelviewprojection);
+					mesh.getMaterial()->getShader()->setUniform("shadowmap_matrix0", m_shadow_modelviewprojection[0]);
+					mesh.getMaterial()->getShader()->setUniform("shadowmap_matrix1", m_shadow_modelviewprojection[1]);
+					mesh.getMaterial()->getShader()->setUniform("shadowmap_matrix2", m_shadow_modelviewprojection[2]);
+					mesh.getMaterial()->getShader()->setUniform("shadowmap_matrix3", m_shadow_modelviewprojection[3]);
 					mesh.getMaterial()->getShader()->setUniform("world_matrix", infos[i].m_model_instance->getMatrix());
 
 					static Matrix bone_mtx[64];
@@ -573,7 +582,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	RenderScene* m_scene;
 	Array<FrameBuffer*> m_framebuffers;
 	FrameBuffer* m_shadowmap_framebuffer;
-	Matrix m_shadow_modelviewprojection;
+	Matrix m_shadow_modelviewprojection[4];
 	Renderer* m_renderer;
 	Vec3 m_light_dir;
 	int m_width;
