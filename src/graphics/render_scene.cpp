@@ -430,6 +430,20 @@ namespace Lux
 				m_cameras[camera.index].m_aspect = w / (float)h;
 			}
 
+			virtual const Array<DebugLine>& getDebugLines() const override
+			{
+				return m_debug_lines;
+			}
+
+			virtual void addDebugLine(const Vec3& from, const Vec3& to, const Vec3& color, float life) override
+			{
+				DebugLine& line = m_debug_lines.pushEmpty();
+				line.m_from = from;
+				line.m_to = to;
+				line.m_color = color;
+				line.m_life = life;
+			}
+
 			virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir) override
 			{
 				RayCastModelHit hit;
@@ -484,6 +498,7 @@ namespace Lux
 			Array<Camera> m_cameras;
 			Universe& m_universe;
 			Engine& m_engine;
+			Array<DebugLine> m_debug_lines;
 	};
 
 
