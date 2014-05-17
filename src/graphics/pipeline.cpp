@@ -80,6 +80,13 @@ struct DrawFullscreenQuadCommand : public Command
 };
 
 
+struct RenderDebugLinesCommand : public Command
+{
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
+	virtual void execute(PipelineInstanceImpl& pipeline) override;
+};
+
+
 struct BindFramebufferTextureCommand : public Command
 {
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
@@ -144,6 +151,7 @@ struct PipelineImpl : public Pipeline
 		addCommandCreator("bind_framebuffer_texture").bind<&CreateCommand<BindFramebufferTextureCommand> >();
 		addCommandCreator("render_shadowmap").bind<&CreateCommand<RenderShadowmapCommand> >();
 		addCommandCreator("bind_shadowmap").bind<&CreateCommand<BindShadowmapCommand> >();
+		addCommandCreator("render_debug_lines").bind<&CreateCommand<RenderDebugLinesCommand> >();
 	}
 
 
@@ -457,6 +465,30 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
+	void renderDebugLines()
+	{
+		// cleanup
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glUseProgram(0);
+		for (int i = 0; i < 16; ++i)
+		{
+			glActiveTexture(GL_TEXTURE0 + i);
+			glDisable(GL_TEXTURE_2D);
+		}
+		glActiveTexture(GL_TEXTURE0); 
+
+		const Array<DebugLine>& lines = m_scene->getDebugLines();
+		glBegin(GL_LINES);
+		for (int i = 0, c = lines.size(); i < c; ++i)
+		{
+			glColor3fv(&lines[i].m_color.x);
+			glVertex3fv(&lines[i].m_from.x);
+			glVertex3fv(&lines[i].m_to.x);
+		}
+		glEnd();
+	}
+
+
 	void renderModels(int64_t layer_mask)
 	{
 		ASSERT(m_renderer != NULL);
@@ -640,6 +672,17 @@ void BindFramebufferCommand::execute(PipelineInstanceImpl& pipeline)
 void UnbindFramebufferCommand::execute(PipelineInstanceImpl&)
 {
 	FrameBuffer::unbind();
+}
+
+
+void RenderDebugLinesCommand::deserialize(PipelineImpl&, ISerializer&)
+{
+}
+
+
+void RenderDebugLinesCommand::execute(PipelineInstanceImpl& pipeline)
+{
+	pipeline.renderDebugLines();
 }
 
 
