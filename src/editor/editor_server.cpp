@@ -16,11 +16,11 @@
 #include "core/log.h"
 #include "core/map.h"
 #include "core/matrix.h"
-#include "core/array.h"
 #include "core/MT/mutex.h"
 #include "core/MT/task.h"
 #include "core/Net/tcp_acceptor.h"
 #include "core/Net/tcp_stream.h"
+#include "core/profiler.h"
 #include "editor/editor_icon.h"
 #include "editor/gizmo.h"
 #include "editor/property_descriptor.h"
@@ -223,6 +223,7 @@ void EditorServer::render(IRenderDevice& render_device)
 
 void EditorServer::renderIcons(IRenderDevice& render_device)
 {
+	PROFILE_FUNCTION();
 	m_impl->renderIcons(render_device);
 }
 
@@ -249,6 +250,7 @@ void EditorServer::registerCreator(uint32_t type, IPlugin& creator)
 
 void EditorServer::tick()
 {
+	PROFILE_FUNCTION();
 	if(m_impl->m_is_game_mode)
 	{
 		m_impl->m_engine.update();
@@ -778,6 +780,7 @@ void EditorServerImpl::renderIcons(IRenderDevice& render_device)
 
 void EditorServerImpl::renderScene(IRenderDevice& render_device)
 {
+	PROFILE_FUNCTION();
 	m_engine.getRenderer().render(render_device);
 }
 

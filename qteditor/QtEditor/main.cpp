@@ -2,6 +2,7 @@
 #include <QApplication>
 #include <qdir.h>
 #include "core/log.h"
+#include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "editor/editor_client.h"
@@ -15,7 +16,6 @@
 #include "gameview.h"
 #include "wgl_render_device.h"
 #include "materialmanager.h"
-
 
 class App
 {
@@ -180,6 +180,7 @@ class App
 
 		void renderEditView()
 		{
+			PROFILE_FUNCTION();
 			m_edit_render_device->beginFrame();
 			m_server.render(*m_edit_render_device);
 			m_server.renderIcons(*m_edit_render_device);
@@ -192,8 +193,12 @@ class App
 
 		void handleEvents()
 		{
+			PROFILE_FUNCTION();
 			m_client.processMessages();
-			m_qt_app->processEvents();
+			{
+				PROFILE_BLOCK("qt::processEvents");
+				m_qt_app->processEvents();
+			}
 			BYTE keys[256];
 			GetKeyboardState(keys);
 			if (m_main_window->getSceneView()->hasFocus())
@@ -230,10 +235,14 @@ class App
 		{
 			while (m_main_window->isVisible())
 			{
-				renderEditView();
-				m_server.getEngine().getRenderer().renderGame();
-				m_server.tick();
-				handleEvents();
+				{
+					PROFILE_BLOCK("tick");
+					renderEditView();
+					m_server.getEngine().getRenderer().renderGame();
+					m_server.tick();
+					handleEvents();
+				}
+				Lux::g_profiler.frame();
 			}
 		}
 
