@@ -41,6 +41,10 @@ private slots:
 	void on_actionScene_View_triggered();
 	virtual void closeEvent(QCloseEvent* event) override;
 
+    void on_actionProfiler_triggered();
+
+    void on_actionMaterial_manager_triggered();
+
 private:
 	Ui::MainWindow* m_ui;
 	Lux::EditorClient* m_client;
@@ -52,5 +56,6 @@ private:
 	class ScriptCompilerWidget* m_script_compiler_ui;
 	class FileServerWidget* m_file_server_ui;
 	class MaterialManager* m_material_manager_ui;
+	class ProfilerUI* m_profiler_ui;
 };
 
