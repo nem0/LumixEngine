@@ -135,6 +135,7 @@ struct EditorServerImpl
 		};
 
 		EditorServerImpl();
+		~EditorServerImpl();
 
 		bool create(const char* base_path);
 		void destroy();
@@ -282,6 +283,21 @@ void EditorServer::destroy()
 		m_impl->destroy();
 		LUX_DELETE(m_impl);
 		m_impl = NULL;
+	}
+}
+
+
+EditorServerImpl::~EditorServerImpl()
+{
+	auto iter = m_component_properties.begin();
+	auto end = m_component_properties.end();
+	while (iter != end)
+	{
+		for (int i = 0, c = iter.second().size(); i < c; ++i)
+		{
+			LUX_DELETE(iter.second()[i]);
+		}
+		++iter;
 	}
 }
 

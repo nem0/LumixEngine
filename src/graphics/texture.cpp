@@ -408,7 +408,7 @@ Texture::Texture(const Path& path, ResourceManager& resource_manager)
 
 Texture::~Texture()
 {
-	glDeleteTextures(1, &m_id);
+	ASSERT(isEmpty());
 }
 
 bool Texture::create(int w, int h)

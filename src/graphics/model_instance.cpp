@@ -1,6 +1,7 @@
 #include "graphics/model_instance.h"
+#include "core/resource_manager.h"
+#include "core/resource_manager_base.h"
 #include "graphics/model.h"
-
 
 namespace Lux
 {
@@ -19,6 +20,7 @@ ModelInstance::ModelInstance(Model& model)
 ModelInstance::~ModelInstance()
 {
 	m_model.getObserverCb().unbind<ModelInstance, &ModelInstance::modelUpdate>(this);
+	m_model.getResourceManager().get(ResourceManager::MODEL)->unload(m_model);
 }
 
 
