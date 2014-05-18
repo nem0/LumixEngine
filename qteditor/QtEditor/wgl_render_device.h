@@ -22,6 +22,14 @@ public:
 
 	}
 
+	~WGLRenderDevice()
+	{
+		if(m_pipeline)
+		{
+			Lux::PipelineInstance::destroy(m_pipeline);
+		}
+	}
+
 	virtual void beginFrame() override
 	{
 		PROFILE_FUNCTION();

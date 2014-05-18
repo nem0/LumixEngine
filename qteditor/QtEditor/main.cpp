@@ -44,8 +44,14 @@ class App
 
 		void onUniverseDestroyed(Lux::Event&)
 		{
-			m_edit_render_device->getPipeline().setScene(NULL); 
-			m_game_render_device->getPipeline().setScene(NULL); 
+			if(m_edit_render_device)
+			{
+				m_edit_render_device->getPipeline().setScene(NULL); 
+			}
+			if(m_game_render_device)
+			{
+				m_game_render_device->getPipeline().setScene(NULL); 
+			}
 			
 		}
 
@@ -178,6 +184,14 @@ class App
 			m_main_window->getGameView()->setPipeline(m_game_render_device->getPipeline());
 		}
 
+		void shutdown()
+		{
+			delete m_game_render_device;
+			m_game_render_device = NULL;
+			delete m_edit_render_device;
+			m_edit_render_device = NULL;
+		}
+
 		void renderEditView()
 		{
 			PROFILE_FUNCTION();
@@ -260,5 +274,6 @@ int main(int argc, char* argv[])
 	App app;
 	app.init(argc, argv);
 	app.run();
+	app.shutdown();
 	return 0;
 }

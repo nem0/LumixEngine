@@ -185,6 +185,7 @@ MaterialManager::~MaterialManager()
 {
 	Lux::RenderScene::destroyInstance(m_impl->m_render_scene);
 	m_impl->m_universe->destroy();
+	delete m_impl->m_render_device;
 	delete m_impl->m_universe;
 	delete m_impl;
 	delete m_ui;

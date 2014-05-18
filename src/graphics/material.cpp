@@ -15,6 +15,11 @@
 namespace Lux
 {
 
+Material::~Material()
+{
+	ASSERT(isEmpty());
+}
+
 void Material::apply(Renderer& renderer, PipelineInstance& pipeline)
 {
 	if(getState() == State::READY)
@@ -149,6 +154,53 @@ void Material::deserializeUniforms(ISerializer& serializer)
 		serializer.deserializeObjectEnd();
 	}
 	serializer.deserializeArrayEnd();
+}
+
+void Material::removeTexture(int i)
+{
+	if (m_textures[i])
+	{
+		removeDependency(*m_textures[i]);
+		m_resource_manager.get(ResourceManager::TEXTURE)->unload(*m_textures[i]);
+	}
+	m_textures.erase(i);
+}
+
+void Material::setTexture(int i, Texture* texture)
+{ 
+	if (m_textures[i])
+	{
+		removeDependency(*m_textures[i]);
+		m_resource_manager.get(ResourceManager::TEXTURE)->unload(*m_textures[i]);
+	}
+	if (texture)
+	{
+		addDependency(*texture);
+	}
+	m_textures[i] = texture; 
+}
+
+void Material::addTexture(Texture* texture)
+{
+	if (texture)
+	{
+		addDependency(*texture);
+	}
+	m_textures.push(texture);
+}
+
+void Material::setShader(Shader* shader)
+{
+	if (m_shader)
+	{ 
+		removeDependency(*m_shader);
+		m_resource_manager.get(ResourceManager::SHADER)->unload(*m_shader);
+	}
+	m_shader = shader;
+	if (m_shader)
+	{
+		addDependency(*m_shader);
+	}
 }
 
 void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
