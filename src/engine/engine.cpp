@@ -32,6 +32,7 @@ namespace Lux
 	struct EngineImpl
 	{
 		EngineImpl(Engine& engine) : m_owner(engine) {}
+		~EngineImpl();
 		bool create(const char* base_path, Engine& owner);
 
 		Renderer* m_renderer;
@@ -71,6 +72,16 @@ namespace Lux
 		OutputDebugString(message);
 	}
 
+
+	EngineImpl::~EngineImpl()
+	{
+		m_resource_manager.get(ResourceManager::TEXTURE)->releaseAll();
+		m_resource_manager.get(ResourceManager::MATERIAL)->releaseAll();
+		m_resource_manager.get(ResourceManager::SHADER)->releaseAll();
+		m_resource_manager.get(ResourceManager::ANIMATION)->releaseAll();
+		m_resource_manager.get(ResourceManager::MODEL)->releaseAll();
+		m_resource_manager.get(ResourceManager::PIPELINE)->releaseAll();
+	}
 
 
 	bool EngineImpl::create(const char* base_path, Engine& owner)
