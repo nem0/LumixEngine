@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/lux.h"
+#include "core/array.h"
 #include "core/string.h"
 #include "graphics/ray_cast_model_hit.h"
 #include "universe/component.h"
@@ -21,6 +22,14 @@ namespace Lux
 		float m_scale;
 	};
 
+	struct DebugLine
+	{
+		Vec3 m_from;
+		Vec3 m_to;
+		Vec3 m_color;
+		float m_life;
+	};
+
 	class LUX_ENGINE_API RenderScene
 	{
 		public:
@@ -37,6 +46,8 @@ namespace Lux
 			virtual Pose& getPose(const Component& cmp) = 0;
 			virtual Component getLight(int index) = 0;
 
+			virtual void addDebugLine(const Vec3& from, const Vec3& to, const Vec3& color, float life) = 0;
+			virtual const Array<DebugLine>& getDebugLines() const = 0;
 			virtual Component getCameraInSlot(const char* slot) = 0;
 			virtual void getCameraFOV(Component camera, float& fov) = 0;
 			virtual void setCameraFOV(Component camera, const float& fov) = 0;
