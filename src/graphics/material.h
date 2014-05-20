@@ -26,28 +26,29 @@ class LUX_ENGINE_API Material : public Resource
 	friend class MaterialManager;
 public:
 	void apply(Renderer& renderer, PipelineInstance& pipeline);
-	void setShader(Shader* shader) { m_shader = shader; }
-	void addTexture(Texture* texture) { m_textures.push(texture); }
-	Shader* getShader() const { return m_shader; }
 	bool isZTest() const { return m_is_z_test; }
 	void enableZTest(bool enable) { m_is_z_test = enable; }
 	bool isBackfaceCulling() const { return m_is_backface_culling; }
 	void enableBackfaceCulling(bool enable) { m_is_backface_culling = enable; }
+
+	void setShader(Shader* shader);
+	Shader* getShader() const { return m_shader; }
+
 	int getTextureCount() const { return m_textures.size(); }
 	Texture* getTexture(int i) { return m_textures[i]; }
-	void setTexture(int i, Texture* texture) { m_textures[i] = texture; }
-	void removeTexture(int i) { m_textures.erase(i); }
+	void addTexture(Texture* texture);
+	void setTexture(int i, Texture* texture);
+	void removeTexture(int i);
+
 private:
 	Material(const Path& path, ResourceManager& resource_manager)
 		: Resource(path, resource_manager)
-		, m_shader()
-		, m_textures()
+		, m_shader(NULL)
 		, m_is_z_test(true)
 		, m_is_backface_culling(true)
 	{ }
 
-	~Material()
-	{ }
+	~Material();
 
 	bool save(ISerializer& serializer);
 	virtual void doUnload(void) override;

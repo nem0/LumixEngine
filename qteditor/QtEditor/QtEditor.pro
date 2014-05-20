@@ -29,7 +29,8 @@ SOURCES += main.cpp\
     propertywidgets/animable_widget.cpp \
     propertywidgets/camerawidget.cpp \
     propertywidgets/lightwidget.cpp \
-    materialmanager.cpp
+    materialmanager.cpp \
+    profilerui.cpp
 
 HEADERS  += mainwindow.h \
     sceneview.h \ 
@@ -48,7 +49,8 @@ HEADERS  += mainwindow.h \
     propertywidgets/lightwidget.h \
     materialmanager.h \
     wgl_render_device.h \
-    renderdevicewidget.h
+    renderdevicewidget.h \
+    profilerui.h
 
 FORMS    += mainwindow.ui \
     logwidget.ui \
@@ -63,7 +65,8 @@ FORMS    += mainwindow.ui \
     propertywidgets/animable_widget.ui \
     propertywidgets/camerawidget.ui \
     propertywidgets/lightwidget.ui \
-    materialmanager.ui
+    materialmanager.ui \
+    profilerui.ui
 
 win32
 {

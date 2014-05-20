@@ -40,6 +40,8 @@ public:
     QAction *actionAsset_Browser;
     QAction *actionFile_server;
     QAction *actionScript_compiler;
+    QAction *actionMaterial_manager;
+    QAction *actionProfiler;
     QWidget *centralWidget;
     QGridLayout *gridLayout;
     QMenuBar *menuBar;
@@ -84,6 +86,10 @@ public:
         actionFile_server->setObjectName(QStringLiteral("actionFile_server"));
         actionScript_compiler = new QAction(MainWindow);
         actionScript_compiler->setObjectName(QStringLiteral("actionScript_compiler"));
+        actionMaterial_manager = new QAction(MainWindow);
+        actionMaterial_manager->setObjectName(QStringLiteral("actionMaterial_manager"));
+        actionProfiler = new QAction(MainWindow);
+        actionProfiler->setObjectName(QStringLiteral("actionProfiler"));
         centralWidget = new QWidget(MainWindow);
         centralWidget->setObjectName(QStringLiteral("centralWidget"));
         centralWidget->setEnabled(true);
@@ -119,6 +125,8 @@ public:
         menuView->addAction(actionFile_server);
         menuView->addAction(actionGame_view);
         menuView->addAction(actionLog);
+        menuView->addAction(actionMaterial_manager);
+        menuView->addAction(actionProfiler);
         menuView->addAction(actionProperties);
         menuView->addAction(actionScene_View);
         menuView->addAction(actionScript_compiler);
@@ -161,6 +169,8 @@ public:
         actionAsset_Browser->setText(QApplication::translate("MainWindow", "Asset browser", 0));
         actionFile_server->setText(QApplication::translate("MainWindow", "File server", 0));
         actionScript_compiler->setText(QApplication::translate("MainWindow", "Script compiler", 0));
+        actionMaterial_manager->setText(QApplication::translate("MainWindow", "Material editor", 0));
+        actionProfiler->setText(QApplication::translate("MainWindow", "Profiler", 0));
         menuView->setTitle(QApplication::translate("MainWindow", "View", 0));
         menuFile->setTitle(QApplication::translate("MainWindow", "File", 0));
         menuTools->setTitle(QApplication::translate("MainWindow", "Tools", 0));

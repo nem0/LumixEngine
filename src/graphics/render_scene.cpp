@@ -72,6 +72,10 @@ namespace Lux
 				EventManager::Listener cb;
 				cb.bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 				m_universe.getEventManager().removeListener(EntityMovedEvent::type, cb);
+				for (int i = 0, c = m_renderables.size(); i < c; ++i)
+				{
+					LUX_DELETE(m_renderables[i].m_model);
+				}
 			}
 
 			virtual void getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) override

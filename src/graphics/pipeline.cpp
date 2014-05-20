@@ -155,7 +155,7 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	~PipelineImpl()
+	virtual ~PipelineImpl() override
 	{
 		for (int i = 0; i < m_commands.size(); ++i)
 		{
@@ -304,6 +304,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	~PipelineInstanceImpl()
 	{
+		m_source.getObserverCb().unbind<PipelineInstanceImpl, &PipelineInstanceImpl::sourceLoaded>(this);
+		m_source.getResourceManager().get(ResourceManager::PIPELINE)->unload(m_source);
 		for (int i = 0; i < m_framebuffers.size(); ++i)
 		{
 			LUX_DELETE(m_framebuffers[i]);
