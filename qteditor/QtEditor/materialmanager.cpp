@@ -11,6 +11,7 @@
 #include "core/FS/file_system.h"
 #include "core/json_serializer.h"
 #include "core/log.h"
+#include "core/profiler.h"
 #include "editor/editor_server.h"
 #include "editor/editor_client.h"
 #include "editor/server_message_types.h"
@@ -72,6 +73,7 @@ MaterialManager::MaterialManager(QWidget *parent)
 
 void MaterialManager::updatePreview()
 {
+	PROFILE_FUNCTION();
 	m_impl->m_render_device->beginFrame();
 	m_impl->m_engine->getRenderer().render(*m_impl->m_render_device);
 	m_impl->m_render_device->endFrame();
@@ -183,6 +185,7 @@ MaterialManager::~MaterialManager()
 {
 	Lux::RenderScene::destroyInstance(m_impl->m_render_scene);
 	m_impl->m_universe->destroy();
+	delete m_impl->m_render_device;
 	delete m_impl->m_universe;
 	delete m_impl;
 	delete m_ui;

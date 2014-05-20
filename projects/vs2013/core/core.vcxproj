@@ -204,6 +204,7 @@
     <ClInclude Include="..\..\..\src\core\path.h" />
     <ClInclude Include="..\..\..\src\core\path_utils.h" />
     <ClInclude Include="..\..\..\src\core\pod_hash_map.h" />
+    <ClInclude Include="..\..\..\src\core\profiler.h" />
     <ClInclude Include="..\..\..\src\core\quat.h" />
     <ClInclude Include="..\..\..\src\core\queue.h" />
     <ClInclude Include="..\..\..\src\core\resource.h" />
@@ -257,6 +258,7 @@
     <ClCompile Include="..\..\..\src\core\resource.cpp" />
     <ClCompile Include="..\..\..\src\core\resource_manager.cpp" />
     <ClCompile Include="..\..\..\src\core\resource_manager_base.cpp" />
+    <ClCompile Include="..\..\..\src\core\profiler.cpp" />
     <ClCompile Include="..\..\..\src\core\timer.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

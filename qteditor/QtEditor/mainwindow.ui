@@ -51,6 +51,8 @@
     <addaction name="actionFile_server"/>
     <addaction name="actionGame_view"/>
     <addaction name="actionLog"/>
+    <addaction name="actionMaterial_manager"/>
+    <addaction name="actionProfiler"/>
     <addaction name="actionProperties"/>
     <addaction name="actionScene_View"/>
     <addaction name="actionScript_compiler"/>
@@ -177,6 +179,16 @@
   <action name="actionScript_compiler">
    <property name="text">
     <string>Script compiler</string>
+   </property>
+  </action>
+  <action name="actionMaterial_manager">
+   <property name="text">
+    <string>Material editor</string>
+   </property>
+  </action>
+  <action name="actionProfiler">
+   <property name="text">
+    <string>Profiler</string>
    </property>
   </action>
  </widget>

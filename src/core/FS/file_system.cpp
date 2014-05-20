@@ -1,14 +1,15 @@
 #include "core/fs/file_system.h"
 
+#include "core/array.h"
 #include "core/fs/disk_file_device.h"
 #include "core/fs/ifile.h"
-#include "core/array.h"
-#include "core/stack_allocator.h"
-#include "core/string.h"
 #include "core/MT/lock_free_fixed_queue.h"
 #include "core/MT/task.h"
 #include "core/MT/transaction.h"
+#include "core/profiler.h"
 #include "core/queue.h"
+#include "core/stack_allocator.h"
+#include "core/string.h"
 
 namespace Lux
 {
@@ -177,11 +178,13 @@ namespace Lux
 
 			void updateAsyncTransactions() override
 			{
+				PROFILE_FUNCTION();
 				while(!m_in_progress.empty())
 				{
 					AsynTrans* tr = m_in_progress.front();
 					if(tr->isCompleted())
 					{
+						PROFILE_BLOCK("processAsyncTransaction");
 						m_in_progress.pop();
 
 						tr->data.m_cb.invoke(tr->data.m_file, !!(tr->data.m_flags & E_SUCCESS), *this);

@@ -124,6 +124,7 @@
     <ClInclude Include="..\..\..\src\core\MT\lock_free_fixed_queue.h">
       <Filter>MT</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\core\profiler.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\core\blob.cpp" />
@@ -209,6 +210,7 @@
     <ClCompile Include="..\..\..\src\core\Net\pc\tcp_stream.cpp">
       <Filter>Net</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\core\profiler.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="FS">
