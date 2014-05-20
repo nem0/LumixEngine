@@ -9,6 +9,7 @@
 #include "core/MT/task.h"
 #include "core/net/tcp_connector.h"
 #include "core/net/tcp_stream.h"
+#include "core/profiler.h"
 #include "editor/client_message_types.h"
 #include "editor/server_message_types.h"
 #include "universe/universe.h"
@@ -79,7 +80,7 @@ namespace Lux
 
 	void EditorClient::processMessages()
 	{
-		
+		PROFILE_FUNCTION();
 		while (!m_impl->m_messages.isEmpty())
 		{
 			uint8_t* msg = m_impl->m_messages.pop();
