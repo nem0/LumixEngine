@@ -4,10 +4,10 @@
 #include "core/fs/file_system.h"
 #include "core/json_serializer.h"
 #include "core/math_utils.h"
-#include "core/array.h"
-#include "core/vec4.h"
+#include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
+#include "core/vec4.h"
 #include "engine/engine.h"
 #include "graphics/geometry.h"
 #include "graphics/gl_ext.h"
@@ -62,6 +62,7 @@ struct RendererImpl : public Renderer
 
 	virtual void renderGame() override
 	{
+		PROFILE_FUNCTION();
 		if (m_render_device)
 		{
 			m_render_device->beginFrame();
@@ -72,6 +73,7 @@ struct RendererImpl : public Renderer
 
 	virtual void render(IRenderDevice& device) override
 	{
+		PROFILE_FUNCTION();
 		// init
 		glEnable(GL_DEPTH_TEST);
 		glDisable(GL_BLEND);
@@ -93,6 +95,7 @@ struct RendererImpl : public Renderer
 	virtual bool create(Engine& engine) override
 	{
 		m_engine = &engine;
+		glewExperimental = GL_TRUE;
 		GLenum err = glewInit();
 		return err == GLEW_OK;
 	}

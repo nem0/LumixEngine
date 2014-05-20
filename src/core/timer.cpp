@@ -13,6 +13,15 @@ class TimerImpl : public Timer
 		{
 			QueryPerformanceFrequency(&m_frequency);
 			QueryPerformanceCounter(&m_last_tick);
+			m_first_tick = m_last_tick;
+		}
+
+		float getTimeSinceStart()
+		{
+			LARGE_INTEGER tick;
+			QueryPerformanceCounter(&tick);
+			float delta = static_cast<float>((double)(tick.QuadPart - m_first_tick.QuadPart) / (double)m_frequency.QuadPart);
+			return delta;
 		}
 
 		float tick()
@@ -26,6 +35,7 @@ class TimerImpl : public Timer
 
 		LARGE_INTEGER m_frequency;
 		LARGE_INTEGER m_last_tick;
+		LARGE_INTEGER m_first_tick;
 };
 
 
