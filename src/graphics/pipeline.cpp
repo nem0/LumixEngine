@@ -286,7 +286,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_shadowmap_framebuffer = NULL;
 		if(pipeline.isReady())
 		{
-			sourceLoaded(Resource::State::READY);
+			sourceLoaded(Resource::State::EMPTY, Resource::State::READY);
 		}
 		else
 		{
@@ -326,9 +326,9 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void sourceLoaded(Resource::State status)
+	void sourceLoaded(Resource::State old_state, Resource::State new_state)
 	{
-		if (status == Resource::State::READY)
+		if (old_state != Resource::State::READY && new_state == Resource::State::READY)
 		{
 			PipelineImpl::FrameBufferDeclaration fb = m_source.m_shadowmap_framebuffer;
 			m_shadowmap_framebuffer = LUX_NEW(FrameBuffer)(fb.m_width, fb.m_height, fb.m_mask, fb.m_name.c_str());

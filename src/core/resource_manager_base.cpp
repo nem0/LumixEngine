@@ -74,6 +74,7 @@ namespace Lux
 	{
 		if(0 == resource.remRef())
 		{
+			resource.incrementDepCount();
 			resource.onUnloading();
 			resource.doUnload();
 		}
@@ -90,6 +91,7 @@ namespace Lux
 
 	void ResourceManagerBase::forceUnload(Resource& resource)
 	{
+		resource.incrementDepCount();
 		resource.onUnloading();
 		resource.doUnload();
 		resource.m_ref_count = 0;

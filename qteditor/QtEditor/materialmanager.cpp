@@ -280,7 +280,7 @@ void MaterialManager::selectMaterial(const char* path)
 	m_impl->m_material = material;
 }
 
-void MaterialManager::onMaterialLoaded(Lux::Resource::State)
+void MaterialManager::onMaterialLoaded(Lux::Resource::State, Lux::Resource::State)
 {
 	ICppObjectProperty* properties[] = 
 	{
