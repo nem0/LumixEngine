@@ -18,7 +18,7 @@
 #include <QtWidgets/QFrame>
 #include <QtWidgets/QHeaderView>
 #include <QtWidgets/QLabel>
-#include <QtWidgets/QSpinBox>
+#include <QtWidgets/QLineEdit>
 
 QT_BEGIN_NAMESPACE
 
@@ -27,13 +27,13 @@ class Ui_CameraWidget
 public:
     QFormLayout *formLayout;
     QLabel *label;
-    QSpinBox *priorityInput;
     QLabel *label_2;
     QLabel *label_3;
     QLabel *label_4;
     QDoubleSpinBox *nearInput;
     QDoubleSpinBox *fovInput;
     QDoubleSpinBox *farInput;
+    QLineEdit *slotEdit;
 
     void setupUi(QFrame *CameraWidget)
     {
@@ -49,14 +49,6 @@ public:
         label->setObjectName(QStringLiteral("label"));
 
         formLayout->setWidget(0, QFormLayout::LabelRole, label);
-
-        priorityInput = new QSpinBox(CameraWidget);
-        priorityInput->setObjectName(QStringLiteral("priorityInput"));
-        priorityInput->setMinimum(-1);
-        priorityInput->setMaximum(999999999);
-        priorityInput->setValue(-1);
-
-        formLayout->setWidget(0, QFormLayout::FieldRole, priorityInput);
 
         label_2 = new QLabel(CameraWidget);
         label_2->setObjectName(QStringLiteral("label_2"));
@@ -92,6 +84,11 @@ public:
 
         formLayout->setWidget(2, QFormLayout::FieldRole, farInput);
 
+        slotEdit = new QLineEdit(CameraWidget);
+        slotEdit->setObjectName(QStringLiteral("slotEdit"));
+
+        formLayout->setWidget(0, QFormLayout::FieldRole, slotEdit);
+
 
         retranslateUi(CameraWidget);
 
@@ -101,7 +98,7 @@ public:
     void retranslateUi(QFrame *CameraWidget)
     {
         CameraWidget->setWindowTitle(QApplication::translate("CameraWidget", "Frame", 0));
-        label->setText(QApplication::translate("CameraWidget", "Priority", 0));
+        label->setText(QApplication::translate("CameraWidget", "Slot", 0));
         label_2->setText(QApplication::translate("CameraWidget", "Near", 0));
         label_3->setText(QApplication::translate("CameraWidget", "Far", 0));
         label_4->setText(QApplication::translate("CameraWidget", "Field of view", 0));

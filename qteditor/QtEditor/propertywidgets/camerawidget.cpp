@@ -24,10 +24,12 @@ void CameraWidget::onEntityProperties(Lux::PropertyListEvent& event)
 	{
 		for (int i = 0; i < event.properties.size(); ++i)
 		{
-			if (event.properties[i].name_hash == crc32("priority"))
+			if (event.properties[i].name_hash == crc32("slot"))
 			{
-				ASSERT(event.properties[i].data_size == 4);
-				m_ui->priorityInput->setValue(*(int*)event.properties[i].data);
+				if (event.properties[i].data_size > 0)
+				{
+					m_ui->slotEdit->setText((char*)event.properties[i].data);
+				}
 			}
 			else if (event.properties[i].name_hash == crc32("fov"))
 			{
@@ -49,12 +51,6 @@ void CameraWidget::onEntityProperties(Lux::PropertyListEvent& event)
 }
 
 
-void CameraWidget::on_priorityInput_valueChanged(int arg1)
-{
-	int32_t priority = arg1;
-	getClient()->setComponentProperty("camera", "priority", &priority, sizeof(priority));
-}
-
 void CameraWidget::on_fovInput_valueChanged(double arg1)
 {
 	float fov = arg1;
@@ -72,4 +68,9 @@ void CameraWidget::on_nearInput_valueChanged(double arg1)
 	float near = arg1;
 	getClient()->setComponentProperty("camera", "near", &near, sizeof(near));
 
+}
+
+void CameraWidget::on_slotEdit_editingFinished()
+{
+	getClient()->setComponentProperty("camera", "slot", m_ui->slotEdit->text().toLocal8Bit().data(), m_ui->slotEdit->text().size());
 }
