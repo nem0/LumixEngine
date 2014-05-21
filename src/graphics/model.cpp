@@ -20,7 +20,7 @@ namespace Lux
 	
 Model::~Model()
 {
-	LUX_DELETE(m_geometry);
+	ASSERT(isEmpty());
 }
 
 
