@@ -404,11 +404,11 @@ struct PipelineInstanceImpl : public PipelineInstance
 		
 		for(int split_index = 0; split_index < 4; ++split_index)
 		{
-			glViewport(1, split_index * m_shadowmap_framebuffer->getHeight() * 0.25f, m_shadowmap_framebuffer->getWidth() - 2, m_shadowmap_framebuffer->getHeight() * 0.25f);
+			glViewport(1, (GLint)(split_index * m_shadowmap_framebuffer->getHeight() * 0.25f), m_shadowmap_framebuffer->getWidth() - 2, (GLsizei)(m_shadowmap_framebuffer->getHeight() * 0.25f));
 			glMatrixMode(GL_PROJECTION);
 			glLoadIdentity();
 			Matrix projection_matrix;
-			float bb_size = 2 * ((split_index + 1) * (split_index + 1) * (split_index + 1));
+			float bb_size = (float)(2 * ((split_index + 1) * (split_index + 1) * (split_index + 1)));
 			getOrthoMatrix(-bb_size, bb_size, -bb_size, bb_size, 0, 100, &projection_matrix);
 			glMultMatrixf(&projection_matrix.m11);
 
