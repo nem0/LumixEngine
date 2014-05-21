@@ -30,7 +30,7 @@ class MaterialManager : public QDockWidget
 		void onPropertyList(Lux::Event& event);
 		void fillObjectMaterials();
 		void selectMaterial(const char* path);
-		void onMaterialLoaded(Lux::Resource::State);
+		void onMaterialLoaded(Lux::Resource::State, Lux::Resource::State);
 
 	private slots:
 		void on_fileListView_doubleClicked(const QModelIndex& index);
