@@ -24,7 +24,7 @@ ModelInstance::~ModelInstance()
 }
 
 
-void ModelInstance::modelUpdate(Resource::State new_state)
+void ModelInstance::modelUpdate(Resource::State old_state, Resource::State new_state)
 {
 	if(new_state == Resource::State::READY)
 	{
