@@ -16,11 +16,12 @@ class Model;
 class ModelInstance
 {
 	public:
-		ModelInstance(Model& model);
+		ModelInstance();
 		~ModelInstance();
 
+		void setModel(Model* model);
 		Matrix& getMatrix() { return m_matrix; }
-		Model& getModel() { return m_model; }
+		Model* getModel() { return m_model; }
 		Pose& getPose() { return m_pose; }
 		void setMatrix(const Matrix& mtx);
 
@@ -30,7 +31,7 @@ class ModelInstance
 
 	private:
 		Pose		m_pose;
-		Model&		m_model;
+		Model*		m_model;
 		Matrix		m_matrix;
 };
 
