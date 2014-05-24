@@ -217,7 +217,7 @@ void Geometry::copy(const uint8_t* data, int size, const Array<int32_t>& indices
 	int pos_offset = m_vertex_definition.getPositionOffset();
 	for (int i = 0, c = m_vertices.size(); i < c; ++i)
 	{
-		m_vertices[i] = *(Vec3*)(data + vertex_size * i + pos_offset);
+		m_vertices[i] = *reinterpret_cast<const Vec3*>(data + vertex_size * i + pos_offset);
 	}
 	m_indices.resize(indices.size());
 	for (int i = 0, c = m_indices.size(); i < c; ++i)
