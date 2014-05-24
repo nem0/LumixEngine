@@ -25,7 +25,7 @@ namespace Lux
 
 	struct Renderable
 	{
-		ModelInstance* m_model;
+		ModelInstance m_model;
 		Entity m_entity;
 		int64_t m_layer_mask;
 		float m_scale;
@@ -72,10 +72,6 @@ namespace Lux
 				EventManager::Listener cb;
 				cb.bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 				m_universe.getEventManager().removeListener(EntityMovedEvent::type, cb);
-				for (int i = 0, c = m_renderables.size(); i < c; ++i)
-				{
-					LUX_DELETE(m_renderables[i].m_model);
-				}
 			}
 
 			virtual void getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) override
@@ -171,9 +167,16 @@ namespace Lux
 				for (int i = 0; i < m_renderables.size(); ++i)
 				{
 					serializer.serializeArrayItem(m_renderables[i].m_entity.index);
-					serializer.serializeArrayItem(m_renderables[i].m_model->getModel().getPath());
+					if (m_renderables[i].m_model.getModel())
+					{
+						serializer.serializeArrayItem(m_renderables[i].m_model.getModel()->getPath());
+					}
+					else
+					{
+						serializer.serializeArrayItem("");
+					}
 					serializer.serializeArrayItem(m_renderables[i].m_scale);
-					Matrix mtx = m_renderables[i].m_model->getMatrix();
+					Matrix mtx = m_renderables[i].m_model.getMatrix();
 					for (int j = 0; j < 16; ++j)
 					{
 						serializer.serializeArrayItem((&mtx.m11)[j]);
@@ -226,10 +229,10 @@ namespace Lux
 					char path[LUX_MAX_PATH];
 					serializer.deserializeArrayItem(path, LUX_MAX_PATH);
 					serializer.deserializeArrayItem(m_renderables[i].m_scale);
-					m_renderables[i].m_model = LUX_NEW(ModelInstance)(static_cast<Model&>(*m_engine.getResourceManager().get(ResourceManager::MODEL)->load(path)));
+					m_renderables[i].m_model.setModel(static_cast<Model*>(m_engine.getResourceManager().get(ResourceManager::MODEL)->load(path)));
 					for (int j = 0; j < 16; ++j)
 					{
-						serializer.deserializeArrayItem((&m_renderables[i].m_model->getMatrix().m11)[j]);
+						serializer.deserializeArrayItem((&m_renderables[i].m_model.getMatrix().m11)[j]);
 					}
 					ComponentEvent evt(Component(m_renderables[i].m_entity, RENDERABLE_HASH, this, i));
 					m_universe.getEventManager().emitEvent(evt);
@@ -286,7 +289,7 @@ namespace Lux
 					r.m_entity = entity;
 					r.m_layer_mask = 1;
 					r.m_scale = 1;
-					r.m_model = NULL;
+					r.m_model.setModel(NULL);
 					Component cmp(entity, type, this, m_renderables.size() - 1);
 					ComponentEvent evt(cmp);
 					m_universe.getEventManager().emitEvent(evt);
@@ -314,7 +317,7 @@ namespace Lux
 				{
 					if (cmps[i].type == RENDERABLE_HASH)
 					{
-						m_renderables[cmps[i].index].m_model->setMatrix(e.entity.getMatrix());
+						m_renderables[cmps[i].index].m_model.setMatrix(e.entity.getMatrix());
 						break;
 					}
 				}
@@ -322,14 +325,14 @@ namespace Lux
 
 			virtual Pose& getPose(const Component& cmp) override
 			{
-				return m_renderables[cmp.index].m_model->getPose();
+				return m_renderables[cmp.index].m_model.getPose();
 			}
 
 			virtual void getRenderablePath(Component cmp, string& path) override
 			{
-					if (m_renderables[cmp.index].m_model)
+					if (m_renderables[cmp.index].m_model.getModel())
 					{
-						path = m_renderables[cmp.index].m_model->getModel().getPath();
+						path = m_renderables[cmp.index].m_model.getModel()->getPath();
 					}
 					else
 					{
@@ -349,11 +352,10 @@ namespace Lux
 
 			virtual void setRenderablePath(Component cmp, const string& path) override
 			{
-				LUX_DELETE(m_renderables[cmp.index].m_model);
 				Renderable& r = m_renderables[cmp.index];
 				Model* model = static_cast<Model*>(m_engine.getResourceManager().get(ResourceManager::MODEL)->load(path));
-				r.m_model = LUX_NEW(ModelInstance)(*model);
-				r.m_model->setMatrix(r.m_entity.getMatrix());
+				r.m_model.setModel(model);
+				r.m_model.setMatrix(r.m_entity.getMatrix());
 			}
 
 			virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) override
@@ -361,11 +363,11 @@ namespace Lux
 				infos.reserve(m_renderables.size());
 				for (int i = 0; i < m_renderables.size(); ++i)
 				{
-					if (m_renderables[i].m_model != NULL && (m_renderables[i].m_layer_mask & layer_mask) != 0)
+					if (m_renderables[i].m_model.getModel() && (m_renderables[i].m_layer_mask & layer_mask) != 0)
 					{
 						RenderableInfo& info = infos.pushEmpty();
 						info.m_scale = m_renderables[i].m_scale;
-						info.m_model_instance = m_renderables[i].m_model;
+						info.m_model_instance = &m_renderables[i].m_model;
 					}
 				}
 			}
@@ -454,15 +456,15 @@ namespace Lux
 				hit.m_is_hit = false;
 				for (int i = 0; i < m_renderables.size(); ++i)
 				{
-					if (m_renderables[i].m_model)
+					if (m_renderables[i].m_model.getModel())
 					{
-						const Vec3& pos = m_renderables[i].m_model->getMatrix().getTranslation();
-						float radius = m_renderables[i].m_model->getModel().getBoundingRadius();
+						const Vec3& pos = m_renderables[i].m_model.getMatrix().getTranslation();
+						float radius = m_renderables[i].m_model.getModel()->getBoundingRadius();
 						float scale = m_renderables[i].m_scale;
 						Vec3 intersection;
 						if (dotProduct(pos - origin, pos - origin) < radius * radius || Math::getRaySphereIntersection(pos, radius * scale, origin, dir, intersection))
 						{
-							RayCastModelHit new_hit = m_renderables[i].m_model->getModel().castRay(origin, dir, m_renderables[i].m_model->getMatrix(), scale);
+							RayCastModelHit new_hit = m_renderables[i].m_model.getModel()->castRay(origin, dir, m_renderables[i].m_model.getMatrix(), scale);
 							if (new_hit.m_is_hit && (!hit.m_is_hit || new_hit.m_t < hit.m_t))
 							{
 								new_hit.m_renderable = Component(m_renderables[i].m_entity, crc32("renderable"), this, i);

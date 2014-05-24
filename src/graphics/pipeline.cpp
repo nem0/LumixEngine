@@ -507,7 +507,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		for (int i = 0; i < count; ++i)
 		{
 			glPushMatrix();
-			Model& model = infos[i].m_model_instance->getModel();
+			Model& model = *infos[i].m_model_instance->getModel();
 			Matrix mtx = infos[i].m_model_instance->getMatrix();
 			mtx.multiply3x3(infos[i].m_scale);
 			glMultMatrixf(&mtx.m11);

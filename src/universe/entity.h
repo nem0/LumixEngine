@@ -13,7 +13,7 @@ namespace Lux
 
 	struct LUX_ENGINE_API Entity final
 	{
-		typedef Array<Component, DefaultAllocator, true> ComponentList;
+		typedef Array<Component, DefaultAllocator, false> ComponentList;
 
 		Entity() {}
 		Entity(Universe* uni, int32_t i) : index(i), universe(uni) {}
