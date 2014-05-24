@@ -7,29 +7,42 @@ namespace Lux
 {
 
 
-ModelInstance::ModelInstance(Model& model)
-	: m_model(model)
+ModelInstance::ModelInstance()
+	: m_model(NULL)
 	, m_matrix(Matrix::IDENTITY)
 {
-	model.getObserverCb().bind<ModelInstance, &ModelInstance::modelUpdate>(this);
-	m_pose.resize(model.getBoneCount());
-	model.getPose(m_pose);
 }
 
 
 ModelInstance::~ModelInstance()
 {
-	m_model.getObserverCb().unbind<ModelInstance, &ModelInstance::modelUpdate>(this);
-	m_model.getResourceManager().get(ResourceManager::MODEL)->unload(m_model);
+	setModel(NULL);
 }
 
 
-void ModelInstance::modelUpdate(Resource::State old_state, Resource::State new_state)
+void ModelInstance::setModel(Model* model)
+{
+	if (m_model)
+	{
+		m_model->getObserverCb().unbind<ModelInstance, &ModelInstance::modelUpdate>(this);
+		m_model->getResourceManager().get(ResourceManager::MODEL)->unload(*m_model);
+	}
+	m_model = model;
+	if (m_model)
+	{
+		m_model->getObserverCb().bind<ModelInstance, &ModelInstance::modelUpdate>(this);
+		m_pose.resize(m_model->getBoneCount());
+		m_model->getPose(m_pose);
+	}
+}
+
+
+void ModelInstance::modelUpdate(Resource::State, Resource::State new_state)
 {
 	if(new_state == Resource::State::READY)
 	{
-		m_pose.resize(m_model.getBoneCount());
-		m_model.getPose(m_pose);
+		m_pose.resize(m_model->getBoneCount());
+		m_model->getPose(m_pose);
 	}
 	else if(new_state == Resource::State::UNLOADING)
 	{

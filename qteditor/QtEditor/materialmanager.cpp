@@ -71,10 +71,13 @@ void MaterialManager::updatePreview()
 void MaterialManager::fillObjectMaterials()
 {
 	m_ui->objectMaterialList->clear();
-	for(int i = 0; i < m_impl->m_selected_object_model->getMeshCount(); ++i)
+	if(m_impl->m_selected_object_model)
 	{
-		const char* path = m_impl->m_selected_object_model->getMesh(i).getMaterial()->getPath().c_str();
-		m_ui->objectMaterialList->addItem(path);
+		for(int i = 0; i < m_impl->m_selected_object_model->getMeshCount(); ++i)
+		{
+			const char* path = m_impl->m_selected_object_model->getMesh(i).getMaterial()->getPath().c_str();
+			m_ui->objectMaterialList->addItem(path);
+		}
 	}
 }
 
