@@ -188,8 +188,9 @@ float Geometry::getBoundingRadius() const
 void Geometry::draw(int start, int count, Shader& shader)
 {
 	glBindBuffer(GL_ARRAY_BUFFER, m_id);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_indices_id);
 	m_vertex_definition.begin(shader);
-	glDrawArrays(GL_TRIANGLES, start, count);
+	glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, (void*)(start * sizeof(GLint)));
 	m_vertex_definition.end(shader);
 }
 
@@ -197,28 +198,41 @@ void Geometry::draw(int start, int count, Shader& shader)
 Geometry::Geometry()
 {
 	glGenBuffers(1, &m_id);
+	glGenBuffers(1, &m_indices_id);
 }
 
 
 Geometry::~Geometry()
 {
 	glDeleteBuffers(1, &m_id);
+	glDeleteBuffers(1, &m_indices_id);
 }
 
 
-void Geometry::copy(const uint8_t* data, int size, VertexDef vertex_definition)
+void Geometry::copy(const uint8_t* data, int size, const Array<int32_t>& indices, VertexDef vertex_definition)
 {
 	m_vertex_definition = vertex_definition;
 	int vertex_size = m_vertex_definition.getVertexSize();
 	m_vertices.resize(size / vertex_size);
 	int pos_offset = m_vertex_definition.getPositionOffset();
-	for(int i = 0, c = m_vertices.size(); i < c; ++i)
+	for (int i = 0, c = m_vertices.size(); i < c; ++i)
 	{
 		m_vertices[i] = *(Vec3*)(data + vertex_size * i + pos_offset);
 	}
+	m_indices.resize(indices.size());
+	for (int i = 0, c = m_indices.size(); i < c; ++i)
+	{
+		m_indices[i] = indices[i];
+	}
+	m_indices_count = indices.size();
 	glBindBuffer(GL_ARRAY_BUFFER, m_id);
 	glBufferData(GL_ARRAY_BUFFER, size, data, GL_STATIC_DRAW);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_indices_id);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(indices[0]), &indices[0], GL_STATIC_DRAW);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	GLenum err = glGetError();
+	err = err;
 }
 
 
