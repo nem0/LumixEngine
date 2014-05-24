@@ -142,13 +142,6 @@ bool Model::parseVertexDef(FS::IFile* file, VertexDef* vertex_definition)
 
 bool Model::parseGeometry(FS::IFile* file, const VertexDef& vertex_definition)
 {
-	struct Vertex
-	{
-		Vec3 pos;
-		Vec3 normal;
-		float u, v;
-	};
-
 	int32_t indices_count = 0;
 	file->read(&indices_count, sizeof(indices_count));
 	if (indices_count <= 0)
@@ -165,25 +158,12 @@ bool Model::parseGeometry(FS::IFile* file, const VertexDef& vertex_definition)
 	{
 		return false;
 	}
-	Array<Vertex> vertices;
-	vertices.resize(vertices_count);
-	file->read(&vertices[0], sizeof(vertices[0]) * vertices_count);
+	Array<float> vertices;
+	vertices.resize(vertices_count * vertex_definition.getVertexSize() / sizeof(vertices[0]));
+	file->read(&vertices[0], sizeof(vertices[0]) * vertices.size());
 	
-	/*Array<Vertex> data;
-	data.resize(indices_count);
-	for(int i = 0; i < indices_count; ++i)
-	{
-		data[i].pos.x = vertices[indices[i]].pos.x;
-		data[i].pos.y = vertices[indices[i]].pos.y;
-		data[i].pos.z = vertices[indices[i]].pos.z;
-		data[i].normal.x = vertices[indices[i]].normal.x;
-		data[i].normal.y = vertices[indices[i]].normal.y;
-		data[i].normal.z = vertices[indices[i]].normal.z;
-		data[i].u = vertices[indices[i]].u;
-		data[i].v = vertices[indices[i]].v;
-	}*/
 	m_geometry = LUX_NEW(Geometry);
-	m_geometry->copy((uint8_t*)&vertices[0], sizeof(vertices[0])* vertices.size(), indices, vertex_definition);
+	m_geometry->copy((uint8_t*)&vertices[0], sizeof(float) * vertices.size(), indices, vertex_definition);
 	return true;
 }
 
