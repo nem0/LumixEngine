@@ -231,8 +231,6 @@ void Geometry::copy(const uint8_t* data, int size, const Array<int32_t>& indices
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_indices_id);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(indices[0]), &indices[0], GL_STATIC_DRAW);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-	GLenum err = glGetError();
-	err = err;
 }
 
 

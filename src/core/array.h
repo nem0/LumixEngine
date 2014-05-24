@@ -10,7 +10,7 @@
 namespace Lux
 {
 
-template <typename T, typename Allocator = DefaultAllocator, bool is_trivially_copyable = std::is_trivially_copyable<T>::value > class Array;
+template <typename T, typename Allocator = DefaultAllocator, bool is_trivially_copyable = std::is_trivial<T>::value > class Array;
 
 template <typename T, typename Allocator>
 class Array<T, Allocator, false>
