@@ -31,7 +31,7 @@ namespace Lux
 
 	struct EngineImpl
 	{
-		EngineImpl(Engine& engine) : m_owner(engine) {}
+		EngineImpl(Engine& engine) : m_owner(engine), m_script_system(ScriptSystem::create()) {}
 		~EngineImpl();
 		bool create(const char* base_path, Engine& owner);
 
@@ -54,7 +54,7 @@ namespace Lux
 		PluginManager m_plugin_manager;
 		Universe* m_universe;
 		RenderScene* m_render_scene;
-		ScriptSystem m_script_system;
+		ScriptSystem* m_script_system;
 		InputSystem m_input_system;
 		Engine& m_owner;
 		Timer* m_timer;
@@ -75,6 +75,7 @@ namespace Lux
 
 	EngineImpl::~EngineImpl()
 	{
+		ScriptSystem::destroy(m_script_system);
 		m_resource_manager.get(ResourceManager::TEXTURE)->releaseAll();
 		m_resource_manager.get(ResourceManager::MATERIAL)->releaseAll();
 		m_resource_manager.get(ResourceManager::SHADER)->releaseAll();
@@ -117,7 +118,7 @@ namespace Lux
 		{
 			return false;
 		}
-		m_script_system.setEngine(m_owner);
+		m_script_system->setEngine(m_owner);
 		return true;
 	}
 
@@ -198,7 +199,7 @@ namespace Lux
 		m_impl->m_universe = LUX_NEW(Universe)();
 		m_impl->m_render_scene = RenderScene::createInstance(*this, *m_impl->m_universe);
 		m_impl->m_plugin_manager.onCreateUniverse(*m_impl->m_universe);
-		m_impl->m_script_system.setUniverse(m_impl->m_universe);
+		m_impl->m_script_system->setUniverse(m_impl->m_universe);
 		m_impl->m_universe->create();
 		
 		UniverseCreatedEvent evt(*m_impl->m_universe);
@@ -213,7 +214,7 @@ namespace Lux
 		{
 			UniverseDestroyedEvent evt(*m_impl->m_universe);
 			m_impl->m_event_manager.emitEvent(evt);
-			m_impl->m_script_system.setUniverse(NULL);
+			m_impl->m_script_system->setUniverse(NULL);
 			m_impl->m_plugin_manager.onDestroyUniverse(*m_impl->m_universe);
 			m_impl->m_universe->destroy();
 			RenderScene::destroyInstance(m_impl->m_render_scene);
@@ -256,7 +257,7 @@ namespace Lux
 			m_impl->m_fps_frame = 0;
 		}
 		float dt = m_impl->m_timer->tick();
-		m_impl->m_script_system.update(dt);
+		m_impl->m_script_system->update(dt);
 		m_impl->m_plugin_manager.update(dt);
 		m_impl->m_input_system.update(dt);
 	}
@@ -271,7 +272,7 @@ namespace Lux
 
 	ScriptSystem& Engine::getScriptSystem()
 	{
-		return m_impl->m_script_system;
+		return *m_impl->m_script_system;
 	}
 
 
@@ -314,7 +315,7 @@ namespace Lux
 		m_impl->m_universe->serialize(serializer);
 		m_impl->m_renderer->serialize(serializer);
 		m_impl->m_render_scene->serialize(serializer);
-		m_impl->m_script_system.serialize(serializer);
+		m_impl->m_script_system->serialize(serializer);
 		m_impl->m_plugin_manager.serialize(serializer);
 	}
 
@@ -324,7 +325,7 @@ namespace Lux
 		m_impl->m_universe->deserialize(serializer);
 		m_impl->m_renderer->deserialize(serializer);
 		m_impl->m_render_scene->deserialize(serializer);
-		m_impl->m_script_system.deserialize(serializer);
+		m_impl->m_script_system->deserialize(serializer);
 		m_impl->m_plugin_manager.deserialize(serializer);
 	}
 
