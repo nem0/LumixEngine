@@ -59,7 +59,7 @@ void PhysicsBoxWidget::on_isDynamicCheckBox_toggled(bool)
 	getClient()->setComponentProperty("box_rigid_actor", "dynamic", &b, sizeof(b)); 
 }
 
-void PhysicsBoxWidget::on_xSizeInput_valueChanged(double arg1)
+void PhysicsBoxWidget::on_xSizeInput_valueChanged(double)
 {
 	Lux::Vec3 v;
 	v.x = (float)m_ui->xSizeInput->value();
@@ -68,7 +68,7 @@ void PhysicsBoxWidget::on_xSizeInput_valueChanged(double arg1)
 	getClient()->setComponentProperty("box_rigid_actor", "size", &v, sizeof(v)); 
 }
 
-void PhysicsBoxWidget::on_ySizeInput_valueChanged(double arg1)
+void PhysicsBoxWidget::on_ySizeInput_valueChanged(double)
 {
 	Lux::Vec3 v;
 	v.x = (float)m_ui->xSizeInput->value();
@@ -77,7 +77,7 @@ void PhysicsBoxWidget::on_ySizeInput_valueChanged(double arg1)
 	getClient()->setComponentProperty("box_rigid_actor", "size", &v, sizeof(v)); 
 }
 
-void PhysicsBoxWidget::on_zSizeInput_valueChanged(double arg1)
+void PhysicsBoxWidget::on_zSizeInput_valueChanged(double)
 {
 	Lux::Vec3 v;
 	v.x = (float)m_ui->xSizeInput->value();
