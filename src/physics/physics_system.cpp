@@ -38,7 +38,6 @@ void PhysicsSystem::onCreateUniverse(Universe& universe)
 {
 	m_impl->m_scene = LUX_NEW(PhysicsScene)();
 	m_impl->m_scene->create(*this, universe);
-
 }
 
 

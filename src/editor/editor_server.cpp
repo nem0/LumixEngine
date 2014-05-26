@@ -709,7 +709,7 @@ bool EditorServerImpl::create(const char* base_path)
 
 	//glPopAttrib();
 	
-	/*if(!m_engine.loadPlugin("physics.dll"))
+	if(!m_engine.loadPlugin("physics.dll"))
 	{
 		g_log_info.log("plugins", "physics plugin has not been loaded");
 	}

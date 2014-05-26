@@ -70,6 +70,7 @@ namespace Lux
 	void showLogInVS(const char*, const char* message)
 	{
 		OutputDebugString(message);
+		OutputDebugString("\n");
 	}
 
 
