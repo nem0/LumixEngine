@@ -22,6 +22,12 @@ class PhysicsBoxWidget : public PropertyWidgetBase
 	private slots:
 		void on_isDynamicCheckBox_toggled(bool checked);
 
+		void on_xSizeInput_valueChanged(double arg1);
+
+		void on_ySizeInput_valueChanged(double arg1);
+
+		void on_zSizeInput_valueChanged(double arg1);
+
 	private:
 		Ui::PhysicsBoxWidget* m_ui;
 };
