@@ -391,7 +391,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	{
 		ASSERT(m_renderer != NULL);
 		Component light_cmp = m_scene->getLight(0);
-		if (!light_cmp.isValid())
+		if (!light_cmp.isValid() || !camera.isValid())
 		{
 			return;
 		}

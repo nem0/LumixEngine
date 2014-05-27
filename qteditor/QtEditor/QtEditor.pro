@@ -30,7 +30,8 @@ SOURCES += main.cpp\
     propertywidgets/camerawidget.cpp \
     propertywidgets/lightwidget.cpp \
     materialmanager.cpp \
-    profilerui.cpp
+    profilerui.cpp \
+    propertywidgets/physics_box_widget.cpp
 
 HEADERS  += mainwindow.h \
     sceneview.h \ 
@@ -50,7 +51,8 @@ HEADERS  += mainwindow.h \
     materialmanager.h \
     wgl_render_device.h \
     renderdevicewidget.h \
-    profilerui.h
+    profilerui.h \
+    propertywidgets/physics_box_widget.h
 
 FORMS    += mainwindow.ui \
     logwidget.ui \
@@ -66,7 +68,8 @@ FORMS    += mainwindow.ui \
     propertywidgets/camerawidget.ui \
     propertywidgets/lightwidget.ui \
     materialmanager.ui \
-    profilerui.ui
+    profilerui.ui \
+    propertywidgets/physics_box_widget.ui
 
 win32
 {
