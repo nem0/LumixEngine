@@ -19,26 +19,27 @@ class Renderer;
 class LUX_ENGINE_API ScriptSystem
 {
 	public:
-		ScriptSystem();
-		~ScriptSystem();
+		static ScriptSystem* create();
+		static void destroy(ScriptSystem* instance);
 
-		void start();
-		void stop();
-		void update(float time_delta);
-		void setUniverse(Universe* universe);
-		Universe* getUniverse() const;
-		Component createScript(Entity entity);
-		void setEngine(Engine& engine);
-		Engine* getEngine() const;
+		virtual void start() = 0;
+		virtual void stop() = 0;
+		virtual void update(float time_delta) = 0;
+		virtual void setUniverse(Universe* universe) = 0;
+		virtual Universe* getUniverse() const = 0;
+		virtual Component createScript(Entity entity) = 0;
+		virtual void setEngine(Engine& engine) = 0;
+		virtual Engine* getEngine() const = 0;
 
-		void deserialize(ISerializer& serializer);
-		void serialize(ISerializer& serializer);
+		virtual void deserialize(ISerializer& serializer) = 0;
+		virtual void serialize(ISerializer& serializer) = 0;
 
-		void getScriptPath(Component cmp, string& str);
-		void setScriptPath(Component cmp, const string& str);
+		virtual void getScriptPath(Component cmp, string& str) = 0;
+		virtual void setScriptPath(Component cmp, const string& str) = 0;
 
-	private:
-		struct ScriptSystemImpl* m_impl;
+	protected:
+		ScriptSystem() {}
+		~ScriptSystem() {}
 };
 
 

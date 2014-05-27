@@ -56,8 +56,8 @@
         <rect>
          <x>0</x>
          <y>0</y>
-         <width>98</width>
-         <height>28</height>
+         <width>247</width>
+         <height>344</height>
         </rect>
        </property>
        <attribute name="label">
@@ -97,6 +97,11 @@
          <item>
           <property name="text">
            <string>Camera</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Physics Box</string>
           </property>
          </item>
          <item>

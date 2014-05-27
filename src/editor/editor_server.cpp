@@ -206,6 +206,7 @@ struct EditorServerImpl
 		FS::MemoryFileDevice m_mem_file_device;
 		FS::TCPFileDevice m_tcp_file_device;
 		IRenderDevice* m_edit_view_render_device;
+		bool m_toggle_game_mode_requested;
 };
 
 
@@ -251,6 +252,11 @@ void EditorServer::registerCreator(uint32_t type, IPlugin& creator)
 
 void EditorServer::tick()
 {
+	if(m_impl->m_toggle_game_mode_requested)
+	{
+		m_impl->toggleGameMode();
+		m_impl->m_toggle_game_mode_requested = false;
+	}
 	PROFILE_FUNCTION();
 	if(m_impl->m_is_game_mode)
 	{
@@ -667,6 +673,7 @@ void EditorServerImpl::load(FS::IFile& file, const char* path)
 	createUniverse(false);
 	JsonSerializer serializer(file, JsonSerializer::READ, path);
 	m_engine.deserialize(serializer);
+	m_camera = m_engine.getRenderScene()->getCameraInSlot("editor").entity;
 	g_log_info.log("editor server", "universe parsed");
 }
 
@@ -702,7 +709,7 @@ bool EditorServerImpl::create(const char* base_path)
 
 	//glPopAttrib();
 	
-	/*if(!m_engine.loadPlugin("physics.dll"))
+	if(!m_engine.loadPlugin("physics.dll"))
 	{
 		g_log_info.log("plugins", "physics plugin has not been loaded");
 	}
@@ -857,6 +864,7 @@ void EditorServerImpl::renderPhysics()
 EditorServerImpl::EditorServerImpl()
 	: m_universe_mutex(false)
 	, m_send_mutex(false)
+	, m_toggle_game_mode_requested(false)
 {
 	m_is_game_mode = false;
 	m_selected_entity = Entity::INVALID;
@@ -1056,6 +1064,7 @@ void EditorServerImpl::destroyUniverse()
 		LUX_DELETE(m_editor_icons[i]);
 	}
 	selectEntity(Entity::INVALID);
+	m_camera = Entity::INVALID;
 	m_editor_icons.clear();
 	m_gizmo.setUniverse(NULL);
 	m_gizmo.destroy();
@@ -1133,7 +1142,7 @@ void EditorServerImpl::onMessage(void* msgptr, int size)
 			addEntity();
 			break;
 		case ClientMessageType::TOGGLE_GAME_MODE:
-			toggleGameMode();
+			m_toggle_game_mode_requested = true;
 			break;
 		case ClientMessageType::GET_POSITION:
 			sendEntityPosition(getSelectedEntity().index);
