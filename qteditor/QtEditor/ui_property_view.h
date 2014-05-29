@@ -109,6 +109,8 @@ public:
         componentTypeCombo->insertItems(0, QStringList()
          << QApplication::translate("PropertyView", "Animable", 0)
          << QApplication::translate("PropertyView", "Camera", 0)
+         << QApplication::translate("PropertyView", "Physics Box", 0)
+         << QApplication::translate("PropertyView", "Physics Controller", 0)
          << QApplication::translate("PropertyView", "Point Light", 0)
          << QApplication::translate("PropertyView", "Renderable", 0)
          << QApplication::translate("PropertyView", "Script", 0)
