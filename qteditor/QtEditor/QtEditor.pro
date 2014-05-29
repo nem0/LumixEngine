@@ -32,7 +32,8 @@ SOURCES += main.cpp\
     materialmanager.cpp \
     profilerui.cpp \
     propertywidgets/physics_box_widget.cpp \
-    propertywidgets/physics_controller_widget.cpp
+    propertywidgets/physics_controller_widget.cpp \
+    propertywidgets/physics_mesh_widget.cpp
 
 HEADERS  += mainwindow.h \
     sceneview.h \ 
@@ -54,7 +55,8 @@ HEADERS  += mainwindow.h \
     renderdevicewidget.h \
     profilerui.h \
     propertywidgets/physics_box_widget.h \
-    propertywidgets/physics_controller_widget.h
+    propertywidgets/physics_controller_widget.h \
+    propertywidgets/physics_mesh_widget.h
 
 FORMS    += mainwindow.ui \
     logwidget.ui \
@@ -72,7 +74,8 @@ FORMS    += mainwindow.ui \
     materialmanager.ui \
     profilerui.ui \
     propertywidgets/physics_box_widget.ui \
-    propertywidgets/physics_controller_widget.ui
+    propertywidgets/physics_controller_widget.ui \
+    propertywidgets/physics_mesh_widget.ui
 
 win32
 {

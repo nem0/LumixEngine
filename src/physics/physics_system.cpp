@@ -18,8 +18,9 @@ namespace Lux
 {
 
 
-static const uint32_t box_rigid_actor_type = crc32("box_rigid_actor");
-static const uint32_t controller_type = crc32("physical_controller");
+	static const uint32_t box_rigid_actor_type = crc32("box_rigid_actor");
+	static const uint32_t mesh_rigid_actor_type = crc32("mesh_rigid_actor");
+	static const uint32_t controller_type = crc32("physical_controller");
 
 
 extern "C" IPlugin* createPlugin()
@@ -76,9 +77,13 @@ Component PhysicsSystem::createComponent(uint32_t component_type, const Entity& 
 	{
 		return m_impl->m_scene->createController(entity);
 	}
-	else if(component_type == box_rigid_actor_type)
+	else if (component_type == box_rigid_actor_type)
 	{
 		return m_impl->m_scene->createBoxRigidActor(entity);
+	}
+	else if (component_type == mesh_rigid_actor_type)
+	{
+		return m_impl->m_scene->createMeshRigidActor(entity);
 	}
 	return Component::INVALID;
 }
@@ -94,7 +99,9 @@ bool PhysicsSystem::create(Engine& engine)
 {
 	engine.getEditorServer()->registerProperty("box_rigid_actor", LUX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("dynamic"), &PhysicsScene::getIsDynamic, &PhysicsScene::setIsDynamic));
 	engine.getEditorServer()->registerProperty("box_rigid_actor", LUX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("size"), &PhysicsScene::getHalfExtents, &PhysicsScene::setHalfExtents));
+	engine.getEditorServer()->registerProperty("mesh_rigid_actor", LUX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("source"), &PhysicsScene::getShapeSource, &PhysicsScene::setShapeSource, IPropertyDescriptor::FILE));
 	engine.getEditorServer()->registerCreator(box_rigid_actor_type, *this);
+	engine.getEditorServer()->registerCreator(mesh_rigid_actor_type, *this);
 	engine.getEditorServer()->registerCreator(controller_type, *this);
 
 	m_impl = LUX_NEW(PhysicsSystemImpl);

@@ -10,6 +10,7 @@
 #include "propertywidgets/lightwidget.h"
 #include "propertywidgets/physics_box_widget.h"
 #include "propertywidgets/physics_controller_widget.h"
+#include "propertywidgets/physics_mesh_widget.h"
 #include "propertywidgets/renderable_widget.h"
 #include "propertywidgets/script_widget.h"
 
@@ -57,6 +58,10 @@ void PropertyView::onEntitySelected(Lux::Event& event)
 		if (e.components[i] == crc32("physical_controller"))
 		{
 			widget = new PhysicsControllerWidget;
+		}
+		if (e.components[i] == crc32("mesh_rigid_actor"))
+		{
+			widget = new PhysicsMeshWidget;
 		}
 		else if (e.components[i] == crc32("box_rigid_actor"))
 		{
@@ -130,5 +135,9 @@ void PropertyView::on_addComponentButton_clicked()
 	else if (strcmp(c, "Physics Controller") == 0)
 	{
 		m_client->addComponent(crc32("physical_controller"));
+	}
+	else if (strcmp(c, "Physics Mesh") == 0)
+	{
+		m_client->addComponent(crc32("mesh_rigid_actor"));
 	}
 }

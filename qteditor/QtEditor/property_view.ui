@@ -111,6 +111,11 @@
          </item>
          <item>
           <property name="text">
+           <string>Physics Mesh</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
            <string>Point Light</string>
           </property>
          </item>
