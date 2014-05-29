@@ -10,6 +10,7 @@
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
 #include "core/iserializer.h"
+#include "core/log.h"
 #include "core/matrix.h"
 #include "engine/engine.h"
 #include "universe/component_event.h"
@@ -43,22 +44,24 @@ struct PhysicsSceneImpl
 		Entity m_entity;
 	};
 
-	Universe*						m_universe;
-	Engine*							m_engine;
-	physx::PxScene*					m_scene;
-	PhysicsSystem*					m_system;
-	physx::PxMaterial*				m_default_material;
+	Universe*					m_universe;
+	Engine*						m_engine;
+	physx::PxScene*				m_scene;
+	PhysicsSystem*				m_system;
+	physx::PxMaterial*			m_default_material;
 	Array<physx::PxRigidActor*>	m_actors;
-	Array<string>					m_shape_sources;
+	Array<string>				m_shape_sources;
+	
 	Array<bool>					m_is_dynamic;
 	Array<Entity>				m_entities;
 	Array<int>					m_index_map;
 	Array<Controller>			m_controllers;
-	PhysicsScene*					m_owner;
+	PhysicsScene*				m_owner;
 };
 
 
 static const uint32_t box_rigid_actor_type = crc32("box_rigid_actor");
+static const uint32_t mesh_rigid_actor_type = crc32("mesh_rigid_actor");
 static const uint32_t controller_type = crc32("physical_controller");
 
 
@@ -81,11 +84,12 @@ struct OutputStream : public physx::PxOutputStream
 	{
 		if(size + (int)count > capacity)
 		{
-			uint8_t* new_data = LUX_NEW_ARRAY(unsigned char, capacity + 4096);
+			int new_capacity = Math::max(size + (int)count, capacity + 4096);
+			uint8_t* new_data = LUX_NEW_ARRAY(unsigned char, new_capacity);
 			memcpy(new_data, data, size);
 			LUX_DELETE_ARRAY(data);
 			data = new_data;
-			capacity += 4096;
+			capacity = new_capacity;
 		}
 		memcpy(data + size, src, count);
 		size += count;
@@ -286,7 +290,53 @@ Component PhysicsScene::createBoxRigidActor(Entity entity)
 }
 
 
-/*void PhysicsScene::getShapeSource(Component cmp, string& str)
+Component PhysicsScene::createMeshRigidActor(Entity entity)
+{
+	int new_index = m_impl->m_entities.size();
+	for (int i = 0; i < m_impl->m_index_map.size(); ++i)
+	{
+		if (m_impl->m_index_map[i] == -1)
+		{
+			new_index = i;
+			break;
+		}
+	}
+	if (new_index == m_impl->m_entities.size())
+	{
+		m_impl->m_actors.push(NULL);
+		m_impl->m_shape_sources.push(string(""));
+		m_impl->m_is_dynamic.push(false);
+		m_impl->m_entities.push(entity);
+	}
+	else
+	{
+		m_impl->m_actors[new_index] = NULL;
+		m_impl->m_shape_sources[new_index] = "";
+		m_impl->m_is_dynamic[new_index] = false;
+		m_impl->m_entities[new_index] = entity;
+	}
+
+/*	physx::PxTriangleMeshGeometry geom;
+	physx::PxTransform transform;
+	Matrix mtx;
+	entity.getMatrix(mtx);
+	matrix2Transform(mtx, transform);
+
+	physx::PxRigidStatic* actor = PxCreateStatic(*m_impl->m_system->m_impl->m_physics, transform, geom, *m_impl->m_default_material);
+	actor->userData = (void*)entity.index;
+	m_impl->m_scene->addActor(*actor);
+	m_impl->m_scene->simulate(0.01f);
+	m_impl->m_scene->fetchResults(true);
+	actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
+	*/
+
+	Component cmp(entity, mesh_rigid_actor_type, this, m_impl->m_actors.size() - 1);
+	m_impl->m_universe->getEventManager().emitEvent(ComponentEvent(cmp));
+	return cmp;
+}
+
+
+void PhysicsScene::getShapeSource(Component cmp, string& str)
 {
 	str = m_impl->m_shape_sources[cmp.index];
 }
@@ -299,99 +349,42 @@ void PhysicsScene::setShapeSource(Component cmp, const string& str)
 		return;
 	}
 
-	FS::IFile* file = m_impl->m_engine->getFileSystem().open("disk", str.c_str(), FS::Mode::OPEN | FS::Mode::READ);
-	if(file)
+	physx::PxTriangleMeshGeometry geom;
+	m_impl->createTriMesh(str.c_str(), geom);
+	
+	physx::PxTransform transform;
+	Matrix mtx;
+	cmp.entity.getMatrix(mtx);
+	matrix2Transform(mtx, transform);
+
+	if (m_impl->m_actors[cmp.index])
 	{
-		physx::PxTransform transform;
-		Matrix mtx;
-		cmp.entity.getMatrix(mtx);
-		matrix2Transform(mtx, transform);
-		physx::PxGeometry* geom = 0;
-		physx::PxBoxGeometry box_geom;
-		physx::PxSphereGeometry sphere_geom;
-		physx::PxConvexMeshGeometry convex_geom;
-		physx::PxTriangleMeshGeometry trimesh_geom;
-
-		long size = file->size();
-		char* buffer = LUX_NEW_ARRAY(char, size);
-		file->read(buffer, size);
-
-		jsmn_parser parser;
-		jsmn_init(&parser);
-		jsmntok_t tokens[255];
-		jsmn_parse(&parser, buffer, tokens, 255);
-		JsonObject root(0, buffer, tokens);
-		JsonObject js_shape = root.getProperty("shape");
-		char tmp[255];
-		if(js_shape.toString(tmp, 255))
-		{
-			if(strcmp(tmp, "sphere") == 0)
-			{
-				root.getProperty("radius").toString(tmp, 255);
-				sscanf_s(tmp, "%f", &sphere_geom.radius);
-				geom = &sphere_geom;
-			}
-			else if(strcmp(tmp, "box") == 0)
-			{
-				root.getProperty("x").toString(tmp, 255);
-				sscanf_s(tmp, "%f", &box_geom.halfExtents.x);
-				root.getProperty("y").toString(tmp, 255);
-				sscanf_s(tmp, "%f", &box_geom.halfExtents.y);
-				root.getProperty("z").toString(tmp, 255);
-				sscanf_s(tmp, "%f", &box_geom.halfExtents.z);
-				geom = &box_geom;
-			}
-			else if(strcmp(tmp, "convex") == 0)
-			{
-				if(root.getProperty("src").toString(tmp, 255))
-				{
-					m_impl->createConvexGeom(tmp, convex_geom);
-				}
-				geom = &convex_geom;
-			}
-			else if(strcmp(tmp, "trimesh") == 0)
-			{
-				if(root.getProperty("src").toString(tmp, 255))
-				{
-					m_impl->createTriMesh(tmp, trimesh_geom);
-				}
-				geom = &trimesh_geom;
-			}
-			else
-			{
-				ASSERT(false); // unsupported type
-			}
-		}
-		LUX_DELETE_ARRAY(buffer);
-
-		if(m_impl->m_actors[cmp.index])
-		{
-			m_impl->m_scene->removeActor(*m_impl->m_actors[cmp.index]);
-			m_impl->m_actors[cmp.index]->release();
-			m_impl->m_actors[cmp.index] = 0;
-		}
-
-		if(geom)
-		{
-			physx::PxRigidActor* actor;
-			if(m_impl->m_is_dynamic[cmp.index])
-			{
-				actor = PxCreateDynamic(*m_impl->m_system->m_impl->m_physics, transform, *geom, *m_impl->m_default_material, 1.0f);
-			}
-			else
-			{
-				actor = PxCreateStatic(*m_impl->m_system->m_impl->m_physics, transform, *geom, *m_impl->m_default_material);
-			}
-			actor->userData = (void*)cmp.entity.index;
-			m_impl->m_scene->addActor(*actor);
-			m_impl->m_scene->simulate(0.01f);
-			m_impl->m_scene->fetchResults(true);
-			m_impl->m_actors[cmp.index] = actor;
-			actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
-			m_impl->m_shape_sources[cmp.index] = str;
-		}
+		m_impl->m_scene->removeActor(*m_impl->m_actors[cmp.index]);
+		m_impl->m_actors[cmp.index]->release();
+		m_impl->m_actors[cmp.index] = NULL;
 	}
-}*/
+
+	physx::PxRigidActor* actor;
+	if (m_impl->m_is_dynamic[cmp.index])
+	{
+		actor = PxCreateDynamic(*m_impl->m_system->m_impl->m_physics, transform, geom, *m_impl->m_default_material, 1.0f);
+	}
+	else
+	{
+		actor = PxCreateStatic(*m_impl->m_system->m_impl->m_physics, transform, geom, *m_impl->m_default_material);
+	}
+	if(actor)
+	{
+		actor->userData = (void*)cmp.entity.index;
+		m_impl->m_scene->addActor(*actor);
+		m_impl->m_actors[cmp.index] = actor;
+		m_impl->m_shape_sources[cmp.index] = str;
+	}
+	else
+	{
+		g_log_error.log("PhysX", "Could not create PhysX mesh %s", str.c_str());
+	}
+}
 
 
 void PhysicsSceneImpl::createTriMesh(const char* path, physx::PxTriangleMeshGeometry& geom)
@@ -416,8 +409,13 @@ void PhysicsSceneImpl::createTriMesh(const char* path, physx::PxTriangleMeshGeom
 		meshDesc.points.data = &verts[0];
 
 		meshDesc.triangles.count = num_indices / 3;
-		meshDesc.triangles.stride = 3*sizeof(physx::PxU32);
+		meshDesc.triangles.stride = 3 * sizeof(physx::PxU32);
 		meshDesc.triangles.data	= &tris[0];
+
+		for(int i = 0; i < num_indices; ++i)
+		{
+			ASSERT(tris[i] < (uint32_t)verts.size());
+		}
 
 		OutputStream writeBuffer;
 		bool status = m_system->m_impl->m_cooking->cookTriangleMesh(meshDesc, writeBuffer);
