@@ -54,7 +54,6 @@ struct RendererImpl : public Renderer
 		gluLookAt(pos.x, pos.y, pos.z, center.x, center.y, center.z, up.x, up.y, up.z);
 	}
 
-
 	virtual void setRenderDevice(IRenderDevice& device) override
 	{
 		m_render_device = &device;

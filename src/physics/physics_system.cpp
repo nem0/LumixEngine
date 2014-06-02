@@ -38,7 +38,7 @@ struct CustomErrorCallback : public physx::PxErrorCallback
 void PhysicsSystem::onCreateUniverse(Universe& universe)
 {
 	m_impl->m_scene = LUX_NEW(PhysicsScene)();
-	m_impl->m_scene->create(*this, universe);
+	m_impl->m_scene->create(*this, universe, *m_impl->m_engine);
 }
 
 
@@ -107,6 +107,7 @@ bool PhysicsSystem::create(Engine& engine)
 	m_impl = LUX_NEW(PhysicsSystemImpl);
 	m_impl->m_allocator = LUX_NEW(physx::PxDefaultAllocator)();
 	m_impl->m_error_callback = LUX_NEW(CustomErrorCallback)();
+	m_impl->m_engine = &engine;
 	m_impl->m_foundation = PxCreateFoundation(
 		PX_PHYSICS_VERSION,
 		*m_impl->m_allocator,

@@ -13,6 +13,7 @@
 #include "core/log.h"
 #include "core/matrix.h"
 #include "engine/engine.h"
+#include "graphics/render_scene.h"
 #include "universe/component_event.h"
 #include "universe/entity_moved_event.h"
 #include "physics/physics_system.h"
@@ -140,13 +141,14 @@ PhysicsScene::PhysicsScene()
 	m_impl = 0;
 }
 
-
-bool PhysicsScene::create(PhysicsSystem& system, Universe& universe)
+	
+bool PhysicsScene::create(PhysicsSystem& system, Universe& universe, Engine& engine)
 {
 	m_impl = LUX_NEW(PhysicsSceneImpl);
 	m_impl->m_owner = this;
 	m_impl->m_universe = &universe;
 	m_impl->m_universe->getEventManager().addListener(EntityMovedEvent::type).bind<PhysicsSceneImpl, &PhysicsSceneImpl::handleEvent>(m_impl);
+	m_impl->m_engine = &engine;
 	physx::PxSceneDesc sceneDesc(system.m_impl->m_physics->getTolerancesScale());
 	sceneDesc.gravity = physx::PxVec3(0.0f, -9.8f, 0.0f);
 	if(!sceneDesc.cpuDispatcher) {
@@ -163,6 +165,9 @@ bool PhysicsScene::create(PhysicsSystem& system, Universe& universe)
 		return false;
 	m_impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE,     1.0);
 	m_impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_SHAPES, 1.0f);
+	m_impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eACTOR_AXES, 1.0f);
+	m_impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_AABBS, 1.0f);
+	m_impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eWORLD_AXES, 1.0f);
 	m_impl->m_system = &system;
 	m_impl->m_default_material = m_impl->m_system->m_impl->m_physics->createMaterial(0.5,0.5,0.5);
 	return true;
@@ -375,6 +380,7 @@ void PhysicsScene::setShapeSource(Component cmp, const string& str)
 	}
 	if(actor)
 	{
+		actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
 		actor->userData = (void*)cmp.entity.index;
 		m_impl->m_scene->addActor(*actor);
 		m_impl->m_actors[cmp.index] = actor;
@@ -479,7 +485,11 @@ void PhysicsScene::render()
 		for(physx::PxU32 i=0; i<numLines; i++)
 		{
 			const physx::PxDebugLine& line = lines[i];
-			glColor3f(0, 1, 0);				
+			GLubyte bytes[3];
+			bytes[0] = (GLubyte)((line.color0 >> 16) & 0xff);
+			bytes[1] = (GLubyte)((line.color0 >> 8) & 0xff);
+			bytes[2] = (GLubyte)((line.color0) & 0xff);
+			glColor3ubv(bytes);
 			glVertex3fv((GLfloat*)&line.pos0);
 			glVertex3fv((GLfloat*)&line.pos1);
 		}
@@ -509,7 +519,6 @@ void PhysicsScene::update(float time_delta)
 		m_impl->m_controllers[i].m_controller->move(g, 0.0001f, time_delta, physx::PxControllerFilters());
 		m_impl->m_controllers[i].m_entity.setPosition((float)p.x, (float)p.y, (float)p.z);
 	}
-
 }
 
 

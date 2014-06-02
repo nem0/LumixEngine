@@ -11,6 +11,9 @@ namespace Lux
 {
 
 
+class Engine;
+
+
 struct RaycastHit
 {
 	Vec3 position;
@@ -25,7 +28,7 @@ class LUX_PHYSICS_API PhysicsScene
 	public:
 		PhysicsScene();
 		
-		bool create(PhysicsSystem& system, Universe& universe);
+		bool create(PhysicsSystem& system, Universe& universe, Engine& engine);
 		void destroy();
 		void update(float time_delta);
 		void render();
