@@ -9,6 +9,7 @@
 #include "core/resource_manager_base.h"
 #include "core/string.h"
 #include "engine/engine.h"
+#include "engine/plugin_manager.h"
 #include "graphics/frame_buffer.h"
 #include "graphics/geometry.h"
 #include "graphics/gl_ext.h"

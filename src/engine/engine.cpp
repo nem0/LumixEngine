@@ -93,6 +93,7 @@ namespace Lux
 		m_fps_frame = 0;
 		m_universe = 0;
 		m_base_path = base_path;
+		m_render_scene = NULL;
 
 		m_renderer = Renderer::createInstance();
 		if(!m_renderer)
@@ -258,6 +259,7 @@ namespace Lux
 			m_impl->m_fps_frame = 0;
 		}
 		float dt = m_impl->m_timer->tick();
+		m_impl->m_render_scene->update(dt);
 		m_impl->m_script_system->update(dt);
 		m_impl->m_plugin_manager.update(dt);
 		m_impl->m_input_system.update(dt);
