@@ -26,6 +26,7 @@ ScriptCompilerWidget::ScriptCompilerWidget(QWidget* parent) :
 
 ScriptCompilerWidget::~ScriptCompilerWidget()
 {
+	delete m_compiler;
 	delete m_ui;
 	delete m_model;
 }
