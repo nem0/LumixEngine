@@ -180,9 +180,11 @@ namespace Lux
 
 	void Engine::destroy()
 	{
+		Timer::destroy(m_impl->m_timer);
+		Timer::destroy(m_impl->m_fps_timer);
 		m_impl->m_plugin_manager.destroy();
 		Renderer::destroyInstance(*m_impl->m_renderer);
-
+		m_impl->m_input_system.destroy();
 		m_impl->m_material_manager.destroy();
 		
 		if(m_impl->m_disk_file_device)

@@ -745,9 +745,6 @@ Component EditorServer::getEditCamera() const
 
 void EditorServerImpl::destroy()
 {
-	m_message_task->m_is_finished = true;
-	LUX_DELETE(m_message_task->m_stream);
-	m_message_task->destroy();
 
 	destroyUniverse();
 	m_engine.destroy();
@@ -758,6 +755,10 @@ void EditorServerImpl::destroy()
 	m_tcp_file_device.disconnect();
 	m_tpc_file_server.stop();
 	FS::FileSystem::destroy(m_file_system);
+	m_message_task->m_is_finished = true;
+	LUX_DELETE(m_message_task->m_stream);
+	m_message_task->destroy();
+	LUX_DELETE(m_message_task);
 }
 
 

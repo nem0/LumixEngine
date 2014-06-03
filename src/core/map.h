@@ -17,7 +17,7 @@ class Map
 	private:
 		struct Node
 		{
-			Node() { left = right = 0; height = 1; }
+			Node() { left = right = NULL; height = 1; }
 			Key		key;
 			Value	value;
 			Node*	left;
@@ -105,6 +105,11 @@ class Map
 		{
 			m_root = NULL;
 			m_size = 0;
+		}
+
+		~Map()
+		{
+			clear();
 		}
 
 		int size()

@@ -150,13 +150,6 @@ struct RendererImpl : public Renderer
 		glPopMatrix();
 	}
 
-
-	virtual Model* getModel(const char* path) override
-	{
-		return static_cast<Model*>(m_engine->getResourceManager().get(ResourceManager::MODEL)->load(path));
-	}
-
-
 	virtual void serialize(ISerializer&) override
 	{
 	}
