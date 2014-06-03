@@ -16,6 +16,7 @@
 #include "core/log.h"
 #include "core/map.h"
 #include "core/matrix.h"
+#include "core/MT/lock_free_queue.h"
 #include "core/MT/mutex.h"
 #include "core/MT/task.h"
 #include "core/Net/tcp_acceptor.h"
@@ -169,7 +170,8 @@ struct EditorServerImpl
 		bool isGameMode() const { return m_is_game_mode; }
 		void save(FS::IFile& file, const char* path);
 		void load(FS::IFile& file, const char* path);
-		void onMessage(void* msgptr, int size);
+		void onMessage(void* msgptr, int32_t size);
+		void processMessages();
 		EditorIconHit raycastEditorIcons(const Vec3& origin, const Vec3& dir);
 
 		const IPropertyDescriptor& getPropertyDescriptor(uint32_t type, uint32_t name_hash);
@@ -207,14 +209,17 @@ struct EditorServerImpl
 		FS::TCPFileDevice m_tcp_file_device;
 		IRenderDevice* m_edit_view_render_device;
 		bool m_toggle_game_mode_requested;
+		
+		MT::LockFreeQueue<uint8_t, 32> m_message_queue;
 };
 
 
-static const uint32_t renderable_type = crc32("renderable");
-static const uint32_t camera_type = crc32("camera");
-static const uint32_t light_type = crc32("light");
-static const uint32_t script_type = crc32("script");
-static const uint32_t animable_type = crc32("animable");
+static const uint32_t RENDERABLE_HASH = crc32("renderable");
+static const uint32_t CAMERA_HASH = crc32("camera");
+static const uint32_t LIGHT_HASH = crc32("light");
+static const uint32_t SCRIPT_HASH = crc32("script");
+static const uint32_t ANIMABLE_HASH = crc32("animable");
+static const uint32_t TERRAIN_HASH = crc32("terrain");
 
 
 void EditorServer::render(IRenderDevice& render_device)
@@ -252,6 +257,7 @@ void EditorServer::registerCreator(uint32_t type, IPlugin& creator)
 
 void EditorServer::tick()
 {
+	m_impl->processMessages();
 	if(m_impl->m_toggle_game_mode_requested)
 	{
 		m_impl->toggleGameMode();
@@ -310,16 +316,18 @@ EditorServerImpl::~EditorServerImpl()
 
 void EditorServerImpl::registerProperties()
 {
-	m_component_properties[camera_type].push(LUX_NEW(PropertyDescriptor<RenderScene>)(crc32("slot"), &RenderScene::getCameraSlot, &RenderScene::setCameraSlot, IPropertyDescriptor::STRING));
-	m_component_properties[camera_type].push(LUX_NEW(PropertyDescriptor<RenderScene>)(crc32("fov"), &RenderScene::getCameraFOV, &RenderScene::setCameraFOV));
-	m_component_properties[camera_type].push(LUX_NEW(PropertyDescriptor<RenderScene>)(crc32("near"), &RenderScene::getCameraNearPlane, &RenderScene::setCameraNearPlane));
-	m_component_properties[camera_type].push(LUX_NEW(PropertyDescriptor<RenderScene>)(crc32("far"), &RenderScene::getCameraFarPlane, &RenderScene::setCameraFarPlane));
-	m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<RenderScene>)(crc32("source"), &RenderScene::getRenderablePath, &RenderScene::setRenderablePath, IPropertyDescriptor::FILE));
+	m_component_properties[CAMERA_HASH].push(LUX_NEW(PropertyDescriptor<RenderScene>)(crc32("slot"), &RenderScene::getCameraSlot, &RenderScene::setCameraSlot, IPropertyDescriptor::STRING));
+	m_component_properties[CAMERA_HASH].push(LUX_NEW(PropertyDescriptor<RenderScene>)(crc32("fov"), &RenderScene::getCameraFOV, &RenderScene::setCameraFOV));
+	m_component_properties[CAMERA_HASH].push(LUX_NEW(PropertyDescriptor<RenderScene>)(crc32("near"), &RenderScene::getCameraNearPlane, &RenderScene::setCameraNearPlane));
+	m_component_properties[CAMERA_HASH].push(LUX_NEW(PropertyDescriptor<RenderScene>)(crc32("far"), &RenderScene::getCameraFarPlane, &RenderScene::setCameraFarPlane));
+	m_component_properties[RENDERABLE_HASH].push(LUX_NEW(PropertyDescriptor<RenderScene>)(crc32("source"), &RenderScene::getRenderablePath, &RenderScene::setRenderablePath, IPropertyDescriptor::FILE));
+	m_component_properties[TERRAIN_HASH].push(LUX_NEW(PropertyDescriptor<RenderScene>)(crc32("heightmap"), &RenderScene::getTerrainHeightmap, &RenderScene::setTerrainHeightmap, IPropertyDescriptor::FILE));
+	m_component_properties[TERRAIN_HASH].push(LUX_NEW(PropertyDescriptor<RenderScene>)(crc32("material"), &RenderScene::getTerrainMaterial, &RenderScene::setTerrainMaterial, IPropertyDescriptor::FILE));
 	/*m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("visible"), &Renderer::getVisible, &Renderer::setVisible));
 	m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("cast shadows"), &Renderer::getCastShadows, &Renderer::setCastShadows));
 	m_component_properties[point_light_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("fov"), &Renderer::getLightFov, &Renderer::setLightFov));
 	m_component_properties[point_light_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("radius"), &Renderer::getLightRadius, &Renderer::setLightRadius));
-	*/m_component_properties[script_type].push(LUX_NEW(PropertyDescriptor<ScriptSystem>)(crc32("source"), &ScriptSystem::getScriptPath, &ScriptSystem::setScriptPath, IPropertyDescriptor::FILE));
+	*/m_component_properties[SCRIPT_HASH].push(LUX_NEW(PropertyDescriptor<ScriptSystem>)(crc32("source"), &ScriptSystem::getScriptPath, &ScriptSystem::setScriptPath, IPropertyDescriptor::FILE));
 }
 
 
@@ -350,7 +358,7 @@ void EditorServerImpl::onPointerDown(int x, int y, MouseButton::Value button)
 	else if(button == MouseButton::LEFT)
 	{
 		Vec3 origin, dir;
-		Component camera_cmp = m_camera.getComponent(camera_type);
+		Component camera_cmp = m_camera.getComponent(CAMERA_HASH);
 		RenderScene* scene = static_cast<RenderScene*>(camera_cmp.system);
 		scene->getRay(camera_cmp, (float)x, (float)y, origin, dir);
 		RayCastModelHit hit = scene->castRay(origin, dir);
@@ -383,7 +391,7 @@ void EditorServerImpl::onPointerDown(int x, int y, MouseButton::Value button)
 		{
 			selectEntity(hit.m_renderable.entity);
 			m_mouse_mode = EditorServerImpl::MouseMode::TRANSFORM;
-			m_gizmo.startTransform(m_camera.getComponent(camera_type), x, y, Gizmo::TransformMode::CAMERA_XZ);
+			m_gizmo.startTransform(m_camera.getComponent(CAMERA_HASH), x, y, Gizmo::TransformMode::CAMERA_XZ);
 		}
 	}
 }
@@ -403,7 +411,7 @@ void EditorServerImpl::onPointerMove(int x, int y, int relx, int rely)
 				
 				Gizmo::TransformOperation tmode = GetKeyState(VK_MENU) & 0x8000 ? Gizmo::TransformOperation::ROTATE : Gizmo::TransformOperation::TRANSLATE;
 				int flags = GetKeyState(VK_LCONTROL) & 0x8000 ? Gizmo::Flags::FIXED_STEP : 0;
-				m_gizmo.transform(m_camera.getComponent(camera_type), tmode, x, y, relx, rely, flags);
+				m_gizmo.transform(m_camera.getComponent(CAMERA_HASH), tmode, x, y, relx, rely, flags);
 			}
 			break;
 	}
@@ -461,7 +469,6 @@ int MessageTask::task()
 			{
 				data.resize(length);
 				m_stream->read(&data[0], length);
-				MT::Lock lock(m_server->m_universe_mutex);
 				m_server->onMessage(&data[0], data.size());
 			}
 		}
@@ -565,21 +572,13 @@ void EditorServerImpl::addComponent(uint32_t type_crc)
 		{
 			plugin->createComponent(type_crc, m_selected_entity);
 		}
-		else if(type_crc == renderable_type)
+		else if(type_crc == RENDERABLE_HASH || type_crc == TERRAIN_HASH || type_crc == CAMERA_HASH || type_crc == LIGHT_HASH)
 		{
-			m_engine.getRenderScene()->createComponent(renderable_type, m_selected_entity);
+			m_engine.getRenderScene()->createComponent(type_crc, m_selected_entity);
 		}
-		else if(type_crc == light_type)
-		{
-			m_engine.getRenderScene()->createComponent(light_type, m_selected_entity);
-		}
-		else if(type_crc == script_type)
+		else if(type_crc == SCRIPT_HASH)
 		{
 			m_engine.getScriptSystem().createScript(m_selected_entity);
-		}
-		else if (type_crc == camera_type)
-		{
-			m_engine.getRenderScene()->createComponent(camera_type, m_selected_entity);
 		}
 		else
 		{
@@ -739,7 +738,7 @@ FS::TCPFileServer& EditorServer::getTCPFileServer()
 
 Component EditorServer::getEditCamera() const
 {
-	return m_impl->m_camera.getComponent(camera_type);
+	return m_impl->m_camera.getComponent(CAMERA_HASH);
 }
 
 
@@ -1008,7 +1007,7 @@ void EditorServerImpl::onComponentEvent(Event& event)
 		bool found = false;
 		for(int i = 0; i < cmps.size(); ++i)
 		{
-			if(cmps[i].type == renderable_type)
+			if(cmps[i].type == RENDERABLE_HASH)
 			{
 				found = true;
 				break;
@@ -1086,7 +1085,7 @@ void EditorServerImpl::createUniverse(bool create_basic_entities)
 		m_camera = m_engine.getUniverse()->createEntity();
 		m_camera.setPosition(0, 0, -5);
 		m_camera.setRotation(Quat(Vec3(0, 1, 0), -Math::PI));
-		Component cmp = m_engine.getRenderScene()->createComponent(camera_type, m_camera);
+		Component cmp = m_engine.getRenderScene()->createComponent(CAMERA_HASH, m_camera);
 		RenderScene* scene = static_cast<RenderScene*>(cmp.system);
 		scene->setCameraSlot(cmp, string("editor"));
 	}
@@ -1102,12 +1101,25 @@ void EditorServerImpl::createUniverse(bool create_basic_entities)
 }
 
 
-void EditorServerImpl::onMessage(void* msgptr, int size)
+void EditorServerImpl::onMessage(void* msgptr, int32_t size)
 {
-	int* msg = static_cast<int*>(msgptr);
-	float* fmsg = static_cast<float*>(msgptr); 
-	switch(msg[0])
+	uint8_t* data = LUX_NEW_ARRAY(uint8_t, size + sizeof(size));
+	memcpy(data + sizeof(size),  msgptr, size);
+	*(int32_t*)data = size;
+	m_message_queue.push(data);
+}
+
+void EditorServerImpl::processMessages()
+{
+	uint8_t* data;
+	while ((data = m_message_queue.pop()) != NULL)
 	{
+		void* msgptr = data + sizeof(int32_t);
+		int32_t size = *(int32_t*)data;
+		int* msg = reinterpret_cast<int*>(msgptr);
+		float* fmsg = reinterpret_cast<float*>(msgptr);
+		switch (msg[0])
+		{
 		case ClientMessageType::POINTER_DOWN:
 			onPointerDown(msg[1], msg[2], (MouseButton::Value)msg[3]);
 			break;
@@ -1118,7 +1130,7 @@ void EditorServerImpl::onMessage(void* msgptr, int size)
 			onPointerUp(msg[1], msg[2], (MouseButton::Value)msg[3]);
 			break;
 		case ClientMessageType::PROPERTY_SET:
-			setProperty(msg+1, size - 4);
+			setProperty(msg + 1, size - 4);
 			break;
 		case ClientMessageType::MOVE_CAMERA:
 			navigate(fmsg[1], fmsg[2], msg[3]);
@@ -1162,6 +1174,8 @@ void EditorServerImpl::onMessage(void* msgptr, int size)
 		default:
 			ASSERT(false); // unknown message
 			break;
+		}
+		LUX_DELETE_ARRAY(data);
 	}
 }
 

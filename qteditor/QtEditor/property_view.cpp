@@ -11,6 +11,7 @@
 #include "propertywidgets/physics_box_widget.h"
 #include "propertywidgets/renderable_widget.h"
 #include "propertywidgets/script_widget.h"
+#include "propertywidgets/terrain_widget.h"
 
 
 PropertyView::PropertyView(QWidget* parent) :
@@ -77,6 +78,10 @@ void PropertyView::onEntitySelected(Lux::Event& event)
 		{
 			widget = new CameraWidget;
 		}
+		else if (e.components[i] == crc32("terrain"))
+		{
+			widget = new TerrainWidget;
+		}
 		else
 		{
 			ASSERT(false);
@@ -98,28 +103,24 @@ void PropertyView::on_addComponentButton_clicked()
 	QByteArray s = m_ui->componentTypeCombo->currentText().toLocal8Bit();
 	const char* c = s.data();
 	/// TODO
-	if (strcmp(c, "Script") == 0)
+	const char* map[] =
 	{
-		m_client->addComponent(crc32("script"));
-	}
-	else if (strcmp(c, "Renderable") == 0)
+		"Script", "script",
+		"Renderable", "renderable",
+		"Point Light", "light",
+		"Animable", "animable",
+		"Camera", "camera",
+		"Physics Box", "box_rigid_actor",
+		"Terrain", "terrain"
+	};
+
+	for(int i = 0; i < sizeof(map) / sizeof(map[0]); i += 2)
 	{
-		m_client->addComponent(crc32("renderable"));
+		if(strcmp(c, map[i]) == 0)
+		{
+			m_client->addComponent(crc32(map[i+1]));
+			return;
+		}
 	}
-	else if (strcmp(c, "Point Light") == 0)
-	{
-		m_client->addComponent(crc32("light"));
-	}
-	else if (strcmp(c, "Animable") == 0)
-	{
-		m_client->addComponent(crc32("animable"));
-	}
-	else if (strcmp(c, "Camera") == 0)
-	{
-		m_client->addComponent(crc32("camera"));
-	}
-	else if (strcmp(c, "Physics Box") == 0)
-	{
-		m_client->addComponent(crc32("box_rigid_actor"));
-	}
+	ASSERT(false); // unknown component type
 }

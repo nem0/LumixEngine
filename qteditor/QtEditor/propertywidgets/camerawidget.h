@@ -20,11 +20,11 @@ class CameraWidget : public PropertyWidgetBase
 		virtual const char* getTitle() const override { return "Camera"; }
 		virtual void onEntityProperties(Lux::PropertyListEvent& event) override;
 
-private slots:
-	void on_fovInput_valueChanged(double arg1);
-	void on_farInput_valueChanged(double arg1);
-	void on_nearInput_valueChanged(double arg1);
-	void on_slotEdit_editingFinished();
+	private slots:
+		void on_fovInput_valueChanged(double arg1);
+		void on_farInput_valueChanged(double arg1);
+		void on_nearInput_valueChanged(double arg1);
+		void on_slotEdit_editingFinished();
 
 	private:
 		Ui::CameraWidget* m_ui;

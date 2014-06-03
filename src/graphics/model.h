@@ -81,7 +81,7 @@ class Model : public Resource
 		const Mesh&	getMesh(int index) const { return m_meshes[index]; }
 		int			getMeshCount() const { return m_meshes.size(); }
 		int			getBoneCount() const	{ return m_bones.size(); }
-		Bone&		getBone(int i)			{ return m_bones[i]; }
+		const Bone&	getBone(int i) const		{ return m_bones[i]; }
 		void		getPose(Pose& pose);
 		float		getBoundingRadius() const { return m_bounding_radius; }
 		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform, float scale);

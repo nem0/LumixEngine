@@ -10,6 +10,7 @@ namespace Lux
 {
 
 	class Engine;
+	class Geometry;
 	class IRenderDevice;
 	class ISerializer;
 	class ModelInstance;
@@ -18,7 +19,11 @@ namespace Lux
 
 	struct RenderableInfo
 	{
-		ModelInstance* m_model_instance;
+		Geometry* m_geometry;
+		Mesh* m_mesh;
+		const Pose* m_pose;
+		const ModelInstance* m_model;
+		const Matrix* m_matrix;
 		float m_scale;
 	};
 
@@ -65,6 +70,10 @@ namespace Lux
 			virtual void setRenderablePath(Component cmp, const string& path) = 0;
 			virtual void setRenderableScale(Component cmp, const float& scale) = 0;
 			virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) = 0;
+			virtual void setTerrainHeightmap(Component cmp, const string& path) = 0;
+			virtual void getTerrainHeightmap(Component cmp, string& path) = 0;
+			virtual void setTerrainMaterial(Component cmp, const string& path) = 0;
+			virtual void getTerrainMaterial(Component cmp, string& path) = 0;
 
 		protected:
 			virtual ~RenderScene() {}
