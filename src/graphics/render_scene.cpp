@@ -67,7 +67,12 @@ namespace Lux
 		{
 			LUX_DELETE(m_mesh);
 			m_mesh = NULL;
-			Array<Vec3> points;
+			struct Vertex
+			{
+				Vec3 pos;
+				float u, v;
+			};
+			Array<Vertex> points;
 			points.resize(m_width * m_height);
 			Array<int32_t> indices;
 			indices.resize((m_width - 1) * (m_height - 1) * 6);
@@ -77,7 +82,9 @@ namespace Lux
 				for (int i = 0; i < m_width; ++i)
 				{
 					int idx = i + j * m_width;
-					points[idx].set((float)i, m_heights[idx] / 10.0f, (float)j);
+					points[idx].pos.set((float)i, m_heights[idx] / 10.0f, (float)j);
+					points[idx].u = i / (float)m_width;
+					points[idx].v = j / (float)m_height;
 					if (j < m_height - 1 && i < m_width - 1)
 					{
 						indices[indices_offset] = idx;
@@ -92,7 +99,7 @@ namespace Lux
 			}
 			
 			VertexDef vertex_def;
-			vertex_def.parse("p", 1);
+			vertex_def.parse("pt", 2);
 			m_geometry.copy((const uint8_t*)&points[0], sizeof(points[0]) * points.size(), indices, vertex_def);
 			m_mesh = LUX_NEW(Mesh)(m_material, 0, indices.size(), "terrain");
 		}
@@ -103,6 +110,7 @@ namespace Lux
 			{
 				TGAHeader header;
 				file->read(&header, sizeof(header));
+				/// TODO 
 				int color_mode = header.bitsPerPixel / 8;
 				m_width = header.width;
 				m_height = header.height;
