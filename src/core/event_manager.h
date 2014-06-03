@@ -35,7 +35,7 @@ class LUX_CORE_API EventManager
 		void emitEvent(Event& event);
 
 	private:
-		typedef map<Event::Type, Array<Listener> > ListenerMap;
+		typedef Map<Event::Type, Array<Listener> > ListenerMap;
 
 	private:
 		ListenerMap m_listeners;

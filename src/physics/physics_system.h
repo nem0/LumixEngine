@@ -26,6 +26,7 @@ class LUX_PHYSICS_API PhysicsSystem : public IPlugin
 		virtual Component createComponent(uint32_t component_type, const Entity& entity) override;
 		virtual const char* getName() const override { return "physics"; }
 		virtual void sendMessage(const char* message) override;
+		class PhysicsScene* getScene() const;
 
 	private:
 		struct PhysicsSystemImpl* m_impl;

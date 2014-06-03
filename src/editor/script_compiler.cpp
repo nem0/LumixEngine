@@ -71,7 +71,7 @@ void ScriptCompiler::compile(const char path[])
 
 ScriptCompiler::Status ScriptCompiler::getStatus(const char* path)
 {
-	Lux::map<uint32_t, Status>::iterator iter = m_status.find(crc32(path));
+	Lux::Map<uint32_t, Status>::iterator iter = m_status.find(crc32(path));
 	return iter == m_status.end() ? UNKNOWN : iter.second();
 }
 

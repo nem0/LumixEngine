@@ -189,8 +189,8 @@ struct EditorServerImpl
 		Gizmo m_gizmo;
 		Entity m_selected_entity;
 		Blob m_stream;
-		map<uint32_t, Array<IPropertyDescriptor*> > m_component_properties;
-		map<uint32_t, IPlugin*> m_creators;
+		Map<uint32_t, Array<IPropertyDescriptor*> > m_component_properties;
+		Map<uint32_t, IPlugin*> m_creators;
 		MouseMode::Value m_mouse_mode;
 		Array<EditorIcon*> m_editor_icons;
 		bool m_is_game_mode;

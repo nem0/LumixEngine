@@ -48,7 +48,7 @@ private:
 	CompileCallbacks m_delegates;
 	Lux::string m_base_path;
 	Lux::Array<ProcessInfo> m_processes;
-	Lux::map<uint32_t, Status> m_status;
-	Lux::map<uint32_t, Lux::string> m_log;
+	Lux::Map<uint32_t, Status> m_status;
+	Lux::Map<uint32_t, Lux::string> m_log;
 
 };

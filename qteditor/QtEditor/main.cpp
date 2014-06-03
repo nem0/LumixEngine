@@ -9,9 +9,12 @@
 #include "editor/editor_server.h"
 #include "editor/gizmo.h"
 #include "engine/engine.h"
+#include "engine/plugin_manager.h"
 #include "graphics/irender_device.h"
 #include "graphics/pipeline.h"
 #include "graphics/renderer.h"
+#include "physics/physics_scene.h"
+#include "physics/physics_system.h"
 #include "sceneview.h"
 #include "gameview.h"
 #include "wgl_render_device.h"
@@ -139,6 +142,14 @@ class App
 			return hglrc;
 		}	
 
+		void renderPhysics()
+		{
+			Lux::PhysicsSystem* system = static_cast<Lux::PhysicsSystem*>(m_server.getEngine().getPluginManager().getPlugin("physics"));
+			if(system && system->getScene())
+			{
+				system->getScene()->render();
+			}
+		}
 
 		void init(int argc, char* argv[])
 		{
@@ -170,6 +181,7 @@ class App
 			m_edit_render_device->m_opengl_context = hglrc;
 			m_edit_render_device->getPipeline().setScene(m_server.getEngine().getRenderScene()); /// TODO manage scene properly
 			m_server.setEditViewRenderDevice(*m_edit_render_device);
+			m_edit_render_device->getPipeline().addCustomCommandHandler("render_physics").bind<App, &App::renderPhysics>(this);
 
 			m_game_render_device = new	WGLRenderDevice(m_server.getEngine(), "pipelines/game_view.json");
 			m_game_render_device->m_hdc = GetDC(game_hwnd);
