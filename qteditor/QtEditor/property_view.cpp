@@ -59,7 +59,7 @@ void PropertyView::onEntitySelected(Lux::Event& event)
 		{
 			widget = new PhysicsControllerWidget;
 		}
-		if (e.components[i] == crc32("mesh_rigid_actor"))
+		else if (e.components[i] == crc32("mesh_rigid_actor"))
 		{
 			widget = new PhysicsMeshWidget;
 		}

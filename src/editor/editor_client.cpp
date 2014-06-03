@@ -135,7 +135,8 @@ namespace Lux
 				}
 				break;
 			case ServerMessageType::PROPERTY_LIST:
-				{
+				{ 	msvcr110d.dll!_wassert(const wchar_t * expr, const wchar_t * filename, unsigned int lineno) Line 344	C
+
 					PropertyListEvent msg;
 					msg.read(stream);
 					m_event_manager.emitEvent(msg);

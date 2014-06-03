@@ -102,7 +102,7 @@ namespace UI
 			DecoratorBase* m_decorator;
 			Block* m_parent;
 			Array<Block*> m_children; 
-			map<uint32_t, EventCallback > m_event_handlers;
+			Map<uint32_t, EventCallback > m_event_handlers;
 			Area m_local_area;
 			Area m_global_area;
 			Area m_content_area;

@@ -12,7 +12,7 @@ namespace Lux
 
 
 template <typename Key, typename Value, typename Allocator = DefaultAllocator>
-class map
+class Map
 {
 	private:
 		struct Node
@@ -94,14 +94,14 @@ class map
 		};
 
 	public:
-		map(const Allocator& allocator)
+		Map(const Allocator& allocator)
 			: m_allocator(allocator)
 		{
 			m_root = NULL;
 			m_size = 0;
 		}
 
-		map()
+		Map()
 		{
 			m_root = NULL;
 			m_size = 0;
@@ -207,12 +207,11 @@ class map
 			rightChild->parent = node->parent;
 			if(rightChild->left)
 				rightChild->left->parent = rightChild;
-			rightChild->height = Math::max(rightChild->getLeftHeight(), rightChild->getRightHeight()) + 1;
-			node->height = Math::max(node->getLeftHeight(), node->getRightHeight()) + 1;
+			rightChild->height = Math::maxValue(rightChild->getLeftHeight(), rightChild->getRightHeight()) + 1;
+			node->height = Math::maxValue(node->getLeftHeight(), node->getRightHeight()) + 1;
 			node = rightChild;
 			return node;
 		}
-
 
 		Node* rotateRight(Node*& node)
 		{
@@ -225,8 +224,8 @@ class map
 			if(leftChild->right)
 				leftChild->right->parent = leftChild;
 
-			leftChild->height = Math::max(leftChild->getLeftHeight(), leftChild->getRightHeight()) + 1;
-			node->height = Math::max(node->getLeftHeight(), node->getRightHeight()) + 1;
+			leftChild->height = Math::maxValue(leftChild->getLeftHeight(), leftChild->getRightHeight()) + 1;
+			node->height = Math::maxValue(node->getLeftHeight(), node->getRightHeight()) + 1;
 			
 			node = leftChild;
 			return node;
@@ -278,7 +277,7 @@ class map
 			{
 				ASSERT(false); // key == node->key -> key already in tree
 			}
-			ret->height = Math::max(node->getLeftHeight(), node->getRightHeight()) + 1;
+			ret->height = Math::maxValue(node->getLeftHeight(), node->getRightHeight()) + 1;
 			return ret;
 		}
 
@@ -355,7 +354,7 @@ class map
 			if (root == NULL)
 				return root;
 
-			root->height = Math::max(root->getLeftHeight(), root->getRightHeight()) + 1;
+			root->height = Math::maxValue(root->getLeftHeight(), root->getRightHeight()) + 1;
 
 			int balance = root->getLeftHeight() - root->getRightHeight();
 

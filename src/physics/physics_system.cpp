@@ -95,6 +95,12 @@ void PhysicsSystem::update(float dt)
 }
 
 
+PhysicsScene* PhysicsSystem::getScene() const
+{
+	return m_impl->m_scene;
+}
+
+
 bool PhysicsSystem::create(Engine& engine)
 {
 	engine.getEditorServer()->registerProperty("box_rigid_actor", LUX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("dynamic"), &PhysicsScene::getIsDynamic, &PhysicsScene::setIsDynamic));

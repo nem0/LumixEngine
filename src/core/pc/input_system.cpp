@@ -14,7 +14,7 @@ namespace Lux
 			InputSystem::InputType type;
 			int key;
 		};
-		map<uint32_t, Action> m_actions;
+		Map<uint32_t, Action> m_actions;
 		float m_mouse_rel_x;
 		float m_mouse_rel_y;
 	};
