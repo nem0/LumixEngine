@@ -5,6 +5,7 @@
 #include "core/fs/file_system.h"
 #include "core/iserializer.h"
 #include "core/json_serializer.h"
+#include "core/log.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "core/string.h"
@@ -250,8 +251,15 @@ struct PipelineImpl : public Pipeline
 			serializer.deserializeArrayItem(tmp, 255);
 			uint32_t command_type_hash = crc32(tmp);
 			Command* cmd = createCommand(command_type_hash);
-			cmd->deserialize(*this, serializer);
-			m_commands.push(cmd);
+			if(cmd)
+			{
+				cmd->deserialize(*this, serializer);
+				m_commands.push(cmd);
+			}
+			else
+			{
+				g_log_error.log("renderer", "Unknown pipeline command %s", tmp);
+			}
 		}
 		serializer.deserializeArrayEnd();
 		serializer.deserializeObjectEnd();
@@ -496,7 +504,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 		glEnd();
 	}
 
-
 	void renderModels(int64_t layer_mask)
 	{
 		ASSERT(m_renderer != NULL);
@@ -504,46 +511,44 @@ struct PipelineInstanceImpl : public PipelineInstance
 		infos.clear();
 		m_scene->getRenderableInfos(infos, layer_mask);
 		int count = infos.size();
+		Material* last_material = NULL;
 		for (int i = 0; i < count; ++i)
 		{
 			glPushMatrix();
-			Model& model = *infos[i].m_model_instance->getModel();
-			Matrix mtx = infos[i].m_model_instance->getMatrix();
-			mtx.multiply3x3(infos[i].m_scale);
-			glMultMatrixf(&mtx.m11);
+			Matrix world_matrix = infos[i].m_model ? infos[i].m_model->getMatrix() : Matrix::IDENTITY;
+			world_matrix.multiply3x3(infos[i].m_scale);
+			glMultMatrixf(&world_matrix.m11);
 			
-			Geometry* geom = model.getGeometry();
-			for (int j = 0; j < model.getMeshCount(); ++j)
+			Mesh& mesh = *infos[i].m_mesh;
+			Material& material = *mesh.getMaterial();
+			if (last_material != &material)
 			{
-				Mesh& mesh = model.getMesh(j);
-				if (mesh.getMaterial()->isReady())
-				{
-					mesh.getMaterial()->apply(*m_renderer, *this);
-					mesh.getMaterial()->getShader()->setUniform("light_dir", m_light_dir);
-					mesh.getMaterial()->getShader()->setUniform("shadowmap_matrix0", m_shadow_modelviewprojection[0]);
-					mesh.getMaterial()->getShader()->setUniform("shadowmap_matrix1", m_shadow_modelviewprojection[1]);
-					mesh.getMaterial()->getShader()->setUniform("shadowmap_matrix2", m_shadow_modelviewprojection[2]);
-					mesh.getMaterial()->getShader()->setUniform("shadowmap_matrix3", m_shadow_modelviewprojection[3]);
-					mesh.getMaterial()->getShader()->setUniform("world_matrix", infos[i].m_model_instance->getMatrix());
-
-					static Matrix bone_mtx[64];
-					Pose& pose = infos[i].m_model_instance->getPose();
-					if (pose.getCount() > 0)
-					{
-						Vec3* poss = pose.getPositions();
-						Quat* rots = pose.getRotations();
-						for (int bone_index = 0, bone_count = pose.getCount(); bone_index < bone_count; ++bone_index)
-						{
-							rots[bone_index].toMatrix(bone_mtx[bone_index]);
-							bone_mtx[bone_index].translate(poss[bone_index]);
-							bone_mtx[bone_index] = bone_mtx[bone_index] * model.getBone(bone_index).inv_bind_matrix;
-						}
-						mesh.getMaterial()->getShader()->setUniform("bone_matrices", bone_mtx, pose.getCount());
-					}
-
-					geom->draw(mesh.getStart(), mesh.getCount(), *mesh.getMaterial()->getShader());
-				}
+				material.apply(*m_renderer, *this);
+				material.getShader()->setUniform("light_dir", m_light_dir);
+				material.getShader()->setUniform("shadowmap_matrix0", m_shadow_modelviewprojection[0]);
+				material.getShader()->setUniform("shadowmap_matrix1", m_shadow_modelviewprojection[1]);
+				material.getShader()->setUniform("shadowmap_matrix2", m_shadow_modelviewprojection[2]);
+				material.getShader()->setUniform("shadowmap_matrix3", m_shadow_modelviewprojection[3]);
+				material.getShader()->setUniform("world_matrix", world_matrix);
+				last_material = &material;
 			}
+			static Matrix bone_mtx[64];
+			if (infos[i].m_pose)
+			{
+				const Pose& pose = *infos[i].m_pose;
+				const Model& model = *infos[i].m_model->getModel();
+				Vec3* poss = pose.getPositions();
+				Quat* rots = pose.getRotations();
+				for (int bone_index = 0, bone_count = pose.getCount(); bone_index < bone_count; ++bone_index)
+				{
+					rots[bone_index].toMatrix(bone_mtx[bone_index]);
+					bone_mtx[bone_index].translate(poss[bone_index]);
+					bone_mtx[bone_index] = bone_mtx[bone_index] * model.getBone(bone_index).inv_bind_matrix;
+				}
+				material.getShader()->setUniform("bone_matrices", bone_mtx, pose.getCount());
+			}
+
+			infos[i].m_geometry->draw(mesh.getStart(), mesh.getCount(), *material.getShader());
 			glPopMatrix();
 		}
 	}

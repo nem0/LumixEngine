@@ -440,13 +440,13 @@ bool Texture::loadTGA(FS::IFile& file)
 
 	if (header.dataType != 2)
 	{
-		g_log_error.log("renderer", "Unsupported texture format %s", m_path);
+		g_log_error.log("renderer", "Unsupported texture format %s", m_path.c_str());
 		return false;
 	}
 
 	if (color_mode < 3)
 	{
-		g_log_error.log("renderer", "Unsupported color mode %s", m_path);
+		g_log_error.log("renderer", "Unsupported color mode %s", m_path.c_str());
 		return false;
 	}
 
@@ -654,19 +654,25 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	{
 		const char* path = m_path.c_str();
 		size_t len = m_path.length();
+		bool loaded = false;
 		if (len > 3 && strcmp(path + len - 4, ".dds") == 0)
 		{
-			bool loaded = loadDDS(*file);
-			ASSERT(loaded);
+			loaded = loadDDS(*file);
 		}
 		else
 		{
-			bool loaded = loadTGA(*file);
-			ASSERT(loaded);
+			loaded = loadTGA(*file);
 		}
-
-		m_size = file->size();
-		decrementDepCount();
+		if(!loaded)
+		{
+			g_log_error.log("renderer", "Error loading texture %s", m_path.c_str());
+			onFailure();
+		}
+		else
+		{
+			m_size = file->size();
+			decrementDepCount();
+		}
 	}
 	else
 	{
