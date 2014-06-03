@@ -29,6 +29,7 @@ struct PipelineInstanceImpl;
 
 struct Command
 {
+	virtual ~Command() {}
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) = 0;
 	virtual void execute(PipelineInstanceImpl& pipeline) = 0;
 };
@@ -167,10 +168,7 @@ struct PipelineImpl : public Pipeline
 
 	virtual ~PipelineImpl() override
 	{
-		for (int i = 0; i < m_commands.size(); ++i)
-		{
-			LUX_DELETE(m_commands[i]);
-		}
+		ASSERT(isEmpty());
 	}
 
 
