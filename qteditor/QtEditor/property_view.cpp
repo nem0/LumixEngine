@@ -5,13 +5,7 @@
 #include "core/event_manager.h"
 #include "editor/editor_client.h"
 #include "editor/server_message_types.h"
-#include "propertywidgets/animable_widget.h"
-#include "propertywidgets/camerawidget.h"
-#include "propertywidgets/lightwidget.h"
-#include "propertywidgets/physics_box_widget.h"
-#include "propertywidgets/renderable_widget.h"
-#include "propertywidgets/script_widget.h"
-#include "propertywidgets/terrain_widget.h"
+#include "property_widget_base.h"
 
 
 PropertyView::PropertyView(QWidget* parent) :
@@ -56,31 +50,55 @@ void PropertyView::onEntitySelected(Lux::Event& event)
 		PropertyWidgetBase* widget = NULL;
 		if (e.components[i] == crc32("box_rigid_actor"))
 		{
-			widget = new PhysicsBoxWidget;
+			widget = new PropertyWidgetBase;
+			widget->addProperty("size", "Size", PropertyWidgetBase::Property::VEC3, NULL);
+			widget->addProperty("dynamic", "Is dynamic", PropertyWidgetBase::Property::BOOL, NULL);
+			widget->setTitle("Physics Box");
+			widget->setComponentType("box_rigid_actor");
 		}
 		else if (e.components[i] == crc32("renderable"))
 		{
-			widget = new RenderableWidget;
+			widget = new PropertyWidgetBase;
+			widget->addProperty("source", "Source", PropertyWidgetBase::Property::FILE, "models (*.msh)");
+			widget->setTitle("Renderable");
+			widget->setComponentType("renderable");
 		}
 		else if (e.components[i] == crc32("animable"))
 		{
-			widget = new AnimableWidget;
+			widget = new PropertyWidgetBase;
+			widget->setTitle("Animable");
+			widget->setComponentType("animable");
 		}
 		else if (e.components[i] == crc32("script"))
 		{
-			widget = new ScriptWidget;
+			widget = new PropertyWidgetBase;
+			widget->addProperty("source", "Source", PropertyWidgetBase::Property::FILE, "scripts (*.cpp)");
+			widget->setTitle("Script");
+			widget->setComponentType("script");
 		}
 		else if (e.components[i] == crc32("light"))
 		{
-			widget = new LightWidget;
+			widget = new PropertyWidgetBase;
+			widget->setTitle("Light");
+			widget->setComponentType("light");
 		}
 		else if (e.components[i] == crc32("camera"))
 		{
-			widget = new CameraWidget;
+			widget = new PropertyWidgetBase;
+			widget->addProperty("slot", "Slot", PropertyWidgetBase::Property::STRING, NULL);
+			widget->addProperty("near", "Near", PropertyWidgetBase::Property::DECIMAL, NULL);
+			widget->addProperty("far", "Far", PropertyWidgetBase::Property::DECIMAL, NULL);
+			widget->addProperty("fov", "Field of view", PropertyWidgetBase::Property::DECIMAL, NULL);
+			widget->setTitle("Camera");
+			widget->setComponentType("camera");
 		}
 		else if (e.components[i] == crc32("terrain"))
 		{
-			widget = new TerrainWidget;
+			widget = new PropertyWidgetBase;
+			widget->addProperty("heightmap", "Heightmap", PropertyWidgetBase::Property::FILE, "TGA image (*.tga)");
+			widget->addProperty("material", "Material", PropertyWidgetBase::Property::FILE, "material (*.mat)");
+			widget->setTitle("Terrain");
+			widget->setComponentType("terrain");
 		}
 		else
 		{
