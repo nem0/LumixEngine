@@ -12,9 +12,11 @@
 #include "editor/server_message_types.h"
 
 
-PropertyWidgetBase::PropertyWidgetBase(QWidget* parent) :
-	QFrame(parent),
-	m_ui(new Ui::PropertyWidgetBase)
+PropertyWidgetBase::PropertyWidgetBase(const char* type, const char* label) 
+	: QFrame(NULL)
+	, m_ui(new Ui::PropertyWidgetBase)
+	, m_component_type(type)
+	, m_widget_title(label)
 {
 	m_ui->setupUi(this);
 	m_form_layout = new QFormLayout(this);
