@@ -8,6 +8,19 @@
 #include "property_widget_base.h"
 
 
+static const char* component_map[] =
+{
+	"Script", "script",
+	"Renderable", "renderable",
+	"Point Light", "light",
+	"Animable", "animable",
+	"Camera", "camera",
+	"Physics Box", "box_rigid_actor",
+	"Terrain", "terrain"
+};
+
+
+
 PropertyView::PropertyView(QWidget* parent) :
 	QDockWidget(parent),
 	m_ui(new Ui::PropertyView)
@@ -46,59 +59,40 @@ void PropertyView::onEntitySelected(Lux::Event& event)
 	for (int i = 0; i < e.components.size(); ++i)
 	{
 		m_client->requestProperties(e.components[i]);
-		/// TODO factory or something
 		PropertyWidgetBase* widget = NULL;
+		for(int j = 0; j < sizeof(component_map) / sizeof(component_map[0]); j += 2)
+		{
+			if(e.components[i] == crc32(component_map[j + 1]))
+			{
+				widget = new PropertyWidgetBase(component_map[j + 1], component_map[j]);
+				break;
+			}
+		}
+		/// TODO refactor
 		if (e.components[i] == crc32("box_rigid_actor"))
 		{
-			widget = new PropertyWidgetBase;
 			widget->addProperty("size", "Size", PropertyWidgetBase::Property::VEC3, NULL);
 			widget->addProperty("dynamic", "Is dynamic", PropertyWidgetBase::Property::BOOL, NULL);
-			widget->setTitle("Physics Box");
-			widget->setComponentType("box_rigid_actor");
 		}
 		else if (e.components[i] == crc32("renderable"))
 		{
-			widget = new PropertyWidgetBase;
 			widget->addProperty("source", "Source", PropertyWidgetBase::Property::FILE, "models (*.msh)");
-			widget->setTitle("Renderable");
-			widget->setComponentType("renderable");
-		}
-		else if (e.components[i] == crc32("animable"))
-		{
-			widget = new PropertyWidgetBase;
-			widget->setTitle("Animable");
-			widget->setComponentType("animable");
 		}
 		else if (e.components[i] == crc32("script"))
 		{
-			widget = new PropertyWidgetBase;
 			widget->addProperty("source", "Source", PropertyWidgetBase::Property::FILE, "scripts (*.cpp)");
-			widget->setTitle("Script");
-			widget->setComponentType("script");
-		}
-		else if (e.components[i] == crc32("light"))
-		{
-			widget = new PropertyWidgetBase;
-			widget->setTitle("Light");
-			widget->setComponentType("light");
 		}
 		else if (e.components[i] == crc32("camera"))
 		{
-			widget = new PropertyWidgetBase;
 			widget->addProperty("slot", "Slot", PropertyWidgetBase::Property::STRING, NULL);
 			widget->addProperty("near", "Near", PropertyWidgetBase::Property::DECIMAL, NULL);
 			widget->addProperty("far", "Far", PropertyWidgetBase::Property::DECIMAL, NULL);
 			widget->addProperty("fov", "Field of view", PropertyWidgetBase::Property::DECIMAL, NULL);
-			widget->setTitle("Camera");
-			widget->setComponentType("camera");
 		}
 		else if (e.components[i] == crc32("terrain"))
 		{
-			widget = new PropertyWidgetBase;
 			widget->addProperty("heightmap", "Heightmap", PropertyWidgetBase::Property::FILE, "TGA image (*.tga)");
 			widget->addProperty("material", "Material", PropertyWidgetBase::Property::FILE, "material (*.mat)");
-			widget->setTitle("Terrain");
-			widget->setComponentType("terrain");
 		}
 		else
 		{
@@ -121,22 +115,12 @@ void PropertyView::on_addComponentButton_clicked()
 	QByteArray s = m_ui->componentTypeCombo->currentText().toLocal8Bit();
 	const char* c = s.data();
 	/// TODO
-	const char* map[] =
-	{
-		"Script", "script",
-		"Renderable", "renderable",
-		"Point Light", "light",
-		"Animable", "animable",
-		"Camera", "camera",
-		"Physics Box", "box_rigid_actor",
-		"Terrain", "terrain"
-	};
 
-	for(int i = 0; i < sizeof(map) / sizeof(map[0]); i += 2)
+	for(int i = 0; i < sizeof(component_map) / sizeof(component_map[0]); i += 2)
 	{
-		if(strcmp(c, map[i]) == 0)
+		if(strcmp(c, component_map[i]) == 0)
 		{
-			m_client->addComponent(crc32(map[i+1]));
+			m_client->addComponent(crc32(component_map[i+1]));
 			return;
 		}
 	}

@@ -44,12 +44,10 @@ public:
 	};
 
 public:
-	explicit PropertyWidgetBase(QWidget* parent = NULL);
+	PropertyWidgetBase(const char* type, const char* label);
 	~PropertyWidgetBase();
 	
 	void setEditorClient(Lux::EditorClient& client) { m_client = &client; }
-	void setComponentType(const char* type) { m_component_type = type; }
-	void setTitle(const char* title) { m_widget_title = title; }
 	const char* getTitle() const { return m_widget_title.c_str(); }
 	void onEntityProperties(Lux::PropertyListEvent&);
 	void addProperty(const char* name, const char* label, Property::Type type, const char* file_type);
