@@ -5,10 +5,12 @@
 #include "core/fs/file_system.h"
 #include "core/iserializer.h"
 #include "core/json_serializer.h"
+#include "core/map.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "core/string.h"
 #include "engine/engine.h"
+#include "engine/plugin_manager.h"
 #include "graphics/frame_buffer.h"
 #include "graphics/geometry.h"
 #include "graphics/gl_ext.h"
@@ -27,8 +29,17 @@ struct PipelineInstanceImpl;
 
 struct Command
 {
+	virtual ~Command() {}
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) = 0;
 	virtual void execute(PipelineInstanceImpl& pipeline) = 0;
+};
+
+
+struct CustomCommand : public Command
+{
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
+	virtual void execute(PipelineInstanceImpl& pipeline) override;
+	uint32_t m_name;
 };
 
 
@@ -131,7 +142,6 @@ struct PipelineImpl : public Pipeline
 		uint32_t m_type_hash;
 	};
 
-	
 	template <typename T>
 	static Command* CreateCommand()
 	{
@@ -143,6 +153,7 @@ struct PipelineImpl : public Pipeline
 		: Pipeline(path, resource_manager)
 	{
 		addCommandCreator("clear").bind<&CreateCommand<ClearCommand> >();
+		addCommandCreator("custom").bind<&CreateCommand<CustomCommand> >();
 		addCommandCreator("render_models").bind<&CreateCommand<RenderModelsCommand> >();
 		addCommandCreator("apply_camera").bind<&CreateCommand<ApplyCameraCommand> >();
 		addCommandCreator("bind_framebuffer").bind<&CreateCommand<BindFramebufferCommand> >();
@@ -157,10 +168,7 @@ struct PipelineImpl : public Pipeline
 
 	virtual ~PipelineImpl() override
 	{
-		for (int i = 0; i < m_commands.size(); ++i)
-		{
-			LUX_DELETE(m_commands[i]);
-		}
+		ASSERT(isEmpty());
 	}
 
 
@@ -275,7 +283,6 @@ struct PipelineImpl : public Pipeline
 		fs.close(file);
 	}
 
-
 	Array<Command*> m_commands;
 	Array<CommandCreator> m_command_creators;
 	Array<FrameBufferDeclaration> m_framebuffers;
@@ -316,6 +323,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 		}
 	}
 
+	CustomCommandHandler& addCustomCommandHandler(const char* name)
+	{
+		return m_custom_commands_handlers[crc32(name)];
+	}
 
 	FrameBuffer* getFrameBuffer(const char* name)
 	{
@@ -385,6 +396,15 @@ struct PipelineInstanceImpl : public PipelineInstance
 		gluLookAt(pos.x, pos.y, pos.z, center.x, center.y, center.z, up.x, up.y, up.z);
 		glGetFloatv(GL_MODELVIEW_MATRIX, m);
 		glPopMatrix();*/
+	}
+
+	void executeCustomCommand(uint32_t name)
+	{
+		Map<uint32_t, CustomCommandHandler>::iterator iter = m_custom_commands_handlers.find(name);
+		if (iter != m_custom_commands_handlers.end())
+		{
+			iter.second().invoke();
+		}
 	}
 
 	void renderShadowmap(Component camera, int64_t layer_mask)
@@ -589,6 +609,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	Vec3 m_light_dir;
 	int m_width;
 	int m_height;
+	Map<uint32_t, CustomCommandHandler> m_custom_commands_handlers;
 
 	private:
 		void operator=(const PipelineInstanceImpl&);
@@ -632,6 +653,21 @@ void ClearCommand::execute(PipelineInstanceImpl&)
 {
 	glClear(m_buffers);
 }
+
+
+void CustomCommand::deserialize(PipelineImpl&, ISerializer& serializer)
+{
+	char tmp[256];
+	serializer.deserializeArrayItem(tmp, 255);
+	m_name = crc32(tmp);
+}
+
+
+void CustomCommand::execute(PipelineInstanceImpl& pipeline)
+{
+	pipeline.executeCustomCommand(m_name);
+}
+
 
 
 void RenderModelsCommand::deserialize(PipelineImpl&, ISerializer& serializer) 

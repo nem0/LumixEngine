@@ -29,6 +29,8 @@ void EditorIcon::create(Engine& engine, RenderScene& scene, Entity& entity, cons
 
 void EditorIcon::destroy()
 {
+	
+	m_model->getResourceManager().get(ResourceManager::MODEL)->unload(*m_model);
 }
 
 
