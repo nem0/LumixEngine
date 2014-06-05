@@ -28,7 +28,7 @@ namespace Lux
 
 		private:
 			Mode m_mode;
-			Lux::map<Lux::string, char*> m_items;
+			Lux::Map<Lux::string, char*> m_items;
 	};
 
 

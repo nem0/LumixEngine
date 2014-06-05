@@ -60,7 +60,7 @@ namespace UI
 		void fontLoaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 		void fontImageLoaded(TextureBase& img);
 
-		map<char, Character> m_characters;
+		Map<char, Character> m_characters;
 		Array<TextureBase*> m_images;
 		OpenGLTexture* m_font_image;
 		int m_window_height;

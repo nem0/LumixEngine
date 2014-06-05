@@ -52,6 +52,9 @@ class LUX_ENGINE_API Pipeline : public Resource
 class LUX_ENGINE_API PipelineInstance abstract
 {
 	public:
+		typedef Delegate<void> CustomCommandHandler; 
+
+	public:
 		virtual ~PipelineInstance() {}
 
 		virtual void render() = 0;
@@ -64,6 +67,8 @@ class LUX_ENGINE_API PipelineInstance abstract
 		virtual void setRenderer(Renderer& renderer) = 0;
 		virtual void setScene(RenderScene* scene) = 0;
 		virtual RenderScene* getScene() = 0;
+		virtual CustomCommandHandler& addCustomCommandHandler(const char* name) = 0;
+
 };
 
 

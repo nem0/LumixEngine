@@ -39,11 +39,11 @@ namespace UI
 
 		Engine* m_engine;
 		Array<Block*> m_blocks;
-		map<uint32_t, DecoratorBase*> m_decorators;
+		Map<uint32_t, DecoratorBase*> m_decorators;
 		Block* m_focus;
 		IRenderer* m_renderer;
 		Array<Atlas*> m_atlases;
-		map<uint32_t, BlockCreator> m_block_creators;
+		Map<uint32_t, BlockCreator> m_block_creators;
 		Array<Gui::MouseMoveCallback> m_mouse_move_callbacks;
 		Array<Gui::MouseCallback> m_mouse_up_callbacks;
 	};
@@ -56,7 +56,7 @@ namespace UI
 			m_blocks[i]->destroy();
 		}
 		m_blocks.clear();
-		for(map<uint32_t, DecoratorBase*>::iterator iter = m_decorators.begin(), end = m_decorators.end(); iter != end; ++iter)
+		for(Map<uint32_t, DecoratorBase*>::iterator iter = m_decorators.begin(), end = m_decorators.end(); iter != end; ++iter)
 		{
 			LUX_DELETE(iter.second());
 		}

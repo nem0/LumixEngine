@@ -93,6 +93,7 @@ namespace Lux
 		m_fps_frame = 0;
 		m_universe = 0;
 		m_base_path = base_path;
+		m_render_scene = NULL;
 
 		m_renderer = Renderer::createInstance();
 		if(!m_renderer)
@@ -179,9 +180,11 @@ namespace Lux
 
 	void Engine::destroy()
 	{
+		Timer::destroy(m_impl->m_timer);
+		Timer::destroy(m_impl->m_fps_timer);
 		m_impl->m_plugin_manager.destroy();
 		Renderer::destroyInstance(*m_impl->m_renderer);
-
+		m_impl->m_input_system.destroy();
 		m_impl->m_material_manager.destroy();
 		
 		if(m_impl->m_disk_file_device)
@@ -258,6 +261,7 @@ namespace Lux
 			m_impl->m_fps_frame = 0;
 		}
 		float dt = m_impl->m_timer->tick();
+		m_impl->m_render_scene->update(dt);
 		m_impl->m_script_system->update(dt);
 		m_impl->m_plugin_manager.update(dt);
 		m_impl->m_input_system.update(dt);

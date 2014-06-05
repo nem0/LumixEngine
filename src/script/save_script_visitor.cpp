@@ -7,7 +7,7 @@ namespace Lux
 
 	SaveScriptVisitor::~SaveScriptVisitor()
 	{
-		Lux::map<Lux::string, char*>::iterator iter = m_items.begin(), end = m_items.end();
+		Lux::Map<Lux::string, char*>::iterator iter = m_items.begin(), end = m_items.end();
 		for(; iter != end; ++iter)
 		{
 			LUX_DELETE_ARRAY(iter.second());

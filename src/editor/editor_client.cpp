@@ -135,7 +135,7 @@ namespace Lux
 				}
 				break;
 			case ServerMessageType::PROPERTY_LIST:
-				{
+				{ 	
 					PropertyListEvent msg;
 					msg.read(stream);
 					m_event_manager.emitEvent(msg);
