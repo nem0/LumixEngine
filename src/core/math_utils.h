@@ -35,6 +35,12 @@ namespace Lux
 		}
 
 		template <typename T>
+		LUX_FORCE_INLINE T maxValue(T a, T b)
+		{
+			return a < b ? b : a;
+		}
+
+		template <typename T>
 		LUX_FORCE_INLINE T abs(T a)
 		{
 			return a > 0 ? a : -a;

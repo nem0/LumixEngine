@@ -40,7 +40,7 @@ HEADERS  += mainwindow.h \
     materialmanager.h \
     wgl_render_device.h \
     renderdevicewidget.h \
-    profilerui.h
+    profilerui.h 
 
 FORMS    += mainwindow.ui \
     logwidget.ui \
