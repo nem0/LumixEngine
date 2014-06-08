@@ -71,6 +71,7 @@ namespace Lux
 			{
 				Vec3 pos;
 				float u, v;
+				Vec3 normal;
 			};
 			Array<Vertex> points;
 			points.resize(m_width * m_height);
@@ -82,9 +83,10 @@ namespace Lux
 				for (int i = 0; i < m_width; ++i)
 				{
 					int idx = i + j * m_width;
-					points[idx].pos.set((float)i, m_heights[idx] / 10.0f, (float)j);
+					points[idx].pos.set((float)(i - (m_width >> 1)), m_heights[idx] / 10.0f - 255 / 10.0f, (float)(j - (m_height >> 1)));
 					points[idx].u = i / (float)m_width;
 					points[idx].v = j / (float)m_height;
+					points[idx].normal.set(0, 1, 0);
 					if (j < m_height - 1 && i < m_width - 1)
 					{
 						indices[indices_offset] = idx;
@@ -99,7 +101,7 @@ namespace Lux
 			}
 			
 			VertexDef vertex_def;
-			vertex_def.parse("pt", 2);
+			vertex_def.parse("ptn", 3);
 			m_geometry.copy((const uint8_t*)&points[0], sizeof(points[0]) * points.size(), indices, vertex_def);
 			m_mesh = LUX_NEW(Mesh)(m_material, 0, indices.size(), "terrain");
 		}
@@ -143,6 +145,8 @@ namespace Lux
 		Material* m_material;
 		FS::ReadCallback m_heightmap_callback;
 		Mesh* m_mesh;
+		Matrix m_matrix;
+		Entity m_entity;
 	};
 
 	struct Renderable
@@ -408,6 +412,8 @@ namespace Lux
 					terrain->m_width = 0;
 					terrain->m_height = 0;
 					terrain->m_heightmap_callback.bind<Terrain, &Terrain::heightmapLoaded>(terrain);
+					terrain->m_matrix = entity.getMatrix();
+					terrain->m_entity = entity;
 					Component cmp(entity, type, this, m_terrains.size() - 1);
 					ComponentEvent evt(cmp);
 					m_universe.getEventManager().emitEvent(evt);
@@ -466,6 +472,11 @@ namespace Lux
 					if (cmps[i].type == RENDERABLE_HASH)
 					{
 						m_renderables[cmps[i].index].m_model.setMatrix(e.entity.getMatrix());
+						break;
+					}
+					else if (cmps[i].type == TERRAIN_HASH)
+					{
+						m_terrains[cmps[i].index]->m_matrix = e.entity.getMatrix();
 						break;
 					}
 				}
@@ -574,7 +585,7 @@ namespace Lux
 						info.m_mesh = m_terrains[i]->m_mesh;
 						info.m_pose = NULL;
 						info.m_model = NULL;
-						info.m_matrix = &Matrix::IDENTITY;
+						info.m_matrix = &m_terrains[i]->m_matrix;
 					}
 				}
 			}
