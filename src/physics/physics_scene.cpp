@@ -12,6 +12,7 @@
 #include "core/iserializer.h"
 #include "core/log.h"
 #include "core/matrix.h"
+#include "core/path.h"
 #include "engine/engine.h"
 #include "graphics/render_scene.h"
 #include "universe/component_event.h"
@@ -22,6 +23,63 @@
 
 namespace Lux
 {
+
+#pragma pack(1) 
+	struct TGAHeader
+	{
+		char  idLength;
+		char  colourMapType;
+		char  dataType;
+		short int colourMapOrigin;
+		short int colourMapLength;
+		char  colourMapDepth;
+		short int xOrigin;
+		short int yOrigin;
+		short int width;
+		short int height;
+		char  bitsPerPixel;
+		char  imageDescriptor;
+	};
+#pragma pack()
+
+class Terrain
+{
+	public:
+		void heightmapLoaded(FS::IFile* file, bool success, FS::FileSystem& filesystem)
+		{
+			if (success)
+			{
+				TGAHeader header;
+				file->read(&header, sizeof(header));
+				/// TODO 
+				int color_mode = header.bitsPerPixel / 8;
+				//m_width = header.width;
+				//m_height = header.height;
+				//m_heights.resize(m_width * m_height);
+				for (int j = 0; j < header.height; ++j)
+				{
+					for (int i = 0; i < header.width; ++i)
+					{
+						uint8_t data[4];
+						file->read(data, sizeof(data[0]) * 3);
+						if (color_mode == 4)
+							file->read(data + 3, sizeof(data[3]));
+						//m_heights[i + j * m_width] = data[0];
+					}
+				}
+				ASSERT(false); // TODO
+			}
+			else
+			{
+				g_log_error.log("physics", "Error loading heightmap %s", m_heightmap_path.c_str());
+			}
+			filesystem.close(file);
+		}
+
+		FS::ReadCallback m_heightmap_callback;
+		Component m_component;
+		Path m_heightmap_path;
+};
 
 
 struct PhysicsSceneImpl
@@ -57,14 +115,15 @@ struct PhysicsSceneImpl
 	Array<Entity>				m_entities;
 	Array<int>					m_index_map;
 	Array<Controller>			m_controllers;
+	Array<Terrain*>				m_terrains;
 	PhysicsScene*				m_owner;
 };
 
 
-static const uint32_t box_rigid_actor_type = crc32("box_rigid_actor");
-static const uint32_t mesh_rigid_actor_type = crc32("mesh_rigid_actor");
-static const uint32_t controller_type = crc32("physical_controller");
-
+static const uint32_t BOX_ACTOR_HASH = crc32("box_rigid_actor");
+static const uint32_t MESH_ACTOR_HASH = crc32("mesh_rigid_actor");
+static const uint32_t CONTROLLER_HASH = crc32("physical_controller");
+static const uint32_t HEIGHTFIELD_HASH = crc32("physical_heightfield");
 
 struct OutputStream : public physx::PxOutputStream
 {
@@ -199,7 +258,7 @@ void matrix2Transform(const Matrix& mtx, physx::PxTransform& transform)
 
 void PhysicsScene::destroyActor(Component cmp)
 {
-	ASSERT(cmp.type == box_rigid_actor_type);
+	ASSERT(cmp.type == BOX_ACTOR_HASH);
 	int inner_index = m_impl->m_index_map[cmp.index];
 	m_impl->m_scene->removeActor(*m_impl->m_actors[inner_index]);
 	m_impl->m_actors[inner_index]->release();
@@ -218,6 +277,43 @@ void PhysicsScene::destroyActor(Component cmp)
 	}
 	m_impl->m_index_map[cmp.index] = -1;
 	m_impl->m_universe->getEventManager().emitEvent(ComponentEvent(cmp, false));
+}
+
+
+Component PhysicsScene::createHeightfield(Entity entity)
+{
+	int new_index = m_impl->m_entities.size();
+	for (int i = 0; i < m_impl->m_index_map.size(); ++i)
+	{
+		if (m_impl->m_index_map[i] == -1)
+		{
+			new_index = i;
+			break;
+		}
+	}
+	if (new_index == m_impl->m_entities.size())
+	{
+		m_impl->m_actors.push(NULL);
+		m_impl->m_shape_sources.push(string(""));
+		m_impl->m_is_dynamic.push(false);
+		m_impl->m_entities.push(entity);
+	}
+	else
+	{
+		m_impl->m_actors[new_index] = NULL;
+		m_impl->m_shape_sources[new_index] = "";
+		m_impl->m_is_dynamic[new_index] = false;
+		m_impl->m_entities[new_index] = entity;
+	}
+
+	Component cmp(entity, HEIGHTFIELD_HASH, this, m_impl->m_actors.size() - 1);
+	Terrain* terrain = LUX_NEW(Terrain);
+	m_impl->m_terrains.push(terrain);
+	terrain->m_component = cmp;
+	terrain->m_heightmap_callback.bind<Terrain, &Terrain::heightmapLoaded>(terrain);
+
+	m_impl->m_universe->getEventManager().emitEvent(ComponentEvent(cmp));
+	return cmp;
 }
 
 
@@ -240,7 +336,7 @@ Component PhysicsScene::createController(Entity entity)
 
 	m_impl->m_controllers.push(c);
 	
-	Component cmp(entity, controller_type, this, m_impl->m_controllers.size() - 1);
+	Component cmp(entity, CONTROLLER_HASH, this, m_impl->m_controllers.size() - 1);
 	m_impl->m_universe->getEventManager().emitEvent(ComponentEvent(cmp));
 	return cmp;
 }
@@ -289,7 +385,7 @@ Component PhysicsScene::createBoxRigidActor(Entity entity)
 	m_impl->m_actors[new_index] = actor;
 	actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
 
-	Component cmp(entity, box_rigid_actor_type, this, m_impl->m_actors.size() - 1);
+	Component cmp(entity, BOX_ACTOR_HASH, this, m_impl->m_actors.size() - 1);
 	m_impl->m_universe->getEventManager().emitEvent(ComponentEvent(cmp));
 	return cmp;
 }
@@ -321,23 +417,22 @@ Component PhysicsScene::createMeshRigidActor(Entity entity)
 		m_impl->m_entities[new_index] = entity;
 	}
 
-/*	physx::PxTriangleMeshGeometry geom;
-	physx::PxTransform transform;
-	Matrix mtx;
-	entity.getMatrix(mtx);
-	matrix2Transform(mtx, transform);
-
-	physx::PxRigidStatic* actor = PxCreateStatic(*m_impl->m_system->m_impl->m_physics, transform, geom, *m_impl->m_default_material);
-	actor->userData = (void*)entity.index;
-	m_impl->m_scene->addActor(*actor);
-	m_impl->m_scene->simulate(0.01f);
-	m_impl->m_scene->fetchResults(true);
-	actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
-	*/
-
-	Component cmp(entity, mesh_rigid_actor_type, this, m_impl->m_actors.size() - 1);
+	Component cmp(entity, MESH_ACTOR_HASH, this, m_impl->m_actors.size() - 1);
 	m_impl->m_universe->getEventManager().emitEvent(ComponentEvent(cmp));
 	return cmp;
+}
+
+
+void PhysicsScene::getHeightmap(Component cmp, string& str)
+{
+	str = m_impl->m_shape_sources[cmp.index];
+}
+
+
+void PhysicsScene::setHeightmap(Component cmp, const string& str)
+{
+	m_impl->m_terrains[cmp.index]->m_heightmap_path = str;
+	m_impl->m_engine->getFileSystem().openAsync(m_impl->m_engine->getFileSystem().getDefaultDevice(), str.c_str(), FS::Mode::OPEN | FS::Mode::READ, m_impl->m_terrains[cmp.index]->m_heightmap_callback);
 }
 
 
@@ -563,7 +658,7 @@ void PhysicsSceneImpl::handleEvent(Event& event)
 		const Entity::ComponentList& cmps = e.getComponents();
 		for(int i = 0, c = cmps.size(); i < c; ++i)
 		{
-			if(cmps[i].type == box_rigid_actor_type)
+			if(cmps[i].type == BOX_ACTOR_HASH)
 			{
 				Vec3 pos = e.getPosition();
 				physx::PxVec3 pvec(pos.x, pos.y, pos.z);
@@ -577,7 +672,7 @@ void PhysicsSceneImpl::handleEvent(Event& event)
 				}
 				break;
 			}
-			else if(cmps[i].type == controller_type)
+			else if(cmps[i].type == CONTROLLER_HASH)
 			{
 				Vec3 pos = e.getPosition();
 				physx::PxExtendedVec3 pvec(pos.x, pos.y, pos.z);
@@ -723,7 +818,7 @@ void PhysicsSceneImpl::deserializeActor(ISerializer& serializer, int idx)
 	m_actors[idx] = actor;
 	actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
 
-	Component cmp(m_entities[idx], box_rigid_actor_type, m_owner, idx);
+	Component cmp(m_entities[idx], BOX_ACTOR_HASH, m_owner, idx);
 	m_universe->getEventManager().emitEvent(ComponentEvent(cmp));
 }
 

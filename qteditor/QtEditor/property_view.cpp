@@ -10,14 +10,15 @@
 
 static const char* component_map[] =
 {
-	"Script", "script",
-	"Renderable", "renderable",
-	"Point Light", "light",
 	"Animable", "animable",
 	"Camera", "camera",
 	"Physics Box", "box_rigid_actor",
 	"Physics Controller", "physical_controller",
 	"Physics Mesh", "mesh_rigid_actor",
+	"Physics Heightfield", "physical_heightfield",
+	"Point Light", "light",
+	"Renderable", "renderable",
+	"Script", "script",
 	"Terrain", "terrain"
 };
 
@@ -28,6 +29,14 @@ PropertyView::PropertyView(QWidget* parent) :
 	m_ui(new Ui::PropertyView)
 {
 	m_ui->setupUi(this);
+
+	QStringList component_list;
+	for(int j = 0; j < sizeof(component_map) / sizeof(component_map[0]); j += 2)
+	{
+		component_list << component_map[j];
+	}
+	
+	m_ui->componentTypeCombo->insertItems(0, component_list);
 }
 
 
@@ -97,6 +106,13 @@ void PropertyView::onEntitySelected(Lux::Event& event)
 			widget->addProperty("material", "Material", PropertyWidgetBase::Property::FILE, "material (*.mat)");
 		}
 		else if (e.components[i] == crc32("physical_controller") || e.components[i] == crc32("mesh_rigid_actor"))
+		{
+		}
+		else if (e.components[i] == crc32("physical_heightfield"))
+		{
+			widget->addProperty("heightmap", "Heightmap", PropertyWidgetBase::Property::FILE, "TGA image (*.tga)");
+		}
+		else if (e.components[i] == crc32("light"))
 		{
 		}
 		else
