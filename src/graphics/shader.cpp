@@ -180,6 +180,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	}
 	else
 	{
+		g_log_error.log("renderer", "Could not load shader %s", m_path.c_str());
 		onFailure();
 	}
 

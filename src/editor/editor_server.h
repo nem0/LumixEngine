@@ -10,9 +10,10 @@ namespace Lux
 {
 
 
+	class EditorClient;
+	class Engine;
 	class IPlugin;
 	class IRenderDevice;
-	class Engine;
 	namespace FS
 	{
 		class TCPFileServer;
@@ -23,8 +24,9 @@ namespace Lux
 		public:
 			EditorServer() { m_impl = 0; }
 
-			bool create(const char* base_path);
+			bool create(const char* base_path, EditorClient& client);
 			void destroy();
+			void onMessage(const uint8_t* data, int32_t size);
 			void tick();
 			void registerCreator(uint32_t type, IPlugin& creator);
 			void registerProperty(const char* component_type, IPropertyDescriptor* descriptor);
