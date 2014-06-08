@@ -252,6 +252,19 @@ namespace Lux
 				return mtx;
 			}
 
+			void update(float dt) override
+			{
+				for (int i = m_debug_lines.size() - 1; i >= 0; --i)
+				{
+					float life = m_debug_lines[i].m_life;
+					life -= dt;
+					if (life < 0)
+					{
+						m_debug_lines.eraseFast(i);
+					}
+				}
+			}
+
 			void serializeCameras(ISerializer& serializer)
 			{
 				serializer.serialize("camera_count", m_cameras.size());

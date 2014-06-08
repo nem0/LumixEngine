@@ -191,8 +191,8 @@ struct EditorServerImpl
 		Gizmo m_gizmo;
 		Entity m_selected_entity;
 		Blob m_stream;
-		map<uint32_t, Array<IPropertyDescriptor*> > m_component_properties;
-		map<uint32_t, IPlugin*> m_creators;
+		Map<uint32_t, Array<IPropertyDescriptor*> > m_component_properties;
+		Map<uint32_t, IPlugin*> m_creators;
 		MouseMode::Value m_mouse_mode;
 		Array<EditorIcon*> m_editor_icons;
 		bool m_is_game_mode;
@@ -744,9 +744,6 @@ Component EditorServer::getEditCamera() const
 
 void EditorServerImpl::destroy()
 {
-	m_message_task->m_is_finished = true;
-	LUX_DELETE(m_message_task->m_stream);
-	m_message_task->destroy();
 
 	destroyUniverse();
 	m_engine.destroy();
@@ -757,6 +754,10 @@ void EditorServerImpl::destroy()
 	m_tcp_file_device.disconnect();
 	m_tpc_file_server.stop();
 	FS::FileSystem::destroy(m_file_system);
+	m_message_task->m_is_finished = true;
+	LUX_DELETE(m_message_task->m_stream);
+	m_message_task->destroy();
+	LUX_DELETE(m_message_task);
 }
 
 

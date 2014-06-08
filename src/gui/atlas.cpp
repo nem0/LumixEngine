@@ -17,7 +17,7 @@ namespace Lux
 			void imageLoaded(TextureBase& img);
 			void atlasLoaded(Lux::FS::IFile* file, bool success, FS::FileSystem& fs);
 
-			map<uint32_t, Atlas::Part*> m_parts;
+			Map<uint32_t, Atlas::Part*> m_parts;
 			TextureBase* m_texture;
 			string m_path;
 			IRenderer* m_renderer;
@@ -94,7 +94,7 @@ namespace Lux
 
 		void AtlasImpl::imageLoaded(TextureBase& img)
 		{
-			for(map<uint32_t, Atlas::Part*>::iterator iter = m_parts.begin(), end = m_parts.end(); iter != end; ++iter)
+			for(Map<uint32_t, Atlas::Part*>::iterator iter = m_parts.begin(), end = m_parts.end(); iter != end; ++iter)
 			{
 				iter.second()->m_left /= img.getWidth(); 
 				iter.second()->m_right /= img.getWidth(); 

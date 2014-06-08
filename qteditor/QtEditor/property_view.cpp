@@ -16,6 +16,8 @@ static const char* component_map[] =
 	"Animable", "animable",
 	"Camera", "camera",
 	"Physics Box", "box_rigid_actor",
+	"Physics Controller", "physical_controller",
+	"Physics Mesh", "mesh_rigid_actor",
 	"Terrain", "terrain"
 };
 
@@ -93,6 +95,9 @@ void PropertyView::onEntitySelected(Lux::Event& event)
 		{
 			widget->addProperty("heightmap", "Heightmap", PropertyWidgetBase::Property::FILE, "TGA image (*.tga)");
 			widget->addProperty("material", "Material", PropertyWidgetBase::Property::FILE, "material (*.mat)");
+		}
+		else if (e.components[i] == crc32("physical_controller") || e.components[i] == crc32("mesh_rigid_actor"))
+		{
 		}
 		else
 		{

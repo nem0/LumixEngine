@@ -43,7 +43,6 @@ class LUX_ENGINE_API Renderer : public IPlugin
 		
 		/// "immediate mode"
 		virtual void renderModel(const Model& model, const Matrix& transform, PipelineInstance& pipeline) = 0;
-		virtual Model* getModel(const char* path) = 0; /// TODO get rid of this - use resource manager
 }; 
 
 

@@ -60,10 +60,10 @@ namespace Lux
 		}
 	};
 
-	typedef map<uint32_t, MemoryTracker::Entry*, MemTrackAllocator> map_alloc_order;
-	typedef map<FileLineReport, intptr_t, MemTrackAllocator> file_line_map;
-	typedef map<const char *, intptr_t, MemTrackAllocator> file_map;
-	typedef map<FileLineReport, uint32_t, MemTrackAllocator> alloc_count_map;
+	typedef Map<uint32_t, MemoryTracker::Entry*, MemTrackAllocator> map_alloc_order;
+	typedef Map<FileLineReport, intptr_t, MemTrackAllocator> file_line_map;
+	typedef Map<const char *, intptr_t, MemTrackAllocator> file_map;
+	typedef Map<FileLineReport, uint32_t, MemTrackAllocator> alloc_count_map;
 
 #pragma init_seg(compiler)
 	MemoryTracker MemoryTracker::s_instance;
