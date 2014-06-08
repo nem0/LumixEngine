@@ -57,5 +57,5 @@ win32
 {
     INCLUDEPATH = ../../src \
 	../../external/glew/include
-    LIBS = -L../../bin/Win32_Debug -lcore -lengine -lopengl32
+    LIBS = -L../../bin/Win32_Debug -lcore -lengine -lopengl32 -lphysics
 }

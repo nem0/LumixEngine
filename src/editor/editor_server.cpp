@@ -16,12 +16,8 @@
 #include "core/log.h"
 #include "core/map.h"
 #include "core/matrix.h"
-#include "core/MT/lock_free_queue.h"
-#include "core/MT/mutex.h"
-#include "core/MT/task.h"
-#include "core/Net/tcp_acceptor.h"
-#include "core/Net/tcp_stream.h"
 #include "core/profiler.h"
+#include "editor/editor_client.h"
 #include "editor/editor_icon.h"
 #include "editor/gizmo.h"
 #include "editor/property_descriptor.h"
@@ -34,9 +30,6 @@
 #include "graphics/renderer.h"
 #include "core/input_system.h"
 #include "core/MT/mutex.h"
-#include "core/MT/task.h"
-#include "core/net/tcp_acceptor.h"
-#include "core/net/tcp_stream.h"
 #include "script/script_system.h"
 #include "universe/component_event.h"
 #include "universe/entity_destroyed_event.h"
@@ -108,19 +101,6 @@ struct MouseButton
 };
 
 
-class MessageTask : public MT::Task
-{
-	public:
-		virtual int task() override;
-
-		struct EditorServerImpl* m_server;
-		Net::TCPAcceptor m_acceptor;
-		Net::TCPStream* m_stream;
-		bool m_is_finished;
-};
-
-
-
 struct EditorServerImpl
 {
 	public:
@@ -135,7 +115,7 @@ struct EditorServerImpl
 			};
 		};
 
-		EditorServerImpl();
+		EditorServerImpl(EditorClient& client, EditorServer& server);
 		~EditorServerImpl();
 
 		bool create(const char* base_path);
@@ -146,7 +126,7 @@ struct EditorServerImpl
 		void selectEntity(Entity e);
 		void navigate(float forward, float right, int fast);
 		void writeString(const char* str);
-		void setProperty(void* data, int size);
+		void setProperty(const void* data, int size);
 		void createUniverse(bool create_scene);
 		void renderIcons(IRenderDevice& render_device);
 		void renderScene(IRenderDevice& render_device);
@@ -158,7 +138,7 @@ struct EditorServerImpl
 		void sendComponent(uint32_t type_crc);
 		void removeComponent(uint32_t type_crc);
 		void sendEntityPosition(int uid);
-		void setEntityPosition(int uid, float* pos);
+		void setEntityPosition(int uid, const float* pos);
 		void addEntity();
 		void removeEntity();
 		void toggleGameMode();
@@ -170,8 +150,7 @@ struct EditorServerImpl
 		bool isGameMode() const { return m_is_game_mode; }
 		void save(FS::IFile& file, const char* path);
 		void load(FS::IFile& file, const char* path);
-		void onMessage(void* msgptr, int32_t size);
-		void processMessages();
+		void onMessage(const uint8_t* msgptr, int32_t size);
 		EditorIconHit raycastEditorIcons(const Vec3& origin, const Vec3& dir);
 
 		const IPropertyDescriptor& getPropertyDescriptor(uint32_t type, uint32_t name_hash);
@@ -187,7 +166,6 @@ struct EditorServerImpl
 		void sendMessage(const uint8_t* data, int32_t length);
 
 		MT::Mutex m_universe_mutex;
-		MT::Mutex m_send_mutex;
 		Gizmo m_gizmo;
 		Entity m_selected_entity;
 		Blob m_stream;
@@ -197,9 +175,8 @@ struct EditorServerImpl
 		Array<EditorIcon*> m_editor_icons;
 		bool m_is_game_mode;
 		FS::IFile* m_game_mode_file;
-		MessageTask* m_message_task;
 		Engine m_engine;
-		EditorServer* m_owner;
+		EditorServer& m_owner;
 		Entity m_camera;
 
 		FS::FileSystem* m_file_system;
@@ -209,8 +186,8 @@ struct EditorServerImpl
 		FS::TCPFileDevice m_tcp_file_device;
 		IRenderDevice* m_edit_view_render_device;
 		bool m_toggle_game_mode_requested;
-		
-		MT::LockFreeQueue<uint8_t, 32> m_message_queue;
+		EditorClient& m_client;
+	
 };
 
 
@@ -257,7 +234,6 @@ void EditorServer::registerCreator(uint32_t type, IPlugin& creator)
 
 void EditorServer::tick()
 {
-	m_impl->processMessages();
 	if(m_impl->m_toggle_game_mode_requested)
 	{
 		m_impl->toggleGameMode();
@@ -272,10 +248,9 @@ void EditorServer::tick()
 }
 
 
-bool EditorServer::create(const char* base_path)
+bool EditorServer::create(const char* base_path, EditorClient& client)
 {
-	m_impl = LUX_NEW(EditorServerImpl)();
-	m_impl->m_owner = this;
+	m_impl = LUX_NEW(EditorServerImpl)(client, *this);
 	
 	if(!m_impl->create(base_path))
 	{
@@ -296,6 +271,12 @@ void EditorServer::destroy()
 		LUX_DELETE(m_impl);
 		m_impl = NULL;
 	}
+}
+
+
+void EditorServer::onMessage(const uint8_t* data, int32_t size)
+{
+	m_impl->onMessage(data, size);
 }
 
 
@@ -453,30 +434,6 @@ void EditorServerImpl::addEntity()
 }
 
 
-int MessageTask::task()
-{
-	m_is_finished = false;
-	m_acceptor.start("127.0.0.1", 10013);
-	m_stream = m_acceptor.accept();
-	Array<uint8_t> data;
-	data.resize(5);
-	while(!m_is_finished)
-	{
-		if(m_stream->read(&data[0], 5))
-		{
-			int length = *(int*)&data[0];
-			if(length > 0)
-			{
-				data.resize(length);
-				m_stream->read(&data[0], length);
-				m_server->onMessage(&data[0], data.size());
-			}
-		}
-	}
-	return 1;
-}
-
-
 void EditorServerImpl::toggleGameMode()
 {
 	if(m_is_game_mode)
@@ -531,7 +488,7 @@ void EditorServerImpl::sendComponent(uint32_t type_crc)
 }
 
 
-void EditorServerImpl::setEntityPosition(int uid, float* pos)
+void EditorServerImpl::setEntityPosition(int uid, const float* pos)
 {
 	Entity e(m_engine.getUniverse(), uid);
 	e.setPosition(pos[0], pos[1], pos[2]);
@@ -679,12 +636,6 @@ void EditorServerImpl::load(FS::IFile& file, const char* path)
 
 bool EditorServerImpl::create(const char* base_path)
 {
-	m_message_task = LUX_NEW(MessageTask)();
-	m_message_task->m_server = this;
-	m_message_task->m_stream = NULL;
-	m_message_task->create("Message Task");
-	m_message_task->run();
-
 	m_file_system = FS::FileSystem::create();
 	m_tpc_file_server.start(base_path);
 
@@ -701,7 +652,7 @@ bool EditorServerImpl::create(const char* base_path)
 	g_log_warning.getCallback().bind<EditorServerImpl, &EditorServerImpl::onLogWarning>(this);
 	g_log_error.getCallback().bind<EditorServerImpl, &EditorServerImpl::onLogError>(this);
 
-	if(!m_engine.create(base_path, m_file_system, m_owner))
+	if(!m_engine.create(base_path, m_file_system, &m_owner))
 	{
 		return false;
 	}
@@ -754,10 +705,6 @@ void EditorServerImpl::destroy()
 	m_tcp_file_device.disconnect();
 	m_tpc_file_server.stop();
 	FS::FileSystem::destroy(m_file_system);
-	m_message_task->m_is_finished = true;
-	LUX_DELETE(m_message_task->m_stream);
-	m_message_task->destroy();
-	LUX_DELETE(m_message_task);
 }
 
 
@@ -781,14 +728,7 @@ void EditorServerImpl::onLogError(const char* system, const char* message)
 
 void EditorServerImpl::sendMessage(const uint8_t* data, int32_t length)
 {
-	if(m_message_task->m_stream)
-	{
-		MT::Lock lock(m_send_mutex);
-		const uint32_t guard = 0x12345678;
-		m_message_task->m_stream->write(length);
-		m_message_task->m_stream->write(guard);
-		m_message_task->m_stream->write(data, length);
-	}
+	m_client.onMessage(data, length);
 }
 
 
@@ -861,10 +801,11 @@ void EditorServerImpl::renderPhysics()
 }
 
 
-EditorServerImpl::EditorServerImpl()
+EditorServerImpl::EditorServerImpl(EditorClient& client, EditorServer& server)
 	: m_universe_mutex(false)
-	, m_send_mutex(false)
 	, m_toggle_game_mode_requested(false)
+	, m_client(client)
+	, m_owner(server)
 {
 	m_is_game_mode = false;
 	m_selected_entity = Entity::INVALID;
@@ -898,7 +839,7 @@ const IPropertyDescriptor& EditorServerImpl::getPropertyDescriptor(uint32_t type
 }
 
 
-void EditorServerImpl::setProperty(void* data, int size)
+void EditorServerImpl::setProperty(const void* data, int size)
 {
 	Blob stream;
 	stream.create(data, size);
@@ -1102,81 +1043,66 @@ void EditorServerImpl::createUniverse(bool create_basic_entities)
 }
 
 
-void EditorServerImpl::onMessage(void* msgptr, int32_t size)
+void EditorServerImpl::onMessage(const uint8_t* data, int32_t size)
 {
-	uint8_t* data = LUX_NEW_ARRAY(uint8_t, size + sizeof(size));
-	memcpy(data + sizeof(size),  msgptr, size);
-	*(int32_t*)data = size;
-	m_message_queue.push(data);
-}
-
-void EditorServerImpl::processMessages()
-{
-	uint8_t* data;
-	while ((data = m_message_queue.pop()) != NULL)
+	const int* msg = reinterpret_cast<const int*>(data);
+	const float* fmsg = reinterpret_cast<const float*>(data);
+	switch (msg[0])
 	{
-		void* msgptr = data + sizeof(int32_t);
-		int32_t size = *(int32_t*)data;
-		int* msg = reinterpret_cast<int*>(msgptr);
-		float* fmsg = reinterpret_cast<float*>(msgptr);
-		switch (msg[0])
-		{
-		case ClientMessageType::POINTER_DOWN:
-			onPointerDown(msg[1], msg[2], (MouseButton::Value)msg[3]);
-			break;
-		case ClientMessageType::POINTER_MOVE:
-			onPointerMove(msg[1], msg[2], msg[3], msg[4]);
-			break;
-		case ClientMessageType::POINTER_UP:
-			onPointerUp(msg[1], msg[2], (MouseButton::Value)msg[3]);
-			break;
-		case ClientMessageType::PROPERTY_SET:
-			setProperty(msg + 1, size - 4);
-			break;
-		case ClientMessageType::MOVE_CAMERA:
-			navigate(fmsg[1], fmsg[2], msg[3]);
-			break;
-		case ClientMessageType::SAVE:
-			save(reinterpret_cast<char*>(&msg[1]));
-			break;
-		case ClientMessageType::LOAD:
-			load(reinterpret_cast<char*>(&msg[1]));
-			break;
-		case ClientMessageType::ADD_COMPONENT:
-			addComponent(*reinterpret_cast<uint32_t*>(&msg[1]));
-			break;
-		case ClientMessageType::GET_PROPERTIES:
-			sendComponent(*reinterpret_cast<uint32_t*>(&msg[1]));
-			break;
-		case ClientMessageType::REMOVE_COMPONENT:
-			removeComponent(*reinterpret_cast<uint32_t*>(&msg[1]));
-			break;
-		case ClientMessageType::ADD_ENTITY:
-			addEntity();
-			break;
-		case ClientMessageType::TOGGLE_GAME_MODE:
-			m_toggle_game_mode_requested = true;
-			break;
-		case ClientMessageType::GET_POSITION:
-			sendEntityPosition(getSelectedEntity().index);
-			break;
-		case ClientMessageType::SET_POSITION:
-			setEntityPosition(msg[1], reinterpret_cast<float*>(&msg[2]));
-			break;
-		case ClientMessageType::REMOVE_ENTITY:
-			removeEntity();
-			break;
-		case ClientMessageType::LOOK_AT_SELECTED:
-			lookAtSelected();
-			break;
-		case ClientMessageType::NEW_UNIVERSE:
-			newUniverse();
-			break;
-		default:
-			ASSERT(false); // unknown message
-			break;
-		}
-		LUX_DELETE_ARRAY(data);
+	case ClientMessageType::POINTER_DOWN:
+		onPointerDown(msg[1], msg[2], (MouseButton::Value)msg[3]);
+		break;
+	case ClientMessageType::POINTER_MOVE:
+		onPointerMove(msg[1], msg[2], msg[3], msg[4]);
+		break;
+	case ClientMessageType::POINTER_UP:
+		onPointerUp(msg[1], msg[2], (MouseButton::Value)msg[3]);
+		break;
+	case ClientMessageType::PROPERTY_SET:
+		setProperty(msg + 1, size - 4);
+		break;
+	case ClientMessageType::MOVE_CAMERA:
+		navigate(fmsg[1], fmsg[2], msg[3]);
+		break;
+	case ClientMessageType::SAVE:
+		save(reinterpret_cast<const char*>(&msg[1]));
+		break;
+	case ClientMessageType::LOAD:
+		load(reinterpret_cast<const char*>(&msg[1]));
+		break;
+	case ClientMessageType::ADD_COMPONENT:
+		addComponent(*reinterpret_cast<const uint32_t*>(&msg[1]));
+		break;
+	case ClientMessageType::GET_PROPERTIES:
+		sendComponent(*reinterpret_cast<const uint32_t*>(&msg[1]));
+		break;
+	case ClientMessageType::REMOVE_COMPONENT:
+		removeComponent(*reinterpret_cast<const uint32_t*>(&msg[1]));
+		break;
+	case ClientMessageType::ADD_ENTITY:
+		addEntity();
+		break;
+	case ClientMessageType::TOGGLE_GAME_MODE:
+		m_toggle_game_mode_requested = true;
+		break;
+	case ClientMessageType::GET_POSITION:
+		sendEntityPosition(getSelectedEntity().index);
+		break;
+	case ClientMessageType::SET_POSITION:
+		setEntityPosition(msg[1], reinterpret_cast<const float*>(&msg[2]));
+		break;
+	case ClientMessageType::REMOVE_ENTITY:
+		removeEntity();
+		break;
+	case ClientMessageType::LOOK_AT_SELECTED:
+		lookAtSelected();
+		break;
+	case ClientMessageType::NEW_UNIVERSE:
+		newUniverse();
+		break;
+	default:
+		ASSERT(false); // unknown message
+		break;
 	}
 }
 
