@@ -49,9 +49,9 @@ class Terrain
 
 		PhysicsSceneImpl* m_scene;
 		FS::ReadCallback m_heightmap_callback;
-		Component m_component;
 		Path m_heightmap_path;
-		int m_actor_index;
+		Entity m_entity;
+		physx::PxRigidActor* m_actor;
 };
 
 
@@ -264,17 +264,17 @@ void PhysicsSceneImpl::heightmapLoaded(Terrain* terrain, FS::IFile* file, bool s
 		physx::PxHeightField* heightfield = m_system->m_impl->m_physics->createHeightField(hfDesc);
 		physx::PxHeightFieldGeometry hfGeom(heightfield, physx::PxMeshGeometryFlags(), 0.1f, 1.0f, 1.0f);
 		
-		if (m_actors[m_terrains[terrain->m_component.index]->m_actor_index])
+		if (terrain->m_actor)
 		{
-			physx::PxRigidActor* actor =  m_actors[m_terrains[terrain->m_component.index]->m_actor_index];
+			physx::PxRigidActor* actor = terrain->m_actor;
 			m_scene->removeActor(*actor);
 			actor->release();
-			m_actors[m_terrains[terrain->m_component.index]->m_actor_index] = NULL;
+			terrain->m_actor = NULL;
 		}
 
 		physx::PxTransform transform;
 		Matrix mtx;
-		terrain->m_component.entity.getMatrix(mtx);
+		terrain->m_entity.getMatrix(mtx);
 		matrix2Transform(mtx, transform);
 
 		physx::PxRigidActor* actor;
@@ -282,10 +282,9 @@ void PhysicsSceneImpl::heightmapLoaded(Terrain* terrain, FS::IFile* file, bool s
 		if (actor)
 		{
 			actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
-			actor->userData = (void*)terrain->m_component.entity.index;
+			actor->userData = (void*)terrain->m_entity.index;
 			m_scene->addActor(*actor);
-			m_actors[m_terrains[terrain->m_component.index]->m_actor_index] = actor;
-			m_shape_sources[m_terrains[terrain->m_component.index]->m_actor_index] = terrain->m_heightmap_path.c_str();
+			terrain->m_actor = actor;
 		}
 		else
 		{
@@ -326,37 +325,15 @@ void PhysicsScene::destroyActor(Component cmp)
 
 Component PhysicsScene::createHeightfield(Entity entity)
 {
-	int new_index = m_impl->m_entities.size();
-	for (int i = 0; i < m_impl->m_index_map.size(); ++i)
-	{
-		if (m_impl->m_index_map[i] == -1)
-		{
-			new_index = i;
-			break;
-		}
-	}
-	if (new_index == m_impl->m_entities.size())
-	{
-		m_impl->m_actors.push(NULL);
-		m_impl->m_shape_sources.push(string(""));
-		m_impl->m_is_dynamic.push(false);
-		m_impl->m_entities.push(entity);
-	}
-	else
-	{
-		m_impl->m_actors[new_index] = NULL;
-		m_impl->m_shape_sources[new_index] = "";
-		m_impl->m_is_dynamic[new_index] = false;
-		m_impl->m_entities[new_index] = entity;
-	}
-
-	Component cmp(entity, HEIGHTFIELD_HASH, this, m_impl->m_terrains.size());
 	Terrain* terrain = LUX_NEW(Terrain);
 	m_impl->m_terrains.push(terrain);
-	terrain->m_component = cmp;
+
+	Component cmp(entity, HEIGHTFIELD_HASH, this, m_impl->m_terrains.size());
+	m_impl->m_terrains.push(terrain);
 	terrain->m_heightmap_callback.bind<Terrain, &Terrain::heightmapLoaded>(terrain);
 	terrain->m_scene = m_impl;
-	terrain->m_actor_index = new_index;
+	terrain->m_actor = NULL;
+	terrain->m_entity = entity;
 
 	m_impl->m_universe->getEventManager().emitEvent(ComponentEvent(cmp));
 	return cmp;
@@ -471,7 +448,7 @@ Component PhysicsScene::createMeshRigidActor(Entity entity)
 
 void PhysicsScene::getHeightmap(Component cmp, string& str)
 {
-	str = m_impl->m_shape_sources[cmp.index];
+	str = m_impl->m_terrains[cmp.index]->m_heightmap_path.c_str();
 }
 
 
@@ -890,7 +867,14 @@ void PhysicsScene::serialize(ISerializer& serializer)
 		serializer.serializeArrayItem(m_impl->m_controllers[i].m_entity.index);
 	}
 	serializer.endArray();
-}
+	serializer.serialize("count", m_impl->m_terrains.size());
+	serializer.beginArray("terrains");
+	for (int i = 0; i < m_impl->m_terrains.size(); ++i)
+	{
+		serializer.serializeArrayItem(m_impl->m_terrains[i]->m_entity.index);
+		serializer.serializeArrayItem(m_impl->m_terrains[i]->m_heightmap_path.c_str());
+	}
+	serializer.endArray();}
 
 
 void PhysicsScene::deserialize(ISerializer& serializer)
@@ -910,6 +894,7 @@ void PhysicsScene::deserialize(ISerializer& serializer)
 		m_impl->m_entities[i].universe = m_impl->m_universe;
 		m_impl->deserializeActor(serializer, i);
 	}
+
 	serializer.deserialize("count", count);
 	m_impl->m_controllers.clear();
 	serializer.deserializeArrayBegin("controllers");
@@ -921,6 +906,25 @@ void PhysicsScene::deserialize(ISerializer& serializer)
 		createController(e);
 		m_impl->setControllerPosition(i, e.getPosition());
 	}		
+	serializer.deserializeArrayEnd();
+
+	serializer.deserialize("count", count);
+	for (int i = 0; i < m_impl->m_terrains.size(); ++i)
+	{
+		LUX_DELETE(m_impl->m_terrains[i]);
+	}
+	m_impl->m_terrains.clear();
+	serializer.deserializeArrayBegin("terrains");
+	for (int i = 0; i < count; ++i)
+	{
+		int index;
+		serializer.deserializeArrayItem(index);
+		Entity e(m_impl->m_universe, index);
+		createHeightfield(e);
+		char tmp[LUX_MAX_PATH];
+		serializer.deserializeArrayItem(tmp, LUX_MAX_PATH);
+		setHeightmap(Component(e, HEIGHTFIELD_HASH, this, i), string(tmp));
+	}
 	serializer.deserializeArrayEnd();
 }
 
