@@ -69,7 +69,6 @@ void PropertyView::onEntitySelected(Lux::Event& event)
 	//m_selected_entity = e.index;
 	for (int i = 0; i < e.components.size(); ++i)
 	{
-		m_client->requestProperties(e.components[i]);
 		PropertyWidgetBase* widget = NULL;
 		for(int j = 0; j < sizeof(component_map) / sizeof(component_map[0]); j += 2)
 		{
@@ -122,6 +121,7 @@ void PropertyView::onEntitySelected(Lux::Event& event)
 		widget->setEditorClient(*m_client);
 		m_ui->components->addItem(widget, widget->getTitle());
 		m_component_uis.push(widget);
+		m_client->requestProperties(e.components[i]);
 	}
 }
 
