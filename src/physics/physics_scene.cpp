@@ -45,40 +45,13 @@ namespace Lux
 class Terrain
 {
 	public:
-		void heightmapLoaded(FS::IFile* file, bool success, FS::FileSystem& filesystem)
-		{
-			if (success)
-			{
-				TGAHeader header;
-				file->read(&header, sizeof(header));
-				/// TODO 
-				int color_mode = header.bitsPerPixel / 8;
-				//m_width = header.width;
-				//m_height = header.height;
-				//m_heights.resize(m_width * m_height);
-				for (int j = 0; j < header.height; ++j)
-				{
-					for (int i = 0; i < header.width; ++i)
-					{
-						uint8_t data[4];
-						file->read(data, sizeof(data[0]) * 3);
-						if (color_mode == 4)
-							file->read(data + 3, sizeof(data[3]));
-						//m_heights[i + j * m_width] = data[0];
-					}
-				}
-				ASSERT(false); // TODO
-			}
-			else
-			{
-				g_log_error.log("physics", "Error loading heightmap %s", m_heightmap_path.c_str());
-			}
-			filesystem.close(file);
-		}
+		void heightmapLoaded(FS::IFile* file, bool success, FS::FileSystem& filesystem);
 
+		PhysicsSceneImpl* m_scene;
 		FS::ReadCallback m_heightmap_callback;
 		Component m_component;
 		Path m_heightmap_path;
+		int m_actor_index;
 };
 
 
@@ -96,6 +69,7 @@ struct PhysicsSceneImpl
 	void setControllerPosition(int index, const Vec3& pos);
 	void serializeActor(ISerializer& serializer, int idx);
 	void deserializeActor(ISerializer& serializer, int idx);
+	void heightmapLoaded(Terrain* terrain, FS::IFile* file, bool success, FS::FileSystem& filesystem);
 
 	struct Controller
 	{
@@ -256,6 +230,74 @@ void matrix2Transform(const Matrix& mtx, physx::PxTransform& transform)
 }
 
 
+void PhysicsSceneImpl::heightmapLoaded(Terrain* terrain, FS::IFile* file, bool success, FS::FileSystem& filesystem)
+{
+	if (success)
+	{
+		TGAHeader header;
+		file->read(&header, sizeof(header));
+		/// TODO 
+		int color_mode = header.bitsPerPixel / 8;
+		Array<physx::PxHeightFieldSample> heights;
+		heights.resize(header.width * header.height);
+		for (int j = 0; j < header.height; ++j)
+		{
+			for (int i = 0; i < header.width; ++i)
+			{
+				uint8_t data[4];
+				file->read(data, sizeof(data[0]) * 3);
+				if (color_mode == 4)
+					file->read(data + 3, sizeof(data[3]));
+				heights[j + i * header.width].height = data[0] - 255;
+			}
+		}
+
+		physx::PxHeightFieldDesc hfDesc;
+		hfDesc.format = physx::PxHeightFieldFormat::eS16_TM;
+		hfDesc.nbColumns = header.width;
+		hfDesc.nbRows = header.height;
+		hfDesc.samples.data = &heights[0];
+		hfDesc.samples.stride = sizeof(physx::PxHeightFieldSample);
+
+		physx::PxHeightField* heightfield = m_system->m_impl->m_physics->createHeightField(hfDesc);
+		physx::PxHeightFieldGeometry hfGeom(heightfield, physx::PxMeshGeometryFlags(), 0.1f, 1.0f, 1.0f);
+		
+		if (m_actors[m_terrains[terrain->m_component.index]->m_actor_index])
+		{
+			physx::PxRigidActor* actor =  m_actors[m_terrains[terrain->m_component.index]->m_actor_index];
+			m_scene->removeActor(*actor);
+			actor->release();
+			m_actors[m_terrains[terrain->m_component.index]->m_actor_index] = NULL;
+		}
+
+		physx::PxTransform transform;
+		Matrix mtx;
+		terrain->m_component.entity.getMatrix(mtx);
+		matrix2Transform(mtx, transform);
+
+		physx::PxRigidActor* actor;
+		actor = PxCreateStatic(*m_system->m_impl->m_physics, transform, hfGeom, *m_default_material);
+		if (actor)
+		{
+			actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
+			actor->userData = (void*)terrain->m_component.entity.index;
+			m_scene->addActor(*actor);
+			m_actors[m_terrains[terrain->m_component.index]->m_actor_index] = actor;
+			m_shape_sources[m_terrains[terrain->m_component.index]->m_actor_index] = terrain->m_heightmap_path.c_str();
+		}
+		else
+		{
+			g_log_error.log("PhysX", "Could not create PhysX heightfield %s", terrain->m_heightmap_path.c_str());
+		}
+	}
+	else
+	{
+		g_log_error.log("physics", "Error loading heightmap %s", terrain->m_heightmap_path.c_str());
+	}
+	filesystem.close(file);
+}
+
+
 void PhysicsScene::destroyActor(Component cmp)
 {
 	ASSERT(cmp.type == BOX_ACTOR_HASH);
@@ -306,11 +348,13 @@ Component PhysicsScene::createHeightfield(Entity entity)
 		m_impl->m_entities[new_index] = entity;
 	}
 
-	Component cmp(entity, HEIGHTFIELD_HASH, this, m_impl->m_actors.size() - 1);
+	Component cmp(entity, HEIGHTFIELD_HASH, this, m_impl->m_terrains.size());
 	Terrain* terrain = LUX_NEW(Terrain);
 	m_impl->m_terrains.push(terrain);
 	terrain->m_component = cmp;
 	terrain->m_heightmap_callback.bind<Terrain, &Terrain::heightmapLoaded>(terrain);
+	terrain->m_scene = m_impl;
+	terrain->m_actor_index = new_index;
 
 	m_impl->m_universe->getEventManager().emitEvent(ComponentEvent(cmp));
 	return cmp;
@@ -490,6 +534,7 @@ void PhysicsScene::setShapeSource(Component cmp, const string& str)
 
 void PhysicsSceneImpl::createTriMesh(const char* path, physx::PxTriangleMeshGeometry& geom)
 {
+	/// TODO
 	FILE* fp;
 	fopen_s(&fp, path, "rb");
 	if(fp)
@@ -881,6 +926,13 @@ PhysicsSystem& PhysicsScene::getSystem() const
 {
 	return *m_impl->m_system;
 }
+
+
+void Terrain::heightmapLoaded(FS::IFile* file, bool success, FS::FileSystem& filesystem)
+{
+	m_scene->heightmapLoaded(this, file, success, filesystem);
+}
+
 
 
 } // !namespace Lux

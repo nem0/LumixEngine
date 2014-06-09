@@ -168,8 +168,8 @@ class Array<T, Allocator, false>
 			}
 		}
 
-		const T& operator[] (int index) const { ASSERT(index < m_size); return m_data[index]; }
-		T& operator[](int index) { return m_data[index]; }
+		const T& operator[] (int index) const { ASSERT(index >= 0 && index < m_size); return m_data[index]; }
+		T& operator[](int index) { ASSERT(index >= 0 && index < m_size);  return m_data[index]; }
  		int size() const { return m_size; }
 		int capacity() const { return m_capacity; }
 
