@@ -147,6 +147,7 @@ namespace Lux
 		Mesh* m_mesh;
 		Matrix m_matrix;
 		Entity m_entity;
+		int64_t m_layer_mask;
 	};
 
 	struct Renderable
@@ -414,6 +415,7 @@ namespace Lux
 					terrain->m_heightmap_callback.bind<Terrain, &Terrain::heightmapLoaded>(terrain);
 					terrain->m_matrix = entity.getMatrix();
 					terrain->m_entity = entity;
+					terrain->m_layer_mask = 1;
 					Component cmp(entity, type, this, m_terrains.size() - 1);
 					ComponentEvent evt(cmp);
 					m_universe.getEventManager().emitEvent(evt);
@@ -577,7 +579,8 @@ namespace Lux
 				}
 				for (int i = 0; i < m_terrains.size(); ++i)
 				{
-					if (m_terrains[0]->m_mesh && m_terrains[0]->m_mesh->getMaterial() && m_terrains[0]->m_mesh->getMaterial()->isReady())
+					bool is_in_wanted_layer = (m_terrains[i]->m_layer_mask & layer_mask) != 0;
+					if (m_terrains[i]->m_mesh && m_terrains[i]->m_mesh->getMaterial() && m_terrains[i]->m_mesh->getMaterial()->isReady() && is_in_wanted_layer)
 					{
 						RenderableInfo& info = infos.pushEmpty();
 						info.m_scale = 1;

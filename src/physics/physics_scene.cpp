@@ -247,7 +247,9 @@ void PhysicsSceneImpl::heightmapLoaded(Terrain* terrain, FS::IFile* file, bool s
 				uint8_t data[4];
 				file->read(data, sizeof(data[0]) * 3);
 				if (color_mode == 4)
+				{
 					file->read(data + 3, sizeof(data[3]));
+				}
 				heights[j + i * header.width].height = data[0] - 255;
 			}
 		}
@@ -804,7 +806,8 @@ void PhysicsSceneImpl::serializeActor(ISerializer& serializer, int idx)
 	if(m_actors[idx]->getNbShapes() == 1 && m_actors[idx]->getShapes(&shapes, 1))
 	{
 		physx::PxBoxGeometry geom;
-		if(shapes->getBoxGeometry(geom))
+		physx::PxHeightFieldGeometry hf_geom;
+		if (shapes->getBoxGeometry(geom))
 		{
 			serializer.serialize("type", (int32_t)BOX);
 			serializer.serialize("x", geom.halfExtents.x);
