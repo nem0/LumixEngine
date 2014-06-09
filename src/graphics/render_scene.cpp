@@ -325,11 +325,26 @@ namespace Lux
 				serializer.endArray();
 			}
 
+			void serializeTerrains(ISerializer& serializer)
+			{
+				serializer.serialize("terrain_count", m_terrains.size());
+				serializer.beginArray("terrains");
+				for (int i = 0; i < m_terrains.size(); ++i)
+				{
+					serializer.serializeArrayItem(m_terrains[i]->m_entity.index);
+					serializer.serializeArrayItem(m_terrains[i]->m_layer_mask);
+					serializer.serializeArrayItem(m_terrains[i]->m_heightmap_path.c_str());
+					serializer.serializeArrayItem(m_terrains[i]->m_material->getPath().c_str());
+				}
+				serializer.endArray();
+			}
+
 			virtual void serialize(ISerializer& serializer) override
 			{
 				serializeCameras(serializer);
 				serializeRenderables(serializer);
 				serializeLights(serializer);
+				serializeTerrains(serializer);
 			}
 
 			void deserializeCameras(ISerializer& serializer)
@@ -397,11 +412,36 @@ namespace Lux
 				serializer.deserializeArrayEnd();
 			}
 
+			void deserializeTerrains(ISerializer& serializer)
+			{
+				int32_t size;
+				serializer.deserialize("terrain_count", size);
+				serializer.deserializeArrayBegin("terrains");
+				for (int i = 0; i < size; ++i)
+				{
+					Entity e;
+					serializer.deserializeArrayItem(e.index);
+					e.universe = &m_universe;
+					Component cmp = createComponent(TERRAIN_HASH, e);
+					Terrain* terrain = m_terrains[cmp.index];
+					serializer.deserializeArrayItem(terrain->m_layer_mask);
+					char path[LUX_MAX_PATH];
+					serializer.deserializeArrayItem(path, LUX_MAX_PATH);
+					setTerrainHeightmap(cmp, string(path));
+					serializer.deserializeArrayItem(path, LUX_MAX_PATH);
+					setTerrainMaterial(cmp, string(path));
+					ComponentEvent evt(cmp);
+					m_universe.getEventManager().emitEvent(evt);
+				}
+				serializer.deserializeArrayEnd();
+			}
+
 			virtual void deserialize(ISerializer& serializer) override
 			{
 				deserializeCameras(serializer);
 				deserializeRenderables(serializer);
 				deserializeLights(serializer);
+				deserializeTerrains(serializer);
 			}
 
 			virtual Component createComponent(uint32_t type, const Entity& entity) override

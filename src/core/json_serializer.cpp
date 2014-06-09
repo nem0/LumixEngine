@@ -158,6 +158,16 @@ void JsonSerializer::serializeArrayItem(int value)
 }
 
 
+void JsonSerializer::serializeArrayItem(int64_t& value)
+{
+	writeBlockComma();
+	char tmp[30];
+	sprintf(tmp, "%" PRIi64, value);
+	m_file.write(tmp, (int32_t)strlen(tmp));
+	m_is_first_in_block = false;
+}
+
+
 void JsonSerializer::serializeArrayItem(float value)
 {
 	writeBlockComma();
