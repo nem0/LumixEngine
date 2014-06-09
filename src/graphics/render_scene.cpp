@@ -83,7 +83,7 @@ namespace Lux
 				for (int i = 0; i < m_width; ++i)
 				{
 					int idx = i + j * m_width;
-					points[idx].pos.set((float)(i - (m_width >> 1)), m_heights[idx] / 10.0f - 255 / 10.0f, (float)(j - (m_height >> 1)));
+					points[idx].pos.set((float)(i ), m_heights[idx] / 10.0f - 255 / 10.0f, (float)(j ));
 					points[idx].u = i / (float)m_width;
 					points[idx].v = j / (float)m_height;
 					points[idx].normal.set(0, 1, 0);
