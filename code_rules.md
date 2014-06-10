@@ -1,16 +1,15 @@
-General Rules
-	- any block of code should not be longer than one page (about 40 lines), except namespaces and classes
-
+# General Rules
+* any block of code should not be longer than one page (about 40 lines), except namespaces and classes
 --------------------------------------------
 1. Macros
-1.1. use pragma once
-	- it's shorter
+  1. use pragma once
+    * it's shorter
 
-1.2. #if #ifdef blocks only a few lines long
-	- readability 
+  2. #if #ifdef blocks only a few lines long
+    * readability 
 	
 	wrong:
-
+```
 	#ifdef _XBOX_ONE
 		int size_limit = 10;
 		// multiple
@@ -53,12 +52,13 @@ General Rules
 	#elif defined WIN32
 		size_limit = 50;
 	#endif
+```
 
-1.3. sort includes, use following rules (most important to least):
-	* in .cpp, corresponding header is first	
-	* first #include <>, then #include "" 
-	* alphabetically
-	- It can be immediately seen, if some header is included twice
+  3. sort includes, use following rules (most important to least):
+    * in .cpp, corresponding header is first	
+    * first #include <>, then #include "" 
+    * alphabetically
+      - It can be immediately seen, if some header is included twice
 
 1.3. no other macros allowed
 	- instead use inline functions, constant variables, ...
