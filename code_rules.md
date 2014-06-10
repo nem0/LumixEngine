@@ -5,7 +5,7 @@ General Rules
 
 ---
 
-1. Macros
+#### Macros
   1. use pragma once
     * it's shorter
 
@@ -70,7 +70,7 @@ General Rules
 
 ---
 
-2. Comments
+#### Comments
   1. less is more 
     - code should be readable enough
 	
@@ -120,7 +120,7 @@ General Rules
 
 ---
 
-3. General formatting
+#### General formatting
 	most of the stuff listed here is just a personal preference, but it should be formatted consistently across the source code
   1. use tabs to indent
   2. spaces after comma
@@ -179,13 +179,13 @@ General Rules
 
 ---
 
-4. Namespaces
+#### Namespaces
   1. everything in Lux namespace
   2. there can be subnamespaces in Lux, e.g. Lux::Math
 
 ---
 
-5. Files
+#### Files
   1. *.cpp, *.h
   2. lower case, use underscore
 	render_scene.h
@@ -195,7 +195,7 @@ General Rules
      - file math/plane.h should be in a filter "math" in Visual Studio
 
 ---
-6. Variables
+#### Variables
   1. local variables, including function arguments
 ```
 	void foo(int size, char* data)
@@ -222,7 +222,7 @@ General Rules
 
 ---
 
-7. Functions
+#### Functions
   1. camel case - The first letter of an identifier is lowercase and the first letter of each subsequent concatenated 	word is capitalized
 ```
 	int getSize();
@@ -269,7 +269,7 @@ General Rules
 
 ---
 
-8. Classes
+#### Classes
   1. use forward declaration instead of include when possible
 	- improves compile time
   2. order: public, protected, private
@@ -284,7 +284,7 @@ General Rules
 
 ---
 
-9. Templates
+#### Templates
   1. no template metaprogramming
 	- can be hard to read
 	- quite offten it abuses templates to do things, they are not supposed to do
@@ -295,7 +295,7 @@ General Rules
 
 ---
 
-10. C++11
+#### C++11
   1. C++11 features are allowed
 	- as long as it's supported on all platforms
 
@@ -338,6 +338,6 @@ General Rules
 
 ---
 
-#### \1. Others
+#### Others
   1. Asserts should not be triggered by data
   2. Data can not cause crash 
