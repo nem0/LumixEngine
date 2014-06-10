@@ -2,7 +2,6 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <cstdio>
-#include <gl/gl.h>
 #include <PxPhysicsAPI.h>
 #include "cooking/PxCooking.h"
 #include "core/crc32.h"
@@ -13,8 +12,11 @@
 #include "core/log.h"
 #include "core/matrix.h"
 #include "core/path.h"
+#include "core/resource_manager.h"
+#include "core/resource_manager_base.h"
 #include "engine/engine.h"
 #include "graphics/render_scene.h"
+#include "graphics/texture.h"
 #include "universe/component_event.h"
 #include "universe/entity_moved_event.h"
 #include "physics/physics_system.h"
@@ -24,34 +26,18 @@
 namespace Lux
 {
 
-#pragma pack(1) 
-	struct TGAHeader
-	{
-		char  idLength;
-		char  colourMapType;
-		char  dataType;
-		short int colourMapOrigin;
-		short int colourMapLength;
-		char  colourMapDepth;
-		short int xOrigin;
-		short int yOrigin;
-		short int width;
-		short int height;
-		char  bitsPerPixel;
-		char  imageDescriptor;
-	};
-#pragma pack()
 
 class Terrain
 {
 	public:
-		void heightmapLoaded(FS::IFile* file, bool success, FS::FileSystem& filesystem);
+		Terrain();
+		~Terrain();
+		void heightmapLoaded(Resource::State, Resource::State new_state);
 
 		PhysicsSceneImpl* m_scene;
-		FS::ReadCallback m_heightmap_callback;
-		Path m_heightmap_path;
 		Entity m_entity;
 		physx::PxRigidActor* m_actor;
+		Texture* m_heightmap;
 };
 
 
@@ -69,7 +55,7 @@ struct PhysicsSceneImpl
 	void setControllerPosition(int index, const Vec3& pos);
 	void serializeActor(ISerializer& serializer, int idx);
 	void deserializeActor(ISerializer& serializer, int idx);
-	void heightmapLoaded(Terrain* terrain, FS::IFile* file, bool success, FS::FileSystem& filesystem);
+	void heightmapLoaded(Terrain* terrain);
 
 	struct Controller
 	{
@@ -230,34 +216,29 @@ void matrix2Transform(const Matrix& mtx, physx::PxTransform& transform)
 }
 
 
-void PhysicsSceneImpl::heightmapLoaded(Terrain* terrain, FS::IFile* file, bool success, FS::FileSystem& filesystem)
+void PhysicsSceneImpl::heightmapLoaded(Terrain* terrain)
 {
-	if (success)
-	{
-		TGAHeader header;
-		file->read(&header, sizeof(header));
-		/// TODO 
-		int color_mode = header.bitsPerPixel / 8;
 		Array<physx::PxHeightFieldSample> heights;
-		heights.resize(header.width * header.height);
-		for (int j = 0; j < header.height; ++j)
+		
+		int width = terrain->m_heightmap->getWidth();
+		int height = terrain->m_heightmap->getHeight();
+		const uint8_t* data = terrain->m_heightmap->getData();
+		heights.resize(width * height);
+		int bytes_per_pixel = terrain->m_heightmap->getBytesPerPixel();
+		for (int j = 0; j < height; ++j)
 		{
-			for (int i = 0; i < header.width; ++i)
+			for (int i = 0; i < width; ++i)
 			{
-				uint8_t data[4];
-				file->read(data, sizeof(data[0]) * 3);
-				if (color_mode == 4)
-				{
-					file->read(data + 3, sizeof(data[3]));
-				}
-				heights[j + i * header.width].height = data[0] - 255;
+				int idx = i + j * width;
+				int idx2 = j + i * height;
+				heights[idx].height = data[idx2 * bytes_per_pixel] - 255;
 			}
 		}
 
 		physx::PxHeightFieldDesc hfDesc;
 		hfDesc.format = physx::PxHeightFieldFormat::eS16_TM;
-		hfDesc.nbColumns = header.width;
-		hfDesc.nbRows = header.height;
+		hfDesc.nbColumns = width;
+		hfDesc.nbRows = height;
 		hfDesc.samples.data = &heights[0];
 		hfDesc.samples.stride = sizeof(physx::PxHeightFieldSample);
 
@@ -288,14 +269,8 @@ void PhysicsSceneImpl::heightmapLoaded(Terrain* terrain, FS::IFile* file, bool s
 		}
 		else
 		{
-			g_log_error.log("PhysX", "Could not create PhysX heightfield %s", terrain->m_heightmap_path.c_str());
+			g_log_error.log("PhysX", "Could not create PhysX heightfield %s", terrain->m_heightmap->getPath().c_str());
 		}
-	}
-	else
-	{
-		g_log_error.log("physics", "Error loading heightmap %s", terrain->m_heightmap_path.c_str());
-	}
-	filesystem.close(file);
 }
 
 
@@ -330,7 +305,7 @@ Component PhysicsScene::createHeightfield(Entity entity)
 
 	Component cmp(entity, HEIGHTFIELD_HASH, this, m_impl->m_terrains.size());
 	m_impl->m_terrains.push(terrain);
-	terrain->m_heightmap_callback.bind<Terrain, &Terrain::heightmapLoaded>(terrain);
+	terrain->m_heightmap = NULL;
 	terrain->m_scene = m_impl;
 	terrain->m_actor = NULL;
 	terrain->m_entity = entity;
@@ -448,14 +423,24 @@ Component PhysicsScene::createMeshRigidActor(Entity entity)
 
 void PhysicsScene::getHeightmap(Component cmp, string& str)
 {
-	str = m_impl->m_terrains[cmp.index]->m_heightmap_path.c_str();
+	str = m_impl->m_terrains[cmp.index]->m_heightmap ? m_impl->m_terrains[cmp.index]->m_heightmap->getPath().c_str() : "";
 }
 
 
 void PhysicsScene::setHeightmap(Component cmp, const string& str)
 {
-	m_impl->m_terrains[cmp.index]->m_heightmap_path = str;
-	m_impl->m_engine->getFileSystem().openAsync(m_impl->m_engine->getFileSystem().getDefaultDevice(), str.c_str(), FS::Mode::OPEN | FS::Mode::READ, m_impl->m_terrains[cmp.index]->m_heightmap_callback);
+	if (m_impl->m_terrains[cmp.index]->m_heightmap)
+	{
+		m_impl->m_engine->getResourceManager().get(ResourceManager::TEXTURE)->unload(*m_impl->m_terrains[cmp.index]->m_heightmap);
+		m_impl->m_terrains[cmp.index]->m_heightmap->getObserverCb().unbind<Terrain, &Terrain::heightmapLoaded>(m_impl->m_terrains[cmp.index]);
+	}
+	m_impl->m_terrains[cmp.index]->m_heightmap = static_cast<Texture*>(m_impl->m_engine->getResourceManager().get(ResourceManager::TEXTURE)->load(str.c_str()));
+	m_impl->m_terrains[cmp.index]->m_heightmap->getObserverCb().bind<Terrain, &Terrain::heightmapLoaded>(m_impl->m_terrains[cmp.index]);
+	m_impl->m_terrains[cmp.index]->m_heightmap->setNonGL(true);
+	if (m_impl->m_terrains[cmp.index]->m_heightmap->isReady())
+	{
+		m_impl->m_terrains[cmp.index]->heightmapLoaded(Resource::State::LOADING, Resource::State::READY);
+	}
 }
 
 
@@ -872,7 +857,7 @@ void PhysicsScene::serialize(ISerializer& serializer)
 	for (int i = 0; i < m_impl->m_terrains.size(); ++i)
 	{
 		serializer.serializeArrayItem(m_impl->m_terrains[i]->m_entity.index);
-		serializer.serializeArrayItem(m_impl->m_terrains[i]->m_heightmap_path.c_str());
+		serializer.serializeArrayItem(m_impl->m_terrains[i]->m_heightmap->getPath().c_str());
 	}
 	serializer.endArray();}
 
@@ -935,9 +920,28 @@ PhysicsSystem& PhysicsScene::getSystem() const
 }
 
 
-void Terrain::heightmapLoaded(FS::IFile* file, bool success, FS::FileSystem& filesystem)
+Terrain::Terrain()
 {
-	m_scene->heightmapLoaded(this, file, success, filesystem);
+	m_heightmap = NULL;
+}
+
+
+Terrain::~Terrain()
+{
+	if (m_heightmap)
+	{
+		m_heightmap->getResourceManager().get(ResourceManager::TEXTURE)->unload(*m_heightmap);
+		m_heightmap->getObserverCb().unbind<Terrain, &Terrain::heightmapLoaded>(this);
+	}
+}
+
+
+void Terrain::heightmapLoaded(Resource::State, Resource::State new_state)
+{
+	if (new_state == Resource::State::READY)
+	{
+		m_scene->heightmapLoaded(this);
+	}
 }
 
 

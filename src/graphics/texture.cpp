@@ -402,6 +402,7 @@ struct TGAHeader
 
 Texture::Texture(const Path& path, ResourceManager& resource_manager)
 	: Resource(path, resource_manager)
+	, m_is_nonGL(false)
 {
 	glGenTextures(1, &m_id);
 }
@@ -437,7 +438,6 @@ bool Texture::loadTGA(FS::IFile& file)
 
 	int color_mode = header.bitsPerPixel / 8;
 	int image_size = header.width * header.height * 4;
-
 	if (header.dataType != 2)
 	{
 		g_log_error.log("renderer", "Unsupported texture format %s", m_path.c_str());
@@ -450,8 +450,14 @@ bool Texture::loadTGA(FS::IFile& file)
 		return false;
 	}
 
+	m_width = header.width;
+	m_height = header.height;
 	TextureManager* manager = static_cast<TextureManager*>(getResourceManager().get(ResourceManager::TEXTURE));
-	uint8_t* image_dest = (uint8_t*)manager->getBuffer(image_size);
+	if (m_is_nonGL)
+	{
+		m_data.resize(image_size);
+	}
+	uint8_t* image_dest = m_is_nonGL ? &m_data[0] : (uint8_t*)manager->getBuffer(image_size);
 
 	// Targa is BGR, swap to RGB, add alpha and flip Y axis
 	for (long y = 0; y < header.height; y++)
@@ -469,6 +475,12 @@ bool Texture::loadTGA(FS::IFile& file)
 				image_dest[write_index + 3] = 255;
 			write_index += 4;
 		}
+	}
+	m_BPP = 4;
+
+	if (m_is_nonGL)
+	{
+		return true;
 	}
 
 	glGenTextures(1, &m_id);
@@ -489,6 +501,11 @@ bool Texture::loadTGA(FS::IFile& file)
 
 bool Texture::loadDDS(FS::IFile& file)
 {
+	if (m_is_nonGL)
+	{
+		g_log_error.log("renderer", "Non GL DDS texture not supported %s", m_path.c_str());
+		return false;
+	}
 	DDS::Header hdr;
 	uint32_t width = 0;
 	uint32_t height = 0;
@@ -499,7 +516,6 @@ bool Texture::loadDDS(FS::IFile& file)
 	if (hdr.dwMagic != DDS::DDS_MAGIC || hdr.dwSize != 124 ||
 		!(hdr.dwFlags & DDS::DDSD_PIXELFORMAT) || !(hdr.dwFlags & DDS::DDSD_CAPS))
 	{
-		ASSERT(false);
 		g_log_error.log("renderer", "Wrong dds format or corrupted dds %s", m_path.c_str());
 		return false;
 	}
@@ -508,7 +524,6 @@ bool Texture::loadDDS(FS::IFile& file)
 	height = hdr.dwHeight;
 	if ((width & (width - 1)) || (height & (height - 1)))
 	{
-		ASSERT(false);
 		g_log_error.log("renderer", "Wrong dds format %s", m_path.c_str());
 		return false;
 	}

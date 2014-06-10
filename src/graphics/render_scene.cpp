@@ -16,6 +16,7 @@
 #include "graphics/model_instance.h"
 #include "graphics/pipeline.h"
 #include "graphics/renderer.h"
+#include "graphics/texture.h"
 #include "universe/component_event.h"
 #include "universe/entity_moved_event.h"
 #include "universe/universe.h"
@@ -28,24 +29,6 @@ namespace Lux
 	static const uint32_t LIGHT_HASH = crc32("light");
 	static const uint32_t CAMERA_HASH = crc32("camera");
 	static const uint32_t TERRAIN_HASH = crc32("terrain");
-
-#pragma pack(1) 
-	struct TGAHeader
-	{
-		char  idLength;
-		char  colourMapType;
-		char  dataType;
-		short int colourMapOrigin;
-		short int colourMapLength;
-		char  colourMapDepth;
-		short int xOrigin;
-		short int yOrigin;
-		short int width;
-		short int height;
-		char  bitsPerPixel;
-		char  imageDescriptor;
-	};
-#pragma pack()
 
 	struct Terrain
 	{
@@ -61,6 +44,10 @@ namespace Lux
 			{
 				m_material->getResourceManager().get(ResourceManager::MATERIAL)->unload(*m_material);
 			}
+			if (m_heightmap)
+			{
+				m_heightmap->getResourceManager().get(ResourceManager::TEXTURE)->unload(*m_heightmap);
+			}
 		}
 
 		void generateGeometry()
@@ -73,17 +60,21 @@ namespace Lux
 				float u, v;
 				Vec3 normal;
 			};
+			m_width = m_heightmap->getWidth();
+			m_height = m_heightmap->getHeight();
 			Array<Vertex> points;
 			points.resize(m_width * m_height);
 			Array<int32_t> indices;
 			indices.resize((m_width - 1) * (m_height - 1) * 6);
 			int indices_offset = 0;
+			const uint8_t* data = m_heightmap->getData();
+			int bytes_per_pixel = m_heightmap->getBytesPerPixel();
 			for (int j = 0; j < m_height; ++j)
 			{
 				for (int i = 0; i < m_width; ++i)
 				{
 					int idx = i + j * m_width;
-					points[idx].pos.set((float)(i ), m_heights[idx] / 10.0f - 255 / 10.0f, (float)(j ));
+					points[idx].pos.set((float)(i), data[idx * bytes_per_pixel] / 10.0f - 255 / 10.0f, (float)(j));
 					points[idx].u = i / (float)m_width;
 					points[idx].v = j / (float)m_height;
 					points[idx].normal.set(0, 1, 0);
@@ -99,55 +90,29 @@ namespace Lux
 					}
 				}
 			}
-			
 			VertexDef vertex_def;
 			vertex_def.parse("ptn", 3);
 			m_geometry.copy((const uint8_t*)&points[0], sizeof(points[0]) * points.size(), indices, vertex_def);
 			m_mesh = LUX_NEW(Mesh)(m_material, 0, indices.size(), "terrain");
 		}
 
-		void heightmapLoaded(FS::IFile* file, bool success, FS::FileSystem& filesystem)
+		void heightmapLoaded(Resource::State, Resource::State new_state)
 		{
-			if (success)
+			if (new_state == Resource::State::READY)
 			{
-				TGAHeader header;
-				file->read(&header, sizeof(header));
-				/// TODO 
-				int color_mode = header.bitsPerPixel / 8;
-				m_width = header.width;
-				m_height = header.height;
-				m_heights.resize(m_width * m_height);
-				for (int j = 0; j < m_height; ++j)
-				{
-					for (int i = 0; i < m_width; ++i)
-					{
-						uint8_t data[4];
-						file->read(data, sizeof(data[0]) * 3);
-						if (color_mode == 4)
-							file->read(data + 3, sizeof(data[3]));
-						m_heights[i + j * m_width] = data[0];
-					}
-				}
 				generateGeometry();
 			}
-			else
-			{
-				g_log_error.log("renderer", "Error loading heightmap %s", m_heightmap_path.c_str());
-			}
-			filesystem.close(file);
 		}
 
 		int32_t m_width;
 		int32_t m_height;
-		Array<uint8_t> m_heights;
 		Geometry m_geometry;
-		Path m_heightmap_path;
 		Material* m_material;
-		FS::ReadCallback m_heightmap_callback;
 		Mesh* m_mesh;
 		Matrix m_matrix;
 		Entity m_entity;
 		int64_t m_layer_mask;
+		Texture* m_heightmap;
 	};
 
 	struct Renderable
@@ -199,6 +164,10 @@ namespace Lux
 				EventManager::Listener cb;
 				cb.bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 				m_universe.getEventManager().removeListener(EntityMovedEvent::type, cb);
+				for (int i = 0; i < m_terrains.size(); ++i)
+				{
+					LUX_DELETE(m_terrains[i]);
+				}
 			}
 
 			virtual void getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) override
@@ -333,7 +302,7 @@ namespace Lux
 				{
 					serializer.serializeArrayItem(m_terrains[i]->m_entity.index);
 					serializer.serializeArrayItem(m_terrains[i]->m_layer_mask);
-					serializer.serializeArrayItem(m_terrains[i]->m_heightmap_path.c_str());
+					serializer.serializeArrayItem(m_terrains[i]->m_heightmap->getPath().c_str());
 					serializer.serializeArrayItem(m_terrains[i]->m_material->getPath().c_str());
 				}
 				serializer.endArray();
@@ -452,10 +421,10 @@ namespace Lux
 					m_terrains.push(terrain);
 					terrain->m_width = 0;
 					terrain->m_height = 0;
-					terrain->m_heightmap_callback.bind<Terrain, &Terrain::heightmapLoaded>(terrain);
 					terrain->m_matrix = entity.getMatrix();
 					terrain->m_entity = entity;
 					terrain->m_layer_mask = 1;
+					terrain->m_heightmap = NULL;
 					Component cmp(entity, type, this, m_terrains.size() - 1);
 					ComponentEvent evt(cmp);
 					m_universe.getEventManager().emitEvent(evt);
@@ -551,13 +520,24 @@ namespace Lux
 
 			virtual void setTerrainHeightmap(Component cmp, const string& path) override
 			{
-				m_terrains[cmp.index]->m_heightmap_path = path;
-				m_engine.getFileSystem().openAsync(m_engine.getFileSystem().getDefaultDevice(), path.c_str(), FS::Mode::OPEN | FS::Mode::READ, m_terrains[cmp.index]->m_heightmap_callback);
+				if (m_terrains[cmp.index]->m_heightmap)
+				{
+					m_engine.getResourceManager().get(ResourceManager::TEXTURE)->unload(*m_terrains[cmp.index]->m_heightmap);
+					m_terrains[cmp.index]->m_heightmap->getObserverCb().unbind<Terrain, &Terrain::heightmapLoaded>(m_terrains[cmp.index]);
+				}
+				Resource* res = m_engine.getResourceManager().get(ResourceManager::TEXTURE)->load(path.c_str());
+				res->getObserverCb().bind<Terrain, &Terrain::heightmapLoaded>(m_terrains[cmp.index]);
+				m_terrains[cmp.index]->m_heightmap = static_cast<Texture*>(res);
+				m_terrains[cmp.index]->m_heightmap->setNonGL(true);
+				if (m_terrains[cmp.index]->m_heightmap->isReady())
+				{
+					m_terrains[cmp.index]->heightmapLoaded(Resource::State::LOADING, Resource::State::READY);
+				}
 			}
 
 			virtual void getTerrainHeightmap(Component cmp, string& path) override
 			{
-				path = m_terrains[cmp.index]->m_heightmap_path.c_str();
+				path = m_terrains[cmp.index]->m_heightmap ? m_terrains[cmp.index]->m_heightmap->getPath().c_str() : "";
 			}
 
 			virtual Pose& getPose(const Component& cmp) override
