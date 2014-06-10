@@ -316,7 +316,7 @@ General Rules
 
 ---
 
-9. Multiplatform
+#### Multiplatform
   1. 64bit friendly
   2. do not use long, long long, short, ...
 	- they are platform dependent
@@ -332,11 +332,12 @@ General Rules
 
 ---
 
-11. Forbidden features
+### Forbidden features
   1. RTTI, exceptions
 	- performace
 
---------------------------------------------
-12. Others
+---
+
+## Others
   1. Asserts should not be triggered by data
   2. Data can not cause crash 
