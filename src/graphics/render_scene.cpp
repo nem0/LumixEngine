@@ -47,6 +47,7 @@ namespace Lux
 			if (m_heightmap)
 			{
 				m_heightmap->getResourceManager().get(ResourceManager::TEXTURE)->unload(*m_heightmap);
+				m_heightmap->getObserverCb().unbind<Terrain, &Terrain::heightmapLoaded>(this);
 			}
 		}
 
@@ -399,8 +400,6 @@ namespace Lux
 					setTerrainHeightmap(cmp, string(path));
 					serializer.deserializeArrayItem(path, LUX_MAX_PATH);
 					setTerrainMaterial(cmp, string(path));
-					ComponentEvent evt(cmp);
-					m_universe.getEventManager().emitEvent(evt);
 				}
 				serializer.deserializeArrayEnd();
 			}

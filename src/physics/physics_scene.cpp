@@ -301,8 +301,6 @@ void PhysicsScene::destroyActor(Component cmp)
 Component PhysicsScene::createHeightfield(Entity entity)
 {
 	Terrain* terrain = LUX_NEW(Terrain);
-	m_impl->m_terrains.push(terrain);
-
 	Component cmp(entity, HEIGHTFIELD_HASH, this, m_impl->m_terrains.size());
 	m_impl->m_terrains.push(terrain);
 	terrain->m_heightmap = NULL;
