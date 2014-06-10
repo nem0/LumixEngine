@@ -5,7 +5,7 @@
   1. use pragma once
     * it's shorter
 
-  2. #if #ifdef blocks only a few lines long
+  2. \#if \#ifdef blocks only a few lines long
     * readability 
 	
 	wrong:
