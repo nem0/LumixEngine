@@ -46,10 +46,11 @@ General Rules
 		// 
 		// stuff
 	#endif
-	
+```	
 
 	right:
 
+```
 	int size_limit;
 	#ifdef _XBOX_ONE
 		size_limit = 10;
@@ -58,15 +59,17 @@ General Rules
 	#endif
 ```
 
-  3. sort includes, use following rules (most important to least):
-    * in .cpp, corresponding header is first	
-    * first #include <>, then #include "" 
-    * alphabetically
-      - It can be immediately seen, if some header is included twice
+2. sort includes, use following rules (most important to least):
+  * in .cpp, corresponding header is first	
+  * first #include <>, then #include "" 
+  * alphabetically
+    - It can be immediately seen, if some header is included twice
 
-1.3. no other macros allowed
-	- instead use inline functions, constant variables, ...
---------------------------------------------
+3. no other macros allowed
+ - instead use inline functions, constant variables, ...
+
+---
+
 2. Comments
 2.1. less is more 
 	- code should be readable enough
