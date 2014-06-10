@@ -1,7 +1,10 @@
 General Rules
 --------------------------------------------
+
 * any block of code should not be longer than one page (about 40 lines), except namespaces and classes
+
 ---
+
 1. Macros
   1. use pragma once
     * it's shorter
