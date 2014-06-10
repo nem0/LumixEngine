@@ -332,12 +332,12 @@ General Rules
 
 ---
 
-### Forbidden features
+#### Forbidden features
   1. RTTI, exceptions
 	- performace
 
 ---
 
-## Others
+#### \1. Others
   1. Asserts should not be triggered by data
   2. Data can not cause crash 
