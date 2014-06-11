@@ -61,9 +61,9 @@ struct PhysicsSceneImpl
 };
 
 
-static const uint32_t box_rigid_actor_type = crc32("box_rigid_actor");
-static const uint32_t mesh_rigid_actor_type = crc32("mesh_rigid_actor");
-static const uint32_t controller_type = crc32("physical_controller");
+static const uint32_t BOX_ACTOR_HASH = crc32("box_rigid_actor");
+static const uint32_t MESH_ACTOR_HASH = crc32("mesh_rigid_actor");
+static const uint32_t CONTROLLER_HASH = crc32("physical_controller");
 
 
 struct OutputStream : public physx::PxOutputStream
@@ -199,7 +199,7 @@ void matrix2Transform(const Matrix& mtx, physx::PxTransform& transform)
 
 void PhysicsScene::destroyActor(Component cmp)
 {
-	ASSERT(cmp.type == box_rigid_actor_type);
+	ASSERT(cmp.type == BOX_ACTOR_HASH);
 	int inner_index = m_impl->m_index_map[cmp.index];
 	m_impl->m_scene->removeActor(*m_impl->m_actors[inner_index]);
 	m_impl->m_actors[inner_index]->release();
@@ -240,7 +240,7 @@ Component PhysicsScene::createController(Entity entity)
 
 	m_impl->m_controllers.push(c);
 	
-	Component cmp(entity, controller_type, this, m_impl->m_controllers.size() - 1);
+	Component cmp(entity, CONTROLLER_HASH, this, m_impl->m_controllers.size() - 1);
 	m_impl->m_universe->getEventManager().emitEvent(ComponentEvent(cmp));
 	return cmp;
 }
@@ -289,7 +289,7 @@ Component PhysicsScene::createBoxRigidActor(Entity entity)
 	m_impl->m_actors[new_index] = actor;
 	actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
 
-	Component cmp(entity, box_rigid_actor_type, this, m_impl->m_actors.size() - 1);
+	Component cmp(entity, BOX_ACTOR_HASH, this, m_impl->m_actors.size() - 1);
 	m_impl->m_universe->getEventManager().emitEvent(ComponentEvent(cmp));
 	return cmp;
 }
@@ -335,7 +335,7 @@ Component PhysicsScene::createMeshRigidActor(Entity entity)
 	actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
 	*/
 
-	Component cmp(entity, mesh_rigid_actor_type, this, m_impl->m_actors.size() - 1);
+	Component cmp(entity, MESH_ACTOR_HASH, this, m_impl->m_actors.size() - 1);
 	m_impl->m_universe->getEventManager().emitEvent(ComponentEvent(cmp));
 	return cmp;
 }
@@ -563,7 +563,7 @@ void PhysicsSceneImpl::handleEvent(Event& event)
 		const Entity::ComponentList& cmps = e.getComponents();
 		for(int i = 0, c = cmps.size(); i < c; ++i)
 		{
-			if(cmps[i].type == box_rigid_actor_type)
+			if(cmps[i].type == BOX_ACTOR_HASH)
 			{
 				Vec3 pos = e.getPosition();
 				physx::PxVec3 pvec(pos.x, pos.y, pos.z);
@@ -577,7 +577,7 @@ void PhysicsSceneImpl::handleEvent(Event& event)
 				}
 				break;
 			}
-			else if(cmps[i].type == controller_type)
+			else if(cmps[i].type == CONTROLLER_HASH)
 			{
 				Vec3 pos = e.getPosition();
 				physx::PxExtendedVec3 pvec(pos.x, pos.y, pos.z);
@@ -723,8 +723,7 @@ void PhysicsSceneImpl::deserializeActor(ISerializer& serializer, int idx)
 	m_actors[idx] = actor;
 	actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
 
-	Component cmp(m_entities[idx], box_rigid_actor_type, m_owner, idx);
-	m_universe->getEventManager().emitEvent(ComponentEvent(cmp));
+	m_universe->addComponent(m_entities[idx], BOX_ACTOR_HASH, m_owner, idx);
 }
 
 
@@ -767,6 +766,7 @@ void PhysicsScene::deserialize(ISerializer& serializer)
 		m_impl->m_entities[i].universe = m_impl->m_universe;
 		m_impl->deserializeActor(serializer, i);
 	}
+	serializer.deserializeArrayEnd();
 	serializer.deserialize("count", count);
 	m_impl->m_controllers.clear();
 	serializer.deserializeArrayBegin("controllers");
@@ -777,6 +777,7 @@ void PhysicsScene::deserialize(ISerializer& serializer)
 		Entity e(m_impl->m_universe, index);
 		createController(e);
 		m_impl->setControllerPosition(i, e.getPosition());
+		m_impl->m_universe->addComponent(e, CONTROLLER_HASH, this, i);
 	}		
 	serializer.deserializeArrayEnd();
 }

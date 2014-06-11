@@ -210,9 +210,9 @@ namespace Lux
 				int32_t size;
 				serializer.deserialize("camera_count", size);
 				serializer.deserializeArrayBegin("cameras");
+				m_cameras.resize(size);
 				for (int i = 0; i < size; ++i)
 				{
-					m_cameras.pushEmpty();
 					serializer.deserializeArrayItem(m_cameras[i].m_far);
 					serializer.deserializeArrayItem(m_cameras[i].m_near);
 					serializer.deserializeArrayItem(m_cameras[i].m_fov);
@@ -223,8 +223,7 @@ namespace Lux
 					serializer.deserializeArrayItem(m_cameras[i].m_entity.index);
 					m_cameras[i].m_entity.universe = &m_universe;
 					serializer.deserializeArrayItem(m_cameras[i].m_slot, Camera::MAX_SLOT_LENGTH);
-					ComponentEvent evt(Component(m_cameras[i].m_entity, CAMERA_HASH, this, i));
-					m_universe.getEventManager().emitEvent(evt);
+					m_universe.addComponent(m_cameras[i].m_entity, CAMERA_HASH, this, i);
 				}
 				serializer.deserializeArrayEnd();
 			}
@@ -234,9 +233,9 @@ namespace Lux
 				int32_t size;
 				serializer.deserialize("renderable_count", size);
 				serializer.deserializeArrayBegin("renderables");
+				m_renderables.resize(size);
 				for (int i = 0; i < size; ++i)
 				{
-					m_renderables.pushEmpty();
 					serializer.deserializeArrayItem(m_renderables[i].m_entity.index);
 					m_renderables[i].m_entity.universe = &m_universe;
 					char path[LUX_MAX_PATH];
@@ -247,8 +246,7 @@ namespace Lux
 					{
 						serializer.deserializeArrayItem((&m_renderables[i].m_model.getMatrix().m11)[j]);
 					}
-					ComponentEvent evt(Component(m_renderables[i].m_entity, RENDERABLE_HASH, this, i));
-					m_universe.getEventManager().emitEvent(evt);
+					m_universe.addComponent(m_renderables[i].m_entity, RENDERABLE_HASH, this, i);
 				}
 				serializer.deserializeArrayEnd();
 			}
@@ -258,14 +256,13 @@ namespace Lux
 				int32_t size;
 				serializer.deserialize("light_count", size);
 				serializer.deserializeArrayBegin("lights");
+				m_lights.resize(size);
 				for (int i = 0; i < size; ++i)
 				{
-					m_lights.pushEmpty();
 					serializer.deserializeArrayItem(m_lights[i].m_entity.index);
 					m_lights[i].m_entity.universe = &m_universe;
 					serializer.deserializeArrayItem((int32_t&)m_lights[i].m_type);
-					ComponentEvent evt(Component(m_lights[i].m_entity, LIGHT_HASH, this, i));
-					m_universe.getEventManager().emitEvent(evt);
+					m_universe.addComponent(m_lights[i].m_entity, LIGHT_HASH, this, i);
 				}
 				serializer.deserializeArrayEnd();
 			}
