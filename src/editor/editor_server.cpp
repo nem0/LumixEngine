@@ -168,7 +168,8 @@ struct EditorServerImpl
 		Entity& getSelectedEntity() { return m_selected_entity; }
 		bool isGameMode() const { return m_is_game_mode; }
 		void save(FS::IFile& file, const char* path);
-		void load(FS::IFile& file, const char* path, bool reset_universe);
+		void load(FS::IFile& file, const char* path);
+		void resetAndLoad(FS::IFile& file, const char* path);
 		void onMessage(void* msgptr, int size);
 		EditorIconHit raycastEditorIcons(const Vec3& origin, const Vec3& dir);
 
@@ -491,7 +492,7 @@ void EditorServerImpl::stopGameMode()
 	m_is_game_mode = false;
 	m_engine.getScriptSystem().stop();
 	m_game_mode_file->seek(FS::SeekMode::BEGIN, 0);
-	load(*m_game_mode_file, "GameMode", false);
+	load(*m_game_mode_file, "GameMode");
 	m_engine.getFileSystem().close(m_game_mode_file);
 	m_game_mode_file = NULL;
 }
@@ -652,7 +653,7 @@ void EditorServerImpl::loadMap(FS::IFile* file, bool success, FS::FileSystem& fs
 	ASSERT(success);
 	if(success)
 	{
-		load(*file, "unknown map", true); /// TODO file path
+		resetAndLoad(*file, "unknown map"); /// TODO file path
 	}
 
 	fs.close(file);
@@ -666,18 +667,21 @@ void EditorServerImpl::newUniverse()
 }
 
 
-void EditorServerImpl::load(FS::IFile& file, const char* path, bool reset_universe)
+void EditorServerImpl::load(FS::IFile& file, const char* path)
 {
 	g_log_info.log("editor server", "parsing universe...");
-	if (reset_universe)
-	{
-		destroyUniverse();
-		createUniverse(false);
-	}
 	JsonSerializer serializer(file, JsonSerializer::READ, path);
 	m_engine.deserialize(serializer);
 	m_camera = m_engine.getRenderScene()->getCameraInSlot("editor").entity;
 	g_log_info.log("editor server", "universe parsed");
+}
+
+
+void EditorServerImpl::resetAndLoad(FS::IFile& file, const char* path)
+{
+	destroyUniverse();
+	createUniverse(false);
+	load(file, path);
 }
 
 

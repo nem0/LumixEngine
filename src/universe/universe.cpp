@@ -137,6 +137,7 @@ void Universe::deserialize(ISerializer& serializer)
 {
 	int count;
 	serializer.deserialize("count", count);
+	m_component_list.clear();
 	m_component_list.resize(count);
 	m_positions.resize(count);
 	m_rotations.resize(count);
@@ -167,6 +168,13 @@ void Universe::deserialize(ISerializer& serializer)
 	serializer.deserializeArrayEnd();
 }
 
+
+
+void Universe::addComponent(const Entity& entity, uint32_t component_type, void* system, int index)
+{
+	Component cmp(entity, component_type, system, index);
+	m_component_list[entity.index].push(cmp);
+}
 
 
 } // !namespace Lux
