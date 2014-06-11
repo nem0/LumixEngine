@@ -60,8 +60,9 @@ General Rules
 ```
 
 2. sort includes, use following rules (most important to least):
+  * precompiled first, if necessary
   * in .cpp, corresponding header is first	
-  * first #include <>, then #include "" 
+  * first #include "", then #include <>
   * alphabetically
     - It can be immediately seen, if some header is included twice
 
