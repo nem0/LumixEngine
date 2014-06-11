@@ -101,21 +101,14 @@ namespace Lux
 			int count;
 			serializer.deserialize("count", count);
 			serializer.deserializeArrayBegin("scripts");
-			for(int i = 0; i < m_scripts.size(); ++i)
+			m_scripts.resize(count);
+			m_paths.resize(count);
+			for (int i = 0; i < m_scripts.size(); ++i)
 			{
-				bool new_script = m_scripts.size() <= i;
-				if(new_script)
-				{
-					m_scripts.pushEmpty();
-					m_paths.pushEmpty();
-				}
 				serializer.deserializeArrayItem(m_scripts[i]);
 				serializer.deserializeArrayItem(m_paths[i]);
-				if(new_script)
-				{
-					ComponentEvent evt(Component(Entity(m_universe, m_scripts[i]), SCRIPT_HASH, this, i));
-					m_universe->getEventManager().emitEvent(evt);
-				}
+				Entity entity(m_universe, m_scripts[i]);
+				m_universe->addComponent(entity, SCRIPT_HASH, this, i);
 			}
 			serializer.deserializeArrayEnd();		
 		}

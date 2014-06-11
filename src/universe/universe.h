@@ -41,6 +41,7 @@ class LUX_ENGINE_API Universe final
 		Vec3 getPosition(int index) { return m_positions[index]; }
 		Quat getRotation(int index) { return m_rotations[index]; }
 		EventManager& getEventManager() const { ASSERT(m_event_manager);  return *m_event_manager; }
+		void addComponent(const Entity& entity, uint32_t component_type, void* system, int index);
 
 		void serialize(ISerializer& serializer);
 		void deserialize(ISerializer& serializer);
