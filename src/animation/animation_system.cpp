@@ -110,7 +110,11 @@ namespace Lux
 		m_impl->m_animables.clear();
 		for(int i = 0; i < count; ++i)
 		{
-			m_impl->m_animables.pushEmpty();
+			bool new_animable = m_impl->m_animables.size() <= i;
+			if(new_animable)
+			{
+				m_impl->m_animables.pushEmpty();
+			}
 			serializer.deserializeArrayItem(m_impl->m_animables[i].m_manual);
 			int entity_index;
 			serializer.deserializeArrayItem(entity_index);
@@ -126,9 +130,12 @@ namespace Lux
 				}
 			}
 			serializer.deserializeArrayItem(m_impl->m_animables[i].m_time);
-			Component cmp(e, animable_type, this, i);
-			ComponentEvent evt(cmp);
-			m_impl->m_universe->getEventManager().emitEvent(evt);
+			if(new_animable)
+			{
+				Component cmp(e, animable_type, this, i);
+				ComponentEvent evt(cmp);
+				m_impl->m_universe->getEventManager().emitEvent(evt);
+			}
 		}
 		serializer.deserializeArrayEnd();
 	}

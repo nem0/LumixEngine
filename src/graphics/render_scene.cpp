@@ -212,7 +212,11 @@ namespace Lux
 				serializer.deserializeArrayBegin("cameras");
 				for (int i = 0; i < size; ++i)
 				{
-					m_cameras.pushEmpty();
+					bool new_camera = m_cameras.size() <= i;
+					if (new_camera)
+					{
+						m_cameras.pushEmpty();
+					}
 					serializer.deserializeArrayItem(m_cameras[i].m_far);
 					serializer.deserializeArrayItem(m_cameras[i].m_near);
 					serializer.deserializeArrayItem(m_cameras[i].m_fov);
@@ -223,8 +227,11 @@ namespace Lux
 					serializer.deserializeArrayItem(m_cameras[i].m_entity.index);
 					m_cameras[i].m_entity.universe = &m_universe;
 					serializer.deserializeArrayItem(m_cameras[i].m_slot, Camera::MAX_SLOT_LENGTH);
-					ComponentEvent evt(Component(m_cameras[i].m_entity, CAMERA_HASH, this, i));
-					m_universe.getEventManager().emitEvent(evt);
+					if (new_camera)
+					{
+						ComponentEvent evt(Component(m_cameras[i].m_entity, CAMERA_HASH, this, i));
+						m_universe.getEventManager().emitEvent(evt);
+					}
 				}
 				serializer.deserializeArrayEnd();
 			}
@@ -236,7 +243,11 @@ namespace Lux
 				serializer.deserializeArrayBegin("renderables");
 				for (int i = 0; i < size; ++i)
 				{
-					m_renderables.pushEmpty();
+					bool new_renderable = m_renderables.size() <= i;
+					if (new_renderable)
+					{
+						m_renderables.pushEmpty();
+					}
 					serializer.deserializeArrayItem(m_renderables[i].m_entity.index);
 					m_renderables[i].m_entity.universe = &m_universe;
 					char path[LUX_MAX_PATH];
@@ -247,8 +258,11 @@ namespace Lux
 					{
 						serializer.deserializeArrayItem((&m_renderables[i].m_model.getMatrix().m11)[j]);
 					}
-					ComponentEvent evt(Component(m_renderables[i].m_entity, RENDERABLE_HASH, this, i));
-					m_universe.getEventManager().emitEvent(evt);
+					if (new_renderable)
+					{
+						ComponentEvent evt(Component(m_renderables[i].m_entity, RENDERABLE_HASH, this, i));
+						m_universe.getEventManager().emitEvent(evt);
+					}
 				}
 				serializer.deserializeArrayEnd();
 			}
@@ -260,12 +274,19 @@ namespace Lux
 				serializer.deserializeArrayBegin("lights");
 				for (int i = 0; i < size; ++i)
 				{
-					m_lights.pushEmpty();
+					bool new_light = m_lights.size() <= i;
+					if(new_light)
+					{
+						m_lights.pushEmpty();
+					}
 					serializer.deserializeArrayItem(m_lights[i].m_entity.index);
 					m_lights[i].m_entity.universe = &m_universe;
 					serializer.deserializeArrayItem((int32_t&)m_lights[i].m_type);
-					ComponentEvent evt(Component(m_lights[i].m_entity, LIGHT_HASH, this, i));
-					m_universe.getEventManager().emitEvent(evt);
+					if(new_light)
+					{
+						ComponentEvent evt(Component(m_lights[i].m_entity, LIGHT_HASH, this, i));
+						m_universe.getEventManager().emitEvent(evt);
+					}
 				}
 				serializer.deserializeArrayEnd();
 			}
