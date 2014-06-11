@@ -14,7 +14,7 @@
 #include "save_script_visitor.h"
 
 
-static const uint32_t script_type = crc32("script");
+static const uint32_t SCRIPT_HASH = crc32("script");
 
 
 namespace Lux
@@ -100,16 +100,17 @@ namespace Lux
 		{
 			int count;
 			serializer.deserialize("count", count);
+			serializer.deserializeArrayBegin("scripts");
 			m_scripts.resize(count);
 			m_paths.resize(count);
-			serializer.deserializeArrayBegin("scripts");
-			for(int i = 0; i < m_scripts.size(); ++i)
+			for (int i = 0; i < m_scripts.size(); ++i)
 			{
 				serializer.deserializeArrayItem(m_scripts[i]);
 				serializer.deserializeArrayItem(m_paths[i]);
+				Entity entity(m_universe, m_scripts[i]);
+				m_universe->addComponent(entity, SCRIPT_HASH, this, i);
 			}
 			serializer.deserializeArrayEnd();		
-			postDeserialize();
 		}
 
 		void serialize(ISerializer& serializer) override
@@ -178,16 +179,6 @@ namespace Lux
 			sprintf_s(path, max_path, "scripts\\e%d.%s", e.index, ext);
 		}
 
-		void postDeserialize()
-		{
-			for(int i = 0; i < m_scripts.size(); ++i)
-			{
-				Entity e(m_universe, m_scripts[i]);
-				ComponentEvent evt(Component(e, script_type, this, i));
-				m_universe->getEventManager().emitEvent(evt);
-			}
-		}
-
 		Component createScript(Entity entity) override
 		{
 			char path[MAX_PATH];
@@ -204,7 +195,7 @@ namespace Lux
 			m_scripts.push(entity.index);
 			m_paths.push(string(path));
 
-			Component cmp(entity, script_type, this, m_scripts.size() - 1);
+			Component cmp(entity, SCRIPT_HASH, this, m_scripts.size() - 1);
 			ComponentEvent evt(cmp);
 			m_universe->getEventManager().emitEvent(evt);
 
