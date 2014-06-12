@@ -33,7 +33,8 @@ SOURCES += main.cpp\
     profilerui.cpp \
     propertywidgets/physics_box_widget.cpp \
     propertywidgets/physics_controller_widget.cpp \
-    propertywidgets/physics_mesh_widget.cpp
+    propertywidgets/physics_mesh_widget.cpp \
+    profilergraph.cpp
 
 HEADERS  += mainwindow.h \
     sceneview.h \ 
@@ -56,7 +57,8 @@ HEADERS  += mainwindow.h \
     profilerui.h \
     propertywidgets/physics_box_widget.h \
     propertywidgets/physics_controller_widget.h \
-    propertywidgets/physics_mesh_widget.h
+    propertywidgets/physics_mesh_widget.h \
+    profilergraph.h
 
 FORMS    += mainwindow.ui \
     logwidget.ui \
@@ -75,11 +77,12 @@ FORMS    += mainwindow.ui \
     profilerui.ui \
     propertywidgets/physics_box_widget.ui \
     propertywidgets/physics_controller_widget.ui \
-    propertywidgets/physics_mesh_widget.ui
+    propertywidgets/physics_mesh_widget.ui \
+    profilergraph.ui
 
 win32
 {
     INCLUDEPATH = ../../src \
 	../../external/glew/include
-    LIBS = -L../../bin/Win32_Debug -lcore -lengine -lopengl32
+    LIBS = -L../../bin/Win32_Debug -lcore -lengine -lopengl32 -lphysics
 }

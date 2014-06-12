@@ -60,6 +60,8 @@ namespace Lux
 			~Block();
 
 		public:
+			static const int MAX_FRAMES = 500;
+
 			Block* m_parent;
 			Block* m_next;
 			Block* m_first_child;
@@ -67,7 +69,7 @@ namespace Lux
 			const char* m_name;
 			const char* m_function;
 			int m_frame_index;
-			Frame m_frames[100];
+			Frame m_frames[MAX_FRAMES];
 	};
 
 
