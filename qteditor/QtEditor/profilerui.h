@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QDockWidget>
+#include <QStyledItemDelegate>
 
 class QAbstractItemModel;
 
@@ -8,6 +9,16 @@ namespace Ui
 {
 class ProfilerUI;
 }
+
+class HistoryDelegate : public QStyledItemDelegate
+{
+	Q_OBJECT
+
+	public:
+		HistoryDelegate(QWidget* parent = NULL);
+
+		void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const;	
+};
 
 class ProfilerUI : public QDockWidget
 {

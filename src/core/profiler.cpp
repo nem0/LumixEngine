@@ -62,6 +62,7 @@ namespace Lux
 					if (m_frame_uid != m_root_block->m_frames[m_frame_uid % 100].m_index)
 					{
 						m_root_block->m_frames[m_frame_uid % 100].m_index = m_frame_uid;
+						m_root_block->m_frame_index = m_frame_uid;
 						m_root_block->m_frames[m_frame_uid % 100].m_length = 0;
 					}
 					m_root_block->m_frames[m_frame_uid % 100].m_start = m_timer->getTimeSinceStart();
@@ -80,6 +81,7 @@ namespace Lux
 				root->m_first_child = root->m_last_child = NULL;
 				root->m_name = name;
 				root->m_function = function;
+				root->m_frame_index = m_frame_uid;
 				m_root_block = m_current_block = root;
 				m_root_block->m_frames[0].m_index = 0;
 				m_root_block->m_frames[0].m_length = 0;
@@ -111,6 +113,7 @@ namespace Lux
 				child->m_first_child = child->m_last_child = NULL;
 				child->m_name = name;
 				child->m_function = function;
+				child->m_frame_index = m_frame_uid;
 			}
 			if (m_frame_uid != child->m_frames[m_frame_uid % 100].m_index)
 			{
@@ -131,6 +134,7 @@ namespace Lux
 		}
 		ASSERT(m_current_block);
 		m_current_block->m_frames[m_frame_uid % 100].m_length += 1000.0f * (m_timer->getTimeSinceStart() - m_current_block->m_frames[m_frame_uid % 100].m_start);
+		m_current_block->m_frame_index = m_frame_uid;
 		m_current_block = m_current_block->m_parent;
 	}
 
