@@ -59,13 +59,13 @@ namespace Lux
 				if (m_root_block->m_name == name && m_root_block->m_function == function)
 				{
 					m_current_block = m_root_block;
-					if (m_frame_uid != m_root_block->m_frames[m_frame_uid % 100].m_index)
+					if (m_frame_uid != m_root_block->m_frames[m_frame_uid % Block::MAX_FRAMES].m_index)
 					{
-						m_root_block->m_frames[m_frame_uid % 100].m_index = m_frame_uid;
+						m_root_block->m_frames[m_frame_uid % Block::MAX_FRAMES].m_index = m_frame_uid;
 						m_root_block->m_frame_index = m_frame_uid;
-						m_root_block->m_frames[m_frame_uid % 100].m_length = 0;
+						m_root_block->m_frames[m_frame_uid % Block::MAX_FRAMES].m_length = 0;
 					}
-					m_root_block->m_frames[m_frame_uid % 100].m_start = m_timer->getTimeSinceStart();
+					m_root_block->m_frames[m_frame_uid % Block::MAX_FRAMES].m_start = m_timer->getTimeSinceStart();
 				}
 				else
 				{
@@ -115,12 +115,12 @@ namespace Lux
 				child->m_function = function;
 				child->m_frame_index = m_frame_uid;
 			}
-			if (m_frame_uid != child->m_frames[m_frame_uid % 100].m_index)
+			if (m_frame_uid != child->m_frames[m_frame_uid % Block::MAX_FRAMES].m_index)
 			{
-				child->m_frames[m_frame_uid % 100].m_index = m_frame_uid;
-				child->m_frames[m_frame_uid % 100].m_length = 0;
+				child->m_frames[m_frame_uid % Block::MAX_FRAMES].m_index = m_frame_uid;
+				child->m_frames[m_frame_uid % Block::MAX_FRAMES].m_length = 0;
 			}
-			child->m_frames[m_frame_uid % 100].m_start = m_timer->getTimeSinceStart();
+			child->m_frames[m_frame_uid % Block::MAX_FRAMES].m_start = m_timer->getTimeSinceStart();
 
 			m_current_block = child;
 		}
@@ -133,7 +133,8 @@ namespace Lux
 			return;
 		}
 		ASSERT(m_current_block);
-		m_current_block->m_frames[m_frame_uid % 100].m_length += 1000.0f * (m_timer->getTimeSinceStart() - m_current_block->m_frames[m_frame_uid % 100].m_start);
+		int idx = m_frame_uid % Block::MAX_FRAMES;
+		m_current_block->m_frames[idx].m_length += 1000.0f * (m_timer->getTimeSinceStart() - m_current_block->m_frames[idx].m_start);
 		m_current_block->m_frame_index = m_frame_uid;
 		m_current_block = m_current_block->m_parent;
 	}
