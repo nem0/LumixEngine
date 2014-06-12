@@ -1,6 +1,8 @@
 #include "profilerui.h"
 #include "ui_profilerui.h"
 #include <qabstractitemmodel.h>
+#include <qpainter.h>
+#include <qpixmap.h>
 #include "core/profiler.h"
 
 
@@ -12,6 +14,7 @@ class ProfileModel : public QAbstractItemModel
 			NAME,
 			FUNCTION,
 			LENGTH,
+			HISTORY,
 			COUNT
 		};
 
@@ -56,6 +59,9 @@ class ProfileModel : public QAbstractItemModel
 						return "Name";
 					case Values::LENGTH:
 						return "Length (ms)";
+					case Values::HISTORY:
+						return "History";
+						break;
 					default:
 						ASSERT(false);
 						return QVariant();
@@ -167,7 +173,10 @@ class ProfileModel : public QAbstractItemModel
 				case Values::NAME:
 					return block->m_name;
 				case Values::LENGTH:
-					return block->m_frames[(m_frame_uid + m_frame_offset) % 100].m_length;
+					return (block->m_frame_index + m_frame_offset - 99) % 100 < 0 ? 0 : block->m_frames[(block->m_frame_index + m_frame_offset - 99) % 100].m_length;
+				case Values::HISTORY:
+					return qVariantFromValue((void*)block);
+					break;
 				default:
 					ASSERT(false);
 					return QVariant();
@@ -180,6 +189,64 @@ class ProfileModel : public QAbstractItemModel
 };
 
 
+HistoryDelegate::HistoryDelegate(QWidget* parent) 
+	: QStyledItemDelegate(parent) 
+{}
+
+
+void HistoryDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const
+{
+	if (index.data().canConvert<void*>())
+	{
+		QPixmap pixmap(option.rect.size());
+		pixmap.fill(Qt::transparent);
+		Lux::Profiler::Block* block = (Lux::Profiler::Block*)index.data().value<void*>();
+		const Lux::Profiler::Block::Frame* frame = block->m_frames;
+
+		//painter->fillRect(option.rect, option.palette.foreground());
+		
+		float max = 0;
+		for(int i = 0; i < 100; ++i)
+		{
+			max = max < frame[i].m_length ? frame[i].m_length : max;
+		}
+		{ // painter2 scope
+			QPainter painter2(&pixmap);
+			painter2.setPen(QColor(255, 255, 255));
+			const ProfileModel* model = static_cast<const ProfileModel*>(index.model());
+			for(int i = 0; i < 99; ++i)
+			{
+				int idx = (block->m_frame_index + 1 + i) % 100;
+				float l = i * option.rect.width() / 100.0f;
+				float t = (option.rect.height() - 1) * (1.0f - frame[idx].m_length / max);
+				float t2 = (option.rect.height() - 1) * (1.0f - frame[(idx + 1) % 100].m_length / max);
+				float r = (i + 1) * (option.rect.width() / 100.0f);
+				painter2.drawLine(QPointF(l, t), QPointF(r, t2));	
+				if(model->m_frame_offset == i)
+				{
+					painter2.setPen(QColor(255, 0, 0));
+					painter2.drawLine(QPointF(l, 0), QPointF(l, option.rect.height()));	
+					painter2.setPen(QColor(255, 255, 255));
+				}
+			}
+			if(model->m_frame_offset == 99)
+			{
+				float l = 99 * option.rect.width() / 100.0f;
+				painter2.setPen(QColor(255, 0, 0));
+				painter2.drawLine(QPointF(l, 0), QPointF(l, option.rect.height()));	
+				painter2.setPen(QColor(255, 255, 255));
+			}
+		}
+		painter->drawPixmap(option.rect, pixmap);
+	}
+	else
+	{
+		QStyledItemDelegate::paint(painter, option, index);
+	}
+
+}
+
+
 ProfilerUI::ProfilerUI(QWidget* parent) 
 	: QDockWidget(parent)
 	, m_ui(new Ui::ProfilerUI)
@@ -190,6 +257,7 @@ ProfilerUI::ProfilerUI(QWidget* parent)
 	m_ui->profileTreeView->header()->setSectionResizeMode(0, QHeaderView::ResizeMode::Stretch);
 	m_ui->profileTreeView->header()->setSectionResizeMode(1, QHeaderView::ResizeMode::ResizeToContents);
 	m_ui->profileTreeView->header()->setSectionResizeMode(2, QHeaderView::ResizeMode::ResizeToContents);
+	m_ui->profileTreeView->setItemDelegate(new HistoryDelegate);
 }
 
 
@@ -213,6 +281,6 @@ void ProfilerUI::on_frameSlider_valueChanged(int value)
 	{
 		m_ui->recordCheckBox->setChecked(false);
 	}
-	((ProfileModel*)m_model)->setFrameOffset(99-value);
+	((ProfileModel*)m_model)->setFrameOffset(value);
 	
 }
