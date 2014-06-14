@@ -826,8 +826,7 @@ void PhysicsSceneImpl::deserializeActor(ISerializer& serializer, int idx)
 	m_actors[idx] = actor;
 	actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
 
-	Component cmp(m_entities[idx], BOX_ACTOR_HASH, m_owner, idx);
-	m_universe->getEventManager().emitEvent(ComponentEvent(cmp));
+	m_universe->addComponent(m_entities[idx], BOX_ACTOR_HASH, m_owner, idx);
 }
 
 
@@ -877,7 +876,7 @@ void PhysicsScene::deserialize(ISerializer& serializer)
 		m_impl->m_entities[i].universe = m_impl->m_universe;
 		m_impl->deserializeActor(serializer, i);
 	}
-
+	serializer.deserializeArrayEnd();
 	serializer.deserialize("count", count);
 	m_impl->m_controllers.clear();
 	serializer.deserializeArrayBegin("controllers");
@@ -888,6 +887,7 @@ void PhysicsScene::deserialize(ISerializer& serializer)
 		Entity e(m_impl->m_universe, index);
 		createController(e);
 		m_impl->setControllerPosition(i, e.getPosition());
+		m_impl->m_universe->addComponent(e, CONTROLLER_HASH, this, i);
 	}		
 	serializer.deserializeArrayEnd();
 
