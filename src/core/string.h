@@ -82,9 +82,17 @@ class base_string
 			if(rhs < m_cstr || rhs >= m_cstr + m_size)
 			{
 				m_allocator.deallocate(m_cstr);
-				m_size = strlen(rhs);
-				m_cstr = (T*)m_allocator.allocate((m_size + 1) * sizeof(T));
-				memcpy(m_cstr, rhs, sizeof(T) * (m_size + 1));
+				if(rhs)
+				{
+					m_size = strlen(rhs);
+					m_cstr = (T*)m_allocator.allocate((m_size + 1) * sizeof(T));
+					memcpy(m_cstr, rhs, sizeof(T) * (m_size + 1));
+				}
+				else
+				{
+					m_size = 0;
+					m_cstr = NULL;
+				}
 			}
 		}
 
