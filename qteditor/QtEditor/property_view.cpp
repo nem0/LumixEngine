@@ -74,8 +74,7 @@ void PropertyView::on_doubleSpinBoxValueChanged()
 {
 	QDoubleSpinBox* sb = qobject_cast<QDoubleSpinBox*>(QObject::sender());
 	int i = sb->property("cpp_prop").toInt();
-	float f;
-	f = (float)qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item, 1))->value();
+	float f = (float)qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item, 1))->value();
 	m_client->setComponentProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), &f, sizeof(f)); 
 }
 
@@ -113,8 +112,7 @@ void PropertyView::onPropertyValue(Property* property, void* data, int32_t data_
 	{
 		case Property::VEC3:
 			{
-				Lux::Vec3 v;
-				memcpy(&v, data, sizeof(v));
+				Lux::Vec3 v = *(Lux::Vec3*)data;
 				QString text;
 				text.sprintf("[%f; %f; %f]", v.x, v.y, v.z);
 				property->m_tree_item->setText(1, text);
@@ -128,8 +126,7 @@ void PropertyView::onPropertyValue(Property* property, void* data, int32_t data_
 			break;
 		case Property::BOOL:
 			{
-				bool b;
-				memcpy(&b, data, sizeof(b));
+				bool b = *(bool*)data; 
 				QCheckBox* cb = qobject_cast<QCheckBox*>(m_ui->propertyList->itemWidget(property->m_tree_item, 1));
 				cb->setChecked(b);
 			}
@@ -149,8 +146,7 @@ void PropertyView::onPropertyValue(Property* property, void* data, int32_t data_
 		case Property::DECIMAL:
 			{
 				QDoubleSpinBox* edit = qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(property->m_tree_item, 1));
-				float f;
-				memcpy(&f, data, sizeof(f));
+				float f = *(float*)data;
 				edit->setValue(f);
 			}
 			break;
