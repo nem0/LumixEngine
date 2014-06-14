@@ -18,7 +18,6 @@ SOURCES += main.cpp\
     sceneview.cpp \ 
     log_widget.cpp \
     property_view.cpp \
-    property_widget_base.cpp \
     gameview.cpp \
     assetbrowser.cpp \
     scripts/scriptcompiler.cpp \
@@ -31,7 +30,6 @@ HEADERS  += mainwindow.h \
     sceneview.h \ 
     log_widget.h \
     property_view.h \
-    property_widget_base.h \
     gameview.h \
     assetbrowser.h \
     scripts/scriptcompiler.h \
@@ -45,7 +43,6 @@ HEADERS  += mainwindow.h \
 FORMS    += mainwindow.ui \
     logwidget.ui \
     property_view.ui \
-    property_widget_base.ui \
     gameview.ui \
     assetbrowser.ui \
     scripts/scriptcompilerwidget.ui \
