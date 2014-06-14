@@ -151,6 +151,8 @@ struct EditorServerImpl
 		void save(FS::IFile& file, const char* path);
 		void load(FS::IFile& file, const char* path);
 		void onMessage(const uint8_t* msgptr, int32_t size);
+		void resetAndLoad(FS::IFile& file, const char* path);
+		void onMessage(void* msgptr, int size);
 		EditorIconHit raycastEditorIcons(const Vec3& origin, const Vec3& dir);
 
 		const IPropertyDescriptor& getPropertyDescriptor(uint32_t type, uint32_t name_hash);
@@ -608,7 +610,7 @@ void EditorServerImpl::loadMap(FS::IFile* file, bool success, FS::FileSystem& fs
 	ASSERT(success);
 	if(success)
 	{
-		load(*file, "unknown map"); /// TODO file path
+		resetAndLoad(*file, "unknown map"); /// TODO file path
 	}
 
 	fs.close(file);
@@ -625,12 +627,18 @@ void EditorServerImpl::newUniverse()
 void EditorServerImpl::load(FS::IFile& file, const char* path)
 {
 	g_log_info.log("editor server", "parsing universe...");
-	destroyUniverse();
-	createUniverse(false);
 	JsonSerializer serializer(file, JsonSerializer::READ, path);
 	m_engine.deserialize(serializer);
 	m_camera = m_engine.getRenderScene()->getCameraInSlot("editor").entity;
 	g_log_info.log("editor server", "universe parsed");
+}
+
+
+void EditorServerImpl::resetAndLoad(FS::IFile& file, const char* path)
+{
+	destroyUniverse();
+	createUniverse(false);
+	load(file, path);
 }
 
 
