@@ -36,6 +36,7 @@ class LUX_PHYSICS_API PhysicsScene
 		Component createBoxRigidActor(Entity entity);
 		Component createMeshRigidActor(Entity entity);
 		Component createController(Entity entity);
+		Component createHeightfield(Entity entity);
 		void destroyActor(Component cmp);
 		PhysicsSystem& getSystem() const;
 		
@@ -45,6 +46,8 @@ class LUX_PHYSICS_API PhysicsScene
 		void setHalfExtents(Component cmp, const Vec3& size);
 		void getShapeSource(Component cmp, string& str);
 		void setShapeSource(Component cmp, const string& str);
+		void getHeightmap(Component cmp, string& str);
+		void setHeightmap(Component cmp, const string& str);
 
 		void moveController(Component cmp, const Vec3& v, float dt);
 	

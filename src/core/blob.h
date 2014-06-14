@@ -13,7 +13,7 @@ namespace Lux
 		public:
 			Blob();
 
-			void create(void* data, int size) { m_data = data; m_size = size; m_pos = 0; }
+			void create(const void* data, int size) { m_data = data; m_size = size; m_pos = 0; }
 			virtual void write(const void* data, int32_t size);
 			virtual bool read(void* data, int32_t size);
 			const uint8_t* getBuffer() const { return &m_buffer[0]; }
@@ -35,7 +35,7 @@ namespace Lux
 			Array<uint8_t> m_buffer;
 			int m_pos;
 			int m_size;
-			void* m_data; 
+			const void* m_data; 
 	};
 
 } // !namespace Lux

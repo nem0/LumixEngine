@@ -5,14 +5,23 @@
 #include "core/event_manager.h"
 #include "editor/editor_client.h"
 #include "editor/server_message_types.h"
-#include "propertywidgets/animable_widget.h"
-#include "propertywidgets/camerawidget.h"
-#include "propertywidgets/lightwidget.h"
-#include "propertywidgets/physics_box_widget.h"
-#include "propertywidgets/physics_controller_widget.h"
-#include "propertywidgets/physics_mesh_widget.h"
-#include "propertywidgets/renderable_widget.h"
-#include "propertywidgets/script_widget.h"
+#include "property_widget_base.h"
+
+
+static const char* component_map[] =
+{
+	"Animable", "animable",
+	"Camera", "camera",
+	"Physics Box", "box_rigid_actor",
+	"Physics Controller", "physical_controller",
+	"Physics Mesh", "mesh_rigid_actor",
+	"Physics Heightfield", "physical_heightfield",
+	"Point Light", "light",
+	"Renderable", "renderable",
+	"Script", "script",
+	"Terrain", "terrain"
+};
+
 
 
 PropertyView::PropertyView(QWidget* parent) :
@@ -20,6 +29,14 @@ PropertyView::PropertyView(QWidget* parent) :
 	m_ui(new Ui::PropertyView)
 {
 	m_ui->setupUi(this);
+
+	QStringList component_list;
+	for(int j = 0; j < sizeof(component_map) / sizeof(component_map[0]); j += 2)
+	{
+		component_list << component_map[j];
+	}
+	
+	m_ui->componentTypeCombo->insertItems(0, component_list);
 }
 
 
@@ -52,40 +69,50 @@ void PropertyView::onEntitySelected(Lux::Event& event)
 	//m_selected_entity = e.index;
 	for (int i = 0; i < e.components.size(); ++i)
 	{
-		m_client->requestProperties(e.components[i]);
-		/// TODO factory or something
 		PropertyWidgetBase* widget = NULL;
-		if (e.components[i] == crc32("physical_controller"))
+		for(int j = 0; j < sizeof(component_map) / sizeof(component_map[0]); j += 2)
 		{
-			widget = new PhysicsControllerWidget;
+			if(e.components[i] == crc32(component_map[j + 1]))
+			{
+				widget = new PropertyWidgetBase(component_map[j + 1], component_map[j]);
+				break;
+			}
 		}
-		else if (e.components[i] == crc32("mesh_rigid_actor"))
+		/// TODO refactor
+		if (e.components[i] == crc32("box_rigid_actor"))
 		{
-			widget = new PhysicsMeshWidget;
-		}
-		else if (e.components[i] == crc32("box_rigid_actor"))
-		{
-			widget = new PhysicsBoxWidget;
+			widget->addProperty("size", "Size", PropertyWidgetBase::Property::VEC3, NULL);
+			widget->addProperty("dynamic", "Is dynamic", PropertyWidgetBase::Property::BOOL, NULL);
 		}
 		else if (e.components[i] == crc32("renderable"))
 		{
-			widget = new RenderableWidget;
-		}
-		else if (e.components[i] == crc32("animable"))
-		{
-			widget = new AnimableWidget;
+			widget->addProperty("source", "Source", PropertyWidgetBase::Property::FILE, "models (*.msh)");
 		}
 		else if (e.components[i] == crc32("script"))
 		{
-			widget = new ScriptWidget;
-		}
-		else if (e.components[i] == crc32("light"))
-		{
-			widget = new LightWidget;
+			widget->addProperty("source", "Source", PropertyWidgetBase::Property::FILE, "scripts (*.cpp)");
 		}
 		else if (e.components[i] == crc32("camera"))
 		{
-			widget = new CameraWidget;
+			widget->addProperty("slot", "Slot", PropertyWidgetBase::Property::STRING, NULL);
+			widget->addProperty("near", "Near", PropertyWidgetBase::Property::DECIMAL, NULL);
+			widget->addProperty("far", "Far", PropertyWidgetBase::Property::DECIMAL, NULL);
+			widget->addProperty("fov", "Field of view", PropertyWidgetBase::Property::DECIMAL, NULL);
+		}
+		else if (e.components[i] == crc32("terrain"))
+		{
+			widget->addProperty("heightmap", "Heightmap", PropertyWidgetBase::Property::FILE, "TGA image (*.tga)");
+			widget->addProperty("material", "Material", PropertyWidgetBase::Property::FILE, "material (*.mat)");
+		}
+		else if (e.components[i] == crc32("physical_controller") || e.components[i] == crc32("mesh_rigid_actor"))
+		{
+		}
+		else if (e.components[i] == crc32("physical_heightfield"))
+		{
+			widget->addProperty("heightmap", "Heightmap", PropertyWidgetBase::Property::FILE, "TGA image (*.tga)");
+		}
+		else if (e.components[i] == crc32("light"))
+		{
 		}
 		else
 		{
@@ -94,6 +121,7 @@ void PropertyView::onEntitySelected(Lux::Event& event)
 		widget->setEditorClient(*m_client);
 		m_ui->components->addItem(widget, widget->getTitle());
 		m_component_uis.push(widget);
+		m_client->requestProperties(e.components[i]);
 	}
 }
 
@@ -108,36 +136,14 @@ void PropertyView::on_addComponentButton_clicked()
 	QByteArray s = m_ui->componentTypeCombo->currentText().toLocal8Bit();
 	const char* c = s.data();
 	/// TODO
-	if (strcmp(c, "Script") == 0)
+
+	for(int i = 0; i < sizeof(component_map) / sizeof(component_map[0]); i += 2)
 	{
-		m_client->addComponent(crc32("script"));
+		if(strcmp(c, component_map[i]) == 0)
+		{
+			m_client->addComponent(crc32(component_map[i+1]));
+			return;
+		}
 	}
-	else if (strcmp(c, "Renderable") == 0)
-	{
-		m_client->addComponent(crc32("renderable"));
-	}
-	else if (strcmp(c, "Point Light") == 0)
-	{
-		m_client->addComponent(crc32("light"));
-	}
-	else if (strcmp(c, "Animable") == 0)
-	{
-		m_client->addComponent(crc32("animable"));
-	}
-	else if (strcmp(c, "Camera") == 0)
-	{
-		m_client->addComponent(crc32("camera"));
-	}
-	else if (strcmp(c, "Physics Box") == 0)
-	{
-		m_client->addComponent(crc32("box_rigid_actor"));
-	}
-	else if (strcmp(c, "Physics Controller") == 0)
-	{
-		m_client->addComponent(crc32("physical_controller"));
-	}
-	else if (strcmp(c, "Physics Mesh") == 0)
-	{
-		m_client->addComponent(crc32("mesh_rigid_actor"));
-	}
+	ASSERT(false); // unknown component type
 }
