@@ -18,9 +18,10 @@ namespace Lux
 {
 
 
-	static const uint32_t box_rigid_actor_type = crc32("box_rigid_actor");
-	static const uint32_t mesh_rigid_actor_type = crc32("mesh_rigid_actor");
-	static const uint32_t controller_type = crc32("physical_controller");
+static const uint32_t BOX_ACTOR_HASH = crc32("box_rigid_actor");
+static const uint32_t MESH_ACTOR_HASH = crc32("mesh_rigid_actor");
+static const uint32_t CONTROLLER_HASH = crc32("physical_controller");
+static const uint32_t HEIGHTFIELD_HASH = crc32("physical_heightfield");
 
 
 extern "C" IPlugin* createPlugin()
@@ -73,15 +74,19 @@ void PhysicsSystem::sendMessage(const char* message)
 
 Component PhysicsSystem::createComponent(uint32_t component_type, const Entity& entity)
 {
-	if(component_type == controller_type)
+	if (component_type == HEIGHTFIELD_HASH)
+	{
+		return m_impl->m_scene->createHeightfield(entity);
+	}
+	else if (component_type == CONTROLLER_HASH)
 	{
 		return m_impl->m_scene->createController(entity);
 	}
-	else if (component_type == box_rigid_actor_type)
+	else if (component_type == BOX_ACTOR_HASH)
 	{
 		return m_impl->m_scene->createBoxRigidActor(entity);
 	}
-	else if (component_type == mesh_rigid_actor_type)
+	else if (component_type == MESH_ACTOR_HASH)
 	{
 		return m_impl->m_scene->createMeshRigidActor(entity);
 	}
@@ -106,9 +111,11 @@ bool PhysicsSystem::create(Engine& engine)
 	engine.getEditorServer()->registerProperty("box_rigid_actor", LUX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("dynamic"), &PhysicsScene::getIsDynamic, &PhysicsScene::setIsDynamic));
 	engine.getEditorServer()->registerProperty("box_rigid_actor", LUX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("size"), &PhysicsScene::getHalfExtents, &PhysicsScene::setHalfExtents));
 	engine.getEditorServer()->registerProperty("mesh_rigid_actor", LUX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("source"), &PhysicsScene::getShapeSource, &PhysicsScene::setShapeSource, IPropertyDescriptor::FILE));
-	engine.getEditorServer()->registerCreator(box_rigid_actor_type, *this);
-	engine.getEditorServer()->registerCreator(mesh_rigid_actor_type, *this);
-	engine.getEditorServer()->registerCreator(controller_type, *this);
+	engine.getEditorServer()->registerProperty("physical_heightfield", LUX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("heightmap"), &PhysicsScene::getHeightmap, &PhysicsScene::setHeightmap, IPropertyDescriptor::FILE));
+	engine.getEditorServer()->registerCreator(HEIGHTFIELD_HASH, *this);
+	engine.getEditorServer()->registerCreator(BOX_ACTOR_HASH, *this);
+	engine.getEditorServer()->registerCreator(MESH_ACTOR_HASH, *this);
+	engine.getEditorServer()->registerCreator(CONTROLLER_HASH, *this);
 
 	m_impl = LUX_NEW(PhysicsSystemImpl);
 	m_impl->m_allocator = LUX_NEW(physx::PxDefaultAllocator)();

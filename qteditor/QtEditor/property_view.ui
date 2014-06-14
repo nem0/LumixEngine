@@ -33,7 +33,7 @@
     <item>
      <widget class="QToolBox" name="components">
       <property name="currentIndex">
-       <number>0</number>
+       <number>1</number>
       </property>
       <property name="tabSpacing">
        <number>1</number>
@@ -43,8 +43,8 @@
         <rect>
          <x>0</x>
          <y>0</y>
-         <width>247</width>
-         <height>344</height>
+         <width>98</width>
+         <height>28</height>
         </rect>
        </property>
        <attribute name="label">
@@ -56,8 +56,8 @@
         <rect>
          <x>0</x>
          <y>0</y>
-         <width>98</width>
-         <height>28</height>
+         <width>247</width>
+         <height>344</height>
         </rect>
        </property>
        <attribute name="label">
@@ -89,46 +89,6 @@
            <verstretch>2</verstretch>
           </sizepolicy>
          </property>
-         <item>
-          <property name="text">
-           <string>Animable</string>
-          </property>
-         </item>
-         <item>
-          <property name="text">
-           <string>Camera</string>
-          </property>
-         </item>
-         <item>
-          <property name="text">
-           <string>Physics Box</string>
-          </property>
-         </item>
-         <item>
-          <property name="text">
-           <string>Physics Controller</string>
-          </property>
-         </item>
-         <item>
-          <property name="text">
-           <string>Physics Mesh</string>
-          </property>
-         </item>
-         <item>
-          <property name="text">
-           <string>Point Light</string>
-          </property>
-         </item>
-         <item>
-          <property name="text">
-           <string>Renderable</string>
-          </property>
-         </item>
-         <item>
-          <property name="text">
-           <string>Script</string>
-          </property>
-         </item>
         </widget>
        </item>
        <item>
