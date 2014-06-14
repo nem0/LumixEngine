@@ -2,6 +2,7 @@
 
 #include <QWidget>
 #include "core/profiler.h"
+#include "profilerui.h"
 
 namespace Ui 
 {
@@ -20,10 +21,11 @@ class ProfilerGraph : public QWidget
 		virtual void mousePressEvent(QMouseEvent*) override;
 		virtual void mouseMoveEvent(QMouseEvent*) override;
 		int getFrame() const { return m_frame; }
-		void setBlock(Lux::Profiler::Block* block) { m_block = block; }
+		void setBlock(ProfileModel::Block* block) { m_block = block; }
+		void setModel(ProfileModel* model) { m_model = model; }
 
 	private:
-		void getBlockPath(Lux::Profiler::Block* block, QPainterPath& path, float max);
+		void getBlockPath(ProfileModel::Block* block, QPainterPath& path, float max);
 
 	signals:
 		void frameSet();
@@ -31,6 +33,7 @@ class ProfilerGraph : public QWidget
 	private:
 		Ui::ProfilerGraph* m_ui;
 		int m_frame;
-		Lux::Profiler::Block* m_block;
+		ProfileModel* m_model;
+		ProfileModel::Block* m_block;
 };
 

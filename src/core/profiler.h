@@ -23,7 +23,7 @@ namespace Lux
 			void frame();
 			void toggleRecording();
 			bool isRecording() const { return m_is_recording; }
-			DelegateList<void (int)>& getFrameListeners() { return m_frame_listeners; }
+			DelegateList<void ()>& getFrameListeners() { return m_frame_listeners; }
 			Block* getRootBlock() const { return m_root_block; }
 
 			void beginBlock(const char* name, const char* function);
@@ -35,41 +35,32 @@ namespace Lux
 			Block* m_current_block;
 			Block* m_root_block;
 			Timer* m_timer;
-			int m_frame_uid;
 			bool m_is_record_toggle_request;
-			DelegateList<void (int)> m_frame_listeners;
+			DelegateList<void ()> m_frame_listeners;
 	};
 
-	class Profiler::Block
+	class LUX_CORE_API Profiler::Block
 	{
 		public:
-			class Frame
+			class Hit
 			{
 				public:
-					int m_index;
 					float m_length;
 					float m_start;
 			};
 		
 		public:
-			Block()
-				: m_frame_index(-1)
-			{ 
-			}
-		
 			~Block();
+			void frame();
+			float getLength();
 
 		public:
-			static const int MAX_FRAMES = 500;
-
 			Block* m_parent;
 			Block* m_next;
 			Block* m_first_child;
-			Block* m_last_child;
 			const char* m_name;
 			const char* m_function;
-			int m_frame_index;
-			Frame m_frames[MAX_FRAMES];
+			Array<Hit> m_hits;
 	};
 
 
