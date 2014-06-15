@@ -70,6 +70,7 @@ struct LUX_ENGINE_API PropertyListEvent : public Event
 	struct Property
 	{
 		Property() {}
+		~Property() { LUX_DELETE_ARRAY(data); }
 		uint32_t name_hash;
 		void* data;
 		int32_t data_size;
