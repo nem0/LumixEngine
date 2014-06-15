@@ -7,6 +7,7 @@
 namespace Lux
 {
 
+	class EditorServer;
 	struct Entity;
 	class EventManager;
 	struct ServerMessage;
@@ -17,9 +18,9 @@ namespace Lux
 		public:
 			EditorClient() { m_impl = NULL; }
 
-			bool create(const char* base_path);
+			bool create(const char* base_path, EditorServer& server);
 			void destroy();
-			void processMessages();
+			void onMessage(const uint8_t* data, int size);
 			void addEntity();
 			void toggleGameMode();
 			void addComponent(uint32_t type);
