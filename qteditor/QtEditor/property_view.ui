@@ -31,39 +31,20 @@
      <number>2</number>
     </property>
     <item>
-     <widget class="QToolBox" name="components">
-      <property name="currentIndex">
-       <number>0</number>
+     <widget class="QTreeWidget" name="propertyList">
+      <property name="headerHidden">
+       <bool>false</bool>
       </property>
-      <property name="tabSpacing">
-       <number>1</number>
-      </property>
-      <widget class="QWidget" name="componentA">
-       <property name="geometry">
-        <rect>
-         <x>0</x>
-         <y>0</y>
-         <width>247</width>
-         <height>344</height>
-        </rect>
+      <column>
+       <property name="text">
+        <string>Name</string>
        </property>
-       <attribute name="label">
-        <string>Page 1</string>
-       </attribute>
-      </widget>
-      <widget class="QWidget" name="componentB">
-       <property name="geometry">
-        <rect>
-         <x>0</x>
-         <y>0</y>
-         <width>98</width>
-         <height>28</height>
-        </rect>
+      </column>
+      <column>
+       <property name="text">
+        <string>Value</string>
        </property>
-       <attribute name="label">
-        <string>Page 2</string>
-       </attribute>
-      </widget>
+      </column>
      </widget>
     </item>
     <item>
@@ -89,46 +70,6 @@
            <verstretch>2</verstretch>
           </sizepolicy>
          </property>
-         <item>
-          <property name="text">
-           <string>Animable</string>
-          </property>
-         </item>
-         <item>
-          <property name="text">
-           <string>Camera</string>
-          </property>
-         </item>
-         <item>
-          <property name="text">
-           <string>Physics Box</string>
-          </property>
-         </item>
-         <item>
-          <property name="text">
-           <string>Physics Controller</string>
-          </property>
-         </item>
-         <item>
-          <property name="text">
-           <string>Physics Mesh</string>
-          </property>
-         </item>
-         <item>
-          <property name="text">
-           <string>Point Light</string>
-          </property>
-         </item>
-         <item>
-          <property name="text">
-           <string>Renderable</string>
-          </property>
-         </item>
-         <item>
-          <property name="text">
-           <string>Script</string>
-          </property>
-         </item>
         </widget>
        </item>
        <item>

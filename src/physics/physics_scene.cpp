@@ -2,7 +2,6 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <cstdio>
-#include <gl/gl.h>
 #include <PxPhysicsAPI.h>
 #include "cooking/PxCooking.h"
 #include "core/crc32.h"
@@ -12,8 +11,12 @@
 #include "core/iserializer.h"
 #include "core/log.h"
 #include "core/matrix.h"
+#include "core/path.h"
+#include "core/resource_manager.h"
+#include "core/resource_manager_base.h"
 #include "engine/engine.h"
 #include "graphics/render_scene.h"
+#include "graphics/texture.h"
 #include "universe/component_event.h"
 #include "universe/entity_moved_event.h"
 #include "physics/physics_system.h"
@@ -22,6 +25,20 @@
 
 namespace Lux
 {
+
+
+class Terrain
+{
+	public:
+		Terrain();
+		~Terrain();
+		void heightmapLoaded(Resource::State, Resource::State new_state);
+
+		PhysicsSceneImpl* m_scene;
+		Entity m_entity;
+		physx::PxRigidActor* m_actor;
+		Texture* m_heightmap;
+};
 
 
 struct PhysicsSceneImpl
@@ -38,6 +55,7 @@ struct PhysicsSceneImpl
 	void setControllerPosition(int index, const Vec3& pos);
 	void serializeActor(ISerializer& serializer, int idx);
 	void deserializeActor(ISerializer& serializer, int idx);
+	void heightmapLoaded(Terrain* terrain);
 
 	struct Controller
 	{
@@ -57,6 +75,7 @@ struct PhysicsSceneImpl
 	Array<Entity>				m_entities;
 	Array<int>					m_index_map;
 	Array<Controller>			m_controllers;
+	Array<Terrain*>				m_terrains;
 	PhysicsScene*				m_owner;
 };
 
@@ -64,7 +83,7 @@ struct PhysicsSceneImpl
 static const uint32_t BOX_ACTOR_HASH = crc32("box_rigid_actor");
 static const uint32_t MESH_ACTOR_HASH = crc32("mesh_rigid_actor");
 static const uint32_t CONTROLLER_HASH = crc32("physical_controller");
-
+static const uint32_t HEIGHTFIELD_HASH = crc32("physical_heightfield");
 
 struct OutputStream : public physx::PxOutputStream
 {
@@ -197,6 +216,64 @@ void matrix2Transform(const Matrix& mtx, physx::PxTransform& transform)
 }
 
 
+void PhysicsSceneImpl::heightmapLoaded(Terrain* terrain)
+{
+		Array<physx::PxHeightFieldSample> heights;
+		
+		int width = terrain->m_heightmap->getWidth();
+		int height = terrain->m_heightmap->getHeight();
+		const uint8_t* data = terrain->m_heightmap->getData();
+		heights.resize(width * height);
+		int bytes_per_pixel = terrain->m_heightmap->getBytesPerPixel();
+		for (int j = 0; j < height; ++j)
+		{
+			for (int i = 0; i < width; ++i)
+			{
+				int idx = i + j * width;
+				int idx2 = j + i * height;
+				heights[idx].height = data[idx2 * bytes_per_pixel] - 255;
+			}
+		}
+
+		physx::PxHeightFieldDesc hfDesc;
+		hfDesc.format = physx::PxHeightFieldFormat::eS16_TM;
+		hfDesc.nbColumns = width;
+		hfDesc.nbRows = height;
+		hfDesc.samples.data = &heights[0];
+		hfDesc.samples.stride = sizeof(physx::PxHeightFieldSample);
+
+		physx::PxHeightField* heightfield = m_system->m_impl->m_physics->createHeightField(hfDesc);
+		physx::PxHeightFieldGeometry hfGeom(heightfield, physx::PxMeshGeometryFlags(), 0.1f, 1.0f, 1.0f);
+		
+		if (terrain->m_actor)
+		{
+			physx::PxRigidActor* actor = terrain->m_actor;
+			m_scene->removeActor(*actor);
+			actor->release();
+			terrain->m_actor = NULL;
+		}
+
+		physx::PxTransform transform;
+		Matrix mtx;
+		terrain->m_entity.getMatrix(mtx);
+		matrix2Transform(mtx, transform);
+
+		physx::PxRigidActor* actor;
+		actor = PxCreateStatic(*m_system->m_impl->m_physics, transform, hfGeom, *m_default_material);
+		if (actor)
+		{
+			actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
+			actor->userData = (void*)terrain->m_entity.index;
+			m_scene->addActor(*actor);
+			terrain->m_actor = actor;
+		}
+		else
+		{
+			g_log_error.log("PhysX", "Could not create PhysX heightfield %s", terrain->m_heightmap->getPath().c_str());
+		}
+}
+
+
 void PhysicsScene::destroyActor(Component cmp)
 {
 	ASSERT(cmp.type == BOX_ACTOR_HASH);
@@ -218,6 +295,21 @@ void PhysicsScene::destroyActor(Component cmp)
 	}
 	m_impl->m_index_map[cmp.index] = -1;
 	m_impl->m_universe->getEventManager().emitEvent(ComponentEvent(cmp, false));
+}
+
+
+Component PhysicsScene::createHeightfield(Entity entity)
+{
+	Terrain* terrain = LUX_NEW(Terrain);
+	Component cmp(entity, HEIGHTFIELD_HASH, this, m_impl->m_terrains.size());
+	m_impl->m_terrains.push(terrain);
+	terrain->m_heightmap = NULL;
+	terrain->m_scene = m_impl;
+	terrain->m_actor = NULL;
+	terrain->m_entity = entity;
+
+	m_impl->m_universe->getEventManager().emitEvent(ComponentEvent(cmp));
+	return cmp;
 }
 
 
@@ -321,23 +413,32 @@ Component PhysicsScene::createMeshRigidActor(Entity entity)
 		m_impl->m_entities[new_index] = entity;
 	}
 
-/*	physx::PxTriangleMeshGeometry geom;
-	physx::PxTransform transform;
-	Matrix mtx;
-	entity.getMatrix(mtx);
-	matrix2Transform(mtx, transform);
-
-	physx::PxRigidStatic* actor = PxCreateStatic(*m_impl->m_system->m_impl->m_physics, transform, geom, *m_impl->m_default_material);
-	actor->userData = (void*)entity.index;
-	m_impl->m_scene->addActor(*actor);
-	m_impl->m_scene->simulate(0.01f);
-	m_impl->m_scene->fetchResults(true);
-	actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
-	*/
-
 	Component cmp(entity, MESH_ACTOR_HASH, this, m_impl->m_actors.size() - 1);
 	m_impl->m_universe->getEventManager().emitEvent(ComponentEvent(cmp));
 	return cmp;
+}
+
+
+void PhysicsScene::getHeightmap(Component cmp, string& str)
+{
+	str = m_impl->m_terrains[cmp.index]->m_heightmap ? m_impl->m_terrains[cmp.index]->m_heightmap->getPath().c_str() : "";
+}
+
+
+void PhysicsScene::setHeightmap(Component cmp, const string& str)
+{
+	if (m_impl->m_terrains[cmp.index]->m_heightmap)
+	{
+		m_impl->m_engine->getResourceManager().get(ResourceManager::TEXTURE)->unload(*m_impl->m_terrains[cmp.index]->m_heightmap);
+		m_impl->m_terrains[cmp.index]->m_heightmap->getObserverCb().unbind<Terrain, &Terrain::heightmapLoaded>(m_impl->m_terrains[cmp.index]);
+	}
+	m_impl->m_terrains[cmp.index]->m_heightmap = static_cast<Texture*>(m_impl->m_engine->getResourceManager().get(ResourceManager::TEXTURE)->load(str.c_str()));
+	m_impl->m_terrains[cmp.index]->m_heightmap->getObserverCb().bind<Terrain, &Terrain::heightmapLoaded>(m_impl->m_terrains[cmp.index]);
+	m_impl->m_terrains[cmp.index]->m_heightmap->setNonGL(true);
+	if (m_impl->m_terrains[cmp.index]->m_heightmap->isReady())
+	{
+		m_impl->m_terrains[cmp.index]->heightmapLoaded(Resource::State::LOADING, Resource::State::READY);
+	}
 }
 
 
@@ -395,6 +496,7 @@ void PhysicsScene::setShapeSource(Component cmp, const string& str)
 
 void PhysicsSceneImpl::createTriMesh(const char* path, physx::PxTriangleMeshGeometry& geom)
 {
+	/// TODO
 	FILE* fp;
 	fopen_s(&fp, path, "rb");
 	if(fp)
@@ -664,7 +766,8 @@ void PhysicsSceneImpl::serializeActor(ISerializer& serializer, int idx)
 	if(m_actors[idx]->getNbShapes() == 1 && m_actors[idx]->getShapes(&shapes, 1))
 	{
 		physx::PxBoxGeometry geom;
-		if(shapes->getBoxGeometry(geom))
+		physx::PxHeightFieldGeometry hf_geom;
+		if (shapes->getBoxGeometry(geom))
 		{
 			serializer.serialize("type", (int32_t)BOX);
 			serializer.serialize("x", geom.halfExtents.x);
@@ -746,7 +849,14 @@ void PhysicsScene::serialize(ISerializer& serializer)
 		serializer.serializeArrayItem(m_impl->m_controllers[i].m_entity.index);
 	}
 	serializer.endArray();
-}
+	serializer.serialize("count", m_impl->m_terrains.size());
+	serializer.beginArray("terrains");
+	for (int i = 0; i < m_impl->m_terrains.size(); ++i)
+	{
+		serializer.serializeArrayItem(m_impl->m_terrains[i]->m_entity.index);
+		serializer.serializeArrayItem(m_impl->m_terrains[i]->m_heightmap->getPath().c_str());
+	}
+	serializer.endArray();}
 
 
 void PhysicsScene::deserialize(ISerializer& serializer)
@@ -780,6 +890,25 @@ void PhysicsScene::deserialize(ISerializer& serializer)
 		m_impl->m_universe->addComponent(e, CONTROLLER_HASH, this, i);
 	}		
 	serializer.deserializeArrayEnd();
+
+	serializer.deserialize("count", count);
+	for (int i = 0; i < m_impl->m_terrains.size(); ++i)
+	{
+		LUX_DELETE(m_impl->m_terrains[i]);
+	}
+	m_impl->m_terrains.clear();
+	serializer.deserializeArrayBegin("terrains");
+	for (int i = 0; i < count; ++i)
+	{
+		int index;
+		serializer.deserializeArrayItem(index);
+		Entity e(m_impl->m_universe, index);
+		createHeightfield(e);
+		char tmp[LUX_MAX_PATH];
+		serializer.deserializeArrayItem(tmp, LUX_MAX_PATH);
+		setHeightmap(Component(e, HEIGHTFIELD_HASH, this, i), string(tmp));
+	}
+	serializer.deserializeArrayEnd();
 }
 
 
@@ -787,6 +916,32 @@ PhysicsSystem& PhysicsScene::getSystem() const
 {
 	return *m_impl->m_system;
 }
+
+
+Terrain::Terrain()
+{
+	m_heightmap = NULL;
+}
+
+
+Terrain::~Terrain()
+{
+	if (m_heightmap)
+	{
+		m_heightmap->getResourceManager().get(ResourceManager::TEXTURE)->unload(*m_heightmap);
+		m_heightmap->getObserverCb().unbind<Terrain, &Terrain::heightmapLoaded>(this);
+	}
+}
+
+
+void Terrain::heightmapLoaded(Resource::State, Resource::State new_state)
+{
+	if (new_state == Resource::State::READY)
+	{
+		m_scene->heightmapLoaded(this);
+	}
+}
+
 
 
 } // !namespace Lux
