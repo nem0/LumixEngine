@@ -47,13 +47,16 @@ void ProfilerGraph::getBlockPath(ProfileModel::Block* block, QPainterPath& path,
 
 	path.moveTo(0, height());
 	
-	int i = m_model->getRoot()->m_frames.size() - block->m_frames.size();
-	for(auto iter = block->m_frames.begin(), end = block->m_frames.end(); iter != end; ++iter)
+	if(max > 0)
 	{
-		float l = i * w / (float)m_model->getRoot()->m_frames.size();
-		++i;
-		float t = (h - 1) * (1.0f - *iter / max);
-		path.lineTo(l, t);
+		int i = m_model->getRoot()->m_frames.size() - block->m_frames.size();
+		for(auto iter = block->m_frames.begin(), end = block->m_frames.end(); iter != end; ++iter)
+		{
+			float l = i * w / (float)m_model->getRoot()->m_frames.size();
+			++i;
+			float t = (h - 1) * (1.0f - *iter / max);
+			path.lineTo(l, t);
+		}
 	}
 	path.lineTo(width(), height());
 	path.closeSubpath();
