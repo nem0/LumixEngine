@@ -13,4 +13,4 @@ Features:
 
 [Data repository](https://github.com/nem0/lumixengine_data)
 
-![Editor screenshot](https://raw.githubusercontent.com/nem0/LumixEngine/profiler_history/docs/editor.png "Editor screenshot")
+![Editor screenshot](https://raw.githubusercontent.com/nem0/LumixEngine/master/docs/editor.png "Editor screenshot")
