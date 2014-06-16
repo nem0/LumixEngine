@@ -48,6 +48,7 @@ namespace Lumix
 		{
 			engine.getEditorServer()->registerCreator(ANIMABLE_HASH, *this);
 		}
+		engine.getEditorServer()->registerProperty("animable", LUMIX_NEW(PropertyDescriptor<AnimationSystem>)(crc32("preview"), &AnimationSystem::getPreview, &AnimationSystem::setPreview, IPropertyDescriptor::FILE));
 		return true;
 	}
 
@@ -180,6 +181,18 @@ namespace Lumix
 	{
 		ResourceManager& rm = m_impl->m_engine.getResourceManager();
 		return static_cast<Animation*>(rm.get(ResourceManager::ANIMATION)->load(path));
+	}
+
+
+	void AnimationSystem::getPreview(Component cmp, string& path)
+	{
+		path = m_impl->m_animables[cmp.index].m_animation ? m_impl->m_animables[cmp.index].m_animation->getPath().c_str() : "";
+	}
+
+
+	void AnimationSystem::setPreview(Component cmp, const string& path)
+	{
+		playAnimation(cmp, path.c_str());
 	}
 
 

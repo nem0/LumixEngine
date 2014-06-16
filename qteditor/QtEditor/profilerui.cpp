@@ -226,8 +226,7 @@ QVariant ProfileModel::data(const QModelIndex& index, int role) const
 			return block->m_name;
 		case Values::LENGTH:
 			{
-				int idx = m_root->m_frames.size() - m_frame;
-				return block->m_frames.size() >= idx ?  block->m_frames[block->m_frames.size() - idx] : 0;
+				return m_frame >= 0 && m_frame < block->m_frames.size() ? block->m_frames[m_frame] : 0;
 			}
 		default:
 			ASSERT(false);

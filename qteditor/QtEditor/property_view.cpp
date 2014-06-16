@@ -320,6 +320,10 @@ void PropertyView::onEntitySelected(Lumix::Event& event)
 		else if (e.components[i] == crc32("light"))
 		{
 		}
+		else if (e.components[i] == crc32("animable"))
+		{
+			addProperty("animable", "preview", "Preview animation", Property::FILE, "Animation (*.ani)");
+		}
 		else
 		{
 			ASSERT(false);
