@@ -24,7 +24,8 @@ SOURCES += main.cpp\
     scripts/scriptcompilerwidget.cpp \
     fileserverwidget.cpp \
     materialmanager.cpp \
-    profilerui.cpp
+    profilerui.cpp \
+    profilergraph.cpp
 
 HEADERS  += mainwindow.h \
     sceneview.h \ 
@@ -38,7 +39,8 @@ HEADERS  += mainwindow.h \
     materialmanager.h \
     wgl_render_device.h \
     renderdevicewidget.h \
-    profilerui.h 
+    profilerui.h \
+    profilergraph.h
 
 FORMS    += mainwindow.ui \
     logwidget.ui \
@@ -48,7 +50,8 @@ FORMS    += mainwindow.ui \
     scripts/scriptcompilerwidget.ui \
     fileserverwidget.ui \
     materialmanager.ui \
-    profilerui.ui
+    profilerui.ui \
+    profilergraph.ui
 
 win32
 {

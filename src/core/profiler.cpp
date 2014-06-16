@@ -10,7 +10,6 @@ namespace Lux
 	Profiler::Profiler()
 	{
 		m_timer = Timer::create();
-		m_frame_uid = 0;
 		m_current_block = NULL;
 		m_root_block = NULL;
 		m_is_recording = false;
@@ -27,10 +26,14 @@ namespace Lux
 
 	void Profiler::frame()
 	{
-		if (m_is_recording)
+		if(m_root_block)
 		{
-			m_frame_listeners.invoke(m_frame_uid);
-			++m_frame_uid;
+			if (m_is_recording)
+			{
+				m_frame_listeners.invoke();
+				ASSERT(!m_current_block);
+				m_root_block->frame();
+			}
 		}
 		if (m_is_record_toggle_request)
 		{
@@ -59,35 +62,24 @@ namespace Lux
 				if (m_root_block->m_name == name && m_root_block->m_function == function)
 				{
 					m_current_block = m_root_block;
-					if (m_frame_uid != m_root_block->m_frames[m_frame_uid % 100].m_index)
-					{
-						m_root_block->m_frames[m_frame_uid % 100].m_index = m_frame_uid;
-						m_root_block->m_frames[m_frame_uid % 100].m_length = 0;
-					}
-					m_root_block->m_frames[m_frame_uid % 100].m_start = m_timer->getTimeSinceStart();
 				}
 				else
 				{
 					ASSERT(false); // there can be only one root
 				}
-				return;
 			}
 			else
 			{
 				Block* root = LUX_NEW(Block);
 				root->m_parent = NULL;
 				root->m_next = NULL;
-				root->m_first_child = root->m_last_child = NULL;
+				root->m_first_child = NULL;
 				root->m_name = name;
 				root->m_function = function;
 				m_root_block = m_current_block = root;
-				m_root_block->m_frames[0].m_index = 0;
-				m_root_block->m_frames[0].m_length = 0;
-				m_root_block->m_frames[0].m_start = m_timer->getTimeSinceStart();
-				return;
 			}
 		}
-		if (m_current_block)
+		else
 		{
 			Block* child = m_current_block->m_first_child;
 			while (child && child->m_name != name && child->m_function != function)
@@ -97,30 +89,19 @@ namespace Lux
 			if (!child)
 			{
 				child = LUX_NEW(Block);
-				if(m_current_block->m_last_child)
-				{
-					m_current_block->m_last_child->m_next = child;
-				}
-				if(!m_current_block->m_first_child)
-				{
-					m_current_block->m_first_child = child;
-				}
-				m_current_block->m_last_child = child;
 				child->m_parent = m_current_block;
-				child->m_next = NULL;
-				child->m_first_child = child->m_last_child = NULL;
+				child->m_first_child = NULL;
 				child->m_name = name;
 				child->m_function = function;
+				child->m_next = m_current_block->m_first_child;
+				m_current_block->m_first_child = child;
 			}
-			if (m_frame_uid != child->m_frames[m_frame_uid % 100].m_index)
-			{
-				child->m_frames[m_frame_uid % 100].m_index = m_frame_uid;
-				child->m_frames[m_frame_uid % 100].m_length = 0;
-			}
-			child->m_frames[m_frame_uid % 100].m_start = m_timer->getTimeSinceStart();
 
 			m_current_block = child;
 		}
+		Block::Hit& hit = m_current_block->m_hits.pushEmpty();
+		hit.m_start = m_timer->getTimeSinceStart();
+		hit.m_length = 0;
 	}
 
 	void Profiler::endBlock()
@@ -130,8 +111,33 @@ namespace Lux
 			return;
 		}
 		ASSERT(m_current_block);
-		m_current_block->m_frames[m_frame_uid % 100].m_length += 1000.0f * (m_timer->getTimeSinceStart() - m_current_block->m_frames[m_frame_uid % 100].m_start);
+		m_current_block->m_hits.back().m_length = 1000.0f * (m_timer->getTimeSinceStart() - m_current_block->m_hits.back().m_start);
 		m_current_block = m_current_block->m_parent;
+	}
+
+
+	float Profiler::Block::getLength()
+	{
+		float ret = 0;
+		for (int i = 0, c = m_hits.size(); i < c; ++i)
+		{
+			ret += m_hits[i].m_length;
+		}
+		return ret;
+	}
+
+
+	void Profiler::Block::frame()
+	{
+		m_hits.clear();
+		if (m_first_child)
+		{
+			m_first_child->frame();
+		}
+		if(m_next)
+		{
+			m_next->frame();
+		}
 	}
 
 
