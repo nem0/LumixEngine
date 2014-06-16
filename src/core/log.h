@@ -1,11 +1,11 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/delegate_list.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 	class LUX_CORE_API Log
@@ -29,4 +29,4 @@ namespace Lux
 	extern Log LUX_CORE_API g_log_error;
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

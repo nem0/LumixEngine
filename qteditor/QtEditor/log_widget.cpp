@@ -9,9 +9,9 @@ LogWidget::LogWidget(QWidget* parent) :
 {
 	m_ui->setupUi(this);
 	connect(this, SIGNAL(infoReceived(const QString&, const QString&)), this, SLOT(onInfoReceived(const QString&, const QString&)));
-	Lux::g_log_info.getCallback().bind<LogWidget, &LogWidget::onInfo>(this);
-	Lux::g_log_warning.getCallback().bind<LogWidget, &LogWidget::onInfo>(this);
-	Lux::g_log_error.getCallback().bind<LogWidget, &LogWidget::onInfo>(this);
+	Lumix::g_log_info.getCallback().bind<LogWidget, &LogWidget::onInfo>(this);
+	Lumix::g_log_warning.getCallback().bind<LogWidget, &LogWidget::onInfo>(this);
+	Lumix::g_log_error.getCallback().bind<LogWidget, &LogWidget::onInfo>(this);
 
 }
 

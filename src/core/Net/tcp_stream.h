@@ -1,9 +1,9 @@
 #pragma once
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include <string.h>
 
-namespace Lux
+namespace Lumix
 {
 	namespace Net
 	{
@@ -115,4 +115,4 @@ namespace Lux
 			uintptr_t m_socket;
 		};
 	} // ~namespace Net
-} // ~namespace Lux
+} // ~namespace Lumix

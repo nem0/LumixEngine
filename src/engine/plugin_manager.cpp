@@ -5,7 +5,7 @@
 #include <Windows.h>
 
 
-namespace Lux 
+namespace Lumix 
 {
 	struct PluginManagerImpl
 	{
@@ -111,7 +111,7 @@ namespace Lux
 	
 	bool PluginManager::create(Engine& engine)
 	{
-		m_impl = LUX_NEW(PluginManagerImpl)();
+		m_impl = LUMIX_NEW(PluginManagerImpl)();
 		m_impl->m_engine = &engine;
 		return true;
 	}
@@ -129,4 +129,4 @@ namespace Lux
 	}
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

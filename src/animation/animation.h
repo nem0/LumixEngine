@@ -3,7 +3,7 @@
 #include "core/resource.h"
 #include "core/resource_manager_base.h"
 
-namespace Lux
+namespace Lumix
 {
 
 namespace FS
@@ -53,4 +53,4 @@ class Animation : public Resource
 };
 
 
-} // ~ namespace Lux
+} // ~ namespace Lumix

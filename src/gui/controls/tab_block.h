@@ -5,7 +5,7 @@
 #include "gui/block.h"
 
 
-namespace Lux
+namespace Lumix
 {
 namespace UI
 {
@@ -19,8 +19,8 @@ namespace UI
 			virtual void serialize(ISerializer& serializer) override;
 			virtual void deserialize(ISerializer& serializer) override;
 
-			Lux::UI::Block& addPage(const char* title);
-			Lux::UI::Block* getPageContent(int index);
+			Lumix::UI::Block& addPage(const char* title);
+			Lumix::UI::Block* getPageContent(int index);
 			void setPageTitle(int index, const char* title);
 			const char* getPageTitle(int index);
 			void removePage(int index);
@@ -29,10 +29,10 @@ namespace UI
 			void labelClick(Block& block, void*);
 
 		private:
-			Lux::UI::Block* m_header;
-			Lux::UI::Block* m_tab_content;
+			Lumix::UI::Block* m_header;
+			Lumix::UI::Block* m_tab_content;
 	};
 
 
 } // ~namespace UI
-} // ~namespace Lux
+} // ~namespace Lumix

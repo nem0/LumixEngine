@@ -1,7 +1,7 @@
 #include "core/math_utils.h"
 
 
-namespace Lux
+namespace Lumix
 {
 	namespace Math
 	{
@@ -31,4 +31,4 @@ namespace Lux
 			return true;
 		}
 	} // ~namespace Math
-} // ~namespace Lux
+} // ~namespace Lumix

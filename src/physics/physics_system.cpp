@@ -14,7 +14,7 @@
 #include "universe/entity_moved_event.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -26,7 +26,7 @@ static const uint32_t HEIGHTFIELD_HASH = crc32("physical_heightfield");
 
 extern "C" IPlugin* createPlugin()
 {
-	return LUX_NEW(PhysicsSystem)();
+	return LUMIX_NEW(PhysicsSystem)();
 }
 
 
@@ -38,7 +38,7 @@ struct CustomErrorCallback : public physx::PxErrorCallback
 
 void PhysicsSystem::onCreateUniverse(Universe& universe)
 {
-	m_impl->m_scene = LUX_NEW(PhysicsScene)();
+	m_impl->m_scene = LUMIX_NEW(PhysicsScene)();
 	m_impl->m_scene->create(*this, universe, *m_impl->m_engine);
 }
 
@@ -108,18 +108,18 @@ PhysicsScene* PhysicsSystem::getScene() const
 
 bool PhysicsSystem::create(Engine& engine)
 {
-	engine.getEditorServer()->registerProperty("box_rigid_actor", LUX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("dynamic"), &PhysicsScene::getIsDynamic, &PhysicsScene::setIsDynamic));
-	engine.getEditorServer()->registerProperty("box_rigid_actor", LUX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("size"), &PhysicsScene::getHalfExtents, &PhysicsScene::setHalfExtents));
-	engine.getEditorServer()->registerProperty("mesh_rigid_actor", LUX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("source"), &PhysicsScene::getShapeSource, &PhysicsScene::setShapeSource, IPropertyDescriptor::FILE));
-	engine.getEditorServer()->registerProperty("physical_heightfield", LUX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("heightmap"), &PhysicsScene::getHeightmap, &PhysicsScene::setHeightmap, IPropertyDescriptor::FILE));
+	engine.getEditorServer()->registerProperty("box_rigid_actor", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("dynamic"), &PhysicsScene::getIsDynamic, &PhysicsScene::setIsDynamic));
+	engine.getEditorServer()->registerProperty("box_rigid_actor", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("size"), &PhysicsScene::getHalfExtents, &PhysicsScene::setHalfExtents));
+	engine.getEditorServer()->registerProperty("mesh_rigid_actor", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("source"), &PhysicsScene::getShapeSource, &PhysicsScene::setShapeSource, IPropertyDescriptor::FILE));
+	engine.getEditorServer()->registerProperty("physical_heightfield", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("heightmap"), &PhysicsScene::getHeightmap, &PhysicsScene::setHeightmap, IPropertyDescriptor::FILE));
 	engine.getEditorServer()->registerCreator(HEIGHTFIELD_HASH, *this);
 	engine.getEditorServer()->registerCreator(BOX_ACTOR_HASH, *this);
 	engine.getEditorServer()->registerCreator(MESH_ACTOR_HASH, *this);
 	engine.getEditorServer()->registerCreator(CONTROLLER_HASH, *this);
 
-	m_impl = LUX_NEW(PhysicsSystemImpl);
-	m_impl->m_allocator = LUX_NEW(physx::PxDefaultAllocator)();
-	m_impl->m_error_callback = LUX_NEW(CustomErrorCallback)();
+	m_impl = LUMIX_NEW(PhysicsSystemImpl);
+	m_impl->m_allocator = LUMIX_NEW(physx::PxDefaultAllocator)();
+	m_impl->m_error_callback = LUMIX_NEW(CustomErrorCallback)();
 	m_impl->m_engine = &engine;
 	m_impl->m_foundation = PxCreateFoundation(
 		PX_PHYSICS_VERSION,
@@ -174,7 +174,7 @@ void CustomErrorCallback::reportError(physx::PxErrorCode::Enum code, const char*
 }
 
 
-} // !namespace Lux
+} // !namespace Lumix
 
 
 

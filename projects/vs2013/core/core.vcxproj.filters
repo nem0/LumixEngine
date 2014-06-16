@@ -14,7 +14,6 @@
     <ClInclude Include="..\..\..\src\core\iserializer.h" />
     <ClInclude Include="..\..\..\src\core\json_serializer.h" />
     <ClInclude Include="..\..\..\src\core\log.h" />
-    <ClInclude Include="..\..\..\src\core\lux.h" />
     <ClInclude Include="..\..\..\src\core\map.h" />
     <ClInclude Include="..\..\..\src\core\math_utils.h" />
     <ClInclude Include="..\..\..\src\core\matrix.h" />
@@ -125,6 +124,7 @@
       <Filter>MT</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\profiler.h" />
+    <ClInclude Include="..\..\..\src\core\lumix.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\core\blob.cpp" />

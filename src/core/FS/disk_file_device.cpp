@@ -6,7 +6,7 @@
 #include "core/os_file.h"
 
 
-namespace Lux
+namespace Lumix
 {
 	namespace FS
 	{
@@ -62,7 +62,7 @@ namespace Lux
 
 		IFile* DiskFileDevice::createFile(IFile*)
 		{
-			return LUX_NEW(DiskFile)();
+			return LUMIX_NEW(DiskFile)();
 		}
 	} // namespace FS
-} // ~namespace Lux
+} // ~namespace Lumix

@@ -7,7 +7,7 @@
 
 #pragma comment(lib, "Ws2_32.lib")
 
-namespace Lux
+namespace Lumix
 {
 	namespace Net
 	{
@@ -45,9 +45,9 @@ namespace Lux
 			}
 
 			m_socket = socket;
-			return LUX_NEW(TCPStream)(socket);		
+			return LUMIX_NEW(TCPStream)(socket);		
 		}
 	} // ~namespace Net
-} // ~namespace Lux
+} // ~namespace Lumix
 
 #endif DISABLE_NETWORK

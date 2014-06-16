@@ -6,7 +6,7 @@
 #include "core/string.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -198,4 +198,4 @@ void PropertyDescriptor<S>::get(Component cmp, Blob& stream) const
 }
 
 
-} // !namespace Lux
+} // !namespace Lumix

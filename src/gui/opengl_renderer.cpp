@@ -16,7 +16,7 @@
 #include "gui/texture_base.h"
 
 
-namespace Lux
+namespace Lumix
 {
 namespace UI
 {
@@ -89,7 +89,7 @@ namespace UI
 
 	bool OpenGLRenderer::create()
 	{
-		m_impl = LUX_NEW(OpenGLRendererImpl)();
+		m_impl = LUMIX_NEW(OpenGLRendererImpl)();
 		return true;
 	}
 
@@ -120,7 +120,7 @@ namespace UI
 		{
 			return img;
 		}
-		img = LUX_NEW(OpenGLTexture)(name, (float)0, (float)0);
+		img = LUMIX_NEW(OpenGLTexture)(name, (float)0, (float)0);
 		static_cast<OpenGLTexture*>(img)->setId(0);
 		static_cast<OpenGLTexture*>(img)->setFileSystem(file_system);
 
@@ -135,7 +135,7 @@ namespace UI
 		if(success)
 		{
 			size_t buffer_size = file->size();
-			char* buffer = LUX_NEW_ARRAY(char, buffer_size);
+			char* buffer = LUMIX_NEW_ARRAY(char, buffer_size);
 			file->read(buffer, buffer_size);			
 			m_fs->close(file);
 
@@ -158,7 +158,7 @@ namespace UI
 			}
 	
 			const char* image_src = buffer + sizeof(TGAHeader);
-			unsigned char* image_dest = LUX_NEW_ARRAY(unsigned char, image_size);
+			unsigned char* image_dest = LUMIX_NEW_ARRAY(unsigned char, image_size);
 	
 
 			// Targa is BGR, swap to RGB and flip Y axis
@@ -568,4 +568,4 @@ namespace UI
 
 
 } // ~namespace UI
-} // ~namespace Lux
+} // ~namespace Lumix

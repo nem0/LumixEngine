@@ -39,18 +39,18 @@ class FileServerWatcher
 			m_fe_device.OnEvent.bind<FileServerWatcher, &FileServerWatcher::fsEventCb>(this);
 		}
 
-		void fsEventCb(const Lux::FS::Event& event)
+		void fsEventCb(const Lumix::FS::Event& event)
 		{
 			m_widget.emitFileEvent(event, m_timer.nsecsElapsed());
 		}
 
-		Lux::FS::FileEventsDevice& getFileEventDevice() 
+		Lumix::FS::FileEventsDevice& getFileEventDevice() 
 		{ 
 			return m_fe_device; 
 		}
 
 private:
-		Lux::FS::FileEventsDevice m_fe_device;
+		Lumix::FS::FileEventsDevice m_fe_device;
 		QElapsedTimer m_timer;
 		FileServerWidget& m_widget;
 };
@@ -114,18 +114,18 @@ void FileServerWidget::onFileEvent(qint32 event, qint64 handle, const QString& p
 }
 
 
-void FileServerWidget::emitFileEvent(const Lux::FS::Event& event, qint64 time)
+void FileServerWidget::emitFileEvent(const Lumix::FS::Event& event, qint64 time)
 {
 	emit fileEvent((qint32)event.type, event.handle, event.path, event.ret, event.param, time);
 }
 
 
-void FileServerWidget::setEditorServer(Lux::EditorServer& server)
+void FileServerWidget::setEditorServer(Lumix::EditorServer& server)
 {
 	m_server = &server;
 
-	Lux::FS::FileEventsDevice& dev = m_watcher->getFileEventDevice();
-	Lux::FS::FileSystem& fs = m_server->getEngine().getFileSystem();
+	Lumix::FS::FileEventsDevice& dev = m_watcher->getFileEventDevice();
+	Lumix::FS::FileSystem& fs = m_server->getEngine().getFileSystem();
 	fs.mount(&dev);
 	fs.setDefaultDevice("memory:events:tcp");
 }

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "core/lux.h"
+#include "core/lumix.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace MT
 	{
@@ -13,4 +13,4 @@ namespace Lux
 		LUX_CORE_API bool compareAndExchange(int32_t volatile* dest, int32_t exchange, int32_t comperand);
 		LUX_CORE_API bool compareAndExchange64(int64_t volatile* dest, int64_t exchange, int64_t comperand);
 	} // ~namespace MT
-} // ~namespace Lux
+} // ~namespace Lumix

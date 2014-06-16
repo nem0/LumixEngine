@@ -8,7 +8,7 @@
 #include "gui/texture_base.h"
 
 
-namespace Lux
+namespace Lumix
 {
 namespace UI
 {
@@ -82,7 +82,7 @@ namespace UI
 			Dockable& dockable = static_cast<Dockable&>(block);
 			if(dockable.isDragged())
 			{
-				Lux::UI::Block* dest = dockable.getGui().getBlock(dockable.getDragX(), dockable.getDragY());
+				Lumix::UI::Block* dest = dockable.getGui().getBlock(dockable.getDragX(), dockable.getDragY());
 				while(dest)
 				{
 					if(dest->getType() == dockable_hash && dest != &dockable && dest != dockable.getContainingDockable())
@@ -108,4 +108,4 @@ namespace UI
 
 
 } // ~namespace UI
-} // ~namespace Lux
+} // ~namespace Lumix

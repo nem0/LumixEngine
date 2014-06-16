@@ -23,7 +23,7 @@
 #include "graphics/pipeline.h"
 #include "animation/animation.h"
 
-namespace Lux
+namespace Lumix
 {
 
 	const Event::Type Engine::UniverseCreatedEvent::s_type = crc32("engine_universe_created_event");
@@ -109,7 +109,7 @@ namespace Lux
 		{
 			return false;
 		}
-		AnimationSystem* anim_system = LUX_NEW(AnimationSystem)();
+		AnimationSystem* anim_system = LUMIX_NEW(AnimationSystem)();
 		if(!anim_system->create(owner))
 		{
 			LUX_DELETE(anim_system);
@@ -137,15 +137,15 @@ namespace Lux
 		g_log_warning.getCallback().bind<showLogInVS>();
 		g_log_error.getCallback().bind<showLogInVS>();
 
-		m_impl = LUX_NEW(EngineImpl)(*this);
+		m_impl = LUMIX_NEW(EngineImpl)(*this);
 		m_impl->m_editor_server = editor_server;
 
 		if(NULL == file_system)
 		{
 			m_impl->m_file_system = FS::FileSystem::create();
 
-			m_impl->m_mem_file_device = LUX_NEW(FS::MemoryFileDevice);
-			m_impl->m_disk_file_device = LUX_NEW(FS::DiskFileDevice);
+			m_impl->m_mem_file_device = LUMIX_NEW(FS::MemoryFileDevice);
+			m_impl->m_disk_file_device = LUMIX_NEW(FS::DiskFileDevice);
 
 			m_impl->m_file_system->mount(m_impl->m_mem_file_device);
 			m_impl->m_file_system->mount(m_impl->m_disk_file_device);
@@ -200,7 +200,7 @@ namespace Lux
 
 	Universe* Engine::createUniverse()
 	{
-		m_impl->m_universe = LUX_NEW(Universe)();
+		m_impl->m_universe = LUMIX_NEW(Universe)();
 		m_impl->m_render_scene = RenderScene::createInstance(*this, *m_impl->m_universe);
 		m_impl->m_plugin_manager.onCreateUniverse(*m_impl->m_universe);
 		m_impl->m_script_system->setUniverse(m_impl->m_universe);
@@ -335,4 +335,4 @@ namespace Lux
 	}
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

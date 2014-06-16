@@ -12,7 +12,7 @@
 
 #undef min
 
-namespace Lux
+namespace Lumix
 {
 	void memTrackerLog(const char*, const char* message, ...)
 	{
@@ -380,8 +380,8 @@ namespace Lux
 
 	MemoryTracker::~MemoryTracker()
 	{
-		Lux::MemoryTracker::getInstance().dumpDetailed();
+		Lumix::MemoryTracker::getInstance().dumpDetailed();
 	}
-} //~namespace Lux
+} //~namespace Lumix
 
 #endif //~MEM_TRACK

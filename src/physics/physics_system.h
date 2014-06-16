@@ -1,11 +1,11 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "engine/iplugin.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -39,4 +39,4 @@ extern "C"
 }
 
 
-} // !namespace Lux
+} // !namespace Lumix

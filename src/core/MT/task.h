@@ -1,8 +1,8 @@
 #pragma once
 
-#include "core/lux.h"
+#include "core/lumix.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace MT
 	{
@@ -47,4 +47,4 @@ namespace Lux
 			struct TaskImpl* m_implementation;
 		};	
 	} // ~namespace MT
-} // ~namespace Lux
+} // ~namespace Lumix

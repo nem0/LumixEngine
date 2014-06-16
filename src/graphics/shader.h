@@ -3,7 +3,7 @@
 #include "graphics/gl_ext.h"
 
 
-namespace Lux
+namespace Lumix
 {
 namespace FS
 {
@@ -49,4 +49,4 @@ class LUX_ENGINE_API Shader : public Resource
 };
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

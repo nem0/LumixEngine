@@ -39,13 +39,13 @@ class App
 			m_server.destroy();
 		}
 
-		void onUniverseCreated(Lux::Event&)
+		void onUniverseCreated(Lumix::Event&)
 		{
 			m_edit_render_device->getPipeline().setScene(m_server.getEngine().getRenderScene()); 
 			m_game_render_device->getPipeline().setScene(m_server.getEngine().getRenderScene()); 
 		}
 
-		void onUniverseDestroyed(Lux::Event&)
+		void onUniverseDestroyed(Lumix::Event&)
 		{
 			if(m_edit_render_device)
 			{
@@ -67,7 +67,7 @@ class App
 			ASSERT(hdc != NULL);
 			if (hdc == NULL)
 			{
-				Lux::g_log_error.log("renderer", "Could not get the device context");
+				Lumix::g_log_error.log("renderer", "Could not get the device context");
 				return NULL;
 			}
 			PIXELFORMATDESCRIPTOR pfd = 
@@ -95,14 +95,14 @@ class App
 			if (pixelformat == 0)
 			{
 				ASSERT(false);
-				Lux::g_log_error.log("renderer", "Could not choose a pixel format");
+				Lumix::g_log_error.log("renderer", "Could not choose a pixel format");
 				return NULL;
 			}
 			BOOL success = SetPixelFormat(hdc, pixelformat, &pfd);
 			if (success == FALSE)
 			{
 				ASSERT(false);
-				Lux::g_log_error.log("renderer", "Could not set a pixel format");
+				Lumix::g_log_error.log("renderer", "Could not set a pixel format");
 				return NULL;
 			}
 			for (int i = 1; i < count; ++i)
@@ -113,14 +113,14 @@ class App
 					if (hdc2 == NULL)
 					{
 						ASSERT(false);
-						Lux::g_log_error.log("renderer", "Could not get the device context");
+						Lumix::g_log_error.log("renderer", "Could not get the device context");
 						return NULL;
 					}
 					BOOL success = SetPixelFormat(hdc2, pixelformat, &pfd);
 					if (success == FALSE)
 					{
 						ASSERT(false);
-						Lux::g_log_error.log("renderer", "Could not set a pixel format");
+						Lumix::g_log_error.log("renderer", "Could not set a pixel format");
 						return NULL;
 					}
 				}
@@ -129,14 +129,14 @@ class App
 			if (hglrc == NULL)
 			{
 				ASSERT(false);
-				Lux::g_log_error.log("renderer", "Could not create an opengl context");
+				Lumix::g_log_error.log("renderer", "Could not create an opengl context");
 				return NULL;
 			}
 			success = wglMakeCurrent(hdc, hglrc);
 			if (success == FALSE)
 			{
 				ASSERT(false);
-				Lux::g_log_error.log("renderer", "Could not make the opengl context current rendering context");
+				Lumix::g_log_error.log("renderer", "Could not make the opengl context current rendering context");
 				return NULL;
 			}
 			return hglrc;
@@ -144,7 +144,7 @@ class App
 
 		void renderPhysics()
 		{
-			Lux::PhysicsSystem* system = static_cast<Lux::PhysicsSystem*>(m_server.getEngine().getPluginManager().getPlugin("physics"));
+			Lumix::PhysicsSystem* system = static_cast<Lumix::PhysicsSystem*>(m_server.getEngine().getPluginManager().getPlugin("physics"));
 			if(system && system->getScene())
 			{
 				system->getScene()->render();
@@ -189,8 +189,8 @@ class App
 			m_game_render_device->getPipeline().setScene(m_server.getEngine().getRenderScene()); /// TODO manage scene properly
 			m_server.getEngine().getRenderer().setRenderDevice(*m_game_render_device);
 
-			m_server.getEngine().getEventManager().addListener(Lux::Engine::UniverseCreatedEvent::s_type).bind<App, &App::onUniverseCreated>(this);
-			m_server.getEngine().getEventManager().addListener(Lux::Engine::UniverseDestroyedEvent::s_type).bind<App, &App::onUniverseDestroyed>(this);
+			m_server.getEngine().getEventManager().addListener(Lumix::Engine::UniverseCreatedEvent::s_type).bind<App, &App::onUniverseCreated>(this);
+			m_server.getEngine().getEventManager().addListener(Lumix::Engine::UniverseDestroyedEvent::s_type).bind<App, &App::onUniverseDestroyed>(this);
 
 			m_main_window->getSceneView()->setPipeline(m_edit_render_device->getPipeline());
 			m_main_window->getGameView()->setPipeline(m_game_render_device->getPipeline());
@@ -267,7 +267,7 @@ class App
 					m_server.tick();
 					handleEvents();
 				}
-				Lux::g_profiler.frame();
+				Lumix::g_profiler.frame();
 			}
 		}
 
@@ -275,8 +275,8 @@ class App
 		WGLRenderDevice* m_edit_render_device;
 		WGLRenderDevice* m_game_render_device;
 		MainWindow* m_main_window;
-		Lux::EditorServer m_server;
-		Lux::EditorClient m_client;
+		Lumix::EditorServer m_server;
+		Lumix::EditorClient m_client;
 		QApplication* m_qt_app;
 };
 

@@ -1,13 +1,13 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/vec3.h"
 #include "gui/atlas.h"
 #include "gui/decorator_base.h"
 
 
-namespace Lux
+namespace Lumix
 {
 namespace UI
 {
@@ -36,4 +36,4 @@ namespace UI
 	};
 
 } // ~namespace UI
-} // ~namespace Lux
+} // ~namespace Lumix

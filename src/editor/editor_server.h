@@ -1,12 +1,12 @@
 #pragma once
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include "editor/property_descriptor.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 

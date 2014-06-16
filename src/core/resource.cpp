@@ -1,11 +1,11 @@
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/resource.h"
 
 #include "core/fs/file_system.h"
 #include "core/path.h"
 #include "core/resource_manager.h"
 
-namespace Lux
+namespace Lumix
 {
 	Resource::Resource(const Path& path, ResourceManager& resource_manager)
 		: m_ref_count()
@@ -115,4 +115,4 @@ namespace Lux
 		if(--m_dep_count == 0)
 			onReady();
 	}
-} // ~namespace Lux
+} // ~namespace Lumix

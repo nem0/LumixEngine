@@ -1,12 +1,12 @@
 #pragma once
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/array.h"
 #include "core/string.h"
 #include "graphics/ray_cast_model_hit.h"
 #include "universe/component.h"
 
-namespace Lux
+namespace Lumix
 {
 
 	class Engine;

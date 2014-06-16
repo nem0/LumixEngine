@@ -3,7 +3,7 @@
 #include "core/vec3.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -188,4 +188,4 @@ void Matrix::setIdentity(Matrix& mtx)
 }
 
 
-} // !namespace Lux
+} // !namespace Lumix

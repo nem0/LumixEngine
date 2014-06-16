@@ -1,9 +1,9 @@
 #pragma once
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/fs/ifile_system_defines.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace FS
 	{
@@ -29,4 +29,4 @@ namespace Lux
 			struct OsFileImpl* m_impl;
 		};
 	} // ~namespace FS
-} // ~namespace Lux
+} // ~namespace Lumix

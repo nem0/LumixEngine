@@ -1,12 +1,12 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/string.h"
 #include "universe/universe.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -43,4 +43,4 @@ class LUX_ENGINE_API ScriptSystem abstract
 };
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

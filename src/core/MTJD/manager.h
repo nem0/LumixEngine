@@ -13,7 +13,7 @@
 #include "core/MT/transaction.h"
 #include "core/Array.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace MTJD
 	{

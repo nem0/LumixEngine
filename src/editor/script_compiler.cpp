@@ -55,7 +55,7 @@ void ScriptCompiler::compile(const char path[])
         &si,
         &pi) == TRUE)
 	{
-		Process* p = LUX_NEW(Process);
+		Process* p = LUMIX_NEW(Process);
 		p->m_handle = pi.hProcess;
 		p->m_path = path;
 		p->m_pipe = read_pipe;
@@ -71,7 +71,7 @@ void ScriptCompiler::compile(const char path[])
 
 ScriptCompiler::Status ScriptCompiler::getStatus(const char* path)
 {
-	Lux::Map<uint32_t, Status>::iterator iter = m_status.find(crc32(path));
+	Lumix::Map<uint32_t, Status>::iterator iter = m_status.find(crc32(path));
 	return iter == m_status.end() ? UNKNOWN : iter.second();
 }
 
@@ -92,7 +92,7 @@ void ScriptCompiler::checkFinished()
 				DWORD read;
 				if(code != 0)
 				{
-					static Lux::string text;
+					static Lumix::string text;
 					text = "";
 					do
 					{
@@ -101,7 +101,7 @@ void ScriptCompiler::checkFinished()
 						text += buf;
 					}
 					while(read == 512);
-					Lux::g_log_info.log("compile script", text.c_str());
+					Lumix::g_log_info.log("compile script", text.c_str());
 				}
 				m_status[crc32(p->m_path.c_str())] = code == 0 ? SUCCESS : FAILURE;
 				CloseHandle(p->m_pipe);

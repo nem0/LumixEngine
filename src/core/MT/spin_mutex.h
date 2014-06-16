@@ -1,7 +1,7 @@
 #pragma once
-#include "core/lux.h"
+#include "core/lumix.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace MT
 	{
@@ -33,4 +33,4 @@ namespace Lux
 			SpinMutex& m_mutex;
 		};
 	}; // ~namespace MT
-}; // ~namespace Lux
+}; // ~namespace Lumix

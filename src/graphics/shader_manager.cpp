@@ -1,10 +1,10 @@
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "graphics/shader_manager.h"
 
 #include "core/resource.h"
 #include "graphics/shader.h"
 
-namespace Lux
+namespace Lumix
 {
 	ShaderManager::ShaderManager()
 		: ResourceManagerBase()
@@ -22,7 +22,7 @@ namespace Lux
 
 	Resource* ShaderManager::createResource(const Path& path)
 	{
-		return LUX_NEW(Shader)(path, getOwner());
+		return LUMIX_NEW(Shader)(path, getOwner());
 	}
 
 	void ShaderManager::destroyResource(Resource& resource)
@@ -40,7 +40,7 @@ namespace Lux
 		}
 		if (m_buffer == NULL)
 		{
-			m_buffer = LUX_NEW_ARRAY(uint8_t, size);
+			m_buffer = LUMIX_NEW_ARRAY(uint8_t, size);
 			m_buffer_size = size;
 		}
 		return m_buffer;

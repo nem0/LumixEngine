@@ -2,11 +2,11 @@
 #include "core/crc32.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
 const Event::Type EntityDestroyedEvent::type = crc32("entity_destroyed");
 
 
-} // !namespace Lux
+} // !namespace Lumix

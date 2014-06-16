@@ -1,9 +1,9 @@
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/path.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 
-namespace Lux
+namespace Lumix
 {
 	ResourceManager::ResourceManager() 
 	{

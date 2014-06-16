@@ -7,12 +7,12 @@
 
 ProfileModel::ProfileModel()
 {
-	Lux::g_profiler.getFrameListeners().bind<ProfileModel, &ProfileModel::onFrame>(this);
+	Lumix::g_profiler.getFrameListeners().bind<ProfileModel, &ProfileModel::onFrame>(this);
 	m_root = NULL;
 	m_frame = 0;
 }
 
-void ProfileModel::cloneBlock(Block* my_block, Lux::Profiler::Block* remote_block)
+void ProfileModel::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_block)
 {
 	ASSERT(my_block->m_name == remote_block->m_name);
 	my_block->m_frames.push_back(remote_block->getLength());
@@ -22,7 +22,7 @@ void ProfileModel::cloneBlock(Block* my_block, Lux::Profiler::Block* remote_bloc
 	}
 	if(!my_block->m_first_child && remote_block->m_first_child)
 	{
-		Lux::Profiler::Block* remote_child = remote_block->m_first_child;
+		Lumix::Profiler::Block* remote_child = remote_block->m_first_child;
 		Block* last_new_child = NULL;
 		while(remote_child)
 		{
@@ -47,7 +47,7 @@ void ProfileModel::cloneBlock(Block* my_block, Lux::Profiler::Block* remote_bloc
 	}
 	else if(my_block->m_first_child)
 	{
-		Lux::Profiler::Block* remote_child = remote_block->m_first_child;
+		Lumix::Profiler::Block* remote_child = remote_block->m_first_child;
 		Block* my_child = my_block->m_first_child;
 		while(remote_child)
 		{
@@ -74,18 +74,18 @@ void ProfileModel::cloneBlock(Block* my_block, Lux::Profiler::Block* remote_bloc
 
 void ProfileModel::onFrame()
 {
-	if(!m_root && Lux::g_profiler.getRootBlock())
+	if(!m_root && Lumix::g_profiler.getRootBlock())
 	{
 		m_root = new Block;
-		m_root->m_function = Lux::g_profiler.getRootBlock()->m_function;
-		m_root->m_name = Lux::g_profiler.getRootBlock()->m_name;
+		m_root->m_function = Lumix::g_profiler.getRootBlock()->m_function;
+		m_root->m_name = Lumix::g_profiler.getRootBlock()->m_name;
 		m_root->m_parent = NULL;
 		m_root->m_next = NULL;
 		m_root->m_first_child = NULL;
 	}
 	if(m_root)
 	{
-		cloneBlock(m_root, Lux::g_profiler.getRootBlock());
+		cloneBlock(m_root, Lumix::g_profiler.getRootBlock());
 	}
 	static int hit = 0;
 	++hit;
@@ -178,7 +178,7 @@ QModelIndex ProfileModel::parent(const QModelIndex& index) const
 int ProfileModel::rowCount(const QModelIndex& parent_index) const
 {
 	Block* parent;
-	if (parent_index.column() > 0 || Lux::g_profiler.getRootBlock() == NULL)
+	if (parent_index.column() > 0 || Lumix::g_profiler.getRootBlock() == NULL)
 		return 0;
 
 	if (!parent_index.isValid() || !parent_index.internalPointer())
@@ -266,7 +266,7 @@ ProfilerUI::~ProfilerUI()
 
 void ProfilerUI::on_recordCheckBox_stateChanged(int)
 {
-	Lux::g_profiler.toggleRecording();
+	Lumix::g_profiler.toggleRecording();
 	m_ui->profileTreeView->setModel(NULL);
 	m_ui->profileTreeView->setModel(m_model);
 	m_ui->profileTreeView->update();

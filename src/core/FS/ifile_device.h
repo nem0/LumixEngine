@@ -1,8 +1,8 @@
 #pragma once
 
-#include "core/lux.h"
+#include "core/lumix.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace FS
 	{
@@ -18,4 +18,4 @@ namespace Lux
 			virtual const char* name() const = 0;
 		};
 	} // ~namespace FS
-} // ~namespace Lux
+} // ~namespace Lumix

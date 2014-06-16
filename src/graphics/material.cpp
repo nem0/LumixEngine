@@ -12,7 +12,7 @@
 #include "graphics/texture.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 Material::~Material()
@@ -269,4 +269,4 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 }
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

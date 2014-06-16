@@ -6,7 +6,7 @@
 
 #ifdef FILE_EVENT_DEVICE
 
-namespace Lux
+namespace Lumix
 {
 	namespace FS
 	{
@@ -124,9 +124,9 @@ namespace Lux
 
 		IFile* FileEventsDevice::createFile(IFile* child)
 		{
-			return LUX_NEW(EventsFile)(*child, OnEvent);
+			return LUMIX_NEW(EventsFile)(*child, OnEvent);
 		}
 	} // namespace FS
-} // ~namespace Lux
+} // ~namespace Lumix
 
 #endif //FILE_EVENT_DEVICE

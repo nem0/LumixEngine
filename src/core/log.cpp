@@ -5,7 +5,7 @@
 #include <cstdarg>
 
 
-namespace Lux
+namespace Lumix
 {
 
 	Log g_log_info;
@@ -23,7 +23,7 @@ namespace Lux
 
 	Log::Log()
 	{
-		m_impl = LUX_NEW(LogImpl)();
+		m_impl = LUMIX_NEW(LogImpl)();
 	}
 
 
@@ -51,4 +51,4 @@ namespace Lux
 	}
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

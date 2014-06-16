@@ -5,7 +5,7 @@
 #include "universe/universe.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 	struct RayCastModelHit
@@ -18,4 +18,4 @@ namespace Lux
 		Component m_renderable;
 	};
 
-} // ~ namespace Lux
+} // ~ namespace Lumix

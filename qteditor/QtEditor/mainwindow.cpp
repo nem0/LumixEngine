@@ -73,14 +73,14 @@ MainWindow::~MainWindow()
 }
 
 
-void MainWindow::setEditorServer(Lux::EditorServer& server)
+void MainWindow::setEditorServer(Lumix::EditorServer& server)
 {
 	m_file_server_ui->setEditorServer(server);
 	m_asset_browser->setEditorServer(server);
 	m_material_manager_ui->setEditorServer(server);
 }
 
-void MainWindow::setEditorClient(Lux::EditorClient& client)
+void MainWindow::setEditorClient(Lumix::EditorClient& client)
 {
 	m_client = &client;
 	m_property_view->setEditorClient(client);

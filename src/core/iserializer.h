@@ -1,11 +1,11 @@
 #pragma once
 
 
-#include "lux.h"
+#include "lumix.h"
 #include "string.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -59,4 +59,4 @@ namespace Lux
 	};
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

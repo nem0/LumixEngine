@@ -1,11 +1,11 @@
-#include "unit_tests/suite/lux_unit_tests.h"
+#include "unit_tests/suite/lumix_unit_tests.h"
 
 #include <Windows.h>
 #include <stdio.h>
 
 #include "core/log.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace UnitTest
 	{

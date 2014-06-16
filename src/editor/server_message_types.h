@@ -7,7 +7,7 @@
 #include "core/event_manager.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -86,4 +86,4 @@ struct LUX_ENGINE_API PropertyListEvent : public Event
 };
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

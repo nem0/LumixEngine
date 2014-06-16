@@ -2,7 +2,7 @@
 
 #include <QMainWindow>
 
-namespace Lux
+namespace Lumix
 {
 	class EditorClient;
 	class EditorServer;
@@ -21,8 +21,8 @@ public:
 	explicit MainWindow(QWidget* parent = NULL);
 	~MainWindow();
 
-	void setEditorClient(Lux::EditorClient& client);
-	void setEditorServer(Lux::EditorServer& server);
+	void setEditorClient(Lumix::EditorClient& client);
+	void setEditorServer(Lumix::EditorServer& server);
 	class SceneView* getSceneView() const;
 	class GameView* getGameView() const;
 	class MaterialManager* getMaterialManager() const { return m_material_manager_ui; }
@@ -47,7 +47,7 @@ private slots:
 
 private:
 	Ui::MainWindow* m_ui;
-	Lux::EditorClient* m_client;
+	Lumix::EditorClient* m_client;
 	class LogWidget* m_log;
 	class PropertyView* m_property_view;
 	class SceneView* m_scene_view;

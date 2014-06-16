@@ -6,7 +6,7 @@
 
 #include "core/MTJD/manager.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace MTJD
 	{

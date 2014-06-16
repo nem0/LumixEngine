@@ -15,7 +15,7 @@
 #include "editor/server_message_types.h"
 #include "universe/universe.h"
 
-namespace Lux
+namespace Lumix
 {
 
 	struct EditorClientImpl
@@ -35,7 +35,7 @@ namespace Lux
 
 	bool EditorClient::create(const char* base_path, EditorServer& server)
 	{
-		m_impl = LUX_NEW(EditorClientImpl)(server);
+		m_impl = LUMIX_NEW(EditorClientImpl)(server);
 		m_impl->m_base_path = base_path;
 		return true;
 	}
@@ -209,4 +209,4 @@ namespace Lux
 	}
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

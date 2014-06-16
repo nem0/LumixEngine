@@ -8,23 +8,23 @@
 #include "gui/irenderer.h"
 #include "gui/texture_base.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace UI
 	{
 		struct AtlasImpl
 		{
 			void imageLoaded(TextureBase& img);
-			void atlasLoaded(Lux::FS::IFile* file, bool success, FS::FileSystem& fs);
+			void atlasLoaded(Lumix::FS::IFile* file, bool success, FS::FileSystem& fs);
 
 			Map<uint32_t, Atlas::Part*> m_parts;
 			TextureBase* m_texture;
 			string m_path;
 			IRenderer* m_renderer;
-			Lux::FS::FileSystem* m_filesystem;
+			Lumix::FS::FileSystem* m_filesystem;
 		};
 		
-		void AtlasImpl::atlasLoaded(Lux::FS::IFile* file, bool success, FS::FileSystem& fs)
+		void AtlasImpl::atlasLoaded(Lumix::FS::IFile* file, bool success, FS::FileSystem& fs)
 		{
 			if(success)
 			{
@@ -40,7 +40,7 @@ namespace Lux
 				for(int i = 0; i < count; ++i)
 				{
 					serializer.deserializeArrayItem(tmp, 260);
-					Atlas::Part* part = LUX_NEW(Atlas::Part)();
+					Atlas::Part* part = LUMIX_NEW(Atlas::Part)();
 					serializer.deserializeArrayItem(part->m_left);
 					serializer.deserializeArrayItem(part->m_top);
 					serializer.deserializeArrayItem(part->m_right);
@@ -79,7 +79,7 @@ namespace Lux
 
 		bool Atlas::create()
 		{
-			m_impl = LUX_NEW(AtlasImpl)();
+			m_impl = LUMIX_NEW(AtlasImpl)();
 			m_impl->m_texture = NULL;
 			m_impl->m_renderer = NULL;
 
@@ -103,7 +103,7 @@ namespace Lux
 			}
 		}
 
-		void Atlas::load(IRenderer& renderer, Lux::FS::FileSystem& file_system, const char* filename)
+		void Atlas::load(IRenderer& renderer, Lumix::FS::FileSystem& file_system, const char* filename)
 		{
 			m_impl->m_path = filename;
 			m_impl->m_renderer = &renderer;
@@ -111,7 +111,7 @@ namespace Lux
 
 			FS::ReadCallback atlas_loaded_cb;
 			atlas_loaded_cb.bind<AtlasImpl, &AtlasImpl::atlasLoaded>(m_impl);
-			file_system.openAsync(file_system.getDefaultDevice(), filename, Lux::FS::Mode::OPEN | Lux::FS::Mode::READ, atlas_loaded_cb);
+			file_system.openAsync(file_system.getDefaultDevice(), filename, Lumix::FS::Mode::OPEN | Lumix::FS::Mode::READ, atlas_loaded_cb);
 		}
 
 		TextureBase* Atlas::getTexture() const
@@ -132,5 +132,5 @@ namespace Lux
 			m_impl->m_parts.find(crc32(name), part);
 			return part;
 		}
-	} // ~namespace Lux
-} // ~namespace Lux
+	} // ~namespace Lumix
+} // ~namespace Lumix

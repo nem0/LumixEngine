@@ -4,7 +4,7 @@
 #include "graphics/gl_ext.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -64,5 +64,5 @@ class Geometry
 };
 
 
-} // ~namespace Lux
+} // ~namespace Lumix
 

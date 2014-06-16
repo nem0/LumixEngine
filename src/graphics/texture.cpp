@@ -7,7 +7,7 @@
 #include "graphics/texture.h"
 #include "graphics/texture_manager.h"
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -207,7 +207,7 @@ namespace DDS
 		}
 		else
 		{
-			uint8_t* tmp = LUX_NEW_ARRAY(uint8_t, size);
+			uint8_t* tmp = LUMIX_NEW_ARRAY(uint8_t, size);
 			memcpy(tmp, mem1, size);
 			memcpy(mem1, mem2, size);
 			memcpy(mem2, tmp, size);
@@ -619,7 +619,7 @@ bool Texture::loadDDS(FS::IFile& file)
 			g_log_error.log("renderer", "Unsupported DDS format or corrupted DDS %s", m_path.c_str());
 			return false;
 		}
-		unsigned char * data = LUX_NEW_ARRAY(unsigned char, size);
+		unsigned char * data = LUMIX_NEW_ARRAY(unsigned char, size);
 		uint32_t palette[256];
 		uint32_t* unpacked = (uint32_t*)manager->getBuffer(size * sizeof(uint32_t));
 		file.read(palette, 4 * 256);
@@ -714,4 +714,4 @@ FS::ReadCallback Texture::getReadCallback()
 	return cb;
 }
 
-} // ~namespace Lux
+} // ~namespace Lumix

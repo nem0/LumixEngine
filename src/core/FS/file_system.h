@@ -1,9 +1,9 @@
 #pragma once
 
 #include "core/fs/ifile_system_defines.h"
-#include "core/lux.h"
+#include "core/lumix.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace FS
 	{
@@ -37,4 +37,4 @@ namespace Lux
 			virtual void setSaveGameDevice(const char* dev) = 0;
 		};
 	} // ~namespace FS
-} // ~namespace Lux
+} // ~namespace Lumix

@@ -3,7 +3,7 @@
 #include "core/event_manager.h"
 #include "universe/entity_moved_event.h"
 
-namespace Lux
+namespace Lumix
 {
 
 	const Entity Entity::INVALID(0, -1);
@@ -134,5 +134,5 @@ namespace Lux
 	} 
 
 
-} // ~namespace Lux
+} // ~namespace Lumix
 

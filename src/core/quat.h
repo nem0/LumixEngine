@@ -2,10 +2,10 @@
 
 
 #include "core/vec3.h"
-#include "core/lux.h"
+#include "core/lumix.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -52,4 +52,4 @@ Vec3 Quat::operator *(const Vec3& v) const
 }
 
 
-} // !namespace Lux
+} // !namespace Lumix

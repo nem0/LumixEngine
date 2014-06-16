@@ -1,11 +1,11 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/string.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 	namespace FS
@@ -43,7 +43,7 @@ namespace Lux
 				bool create();
 				void destroy();
 
-				void load(IRenderer& renderer, Lux::FS::FileSystem& file_system, const char* filename);
+				void load(IRenderer& renderer, Lumix::FS::FileSystem& file_system, const char* filename);
 				TextureBase* getTexture() const;
 				const Part* getPart(const char* name);
 				const string& getPath() const;
@@ -52,6 +52,6 @@ namespace Lux
 				struct AtlasImpl* m_impl;
 		};
 
-	} // ~namespace Lux
+	} // ~namespace Lumix
 
-} // ~namespace Lux
+} // ~namespace Lumix

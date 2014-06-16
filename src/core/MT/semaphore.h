@@ -1,7 +1,7 @@
 #pragma once
-#include "core/lux.h"
+#include "core/lumix.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace MT
 	{
@@ -22,4 +22,4 @@ namespace Lux
 			SemaphoreHandle m_id;
 		};
 	}; // ~namespac MT
-}; //~namespace Lux
+}; //~namespace Lumix

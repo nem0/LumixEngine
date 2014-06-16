@@ -2,7 +2,7 @@
 #include "core/blob.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -49,7 +49,7 @@ void LogEvent::read(Blob& stream)
 	}
 	else
 	{
-		char* buf = LUX_NEW_ARRAY(char, len+1);
+		char* buf = LUMIX_NEW_ARRAY(char, len+1);
 		stream.read(buf, len);
 		buf[len] = 0;
 		message = buf;
@@ -68,10 +68,10 @@ void PropertyListEvent::read(Blob& stream)
 	{
 		stream.read(&properties[i].name_hash, sizeof(properties[i].name_hash));
 		stream.read(&properties[i].data_size, sizeof(properties[i].data_size));
-		properties[i].data = LUX_NEW_ARRAY(uint8_t, properties[i].data_size);
+		properties[i].data = LUMIX_NEW_ARRAY(uint8_t, properties[i].data_size);
 		stream.read(properties[i].data, properties[i].data_size);
 	}
 }
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

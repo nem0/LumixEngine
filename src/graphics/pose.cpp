@@ -4,7 +4,7 @@
 #include "core/vec3.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -28,8 +28,8 @@ void Pose::resize(int count)
 	LUX_DELETE_ARRAY(m_positions);
 	LUX_DELETE_ARRAY(m_rotations);
 	m_count = count;
-	m_positions = LUX_NEW_ARRAY(Vec3, count);
-	m_rotations = LUX_NEW_ARRAY(Quat, count);
+	m_positions = LUMIX_NEW_ARRAY(Vec3, count);
+	m_rotations = LUMIX_NEW_ARRAY(Quat, count);
 }
 
 
@@ -43,4 +43,4 @@ void Pose::setMatrices(Matrix* mtx) const
 }
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

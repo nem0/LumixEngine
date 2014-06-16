@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include <map>
 #include <vector>
 #include "core/iserializer.h"
@@ -10,7 +10,7 @@
 #include "core/string.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -118,4 +118,4 @@ namespace Lux
 	};
 
 
-} // !namespace lux
+} // !namespace Lumix

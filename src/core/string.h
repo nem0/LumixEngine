@@ -2,11 +2,11 @@
 
 
 #include "core/default_allocator.h"
-#include "core/lux.h"
+#include "core/lumix.h"
 #include <cstring>
 
 
-namespace Lux
+namespace Lumix
 {
 	
 
@@ -288,4 +288,4 @@ class base_string
 typedef base_string<char> string;
 
 
-} // !namespace Lux
+} // !namespace Lumix

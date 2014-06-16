@@ -7,7 +7,7 @@
 #include "core/json_serializer.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -36,7 +36,7 @@ void Universe::create()
 
 Universe::Universe()
 {
-	m_event_manager = LUX_NEW(EventManager);
+	m_event_manager = LUMIX_NEW(EventManager);
 	m_event_manager->addListener(ComponentEvent::type).bind<Universe, &Universe::onEvent>(this);
 }
 
@@ -177,4 +177,4 @@ void Universe::addComponent(const Entity& entity, uint32_t component_type, void*
 }
 
 
-} // !namespace Lux
+} // !namespace Lumix

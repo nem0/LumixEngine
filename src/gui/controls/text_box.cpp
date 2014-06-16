@@ -4,7 +4,7 @@
 #include "gui/gui.h"
 
 
-namespace Lux
+namespace Lumix
 {
 namespace UI
 {
@@ -14,7 +14,7 @@ TextBox::TextBox(const char* text, Gui& gui, Block* parent)
 	: Block(gui, parent, "_box")
 {
 	setArea(0, 0, 0, 0, 0, 100, 0, 20);
-	m_label_ui = LUX_NEW(Block)(gui, this, "_text");
+	m_label_ui = LUMIX_NEW(Block)(gui, this, "_text");
 	m_label_ui->setBlockText(text);
 	m_label_ui->setArea(0, 3, 0, 0, 1, 0, 1, 0);
 	m_label_ui->onEvent("key_down").bind<TextBox, &TextBox::keyDown>(this);
@@ -22,7 +22,7 @@ TextBox::TextBox(const char* text, Gui& gui, Block* parent)
 	m_label_ui->onEvent("blur").bind<TextBox, &TextBox::blurred>(this);
 	m_label_ui->setIsClipping(true);
 	m_cursor_pos = 0; 
-	m_cursor = LUX_NEW(Block)(gui, m_label_ui, "_cursor");
+	m_cursor = LUMIX_NEW(Block)(gui, m_label_ui, "_cursor");
 	m_cursor->hide();
 }
 
@@ -63,7 +63,7 @@ static const int32_t KEY_DELETE = '\177';
 
 void TextBox::keyDown(Block& block, void* user_data)
 {
-	Lux::string s = block.getBlockText();
+	Lumix::string s = block.getBlockText();
 	char c[2];
 	switch((int32_t)user_data)
 	{
@@ -146,4 +146,4 @@ void TextBox::deserialize(ISerializer& serializer)
 
 
 } // ~namespace UI
-} // ~namespace Lux
+} // ~namespace Lumix

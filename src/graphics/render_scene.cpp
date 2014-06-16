@@ -22,7 +22,7 @@
 #include "universe/universe.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 	static const uint32_t RENDERABLE_HASH = crc32("renderable");
@@ -94,7 +94,7 @@ namespace Lux
 			VertexDef vertex_def;
 			vertex_def.parse("ptn", 3);
 			m_geometry.copy((const uint8_t*)&points[0], sizeof(points[0]) * points.size(), indices, vertex_def);
-			m_mesh = LUX_NEW(Mesh)(m_material, 0, indices.size(), "terrain");
+			m_mesh = LUMIX_NEW(Mesh)(m_material, 0, indices.size(), "terrain");
 		}
 
 		void heightmapLoaded(Resource::State, Resource::State new_state)
@@ -413,7 +413,7 @@ namespace Lux
 			{
 				if (type == TERRAIN_HASH)
 				{
-					Terrain* terrain = LUX_NEW(Terrain);
+					Terrain* terrain = LUMIX_NEW(Terrain);
 					m_terrains.push(terrain);
 					terrain->m_width = 0;
 					terrain->m_height = 0;
@@ -748,7 +748,7 @@ namespace Lux
 
 	RenderScene* RenderScene::createInstance(Engine& engine, Universe& universe)
 	{
-		return LUX_NEW(RenderSceneImpl)(engine, universe);
+		return LUMIX_NEW(RenderSceneImpl)(engine, universe);
 	}
 
 

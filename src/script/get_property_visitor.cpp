@@ -1,7 +1,7 @@
 #include "get_property_visitor.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 	GetPropertyVisitor::GetPropertyVisitor(const char* name)
@@ -21,7 +21,7 @@ namespace Lux
 		if(m_property_name == name && m_value == 0)
 		{
 			m_type = FLOAT;
-			m_value = LUX_NEW_ARRAY(char, sizeof(float));
+			m_value = LUMIX_NEW_ARRAY(char, sizeof(float));
 			memcpy(m_value, &value, sizeof(value));
 			m_value_size = sizeof(value);
 		}
@@ -29,4 +29,4 @@ namespace Lux
 
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

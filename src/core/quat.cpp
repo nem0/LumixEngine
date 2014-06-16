@@ -4,7 +4,7 @@
 #include "core/matrix.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -112,4 +112,4 @@ void Quat::toMatrix(Matrix& mtx) const
 }
 
 
-} // !namespace Lux
+} // !namespace Lumix

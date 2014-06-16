@@ -11,7 +11,7 @@
 #include "graphics/shader_manager.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -208,4 +208,4 @@ FS::ReadCallback Shader::getReadCallback()
 }
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

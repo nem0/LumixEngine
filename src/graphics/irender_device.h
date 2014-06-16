@@ -1,9 +1,9 @@
 #pragma once
 
-#include "core/lux.h"
+#include "core/lumix.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -21,4 +21,4 @@ class LUX_ENGINE_API IRenderDevice abstract
 };
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

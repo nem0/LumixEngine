@@ -3,12 +3,12 @@
 #define FILE_EVENT_DEVICE
 #ifdef FILE_EVENT_DEVICE
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/fs/ifile_device.h"
 
 #include "core/delegate.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace FS
 	{
@@ -51,6 +51,6 @@ namespace Lux
 			const char* name() const { return "events"; }
 		};
 	} // namespace FS
-} // ~namespace Lux
+} // ~namespace Lumix
 
 #endif //FILE_EVENT_DEVICE

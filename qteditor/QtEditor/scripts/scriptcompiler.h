@@ -11,7 +11,7 @@ class ScriptCompiler : public QObject
 {
 	Q_OBJECT
 public:
-	typedef Lux::DelegateList<void (const char*, uint32_t)> CompileCallbacks;
+	typedef Lumix::DelegateList<void (const char*, uint32_t)> CompileCallbacks;
 	enum Status
 	{
 		UNKNOWN,
@@ -41,14 +41,14 @@ private:
 	struct ProcessInfo
 	{
 		class QProcess* m_process;
-		Lux::string m_path;
+		Lumix::string m_path;
 	};
 
 private:
 	CompileCallbacks m_delegates;
-	Lux::string m_base_path;
-	Lux::Array<ProcessInfo> m_processes;
-	Lux::Map<uint32_t, Status> m_status;
-	Lux::Map<uint32_t, Lux::string> m_log;
+	Lumix::string m_base_path;
+	Lumix::Array<ProcessInfo> m_processes;
+	Lumix::Map<uint32_t, Status> m_status;
+	Lumix::Map<uint32_t, Lumix::string> m_log;
 
 };

@@ -11,7 +11,7 @@
 #include "core/net/tcp_acceptor.h"
 #include "core/net/tcp_stream.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace FS
 	{
@@ -49,7 +49,7 @@ namespace Lux
 							int32_t id = m_ids.alloc();
 							if(id > 0)
 							{
-								OsFile* file = LUX_NEW(OsFile)();
+								OsFile* file = LUMIX_NEW(OsFile)();
 								m_files[id] = file;
 
 								string path;
@@ -219,7 +219,7 @@ namespace Lux
 
 		void TCPFileServer::start(const char* base_path)
 		{
-			m_impl = LUX_NEW(TCPFileServerImpl);
+			m_impl = LUMIX_NEW(TCPFileServerImpl);
 			m_impl->m_task.setBasePath(base_path);
 			m_impl->m_task.create("TCP File Server Task");
 			m_impl->m_task.run();
@@ -242,4 +242,4 @@ namespace Lux
 
 
 	} // ~namespace FS
-} // ~namespace Lux
+} // ~namespace Lumix

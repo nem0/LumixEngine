@@ -6,7 +6,7 @@
 #include "graphics/gl_ext.h"
 
 
-namespace Lux
+namespace Lumix
 {
 namespace FS
 {
@@ -46,4 +46,4 @@ class Texture : public Resource
 };
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

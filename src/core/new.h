@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/lux.h"
+#include "core/lumix.h"
 
 void* operator new		(size_t size);
 void* operator new[]	(size_t size);

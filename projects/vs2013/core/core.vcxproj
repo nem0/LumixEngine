@@ -173,7 +173,7 @@
     <ClInclude Include="..\..\..\src\core\iserializer.h" />
     <ClInclude Include="..\..\..\src\core\json_serializer.h" />
     <ClInclude Include="..\..\..\src\core\log.h" />
-    <ClInclude Include="..\..\..\src\core\lux.h" />
+    <ClInclude Include="..\..\..\src\core\lumix.h" />
     <ClInclude Include="..\..\..\src\core\map.h" />
     <ClInclude Include="..\..\..\src\core\math_utils.h" />
     <ClInclude Include="..\..\..\src\core\matrix.h" />

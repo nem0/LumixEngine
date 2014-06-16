@@ -4,7 +4,7 @@
 #include "gui/block.h"
 
 
-namespace Lux
+namespace Lumix
 {
 namespace UI
 {
@@ -32,10 +32,10 @@ namespace UI
 
 		private:
 			int m_cursor_pos;
-			Lux::UI::Block* m_cursor;
-			Lux::UI::Block* m_label_ui;
+			Lumix::UI::Block* m_cursor;
+			Lumix::UI::Block* m_label_ui;
 	};
 
 
 } // ~namespace UI
-} // ~namespace Lux
+} // ~namespace Lumix

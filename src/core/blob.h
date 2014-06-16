@@ -1,11 +1,11 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/array.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 	class LUX_CORE_API Blob
@@ -38,4 +38,4 @@ namespace Lux
 			const void* m_data; 
 	};
 
-} // !namespace Lux
+} // !namespace Lumix

@@ -5,7 +5,7 @@
 #include "core/resource.h"
 
 
-namespace Lux
+namespace Lumix
 {
 namespace FS
 {
@@ -87,4 +87,4 @@ private:
 	bool m_is_backface_culling;
 };
 
-} // ~namespace Lux
+} // ~namespace Lumix

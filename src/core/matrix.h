@@ -1,12 +1,12 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/vec3.h"
 #include "core/vec4.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -192,4 +192,4 @@ struct LUX_CORE_API Matrix
 void multiplicate(Matrix& result, const Matrix& op1, const Matrix& op2);
 
 
-} // !namespace Lux
+} // !namespace Lumix

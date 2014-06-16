@@ -1,12 +1,12 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include <cmath>
 #include "core/vec3.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -153,4 +153,4 @@ inline void lerp(const Vec4& op1, const Vec4& op2, Vec4* out, float t)
 }
 
 
-} // !namespace Lux
+} // !namespace Lumix

@@ -1,11 +1,11 @@
 #pragma once
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/delegate_list.h"
 #include "core/resource.h"
 #include "core/resource_manager_base.h"
 
-namespace Lux
+namespace Lumix
 {
 	
 struct Component;

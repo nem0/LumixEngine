@@ -1,7 +1,7 @@
 #include "core/fifo_allocator.h"
 #include "core/MT/atomic.h"
 
-namespace Lux
+namespace Lumix
 {
 	struct AllocationHeader
 	{
@@ -63,4 +63,4 @@ namespace Lux
 	}
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

@@ -6,7 +6,7 @@
 #include "gui/texture_base.h"
 
 
-namespace Lux
+namespace Lumix
 {
 namespace UI
 {
@@ -80,4 +80,4 @@ namespace UI
 
 
 } // ~namespace UI
-} // ~namespace Lux
+} // ~namespace Lumix

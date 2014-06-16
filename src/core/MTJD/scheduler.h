@@ -4,7 +4,7 @@
 #include "core/MT/event.h"
 #include "core/MT/semaphore.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace MTJD
 	{
