@@ -1,7 +1,6 @@
 #pragma once
 
 #include <QWidget>
-#include "core/profiler.h"
 #include "profilerui.h"
 
 namespace Ui 
