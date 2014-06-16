@@ -159,6 +159,7 @@ namespace Lumix
 		animable.m_manual = true;
 		animable.m_time = 0;
 		animable.m_renderable = Component::INVALID;
+		animable.m_animation = NULL;
 
 		const Entity::ComponentList& cmps = entity.getComponents();
 		for(int i = 0; i < cmps.size(); ++i)
