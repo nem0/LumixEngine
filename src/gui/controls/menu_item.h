@@ -4,7 +4,7 @@
 #include "gui/block.h"
 
 
-namespace Lux
+namespace Lumix
 {
 namespace UI
 {
@@ -28,10 +28,10 @@ namespace UI
 			void blurSubMenu(Block& block, void*);
 
 		private:
-			Lux::UI::Block* m_sub_container;
-			Lux::UI::Block* m_label;
+			Lumix::UI::Block* m_sub_container;
+			Lumix::UI::Block* m_label;
 	};
 
 
 } // ~namespace UI
-} // ~namespace Lux
+} // ~namespace Lumix

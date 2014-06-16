@@ -1,4 +1,4 @@
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "graphics/model.h"
 
 #include "core/fs/file_system.h"
@@ -14,7 +14,7 @@
 #include "graphics/renderer.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 	
@@ -162,7 +162,7 @@ bool Model::parseGeometry(FS::IFile* file, const VertexDef& vertex_definition)
 	vertices.resize(vertices_count * vertex_definition.getVertexSize() / sizeof(vertices[0]));
 	file->read(&vertices[0], sizeof(vertices[0]) * vertices.size());
 	
-	m_geometry = LUX_NEW(Geometry);
+	m_geometry = LUMIX_NEW(Geometry);
 	m_geometry->copy((uint8_t*)&vertices[0], sizeof(float) * vertices.size(), indices, vertex_definition);
 	return true;
 }
@@ -315,4 +315,4 @@ FS::ReadCallback Model::getReadCallback()
 
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

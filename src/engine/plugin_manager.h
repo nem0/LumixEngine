@@ -1,10 +1,10 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 	class Engine;
@@ -33,4 +33,4 @@ namespace Lux
 	};
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

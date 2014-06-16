@@ -1,4 +1,4 @@
-#include "unit_tests/suite/lux_unit_tests.h"
+#include "unit_tests/suite/lumix_unit_tests.h"
 
 #include "core/log.h"
 #include "core/MT/lock_free_fixed_queue.h"
@@ -11,7 +11,7 @@
 
 //#define ASSERT_HANDLE_FAIL
 
-namespace Lux
+namespace Lumix
 {
 	namespace UnitTest
 	{
@@ -225,7 +225,7 @@ namespace Lux
 
 		Manager::Manager()
 		{
-			m_impl = LUX_NEW(ManagerImpl)();
+			m_impl = LUMIX_NEW(ManagerImpl)();
 		}
 
 		Manager::~Manager()

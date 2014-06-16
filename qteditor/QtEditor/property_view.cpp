@@ -42,11 +42,11 @@ PropertyView::PropertyView(QWidget* parent) :
 }
 
 
-void PropertyView::setEditorClient(Lux::EditorClient& client)
+void PropertyView::setEditorClient(Lumix::EditorClient& client)
 {
 	m_client = &client;
-	m_client->getEventManager().addListener(Lux::ServerMessageType::PROPERTY_LIST).bind<PropertyView, &PropertyView::onPropertyList>(this);
-	m_client->getEventManager().addListener(Lux::ServerMessageType::ENTITY_SELECTED).bind<PropertyView, &PropertyView::onEntitySelected>(this);
+	m_client->getEventManager().addListener(Lumix::ServerMessageType::PROPERTY_LIST).bind<PropertyView, &PropertyView::onPropertyList>(this);
+	m_client->getEventManager().addListener(Lumix::ServerMessageType::ENTITY_SELECTED).bind<PropertyView, &PropertyView::onEntitySelected>(this);
 }
 
 
@@ -63,7 +63,7 @@ void PropertyView::on_vec3ValueChanged()
 {
 	QDoubleSpinBox* sb = qobject_cast<QDoubleSpinBox*>(QObject::sender());
 	int i = sb->property("cpp_prop").toInt();
-	Lux::Vec3 v;
+	Lumix::Vec3 v;
 	v.x = (float)qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item->child(0), 1))->value();
 	v.y = (float)qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item->child(1), 1))->value();
 	v.z = (float)qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item->child(2), 1))->value();
@@ -112,7 +112,7 @@ void PropertyView::onPropertyValue(Property* property, void* data, int32_t data_
 	{
 		case Property::VEC3:
 			{
-				Lux::Vec3 v = *(Lux::Vec3*)data;
+				Lumix::Vec3 v = *(Lumix::Vec3*)data;
 				QString text;
 				text.sprintf("[%f; %f; %f]", v.x, v.y, v.z);
 				property->m_tree_item->setText(1, text);
@@ -157,9 +157,9 @@ void PropertyView::onPropertyValue(Property* property, void* data, int32_t data_
 }
 
 
-void PropertyView::onPropertyList(Lux::Event& event)
+void PropertyView::onPropertyList(Lumix::Event& event)
 {
-	Lux::PropertyListEvent& e = static_cast<Lux::PropertyListEvent&>(event);
+	Lumix::PropertyListEvent& e = static_cast<Lumix::PropertyListEvent&>(event);
 	for(int i = 0; i < e.properties.size(); ++i)
 	{
 		for(int j = 0; j < m_properties.size(); ++j)
@@ -269,9 +269,9 @@ void PropertyView::clear()
 }
 
 
-void PropertyView::onEntitySelected(Lux::Event& event)
+void PropertyView::onEntitySelected(Lumix::Event& event)
 {
-	Lux::EntitySelectedEvent& e = static_cast<Lux::EntitySelectedEvent&>(event);
+	Lumix::EntitySelectedEvent& e = static_cast<Lumix::EntitySelectedEvent&>(event);
 	clear();
 	for (int i = 0; i < e.components.size(); ++i)
 	{

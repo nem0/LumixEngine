@@ -1,7 +1,7 @@
 #include "core/default_allocator.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -22,4 +22,4 @@ namespace Lux
 		return LUX_REALLOC(p, n);
 	}
 
-} // ~namespace Lux
+} // ~namespace Lumix

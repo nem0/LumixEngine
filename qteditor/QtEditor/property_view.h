@@ -5,7 +5,7 @@
 #include "core/array.h"
 #include "core/string.h"
 
-namespace Lux
+namespace Lumix
 {
 	class EditorClient;
 	class Event;
@@ -37,9 +37,9 @@ public:
 				
 			Type m_type;
 			uint32_t m_component;
-			Lux::string m_name;
-			Lux::string m_file_type;
-			Lux::string m_component_name;
+			Lumix::string m_name;
+			Lumix::string m_file_type;
+			Lumix::string m_component_name;
 			uint32_t m_name_hash;
 			QTreeWidgetItem* m_tree_item;
 	};
@@ -47,7 +47,7 @@ public:
 public:
 	explicit PropertyView(QWidget* parent = NULL);
 	~PropertyView();
-	void setEditorClient(Lux::EditorClient& client);
+	void setEditorClient(Lumix::EditorClient& client);
 
 private slots:
 	void on_addComponentButton_clicked();
@@ -59,15 +59,15 @@ private slots:
 
 private:
 	void clear();
-	void onPropertyList(Lux::Event& event);
-	void onEntitySelected(Lux::Event& event);
+	void onPropertyList(Lumix::Event& event);
+	void onEntitySelected(Lumix::Event& event);
 	void addProperty(const char* component, const char* name, const char* label, Property::Type type, const char* file_type);
 	void onPropertyValue(Property* property, void* data, int32_t data_size);
 
 private:
 	Ui::PropertyView* m_ui;
-	Lux::EditorClient* m_client;
-	Lux::Array<Property*> m_properties;
+	Lumix::EditorClient* m_client;
+	Lumix::Array<Property*> m_properties;
 };
 
 

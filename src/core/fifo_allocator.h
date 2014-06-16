@@ -1,11 +1,11 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/MT/spin_mutex.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -29,4 +29,4 @@ namespace Lux
 	};
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

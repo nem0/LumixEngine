@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 
 
 LUX_CORE_API uint32_t crc32(const void* data, int length);

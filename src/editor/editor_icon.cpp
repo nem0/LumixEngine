@@ -14,7 +14,7 @@
 
 #include <gl/GL.h>
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -66,7 +66,7 @@ void EditorIcon::render(Renderer* renderer, IRenderDevice& render_device)
 	if (m_is_visible)
 	{
 		Component camera = m_scene->getCameraInSlot("editor");
-		Lux::Matrix mtx = camera.entity.getMatrix();
+		Lumix::Matrix mtx = camera.entity.getMatrix();
 
 		float fov;
 		static_cast<RenderScene*>(camera.system)->getCameraFOV(camera, fov);
@@ -87,4 +87,4 @@ void EditorIcon::render(Renderer* renderer, IRenderDevice& render_device)
 }
 
 
-} // !namespace Lux
+} // !namespace Lumix

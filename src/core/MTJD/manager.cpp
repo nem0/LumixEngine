@@ -1,11 +1,11 @@
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/MTJD/manager.h"
 
 #include "core/MTJD/job.h"
 #include "core/MTJD/scheduler.h"
 #include "core/MTJD/worker_thread.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace MTJD
 	{
@@ -19,7 +19,7 @@ namespace Lux
 			m_scheduler.create("Scheduler");
 			m_scheduler.run();
 
-			m_worker_tasks = LUX_NEW_ARRAY(WorkerTask, threads_num);
+			m_worker_tasks = LUMIX_NEW_ARRAY(WorkerTask, threads_num);
 			for (uint32_t i = 0; i < threads_num; ++i)
 			{
 				m_worker_tasks[i].create("MTJD::WorkerTask", this, &m_trans_queue);

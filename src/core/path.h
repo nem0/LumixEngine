@@ -2,7 +2,7 @@
 
 #include "core/string.h"
 
-namespace Lux
+namespace Lumix
 {
 	class LUX_CORE_API Path
 	{

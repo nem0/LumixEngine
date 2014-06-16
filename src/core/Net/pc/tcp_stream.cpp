@@ -3,7 +3,7 @@
 #include <string.h>
 #include <Windows.h>
 
-namespace Lux
+namespace Lumix
 {
 	namespace Net
 	{
@@ -67,4 +67,4 @@ namespace Lux
 			return (size_t)send == size;
 		}
 	} // ~namespace Net
-} // ~namespace Lux
+} // ~namespace Lumix

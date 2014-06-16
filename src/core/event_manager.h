@@ -1,13 +1,13 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/delegate.h"
 #include "core/array.h"
 #include "core/map.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -42,4 +42,4 @@ class LUX_CORE_API EventManager
 };
 
 
-} // !namespace Lux
+} // !namespace Lumix

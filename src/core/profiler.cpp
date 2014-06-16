@@ -1,7 +1,7 @@
 #include "profiler.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 	LUX_CORE_API Profiler g_profiler;
@@ -70,7 +70,7 @@ namespace Lux
 			}
 			else
 			{
-				Block* root = LUX_NEW(Block);
+				Block* root = LUMIX_NEW(Block);
 				root->m_parent = NULL;
 				root->m_next = NULL;
 				root->m_first_child = NULL;
@@ -88,7 +88,7 @@ namespace Lux
 			}
 			if (!child)
 			{
-				child = LUX_NEW(Block);
+				child = LUMIX_NEW(Block);
 				child->m_parent = m_current_block;
 				child->m_first_child = NULL;
 				child->m_name = name;
@@ -152,4 +152,4 @@ namespace Lux
 	}
 
 
-} // namespace Lux
+} // namespace Lumix

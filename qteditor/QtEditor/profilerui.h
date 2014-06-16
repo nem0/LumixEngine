@@ -57,7 +57,7 @@ class ProfileModel : public QAbstractItemModel
 		void setFrame(int frame) { m_frame = frame; } 
 
 	private:
-		void cloneBlock(Block* my_block, Lux::Profiler::Block* remote_block);
+		void cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_block);
 		void onFrame();
 
 		virtual QVariant headerData(int section, Qt::Orientation, int role = Qt::DisplayRole) const override;

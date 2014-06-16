@@ -1,4 +1,4 @@
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/resource_manager_base.h"
 
 #include "core/crc32.h"
@@ -7,7 +7,7 @@
 #include "core/resource.h"
 #include "core/resource_manager.h"
 
-namespace Lux
+namespace Lumix
 {
 	void ResourceManagerBase::create(uint32_t id, ResourceManager& owner)
 	{

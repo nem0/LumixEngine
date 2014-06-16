@@ -11,7 +11,7 @@
 class ScriptCompiler
 {
 	public:
-		typedef Lux::DelegateList<void (const char*, uint32_t)> CompileCallbacks;
+		typedef Lumix::DelegateList<void (const char*, uint32_t)> CompileCallbacks;
 		enum Status
 		{
 			UNKNOWN,
@@ -35,12 +35,12 @@ class ScriptCompiler
 			HANDLE m_handle;
 			HANDLE m_pipe;
 			HANDLE m_write_pipe;
-			Lux::string m_path;
+			Lumix::string m_path;
 		};
 
 	private:
 		CompileCallbacks m_delegates;
-		Lux::string m_base_path;
-		Lux::Array<Process*> m_processes;
-		Lux::Map<uint32_t, Status> m_status;
+		Lumix::string m_base_path;
+		Lumix::Array<Process*> m_processes;
+		Lumix::Map<uint32_t, Status> m_status;
 };

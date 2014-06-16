@@ -1,12 +1,12 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/matrix.h"
 #include "core/array.h"
 
 
-namespace Lux
+namespace Lumix
 {
 	class  Universe;
 	struct Component;

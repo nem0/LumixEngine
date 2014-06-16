@@ -3,11 +3,11 @@
 
 #include <new>
 #include "core/default_allocator.h"
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/math_utils.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -460,4 +460,4 @@ class Map
 };
 
 
-} // !namespace Lux
+} // !namespace Lumix

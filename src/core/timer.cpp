@@ -2,7 +2,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -42,7 +42,7 @@ class TimerImpl : public Timer
 
 Timer* Timer::create()
 {
-	return LUX_NEW(TimerImpl);
+	return LUMIX_NEW(TimerImpl);
 }
 
 
@@ -52,4 +52,4 @@ void Timer::destroy(Timer* timer)
 }
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

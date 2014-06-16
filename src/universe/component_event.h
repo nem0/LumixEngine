@@ -1,11 +1,11 @@
 #pragma once
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/event_manager.h"
 #include "universe.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 /// create or destroy event
@@ -23,4 +23,4 @@ class LUX_ENGINE_API ComponentEvent : public Event
 };
 
 
-} // !namespace Lux
+} // !namespace Lumix

@@ -1,4 +1,4 @@
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/path.h"
 
 #include "core/crc32.h"
@@ -7,7 +7,7 @@
 
 #include <string>
 
-namespace Lux
+namespace Lumix
 {
 	Path::Path(const Path& rhs)
 		: m_id(rhs.m_id)

@@ -1,11 +1,11 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "engine/iplugin.h"
 
 
-namespace Lux
+namespace Lumix
 {
 	namespace FS
 	{
@@ -44,4 +44,4 @@ namespace Lux
 	};
 
 
-}// ~ namespace Lux 
+}// ~ namespace Lumix 

@@ -1,11 +1,11 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "universe/component.h"
 
 
-namespace Lux
+namespace Lumix
 {
 	class Engine;
 	class ISerializer;

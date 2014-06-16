@@ -1,6 +1,6 @@
 #pragma once
 
-namespace Lux
+namespace Lumix
 {
 	namespace UnitTest
 	{
@@ -13,7 +13,7 @@ namespace Lux
 			{
 				if (NULL == s_instance)
 				{
-					s_instance = LUX_NEW(Manager)();
+					s_instance = LUMIX_NEW(Manager)();
 				}
 
 				return *s_instance;
@@ -52,6 +52,6 @@ namespace Lux
 } //~UnitTest
 
 #define REGISTER_TEST(name, method, params) \
-namespace { extern "C" Lux::UnitTest::Helper JOIN_STRINGS(JOIN_STRINGS(test_register_, method), __LINE__)(name, method, params); } \
+namespace { extern "C" Lumix::UnitTest::Helper JOIN_STRINGS(JOIN_STRINGS(test_register_, method), __LINE__)(name, method, params); } \
 	LUX_FORCE_SYMBOL(JOIN_STRINGS(test_register_ ,JOIN_STRINGS(method, __LINE__)))
 

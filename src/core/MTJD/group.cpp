@@ -1,8 +1,8 @@
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/MTJD/group.h"
 #include "core/MT/atomic.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace MTJD
 	{

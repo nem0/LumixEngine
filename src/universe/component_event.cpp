@@ -2,11 +2,11 @@
 #include "core/crc32.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
 const Event::Type ComponentEvent::type = crc32("component");
 
 
-} // !namespace Lux
+} // !namespace Lumix

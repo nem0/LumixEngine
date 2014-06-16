@@ -8,7 +8,7 @@ namespace Ui
 	class MaterialManager;
 }
 
-namespace Lux
+namespace Lumix
 {
 	class EditorServer;
 	class EditorClient;
@@ -22,15 +22,15 @@ class MaterialManager : public QDockWidget
 	public:
 		explicit MaterialManager(QWidget* parent = NULL);
 		~MaterialManager();
-		void setEditorServer(Lux::EditorServer& server);
-		void setEditorClient(Lux::EditorClient& client);
+		void setEditorServer(Lumix::EditorServer& server);
+		void setEditorClient(Lumix::EditorClient& client);
 		void updatePreview();
 
 	private:
-		void onPropertyList(Lux::Event& event);
+		void onPropertyList(Lumix::Event& event);
 		void fillObjectMaterials();
 		void selectMaterial(const char* path);
-		void onMaterialLoaded(Lux::Resource::State, Lux::Resource::State);
+		void onMaterialLoaded(Lumix::Resource::State, Lumix::Resource::State);
 
 	private slots:
 		void on_fileListView_doubleClicked(const QModelIndex& index);

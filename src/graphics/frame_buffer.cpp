@@ -3,7 +3,7 @@
 #include "graphics/gl_ext.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -76,4 +76,4 @@ void FrameBuffer::unbind()
 }
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

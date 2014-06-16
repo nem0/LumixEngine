@@ -1,9 +1,9 @@
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/MTJD/job.h"
 
 #include "core/MTJD/manager.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace MTJD
 	{

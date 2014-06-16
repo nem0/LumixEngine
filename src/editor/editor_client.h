@@ -1,10 +1,10 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 	class EditorServer;
@@ -40,4 +40,4 @@ namespace Lux
 			struct EditorClientImpl* m_impl;
 	};
 
-} // ~namespace Lux
+} // ~namespace Lumix

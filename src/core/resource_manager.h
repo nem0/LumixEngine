@@ -2,7 +2,7 @@
 
 #include "core/pod_hash_map.h"
 
-namespace Lux
+namespace Lumix
 {
 	class Resource;
 	namespace FS

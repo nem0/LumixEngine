@@ -10,7 +10,7 @@
 #include "universe/universe.h"
 #include "core/resource_manager.h"
 
-namespace Lux
+namespace Lumix
 {
 
 	static const uint32_t RENDERABLE_HASH = crc32("renderable");
@@ -42,7 +42,7 @@ namespace Lux
 
 	bool AnimationSystem::create(Engine& engine)
 	{
-		m_impl = LUX_NEW(AnimationSystemImpl)(engine);
+		m_impl = LUMIX_NEW(AnimationSystemImpl)(engine);
 		m_impl->m_universe = 0;
 		if(engine.getEditorServer())
 		{
@@ -220,4 +220,4 @@ namespace Lux
 	}
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

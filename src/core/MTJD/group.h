@@ -2,7 +2,7 @@
 
 #include "core/MTJD/base_entry.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace MTJD
 	{

@@ -22,7 +22,7 @@
 #include "graphics/shader.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 struct PipelineImpl;
@@ -146,7 +146,7 @@ struct PipelineImpl : public Pipeline
 	template <typename T>
 	static Command* CreateCommand()
 	{
-		return LUX_NEW(T);
+		return LUMIX_NEW(T);
 	}
 
 
@@ -360,12 +360,12 @@ struct PipelineInstanceImpl : public PipelineInstance
 		if (old_state != Resource::State::READY && new_state == Resource::State::READY)
 		{
 			PipelineImpl::FrameBufferDeclaration fb = m_source.m_shadowmap_framebuffer;
-			m_shadowmap_framebuffer = LUX_NEW(FrameBuffer)(fb.m_width, fb.m_height, fb.m_mask, fb.m_name.c_str());
+			m_shadowmap_framebuffer = LUMIX_NEW(FrameBuffer)(fb.m_width, fb.m_height, fb.m_mask, fb.m_name.c_str());
 			m_framebuffers.reserve(m_source.m_framebuffers.size());
 			for (int i = 0; i < m_source.m_framebuffers.size(); ++i)
 			{
 				fb = m_source.m_framebuffers[i];
-				m_framebuffers.push(LUX_NEW(FrameBuffer)(fb.m_width, fb.m_height, fb.m_mask, fb.m_name.c_str()));
+				m_framebuffers.push(LUMIX_NEW(FrameBuffer)(fb.m_width, fb.m_height, fb.m_mask, fb.m_name.c_str()));
 			}
 		}
 	}
@@ -630,7 +630,7 @@ Pipeline::Pipeline(const Path& path, ResourceManager& resource_manager)
 
 PipelineInstance* PipelineInstance::create(Pipeline& pipeline)
 {
-	return LUX_NEW(PipelineInstanceImpl)(pipeline);
+	return LUMIX_NEW(PipelineInstanceImpl)(pipeline);
 }
 
 
@@ -818,7 +818,7 @@ void BindShadowmapCommand::execute(PipelineInstanceImpl& pipeline)
 
 Resource* PipelineManager::createResource(const Path& path)
 {
-	return LUX_NEW(PipelineImpl)(path, getOwner());
+	return LUMIX_NEW(PipelineImpl)(path, getOwner());
 }
 
 
@@ -828,4 +828,4 @@ void PipelineManager::destroyResource(Resource& resource)
 }
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

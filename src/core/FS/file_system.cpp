@@ -11,7 +11,7 @@
 #include "core/stack_allocator.h"
 #include "core/string.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace FS
 	{
@@ -83,7 +83,7 @@ namespace Lux
 		public:
 			FileSystemImpl()
 			{
-				m_task = LUX_NEW(FSTask)(&m_transaction_queue);
+				m_task = LUMIX_NEW(FSTask)(&m_transaction_queue);
 				m_task->create("FSTask");
 				m_task->run();
 			}
@@ -289,7 +289,7 @@ namespace Lux
 
 		FileSystem* FileSystem::create()
 		{
-			return LUX_NEW(FileSystemImpl)();
+			return LUMIX_NEW(FileSystemImpl)();
 		}
 
 		void FileSystem::destroy(FileSystem* fs)
@@ -297,4 +297,4 @@ namespace Lux
 			LUX_DELETE(fs);
 		}
 	} // ~namespace FS
-} // ~namespace Lux
+} // ~namespace Lumix

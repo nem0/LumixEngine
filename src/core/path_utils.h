@@ -1,6 +1,6 @@
 #pragma once
 
-namespace Lux
+namespace Lumix
 {
 	struct LUX_CORE_API PathUtils
 	{

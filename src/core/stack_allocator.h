@@ -1,10 +1,10 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 	template <size_t SIZE>
@@ -61,4 +61,4 @@ namespace Lux
 
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

@@ -20,7 +20,7 @@
 
 
 
-namespace Lux
+namespace Lumix
 {
 namespace UI
 {
@@ -89,7 +89,7 @@ namespace UI
 
 	void GuiImpl::textboxKeyDown(Block& block, void* user_data) 
 	{
-		Lux::string s = block.getBlockText();
+		Lumix::string s = block.getBlockText();
 		char c[2];
 		switch((int32_t)user_data)
 		{
@@ -115,34 +115,34 @@ namespace UI
 
 	Block* createButton(Gui& gui, Block* parent)
 	{
-		return LUX_NEW(Button)("", gui, parent);
+		return LUMIX_NEW(Button)("", gui, parent);
 	}
 
 	Block* createCheckBox(Gui& gui, Block* parent)
 	{
-		return LUX_NEW(CheckBox)("", gui, parent);
+		return LUMIX_NEW(CheckBox)("", gui, parent);
 	}
 
 	Block* createMenuBar(Gui& gui, Block* parent)
 	{
-		return LUX_NEW(MenuBar)(gui, parent);
+		return LUMIX_NEW(MenuBar)(gui, parent);
 	}
 
 	Block* createMenuItem(Gui& gui, Block* parent)
 	{
-		MenuItem* menu_item = LUX_NEW(MenuItem)("", gui);
+		MenuItem* menu_item = LUMIX_NEW(MenuItem)("", gui);
 		static_cast<MenuBar*>(parent)->addItem(menu_item);
 		return menu_item;
 	}
 
 	Block* createTextBox(Gui& gui, Block* parent)
 	{
-		return LUX_NEW(TextBox)("", gui, parent);
+		return LUMIX_NEW(TextBox)("", gui, parent);
 	}
 
 	bool Gui::create(Engine& engine)
 	{
-		m_impl = LUX_NEW(GuiImpl)();
+		m_impl = LUMIX_NEW(GuiImpl)();
 		m_impl->m_focus = NULL;
 		m_impl->m_renderer = NULL;
 		m_impl->m_engine = &engine;
@@ -262,13 +262,13 @@ namespace UI
 			return creator.invoke(*this, parent);
 		}
 		ASSERT(type == block_hash);
-		return LUX_NEW(Block)(*this, parent, NULL);
+		return LUMIX_NEW(Block)(*this, parent, NULL);
 	}
 
 
-	Block* Gui::createGui(Lux::FS::IFile& file)
+	Block* Gui::createGui(Lumix::FS::IFile& file)
 	{
-		Block* root = LUX_NEW(Block)(*this, NULL, NULL);
+		Block* root = LUMIX_NEW(Block)(*this, NULL, NULL);
 		JsonSerializer serializer(file, JsonSerializer::READ); 
 		root->deserialize(serializer);
 		return root;
@@ -284,7 +284,7 @@ namespace UI
 				return m_impl->m_atlases[i];
 			}
 		}
-		Atlas* atlas = LUX_NEW(Atlas)();
+		Atlas* atlas = LUMIX_NEW(Atlas)();
 		if(!atlas->create())
 		{
 			LUX_DELETE(atlas);
@@ -318,7 +318,7 @@ namespace UI
 
 	Block* Gui::createTopLevelBlock(float width, float height)
 	{
-		Block* block = LUX_NEW(Block)(*this, NULL, NULL);
+		Block* block = LUMIX_NEW(Block)(*this, NULL, NULL);
 		block->setArea(0, 0, 0, 0, 0, width, 0, height);
 		m_impl->m_blocks.push(block);
 		return block;
@@ -339,14 +339,14 @@ namespace UI
 
 	void Gui::createBaseDecorators(const char* atlas_path)
 	{
-		CursorDecorator* cursor_decorator = LUX_NEW(Lux::UI::CursorDecorator)("_cursor");
-		CheckBoxDecorator* check_box_decorator = LUX_NEW(CheckBoxDecorator)("_check_box");
-		TextDecorator* text_decorator = LUX_NEW(TextDecorator)("_text");
-		TextDecorator* text_centered_decorator = LUX_NEW(TextDecorator)("_text_centered");
+		CursorDecorator* cursor_decorator = LUMIX_NEW(Lumix::UI::CursorDecorator)("_cursor");
+		CheckBoxDecorator* check_box_decorator = LUMIX_NEW(CheckBoxDecorator)("_check_box");
+		TextDecorator* text_decorator = LUMIX_NEW(TextDecorator)("_text");
+		TextDecorator* text_centered_decorator = LUMIX_NEW(TextDecorator)("_text_centered");
 		text_centered_decorator->setTextCentered(true);
-		DockableDecorator* dockable_decorator = LUX_NEW(DockableDecorator)("_dockable");
-		BoxDecorator* box_decorator = LUX_NEW(BoxDecorator)("_box");
-		ScrollbarDecorator* scrollbar_decorator = LUX_NEW(ScrollbarDecorator)("_scrollbar"); 
+		DockableDecorator* dockable_decorator = LUMIX_NEW(DockableDecorator)("_dockable");
+		BoxDecorator* box_decorator = LUMIX_NEW(BoxDecorator)("_box");
+		ScrollbarDecorator* scrollbar_decorator = LUMIX_NEW(ScrollbarDecorator)("_scrollbar"); 
 		addDecorator(*cursor_decorator);
 		addDecorator(*text_decorator);
 		addDecorator(*text_centered_decorator);
@@ -432,8 +432,8 @@ namespace UI
 
 	extern "C" LUX_GUI_API IPlugin* createPlugin()
 	{
-		return LUX_NEW(Gui)();
+		return LUMIX_NEW(Gui)();
 	}
 
 } // ~namespace UI
-} // ~namespace Lux
+} // ~namespace Lumix

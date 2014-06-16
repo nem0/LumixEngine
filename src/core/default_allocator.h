@@ -1,10 +1,10 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 	class LUX_CORE_API DefaultAllocator
@@ -16,4 +16,4 @@ namespace Lux
 	};
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

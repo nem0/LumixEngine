@@ -24,7 +24,7 @@
 #include "universe/universe.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -166,7 +166,7 @@ struct RendererImpl : public Renderer
 
 Renderer* Renderer::createInstance()
 {
-	return LUX_NEW(RendererImpl);
+	return LUMIX_NEW(RendererImpl);
 }
 
 
@@ -176,4 +176,4 @@ void Renderer::destroyInstance(Renderer& renderer)
 }
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

@@ -1,4 +1,4 @@
-#include "unit_tests/suite/lux_unit_tests.h"
+#include "unit_tests/suite/lumix_unit_tests.h"
 
 #include "core/MT/lock_free_fixed_queue.h"
 #include "core/MT/transaction.h"
@@ -13,10 +13,10 @@ namespace
 		uint32_t thread_id;
 	};
 
-	typedef Lux::MT::Transaction<Test> AsynTrans;
-	typedef Lux::MT::LockFreeFixedQueue<AsynTrans, 16> TransQueue;
+	typedef Lumix::MT::Transaction<Test> AsynTrans;
+	typedef Lumix::MT::LockFreeFixedQueue<AsynTrans, 16> TransQueue;
 
-	class TestTaskConsumer : public Lux::MT::Task
+	class TestTaskConsumer : public Lumix::MT::Task
 	{
 	public:
 		TestTaskConsumer(TransQueue* queue, Test* array)
@@ -36,7 +36,7 @@ namespace
 					break;
 
 				tr->data.proc_count++;
-				tr->data.thread_id = Lux::MT::getCurrentThreadID();
+				tr->data.thread_id = Lumix::MT::getCurrentThreadID();
 				tr->setCompleted();
 
 				m_array[tr->data.idx].proc_count = tr->data.proc_count;
@@ -50,7 +50,7 @@ namespace
 		Test* m_array;
 	};
 
-	class TestTaskProducer : public Lux::MT::Task
+	class TestTaskProducer : public Lumix::MT::Task
 	{
 	public:
 		TestTaskProducer(TransQueue* queue, Test* array, size_t size)
@@ -84,12 +84,12 @@ namespace
 	void UT_tq_heavy_usage(const char* params)
 	{
 		const size_t itemsCount = 1200000;
-		Test* testItems = LUX_NEW_ARRAY(Test, itemsCount);
+		Test* testItems = LUMIX_NEW_ARRAY(Test, itemsCount);
 		for (size_t i = 0; i < itemsCount; i++)
 		{
 			testItems[i].idx = i;
 			testItems[i].proc_count = 0;
-			testItems[i].thread_id = Lux::MT::getCurrentThreadID();
+			testItems[i].thread_id = Lumix::MT::getCurrentThreadID();
 		}
 
 		TransQueue trans_queue;
@@ -129,7 +129,7 @@ namespace
 			|| !prod3.isFinished()
 			|| !prod4.isFinished()
 			|| !trans_queue.isEmpty())
-			Lux::MT::yield();
+			Lumix::MT::yield();
 
 		trans_queue.abort();
 		trans_queue.abort();
@@ -146,30 +146,30 @@ namespace
 		cons3.destroy();
 		cons4.destroy();
 
-		Lux::g_log_info.log("unit", "UT_tq_heavy_usage is finishing ...");
-		Lux::g_log_info.log("unit", "UT_tq_heavy_usage is checking results ...");
+		Lumix::g_log_info.log("unit", "UT_tq_heavy_usage is finishing ...");
+		Lumix::g_log_info.log("unit", "UT_tq_heavy_usage is checking results ...");
 
 		for (size_t i = 0; i < itemsCount; i++)
 		{
 			LUX_EXPECT_EQ(testItems[i].idx, i);
 			LUX_EXPECT_EQ(testItems[i].proc_count, 1);
-			LUX_EXPECT_NE(testItems[i].thread_id, Lux::MT::getCurrentThreadID());
+			LUX_EXPECT_NE(testItems[i].thread_id, Lumix::MT::getCurrentThreadID());
 		}
 
 		LUX_DELETE_ARRAY(testItems);
 
-		Lux::g_log_info.log("unit", "UT_tq_heavy_usage finished ...");
+		Lumix::g_log_info.log("unit", "UT_tq_heavy_usage finished ...");
 	};
 
 	void UT_tq_push(const char* params)
 	{
 		const size_t itemsCount = 1200000;
-		Test* testItems = LUX_NEW_ARRAY(Test, itemsCount);
+		Test* testItems = LUMIX_NEW_ARRAY(Test, itemsCount);
 		for (size_t i = 0; i < itemsCount; i++)
 		{
 			testItems[i].idx = i;
 			testItems[i].proc_count = 0;
-			testItems[i].thread_id = Lux::MT::getCurrentThreadID();
+			testItems[i].thread_id = Lumix::MT::getCurrentThreadID();
 		}
 
 		TransQueue trans_queue;
@@ -181,30 +181,30 @@ namespace
 		cons.create("consumer");
 
 		prod.run();
-		Lux::MT::sleep(1000);
+		Lumix::MT::sleep(1000);
 		cons.run();
 
 		while (!prod.isFinished() || !trans_queue.isEmpty())
-			Lux::MT::yield();
+			Lumix::MT::yield();
 
 		trans_queue.abort();
 
 		prod.destroy();
 		cons.destroy();
 
-		Lux::g_log_info.log("unit", "UT_tq_push is finishing ...");
-		Lux::g_log_info.log("unit", "UT_tq_push is checking results ...");
+		Lumix::g_log_info.log("unit", "UT_tq_push is finishing ...");
+		Lumix::g_log_info.log("unit", "UT_tq_push is checking results ...");
 
 		for (size_t i = 0; i < itemsCount; i++)
 		{
 			LUX_EXPECT_EQ(testItems[i].idx, i);
 			LUX_EXPECT_EQ(testItems[i].proc_count, 1);
-			LUX_EXPECT_NE(testItems[i].thread_id, Lux::MT::getCurrentThreadID());
+			LUX_EXPECT_NE(testItems[i].thread_id, Lumix::MT::getCurrentThreadID());
 		}
 
 		LUX_DELETE_ARRAY(testItems);
 
-		Lux::g_log_info.log("unit", "UT_tq_heavy_usage finished ...");
+		Lumix::g_log_info.log("unit", "UT_tq_heavy_usage finished ...");
 	}
 }
 

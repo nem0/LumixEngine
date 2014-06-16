@@ -1,10 +1,10 @@
 #pragma once
-#include "core\lux.h"
-#include "universe\universe.h"
+#include "core/lumix.h"
+#include "universe/universe.h"
 
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -23,4 +23,4 @@ class BaseScript
 };
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

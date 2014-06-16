@@ -2,11 +2,11 @@
 #include "core/crc32.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
 const Event::Type EntityMovedEvent::type = crc32("entity_moved");
 
 
-} // !namespace Lux
+} // !namespace Lumix

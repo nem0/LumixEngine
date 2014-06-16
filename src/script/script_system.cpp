@@ -17,7 +17,7 @@
 static const uint32_t SCRIPT_HASH = crc32("script");
 
 
-namespace Lux
+namespace Lumix
 {
 	typedef BaseScript* (*CreateScriptFunction)();
 	typedef void (*DestroyScriptFunction)(BaseScript* script);
@@ -207,7 +207,7 @@ namespace Lux
 
 	ScriptSystem* ScriptSystem::create()
 	{
-		return LUX_NEW(ScriptSystemImpl);
+		return LUMIX_NEW(ScriptSystemImpl);
 	}
 
 
@@ -219,4 +219,4 @@ namespace Lux
 
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

@@ -62,27 +62,27 @@ class RenderDeviceWidget : public QWidget
 
 		void rotateCamera(int x, int y)
 		{
-			m_latitude = Lux::Math::clamp(m_latitude + x * 0.01f, -Lux::Math::PI, Lux::Math::PI);
-			m_longitude = Lux::Math::clamp(m_longitude + y * 0.01f, -Lux::Math::PI, Lux::Math::PI);
-			Lux::Entity camera = m_render_device->getPipeline().getScene()->getCameraInSlot("editor").entity;
-			Lux::Matrix mtx = Lux::Matrix::IDENTITY;
-			Lux::Vec3 pos = Lux::Vec3(cosf(m_longitude) * sinf(m_latitude) * 5, sinf(m_longitude) * 5, cosf(m_latitude) * cosf(m_longitude) * 5);
-			Lux::Vec3 dir = pos;
+			m_latitude = Lumix::Math::clamp(m_latitude + x * 0.01f, -Lumix::Math::PI, Lumix::Math::PI);
+			m_longitude = Lumix::Math::clamp(m_longitude + y * 0.01f, -Lumix::Math::PI, Lumix::Math::PI);
+			Lumix::Entity camera = m_render_device->getPipeline().getScene()->getCameraInSlot("editor").entity;
+			Lumix::Matrix mtx = Lumix::Matrix::IDENTITY;
+			Lumix::Vec3 pos = Lumix::Vec3(cosf(m_longitude) * sinf(m_latitude) * 5, sinf(m_longitude) * 5, cosf(m_latitude) * cosf(m_longitude) * 5);
+			Lumix::Vec3 dir = pos;
 			dir.normalize();
-			Lux::Vec3 up(-sinf(m_latitude) * sinf(m_longitude), cosf(m_longitude), -cosf(m_latitude) * sinf(m_longitude));
-			Lux::Vec3 right = Lux::crossProduct(up, dir);
+			Lumix::Vec3 up(-sinf(m_latitude) * sinf(m_longitude), cosf(m_longitude), -cosf(m_latitude) * sinf(m_longitude));
+			Lumix::Vec3 right = Lumix::crossProduct(up, dir);
 			right.normalize();
-			up = Lux::crossProduct(dir, right);
+			up = Lumix::crossProduct(dir, right);
 			up.normalize();
-			mtx.setTranslation(pos + Lux::Vec3(0, 0, -5));
+			mtx.setTranslation(pos + Lumix::Vec3(0, 0, -5));
 			mtx.setZVector(dir);
 			mtx.setXVector(right);
 			mtx.setYVector(up);
 			camera.setMatrix(mtx);
 		}
 
-		Lux::IRenderDevice* m_render_device;
-		Lux::Engine* m_engine;
+		Lumix::IRenderDevice* m_render_device;
+		Lumix::Engine* m_engine;
 		int m_last_x;
 		int m_last_y;
 		float m_latitude;

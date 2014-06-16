@@ -4,7 +4,7 @@
 #include "core/log.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -582,4 +582,4 @@ void JsonSerializer::logErrorIfNot(bool condition)
 }
 
 
-} // ~namespace lux
+} // ~namespace Lumix

@@ -2,7 +2,7 @@
 #include "graphics/gl_ext.h"
 #include "graphics/shader.h"
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -234,4 +234,4 @@ void Geometry::copy(const uint8_t* data, int size, const Array<int32_t>& indices
 }
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

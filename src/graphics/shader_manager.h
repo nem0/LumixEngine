@@ -2,7 +2,7 @@
 
 #include "core/resource_manager_base.h"
 
-namespace Lux
+namespace Lumix
 {
 	class LUX_ENGINE_API ShaderManager : public ResourceManagerBase
 	{

@@ -1,9 +1,9 @@
 #pragma once
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/fs/ifile_device.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace Net
 	{
@@ -53,4 +53,4 @@ namespace Lux
 			TCPImpl* m_impl;
 		};
 	} // ~namespace FS
-} // ~namespace Lux
+} // ~namespace Lumix

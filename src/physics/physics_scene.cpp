@@ -23,7 +23,7 @@
 #include "physics/physics_system_impl.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -89,7 +89,7 @@ struct OutputStream : public physx::PxOutputStream
 {
 	OutputStream()
 	{
-		data = LUX_NEW_ARRAY(uint8_t, 4096);
+		data = LUMIX_NEW_ARRAY(uint8_t, 4096);
 		capacity = 4096;
 		size = 0;
 	}
@@ -105,7 +105,7 @@ struct OutputStream : public physx::PxOutputStream
 		if(size + (int)count > capacity)
 		{
 			int new_capacity = Math::max(size + (int)count, capacity + 4096);
-			uint8_t* new_data = LUX_NEW_ARRAY(unsigned char, new_capacity);
+			uint8_t* new_data = LUMIX_NEW_ARRAY(unsigned char, new_capacity);
 			memcpy(new_data, data, size);
 			LUX_DELETE_ARRAY(data);
 			data = new_data;
@@ -163,7 +163,7 @@ PhysicsScene::PhysicsScene()
 	
 bool PhysicsScene::create(PhysicsSystem& system, Universe& universe, Engine& engine)
 {
-	m_impl = LUX_NEW(PhysicsSceneImpl);
+	m_impl = LUMIX_NEW(PhysicsSceneImpl);
 	m_impl->m_owner = this;
 	m_impl->m_universe = &universe;
 	m_impl->m_universe->getEventManager().addListener(EntityMovedEvent::type).bind<PhysicsSceneImpl, &PhysicsSceneImpl::handleEvent>(m_impl);
@@ -300,7 +300,7 @@ void PhysicsScene::destroyActor(Component cmp)
 
 Component PhysicsScene::createHeightfield(Entity entity)
 {
-	Terrain* terrain = LUX_NEW(Terrain);
+	Terrain* terrain = LUMIX_NEW(Terrain);
 	Component cmp(entity, HEIGHTFIELD_HASH, this, m_impl->m_terrains.size());
 	m_impl->m_terrains.push(terrain);
 	terrain->m_heightmap = NULL;
@@ -944,4 +944,4 @@ void Terrain::heightmapLoaded(Resource::State, Resource::State new_state)
 
 
 
-} // !namespace Lux
+} // !namespace Lumix

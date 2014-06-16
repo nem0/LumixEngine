@@ -1,13 +1,13 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/delegate_list.h"
 #include "core/string.h"
 #include "core/timer.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -82,9 +82,9 @@ namespace Lux
 	};
 
 
-#define BEGIN_PROFILE_BLOCK(name) Lux::g_profiler.beginBlock(name, __FUNCSIG__)
-#define END_PROFILE_BLOCK() Lux::g_profiler.endBlock()
-#define PROFILE_FUNCTION() Lux::ProfileScope profile_scope(__FUNCTION__, __FUNCSIG__);
-#define PROFILE_BLOCK(name) Lux::ProfileScope profile_scope(name, __FUNCSIG__);
+#define BEGIN_PROFILE_BLOCK(name) Lumix::g_profiler.beginBlock(name, __FUNCSIG__)
+#define END_PROFILE_BLOCK() Lumix::g_profiler.endBlock()
+#define PROFILE_FUNCTION() Lumix::ProfileScope profile_scope(__FUNCTION__, __FUNCSIG__);
+#define PROFILE_BLOCK(name) Lumix::ProfileScope profile_scope(name, __FUNCSIG__);
 
-} // namespace Lux
+} // namespace Lumix

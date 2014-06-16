@@ -1,11 +1,11 @@
 #pragma once
 
-#include "core/lux.h"
+#include "core/lumix.h"
 
 // base on molecular musings blogpost
 
 
-namespace Lux
+namespace Lumix
 {
 
 	template <typename T> class Delegate;

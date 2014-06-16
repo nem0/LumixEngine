@@ -1,7 +1,7 @@
 #pragma once
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -14,4 +14,4 @@ namespace Lux
 	};
 
 
-} // ~ namespace Lux
+} // ~ namespace Lumix

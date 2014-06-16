@@ -1,11 +1,11 @@
 #pragma once
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "script_visitor.h"
 #include "core/map.h"
 #include "core/string.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -28,8 +28,8 @@ namespace Lux
 
 		private:
 			Mode m_mode;
-			Lux::Map<Lux::string, char*> m_items;
+			Lumix::Map<Lumix::string, char*> m_items;
 	};
 
 
-} // ~ namespace Lux
+} // ~ namespace Lumix

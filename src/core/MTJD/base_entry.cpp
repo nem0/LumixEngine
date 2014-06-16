@@ -1,9 +1,9 @@
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/MTJD/base_entry.h"
 
 #include "core/MTJD/manager.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace MTJD
 	{
@@ -12,7 +12,7 @@ namespace Lux
 		{
 #if TYPE == MULTI_THREAD
 
-			m_sync_event = sync_event ? LUX_NEW(MT::Event)(MT::EventFlags::MANUAL_RESET) : NULL;
+			m_sync_event = sync_event ? LUMIX_NEW(MT::Event)(MT::EventFlags::MANUAL_RESET) : NULL;
 
 #endif // TYPE == MULTI_THREAD
 		}

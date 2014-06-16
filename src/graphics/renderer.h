@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/array.h"
 #include "core/string.h"
 #include "engine/iplugin.h"
@@ -8,7 +8,7 @@
 #include "graphics/render_scene.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -46,5 +46,5 @@ class LUX_ENGINE_API Renderer : public IPlugin
 }; 
 
 
-} // !namespace Lux
+} // !namespace Lumix
 

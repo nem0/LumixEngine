@@ -1,7 +1,7 @@
 #include "core/event_manager.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -37,4 +37,4 @@ void EventManager::removeListener(Event::Type type, const Listener& listener)
 }
 
 
-} // !namespace Lux
+} // !namespace Lumix

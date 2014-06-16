@@ -4,7 +4,7 @@
 #include "core/MT/event.h"
 #include "core/Array.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace MTJD
 	{

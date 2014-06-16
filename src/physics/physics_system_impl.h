@@ -4,7 +4,7 @@
 #include <PxPhysicsAPI.h>
 
 
-namespace Lux
+namespace Lumix
 {
 
 	

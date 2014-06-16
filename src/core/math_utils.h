@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/vec3.h"
 
 #ifdef max
@@ -13,7 +13,7 @@
 #endif
 
 
-namespace Lux
+namespace Lumix
 {
 	namespace Math
 	{

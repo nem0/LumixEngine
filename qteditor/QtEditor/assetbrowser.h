@@ -2,7 +2,7 @@
 
 #include <QDockWidget>
 
-namespace Lux
+namespace Lumix
 {
 	class EditorClient;
 	class EditorServer;
@@ -20,8 +20,8 @@ class AssetBrowser : public QDockWidget
 public:
 	explicit AssetBrowser(QWidget* parent = NULL);
 	~AssetBrowser();
-	void setEditorClient(Lux::EditorClient& client) { m_client = &client; }
-	void setEditorServer(Lux::EditorServer& server) { m_server = &server; }
+	void setEditorClient(Lumix::EditorClient& client) { m_client = &client; }
+	void setEditorServer(Lumix::EditorServer& server) { m_server = &server; }
 	void emitFileChanged(const char* path);
 
 private:
@@ -40,7 +40,7 @@ private:
 	Ui::AssetBrowser* m_ui;
 	class QFileSystemModel* m_model;
 	class FileSystemWatcher* m_watcher;
-	Lux::EditorClient* m_client;
-	Lux::EditorServer* m_server;
+	Lumix::EditorClient* m_client;
+	Lumix::EditorServer* m_server;
 	QString m_base_path;
 };

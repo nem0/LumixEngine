@@ -16,7 +16,7 @@
 #include "universe/universe.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -231,4 +231,4 @@ Vec3 Gizmo::getMousePlaneIntersection(Component camera, int x, int y)
 }
 
 
-} // !namespace Lux
+} // !namespace Lumix

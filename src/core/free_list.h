@@ -1,8 +1,8 @@
 #pragma once
 
-#include "core/lux.h"
+#include "core/lumix.h"
 
-namespace Lux
+namespace Lumix
 {
 	template<class T, int32_t chunk_size, int32_t align_of = sizeof(double)>
 	class FreeList
@@ -10,7 +10,7 @@ namespace Lux
 	public:
 		FreeList()
 		{
-			m_heap = static_cast<T*>(LUX_NEW_ARRAY(char, sizeof(T) * chunk_size));
+			m_heap = static_cast<T*>(LUMIX_NEW_ARRAY(char, sizeof(T) * chunk_size));
 			m_pool_index = chunk_size;
 
 			for (int32_t i = 0; i < chunk_size; i++)
@@ -113,4 +113,4 @@ namespace Lux
 		int32_t		m_pool_index;
 		int32_t		m_pool[chunk_size];
 	};
-} // ~namespace Lux
+} // ~namespace Lumix

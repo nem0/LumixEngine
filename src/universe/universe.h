@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/array.h"
 #include "core/quat.h"
 #include "core/array.h"
@@ -10,7 +10,7 @@
 #include "universe/entity.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -58,4 +58,4 @@ class LUX_ENGINE_API Universe final
 };
 
 
-} // !namespace Lux
+} // !namespace Lumix

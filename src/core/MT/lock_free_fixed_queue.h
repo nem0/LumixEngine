@@ -3,7 +3,7 @@
 #include "core/MT/atomic.h"
 #include "core/MT/semaphore.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace MT
 	{
@@ -199,4 +199,4 @@ namespace Lux
 			MT::Semaphore		m_data_signal;
 		};
 	} // ~namespace MT
-} // ~namespace Lux
+} // ~namespace Lumix

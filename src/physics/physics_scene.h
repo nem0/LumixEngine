@@ -1,13 +1,13 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/string.h"
 #include "core/vec3.h"
 #include "universe/universe.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -59,4 +59,4 @@ class LUX_PHYSICS_API PhysicsScene
 };
 
 
-} // !namespace Lux
+} // !namespace Lumix

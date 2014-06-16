@@ -3,13 +3,13 @@
 
 #include "core/delegate.h"
 #include "core/delegate_list.h"
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/map.h"
 #include "core/array.h"
 #include "core/string.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 class ISerializer;
@@ -121,4 +121,4 @@ namespace UI
 
 
 } // ~namespace UI
-} // ~namespace Lux
+} // ~namespace Lumix

@@ -6,7 +6,7 @@
 #include "graphics/pose.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -37,4 +37,4 @@ class ModelInstance
 };
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

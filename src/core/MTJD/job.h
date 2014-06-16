@@ -3,7 +3,7 @@
 #include "core/MTJD/enums.h"
 #include "core/MTJD/group.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace MTJD
 	{

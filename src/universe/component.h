@@ -1,11 +1,11 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "universe/entity.h"
 
 
-namespace Lux
+namespace Lumix
 {
 	struct Entity;
 
@@ -37,4 +37,4 @@ namespace Lux
 	}; 
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

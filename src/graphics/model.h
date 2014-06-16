@@ -12,7 +12,7 @@
 #include "graphics/ray_cast_model_hit.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 class Geometry;
@@ -105,4 +105,4 @@ class Model : public Resource
 };
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

@@ -4,7 +4,7 @@
 #include <Windows.h>
 
 
-namespace Lux
+namespace Lumix
 {
 
 	struct InputSystemImpl
@@ -29,7 +29,7 @@ namespace Lux
 
 	bool InputSystem::create()
 	{
-		m_impl = LUX_NEW(InputSystemImpl)();
+		m_impl = LUMIX_NEW(InputSystemImpl)();
 		m_impl->m_mouse_rel_x = 0;
 		m_impl->m_mouse_rel_y = 0;
 		return true;
@@ -89,4 +89,4 @@ namespace Lux
 	}
 
 
-} // ~ namespace Lux
+} // ~ namespace Lumix

@@ -37,7 +37,7 @@
 #include "universe/universe.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -252,7 +252,7 @@ void EditorServer::tick()
 
 bool EditorServer::create(const char* base_path, EditorClient& client)
 {
-	m_impl = LUX_NEW(EditorServerImpl)(client, *this);
+	m_impl = LUMIX_NEW(EditorServerImpl)(client, *this);
 	
 	if(!m_impl->create(base_path))
 	{
@@ -299,18 +299,18 @@ EditorServerImpl::~EditorServerImpl()
 
 void EditorServerImpl::registerProperties()
 {
-	m_component_properties[CAMERA_HASH].push(LUX_NEW(PropertyDescriptor<RenderScene>)(crc32("slot"), &RenderScene::getCameraSlot, &RenderScene::setCameraSlot, IPropertyDescriptor::STRING));
-	m_component_properties[CAMERA_HASH].push(LUX_NEW(PropertyDescriptor<RenderScene>)(crc32("fov"), &RenderScene::getCameraFOV, &RenderScene::setCameraFOV));
-	m_component_properties[CAMERA_HASH].push(LUX_NEW(PropertyDescriptor<RenderScene>)(crc32("near"), &RenderScene::getCameraNearPlane, &RenderScene::setCameraNearPlane));
-	m_component_properties[CAMERA_HASH].push(LUX_NEW(PropertyDescriptor<RenderScene>)(crc32("far"), &RenderScene::getCameraFarPlane, &RenderScene::setCameraFarPlane));
-	m_component_properties[RENDERABLE_HASH].push(LUX_NEW(PropertyDescriptor<RenderScene>)(crc32("source"), &RenderScene::getRenderablePath, &RenderScene::setRenderablePath, IPropertyDescriptor::FILE));
-	m_component_properties[TERRAIN_HASH].push(LUX_NEW(PropertyDescriptor<RenderScene>)(crc32("heightmap"), &RenderScene::getTerrainHeightmap, &RenderScene::setTerrainHeightmap, IPropertyDescriptor::FILE));
-	m_component_properties[TERRAIN_HASH].push(LUX_NEW(PropertyDescriptor<RenderScene>)(crc32("material"), &RenderScene::getTerrainMaterial, &RenderScene::setTerrainMaterial, IPropertyDescriptor::FILE));
-	/*m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("visible"), &Renderer::getVisible, &Renderer::setVisible));
-	m_component_properties[renderable_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("cast shadows"), &Renderer::getCastShadows, &Renderer::setCastShadows));
-	m_component_properties[point_light_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("fov"), &Renderer::getLightFov, &Renderer::setLightFov));
-	m_component_properties[point_light_type].push(LUX_NEW(PropertyDescriptor<Renderer>)(crc32("radius"), &Renderer::getLightRadius, &Renderer::setLightRadius));
-	*/m_component_properties[SCRIPT_HASH].push(LUX_NEW(PropertyDescriptor<ScriptSystem>)(crc32("source"), &ScriptSystem::getScriptPath, &ScriptSystem::setScriptPath, IPropertyDescriptor::FILE));
+	m_component_properties[CAMERA_HASH].push(LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("slot"), &RenderScene::getCameraSlot, &RenderScene::setCameraSlot, IPropertyDescriptor::STRING));
+	m_component_properties[CAMERA_HASH].push(LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("fov"), &RenderScene::getCameraFOV, &RenderScene::setCameraFOV));
+	m_component_properties[CAMERA_HASH].push(LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("near"), &RenderScene::getCameraNearPlane, &RenderScene::setCameraNearPlane));
+	m_component_properties[CAMERA_HASH].push(LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("far"), &RenderScene::getCameraFarPlane, &RenderScene::setCameraFarPlane));
+	m_component_properties[RENDERABLE_HASH].push(LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("source"), &RenderScene::getRenderablePath, &RenderScene::setRenderablePath, IPropertyDescriptor::FILE));
+	m_component_properties[TERRAIN_HASH].push(LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("heightmap"), &RenderScene::getTerrainHeightmap, &RenderScene::setTerrainHeightmap, IPropertyDescriptor::FILE));
+	m_component_properties[TERRAIN_HASH].push(LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("material"), &RenderScene::getTerrainMaterial, &RenderScene::setTerrainMaterial, IPropertyDescriptor::FILE));
+	/*m_component_properties[renderable_type].push(LUMIX_NEW(PropertyDescriptor<Renderer>)(crc32("visible"), &Renderer::getVisible, &Renderer::setVisible));
+	m_component_properties[renderable_type].push(LUMIX_NEW(PropertyDescriptor<Renderer>)(crc32("cast shadows"), &Renderer::getCastShadows, &Renderer::setCastShadows));
+	m_component_properties[point_light_type].push(LUMIX_NEW(PropertyDescriptor<Renderer>)(crc32("fov"), &Renderer::getLightFov, &Renderer::setLightFov));
+	m_component_properties[point_light_type].push(LUMIX_NEW(PropertyDescriptor<Renderer>)(crc32("radius"), &Renderer::getLightRadius, &Renderer::setLightRadius));
+	*/m_component_properties[SCRIPT_HASH].push(LUMIX_NEW(PropertyDescriptor<ScriptSystem>)(crc32("source"), &ScriptSystem::getScriptPath, &ScriptSystem::setScriptPath, IPropertyDescriptor::FILE));
 }
 
 
@@ -430,7 +430,7 @@ void EditorServerImpl::addEntity()
 	Entity e = m_engine.getUniverse()->createEntity();
 	e.setPosition(m_camera.getPosition() + m_camera.getRotation() * Vec3(0, 0, -2));
 	selectEntity(e);
-	EditorIcon* er = LUX_NEW(EditorIcon)();
+	EditorIcon* er = LUMIX_NEW(EditorIcon)();
 	er->create(m_engine, *m_engine.getRenderScene(), m_selected_entity, Component::INVALID);
 	m_editor_icons.push(er);
 }
@@ -565,7 +565,7 @@ void EditorServerImpl::lookAtSelected()
 void EditorServerImpl::removeEntity()
 {
 	m_engine.getUniverse()->destroyEntity(m_selected_entity);
-	selectEntity(Lux::Entity::INVALID);
+	selectEntity(Lumix::Entity::INVALID);
 }
 
 
@@ -953,7 +953,7 @@ void EditorServerImpl::onComponentEvent(Event& event)
 	}			
 	if(e.is_created)
 	{
-		const Lux::Entity::ComponentList& cmps = e.component.entity.getComponents();
+		const Lumix::Entity::ComponentList& cmps = e.component.entity.getComponents();
 		bool found = false;
 		for(int i = 0; i < cmps.size(); ++i)
 		{
@@ -965,7 +965,7 @@ void EditorServerImpl::onComponentEvent(Event& event)
 		}
 		if(!found)
 		{
-			EditorIcon* er = LUX_NEW(EditorIcon)();
+			EditorIcon* er = LUMIX_NEW(EditorIcon)();
 			er->create(m_engine, *m_engine.getRenderScene(), e.component.entity, e.component);
 			m_editor_icons.push(er);
 		}
@@ -974,7 +974,7 @@ void EditorServerImpl::onComponentEvent(Event& event)
 	{
 		if(e.component.entity.existsInUniverse() &&  e.component.entity.getComponents().empty())
 		{
-			EditorIcon* er = LUX_NEW(EditorIcon)();
+			EditorIcon* er = LUMIX_NEW(EditorIcon)();
 			er->create(m_engine, *m_engine.getRenderScene(), e.component.entity, Component::INVALID);
 			m_editor_icons.push(er);
 		}
@@ -1116,4 +1116,4 @@ void EditorServerImpl::onMessage(const uint8_t* data, int32_t size)
 
 
 
-} // !namespace Lux
+} // !namespace Lumix

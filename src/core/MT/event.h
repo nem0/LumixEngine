@@ -1,7 +1,7 @@
 #pragma once
-#include "core/lux.h"
+#include "core/lumix.h"
 
-namespace  Lux
+namespace Lumix
 {
 	namespace MT
 	{
@@ -38,4 +38,4 @@ namespace  Lux
 			EventHandle m_id;
 		};
 	}; // ~namespace MT
-}; // ~namespace Lux
+}; // ~namespace Lumix

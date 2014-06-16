@@ -1,11 +1,11 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/event_manager.h"
 
 
-namespace Lux
+namespace Lumix
 {
 	namespace FS
 	{
@@ -101,4 +101,4 @@ namespace Lux
 	};
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

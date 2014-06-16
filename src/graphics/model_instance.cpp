@@ -3,7 +3,7 @@
 #include "core/resource_manager_base.h"
 #include "graphics/model.h"
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -57,4 +57,4 @@ void ModelInstance::setMatrix(const Matrix& mtx)
 }
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

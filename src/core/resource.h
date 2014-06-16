@@ -4,7 +4,7 @@
 #include "core/delegate_list.h"
 #include "core/path.h"
 
-namespace Lux
+namespace Lumix
 {
 	// forward declarations
 	class ResourceManager;
@@ -79,4 +79,4 @@ namespace Lux
 		ObserverCallback m_cb;
 		ResourceManager& m_resource_manager;
 	};
-} // ~namespace Lux
+} // ~namespace Lumix

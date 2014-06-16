@@ -7,7 +7,7 @@
 
 
 
-namespace Lux
+namespace Lumix
 {
 
 template <typename T, typename Allocator = DefaultAllocator, bool is_trivially_copyable = std::is_trivial<T>::value > class Array;
@@ -365,4 +365,4 @@ private:
 
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

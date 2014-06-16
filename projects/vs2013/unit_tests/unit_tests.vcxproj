@@ -26,7 +26,7 @@
     <ClCompile Include="..\..\..\src\unit_tests\suite\unit_test_manager.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\src\unit_tests\suite\lux_unit_tests.h" />
+    <ClInclude Include="..\..\..\src\unit_tests\suite\lumix_unit_tests.h" />
     <ClInclude Include="..\..\..\src\unit_tests\suite\platform_defines.h" />
     <ClInclude Include="..\..\..\src\unit_tests\suite\unit_test.h" />
     <ClInclude Include="..\..\..\src\unit_tests\suite\unit_test_app.h" />

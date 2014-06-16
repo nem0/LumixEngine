@@ -4,7 +4,7 @@
 #include "gui/block.h"
 
 
-namespace Lux
+namespace Lumix
 {
 namespace UI
 {
@@ -51,13 +51,13 @@ namespace UI
 			float m_max;
 			float m_value;
 			float m_step;
-			Lux::UI::Block* m_down_arrow;
-			Lux::UI::Block* m_up_arrow;
-			Lux::UI::Block* m_slider;
+			Lumix::UI::Block* m_down_arrow;
+			Lumix::UI::Block* m_up_arrow;
+			Lumix::UI::Block* m_slider;
 			Type m_scrollbar_type;
 	};
 
 
 } // ~namespace UI
-} // ~namespace Lux
+} // ~namespace Lumix
 

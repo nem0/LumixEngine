@@ -1,9 +1,9 @@
 #pragma once
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/fs/ifile_device.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace FS
 	{
@@ -17,4 +17,4 @@ namespace Lux
 			const char* name() const { return "disk"; }
 		};
 	} // ~namespace FS
-} // ~namespace Lux
+} // ~namespace Lumix

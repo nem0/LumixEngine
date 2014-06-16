@@ -2,7 +2,7 @@
 
 #include <array>
 
-namespace Lux
+namespace Lumix
 {
 	template <class T, size_t Size> 
 	class StaticArray
@@ -126,4 +126,4 @@ namespace Lux
 	};
 	// not supported
 	template <class T> class StaticArray<T, 0>;
-} // ~namespace Lux
+} // ~namespace Lumix

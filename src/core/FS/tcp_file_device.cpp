@@ -8,7 +8,7 @@
 #include "core/MT/spin_mutex.h"
 
 
-namespace Lux
+namespace Lumix
 {
 	namespace FS
 	{
@@ -149,12 +149,12 @@ namespace Lux
 
 		IFile* TCPFileDevice::createFile(IFile*)
 		{
-			return LUX_NEW(TCPFile)(m_impl->m_stream, m_impl->m_spin_mutex);
+			return LUMIX_NEW(TCPFile)(m_impl->m_stream, m_impl->m_spin_mutex);
 		}
 
 		void TCPFileDevice::connect(const char* ip, uint16_t port)
 		{
-			m_impl = LUX_NEW(TCPImpl);
+			m_impl = LUMIX_NEW(TCPImpl);
 			m_impl->m_stream = m_impl->m_connector.connect(ip, port);
 		}
 
@@ -165,4 +165,4 @@ namespace Lux
 			LUX_DELETE(m_impl);
 		}
 	} // namespace FS
-} // ~namespace Lux
+} // ~namespace Lumix

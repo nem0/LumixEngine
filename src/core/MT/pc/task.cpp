@@ -1,8 +1,8 @@
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/MT/task.h"
 #include <Windows.h>
 
-namespace Lux
+namespace Lumix
 {
 	namespace MT
 	{
@@ -68,7 +68,7 @@ namespace Lux
 
 		Task::Task()
 		{
-			TaskImpl* impl = LUX_NEW(TaskImpl);
+			TaskImpl* impl = LUMIX_NEW(TaskImpl);
 			impl->m_handle = NULL;
 			impl->m_affinity_mask = getProccessAffinityMask();
 			impl->m_priority = ::GetThreadPriority(GetCurrentThread());
@@ -214,4 +214,4 @@ namespace Lux
 			}
 		}
 	} // ~namespace MT
-} // ~namespace Lux
+} // ~namespace Lumix
