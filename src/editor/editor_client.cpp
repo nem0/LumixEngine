@@ -9,6 +9,7 @@
 #include "core/MT/task.h"
 #include "core/net/tcp_connector.h"
 #include "core/net/tcp_stream.h"
+#include "core/path.h"
 #include "core/profiler.h"
 #include "editor/client_message_types.h"
 #include "editor/editor_server.h"
@@ -28,7 +29,7 @@ namespace Lumix
 		void onMessage(const uint8_t* data, int size);
 
 		EventManager m_event_manager;
-		string m_base_path;
+		Path m_base_path;
 		EditorServer& m_server;
 	};
 
