@@ -35,8 +35,10 @@ private slots:
 	void onFileChanged(const QString& path);
 	void on_searchInput_textEdited(const QString &arg1);
 	void on_listWidget_activated(const QModelIndex &index);
+	void on_treeView_customContextMenuRequested(const QPoint &pos);
+	void on_exportFinished(int);
 
-private:
+	private:
 	Ui::AssetBrowser* m_ui;
 	class QFileSystemModel* m_model;
 	class FileSystemWatcher* m_watcher;
