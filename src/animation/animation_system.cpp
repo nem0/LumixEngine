@@ -221,7 +221,7 @@ namespace Lumix
 			if(!animable.m_manual && animable.m_animation->isReady())
 			{
 				RenderScene* scene = static_cast<RenderScene*>(animable.m_renderable.system);
-				animable.m_animation->getPose(animable.m_time, scene->getPose(animable.m_renderable));
+				animable.m_animation->getPose(animable.m_time, scene->getPose(animable.m_renderable), *scene->getModel(animable.m_renderable));
 				float t = animable.m_time + time_delta;
 				float l = animable.m_animation->getLength();
 				while(t > l)
