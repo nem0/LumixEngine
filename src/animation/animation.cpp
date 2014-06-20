@@ -2,8 +2,10 @@
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
 #include "core/log.h"
+#include "core/matrix.h"
 #include "core/quat.h"
 #include "core/vec3.h"
+#include "graphics/model.h"
 #include "graphics/pose.h"
 
 
@@ -52,7 +54,7 @@ Animation::~Animation()
 static const float ANIMATION_FPS = 30.0f;
 
 
-void Animation::getPose(float time, Pose& pose) const
+void Animation::getPose(float time, Pose& pose, Model& model) const
 {
 	int frame = (int)(time * ANIMATION_FPS);
 	frame = frame >= m_frame_count ? m_frame_count - 1 : frame;
@@ -68,6 +70,12 @@ void Animation::getPose(float time, Pose& pose) const
 		{
 			lerp(m_positions[off + i], m_positions[off2 + i], &pos[i], t);
 			nlerp(m_rotations[off + i], m_rotations[off2 + i], &rot[i], t);
+			int parent = model.getBone(i).parent_idx;
+			if (parent >= 0)
+			{
+				pos[i] = rot[parent] * pos[i] + pos[parent];
+				rot[i] = rot[i] * rot[parent];
+			}
 		}
 	}
 	else
@@ -76,6 +84,12 @@ void Animation::getPose(float time, Pose& pose) const
 		{
 			pos[i] = m_positions[off + i];
 			rot[i] = m_rotations[off + i];
+			int parent = model.getBone(i).parent_idx;
+			if (parent >= 0)
+			{
+				pos[i] = rot[parent] * pos[i] + pos[parent];
+				rot[i] = rot[i] * rot[parent];
+			}
 		}
 	}
 }

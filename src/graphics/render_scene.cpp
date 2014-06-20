@@ -279,7 +279,7 @@ namespace Lumix
 					serializer.serializeArrayItem(m_renderables[i].m_entity.index);
 					if (m_renderables[i].m_model.getModel())
 					{
-						serializer.serializeArrayItem(m_renderables[i].m_model.getModel()->getPath());
+						serializer.serializeArrayItem(m_renderables[i].m_model.getModel()->getPath().c_str());
 					}
 					else
 					{
@@ -541,11 +541,16 @@ namespace Lumix
 				return m_renderables[cmp.index].m_model.getPose();
 			}
 
+			virtual Model* getModel(Component cmp) override
+			{
+				return m_renderables[cmp.index].m_model.getModel();
+			}
+
 			virtual void getRenderablePath(Component cmp, string& path) override
 			{
 					if (m_renderables[cmp.index].m_model.getModel())
 					{
-						path = m_renderables[cmp.index].m_model.getModel()->getPath();
+						path = m_renderables[cmp.index].m_model.getModel()->getPath().c_str();
 					}
 					else
 					{
