@@ -63,7 +63,8 @@ private:
 		{
 			INT,
 			FLOAT,
-			MATRIX
+			MATRIX,
+			TIME
 		};
 		static const int MAX_NAME_LENGTH = 30;
 		char m_name[MAX_NAME_LENGTH + 1];
