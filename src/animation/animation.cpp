@@ -56,39 +56,42 @@ static const float ANIMATION_FPS = 30.0f;
 
 void Animation::getPose(float time, Pose& pose, Model& model) const
 {
-	int frame = (int)(time * ANIMATION_FPS);
-	frame = frame >= m_frame_count ? m_frame_count - 1 : frame;
-	Vec3* pos = pose.getPositions();
-	Quat* rot = pose.getRotations();
-	int off = frame * m_bone_count;
-	int off2 = off + m_bone_count;
-	float t = (time - frame / ANIMATION_FPS) / (1 / ANIMATION_FPS);
-	
-	if(frame < m_frame_count - 1)
+	if(model.isReady())
 	{
-		for(int i = 0; i < m_bone_count; ++i)
+		int frame = (int)(time * ANIMATION_FPS);
+		frame = frame >= m_frame_count ? m_frame_count - 1 : frame;
+		Vec3* pos = pose.getPositions();
+		Quat* rot = pose.getRotations();
+		int off = frame * m_bone_count;
+		int off2 = off + m_bone_count;
+		float t = (time - frame / ANIMATION_FPS) / (1 / ANIMATION_FPS);
+	
+		if(frame < m_frame_count - 1)
 		{
-			lerp(m_positions[off + i], m_positions[off2 + i], &pos[i], t);
-			nlerp(m_rotations[off + i], m_rotations[off2 + i], &rot[i], t);
-			int parent = model.getBone(i).parent_idx;
-			if (parent >= 0)
+			for(int i = 0; i < m_bone_count; ++i)
 			{
-				pos[i] = rot[parent] * pos[i] + pos[parent];
-				rot[i] = rot[i] * rot[parent];
+				lerp(m_positions[off + i], m_positions[off2 + i], &pos[i], t);
+				nlerp(m_rotations[off + i], m_rotations[off2 + i], &rot[i], t);
+				int parent = model.getBone(i).parent_idx;
+				if (parent >= 0)
+				{
+					pos[i] = rot[parent] * pos[i] + pos[parent];
+					rot[i] = rot[i] * rot[parent];
+				}
 			}
 		}
-	}
-	else
-	{
-		for(int i = 0; i < m_bone_count; ++i)
+		else
 		{
-			pos[i] = m_positions[off + i];
-			rot[i] = m_rotations[off + i];
-			int parent = model.getBone(i).parent_idx;
-			if (parent >= 0)
+			for(int i = 0; i < m_bone_count; ++i)
 			{
-				pos[i] = rot[parent] * pos[i] + pos[parent];
-				rot[i] = rot[i] * rot[parent];
+				pos[i] = m_positions[off + i];
+				rot[i] = m_rotations[off + i];
+				int parent = model.getBone(i).parent_idx;
+				if (parent >= 0)
+				{
+					pos[i] = rot[parent] * pos[i] + pos[parent];
+					rot[i] = rot[i] * rot[parent];
+				}
 			}
 		}
 	}
