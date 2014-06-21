@@ -112,7 +112,7 @@ class FileSystemWatcher
 
 void getDefaultFilters(QStringList& filters)
 {
-	filters << "*.msh" << "*.unv" << "*.ani" << "*.blend";
+	filters << "*.msh" << "*.unv" << "*.ani" << "*.blend" << "*.tga" << "*.mat";
 }
 
 
@@ -264,7 +264,7 @@ void AssetBrowser::on_listWidget_activated(const QModelIndex &index)
 	handleDoubleClick(info);
 }
 
-void AssetBrowser::on_exportFinished(int error_code)
+void AssetBrowser::on_exportFinished(int)
 {
 	QProcess* process = static_cast<QProcess*>(QObject::sender());
 	QString s = process->readAll();;

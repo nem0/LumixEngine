@@ -2,7 +2,9 @@
 #include "ui_property_view.h"
 #include <qcheckbox.h>
 #include <QDoubleSpinBox>
+#include <QDragEnterEvent>
 #include <QFileDialog>
+#include <QMimeData>
 #include <qlineedit.h>
 #include <qpushbutton.h>
 #include "core/crc32.h"
@@ -39,6 +41,12 @@ PropertyView::PropertyView(QWidget* parent) :
 	}
 	
 	m_ui->componentTypeCombo->insertItems(0, component_list);
+}
+
+
+Lumix::EditorClient* PropertyView::getEditorClient()
+{
+	return m_client;
 }
 
 
@@ -106,7 +114,7 @@ void PropertyView::on_browseFilesClicked()
 	m_client->setComponentProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), edit->text().toLocal8Bit().data(), edit->text().size());
 }
 
-void PropertyView::onPropertyValue(Property* property, void* data, int32_t data_size)
+void PropertyView::onPropertyValue(Property* property, void* data, int32_t)
 {
 	switch(property->m_type)
 	{
@@ -174,6 +182,48 @@ void PropertyView::onPropertyList(Lumix::Event& event)
 }
 
 
+class FileEdit : public QLineEdit
+{
+	public:
+		FileEdit(QWidget* parent, PropertyView* property_view)
+			: QLineEdit(parent)
+			, m_property_view(property_view)
+		{
+			setAcceptDrops(true);
+		}
+
+		virtual void dragEnterEvent(QDragEnterEvent* event) override
+		{
+			if (event->mimeData()->hasUrls())
+			{
+				event->acceptProposedAction();
+			}
+		}
+
+		virtual void dropEvent(QDropEvent* event)
+		{
+			const QList<QUrl>& list = event->mimeData()->urls();
+			if(!list.empty())
+			{
+				QString file = list[0].toLocalFile();
+				if(file.toLower().startsWith(m_property_view->getEditorClient()->getBasePath()))
+				{
+					file.remove(0, QString(m_property_view->getEditorClient()->getBasePath()).length());
+				}
+				if(file.startsWith("/"))
+				{
+					file.remove(0, 1);
+				}
+				setText(file);
+				emit editingFinished();
+			}
+		}
+
+	private:
+		PropertyView* m_property_view;
+};
+
+
 void PropertyView::addProperty(const char* component, const char* name, const char* label, Property::Type type, const char* file_type)
 {
 	QTreeWidgetItem* item = new QTreeWidgetItem(QStringList() << label);
@@ -222,7 +272,7 @@ void PropertyView::addProperty(const char* component, const char* name, const ch
 		case Property::FILE:
 			{
 				QWidget* widget = new QWidget();
-				QLineEdit* edit = new QLineEdit(widget);
+				QLineEdit* edit = new FileEdit(widget, this);
 				edit->setProperty("cpp_prop", (int)(m_properties.size() - 1)); 
 				QHBoxLayout* layout = new QHBoxLayout(widget);
 				layout->addWidget(edit);

@@ -48,6 +48,7 @@ public:
 	explicit PropertyView(QWidget* parent = NULL);
 	~PropertyView();
 	void setEditorClient(Lumix::EditorClient& client);
+	Lumix::EditorClient* getEditorClient();
 
 private slots:
 	void on_addComponentButton_clicked();
