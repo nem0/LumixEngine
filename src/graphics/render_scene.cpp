@@ -8,6 +8,7 @@
 #include "core/log.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
+#include "core/timer.h"
 #include "engine/engine.h"
 #include "graphics/geometry.h"
 #include "graphics/irender_device.h"
@@ -158,6 +159,7 @@ namespace Lumix
 				, m_universe(universe)
 			{
 				m_universe.getEventManager().addListener(EntityMovedEvent::type).bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
+				m_timer = Timer::create();
 			}
 
 			~RenderSceneImpl()
@@ -169,6 +171,7 @@ namespace Lumix
 				{
 					LUX_DELETE(m_terrains[i]);
 				}
+				Timer::destroy(m_timer);
 			}
 
 			virtual void getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) override
@@ -740,6 +743,11 @@ namespace Lumix
 				return Component::INVALID;
 			}
 
+			virtual Timer* getTimer() const override
+			{
+				return m_timer;
+			}
+
 		private:
 			Array<Renderable> m_renderables;
 			Array<Light> m_lights;
@@ -748,6 +756,7 @@ namespace Lumix
 			Universe& m_universe;
 			Engine& m_engine;
 			Array<DebugLine> m_debug_lines;
+			Timer* m_timer;
 	};
 
 

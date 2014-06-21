@@ -17,6 +17,7 @@ namespace Lumix
 	class Model;
 	class ModelInstance;
 	class Pose;
+	class Timer;
 	class Universe;
 
 	struct RenderableInfo
@@ -50,6 +51,7 @@ namespace Lumix
 			virtual void getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) = 0;
 			virtual void applyCamera(Component camera) = 0;
 			virtual void update(float dt) = 0;
+			virtual Timer* getTimer() const = 0;
 
 			virtual Pose& getPose(const Component& cmp) = 0;
 			virtual Component getLight(int index) = 0;
