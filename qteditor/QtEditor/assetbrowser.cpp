@@ -38,7 +38,7 @@ class FileSystemWatcher
 		{
 			m_overlapped.hEvent = this;
 			m_handle = CreateFile(path, FILE_LIST_DIRECTORY, FILE_SHARE_DELETE | FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, NULL);
-			ReadDirectoryChangesW(m_handle, m_info, sizeof(m_info), TRUE, FILE_NOTIFY_CHANGE_LAST_WRITE, &m_received, &m_overlapped, callback);
+			ReadDirectoryChangesW(m_handle, m_info, sizeof(m_info), TRUE, FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_LAST_WRITE, &m_received, &m_overlapped, callback);
 		}
 
 		static void CALLBACK callback(DWORD errorCode, DWORD tferred, LPOVERLAPPED over)
@@ -47,21 +47,62 @@ class FileSystemWatcher
 			FileSystemWatcher* watcher = (FileSystemWatcher*)over->hEvent;
 			if(tferred > 0)
 			{
-				switch(watcher->m_info[0].Action)
+				FILE_NOTIFY_INFORMATION* info = &watcher->m_info[0];
+				while(info)
 				{
-					case FILE_ACTION_MODIFIED:
-						{
-							char tmp[MAX_PATH];
-							wcharToCharArray(watcher->m_info[0].FileName, tmp, watcher->m_info[0].FileNameLength);
-							watcher->m_asset_browser->emitFileChanged(tmp);
-						}
-						break;
+					switch(info->Action)
+					{
+						case FILE_ACTION_ADDED:
+						case FILE_ACTION_MODIFIED:
+							{
+								char tmp[MAX_PATH];
+								wcharToCharArray(info->FileName, tmp, info->FileNameLength);
+								watcher->m_asset_browser->emitFileChanged(tmp);
+							}
+							break;
+						default:
+							ASSERT(false);
+							break;
+					}
+					info = info->NextEntryOffset == 0 ? NULL : (FILE_NOTIFY_INFORMATION*)(((char*)info) + info->NextEntryOffset);
 				}
 			}
-			ReadDirectoryChangesW(watcher->m_handle, watcher->m_info, sizeof(watcher->m_info), TRUE, FILE_NOTIFY_CHANGE_LAST_WRITE, &watcher->m_received, &watcher->m_overlapped, callback);
+			BOOL b = ReadDirectoryChangesW(watcher->m_handle, watcher->m_info2, sizeof(watcher->m_info), TRUE, FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_FILE_NAME, &watcher->m_received, &watcher->m_overlapped, callback2);
+			ASSERT(b);
+		}
+		
+		static void CALLBACK callback2(DWORD errorCode, DWORD tferred, LPOVERLAPPED over)
+		{
+			ASSERT(errorCode == 0);
+			FileSystemWatcher* watcher = (FileSystemWatcher*)over->hEvent;
+			if(tferred > 0)
+			{
+				FILE_NOTIFY_INFORMATION* info = &watcher->m_info2[0];
+				while(info)
+				{
+					switch(info->Action)
+					{
+						case FILE_ACTION_ADDED:
+						case FILE_ACTION_MODIFIED:
+							{
+								char tmp[MAX_PATH];
+								wcharToCharArray(info->FileName, tmp, info->FileNameLength);
+								watcher->m_asset_browser->emitFileChanged(tmp);
+							}
+							break;
+						default:
+							ASSERT(false);
+							break;
+					}
+					info = info->NextEntryOffset == 0 ? NULL : (FILE_NOTIFY_INFORMATION*)(((char*)info) + info->NextEntryOffset);
+				}
+			}
+			BOOL b = ReadDirectoryChangesW(watcher->m_handle, watcher->m_info, sizeof(watcher->m_info), TRUE, FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_FILE_NAME, &watcher->m_received, &watcher->m_overlapped, callback);
+			ASSERT(b);
 		}
 
 		FILE_NOTIFY_INFORMATION m_info[10];
+		FILE_NOTIFY_INFORMATION m_info2[10];
 		HANDLE m_handle;
 		DWORD m_received;
 		OVERLAPPED m_overlapped;
@@ -159,7 +200,15 @@ void AssetBrowser::on_treeView_doubleClicked(const QModelIndex &index)
 
 void AssetBrowser::onFileChanged(const QString& path)
 {
-	if(m_server)
+	if(QFileInfo(path).suffix() == "blend@")
+	{
+		QFileInfo file_info(path);
+		QString base_name = file_info.absolutePath() + "/" + file_info.baseName() + ".blend";
+		QFileInfo result_file_info(base_name);
+		exportAnimation(result_file_info);
+		exportModel(result_file_info);
+	}
+	else if(m_server)
 	{
 		m_server->getEngine().getResourceManager().reload(path.toLatin1().data());
 	}
@@ -224,20 +273,36 @@ void AssetBrowser::on_exportFinished(int error_code)
 	{
 		s += process->readAll();
 	}
-/*	for(int i = 0; i < m_processes.size(); ++i)
-	{
-		if(m_processes[i].m_process == process)
-		{
-			uint32_t hash = crc32(m_processes[i].m_path.c_str());
-			m_log[hash] = s.toLatin1().data();
-			m_status[hash] = exitCode == 0 ? SUCCESS : FAILURE;
-			
-			QString msg;
-			msg.sprintf("Script %s compiled", m_processes[i].m_path.c_str());
-			emit messageLogged(msg);
-			break;
-		}
-	}*/
+}
+
+void AssetBrowser::exportAnimation(const QFileInfo& file_info)
+{
+	ProcessInfo process;
+	process.m_path = file_info.path().toLatin1().data();
+	process.m_process = new QProcess();
+	//m_processes.push(process);
+	QStringList list;
+	list.push_back("/C");
+	list.push_back("models\\export_anim.bat");
+	list.push_back(file_info.absoluteFilePath().toLatin1().data());
+	list.push_back(m_base_path.toLatin1().data());
+	connect(process.m_process, (void (QProcess::*)(int))&QProcess::finished, this, &AssetBrowser::on_exportFinished);
+	process.m_process->start("cmd.exe", list);
+}
+
+void AssetBrowser::exportModel(const QFileInfo& file_info)
+{
+	ProcessInfo process;
+	process.m_path = file_info.path().toLatin1().data();
+	process.m_process = new QProcess();
+	//m_processes.push(process);
+	QStringList list;
+	list.push_back("/C");
+	list.push_back("models\\export_mesh.bat");
+	list.push_back(file_info.absoluteFilePath().toLatin1().data());
+	list.push_back(m_base_path.toLatin1().data());
+	connect(process.m_process, (void (QProcess::*)(int))&QProcess::finished, this, &AssetBrowser::on_exportFinished);
+	process.m_process->start("cmd.exe", list);
 }
 
 void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
@@ -254,31 +319,11 @@ void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
 		QAction* action = menu->exec(mapToGlobal(pos));
 		if(action == export_anim_action)
 		{
-			ProcessInfo process;
-			process.m_path = file_info.path().toLatin1().data();
-			process.m_process = new QProcess();
-			//m_processes.push(process);
-			QStringList list;
-			list.push_back("/C");
-			list.push_back("models\\export_anim.bat");
-			list.push_back(file_info.absoluteFilePath().toLatin1().data());
-			list.push_back(m_base_path.toLatin1().data());
-			connect(process.m_process, (void (QProcess::*)(int))&QProcess::finished, this, &AssetBrowser::on_exportFinished);
-			process.m_process->start("cmd.exe", list);
+			exportAnimation(file_info);
 		}
 		else if(action == export_model_action)
 		{
-			ProcessInfo process;
-			process.m_path = file_info.path().toLatin1().data();
-			process.m_process = new QProcess();
-			//m_processes.push(process);
-			QStringList list;
-			list.push_back("/C");
-			list.push_back("models\\export_mesh.bat");
-			list.push_back(file_info.absoluteFilePath().toLatin1().data());
-			list.push_back(m_base_path.toLatin1().data());
-			connect(process.m_process, (void (QProcess::*)(int))&QProcess::finished, this, &AssetBrowser::on_exportFinished);
-			process.m_process->start("cmd.exe", list);
+			exportModel(file_info);
 		}
 	}
 
