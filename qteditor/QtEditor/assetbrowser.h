@@ -26,6 +26,8 @@ public:
 
 private:
 	void handleDoubleClick(const class QFileInfo& file_info);
+	void exportAnimation(const QFileInfo& file_info);
+	void exportModel(const QFileInfo& file_info);
 
 signals:
 	void fileChanged(const QString& string);
@@ -38,7 +40,7 @@ private slots:
 	void on_treeView_customContextMenuRequested(const QPoint &pos);
 	void on_exportFinished(int);
 
-	private:
+private:
 	Ui::AssetBrowser* m_ui;
 	class QFileSystemModel* m_model;
 	class FileSystemWatcher* m_watcher;
