@@ -336,7 +336,8 @@ General Rules
 #### Forbidden features
   1. RTTI, exceptions
 	- performace
-
+  2. Ellipses functions : sprintf, ...
+        - when the type of the argument is changed (e.g. const char* -> Lumix::string), no compiler warning/error is             emitted
 ---
 
 #### Others
