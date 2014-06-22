@@ -9,6 +9,7 @@ namespace Lumix
 {
 	class EditorClient;
 	class Event;
+	class Path;
 }
 
 namespace Ui
@@ -17,6 +18,7 @@ namespace Ui
 }
 
 class QTreeWidgetItem;
+class ScriptCompiler;
 
 class PropertyView : public QDockWidget
 {
@@ -49,6 +51,7 @@ public:
 	~PropertyView();
 	void setEditorClient(Lumix::EditorClient& client);
 	Lumix::EditorClient* getEditorClient();
+	void setScriptCompiler(ScriptCompiler* compiler);
 
 private slots:
 	void on_addComponentButton_clicked();
@@ -57,6 +60,8 @@ private slots:
 	void on_vec3ValueChanged();
 	void on_lineEditEditingFinished();
 	void on_browseFilesClicked();
+	void on_compileScriptClicked();
+	void on_editScriptClicked();
 
 private:
 	void clear();
@@ -64,11 +69,15 @@ private:
 	void onEntitySelected(Lumix::Event& event);
 	void addProperty(const char* component, const char* name, const char* label, Property::Type type, const char* file_type);
 	void onPropertyValue(Property* property, void* data, int32_t data_size);
+	void addScriptCustomProperties();
+	void onScriptCompiled(const Lumix::Path& path, uint32_t status);
+	void setScriptStatus(uint32_t status);
 
 private:
 	Ui::PropertyView* m_ui;
 	Lumix::EditorClient* m_client;
 	Lumix::Array<Property*> m_properties;
+	ScriptCompiler* m_compiler;
 };
 
 

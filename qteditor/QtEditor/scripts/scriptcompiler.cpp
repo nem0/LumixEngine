@@ -4,7 +4,7 @@
 #include <qtextstream.h>
 #include "core/crc32.h"
 #include "core/log.h"
-
+#include "core/path.h"
 
 ScriptCompiler::ScriptCompiler(QObject* parent) :
 	QObject(parent)
@@ -29,15 +29,24 @@ void ScriptCompiler::compileAll()
 }
 
 
-void ScriptCompiler::compile(const char path[])
+void ScriptCompiler::compile(const Lumix::Path& path)
 {
 	ProcessInfo process;
-	process.m_path = path;
+	Lumix::Path rel_path;
+	if(strncmp(path.c_str(), m_base_path.c_str(), m_base_path.length()) == 0)
+	{
+		rel_path = path.c_str() + m_base_path.length() + 1;
+	}
+	else
+	{
+		rel_path = path;
+	}
+	process.m_path = rel_path;
 	process.m_process = new QProcess();
 	m_processes.push(process);
 	QStringList list;
 	char cmd_line[255];
-	sprintf(cmd_line, "scripts\\compile.bat %s", path);
+	sprintf(cmd_line, "%s\\scripts\\compile.bat %s", m_base_path.c_str(), path.c_str());
 	list.push_back("/C");
 	list.push_back(cmd_line);
 	connect(process.m_process, SIGNAL(finished(int)), this, SLOT(compilerFinish(int)));
@@ -63,7 +72,15 @@ void ScriptCompiler::compilerFinish(int exitCode)
 			m_status[hash] = exitCode == 0 ? SUCCESS : FAILURE;
 			
 			QString msg;
-			msg.sprintf("Script %s compiled", m_processes[i].m_path.c_str());
+			if(exitCode == 0)
+			{
+				msg.sprintf("Script %s compiled successfully", m_processes[i].m_path.c_str());
+			}
+			else
+			{
+				msg.sprintf("Script %s failed to compile", m_processes[i].m_path.c_str());
+			}
+			m_delegates.invoke(m_processes[i].m_path.c_str(), exitCode);
 			emit messageLogged(msg);
 			break;
 		}
@@ -71,9 +88,19 @@ void ScriptCompiler::compilerFinish(int exitCode)
 }
 
 
-ScriptCompiler::Status ScriptCompiler::getStatus(const char* path)
+ScriptCompiler::Status ScriptCompiler::getStatus(const Lumix::Path& path)
 {
-	Lumix::Map<uint32_t, Status>::iterator iter = m_status.find(crc32(path));
+	uint32_t hash;
+	if(strncmp(path.c_str(), m_base_path.c_str(), m_base_path.length()) == 0)
+	{
+		hash = crc32(path.c_str() + m_base_path.length() + 1);
+	}
+	else
+	{
+		hash = crc32(path.c_str());
+	}
+
+	Lumix::Map<uint32_t, Status>::iterator iter = m_status.find(hash);
 	return iter == m_status.end() ? UNKNOWN : iter.second();
 }
 
@@ -100,7 +127,16 @@ void ScriptCompiler::checkFinished()
 }
 
 
-const char* ScriptCompiler::getLog(const char* path)
+const char* ScriptCompiler::getLog(const Lumix::Path& path)
 {
-	return m_log[crc32(path)].c_str();
+	uint32_t hash;
+	if(strncmp(path.c_str(), m_base_path.c_str(), m_base_path.length()) == 0)
+	{
+		hash = crc32(path.c_str() + m_base_path.length() + 1);
+	}
+	else
+	{
+		hash = crc32(path.c_str());
+	}
+	return m_log[hash].c_str();
 }
