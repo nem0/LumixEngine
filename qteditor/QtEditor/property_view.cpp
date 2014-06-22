@@ -390,7 +390,7 @@ void PropertyView::on_compileScriptClicked()
 {
 	for(int i = 0; i < m_properties.size(); ++i)
 	{
-		if(m_properties[i]->m_name == "source")
+		if(m_properties[i]->m_component_name == "script" && m_properties[i]->m_name == "source")
 		{
 			QLineEdit* edit = qobject_cast<QLineEdit*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item, 1)->children()[0]);
 			m_compiler->compile(edit->text().toLatin1().data());

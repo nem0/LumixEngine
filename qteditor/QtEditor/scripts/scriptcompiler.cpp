@@ -46,7 +46,7 @@ void ScriptCompiler::compile(const Lumix::Path& path)
 	m_processes.push(process);
 	QStringList list;
 	char cmd_line[255];
-	sprintf(cmd_line, "%s\\scripts\\compile.bat %s", m_base_path.c_str(), path.c_str());
+	sprintf(cmd_line, "%s\\scripts\\compile.bat %s\\%s", m_base_path.c_str(), m_base_path.c_str(), rel_path.c_str());
 	list.push_back("/C");
 	list.push_back(cmd_line);
 	connect(process.m_process, SIGNAL(finished(int)), this, SLOT(compilerFinish(int)));
