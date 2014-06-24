@@ -28,6 +28,7 @@ private:
 	void handleDoubleClick(const class QFileInfo& file_info);
 	void exportAnimation(const QFileInfo& file_info);
 	void exportModel(const QFileInfo& file_info);
+	void onFileSystemWatcherCallback(const char* path);
 
 signals:
 	void fileChanged(const QString& string);

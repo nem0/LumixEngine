@@ -1,5 +1,10 @@
 #include "property_view.h"
 #include "ui_property_view.h"
+#include "core/crc32.h"
+#include "core/event_manager.h"
+#include "editor/editor_client.h"
+#include "editor/server_message_types.h"
+#include "scripts/scriptcompiler.h"
 #include <qcheckbox.h>
 #include <qdesktopservices.h>
 #include <QDoubleSpinBox>
@@ -8,11 +13,6 @@
 #include <QMimeData>
 #include <qlineedit.h>
 #include <qpushbutton.h>
-#include "core/crc32.h"
-#include "core/event_manager.h"
-#include "editor/editor_client.h"
-#include "editor/server_message_types.h"
-#include "scripts/scriptcompiler.h"
 
 
 static const char* component_map[] =
