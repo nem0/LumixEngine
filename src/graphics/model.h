@@ -65,6 +65,7 @@ class Model : public Resource
 			Vec3 position;
 			Quat rotation;
 			Matrix inv_bind_matrix;
+			int parent_idx;
 		};
 
 	public:
@@ -85,7 +86,6 @@ class Model : public Resource
 		void		getPose(Pose& pose);
 		float		getBoundingRadius() const { return m_bounding_radius; }
 		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform, float scale);
-		const char* getPath() const { return m_path.c_str(); }
 
 	private:
 		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
@@ -93,6 +93,7 @@ class Model : public Resource
 		bool parseGeometry(FS::IFile* file, const VertexDef& vertex_definition);
 		bool parseBones(FS::IFile* file);
 		bool parseMeshes(FS::IFile* file);
+		int getBoneIdx(const char* name);
 
 		virtual void doUnload(void) override;
 		virtual FS::ReadCallback getReadCallback() override;

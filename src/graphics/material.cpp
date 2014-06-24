@@ -5,6 +5,7 @@
 #include "core/log.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
+#include "core/timer.h"
 #include "graphics/frame_buffer.h"
 #include "graphics/pipeline.h"
 #include "graphics/renderer.h"
@@ -51,6 +52,9 @@ void Material::apply(Renderer& renderer, PipelineInstance& pipeline)
 					break;
 				case Uniform::MATRIX:
 					m_shader->setUniform(uniform.m_name, uniform.m_matrix);
+					break;
+				case Uniform::TIME:
+					m_shader->setUniform(uniform.m_name, pipeline.getScene()->getTimer()->getTimeSinceStart());
 					break;
 				default:
 					ASSERT(false);
@@ -145,6 +149,11 @@ void Material::deserializeUniforms(ISerializer& serializer)
 					ASSERT(i == 15 || !serializer.isArrayEnd());
 				}
 				serializer.deserializeArrayEnd();
+			}
+			else if (strcmp(label, "time") == 0)
+			{
+				uniform.m_type = Uniform::TIME;
+				serializer.deserialize(uniform.m_float);
 			}
 			else
 			{

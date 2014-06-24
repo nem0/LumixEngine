@@ -3,6 +3,7 @@
 
 #include "core/lumix.h"
 #include "engine/iplugin.h"
+#include "core/string.h"
 
 
 namespace Lumix
@@ -11,7 +12,6 @@ namespace Lumix
 	{
 		class FileSystem;
 	};
-
 
 	class Animation;
 	class Engine;
@@ -33,6 +33,8 @@ namespace Lumix
 			virtual Component createComponent(uint32_t, const Entity&) override;
 			virtual const char* getName() const override { return "animation"; }
 
+			void getPreview(Component cmp, string& path);
+			void setPreview(Component cmp, const string& path);
 			void destroy();
 			Component createAnimable(const Entity& entity);
 			void playAnimation(const Component& cmp, const char* path);

@@ -132,7 +132,7 @@ bool Model::parseVertexDef(FS::IFile* file, VertexDef* vertex_definition)
 	ASSERT(vertex_def_size < 16);
 	if (vertex_def_size >= 16)
 	{
-		g_log_error.log("renderer", "Model file corrupted %s", getPath());
+		g_log_error.log("renderer", "Model file corrupted %s", getPath().c_str());
 		return false;
 	}
 	file->read(tmp, vertex_def_size);
@@ -200,6 +200,22 @@ bool Model::parseBones(FS::IFile* file)
 		file->read(&b.position.x, sizeof(float)* 3);
 		file->read(&b.rotation.x, sizeof(float)* 4);
 	}
+	for (int i = 0; i < bone_count; ++i)
+	{
+		Model::Bone& b = m_bones[i];
+		if (b.parent.length() == 0)
+		{
+			b.parent_idx = -1;
+		}
+		else
+		{
+			b.parent_idx = getBoneIdx(b.parent.c_str());
+			if (b.parent_idx < 0)
+			{
+				g_log_error.log("renderer", "Invalid skeleton in %s", getPath().c_str());
+			}
+		}
+	}
 	for (int i = 0; i < m_bones.size(); ++i)
 	{
 		m_bones[i].rotation.toMatrix(m_bones[i].inv_bind_matrix);
@@ -210,6 +226,18 @@ bool Model::parseBones(FS::IFile* file)
 		m_bones[i].inv_bind_matrix.fastInverse();
 	}
 	return true;
+}
+
+int Model::getBoneIdx(const char* name)
+{
+	for (int i = 0, c = m_bones.size(); i < c; ++i)
+	{
+		if (m_bones[i].name == name)
+		{
+			return i;
+		}
+	}
+	return -1;
 }
 
 bool Model::parseMeshes(FS::IFile* file)

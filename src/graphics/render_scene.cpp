@@ -8,6 +8,7 @@
 #include "core/log.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
+#include "core/timer.h"
 #include "engine/engine.h"
 #include "graphics/geometry.h"
 #include "graphics/irender_device.h"
@@ -78,7 +79,6 @@ namespace Lumix
 					points[idx].pos.set((float)(i), data[idx * bytes_per_pixel] / 10.0f - 255 / 10.0f, (float)(j));
 					points[idx].u = i / (float)m_width;
 					points[idx].v = j / (float)m_height;
-					points[idx].normal.set(0, 1, 0);
 					if (j < m_height - 1 && i < m_width - 1)
 					{
 						indices[indices_offset] = idx;
@@ -89,6 +89,16 @@ namespace Lumix
 						indices[indices_offset + 5] = idx + 1;
 						indices_offset += 6;
 					}
+				}
+			}
+			for (int j = 1; j < m_height - 1; ++j)
+			{
+				for (int i = 1; i < m_width - 1; ++i)
+				{
+					int idx = i + j * m_width;
+					Vec3 n = crossProduct(points[idx + 1].pos - points[idx - 1].pos, points[idx - m_width].pos - points[idx + m_width].pos);
+					n.normalize();
+					points[idx].normal = n;
 				}
 			}
 			VertexDef vertex_def;
@@ -158,6 +168,7 @@ namespace Lumix
 				, m_universe(universe)
 			{
 				m_universe.getEventManager().addListener(EntityMovedEvent::type).bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
+				m_timer = Timer::create();
 			}
 
 			~RenderSceneImpl()
@@ -169,6 +180,7 @@ namespace Lumix
 				{
 					LUX_DELETE(m_terrains[i]);
 				}
+				Timer::destroy(m_timer);
 			}
 
 			virtual void getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) override
@@ -279,7 +291,7 @@ namespace Lumix
 					serializer.serializeArrayItem(m_renderables[i].m_entity.index);
 					if (m_renderables[i].m_model.getModel())
 					{
-						serializer.serializeArrayItem(m_renderables[i].m_model.getModel()->getPath());
+						serializer.serializeArrayItem(m_renderables[i].m_model.getModel()->getPath().c_str());
 					}
 					else
 					{
@@ -541,11 +553,16 @@ namespace Lumix
 				return m_renderables[cmp.index].m_model.getPose();
 			}
 
+			virtual Model* getModel(Component cmp) override
+			{
+				return m_renderables[cmp.index].m_model.getModel();
+			}
+
 			virtual void getRenderablePath(Component cmp, string& path) override
 			{
 					if (m_renderables[cmp.index].m_model.getModel())
 					{
-						path = m_renderables[cmp.index].m_model.getModel()->getPath();
+						path = m_renderables[cmp.index].m_model.getModel()->getPath().c_str();
 					}
 					else
 					{
@@ -735,6 +752,11 @@ namespace Lumix
 				return Component::INVALID;
 			}
 
+			virtual Timer* getTimer() const override
+			{
+				return m_timer;
+			}
+
 		private:
 			Array<Renderable> m_renderables;
 			Array<Light> m_lights;
@@ -743,6 +765,7 @@ namespace Lumix
 			Universe& m_universe;
 			Engine& m_engine;
 			Array<DebugLine> m_debug_lines;
+			Timer* m_timer;
 	};
 
 
