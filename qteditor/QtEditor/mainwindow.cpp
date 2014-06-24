@@ -46,6 +46,8 @@ MainWindow::MainWindow(QWidget* parent) :
 	addDockWidget(static_cast<Qt::DockWidgetArea>(8), m_material_manager_ui);
 	addDockWidget(static_cast<Qt::DockWidgetArea>(1), m_profiler_ui);
 
+	m_property_view->setScriptCompiler(m_script_compiler_ui->getCompiler());
+
 	restoreState(settings.value("mainWindowState").toByteArray());
 }
 

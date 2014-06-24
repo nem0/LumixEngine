@@ -1,14 +1,18 @@
 #include "property_view.h"
 #include "ui_property_view.h"
-#include <qcheckbox.h>
-#include <QDoubleSpinBox>
-#include <QFileDialog>
-#include <qlineedit.h>
-#include <qpushbutton.h>
 #include "core/crc32.h"
 #include "core/event_manager.h"
 #include "editor/editor_client.h"
 #include "editor/server_message_types.h"
+#include "scripts/scriptcompiler.h"
+#include <qcheckbox.h>
+#include <qdesktopservices.h>
+#include <QDoubleSpinBox>
+#include <QDragEnterEvent>
+#include <QFileDialog>
+#include <QMimeData>
+#include <qlineedit.h>
+#include <qpushbutton.h>
 
 
 static const char* component_map[] =
@@ -39,6 +43,12 @@ PropertyView::PropertyView(QWidget* parent) :
 	}
 	
 	m_ui->componentTypeCombo->insertItems(0, component_list);
+}
+
+
+Lumix::EditorClient* PropertyView::getEditorClient()
+{
+	return m_client;
 }
 
 
@@ -106,8 +116,13 @@ void PropertyView::on_browseFilesClicked()
 	m_client->setComponentProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), edit->text().toLocal8Bit().data(), edit->text().size());
 }
 
-void PropertyView::onPropertyValue(Property* property, void* data, int32_t data_size)
+void PropertyView::onPropertyValue(Property* property, void* data, int32_t)
 {
+	if(property->m_component_name == "script" && property->m_name == "source")
+	{
+		setScriptStatus(m_compiler->getStatus(static_cast<char*>(data)));
+	}
+
 	switch(property->m_type)
 	{
 		case Property::VEC3:
@@ -174,6 +189,48 @@ void PropertyView::onPropertyList(Lumix::Event& event)
 }
 
 
+class FileEdit : public QLineEdit
+{
+	public:
+		FileEdit(QWidget* parent, PropertyView* property_view)
+			: QLineEdit(parent)
+			, m_property_view(property_view)
+		{
+			setAcceptDrops(true);
+		}
+
+		virtual void dragEnterEvent(QDragEnterEvent* event) override
+		{
+			if (event->mimeData()->hasUrls())
+			{
+				event->acceptProposedAction();
+			}
+		}
+
+		virtual void dropEvent(QDropEvent* event)
+		{
+			const QList<QUrl>& list = event->mimeData()->urls();
+			if(!list.empty())
+			{
+				QString file = list[0].toLocalFile();
+				if(file.toLower().startsWith(m_property_view->getEditorClient()->getBasePath()))
+				{
+					file.remove(0, QString(m_property_view->getEditorClient()->getBasePath()).length());
+				}
+				if(file.startsWith("/"))
+				{
+					file.remove(0, 1);
+				}
+				setText(file);
+				emit editingFinished();
+			}
+		}
+
+	private:
+		PropertyView* m_property_view;
+};
+
+
 void PropertyView::addProperty(const char* component, const char* name, const char* label, Property::Type type, const char* file_type)
 {
 	QTreeWidgetItem* item = new QTreeWidgetItem(QStringList() << label);
@@ -222,7 +279,7 @@ void PropertyView::addProperty(const char* component, const char* name, const ch
 		case Property::FILE:
 			{
 				QWidget* widget = new QWidget();
-				QLineEdit* edit = new QLineEdit(widget);
+				QLineEdit* edit = new FileEdit(widget, this);
 				edit->setProperty("cpp_prop", (int)(m_properties.size() - 1)); 
 				QHBoxLayout* layout = new QHBoxLayout(widget);
 				layout->addWidget(edit);
@@ -258,6 +315,16 @@ void PropertyView::addProperty(const char* component, const char* name, const ch
 }
 
 
+void PropertyView::setScriptCompiler(ScriptCompiler* compiler)
+{
+	m_compiler = compiler;
+	if(m_compiler)
+	{
+		m_compiler->onCompile().bind<PropertyView, &PropertyView::onScriptCompiled>(this);
+	}
+}
+
+
 void PropertyView::clear()
 {
 	m_ui->propertyList->clear();
@@ -266,6 +333,105 @@ void PropertyView::clear()
 		delete m_properties[i];
 	}
 	m_properties.clear();
+}
+
+
+void PropertyView::setScriptStatus(uint32_t status)
+{
+	for(int i = 0; i < m_ui->propertyList->topLevelItemCount(); ++i)
+	{
+		QTreeWidgetItem* item = m_ui->propertyList->topLevelItem(i);
+		if(item->text(0) == "Script")
+		{
+			for(int j = 0; j < item->childCount(); ++j)
+			{
+				if(item->child(j)->text(0) == "Status")
+				{
+					switch(status)
+					{
+						case ScriptCompiler::SUCCESS:
+							item->child(j)->setText(1, "Success");
+							break;
+						case ScriptCompiler::NOT_COMPILED:
+							item->child(j)->setText(1, "Not compiled");
+							break;
+						case ScriptCompiler::UNKNOWN:
+							item->child(j)->setText(1, "Unknown");
+							break;
+						case ScriptCompiler::FAILURE:
+							item->child(j)->setText(1, "Failure");
+							break;
+						default:
+							ASSERT(false);
+							break;
+					}
+					
+					return;
+				}
+			}
+		}
+	}
+}
+
+
+void PropertyView::onScriptCompiled(const Lumix::Path& path, uint32_t status)
+{
+	QString script_path(path);
+	script_path = script_path.toLower();
+	if(script_path.startsWith(m_client->getBasePath()))
+	{
+		script_path.remove(0, strlen(m_client->getBasePath()) + 1);
+	}
+	setScriptStatus(status == 0 ? ScriptCompiler::SUCCESS : ScriptCompiler::FAILURE);
+}
+
+
+void PropertyView::on_compileScriptClicked()
+{
+	for(int i = 0; i < m_properties.size(); ++i)
+	{
+		if(m_properties[i]->m_component_name == "script" && m_properties[i]->m_name == "source")
+		{
+			QLineEdit* edit = qobject_cast<QLineEdit*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item, 1)->children()[0]);
+			m_compiler->compile(edit->text().toLatin1().data());
+			break;
+		}
+	}
+}
+
+
+void PropertyView::on_editScriptClicked()
+{
+	for(int i = 0; i < m_properties.size(); ++i)
+	{
+		if(m_properties[i]->m_name == "source")
+		{
+			QLineEdit* edit = qobject_cast<QLineEdit*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item, 1)->children()[0]);
+			QDesktopServices::openUrl(QUrl::fromLocalFile(edit->text()));
+			break;
+		}
+	}
+}
+
+
+void PropertyView::addScriptCustomProperties()
+{
+	QTreeWidgetItem* tools_item = new QTreeWidgetItem(QStringList() << "Tools");
+	m_ui->propertyList->topLevelItem(0)->insertChild(0, tools_item);
+	QWidget* widget = new QWidget();
+	QHBoxLayout* layout = new QHBoxLayout(widget);
+	layout->setContentsMargins(0, 0, 0, 0);
+	QPushButton* compile_button = new QPushButton("Compile", widget);
+	QPushButton* edit_button = new QPushButton("Edit", widget);
+	layout->addWidget(compile_button);
+	layout->addWidget(edit_button);
+	m_ui->propertyList->setItemWidget(tools_item, 1, widget);
+	connect(compile_button, &QPushButton::clicked, this, &PropertyView::on_compileScriptClicked);
+	connect(edit_button, &QPushButton::clicked, this, &PropertyView::on_editScriptClicked);
+
+	QTreeWidgetItem* status_item = new QTreeWidgetItem(QStringList() << "Status");
+	m_ui->propertyList->topLevelItem(0)->insertChild(0, status_item);
+	status_item->setText(1, "Unknown");
 }
 
 
@@ -297,6 +463,7 @@ void PropertyView::onEntitySelected(Lumix::Event& event)
 		else if (e.components[i] == crc32("script"))
 		{
 			addProperty("script", "source", "Source", Property::FILE, "scripts (*.cpp)");
+			addScriptCustomProperties();
 		}
 		else if (e.components[i] == crc32("camera"))
 		{
@@ -319,6 +486,10 @@ void PropertyView::onEntitySelected(Lumix::Event& event)
 		}
 		else if (e.components[i] == crc32("light"))
 		{
+		}
+		else if (e.components[i] == crc32("animable"))
+		{
+			addProperty("animable", "preview", "Preview animation", Property::FILE, "Animation (*.ani)");
 		}
 		else
 		{

@@ -48,6 +48,7 @@ namespace Lumix
 		{
 			engine.getEditorServer()->registerCreator(ANIMABLE_HASH, *this);
 		}
+		engine.getEditorServer()->registerProperty("animable", LUMIX_NEW(PropertyDescriptor<AnimationSystem>)(crc32("preview"), &AnimationSystem::getPreview, &AnimationSystem::setPreview, IPropertyDescriptor::FILE));
 		return true;
 	}
 
@@ -158,6 +159,7 @@ namespace Lumix
 		animable.m_manual = true;
 		animable.m_time = 0;
 		animable.m_renderable = Component::INVALID;
+		animable.m_animation = NULL;
 
 		const Entity::ComponentList& cmps = entity.getComponents();
 		for(int i = 0; i < cmps.size(); ++i)
@@ -180,6 +182,18 @@ namespace Lumix
 	{
 		ResourceManager& rm = m_impl->m_engine.getResourceManager();
 		return static_cast<Animation*>(rm.get(ResourceManager::ANIMATION)->load(path));
+	}
+
+
+	void AnimationSystem::getPreview(Component cmp, string& path)
+	{
+		path = m_impl->m_animables[cmp.index].m_animation ? m_impl->m_animables[cmp.index].m_animation->getPath().c_str() : "";
+	}
+
+
+	void AnimationSystem::setPreview(Component cmp, const string& path)
+	{
+		playAnimation(cmp, path.c_str());
 	}
 
 
@@ -207,7 +221,7 @@ namespace Lumix
 			if(!animable.m_manual && animable.m_animation->isReady())
 			{
 				RenderScene* scene = static_cast<RenderScene*>(animable.m_renderable.system);
-				animable.m_animation->getPose(animable.m_time, scene->getPose(animable.m_renderable));
+				animable.m_animation->getPose(animable.m_time, scene->getPose(animable.m_renderable), *scene->getModel(animable.m_renderable));
 				float t = animable.m_time + time_delta;
 				float l = animable.m_animation->getLength();
 				while(t > l)

@@ -26,6 +26,9 @@ public:
 
 private:
 	void handleDoubleClick(const class QFileInfo& file_info);
+	void exportAnimation(const QFileInfo& file_info);
+	void exportModel(const QFileInfo& file_info);
+	void onFileSystemWatcherCallback(const char* path);
 
 signals:
 	void fileChanged(const QString& string);
@@ -35,6 +38,8 @@ private slots:
 	void onFileChanged(const QString& path);
 	void on_searchInput_textEdited(const QString &arg1);
 	void on_listWidget_activated(const QModelIndex &index);
+	void on_treeView_customContextMenuRequested(const QPoint &pos);
+	void on_exportFinished(int);
 
 private:
 	Ui::AssetBrowser* m_ui;

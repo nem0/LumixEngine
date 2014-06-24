@@ -8,13 +8,16 @@ namespace Ui
 	class ScriptCompilerWidget;
 }
 
+class ScriptCompiler;
+
 class ScriptCompilerWidget : public QDockWidget
 {
 	Q_OBJECT
 
 public:
-	explicit ScriptCompilerWidget(QWidget* parent = 0);
+	explicit ScriptCompilerWidget(QWidget* parent = NULL);
 	~ScriptCompilerWidget();
+	ScriptCompiler* getCompiler() const { return m_compiler; }
 
 private slots:
 	void on_scriptListView_clicked(const QModelIndex &index);
@@ -25,7 +28,7 @@ private slots:
 private:
 	Ui::ScriptCompilerWidget* m_ui;
 	class QFileSystemModel* m_model;
-	class ScriptCompiler* m_compiler;
+	ScriptCompiler* m_compiler;
 	Lumix::string m_base_path;
 };
 
