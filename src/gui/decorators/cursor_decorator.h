@@ -18,7 +18,7 @@ namespace UI
 	class TextureBase;
 
 
-	class LUX_GUI_API CursorDecorator : public DecoratorBase
+	class LUMIX_GUI_API CursorDecorator : public DecoratorBase
 	{
 		public:
 			CursorDecorator(const char* name) : DecoratorBase(name) {}

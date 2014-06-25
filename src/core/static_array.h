@@ -23,12 +23,12 @@ namespace Lumix
 			}
 		}
 
-		LUX_FORCE_INLINE size_type size() const 
+		LUMIX_FORCE_INLINE size_type size() const 
 		{
 			return Size;
 		}
 
-		LUX_FORCE_INLINE size_type maxSize() const 
+		LUMIX_FORCE_INLINE size_type maxSize() const 
 		{
 			return Size;
 		}

@@ -10,7 +10,7 @@ namespace UI
 {
 
 
-	class LUX_GUI_API MenuBar : public Block
+	class LUMIX_GUI_API MenuBar : public Block
 	{
 		public:
 			MenuBar(Gui& gui, Block* parent);

@@ -75,7 +75,7 @@ namespace Lumix
 							m_ids.release(id);
 
 							file->close();
-							LUX_DELETE(file);
+							LUMIX_DELETE(file);
 						}
 						break;
 					case TCPCommand::Read:
@@ -166,7 +166,7 @@ namespace Lumix
 					}
 				}
 
-				LUX_DELETE(stream);
+				LUMIX_DELETE(stream);
 				return 0;
 			}
 
@@ -213,7 +213,7 @@ namespace Lumix
 
 		TCPFileServer::~TCPFileServer()
 		{
-			LUX_DELETE(m_impl);
+			LUMIX_DELETE(m_impl);
 		}
 
 
@@ -230,7 +230,7 @@ namespace Lumix
 		{
 			m_impl->m_task.stop();
 			m_impl->m_task.destroy();
-			LUX_DELETE(m_impl);
+			LUMIX_DELETE(m_impl);
 			m_impl = NULL;
 		}
 

@@ -45,7 +45,7 @@ namespace Lumix
 	{
 		if (m_impl)
 		{
-			LUX_DELETE(m_impl);
+			LUMIX_DELETE(m_impl);
 			m_impl = NULL;
 		}
 	}

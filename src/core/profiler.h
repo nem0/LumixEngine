@@ -11,7 +11,7 @@ namespace Lumix
 {
 
 
-	class LUX_CORE_API Profiler
+	class LUMIX_CORE_API Profiler
 	{
 		public: 
 			class Block;
@@ -39,7 +39,7 @@ namespace Lumix
 			DelegateList<void ()> m_frame_listeners;
 	};
 
-	class LUX_CORE_API Profiler::Block
+	class LUMIX_CORE_API Profiler::Block
 	{
 		public:
 			class Hit
@@ -64,7 +64,7 @@ namespace Lumix
 	};
 
 
-	extern LUX_CORE_API Profiler g_profiler;
+	extern LUMIX_CORE_API Profiler g_profiler;
 
 
 	class ProfileScope

@@ -9,7 +9,7 @@ namespace Lumix
 {
 	namespace FS
 	{
-		class LUX_CORE_API MemoryFile : public IFile
+		class LUMIX_CORE_API MemoryFile : public IFile
 		{
 		public:
 			MemoryFile(IFile* file)
@@ -24,8 +24,8 @@ namespace Lumix
 
 			~MemoryFile() 
 			{ 
-				LUX_DELETE(m_file);
-				LUX_DELETE_ARRAY(m_buffer);
+				LUMIX_DELETE(m_file);
+				LUMIX_DELETE_ARRAY(m_buffer);
 			}
 
 			virtual bool open(const char* path, Mode mode) override
@@ -71,7 +71,7 @@ namespace Lumix
 					m_file->close();
 				}
 
-				LUX_DELETE_ARRAY(m_buffer);
+				LUMIX_DELETE_ARRAY(m_buffer);
 				m_buffer = NULL;
 			}
 
@@ -93,7 +93,7 @@ namespace Lumix
 					size_t new_cap = pos + size;
 					uint8_t* new_data = LUMIX_NEW_ARRAY(uint8_t, new_cap);
 					memcpy(new_data, m_buffer, sz);
-					LUX_DELETE_ARRAY(m_buffer);
+					LUMIX_DELETE_ARRAY(m_buffer);
 					m_buffer = new_data;
 					m_capacity = new_cap;
 				}

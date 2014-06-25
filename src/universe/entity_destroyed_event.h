@@ -9,7 +9,7 @@ namespace Lumix
 {
 
 
-class LUX_ENGINE_API EntityDestroyedEvent : public Event
+class LUMIX_ENGINE_API EntityDestroyedEvent : public Event
 {
 	public:
 		static const Event::Type type;

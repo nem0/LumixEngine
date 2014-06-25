@@ -219,10 +219,10 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	{
 		JsonSerializer serializer(*file, JsonSerializer::READ, m_path.c_str());
 		serializer.deserializeObjectBegin();
-		char path[LUX_MAX_PATH];
+		char path[LUMIX_MAX_PATH];
 		char label[256];
-		char material_dir[LUX_MAX_PATH];
-		PathUtils::getDir(material_dir, LUX_MAX_PATH, m_path.c_str());
+		char material_dir[LUMIX_MAX_PATH];
+		PathUtils::getDir(material_dir, LUMIX_MAX_PATH, m_path.c_str());
 		while (!serializer.isObjectEnd())
 		{
 			serializer.deserializeLabel(label, 255);
@@ -235,7 +235,7 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 				serializer.deserialize(path, MAX_PATH);
 				if (path[0] != '\0')
 				{
-					char texture_path[LUX_MAX_PATH];
+					char texture_path[LUMIX_MAX_PATH];
 					strcpy(texture_path, material_dir);
 					strcat(texture_path, path);
 					Texture* texture = static_cast<Texture*>(m_resource_manager.get(ResourceManager::TEXTURE)->load(texture_path));

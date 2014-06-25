@@ -38,7 +38,7 @@ namespace Lumix
 		float m_life;
 	};
 
-	class LUX_ENGINE_API RenderScene
+	class LUMIX_ENGINE_API RenderScene
 	{
 		public:
 			static RenderScene* createInstance(Engine& engine, Universe& universe);

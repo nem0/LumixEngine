@@ -11,7 +11,7 @@ namespace UI
 
 	class Scrollbar;
 
-	class LUX_GUI_API Dockable : public Block
+	class LUMIX_GUI_API Dockable : public Block
 	{
 		public:
 			enum Slot

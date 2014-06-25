@@ -4,7 +4,7 @@
 
 namespace Lumix
 {
-	class LUX_ENGINE_API ShaderManager : public ResourceManagerBase
+	class LUMIX_ENGINE_API ShaderManager : public ResourceManagerBase
 	{
 	public:
 		ShaderManager();

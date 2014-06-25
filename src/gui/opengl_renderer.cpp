@@ -96,7 +96,7 @@ namespace UI
 
 	void OpenGLRenderer::destroy()
 	{
-		LUX_DELETE(m_impl);
+		LUMIX_DELETE(m_impl);
 		m_impl = NULL;
 	}
 
@@ -147,13 +147,13 @@ namespace UI
 	
 			if (header.dataType != 2)
 			{
-				LUX_DELETE_ARRAY(buffer);
+				LUMIX_DELETE_ARRAY(buffer);
 				return;
 			}
 	
 			if (color_mode < 3)
 			{
-				LUX_DELETE_ARRAY(buffer);
+				LUMIX_DELETE_ARRAY(buffer);
 				return;
 			}
 	
@@ -185,7 +185,7 @@ namespace UI
 			glGenTextures(1, &texture_id);
 			if (texture_id == 0)
 			{
-				LUX_DELETE_ARRAY(buffer);
+				LUMIX_DELETE_ARRAY(buffer);
 				return;
 			}
 
@@ -198,8 +198,8 @@ namespace UI
 			/*glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);*/
 
-			LUX_DELETE_ARRAY(image_dest);
-			LUX_DELETE_ARRAY(buffer);
+			LUMIX_DELETE_ARRAY(image_dest);
+			LUMIX_DELETE_ARRAY(buffer);
 	
 			setId(texture_id);
 			setSize((float)header.width, (float)header.height);

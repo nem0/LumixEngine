@@ -8,7 +8,7 @@ namespace
 	{
 		Lumix::HashMap<int32_t, int32_t> hash_table;
 
-		LUX_EXPECT_TRUE(hash_table.empty());
+		LUMIX_EXPECT_TRUE(hash_table.empty());
 	};
 }
 

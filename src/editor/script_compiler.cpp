@@ -106,7 +106,7 @@ void ScriptCompiler::checkFinished()
 				m_status[crc32(p->m_path.c_str())] = code == 0 ? SUCCESS : FAILURE;
 				CloseHandle(p->m_pipe);
 				CloseHandle(p->m_write_pipe);
-				LUX_DELETE(p);
+				LUMIX_DELETE(p);
 			}
 		}
 	}

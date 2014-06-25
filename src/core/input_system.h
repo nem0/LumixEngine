@@ -13,7 +13,7 @@ namespace Lumix
 		key down duration
 	*/
 
-	class LUX_CORE_API InputSystem
+	class LUMIX_CORE_API InputSystem
 	{
 		public:
 			enum InputType 

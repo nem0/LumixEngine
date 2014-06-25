@@ -9,7 +9,7 @@ namespace Lumix
 {
 
 
-	class LUX_CORE_API ISerializer abstract
+	class LUMIX_CORE_API ISerializer abstract
 	{
 		public:
 			virtual void serialize(const char* label, uint32_t value) = 0;

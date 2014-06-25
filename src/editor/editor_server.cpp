@@ -256,7 +256,7 @@ bool EditorServer::create(const char* base_path, EditorClient& client)
 	
 	if(!m_impl->create(base_path))
 	{
-		LUX_DELETE(m_impl);
+		LUMIX_DELETE(m_impl);
 		m_impl = NULL;
 		return false;
 	}
@@ -270,7 +270,7 @@ void EditorServer::destroy()
 	if (m_impl)
 	{
 		m_impl->destroy();
-		LUX_DELETE(m_impl);
+		LUMIX_DELETE(m_impl);
 		m_impl = NULL;
 	}
 }
@@ -290,7 +290,7 @@ EditorServerImpl::~EditorServerImpl()
 	{
 		for (int i = 0, c = iter.second().size(); i < c; ++i)
 		{
-			LUX_DELETE(iter.second()[i]);
+			LUMIX_DELETE(iter.second()[i]);
 		}
 		++iter;
 	}
@@ -946,7 +946,7 @@ void EditorServerImpl::onComponentEvent(Event& event)
 		if(m_editor_icons[i]->getEntity() == e.component.entity)
 		{
 			m_editor_icons[i]->destroy();
-			LUX_DELETE(m_editor_icons[i]);
+			LUMIX_DELETE(m_editor_icons[i]);
 			m_editor_icons.eraseFast(i);
 			break;
 		}
@@ -996,7 +996,7 @@ void EditorServerImpl::onEvent(Event& evt)
 			if(m_editor_icons[i]->getEntity() == e)
 			{
 				m_editor_icons[i]->destroy();
-				LUX_DELETE(m_editor_icons[i]);
+				LUMIX_DELETE(m_editor_icons[i]);
 				m_editor_icons.eraseFast(i);
 				break;
 			}
@@ -1010,7 +1010,7 @@ void EditorServerImpl::destroyUniverse()
 	for (int i = 0; i < m_editor_icons.size(); ++i)
 	{
 		m_editor_icons[i]->destroy();
-		LUX_DELETE(m_editor_icons[i]);
+		LUMIX_DELETE(m_editor_icons[i]);
 	}
 	selectEntity(Entity::INVALID);
 	m_camera = Entity::INVALID;

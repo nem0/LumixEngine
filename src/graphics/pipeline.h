@@ -24,7 +24,7 @@ class IFile;
 }
 
 
-class LUX_ENGINE_API PipelineManager : public ResourceManagerBase
+class LUMIX_ENGINE_API PipelineManager : public ResourceManagerBase
 {
 public:
 	PipelineManager() : ResourceManagerBase() {}
@@ -36,7 +36,7 @@ protected:
 };
 
 
-class LUX_ENGINE_API Pipeline : public Resource
+class LUMIX_ENGINE_API Pipeline : public Resource
 {
 	public:
 		Pipeline(const Path& path, ResourceManager& resource_manager);
@@ -49,7 +49,7 @@ class LUX_ENGINE_API Pipeline : public Resource
 };
 
 
-class LUX_ENGINE_API PipelineInstance abstract
+class LUMIX_ENGINE_API PipelineInstance abstract
 {
 	public:
 		typedef Delegate<void> CustomCommandHandler; 

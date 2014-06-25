@@ -8,7 +8,7 @@ namespace Lumix
 {
 
 
-	class LUX_CORE_API Timer
+	class LUMIX_CORE_API Timer
 	{
 		public:
 			/// returns time (seconds) since the last tick() call or since the creation of the timer

@@ -21,7 +21,7 @@ namespace UI
 	class Block;
 
 
-	class LUX_GUI_API Gui : public IPlugin
+	class LUMIX_GUI_API Gui : public IPlugin
 	{
 		public:
 			typedef Delegate<void (int, int)> MouseCallback;

@@ -2,7 +2,7 @@
 
 namespace Lumix
 {
-	struct LUX_CORE_API PathUtils
+	struct LUMIX_CORE_API PathUtils
 	{
 		static void normalize(const char* path, char* out, uint32_t max_size)
 		{

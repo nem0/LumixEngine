@@ -11,7 +11,7 @@ namespace UI
 
 	class Scrollbar;
 
-	class LUX_GUI_API Scrollable : public Block
+	class LUMIX_GUI_API Scrollable : public Block
 	{
 		public:
 			Scrollable(Gui& gui, Block* parent);

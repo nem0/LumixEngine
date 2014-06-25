@@ -13,7 +13,7 @@ namespace Lumix
 
 Universe::~Universe()
 {
-	LUX_DELETE(m_event_manager);
+	LUMIX_DELETE(m_event_manager);
 }
 
 

@@ -13,7 +13,7 @@ namespace Lumix
 struct Quat;
 
 
-struct LUX_CORE_API Matrix
+struct LUMIX_CORE_API Matrix
 {
 	Matrix() {}
 

@@ -19,7 +19,7 @@ namespace Lumix
 		class TCPFileServer;
 	}
 
-	class LUX_ENGINE_API EditorServer
+	class LUMIX_ENGINE_API EditorServer
 	{
 		public:
 			EditorServer() { m_impl = 0; }

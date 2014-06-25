@@ -19,7 +19,7 @@ namespace Lumix
 	class ISerializer;
 	class Universe;
 
-	class LUX_ENGINE_API AnimationSystem : public IPlugin
+	class LUMIX_ENGINE_API AnimationSystem : public IPlugin
 	{
 		public:
 			AnimationSystem() { m_impl = 0; }

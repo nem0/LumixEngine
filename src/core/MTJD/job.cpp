@@ -53,8 +53,8 @@ namespace Lumix
 
 			if (m_auto_destroy)
 			{
-				LUX_DELETE(this);
+				LUMIX_DELETE(this);
 			}
 		}
 	} // ~namepsace MTJD
-} // ~namepsace Lux
+} // ~namepsace Lumix

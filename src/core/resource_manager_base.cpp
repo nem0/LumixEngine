@@ -121,7 +121,7 @@ namespace Lumix
 	{
 		for(ResourceTable::iterator it = m_resources.begin(); m_resources.end() != it; ++it)
 		{
-			LUX_DELETE(*it);
+			LUMIX_DELETE(*it);
 		}
 	}
 

@@ -25,4 +25,4 @@ namespace Lumix
 			Manager* m_manager;
 		};
 	} // ~namepsace MTJD
-} // ~namepsace Lux
+} // ~namepsace Lumix

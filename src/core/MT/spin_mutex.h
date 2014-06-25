@@ -7,7 +7,7 @@ namespace Lumix
 	{
 		typedef volatile int32_t SpinMutexHandle;
 
-		class LUX_CORE_API SpinMutex
+		class LUMIX_CORE_API SpinMutex
 		{
 		public:
 			explicit SpinMutex(bool locked);

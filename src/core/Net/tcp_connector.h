@@ -8,7 +8,7 @@ namespace Lumix
 	{
 		class TCPStream;
 
-		class LUX_CORE_API TCPConnector
+		class LUMIX_CORE_API TCPConnector
 		{
 		public:
 			TCPConnector() : m_socket(0) {}

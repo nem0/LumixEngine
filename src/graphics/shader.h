@@ -14,7 +14,7 @@ namespace FS
 struct Vec3;
 struct Matrix;
 
-class LUX_ENGINE_API Shader : public Resource
+class LUMIX_ENGINE_API Shader : public Resource
 {
 	public:
 		static const int MAX_ATTRIBUTE_COUNT = 16;

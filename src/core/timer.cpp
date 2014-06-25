@@ -48,7 +48,7 @@ Timer* Timer::create()
 
 void Timer::destroy(Timer* timer)
 {
-	LUX_DELETE(timer);
+	LUMIX_DELETE(timer);
 }
 
 

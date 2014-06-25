@@ -79,7 +79,7 @@ namespace Lumix
 			if (NULL != m_impl)
 			{
 				::CloseHandle(m_impl->m_file);
-				LUX_DELETE(m_impl);
+				LUMIX_DELETE(m_impl);
 				m_impl = NULL;
 			}
 		}

@@ -196,7 +196,7 @@ namespace DDS
 		uint8_t row[6];
 	};
 
-	static LUX_FORCE_INLINE void swapMemory(void* mem1, void* mem2, size_t size)
+	static LUMIX_FORCE_INLINE void swapMemory(void* mem1, void* mem2, size_t size)
 	{
 		if(size < 2048)
 		{
@@ -211,7 +211,7 @@ namespace DDS
 			memcpy(tmp, mem1, size);
 			memcpy(mem1, mem2, size);
 			memcpy(mem2, tmp, size);
-			LUX_DELETE_ARRAY(tmp);
+			LUMIX_DELETE_ARRAY(tmp);
 		}
 	}
 
@@ -636,7 +636,7 @@ bool Texture::loadDDS(FS::IFile& file)
 			height = (height + 1) >> 1;
 			size = width * height * li->blockBytes;
 		}
-		LUX_DELETE_ARRAY(data);
+		LUMIX_DELETE_ARRAY(data);
 	}
 	else
 	{

@@ -26,7 +26,7 @@ struct ServerMessageType
 };
 
 
-struct LUX_ENGINE_API EntityPositionEvent : public Event
+struct LUMIX_ENGINE_API EntityPositionEvent : public Event
 {
 	EntityPositionEvent() { m_type = ServerMessageType::ENTITY_POSITION; }
 	
@@ -40,7 +40,7 @@ struct LUX_ENGINE_API EntityPositionEvent : public Event
 };
 
 
-struct LUX_ENGINE_API EntitySelectedEvent : public Event
+struct LUMIX_ENGINE_API EntitySelectedEvent : public Event
 {
 	EntitySelectedEvent() { m_type = ServerMessageType::ENTITY_SELECTED; }
 	
@@ -52,7 +52,7 @@ struct LUX_ENGINE_API EntitySelectedEvent : public Event
 };
 
 
-struct LUX_ENGINE_API LogEvent : public Event
+struct LUMIX_ENGINE_API LogEvent : public Event
 {
 	LogEvent() { m_type = ServerMessageType::LOG_MESSAGE; }
 	
@@ -65,12 +65,12 @@ struct LUX_ENGINE_API LogEvent : public Event
 };
 
 
-struct LUX_ENGINE_API PropertyListEvent : public Event
+struct LUMIX_ENGINE_API PropertyListEvent : public Event
 {
 	struct Property
 	{
 		Property() { data = NULL; }
-		~Property() { LUX_DELETE_ARRAY(data); }
+		~Property() { LUMIX_DELETE_ARRAY(data); }
 		uint32_t name_hash;
 		void* data;
 		int32_t data_size;

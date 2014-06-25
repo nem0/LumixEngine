@@ -161,8 +161,8 @@ namespace Lumix
 		void TCPFileDevice::disconnect()
 		{
 			m_impl->m_stream->write(TCPCommand::Disconnect);
-			LUX_DELETE(m_impl->m_stream);
-			LUX_DELETE(m_impl);
+			LUMIX_DELETE(m_impl->m_stream);
+			LUMIX_DELETE(m_impl);
 		}
 	} // namespace FS
 } // ~namespace Lumix

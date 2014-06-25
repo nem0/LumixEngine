@@ -11,7 +11,7 @@ namespace UI
 
 	class MenuBar;
 
-	class LUX_GUI_API MenuItem : public Block
+	class LUMIX_GUI_API MenuItem : public Block
 	{
 		public:
 			MenuItem(const char* label, Gui& gui);

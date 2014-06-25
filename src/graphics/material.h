@@ -21,7 +21,7 @@ class Shader;
 class Texture;
 
 
-class LUX_ENGINE_API Material : public Resource
+class LUMIX_ENGINE_API Material : public Resource
 {
 	friend class MaterialManager;
 public:

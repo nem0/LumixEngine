@@ -88,7 +88,7 @@ namespace Lumix
 
 		void Atlas::destroy()
 		{
-			LUX_DELETE(m_impl);
+			LUMIX_DELETE(m_impl);
 			m_impl = NULL;
 		}
 

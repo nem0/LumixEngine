@@ -33,7 +33,7 @@ MainWindow::MainWindow(QWidget* parent) :
 	m_material_manager_ui = new MaterialManager;
 	m_profiler_ui = new ProfilerUI;
 
-	QSettings settings("Lux", "QtEditor");
+	QSettings settings("Lumix", "QtEditor");
 	restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
 	
 	addDockWidget(static_cast<Qt::DockWidgetArea>(1), m_game_view);
@@ -54,7 +54,7 @@ MainWindow::MainWindow(QWidget* parent) :
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
-	QSettings settings("Lux", "QtEditor");
+	QSettings settings("Lumix", "QtEditor");
 	settings.setValue("mainWindowGeometry", saveGeometry());
 	settings.setValue("mainWindowState", saveState());
 	QMainWindow::closeEvent(event);

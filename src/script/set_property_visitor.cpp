@@ -14,7 +14,7 @@ namespace Lumix
 
 	SetPropertyVisitor::~SetPropertyVisitor()
 	{
-		LUX_DELETE_ARRAY(m_value);
+		LUMIX_DELETE_ARRAY(m_value);
 	}
 
 	void SetPropertyVisitor::visit(const char* name, float& value)

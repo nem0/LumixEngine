@@ -8,7 +8,7 @@
 namespace Lumix
 {
 
-	class LUX_CORE_API Blob
+	class LUMIX_CORE_API Blob
 	{
 		public:
 			Blob();

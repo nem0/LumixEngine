@@ -49,7 +49,7 @@ namespace Lumix
 			m_scheduler.dataSignal();
 			m_scheduler.destroy();
 
-			LUX_DELETE_ARRAY(m_worker_tasks);
+			LUMIX_DELETE_ARRAY(m_worker_tasks);
 
 #endif //TYPE == MULTI_THREAD
 		}
@@ -198,4 +198,4 @@ namespace Lumix
 #endif
 		}
 	} // ~namepsace MTJD
-} // ~namepsace Lux
+} // ~namepsace Lumix

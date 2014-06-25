@@ -11,7 +11,7 @@ namespace Lumix
 {
 
 
-class LUX_CORE_API Event
+class LUMIX_CORE_API Event
 {
 	public:
 		typedef uint32_t Type;
@@ -24,7 +24,7 @@ class LUX_CORE_API Event
 };
 
 
-class LUX_CORE_API EventManager
+class LUMIX_CORE_API EventManager
 {
 	public:
 		typedef Delegate<void (Event&)> Listener;

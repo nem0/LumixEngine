@@ -10,7 +10,7 @@ namespace Lumix
 		class IFile;
 		class IFileDevice;
 
-		class LUX_CORE_API FileSystem abstract
+		class LUMIX_CORE_API FileSystem abstract
 		{
 		public:
 			static FileSystem* create();

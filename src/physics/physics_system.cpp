@@ -46,7 +46,7 @@ void PhysicsSystem::onCreateUniverse(Universe& universe)
 void PhysicsSystem::onDestroyUniverse(Universe& universe)
 {
 	m_impl->m_scene->destroy();
-	LUX_DELETE(m_impl->m_scene);
+	LUMIX_DELETE(m_impl->m_scene);
 	m_impl->m_scene = NULL;
 }
 
@@ -146,9 +146,9 @@ void PhysicsSystem::destroy()
 	m_impl->m_cooking->release();
 	m_impl->m_physics->release();
 	m_impl->m_foundation->release();
-	LUX_DELETE(m_impl->m_allocator);
-	LUX_DELETE(m_impl->m_error_callback);
-	LUX_DELETE(m_impl);
+	LUMIX_DELETE(m_impl->m_allocator);
+	LUMIX_DELETE(m_impl->m_error_callback);
+	LUMIX_DELETE(m_impl);
 	m_impl = 0;
 }
 

@@ -8,7 +8,7 @@ namespace Lumix
 	{
 		class TCPStream;
 
-		class LUX_CORE_API TCPAcceptor
+		class LUMIX_CORE_API TCPAcceptor
 		{
 		public:
 			TCPAcceptor() {}

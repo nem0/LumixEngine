@@ -8,7 +8,7 @@
 #define JOIN_STRINGS_2(A, B) A ## B
 #define JOIN_STRINGS(A, B) JOIN_STRINGS_2(A, B)
 
-#define LUX_FORCE_SYMBOL(symbol) \
+#define LUMIX_FORCE_SYMBOL(symbol) \
 	__pragma(comment(linker, "/INCLUDE:_" STRINGIZE(symbol)))
 
 #define NOTE(msg)\
@@ -26,7 +26,7 @@
 #include <cassert>
 #include <malloc.h>
 
-const uint32_t LUX_MAX_PATH = 260;
+const uint32_t LUMIX_MAX_PATH = 260;
 
 #ifndef ASSERT
 #define ASSERT(x) assert(x)
@@ -36,40 +36,39 @@ const uint32_t LUX_MAX_PATH = 260;
 #define NULL nullptr
 #endif
 
-#define LUX_INLINE __inline
-#define LUX_FORCE_INLINE __forceinline
+#define LUMIX_FORCE_INLINE __forceinline
 
 #ifdef BUILDING_CORE
-#define LUX_CORE_API __declspec(dllexport)
+#define LUMIX_CORE_API __declspec(dllexport)
 #else
-#define LUX_CORE_API __declspec(dllimport)
+#define LUMIX_CORE_API __declspec(dllimport)
 #endif
 
 
 #ifdef BUILDING_PHYSICS
-#define LUX_PHYSICS_API __declspec(dllexport)
+#define LUMIX_PHYSICS_API __declspec(dllexport)
 #else
-#define LUX_PHYSICS_API __declspec(dllimport)
+#define LUMIX_PHYSICS_API __declspec(dllimport)
 #endif
 
 
 #ifdef BUILDING_NAVIGATION
-#define LUX_NAVIGATION_API __declspec(dllexport)
+#define LUMIX_NAVIGATION_API __declspec(dllexport)
 #else
-#define LUX_NAVIGATION_API __declspec(dllimport)
+#define LUMIX_NAVIGATION_API __declspec(dllimport)
 #endif
 
 
 #ifdef BUILDING_ENGINE
-#define LUX_ENGINE_API __declspec(dllexport)
+#define LUMIX_ENGINE_API __declspec(dllexport)
 #else
-#define LUX_ENGINE_API __declspec(dllimport)
+#define LUMIX_ENGINE_API __declspec(dllimport)
 #endif
 
 #ifdef BUILDING_GUI
-#define LUX_GUI_API __declspec(dllexport)
+#define LUMIX_GUI_API __declspec(dllexport)
 #else
-#define LUX_GUI_API __declspec(dllimport)
+#define LUMIX_GUI_API __declspec(dllimport)
 #endif
 
 #include "core/new.h"

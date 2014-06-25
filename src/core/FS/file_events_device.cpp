@@ -22,7 +22,7 @@ namespace Lumix
 
 			virtual ~EventsFile() 
 			{
-				LUX_DELETE(&m_file);
+				LUMIX_DELETE(&m_file);
 			}
 
 

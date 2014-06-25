@@ -151,12 +151,12 @@ namespace
 
 		for (size_t i = 0; i < itemsCount; i++)
 		{
-			LUX_EXPECT_EQ(testItems[i].idx, i);
-			LUX_EXPECT_EQ(testItems[i].proc_count, 1);
-			LUX_EXPECT_NE(testItems[i].thread_id, Lumix::MT::getCurrentThreadID());
+			LUMIX_EXPECT_EQ(testItems[i].idx, i);
+			LUMIX_EXPECT_EQ(testItems[i].proc_count, 1);
+			LUMIX_EXPECT_NE(testItems[i].thread_id, Lumix::MT::getCurrentThreadID());
 		}
 
-		LUX_DELETE_ARRAY(testItems);
+		LUMIX_DELETE_ARRAY(testItems);
 
 		Lumix::g_log_info.log("unit", "UT_tq_heavy_usage finished ...");
 	};
@@ -197,12 +197,12 @@ namespace
 
 		for (size_t i = 0; i < itemsCount; i++)
 		{
-			LUX_EXPECT_EQ(testItems[i].idx, i);
-			LUX_EXPECT_EQ(testItems[i].proc_count, 1);
-			LUX_EXPECT_NE(testItems[i].thread_id, Lumix::MT::getCurrentThreadID());
+			LUMIX_EXPECT_EQ(testItems[i].idx, i);
+			LUMIX_EXPECT_EQ(testItems[i].proc_count, 1);
+			LUMIX_EXPECT_NE(testItems[i].thread_id, Lumix::MT::getCurrentThreadID());
 		}
 
-		LUX_DELETE_ARRAY(testItems);
+		LUMIX_DELETE_ARRAY(testItems);
 
 		Lumix::g_log_info.log("unit", "UT_tq_heavy_usage finished ...");
 	}

@@ -16,7 +16,7 @@ namespace Lumix
 
 	TextureManager::~TextureManager()
 	{
-		LUX_DELETE_ARRAY(m_buffer);
+		LUMIX_DELETE_ARRAY(m_buffer);
 	}
 
 
@@ -27,14 +27,14 @@ namespace Lumix
 
 	void TextureManager::destroyResource(Resource& resource)
 	{
-		LUX_DELETE(static_cast<Texture*>(&resource));
+		LUMIX_DELETE(static_cast<Texture*>(&resource));
 	}
 
 	uint8_t* TextureManager::getBuffer(int32_t size)
 	{
 		if (m_buffer_size < size)
 		{
-			LUX_DELETE_ARRAY(m_buffer);
+			LUMIX_DELETE_ARRAY(m_buffer);
 			m_buffer = NULL;
 			m_buffer_size = -1;
 		}

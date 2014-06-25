@@ -27,7 +27,7 @@ class Universe;
 
 
 
-class LUX_ENGINE_API Renderer : public IPlugin 
+class LUMIX_ENGINE_API Renderer : public IPlugin 
 {
 	public:
 		static Renderer* createInstance();

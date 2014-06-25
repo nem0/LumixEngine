@@ -9,7 +9,7 @@ namespace Lumix
 	{
 		class Manager;
 
-		class LUX_CORE_API Job : public BaseEntry
+		class LUMIX_CORE_API Job : public BaseEntry
 		{
 			friend class Manager;
 			friend class WorkerTask;
@@ -53,4 +53,4 @@ namespace Lumix
 #endif //FINAL_RELEASE
 		};
 	} // ~namepsace MTJD
-} // ~namepsace Lux
+} // ~namepsace Lumix
