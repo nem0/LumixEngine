@@ -127,7 +127,7 @@ void MaterialManager::setEditorServer(Lumix::EditorServer& server)
 	Lumix::Entity model_entity = m_impl->m_universe->createEntity();
 	model_entity.setPosition(0, 0, -5);
 	Lumix::Component cmp2 = m_impl->m_render_scene->createComponent(crc32("renderable"), model_entity);
-	m_impl->m_render_scene->setRenderablePath(cmp2, Lumix::string("models/material_sphere.msh"));
+	m_impl->m_render_scene->setRenderablePath(cmp2, Lumix::string("models/editor/material_sphere.msh"));
 
 	m_ui->previewWidget->setAttribute(Qt::WA_NoSystemBackground);
 	m_ui->previewWidget->setAutoFillBackground(false);
@@ -290,7 +290,7 @@ void MaterialManager::onMaterialLoaded(Lumix::Resource::State, Lumix::Resource::
 		new CppObjectProperty<Lumix::Shader*, Lumix::Material>("Shader", &Lumix::Material::getShader, &Lumix::Material::setShader)
 	};
 
-	Lumix::Model* model = static_cast<Lumix::Model*>(m_impl->m_engine->getResourceManager().get(Lumix::ResourceManager::MODEL)->get("models/material_sphere.msh"));
+	Lumix::Model* model = static_cast<Lumix::Model*>(m_impl->m_engine->getResourceManager().get(Lumix::ResourceManager::MODEL)->get("models/editor/material_sphere.msh"));
 	Lumix::Material* material = m_impl->m_material;
 	material->getObserverCb().unbind<MaterialManager, &MaterialManager::onMaterialLoaded>(this);
 	model->getMesh(0).setMaterial(material);
