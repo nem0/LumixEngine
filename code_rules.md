@@ -282,7 +282,7 @@ General Rules
   5. consider using composition over inheritance
 	- inheritance is quite often used wrong
   6. never use multiple inheritance, except if all base classes but one are abstract
-
+  7. if a class is manually (de)allocating some memory, always implement a copy constructor and an assignement operator
 ---
 
 #### Templates
