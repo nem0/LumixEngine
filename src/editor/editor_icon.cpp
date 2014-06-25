@@ -22,7 +22,7 @@ void EditorIcon::create(Engine& engine, RenderScene& scene, Entity& entity, cons
 {
 	m_scene = &scene;
 	m_entity = entity;
-	m_model = static_cast<Model*>(engine.getResourceManager().get(ResourceManager::MODEL)->load("models/icon.msh"));
+	m_model = static_cast<Model*>(engine.getResourceManager().get(ResourceManager::MODEL)->load("models/editor/icon.msh"));
 	m_is_visible = true;
 }
 

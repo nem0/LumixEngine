@@ -3,6 +3,7 @@
 #include "core/fs/ifile.h"
 #include "core/json_serializer.h"
 #include "core/log.h"
+#include "core/path_utils.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "core/timer.h"
@@ -218,9 +219,11 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	{
 		JsonSerializer serializer(*file, JsonSerializer::READ, m_path.c_str());
 		serializer.deserializeObjectBegin();
-		char path[MAX_PATH];
+		char path[LUX_MAX_PATH];
 		char label[256];
-		while(!serializer.isObjectEnd())
+		char material_dir[LUX_MAX_PATH];
+		PathUtils::getDir(material_dir, LUX_MAX_PATH, m_path.c_str());
+		while (!serializer.isObjectEnd())
 		{
 			serializer.deserializeLabel(label, 255);
 			if (strcmp(label, "uniforms") == 0)
@@ -232,7 +235,10 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 				serializer.deserialize(path, MAX_PATH);
 				if (path[0] != '\0')
 				{
-					Texture* texture = static_cast<Texture*>(m_resource_manager.get(ResourceManager::TEXTURE)->load(path));
+					char texture_path[LUX_MAX_PATH];
+					strcpy(texture_path, material_dir);
+					strcat(texture_path, path);
+					Texture* texture = static_cast<Texture*>(m_resource_manager.get(ResourceManager::TEXTURE)->load(texture_path));
 					m_textures.push(texture);
 					addDependency(*texture);
 				}

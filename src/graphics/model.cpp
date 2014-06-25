@@ -1,10 +1,11 @@
 #include "core/lumix.h"
 #include "graphics/model.h"
 
+#include "core/array.h"
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
 #include "core/log.h"
-#include "core/array.h"
+#include "core/path_utils.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "core/vec3.h"
@@ -251,19 +252,21 @@ bool Model::parseMeshes(FS::IFile* file)
 	}
 	int32_t mesh_vertex_offset = 0;
 	m_meshes.reserve(object_count);
+	char model_dir[LUX_MAX_PATH];
+	PathUtils::getDir(model_dir, LUX_MAX_PATH, m_path.c_str());
 	for (int i = 0; i < object_count; ++i)
 	{
 		int32_t str_size;
 		file->read(&str_size, sizeof(str_size));
-		char material_name[MAX_PATH];
+		char material_name[LUX_MAX_PATH];
 		file->read(material_name, str_size);
-		if (str_size >= MAX_PATH)
+		if (str_size >= LUX_MAX_PATH)
 		{
 			return false;
 		}
 		material_name[str_size] = 0;
-		char material_path[MAX_PATH];
-		strcpy(material_path, "materials/");
+		char material_path[LUX_MAX_PATH];
+		strcpy(material_path, model_dir);
 		strcat(material_path, material_name);
 		strcat(material_path, ".mat");
 
@@ -271,11 +274,11 @@ bool Model::parseMeshes(FS::IFile* file)
 		file->read(&mesh_tri_count, sizeof(mesh_tri_count));
 
 		file->read(&str_size, sizeof(str_size));
-		if (str_size >= MAX_PATH)
+		if (str_size >= LUX_MAX_PATH)
 		{
 			return false;
 		}
-		char mesh_name[MAX_PATH];
+		char mesh_name[LUX_MAX_PATH];
 		mesh_name[str_size] = 0;
 		file->read(mesh_name, str_size);
 
