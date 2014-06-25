@@ -55,7 +55,7 @@ namespace Lumix
 
 	void AnimationSystem::destroy()
 	{
-		LUX_DELETE(m_impl);
+		LUMIX_DELETE(m_impl);
 		m_impl = 0;
 	}
 

@@ -17,7 +17,7 @@ namespace UI
 	class TextureBase;
 
 
-	class LUX_GUI_API ScrollbarDecorator : public DecoratorBase
+	class LUMIX_GUI_API ScrollbarDecorator : public DecoratorBase
 	{
 		public:
 			enum Parts

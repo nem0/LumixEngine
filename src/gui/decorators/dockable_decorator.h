@@ -18,7 +18,7 @@ namespace UI
 	class TextureBase;
 
 
-	class LUX_GUI_API DockableDecorator : public DecoratorBase
+	class LUMIX_GUI_API DockableDecorator : public DecoratorBase
 	{
 		public:
 			DockableDecorator(const char* name) : DecoratorBase(name) {}

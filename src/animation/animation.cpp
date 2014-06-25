@@ -31,7 +31,7 @@ Resource* AnimationManager::createResource(const Path& path)
 
 void AnimationManager::destroyResource(Resource& resource)
 {
-	LUX_DELETE(static_cast<Animation*>(&resource));
+	LUMIX_DELETE(static_cast<Animation*>(&resource));
 }
 
 
@@ -46,8 +46,8 @@ Animation::Animation(const Path& path, ResourceManager& resource_manager)
 
 Animation::~Animation()
 {
-	LUX_DELETE_ARRAY(m_positions);
-	LUX_DELETE_ARRAY(m_rotations);
+	LUMIX_DELETE_ARRAY(m_positions);
+	LUMIX_DELETE_ARRAY(m_rotations);
 }
 
 
@@ -102,8 +102,8 @@ void Animation::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 {
 	if (success)
 	{
-		LUX_DELETE_ARRAY(m_positions);
-		LUX_DELETE_ARRAY(m_rotations);
+		LUMIX_DELETE_ARRAY(m_positions);
+		LUMIX_DELETE_ARRAY(m_rotations);
 		m_positions = NULL;
 		m_rotations = NULL;
 		m_frame_count = m_bone_count = 0;
@@ -145,8 +145,8 @@ void Animation::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 
 void Animation::doUnload(void)
 {
-	LUX_DELETE_ARRAY(m_positions);
-	LUX_DELETE_ARRAY(m_rotations);
+	LUMIX_DELETE_ARRAY(m_positions);
+	LUMIX_DELETE_ARRAY(m_rotations);
 	m_rotations = NULL;
 	m_positions = NULL;
 	m_frame_count = 0;

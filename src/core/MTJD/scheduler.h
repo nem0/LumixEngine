@@ -10,7 +10,7 @@ namespace Lumix
 	{
 		class Manager;
 
-		class LUX_CORE_API Scheduler : public MT::Task
+		class LUMIX_CORE_API Scheduler : public MT::Task
 		{
 		public:
 			explicit Scheduler(Manager& manager);
@@ -28,4 +28,4 @@ namespace Lumix
 			Manager&	m_manager;
 		};
 	} // ~namepsace MTJD
-} // ~namepsace Lux
+} // ~namepsace Lumix

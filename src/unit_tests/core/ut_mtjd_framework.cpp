@@ -91,16 +91,16 @@ void UT_MTJDFrameworkTest(const char* params)
 	{
 		for (int32_t j = 0; j < BUFFER_SIZE; j++)
 		{
-			LUX_EXPECT_EQ(OUT_BUFFER[i][j], (float)j + (float)j);
+			LUMIX_EXPECT_EQ(OUT_BUFFER[i][j], (float)j + (float)j);
 		}
 	}
 
 	for (int32_t i = 0; i < TESTS_COUNT - 1; i++)
 	{
-		LUX_DELETE(jobs[i]);
+		LUMIX_DELETE(jobs[i]);
 	}
 
-	LUX_DELETE_ARRAY(jobs);
+	LUMIX_DELETE_ARRAY(jobs);
 }
 
 void UT_MTJDFrameworkDependencyTest(const char* params)
@@ -143,15 +143,15 @@ void UT_MTJDFrameworkDependencyTest(const char* params)
 
 	for (int32_t i = 0; i < BUFFER_SIZE; i++)
 	{
-		LUX_EXPECT_EQ(OUT_BUFFER[0][i], (float)i * (float)(TESTS_COUNT + 1));
+		LUMIX_EXPECT_EQ(OUT_BUFFER[0][i], (float)i * (float)(TESTS_COUNT + 1));
 	}
 
 	for (int32_t i = 0; i < TESTS_COUNT - 1; i++)
 	{
-		LUX_DELETE(jobs[i]);
+		LUMIX_DELETE(jobs[i]);
 	}
 
-	LUX_DELETE_ARRAY(jobs);
+	LUMIX_DELETE_ARRAY(jobs);
 }
 
 //REGISTER_TEST("unit_tests/core/MTJD/frameworkTest", UT_MTJDFrameworkTest, "")

@@ -9,7 +9,7 @@ namespace Lumix
 {
 
 
-class LUX_PHYSICS_API PhysicsSystem : public IPlugin
+class LUMIX_PHYSICS_API PhysicsSystem : public IPlugin
 {
 	friend class PhysicsScene;
 	friend struct PhysicsSceneImpl;
@@ -35,7 +35,7 @@ class LUX_PHYSICS_API PhysicsSystem : public IPlugin
 
 extern "C"
 {
-	LUX_PHYSICS_API IPlugin* createPlugin();
+	LUMIX_PHYSICS_API IPlugin* createPlugin();
 }
 
 

@@ -58,13 +58,13 @@ namespace UI
 		m_blocks.clear();
 		for(Map<uint32_t, DecoratorBase*>::iterator iter = m_decorators.begin(), end = m_decorators.end(); iter != end; ++iter)
 		{
-			LUX_DELETE(iter.second());
+			LUMIX_DELETE(iter.second());
 		}
 		m_decorators.clear();
 		for(int i = 0; i < m_atlases.size(); ++i)
 		{
 			m_atlases[i]->destroy();
-			LUX_DELETE(m_atlases[i]);
+			LUMIX_DELETE(m_atlases[i]);
 		}
 		m_atlases.clear();
 	}
@@ -158,7 +158,7 @@ namespace UI
 
 	void Gui::destroy()
 	{
-		LUX_DELETE(m_impl);
+		LUMIX_DELETE(m_impl);
 		m_impl = NULL;
 	}
 
@@ -287,7 +287,7 @@ namespace UI
 		Atlas* atlas = LUMIX_NEW(Atlas)();
 		if(!atlas->create())
 		{
-			LUX_DELETE(atlas);
+			LUMIX_DELETE(atlas);
 			return NULL;
 		}
 		m_impl->m_atlases.push(atlas);
@@ -430,7 +430,7 @@ namespace UI
 	}
 
 
-	extern "C" LUX_GUI_API IPlugin* createPlugin()
+	extern "C" LUMIX_GUI_API IPlugin* createPlugin()
 	{
 		return LUMIX_NEW(Gui)();
 	}

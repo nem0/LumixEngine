@@ -18,7 +18,7 @@ namespace Lumix
 
 		~Queue()
 		{
-			LUX_DELETE_ARRAY(m_buffer);
+			LUMIX_DELETE_ARRAY(m_buffer);
 		}
 
 		bool empty() const { return m_rd == m_wr; } 

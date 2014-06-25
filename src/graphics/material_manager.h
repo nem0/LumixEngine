@@ -4,7 +4,7 @@
 
 namespace Lumix
 {
-	class LUX_ENGINE_API MaterialManager : public ResourceManagerBase
+	class LUMIX_ENGINE_API MaterialManager : public ResourceManagerBase
 	{
 	public:
 		MaterialManager() : ResourceManagerBase() {}

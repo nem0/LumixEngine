@@ -37,7 +37,7 @@ namespace Lumix
 			int32_t value;
 		};
 
-		class LUX_CORE_API TCPFileDevice : public IFileDevice
+		class LUMIX_CORE_API TCPFileDevice : public IFileDevice
 		{
 		public:
 			virtual IFile* createFile(IFile* child) override;

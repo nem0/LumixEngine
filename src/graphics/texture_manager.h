@@ -4,7 +4,7 @@
 
 namespace Lumix
 {
-	class LUX_ENGINE_API TextureManager : public ResourceManagerBase
+	class LUMIX_ENGINE_API TextureManager : public ResourceManagerBase
 	{
 	public:
 		TextureManager();

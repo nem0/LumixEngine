@@ -16,7 +16,7 @@ namespace Lumix
 
 	ShaderManager::~ShaderManager()
 	{
-		LUX_DELETE_ARRAY(m_buffer);
+		LUMIX_DELETE_ARRAY(m_buffer);
 	}
 
 
@@ -27,14 +27,14 @@ namespace Lumix
 
 	void ShaderManager::destroyResource(Resource& resource)
 	{
-		LUX_DELETE(static_cast<Shader*>(&resource));
+		LUMIX_DELETE(static_cast<Shader*>(&resource));
 	}
 
 	uint8_t* ShaderManager::getBuffer(int32_t size)
 	{
 		if (m_buffer_size < size)
 		{
-			LUX_DELETE_ARRAY(m_buffer);
+			LUMIX_DELETE_ARRAY(m_buffer);
 			m_buffer = NULL;
 			m_buffer_size = -1;
 		}

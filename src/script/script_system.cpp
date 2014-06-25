@@ -213,7 +213,7 @@ namespace Lumix
 
 	void ScriptSystem::destroy(ScriptSystem* instance)
 	{
-		LUX_DELETE(instance);
+		LUMIX_DELETE(instance);
 	}
 
 

@@ -35,4 +35,4 @@ namespace Lumix
 			Count,
 		};
 	} // ~namepsace MTJD
-} // ~namepsace Lux
+} // ~namepsace Lumix

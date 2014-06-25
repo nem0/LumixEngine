@@ -10,7 +10,7 @@ namespace UI
 {
 
 
-	class LUX_GUI_API TextBox : public Block
+	class LUMIX_GUI_API TextBox : public Block
 	{
 		public:
 			TextBox(const char* text, Gui& gui, Block* parent);

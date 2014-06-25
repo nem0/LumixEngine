@@ -92,4 +92,4 @@ namespace Lumix
 #endif //TYPE == MULTI_THREAD
 		}
 	} // ~namepsace MTJD
-} // ~namepsace Lux
+} // ~namepsace Lumix

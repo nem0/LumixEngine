@@ -12,7 +12,7 @@ namespace Lumix
 	class ISerializer;
 	class Universe;
 
-	class LUX_ENGINE_API PluginManager
+	class LUMIX_ENGINE_API PluginManager
 	{
 		public:
 			PluginManager() { m_impl = 0; }

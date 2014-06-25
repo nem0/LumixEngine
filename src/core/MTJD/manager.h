@@ -20,7 +20,7 @@ namespace Lumix
 		class Job;
 		class WorkerTask;
 
-		class LUX_CORE_API Manager
+		class LUMIX_CORE_API Manager
 		{
 			friend class Scheduler;
 			friend class SpuHelperTask;
@@ -60,4 +60,4 @@ namespace Lumix
 			volatile int32_t m_scheduling_counter;
 		};
 	} // ~namepsace MTJD
-} // ~namepsace Lux
+} // ~namepsace Lumix

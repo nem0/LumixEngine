@@ -7,7 +7,7 @@
 namespace Lumix
 {
 
-	class LUX_CORE_API DefaultAllocator
+	class LUMIX_CORE_API DefaultAllocator
 	{
 		public:
 			void* allocate(size_t n);

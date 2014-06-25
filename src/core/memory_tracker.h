@@ -20,7 +20,7 @@ namespace Lumix
 		void* reallocate(void* p, size_t n) { return realloc(p, n); }
 	};
 
-	class LUX_CORE_API MemoryTracker
+	class LUMIX_CORE_API MemoryTracker
 	{
 	public:
 		class Entry

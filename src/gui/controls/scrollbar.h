@@ -9,7 +9,7 @@ namespace Lumix
 namespace UI
 {
 
-	class LUX_GUI_API Scrollbar : public Block
+	class LUMIX_GUI_API Scrollbar : public Block
 	{
 		public:
 			enum Type

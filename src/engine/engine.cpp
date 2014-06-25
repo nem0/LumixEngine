@@ -112,7 +112,7 @@ namespace Lumix
 		AnimationSystem* anim_system = LUMIX_NEW(AnimationSystem)();
 		if(!anim_system->create(owner))
 		{
-			LUX_DELETE(anim_system);
+			LUMIX_DELETE(anim_system);
 			return false;
 		}
 		m_plugin_manager.addPlugin(anim_system);
@@ -161,7 +161,7 @@ namespace Lumix
 
 		if(!m_impl->create(base_path, *this))
 		{
-			LUX_DELETE(m_impl);
+			LUMIX_DELETE(m_impl);
 			m_impl = NULL;
 			return false;
 		}
@@ -190,11 +190,11 @@ namespace Lumix
 		if(m_impl->m_disk_file_device)
 		{
 			FS::FileSystem::destroy(m_impl->m_file_system);
-			LUX_DELETE(m_impl->m_mem_file_device);
-			LUX_DELETE(m_impl->m_disk_file_device);
+			LUMIX_DELETE(m_impl->m_mem_file_device);
+			LUMIX_DELETE(m_impl->m_disk_file_device);
 		}
 
-		LUX_DELETE(m_impl);
+		LUMIX_DELETE(m_impl);
 		m_impl = 0;
 	}
 
@@ -223,7 +223,7 @@ namespace Lumix
 			m_impl->m_universe->destroy();
 			RenderScene::destroyInstance(m_impl->m_render_scene);
 			m_impl->m_render_scene = NULL;
-			LUX_DELETE(m_impl->m_universe);
+			LUMIX_DELETE(m_impl->m_universe);
 			m_impl->m_universe = 0;
 		}
 	}

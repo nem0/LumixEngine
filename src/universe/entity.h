@@ -11,7 +11,7 @@ namespace Lumix
 	class  Universe;
 	struct Component;
 
-	struct LUX_ENGINE_API Entity final
+	struct LUMIX_ENGINE_API Entity final
 	{
 		typedef Array<Component, DefaultAllocator, false> ComponentList;
 
@@ -41,4 +41,4 @@ namespace Lumix
 
 		static const Entity INVALID;
 	};
-} // ~namepsace Lux
+} // ~namepsace Lumix

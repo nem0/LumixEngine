@@ -6,8 +6,8 @@ namespace Lumix
 {
 	namespace FS
 	{
-		class LUX_CORE_API IFile;
-		class LUX_CORE_API IFileDevice
+		class LUMIX_CORE_API IFile;
+		class LUMIX_CORE_API IFileDevice
 		{
 		public:
 			IFileDevice() {}

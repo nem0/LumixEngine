@@ -16,7 +16,7 @@ class Navigation;
 class Renderer;
 
 
-class LUX_ENGINE_API ScriptSystem abstract
+class LUMIX_ENGINE_API ScriptSystem abstract
 {
 	public:
 		static ScriptSystem* create();

@@ -177,7 +177,7 @@ struct PipelineImpl : public Pipeline
 	{
 		for (int i = 0; i < m_commands.size(); ++i)
 		{
-			LUX_DELETE(m_commands[i]);
+			LUMIX_DELETE(m_commands[i]);
 		}
 		m_commands.clear();
 		onEmpty();
@@ -323,11 +323,11 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_source.getResourceManager().get(ResourceManager::PIPELINE)->unload(m_source);
 		for (int i = 0; i < m_framebuffers.size(); ++i)
 		{
-			LUX_DELETE(m_framebuffers[i]);
+			LUMIX_DELETE(m_framebuffers[i]);
 		}
 		if (m_shadowmap_framebuffer)
 		{
-			LUX_DELETE(m_shadowmap_framebuffer);
+			LUMIX_DELETE(m_shadowmap_framebuffer);
 		}
 	}
 
@@ -635,7 +635,7 @@ PipelineInstance* PipelineInstance::create(Pipeline& pipeline)
 
 void PipelineInstance::destroy(PipelineInstance* pipeline)
 {
-	LUX_DELETE(pipeline);
+	LUMIX_DELETE(pipeline);
 }
 
 
@@ -823,7 +823,7 @@ Resource* PipelineManager::createResource(const Path& path)
 
 void PipelineManager::destroyResource(Resource& resource)
 {
-	LUX_DELETE(static_cast<PipelineImpl*>(&resource));
+	LUMIX_DELETE(static_cast<PipelineImpl*>(&resource));
 }
 
 

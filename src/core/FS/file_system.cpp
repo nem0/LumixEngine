@@ -92,7 +92,7 @@ namespace Lumix
 			{
 				m_task->stop();
 				m_task->destroy();
-				LUX_DELETE(m_task);
+				LUMIX_DELETE(m_task);
 			}
 
 			bool mount(IFileDevice* device) override
@@ -135,7 +135,7 @@ namespace Lumix
 					}
 					else
 					{
-						LUX_DELETE(prev);
+						LUMIX_DELETE(prev);
 						return NULL;
 					}
 				}
@@ -163,7 +163,7 @@ namespace Lumix
 			void close(IFile* file) override
 			{
 				file->close();
-				LUX_DELETE(file);
+				LUMIX_DELETE(file);
 			}
 
 			void closeAsync(IFile* file) override
@@ -266,7 +266,7 @@ namespace Lumix
 
 			static void closeAsync(IFile* file, bool, FileSystem&)
 			{
-				LUX_DELETE(file);
+				LUMIX_DELETE(file);
 			}
 
 			void destroy()
@@ -294,7 +294,7 @@ namespace Lumix
 
 		void FileSystem::destroy(FileSystem* fs)
 		{
-			LUX_DELETE(fs);
+			LUMIX_DELETE(fs);
 		}
 	} // ~namespace FS
 } // ~namespace Lumix

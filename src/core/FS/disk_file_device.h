@@ -9,7 +9,7 @@ namespace Lumix
 	{
 		class IFile;
 
-		class LUX_CORE_API DiskFileDevice : public IFileDevice
+		class LUMIX_CORE_API DiskFileDevice : public IFileDevice
 		{
 		public:
 			virtual IFile* createFile(IFile* child) override;

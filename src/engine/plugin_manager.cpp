@@ -90,7 +90,7 @@ namespace Lumix
 				IPlugin* plugin = creator();
 				if(!plugin->create(*m_impl->m_engine))
 				{
-					LUX_DELETE(plugin);
+					LUMIX_DELETE(plugin);
 					ASSERT(false);
 					return false;
 				}
@@ -122,9 +122,9 @@ namespace Lumix
 		for(int i = 0; i < m_impl->m_plugins.size(); ++i)
 		{
 			m_impl->m_plugins[i]->destroy();
-			LUX_DELETE(m_impl->m_plugins[i]);
+			LUMIX_DELETE(m_impl->m_plugins[i]);
 		}
-		LUX_DELETE(m_impl);
+		LUMIX_DELETE(m_impl);
 		m_impl = NULL;
 	}
 

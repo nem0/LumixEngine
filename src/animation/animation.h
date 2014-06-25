@@ -18,7 +18,7 @@ struct Quat;
 struct Vec3;
 
 
-class LUX_ENGINE_API AnimationManager : public ResourceManagerBase
+class LUMIX_ENGINE_API AnimationManager : public ResourceManagerBase
 {
 public:
 	AnimationManager() : ResourceManagerBase() {}

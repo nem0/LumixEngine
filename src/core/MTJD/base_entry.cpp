@@ -21,7 +21,7 @@ namespace Lumix
 		{
 #if TYPE == MULTI_THREAD
 
-			LUX_DELETE(m_sync_event);
+			LUMIX_DELETE(m_sync_event);
 
 #endif //TYPE == MULTI_THREAD
 		}
@@ -69,4 +69,4 @@ namespace Lumix
 #endif // TYPE == MULTI_THREAD
 		}
 	} // ~namepsace MTJD
-} // ~namepsace Lux
+} // ~namepsace Lumix

@@ -35,4 +35,4 @@ namespace Lumix
 			m_data_event.trigger();
 		}
 	} // ~namepsace MTJD
-} // ~namepsace Lux
+} // ~namepsace Lumix

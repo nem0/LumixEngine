@@ -13,7 +13,7 @@ namespace Lumix
 	struct ServerMessage;
 	struct Vec3;
 
-	class LUX_ENGINE_API EditorClient
+	class LUMIX_ENGINE_API EditorClient
 	{
 		public:
 			EditorClient() { m_impl = NULL; }

@@ -13,7 +13,7 @@ namespace Lumix
 
 	GetPropertyVisitor::~GetPropertyVisitor()
 	{
-		LUX_DELETE_ARRAY(m_value);
+		LUMIX_DELETE_ARRAY(m_value);
 	}
 
 	void GetPropertyVisitor::visit(const char* name, float& value)

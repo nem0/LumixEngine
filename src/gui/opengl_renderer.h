@@ -12,7 +12,7 @@ namespace UI
 {
 
 
-	class LUX_GUI_API OpenGLRenderer : public IRenderer
+	class LUMIX_GUI_API OpenGLRenderer : public IRenderer
 	{
 		public:
 			OpenGLRenderer() { m_impl = 0; }

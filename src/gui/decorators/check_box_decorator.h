@@ -17,7 +17,7 @@ namespace UI
 	class TextureBase;
 
 
-	class LUX_GUI_API CheckBoxDecorator : public DecoratorBase
+	class LUMIX_GUI_API CheckBoxDecorator : public DecoratorBase
 	{
 		public:
 			CheckBoxDecorator(const char* name) : DecoratorBase(name) {}

@@ -25,7 +25,7 @@ namespace Lumix
 	class Universe;
 
 
-	class LUX_ENGINE_API Engine
+	class LUMIX_ENGINE_API Engine
 	{
 		public:
 			class UniverseCreatedEvent;
@@ -64,7 +64,7 @@ namespace Lumix
 			struct EngineImpl* m_impl;
 	};
 
-	class LUX_ENGINE_API Engine::UniverseCreatedEvent : public Event
+	class LUMIX_ENGINE_API Engine::UniverseCreatedEvent : public Event
 	{
 		public:
 			static const Event::Type s_type;
@@ -82,7 +82,7 @@ namespace Lumix
 			Universe& m_universe;
 	};
 
-	class LUX_ENGINE_API Engine::UniverseDestroyedEvent : public Event
+	class LUMIX_ENGINE_API Engine::UniverseDestroyedEvent : public Event
 	{
 		public:
 			static const Event::Type s_type;

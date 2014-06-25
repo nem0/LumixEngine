@@ -7,7 +7,7 @@ namespace Lumix
 {
 	namespace FS
 	{
-		class LUX_CORE_API OsFile
+		class LUMIX_CORE_API OsFile
 		{
 		public:
 			OsFile();

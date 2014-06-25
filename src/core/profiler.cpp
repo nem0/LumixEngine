@@ -4,7 +4,7 @@
 namespace Lumix
 {
 
-	LUX_CORE_API Profiler g_profiler;
+	LUMIX_CORE_API Profiler g_profiler;
 
 
 	Profiler::Profiler()
@@ -19,7 +19,7 @@ namespace Lumix
 
 	Profiler::~Profiler()
 	{
-		LUX_DELETE(m_root_block);
+		LUMIX_DELETE(m_root_block);
 		Timer::destroy(m_timer);
 	}
 
@@ -146,7 +146,7 @@ namespace Lumix
 		while (m_first_child)
 		{
 			Block* child = m_first_child->m_next;
-			LUX_DELETE(m_first_child);
+			LUMIX_DELETE(m_first_child);
 			m_first_child = child;
 		}
 	}

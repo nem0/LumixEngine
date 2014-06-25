@@ -40,7 +40,7 @@ namespace Lumix
 
 		~Terrain()
 		{
-			LUX_DELETE(m_mesh);
+			LUMIX_DELETE(m_mesh);
 			if (m_material)
 			{
 				m_material->getResourceManager().get(ResourceManager::MATERIAL)->unload(*m_material);
@@ -54,7 +54,7 @@ namespace Lumix
 
 		void generateGeometry()
 		{
-			LUX_DELETE(m_mesh);
+			LUMIX_DELETE(m_mesh);
 			m_mesh = NULL;
 			struct Vertex
 			{
@@ -178,7 +178,7 @@ namespace Lumix
 				m_universe.getEventManager().removeListener(EntityMovedEvent::type, cb);
 				for (int i = 0; i < m_terrains.size(); ++i)
 				{
-					LUX_DELETE(m_terrains[i]);
+					LUMIX_DELETE(m_terrains[i]);
 				}
 				Timer::destroy(m_timer);
 			}
@@ -362,8 +362,8 @@ namespace Lumix
 				{
 					serializer.deserializeArrayItem(m_renderables[i].m_entity.index);
 					m_renderables[i].m_entity.universe = &m_universe;
-					char path[LUX_MAX_PATH];
-					serializer.deserializeArrayItem(path, LUX_MAX_PATH);
+					char path[LUMIX_MAX_PATH];
+					serializer.deserializeArrayItem(path, LUMIX_MAX_PATH);
 					serializer.deserializeArrayItem(m_renderables[i].m_scale);
 					m_renderables[i].m_model.setModel(static_cast<Model*>(m_engine.getResourceManager().get(ResourceManager::MODEL)->load(path)));
 					for (int j = 0; j < 16; ++j)
@@ -404,10 +404,10 @@ namespace Lumix
 					Component cmp = createComponent(TERRAIN_HASH, e);
 					Terrain* terrain = m_terrains[cmp.index];
 					serializer.deserializeArrayItem(terrain->m_layer_mask);
-					char path[LUX_MAX_PATH];
-					serializer.deserializeArrayItem(path, LUX_MAX_PATH);
+					char path[LUMIX_MAX_PATH];
+					serializer.deserializeArrayItem(path, LUMIX_MAX_PATH);
 					setTerrainHeightmap(cmp, string(path));
-					serializer.deserializeArrayItem(path, LUX_MAX_PATH);
+					serializer.deserializeArrayItem(path, LUMIX_MAX_PATH);
 					setTerrainMaterial(cmp, string(path));
 				}
 				serializer.deserializeArrayEnd();
@@ -777,7 +777,7 @@ namespace Lumix
 
 	void RenderScene::destroyInstance(RenderScene* scene)
 	{
-		LUX_DELETE(scene);
+		LUMIX_DELETE(scene);
 	}
 
 }

@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Lux Editor</string>
+   <string>Lumix Editor</string>
   </property>
   <property name="dockNestingEnabled">
    <bool>true</bool>

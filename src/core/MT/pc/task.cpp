@@ -84,7 +84,7 @@ namespace Lumix
 		Task::~Task()
 		{
 			ASSERT(NULL == m_implementation->m_handle);
-			LUX_DELETE(m_implementation);
+			LUMIX_DELETE(m_implementation);
 		}
 
 		bool Task::create(const char* name)

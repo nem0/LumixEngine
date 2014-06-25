@@ -22,7 +22,7 @@ namespace UI
 	class IRenderer;
 
 
-	class LUX_GUI_API Block
+	class LUMIX_GUI_API Block
 	{
 		friend class Gui;
 		public:

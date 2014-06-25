@@ -32,10 +32,10 @@ namespace Lumix
 		const char *file;
 		int32_t line;
 
-		LUX_FORCE_INLINE bool operator == (const FileLineReport &other) const { return file == other.file && line == other.line; }
-		LUX_FORCE_INLINE bool operator != (const FileLineReport &other) const { return !(*this == other); }
+		LUMIX_FORCE_INLINE bool operator == (const FileLineReport &other) const { return file == other.file && line == other.line; }
+		LUMIX_FORCE_INLINE bool operator != (const FileLineReport &other) const { return !(*this == other); }
 
-		LUX_FORCE_INLINE bool operator < (const FileLineReport &other) const
+		LUMIX_FORCE_INLINE bool operator < (const FileLineReport &other) const
 		{
 			if(file == NULL)
 				return other.file != NULL;
@@ -47,7 +47,7 @@ namespace Lumix
 			return line < other.line;
 		}
 
-		LUX_FORCE_INLINE bool operator > (const FileLineReport &other) const
+		LUMIX_FORCE_INLINE bool operator > (const FileLineReport &other) const
 		{
 			if(file == NULL)
 				return other.file != NULL;

@@ -18,7 +18,7 @@ namespace Lumix
 	void removePtr(void* ptr) {}
 #endif
 
-	LUX_FORCE_INLINE void* lumix_new(size_t size, const char* file, int32_t line)
+	LUMIX_FORCE_INLINE void* lumix_new(size_t size, const char* file, int32_t line)
 	{
 		if(!size)size = 1;
 
@@ -27,7 +27,7 @@ namespace Lumix
 		return p;
 	}
 
-	LUX_FORCE_INLINE void* lumix_new_aligned(size_t size, size_t alignment, const char* file, int32_t line)
+	LUMIX_FORCE_INLINE void* lumix_new_aligned(size_t size, size_t alignment, const char* file, int32_t line)
 	{
 		if(!size)size = 1;
 		void* p = _aligned_malloc(size, alignment);
@@ -35,7 +35,7 @@ namespace Lumix
 		return p;
 	}
 	
-	LUX_FORCE_INLINE void* lumix_realloc(void* ptr, size_t size, const char* file, int32_t line)
+	LUMIX_FORCE_INLINE void* lumix_realloc(void* ptr, size_t size, const char* file, int32_t line)
 	{
 		if(NULL == ptr && 0 < size)
 		{
@@ -66,7 +66,7 @@ namespace Lumix
 		return NULL;
 	}
 	
-	LUX_FORCE_INLINE void lumix_delete(void* ptr)
+	LUMIX_FORCE_INLINE void lumix_delete(void* ptr)
 	{
 		if(!ptr)return;
 
@@ -74,7 +74,7 @@ namespace Lumix
 		free(ptr);
 	}
 
-	LUX_FORCE_INLINE void lumix_delete_aligned(void* ptr)
+	LUMIX_FORCE_INLINE void lumix_delete_aligned(void* ptr)
 	{
 		if(!ptr)return;
 

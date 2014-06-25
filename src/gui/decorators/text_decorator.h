@@ -12,7 +12,7 @@ namespace UI
 
 	class IRenderer;
 
-	class LUX_GUI_API TextDecorator : public DecoratorBase
+	class LUMIX_GUI_API TextDecorator : public DecoratorBase
 	{
 		public:
 			struct Part

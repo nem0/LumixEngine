@@ -14,7 +14,7 @@ namespace Lumix
 {
 
 
-	class LUX_CORE_API JsonSerializer : public ISerializer
+	class LUMIX_CORE_API JsonSerializer : public ISerializer
 	{
 		public:
 			enum AccessMode

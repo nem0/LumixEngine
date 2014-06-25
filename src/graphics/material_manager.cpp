@@ -13,6 +13,6 @@ namespace Lumix
 
 	void MaterialManager::destroyResource(Resource& resource)
 	{
-		LUX_DELETE(static_cast<Material*>(&resource));
+		LUMIX_DELETE(static_cast<Material*>(&resource));
 	}
 }

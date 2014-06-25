@@ -53,7 +53,7 @@ void LogEvent::read(Blob& stream)
 		stream.read(buf, len);
 		buf[len] = 0;
 		message = buf;
-		LUX_DELETE_ARRAY(buf);
+		LUMIX_DELETE_ARRAY(buf);
 	}
 }
 

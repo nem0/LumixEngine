@@ -18,7 +18,7 @@ class Renderer;
 class Universe;
 
 
-class LUX_ENGINE_API Gizmo
+class LUMIX_ENGINE_API Gizmo
 {
 	public:
 		struct Flags

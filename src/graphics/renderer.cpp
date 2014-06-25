@@ -172,7 +172,7 @@ Renderer* Renderer::createInstance()
 
 void Renderer::destroyInstance(Renderer& renderer)
 {
-	LUX_DELETE(&renderer);
+	LUMIX_DELETE(&renderer);
 }
 
 

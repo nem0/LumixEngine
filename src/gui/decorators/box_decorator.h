@@ -17,7 +17,7 @@ namespace UI
 	class TextureBase;
 
 
-	class LUX_GUI_API BoxDecorator : public DecoratorBase
+	class LUMIX_GUI_API BoxDecorator : public DecoratorBase
 	{
 		public:
 			BoxDecorator(const char* name) : DecoratorBase(name) {}

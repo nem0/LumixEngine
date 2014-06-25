@@ -230,7 +230,7 @@ namespace Lumix
 
 		Manager::~Manager()
 		{
-			LUX_DELETE(m_impl);
+			LUMIX_DELETE(m_impl);
 		}
 	} //~UnitTest
 } //~UnitTest

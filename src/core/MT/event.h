@@ -21,7 +21,7 @@ namespace Lumix
 
 		typedef void* EventHandle;
 
-		class LUX_CORE_API Event
+		class LUMIX_CORE_API Event
 		{
 		public:
 			explicit Event(EventFlags flags);

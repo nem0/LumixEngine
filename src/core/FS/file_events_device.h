@@ -39,7 +39,7 @@ namespace Lumix
 			int32_t param;
 		};	
 
-		class LUX_CORE_API FileEventsDevice : public IFileDevice
+		class LUMIX_CORE_API FileEventsDevice : public IFileDevice
 		{
 		public:
 			typedef Delegate<void(const Event&)>  EventCallback;

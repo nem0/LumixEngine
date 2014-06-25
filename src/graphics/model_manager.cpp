@@ -13,6 +13,6 @@ namespace Lumix
 
 	void ModelManager::destroyResource(Resource& resource)
 	{
-		LUX_DELETE(static_cast<Model*>(&resource));
+		LUMIX_DELETE(static_cast<Model*>(&resource));
 	}
 }

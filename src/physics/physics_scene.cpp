@@ -96,7 +96,7 @@ struct OutputStream : public physx::PxOutputStream
 
 	~OutputStream()
 	{
-		LUX_DELETE_ARRAY(data);
+		LUMIX_DELETE_ARRAY(data);
 	}
 
 
@@ -107,7 +107,7 @@ struct OutputStream : public physx::PxOutputStream
 			int new_capacity = Math::max(size + (int)count, capacity + 4096);
 			uint8_t* new_data = LUMIX_NEW_ARRAY(unsigned char, new_capacity);
 			memcpy(new_data, data, size);
-			LUX_DELETE_ARRAY(data);
+			LUMIX_DELETE_ARRAY(data);
 			data = new_data;
 			capacity = new_capacity;
 		}
@@ -197,7 +197,7 @@ void PhysicsScene::destroy()
 {
 	m_impl->m_default_material->release();
 	m_impl->m_scene->release();
-	LUX_DELETE(m_impl);
+	LUMIX_DELETE(m_impl);
 	m_impl = NULL;
 }
 
@@ -894,7 +894,7 @@ void PhysicsScene::deserialize(ISerializer& serializer)
 	serializer.deserialize("count", count);
 	for (int i = 0; i < m_impl->m_terrains.size(); ++i)
 	{
-		LUX_DELETE(m_impl->m_terrains[i]);
+		LUMIX_DELETE(m_impl->m_terrains[i]);
 	}
 	m_impl->m_terrains.clear();
 	serializer.deserializeArrayBegin("terrains");
@@ -904,8 +904,8 @@ void PhysicsScene::deserialize(ISerializer& serializer)
 		serializer.deserializeArrayItem(index);
 		Entity e(m_impl->m_universe, index);
 		createHeightfield(e);
-		char tmp[LUX_MAX_PATH];
-		serializer.deserializeArrayItem(tmp, LUX_MAX_PATH);
+		char tmp[LUMIX_MAX_PATH];
+		serializer.deserializeArrayItem(tmp, LUMIX_MAX_PATH);
 		setHeightmap(Component(e, HEIGHTFIELD_HASH, this, i), string(tmp));
 	}
 	serializer.deserializeArrayEnd();

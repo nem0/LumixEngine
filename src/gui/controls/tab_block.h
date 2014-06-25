@@ -10,7 +10,7 @@ namespace Lumix
 namespace UI
 {
 
-	class LUX_GUI_API TabBlock : public Block
+	class LUMIX_GUI_API TabBlock : public Block
 	{
 		public:
 			TabBlock(Gui& gui, Block* parent);
