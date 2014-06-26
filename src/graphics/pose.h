@@ -26,6 +26,10 @@ class Pose
 		Quat* getRotations() const { return m_rotations; }
 
 	private:
+		Pose(const Pose&) {}
+		void operator =(const Pose&) {}
+
+	private:
 		int32_t m_count;
 		Vec3* m_positions;
 		Quat* m_rotations;
