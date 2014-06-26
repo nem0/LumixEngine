@@ -128,10 +128,16 @@ namespace Lumix
 
 	struct Renderable
 	{
+		Renderable() {}
+
 		ModelInstance m_model;
 		Entity m_entity;
 		int64_t m_layer_mask;
 		float m_scale;
+
+		private:
+			Renderable(const Renderable&) {}
+			void operator =(const Renderable&) {}
 	};
 
 	struct Light
