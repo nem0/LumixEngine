@@ -29,6 +29,8 @@ class ModelInstance
 	private:
 		void modelUpdate(Resource::State old_state, Resource::State new_state);
 		void operator=(const ModelInstance&);
+		ModelInstance(const ModelInstance&) {}
+
 
 	private:
 		Pose		m_pose;
