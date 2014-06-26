@@ -156,15 +156,8 @@ class Array<T, Allocator, false>
 		{
 			if(capacity > m_capacity)
 			{
-				T* newData = (T*)m_allocator.allocate(capacity * sizeof(T));
-				for(int i = 0; i < m_size; ++i)
-				{
-					new ((char*)(newData + i)) T(m_data[i]);
-				}
-				callDestructors(m_data, m_data + m_size);
-				m_allocator.deallocate(m_data);
-				m_data = newData;
-				m_capacity = capacity;			
+				m_data = (T*)m_allocator.reallocate(m_data, capacity * sizeof(T));
+				m_capacity = capacity;
 			}
 		}
 
@@ -179,14 +172,7 @@ class Array<T, Allocator, false>
 		void grow()
 		{
 			int newCapacity = m_capacity == 0 ? 4 : m_capacity * 2;
-			T* newData = (T*)m_allocator.allocate(newCapacity * sizeof(T));
-			for(int i = 0; i < m_size; ++i)
-			{
-				new ((char*)(newData + i)) T(m_data[i]);
-			}
-			callDestructors(m_data, m_data + m_size);
-			m_allocator.deallocate(m_data);
-			m_data = newData;
+			m_data = (T*)m_allocator.reallocate(m_data, newCapacity * sizeof(T));
 			m_capacity = newCapacity;
 		}
 

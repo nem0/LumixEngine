@@ -131,8 +131,8 @@ struct EditorServerImpl
 		void renderIcons(IRenderDevice& render_device);
 		void renderScene(IRenderDevice& render_device);
 		void renderPhysics();
-		void save(const char* path);
-		void load(const char* path);
+		void save(const Path& path);
+		void load(const Path& path);
 		void loadMap(FS::IFile* file, bool success, FS::FileSystem& fs);
 		void addComponent(uint32_t type_crc);
 		void sendComponent(uint32_t type_crc);
@@ -407,12 +407,12 @@ void EditorServerImpl::onPointerUp(int, int, MouseButton::Value)
 }
 
 
-void EditorServerImpl::save(const char* path)
+void EditorServerImpl::save(const Path& path)
 {
-	g_log_info.log("editor server", "saving universe %s...", path);
+	g_log_info.log("editor server", "saving universe %s...", path.c_str());
 	FS::FileSystem& fs = m_engine.getFileSystem();
 	FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
-	save(*file, path);
+	save(*file, path.c_str());
 	fs.close(file);
 }
 
@@ -596,9 +596,9 @@ void EditorServerImpl::removeComponent(uint32_t)
 	selectEntity(m_selected_entity);*/
 }
 
-void EditorServerImpl::load(const char* path)
+void EditorServerImpl::load(const Path& path)
 {
-	g_log_info.log("editor server", "loading universe %s...", path);
+	g_log_info.log("editor server", "Loading universe %s...", path.c_str());
 	FS::FileSystem& fs = m_engine.getFileSystem();
 	FS::ReadCallback file_read_cb;
 	file_read_cb.bind<EditorServerImpl, &EditorServerImpl::loadMap>(this);
