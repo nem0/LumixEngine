@@ -108,16 +108,20 @@ namespace Lumix
 					indices_offset += 6;
 				}
 			}
-			/*for (int j = 1; j < m_height - 1; ++j)
+			for (int j = 1; j < m_height - 1; ++j)
 			{
 				for (int i = 1; i < m_width - 1; ++i)
 				{
-					int idx = i + j * m_width;
-					Vec3 n = crossProduct(points[idx + 1].pos - points[idx - 1].pos, points[idx - m_width].pos - points[idx + m_width].pos);
-					n.normalize();
-					points[idx].normal = n;
+					int idx = 4 * (i + j * m_width);
+					for (int k = 0; k < 4; ++k)
+					{
+						Vec3 n = crossProduct(points[idx + 4].pos - points[idx - 4].pos, points[idx - m_width * 4].pos - points[idx + m_width * 4].pos);
+						n.normalize();
+						points[idx].normal = n;
+						++idx;
+					}
 				}
-			}*/
+			}
 			VertexDef vertex_def;
 			vertex_def.parse("ptf2n", 5);
 			m_geometry.copy((const uint8_t*)&points[0], sizeof(points[0]) * points.size(), indices, vertex_def);
