@@ -344,3 +344,4 @@ General Rules
 #### Others
   1. Asserts should not be triggered by data
   2. Data can not cause crash 
+  3. Pull requests with TODO in source code can not be merged to master
