@@ -16,6 +16,7 @@ struct VertexAttributeDef
 	enum Type
 	{
 		FLOAT4,
+		FLOAT2,
 		INT4,
 		POSITION,
 		NORMAL,
