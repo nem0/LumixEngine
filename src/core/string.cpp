@@ -18,6 +18,68 @@ namespace Lumix
 		}
 	}
 
+	bool fromCString(const char* input, int length, int32_t* value)
+	{
+		int64_t val;
+		bool b = fromCString(input, length, &val);
+		*value = (int32_t)val;
+		return b;
+	}
+
+	bool fromCString(const char* input, int length, int64_t* value)
+	{
+		if (length > 0)
+		{
+			const char* c = input;
+			*value = 0;
+			if (*c == '-')
+			{
+				++c;
+				--length;
+				if (!length)
+				{
+					return false;
+				}
+			}
+			while (length && *c >= '0' && *c <= '9')
+			{
+				*value *= 10;
+				*value += *c - '0';
+				++c;
+				--length;
+			}
+			if (input[0] == '-')
+			{
+				*value = -*value;
+			}
+			return true;
+		}
+		return false;
+	}
+
+	bool fromCString(const char* input, int length, uint32_t* value)
+	{
+		if (length > 0)
+		{
+			const char* c = input;
+			*value = 0;
+			if (*c == '-')
+			{
+				return false;
+			}
+			while (length && *c >= '0' && *c <= '9')
+			{
+				*value *= 10;
+				*value += *c - '0';
+				++c;
+				--length;
+			}
+			return true;
+		}
+		return false;
+	}
+
+
 	bool toCString(int32_t value, char* output, int length)
 	{
 		char* c = output;
