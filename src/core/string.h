@@ -16,6 +16,10 @@ LUMIX_CORE_API bool toCString(int64_t value, char* output, int length);
 LUMIX_CORE_API bool toCString(uint32_t value, char* output, int length);
 LUMIX_CORE_API bool toCString(float value, char* output, int length, int after_point);
 
+LUMIX_CORE_API bool fromCString(const char* input, int length, int32_t* value);
+LUMIX_CORE_API bool fromCString(const char* input, int length, int64_t* value);
+LUMIX_CORE_API bool fromCString(const char* input, int length, uint32_t* value);
+
 
 template <class T, typename Allocator = DefaultAllocator>
 class base_string
