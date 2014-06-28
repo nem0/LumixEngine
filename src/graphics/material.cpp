@@ -108,7 +108,9 @@ bool Material::save(ISerializer& serializer)
 	serializer.serialize("shader", m_shader->getPath().c_str());
 	for (int i = 0; i < m_textures.size(); ++i)
 	{
-		serializer.serialize("texture", m_textures[i]->getPath().c_str());
+		char path[LUMIX_MAX_PATH];
+		PathUtils::getFilename(path, LUMIX_MAX_PATH, m_textures[i]->getPath().c_str());
+		serializer.serialize("texture", path);
 	}
 	serializer.endObject();
 	return false;
