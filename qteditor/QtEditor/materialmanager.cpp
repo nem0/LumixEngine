@@ -381,12 +381,19 @@ void MaterialManager::on_objectMaterialList_doubleClicked(const QModelIndex &ind
 void MaterialManager::on_saveMaterialButton_clicked()
 {
 	Lumix::FS::FileSystem& fs = m_impl->m_engine->getFileSystem();
-	Lumix::FS::IFile* file = fs.open(fs.getDefaultDevice(), m_impl->m_material->getPath().c_str(), Lumix::FS::Mode::RECREATE | Lumix::FS::Mode::WRITE);
+	// use temporary because otherwise the materials is reloaded during saving
+	char tmp_path[LUMIX_MAX_PATH];
+	strcpy(tmp_path, m_impl->m_material->getPath().c_str());
+	strcat(tmp_path, ".tmp");
+	Lumix::FS::IFile* file = fs.open(fs.getDefaultDevice(), tmp_path, Lumix::FS::Mode::RECREATE | Lumix::FS::Mode::WRITE);
 	if(file)
 	{
 		Lumix::JsonSerializer serializer(*file, Lumix::JsonSerializer::AccessMode::WRITE, m_impl->m_material->getPath().c_str());
 		m_impl->m_material->save(serializer);
 		fs.close(file);
+
+		QFile::remove(m_impl->m_material->getPath().c_str());
+		QFile::rename(tmp_path, m_impl->m_material->getPath().c_str());
 	}
 	else
 	{
