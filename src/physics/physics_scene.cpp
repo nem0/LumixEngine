@@ -173,7 +173,7 @@ bool PhysicsScene::create(PhysicsSystem& system, Universe& universe, Engine& eng
 	if(!sceneDesc.cpuDispatcher) {
 		physx::PxDefaultCpuDispatcher* cpu_dispatcher = physx::PxDefaultCpuDispatcherCreate(1);
 		if(!cpu_dispatcher)
-			printf("PxDefaultCpuDispatcherCreate failed!");
+			g_log_error.log("physics", "PxDefaultCpuDispatcherCreate failed!");
 		sceneDesc.cpuDispatcher = cpu_dispatcher;
 	} 
 	if(!sceneDesc.filterShader)

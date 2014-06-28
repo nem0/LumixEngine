@@ -35,6 +35,66 @@ namespace Lumix
 		return false;
 	}
 
+	bool toCString(int64_t value, char* output, int length)
+	{
+		char* c = output;
+		char* num_start = output;
+		if (length > 0)
+		{
+			if (value == 0)
+			{
+				if (length == 1)
+				{
+					return false;
+				}
+				*c = '0';
+				*(c + 1) = 0;
+				return true;
+			}
+			while (value > 0 && length > 1)
+			{
+				*c = value % 10 + '0';
+				value = value / 10;
+				--length;
+				++c;
+			}
+			if (length > 0)
+			{
+				reverse(num_start, c - num_start);
+				*c = 0;
+				return true;
+			}
+		}
+		return false;
+	}
+
+	bool toCStringHex(uint8_t value, char* output, int length)
+	{
+		if (length < 2)
+		{
+			return false;
+		}
+		uint8_t first = value / 16;
+		if (first > 9)
+		{
+			output[0] = 'A' + first - 10;
+		}
+		else
+		{
+			output[0] = '0' + first;
+		}
+		uint8_t second = value % 16;
+		if (second > 9)
+		{
+			output[1] = 'A' + second - 10;
+		}
+		else
+		{
+			output[1] = '0' + second;
+		}
+		return true;
+	}
+
 	bool toCString(uint32_t value, char* output, int length)
 	{
 		char* c = output;
