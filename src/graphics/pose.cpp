@@ -28,8 +28,16 @@ void Pose::resize(int count)
 	LUMIX_DELETE_ARRAY(m_positions);
 	LUMIX_DELETE_ARRAY(m_rotations);
 	m_count = count;
-	m_positions = LUMIX_NEW_ARRAY(Vec3, count);
-	m_rotations = LUMIX_NEW_ARRAY(Quat, count);
+	if(m_count)
+	{
+		m_positions = LUMIX_NEW_ARRAY(Vec3, count);
+		m_rotations = LUMIX_NEW_ARRAY(Quat, count);
+	}
+	else
+	{
+		m_positions = NULL;
+		m_rotations = NULL;
+	}
 }
 
 
