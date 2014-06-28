@@ -241,8 +241,22 @@ void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
 			exportModel(file_info);
 		}
 	}
+}
 
-	//actionPtrList.push_back(menu);
-	//QAction* act = menu->exec(qtActions,globalPos);
-	//if(act==NULL) return;
+void AssetBrowser::on_filterComboBox_currentTextChanged(const QString &arg1)
+{
+	QStringList filters;
+	if(m_ui->filterComboBox->currentText() == "All")
+	{
+		getDefaultFilters(filters);
+	}
+	else if(m_ui->filterComboBox->currentText() == "Mesh")
+	{
+		filters << "*.msh";
+	}
+	else if(m_ui->filterComboBox->currentText() == "Material")
+	{
+		filters << "*.mat";
+	}
+	m_model->setNameFilters(filters);
 }

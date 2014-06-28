@@ -2,6 +2,16 @@
 
 #include <Windows.h>
 
+static const DWORD READ_DIR_CHANGE_FILTER = 
+	FILE_NOTIFY_CHANGE_SECURITY|
+	FILE_NOTIFY_CHANGE_CREATION|
+	FILE_NOTIFY_CHANGE_LAST_ACCESS|
+	FILE_NOTIFY_CHANGE_LAST_WRITE|
+	FILE_NOTIFY_CHANGE_SIZE|
+	FILE_NOTIFY_CHANGE_ATTRIBUTES|
+	FILE_NOTIFY_CHANGE_DIR_NAME|
+	FILE_NOTIFY_CHANGE_FILE_NAME;
+
 class FileSystemWatcherPC : public FileSystemWatcher
 {
 	public:
@@ -18,7 +28,7 @@ class FileSystemWatcherPC : public FileSystemWatcher
 		{
 			m_overlapped.hEvent = this;
 			m_handle = CreateFile(path, FILE_LIST_DIRECTORY, FILE_SHARE_DELETE | FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, NULL);
-			ReadDirectoryChangesW(m_handle, m_info, sizeof(m_info), TRUE, FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_LAST_WRITE, &m_received, &m_overlapped, callback);
+			ReadDirectoryChangesW(m_handle, m_info, sizeof(m_info), TRUE, READ_DIR_CHANGE_FILTER, &m_received, &m_overlapped, callback);
 		}
 
 		static void CALLBACK callback(DWORD errorCode, DWORD tferred, LPOVERLAPPED over)
@@ -51,7 +61,7 @@ class FileSystemWatcherPC : public FileSystemWatcher
 					info = info->NextEntryOffset == 0 ? NULL : (FILE_NOTIFY_INFORMATION*)(((char*)info) + info->NextEntryOffset);
 				}
 			}
-			BOOL b = ReadDirectoryChangesW(watcher->m_handle, watcher->m_info2, sizeof(watcher->m_info), TRUE, FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_FILE_NAME, &watcher->m_received, &watcher->m_overlapped, callback2);
+			BOOL b = ReadDirectoryChangesW(watcher->m_handle, watcher->m_info2, sizeof(watcher->m_info), TRUE, READ_DIR_CHANGE_FILTER, &watcher->m_received, &watcher->m_overlapped, callback2);
 			ASSERT(b);
 		}
 		
@@ -81,7 +91,7 @@ class FileSystemWatcherPC : public FileSystemWatcher
 					info = info->NextEntryOffset == 0 ? NULL : (FILE_NOTIFY_INFORMATION*)(((char*)info) + info->NextEntryOffset);
 				}
 			}
-			BOOL b = ReadDirectoryChangesW(watcher->m_handle, watcher->m_info, sizeof(watcher->m_info), TRUE, FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_FILE_NAME, &watcher->m_received, &watcher->m_overlapped, callback);
+			BOOL b = ReadDirectoryChangesW(watcher->m_handle, watcher->m_info, sizeof(watcher->m_info), TRUE, READ_DIR_CHANGE_FILTER, &watcher->m_received, &watcher->m_overlapped, callback);
 			ASSERT(b);
 		}
 
