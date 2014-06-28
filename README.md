@@ -8,6 +8,8 @@ Features:
   * editor included
   * easy to use, fast and flexible 
   * open source
+  * component based
+  * data driven
 
 [Code rules](code_rules.md)
 
