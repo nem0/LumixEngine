@@ -288,4 +288,9 @@ class base_string
 typedef base_string<char> string;
 
 
+LUMIX_CORE_API bool toCString(int32_t value, char* output, int length);
+LUMIX_CORE_API bool toCString(uint32_t value, char* output, int length);
+LUMIX_CORE_API bool toCString(float value, char* output, int length, int after_point);
+
+
 } // !namespace Lumix

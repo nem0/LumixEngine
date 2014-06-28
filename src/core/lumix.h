@@ -29,7 +29,11 @@
 const uint32_t LUMIX_MAX_PATH = 260;
 
 #ifndef ASSERT
+#ifdef _WIN32
+#define ASSERT(x) { const volatile bool b = !(x); if(b) __debugbreak(); } 
+#else
 #define ASSERT(x) assert(x)
+#endif
 #endif
 
 #ifndef NULL
