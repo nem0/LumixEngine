@@ -60,49 +60,70 @@ namespace Lumix
 			{
 				Vec3 pos;
 				float u, v;
+				float u2, v2;
 				Vec3 normal;
 			};
 			m_width = m_heightmap->getWidth();
 			m_height = m_heightmap->getHeight();
 			Array<Vertex> points;
-			points.resize(m_width * m_height);
+			points.resize(m_width * m_height * 4);
 			Array<int32_t> indices;
 			indices.resize((m_width - 1) * (m_height - 1) * 6);
 			int indices_offset = 0;
 			const uint8_t* data = m_heightmap->getData();
 			int bytes_per_pixel = m_heightmap->getBytesPerPixel();
-			for (int j = 0; j < m_height; ++j)
+			for (int j = 0; j < m_height - 1; ++j)
 			{
-				for (int i = 0; i < m_width; ++i)
+				for (int i = 0; i < m_width - 1; ++i)
 				{
-					int idx = i + j * m_width;
-					points[idx].pos.set((float)(i), data[idx * bytes_per_pixel] / 10.0f - 255 / 10.0f, (float)(j));
+					int idx = 4 * (i + j * m_width);
+					int data_idx = i + j * m_width;
+					points[idx].pos.set((float)(i) / 5, data[data_idx * bytes_per_pixel] / 20.0f - 255 / 20.0f, (float)(j) / 5);
+					points[idx].u2 = 0;
+					points[idx].v2 = 0;
 					points[idx].u = i / (float)m_width;
 					points[idx].v = j / (float)m_height;
-					if (j < m_height - 1 && i < m_width - 1)
-					{
-						indices[indices_offset] = idx;
-						indices[indices_offset + 1] = idx + m_width;
-						indices[indices_offset + 2] = idx + 1 + m_width;
-						indices[indices_offset + 3] = idx;
-						indices[indices_offset + 4] = idx + 1 + m_width;
-						indices[indices_offset + 5] = idx + 1;
-						indices_offset += 6;
-					}
+					points[idx+1].pos.set((float)(i+1) / 5, data[(data_idx + 1)* bytes_per_pixel] / 20.0f - 255 / 20.0f, (float)(j) / 5);
+					points[idx+1].u2 = 1;
+					points[idx+1].v2 = 0;
+					points[idx+1].u = (i+1) / (float)m_width;
+					points[idx+1].v = j / (float)m_height;
+					points[idx+2].pos.set((float)(i+1) / 5, data[(data_idx + 1 + m_width)* bytes_per_pixel] / 20.0f - 255 / 20.0f, (float)(j+1) / 5);
+					points[idx+2].u2 = 1;
+					points[idx+2].v2 = 1;
+					points[idx+2].u = (i+1) / (float)m_width;
+					points[idx+2].v = (j+1) / (float)m_height;
+					points[idx+3].pos.set((float)(i) / 5, data[(data_idx + m_width) * bytes_per_pixel] / 20.0f - 255 / 20.0f, (float)(j+1) / 5);
+					points[idx+3].u2 = 0;
+					points[idx+3].v2 = 1;
+					points[idx+3].u = i / (float)m_width;
+					points[idx+3].v = (j+1) / (float)m_height;
+					
+					indices[indices_offset] = idx;
+					indices[indices_offset + 1] = idx + 3;
+					indices[indices_offset + 2] = idx + 2;
+					indices[indices_offset + 3] = idx;
+					indices[indices_offset + 4] = idx + 2;
+					indices[indices_offset + 5] = idx + 1;
+					indices_offset += 6;
 				}
 			}
 			for (int j = 1; j < m_height - 1; ++j)
 			{
 				for (int i = 1; i < m_width - 1; ++i)
 				{
-					int idx = i + j * m_width;
-					Vec3 n = crossProduct(points[idx + 1].pos - points[idx - 1].pos, points[idx - m_width].pos - points[idx + m_width].pos);
-					n.normalize();
-					points[idx].normal = n;
+					int idx = 4 * (i + j * m_width);
+					for (int k = 0; k < 4; ++k)
+					{
+						Vec3 n = crossProduct(points[idx + 4].pos - points[idx - 4].pos, points[idx - m_width * 4].pos - points[idx + m_width * 4].pos);
+						n.normalize();
+						points[idx].normal = n;
+						++idx;
+					}
 				}
 			}
 			VertexDef vertex_def;
-			vertex_def.parse("ptn", 3);
+			vertex_def.parse("ptf2n", 5);
 			m_geometry.copy((const uint8_t*)&points[0], sizeof(points[0]) * points.size(), indices, vertex_def);
 			m_mesh = LUMIX_NEW(Mesh)(m_material, 0, indices.size(), "terrain");
 		}
