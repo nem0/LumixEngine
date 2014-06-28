@@ -173,10 +173,21 @@ namespace Lumix
 			strcat(full_path, dll_path);
 		}
 
-		void getScriptDefaultPath(Entity e, char* path, char* full_path, int max_path, const char* ext)
+		void getScriptDefaultPath(Entity e, char* path, char* full_path, int, const char* ext)
 		{
-			sprintf_s(full_path, max_path, "%s\\scripts\\e%d.%s", m_engine->getBasePath(), e.index, ext);
-			sprintf_s(path, max_path, "scripts\\e%d.%s", e.index, ext);
+			char tmp[30];
+			toCString(e.index, tmp, 30);
+
+			strcpy(full_path, m_engine->getBasePath());
+			strcat(full_path, "\\scripts\\e");
+			strcat(full_path, tmp);
+			strcat(full_path, ".");
+			strcat(full_path, ext);
+
+			strcpy(path, "scripts\\e");
+			strcat(path, tmp);
+			strcat(path, ".");
+			strcat(path, ext);
 		}
 
 		Component createScript(Entity entity) override

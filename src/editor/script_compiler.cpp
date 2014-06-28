@@ -15,7 +15,8 @@ void ScriptCompiler::compileAll()
 	do
 	{
 		char path[260];
-		sprintf(path, "scripts\\%s", find_data.cFileName);
+		strcpy(path, "script\\");
+		strcat(path, find_data.cFileName);
 		compile(path);
 	}
 	while(FindNextFile(h, &find_data));
@@ -43,7 +44,8 @@ void ScriptCompiler::compile(const char path[])
 	si.hStdOutput = write_pipe;
 	si.hStdError = write_pipe;
 	si.dwFlags |= STARTF_USESTDHANDLES;
-	sprintf(cmd_line, "/C scripts\\compile.bat %s", path);
+	strcpy(cmd_line, "/C scripts\\compile.bat ");
+	strcat(cmd_line, path);
     if ( CreateProcess("C:\\windows\\system32\\cmd.exe",     // Application name
         cmd_line,
         NULL,
