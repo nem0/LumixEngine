@@ -1,7 +1,6 @@
 #include "physics/physics_scene.h"
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
-#include <cstdio>
 #include <PxPhysicsAPI.h>
 #include "cooking/PxCooking.h"
 #include "core/crc32.h"

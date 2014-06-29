@@ -1,8 +1,6 @@
 #include "core/log.h"
 #include "core/array.h"
 #include "core/string.h"
-#include <cstdio>
-#include <cstdarg>
 
 
 namespace Lumix

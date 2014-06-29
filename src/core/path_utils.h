@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstring>
+
 namespace Lumix
 {
 	struct LUMIX_CORE_API PathUtils
@@ -22,9 +24,9 @@ namespace Lumix
 			(i < max_size ? *out : *(out - 1)) = '\0';
 		}
 
-		static void getDir(char* dir, int /*max_length*/, const char* src)
+		static void getDir(char* dir, int max_length, const char* src)
 		{
-			strcpy(dir, src);
+			copyCString(dir, max_length, src);
 			for (int i = strlen(dir) - 1; i >= 0; --i)
 			{
 				if (dir[i] == '\\' || dir[i] == '/')

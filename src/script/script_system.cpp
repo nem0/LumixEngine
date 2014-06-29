@@ -1,6 +1,5 @@
 #include "script_system.h"
 #include <Windows.h>
-#include <cstdio>
 #include "core/crc32.h"
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
@@ -162,32 +161,32 @@ namespace Lumix
 	
 		void getDll(const char* script_path, char* dll_path, char* full_path, int max_length)
 		{
-			strcpy_s(dll_path, max_length, script_path);
+			copyCString(dll_path, max_length, script_path);
 			int32_t len = (int32_t)strlen(script_path);
 			if(len > 4)
 			{
-				strcpy_s(dll_path + len - 4, 5, ".dll"); 
+				copyCString(dll_path + len - 4, 5, ".dll");
 			}
-			strcpy(full_path, m_engine->getBasePath());
-			strcat(full_path, "\\");
-			strcat(full_path, dll_path);
+			copyCString(full_path, max_length, m_engine->getBasePath());
+			catCString(full_path, max_length, "\\");
+			catCString(full_path, max_length, dll_path);
 		}
 
-		void getScriptDefaultPath(Entity e, char* path, char* full_path, int, const char* ext)
+		void getScriptDefaultPath(Entity e, char* path, char* full_path, int length, const char* ext)
 		{
 			char tmp[30];
 			toCString(e.index, tmp, 30);
 
-			strcpy(full_path, m_engine->getBasePath());
-			strcat(full_path, "\\scripts\\e");
-			strcat(full_path, tmp);
-			strcat(full_path, ".");
-			strcat(full_path, ext);
+			copyCString(full_path, length, m_engine->getBasePath());
+			catCString(full_path, length, "\\scripts\\e");
+			catCString(full_path, length, tmp);
+			catCString(full_path, length, ".");
+			catCString(full_path, length, ext);
 
-			strcpy(path, "scripts\\e");
-			strcat(path, tmp);
-			strcat(path, ".");
-			strcat(path, ext);
+			copyCString(path, length, "scripts\\e");
+			catCString(path, length, tmp);
+			catCString(path, length, ".");
+			catCString(path, length, ext);
 		}
 
 		Component createScript(Entity entity) override

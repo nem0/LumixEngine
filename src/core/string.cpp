@@ -4,6 +4,33 @@
 namespace Lumix
 {
 
+	bool copyCString(char* destination, int length, const char* source)
+	{
+		while (*source && length)
+		{
+			*destination = *source;
+			--length;
+			++destination;
+			++source;
+		}
+		if (length > 0)
+		{
+			*destination = 0;
+			return true;
+		}
+		return false;
+	}
+
+	bool catCString(char* destination, int length, const char* source)
+	{
+		while (*destination && length)
+		{
+			--length;
+			++destination;
+		}
+		return copyCString(destination, length, source);
+	}
+
 	static void reverse(char* str, int length)
 	{
 		char* beg = str;

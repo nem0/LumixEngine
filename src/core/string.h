@@ -3,7 +3,6 @@
 
 #include "core/default_allocator.h"
 #include "core/lumix.h"
-#include <cstring>
 
 
 namespace Lumix
@@ -19,7 +18,8 @@ LUMIX_CORE_API bool toCString(float value, char* output, int length, int after_p
 LUMIX_CORE_API bool fromCString(const char* input, int length, int32_t* value);
 LUMIX_CORE_API bool fromCString(const char* input, int length, int64_t* value);
 LUMIX_CORE_API bool fromCString(const char* input, int length, uint32_t* value);
-
+LUMIX_CORE_API bool copyCString(char* destination, int length, const char* source);
+LUMIX_CORE_API bool catCString(char* destination, int length, const char* source);
 
 template <class T, typename Allocator = DefaultAllocator>
 class base_string
@@ -223,13 +223,13 @@ class base_string
 				{
 					m_size += base_string<T, Allocator>::strlen(rhs);
 					m_cstr = (T*)m_allocator.reallocate(m_cstr, m_size + 1);
-					base_string<T, Allocator>::strcat(m_cstr, rhs);			
+					catCString(m_cstr, m_size + 1, rhs);
 				}
 				else
 				{
 					m_size = base_string<T, Allocator>::strlen(rhs);
 					m_cstr = (T*)m_allocator.allocate(m_size + 1);
-					base_string<T, Allocator>::strcpy(m_cstr, rhs);
+					copyCString(m_cstr, m_size + 1, rhs);
 				}
 			}
 		}
@@ -244,7 +244,7 @@ class base_string
 			{
 				m_size += rhs.length();
 				m_cstr = (T*)m_allocator.reallocate(m_cstr, m_size + 1);
-				base_string<T>::strcat(m_cstr, rhs.m_cstr);
+				catCString(m_cstr, m_size + 1, rhs.m_cstr);
 			}
 			else
 			{
@@ -267,7 +267,7 @@ class base_string
 		{
 			if(pos >= 0 && pos < m_size)
 			{
-				base_string<T>::strcpy(m_cstr + pos, m_cstr + pos + 1);
+				copyCString(m_cstr + pos, m_size - pos, m_cstr + pos + 1);
 				--m_size;
 			}
 		}
@@ -276,50 +276,6 @@ class base_string
 		static const int npos = 0xffFFffFF;
 
 	private:
-		static void strcat(T* desc, const T* src)
-		{
-			T* d = desc;
-			while(*d)
-			{
-				++d;
-			}
-			const T* s = src;
-			while(*s)
-			{
-				*d = *s;
-				++s; 
-				++d;
-			}
-			*d = 0;
-		}
-
-		static void strcpy(T* desc, const T* src)
-		{
-			T* d = desc;
-			const T* s = src;
-			while(*s)
-			{
-				*d = *s;
-				++s; 
-				++d;
-			}
-			*d = 0;
-		}
-
-		static void strncpy(T* desc, const T* src, size_t max_size)
-		{
-			T* d = desc;
-			const T* s = src;
-			while(*s && (size_t)(s - src) < max_size)
-			{
-				*d = *s;
-				++s; 
-				++d;
-			}
-			*d = 0;
-		}
-
-
 		static int32_t strlen(const T* rhs) 
 		{
 			const T* c = rhs;

@@ -235,10 +235,10 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 				serializer.deserialize(path, MAX_PATH);
 				if (path[0] != '\0')
 				{
-					char texture_path[LUMIX_MAX_PATH];
-					strcpy(texture_path, material_dir);
-					strcat(texture_path, path);
-					Texture* texture = static_cast<Texture*>(m_resource_manager.get(ResourceManager::TEXTURE)->load(texture_path));
+					base_string<char, StackAllocator<LUMIX_MAX_PATH> > texture_path;
+					texture_path = material_dir;
+					texture_path += path;
+					Texture* texture = static_cast<Texture*>(m_resource_manager.get(ResourceManager::TEXTURE)->load(texture_path.c_str()));
 					m_textures.push(texture);
 					addDependency(*texture);
 				}
