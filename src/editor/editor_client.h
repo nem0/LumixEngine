@@ -2,14 +2,16 @@
 
 
 #include "core/lumix.h"
-
+#include "core/delegate_list.h"
 
 namespace Lumix
 {
 
 	class EditorServer;
 	struct Entity;
+	struct EntitySelectedEvent;
 	class EventManager;
+	struct PropertyListEvent;
 	struct ServerMessage;
 	struct Vec3;
 
@@ -35,6 +37,8 @@ namespace Lumix
 			void setEntityPosition(int32_t entity, const Vec3& position);
 			const char* getBasePath() const;
 			EventManager& getEventManager();
+			DelegateList<void (PropertyListEvent&)>& propertyListReceived();
+			DelegateList<void (EntitySelectedEvent&)>& entitySelected();
 
 		private:
 			struct EditorClientImpl* m_impl;

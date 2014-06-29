@@ -13,6 +13,7 @@ namespace Lumix
 	class EditorServer;
 	class EditorClient;
 	class Event;
+	struct PropertyListEvent;
 }
 
 class MaterialManager : public QDockWidget
@@ -27,7 +28,7 @@ class MaterialManager : public QDockWidget
 		void updatePreview();
 
 	private:
-		void onPropertyList(Lumix::Event& event);
+		void onPropertyList(Lumix::PropertyListEvent& event);
 		void fillObjectMaterials();
 		void selectMaterial(const char* path);
 		void onMaterialLoaded(Lumix::Resource::State, Lumix::Resource::State);

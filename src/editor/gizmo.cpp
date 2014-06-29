@@ -1,7 +1,6 @@
 //#define _USE_MATH_DEFINES
 //#include <cmath>
 #include "core/crc32.h"
-#include "core/event_manager.h"
 #include "core/math_utils.h"
 #include "core/matrix.h"
 #include "core/quat.h"
@@ -12,7 +11,6 @@
 #include "graphics/irender_device.h"
 #include "graphics/model.h"
 #include "graphics/renderer.h"
-#include "universe/entity_moved_event.h"
 #include "universe/universe.h"
 
 
