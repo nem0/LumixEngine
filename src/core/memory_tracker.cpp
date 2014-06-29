@@ -24,7 +24,7 @@ namespace Lumix
 		vsnprintf(tmp, 1021, message, args);
 		va_end(args);
 
-		strcat(tmp, "\n");
+		catCString(tmp, sizeof(tmp), "\n");
 		OutputDebugString(tmp);
 	}
 
@@ -206,7 +206,7 @@ namespace Lumix
 			Entry& entry = *(it.second());
 			getEntryLog(entry, NULL, string);
 
-			memTrackerLog("MemoryTracker", "%s", string);
+			memTrackerLog("MemoryTracker", string.c_str());
 		}
 
 		if(count)
@@ -240,21 +240,20 @@ namespace Lumix
 
 		for (file_line_map::iterator it = report_map.begin(); it != report_map.end(); ++it)
 		{
-			char string[512];
+			base_string<char, StackAllocator<512> > string;
 
 			const FileLineReport &rep = it.first();
 			intptr_t size = it.second();
 
 			const char *file = rep.file ? rep.file : "unknown";
 
-			strcpy(string, file);
-			char tmp[30];
-			toCString(rep.line, tmp, 30);
-			strcat(string, tmp);
-			toCString(size, tmp, 30);
-			strcat(string, tmp);
+			string = file;
+			string += "(";
+			string.cat(rep.line);
+			string += ") : ";
+			string.cat(size);
 
-			memTrackerLog("MemoryTracker", "%s", string);
+			memTrackerLog("MemoryTracker", string.c_str());
 		}
 
 		memTrackerLog("MemoryTracker", "Object dump complete.");
@@ -282,17 +281,17 @@ namespace Lumix
 
 		for (file_map::iterator it = report_map.begin(); it != report_map.end(); ++it)
 		{
-			char string[512];
+			base_string<char, StackAllocator<512> > string;
 
 			intptr_t size = it.second();
 			const char *file = it.first();
 
-			strcpy(string, file);
-			char tmp[30];
-			toCString(size, tmp, 30);
-			strcat(string, tmp);
+			
+			string = file;
+			string += " : ";
+			string.cat(size);
 
-			memTrackerLog("MemoryTracker", "%s", string);
+			memTrackerLog("MemoryTracker", string.c_str());
 		}
 
 		memTrackerLog("MemoryTracker", "Object dump complete.");

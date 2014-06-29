@@ -1,7 +1,8 @@
 #include "editor/script_compiler.h"
-#include <cstdio>
 #include "core/crc32.h"
 #include "core/log.h"
+#include "core/stack_allocator.h"
+#include "core/string.h"
 
 
 void ScriptCompiler::compileAll()
@@ -12,12 +13,12 @@ void ScriptCompiler::compileAll()
 	{
 		return;
 	}
+	Lumix::base_string<char, Lumix::StackAllocator<LUMIX_MAX_PATH> > path;
 	do
 	{
-		char path[260];
-		strcpy(path, "script\\");
-		strcat(path, find_data.cFileName);
-		compile(path);
+		path = "script\\";
+		path += find_data.cFileName;
+		compile(path.c_str());
 	}
 	while(FindNextFile(h, &find_data));
 }
@@ -30,7 +31,7 @@ void ScriptCompiler::compile(const char path[])
     ZeroMemory( &si, sizeof(si) );
     si.cb = sizeof(si);
     ZeroMemory( &pi, sizeof(pi) );
-	char cmd_line[255];
+	char cmd_line[LUMIX_MAX_PATH + 100];
 	HANDLE read_pipe, write_pipe;
 
 	SECURITY_ATTRIBUTES saAttr; 
@@ -44,8 +45,8 @@ void ScriptCompiler::compile(const char path[])
 	si.hStdOutput = write_pipe;
 	si.hStdError = write_pipe;
 	si.dwFlags |= STARTF_USESTDHANDLES;
-	strcpy(cmd_line, "/C scripts\\compile.bat ");
-	strcat(cmd_line, path);
+	Lumix::copyCString(cmd_line, sizeof(cmd_line), "/C scripts\\compile.bat ");
+	Lumix::catCString(cmd_line, sizeof(cmd_line), path);
     if ( CreateProcess("C:\\windows\\system32\\cmd.exe",     // Application name
         cmd_line,
         NULL,

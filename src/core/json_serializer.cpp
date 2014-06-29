@@ -1,5 +1,4 @@
 #include "json_serializer.h"
-#include <cstring>
 #include <inttypes.h>
 #include "core/log.h"
 

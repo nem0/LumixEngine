@@ -14,7 +14,7 @@ namespace Lumix
 	{
 		size_t len = strlen(rhs.m_path);
 		ASSERT(len < LUMIX_MAX_PATH);
-		strcpy(m_path, rhs.m_path);
+		copyCString(m_path, sizeof(m_path), rhs.m_path);
 	}
 
 	Path::Path(const char* path)
@@ -36,7 +36,7 @@ namespace Lumix
 	Path::Path(uint32_t id, const char* path)
 		: m_id(id)
 	{
-		strcpy(m_path, path);
+		copyCString(m_path, sizeof(m_path), path);
 	}
 
 	Path::~Path()

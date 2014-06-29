@@ -743,11 +743,11 @@ void DrawFullscreenQuadCommand::deserialize(PipelineImpl& pipeline, ISerializer&
 	const int MATERIAL_NAME_MAX_LENGTH = 100;
 	char material[MATERIAL_NAME_MAX_LENGTH];
 	serializer.deserializeArrayItem(material, MATERIAL_NAME_MAX_LENGTH);
-	char material_path[MAX_PATH];
-	strcpy(material_path, "materials/");
-	strcat(material_path, material);
-	strcat(material_path, ".mat");
-	m_material = static_cast<Material*>(pipeline.getResourceManager().get(ResourceManager::MATERIAL)->load(material_path));
+	base_string<char, StackAllocator<LUMIX_MAX_PATH> > material_path;
+	material_path = "materials/";
+	material_path += material;
+	material_path += ".mat";
+	m_material = static_cast<Material*>(pipeline.getResourceManager().get(ResourceManager::MATERIAL)->load(material_path.c_str()));
 }
 
 
