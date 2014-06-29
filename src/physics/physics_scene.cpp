@@ -303,7 +303,7 @@ Component PhysicsScene::createHeightfield(Entity entity)
 	terrain->m_scene = m_impl;
 	terrain->m_actor = NULL;
 	terrain->m_entity = entity;
-	Component cmp = m_impl->m_universe->addComponent(entity, HEIGHTFIELD_HASH, this, m_impl->m_terrains.size());
+	Component cmp = m_impl->m_universe->addComponent(entity, HEIGHTFIELD_HASH, this, m_impl->m_terrains.size() - 1);
 	m_impl->m_universe->componentCreated().invoke(cmp);
 	return cmp;
 }
