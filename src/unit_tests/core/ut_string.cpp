@@ -34,7 +34,7 @@ void UT_string(const char* params)
 		LUMIX_EXPECT_EQ((const char*)tmp, (const char*)tmp2);
 	}
 
-	float f = 0xffffFFFF;
+	float f = (float)0xffffFFFF;
 	f += 1000;
 	Lumix::toCString(f, tmp, 100, 6);
 	sprintf(tmp2, "%f", f);

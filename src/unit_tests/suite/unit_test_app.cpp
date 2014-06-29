@@ -12,7 +12,10 @@ namespace Lumix
 		void outputToVS(const char* system, const char* message)
 		{
 			char tmp[2048];
-			sprintf(tmp, "%s: %s\r", system, message);
+			strcpy(tmp, system);
+			strcat(tmp, ": ");
+			strcat(tmp, message);
+			strcat(tmp, "\r");
 
 			OutputDebugString(tmp);
 		}

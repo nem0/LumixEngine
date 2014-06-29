@@ -78,7 +78,7 @@ namespace Lumix
 					BaseScript* script = f();
 					if(!f)
 					{
-						g_log_warning.log("script", "failed to create script %s", m_paths[i].c_str());
+						g_log_warning.log("script") << "failed to create script " << m_paths[i].c_str();
 						FreeLibrary(h);
 					}
 					else
@@ -90,7 +90,7 @@ namespace Lumix
 				}
 				else
 				{
-					g_log_warning.log("script", "failed to load script %s", m_paths[i].c_str());
+					g_log_warning.log("script") << "failed to load script " << m_paths[i].c_str();
 				}
 			}
 			m_is_running = true;

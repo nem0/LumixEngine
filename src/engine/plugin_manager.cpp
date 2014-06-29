@@ -79,7 +79,7 @@ namespace Lumix
 
 	IPlugin* PluginManager::load(const char* path)
 	{
-		g_log_info.log("plugins", "loading plugin %s", path);
+		g_log_info.log("plugins") << "loading plugin " << path;
 		typedef IPlugin* (*PluginCreator)();
 		HMODULE lib = LoadLibrary(TEXT(path));
 		if(lib)
@@ -95,7 +95,7 @@ namespace Lumix
 					return false;
 				}
 				m_impl->m_plugins.push(plugin);
-				g_log_info.log("plugins", "plugin loaded");
+				g_log_info.log("plugins") << "plugin loaded";
 				return plugin;
 			}
 		}

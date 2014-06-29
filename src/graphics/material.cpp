@@ -259,14 +259,14 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			}
 			else
 			{
-				g_log_warning.log("Unknown parameter %s in material %s", label, m_path.c_str());
+				g_log_warning.log("renderer") << "Unknown parameter " << label << " in material " << m_path.c_str();
 			}
 		}
 		serializer.deserializeObjectEnd();
 
 		if (!m_shader)
 		{
-			g_log_error.log("renderer", "Material %s without a shader", m_path.c_str());
+			g_log_error.log("renderer") << "Material " << m_path.c_str() << " without a shader";
 			onFailure();
 			fs.close(file);
 			return;
@@ -277,7 +277,7 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	}
 	else
 	{
-		g_log_info.log("loading", "Error loading material %s.", m_path.c_str());
+		g_log_info.log("renderer") << "Error loading material " << m_path.c_str();
 		onFailure();
 	}
 	fs.close(file);

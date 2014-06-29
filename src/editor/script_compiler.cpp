@@ -103,7 +103,7 @@ void ScriptCompiler::checkFinished()
 						text += buf;
 					}
 					while(read == 512);
-					Lumix::g_log_info.log("compile script", text.c_str());
+					Lumix::g_log_info.log("script") << "compile script " << text.c_str();
 				}
 				m_status[crc32(p->m_path.c_str())] = code == 0 ? SUCCESS : FAILURE;
 				CloseHandle(p->m_pipe);

@@ -409,7 +409,7 @@ void EditorServerImpl::onPointerUp(int, int, MouseButton::Value)
 
 void EditorServerImpl::save(const Path& path)
 {
-	g_log_info.log("editor server", "saving universe %s...", path.c_str());
+	g_log_info.log("editor server") << "saving universe " << path.c_str() << "...";
 	FS::FileSystem& fs = m_engine.getFileSystem();
 	FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
 	save(*file, path.c_str());
@@ -421,7 +421,7 @@ void EditorServerImpl::save(FS::IFile& file, const char* path)
 {
 	JsonSerializer serializer(file, JsonSerializer::WRITE, path);
 	m_engine.serialize(serializer);
-	g_log_info.log("editor server", "universe saved");
+	g_log_info.log("editor server") << "universe saved";
 }
 
 
@@ -598,7 +598,7 @@ void EditorServerImpl::removeComponent(uint32_t)
 
 void EditorServerImpl::load(const Path& path)
 {
-	g_log_info.log("editor server", "Loading universe %s...", path.c_str());
+	g_log_info.log("editor server") << "Loading universe " << path.c_str() << "...";
 	FS::FileSystem& fs = m_engine.getFileSystem();
 	FS::ReadCallback file_read_cb;
 	file_read_cb.bind<EditorServerImpl, &EditorServerImpl::loadMap>(this);
@@ -620,17 +620,17 @@ void EditorServerImpl::newUniverse()
 {
 	destroyUniverse();
 	createUniverse(false);
-	g_log_info.log("editor server", "universe created");
+	g_log_info.log("editor server") << "universe created";
 }
 
 
 void EditorServerImpl::load(FS::IFile& file, const char* path)
 {
-	g_log_info.log("editor server", "parsing universe...");
+	g_log_info.log("editor server") << "parsing universe...";
 	JsonSerializer serializer(file, JsonSerializer::READ, path);
 	m_engine.deserialize(serializer);
 	m_camera = m_engine.getRenderScene()->getCameraInSlot("editor").entity;
-	g_log_info.log("editor server", "universe parsed");
+	g_log_info.log("editor server") << "universe parsed";
 }
 
 
@@ -669,7 +669,7 @@ bool EditorServerImpl::create(const char* base_path)
 	
 	if(!m_engine.loadPlugin("physics.dll"))
 	{
-		g_log_info.log("plugins", "physics plugin has not been loaded");
+		g_log_info.log("plugins") << "physics plugin has not been loaded";
 	}
 	/*if(!m_engine.loadPlugin("navigation.dll"))
 	{
