@@ -39,13 +39,13 @@ class App
 			m_server.destroy();
 		}
 
-		void onUniverseCreated(Lumix::Event&)
+		void onUniverseCreated()
 		{
 			m_edit_render_device->getPipeline().setScene(m_server.getEngine().getRenderScene()); 
 			m_game_render_device->getPipeline().setScene(m_server.getEngine().getRenderScene()); 
 		}
 
-		void onUniverseDestroyed(Lumix::Event&)
+		void onUniverseDestroyed()
 		{
 			if(m_edit_render_device)
 			{
@@ -189,8 +189,8 @@ class App
 			m_game_render_device->getPipeline().setScene(m_server.getEngine().getRenderScene()); /// TODO manage scene properly
 			m_server.getEngine().getRenderer().setRenderDevice(*m_game_render_device);
 
-			m_server.getEngine().getEventManager().addListener(Lumix::Engine::UniverseCreatedEvent::s_type).bind<App, &App::onUniverseCreated>(this);
-			m_server.getEngine().getEventManager().addListener(Lumix::Engine::UniverseDestroyedEvent::s_type).bind<App, &App::onUniverseDestroyed>(this);
+			m_server.universeCreated().bind<App, &App::onUniverseCreated>(this);
+			m_server.universeDestroyed().bind<App, &App::onUniverseDestroyed>(this);
 
 			m_main_window->getSceneView()->setPipeline(m_edit_render_device->getPipeline());
 			m_main_window->getGameView()->setPipeline(m_game_render_device->getPipeline());

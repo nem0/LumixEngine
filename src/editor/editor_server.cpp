@@ -1,10 +1,13 @@
 #include "editor_server.h"
 
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 #include <gl/GL.h>
 
 #include "core/array.h"
 #include "core/blob.h"
 #include "core/crc32.h"
+#include "core/delegate_list.h"
 #include "core/fs/file_system.h"
 #include "core/fs/memory_file_device.h"
 #include "core/fs/disk_file_device.h"
@@ -31,9 +34,6 @@
 #include "core/input_system.h"
 #include "core/MT/mutex.h"
 #include "script/script_system.h"
-#include "universe/component_event.h"
-#include "universe/entity_destroyed_event.h"
-#include "universe/entity_moved_event.h"
 #include "universe/universe.h"
 
 
@@ -158,8 +158,10 @@ struct EditorServerImpl
 		const IPropertyDescriptor& getPropertyDescriptor(uint32_t type, uint32_t name_hash);
 		void registerProperties();
 		void rotateCamera(int x, int y);
-		void onEvent(Event& evt);
-		void onComponentEvent(Event& e);
+		void onEntityMoved(Entity& entity);
+		void onEntityDestroyed(Entity& entity);
+		void onComponentCreated(Component& cmp);
+		void onComponentDestroyed(Component& cmp);
 		void destroyUniverse();
 		bool loadPlugin(const char* plugin_name);
 		void onLogInfo(const char* system, const char* message);
@@ -180,6 +182,8 @@ struct EditorServerImpl
 		Engine m_engine;
 		EditorServer& m_owner;
 		Entity m_camera;
+		DelegateList<void ()> m_universe_destroyed;
+		DelegateList<void ()> m_universe_created;
 
 		FS::FileSystem* m_file_system;
 		FS::TCPFileServer m_tpc_file_server;
@@ -937,69 +941,74 @@ void EditorServerImpl::selectEntity(Entity e)
 }
 
 
-void EditorServerImpl::onComponentEvent(Event& event)
+void EditorServerImpl::onComponentCreated(Component& cmp)
 {
-	ASSERT(event.getType() == ComponentEvent::type);
-	ComponentEvent& e = static_cast<ComponentEvent&>(event);
-	for(int i = 0; i < m_editor_icons.size(); ++i)
+	for (int i = 0; i < m_editor_icons.size(); ++i)
 	{
-		if(m_editor_icons[i]->getEntity() == e.component.entity)
+		if (m_editor_icons[i]->getEntity() == cmp.entity)
 		{
 			m_editor_icons[i]->destroy();
 			LUMIX_DELETE(m_editor_icons[i]);
 			m_editor_icons.eraseFast(i);
 			break;
 		}
-	}			
-	if(e.is_created)
+	}
+	const Lumix::Entity::ComponentList& cmps = cmp.entity.getComponents();
+	bool found = false;
+	for (int i = 0; i < cmps.size(); ++i)
 	{
-		const Lumix::Entity::ComponentList& cmps = e.component.entity.getComponents();
-		bool found = false;
-		for(int i = 0; i < cmps.size(); ++i)
+		if (cmps[i].type == RENDERABLE_HASH)
 		{
-			if(cmps[i].type == RENDERABLE_HASH)
-			{
-				found = true;
-				break;
-			}
-		}
-		if(!found)
-		{
-			EditorIcon* er = LUMIX_NEW(EditorIcon)();
-			er->create(m_engine, *m_engine.getRenderScene(), e.component.entity, e.component);
-			m_editor_icons.push(er);
+			found = true;
+			break;
 		}
 	}
-	else
+	if (!found)
 	{
-		if(e.component.entity.existsInUniverse() &&  e.component.entity.getComponents().empty())
-		{
-			EditorIcon* er = LUMIX_NEW(EditorIcon)();
-			er->create(m_engine, *m_engine.getRenderScene(), e.component.entity, Component::INVALID);
-			m_editor_icons.push(er);
-		}
+		EditorIcon* er = LUMIX_NEW(EditorIcon)();
+		er->create(m_engine, *m_engine.getRenderScene(), cmp.entity, cmp);
+		m_editor_icons.push(er);
 	}
 }
 
 
-void EditorServerImpl::onEvent(Event& evt)
+void EditorServerImpl::onComponentDestroyed(Component& cmp)
 {
-	if(evt.getType() == EntityMovedEvent::type)
+	for (int i = 0; i < m_editor_icons.size(); ++i)
 	{
-		sendEntityPosition(static_cast<EntityMovedEvent&>(evt).entity.index);
-	}
-	else if(evt.getType() == EntityDestroyedEvent::type)
-	{
-		Entity e = static_cast<EntityDestroyedEvent&>(evt).entity;
-		for(int i = 0; i < m_editor_icons.size(); ++i)
+		if (m_editor_icons[i]->getEntity() == cmp.entity)
 		{
-			if(m_editor_icons[i]->getEntity() == e)
-			{
-				m_editor_icons[i]->destroy();
-				LUMIX_DELETE(m_editor_icons[i]);
-				m_editor_icons.eraseFast(i);
-				break;
-			}
+			m_editor_icons[i]->destroy();
+			LUMIX_DELETE(m_editor_icons[i]);
+			m_editor_icons.eraseFast(i);
+			break;
+		}
+	}
+	if(cmp.entity.existsInUniverse() && cmp.entity.getComponents().empty())
+	{
+		EditorIcon* er = LUMIX_NEW(EditorIcon)();
+		er->create(m_engine, *m_engine.getRenderScene(), cmp.entity, Component::INVALID);
+		m_editor_icons.push(er);
+	}
+}
+
+
+void EditorServerImpl::onEntityMoved(Entity& entity)
+{
+	sendEntityPosition(entity.index);
+}
+
+
+void EditorServerImpl::onEntityDestroyed(Entity& entity)
+{
+	for(int i = 0; i < m_editor_icons.size(); ++i)
+	{
+		if (m_editor_icons[i]->getEntity() == entity)
+		{
+			m_editor_icons[i]->destroy();
+			LUMIX_DELETE(m_editor_icons[i]);
+			m_editor_icons.eraseFast(i);
+			break;
 		}
 	}
 }
@@ -1007,6 +1016,7 @@ void EditorServerImpl::onEvent(Event& evt)
 
 void EditorServerImpl::destroyUniverse()
 {
+	m_universe_destroyed.invoke();
 	for (int i = 0; i < m_editor_icons.size(); ++i)
 	{
 		m_editor_icons[i]->destroy();
@@ -1027,6 +1037,19 @@ void EditorServer::setEditViewRenderDevice(IRenderDevice& render_device)
 }
 
 
+DelegateList<void ()>& EditorServer::universeCreated()
+{
+	return m_impl->m_universe_created;
+}
+
+
+DelegateList<void ()>& EditorServer::universeDestroyed()
+{
+	return m_impl->m_universe_destroyed;
+}
+
+
+
 void EditorServerImpl::createUniverse(bool create_basic_entities)
 {
 	Universe* universe = m_engine.createUniverse();
@@ -1043,11 +1066,14 @@ void EditorServerImpl::createUniverse(bool create_basic_entities)
 	m_gizmo.setUniverse(universe);
 	m_gizmo.hide();
 
-	universe->getEventManager().addListener(EntityMovedEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);
-	universe->getEventManager().addListener(ComponentEvent::type).bind<EditorServerImpl, &EditorServerImpl::onComponentEvent>(this);
-	universe->getEventManager().addListener(EntityDestroyedEvent::type).bind<EditorServerImpl, &EditorServerImpl::onEvent>(this);
+	universe->entityMoved().bind<EditorServerImpl, &EditorServerImpl::onEntityMoved>(this);
+	universe->componentCreated().bind<EditorServerImpl, &EditorServerImpl::onComponentCreated>(this);
+	universe->componentDestroyed().bind<EditorServerImpl, &EditorServerImpl::onComponentDestroyed>(this);
+	universe->entityDestroyed().bind<EditorServerImpl, &EditorServerImpl::onEntityDestroyed>(this);
 
 	m_selected_entity = Entity::INVALID;
+	m_universe_created.invoke();
+
 }
 
 

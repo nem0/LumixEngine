@@ -9,7 +9,6 @@
 #include "core/array.h"
 #include "engine/engine.h"
 #include "universe/universe.h"
-#include "universe/component_event.h"
 #include "base_script.h"
 #include "save_script_visitor.h"
 
@@ -195,10 +194,8 @@ namespace Lumix
 			m_scripts.push(entity.index);
 			m_paths.push(string(path));
 
-			Component cmp(entity, SCRIPT_HASH, this, m_scripts.size() - 1);
-			ComponentEvent evt(cmp);
-			m_universe->getEventManager().emitEvent(evt);
-
+			Component cmp = m_universe->addComponent(entity, SCRIPT_HASH, this, m_scripts.size() - 1);
+			m_universe->componentCreated().invoke(cmp);
 			return cmp;
 		}
 

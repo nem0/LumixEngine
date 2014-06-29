@@ -7,7 +7,6 @@
     <ClInclude Include="..\..\..\src\core\default_allocator.h" />
     <ClInclude Include="..\..\..\src\core\delegate.h" />
     <ClInclude Include="..\..\..\src\core\delegate_list.h" />
-    <ClInclude Include="..\..\..\src\core\event_manager.h" />
     <ClInclude Include="..\..\..\src\core\free_list.h" />
     <ClInclude Include="..\..\..\src\core\hash_map.h" />
     <ClInclude Include="..\..\..\src\core\input_system.h" />
@@ -130,7 +129,6 @@
     <ClCompile Include="..\..\..\src\core\blob.cpp" />
     <ClCompile Include="..\..\..\src\core\crc32.cpp" />
     <ClCompile Include="..\..\..\src\core\default_allocator.cpp" />
-    <ClCompile Include="..\..\..\src\core\event_manager.cpp" />
     <ClCompile Include="..\..\..\src\core\json_serializer.cpp" />
     <ClCompile Include="..\..\..\src\core\log.cpp" />
     <ClCompile Include="..\..\..\src\core\math_utils.cpp" />
