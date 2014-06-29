@@ -15,7 +15,7 @@ namespace
 
 	void fs_event_cb(const Lumix::FS::Event& event)
 	{
-		Lumix::g_log_info.log("unit", "Event: %d", (uint32_t)event.type);
+		Lumix::g_log_info.log("unit") <<  "Event: " << (uint32_t)event.type;
 		occured_event |= 1 << (uint32_t)event.type;
 	}
 

@@ -133,7 +133,7 @@ bool Model::parseVertexDef(FS::IFile* file, VertexDef* vertex_definition)
 	ASSERT(vertex_def_size < 16);
 	if (vertex_def_size >= 16)
 	{
-		g_log_error.log("renderer", "Model file corrupted %s", getPath().c_str());
+		g_log_error.log("renderer") << "Model file corrupted " << getPath().c_str();
 		return false;
 	}
 	file->read(tmp, vertex_def_size);
@@ -213,7 +213,7 @@ bool Model::parseBones(FS::IFile* file)
 			b.parent_idx = getBoneIdx(b.parent.c_str());
 			if (b.parent_idx < 0)
 			{
-				g_log_error.log("renderer", "Invalid skeleton in %s", getPath().c_str());
+				g_log_error.log("renderer") << "Invalid skeleton in " << getPath().c_str();
 			}
 		}
 	}
@@ -314,7 +314,7 @@ void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	}
 	else
 	{
-		g_log_info.log("renderer", "Error loading model %s", m_path.c_str());
+		g_log_info.log("renderer") << "Error loading model " << m_path.c_str();
 		onFailure();
 	}
 

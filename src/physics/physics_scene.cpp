@@ -170,18 +170,25 @@ bool PhysicsScene::create(PhysicsSystem& system, Universe& universe, Engine& eng
 	m_impl->m_engine = &engine;
 	physx::PxSceneDesc sceneDesc(system.m_impl->m_physics->getTolerancesScale());
 	sceneDesc.gravity = physx::PxVec3(0.0f, -9.8f, 0.0f);
-	if(!sceneDesc.cpuDispatcher) {
+	if (!sceneDesc.cpuDispatcher) 
+	{
 		physx::PxDefaultCpuDispatcher* cpu_dispatcher = physx::PxDefaultCpuDispatcherCreate(1);
-		if(!cpu_dispatcher)
-			g_log_error.log("physics", "PxDefaultCpuDispatcherCreate failed!");
+		if (!cpu_dispatcher)
+		{
+			g_log_error.log("physics") << "PxDefaultCpuDispatcherCreate failed!";
+		}
 		sceneDesc.cpuDispatcher = cpu_dispatcher;
 	} 
-	if(!sceneDesc.filterShader)
-		sceneDesc.filterShader  = &physx::PxDefaultSimulationFilterShader;
+	if (!sceneDesc.filterShader)
+	{
+		sceneDesc.filterShader = &physx::PxDefaultSimulationFilterShader;
+	}
 
 	m_impl->m_scene = system.m_impl->m_physics->createScene(sceneDesc);
 	if (!m_impl->m_scene)
+	{
 		return false;
+	}
 	m_impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE,     1.0);
 	m_impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_SHAPES, 1.0f);
 	m_impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eACTOR_AXES, 1.0f);
@@ -269,7 +276,7 @@ void PhysicsSceneImpl::heightmapLoaded(Terrain* terrain)
 		}
 		else
 		{
-			g_log_error.log("PhysX", "Could not create PhysX heightfield %s", terrain->m_heightmap->getPath().c_str());
+			g_log_error.log("PhysX") << "Could not create PhysX heightfield " << terrain->m_heightmap->getPath().c_str();
 		}
 }
 
@@ -489,7 +496,7 @@ void PhysicsScene::setShapeSource(Component cmp, const string& str)
 	}
 	else
 	{
-		g_log_error.log("PhysX", "Could not create PhysX mesh %s", str.c_str());
+		g_log_error.log("PhysX") << "Could not create PhysX mesh " << str.c_str();
 	}
 }
 

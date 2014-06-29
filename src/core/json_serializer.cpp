@@ -571,7 +571,7 @@ void JsonSerializer::logErrorIfNot(bool condition)
 {
 	if (!condition)
 	{
-		g_log_error.log("serializer", "Error parsing JSON file %s", m_path.c_str());
+		g_log_error.log("serializer") << "Error parsing JSON file " << m_path.c_str();
 	}
 }
 

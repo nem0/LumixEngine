@@ -266,7 +266,7 @@ struct PipelineImpl : public Pipeline
 			}
 			else
 			{
-				g_log_error.log("renderer", "Unknown pipeline command %s", tmp);
+				g_log_error.log("renderer") << "Unknown pipeline command " << tmp;
 			}
 		}
 		serializer.deserializeArrayEnd();
