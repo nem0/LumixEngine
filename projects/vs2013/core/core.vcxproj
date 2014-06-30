@@ -259,6 +259,7 @@
     <ClCompile Include="..\..\..\src\core\resource_manager.cpp" />
     <ClCompile Include="..\..\..\src\core\resource_manager_base.cpp" />
     <ClCompile Include="..\..\..\src\core\profiler.cpp" />
+    <ClCompile Include="..\..\..\src\core\string.cpp" />
     <ClCompile Include="..\..\..\src\core\timer.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

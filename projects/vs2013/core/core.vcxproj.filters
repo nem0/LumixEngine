@@ -211,6 +211,7 @@
       <Filter>Net</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\core\profiler.cpp" />
+    <ClCompile Include="..\..\..\src\core\string.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="FS">

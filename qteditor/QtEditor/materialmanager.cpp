@@ -387,6 +387,6 @@ void MaterialManager::on_saveMaterialButton_clicked()
 	}
 	else
 	{
-		Lumix::g_log_error.log("Material manager", "Could not save file %s", m_impl->m_material->getPath().c_str());
+		Lumix::g_log_error.log("Material manager") << "Could not save file " << m_impl->m_material->getPath().c_str();
 	}
 }

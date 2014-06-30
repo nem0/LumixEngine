@@ -2,6 +2,8 @@
 #include "core/log.h"
 #include "core/math_utils.h"
 #include "core/MT/spin_mutex.h"
+#include "core/stack_allocator.h"
+#include "core/string.h"
 
 //#include <new>
 #include <stdio.h>
@@ -22,7 +24,7 @@ namespace Lumix
 		vsnprintf(tmp, 1021, message, args);
 		va_end(args);
 
-		strcat(tmp, "\n");
+		catCString(tmp, sizeof(tmp), "\n");
 		OutputDebugString(tmp);
 	}
 
@@ -99,6 +101,20 @@ namespace Lumix
 		}
 	}
 
+	static void getEntryLog(MemoryTracker::Entry& entry, void* address, base_string<char, StackAllocator<512> >& string)
+	{
+		if (entry.file() != NULL)
+		{
+			string.cat(entry.file(), "(", entry.line(), ") : ");
+		}
+		string.cat("{", entry.allocID(), " } normal block");
+		if (address)
+		{
+			string.cat(" at ", (int64_t)address);
+		}
+		string.cat(", ", entry.size(), " bytes long.");
+	}
+
 	void MemoryTracker::dumpDetailed()
 	{
 		// Detected memory leaks!
@@ -124,19 +140,12 @@ namespace Lumix
 
 		for (EntryTable::iterator it = m_map.begin(); it != m_map.end(); ++it)
 		{
-			char string[512];
+			base_string<char, StackAllocator<512> > string;
 
 			Entry& entry = *it;
 			void* adr = it.key();
 
-			if (entry.file() != NULL)
-			{
-				sprintf(string, "%s(%d): {%d} normal block at %p, %d bytes long.", entry.file(), entry.line(), entry.allocID(), adr, entry.size());
-			}
-			else
-			{
-				sprintf(string, "{%d} normal block at %p, %d bytes long.", entry.allocID(), adr, entry.size());
-			}
+			getEntryLog(entry, adr, string);
 			memTrackerLog("MemoryTracker", "%s", string);
 
 			int32_t str_len = Math::min(16, (int32_t)entry.size());
@@ -144,13 +153,14 @@ namespace Lumix
 			memset(asci_buf, 0, 17);
 			memcpy(asci_buf, adr, str_len);
 
-			sprintf(string, "Data: <%s>", asci_buf);
+			string = "";
+			string.cat("Data: <", asci_buf, ">");
 			for (int j = 0; j < str_len; j++)
 			{
 				char hex[4];
-				memset (hex, 0, sizeof(hex));
-				sprintf(hex, " %.2X", *((uint8_t*)adr + j));
-				strcat(string, hex);
+				hex[0] = ' ';
+				toCStringHex(*((uint8_t*)adr + j), hex+1, 2);
+				string.cat(hex);
 			}
 			memTrackerLog("MemoryTracker", "%s", string);
 		}
@@ -192,18 +202,11 @@ namespace Lumix
 
 		for (map_alloc_order::iterator it = alloc_order_map.begin(); it != alloc_order_map.end(); ++it)
 		{
-			char string[512];
+			base_string<char, StackAllocator<512> > string;
 			Entry& entry = *(it.second());
-			if (entry.file() != NULL)
-			{
-				sprintf(string, "%s(%d): {%d} normal block, %d bytes long.", entry.file(), entry.line(), entry.allocID(), entry.size());
-			}
-			else
-			{
-				sprintf(string, "{%d} normal block, %d bytes long.", entry.allocID(), entry.size());
-			}
+			getEntryLog(entry, NULL, string);
 
-			memTrackerLog("MemoryTracker", "%s", string);
+			memTrackerLog("MemoryTracker", string.c_str());
 		}
 
 		if(count)
@@ -237,21 +240,20 @@ namespace Lumix
 
 		for (file_line_map::iterator it = report_map.begin(); it != report_map.end(); ++it)
 		{
-			char string[512];
+			base_string<char, StackAllocator<512> > string;
 
 			const FileLineReport &rep = it.first();
 			intptr_t size = it.second();
 
 			const char *file = rep.file ? rep.file : "unknown";
 
-			if(size >= 1000000)
-				sprintf(string, "%30s(%5d) : %2d %03d %03d", file, rep.line, size / 1000000, (size % 1000000) / 1000, (size & 1000));
-			else if(size >= 1000)
-				sprintf(string, "%30s(%5d) : %6d %03d", file, rep.line, size / 1000, size % 1000);
-			else
-				sprintf(string, "%30s(%5d) : %10d", file, rep.line, size);
+			string = file;
+			string += "(";
+			string.cat(rep.line);
+			string += ") : ";
+			string.cat(size);
 
-			memTrackerLog("MemoryTracker", "%s", string);
+			memTrackerLog("MemoryTracker", string.c_str());
 		}
 
 		memTrackerLog("MemoryTracker", "Object dump complete.");
@@ -279,19 +281,17 @@ namespace Lumix
 
 		for (file_map::iterator it = report_map.begin(); it != report_map.end(); ++it)
 		{
-			char string[512];
+			base_string<char, StackAllocator<512> > string;
 
 			intptr_t size = it.second();
 			const char *file = it.first();
 
-			if(size >= 1000000)
-				sprintf(string, "%30s : %2d %03d %03d", file, size / 1000000, (size % 1000000) / 1000, (size & 1000));
-			else if(size >= 1000)
-				sprintf(string, "%30s : %6d %03d", file, size / 1000, size % 1000);
-			else
-				sprintf(string, "%30s : %10d", file, size);
+			
+			string = file;
+			string += " : ";
+			string.cat(size);
 
-			memTrackerLog("MemoryTracker", "%s", string);
+			memTrackerLog("MemoryTracker", string.c_str());
 		}
 
 		memTrackerLog("MemoryTracker", "Object dump complete.");
@@ -328,7 +328,7 @@ namespace Lumix
 
 		for (EntryTable::iterator it = m_map.begin(); it != m_map.end(); ++it)
 		{
-			char string[512];
+			base_string<char, StackAllocator<512> > string;
 
 			Entry& entry = *it;
 			void* adr = it.key();
@@ -338,14 +338,7 @@ namespace Lumix
 
 			size += entry.size();
 
-			if (entry.file() != NULL)
-			{
-				sprintf(string, "%s(%d) : {%d} normal block at %p, %d bytes long.", entry.file(), entry.line(), entry.allocID(), adr, entry.size());
-			}
-			else
-			{
-				sprintf(string, "{%d} normal block at %p, %d bytes long.", entry.allocID(), adr, entry.size());
-			}
+			getEntryLog(entry, adr, string);
 
 			memTrackerLog("MemoryTracker", "%s", string);
 
@@ -354,13 +347,13 @@ namespace Lumix
 			memset(asci_buf, 0, 17);
 			memcpy(asci_buf, adr, str_len);
 
-			sprintf(string, "Data: <%s>", asci_buf);
+			string.cat("Data: <", asci_buf, ">");
 			for (int j = 0; j < str_len; j++)
 			{
 				char hex[4];
-				memset (hex, 0, sizeof(hex));
-				sprintf(hex, " %.2X", *((uint8_t*)adr + j));
-				strcat(string, hex);
+				hex[0] = ' ';
+				toCStringHex(*((uint8_t*)adr + j), hex + 1, 2);
+				string.cat(hex);
 			}
 
 			memTrackerLog("MemoryTracker", "%s", string);

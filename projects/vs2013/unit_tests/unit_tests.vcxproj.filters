@@ -30,6 +30,9 @@
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_mtjd_framework.cpp">
       <Filter>core</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_string.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\unit_tests\suite\unit_test.h">

@@ -243,7 +243,7 @@ void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
 	}
 }
 
-void AssetBrowser::on_filterComboBox_currentTextChanged(const QString &arg1)
+void AssetBrowser::on_filterComboBox_currentTextChanged(const QString&)
 {
 	QStringList filters;
 	if(m_ui->filterComboBox->currentText() == "All")

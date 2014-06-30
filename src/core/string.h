@@ -3,12 +3,23 @@
 
 #include "core/default_allocator.h"
 #include "core/lumix.h"
-#include <cstring>
 
 
 namespace Lumix
 {
-	
+
+
+LUMIX_CORE_API bool toCStringHex(uint8_t value, char* output, int length);
+LUMIX_CORE_API bool toCString(int32_t value, char* output, int length);
+LUMIX_CORE_API bool toCString(int64_t value, char* output, int length);
+LUMIX_CORE_API bool toCString(uint32_t value, char* output, int length);
+LUMIX_CORE_API bool toCString(float value, char* output, int length, int after_point);
+
+LUMIX_CORE_API bool fromCString(const char* input, int length, int32_t* value);
+LUMIX_CORE_API bool fromCString(const char* input, int length, int64_t* value);
+LUMIX_CORE_API bool fromCString(const char* input, int length, uint32_t* value);
+LUMIX_CORE_API bool copyString(char* destination, int length, const char* source);
+LUMIX_CORE_API bool catCString(char* destination, int length, const char* source);
 
 template <class T, typename Allocator = DefaultAllocator>
 class base_string
@@ -145,21 +156,80 @@ class base_string
 			return base_string<T, Allocator>(*this, start, length);
 		}
 		
+		template <class V>
+		base_string<T, Allocator>& cat(V value)
+		{
+			char tmp[30];
+			toCString(value, tmp, 30);
+			*this += tmp;
+			return *this;
+		}
+
+		template<>
+		base_string<T, Allocator>& cat<char*>(char* value)
+		{
+			*this += value;
+			return *this;
+		}
+
+		template<>
+		base_string<T, Allocator>& cat<const char*>(const char* value)
+		{
+			*this += value;
+			return *this;
+		}
+
+		template <class V1, class V2>
+		base_string<T, Allocator>& cat(V1 v1, V2 v2)
+		{
+			cat(v1);
+			return cat(v2);
+		}
+
+		template <class V1, class V2, class V3>
+		base_string<T, Allocator>& cat(V1 v1, V2 v2, V3 v3)
+		{
+			cat(v1);
+			return cat(v2, v3);
+		}
+
+
+		template <class V1, class V2, class V3, class V4>
+		base_string<T, Allocator>& cat(V1 v1, V2 v2, V3 v3, V4 v4)
+		{
+			cat(v1);
+			return cat(v2, v3, v4);
+		}
+
+		template <class V1, class V2, class V3, class V4, class V5>
+		base_string<T, Allocator>& cat(V1 v1, V2 v2, V3 v3, V4 v4, V5 v5)
+		{
+			cat(v1);
+			return cat(v2, v3, v4, v5);
+		}
+
+		template <class V1, class V2, class V3, class V4, class V5, class V6>
+		base_string<T, Allocator>& cat(V1 v1, V2 v2, V3 v3, V4 v4, V5 v5, V6 v6)
+		{
+			cat(v1);
+			return cat(v2, v3, v4, v5, v6);
+		}
+
 		void operator += (const T* rhs)
 		{
 			if(rhs < m_cstr || rhs >= m_cstr + m_size)
 			{
 				if(m_cstr)
 				{
-					m_size += base_string<T>::strlen(rhs);
+					m_size += base_string<T, Allocator>::strlen(rhs);
 					m_cstr = (T*)m_allocator.reallocate(m_cstr, m_size + 1);
-					base_string<T>::strcat(m_cstr, rhs);			
+					catCString(m_cstr, m_size + 1, rhs);
 				}
 				else
 				{
-					m_size = base_string<T>::strlen(rhs);
+					m_size = base_string<T, Allocator>::strlen(rhs);
 					m_cstr = (T*)m_allocator.allocate(m_size + 1);
-					base_string<T>::strcpy(m_cstr, rhs);
+					copyString(m_cstr, m_size + 1, rhs);
 				}
 			}
 		}
@@ -174,7 +244,7 @@ class base_string
 			{
 				m_size += rhs.length();
 				m_cstr = (T*)m_allocator.reallocate(m_cstr, m_size + 1);
-				base_string<T>::strcat(m_cstr, rhs.m_cstr);
+				catCString(m_cstr, m_size + 1, rhs.m_cstr);
 			}
 			else
 			{
@@ -197,7 +267,7 @@ class base_string
 		{
 			if(pos >= 0 && pos < m_size)
 			{
-				base_string<T>::strcpy(m_cstr + pos, m_cstr + pos + 1);
+				copyString(m_cstr + pos, m_size - pos, m_cstr + pos + 1);
 				--m_size;
 			}
 		}
@@ -206,50 +276,6 @@ class base_string
 		static const int npos = 0xffFFffFF;
 
 	private:
-		static void strcat(T* desc, const T* src)
-		{
-			T* d = desc;
-			while(*d)
-			{
-				++d;
-			}
-			const T* s = src;
-			while(*s)
-			{
-				*d = *s;
-				++s; 
-				++d;
-			}
-			*d = 0;
-		}
-
-		static void strcpy(T* desc, const T* src)
-		{
-			T* d = desc;
-			const T* s = src;
-			while(*s)
-			{
-				*d = *s;
-				++s; 
-				++d;
-			}
-			*d = 0;
-		}
-
-		static void strncpy(T* desc, const T* src, size_t max_size)
-		{
-			T* d = desc;
-			const T* s = src;
-			while(*s && (size_t)(s - src) < max_size)
-			{
-				*d = *s;
-				++s; 
-				++d;
-			}
-			*d = 0;
-		}
-
-
 		static int32_t strlen(const T* rhs) 
 		{
 			const T* c = rhs;
