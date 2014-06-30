@@ -18,7 +18,7 @@ LUMIX_CORE_API bool toCString(float value, char* output, int length, int after_p
 LUMIX_CORE_API bool fromCString(const char* input, int length, int32_t* value);
 LUMIX_CORE_API bool fromCString(const char* input, int length, int64_t* value);
 LUMIX_CORE_API bool fromCString(const char* input, int length, uint32_t* value);
-LUMIX_CORE_API bool copyCString(char* destination, int length, const char* source);
+LUMIX_CORE_API bool copyString(char* destination, int length, const char* source);
 LUMIX_CORE_API bool catCString(char* destination, int length, const char* source);
 
 template <class T, typename Allocator = DefaultAllocator>
@@ -229,7 +229,7 @@ class base_string
 				{
 					m_size = base_string<T, Allocator>::strlen(rhs);
 					m_cstr = (T*)m_allocator.allocate(m_size + 1);
-					copyCString(m_cstr, m_size + 1, rhs);
+					copyString(m_cstr, m_size + 1, rhs);
 				}
 			}
 		}
@@ -267,7 +267,7 @@ class base_string
 		{
 			if(pos >= 0 && pos < m_size)
 			{
-				copyCString(m_cstr + pos, m_size - pos, m_cstr + pos + 1);
+				copyString(m_cstr + pos, m_size - pos, m_cstr + pos + 1);
 				--m_size;
 			}
 		}
