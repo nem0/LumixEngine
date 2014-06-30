@@ -54,11 +54,11 @@ namespace Lumix
 
 					UnitTestPair& ut = test->data;
 					
-					g_log_info.log("unit", "-------------------------");
-					g_log_info.log("unit", ut.name);
-					g_log_info.log("unit", "-------------------------");
+					g_log_info.log("unit") << "-------------------------";
+					g_log_info.log("unit") << ut.name;
+					g_log_info.log("unit") << "-------------------------";
 					ut.func(ut.parameters);
-					g_log_info.log("unit", "-------------------------");
+					g_log_info.log("unit") << "-------------------------";
 
 					test->setCompleted();
 				}
@@ -88,12 +88,12 @@ namespace Lumix
 			{
 				for(int i = 0, c = m_unit_tests.size(); i < c; ++i)
 				{
-					g_log_info.log("unit", m_unit_tests[i].name);
+					g_log_info.log("unit") << m_unit_tests[i].name;
 				}
 
-				g_log_info.log("unit", "");
-				g_log_info.log("unit", "Running tests ...");
-				g_log_info.log("unit", "");
+				g_log_info.log("unit") << "";
+				g_log_info.log("unit") << "Running tests ...";
+				g_log_info.log("unit") << "";
 			}
 
 			void runTests(const char* filter_tests)
@@ -144,15 +144,15 @@ namespace Lumix
 			{
 				if (m_fails > 0)
 				{
-					g_log_info.log("unit", "----------Fails----------");
+					g_log_info.log("unit") << "----------Fails----------";
 					for (int i = 0; i < m_failed_tests.size(); i++) 
 					{
-						g_log_info.log("unit", "%s(%d)", m_failed_tests[i].m_file_name, m_failed_tests[i].m_line);
+						g_log_info.log("unit") << m_failed_tests[i].m_file_name << "(" << m_failed_tests[i].m_line << ")";
 					}
 				}
-				g_log_info.log("unit", "--------- Results ---------");
-				g_log_info.log("unit", "Fails:     %d", m_fails);
-				g_log_info.log("unit", "---------------------------");
+				g_log_info.log("unit") << "--------- Results ---------";
+				g_log_info.log("unit") << "Fails:     " << m_fails;
+				g_log_info.log("unit") << "---------------------------";
 			}
 
 			void handleFail(const char* file_name, uint32_t line)

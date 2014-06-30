@@ -1,6 +1,5 @@
 #include "script_system.h"
 #include <Windows.h>
-#include <cstdio>
 #include "core/crc32.h"
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
@@ -78,7 +77,7 @@ namespace Lumix
 					BaseScript* script = f();
 					if(!f)
 					{
-						g_log_warning.log("script", "failed to create script %s", m_paths[i].c_str());
+						g_log_warning.log("script") << "failed to create script " << m_paths[i].c_str();
 						FreeLibrary(h);
 					}
 					else
@@ -90,7 +89,7 @@ namespace Lumix
 				}
 				else
 				{
-					g_log_warning.log("script", "failed to load script %s", m_paths[i].c_str());
+					g_log_warning.log("script") << "failed to load script " << m_paths[i].c_str();
 				}
 			}
 			m_is_running = true;
@@ -162,21 +161,32 @@ namespace Lumix
 	
 		void getDll(const char* script_path, char* dll_path, char* full_path, int max_length)
 		{
-			strcpy_s(dll_path, max_length, script_path);
+			copyString(dll_path, max_length, script_path);
 			int32_t len = (int32_t)strlen(script_path);
 			if(len > 4)
 			{
-				strcpy_s(dll_path + len - 4, 5, ".dll"); 
+				copyString(dll_path + len - 4, 5, ".dll");
 			}
-			strcpy(full_path, m_engine->getBasePath());
-			strcat(full_path, "\\");
-			strcat(full_path, dll_path);
+			copyString(full_path, max_length, m_engine->getBasePath());
+			catCString(full_path, max_length, "\\");
+			catCString(full_path, max_length, dll_path);
 		}
 
-		void getScriptDefaultPath(Entity e, char* path, char* full_path, int max_path, const char* ext)
+		void getScriptDefaultPath(Entity e, char* path, char* full_path, int length, const char* ext)
 		{
-			sprintf_s(full_path, max_path, "%s\\scripts\\e%d.%s", m_engine->getBasePath(), e.index, ext);
-			sprintf_s(path, max_path, "scripts\\e%d.%s", e.index, ext);
+			char tmp[30];
+			toCString(e.index, tmp, 30);
+
+			copyString(full_path, length, m_engine->getBasePath());
+			catCString(full_path, length, "\\scripts\\e");
+			catCString(full_path, length, tmp);
+			catCString(full_path, length, ".");
+			catCString(full_path, length, ext);
+
+			copyString(path, length, "scripts\\e");
+			catCString(path, length, tmp);
+			catCString(path, length, ".");
+			catCString(path, length, ext);
 		}
 
 		Component createScript(Entity entity) override

@@ -29,7 +29,7 @@ namespace Lumix
 			IFile* m_file;
 			ReadCallback m_cb;
 			Mode m_mode;
-			char m_path[_MAX_PATH];
+			char m_path[LUMIX_MAX_PATH];
 			uint8_t m_flags;
 
 		};
@@ -153,7 +153,7 @@ namespace Lumix
 					item.m_file = prev;
 					item.m_cb = call_back;
 					item.m_mode = mode;
-					strcpy(item.m_path, file);
+					copyString(item.m_path, sizeof(item.m_path), file);
 					item.m_flags = E_IS_OPEN;
 				}
 
@@ -206,7 +206,7 @@ namespace Lumix
 						tr->data.m_file = item.m_file;
 						tr->data.m_cb = item.m_cb;
 						tr->data.m_mode = item.m_mode;
-						strcpy(tr->data.m_path, item.m_path);
+						copyString(tr->data.m_path, sizeof(tr->data.m_path), item.m_path);
 						tr->data.m_flags = item.m_flags;
 						tr->reset();
 

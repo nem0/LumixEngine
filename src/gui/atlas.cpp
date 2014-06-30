@@ -1,5 +1,4 @@
 #include "atlas.h"
-#include <cstring>
 #include "core/crc32.h"
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"

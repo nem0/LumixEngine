@@ -113,14 +113,14 @@ void Animation::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		{
 			fs.close(file);
 			onFailure();
-			g_log_error.log("animation", "%s is not an animation file", m_path.c_str());
+			g_log_error.log("animation") << m_path.c_str() << " is not an animation file";
 			return;
 		}
 		if (header.version > 1)
 		{
 			fs.close(file);
 			onFailure();
-			g_log_error.log("animation", "Unsupported animation version %d (%s)", header.version, m_path.c_str());
+			g_log_error.log("animation") << "Unsupported animation version " << header.version << " (" << m_path.c_str() << ")";
 			return;
 		}
 		file->read(&m_frame_count, sizeof(m_frame_count));
