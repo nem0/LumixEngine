@@ -4,7 +4,7 @@
 namespace Lumix
 {
 
-	bool copyCString(char* destination, int length, const char* source)
+	bool copyString(char* destination, int length, const char* source)
 	{
 		while (*source && length)
 		{
@@ -28,7 +28,7 @@ namespace Lumix
 			--length;
 			++destination;
 		}
-		return copyCString(destination, length, source);
+		return copyString(destination, length, source);
 	}
 
 	static void reverse(char* str, int length)

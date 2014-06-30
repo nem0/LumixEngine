@@ -669,7 +669,7 @@ namespace Lumix
 
 			virtual void setCameraSlot(Component camera, const string& slot) override
 			{
-				copyCString(m_cameras[camera.index].m_slot, Camera::MAX_SLOT_LENGTH, slot.c_str());
+				copyString(m_cameras[camera.index].m_slot, Camera::MAX_SLOT_LENGTH, slot.c_str());
 			}
 
 			virtual void getCameraSlot(Component camera, string& slot) override

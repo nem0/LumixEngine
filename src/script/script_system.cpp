@@ -161,13 +161,13 @@ namespace Lumix
 	
 		void getDll(const char* script_path, char* dll_path, char* full_path, int max_length)
 		{
-			copyCString(dll_path, max_length, script_path);
+			copyString(dll_path, max_length, script_path);
 			int32_t len = (int32_t)strlen(script_path);
 			if(len > 4)
 			{
-				copyCString(dll_path + len - 4, 5, ".dll");
+				copyString(dll_path + len - 4, 5, ".dll");
 			}
-			copyCString(full_path, max_length, m_engine->getBasePath());
+			copyString(full_path, max_length, m_engine->getBasePath());
 			catCString(full_path, max_length, "\\");
 			catCString(full_path, max_length, dll_path);
 		}
@@ -177,13 +177,13 @@ namespace Lumix
 			char tmp[30];
 			toCString(e.index, tmp, 30);
 
-			copyCString(full_path, length, m_engine->getBasePath());
+			copyString(full_path, length, m_engine->getBasePath());
 			catCString(full_path, length, "\\scripts\\e");
 			catCString(full_path, length, tmp);
 			catCString(full_path, length, ".");
 			catCString(full_path, length, ext);
 
-			copyCString(path, length, "scripts\\e");
+			copyString(path, length, "scripts\\e");
 			catCString(path, length, tmp);
 			catCString(path, length, ".");
 			catCString(path, length, ext);

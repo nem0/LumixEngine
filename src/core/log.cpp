@@ -1,5 +1,6 @@
 #include "core/log.h"
 #include "core/array.h"
+#include "core/path.h"
 #include "core/string.h"
 
 
@@ -71,4 +72,9 @@ namespace Lumix
 		return *this;
 	}
 
+	LogProxy& LogProxy::operator <<(const Path& path)
+	{
+		m_message.cat(path.c_str());
+		return *this;
+	}
 } // ~namespace Lumix
