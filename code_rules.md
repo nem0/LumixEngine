@@ -59,6 +59,25 @@ General Rules
 	#endif
 ```
 
+  3. indent macros
+  	wrong:
+
+```
+	int x = 0;
+#ifdef _XBOX_ONE
+	x = 10;
+#endif
+```
+
+	right:
+	
+```
+	int x = 0;
+	#ifdef _XBOX_ONE
+		x = 10;
+	#endif
+```
+
 2. sort includes, use following rules (most important to least):
   * precompiled first, if necessary
   * in .cpp, corresponding header is first	
