@@ -474,7 +474,7 @@ void PropertyView::onEntitySelected(Lumix::Event& event)
 		}
 		else if (e.components[i] == crc32("terrain"))
 		{
-			addProperty("terrain", "heightmap", "Heightmap", Property::FILE, "TGA image (*.tga)");
+			addProperty("terrain", "heightmap", "Heightmap", Property::FILE, "TGA image (*.tga), Raw image (*.raw)");
 			addProperty("terrain", "material", "Material", Property::FILE, "material (*.mat)");
 		}
 		else if (e.components[i] == crc32("physical_controller") || e.components[i] == crc32("mesh_rigid_actor"))
