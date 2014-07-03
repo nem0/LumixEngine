@@ -32,6 +32,7 @@ class Texture : public Resource
 		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 		bool loadDDS(FS::IFile& file);
 		bool loadTGA(FS::IFile& file);
+		bool loadRaw(FS::IFile& file);
 
 		virtual void doUnload(void) override;
 		virtual FS::ReadCallback getReadCallback() override;

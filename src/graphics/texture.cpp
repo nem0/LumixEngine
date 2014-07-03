@@ -431,6 +431,23 @@ void Texture::apply(int unit)
 }
 
 
+bool Texture::loadRaw(FS::IFile& file)
+{
+	if (!m_is_nonGL)
+	{
+		g_log_error.log("renderer") << "Raw images only supported as non-GL textures";
+		return false;
+	}
+	size_t size = file.size();
+	m_data.resize(size);
+	file.read(&m_data[0], size);
+	m_width = sqrt(size / 2);
+	m_height = sqrt(size / 2);
+	m_BPP = 2;
+	return true;
+}
+
+
 bool Texture::loadTGA(FS::IFile& file)
 {
 	TGAHeader header;
@@ -673,6 +690,10 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		if (len > 3 && strcmp(path + len - 4, ".dds") == 0)
 		{
 			loaded = loadDDS(*file);
+		}
+		if (len > 3 && strcmp(path + len - 4, ".raw") == 0)
+		{
+			loaded = loadRaw(*file);
 		}
 		else
 		{
