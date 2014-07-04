@@ -70,30 +70,27 @@ namespace Lumix
 			Array<int32_t> indices;
 			indices.resize((m_width - 1) * (m_height - 1) * 6);
 			int indices_offset = 0;
-			const uint8_t* data = m_heightmap->getData();
-			int bytes_per_pixel = m_heightmap->getBytesPerPixel();
 			for (int j = 0; j < m_height - 1; ++j)
 			{
 				for (int i = 0; i < m_width - 1; ++i)
 				{
 					int idx = 4 * (i + j * m_width);
-					int data_idx = i + j * m_width;
-					points[idx].pos.set((float)(i) / 5, data[data_idx * bytes_per_pixel] / 20.0f - 255 / 20.0f, (float)(j) / 5);
+					points[idx].pos.set((float)(i) / 5, 0, (float)(j) / 5);
 					points[idx].u2 = 0;
 					points[idx].v2 = 0;
 					points[idx].u = i / (float)m_width;
 					points[idx].v = j / (float)m_height;
-					points[idx+1].pos.set((float)(i+1) / 5, data[(data_idx + 1)* bytes_per_pixel] / 20.0f - 255 / 20.0f, (float)(j) / 5);
+					points[idx+1].pos.set((float)(i+1) / 5, 0, (float)(j) / 5);
 					points[idx+1].u2 = 1;
 					points[idx+1].v2 = 0;
 					points[idx+1].u = (i+1) / (float)m_width;
 					points[idx+1].v = j / (float)m_height;
-					points[idx+2].pos.set((float)(i+1) / 5, data[(data_idx + 1 + m_width)* bytes_per_pixel] / 20.0f - 255 / 20.0f, (float)(j+1) / 5);
+					points[idx+2].pos.set((float)(i+1) / 5, 0, (float)(j+1) / 5);
 					points[idx+2].u2 = 1;
 					points[idx+2].v2 = 1;
 					points[idx+2].u = (i+1) / (float)m_width;
 					points[idx+2].v = (j+1) / (float)m_height;
-					points[idx+3].pos.set((float)(i) / 5, data[(data_idx + m_width) * bytes_per_pixel] / 20.0f - 255 / 20.0f, (float)(j+1) / 5);
+					points[idx+3].pos.set((float)(i) / 5, 0, (float)(j+1) / 5);
 					points[idx+3].u2 = 0;
 					points[idx+3].v2 = 1;
 					points[idx+3].u = i / (float)m_width;
@@ -577,7 +574,6 @@ namespace Lumix
 				Resource* res = m_engine.getResourceManager().get(ResourceManager::TEXTURE)->load(path.c_str());
 				res->getObserverCb().bind<Terrain, &Terrain::heightmapLoaded>(m_terrains[cmp.index]);
 				m_terrains[cmp.index]->m_heightmap = static_cast<Texture*>(res);
-				m_terrains[cmp.index]->m_heightmap->setNonGL(true);
 				if (m_terrains[cmp.index]->m_heightmap->isReady())
 				{
 					m_terrains[cmp.index]->heightmapLoaded(Resource::State::LOADING, Resource::State::READY);

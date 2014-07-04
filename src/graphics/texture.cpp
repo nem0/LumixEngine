@@ -441,8 +441,8 @@ bool Texture::loadRaw(FS::IFile& file)
 	size_t size = file.size();
 	m_data.resize(size);
 	file.read(&m_data[0], size);
-	m_width = sqrt(size / 2);
-	m_height = sqrt(size / 2);
+	m_width = (int)sqrt(size / 2);
+	m_height = m_width;
 	m_BPP = 2;
 	return true;
 }
@@ -691,7 +691,7 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		{
 			loaded = loadDDS(*file);
 		}
-		if (len > 3 && strcmp(path + len - 4, ".raw") == 0)
+		else if (len > 3 && strcmp(path + len - 4, ".raw") == 0)
 		{
 			loaded = loadRaw(*file);
 		}
