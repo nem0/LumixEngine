@@ -1,14 +1,12 @@
 #include "animation_system.h"
 #include "animation/animation.h"
 #include "core/crc32.h"
-#include "core/event_manager.h"
 #include "core/json_serializer.h"
+#include "core/resource_manager.h"
 #include "editor/editor_server.h"
 #include "engine/engine.h"
 #include "graphics/renderer.h"
-#include "universe/component_event.h"
 #include "universe/universe.h"
-#include "core/resource_manager.h"
 
 namespace Lumix
 {
@@ -34,7 +32,7 @@ namespace Lumix
 			Universe* m_universe;
 			Engine& m_engine;
 
-			void onEvent(Event& event);
+			void onComponentCreated(Component& component);
 		
 		private:
 			void operator=(const AnimationSystemImpl&);
@@ -64,7 +62,7 @@ namespace Lumix
 	{
 		ASSERT(!m_impl->m_universe);
 		m_impl->m_universe = &universe;
-		m_impl->m_universe->getEventManager().addListener(ComponentEvent::type).bind<AnimationSystemImpl, &AnimationSystemImpl::onEvent>(m_impl);
+		m_impl->m_universe->componentCreated().bind<AnimationSystemImpl, &AnimationSystemImpl::onComponentCreated>(m_impl);
 	}
 
 
@@ -72,9 +70,7 @@ namespace Lumix
 	{
 		ASSERT(m_impl->m_universe);
 		m_impl->m_animables.clear();
-		EventManager::Listener cb;
-		cb.bind<AnimationSystemImpl, &AnimationSystemImpl::onEvent>(m_impl);
-		m_impl->m_universe->getEventManager().removeListener(ComponentEvent::type, cb);
+		m_impl->m_universe->componentCreated().unbind<AnimationSystemImpl, &AnimationSystemImpl::onComponentCreated>(m_impl);
 		m_impl->m_universe = 0;
 	}
 
@@ -132,21 +128,17 @@ namespace Lumix
 	}
 
 
-	void AnimationSystemImpl::onEvent(Event& event)
+	void AnimationSystemImpl::onComponentCreated(Component& cmp)
 	{
-		if(event.getType() == ComponentEvent::type)
+		if(cmp.type == RENDERABLE_HASH)
 		{
-			ComponentEvent& e = static_cast<ComponentEvent&>(event);
-			if(e.component.type == RENDERABLE_HASH)
+			const Entity::ComponentList& cmps = cmp.entity.getComponents();
+			for(int i = 0; i < cmps.size(); ++i)
 			{
-				const Entity::ComponentList& cmps = e.component.entity.getComponents();
-				for(int i = 0; i < cmps.size(); ++i)
+				if(cmps[i].type == ANIMABLE_HASH)
 				{
-					if(cmps[i].type == ANIMABLE_HASH)
-					{
-						m_animables[cmps[i].index].m_renderable = e.component;
-						break;
-					}
+					m_animables[cmps[i].index].m_renderable = cmp;
+					break;
 				}
 			}
 		}
@@ -171,10 +163,9 @@ namespace Lumix
 			}
 		}
 
-		Component cmp(entity, ANIMABLE_HASH, this, m_impl->m_animables.size() - 1);
-		ComponentEvent evt(cmp);
-		m_impl->m_universe->getEventManager().emitEvent(evt);
-		return Component(entity, ANIMABLE_HASH, this, m_impl->m_animables.size() - 1);
+		Component cmp = m_impl->m_universe->addComponent(entity, ANIMABLE_HASH, this, m_impl->m_animables.size() - 1);
+		m_impl->m_universe->componentCreated().invoke(cmp);
+		return cmp;
 	}
 
 

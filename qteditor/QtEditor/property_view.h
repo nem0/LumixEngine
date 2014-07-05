@@ -8,8 +8,10 @@
 namespace Lumix
 {
 	class EditorClient;
+	struct EntitySelectedEvent;
 	class Event;
 	class Path;
+	struct PropertyListEvent;
 }
 
 namespace Ui
@@ -65,8 +67,8 @@ private slots:
 
 private:
 	void clear();
-	void onPropertyList(Lumix::Event& event);
-	void onEntitySelected(Lumix::Event& event);
+	void onPropertyList(Lumix::PropertyListEvent& event);
+	void onEntitySelected(Lumix::EntitySelectedEvent& event);
 	void addProperty(const char* component, const char* name, const char* label, Property::Type type, const char* file_type);
 	void onPropertyValue(Property* property, void* data, int32_t data_size);
 	void addScriptCustomProperties();

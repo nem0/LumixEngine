@@ -96,16 +96,7 @@
     <ClCompile Include="..\..\..\src\universe\component.cpp">
       <Filter>universe</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\universe\component_event.cpp">
-      <Filter>universe</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\universe\entity.cpp">
-      <Filter>universe</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\universe\entity_destroyed_event.cpp">
-      <Filter>universe</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\universe\entity_moved_event.cpp">
       <Filter>universe</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\universe\universe.cpp">
@@ -225,16 +216,7 @@
     <ClInclude Include="..\..\..\src\universe\component.h">
       <Filter>universe</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\universe\component_event.h">
-      <Filter>universe</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\universe\entity.h">
-      <Filter>universe</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\universe\entity_destroyed_event.h">
-      <Filter>universe</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\universe\entity_moved_event.h">
       <Filter>universe</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\universe\universe.h">
