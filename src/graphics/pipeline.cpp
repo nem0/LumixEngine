@@ -302,6 +302,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 {
 	PipelineInstanceImpl(Pipeline& pipeline)
 		: m_source(static_cast<PipelineImpl&>(pipeline))
+		, m_active_camera(Component::INVALID)
 	{
 		m_scene = NULL;
 		m_light_dir.set(0, -1, 0);
@@ -329,6 +330,11 @@ struct PipelineInstanceImpl : public PipelineInstance
 		{
 			LUMIX_DELETE(m_shadowmap_framebuffer);
 		}
+	}
+
+	void setActiveCamera(const Component& cmp)
+	{
+		m_active_camera = cmp;
 	}
 
 	CustomCommandHandler& addCustomCommandHandler(const char* name)
@@ -571,6 +577,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 			infos[i].m_geometry->draw(mesh.getStart(), mesh.getCount(), *material.getShader());
 			glPopMatrix();
 		}
+		if (m_active_camera.isValid())
+		{
+			m_scene->renderTerrains(*m_renderer, *this, m_active_camera.entity.getPosition());
+		}
 	}
 
 	virtual void resize(int w, int h) override
@@ -615,6 +625,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	int m_width;
 	int m_height;
 	Map<uint32_t, CustomCommandHandler> m_custom_commands_handlers;
+	Component m_active_camera;
 
 	private:
 		void operator=(const PipelineInstanceImpl&);
@@ -697,6 +708,7 @@ void ApplyCameraCommand::execute(PipelineInstanceImpl& pipeline)
 {
 	ASSERT(pipeline.m_renderer != NULL);
 	Component cmp = pipeline.m_scene->getCameraInSlot(m_camera_slot.c_str()); 
+	pipeline.setActiveCamera(cmp);
 	if (cmp.isValid())
 	{
 		pipeline.m_scene->setCameraSize(cmp, pipeline.m_width, pipeline.m_height);

@@ -16,7 +16,9 @@ namespace Lumix
 	class Mesh;
 	class Model;
 	class ModelInstance;
+	class PipelineInstance;
 	class Pose;
+	class Renderer;
 	class Timer;
 	class Universe;
 
@@ -52,11 +54,13 @@ namespace Lumix
 			virtual void applyCamera(Component camera) = 0;
 			virtual void update(float dt) = 0;
 			virtual Timer* getTimer() const = 0;
+			virtual void renderTerrains(Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos) = 0;
 
 			virtual Pose& getPose(const Component& cmp) = 0;
 			virtual Component getLight(int index) = 0;
 
 			virtual void addDebugLine(const Vec3& from, const Vec3& to, const Vec3& color, float life) = 0;
+			virtual void addDebugCube(const Vec3& from, float size, const Vec3& color, float life) = 0;
 			virtual const Array<DebugLine>& getDebugLines() const = 0;
 			virtual Component getCameraInSlot(const char* slot) = 0;
 			virtual void getCameraFOV(Component camera, float& fov) = 0;
