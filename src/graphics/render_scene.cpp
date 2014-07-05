@@ -17,6 +17,7 @@
 #include "graphics/model_instance.h"
 #include "graphics/pipeline.h"
 #include "graphics/renderer.h"
+#include "graphics/shader.h"
 #include "graphics/texture.h"
 #include "universe/component_event.h"
 #include "universe/entity_moved_event.h"
@@ -31,11 +32,98 @@ namespace Lumix
 	static const uint32_t CAMERA_HASH = crc32("camera");
 	static const uint32_t TERRAIN_HASH = crc32("terrain");
 
+	struct TerrainQuad
+	{
+		enum ChildType
+		{
+			TOP_LEFT,
+			TOP_RIGHT,
+			BOTTOM_LEFT,
+			BOTTOM_RIGHT,
+			CHILD_COUNT
+		};
+		
+		TerrainQuad()
+		{
+			for (int i = 0; i < CHILD_COUNT; ++i)
+			{
+				m_children[i] = NULL;
+			}
+		}
+
+		~TerrainQuad()
+		{
+			for (int i = 0; i < CHILD_COUNT; ++i)
+			{
+				LUMIX_DELETE(m_children[i]);
+			}
+		}
+
+		void createChildren()
+		{
+			if (m_lod < 8 && m_size > 16)
+			{
+				for (int i = 0; i < CHILD_COUNT; ++i)
+				{
+					m_children[i] = LUMIX_NEW(TerrainQuad);
+					m_children[i]->m_lod = m_lod + 1;
+					m_children[i]->m_size = m_size / 2;
+				}
+				m_children[TOP_LEFT]->m_min = m_min;
+				m_children[TOP_RIGHT]->m_min.set(m_min.x + m_size / 2, 0, m_min.z);
+				m_children[BOTTOM_LEFT]->m_min.set(m_min.x, 0, m_min.z + m_size / 2);
+				m_children[BOTTOM_RIGHT]->m_min.set(m_min.x + m_size / 2, 0, m_min.z + m_size / 2);
+				for (int i = 0; i < CHILD_COUNT; ++i)
+				{
+					m_children[i]->createChildren();
+				}
+			}
+		}
+
+		bool render(Mesh* mesh, Geometry& geometry, const Vec3& camera_pos, RenderScene& scene)
+		{
+			Vec3 diff = camera_pos - (m_min + Vec3(m_size * 0.5f, 0, m_size * 0.5f));
+			diff.y = 0;
+			float dist = diff.length();
+			Shader& shader = *mesh->getMaterial()->getShader();
+			if (dist > m_size * 1.9999f && m_lod > 1)
+			{
+				return false;
+			}
+			for (int i = 0; i < CHILD_COUNT; ++i)
+			{
+				if (!m_children[i] || !m_children[i]->render(mesh, geometry, camera_pos, scene))
+				{
+					Vec3 morph_const(0, 0, 0);
+					float size = m_size;
+					while (size >= 16)
+					{
+						morph_const.x += size / 2;
+						size *= 0.5f;
+					}
+					morph_const.y = 1 / (m_size - morph_const.x);
+
+					shader.setUniform("morph_const", morph_const);
+					shader.setUniform("quad_size", m_size);
+					shader.setUniform("quad_min", m_min);
+					geometry.draw(mesh->getCount() / 4 * i , mesh->getCount() / 4, shader);
+				}
+			}
+			return true;
+		}
+
+		TerrainQuad* m_children[CHILD_COUNT];
+		Vec3 m_min;
+		float m_size;
+		int m_lod;
+	};
+
 	struct Terrain
 	{
 		Terrain()
 			: m_mesh(NULL)
 			, m_material(NULL)
+			, m_root(NULL)
 		{}
 
 		~Terrain()
@@ -52,50 +140,36 @@ namespace Lumix
 			}
 		}
 
-		void generateGeometry()
+		void render(Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos)
 		{
-			LUMIX_DELETE(m_mesh);
-			m_mesh = NULL;
-			struct Vertex
+			m_material->apply(renderer, pipeline);
+			m_mesh->getMaterial()->getShader()->setUniform("map_size", m_root->m_size);
+			m_mesh->getMaterial()->getShader()->setUniform("camera_pos", camera_pos);
+			m_root->render(m_mesh, m_geometry, camera_pos, *pipeline.getScene());
+		}
+
+		void generateQuadTree()
+		{
+			LUMIX_DELETE(m_root);
+			m_root = LUMIX_NEW(TerrainQuad);
+			m_root->m_lod = 1;
+			m_root->m_min.set(0, 0, 0);
+			m_root->m_size = (float)m_heightmap->getWidth();
+			m_root->createChildren();
+		}
+
+		void generateSubgrid(Array<Vec3>& points, Array<int32_t>& indices, int& indices_offset, int start_x, int start_y)
+		{
+			for (int j = start_y; j < start_y + 8; ++j)
 			{
-				Vec3 pos;
-				float u, v;
-				float u2, v2;
-				Vec3 normal;
-			};
-			m_width = m_heightmap->getWidth();
-			m_height = m_heightmap->getHeight();
-			Array<Vertex> points;
-			points.resize(m_width * m_height * 4);
-			Array<int32_t> indices;
-			indices.resize((m_width - 1) * (m_height - 1) * 6);
-			int indices_offset = 0;
-			for (int j = 0; j < m_height - 1; ++j)
-			{
-				for (int i = 0; i < m_width - 1; ++i)
+				for (int i = start_x; i < start_x + 8; ++i)
 				{
-					int idx = 4 * (i + j * m_width);
-					points[idx].pos.set((float)(i) / 5, 0, (float)(j) / 5);
-					points[idx].u2 = 0;
-					points[idx].v2 = 0;
-					points[idx].u = i / (float)m_width;
-					points[idx].v = j / (float)m_height;
-					points[idx+1].pos.set((float)(i+1) / 5, 0, (float)(j) / 5);
-					points[idx+1].u2 = 1;
-					points[idx+1].v2 = 0;
-					points[idx+1].u = (i+1) / (float)m_width;
-					points[idx+1].v = j / (float)m_height;
-					points[idx+2].pos.set((float)(i+1) / 5, 0, (float)(j+1) / 5);
-					points[idx+2].u2 = 1;
-					points[idx+2].v2 = 1;
-					points[idx+2].u = (i+1) / (float)m_width;
-					points[idx+2].v = (j+1) / (float)m_height;
-					points[idx+3].pos.set((float)(i) / 5, 0, (float)(j+1) / 5);
-					points[idx+3].u2 = 0;
-					points[idx+3].v2 = 1;
-					points[idx+3].u = i / (float)m_width;
-					points[idx+3].v = (j+1) / (float)m_height;
-					
+					int idx = 4 * (i + j * GRID_SIZE);
+					points[idx].set((float)(i) / GRID_SIZE, 0, (float)(j) / GRID_SIZE);
+					points[idx + 1].set((float)(i + 1) / GRID_SIZE, 0, (float)(j) / GRID_SIZE);
+					points[idx + 2].set((float)(i + 1) / GRID_SIZE, 0, (float)(j + 1) / GRID_SIZE);
+					points[idx + 3].set((float)(i) / GRID_SIZE, 0, (float)(j + 1) / GRID_SIZE);
+
 					indices[indices_offset] = idx;
 					indices[indices_offset + 1] = idx + 3;
 					indices[indices_offset + 2] = idx + 2;
@@ -105,22 +179,26 @@ namespace Lumix
 					indices_offset += 6;
 				}
 			}
-			for (int j = 1; j < m_height - 1; ++j)
-			{
-				for (int i = 1; i < m_width - 1; ++i)
-				{
-					int idx = 4 * (i + j * m_width);
-					for (int k = 0; k < 4; ++k)
-					{
-						Vec3 n = crossProduct(points[idx + 4].pos - points[idx - 4].pos, points[idx - m_width * 4].pos - points[idx + m_width * 4].pos);
-						n.normalize();
-						points[idx].normal = n;
-						++idx;
-					}
-				}
-			}
+		}
+
+		void generateGeometry()
+		{
+			LUMIX_DELETE(m_mesh);
+			m_mesh = NULL;
+			m_width = m_heightmap->getWidth();
+			m_height = m_heightmap->getHeight();
+			Array<Vec3> points;
+			points.resize(GRID_SIZE * GRID_SIZE * 4);
+			Array<int32_t> indices;
+			indices.resize(GRID_SIZE * GRID_SIZE * 6);
+			int indices_offset = 0;
+			generateSubgrid(points, indices, indices_offset, 0, 0);
+			generateSubgrid(points, indices, indices_offset, 8, 0);
+			generateSubgrid(points, indices, indices_offset, 0, 8);
+			generateSubgrid(points, indices, indices_offset, 8, 8);
+			
 			VertexDef vertex_def;
-			vertex_def.parse("ptf2n", 5);
+			vertex_def.parse("p", 1);
 			m_geometry.copy((const uint8_t*)&points[0], sizeof(points[0]) * points.size(), indices, vertex_def);
 			m_mesh = LUMIX_NEW(Mesh)(m_material, 0, indices.size(), "terrain");
 		}
@@ -130,8 +208,11 @@ namespace Lumix
 			if (new_state == Resource::State::READY)
 			{
 				generateGeometry();
+				generateQuadTree();
 			}
 		}
+
+		static const int GRID_SIZE = 16;
 
 		int32_t m_width;
 		int32_t m_height;
@@ -142,6 +223,7 @@ namespace Lumix
 		Entity m_entity;
 		int64_t m_layer_mask;
 		Texture* m_heightmap;
+		TerrainQuad* m_root;
 	};
 
 	struct Renderable
@@ -647,20 +729,6 @@ namespace Lumix
 						}
 					}
 				}
-				for (int i = 0; i < m_terrains.size(); ++i)
-				{
-					bool is_in_wanted_layer = (m_terrains[i]->m_layer_mask & layer_mask) != 0;
-					if (m_terrains[i]->m_mesh && m_terrains[i]->m_mesh->getMaterial() && m_terrains[i]->m_mesh->getMaterial()->isReady() && is_in_wanted_layer)
-					{
-						RenderableInfo& info = infos.pushEmpty();
-						info.m_scale = 1;
-						info.m_geometry = &m_terrains[i]->m_geometry;
-						info.m_mesh = m_terrains[i]->m_mesh;
-						info.m_pose = NULL;
-						info.m_model = NULL;
-						info.m_matrix = &m_terrains[i]->m_matrix;
-					}
-				}
 			}
 
 			virtual void setCameraSlot(Component camera, const string& slot) override
@@ -725,6 +793,32 @@ namespace Lumix
 				return m_debug_lines;
 			}
 
+			virtual void addDebugCube(const Vec3& from, float size, const Vec3& color, float life) override
+			{
+				Vec3 a = from;
+				Vec3 b = from;
+				b.x += size;
+				addDebugLine(a, b, color, life);
+				a.set(b.x, b.y, b.z + size);
+				addDebugLine(a, b, color, life);
+				b.set(a.x - size, a.y, a.z);
+				addDebugLine(a, b, color, life);
+				a.set(b.x, b.y, b.z - size);
+				addDebugLine(a, b, color, life);
+
+				a = from;
+				a.y += size;
+				b = a;
+				b.x += size;
+				addDebugLine(a, b, color, life);
+				a.set(b.x, b.y, b.z + size);
+				addDebugLine(a, b, color, life);
+				b.set(a.x - size, a.y, a.z);
+				addDebugLine(a, b, color, life);
+				a.set(b.x, b.y, b.z - size);
+				addDebugLine(a, b, color, life);
+			}
+
 			virtual void addDebugLine(const Vec3& from, const Vec3& to, const Vec3& color, float life) override
 			{
 				DebugLine& line = m_debug_lines.pushEmpty();
@@ -785,6 +879,18 @@ namespace Lumix
 			virtual Timer* getTimer() const override
 			{
 				return m_timer;
+			}
+
+			virtual void renderTerrains(Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos) override
+			{
+				for (int i = 0; i < m_terrains.size(); ++i)
+				{
+					if (m_terrains[i]->m_mesh && m_terrains[i]->m_mesh->getMaterial() && m_terrains[i]->m_mesh->getMaterial()->isReady())
+					{
+						static const Vec3 p(0, 0, 0);
+						m_terrains[i]->render(renderer, pipeline, camera_pos);
+					}
+				}
 			}
 
 		private:
