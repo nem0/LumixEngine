@@ -1,9 +1,5 @@
 #include "editor_server.h"
 
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-#include <gl/GL.h>
-
 #include "core/array.h"
 #include "core/blob.h"
 #include "core/crc32.h"
@@ -121,7 +117,7 @@ struct EditorServerImpl
 		bool create(const char* base_path);
 		void destroy();
 		void onPointerDown(int x, int y, MouseButton::Value button);
-		void onPointerMove(int x, int y, int relx, int rely);
+		void onPointerMove(int x, int y, int relx, int rely, int mouse_flags);
 		void onPointerUp(int x, int y, MouseButton::Value button);
 		void selectEntity(Entity e);
 		void navigate(float forward, float right, int fast);
@@ -384,7 +380,7 @@ void EditorServerImpl::onPointerDown(int x, int y, MouseButton::Value button)
 }
 
 
-void EditorServerImpl::onPointerMove(int x, int y, int relx, int rely)
+void EditorServerImpl::onPointerMove(int x, int y, int relx, int rely, int mouse_flags)
 {
 	switch(m_mouse_mode)
 	{
@@ -395,9 +391,8 @@ void EditorServerImpl::onPointerMove(int x, int y, int relx, int rely)
 			break;
 		case EditorServerImpl::MouseMode::TRANSFORM:
 			{
-				
-				Gizmo::TransformOperation tmode = GetKeyState(VK_MENU) & 0x8000 ? Gizmo::TransformOperation::ROTATE : Gizmo::TransformOperation::TRANSLATE;
-				int flags = GetKeyState(VK_LCONTROL) & 0x8000 ? Gizmo::Flags::FIXED_STEP : 0;
+				Gizmo::TransformOperation tmode = mouse_flags & (int)EditorServer::MouseFlags::ALT/*GetKeyState(VK_MENU) & 0x8000*/ ? Gizmo::TransformOperation::ROTATE : Gizmo::TransformOperation::TRANSLATE;
+				int flags = mouse_flags & (int)EditorServer::MouseFlags::CONTROL/*GetKeyState(VK_LCONTROL) & 0x8000*/ ? Gizmo::Flags::FIXED_STEP : 0;
 				m_gizmo.transform(m_camera.getComponent(CAMERA_HASH), tmode, x, y, relx, rely, flags);
 			}
 			break;
@@ -1087,7 +1082,7 @@ void EditorServerImpl::onMessage(const uint8_t* data, int32_t size)
 		onPointerDown(msg[1], msg[2], (MouseButton::Value)msg[3]);
 		break;
 	case ClientMessageType::POINTER_MOVE:
-		onPointerMove(msg[1], msg[2], msg[3], msg[4]);
+		onPointerMove(msg[1], msg[2], msg[3], msg[4], msg[5]);
 		break;
 	case ClientMessageType::POINTER_UP:
 		onPointerUp(msg[1], msg[2], (MouseButton::Value)msg[3]);
