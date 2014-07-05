@@ -2,32 +2,28 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
+#include "animation/animation.h"
 #include "animation/animation_system.h"
 #include "core/crc32.h"
 #include "core/fs/disk_file_device.h"
 #include "core/fs/file_system.h"
 #include "core/input_system.h"
 #include "core/log.h"
-#include "core/event_manager.h"
 #include "core/fs/memory_file_device.h"
 #include "core/resource_manager.h"
 #include "core/timer.h"
 #include "engine/plugin_manager.h"
-#include "graphics/renderer.h"
-#include "script/script_system.h"
-
 #include "graphics/material_manager.h"
 #include "graphics/model_manager.h"
+#include "graphics/pipeline.h"
+#include "graphics/renderer.h"
 #include "graphics/shader_manager.h"
 #include "graphics/texture_manager.h"
-#include "graphics/pipeline.h"
-#include "animation/animation.h"
+#include "script/script_system.h"
+
 
 namespace Lumix
 {
-
-	const Event::Type Engine::UniverseCreatedEvent::s_type = crc32("engine_universe_created_event");
-	const Event::Type Engine::UniverseDestroyedEvent::s_type = crc32("engine_universe_destroyed_event");
 
 	struct EngineImpl
 	{
@@ -47,7 +43,6 @@ namespace Lumix
 		TextureManager	m_texture_manager;
 		PipelineManager m_pipeline_manager;
 		AnimationManager m_animation_manager;
-		EventManager m_event_manager;
 
 		string m_base_path;
 		EditorServer* m_editor_server;
@@ -124,13 +119,7 @@ namespace Lumix
 		return true;
 	}
 
-
-	EventManager& Engine::getEventManager() const
-	{
-		return m_impl->m_event_manager;
-	}
-
-
+	
 	bool Engine::create(const char* base_path, FS::FileSystem* file_system, EditorServer* editor_server)
 	{
 		g_log_info.getCallback().bind<showLogInVS>();
@@ -206,8 +195,6 @@ namespace Lumix
 		m_impl->m_script_system->setUniverse(m_impl->m_universe);
 		m_impl->m_universe->create();
 		
-		UniverseCreatedEvent evt(*m_impl->m_universe);
-		m_impl->m_event_manager.emitEvent(evt);
 		return m_impl->m_universe;
 	}
 
@@ -216,8 +203,6 @@ namespace Lumix
 		ASSERT(m_impl->m_universe);
 		if (m_impl->m_universe)
 		{
-			UniverseDestroyedEvent evt(*m_impl->m_universe);
-			m_impl->m_event_manager.emitEvent(evt);
 			m_impl->m_script_system->setUniverse(NULL);
 			m_impl->m_plugin_manager.onDestroyUniverse(*m_impl->m_universe);
 			m_impl->m_universe->destroy();

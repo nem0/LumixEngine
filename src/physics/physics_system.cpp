@@ -10,8 +10,6 @@
 #include "engine/engine.h"
 #include "physics/physics_scene.h"
 #include "physics/physics_system_impl.h"
-#include "universe/component_event.h"
-#include "universe/entity_moved_event.h"
 
 
 namespace Lumix

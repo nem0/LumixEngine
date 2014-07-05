@@ -81,9 +81,8 @@ void MaterialManager::fillObjectMaterials()
 	}
 }
 
-void MaterialManager::onPropertyList(Lumix::Event& evt)
+void MaterialManager::onPropertyList(Lumix::PropertyListEvent& event)
 {
-	Lumix::PropertyListEvent& event = static_cast<Lumix::PropertyListEvent&>(evt);
 	if (event.type_hash == crc32("renderable"))
 	{
 		for (int i = 0; i < event.properties.size(); ++i)
@@ -99,7 +98,7 @@ void MaterialManager::onPropertyList(Lumix::Event& evt)
 
 void MaterialManager::setEditorClient(Lumix::EditorClient& client)
 {
-	client.getEventManager().addListener(Lumix::ServerMessageType::PROPERTY_LIST).bind<MaterialManager, &MaterialManager::onPropertyList>(this);
+	client.propertyListReceived().bind<MaterialManager, &MaterialManager::onPropertyList>(this);
 }
 
 void MaterialManager::setEditorServer(Lumix::EditorServer& server)
