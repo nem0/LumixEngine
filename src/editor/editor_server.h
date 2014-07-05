@@ -21,6 +21,13 @@ namespace Lumix
 	class LUMIX_ENGINE_API EditorServer
 	{
 		public:
+			enum class MouseFlags : int
+			{
+				ALT = 1,
+				CONTROL = 2
+			};
+
+		public:
 			EditorServer() { m_impl = 0; }
 
 			bool create(const char* base_path, EditorClient& client);

@@ -102,13 +102,13 @@ namespace Lumix
 	}
 
 
-	DelegateList<void(PropertyListEvent&)>& EditorClient::propertyListReceived()
+	EditorClient::PropertyListCallback& EditorClient::propertyListReceived()
 	{
 		return m_impl->m_property_list_received;
 	}
 
 
-	DelegateList<void(EntitySelectedEvent&)>& EditorClient::entitySelected()
+	EditorClient::EntitySelectedCallback& EditorClient::entitySelected()
 	{
 		return m_impl->m_entity_selected;
 	}
@@ -162,10 +162,10 @@ namespace Lumix
 	}
 
 
-	void EditorClient::mouseMove(int x, int y, int dx, int dy)
+	void EditorClient::mouseMove(int x, int y, int dx, int dy, int flags)
 	{
-		int data[4] = {x, y, dx, dy};
-		m_impl->sendMessage(ClientMessageType::POINTER_MOVE, data, 16);
+		int data[] = {x, y, dx, dy, flags};
+		m_impl->sendMessage(ClientMessageType::POINTER_MOVE, data, 20);
 
 	}
 	

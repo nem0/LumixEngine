@@ -18,6 +18,10 @@ namespace Lumix
 	class LUMIX_ENGINE_API EditorClient
 	{
 		public:
+			typedef DelegateList<void(PropertyListEvent&)> PropertyListCallback;
+			typedef DelegateList<void(EntitySelectedEvent&)> EntitySelectedCallback;
+
+		public:
 			EditorClient() { m_impl = NULL; }
 
 			bool create(const char* base_path, EditorServer& server);
@@ -28,7 +32,7 @@ namespace Lumix
 			void addComponent(uint32_t type);
 			void mouseDown(int x, int y, int button);
 			void mouseUp(int x, int y, int button);
-			void mouseMove(int x, int y, int dx, int dy);
+			void mouseMove(int x, int y, int dx, int dy, int flags);
 			void requestProperties(uint32_t type_crc);
 			void setComponentProperty(const char* component, const char* property, const void* value, int32_t length);
 			void navigate(float forward, float right, int32_t fast);
@@ -37,8 +41,8 @@ namespace Lumix
 			void setEntityPosition(int32_t entity, const Vec3& position);
 			const char* getBasePath() const;
 			EventManager& getEventManager();
-			DelegateList<void (PropertyListEvent&)>& propertyListReceived();
-			DelegateList<void (EntitySelectedEvent&)>& entitySelected();
+			PropertyListCallback& propertyListReceived();
+			EntitySelectedCallback& entitySelected();
 
 		private:
 			struct EditorClientImpl* m_impl;
