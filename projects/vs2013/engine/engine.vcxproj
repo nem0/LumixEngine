@@ -168,7 +168,6 @@
     <ClCompile Include="..\..\..\src\editor\editor_icon.cpp" />
     <ClCompile Include="..\..\..\src\editor\editor_server.cpp" />
     <ClCompile Include="..\..\..\src\editor\gizmo.cpp" />
-    <ClCompile Include="..\..\..\src\editor\script_compiler.cpp" />
     <ClCompile Include="..\..\..\src\editor\server_message_types.cpp" />
     <ClCompile Include="..\..\..\src\engine\engine.cpp" />
     <ClCompile Include="..\..\..\src\engine\iplugin.cpp" />
@@ -205,7 +204,6 @@
     <ClInclude Include="..\..\..\src\editor\editor_server.h" />
     <ClInclude Include="..\..\..\src\editor\gizmo.h" />
     <ClInclude Include="..\..\..\src\editor\property_descriptor.h" />
-    <ClInclude Include="..\..\..\src\editor\script_compiler.h" />
     <ClInclude Include="..\..\..\src\editor\server_message_types.h" />
     <ClInclude Include="..\..\..\src\engine\engine.h" />
     <ClInclude Include="..\..\..\src\engine\iplugin.h" />

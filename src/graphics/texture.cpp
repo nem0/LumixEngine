@@ -440,13 +440,13 @@ bool Texture::loadTGA(FS::IFile& file)
 	int image_size = header.width * header.height * 4;
 	if (header.dataType != 2)
 	{
-		g_log_error.log("renderer", "Unsupported texture format %s", m_path.c_str());
+		g_log_error.log("renderer") << "Unsupported texture format " << m_path.c_str();
 		return false;
 	}
 
 	if (color_mode < 3)
 	{
-		g_log_error.log("renderer", "Unsupported color mode %s", m_path.c_str());
+		g_log_error.log("renderer") << "Unsupported color mode " << m_path.c_str();
 		return false;
 	}
 
@@ -503,7 +503,7 @@ bool Texture::loadDDS(FS::IFile& file)
 {
 	if (m_is_nonGL)
 	{
-		g_log_error.log("renderer", "Non GL DDS texture not supported %s", m_path.c_str());
+		g_log_error.log("renderer") << "Non GL DDS texture not supported " << m_path.c_str();
 		return false;
 	}
 	DDS::Header hdr;
@@ -516,7 +516,7 @@ bool Texture::loadDDS(FS::IFile& file)
 	if (hdr.dwMagic != DDS::DDS_MAGIC || hdr.dwSize != 124 ||
 		!(hdr.dwFlags & DDS::DDSD_PIXELFORMAT) || !(hdr.dwFlags & DDS::DDSD_CAPS))
 	{
-		g_log_error.log("renderer", "Wrong dds format or corrupted dds %s", m_path.c_str());
+		g_log_error.log("renderer") << "Wrong dds format or corrupted dds " << m_path.c_str();
 		return false;
 	}
 
@@ -524,7 +524,7 @@ bool Texture::loadDDS(FS::IFile& file)
 	height = hdr.dwHeight;
 	if ((width & (width - 1)) || (height & (height - 1)))
 	{
-		g_log_error.log("renderer", "Wrong dds format %s", m_path.c_str());
+		g_log_error.log("renderer") << "Wrong dds format " << m_path.c_str();
 		return false;
 	}
 
@@ -564,14 +564,14 @@ bool Texture::loadDDS(FS::IFile& file)
 	}
 	else
 	{
-		g_log_error.log("renderer", "Unsupported DDS format %s", m_path.c_str());
+		g_log_error.log("renderer") << "Unsupported DDS format " << m_path.c_str();
 		return false;
 	}
 
 	glGenTextures(1, &m_id);
 	if (m_id == 0)
 	{
-		g_log_error.log("renderer", "Error generating OpenGL texture %s", m_path.c_str());
+		g_log_error.log("renderer") << "Error generating OpenGL texture " << m_path.c_str();
 		return false;
 	}
 
@@ -586,7 +586,7 @@ bool Texture::loadDDS(FS::IFile& file)
 		if (size != hdr.dwPitchOrLinearSize || (hdr.dwFlags & DDS::DDSD_LINEARSIZE) == 0)
 		{
 			glDeleteTextures(1, &m_id);
-			g_log_error.log("renderer", "Unsupported DDS format %s", m_path.c_str());
+			g_log_error.log("renderer") << "Unsupported DDS format " << m_path.c_str();
 			onFailure();
 			return false;
 		}
@@ -609,14 +609,14 @@ bool Texture::loadDDS(FS::IFile& file)
 		if ((hdr.dwFlags & DDS::DDSD_PITCH) == 0 || hdr.pixelFormat.dwRGBBitCount != 8)
 		{
 			glDeleteTextures(1, &m_id);
-			g_log_error.log("renderer", "Unsupported DDS format %s", m_path.c_str());
+			g_log_error.log("renderer") << "Unsupported DDS format " << m_path.c_str();
 			return false;
 		}
 		uint32_t size = hdr.dwPitchOrLinearSize * height;
 		if (size != width * height * li->blockBytes)
 		{
 			glDeleteTextures(1, &m_id);
-			g_log_error.log("renderer", "Unsupported DDS format or corrupted DDS %s", m_path.c_str());
+			g_log_error.log("renderer") << "Unsupported DDS format or corrupted DDS " << m_path.c_str();
 			return false;
 		}
 		unsigned char * data = LUMIX_NEW_ARRAY(unsigned char, size);
@@ -680,7 +680,7 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		}
 		if(!loaded)
 		{
-			g_log_error.log("renderer", "Error loading texture %s", m_path.c_str());
+			g_log_error.log("renderer") << "Error loading texture " << m_path.c_str();
 			onFailure();
 		}
 		else
@@ -691,7 +691,7 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	}
 	else
 	{
-		g_log_error.log("renderer", "Error loading texture %s", m_path.c_str());
+		g_log_error.log("renderer") << "Error loading texture " << m_path.c_str();
 		onFailure();
 	}
 	

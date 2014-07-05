@@ -45,7 +45,7 @@ namespace
 		resource_manager.create(*file_system);
 		texture_manager.create(Lumix::ResourceManager::TEXTURE, resource_manager);
 
-		Lumix::g_log_info.log("unit", "loading ...");
+		Lumix::g_log_info.log("unit") << "loading ...";
 		Lumix::Resource* texture_tga1 = texture_manager.load(texture_test_tga);
 		Lumix::Resource* texture_tga2 = texture_manager.load(texture_test_tga);
 		Lumix::Resource* texture_tga3 = texture_manager.get(texture_test_tga);
@@ -75,7 +75,7 @@ namespace
 
 		LUMIX_EXPECT_EQ(texture_test_tga_size, texture_tga1->size());
 
-		Lumix::g_log_info.log("unit", "unloading ...");
+		Lumix::g_log_info.log("unit") << "unloading ...";
 
 		texture_manager.unload(texture_test_tga);
 
@@ -96,7 +96,7 @@ namespace
 
 		LUMIX_EXPECT_EQ(0, texture_tga1->size());
 
-		Lumix::g_log_info.log("unit", "loading ...");
+		Lumix::g_log_info.log("unit") << "loading ...";
 
 		texture_manager.load(*texture_tga1);
 		texture_manager.load(*texture_tga2);
@@ -119,7 +119,7 @@ namespace
 		LUMIX_EXPECT_EQ(texture_test_tga_size, texture_tga1->size());
 
 
-		Lumix::g_log_info.log("unit", "force unloading ...");
+		Lumix::g_log_info.log("unit") << "force unloading ...";
 
 		texture_manager.forceUnload(texture_test_tga);
 
@@ -182,7 +182,7 @@ namespace
 		resource_manager.create(*file_system);
 		animation_manager.create(Lumix::ResourceManager::ANIMATION, resource_manager);
 
-		Lumix::g_log_info.log("unit", "loading ...");
+		Lumix::g_log_info.log("unit") << "loading ...";
 		Lumix::Resource* animation_1 = animation_manager.load(anim_test);
 		Lumix::Resource* animation_2 = animation_manager.get(anim_test);
 
@@ -209,7 +209,7 @@ namespace
 
 		LUMIX_EXPECT_EQ(anim_test_size, animation_2->size());
 
-		Lumix::g_log_info.log("unit", "unloading ...");
+		Lumix::g_log_info.log("unit") << "unloading ...";
 
 		animation_manager.unload(*animation_2);
 
@@ -222,7 +222,7 @@ namespace
 
 		LUMIX_EXPECT_EQ(0, animation_1->size());
 
-		Lumix::g_log_info.log("unit", "loading ...");
+		Lumix::g_log_info.log("unit") << "loading ...";
 
 		animation_manager.load(*animation_1);
 		animation_manager.load(*animation_2);
@@ -243,7 +243,7 @@ namespace
 
 		LUMIX_EXPECT_EQ(anim_test_size, animation_1->size());
 
-		Lumix::g_log_info.log("unit", "force unloading ...");
+		Lumix::g_log_info.log("unit") << "force unloading ...";
 
 		animation_manager.forceUnload(*animation_2);
 
@@ -308,7 +308,7 @@ namespace
 		resource_manager.create(*file_system);
 		animation_manager.create(Lumix::ResourceManager::ANIMATION, resource_manager);
 
-		Lumix::g_log_info.log("unit", "loading ...");
+		Lumix::g_log_info.log("unit") << "loading ...";
 		{
 			Lumix::FS::IFile* valid_file = file_system->open("memory:disk", anim_test_valid, Lumix::FS::Mode::OPEN | Lumix::FS::Mode::READ);
 			LUMIX_EXPECT_NOT_NULL(valid_file);
@@ -324,7 +324,7 @@ namespace
 			file_system->close(error_file);
 		}
 
-		Lumix::g_log_info.log("unit", "loading ...");
+		Lumix::g_log_info.log("unit") << "loading ...";
 		Lumix::Resource* animation = animation_manager.load(anim_test_fail);
 
 		LUMIX_EXPECT_NOT_NULL(animation);
@@ -360,7 +360,7 @@ namespace
 			file_system->close(error_file);
 		}
 
-		Lumix::g_log_info.log("unit", "reloading invalid ...");
+		Lumix::g_log_info.log("unit") << "reloading invalid ...";
 		animation_manager.reload(*animation);
 
 		waitForFinishLoading(animation, file_system);
@@ -386,7 +386,7 @@ namespace
 			file_system->close(error_file);
 		}
 
-		Lumix::g_log_info.log("unit", "reloading valid ...");
+		Lumix::g_log_info.log("unit") << "reloading valid ...";
 		animation_manager.reload(*animation);
 
 		waitForFinishLoading(animation, file_system);

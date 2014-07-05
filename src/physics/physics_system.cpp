@@ -168,7 +168,7 @@ bool PhysicsSystemImpl::connect2VisualDebugger()
 
 void CustomErrorCallback::reportError(physx::PxErrorCode::Enum code, const char* message, const char* file, int line)
 {
-	g_log_error.log("PhysX", message);
+	g_log_error.log("PhysX") << message;
 }
 
 

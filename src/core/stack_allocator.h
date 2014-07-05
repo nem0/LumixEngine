@@ -8,7 +8,7 @@ namespace Lumix
 {
 
 	template <size_t SIZE>
-	class LUMIX_CORE_API StackAllocator
+	class StackAllocator
 	{
 		public:
 			StackAllocator();

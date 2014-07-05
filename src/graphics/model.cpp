@@ -133,7 +133,7 @@ bool Model::parseVertexDef(FS::IFile* file, VertexDef* vertex_definition)
 	ASSERT(vertex_def_size < 16);
 	if (vertex_def_size >= 16)
 	{
-		g_log_error.log("renderer", "Model file corrupted %s", getPath().c_str());
+		g_log_error.log("renderer") << "Model file corrupted " << getPath().c_str();
 		return false;
 	}
 	file->read(tmp, vertex_def_size);
@@ -213,7 +213,7 @@ bool Model::parseBones(FS::IFile* file)
 			b.parent_idx = getBoneIdx(b.parent.c_str());
 			if (b.parent_idx < 0)
 			{
-				g_log_error.log("renderer", "Invalid skeleton in %s", getPath().c_str());
+				g_log_error.log("renderer") << "Invalid skeleton in " << getPath().c_str();
 			}
 		}
 	}
@@ -265,10 +265,11 @@ bool Model::parseMeshes(FS::IFile* file)
 			return false;
 		}
 		material_name[str_size] = 0;
-		char material_path[LUMIX_MAX_PATH];
-		strcpy(material_path, model_dir);
-		strcat(material_path, material_name);
-		strcat(material_path, ".mat");
+		
+		base_string<char, StackAllocator<LUMIX_MAX_PATH> > material_path;
+		material_path = model_dir;
+		material_path += material_name;
+		material_path += ".mat";
 
 		int32_t mesh_tri_count = 0;
 		file->read(&mesh_tri_count, sizeof(mesh_tri_count));
@@ -282,7 +283,7 @@ bool Model::parseMeshes(FS::IFile* file)
 		mesh_name[str_size] = 0;
 		file->read(mesh_name, str_size);
 
-		Material* material = static_cast<Material*>(m_resource_manager.get(ResourceManager::MATERIAL)->load(material_path));
+		Material* material = static_cast<Material*>(m_resource_manager.get(ResourceManager::MATERIAL)->load(material_path.c_str()));
 		Mesh mesh(material, mesh_vertex_offset, mesh_tri_count * 3, mesh_name);
 		mesh_vertex_offset += mesh_tri_count * 3;
 		m_meshes.push(mesh);
@@ -314,7 +315,7 @@ void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	}
 	else
 	{
-		g_log_info.log("renderer", "Error loading model %s", m_path.c_str());
+		g_log_info.log("renderer") << "Error loading model " << m_path.c_str();
 		onFailure();
 	}
 

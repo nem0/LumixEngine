@@ -19,6 +19,7 @@
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_mtjd_framework.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_path.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_quat.cpp" />
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_string.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_transaction_queue.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\engine\ut_resource_managers.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\main.cpp" />
