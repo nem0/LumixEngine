@@ -125,7 +125,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 					++attribute_count;
 					if (attribute_count == MAX_ATTRIBUTE_COUNT)
 					{
-						g_log_error.log("renderer", "Too many vertex attributes in shader %s", m_path.c_str());
+						g_log_error.log("renderer") << "Too many vertex attributes in shader " << m_path.c_str();
 						onFailure();
 						fs.close(file);
 						return;
@@ -149,7 +149,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		char* end = strstr(buf, "//~VS");		
 		if (!end)
 		{
-			g_log_error.log("renderer", "Could not process shader file %s", m_path.c_str());
+			g_log_error.log("renderer") << "Could not process shader file " << m_path.c_str();
 			onFailure();
 			fs.close(file);
 			return;
@@ -163,7 +163,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		glGetProgramiv(m_program_id, GL_LINK_STATUS, &link_status);
 		if (link_status != GL_TRUE)
 		{
-			g_log_error.log("renderer", "Could not link shader %s", m_path.c_str());
+			g_log_error.log("renderer") << "Could not link shader " << m_path.c_str();
 			onFailure();
 			fs.close(file);
 			return;
@@ -180,7 +180,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	}
 	else
 	{
-		g_log_error.log("renderer", "Could not load shader %s", m_path.c_str());
+		g_log_error.log("renderer") << "Could not load shader " << m_path.c_str();
 		onFailure();
 	}
 

@@ -67,7 +67,7 @@ class App
 			ASSERT(hdc != NULL);
 			if (hdc == NULL)
 			{
-				Lumix::g_log_error.log("renderer", "Could not get the device context");
+				Lumix::g_log_error.log("renderer") << "Could not get the device context";
 				return NULL;
 			}
 			PIXELFORMATDESCRIPTOR pfd = 
@@ -95,14 +95,14 @@ class App
 			if (pixelformat == 0)
 			{
 				ASSERT(false);
-				Lumix::g_log_error.log("renderer", "Could not choose a pixel format");
+				Lumix::g_log_error.log("renderer") << "Could not choose a pixel format";
 				return NULL;
 			}
 			BOOL success = SetPixelFormat(hdc, pixelformat, &pfd);
 			if (success == FALSE)
 			{
 				ASSERT(false);
-				Lumix::g_log_error.log("renderer", "Could not set a pixel format");
+				Lumix::g_log_error.log("renderer") << "Could not set a pixel format";
 				return NULL;
 			}
 			for (int i = 1; i < count; ++i)
@@ -113,14 +113,14 @@ class App
 					if (hdc2 == NULL)
 					{
 						ASSERT(false);
-						Lumix::g_log_error.log("renderer", "Could not get the device context");
+						Lumix::g_log_error.log("renderer") << "Could not get the device context";
 						return NULL;
 					}
 					BOOL success = SetPixelFormat(hdc2, pixelformat, &pfd);
 					if (success == FALSE)
 					{
 						ASSERT(false);
-						Lumix::g_log_error.log("renderer", "Could not set a pixel format");
+						Lumix::g_log_error.log("renderer") << "Could not set a pixel format";
 						return NULL;
 					}
 				}
@@ -129,14 +129,14 @@ class App
 			if (hglrc == NULL)
 			{
 				ASSERT(false);
-				Lumix::g_log_error.log("renderer", "Could not create an opengl context");
+				Lumix::g_log_error.log("renderer") << "Could not create an opengl context";
 				return NULL;
 			}
 			success = wglMakeCurrent(hdc, hglrc);
 			if (success == FALSE)
 			{
 				ASSERT(false);
-				Lumix::g_log_error.log("renderer", "Could not make the opengl context current rendering context");
+				Lumix::g_log_error.log("renderer") << "Could not make the opengl context current rendering context";
 				return NULL;
 			}
 			return hglrc;

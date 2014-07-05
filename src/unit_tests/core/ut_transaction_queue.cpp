@@ -146,8 +146,8 @@ namespace
 		cons3.destroy();
 		cons4.destroy();
 
-		Lumix::g_log_info.log("unit", "UT_tq_heavy_usage is finishing ...");
-		Lumix::g_log_info.log("unit", "UT_tq_heavy_usage is checking results ...");
+		Lumix::g_log_info.log("unit") << "UT_tq_heavy_usage is finishing ...";
+		Lumix::g_log_info.log("unit") << "UT_tq_heavy_usage is checking results ...";
 
 		for (size_t i = 0; i < itemsCount; i++)
 		{
@@ -158,7 +158,7 @@ namespace
 
 		LUMIX_DELETE_ARRAY(testItems);
 
-		Lumix::g_log_info.log("unit", "UT_tq_heavy_usage finished ...");
+		Lumix::g_log_info.log("unit") << "UT_tq_heavy_usage finished ...";
 	};
 
 	void UT_tq_push(const char* params)
@@ -192,8 +192,8 @@ namespace
 		prod.destroy();
 		cons.destroy();
 
-		Lumix::g_log_info.log("unit", "UT_tq_push is finishing ...");
-		Lumix::g_log_info.log("unit", "UT_tq_push is checking results ...");
+		Lumix::g_log_info.log("unit") << "UT_tq_push is finishing ...";
+		Lumix::g_log_info.log("unit") << "UT_tq_push is checking results ...";
 
 		for (size_t i = 0; i < itemsCount; i++)
 		{
@@ -204,7 +204,7 @@ namespace
 
 		LUMIX_DELETE_ARRAY(testItems);
 
-		Lumix::g_log_info.log("unit", "UT_tq_heavy_usage finished ...");
+		Lumix::g_log_info.log("unit") << "UT_tq_heavy_usage finished ...";
 	}
 }
 
