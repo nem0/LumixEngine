@@ -44,6 +44,15 @@ struct CustomCommand : public Command
 };
 
 
+struct PolygonModeCommand : public Command
+{
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
+	virtual void execute(PipelineInstanceImpl& pipeline) override;
+	
+	bool m_fill;
+};
+
+
 struct ClearCommand : public Command
 {
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
@@ -164,6 +173,7 @@ struct PipelineImpl : public Pipeline
 		addCommandCreator("render_shadowmap").bind<&CreateCommand<RenderShadowmapCommand> >();
 		addCommandCreator("bind_shadowmap").bind<&CreateCommand<BindShadowmapCommand> >();
 		addCommandCreator("render_debug_lines").bind<&CreateCommand<RenderDebugLinesCommand> >();
+		addCommandCreator("polygon_mode").bind<&CreateCommand<PolygonModeCommand> >();
 	}
 
 
@@ -251,9 +261,8 @@ struct PipelineImpl : public Pipeline
 		serializer.deserialize("shadowmap_height", m_shadowmap_framebuffer.m_height);
 		m_shadowmap_framebuffer.m_mask = FrameBuffer::DEPTH_BIT;
 		
-		serializer.deserialize("command_count", count);
 		serializer.deserializeArrayBegin("commands");
-		for(int i = 0; i < count; ++i)
+		while (!serializer.isArrayEnd())
 		{
 			char tmp[255];
 			serializer.deserializeArrayItem(tmp, 255);
@@ -579,7 +588,11 @@ struct PipelineInstanceImpl : public PipelineInstance
 		}
 		if (m_active_camera.isValid())
 		{
-			m_scene->renderTerrains(*m_renderer, *this, m_active_camera.entity.getPosition());
+			static bool b = true;
+			static Vec3 c(8, 0, 8);
+			if (b)
+				c = m_active_camera.entity.getPosition();
+			m_scene->renderTerrains(*m_renderer, *this, c);
 		}
 	}
 
@@ -649,6 +662,17 @@ void PipelineInstance::destroy(PipelineInstance* pipeline)
 	LUMIX_DELETE(pipeline);
 }
 
+
+void PolygonModeCommand::deserialize(PipelineImpl&, ISerializer& serializer)
+{
+	serializer.deserializeArrayItem(m_fill);
+}
+
+
+void PolygonModeCommand::execute(PipelineInstanceImpl&)
+{
+	glPolygonMode(GL_FRONT_AND_BACK, m_fill ? GL_FILL : GL_LINE);
+}
 
 void ClearCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {

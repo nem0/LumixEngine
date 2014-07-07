@@ -6,6 +6,7 @@
 #include "core/FS/ifile.h"
 #include "core/iserializer.h"
 #include "core/log.h"
+#include "core/math_utils.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "core/timer.h"
@@ -80,13 +81,50 @@ namespace Lumix
 			}
 		}
 
+		float getDistance(const Vec3& camera_pos)
+		{
+			Vec3 _max(m_min.x + m_size, m_min.y, m_min.z + m_size);
+			float dist = 0;
+			if (camera_pos.x < m_min.x)
+			{
+				float d = m_min.x - camera_pos.x;
+				dist += d*d;
+			}
+			if (camera_pos.x > _max.x)
+			{
+				float d = _max.x - camera_pos.x;
+				dist += d*d;
+			}
+			if (camera_pos.z < m_min.z)
+			{
+				float d = m_min.z - camera_pos.z;
+				dist += d*d;
+			}
+			if (camera_pos.z > _max.z)
+			{
+				float d = _max.z - camera_pos.z;
+				dist += d*d;
+			}
+			return sqrt(dist);
+		}
+
+		static float getRadius2(float size)
+		{
+			return getRadius(size / 2) + sqrt(2*size/2 * size/2);
+		}
+
+		static float getRadius(float size)
+		{
+			return (size > 17 ? 2 : 1) * sqrt(2 * size*size) + size * 0.25f;
+		}
+
+
 		bool render(Mesh* mesh, Geometry& geometry, const Vec3& camera_pos, RenderScene& scene)
 		{
-			Vec3 diff = camera_pos - (m_min + Vec3(m_size * 0.5f, 0, m_size * 0.5f));
-			diff.y = 0;
-			float dist = diff.length();
+			float dist = getDistance(camera_pos);
 			Shader& shader = *mesh->getMaterial()->getShader();
-			if (dist > m_size * 1.9999f && m_lod > 1)
+			float r = getRadius(m_size);
+			if (dist > r && m_lod > 1)
 			{
 				return false;
 			}
@@ -101,6 +139,7 @@ namespace Lumix
 						morph_const.x += size / 2;
 						size *= 0.5f;
 					}
+					morph_const.x = dist;
 					morph_const.y = 1 / (m_size - morph_const.x);
 
 					shader.setUniform("morph_const", morph_const);
@@ -817,6 +856,21 @@ namespace Lumix
 				addDebugLine(a, b, color, life);
 				a.set(b.x, b.y, b.z - size);
 				addDebugLine(a, b, color, life);
+			}
+
+			virtual void addDebugCircle(const Vec3& center, float radius, const Vec3& color, float life) override
+			{
+				float prevx = radius;
+				float prevz = 0;
+				for (int i = 1; i < 64; ++i)
+				{
+					float a = i / 64.0f * 2 * Math::PI;
+					float x = cosf(a) * radius;
+					float z = sinf(a) * radius;
+					addDebugLine(center + Vec3(x, 0, z), center + Vec3(prevx, 0, prevz), color, life);
+					prevx = x;
+					prevz = z;
+				}
 			}
 
 			virtual void addDebugLine(const Vec3& from, const Vec3& to, const Vec3& color, float life) override
