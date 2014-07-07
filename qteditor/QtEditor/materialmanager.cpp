@@ -66,6 +66,7 @@ void MaterialManager::updatePreview()
 	m_impl->m_render_device->beginFrame();
 	m_impl->m_engine->getRenderer().render(*m_impl->m_render_device);
 	m_impl->m_render_device->endFrame();
+	m_impl->m_render_scene->update(0.01f); TODO("time");
 }
 
 void MaterialManager::fillObjectMaterials()

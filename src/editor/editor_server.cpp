@@ -246,6 +246,11 @@ void EditorServer::tick()
 	{
 		m_impl->m_engine.update();
 	}
+	else
+	{
+		TODO("ak toto komitnem, tak je zle");
+		m_impl->m_engine.getRenderScene()->update(0.1f); 
+	}
 	m_impl->m_engine.getFileSystem().updateAsyncTransactions();
 }
 
