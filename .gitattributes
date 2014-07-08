@@ -6,7 +6,8 @@
 *.c text
 *.inl text
 *.h text
-
+*.md text
+*.natvis eol=crlf
 *.sln text eol=crlf
 *.vcxproj text eol=crlf
 
