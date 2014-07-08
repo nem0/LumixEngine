@@ -189,7 +189,6 @@ struct EditorServerImpl
 		IRenderDevice* m_edit_view_render_device;
 		bool m_toggle_game_mode_requested;
 		EditorClient& m_client;
-	
 };
 
 
@@ -242,15 +241,7 @@ void EditorServer::tick()
 		m_impl->m_toggle_game_mode_requested = false;
 	}
 	PROFILE_FUNCTION();
-	if(m_impl->m_is_game_mode)
-	{
-		m_impl->m_engine.update();
-	}
-	else
-	{
-		TODO("ak toto komitnem, tak je zle");
-		m_impl->m_engine.getRenderScene()->update(0.1f); 
-	}
+	m_impl->m_engine.update(m_impl->m_is_game_mode);
 	m_impl->m_engine.getFileSystem().updateAsyncTransactions();
 }
 
@@ -828,7 +819,7 @@ EditorServerImpl::EditorServerImpl(EditorClient& client, EditorServer& server)
 
 void EditorServerImpl::navigate(float forward, float right, int fast)
 {
-	float navigation_speed = (fast ? 0.4f : 0.1f);
+	float navigation_speed = (fast ? 2.4f : 0.1f);
 	Vec3 pos = m_camera.getPosition();
 	Quat rot = m_camera.getRotation();;
 	pos += rot * Vec3(0, 0, -1) * forward * navigation_speed;

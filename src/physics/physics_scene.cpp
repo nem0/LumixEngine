@@ -502,7 +502,6 @@ void PhysicsScene::setShapeSource(Component cmp, const string& str)
 
 void PhysicsSceneImpl::createTriMesh(const char* path, physx::PxTriangleMeshGeometry& geom)
 {
-	/// TODO
 	FILE* fp;
 	fopen_s(&fp, path, "rb");
 	if(fp)
