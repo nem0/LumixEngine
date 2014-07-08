@@ -67,7 +67,7 @@ namespace Lumix
 	typedef Map<const char *, intptr_t, MemTrackAllocator> file_map;
 	typedef Map<FileLineReport, uint32_t, MemTrackAllocator> alloc_count_map;
 
-#pragma init_seg(compiler)
+	#pragma init_seg(compiler)
 	MemoryTracker MemoryTracker::s_instance;
 	uint32_t MemoryTracker::s_alloc_counter = 0;
 
@@ -146,7 +146,7 @@ namespace Lumix
 			void* adr = it.key();
 
 			getEntryLog(entry, adr, string);
-			memTrackerLog("MemoryTracker", "%s", string);
+			memTrackerLog("MemoryTracker", "%s", string.c_str());
 
 			int32_t str_len = Math::min(16, (int32_t)entry.size());
 			char asci_buf[17];
@@ -162,7 +162,7 @@ namespace Lumix
 				toCStringHex(*((uint8_t*)adr + j), hex+1, 2);
 				string.cat(hex);
 			}
-			memTrackerLog("MemoryTracker", "%s", string);
+			memTrackerLog("MemoryTracker", "%s", string.c_str());
 		}
 		if(count)
 		{
@@ -340,7 +340,7 @@ namespace Lumix
 
 			getEntryLog(entry, adr, string);
 
-			memTrackerLog("MemoryTracker", "%s", string);
+			memTrackerLog("MemoryTracker", "%s", string.c_str());
 
 			int str_len = Math::min(16, (int)entry.size());
 			char asci_buf[17];
@@ -356,7 +356,7 @@ namespace Lumix
 				string.cat(hex);
 			}
 
-			memTrackerLog("MemoryTracker", "%s", string);
+			memTrackerLog("MemoryTracker", "%s", string.c_str());
 		}
 
 		if (0 < size) {

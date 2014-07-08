@@ -433,17 +433,29 @@ void Texture::apply(int unit)
 
 bool Texture::loadRaw(FS::IFile& file)
 {
-	if (!m_is_nonGL)
-	{
-		g_log_error.log("renderer") << "Raw images only supported as non-GL textures";
-		return false;
-	}
 	size_t size = file.size();
-	m_data.resize(size);
-	file.read(&m_data[0], size);
 	m_width = (int)sqrt(size / 2);
 	m_height = m_width;
 	m_BPP = 2;
+
+	if (m_is_nonGL)
+	{
+		m_data.resize(size);
+		file.read(&m_data[0], size);
+	}
+	else
+	{
+		glGenTextures(1, &m_id);
+		if (m_id == 0)
+		{
+			return false;
+		}
+
+		glBindTexture(GL_TEXTURE_2D, m_id);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE16UI_EXT, m_width, m_height, 0, GL_LUMINANCE_INTEGER_EXT, GL_UNSIGNED_SHORT, file.getBuffer());
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	}
 	return true;
 }
 

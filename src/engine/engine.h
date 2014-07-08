@@ -55,7 +55,7 @@ namespace Lumix
 			ResourceManager& getResourceManager() const;
 
 			const char* getBasePath() const;
-			void update();
+			void update(bool is_game_running);
 			void serialize(ISerializer& serializer);
 			void deserialize(ISerializer& serializer);
 			float getFPS() const;
