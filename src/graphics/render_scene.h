@@ -13,6 +13,7 @@ namespace Lumix
 	class Geometry;
 	class IRenderDevice;
 	class ISerializer;
+	class Material;
 	class Mesh;
 	class Model;
 	class ModelInstance;
@@ -21,6 +22,13 @@ namespace Lumix
 	class Renderer;
 	class Timer;
 	class Universe;
+
+	struct TerrainInfo
+	{
+		Entity m_entity;
+		Material* m_material;
+		int m_index;
+	};
 
 	struct RenderableInfo
 	{
@@ -54,7 +62,7 @@ namespace Lumix
 			virtual void applyCamera(Component camera) = 0;
 			virtual void update(float dt) = 0;
 			virtual Timer* getTimer() const = 0;
-			virtual void renderTerrains(Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos) = 0;
+			virtual void renderTerrain(const TerrainInfo& info, Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos) = 0;
 
 			virtual Pose& getPose(const Component& cmp) = 0;
 			virtual Component getLight(int index) = 0;
@@ -81,6 +89,7 @@ namespace Lumix
 			virtual void setRenderablePath(Component cmp, const string& path) = 0;
 			virtual void setRenderableScale(Component cmp, const float& scale) = 0;
 			virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) = 0;
+			virtual void getTerrainInfos(Array<TerrainInfo>& infos, int64_t layer_mask) = 0;
 			virtual void setTerrainHeightmap(Component cmp, const string& path) = 0;
 			virtual void getTerrainHeightmap(Component cmp, string& path) = 0;
 			virtual void setTerrainMaterial(Component cmp, const string& path) = 0;

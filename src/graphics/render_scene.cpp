@@ -108,12 +108,14 @@ namespace Lumix
 			return sqrt(dist);
 		}
 
-		static float getRadius2(float size)
+		static float getRadiusInner(float size)
 		{
-			return getRadius(size / 2) + sqrt(2*size/2 * size/2);
+			float lower_level_size = size / 2;
+			float lower_level_diagonal = sqrt(2 * size / 2 * size / 2);
+			return getRadiusOuter(lower_level_size) + lower_level_diagonal;
 		}
 
-		static float getRadius(float size)
+		static float getRadiusOuter(float size)
 		{
 			return (size > 17 ? 2 : 1) * sqrt(2 * size*size) + size * 0.25f;
 		}
@@ -122,26 +124,17 @@ namespace Lumix
 		bool render(Mesh* mesh, Geometry& geometry, const Vec3& camera_pos, RenderScene& scene)
 		{
 			float dist = getDistance(camera_pos);
-			Shader& shader = *mesh->getMaterial()->getShader();
-			float r = getRadius(m_size);
+			float r = getRadiusOuter(m_size);
 			if (dist > r && m_lod > 1)
 			{
 				return false;
 			}
+			Vec3 morph_const(r, getRadiusInner(m_size), 0);
+			Shader& shader = *mesh->getMaterial()->getShader();
 			for (int i = 0; i < CHILD_COUNT; ++i)
 			{
 				if (!m_children[i] || !m_children[i]->render(mesh, geometry, camera_pos, scene))
 				{
-					Vec3 morph_const(0, 0, 0);
-					float size = m_size;
-					while (size >= 16)
-					{
-						morph_const.x += size / 2;
-						size *= 0.5f;
-					}
-					morph_const.x = dist;
-					morph_const.y = 1 / (m_size - morph_const.x);
-
 					shader.setUniform("morph_const", morph_const);
 					shader.setUniform("quad_size", m_size);
 					shader.setUniform("quad_min", m_min);
@@ -746,6 +739,21 @@ namespace Lumix
 				r.m_model.setMatrix(r.m_entity.getMatrix());
 			}
 
+			virtual void getTerrainInfos(Array<TerrainInfo>& infos, int64_t layer_mask) override
+			{
+				infos.reserve(m_terrains.size());
+				for (int i = 0; i < m_terrains.size(); ++i)
+				{
+					if ((m_terrains[i]->m_layer_mask & layer_mask) != 0)
+					{
+						TerrainInfo& info = infos.pushEmpty();
+						info.m_entity = m_terrains[i]->m_entity;
+						info.m_material = m_terrains[i]->m_material;
+						info.m_index = i;
+					}
+				}
+			}
+
 			virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) override
 			{
 				infos.reserve(m_renderables.size() * 2);
@@ -935,15 +943,12 @@ namespace Lumix
 				return m_timer;
 			}
 
-			virtual void renderTerrains(Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos) override
+			virtual void renderTerrain(const TerrainInfo& info, Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos) override
 			{
-				for (int i = 0; i < m_terrains.size(); ++i)
+				int i = info.m_index;
+				if (m_terrains[i]->m_mesh && m_terrains[i]->m_mesh->getMaterial() && m_terrains[i]->m_mesh->getMaterial()->isReady())
 				{
-					if (m_terrains[i]->m_mesh && m_terrains[i]->m_mesh->getMaterial() && m_terrains[i]->m_mesh->getMaterial()->isReady())
-					{
-						static const Vec3 p(0, 0, 0);
-						m_terrains[i]->render(renderer, pipeline, camera_pos);
-					}
+					m_terrains[i]->render(renderer, pipeline, camera_pos);
 				}
 			}
 

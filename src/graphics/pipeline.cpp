@@ -588,11 +588,14 @@ struct PipelineInstanceImpl : public PipelineInstance
 		}
 		if (m_active_camera.isValid())
 		{
-			static bool b = true;
-			static Vec3 c(8, 0, 8);
-			if (b)
-				c = m_active_camera.entity.getPosition();
-			m_scene->renderTerrains(*m_renderer, *this, c);
+			static Array<TerrainInfo> terrain_infos;
+			terrain_infos.clear();
+			m_scene->getTerrainInfos(terrain_infos, layer_mask);
+			Vec3 camera_position = m_active_camera.entity.getPosition();
+			for (int i = 0; i < terrain_infos.size(); ++i)
+			{
+				m_scene->renderTerrain(terrain_infos[i], *m_renderer, *this, camera_position);
+			}
 		}
 	}
 
