@@ -4,7 +4,6 @@
 #include "core/map.h"
 #include "core/array.h"
 #include "core/string.h"
-#include "core/event_manager.h"
 
 
 namespace Lumix
@@ -26,11 +25,8 @@ struct ServerMessageType
 };
 
 
-struct LUMIX_ENGINE_API EntityPositionEvent : public Event
+struct LUMIX_ENGINE_API EntityPositionEvent
 {
-	EntityPositionEvent() { m_type = ServerMessageType::ENTITY_POSITION; }
-	
-	//virtual void write(IStream& stream) override;
 	void read(Blob& stream);
 	
 	int32_t index;
@@ -40,11 +36,8 @@ struct LUMIX_ENGINE_API EntityPositionEvent : public Event
 };
 
 
-struct LUMIX_ENGINE_API EntitySelectedEvent : public Event
+struct LUMIX_ENGINE_API EntitySelectedEvent
 {
-	EntitySelectedEvent() { m_type = ServerMessageType::ENTITY_SELECTED; }
-	
-	//virtual void write(IStream& stream) override;
 	void read(Blob& stream);
 	
 	int32_t index;
@@ -52,11 +45,8 @@ struct LUMIX_ENGINE_API EntitySelectedEvent : public Event
 };
 
 
-struct LUMIX_ENGINE_API LogEvent : public Event
+struct LUMIX_ENGINE_API LogEvent
 {
-	LogEvent() { m_type = ServerMessageType::LOG_MESSAGE; }
-	
-	//virtual void write(IStream& stream) override;
 	void read(Blob& stream);
 	
 	int32_t type;
@@ -65,7 +55,7 @@ struct LUMIX_ENGINE_API LogEvent : public Event
 };
 
 
-struct LUMIX_ENGINE_API PropertyListEvent : public Event
+struct LUMIX_ENGINE_API PropertyListEvent
 {
 	struct Property
 	{
@@ -76,9 +66,6 @@ struct LUMIX_ENGINE_API PropertyListEvent : public Event
 		int32_t data_size;
 	};
 
-	PropertyListEvent() { m_type = ServerMessageType::PROPERTY_LIST; }
-	
-	//virtual void write(IStream& stream) override;
 	void read(Blob& stream);
 	
 	uint32_t type_hash;

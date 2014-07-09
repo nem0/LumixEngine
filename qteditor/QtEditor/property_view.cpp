@@ -1,7 +1,6 @@
 #include "property_view.h"
 #include "ui_property_view.h"
 #include "core/crc32.h"
-#include "core/event_manager.h"
 #include "editor/editor_client.h"
 #include "editor/server_message_types.h"
 #include "scripts/scriptcompiler.h"
@@ -55,8 +54,8 @@ Lumix::EditorClient* PropertyView::getEditorClient()
 void PropertyView::setEditorClient(Lumix::EditorClient& client)
 {
 	m_client = &client;
-	m_client->getEventManager().addListener(Lumix::ServerMessageType::PROPERTY_LIST).bind<PropertyView, &PropertyView::onPropertyList>(this);
-	m_client->getEventManager().addListener(Lumix::ServerMessageType::ENTITY_SELECTED).bind<PropertyView, &PropertyView::onEntitySelected>(this);
+	m_client->propertyListReceived().bind<PropertyView, &PropertyView::onPropertyList>(this);
+	m_client->entitySelected().bind<PropertyView, &PropertyView::onEntitySelected>(this);
 }
 
 
@@ -172,9 +171,8 @@ void PropertyView::onPropertyValue(Property* property, void* data, int32_t)
 }
 
 
-void PropertyView::onPropertyList(Lumix::Event& event)
+void PropertyView::onPropertyList(Lumix::PropertyListEvent& e)
 {
-	Lumix::PropertyListEvent& e = static_cast<Lumix::PropertyListEvent&>(event);
 	for(int i = 0; i < e.properties.size(); ++i)
 	{
 		for(int j = 0; j < m_properties.size(); ++j)
@@ -436,9 +434,8 @@ void PropertyView::addScriptCustomProperties()
 }
 
 
-void PropertyView::onEntitySelected(Lumix::Event& event)
+void PropertyView::onEntitySelected(Lumix::EntitySelectedEvent& e)
 {
-	Lumix::EntitySelectedEvent& e = static_cast<Lumix::EntitySelectedEvent&>(event);
 	clear();
 	for (int i = 0; i < e.components.size(); ++i)
 	{

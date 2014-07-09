@@ -19,8 +19,6 @@
 #include "graphics/render_scene.h"
 #include "graphics/shader.h"
 #include "graphics/texture.h"
-#include "universe/component_event.h"
-#include "universe/entity_moved_event.h"
 #include "universe/universe.h"
 
 

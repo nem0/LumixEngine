@@ -156,7 +156,6 @@
     <ClInclude Include="..\..\..\src\core\default_allocator.h" />
     <ClInclude Include="..\..\..\src\core\delegate.h" />
     <ClInclude Include="..\..\..\src\core\delegate_list.h" />
-    <ClInclude Include="..\..\..\src\core\event_manager.h" />
     <ClInclude Include="..\..\..\src\core\fifo_allocator.h" />
     <ClInclude Include="..\..\..\src\core\free_list.h" />
     <ClInclude Include="..\..\..\src\core\FS\disk_file_device.h" />
@@ -221,7 +220,6 @@
     <ClCompile Include="..\..\..\src\core\blob.cpp" />
     <ClCompile Include="..\..\..\src\core\crc32.cpp" />
     <ClCompile Include="..\..\..\src\core\default_allocator.cpp" />
-    <ClCompile Include="..\..\..\src\core\event_manager.cpp" />
     <ClCompile Include="..\..\..\src\core\fifo_allocator.cpp" />
     <ClCompile Include="..\..\..\src\core\FS\disk_file_device.cpp" />
     <ClCompile Include="..\..\..\src\core\FS\file_events_device.cpp" />

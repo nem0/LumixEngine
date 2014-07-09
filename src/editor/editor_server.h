@@ -1,8 +1,7 @@
 #pragma once
 
 #include "core/lumix.h"
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
+#include "core/delegate_list.h"
 #include "editor/property_descriptor.h"
 
 
@@ -22,6 +21,13 @@ namespace Lumix
 	class LUMIX_ENGINE_API EditorServer
 	{
 		public:
+			enum class MouseFlags : int
+			{
+				ALT = 1,
+				CONTROL = 2
+			};
+
+		public:
 			EditorServer() { m_impl = 0; }
 
 			bool create(const char* base_path, EditorClient& client);
@@ -37,6 +43,8 @@ namespace Lumix
 			class Gizmo& getGizmo();
 			class FS::TCPFileServer& getTCPFileServer();
 			void setEditViewRenderDevice(IRenderDevice& render_device);
+			DelegateList<void ()>& universeCreated();
+			DelegateList<void ()>& universeDestroyed();
 
 		private:
 			struct EditorServerImpl* m_impl;

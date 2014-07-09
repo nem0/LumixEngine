@@ -146,7 +146,7 @@ namespace Lumix
 			void* adr = it.key();
 
 			getEntryLog(entry, adr, string);
-			memTrackerLog("MemoryTracker", "%s", string.c_str());
+			memTrackerLog("MemoryTracker", string.c_str());
 
 			int32_t str_len = Math::min(16, (int32_t)entry.size());
 			char asci_buf[17];
