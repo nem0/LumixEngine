@@ -1,7 +1,6 @@
 #include "render_scene.h"
 #include "core/array.h"
 #include "core/crc32.h"
-#include "core/event_manager.h"
 #include "core/FS/file_system.h"
 #include "core/FS/ifile.h"
 #include "core/iserializer.h"
@@ -20,8 +19,6 @@
 #include "graphics/renderer.h"
 #include "graphics/shader.h"
 #include "graphics/texture.h"
-#include "universe/component_event.h"
-#include "universe/entity_moved_event.h"
 #include "universe/universe.h"
 
 
@@ -305,15 +302,13 @@ namespace Lumix
 				: m_engine(engine)
 				, m_universe(universe)
 			{
-				m_universe.getEventManager().addListener(EntityMovedEvent::type).bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
+				m_universe.entityMoved().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 				m_timer = Timer::create();
 			}
 
 			~RenderSceneImpl()
 			{
-				EventManager::Listener cb;
-				cb.bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
-				m_universe.getEventManager().removeListener(EntityMovedEvent::type, cb);
+				m_universe.entityMoved().unbind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 				for (int i = 0; i < m_renderables.size(); ++i)
 				{
 					LUMIX_DELETE(m_renderables[i]);
@@ -586,9 +581,8 @@ namespace Lumix
 					terrain->m_layer_mask = 1;
 					terrain->m_xz_scale = 1;
 					terrain->m_y_scale = 1;
-					Component cmp(entity, type, this, m_terrains.size() - 1);
-					ComponentEvent evt(cmp);
-					m_universe.getEventManager().emitEvent(evt);
+					Component cmp = m_universe.addComponent(entity, type, this, m_terrains.size() - 1);
+					m_universe.componentCreated().invoke(cmp);
 					return cmp;
 
 				}
@@ -604,9 +598,8 @@ namespace Lumix
 					camera.m_near = 0.1f;
 					camera.m_far = 10000.0f;
 					camera.m_slot[0] = '\0';
-					Component cmp(entity, type, this, m_cameras.size() - 1);
-					ComponentEvent evt(cmp);
-					m_universe.getEventManager().emitEvent(evt);
+					Component cmp = m_universe.addComponent(entity, type, this, m_cameras.size() - 1);
+					m_universe.componentCreated().invoke(cmp);
 					return cmp;
 				}
 				else if (type == RENDERABLE_HASH)
@@ -617,39 +610,36 @@ namespace Lumix
 					r.m_layer_mask = 1;
 					r.m_scale = 1;
 					r.m_model.setModel(NULL);
-					Component cmp(entity, type, this, m_renderables.size() - 1);
-					ComponentEvent evt(cmp);
-					m_universe.getEventManager().emitEvent(evt);
-					return Component(entity, type, this, m_renderables.size() - 1);
+					Component cmp = m_universe.addComponent(entity, type, this, m_renderables.size() - 1);
+					m_universe.componentCreated().invoke(cmp);
+					return cmp;
 				}
 				else if (type == LIGHT_HASH)
 				{
 					Light& light = m_lights.pushEmpty();
 					light.m_type = Light::Type::DIRECTIONAL;
 					light.m_entity = entity;
-					Component cmp(entity, type, this, m_lights.size() - 1);
-					ComponentEvent evt(cmp);
-					m_universe.getEventManager().emitEvent(evt);
-					return Component(entity, type, this, m_lights.size() - 1);
+					Component cmp = m_universe.addComponent(entity, type, this, m_lights.size() - 1);
+					m_universe.componentCreated().invoke(cmp);
+					return cmp;
 				}
 				ASSERT(false);
 				return Component::INVALID;
 			}
 
-			void onEntityMoved(Event& evt)
+			void onEntityMoved(Entity& entity)
 			{
-				EntityMovedEvent e = static_cast<EntityMovedEvent&>(evt);
-				const Entity::ComponentList& cmps = e.entity.getComponents();
+				const Entity::ComponentList& cmps = entity.getComponents();
 				for (int i = 0; i < cmps.size(); ++i)
 				{
 					if (cmps[i].type == RENDERABLE_HASH)
 					{
-						m_renderables[cmps[i].index]->m_model.setMatrix(e.entity.getMatrix());
+						m_renderables[cmps[i].index]->m_model.setMatrix(entity.getMatrix());
 						break;
 					}
 					else if (cmps[i].type == TERRAIN_HASH)
 					{
-						m_terrains[cmps[i].index]->m_matrix = e.entity.getMatrix();
+						m_terrains[cmps[i].index]->m_matrix = entity.getMatrix();
 						break;
 					}
 				}

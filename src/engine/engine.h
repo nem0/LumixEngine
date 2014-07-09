@@ -2,7 +2,6 @@
 
 
 #include "core/lumix.h"
-#include "core/event_manager.h"
 
 
 namespace Lumix
@@ -13,7 +12,6 @@ namespace Lumix
 	}
 
 	class EditorServer;
-	class EventManager;
 	class InputSystem;
 	class IPlugin;
 	class ISerializer;
@@ -27,10 +25,6 @@ namespace Lumix
 
 	class LUMIX_ENGINE_API Engine
 	{
-		public:
-			class UniverseCreatedEvent;
-			class UniverseDestroyedEvent;
-
 		public:
 			Engine() { m_impl = NULL; }
 			~Engine() { ASSERT(m_impl == NULL); }
@@ -47,7 +41,6 @@ namespace Lumix
 			ScriptSystem& getScriptSystem();
 			InputSystem& getInputSystem();
 			PluginManager& getPluginManager();
-			EventManager& getEventManager() const;
 			IPlugin* loadPlugin(const char* name);
 			Universe* getUniverse() const;
 			RenderScene* getRenderScene() const;
@@ -63,42 +56,6 @@ namespace Lumix
 		private:
 			struct EngineImpl* m_impl;
 	};
-
-	class LUMIX_ENGINE_API Engine::UniverseCreatedEvent : public Event
-	{
-		public:
-			static const Event::Type s_type;
-
-		public:
-			UniverseCreatedEvent(Universe& universe)
-				: m_universe(universe)
-			{
-				m_type = s_type;
-			}
-
-			Universe& getUniverse() { return m_universe; }
-
-		private:
-			Universe& m_universe;
-	};
-
-	class LUMIX_ENGINE_API Engine::UniverseDestroyedEvent : public Event
-	{
-		public:
-			static const Event::Type s_type;
-
-		public:
-			UniverseDestroyedEvent(Universe& universe)
-				: m_universe(universe)
-			{
-				m_type = s_type;
-			}
-
-			Universe& getUniverse() { return m_universe; }
-
-		private:
-			Universe& m_universe;
-	};
-
+	
 
 } // ~namespace Lumix

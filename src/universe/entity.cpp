@@ -1,7 +1,5 @@
 #include "universe/entity.h"
 #include "universe/universe.h"
-#include "core/event_manager.h"
-#include "universe/entity_moved_event.h"
 
 namespace Lumix
 {
@@ -74,8 +72,7 @@ namespace Lumix
 	{
 		universe->m_positions[index] = pos;
 		universe->m_rotations[index] = rot;
-		EntityMovedEvent evt(*this);
-		universe->getEventManager().emitEvent(evt);
+		universe->entityMoved().invoke(*this);
 	}
 
 
@@ -85,24 +82,21 @@ namespace Lumix
 		mtx.getRotation(rot);
 		universe->m_positions[index] = mtx.getTranslation();
 		universe->m_rotations[index] = rot;
-		EntityMovedEvent evt(*this);
-		universe->getEventManager().emitEvent(evt);
+		universe->entityMoved().invoke(*this);
 	}
 
 
 	void Entity::setPosition(float x, float y, float z)
 	{
 		universe->m_positions[index].set(x, y, z);
-		EntityMovedEvent evt(*this);
-		universe->getEventManager().emitEvent(evt);
+		universe->entityMoved().invoke(*this);
 	}
 
 
 	void Entity::setPosition(const Vec3& pos)
 	{
 		universe->m_positions[index] = pos;
-		EntityMovedEvent evt(*this);
-		universe->getEventManager().emitEvent(evt);
+		universe->entityMoved().invoke(*this);
 	}
 
 
@@ -121,17 +115,15 @@ namespace Lumix
 	void Entity::setRotation(float x, float y, float z, float w)
 	{
 		universe->m_rotations[index].set(x, y, z, w);
-		EntityMovedEvent evt(*this);
-		universe->getEventManager().emitEvent(evt);
+		universe->entityMoved().invoke(*this);
 	}
 
 
 	void Entity::setRotation(const Quat& rot)
 	{
 		universe->m_rotations[index] = rot;
-		EntityMovedEvent evt(*this);
-		universe->getEventManager().emitEvent(evt);
-	} 
+		universe->entityMoved().invoke(*this);
+	}
 
 
 } // ~namespace Lumix

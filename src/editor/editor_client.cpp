@@ -2,7 +2,6 @@
 #include "core/array.h"
 #include "core/blob.h"
 #include "core/crc32.h"
-#include "core/event_manager.h"
 #include "core/fifo_allocator.h"
 #include "core/MT/lock_free_queue.h"
 #include "core/MT/mutex.h"
@@ -28,9 +27,12 @@ namespace Lumix
 		void sendMessage(uint32_t type, const void* data, int32_t size);
 		void onMessage(const uint8_t* data, int size);
 
-		EventManager m_event_manager;
 		Path m_base_path;
 		EditorServer& m_server;
+		DelegateList<void(EntityPositionEvent&)> m_entity_position_changed;
+		DelegateList<void(EntitySelectedEvent&)> m_entity_selected;
+		DelegateList <void(LogEvent&)> m_message_logged;
+		DelegateList <void(PropertyListEvent&)> m_property_list_received;
 	};
 
 
@@ -70,33 +72,45 @@ namespace Lumix
 				{
 					EntityPositionEvent msg;
 					msg.read(stream);
-					m_event_manager.emitEvent(msg);
+					m_entity_position_changed.invoke(msg);
 				}
 				break;
 			case ServerMessageType::ENTITY_SELECTED:
 				{
 					EntitySelectedEvent msg;
 					msg.read(stream);
-					m_event_manager.emitEvent(msg);
+					m_entity_selected.invoke(msg);
 				}
 				break;
 			case ServerMessageType::PROPERTY_LIST:
 				{ 	
 					PropertyListEvent msg;
 					msg.read(stream);
-					m_event_manager.emitEvent(msg);
+					m_property_list_received.invoke(msg);
 				}
 				break;
 			case ServerMessageType::LOG_MESSAGE:
 				{
 					LogEvent msg;
 					msg.read(stream);
-					m_event_manager.emitEvent(msg);
+					m_message_logged.invoke(msg);
 				}
 				break;
 			default:
 				break;
 		}
+	}
+
+
+	EditorClient::PropertyListCallback& EditorClient::propertyListReceived()
+	{
+		return m_impl->m_property_list_received;
+	}
+
+
+	EditorClient::EntitySelectedCallback& EditorClient::entitySelected()
+	{
+		return m_impl->m_entity_selected;
 	}
 
 
@@ -148,20 +162,13 @@ namespace Lumix
 	}
 
 
-	void EditorClient::mouseMove(int x, int y, int dx, int dy)
+	void EditorClient::mouseMove(int x, int y, int dx, int dy, int flags)
 	{
-		int data[4] = {x, y, dx, dy};
-		m_impl->sendMessage(ClientMessageType::POINTER_MOVE, data, 16);
+		int data[] = {x, y, dx, dy, flags};
+		m_impl->sendMessage(ClientMessageType::POINTER_MOVE, data, 20);
 
 	}
-
-
-	EventManager& EditorClient::getEventManager()
-	{
-		return m_impl->m_event_manager;
-	}
-
-
+	
 	void EditorClient::loadUniverse(const char* path)
 	{
 		m_impl->sendMessage(ClientMessageType::LOAD, path, (int32_t)strlen(path)+1);

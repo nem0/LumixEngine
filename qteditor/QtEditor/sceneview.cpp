@@ -1,6 +1,7 @@
 #include "sceneview.h"
 #include "editor/editor_client.h"
 #include "editor/editor_server.h"
+#include <qapplication.h>
 #include <QDragEnterEvent>
 #include <QMimeData>
 #include <QMouseEvent>
@@ -58,7 +59,10 @@ void SceneView::mousePressEvent(QMouseEvent* event)
 
 void SceneView::mouseMoveEvent(QMouseEvent* event)
 {
-	m_client->mouseMove(event->x(), event->y(), event->x() - m_last_x, event->y() - m_last_y);
+	int flags = 0;
+	flags |= Qt::ControlModifier & QApplication::keyboardModifiers() ? (int)Lumix::EditorServer::MouseFlags::CONTROL : 0;
+	flags |= Qt::AltModifier & QApplication::keyboardModifiers() ? (int)Lumix::EditorServer::MouseFlags::ALT : 0;
+	m_client->mouseMove(event->x(), event->y(), event->x() - m_last_x, event->y() - m_last_y, flags);
 	m_last_x = event->x();
 	m_last_y = event->y();
 }
