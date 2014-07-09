@@ -305,6 +305,7 @@ void PropertyView::addProperty(const char* component, const char* name, const ch
 				QDoubleSpinBox* edit = new QDoubleSpinBox();
 				edit->setProperty("cpp_prop", (int)(m_properties.size() - 1)); 
 				m_ui->propertyList->setItemWidget(item, 1, edit);
+				edit->setMaximum(9999);
 				connect(edit, (void (QDoubleSpinBox::*)(double))&QDoubleSpinBox::valueChanged, this, &PropertyView::on_doubleSpinBoxValueChanged);
 			}
 			break;
@@ -476,6 +477,7 @@ void PropertyView::onEntitySelected(Lumix::Event& event)
 		{
 			addProperty("terrain", "material", "Material", Property::FILE, "material (*.mat)");
 			addProperty("terrain", "xz_scale", "Meter per texel", Property::DECIMAL, NULL);
+			addProperty("terrain", "y_scale", "Height scale", Property::DECIMAL, NULL);
 		}
 		else if (e.components[i] == crc32("physical_controller") || e.components[i] == crc32("mesh_rigid_actor"))
 		{

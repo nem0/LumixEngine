@@ -602,7 +602,11 @@ struct PipelineInstanceImpl : public PipelineInstance
 						Matrix world_matrix;
 						terrain_infos[i].m_entity.getMatrix(world_matrix);
 						terrain_infos[i].m_material->getShader()->setUniform("world_matrix", world_matrix);
-						terrain_infos[i].m_material->getShader()->setUniform("xz_scale", terrain_infos[i].m_xz_scale);
+						Vec3 scale;
+						scale.x = terrain_infos[i].m_xz_scale;
+						scale.y = terrain_infos[i].m_y_scale;
+						scale.z = scale.x;
+						terrain_infos[i].m_material->getShader()->setUniform("terrain_scale", scale);
 						m_scene->renderTerrain(terrain_infos[i], *m_renderer, *this, camera_position);
 					}
 				}

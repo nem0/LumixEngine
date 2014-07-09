@@ -255,6 +255,7 @@ namespace Lumix
 		int64_t m_layer_mask;
 		TerrainQuad* m_root;
 		float m_xz_scale;
+		float m_y_scale;
 	};
 
 	struct Renderable
@@ -457,6 +458,8 @@ namespace Lumix
 					serializer.serializeArrayItem(m_terrains[i]->m_entity.index);
 					serializer.serializeArrayItem(m_terrains[i]->m_layer_mask);
 					serializer.serializeArrayItem(m_terrains[i]->m_material->getPath().c_str());
+					serializer.serializeArrayItem(m_terrains[i]->m_xz_scale);
+					serializer.serializeArrayItem(m_terrains[i]->m_y_scale);
 				}
 				serializer.endArray();
 			}
@@ -556,6 +559,8 @@ namespace Lumix
 					char path[LUMIX_MAX_PATH];
 					serializer.deserializeArrayItem(path, LUMIX_MAX_PATH);
 					setTerrainMaterial(cmp, string(path));
+					serializer.deserializeArrayItem(m_terrains[i]->m_xz_scale);
+					serializer.deserializeArrayItem(m_terrains[i]->m_y_scale);
 				}
 				serializer.deserializeArrayEnd();
 			}
@@ -580,6 +585,7 @@ namespace Lumix
 					terrain->m_entity = entity;
 					terrain->m_layer_mask = 1;
 					terrain->m_xz_scale = 1;
+					terrain->m_y_scale = 1;
 					Component cmp(entity, type, this, m_terrains.size() - 1);
 					ComponentEvent evt(cmp);
 					m_universe.getEventManager().emitEvent(evt);
@@ -686,6 +692,16 @@ namespace Lumix
 				scale = m_terrains[cmp.index]->m_xz_scale;
 			}
 
+			virtual void setTerrainYScale(Component cmp, const float& scale) override
+			{
+				m_terrains[cmp.index]->m_y_scale = scale;
+			}
+
+			virtual void getTerrainYScale(Component cmp, float& scale)
+			{
+				scale = m_terrains[cmp.index]->m_y_scale;
+			}
+
 			virtual Pose& getPose(const Component& cmp) override
 			{
 				return m_renderables[cmp.index]->m_model.getPose();
@@ -738,6 +754,7 @@ namespace Lumix
 						info.m_material = m_terrains[i]->m_material;
 						info.m_index = i;
 						info.m_xz_scale = m_terrains[i]->m_xz_scale;
+						info.m_y_scale = m_terrains[i]->m_y_scale;
 					}
 				}
 			}
