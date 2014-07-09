@@ -599,6 +599,13 @@ struct PipelineInstanceImpl : public PipelineInstance
 					if (terrain_infos[i].m_material->getShader())
 					{
 						terrain_infos[i].m_material->getShader()->setUniform("light_dir", m_light_dir);
+						Matrix world_matrix;
+						Matrix scale_matrix = Matrix::IDENTITY;
+						scale_matrix.m11 = terrain_infos[i].m_xz_scale;
+						scale_matrix.m33 = terrain_infos[i].m_xz_scale;
+						terrain_infos[i].m_entity.getMatrix(world_matrix);
+						world_matrix = world_matrix * scale_matrix;
+						terrain_infos[i].m_material->getShader()->setUniform("world_matrix", world_matrix);
 						m_scene->renderTerrain(terrain_infos[i], *m_renderer, *this, camera_position);
 					}
 				}

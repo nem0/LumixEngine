@@ -148,6 +148,7 @@ namespace Lumix
 		Vec3 m_min;
 		float m_size;
 		int m_lod;
+		float m_xz_scale;
 	};
 
 	struct Terrain
@@ -156,19 +157,17 @@ namespace Lumix
 			: m_mesh(NULL)
 			, m_material(NULL)
 			, m_root(NULL)
-		{}
+		{
+			generateGeometry();
+		}
 
 		~Terrain()
 		{
 			LUMIX_DELETE(m_mesh);
 			if (m_material)
 			{
+				m_material->getObserverCb().unbind<Terrain, &Terrain::onMaterialLoaded>(this);
 				m_material->getResourceManager().get(ResourceManager::MATERIAL)->unload(*m_material);
-			}
-			if (m_heightmap)
-			{
-				m_heightmap->getResourceManager().get(ResourceManager::TEXTURE)->unload(*m_heightmap);
-				m_heightmap->getObserverCb().unbind<Terrain, &Terrain::heightmapLoaded>(this);
 			}
 		}
 
@@ -180,13 +179,13 @@ namespace Lumix
 			m_root->render(m_mesh, m_geometry, camera_pos, *pipeline.getScene());
 		}
 
-		void generateQuadTree()
+		void generateQuadTree(float size)
 		{
 			LUMIX_DELETE(m_root);
 			m_root = LUMIX_NEW(TerrainQuad);
 			m_root->m_lod = 1;
 			m_root->m_min.set(0, 0, 0);
-			m_root->m_size = (float)m_heightmap->getWidth();
+			m_root->m_size = size;
 			m_root->createChildren();
 		}
 
@@ -217,8 +216,6 @@ namespace Lumix
 		{
 			LUMIX_DELETE(m_mesh);
 			m_mesh = NULL;
-			m_width = m_heightmap->getWidth();
-			m_height = m_heightmap->getHeight();
 			Array<Vec3> points;
 			points.resize(GRID_SIZE * GRID_SIZE * 4);
 			Array<int32_t> indices;
@@ -235,14 +232,16 @@ namespace Lumix
 			m_mesh = LUMIX_NEW(Mesh)(m_material, 0, indices.size(), "terrain");
 		}
 
-		void heightmapLoaded(Resource::State, Resource::State new_state)
+		void onMaterialLoaded(Resource::State, Resource::State new_state)
 		{
 			if (new_state == Resource::State::READY)
 			{
-				generateGeometry();
-				generateQuadTree();
+				m_width = m_material->getTexture(0)->getWidth();
+				m_height = m_material->getTexture(0)->getHeight();
+				generateQuadTree((float)m_width);
 			}
 		}
+
 
 		static const int GRID_SIZE = 16;
 
@@ -254,8 +253,8 @@ namespace Lumix
 		Matrix m_matrix;
 		Entity m_entity;
 		int64_t m_layer_mask;
-		Texture* m_heightmap;
 		TerrainQuad* m_root;
+		float m_xz_scale;
 	};
 
 	struct Renderable
@@ -457,7 +456,6 @@ namespace Lumix
 				{
 					serializer.serializeArrayItem(m_terrains[i]->m_entity.index);
 					serializer.serializeArrayItem(m_terrains[i]->m_layer_mask);
-					serializer.serializeArrayItem(m_terrains[i]->m_heightmap->getPath().c_str());
 					serializer.serializeArrayItem(m_terrains[i]->m_material->getPath().c_str());
 				}
 				serializer.endArray();
@@ -557,8 +555,6 @@ namespace Lumix
 					serializer.deserializeArrayItem(terrain->m_layer_mask);
 					char path[LUMIX_MAX_PATH];
 					serializer.deserializeArrayItem(path, LUMIX_MAX_PATH);
-					setTerrainHeightmap(cmp, string(path));
-					serializer.deserializeArrayItem(path, LUMIX_MAX_PATH);
 					setTerrainMaterial(cmp, string(path));
 				}
 				serializer.deserializeArrayEnd();
@@ -583,7 +579,7 @@ namespace Lumix
 					terrain->m_matrix = entity.getMatrix();
 					terrain->m_entity = entity;
 					terrain->m_layer_mask = 1;
-					terrain->m_heightmap = NULL;
+					terrain->m_xz_scale = 1;
 					Component cmp(entity, type, this, m_terrains.size() - 1);
 					ComponentEvent evt(cmp);
 					m_universe.getEventManager().emitEvent(evt);
@@ -600,7 +596,7 @@ namespace Lumix
 					camera.m_height = 600;
 					camera.m_aspect = 800.0f / 600.0f;
 					camera.m_near = 0.1f;
-					camera.m_far = 1000.0f;
+					camera.m_far = 10000.0f;
 					camera.m_slot[0] = '\0';
 					Component cmp(entity, type, this, m_cameras.size() - 1);
 					ComponentEvent evt(cmp);
@@ -658,11 +654,13 @@ namespace Lumix
 				if (m_terrains[cmp.index]->m_material)
 				{
 					m_engine.getResourceManager().get(ResourceManager::MATERIAL)->unload(*m_terrains[cmp.index]->m_material);
+					m_terrains[cmp.index]->m_material->getObserverCb().unbind<Terrain, &Terrain::onMaterialLoaded>(m_terrains[cmp.index]);
 				}
 				m_terrains[cmp.index]->m_material = static_cast<Material*>(m_engine.getResourceManager().get(ResourceManager::MATERIAL)->load(path.c_str()));
 				if (m_terrains[cmp.index]->m_mesh)
 				{
 					m_terrains[cmp.index]->m_mesh->setMaterial(m_terrains[cmp.index]->m_material);
+					m_terrains[cmp.index]->m_material->getObserverCb().bind<Terrain, &Terrain::onMaterialLoaded>(m_terrains[cmp.index]);
 				}
 			}
 
@@ -678,25 +676,14 @@ namespace Lumix
 				}
 			}
 
-			virtual void setTerrainHeightmap(Component cmp, const string& path) override
+			virtual void setTerrainXZScale(Component cmp, const float& scale) override
 			{
-				if (m_terrains[cmp.index]->m_heightmap)
-				{
-					m_engine.getResourceManager().get(ResourceManager::TEXTURE)->unload(*m_terrains[cmp.index]->m_heightmap);
-					m_terrains[cmp.index]->m_heightmap->getObserverCb().unbind<Terrain, &Terrain::heightmapLoaded>(m_terrains[cmp.index]);
-				}
-				Resource* res = m_engine.getResourceManager().get(ResourceManager::TEXTURE)->load(path.c_str());
-				res->getObserverCb().bind<Terrain, &Terrain::heightmapLoaded>(m_terrains[cmp.index]);
-				m_terrains[cmp.index]->m_heightmap = static_cast<Texture*>(res);
-				if (m_terrains[cmp.index]->m_heightmap->isReady())
-				{
-					m_terrains[cmp.index]->heightmapLoaded(Resource::State::LOADING, Resource::State::READY);
-				}
+				m_terrains[cmp.index]->m_xz_scale = scale;
 			}
 
-			virtual void getTerrainHeightmap(Component cmp, string& path) override
+			virtual void getTerrainXZScale(Component cmp, float& scale) override
 			{
-				path = m_terrains[cmp.index]->m_heightmap ? m_terrains[cmp.index]->m_heightmap->getPath().c_str() : "";
+				scale = m_terrains[cmp.index]->m_xz_scale;
 			}
 
 			virtual Pose& getPose(const Component& cmp) override
@@ -750,6 +737,7 @@ namespace Lumix
 						info.m_entity = m_terrains[i]->m_entity;
 						info.m_material = m_terrains[i]->m_material;
 						info.m_index = i;
+						info.m_xz_scale = m_terrains[i]->m_xz_scale;
 					}
 				}
 			}
