@@ -434,9 +434,9 @@ void Texture::apply(int unit)
 bool Texture::loadRaw(FS::IFile& file)
 {
 	size_t size = file.size();
-	m_width = (int)sqrt(size / 2);
-	m_height = m_width;
 	m_BPP = 2;
+	m_width = (int)sqrt(size / m_BPP);
+	m_height = m_width;
 
 	if (m_is_nonGL)
 	{
@@ -452,7 +452,7 @@ bool Texture::loadRaw(FS::IFile& file)
 		}
 
 		glBindTexture(GL_TEXTURE_2D, m_id);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE16UI_EXT, m_width, m_height, 0, GL_LUMINANCE_INTEGER_EXT, GL_UNSIGNED_SHORT, file.getBuffer());
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_R16, m_width, m_height, 0, GL_RED, GL_UNSIGNED_SHORT, file.getBuffer());
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	}

@@ -594,7 +594,14 @@ struct PipelineInstanceImpl : public PipelineInstance
 			Vec3 camera_position = m_active_camera.entity.getPosition();
 			for (int i = 0; i < terrain_infos.size(); ++i)
 			{
-				m_scene->renderTerrain(terrain_infos[i], *m_renderer, *this, camera_position);
+				if (terrain_infos[i].m_material)
+				{
+					if (terrain_infos[i].m_material->getShader())
+					{
+						terrain_infos[i].m_material->getShader()->setUniform("light_dir", m_light_dir);
+						m_scene->renderTerrain(terrain_infos[i], *m_renderer, *this, camera_position);
+					}
+				}
 			}
 		}
 	}
