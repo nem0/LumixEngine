@@ -160,6 +160,7 @@ namespace Lumix
 				char hex[4];
 				hex[0] = ' ';
 				toCStringHex(*((uint8_t*)adr + j), hex+1, 2);
+				hex[3] = 0;
 				string.cat(hex);
 			}
 			memTrackerLog("MemoryTracker", "%s", string.c_str());
@@ -353,6 +354,7 @@ namespace Lumix
 				char hex[4];
 				hex[0] = ' ';
 				toCStringHex(*((uint8_t*)adr + j), hex + 1, 2);
+				hex[3] = 0;
 				string.cat(hex);
 			}
 
