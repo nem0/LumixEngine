@@ -28,6 +28,7 @@ namespace Lumix
 		Entity m_entity;
 		Material* m_material;
 		float m_xz_scale;
+		float m_y_scale;
 		int m_index;
 	};
 
@@ -95,6 +96,8 @@ namespace Lumix
 			virtual void getTerrainMaterial(Component cmp, string& path) = 0;
 			virtual void setTerrainXZScale(Component cmp, const float& scale) = 0;
 			virtual void getTerrainXZScale(Component cmp, float& scale) = 0;
+			virtual void setTerrainYScale(Component cmp, const float& scale) = 0;
+			virtual void getTerrainYScale(Component cmp, float& scale) = 0;
 
 		protected:
 			virtual ~RenderScene() {}
