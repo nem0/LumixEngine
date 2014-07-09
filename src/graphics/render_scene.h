@@ -27,6 +27,7 @@ namespace Lumix
 	{
 		Entity m_entity;
 		Material* m_material;
+		float m_xz_scale;
 		int m_index;
 	};
 
@@ -90,10 +91,10 @@ namespace Lumix
 			virtual void setRenderableScale(Component cmp, const float& scale) = 0;
 			virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) = 0;
 			virtual void getTerrainInfos(Array<TerrainInfo>& infos, int64_t layer_mask) = 0;
-			virtual void setTerrainHeightmap(Component cmp, const string& path) = 0;
-			virtual void getTerrainHeightmap(Component cmp, string& path) = 0;
 			virtual void setTerrainMaterial(Component cmp, const string& path) = 0;
 			virtual void getTerrainMaterial(Component cmp, string& path) = 0;
+			virtual void setTerrainXZScale(Component cmp, const float& scale) = 0;
+			virtual void getTerrainXZScale(Component cmp, float& scale) = 0;
 
 		protected:
 			virtual ~RenderScene() {}
