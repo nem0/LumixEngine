@@ -55,9 +55,14 @@ struct LUMIX_CORE_API Vec3
 		this->z = z;
 	}
 
-	Vec3 operator *(float s)
+	Vec3 operator *(float s) const
 	{
 		return Vec3(x * s, y * s, z * s);
+	}
+
+	Vec3 operator /(float s) const
+	{
+		return Vec3(x / s, y / s, z / s);
 	}
 
 	void operator *=(float rhs)
@@ -137,12 +142,6 @@ struct LUMIX_CORE_API Vec3
 
 	float x, y, z;
 };
-
-
-inline Vec3 operator *(const Vec3& v, float s)
-{
-	return Vec3(v.x * s, v.y * s, v.z* s);
-}
 
 
 inline float dotProduct(const Vec3& op1, const Vec3& op2)
