@@ -2,7 +2,7 @@
 
 #include "core/pod_hash_map.h"
 
-namespace Lux 
+namespace Lumix 
 {
 	namespace FS
 	{
@@ -13,7 +13,7 @@ namespace Lux
 	class Resource;
 	class ResourceManager;
 
-	class LUX_CORE_API ResourceManagerBase abstract
+	class LUMIX_CORE_API ResourceManagerBase abstract
 	{
 		friend class Resource;
 		typedef PODHashMap<uint32_t, Resource*> ResourceTable;

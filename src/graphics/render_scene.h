@@ -1,27 +1,44 @@
 #pragma once
 
-#include "core/lux.h"
+#include "core/lumix.h"
+#include "core/array.h"
 #include "core/string.h"
 #include "graphics/ray_cast_model_hit.h"
 #include "universe/component.h"
 
-namespace Lux
+namespace Lumix
 {
 
 	class Engine;
+	class Geometry;
 	class IRenderDevice;
 	class ISerializer;
+	class Mesh;
+	class Model;
 	class ModelInstance;
 	class Pose;
+	class Timer;
 	class Universe;
 
 	struct RenderableInfo
 	{
-		ModelInstance* m_model_instance;
+		Geometry* m_geometry;
+		Mesh* m_mesh;
+		const Pose* m_pose;
+		const ModelInstance* m_model;
+		const Matrix* m_matrix;
 		float m_scale;
 	};
 
-	class LUX_ENGINE_API RenderScene
+	struct DebugLine
+	{
+		Vec3 m_from;
+		Vec3 m_to;
+		Vec3 m_color;
+		float m_life;
+	};
+
+	class LUMIX_ENGINE_API RenderScene
 	{
 		public:
 			static RenderScene* createInstance(Engine& engine, Universe& universe);
@@ -33,10 +50,14 @@ namespace Lux
 			virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir) = 0;
 			virtual void getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) = 0;
 			virtual void applyCamera(Component camera) = 0;
+			virtual void update(float dt) = 0;
+			virtual Timer* getTimer() const = 0;
 
 			virtual Pose& getPose(const Component& cmp) = 0;
 			virtual Component getLight(int index) = 0;
 
+			virtual void addDebugLine(const Vec3& from, const Vec3& to, const Vec3& color, float life) = 0;
+			virtual const Array<DebugLine>& getDebugLines() const = 0;
 			virtual Component getCameraInSlot(const char* slot) = 0;
 			virtual void getCameraFOV(Component camera, float& fov) = 0;
 			virtual void setCameraFOV(Component camera, const float& fov) = 0;
@@ -49,11 +70,16 @@ namespace Lux
 			virtual void setCameraSlot(Component camera, const string& slot) = 0;
 			virtual void getCameraSlot(Component camera, string& slot) = 0;
 			virtual void setCameraSize(Component camera, int w, int h) = 0;
+			virtual Model* getModel(Component cmp) = 0;
 			virtual void getRenderablePath(Component cmp, string& path) = 0;
 			virtual void setRenderableLayer(Component cmp, const int32_t& layer) = 0;
 			virtual void setRenderablePath(Component cmp, const string& path) = 0;
 			virtual void setRenderableScale(Component cmp, const float& scale) = 0;
 			virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) = 0;
+			virtual void setTerrainHeightmap(Component cmp, const string& path) = 0;
+			virtual void getTerrainHeightmap(Component cmp, string& path) = 0;
+			virtual void setTerrainMaterial(Component cmp, const string& path) = 0;
+			virtual void getTerrainMaterial(Component cmp, string& path) = 0;
 
 		protected:
 			virtual ~RenderScene() {}

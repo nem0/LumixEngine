@@ -1,16 +1,16 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/array.h"
+#include "core/delegate_list.h"
 #include "core/quat.h"
-#include "core/array.h"
 #include "core/vec3.h"
 #include "universe/component.h"
 #include "universe/entity.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -23,7 +23,7 @@ class Universe;
 struct Vec3;
 
 
-class LUX_ENGINE_API Universe final
+class LUMIX_ENGINE_API Universe final
 {
 	friend struct Entity;
 	public:
@@ -37,13 +37,20 @@ class LUX_ENGINE_API Universe final
 		void destroy();
 
 		Entity createEntity();
-		void destroyEntity(const Entity& entity);
+		void destroyEntity(Entity& entity);
 		Vec3 getPosition(int index) { return m_positions[index]; }
 		Quat getRotation(int index) { return m_rotations[index]; }
-		EventManager& getEventManager() const { ASSERT(m_event_manager);  return *m_event_manager; }
+		Component addComponent(const Entity& entity, uint32_t component_type, void* system, int index);
+		void removeComponent(const Component& cmp);
+
+		DelegateList<void(Entity&)>& entityMoved() { return m_entity_moved; }
+		DelegateList<void(Entity&)>& entityDestroyed() { return m_entity_destroyed; }
+		DelegateList<void(Component&)>& componentCreated() { return m_component_created; }
+		DelegateList<void(Component&)>& componentDestroyed() { return m_component_destroyed; }
 
 		void serialize(ISerializer& serializer);
 		void deserialize(ISerializer& serializer);
+
 
 	private:
 		void onEvent(Event& event);
@@ -52,9 +59,12 @@ class LUX_ENGINE_API Universe final
 		Array<Vec3>		m_positions;		//< entity positions
 		Array<Quat>		m_rotations;		//< entity rotations
 		Array<int>		m_free_slots;
-		ComponentList		m_component_list;
-		EventManager*		m_event_manager;
+		ComponentList	m_component_list;
+		DelegateList<void(Entity&)> m_entity_moved;
+		DelegateList<void(Entity&)> m_entity_destroyed;
+		DelegateList<void(Component&)> m_component_created;
+		DelegateList<void(Component&)> m_component_destroyed;
 };
 
 
-} // !namespace Lux
+} // !namespace Lumix

@@ -6,7 +6,7 @@
 #include "graphics/pose.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -16,23 +16,27 @@ class Model;
 class ModelInstance
 {
 	public:
-		ModelInstance(Model& model);
+		ModelInstance();
 		~ModelInstance();
 
+		void setModel(Model* model);
+		const Matrix& getMatrix() const { return m_matrix; }
 		Matrix& getMatrix() { return m_matrix; }
-		Model& getModel() { return m_model; }
+		Model* getModel() const { return m_model; }
 		Pose& getPose() { return m_pose; }
 		void setMatrix(const Matrix& mtx);
 
 	private:
-		void modelUpdate(Resource::State state);
+		void modelUpdate(Resource::State old_state, Resource::State new_state);
 		void operator=(const ModelInstance&);
+		ModelInstance(const ModelInstance&) {}
+
 
 	private:
 		Pose		m_pose;
-		Model&		m_model;
+		Model*		m_model;
 		Matrix		m_matrix;
 };
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

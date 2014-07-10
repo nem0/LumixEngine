@@ -1,7 +1,7 @@
 #include "core/blob.h"
 #include <new>
 
-namespace Lux
+namespace Lumix
 {
 	Blob::Blob()
 	{
@@ -41,4 +41,4 @@ namespace Lux
 		write(size);
 		write(string, size);
 	}
-} // !namespace Lux
+} // !namespace Lumix

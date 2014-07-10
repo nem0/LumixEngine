@@ -3,13 +3,13 @@
 
 #include "core/delegate.h"
 #include "core/delegate_list.h"
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/map.h"
 #include "core/array.h"
 #include "core/string.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 class ISerializer;
@@ -22,7 +22,7 @@ namespace UI
 	class IRenderer;
 
 
-	class LUX_GUI_API Block
+	class LUMIX_GUI_API Block
 	{
 		friend class Gui;
 		public:
@@ -102,7 +102,7 @@ namespace UI
 			DecoratorBase* m_decorator;
 			Block* m_parent;
 			Array<Block*> m_children; 
-			map<uint32_t, EventCallback > m_event_handlers;
+			Map<uint32_t, EventCallback > m_event_handlers;
 			Area m_local_area;
 			Area m_global_area;
 			Area m_content_area;
@@ -121,4 +121,4 @@ namespace UI
 
 
 } // ~namespace UI
-} // ~namespace Lux
+} // ~namespace Lumix

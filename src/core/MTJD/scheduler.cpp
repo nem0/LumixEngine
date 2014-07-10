@@ -1,9 +1,9 @@
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/MTJD/scheduler.h"
 
 #include "core/MTJD/manager.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace MTJD
 	{
@@ -35,4 +35,4 @@ namespace Lux
 			m_data_event.trigger();
 		}
 	} // ~namepsace MTJD
-} // ~namepsace Lux
+} // ~namepsace Lumix

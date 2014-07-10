@@ -4,13 +4,13 @@
 #include "gui/block.h"
 
 
-namespace Lux
+namespace Lumix
 {
 namespace UI
 {
 
 
-	class LUX_GUI_API Button : public Block
+	class LUMIX_GUI_API Button : public Block
 	{
 		public:
 			Button(const char* label, Gui& gui, Block* parent);
@@ -24,4 +24,4 @@ namespace UI
 
 
 } // ~namespace UI
-} // ~namespace Lux
+} // ~namespace Lumix

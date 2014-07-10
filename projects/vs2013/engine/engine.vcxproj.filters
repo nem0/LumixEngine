@@ -96,16 +96,7 @@
     <ClCompile Include="..\..\..\src\universe\component.cpp">
       <Filter>universe</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\universe\component_event.cpp">
-      <Filter>universe</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\universe\entity.cpp">
-      <Filter>universe</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\universe\entity_destroyed_event.cpp">
-      <Filter>universe</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\universe\entity_moved_event.cpp">
       <Filter>universe</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\universe\universe.cpp">
@@ -123,9 +114,6 @@
     </ClCompile>
     <ClCompile Include="..\..\..\src\graphics\texture_manager.cpp">
       <Filter>graphics</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\editor\script_compiler.cpp">
-      <Filter>editor</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\graphics\render_scene.cpp">
       <Filter>graphics</Filter>
@@ -231,16 +219,7 @@
     <ClInclude Include="..\..\..\src\universe\component.h">
       <Filter>universe</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\universe\component_event.h">
-      <Filter>universe</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\universe\entity.h">
-      <Filter>universe</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\universe\entity_destroyed_event.h">
-      <Filter>universe</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\universe\entity_moved_event.h">
       <Filter>universe</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\universe\universe.h">
@@ -257,9 +236,6 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\graphics\texture_manager.h">
       <Filter>graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\editor\script_compiler.h">
-      <Filter>editor</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\graphics\render_scene.h">
       <Filter>graphics</Filter>

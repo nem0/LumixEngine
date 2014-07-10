@@ -1,12 +1,12 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "engine/iplugin.h"
 #include "gui/block.h"
 #include "gui/irenderer.h"
 
-namespace Lux
+namespace Lumix
 {
 
 namespace FS
@@ -21,7 +21,7 @@ namespace UI
 	class Block;
 
 
-	class LUX_GUI_API Gui : public IPlugin
+	class LUMIX_GUI_API Gui : public IPlugin
 	{
 		public:
 			typedef Delegate<void (int, int)> MouseCallback;
@@ -51,7 +51,7 @@ namespace UI
 			DecoratorBase* getDecorator(const char* name);
 			void addDecorator(DecoratorBase& decorator);
 			Atlas* loadAtlas(const char* path);
-			Block* createGui(Lux::FS::IFile& file);
+			Block* createGui(Lumix::FS::IFile& file);
 			Block* createBlock(uint32_t type, Block* parent);
 			Block* getBlock(int x, int y);
 			MouseMoveCallback& addMouseMoveCallback();
@@ -65,4 +65,4 @@ namespace UI
 
 
 } // ~namespace UI
-} // ~namespace Lux
+} // ~namespace Lumix

@@ -1,16 +1,16 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "universe/entity.h"
 
 
-namespace Lux
+namespace Lumix
 {
 	struct Entity;
 
 
-	struct LUX_ENGINE_API Component final
+	struct LUMIX_ENGINE_API Component final
 	{
 
 		typedef uint32_t Type;
@@ -37,4 +37,4 @@ namespace Lux
 	}; 
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

@@ -1,10 +1,10 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 	/* action type
@@ -13,7 +13,7 @@ namespace Lux
 		key down duration
 	*/
 
-	class LUX_CORE_API InputSystem
+	class LUMIX_CORE_API InputSystem
 	{
 		public:
 			enum InputType 
@@ -40,4 +40,4 @@ namespace Lux
 
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

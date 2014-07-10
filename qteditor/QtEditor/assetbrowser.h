@@ -2,7 +2,7 @@
 
 #include <QDockWidget>
 
-namespace Lux
+namespace Lumix
 {
 	class EditorClient;
 	class EditorServer;
@@ -20,12 +20,15 @@ class AssetBrowser : public QDockWidget
 public:
 	explicit AssetBrowser(QWidget* parent = NULL);
 	~AssetBrowser();
-	void setEditorClient(Lux::EditorClient& client) { m_client = &client; }
-	void setEditorServer(Lux::EditorServer& server) { m_server = &server; }
+	void setEditorClient(Lumix::EditorClient& client) { m_client = &client; }
+	void setEditorServer(Lumix::EditorServer& server) { m_server = &server; }
 	void emitFileChanged(const char* path);
 
 private:
 	void handleDoubleClick(const class QFileInfo& file_info);
+	void exportAnimation(const QFileInfo& file_info);
+	void exportModel(const QFileInfo& file_info);
+	void onFileSystemWatcherCallback(const char* path);
 
 signals:
 	void fileChanged(const QString& string);
@@ -35,12 +38,15 @@ private slots:
 	void onFileChanged(const QString& path);
 	void on_searchInput_textEdited(const QString &arg1);
 	void on_listWidget_activated(const QModelIndex &index);
+	void on_treeView_customContextMenuRequested(const QPoint &pos);
+	void on_exportFinished(int);
+	void on_filterComboBox_currentTextChanged(const QString &arg1);
 
-private:
+	private:
 	Ui::AssetBrowser* m_ui;
 	class QFileSystemModel* m_model;
 	class FileSystemWatcher* m_watcher;
-	Lux::EditorClient* m_client;
-	Lux::EditorServer* m_server;
+	Lumix::EditorClient* m_client;
+	Lumix::EditorServer* m_server;
 	QString m_base_path;
 };

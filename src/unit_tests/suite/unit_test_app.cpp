@@ -1,20 +1,22 @@
-#include "unit_tests/suite/lux_unit_tests.h"
+#include "unit_tests/suite/lumix_unit_tests.h"
 
 #include <Windows.h>
+#include "core/log.h"
 #include <stdio.h>
 
-#include "core/log.h"
-
-namespace Lux
+namespace Lumix
 {
 	namespace UnitTest
 	{
 		void outputToVS(const char* system, const char* message)
 		{
-			char tmp[2048];
-			sprintf(tmp, "%s: %s\r", system, message);
+			base_string<char, StackAllocator<2048> > tmp;
+			tmp = system;
+			tmp += ": ";
+			tmp += message;
+			tmp += "\r";
 
-			OutputDebugString(tmp);
+			OutputDebugString(tmp.c_str());
 		}
 
 		void outputToConsole(const char* system, const char* message)

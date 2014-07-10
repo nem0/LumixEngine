@@ -2,7 +2,7 @@
 
 #include "core/MT/event.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace MT
 	{
@@ -20,4 +20,4 @@ namespace Lux
 			T			data;
 		};
 	} // ~namespace MT
-} // ~namespace Lux
+} // ~namespace Lumix

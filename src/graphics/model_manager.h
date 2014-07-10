@@ -2,9 +2,9 @@
 
 #include "core/resource_manager_base.h"
 
-namespace Lux
+namespace Lumix
 {
-	class LUX_ENGINE_API ModelManager : public ResourceManagerBase
+	class LUMIX_ENGINE_API ModelManager : public ResourceManagerBase
 	{
 	public:
 		ModelManager() : ResourceManagerBase() {}

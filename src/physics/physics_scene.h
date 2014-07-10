@@ -1,14 +1,17 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/string.h"
 #include "core/vec3.h"
 #include "universe/universe.h"
 
 
-namespace Lux
+namespace Lumix
 {
+
+
+class Engine;
 
 
 struct RaycastHit
@@ -19,19 +22,21 @@ struct RaycastHit
 };
 
 
-class LUX_PHYSICS_API PhysicsScene
+class LUMIX_PHYSICS_API PhysicsScene
 {
 	friend class PhysicsSystem;
 	public:
 		PhysicsScene();
 		
-		bool create(PhysicsSystem& system, Universe& universe);
+		bool create(PhysicsSystem& system, Universe& universe, Engine& engine);
 		void destroy();
 		void update(float time_delta);
 		void render();
 		bool raycast(const Vec3& origin, const Vec3& dir, float distance, RaycastHit& result);
 		Component createBoxRigidActor(Entity entity);
+		Component createMeshRigidActor(Entity entity);
 		Component createController(Entity entity);
+		Component createHeightfield(Entity entity);
 		void destroyActor(Component cmp);
 		PhysicsSystem& getSystem() const;
 		
@@ -39,6 +44,10 @@ class LUX_PHYSICS_API PhysicsScene
 		void setIsDynamic(Component cmp, const bool& is);
 		void getHalfExtents(Component cmp, Vec3& size);
 		void setHalfExtents(Component cmp, const Vec3& size);
+		void getShapeSource(Component cmp, string& str);
+		void setShapeSource(Component cmp, const string& str);
+		void getHeightmap(Component cmp, string& str);
+		void setHeightmap(Component cmp, const string& str);
 
 		void moveController(Component cmp, const Vec3& v, float dt);
 	
@@ -50,4 +59,4 @@ class LUX_PHYSICS_API PhysicsScene
 };
 
 
-} // !namespace Lux
+} // !namespace Lumix

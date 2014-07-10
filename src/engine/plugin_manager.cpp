@@ -5,7 +5,7 @@
 #include <Windows.h>
 
 
-namespace Lux 
+namespace Lumix 
 {
 	struct PluginManagerImpl
 	{
@@ -79,7 +79,7 @@ namespace Lux
 
 	IPlugin* PluginManager::load(const char* path)
 	{
-		g_log_info.log("plugins", "loading plugin %s", path);
+		g_log_info.log("plugins") << "loading plugin " << path;
 		typedef IPlugin* (*PluginCreator)();
 		HMODULE lib = LoadLibrary(TEXT(path));
 		if(lib)
@@ -90,12 +90,12 @@ namespace Lux
 				IPlugin* plugin = creator();
 				if(!plugin->create(*m_impl->m_engine))
 				{
-					LUX_DELETE(plugin);
+					LUMIX_DELETE(plugin);
 					ASSERT(false);
 					return false;
 				}
 				m_impl->m_plugins.push(plugin);
-				g_log_info.log("plugins", "plugin loaded");
+				g_log_info.log("plugins") << "plugin loaded";
 				return plugin;
 			}
 		}
@@ -111,7 +111,7 @@ namespace Lux
 	
 	bool PluginManager::create(Engine& engine)
 	{
-		m_impl = LUX_NEW(PluginManagerImpl)();
+		m_impl = LUMIX_NEW(PluginManagerImpl)();
 		m_impl->m_engine = &engine;
 		return true;
 	}
@@ -122,11 +122,11 @@ namespace Lux
 		for(int i = 0; i < m_impl->m_plugins.size(); ++i)
 		{
 			m_impl->m_plugins[i]->destroy();
-			LUX_DELETE(m_impl->m_plugins[i]);
+			LUMIX_DELETE(m_impl->m_plugins[i]);
 		}
-		LUX_DELETE(m_impl);
+		LUMIX_DELETE(m_impl);
 		m_impl = NULL;
 	}
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

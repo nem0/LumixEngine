@@ -5,7 +5,7 @@
 #include "graphics/gl_ext.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 

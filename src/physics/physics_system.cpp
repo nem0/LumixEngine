@@ -10,21 +10,21 @@
 #include "engine/engine.h"
 #include "physics/physics_scene.h"
 #include "physics/physics_system_impl.h"
-#include "universe/component_event.h"
-#include "universe/entity_moved_event.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
-static const uint32_t box_rigid_actor_type = crc32("box_rigid_actor");
-static const uint32_t controller_type = crc32("physical_controller");
+static const uint32_t BOX_ACTOR_HASH = crc32("box_rigid_actor");
+static const uint32_t MESH_ACTOR_HASH = crc32("mesh_rigid_actor");
+static const uint32_t CONTROLLER_HASH = crc32("physical_controller");
+static const uint32_t HEIGHTFIELD_HASH = crc32("physical_heightfield");
 
 
 extern "C" IPlugin* createPlugin()
 {
-	return LUX_NEW(PhysicsSystem)();
+	return LUMIX_NEW(PhysicsSystem)();
 }
 
 
@@ -36,16 +36,15 @@ struct CustomErrorCallback : public physx::PxErrorCallback
 
 void PhysicsSystem::onCreateUniverse(Universe& universe)
 {
-	m_impl->m_scene = LUX_NEW(PhysicsScene)();
-	m_impl->m_scene->create(*this, universe);
-
+	m_impl->m_scene = LUMIX_NEW(PhysicsScene)();
+	m_impl->m_scene->create(*this, universe, *m_impl->m_engine);
 }
 
 
 void PhysicsSystem::onDestroyUniverse(Universe& universe)
 {
 	m_impl->m_scene->destroy();
-	LUX_DELETE(m_impl->m_scene);
+	LUMIX_DELETE(m_impl->m_scene);
 	m_impl->m_scene = NULL;
 }
 
@@ -73,13 +72,21 @@ void PhysicsSystem::sendMessage(const char* message)
 
 Component PhysicsSystem::createComponent(uint32_t component_type, const Entity& entity)
 {
-	if(component_type == controller_type)
+	if (component_type == HEIGHTFIELD_HASH)
+	{
+		return m_impl->m_scene->createHeightfield(entity);
+	}
+	else if (component_type == CONTROLLER_HASH)
 	{
 		return m_impl->m_scene->createController(entity);
 	}
-	else if(component_type == box_rigid_actor_type)
+	else if (component_type == BOX_ACTOR_HASH)
 	{
 		return m_impl->m_scene->createBoxRigidActor(entity);
+	}
+	else if (component_type == MESH_ACTOR_HASH)
+	{
+		return m_impl->m_scene->createMeshRigidActor(entity);
 	}
 	return Component::INVALID;
 }
@@ -91,16 +98,27 @@ void PhysicsSystem::update(float dt)
 }
 
 
+PhysicsScene* PhysicsSystem::getScene() const
+{
+	return m_impl->m_scene;
+}
+
+
 bool PhysicsSystem::create(Engine& engine)
 {
-	engine.getEditorServer()->registerProperty("box_rigid_actor", LUX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("dynamic"), &PhysicsScene::getIsDynamic, &PhysicsScene::setIsDynamic));
-	engine.getEditorServer()->registerProperty("box_rigid_actor", LUX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("size"), &PhysicsScene::getHalfExtents, &PhysicsScene::setHalfExtents));
-	engine.getEditorServer()->registerCreator(box_rigid_actor_type, *this);
-	engine.getEditorServer()->registerCreator(controller_type, *this);
+	engine.getEditorServer()->registerProperty("box_rigid_actor", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("dynamic"), &PhysicsScene::getIsDynamic, &PhysicsScene::setIsDynamic));
+	engine.getEditorServer()->registerProperty("box_rigid_actor", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("size"), &PhysicsScene::getHalfExtents, &PhysicsScene::setHalfExtents));
+	engine.getEditorServer()->registerProperty("mesh_rigid_actor", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("source"), &PhysicsScene::getShapeSource, &PhysicsScene::setShapeSource, IPropertyDescriptor::FILE));
+	engine.getEditorServer()->registerProperty("physical_heightfield", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("heightmap"), &PhysicsScene::getHeightmap, &PhysicsScene::setHeightmap, IPropertyDescriptor::FILE));
+	engine.getEditorServer()->registerCreator(HEIGHTFIELD_HASH, *this);
+	engine.getEditorServer()->registerCreator(BOX_ACTOR_HASH, *this);
+	engine.getEditorServer()->registerCreator(MESH_ACTOR_HASH, *this);
+	engine.getEditorServer()->registerCreator(CONTROLLER_HASH, *this);
 
-	m_impl = LUX_NEW(PhysicsSystemImpl);
-	m_impl->m_allocator = LUX_NEW(physx::PxDefaultAllocator)();
-	m_impl->m_error_callback = LUX_NEW(CustomErrorCallback)();
+	m_impl = LUMIX_NEW(PhysicsSystemImpl);
+	m_impl->m_allocator = LUMIX_NEW(physx::PxDefaultAllocator)();
+	m_impl->m_error_callback = LUMIX_NEW(CustomErrorCallback)();
+	m_impl->m_engine = &engine;
 	m_impl->m_foundation = PxCreateFoundation(
 		PX_PHYSICS_VERSION,
 		*m_impl->m_allocator,
@@ -126,9 +144,9 @@ void PhysicsSystem::destroy()
 	m_impl->m_cooking->release();
 	m_impl->m_physics->release();
 	m_impl->m_foundation->release();
-	LUX_DELETE(m_impl->m_allocator);
-	LUX_DELETE(m_impl->m_error_callback);
-	LUX_DELETE(m_impl);
+	LUMIX_DELETE(m_impl->m_allocator);
+	LUMIX_DELETE(m_impl->m_error_callback);
+	LUMIX_DELETE(m_impl);
 	m_impl = 0;
 }
 
@@ -150,11 +168,11 @@ bool PhysicsSystemImpl::connect2VisualDebugger()
 
 void CustomErrorCallback::reportError(physx::PxErrorCode::Enum code, const char* message, const char* file, int line)
 {
-	g_log_error.log("PhysX", message);
+	g_log_error.log("PhysX") << message;
 }
 
 
-} // !namespace Lux
+} // !namespace Lumix
 
 
 

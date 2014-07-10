@@ -6,7 +6,7 @@
 #include "core/string.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -114,6 +114,7 @@ void PropertyDescriptor<S>::set(Component cmp, Blob& stream) const
 				(static_cast<S*>(cmp.system)->*m_bool_setter)(cmp, b); 
 			}
 			break;
+		case STRING:
 		case FILE:
 			{
 				char tmp[301];
@@ -144,6 +145,7 @@ void PropertyDescriptor<S>::get(Component cmp, Blob& stream) const
 	int len = 4;
 	switch(m_type)
 	{
+		case STRING:
 		case FILE:
 			{
 				string value;
@@ -196,4 +198,4 @@ void PropertyDescriptor<S>::get(Component cmp, Blob& stream) const
 }
 
 
-} // !namespace Lux
+} // !namespace Lumix

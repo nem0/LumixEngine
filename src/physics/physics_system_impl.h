@@ -4,7 +4,7 @@
 #include <PxPhysicsAPI.h>
 
 
-namespace Lux
+namespace Lumix
 {
 
 	
@@ -19,6 +19,7 @@ struct PhysicsSystemImpl
 	physx::PxErrorCallback*		m_error_callback;
 	physx::PxCooking*			m_cooking;
 	class PhysicsScene*			m_scene;
+	class Engine*				m_engine;
 };
 
 

@@ -1,10 +1,10 @@
 #include "core/os_file.h"
-#include "core/lux.h"
+#include "core/lumix.h"
 
 #include <assert.h>
 #include <windows.h>
 
-namespace Lux
+namespace Lumix
 {
 	namespace FS
 	{
@@ -64,7 +64,7 @@ namespace Lux
 			if(INVALID_HANDLE_VALUE != hnd)
 			{
 				TODO("lock-free free list");
-				OsFileImpl* impl = LUX_NEW(OsFileImpl); 
+				OsFileImpl* impl = LUMIX_NEW(OsFileImpl); 
 				impl->m_file = hnd;
 				m_impl = impl;
 
@@ -79,7 +79,7 @@ namespace Lux
 			if (NULL != m_impl)
 			{
 				::CloseHandle(m_impl->m_file);
-				LUX_DELETE(m_impl);
+				LUMIX_DELETE(m_impl);
 				m_impl = NULL;
 			}
 		}
@@ -138,4 +138,4 @@ namespace Lux
 			::SetEndOfFile(m_impl->m_file);
 		}
 	} // ~namespace FS
-} // ~namespace Lux
+} // ~namespace Lumix

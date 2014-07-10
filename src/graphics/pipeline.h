@@ -1,11 +1,11 @@
 #pragma once
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/delegate_list.h"
 #include "core/resource.h"
 #include "core/resource_manager_base.h"
 
-namespace Lux
+namespace Lumix
 {
 	
 struct Component;
@@ -24,7 +24,7 @@ class IFile;
 }
 
 
-class LUX_ENGINE_API PipelineManager : public ResourceManagerBase
+class LUMIX_ENGINE_API PipelineManager : public ResourceManagerBase
 {
 public:
 	PipelineManager() : ResourceManagerBase() {}
@@ -36,7 +36,7 @@ protected:
 };
 
 
-class LUX_ENGINE_API Pipeline : public Resource
+class LUMIX_ENGINE_API Pipeline : public Resource
 {
 	public:
 		Pipeline(const Path& path, ResourceManager& resource_manager);
@@ -49,8 +49,11 @@ class LUX_ENGINE_API Pipeline : public Resource
 };
 
 
-class LUX_ENGINE_API PipelineInstance abstract
+class LUMIX_ENGINE_API PipelineInstance abstract
 {
+	public:
+		typedef Delegate<void> CustomCommandHandler; 
+
 	public:
 		virtual ~PipelineInstance() {}
 
@@ -64,6 +67,8 @@ class LUX_ENGINE_API PipelineInstance abstract
 		virtual void setRenderer(Renderer& renderer) = 0;
 		virtual void setScene(RenderScene* scene) = 0;
 		virtual RenderScene* getScene() = 0;
+		virtual CustomCommandHandler& addCustomCommandHandler(const char* name) = 0;
+
 };
 
 

@@ -7,10 +7,10 @@
 
 
 
-namespace Lux
+namespace Lumix
 {
 
-template <typename T, typename Allocator = DefaultAllocator, bool is_trivially_copyable = std::is_trivially_copyable<T>::value > class Array;
+template <typename T, typename Allocator = DefaultAllocator, bool is_trivially_copyable = std::is_trivial<T>::value > class Array;
 
 template <typename T, typename Allocator>
 class Array<T, Allocator, false>
@@ -200,20 +200,13 @@ class Array<T, Allocator, false>
 		{
 			if(capacity > m_capacity)
 			{
-				T* newData = (T*)m_allocator.allocate(capacity * sizeof(T));
-				for(int i = 0; i < m_size; ++i)
-				{
-					new ((char*)(newData + i)) T(m_data[i]);
-				}
-				callDestructors(m_data, m_data + m_size);
-				m_allocator.deallocate(m_data);
-				m_data = newData;
-				m_capacity = capacity;			
+				m_data = (T*)m_allocator.reallocate(m_data, capacity * sizeof(T));
+				m_capacity = capacity;
 			}
 		}
 
-		const T& operator[] (int index) const { ASSERT(index < m_size); return m_data[index]; }
-		T& operator[](int index) { return m_data[index]; }
+		const T& operator[] (int index) const { ASSERT(index >= 0 && index < m_size); return m_data[index]; }
+		T& operator[](int index) { ASSERT(index >= 0 && index < m_size);  return m_data[index]; }
  		int size() const { return m_size; }
 		int capacity() const { return m_capacity; }
 
@@ -223,14 +216,7 @@ class Array<T, Allocator, false>
 		void grow()
 		{
 			int newCapacity = m_capacity == 0 ? 4 : m_capacity * 2;
-			T* newData = (T*)m_allocator.allocate(newCapacity * sizeof(T));
-			for(int i = 0; i < m_size; ++i)
-			{
-				new ((char*)(newData + i)) T(m_data[i]);
-			}
-			callDestructors(m_data, m_data + m_size);
-			m_allocator.deallocate(m_data);
-			m_data = newData;
+			m_data = (T*)m_allocator.reallocate(m_data, newCapacity * sizeof(T));
 			m_capacity = newCapacity;
 		}
 
@@ -409,4 +395,4 @@ private:
 
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

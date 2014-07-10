@@ -4,11 +4,11 @@
 #include "core/MT/event.h"
 #include "core/Array.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace MTJD
 	{
-		class LUX_CORE_API BaseEntry abstract
+		class LUMIX_CORE_API BaseEntry abstract
 		{
 		public:
 			typedef Array<BaseEntry*> DependencyTable;
@@ -34,4 +34,4 @@ namespace Lux
 			DependencyTable		m_dependency_table;
 		};
 	} // ~namepsace MTJD
-} // ~namepsace Lux
+} // ~namepsace Lumix

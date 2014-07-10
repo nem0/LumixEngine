@@ -4,7 +4,7 @@
 #include "gui/controls/scrollbar.h"
 
 
-namespace Lux
+namespace Lumix
 {
 namespace UI
 {
@@ -14,17 +14,17 @@ Scrollable::Scrollable(Gui& gui, Block* parent)
 	: Block(gui, parent, "_box")
 {
 	setArea(0, 0, 0, 0, 1, 0, 1, 0);
-	m_container = LUX_NEW(Lux::UI::Block)(gui, this, NULL);
+	m_container = LUMIX_NEW(Lumix::UI::Block)(gui, this, NULL);
 	m_container->setIsClipping(true);
 	m_container->setArea(0, 0, 0, 0, 1, 0, 1, 0);
 
-	m_vertical_scrollbar = LUX_NEW(Scrollbar)(gui, this);
+	m_vertical_scrollbar = LUMIX_NEW(Scrollbar)(gui, this);
 	m_vertical_scrollbar->setArea(1, -20, 0, 0, 1, 0, 1, 0); 
 	m_vertical_scrollbar->hide();
 	m_vertical_scrollbar->setScrollbarType(Scrollbar::VERTICAL);
 	m_vertical_scrollbar->onEvent("value_changed").bind<Scrollable, &Scrollable::scrollbarValueChanged>(this);
 
-	m_horizontal_scrollbar = LUX_NEW(Scrollbar)(gui, this);
+	m_horizontal_scrollbar = LUMIX_NEW(Scrollbar)(gui, this);
 	m_horizontal_scrollbar->setArea(0, 0, 1, -20, 1, 0, 1, 0); 
 	m_horizontal_scrollbar->hide();
 	m_horizontal_scrollbar->onEvent("value_changed").bind<Scrollable, &Scrollable::scrollbarValueChanged>(this);
@@ -135,4 +135,4 @@ void Scrollable::layout()
 
 
 } // ~namespace UI
-} // ~namespace Lux
+} // ~namespace Lumix

@@ -11,7 +11,7 @@
 #include "graphics/shader_manager.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -42,7 +42,9 @@ void Shader::setUniform(const char* name, int value)
 	GLint loc = glGetUniformLocation(m_program_id, name);
 	if(loc >= 0)
 	{
-		glProgramUniform1i(m_program_id, loc, value);
+		//glProgramUniform1i(m_program_id, loc, value);
+		glUseProgram(m_program_id);
+		glUniform1i(loc, value);
 	}
 }
 
@@ -52,7 +54,9 @@ void Shader::setUniform(const char* name, const Vec3& value)
 	GLint loc = glGetUniformLocation(m_program_id, name);
 	if(loc >= 0)
 	{
-		glProgramUniform3f(m_program_id, loc, value.x, value.y, value.z);
+		//glProgramUniform3f(m_program_id, loc, value.x, value.y, value.z);
+		glUseProgram(m_program_id);
+		glUniform3f(loc, value.x, value.y, value.z);
 	}
 }
 
@@ -62,7 +66,9 @@ void Shader::setUniform(const char* name, GLfloat value)
 	GLint loc = glGetUniformLocation(m_program_id, name);
 	if(loc >= 0)
 	{
-		glProgramUniform1f(m_program_id, loc, value);
+		//glProgramUniform1f(m_program_id, loc, value);
+		glUseProgram(m_program_id);
+		glUniform1f(loc, value);
 	}
 }
 
@@ -72,7 +78,9 @@ void Shader::setUniform(const char* name, const Matrix& mtx)
 	GLint loc = glGetUniformLocation(m_program_id, name);
 	if(loc >= 0)
 	{
-		glProgramUniformMatrix4fv(m_program_id, loc, 1, false, &mtx.m11);
+		//glProgramUniformMatrix4fv(m_program_id, loc, 1, false, &mtx.m11);
+		glUseProgram(m_program_id);
+		glUniformMatrix4fv(loc, 1, false, &mtx.m11);
 	}
 }
 
@@ -81,7 +89,9 @@ void Shader::setUniform(const char* name, const Matrix* matrices, int count)
 	GLint loc = glGetUniformLocation(m_program_id, name);
 	if(loc >= 0) // this is here because of bug in some gl implementations
 	{
-		glProgramUniformMatrix4fv(m_program_id, loc, count, false, &matrices[0].m11);
+		//glProgramUniformMatrix4fv(m_program_id, loc, count, false, &matrices[0].m11);
+		glUseProgram(m_program_id);
+		glUniformMatrix4fv(loc, count, false, &matrices[0].m11);	
 	}
 }
 
@@ -115,7 +125,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 					++attribute_count;
 					if (attribute_count == MAX_ATTRIBUTE_COUNT)
 					{
-						g_log_error.log("renderer", "Too many vertex attributes in shader %s", m_path.c_str());
+						g_log_error.log("renderer") << "Too many vertex attributes in shader " << m_path.c_str();
 						onFailure();
 						fs.close(file);
 						return;
@@ -139,7 +149,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		char* end = strstr(buf, "//~VS");		
 		if (!end)
 		{
-			g_log_error.log("renderer", "Could not process shader file %s", m_path.c_str());
+			g_log_error.log("renderer") << "Could not process shader file " << m_path.c_str();
 			onFailure();
 			fs.close(file);
 			return;
@@ -153,7 +163,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		glGetProgramiv(m_program_id, GL_LINK_STATUS, &link_status);
 		if (link_status != GL_TRUE)
 		{
-			g_log_error.log("renderer", "Could not link shader %s", m_path.c_str());
+			g_log_error.log("renderer") << "Could not link shader " << m_path.c_str();
 			onFailure();
 			fs.close(file);
 			return;
@@ -170,6 +180,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	}
 	else
 	{
+		g_log_error.log("renderer") << "Could not load shader " << m_path.c_str();
 		onFailure();
 	}
 
@@ -197,4 +208,4 @@ FS::ReadCallback Shader::getReadCallback()
 }
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

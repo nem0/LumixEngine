@@ -2,6 +2,8 @@
 #include "core/log.h"
 #include "core/math_utils.h"
 #include "core/MT/spin_mutex.h"
+#include "core/stack_allocator.h"
+#include "core/string.h"
 
 //#include <new>
 #include <stdio.h>
@@ -12,7 +14,7 @@
 
 #undef min
 
-namespace Lux
+namespace Lumix
 {
 	void memTrackerLog(const char*, const char* message, ...)
 	{
@@ -22,7 +24,7 @@ namespace Lux
 		vsnprintf(tmp, 1021, message, args);
 		va_end(args);
 
-		strcat(tmp, "\n");
+		catCString(tmp, sizeof(tmp), "\n");
 		OutputDebugString(tmp);
 	}
 
@@ -32,10 +34,10 @@ namespace Lux
 		const char *file;
 		int32_t line;
 
-		LUX_FORCE_INLINE bool operator == (const FileLineReport &other) const { return file == other.file && line == other.line; }
-		LUX_FORCE_INLINE bool operator != (const FileLineReport &other) const { return !(*this == other); }
+		LUMIX_FORCE_INLINE bool operator == (const FileLineReport &other) const { return file == other.file && line == other.line; }
+		LUMIX_FORCE_INLINE bool operator != (const FileLineReport &other) const { return !(*this == other); }
 
-		LUX_FORCE_INLINE bool operator < (const FileLineReport &other) const
+		LUMIX_FORCE_INLINE bool operator < (const FileLineReport &other) const
 		{
 			if(file == NULL)
 				return other.file != NULL;
@@ -47,7 +49,7 @@ namespace Lux
 			return line < other.line;
 		}
 
-		LUX_FORCE_INLINE bool operator > (const FileLineReport &other) const
+		LUMIX_FORCE_INLINE bool operator > (const FileLineReport &other) const
 		{
 			if(file == NULL)
 				return other.file != NULL;
@@ -60,10 +62,10 @@ namespace Lux
 		}
 	};
 
-	typedef map<uint32_t, MemoryTracker::Entry*, MemTrackAllocator> map_alloc_order;
-	typedef map<FileLineReport, intptr_t, MemTrackAllocator> file_line_map;
-	typedef map<const char *, intptr_t, MemTrackAllocator> file_map;
-	typedef map<FileLineReport, uint32_t, MemTrackAllocator> alloc_count_map;
+	typedef Map<uint32_t, MemoryTracker::Entry*, MemTrackAllocator> map_alloc_order;
+	typedef Map<FileLineReport, intptr_t, MemTrackAllocator> file_line_map;
+	typedef Map<const char *, intptr_t, MemTrackAllocator> file_map;
+	typedef Map<FileLineReport, uint32_t, MemTrackAllocator> alloc_count_map;
 
 #pragma init_seg(compiler)
 	MemoryTracker MemoryTracker::s_instance;
@@ -99,6 +101,20 @@ namespace Lux
 		}
 	}
 
+	static void getEntryLog(MemoryTracker::Entry& entry, void* address, base_string<char, StackAllocator<512> >& string)
+	{
+		if (entry.file() != NULL)
+		{
+			string.cat(entry.file(), "(", entry.line(), ") : ");
+		}
+		string.cat("{", entry.allocID(), " } normal block");
+		if (address)
+		{
+			string.cat(" at ", (int64_t)address);
+		}
+		string.cat(", ", entry.size(), " bytes long.");
+	}
+
 	void MemoryTracker::dumpDetailed()
 	{
 		// Detected memory leaks!
@@ -124,33 +140,27 @@ namespace Lux
 
 		for (EntryTable::iterator it = m_map.begin(); it != m_map.end(); ++it)
 		{
-			char string[512];
+			base_string<char, StackAllocator<512> > string;
 
 			Entry& entry = *it;
 			void* adr = it.key();
 
-			if (entry.file() != NULL)
-			{
-				sprintf(string, "%s(%d): {%d} normal block at %p, %d bytes long.", entry.file(), entry.line(), entry.allocID(), adr, entry.size());
-			}
-			else
-			{
-				sprintf(string, "{%d} normal block at %p, %d bytes long.", entry.allocID(), adr, entry.size());
-			}
-			memTrackerLog("MemoryTracker", "%s", string);
+			getEntryLog(entry, adr, string);
+			memTrackerLog("MemoryTracker", string.c_str());
 
 			int32_t str_len = Math::min(16, (int32_t)entry.size());
 			char asci_buf[17];
 			memset(asci_buf, 0, 17);
 			memcpy(asci_buf, adr, str_len);
 
-			sprintf(string, "Data: <%s>", asci_buf);
+			string = "";
+			string.cat("Data: <", asci_buf, ">");
 			for (int j = 0; j < str_len; j++)
 			{
 				char hex[4];
-				memset (hex, 0, sizeof(hex));
-				sprintf(hex, " %.2X", *((uint8_t*)adr + j));
-				strcat(string, hex);
+				hex[0] = ' ';
+				toCStringHex(*((uint8_t*)adr + j), hex+1, 2);
+				string.cat(hex);
 			}
 			memTrackerLog("MemoryTracker", "%s", string);
 		}
@@ -192,18 +202,11 @@ namespace Lux
 
 		for (map_alloc_order::iterator it = alloc_order_map.begin(); it != alloc_order_map.end(); ++it)
 		{
-			char string[512];
+			base_string<char, StackAllocator<512> > string;
 			Entry& entry = *(it.second());
-			if (entry.file() != NULL)
-			{
-				sprintf(string, "%s(%d): {%d} normal block, %d bytes long.", entry.file(), entry.line(), entry.allocID(), entry.size());
-			}
-			else
-			{
-				sprintf(string, "{%d} normal block, %d bytes long.", entry.allocID(), entry.size());
-			}
+			getEntryLog(entry, NULL, string);
 
-			memTrackerLog("MemoryTracker", "%s", string);
+			memTrackerLog("MemoryTracker", string.c_str());
 		}
 
 		if(count)
@@ -237,21 +240,20 @@ namespace Lux
 
 		for (file_line_map::iterator it = report_map.begin(); it != report_map.end(); ++it)
 		{
-			char string[512];
+			base_string<char, StackAllocator<512> > string;
 
 			const FileLineReport &rep = it.first();
 			intptr_t size = it.second();
 
 			const char *file = rep.file ? rep.file : "unknown";
 
-			if(size >= 1000000)
-				sprintf(string, "%30s(%5d) : %2d %03d %03d", file, rep.line, size / 1000000, (size % 1000000) / 1000, (size & 1000));
-			else if(size >= 1000)
-				sprintf(string, "%30s(%5d) : %6d %03d", file, rep.line, size / 1000, size % 1000);
-			else
-				sprintf(string, "%30s(%5d) : %10d", file, rep.line, size);
+			string = file;
+			string += "(";
+			string.cat(rep.line);
+			string += ") : ";
+			string.cat(size);
 
-			memTrackerLog("MemoryTracker", "%s", string);
+			memTrackerLog("MemoryTracker", string.c_str());
 		}
 
 		memTrackerLog("MemoryTracker", "Object dump complete.");
@@ -279,19 +281,17 @@ namespace Lux
 
 		for (file_map::iterator it = report_map.begin(); it != report_map.end(); ++it)
 		{
-			char string[512];
+			base_string<char, StackAllocator<512> > string;
 
 			intptr_t size = it.second();
 			const char *file = it.first();
 
-			if(size >= 1000000)
-				sprintf(string, "%30s : %2d %03d %03d", file, size / 1000000, (size % 1000000) / 1000, (size & 1000));
-			else if(size >= 1000)
-				sprintf(string, "%30s : %6d %03d", file, size / 1000, size % 1000);
-			else
-				sprintf(string, "%30s : %10d", file, size);
+			
+			string = file;
+			string += " : ";
+			string.cat(size);
 
-			memTrackerLog("MemoryTracker", "%s", string);
+			memTrackerLog("MemoryTracker", string.c_str());
 		}
 
 		memTrackerLog("MemoryTracker", "Object dump complete.");
@@ -328,7 +328,7 @@ namespace Lux
 
 		for (EntryTable::iterator it = m_map.begin(); it != m_map.end(); ++it)
 		{
-			char string[512];
+			base_string<char, StackAllocator<512> > string;
 
 			Entry& entry = *it;
 			void* adr = it.key();
@@ -338,14 +338,7 @@ namespace Lux
 
 			size += entry.size();
 
-			if (entry.file() != NULL)
-			{
-				sprintf(string, "%s(%d) : {%d} normal block at %p, %d bytes long.", entry.file(), entry.line(), entry.allocID(), adr, entry.size());
-			}
-			else
-			{
-				sprintf(string, "{%d} normal block at %p, %d bytes long.", entry.allocID(), adr, entry.size());
-			}
+			getEntryLog(entry, adr, string);
 
 			memTrackerLog("MemoryTracker", "%s", string);
 
@@ -354,13 +347,13 @@ namespace Lux
 			memset(asci_buf, 0, 17);
 			memcpy(asci_buf, adr, str_len);
 
-			sprintf(string, "Data: <%s>", asci_buf);
+			string.cat("Data: <", asci_buf, ">");
 			for (int j = 0; j < str_len; j++)
 			{
 				char hex[4];
-				memset (hex, 0, sizeof(hex));
-				sprintf(hex, " %.2X", *((uint8_t*)adr + j));
-				strcat(string, hex);
+				hex[0] = ' ';
+				toCStringHex(*((uint8_t*)adr + j), hex + 1, 2);
+				string.cat(hex);
 			}
 
 			memTrackerLog("MemoryTracker", "%s", string);
@@ -380,8 +373,8 @@ namespace Lux
 
 	MemoryTracker::~MemoryTracker()
 	{
-		Lux::MemoryTracker::getInstance().dumpDetailed();
+		Lumix::MemoryTracker::getInstance().dumpDetailed();
 	}
-} //~namespace Lux
+} //~namespace Lumix
 
 #endif //~MEM_TRACK

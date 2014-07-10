@@ -1,20 +1,18 @@
 #include "animation_system.h"
 #include "animation/animation.h"
 #include "core/crc32.h"
-#include "core/event_manager.h"
 #include "core/json_serializer.h"
+#include "core/resource_manager.h"
 #include "editor/editor_server.h"
 #include "engine/engine.h"
 #include "graphics/renderer.h"
-#include "universe/component_event.h"
 #include "universe/universe.h"
-#include "core/resource_manager.h"
 
-namespace Lux
+namespace Lumix
 {
 
-	static const uint32_t renderable_type = crc32("renderable");
-	static const uint32_t animable_type = crc32("animable");
+	static const uint32_t RENDERABLE_HASH = crc32("renderable");
+	static const uint32_t ANIMABLE_HASH = crc32("animable");
 
 
 	struct AnimationSystemImpl
@@ -34,7 +32,7 @@ namespace Lux
 			Universe* m_universe;
 			Engine& m_engine;
 
-			void onEvent(Event& event);
+			void onComponentCreated(Component& component);
 		
 		private:
 			void operator=(const AnimationSystemImpl&);
@@ -42,19 +40,20 @@ namespace Lux
 
 	bool AnimationSystem::create(Engine& engine)
 	{
-		m_impl = LUX_NEW(AnimationSystemImpl)(engine);
+		m_impl = LUMIX_NEW(AnimationSystemImpl)(engine);
 		m_impl->m_universe = 0;
 		if(engine.getEditorServer())
 		{
-			engine.getEditorServer()->registerCreator(animable_type, *this);
+			engine.getEditorServer()->registerCreator(ANIMABLE_HASH, *this);
 		}
+		engine.getEditorServer()->registerProperty("animable", LUMIX_NEW(PropertyDescriptor<AnimationSystem>)(crc32("preview"), &AnimationSystem::getPreview, &AnimationSystem::setPreview, IPropertyDescriptor::FILE));
 		return true;
 	}
 
 
 	void AnimationSystem::destroy()
 	{
-		LUX_DELETE(m_impl);
+		LUMIX_DELETE(m_impl);
 		m_impl = 0;
 	}
 
@@ -63,7 +62,7 @@ namespace Lux
 	{
 		ASSERT(!m_impl->m_universe);
 		m_impl->m_universe = &universe;
-		m_impl->m_universe->getEventManager().addListener(ComponentEvent::type).bind<AnimationSystemImpl, &AnimationSystemImpl::onEvent>(m_impl);
+		m_impl->m_universe->componentCreated().bind<AnimationSystemImpl, &AnimationSystemImpl::onComponentCreated>(m_impl);
 	}
 
 
@@ -71,16 +70,14 @@ namespace Lux
 	{
 		ASSERT(m_impl->m_universe);
 		m_impl->m_animables.clear();
-		EventManager::Listener cb;
-		cb.bind<AnimationSystemImpl, &AnimationSystemImpl::onEvent>(m_impl);
-		m_impl->m_universe->getEventManager().removeListener(ComponentEvent::type, cb);
+		m_impl->m_universe->componentCreated().unbind<AnimationSystemImpl, &AnimationSystemImpl::onComponentCreated>(m_impl);
 		m_impl->m_universe = 0;
 	}
 
 
 	Component AnimationSystem::createComponent(uint32_t component_type, const Entity& entity) 
 	{
-		if(component_type == animable_type)
+		if(component_type == ANIMABLE_HASH)
 		{
 			return createAnimable(entity);
 		}
@@ -107,10 +104,9 @@ namespace Lux
 		int count;
 		serializer.deserialize("count", count);
 		serializer.deserializeArrayBegin("animables");
-		m_impl->m_animables.clear();
+		m_impl->m_animables.resize(count);
 		for(int i = 0; i < count; ++i)
 		{
-			m_impl->m_animables.pushEmpty();
 			serializer.deserializeArrayItem(m_impl->m_animables[i].m_manual);
 			int entity_index;
 			serializer.deserializeArrayItem(entity_index);
@@ -119,36 +115,30 @@ namespace Lux
 			m_impl->m_animables[i].m_renderable = Component::INVALID;
 			for(int j = 0; j < cmps.size(); ++j)
 			{
-				if(cmps[j].type == renderable_type)
+				if(cmps[j].type == RENDERABLE_HASH)
 				{
 					m_impl->m_animables[i].m_renderable = cmps[j];
 					break;
 				}
 			}
 			serializer.deserializeArrayItem(m_impl->m_animables[i].m_time);
-			Component cmp(e, animable_type, this, i);
-			ComponentEvent evt(cmp);
-			m_impl->m_universe->getEventManager().emitEvent(evt);
+			m_impl->m_universe->addComponent(e, ANIMABLE_HASH, this, i);
 		}
 		serializer.deserializeArrayEnd();
 	}
 
 
-	void AnimationSystemImpl::onEvent(Event& event)
+	void AnimationSystemImpl::onComponentCreated(Component& cmp)
 	{
-		if(event.getType() == ComponentEvent::type)
+		if(cmp.type == RENDERABLE_HASH)
 		{
-			ComponentEvent& e = static_cast<ComponentEvent&>(event);
-			if(e.component.type == renderable_type)
+			const Entity::ComponentList& cmps = cmp.entity.getComponents();
+			for(int i = 0; i < cmps.size(); ++i)
 			{
-				const Entity::ComponentList& cmps = e.component.entity.getComponents();
-				for(int i = 0; i < cmps.size(); ++i)
+				if(cmps[i].type == ANIMABLE_HASH)
 				{
-					if(cmps[i].type == animable_type)
-					{
-						m_animables[cmps[i].index].m_renderable = e.component;
-						break;
-					}
+					m_animables[cmps[i].index].m_renderable = cmp;
+					break;
 				}
 			}
 		}
@@ -161,21 +151,21 @@ namespace Lux
 		animable.m_manual = true;
 		animable.m_time = 0;
 		animable.m_renderable = Component::INVALID;
+		animable.m_animation = NULL;
 
 		const Entity::ComponentList& cmps = entity.getComponents();
 		for(int i = 0; i < cmps.size(); ++i)
 		{
-			if(cmps[i].type == renderable_type)
+			if(cmps[i].type == RENDERABLE_HASH)
 			{
 				animable.m_renderable = cmps[i];
 				break;
 			}
 		}
 
-		Component cmp(entity, animable_type, this, m_impl->m_animables.size() - 1);
-		ComponentEvent evt(cmp);
-		m_impl->m_universe->getEventManager().emitEvent(evt);
-		return Component(entity, animable_type, this, m_impl->m_animables.size() - 1);
+		Component cmp = m_impl->m_universe->addComponent(entity, ANIMABLE_HASH, this, m_impl->m_animables.size() - 1);
+		m_impl->m_universe->componentCreated().invoke(cmp);
+		return cmp;
 	}
 
 
@@ -183,6 +173,18 @@ namespace Lux
 	{
 		ResourceManager& rm = m_impl->m_engine.getResourceManager();
 		return static_cast<Animation*>(rm.get(ResourceManager::ANIMATION)->load(path));
+	}
+
+
+	void AnimationSystem::getPreview(Component cmp, string& path)
+	{
+		path = m_impl->m_animables[cmp.index].m_animation ? m_impl->m_animables[cmp.index].m_animation->getPath().c_str() : "";
+	}
+
+
+	void AnimationSystem::setPreview(Component cmp, const string& path)
+	{
+		playAnimation(cmp, path.c_str());
 	}
 
 
@@ -210,7 +212,7 @@ namespace Lux
 			if(!animable.m_manual && animable.m_animation->isReady())
 			{
 				RenderScene* scene = static_cast<RenderScene*>(animable.m_renderable.system);
-				animable.m_animation->getPose(animable.m_time, scene->getPose(animable.m_renderable));
+				animable.m_animation->getPose(animable.m_time, scene->getPose(animable.m_renderable), *scene->getModel(animable.m_renderable));
 				float t = animable.m_time + time_delta;
 				float l = animable.m_animation->getLength();
 				while(t > l)
@@ -223,4 +225,4 @@ namespace Lux
 	}
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

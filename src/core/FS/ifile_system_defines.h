@@ -1,9 +1,9 @@
 #pragma once
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/delegate.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace FS
 	{
@@ -45,4 +45,4 @@ namespace Lux
 			uint32_t value;
 		};
 	} // ~namespace FS
-} // ~namespace Lux
+} // ~namespace Lumix

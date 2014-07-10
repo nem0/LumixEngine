@@ -4,14 +4,14 @@
 #include "gui/block.h"
 
 
-namespace Lux
+namespace Lumix
 {
 namespace UI
 {
 
 	class Scrollbar;
 
-	class LUX_GUI_API Dockable : public Block
+	class LUMIX_GUI_API Dockable : public Block
 	{
 		public:
 			enum Slot
@@ -59,4 +59,4 @@ namespace UI
 
 
 } // ~namespace UI
-} // ~namespace Lux
+} // ~namespace Lumix

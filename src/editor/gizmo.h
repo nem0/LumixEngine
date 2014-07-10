@@ -1,13 +1,13 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/vec3.h"
 #include "universe/universe.h"
 #include "graphics/model.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -18,7 +18,7 @@ class Renderer;
 class Universe;
 
 
-class LUX_ENGINE_API Gizmo
+class LUMIX_ENGINE_API Gizmo
 {
 	public:
 		struct Flags
@@ -105,4 +105,4 @@ class LUX_ENGINE_API Gizmo
 };
 
 
-} // !namespace Lux
+} // !namespace Lumix

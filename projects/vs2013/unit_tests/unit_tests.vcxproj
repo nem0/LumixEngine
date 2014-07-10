@@ -19,6 +19,7 @@
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_mtjd_framework.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_path.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_quat.cpp" />
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_string.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_transaction_queue.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\engine\ut_resource_managers.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\graphics\ut_clipper.cpp" />
@@ -27,7 +28,7 @@
     <ClCompile Include="..\..\..\src\unit_tests\suite\unit_test_manager.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\src\unit_tests\suite\lux_unit_tests.h" />
+    <ClInclude Include="..\..\..\src\unit_tests\suite\lumix_unit_tests.h" />
     <ClInclude Include="..\..\..\src\unit_tests\suite\platform_defines.h" />
     <ClInclude Include="..\..\..\src\unit_tests\suite\unit_test.h" />
     <ClInclude Include="..\..\..\src\unit_tests\suite\unit_test_app.h" />

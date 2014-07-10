@@ -3,7 +3,7 @@
 #include "core/math_utils.h"
 #include <new>
 
-namespace Lux
+namespace Lumix
 {
 	template <typename T, uint32_t count>
 	class Queue
@@ -12,13 +12,13 @@ namespace Lux
 		Queue()
 		{
 			ASSERT(Math::isPowOfTwo(count));
-			m_buffer = (T*)(LUX_NEW_ARRAY(char, sizeof(T) * count));
+			m_buffer = (T*)(LUMIX_NEW_ARRAY(char, sizeof(T) * count));
 			m_wr = m_rd = 0;
 		}
 
 		~Queue()
 		{
-			LUX_DELETE_ARRAY(m_buffer);
+			LUMIX_DELETE_ARRAY(m_buffer);
 		}
 
 		bool empty() const { return m_rd == m_wr; } 

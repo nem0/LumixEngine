@@ -1,15 +1,15 @@
 #pragma once
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/fs/ifile_device.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace FS
 	{
 		class IFile;
 
-		class LUX_CORE_API MemoryFileDevice : public IFileDevice
+		class LUMIX_CORE_API MemoryFileDevice : public IFileDevice
 		{
 		public:
 			virtual IFile* createFile(IFile* child) override;
@@ -17,4 +17,4 @@ namespace Lux
 			const char* name() const { return "memory"; }
 		};
 	} // ~namespace FS
-} // ~namespace Lux
+} // ~namespace Lumix

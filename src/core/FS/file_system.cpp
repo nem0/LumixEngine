@@ -1,16 +1,17 @@
 #include "core/fs/file_system.h"
 
+#include "core/array.h"
 #include "core/fs/disk_file_device.h"
 #include "core/fs/ifile.h"
-#include "core/array.h"
-#include "core/stack_allocator.h"
-#include "core/string.h"
 #include "core/MT/lock_free_fixed_queue.h"
 #include "core/MT/task.h"
 #include "core/MT/transaction.h"
+#include "core/profiler.h"
 #include "core/queue.h"
+#include "core/stack_allocator.h"
+#include "core/string.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace FS
 	{
@@ -28,7 +29,7 @@ namespace Lux
 			IFile* m_file;
 			ReadCallback m_cb;
 			Mode m_mode;
-			char m_path[_MAX_PATH];
+			char m_path[LUMIX_MAX_PATH];
 			uint8_t m_flags;
 
 		};
@@ -82,7 +83,7 @@ namespace Lux
 		public:
 			FileSystemImpl()
 			{
-				m_task = LUX_NEW(FSTask)(&m_transaction_queue);
+				m_task = LUMIX_NEW(FSTask)(&m_transaction_queue);
 				m_task->create("FSTask");
 				m_task->run();
 			}
@@ -91,7 +92,7 @@ namespace Lux
 			{
 				m_task->stop();
 				m_task->destroy();
-				LUX_DELETE(m_task);
+				LUMIX_DELETE(m_task);
 			}
 
 			bool mount(IFileDevice* device) override
@@ -134,7 +135,7 @@ namespace Lux
 					}
 					else
 					{
-						LUX_DELETE(prev);
+						LUMIX_DELETE(prev);
 						return NULL;
 					}
 				}
@@ -152,7 +153,7 @@ namespace Lux
 					item.m_file = prev;
 					item.m_cb = call_back;
 					item.m_mode = mode;
-					strcpy(item.m_path, file);
+					copyString(item.m_path, sizeof(item.m_path), file);
 					item.m_flags = E_IS_OPEN;
 				}
 
@@ -162,7 +163,7 @@ namespace Lux
 			void close(IFile* file) override
 			{
 				file->close();
-				LUX_DELETE(file);
+				LUMIX_DELETE(file);
 			}
 
 			void closeAsync(IFile* file) override
@@ -177,11 +178,13 @@ namespace Lux
 
 			void updateAsyncTransactions() override
 			{
+				PROFILE_FUNCTION();
 				while(!m_in_progress.empty())
 				{
 					AsynTrans* tr = m_in_progress.front();
 					if(tr->isCompleted())
 					{
+						PROFILE_BLOCK("processAsyncTransaction");
 						m_in_progress.pop();
 
 						tr->data.m_cb.invoke(tr->data.m_file, !!(tr->data.m_flags & E_SUCCESS), *this);
@@ -203,7 +206,7 @@ namespace Lux
 						tr->data.m_file = item.m_file;
 						tr->data.m_cb = item.m_cb;
 						tr->data.m_mode = item.m_mode;
-						strcpy(tr->data.m_path, item.m_path);
+						copyString(tr->data.m_path, sizeof(tr->data.m_path), item.m_path);
 						tr->data.m_flags = item.m_flags;
 						tr->reset();
 
@@ -263,7 +266,7 @@ namespace Lux
 
 			static void closeAsync(IFile* file, bool, FileSystem&)
 			{
-				LUX_DELETE(file);
+				LUMIX_DELETE(file);
 			}
 
 			void destroy()
@@ -286,12 +289,12 @@ namespace Lux
 
 		FileSystem* FileSystem::create()
 		{
-			return LUX_NEW(FileSystemImpl)();
+			return LUMIX_NEW(FileSystemImpl)();
 		}
 
 		void FileSystem::destroy(FileSystem* fs)
 		{
-			LUX_DELETE(fs);
+			LUMIX_DELETE(fs);
 		}
 	} // ~namespace FS
-} // ~namespace Lux
+} // ~namespace Lumix

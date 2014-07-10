@@ -17,7 +17,7 @@
 #include "gui/texture_base.h"
 
 
-namespace Lux
+namespace Lumix
 {
 namespace UI
 {
@@ -61,7 +61,7 @@ namespace UI
 		void fontLoaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 		void fontImageLoaded(TextureBase& img);
 
-		map<char, Character> m_characters;
+		Map<char, Character> m_characters;
 		Array<TextureBase*> m_images;
 		OpenGLTexture* m_font_image;
 		int m_window_height;
@@ -90,14 +90,14 @@ namespace UI
 
 	bool OpenGLRenderer::create()
 	{
-		m_impl = LUX_NEW(OpenGLRendererImpl)();
+		m_impl = LUMIX_NEW(OpenGLRendererImpl)();
 		return true;
 	}
 
 
 	void OpenGLRenderer::destroy()
 	{
-		LUX_DELETE(m_impl);
+		LUMIX_DELETE(m_impl);
 		m_impl = NULL;
 	}
 
@@ -121,7 +121,7 @@ namespace UI
 		{
 			return img;
 		}
-		img = LUX_NEW(OpenGLTexture)(name, (float)0, (float)0);
+		img = LUMIX_NEW(OpenGLTexture)(name, (float)0, (float)0);
 		static_cast<OpenGLTexture*>(img)->setId(0);
 		static_cast<OpenGLTexture*>(img)->setFileSystem(file_system);
 
@@ -136,7 +136,7 @@ namespace UI
 		if(success)
 		{
 			size_t buffer_size = file->size();
-			char* buffer = LUX_NEW_ARRAY(char, buffer_size);
+			char* buffer = LUMIX_NEW_ARRAY(char, buffer_size);
 			file->read(buffer, buffer_size);			
 			m_fs->close(file);
 
@@ -148,18 +148,18 @@ namespace UI
 	
 			if (header.dataType != 2)
 			{
-				LUX_DELETE_ARRAY(buffer);
+				LUMIX_DELETE_ARRAY(buffer);
 				return;
 			}
 	
 			if (color_mode < 3)
 			{
-				LUX_DELETE_ARRAY(buffer);
+				LUMIX_DELETE_ARRAY(buffer);
 				return;
 			}
 	
 			const char* image_src = buffer + sizeof(TGAHeader);
-			unsigned char* image_dest = LUX_NEW_ARRAY(unsigned char, image_size);
+			unsigned char* image_dest = LUMIX_NEW_ARRAY(unsigned char, image_size);
 	
 
 			// Targa is BGR, swap to RGB and flip Y axis
@@ -186,7 +186,7 @@ namespace UI
 			glGenTextures(1, &texture_id);
 			if (texture_id == 0)
 			{
-				LUX_DELETE_ARRAY(buffer);
+				LUMIX_DELETE_ARRAY(buffer);
 				return;
 			}
 
@@ -199,8 +199,8 @@ namespace UI
 			/*glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);*/
 
-			LUX_DELETE_ARRAY(image_dest);
-			LUX_DELETE_ARRAY(buffer);
+			LUMIX_DELETE_ARRAY(image_dest);
+			LUMIX_DELETE_ARRAY(buffer);
 	
 			setId(texture_id);
 			setSize((float)header.width, (float)header.height);
@@ -569,4 +569,4 @@ namespace UI
 
 
 } // ~namespace UI
-} // ~namespace Lux
+} // ~namespace Lumix

@@ -1,11 +1,11 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/string.h"
 
 
-namespace Lux
+namespace Lumix
 {
 namespace UI
 {
@@ -15,7 +15,7 @@ namespace UI
 	class IRenderer;
 
 
-	class LUX_GUI_API DecoratorBase abstract
+	class LUMIX_GUI_API DecoratorBase abstract
 	{
 		public:
 			DecoratorBase(const char* name) : m_name(name) {}
@@ -29,4 +29,4 @@ namespace UI
 
 
 } // ~namespace UI
-} // ~namespace Lux
+} // ~namespace Lumix

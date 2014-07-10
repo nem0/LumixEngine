@@ -2,20 +2,23 @@
 #include <QApplication>
 #include <qdir.h>
 #include "core/log.h"
+#include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "editor/editor_client.h"
 #include "editor/editor_server.h"
 #include "editor/gizmo.h"
 #include "engine/engine.h"
+#include "engine/plugin_manager.h"
 #include "graphics/irender_device.h"
 #include "graphics/pipeline.h"
 #include "graphics/renderer.h"
+#include "physics/physics_scene.h"
+#include "physics/physics_system.h"
 #include "sceneview.h"
 #include "gameview.h"
 #include "wgl_render_device.h"
 #include "materialmanager.h"
-
 
 class App
 {
@@ -36,16 +39,22 @@ class App
 			m_server.destroy();
 		}
 
-		void onUniverseCreated(Lux::Event&)
+		void onUniverseCreated()
 		{
 			m_edit_render_device->getPipeline().setScene(m_server.getEngine().getRenderScene()); 
 			m_game_render_device->getPipeline().setScene(m_server.getEngine().getRenderScene()); 
 		}
 
-		void onUniverseDestroyed(Lux::Event&)
+		void onUniverseDestroyed()
 		{
-			m_edit_render_device->getPipeline().setScene(NULL); 
-			m_game_render_device->getPipeline().setScene(NULL); 
+			if(m_edit_render_device)
+			{
+				m_edit_render_device->getPipeline().setScene(NULL); 
+			}
+			if(m_game_render_device)
+			{
+				m_game_render_device->getPipeline().setScene(NULL); 
+			}
 			
 		}
 
@@ -58,7 +67,7 @@ class App
 			ASSERT(hdc != NULL);
 			if (hdc == NULL)
 			{
-				Lux::g_log_error.log("renderer", "Could not get the device context");
+				Lumix::g_log_error.log("renderer") << "Could not get the device context";
 				return NULL;
 			}
 			PIXELFORMATDESCRIPTOR pfd = 
@@ -86,14 +95,14 @@ class App
 			if (pixelformat == 0)
 			{
 				ASSERT(false);
-				Lux::g_log_error.log("renderer", "Could not choose a pixel format");
+				Lumix::g_log_error.log("renderer") << "Could not choose a pixel format";
 				return NULL;
 			}
 			BOOL success = SetPixelFormat(hdc, pixelformat, &pfd);
 			if (success == FALSE)
 			{
 				ASSERT(false);
-				Lux::g_log_error.log("renderer", "Could not set a pixel format");
+				Lumix::g_log_error.log("renderer") << "Could not set a pixel format";
 				return NULL;
 			}
 			for (int i = 1; i < count; ++i)
@@ -104,14 +113,14 @@ class App
 					if (hdc2 == NULL)
 					{
 						ASSERT(false);
-						Lux::g_log_error.log("renderer", "Could not get the device context");
+						Lumix::g_log_error.log("renderer") << "Could not get the device context";
 						return NULL;
 					}
 					BOOL success = SetPixelFormat(hdc2, pixelformat, &pfd);
 					if (success == FALSE)
 					{
 						ASSERT(false);
-						Lux::g_log_error.log("renderer", "Could not set a pixel format");
+						Lumix::g_log_error.log("renderer") << "Could not set a pixel format";
 						return NULL;
 					}
 				}
@@ -120,19 +129,27 @@ class App
 			if (hglrc == NULL)
 			{
 				ASSERT(false);
-				Lux::g_log_error.log("renderer", "Could not create an opengl context");
+				Lumix::g_log_error.log("renderer") << "Could not create an opengl context";
 				return NULL;
 			}
 			success = wglMakeCurrent(hdc, hglrc);
 			if (success == FALSE)
 			{
 				ASSERT(false);
-				Lux::g_log_error.log("renderer", "Could not make the opengl context current rendering context");
+				Lumix::g_log_error.log("renderer") << "Could not make the opengl context current rendering context";
 				return NULL;
 			}
 			return hglrc;
 		}	
 
+		void renderPhysics()
+		{
+			Lumix::PhysicsSystem* system = static_cast<Lumix::PhysicsSystem*>(m_server.getEngine().getPluginManager().getPlugin("physics"));
+			if(system && system->getScene())
+			{
+				system->getScene()->render();
+			}
+		}
 
 		void init(int argc, char* argv[])
 		{
@@ -149,10 +166,10 @@ class App
 			HWND hwnds[] = {hwnd, game_hwnd};
 			HGLRC hglrc = createGLContext(hwnds, 2);
 
-			bool server_created = m_server.create(QDir::currentPath().toLocal8Bit().data());
+			bool server_created = m_server.create(QDir::currentPath().toLocal8Bit().data(), m_client);
 			ASSERT(server_created);
 			m_server.tick();
-			bool client_created = m_client.create(m_server.getEngine().getBasePath());
+			bool client_created = m_client.create(m_server.getEngine().getBasePath(), m_server);
 			ASSERT(client_created);
 
 			m_main_window->setEditorClient(m_client);
@@ -164,6 +181,7 @@ class App
 			m_edit_render_device->m_opengl_context = hglrc;
 			m_edit_render_device->getPipeline().setScene(m_server.getEngine().getRenderScene()); /// TODO manage scene properly
 			m_server.setEditViewRenderDevice(*m_edit_render_device);
+			m_edit_render_device->getPipeline().addCustomCommandHandler("render_physics").bind<App, &App::renderPhysics>(this);
 
 			m_game_render_device = new	WGLRenderDevice(m_server.getEngine(), "pipelines/game_view.json");
 			m_game_render_device->m_hdc = GetDC(game_hwnd);
@@ -171,15 +189,24 @@ class App
 			m_game_render_device->getPipeline().setScene(m_server.getEngine().getRenderScene()); /// TODO manage scene properly
 			m_server.getEngine().getRenderer().setRenderDevice(*m_game_render_device);
 
-			m_server.getEngine().getEventManager().addListener(Lux::Engine::UniverseCreatedEvent::s_type).bind<App, &App::onUniverseCreated>(this);
-			m_server.getEngine().getEventManager().addListener(Lux::Engine::UniverseDestroyedEvent::s_type).bind<App, &App::onUniverseDestroyed>(this);
+			m_server.universeCreated().bind<App, &App::onUniverseCreated>(this);
+			m_server.universeDestroyed().bind<App, &App::onUniverseDestroyed>(this);
 
 			m_main_window->getSceneView()->setPipeline(m_edit_render_device->getPipeline());
 			m_main_window->getGameView()->setPipeline(m_game_render_device->getPipeline());
 		}
 
+		void shutdown()
+		{
+			delete m_game_render_device;
+			m_game_render_device = NULL;
+			delete m_edit_render_device;
+			m_edit_render_device = NULL;
+		}
+
 		void renderEditView()
 		{
+			PROFILE_FUNCTION();
 			m_edit_render_device->beginFrame();
 			m_server.render(*m_edit_render_device);
 			m_server.renderIcons(*m_edit_render_device);
@@ -192,8 +219,11 @@ class App
 
 		void handleEvents()
 		{
-			m_client.processMessages();
-			m_qt_app->processEvents();
+			PROFILE_FUNCTION();
+			{
+				PROFILE_BLOCK("qt::processEvents");
+				m_qt_app->processEvents();
+			}
 			BYTE keys[256];
 			GetKeyboardState(keys);
 			if (m_main_window->getSceneView()->hasFocus())
@@ -230,10 +260,14 @@ class App
 		{
 			while (m_main_window->isVisible())
 			{
-				renderEditView();
-				m_server.getEngine().getRenderer().renderGame();
-				m_server.tick();
-				handleEvents();
+				{
+					PROFILE_BLOCK("tick");
+					renderEditView();
+					m_server.getEngine().getRenderer().renderGame();
+					m_server.tick();
+					handleEvents();
+				}
+				Lumix::g_profiler.frame();
 			}
 		}
 
@@ -241,8 +275,8 @@ class App
 		WGLRenderDevice* m_edit_render_device;
 		WGLRenderDevice* m_game_render_device;
 		MainWindow* m_main_window;
-		Lux::EditorServer m_server;
-		Lux::EditorClient m_client;
+		Lumix::EditorServer m_server;
+		Lumix::EditorClient m_client;
 		QApplication* m_qt_app;
 };
 
@@ -251,5 +285,6 @@ int main(int argc, char* argv[])
 	App app;
 	app.init(argc, argv);
 	app.run();
+	app.shutdown();
 	return 0;
 }

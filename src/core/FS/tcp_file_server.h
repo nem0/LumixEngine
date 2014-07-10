@@ -1,12 +1,12 @@
 #pragma once
 
-#include "core/lux.h"
+#include "core/lumix.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace FS
 	{
-		class LUX_CORE_API TCPFileServer
+		class LUMIX_CORE_API TCPFileServer
 		{
 		public:
 			TCPFileServer();

@@ -1,18 +1,18 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "universe/component.h"
 
 
-namespace Lux
+namespace Lumix
 {
 	class Engine;
 	class ISerializer;
 	class Universe;
 
 
-	class LUX_ENGINE_API IPlugin abstract
+	class LUMIX_ENGINE_API IPlugin abstract
 	{
 		public:
 			virtual ~IPlugin();

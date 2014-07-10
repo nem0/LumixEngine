@@ -13,14 +13,14 @@
 #include "core/MT/transaction.h"
 #include "core/Array.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace MTJD
 	{
 		class Job;
 		class WorkerTask;
 
-		class LUX_CORE_API Manager
+		class LUMIX_CORE_API Manager
 		{
 			friend class Scheduler;
 			friend class SpuHelperTask;
@@ -60,4 +60,4 @@ namespace Lux
 			volatile int32_t m_scheduling_counter;
 		};
 	} // ~namepsace MTJD
-} // ~namepsace Lux
+} // ~namepsace Lumix

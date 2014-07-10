@@ -8,6 +8,10 @@
 #include <qpainter.h>
 #include <qpushbutton.h>
 #include "core/crc32.h"
+#include "core/FS/file_system.h"
+#include "core/json_serializer.h"
+#include "core/log.h"
+#include "core/profiler.h"
 #include "editor/editor_server.h"
 #include "editor/editor_client.h"
 #include "editor/server_message_types.h"
@@ -23,27 +27,16 @@
 #include "wgl_render_device.h"
 
 
-struct CheckboxWithUserData : public QCheckBox
-{
-	void* m_user_data;
-};
-
-struct LineEditWithUserData : public QLineEdit
-{
-	void* m_user_data;
-};
-
-
 class MaterialManagerUI
 {
 	public:
-		Lux::Engine* m_engine;
-		Lux::Universe* m_universe;
-		Lux::RenderScene* m_render_scene;
+		Lumix::Engine* m_engine;
+		Lumix::Universe* m_universe;
+		Lumix::RenderScene* m_render_scene;
 		WGLRenderDevice* m_render_device;
-		Lux::Model* m_selected_object_model;
+		Lumix::Model* m_selected_object_model;
 		QFileSystemModel* m_fs_model;
-		Lux::Material* m_material;
+		Lumix::Material* m_material;
 };
 
 
@@ -69,6 +62,7 @@ MaterialManager::MaterialManager(QWidget *parent)
 
 void MaterialManager::updatePreview()
 {
+	PROFILE_FUNCTION();
 	m_impl->m_render_device->beginFrame();
 	m_impl->m_engine->getRenderer().render(*m_impl->m_render_device);
 	m_impl->m_render_device->endFrame();
@@ -77,60 +71,62 @@ void MaterialManager::updatePreview()
 void MaterialManager::fillObjectMaterials()
 {
 	m_ui->objectMaterialList->clear();
-	for(int i = 0; i < m_impl->m_selected_object_model->getMeshCount(); ++i)
+	if(m_impl->m_selected_object_model)
 	{
-		const char* path = m_impl->m_selected_object_model->getMesh(i).getMaterial()->getPath().c_str();
-		m_ui->objectMaterialList->addItem(path);
+		for(int i = 0; i < m_impl->m_selected_object_model->getMeshCount(); ++i)
+		{
+			const char* path = m_impl->m_selected_object_model->getMesh(i).getMaterial()->getPath().c_str();
+			m_ui->objectMaterialList->addItem(path);
+		}
 	}
 }
 
-void MaterialManager::onPropertyList(Lux::Event& evt)
+void MaterialManager::onPropertyList(Lumix::PropertyListEvent& event)
 {
-	Lux::PropertyListEvent& event = static_cast<Lux::PropertyListEvent&>(evt);
 	if (event.type_hash == crc32("renderable"))
 	{
 		for (int i = 0; i < event.properties.size(); ++i)
 		{
 			if (event.properties[i].name_hash == crc32("source"))
 			{	
-				m_impl->m_selected_object_model = static_cast<Lux::Model*>(m_impl->m_engine->getResourceManager().get(Lux::ResourceManager::MODEL)->get((char*)event.properties[i].data));
+				m_impl->m_selected_object_model = static_cast<Lumix::Model*>(m_impl->m_engine->getResourceManager().get(Lumix::ResourceManager::MODEL)->get((char*)event.properties[i].data));
 				fillObjectMaterials();
 			}
 		}
 	}
 }
 
-void MaterialManager::setEditorClient(Lux::EditorClient& client)
+void MaterialManager::setEditorClient(Lumix::EditorClient& client)
 {
-	client.getEventManager().addListener(Lux::ServerMessageType::PROPERTY_LIST).bind<MaterialManager, &MaterialManager::onPropertyList>(this);
+	client.propertyListReceived().bind<MaterialManager, &MaterialManager::onPropertyList>(this);
 }
 
-void MaterialManager::setEditorServer(Lux::EditorServer& server)
+void MaterialManager::setEditorServer(Lumix::EditorServer& server)
 {
 	ASSERT(m_impl->m_engine == NULL);
 	HWND hwnd = (HWND)m_ui->previewWidget->winId();
 	m_impl->m_engine = &server.getEngine();
-	m_impl->m_universe = new Lux::Universe();
+	m_impl->m_universe = new Lumix::Universe();
 	m_impl->m_universe->create();
 
-	m_impl->m_render_scene = Lux::RenderScene::createInstance(server.getEngine(), *m_impl->m_universe);
+	m_impl->m_render_scene = Lumix::RenderScene::createInstance(server.getEngine(), *m_impl->m_universe);
 	m_impl->m_render_device = new WGLRenderDevice(server.getEngine(), "pipelines/main.json");
 	m_impl->m_render_device->m_hdc = GetDC(hwnd);
 	m_impl->m_render_device->m_opengl_context = wglGetCurrentContext();
 	m_impl->m_render_device->getPipeline().setScene(m_impl->m_render_scene);
 	
-	const Lux::Entity& camera_entity = m_impl->m_universe->createEntity();
-	Lux::Component cmp = m_impl->m_render_scene->createComponent(crc32("camera"), camera_entity);
-	m_impl->m_render_scene->setCameraSlot(cmp, Lux::string("editor"));
+	const Lumix::Entity& camera_entity = m_impl->m_universe->createEntity();
+	Lumix::Component cmp = m_impl->m_render_scene->createComponent(crc32("camera"), camera_entity);
+	m_impl->m_render_scene->setCameraSlot(cmp, Lumix::string("editor"));
 	
-	Lux::Entity light_entity = m_impl->m_universe->createEntity();
-	light_entity.setRotation(Lux::Quat(Lux::Vec3(0, 1, 0), 3.14159265f));
+	Lumix::Entity light_entity = m_impl->m_universe->createEntity();
+	light_entity.setRotation(Lumix::Quat(Lumix::Vec3(0, 1, 0), 3.14159265f));
 	m_impl->m_render_scene->createComponent(crc32("light"), light_entity);
 	
-	Lux::Entity model_entity = m_impl->m_universe->createEntity();
+	Lumix::Entity model_entity = m_impl->m_universe->createEntity();
 	model_entity.setPosition(0, 0, -5);
-	Lux::Component cmp2 = m_impl->m_render_scene->createComponent(crc32("renderable"), model_entity);
-	m_impl->m_render_scene->setRenderablePath(cmp2, Lux::string("models/material_sphere.msh"));
+	Lumix::Component cmp2 = m_impl->m_render_scene->createComponent(crc32("renderable"), model_entity);
+	m_impl->m_render_scene->setRenderablePath(cmp2, Lumix::string("models/editor/material_sphere.msh"));
 
 	m_ui->previewWidget->setAttribute(Qt::WA_NoSystemBackground);
 	m_ui->previewWidget->setAutoFillBackground(false);
@@ -178,8 +174,9 @@ void MaterialManager::setEditorServer(Lux::EditorServer& server)
 
 MaterialManager::~MaterialManager()
 {
-	Lux::RenderScene::destroyInstance(m_impl->m_render_scene);
+	Lumix::RenderScene::destroyInstance(m_impl->m_render_scene);
 	m_impl->m_universe->destroy();
+	delete m_impl->m_render_device;
 	delete m_impl->m_universe;
 	delete m_impl;
 	delete m_ui;
@@ -203,11 +200,11 @@ class ICppObjectProperty
 		static Type getType();
 
 		template <> static Type getType<bool>() { return BOOL; }
-		template <> static Type getType<Lux::Shader*>() { return SHADER; }
+		template <> static Type getType<Lumix::Shader*>() { return SHADER; }
 
 	protected:
 		Type m_type;
-		Lux::string m_name;
+		Lumix::string m_name;
 
 };
 
@@ -246,62 +243,83 @@ class CppObjectProperty : public ICppObjectProperty
 
 void MaterialManager::onBoolPropertyStateChanged(int)
 {
-	CheckboxWithUserData* obj = static_cast<CheckboxWithUserData*>(QObject::sender());
-	CppObjectProperty<bool, Lux::Material>* prop = static_cast<CppObjectProperty<bool, Lux::Material>*>(obj->m_user_data);
-	prop->set(*m_impl->m_material, obj->isChecked());
+	QCheckBox* obj = qobject_cast<QCheckBox*>(QObject::sender());
+	if(obj)
+	{
+		CppObjectProperty<bool, Lumix::Material>* prop = static_cast<CppObjectProperty<bool, Lumix::Material>*>(obj->property("cpp_property").data());
+		prop->set(*m_impl->m_material, obj->isChecked());
+	}
 }
 
 void MaterialManager::onTextureChanged()
 {
-	LineEditWithUserData* edit = static_cast<LineEditWithUserData*>(QObject::sender());
-	int i = (intptr_t)edit->m_user_data;
-	m_impl->m_material->setTexture(i, static_cast<Lux::Texture*>(m_impl->m_engine->getResourceManager().get(Lux::ResourceManager::TEXTURE)->load(edit->text().toLatin1().data())));
+	QLineEdit* edit = qobject_cast<QLineEdit*>(QObject::sender());
+	if(edit)
+	{
+		int i = edit->property("texture_index").toInt();
+		m_impl->m_material->setTexture(i, static_cast<Lumix::Texture*>(m_impl->m_engine->getResourceManager().get(Lumix::ResourceManager::TEXTURE)->load(edit->text().toLatin1().data())));
+	}
 }
 
 void MaterialManager::onShaderChanged()
 {
 	QLineEdit* edit = static_cast<QLineEdit*>(QObject::sender());
-	m_impl->m_material->setShader(static_cast<Lux::Shader*>(m_impl->m_engine->getResourceManager().get(Lux::ResourceManager::SHADER)->load(edit->text().toLatin1().data())));
+	m_impl->m_material->setShader(static_cast<Lumix::Shader*>(m_impl->m_engine->getResourceManager().get(Lumix::ResourceManager::SHADER)->load(edit->text().toLatin1().data())));
+}
+
+void MaterialManager::onTextureAdded()
+{
+	m_impl->m_material->addTexture(static_cast<Lumix::Texture*>(m_impl->m_engine->getResourceManager().get(Lumix::ResourceManager::TEXTURE)->load("textures/default.dds")));
+	selectMaterial(m_impl->m_material->getPath().c_str());
 }
 
 void MaterialManager::selectMaterial(const char* path)
 {
+	Lumix::Material* material = static_cast<Lumix::Material*>(m_impl->m_engine->getResourceManager().get(Lumix::ResourceManager::MATERIAL)->load(path));
+	material->getObserverCb().bind<MaterialManager, &MaterialManager::onMaterialLoaded>(this);
+	m_impl->m_material = material;
+}
+
+void MaterialManager::onMaterialLoaded(Lumix::Resource::State, Lumix::Resource::State)
+{
 	ICppObjectProperty* properties[] = 
 	{
-		new CppObjectProperty<bool, Lux::Material>("Z test", &Lux::Material::isZTest, &Lux::Material::enableZTest),
-		new CppObjectProperty<bool, Lux::Material>("Backface culling", &Lux::Material::isBackfaceCulling, &Lux::Material::enableBackfaceCulling),
-		new CppObjectProperty<Lux::Shader*, Lux::Material>("Shader", &Lux::Material::getShader, &Lux::Material::setShader)
+		new CppObjectProperty<bool, Lumix::Material>("Z test", &Lumix::Material::isZTest, &Lumix::Material::enableZTest),
+		new CppObjectProperty<bool, Lumix::Material>("Backface culling", &Lumix::Material::isBackfaceCulling, &Lumix::Material::enableBackfaceCulling),
+		new CppObjectProperty<Lumix::Shader*, Lumix::Material>("Shader", &Lumix::Material::getShader, &Lumix::Material::setShader)
 	};
 
-	Lux::Model* model = static_cast<Lux::Model*>(m_impl->m_engine->getResourceManager().get(Lux::ResourceManager::MODEL)->get("models/material_sphere.msh"));
-	Lux::Material* material = static_cast<Lux::Material*>(m_impl->m_engine->getResourceManager().get(Lux::ResourceManager::MATERIAL)->load(path));
-	m_impl->m_material = material;
+	Lumix::Model* model = static_cast<Lumix::Model*>(m_impl->m_engine->getResourceManager().get(Lumix::ResourceManager::MODEL)->get("models/editor/material_sphere.msh"));
+	Lumix::Material* material = m_impl->m_material;
+	material->getObserverCb().unbind<MaterialManager, &MaterialManager::onMaterialLoaded>(this);
 	model->getMesh(0).setMaterial(material);
-
 
 	QFormLayout* layout = m_ui->materialPropertiesLayout;
 	QLayoutItem* item;
 	while((item = layout->takeAt(0)) != NULL)
 	{
+		delete item->widget();
 		delete item;
 	}
+
 	for(int i = 0; i < sizeof(properties) / sizeof(ICppObjectProperty*); ++i)
 	{
 		switch(properties[i]->getType())
 		{
 			case ICppObjectProperty::BOOL:
 				{
-					CheckboxWithUserData* checkbox = new CheckboxWithUserData();
-					checkbox->setChecked(static_cast<CppObjectProperty<bool, Lux::Material>*>(properties[i])->get(*material));
+					QCheckBox* checkbox = new QCheckBox();
+					checkbox->setProperty("cpp_property", qVariantFromValue((void*)properties[i]));
+					
+					checkbox->setChecked(static_cast<CppObjectProperty<bool, Lumix::Material>*>(properties[i])->get(*material));
 					layout->addRow(properties[i]->getName(), checkbox);
-					checkbox->m_user_data = properties[i];
 					connect(checkbox, SIGNAL(stateChanged(int)), this, SLOT(onBoolPropertyStateChanged(int)));
 				}
 				break;
 			case ICppObjectProperty::SHADER:
 				{
 					QLineEdit* edit = new QLineEdit();
-					Lux::Shader* shader = static_cast<CppObjectProperty<Lux::Shader*, Lux::Material>*>(properties[i])->get(*material);
+					Lumix::Shader* shader = static_cast<CppObjectProperty<Lumix::Shader*, Lumix::Material>*>(properties[i])->get(*material);
 					if(shader)
 					{
 						edit->setText(shader->getPath().c_str());
@@ -317,20 +335,31 @@ void MaterialManager::selectMaterial(const char* path)
 	}
 	for(int i = 0; i < material->getTextureCount(); ++i)
 	{
-		LineEditWithUserData* edit = new LineEditWithUserData;
+		QLineEdit* edit = new QLineEdit;
 		QBoxLayout* inner_layout = new QBoxLayout(QBoxLayout::Direction::LeftToRight);
 		QPushButton* button = new QPushButton();
 		button->setText("Remove");
 		inner_layout->addWidget(edit);
 		inner_layout->addWidget(button);
 		edit->setText(material->getTexture(i)->getPath().c_str());
-		edit->m_user_data = (void*)(intptr_t)i;
+		edit->setProperty("texture_index", i);
 		layout->addRow("Texture", inner_layout);
 		connect(edit, SIGNAL(editingFinished()), this, SLOT(onTextureChanged()));
+		connect(button, SIGNAL(clicked()), this, SLOT(onTextureRemoved()));
+		button->setProperty("texture_id", i);
 	}
 	QPushButton* button = new QPushButton();
 	button->setText("Add Texture");
+	connect(button, SIGNAL(clicked()), this, SLOT(onTextureAdded()));
 	layout->addRow("", button);
+}
+
+void MaterialManager::onTextureRemoved()
+{
+	QPushButton* button = static_cast<QPushButton*>(QObject::sender());
+	int i = button->property("texture_id").toInt();
+	m_impl->m_material->removeTexture(i);
+	selectMaterial(m_impl->m_material->getPath().c_str());
 }
 
 void MaterialManager::on_fileListView_doubleClicked(const QModelIndex &index)
@@ -343,4 +372,20 @@ void MaterialManager::on_objectMaterialList_doubleClicked(const QModelIndex &ind
 {
 	QListWidgetItem* item = m_ui->objectMaterialList->item(index.row());
 	selectMaterial(item->text().toLatin1().data());
+}
+
+void MaterialManager::on_saveMaterialButton_clicked()
+{
+	Lumix::FS::FileSystem& fs = m_impl->m_engine->getFileSystem();
+	Lumix::FS::IFile* file = fs.open(fs.getDefaultDevice(), m_impl->m_material->getPath().c_str(), Lumix::FS::Mode::RECREATE | Lumix::FS::Mode::WRITE);
+	if(file)
+	{
+		Lumix::JsonSerializer serializer(*file, Lumix::JsonSerializer::AccessMode::WRITE, m_impl->m_material->getPath().c_str());
+		m_impl->m_material->save(serializer);
+		fs.close(file);
+	}
+	else
+	{
+		Lumix::g_log_error.log("Material manager") << "Could not save file " << m_impl->m_material->getPath().c_str();
+	}
 }

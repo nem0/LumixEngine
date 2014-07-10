@@ -1,11 +1,10 @@
 #include "core/log.h"
 #include "core/array.h"
+#include "core/path.h"
 #include "core/string.h"
-#include <cstdio>
-#include <cstdarg>
 
 
-namespace Lux
+namespace Lumix
 {
 
 	Log g_log_info;
@@ -23,25 +22,19 @@ namespace Lux
 
 	Log::Log()
 	{
-		m_impl = LUX_NEW(LogImpl)();
+		m_impl = LUMIX_NEW(LogImpl)();
 	}
 
 
 	Log::~Log()
 	{
-		LUX_DELETE(m_impl);
+		LUMIX_DELETE(m_impl);
 	}
 
 
-	void Log::log(const char* system, const char* message, ...)
+	LogProxy Log::log(const char* system)
 	{
-		char tmp[1024];
-		va_list args;
-		va_start(args, message);
-		vsnprintf(tmp, 1024, message, args);
-
-		m_impl->m_callbacks.invoke(system, tmp);
-		va_end(args);
+		return LogProxy(*this, system);
 	}
 
 
@@ -50,5 +43,38 @@ namespace Lux
 		return m_impl->m_callbacks;
 	}
 
+	LogProxy::LogProxy(Log& log, const char* system)
+		: m_log(log)
+	{
+		m_system = system;
+	}
 
-} // ~namespace Lux
+	LogProxy::~LogProxy()
+	{
+		m_log.getCallback().invoke(m_system.c_str(), m_message.c_str());
+	}
+
+	LogProxy& LogProxy::operator <<(const char* message)
+	{
+		m_message.cat(message);
+		return *this;
+	}
+
+	LogProxy& LogProxy::operator <<(uint32_t message)
+	{
+		m_message.cat(message);
+		return *this;
+	}
+
+	LogProxy& LogProxy::operator <<(int32_t message)
+	{
+		m_message.cat(message);
+		return *this;
+	}
+
+	LogProxy& LogProxy::operator <<(const Path& path)
+	{
+		m_message.cat(path.c_str());
+		return *this;
+	}
+} // ~namespace Lumix

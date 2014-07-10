@@ -1,10 +1,9 @@
 #include "json_serializer.h"
-#include <cstring>
 #include <inttypes.h>
 #include "core/log.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -27,7 +26,8 @@ void JsonSerializer::serialize(const char* label, unsigned int value)
 	writeBlockComma();
 	char tmp[20];
 	writeString(label);
-	sprintf(tmp, " : %u", value);
+	toCString(value, tmp, 20);
+	m_file.write(" : ", (int32_t)strlen(" : "));
 	m_file.write(tmp, (int32_t)strlen(tmp));
 	m_is_first_in_block = false;
 }
@@ -38,7 +38,8 @@ void JsonSerializer::serialize(const char* label, float value)
 	writeBlockComma();
 	char tmp[20];
 	writeString(label);
-	sprintf(tmp, " : %f", value);
+	toCString(value, tmp, 20, 8);
+	m_file.write(" : ", (int32_t)strlen(" : "));
 	m_file.write(tmp, (int32_t)strlen(tmp));
 	m_is_first_in_block = false;
 }
@@ -50,7 +51,8 @@ void JsonSerializer::serialize(const char* label, int value)
 	writeBlockComma();
 	char tmp[20];
 	writeString(label);
-	sprintf(tmp, " : %d", value);
+	toCString(value, tmp, 20);
+	m_file.write(" : ", (int32_t)strlen(" : "));
 	m_file.write(tmp, (int32_t)strlen(tmp));
 	m_is_first_in_block = false;
 }
@@ -86,7 +88,7 @@ void JsonSerializer::serialize(const char* label, bool value)
 void JsonSerializer::beginObject()
 {
 	writeBlockComma();
-	m_file.write("{", 4);
+	m_file.write("{", 1);
 	m_is_first_in_block = true;
 }
 
@@ -142,7 +144,7 @@ void JsonSerializer::serializeArrayItem(unsigned int value)
 {
 	writeBlockComma();
 	char tmp[20];
-	sprintf(tmp, "%u", value); 
+	toCString(value, tmp, 20);
 	m_file.write(tmp, (int32_t)strlen(tmp));
 	m_is_first_in_block = false;
 }
@@ -152,7 +154,17 @@ void JsonSerializer::serializeArrayItem(int value)
 {
 	writeBlockComma();
 	char tmp[20];
-	sprintf(tmp, "%d", value); 
+	toCString(value, tmp, 20);
+	m_file.write(tmp, (int32_t)strlen(tmp));
+	m_is_first_in_block = false;
+}
+
+
+void JsonSerializer::serializeArrayItem(int64_t& value)
+{
+	writeBlockComma();
+	char tmp[30];
+	toCString(value, tmp, 30);
 	m_file.write(tmp, (int32_t)strlen(tmp));
 	m_is_first_in_block = false;
 }
@@ -162,7 +174,7 @@ void JsonSerializer::serializeArrayItem(float value)
 {
 	writeBlockComma();
 	char tmp[20];
-	sprintf(tmp, "%f", value); 
+	toCString(value, tmp, 20, 8);
 	m_file.write(tmp, (int32_t)strlen(tmp));
 	m_is_first_in_block = false;
 }
@@ -187,8 +199,7 @@ void JsonSerializer::deserialize(bool& value)
 void JsonSerializer::deserialize(float& value)
 {
 	logErrorIfNot(!m_is_string_token);
-	int i = sscanf(m_token, "%f", &value);
-	logErrorIfNot(i == 1);
+	value = (float)atof(m_token);
 	deserializeToken();
 }
 
@@ -197,8 +208,7 @@ void JsonSerializer::deserialize(float& value)
 void JsonSerializer::deserialize(int32_t& value)
 {
 	logErrorIfNot(!m_is_string_token);
-	int i = sscanf(m_token, "%" PRIi32, &value);
-	logErrorIfNot(i == 1);
+	logErrorIfNot(fromCString(m_token, strlen(m_token), &value));
 	deserializeToken();
 }
 
@@ -214,8 +224,7 @@ void JsonSerializer::deserialize(const char* label, float& value)
 {
 	deserializeLabel(label);
 	logErrorIfNot(!m_is_string_token);
-	int i = sscanf_s(m_token, "%f", &value);
-	logErrorIfNot(i == 1);
+	value = (float)atof(m_token);
 	deserializeToken();
 }
 
@@ -224,8 +233,7 @@ void JsonSerializer::deserialize(const char* label, uint32_t& value)
 {
 	deserializeLabel(label);
 	logErrorIfNot(!m_is_string_token);
-	int i = sscanf_s(m_token, "%" PRIu32, &value);
-	logErrorIfNot(i == 1);
+	logErrorIfNot(fromCString(m_token, strlen(m_token), &value));
 	deserializeToken();
 }
 
@@ -236,12 +244,11 @@ bool JsonSerializer::isObjectEnd() const
 }
 
 
-void JsonSerializer::deserialize(const char* label, int& value)
+void JsonSerializer::deserialize(const char* label, int32_t& value)
 {
 	deserializeLabel(label);
 	logErrorIfNot(!m_is_string_token);
-	int i = sscanf_s(m_token, "%d", &value);
-	logErrorIfNot(i == 1);
+	logErrorIfNot(fromCString(m_token, strlen(m_token), &value));
 	deserializeToken();
 }
 
@@ -328,8 +335,7 @@ void JsonSerializer::deserializeArrayItem(uint32_t& value)
 {
 	deserializeArrayComma();
 	logErrorIfNot(!m_is_string_token);
-	int i = sscanf_s(m_token, "%" PRIu32, &value);
-	logErrorIfNot(i == 1);
+	logErrorIfNot(fromCString(m_token, strlen(m_token), &value));
 	deserializeToken();
 }
 
@@ -338,8 +344,7 @@ void JsonSerializer::deserializeArrayItem(int32_t& value)
 {
 	deserializeArrayComma();
 	logErrorIfNot(!m_is_string_token);
-	int i = sscanf_s(m_token, "%" PRIi32, &value);
-	logErrorIfNot(i == 1);
+	logErrorIfNot(fromCString(m_token, strlen(m_token), &value));
 	deserializeToken();
 }
 
@@ -348,8 +353,7 @@ void JsonSerializer::deserializeArrayItem(int64_t& value)
 {
 	deserializeArrayComma();
 	logErrorIfNot(!m_is_string_token);
-	int i = sscanf_s(m_token, "%" PRIi64, &value);
-	logErrorIfNot(i == 1);
+	logErrorIfNot(fromCString(m_token, strlen(m_token), &value));
 	deserializeToken();
 }
 
@@ -358,8 +362,7 @@ void JsonSerializer::deserializeArrayItem(float& value)
 {
 	deserializeArrayComma();
 	logErrorIfNot(!m_is_string_token);
-	int i = sscanf_s(m_token, "%f", &value);
-	logErrorIfNot(i == 1);
+	value = (float)atof(m_token);
 	deserializeToken();
 }
 
@@ -567,9 +570,9 @@ void JsonSerializer::logErrorIfNot(bool condition)
 {
 	if (!condition)
 	{
-		g_log_error.log("serializer", "Error parsing JSON file %s", m_path.c_str());
+		g_log_error.log("serializer") << "Error parsing JSON file " << m_path.c_str();
 	}
 }
 
 
-} // ~namespace lux
+} // ~namespace Lumix

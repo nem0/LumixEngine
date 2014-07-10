@@ -5,7 +5,7 @@
 #include "gui/decorator_base.h"
 
 
-namespace Lux
+namespace Lumix
 {
 namespace UI
 {
@@ -39,7 +39,7 @@ namespace UI
 	void Block::destroy()
 	{
 		setParent(NULL);
-		LUX_DELETE(this);
+		LUMIX_DELETE(this);
 	}
 
 
@@ -51,7 +51,7 @@ namespace UI
 		}
 		for(int i = 0; i < m_children.size(); ++i)
 		{
-			LUX_DELETE(m_children[i]);
+			LUMIX_DELETE(m_children[i]);
 		}
 	}
 
@@ -77,7 +77,7 @@ namespace UI
 			{
 				if(m_parent->m_children[i]->getZ() < m_parent->m_children[i+1]->getZ())
 				{
-					Lux::UI::Block* tmp = m_parent->m_children[i];
+					Lumix::UI::Block* tmp = m_parent->m_children[i];
 					m_parent->m_children[i] = m_parent->m_children[i+1];
 					m_parent->m_children[i+1] = tmp;
 				}
@@ -86,7 +86,7 @@ namespace UI
 			{
 				if(m_parent->m_children[i]->getZ() > m_parent->m_children[i-1]->getZ())
 				{
-					Lux::UI::Block* tmp = m_parent->m_children[i];
+					Lumix::UI::Block* tmp = m_parent->m_children[i];
 					m_parent->m_children[i] = m_parent->m_children[i-1];
 					m_parent->m_children[i-1] = tmp;
 				}
@@ -159,7 +159,7 @@ namespace UI
 		{
 			if(m_children[i]->getZ() > m_children[i-1]->getZ())
 			{
-				Lux::UI::Block* tmp = m_children[i];
+				Lumix::UI::Block* tmp = m_children[i];
 				m_children[i] = m_children[i-1];
 				m_children[i-1] = tmp;
 			}
@@ -417,4 +417,4 @@ namespace UI
 
 
 } // ~namespace UI
-} // ~namespace Lux
+} // ~namespace Lumix

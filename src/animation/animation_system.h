@@ -1,17 +1,17 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "engine/iplugin.h"
+#include "core/string.h"
 
 
-namespace Lux
+namespace Lumix
 {
 	namespace FS
 	{
 		class FileSystem;
 	};
-
 
 	class Animation;
 	class Engine;
@@ -19,7 +19,7 @@ namespace Lux
 	class ISerializer;
 	class Universe;
 
-	class LUX_ENGINE_API AnimationSystem : public IPlugin
+	class LUMIX_ENGINE_API AnimationSystem : public IPlugin
 	{
 		public:
 			AnimationSystem() { m_impl = 0; }
@@ -33,6 +33,8 @@ namespace Lux
 			virtual Component createComponent(uint32_t, const Entity&) override;
 			virtual const char* getName() const override { return "animation"; }
 
+			void getPreview(Component cmp, string& path);
+			void setPreview(Component cmp, const string& path);
 			void destroy();
 			Component createAnimable(const Entity& entity);
 			void playAnimation(const Component& cmp, const char* path);
@@ -44,4 +46,4 @@ namespace Lux
 	};
 
 
-}// ~ namespace Lux 
+}// ~ namespace Lumix 

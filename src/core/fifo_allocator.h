@@ -1,16 +1,16 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/MT/spin_mutex.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
 	/// FIFOAllocator uses fixed ring buffer to allocate memory in FIFO order.
-	class LUX_CORE_API FIFOAllocator
+	class LUMIX_CORE_API FIFOAllocator
 	{
 		public:
 			FIFOAllocator(size_t buffer_size);
@@ -29,4 +29,4 @@ namespace Lux
 	};
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

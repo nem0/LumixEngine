@@ -1,25 +1,40 @@
 #include "physics/physics_scene.h"
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
-#include <cstdio>
-#include <gl/gl.h>
 #include <PxPhysicsAPI.h>
 #include "cooking/PxCooking.h"
 #include "core/crc32.h"
-#include "core/event_manager.h"
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
 #include "core/iserializer.h"
+#include "core/log.h"
 #include "core/matrix.h"
+#include "core/path.h"
+#include "core/resource_manager.h"
+#include "core/resource_manager_base.h"
 #include "engine/engine.h"
-#include "universe/component_event.h"
-#include "universe/entity_moved_event.h"
+#include "graphics/render_scene.h"
+#include "graphics/texture.h"
 #include "physics/physics_system.h"
 #include "physics/physics_system_impl.h"
 
 
-namespace Lux
+namespace Lumix
 {
+
+
+class Terrain
+{
+	public:
+		Terrain();
+		~Terrain();
+		void heightmapLoaded(Resource::State, Resource::State new_state);
+
+		PhysicsSceneImpl* m_scene;
+		Entity m_entity;
+		physx::PxRigidActor* m_actor;
+		Texture* m_heightmap;
+};
 
 
 struct PhysicsSceneImpl
@@ -29,13 +44,14 @@ struct PhysicsSceneImpl
 		BOX
 	};
 
-	void handleEvent(Event& event);
+	void onEntityMoved(Entity& entity);
 	void createConvexGeom(const char* path, physx::PxConvexMeshGeometry& geom);
 	void createTriMesh(const char* path, physx::PxTriangleMeshGeometry& geom);
 
 	void setControllerPosition(int index, const Vec3& pos);
 	void serializeActor(ISerializer& serializer, int idx);
 	void deserializeActor(ISerializer& serializer, int idx);
+	void heightmapLoaded(Terrain* terrain);
 
 	struct Controller
 	{
@@ -43,37 +59,40 @@ struct PhysicsSceneImpl
 		Entity m_entity;
 	};
 
-	Universe*						m_universe;
-	Engine*							m_engine;
-	physx::PxScene*					m_scene;
-	PhysicsSystem*					m_system;
-	physx::PxMaterial*				m_default_material;
+	Universe*					m_universe;
+	Engine*						m_engine;
+	physx::PxScene*				m_scene;
+	PhysicsSystem*				m_system;
+	physx::PxMaterial*			m_default_material;
 	Array<physx::PxRigidActor*>	m_actors;
-	Array<string>					m_shape_sources;
+	Array<string>				m_shape_sources;
+	
 	Array<bool>					m_is_dynamic;
 	Array<Entity>				m_entities;
 	Array<int>					m_index_map;
 	Array<Controller>			m_controllers;
-	PhysicsScene*					m_owner;
+	Array<Terrain*>				m_terrains;
+	PhysicsScene*				m_owner;
 };
 
 
-static const uint32_t box_rigid_actor_type = crc32("box_rigid_actor");
-static const uint32_t controller_type = crc32("physical_controller");
-
+static const uint32_t BOX_ACTOR_HASH = crc32("box_rigid_actor");
+static const uint32_t MESH_ACTOR_HASH = crc32("mesh_rigid_actor");
+static const uint32_t CONTROLLER_HASH = crc32("physical_controller");
+static const uint32_t HEIGHTFIELD_HASH = crc32("physical_heightfield");
 
 struct OutputStream : public physx::PxOutputStream
 {
 	OutputStream()
 	{
-		data = LUX_NEW_ARRAY(uint8_t, 4096);
+		data = LUMIX_NEW_ARRAY(uint8_t, 4096);
 		capacity = 4096;
 		size = 0;
 	}
 
 	~OutputStream()
 	{
-		LUX_DELETE_ARRAY(data);
+		LUMIX_DELETE_ARRAY(data);
 	}
 
 
@@ -81,11 +100,12 @@ struct OutputStream : public physx::PxOutputStream
 	{
 		if(size + (int)count > capacity)
 		{
-			uint8_t* new_data = LUX_NEW_ARRAY(unsigned char, capacity + 4096);
+			int new_capacity = Math::max(size + (int)count, capacity + 4096);
+			uint8_t* new_data = LUMIX_NEW_ARRAY(unsigned char, new_capacity);
 			memcpy(new_data, data, size);
-			LUX_DELETE_ARRAY(data);
+			LUMIX_DELETE_ARRAY(data);
 			data = new_data;
-			capacity += 4096;
+			capacity = new_capacity;
 		}
 		memcpy(data + size, src, count);
 		size += count;
@@ -136,29 +156,40 @@ PhysicsScene::PhysicsScene()
 	m_impl = 0;
 }
 
-
-bool PhysicsScene::create(PhysicsSystem& system, Universe& universe)
+	
+bool PhysicsScene::create(PhysicsSystem& system, Universe& universe, Engine& engine)
 {
-	m_impl = LUX_NEW(PhysicsSceneImpl);
+	m_impl = LUMIX_NEW(PhysicsSceneImpl);
 	m_impl->m_owner = this;
 	m_impl->m_universe = &universe;
-	m_impl->m_universe->getEventManager().addListener(EntityMovedEvent::type).bind<PhysicsSceneImpl, &PhysicsSceneImpl::handleEvent>(m_impl);
+	m_impl->m_universe->entityMoved().bind<PhysicsSceneImpl, &PhysicsSceneImpl::onEntityMoved>(m_impl);
+	m_impl->m_engine = &engine;
 	physx::PxSceneDesc sceneDesc(system.m_impl->m_physics->getTolerancesScale());
 	sceneDesc.gravity = physx::PxVec3(0.0f, -9.8f, 0.0f);
-	if(!sceneDesc.cpuDispatcher) {
+	if (!sceneDesc.cpuDispatcher) 
+	{
 		physx::PxDefaultCpuDispatcher* cpu_dispatcher = physx::PxDefaultCpuDispatcherCreate(1);
-		if(!cpu_dispatcher)
-			printf("PxDefaultCpuDispatcherCreate failed!");
+		if (!cpu_dispatcher)
+		{
+			g_log_error.log("physics") << "PxDefaultCpuDispatcherCreate failed!";
+		}
 		sceneDesc.cpuDispatcher = cpu_dispatcher;
 	} 
-	if(!sceneDesc.filterShader)
-		sceneDesc.filterShader  = &physx::PxDefaultSimulationFilterShader;
+	if (!sceneDesc.filterShader)
+	{
+		sceneDesc.filterShader = &physx::PxDefaultSimulationFilterShader;
+	}
 
 	m_impl->m_scene = system.m_impl->m_physics->createScene(sceneDesc);
 	if (!m_impl->m_scene)
+	{
 		return false;
+	}
 	m_impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE,     1.0);
 	m_impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_SHAPES, 1.0f);
+	m_impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eACTOR_AXES, 1.0f);
+	m_impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_AABBS, 1.0f);
+	m_impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eWORLD_AXES, 1.0f);
 	m_impl->m_system = &system;
 	m_impl->m_default_material = m_impl->m_system->m_impl->m_physics->createMaterial(0.5,0.5,0.5);
 	return true;
@@ -169,7 +200,7 @@ void PhysicsScene::destroy()
 {
 	m_impl->m_default_material->release();
 	m_impl->m_scene->release();
-	LUX_DELETE(m_impl);
+	LUMIX_DELETE(m_impl);
 	m_impl = NULL;
 }
 
@@ -188,13 +219,71 @@ void matrix2Transform(const Matrix& mtx, physx::PxTransform& transform)
 }
 
 
+void PhysicsSceneImpl::heightmapLoaded(Terrain* terrain)
+{
+		Array<physx::PxHeightFieldSample> heights;
+		
+		int width = terrain->m_heightmap->getWidth();
+		int height = terrain->m_heightmap->getHeight();
+		const uint8_t* data = terrain->m_heightmap->getData();
+		heights.resize(width * height);
+		int bytes_per_pixel = terrain->m_heightmap->getBytesPerPixel();
+		for (int j = 0; j < height; ++j)
+		{
+			for (int i = 0; i < width; ++i)
+			{
+				int idx = i + j * width;
+				int idx2 = j + i * height;
+				heights[idx].height = data[idx2 * bytes_per_pixel] - 255;
+			}
+		}
+
+		physx::PxHeightFieldDesc hfDesc;
+		hfDesc.format = physx::PxHeightFieldFormat::eS16_TM;
+		hfDesc.nbColumns = width;
+		hfDesc.nbRows = height;
+		hfDesc.samples.data = &heights[0];
+		hfDesc.samples.stride = sizeof(physx::PxHeightFieldSample);
+
+		physx::PxHeightField* heightfield = m_system->m_impl->m_physics->createHeightField(hfDesc);
+		physx::PxHeightFieldGeometry hfGeom(heightfield, physx::PxMeshGeometryFlags(), 0.1f, 1.0f, 1.0f);
+		
+		if (terrain->m_actor)
+		{
+			physx::PxRigidActor* actor = terrain->m_actor;
+			m_scene->removeActor(*actor);
+			actor->release();
+			terrain->m_actor = NULL;
+		}
+
+		physx::PxTransform transform;
+		Matrix mtx;
+		terrain->m_entity.getMatrix(mtx);
+		matrix2Transform(mtx, transform);
+
+		physx::PxRigidActor* actor;
+		actor = PxCreateStatic(*m_system->m_impl->m_physics, transform, hfGeom, *m_default_material);
+		if (actor)
+		{
+			actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
+			actor->userData = (void*)terrain->m_entity.index;
+			m_scene->addActor(*actor);
+			terrain->m_actor = actor;
+		}
+		else
+		{
+			g_log_error.log("PhysX") << "Could not create PhysX heightfield " << terrain->m_heightmap->getPath().c_str();
+		}
+}
+
+
 void PhysicsScene::destroyActor(Component cmp)
 {
-	ASSERT(cmp.type == box_rigid_actor_type);
+	ASSERT(cmp.type == BOX_ACTOR_HASH);
+	m_impl->m_universe->componentDestroyed().invoke(cmp);
 	int inner_index = m_impl->m_index_map[cmp.index];
 	m_impl->m_scene->removeActor(*m_impl->m_actors[inner_index]);
 	m_impl->m_actors[inner_index]->release();
-	m_impl->m_universe->getEventManager().emitEvent(ComponentEvent(cmp, false));
 	m_impl->m_actors.eraseFast(inner_index);
 	m_impl->m_shape_sources.eraseFast(inner_index);
 	m_impl->m_is_dynamic.eraseFast(inner_index);
@@ -208,7 +297,21 @@ void PhysicsScene::destroyActor(Component cmp)
 		}
 	}
 	m_impl->m_index_map[cmp.index] = -1;
-	m_impl->m_universe->getEventManager().emitEvent(ComponentEvent(cmp, false));
+	m_impl->m_universe->removeComponent(cmp);
+}
+
+
+Component PhysicsScene::createHeightfield(Entity entity)
+{
+	Terrain* terrain = LUMIX_NEW(Terrain);
+	m_impl->m_terrains.push(terrain);
+	terrain->m_heightmap = NULL;
+	terrain->m_scene = m_impl;
+	terrain->m_actor = NULL;
+	terrain->m_entity = entity;
+	Component cmp = m_impl->m_universe->addComponent(entity, HEIGHTFIELD_HASH, this, m_impl->m_terrains.size() - 1);
+	m_impl->m_universe->componentCreated().invoke(cmp);
+	return cmp;
 }
 
 
@@ -231,8 +334,8 @@ Component PhysicsScene::createController(Entity entity)
 
 	m_impl->m_controllers.push(c);
 	
-	Component cmp(entity, controller_type, this, m_impl->m_controllers.size() - 1);
-	m_impl->m_universe->getEventManager().emitEvent(ComponentEvent(cmp));
+	Component cmp = m_impl->m_universe->addComponent(entity, CONTROLLER_HASH, this, m_impl->m_controllers.size() - 1);
+	m_impl->m_universe->componentCreated().invoke(cmp);
 	return cmp;
 }
 
@@ -280,13 +383,68 @@ Component PhysicsScene::createBoxRigidActor(Entity entity)
 	m_impl->m_actors[new_index] = actor;
 	actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
 
-	Component cmp(entity, box_rigid_actor_type, this, m_impl->m_actors.size() - 1);
-	m_impl->m_universe->getEventManager().emitEvent(ComponentEvent(cmp));
+	Component cmp = m_impl->m_universe->addComponent(entity, BOX_ACTOR_HASH, this, m_impl->m_actors.size() - 1);
+	m_impl->m_universe->componentCreated().invoke(cmp);
 	return cmp;
 }
 
 
-/*void PhysicsScene::getShapeSource(Component cmp, string& str)
+Component PhysicsScene::createMeshRigidActor(Entity entity)
+{
+	int new_index = m_impl->m_entities.size();
+	for (int i = 0; i < m_impl->m_index_map.size(); ++i)
+	{
+		if (m_impl->m_index_map[i] == -1)
+		{
+			new_index = i;
+			break;
+		}
+	}
+	if (new_index == m_impl->m_entities.size())
+	{
+		m_impl->m_actors.push(NULL);
+		m_impl->m_shape_sources.push(string(""));
+		m_impl->m_is_dynamic.push(false);
+		m_impl->m_entities.push(entity);
+	}
+	else
+	{
+		m_impl->m_actors[new_index] = NULL;
+		m_impl->m_shape_sources[new_index] = "";
+		m_impl->m_is_dynamic[new_index] = false;
+		m_impl->m_entities[new_index] = entity;
+	}
+
+	Component cmp = m_impl->m_universe->addComponent(entity, MESH_ACTOR_HASH, this, m_impl->m_actors.size() - 1);
+	m_impl->m_universe->componentCreated().invoke(cmp);
+	return cmp;
+}
+
+
+void PhysicsScene::getHeightmap(Component cmp, string& str)
+{
+	str = m_impl->m_terrains[cmp.index]->m_heightmap ? m_impl->m_terrains[cmp.index]->m_heightmap->getPath().c_str() : "";
+}
+
+
+void PhysicsScene::setHeightmap(Component cmp, const string& str)
+{
+	if (m_impl->m_terrains[cmp.index]->m_heightmap)
+	{
+		m_impl->m_engine->getResourceManager().get(ResourceManager::TEXTURE)->unload(*m_impl->m_terrains[cmp.index]->m_heightmap);
+		m_impl->m_terrains[cmp.index]->m_heightmap->getObserverCb().unbind<Terrain, &Terrain::heightmapLoaded>(m_impl->m_terrains[cmp.index]);
+	}
+	m_impl->m_terrains[cmp.index]->m_heightmap = static_cast<Texture*>(m_impl->m_engine->getResourceManager().get(ResourceManager::TEXTURE)->load(str.c_str()));
+	m_impl->m_terrains[cmp.index]->m_heightmap->getObserverCb().bind<Terrain, &Terrain::heightmapLoaded>(m_impl->m_terrains[cmp.index]);
+	m_impl->m_terrains[cmp.index]->m_heightmap->setNonGL(true);
+	if (m_impl->m_terrains[cmp.index]->m_heightmap->isReady())
+	{
+		m_impl->m_terrains[cmp.index]->heightmapLoaded(Resource::State::LOADING, Resource::State::READY);
+	}
+}
+
+
+void PhysicsScene::getShapeSource(Component cmp, string& str)
 {
 	str = m_impl->m_shape_sources[cmp.index];
 }
@@ -299,103 +457,48 @@ void PhysicsScene::setShapeSource(Component cmp, const string& str)
 		return;
 	}
 
-	FS::IFile* file = m_impl->m_engine->getFileSystem().open("disk", str.c_str(), FS::Mode::OPEN | FS::Mode::READ);
-	if(file)
+	physx::PxTriangleMeshGeometry geom;
+	m_impl->createTriMesh(str.c_str(), geom);
+	
+	physx::PxTransform transform;
+	Matrix mtx;
+	cmp.entity.getMatrix(mtx);
+	matrix2Transform(mtx, transform);
+
+	if (m_impl->m_actors[cmp.index])
 	{
-		physx::PxTransform transform;
-		Matrix mtx;
-		cmp.entity.getMatrix(mtx);
-		matrix2Transform(mtx, transform);
-		physx::PxGeometry* geom = 0;
-		physx::PxBoxGeometry box_geom;
-		physx::PxSphereGeometry sphere_geom;
-		physx::PxConvexMeshGeometry convex_geom;
-		physx::PxTriangleMeshGeometry trimesh_geom;
-
-		long size = file->size();
-		char* buffer = LUX_NEW_ARRAY(char, size);
-		file->read(buffer, size);
-
-		jsmn_parser parser;
-		jsmn_init(&parser);
-		jsmntok_t tokens[255];
-		jsmn_parse(&parser, buffer, tokens, 255);
-		JsonObject root(0, buffer, tokens);
-		JsonObject js_shape = root.getProperty("shape");
-		char tmp[255];
-		if(js_shape.toString(tmp, 255))
-		{
-			if(strcmp(tmp, "sphere") == 0)
-			{
-				root.getProperty("radius").toString(tmp, 255);
-				sscanf_s(tmp, "%f", &sphere_geom.radius);
-				geom = &sphere_geom;
-			}
-			else if(strcmp(tmp, "box") == 0)
-			{
-				root.getProperty("x").toString(tmp, 255);
-				sscanf_s(tmp, "%f", &box_geom.halfExtents.x);
-				root.getProperty("y").toString(tmp, 255);
-				sscanf_s(tmp, "%f", &box_geom.halfExtents.y);
-				root.getProperty("z").toString(tmp, 255);
-				sscanf_s(tmp, "%f", &box_geom.halfExtents.z);
-				geom = &box_geom;
-			}
-			else if(strcmp(tmp, "convex") == 0)
-			{
-				if(root.getProperty("src").toString(tmp, 255))
-				{
-					m_impl->createConvexGeom(tmp, convex_geom);
-				}
-				geom = &convex_geom;
-			}
-			else if(strcmp(tmp, "trimesh") == 0)
-			{
-				if(root.getProperty("src").toString(tmp, 255))
-				{
-					m_impl->createTriMesh(tmp, trimesh_geom);
-				}
-				geom = &trimesh_geom;
-			}
-			else
-			{
-				ASSERT(false); // unsupported type
-			}
-		}
-		LUX_DELETE_ARRAY(buffer);
-
-		if(m_impl->m_actors[cmp.index])
-		{
-			m_impl->m_scene->removeActor(*m_impl->m_actors[cmp.index]);
-			m_impl->m_actors[cmp.index]->release();
-			m_impl->m_actors[cmp.index] = 0;
-		}
-
-		if(geom)
-		{
-			physx::PxRigidActor* actor;
-			if(m_impl->m_is_dynamic[cmp.index])
-			{
-				actor = PxCreateDynamic(*m_impl->m_system->m_impl->m_physics, transform, *geom, *m_impl->m_default_material, 1.0f);
-			}
-			else
-			{
-				actor = PxCreateStatic(*m_impl->m_system->m_impl->m_physics, transform, *geom, *m_impl->m_default_material);
-			}
-			actor->userData = (void*)cmp.entity.index;
-			m_impl->m_scene->addActor(*actor);
-			m_impl->m_scene->simulate(0.01f);
-			m_impl->m_scene->fetchResults(true);
-			m_impl->m_actors[cmp.index] = actor;
-			actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
-			m_impl->m_shape_sources[cmp.index] = str;
-		}
+		m_impl->m_scene->removeActor(*m_impl->m_actors[cmp.index]);
+		m_impl->m_actors[cmp.index]->release();
+		m_impl->m_actors[cmp.index] = NULL;
 	}
-}*/
+
+	physx::PxRigidActor* actor;
+	if (m_impl->m_is_dynamic[cmp.index])
+	{
+		actor = PxCreateDynamic(*m_impl->m_system->m_impl->m_physics, transform, geom, *m_impl->m_default_material, 1.0f);
+	}
+	else
+	{
+		actor = PxCreateStatic(*m_impl->m_system->m_impl->m_physics, transform, geom, *m_impl->m_default_material);
+	}
+	if(actor)
+	{
+		actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
+		actor->userData = (void*)cmp.entity.index;
+		m_impl->m_scene->addActor(*actor);
+		m_impl->m_actors[cmp.index] = actor;
+		m_impl->m_shape_sources[cmp.index] = str;
+	}
+	else
+	{
+		g_log_error.log("PhysX") << "Could not create PhysX mesh " << str.c_str();
+	}
+}
 
 
 void PhysicsSceneImpl::createTriMesh(const char* path, physx::PxTriangleMeshGeometry& geom)
 {
+	/// TODO
 	FILE* fp;
 	fopen_s(&fp, path, "rb");
 	if(fp)
@@ -416,8 +519,13 @@ void PhysicsSceneImpl::createTriMesh(const char* path, physx::PxTriangleMeshGeom
 		meshDesc.points.data = &verts[0];
 
 		meshDesc.triangles.count = num_indices / 3;
-		meshDesc.triangles.stride = 3*sizeof(physx::PxU32);
+		meshDesc.triangles.stride = 3 * sizeof(physx::PxU32);
 		meshDesc.triangles.data	= &tris[0];
+
+		for(int i = 0; i < num_indices; ++i)
+		{
+			ASSERT(tris[i] < (uint32_t)verts.size());
+		}
 
 		OutputStream writeBuffer;
 		bool status = m_system->m_impl->m_cooking->cookTriangleMesh(meshDesc, writeBuffer);
@@ -481,7 +589,11 @@ void PhysicsScene::render()
 		for(physx::PxU32 i=0; i<numLines; i++)
 		{
 			const physx::PxDebugLine& line = lines[i];
-			glColor3f(0, 1, 0);				
+			GLubyte bytes[3];
+			bytes[0] = (GLubyte)((line.color0 >> 16) & 0xff);
+			bytes[1] = (GLubyte)((line.color0 >> 8) & 0xff);
+			bytes[2] = (GLubyte)((line.color0) & 0xff);
+			glColor3ubv(bytes);
 			glVertex3fv((GLfloat*)&line.pos0);
 			glVertex3fv((GLfloat*)&line.pos1);
 		}
@@ -511,7 +623,6 @@ void PhysicsScene::update(float time_delta)
 		m_impl->m_controllers[i].m_controller->move(g, 0.0001f, time_delta, physx::PxControllerFilters());
 		m_impl->m_controllers[i].m_entity.setPosition((float)p.x, (float)p.y, (float)p.z);
 	}
-
 }
 
 
@@ -548,35 +659,31 @@ bool PhysicsScene::raycast(const Vec3& origin, const Vec3& dir, float distance, 
 }
 
 
-void PhysicsSceneImpl::handleEvent(Event& event)
+void PhysicsSceneImpl::onEntityMoved(Entity& entity)
 {
-	if(event.getType() == EntityMovedEvent::type)
+	const Entity::ComponentList& cmps = entity.getComponents();
+	for(int i = 0, c = cmps.size(); i < c; ++i)
 	{
-		Entity& e = static_cast<EntityMovedEvent&>(event).entity;
-		const Entity::ComponentList& cmps = e.getComponents();
-		for(int i = 0, c = cmps.size(); i < c; ++i)
+		if(cmps[i].type == BOX_ACTOR_HASH)
 		{
-			if(cmps[i].type == box_rigid_actor_type)
+			Vec3 pos = entity.getPosition();
+			physx::PxVec3 pvec(pos.x, pos.y, pos.z);
+			Quat q;
+			entity.getMatrix().getRotation(q);
+			physx::PxQuat pquat(q.x, q.y, q.z, q.w);
+			physx::PxTransform trans(pvec, pquat);
+			if(m_actors[cmps[i].index])
 			{
-				Vec3 pos = e.getPosition();
-				physx::PxVec3 pvec(pos.x, pos.y, pos.z);
-				Quat q;
-				e.getMatrix().getRotation(q);
-				physx::PxQuat pquat(q.x, q.y, q.z, q.w);
-				physx::PxTransform trans(pvec, pquat);
-				if(m_actors[cmps[i].index])
-				{
-					m_actors[cmps[i].index]->setGlobalPose(trans, false);
-				}
-				break;
+				m_actors[cmps[i].index]->setGlobalPose(trans, false);
 			}
-			else if(cmps[i].type == controller_type)
-			{
-				Vec3 pos = e.getPosition();
-				physx::PxExtendedVec3 pvec(pos.x, pos.y, pos.z);
-				m_controllers[cmps[i].index].m_controller->setPosition(pvec);
-				break;
-			}
+			break;
+		}
+		else if(cmps[i].type == CONTROLLER_HASH)
+		{
+			Vec3 pos = entity.getPosition();
+			physx::PxExtendedVec3 pvec(pos.x, pos.y, pos.z);
+			m_controllers[cmps[i].index].m_controller->setPosition(pvec);
+			break;
 		}
 	}
 }
@@ -657,7 +764,8 @@ void PhysicsSceneImpl::serializeActor(ISerializer& serializer, int idx)
 	if(m_actors[idx]->getNbShapes() == 1 && m_actors[idx]->getShapes(&shapes, 1))
 	{
 		physx::PxBoxGeometry geom;
-		if(shapes->getBoxGeometry(geom))
+		physx::PxHeightFieldGeometry hf_geom;
+		if (shapes->getBoxGeometry(geom))
 		{
 			serializer.serialize("type", (int32_t)BOX);
 			serializer.serialize("x", geom.halfExtents.x);
@@ -716,8 +824,7 @@ void PhysicsSceneImpl::deserializeActor(ISerializer& serializer, int idx)
 	m_actors[idx] = actor;
 	actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
 
-	Component cmp(m_entities[idx], box_rigid_actor_type, m_owner, idx);
-	m_universe->getEventManager().emitEvent(ComponentEvent(cmp));
+	m_universe->addComponent(m_entities[idx], BOX_ACTOR_HASH, m_owner, idx);
 }
 
 
@@ -740,7 +847,14 @@ void PhysicsScene::serialize(ISerializer& serializer)
 		serializer.serializeArrayItem(m_impl->m_controllers[i].m_entity.index);
 	}
 	serializer.endArray();
-}
+	serializer.serialize("count", m_impl->m_terrains.size());
+	serializer.beginArray("terrains");
+	for (int i = 0; i < m_impl->m_terrains.size(); ++i)
+	{
+		serializer.serializeArrayItem(m_impl->m_terrains[i]->m_entity.index);
+		serializer.serializeArrayItem(m_impl->m_terrains[i]->m_heightmap->getPath().c_str());
+	}
+	serializer.endArray();}
 
 
 void PhysicsScene::deserialize(ISerializer& serializer)
@@ -760,6 +874,7 @@ void PhysicsScene::deserialize(ISerializer& serializer)
 		m_impl->m_entities[i].universe = m_impl->m_universe;
 		m_impl->deserializeActor(serializer, i);
 	}
+	serializer.deserializeArrayEnd();
 	serializer.deserialize("count", count);
 	m_impl->m_controllers.clear();
 	serializer.deserializeArrayBegin("controllers");
@@ -770,7 +885,27 @@ void PhysicsScene::deserialize(ISerializer& serializer)
 		Entity e(m_impl->m_universe, index);
 		createController(e);
 		m_impl->setControllerPosition(i, e.getPosition());
+		m_impl->m_universe->addComponent(e, CONTROLLER_HASH, this, i);
 	}		
+	serializer.deserializeArrayEnd();
+
+	serializer.deserialize("count", count);
+	for (int i = 0; i < m_impl->m_terrains.size(); ++i)
+	{
+		LUMIX_DELETE(m_impl->m_terrains[i]);
+	}
+	m_impl->m_terrains.clear();
+	serializer.deserializeArrayBegin("terrains");
+	for (int i = 0; i < count; ++i)
+	{
+		int index;
+		serializer.deserializeArrayItem(index);
+		Entity e(m_impl->m_universe, index);
+		createHeightfield(e);
+		char tmp[LUMIX_MAX_PATH];
+		serializer.deserializeArrayItem(tmp, LUMIX_MAX_PATH);
+		setHeightmap(Component(e, HEIGHTFIELD_HASH, this, i), string(tmp));
+	}
 	serializer.deserializeArrayEnd();
 }
 
@@ -781,4 +916,30 @@ PhysicsSystem& PhysicsScene::getSystem() const
 }
 
 
-} // !namespace Lux
+Terrain::Terrain()
+{
+	m_heightmap = NULL;
+}
+
+
+Terrain::~Terrain()
+{
+	if (m_heightmap)
+	{
+		m_heightmap->getResourceManager().get(ResourceManager::TEXTURE)->unload(*m_heightmap);
+		m_heightmap->getObserverCb().unbind<Terrain, &Terrain::heightmapLoaded>(this);
+	}
+}
+
+
+void Terrain::heightmapLoaded(Resource::State, Resource::State new_state)
+{
+	if (new_state == Resource::State::READY)
+	{
+		m_scene->heightmapLoaded(this);
+	}
+}
+
+
+
+} // !namespace Lumix

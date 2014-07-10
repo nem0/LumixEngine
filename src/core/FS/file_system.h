@@ -1,16 +1,16 @@
 #pragma once
 
 #include "core/fs/ifile_system_defines.h"
-#include "core/lux.h"
+#include "core/lumix.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace FS
 	{
 		class IFile;
 		class IFileDevice;
 
-		class LUX_CORE_API FileSystem abstract
+		class LUMIX_CORE_API FileSystem abstract
 		{
 		public:
 			static FileSystem* create();
@@ -37,4 +37,4 @@ namespace Lux
 			virtual void setSaveGameDevice(const char* dev) = 0;
 		};
 	} // ~namespace FS
-} // ~namespace Lux
+} // ~namespace Lumix

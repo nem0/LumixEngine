@@ -4,7 +4,7 @@
 #include "universe/universe.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 

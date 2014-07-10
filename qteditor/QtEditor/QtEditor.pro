@@ -18,55 +18,46 @@ SOURCES += main.cpp\
     sceneview.cpp \ 
     log_widget.cpp \
     property_view.cpp \
-    propertywidgets/renderable_widget.cpp \
-    property_widget_base.cpp \
-    propertywidgets/script_widget.cpp \
     gameview.cpp \
     assetbrowser.cpp \
     scripts/scriptcompiler.cpp \
     scripts/scriptcompilerwidget.cpp \
     fileserverwidget.cpp \
-    propertywidgets/animable_widget.cpp \
-    propertywidgets/camerawidget.cpp \
-    propertywidgets/lightwidget.cpp \
-    materialmanager.cpp
+    materialmanager.cpp \
+    profilerui.cpp \
+    profilergraph.cpp \
+    pc/file_system_watcher.cpp
 
 HEADERS  += mainwindow.h \
     sceneview.h \ 
     log_widget.h \
     property_view.h \
-    propertywidgets/renderable_widget.h \
-    property_widget_base.h \
-    propertywidgets/script_widget.h \
     gameview.h \
     assetbrowser.h \
     scripts/scriptcompiler.h \
     scripts/scriptcompilerwidget.h \
     fileserverwidget.h \
-    propertywidgets/animable_widget.h \
-    propertywidgets/camerawidget.h \
-    propertywidgets/lightwidget.h \
     materialmanager.h \
     wgl_render_device.h \
-    renderdevicewidget.h
+    renderdevicewidget.h \
+    profilerui.h \
+    profilergraph.h \
+    file_system_watcher.h
 
 FORMS    += mainwindow.ui \
     logwidget.ui \
     property_view.ui \
-    propertywidgets/renderable_widget.ui \
-    property_widget_base.ui \
-    propertywidgets/script_widget.ui \
     gameview.ui \
     assetbrowser.ui \
     scripts/scriptcompilerwidget.ui \
     fileserverwidget.ui \
-    propertywidgets/animable_widget.ui \
-    propertywidgets/camerawidget.ui \
-    propertywidgets/lightwidget.ui \
-    materialmanager.ui
+    materialmanager.ui \
+    profilerui.ui \
+    profilergraph.ui
 
 win32
 {
-    INCLUDEPATH = ../../src;../../external/glew/include
-    LIBS = -L../../bin/Win32_Debug -lcore -lengine -lopengl32
+    INCLUDEPATH = ../../src \
+	../../external/glew/include
+    LIBS = -L../../bin/Win32_Debug -lcore -lengine -lopengl32 -lphysics
 }

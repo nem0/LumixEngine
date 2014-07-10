@@ -3,8 +3,10 @@
 #include "core/fs/ifile.h"
 #include "core/json_serializer.h"
 #include "core/log.h"
+#include "core/path_utils.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
+#include "core/timer.h"
 #include "graphics/frame_buffer.h"
 #include "graphics/pipeline.h"
 #include "graphics/renderer.h"
@@ -12,8 +14,13 @@
 #include "graphics/texture.h"
 
 
-namespace Lux
+namespace Lumix
 {
+
+Material::~Material()
+{
+	ASSERT(isEmpty());
+}
 
 void Material::apply(Renderer& renderer, PipelineInstance& pipeline)
 {
@@ -46,6 +53,9 @@ void Material::apply(Renderer& renderer, PipelineInstance& pipeline)
 					break;
 				case Uniform::MATRIX:
 					m_shader->setUniform(uniform.m_name, uniform.m_matrix);
+					break;
+				case Uniform::TIME:
+					m_shader->setUniform(uniform.m_name, pipeline.getScene()->getTimer()->getTimeSinceStart());
 					break;
 				default:
 					ASSERT(false);
@@ -92,6 +102,18 @@ FS::ReadCallback Material::getReadCallback()
 	return rc;
 }
 
+bool Material::save(ISerializer& serializer)
+{
+	serializer.beginObject();
+	serializer.serialize("shader", m_shader->getPath().c_str());
+	for (int i = 0; i < m_textures.size(); ++i)
+	{
+		serializer.serialize("texture", m_textures[i]->getPath().c_str());
+	}
+	serializer.endObject();
+	return false;
+}
+
 void Material::deserializeUniforms(ISerializer& serializer)
 {
 	serializer.deserializeArrayBegin();
@@ -129,6 +151,11 @@ void Material::deserializeUniforms(ISerializer& serializer)
 				}
 				serializer.deserializeArrayEnd();
 			}
+			else if (strcmp(label, "time") == 0)
+			{
+				uniform.m_type = Uniform::TIME;
+				serializer.deserialize(uniform.m_float);
+			}
 			else
 			{
 				ASSERT(false);
@@ -139,15 +166,64 @@ void Material::deserializeUniforms(ISerializer& serializer)
 	serializer.deserializeArrayEnd();
 }
 
+void Material::removeTexture(int i)
+{
+	if (m_textures[i])
+	{
+		removeDependency(*m_textures[i]);
+		m_resource_manager.get(ResourceManager::TEXTURE)->unload(*m_textures[i]);
+	}
+	m_textures.erase(i);
+}
+
+void Material::setTexture(int i, Texture* texture)
+{ 
+	if (m_textures[i])
+	{
+		removeDependency(*m_textures[i]);
+		m_resource_manager.get(ResourceManager::TEXTURE)->unload(*m_textures[i]);
+	}
+	if (texture)
+	{
+		addDependency(*texture);
+	}
+	m_textures[i] = texture; 
+}
+
+void Material::addTexture(Texture* texture)
+{
+	if (texture)
+	{
+		addDependency(*texture);
+	}
+	m_textures.push(texture);
+}
+
+void Material::setShader(Shader* shader)
+{
+	if (m_shader)
+	{ 
+		removeDependency(*m_shader);
+		m_resource_manager.get(ResourceManager::SHADER)->unload(*m_shader);
+	}
+	m_shader = shader;
+	if (m_shader)
+	{
+		addDependency(*m_shader);
+	}
+}
+
 void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 {
 	if(success)
 	{
 		JsonSerializer serializer(*file, JsonSerializer::READ, m_path.c_str());
 		serializer.deserializeObjectBegin();
-		char path[MAX_PATH];
+		char path[LUMIX_MAX_PATH];
 		char label[256];
-		while(!serializer.isObjectEnd())
+		char material_dir[LUMIX_MAX_PATH];
+		PathUtils::getDir(material_dir, LUMIX_MAX_PATH, m_path.c_str());
+		while (!serializer.isObjectEnd())
 		{
 			serializer.deserializeLabel(label, 255);
 			if (strcmp(label, "uniforms") == 0)
@@ -159,7 +235,10 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 				serializer.deserialize(path, MAX_PATH);
 				if (path[0] != '\0')
 				{
-					Texture* texture = static_cast<Texture*>(m_resource_manager.get(ResourceManager::TEXTURE)->load(path));
+					base_string<char, StackAllocator<LUMIX_MAX_PATH> > texture_path;
+					texture_path = material_dir;
+					texture_path += path;
+					Texture* texture = static_cast<Texture*>(m_resource_manager.get(ResourceManager::TEXTURE)->load(texture_path.c_str()));
 					m_textures.push(texture);
 					addDependency(*texture);
 				}
@@ -180,14 +259,14 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			}
 			else
 			{
-				g_log_warning.log("Unknown parameter %s in material %s", label, m_path.c_str());
+				g_log_warning.log("renderer") << "Unknown parameter " << label << " in material " << m_path.c_str();
 			}
 		}
 		serializer.deserializeObjectEnd();
 
 		if (!m_shader)
 		{
-			g_log_error.log("renderer", "Material %s without a shader", m_path.c_str());
+			g_log_error.log("renderer") << "Material " << m_path.c_str() << " without a shader";
 			onFailure();
 			fs.close(file);
 			return;
@@ -198,11 +277,11 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	}
 	else
 	{
-		g_log_info.log("loading", "Error loading material %s.", m_path.c_str());
+		g_log_info.log("renderer") << "Error loading material " << m_path.c_str();
 		onFailure();
 	}
 	fs.close(file);
 }
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

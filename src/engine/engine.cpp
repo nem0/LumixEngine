@@ -2,36 +2,33 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
+#include "animation/animation.h"
 #include "animation/animation_system.h"
 #include "core/crc32.h"
 #include "core/fs/disk_file_device.h"
 #include "core/fs/file_system.h"
 #include "core/input_system.h"
 #include "core/log.h"
-#include "core/event_manager.h"
 #include "core/fs/memory_file_device.h"
 #include "core/resource_manager.h"
 #include "core/timer.h"
 #include "engine/plugin_manager.h"
-#include "graphics/renderer.h"
-#include "script/script_system.h"
-
 #include "graphics/material_manager.h"
 #include "graphics/model_manager.h"
+#include "graphics/pipeline.h"
+#include "graphics/renderer.h"
 #include "graphics/shader_manager.h"
 #include "graphics/texture_manager.h"
-#include "graphics/pipeline.h"
-#include "animation/animation.h"
+#include "script/script_system.h"
 
-namespace Lux
+
+namespace Lumix
 {
-
-	const Event::Type Engine::UniverseCreatedEvent::s_type = crc32("engine_universe_created_event");
-	const Event::Type Engine::UniverseDestroyedEvent::s_type = crc32("engine_universe_destroyed_event");
 
 	struct EngineImpl
 	{
-		EngineImpl(Engine& engine) : m_owner(engine) {}
+		EngineImpl(Engine& engine) : m_owner(engine), m_script_system(ScriptSystem::create()) {}
+		~EngineImpl();
 		bool create(const char* base_path, Engine& owner);
 
 		Renderer* m_renderer;
@@ -46,14 +43,13 @@ namespace Lux
 		TextureManager	m_texture_manager;
 		PipelineManager m_pipeline_manager;
 		AnimationManager m_animation_manager;
-		EventManager m_event_manager;
 
 		string m_base_path;
 		EditorServer* m_editor_server;
 		PluginManager m_plugin_manager;
 		Universe* m_universe;
 		RenderScene* m_render_scene;
-		ScriptSystem m_script_system;
+		ScriptSystem* m_script_system;
 		InputSystem m_input_system;
 		Engine& m_owner;
 		Timer* m_timer;
@@ -69,8 +65,20 @@ namespace Lux
 	void showLogInVS(const char*, const char* message)
 	{
 		OutputDebugString(message);
+		OutputDebugString("\n");
 	}
 
+
+	EngineImpl::~EngineImpl()
+	{
+		ScriptSystem::destroy(m_script_system);
+		m_resource_manager.get(ResourceManager::TEXTURE)->releaseAll();
+		m_resource_manager.get(ResourceManager::MATERIAL)->releaseAll();
+		m_resource_manager.get(ResourceManager::SHADER)->releaseAll();
+		m_resource_manager.get(ResourceManager::ANIMATION)->releaseAll();
+		m_resource_manager.get(ResourceManager::MODEL)->releaseAll();
+		m_resource_manager.get(ResourceManager::PIPELINE)->releaseAll();
+	}
 
 
 	bool EngineImpl::create(const char* base_path, Engine& owner)
@@ -80,6 +88,7 @@ namespace Lux
 		m_fps_frame = 0;
 		m_universe = 0;
 		m_base_path = base_path;
+		m_render_scene = NULL;
 
 		m_renderer = Renderer::createInstance();
 		if(!m_renderer)
@@ -95,10 +104,10 @@ namespace Lux
 		{
 			return false;
 		}
-		AnimationSystem* anim_system = LUX_NEW(AnimationSystem)();
+		AnimationSystem* anim_system = LUMIX_NEW(AnimationSystem)();
 		if(!anim_system->create(owner))
 		{
-			LUX_DELETE(anim_system);
+			LUMIX_DELETE(anim_system);
 			return false;
 		}
 		m_plugin_manager.addPlugin(anim_system);
@@ -106,32 +115,26 @@ namespace Lux
 		{
 			return false;
 		}
-		m_script_system.setEngine(m_owner);
+		m_script_system->setEngine(m_owner);
 		return true;
 	}
 
-
-	EventManager& Engine::getEventManager() const
-	{
-		return m_impl->m_event_manager;
-	}
-
-
+	
 	bool Engine::create(const char* base_path, FS::FileSystem* file_system, EditorServer* editor_server)
 	{
 		g_log_info.getCallback().bind<showLogInVS>();
 		g_log_warning.getCallback().bind<showLogInVS>();
 		g_log_error.getCallback().bind<showLogInVS>();
 
-		m_impl = LUX_NEW(EngineImpl)(*this);
+		m_impl = LUMIX_NEW(EngineImpl)(*this);
 		m_impl->m_editor_server = editor_server;
 
 		if(NULL == file_system)
 		{
 			m_impl->m_file_system = FS::FileSystem::create();
 
-			m_impl->m_mem_file_device = LUX_NEW(FS::MemoryFileDevice);
-			m_impl->m_disk_file_device = LUX_NEW(FS::DiskFileDevice);
+			m_impl->m_mem_file_device = LUMIX_NEW(FS::MemoryFileDevice);
+			m_impl->m_disk_file_device = LUMIX_NEW(FS::DiskFileDevice);
 
 			m_impl->m_file_system->mount(m_impl->m_mem_file_device);
 			m_impl->m_file_system->mount(m_impl->m_disk_file_device);
@@ -147,7 +150,7 @@ namespace Lux
 
 		if(!m_impl->create(base_path, *this))
 		{
-			LUX_DELETE(m_impl);
+			LUMIX_DELETE(m_impl);
 			m_impl = NULL;
 			return false;
 		}
@@ -166,32 +169,32 @@ namespace Lux
 
 	void Engine::destroy()
 	{
+		Timer::destroy(m_impl->m_timer);
+		Timer::destroy(m_impl->m_fps_timer);
 		m_impl->m_plugin_manager.destroy();
 		Renderer::destroyInstance(*m_impl->m_renderer);
-
+		m_impl->m_input_system.destroy();
 		m_impl->m_material_manager.destroy();
 		
 		if(m_impl->m_disk_file_device)
 		{
 			FS::FileSystem::destroy(m_impl->m_file_system);
-			LUX_DELETE(m_impl->m_mem_file_device);
-			LUX_DELETE(m_impl->m_disk_file_device);
+			LUMIX_DELETE(m_impl->m_mem_file_device);
+			LUMIX_DELETE(m_impl->m_disk_file_device);
 		}
 
-		LUX_DELETE(m_impl);
+		LUMIX_DELETE(m_impl);
 		m_impl = 0;
 	}
 
 	Universe* Engine::createUniverse()
 	{
-		m_impl->m_universe = LUX_NEW(Universe)();
+		m_impl->m_universe = LUMIX_NEW(Universe)();
 		m_impl->m_render_scene = RenderScene::createInstance(*this, *m_impl->m_universe);
 		m_impl->m_plugin_manager.onCreateUniverse(*m_impl->m_universe);
-		m_impl->m_script_system.setUniverse(m_impl->m_universe);
+		m_impl->m_script_system->setUniverse(m_impl->m_universe);
 		m_impl->m_universe->create();
 		
-		UniverseCreatedEvent evt(*m_impl->m_universe);
-		m_impl->m_event_manager.emitEvent(evt);
 		return m_impl->m_universe;
 	}
 
@@ -200,14 +203,12 @@ namespace Lux
 		ASSERT(m_impl->m_universe);
 		if (m_impl->m_universe)
 		{
-			UniverseDestroyedEvent evt(*m_impl->m_universe);
-			m_impl->m_event_manager.emitEvent(evt);
-			m_impl->m_script_system.setUniverse(NULL);
+			m_impl->m_script_system->setUniverse(NULL);
 			m_impl->m_plugin_manager.onDestroyUniverse(*m_impl->m_universe);
 			m_impl->m_universe->destroy();
 			RenderScene::destroyInstance(m_impl->m_render_scene);
 			m_impl->m_render_scene = NULL;
-			LUX_DELETE(m_impl->m_universe);
+			LUMIX_DELETE(m_impl->m_universe);
 			m_impl->m_universe = 0;
 		}
 	}
@@ -245,7 +246,8 @@ namespace Lux
 			m_impl->m_fps_frame = 0;
 		}
 		float dt = m_impl->m_timer->tick();
-		m_impl->m_script_system.update(dt);
+		m_impl->m_render_scene->update(dt);
+		m_impl->m_script_system->update(dt);
 		m_impl->m_plugin_manager.update(dt);
 		m_impl->m_input_system.update(dt);
 	}
@@ -260,7 +262,7 @@ namespace Lux
 
 	ScriptSystem& Engine::getScriptSystem()
 	{
-		return m_impl->m_script_system;
+		return *m_impl->m_script_system;
 	}
 
 
@@ -303,7 +305,7 @@ namespace Lux
 		m_impl->m_universe->serialize(serializer);
 		m_impl->m_renderer->serialize(serializer);
 		m_impl->m_render_scene->serialize(serializer);
-		m_impl->m_script_system.serialize(serializer);
+		m_impl->m_script_system->serialize(serializer);
 		m_impl->m_plugin_manager.serialize(serializer);
 	}
 
@@ -313,9 +315,9 @@ namespace Lux
 		m_impl->m_universe->deserialize(serializer);
 		m_impl->m_renderer->deserialize(serializer);
 		m_impl->m_render_scene->deserialize(serializer);
-		m_impl->m_script_system.deserialize(serializer);
+		m_impl->m_script_system->deserialize(serializer);
 		m_impl->m_plugin_manager.deserialize(serializer);
 	}
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

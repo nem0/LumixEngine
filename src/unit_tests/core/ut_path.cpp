@@ -1,4 +1,4 @@
-#include "unit_tests/suite/lux_unit_tests.h"
+#include "unit_tests/suite/lumix_unit_tests.h"
 
 #include "core/path.h"
 #include "core/crc32.h"
@@ -8,11 +8,11 @@ const char res_path[] = "d:/unit/test/path_1231231.ext";
 
 void UT_path(const char* params)
 {
-	Lux::Path path(src_path);
+	Lumix::Path path(src_path);
 
-	LUX_EXPECT_EQ((const char*)path, res_path);
+	LUMIX_EXPECT_EQ((const char*)path, res_path);
 
-	LUX_EXPECT_EQ(uint32_t(path), crc32(res_path));
+	LUMIX_EXPECT_EQ(uint32_t(path), crc32(res_path));
 }
 
 REGISTER_TEST("unit_tests/core/path/path", UT_path, "")

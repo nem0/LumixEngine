@@ -1,11 +1,11 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "gui/block.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -37,4 +37,4 @@ namespace UI
 
 } // ~namespace UI
 
-} // ~namespace Lux
+} // ~namespace Lumix
