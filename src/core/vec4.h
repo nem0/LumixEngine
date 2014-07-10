@@ -98,12 +98,20 @@ struct LUX_CORE_API Vec4
 		this->w = w;
 	}
 
-	void set(float x, float y, float z)
+	inline void set(float x, float y, float z, float w)
 	{
 		this->x = x;
 		this->y = y;
 		this->z = z;
 		this->w = w;
+	}
+
+	inline void set(const Vec4& rhs)
+	{
+		x = rhs.x;
+		y = rhs.y;
+		z = rhs.z;
+		w = rhs.w;
 	}
 	
 	inline float length() const

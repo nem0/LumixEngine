@@ -47,5 +47,5 @@ class LUX_ENGINE_API Renderer : public IPlugin
 }; 
 
 
-} // !namespace Lux
+} // ~namespace Lux
 

@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <Windows.h>
+#include <gl/glew.h>
 #include <gl/GL.h>
 #include "gui/opengl_renderer.h"
 #include "core/array.h"
