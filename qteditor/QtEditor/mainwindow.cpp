@@ -12,6 +12,7 @@
 #include "sceneview.h"
 #include "scripts/scriptcompilerwidget.h"
 #include "materialmanager.h"
+#include "profilerui.h"
 
 
 MainWindow::MainWindow(QWidget* parent) :
@@ -30,8 +31,9 @@ MainWindow::MainWindow(QWidget* parent) :
 	m_script_compiler_ui = new ScriptCompilerWidget;
 	m_file_server_ui = new FileServerWidget;
 	m_material_manager_ui = new MaterialManager;
+	m_profiler_ui = new ProfilerUI;
 
-	QSettings settings("Lux", "QtEditor");
+	QSettings settings("Lumix", "QtEditor");
 	restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
 	
 	addDockWidget(static_cast<Qt::DockWidgetArea>(1), m_game_view);
@@ -42,6 +44,9 @@ MainWindow::MainWindow(QWidget* parent) :
 	addDockWidget(static_cast<Qt::DockWidgetArea>(2), m_scene_view);
 	addDockWidget(static_cast<Qt::DockWidgetArea>(2), m_asset_browser);
 	addDockWidget(static_cast<Qt::DockWidgetArea>(8), m_material_manager_ui);
+	addDockWidget(static_cast<Qt::DockWidgetArea>(1), m_profiler_ui);
+
+	m_property_view->setScriptCompiler(m_script_compiler_ui->getCompiler());
 
 	restoreState(settings.value("mainWindowState").toByteArray());
 }
@@ -49,7 +54,7 @@ MainWindow::MainWindow(QWidget* parent) :
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
-	QSettings settings("Lux", "QtEditor");
+	QSettings settings("Lumix", "QtEditor");
 	settings.setValue("mainWindowGeometry", saveGeometry());
 	settings.setValue("mainWindowState", saveState());
 	QMainWindow::closeEvent(event);
@@ -66,17 +71,18 @@ MainWindow::~MainWindow()
 	delete m_script_compiler_ui;
 	delete m_file_server_ui;
 	delete m_material_manager_ui;
+	delete m_profiler_ui;
 }
 
 
-void MainWindow::setEditorServer(Lux::EditorServer& server)
+void MainWindow::setEditorServer(Lumix::EditorServer& server)
 {
 	m_file_server_ui->setEditorServer(server);
 	m_asset_browser->setEditorServer(server);
 	m_material_manager_ui->setEditorServer(server);
 }
 
-void MainWindow::setEditorClient(Lux::EditorClient& client)
+void MainWindow::setEditorClient(Lumix::EditorClient& client)
 {
 	m_client = &client;
 	m_property_view->setEditorClient(client);
@@ -176,4 +182,14 @@ void MainWindow::on_actionAsset_Browser_triggered()
 void MainWindow::on_actionScene_View_triggered()
 {
 	m_scene_view->show();
+}
+
+void MainWindow::on_actionProfiler_triggered()
+{
+	m_profiler_ui->show();
+}
+
+void MainWindow::on_actionMaterial_manager_triggered()
+{
+    m_material_manager_ui->show();
 }

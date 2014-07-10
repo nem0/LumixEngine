@@ -1,15 +1,15 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include <cmath>
 
 
-namespace Lux
+namespace Lumix
 {
 
 
-struct LUX_CORE_API Vec3
+struct LUMIX_CORE_API Vec3
 {
 	Vec3() {}
 
@@ -172,4 +172,4 @@ inline void lerp(const Vec3& op1, const Vec3& op2, Vec3* out, float t)
 }
 
 
-} // !namespace Lux
+} // !namespace Lumix

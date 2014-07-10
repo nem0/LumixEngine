@@ -3,7 +3,7 @@
 #include "core/resource.h"
 #include "core/resource_manager_base.h"
 
-namespace Lux
+namespace Lumix
 {
 
 namespace FS
@@ -12,12 +12,13 @@ namespace FS
 	class IFile;
 }
 
-struct Vec3;
-struct Quat;
+class Model;
 class Pose;
+struct Quat;
+struct Vec3;
 
 
-class LUX_ENGINE_API AnimationManager : public ResourceManagerBase
+class LUMIX_ENGINE_API AnimationManager : public ResourceManagerBase
 {
 public:
 	AnimationManager() : ResourceManagerBase() {}
@@ -35,7 +36,7 @@ class Animation : public Resource
 		Animation(const Path& path, ResourceManager& resource_manager);
 		~Animation();
 
-		void getPose(float time, Pose& pose) const;
+		void getPose(float time, Pose& pose, Model& model) const;
 		int getFrameCount() const { return m_frame_count; }
 		float getLength() const { return m_frame_count / 30.0f; }
 
@@ -53,4 +54,4 @@ class Animation : public Resource
 };
 
 
-} // ~ namespace Lux
+} // ~ namespace Lumix

@@ -7,7 +7,7 @@
 #include "graphics/texture.h"
 #include "graphics/texture_manager.h"
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -196,7 +196,7 @@ namespace DDS
 		uint8_t row[6];
 	};
 
-	static LUX_FORCE_INLINE void swapMemory(void* mem1, void* mem2, size_t size)
+	static LUMIX_FORCE_INLINE void swapMemory(void* mem1, void* mem2, size_t size)
 	{
 		if(size < 2048)
 		{
@@ -207,11 +207,11 @@ namespace DDS
 		}
 		else
 		{
-			uint8_t* tmp = LUX_NEW_ARRAY(uint8_t, size);
+			uint8_t* tmp = LUMIX_NEW_ARRAY(uint8_t, size);
 			memcpy(tmp, mem1, size);
 			memcpy(mem1, mem2, size);
 			memcpy(mem2, tmp, size);
-			LUX_DELETE_ARRAY(tmp);
+			LUMIX_DELETE_ARRAY(tmp);
 		}
 	}
 
@@ -402,13 +402,14 @@ struct TGAHeader
 
 Texture::Texture(const Path& path, ResourceManager& resource_manager)
 	: Resource(path, resource_manager)
+	, m_is_nonGL(false)
 {
 	glGenTextures(1, &m_id);
 }
 
 Texture::~Texture()
 {
-	glDeleteTextures(1, &m_id);
+	ASSERT(isEmpty());
 }
 
 bool Texture::create(int w, int h)
@@ -437,21 +438,26 @@ bool Texture::loadTGA(FS::IFile& file)
 
 	int color_mode = header.bitsPerPixel / 8;
 	int image_size = header.width * header.height * 4;
-
 	if (header.dataType != 2)
 	{
-		g_log_error.log("renderer", "Unsupported texture format %s", m_path);
+		g_log_error.log("renderer") << "Unsupported texture format " << m_path.c_str();
 		return false;
 	}
 
 	if (color_mode < 3)
 	{
-		g_log_error.log("renderer", "Unsupported color mode %s", m_path);
+		g_log_error.log("renderer") << "Unsupported color mode " << m_path.c_str();
 		return false;
 	}
 
+	m_width = header.width;
+	m_height = header.height;
 	TextureManager* manager = static_cast<TextureManager*>(getResourceManager().get(ResourceManager::TEXTURE));
-	uint8_t* image_dest = (uint8_t*)manager->getBuffer(image_size);
+	if (m_is_nonGL)
+	{
+		m_data.resize(image_size);
+	}
+	uint8_t* image_dest = m_is_nonGL ? &m_data[0] : (uint8_t*)manager->getBuffer(image_size);
 
 	// Targa is BGR, swap to RGB, add alpha and flip Y axis
 	for (long y = 0; y < header.height; y++)
@@ -469,6 +475,12 @@ bool Texture::loadTGA(FS::IFile& file)
 				image_dest[write_index + 3] = 255;
 			write_index += 4;
 		}
+	}
+	m_BPP = 4;
+
+	if (m_is_nonGL)
+	{
+		return true;
 	}
 
 	glGenTextures(1, &m_id);
@@ -489,6 +501,11 @@ bool Texture::loadTGA(FS::IFile& file)
 
 bool Texture::loadDDS(FS::IFile& file)
 {
+	if (m_is_nonGL)
+	{
+		g_log_error.log("renderer") << "Non GL DDS texture not supported " << m_path.c_str();
+		return false;
+	}
 	DDS::Header hdr;
 	uint32_t width = 0;
 	uint32_t height = 0;
@@ -499,8 +516,7 @@ bool Texture::loadDDS(FS::IFile& file)
 	if (hdr.dwMagic != DDS::DDS_MAGIC || hdr.dwSize != 124 ||
 		!(hdr.dwFlags & DDS::DDSD_PIXELFORMAT) || !(hdr.dwFlags & DDS::DDSD_CAPS))
 	{
-		ASSERT(false);
-		g_log_error.log("renderer", "Wrong dds format or corrupted dds %s", m_path.c_str());
+		g_log_error.log("renderer") << "Wrong dds format or corrupted dds " << m_path.c_str();
 		return false;
 	}
 
@@ -508,8 +524,7 @@ bool Texture::loadDDS(FS::IFile& file)
 	height = hdr.dwHeight;
 	if ((width & (width - 1)) || (height & (height - 1)))
 	{
-		ASSERT(false);
-		g_log_error.log("renderer", "Wrong dds format %s", m_path.c_str());
+		g_log_error.log("renderer") << "Wrong dds format " << m_path.c_str();
 		return false;
 	}
 
@@ -549,14 +564,14 @@ bool Texture::loadDDS(FS::IFile& file)
 	}
 	else
 	{
-		g_log_error.log("renderer", "Unsupported DDS format %s", m_path.c_str());
+		g_log_error.log("renderer") << "Unsupported DDS format " << m_path.c_str();
 		return false;
 	}
 
 	glGenTextures(1, &m_id);
 	if (m_id == 0)
 	{
-		g_log_error.log("renderer", "Error generating OpenGL texture %s", m_path.c_str());
+		g_log_error.log("renderer") << "Error generating OpenGL texture " << m_path.c_str();
 		return false;
 	}
 
@@ -571,7 +586,7 @@ bool Texture::loadDDS(FS::IFile& file)
 		if (size != hdr.dwPitchOrLinearSize || (hdr.dwFlags & DDS::DDSD_LINEARSIZE) == 0)
 		{
 			glDeleteTextures(1, &m_id);
-			g_log_error.log("renderer", "Unsupported DDS format %s", m_path.c_str());
+			g_log_error.log("renderer") << "Unsupported DDS format " << m_path.c_str();
 			onFailure();
 			return false;
 		}
@@ -594,17 +609,17 @@ bool Texture::loadDDS(FS::IFile& file)
 		if ((hdr.dwFlags & DDS::DDSD_PITCH) == 0 || hdr.pixelFormat.dwRGBBitCount != 8)
 		{
 			glDeleteTextures(1, &m_id);
-			g_log_error.log("renderer", "Unsupported DDS format %s", m_path.c_str());
+			g_log_error.log("renderer") << "Unsupported DDS format " << m_path.c_str();
 			return false;
 		}
 		uint32_t size = hdr.dwPitchOrLinearSize * height;
 		if (size != width * height * li->blockBytes)
 		{
 			glDeleteTextures(1, &m_id);
-			g_log_error.log("renderer", "Unsupported DDS format or corrupted DDS %s", m_path.c_str());
+			g_log_error.log("renderer") << "Unsupported DDS format or corrupted DDS " << m_path.c_str();
 			return false;
 		}
-		unsigned char * data = LUX_NEW_ARRAY(unsigned char, size);
+		unsigned char * data = LUMIX_NEW_ARRAY(unsigned char, size);
 		uint32_t palette[256];
 		uint32_t* unpacked = (uint32_t*)manager->getBuffer(size * sizeof(uint32_t));
 		file.read(palette, 4 * 256);
@@ -621,7 +636,7 @@ bool Texture::loadDDS(FS::IFile& file)
 			height = (height + 1) >> 1;
 			size = width * height * li->blockBytes;
 		}
-		LUX_DELETE_ARRAY(data);
+		LUMIX_DELETE_ARRAY(data);
 	}
 	else
 	{
@@ -654,23 +669,29 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	{
 		const char* path = m_path.c_str();
 		size_t len = m_path.length();
+		bool loaded = false;
 		if (len > 3 && strcmp(path + len - 4, ".dds") == 0)
 		{
-			bool loaded = loadDDS(*file);
-			ASSERT(loaded);
+			loaded = loadDDS(*file);
 		}
 		else
 		{
-			bool loaded = loadTGA(*file);
-			ASSERT(loaded);
+			loaded = loadTGA(*file);
 		}
-
-		m_size = file->size();
-		decrementDepCount();
+		if(!loaded)
+		{
+			g_log_error.log("renderer") << "Error loading texture " << m_path.c_str();
+			onFailure();
+		}
+		else
+		{
+			m_size = file->size();
+			decrementDepCount();
+		}
 	}
 	else
 	{
-		g_log_error.log("renderer", "Error loading texture %s", m_path.c_str());
+		g_log_error.log("renderer") << "Error loading texture " << m_path.c_str();
 		onFailure();
 	}
 	
@@ -693,4 +714,4 @@ FS::ReadCallback Texture::getReadCallback()
 	return cb;
 }
 
-} // ~namespace Lux
+} // ~namespace Lumix

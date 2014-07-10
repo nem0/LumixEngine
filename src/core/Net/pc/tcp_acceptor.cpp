@@ -3,7 +3,7 @@
 
 #include <Windows.h>
 
-namespace Lux
+namespace Lumix
 {
 	namespace Net
 	{
@@ -48,7 +48,7 @@ namespace Lux
 		TCPStream* TCPAcceptor::accept()
 		{
 			SOCKET socket = ::accept(m_socket, NULL, NULL);
-			return LUX_NEW(TCPStream)(socket);
+			return LUMIX_NEW(TCPStream)(socket);
 		}
 	} // ~namespace Net
-} // ~namespace Lux
+} // ~namespace Lumix

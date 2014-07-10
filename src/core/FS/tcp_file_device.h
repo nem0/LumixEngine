@@ -1,9 +1,9 @@
 #pragma once
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/fs/ifile_device.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace Net
 	{
@@ -37,7 +37,7 @@ namespace Lux
 			int32_t value;
 		};
 
-		class LUX_CORE_API TCPFileDevice : public IFileDevice
+		class LUMIX_CORE_API TCPFileDevice : public IFileDevice
 		{
 		public:
 			virtual IFile* createFile(IFile* child) override;
@@ -53,4 +53,4 @@ namespace Lux
 			TCPImpl* m_impl;
 		};
 	} // ~namespace FS
-} // ~namespace Lux
+} // ~namespace Lumix

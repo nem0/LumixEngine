@@ -1,13 +1,13 @@
 #pragma once
-#include "core/lux.h"
+#include "core/lumix.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace MT
 	{
 		typedef void* SemaphoreHandle;
 
-		class LUX_CORE_API Semaphore
+		class LUMIX_CORE_API Semaphore
 		{
 		public:
 			Semaphore(int init_count, int max_count);
@@ -22,4 +22,4 @@ namespace Lux
 			SemaphoreHandle m_id;
 		};
 	}; // ~namespac MT
-}; //~namespace Lux
+}; //~namespace Lumix

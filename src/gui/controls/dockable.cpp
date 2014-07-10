@@ -4,7 +4,7 @@
 #include "gui/gui.h"
 
 
-namespace Lux
+namespace Lumix
 {
 namespace UI
 {
@@ -14,7 +14,7 @@ Dockable::Dockable(Gui& gui, Block* parent)
 	: Block(gui, parent, "_dockable")
 {
 	setArea(0, 0, 0, 0, 1, 0, 1, 0);
-	m_content = LUX_NEW(Block)(getGui(), this, NULL);
+	m_content = LUMIX_NEW(Block)(getGui(), this, NULL);
 	m_content->setArea(0, 0, 0, 0, 1, 0, 1, 0);
 	m_containing_dockable = NULL;
 	m_content->setIsClickable(false);
@@ -58,12 +58,12 @@ void Dockable::undock()
 	if(m_containing_dockable)
 	{
 		Dockable* top_dockable = m_containing_dockable->m_containing_dockable;
-		Lux::UI::Block* parent = m_containing_dockable->getParent();
+		Lumix::UI::Block* parent = m_containing_dockable->getParent();
 		ASSERT(m_containing_dockable->getParent());
 		setParent(NULL);
 		while(m_containing_dockable->getContent()->getChildCount() > 0)
 		{
-			Lux::UI::Block* child = m_containing_dockable->getContent()->getChild(0);
+			Lumix::UI::Block* child = m_containing_dockable->getContent()->getChild(0);
 			if(child != m_containing_dockable->m_divider)
 			{
 				ASSERT(child->getType() == crc32("dockable"));
@@ -100,12 +100,12 @@ void Dockable::dock(Dockable& dockable, Slot slot)
 	}
 	dockable.undock();
 
-	Lux::UI::Block* parent = getParent();
-	Dockable* new_root = LUX_NEW(Dockable)(getGui(), NULL);
+	Lumix::UI::Block* parent = getParent();
+	Dockable* new_root = LUMIX_NEW(Dockable)(getGui(), NULL);
 	setParent(new_root->getContent());
 	dockable.setParent(new_root->getContent());	
 
-	new_root->m_divider = LUX_NEW(Lux::UI::Block)(getGui(), new_root->getContent(), NULL);
+	new_root->m_divider = LUMIX_NEW(Lumix::UI::Block)(getGui(), new_root->getContent(), NULL);
 	new_root->m_divider->onEvent("mouse_down").bind<Dockable, &Dockable::dividerMouseDown>(new_root);
 	new_root->m_divider->setZIndex(dockable.getZIndex() + 1);
 	new_root->m_divider->setBlockText("divider");
@@ -268,4 +268,4 @@ void Dockable::drop(int x, int y)
 
 
 } // ~namespace UI
-} // ~namespace Lux
+} // ~namespace Lumix

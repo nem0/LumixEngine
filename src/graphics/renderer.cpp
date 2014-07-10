@@ -4,10 +4,10 @@
 #include "core/fs/file_system.h"
 #include "core/json_serializer.h"
 #include "core/math_utils.h"
-#include "core/array.h"
-#include "core/vec4.h"
+#include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
+#include "core/vec4.h"
 #include "engine/engine.h"
 #include "graphics/geometry.h"
 #include "graphics/gl_ext.h"
@@ -19,12 +19,10 @@
 #include "graphics/render_scene.h"
 #include "graphics/shader.h"
 #include "graphics/texture.h"
-#include "universe/component_event.h"
-#include "universe/entity_moved_event.h"
 #include "universe/universe.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -54,7 +52,6 @@ struct RendererImpl : public Renderer
 		gluLookAt(pos.x, pos.y, pos.z, center.x, center.y, center.z, up.x, up.y, up.z);
 	}
 
-
 	virtual void setRenderDevice(IRenderDevice& device) override
 	{
 		m_render_device = &device;
@@ -62,6 +59,7 @@ struct RendererImpl : public Renderer
 
 	virtual void renderGame() override
 	{
+		PROFILE_FUNCTION();
 		if (m_render_device)
 		{
 			m_render_device->beginFrame();
@@ -72,6 +70,7 @@ struct RendererImpl : public Renderer
 
 	virtual void render(IRenderDevice& device) override
 	{
+		PROFILE_FUNCTION();
 		// init
 		glEnable(GL_DEPTH_TEST);
 		glDisable(GL_BLEND);
@@ -93,6 +92,7 @@ struct RendererImpl : public Renderer
 	virtual bool create(Engine& engine) override
 	{
 		m_engine = &engine;
+		glewExperimental = GL_TRUE;
 		GLenum err = glewInit();
 		return err == GLEW_OK;
 	}
@@ -148,13 +148,6 @@ struct RendererImpl : public Renderer
 		glPopMatrix();
 	}
 
-
-	virtual Model* getModel(const char* path) override
-	{
-		return static_cast<Model*>(m_engine->getResourceManager().get(ResourceManager::MODEL)->load(path));
-	}
-
-
 	virtual void serialize(ISerializer&) override
 	{
 	}
@@ -171,14 +164,14 @@ struct RendererImpl : public Renderer
 
 Renderer* Renderer::createInstance()
 {
-	return LUX_NEW(RendererImpl);
+	return LUMIX_NEW(RendererImpl);
 }
 
 
 void Renderer::destroyInstance(Renderer& renderer)
 {
-	LUX_DELETE(&renderer);
+	LUMIX_DELETE(&renderer);
 }
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

@@ -1,11 +1,11 @@
 #pragma once
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "script_visitor.h"
 #include "core/map.h"
 #include "core/string.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -29,8 +29,8 @@ namespace Lux
 			PropertyType m_type;
 		
 		private:
-			Lux::string m_property_name;
+			Lumix::string m_property_name;
 	};
 
 
-} // ~ namespace Lux
+} // ~ namespace Lumix

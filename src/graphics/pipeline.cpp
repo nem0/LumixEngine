@@ -5,10 +5,13 @@
 #include "core/fs/file_system.h"
 #include "core/iserializer.h"
 #include "core/json_serializer.h"
+#include "core/log.h"
+#include "core/map.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "core/string.h"
 #include "engine/engine.h"
+#include "engine/plugin_manager.h"
 #include "graphics/frame_buffer.h"
 #include "graphics/geometry.h"
 #include "graphics/gl_ext.h"
@@ -19,7 +22,7 @@
 #include "graphics/shader.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 struct PipelineImpl;
@@ -27,8 +30,17 @@ struct PipelineInstanceImpl;
 
 struct Command
 {
+	virtual ~Command() {}
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) = 0;
 	virtual void execute(PipelineInstanceImpl& pipeline) = 0;
+};
+
+
+struct CustomCommand : public Command
+{
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
+	virtual void execute(PipelineInstanceImpl& pipeline) override;
+	uint32_t m_name;
 };
 
 
@@ -80,6 +92,13 @@ struct DrawFullscreenQuadCommand : public Command
 };
 
 
+struct RenderDebugLinesCommand : public Command
+{
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
+	virtual void execute(PipelineInstanceImpl& pipeline) override;
+};
+
+
 struct BindFramebufferTextureCommand : public Command
 {
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
@@ -124,11 +143,10 @@ struct PipelineImpl : public Pipeline
 		uint32_t m_type_hash;
 	};
 
-	
 	template <typename T>
 	static Command* CreateCommand()
 	{
-		return LUX_NEW(T);
+		return LUMIX_NEW(T);
 	}
 
 
@@ -136,6 +154,7 @@ struct PipelineImpl : public Pipeline
 		: Pipeline(path, resource_manager)
 	{
 		addCommandCreator("clear").bind<&CreateCommand<ClearCommand> >();
+		addCommandCreator("custom").bind<&CreateCommand<CustomCommand> >();
 		addCommandCreator("render_models").bind<&CreateCommand<RenderModelsCommand> >();
 		addCommandCreator("apply_camera").bind<&CreateCommand<ApplyCameraCommand> >();
 		addCommandCreator("bind_framebuffer").bind<&CreateCommand<BindFramebufferCommand> >();
@@ -144,15 +163,13 @@ struct PipelineImpl : public Pipeline
 		addCommandCreator("bind_framebuffer_texture").bind<&CreateCommand<BindFramebufferTextureCommand> >();
 		addCommandCreator("render_shadowmap").bind<&CreateCommand<RenderShadowmapCommand> >();
 		addCommandCreator("bind_shadowmap").bind<&CreateCommand<BindShadowmapCommand> >();
+		addCommandCreator("render_debug_lines").bind<&CreateCommand<RenderDebugLinesCommand> >();
 	}
 
 
-	~PipelineImpl()
+	virtual ~PipelineImpl() override
 	{
-		for (int i = 0; i < m_commands.size(); ++i)
-		{
-			LUX_DELETE(m_commands[i]);
-		}
+		ASSERT(isEmpty());
 	}
 
 
@@ -160,7 +177,7 @@ struct PipelineImpl : public Pipeline
 	{
 		for (int i = 0; i < m_commands.size(); ++i)
 		{
-			LUX_DELETE(m_commands[i]);
+			LUMIX_DELETE(m_commands[i]);
 		}
 		m_commands.clear();
 		onEmpty();
@@ -242,8 +259,15 @@ struct PipelineImpl : public Pipeline
 			serializer.deserializeArrayItem(tmp, 255);
 			uint32_t command_type_hash = crc32(tmp);
 			Command* cmd = createCommand(command_type_hash);
-			cmd->deserialize(*this, serializer);
-			m_commands.push(cmd);
+			if(cmd)
+			{
+				cmd->deserialize(*this, serializer);
+				m_commands.push(cmd);
+			}
+			else
+			{
+				g_log_error.log("renderer") << "Unknown pipeline command " << tmp;
+			}
 		}
 		serializer.deserializeArrayEnd();
 		serializer.deserializeObjectEnd();
@@ -267,7 +291,6 @@ struct PipelineImpl : public Pipeline
 		fs.close(file);
 	}
 
-
 	Array<Command*> m_commands;
 	Array<CommandCreator> m_command_creators;
 	Array<FrameBufferDeclaration> m_framebuffers;
@@ -286,7 +309,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_shadowmap_framebuffer = NULL;
 		if(pipeline.isReady())
 		{
-			sourceLoaded(Resource::State::READY);
+			sourceLoaded(Resource::State::EMPTY, Resource::State::READY);
 		}
 		else
 		{
@@ -296,16 +319,22 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	~PipelineInstanceImpl()
 	{
+		m_source.getObserverCb().unbind<PipelineInstanceImpl, &PipelineInstanceImpl::sourceLoaded>(this);
+		m_source.getResourceManager().get(ResourceManager::PIPELINE)->unload(m_source);
 		for (int i = 0; i < m_framebuffers.size(); ++i)
 		{
-			LUX_DELETE(m_framebuffers[i]);
+			LUMIX_DELETE(m_framebuffers[i]);
 		}
 		if (m_shadowmap_framebuffer)
 		{
-			LUX_DELETE(m_shadowmap_framebuffer);
+			LUMIX_DELETE(m_shadowmap_framebuffer);
 		}
 	}
 
+	CustomCommandHandler& addCustomCommandHandler(const char* name)
+	{
+		return m_custom_commands_handlers[crc32(name)];
+	}
 
 	FrameBuffer* getFrameBuffer(const char* name)
 	{
@@ -326,17 +355,17 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void sourceLoaded(Resource::State status)
+	void sourceLoaded(Resource::State old_state, Resource::State new_state)
 	{
-		if (status == Resource::State::READY)
+		if (old_state != Resource::State::READY && new_state == Resource::State::READY)
 		{
 			PipelineImpl::FrameBufferDeclaration fb = m_source.m_shadowmap_framebuffer;
-			m_shadowmap_framebuffer = LUX_NEW(FrameBuffer)(fb.m_width, fb.m_height, fb.m_mask, fb.m_name.c_str());
+			m_shadowmap_framebuffer = LUMIX_NEW(FrameBuffer)(fb.m_width, fb.m_height, fb.m_mask, fb.m_name.c_str());
 			m_framebuffers.reserve(m_source.m_framebuffers.size());
 			for (int i = 0; i < m_source.m_framebuffers.size(); ++i)
 			{
 				fb = m_source.m_framebuffers[i];
-				m_framebuffers.push(LUX_NEW(FrameBuffer)(fb.m_width, fb.m_height, fb.m_mask, fb.m_name.c_str()));
+				m_framebuffers.push(LUMIX_NEW(FrameBuffer)(fb.m_width, fb.m_height, fb.m_mask, fb.m_name.c_str()));
 			}
 		}
 	}
@@ -377,46 +406,61 @@ struct PipelineInstanceImpl : public PipelineInstance
 		glPopMatrix();*/
 	}
 
+	void executeCustomCommand(uint32_t name)
+	{
+		Map<uint32_t, CustomCommandHandler>::iterator iter = m_custom_commands_handlers.find(name);
+		if (iter != m_custom_commands_handlers.end())
+		{
+			iter.second().invoke();
+		}
+	}
+
 	void renderShadowmap(Component camera, int64_t layer_mask)
 	{
 		ASSERT(m_renderer != NULL);
 		Component light_cmp = m_scene->getLight(0);
-		if (!light_cmp.isValid())
+		if (!light_cmp.isValid() || !camera.isValid())
 		{
 			return;
 		}
 		glEnable(GL_CULL_FACE);
 		glCullFace(GL_FRONT);
-		glViewport(0, 0, m_shadowmap_framebuffer->getWidth(), m_shadowmap_framebuffer->getHeight());
 		m_shadowmap_framebuffer->bind();
 		glClear(GL_DEPTH_BUFFER_BIT);
 		glMatrixMode(GL_PROJECTION);
 		glPushMatrix();
-		glLoadIdentity();
-		Matrix projection_matrix;
-		getOrthoMatrix(-10, 10, -10, 10, 0, 100, &projection_matrix);
-		glMultMatrixf(&projection_matrix.m11);
+		
+		for(int split_index = 0; split_index < 4; ++split_index)
+		{
+			glViewport(1, (GLint)(split_index * m_shadowmap_framebuffer->getHeight() * 0.25f), m_shadowmap_framebuffer->getWidth() - 2, (GLsizei)(m_shadowmap_framebuffer->getHeight() * 0.25f));
+			glMatrixMode(GL_PROJECTION);
+			glLoadIdentity();
+			Matrix projection_matrix;
+			float bb_size = (float)(2 * ((split_index + 1) * (split_index + 1) * (split_index + 1)));
+			getOrthoMatrix(-bb_size, bb_size, -bb_size, bb_size, 0, 100, &projection_matrix);
+			glMultMatrixf(&projection_matrix.m11);
 
-		Matrix mtx = light_cmp.entity.getMatrix();
-		m_light_dir = mtx.getZVector();
-		glMatrixMode(GL_MODELVIEW);
-		glLoadIdentity();
-		Matrix modelview_matrix;
-		Vec3 pos = camera.entity.getPosition();
-		Vec3 cam_forward = camera.entity.getRotation() * Vec3(0, 0, 1);
-		pos -= mtx.getZVector() * 10 + cam_forward * 10 * -dotProduct(mtx.getZVector(), cam_forward);
-		getLookAtMatrix(pos, pos + mtx.getZVector(), mtx.getYVector(), &modelview_matrix);
-		glMultMatrixf(&modelview_matrix.m11);
-		static const Matrix biasMatrix(
-			0.5, 0.0, 0.0, 0.0,
-			0.0, 0.5, 0.0, 0.0,
-			0.0, 0.0, 0.5, 0.0,
-			0.5, 0.5, 0.5, 1.0
-			);
-		m_shadow_modelviewprojection = biasMatrix * (projection_matrix * modelview_matrix);
+			Matrix light_mtx = light_cmp.entity.getMatrix();
+			m_light_dir = light_mtx.getZVector();
+			glMatrixMode(GL_MODELVIEW);
+			glLoadIdentity();
+			Matrix modelview_matrix;
+			Vec3 pos = camera.entity.getPosition();
+			Vec3 cam_forward = camera.entity.getRotation() * Vec3(0, 0, 1);
+			pos -= light_mtx.getZVector() * 10;
+			Vec3 up = camera.entity.getMatrix().getXVector();
+			getLookAtMatrix(pos, pos + light_mtx.getZVector(), light_mtx.getYVector(), &modelview_matrix);
+			glMultMatrixf(&modelview_matrix.m11);
+			static const Matrix biasMatrix(
+				0.5, 0.0, 0.0, 0.0,
+				0.0, 0.5, 0.0, 0.0,
+				0.0, 0.0, 0.5, 0.0,
+				0.5, 0.5, 0.5, 1.0
+				);
+			m_shadow_modelviewprojection[split_index] = biasMatrix * (projection_matrix * modelview_matrix);
 
-		renderModels(layer_mask);
-
+			renderModels(layer_mask);
+		}
 		glMatrixMode(GL_PROJECTION);
 		glPopMatrix();
 		glMatrixMode(GL_MODELVIEW);
@@ -457,6 +501,29 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
+	void renderDebugLines()
+	{
+		// cleanup
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glUseProgram(0);
+		for (int i = 0; i < 16; ++i)
+		{
+			glActiveTexture(GL_TEXTURE0 + i);
+			glDisable(GL_TEXTURE_2D);
+		}
+		glActiveTexture(GL_TEXTURE0); 
+
+		const Array<DebugLine>& lines = m_scene->getDebugLines();
+		glBegin(GL_LINES);
+		for (int i = 0, c = lines.size(); i < c; ++i)
+		{
+			glColor3fv(&lines[i].m_color.x);
+			glVertex3fv(&lines[i].m_from.x);
+			glVertex3fv(&lines[i].m_to.x);
+		}
+		glEnd();
+	}
+
 	void renderModels(int64_t layer_mask)
 	{
 		ASSERT(m_renderer != NULL);
@@ -464,43 +531,44 @@ struct PipelineInstanceImpl : public PipelineInstance
 		infos.clear();
 		m_scene->getRenderableInfos(infos, layer_mask);
 		int count = infos.size();
+		Material* last_material = NULL;
 		for (int i = 0; i < count; ++i)
 		{
 			glPushMatrix();
-			Model& model = infos[i].m_model_instance->getModel();
-			Matrix mtx = infos[i].m_model_instance->getMatrix();
-			mtx.multiply3x3(infos[i].m_scale);
-			glMultMatrixf(&mtx.m11);
+			Matrix world_matrix = infos[i].m_model ? infos[i].m_model->getMatrix() : *infos[i].m_matrix;
+			world_matrix.multiply3x3(infos[i].m_scale);
+			glMultMatrixf(&world_matrix.m11);
 			
-			Geometry* geom = model.getGeometry();
-			for (int j = 0; j < model.getMeshCount(); ++j)
+			Mesh& mesh = *infos[i].m_mesh;
+			Material& material = *mesh.getMaterial();
+			if (last_material != &material)
 			{
-				Mesh& mesh = model.getMesh(j);
-				if (mesh.getMaterial()->isReady())
-				{
-					mesh.getMaterial()->apply(*m_renderer, *this);
-					mesh.getMaterial()->getShader()->setUniform("light_dir", m_light_dir);
-					mesh.getMaterial()->getShader()->setUniform("shadowmap_matrix", m_shadow_modelviewprojection);
-					mesh.getMaterial()->getShader()->setUniform("world_matrix", infos[i].m_model_instance->getMatrix());
-
-					static Matrix bone_mtx[64];
-					Pose& pose = infos[i].m_model_instance->getPose();
-					if (pose.getCount() > 0)
-					{
-						Vec3* poss = pose.getPositions();
-						Quat* rots = pose.getRotations();
-						for (int bone_index = 0, bone_count = pose.getCount(); bone_index < bone_count; ++bone_index)
-						{
-							rots[bone_index].toMatrix(bone_mtx[bone_index]);
-							bone_mtx[bone_index].translate(poss[bone_index]);
-							bone_mtx[bone_index] = bone_mtx[bone_index] * model.getBone(bone_index).inv_bind_matrix;
-						}
-						mesh.getMaterial()->getShader()->setUniform("bone_matrices", bone_mtx, pose.getCount());
-					}
-
-					geom->draw(mesh.getStart(), mesh.getCount(), *mesh.getMaterial()->getShader());
-				}
+				material.apply(*m_renderer, *this);
+				material.getShader()->setUniform("light_dir", m_light_dir);
+				material.getShader()->setUniform("shadowmap_matrix0", m_shadow_modelviewprojection[0]);
+				material.getShader()->setUniform("shadowmap_matrix1", m_shadow_modelviewprojection[1]);
+				material.getShader()->setUniform("shadowmap_matrix2", m_shadow_modelviewprojection[2]);
+				material.getShader()->setUniform("shadowmap_matrix3", m_shadow_modelviewprojection[3]);
+				material.getShader()->setUniform("world_matrix", world_matrix);
+				last_material = &material;
 			}
+			static Matrix bone_mtx[64];
+			if (infos[i].m_pose)
+			{
+				const Pose& pose = *infos[i].m_pose;
+				const Model& model = *infos[i].m_model->getModel();
+				Vec3* poss = pose.getPositions();
+				Quat* rots = pose.getRotations();
+				for (int bone_index = 0, bone_count = pose.getCount(); bone_index < bone_count; ++bone_index)
+				{
+					rots[bone_index].toMatrix(bone_mtx[bone_index]);
+					bone_mtx[bone_index].translate(poss[bone_index]);
+					bone_mtx[bone_index] = bone_mtx[bone_index] * model.getBone(bone_index).inv_bind_matrix;
+				}
+				material.getShader()->setUniform("bone_matrices", bone_mtx, pose.getCount());
+			}
+
+			infos[i].m_geometry->draw(mesh.getStart(), mesh.getCount(), *material.getShader());
 			glPopMatrix();
 		}
 	}
@@ -541,11 +609,12 @@ struct PipelineInstanceImpl : public PipelineInstance
 	RenderScene* m_scene;
 	Array<FrameBuffer*> m_framebuffers;
 	FrameBuffer* m_shadowmap_framebuffer;
-	Matrix m_shadow_modelviewprojection;
+	Matrix m_shadow_modelviewprojection[4];
 	Renderer* m_renderer;
 	Vec3 m_light_dir;
 	int m_width;
 	int m_height;
+	Map<uint32_t, CustomCommandHandler> m_custom_commands_handlers;
 
 	private:
 		void operator=(const PipelineInstanceImpl&);
@@ -560,13 +629,13 @@ Pipeline::Pipeline(const Path& path, ResourceManager& resource_manager)
 
 PipelineInstance* PipelineInstance::create(Pipeline& pipeline)
 {
-	return LUX_NEW(PipelineInstanceImpl)(pipeline);
+	return LUMIX_NEW(PipelineInstanceImpl)(pipeline);
 }
 
 
 void PipelineInstance::destroy(PipelineInstance* pipeline)
 {
-	LUX_DELETE(pipeline);
+	LUMIX_DELETE(pipeline);
 }
 
 
@@ -589,6 +658,21 @@ void ClearCommand::execute(PipelineInstanceImpl&)
 {
 	glClear(m_buffers);
 }
+
+
+void CustomCommand::deserialize(PipelineImpl&, ISerializer& serializer)
+{
+	char tmp[256];
+	serializer.deserializeArrayItem(tmp, 255);
+	m_name = crc32(tmp);
+}
+
+
+void CustomCommand::execute(PipelineInstanceImpl& pipeline)
+{
+	pipeline.executeCustomCommand(m_name);
+}
+
 
 
 void RenderModelsCommand::deserialize(PipelineImpl&, ISerializer& serializer) 
@@ -643,16 +727,27 @@ void UnbindFramebufferCommand::execute(PipelineInstanceImpl&)
 }
 
 
+void RenderDebugLinesCommand::deserialize(PipelineImpl&, ISerializer&)
+{
+}
+
+
+void RenderDebugLinesCommand::execute(PipelineInstanceImpl& pipeline)
+{
+	pipeline.renderDebugLines();
+}
+
+
 void DrawFullscreenQuadCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer)
 {
 	const int MATERIAL_NAME_MAX_LENGTH = 100;
 	char material[MATERIAL_NAME_MAX_LENGTH];
 	serializer.deserializeArrayItem(material, MATERIAL_NAME_MAX_LENGTH);
-	char material_path[MAX_PATH];
-	strcpy(material_path, "materials/");
-	strcat(material_path, material);
-	strcat(material_path, ".mat");
-	m_material = static_cast<Material*>(pipeline.getResourceManager().get(ResourceManager::MATERIAL)->load(material_path));
+	base_string<char, StackAllocator<LUMIX_MAX_PATH> > material_path;
+	material_path = "materials/";
+	material_path += material;
+	material_path += ".mat";
+	m_material = static_cast<Material*>(pipeline.getResourceManager().get(ResourceManager::MATERIAL)->load(material_path.c_str()));
 }
 
 
@@ -722,14 +817,14 @@ void BindShadowmapCommand::execute(PipelineInstanceImpl& pipeline)
 
 Resource* PipelineManager::createResource(const Path& path)
 {
-	return LUX_NEW(PipelineImpl)(path, getOwner());
+	return LUMIX_NEW(PipelineImpl)(path, getOwner());
 }
 
 
 void PipelineManager::destroyResource(Resource& resource)
 {
-	LUX_DELETE(static_cast<PipelineImpl*>(&resource));
+	LUMIX_DELETE(static_cast<PipelineImpl*>(&resource));
 }
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

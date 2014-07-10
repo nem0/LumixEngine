@@ -5,7 +5,7 @@
 #include "core/string.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 	namespace UI
@@ -35,6 +35,6 @@ namespace Lux
 				DelegateList<void (TextureBase&)> m_on_loaded;
 		};
 
-	} // ~namespace Lux
+	} // ~namespace Lumix
 
-} // ~namespace Lux
+} // ~namespace Lumix

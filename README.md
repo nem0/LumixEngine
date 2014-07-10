@@ -1,9 +1,18 @@
-LuxEngine
+#LumixEngine
 =========
 
-3d game engine
+3D Game Engine
 
-Data
-=========
-data can be found at https://dl.dropboxusercontent.com/u/28934398/luxengine_data.zip
+Features:
+  * multiplatform (PC, consoles, phones, tablets, ...)
+  * editor included
+  * easy to use, fast and flexible 
+  * open source
+  * component based
+  * data driven
 
+[Code rules](code_rules.md)
+
+[Data repository](https://github.com/nem0/lumixengine_data)
+
+![Editor screenshot](https://raw.githubusercontent.com/nem0/LumixEngine/master/docs/editor.png "Editor screenshot")

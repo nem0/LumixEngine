@@ -1,11 +1,11 @@
 #pragma once
 
-#include "core/lux.h"
+#include "core/lumix.h"
 
 // base on molecular musings blogpost
 
 
-namespace Lux
+namespace Lumix
 {
 
 	template <typename T> class Delegate;
@@ -19,13 +19,13 @@ namespace Lux
 			struct Stub { InstancePtr first; InternalFunction second; };
 
 			template <R (*Function)()>
-			static LUX_FORCE_INLINE R FunctionStub(InstancePtr)
+			static LUMIX_FORCE_INLINE R FunctionStub(InstancePtr)
 			{
 				return (Function)();
 			}
 
 			template <class C, R (C::*Function)()>
-			static LUX_FORCE_INLINE R ClassMethodStub(InstancePtr instance)
+			static LUMIX_FORCE_INLINE R ClassMethodStub(InstancePtr instance)
 			{
 				return (static_cast<C*>(instance)->*Function)();
 			}
@@ -75,13 +75,13 @@ namespace Lux
 			struct Stub { InstancePtr first; InternalFunction second; };
 
 			template <R (*Function)(A0)>
-			static LUX_FORCE_INLINE R FunctionStub(InstancePtr, A0 a0)
+			static LUMIX_FORCE_INLINE R FunctionStub(InstancePtr, A0 a0)
 			{
 				return (Function)(a0);
 			}
 
 			template <class C, R (C::*Function)(A0)>
-			static LUX_FORCE_INLINE R ClassMethodStub(InstancePtr instance, A0 a0)
+			static LUMIX_FORCE_INLINE R ClassMethodStub(InstancePtr instance, A0 a0)
 			{
 				return (static_cast<C*>(instance)->*Function)(a0);
 			}
@@ -132,13 +132,13 @@ namespace Lux
 			struct Stub { InstancePtr first; InternalFunction second; };
 
 			template <R (*Function)(A0, A1)>
-			static LUX_FORCE_INLINE R FunctionStub(InstancePtr, A0 a0, A1 a1)
+			static LUMIX_FORCE_INLINE R FunctionStub(InstancePtr, A0 a0, A1 a1)
 			{
 				return (Function)(a0, a1);
 			}
 
 			template <class C, R (C::*Function)(A0, A1)>
-			static LUX_FORCE_INLINE R ClassMethodStub(InstancePtr instance, A0 a0, A1 a1)
+			static LUMIX_FORCE_INLINE R ClassMethodStub(InstancePtr instance, A0 a0, A1 a1)
 			{
 				return (static_cast<C*>(instance)->*Function)(a0, a1);
 			}
@@ -188,13 +188,13 @@ namespace Lux
 			struct Stub { InstancePtr first; InternalFunction second; };
 
 			template <R (*Function)(A0, A1, A2)>
-			static LUX_FORCE_INLINE R FunctionStub(InstancePtr, A0 a0, A1 a1, A2 a2)
+			static LUMIX_FORCE_INLINE R FunctionStub(InstancePtr, A0 a0, A1 a1, A2 a2)
 			{
 				return (Function)(a0, a1, a2);
 			}
 
 			template <class C, R (C::*Function)(A0, A1, A2)>
-			static LUX_FORCE_INLINE R ClassMethodStub(InstancePtr instance, A0 a0, A1 a1, A2 a2)
+			static LUMIX_FORCE_INLINE R ClassMethodStub(InstancePtr instance, A0 a0, A1 a1, A2 a2)
 			{
 				return (static_cast<C*>(instance)->*Function)(a0, a1, a2);
 			}
@@ -244,13 +244,13 @@ namespace Lux
 			struct Stub { InstancePtr first; InternalFunction second; };
 
 			template <R (*Function)(A0, A1, A2, A3)>
-			static LUX_FORCE_INLINE R FunctionStub(InstancePtr, A0 a0, A1 a1, A2 a2, A3 a3)
+			static LUMIX_FORCE_INLINE R FunctionStub(InstancePtr, A0 a0, A1 a1, A2 a2, A3 a3)
 			{
 				return (Function)(a0, a1, a2, a3);
 			}
 
 			template <class C, R (C::*Function)(A0, A1, A2, A3)>
-			static LUX_FORCE_INLINE R ClassMethodStub(InstancePtr instance, A0 a0, A1 a1, A2 a2, A3 a3)
+			static LUMIX_FORCE_INLINE R ClassMethodStub(InstancePtr instance, A0 a0, A1 a1, A2 a2, A3 a3)
 			{
 				return (static_cast<C*>(instance)->*Function)(a0, a1, a2, a3);
 			}

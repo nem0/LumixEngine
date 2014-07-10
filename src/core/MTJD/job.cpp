@@ -1,9 +1,9 @@
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/MTJD/job.h"
 
 #include "core/MTJD/manager.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace MTJD
 	{
@@ -53,8 +53,8 @@ namespace Lux
 
 			if (m_auto_destroy)
 			{
-				LUX_DELETE(this);
+				LUMIX_DELETE(this);
 			}
 		}
 	} // ~namepsace MTJD
-} // ~namepsace Lux
+} // ~namepsace Lumix

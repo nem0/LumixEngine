@@ -1,13 +1,14 @@
 #pragma once
 
 #include "core/string.h"
+#include <cstring>
 
-namespace Lux
+namespace Lumix
 {
-	class LUX_CORE_API Path
+	class LUMIX_CORE_API Path
 	{
 	public:
-		LUX_FORCE_INLINE Path()
+		LUMIX_FORCE_INLINE Path()
 			: m_id(0)
 		{
 			m_path[0] = '\0';
@@ -34,7 +35,7 @@ namespace Lux
 		bool isValid() { return NULL != m_path; }
 
 	private:
-		char		m_path[LUX_MAX_PATH];
+		char		m_path[LUMIX_MAX_PATH];
 		uint32_t	m_id;
 	};
 }

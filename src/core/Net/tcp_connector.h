@@ -1,14 +1,14 @@
 #pragma once
 
-#include "core/lux.h"
+#include "core/lumix.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace Net
 	{
 		class TCPStream;
 
-		class LUX_CORE_API TCPConnector
+		class LUMIX_CORE_API TCPConnector
 		{
 		public:
 			TCPConnector() : m_socket(0) {}
@@ -19,4 +19,4 @@ namespace Lux
 			uintptr_t m_socket;
 		};
 	} // ~namespace Net
-} // ~namespace Lux
+} // ~namespace Lumix

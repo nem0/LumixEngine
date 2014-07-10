@@ -1,8 +1,8 @@
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/MT/task.h"
 #include <Windows.h>
 
-namespace Lux
+namespace Lumix
 {
 	namespace MT
 	{
@@ -10,7 +10,7 @@ namespace Lux
 
 		void SetThreadName(DWORD thread_id, const char* thread_name);
 
-		
+
 		static uint32_t s_main_thread_id = 0;
 
 		void sleep(uint32_t miliseconds) { ::Sleep(miliseconds); }
@@ -56,9 +56,8 @@ namespace Lux
 		{
 			uint32_t ret = 0xffffFFFF;
 			struct TaskImpl* impl = reinterpret_cast<TaskImpl*>(ptr);
-			if(!impl->m_force_exit)
+			if (!impl->m_force_exit)
 			{
-				impl->m_is_running = true;
 				ret = impl->m_owner->task();
 			}
 			impl->m_exited = true;
@@ -69,7 +68,7 @@ namespace Lux
 
 		Task::Task()
 		{
-			TaskImpl* impl = LUX_NEW(TaskImpl);
+			TaskImpl* impl = LUMIX_NEW(TaskImpl);
 			impl->m_handle = NULL;
 			impl->m_affinity_mask = getProccessAffinityMask();
 			impl->m_priority = ::GetThreadPriority(GetCurrentThread());
@@ -85,7 +84,7 @@ namespace Lux
 		Task::~Task()
 		{
 			ASSERT(NULL == m_implementation->m_handle);
-			LUX_DELETE(m_implementation);
+			LUMIX_DELETE(m_implementation);
 		}
 
 		bool Task::create(const char* name)
@@ -102,12 +101,13 @@ namespace Lux
 
 		bool Task::run()
 		{
+			m_implementation->m_is_running = true;
 			return ::ResumeThread(m_implementation->m_handle) != -1;
 		}
 
 		bool Task::destroy()
 		{
-			while(m_implementation->m_is_running)
+			while (m_implementation->m_is_running)
 			{
 				yield();
 			}
@@ -120,7 +120,7 @@ namespace Lux
 		void Task::setAffinityMask(uint32_t affinity_mask)
 		{
 			m_implementation->m_affinity_mask = affinity_mask;
-			if(m_implementation->m_handle)
+			if (m_implementation->m_handle)
 			{
 				::SetThreadIdealProcessor(m_implementation->m_handle, affinity_mask);
 			}
@@ -129,7 +129,7 @@ namespace Lux
 		void Task::setPriority(uint32_t priority)
 		{
 			m_implementation->m_priority = priority;
-			if(m_implementation->m_handle)
+			if (m_implementation->m_handle)
 			{
 				::SetThreadPriority(m_implementation->m_handle, priority);
 			}
@@ -157,9 +157,9 @@ namespace Lux
 			return m_implementation->m_is_running;
 		}
 
-		bool Task::isFinished() const 
-		{ 
-			return m_implementation->m_exited; 
+		bool Task::isFinished() const
+		{
+			return m_implementation->m_exited;
 		}
 
 		bool Task::isForceExit() const
@@ -171,7 +171,7 @@ namespace Lux
 		{
 			m_implementation->m_force_exit = true;
 
-			while(!isFinished() && wait)
+			while (!isFinished() && wait)
 			{
 				yield();
 			}
@@ -184,7 +184,7 @@ namespace Lux
 			::ExitThread(exitCode);
 		}
 
-		static const DWORD MS_VC_EXCEPTION=0x406D1388;
+		static const DWORD MS_VC_EXCEPTION = 0x406D1388;
 
 		#pragma pack(push,8)
 		typedef struct tagTHREADNAME_INFO
@@ -193,7 +193,7 @@ namespace Lux
 			DWORD type;
 			LPCSTR name;
 			DWORD thread_id;
-			DWORD flags; 
+			DWORD flags;
 		} THREADNAME_INFO;
 		#pragma pack(pop)
 
@@ -207,11 +207,11 @@ namespace Lux
 
 			__try
 			{
-				RaiseException( MS_VC_EXCEPTION, 0, sizeof(info)/sizeof(ULONG_PTR), (ULONG_PTR*)&info );
+				RaiseException(MS_VC_EXCEPTION, 0, sizeof(info) / sizeof(ULONG_PTR), (ULONG_PTR*)&info);
 			}
-			__except(EXCEPTION_EXECUTE_HANDLER)
+			__except (EXCEPTION_EXECUTE_HANDLER)
 			{
 			}
 		}
 	} // ~namespace MT
-} // ~namespace Lux
+} // ~namespace Lumix

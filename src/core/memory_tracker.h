@@ -2,7 +2,7 @@
 
 #ifdef MEM_TRACK
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/pod_hash_map.h"
 #include "core/map.h"
 #include "core/MT/spin_mutex.h"
@@ -10,7 +10,7 @@
 #include <crtdbg.h>
 #include <stdlib.h>
 
-namespace Lux
+namespace Lumix
 {
 	class MemTrackAllocator
 	{
@@ -20,7 +20,7 @@ namespace Lux
 		void* reallocate(void* p, size_t n) { return realloc(p, n); }
 	};
 
-	class LUX_CORE_API MemoryTracker
+	class LUMIX_CORE_API MemoryTracker
 	{
 	public:
 		class Entry
@@ -89,6 +89,6 @@ namespace Lux
 		static MemoryTracker s_instance;
 		static uint32_t s_alloc_counter;
 	};
-} //~namespace Lux
+} //~namespace Lumix
 
 #endif // MEM_TRACK

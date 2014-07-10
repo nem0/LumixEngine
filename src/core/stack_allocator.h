@@ -1,14 +1,14 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 	template <size_t SIZE>
-	class LUX_CORE_API StackAllocator
+	class StackAllocator
 	{
 		public:
 			StackAllocator();
@@ -61,4 +61,4 @@ namespace Lux
 
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

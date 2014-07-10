@@ -1,34 +1,161 @@
 #include "render_scene.h"
 #include "core/array.h"
 #include "core/crc32.h"
-#include "core/event_manager.h"
+#include "core/FS/file_system.h"
+#include "core/FS/ifile.h"
 #include "core/iserializer.h"
+#include "core/log.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
+#include "core/timer.h"
 #include "engine/engine.h"
+#include "graphics/geometry.h"
 #include "graphics/irender_device.h"
+#include "graphics/material.h"
 #include "graphics/model.h"
 #include "graphics/model_instance.h"
 #include "graphics/pipeline.h"
 #include "graphics/renderer.h"
-#include "universe/component_event.h"
-#include "universe/entity_moved_event.h"
+#include "graphics/texture.h"
 #include "universe/universe.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 	static const uint32_t RENDERABLE_HASH = crc32("renderable");
 	static const uint32_t LIGHT_HASH = crc32("light");
 	static const uint32_t CAMERA_HASH = crc32("camera");
+	static const uint32_t TERRAIN_HASH = crc32("terrain");
+
+	struct Terrain
+	{
+		Terrain()
+			: m_mesh(NULL)
+			, m_material(NULL)
+		{}
+
+		~Terrain()
+		{
+			LUMIX_DELETE(m_mesh);
+			if (m_material)
+			{
+				m_material->getResourceManager().get(ResourceManager::MATERIAL)->unload(*m_material);
+			}
+			if (m_heightmap)
+			{
+				m_heightmap->getResourceManager().get(ResourceManager::TEXTURE)->unload(*m_heightmap);
+				m_heightmap->getObserverCb().unbind<Terrain, &Terrain::heightmapLoaded>(this);
+			}
+		}
+
+		void generateGeometry()
+		{
+			LUMIX_DELETE(m_mesh);
+			m_mesh = NULL;
+			struct Vertex
+			{
+				Vec3 pos;
+				float u, v;
+				float u2, v2;
+				Vec3 normal;
+			};
+			m_width = m_heightmap->getWidth();
+			m_height = m_heightmap->getHeight();
+			Array<Vertex> points;
+			points.resize(m_width * m_height * 4);
+			Array<int32_t> indices;
+			indices.resize((m_width - 1) * (m_height - 1) * 6);
+			int indices_offset = 0;
+			const uint8_t* data = m_heightmap->getData();
+			int bytes_per_pixel = m_heightmap->getBytesPerPixel();
+			for (int j = 0; j < m_height - 1; ++j)
+			{
+				for (int i = 0; i < m_width - 1; ++i)
+				{
+					int idx = 4 * (i + j * m_width);
+					int data_idx = i + j * m_width;
+					points[idx].pos.set((float)(i) / 5, data[data_idx * bytes_per_pixel] / 20.0f - 255 / 20.0f, (float)(j) / 5);
+					points[idx].u2 = 0;
+					points[idx].v2 = 0;
+					points[idx].u = i / (float)m_width;
+					points[idx].v = j / (float)m_height;
+					points[idx+1].pos.set((float)(i+1) / 5, data[(data_idx + 1)* bytes_per_pixel] / 20.0f - 255 / 20.0f, (float)(j) / 5);
+					points[idx+1].u2 = 1;
+					points[idx+1].v2 = 0;
+					points[idx+1].u = (i+1) / (float)m_width;
+					points[idx+1].v = j / (float)m_height;
+					points[idx+2].pos.set((float)(i+1) / 5, data[(data_idx + 1 + m_width)* bytes_per_pixel] / 20.0f - 255 / 20.0f, (float)(j+1) / 5);
+					points[idx+2].u2 = 1;
+					points[idx+2].v2 = 1;
+					points[idx+2].u = (i+1) / (float)m_width;
+					points[idx+2].v = (j+1) / (float)m_height;
+					points[idx+3].pos.set((float)(i) / 5, data[(data_idx + m_width) * bytes_per_pixel] / 20.0f - 255 / 20.0f, (float)(j+1) / 5);
+					points[idx+3].u2 = 0;
+					points[idx+3].v2 = 1;
+					points[idx+3].u = i / (float)m_width;
+					points[idx+3].v = (j+1) / (float)m_height;
+					
+					indices[indices_offset] = idx;
+					indices[indices_offset + 1] = idx + 3;
+					indices[indices_offset + 2] = idx + 2;
+					indices[indices_offset + 3] = idx;
+					indices[indices_offset + 4] = idx + 2;
+					indices[indices_offset + 5] = idx + 1;
+					indices_offset += 6;
+				}
+			}
+			for (int j = 1; j < m_height - 1; ++j)
+			{
+				for (int i = 1; i < m_width - 1; ++i)
+				{
+					int idx = 4 * (i + j * m_width);
+					for (int k = 0; k < 4; ++k)
+					{
+						Vec3 n = crossProduct(points[idx + 4].pos - points[idx - 4].pos, points[idx - m_width * 4].pos - points[idx + m_width * 4].pos);
+						n.normalize();
+						points[idx].normal = n;
+						++idx;
+					}
+				}
+			}
+			VertexDef vertex_def;
+			vertex_def.parse("ptf2n", 5);
+			m_geometry.copy((const uint8_t*)&points[0], sizeof(points[0]) * points.size(), indices, vertex_def);
+			m_mesh = LUMIX_NEW(Mesh)(m_material, 0, indices.size(), "terrain");
+		}
+
+		void heightmapLoaded(Resource::State, Resource::State new_state)
+		{
+			if (new_state == Resource::State::READY)
+			{
+				generateGeometry();
+			}
+		}
+
+		int32_t m_width;
+		int32_t m_height;
+		Geometry m_geometry;
+		Material* m_material;
+		Mesh* m_mesh;
+		Matrix m_matrix;
+		Entity m_entity;
+		int64_t m_layer_mask;
+		Texture* m_heightmap;
+	};
 
 	struct Renderable
 	{
-		ModelInstance* m_model;
+		Renderable() {}
+
+		ModelInstance m_model;
 		Entity m_entity;
 		int64_t m_layer_mask;
 		float m_scale;
+
+		private:
+			Renderable(const Renderable&) {}
+			void operator =(const Renderable&) {}
 	};
 
 	struct Light
@@ -64,14 +191,22 @@ namespace Lux
 				: m_engine(engine)
 				, m_universe(universe)
 			{
-				m_universe.getEventManager().addListener(EntityMovedEvent::type).bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
+				m_universe.entityMoved().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
+				m_timer = Timer::create();
 			}
 
 			~RenderSceneImpl()
 			{
-				EventManager::Listener cb;
-				cb.bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
-				m_universe.getEventManager().removeListener(EntityMovedEvent::type, cb);
+				m_universe.entityMoved().unbind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
+				for (int i = 0; i < m_renderables.size(); ++i)
+				{
+					LUMIX_DELETE(m_renderables[i]);
+				}
+				for (int i = 0; i < m_terrains.size(); ++i)
+				{
+					LUMIX_DELETE(m_terrains[i]);
+				}
+				Timer::destroy(m_timer);
 			}
 
 			virtual void getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) override
@@ -130,6 +265,19 @@ namespace Lux
 				return mtx;
 			}
 
+			void update(float dt) override
+			{
+				for (int i = m_debug_lines.size() - 1; i >= 0; --i)
+				{
+					float life = m_debug_lines[i].m_life;
+					life -= dt;
+					if (life < 0)
+					{
+						m_debug_lines.eraseFast(i);
+					}
+				}
+			}
+
 			void serializeCameras(ISerializer& serializer)
 			{
 				serializer.serialize("camera_count", m_cameras.size());
@@ -166,14 +314,35 @@ namespace Lux
 				serializer.beginArray("renderables");
 				for (int i = 0; i < m_renderables.size(); ++i)
 				{
-					serializer.serializeArrayItem(m_renderables[i].m_entity.index);
-					serializer.serializeArrayItem(m_renderables[i].m_model->getModel().getPath());
-					serializer.serializeArrayItem(m_renderables[i].m_scale);
-					Matrix mtx = m_renderables[i].m_model->getMatrix();
+					serializer.serializeArrayItem(m_renderables[i]->m_entity.index);
+					if (m_renderables[i]->m_model.getModel())
+					{
+						serializer.serializeArrayItem(m_renderables[i]->m_model.getModel()->getPath().c_str());
+					}
+					else
+					{
+						serializer.serializeArrayItem("");
+					}
+					serializer.serializeArrayItem(m_renderables[i]->m_scale);
+					Matrix mtx = m_renderables[i]->m_model.getMatrix();
 					for (int j = 0; j < 16; ++j)
 					{
 						serializer.serializeArrayItem((&mtx.m11)[j]);
 					}
+				}
+				serializer.endArray();
+			}
+
+			void serializeTerrains(ISerializer& serializer)
+			{
+				serializer.serialize("terrain_count", m_terrains.size());
+				serializer.beginArray("terrains");
+				for (int i = 0; i < m_terrains.size(); ++i)
+				{
+					serializer.serializeArrayItem(m_terrains[i]->m_entity.index);
+					serializer.serializeArrayItem(m_terrains[i]->m_layer_mask);
+					serializer.serializeArrayItem(m_terrains[i]->m_heightmap->getPath().c_str());
+					serializer.serializeArrayItem(m_terrains[i]->m_material->getPath().c_str());
 				}
 				serializer.endArray();
 			}
@@ -183,6 +352,7 @@ namespace Lux
 				serializeCameras(serializer);
 				serializeRenderables(serializer);
 				serializeLights(serializer);
+				serializeTerrains(serializer);
 			}
 
 			void deserializeCameras(ISerializer& serializer)
@@ -190,9 +360,9 @@ namespace Lux
 				int32_t size;
 				serializer.deserialize("camera_count", size);
 				serializer.deserializeArrayBegin("cameras");
+				m_cameras.resize(size);
 				for (int i = 0; i < size; ++i)
 				{
-					m_cameras.pushEmpty();
 					serializer.deserializeArrayItem(m_cameras[i].m_far);
 					serializer.deserializeArrayItem(m_cameras[i].m_near);
 					serializer.deserializeArrayItem(m_cameras[i].m_fov);
@@ -203,8 +373,7 @@ namespace Lux
 					serializer.deserializeArrayItem(m_cameras[i].m_entity.index);
 					m_cameras[i].m_entity.universe = &m_universe;
 					serializer.deserializeArrayItem(m_cameras[i].m_slot, Camera::MAX_SLOT_LENGTH);
-					ComponentEvent evt(Component(m_cameras[i].m_entity, CAMERA_HASH, this, i));
-					m_universe.getEventManager().emitEvent(evt);
+					m_universe.addComponent(m_cameras[i].m_entity, CAMERA_HASH, this, i);
 				}
 				serializer.deserializeArrayEnd();
 			}
@@ -214,21 +383,29 @@ namespace Lux
 				int32_t size;
 				serializer.deserialize("renderable_count", size);
 				serializer.deserializeArrayBegin("renderables");
+				for (int i = size; i < m_renderables.size(); ++i)
+				{
+					LUMIX_DELETE(m_renderables[i]);
+				}
+				int old_size = m_renderables.size();
+				m_renderables.resize(size);
+				for (int i = old_size; i < size; ++i)
+				{
+					m_renderables[i] = LUMIX_NEW(Renderable);
+				}
 				for (int i = 0; i < size; ++i)
 				{
-					m_renderables.pushEmpty();
-					serializer.deserializeArrayItem(m_renderables[i].m_entity.index);
-					m_renderables[i].m_entity.universe = &m_universe;
-					char path[LUX_MAX_PATH];
-					serializer.deserializeArrayItem(path, LUX_MAX_PATH);
-					serializer.deserializeArrayItem(m_renderables[i].m_scale);
-					m_renderables[i].m_model = LUX_NEW(ModelInstance)(static_cast<Model&>(*m_engine.getResourceManager().get(ResourceManager::MODEL)->load(path)));
+					serializer.deserializeArrayItem(m_renderables[i]->m_entity.index);
+					m_renderables[i]->m_entity.universe = &m_universe;
+					char path[LUMIX_MAX_PATH];
+					serializer.deserializeArrayItem(path, LUMIX_MAX_PATH);
+					serializer.deserializeArrayItem(m_renderables[i]->m_scale);
+					m_renderables[i]->m_model.setModel(static_cast<Model*>(m_engine.getResourceManager().get(ResourceManager::MODEL)->load(path)));
 					for (int j = 0; j < 16; ++j)
 					{
-						serializer.deserializeArrayItem((&m_renderables[i].m_model->getMatrix().m11)[j]);
+						serializer.deserializeArrayItem((&m_renderables[i]->m_model.getMatrix().m11)[j]);
 					}
-					ComponentEvent evt(Component(m_renderables[i].m_entity, RENDERABLE_HASH, this, i));
-					m_universe.getEventManager().emitEvent(evt);
+					m_universe.addComponent(m_renderables[i]->m_entity, RENDERABLE_HASH, this, i);
 				}
 				serializer.deserializeArrayEnd();
 			}
@@ -238,14 +415,35 @@ namespace Lux
 				int32_t size;
 				serializer.deserialize("light_count", size);
 				serializer.deserializeArrayBegin("lights");
+				m_lights.resize(size);
 				for (int i = 0; i < size; ++i)
 				{
-					m_lights.pushEmpty();
 					serializer.deserializeArrayItem(m_lights[i].m_entity.index);
 					m_lights[i].m_entity.universe = &m_universe;
 					serializer.deserializeArrayItem((int32_t&)m_lights[i].m_type);
-					ComponentEvent evt(Component(m_lights[i].m_entity, LIGHT_HASH, this, i));
-					m_universe.getEventManager().emitEvent(evt);
+					m_universe.addComponent(m_lights[i].m_entity, LIGHT_HASH, this, i);
+				}
+				serializer.deserializeArrayEnd();
+			}
+
+			void deserializeTerrains(ISerializer& serializer)
+			{
+				int32_t size;
+				serializer.deserialize("terrain_count", size);
+				serializer.deserializeArrayBegin("terrains");
+				for (int i = 0; i < size; ++i)
+				{
+					Entity e;
+					serializer.deserializeArrayItem(e.index);
+					e.universe = &m_universe;
+					Component cmp = createComponent(TERRAIN_HASH, e);
+					Terrain* terrain = m_terrains[cmp.index];
+					serializer.deserializeArrayItem(terrain->m_layer_mask);
+					char path[LUMIX_MAX_PATH];
+					serializer.deserializeArrayItem(path, LUMIX_MAX_PATH);
+					setTerrainHeightmap(cmp, string(path));
+					serializer.deserializeArrayItem(path, LUMIX_MAX_PATH);
+					setTerrainMaterial(cmp, string(path));
 				}
 				serializer.deserializeArrayEnd();
 			}
@@ -255,11 +453,27 @@ namespace Lux
 				deserializeCameras(serializer);
 				deserializeRenderables(serializer);
 				deserializeLights(serializer);
+				deserializeTerrains(serializer);
 			}
 
 			virtual Component createComponent(uint32_t type, const Entity& entity) override
 			{
-				if (type == CAMERA_HASH)
+				if (type == TERRAIN_HASH)
+				{
+					Terrain* terrain = LUMIX_NEW(Terrain);
+					m_terrains.push(terrain);
+					terrain->m_width = 0;
+					terrain->m_height = 0;
+					terrain->m_matrix = entity.getMatrix();
+					terrain->m_entity = entity;
+					terrain->m_layer_mask = 1;
+					terrain->m_heightmap = NULL;
+					Component cmp = m_universe.addComponent(entity, type, this, m_terrains.size() - 1);
+					m_universe.componentCreated().invoke(cmp);
+					return cmp;
+
+				}
+				else if (type == CAMERA_HASH)
 				{
 					Camera& camera = m_cameras.pushEmpty();
 					camera.m_is_active = false;
@@ -271,61 +485,115 @@ namespace Lux
 					camera.m_near = 0.1f;
 					camera.m_far = 1000.0f;
 					camera.m_slot[0] = '\0';
-					Component cmp(entity, type, this, m_cameras.size() - 1);
-					ComponentEvent evt(cmp);
-					m_universe.getEventManager().emitEvent(evt);
-					return Component(entity, type, this, m_cameras.size() - 1);
+					Component cmp = m_universe.addComponent(entity, type, this, m_cameras.size() - 1);
+					m_universe.componentCreated().invoke(cmp);
+					return cmp;
 				}
 				else if (type == RENDERABLE_HASH)
 				{
-					Renderable& r = m_renderables.pushEmpty();
+					m_renderables.push(LUMIX_NEW(Renderable));
+					Renderable& r = *m_renderables.back();
 					r.m_entity = entity;
 					r.m_layer_mask = 1;
 					r.m_scale = 1;
-					r.m_model = NULL;
-					Component cmp(entity, type, this, m_renderables.size() - 1);
-					ComponentEvent evt(cmp);
-					m_universe.getEventManager().emitEvent(evt);
-					return Component(entity, type, this, m_renderables.size() - 1);
+					r.m_model.setModel(NULL);
+					Component cmp = m_universe.addComponent(entity, type, this, m_renderables.size() - 1);
+					m_universe.componentCreated().invoke(cmp);
+					return cmp;
 				}
 				else if (type == LIGHT_HASH)
 				{
 					Light& light = m_lights.pushEmpty();
 					light.m_type = Light::Type::DIRECTIONAL;
 					light.m_entity = entity;
-					Component cmp(entity, type, this, m_lights.size() - 1);
-					ComponentEvent evt(cmp);
-					m_universe.getEventManager().emitEvent(evt);
-					return Component(entity, type, this, m_lights.size() - 1);
+					Component cmp = m_universe.addComponent(entity, type, this, m_lights.size() - 1);
+					m_universe.componentCreated().invoke(cmp);
+					return cmp;
 				}
 				ASSERT(false);
 				return Component::INVALID;
 			}
 
-			void onEntityMoved(Event& evt)
+			void onEntityMoved(Entity& entity)
 			{
-				EntityMovedEvent e = static_cast<EntityMovedEvent&>(evt);
-				const Entity::ComponentList& cmps = e.entity.getComponents();
+				const Entity::ComponentList& cmps = entity.getComponents();
 				for (int i = 0; i < cmps.size(); ++i)
 				{
 					if (cmps[i].type == RENDERABLE_HASH)
 					{
-						m_renderables[cmps[i].index].m_model->setMatrix(e.entity.getMatrix());
+						m_renderables[cmps[i].index]->m_model.setMatrix(entity.getMatrix());
+						break;
+					}
+					else if (cmps[i].type == TERRAIN_HASH)
+					{
+						m_terrains[cmps[i].index]->m_matrix = entity.getMatrix();
 						break;
 					}
 				}
 			}
 
+			virtual void setTerrainMaterial(Component cmp, const string& path) override
+			{
+				if (m_terrains[cmp.index]->m_material)
+				{
+					m_engine.getResourceManager().get(ResourceManager::MATERIAL)->unload(*m_terrains[cmp.index]->m_material);
+				}
+				m_terrains[cmp.index]->m_material = static_cast<Material*>(m_engine.getResourceManager().get(ResourceManager::MATERIAL)->load(path.c_str()));
+				if (m_terrains[cmp.index]->m_mesh)
+				{
+					m_terrains[cmp.index]->m_mesh->setMaterial(m_terrains[cmp.index]->m_material);
+				}
+			}
+
+			virtual void getTerrainMaterial(Component cmp, string& path) override
+			{
+				if (m_terrains[cmp.index]->m_material)
+				{
+					path = m_terrains[cmp.index]->m_material->getPath().c_str();
+				}
+				else
+				{
+					path = "";
+				}
+			}
+
+			virtual void setTerrainHeightmap(Component cmp, const string& path) override
+			{
+				if (m_terrains[cmp.index]->m_heightmap)
+				{
+					m_engine.getResourceManager().get(ResourceManager::TEXTURE)->unload(*m_terrains[cmp.index]->m_heightmap);
+					m_terrains[cmp.index]->m_heightmap->getObserverCb().unbind<Terrain, &Terrain::heightmapLoaded>(m_terrains[cmp.index]);
+				}
+				Resource* res = m_engine.getResourceManager().get(ResourceManager::TEXTURE)->load(path.c_str());
+				res->getObserverCb().bind<Terrain, &Terrain::heightmapLoaded>(m_terrains[cmp.index]);
+				m_terrains[cmp.index]->m_heightmap = static_cast<Texture*>(res);
+				m_terrains[cmp.index]->m_heightmap->setNonGL(true);
+				if (m_terrains[cmp.index]->m_heightmap->isReady())
+				{
+					m_terrains[cmp.index]->heightmapLoaded(Resource::State::LOADING, Resource::State::READY);
+				}
+			}
+
+			virtual void getTerrainHeightmap(Component cmp, string& path) override
+			{
+				path = m_terrains[cmp.index]->m_heightmap ? m_terrains[cmp.index]->m_heightmap->getPath().c_str() : "";
+			}
+
 			virtual Pose& getPose(const Component& cmp) override
 			{
-				return m_renderables[cmp.index].m_model->getPose();
+				return m_renderables[cmp.index]->m_model.getPose();
+			}
+
+			virtual Model* getModel(Component cmp) override
+			{
+				return m_renderables[cmp.index]->m_model.getModel();
 			}
 
 			virtual void getRenderablePath(Component cmp, string& path) override
 			{
-					if (m_renderables[cmp.index].m_model)
+					if (m_renderables[cmp.index]->m_model.getModel())
 					{
-						path = m_renderables[cmp.index].m_model->getModel().getPath();
+						path = m_renderables[cmp.index]->m_model.getModel()->getPath().c_str();
 					}
 					else
 					{
@@ -335,47 +603,63 @@ namespace Lux
 
 			virtual void setRenderableLayer(Component cmp, const int32_t& layer) override
 			{
-				m_renderables[cmp.index].m_layer_mask = ((int64_t)1 << (int64_t)layer);
+				m_renderables[cmp.index]->m_layer_mask = ((int64_t)1 << (int64_t)layer);
 			}
 
 			virtual void setRenderableScale(Component cmp, const float& scale) override
 			{
-				m_renderables[cmp.index].m_scale = scale;
+				m_renderables[cmp.index]->m_scale = scale;
 			}
 
 			virtual void setRenderablePath(Component cmp, const string& path) override
 			{
-				LUX_DELETE(m_renderables[cmp.index].m_model);
-				Renderable& r = m_renderables[cmp.index];
+				Renderable& r = *m_renderables[cmp.index];
 				Model* model = static_cast<Model*>(m_engine.getResourceManager().get(ResourceManager::MODEL)->load(path));
-				r.m_model = LUX_NEW(ModelInstance)(*model);
-				r.m_model->setMatrix(r.m_entity.getMatrix());
+				r.m_model.setModel(model);
+				r.m_model.setMatrix(r.m_entity.getMatrix());
 			}
 
 			virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) override
 			{
-				infos.reserve(m_renderables.size());
+				infos.reserve(m_renderables.size() * 2);
 				for (int i = 0; i < m_renderables.size(); ++i)
 				{
-					if (m_renderables[i].m_model != NULL && (m_renderables[i].m_layer_mask & layer_mask) != 0)
+					if (m_renderables[i]->m_model.getModel() && (m_renderables[i]->m_layer_mask & layer_mask) != 0)
+					{
+						for (int j = 0, c = m_renderables[i]->m_model.getModel()->getMeshCount(); j < c; ++j)
+						{
+							if (m_renderables[i]->m_model.getModel()->getMesh(j).getMaterial()->isReady())
+							{
+								RenderableInfo& info = infos.pushEmpty();
+								info.m_scale = m_renderables[i]->m_scale;
+								info.m_geometry = m_renderables[i]->m_model.getModel()->getGeometry();
+								info.m_mesh = &m_renderables[i]->m_model.getModel()->getMesh(j);
+								info.m_pose = &m_renderables[i]->m_model.getPose();
+								info.m_model = &m_renderables[i]->m_model;
+								info.m_matrix = &m_renderables[i]->m_model.getMatrix();
+							}
+						}
+					}
+				}
+				for (int i = 0; i < m_terrains.size(); ++i)
+				{
+					bool is_in_wanted_layer = (m_terrains[i]->m_layer_mask & layer_mask) != 0;
+					if (m_terrains[i]->m_mesh && m_terrains[i]->m_mesh->getMaterial() && m_terrains[i]->m_mesh->getMaterial()->isReady() && is_in_wanted_layer)
 					{
 						RenderableInfo& info = infos.pushEmpty();
-						info.m_scale = m_renderables[i].m_scale;
-						info.m_model_instance = m_renderables[i].m_model;
+						info.m_scale = 1;
+						info.m_geometry = &m_terrains[i]->m_geometry;
+						info.m_mesh = m_terrains[i]->m_mesh;
+						info.m_pose = NULL;
+						info.m_model = NULL;
+						info.m_matrix = &m_terrains[i]->m_matrix;
 					}
 				}
 			}
 
 			virtual void setCameraSlot(Component camera, const string& slot) override
 			{
-				if (slot.length() > Camera::MAX_SLOT_LENGTH)
-				{
-					strncpy(m_cameras[camera.index].m_slot, slot.c_str(), Camera::MAX_SLOT_LENGTH);
-				}
-				else
-				{
-					strcpy(m_cameras[camera.index].m_slot, slot.c_str());
-				}
+				copyString(m_cameras[camera.index].m_slot, Camera::MAX_SLOT_LENGTH, slot.c_str());
 			}
 
 			virtual void getCameraSlot(Component camera, string& slot) override
@@ -430,24 +714,38 @@ namespace Lux
 				m_cameras[camera.index].m_aspect = w / (float)h;
 			}
 
+			virtual const Array<DebugLine>& getDebugLines() const override
+			{
+				return m_debug_lines;
+			}
+
+			virtual void addDebugLine(const Vec3& from, const Vec3& to, const Vec3& color, float life) override
+			{
+				DebugLine& line = m_debug_lines.pushEmpty();
+				line.m_from = from;
+				line.m_to = to;
+				line.m_color = color;
+				line.m_life = life;
+			}
+
 			virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir) override
 			{
 				RayCastModelHit hit;
 				hit.m_is_hit = false;
 				for (int i = 0; i < m_renderables.size(); ++i)
 				{
-					if (m_renderables[i].m_model)
+					if (m_renderables[i]->m_model.getModel())
 					{
-						const Vec3& pos = m_renderables[i].m_model->getMatrix().getTranslation();
-						float radius = m_renderables[i].m_model->getModel().getBoundingRadius();
-						float scale = m_renderables[i].m_scale;
+						const Vec3& pos = m_renderables[i]->m_model.getMatrix().getTranslation();
+						float radius = m_renderables[i]->m_model.getModel()->getBoundingRadius();
+						float scale = m_renderables[i]->m_scale;
 						Vec3 intersection;
 						if (dotProduct(pos - origin, pos - origin) < radius * radius || Math::getRaySphereIntersection(pos, radius * scale, origin, dir, intersection))
 						{
-							RayCastModelHit new_hit = m_renderables[i].m_model->getModel().castRay(origin, dir, m_renderables[i].m_model->getMatrix(), scale);
+							RayCastModelHit new_hit = m_renderables[i]->m_model.getModel()->castRay(origin, dir, m_renderables[i]->m_model.getMatrix(), scale);
 							if (new_hit.m_is_hit && (!hit.m_is_hit || new_hit.m_t < hit.m_t))
 							{
-								new_hit.m_renderable = Component(m_renderables[i].m_entity, crc32("renderable"), this, i);
+								new_hit.m_renderable = Component(m_renderables[i]->m_entity, crc32("renderable"), this, i);
 								hit = new_hit;
 								hit.m_is_hit = true;
 							}
@@ -478,24 +776,32 @@ namespace Lux
 				return Component::INVALID;
 			}
 
+			virtual Timer* getTimer() const override
+			{
+				return m_timer;
+			}
+
 		private:
-			Array<Renderable> m_renderables;
+			Array<Renderable*> m_renderables;
 			Array<Light> m_lights;
 			Array<Camera> m_cameras;
+			Array<Terrain*> m_terrains;
 			Universe& m_universe;
 			Engine& m_engine;
+			Array<DebugLine> m_debug_lines;
+			Timer* m_timer;
 	};
 
 
 	RenderScene* RenderScene::createInstance(Engine& engine, Universe& universe)
 	{
-		return LUX_NEW(RenderSceneImpl)(engine, universe);
+		return LUMIX_NEW(RenderSceneImpl)(engine, universe);
 	}
 
 
 	void RenderScene::destroyInstance(RenderScene* scene)
 	{
-		LUX_DELETE(scene);
+		LUMIX_DELETE(scene);
 	}
 
 }

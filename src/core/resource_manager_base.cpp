@@ -1,4 +1,4 @@
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/resource_manager_base.h"
 
 #include "core/crc32.h"
@@ -7,7 +7,7 @@
 #include "core/resource.h"
 #include "core/resource_manager.h"
 
-namespace Lux
+namespace Lumix
 {
 	void ResourceManagerBase::create(uint32_t id, ResourceManager& owner)
 	{
@@ -74,6 +74,7 @@ namespace Lux
 	{
 		if(0 == resource.remRef())
 		{
+			resource.incrementDepCount();
 			resource.onUnloading();
 			resource.doUnload();
 		}
@@ -90,6 +91,7 @@ namespace Lux
 
 	void ResourceManagerBase::forceUnload(Resource& resource)
 	{
+		resource.incrementDepCount();
 		resource.onUnloading();
 		resource.doUnload();
 		resource.m_ref_count = 0;
@@ -119,7 +121,7 @@ namespace Lux
 	{
 		for(ResourceTable::iterator it = m_resources.begin(); m_resources.end() != it; ++it)
 		{
-			LUX_DELETE(*it);
+			LUMIX_DELETE(*it);
 		}
 	}
 

@@ -34,7 +34,29 @@
      <widget class="QLineEdit" name="searchInput"/>
     </item>
     <item>
+     <widget class="QComboBox" name="filterComboBox">
+      <item>
+       <property name="text">
+        <string>All</string>
+       </property>
+      </item>
+      <item>
+       <property name="text">
+        <string>Mesh</string>
+       </property>
+      </item>
+      <item>
+       <property name="text">
+        <string>Material</string>
+       </property>
+      </item>
+     </widget>
+    </item>
+    <item>
      <widget class="QTreeView" name="treeView">
+      <property name="contextMenuPolicy">
+       <enum>Qt::CustomContextMenu</enum>
+      </property>
       <property name="editTriggers">
        <set>QAbstractItemView::NoEditTriggers</set>
       </property>

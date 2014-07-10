@@ -1,4 +1,4 @@
-#include "unit_tests/suite/lux_unit_tests.h"
+#include "unit_tests/suite/lumix_unit_tests.h"
 
 #include "core/log.h"
 #include "core/MT/lock_free_fixed_queue.h"
@@ -11,7 +11,7 @@
 
 //#define ASSERT_HANDLE_FAIL
 
-namespace Lux
+namespace Lumix
 {
 	namespace UnitTest
 	{
@@ -54,11 +54,11 @@ namespace Lux
 
 					UnitTestPair& ut = test->data;
 					
-					g_log_info.log("unit", "-------------------------");
-					g_log_info.log("unit", ut.name);
-					g_log_info.log("unit", "-------------------------");
+					g_log_info.log("unit") << "-------------------------";
+					g_log_info.log("unit") << ut.name;
+					g_log_info.log("unit") << "-------------------------";
 					ut.func(ut.parameters);
-					g_log_info.log("unit", "-------------------------");
+					g_log_info.log("unit") << "-------------------------";
 
 					test->setCompleted();
 				}
@@ -88,12 +88,12 @@ namespace Lux
 			{
 				for(int i = 0, c = m_unit_tests.size(); i < c; ++i)
 				{
-					g_log_info.log("unit", m_unit_tests[i].name);
+					g_log_info.log("unit") << m_unit_tests[i].name;
 				}
 
-				g_log_info.log("unit", "");
-				g_log_info.log("unit", "Running tests ...");
-				g_log_info.log("unit", "");
+				g_log_info.log("unit") << "";
+				g_log_info.log("unit") << "Running tests ...";
+				g_log_info.log("unit") << "";
 			}
 
 			void runTests(const char* filter_tests)
@@ -144,15 +144,15 @@ namespace Lux
 			{
 				if (m_fails > 0)
 				{
-					g_log_info.log("unit", "----------Fails----------");
+					g_log_info.log("unit") << "----------Fails----------";
 					for (int i = 0; i < m_failed_tests.size(); i++) 
 					{
-						g_log_info.log("unit", "%s(%d)", m_failed_tests[i].m_file_name, m_failed_tests[i].m_line);
+						g_log_info.log("unit") << m_failed_tests[i].m_file_name << "(" << m_failed_tests[i].m_line << ")";
 					}
 				}
-				g_log_info.log("unit", "--------- Results ---------");
-				g_log_info.log("unit", "Fails:     %d", m_fails);
-				g_log_info.log("unit", "---------------------------");
+				g_log_info.log("unit") << "--------- Results ---------";
+				g_log_info.log("unit") << "Fails:     " << m_fails;
+				g_log_info.log("unit") << "---------------------------";
 			}
 
 			void handleFail(const char* file_name, uint32_t line)
@@ -225,12 +225,12 @@ namespace Lux
 
 		Manager::Manager()
 		{
-			m_impl = LUX_NEW(ManagerImpl)();
+			m_impl = LUMIX_NEW(ManagerImpl)();
 		}
 
 		Manager::~Manager()
 		{
-			LUX_DELETE(m_impl);
+			LUMIX_DELETE(m_impl);
 		}
 	} //~UnitTest
 } //~UnitTest

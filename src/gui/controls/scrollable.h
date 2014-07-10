@@ -4,14 +4,14 @@
 #include "gui/block.h"
 
 
-namespace Lux
+namespace Lumix
 {
 namespace UI
 {
 
 	class Scrollbar;
 
-	class LUX_GUI_API Scrollable : public Block
+	class LUMIX_GUI_API Scrollable : public Block
 	{
 		public:
 			Scrollable(Gui& gui, Block* parent);
@@ -20,7 +20,7 @@ namespace UI
 			virtual void serialize(ISerializer& serializer) override;
 			virtual void deserialize(ISerializer& serializer) override;
 			virtual void layout() override;
-			Lux::UI::Block* getContainer() const { return m_container; } 
+			Lumix::UI::Block* getContainer() const { return m_container; } 
 
 		private:
 			void scrollbarValueChanged(Block& block, void*);
@@ -28,9 +28,9 @@ namespace UI
 		private:
 			Scrollbar* m_horizontal_scrollbar;
 			Scrollbar* m_vertical_scrollbar;
-			Lux::UI::Block* m_container;
+			Lumix::UI::Block* m_container;
 	};
 
 
 } // ~namespace UI
-} // ~namespace Lux
+} // ~namespace Lumix

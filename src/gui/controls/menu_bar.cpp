@@ -3,7 +3,7 @@
 #include "gui/controls/menu_item.h"
 
 
-namespace Lux
+namespace Lumix
 {
 namespace UI
 {
@@ -36,4 +36,4 @@ uint32_t MenuBar::getType() const
 
 
 } // ~namespace UI
-} // ~namespace Lux
+} // ~namespace Lumix

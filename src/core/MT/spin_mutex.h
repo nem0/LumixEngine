@@ -1,13 +1,13 @@
 #pragma once
-#include "core/lux.h"
+#include "core/lumix.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace MT
 	{
 		typedef volatile int32_t SpinMutexHandle;
 
-		class LUX_CORE_API SpinMutex
+		class LUMIX_CORE_API SpinMutex
 		{
 		public:
 			explicit SpinMutex(bool locked);
@@ -33,4 +33,4 @@ namespace Lux
 			SpinMutex& m_mutex;
 		};
 	}; // ~namespace MT
-}; // ~namespace Lux
+}; // ~namespace Lumix

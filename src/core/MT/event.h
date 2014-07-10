@@ -1,7 +1,7 @@
 #pragma once
-#include "core/lux.h"
+#include "core/lumix.h"
 
-namespace  Lux
+namespace Lumix
 {
 	namespace MT
 	{
@@ -21,7 +21,7 @@ namespace  Lux
 
 		typedef void* EventHandle;
 
-		class LUX_CORE_API Event
+		class LUMIX_CORE_API Event
 		{
 		public:
 			explicit Event(EventFlags flags);
@@ -38,4 +38,4 @@ namespace  Lux
 			EventHandle m_id;
 		};
 	}; // ~namespace MT
-}; // ~namespace Lux
+}; // ~namespace Lumix

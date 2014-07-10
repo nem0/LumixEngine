@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include <map>
 #include <vector>
 #include "core/iserializer.h"
@@ -10,11 +10,11 @@
 #include "core/string.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
-	class LUX_CORE_API JsonSerializer : public ISerializer
+	class LUMIX_CORE_API JsonSerializer : public ISerializer
 	{
 		public:
 			enum AccessMode
@@ -41,6 +41,7 @@ namespace Lux
 			virtual void endArray() override;
 			virtual void serializeArrayItem(uint32_t value) override;
 			virtual void serializeArrayItem(int32_t value) override;
+			virtual void serializeArrayItem(int64_t& value) override;
 			virtual void serializeArrayItem(float value) override;
 			virtual void serializeArrayItem(bool value) override;
 			virtual void serializeArrayItem(const char* value) override;
@@ -117,4 +118,4 @@ namespace Lux
 	};
 
 
-} // !namespace lux
+} // !namespace Lumix

@@ -2,7 +2,7 @@
 
 #include <QMainWindow>
 
-namespace Lux
+namespace Lumix
 {
 	class EditorClient;
 	class EditorServer;
@@ -21,8 +21,8 @@ public:
 	explicit MainWindow(QWidget* parent = NULL);
 	~MainWindow();
 
-	void setEditorClient(Lux::EditorClient& client);
-	void setEditorServer(Lux::EditorServer& server);
+	void setEditorClient(Lumix::EditorClient& client);
+	void setEditorServer(Lumix::EditorServer& server);
 	class SceneView* getSceneView() const;
 	class GameView* getGameView() const;
 	class MaterialManager* getMaterialManager() const { return m_material_manager_ui; }
@@ -41,9 +41,13 @@ private slots:
 	void on_actionScene_View_triggered();
 	virtual void closeEvent(QCloseEvent* event) override;
 
+    void on_actionProfiler_triggered();
+
+    void on_actionMaterial_manager_triggered();
+
 private:
 	Ui::MainWindow* m_ui;
-	Lux::EditorClient* m_client;
+	Lumix::EditorClient* m_client;
 	class LogWidget* m_log;
 	class PropertyView* m_property_view;
 	class SceneView* m_scene_view;
@@ -52,5 +56,6 @@ private:
 	class ScriptCompilerWidget* m_script_compiler_ui;
 	class FileServerWidget* m_file_server_ui;
 	class MaterialManager* m_material_manager_ui;
+	class ProfilerUI* m_profiler_ui;
 };
 

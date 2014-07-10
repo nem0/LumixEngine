@@ -2,116 +2,65 @@
 #include "core/array.h"
 #include "core/blob.h"
 #include "core/crc32.h"
-#include "core/event_manager.h"
 #include "core/fifo_allocator.h"
 #include "core/MT/lock_free_queue.h"
 #include "core/MT/mutex.h"
 #include "core/MT/task.h"
 #include "core/net/tcp_connector.h"
 #include "core/net/tcp_stream.h"
+#include "core/path.h"
+#include "core/profiler.h"
 #include "editor/client_message_types.h"
+#include "editor/editor_server.h"
 #include "editor/server_message_types.h"
 #include "universe/universe.h"
 
-namespace Lux
+namespace Lumix
 {
-
-	class ReceiveTask : public MT::Task
-	{
-	public:
-		ReceiveTask() : m_finished(false), m_allocator(10*1024) {}
-
-		virtual int task() override;
-		void stop() { m_finished = true; }
-
-		struct EditorClientImpl* m_client;
-		FIFOAllocator m_allocator;
-
-	private:
-		volatile bool m_finished;
-	};
-
 
 	struct EditorClientImpl
 	{
-		typedef MT::LockFreeQueue<uint8_t, 32> MessageQueue;
+		EditorClientImpl(EditorServer& server)
+			: m_server(server)
+		{}
 
 		void sendMessage(uint32_t type, const void* data, int32_t size);
-		void onMessage(uint8_t* data, int size);
+		void onMessage(const uint8_t* data, int size);
 
-		Net::TCPConnector m_connector;
-		Net::TCPStream* m_stream;
-		ReceiveTask m_task;
-		EventManager m_event_manager;
-		MessageQueue m_messages;
-		string m_base_path;
+		Path m_base_path;
+		EditorServer& m_server;
+		DelegateList<void(EntityPositionEvent&)> m_entity_position_changed;
+		DelegateList<void(EntitySelectedEvent&)> m_entity_selected;
+		DelegateList <void(LogEvent&)> m_message_logged;
+		DelegateList <void(PropertyListEvent&)> m_property_list_received;
 	};
 
 
-	int ReceiveTask::task()
+	bool EditorClient::create(const char* base_path, EditorServer& server)
 	{
-		uint8_t data[8];
-		while(!m_finished)
-		{
-			if(m_client->m_stream->read(&data[0], 8))
-			{
-				int32_t length = *(int32_t*)&data[0];
-				int32_t guard = *(int32_t*)&data[4];
-				ASSERT(guard == 0x12345678);
-				if(length > 0)
-				{
-					uint8_t* msg = NULL;
-					while (msg == NULL)
-					{
-						msg = (uint8_t*)m_allocator.allocate(length + 4);
-					}
-					m_client->m_stream->read(msg + 4, length);
-					((int32_t*)msg)[0] = length;
-					{
-						while(!m_client->m_messages.push(msg));
-					}
-				}
-			}
-		}
-		return 1;
-	}
-
-
-	void EditorClient::processMessages()
-	{
-		
-		while (!m_impl->m_messages.isEmpty())
-		{
-			uint8_t* msg = m_impl->m_messages.pop();
-			m_impl->onMessage(msg + 4, *(int32_t*)msg);
-			m_impl->m_task.m_allocator.deallocate(msg);
-		}
-	}
-
-
-	bool EditorClient::create(const char* base_path)
-	{
-		m_impl = LUX_NEW(EditorClientImpl);
+		m_impl = LUMIX_NEW(EditorClientImpl)(server);
 		m_impl->m_base_path = base_path;
-		m_impl->m_stream = m_impl->m_connector.connect("127.0.0.1", 10013);
-		m_impl->m_task.m_client = m_impl;
-		bool success = m_impl->m_task.create("ClientReceiver");
-		success = success && m_impl->m_task.run();
-		return success && m_impl->m_stream != NULL;
+		return true;
 	}
 
 	void EditorClient::destroy()
 	{
 		if (m_impl)
 		{
-			LUX_DELETE(m_impl->m_stream);
-			m_impl->m_task.stop();
-			m_impl->m_task.destroy();
-			LUX_DELETE(m_impl);
+			LUMIX_DELETE(m_impl);
+			m_impl = NULL;
 		}
 	}
 
-	void EditorClientImpl::onMessage(uint8_t* data, int size)
+	void EditorClient::onMessage(const uint8_t* data, int size)
+	{
+		if(m_impl)
+		{
+			m_impl->onMessage(data, size);
+		}
+	}
+
+	void EditorClientImpl::onMessage(const uint8_t* data, int size)
 	{
 		Blob stream;
 		stream.create(data, size);
@@ -123,28 +72,28 @@ namespace Lux
 				{
 					EntityPositionEvent msg;
 					msg.read(stream);
-					m_event_manager.emitEvent(msg);
+					m_entity_position_changed.invoke(msg);
 				}
 				break;
 			case ServerMessageType::ENTITY_SELECTED:
 				{
 					EntitySelectedEvent msg;
 					msg.read(stream);
-					m_event_manager.emitEvent(msg);
+					m_entity_selected.invoke(msg);
 				}
 				break;
 			case ServerMessageType::PROPERTY_LIST:
-				{
+				{ 	
 					PropertyListEvent msg;
 					msg.read(stream);
-					m_event_manager.emitEvent(msg);
+					m_property_list_received.invoke(msg);
 				}
 				break;
 			case ServerMessageType::LOG_MESSAGE:
 				{
 					LogEvent msg;
 					msg.read(stream);
-					m_event_manager.emitEvent(msg);
+					m_message_logged.invoke(msg);
 				}
 				break;
 			default:
@@ -153,17 +102,27 @@ namespace Lux
 	}
 
 
+	EditorClient::PropertyListCallback& EditorClient::propertyListReceived()
+	{
+		return m_impl->m_property_list_received;
+	}
+
+
+	EditorClient::EntitySelectedCallback& EditorClient::entitySelected()
+	{
+		return m_impl->m_entity_selected;
+	}
+
+
 	void EditorClientImpl::sendMessage(uint32_t type, const void* data, int32_t size)
 	{
-		static const uint8_t header_end = 0;
-		int32_t whole_size = size + 4;
-		m_stream->write(&whole_size, sizeof(whole_size));
-		m_stream->write(&header_end, sizeof(header_end));
-		m_stream->write(&type, sizeof(type));
-		if(data)
+		Blob stream;
+		stream.write(&type, sizeof(type));
+		if (data)
 		{
-			m_stream->write(data, size);
+			stream.write(data, size);
 		}
+		m_server.onMessage(stream.getBuffer(), stream.getBufferSize());
 	}
 
 
@@ -203,20 +162,13 @@ namespace Lux
 	}
 
 
-	void EditorClient::mouseMove(int x, int y, int dx, int dy)
+	void EditorClient::mouseMove(int x, int y, int dx, int dy, int flags)
 	{
-		int data[4] = {x, y, dx, dy};
-		m_impl->sendMessage(ClientMessageType::POINTER_MOVE, data, 16);
+		int data[] = {x, y, dx, dy, flags};
+		m_impl->sendMessage(ClientMessageType::POINTER_MOVE, data, 20);
 
 	}
-
-
-	EventManager& EditorClient::getEventManager()
-	{
-		return m_impl->m_event_manager;
-	}
-
-
+	
 	void EditorClient::loadUniverse(const char* path)
 	{
 		m_impl->sendMessage(ClientMessageType::LOAD, path, (int32_t)strlen(path)+1);
@@ -265,4 +217,4 @@ namespace Lux
 	}
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

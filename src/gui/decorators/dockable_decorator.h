@@ -1,13 +1,13 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/vec3.h"
 #include "gui/atlas.h"
 #include "gui/decorator_base.h"
 
 
-namespace Lux
+namespace Lumix
 {
 namespace UI
 {
@@ -18,7 +18,7 @@ namespace UI
 	class TextureBase;
 
 
-	class LUX_GUI_API DockableDecorator : public DecoratorBase
+	class LUMIX_GUI_API DockableDecorator : public DecoratorBase
 	{
 		public:
 			DockableDecorator(const char* name) : DecoratorBase(name) {}
@@ -38,4 +38,4 @@ namespace UI
 	};
 
 } // ~namespace UI
-} // ~namespace Lux
+} // ~namespace Lumix

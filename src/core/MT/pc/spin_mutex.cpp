@@ -1,7 +1,7 @@
 #include "core/MT/spin_mutex.h"
 #include <Windows.h>
 
-namespace Lux
+namespace Lumix
 {
 	namespace MT
 	{
@@ -50,4 +50,4 @@ namespace Lux
 			m_id = 0;
 		}
 	} // ~namespace MT
-} // ~namespace Lux
+} // ~namespace Lumix

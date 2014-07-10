@@ -5,7 +5,7 @@
 #include "core/array.h"
 
 
-namespace Lux
+namespace Lumix
 {
 	template <typename T> class DelegateList;
 
@@ -133,4 +133,4 @@ namespace Lux
 		private:
 			Array<Delegate<R (A0, A1)> > m_delegates;
 	};
-} // ~namespace Lux
+} // ~namespace Lumix

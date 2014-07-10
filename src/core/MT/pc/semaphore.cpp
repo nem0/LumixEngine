@@ -2,7 +2,7 @@
 #include <Windows.h>
 #include <cassert>
 
-namespace Lux
+namespace Lumix
 {
 	namespace MT
 	{
@@ -31,4 +31,4 @@ namespace Lux
 			return WAIT_OBJECT_0 == ::WaitForSingleObject(m_id, 0);
 		}
 	}; // ~namespac MT
-} // ~namespace Lux
+} // ~namespace Lumix

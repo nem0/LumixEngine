@@ -1,19 +1,19 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/matrix.h"
 #include "core/array.h"
 
 
-namespace Lux
+namespace Lumix
 {
 	class  Universe;
 	struct Component;
 
-	struct LUX_ENGINE_API Entity final
+	struct LUMIX_ENGINE_API Entity final
 	{
-		typedef Array<Component, DefaultAllocator, true> ComponentList;
+		typedef Array<Component, DefaultAllocator, false> ComponentList;
 
 		Entity() {}
 		Entity(Universe* uni, int32_t i) : index(i), universe(uni) {}
@@ -41,4 +41,4 @@ namespace Lux
 
 		static const Entity INVALID;
 	};
-} // ~namepsace Lux
+} // ~namepsace Lumix

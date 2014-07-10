@@ -1,4 +1,4 @@
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/MTJD/worker_thread.h"
 
 #include "core/MTJD/manager.h"
@@ -7,7 +7,7 @@
 #define PROFILE_START
 #define PROFILE_STOP
 
-namespace Lux
+namespace Lumix
 {
 	namespace MTJD
 	{
@@ -57,4 +57,4 @@ namespace Lux
 
 #endif // TYPE == MULTI_THREAD
 	} // ~namepsace MTJD
-} // ~namepsace Lux
+} // ~namepsace Lumix

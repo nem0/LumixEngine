@@ -1,11 +1,11 @@
 #pragma once
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "script_visitor.h"
 #include "core/map.h"
 #include "core/string.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -18,10 +18,10 @@ namespace Lux
 			virtual void visit(const char* name, float& value) override;
 		
 		private:
-			Lux::string m_property_name;
+			Lumix::string m_property_name;
 			char* m_value;
 			int m_value_size;
 	};
 
 
-} // ~ namespace Lux
+} // ~ namespace Lumix

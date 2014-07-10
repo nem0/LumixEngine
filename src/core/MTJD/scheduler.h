@@ -4,13 +4,13 @@
 #include "core/MT/event.h"
 #include "core/MT/semaphore.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace MTJD
 	{
 		class Manager;
 
-		class LUX_CORE_API Scheduler : public MT::Task
+		class LUMIX_CORE_API Scheduler : public MT::Task
 		{
 		public:
 			explicit Scheduler(Manager& manager);
@@ -28,4 +28,4 @@ namespace Lux
 			Manager&	m_manager;
 		};
 	} // ~namepsace MTJD
-} // ~namepsace Lux
+} // ~namepsace Lumix

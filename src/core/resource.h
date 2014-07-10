@@ -4,12 +4,12 @@
 #include "core/delegate_list.h"
 #include "core/path.h"
 
-namespace Lux
+namespace Lumix
 {
 	// forward declarations
 	class ResourceManager;
 
-	class LUX_CORE_API Resource abstract
+	class LUMIX_CORE_API Resource abstract
 	{
 	public:
 		friend class ResourceManagerBase;
@@ -23,7 +23,7 @@ namespace Lux
 			FAILURE,
 		};
 
-		typedef DelegateList<void (State)> ObserverCallback;
+		typedef DelegateList<void (State, State)> ObserverCallback;
 
 		State getState() const { return m_state; }
 
@@ -63,7 +63,8 @@ namespace Lux
 		void addDependency(Resource& dependent_resource);
 		void removeDependency(Resource& dependent_resource);
 
-		void onStateChanged(State new_state);
+		void onStateChanged(State old_state, State new_state);
+		void incrementDepCount();
 		void decrementDepCount();
 
 	private:
@@ -78,4 +79,4 @@ namespace Lux
 		ObserverCallback m_cb;
 		ResourceManager& m_resource_manager;
 	};
-} // ~namespace Lux
+} // ~namespace Lumix

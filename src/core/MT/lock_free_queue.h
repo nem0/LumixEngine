@@ -2,7 +2,7 @@
 
 #include "core/MT/atomic.h"
 
-namespace Lux 
+namespace Lumix 
 {
 	namespace MT
 	{
@@ -116,5 +116,5 @@ namespace Lux
 		}
 
 	} // ~namespace MT
-} // ~namespace Lux
+} // ~namespace Lumix
 

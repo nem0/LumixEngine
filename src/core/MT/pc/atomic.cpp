@@ -1,7 +1,7 @@
 #include "core/MT/atomic.h"
 #include <Windows.h>
 
-namespace Lux
+namespace Lumix
 {
 	namespace MT
 	{
@@ -35,4 +35,4 @@ namespace Lux
 			return InterlockedCompareExchange64(dest, exchange, comperand) == comperand;
 		}
 	} // ~namespace MT
-} // ~namespace Lux
+} // ~namespace Lumix

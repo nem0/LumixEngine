@@ -1,10 +1,10 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 	class Engine;
@@ -12,7 +12,7 @@ namespace Lux
 	class ISerializer;
 	class Universe;
 
-	class LUX_ENGINE_API PluginManager
+	class LUMIX_ENGINE_API PluginManager
 	{
 		public:
 			PluginManager() { m_impl = 0; }
@@ -33,4 +33,4 @@ namespace Lux
 	};
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

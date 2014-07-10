@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/array.h"
 #include "core/string.h"
 #include "engine/iplugin.h"
@@ -8,7 +8,7 @@
 #include "graphics/render_scene.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -27,7 +27,7 @@ class Universe;
 
 
 
-class LUX_ENGINE_API Renderer : public IPlugin 
+class LUMIX_ENGINE_API Renderer : public IPlugin 
 {
 	public:
 		static Renderer* createInstance();
@@ -43,9 +43,8 @@ class LUX_ENGINE_API Renderer : public IPlugin
 		
 		/// "immediate mode"
 		virtual void renderModel(const Model& model, const Matrix& transform, PipelineInstance& pipeline) = 0;
-		virtual Model* getModel(const char* path) = 0; /// TODO get rid of this - use resource manager
 }; 
 
 
-} // ~namespace Lux
+} // !namespace Lumix
 

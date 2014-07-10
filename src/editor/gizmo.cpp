@@ -1,25 +1,26 @@
 //#define _USE_MATH_DEFINES
 //#include <cmath>
 #include "core/crc32.h"
-#include "core/event_manager.h"
 #include "core/math_utils.h"
 #include "core/matrix.h"
 #include "core/quat.h"
+#include "core/resource_manager.h"
+#include "core/resource_manager_base.h"
 #include "editor/gizmo.h"
+#include "engine/engine.h"
 #include "graphics/irender_device.h"
 #include "graphics/model.h"
 #include "graphics/renderer.h"
-#include "universe/entity_moved_event.h"
 #include "universe/universe.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
 Gizmo::Gizmo()
 {
-//	m_handle = 0;
+	m_model = NULL;
 	m_selected_entity.index = -1;
 }
 
@@ -31,7 +32,7 @@ Gizmo::~Gizmo()
 
 void Gizmo::destroy()
 {
-	//h3dRemoveNode(m_handle);
+	m_renderer->getEngine().getResourceManager().get(ResourceManager::MODEL)->unload(*m_model);
 }
 
 
@@ -39,20 +40,19 @@ void Gizmo::create(Renderer& renderer)
 {
 	m_scale = 1;
 	m_renderer = &renderer;
-	m_model = renderer.getModel("models/gizmo.msh");
+	m_model = static_cast<Model*>(renderer.getEngine().getResourceManager().get(ResourceManager::MODEL)->load("models/editor/gizmo.msh"));
 }
 
 
 void Gizmo::hide()
 {
-	//h3dSetNodeFlags(m_handle, h3dGetNodeFlags(m_handle) | H3DNodeFlags::Inactive, true);
+	//ASSERT(false);
 }
 
 
 void Gizmo::show()
 {
-	/*h3dSetNodeFlags(m_handle, h3dGetNodeFlags(m_handle) & ~H3DNodeFlags::Inactive, true);
-	h3dSetNodeFlags(m_handle, h3dGetNodeFlags(m_handle) | H3DNodeFlags::NoCastShadow, true);	*/
+	//ASSERT(false);
 }
 
 
@@ -82,7 +82,6 @@ void Gizmo::updateScale(Component camera)
 
 void Gizmo::setEntity(Entity entity)
 {
-	//h3dSetNodeFlags(m_handle, h3dGetNodeFlags(m_handle) | H3DNodeFlags::NoCastShadow, true);	
 	m_selected_entity = entity;
 	if(m_selected_entity.index != -1)
 	{
@@ -230,4 +229,4 @@ Vec3 Gizmo::getMousePlaneIntersection(Component camera, int x, int y)
 }
 
 
-} // !namespace Lux
+} // !namespace Lumix

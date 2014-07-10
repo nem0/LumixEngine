@@ -1,18 +1,18 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "gui/irenderer.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 namespace UI
 {
 
 
-	class LUX_GUI_API OpenGLRenderer : public IRenderer
+	class LUMIX_GUI_API OpenGLRenderer : public IRenderer
 	{
 		public:
 			OpenGLRenderer() { m_impl = 0; }
@@ -37,4 +37,4 @@ namespace UI
 
 
 } // ~namespace UI
-} // ~namespace Lux
+} // ~namespace Lumix

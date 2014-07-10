@@ -14,7 +14,7 @@
 
 #include <gl/GL.h>
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -22,13 +22,15 @@ void EditorIcon::create(Engine& engine, RenderScene& scene, Entity& entity, cons
 {
 	m_scene = &scene;
 	m_entity = entity;
-	m_model = static_cast<Model*>(engine.getResourceManager().get(ResourceManager::MODEL)->load("models/icon.msh"));
+	m_model = static_cast<Model*>(engine.getResourceManager().get(ResourceManager::MODEL)->load("models/editor/icon.msh"));
 	m_is_visible = true;
 }
 
 
 void EditorIcon::destroy()
 {
+	
+	m_model->getResourceManager().get(ResourceManager::MODEL)->unload(*m_model);
 }
 
 
@@ -64,7 +66,7 @@ void EditorIcon::render(Renderer* renderer, IRenderDevice& render_device)
 	if (m_is_visible)
 	{
 		Component camera = m_scene->getCameraInSlot("editor");
-		Lux::Matrix mtx = camera.entity.getMatrix();
+		Lumix::Matrix mtx = camera.entity.getMatrix();
 
 		float fov;
 		static_cast<RenderScene*>(camera.system)->getCameraFOV(camera, fov);
@@ -85,4 +87,4 @@ void EditorIcon::render(Renderer* renderer, IRenderDevice& render_device)
 }
 
 
-} // !namespace Lux
+} // !namespace Lumix

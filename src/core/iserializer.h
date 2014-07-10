@@ -1,15 +1,15 @@
 #pragma once
 
 
-#include "lux.h"
+#include "lumix.h"
 #include "string.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
-	class LUX_CORE_API ISerializer abstract
+	class LUMIX_CORE_API ISerializer abstract
 	{
 		public:
 			virtual void serialize(const char* label, uint32_t value) = 0;
@@ -24,6 +24,7 @@ namespace Lux
 			virtual void endArray() = 0;
 			virtual void serializeArrayItem(uint32_t value) = 0;
 			virtual void serializeArrayItem(int32_t value) = 0;
+			virtual void serializeArrayItem(int64_t& value) = 0;
 			virtual void serializeArrayItem(float value) = 0;
 			virtual void serializeArrayItem(bool value) = 0;
 			virtual void serializeArrayItem(const char* value) = 0;
@@ -58,4 +59,4 @@ namespace Lux
 	};
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

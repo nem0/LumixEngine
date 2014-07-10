@@ -30,6 +30,9 @@
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_mtjd_framework.cpp">
       <Filter>core</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_string.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\src\unit_tests\graphics\ut_clipper.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
@@ -44,10 +47,10 @@
     <ClInclude Include="..\..\..\src\unit_tests\suite\unit_test_manager.h">
       <Filter>suite</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\unit_tests\suite\lux_unit_tests.h">
+    <ClInclude Include="..\..\..\src\unit_tests\suite\platform_defines.h">
       <Filter>suite</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\unit_tests\suite\platform_defines.h">
+    <ClInclude Include="..\..\..\src\unit_tests\suite\lumix_unit_tests.h">
       <Filter>suite</Filter>
     </ClInclude>
   </ItemGroup>

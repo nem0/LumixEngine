@@ -1,7 +1,7 @@
 #pragma once
 
 
-namespace Lux
+namespace Lumix
 {
 
 
@@ -34,4 +34,4 @@ struct ClientMessageType
 };
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

@@ -1,6 +1,6 @@
 #pragma once
 
-namespace Lux
+namespace Lumix
 {
 	namespace MTJD
 	{
@@ -35,4 +35,4 @@ namespace Lux
 			Count,
 		};
 	} // ~namepsace MTJD
-} // ~namepsace Lux
+} // ~namepsace Lumix

@@ -4,13 +4,13 @@
 #include "gui/block.h"
 
 
-namespace Lux
+namespace Lumix
 {
 namespace UI
 {
 
 
-	class LUX_GUI_API CheckBox : public Block
+	class LUMIX_GUI_API CheckBox : public Block
 	{
 		public:
 			CheckBox(bool is_checked, Gui& gui, Block* parent);
@@ -32,4 +32,4 @@ namespace UI
 
 
 } // ~namespace UI
-} // ~namespace Lux
+} // ~namespace Lumix

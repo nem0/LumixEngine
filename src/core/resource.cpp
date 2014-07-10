@@ -1,11 +1,11 @@
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/resource.h"
 
 #include "core/fs/file_system.h"
 #include "core/path.h"
 #include "core/resource_manager.h"
 
-namespace Lux
+namespace Lumix
 {
 	Resource::Resource(const Path& path, ResourceManager& resource_manager)
 		: m_ref_count()
@@ -22,42 +22,47 @@ namespace Lux
 
 	void Resource::onEmpty(void)
 	{
+		State old_state = m_state;
 		m_state = State::EMPTY;
-		m_cb.invoke(State::EMPTY);
+		m_cb.invoke(old_state, State::EMPTY);
 	}
 
 	void Resource::onLoading(void)
 	{
+		State old_state = m_state;
 		m_state = State::LOADING;
-		m_cb.invoke(State::LOADING);
+		m_cb.invoke(old_state, State::LOADING);
 	}
 
 	void Resource::onReady(void)
 	{
+		State old_state = m_state;
 		m_state = State::READY;
-		m_cb.invoke(State::READY);
+		m_cb.invoke(old_state, State::READY);
 	}
 
 	void Resource::onUnloading(void)
 	{
+		State old_state = m_state;
 		m_state = State::UNLOADING;
-		++m_dep_count;
-		m_cb.invoke(State::UNLOADING);
+		m_cb.invoke(old_state, State::UNLOADING);
 	}
 
 	void Resource::onReloading(void)
 	{
-		if (State::READY == m_state)
+		State old_state = m_state;
+		if (State::READY == old_state)
 			++m_dep_count;
 
 		m_state = State::UNLOADING;
-		m_cb.invoke(State::UNLOADING);
+		m_cb.invoke(old_state, State::UNLOADING);
 	}
 
 	void Resource::onFailure(void)
 	{
+		State old_state = m_state;
 		m_state = State::FAILURE;
-		m_cb.invoke(State::FAILURE);
+		m_cb.invoke(old_state, State::FAILURE);
 	}
 
 	void Resource::doLoad(void)
@@ -69,7 +74,8 @@ namespace Lux
 	void Resource::addDependency(Resource& dependent_resource)
 	{
 		dependent_resource.m_cb.bind<Resource, &Resource::onStateChanged>(this);
-		m_dep_count += (dependent_resource.isReady() ? 0 : 1);
+		if (!dependent_resource.isReady())
+			incrementDepCount();
 	}
 
 	void Resource::removeDependency(Resource& dependent_resource)
@@ -81,20 +87,27 @@ namespace Lux
 		}
 	}
 
-	void Resource::onStateChanged(State new_state)
+	void Resource::onStateChanged(State old_state, State new_state)
 	{
 		if(State::READY == new_state)
 		{
 			decrementDepCount();
 		}
-		else
+		else if (State::READY == old_state && State::UNLOADING == new_state)
 		{
-			m_dep_count++;
 			if(isReady())
 			{
 				onUnloading();
 			}
+
+			incrementDepCount();
 		}
+	}
+
+	void Resource::incrementDepCount()
+	{
+		if (m_dep_count++ == 0)
+			onUnloading();
 	}
 
 	void Resource::decrementDepCount()
@@ -102,4 +115,4 @@ namespace Lux
 		if(--m_dep_count == 0)
 			onReady();
 	}
-} // ~namespace Lux
+} // ~namespace Lumix

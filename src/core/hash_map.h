@@ -1,10 +1,10 @@
 #pragma once
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "core/math_utils.h"
 #include "core/default_allocator.h"
 
-namespace Lux
+namespace Lumix
 {
 	template <class K, class V>
 	struct HashNode
@@ -530,4 +530,4 @@ namespace Lux
 		size_type m_max_id;
 		allocator_type m_allocator;
 	};
-} // ~namespace Lux
+} // ~namespace Lumix

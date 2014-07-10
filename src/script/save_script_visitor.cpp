@@ -1,16 +1,16 @@
 #include "save_script_visitor.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
 	SaveScriptVisitor::~SaveScriptVisitor()
 	{
-		Lux::map<Lux::string, char*>::iterator iter = m_items.begin(), end = m_items.end();
+		Lumix::Map<Lumix::string, char*>::iterator iter = m_items.begin(), end = m_items.end();
 		for(; iter != end; ++iter)
 		{
-			LUX_DELETE_ARRAY(iter.second());
+			LUMIX_DELETE_ARRAY(iter.second());
 		}
 	}
 
@@ -20,7 +20,7 @@ namespace Lux
 		/// TODO check if saved size == loaded size
 		if(m_mode == SAVE)
 		{
-			char* data = LUX_NEW_ARRAY(char, sizeof(value));
+			char* data = LUMIX_NEW_ARRAY(char, sizeof(value));
 			memcpy(data, &value, sizeof(value));
 			m_items.insert(string(name), data);
 		}
@@ -46,4 +46,4 @@ namespace Lux
 
 
 
-} // ~namespace Lux
+} // ~namespace Lumix

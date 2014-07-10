@@ -1,13 +1,13 @@
 #pragma once
-#include "core/lux.h"
+#include "core/lumix.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace MT
 	{
 		typedef void* MutexHandle;
 
-		class LUX_CORE_API Mutex
+		class LUMIX_CORE_API Mutex
 		{
 		public:
 			explicit Mutex(bool locked);
@@ -33,4 +33,4 @@ namespace Lux
 			Mutex& m_mutex;
 		};
 	} // ~namespace MT
-}; // ~namespace Lux
+}; // ~namespace Lumix

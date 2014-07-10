@@ -4,7 +4,7 @@
 #include <qtablewidget.h>
 #include "core/fs/file_events_device.h"
 
-namespace Lux
+namespace Lumix
 {
 	class EditorServer;
 }
@@ -22,9 +22,9 @@ public:
 	explicit FileServerWidget(QWidget* parent = NULL);
 	~FileServerWidget();
 	
-	void setEditorServer(Lux::EditorServer& server);
-	void fsEventCb(const Lux::FS::Event& event, int32_t param);
-	void emitFileEvent(const Lux::FS::Event& event, qint64 time);
+	void setEditorServer(Lumix::EditorServer& server);
+	void fsEventCb(const Lumix::FS::Event& event, int32_t param);
+	void emitFileEvent(const Lumix::FS::Event& event, qint64 time);
 
 signals:
 	void fileEvent(qint32 event, qint64 handle, const QString& path, qint32 ret, qint32 param, qint64 time);
@@ -44,7 +44,7 @@ private:
 	void filterTable();
 
 	Ui::FileServerWidget* m_ui;
-	Lux::EditorServer* m_server;
+	Lumix::EditorServer* m_server;
 	class FileServerWatcher* m_watcher;
 };
 

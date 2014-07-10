@@ -3,7 +3,7 @@
 #include "core/iserializer.h"
 
 
-namespace Lux
+namespace Lumix
 {
 namespace UI
 {
@@ -52,4 +52,4 @@ void CheckBox::deserialize(ISerializer& serializer)
 
 
 } // ~namespace UI
-} // ~namespace Lux
+} // ~namespace Lumix

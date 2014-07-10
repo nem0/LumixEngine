@@ -3,7 +3,7 @@
 #include <cassert>
 
 
-namespace Lux
+namespace Lumix
 {
 	namespace MT
 	{
@@ -33,4 +33,4 @@ namespace Lux
 			::ReleaseMutex(m_id);
 		}
 	} // ~namespace MT
-} // ~namespace Lux
+} // ~namespace Lumix

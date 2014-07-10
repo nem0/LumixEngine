@@ -2,11 +2,11 @@
 
 #include "core/MTJD/base_entry.h"
 
-namespace Lux
+namespace Lumix
 {
 	namespace MTJD
 	{
-		class LUX_CORE_API Group : public BaseEntry
+		class LUMIX_CORE_API Group : public BaseEntry
 		{
 		public:
 			explicit Group(bool sync_event);
@@ -25,4 +25,4 @@ namespace Lux
 			DependencyTable m_static_dependency_table;
 		};
 	} // ~namepsace MTJD
-} // ~namepsace Lux
+} // ~namepsace Lumix

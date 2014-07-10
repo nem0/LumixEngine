@@ -1,17 +1,19 @@
 #pragma once
 
 #include <QDockWidget>
+#include "core/resource.h"
 
 namespace Ui 
 {
 	class MaterialManager;
 }
 
-namespace Lux
+namespace Lumix
 {
 	class EditorServer;
 	class EditorClient;
 	class Event;
+	struct PropertyListEvent;
 }
 
 class MaterialManager : public QDockWidget
@@ -21,23 +23,27 @@ class MaterialManager : public QDockWidget
 	public:
 		explicit MaterialManager(QWidget* parent = NULL);
 		~MaterialManager();
-		void setEditorServer(Lux::EditorServer& server);
-		void setEditorClient(Lux::EditorClient& client);
+		void setEditorServer(Lumix::EditorServer& server);
+		void setEditorClient(Lumix::EditorClient& client);
 		void updatePreview();
 
 	private:
-		void onPropertyList(Lux::Event& event);
+		void onPropertyList(Lumix::PropertyListEvent& event);
 		void fillObjectMaterials();
 		void selectMaterial(const char* path);
+		void onMaterialLoaded(Lumix::Resource::State, Lumix::Resource::State);
 
 	private slots:
 		void on_fileListView_doubleClicked(const QModelIndex& index);
 		void on_objectMaterialList_doubleClicked(const QModelIndex& index);
+		void on_saveMaterialButton_clicked();
 		void onBoolPropertyStateChanged(int state);
 		void onShaderChanged();
 		void onTextureChanged();
+		void onTextureRemoved();
+		void onTextureAdded();
 
-	private:
+private:
 		Ui::MaterialManager* m_ui;
 		class MaterialManagerUI* m_impl;
 };

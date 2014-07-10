@@ -1,15 +1,15 @@
 #pragma once
 
 
-#include "core/lux.h"
+#include "core/lumix.h"
 #include "engine/iplugin.h"
 
 
-namespace Lux
+namespace Lumix
 {
 
 
-class LUX_PHYSICS_API PhysicsSystem : public IPlugin
+class LUMIX_PHYSICS_API PhysicsSystem : public IPlugin
 {
 	friend class PhysicsScene;
 	friend struct PhysicsSceneImpl;
@@ -26,6 +26,7 @@ class LUX_PHYSICS_API PhysicsSystem : public IPlugin
 		virtual Component createComponent(uint32_t component_type, const Entity& entity) override;
 		virtual const char* getName() const override { return "physics"; }
 		virtual void sendMessage(const char* message) override;
+		class PhysicsScene* getScene() const;
 
 	private:
 		struct PhysicsSystemImpl* m_impl;
@@ -34,8 +35,8 @@ class LUX_PHYSICS_API PhysicsSystem : public IPlugin
 
 extern "C"
 {
-	LUX_PHYSICS_API IPlugin* createPlugin();
+	LUMIX_PHYSICS_API IPlugin* createPlugin();
 }
 
 
-} // !namespace Lux
+} // !namespace Lumix

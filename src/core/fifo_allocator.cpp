@@ -1,7 +1,7 @@
 #include "core/fifo_allocator.h"
 #include "core/MT/atomic.h"
 
-namespace Lux
+namespace Lumix
 {
 	struct AllocationHeader
 	{
@@ -13,14 +13,14 @@ namespace Lux
 		: m_mutex(false)
 	{
 		m_buffer_size = buffer_size;
-		m_buffer = static_cast<uint8_t*>(LUX_MALLOC(buffer_size));
+		m_buffer = static_cast<uint8_t*>(LUMIX_MALLOC(buffer_size));
 		m_start = m_end = 0;
 	}
 
 	FIFOAllocator::~FIFOAllocator()
 	{
 		ASSERT(m_start == m_end);
-		LUX_FREE(m_buffer);
+		LUMIX_FREE(m_buffer);
 	}
 
 	void* FIFOAllocator::allocate(size_t n)
@@ -63,4 +63,4 @@ namespace Lux
 	}
 
 
-} // ~namespace Lux
+} // ~namespace Lumix
