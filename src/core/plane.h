@@ -3,7 +3,7 @@
 #include "core/vec3.h"
 #include "core/vec4.h"
 
-namespace Lux
+namespace Lumix
 {
 	struct Plane
 	{

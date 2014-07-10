@@ -1,26 +1,35 @@
+#include "core/lumix.h"
 #include "engine/engine.h"
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
 
 #include "animation/animation.h"
 #include "animation/animation_system.h"
+
 #include "core/crc32.h"
-#include "core/fs/disk_file_device.h"
-#include "core/fs/file_system.h"
 #include "core/input_system.h"
 #include "core/log.h"
-#include "core/fs/memory_file_device.h"
 #include "core/resource_manager.h"
 #include "core/timer.h"
+
+#include "core/fs/disk_file_device.h"
+#include "core/fs/file_system.h"
+#include "core/fs/memory_file_device.h"
+
+#include "core/mtjd/manager.h"
+
 #include "engine/plugin_manager.h"
+
+#include "graphics/culling_system.h"
 #include "graphics/material_manager.h"
 #include "graphics/model_manager.h"
 #include "graphics/pipeline.h"
 #include "graphics/renderer.h"
 #include "graphics/shader_manager.h"
 #include "graphics/texture_manager.h"
+
 #include "script/script_system.h"
 
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 
 namespace Lumix
 {
@@ -43,6 +52,8 @@ namespace Lumix
 		TextureManager	m_texture_manager;
 		PipelineManager m_pipeline_manager;
 		AnimationManager m_animation_manager;
+		MTJD::Manager	m_mtjd_manager;
+		CullingSystem*	m_culling_system;
 
 		string m_base_path;
 		EditorServer* m_editor_server;
@@ -162,6 +173,7 @@ namespace Lumix
 		m_impl->m_texture_manager.create(ResourceManager::TEXTURE, m_impl->m_resource_manager);
 		m_impl->m_pipeline_manager.create(ResourceManager::PIPELINE, m_impl->m_resource_manager);
 		m_impl->m_animation_manager.create(ResourceManager::ANIMATION, m_impl->m_resource_manager);
+		m_impl->m_culling_system = CullingSystem::create(m_impl->m_mtjd_manager);
 
 		return true;
 	}
@@ -173,6 +185,8 @@ namespace Lumix
 		Timer::destroy(m_impl->m_fps_timer);
 		m_impl->m_plugin_manager.destroy();
 		Renderer::destroyInstance(*m_impl->m_renderer);
+		CullingSystem::destroy(*m_impl->m_culling_system);
+
 		m_impl->m_input_system.destroy();
 		m_impl->m_material_manager.destroy();
 		
@@ -283,9 +297,22 @@ namespace Lumix
 		return m_impl->m_universe;
 	}
 
+
 	RenderScene* Engine::getRenderScene() const
 	{
 		return m_impl->m_render_scene;
+	}
+
+
+	MTJD::Manager& Engine::getMTJDManager() const
+	{
+		return m_impl->m_mtjd_manager;
+	}
+
+
+	CullingSystem& Engine::getCullingSystem() const
+	{
+		return *m_impl->m_culling_system;
 	}
 
 

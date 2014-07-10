@@ -9,7 +9,7 @@ namespace Lumix
 {
 
 
-struct LUMIX_CORE_API Vec3
+struct Vec3
 {
 	Vec3() {}
 

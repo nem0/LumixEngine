@@ -1,3 +1,4 @@
+#include "core/lumix.h"
 #include "core/timer.h"
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
