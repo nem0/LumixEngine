@@ -10,6 +10,10 @@
 *.natvis eol=crlf
 *.sln text eol=crlf
 *.vcxproj text eol=crlf
+*.vcxproj.filters text eol=crlf
+*.ui text
+*.pro text
+
 
 ###############################################################################
 # Set default behavior for command prompt diff.
@@ -34,6 +38,7 @@
 #*.csproj    merge=astextplain
 #*.vbproj    merge=astextplain
 *.vcxproj   merge=astextplain
+*.vcxproj.filters   merge=astextplain
 #*.vcproj    merge=astextplain
 #*.dbproj    merge=astextplain
 #*.fsproj    merge=astextplain
