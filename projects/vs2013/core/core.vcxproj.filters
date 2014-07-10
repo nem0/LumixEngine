@@ -124,6 +124,9 @@
     <ClInclude Include="..\..\..\src\core\MT\lock_free_fixed_queue.h">
       <Filter>MT</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\core\plane.h" />
+    <ClInclude Include="..\..\..\src\core\frustum.h" />
+    <ClInclude Include="..\..\..\src\core\sphere.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\core\blob.cpp" />
