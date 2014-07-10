@@ -29,6 +29,12 @@ namespace Lumix
 		}
 
 		template <typename T>
+		LUMIX_FORCE_INLINE T minValue(T a, T b)
+		{
+			return a < b ? a : b;
+		}
+
+		template <typename T>
 		LUMIX_FORCE_INLINE T max(T a, T b)
 		{
 			return a < b ? b : a;

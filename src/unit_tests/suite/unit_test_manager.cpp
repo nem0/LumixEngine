@@ -135,6 +135,8 @@ namespace Lumix
 						m_task.destroy();
 						spawnWorkerTask();
 					}
+
+					Lumix::MT::yield();
 				}
 
 				m_trans_queue.abort();

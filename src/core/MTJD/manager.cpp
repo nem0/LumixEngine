@@ -5,6 +5,8 @@
 #include "core/MTJD/scheduler.h"
 #include "core/MTJD/worker_thread.h"
 
+#include "core/log.h"
+
 namespace Lumix
 {
 	namespace MTJD

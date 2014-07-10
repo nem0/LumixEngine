@@ -5,28 +5,33 @@
 #include "core/sphere.h"
 //// remove
 
-namespace Lux
+namespace Lumix
 {
+	namespace MTJD
+		 {
+		class Manager;
+		}
 	struct Frustum;
 
-	class LUX_ENGINE_API CullingSystem
+	class LUMIX_ENGINE_API CullingSystem
 	{
 	public:
-		CullingSystem() : m_impl(NULL) { }
-		~CullingSystem();
+		CullingSystem() { }
+		virtual ~CullingSystem() { }
 
-		void create();
-		void destroy();
+		static CullingSystem* create(MTJD::Manager& mtjd_manager);
+		static void destroy(CullingSystem& culling_system);
 
-		const Array<bool>& getResult();
+		virtual const Array<bool>& getResult() = 0;
+		virtual const Array<bool>& getResultAsync() = 0;
 
-		void cullToFrustum(const Frustum& frustum);
+		virtual void cullToFrustum(const Frustum& frustum) = 0;
+		virtual void cullToFrustumAsync(const Frustum& frustum) = 0;
+		
+		virtual void addStatic(const Sphere& sphere) = 0;
 
 		//// test
-		void insert(const Array<Sphere>& spheres);
+		virtual void insert(const Array<Sphere>& spheres) = 0;
 		//// test
-
-	private:
-		struct CullingSystemImpl* m_impl;
 	};
 } // ~namespace Lux

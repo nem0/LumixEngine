@@ -2,7 +2,7 @@
 
 #include "vec4.h"
 
-namespace Lux
+namespace Lumix
 {
 	struct Sphere
 	{

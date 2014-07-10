@@ -1,9 +1,6 @@
 #pragma once
 
 
-#include "core/lumix.h"
-
-
 namespace Lumix
 {
 	namespace FS
@@ -11,6 +8,12 @@ namespace Lumix
 			class FileSystem;
 	}
 
+	namespace MTJD
+	{
+		class Manager;
+	}
+
+	class CullingSystem;
 	class EditorServer;
 	class InputSystem;
 	class IPlugin;
@@ -44,6 +47,8 @@ namespace Lumix
 			IPlugin* loadPlugin(const char* name);
 			Universe* getUniverse() const;
 			RenderScene* getRenderScene() const;
+			MTJD::Manager& getMTJDManager() const;
+			CullingSystem& getCullingSystem() const;
 
 			ResourceManager& getResourceManager() const;
 

@@ -1,8 +1,10 @@
 #pragma once
 
+#include "core/lumix.h"
 #include "core/plane.h"
+#include "core/math_utils.h"
 
-namespace Lux
+namespace Lumix
 {
 	struct Frustum
 	{
@@ -10,7 +12,7 @@ namespace Lux
 
 		inline void compute(const Vec3& position, const Vec3& direction, const Vec3& up, float fov, float ratio, float near, float far)
 		{
-			float tang = (float)tan(3.14159265f / 180.0f * fov * 0.5f);
+			float tang = (float)tan(Math::PI / 180.0f * fov * 0.5f);
 			float nh = near * tang;
 			float nw = nh * ratio;
 
