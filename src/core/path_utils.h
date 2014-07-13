@@ -38,8 +38,20 @@ namespace Lumix
 			}
 		}
 
-	private:
-		PathUtils();
-		~PathUtils();
+		static void getFilename(char* filename, int /*max_length*/, const char* src)
+		{
+			for (int i = strlen(src) - 1; i >= 0; --i)
+			{
+				if (src[i] == '\\' || src[i] == '/')
+				{
+					++i;
+					strcpy(filename, src + i);
+					break;
+				}
+			}
+		}
+		private:
+			PathUtils();
+			~PathUtils();
 	};
 }
