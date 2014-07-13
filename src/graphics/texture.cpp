@@ -431,6 +431,35 @@ void Texture::apply(int unit)
 }
 
 
+bool Texture::loadRaw(FS::IFile& file)
+{
+	size_t size = file.size();
+	m_BPP = 2;
+	m_width = (int)sqrt(size / m_BPP);
+	m_height = m_width;
+
+	if (m_is_nonGL)
+	{
+		m_data.resize(size);
+		file.read(&m_data[0], size);
+	}
+	else
+	{
+		glGenTextures(1, &m_id);
+		if (m_id == 0)
+		{
+			return false;
+		}
+
+		glBindTexture(GL_TEXTURE_2D, m_id);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_R16, m_width, m_height, 0, GL_RED, GL_UNSIGNED_SHORT, file.getBuffer());
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	}
+	return true;
+}
+
+
 bool Texture::loadTGA(FS::IFile& file)
 {
 	TGAHeader header;
@@ -673,6 +702,10 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		if (len > 3 && strcmp(path + len - 4, ".dds") == 0)
 		{
 			loaded = loadDDS(*file);
+		}
+		else if (len > 3 && strcmp(path + len - 4, ".raw") == 0)
+		{
+			loaded = loadRaw(*file);
 		}
 		else
 		{

@@ -13,12 +13,24 @@ namespace Lumix
 	class Geometry;
 	class IRenderDevice;
 	class ISerializer;
+	class Material;
 	class Mesh;
 	class Model;
 	class ModelInstance;
+	class PipelineInstance;
 	class Pose;
+	class Renderer;
 	class Timer;
 	class Universe;
+
+	struct TerrainInfo
+	{
+		Entity m_entity;
+		Material* m_material;
+		float m_xz_scale;
+		float m_y_scale;
+		int m_index;
+	};
 
 	struct RenderableInfo
 	{
@@ -52,11 +64,14 @@ namespace Lumix
 			virtual void applyCamera(Component camera) = 0;
 			virtual void update(float dt) = 0;
 			virtual Timer* getTimer() const = 0;
+			virtual void renderTerrain(const TerrainInfo& info, Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos) = 0;
 
 			virtual Pose& getPose(const Component& cmp) = 0;
 			virtual Component getLight(int index) = 0;
 
 			virtual void addDebugLine(const Vec3& from, const Vec3& to, const Vec3& color, float life) = 0;
+			virtual void addDebugCube(const Vec3& from, float size, const Vec3& color, float life) = 0;
+			virtual void addDebugCircle(const Vec3& center, float radius, const Vec3& color, float life) = 0;
 			virtual const Array<DebugLine>& getDebugLines() const = 0;
 			virtual Component getCameraInSlot(const char* slot) = 0;
 			virtual void getCameraFOV(Component camera, float& fov) = 0;
@@ -76,10 +91,13 @@ namespace Lumix
 			virtual void setRenderablePath(Component cmp, const string& path) = 0;
 			virtual void setRenderableScale(Component cmp, const float& scale) = 0;
 			virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) = 0;
-			virtual void setTerrainHeightmap(Component cmp, const string& path) = 0;
-			virtual void getTerrainHeightmap(Component cmp, string& path) = 0;
+			virtual void getTerrainInfos(Array<TerrainInfo>& infos, int64_t layer_mask) = 0;
 			virtual void setTerrainMaterial(Component cmp, const string& path) = 0;
 			virtual void getTerrainMaterial(Component cmp, string& path) = 0;
+			virtual void setTerrainXZScale(Component cmp, const float& scale) = 0;
+			virtual void getTerrainXZScale(Component cmp, float& scale) = 0;
+			virtual void setTerrainYScale(Component cmp, const float& scale) = 0;
+			virtual void getTerrainYScale(Component cmp, float& scale) = 0;
 
 		protected:
 			virtual ~RenderScene() {}

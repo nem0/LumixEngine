@@ -17,7 +17,6 @@ namespace Lumix
 
 	void SaveScriptVisitor::visit(const char* name, float& value)
 	{
-		/// TODO check if saved size == loaded size
 		if(m_mode == SAVE)
 		{
 			char* data = LUMIX_NEW_ARRAY(char, sizeof(value));

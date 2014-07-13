@@ -20,7 +20,6 @@ void multiplicate(Matrix& result, const Matrix& op1, const Matrix& op2)
 	ASSERT(&result != &op2);
 	ASSERT(&result != &op1); // use operator *
 
-	/// TODO optimize
 	result.m11 = op1.m11 * op2.m11 + op1.m21 * op2.m12 + op1.m31 * op2.m13 + op1.m41 * op2.m14;
 	result.m21 = op1.m11 * op2.m21 + op1.m21 * op2.m22 + op1.m31 * op2.m23 + op1.m41 * op2.m24;
 	result.m31 = op1.m11 * op2.m31 + op1.m21 * op2.m32 + op1.m31 * op2.m33 + op1.m41 * op2.m34;

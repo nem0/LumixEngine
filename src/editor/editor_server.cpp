@@ -189,7 +189,6 @@ struct EditorServerImpl
 		IRenderDevice* m_edit_view_render_device;
 		bool m_toggle_game_mode_requested;
 		EditorClient& m_client;
-	
 };
 
 
@@ -242,10 +241,7 @@ void EditorServer::tick()
 		m_impl->m_toggle_game_mode_requested = false;
 	}
 	PROFILE_FUNCTION();
-	if(m_impl->m_is_game_mode)
-	{
-		m_impl->m_engine.update();
-	}
+	m_impl->m_engine.update(m_impl->m_is_game_mode);
 	m_impl->m_engine.getFileSystem().updateAsyncTransactions();
 }
 
@@ -304,8 +300,9 @@ void EditorServerImpl::registerProperties()
 	m_component_properties[CAMERA_HASH].push(LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("near"), &RenderScene::getCameraNearPlane, &RenderScene::setCameraNearPlane));
 	m_component_properties[CAMERA_HASH].push(LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("far"), &RenderScene::getCameraFarPlane, &RenderScene::setCameraFarPlane));
 	m_component_properties[RENDERABLE_HASH].push(LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("source"), &RenderScene::getRenderablePath, &RenderScene::setRenderablePath, IPropertyDescriptor::FILE));
-	m_component_properties[TERRAIN_HASH].push(LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("heightmap"), &RenderScene::getTerrainHeightmap, &RenderScene::setTerrainHeightmap, IPropertyDescriptor::FILE));
 	m_component_properties[TERRAIN_HASH].push(LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("material"), &RenderScene::getTerrainMaterial, &RenderScene::setTerrainMaterial, IPropertyDescriptor::FILE));
+	m_component_properties[TERRAIN_HASH].push(LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("xz_scale"), &RenderScene::getTerrainXZScale, &RenderScene::setTerrainXZScale));
+	m_component_properties[TERRAIN_HASH].push(LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("y_scale"), &RenderScene::getTerrainYScale, &RenderScene::setTerrainYScale));
 	/*m_component_properties[renderable_type].push(LUMIX_NEW(PropertyDescriptor<Renderer>)(crc32("visible"), &Renderer::getVisible, &Renderer::setVisible));
 	m_component_properties[renderable_type].push(LUMIX_NEW(PropertyDescriptor<Renderer>)(crc32("cast shadows"), &Renderer::getCastShadows, &Renderer::setCastShadows));
 	m_component_properties[point_light_type].push(LUMIX_NEW(PropertyDescriptor<Renderer>)(crc32("fov"), &Renderer::getLightFov, &Renderer::setLightFov));
@@ -822,7 +819,9 @@ EditorServerImpl::EditorServerImpl(EditorClient& client, EditorServer& server)
 
 void EditorServerImpl::navigate(float forward, float right, int fast)
 {
-	float navigation_speed = (fast ? 0.4f : 0.1f);
+	static const float NORMAL_SPEED = 0.1f;
+	static const float FAST_SPEED = 0.1f;
+	float navigation_speed = (fast ? FAST_SPEED : NORMAL_SPEED);
 	Vec3 pos = m_camera.getPosition();
 	Quat rot = m_camera.getRotation();;
 	pos += rot * Vec3(0, 0, -1) * forward * navigation_speed;

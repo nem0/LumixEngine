@@ -237,19 +237,25 @@ namespace Lumix
 	}
 
 
-	void Engine::update()
+	void Engine::update(bool is_game_running)
 	{
-		++m_impl->m_fps_frame;
-		if(m_impl->m_fps_frame == 30)
+		if (is_game_running)
 		{
-			m_impl->m_fps = 30.0f / m_impl->m_fps_timer->tick();
-			m_impl->m_fps_frame = 0;
+			++m_impl->m_fps_frame;
+			if (m_impl->m_fps_frame == 30)
+			{
+				m_impl->m_fps = 30.0f / m_impl->m_fps_timer->tick();
+				m_impl->m_fps_frame = 0;
+			}
 		}
 		float dt = m_impl->m_timer->tick();
 		m_impl->m_render_scene->update(dt);
-		m_impl->m_script_system->update(dt);
-		m_impl->m_plugin_manager.update(dt);
-		m_impl->m_input_system.update(dt);
+		if (is_game_running)
+		{
+			m_impl->m_script_system->update(dt);
+			m_impl->m_plugin_manager.update(dt);
+			m_impl->m_input_system.update(dt);
+		}
 	}
 
 
