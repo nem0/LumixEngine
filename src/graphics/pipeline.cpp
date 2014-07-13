@@ -44,6 +44,15 @@ struct CustomCommand : public Command
 };
 
 
+struct PolygonModeCommand : public Command
+{
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
+	virtual void execute(PipelineInstanceImpl& pipeline) override;
+	
+	bool m_fill;
+};
+
+
 struct ClearCommand : public Command
 {
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
@@ -164,6 +173,7 @@ struct PipelineImpl : public Pipeline
 		addCommandCreator("render_shadowmap").bind<&CreateCommand<RenderShadowmapCommand> >();
 		addCommandCreator("bind_shadowmap").bind<&CreateCommand<BindShadowmapCommand> >();
 		addCommandCreator("render_debug_lines").bind<&CreateCommand<RenderDebugLinesCommand> >();
+		addCommandCreator("polygon_mode").bind<&CreateCommand<PolygonModeCommand> >();
 	}
 
 
@@ -251,9 +261,8 @@ struct PipelineImpl : public Pipeline
 		serializer.deserialize("shadowmap_height", m_shadowmap_framebuffer.m_height);
 		m_shadowmap_framebuffer.m_mask = FrameBuffer::DEPTH_BIT;
 		
-		serializer.deserialize("command_count", count);
 		serializer.deserializeArrayBegin("commands");
-		for(int i = 0; i < count; ++i)
+		while (!serializer.isArrayEnd())
 		{
 			char tmp[255];
 			serializer.deserializeArrayItem(tmp, 255);
@@ -302,6 +311,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 {
 	PipelineInstanceImpl(Pipeline& pipeline)
 		: m_source(static_cast<PipelineImpl&>(pipeline))
+		, m_active_camera(Component::INVALID)
 	{
 		m_scene = NULL;
 		m_light_dir.set(0, -1, 0);
@@ -329,6 +339,11 @@ struct PipelineInstanceImpl : public PipelineInstance
 		{
 			LUMIX_DELETE(m_shadowmap_framebuffer);
 		}
+	}
+
+	void setActiveCamera(const Component& cmp)
+	{
+		m_active_camera = cmp;
 	}
 
 	CustomCommandHandler& addCustomCommandHandler(const char* name)
@@ -571,6 +586,32 @@ struct PipelineInstanceImpl : public PipelineInstance
 			infos[i].m_geometry->draw(mesh.getStart(), mesh.getCount(), *material.getShader());
 			glPopMatrix();
 		}
+		if (m_active_camera.isValid())
+		{
+			static Array<TerrainInfo> terrain_infos;
+			terrain_infos.clear();
+			m_scene->getTerrainInfos(terrain_infos, layer_mask);
+			Vec3 camera_position = m_active_camera.entity.getPosition();
+			for (int i = 0; i < terrain_infos.size(); ++i)
+			{
+				if (terrain_infos[i].m_material)
+				{
+					if (terrain_infos[i].m_material->getShader())
+					{
+						terrain_infos[i].m_material->getShader()->setUniform("light_dir", m_light_dir);
+						Matrix world_matrix;
+						terrain_infos[i].m_entity.getMatrix(world_matrix);
+						terrain_infos[i].m_material->getShader()->setUniform("world_matrix", world_matrix);
+						Vec3 scale;
+						scale.x = terrain_infos[i].m_xz_scale;
+						scale.y = terrain_infos[i].m_y_scale;
+						scale.z = scale.x;
+						terrain_infos[i].m_material->getShader()->setUniform("terrain_scale", scale);
+						m_scene->renderTerrain(terrain_infos[i], *m_renderer, *this, camera_position);
+					}
+				}
+			}
+		}
 	}
 
 	virtual void resize(int w, int h) override
@@ -615,6 +656,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	int m_width;
 	int m_height;
 	Map<uint32_t, CustomCommandHandler> m_custom_commands_handlers;
+	Component m_active_camera;
 
 	private:
 		void operator=(const PipelineInstanceImpl&);
@@ -638,6 +680,17 @@ void PipelineInstance::destroy(PipelineInstance* pipeline)
 	LUMIX_DELETE(pipeline);
 }
 
+
+void PolygonModeCommand::deserialize(PipelineImpl&, ISerializer& serializer)
+{
+	serializer.deserializeArrayItem(m_fill);
+}
+
+
+void PolygonModeCommand::execute(PipelineInstanceImpl&)
+{
+	glPolygonMode(GL_FRONT_AND_BACK, m_fill ? GL_FILL : GL_LINE);
+}
 
 void ClearCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
@@ -697,6 +750,7 @@ void ApplyCameraCommand::execute(PipelineInstanceImpl& pipeline)
 {
 	ASSERT(pipeline.m_renderer != NULL);
 	Component cmp = pipeline.m_scene->getCameraInSlot(m_camera_slot.c_str()); 
+	pipeline.setActiveCamera(cmp);
 	if (cmp.isValid())
 	{
 		pipeline.m_scene->setCameraSize(cmp, pipeline.m_width, pipeline.m_height);

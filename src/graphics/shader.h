@@ -29,7 +29,10 @@ class LUMIX_ENGINE_API Shader : public Resource
 		void setUniform(const char* name, GLfloat value);
 		void setUniform(const char* name, const Matrix& mtx);
 		void setUniform(const char* name, const Matrix* matrices, int count);
-		GLint getAttribId(int index) { return m_vertex_attributes_ids[index]; }
+		GLint getAttribId(int index) const { return m_vertex_attributes_ids[index]; }
+		GLint getPositionAttribId() const { return m_position_attrib_id; }
+		GLint getNormalAttribId() const { return m_normal_attrib_id; }
+		GLint getTexCoordAttribId() const { return m_tex_coord_attrib_id; }
 		bool isShadowmapRequired() const { return m_is_shadowmap_required; }
 
 	private:
@@ -45,6 +48,9 @@ class LUMIX_ENGINE_API Shader : public Resource
 		GLuint	m_vertex_id;
 		GLuint	m_fragment_id;
 		GLint	m_vertex_attributes_ids[MAX_ATTRIBUTE_COUNT];
+		GLint	m_position_attrib_id;
+		GLint	m_normal_attrib_id;
+		GLint	m_tex_coord_attrib_id;
 		bool	m_is_shadowmap_required;
 };
 

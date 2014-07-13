@@ -61,9 +61,6 @@ namespace Lumix
 		bool TCPStream::write(const void* buffer, size_t size)
 		{
 			int send = ::send(m_socket, static_cast<const char*>(buffer), (int)size, 0);
-
-			//todo: handle errors
-
 			return (size_t)send == size;
 		}
 	} // ~namespace Net
