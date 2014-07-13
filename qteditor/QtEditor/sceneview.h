@@ -10,6 +10,8 @@ namespace Lumix
 	class PipelineInstance;
 }
 
+class QDoubleSpinBox;
+
 class SceneView : public QDockWidget
 {
 	Q_OBJECT
@@ -18,6 +20,8 @@ public:
 	void setEditorClient(Lumix::EditorClient& client) { m_client = &client; }
 	void setServer(Lumix::EditorServer* server) { m_server = server; }
 	void setPipeline(Lumix::PipelineInstance& pipeline) { m_pipeline = &pipeline; }
+	QWidget* getViewWidget() { return m_view; }
+	float getNavivationSpeed() const;
 
 private:
 	virtual void mousePressEvent(QMouseEvent* event) override;
@@ -31,6 +35,8 @@ private:
 	Lumix::EditorClient* m_client;
 	Lumix::EditorServer* m_server;
 	Lumix::PipelineInstance* m_pipeline;
+	QWidget* m_view;
+	QDoubleSpinBox* m_speed_input;
 	int m_last_x;
 	int m_last_y;
 

@@ -161,7 +161,7 @@ class App
 			m_main_window = new MainWindow();
 			m_main_window->show();
 
-			HWND hwnd = (HWND)m_main_window->getSceneView()->widget()->winId();
+			HWND hwnd = (HWND)m_main_window->getSceneView()->getViewWidget()->winId();
 			HWND game_hwnd = (HWND)m_main_window->getGameView()->getContentWidget()->winId();
 			HWND hwnds[] = {hwnd, game_hwnd};
 			HGLRC hglrc = createGLContext(hwnds, 2);
@@ -231,10 +231,10 @@ class App
 				/// TODO refactor
 				if(keys[VK_CONTROL] >> 7 == 0)
 				{
-					int speed = 0;
+					float speed = m_main_window->getSceneView()->getNavivationSpeed();
 					if (keys[VK_LSHIFT] >> 7)
 					{
-						speed = 1;
+						speed *= 10;
 					}
 					if (keys['W'] >> 7)
 					{
