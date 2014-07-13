@@ -2,9 +2,11 @@
 #include "editor/editor_client.h"
 #include "editor/editor_server.h"
 #include <qapplication.h>
+#include <QDoubleSpinBox>
 #include <QDragEnterEvent>
 #include <QMimeData>
 #include <QMouseEvent>
+#include <QVBoxLayout>
 #include "core/crc32.h"
 #include "graphics/pipeline.h"
 
@@ -12,12 +14,28 @@ SceneView::SceneView(QWidget* parent) :
 	QDockWidget(parent)
 {
 	m_pipeline = NULL;
-	setWidget(new QWidget());
+	QWidget* root = new QWidget();
+	QVBoxLayout* vertical_layout = new QVBoxLayout(root);
+	QHBoxLayout* horizontal_layout = new QHBoxLayout(root);
+	m_view = new QWidget(root);
+	m_speed_input = new QDoubleSpinBox(root);
+	m_speed_input->setSingleStep(0.1f);
+	m_speed_input->setValue(0.1f);
+	vertical_layout->addLayout(horizontal_layout);
+	horizontal_layout->addWidget(m_speed_input);
+	horizontal_layout->addStretch();
+	vertical_layout->addWidget(m_view);
+	setWidget(root);
 	setWindowTitle("Scene");
 	setObjectName("sceneView");
 	setAcceptDrops(true);
 }
 
+
+float SceneView::getNavivationSpeed() const
+{
+	return m_speed_input->value();
+}
 
 void SceneView::dragEnterEvent(QDragEnterEvent *event)
 {
@@ -73,12 +91,10 @@ void SceneView::mouseReleaseEvent(QMouseEvent* event)
 }
 
 
-void SceneView::resizeEvent(QResizeEvent* event)
+void SceneView::resizeEvent(QResizeEvent*)
 {
-	int w = event->size().width();
-	int h = event->size().height();
 	if (m_pipeline)
 	{
-		m_pipeline->resize(w, h);
+		m_pipeline->resize(m_view->width(), m_view->height());
 	}
 }

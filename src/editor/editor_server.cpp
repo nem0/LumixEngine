@@ -120,7 +120,7 @@ struct EditorServerImpl
 		void onPointerMove(int x, int y, int relx, int rely, int mouse_flags);
 		void onPointerUp(int x, int y, MouseButton::Value button);
 		void selectEntity(Entity e);
-		void navigate(float forward, float right, int fast);
+		void navigate(float forward, float right, float speed);
 		void writeString(const char* str);
 		void setProperty(const void* data, int size);
 		void createUniverse(bool create_scene);
@@ -817,15 +817,12 @@ EditorServerImpl::EditorServerImpl(EditorClient& client, EditorServer& server)
 }
 
 
-void EditorServerImpl::navigate(float forward, float right, int fast)
+void EditorServerImpl::navigate(float forward, float right, float speed)
 {
-	static const float NORMAL_SPEED = 0.1f;
-	static const float FAST_SPEED = 0.1f;
-	float navigation_speed = (fast ? FAST_SPEED : NORMAL_SPEED);
 	Vec3 pos = m_camera.getPosition();
 	Quat rot = m_camera.getRotation();;
-	pos += rot * Vec3(0, 0, -1) * forward * navigation_speed;
-	pos += rot * Vec3(1, 0, 0) * right * navigation_speed;
+	pos += rot * Vec3(0, 0, -1) * forward * speed;
+	pos += rot * Vec3(1, 0, 0) * right * speed;
 	m_camera.setPosition(pos);
 }
 
@@ -1090,7 +1087,7 @@ void EditorServerImpl::onMessage(const uint8_t* data, int32_t size)
 		setProperty(msg + 1, size - 4);
 		break;
 	case ClientMessageType::MOVE_CAMERA:
-		navigate(fmsg[1], fmsg[2], msg[3]);
+		navigate(fmsg[1], fmsg[2], fmsg[3]);
 		break;
 	case ClientMessageType::SAVE:
 		save(reinterpret_cast<const char*>(&msg[1]));
