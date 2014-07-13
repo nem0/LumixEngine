@@ -381,7 +381,7 @@ void MaterialManager::on_objectMaterialList_doubleClicked(const QModelIndex &ind
 void MaterialManager::on_saveMaterialButton_clicked()
 {
 	Lumix::FS::FileSystem& fs = m_impl->m_engine->getFileSystem();
-	// use temporary because otherwise the materials is reloaded during saving
+	// use temporary because otherwise the material is reloaded during saving
 	char tmp_path[LUMIX_MAX_PATH];
 	strcpy(tmp_path, m_impl->m_material->getPath().c_str());
 	strcat(tmp_path, ".tmp");
