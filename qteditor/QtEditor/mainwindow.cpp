@@ -193,3 +193,8 @@ void MainWindow::on_actionMaterial_manager_triggered()
 {
     m_material_manager_ui->show();
 }
+
+void MainWindow::on_actionPolygon_Mode_changed()
+{
+	m_client->setWireframe(m_ui->actionPolygon_Mode->isChecked());
+}

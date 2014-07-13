@@ -16,6 +16,7 @@
 #include "core/map.h"
 #include "core/matrix.h"
 #include "core/profiler.h"
+#include "editor/client_message_types.h"
 #include "editor/editor_client.h"
 #include "editor/editor_icon.h"
 #include "editor/gizmo.h"
@@ -41,35 +42,6 @@ struct EditorIconHit
 {
 	EditorIcon* m_icon;
 	float m_t;
-};
-
-
-struct ClientMessageType
-{
-	enum 
-	{
-		POINTER_DOWN = 1,
-		POINTER_MOVE,
-		POINTER_UP,
-		PROPERTY_SET,
-		MOVE_CAMERA,			// 5
-		SAVE,
-		LOAD,
-		ADD_COMPONENT = 8,
-		GET_PROPERTIES = 9,
-		REMOVE_COMPONENT = 10,
-		ADD_ENTITY,				// 11
-		TOGGLE_GAME_MODE,		// 12
-		GET_POSITION,			// 13
-		SET_POSITION,			// 14
-		REMOVE_ENTITY,			// 15
-		SET_EDIT_MODE,			// 16
-								// 17
-								// 18
-		NEW_UNIVERSE = 19,		// 19
-		LOOK_AT_SELECTED = 20,	// 20
-		STOP_GAME_MODE,			// 21
-	};
 };
 
 
@@ -164,6 +136,7 @@ struct EditorServerImpl
 		void onLogWarning(const char* system, const char* message);
 		void onLogError(const char* system, const char* message);
 		void sendMessage(const uint8_t* data, int32_t length);
+		void setWireframe(bool is_wireframe);
 
 		MT::Mutex m_universe_mutex;
 		Gizmo m_gizmo;
@@ -730,6 +703,12 @@ void EditorServerImpl::onLogError(const char* system, const char* message)
 }
 
 
+void EditorServerImpl::setWireframe(bool is_wireframe)
+{
+	m_engine.getRenderer().setEditorWireframe(is_wireframe);
+}
+
+
 void EditorServerImpl::sendMessage(const uint8_t* data, int32_t length)
 {
 	m_client.onMessage(data, length);
@@ -1103,6 +1082,9 @@ void EditorServerImpl::onMessage(const uint8_t* data, int32_t size)
 		break;
 	case ClientMessageType::REMOVE_COMPONENT:
 		removeComponent(*reinterpret_cast<const uint32_t*>(&msg[1]));
+		break;
+	case ClientMessageType::SET_WIREFRAME:
+		setWireframe((bool)msg[1]);
 		break;
 	case ClientMessageType::ADD_ENTITY:
 		addEntity();

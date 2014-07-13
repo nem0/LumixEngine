@@ -45,6 +45,8 @@ private slots:
 
     void on_actionMaterial_manager_triggered();
 
+    void on_actionPolygon_Mode_changed();
+
 private:
 	Ui::MainWindow* m_ui;
 	Lumix::EditorClient* m_client;

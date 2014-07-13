@@ -39,6 +39,7 @@ namespace Lumix
 			void loadUniverse(const char* path);
 			void saveUniverse(const char* path);
 			void setEntityPosition(int32_t entity, const Vec3& position);
+			void setWireframe(bool is_wireframe);
 			const char* getBasePath() const;
 			EventManager& getEventManager();
 			PropertyListCallback& propertyListReceived();
