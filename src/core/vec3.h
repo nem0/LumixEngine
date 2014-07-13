@@ -62,7 +62,8 @@ struct LUMIX_CORE_API Vec3
 
 	Vec3 operator /(float s) const
 	{
-		return Vec3(x / s, y / s, z / s);
+		float tmp = 1 / s;
+		return Vec3(x * tmp, y * tmp, z * tmp);
 	}
 
 	void operator *=(float rhs)

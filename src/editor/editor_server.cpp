@@ -819,7 +819,9 @@ EditorServerImpl::EditorServerImpl(EditorClient& client, EditorServer& server)
 
 void EditorServerImpl::navigate(float forward, float right, int fast)
 {
-	float navigation_speed = (fast ? 2.4f : 0.1f);
+	static const float NORMAL_SPEED = 0.1f;
+	static const float FAST_SPEED = 0.1f;
+	float navigation_speed = (fast ? FAST_SPEED : NORMAL_SPEED);
 	Vec3 pos = m_camera.getPosition();
 	Quat rot = m_camera.getRotation();;
 	pos += rot * Vec3(0, 0, -1) * forward * navigation_speed;
