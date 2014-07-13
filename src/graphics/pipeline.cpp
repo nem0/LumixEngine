@@ -370,6 +370,13 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
+	Renderer& getRenderer()
+	{
+		ASSERT(m_renderer);
+		return *m_renderer;
+	}
+
+
 	void sourceLoaded(Resource::State old_state, Resource::State new_state)
 	{
 		if (old_state != Resource::State::READY && new_state == Resource::State::READY)
@@ -687,9 +694,9 @@ void PolygonModeCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 }
 
 
-void PolygonModeCommand::execute(PipelineInstanceImpl&)
+void PolygonModeCommand::execute(PipelineInstanceImpl& pipeline)
 {
-	glPolygonMode(GL_FRONT_AND_BACK, m_fill ? GL_FILL : GL_LINE);
+	glPolygonMode(GL_FRONT_AND_BACK, m_fill && !pipeline.getRenderer().isEditorWireframe() ? GL_FILL : GL_LINE);
 }
 
 void ClearCommand::deserialize(PipelineImpl&, ISerializer& serializer)

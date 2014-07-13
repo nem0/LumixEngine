@@ -174,6 +174,12 @@ namespace Lumix
 		m_impl->sendMessage(ClientMessageType::LOAD, path, (int32_t)strlen(path)+1);
 	}
 
+	void EditorClient::setWireframe(bool is_wireframe)
+	{
+		int32_t data = is_wireframe;
+		m_impl->sendMessage(ClientMessageType::SET_WIREFRAME, &data, sizeof(data));
+	}
+
 	void EditorClient::setEntityPosition(int32_t entity, const Vec3& position)
 	{
 		uint8_t data[sizeof(entity) + sizeof(position)];

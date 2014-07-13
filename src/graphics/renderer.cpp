@@ -36,6 +36,7 @@ struct RendererImpl : public Renderer
 
 	RendererImpl()
 	{
+		m_is_editor_wireframe = false;
 	}
 
 	virtual void setProjection(float width, float height, float fov, float near_plane, float far_plane, const Matrix& mtx) override
@@ -156,9 +157,20 @@ struct RendererImpl : public Renderer
 	{
 	}
 
+	virtual void setEditorWireframe(bool is_wireframe)
+	{
+		m_is_editor_wireframe = is_wireframe;
+	}
+
+	virtual bool isEditorWireframe() const
+	{
+		return m_is_editor_wireframe;
+	}
+
 	Engine* m_engine;
 	Array<Model*> m_models;	
 	IRenderDevice* m_render_device;
+	bool m_is_editor_wireframe;
 };
 
 

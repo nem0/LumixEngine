@@ -26,7 +26,7 @@ struct ClientMessageType
 		REMOVE_ENTITY,			// 15
 		SET_EDIT_MODE,			// 16
 		EDIT_SCRIPT,			// 17
-								// 18
+		SET_WIREFRAME,			// 18
 		NEW_UNIVERSE = 19,		// 19
 		LOOK_AT_SELECTED = 20,	// 20
 		STOP_GAME_MODE,			// 21
