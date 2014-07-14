@@ -34,6 +34,8 @@ class Terrain
 		Entity m_entity;
 		physx::PxRigidActor* m_actor;
 		Texture* m_heightmap;
+		float m_xz_scale;
+		float m_y_scale;
 };
 
 
@@ -185,11 +187,11 @@ bool PhysicsScene::create(PhysicsSystem& system, Universe& universe, Engine& eng
 	{
 		return false;
 	}
-	m_impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE,     1.0);
+	/*m_impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE,     1.0);
 	m_impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_SHAPES, 1.0f);
 	m_impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eACTOR_AXES, 1.0f);
 	m_impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_AABBS, 1.0f);
-	m_impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eWORLD_AXES, 1.0f);
+	m_impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eWORLD_AXES, 1.0f);*/
 	m_impl->m_system = &system;
 	m_impl->m_default_material = m_impl->m_system->m_impl->m_physics->createMaterial(0.5,0.5,0.5);
 	return true;
@@ -225,16 +227,32 @@ void PhysicsSceneImpl::heightmapLoaded(Terrain* terrain)
 		
 		int width = terrain->m_heightmap->getWidth();
 		int height = terrain->m_heightmap->getHeight();
-		const uint8_t* data = terrain->m_heightmap->getData();
 		heights.resize(width * height);
 		int bytes_per_pixel = terrain->m_heightmap->getBytesPerPixel();
-		for (int j = 0; j < height; ++j)
+		if (bytes_per_pixel == 2)
 		{
-			for (int i = 0; i < width; ++i)
+			const uint16_t* data = (const uint16_t*)terrain->m_heightmap->getData();
+			for (int j = 0; j < height; ++j)
 			{
-				int idx = i + j * width;
-				int idx2 = j + i * height;
-				heights[idx].height = data[idx2 * bytes_per_pixel] - 255;
+				for (int i = 0; i < width; ++i)
+				{
+					int idx = i + j * width;
+					int idx2 = j + i * height;
+					heights[idx].height = data[idx2];
+				}
+			}
+		}
+		else
+		{
+			const uint8_t* data = terrain->m_heightmap->getData();
+			for (int j = 0; j < height; ++j)
+			{
+				for (int i = 0; i < width; ++i)
+				{
+					int idx = i + j * width;
+					int idx2 = j + i * height;
+					heights[idx].height = data[idx2 * bytes_per_pixel];
+				}
 			}
 		}
 
@@ -246,7 +264,8 @@ void PhysicsSceneImpl::heightmapLoaded(Terrain* terrain)
 		hfDesc.samples.stride = sizeof(physx::PxHeightFieldSample);
 
 		physx::PxHeightField* heightfield = m_system->m_impl->m_physics->createHeightField(hfDesc);
-		physx::PxHeightFieldGeometry hfGeom(heightfield, physx::PxMeshGeometryFlags(), 0.1f, 1.0f, 1.0f);
+		float height_scale = bytes_per_pixel == 2 ? 1 / (255 * 255.0f) : 1 / 255.0f;
+		physx::PxHeightFieldGeometry hfGeom(heightfield, physx::PxMeshGeometryFlags(), height_scale * terrain->m_y_scale, terrain->m_xz_scale, terrain->m_xz_scale);
 		
 		if (terrain->m_actor)
 		{
@@ -265,7 +284,7 @@ void PhysicsSceneImpl::heightmapLoaded(Terrain* terrain)
 		actor = PxCreateStatic(*m_system->m_impl->m_physics, transform, hfGeom, *m_default_material);
 		if (actor)
 		{
-			actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
+			actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, width <= 1024);
 			actor->userData = (void*)terrain->m_entity.index;
 			m_scene->addActor(*actor);
 			terrain->m_actor = actor;
@@ -424,6 +443,41 @@ Component PhysicsScene::createMeshRigidActor(Entity entity)
 void PhysicsScene::getHeightmap(Component cmp, string& str)
 {
 	str = m_impl->m_terrains[cmp.index]->m_heightmap ? m_impl->m_terrains[cmp.index]->m_heightmap->getPath().c_str() : "";
+}
+
+
+void PhysicsScene::getHeightmapXZScale(Component cmp, float& scale)
+{
+	scale = m_impl->m_terrains[cmp.index]->m_xz_scale;
+}
+
+
+void PhysicsScene::setHeightmapXZScale(Component cmp, const float& scale)
+{
+	if (scale != m_impl->m_terrains[cmp.index]->m_xz_scale)
+	{
+		m_impl->m_terrains[cmp.index]->m_xz_scale = scale;
+		m_impl->heightmapLoaded(m_impl->m_terrains[cmp.index]);
+	}
+}
+
+
+void PhysicsScene::getHeightmapYScale(Component cmp, float& scale)
+{
+	scale = m_impl->m_terrains[cmp.index]->m_y_scale;
+}
+
+
+void PhysicsScene::setHeightmapYScale(Component cmp, const float& scale)
+{
+	if (scale != m_impl->m_terrains[cmp.index]->m_y_scale)
+	{
+		m_impl->m_terrains[cmp.index]->m_y_scale = scale;
+		if (m_impl->m_terrains[cmp.index]->m_heightmap)
+		{
+			m_impl->heightmapLoaded(m_impl->m_terrains[cmp.index]);
+		}
+	}
 }
 
 
@@ -918,6 +972,8 @@ PhysicsSystem& PhysicsScene::getSystem() const
 Terrain::Terrain()
 {
 	m_heightmap = NULL;
+	m_xz_scale = 1.0f;
+	m_y_scale = 1.0f;
 }
 
 

@@ -48,6 +48,10 @@ class LUMIX_PHYSICS_API PhysicsScene
 		void setShapeSource(Component cmp, const string& str);
 		void getHeightmap(Component cmp, string& str);
 		void setHeightmap(Component cmp, const string& str);
+		void getHeightmapXZScale(Component cmp, float& scale);
+		void setHeightmapXZScale(Component cmp, const float& scale);
+		void getHeightmapYScale(Component cmp, float& scale);
+		void setHeightmapYScale(Component cmp, const float& scale);
 
 		void moveController(Component cmp, const Vec3& v, float dt);
 	
