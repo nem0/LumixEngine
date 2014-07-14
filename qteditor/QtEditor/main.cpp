@@ -226,7 +226,7 @@ class App
 			}
 			BYTE keys[256];
 			GetKeyboardState(keys);
-			if (m_main_window->getSceneView()->hasFocus())
+			if (m_main_window->getSceneView()->getViewWidget()->hasFocus())
 			{
 				/// TODO refactor
 				if(keys[VK_CONTROL] >> 7 == 0)
