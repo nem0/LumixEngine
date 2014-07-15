@@ -170,10 +170,13 @@ namespace Lumix
 
 		void render(Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos)
 		{
-			m_material->apply(renderer, pipeline);
-			m_mesh->getMaterial()->getShader()->setUniform("map_size", m_root->m_size);
-			m_mesh->getMaterial()->getShader()->setUniform("camera_pos", camera_pos);
-			m_root->render(m_mesh, m_geometry, camera_pos, *pipeline.getScene());
+			if (m_root)
+			{
+				m_material->apply(renderer, pipeline);
+				m_mesh->getMaterial()->getShader()->setUniform("map_size", m_root->m_size);
+				m_mesh->getMaterial()->getShader()->setUniform("camera_pos", camera_pos);
+				m_root->render(m_mesh, m_geometry, camera_pos, *pipeline.getScene());
+			}
 		}
 
 		void generateQuadTree(float size)
