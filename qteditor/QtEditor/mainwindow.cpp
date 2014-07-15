@@ -198,3 +198,8 @@ void MainWindow::on_actionPolygon_Mode_changed()
 {
 	m_client->setWireframe(m_ui->actionPolygon_Mode->isChecked());
 }
+
+void MainWindow::on_actionGame_mode_triggered()
+{
+	m_client->toggleGameMode();
+}

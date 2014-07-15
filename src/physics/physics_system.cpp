@@ -104,13 +104,13 @@ PhysicsScene* PhysicsSystem::getScene() const
 }
 
 
-class MyAllocator : public physx::PxAllocatorCallback
+class AssertNullAllocator : public physx::PxAllocatorCallback
 {
 	public:
 		virtual void* allocate(size_t size, const char* typeName, const char* filename, int line) override
 		{
 			void* ret = _aligned_malloc(size, 16);
-			g_log_info.log("PhysX") << "Allocated " << size << " bytes for " << typeName << " from " << filename << "(" << line << ")";
+			//g_log_info.log("PhysX") << "Allocated " << size << " bytes for " << typeName << " from " << filename << "(" << line << ")";
 			ASSERT(ret);
 			return ret;
 		}
@@ -119,6 +119,7 @@ class MyAllocator : public physx::PxAllocatorCallback
 			_aligned_free(ptr);
 		}
 };
+
 
 bool PhysicsSystem::create(Engine& engine)
 {
@@ -134,7 +135,7 @@ bool PhysicsSystem::create(Engine& engine)
 	engine.getEditorServer()->registerCreator(CONTROLLER_HASH, *this);
 
 	m_impl = LUMIX_NEW(PhysicsSystemImpl);
-	m_impl->m_allocator = LUMIX_NEW(MyAllocator)();
+	m_impl->m_allocator = LUMIX_NEW(AssertNullAllocator)();
 	m_impl->m_error_callback = LUMIX_NEW(CustomErrorCallback)();
 	m_impl->m_engine = &engine;
 	m_impl->m_foundation = PxCreateFoundation(
