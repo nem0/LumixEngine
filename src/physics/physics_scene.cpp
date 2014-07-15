@@ -187,11 +187,13 @@ bool PhysicsScene::create(PhysicsSystem& system, Universe& universe, Engine& eng
 	{
 		return false;
 	}
-	/*m_impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE,     1.0);
-	m_impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_SHAPES, 1.0f);
+	
+	//m_impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_SHAPES, 1.0f);
+	m_impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE, 1.0);
 	m_impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eACTOR_AXES, 1.0f);
 	m_impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_AABBS, 1.0f);
-	m_impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eWORLD_AXES, 1.0f);*/
+	m_impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eWORLD_AXES, 1.0f);
+	m_impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCONTACT_POINT, 1.0f);
 	m_impl->m_system = &system;
 	m_impl->m_default_material = m_impl->m_system->m_impl->m_physics->createMaterial(0.5,0.5,0.5);
 	return true;
@@ -223,76 +225,79 @@ void matrix2Transform(const Matrix& mtx, physx::PxTransform& transform)
 
 void PhysicsSceneImpl::heightmapLoaded(Terrain* terrain)
 {
-		Array<physx::PxHeightFieldSample> heights;
+	Array<physx::PxHeightFieldSample> heights;
 		
-		int width = terrain->m_heightmap->getWidth();
-		int height = terrain->m_heightmap->getHeight();
-		heights.resize(width * height);
-		int bytes_per_pixel = terrain->m_heightmap->getBytesPerPixel();
-		if (bytes_per_pixel == 2)
+	int width = terrain->m_heightmap->getWidth();
+	int height = terrain->m_heightmap->getHeight();
+	heights.resize(width * height);
+	int bytes_per_pixel = terrain->m_heightmap->getBytesPerPixel();
+	if (bytes_per_pixel == 2)
+	{
+		const uint16_t* data = (const uint16_t*)terrain->m_heightmap->getData();
+		for (int j = 0; j < height; ++j)
 		{
-			const uint16_t* data = (const uint16_t*)terrain->m_heightmap->getData();
-			for (int j = 0; j < height; ++j)
+			for (int i = 0; i < width; ++i)
 			{
-				for (int i = 0; i < width; ++i)
-				{
-					int idx = i + j * width;
-					int idx2 = j + i * height;
-					heights[idx].height = data[idx2];
-				}
+				int idx = i + j * width;
+				int idx2 = j + i * height;
+				heights[idx].height = data[idx2];
+				heights[idx].materialIndex0 = heights[idx].materialIndex1 = 0;
 			}
 		}
-		else
+	}
+	else
+	{
+		const uint8_t* data = terrain->m_heightmap->getData();
+		for (int j = 0; j < height; ++j)
 		{
-			const uint8_t* data = terrain->m_heightmap->getData();
-			for (int j = 0; j < height; ++j)
+			for (int i = 0; i < width; ++i)
 			{
-				for (int i = 0; i < width; ++i)
-				{
-					int idx = i + j * width;
-					int idx2 = j + i * height;
-					heights[idx].height = data[idx2 * bytes_per_pixel];
-				}
+				int idx = i + j * width;
+				int idx2 = j + i * height;
+				heights[idx].height = data[idx2 * bytes_per_pixel];
+				heights[idx].materialIndex0 = heights[idx].materialIndex1 = 0;
 			}
 		}
+	}
 
-		physx::PxHeightFieldDesc hfDesc;
-		hfDesc.format = physx::PxHeightFieldFormat::eS16_TM;
-		hfDesc.nbColumns = width;
-		hfDesc.nbRows = height;
-		hfDesc.samples.data = &heights[0];
-		hfDesc.samples.stride = sizeof(physx::PxHeightFieldSample);
+	physx::PxHeightFieldDesc hfDesc;
+	hfDesc.format = physx::PxHeightFieldFormat::eS16_TM;
+	hfDesc.nbColumns = width;
+	hfDesc.nbRows = height;
+	hfDesc.samples.data = &heights[0];
+	hfDesc.samples.stride = sizeof(physx::PxHeightFieldSample);
+	hfDesc.thickness = -1;
 
-		physx::PxHeightField* heightfield = m_system->m_impl->m_physics->createHeightField(hfDesc);
-		float height_scale = bytes_per_pixel == 2 ? 1 / (255 * 255.0f) : 1 / 255.0f;
-		physx::PxHeightFieldGeometry hfGeom(heightfield, physx::PxMeshGeometryFlags(), height_scale * terrain->m_y_scale, terrain->m_xz_scale, terrain->m_xz_scale);
+	physx::PxHeightField* heightfield = m_system->m_impl->m_physics->createHeightField(hfDesc);
+	float height_scale = bytes_per_pixel == 2 ? 1 / (256 * 256.0f) : 1 / 256.0f;
+	physx::PxHeightFieldGeometry hfGeom(heightfield, physx::PxMeshGeometryFlags(), height_scale * terrain->m_y_scale, terrain->m_xz_scale, terrain->m_xz_scale);
 		
-		if (terrain->m_actor)
-		{
-			physx::PxRigidActor* actor = terrain->m_actor;
-			m_scene->removeActor(*actor);
-			actor->release();
-			terrain->m_actor = NULL;
-		}
+	if (terrain->m_actor)
+	{
+		physx::PxRigidActor* actor = terrain->m_actor;
+		m_scene->removeActor(*actor);
+		actor->release();
+		terrain->m_actor = NULL;
+	}
 
-		physx::PxTransform transform;
-		Matrix mtx;
-		terrain->m_entity.getMatrix(mtx);
-		matrix2Transform(mtx, transform);
+	physx::PxTransform transform;
+	Matrix mtx;
+	terrain->m_entity.getMatrix(mtx);
+	matrix2Transform(mtx, transform);
 
-		physx::PxRigidActor* actor;
-		actor = PxCreateStatic(*m_system->m_impl->m_physics, transform, hfGeom, *m_default_material);
-		if (actor)
-		{
-			actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, width <= 1024);
-			actor->userData = (void*)terrain->m_entity.index;
-			m_scene->addActor(*actor);
-			terrain->m_actor = actor;
-		}
-		else
-		{
-			g_log_error.log("PhysX") << "Could not create PhysX heightfield " << terrain->m_heightmap->getPath().c_str();
-		}
+	physx::PxRigidActor* actor;
+	actor = PxCreateStatic(*m_system->m_impl->m_physics, transform, hfGeom, *m_default_material);
+	if (actor)
+	{
+		actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, width <= 1024);
+		actor->userData = (void*)terrain->m_entity.index;
+		m_scene->addActor(*actor);
+		terrain->m_actor = actor;
+	}
+	else
+	{
+		g_log_error.log("PhysX") << "Could not create PhysX heightfield " << terrain->m_heightmap->getPath().c_str();
+	}
 }
 
 
@@ -906,6 +911,8 @@ void PhysicsScene::serialize(ISerializer& serializer)
 	{
 		serializer.serializeArrayItem(m_impl->m_terrains[i]->m_entity.index);
 		serializer.serializeArrayItem(m_impl->m_terrains[i]->m_heightmap->getPath().c_str());
+		serializer.serializeArrayItem(m_impl->m_terrains[i]->m_xz_scale);
+		serializer.serializeArrayItem(m_impl->m_terrains[i]->m_y_scale);
 	}
 	serializer.endArray();}
 
@@ -957,6 +964,9 @@ void PhysicsScene::deserialize(ISerializer& serializer)
 		createHeightfield(e);
 		char tmp[LUMIX_MAX_PATH];
 		serializer.deserializeArrayItem(tmp, LUMIX_MAX_PATH);
+		serializer.deserializeArrayItem(m_impl->m_terrains[i]->m_xz_scale);
+		serializer.deserializeArrayItem(m_impl->m_terrains[i]->m_y_scale);
+
 		setHeightmap(Component(e, HEIGHTFIELD_HASH, this, i), string(tmp));
 	}
 	serializer.deserializeArrayEnd();
