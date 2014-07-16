@@ -10,6 +10,7 @@
 #include "core/log.h"
 #include "core/matrix.h"
 #include "core/path.h"
+#include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "engine/engine.h"
@@ -225,6 +226,7 @@ void matrix2Transform(const Matrix& mtx, physx::PxTransform& transform)
 
 void PhysicsSceneImpl::heightmapLoaded(Terrain* terrain)
 {
+	PROFILE_FUNCTION();
 	Array<physx::PxHeightFieldSample> heights;
 		
 	int width = terrain->m_heightmap->getWidth();
@@ -233,6 +235,7 @@ void PhysicsSceneImpl::heightmapLoaded(Terrain* terrain)
 	int bytes_per_pixel = terrain->m_heightmap->getBytesPerPixel();
 	if (bytes_per_pixel == 2)
 	{
+		PROFILE_BLOCK("copyData");
 		const uint16_t* data = (const uint16_t*)terrain->m_heightmap->getData();
 		for (int j = 0; j < height; ++j)
 		{
@@ -247,6 +250,7 @@ void PhysicsSceneImpl::heightmapLoaded(Terrain* terrain)
 	}
 	else
 	{
+		PROFILE_BLOCK("copyData");
 		const uint8_t* data = terrain->m_heightmap->getData();
 		for (int j = 0; j < height; ++j)
 		{
@@ -271,7 +275,6 @@ void PhysicsSceneImpl::heightmapLoaded(Terrain* terrain)
 	physx::PxHeightField* heightfield = m_system->m_impl->m_physics->createHeightField(hfDesc);
 	float height_scale = bytes_per_pixel == 2 ? 1 / (256 * 256.0f) : 1 / 256.0f;
 	physx::PxHeightFieldGeometry hfGeom(heightfield, physx::PxMeshGeometryFlags(), height_scale * terrain->m_y_scale, terrain->m_xz_scale, terrain->m_xz_scale);
-		
 	if (terrain->m_actor)
 	{
 		physx::PxRigidActor* actor = terrain->m_actor;

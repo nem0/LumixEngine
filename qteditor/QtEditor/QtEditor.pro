@@ -8,7 +8,8 @@ QT       += core gui opengl
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
-TARGET = ../../../bin/Win32_Debug/QtEditor
+Release:TARGET = ../../../bin/Win32_Release/QtEditor
+Debug:TARGET = ../../../bin/Win32_Debug/QtEditor
 TEMPLATE = app
 CONFIG -= flat
 
@@ -59,5 +60,6 @@ win32
 {
     INCLUDEPATH = ../../src \
 	../../external/glew/include
-    LIBS = -L../../bin/Win32_Debug -lcore -lengine -lopengl32 -lphysics
+    Release:LIBS = -L../../bin/Win32_Release -lcore -lengine -lopengl32 -lphysics
+    Debug:LIBS = -L../../bin/Win32_Debug -lcore -lengine -lopengl32 -lphysics
 }
