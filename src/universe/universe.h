@@ -15,7 +15,6 @@ namespace Lumix
 
 
 class Event;
-class EventManager;
 class ISerializer;
 struct Matrix;
 struct Quat;

@@ -731,59 +731,6 @@ void EditorServerImpl::renderScene(IRenderDevice& render_device)
 }
 
 
-void EditorServerImpl::renderPhysics()
-{
-	ASSERT(false);
-	/*glMatrixMode(GL_PROJECTION);
-	float proj[16];
-	h3dGetCameraProjMat(m_engine.getRenderer().getRawCameraNode(), proj);
-	glLoadMatrixf(proj);
-		
-	glMatrixMode(GL_MODELVIEW);
-	
-	Matrix mtx;
-	m_engine.getRenderer().getCameraMatrix(mtx);
-	mtx.fastInverse();
-	glLoadMatrixf(&mtx.m11);
-
-	glViewport(0, 0, m_engine.getRenderer().getWidth(), m_engine.getRenderer().getHeight());
-
-	glEnable(GL_DEPTH_TEST);
-	glDisable(GL_CULL_FACE);
-	glDisable(GL_TEXTURE_2D);
-	glDisable(GL_BLEND);
-
-	glDisableClientState(GL_VERTEX_ARRAY);
-	glDisableClientState(GL_COLOR_ARRAY);
-	glDisableClientState(GL_NORMAL_ARRAY);
-	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-
-	IPlugin* physics = m_engine.getPluginManager().getPlugin("physics");
-	if(physics)
-	{
-		physics->sendMessage("render");
-	}
-	/*m_physics_scene->getRawScene()->getNbActors(physx::PxActorTypeSelectionFlag::eRIGID_STATIC);
-	const physx::PxRenderBuffer& rb = m_physics_scene->getRawScene()->getRenderBuffer();
-	const physx::PxU32 numLines = rb.getNbLines();
-	const physx::PxU32 numPoints = rb.getNbPoints();
-	const physx::PxU32 numTri = rb.getNbTriangles();
-	if(numLines)
-	{
-		glBegin(GL_LINES);
-		const physx::PxDebugLine* PX_RESTRICT lines = rb.getLines();
-		for(physx::PxU32 i=0; i<numLines; i++)
-		{
-			const physx::PxDebugLine& line = lines[i];
-			glColor3f(1, 1, 1);				
-			glVertex3fv((GLfloat*)&line.pos0);
-			glVertex3fv((GLfloat*)&line.pos1);
-		}
-		glEnd();
-	}*/
-}
-
-
 EditorServerImpl::EditorServerImpl(EditorClient& client, EditorServer& server)
 	: m_universe_mutex(false)
 	, m_toggle_game_mode_requested(false)

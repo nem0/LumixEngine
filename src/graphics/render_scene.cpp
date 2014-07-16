@@ -6,6 +6,7 @@
 #include "core/iserializer.h"
 #include "core/log.h"
 #include "core/math_utils.h"
+#include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "core/timer.h"
@@ -150,6 +151,12 @@ namespace Lumix
 
 	struct Terrain
 	{
+		struct Sample
+		{
+			Vec3 pos;
+			float u, v;
+		};
+
 		Terrain()
 			: m_mesh(NULL)
 			, m_material(NULL)
@@ -189,17 +196,25 @@ namespace Lumix
 			m_root->createChildren();
 		}
 
-		void generateSubgrid(Array<Vec3>& points, Array<int32_t>& indices, int& indices_offset, int start_x, int start_y)
+		void generateSubgrid(Array<Sample>& samples, Array<int32_t>& indices, int& indices_offset, int start_x, int start_y)
 		{
 			for (int j = start_y; j < start_y + 8; ++j)
 			{
 				for (int i = start_x; i < start_x + 8; ++i)
 				{
 					int idx = 4 * (i + j * GRID_SIZE);
-					points[idx].set((float)(i) / GRID_SIZE, 0, (float)(j) / GRID_SIZE);
-					points[idx + 1].set((float)(i + 1) / GRID_SIZE, 0, (float)(j) / GRID_SIZE);
-					points[idx + 2].set((float)(i + 1) / GRID_SIZE, 0, (float)(j + 1) / GRID_SIZE);
-					points[idx + 3].set((float)(i) / GRID_SIZE, 0, (float)(j + 1) / GRID_SIZE);
+					samples[idx].pos.set((float)(i) / GRID_SIZE, 0, (float)(j) / GRID_SIZE);
+					samples[idx + 1].pos.set((float)(i + 1) / GRID_SIZE, 0, (float)(j) / GRID_SIZE);
+					samples[idx + 2].pos.set((float)(i + 1) / GRID_SIZE, 0, (float)(j + 1) / GRID_SIZE);
+					samples[idx + 3].pos.set((float)(i) / GRID_SIZE, 0, (float)(j + 1) / GRID_SIZE);
+					samples[idx].u = 0;
+					samples[idx].v = 0;
+					samples[idx+1].u = 1;
+					samples[idx+1].v = 0;
+					samples[idx+2].u = 1;
+					samples[idx+2].v = 1;
+					samples[idx+3].u = 0;
+					samples[idx+3].v = 1;
 
 					indices[indices_offset] = idx;
 					indices[indices_offset + 1] = idx + 3;
@@ -216,7 +231,7 @@ namespace Lumix
 		{
 			LUMIX_DELETE(m_mesh);
 			m_mesh = NULL;
-			Array<Vec3> points;
+			Array<Sample> points;
 			points.resize(GRID_SIZE * GRID_SIZE * 4);
 			Array<int32_t> indices;
 			indices.resize(GRID_SIZE * GRID_SIZE * 6);
@@ -227,13 +242,14 @@ namespace Lumix
 			generateSubgrid(points, indices, indices_offset, 8, 8);
 			
 			VertexDef vertex_def;
-			vertex_def.parse("p", 1);
+			vertex_def.parse("pt", 2);
 			m_geometry.copy((const uint8_t*)&points[0], sizeof(points[0]) * points.size(), indices, vertex_def);
 			m_mesh = LUMIX_NEW(Mesh)(m_material, 0, indices.size(), "terrain");
 		}
 
 		void onMaterialLoaded(Resource::State, Resource::State new_state)
 		{
+			PROFILE_FUNCTION();
 			if (new_state == Resource::State::READY)
 			{
 				m_width = m_material->getTexture(0)->getWidth();

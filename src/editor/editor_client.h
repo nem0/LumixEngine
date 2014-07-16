@@ -10,7 +10,6 @@ namespace Lumix
 	class EditorServer;
 	struct Entity;
 	struct EntitySelectedEvent;
-	class EventManager;
 	struct PropertyListEvent;
 	struct ServerMessage;
 	struct Vec3;
@@ -41,7 +40,6 @@ namespace Lumix
 			void setEntityPosition(int32_t entity, const Vec3& position);
 			void setWireframe(bool is_wireframe);
 			const char* getBasePath() const;
-			EventManager& getEventManager();
 			PropertyListCallback& propertyListReceived();
 			EntitySelectedCallback& entitySelected();
 
