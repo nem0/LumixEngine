@@ -402,7 +402,7 @@ struct TGAHeader
 
 Texture::Texture(const Path& path, ResourceManager& resource_manager)
 	: Resource(path, resource_manager)
-	, m_is_nonGL(false)
+	, m_flags(Texture::RENDERABLE)
 {
 	glGenTextures(1, &m_id);
 }
@@ -438,12 +438,12 @@ bool Texture::loadRaw(FS::IFile& file)
 	m_width = (int)sqrt(size / m_BPP);
 	m_height = m_width;
 
-	if (m_is_nonGL)
+	if (m_flags & KEEP_DATA)
 	{
 		m_data.resize(size);
 		file.read(&m_data[0], size);
 	}
-	else
+	if (m_flags & RENDERABLE)
 	{
 		glGenTextures(1, &m_id);
 		if (m_id == 0)
@@ -484,11 +484,11 @@ bool Texture::loadTGA(FS::IFile& file)
 	m_width = header.width;
 	m_height = header.height;
 	TextureManager* manager = static_cast<TextureManager*>(getResourceManager().get(ResourceManager::TEXTURE));
-	if (m_is_nonGL)
+	if (m_flags && KEEP_DATA)
 	{
 		m_data.resize(image_size);
 	}
-	uint8_t* image_dest = m_is_nonGL ? &m_data[0] : (uint8_t*)manager->getBuffer(image_size);
+	uint8_t* image_dest = (m_flags & KEEP_DATA) ? &m_data[0] : (uint8_t*)manager->getBuffer(image_size);
 
 	// Targa is BGR, swap to RGB, add alpha and flip Y axis
 	for (long y = 0; y < header.height; y++)
@@ -509,7 +509,7 @@ bool Texture::loadTGA(FS::IFile& file)
 	}
 	m_BPP = 4;
 
-	if (m_is_nonGL)
+	if ((m_flags & RENDERABLE) == 0)
 	{
 		return true;
 	}
@@ -530,11 +530,29 @@ bool Texture::loadTGA(FS::IFile& file)
 }
 
 
+void Texture::setFlag(Flags flag)
+{
+	int32_t flags = m_flags |= flag;
+	bool should_keep_data = (flags & KEEP_DATA) != 0;
+	bool was_data_kept = (flags & KEEP_DATA) != 0;
+	if (!was_data_kept && should_keep_data)
+	{
+		ASSERT(!isReady()); // this has to be set before the texture is loaded
+	}
+	else if (was_data_kept && !should_keep_data)
+	{
+		m_data.clear();
+	}
+
+	m_flags = flags;
+}
+
+
 bool Texture::loadDDS(FS::IFile& file)
 {
-	if (m_is_nonGL)
+	if (m_flags & KEEP_DATA)
 	{
-		g_log_error.log("renderer") << "Non GL DDS texture not supported " << m_path.c_str();
+		g_log_error.log("renderer") << "DDS texture " << m_path.c_str() << " can only be used as renderable texture";
 		return false;
 	}
 	DDS::Header hdr;
