@@ -168,6 +168,7 @@ namespace Lumix
 		~Terrain()
 		{
 			LUMIX_DELETE(m_mesh);
+			LUMIX_DELETE(m_root);
 			if (m_material)
 			{
 				m_material->getObserverCb().unbind<Terrain, &Terrain::onMaterialLoaded>(this);
@@ -562,19 +563,28 @@ namespace Lumix
 				int32_t size;
 				serializer.deserialize("terrain_count", size);
 				serializer.deserializeArrayBegin("terrains");
+				for (int i = size; i < m_terrains.size(); ++i)
+				{
+					LUMIX_DELETE(m_terrains[i]);
+				}
+				int old_size = m_terrains.size();
+				m_terrains.resize(size);
+				for (int i = old_size; i < size; ++i)
+				{
+					m_terrains[i] = LUMIX_NEW(Terrain);
+				}
 				for (int i = 0; i < size; ++i)
 				{
-					Entity e;
-					serializer.deserializeArrayItem(e.index);
-					e.universe = &m_universe;
-					Component cmp = createComponent(TERRAIN_HASH, e);
-					Terrain* terrain = m_terrains[cmp.index];
+					Terrain* terrain = m_terrains[i];
+					serializer.deserializeArrayItem(terrain->m_entity.index);
+					terrain->m_entity.universe = &m_universe;
 					serializer.deserializeArrayItem(terrain->m_layer_mask);
 					char path[LUMIX_MAX_PATH];
 					serializer.deserializeArrayItem(path, LUMIX_MAX_PATH);
-					setTerrainMaterial(cmp, string(path));
-					serializer.deserializeArrayItem(m_terrains[i]->m_xz_scale);
-					serializer.deserializeArrayItem(m_terrains[i]->m_y_scale);
+					setTerrainMaterial(Component(terrain->m_entity, TERRAIN_HASH, this, i), string(path));
+					serializer.deserializeArrayItem(terrain->m_xz_scale);
+					serializer.deserializeArrayItem(terrain->m_y_scale);
+					m_universe.addComponent(terrain->m_entity, TERRAIN_HASH, this, i);
 				}
 				serializer.deserializeArrayEnd();
 			}
@@ -666,16 +676,24 @@ namespace Lumix
 
 			virtual void setTerrainMaterial(Component cmp, const string& path) override
 			{
-				if (m_terrains[cmp.index]->m_material)
+				Material* material = static_cast<Material*>(m_engine.getResourceManager().get(ResourceManager::MATERIAL)->load(path.c_str()));
+				if (material != m_terrains[cmp.index]->m_material)
 				{
-					m_engine.getResourceManager().get(ResourceManager::MATERIAL)->unload(*m_terrains[cmp.index]->m_material);
-					m_terrains[cmp.index]->m_material->getObserverCb().unbind<Terrain, &Terrain::onMaterialLoaded>(m_terrains[cmp.index]);
+					if (m_terrains[cmp.index]->m_material)
+					{
+						m_engine.getResourceManager().get(ResourceManager::MATERIAL)->unload(*m_terrains[cmp.index]->m_material);
+						m_terrains[cmp.index]->m_material->getObserverCb().unbind<Terrain, &Terrain::onMaterialLoaded>(m_terrains[cmp.index]);
+					}
+					m_terrains[cmp.index]->m_material = material;
+					if (m_terrains[cmp.index]->m_mesh)
+					{
+						m_terrains[cmp.index]->m_mesh->setMaterial(m_terrains[cmp.index]->m_material);
+						m_terrains[cmp.index]->m_material->getObserverCb().bind<Terrain, &Terrain::onMaterialLoaded>(m_terrains[cmp.index]);
+					}
 				}
-				m_terrains[cmp.index]->m_material = static_cast<Material*>(m_engine.getResourceManager().get(ResourceManager::MATERIAL)->load(path.c_str()));
-				if (m_terrains[cmp.index]->m_mesh)
+				else
 				{
-					m_terrains[cmp.index]->m_mesh->setMaterial(m_terrains[cmp.index]->m_material);
-					m_terrains[cmp.index]->m_material->getObserverCb().bind<Terrain, &Terrain::onMaterialLoaded>(m_terrains[cmp.index]);
+					material->getResourceManager().get(ResourceManager::MATERIAL)->unload(*material);
 				}
 			}
 

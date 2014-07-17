@@ -1031,7 +1031,7 @@ void EditorServerImpl::onMessage(const uint8_t* data, int32_t size)
 		removeComponent(*reinterpret_cast<const uint32_t*>(&msg[1]));
 		break;
 	case ClientMessageType::SET_WIREFRAME:
-		setWireframe((bool)msg[1]);
+		setWireframe(msg[1] != 0);
 		break;
 	case ClientMessageType::ADD_ENTITY:
 		addEntity();

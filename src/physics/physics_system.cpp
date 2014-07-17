@@ -36,15 +36,13 @@ struct CustomErrorCallback : public physx::PxErrorCallback
 
 void PhysicsSystem::onCreateUniverse(Universe& universe)
 {
-	m_impl->m_scene = LUMIX_NEW(PhysicsScene)();
-	m_impl->m_scene->create(*this, universe, *m_impl->m_engine);
+	m_impl->m_scene = PhysicsScene::create(*this, universe, *m_impl->m_engine);
 }
 
 
 void PhysicsSystem::onDestroyUniverse(Universe& universe)
 {
-	m_impl->m_scene->destroy();
-	LUMIX_DELETE(m_impl->m_scene);
+	PhysicsScene::destroy(m_impl->m_scene);
 	m_impl->m_scene = NULL;
 }
 
