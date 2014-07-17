@@ -750,16 +750,16 @@ struct PhysicsSceneImpl : public PhysicsScene
 		switch (type)
 		{
 			case BOX:
-			{
-				serializer.deserialize("x", box_geom.halfExtents.x);
-				serializer.deserialize("y", box_geom.halfExtents.y);
-				serializer.deserialize("z", box_geom.halfExtents.z);
-				geom = &box_geom;
-			}
-			break;
-		default:
-			ASSERT(false);
-			break;
+				{
+					serializer.deserialize("x", box_geom.halfExtents.x);
+					serializer.deserialize("y", box_geom.halfExtents.y);
+					serializer.deserialize("z", box_geom.halfExtents.z);
+					geom = &box_geom;
+				}
+				break;
+			default:
+				ASSERT(false);
+				break;
 		}
 
 		physx::PxRigidActor* actor;

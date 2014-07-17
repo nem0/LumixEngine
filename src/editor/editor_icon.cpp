@@ -18,7 +18,7 @@ namespace Lumix
 {
 
 
-void EditorIcon::create(Engine& engine, RenderScene& scene, Entity& entity, const Component&)
+void EditorIcon::create(Engine& engine, RenderScene& scene, const Entity& entity, const Component&)
 {
 	m_scene = &scene;
 	m_entity = entity;
