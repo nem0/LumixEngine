@@ -137,6 +137,7 @@ struct EditorServerImpl
 		void onLogError(const char* system, const char* message);
 		void sendMessage(const uint8_t* data, int32_t length);
 		void setWireframe(bool is_wireframe);
+		void createEditorIcon(const Entity& entity);
 
 		MT::Mutex m_universe_mutex;
 		Gizmo m_gizmo;
@@ -600,8 +601,36 @@ void EditorServerImpl::load(FS::IFile& file, const char* path)
 	m_engine.deserialize(serializer);
 	m_camera = m_engine.getRenderScene()->getCameraInSlot("editor").entity;
 	g_log_info.log("editor server") << "universe parsed";
+
+	Universe* universe = m_engine.getUniverse();
+	for (int i = 0; i < universe->getEntityCount(); ++i)
+	{
+		Entity e(universe, i);
+		createEditorIcon(e);
+	}
 }
 
+
+void EditorServerImpl::createEditorIcon(const Entity& entity)
+{
+	const Entity::ComponentList& cmps = entity.getComponents();
+
+	bool found = false;
+	for (int i = 0; i < cmps.size(); ++i)
+	{
+		if (cmps[i].type == RENDERABLE_HASH)
+		{
+			found = true;
+			break;
+		}
+	}
+	if (!found)
+	{
+		EditorIcon* er = LUMIX_NEW(EditorIcon)();
+		er->create(m_engine, *m_engine.getRenderScene(), entity, Component::INVALID);
+		m_editor_icons.push(er);
+	}
+}
 
 void EditorServerImpl::resetAndLoad(FS::IFile& file, const char* path)
 {
