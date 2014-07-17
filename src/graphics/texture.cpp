@@ -402,7 +402,7 @@ struct TGAHeader
 
 Texture::Texture(const Path& path, ResourceManager& resource_manager)
 	: Resource(path, resource_manager)
-	, m_flags(Texture::RENDERABLE)
+	, m_data_reference(0)
 {
 	glGenTextures(1, &m_id);
 }
@@ -438,26 +438,25 @@ bool Texture::loadRaw(FS::IFile& file)
 	m_width = (int)sqrt(size / m_BPP);
 	m_height = m_width;
 
-	if (m_flags & KEEP_DATA)
+	if (m_data_reference)
 	{
 		m_data.resize(size);
 		file.read(&m_data[0], size);
 	}
-	if (m_flags & RENDERABLE)
-	{
-		glGenTextures(1, &m_id);
-		if (m_id == 0)
-		{
-			return false;
-		}
 
-		glBindTexture(GL_TEXTURE_2D, m_id);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_R16, m_width, m_height, 0, GL_RED, GL_UNSIGNED_SHORT, file.getBuffer());
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glGenTextures(1, &m_id);
+	if (m_id == 0)
+	{
+		return false;
 	}
+
+	glBindTexture(GL_TEXTURE_2D, m_id);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_R16, m_width, m_height, 0, GL_RED, GL_UNSIGNED_SHORT, file.getBuffer());
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
 	return true;
 }
 
@@ -484,11 +483,11 @@ bool Texture::loadTGA(FS::IFile& file)
 	m_width = header.width;
 	m_height = header.height;
 	TextureManager* manager = static_cast<TextureManager*>(getResourceManager().get(ResourceManager::TEXTURE));
-	if (m_flags && KEEP_DATA)
+	if (m_data_reference)
 	{
 		m_data.resize(image_size);
 	}
-	uint8_t* image_dest = (m_flags & KEEP_DATA) ? &m_data[0] : (uint8_t*)manager->getBuffer(image_size);
+	uint8_t* image_dest = m_data_reference ? &m_data[0] : (uint8_t*)manager->getBuffer(image_size);
 
 	// Targa is BGR, swap to RGB, add alpha and flip Y axis
 	for (long y = 0; y < header.height; y++)
@@ -509,11 +508,6 @@ bool Texture::loadTGA(FS::IFile& file)
 	}
 	m_BPP = 4;
 
-	if ((m_flags & RENDERABLE) == 0)
-	{
-		return true;
-	}
-
 	glGenTextures(1, &m_id);
 	if (m_id == 0)
 	{
@@ -530,27 +524,26 @@ bool Texture::loadTGA(FS::IFile& file)
 }
 
 
-void Texture::setFlag(Flags flag)
+void Texture::addDataReference()
 {
-	int32_t flags = m_flags |= flag;
-	bool should_keep_data = (flags & KEEP_DATA) != 0;
-	bool was_data_kept = (flags & KEEP_DATA) != 0;
-	if (!was_data_kept && should_keep_data)
-	{
-		ASSERT(!isReady()); // this has to be set before the texture is loaded
-	}
-	else if (was_data_kept && !should_keep_data)
+	ASSERT(!isReady());
+	++m_data_reference;
+}
+
+
+void Texture::removeDataReference()
+{
+	--m_data_reference;
+	if (m_data_reference == 0)
 	{
 		m_data.clear();
 	}
-
-	m_flags = flags;
 }
 
 
 bool Texture::loadDDS(FS::IFile& file)
 {
-	if (m_flags & KEEP_DATA)
+	if (m_data_reference)
 	{
 		g_log_error.log("renderer") << "DDS texture " << m_path.c_str() << " can only be used as renderable texture";
 		return false;
