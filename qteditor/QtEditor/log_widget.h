@@ -17,7 +17,7 @@ public:
 
 signals:
 	void infoReceived(const QString& system, const QString& message);
-
+	
 private slots:
 	void on_clearButton_clicked();
 	void onInfoReceived(const QString& system, const QString& message);

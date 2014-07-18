@@ -481,7 +481,9 @@ void PropertyView::onEntitySelected(Lumix::EntitySelectedEvent& e)
 		}
 		else if (e.components[i] == crc32("physical_heightfield"))
 		{
-			addProperty("physical_heightfield", "heightmap", "Heightmap", Property::FILE, "TGA image (*.tga)");
+			addProperty("physical_heightfield", "heightmap", "Heightmap", Property::FILE, "Heightmaps (*.tga *.raw)");
+			addProperty("physical_heightfield", "xz_scale", "Meters per pixel", Property::DECIMAL, NULL);
+			addProperty("physical_heightfield", "y_scale", "Height scale", Property::DECIMAL, NULL);
 		}
 		else if (e.components[i] == crc32("light"))
 		{
