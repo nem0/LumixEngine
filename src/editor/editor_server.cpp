@@ -16,6 +16,7 @@
 #include "core/map.h"
 #include "core/matrix.h"
 #include "core/profiler.h"
+#include "editor/client_message_types.h"
 #include "editor/editor_client.h"
 #include "editor/editor_icon.h"
 #include "editor/gizmo.h"
@@ -41,35 +42,6 @@ struct EditorIconHit
 {
 	EditorIcon* m_icon;
 	float m_t;
-};
-
-
-struct ClientMessageType
-{
-	enum 
-	{
-		POINTER_DOWN = 1,
-		POINTER_MOVE,
-		POINTER_UP,
-		PROPERTY_SET,
-		MOVE_CAMERA,			// 5
-		SAVE,
-		LOAD,
-		ADD_COMPONENT = 8,
-		GET_PROPERTIES = 9,
-		REMOVE_COMPONENT = 10,
-		ADD_ENTITY,				// 11
-		TOGGLE_GAME_MODE,		// 12
-		GET_POSITION,			// 13
-		SET_POSITION,			// 14
-		REMOVE_ENTITY,			// 15
-		SET_EDIT_MODE,			// 16
-								// 17
-								// 18
-		NEW_UNIVERSE = 19,		// 19
-		LOOK_AT_SELECTED = 20,	// 20
-		STOP_GAME_MODE,			// 21
-	};
 };
 
 
@@ -120,7 +92,7 @@ struct EditorServerImpl
 		void onPointerMove(int x, int y, int relx, int rely, int mouse_flags);
 		void onPointerUp(int x, int y, MouseButton::Value button);
 		void selectEntity(Entity e);
-		void navigate(float forward, float right, int fast);
+		void navigate(float forward, float right, float speed);
 		void writeString(const char* str);
 		void setProperty(const void* data, int size);
 		void createUniverse(bool create_scene);
@@ -164,6 +136,8 @@ struct EditorServerImpl
 		void onLogWarning(const char* system, const char* message);
 		void onLogError(const char* system, const char* message);
 		void sendMessage(const uint8_t* data, int32_t length);
+		void setWireframe(bool is_wireframe);
+		void createEditorIcon(const Entity& entity);
 
 		MT::Mutex m_universe_mutex;
 		Gizmo m_gizmo;
@@ -627,8 +601,36 @@ void EditorServerImpl::load(FS::IFile& file, const char* path)
 	m_engine.deserialize(serializer);
 	m_camera = m_engine.getRenderScene()->getCameraInSlot("editor").entity;
 	g_log_info.log("editor server") << "universe parsed";
+
+	Universe* universe = m_engine.getUniverse();
+	for (int i = 0; i < universe->getEntityCount(); ++i)
+	{
+		Entity e(universe, i);
+		createEditorIcon(e);
+	}
 }
 
+
+void EditorServerImpl::createEditorIcon(const Entity& entity)
+{
+	const Entity::ComponentList& cmps = entity.getComponents();
+
+	bool found = false;
+	for (int i = 0; i < cmps.size(); ++i)
+	{
+		if (cmps[i].type == RENDERABLE_HASH)
+		{
+			found = true;
+			break;
+		}
+	}
+	if (!found)
+	{
+		EditorIcon* er = LUMIX_NEW(EditorIcon)();
+		er->create(m_engine, *m_engine.getRenderScene(), entity, Component::INVALID);
+		m_editor_icons.push(er);
+	}
+}
 
 void EditorServerImpl::resetAndLoad(FS::IFile& file, const char* path)
 {
@@ -730,6 +732,12 @@ void EditorServerImpl::onLogError(const char* system, const char* message)
 }
 
 
+void EditorServerImpl::setWireframe(bool is_wireframe)
+{
+	m_engine.getRenderer().setEditorWireframe(is_wireframe);
+}
+
+
 void EditorServerImpl::sendMessage(const uint8_t* data, int32_t length)
 {
 	m_client.onMessage(data, length);
@@ -752,59 +760,6 @@ void EditorServerImpl::renderScene(IRenderDevice& render_device)
 }
 
 
-void EditorServerImpl::renderPhysics()
-{
-	ASSERT(false);
-	/*glMatrixMode(GL_PROJECTION);
-	float proj[16];
-	h3dGetCameraProjMat(m_engine.getRenderer().getRawCameraNode(), proj);
-	glLoadMatrixf(proj);
-		
-	glMatrixMode(GL_MODELVIEW);
-	
-	Matrix mtx;
-	m_engine.getRenderer().getCameraMatrix(mtx);
-	mtx.fastInverse();
-	glLoadMatrixf(&mtx.m11);
-
-	glViewport(0, 0, m_engine.getRenderer().getWidth(), m_engine.getRenderer().getHeight());
-
-	glEnable(GL_DEPTH_TEST);
-	glDisable(GL_CULL_FACE);
-	glDisable(GL_TEXTURE_2D);
-	glDisable(GL_BLEND);
-
-	glDisableClientState(GL_VERTEX_ARRAY);
-	glDisableClientState(GL_COLOR_ARRAY);
-	glDisableClientState(GL_NORMAL_ARRAY);
-	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-
-	IPlugin* physics = m_engine.getPluginManager().getPlugin("physics");
-	if(physics)
-	{
-		physics->sendMessage("render");
-	}
-	/*m_physics_scene->getRawScene()->getNbActors(physx::PxActorTypeSelectionFlag::eRIGID_STATIC);
-	const physx::PxRenderBuffer& rb = m_physics_scene->getRawScene()->getRenderBuffer();
-	const physx::PxU32 numLines = rb.getNbLines();
-	const physx::PxU32 numPoints = rb.getNbPoints();
-	const physx::PxU32 numTri = rb.getNbTriangles();
-	if(numLines)
-	{
-		glBegin(GL_LINES);
-		const physx::PxDebugLine* PX_RESTRICT lines = rb.getLines();
-		for(physx::PxU32 i=0; i<numLines; i++)
-		{
-			const physx::PxDebugLine& line = lines[i];
-			glColor3f(1, 1, 1);				
-			glVertex3fv((GLfloat*)&line.pos0);
-			glVertex3fv((GLfloat*)&line.pos1);
-		}
-		glEnd();
-	}*/
-}
-
-
 EditorServerImpl::EditorServerImpl(EditorClient& client, EditorServer& server)
 	: m_universe_mutex(false)
 	, m_toggle_game_mode_requested(false)
@@ -817,15 +772,12 @@ EditorServerImpl::EditorServerImpl(EditorClient& client, EditorServer& server)
 }
 
 
-void EditorServerImpl::navigate(float forward, float right, int fast)
+void EditorServerImpl::navigate(float forward, float right, float speed)
 {
-	static const float NORMAL_SPEED = 0.1f;
-	static const float FAST_SPEED = 0.1f;
-	float navigation_speed = (fast ? FAST_SPEED : NORMAL_SPEED);
 	Vec3 pos = m_camera.getPosition();
 	Quat rot = m_camera.getRotation();;
-	pos += rot * Vec3(0, 0, -1) * forward * navigation_speed;
-	pos += rot * Vec3(1, 0, 0) * right * navigation_speed;
+	pos += rot * Vec3(0, 0, -1) * forward * speed;
+	pos += rot * Vec3(1, 0, 0) * right * speed;
 	m_camera.setPosition(pos);
 }
 
@@ -1090,7 +1042,7 @@ void EditorServerImpl::onMessage(const uint8_t* data, int32_t size)
 		setProperty(msg + 1, size - 4);
 		break;
 	case ClientMessageType::MOVE_CAMERA:
-		navigate(fmsg[1], fmsg[2], msg[3]);
+		navigate(fmsg[1], fmsg[2], fmsg[3]);
 		break;
 	case ClientMessageType::SAVE:
 		save(reinterpret_cast<const char*>(&msg[1]));
@@ -1106,6 +1058,9 @@ void EditorServerImpl::onMessage(const uint8_t* data, int32_t size)
 		break;
 	case ClientMessageType::REMOVE_COMPONENT:
 		removeComponent(*reinterpret_cast<const uint32_t*>(&msg[1]));
+		break;
+	case ClientMessageType::SET_WIREFRAME:
+		setWireframe(msg[1] != 0);
 		break;
 	case ClientMessageType::ADD_ENTITY:
 		addEntity();

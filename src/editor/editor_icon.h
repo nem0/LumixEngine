@@ -21,7 +21,7 @@ class EditorIcon
 {
 	friend class EditorApp;
 	public:
-		void create(Engine& engine, RenderScene& scene, Entity& entity, const Component& cmp);
+		void create(Engine& engine, RenderScene& scene, const Entity& entity, const Component& cmp);
 		void destroy();
 		void render(Renderer* renderer, IRenderDevice& render_device);
 		void show();

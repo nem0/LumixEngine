@@ -61,6 +61,18 @@ class Array<T, Allocator, false>
 			m_allocator.deallocate(m_data);
 		}
 
+		void eraseItemFast(const T& item)
+		{
+			for (int i = 0; i < m_size; ++i)
+			{
+				if (m_data[i] == item)
+				{
+					eraseFast(i);
+					return;
+				}
+			}
+		}
+
 		void eraseFast(int index)
 		{
 			if(index >= 0 && index < m_size)
@@ -246,6 +258,18 @@ public:
 				memmove(m_data + index, m_data + m_size - 1, sizeof(T));
 			}
 			--m_size;
+		}
+	}
+
+	void eraseItemFast(const T& item)
+	{
+		for (int i = 0; i < m_size; ++i)
+		{
+			if (m_data[i] == item)
+			{
+				eraseFast(i);
+				return;
+			}
 		}
 	}
 

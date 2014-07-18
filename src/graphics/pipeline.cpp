@@ -370,6 +370,13 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
+	Renderer& getRenderer()
+	{
+		ASSERT(m_renderer);
+		return *m_renderer;
+	}
+
+
 	void sourceLoaded(Resource::State old_state, Resource::State new_state)
 	{
 		if (old_state != Resource::State::READY && new_state == Resource::State::READY)
@@ -539,6 +546,41 @@ struct PipelineInstanceImpl : public PipelineInstance
 		glEnd();
 	}
 
+	void renderTerrains(int64_t layer_mask)
+	{
+		if (m_active_camera.isValid())
+		{
+			m_terrain_infos.clear();
+			m_scene->getTerrainInfos(m_terrain_infos, layer_mask);
+			Vec3 camera_position = m_active_camera.entity.getPosition();
+			for (int i = 0; i < m_terrain_infos.size(); ++i)
+			{
+				if (m_terrain_infos[i].m_material)
+				{
+					if (m_terrain_infos[i].m_material->getShader())
+					{
+						Matrix world_matrix;
+						m_terrain_infos[i].m_entity.getMatrix(world_matrix);
+						Shader* shader = m_terrain_infos[i].m_material->getShader();
+						shader->setUniform("world_matrix", world_matrix);
+						shader->setUniform("shadowmap_matrix0", m_shadow_modelviewprojection[0]);
+						shader->setUniform("shadowmap_matrix1", m_shadow_modelviewprojection[1]);
+						shader->setUniform("shadowmap_matrix2", m_shadow_modelviewprojection[2]);
+						shader->setUniform("shadowmap_matrix3", m_shadow_modelviewprojection[3]);
+						shader->setUniform("light_dir", m_light_dir);
+
+						Vec3 scale;
+						scale.x = m_terrain_infos[i].m_xz_scale;
+						scale.y = m_terrain_infos[i].m_y_scale;
+						scale.z = scale.x;
+						m_terrain_infos[i].m_material->getShader()->setUniform("terrain_scale", scale);
+						m_scene->renderTerrain(m_terrain_infos[i], *m_renderer, *this, camera_position);
+					}
+				}
+			}
+		}
+	}
+
 	void renderModels(int64_t layer_mask)
 	{
 		ASSERT(m_renderer != NULL);
@@ -559,12 +601,12 @@ struct PipelineInstanceImpl : public PipelineInstance
 			if (last_material != &material)
 			{
 				material.apply(*m_renderer, *this);
-				material.getShader()->setUniform("light_dir", m_light_dir);
+				material.getShader()->setUniform("world_matrix", world_matrix);
 				material.getShader()->setUniform("shadowmap_matrix0", m_shadow_modelviewprojection[0]);
 				material.getShader()->setUniform("shadowmap_matrix1", m_shadow_modelviewprojection[1]);
 				material.getShader()->setUniform("shadowmap_matrix2", m_shadow_modelviewprojection[2]);
 				material.getShader()->setUniform("shadowmap_matrix3", m_shadow_modelviewprojection[3]);
-				material.getShader()->setUniform("world_matrix", world_matrix);
+				material.getShader()->setUniform("light_dir", m_light_dir);
 				last_material = &material;
 			}
 			static Matrix bone_mtx[64];
@@ -586,32 +628,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 			infos[i].m_geometry->draw(mesh.getStart(), mesh.getCount(), *material.getShader());
 			glPopMatrix();
 		}
-		if (m_active_camera.isValid())
-		{
-			static Array<TerrainInfo> terrain_infos;
-			terrain_infos.clear();
-			m_scene->getTerrainInfos(terrain_infos, layer_mask);
-			Vec3 camera_position = m_active_camera.entity.getPosition();
-			for (int i = 0; i < terrain_infos.size(); ++i)
-			{
-				if (terrain_infos[i].m_material)
-				{
-					if (terrain_infos[i].m_material->getShader())
-					{
-						terrain_infos[i].m_material->getShader()->setUniform("light_dir", m_light_dir);
-						Matrix world_matrix;
-						terrain_infos[i].m_entity.getMatrix(world_matrix);
-						terrain_infos[i].m_material->getShader()->setUniform("world_matrix", world_matrix);
-						Vec3 scale;
-						scale.x = terrain_infos[i].m_xz_scale;
-						scale.y = terrain_infos[i].m_y_scale;
-						scale.z = scale.x;
-						terrain_infos[i].m_material->getShader()->setUniform("terrain_scale", scale);
-						m_scene->renderTerrain(terrain_infos[i], *m_renderer, *this, camera_position);
-					}
-				}
-			}
-		}
+
+		renderTerrains(layer_mask);
 	}
 
 	virtual void resize(int w, int h) override
@@ -657,6 +675,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	int m_height;
 	Map<uint32_t, CustomCommandHandler> m_custom_commands_handlers;
 	Component m_active_camera;
+	Array<TerrainInfo> m_terrain_infos;
 
 	private:
 		void operator=(const PipelineInstanceImpl&);
@@ -687,9 +706,9 @@ void PolygonModeCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 }
 
 
-void PolygonModeCommand::execute(PipelineInstanceImpl&)
+void PolygonModeCommand::execute(PipelineInstanceImpl& pipeline)
 {
-	glPolygonMode(GL_FRONT_AND_BACK, m_fill ? GL_FILL : GL_LINE);
+	glPolygonMode(GL_FRONT_AND_BACK, m_fill && !pipeline.getRenderer().isEditorWireframe() ? GL_FILL : GL_LINE);
 }
 
 void ClearCommand::deserialize(PipelineImpl&, ISerializer& serializer)

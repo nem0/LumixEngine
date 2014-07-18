@@ -174,6 +174,12 @@ namespace Lumix
 		m_impl->sendMessage(ClientMessageType::LOAD, path, (int32_t)strlen(path)+1);
 	}
 
+	void EditorClient::setWireframe(bool is_wireframe)
+	{
+		int32_t data = is_wireframe;
+		m_impl->sendMessage(ClientMessageType::SET_WIREFRAME, &data, sizeof(data));
+	}
+
 	void EditorClient::setEntityPosition(int32_t entity, const Vec3& position)
 	{
 		uint8_t data[sizeof(entity) + sizeof(position)];
@@ -187,12 +193,12 @@ namespace Lumix
 		m_impl->sendMessage(ClientMessageType::SAVE, path, (int32_t)strlen(path)+1);
 	}
 
-	void EditorClient::navigate(float forward, float right, int32_t fast)
+	void EditorClient::navigate(float forward, float right, float speed)
 	{
 		uint8_t data[12];
 		*(float*)data = forward;
-		*(float*)(data+4) = right;
-		*(int32_t*)(data+8) = fast;
+		*(float*)(data + 4) = right;
+		*(float*)(data + 8) = speed;
 		m_impl->sendMessage(ClientMessageType::MOVE_CAMERA, data, 12);
 	}
 

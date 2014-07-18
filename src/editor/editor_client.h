@@ -10,7 +10,6 @@ namespace Lumix
 	class EditorServer;
 	struct Entity;
 	struct EntitySelectedEvent;
-	class EventManager;
 	struct PropertyListEvent;
 	struct ServerMessage;
 	struct Vec3;
@@ -35,12 +34,12 @@ namespace Lumix
 			void mouseMove(int x, int y, int dx, int dy, int flags);
 			void requestProperties(uint32_t type_crc);
 			void setComponentProperty(const char* component, const char* property, const void* value, int32_t length);
-			void navigate(float forward, float right, int32_t fast);
+			void navigate(float forward, float right, float speed);
 			void loadUniverse(const char* path);
 			void saveUniverse(const char* path);
 			void setEntityPosition(int32_t entity, const Vec3& position);
+			void setWireframe(bool is_wireframe);
 			const char* getBasePath() const;
-			EventManager& getEventManager();
 			PropertyListCallback& propertyListReceived();
 			EntitySelectedCallback& entitySelected();
 
