@@ -401,7 +401,7 @@ void EditorServerImpl::addEntity()
 	e.setPosition(m_camera.getPosition() + m_camera.getRotation() * Vec3(0, 0, -2));
 	selectEntity(e);
 	EditorIcon* er = LUMIX_NEW(EditorIcon)();
-	er->create(m_engine, *m_engine.getRenderScene(), m_selected_entity, Component::INVALID);
+	er->create(m_engine, *m_engine.getRenderScene(), m_selected_entity);
 	m_editor_icons.push(er);
 }
 
@@ -615,19 +615,19 @@ void EditorServerImpl::createEditorIcon(const Entity& entity)
 {
 	const Entity::ComponentList& cmps = entity.getComponents();
 
-	bool found = false;
+	bool found_renderable = false;
 	for (int i = 0; i < cmps.size(); ++i)
 	{
 		if (cmps[i].type == RENDERABLE_HASH)
 		{
-			found = true;
+			found_renderable = true;
 			break;
 		}
 	}
-	if (!found)
+	if (!found_renderable)
 	{
 		EditorIcon* er = LUMIX_NEW(EditorIcon)();
-		er->create(m_engine, *m_engine.getRenderScene(), entity, Component::INVALID);
+		er->create(m_engine, *m_engine.getRenderScene(), entity);
 		m_editor_icons.push(er);
 	}
 }
@@ -900,22 +900,7 @@ void EditorServerImpl::onComponentCreated(Component& cmp)
 			break;
 		}
 	}
-	const Lumix::Entity::ComponentList& cmps = cmp.entity.getComponents();
-	bool found = false;
-	for (int i = 0; i < cmps.size(); ++i)
-	{
-		if (cmps[i].type == RENDERABLE_HASH)
-		{
-			found = true;
-			break;
-		}
-	}
-	if (!found)
-	{
-		EditorIcon* er = LUMIX_NEW(EditorIcon)();
-		er->create(m_engine, *m_engine.getRenderScene(), cmp.entity, cmp);
-		m_editor_icons.push(er);
-	}
+	createEditorIcon(cmp.entity);
 }
 
 
@@ -934,7 +919,7 @@ void EditorServerImpl::onComponentDestroyed(Component& cmp)
 	if(cmp.entity.existsInUniverse() && cmp.entity.getComponents().empty())
 	{
 		EditorIcon* er = LUMIX_NEW(EditorIcon)();
-		er->create(m_engine, *m_engine.getRenderScene(), cmp.entity, Component::INVALID);
+		er->create(m_engine, *m_engine.getRenderScene(), cmp.entity);
 		m_editor_icons.push(er);
 	}
 }
