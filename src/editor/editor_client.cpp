@@ -197,8 +197,8 @@ namespace Lumix
 	{
 		uint8_t data[12];
 		*(float*)data = forward;
-		*(float*)(data+4) = right;
-		*(float*)(data+8) = speed;
+		*(float*)(data + 4) = right;
+		*(float*)(data + 8) = speed;
 		m_impl->sendMessage(ClientMessageType::MOVE_CAMERA, data, 12);
 	}
 

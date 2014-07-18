@@ -550,19 +550,18 @@ struct PipelineInstanceImpl : public PipelineInstance
 	{
 		if (m_active_camera.isValid())
 		{
-			static Array<TerrainInfo> terrain_infos;
-			terrain_infos.clear();
-			m_scene->getTerrainInfos(terrain_infos, layer_mask);
+			m_terrain_infos.clear();
+			m_scene->getTerrainInfos(m_terrain_infos, layer_mask);
 			Vec3 camera_position = m_active_camera.entity.getPosition();
-			for (int i = 0; i < terrain_infos.size(); ++i)
+			for (int i = 0; i < m_terrain_infos.size(); ++i)
 			{
-				if (terrain_infos[i].m_material)
+				if (m_terrain_infos[i].m_material)
 				{
-					if (terrain_infos[i].m_material->getShader())
+					if (m_terrain_infos[i].m_material->getShader())
 					{
 						Matrix world_matrix;
-						terrain_infos[i].m_entity.getMatrix(world_matrix);
-						Shader* shader = terrain_infos[i].m_material->getShader();
+						m_terrain_infos[i].m_entity.getMatrix(world_matrix);
+						Shader* shader = m_terrain_infos[i].m_material->getShader();
 						shader->setUniform("world_matrix", world_matrix);
 						shader->setUniform("shadowmap_matrix0", m_shadow_modelviewprojection[0]);
 						shader->setUniform("shadowmap_matrix1", m_shadow_modelviewprojection[1]);
@@ -571,11 +570,11 @@ struct PipelineInstanceImpl : public PipelineInstance
 						shader->setUniform("light_dir", m_light_dir);
 
 						Vec3 scale;
-						scale.x = terrain_infos[i].m_xz_scale;
-						scale.y = terrain_infos[i].m_y_scale;
+						scale.x = m_terrain_infos[i].m_xz_scale;
+						scale.y = m_terrain_infos[i].m_y_scale;
 						scale.z = scale.x;
-						terrain_infos[i].m_material->getShader()->setUniform("terrain_scale", scale);
-						m_scene->renderTerrain(terrain_infos[i], *m_renderer, *this, camera_position);
+						m_terrain_infos[i].m_material->getShader()->setUniform("terrain_scale", scale);
+						m_scene->renderTerrain(m_terrain_infos[i], *m_renderer, *this, camera_position);
 					}
 				}
 			}
@@ -676,6 +675,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	int m_height;
 	Map<uint32_t, CustomCommandHandler> m_custom_commands_handlers;
 	Component m_active_camera;
+	Array<TerrainInfo> m_terrain_infos;
 
 	private:
 		void operator=(const PipelineInstanceImpl&);

@@ -147,7 +147,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	Component createHeightfield(Entity entity)
+	virtual Component createHeightfield(Entity entity) override
 	{
 		Terrain* terrain = LUMIX_NEW(Terrain);
 		m_terrains.push(terrain);
@@ -161,7 +161,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	Component createController(Entity entity)
+	virtual Component createController(Entity entity) override
 	{
 		physx::PxCapsuleControllerDesc cDesc;
 		cDesc.material = m_default_material;
@@ -186,7 +186,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	Component createBoxRigidActor(Entity entity)
+	virtual Component createBoxRigidActor(Entity entity) override
 	{
 		RigidActor* actor = LUMIX_NEW(RigidActor);
 		m_actors.push(actor);
@@ -214,7 +214,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	Component createMeshRigidActor(Entity entity)
+	virtual Component createMeshRigidActor(Entity entity) override
 	{
 		RigidActor* actor = LUMIX_NEW(RigidActor);
 		m_actors.push(actor);
@@ -227,19 +227,19 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void getHeightmap(Component cmp, string& str)
+	virtual void getHeightmap(Component cmp, string& str) override
 	{
 		str = m_terrains[cmp.index]->m_heightmap ? m_terrains[cmp.index]->m_heightmap->getPath().c_str() : "";
 	}
 
 
-	void getHeightmapXZScale(Component cmp, float& scale)
+	virtual void getHeightmapXZScale(Component cmp, float& scale) override
 	{
 		scale = m_terrains[cmp.index]->m_xz_scale;
 	}
 
 
-	void setHeightmapXZScale(Component cmp, const float& scale)
+	virtual void setHeightmapXZScale(Component cmp, const float& scale) override
 	{
 		if (scale != m_terrains[cmp.index]->m_xz_scale)
 		{
@@ -249,13 +249,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void getHeightmapYScale(Component cmp, float& scale)
+	virtual void getHeightmapYScale(Component cmp, float& scale) override
 	{
 		scale = m_terrains[cmp.index]->m_y_scale;
 	}
 
 
-	void setHeightmapYScale(Component cmp, const float& scale)
+	virtual void setHeightmapYScale(Component cmp, const float& scale) override
 	{
 		if (scale != m_terrains[cmp.index]->m_y_scale)
 		{
@@ -268,7 +268,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void setHeightmap(Component cmp, const string& str)
+	virtual void setHeightmap(Component cmp, const string& str) override
 	{
 		if (m_terrains[cmp.index]->m_heightmap)
 		{
@@ -285,13 +285,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void getShapeSource(Component cmp, string& str)
+	virtual void getShapeSource(Component cmp, string& str) override
 	{
 		str = m_actors[cmp.index]->m_source;
 	}
 
 
-	void setShapeSource(Component cmp, const string& str)
+	virtual void setShapeSource(Component cmp, const string& str) override
 	{
 		bool is_dynamic = false;
 		getIsDynamic(cmp, is_dynamic);
@@ -417,18 +417,18 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void render()
+	virtual void render() override
 	{
 		m_scene->getNbActors(physx::PxActorTypeSelectionFlag::eRIGID_STATIC);
 		const physx::PxRenderBuffer& rb = m_scene->getRenderBuffer();
-		const physx::PxU32 numLines = rb.getNbLines();
-		const physx::PxU32 numPoints = rb.getNbPoints();
-		const physx::PxU32 numTri = rb.getNbTriangles();
-		if (numLines)
+		const physx::PxU32 num_lines = rb.getNbLines();
+		const physx::PxU32 num_points = rb.getNbPoints();
+		const physx::PxU32 num_tri = rb.getNbTriangles();
+		if (num_lines)
 		{
 			glBegin(GL_LINES);
 			const physx::PxDebugLine* PX_RESTRICT lines = rb.getLines();
-			for (physx::PxU32 i = 0; i<numLines; i++)
+			for (physx::PxU32 i = 0; i < num_lines; ++i)
 			{
 				const physx::PxDebugLine& line = lines[i];
 				GLubyte bytes[3];
@@ -444,7 +444,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void update(float time_delta)
+	virtual void update(float time_delta) override
 	{
 		time_delta = 0.01f;
 		m_scene->simulate(time_delta);
@@ -466,13 +466,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void moveController(Component cmp, const Vec3& v, float dt)
+	virtual void moveController(Component cmp, const Vec3& v, float dt) override
 	{
 		m_controllers[cmp.index].m_controller->move(physx::PxVec3(v.x, v.y, v.z), 0.001f, dt, physx::PxControllerFilters());
 	}
 
 
-	bool raycast(const Vec3& origin, const Vec3& dir, float distance, RaycastHit& result)
+	virtual bool raycast(const Vec3& origin, const Vec3& dir, float distance, RaycastHit& result) override
 	{
 		physx::PxVec3 physx_origin(origin.x, origin.y, origin.z);
 		physx::PxVec3 unit_dir(dir.x, dir.y, dir.z);
@@ -516,14 +516,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 				{
 					m_actors[cmps[i].index]->m_physx_actor->setGlobalPose(trans, false);
 				}
-				break;
 			}
 			else if (cmps[i].type == CONTROLLER_HASH)
 			{
 				Vec3 pos = entity.getPosition();
 				physx::PxExtendedVec3 pvec(pos.x, pos.y, pos.z);
 				m_controllers[cmps[i].index].m_controller->setPosition(pvec);
-				break;
 			}
 		}
 	}
@@ -569,7 +567,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			}
 		}
 
-		terrain->m_heightmap->removeDataReference();
+		//terrain->m_heightmap->removeDataReference();
 
 		physx::PxHeightFieldDesc hfDesc;
 		hfDesc.format = physx::PxHeightFieldFormat::eS16_TM;
@@ -625,13 +623,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void getIsDynamic(Component cmp, bool& is)
+	virtual void getIsDynamic(Component cmp, bool& is) override
 	{
 		is = isDynamic(cmp.index);
 	}
 
 
-	void getHalfExtents(Component cmp, Vec3& size)
+	virtual void getHalfExtents(Component cmp, Vec3& size) override
 	{
 		physx::PxRigidActor* actor = m_actors[cmp.index]->m_physx_actor;
 		physx::PxShape* shapes;
@@ -645,7 +643,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void setHalfExtents(Component cmp, const Vec3& size)
+	virtual void setHalfExtents(Component cmp, const Vec3& size) override
 	{
 		physx::PxRigidActor* actor = m_actors[cmp.index]->m_physx_actor;
 		physx::PxShape* shapes;
@@ -663,7 +661,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void setIsDynamic(Component cmp, const bool& is)
+	virtual void setIsDynamic(Component cmp, const bool& new_value) override
 	{
 		int dynamic_index = -1;
 		RigidActor* actor = m_actors[cmp.index];
@@ -676,9 +674,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 			}
 		}
 		bool is_dynamic = dynamic_index != -1;
-		if (is_dynamic != is)
+		if (is_dynamic != new_value)
 		{
-			if (is)
+			if (new_value)
 			{
 				m_dynamic_actors.push(actor);
 			}
@@ -695,7 +693,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 				matrix2Transform(cmp.entity.getMatrix(), transform);
 
 				physx::PxRigidActor* actor;
-				if (is)
+				if (new_value)
 				{
 					actor = PxCreateDynamic(*m_system->m_impl->m_physics, transform, geom.any(), *m_default_material, 1.0f);
 				}
@@ -703,6 +701,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 				{
 					actor = PxCreateStatic(*m_system->m_impl->m_physics, transform, geom.any(), *m_default_material);
 				}
+				ASSERT(actor);
 				m_scene->removeActor(*m_actors[cmp.index]->m_physx_actor);
 				m_actors[cmp.index]->m_physx_actor->release();
 				m_scene->addActor(*actor);
@@ -782,7 +781,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void serialize(ISerializer& serializer)
+	virtual void serialize(ISerializer& serializer) override
 	{
 		serializer.serialize("count", m_actors.size());
 		serializer.beginArray("actors");
@@ -916,7 +915,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void deserialize(ISerializer& serializer)
+	virtual void deserialize(ISerializer& serializer) override
 	{
 		deserializeActors(serializer);
 		deserializeControllers(serializer);
@@ -924,7 +923,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	PhysicsSystem& getSystem() const
+	virtual PhysicsSystem& getSystem() const override
 	{
 		return *m_system;
 	}
