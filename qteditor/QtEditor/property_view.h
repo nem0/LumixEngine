@@ -8,6 +8,7 @@
 namespace Lumix
 {
 	class EditorClient;
+	struct EntityPositionEvent;
 	struct EntitySelectedEvent;
 	class Event;
 	class Path;
@@ -69,6 +70,7 @@ private:
 	void clear();
 	void onPropertyList(Lumix::PropertyListEvent& event);
 	void onEntitySelected(Lumix::EntitySelectedEvent& event);
+	void onEntityPosition(Lumix::EntityPositionEvent& e);
 	void addProperty(const char* component, const char* name, const char* label, Property::Type type, const char* file_type);
 	void onPropertyValue(Property* property, void* data, int32_t data_size);
 	void addScriptCustomProperties();
@@ -80,6 +82,7 @@ private:
 	Lumix::EditorClient* m_client;
 	Lumix::Array<Property*> m_properties;
 	ScriptCompiler* m_compiler;
+	int m_selected_entity_index;
 };
 
 
