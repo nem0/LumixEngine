@@ -884,6 +884,7 @@ void EditorServerImpl::selectEntity(Entity e)
 		}
 	}
 	sendMessage(m_stream.getBuffer(), m_stream.getBufferSize());
+	sendEntityPosition(e.index);
 }
 
 
