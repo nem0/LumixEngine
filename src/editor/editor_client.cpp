@@ -113,6 +113,10 @@ namespace Lumix
 		return m_impl->m_entity_selected;
 	}
 
+	EditorClient::EntityPositionCallback& EditorClient::entityPositionReceived()
+	{
+		return m_impl->m_entity_position_changed;
+	}
 
 	void EditorClientImpl::sendMessage(uint32_t type, const void* data, int32_t size)
 	{
