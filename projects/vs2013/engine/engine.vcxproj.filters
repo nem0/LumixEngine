@@ -103,6 +103,9 @@
     <ClCompile Include="..\..\..\src\graphics\render_scene.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\graphics\terrain.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\animation\animation.h">
@@ -202,6 +205,9 @@
       <Filter>graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\graphics\render_scene.h">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\graphics\terrain.h">
       <Filter>graphics</Filter>
     </ClInclude>
   </ItemGroup>

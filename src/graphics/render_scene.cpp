@@ -19,6 +19,7 @@
 #include "graphics/pipeline.h"
 #include "graphics/renderer.h"
 #include "graphics/shader.h"
+#include "graphics/terrain.h"
 #include "graphics/texture.h"
 #include "universe/universe.h"
 
@@ -31,249 +32,6 @@ namespace Lumix
 	static const uint32_t CAMERA_HASH = crc32("camera");
 	static const uint32_t TERRAIN_HASH = crc32("terrain");
 
-	struct TerrainQuad
-	{
-		enum ChildType
-		{
-			TOP_LEFT,
-			TOP_RIGHT,
-			BOTTOM_LEFT,
-			BOTTOM_RIGHT,
-			CHILD_COUNT
-		};
-		
-		TerrainQuad()
-		{
-			for (int i = 0; i < CHILD_COUNT; ++i)
-			{
-				m_children[i] = NULL;
-			}
-		}
-
-		~TerrainQuad()
-		{
-			for (int i = 0; i < CHILD_COUNT; ++i)
-			{
-				LUMIX_DELETE(m_children[i]);
-			}
-		}
-
-		void createChildren()
-		{
-			if (m_lod < 8 && m_size > 16)
-			{
-				for (int i = 0; i < CHILD_COUNT; ++i)
-				{
-					m_children[i] = LUMIX_NEW(TerrainQuad);
-					m_children[i]->m_lod = m_lod + 1;
-					m_children[i]->m_size = m_size / 2;
-				}
-				m_children[TOP_LEFT]->m_min = m_min;
-				m_children[TOP_RIGHT]->m_min.set(m_min.x + m_size / 2, 0, m_min.z);
-				m_children[BOTTOM_LEFT]->m_min.set(m_min.x, 0, m_min.z + m_size / 2);
-				m_children[BOTTOM_RIGHT]->m_min.set(m_min.x + m_size / 2, 0, m_min.z + m_size / 2);
-				for (int i = 0; i < CHILD_COUNT; ++i)
-				{
-					m_children[i]->createChildren();
-				}
-			}
-		}
-
-		float getDistance(const Vec3& camera_pos)
-		{
-			Vec3 _max(m_min.x + m_size, m_min.y, m_min.z + m_size);
-			float dist = 0;
-			if (camera_pos.x < m_min.x)
-			{
-				float d = m_min.x - camera_pos.x;
-				dist += d*d;
-			}
-			if (camera_pos.x > _max.x)
-			{
-				float d = _max.x - camera_pos.x;
-				dist += d*d;
-			}
-			if (camera_pos.z < m_min.z)
-			{
-				float d = m_min.z - camera_pos.z;
-				dist += d*d;
-			}
-			if (camera_pos.z > _max.z)
-			{
-				float d = _max.z - camera_pos.z;
-				dist += d*d;
-			}
-			return sqrt(dist);
-		}
-
-		static float getRadiusInner(float size)
-		{
-			float lower_level_size = size / 2;
-			float lower_level_diagonal = sqrt(2 * size / 2 * size / 2);
-			return getRadiusOuter(lower_level_size) + lower_level_diagonal;
-		}
-
-		static float getRadiusOuter(float size)
-		{
-			return (size > 17 ? 2 : 1) * sqrt(2 * size*size) + size * 0.25f;
-		}
-
-
-		bool render(Mesh* mesh, Geometry& geometry, const Vec3& camera_pos, RenderScene& scene)
-		{
-			float dist = getDistance(camera_pos);
-			float r = getRadiusOuter(m_size);
-			if (dist > r && m_lod > 1)
-			{
-				return false;
-			}
-			Vec3 morph_const(r, getRadiusInner(m_size), 0);
-			Shader& shader = *mesh->getMaterial()->getShader();
-			for (int i = 0; i < CHILD_COUNT; ++i)
-			{
-				if (!m_children[i] || !m_children[i]->render(mesh, geometry, camera_pos, scene))
-				{
-					shader.setUniform("morph_const", morph_const);
-					shader.setUniform("quad_size", m_size);
-					shader.setUniform("quad_min", m_min);
-					geometry.draw(mesh->getCount() / 4 * i , mesh->getCount() / 4, shader);
-				}
-			}
-			return true;
-		}
-
-		TerrainQuad* m_children[CHILD_COUNT];
-		Vec3 m_min;
-		float m_size;
-		int m_lod;
-		float m_xz_scale;
-	};
-
-	struct Terrain
-	{
-		struct Sample
-		{
-			Vec3 pos;
-			float u, v;
-		};
-
-		Terrain()
-			: m_mesh(NULL)
-			, m_material(NULL)
-			, m_root(NULL)
-		{
-			generateGeometry();
-		}
-
-		~Terrain()
-		{
-			LUMIX_DELETE(m_mesh);
-			LUMIX_DELETE(m_root);
-			if (m_material)
-			{
-				m_material->getObserverCb().unbind<Terrain, &Terrain::onMaterialLoaded>(this);
-				m_material->getResourceManager().get(ResourceManager::MATERIAL)->unload(*m_material);
-			}
-		}
-
-		void render(Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos)
-		{
-			if (m_root)
-			{
-				m_material->apply(renderer, pipeline);
-				m_mesh->getMaterial()->getShader()->setUniform("map_size", m_root->m_size);
-				m_mesh->getMaterial()->getShader()->setUniform("camera_pos", camera_pos);
-				m_root->render(m_mesh, m_geometry, camera_pos, *pipeline.getScene());
-			}
-		}
-
-		void generateQuadTree(float size)
-		{
-			LUMIX_DELETE(m_root);
-			m_root = LUMIX_NEW(TerrainQuad);
-			m_root->m_lod = 1;
-			m_root->m_min.set(0, 0, 0);
-			m_root->m_size = size;
-			m_root->createChildren();
-		}
-
-		void generateSubgrid(Array<Sample>& samples, Array<int32_t>& indices, int& indices_offset, int start_x, int start_y)
-		{
-			for (int j = start_y; j < start_y + 8; ++j)
-			{
-				for (int i = start_x; i < start_x + 8; ++i)
-				{
-					int idx = 4 * (i + j * GRID_SIZE);
-					samples[idx].pos.set((float)(i) / GRID_SIZE, 0, (float)(j) / GRID_SIZE);
-					samples[idx + 1].pos.set((float)(i + 1) / GRID_SIZE, 0, (float)(j) / GRID_SIZE);
-					samples[idx + 2].pos.set((float)(i + 1) / GRID_SIZE, 0, (float)(j + 1) / GRID_SIZE);
-					samples[idx + 3].pos.set((float)(i) / GRID_SIZE, 0, (float)(j + 1) / GRID_SIZE);
-					samples[idx].u = 0;
-					samples[idx].v = 0;
-					samples[idx+1].u = 1;
-					samples[idx+1].v = 0;
-					samples[idx+2].u = 1;
-					samples[idx+2].v = 1;
-					samples[idx+3].u = 0;
-					samples[idx+3].v = 1;
-
-					indices[indices_offset] = idx;
-					indices[indices_offset + 1] = idx + 3;
-					indices[indices_offset + 2] = idx + 2;
-					indices[indices_offset + 3] = idx;
-					indices[indices_offset + 4] = idx + 2;
-					indices[indices_offset + 5] = idx + 1;
-					indices_offset += 6;
-				}
-			}
-		}
-
-		void generateGeometry()
-		{
-			LUMIX_DELETE(m_mesh);
-			m_mesh = NULL;
-			Array<Sample> points;
-			points.resize(GRID_SIZE * GRID_SIZE * 4);
-			Array<int32_t> indices;
-			indices.resize(GRID_SIZE * GRID_SIZE * 6);
-			int indices_offset = 0;
-			generateSubgrid(points, indices, indices_offset, 0, 0);
-			generateSubgrid(points, indices, indices_offset, 8, 0);
-			generateSubgrid(points, indices, indices_offset, 0, 8);
-			generateSubgrid(points, indices, indices_offset, 8, 8);
-			
-			VertexDef vertex_def;
-			vertex_def.parse("pt", 2);
-			m_geometry.copy((const uint8_t*)&points[0], sizeof(points[0]) * points.size(), indices, vertex_def);
-			m_mesh = LUMIX_NEW(Mesh)(m_material, 0, indices.size(), "terrain");
-		}
-
-		void onMaterialLoaded(Resource::State, Resource::State new_state)
-		{
-			PROFILE_FUNCTION();
-			if (new_state == Resource::State::READY)
-			{
-				m_width = m_material->getTexture(0)->getWidth();
-				m_height = m_material->getTexture(0)->getHeight();
-				generateQuadTree((float)m_width);
-			}
-		}
-
-
-		static const int GRID_SIZE = 16;
-
-		int32_t m_width;
-		int32_t m_height;
-		Geometry m_geometry;
-		Material* m_material;
-		Mesh* m_mesh;
-		Matrix m_matrix;
-		Entity m_entity;
-		int64_t m_layer_mask;
-		TerrainQuad* m_root;
-		float m_xz_scale;
-		float m_y_scale;
-	};
 
 	struct Renderable
 	{
@@ -470,11 +228,7 @@ namespace Lumix
 				serializer.beginArray("terrains");
 				for (int i = 0; i < m_terrains.size(); ++i)
 				{
-					serializer.serializeArrayItem(m_terrains[i]->m_entity.index);
-					serializer.serializeArrayItem(m_terrains[i]->m_layer_mask);
-					serializer.serializeArrayItem(m_terrains[i]->m_material->getPath().c_str());
-					serializer.serializeArrayItem(m_terrains[i]->m_xz_scale);
-					serializer.serializeArrayItem(m_terrains[i]->m_y_scale);
+					m_terrains[i]->serialize(serializer);
 				}
 				serializer.endArray();
 			}
@@ -571,20 +325,12 @@ namespace Lumix
 				m_terrains.resize(size);
 				for (int i = old_size; i < size; ++i)
 				{
-					m_terrains[i] = LUMIX_NEW(Terrain);
+					m_terrains[i] = LUMIX_NEW(Terrain)(Entity::INVALID);
 				}
 				for (int i = 0; i < size; ++i)
 				{
 					Terrain* terrain = m_terrains[i];
-					serializer.deserializeArrayItem(terrain->m_entity.index);
-					terrain->m_entity.universe = &m_universe;
-					serializer.deserializeArrayItem(terrain->m_layer_mask);
-					char path[LUMIX_MAX_PATH];
-					serializer.deserializeArrayItem(path, LUMIX_MAX_PATH);
-					setTerrainMaterial(Component(terrain->m_entity, TERRAIN_HASH, this, i), string(path));
-					serializer.deserializeArrayItem(terrain->m_xz_scale);
-					serializer.deserializeArrayItem(terrain->m_y_scale);
-					m_universe.addComponent(terrain->m_entity, TERRAIN_HASH, this, i);
+					terrain->deserialize(serializer, m_universe, *this, i);
 				}
 				serializer.deserializeArrayEnd();
 			}
@@ -601,15 +347,8 @@ namespace Lumix
 			{
 				if (type == TERRAIN_HASH)
 				{
-					Terrain* terrain = LUMIX_NEW(Terrain);
+					Terrain* terrain = LUMIX_NEW(Terrain)(entity);
 					m_terrains.push(terrain);
-					terrain->m_width = 0;
-					terrain->m_height = 0;
-					terrain->m_matrix = entity.getMatrix();
-					terrain->m_entity = entity;
-					terrain->m_layer_mask = 1;
-					terrain->m_xz_scale = 1;
-					terrain->m_y_scale = 1;
 					Component cmp = m_universe.addComponent(entity, type, this, m_terrains.size() - 1);
 					m_universe.componentCreated().invoke(cmp);
 					return cmp;
@@ -666,42 +405,25 @@ namespace Lumix
 						m_renderables[cmps[i].index]->m_model.setMatrix(entity.getMatrix());
 						break;
 					}
-					else if (cmps[i].type == TERRAIN_HASH)
-					{
-						m_terrains[cmps[i].index]->m_matrix = entity.getMatrix();
-						break;
-					}
 				}
+			}
+
+			virtual Engine& getEngine() const override
+			{
+				return m_engine;
 			}
 
 			virtual void setTerrainMaterial(Component cmp, const string& path) override
 			{
 				Material* material = static_cast<Material*>(m_engine.getResourceManager().get(ResourceManager::MATERIAL)->load(path.c_str()));
-				if (material != m_terrains[cmp.index]->m_material)
-				{
-					if (m_terrains[cmp.index]->m_material)
-					{
-						m_engine.getResourceManager().get(ResourceManager::MATERIAL)->unload(*m_terrains[cmp.index]->m_material);
-						m_terrains[cmp.index]->m_material->getObserverCb().unbind<Terrain, &Terrain::onMaterialLoaded>(m_terrains[cmp.index]);
-					}
-					m_terrains[cmp.index]->m_material = material;
-					if (m_terrains[cmp.index]->m_mesh)
-					{
-						m_terrains[cmp.index]->m_mesh->setMaterial(m_terrains[cmp.index]->m_material);
-						m_terrains[cmp.index]->m_material->getObserverCb().bind<Terrain, &Terrain::onMaterialLoaded>(m_terrains[cmp.index]);
-					}
-				}
-				else
-				{
-					material->getResourceManager().get(ResourceManager::MATERIAL)->unload(*material);
-				}
+				m_terrains[cmp.index]->setMaterial(material);
 			}
 
 			virtual void getTerrainMaterial(Component cmp, string& path) override
 			{
-				if (m_terrains[cmp.index]->m_material)
+				if (m_terrains[cmp.index]->getMaterial())
 				{
-					path = m_terrains[cmp.index]->m_material->getPath().c_str();
+					path = m_terrains[cmp.index]->getMaterial()->getPath().c_str();
 				}
 				else
 				{
@@ -711,22 +433,22 @@ namespace Lumix
 
 			virtual void setTerrainXZScale(Component cmp, const float& scale) override
 			{
-				m_terrains[cmp.index]->m_xz_scale = scale;
+				m_terrains[cmp.index]->setXZScale(scale);
 			}
 
 			virtual void getTerrainXZScale(Component cmp, float& scale) override
 			{
-				scale = m_terrains[cmp.index]->m_xz_scale;
+				scale = m_terrains[cmp.index]->getXZScale();
 			}
 
 			virtual void setTerrainYScale(Component cmp, const float& scale) override
 			{
-				m_terrains[cmp.index]->m_y_scale = scale;
+				m_terrains[cmp.index]->setYScale(scale);
 			}
 
 			virtual void getTerrainYScale(Component cmp, float& scale)
 			{
-				scale = m_terrains[cmp.index]->m_y_scale;
+				scale = m_terrains[cmp.index]->getYScale();
 			}
 
 			virtual Pose& getPose(const Component& cmp) override
@@ -774,14 +496,14 @@ namespace Lumix
 				infos.reserve(m_terrains.size());
 				for (int i = 0; i < m_terrains.size(); ++i)
 				{
-					if ((m_terrains[i]->m_layer_mask & layer_mask) != 0)
+					if ((m_terrains[i]->getLayerMask() & layer_mask) != 0)
 					{
 						TerrainInfo& info = infos.pushEmpty();
-						info.m_entity = m_terrains[i]->m_entity;
-						info.m_material = m_terrains[i]->m_material;
+						info.m_entity = m_terrains[i]->getEntity();
+						info.m_material = m_terrains[i]->getMaterial();
 						info.m_index = i;
-						info.m_xz_scale = m_terrains[i]->m_xz_scale;
-						info.m_y_scale = m_terrains[i]->m_y_scale;
+						info.m_xz_scale = m_terrains[i]->getXZScale();
+						info.m_y_scale = m_terrains[i]->getYScale();
 					}
 				}
 			}
@@ -978,9 +700,9 @@ namespace Lumix
 			virtual void renderTerrain(const TerrainInfo& info, Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos) override
 			{
 				int i = info.m_index;
-				if (m_terrains[i]->m_mesh && m_terrains[i]->m_mesh->getMaterial() && m_terrains[i]->m_mesh->getMaterial()->isReady())
+				if (m_terrains[i]->getMaterial() && m_terrains[i]->getMaterial()->isReady())
 				{
-					Vec3 rel_cam_pos = camera_pos / m_terrains[i]->m_xz_scale;
+					Vec3 rel_cam_pos = camera_pos / m_terrains[i]->getXZScale();
 					m_terrains[i]->render(renderer, pipeline, rel_cam_pos);
 				}
 			}

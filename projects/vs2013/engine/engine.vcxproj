@@ -185,6 +185,7 @@
     <ClCompile Include="..\..\..\src\graphics\render_scene.cpp" />
     <ClCompile Include="..\..\..\src\graphics\shader.cpp" />
     <ClCompile Include="..\..\..\src\graphics\shader_manager.cpp" />
+    <ClCompile Include="..\..\..\src\graphics\terrain.cpp" />
     <ClCompile Include="..\..\..\src\graphics\texture.cpp" />
     <ClCompile Include="..\..\..\src\graphics\texture_manager.cpp" />
     <ClCompile Include="..\..\..\src\universe\component.cpp" />
@@ -220,6 +221,7 @@
     <ClInclude Include="..\..\..\src\graphics\render_scene.h" />
     <ClInclude Include="..\..\..\src\graphics\shader.h" />
     <ClInclude Include="..\..\..\src\graphics\shader_manager.h" />
+    <ClInclude Include="..\..\..\src\graphics\terrain.h" />
     <ClInclude Include="..\..\..\src\graphics\texture.h" />
     <ClInclude Include="..\..\..\src\graphics\texture_manager.h" />
     <ClInclude Include="..\..\..\src\universe\component.h" />
