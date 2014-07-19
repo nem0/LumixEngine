@@ -27,6 +27,15 @@ void Material::apply(Renderer& renderer, PipelineInstance& pipeline)
 	if(getState() == State::READY)
 	{
 		m_shader->apply();
+		switch (m_depth_func)
+		{
+			case DepthFunc::LEQUAL:
+				glDepthFunc(GL_LEQUAL);
+				break;
+			default:
+				glDepthFunc(GL_LESS);
+				break;
+		}
 		if (m_is_backface_culling)
 		{
 			glEnable(GL_CULL_FACE);
@@ -258,6 +267,23 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			else if (strcmp(label, "backface_culling") == 0)
 			{
 				serializer.deserialize(m_is_backface_culling);
+			}
+			else if (strcmp(label, "depth_func") == 0)
+			{
+				char tmp[30];
+				serializer.deserialize(tmp, 30);
+				if (strcmp(tmp, "lequal") == 0)
+				{
+					m_depth_func = DepthFunc::LEQUAL;
+				}
+				else if (strcmp(tmp, "less") == 0)
+				{
+					m_depth_func = DepthFunc::LESS;
+				}
+				else
+				{
+					g_log_warning.log("Renderer") << "Unknown depth function " << tmp << " in material " << m_path.c_str();
+				}
 			}
 			else
 			{
