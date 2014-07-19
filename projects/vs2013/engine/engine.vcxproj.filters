@@ -1,9 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="script">
-      <UniqueIdentifier>{af898ef8-401c-4aae-972c-8a5da5ead331}</UniqueIdentifier>
-    </Filter>
     <Filter Include="universe">
       <UniqueIdentifier>{17bfcc99-db07-4e7b-a65c-f59f818f4c83}</UniqueIdentifier>
     </Filter>
@@ -80,18 +77,6 @@
     </ClCompile>
     <ClCompile Include="..\..\..\src\editor\server_message_types.cpp">
       <Filter>editor</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\script\get_property_visitor.cpp">
-      <Filter>script</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\script\save_script_visitor.cpp">
-      <Filter>script</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\script\script_system.cpp">
-      <Filter>script</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\script\set_property_visitor.cpp">
-      <Filter>script</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\universe\component.cpp">
       <Filter>universe</Filter>
@@ -194,24 +179,6 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\editor\server_message_types.h">
       <Filter>editor</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\script\base_script.h">
-      <Filter>script</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\script\get_property_visitor.h">
-      <Filter>script</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\script\save_script_visitor.h">
-      <Filter>script</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\script\script_system.h">
-      <Filter>script</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\script\script_visitor.h">
-      <Filter>script</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\script\set_property_visitor.h">
-      <Filter>script</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\universe\component.h">
       <Filter>universe</Filter>

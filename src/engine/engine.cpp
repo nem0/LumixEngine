@@ -27,7 +27,7 @@ namespace Lumix
 
 	struct EngineImpl
 	{
-		EngineImpl(Engine& engine) : m_owner(engine), m_script_system(ScriptSystem::create()) {}
+		EngineImpl(Engine& engine) : m_owner(engine) {}
 		~EngineImpl();
 		bool create(const char* base_path, Engine& owner);
 
@@ -49,7 +49,6 @@ namespace Lumix
 		PluginManager m_plugin_manager;
 		Universe* m_universe;
 		RenderScene* m_render_scene;
-		ScriptSystem* m_script_system;
 		InputSystem m_input_system;
 		Engine& m_owner;
 		Timer* m_timer;
@@ -71,7 +70,6 @@ namespace Lumix
 
 	EngineImpl::~EngineImpl()
 	{
-		ScriptSystem::destroy(m_script_system);
 		m_resource_manager.get(ResourceManager::TEXTURE)->releaseAll();
 		m_resource_manager.get(ResourceManager::MATERIAL)->releaseAll();
 		m_resource_manager.get(ResourceManager::SHADER)->releaseAll();
@@ -115,7 +113,6 @@ namespace Lumix
 		{
 			return false;
 		}
-		m_script_system->setEngine(m_owner);
 		return true;
 	}
 
@@ -192,7 +189,6 @@ namespace Lumix
 		m_impl->m_universe = LUMIX_NEW(Universe)();
 		m_impl->m_render_scene = RenderScene::createInstance(*this, *m_impl->m_universe);
 		m_impl->m_plugin_manager.onCreateUniverse(*m_impl->m_universe);
-		m_impl->m_script_system->setUniverse(m_impl->m_universe);
 		m_impl->m_universe->create();
 		
 		return m_impl->m_universe;
@@ -203,7 +199,6 @@ namespace Lumix
 		ASSERT(m_impl->m_universe);
 		if (m_impl->m_universe)
 		{
-			m_impl->m_script_system->setUniverse(NULL);
 			m_impl->m_plugin_manager.onDestroyUniverse(*m_impl->m_universe);
 			m_impl->m_universe->destroy();
 			RenderScene::destroyInstance(m_impl->m_render_scene);
@@ -252,7 +247,6 @@ namespace Lumix
 		m_impl->m_render_scene->update(dt);
 		if (is_game_running)
 		{
-			m_impl->m_script_system->update(dt);
 			m_impl->m_plugin_manager.update(dt);
 			m_impl->m_input_system.update(dt);
 		}
@@ -262,13 +256,6 @@ namespace Lumix
 	IPlugin* Engine::loadPlugin(const char* name)
 	{
 		return m_impl->m_plugin_manager.load(name);
-	}
-
-	
-
-	ScriptSystem& Engine::getScriptSystem()
-	{
-		return *m_impl->m_script_system;
 	}
 
 
@@ -311,7 +298,6 @@ namespace Lumix
 		m_impl->m_universe->serialize(serializer);
 		m_impl->m_renderer->serialize(serializer);
 		m_impl->m_render_scene->serialize(serializer);
-		m_impl->m_script_system->serialize(serializer);
 		m_impl->m_plugin_manager.serialize(serializer);
 	}
 
@@ -321,7 +307,6 @@ namespace Lumix
 		m_impl->m_universe->deserialize(serializer);
 		m_impl->m_renderer->deserialize(serializer);
 		m_impl->m_render_scene->deserialize(serializer);
-		m_impl->m_script_system->deserialize(serializer);
 		m_impl->m_plugin_manager.deserialize(serializer);
 	}
 

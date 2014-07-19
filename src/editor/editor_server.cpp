@@ -281,7 +281,7 @@ void EditorServerImpl::registerProperties()
 	m_component_properties[renderable_type].push(LUMIX_NEW(PropertyDescriptor<Renderer>)(crc32("cast shadows"), &Renderer::getCastShadows, &Renderer::setCastShadows));
 	m_component_properties[point_light_type].push(LUMIX_NEW(PropertyDescriptor<Renderer>)(crc32("fov"), &Renderer::getLightFov, &Renderer::setLightFov));
 	m_component_properties[point_light_type].push(LUMIX_NEW(PropertyDescriptor<Renderer>)(crc32("radius"), &Renderer::getLightRadius, &Renderer::setLightRadius));
-	*/m_component_properties[SCRIPT_HASH].push(LUMIX_NEW(PropertyDescriptor<ScriptSystem>)(crc32("source"), &ScriptSystem::getScriptPath, &ScriptSystem::setScriptPath, IPropertyDescriptor::FILE));
+	*/
 }
 
 
@@ -416,7 +416,6 @@ void EditorServerImpl::toggleGameMode()
 	{
 		m_game_mode_file = m_engine.getFileSystem().open("memory", "", FS::Mode::WRITE);
 		save(*m_game_mode_file, "GameMode");
-		m_engine.getScriptSystem().start();
 		m_is_game_mode = true;
 	}
 }
@@ -425,7 +424,6 @@ void EditorServerImpl::toggleGameMode()
 void EditorServerImpl::stopGameMode()
 {
 	m_is_game_mode = false;
-	m_engine.getScriptSystem().stop();
 	m_game_mode_file->seek(FS::SeekMode::BEGIN, 0);
 	load(*m_game_mode_file, "GameMode");
 	m_engine.getFileSystem().close(m_game_mode_file);
@@ -504,10 +502,6 @@ void EditorServerImpl::addComponent(uint32_t type_crc)
 		else if(type_crc == RENDERABLE_HASH || type_crc == TERRAIN_HASH || type_crc == CAMERA_HASH || type_crc == LIGHT_HASH)
 		{
 			m_engine.getRenderScene()->createComponent(type_crc, m_selected_entity);
-		}
-		else if(type_crc == SCRIPT_HASH)
-		{
-			m_engine.getScriptSystem().createScript(m_selected_entity);
 		}
 		else
 		{
@@ -665,9 +659,13 @@ bool EditorServerImpl::create(const char* base_path)
 
 	//glPopAttrib();
 	
-	if(!m_engine.loadPlugin("physics.dll"))
+	if (!m_engine.loadPlugin("physics.dll"))
 	{
 		g_log_info.log("plugins") << "physics plugin has not been loaded";
+	}
+	if (!m_engine.loadPlugin("script.dll"))
+	{
+		g_log_info.log("plugins") << "script plugin has not been loaded";
 	}
 	/*if(!m_engine.loadPlugin("navigation.dll"))
 	{
