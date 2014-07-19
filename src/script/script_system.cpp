@@ -271,7 +271,7 @@ namespace Lumix
 
 		virtual void destroy() override
 		{
-			ASSERT(false);
+			stopAll();
 		}
 
 

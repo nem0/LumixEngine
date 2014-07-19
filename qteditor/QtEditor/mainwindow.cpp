@@ -22,7 +22,8 @@ MainWindow::MainWindow(QWidget* parent) :
 	m_client = NULL;
 	m_ui->setupUi(this);
 	m_ui->centralWidget->hide();
-	
+	setDockOptions(AllowNestedDocks | AnimatedDocks | AllowTabbedDocks);
+
 	m_log = new LogWidget;
 	m_property_view = new PropertyView;
 	m_scene_view = new SceneView;
