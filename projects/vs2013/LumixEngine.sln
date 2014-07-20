@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Express 2013 for Windows Desktop
-VisualStudioVersion = 12.0.30324.0
+VisualStudioVersion = 12.0.21005.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "core", "core\core.vcxproj", "{A0A17BB4-760B-4E34-B1B0-3E43E5F2778A}"
 EndProject
@@ -24,6 +24,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "unit_tests", "unit_tests\un
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "script", "script\script.vcxproj", "{E56A8C15-C73D-43E4-8D7C-04BBFC062ACC}"
+	ProjectSection(ProjectDependencies) = postProject
+		{E1A0C677-DE71-4AD8-B802-AA7A3332D822} = {E1A0C677-DE71-4AD8-B802-AA7A3332D822}
+		{A0A17BB4-760B-4E34-B1B0-3E43E5F2778A} = {A0A17BB4-760B-4E34-B1B0-3E43E5F2778A}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
