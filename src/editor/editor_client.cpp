@@ -136,6 +136,12 @@ namespace Lumix
 	}
 
 
+	void EditorClient::lookAtSelected()
+	{
+		m_impl->sendMessage((uint32_t)ClientMessageType::LOOK_AT_SELECTED, NULL, 0);
+	}
+
+
 	void EditorClient::addComponent(uint32_t type)
 	{
 		m_impl->sendMessage((uint32_t)ClientMessageType::ADD_COMPONENT, &type, sizeof(type));

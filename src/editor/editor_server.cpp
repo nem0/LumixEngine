@@ -514,15 +514,13 @@ void EditorServerImpl::addComponent(uint32_t type_crc)
 
 void EditorServerImpl::lookAtSelected()
 {
-	/*if(m_selected_entity.isValid())
+	if(m_selected_entity.isValid())
 	{
-		Vec3 dir = m_camera_rot * Vec3(0, 0, 1);
-		m_camera_pos = m_selected_entity.getPosition() + dir * 10;
-		Matrix mtx;
-		m_camera_rot.toMatrix(mtx);
-		mtx.setTranslation(m_camera_pos);
-		m_engine.getRenderer().setCameraMatrix(mtx);
-	}*/
+		Matrix camera_mtx = m_camera.getMatrix();
+		Vec3 dir = camera_mtx * Vec3(0, 0, 1);
+		camera_mtx.setTranslation(m_selected_entity.getPosition() + dir * 10);
+		m_camera.setMatrix(camera_mtx);
+	}
 }
 
 

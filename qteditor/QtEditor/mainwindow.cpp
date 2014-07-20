@@ -204,3 +204,8 @@ void MainWindow::on_actionGame_mode_triggered()
 {
 	m_client->toggleGameMode();
 }
+
+void MainWindow::on_actionLook_at_selected_entity_triggered()
+{
+	m_client->lookAtSelected();
+}
