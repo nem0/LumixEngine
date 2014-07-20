@@ -398,7 +398,19 @@ void EditorServerImpl::save(FS::IFile& file, const char* path)
 void EditorServerImpl::addEntity()
 {
 	Entity e = m_engine.getUniverse()->createEntity();
-	e.setPosition(m_camera.getPosition() + m_camera.getRotation() * Vec3(0, 0, -2));
+
+	RenderScene* scene = m_engine.getRenderScene();
+	Vec3 origin = m_camera.getPosition();
+	Vec3 dir = -m_camera.getMatrix().getZVector();
+	RayCastModelHit hit = scene->castRay(origin, dir);
+	if (hit.m_is_hit)
+	{
+		e.setPosition(hit.m_origin + hit.m_dir * hit.m_t);
+	}
+	else
+	{
+		e.setPosition(m_camera.getPosition() + m_camera.getRotation() * Vec3(0, 0, -2));
+	}
 	selectEntity(e);
 	EditorIcon* er = LUMIX_NEW(EditorIcon)();
 	er->create(m_engine, *m_engine.getRenderScene(), m_selected_entity);

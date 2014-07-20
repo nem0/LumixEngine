@@ -180,6 +180,10 @@ namespace Lumix
 			{
 				m_mesh->setMaterial(m_material);
 				m_material->getObserverCb().bind<Terrain, &Terrain::onMaterialLoaded>(this);
+				if (m_material->isReady())
+				{
+					onMaterialLoaded(Resource::State::READY, Resource::State::READY);
+				}
 			}
 		}
 		else if(material)
