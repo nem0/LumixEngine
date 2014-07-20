@@ -30,6 +30,7 @@ namespace Lumix
 			void onMessage(const uint8_t* data, int size);
 			void addEntity();
 			void toggleGameMode();
+			void lookAtSelected();
 			void addComponent(uint32_t type);
 			void mouseDown(int x, int y, int button);
 			void mouseUp(int x, int y, int button);

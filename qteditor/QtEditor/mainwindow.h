@@ -49,6 +49,8 @@ private slots:
 
     void on_actionGame_mode_triggered();
 
+    void on_actionLook_at_selected_entity_triggered();
+
 private:
 	Ui::MainWindow* m_ui;
 	Lumix::EditorClient* m_client;
