@@ -343,7 +343,7 @@ void EditorServerImpl::onPointerDown(int x, int y, MouseButton::Value button)
 		}
 		else if(hit.m_is_hit)
 		{
-			selectEntity(hit.m_renderable.entity);
+			selectEntity(hit.m_component.entity);
 			m_mouse_mode = EditorServerImpl::MouseMode::TRANSFORM;
 			m_gizmo.startTransform(m_camera.getComponent(CAMERA_HASH), x, y, Gizmo::TransformMode::CAMERA_XZ);
 		}

@@ -71,6 +71,7 @@ namespace Lumix
 			virtual Component getLight(int index) = 0;
 
 			virtual void addDebugLine(const Vec3& from, const Vec3& to, const Vec3& color, float life) = 0;
+			virtual void addDebugCross(const Vec3& center, float size, const Vec3& color, float life) = 0;
 			virtual void addDebugCube(const Vec3& from, float size, const Vec3& color, float life) = 0;
 			virtual void addDebugCircle(const Vec3& center, float radius, const Vec3& color, float life) = 0;
 			virtual const Array<DebugLine>& getDebugLines() const = 0;

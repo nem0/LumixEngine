@@ -19,8 +19,9 @@ namespace Lumix
 	{
 		static const float PI = 3.14159265f;
 
-		LUMIX_CORE_API Vec3 getRayPlaneIntersecion(const Vec3& origin, const Vec3& dir, const Vec3& plane_point, const Vec3& normal);
-		LUMIX_CORE_API bool getRaySphereIntersection(const Vec3& point, float radius, const Vec3& origin, const Vec3& dir, Vec3& out);
+		LUMIX_CORE_API bool getRayPlaneIntersecion(const Vec3& origin, const Vec3& dir, const Vec3& plane_point, const Vec3& normal, float& out);
+		LUMIX_CORE_API bool getRaySphereIntersection(const Vec3& origin, const Vec3& dir, const Vec3& center, float radius, Vec3& out);
+		LUMIX_CORE_API bool getRayAABBIntersection(const Vec3& origin, const Vec3& dir, const Vec3& min, const Vec3& size, Vec3& out);
 
 		template <typename T>
 		LUMIX_FORCE_INLINE T min(T a, T b)

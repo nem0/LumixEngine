@@ -1,5 +1,6 @@
 #include "terrain.h"
 #include "core/iserializer.h"
+#include "core/math_utils.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "engine/engine.h"
@@ -53,7 +54,7 @@ namespace Lumix
 
 		void createChildren()
 		{
-			if (m_lod < 8 && m_size > 16)
+			if (m_lod < 16 && m_size > 16)
 			{
 				for (int i = 0; i < CHILD_COUNT; ++i)
 				{
@@ -159,13 +160,9 @@ namespace Lumix
 
 	Terrain::~Terrain()
 	{
+		setMaterial(NULL);
 		LUMIX_DELETE(m_mesh);
 		LUMIX_DELETE(m_root);
-		if (m_material)
-		{
-			m_material->getObserverCb().unbind<Terrain, &Terrain::onMaterialLoaded>(this);
-			m_material->getResourceManager().get(ResourceManager::MATERIAL)->unload(*m_material);
-		}
 	}
 
 
@@ -179,13 +176,13 @@ namespace Lumix
 				m_material->getObserverCb().unbind<Terrain, &Terrain::onMaterialLoaded>(this);
 			}
 			m_material = material;
-			if (m_mesh)
+			if (m_mesh && m_material)
 			{
 				m_mesh->setMaterial(m_material);
 				m_material->getObserverCb().bind<Terrain, &Terrain::onMaterialLoaded>(this);
 			}
 		}
-		else
+		else if(material)
 		{
 			material->getResourceManager().get(ResourceManager::MATERIAL)->unload(*material);
 		}
@@ -225,6 +222,119 @@ namespace Lumix
 			m_root->render(m_mesh, m_geometry, camera_pos, *pipeline.getScene());
 		}
 	}
+
+
+	float Terrain::getHeight(int x, int z)
+	{
+		Texture* t = m_material->getTexture(0);
+		int idx = x + z * m_width;
+		if (t->getBytesPerPixel() == 2)
+		{
+			return ((m_y_scale / (256.0f * 256.0f)) * ((uint16_t*)t->getData())[idx]);
+		}
+		else if(t->getBytesPerPixel() == 4)
+		{
+			return ((m_y_scale / 255.0f) * ((uint8_t*)t->getData())[idx * 4]);
+		}
+		else
+		{
+			ASSERT(false); TODO("todo");
+		}
+		return 0;
+	}
+
+	bool getRayTriangleIntersection(const Vec3& local_origin, const Vec3& local_dir, const Vec3& p0, const Vec3& p1, const Vec3& p2, float& out)
+	{
+		Vec3 normal = crossProduct(p1 - p0, p2 - p0);
+		float q = dotProduct(normal, local_dir);
+		if (q == 0)
+		{
+			return false;
+		}
+		float d = -dotProduct(normal, p0);
+		float t = -(dotProduct(normal, local_origin) + d) / q;
+		if (t < 0)
+		{
+			return false;
+		}
+		Vec3 hit_point = local_origin + local_dir * t;
+
+		Vec3 edge0 = p1 - p0;
+		Vec3 VP0 = hit_point - p0;
+		if (dotProduct(normal, crossProduct(edge0, VP0)) < 0)
+		{
+			return false;
+		}
+
+		Vec3 edge1 = p2 - p1;
+		Vec3 VP1 = hit_point - p1;
+		if (dotProduct(normal, crossProduct(edge1, VP1)) < 0)
+		{
+			return false;
+		}
+
+		Vec3 edge2 = p0 - p2;
+		Vec3 VP2 = hit_point - p2;
+		if (dotProduct(normal, crossProduct(edge2, VP2)) < 0)
+		{
+			return false;
+		}
+
+		out = t;
+		return true;
+	}
+
+	
+	RayCastModelHit Terrain::castRay(const Vec3& origin, const Vec3& dir)
+	{
+		RayCastModelHit hit;
+		hit.m_is_hit = false;
+		if (m_material && m_material->isReady())
+		{
+			Matrix mtx = m_entity.getMatrix();
+			mtx.fastInverse();
+			Vec3 rel_origin = mtx.multiplyPosition(origin);
+			Vec3 rel_dir = mtx * dir;
+			Vec3 start;
+			Vec3 size(m_root->m_size * m_xz_scale, m_y_scale, m_root->m_size * m_xz_scale);
+			if (Math::getRayAABBIntersection(rel_origin, rel_dir, m_root->m_min, size, start))
+			{
+				Vec3 p = start;
+				while (p.x >= m_root->m_min.x && p.x <= m_root->m_min.x + m_root->m_size * m_xz_scale
+					&& p.z >= m_root->m_min.z && p.z <= m_root->m_min.z + m_root->m_size * m_xz_scale)
+				{
+					float t;
+					int hx = (int)(p.x / m_xz_scale);
+					int hz = (int)(p.z / m_xz_scale);
+					float x = hx * m_xz_scale;
+					float z = hz * m_xz_scale;
+					Vec3 p0(x, getHeight(hx, hz), z);
+					Vec3 p1(x + m_xz_scale, getHeight(hx + 1, hz), z);
+					Vec3 p2(x + m_xz_scale, getHeight(hx + 1, hz + 1), z + m_xz_scale);
+					Vec3 p3(x, getHeight(hx, hz + 1), z + m_xz_scale);
+					if (getRayTriangleIntersection(rel_origin, rel_dir, p0, p1, p2, t))
+					{
+						hit.m_is_hit = true;
+						hit.m_origin = origin;
+						hit.m_dir = dir;
+						hit.m_t = t;
+						return hit;
+					}
+					if (getRayTriangleIntersection(rel_origin, rel_dir, p0, p2, p3, t))
+					{
+						hit.m_is_hit = true;
+						hit.m_origin = origin;
+						hit.m_dir = dir;
+						hit.m_t = t;
+						return hit;
+					}
+					p += dir;
+				}
+			}
+		}
+		return hit;
+	}
+
 
 	static TerrainQuad* generateQuadTree(float size)
 	{

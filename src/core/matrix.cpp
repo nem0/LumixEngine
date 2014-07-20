@@ -168,7 +168,7 @@ void Matrix::multiply3x3(float scale)
 }
 
 
-Vec3 Matrix::mutliplyPosition(const Vec3& rhs)
+Vec3 Matrix::multiplyPosition(const Vec3& rhs)
 {
 	return Vec3(
 		m11 * rhs.x + m21 * rhs.y + m31 * rhs.z + m41,	
