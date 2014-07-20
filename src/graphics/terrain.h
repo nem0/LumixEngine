@@ -30,6 +30,7 @@ class Terrain
 		~Terrain();
 
 		void render(Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos);
+		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir);
 		int64_t getLayerMask() const { return m_layer_mask; }
 		void serialize(ISerializer& serializer);
 		void deserialize(ISerializer& serializer, Universe& universe, RenderScene& scene, int index);
@@ -44,6 +45,7 @@ class Terrain
 	private: 
 		void generateGeometry();
 		void onMaterialLoaded(Resource::State, Resource::State new_state);
+		float getHeight(int x, int z);
 
 	private:
 		Mesh* m_mesh;

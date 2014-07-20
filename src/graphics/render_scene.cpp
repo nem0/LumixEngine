@@ -635,6 +635,16 @@ namespace Lumix
 				}
 			}
 
+			virtual void addDebugCross(const Vec3& center, float size, const Vec3& color, float life) override
+			{
+				addDebugLine(center, Vec3(center.x - size, center.y, center.z), color, life);
+				addDebugLine(center, Vec3(center.x + size, center.y, center.z), color, life);
+				addDebugLine(center, Vec3(center.x, center.y - size, center.z), color, life);
+				addDebugLine(center, Vec3(center.x, center.y + size, center.z), color, life);
+				addDebugLine(center, Vec3(center.x, center.y, center.z - size), color, life);
+				addDebugLine(center, Vec3(center.x, center.y, center.z + size), color, life);
+			}
+
 			virtual void addDebugLine(const Vec3& from, const Vec3& to, const Vec3& color, float life) override
 			{
 				DebugLine& line = m_debug_lines.pushEmpty();
@@ -656,16 +666,25 @@ namespace Lumix
 						float radius = m_renderables[i]->m_model.getModel()->getBoundingRadius();
 						float scale = m_renderables[i]->m_scale;
 						Vec3 intersection;
-						if (dotProduct(pos - origin, pos - origin) < radius * radius || Math::getRaySphereIntersection(pos, radius * scale, origin, dir, intersection))
+						if (dotProduct(pos - origin, pos - origin) < radius * radius || Math::getRaySphereIntersection(origin, dir, pos, radius * scale, intersection))
 						{
 							RayCastModelHit new_hit = m_renderables[i]->m_model.getModel()->castRay(origin, dir, m_renderables[i]->m_model.getMatrix(), scale);
 							if (new_hit.m_is_hit && (!hit.m_is_hit || new_hit.m_t < hit.m_t))
 							{
-								new_hit.m_renderable = Component(m_renderables[i]->m_entity, crc32("renderable"), this, i);
+								new_hit.m_component = Component(m_renderables[i]->m_entity, RENDERABLE_HASH, this, i);
 								hit = new_hit;
 								hit.m_is_hit = true;
 							}
 						}
+					}
+				}
+				for (int i = 0; i < m_terrains.size(); ++i)
+				{
+					RayCastModelHit terrain_hit = m_terrains[i]->castRay(origin, dir);
+					if (terrain_hit.m_is_hit && (!hit.m_is_hit || terrain_hit.m_t < hit.m_t))
+					{
+						terrain_hit.m_component = Component(m_terrains[i]->getEntity(), TERRAIN_HASH, this, i);
+						hit = terrain_hit;
 					}
 				}
 				return hit;
