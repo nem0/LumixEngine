@@ -220,6 +220,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		m_actors.push(actor);
 		actor->m_source = "";
 		actor->m_entity = entity;
+		actor->m_physx_actor = NULL;
 
 		Component cmp = m_universe->addComponent(entity, MESH_ACTOR_HASH, this, m_actors.size() - 1);
 		m_universe->componentCreated().invoke(cmp);
@@ -295,7 +296,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		bool is_dynamic = false;
 		getIsDynamic(cmp, is_dynamic);
-		if (m_actors[cmp.index]->m_source == str && is_dynamic == !m_actors[cmp.index]->m_physx_actor->isRigidStatic())
+		if (m_actors[cmp.index]->m_source == str && (!m_actors[cmp.index]->m_physx_actor || is_dynamic == !m_actors[cmp.index]->m_physx_actor->isRigidStatic()))
 		{
 			return;
 		}
@@ -308,7 +309,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		cmp.entity.getMatrix(mtx);
 		matrix2Transform(mtx, transform);
 
-		if (m_actors[cmp.index])
+		if (m_actors[cmp.index] && m_actors[cmp.index]->m_physx_actor)
 		{
 			m_scene->removeActor(*m_actors[cmp.index]->m_physx_actor);
 			m_actors[cmp.index]->m_physx_actor->release();
@@ -984,7 +985,7 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system, Universe& universe, En
 		return NULL;
 	}
 	
-	//impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_SHAPES, 1.0f);
+	impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_SHAPES, 1.0f);
 	impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE, 1.0);
 	impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eACTOR_AXES, 1.0f);
 	impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_AABBS, 1.0f);
