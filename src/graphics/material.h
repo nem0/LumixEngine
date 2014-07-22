@@ -25,6 +25,13 @@ class LUMIX_ENGINE_API Material : public Resource
 {
 	friend class MaterialManager;
 public:
+	enum class DepthFunc
+	{
+		LEQUAL,
+		LESS
+	};
+	
+public:
 	void apply(Renderer& renderer, PipelineInstance& pipeline);
 	bool isZTest() const { return m_is_z_test; }
 	void enableZTest(bool enable) { m_is_z_test = enable; }
@@ -46,6 +53,7 @@ private:
 		, m_shader(NULL)
 		, m_is_z_test(true)
 		, m_is_backface_culling(true)
+		, m_depth_func(DepthFunc::LESS)
 	{ }
 
 	~Material();
@@ -86,6 +94,7 @@ private:
 	Array<Uniform> m_uniforms;
 	bool m_is_z_test;
 	bool m_is_backface_culling;
+	DepthFunc m_depth_func;
 };
 
 } // ~namespace Lumix

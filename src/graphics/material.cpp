@@ -27,6 +27,15 @@ void Material::apply(Renderer& renderer, PipelineInstance& pipeline)
 	if(getState() == State::READY)
 	{
 		m_shader->apply();
+		switch (m_depth_func)
+		{
+			case DepthFunc::LEQUAL:
+				glDepthFunc(GL_LEQUAL);
+				break;
+			default:
+				glDepthFunc(GL_LESS);
+				break;
+		}
 		if (m_is_backface_culling)
 		{
 			glEnable(GL_CULL_FACE);
@@ -232,7 +241,7 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			{
 				deserializeUniforms(serializer);
 			}
-			else if (strcmp(label, "texture") == 0)
+			else if (strcmp(label, "texture") == 0 || strcmp(label, "heightmap") == 0)
 			{
 				serializer.deserialize(path, MAX_PATH);
 				if (path[0] != '\0')
@@ -241,6 +250,25 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 					texture_path = material_dir;
 					texture_path += path;
 					Texture* texture = static_cast<Texture*>(m_resource_manager.get(ResourceManager::TEXTURE)->load(texture_path.c_str()));
+					bool is_heightmap = label[0] == 'h';
+					if (is_heightmap)
+					{
+						if (!m_textures.empty())
+						{
+							g_log_error.log("Renderer") << "Heightmap must be the first texture in material " << m_path.c_str();
+							onFailure();
+							fs.close(file);
+							return;
+						}
+						if (texture->isReady() && !texture->getData())
+						{
+							g_log_error.log("Renderer") << "Heightmap " << m_path.c_str() << " can not be used as an ordinary texture";
+							onFailure();
+							fs.close(file);
+							return;
+						}
+						texture->addDataReference();
+					}
 					m_textures.push(texture);
 					addDependency(*texture);
 				}
@@ -258,6 +286,23 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			else if (strcmp(label, "backface_culling") == 0)
 			{
 				serializer.deserialize(m_is_backface_culling);
+			}
+			else if (strcmp(label, "depth_func") == 0)
+			{
+				char tmp[30];
+				serializer.deserialize(tmp, 30);
+				if (strcmp(tmp, "lequal") == 0)
+				{
+					m_depth_func = DepthFunc::LEQUAL;
+				}
+				else if (strcmp(tmp, "less") == 0)
+				{
+					m_depth_func = DepthFunc::LESS;
+				}
+				else
+				{
+					g_log_warning.log("Renderer") << "Unknown depth function " << tmp << " in material " << m_path.c_str();
+				}
 			}
 			else
 			{

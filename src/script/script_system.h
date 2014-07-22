@@ -3,6 +3,7 @@
 
 #include "core/lumix.h"
 #include "core/string.h"
+#include "engine/iplugin.h"
 #include "universe/universe.h"
 
 
@@ -16,19 +17,12 @@ class Navigation;
 class Renderer;
 
 
-class LUMIX_ENGINE_API ScriptSystem abstract
+class LUMIX_SCRIPT_API ScriptSystem : public IPlugin
 {
 	public:
-		static ScriptSystem* create();
-		static void destroy(ScriptSystem* instance);
-
-		virtual void start() = 0;
-		virtual void stop() = 0;
 		virtual void update(float time_delta) = 0;
-		virtual void setUniverse(Universe* universe) = 0;
 		virtual Universe* getUniverse() const = 0;
 		virtual Component createScript(Entity entity) = 0;
-		virtual void setEngine(Engine& engine) = 0;
 		virtual Engine* getEngine() const = 0;
 
 		virtual void deserialize(ISerializer& serializer) = 0;
@@ -39,8 +33,14 @@ class LUMIX_ENGINE_API ScriptSystem abstract
 
 	protected:
 		ScriptSystem() {}
-		~ScriptSystem() {}
+		virtual ~ScriptSystem() {}
 };
+
+
+extern "C"
+{
+	LUMIX_SCRIPT_API IPlugin* createPlugin();
+}
 
 
 } // ~namespace Lumix

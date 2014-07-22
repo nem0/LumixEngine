@@ -113,6 +113,10 @@ namespace Lumix
 		return m_impl->m_entity_selected;
 	}
 
+	EditorClient::EntityPositionCallback& EditorClient::entityPositionReceived()
+	{
+		return m_impl->m_entity_position_changed;
+	}
 
 	void EditorClientImpl::sendMessage(uint32_t type, const void* data, int32_t size)
 	{
@@ -129,6 +133,12 @@ namespace Lumix
 	const char* EditorClient::getBasePath() const
 	{
 		return m_impl->m_base_path.c_str();
+	}
+
+
+	void EditorClient::lookAtSelected()
+	{
+		m_impl->sendMessage((uint32_t)ClientMessageType::LOOK_AT_SELECTED, NULL, 0);
 	}
 
 

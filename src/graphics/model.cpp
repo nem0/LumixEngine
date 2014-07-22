@@ -37,7 +37,7 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 	Matrix inv = model_transform;
 	inv.multiply3x3(scale);
 	inv.inverse();
-	Vec3 local_origin = inv.mutliplyPosition(origin);
+	Vec3 local_origin = inv.multiplyPosition(origin);
 	Vec3 local_dir = static_cast<Vec3>(inv * Vec4(dir.x, dir.y, dir.z, 0));
 
 	const Array<Vec3>& vertices = m_geometry->getVertices();

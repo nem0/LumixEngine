@@ -9,6 +9,7 @@ namespace Lumix
 
 	class EditorServer;
 	struct Entity;
+	struct EntityPositionEvent;
 	struct EntitySelectedEvent;
 	struct PropertyListEvent;
 	struct ServerMessage;
@@ -19,6 +20,7 @@ namespace Lumix
 		public:
 			typedef DelegateList<void(PropertyListEvent&)> PropertyListCallback;
 			typedef DelegateList<void(EntitySelectedEvent&)> EntitySelectedCallback;
+			typedef DelegateList<void(EntityPositionEvent&)> EntityPositionCallback;
 
 		public:
 			EditorClient() { m_impl = NULL; }
@@ -28,6 +30,7 @@ namespace Lumix
 			void onMessage(const uint8_t* data, int size);
 			void addEntity();
 			void toggleGameMode();
+			void lookAtSelected();
 			void addComponent(uint32_t type);
 			void mouseDown(int x, int y, int button);
 			void mouseUp(int x, int y, int button);
@@ -42,6 +45,7 @@ namespace Lumix
 			const char* getBasePath() const;
 			PropertyListCallback& propertyListReceived();
 			EntitySelectedCallback& entitySelected();
+			EntityPositionCallback& entityPositionReceived();
 
 		private:
 			struct EditorClientImpl* m_impl;

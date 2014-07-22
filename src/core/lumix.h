@@ -69,10 +69,10 @@ const uint32_t LUMIX_MAX_PATH = 260;
 #define LUMIX_ENGINE_API __declspec(dllimport)
 #endif
 
-#ifdef BUILDING_GUI
-#define LUMIX_GUI_API __declspec(dllexport)
+#ifdef BUILDING_SCRIPT
+#define LUMIX_SCRIPT_API __declspec(dllexport)
 #else
-#define LUMIX_GUI_API __declspec(dllimport)
+#define LUMIX_SCRIPT_API __declspec(dllimport)
 #endif
 
 #include "core/new.h"

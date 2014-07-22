@@ -61,6 +61,7 @@
      <addaction name="actionScene_View"/>
      <addaction name="actionScript_compiler"/>
     </widget>
+    <addaction name="actionLook_at_selected_entity"/>
     <addaction name="actionPolygon_Mode"/>
     <addaction name="menuWindows"/>
    </widget>
@@ -207,6 +208,14 @@
    </property>
    <property name="shortcut">
     <string>Ctrl+W</string>
+   </property>
+  </action>
+  <action name="actionLook_at_selected_entity">
+   <property name="text">
+    <string>Look at selected entity</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Tab</string>
    </property>
   </action>
  </widget>
