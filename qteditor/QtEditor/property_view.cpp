@@ -489,7 +489,11 @@ void PropertyView::onEntitySelected(Lumix::EntitySelectedEvent& e)
 			addProperty("terrain", "xz_scale", "Meter per texel", Property::DECIMAL, NULL);
 			addProperty("terrain", "y_scale", "Height scale", Property::DECIMAL, NULL);
 		}
-		else if (e.components[i] == crc32("physical_controller") || e.components[i] == crc32("mesh_rigid_actor"))
+		else if (e.components[i] == crc32("mesh_rigid_actor"))
+		{
+			addProperty("mesh_rigid_actor", "source", "Source", Property::FILE, "Physics (*.pda)");
+		}
+		else if (e.components[i] == crc32("physical_controller"))
 		{
 		}
 		else if (e.components[i] == crc32("physical_heightfield"))
