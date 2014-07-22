@@ -176,7 +176,7 @@ struct LUMIX_CORE_API Matrix
 	Vec3 getTranslation() const;
 	void getRotation(Quat& rot) const;
 	void transpose();
-	Vec3 mutliplyPosition(const Vec3& pos);
+	Vec3 multiplyPosition(const Vec3& pos);
 	void multiply3x3(float scale);
 	static void setIdentity(Matrix& mtx);
 

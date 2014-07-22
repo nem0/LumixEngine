@@ -281,7 +281,7 @@ void EditorServerImpl::registerProperties()
 	m_component_properties[renderable_type].push(LUMIX_NEW(PropertyDescriptor<Renderer>)(crc32("cast shadows"), &Renderer::getCastShadows, &Renderer::setCastShadows));
 	m_component_properties[point_light_type].push(LUMIX_NEW(PropertyDescriptor<Renderer>)(crc32("fov"), &Renderer::getLightFov, &Renderer::setLightFov));
 	m_component_properties[point_light_type].push(LUMIX_NEW(PropertyDescriptor<Renderer>)(crc32("radius"), &Renderer::getLightRadius, &Renderer::setLightRadius));
-	*/m_component_properties[SCRIPT_HASH].push(LUMIX_NEW(PropertyDescriptor<ScriptSystem>)(crc32("source"), &ScriptSystem::getScriptPath, &ScriptSystem::setScriptPath, IPropertyDescriptor::FILE));
+	*/
 }
 
 
@@ -343,7 +343,7 @@ void EditorServerImpl::onPointerDown(int x, int y, MouseButton::Value button)
 		}
 		else if(hit.m_is_hit)
 		{
-			selectEntity(hit.m_renderable.entity);
+			selectEntity(hit.m_component.entity);
 			m_mouse_mode = EditorServerImpl::MouseMode::TRANSFORM;
 			m_gizmo.startTransform(m_camera.getComponent(CAMERA_HASH), x, y, Gizmo::TransformMode::CAMERA_XZ);
 		}
@@ -398,10 +398,22 @@ void EditorServerImpl::save(FS::IFile& file, const char* path)
 void EditorServerImpl::addEntity()
 {
 	Entity e = m_engine.getUniverse()->createEntity();
-	e.setPosition(m_camera.getPosition() + m_camera.getRotation() * Vec3(0, 0, -2));
+
+	RenderScene* scene = m_engine.getRenderScene();
+	Vec3 origin = m_camera.getPosition();
+	Vec3 dir = -m_camera.getMatrix().getZVector();
+	RayCastModelHit hit = scene->castRay(origin, dir);
+	if (hit.m_is_hit)
+	{
+		e.setPosition(hit.m_origin + hit.m_dir * hit.m_t);
+	}
+	else
+	{
+		e.setPosition(m_camera.getPosition() + m_camera.getRotation() * Vec3(0, 0, -2));
+	}
 	selectEntity(e);
 	EditorIcon* er = LUMIX_NEW(EditorIcon)();
-	er->create(m_engine, *m_engine.getRenderScene(), m_selected_entity, Component::INVALID);
+	er->create(m_engine, *m_engine.getRenderScene(), m_selected_entity);
 	m_editor_icons.push(er);
 }
 
@@ -416,7 +428,6 @@ void EditorServerImpl::toggleGameMode()
 	{
 		m_game_mode_file = m_engine.getFileSystem().open("memory", "", FS::Mode::WRITE);
 		save(*m_game_mode_file, "GameMode");
-		m_engine.getScriptSystem().start();
 		m_is_game_mode = true;
 	}
 }
@@ -425,7 +436,6 @@ void EditorServerImpl::toggleGameMode()
 void EditorServerImpl::stopGameMode()
 {
 	m_is_game_mode = false;
-	m_engine.getScriptSystem().stop();
 	m_game_mode_file->seek(FS::SeekMode::BEGIN, 0);
 	load(*m_game_mode_file, "GameMode");
 	m_engine.getFileSystem().close(m_game_mode_file);
@@ -505,10 +515,6 @@ void EditorServerImpl::addComponent(uint32_t type_crc)
 		{
 			m_engine.getRenderScene()->createComponent(type_crc, m_selected_entity);
 		}
-		else if(type_crc == SCRIPT_HASH)
-		{
-			m_engine.getScriptSystem().createScript(m_selected_entity);
-		}
 		else
 		{
 			ASSERT(false);
@@ -520,15 +526,13 @@ void EditorServerImpl::addComponent(uint32_t type_crc)
 
 void EditorServerImpl::lookAtSelected()
 {
-	/*if(m_selected_entity.isValid())
+	if(m_selected_entity.isValid())
 	{
-		Vec3 dir = m_camera_rot * Vec3(0, 0, 1);
-		m_camera_pos = m_selected_entity.getPosition() + dir * 10;
-		Matrix mtx;
-		m_camera_rot.toMatrix(mtx);
-		mtx.setTranslation(m_camera_pos);
-		m_engine.getRenderer().setCameraMatrix(mtx);
-	}*/
+		Matrix camera_mtx = m_camera.getMatrix();
+		Vec3 dir = camera_mtx * Vec3(0, 0, 1);
+		camera_mtx.setTranslation(m_selected_entity.getPosition() + dir * 10);
+		m_camera.setMatrix(camera_mtx);
+	}
 }
 
 
@@ -615,19 +619,19 @@ void EditorServerImpl::createEditorIcon(const Entity& entity)
 {
 	const Entity::ComponentList& cmps = entity.getComponents();
 
-	bool found = false;
+	bool found_renderable = false;
 	for (int i = 0; i < cmps.size(); ++i)
 	{
 		if (cmps[i].type == RENDERABLE_HASH)
 		{
-			found = true;
+			found_renderable = true;
 			break;
 		}
 	}
-	if (!found)
+	if (!found_renderable)
 	{
 		EditorIcon* er = LUMIX_NEW(EditorIcon)();
-		er->create(m_engine, *m_engine.getRenderScene(), entity, Component::INVALID);
+		er->create(m_engine, *m_engine.getRenderScene(), entity);
 		m_editor_icons.push(er);
 	}
 }
@@ -665,9 +669,13 @@ bool EditorServerImpl::create(const char* base_path)
 
 	//glPopAttrib();
 	
-	if(!m_engine.loadPlugin("physics.dll"))
+	if (!m_engine.loadPlugin("physics.dll"))
 	{
 		g_log_info.log("plugins") << "physics plugin has not been loaded";
+	}
+	if (!m_engine.loadPlugin("script.dll"))
+	{
+		g_log_info.log("plugins") << "script plugin has not been loaded";
 	}
 	/*if(!m_engine.loadPlugin("navigation.dll"))
 	{
@@ -884,6 +892,7 @@ void EditorServerImpl::selectEntity(Entity e)
 		}
 	}
 	sendMessage(m_stream.getBuffer(), m_stream.getBufferSize());
+	sendEntityPosition(e.index);
 }
 
 
@@ -899,22 +908,7 @@ void EditorServerImpl::onComponentCreated(Component& cmp)
 			break;
 		}
 	}
-	const Lumix::Entity::ComponentList& cmps = cmp.entity.getComponents();
-	bool found = false;
-	for (int i = 0; i < cmps.size(); ++i)
-	{
-		if (cmps[i].type == RENDERABLE_HASH)
-		{
-			found = true;
-			break;
-		}
-	}
-	if (!found)
-	{
-		EditorIcon* er = LUMIX_NEW(EditorIcon)();
-		er->create(m_engine, *m_engine.getRenderScene(), cmp.entity, cmp);
-		m_editor_icons.push(er);
-	}
+	createEditorIcon(cmp.entity);
 }
 
 
@@ -933,7 +927,7 @@ void EditorServerImpl::onComponentDestroyed(Component& cmp)
 	if(cmp.entity.existsInUniverse() && cmp.entity.getComponents().empty())
 	{
 		EditorIcon* er = LUMIX_NEW(EditorIcon)();
-		er->create(m_engine, *m_engine.getRenderScene(), cmp.entity, Component::INVALID);
+		er->create(m_engine, *m_engine.getRenderScene(), cmp.entity);
 		m_editor_icons.push(er);
 	}
 }

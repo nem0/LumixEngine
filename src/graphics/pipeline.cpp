@@ -555,27 +555,24 @@ struct PipelineInstanceImpl : public PipelineInstance
 			Vec3 camera_position = m_active_camera.entity.getPosition();
 			for (int i = 0; i < m_terrain_infos.size(); ++i)
 			{
-				if (m_terrain_infos[i].m_material)
+				if (m_terrain_infos[i].m_material && m_terrain_infos[i].m_material->getShader())
 				{
-					if (m_terrain_infos[i].m_material->getShader())
-					{
-						Matrix world_matrix;
-						m_terrain_infos[i].m_entity.getMatrix(world_matrix);
-						Shader* shader = m_terrain_infos[i].m_material->getShader();
-						shader->setUniform("world_matrix", world_matrix);
-						shader->setUniform("shadowmap_matrix0", m_shadow_modelviewprojection[0]);
-						shader->setUniform("shadowmap_matrix1", m_shadow_modelviewprojection[1]);
-						shader->setUniform("shadowmap_matrix2", m_shadow_modelviewprojection[2]);
-						shader->setUniform("shadowmap_matrix3", m_shadow_modelviewprojection[3]);
-						shader->setUniform("light_dir", m_light_dir);
+					Matrix world_matrix;
+					m_terrain_infos[i].m_entity.getMatrix(world_matrix);
+					Shader* shader = m_terrain_infos[i].m_material->getShader();
+					shader->setUniform("world_matrix", world_matrix);
+					shader->setUniform("shadowmap_matrix0", m_shadow_modelviewprojection[0]);
+					shader->setUniform("shadowmap_matrix1", m_shadow_modelviewprojection[1]);
+					shader->setUniform("shadowmap_matrix2", m_shadow_modelviewprojection[2]);
+					shader->setUniform("shadowmap_matrix3", m_shadow_modelviewprojection[3]);
+					shader->setUniform("light_dir", m_light_dir);
 
-						Vec3 scale;
-						scale.x = m_terrain_infos[i].m_xz_scale;
-						scale.y = m_terrain_infos[i].m_y_scale;
-						scale.z = scale.x;
-						m_terrain_infos[i].m_material->getShader()->setUniform("terrain_scale", scale);
-						m_scene->renderTerrain(m_terrain_infos[i], *m_renderer, *this, camera_position);
-					}
+					Vec3 scale;
+					scale.x = m_terrain_infos[i].m_xz_scale;
+					scale.y = m_terrain_infos[i].m_y_scale;
+					scale.z = scale.x;
+					m_terrain_infos[i].m_material->getShader()->setUniform("terrain_scale", scale);
+					m_scene->renderTerrain(m_terrain_infos[i], *m_renderer, *this, camera_position);
 				}
 			}
 		}
