@@ -51,6 +51,10 @@ private slots:
 
     void on_actionLook_at_selected_entity_triggered();
 
+    void on_actionNew_triggered();
+
+    void on_actionSave_triggered();
+
 private:
 	Ui::MainWindow* m_ui;
 	Lumix::EditorClient* m_client;
