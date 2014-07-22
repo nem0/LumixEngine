@@ -28,7 +28,9 @@ namespace Lumix
 		void onMessage(const uint8_t* data, int size);
 
 		Path m_base_path;
+		Path m_universe_path;
 		EditorServer& m_server;
+
 		DelegateList<void(EntityPositionEvent&)> m_entity_position_changed;
 		DelegateList<void(EntitySelectedEvent&)> m_entity_selected;
 		DelegateList <void(LogEvent&)> m_message_logged;
@@ -181,6 +183,7 @@ namespace Lumix
 	
 	void EditorClient::loadUniverse(const char* path)
 	{
+		m_impl->m_universe_path = path;
 		m_impl->sendMessage(ClientMessageType::LOAD, path, (int32_t)strlen(path)+1);
 	}
 
@@ -188,6 +191,12 @@ namespace Lumix
 	{
 		int32_t data = is_wireframe;
 		m_impl->sendMessage(ClientMessageType::SET_WIREFRAME, &data, sizeof(data));
+	}
+
+	void EditorClient::newUniverse()
+	{
+		m_impl->m_universe_path = "";
+		m_impl->sendMessage(ClientMessageType::NEW_UNIVERSE, NULL, 0);
 	}
 
 	void EditorClient::setEntityPosition(int32_t entity, const Vec3& position)
@@ -198,8 +207,14 @@ namespace Lumix
 		m_impl->sendMessage(ClientMessageType::SET_POSITION, data, sizeof(entity) + sizeof(position));
 	}
 
+	const char* EditorClient::getUniversePath() const
+	{
+		return m_impl->m_universe_path.c_str();
+	}
+
 	void EditorClient::saveUniverse(const char* path)
 	{
+		m_impl->m_universe_path = path;
 		m_impl->sendMessage(ClientMessageType::SAVE, path, (int32_t)strlen(path)+1);
 	}
 

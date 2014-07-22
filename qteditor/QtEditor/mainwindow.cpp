@@ -209,3 +209,20 @@ void MainWindow::on_actionLook_at_selected_entity_triggered()
 {
 	m_client->lookAtSelected();
 }
+
+void MainWindow::on_actionNew_triggered()
+{
+	m_client->newUniverse();
+}
+
+void MainWindow::on_actionSave_triggered()
+{
+	if (m_client->getUniversePath()[0] == '\0')
+	{
+		on_actionSave_As_triggered();
+	}
+	else
+	{
+		m_client->saveUniverse(m_client->getUniversePath());
+	}
+}

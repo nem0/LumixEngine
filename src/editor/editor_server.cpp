@@ -593,7 +593,7 @@ void EditorServerImpl::loadMap(FS::IFile* file, bool success, FS::FileSystem& fs
 void EditorServerImpl::newUniverse()
 {
 	destroyUniverse();
-	createUniverse(false);
+	createUniverse(true);
 	g_log_info.log("editor server") << "universe created";
 }
 
