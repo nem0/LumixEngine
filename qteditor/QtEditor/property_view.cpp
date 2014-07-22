@@ -315,7 +315,7 @@ void PropertyView::addProperty(const char* component, const char* name, const ch
 				QDoubleSpinBox* edit = new QDoubleSpinBox();
 				edit->setProperty("cpp_prop", (int)(m_properties.size() - 1)); 
 				m_ui->propertyList->setItemWidget(item, 1, edit);
-				edit->setMaximum(999999);
+				edit->setMaximum(FLT_MAX);
 				connect(edit, (void (QDoubleSpinBox::*)(double))&QDoubleSpinBox::valueChanged, this, &PropertyView::on_doubleSpinBoxValueChanged);
 			}
 			break;
