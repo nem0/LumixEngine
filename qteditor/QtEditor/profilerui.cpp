@@ -3,7 +3,7 @@
 #include <qpainter.h>
 #include <qpixmap.h>
 
-
+static const int MAX_FRAMES = 200;
 
 ProfileModel::ProfileModel()
 {
@@ -16,7 +16,7 @@ void ProfileModel::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bl
 {
 	ASSERT(my_block->m_name == remote_block->m_name);
 	my_block->m_frames.push_back(remote_block->getLength());
-	if(my_block->m_frames.size() > 200)
+	if (my_block->m_frames.size() > MAX_FRAMES)
 	{
 		my_block->m_frames.pop_front();
 	}
@@ -32,6 +32,10 @@ void ProfileModel::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bl
 			my_child->m_parent = my_block;
 			my_child->m_next = NULL;
 			my_child->m_first_child = NULL;
+			for (int i = 0; i < MAX_FRAMES; ++i)
+			{
+				my_child->m_frames.push_back(0);
+			}
 			if(last_new_child)
 			{
 				last_new_child->m_next = my_child;
