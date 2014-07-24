@@ -2,6 +2,7 @@
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
 #include "core/log.h"
+#include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "graphics/texture.h"
@@ -339,6 +340,7 @@ namespace DDS
 	/// from gpu gems
 	static void flipCompressedTexture(int w, int h, int format, void* surface)
 	{
+		PROFILE_FUNCTION();
 		void (*flipBlocksFunction)(DXTColBlock*, int);
 		int xblocks = w >> 2;
 		int yblocks = h >> 2;
@@ -547,6 +549,7 @@ void Texture::removeDataReference()
 
 bool Texture::loadDDS(FS::IFile& file)
 {
+	PROFILE_FUNCTION();
 	if (m_data_reference)
 	{
 		g_log_error.log("renderer") << "DDS texture " << m_path.c_str() << " can only be used as renderable texture";

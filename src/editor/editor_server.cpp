@@ -655,8 +655,8 @@ bool EditorServerImpl::create(const char* base_path)
 	m_file_system->mount(&m_disk_file_device);
 	m_file_system->mount(&m_tcp_file_device);
 
-	m_file_system->setDefaultDevice("memory:tcp");
-	m_file_system->setSaveGameDevice("memory:tcp");
+	m_file_system->setDefaultDevice("memory:disk");
+	m_file_system->setSaveGameDevice("memory:disk");
 	
 	g_log_info.getCallback().bind<EditorServerImpl, &EditorServerImpl::onLogInfo>(this);
 	g_log_warning.getCallback().bind<EditorServerImpl, &EditorServerImpl::onLogWarning>(this);
