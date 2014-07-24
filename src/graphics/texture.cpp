@@ -199,9 +199,9 @@ namespace DDS
 
 	static LUMIX_FORCE_INLINE void swapMemory(void* mem1, void* mem2, size_t size)
 	{
-		if(size < 2048)
+		if(size <= 32768)
 		{
-			uint8_t tmp[2048];
+			uint8_t tmp[32768];
 			memcpy(tmp, mem1, size);
 			memcpy(mem1, mem2, size);
 			memcpy(mem2, tmp, size);
@@ -216,14 +216,28 @@ namespace DDS
 		}
 	}
 
+	static LUMIX_FORCE_INLINE void swapBytes(uint8_t* LUMIX_RESTRICT mem1, uint8_t* LUMIX_RESTRICT mem2)
+	{
+		uint8_t tmp = *mem1;
+		*mem1 = *mem2;
+		*mem2 = tmp;
+	}
+
+	static LUMIX_FORCE_INLINE void swapBytes(uint16_t* LUMIX_RESTRICT mem1, uint16_t* LUMIX_RESTRICT mem2)
+	{
+		uint16_t tmp = *mem1;
+		*mem1 = *mem2;
+		*mem2 = tmp;
+	}
+
 	static void flipBlockDXTC1(DXTColBlock *line, int numBlocks)
 	{
 		DXTColBlock *curblock = line;
 
 		for (int i = 0; i < numBlocks; i++)
 		{
-			swapMemory(&curblock->row[0], &curblock->row[3], sizeof(uint8_t));
-			swapMemory(&curblock->row[1], &curblock->row[2], sizeof(uint8_t));
+			swapBytes(&curblock->row[0], &curblock->row[3]);
+			swapBytes(&curblock->row[1], &curblock->row[2]);
 			++curblock;
 		}
 	}
@@ -237,12 +251,12 @@ namespace DDS
 		{
 			alphablock = (DXT3AlphaBlock*)curblock;
 
-			swapMemory(&alphablock->row[0], &alphablock->row[3], sizeof(uint16_t));
-			swapMemory(&alphablock->row[1], &alphablock->row[2], sizeof(uint16_t));
+			swapBytes((uint16_t*)&alphablock->row[0], (uint16_t*)&alphablock->row[3]);
+			swapBytes((uint16_t*)&alphablock->row[1], (uint16_t*)&alphablock->row[2]);
 			++curblock;
 
-			swapMemory(&curblock->row[0], &curblock->row[3], sizeof(uint8_t));
-			swapMemory(&curblock->row[1], &curblock->row[2], sizeof(uint8_t));
+			swapBytes(&curblock->row[0], &curblock->row[3]);
+			swapBytes(&curblock->row[1], &curblock->row[2]);
 			++curblock;
 		}
 	}
@@ -330,8 +344,8 @@ namespace DDS
 
 			++curblock;
 
-			swapMemory(&curblock->row[0], &curblock->row[3], sizeof(uint8_t));
-			swapMemory(&curblock->row[1], &curblock->row[2], sizeof(uint8_t));
+			swapBytes(&curblock->row[0], &curblock->row[3]);
+			swapBytes(&curblock->row[1], &curblock->row[2]);
 
 			++curblock;
 		}
@@ -367,8 +381,8 @@ namespace DDS
 
 		int linesize = xblocks * blocksize;
 
-		DXTColBlock *top = (DXTColBlock*)surface;
-		DXTColBlock *bottom = (DXTColBlock*)((uint8_t*)surface + ((yblocks - 1) * linesize));
+		DXTColBlock * LUMIX_RESTRICT top = (DXTColBlock*)surface;
+		DXTColBlock * LUMIX_RESTRICT bottom = (DXTColBlock*)((uint8_t*)surface + ((yblocks - 1) * linesize));
 
 		while (top < bottom)
 		{

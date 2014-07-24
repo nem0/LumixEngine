@@ -75,6 +75,8 @@ const uint32_t LUMIX_MAX_PATH = 260;
 #define LUMIX_SCRIPT_API __declspec(dllimport)
 #endif
 
+#define LUMIX_RESTRICT __restrict
+
 #include "core/new.h"
 #include "core/new_macros.h"
 
