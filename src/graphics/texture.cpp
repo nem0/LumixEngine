@@ -403,6 +403,7 @@ struct TGAHeader
 Texture::Texture(const Path& path, ResourceManager& resource_manager)
 	: Resource(path, resource_manager)
 	, m_data_reference(0)
+	, m_is_cubemap(false)
 {
 	glGenTextures(1, &m_id);
 }
@@ -426,8 +427,9 @@ bool Texture::create(int w, int h)
 void Texture::apply(int unit)
 {
 	glActiveTexture(GL_TEXTURE0 + unit); 
-	glBindTexture(GL_TEXTURE_2D, m_id);
-	glEnable(GL_TEXTURE_2D);
+	//glDisable(m_is_cubemap ? GL_TEXTURE_2D : GL_TEXTURE_CUBE_MAP);
+	glEnable(m_is_cubemap ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D);
+	glBindTexture(m_is_cubemap ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D, m_id);
 }
 
 
@@ -557,6 +559,8 @@ bool Texture::loadDDS(FS::IFile& file)
 
 	file.read(&hdr, sizeof(hdr));
 
+	m_is_cubemap = (hdr.caps2.dwCaps2 & DDS::DDSCAPS2_CUBEMAP) != 0;
+
 	if (hdr.dwMagic != DDS::DDS_MAGIC || hdr.dwSize != 124 ||
 		!(hdr.dwFlags & DDS::DDSD_PIXELFORMAT) || !(hdr.dwFlags & DDS::DDSD_CAPS))
 	{
@@ -620,33 +624,63 @@ bool Texture::loadDDS(FS::IFile& file)
 	}
 
 	TextureManager* manager = static_cast<TextureManager*>(getResourceManager().get(ResourceManager::TEXTURE));
-	glBindTexture(GL_TEXTURE_2D, m_id);
+	if (m_is_cubemap)
+	{
+		glEnable(GL_TEXTURE_CUBE_MAP);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, m_id);
+	}
+	else
+	{
+		glBindTexture(GL_TEXTURE_2D, m_id);
+	}
 
 	glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_FALSE);
 	mipMapCount = (hdr.dwFlags & DDS::DDSD_MIPMAPCOUNT) ? hdr.dwMipMapCount : 1;
 	if (li->compressed)
 	{
 		uint32_t size = Math::max(li->divSize, width) / li->divSize * Math::max(li->divSize, height) / li->divSize * li->blockBytes;
-		if (size != hdr.dwPitchOrLinearSize || (hdr.dwFlags & DDS::DDSD_LINEARSIZE) == 0)
-		{
-			glDeleteTextures(1, &m_id);
-			g_log_error.log("renderer") << "Unsupported DDS format " << m_path.c_str();
-			onFailure();
-			return false;
-		}
 		uint8_t* data = (uint8_t*)manager->getBuffer(size);
 		ASSERT(data);
-		for (uint32_t ix = 0; ix < mipMapCount; ++ix)
+		if (m_is_cubemap)
 		{
-			file.read(data, size);
-			DDS::flipCompressedTexture(width, height, li->internalFormat, data);
-			glCompressedTexImage2D(GL_TEXTURE_2D, ix, li->internalFormat, width, height, 0, size, data);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			width = (width + 1) >> 1;
-			height = (height + 1) >> 1;
-			size = Math::max(li->divSize, width) / li->divSize * Math::max(li->divSize, height) / li->divSize * li->blockBytes;
+			GLenum sides[] = { GL_TEXTURE_CUBE_MAP_POSITIVE_X, GL_TEXTURE_CUBE_MAP_NEGATIVE_X, GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, GL_TEXTURE_CUBE_MAP_POSITIVE_Y, GL_TEXTURE_CUBE_MAP_POSITIVE_Z, GL_TEXTURE_CUBE_MAP_NEGATIVE_Z };
+			for (int i = 0; i < 6; ++i)
+			{
+				width = hdr.dwWidth;
+				height = hdr.dwHeight;
+				size = Math::max(li->divSize, width) / li->divSize * Math::max(li->divSize, height) / li->divSize * li->blockBytes;
+				for (uint32_t ix = 0; ix < mipMapCount; ++ix)
+				{
+					file.read(data, size);
+					DDS::flipCompressedTexture(width, height, li->internalFormat, data);
+					
+					glCompressedTexImage2D(sides[i], ix, li->internalFormat, width, height, 0, size, data);
+					glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+					glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+					glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+					glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+					glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+					width = (width + 1) >> 1;
+					height = (height + 1) >> 1;
+					size = Math::max(li->divSize, width) / li->divSize * Math::max(li->divSize, height) / li->divSize * li->blockBytes;
+				}
+			}
 		}
+		else
+		{
+			for (uint32_t ix = 0; ix < mipMapCount; ++ix)
+			{
+				file.read(data, size);
+				DDS::flipCompressedTexture(width, height, li->internalFormat, data);
+				glCompressedTexImage2D(GL_TEXTURE_2D, ix, li->internalFormat, width, height, 0, size, data);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+				width = (width + 1) >> 1;
+				height = (height + 1) >> 1;
+				size = Math::max(li->divSize, width) / li->divSize * Math::max(li->divSize, height) / li->divSize * li->blockBytes;
+			}
+		}
+
 	}
 	else if (li->palette)
 	{
@@ -701,7 +735,7 @@ bool Texture::loadDDS(FS::IFile& file)
 		}
 		glPixelStorei(GL_UNPACK_SWAP_BYTES, GL_FALSE);
 	}
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, mipMapCount - 1);
+	glTexParameteri(m_is_cubemap ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, mipMapCount - 1);
 
 	return true;
 }
