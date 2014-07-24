@@ -45,6 +45,7 @@ class LUMIX_ENGINE_API Texture : public Resource
 		int m_BPP;
 		int m_data_reference;
 		Array<uint8_t> m_data;
+		bool m_is_cubemap;
 };
 
 
