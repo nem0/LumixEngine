@@ -5,6 +5,16 @@
 
 static const int MAX_FRAMES = 200;
 
+ProfileModel::Block::Block()
+{
+	m_frames.reserve(MAX_FRAMES);
+	for(int i = 0; i < MAX_FRAMES; ++i)
+	{
+		m_frames.push_back(0);
+	}
+}
+
+
 ProfileModel::ProfileModel()
 {
 	Lumix::g_profiler.getFrameListeners().bind<ProfileModel, &ProfileModel::onFrame>(this);
@@ -32,10 +42,6 @@ void ProfileModel::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bl
 			my_child->m_parent = my_block;
 			my_child->m_next = NULL;
 			my_child->m_first_child = NULL;
-			for (int i = 0; i < MAX_FRAMES; ++i)
-			{
-				my_child->m_frames.push_back(0);
-			}
 			if(last_new_child)
 			{
 				last_new_child->m_next = my_child;
@@ -86,6 +92,7 @@ void ProfileModel::onFrame()
 		m_root->m_parent = NULL;
 		m_root->m_next = NULL;
 		m_root->m_first_child = NULL;
+
 	}
 	if(m_root)
 	{
