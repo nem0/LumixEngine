@@ -59,9 +59,10 @@ void ProfileModel::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bl
 	{
 		Lumix::Profiler::Block* remote_child = remote_block->m_first_child;
 		Block* my_child = my_block->m_first_child;
+		Block* prev_my_child = NULL;
 		while(remote_child)
 		{
-			if(my_child->m_name != remote_child->m_name && my_child->m_function != remote_child->m_function)
+			if(my_child->m_name != remote_child->m_name || my_child->m_function != remote_child->m_function)
 			{
 				Block* new_child = new Block;
 				new_child->m_function = remote_child->m_function;
@@ -69,14 +70,21 @@ void ProfileModel::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bl
 				new_child->m_parent = my_block;
 				new_child->m_next = my_child;
 				new_child->m_first_child = NULL;
-				my_child = new_child;
 				if(my_child == my_block->m_first_child)
 				{
 					my_block->m_first_child = new_child;
+					new_child->m_next = my_child;
 				}
+				else 
+				{
+					new_child->m_next = my_child;
+					prev_my_child->m_next = new_child;
+				}
+				my_child = new_child;
 			}
 			cloneBlock(my_child, remote_child);
 			remote_child = remote_child->m_next;
+			prev_my_child = my_child;
 			my_child = my_child->m_next;
 		}
 	}
