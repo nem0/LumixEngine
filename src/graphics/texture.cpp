@@ -451,6 +451,7 @@ void Texture::apply(int unit)
 
 bool Texture::loadRaw(FS::IFile& file)
 {
+	PROFILE_FUNCTION();
 	size_t size = file.size();
 	m_BPP = 2;
 	m_width = (int)sqrt(size / m_BPP);
@@ -481,6 +482,7 @@ bool Texture::loadRaw(FS::IFile& file)
 
 bool Texture::loadTGA(FS::IFile& file)
 {
+	PROFILE_FUNCTION();
 	TGAHeader header;
 	file.read(&header, sizeof(header));
 
@@ -759,6 +761,7 @@ bool Texture::loadDDS(FS::IFile& file)
 
 void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 {
+	PROFILE_FUNCTION();
 	ASSERT(file);
 	if (success)
 	{

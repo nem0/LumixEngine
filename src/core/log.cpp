@@ -60,6 +60,12 @@ namespace Lumix
 		return *this;
 	}
 
+	LogProxy& LogProxy::operator <<(float message)
+	{
+		m_message.cat(message);
+		return *this;
+	}
+
 	LogProxy& LogProxy::operator <<(uint32_t message)
 	{
 		m_message.cat(message);

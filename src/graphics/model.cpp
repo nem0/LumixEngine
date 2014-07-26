@@ -6,6 +6,7 @@
 #include "core/fs/ifile.h"
 #include "core/log.h"
 #include "core/path_utils.h"
+#include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "core/vec3.h"
@@ -294,6 +295,7 @@ bool Model::parseMeshes(FS::IFile* file)
 
 void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 { 
+	PROFILE_FUNCTION();
 	if(success)
 	{
 		VertexDef vertex_definition;

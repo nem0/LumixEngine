@@ -127,7 +127,7 @@ void FileServerWidget::setEditorServer(Lumix::EditorServer& server)
 	Lumix::FS::FileEventsDevice& dev = m_watcher->getFileEventDevice();
 	Lumix::FS::FileSystem& fs = m_server->getEngine().getFileSystem();
 	fs.mount(&dev);
-	fs.setDefaultDevice("memory:events:tcp");
+	fs.setDefaultDevice("memory:events:disk");
 }
 
 

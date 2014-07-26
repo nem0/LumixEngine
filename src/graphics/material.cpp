@@ -4,6 +4,7 @@
 #include "core/json_serializer.h"
 #include "core/log.h"
 #include "core/path_utils.h"
+#include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "core/timer.h"
@@ -226,6 +227,7 @@ void Material::setShader(Shader* shader)
 
 void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 {
+	PROFILE_FUNCTION();
 	if(success)
 	{
 		JsonSerializer serializer(*file, JsonSerializer::READ, m_path.c_str());
