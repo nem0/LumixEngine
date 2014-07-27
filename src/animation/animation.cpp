@@ -73,6 +73,7 @@ void Animation::getPose(float time, Pose& pose, Model& model) const
 				lerp(m_positions[off + i], m_positions[off2 + i], &pos[i], t);
 				nlerp(m_rotations[off + i], m_rotations[off2 + i], &rot[i], t);
 				int parent = model.getBone(i).parent_idx;
+				ASSERT(parent < i);
 				if (parent >= 0)
 				{
 					pos[i] = rot[parent] * pos[i] + pos[parent];
@@ -87,6 +88,7 @@ void Animation::getPose(float time, Pose& pose, Model& model) const
 				pos[i] = m_positions[off + i];
 				rot[i] = m_rotations[off + i];
 				int parent = model.getBone(i).parent_idx;
+				ASSERT(parent < i);
 				if (parent >= 0)
 				{
 					pos[i] = rot[parent] * pos[i] + pos[parent];
