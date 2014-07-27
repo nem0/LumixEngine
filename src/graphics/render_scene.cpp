@@ -526,6 +526,8 @@ namespace Lumix
 								info.m_pose = &m_renderables[i]->m_model.getPose();
 								info.m_model = &m_renderables[i]->m_model;
 								info.m_matrix = &m_renderables[i]->m_model.getMatrix();
+
+								m_renderables[i]->m_model.getPose().computeAbsolute(*info.m_model->getModel());
 							}
 						}
 					}

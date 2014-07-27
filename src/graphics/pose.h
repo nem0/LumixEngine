@@ -9,6 +9,7 @@ namespace Lumix
 
 
 struct Matrix;
+class Model;
 struct Quat;
 struct Vec3;
 
@@ -24,12 +25,16 @@ class Pose
 		int getCount() const { return m_count; }
 		Vec3* getPositions() const { return m_positions; }
 		Quat* getRotations() const { return m_rotations; }
+		void computeAbsolute(Model& model);
+		void setIsRelative() { m_is_absolute = false; }
 
 	private:
 		Pose(const Pose&) {}
 		void operator =(const Pose&) {}
+		void computeAbsolute(Model& model, int i, bool* valid);
 
 	private:
+		bool m_is_absolute;
 		int32_t m_count;
 		Vec3* m_positions;
 		Quat* m_rotations;

@@ -409,6 +409,7 @@ namespace Lumix
 
 		void destruct(node_type* n)
 		{
+			(void)n; /// to avoid a bug in VS 2013 - n is unused warning
 			n->~node_type();
 		}
 

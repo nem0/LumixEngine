@@ -4,6 +4,7 @@
 #include "core/array.h"
 #include "core/crc32.h"
 #include "core/delegate_list.h"
+#include "core/hash_map.h"
 #include "core/matrix.h"
 #include "core/quat.h"
 #include "core/string.h"
@@ -58,6 +59,8 @@ class Mesh
 class Model : public Resource
 {
 	public:
+		typedef HashMap<uint32_t, int> BoneMap;
+
 		struct Bone
 		{
 			string name;
@@ -83,6 +86,7 @@ class Model : public Resource
 		int			getMeshCount() const { return m_meshes.size(); }
 		int			getBoneCount() const	{ return m_bones.size(); }
 		const Bone&	getBone(int i) const		{ return m_bones[i]; }
+		BoneMap::iterator	getBoneIndex(uint32_t hash) { return m_bone_map.find(hash); }
 		void		getPose(Pose& pose);
 		float		getBoundingRadius() const { return m_bounding_radius; }
 		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform, float scale);
@@ -103,6 +107,7 @@ class Model : public Resource
 		Array<Mesh> m_meshes;
 		Array<Bone> m_bones;
 		float m_bounding_radius;
+		BoneMap m_bone_map; // maps bone name hash to bone index in m_bones
 };
 
 
