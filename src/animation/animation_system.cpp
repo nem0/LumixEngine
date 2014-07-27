@@ -209,17 +209,20 @@ namespace Lumix
 		for(int i = 0, c = m_impl->m_animables.size(); i < c; ++i)
 		{
 			AnimationSystemImpl::Animable& animable = m_impl->m_animables[i];
-			if(!animable.m_manual && animable.m_animation->isReady())
+			if(animable.m_animation->isReady())
 			{
 				RenderScene* scene = static_cast<RenderScene*>(animable.m_renderable.system);
 				animable.m_animation->getPose(animable.m_time, scene->getPose(animable.m_renderable), *scene->getModel(animable.m_renderable));
-				float t = animable.m_time + time_delta;
-				float l = animable.m_animation->getLength();
-				while(t > l)
+				if (!animable.m_manual)
 				{
-					t -= l;
+					float t = animable.m_time + time_delta;
+					float l = animable.m_animation->getLength();
+					while (t > l)
+					{
+						t -= l;
+					}
+					animable.m_time = t;
 				}
-				animable.m_time = t;
 			}
 		}
 	}
