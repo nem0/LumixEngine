@@ -397,6 +397,18 @@ void PropertyView::onScriptCompiled(const Lumix::Path& path, uint32_t status)
 }
 
 
+void PropertyView::on_animablePlayPause()
+{
+	m_client->playPausePreviewAnimable();
+}
+
+
+void PropertyView::on_animableTimeSet(int value)
+{
+	m_client->setAnimableTime(value);
+}
+
+
 void PropertyView::on_compileScriptClicked()
 {
 	for(int i = 0; i < m_properties.size(); ++i)
@@ -422,6 +434,25 @@ void PropertyView::on_editScriptClicked()
 			break;
 		}
 	}
+}
+
+
+void PropertyView::addAnimableCustomProperties()
+{
+	QTreeWidgetItem* tools_item = new QTreeWidgetItem(QStringList() << "Tools");
+	m_ui->propertyList->topLevelItem(0)->insertChild(0, tools_item);
+	QWidget* widget = new QWidget();
+	QHBoxLayout* layout = new QHBoxLayout(widget);
+	layout->setContentsMargins(0, 0, 0, 0);
+	QPushButton* compile_button = new QPushButton("Play/Pause", widget);
+	QSlider* slider = new QSlider(Qt::Orientation::Horizontal, widget);
+	slider->setMinimum(0);
+	slider->setMaximum(100);
+	layout->addWidget(compile_button);
+	layout->addWidget(slider);
+	m_ui->propertyList->setItemWidget(tools_item, 1, widget);
+	connect(compile_button, &QPushButton::clicked, this, &PropertyView::on_animablePlayPause);
+	connect(slider, &QSlider::valueChanged, this, &PropertyView::on_animableTimeSet);
 }
 
 
@@ -508,6 +539,7 @@ void PropertyView::onEntitySelected(Lumix::EntitySelectedEvent& e)
 		else if (e.components[i] == crc32("animable"))
 		{
 			addProperty("animable", "preview", "Preview animation", Property::FILE, "Animation (*.ani)");
+			addAnimableCustomProperties();
 		}
 		else
 		{

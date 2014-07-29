@@ -176,6 +176,24 @@ namespace Lumix
 	}
 
 
+	void AnimationSystem::setFrame(Component cmp, int frame)
+	{
+		m_impl->m_animables[cmp.index].m_time = m_impl->m_animables[cmp.index].m_animation->getLength() * frame / 30.0f; /// TODO get rid of the constant
+	}
+
+
+	bool AnimationSystem::isManual(Component cmp)
+	{
+		return m_impl->m_animables[cmp.index].m_manual;
+	}
+
+
+	void AnimationSystem::setManual(Component cmp, bool is_manual)
+	{
+		m_impl->m_animables[cmp.index].m_manual = is_manual;
+	}
+
+
 	void AnimationSystem::getPreview(Component cmp, string& path)
 	{
 		path = m_impl->m_animables[cmp.index].m_animation ? m_impl->m_animables[cmp.index].m_animation->getPath().c_str() : "";
@@ -209,7 +227,7 @@ namespace Lumix
 		for(int i = 0, c = m_impl->m_animables.size(); i < c; ++i)
 		{
 			AnimationSystemImpl::Animable& animable = m_impl->m_animables[i];
-			if(animable.m_animation->isReady())
+			if (animable.m_animation && animable.m_animation->isReady())
 			{
 				RenderScene* scene = static_cast<RenderScene*>(animable.m_renderable.system);
 				animable.m_animation->getPose(animable.m_time, scene->getPose(animable.m_renderable), *scene->getModel(animable.m_renderable));

@@ -27,9 +27,11 @@ struct ClientMessageType
 		SET_EDIT_MODE,			// 16
 		EDIT_SCRIPT,			// 17
 		SET_WIREFRAME,			// 18
-		NEW_UNIVERSE = 19,		// 19
-		LOOK_AT_SELECTED = 20,	// 20
+		NEW_UNIVERSE,			// 19
+		LOOK_AT_SELECTED,		// 20
 		STOP_GAME_MODE,			// 21
+		PLAY_PAUSE_ANIMABLE,
+		SET_ANIMABLE_TIME
 	};
 };
 
