@@ -1,5 +1,6 @@
 #include "editor_server.h"
 
+#include "animation/animation_system.h"
 #include "core/array.h"
 #include "core/blob.h"
 #include "core/crc32.h"
@@ -113,6 +114,8 @@ struct EditorServerImpl
 		void stopGameMode();
 		void lookAtSelected();
 		void newUniverse();
+		void playPausePreviewAnimable();
+		void setAnimableTime(int frame);
 		void logMessage(int32_t type, const char* system, const char* msg);
 		Entity& getSelectedEntity() { return m_selected_entity; }
 		bool isGameMode() const { return m_is_game_mode; }
@@ -588,6 +591,20 @@ void EditorServerImpl::loadMap(FS::IFile* file, bool success, FS::FileSystem& fs
 	}
 
 	fs.close(file);
+}
+
+void EditorServerImpl::setAnimableTime(int frame)
+{
+	AnimationSystem* anim_system = static_cast<AnimationSystem*>(m_engine.getPluginManager().getPlugin("animation"));
+	Component cmp = m_selected_entity.getComponent(crc32("animable"));
+	anim_system->setFrame(cmp, frame);
+}
+
+void EditorServerImpl::playPausePreviewAnimable()
+{
+	AnimationSystem* anim_system = static_cast<AnimationSystem*>(m_engine.getPluginManager().getPlugin("animation"));
+	Component cmp = m_selected_entity.getComponent(crc32("animable"));
+	anim_system->setManual(cmp, !anim_system->isManual(cmp));
 }
 
 void EditorServerImpl::newUniverse()
@@ -1076,6 +1093,12 @@ void EditorServerImpl::onMessage(const uint8_t* data, int32_t size)
 		break;
 	case ClientMessageType::NEW_UNIVERSE:
 		newUniverse();
+		break;
+	case ClientMessageType::PLAY_PAUSE_ANIMABLE:
+		playPausePreviewAnimable();
+		break;
+	case ClientMessageType::SET_ANIMABLE_TIME:
+		setAnimableTime(msg[1]);
 		break;
 	default:
 		ASSERT(false); // unknown message

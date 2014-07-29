@@ -65,6 +65,8 @@ private slots:
 	void on_browseFilesClicked();
 	void on_compileScriptClicked();
 	void on_editScriptClicked();
+	void on_animablePlayPause();
+	void on_animableTimeSet(int value);
 
 private:
 	void clear();
@@ -74,6 +76,7 @@ private:
 	void addProperty(const char* component, const char* name, const char* label, Property::Type type, const char* file_type);
 	void onPropertyValue(Property* property, void* data, int32_t data_size);
 	void addScriptCustomProperties();
+	void addAnimableCustomProperties();
 	void onScriptCompiled(const Lumix::Path& path, uint32_t status);
 	void setScriptStatus(uint32_t status);
 

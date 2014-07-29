@@ -44,6 +44,8 @@ namespace Lumix
 			void setEntityPosition(int32_t entity, const Vec3& position);
 			void setWireframe(bool is_wireframe);
 			void newUniverse();
+			void playPausePreviewAnimable();
+			void setAnimableTime(int time);
 			const char* getBasePath() const;
 			PropertyListCallback& propertyListReceived();
 			EntitySelectedCallback& entitySelected();

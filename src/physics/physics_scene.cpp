@@ -543,12 +543,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 			const uint16_t* LUMIX_RESTRICT data = (const uint16_t*)terrain->m_heightmap->getData();
 			for (int j = 0; j < height; ++j)
 			{
+				int idx = j * width;
 				for (int i = 0; i < width; ++i)
 				{
-					int idx = i + j * width;
 					int idx2 = j + i * height;
 					heights[idx].height = data[idx2];
 					heights[idx].materialIndex0 = heights[idx].materialIndex1 = 0;
+					++idx;
 				}
 			}
 		}

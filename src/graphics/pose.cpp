@@ -27,6 +27,7 @@ Pose::~Pose()
 
 void Pose::resize(int count)
 {
+	m_is_absolute = false;
 	LUMIX_DELETE_ARRAY(m_positions);
 	LUMIX_DELETE_ARRAY(m_rotations);
 	m_count = count;

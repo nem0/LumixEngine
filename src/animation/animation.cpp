@@ -78,6 +78,7 @@ void Animation::getPose(float time, Pose& pose, Model& model) const
 					int model_bone_index = iter.value();
 					lerp(m_positions[off + i], m_positions[off2 + i], &pos[model_bone_index], t);
 					nlerp(m_rotations[off + i], m_rotations[off2 + i], &rot[model_bone_index], t);
+
 					/*int parent = model.getBone(model_bone_index).parent_idx;
 					ASSERT(parent < model_bone_index);
 					if (parent >= 0)
@@ -109,6 +110,7 @@ void Animation::getPose(float time, Pose& pose, Model& model) const
 			}
 		}
 		pose.setIsRelative();
+		pose.computeAbsolute(model);
 	}
 }
 

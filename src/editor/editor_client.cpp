@@ -199,6 +199,16 @@ namespace Lumix
 		m_impl->sendMessage(ClientMessageType::NEW_UNIVERSE, NULL, 0);
 	}
 
+	void EditorClient::setAnimableTime(int32_t time)
+	{
+		m_impl->sendMessage(ClientMessageType::SET_ANIMABLE_TIME, &time, sizeof(time));
+	}
+
+	void EditorClient::playPausePreviewAnimable()
+	{
+		m_impl->sendMessage(ClientMessageType::PLAY_PAUSE_ANIMABLE, NULL, 0);
+	}
+
 	void EditorClient::setEntityPosition(int32_t entity, const Vec3& position)
 	{
 		uint8_t data[sizeof(entity) + sizeof(position)];
