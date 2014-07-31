@@ -89,8 +89,7 @@ class PropertyDescriptor : public IPropertyDescriptor
 template <class S>
 void PropertyDescriptor<S>::set(Component cmp, Blob& stream) const
 {
-	int len;
-	stream.read(&len, sizeof(len));
+	int len = stream.getBufferSize();
 	switch(m_type)
 	{
 		case DECIMAL:
@@ -151,7 +150,6 @@ void PropertyDescriptor<S>::get(Component cmp, Blob& stream) const
 				string value;
 				(static_cast<S*>(cmp.system)->*m_getter)(cmp, value);
 				len = value.length() + 1;
-				stream.write(&len, sizeof(len));
 				stream.write(value.c_str(), len);
 			}
 			break;
@@ -160,7 +158,6 @@ void PropertyDescriptor<S>::get(Component cmp, Blob& stream) const
 				float f;
 				(static_cast<S*>(cmp.system)->*m_decimal_getter)(cmp, f);
 				len = sizeof(f);
-				stream.write(&len, sizeof(len));
 				stream.write(&f, len);
 			}
 			break;
@@ -169,7 +166,6 @@ void PropertyDescriptor<S>::get(Component cmp, Blob& stream) const
 				int32_t i;
 				(static_cast<S*>(cmp.system)->*m_integer_getter)(cmp, i);
 				len = sizeof(i);
-				stream.write(&len, sizeof(len));
 				stream.write(&i, len);
 			}
 			break;
@@ -178,7 +174,6 @@ void PropertyDescriptor<S>::get(Component cmp, Blob& stream) const
 				bool b;
 				(static_cast<S*>(cmp.system)->*m_bool_getter)(cmp, b);
 				len = sizeof(b);
-				stream.write(&len, sizeof(len));
 				stream.write(&b, len);
 			}
 			break;
@@ -187,7 +182,6 @@ void PropertyDescriptor<S>::get(Component cmp, Blob& stream) const
 				Vec3 v;
 				(static_cast<S*>(cmp.system)->*m_vec3_getter)(cmp, v);
 				len = sizeof(v);
-				stream.write(&len, sizeof(len));
 				stream.write(&v, len);
 			}
 			break;

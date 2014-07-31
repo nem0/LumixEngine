@@ -17,8 +17,6 @@
 #include "core/map.h"
 #include "core/matrix.h"
 #include "core/profiler.h"
-#include "editor/client_message_types.h"
-#include "editor/editor_client.h"
 #include "editor/editor_icon.h"
 #include "editor/gizmo.h"
 #include "editor/property_descriptor.h"
@@ -59,17 +57,6 @@ struct ServerMessageType
 
 
 
-struct MouseButton
-{
-	enum Value
-	{
-		LEFT,
-		MIDDLE,
-		RIGHT
-	};
-};
-
-
 struct EditorServerImpl
 {
 	public:
@@ -84,7 +71,7 @@ struct EditorServerImpl
 			};
 		};
 
-		EditorServerImpl(EditorClient& client, EditorServer& server);
+		EditorServerImpl(EditorServer& server);
 		~EditorServerImpl();
 
 		bool create(const char* base_path);
@@ -95,7 +82,7 @@ struct EditorServerImpl
 		void selectEntity(Entity e);
 		void navigate(float forward, float right, float speed);
 		void writeString(const char* str);
-		void setProperty(const void* data, int size);
+		void setProperty(const char* component, const char* property, const void* data, int size);
 		void createUniverse(bool create_scene);
 		void renderIcons(IRenderDevice& render_device);
 		void renderScene(IRenderDevice& render_device);
@@ -104,41 +91,27 @@ struct EditorServerImpl
 		void load(const Path& path);
 		void loadMap(FS::IFile* file, bool success, FS::FileSystem& fs);
 		void addComponent(uint32_t type_crc);
-		void sendComponent(uint32_t type_crc);
-		void removeComponent(uint32_t type_crc);
-		void sendEntityPosition(int uid);
-		void setEntityPosition(int uid, const float* pos);
 		void addEntity();
 		void removeEntity();
 		void toggleGameMode();
 		void stopGameMode();
 		void lookAtSelected();
 		void newUniverse();
-		void playPausePreviewAnimable();
-		void setAnimableTime(int frame);
-		void logMessage(int32_t type, const char* system, const char* msg);
 		Entity& getSelectedEntity() { return m_selected_entity; }
 		bool isGameMode() const { return m_is_game_mode; }
 		void save(FS::IFile& file, const char* path);
 		void load(FS::IFile& file, const char* path);
-		void onMessage(const uint8_t* msgptr, int32_t size);
 		void resetAndLoad(FS::IFile& file, const char* path);
-		void onMessage(void* msgptr, int size);
 		EditorIconHit raycastEditorIcons(const Vec3& origin, const Vec3& dir);
 
 		const IPropertyDescriptor& getPropertyDescriptor(uint32_t type, uint32_t name_hash);
 		void registerProperties();
 		void rotateCamera(int x, int y);
-		void onEntityMoved(Entity& entity);
 		void onEntityDestroyed(Entity& entity);
 		void onComponentCreated(Component& cmp);
 		void onComponentDestroyed(Component& cmp);
 		void destroyUniverse();
 		bool loadPlugin(const char* plugin_name);
-		void onLogInfo(const char* system, const char* message);
-		void onLogWarning(const char* system, const char* message);
-		void onLogError(const char* system, const char* message);
-		void sendMessage(const uint8_t* data, int32_t length);
 		void setWireframe(bool is_wireframe);
 		void createEditorIcon(const Entity& entity);
 
@@ -157,6 +130,7 @@ struct EditorServerImpl
 		Entity m_camera;
 		DelegateList<void ()> m_universe_destroyed;
 		DelegateList<void ()> m_universe_created;
+		DelegateList<void(Entity&)> m_entity_selected;
 
 		FS::FileSystem* m_file_system;
 		FS::TCPFileServer m_tpc_file_server;
@@ -165,7 +139,8 @@ struct EditorServerImpl
 		FS::TCPFileDevice m_tcp_file_device;
 		IRenderDevice* m_edit_view_render_device;
 		bool m_toggle_game_mode_requested;
-		EditorClient& m_client;
+		Path m_universe_path;
+		Path m_base_path;
 };
 
 
@@ -180,6 +155,12 @@ static const uint32_t TERRAIN_HASH = crc32("terrain");
 void EditorServer::render(IRenderDevice& render_device)
 {
 	m_impl->renderScene(render_device);
+}
+
+
+const char* EditorServer::getBasePath()
+{
+	return m_impl->m_base_path.c_str();
 }
 
 
@@ -223,9 +204,9 @@ void EditorServer::tick()
 }
 
 
-bool EditorServer::create(const char* base_path, EditorClient& client)
+bool EditorServer::create(const char* base_path)
 {
-	m_impl = LUMIX_NEW(EditorServerImpl)(client, *this);
+	m_impl = LUMIX_NEW(EditorServerImpl)(*this);
 	
 	if(!m_impl->create(base_path))
 	{
@@ -246,12 +227,6 @@ void EditorServer::destroy()
 		LUMIX_DELETE(m_impl);
 		m_impl = NULL;
 	}
-}
-
-
-void EditorServer::onMessage(const uint8_t* data, int32_t size)
-{
-	m_impl->onMessage(data, size);
 }
 
 
@@ -387,6 +362,7 @@ void EditorServerImpl::save(const Path& path)
 	FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
 	save(*file, path.c_str());
 	fs.close(file);
+	m_universe_path = path;
 }
 
 
@@ -446,56 +422,6 @@ void EditorServerImpl::stopGameMode()
 }
 
 
-void EditorServerImpl::sendComponent(uint32_t type_crc)
-{
-	if(m_selected_entity.isValid())
-	{
-		m_stream.flush();
-		m_stream.write(ServerMessageType::PROPERTY_LIST);
-		const Entity::ComponentList& cmps = m_selected_entity.getComponents();
-		for(int i = 0; i < cmps.size(); ++i)
-		{
-			if(cmps[i].type == type_crc)
-			{
-				Array<IPropertyDescriptor*>& props = m_component_properties[cmps[i].type];
-				m_stream.write(props.size());
-				m_stream.write(type_crc);
-				for(int j = 0; j < props.size(); ++j)
-				{
-					m_stream.write(props[j]->getNameHash());
-					props[j]->get(cmps[i], m_stream);
-				}
-				break;
-			}
-		}
-		sendMessage(m_stream.getBuffer(), m_stream.getBufferSize());
-	}
-}
-
-
-void EditorServerImpl::setEntityPosition(int uid, const float* pos)
-{
-	Entity e(m_engine.getUniverse(), uid);
-	e.setPosition(pos[0], pos[1], pos[2]);
-}
-
-
-void EditorServerImpl::sendEntityPosition(int uid)
-{
-	Entity entity(m_engine.getUniverse(), uid);
-	if(entity.isValid())
-	{
-		m_stream.flush();
-		m_stream.write(ServerMessageType::ENTITY_POSITION);
-		m_stream.write(entity.index);
-		m_stream.write(entity.getPosition().x);
-		m_stream.write(entity.getPosition().y);
-		m_stream.write(entity.getPosition().z);
-		sendMessage(m_stream.getBuffer(), m_stream.getBufferSize());
-	}
-}
-
-
 void EditorServerImpl::addComponent(uint32_t type_crc)
 {
 	if(m_selected_entity.isValid())
@@ -546,35 +472,9 @@ void EditorServerImpl::removeEntity()
 }
 
 
-void EditorServerImpl::removeComponent(uint32_t)
-{
-	/*const Entity::ComponentList& cmps = m_selected_entity.getComponents();
-	Component cmp;
-	for(int i = 0; i < cmps.size(); ++i)
-	{
-		if(cmps[i].type == type_crc)
-		{
-			cmp = cmps[i];
-			break;
-		}
-	}
-	if(type_crc == renderable_type)
-	{
-		m_engine.getRenderer().destroyRenderable(cmp);
-	}
-	else if(type_crc == point_light_type)
-	{
-		m_engine.getRenderer().destroyPointLight(cmp);
-	}
-	else
-	{
-		ASSERT(false);
-	}
-	selectEntity(m_selected_entity);*/
-}
-
 void EditorServerImpl::load(const Path& path)
 {
+	m_universe_path = path;
 	g_log_info.log("editor server") << "Loading universe " << path.c_str() << "...";
 	FS::FileSystem& fs = m_engine.getFileSystem();
 	FS::ReadCallback file_read_cb;
@@ -593,22 +493,9 @@ void EditorServerImpl::loadMap(FS::IFile* file, bool success, FS::FileSystem& fs
 	fs.close(file);
 }
 
-void EditorServerImpl::setAnimableTime(int frame)
-{
-	AnimationSystem* anim_system = static_cast<AnimationSystem*>(m_engine.getPluginManager().getPlugin("animation"));
-	Component cmp = m_selected_entity.getComponent(crc32("animable"));
-	anim_system->setFrame(cmp, frame);
-}
-
-void EditorServerImpl::playPausePreviewAnimable()
-{
-	AnimationSystem* anim_system = static_cast<AnimationSystem*>(m_engine.getPluginManager().getPlugin("animation"));
-	Component cmp = m_selected_entity.getComponent(crc32("animable"));
-	anim_system->setManual(cmp, !anim_system->isManual(cmp));
-}
-
 void EditorServerImpl::newUniverse()
 {
+	m_universe_path = "";
 	destroyUniverse();
 	createUniverse(true);
 	g_log_info.log("editor server") << "universe created";
@@ -665,6 +552,7 @@ bool EditorServerImpl::create(const char* base_path)
 {
 	m_file_system = FS::FileSystem::create();
 	m_tpc_file_server.start(base_path);
+	m_base_path = base_path;
 
 	m_tcp_file_device.connect("127.0.0.1", 10001);
 
@@ -674,10 +562,6 @@ bool EditorServerImpl::create(const char* base_path)
 
 	m_file_system->setDefaultDevice("memory:disk");
 	m_file_system->setSaveGameDevice("memory:disk");
-	
-	g_log_info.getCallback().bind<EditorServerImpl, &EditorServerImpl::onLogInfo>(this);
-	g_log_warning.getCallback().bind<EditorServerImpl, &EditorServerImpl::onLogWarning>(this);
-	g_log_error.getCallback().bind<EditorServerImpl, &EditorServerImpl::onLogError>(this);
 
 	if(!m_engine.create(base_path, m_file_system, &m_owner))
 	{
@@ -729,9 +613,6 @@ void EditorServerImpl::destroy()
 
 	destroyUniverse();
 	m_engine.destroy();
-	g_log_info.getCallback().unbind<EditorServerImpl, &EditorServerImpl::onLogInfo>(this);
-	g_log_warning.getCallback().unbind<EditorServerImpl, &EditorServerImpl::onLogWarning>(this);
-	g_log_error.getCallback().unbind<EditorServerImpl, &EditorServerImpl::onLogError>(this);
 
 	m_tcp_file_device.disconnect();
 	m_tpc_file_server.stop();
@@ -739,33 +620,9 @@ void EditorServerImpl::destroy()
 }
 
 
-void EditorServerImpl::onLogInfo(const char* system, const char* message)
-{
-	logMessage(0, system, message);
-}
-
-
-void EditorServerImpl::onLogWarning(const char* system, const char* message)
-{
-	logMessage(1, system, message);
-}
-
-
-void EditorServerImpl::onLogError(const char* system, const char* message)
-{
-	logMessage(2, system, message);
-}
-
-
 void EditorServerImpl::setWireframe(bool is_wireframe)
 {
 	m_engine.getRenderer().setEditorWireframe(is_wireframe);
-}
-
-
-void EditorServerImpl::sendMessage(const uint8_t* data, int32_t length)
-{
-	m_client.onMessage(data, length);
 }
 
 
@@ -785,15 +642,15 @@ void EditorServerImpl::renderScene(IRenderDevice& render_device)
 }
 
 
-EditorServerImpl::EditorServerImpl(EditorClient& client, EditorServer& server)
+EditorServerImpl::EditorServerImpl(EditorServer& server)
 	: m_universe_mutex(false)
 	, m_toggle_game_mode_requested(false)
-	, m_client(client)
 	, m_owner(server)
 {
 	m_is_game_mode = false;
 	m_selected_entity = Entity::INVALID;
 	m_edit_view_render_device = NULL;
+	m_universe_path = "";
 }
 
 
@@ -804,6 +661,18 @@ void EditorServerImpl::navigate(float forward, float right, float speed)
 	pos += rot * Vec3(0, 0, -1) * forward * speed;
 	pos += rot * Vec3(1, 0, 0) * right * speed;
 	m_camera.setPosition(pos);
+}
+
+
+const IPropertyDescriptor& EditorServer::getPropertyDescriptor(uint32_t type, uint32_t name_hash)
+{
+	return m_impl->getPropertyDescriptor(type, name_hash);
+}
+
+
+Entity EditorServer::getSelectedEntity() const
+{
+	return m_impl->m_selected_entity;
 }
 
 
@@ -822,31 +691,21 @@ const IPropertyDescriptor& EditorServerImpl::getPropertyDescriptor(uint32_t type
 }
 
 
-void EditorServerImpl::setProperty(const void* data, int size)
+void EditorServerImpl::setProperty(const char* component, const char* property, const void* data, int size)
 {
-	Blob stream;
-	stream.create(data, size);
-	uint32_t component_type;
-	stream.read(component_type);
-	Component cmp = Component::INVALID;
-	if(m_selected_entity.isValid())
+	if (m_selected_entity.isValid())
 	{
-		const Entity::ComponentList& cmps = m_selected_entity.getComponents();
-		for(int i = 0; i < cmps.size(); ++i)
+		Blob stream;
+		stream.create(data, size);
+		uint32_t component_type = crc32(component);
+		Component cmp = m_selected_entity.getComponent(component_type);
+
+		if (cmp.isValid())
 		{
-			if(cmps[i].type == component_type)
-			{
-				cmp = cmps[i];
-				break;
-			}
+			uint32_t name_hash = crc32(property);
+			const IPropertyDescriptor& cp = getPropertyDescriptor(cmp.type, name_hash);
+			cp.set(cmp, stream);
 		}
-	}
-	if(cmp.isValid())
-	{
-		uint32_t name_hash;
-		stream.read(name_hash);
-		const IPropertyDescriptor& cp = getPropertyDescriptor(cmp.type, name_hash);
-		cp.set(cmp, stream);
 	}
 }
 
@@ -881,35 +740,11 @@ void EditorServerImpl::writeString(const char* str)
 }
 
 
-void EditorServerImpl::logMessage(int32_t type, const char* system, const char* msg)
-{
-	m_stream.flush();
-	m_stream.write(ServerMessageType::LOG_MESSAGE);
-	m_stream.write(type);
-	writeString(system);
-	writeString(msg);
-	sendMessage(m_stream.getBuffer(), m_stream.getBufferSize());
-}
-
-
 void EditorServerImpl::selectEntity(Entity e)
 {
 	m_selected_entity = e;
 	m_gizmo.setEntity(e);
-	m_stream.flush();
-	m_stream.write(ServerMessageType::ENTITY_SELECTED);
-	m_stream.write(e.index);
-	if(e.isValid())
-	{
-		const Entity::ComponentList& cmps = e.getComponents();
-		m_stream.write(cmps.size());
-		for(int i = 0; i < cmps.size(); ++i)
-		{
-			m_stream.write(cmps[i].type);
-		}
-	}
-	sendMessage(m_stream.getBuffer(), m_stream.getBufferSize());
-	sendEntityPosition(e.index);
+	m_entity_selected.invoke(e);
 }
 
 
@@ -947,12 +782,6 @@ void EditorServerImpl::onComponentDestroyed(Component& cmp)
 		er->create(m_engine, *m_engine.getRenderScene(), cmp.entity);
 		m_editor_icons.push(er);
 	}
-}
-
-
-void EditorServerImpl::onEntityMoved(Entity& entity)
-{
-	sendEntityPosition(entity.index);
 }
 
 
@@ -994,9 +823,90 @@ void EditorServer::setEditViewRenderDevice(IRenderDevice& render_device)
 }
 
 
+void EditorServer::loadUniverse(const Path& path)
+{
+	m_impl->load(path);
+}
+
+void EditorServer::saveUniverse(const Path& path)
+{
+	m_impl->save(path);
+}
+
+void EditorServer::newUniverse()
+{
+	m_impl->newUniverse();
+}
+
+Path EditorServer::getUniversePath() const
+{
+	return m_impl->m_universe_path;
+}
+
+void EditorServer::addComponent(uint32_t type_crc)
+{
+	m_impl->addComponent(type_crc);
+}
+
+
+void EditorServer::addEntity()
+{
+	m_impl->addEntity();
+}
+
+void EditorServer::toggleGameMode()
+{
+	m_impl->toggleGameMode();
+}
+
+void EditorServer::setWireframe(bool is_wireframe)
+{
+	m_impl->setWireframe(is_wireframe);
+}
+
+
+void EditorServer::lookAtSelected()
+{
+	m_impl->lookAtSelected();
+}
+
+
+void EditorServer::navigate(float forward, float right, float speed)
+{
+	m_impl->navigate(forward, right, speed);
+}
+
+void EditorServer::setProperty(const char* component, const char* property, const void* data, int size)
+{
+	m_impl->setProperty(component, property, data, size);
+}
+
+
+void EditorServer::onMouseDown(int x, int y, MouseButton::Value button)
+{
+	m_impl->onPointerDown(x, y, button);
+}
+
+void EditorServer::onMouseMove(int x, int y, int relx, int rely, int mouse_flags)
+{
+	m_impl->onPointerMove(x, y, relx, rely, mouse_flags);
+}
+
+void EditorServer::onMouseUp(int x, int y, MouseButton::Value button)
+{
+	m_impl->onPointerUp(x, y, button);
+}
+
+
 DelegateList<void ()>& EditorServer::universeCreated()
 {
 	return m_impl->m_universe_created;
+}
+
+
+DelegateList<void(Entity&)>& EditorServer::entitySelected()
+{
+	return m_impl->m_entity_selected;
 }
 
 
@@ -1023,7 +933,6 @@ void EditorServerImpl::createUniverse(bool create_basic_entities)
 	m_gizmo.setUniverse(universe);
 	m_gizmo.hide();
 
-	universe->entityMoved().bind<EditorServerImpl, &EditorServerImpl::onEntityMoved>(this);
 	universe->componentCreated().bind<EditorServerImpl, &EditorServerImpl::onComponentCreated>(this);
 	universe->componentDestroyed().bind<EditorServerImpl, &EditorServerImpl::onComponentDestroyed>(this);
 	universe->entityDestroyed().bind<EditorServerImpl, &EditorServerImpl::onEntityDestroyed>(this);
@@ -1034,77 +943,6 @@ void EditorServerImpl::createUniverse(bool create_basic_entities)
 }
 
 
-void EditorServerImpl::onMessage(const uint8_t* data, int32_t size)
-{
-	const int* msg = reinterpret_cast<const int*>(data);
-	const float* fmsg = reinterpret_cast<const float*>(data);
-	switch (msg[0])
-	{
-	case ClientMessageType::POINTER_DOWN:
-		onPointerDown(msg[1], msg[2], (MouseButton::Value)msg[3]);
-		break;
-	case ClientMessageType::POINTER_MOVE:
-		onPointerMove(msg[1], msg[2], msg[3], msg[4], msg[5]);
-		break;
-	case ClientMessageType::POINTER_UP:
-		onPointerUp(msg[1], msg[2], (MouseButton::Value)msg[3]);
-		break;
-	case ClientMessageType::PROPERTY_SET:
-		setProperty(msg + 1, size - 4);
-		break;
-	case ClientMessageType::MOVE_CAMERA:
-		navigate(fmsg[1], fmsg[2], fmsg[3]);
-		break;
-	case ClientMessageType::SAVE:
-		save(reinterpret_cast<const char*>(&msg[1]));
-		break;
-	case ClientMessageType::LOAD:
-		load(reinterpret_cast<const char*>(&msg[1]));
-		break;
-	case ClientMessageType::ADD_COMPONENT:
-		addComponent(*reinterpret_cast<const uint32_t*>(&msg[1]));
-		break;
-	case ClientMessageType::GET_PROPERTIES:
-		sendComponent(*reinterpret_cast<const uint32_t*>(&msg[1]));
-		break;
-	case ClientMessageType::REMOVE_COMPONENT:
-		removeComponent(*reinterpret_cast<const uint32_t*>(&msg[1]));
-		break;
-	case ClientMessageType::SET_WIREFRAME:
-		setWireframe(msg[1] != 0);
-		break;
-	case ClientMessageType::ADD_ENTITY:
-		addEntity();
-		break;
-	case ClientMessageType::TOGGLE_GAME_MODE:
-		m_toggle_game_mode_requested = true;
-		break;
-	case ClientMessageType::GET_POSITION:
-		sendEntityPosition(getSelectedEntity().index);
-		break;
-	case ClientMessageType::SET_POSITION:
-		setEntityPosition(msg[1], reinterpret_cast<const float*>(&msg[2]));
-		break;
-	case ClientMessageType::REMOVE_ENTITY:
-		removeEntity();
-		break;
-	case ClientMessageType::LOOK_AT_SELECTED:
-		lookAtSelected();
-		break;
-	case ClientMessageType::NEW_UNIVERSE:
-		newUniverse();
-		break;
-	case ClientMessageType::PLAY_PAUSE_ANIMABLE:
-		playPausePreviewAnimable();
-		break;
-	case ClientMessageType::SET_ANIMABLE_TIME:
-		setAnimableTime(msg[1]);
-		break;
-	default:
-		ASSERT(false); // unknown message
-		break;
-	}
-}
 
 
 
