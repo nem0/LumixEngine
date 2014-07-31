@@ -63,9 +63,6 @@
     <ClCompile Include="..\..\..\src\engine\plugin_manager.cpp">
       <Filter>engine</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\editor\editor_client.cpp">
-      <Filter>editor</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\editor\editor_icon.cpp">
       <Filter>editor</Filter>
     </ClCompile>
@@ -73,9 +70,6 @@
       <Filter>editor</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\editor\gizmo.cpp">
-      <Filter>editor</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\editor\server_message_types.cpp">
       <Filter>editor</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\universe\component.cpp">
@@ -162,12 +156,6 @@
     <ClInclude Include="..\..\..\src\engine\plugin_manager.h">
       <Filter>engine</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\editor\client_message_types.h">
-      <Filter>editor</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\editor\editor_client.h">
-      <Filter>editor</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\editor\editor_icon.h">
       <Filter>editor</Filter>
     </ClInclude>
@@ -178,9 +166,6 @@
       <Filter>editor</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\editor\property_descriptor.h">
-      <Filter>editor</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\editor\server_message_types.h">
       <Filter>editor</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\universe\component.h">

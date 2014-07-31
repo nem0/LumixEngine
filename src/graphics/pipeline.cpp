@@ -613,6 +613,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 				const Model& model = *infos[i].m_model->getModel();
 				Vec3* poss = pose.getPositions();
 				Quat* rots = pose.getRotations();
+				ASSERT(pose.getCount() <= 64);
 				for (int bone_index = 0, bone_count = pose.getCount(); bone_index < bone_count; ++bone_index)
 				{
 					rots[bone_index].toMatrix(bone_mtx[bone_index]);

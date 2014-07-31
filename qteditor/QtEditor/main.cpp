@@ -5,7 +5,6 @@
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
-#include "editor/editor_client.h"
 #include "editor/editor_server.h"
 #include "editor/gizmo.h"
 #include "engine/engine.h"
@@ -35,7 +34,6 @@ class App
 		{
 			delete m_main_window;
 			delete m_qt_app;
-			m_client.destroy();
 			m_server.destroy();
 		}
 
@@ -166,13 +164,10 @@ class App
 			HWND hwnds[] = {hwnd, game_hwnd};
 			HGLRC hglrc = createGLContext(hwnds, 2);
 
-			bool server_created = m_server.create(QDir::currentPath().toLocal8Bit().data(), m_client);
+			bool server_created = m_server.create(QDir::currentPath().toLocal8Bit().data());
 			ASSERT(server_created);
 			m_server.tick();
-			bool client_created = m_client.create(m_server.getEngine().getBasePath(), m_server);
-			ASSERT(client_created);
 
-			m_main_window->setEditorClient(m_client);
 			m_main_window->setEditorServer(m_server);
 			m_main_window->getSceneView()->setServer(&m_server);
 
@@ -238,19 +233,19 @@ class App
 					}
 					if (keys['W'] >> 7)
 					{
-						m_client.navigate(1, 0, speed);
+						m_server.navigate(1, 0, speed);
 					}
 					else if (keys['S'] >> 7)
 					{
-						m_client.navigate(-1, 0, speed);
+						m_server.navigate(-1, 0, speed);
 					}
 					if (keys['A'] >> 7)
 					{
-						m_client.navigate(0, -1, speed);
+						m_server.navigate(0, -1, speed);
 					}
 					else if (keys['D'] >> 7)
 					{
-						m_client.navigate(0, 1, speed);
+						m_server.navigate(0, 1, speed);
 					}
 				}
 			}
@@ -276,7 +271,6 @@ class App
 		WGLRenderDevice* m_game_render_device;
 		MainWindow* m_main_window;
 		Lumix::EditorServer m_server;
-		Lumix::EditorClient m_client;
 		QApplication* m_qt_app;
 };
 

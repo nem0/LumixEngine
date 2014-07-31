@@ -214,11 +214,23 @@ namespace Lumix
 	}
 
 
-	void AnimationSystem::setAnimationTime(const Component& cmp, float time)
+	void AnimationSystem::setAnimationFrame(const Component& cmp, int frame)
 	{
-		m_impl->m_animables[cmp.index].m_time = time;
+		if (m_impl->m_animables[cmp.index].m_animation)
+		{
+			m_impl->m_animables[cmp.index].m_time = m_impl->m_animables[cmp.index].m_animation->getLength() * frame / m_impl->m_animables[cmp.index].m_animation->getFrameCount();
+		}
 	}
 
+
+	int AnimationSystem::getFrameCount(const Component& cmp) const
+	{
+		if (m_impl->m_animables[cmp.index].m_animation)
+		{
+			return m_impl->m_animables[cmp.index].m_animation->getFrameCount();
+		}
+		return -1;
+	}
 
 	void AnimationSystem::update(float time_delta)
 	{

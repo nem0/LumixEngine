@@ -1,8 +1,9 @@
 #include "property_view.h"
 #include "ui_property_view.h"
+#include "animation/animation_system.h"
 #include "core/crc32.h"
-#include "editor/editor_client.h"
-#include "editor/server_message_types.h"
+#include "editor/editor_server.h"
+#include "engine/engine.h"
 #include "scripts/scriptcompiler.h"
 #include <qcheckbox.h>
 #include <qdesktopservices.h>
@@ -45,27 +46,21 @@ PropertyView::PropertyView(QWidget* parent) :
 }
 
 
-Lumix::EditorClient* PropertyView::getEditorClient()
+PropertyView::~PropertyView()
 {
-	return m_client;
+	m_server->entitySelected().unbind<PropertyView, &PropertyView::onEntitySelected>(this);
+	m_server->universeCreated().unbind<PropertyView, &PropertyView::onUniverseCreated>(this);
+	m_server->universeDestroyed().unbind<PropertyView, &PropertyView::onUniverseDestroyed>(this);
+	onUniverseCreated();
+	delete m_ui;
 }
-
-
-void PropertyView::setEditorClient(Lumix::EditorClient& client)
-{
-	m_client = &client;
-	m_client->propertyListReceived().bind<PropertyView, &PropertyView::onPropertyList>(this);
-	m_client->entitySelected().bind<PropertyView, &PropertyView::onEntitySelected>(this);
-	m_client->entityPositionReceived().bind<PropertyView, &PropertyView::onEntityPosition>(this);
-}
-
 
 void PropertyView::on_checkboxStateChanged()
 {
 	QCheckBox* cb = qobject_cast<QCheckBox*>(QObject::sender());
 	int i = cb->property("cpp_prop").toInt();
 	bool b = cb->isChecked();
-	m_client->setComponentProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), &b, sizeof(b)); 
+	m_server->setProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), &b, sizeof(b)); 
 }
 
 
@@ -77,7 +72,7 @@ void PropertyView::on_vec3ValueChanged()
 	v.x = (float)qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item->child(0), 1))->value();
 	v.y = (float)qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item->child(1), 1))->value();
 	v.z = (float)qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item->child(2), 1))->value();
-	m_client->setComponentProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), &v, sizeof(v)); 
+	m_server->setProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), &v, sizeof(v));
 }
 
 void PropertyView::on_doubleSpinBoxValueChanged()
@@ -85,7 +80,7 @@ void PropertyView::on_doubleSpinBoxValueChanged()
 	QDoubleSpinBox* sb = qobject_cast<QDoubleSpinBox*>(QObject::sender());
 	int i = sb->property("cpp_prop").toInt();
 	float f = (float)qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item, 1))->value();
-	m_client->setComponentProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), &f, sizeof(f)); 
+	m_server->setProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), &f, sizeof(f));
 }
 
 void PropertyView::on_lineEditEditingFinished()
@@ -94,7 +89,7 @@ void PropertyView::on_lineEditEditingFinished()
 	int i = edit->property("cpp_prop").toInt();
 	QByteArray byte_array = edit->text().toLatin1();
 	const char* text = byte_array.data();
-	m_client->setComponentProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), text, byte_array.size()); 
+	m_server->setProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), text, byte_array.size());
 }
 
 void PropertyView::on_browseFilesClicked()
@@ -102,25 +97,17 @@ void PropertyView::on_browseFilesClicked()
 	QPushButton* button = qobject_cast<QPushButton*>(QObject::sender());
 	int i = button->property("cpp_prop").toInt();
 	QString str = QFileDialog::getOpenFileName(NULL, QString(), QString(), m_properties[i]->m_file_type.c_str());
-	int len = (int)strlen(m_client->getBasePath());
 	
 	QLineEdit* edit = qobject_cast<QLineEdit*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item, 1)->children()[0]);
-	if (strncmp(str.toLocal8Bit().data(), m_client->getBasePath(), len) == 0)
-	{
-		edit->setText(str.toLocal8Bit().data() + len);
-	}
-	else
-	{
-		edit->setText(str);
-	}
-	m_client->setComponentProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), edit->text().toLocal8Bit().data(), edit->text().size());
+	edit->setText(str);
+	m_server->setProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), edit->text().toLocal8Bit().data(), edit->text().size());
 }
 
-void PropertyView::onPropertyValue(Property* property, void* data, int32_t)
+void PropertyView::onPropertyValue(Property* property, const void* data, int32_t)
 {
 	if(property->m_component_name == "script" && property->m_name == "source")
 	{
-		setScriptStatus(m_compiler->getStatus(static_cast<char*>(data)));
+		setScriptStatus(m_compiler->getStatus(static_cast<const char*>(data)));
 	}
 
 	switch(property->m_type)
@@ -172,29 +159,14 @@ void PropertyView::onPropertyValue(Property* property, void* data, int32_t)
 }
 
 
-void PropertyView::onEntityPosition(Lumix::EntityPositionEvent& e)
+void PropertyView::onEntityPosition(Lumix::Entity& e)
 {
-	if (m_selected_entity_index == e.index)
+	if (m_selected_entity == e)
 	{
-		m_ui->positionX->setValue(e.x);
-		m_ui->positionY->setValue(e.y);
-		m_ui->positionZ->setValue(e.z);
-	}
-}
-
-
-void PropertyView::onPropertyList(Lumix::PropertyListEvent& e)
-{
-	for(int i = 0; i < e.properties.size(); ++i)
-	{
-		for(int j = 0; j < m_properties.size(); ++j)
-		{
-			if(e.type_hash == m_properties[j]->m_component && e.properties[i].name_hash == m_properties[j]->m_name_hash)
-			{
-				onPropertyValue(m_properties[j], e.properties[i].data, e.properties[i].data_size);
-				break;
-			}
-		}
+		Lumix::Vec3 pos = e.getPosition();
+		m_ui->positionX->setValue(pos.x);
+		m_ui->positionY->setValue(pos.y);
+		m_ui->positionZ->setValue(pos.z);
 	}
 }
 
@@ -223,9 +195,9 @@ class FileEdit : public QLineEdit
 			if(!list.empty())
 			{
 				QString file = list[0].toLocalFile();
-				if(file.toLower().startsWith(m_property_view->getEditorClient()->getBasePath()))
+				if(file.toLower().startsWith(m_server->getBasePath()))
 				{
-					file.remove(0, QString(m_property_view->getEditorClient()->getBasePath()).length());
+					file.remove(0, QString(m_server->getBasePath()).length());
 				}
 				if(file.startsWith("/"))
 				{
@@ -236,8 +208,14 @@ class FileEdit : public QLineEdit
 			}
 		}
 
+		void setServer(Lumix::EditorServer* server)
+		{
+			m_server = server;
+		}
+
 	private:
 		PropertyView* m_property_view;
+		Lumix::EditorServer* m_server;
 };
 
 
@@ -289,7 +267,8 @@ void PropertyView::addProperty(const char* component, const char* name, const ch
 		case Property::FILE:
 			{
 				QWidget* widget = new QWidget();
-				QLineEdit* edit = new FileEdit(widget, this);
+				FileEdit* edit = new FileEdit(widget, this);
+				edit->setServer(m_server);
 				edit->setProperty("cpp_prop", (int)(m_properties.size() - 1)); 
 				QHBoxLayout* layout = new QHBoxLayout(widget);
 				layout->addWidget(edit);
@@ -325,6 +304,28 @@ void PropertyView::addProperty(const char* component, const char* name, const ch
 	}
 }
 
+
+void PropertyView::setEditorServer(Lumix::EditorServer& server)
+{
+	m_server = &server;
+	m_server->entitySelected().bind<PropertyView, &PropertyView::onEntitySelected>(this);
+	m_server->universeCreated().bind<PropertyView, &PropertyView::onUniverseCreated>(this);
+	m_server->universeDestroyed().bind<PropertyView, &PropertyView::onUniverseDestroyed>(this);
+	if (m_server->getEngine().getUniverse())
+	{
+		onUniverseCreated();
+	}
+}
+
+void PropertyView::onUniverseCreated()
+{
+	m_server->getEngine().getUniverse()->entityMoved().bind<PropertyView, &PropertyView::onEntityPosition>(this);
+}
+
+void PropertyView::onUniverseDestroyed()
+{
+	m_server->getEngine().getUniverse()->entityMoved().unbind<PropertyView, &PropertyView::onEntityPosition>(this);
+}
 
 void PropertyView::setScriptCompiler(ScriptCompiler* compiler)
 {
@@ -385,27 +386,31 @@ void PropertyView::setScriptStatus(uint32_t status)
 }
 
 
-void PropertyView::onScriptCompiled(const Lumix::Path& path, uint32_t status)
+void PropertyView::onScriptCompiled(const Lumix::Path&, uint32_t status)
 {
-	QString script_path(path);
-	script_path = script_path.toLower();
-	if(script_path.startsWith(m_client->getBasePath()))
-	{
-		script_path.remove(0, strlen(m_client->getBasePath()) + 1);
-	}
 	setScriptStatus(status == 0 ? ScriptCompiler::SUCCESS : ScriptCompiler::FAILURE);
 }
 
 
 void PropertyView::on_animablePlayPause()
 {
-	m_client->playPausePreviewAnimable();
+	Lumix::Component cmp = m_server->getSelectedEntity().getComponent(crc32("animable"));
+	if (cmp.isValid())
+	{
+		Lumix::AnimationSystem* anim_system = static_cast<Lumix::AnimationSystem*>(cmp.system);
+		anim_system->setManual(cmp, !anim_system->isManual(cmp));
+	}
+
 }
 
 
 void PropertyView::on_animableTimeSet(int value)
 {
-	m_client->setAnimableTime(value);
+	Lumix::Component cmp = m_server->getSelectedEntity().getComponent(crc32("animable"));
+	if (cmp.isValid())
+	{
+		static_cast<Lumix::AnimationSystem*>(cmp.system)->setAnimationFrame(cmp, value);
+	}
 }
 
 
@@ -437,7 +442,7 @@ void PropertyView::on_editScriptClicked()
 }
 
 
-void PropertyView::addAnimableCustomProperties()
+void PropertyView::addAnimableCustomProperties(const Lumix::Component& cmp)
 {
 	QTreeWidgetItem* tools_item = new QTreeWidgetItem(QStringList() << "Tools");
 	m_ui->propertyList->topLevelItem(0)->insertChild(0, tools_item);
@@ -446,8 +451,10 @@ void PropertyView::addAnimableCustomProperties()
 	layout->setContentsMargins(0, 0, 0, 0);
 	QPushButton* compile_button = new QPushButton("Play/Pause", widget);
 	QSlider* slider = new QSlider(Qt::Orientation::Horizontal, widget);
+	slider->setObjectName("animation_frame_slider");
 	slider->setMinimum(0);
-	slider->setMaximum(100);
+	int frame_count = static_cast<Lumix::AnimationSystem*>(cmp.system)->getFrameCount(cmp);
+	slider->setMaximum(frame_count);
 	layout->addWidget(compile_button);
 	layout->addWidget(slider);
 	m_ui->propertyList->setItemWidget(tools_item, 1, widget);
@@ -477,15 +484,17 @@ void PropertyView::addScriptCustomProperties()
 }
 
 
-void PropertyView::onEntitySelected(Lumix::EntitySelectedEvent& e)
+void PropertyView::onEntitySelected(Lumix::Entity& e)
 {
-	m_selected_entity_index = e.index;
+	m_selected_entity = e;
+	/// TODO miki
 	clear();
-	for (int i = 0; i < e.components.size(); ++i)
+	const Lumix::Entity::ComponentList& cmps = e.getComponents();
+	for (int i = 0; i < cmps.size(); ++i)
 	{
 		for(int j = 0; j < sizeof(component_map) / sizeof(component_map[0]); j += 2)
 		{
-			if(e.components[i] == crc32(component_map[j + 1]))
+			if (cmps[i].type == crc32(component_map[j + 1]))
 			{
 				m_ui->propertyList->insertTopLevelItem(0, new QTreeWidgetItem());
 				m_ui->propertyList->topLevelItem(0)->setText(0, component_map[j]);
@@ -493,80 +502,113 @@ void PropertyView::onEntitySelected(Lumix::EntitySelectedEvent& e)
 			}
 		}
 		/// TODO refactor
-		if (e.components[i] == crc32("box_rigid_actor"))
+		if (cmps[i].type == crc32("box_rigid_actor"))
 		{
 			addProperty("box_rigid_actor", "size", "Size", Property::VEC3, NULL);
 			addProperty("box_rigid_actor", "dynamic", "Is dynamic", Property::BOOL, NULL);
 		}
-		else if (e.components[i] == crc32("renderable"))
+		else if (cmps[i].type == crc32("renderable"))
 		{
 			addProperty("renderable", "source", "Source", Property::FILE, "models (*.msh)");
 		}
-		else if (e.components[i] == crc32("script"))
+		else if (cmps[i].type == crc32("script"))
 		{
 			addProperty("script", "source", "Source", Property::FILE, "scripts (*.cpp)");
 			addScriptCustomProperties();
 		}
-		else if (e.components[i] == crc32("camera"))
+		else if (cmps[i].type  == crc32("camera"))
 		{
 			addProperty("camera", "slot", "Slot", Property::STRING, NULL);
 			addProperty("camera", "near", "Near", Property::DECIMAL, NULL);
 			addProperty("camera", "far", "Far", Property::DECIMAL, NULL);
 			addProperty("camera", "fov", "Field of view", Property::DECIMAL, NULL);
 		}
-		else if (e.components[i] == crc32("terrain"))
+		else if (cmps[i].type == crc32("terrain"))
 		{
 			addProperty("terrain", "material", "Material", Property::FILE, "material (*.mat)");
 			addProperty("terrain", "xz_scale", "Meter per texel", Property::DECIMAL, NULL);
 			addProperty("terrain", "y_scale", "Height scale", Property::DECIMAL, NULL);
 		}
-		else if (e.components[i] == crc32("mesh_rigid_actor"))
+		else if (cmps[i].type == crc32("mesh_rigid_actor"))
 		{
 			addProperty("mesh_rigid_actor", "source", "Source", Property::FILE, "Physics (*.pda)");
 		}
-		else if (e.components[i] == crc32("physical_controller"))
+		else if (cmps[i].type == crc32("physical_controller"))
 		{
 		}
-		else if (e.components[i] == crc32("physical_heightfield"))
+		else if (cmps[i].type == crc32("physical_heightfield"))
 		{
 			addProperty("physical_heightfield", "heightmap", "Heightmap", Property::FILE, "Heightmaps (*.tga *.raw)");
 			addProperty("physical_heightfield", "xz_scale", "Meters per pixel", Property::DECIMAL, NULL);
 			addProperty("physical_heightfield", "y_scale", "Height scale", Property::DECIMAL, NULL);
 		}
-		else if (e.components[i] == crc32("light"))
+		else if (cmps[i].type == crc32("light"))
 		{
 		}
-		else if (e.components[i] == crc32("animable"))
+		else if (cmps[i].type == crc32("animable"))
 		{
 			addProperty("animable", "preview", "Preview animation", Property::FILE, "Animation (*.ani)");
-			addAnimableCustomProperties();
+			addAnimableCustomProperties(cmps[i]);
 		}
 		else
 		{
 			ASSERT(false);
 		}
 		m_ui->propertyList->expandAll();
-		m_client->requestProperties(e.components[i]);
+	}
+	onEntityPosition(e);
+	updateValues();
+}
+
+void PropertyView::updateValues()
+{
+	if (m_selected_entity.isValid())
+	{
+		const Lumix::Entity::ComponentList& cmps = m_selected_entity.getComponents();
+		for (int i = 0; i < m_properties.size(); ++i)
+		{
+			Lumix::Blob stream;
+			const Lumix::IPropertyDescriptor& prop = m_server->getPropertyDescriptor(m_properties[i]->m_component, m_properties[i]->m_name_hash);
+			prop.get(cmps[i], stream);
+			onPropertyValue(m_properties[i], stream.getBuffer(), stream.getBufferSize());
+		}
+		Lumix::Component animable = m_selected_entity.getComponent(crc32("animable"));
+		if (animable.isValid())
+		{
+#if 0
+			QTreeWidgetItem* tools_item = new QTreeWidgetItem(QStringList() << "Tools");
+			m_ui->propertyList->topLevelItem(0)->insertChild(0, tools_item);
+			QWidget* widget = new QWidget();
+			QHBoxLayout* layout = new QHBoxLayout(widget);
+			layout->setContentsMargins(0, 0, 0, 0);
+			QPushButton* compile_button = new QPushButton("Play/Pause", widget);
+			QSlider* slider = new QSlider(Qt::Orientation::Horizontal, widget);
+			slider->s
+			slider->setMinimum(0);
+			slider->setMaximum(100);
+			layout->addWidget(compile_button);
+			layout->addWidget(slider);
+			m_ui->propertyList->setItemWidget(tools_item, 1, widget);
+			connect(compile_button, &QPushButton::clicked, this, &PropertyView::on_animablePlayPause);
+			connect(slider, &QSlider::valueChanged, this, &PropertyView::on_animableTimeSet);
+#endif
+			int frame_count = static_cast<Lumix::AnimationSystem*>(animable.system)->getFrameCount(animable);
+			m_ui->propertyList->findChild<QSlider*>("animation_frame_slider")->setMaximum(frame_count);
+		}
 	}
 }
 
-
-PropertyView::~PropertyView()
-{
-	delete m_ui;
-}
 
 void PropertyView::on_addComponentButton_clicked()
 {
 	QByteArray s = m_ui->componentTypeCombo->currentText().toLocal8Bit();
 	const char* c = s.data();
-	/// TODO
 
 	for(int i = 0; i < sizeof(component_map) / sizeof(component_map[0]); i += 2)
 	{
 		if(strcmp(c, component_map[i]) == 0)
 		{
-			m_client->addComponent(crc32(component_map[i+1]));
+			m_server->addComponent(crc32(component_map[i+1]));
 			return;
 		}
 	}

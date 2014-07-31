@@ -7,16 +7,25 @@
 
 namespace Lumix
 {
-
-
-	class EditorClient;
+	
 	class Engine;
 	class IPlugin;
 	class IRenderDevice;
+	class Path;
 	namespace FS
 	{
 		class TCPFileServer;
 	}
+
+	struct MouseButton
+	{
+		enum Value
+		{
+			LEFT,
+			MIDDLE,
+			RIGHT
+		};
+	};
 
 	class LUMIX_ENGINE_API EditorServer
 	{
@@ -30,7 +39,7 @@ namespace Lumix
 		public:
 			EditorServer() { m_impl = 0; }
 
-			bool create(const char* base_path, EditorClient& client);
+			bool create(const char* base_path);
 			void destroy();
 			void onMessage(const uint8_t* data, int32_t size);
 			void tick();
@@ -43,7 +52,25 @@ namespace Lumix
 			class Gizmo& getGizmo();
 			class FS::TCPFileServer& getTCPFileServer();
 			void setEditViewRenderDevice(IRenderDevice& render_device);
-			DelegateList<void ()>& universeCreated();
+			void loadUniverse(const Path& path);
+			void saveUniverse(const Path& path);
+			void newUniverse();
+			Path getUniversePath() const;
+			void addComponent(uint32_t type_crc);
+			void addEntity();
+			void toggleGameMode();
+			void navigate(float forward, float right, float speed);
+			void setProperty(const char* component, const char* property, const void* data, int size);
+			void onMouseDown(int x, int y, MouseButton::Value button);
+			void onMouseMove(int x, int y, int relx, int rely, int mouse_flags);
+			void onMouseUp(int x, int y, MouseButton::Value button);
+			void setWireframe(bool is_wireframe);
+			void lookAtSelected();
+			const char* getBasePath();
+			Entity getSelectedEntity() const;
+			const IPropertyDescriptor& getPropertyDescriptor(uint32_t type, uint32_t name_hash);
+			DelegateList<void(Entity&)>& entitySelected();
+			DelegateList<void()>& universeCreated();
 			DelegateList<void ()>& universeDestroyed();
 
 		private:

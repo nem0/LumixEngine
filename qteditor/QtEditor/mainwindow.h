@@ -4,7 +4,6 @@
 
 namespace Lumix
 {
-	class EditorClient;
 	class EditorServer;
 }
 
@@ -21,7 +20,6 @@ public:
 	explicit MainWindow(QWidget* parent = NULL);
 	~MainWindow();
 
-	void setEditorClient(Lumix::EditorClient& client);
 	void setEditorServer(Lumix::EditorServer& server);
 	class SceneView* getSceneView() const;
 	class GameView* getGameView() const;
@@ -57,7 +55,7 @@ private slots:
 
 private:
 	Ui::MainWindow* m_ui;
-	Lumix::EditorClient* m_client;
+	Lumix::EditorServer* m_server;
 	class LogWidget* m_log;
 	class PropertyView* m_property_view;
 	class SceneView* m_scene_view;

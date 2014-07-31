@@ -41,7 +41,8 @@ namespace Lumix
 			void destroy();
 			Component createAnimable(const Entity& entity);
 			void playAnimation(const Component& cmp, const char* path);
-			void setAnimationTime(const Component& cmp, float time);
+			void setAnimationFrame(const Component& cmp, int frame);
+			int getFrameCount(const Component& cmp) const;
 			Animation* loadAnimation(const char* path);
 
 		private:
