@@ -28,19 +28,20 @@ class App
 			m_edit_render_device = NULL;
 			m_qt_app = NULL;
 			m_main_window = NULL;
+			m_server = NULL;
 		}
 
 		~App()
 		{
 			delete m_main_window;
 			delete m_qt_app;
-			m_server.destroy();
+			Lumix::EditorServer::destroy(m_server);
 		}
 
 		void onUniverseCreated()
 		{
-			m_edit_render_device->getPipeline().setScene(m_server.getEngine().getRenderScene()); 
-			m_game_render_device->getPipeline().setScene(m_server.getEngine().getRenderScene()); 
+			m_edit_render_device->getPipeline().setScene(m_server->getEngine().getRenderScene()); 
+			m_game_render_device->getPipeline().setScene(m_server->getEngine().getRenderScene()); 
 		}
 
 		void onUniverseDestroyed()
@@ -142,7 +143,7 @@ class App
 
 		void renderPhysics()
 		{
-			Lumix::PhysicsSystem* system = static_cast<Lumix::PhysicsSystem*>(m_server.getEngine().getPluginManager().getPlugin("physics"));
+			Lumix::PhysicsSystem* system = static_cast<Lumix::PhysicsSystem*>(m_server->getEngine().getPluginManager().getPlugin("physics"));
 			if(system && system->getScene())
 			{
 				system->getScene()->render();
@@ -164,28 +165,28 @@ class App
 			HWND hwnds[] = {hwnd, game_hwnd};
 			HGLRC hglrc = createGLContext(hwnds, 2);
 
-			bool server_created = m_server.create(QDir::currentPath().toLocal8Bit().data());
-			ASSERT(server_created);
-			m_server.tick();
+			m_server = Lumix::EditorServer::create(QDir::currentPath().toLocal8Bit().data());
+			ASSERT(m_server);
+			m_server->tick();
 
-			m_main_window->setEditorServer(m_server);
-			m_main_window->getSceneView()->setServer(&m_server);
+			m_main_window->setEditorServer(*m_server);
+			m_main_window->getSceneView()->setServer(m_server);
 
-			m_edit_render_device = new WGLRenderDevice(m_server.getEngine(), "pipelines/main.json");
+			m_edit_render_device = new WGLRenderDevice(m_server->getEngine(), "pipelines/main.json");
 			m_edit_render_device->m_hdc = GetDC(hwnd);
 			m_edit_render_device->m_opengl_context = hglrc;
-			m_edit_render_device->getPipeline().setScene(m_server.getEngine().getRenderScene()); /// TODO manage scene properly
-			m_server.setEditViewRenderDevice(*m_edit_render_device);
+			m_edit_render_device->getPipeline().setScene(m_server->getEngine().getRenderScene()); /// TODO manage scene properly
+			m_server->setEditViewRenderDevice(*m_edit_render_device);
 			m_edit_render_device->getPipeline().addCustomCommandHandler("render_physics").bind<App, &App::renderPhysics>(this);
 
-			m_game_render_device = new	WGLRenderDevice(m_server.getEngine(), "pipelines/game_view.json");
+			m_game_render_device = new	WGLRenderDevice(m_server->getEngine(), "pipelines/game_view.json");
 			m_game_render_device->m_hdc = GetDC(game_hwnd);
 			m_game_render_device->m_opengl_context = hglrc;
-			m_game_render_device->getPipeline().setScene(m_server.getEngine().getRenderScene()); /// TODO manage scene properly
-			m_server.getEngine().getRenderer().setRenderDevice(*m_game_render_device);
+			m_game_render_device->getPipeline().setScene(m_server->getEngine().getRenderScene()); /// TODO manage scene properly
+			m_server->getEngine().getRenderer().setRenderDevice(*m_game_render_device);
 
-			m_server.universeCreated().bind<App, &App::onUniverseCreated>(this);
-			m_server.universeDestroyed().bind<App, &App::onUniverseDestroyed>(this);
+			m_server->universeCreated().bind<App, &App::onUniverseCreated>(this);
+			m_server->universeDestroyed().bind<App, &App::onUniverseDestroyed>(this);
 
 			m_main_window->getSceneView()->setPipeline(m_edit_render_device->getPipeline());
 			m_main_window->getGameView()->setPipeline(m_game_render_device->getPipeline());
@@ -203,10 +204,10 @@ class App
 		{
 			PROFILE_FUNCTION();
 			m_edit_render_device->beginFrame();
-			m_server.render(*m_edit_render_device);
-			m_server.renderIcons(*m_edit_render_device);
-			m_server.getGizmo().updateScale(m_server.getEditCamera());
-			m_server.getGizmo().render(m_server.getEngine().getRenderer(), *m_edit_render_device);
+			m_server->render(*m_edit_render_device);
+			m_server->renderIcons(*m_edit_render_device);
+			m_server->getGizmo().updateScale(m_server->getEditCamera());
+			m_server->getGizmo().render(m_server->getEngine().getRenderer(), *m_edit_render_device);
 			m_edit_render_device->endFrame();
 
 			m_main_window->getMaterialManager()->updatePreview();
@@ -233,19 +234,19 @@ class App
 					}
 					if (keys['W'] >> 7)
 					{
-						m_server.navigate(1, 0, speed);
+						m_server->navigate(1, 0, speed);
 					}
 					else if (keys['S'] >> 7)
 					{
-						m_server.navigate(-1, 0, speed);
+						m_server->navigate(-1, 0, speed);
 					}
 					if (keys['A'] >> 7)
 					{
-						m_server.navigate(0, -1, speed);
+						m_server->navigate(0, -1, speed);
 					}
 					else if (keys['D'] >> 7)
 					{
-						m_server.navigate(0, 1, speed);
+						m_server->navigate(0, 1, speed);
 					}
 				}
 			}
@@ -258,8 +259,8 @@ class App
 				{
 					PROFILE_BLOCK("tick");
 					renderEditView();
-					m_server.getEngine().getRenderer().renderGame();
-					m_server.tick();
+					m_server->getEngine().getRenderer().renderGame();
+					m_server->tick();
 					handleEvents();
 				}
 				Lumix::g_profiler.frame();
@@ -270,7 +271,7 @@ class App
 		WGLRenderDevice* m_edit_render_device;
 		WGLRenderDevice* m_game_render_device;
 		MainWindow* m_main_window;
-		Lumix::EditorServer m_server;
+		Lumix::EditorServer* m_server;
 		QApplication* m_qt_app;
 };
 
