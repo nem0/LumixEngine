@@ -100,7 +100,7 @@ namespace Lumix
 			virtual void getTerrainXZScale(Component cmp, float& scale) = 0;
 			virtual void setTerrainYScale(Component cmp, const float& scale) = 0;
 			virtual void getTerrainYScale(Component cmp, float& scale) = 0;
-
+	
 		protected:
 			virtual ~RenderScene() {}
 	};

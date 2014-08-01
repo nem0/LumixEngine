@@ -17,6 +17,8 @@
 #include "core/map.h"
 #include "core/matrix.h"
 #include "core/profiler.h"
+#include "core/resource_manager.h"
+#include "core/resource_manager_base.h"
 #include "editor/editor_icon.h"
 #include "editor/gizmo.h"
 #include "editor/property_descriptor.h"
@@ -24,9 +26,11 @@
 #include "engine/iplugin.h"
 #include "engine/plugin_manager.h"
 #include "graphics/irender_device.h"
+#include "graphics/material.h"
 #include "graphics/model.h"
 #include "graphics/pipeline.h"
 #include "graphics/renderer.h"
+#include "graphics/texture.h"
 #include "core/input_system.h"
 #include "core/MT/mutex.h"
 #include "script/script_system.h"
@@ -185,11 +189,117 @@ struct WorldEditorImpl : public WorldEditor
 				}
 				else if (hit.m_is_hit)
 				{
-					selectEntity(hit.m_component.entity);
-					m_mouse_mode = MouseMode::TRANSFORM;
-					m_gizmo.startTransform(m_camera.getComponent(CAMERA_HASH), x, y, Gizmo::TransformMode::CAMERA_XZ);
+					onEntityMouseDown(hit, x, y);
 				}
 			}
+		}
+
+
+		void addTerrainLevel(Component terrain, const RayCastModelHit& hit, float rel_amount, float radius)
+		{
+			string material_path;
+			static_cast<RenderScene*>(terrain.system)->getTerrainMaterial(hit.m_component, material_path);
+			Material* material = static_cast<Material*>(m_engine.getResourceManager().get(ResourceManager::MATERIAL)->get(material_path));
+			Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
+			Texture* heightmap = material->getTexture(0);
+			heightmap = heightmap;
+			Matrix entity_mtx = hit.m_component.entity.getMatrix();
+			entity_mtx.fastInverse();
+			Vec3 local_pos = entity_mtx.multiplyPosition(hit_pos);
+			
+			int w = heightmap->getWidth();
+			if (heightmap->getBytesPerPixel() == 4)
+			{
+				int from_x = Math::maxValue((int)(local_pos.x - radius), 0);
+				int to_x = Math::minValue((int)(local_pos.x + radius), heightmap->getWidth());
+				int from_z = Math::maxValue((int)(local_pos.z - radius), 0);
+				int to_z = Math::minValue((int)(local_pos.z + radius), heightmap->getHeight());
+				
+				float amount = rel_amount * 255;
+
+				for (int i = from_x, end = to_x; i < end; ++i)
+				{
+					for (int j = from_z, end2 = to_z; j < end2; ++j)
+					{
+						float dist = sqrt((local_pos.x - i) * (local_pos.x - i) + (local_pos.z - j) * (local_pos.z - j));
+						float add_rel = 1.0f - Math::minValue(dist / radius, 1.0f);
+						uint8_t add = (uint8_t)(add_rel * amount);
+						add = Math::minValue(add, (uint8_t)(255 - heightmap->getData()[4 * (i + j * w)]));
+						heightmap->getData()[4 * (i + j * w)] += add;
+						heightmap->getData()[4 * (i + j * w) + 1] += add;
+						heightmap->getData()[4 * (i + j * w) + 2] += add;
+						heightmap->getData()[4 * (i + j * w) + 3] += add;
+					}
+				}
+			}
+			else if (heightmap->getBytesPerPixel() == 2)
+			{
+				uint16_t* data = reinterpret_cast<uint16_t*>(heightmap->getData());
+				int from_x = Math::maxValue((int)(local_pos.x - radius), 0);
+				int to_x = Math::minValue((int)(local_pos.x + radius), heightmap->getWidth());
+				int from_z = Math::maxValue((int)(local_pos.z - radius), 0);
+				int to_z = Math::minValue((int)(local_pos.z + radius), heightmap->getHeight());
+				
+				float amount = rel_amount * (256 * 256 - 1);
+
+				for (int i = from_x, end = to_x; i < end; ++i)
+				{
+					for (int j = from_z, end2 = to_z; j < end2; ++j)
+					{
+						float dist = sqrt((local_pos.x - i) * (local_pos.x - i) + (local_pos.z - j) * (local_pos.z - j));
+						float add_rel = 1.0f - Math::minValue(dist / radius, 1.0f);
+						uint16_t add = (uint16_t)(add_rel * amount);
+						if (rel_amount > 0)
+						{
+							add = Math::minValue(add, (uint16_t)((256 * 256 - 1) - data[i + j * w]));
+						}
+						else if ((uint16_t)(data[i + j * w] + add) > data[i + j * w])
+						{
+							add = (uint16_t)0 - data[i + j * w];
+						}
+						data[i + j * w] = data[i + j * w] + add;
+					}
+				}
+			}
+			else
+			{
+				ASSERT(false);
+			}
+			heightmap->onDataUpdated();
+		}
+
+
+		void onEntityMouseDown(const RayCastModelHit& hit, int x, int y)
+		{
+			Entity entity = hit.m_component.entity;
+			if (m_selected_entity == entity)
+			{
+				Component terrain = entity.getComponent(TERRAIN_HASH);
+				if (terrain.isValid())
+				{
+					Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
+					m_mouse_mode = MouseMode::CUSTOM;
+					addTerrainLevel(terrain, hit, m_terrain_brush_strength, (float)m_terrain_brush_size);
+				}
+			}
+			else
+			{
+				selectEntity(entity);
+				m_mouse_mode = MouseMode::TRANSFORM;
+				m_gizmo.startTransform(m_camera.getComponent(CAMERA_HASH), x, y, Gizmo::TransformMode::CAMERA_XZ);
+			}
+		}
+
+
+		virtual void setTerrainBrushStrength(float value) override
+		{
+			m_terrain_brush_strength = value;
+		}
+
+
+		virtual void setTerrainBrushSize(int value) override
+		{
+			m_terrain_brush_size = value;
 		}
 
 
@@ -197,6 +307,20 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			switch (m_mouse_mode)
 			{
+				case MouseMode::CUSTOM:
+					{
+						Component terrain = m_selected_entity.getComponent(TERRAIN_HASH);
+						Component camera_cmp = m_camera.getComponent(CAMERA_HASH);
+						RenderScene* scene = static_cast<RenderScene*>(camera_cmp.system);
+						Vec3 origin, dir;
+						scene->getRay(camera_cmp, (float)x, (float)y, origin, dir);
+						RayCastModelHit hit = scene->castRay(origin, dir);
+						if (hit.m_is_hit)
+						{
+							addTerrainLevel(terrain, hit, m_terrain_brush_strength, (float)m_terrain_brush_size);
+						}
+					}
+					break;
 				case MouseMode::NAVIGATE:
 					rotateCamera(relx, rely);
 					break;
@@ -506,6 +630,8 @@ struct WorldEditorImpl : public WorldEditor
 			m_selected_entity = Entity::INVALID;
 			m_edit_view_render_device = NULL;
 			m_universe_path = "";
+			m_terrain_brush_size = 10;
+			m_terrain_brush_strength = 0.01f;
 		}
 
 
@@ -722,7 +848,8 @@ struct WorldEditorImpl : public WorldEditor
 				NONE,
 				SELECT,
 				NAVIGATE,
-				TRANSFORM
+				TRANSFORM,
+				CUSTOM
 			};
 		};
 
@@ -750,6 +877,8 @@ struct WorldEditorImpl : public WorldEditor
 		bool m_toggle_game_mode_requested;
 		Path m_universe_path;
 		Path m_base_path;
+		int m_terrain_brush_size;
+		float m_terrain_brush_strength;
 };
 
 

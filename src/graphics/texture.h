@@ -26,9 +26,11 @@ class LUMIX_ENGINE_API Texture : public Resource
 		int getHeight() const { return m_height; }
 		int getBytesPerPixel() const { return m_BPP; }
 		const uint8_t* getData() const { return m_data.empty() ? NULL : &m_data[0]; }
+		uint8_t* getData() { return m_data.empty() ? NULL : &m_data[0]; }
 		void addDataReference();
 		void removeDataReference();
-	
+		void onDataUpdated();
+
 	private:
 		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 		bool loadDDS(FS::IFile& file);

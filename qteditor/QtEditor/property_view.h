@@ -67,6 +67,8 @@ private slots:
 	void on_editScriptClicked();
 	void on_animablePlayPause();
 	void on_animableTimeSet(int value);
+	void on_terrainBrushSizeChanged(int value);
+	void on_terrainBrushStrengthChanged(int value);
 
 private:
 	void clear();

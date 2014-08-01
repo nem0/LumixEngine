@@ -582,7 +582,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			hfDesc.thickness = -1;
 
 			physx::PxHeightField* heightfield = m_system->m_impl->m_physics->createHeightField(hfDesc);
-			float height_scale = bytes_per_pixel == 2 ? 1 / (256 * 256.0f) : 1 / 255.0f;
+			float height_scale = bytes_per_pixel == 2 ? 1 / (256 * 256.0f - 1) : 1 / 255.0f;
 			physx::PxHeightFieldGeometry hfGeom(heightfield, physx::PxMeshGeometryFlags(), height_scale * terrain->m_y_scale, terrain->m_xz_scale, terrain->m_xz_scale);
 			if (terrain->m_actor)
 			{
