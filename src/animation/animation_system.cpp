@@ -3,7 +3,7 @@
 #include "core/crc32.h"
 #include "core/json_serializer.h"
 #include "core/resource_manager.h"
-#include "editor/editor_server.h"
+#include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "graphics/renderer.h"
 #include "universe/universe.h"
@@ -42,11 +42,11 @@ namespace Lumix
 	{
 		m_impl = LUMIX_NEW(AnimationSystemImpl)(engine);
 		m_impl->m_universe = 0;
-		if(engine.getEditorServer())
+		if(engine.getWorldEditor())
 		{
-			engine.getEditorServer()->registerCreator(ANIMABLE_HASH, *this);
+			engine.getWorldEditor()->registerCreator(ANIMABLE_HASH, *this);
 		}
-		engine.getEditorServer()->registerProperty("animable", LUMIX_NEW(PropertyDescriptor<AnimationSystem>)(crc32("preview"), &AnimationSystem::getPreview, &AnimationSystem::setPreview, IPropertyDescriptor::FILE));
+		engine.getWorldEditor()->registerProperty("animable", LUMIX_NEW(PropertyDescriptor<AnimationSystem>)(crc32("preview"), &AnimationSystem::getPreview, &AnimationSystem::setPreview, IPropertyDescriptor::FILE));
 		return true;
 	}
 

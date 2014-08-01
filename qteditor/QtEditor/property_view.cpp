@@ -2,7 +2,7 @@
 #include "ui_property_view.h"
 #include "animation/animation_system.h"
 #include "core/crc32.h"
-#include "editor/editor_server.h"
+#include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "scripts/scriptcompiler.h"
 #include <qcheckbox.h>
@@ -208,14 +208,14 @@ class FileEdit : public QLineEdit
 			}
 		}
 
-		void setServer(Lumix::EditorServer* server)
+		void setServer(Lumix::WorldEditor* server)
 		{
 			m_server = server;
 		}
 
 	private:
 		PropertyView* m_property_view;
-		Lumix::EditorServer* m_server;
+		Lumix::WorldEditor* m_server;
 };
 
 
@@ -305,7 +305,7 @@ void PropertyView::addProperty(const char* component, const char* name, const ch
 }
 
 
-void PropertyView::setEditorServer(Lumix::EditorServer& server)
+void PropertyView::setWorldEditor(Lumix::WorldEditor& server)
 {
 	m_server = &server;
 	m_server->entitySelected().bind<PropertyView, &PropertyView::onEntitySelected>(this);
@@ -442,6 +442,27 @@ void PropertyView::on_editScriptClicked()
 }
 
 
+void PropertyView::addTerrainCustomProperties()
+{
+	/*QTreeWidgetItem* tools_item = new QTreeWidgetItem(QStringList() << "Tools");
+	m_ui->propertyList->topLevelItem(0)->insertChild(0, tools_item);
+	QWidget* widget = new QWidget();
+	QHBoxLayout* layout = new QHBoxLayout(widget);
+	layout->setContentsMargins(0, 0, 0, 0);
+	QPushButton* compile_button = new QPushButton("Play/Pause", widget);
+	QSlider* slider = new QSlider(Qt::Orientation::Horizontal, widget);
+	slider->setObjectName("animation_frame_slider");
+	slider->setMinimum(0);
+	int frame_count = static_cast<Lumix::AnimationSystem*>(cmp.system)->getFrameCount(cmp);
+	slider->setMaximum(frame_count);
+	layout->addWidget(compile_button);
+	layout->addWidget(slider);
+	m_ui->propertyList->setItemWidget(tools_item, 1, widget);
+	connect(compile_button, &QPushButton::clicked, this, &PropertyView::on_animablePlayPause);
+	connect(slider, &QSlider::valueChanged, this, &PropertyView::on_animableTimeSet);*/
+}
+
+
 void PropertyView::addAnimableCustomProperties(const Lumix::Component& cmp)
 {
 	QTreeWidgetItem* tools_item = new QTreeWidgetItem(QStringList() << "Tools");
@@ -528,6 +549,7 @@ void PropertyView::onEntitySelected(Lumix::Entity& e)
 			addProperty("terrain", "material", "Material", Property::FILE, "material (*.mat)");
 			addProperty("terrain", "xz_scale", "Meter per texel", Property::DECIMAL, NULL);
 			addProperty("terrain", "y_scale", "Height scale", Property::DECIMAL, NULL);
+			addTerrainCustomProperties();
 		}
 		else if (cmps[i].type == crc32("mesh_rigid_actor"))
 		{
@@ -564,12 +586,11 @@ void PropertyView::updateValues()
 {
 	if (m_selected_entity.isValid())
 	{
-		const Lumix::Entity::ComponentList& cmps = m_selected_entity.getComponents();
 		for (int i = 0; i < m_properties.size(); ++i)
 		{
 			Lumix::Blob stream;
 			const Lumix::IPropertyDescriptor& prop = m_server->getPropertyDescriptor(m_properties[i]->m_component, m_properties[i]->m_name_hash);
-			prop.get(cmps[i], stream);
+			prop.get(m_selected_entity.getComponent(m_properties[i]->m_component), stream);
 			onPropertyValue(m_properties[i], stream.getBuffer(), stream.getBufferSize());
 		}
 		Lumix::Component animable = m_selected_entity.getComponent(crc32("animable"));

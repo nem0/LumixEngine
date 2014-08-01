@@ -1,5 +1,5 @@
 #include "sceneview.h"
-#include "editor/editor_server.h"
+#include "editor/world_editor.h"
 #include <qapplication.h>
 #include <QDoubleSpinBox>
 #include <QDragEnterEvent>
@@ -28,8 +28,8 @@ class ViewWidget : public QWidget
 		virtual void mouseMoveEvent(QMouseEvent* event) override
 		{
 			int flags = 0;
-			flags |= Qt::ControlModifier & QApplication::keyboardModifiers() ? (int)Lumix::EditorServer::MouseFlags::CONTROL : 0;
-			flags |= Qt::AltModifier & QApplication::keyboardModifiers() ? (int)Lumix::EditorServer::MouseFlags::ALT : 0;
+			flags |= Qt::ControlModifier & QApplication::keyboardModifiers() ? (int)Lumix::WorldEditor::MouseFlags::CONTROL : 0;
+			flags |= Qt::AltModifier & QApplication::keyboardModifiers() ? (int)Lumix::WorldEditor::MouseFlags::ALT : 0;
 			m_server->onMouseMove(event->x(), event->y(), event->x() - m_last_x, event->y() - m_last_y, flags);
 			m_last_x = event->x();
 			m_last_y = event->y();
@@ -40,7 +40,7 @@ class ViewWidget : public QWidget
 			m_server->onMouseUp(event->x(), event->y(), event->button() == Qt::RightButton ? Lumix::MouseButton::RIGHT : Lumix::MouseButton::LEFT);
 		}
 
-		Lumix::EditorServer* m_server;
+		Lumix::WorldEditor* m_server;
 		int m_last_x;
 		int m_last_y;
 };
@@ -68,7 +68,7 @@ SceneView::SceneView(QWidget* parent) :
 }
 
 
-void SceneView::setServer(Lumix::EditorServer* server)
+void SceneView::setServer(Lumix::WorldEditor* server)
 {
 	static_cast<ViewWidget*>(m_view)->m_server = server;
 	m_server = server;

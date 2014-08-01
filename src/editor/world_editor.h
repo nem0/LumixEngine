@@ -27,7 +27,7 @@ namespace Lumix
 		};
 	};
 
-	class LUMIX_ENGINE_API EditorServer
+	class LUMIX_ENGINE_API WorldEditor
 	{
 		public:
 			enum class MouseFlags : int
@@ -37,8 +37,8 @@ namespace Lumix
 			};
 
 		public:
-			static EditorServer* create(const char* base_path);
-			static void destroy(EditorServer* server);
+			static WorldEditor* create(const char* base_path);
+			static void destroy(WorldEditor* server);
 
 			virtual void tick() = 0;
 			virtual void registerCreator(uint32_t type, IPlugin& creator) = 0;
@@ -72,7 +72,7 @@ namespace Lumix
 			virtual DelegateList<void()>& universeDestroyed() = 0;
 
 		protected:
-			virtual ~EditorServer() {}
+			virtual ~WorldEditor() {}
 	};
 
 

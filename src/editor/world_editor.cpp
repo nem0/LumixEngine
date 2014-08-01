@@ -1,4 +1,4 @@
-#include "editor_server.h"
+#include "world_editor.h"
 
 #include "animation/animation_system.h"
 #include "core/array.h"
@@ -52,7 +52,7 @@ static const uint32_t ANIMABLE_HASH = crc32("animable");
 static const uint32_t TERRAIN_HASH = crc32("terrain");
 
 
-struct EditorServerImpl : public EditorServer
+struct WorldEditorImpl : public WorldEditor
 {
 	public:
 
@@ -94,7 +94,7 @@ struct EditorServerImpl : public EditorServer
 		}
 
 	
-		virtual ~EditorServerImpl()
+		virtual ~WorldEditorImpl()
 		{
 			auto iter = m_component_properties.begin();
 			auto end = m_component_properties.end();
@@ -333,7 +333,7 @@ struct EditorServerImpl : public EditorServer
 			g_log_info.log("editor server") << "Loading universe " << path.c_str() << "...";
 			FS::FileSystem& fs = m_engine.getFileSystem();
 			FS::ReadCallback file_read_cb;
-			file_read_cb.bind<EditorServerImpl, &EditorServerImpl::loadMap>(this);
+			file_read_cb.bind<WorldEditorImpl, &WorldEditorImpl::loadMap>(this);
 			fs.openAsync(fs.getDefaultDevice(), path, FS::Mode::OPEN | FS::Mode::READ, file_read_cb);
 		}
 
@@ -498,7 +498,7 @@ struct EditorServerImpl : public EditorServer
 		}
 
 
-		EditorServerImpl()
+		WorldEditorImpl()
 			: m_universe_mutex(false)
 			, m_toggle_game_mode_requested(false)
 		{
@@ -705,9 +705,9 @@ struct EditorServerImpl : public EditorServer
 			m_gizmo.setUniverse(universe);
 			m_gizmo.hide();
 
-			universe->componentCreated().bind<EditorServerImpl, &EditorServerImpl::onComponentCreated>(this);
-			universe->componentDestroyed().bind<EditorServerImpl, &EditorServerImpl::onComponentDestroyed>(this);
-			universe->entityDestroyed().bind<EditorServerImpl, &EditorServerImpl::onEntityDestroyed>(this);
+			universe->componentCreated().bind<WorldEditorImpl, &WorldEditorImpl::onComponentCreated>(this);
+			universe->componentDestroyed().bind<WorldEditorImpl, &WorldEditorImpl::onComponentDestroyed>(this);
+			universe->entityDestroyed().bind<WorldEditorImpl, &WorldEditorImpl::onEntityDestroyed>(this);
 
 			m_selected_entity = Entity::INVALID;
 			m_universe_created.invoke();
@@ -753,9 +753,9 @@ struct EditorServerImpl : public EditorServer
 };
 
 
-EditorServer* EditorServer::create(const char* base_path)
+WorldEditor* WorldEditor::create(const char* base_path)
 {
-	EditorServerImpl* impl = LUMIX_NEW(EditorServerImpl)();
+	WorldEditorImpl* impl = LUMIX_NEW(WorldEditorImpl)();
 
 	if (!impl->create(base_path))
 	{
@@ -767,9 +767,9 @@ EditorServer* EditorServer::create(const char* base_path)
 }
 
 
-void EditorServer::destroy(EditorServer* server)
+void WorldEditor::destroy(WorldEditor* server)
 {
-	static_cast<EditorServerImpl*>(server)->destroy();
+	static_cast<WorldEditorImpl*>(server)->destroy();
 	LUMIX_DELETE(server);
 }
 

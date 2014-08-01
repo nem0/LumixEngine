@@ -4,7 +4,7 @@
 
 namespace Lumix
 {
-	class EditorServer;
+	class WorldEditor;
 }
 
 namespace Ui
@@ -20,7 +20,7 @@ public:
 	explicit MainWindow(QWidget* parent = NULL);
 	~MainWindow();
 
-	void setEditorServer(Lumix::EditorServer& server);
+	void setWorldEditor(Lumix::WorldEditor& server);
 	class SceneView* getSceneView() const;
 	class GameView* getGameView() const;
 	class MaterialManager* getMaterialManager() const { return m_material_manager_ui; }
@@ -55,7 +55,7 @@ private slots:
 
 private:
 	Ui::MainWindow* m_ui;
-	Lumix::EditorServer* m_server;
+	Lumix::WorldEditor* m_server;
 	class LogWidget* m_log;
 	class PropertyView* m_property_view;
 	class SceneView* m_scene_view;

@@ -12,7 +12,7 @@
 #include "core/json_serializer.h"
 #include "core/log.h"
 #include "core/profiler.h"
-#include "editor/editor_server.h"
+#include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "graphics/material.h"
 #include "graphics/model.h"
@@ -80,7 +80,7 @@ void MaterialManager::fillObjectMaterials()
 	}
 }
 
-void MaterialManager::setEditorServer(Lumix::EditorServer& server)
+void MaterialManager::setWorldEditor(Lumix::WorldEditor& server)
 {
 	ASSERT(m_impl->m_engine == NULL);
 	HWND hwnd = (HWND)m_ui->previewWidget->winId();
@@ -114,7 +114,7 @@ void MaterialManager::setEditorServer(Lumix::EditorServer& server)
 	m_ui->previewWidget->setAttribute(Qt::WA_PaintOnScreen);
 	m_ui->previewWidget->m_render_device = m_impl->m_render_device;
 	m_ui->previewWidget->m_engine = m_impl->m_engine;
-	/// TODO refactor (EditorServer::create)
+	/// TODO refactor (WorldEditor::create)
 	HDC hdc;
 	hdc = GetDC(hwnd);
 	ASSERT(hdc != NULL);

@@ -5,7 +5,7 @@
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
-#include "editor/editor_server.h"
+#include "editor/world_editor.h"
 #include "editor/gizmo.h"
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
@@ -35,7 +35,7 @@ class App
 		{
 			delete m_main_window;
 			delete m_qt_app;
-			Lumix::EditorServer::destroy(m_server);
+			Lumix::WorldEditor::destroy(m_server);
 		}
 
 		void onUniverseCreated()
@@ -165,11 +165,11 @@ class App
 			HWND hwnds[] = {hwnd, game_hwnd};
 			HGLRC hglrc = createGLContext(hwnds, 2);
 
-			m_server = Lumix::EditorServer::create(QDir::currentPath().toLocal8Bit().data());
+			m_server = Lumix::WorldEditor::create(QDir::currentPath().toLocal8Bit().data());
 			ASSERT(m_server);
 			m_server->tick();
 
-			m_main_window->setEditorServer(*m_server);
+			m_main_window->setWorldEditor(*m_server);
 			m_main_window->getSceneView()->setServer(m_server);
 
 			m_edit_render_device = new WGLRenderDevice(m_server->getEngine(), "pipelines/main.json");
@@ -271,7 +271,7 @@ class App
 		WGLRenderDevice* m_edit_render_device;
 		WGLRenderDevice* m_game_render_device;
 		MainWindow* m_main_window;
-		Lumix::EditorServer* m_server;
+		Lumix::WorldEditor* m_server;
 		QApplication* m_qt_app;
 };
 

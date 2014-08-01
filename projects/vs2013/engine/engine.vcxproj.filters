@@ -66,9 +66,6 @@
     <ClCompile Include="..\..\..\src\editor\editor_icon.cpp">
       <Filter>editor</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\editor\editor_server.cpp">
-      <Filter>editor</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\editor\gizmo.cpp">
       <Filter>editor</Filter>
     </ClCompile>
@@ -99,6 +96,9 @@
     </ClCompile>
     <ClCompile Include="..\..\..\src\graphics\terrain.cpp">
       <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\editor\world_editor.cpp">
+      <Filter>editor</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -159,9 +159,6 @@
     <ClInclude Include="..\..\..\src\editor\editor_icon.h">
       <Filter>editor</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\editor\editor_server.h">
-      <Filter>editor</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\editor\gizmo.h">
       <Filter>editor</Filter>
     </ClInclude>
@@ -194,6 +191,9 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\graphics\terrain.h">
       <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\editor\world_editor.h">
+      <Filter>editor</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

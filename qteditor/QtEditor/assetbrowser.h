@@ -4,7 +4,7 @@
 
 namespace Lumix
 {
-	class EditorServer;
+	class WorldEditor;
 }
 
 namespace Ui
@@ -19,7 +19,7 @@ class AssetBrowser : public QDockWidget
 public:
 	explicit AssetBrowser(QWidget* parent = NULL);
 	~AssetBrowser();
-	void setEditorServer(Lumix::EditorServer& server) { m_server = &server; }
+	void setWorldEditor(Lumix::WorldEditor& server) { m_server = &server; }
 	void emitFileChanged(const char* path);
 
 private:
@@ -44,6 +44,6 @@ private slots:
 	Ui::AssetBrowser* m_ui;
 	class QFileSystemModel* m_model;
 	class FileSystemWatcher* m_watcher;
-	Lumix::EditorServer* m_server;
+	Lumix::WorldEditor* m_server;
 	QString m_base_path;
 };
