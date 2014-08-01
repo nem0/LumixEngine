@@ -449,6 +449,24 @@ void Texture::apply(int unit)
 }
 
 
+void Texture::onDataUpdated()
+{
+	glBindTexture(GL_TEXTURE_2D, m_id);
+	if (m_BPP == 4)
+	{
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_width, m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, &m_data[0]);
+	}
+	else if (m_BPP == 2)
+	{
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_R16, m_width, m_height, 0, GL_RED, GL_UNSIGNED_SHORT, &m_data[0]);
+	}
+	else
+	{
+		ASSERT(false);
+	}
+}
+
+
 bool Texture::loadRaw(FS::IFile& file)
 {
 	PROFILE_FUNCTION();

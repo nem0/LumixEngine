@@ -444,22 +444,33 @@ void PropertyView::on_editScriptClicked()
 
 void PropertyView::addTerrainCustomProperties()
 {
-	/*QTreeWidgetItem* tools_item = new QTreeWidgetItem(QStringList() << "Tools");
-	m_ui->propertyList->topLevelItem(0)->insertChild(0, tools_item);
-	QWidget* widget = new QWidget();
-	QHBoxLayout* layout = new QHBoxLayout(widget);
-	layout->setContentsMargins(0, 0, 0, 0);
-	QPushButton* compile_button = new QPushButton("Play/Pause", widget);
-	QSlider* slider = new QSlider(Qt::Orientation::Horizontal, widget);
-	slider->setObjectName("animation_frame_slider");
-	slider->setMinimum(0);
-	int frame_count = static_cast<Lumix::AnimationSystem*>(cmp.system)->getFrameCount(cmp);
-	slider->setMaximum(frame_count);
-	layout->addWidget(compile_button);
-	layout->addWidget(slider);
-	m_ui->propertyList->setItemWidget(tools_item, 1, widget);
-	connect(compile_button, &QPushButton::clicked, this, &PropertyView::on_animablePlayPause);
-	connect(slider, &QSlider::valueChanged, this, &PropertyView::on_animableTimeSet);*/
+	QSlider* slider = new QSlider(Qt::Orientation::Horizontal);
+	QTreeWidgetItem* item = new QTreeWidgetItem(QStringList() << "Brush size");
+	m_ui->propertyList->topLevelItem(0)->insertChild(0, item);
+	m_ui->propertyList->setItemWidget(item, 1, slider);
+	slider->setMinimum(1);
+	slider->setMaximum(100);
+	connect(slider, &QSlider::valueChanged, this, &PropertyView::on_terrainBrushSizeChanged);
+
+	slider = new QSlider(Qt::Orientation::Horizontal);
+	item = new QTreeWidgetItem(QStringList() << "Brush strength");
+	m_ui->propertyList->topLevelItem(0)->insertChild(1, item);
+	m_ui->propertyList->setItemWidget(item, 1, slider);
+	slider->setMinimum(-100);
+	slider->setMaximum(100);
+	connect(slider, &QSlider::valueChanged, this, &PropertyView::on_terrainBrushStrengthChanged);
+}
+
+
+void PropertyView::on_terrainBrushStrengthChanged(int value)
+{
+	m_server->setTerrainBrushStrength(value / 50000.0f);
+}
+
+
+void PropertyView::on_terrainBrushSizeChanged(int value)
+{
+	m_server->setTerrainBrushSize(value);
 }
 
 
@@ -596,23 +607,6 @@ void PropertyView::updateValues()
 		Lumix::Component animable = m_selected_entity.getComponent(crc32("animable"));
 		if (animable.isValid())
 		{
-#if 0
-			QTreeWidgetItem* tools_item = new QTreeWidgetItem(QStringList() << "Tools");
-			m_ui->propertyList->topLevelItem(0)->insertChild(0, tools_item);
-			QWidget* widget = new QWidget();
-			QHBoxLayout* layout = new QHBoxLayout(widget);
-			layout->setContentsMargins(0, 0, 0, 0);
-			QPushButton* compile_button = new QPushButton("Play/Pause", widget);
-			QSlider* slider = new QSlider(Qt::Orientation::Horizontal, widget);
-			slider->s
-			slider->setMinimum(0);
-			slider->setMaximum(100);
-			layout->addWidget(compile_button);
-			layout->addWidget(slider);
-			m_ui->propertyList->setItemWidget(tools_item, 1, widget);
-			connect(compile_button, &QPushButton::clicked, this, &PropertyView::on_animablePlayPause);
-			connect(slider, &QSlider::valueChanged, this, &PropertyView::on_animableTimeSet);
-#endif
 			int frame_count = static_cast<Lumix::AnimationSystem*>(animable.system)->getFrameCount(animable);
 			m_ui->propertyList->findChild<QSlider*>("animation_frame_slider")->setMaximum(frame_count);
 		}

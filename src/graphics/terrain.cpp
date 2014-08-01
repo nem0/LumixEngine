@@ -304,12 +304,11 @@ namespace Lumix
 			if (Math::getRayAABBIntersection(rel_origin, rel_dir, m_root->m_min, size, start))
 			{
 				Vec3 p = start;
-				while (p.x >= m_root->m_min.x && p.x <= m_root->m_min.x + m_root->m_size * m_xz_scale
-					&& p.z >= m_root->m_min.z && p.z <= m_root->m_min.z + m_root->m_size * m_xz_scale)
+				int hx = (int)(p.x / m_xz_scale);
+				int hz = (int)(p.z / m_xz_scale);
+				while (hx >= 0 && hz >= 0 && hx < m_width - 1 && hz < m_height - 1)
 				{
 					float t;
-					int hx = (int)(p.x / m_xz_scale);
-					int hz = (int)(p.z / m_xz_scale);
 					float x = hx * m_xz_scale;
 					float z = hz * m_xz_scale;
 					Vec3 p0(x, getHeight(hx, hz), z);
@@ -332,7 +331,9 @@ namespace Lumix
 						hit.m_t = t;
 						return hit;
 					}
-					p += dir;
+					p += rel_dir;
+					hx = (int)(p.x / m_xz_scale);
+					hz = (int)(p.z / m_xz_scale);
 				}
 			}
 		}

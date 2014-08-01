@@ -65,6 +65,8 @@ namespace Lumix
 			virtual void setWireframe(bool is_wireframe) = 0;
 			virtual void lookAtSelected() = 0;
 			virtual const char* getBasePath() = 0;
+			virtual void setTerrainBrushSize(int value) = 0;
+			virtual void setTerrainBrushStrength(float value) = 0;
 			virtual Entity getSelectedEntity() const = 0;
 			virtual const IPropertyDescriptor& getPropertyDescriptor(uint32_t type, uint32_t name_hash) = 0;
 			virtual DelegateList<void(Entity&)>& entitySelected() = 0;
