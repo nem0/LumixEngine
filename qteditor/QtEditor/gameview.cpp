@@ -1,7 +1,7 @@
 #include "gameview.h"
 #include "ui_gameview.h"
 #include <QMouseEvent>
-#include "editor/editor_server.h"
+#include "editor/world_editor.h"
 #include "graphics/pipeline.h"
 
 GameView::GameView(QWidget* parent) :

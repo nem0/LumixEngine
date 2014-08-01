@@ -9,7 +9,7 @@
 namespace Lumix
 {
 	struct Component;
-	class EditorServer;
+	class WorldEditor;
 	struct Entity;
 	class Event;
 	class Path;
@@ -53,7 +53,7 @@ public:
 public:
 	explicit PropertyView(QWidget* parent = NULL);
 	~PropertyView();
-	void setEditorServer(Lumix::EditorServer& server);
+	void setWorldEditor(Lumix::WorldEditor& server);
 	void setScriptCompiler(ScriptCompiler* compiler);
 
 private slots:
@@ -78,6 +78,7 @@ private:
 	void onPropertyValue(Property* property, const void* data, int32_t data_size);
 	void addScriptCustomProperties();
 	void addAnimableCustomProperties(const Lumix::Component& cmp);
+	void addTerrainCustomProperties();
 	void onScriptCompiled(const Lumix::Path& path, uint32_t status);
 	void setScriptStatus(uint32_t status);
 	void updateValues();
@@ -87,7 +88,7 @@ private:
 	Lumix::Array<Property*> m_properties;
 	ScriptCompiler* m_compiler;
 	Lumix::Entity m_selected_entity;
-	Lumix::EditorServer* m_server;
+	Lumix::WorldEditor* m_server;
 };
 
 

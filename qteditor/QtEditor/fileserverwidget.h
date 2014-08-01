@@ -6,7 +6,7 @@
 
 namespace Lumix
 {
-	class EditorServer;
+	class WorldEditor;
 }
 
 namespace Ui
@@ -22,7 +22,7 @@ public:
 	explicit FileServerWidget(QWidget* parent = NULL);
 	~FileServerWidget();
 	
-	void setEditorServer(Lumix::EditorServer& server);
+	void setWorldEditor(Lumix::WorldEditor& server);
 	void fsEventCb(const Lumix::FS::Event& event, int32_t param);
 	void emitFileEvent(const Lumix::FS::Event& event, qint64 time);
 
@@ -44,7 +44,7 @@ private:
 	void filterTable();
 
 	Ui::FileServerWidget* m_ui;
-	Lumix::EditorServer* m_server;
+	Lumix::WorldEditor* m_server;
 	class FileServerWatcher* m_watcher;
 };
 

@@ -4,7 +4,7 @@
 #include "core/crc32.h"
 #include "core/resource.h"
 #include "core/resource_manager.h"
-#include "editor/editor_server.h"
+#include "editor/world_editor.h"
 #include "engine/engine.h"
 #include <qfilesystemmodel.h>
 #include <qlistwidget.h>

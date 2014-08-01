@@ -6,7 +6,7 @@
 #include "core/json_serializer.h"
 #include "core/log.h"
 #include "core/array.h"
-#include "editor/editor_server.h"
+#include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "universe/universe.h"
 #include "base_script.h"
@@ -263,8 +263,8 @@ namespace Lumix
 		virtual bool create(Engine& engine) override
 		{
 			m_engine = &engine;
-			engine.getEditorServer()->registerProperty("script", LUMIX_NEW(PropertyDescriptor<ScriptSystem>)(crc32("source"), &ScriptSystem::getScriptPath, &ScriptSystem::setScriptPath, IPropertyDescriptor::FILE)); 
-			engine.getEditorServer()->registerCreator(SCRIPT_HASH, *this);
+			engine.getWorldEditor()->registerProperty("script", LUMIX_NEW(PropertyDescriptor<ScriptSystem>)(crc32("source"), &ScriptSystem::getScriptPath, &ScriptSystem::setScriptPath, IPropertyDescriptor::FILE)); 
+			engine.getWorldEditor()->registerCreator(SCRIPT_HASH, *this);
 			return true;
 		}
 

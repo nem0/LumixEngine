@@ -3,7 +3,7 @@
 #include <qfiledialog.h>
 #include <qsettings.h>
 #include "assetbrowser.h"
-#include "editor/editor_server.h"
+#include "editor/world_editor.h"
 #include "fileserverwidget.h"
 #include "gameview.h"
 #include "log_widget.h"
@@ -74,13 +74,13 @@ MainWindow::~MainWindow()
 }
 
 
-void MainWindow::setEditorServer(Lumix::EditorServer& server)
+void MainWindow::setWorldEditor(Lumix::WorldEditor& server)
 {
 	m_server = &server;
-	m_file_server_ui->setEditorServer(server);
-	m_asset_browser->setEditorServer(server);
-	m_material_manager_ui->setEditorServer(server);
-	m_property_view->setEditorServer(server);
+	m_file_server_ui->setWorldEditor(server);
+	m_asset_browser->setWorldEditor(server);
+	m_material_manager_ui->setWorldEditor(server);
+	m_property_view->setWorldEditor(server);
 }
 
 GameView* MainWindow::getGameView() const

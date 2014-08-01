@@ -6,7 +6,7 @@
 
 namespace Lumix
 {
-	class EditorServer;
+	class WorldEditor;
 	class PipelineInstance;
 }
 
@@ -35,6 +35,6 @@ private:
 private:
 	Ui::GameView* m_ui;
 	Lumix::PipelineInstance* m_pipeline;
-	Lumix::EditorServer* m_server;
+	Lumix::WorldEditor* m_server;
 };
 
