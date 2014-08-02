@@ -1,4 +1,4 @@
-#include "core/fs/os_file.h"
+#include "core/os_file.h"
 #include "core/lumix.h"
 
 #include <assert.h>

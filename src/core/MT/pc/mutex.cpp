@@ -1,4 +1,4 @@
-#include "core/MT/mutex.h"
+#include "core/mt/mutex.h"
 #include <Windows.h>
 #include <cassert>
 
