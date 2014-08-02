@@ -1,7 +1,7 @@
 #include "core/memory_tracker.h"
 #include "core/log.h"
 #include "core/math_utils.h"
-#include "core/MT/spin_mutex.h"
+#include "core/mt/spin_mutex.h"
 #include "core/stack_allocator.h"
 #include "core/string.h"
 

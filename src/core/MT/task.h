@@ -2,21 +2,13 @@
 
 #include "core/lumix.h"
 
+//#include <windows.h>
+//#include <intrin.h>
+
 namespace Lumix
 {
 	namespace MT
 	{
-		LUMIX_CORE_API void sleep(uint32_t miliseconds);
-		LUMIX_CORE_API inline void yield() { sleep(0); }
-
-		LUMIX_CORE_API uint32_t getCPUsCount();
-		
-		LUMIX_CORE_API uint32_t getCurrentThreadID();
-		LUMIX_CORE_API uint32_t getProccessAffinityMask();
-
-		LUMIX_CORE_API bool isMainThread();
-		LUMIX_CORE_API void setMainThread();
-
 		class LUMIX_CORE_API Task
 		{
 		public:
@@ -41,10 +33,35 @@ namespace Lumix
 			bool isForceExit() const;
 
 			void forceExit(bool wait);
-			void exit(int32_t exitCode);
+			void exit(int32_t exit_code);
 
 		private:
 			struct TaskImpl* m_implementation;
-		};	
-	} // ~namespace MT
-} // ~namespace Lumix
+		};
+
+		//namespace Logger
+		//{
+		//	struct Event
+		//	{
+		//		uint32_t tid;        // Thread ID
+		//		const char* msg;  // Message string
+		//		uint32_t param;      // A parameter which can mean anything you want
+		//	};
+
+		//	static const int BUFFER_SIZE = 65536;   // Must be a power of 2
+		//	extern Event g_events[BUFFER_SIZE];
+		//	extern LONG g_pos;
+
+		//	inline void Log(const char* msg, uint32_t param)
+		//	{
+		//		// Get next event index
+		//		LONG index = _InterlockedIncrement(&g_pos);
+		//		// Write an event at this index
+		//		Event* e = g_events + (index & (BUFFER_SIZE - 1));  // Wrap to buffer size
+		//		e->tid = ((uint32_t*)__readfsdword(24))[9];           // Get thread ID
+		//		e->msg = msg;
+		//		e->param = param;
+		//	}
+		//}
+	} // !namespace MT
+} // !namespace Lumix

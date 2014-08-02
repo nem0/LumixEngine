@@ -1,9 +1,11 @@
 #include "core/lumix.h"
-#include "core/MTJD/manager.h"
+#include "core/mtjd/manager.h"
 
-#include "core/MTJD/job.h"
-#include "core/MTJD/scheduler.h"
-#include "core/MTJD/worker_thread.h"
+#include "core/mtjd/job.h"
+#include "core/mtjd/scheduler.h"
+#include "core/mtjd/worker_thread.h"
+
+#include "core/mt/thread.h"
 
 namespace Lumix
 {
@@ -100,7 +102,7 @@ namespace Lumix
 				tr->data = job;
 				if (!m_trans_queue.push(tr, false))
 				{
-					m_trans_queue.dealoc(tr, true);
+					m_trans_queue.dealoc(tr);
 					pushReadyJob(job);
 				}
 				else
@@ -125,7 +127,7 @@ namespace Lumix
 						if (tr->isCompleted())
 						{
 							tr->data->onExecuted();
-							m_trans_queue.dealoc(tr, true);
+							m_trans_queue.dealoc(tr);
 							m_pending_trans.eraseFast(i);
 						}
 						else
