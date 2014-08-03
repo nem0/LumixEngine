@@ -99,7 +99,7 @@ void UT_MTJDFrameworkTest(const char* params)
 			}
 		}
 
-		for (int32_t i = 0; i < TESTS_COUNT - 1; i++)
+		for (int32_t i = 0; i < TESTS_COUNT; i++)
 		{
 			LUMIX_DELETE(jobs[i]);
 		}
@@ -151,7 +151,7 @@ void UT_MTJDFrameworkDependencyTest(const char* params)
 		LUMIX_EXPECT_EQ(OUT_BUFFER[0][i], (float)i * (float)(TESTS_COUNT + 1));
 	}
 
-	for (int32_t i = 0; i < TESTS_COUNT - 1; i++)
+	for (int32_t i = 0; i < TESTS_COUNT; i++)
 	{
 		LUMIX_DELETE(jobs[i]);
 	}
