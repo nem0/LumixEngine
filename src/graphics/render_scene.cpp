@@ -572,7 +572,7 @@ namespace Lumix
 					r.m_scale = 1;
 					r.m_model.setModel(NULL);
 
-					m_engine.getCullingSystem().addStatic(Sphere(entity.getPosition(), 1.0f));
+					m_engine.getCullingSystem().addStatic(Sphere(entity.getPosition(), 1.0f), m_renderables.size() - 1);
 					Component cmp = m_universe.addComponent(entity, type, this, m_renderables.size() - 1);
 					m_universe.componentCreated().invoke(cmp);
 					return cmp;
@@ -699,10 +699,11 @@ namespace Lumix
 			{
 				infos.reserve(m_renderables.size() * 2);
 				m_engine.getCullingSystem().cullToFrustumAsync(m_camera_frustum);
+				const CullingSystem::Results& results = m_engine.getCullingSystem().getResultAsync();
 
 				for (int i = 0; i < m_renderables.size(); ++i)
 				{
-					if (m_renderables[i]->m_model.getModel() && (m_renderables[i]->m_layer_mask & layer_mask) != 0)
+					if (m_renderables[i]->m_model.getModel() && (m_renderables[i]->m_layer_mask & layer_mask) != 0 && results[i] > 0)
 					{
 						for (int j = 0, c = m_renderables[i]->m_model.getModel()->getMeshCount(); j < c; ++j)
 						{

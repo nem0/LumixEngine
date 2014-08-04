@@ -63,13 +63,13 @@ namespace
 			Lumix::ScopedTimer timer("Culling System");
 
 			culling_system->cullToFrustum(clipping_frustum);
-			const Lumix::Array<bool>& result = culling_system->getResult();
+			const Lumix::CullingSystem::Results& result = culling_system->getResult();
 
 			//Lumix::g_log_info.log("unit") << "Culling system test took: " << timer.getTimeSinceStart();
 
 			for (int i = 0; i < result.size(); i++)
 			{
-				LUMIX_EXPECT_EQ(result[i], i < 6);
+				LUMIX_EXPECT_EQ(result[i], i < 6 ? result[i] : -1);
 			}
 
 		}
@@ -107,12 +107,12 @@ namespace
 
 			culling_system->cullToFrustumAsync(clipping_frustum);
 
-			const Lumix::Array<bool>& result = culling_system->getResultAsync();
+			const Lumix::CullingSystem::Results& result = culling_system->getResultAsync();
 			//Lumix::g_log_info.log("unit") << "Culling system test async took: " << timer.getTimeSinceStart();
 
 			for (int i = 0; i < result.size(); i++)
 			{
-				LUMIX_EXPECT_EQ(result[i], i < 6);
+				LUMIX_EXPECT_EQ(result[i], i < 6 ? result[i] : -1);
 			}
 
 		}
