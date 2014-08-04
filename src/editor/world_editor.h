@@ -12,6 +12,7 @@ namespace Lumix
 	class IPlugin;
 	class IRenderDevice;
 	class Path;
+	class RayCastModelHit;
 	namespace FS
 	{
 		class TCPFileServer;
@@ -34,6 +35,16 @@ namespace Lumix
 			{
 				ALT = 1,
 				CONTROL = 2
+			};
+
+			class Plugin
+			{
+				public:
+					virtual ~Plugin() {}
+
+					virtual bool onEntityMouseDown(const RayCastModelHit& hit, int x, int y) = 0;
+					virtual void onMouseMove(int x, int y, int rel_x, int rel_y, int mouse_flags) = 0;
+					virtual void onMouseUp(int x, int y, MouseButton::Value button) = 0;
 			};
 
 		public:
@@ -65,13 +76,12 @@ namespace Lumix
 			virtual void setWireframe(bool is_wireframe) = 0;
 			virtual void lookAtSelected() = 0;
 			virtual const char* getBasePath() = 0;
-			virtual void setTerrainBrushSize(int value) = 0;
-			virtual void setTerrainBrushStrength(float value) = 0;
 			virtual Entity getSelectedEntity() const = 0;
 			virtual const IPropertyDescriptor& getPropertyDescriptor(uint32_t type, uint32_t name_hash) = 0;
 			virtual DelegateList<void(Entity&)>& entitySelected() = 0;
 			virtual DelegateList<void()>& universeCreated() = 0;
 			virtual DelegateList<void()>& universeDestroyed() = 0;
+			virtual void addPlugin(Plugin* plugin) = 0;
 
 		protected:
 			virtual ~WorldEditor() {}

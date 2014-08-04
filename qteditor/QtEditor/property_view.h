@@ -69,6 +69,9 @@ private slots:
 	void on_animableTimeSet(int value);
 	void on_terrainBrushSizeChanged(int value);
 	void on_terrainBrushStrengthChanged(int value);
+	void on_TerrainHeightTypeClicked();
+	void on_TerrainTextureTypeClicked();
+	void on_terrainBrushTextureChanged(int value);
 
 private:
 	void clear();
@@ -80,7 +83,7 @@ private:
 	void onPropertyValue(Property* property, const void* data, int32_t data_size);
 	void addScriptCustomProperties();
 	void addAnimableCustomProperties(const Lumix::Component& cmp);
-	void addTerrainCustomProperties();
+	void addTerrainCustomProperties(const Lumix::Component& terrain_component);
 	void onScriptCompiled(const Lumix::Path& path, uint32_t status);
 	void setScriptStatus(uint32_t status);
 	void updateValues();
@@ -90,7 +93,8 @@ private:
 	Lumix::Array<Property*> m_properties;
 	ScriptCompiler* m_compiler;
 	Lumix::Entity m_selected_entity;
-	Lumix::WorldEditor* m_server;
+	Lumix::WorldEditor* m_world_editor;
+	class TerrainEditor* m_terrain_editor;
 };
 
 

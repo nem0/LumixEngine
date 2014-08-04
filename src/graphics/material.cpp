@@ -243,7 +243,7 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			{
 				deserializeUniforms(serializer);
 			}
-			else if (strcmp(label, "texture") == 0 || strcmp(label, "heightmap") == 0)
+			else if (strcmp(label, "texture") == 0 || strcmp(label, "heightmap") == 0 || strcmp(label, "splatmap") == 0)
 			{
 				serializer.deserialize(path, MAX_PATH);
 				if (path[0] != '\0')
@@ -253,6 +253,7 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 					texture_path += path;
 					Texture* texture = static_cast<Texture*>(m_resource_manager.get(ResourceManager::TEXTURE)->load(texture_path.c_str()));
 					bool is_heightmap = label[0] == 'h';
+					bool is_splatmap = label[0] == 's';
 					if (is_heightmap)
 					{
 						if (!m_textures.empty())
@@ -262,9 +263,12 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 							fs.close(file);
 							return;
 						}
+					}
+					if (is_heightmap || is_splatmap)
+					{
 						if (texture->isReady() && !texture->getData())
 						{
-							g_log_error.log("Renderer") << "Heightmap " << m_path.c_str() << " can not be used as an ordinary texture";
+							g_log_error.log("Renderer") << (is_heightmap ? "Heightmap " : "Splatmap ") << m_path.c_str() << " can not be used as an ordinary texture";
 							onFailure();
 							fs.close(file);
 							return;
