@@ -48,13 +48,13 @@ MaterialManager::MaterialManager(QWidget *parent)
 	m_impl->m_selected_object_model = NULL;
 	m_ui->setupUi(this);
 	m_impl->m_fs_model = new QFileSystemModel();
-	m_impl->m_fs_model->setRootPath(QDir::currentPath() + "/materials");
+	m_impl->m_fs_model->setRootPath(QDir::currentPath());
 	QStringList filters;
 	filters << "*.mat";
 	m_impl->m_fs_model->setNameFilters(filters);
 	m_impl->m_fs_model->setNameFilterDisables(false);
 	m_ui->fileListView->setModel(m_impl->m_fs_model);
-	m_ui->fileListView->setRootIndex(m_impl->m_fs_model->index(QDir::currentPath() + "/materials"));
+	m_ui->fileListView->setRootIndex(m_impl->m_fs_model->index(QDir::currentPath()));
 	m_impl->m_engine = NULL;
 	m_impl->m_universe = NULL;
 	m_impl->m_render_scene = NULL;
@@ -66,6 +66,7 @@ void MaterialManager::updatePreview()
 	m_impl->m_render_device->beginFrame();
 	m_impl->m_engine->getRenderer().render(*m_impl->m_render_device);
 	m_impl->m_render_device->endFrame();
+	m_impl->m_render_scene->update(0.01f); TODO("time");
 }
 
 void MaterialManager::fillObjectMaterials()
@@ -246,7 +247,7 @@ void MaterialManager::onBoolPropertyStateChanged(int)
 	QCheckBox* obj = qobject_cast<QCheckBox*>(QObject::sender());
 	if(obj)
 	{
-		CppObjectProperty<bool, Lumix::Material>* prop = static_cast<CppObjectProperty<bool, Lumix::Material>*>(obj->property("cpp_property").data());
+		CppObjectProperty<bool, Lumix::Material>* prop = static_cast<CppObjectProperty<bool, Lumix::Material>*>(obj->property("cpp_property").value<void*>());
 		prop->set(*m_impl->m_material, obj->isChecked());
 	}
 }
@@ -278,6 +279,10 @@ void MaterialManager::selectMaterial(const char* path)
 	Lumix::Material* material = static_cast<Lumix::Material*>(m_impl->m_engine->getResourceManager().get(Lumix::ResourceManager::MATERIAL)->load(path));
 	material->getObserverCb().bind<MaterialManager, &MaterialManager::onMaterialLoaded>(this);
 	m_impl->m_material = material;
+	if(material->isReady())
+	{
+		onMaterialLoaded(Lumix::Resource::State::READY, Lumix::Resource::State::READY);
+	}
 }
 
 void MaterialManager::onMaterialLoaded(Lumix::Resource::State, Lumix::Resource::State)
@@ -309,8 +314,7 @@ void MaterialManager::onMaterialLoaded(Lumix::Resource::State, Lumix::Resource::
 			case ICppObjectProperty::BOOL:
 				{
 					QCheckBox* checkbox = new QCheckBox();
-					checkbox->setProperty("cpp_property", qVariantFromValue((void*)properties[i]));
-					
+					checkbox->setProperty("cpp_property", QVariant::fromValue((void*)properties[i]));
 					checkbox->setChecked(static_cast<CppObjectProperty<bool, Lumix::Material>*>(properties[i])->get(*material));
 					layout->addRow(properties[i]->getName(), checkbox);
 					connect(checkbox, SIGNAL(stateChanged(int)), this, SLOT(onBoolPropertyStateChanged(int)));
@@ -377,12 +381,19 @@ void MaterialManager::on_objectMaterialList_doubleClicked(const QModelIndex &ind
 void MaterialManager::on_saveMaterialButton_clicked()
 {
 	Lumix::FS::FileSystem& fs = m_impl->m_engine->getFileSystem();
-	Lumix::FS::IFile* file = fs.open(fs.getDefaultDevice(), m_impl->m_material->getPath().c_str(), Lumix::FS::Mode::RECREATE | Lumix::FS::Mode::WRITE);
+	// use temporary because otherwise the material is reloaded during saving
+	char tmp_path[LUMIX_MAX_PATH];
+	strcpy(tmp_path, m_impl->m_material->getPath().c_str());
+	strcat(tmp_path, ".tmp");
+	Lumix::FS::IFile* file = fs.open(fs.getDefaultDevice(), tmp_path, Lumix::FS::Mode::RECREATE | Lumix::FS::Mode::WRITE);
 	if(file)
 	{
 		Lumix::JsonSerializer serializer(*file, Lumix::JsonSerializer::AccessMode::WRITE, m_impl->m_material->getPath().c_str());
 		m_impl->m_material->save(serializer);
 		fs.close(file);
+
+		QFile::remove(m_impl->m_material->getPath().c_str());
+		QFile::rename(tmp_path, m_impl->m_material->getPath().c_str());
 	}
 	else
 	{

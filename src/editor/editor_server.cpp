@@ -16,6 +16,7 @@
 #include "core/map.h"
 #include "core/matrix.h"
 #include "core/profiler.h"
+#include "editor/client_message_types.h"
 #include "editor/editor_client.h"
 #include "editor/editor_icon.h"
 #include "editor/gizmo.h"
@@ -28,7 +29,7 @@
 #include "graphics/pipeline.h"
 #include "graphics/renderer.h"
 #include "core/input_system.h"
-#include "core/MT/mutex.h"
+#include "core/mt/mutex.h"
 #include "script/script_system.h"
 #include "universe/universe.h"
 
@@ -41,35 +42,6 @@ struct EditorIconHit
 {
 	EditorIcon* m_icon;
 	float m_t;
-};
-
-
-struct ClientMessageType
-{
-	enum 
-	{
-		POINTER_DOWN = 1,
-		POINTER_MOVE,
-		POINTER_UP,
-		PROPERTY_SET,
-		MOVE_CAMERA,			// 5
-		SAVE,
-		LOAD,
-		ADD_COMPONENT = 8,
-		GET_PROPERTIES = 9,
-		REMOVE_COMPONENT = 10,
-		ADD_ENTITY,				// 11
-		TOGGLE_GAME_MODE,		// 12
-		GET_POSITION,			// 13
-		SET_POSITION,			// 14
-		REMOVE_ENTITY,			// 15
-		SET_EDIT_MODE,			// 16
-								// 17
-								// 18
-		NEW_UNIVERSE = 19,		// 19
-		LOOK_AT_SELECTED = 20,	// 20
-		STOP_GAME_MODE,			// 21
-	};
 };
 
 
@@ -120,7 +92,7 @@ struct EditorServerImpl
 		void onPointerMove(int x, int y, int relx, int rely, int mouse_flags);
 		void onPointerUp(int x, int y, MouseButton::Value button);
 		void selectEntity(Entity e);
-		void navigate(float forward, float right, int fast);
+		void navigate(float forward, float right, float speed);
 		void writeString(const char* str);
 		void setProperty(const void* data, int size);
 		void createUniverse(bool create_scene);
@@ -164,6 +136,8 @@ struct EditorServerImpl
 		void onLogWarning(const char* system, const char* message);
 		void onLogError(const char* system, const char* message);
 		void sendMessage(const uint8_t* data, int32_t length);
+		void setWireframe(bool is_wireframe);
+		void createEditorIcon(const Entity& entity);
 
 		MT::Mutex m_universe_mutex;
 		Gizmo m_gizmo;
@@ -189,7 +163,6 @@ struct EditorServerImpl
 		IRenderDevice* m_edit_view_render_device;
 		bool m_toggle_game_mode_requested;
 		EditorClient& m_client;
-	
 };
 
 
@@ -242,10 +215,7 @@ void EditorServer::tick()
 		m_impl->m_toggle_game_mode_requested = false;
 	}
 	PROFILE_FUNCTION();
-	if(m_impl->m_is_game_mode)
-	{
-		m_impl->m_engine.update();
-	}
+	m_impl->m_engine.update(m_impl->m_is_game_mode);
 	m_impl->m_engine.getFileSystem().updateAsyncTransactions();
 }
 
@@ -304,13 +274,14 @@ void EditorServerImpl::registerProperties()
 	m_component_properties[CAMERA_HASH].push(LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("near"), &RenderScene::getCameraNearPlane, &RenderScene::setCameraNearPlane));
 	m_component_properties[CAMERA_HASH].push(LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("far"), &RenderScene::getCameraFarPlane, &RenderScene::setCameraFarPlane));
 	m_component_properties[RENDERABLE_HASH].push(LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("source"), &RenderScene::getRenderablePath, &RenderScene::setRenderablePath, IPropertyDescriptor::FILE));
-	m_component_properties[TERRAIN_HASH].push(LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("heightmap"), &RenderScene::getTerrainHeightmap, &RenderScene::setTerrainHeightmap, IPropertyDescriptor::FILE));
 	m_component_properties[TERRAIN_HASH].push(LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("material"), &RenderScene::getTerrainMaterial, &RenderScene::setTerrainMaterial, IPropertyDescriptor::FILE));
+	m_component_properties[TERRAIN_HASH].push(LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("xz_scale"), &RenderScene::getTerrainXZScale, &RenderScene::setTerrainXZScale));
+	m_component_properties[TERRAIN_HASH].push(LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("y_scale"), &RenderScene::getTerrainYScale, &RenderScene::setTerrainYScale));
 	/*m_component_properties[renderable_type].push(LUMIX_NEW(PropertyDescriptor<Renderer>)(crc32("visible"), &Renderer::getVisible, &Renderer::setVisible));
 	m_component_properties[renderable_type].push(LUMIX_NEW(PropertyDescriptor<Renderer>)(crc32("cast shadows"), &Renderer::getCastShadows, &Renderer::setCastShadows));
 	m_component_properties[point_light_type].push(LUMIX_NEW(PropertyDescriptor<Renderer>)(crc32("fov"), &Renderer::getLightFov, &Renderer::setLightFov));
 	m_component_properties[point_light_type].push(LUMIX_NEW(PropertyDescriptor<Renderer>)(crc32("radius"), &Renderer::getLightRadius, &Renderer::setLightRadius));
-	*/m_component_properties[SCRIPT_HASH].push(LUMIX_NEW(PropertyDescriptor<ScriptSystem>)(crc32("source"), &ScriptSystem::getScriptPath, &ScriptSystem::setScriptPath, IPropertyDescriptor::FILE));
+	*/
 }
 
 
@@ -372,7 +343,7 @@ void EditorServerImpl::onPointerDown(int x, int y, MouseButton::Value button)
 		}
 		else if(hit.m_is_hit)
 		{
-			selectEntity(hit.m_renderable.entity);
+			selectEntity(hit.m_component.entity);
 			m_mouse_mode = EditorServerImpl::MouseMode::TRANSFORM;
 			m_gizmo.startTransform(m_camera.getComponent(CAMERA_HASH), x, y, Gizmo::TransformMode::CAMERA_XZ);
 		}
@@ -427,10 +398,22 @@ void EditorServerImpl::save(FS::IFile& file, const char* path)
 void EditorServerImpl::addEntity()
 {
 	Entity e = m_engine.getUniverse()->createEntity();
-	e.setPosition(m_camera.getPosition() + m_camera.getRotation() * Vec3(0, 0, -2));
+
+	RenderScene* scene = m_engine.getRenderScene();
+	Vec3 origin = m_camera.getPosition();
+	Vec3 dir = -m_camera.getMatrix().getZVector();
+	RayCastModelHit hit = scene->castRay(origin, dir);
+	if (hit.m_is_hit)
+	{
+		e.setPosition(hit.m_origin + hit.m_dir * hit.m_t);
+	}
+	else
+	{
+		e.setPosition(m_camera.getPosition() + m_camera.getRotation() * Vec3(0, 0, -2));
+	}
 	selectEntity(e);
 	EditorIcon* er = LUMIX_NEW(EditorIcon)();
-	er->create(m_engine, *m_engine.getRenderScene(), m_selected_entity, Component::INVALID);
+	er->create(m_engine, *m_engine.getRenderScene(), m_selected_entity);
 	m_editor_icons.push(er);
 }
 
@@ -445,7 +428,6 @@ void EditorServerImpl::toggleGameMode()
 	{
 		m_game_mode_file = m_engine.getFileSystem().open("memory", "", FS::Mode::WRITE);
 		save(*m_game_mode_file, "GameMode");
-		m_engine.getScriptSystem().start();
 		m_is_game_mode = true;
 	}
 }
@@ -454,7 +436,6 @@ void EditorServerImpl::toggleGameMode()
 void EditorServerImpl::stopGameMode()
 {
 	m_is_game_mode = false;
-	m_engine.getScriptSystem().stop();
 	m_game_mode_file->seek(FS::SeekMode::BEGIN, 0);
 	load(*m_game_mode_file, "GameMode");
 	m_engine.getFileSystem().close(m_game_mode_file);
@@ -534,10 +515,6 @@ void EditorServerImpl::addComponent(uint32_t type_crc)
 		{
 			m_engine.getRenderScene()->createComponent(type_crc, m_selected_entity);
 		}
-		else if(type_crc == SCRIPT_HASH)
-		{
-			m_engine.getScriptSystem().createScript(m_selected_entity);
-		}
 		else
 		{
 			ASSERT(false);
@@ -549,15 +526,13 @@ void EditorServerImpl::addComponent(uint32_t type_crc)
 
 void EditorServerImpl::lookAtSelected()
 {
-	/*if(m_selected_entity.isValid())
+	if(m_selected_entity.isValid())
 	{
-		Vec3 dir = m_camera_rot * Vec3(0, 0, 1);
-		m_camera_pos = m_selected_entity.getPosition() + dir * 10;
-		Matrix mtx;
-		m_camera_rot.toMatrix(mtx);
-		mtx.setTranslation(m_camera_pos);
-		m_engine.getRenderer().setCameraMatrix(mtx);
-	}*/
+		Matrix camera_mtx = m_camera.getMatrix();
+		Vec3 dir = camera_mtx * Vec3(0, 0, 1);
+		camera_mtx.setTranslation(m_selected_entity.getPosition() + dir * 10);
+		m_camera.setMatrix(camera_mtx);
+	}
 }
 
 
@@ -630,8 +605,36 @@ void EditorServerImpl::load(FS::IFile& file, const char* path)
 	m_engine.deserialize(serializer);
 	m_camera = m_engine.getRenderScene()->getCameraInSlot("editor").entity;
 	g_log_info.log("editor server") << "universe parsed";
+
+	Universe* universe = m_engine.getUniverse();
+	for (int i = 0; i < universe->getEntityCount(); ++i)
+	{
+		Entity e(universe, i);
+		createEditorIcon(e);
+	}
 }
 
+
+void EditorServerImpl::createEditorIcon(const Entity& entity)
+{
+	const Entity::ComponentList& cmps = entity.getComponents();
+
+	bool found_renderable = false;
+	for (int i = 0; i < cmps.size(); ++i)
+	{
+		if (cmps[i].type == RENDERABLE_HASH)
+		{
+			found_renderable = true;
+			break;
+		}
+	}
+	if (!found_renderable)
+	{
+		EditorIcon* er = LUMIX_NEW(EditorIcon)();
+		er->create(m_engine, *m_engine.getRenderScene(), entity);
+		m_editor_icons.push(er);
+	}
+}
 
 void EditorServerImpl::resetAndLoad(FS::IFile& file, const char* path)
 {
@@ -666,9 +669,13 @@ bool EditorServerImpl::create(const char* base_path)
 
 	//glPopAttrib();
 	
-	if(!m_engine.loadPlugin("physics.dll"))
+	if (!m_engine.loadPlugin("physics.dll"))
 	{
 		g_log_info.log("plugins") << "physics plugin has not been loaded";
+	}
+	if (!m_engine.loadPlugin("script.dll"))
+	{
+		g_log_info.log("plugins") << "script plugin has not been loaded";
 	}
 	/*if(!m_engine.loadPlugin("navigation.dll"))
 	{
@@ -733,6 +740,12 @@ void EditorServerImpl::onLogError(const char* system, const char* message)
 }
 
 
+void EditorServerImpl::setWireframe(bool is_wireframe)
+{
+	m_engine.getRenderer().setEditorWireframe(is_wireframe);
+}
+
+
 void EditorServerImpl::sendMessage(const uint8_t* data, int32_t length)
 {
 	m_client.onMessage(data, length);
@@ -755,59 +768,6 @@ void EditorServerImpl::renderScene(IRenderDevice& render_device)
 }
 
 
-void EditorServerImpl::renderPhysics()
-{
-	ASSERT(false);
-	/*glMatrixMode(GL_PROJECTION);
-	float proj[16];
-	h3dGetCameraProjMat(m_engine.getRenderer().getRawCameraNode(), proj);
-	glLoadMatrixf(proj);
-		
-	glMatrixMode(GL_MODELVIEW);
-	
-	Matrix mtx;
-	m_engine.getRenderer().getCameraMatrix(mtx);
-	mtx.fastInverse();
-	glLoadMatrixf(&mtx.m11);
-
-	glViewport(0, 0, m_engine.getRenderer().getWidth(), m_engine.getRenderer().getHeight());
-
-	glEnable(GL_DEPTH_TEST);
-	glDisable(GL_CULL_FACE);
-	glDisable(GL_TEXTURE_2D);
-	glDisable(GL_BLEND);
-
-	glDisableClientState(GL_VERTEX_ARRAY);
-	glDisableClientState(GL_COLOR_ARRAY);
-	glDisableClientState(GL_NORMAL_ARRAY);
-	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-
-	IPlugin* physics = m_engine.getPluginManager().getPlugin("physics");
-	if(physics)
-	{
-		physics->sendMessage("render");
-	}
-	/*m_physics_scene->getRawScene()->getNbActors(physx::PxActorTypeSelectionFlag::eRIGID_STATIC);
-	const physx::PxRenderBuffer& rb = m_physics_scene->getRawScene()->getRenderBuffer();
-	const physx::PxU32 numLines = rb.getNbLines();
-	const physx::PxU32 numPoints = rb.getNbPoints();
-	const physx::PxU32 numTri = rb.getNbTriangles();
-	if(numLines)
-	{
-		glBegin(GL_LINES);
-		const physx::PxDebugLine* PX_RESTRICT lines = rb.getLines();
-		for(physx::PxU32 i=0; i<numLines; i++)
-		{
-			const physx::PxDebugLine& line = lines[i];
-			glColor3f(1, 1, 1);				
-			glVertex3fv((GLfloat*)&line.pos0);
-			glVertex3fv((GLfloat*)&line.pos1);
-		}
-		glEnd();
-	}*/
-}
-
-
 EditorServerImpl::EditorServerImpl(EditorClient& client, EditorServer& server)
 	: m_universe_mutex(false)
 	, m_toggle_game_mode_requested(false)
@@ -820,13 +780,12 @@ EditorServerImpl::EditorServerImpl(EditorClient& client, EditorServer& server)
 }
 
 
-void EditorServerImpl::navigate(float forward, float right, int fast)
+void EditorServerImpl::navigate(float forward, float right, float speed)
 {
-	float navigation_speed = (fast ? 0.4f : 0.1f);
 	Vec3 pos = m_camera.getPosition();
 	Quat rot = m_camera.getRotation();;
-	pos += rot * Vec3(0, 0, -1) * forward * navigation_speed;
-	pos += rot * Vec3(1, 0, 0) * right * navigation_speed;
+	pos += rot * Vec3(0, 0, -1) * forward * speed;
+	pos += rot * Vec3(1, 0, 0) * right * speed;
 	m_camera.setPosition(pos);
 }
 
@@ -933,6 +892,7 @@ void EditorServerImpl::selectEntity(Entity e)
 		}
 	}
 	sendMessage(m_stream.getBuffer(), m_stream.getBufferSize());
+	sendEntityPosition(e.index);
 }
 
 
@@ -948,22 +908,7 @@ void EditorServerImpl::onComponentCreated(Component& cmp)
 			break;
 		}
 	}
-	const Lumix::Entity::ComponentList& cmps = cmp.entity.getComponents();
-	bool found = false;
-	for (int i = 0; i < cmps.size(); ++i)
-	{
-		if (cmps[i].type == RENDERABLE_HASH)
-		{
-			found = true;
-			break;
-		}
-	}
-	if (!found)
-	{
-		EditorIcon* er = LUMIX_NEW(EditorIcon)();
-		er->create(m_engine, *m_engine.getRenderScene(), cmp.entity, cmp);
-		m_editor_icons.push(er);
-	}
+	createEditorIcon(cmp.entity);
 }
 
 
@@ -982,7 +927,7 @@ void EditorServerImpl::onComponentDestroyed(Component& cmp)
 	if(cmp.entity.existsInUniverse() && cmp.entity.getComponents().empty())
 	{
 		EditorIcon* er = LUMIX_NEW(EditorIcon)();
-		er->create(m_engine, *m_engine.getRenderScene(), cmp.entity, Component::INVALID);
+		er->create(m_engine, *m_engine.getRenderScene(), cmp.entity);
 		m_editor_icons.push(er);
 	}
 }
@@ -1091,7 +1036,7 @@ void EditorServerImpl::onMessage(const uint8_t* data, int32_t size)
 		setProperty(msg + 1, size - 4);
 		break;
 	case ClientMessageType::MOVE_CAMERA:
-		navigate(fmsg[1], fmsg[2], msg[3]);
+		navigate(fmsg[1], fmsg[2], fmsg[3]);
 		break;
 	case ClientMessageType::SAVE:
 		save(reinterpret_cast<const char*>(&msg[1]));
@@ -1107,6 +1052,9 @@ void EditorServerImpl::onMessage(const uint8_t* data, int32_t size)
 		break;
 	case ClientMessageType::REMOVE_COMPONENT:
 		removeComponent(*reinterpret_cast<const uint32_t*>(&msg[1]));
+		break;
+	case ClientMessageType::SET_WIREFRAME:
+		setWireframe(msg[1] != 0);
 		break;
 	case ClientMessageType::ADD_ENTITY:
 		addEntity();

@@ -140,7 +140,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		}
 		serializer.deserializeObjectEnd();
 		
-		int32_t size = (int32_t)file->size() - file->pos() + 1; /// TODO + 1 is from JsonSerializer::m_buffer, hide this implementation detail
+		int32_t size = (int32_t)file->size() - file->pos() + 1;
 		ShaderManager* manager = static_cast<ShaderManager*>(getResourceManager().get(ResourceManager::SHADER));
 		char* buf = reinterpret_cast<char*>(manager->getBuffer(size + 1));
 		serializer.deserializeRawString(buf, size);
@@ -157,7 +157,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		int32_t vs_len = (int32_t)(end - buf);
 		buf[vs_len-1] = 0;
 		m_vertex_id = attach(GL_VERTEX_SHADER, buf, vs_len);
-		m_fragment_id = attach(GL_FRAGMENT_SHADER, buf + vs_len, size - vs_len); /// TODO size
+		m_fragment_id = attach(GL_FRAGMENT_SHADER, buf + vs_len, size - vs_len);
 		glLinkProgram(m_program_id);
 		GLint link_status;
 		glGetProgramiv(m_program_id, GL_LINK_STATUS, &link_status);
@@ -173,7 +173,9 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		{
 			m_vertex_attributes_ids[i] = glGetAttribLocation(m_program_id, attributes[i]);
 		}
-
+		m_position_attrib_id = glGetAttribLocation(m_program_id, "in_position");
+		m_normal_attrib_id = glGetAttribLocation(m_program_id, "in_normal");
+		m_tex_coord_attrib_id = glGetAttribLocation(m_program_id, "in_tex_coord");
 
 		m_size = file->size();
 		decrementDepCount();

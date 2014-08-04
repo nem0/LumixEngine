@@ -35,7 +35,9 @@ void GameView::resizeEvent(QResizeEvent* event)
 	}
 }
 
+
 void GameView::on_playButton_clicked()
 {
 	m_client->toggleGameMode();
 }
+

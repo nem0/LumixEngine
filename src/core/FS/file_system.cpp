@@ -3,9 +3,9 @@
 #include "core/array.h"
 #include "core/fs/disk_file_device.h"
 #include "core/fs/ifile.h"
-#include "core/MT/lock_free_fixed_queue.h"
-#include "core/MT/task.h"
-#include "core/MT/transaction.h"
+#include "core/mt/lock_free_fixed_queue.h"
+#include "core/mt/task.h"
+#include "core/mt/transaction.h"
 #include "core/profiler.h"
 #include "core/queue.h"
 #include "core/stack_allocator.h"
@@ -188,7 +188,7 @@ namespace Lumix
 						m_in_progress.pop();
 
 						tr->data.m_cb.invoke(tr->data.m_file, !!(tr->data.m_flags & E_SUCCESS), *this);
-						m_transaction_queue.dealoc(tr, true);
+						m_transaction_queue.dealoc(tr);
 					}
 					else
 					{

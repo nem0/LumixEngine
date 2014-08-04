@@ -36,15 +36,13 @@ struct CustomErrorCallback : public physx::PxErrorCallback
 
 void PhysicsSystem::onCreateUniverse(Universe& universe)
 {
-	m_impl->m_scene = LUMIX_NEW(PhysicsScene)();
-	m_impl->m_scene->create(*this, universe, *m_impl->m_engine);
+	m_impl->m_scene = PhysicsScene::create(*this, universe, *m_impl->m_engine);
 }
 
 
 void PhysicsSystem::onDestroyUniverse(Universe& universe)
 {
-	m_impl->m_scene->destroy();
-	LUMIX_DELETE(m_impl->m_scene);
+	PhysicsScene::destroy(m_impl->m_scene);
 	m_impl->m_scene = NULL;
 }
 
@@ -104,19 +102,38 @@ PhysicsScene* PhysicsSystem::getScene() const
 }
 
 
+class AssertNullAllocator : public physx::PxAllocatorCallback
+{
+	public:
+		virtual void* allocate(size_t size, const char* typeName, const char* filename, int line) override
+		{
+			void* ret = _aligned_malloc(size, 16);
+			//g_log_info.log("PhysX") << "Allocated " << size << " bytes for " << typeName << " from " << filename << "(" << line << ")";
+			ASSERT(ret);
+			return ret;
+		}
+		virtual void deallocate(void* ptr) override
+		{
+			_aligned_free(ptr);
+		}
+};
+
+
 bool PhysicsSystem::create(Engine& engine)
 {
 	engine.getEditorServer()->registerProperty("box_rigid_actor", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("dynamic"), &PhysicsScene::getIsDynamic, &PhysicsScene::setIsDynamic));
 	engine.getEditorServer()->registerProperty("box_rigid_actor", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("size"), &PhysicsScene::getHalfExtents, &PhysicsScene::setHalfExtents));
 	engine.getEditorServer()->registerProperty("mesh_rigid_actor", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("source"), &PhysicsScene::getShapeSource, &PhysicsScene::setShapeSource, IPropertyDescriptor::FILE));
 	engine.getEditorServer()->registerProperty("physical_heightfield", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("heightmap"), &PhysicsScene::getHeightmap, &PhysicsScene::setHeightmap, IPropertyDescriptor::FILE));
+	engine.getEditorServer()->registerProperty("physical_heightfield", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("xz_scale"), &PhysicsScene::getHeightmapXZScale, &PhysicsScene::setHeightmapXZScale));
+	engine.getEditorServer()->registerProperty("physical_heightfield", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("y_scale"), &PhysicsScene::getHeightmapYScale, &PhysicsScene::setHeightmapYScale));
 	engine.getEditorServer()->registerCreator(HEIGHTFIELD_HASH, *this);
 	engine.getEditorServer()->registerCreator(BOX_ACTOR_HASH, *this);
 	engine.getEditorServer()->registerCreator(MESH_ACTOR_HASH, *this);
 	engine.getEditorServer()->registerCreator(CONTROLLER_HASH, *this);
 
 	m_impl = LUMIX_NEW(PhysicsSystemImpl);
-	m_impl->m_allocator = LUMIX_NEW(physx::PxDefaultAllocator)();
+	m_impl->m_allocator = LUMIX_NEW(AssertNullAllocator)();
 	m_impl->m_error_callback = LUMIX_NEW(CustomErrorCallback)();
 	m_impl->m_engine = &engine;
 	m_impl->m_foundation = PxCreateFoundation(

@@ -22,7 +22,6 @@ namespace Lumix
 	class Renderer;
 	class RenderScene;
 	class ResourceManager;
-	class ScriptSystem;
 	class Universe;
 
 
@@ -41,7 +40,6 @@ namespace Lumix
 			EditorServer* getEditorServer() const;
 			FS::FileSystem& getFileSystem();
 			Renderer& getRenderer();
-			ScriptSystem& getScriptSystem();
 			InputSystem& getInputSystem();
 			PluginManager& getPluginManager();
 			IPlugin* loadPlugin(const char* name);
@@ -53,7 +51,7 @@ namespace Lumix
 			ResourceManager& getResourceManager() const;
 
 			const char* getBasePath() const;
-			void update();
+			void update(bool is_game_running);
 			void serialize(ISerializer& serializer);
 			void deserialize(ISerializer& serializer);
 			float getFPS() const;

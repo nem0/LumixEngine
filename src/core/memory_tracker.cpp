@@ -1,7 +1,7 @@
 #include "core/memory_tracker.h"
 #include "core/log.h"
 #include "core/math_utils.h"
-#include "core/MT/spin_mutex.h"
+#include "core/mt/spin_mutex.h"
 #include "core/stack_allocator.h"
 #include "core/string.h"
 
@@ -67,7 +67,7 @@ namespace Lumix
 	typedef Map<const char *, intptr_t, MemTrackAllocator> file_map;
 	typedef Map<FileLineReport, uint32_t, MemTrackAllocator> alloc_count_map;
 
-#pragma init_seg(compiler)
+	#pragma init_seg(compiler)
 	MemoryTracker MemoryTracker::s_instance;
 	uint32_t MemoryTracker::s_alloc_counter = 0;
 
@@ -160,9 +160,10 @@ namespace Lumix
 				char hex[4];
 				hex[0] = ' ';
 				toCStringHex(*((uint8_t*)adr + j), hex+1, 2);
+				hex[3] = 0;
 				string.cat(hex);
 			}
-			memTrackerLog("MemoryTracker", "%s", string);
+			memTrackerLog("MemoryTracker", "%s", string.c_str());
 		}
 		if(count)
 		{
@@ -340,7 +341,7 @@ namespace Lumix
 
 			getEntryLog(entry, adr, string);
 
-			memTrackerLog("MemoryTracker", "%s", string);
+			memTrackerLog("MemoryTracker", "%s", string.c_str());
 
 			int str_len = Math::min(16, (int)entry.size());
 			char asci_buf[17];
@@ -353,10 +354,11 @@ namespace Lumix
 				char hex[4];
 				hex[0] = ' ';
 				toCStringHex(*((uint8_t*)adr + j), hex + 1, 2);
+				hex[3] = 0;
 				string.cat(hex);
 			}
 
-			memTrackerLog("MemoryTracker", "%s", string);
+			memTrackerLog("MemoryTracker", "%s", string.c_str());
 		}
 
 		if (0 < size) {

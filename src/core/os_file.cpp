@@ -1,4 +1,4 @@
-#include "core/os_file.h"
+#include "core/fs/os_file.h"
 #include "core/lumix.h"
 
 #include <assert.h>
@@ -46,7 +46,7 @@ namespace Lumix
 					FILE_ATTRIBUTE_NORMAL,
 					NULL);
 			}
-			else if(Mode::RECREATE & mode)
+			else if (Mode::CREATE & mode)
 			{
 				hnd = ::CreateFile(path, 
 					Mode::WRITE & mode ? GENERIC_WRITE : 0 | Mode::READ & mode ? GENERIC_READ : 0,

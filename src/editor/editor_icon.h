@@ -20,8 +20,14 @@ class RenderScene;
 class EditorIcon
 {
 	friend class EditorApp;
+	enum Type
+	{
+		PHYSICAL_CONTROLLER,
+		PHYSICAL_BOX,
+		ENTITY
+	};
 	public:
-		void create(Engine& engine, RenderScene& scene, Entity& entity, const Component& cmp);
+		void create(Engine& engine, RenderScene& scene, const Entity& entity);
 		void destroy();
 		void render(Renderer* renderer, IRenderDevice& render_device);
 		void show();
@@ -36,6 +42,7 @@ class EditorIcon
 		Matrix m_matrix;
 		float m_scale;
 		bool m_is_visible;
+		Type m_type;
 };
 
 

@@ -14,7 +14,7 @@ namespace FS
 }
 
 
-class Texture : public Resource
+class LUMIX_ENGINE_API Texture : public Resource
 {
 	public:
 		Texture(const Path& path, ResourceManager& resource_manager);
@@ -26,12 +26,14 @@ class Texture : public Resource
 		int getHeight() const { return m_height; }
 		int getBytesPerPixel() const { return m_BPP; }
 		const uint8_t* getData() const { return m_data.empty() ? NULL : &m_data[0]; }
-		void setNonGL(bool is_nonGL) { m_is_nonGL = is_nonGL; }
+		void addDataReference();
+		void removeDataReference();
 	
 	private:
 		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 		bool loadDDS(FS::IFile& file);
 		bool loadTGA(FS::IFile& file);
+		bool loadRaw(FS::IFile& file);
 
 		virtual void doUnload(void) override;
 		virtual FS::ReadCallback getReadCallback() override;
@@ -41,8 +43,8 @@ class Texture : public Resource
 		int m_width;
 		int m_height;
 		int m_BPP;
+		int m_data_reference;
 		Array<uint8_t> m_data;
-		bool m_is_nonGL;
 };
 
 
