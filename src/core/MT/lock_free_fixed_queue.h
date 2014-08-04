@@ -126,7 +126,7 @@ namespace Lumix
 				{
 					if (m_rd != m_wr)
 					{
-						int cur_read_idx = m_rd;
+						int32_t cur_read_idx = m_rd;
 						int32_t idx = cur_read_idx & (size - 1);
 
 						Node cur_node(cur_read_idx, m_queue[idx].data.pair.el);
@@ -322,7 +322,7 @@ namespace Lumix
 				{
 					if (m_rd != m_wr)
 					{
-						int cur_read_idx = m_rd;
+						int32_t cur_read_idx = m_rd;
 						int32_t idx = cur_read_idx & (size - 1);
 
 						Node cur_node(cur_read_idx, m_queue[idx].data.pair.el);

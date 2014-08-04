@@ -26,7 +26,7 @@ namespace Lumix
 		{
 			uint32_t ret = 0xffffFFFF;
 			struct TaskImpl* impl = reinterpret_cast<TaskImpl*>(ptr);
-			SetThreadName(impl->m_thread_id, impl->m_thread_name);
+			setThreadName(impl->m_thread_id, impl->m_thread_name);
 			if (!impl->m_force_exit)
 			{
 				ret = impl->m_owner->task();

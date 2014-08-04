@@ -8,7 +8,7 @@ namespace Lumix
 	{
 		static uint32_t s_main_thread_id = 0;
 
-		void sleep(uint32_t miliseconds) { ::Sleep(miliseconds); }
+		void sleep(uint32_t milliseconds) { ::Sleep(milliseconds); }
 
 		uint32_t getCPUsCount()
 		{
@@ -46,7 +46,7 @@ namespace Lumix
 		} THREADNAME_INFO;
 #pragma pack(pop)
 
-		void SetThreadName(uint32_t thread_id, const char* thread_name)
+		void setThreadName(uint32_t thread_id, const char* thread_name)
 		{
 			THREADNAME_INFO info;
 			info.type = 0x1000;
