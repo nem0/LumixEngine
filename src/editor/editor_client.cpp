@@ -3,9 +3,9 @@
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/fifo_allocator.h"
-#include "core/MT/lock_free_queue.h"
-#include "core/MT/mutex.h"
-#include "core/MT/task.h"
+#include "core/mt/lock_free_queue.h"
+#include "core/mt/mutex.h"
+#include "core/mt/task.h"
 #include "core/net/tcp_connector.h"
 #include "core/net/tcp_stream.h"
 #include "core/path.h"
@@ -113,6 +113,10 @@ namespace Lumix
 		return m_impl->m_entity_selected;
 	}
 
+	EditorClient::EntityPositionCallback& EditorClient::entityPositionReceived()
+	{
+		return m_impl->m_entity_position_changed;
+	}
 
 	void EditorClientImpl::sendMessage(uint32_t type, const void* data, int32_t size)
 	{
@@ -129,6 +133,12 @@ namespace Lumix
 	const char* EditorClient::getBasePath() const
 	{
 		return m_impl->m_base_path.c_str();
+	}
+
+
+	void EditorClient::lookAtSelected()
+	{
+		m_impl->sendMessage((uint32_t)ClientMessageType::LOOK_AT_SELECTED, NULL, 0);
 	}
 
 
@@ -174,6 +184,12 @@ namespace Lumix
 		m_impl->sendMessage(ClientMessageType::LOAD, path, (int32_t)strlen(path)+1);
 	}
 
+	void EditorClient::setWireframe(bool is_wireframe)
+	{
+		int32_t data = is_wireframe;
+		m_impl->sendMessage(ClientMessageType::SET_WIREFRAME, &data, sizeof(data));
+	}
+
 	void EditorClient::setEntityPosition(int32_t entity, const Vec3& position)
 	{
 		uint8_t data[sizeof(entity) + sizeof(position)];
@@ -187,12 +203,12 @@ namespace Lumix
 		m_impl->sendMessage(ClientMessageType::SAVE, path, (int32_t)strlen(path)+1);
 	}
 
-	void EditorClient::navigate(float forward, float right, int32_t fast)
+	void EditorClient::navigate(float forward, float right, float speed)
 	{
 		uint8_t data[12];
 		*(float*)data = forward;
-		*(float*)(data+4) = right;
-		*(int32_t*)(data+8) = fast;
+		*(float*)(data + 4) = right;
+		*(float*)(data + 8) = speed;
 		m_impl->sendMessage(ClientMessageType::MOVE_CAMERA, data, 12);
 	}
 

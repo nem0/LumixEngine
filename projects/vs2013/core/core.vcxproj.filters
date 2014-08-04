@@ -19,7 +19,6 @@
     <ClInclude Include="..\..\..\src\core\memory_tracker.h" />
     <ClInclude Include="..\..\..\src\core\new.h" />
     <ClInclude Include="..\..\..\src\core\new_macros.h" />
-    <ClInclude Include="..\..\..\src\core\os_file.h" />
     <ClInclude Include="..\..\..\src\core\pod_hash_map.h" />
     <ClInclude Include="..\..\..\src\core\quat.h" />
     <ClInclude Include="..\..\..\src\core\queue.h" />
@@ -36,97 +35,100 @@
     <ClInclude Include="..\..\..\src\core\resource.h" />
     <ClInclude Include="..\..\..\src\core\fifo_allocator.h" />
     <ClInclude Include="..\..\..\src\core\FS\disk_file_device.h">
-      <Filter>FS</Filter>
+      <Filter>fs</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\FS\file_events_device.h">
-      <Filter>FS</Filter>
+      <Filter>fs</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\FS\file_system.h">
-      <Filter>FS</Filter>
+      <Filter>fs</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\FS\ifile.h">
-      <Filter>FS</Filter>
+      <Filter>fs</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\FS\ifile_device.h">
-      <Filter>FS</Filter>
+      <Filter>fs</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\FS\ifile_system_defines.h">
-      <Filter>FS</Filter>
+      <Filter>fs</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\FS\memory_file_device.h">
-      <Filter>FS</Filter>
+      <Filter>fs</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\FS\tcp_file_device.h">
-      <Filter>FS</Filter>
+      <Filter>fs</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\FS\tcp_file_server.h">
-      <Filter>FS</Filter>
+      <Filter>fs</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\MT\atomic.h">
-      <Filter>MT</Filter>
+      <Filter>mt</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\MT\event.h">
-      <Filter>MT</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\core\MT\lock_free_queue.h">
-      <Filter>MT</Filter>
+      <Filter>mt</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\MT\mutex.h">
-      <Filter>MT</Filter>
+      <Filter>mt</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\MT\semaphore.h">
-      <Filter>MT</Filter>
+      <Filter>mt</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\MT\spin_mutex.h">
-      <Filter>MT</Filter>
+      <Filter>mt</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\MT\task.h">
-      <Filter>MT</Filter>
+      <Filter>mt</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\MTJD\base_entry.h">
-      <Filter>MTJD</Filter>
+      <Filter>mtjd</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\MTJD\worker_thread.h">
-      <Filter>MTJD</Filter>
+      <Filter>mtjd</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\MTJD\enums.h">
-      <Filter>MTJD</Filter>
+      <Filter>mtjd</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\MTJD\group.h">
-      <Filter>MTJD</Filter>
+      <Filter>mtjd</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\MTJD\job.h">
-      <Filter>MTJD</Filter>
+      <Filter>mtjd</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\MTJD\manager.h">
-      <Filter>MTJD</Filter>
+      <Filter>mtjd</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\MTJD\scheduler.h">
-      <Filter>MTJD</Filter>
+      <Filter>mtjd</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\MTJD\framework.h">
-      <Filter>MTJD</Filter>
+      <Filter>mtjd</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\Net\tcp_acceptor.h">
-      <Filter>Net</Filter>
+      <Filter>net</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\Net\tcp_connector.h">
-      <Filter>Net</Filter>
+      <Filter>net</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\Net\tcp_stream.h">
-      <Filter>Net</Filter>
+      <Filter>net</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\MT\transaction.h">
-      <Filter>MT</Filter>
+      <Filter>mt</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\MT\lock_free_fixed_queue.h">
-      <Filter>MT</Filter>
+      <Filter>mt</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\profiler.h" />
     <ClInclude Include="..\..\..\src\core\lumix.h" />
     <ClInclude Include="..\..\..\src\core\plane.h" />
     <ClInclude Include="..\..\..\src\core\frustum.h" />
     <ClInclude Include="..\..\..\src\core\sphere.h" />
+    <ClInclude Include="..\..\..\src\core\os_file.h">
+      <Filter>fs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\core\mt\thread.h">
+      <Filter>mt</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\core\blob.cpp" />
@@ -139,7 +141,6 @@
     <ClCompile Include="..\..\..\src\core\memory_tracker.cpp" />
     <ClCompile Include="..\..\..\src\core\new.cpp" />
     <ClCompile Include="..\..\..\src\core\new_macros.cpp" />
-    <ClCompile Include="..\..\..\src\core\os_file.cpp" />
     <ClCompile Include="..\..\..\src\core\quat.cpp" />
     <ClCompile Include="..\..\..\src\core\timer.cpp" />
     <ClCompile Include="..\..\..\src\core\pc\input_system.cpp" />
@@ -149,83 +150,89 @@
     <ClCompile Include="..\..\..\src\core\resource.cpp" />
     <ClCompile Include="..\..\..\src\core\fifo_allocator.cpp" />
     <ClCompile Include="..\..\..\src\core\FS\disk_file_device.cpp">
-      <Filter>FS</Filter>
+      <Filter>fs</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\core\FS\file_events_device.cpp">
-      <Filter>FS</Filter>
+      <Filter>fs</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\core\FS\file_system.cpp">
-      <Filter>FS</Filter>
+      <Filter>fs</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\core\FS\memory_file_device.cpp">
-      <Filter>FS</Filter>
+      <Filter>fs</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\core\FS\tcp_file_device.cpp">
-      <Filter>FS</Filter>
+      <Filter>fs</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\core\FS\tcp_file_server.cpp">
-      <Filter>FS</Filter>
+      <Filter>fs</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\core\MT\pc\atomic.cpp">
-      <Filter>MT</Filter>
+      <Filter>mt</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\core\MT\pc\event.cpp">
-      <Filter>MT</Filter>
+      <Filter>mt</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\core\MT\pc\mutex.cpp">
-      <Filter>MT</Filter>
+      <Filter>mt</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\core\MT\pc\semaphore.cpp">
-      <Filter>MT</Filter>
+      <Filter>mt</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\core\MT\pc\spin_mutex.cpp">
-      <Filter>MT</Filter>
+      <Filter>mt</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\core\MT\pc\task.cpp">
-      <Filter>MT</Filter>
+      <Filter>mt</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\core\MTJD\base_entry.cpp">
-      <Filter>MTJD</Filter>
+      <Filter>mtjd</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\core\MTJD\worker_thread.cpp">
-      <Filter>MTJD</Filter>
+      <Filter>mtjd</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\core\MTJD\group.cpp">
-      <Filter>MTJD</Filter>
+      <Filter>mtjd</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\core\MTJD\job.cpp">
-      <Filter>MTJD</Filter>
+      <Filter>mtjd</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\core\MTJD\manager.cpp">
-      <Filter>MTJD</Filter>
+      <Filter>mtjd</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\core\MTJD\scheduler.cpp">
-      <Filter>MTJD</Filter>
+      <Filter>mtjd</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\core\Net\pc\tcp_acceptor.cpp">
-      <Filter>Net</Filter>
+      <Filter>net</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\core\Net\pc\tcp_connector.cpp">
-      <Filter>Net</Filter>
+      <Filter>net</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\core\Net\pc\tcp_stream.cpp">
-      <Filter>Net</Filter>
+      <Filter>net</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\core\profiler.cpp" />
     <ClCompile Include="..\..\..\src\core\string.cpp" />
+    <ClCompile Include="..\..\..\src\core\os_file.cpp">
+      <Filter>fs</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\core\mt\pc\thread.cpp">
+      <Filter>mt</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <Filter Include="FS">
+    <Filter Include="fs">
       <UniqueIdentifier>{3c4deb1a-249d-4dd5-b588-fdf23f704f40}</UniqueIdentifier>
     </Filter>
-    <Filter Include="MT">
+    <Filter Include="mt">
       <UniqueIdentifier>{e4ae7715-8cd7-4b2c-8da8-e6fb2afc4536}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Net">
-      <UniqueIdentifier>{129b26b9-e5b8-4ef9-b3f8-e886c1337601}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="MTJD">
+    <Filter Include="mtjd">
       <UniqueIdentifier>{ce2d1d5a-45d2-4b29-a646-769605372872}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="net">
+      <UniqueIdentifier>{129b26b9-e5b8-4ef9-b3f8-e886c1337601}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

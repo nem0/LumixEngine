@@ -1,4 +1,4 @@
-#include "core/MT/event.h"
+#include "core/mt/event.h"
 #include <windows.h>
 #include <cassert>
 

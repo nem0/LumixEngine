@@ -56,6 +56,7 @@ void PropertyView::setEditorClient(Lumix::EditorClient& client)
 	m_client = &client;
 	m_client->propertyListReceived().bind<PropertyView, &PropertyView::onPropertyList>(this);
 	m_client->entitySelected().bind<PropertyView, &PropertyView::onEntitySelected>(this);
+	m_client->entityPositionReceived().bind<PropertyView, &PropertyView::onEntityPosition>(this);
 }
 
 
@@ -167,6 +168,17 @@ void PropertyView::onPropertyValue(Property* property, void* data, int32_t)
 		default:
 			ASSERT(false);
 			break;
+	}
+}
+
+
+void PropertyView::onEntityPosition(Lumix::EntityPositionEvent& e)
+{
+	if (m_selected_entity_index == e.index)
+	{
+		m_ui->positionX->setValue(e.x);
+		m_ui->positionY->setValue(e.y);
+		m_ui->positionZ->setValue(e.z);
 	}
 }
 
@@ -303,6 +315,7 @@ void PropertyView::addProperty(const char* component, const char* name, const ch
 				QDoubleSpinBox* edit = new QDoubleSpinBox();
 				edit->setProperty("cpp_prop", (int)(m_properties.size() - 1)); 
 				m_ui->propertyList->setItemWidget(item, 1, edit);
+				edit->setMaximum(FLT_MAX);
 				connect(edit, (void (QDoubleSpinBox::*)(double))&QDoubleSpinBox::valueChanged, this, &PropertyView::on_doubleSpinBoxValueChanged);
 			}
 			break;
@@ -435,6 +448,7 @@ void PropertyView::addScriptCustomProperties()
 
 void PropertyView::onEntitySelected(Lumix::EntitySelectedEvent& e)
 {
+	m_selected_entity_index = e.index;
 	clear();
 	for (int i = 0; i < e.components.size(); ++i)
 	{
@@ -471,15 +485,18 @@ void PropertyView::onEntitySelected(Lumix::EntitySelectedEvent& e)
 		}
 		else if (e.components[i] == crc32("terrain"))
 		{
-			addProperty("terrain", "heightmap", "Heightmap", Property::FILE, "TGA image (*.tga)");
 			addProperty("terrain", "material", "Material", Property::FILE, "material (*.mat)");
+			addProperty("terrain", "xz_scale", "Meter per texel", Property::DECIMAL, NULL);
+			addProperty("terrain", "y_scale", "Height scale", Property::DECIMAL, NULL);
 		}
 		else if (e.components[i] == crc32("physical_controller") || e.components[i] == crc32("mesh_rigid_actor"))
 		{
 		}
 		else if (e.components[i] == crc32("physical_heightfield"))
 		{
-			addProperty("physical_heightfield", "heightmap", "Heightmap", Property::FILE, "TGA image (*.tga)");
+			addProperty("physical_heightfield", "heightmap", "Heightmap", Property::FILE, "Heightmaps (*.tga *.raw)");
+			addProperty("physical_heightfield", "xz_scale", "Meters per pixel", Property::DECIMAL, NULL);
+			addProperty("physical_heightfield", "y_scale", "Height scale", Property::DECIMAL, NULL);
 		}
 		else if (e.components[i] == crc32("light"))
 		{

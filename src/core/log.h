@@ -27,6 +27,8 @@ namespace Lumix
 			base_string<char, StackAllocator<64> > m_system;
 			base_string<char, StackAllocator<1024> > m_message;
 			Log& m_log;
+
+			void operator = (const LogProxy&) {}
 	};
 
 	class LUMIX_CORE_API Log

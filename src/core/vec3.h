@@ -56,9 +56,15 @@ struct Vec3
 		this->z = z;
 	}
 
-	Vec3 operator *(float s)
+	Vec3 operator *(float s) const
 	{
 		return Vec3(x * s, y * s, z * s);
+	}
+
+	Vec3 operator /(float s) const
+	{
+		float tmp = 1 / s;
+		return Vec3(x * tmp, y * tmp, z * tmp);
 	}
 
 	void operator *=(float rhs)
@@ -138,12 +144,6 @@ struct Vec3
 
 	float x, y, z;
 };
-
-
-inline Vec3 operator *(const Vec3& v, float s)
-{
-	return Vec3(v.x * s, v.y * s, v.z* s);
-}
 
 
 inline float dotProduct(const Vec3& op1, const Vec3& op2)

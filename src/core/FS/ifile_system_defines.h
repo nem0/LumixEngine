@@ -21,7 +21,6 @@ namespace Lumix
 				OPEN			= WRITE << 1,
 				CREATE			= OPEN << 1,
 				OPEN_OR_CREATE	= CREATE << 1,
-				RECREATE		= OPEN_OR_CREATE << 1,
 			};
 
 			Mode() : value(0) {}

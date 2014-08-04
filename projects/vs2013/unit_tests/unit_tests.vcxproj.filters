@@ -36,6 +36,9 @@
     <ClCompile Include="..\..\..\src\unit_tests\graphics\ut_clipper.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_fixed_lock_free_queue.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\unit_tests\suite\unit_test.h">

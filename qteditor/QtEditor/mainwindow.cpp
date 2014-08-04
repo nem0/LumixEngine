@@ -22,7 +22,8 @@ MainWindow::MainWindow(QWidget* parent) :
 	m_client = NULL;
 	m_ui->setupUi(this);
 	m_ui->centralWidget->hide();
-	
+	setDockOptions(AllowNestedDocks | AnimatedDocks | AllowTabbedDocks);
+
 	m_log = new LogWidget;
 	m_property_view = new PropertyView;
 	m_scene_view = new SceneView;
@@ -192,4 +193,19 @@ void MainWindow::on_actionProfiler_triggered()
 void MainWindow::on_actionMaterial_manager_triggered()
 {
     m_material_manager_ui->show();
+}
+
+void MainWindow::on_actionPolygon_Mode_changed()
+{
+	m_client->setWireframe(m_ui->actionPolygon_Mode->isChecked());
+}
+
+void MainWindow::on_actionGame_mode_triggered()
+{
+	m_client->toggleGameMode();
+}
+
+void MainWindow::on_actionLook_at_selected_entity_triggered()
+{
+	m_client->lookAtSelected();
 }

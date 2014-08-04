@@ -1,9 +1,9 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
 
 #include "core/log.h"
-#include "core/MT/lock_free_fixed_queue.h"
-#include "core/MT/task.h"
-#include "core/MT/transaction.h"
+#include "core/mt/lock_free_fixed_queue.h"
+#include "core/mt/task.h"
+#include "core/mt/transaction.h"
 #include "core/queue.h"
 #include "core/array.h"
 
@@ -108,7 +108,7 @@ namespace Lumix
 						if(test->isCompleted())
 						{
 							m_in_progress.pop();
-							m_trans_queue.dealoc(test, true);
+							m_trans_queue.dealoc(test);
 						}
 					}
 
@@ -125,12 +125,12 @@ namespace Lumix
 					}
 
 					// fatal error occured. We need to respawn task.
-					if(10 == m_task.getExitCode())
+					if (m_task.isFinished())
 					{
 						// test failed, remove it from the queue and spawn new thread
 						AsynTest* test = m_in_progress.front();
 						m_in_progress.pop();
-							m_trans_queue.dealoc(test, true);
+							m_trans_queue.dealoc(test);
 
 						m_task.destroy();
 						spawnWorkerTask();

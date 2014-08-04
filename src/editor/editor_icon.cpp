@@ -18,18 +18,43 @@ namespace Lumix
 {
 
 
-void EditorIcon::create(Engine& engine, RenderScene& scene, Entity& entity, const Component&)
+void EditorIcon::create(Engine& engine, RenderScene& scene, const Entity& entity)
 {
 	m_scene = &scene;
 	m_entity = entity;
-	m_model = static_cast<Model*>(engine.getResourceManager().get(ResourceManager::MODEL)->load("models/editor/icon.msh"));
 	m_is_visible = true;
+	const Entity::ComponentList& cmps = entity.getComponents();
+	m_type = ENTITY;
+	for (int i = 0; i < cmps.size(); ++i)
+	{
+		if (cmps[i].type == crc32("physical_controller"))
+		{
+			m_type = PHYSICAL_CONTROLLER;
+			break;
+		}
+		else if (cmps[i].type == crc32("box_rigid_actor"))
+		{
+			m_type = PHYSICAL_BOX;
+			break;
+		}
+	}
+	switch (m_type)
+	{
+		case PHYSICAL_CONTROLLER:
+			m_model = static_cast<Model*>(engine.getResourceManager().get(ResourceManager::MODEL)->load("models/editor/phy_controller_icon.msh"));
+			break;
+		case PHYSICAL_BOX:
+			m_model = static_cast<Model*>(engine.getResourceManager().get(ResourceManager::MODEL)->load("models/editor/phy_box_icon.msh"));
+			break;
+		default:
+			m_model = static_cast<Model*>(engine.getResourceManager().get(ResourceManager::MODEL)->load("models/editor/icon.msh"));
+			break;
+	}
 }
 
 
 void EditorIcon::destroy()
 {
-	
 	m_model->getResourceManager().get(ResourceManager::MODEL)->unload(*m_model);
 }
 

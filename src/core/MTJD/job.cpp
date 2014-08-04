@@ -47,11 +47,12 @@ namespace Lumix
 
 		void Job::onExecuted()
 		{
+			m_executed = true;
+			bool auto_destroy = m_auto_destroy;
+
 			BaseEntry::dependencyReady();
 
-			m_executed = true;
-
-			if (m_auto_destroy)
+			if (auto_destroy)
 			{
 				LUMIX_DELETE(this);
 			}
