@@ -8,14 +8,15 @@
 namespace Lumix
 {
 
-	struct RayCastModelHit
+	class  RayCastModelHit
 	{
-		bool m_is_hit;
-		float m_t;
-		Vec3 m_origin;
-		Vec3 m_dir;
-		class Mesh* m_mesh;
-		Component m_component;
+		public:
+			bool m_is_hit;
+			float m_t;
+			Vec3 m_origin;
+			Vec3 m_dir;
+			class Mesh* m_mesh;
+			Component m_component;
 	};
 
 } // ~ namespace Lumix
