@@ -521,76 +521,79 @@ void PropertyView::onEntitySelected(Lumix::Entity& e)
 	m_selected_entity = e;
 	/// TODO miki
 	clear();
-	const Lumix::Entity::ComponentList& cmps = e.getComponents();
-	for (int i = 0; i < cmps.size(); ++i)
+	if (e.isValid())
 	{
-		for(int j = 0; j < sizeof(component_map) / sizeof(component_map[0]); j += 2)
+		const Lumix::Entity::ComponentList& cmps = e.getComponents();
+		for (int i = 0; i < cmps.size(); ++i)
 		{
-			if (cmps[i].type == crc32(component_map[j + 1]))
+			for (int j = 0; j < sizeof(component_map) / sizeof(component_map[0]); j += 2)
 			{
-				m_ui->propertyList->insertTopLevelItem(0, new QTreeWidgetItem());
-				m_ui->propertyList->topLevelItem(0)->setText(0, component_map[j]);
-				break;
+				if (cmps[i].type == crc32(component_map[j + 1]))
+				{
+					m_ui->propertyList->insertTopLevelItem(0, new QTreeWidgetItem());
+					m_ui->propertyList->topLevelItem(0)->setText(0, component_map[j]);
+					break;
+				}
 			}
+			/// TODO refactor
+			if (cmps[i].type == crc32("box_rigid_actor"))
+			{
+				addProperty("box_rigid_actor", "size", "Size", Property::VEC3, NULL);
+				addProperty("box_rigid_actor", "dynamic", "Is dynamic", Property::BOOL, NULL);
+			}
+			else if (cmps[i].type == crc32("renderable"))
+			{
+				addProperty("renderable", "source", "Source", Property::FILE, "models (*.msh)");
+			}
+			else if (cmps[i].type == crc32("script"))
+			{
+				addProperty("script", "source", "Source", Property::FILE, "scripts (*.cpp)");
+				addScriptCustomProperties();
+			}
+			else if (cmps[i].type == crc32("camera"))
+			{
+				addProperty("camera", "slot", "Slot", Property::STRING, NULL);
+				addProperty("camera", "near", "Near", Property::DECIMAL, NULL);
+				addProperty("camera", "far", "Far", Property::DECIMAL, NULL);
+				addProperty("camera", "fov", "Field of view", Property::DECIMAL, NULL);
+			}
+			else if (cmps[i].type == crc32("terrain"))
+			{
+				addProperty("terrain", "material", "Material", Property::FILE, "material (*.mat)");
+				addProperty("terrain", "xz_scale", "Meter per texel", Property::DECIMAL, NULL);
+				addProperty("terrain", "y_scale", "Height scale", Property::DECIMAL, NULL);
+				addTerrainCustomProperties();
+			}
+			else if (cmps[i].type == crc32("mesh_rigid_actor"))
+			{
+				addProperty("mesh_rigid_actor", "source", "Source", Property::FILE, "Physics (*.pda)");
+			}
+			else if (cmps[i].type == crc32("physical_controller"))
+			{
+			}
+			else if (cmps[i].type == crc32("physical_heightfield"))
+			{
+				addProperty("physical_heightfield", "heightmap", "Heightmap", Property::FILE, "Heightmaps (*.tga *.raw)");
+				addProperty("physical_heightfield", "xz_scale", "Meters per pixel", Property::DECIMAL, NULL);
+				addProperty("physical_heightfield", "y_scale", "Height scale", Property::DECIMAL, NULL);
+			}
+			else if (cmps[i].type == crc32("light"))
+			{
+			}
+			else if (cmps[i].type == crc32("animable"))
+			{
+				addProperty("animable", "preview", "Preview animation", Property::FILE, "Animation (*.ani)");
+				addAnimableCustomProperties(cmps[i]);
+			}
+			else
+			{
+				ASSERT(false);
+			}
+			m_ui->propertyList->expandAll();
 		}
-		/// TODO refactor
-		if (cmps[i].type == crc32("box_rigid_actor"))
-		{
-			addProperty("box_rigid_actor", "size", "Size", Property::VEC3, NULL);
-			addProperty("box_rigid_actor", "dynamic", "Is dynamic", Property::BOOL, NULL);
-		}
-		else if (cmps[i].type == crc32("renderable"))
-		{
-			addProperty("renderable", "source", "Source", Property::FILE, "models (*.msh)");
-		}
-		else if (cmps[i].type == crc32("script"))
-		{
-			addProperty("script", "source", "Source", Property::FILE, "scripts (*.cpp)");
-			addScriptCustomProperties();
-		}
-		else if (cmps[i].type  == crc32("camera"))
-		{
-			addProperty("camera", "slot", "Slot", Property::STRING, NULL);
-			addProperty("camera", "near", "Near", Property::DECIMAL, NULL);
-			addProperty("camera", "far", "Far", Property::DECIMAL, NULL);
-			addProperty("camera", "fov", "Field of view", Property::DECIMAL, NULL);
-		}
-		else if (cmps[i].type == crc32("terrain"))
-		{
-			addProperty("terrain", "material", "Material", Property::FILE, "material (*.mat)");
-			addProperty("terrain", "xz_scale", "Meter per texel", Property::DECIMAL, NULL);
-			addProperty("terrain", "y_scale", "Height scale", Property::DECIMAL, NULL);
-			addTerrainCustomProperties();
-		}
-		else if (cmps[i].type == crc32("mesh_rigid_actor"))
-		{
-			addProperty("mesh_rigid_actor", "source", "Source", Property::FILE, "Physics (*.pda)");
-		}
-		else if (cmps[i].type == crc32("physical_controller"))
-		{
-		}
-		else if (cmps[i].type == crc32("physical_heightfield"))
-		{
-			addProperty("physical_heightfield", "heightmap", "Heightmap", Property::FILE, "Heightmaps (*.tga *.raw)");
-			addProperty("physical_heightfield", "xz_scale", "Meters per pixel", Property::DECIMAL, NULL);
-			addProperty("physical_heightfield", "y_scale", "Height scale", Property::DECIMAL, NULL);
-		}
-		else if (cmps[i].type == crc32("light"))
-		{
-		}
-		else if (cmps[i].type == crc32("animable"))
-		{
-			addProperty("animable", "preview", "Preview animation", Property::FILE, "Animation (*.ani)");
-			addAnimableCustomProperties(cmps[i]);
-		}
-		else
-		{
-			ASSERT(false);
-		}
-		m_ui->propertyList->expandAll();
+		onEntityPosition(e);
+		updateValues();
 	}
-	onEntityPosition(e);
-	updateValues();
 }
 
 void PropertyView::updateValues()

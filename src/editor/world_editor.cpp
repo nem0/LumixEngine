@@ -206,7 +206,10 @@ struct WorldEditorImpl : public WorldEditor
 			Matrix entity_mtx = hit.m_component.entity.getMatrix();
 			entity_mtx.fastInverse();
 			Vec3 local_pos = entity_mtx.multiplyPosition(hit_pos);
-			
+			float xz_scale;
+			static_cast<RenderScene*>(terrain.system)->getTerrainXZScale(terrain, xz_scale);
+			local_pos = local_pos / xz_scale;
+
 			int w = heightmap->getWidth();
 			if (heightmap->getBytesPerPixel() == 4)
 			{
