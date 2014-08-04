@@ -5,7 +5,7 @@
 #include "core/lumix.h"
 #include "core/pod_hash_map.h"
 #include "core/map.h"
-#include "core/MT/spin_mutex.h"
+#include "core/mt/spin_mutex.h"
 
 #include <crtdbg.h>
 #include <stdlib.h>

@@ -1,4 +1,4 @@
-#include "core/MT/atomic.h"
+#include "core/mt/atomic.h"
 #include <Windows.h>
 
 namespace Lumix
