@@ -1,7 +1,7 @@
 #pragma once
 
-#include "core/MT/task.h"
-#include "core/MT/event.h"
+#include "core/mt/task.h"
+#include "core/mt/event.h"
 #include "core/Array.h"
 
 namespace Lumix

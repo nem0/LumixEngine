@@ -5,7 +5,7 @@
 #include "core/fs/file_system.h"
 #include "core/net/tcp_connector.h"
 #include "core/net/tcp_stream.h"
-#include "core/MT/spin_mutex.h"
+#include "core/mt/spin_mutex.h"
 
 
 namespace Lumix
