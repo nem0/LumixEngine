@@ -725,8 +725,7 @@ namespace Lumix
 				int i = info.m_index;
 				if (m_terrains[i]->getMaterial() && m_terrains[i]->getMaterial()->isReady())
 				{
-					Vec3 rel_cam_pos = camera_pos / m_terrains[i]->getXZScale();
-					m_terrains[i]->render(renderer, pipeline, rel_cam_pos);
+					m_terrains[i]->render(renderer, pipeline, camera_pos);
 				}
 			}
 
