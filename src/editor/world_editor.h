@@ -67,6 +67,7 @@ namespace Lumix
 			virtual Path getUniversePath() const = 0;
 			virtual void addComponent(uint32_t type_crc) = 0;
 			virtual void addEntity() = 0;
+			virtual void addEntityAt(int camera_x, int camera_y) = 0;
 			virtual void snapToTerrain() = 0;
 			virtual void toggleGameMode() = 0;
 			virtual void navigate(float forward, float right, float speed) = 0;
