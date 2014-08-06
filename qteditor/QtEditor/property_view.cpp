@@ -74,9 +74,10 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 							ASSERT(false);
 							break;
 					}
+					return true;
 				}
 			}
-			return true;
+			return false;
 		}
 
 		virtual void onMouseMove(int x, int y, int /*rel_x*/, int /*rel_y*/, int /*mouse_flags*/) override
