@@ -30,12 +30,14 @@ class LUMIX_ENGINE_API Texture : public Resource
 		void addDataReference();
 		void removeDataReference();
 		void onDataUpdated();
+		void save();
 
 	private:
 		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 		bool loadDDS(FS::IFile& file);
 		bool loadTGA(FS::IFile& file);
 		bool loadRaw(FS::IFile& file);
+		void saveTGA();
 
 		virtual void doUnload(void) override;
 		virtual FS::ReadCallback getReadCallback() override;

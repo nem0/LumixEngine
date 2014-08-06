@@ -112,8 +112,18 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 		}
 
 
+		Lumix::Material* getMaterial()
+		{
+			Lumix::string material_path;
+			static_cast<Lumix::RenderScene*>(m_component.system)->getTerrainMaterial(m_component, material_path);
+			return static_cast<Lumix::Material*>(m_world_editor.getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL)->get(material_path.c_str()));
+		}
+
+
 		void addSplatWeight(Lumix::Component terrain, const Lumix::RayCastModelHit& hit)
 		{
+			if (!terrain.isValid())
+				return;
 			float radius = (float)m_terrain_brush_size;
 			float rel_amount = m_terrain_brush_strength;
 			Lumix::string material_path;
@@ -121,12 +131,15 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			Lumix::Material* material = static_cast<Lumix::Material*>(m_world_editor.getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL)->get(material_path));
 			Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
 			Lumix::Texture* splatmap = material->getTexture(material->getTextureCount() - 1);
+			Lumix::Texture* heightmap = material->getTexture(0);
 			Lumix::Matrix entity_mtx = hit.m_component.entity.getMatrix();
 			entity_mtx.fastInverse();
 			Lumix::Vec3 local_pos = entity_mtx.multiplyPosition(hit_pos);
 			float xz_scale;
 			static_cast<Lumix::RenderScene*>(terrain.system)->getTerrainXZScale(terrain, xz_scale);
 			local_pos = local_pos / xz_scale;
+			local_pos.x *= (float)splatmap->getWidth() / heightmap->getWidth();
+			local_pos.z *= (float)splatmap->getHeight() / heightmap->getHeight();
 
 			const float strengt_multiplicator = 1;
 
@@ -735,9 +748,24 @@ void PropertyView::addTerrainCustomProperties(const Lumix::Component& terrain_co
 	m_terrain_editor->m_tree_top_level = m_ui->propertyList->topLevelItem(0);
 	m_terrain_editor->m_component = terrain_component;
 
+	{
+		QWidget* widget = new QWidget();
+		QTreeWidgetItem* item = new QTreeWidgetItem(QStringList() << "Save");
+		m_ui->propertyList->topLevelItem(0)->insertChild(0, item);
+		QHBoxLayout* layout = new QHBoxLayout(widget);
+		QPushButton* height_button = new QPushButton("Heightmap", widget);
+		layout->addWidget(height_button);
+		QPushButton* texture_button = new QPushButton("Splatmap", widget);
+		layout->addWidget(texture_button);
+		layout->setContentsMargins(2, 2, 2, 2);
+		m_ui->propertyList->setItemWidget(item, 1, widget);
+		connect(height_button, &QPushButton::clicked, this, &PropertyView::on_TerrainHeightSaveClicked);
+		connect(texture_button, &QPushButton::clicked, this, &PropertyView::on_TerrainSplatSaveClicked);
+	}
+
 	QSlider* slider = new QSlider(Qt::Orientation::Horizontal);
 	QTreeWidgetItem* item = new QTreeWidgetItem(QStringList() << "Brush size");
-	m_ui->propertyList->topLevelItem(0)->insertChild(0, item);
+	m_ui->propertyList->topLevelItem(0)->insertChild(1, item);
 	m_ui->propertyList->setItemWidget(item, 1, slider);
 	slider->setMinimum(1);
 	slider->setMaximum(100);
@@ -745,7 +773,7 @@ void PropertyView::addTerrainCustomProperties(const Lumix::Component& terrain_co
 
 	slider = new QSlider(Qt::Orientation::Horizontal);
 	item = new QTreeWidgetItem(QStringList() << "Brush strength");
-	m_ui->propertyList->topLevelItem(0)->insertChild(1, item);
+	m_ui->propertyList->topLevelItem(0)->insertChild(2, item);
 	m_ui->propertyList->setItemWidget(item, 1, slider);
 	slider->setMinimum(-100);
 	slider->setMaximum(100);
@@ -753,7 +781,7 @@ void PropertyView::addTerrainCustomProperties(const Lumix::Component& terrain_co
 
 	QWidget* widget = new QWidget();
 	item = new QTreeWidgetItem(QStringList() << "Brush type");
-	m_ui->propertyList->topLevelItem(0)->insertChild(2, item);
+	m_ui->propertyList->topLevelItem(0)->insertChild(3, item);
 	QHBoxLayout* layout = new QHBoxLayout(widget);
 	QPushButton* height_button = new QPushButton("Height", widget);
 	layout->addWidget(height_button);
@@ -761,11 +789,26 @@ void PropertyView::addTerrainCustomProperties(const Lumix::Component& terrain_co
 	layout->addWidget(texture_button);
 	layout->setContentsMargins(2, 2, 2, 2);
 	m_ui->propertyList->setItemWidget(item, 1, widget);
-
 	m_terrain_editor->m_type = TerrainEditor::HEIGHT;
 	connect(height_button, &QPushButton::clicked, this, &PropertyView::on_TerrainHeightTypeClicked);
 	connect(texture_button, &QPushButton::clicked, this, &PropertyView::on_TerrainTextureTypeClicked);
+
 }
+
+
+void PropertyView::on_TerrainHeightSaveClicked()
+{
+	Lumix::Material* material = m_terrain_editor->getMaterial();
+	material->getTexture(0)->save();
+}
+
+
+void PropertyView::on_TerrainSplatSaveClicked()
+{
+	Lumix::Material* material = m_terrain_editor->getMaterial();
+	material->getTexture(material->getTextureCount() - 1)->save();
+}
+
 
 void PropertyView::on_TerrainHeightTypeClicked()
 {
@@ -782,10 +825,8 @@ void PropertyView::on_TerrainTextureTypeClicked()
 
 	QComboBox* combobox = new QComboBox();
 	QTreeWidgetItem* item = new QTreeWidgetItem(QStringList() << "Texture");
-	m_terrain_editor->m_tree_top_level->insertChild(3, item);
-	Lumix::string material_path;
-	static_cast<Lumix::RenderScene*>(m_terrain_editor->m_component.system)->getTerrainMaterial(m_terrain_editor->m_component, material_path);
-	Lumix::Material* material = static_cast<Lumix::Material*>(m_world_editor->getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL)->get(material_path.c_str()));
+	m_terrain_editor->m_tree_top_level->insertChild(4, item);
+	Lumix::Material* material = m_terrain_editor->getMaterial();
 	if (material && material->isReady())
 	{
 		for (int i = 1; i < material->getTextureCount() - 1; ++i)
