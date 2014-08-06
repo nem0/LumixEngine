@@ -72,6 +72,8 @@ private slots:
 	void on_TerrainHeightTypeClicked();
 	void on_TerrainTextureTypeClicked();
 	void on_terrainBrushTextureChanged(int value);
+	void on_TerrainHeightSaveClicked();
+	void on_TerrainSplatSaveClicked();
 
 private:
 	void clear();
