@@ -306,7 +306,7 @@ namespace Lumix
 				Vec3 p = start;
 				int hx = (int)(p.x / m_xz_scale);
 				int hz = (int)(p.z / m_xz_scale);
-				while (hx >= 0 && hz >= 0 && hx < m_width - 1 && hz < m_height - 1)
+				while (hx >= 0 && hz >= 0 && hx < m_width - 1 && hz < m_height - 1 && p.y > m_root->m_min.y && p.y < m_root->m_min.y + m_root->m_size)
 				{
 					float t;
 					float x = hx * m_xz_scale;

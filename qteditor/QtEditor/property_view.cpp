@@ -87,7 +87,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(camera_cmp.system);
 			Lumix::Vec3 origin, dir;
 			scene->getRay(camera_cmp, (float)x, (float)y, origin, dir);
-			Lumix::RayCastModelHit hit = scene->castRay(origin, dir);
+			Lumix::RayCastModelHit hit = scene->castRay(origin, dir, Lumix::Component::INVALID);
 			switch (m_type)
 			{
 				case HEIGHT:

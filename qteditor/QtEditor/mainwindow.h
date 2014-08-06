@@ -20,7 +20,7 @@ public:
 	explicit MainWindow(QWidget* parent = NULL);
 	~MainWindow();
 
-	void setWorldEditor(Lumix::WorldEditor& server);
+	void setWorldEditor(Lumix::WorldEditor& world_editor);
 	class SceneView* getSceneView() const;
 	class GameView* getGameView() const;
 	class MaterialManager* getMaterialManager() const { return m_material_manager_ui; }
@@ -38,24 +38,18 @@ private slots:
 	void on_actionAsset_Browser_triggered();
 	void on_actionScene_View_triggered();
 	virtual void closeEvent(QCloseEvent* event) override;
-
     void on_actionProfiler_triggered();
-
     void on_actionMaterial_manager_triggered();
-
     void on_actionPolygon_Mode_changed();
-
     void on_actionGame_mode_triggered();
-
     void on_actionLook_at_selected_entity_triggered();
-
     void on_actionNew_triggered();
-
     void on_actionSave_triggered();
+    void on_actionSnap_to_terrain_triggered();
 
 private:
 	Ui::MainWindow* m_ui;
-	Lumix::WorldEditor* m_server;
+	Lumix::WorldEditor* m_world_editor;
 	class LogWidget* m_log;
 	class PropertyView* m_property_view;
 	class SceneView* m_scene_view;

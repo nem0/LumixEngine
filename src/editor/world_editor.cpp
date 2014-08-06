@@ -161,7 +161,7 @@ struct WorldEditorImpl : public WorldEditor
 				Component camera_cmp = m_camera.getComponent(CAMERA_HASH);
 				RenderScene* scene = static_cast<RenderScene*>(camera_cmp.system);
 				scene->getRay(camera_cmp, (float)x, (float)y, origin, dir);
-				RayCastModelHit hit = scene->castRay(origin, dir);
+				RayCastModelHit hit = scene->castRay(origin, dir, Component::INVALID);
 				RayCastModelHit gizmo_hit = m_gizmo.castRay(origin, dir);
 				EditorIconHit icon_hit = raycastEditorIcons(origin, dir);
 				if (gizmo_hit.m_is_hit && (icon_hit.m_t < 0 || gizmo_hit.m_t < icon_hit.m_t))
@@ -275,6 +275,20 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
+		virtual void snapToTerrain() override
+		{
+			if (m_selected_entity.isValid())
+			{
+				Component renderable = m_selected_entity.getComponent(RENDERABLE_HASH);
+				RenderScene* scene = m_engine.getRenderScene();
+				RayCastModelHit hit = scene->castRay(m_selected_entity.getPosition(), Vec3(0, -1, 0), renderable);
+				if (hit.m_is_hit)
+				{
+					m_selected_entity.setPosition(hit.m_origin + hit.m_dir * hit.m_t);
+				}
+			}
+		}
+
 		virtual void addEntity() override
 		{
 			Entity e = m_engine.getUniverse()->createEntity();
@@ -282,7 +296,7 @@ struct WorldEditorImpl : public WorldEditor
 			RenderScene* scene = m_engine.getRenderScene();
 			Vec3 origin = m_camera.getPosition();
 			Vec3 dir = -m_camera.getMatrix().getZVector();
-			RayCastModelHit hit = scene->castRay(origin, dir);
+			RayCastModelHit hit = scene->castRay(origin, dir, Component::INVALID);
 			if (hit.m_is_hit)
 			{
 				e.setPosition(hit.m_origin + hit.m_dir * hit.m_t);

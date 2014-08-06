@@ -19,7 +19,7 @@ class ViewWidget : public QWidget
 
 		virtual void mousePressEvent(QMouseEvent* event) override
 		{
-			m_server->onMouseDown(event->x(), event->y(), event->button() == Qt::RightButton ? Lumix::MouseButton::RIGHT : Lumix::MouseButton::LEFT);
+			m_world_editor->onMouseDown(event->x(), event->y(), event->button() == Qt::RightButton ? Lumix::MouseButton::RIGHT : Lumix::MouseButton::LEFT);
 			m_last_x = event->x();
 			m_last_y = event->y();
 			setFocus();
@@ -30,17 +30,17 @@ class ViewWidget : public QWidget
 			int flags = 0;
 			flags |= Qt::ControlModifier & QApplication::keyboardModifiers() ? (int)Lumix::WorldEditor::MouseFlags::CONTROL : 0;
 			flags |= Qt::AltModifier & QApplication::keyboardModifiers() ? (int)Lumix::WorldEditor::MouseFlags::ALT : 0;
-			m_server->onMouseMove(event->x(), event->y(), event->x() - m_last_x, event->y() - m_last_y, flags);
+			m_world_editor->onMouseMove(event->x(), event->y(), event->x() - m_last_x, event->y() - m_last_y, flags);
 			m_last_x = event->x();
 			m_last_y = event->y();
 		}
 
 		virtual void mouseReleaseEvent(QMouseEvent* event) override
 		{
-			m_server->onMouseUp(event->x(), event->y(), event->button() == Qt::RightButton ? Lumix::MouseButton::RIGHT : Lumix::MouseButton::LEFT);
+			m_world_editor->onMouseUp(event->x(), event->y(), event->button() == Qt::RightButton ? Lumix::MouseButton::RIGHT : Lumix::MouseButton::LEFT);
 		}
 
-		Lumix::WorldEditor* m_server;
+		Lumix::WorldEditor* m_world_editor;
 		int m_last_x;
 		int m_last_y;
 };
@@ -68,10 +68,10 @@ SceneView::SceneView(QWidget* parent) :
 }
 
 
-void SceneView::setServer(Lumix::WorldEditor* server)
+void SceneView::setWorldEditor(Lumix::WorldEditor* world_editor)
 {
-	static_cast<ViewWidget*>(m_view)->m_server = server;
-	m_server = server;
+	static_cast<ViewWidget*>(m_view)->m_world_editor = world_editor;
+	m_world_editor = world_editor;
 }
 
 
@@ -97,9 +97,9 @@ void SceneView::dropEvent(QDropEvent *event)
 		QString file = list[0].toLocalFile();
 		if(file.endsWith(".msh"))
 		{
-			m_server->addEntity();
-			m_server->addComponent(crc32("renderable"));
-			m_server->setProperty("renderable", "source", file.toLatin1().data(), file.length());
+			m_world_editor->addEntity();
+			m_world_editor->addComponent(crc32("renderable"));
+			m_world_editor->setProperty("renderable", "source", file.toLatin1().data(), file.length());
 		}
 	}
 }
