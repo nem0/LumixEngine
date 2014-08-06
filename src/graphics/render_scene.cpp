@@ -656,13 +656,15 @@ namespace Lumix
 				line.m_life = life;
 			}
 
-			virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir) override
+			virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Component& ignore) override
 			{
 				RayCastModelHit hit;
 				hit.m_is_hit = false;
+				Renderable* ignore_renderable = ignore.type == RENDERABLE_HASH ? m_renderables[ignore.index] : NULL;
+				Terrain* ignore_terrain = ignore.type == TERRAIN_HASH ? m_terrains[ignore.index] : NULL;
 				for (int i = 0; i < m_renderables.size(); ++i)
 				{
-					if (m_renderables[i]->m_model.getModel())
+					if (ignore_renderable != m_renderables[i] && m_renderables[i]->m_model.getModel())
 					{
 						const Vec3& pos = m_renderables[i]->m_model.getMatrix().getTranslation();
 						float radius = m_renderables[i]->m_model.getModel()->getBoundingRadius();
@@ -683,7 +685,7 @@ namespace Lumix
 				for (int i = 0; i < m_terrains.size(); ++i)
 				{
 					RayCastModelHit terrain_hit = m_terrains[i]->castRay(origin, dir);
-					if (terrain_hit.m_is_hit && (!hit.m_is_hit || terrain_hit.m_t < hit.m_t))
+					if (terrain_hit.m_is_hit && ignore_terrain != m_terrains[i] && (!hit.m_is_hit || terrain_hit.m_t < hit.m_t))
 					{
 						terrain_hit.m_component = Component(m_terrains[i]->getEntity(), TERRAIN_HASH, this, i);
 						hit = terrain_hit;

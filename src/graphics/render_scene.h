@@ -59,7 +59,7 @@ namespace Lumix
 			virtual void serialize(ISerializer& serializer) = 0;
 			virtual void deserialize(ISerializer& serializer) = 0;
 			virtual Component createComponent(uint32_t type, const Entity& entity) = 0;
-			virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir) = 0;
+			virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Component& ignore) = 0;
 			virtual void getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) = 0;
 			virtual void applyCamera(Component camera) = 0;
 			virtual void update(float dt) = 0;

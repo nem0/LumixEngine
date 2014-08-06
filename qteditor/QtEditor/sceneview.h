@@ -16,7 +16,7 @@ class SceneView : public QDockWidget
 	Q_OBJECT
 public:
 	explicit SceneView(QWidget* parent = NULL);
-	void setServer(Lumix::WorldEditor* server);
+	void setWorldEditor(Lumix::WorldEditor* server);
 	void setPipeline(Lumix::PipelineInstance& pipeline) { m_pipeline = &pipeline; }
 	QWidget* getViewWidget() { return m_view; }
 	float getNavivationSpeed() const;
@@ -27,7 +27,7 @@ private:
 	virtual void dropEvent(QDropEvent *event) override;
 
 private:	
-	Lumix::WorldEditor* m_server;
+	Lumix::WorldEditor* m_world_editor;
 	Lumix::PipelineInstance* m_pipeline;
 	QWidget* m_view;
 	QDoubleSpinBox* m_speed_input;
