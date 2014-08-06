@@ -97,7 +97,7 @@ void SceneView::dropEvent(QDropEvent *event)
 		QString file = list[0].toLocalFile();
 		if(file.endsWith(".msh"))
 		{
-			m_world_editor->addEntity();
+			m_world_editor->addEntityAt(event->pos().x(), event->pos().y());
 			m_world_editor->addComponent(crc32("renderable"));
 			m_world_editor->setProperty("renderable", "source", file.toLatin1().data(), file.length());
 		}

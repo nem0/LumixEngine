@@ -291,12 +291,23 @@ struct WorldEditorImpl : public WorldEditor
 
 		virtual void addEntity() override
 		{
+			Component cmp = m_camera.getComponent(CAMERA_HASH);
+			float width;
+			float height;
+			m_engine.getRenderScene()->getCameraWidth(cmp, width);
+			m_engine.getRenderScene()->getCameraHeight(cmp, height);
+			addEntityAt((int)width >> 1, (int)height >> 1);
+		}
+
+		virtual void addEntityAt(int camera_x, int camera_y) override
+		{
 			Entity e = m_engine.getUniverse()->createEntity();
 
 			RenderScene* scene = m_engine.getRenderScene();
-			Vec3 origin = m_camera.getPosition();
-			Vec3 dir = -m_camera.getMatrix().getZVector();
-			RayCastModelHit hit = scene->castRay(origin, dir, Component::INVALID);
+			Vec3 origin;
+			Vec3 dir;
+			scene->getRay(m_camera.getComponent(CAMERA_HASH), (float)camera_x, (float)camera_y, origin, dir);
+				RayCastModelHit hit = scene->castRay(origin, dir, Component::INVALID);
 			if (hit.m_is_hit)
 			{
 				e.setPosition(hit.m_origin + hit.m_dir * hit.m_t);
