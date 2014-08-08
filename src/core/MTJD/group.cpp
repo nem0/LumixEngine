@@ -1,6 +1,6 @@
 #include "core/lumix.h"
 #include "core/MTJD/group.h"
-#include "core/MT/atomic.h"
+#include "core/mt/atomic.h"
 
 namespace Lumix
 {

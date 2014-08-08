@@ -1,4 +1,4 @@
-#include "core/MT/spin_mutex.h"
+#include "core/mt/spin_mutex.h"
 #include <Windows.h>
 
 namespace Lumix

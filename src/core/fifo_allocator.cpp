@@ -1,5 +1,5 @@
 #include "core/fifo_allocator.h"
-#include "core/MT/atomic.h"
+#include "core/mt/atomic.h"
 
 namespace Lumix
 {

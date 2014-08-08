@@ -32,7 +32,7 @@
 #include "graphics/renderer.h"
 #include "graphics/texture.h"
 #include "core/input_system.h"
-#include "core/MT/mutex.h"
+#include "core/mt/mutex.h"
 #include "script/script_system.h"
 #include "universe/universe.h"
 

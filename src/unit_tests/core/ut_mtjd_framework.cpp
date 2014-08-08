@@ -6,6 +6,7 @@ namespace
 {
 	const int32_t BUFFER_SIZE = 10000;
 	const int32_t TESTS_COUNT = 10;
+	const int32_t TEST_RUNS = 100;
 
 	float IN1_BUFFER[TESTS_COUNT][BUFFER_SIZE];
 	float IN2_BUFFER[TESTS_COUNT][BUFFER_SIZE];
@@ -26,6 +27,7 @@ public:
 		, m_buffer_out(buffer_out)
 		, m_size(size)
 	{
+		setJobName("TestJob");
 	}
 
 	~TestJob()
@@ -53,54 +55,57 @@ private:
 
 void UT_MTJDFrameworkTest(const char* params)
 {
-	for (int32_t i = 0; i < TESTS_COUNT; i++)
-	{
-		for (int32_t j = 0; j < BUFFER_SIZE; j++)
-		{
-			IN1_BUFFER[i][j] = (float)j;
-			IN2_BUFFER[i][j] = (float)j;
-			OUT_BUFFER[i][j] = 0;
-		}
-	}
-
 	Lumix::MTJD::Manager manager;
 
-	TestJob** jobs = LUMIX_NEW_ARRAY(TestJob*, TESTS_COUNT);
-
-	for (int32_t i = 0; i < TESTS_COUNT; i++)
+	for (size_t x = 0; x < TEST_RUNS; x++)
 	{
-		jobs[i] = LUMIX_NEW(TestJob)(IN1_BUFFER[i], IN2_BUFFER[i], OUT_BUFFER[i], BUFFER_SIZE, false, manager);
-	}
-
-	for (int32_t i = 0; i < TESTS_COUNT / 2; i += 2)
-	{
-		jobs[i]->addDependency(jobs[i + 1]);
-	}
-
-	for (int32_t i = 0; i < TESTS_COUNT; i++)
-	{
-		manager.schedule(jobs[i]);
-	}
-
-	for (int32_t i = 0; i < TESTS_COUNT; i++)
-	{
-		jobs[i]->sync();
-	}
-
-	for (int32_t i = 0; i < TESTS_COUNT; i++)
-	{
-		for (int32_t j = 0; j < BUFFER_SIZE; j++)
+		for (int32_t i = 0; i < TESTS_COUNT; i++)
 		{
-			LUMIX_EXPECT_EQ(OUT_BUFFER[i][j], (float)j + (float)j);
+			for (int32_t j = 0; j < BUFFER_SIZE; j++)
+			{
+				IN1_BUFFER[i][j] = (float)j;
+				IN2_BUFFER[i][j] = (float)j;
+				OUT_BUFFER[i][j] = 0;
+			}
 		}
-	}
 
-	for (int32_t i = 0; i < TESTS_COUNT - 1; i++)
-	{
-		LUMIX_DELETE(jobs[i]);
-	}
+		TestJob** jobs = LUMIX_NEW_ARRAY(TestJob*, TESTS_COUNT);
 
-	LUMIX_DELETE_ARRAY(jobs);
+		for (int32_t i = 0; i < TESTS_COUNT; i++)
+		{
+			jobs[i] = LUMIX_NEW(TestJob)(IN1_BUFFER[i], IN2_BUFFER[i], OUT_BUFFER[i], BUFFER_SIZE, false, manager);
+		}
+
+		for (int32_t i = 0; i < TESTS_COUNT / 2; i += 2)
+		{
+			jobs[i]->addDependency(jobs[i + 1]);
+		}
+
+		for (int32_t i = TESTS_COUNT - 1; i > -1; i--)
+		{
+			manager.schedule(jobs[i]);
+		}
+
+		for (int32_t i = 0; i < TESTS_COUNT; i++)
+		{
+			jobs[i]->sync();
+		}
+
+		for (int32_t i = 0; i < TESTS_COUNT; i++)
+		{
+			for (int32_t j = 0; j < BUFFER_SIZE; j++)
+			{
+				LUMIX_EXPECT_EQ(OUT_BUFFER[i][j], (float)j + (float)j);
+			}
+		}
+
+		for (int32_t i = 0; i < TESTS_COUNT; i++)
+		{
+			LUMIX_DELETE(jobs[i]);
+		}
+
+		LUMIX_DELETE_ARRAY(jobs);
+	}
 }
 
 void UT_MTJDFrameworkDependencyTest(const char* params)
@@ -146,7 +151,7 @@ void UT_MTJDFrameworkDependencyTest(const char* params)
 		LUMIX_EXPECT_EQ(OUT_BUFFER[0][i], (float)i * (float)(TESTS_COUNT + 1));
 	}
 
-	for (int32_t i = 0; i < TESTS_COUNT - 1; i++)
+	for (int32_t i = 0; i < TESTS_COUNT; i++)
 	{
 		LUMIX_DELETE(jobs[i]);
 	}
@@ -154,5 +159,5 @@ void UT_MTJDFrameworkDependencyTest(const char* params)
 	LUMIX_DELETE_ARRAY(jobs);
 }
 
-//REGISTER_TEST("unit_tests/core/MTJD/frameworkTest", UT_MTJDFrameworkTest, "")
-//REGISTER_TEST("unit_tests/core/MTJD/frameworkDependencyTest", UT_MTJDFrameworkDependencyTest, "")
+REGISTER_TEST("unit_tests/core/MTJD/frameworkTest", UT_MTJDFrameworkTest, "")
+REGISTER_TEST("unit_tests/core/MTJD/frameworkDependencyTest", UT_MTJDFrameworkDependencyTest, "")

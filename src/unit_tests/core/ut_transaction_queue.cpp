@@ -1,8 +1,9 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
 
-#include "core/MT/lock_free_fixed_queue.h"
-#include "core/MT/transaction.h"
-#include "core/MT/task.h"
+#include "core/mt/lock_free_fixed_queue.h"
+#include "core/mt/transaction.h"
+#include "core/mt/task.h"
+#include "core/mt/thread.h"
 
 namespace
 {
@@ -41,7 +42,7 @@ namespace
 
 				m_array[tr->data.idx].proc_count = tr->data.proc_count;
 				m_array[tr->data.idx].thread_id = tr->data.thread_id;
-				m_trans_queue->dealoc(tr, true);
+				m_trans_queue->dealoc(tr);
 			}
 			return 0;
 		}

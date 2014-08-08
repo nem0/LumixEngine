@@ -2,7 +2,7 @@
 
 
 #include "core/lumix.h"
-#include "core/MT/spin_mutex.h"
+#include "core/mt/spin_mutex.h"
 
 
 namespace Lumix
