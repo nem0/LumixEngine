@@ -10,8 +10,7 @@ namespace Ui
 
 namespace Lumix
 {
-	class EditorServer;
-	class EditorClient;
+	class WorldEditor;
 	class Event;
 	struct PropertyListEvent;
 }
@@ -23,8 +22,7 @@ class MaterialManager : public QDockWidget
 	public:
 		explicit MaterialManager(QWidget* parent = NULL);
 		~MaterialManager();
-		void setEditorServer(Lumix::EditorServer& server);
-		void setEditorClient(Lumix::EditorClient& client);
+		void setWorldEditor(Lumix::WorldEditor& server);
 		void updatePreview();
 
 	private:

@@ -19,6 +19,7 @@ namespace Lumix
 			~LogProxy();
 
 			LogProxy& operator <<(const char* message);
+			LogProxy& operator <<(float message);
 			LogProxy& operator <<(int32_t message);
 			LogProxy& operator <<(uint32_t message);
 			LogProxy& operator <<(const Path& path);

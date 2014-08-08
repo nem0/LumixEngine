@@ -3,7 +3,7 @@
 #include "core/crc32.h"
 #include "core/json_serializer.h"
 #include "core/resource_manager.h"
-#include "editor/editor_server.h"
+#include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "graphics/renderer.h"
 #include "universe/universe.h"
@@ -42,11 +42,11 @@ namespace Lumix
 	{
 		m_impl = LUMIX_NEW(AnimationSystemImpl)(engine);
 		m_impl->m_universe = 0;
-		if(engine.getEditorServer())
+		if(engine.getWorldEditor())
 		{
-			engine.getEditorServer()->registerCreator(ANIMABLE_HASH, *this);
+			engine.getWorldEditor()->registerCreator(ANIMABLE_HASH, *this);
 		}
-		engine.getEditorServer()->registerProperty("animable", LUMIX_NEW(PropertyDescriptor<AnimationSystem>)(crc32("preview"), &AnimationSystem::getPreview, &AnimationSystem::setPreview, IPropertyDescriptor::FILE));
+		engine.getWorldEditor()->registerProperty("animable", LUMIX_NEW(PropertyDescriptor<AnimationSystem>)(crc32("preview"), &AnimationSystem::getPreview, &AnimationSystem::setPreview, IPropertyDescriptor::FILE));
 		return true;
 	}
 
@@ -176,6 +176,24 @@ namespace Lumix
 	}
 
 
+	void AnimationSystem::setFrame(Component cmp, int frame)
+	{
+		m_impl->m_animables[cmp.index].m_time = m_impl->m_animables[cmp.index].m_animation->getLength() * frame / 30.0f; /// TODO get rid of the constant
+	}
+
+
+	bool AnimationSystem::isManual(Component cmp)
+	{
+		return m_impl->m_animables[cmp.index].m_manual;
+	}
+
+
+	void AnimationSystem::setManual(Component cmp, bool is_manual)
+	{
+		m_impl->m_animables[cmp.index].m_manual = is_manual;
+	}
+
+
 	void AnimationSystem::getPreview(Component cmp, string& path)
 	{
 		path = m_impl->m_animables[cmp.index].m_animation ? m_impl->m_animables[cmp.index].m_animation->getPath().c_str() : "";
@@ -196,11 +214,23 @@ namespace Lumix
 	}
 
 
-	void AnimationSystem::setAnimationTime(const Component& cmp, float time)
+	void AnimationSystem::setAnimationFrame(const Component& cmp, int frame)
 	{
-		m_impl->m_animables[cmp.index].m_time = time;
+		if (m_impl->m_animables[cmp.index].m_animation)
+		{
+			m_impl->m_animables[cmp.index].m_time = m_impl->m_animables[cmp.index].m_animation->getLength() * frame / m_impl->m_animables[cmp.index].m_animation->getFrameCount();
+		}
 	}
 
+
+	int AnimationSystem::getFrameCount(const Component& cmp) const
+	{
+		if (m_impl->m_animables[cmp.index].m_animation)
+		{
+			return m_impl->m_animables[cmp.index].m_animation->getFrameCount();
+		}
+		return -1;
+	}
 
 	void AnimationSystem::update(float time_delta)
 	{
@@ -209,17 +239,20 @@ namespace Lumix
 		for(int i = 0, c = m_impl->m_animables.size(); i < c; ++i)
 		{
 			AnimationSystemImpl::Animable& animable = m_impl->m_animables[i];
-			if(!animable.m_manual && animable.m_animation->isReady())
+			if (animable.m_animation && animable.m_animation->isReady())
 			{
 				RenderScene* scene = static_cast<RenderScene*>(animable.m_renderable.system);
 				animable.m_animation->getPose(animable.m_time, scene->getPose(animable.m_renderable), *scene->getModel(animable.m_renderable));
-				float t = animable.m_time + time_delta;
-				float l = animable.m_animation->getLength();
-				while(t > l)
+				if (!animable.m_manual)
 				{
-					t -= l;
+					float t = animable.m_time + time_delta;
+					float l = animable.m_animation->getLength();
+					while (t > l)
+					{
+						t -= l;
+					}
+					animable.m_time = t;
 				}
-				animable.m_time = t;
 			}
 		}
 	}

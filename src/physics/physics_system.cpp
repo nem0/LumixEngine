@@ -5,7 +5,7 @@
 #include "cooking/PxCooking.h"
 #include "core/crc32.h"
 #include "core/log.h"
-#include "editor/editor_server.h"
+#include "editor/world_editor.h"
 #include "editor/property_descriptor.h"
 #include "engine/engine.h"
 #include "physics/physics_scene.h"
@@ -121,16 +121,16 @@ class AssertNullAllocator : public physx::PxAllocatorCallback
 
 bool PhysicsSystem::create(Engine& engine)
 {
-	engine.getEditorServer()->registerProperty("box_rigid_actor", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("dynamic"), &PhysicsScene::getIsDynamic, &PhysicsScene::setIsDynamic));
-	engine.getEditorServer()->registerProperty("box_rigid_actor", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("size"), &PhysicsScene::getHalfExtents, &PhysicsScene::setHalfExtents));
-	engine.getEditorServer()->registerProperty("mesh_rigid_actor", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("source"), &PhysicsScene::getShapeSource, &PhysicsScene::setShapeSource, IPropertyDescriptor::FILE));
-	engine.getEditorServer()->registerProperty("physical_heightfield", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("heightmap"), &PhysicsScene::getHeightmap, &PhysicsScene::setHeightmap, IPropertyDescriptor::FILE));
-	engine.getEditorServer()->registerProperty("physical_heightfield", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("xz_scale"), &PhysicsScene::getHeightmapXZScale, &PhysicsScene::setHeightmapXZScale));
-	engine.getEditorServer()->registerProperty("physical_heightfield", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("y_scale"), &PhysicsScene::getHeightmapYScale, &PhysicsScene::setHeightmapYScale));
-	engine.getEditorServer()->registerCreator(HEIGHTFIELD_HASH, *this);
-	engine.getEditorServer()->registerCreator(BOX_ACTOR_HASH, *this);
-	engine.getEditorServer()->registerCreator(MESH_ACTOR_HASH, *this);
-	engine.getEditorServer()->registerCreator(CONTROLLER_HASH, *this);
+	engine.getWorldEditor()->registerProperty("box_rigid_actor", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("dynamic"), &PhysicsScene::getIsDynamic, &PhysicsScene::setIsDynamic));
+	engine.getWorldEditor()->registerProperty("box_rigid_actor", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("size"), &PhysicsScene::getHalfExtents, &PhysicsScene::setHalfExtents));
+	engine.getWorldEditor()->registerProperty("mesh_rigid_actor", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("source"), &PhysicsScene::getShapeSource, &PhysicsScene::setShapeSource, IPropertyDescriptor::FILE));
+	engine.getWorldEditor()->registerProperty("physical_heightfield", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("heightmap"), &PhysicsScene::getHeightmap, &PhysicsScene::setHeightmap, IPropertyDescriptor::FILE));
+	engine.getWorldEditor()->registerProperty("physical_heightfield", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("xz_scale"), &PhysicsScene::getHeightmapXZScale, &PhysicsScene::setHeightmapXZScale));
+	engine.getWorldEditor()->registerProperty("physical_heightfield", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("y_scale"), &PhysicsScene::getHeightmapYScale, &PhysicsScene::setHeightmapYScale));
+	engine.getWorldEditor()->registerCreator(HEIGHTFIELD_HASH, *this);
+	engine.getWorldEditor()->registerCreator(BOX_ACTOR_HASH, *this);
+	engine.getWorldEditor()->registerCreator(MESH_ACTOR_HASH, *this);
+	engine.getWorldEditor()->registerCreator(CONTROLLER_HASH, *this);
 
 	m_impl = LUMIX_NEW(PhysicsSystemImpl);
 	m_impl->m_allocator = LUMIX_NEW(AssertNullAllocator)();

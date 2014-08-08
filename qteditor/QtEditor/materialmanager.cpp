@@ -12,9 +12,7 @@
 #include "core/json_serializer.h"
 #include "core/log.h"
 #include "core/profiler.h"
-#include "editor/editor_server.h"
-#include "editor/editor_client.h"
-#include "editor/server_message_types.h"
+#include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "graphics/material.h"
 #include "graphics/model.h"
@@ -82,27 +80,7 @@ void MaterialManager::fillObjectMaterials()
 	}
 }
 
-void MaterialManager::onPropertyList(Lumix::PropertyListEvent& event)
-{
-	if (event.type_hash == crc32("renderable"))
-	{
-		for (int i = 0; i < event.properties.size(); ++i)
-		{
-			if (event.properties[i].name_hash == crc32("source"))
-			{	
-				m_impl->m_selected_object_model = static_cast<Lumix::Model*>(m_impl->m_engine->getResourceManager().get(Lumix::ResourceManager::MODEL)->get((char*)event.properties[i].data));
-				fillObjectMaterials();
-			}
-		}
-	}
-}
-
-void MaterialManager::setEditorClient(Lumix::EditorClient& client)
-{
-	client.propertyListReceived().bind<MaterialManager, &MaterialManager::onPropertyList>(this);
-}
-
-void MaterialManager::setEditorServer(Lumix::EditorServer& server)
+void MaterialManager::setWorldEditor(Lumix::WorldEditor& server)
 {
 	ASSERT(m_impl->m_engine == NULL);
 	HWND hwnd = (HWND)m_ui->previewWidget->winId();
@@ -136,7 +114,7 @@ void MaterialManager::setEditorServer(Lumix::EditorServer& server)
 	m_ui->previewWidget->setAttribute(Qt::WA_PaintOnScreen);
 	m_ui->previewWidget->m_render_device = m_impl->m_render_device;
 	m_ui->previewWidget->m_engine = m_impl->m_engine;
-	/// TODO refactor (EditorServer::create)
+	/// TODO refactor (WorldEditor::create)
 	HDC hdc;
 	hdc = GetDC(hwnd);
 	ASSERT(hdc != NULL);
@@ -385,7 +363,7 @@ void MaterialManager::on_saveMaterialButton_clicked()
 	char tmp_path[LUMIX_MAX_PATH];
 	strcpy(tmp_path, m_impl->m_material->getPath().c_str());
 	strcat(tmp_path, ".tmp");
-	Lumix::FS::IFile* file = fs.open(fs.getDefaultDevice(), tmp_path, Lumix::FS::Mode::RECREATE | Lumix::FS::Mode::WRITE);
+	Lumix::FS::IFile* file = fs.open(fs.getDefaultDevice(), tmp_path, Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE);
 	if(file)
 	{
 		Lumix::JsonSerializer serializer(*file, Lumix::JsonSerializer::AccessMode::WRITE, m_impl->m_material->getPath().c_str());

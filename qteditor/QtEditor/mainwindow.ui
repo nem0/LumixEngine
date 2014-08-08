@@ -81,6 +81,7 @@
     </property>
     <addaction name="actionGame_mode"/>
     <addaction name="actionCompile_scripts"/>
+    <addaction name="actionSnap_to_terrain"/>
    </widget>
    <widget class="QMenu" name="menuEntity">
     <property name="title">
@@ -216,6 +217,14 @@
    </property>
    <property name="shortcut">
     <string>Ctrl+Tab</string>
+   </property>
+  </action>
+  <action name="actionSnap_to_terrain">
+   <property name="text">
+    <string>Snap to terrain</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+T</string>
    </property>
   </action>
  </widget>

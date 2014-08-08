@@ -5,7 +5,7 @@
 #include "core/fs/file_system.h"
 #include "core/fs/tcp_file_server.h"
 #include "core/fs/file_events_device.h"
-#include "editor/editor_server.h"
+#include "editor/world_editor.h"
 
 namespace
 {
@@ -120,14 +120,14 @@ void FileServerWidget::emitFileEvent(const Lumix::FS::Event& event, qint64 time)
 }
 
 
-void FileServerWidget::setEditorServer(Lumix::EditorServer& server)
+void FileServerWidget::setWorldEditor(Lumix::WorldEditor& server)
 {
 	m_server = &server;
 
 	Lumix::FS::FileEventsDevice& dev = m_watcher->getFileEventDevice();
 	Lumix::FS::FileSystem& fs = m_server->getEngine().getFileSystem();
 	fs.mount(&dev);
-	fs.setDefaultDevice("memory:events:tcp");
+	fs.setDefaultDevice("memory:events:disk");
 }
 
 

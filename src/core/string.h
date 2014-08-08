@@ -166,6 +166,15 @@ class base_string
 		}
 
 		template<>
+		base_string<T, Allocator>& cat<float>(float value)
+		{
+			char tmp[40];
+			toCString(value, tmp, 30, 10);
+			*this += tmp;
+			return *this;
+		}
+
+		template<>
 		base_string<T, Allocator>& cat<char*>(char* value)
 		{
 			*this += value;

@@ -43,6 +43,8 @@ class ProfileModel : public QAbstractItemModel
 
 		struct Block
 		{
+			Block();
+
 			const char* m_name;
 			const char* m_function;
 			Block* m_parent;
