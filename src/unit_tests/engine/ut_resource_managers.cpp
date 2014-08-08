@@ -1,9 +1,11 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
 
-#include "core/FS/ifile.h"
+#include "core/fs/ifile.h"
 #include "core/fs/file_system.h"
 #include "core/fs/memory_file_device.h"
 #include "core/fs/disk_file_device.h"
+
+#include "core/mt/thread.h"
 
 #include "core/resource_manager.h"
 #include "core/resource.h"

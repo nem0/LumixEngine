@@ -2,12 +2,12 @@
 
 #include "core/array.h"
 #include "core/free_list.h"
-#include "core/os_file.h"
 #include "core/path.h"
 #include "core/static_array.h"
 #include "core/string.h"
+#include "core/fs/os_file.h"
 #include "core/fs/tcp_file_device.h"
-#include "core/MT/task.h"
+#include "core/mt/task.h"
 #include "core/net/tcp_acceptor.h"
 #include "core/net/tcp_stream.h"
 

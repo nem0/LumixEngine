@@ -1,5 +1,6 @@
 #include "core/new_macros.h"
 #include "core/memory_tracker.h"
+#include "core/mt/task.h"
 
 namespace Lumix 
 {

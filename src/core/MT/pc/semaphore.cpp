@@ -1,4 +1,4 @@
-#include "core/MT/semaphore.h"
+#include "core/mt/semaphore.h"
 #include <Windows.h>
 #include <cassert>
 
