@@ -63,19 +63,10 @@
     <ClCompile Include="..\..\..\src\engine\plugin_manager.cpp">
       <Filter>engine</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\editor\editor_client.cpp">
-      <Filter>editor</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\editor\editor_icon.cpp">
       <Filter>editor</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\editor\editor_server.cpp">
-      <Filter>editor</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\editor\gizmo.cpp">
-      <Filter>editor</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\editor\server_message_types.cpp">
       <Filter>editor</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\universe\component.cpp">
@@ -105,6 +96,9 @@
     </ClCompile>
     <ClCompile Include="..\..\..\src\graphics\terrain.cpp">
       <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\editor\world_editor.cpp">
+      <Filter>editor</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -162,25 +156,13 @@
     <ClInclude Include="..\..\..\src\engine\plugin_manager.h">
       <Filter>engine</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\editor\client_message_types.h">
-      <Filter>editor</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\editor\editor_client.h">
-      <Filter>editor</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\editor\editor_icon.h">
-      <Filter>editor</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\editor\editor_server.h">
       <Filter>editor</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\editor\gizmo.h">
       <Filter>editor</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\editor\property_descriptor.h">
-      <Filter>editor</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\editor\server_message_types.h">
       <Filter>editor</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\universe\component.h">
@@ -209,6 +191,9 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\graphics\terrain.h">
       <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\editor\world_editor.h">
+      <Filter>editor</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

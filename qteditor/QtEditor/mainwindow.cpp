@@ -3,8 +3,7 @@
 #include <qfiledialog.h>
 #include <qsettings.h>
 #include "assetbrowser.h"
-#include "editor/editor_client.h"
-#include "editor/editor_server.h"
+#include "editor/world_editor.h"
 #include "fileserverwidget.h"
 #include "gameview.h"
 #include "log_widget.h"
@@ -19,7 +18,6 @@ MainWindow::MainWindow(QWidget* parent) :
 	QMainWindow(parent),
 	m_ui(new Ui::MainWindow)
 {
-	m_client = NULL;
 	m_ui->setupUi(this);
 	m_ui->centralWidget->hide();
 	setDockOptions(AllowNestedDocks | AnimatedDocks | AllowTabbedDocks);
@@ -76,23 +74,14 @@ MainWindow::~MainWindow()
 }
 
 
-void MainWindow::setEditorServer(Lumix::EditorServer& server)
+void MainWindow::setWorldEditor(Lumix::WorldEditor& server)
 {
-	m_file_server_ui->setEditorServer(server);
-	m_asset_browser->setEditorServer(server);
-	m_material_manager_ui->setEditorServer(server);
+	m_world_editor = &server;
+	m_file_server_ui->setWorldEditor(server);
+	m_asset_browser->setWorldEditor(server);
+	m_material_manager_ui->setWorldEditor(server);
+	m_property_view->setWorldEditor(server);
 }
-
-void MainWindow::setEditorClient(Lumix::EditorClient& client)
-{
-	m_client = &client;
-	m_property_view->setEditorClient(client);
-	m_scene_view->setEditorClient(client);
-	m_asset_browser->setEditorClient(client);
-	m_game_view->setEditorClient(client);
-	m_material_manager_ui->setEditorClient(client);
-}
-
 
 GameView* MainWindow::getGameView() const
 {
@@ -111,43 +100,28 @@ void MainWindow::on_actionLog_triggered()
 	m_log->show();
 }
 
+
 void MainWindow::on_actionOpen_triggered()
 {
 	QByteArray path = QFileDialog::getOpenFileName(NULL, QString(), QString(), "universe (*.unv)").toLocal8Bit();
-	int len = (int)strlen(m_client->getBasePath());
 	if (!path.isEmpty())
 	{
-		if (strncmp(path.data(), m_client->getBasePath(), len) == 0)
-		{
-			m_client->loadUniverse(path.data() + len);
-		}
-		else
-		{
-			m_client->loadUniverse(path.data());
-		}
+		m_world_editor->loadUniverse(path.data());
 	}
 }
 
 void MainWindow::on_actionSave_As_triggered()
 {
 	QByteArray path = QFileDialog::getSaveFileName().toLocal8Bit();
-	int len = (int)strlen(m_client->getBasePath());
 	if (!path.isEmpty())
 	{
-		if (strncmp(path.data(), m_client->getBasePath(), len) == 0)
-		{
-			m_client->saveUniverse(path.data() + len);
-		}
-		else
-		{
-			m_client->saveUniverse(path.data());
-		}
+		m_world_editor->saveUniverse(path.data());
 	}
 }
 
 void MainWindow::on_actionCreate_triggered()
 {
-	m_client->addEntity();
+	m_world_editor->addEntity();
 }
 
 void MainWindow::on_actionProperties_triggered()
@@ -197,15 +171,37 @@ void MainWindow::on_actionMaterial_manager_triggered()
 
 void MainWindow::on_actionPolygon_Mode_changed()
 {
-	m_client->setWireframe(m_ui->actionPolygon_Mode->isChecked());
+	m_world_editor->setWireframe(m_ui->actionPolygon_Mode->isChecked());
 }
 
 void MainWindow::on_actionGame_mode_triggered()
 {
-	m_client->toggleGameMode();
+	m_world_editor->toggleGameMode();
 }
 
 void MainWindow::on_actionLook_at_selected_entity_triggered()
 {
-	m_client->lookAtSelected();
+	m_world_editor->lookAtSelected();
+}
+
+void MainWindow::on_actionNew_triggered()
+{
+	m_world_editor->newUniverse();
+}
+
+void MainWindow::on_actionSave_triggered()
+{
+	if (m_world_editor->getUniversePath()[0] == '\0')
+	{
+		on_actionSave_As_triggered();
+	}
+	else
+	{
+		m_world_editor->saveUniverse(m_world_editor->getUniversePath());
+	}
+}
+
+void MainWindow::on_actionSnap_to_terrain_triggered()
+{
+	m_world_editor->snapToTerrain();
 }

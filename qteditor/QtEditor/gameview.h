@@ -6,7 +6,7 @@
 
 namespace Lumix
 {
-	class EditorClient;
+	class WorldEditor;
 	class PipelineInstance;
 }
 
@@ -25,7 +25,6 @@ public:
 
 	QWidget* getContentWidget() const;
 	void setPipeline(Lumix::PipelineInstance& pipeline) { m_pipeline = &pipeline; }
-	void setEditorClient(Lumix::EditorClient& client) { m_client = &client; }
 
 private slots:
 	void on_playButton_clicked();
@@ -36,6 +35,6 @@ private:
 private:
 	Ui::GameView* m_ui;
 	Lumix::PipelineInstance* m_pipeline;
-	Lumix::EditorClient* m_client;
+	Lumix::WorldEditor* m_server;
 };
 

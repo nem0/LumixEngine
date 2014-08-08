@@ -3,6 +3,16 @@
 #include <qpainter.h>
 #include <qpixmap.h>
 
+static const int MAX_FRAMES = 200;
+
+ProfileModel::Block::Block()
+{
+	m_frames.reserve(MAX_FRAMES);
+	for(int i = 0; i < MAX_FRAMES; ++i)
+	{
+		m_frames.push_back(0);
+	}
+}
 
 
 ProfileModel::ProfileModel()
@@ -16,7 +26,7 @@ void ProfileModel::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bl
 {
 	ASSERT(my_block->m_name == remote_block->m_name);
 	my_block->m_frames.push_back(remote_block->getLength());
-	if(my_block->m_frames.size() > 200)
+	if (my_block->m_frames.size() > MAX_FRAMES)
 	{
 		my_block->m_frames.pop_front();
 	}
@@ -49,9 +59,10 @@ void ProfileModel::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bl
 	{
 		Lumix::Profiler::Block* remote_child = remote_block->m_first_child;
 		Block* my_child = my_block->m_first_child;
+		Block* prev_my_child = NULL;
 		while(remote_child)
 		{
-			if(my_child->m_name != remote_child->m_name && my_child->m_function != remote_child->m_function)
+			if(my_child->m_name != remote_child->m_name || my_child->m_function != remote_child->m_function)
 			{
 				Block* new_child = new Block;
 				new_child->m_function = remote_child->m_function;
@@ -59,14 +70,20 @@ void ProfileModel::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bl
 				new_child->m_parent = my_block;
 				new_child->m_next = my_child;
 				new_child->m_first_child = NULL;
-				my_child = new_child;
-				if(my_child == my_block->m_first_child)
+				new_child->m_next = my_child;
+				if (my_child == my_block->m_first_child)
 				{
 					my_block->m_first_child = new_child;
 				}
+				else 
+				{
+					prev_my_child->m_next = new_child;
+				}
+				my_child = new_child;
 			}
 			cloneBlock(my_child, remote_child);
 			remote_child = remote_child->m_next;
+			prev_my_child = my_child;
 			my_child = my_child->m_next;
 		}
 	}
@@ -82,6 +99,7 @@ void ProfileModel::onFrame()
 		m_root->m_parent = NULL;
 		m_root->m_next = NULL;
 		m_root->m_first_child = NULL;
+
 	}
 	if(m_root)
 	{

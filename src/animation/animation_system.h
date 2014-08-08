@@ -33,12 +33,16 @@ namespace Lumix
 			virtual Component createComponent(uint32_t, const Entity&) override;
 			virtual const char* getName() const override { return "animation"; }
 
+			void setFrame(Component cmp, int frame);
+			bool isManual(Component cmp);
+			void setManual(Component cmp, bool is_manual);
 			void getPreview(Component cmp, string& path);
 			void setPreview(Component cmp, const string& path);
 			void destroy();
 			Component createAnimable(const Entity& entity);
 			void playAnimation(const Component& cmp, const char* path);
-			void setAnimationTime(const Component& cmp, float time);
+			void setAnimationFrame(const Component& cmp, int frame);
+			int getFrameCount(const Component& cmp) const;
 			Animation* loadAnimation(const char* path);
 
 		private:

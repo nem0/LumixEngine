@@ -4,12 +4,13 @@
 #include <QDockWidget>
 #include "core/array.h"
 #include "core/string.h"
+#include "universe/entity.h"
 
 namespace Lumix
 {
-	class EditorClient;
-	struct EntityPositionEvent;
-	struct EntitySelectedEvent;
+	struct Component;
+	class WorldEditor;
+	struct Entity;
 	class Event;
 	class Path;
 	struct PropertyListEvent;
@@ -52,8 +53,7 @@ public:
 public:
 	explicit PropertyView(QWidget* parent = NULL);
 	~PropertyView();
-	void setEditorClient(Lumix::EditorClient& client);
-	Lumix::EditorClient* getEditorClient();
+	void setWorldEditor(Lumix::WorldEditor& server);
 	void setScriptCompiler(ScriptCompiler* compiler);
 
 private slots:
@@ -65,24 +65,38 @@ private slots:
 	void on_browseFilesClicked();
 	void on_compileScriptClicked();
 	void on_editScriptClicked();
+	void on_animablePlayPause();
+	void on_animableTimeSet(int value);
+	void on_terrainBrushSizeChanged(int value);
+	void on_terrainBrushStrengthChanged(int value);
+	void on_TerrainHeightTypeClicked();
+	void on_TerrainTextureTypeClicked();
+	void on_terrainBrushTextureChanged(int value);
+	void on_TerrainHeightSaveClicked();
+	void on_TerrainSplatSaveClicked();
 
 private:
 	void clear();
-	void onPropertyList(Lumix::PropertyListEvent& event);
-	void onEntitySelected(Lumix::EntitySelectedEvent& event);
-	void onEntityPosition(Lumix::EntityPositionEvent& e);
+	void onUniverseCreated();
+	void onUniverseDestroyed();
+	void onEntitySelected(Lumix::Entity& e);
+	void onEntityPosition(Lumix::Entity& e);
 	void addProperty(const char* component, const char* name, const char* label, Property::Type type, const char* file_type);
-	void onPropertyValue(Property* property, void* data, int32_t data_size);
+	void onPropertyValue(Property* property, const void* data, int32_t data_size);
 	void addScriptCustomProperties();
+	void addAnimableCustomProperties(const Lumix::Component& cmp);
+	void addTerrainCustomProperties(const Lumix::Component& terrain_component);
 	void onScriptCompiled(const Lumix::Path& path, uint32_t status);
 	void setScriptStatus(uint32_t status);
+	void updateValues();
 
 private:
 	Ui::PropertyView* m_ui;
-	Lumix::EditorClient* m_client;
 	Lumix::Array<Property*> m_properties;
 	ScriptCompiler* m_compiler;
-	int m_selected_entity_index;
+	Lumix::Entity m_selected_entity;
+	Lumix::WorldEditor* m_world_editor;
+	class TerrainEditor* m_terrain_editor;
 };
 
 

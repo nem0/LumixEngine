@@ -5,8 +5,7 @@
 
 namespace Lumix
 {
-	class EditorClient;
-	class EditorServer;
+	class WorldEditor;
 	class PipelineInstance;
 }
 
@@ -17,8 +16,7 @@ class SceneView : public QDockWidget
 	Q_OBJECT
 public:
 	explicit SceneView(QWidget* parent = NULL);
-	void setEditorClient(Lumix::EditorClient& client);
-	void setServer(Lumix::EditorServer* server) { m_server = server; }
+	void setWorldEditor(Lumix::WorldEditor* server);
 	void setPipeline(Lumix::PipelineInstance& pipeline) { m_pipeline = &pipeline; }
 	QWidget* getViewWidget() { return m_view; }
 	float getNavivationSpeed() const;
@@ -29,8 +27,7 @@ private:
 	virtual void dropEvent(QDropEvent *event) override;
 
 private:	
-	Lumix::EditorClient* m_client;
-	Lumix::EditorServer* m_server;
+	Lumix::WorldEditor* m_world_editor;
 	Lumix::PipelineInstance* m_pipeline;
 	QWidget* m_view;
 	QDoubleSpinBox* m_speed_input;
