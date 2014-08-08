@@ -70,14 +70,13 @@ void ProfileModel::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bl
 				new_child->m_parent = my_block;
 				new_child->m_next = my_child;
 				new_child->m_first_child = NULL;
-				if(my_child == my_block->m_first_child)
+				new_child->m_next = my_child;
+				if (my_child == my_block->m_first_child)
 				{
 					my_block->m_first_child = new_child;
-					new_child->m_next = my_child;
 				}
 				else 
 				{
-					new_child->m_next = my_child;
 					prev_my_child->m_next = new_child;
 				}
 				my_child = new_child;

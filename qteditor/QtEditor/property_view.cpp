@@ -154,14 +154,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 				int to_z = Lumix::Math::minValue((int)(local_pos.z + radius), splatmap->getHeight());
 
 				float amount = rel_amount * 255 * strengt_multiplicator;
-				if (amount > 0)
-				{
-					amount = Lumix::Math::maxValue(amount, 1.1f);
-				}
-				else
-				{
-					amount = Lumix::Math::minValue(amount, -1.1f);
-				}
+				amount = amount > 0 ? Lumix::Math::maxValue(amount, 1.1f) : Lumix::Math::minValue(amount, -1.1f);
 
 				for (int i = from_x, end = to_x; i < end; ++i)
 				{
