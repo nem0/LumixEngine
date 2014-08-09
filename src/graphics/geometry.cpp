@@ -34,10 +34,15 @@ void VertexDef::parse(const char* data, int size)
 				break;
 			case 'i':
 				++i;
-				if(data[i] == '4')
+				if (data[i] == '4')
 				{
 					m_attributes[index] = VertexAttributeDef::INT4;
 					m_vertex_size += 4 * sizeof(int);
+				}
+				else if (data[i] == '1')
+				{
+					m_attributes[index] = VertexAttributeDef::INT1;
+					m_vertex_size += sizeof(int);
 				}
 				else
 				{
@@ -82,6 +87,9 @@ int VertexDef::getPositionOffset() const
 				break;
 			case VertexAttributeDef::INT4:
 				offset += 4 * sizeof(int);
+				break;
+			case VertexAttributeDef::INT1:
+				offset += sizeof(int);
 				break;
 			case VertexAttributeDef::POSITION:
 				return offset;
@@ -139,7 +147,13 @@ void VertexDef::begin(Shader& shader)
 			case VertexAttributeDef::INT4:
 				glEnableVertexAttribArray(shader.getAttribId(shader_attrib_idx));
 				glVertexAttribPointer(shader.getAttribId(shader_attrib_idx), 4, GL_INT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
-				offset += sizeof(GLint) * 4;
+				offset += sizeof(GLint)* 4;
+				++shader_attrib_idx;
+				break;
+			case VertexAttributeDef::INT1:
+				glEnableVertexAttribArray(shader.getAttribId(shader_attrib_idx));
+				glVertexAttribPointer(shader.getAttribId(shader_attrib_idx), 1, GL_INT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
+				offset += sizeof(GLint)* 1;
 				++shader_attrib_idx;
 				break;
 			default:
@@ -167,6 +181,7 @@ void VertexDef::end(Shader& shader)
 			case VertexAttributeDef::TEXTURE_COORDS:
 				glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 				break;
+			case VertexAttributeDef::INT1:
 			case VertexAttributeDef::INT4:
 			case VertexAttributeDef::FLOAT4:
 			case VertexAttributeDef::FLOAT2:
@@ -221,6 +236,59 @@ Geometry::~Geometry()
 }
 
 
+void Geometry::copy(const Geometry& source, int times)
+{
+	/// TODO this is only suitable for grass
+	ASSERT(!source.m_indices.empty());
+	bool has_matrix_index_attribute = source.m_vertex_definition.getAttributeType(3) == VertexAttributeDef::INT1;
+	ASSERT(has_matrix_index_attribute);
+	m_vertex_definition = source.m_vertex_definition;
+
+	glBindBuffer(GL_ARRAY_BUFFER, source.m_id);
+	uint8_t* data = (uint8_t*)glMapBuffer(GL_ARRAY_BUFFER, GL_READ_ONLY);
+	Array<uint8_t> data_copy;
+	int one_size = m_vertex_definition.getVertexSize() * source.getVertices().size();
+	data_copy.resize(one_size * times);
+	int vertex_size = m_vertex_definition.getVertexSize();
+	const int i1_offset = 3 * sizeof(float)+3 * sizeof(float)+2 * sizeof(float);
+	for (int i = 0; i < times; ++i)
+	{
+		memcpy(&data_copy[i * one_size], data, one_size);
+		for (int j = 0; j < source.getVertices().size(); ++j)
+		{
+			data_copy[i * one_size + j * vertex_size + i1_offset] = (uint8_t)i;
+		}
+	}
+	glUnmapBuffer(GL_ARRAY_BUFFER);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, source.m_indices_id);
+	data = (uint8_t*)glMapBuffer(GL_ELEMENT_ARRAY_BUFFER, GL_READ_ONLY);
+	Array<int> indices_data_copy;
+	int indices_count = source.getIndices().size();
+	indices_data_copy.resize(indices_count * times);
+	int index_offset = source.getVertices().size();
+	for (int i = 0; i < times; ++i)
+	{
+		memcpy(&indices_data_copy[i * indices_count], data, sizeof(int) * indices_count);
+		for (int j = 0, c = indices_count; j < c; ++j)
+		{
+			indices_data_copy[i * indices_count + j] += index_offset * i;
+		}
+	}
+	glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	
+	glBindBuffer(GL_ARRAY_BUFFER, m_id);
+	glBufferData(GL_ARRAY_BUFFER, data_copy.size() * sizeof(data_copy[0]), &data_copy[0], GL_STATIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_indices_id);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices_data_copy.size() * sizeof(indices_data_copy[0]), &indices_data_copy[0], GL_STATIC_DRAW);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+}
+
+
 void Geometry::copy(const uint8_t* data, int size, const Array<int32_t>& indices, VertexDef vertex_definition)
 {
 	m_vertex_definition = vertex_definition;
@@ -236,7 +304,6 @@ void Geometry::copy(const uint8_t* data, int size, const Array<int32_t>& indices
 	{
 		m_indices[i] = indices[i];
 	}
-	m_indices_count = indices.size();
 	glBindBuffer(GL_ARRAY_BUFFER, m_id);
 	glBufferData(GL_ARRAY_BUFFER, size, data, GL_STATIC_DRAW);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);

@@ -546,6 +546,30 @@ struct PipelineInstanceImpl : public PipelineInstance
 		glEnd();
 	}
 
+	void renderGrass()
+	{
+		if (m_active_camera.isValid())
+		{
+			static Array<GrassInfo> grass_info;
+			grass_info.clear();
+			m_scene->getGrassInfos(grass_info);
+			for (int i = 0; i < grass_info.size(); ++i)
+			{
+				grass_info[i].m_mesh->getMaterial()->apply(*m_renderer, *this);
+				Shader* shader = grass_info[i].m_mesh->getMaterial()->getShader();
+				shader->setUniform("shadowmap_matrix0", m_shadow_modelviewprojection[0]);
+				shader->setUniform("shadowmap_matrix1", m_shadow_modelviewprojection[1]);
+				shader->setUniform("shadowmap_matrix2", m_shadow_modelviewprojection[2]);
+				shader->setUniform("shadowmap_matrix3", m_shadow_modelviewprojection[3]);
+				shader->setUniform("light_dir", m_light_dir);
+				shader->setUniform("grass_matrices", grass_info[i].m_matrices, 50); /// TODO get rid of the constant
+
+				Mesh& mesh = *grass_info[i].m_mesh;
+				grass_info[i].m_geometry->draw(mesh.getStart(), mesh.getCount(), *shader);
+			}
+		}
+	}
+
 	void renderTerrains(int64_t layer_mask)
 	{
 		if (m_active_camera.isValid())
@@ -560,6 +584,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 					Matrix world_matrix;
 					m_terrain_infos[i].m_entity.getMatrix(world_matrix);
 					Shader* shader = m_terrain_infos[i].m_material->getShader();
+					m_terrain_infos[i].m_material->apply(*m_renderer, *this);
 					shader->setUniform("world_matrix", world_matrix);
 					shader->setUniform("shadowmap_matrix0", m_shadow_modelviewprojection[0]);
 					shader->setUniform("shadowmap_matrix1", m_shadow_modelviewprojection[1]);
@@ -628,6 +653,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		}
 
 		renderTerrains(layer_mask);
+		renderGrass();
 	}
 
 	virtual void resize(int w, int h) override
