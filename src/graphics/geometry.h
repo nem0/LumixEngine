@@ -18,6 +18,7 @@ struct VertexAttributeDef
 		FLOAT4,
 		FLOAT2,
 		INT4,
+		INT1,
 		POSITION,
 		NORMAL,
 		TEXTURE_COORDS,
@@ -34,6 +35,7 @@ struct VertexDef
 		int getPositionOffset() const;
 		void begin(Shader& shader);
 		void end(Shader& shader);
+		VertexAttributeDef::Type getAttributeType(int i) const { return i < m_attribute_count ? m_attributes[i] : VertexAttributeDef::NONE; }
 
 	private:
 		VertexAttributeDef::Type m_attributes[16];
@@ -50,10 +52,12 @@ class Geometry
 		~Geometry();
 
 		void copy(const uint8_t* data, int size, const Array<int32_t>& indices, VertexDef vertex_definition);
+		void copy(const Geometry& source, int times);
 		void draw(int start, int count, Shader& shader);
 		const Array<Vec3>& getVertices() const { return m_vertices; }
 		const Array<int32_t>& getIndices() const { return m_indices; }
 		float getBoundingRadius() const; 
+		const VertexDef& getVertexDefinition() const { return m_vertex_definition; }
 
 	private:
 		GLuint m_id;
@@ -61,7 +65,6 @@ class Geometry
 		VertexDef m_vertex_definition;
 		Array<Vec3> m_vertices;
 		Array<int32_t> m_indices;
-		int m_indices_count;
 };
 
 

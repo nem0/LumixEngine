@@ -26,7 +26,18 @@ struct TerrainQuad;
 class Terrain
 {
 	public:
-		Terrain(const Entity& entity);
+		class GrassQuad
+		{
+			public:
+				Array<Matrix> m_matrices;
+		};
+
+	public:
+		static const int GRASS_QUADS_WIDTH = 10;
+		static const int GRASS_QUADS_HEIGHT = 10;
+
+	public:
+		Terrain(const Entity& entity, RenderScene& scene);
 		~Terrain();
 
 		void render(Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos);
@@ -40,12 +51,16 @@ class Terrain
 		float getYScale() const { return m_y_scale; }
 		Entity getEntity() const { return m_entity; }
 		Material* getMaterial() const { return m_material; }
+		void setGrass(const Path& path);
 		void setMaterial(Material* material);
+		void getGrassInfos(Array<GrassInfo>& infos, const Vec3& camera_position);
 
 	private: 
+		void updateGrass(const Vec3& camera_position);
 		void generateGeometry();
 		void onMaterialLoaded(Resource::State, Resource::State new_state);
 		float getHeight(int x, int z);
+		void grassLoaded(Resource::State, Resource::State);
 
 	private:
 		Mesh* m_mesh;
@@ -58,6 +73,11 @@ class Terrain
 		float m_y_scale;
 		Entity m_entity;
 		Material* m_material;
+		Geometry* m_grass_geometry;
+		Mesh* m_grass_mesh;
+		RenderScene& m_scene;
+		Model* m_grass_model;
+		GrassQuad m_grass_quads[GRASS_QUADS_WIDTH][GRASS_QUADS_HEIGHT];
 };
 
 
