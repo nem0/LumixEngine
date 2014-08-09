@@ -28,7 +28,6 @@ SOURCES += main.cpp\
     profilerui.cpp \
     profilergraph.cpp \
     pc/file_system_watcher.cpp \
-    terrain_editor.cpp
 
 HEADERS  += mainwindow.h \
     sceneview.h \ 
@@ -45,7 +44,6 @@ HEADERS  += mainwindow.h \
     profilerui.h \
     profilergraph.h \
     file_system_watcher.h \
-    terrain_editor.h
 
 FORMS    += mainwindow.ui \
     logwidget.ui \
@@ -56,8 +54,7 @@ FORMS    += mainwindow.ui \
     fileserverwidget.ui \
     materialmanager.ui \
     profilerui.ui \
-    profilergraph.ui \
-    terrain_editor.ui
+    profilergraph.ui
 
 win32
 {

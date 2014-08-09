@@ -509,11 +509,14 @@ namespace Lumix
 				}
 			}
 
-			virtual void getGrassInfos(Array<GrassInfo>& infos)
+			virtual void getGrassInfos(Array<GrassInfo>& infos, int64_t layer_mask)
 			{
 				for (int i = 0; i < m_terrains.size(); ++i)
 				{
-					m_terrains[i]->getGrassInfos(infos, m_applied_camera.entity.getPosition());
+					if ((m_terrains[i]->getLayerMask() & layer_mask) != 0)
+					{
+						m_terrains[i]->getGrassInfos(infos, m_applied_camera.entity.getPosition());
+					}
 				}
 			}
 

@@ -546,13 +546,13 @@ struct PipelineInstanceImpl : public PipelineInstance
 		glEnd();
 	}
 
-	void renderGrass()
+	void renderGrass(int64_t layer_mask)
 	{
 		if (m_active_camera.isValid())
 		{
 			static Array<GrassInfo> grass_info;
 			grass_info.clear();
-			m_scene->getGrassInfos(grass_info);
+			m_scene->getGrassInfos(grass_info, layer_mask);
 			for (int i = 0; i < grass_info.size(); ++i)
 			{
 				grass_info[i].m_mesh->getMaterial()->apply(*m_renderer, *this);
@@ -653,7 +653,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		}
 
 		renderTerrains(layer_mask);
-		renderGrass();
+		renderGrass(layer_mask);
 	}
 
 	virtual void resize(int w, int h) override
