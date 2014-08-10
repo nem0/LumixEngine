@@ -33,15 +33,13 @@ public:
 	virtual void beginFrame() override
 	{
 		PROFILE_FUNCTION();
-		BOOL b = wglMakeCurrent(m_hdc, m_opengl_context);
-		ASSERT(b);
+		wglMakeCurrent(m_hdc, m_opengl_context);
 	}
 
 	virtual void endFrame() override
 	{
 		PROFILE_FUNCTION();
-		BOOL b = wglSwapLayerBuffers(m_hdc, WGL_SWAP_MAIN_PLANE);
-		ASSERT(b);
+		wglSwapLayerBuffers(m_hdc, WGL_SWAP_MAIN_PLANE);
 	}
 
 	virtual Lumix::PipelineInstance& getPipeline()
