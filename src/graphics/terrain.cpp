@@ -11,6 +11,7 @@
 #include "graphics/render_scene.h"
 #include "graphics/shader.h"
 #include "graphics/texture.h"
+#include <cfloat>
 
 
 namespace Lumix
@@ -174,11 +175,29 @@ namespace Lumix
 			m_grass_model->getObserverCb().unbind<Terrain, &Terrain::grassLoaded>(this);
 			LUMIX_DELETE(m_grass_mesh);
 			LUMIX_DELETE(m_grass_geometry);
+			for (int i = 0; i < m_grass_quads.size(); ++i)
+			{
+				LUMIX_DELETE(m_grass_quads[i]);
+			}
+			for (int i = 0; i < m_free_grass_quads.size(); ++i)
+			{
+				LUMIX_DELETE(m_free_grass_quads[i]);
+			}
 		}
 	}
 
 
-	void Terrain::setGrass(const Path& path)
+	Path Terrain::getGrassPath()
+	{
+		if (m_grass_model)
+		{
+			return m_grass_model->getPath();
+		}
+		return "";
+	}
+
+
+	void Terrain::setGrassPath(const Path& path)
 	{
 		if (m_grass_model)
 		{
@@ -192,42 +211,126 @@ namespace Lumix
 		m_grass_model = static_cast<Model*>(m_scene.getEngine().getResourceManager().get(ResourceManager::MODEL)->load(path));
 		m_grass_model->getObserverCb().bind<Terrain, &Terrain::grassLoaded>(this);
 	}
+	
 
 	void Terrain::updateGrass(const Vec3& camera_position)
 	{
-		float cx = (int)((camera_position.x + 5) / 10) * 10.0f;
-		float cy = (int)((camera_position.z + 5) / 10) * 10.0f;
+		PROFILE_FUNCTION();
+		if (m_free_grass_quads.size() + m_grass_quads.size() < GRASS_QUADS_HEIGHT * GRASS_QUADS_WIDTH)
+		{
+			int new_count = GRASS_QUADS_HEIGHT * GRASS_QUADS_WIDTH - m_grass_quads.size();
+			for (int i = 0; i < new_count; ++i)
+			{
+				m_free_grass_quads.push(LUMIX_NEW(GrassQuad));
+			}
+		}
+
+		if ((m_last_camera_position - camera_position).length() > 1)
+		{
+			Matrix mtx = m_entity.getMatrix();
+			Matrix inv_mtx = m_entity.getMatrix();
+			inv_mtx.fastInverse();
+			Vec3 local_camera_position = inv_mtx.multiplyPosition(camera_position);
+			float cx = (int)(local_camera_position.x / (GRASS_QUAD_SIZE)) * (float)GRASS_QUAD_SIZE;
+			float cz = (int)(local_camera_position.z / (GRASS_QUAD_SIZE)) * (float)GRASS_QUAD_SIZE;
+			float from_quad_x = cx - (GRASS_QUADS_WIDTH >> 1) * GRASS_QUAD_SIZE;
+			float from_quad_z = cz - (GRASS_QUADS_HEIGHT >> 1) * GRASS_QUAD_SIZE;
+			float to_quad_x = cx + (GRASS_QUADS_WIDTH >> 1) * GRASS_QUAD_SIZE;
+			float to_quad_z = cz + (GRASS_QUADS_WIDTH >> 1) * GRASS_QUAD_SIZE;
+
+			float old_bounds[4] = { FLT_MAX, FLT_MIN, FLT_MAX, FLT_MIN };
+			for (int i = m_grass_quads.size() - 1; i >= 0; --i)
+			{
+				GrassQuad* quad = m_grass_quads[i];
+				old_bounds[0] = Math::minValue(old_bounds[0], quad->m_x);
+				old_bounds[1] = Math::maxValue(old_bounds[1], quad->m_x);
+				old_bounds[2] = Math::minValue(old_bounds[2], quad->m_z);
+				old_bounds[3] = Math::maxValue(old_bounds[3], quad->m_z);
+				if (quad->m_x < from_quad_x || quad->m_x > to_quad_x || quad->m_z < from_quad_z || quad->m_z > to_quad_z)
+				{
+					m_free_grass_quads.push(m_grass_quads[i]);
+					m_grass_quads.eraseFast(i);
+				}
+			}
+
+			from_quad_x = Math::maxValue(0.0f, from_quad_x);
+			from_quad_z = Math::maxValue(0.0f, from_quad_z);
+
+			for (float quad_z = from_quad_z; quad_z <= to_quad_z; quad_z += GRASS_QUAD_SIZE)
+			{
+				for (float quad_x = from_quad_x; quad_x <= to_quad_x; quad_x += GRASS_QUAD_SIZE)
+				{
+					if (quad_x < old_bounds[0] || quad_x > old_bounds[1] || quad_z < old_bounds[2] || quad_z > old_bounds[3])
+					{
+						GrassQuad* quad = m_free_grass_quads.back();
+						m_free_grass_quads.pop();
+						m_grass_quads.push(quad);
+						quad->m_matrices.resize(31 * 31);
+						quad->m_x = quad_x;
+						quad->m_z = quad_z;
+						srand((int)quad_x + (int)quad_z * GRASS_QUADS_WIDTH);
+						int index = 0;
+						for (float dx = 0; dx < GRASS_QUAD_SIZE; dx += 0.333f)
+						{
+							for (float dz = 0; dz < GRASS_QUAD_SIZE; dz += 0.333f)
+							{
+								quad->m_matrices[index] = Matrix::IDENTITY;
+								float x = quad_x + dx + (rand() % 100 - 50) / 100.0f;
+								float z = quad_z + dz + (rand() % 100 - 50) / 100.0f;;
+								quad->m_matrices[index].setTranslation(Vec3(x, getHeight(x / m_xz_scale, z / m_xz_scale), z));
+								quad->m_matrices[index] = mtx * quad->m_matrices[index];
+								++index;
+							}
+						}
+					}
+				}
+			}
+			m_last_camera_position = camera_position;
+		}
+	}
+
+	/*void Terrain::initGrass(const Vec3& camera_position)
+	{
+		PROFILE_FUNCTION();
+		Matrix mtx = m_entity.getMatrix();
+		Matrix inv_mtx = m_entity.getMatrix();
+		inv_mtx.fastInverse();
+		Vec3 local_camera_position = inv_mtx.multiplyPosition(camera_position);
+		float cx = (int)(local_camera_position.x / (GRASS_QUAD_SIZE)) * (float)GRASS_QUAD_SIZE;
+		float cz = (int)(local_camera_position.z / (GRASS_QUAD_SIZE)) * (float)GRASS_QUAD_SIZE;
+		m_grass_quads_world.resize(GRASS_QUADS_HEIGHT);
 		for (int j = 0; j < GRASS_QUADS_HEIGHT; ++j)
 		{
+			m_grass_quads_world[j].resize(GRASS_QUADS_HEIGHT);
 			for (int i = 0; i < GRASS_QUADS_WIDTH; ++i)
 			{
-				m_grass_quads[i][j].m_matrices.resize(10 * 10);
-				float x = cx - (i - 5) * 10;
-				float y = cy - (j - 5) * 10;
-				if (x > -1 && y > -1)
+				float quad_x = cx - (i - (GRASS_QUADS_WIDTH >> 1)) * GRASS_QUAD_SIZE;
+				float quad_z = cz - (j - (GRASS_QUADS_HEIGHT >> 1)) * GRASS_QUAD_SIZE;
+				if (quad_x > -1 && quad_z > -1)
 				{
-					for (int a = 0; a < 10; ++a)
+					m_grass_quads[i][j].m_matrices.resize(31 * 31);
+					m_grass_quads[i][j].m_x = quad_x;
+					m_grass_quads[i][j].m_z = quad_z;
+					m_grass_quads_world[j][i] = &m_grass_quads[i][j];
+					srand((int)quad_x + (int)quad_z * GRASS_QUADS_WIDTH);
+					int index = 0;
+					for (float dx = 0; dx < GRASS_QUAD_SIZE; dx += 0.333f)
 					{
-						for (int b = 0; b < 10; ++b)
+						for (float dz = 0; dz < GRASS_QUAD_SIZE; dz += 0.333f)
 						{
-							m_grass_quads[i][j].m_matrices[a + b * 10] = Matrix::IDENTITY;
-							m_grass_quads[i][j].m_matrices[a + b * 10].setTranslation(Vec3(x + a, getHeight(x + a, y + b), y + b));
+							m_grass_quads[i][j].m_matrices[index] = Matrix::IDENTITY;
+							float x = quad_x + dx + (rand() % 100 - 50) / 100.0f;
+							float z = quad_z + dz + (rand() % 100 - 50) / 100.0f;;
+							m_grass_quads[i][j].m_matrices[index].setTranslation(Vec3(x, getHeight(x / m_xz_scale, z / m_xz_scale), z));
+							m_grass_quads[i][j].m_matrices[index] = mtx * m_grass_quads[i][j].m_matrices[index];
+							++index;
 						}
 					}
 				}
 			}
 		}
-
-/*		for (int i = 0; i < COPY_COUNT; ++i)
-		{
-			m_grass_matrices[i] = Matrix::IDENTITY;
-			if (camera_position.z > 0 && camera_position.x > 0)
-			{
-				Vec3 pos((int)(camera_position.x + i), getHeight(camera_position.x + i, camera_position.z), (int)camera_position.z);
-				m_grass_matrices[i].setTranslation(pos);
-			}
-		}*/
-	}
+		m_last_camera_position = camera_position;
+	}*/
 
 
 	void Terrain::grassLoaded(Resource::State, Resource::State)
@@ -249,22 +352,14 @@ namespace Lumix
 		if (m_grass_geometry && m_grass_model->isReady())
 		{
 			updateGrass(camera_position);
-			for (int i = 0; i < GRASS_QUADS_WIDTH; ++i)
+			for (int i = 0; i < m_grass_quads.size(); ++i)
 			{
-				for (int j = 0; j < GRASS_QUADS_HEIGHT; ++j)
+				for (int k = 0, kc = m_grass_quads[i]->m_matrices.size() / 50; k < kc; ++k)
 				{
-					{
-						GrassInfo& info = infos.pushEmpty();
-						info.m_geometry = m_grass_geometry;
-						info.m_matrices = &m_grass_quads[i][j].m_matrices[0];
-						info.m_mesh = m_grass_mesh;
-					}
-					{
-						GrassInfo& info = infos.pushEmpty();
-						info.m_geometry = m_grass_geometry;
-						info.m_matrices = &m_grass_quads[i][j].m_matrices[50];
-						info.m_mesh = m_grass_mesh;
-					}
+					GrassInfo& info = infos.pushEmpty();
+					info.m_geometry = m_grass_geometry;
+					info.m_matrices = &m_grass_quads[i]->m_matrices[50 * k];
+					info.m_mesh = m_grass_mesh;
 				}
 			}
 		}
@@ -295,8 +390,6 @@ namespace Lumix
 		{
 			material->getResourceManager().get(ResourceManager::MATERIAL)->unload(*material);
 		}
-
-		setGrass("models/grass/grass.msh");
 	}
 
 	void Terrain::deserialize(ISerializer& serializer, Universe& universe, RenderScene& scene, int index)
@@ -338,11 +431,33 @@ namespace Lumix
 		}
 	}
 
+	float Terrain::getHeight(float x, float z)
+	{
+		int int_x = (int)x;
+		int int_z = (int)z;
+		float dec_x = x - int_x;
+		float dec_z = z - int_z;
+		if (dec_x > dec_z)
+		{
+			float h0 = getHeight(int_x, int_z);
+			float h1 = getHeight(int_x + 1, int_z);
+			float h2 = getHeight(int_x + 1, int_z + 1);
+			return h0 + (h1 - h0) * dec_x + (h2 - h1) * dec_z;
+		}
+		else
+		{
+			float h0 = getHeight(int_x, int_z);
+			float h1 = getHeight(int_x + 1, int_z + 1);
+			float h2 = getHeight(int_x, int_z + 1);
+			return h0 + (h2 - h0) * dec_z + (h1 - h2) * dec_x;
+		}
+	}
+
 
 	float Terrain::getHeight(int x, int z)
 	{
 		Texture* t = m_material->getTexture(0);
-		int idx = x + z * m_width;
+		int idx = Math::clamp(x, 0, m_width) + Math::clamp(z, 0, m_height) * m_width;
 		if (t->getBytesPerPixel() == 2)
 		{
 			return ((m_y_scale / (256.0f * 256.0f - 1)) * ((uint16_t*)t->getData())[idx]);

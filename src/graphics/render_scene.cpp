@@ -521,6 +521,18 @@ namespace Lumix
 			}
 
 
+			virtual void setTerrainGrass(Component cmp, const string& path) override
+			{
+				m_terrains[cmp.index]->setGrassPath(path.c_str());
+			}
+
+
+			virtual void getTerrainGrass(Component cmp, string& path) override
+			{
+				path = m_terrains[cmp.index]->getGrassPath().c_str();
+			}
+
+
 			virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) override
 			{
 				infos.reserve(m_renderables.size() * 2);
