@@ -123,6 +123,7 @@ namespace Lumix
 
 			virtual void applyCamera(Component cmp) override
 			{
+				m_applied_camera = cmp;
 				Matrix mtx;
 				cmp.entity.getMatrix(mtx);
 				float fov = m_cameras[cmp.index].m_fov;
@@ -325,7 +326,7 @@ namespace Lumix
 				m_terrains.resize(size);
 				for (int i = old_size; i < size; ++i)
 				{
-					m_terrains[i] = LUMIX_NEW(Terrain)(Entity::INVALID);
+					m_terrains[i] = LUMIX_NEW(Terrain)(Entity::INVALID, *this);
 				}
 				for (int i = 0; i < size; ++i)
 				{
@@ -347,7 +348,7 @@ namespace Lumix
 			{
 				if (type == TERRAIN_HASH)
 				{
-					Terrain* terrain = LUMIX_NEW(Terrain)(entity);
+					Terrain* terrain = LUMIX_NEW(Terrain)(entity, *this);
 					m_terrains.push(terrain);
 					Component cmp = m_universe.addComponent(entity, type, this, m_terrains.size() - 1);
 					m_universe.componentCreated().invoke(cmp);
@@ -507,6 +508,30 @@ namespace Lumix
 					}
 				}
 			}
+
+			virtual void getGrassInfos(Array<GrassInfo>& infos, int64_t layer_mask)
+			{
+				for (int i = 0; i < m_terrains.size(); ++i)
+				{
+					if ((m_terrains[i]->getLayerMask() & layer_mask) != 0)
+					{
+						m_terrains[i]->getGrassInfos(infos, m_applied_camera.entity.getPosition());
+					}
+				}
+			}
+
+
+			virtual void setTerrainGrass(Component cmp, const string& path) override
+			{
+				m_terrains[cmp.index]->setGrassPath(path.c_str());
+			}
+
+
+			virtual void getTerrainGrass(Component cmp, string& path) override
+			{
+				path = m_terrains[cmp.index]->getGrassPath().c_str();
+			}
+
 
 			virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) override
 			{
@@ -738,6 +763,7 @@ namespace Lumix
 			Engine& m_engine;
 			Array<DebugLine> m_debug_lines;
 			Timer* m_timer;
+			Component m_applied_camera;
 	};
 
 

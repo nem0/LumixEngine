@@ -546,6 +546,38 @@ struct PipelineInstanceImpl : public PipelineInstance
 		glEnd();
 	}
 
+	void renderGrass(int64_t layer_mask)
+	{
+		if (m_active_camera.isValid())
+		{
+			Material* last_material = NULL;
+			m_grass_infos.clear();
+			m_scene->getGrassInfos(m_grass_infos, layer_mask);
+			glEnable(GL_MULTISAMPLE);
+			glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE_ARB);
+			for (int i = 0; i < m_grass_infos.size(); ++i)
+			{
+				Shader* shader = m_grass_infos[i].m_mesh->getMaterial()->getShader();
+				if (m_grass_infos[i].m_mesh->getMaterial() != last_material)
+				{
+					m_grass_infos[i].m_mesh->getMaterial()->apply(*m_renderer, *this);
+					shader->setUniform("shadowmap_matrix0", m_shadow_modelviewprojection[0]);
+					shader->setUniform("shadowmap_matrix1", m_shadow_modelviewprojection[1]);
+					shader->setUniform("shadowmap_matrix2", m_shadow_modelviewprojection[2]);
+					shader->setUniform("shadowmap_matrix3", m_shadow_modelviewprojection[3]);
+					shader->setUniform("light_dir", m_light_dir);
+					last_material = m_grass_infos[i].m_mesh->getMaterial();
+				}
+				shader->setUniform("grass_matrices", m_grass_infos[i].m_matrices, 50); /// TODO get rid of the constant
+
+				Mesh& mesh = *m_grass_infos[i].m_mesh;
+				m_grass_infos[i].m_geometry->draw(mesh.getStart(), mesh.getCount(), *shader);
+			}
+			glDisable(GL_MULTISAMPLE);
+			glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE_ARB);
+		}
+	}
+
 	void renderTerrains(int64_t layer_mask)
 	{
 		if (m_active_camera.isValid())
@@ -560,6 +592,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 					Matrix world_matrix;
 					m_terrain_infos[i].m_entity.getMatrix(world_matrix);
 					Shader* shader = m_terrain_infos[i].m_material->getShader();
+					m_terrain_infos[i].m_material->apply(*m_renderer, *this);
 					shader->setUniform("world_matrix", world_matrix);
 					shader->setUniform("shadowmap_matrix0", m_shadow_modelviewprojection[0]);
 					shader->setUniform("shadowmap_matrix1", m_shadow_modelviewprojection[1]);
@@ -628,6 +661,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		}
 
 		renderTerrains(layer_mask);
+		renderGrass(layer_mask);
 	}
 
 	virtual void resize(int w, int h) override
@@ -674,6 +708,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	Map<uint32_t, CustomCommandHandler> m_custom_commands_handlers;
 	Component m_active_camera;
 	Array<TerrainInfo> m_terrain_infos;
+	Array<GrassInfo> m_grass_infos;
 
 	private:
 		void operator=(const PipelineInstanceImpl&);

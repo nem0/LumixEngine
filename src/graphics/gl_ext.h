@@ -4,3 +4,4 @@
 #define GLEW_STATIC
 #include <gl/glew.h>
 #include <gl/GL.h>
+#include <gl/wglew.h>

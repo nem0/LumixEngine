@@ -32,7 +32,7 @@ namespace Lumix
 		bool operator == (const char* rhs) const { Path path(rhs); return m_id == path.m_id; }
 		bool operator == (uint32_t rhs) const { return m_id == rhs; }
 
-		bool isValid() { return NULL != m_path; }
+		bool isValid() const { return m_path[0] != '\0'; }
 
 	private:
 		char		m_path[LUMIX_MAX_PATH];

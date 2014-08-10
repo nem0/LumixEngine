@@ -629,7 +629,7 @@ bool Texture::loadTGA(FS::IFile& file)
 
 void Texture::addDataReference()
 {
-	ASSERT(!isReady());
+	ASSERT(!isReady() || m_data_reference > 0);
 	++m_data_reference;
 }
 

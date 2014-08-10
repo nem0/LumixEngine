@@ -42,6 +42,13 @@ namespace Lumix
 		float m_scale;
 	};
 
+	struct GrassInfo
+	{
+		Geometry* m_geometry;
+		Mesh* m_mesh;
+		const Matrix* m_matrices;
+	};
+
 	struct DebugLine
 	{
 		Vec3 m_from;
@@ -93,6 +100,8 @@ namespace Lumix
 			virtual void setRenderablePath(Component cmp, const string& path) = 0;
 			virtual void setRenderableScale(Component cmp, const float& scale) = 0;
 			virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) = 0;
+			
+			virtual void getGrassInfos(Array<GrassInfo>& infos, int64_t layer_mask) = 0;
 			virtual void getTerrainInfos(Array<TerrainInfo>& infos, int64_t layer_mask) = 0;
 			virtual void setTerrainMaterial(Component cmp, const string& path) = 0;
 			virtual void getTerrainMaterial(Component cmp, string& path) = 0;
@@ -100,7 +109,9 @@ namespace Lumix
 			virtual void getTerrainXZScale(Component cmp, float& scale) = 0;
 			virtual void setTerrainYScale(Component cmp, const float& scale) = 0;
 			virtual void getTerrainYScale(Component cmp, float& scale) = 0;
-	
+			virtual void setTerrainGrass(Component cmp, const string& path) = 0;
+			virtual void getTerrainGrass(Component cmp, string& path) = 0;
+
 		protected:
 			virtual ~RenderScene() {}
 	};
