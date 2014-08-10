@@ -53,6 +53,7 @@ namespace Lumix
 			~Block();
 			void frame();
 			float getLength();
+			int getHitCount() const { return m_hits.size(); }
 
 		public:
 			Block* m_parent;

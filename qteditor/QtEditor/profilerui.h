@@ -38,6 +38,7 @@ class ProfileModel : public QAbstractItemModel
 			NAME,
 			FUNCTION,
 			LENGTH,
+			HIT_COUNT,
 			COUNT
 		};
 
@@ -51,6 +52,7 @@ class ProfileModel : public QAbstractItemModel
 			Block* m_first_child;
 			Block* m_next;
 			QList<float> m_frames;
+			QList<int> m_hit_counts;
 		};
 
 	public:
