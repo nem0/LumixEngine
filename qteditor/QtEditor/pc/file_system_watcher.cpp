@@ -78,13 +78,19 @@ class FileSystemWatcherPC : public FileSystemWatcher
 				{
 					switch(info->Action)
 					{
+						case FILE_ACTION_RENAMED_NEW_NAME:
 						case FILE_ACTION_ADDED:
 						case FILE_ACTION_MODIFIED:
 							{
 								char tmp[MAX_PATH];
 								wcharToCharArray(info->FileName, tmp, info->FileNameLength);
 								watcher->m_callback.invoke(tmp);
+//								watcher->m_asset_browser->emitFileChanged(tmp);
 							}
+							break;
+						case FILE_ACTION_RENAMED_OLD_NAME:
+						case FILE_ACTION_REMOVED:
+							//do not do anything
 							break;
 						default:
 							ASSERT(false);
