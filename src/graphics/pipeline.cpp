@@ -7,6 +7,7 @@
 #include "core/json_serializer.h"
 #include "core/log.h"
 #include "core/map.h"
+#include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "core/string.h"
@@ -548,6 +549,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void renderGrass(int64_t layer_mask)
 	{
+		PROFILE_FUNCTION();
 		if (m_active_camera.isValid())
 		{
 			Material* last_material = NULL;
@@ -559,11 +561,11 @@ struct PipelineInstanceImpl : public PipelineInstance
 				if (m_grass_infos[i].m_mesh->getMaterial() != last_material)
 				{
 					m_grass_infos[i].m_mesh->getMaterial()->apply(*m_renderer, *this);
-					shader->setUniform("shadowmap_matrix0", m_shadow_modelviewprojection[0]);
+					/*shader->setUniform("shadowmap_matrix0", m_shadow_modelviewprojection[0]);
 					shader->setUniform("shadowmap_matrix1", m_shadow_modelviewprojection[1]);
 					shader->setUniform("shadowmap_matrix2", m_shadow_modelviewprojection[2]);
 					shader->setUniform("shadowmap_matrix3", m_shadow_modelviewprojection[3]);
-					shader->setUniform("light_dir", m_light_dir);
+					shader->setUniform("light_dir", m_light_dir);*/
 					last_material = m_grass_infos[i].m_mesh->getMaterial();
 				}
 				shader->setUniform("grass_matrices", m_grass_infos[i].m_matrices, 50); /// TODO get rid of the constant
@@ -576,6 +578,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void renderTerrains(int64_t layer_mask)
 	{
+		PROFILE_FUNCTION();
 		if (m_active_camera.isValid())
 		{
 			m_terrain_infos.clear();
@@ -609,6 +612,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void renderModels(int64_t layer_mask)
 	{
+		PROFILE_FUNCTION();
 		ASSERT(m_renderer != NULL);
 		static Array<RenderableInfo> infos;
 		infos.clear();

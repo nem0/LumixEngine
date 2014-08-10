@@ -12,6 +12,11 @@ ProfileModel::Block::Block()
 	{
 		m_frames.push_back(0);
 	}
+	m_hit_counts.reserve(MAX_FRAMES);
+	for (int i = 0; i < MAX_FRAMES; ++i)
+	{
+		m_hit_counts.push_back(0);
+	}
 }
 
 
@@ -26,11 +31,16 @@ void ProfileModel::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bl
 {
 	ASSERT(my_block->m_name == remote_block->m_name);
 	my_block->m_frames.push_back(remote_block->getLength());
+	my_block->m_hit_counts.push_back(remote_block->getHitCount());
 	if (my_block->m_frames.size() > MAX_FRAMES)
 	{
 		my_block->m_frames.pop_front();
 	}
-	if(!my_block->m_first_child && remote_block->m_first_child)
+	if (my_block->m_hit_counts.size() > MAX_FRAMES)
+	{
+		my_block->m_hit_counts.pop_front();
+	}
+	if (!my_block->m_first_child && remote_block->m_first_child)
 	{
 		Lumix::Profiler::Block* remote_child = remote_block->m_first_child;
 		Block* last_new_child = NULL;
@@ -132,6 +142,9 @@ QVariant ProfileModel::headerData(int section, Qt::Orientation, int role) const
 				return "Name";
 			case Values::LENGTH:
 				return "Length (ms)";
+			case Values::HIT_COUNT:
+				return "Hit count";
+				break;
 			default:
 				ASSERT(false);
 				return QVariant();
@@ -243,9 +256,10 @@ QVariant ProfileModel::data(const QModelIndex& index, int role) const
 		case Values::NAME:
 			return block->m_name;
 		case Values::LENGTH:
-			{
-				return m_frame >= 0 && m_frame < block->m_frames.size() ? block->m_frames[m_frame] : 0;
-			}
+			return m_frame >= 0 && m_frame < block->m_frames.size() ? block->m_frames[m_frame] : 0;
+		case Values::HIT_COUNT:
+			return m_frame >= 0 && m_frame < block->m_hit_counts.size() ? block->m_hit_counts[m_frame] : 0;
+			break;
 		default:
 			ASSERT(false);
 			return QVariant();

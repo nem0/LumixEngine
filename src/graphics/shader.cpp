@@ -4,6 +4,7 @@
 #include "core/json_serializer.h"
 #include "core/log.h"
 #include "core/matrix.h"
+#include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "core/vec3.h"
@@ -39,6 +40,7 @@ void Shader::apply()
 
 void Shader::setUniform(const char* name, int value)
 {
+	PROFILE_FUNCTION();
 	GLint loc = glGetUniformLocation(m_program_id, name);
 	if(loc >= 0)
 	{
@@ -51,6 +53,7 @@ void Shader::setUniform(const char* name, int value)
 
 void Shader::setUniform(const char* name, const Vec3& value)
 {
+	PROFILE_FUNCTION();
 	GLint loc = glGetUniformLocation(m_program_id, name);
 	if(loc >= 0)
 	{
@@ -63,6 +66,7 @@ void Shader::setUniform(const char* name, const Vec3& value)
 
 void Shader::setUniform(const char* name, GLfloat value)
 {
+	PROFILE_FUNCTION();
 	GLint loc = glGetUniformLocation(m_program_id, name);
 	if(loc >= 0)
 	{
@@ -75,6 +79,7 @@ void Shader::setUniform(const char* name, GLfloat value)
 
 void Shader::setUniform(const char* name, const Matrix& mtx)
 {
+	PROFILE_FUNCTION();
 	GLint loc = glGetUniformLocation(m_program_id, name);
 	if(loc >= 0)
 	{
@@ -86,6 +91,7 @@ void Shader::setUniform(const char* name, const Matrix& mtx)
 
 void Shader::setUniform(const char* name, const Matrix* matrices, int count)
 {
+	PROFILE_FUNCTION();
 	GLint loc = glGetUniformLocation(m_program_id, name);
 	if(loc >= 0) // this is here because of bug in some gl implementations
 	{
