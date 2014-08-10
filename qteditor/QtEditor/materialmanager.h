@@ -11,6 +11,7 @@ namespace Ui
 namespace Lumix
 {
 	class WorldEditor;
+	struct Entity;
 	class Event;
 	struct PropertyListEvent;
 }
@@ -26,10 +27,10 @@ class MaterialManager : public QDockWidget
 		void updatePreview();
 
 	private:
-		void onPropertyList(Lumix::PropertyListEvent& event);
 		void fillObjectMaterials();
 		void selectMaterial(const char* path);
 		void onMaterialLoaded(Lumix::Resource::State, Lumix::Resource::State);
+		void onEntitySelected(Lumix::Entity& entity);
 
 	private slots:
 		void on_fileListView_doubleClicked(const QModelIndex& index);
