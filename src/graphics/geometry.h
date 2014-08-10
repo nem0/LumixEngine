@@ -1,5 +1,6 @@
 #pragma once
 #include "core/array.h"
+#include "core/delegate.h"
 #include "core/vec3.h"
 #include "graphics/gl_ext.h"
 
@@ -48,11 +49,15 @@ struct VertexDef
 class Geometry
 {
 	public:
+		typedef Delegate<void(Array<uint8_t>&)> VertexCallback;
+		typedef Delegate<void(Array<int>&)> IndexCallback;
+
+	public:
 		Geometry();
 		~Geometry();
 
 		void copy(const uint8_t* data, int size, const Array<int32_t>& indices, VertexDef vertex_definition);
-		void copy(const Geometry& source, int times);
+		void copy(const Geometry& source, int times, VertexCallback& vertex_callback, IndexCallback& index_callback);
 		void draw(int start, int count, Shader& shader);
 		const Array<Vec3>& getVertices() const { return m_vertices; }
 		const Array<int32_t>& getIndices() const { return m_indices; }
