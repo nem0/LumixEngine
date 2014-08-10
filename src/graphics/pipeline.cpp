@@ -550,29 +550,28 @@ struct PipelineInstanceImpl : public PipelineInstance
 	{
 		if (m_active_camera.isValid())
 		{
-			static Array<GrassInfo> grass_info;
 			Material* last_material = NULL;
-			grass_info.clear();
-			m_scene->getGrassInfos(grass_info, layer_mask);
+			m_grass_infos.clear();
+			m_scene->getGrassInfos(m_grass_infos, layer_mask);
 			glEnable(GL_MULTISAMPLE);
 			glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE_ARB);
-			for (int i = 0; i < grass_info.size(); ++i)
+			for (int i = 0; i < m_grass_infos.size(); ++i)
 			{
-				Shader* shader = grass_info[i].m_mesh->getMaterial()->getShader();
-				if (grass_info[i].m_mesh->getMaterial() != last_material)
+				Shader* shader = m_grass_infos[i].m_mesh->getMaterial()->getShader();
+				if (m_grass_infos[i].m_mesh->getMaterial() != last_material)
 				{
-					grass_info[i].m_mesh->getMaterial()->apply(*m_renderer, *this);
+					m_grass_infos[i].m_mesh->getMaterial()->apply(*m_renderer, *this);
 					shader->setUniform("shadowmap_matrix0", m_shadow_modelviewprojection[0]);
 					shader->setUniform("shadowmap_matrix1", m_shadow_modelviewprojection[1]);
 					shader->setUniform("shadowmap_matrix2", m_shadow_modelviewprojection[2]);
 					shader->setUniform("shadowmap_matrix3", m_shadow_modelviewprojection[3]);
 					shader->setUniform("light_dir", m_light_dir);
-					last_material = grass_info[i].m_mesh->getMaterial();
+					last_material = m_grass_infos[i].m_mesh->getMaterial();
 				}
-				shader->setUniform("grass_matrices", grass_info[i].m_matrices, 50); /// TODO get rid of the constant
+				shader->setUniform("grass_matrices", m_grass_infos[i].m_matrices, 50); /// TODO get rid of the constant
 
-				Mesh& mesh = *grass_info[i].m_mesh;
-				grass_info[i].m_geometry->draw(mesh.getStart(), mesh.getCount(), *shader);
+				Mesh& mesh = *m_grass_infos[i].m_mesh;
+				m_grass_infos[i].m_geometry->draw(mesh.getStart(), mesh.getCount(), *shader);
 			}
 			glDisable(GL_MULTISAMPLE);
 			glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE_ARB);
@@ -709,6 +708,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	Map<uint32_t, CustomCommandHandler> m_custom_commands_handlers;
 	Component m_active_camera;
 	Array<TerrainInfo> m_terrain_infos;
+	Array<GrassInfo> m_grass_infos;
 
 	private:
 		void operator=(const PipelineInstanceImpl&);
