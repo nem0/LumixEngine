@@ -49,6 +49,7 @@ void Material::apply(Renderer& renderer, PipelineInstance& pipeline)
 		{
 			m_textures[i]->apply(i);
 		}
+		renderer.enableAlphaToCoverage(m_is_alpha_to_coverage);
 		renderer.enableZTest(m_is_z_test);
 		for (int i = 0, c = m_uniforms.size(); i < c; ++i)
 		{
@@ -278,6 +279,10 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 					m_textures.push(texture);
 					addDependency(*texture);
 				}
+			}
+			else if (strcmp(label, "alpha_to_coverage") == 0)
+			{
+				serializer.deserialize(m_is_alpha_to_coverage);
 			}
 			else if (strcmp(label, "shader") == 0)
 			{

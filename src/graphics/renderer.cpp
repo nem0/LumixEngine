@@ -115,6 +115,22 @@ struct RendererImpl : public Renderer
 		return Component::INVALID;
 	}
 
+
+	virtual void enableAlphaToCoverage(bool enable) override
+	{
+		if (enable)
+		{
+			glEnable(GL_MULTISAMPLE);
+			glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+		}
+		else
+		{
+			glDisable(GL_MULTISAMPLE);
+			glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+		}
+	}
+
+
 	virtual void enableZTest(bool enable) override
 	{
 		if (enable)

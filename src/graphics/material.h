@@ -54,6 +54,7 @@ private:
 		, m_is_z_test(true)
 		, m_is_backface_culling(true)
 		, m_depth_func(DepthFunc::LESS)
+		, m_is_alpha_to_coverage(false)
 	{ }
 
 	~Material();
@@ -94,6 +95,7 @@ private:
 	Array<Uniform> m_uniforms;
 	bool m_is_z_test;
 	bool m_is_backface_culling;
+	bool m_is_alpha_to_coverage;
 	DepthFunc m_depth_func;
 };
 
