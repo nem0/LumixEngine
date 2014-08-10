@@ -30,11 +30,14 @@ class Terrain
 		{
 			public:
 				Array<Matrix> m_matrices;
+				float m_x;
+				float m_z;
 		};
 
 	public:
-		static const int GRASS_QUADS_WIDTH = 10;
-		static const int GRASS_QUADS_HEIGHT = 10;
+		static const int GRASS_QUADS_WIDTH = 5;
+		static const int GRASS_QUADS_HEIGHT = 5;
+		static const int GRASS_QUAD_SIZE = 10;
 
 	public:
 		Terrain(const Entity& entity, RenderScene& scene);
@@ -51,7 +54,8 @@ class Terrain
 		float getYScale() const { return m_y_scale; }
 		Entity getEntity() const { return m_entity; }
 		Material* getMaterial() const { return m_material; }
-		void setGrass(const Path& path);
+		void setGrassPath(const Path& path);
+		Path getGrassPath();
 		void setMaterial(Material* material);
 		void getGrassInfos(Array<GrassInfo>& infos, const Vec3& camera_position);
 
@@ -60,6 +64,7 @@ class Terrain
 		void generateGeometry();
 		void onMaterialLoaded(Resource::State, Resource::State new_state);
 		float getHeight(int x, int z);
+		float getHeight(float x, float z);
 		void grassLoaded(Resource::State, Resource::State);
 
 	private:
@@ -77,7 +82,9 @@ class Terrain
 		Mesh* m_grass_mesh;
 		RenderScene& m_scene;
 		Model* m_grass_model;
-		GrassQuad m_grass_quads[GRASS_QUADS_WIDTH][GRASS_QUADS_HEIGHT];
+		Array<GrassQuad*> m_free_grass_quads;
+		Array<GrassQuad*> m_grass_quads;
+		Vec3 m_last_camera_position;
 };
 
 

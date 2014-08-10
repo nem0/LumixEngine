@@ -939,6 +939,7 @@ void PropertyView::onEntitySelected(Lumix::Entity& e)
 				addProperty("terrain", "material", "Material", Property::FILE, "material (*.mat)");
 				addProperty("terrain", "xz_scale", "Meter per texel", Property::DECIMAL, NULL);
 				addProperty("terrain", "y_scale", "Height scale", Property::DECIMAL, NULL);
+				addProperty("terrain", "grass_mesh", "Grass mesh", Property::FILE, "mesh (*.msh)");
 				addTerrainCustomProperties(cmps[i]);
 			}
 			else if (cmps[i].type == crc32("mesh_rigid_actor"))
