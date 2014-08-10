@@ -147,13 +147,13 @@ void VertexDef::begin(Shader& shader)
 			case VertexAttributeDef::INT4:
 				glEnableVertexAttribArray(shader.getAttribId(shader_attrib_idx));
 				glVertexAttribPointer(shader.getAttribId(shader_attrib_idx), 4, GL_INT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
-				offset += sizeof(GLint)* 4;
+				offset += sizeof(GLint) * 4;
 				++shader_attrib_idx;
 				break;
 			case VertexAttributeDef::INT1:
 				glEnableVertexAttribArray(shader.getAttribId(shader_attrib_idx));
 				glVertexAttribPointer(shader.getAttribId(shader_attrib_idx), 1, GL_INT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
-				offset += sizeof(GLint)* 1;
+				offset += sizeof(GLint) * 1;
 				++shader_attrib_idx;
 				break;
 			default:
