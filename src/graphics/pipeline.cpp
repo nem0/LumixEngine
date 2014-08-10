@@ -554,6 +554,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 			Material* last_material = NULL;
 			grass_info.clear();
 			m_scene->getGrassInfos(grass_info, layer_mask);
+			glEnable(GL_MULTISAMPLE);
+			glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE_ARB);
 			for (int i = 0; i < grass_info.size(); ++i)
 			{
 				Shader* shader = grass_info[i].m_mesh->getMaterial()->getShader();
@@ -572,6 +574,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 				Mesh& mesh = *grass_info[i].m_mesh;
 				grass_info[i].m_geometry->draw(mesh.getStart(), mesh.getCount(), *shader);
 			}
+			glDisable(GL_MULTISAMPLE);
+			glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE_ARB);
 		}
 	}
 
