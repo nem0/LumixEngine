@@ -103,7 +103,6 @@ namespace Lumix
 		Block::Hit& hit = m_current_block->m_hits.pushEmpty();
 		hit.m_start = m_timer->getTimeSinceStart();
 		hit.m_length = 0;
-		g_log_info.log("profiler") << "begin block " << m_current_block->m_name << " " << m_current_block->m_hits.back().m_start;
 	}
 
 	void Profiler::endBlock()
@@ -115,7 +114,6 @@ namespace Lumix
 		ASSERT(m_current_block);
 		float now = m_timer->getTimeSinceStart();
 		m_current_block->m_hits.back().m_length = 1000.0f * (now - m_current_block->m_hits.back().m_start);
-		g_log_info.log("profiler") << "begin block " << m_current_block->m_name << " " << m_current_block->m_hits.back().m_length << " now = " << now;
 		m_current_block = m_current_block->m_parent;
 	}
 
