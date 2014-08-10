@@ -66,6 +66,8 @@ class Terrain
 		float getHeight(int x, int z);
 		float getHeight(float x, float z);
 		void grassLoaded(Resource::State, Resource::State);
+		void grassVertexCopyCallback(Array<uint8_t>& data);
+		void grassIndexCopyCallback(Array<int>& data);
 
 	private:
 		Mesh* m_mesh;

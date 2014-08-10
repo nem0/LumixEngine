@@ -1,5 +1,6 @@
 #include "terrain.h"
 #include "core/iserializer.h"
+#include "core/log.h"
 #include "core/math_utils.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
@@ -203,13 +204,17 @@ namespace Lumix
 		{
 			m_grass_model->getResourceManager().get(ResourceManager::MODEL)->unload(*m_grass_model);
 			m_grass_model->getObserverCb().unbind<Terrain, &Terrain::grassLoaded>(this);
+			m_grass_model = NULL;
 			LUMIX_DELETE(m_grass_mesh);
 			LUMIX_DELETE(m_grass_geometry);
 			m_grass_mesh = NULL;
 			m_grass_geometry = NULL;
 		}
-		m_grass_model = static_cast<Model*>(m_scene.getEngine().getResourceManager().get(ResourceManager::MODEL)->load(path));
-		m_grass_model->getObserverCb().bind<Terrain, &Terrain::grassLoaded>(this);
+		if (path.isValid())
+		{
+			m_grass_model = static_cast<Model*>(m_scene.getEngine().getResourceManager().get(ResourceManager::MODEL)->load(path));
+			m_grass_model->getObserverCb().bind<Terrain, &Terrain::grassLoaded>(this);
+		}
 	}
 	
 
@@ -333,6 +338,43 @@ namespace Lumix
 	}*/
 
 
+	void Terrain::grassVertexCopyCallback(Array<uint8_t>& data)
+	{
+		bool has_matrix_index_attribute = m_grass_model->getGeometry()->getVertexDefinition().getAttributeType(3) == VertexAttributeDef::INT1;
+		if (has_matrix_index_attribute)
+		{
+			int vertex_size = m_grass_model->getGeometry()->getVertexDefinition().getVertexSize();
+			int one_size = vertex_size * m_grass_model->getGeometry()->getVertices().size();
+			const int i1_offset = 3 * sizeof(float) + 3 * sizeof(float) + 2 * sizeof(float);
+			for (int i = 0; i < COPY_COUNT; ++i)
+			{
+				for (int j = 0; j < m_grass_model->getGeometry()->getVertices().size(); ++j)
+				{
+					data[i * one_size + j * vertex_size + i1_offset] = (uint8_t)i;
+				}
+			}
+		}
+		else
+		{
+			g_log_error.log("renderer") << "Mesh " << m_grass_model->getPath().c_str() << " is not a grass mesh - wrong format";
+		}
+	}
+
+
+	void Terrain::grassIndexCopyCallback(Array<int>& data)
+	{
+		int indices_count = m_grass_model->getGeometry()->getIndices().size();
+		int index_offset = m_grass_model->getGeometry()->getVertices().size();
+		for (int i = 0; i < COPY_COUNT; ++i)
+		{
+			for (int j = 0, c = indices_count; j < c; ++j)
+			{
+				data[i * indices_count + j] += index_offset * i;
+			}
+		}
+	}
+
+
 	void Terrain::grassLoaded(Resource::State, Resource::State)
 	{
 		if (m_grass_model->isReady())
@@ -340,7 +382,11 @@ namespace Lumix
 			LUMIX_DELETE(m_grass_geometry);
 
 			m_grass_geometry = LUMIX_NEW(Geometry);
-			m_grass_geometry->copy(*m_grass_model->getGeometry(), COPY_COUNT);
+			Geometry::VertexCallback vertex_callback;
+			Geometry::IndexCallback index_callback;
+			vertex_callback.bind<Terrain, &Terrain::grassVertexCopyCallback>(this);
+			index_callback.bind<Terrain, &Terrain::grassIndexCopyCallback>(this);
+			m_grass_geometry->copy(*m_grass_model->getGeometry(), COPY_COUNT, vertex_callback, index_callback);
 			Material* material = m_grass_model->getMesh(0).getMaterial();
 			m_grass_mesh = LUMIX_NEW(Mesh)(material, 0, m_grass_model->getMesh(0).getCount() * COPY_COUNT, "grass");
 		}
@@ -402,6 +448,8 @@ namespace Lumix
 		setMaterial(static_cast<Material*>(scene.getEngine().getResourceManager().get(ResourceManager::MATERIAL)->load(path)));
 		serializer.deserializeArrayItem(m_xz_scale);
 		serializer.deserializeArrayItem(m_y_scale);
+		serializer.deserializeArrayItem(path, LUMIX_MAX_PATH);
+		setGrassPath(path);
 		universe.addComponent(m_entity, TERRAIN_HASH, &scene, index);
 	}
 
@@ -413,6 +461,7 @@ namespace Lumix
 		serializer.serializeArrayItem(m_material->getPath().c_str());
 		serializer.serializeArrayItem(m_xz_scale);
 		serializer.serializeArrayItem(m_y_scale);
+		serializer.serializeArrayItem(m_grass_model ? m_grass_model->getPath().c_str() : "");
 	}
 
 

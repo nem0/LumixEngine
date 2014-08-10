@@ -236,29 +236,22 @@ Geometry::~Geometry()
 }
 
 
-void Geometry::copy(const Geometry& source, int times)
+void Geometry::copy(const Geometry& source, int times, VertexCallback& vertex_callback, IndexCallback& index_callback)
 {
-	/// TODO this is only suitable for grass
 	ASSERT(!source.m_indices.empty());
-	bool has_matrix_index_attribute = source.m_vertex_definition.getAttributeType(3) == VertexAttributeDef::INT1;
-	ASSERT(has_matrix_index_attribute);
 	m_vertex_definition = source.m_vertex_definition;
 
 	glBindBuffer(GL_ARRAY_BUFFER, source.m_id);
 	uint8_t* data = (uint8_t*)glMapBuffer(GL_ARRAY_BUFFER, GL_READ_ONLY);
 	Array<uint8_t> data_copy;
-	int one_size = m_vertex_definition.getVertexSize() * source.getVertices().size();
-	data_copy.resize(one_size * times);
 	int vertex_size = m_vertex_definition.getVertexSize();
-	const int i1_offset = 3 * sizeof(float)+3 * sizeof(float)+2 * sizeof(float);
+	int one_size = vertex_size * source.getVertices().size();
+	data_copy.resize(one_size * times);
 	for (int i = 0; i < times; ++i)
 	{
 		memcpy(&data_copy[i * one_size], data, one_size);
-		for (int j = 0; j < source.getVertices().size(); ++j)
-		{
-			data_copy[i * one_size + j * vertex_size + i1_offset] = (uint8_t)i;
-		}
 	}
+	vertex_callback.invoke(data_copy);
 	glUnmapBuffer(GL_ARRAY_BUFFER);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -267,15 +260,11 @@ void Geometry::copy(const Geometry& source, int times)
 	Array<int> indices_data_copy;
 	int indices_count = source.getIndices().size();
 	indices_data_copy.resize(indices_count * times);
-	int index_offset = source.getVertices().size();
 	for (int i = 0; i < times; ++i)
 	{
 		memcpy(&indices_data_copy[i * indices_count], data, sizeof(int) * indices_count);
-		for (int j = 0, c = indices_count; j < c; ++j)
-		{
-			indices_data_copy[i * indices_count + j] += index_offset * i;
-		}
 	}
+	index_callback.invoke(indices_data_copy);
 	glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 	
