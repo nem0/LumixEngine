@@ -561,17 +561,17 @@ struct PipelineInstanceImpl : public PipelineInstance
 				if (m_grass_infos[i].m_mesh->getMaterial() != last_material)
 				{
 					m_grass_infos[i].m_mesh->getMaterial()->apply(*m_renderer, *this);
-					/*shader->setUniform("shadowmap_matrix0", m_shadow_modelviewprojection[0]);
+					shader->setUniform("shadowmap_matrix0", m_shadow_modelviewprojection[0]);
 					shader->setUniform("shadowmap_matrix1", m_shadow_modelviewprojection[1]);
 					shader->setUniform("shadowmap_matrix2", m_shadow_modelviewprojection[2]);
 					shader->setUniform("shadowmap_matrix3", m_shadow_modelviewprojection[3]);
-					shader->setUniform("light_dir", m_light_dir);*/
+					shader->setUniform("light_dir", m_light_dir);
 					last_material = m_grass_infos[i].m_mesh->getMaterial();
 				}
-				shader->setUniform("grass_matrices", m_grass_infos[i].m_matrices, 50); /// TODO get rid of the constant
+				shader->setUniform("grass_matrices", m_grass_infos[i].m_matrices, m_grass_infos[i].m_matrix_count);
 
 				Mesh& mesh = *m_grass_infos[i].m_mesh;
-				m_grass_infos[i].m_geometry->draw(mesh.getStart(), mesh.getCount(), *shader);
+				m_grass_infos[i].m_geometry->draw(mesh.getStart(), mesh.getCount() / m_grass_infos[i].m_mesh_copy_count * m_grass_infos[i].m_matrix_count, *shader);
 			}
 		}
 	}

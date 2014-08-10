@@ -80,16 +80,31 @@ void MaterialManager::fillObjectMaterials()
 	}
 }
 
-void MaterialManager::setWorldEditor(Lumix::WorldEditor& server)
+
+void MaterialManager::onEntitySelected(Lumix::Entity& entity)
+{
+	if (entity.isValid())
+	{
+		Lumix::Component cmp = entity.getComponent(crc32("renderable"));
+		if (cmp.isValid())
+		{
+			m_impl->m_selected_object_model = static_cast<Lumix::RenderScene*>(cmp.system)->getModel(cmp);
+			fillObjectMaterials();
+		}
+	}
+}
+
+void MaterialManager::setWorldEditor(Lumix::WorldEditor& editor)
 {
 	ASSERT(m_impl->m_engine == NULL);
 	HWND hwnd = (HWND)m_ui->previewWidget->winId();
-	m_impl->m_engine = &server.getEngine();
+	editor.entitySelected().bind<MaterialManager, &MaterialManager::onEntitySelected>(this);
+	m_impl->m_engine = &editor.getEngine();
 	m_impl->m_universe = new Lumix::Universe();
 	m_impl->m_universe->create();
 
-	m_impl->m_render_scene = Lumix::RenderScene::createInstance(server.getEngine(), *m_impl->m_universe);
-	m_impl->m_render_device = new WGLRenderDevice(server.getEngine(), "pipelines/main.json");
+	m_impl->m_render_scene = Lumix::RenderScene::createInstance(editor.getEngine(), *m_impl->m_universe);
+	m_impl->m_render_device = new WGLRenderDevice(editor.getEngine(), "pipelines/main.json");
 	m_impl->m_render_device->m_hdc = GetDC(hwnd);
 	m_impl->m_render_device->m_opengl_context = wglGetCurrentContext();
 	m_impl->m_render_device->getPipeline().setScene(m_impl->m_render_scene);
@@ -268,6 +283,7 @@ void MaterialManager::onMaterialLoaded(Lumix::Resource::State, Lumix::Resource::
 	ICppObjectProperty* properties[] = 
 	{
 		new CppObjectProperty<bool, Lumix::Material>("Z test", &Lumix::Material::isZTest, &Lumix::Material::enableZTest),
+		new CppObjectProperty<bool, Lumix::Material>("Alpha to coverage", &Lumix::Material::isAlphaToCoverage, &Lumix::Material::enableAlphaToCoverage),
 		new CppObjectProperty<bool, Lumix::Material>("Backface culling", &Lumix::Material::isBackfaceCulling, &Lumix::Material::enableBackfaceCulling),
 		new CppObjectProperty<Lumix::Shader*, Lumix::Material>("Shader", &Lumix::Material::getShader, &Lumix::Material::setShader)
 	};
