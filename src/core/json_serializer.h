@@ -75,6 +75,11 @@ namespace Lumix
 			virtual void nextArrayItem() override;
 			virtual bool isObjectEnd() const override;
 
+			size_t getRestOfFileSize()
+			{
+				return m_file.size() - m_file.pos() + 1 + strlen(m_token);
+			}
+
 		private:
 			void deserializeLabel(const char* label);
 			void deserializeToken();
