@@ -77,7 +77,8 @@ namespace Lumix
 
 			size_t getRestOfFileSize()
 			{
-				return m_file.size() - m_file.pos() + 1 + strlen(m_token);
+				const size_t NEW_LINE_AND_M_BUFFER_SIZE = sizeof('\n') + sizeof(m_buffer);
+				return m_file.size() - m_file.pos() + NEW_LINE_AND_M_BUFFER_SIZE + strlen(m_token);
 			}
 
 		private:
