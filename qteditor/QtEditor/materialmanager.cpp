@@ -83,6 +83,12 @@ void MaterialManager::fillObjectMaterials()
 }
 
 
+QWidget* MaterialManager::getPreview() const
+{
+	return m_ui->previewWidget;
+}
+
+
 void MaterialManager::onEntitySelected(Lumix::Entity& entity)
 {
 	if (entity.isValid())
@@ -132,41 +138,6 @@ void MaterialManager::setWorldEditor(Lumix::WorldEditor& editor)
 	m_ui->previewWidget->setAttribute(Qt::WA_PaintOnScreen);
 	m_ui->previewWidget->m_render_device = m_impl->m_render_device;
 	m_ui->previewWidget->m_engine = m_impl->m_engine;
-	/// TODO refactor (WorldEditor::create)
-	HDC hdc;
-	hdc = GetDC(hwnd);
-	ASSERT(hdc != NULL);
-	PIXELFORMATDESCRIPTOR pfd = 
-	{ 
-		sizeof(PIXELFORMATDESCRIPTOR),  //  size of this pfd  
-		1,                     // version number  
-		PFD_DRAW_TO_WINDOW |   // support window  
-		PFD_SUPPORT_OPENGL |   // support OpenGL  
-		PFD_DOUBLEBUFFER,      // double buffered  
-		PFD_TYPE_RGBA,         // RGBA type  
-		24,                    // 24-bit color depth  
-		0, 0, 0, 0, 0, 0,      // color bits ignored  
-		0,                     // no alpha buffer  
-		0,                     // shift bit ignored  
-		0,                     // no accumulation buffer  
-		0, 0, 0, 0,            // accum bits ignored  
-		32,                    // 32-bit z-buffer      
-		0,                     // no stencil buffer  
-		0,                     // no auxiliary buffer  
-		PFD_MAIN_PLANE,        // main layer  
-		0,                     // reserved  
-		0, 0, 0                // layer masks ignored  
-	}; 
-	int pixelformat = ChoosePixelFormat(hdc, &pfd);
-	if (pixelformat == 0)
-	{
-		ASSERT(false);
-	}
-	BOOL success = SetPixelFormat(hdc, pixelformat, &pfd);
-	if (success == FALSE)
-	{
-		ASSERT(false);
-	}
 }
 
 MaterialManager::~MaterialManager()

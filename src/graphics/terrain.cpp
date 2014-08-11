@@ -352,7 +352,7 @@ namespace Lumix
 
 	void Terrain::getGrassInfos(Array<GrassInfo>& infos, const Vec3& camera_position)
 	{
-		if (m_grass_geometry && m_grass_model->isReady())
+		if (m_grass_geometry && m_grass_model->isReady() && m_material->isReady())
 		{
 			updateGrass(camera_position);
 			for (int i = 0; i < m_grass_quads.size(); ++i)

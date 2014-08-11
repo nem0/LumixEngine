@@ -25,6 +25,7 @@ class MaterialManager : public QDockWidget
 		~MaterialManager();
 		void setWorldEditor(Lumix::WorldEditor& server);
 		void updatePreview();
+		QWidget* getPreview() const;
 
 	private:
 		void fillObjectMaterials();
