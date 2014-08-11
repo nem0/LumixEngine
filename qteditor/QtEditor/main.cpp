@@ -319,9 +319,6 @@ class App
 					m_world_editor->tick();
 					handleEvents();
 				}
-				{
-					PROFILE_BLOCK("tick2");
-				}
 				Lumix::g_profiler.frame();
 			}
 		}
