@@ -65,7 +65,7 @@ namespace Lumix
 			}
 			if (root)
 			{
-				m_current_block = m_root_block;
+				m_current_block = root;
 			}
 			else
 			{

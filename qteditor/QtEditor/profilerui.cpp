@@ -24,7 +24,7 @@ ProfileModel::ProfileModel()
 {
 	Lumix::g_profiler.getFrameListeners().bind<ProfileModel, &ProfileModel::onFrame>(this);
 	m_root = NULL;
-	m_frame = 0;
+	m_frame = -1;
 }
 
 void ProfileModel::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_block)
@@ -241,9 +241,9 @@ QVariant ProfileModel::data(const QModelIndex& index, int role) const
 		case Values::NAME:
 			return block->m_name;
 		case Values::LENGTH:
-			return m_frame >= 0 && m_frame < block->m_frames.size() ? block->m_frames[m_frame] : 0;
+			return m_frame >= 0 && m_frame < block->m_frames.size() ? block->m_frames[m_frame] : (block->m_frames.isEmpty() ? 0 : block->m_frames.back());
 		case Values::HIT_COUNT:
-			return m_frame >= 0 && m_frame < block->m_hit_counts.size() ? block->m_hit_counts[m_frame] : 0;
+			return m_frame >= 0 && m_frame < block->m_hit_counts.size() ? block->m_hit_counts[m_frame] : (block->m_hit_counts.isEmpty() ? 0 : block->m_hit_counts.back());
 			break;
 		default:
 			ASSERT(false);
