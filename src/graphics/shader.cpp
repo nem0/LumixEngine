@@ -146,7 +146,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		}
 		serializer.deserializeObjectEnd();
 		
-		int32_t size = (int32_t)file->size() - file->pos() + 1;
+		int32_t size = serializer.getRestOfFileSize();
 		ShaderManager* manager = static_cast<ShaderManager*>(getResourceManager().get(ResourceManager::SHADER));
 		char* buf = reinterpret_cast<char*>(manager->getBuffer(size + 1));
 		serializer.deserializeRawString(buf, size);

@@ -280,8 +280,10 @@ void JsonSerializer::deserializeArrayBegin()
 
 void JsonSerializer::deserializeRawString(char* buffer, int max_length)
 {
-	buffer[0] = m_buffer;
-	m_file.read(buffer + 1, max_length);
+	strncpy(buffer, m_token, max_length);
+	size_t token_length = strlen(m_token);
+	buffer[token_length] = m_buffer;
+	m_file.read(buffer + token_length + 1, max_length - token_length - 1);
 }
 
 
