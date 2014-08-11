@@ -99,7 +99,9 @@ void SceneView::dropEvent(QDropEvent *event)
 		{
 			m_world_editor->addEntityAt(event->pos().x(), event->pos().y());
 			m_world_editor->addComponent(crc32("renderable"));
-			m_world_editor->setProperty("renderable", "source", file.toLatin1().data(), file.length());
+			char rel_path[LUMIX_MAX_PATH];
+			m_world_editor->getRelativePath(rel_path, LUMIX_MAX_PATH, file.toLatin1().data());
+			m_world_editor->setProperty("renderable", "source", rel_path, strlen(rel_path));
 		}
 	}
 }
