@@ -413,6 +413,18 @@ struct WorldEditorImpl : public WorldEditor
 			fs.close(file);
 		}
 
+		virtual void getRelativePath(char* relative_path, int max_length, const char* source) override
+		{
+			if (strncmp(m_base_path.c_str(), source, m_base_path.length()) == 0)
+			{
+				strncpy(relative_path, source + m_base_path.length(), max_length);
+			}
+			else
+			{
+				strncpy(relative_path, source, max_length);
+			}
+		}
+
 		virtual void newUniverse() override
 		{
 			m_universe_path = "";

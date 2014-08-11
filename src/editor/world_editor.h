@@ -84,6 +84,7 @@ namespace Lumix
 			virtual DelegateList<void()>& universeCreated() = 0;
 			virtual DelegateList<void()>& universeDestroyed() = 0;
 			virtual void addPlugin(Plugin* plugin) = 0;
+			virtual void getRelativePath(char* relative_path, int max_length, const char* source) = 0;
 
 		protected:
 			virtual ~WorldEditor() {}
