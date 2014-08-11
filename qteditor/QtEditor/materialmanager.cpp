@@ -35,6 +35,7 @@ class MaterialManagerUI
 		Lumix::Model* m_selected_object_model;
 		QFileSystemModel* m_fs_model;
 		Lumix::Material* m_material;
+		Lumix::WorldEditor* m_world_editor;
 };
 
 
@@ -44,6 +45,7 @@ MaterialManager::MaterialManager(QWidget *parent)
 {
 	m_impl = new MaterialManagerUI();
 	m_impl->m_selected_object_model = NULL;
+	m_impl->m_world_editor = NULL;
 	m_ui->setupUi(this);
 	m_impl->m_fs_model = new QFileSystemModel();
 	m_impl->m_fs_model->setRootPath(QDir::currentPath());
@@ -51,8 +53,8 @@ MaterialManager::MaterialManager(QWidget *parent)
 	filters << "*.mat";
 	m_impl->m_fs_model->setNameFilters(filters);
 	m_impl->m_fs_model->setNameFilterDisables(false);
-	m_ui->fileListView->setModel(m_impl->m_fs_model);
-	m_ui->fileListView->setRootIndex(m_impl->m_fs_model->index(QDir::currentPath()));
+	m_ui->fileTreeView->setModel(m_impl->m_fs_model);
+	m_ui->fileTreeView->setRootIndex(m_impl->m_fs_model->index(QDir::currentPath()));
 	m_impl->m_engine = NULL;
 	m_impl->m_universe = NULL;
 	m_impl->m_render_scene = NULL;
@@ -97,6 +99,7 @@ void MaterialManager::onEntitySelected(Lumix::Entity& entity)
 void MaterialManager::setWorldEditor(Lumix::WorldEditor& editor)
 {
 	ASSERT(m_impl->m_engine == NULL);
+	m_impl->m_world_editor = &editor;
 	HWND hwnd = (HWND)m_ui->previewWidget->winId();
 	editor.entitySelected().bind<MaterialManager, &MaterialManager::onEntitySelected>(this);
 	m_impl->m_engine = &editor.getEngine();
@@ -269,7 +272,9 @@ void MaterialManager::onTextureAdded()
 
 void MaterialManager::selectMaterial(const char* path)
 {
-	Lumix::Material* material = static_cast<Lumix::Material*>(m_impl->m_engine->getResourceManager().get(Lumix::ResourceManager::MATERIAL)->load(path));
+	char rel_path[LUMIX_MAX_PATH];
+	m_impl->m_world_editor->getRelativePath(rel_path, LUMIX_MAX_PATH, path);
+	Lumix::Material* material = static_cast<Lumix::Material*>(m_impl->m_engine->getResourceManager().get(Lumix::ResourceManager::MATERIAL)->load(rel_path));
 	material->getObserverCb().bind<MaterialManager, &MaterialManager::onMaterialLoaded>(this);
 	m_impl->m_material = material;
 	if(material->isReady())
@@ -360,12 +365,6 @@ void MaterialManager::onTextureRemoved()
 	selectMaterial(m_impl->m_material->getPath().c_str());
 }
 
-void MaterialManager::on_fileListView_doubleClicked(const QModelIndex &index)
-{
-	QString file_path = m_impl->m_fs_model->fileInfo(index).filePath().toLower();
-	selectMaterial(file_path.toLatin1().data());
-}
-
 void MaterialManager::on_objectMaterialList_doubleClicked(const QModelIndex &index)
 {
 	QListWidgetItem* item = m_ui->objectMaterialList->item(index.row());
@@ -393,4 +392,10 @@ void MaterialManager::on_saveMaterialButton_clicked()
 	{
 		Lumix::g_log_error.log("Material manager") << "Could not save file " << m_impl->m_material->getPath().c_str();
 	}
+}
+
+void MaterialManager::on_fileTreeView_doubleClicked(const QModelIndex &index)
+{
+	QString file_path = m_impl->m_fs_model->fileInfo(index).filePath().toLower();
+	selectMaterial(file_path.toLatin1().data());
 }
