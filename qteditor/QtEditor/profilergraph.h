@@ -25,6 +25,7 @@ class ProfilerGraph : public QWidget
 
 	private:
 		void getBlockPath(ProfileModel::Block* block, QPainterPath& path, float max);
+		void getRootPath(QPainterPath& path, float max);
 
 	signals:
 		void frameSet();
