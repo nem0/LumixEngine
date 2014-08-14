@@ -39,6 +39,36 @@ void ProfilerGraph::mouseMoveEvent(QMouseEvent* event)
 	}
 }
 
+void ProfilerGraph::getRootPath(QPainterPath& path, float max)
+{
+	ProfileModel::Block* root = m_model->getRoot();
+
+	int w = width();
+	int h = height();
+
+	path.moveTo(0, height());
+
+	if (max > 0)
+	{
+		for (int i = 0; i < root->m_frames.size(); ++i)
+		{
+			float l = i * w / (float)m_model->getRoot()->m_frames.size();
+			float time = 0;
+			ProfileModel::Block* block = root;
+			while (block)
+			{
+				time += block->m_frames[i];
+				block = block->m_next;
+			}
+			float t = (h - 1) * (1.0f - time / max);
+			path.lineTo(l, t);
+		}
+	}
+	path.lineTo(width(), height());
+	path.closeSubpath();
+
+}
+
 
 void ProfilerGraph::getBlockPath(ProfileModel::Block* block, QPainterPath& path, float max)
 {
@@ -49,12 +79,11 @@ void ProfilerGraph::getBlockPath(ProfileModel::Block* block, QPainterPath& path,
 	
 	if(max > 0)
 	{
-		int i = m_model->getRoot()->m_frames.size() - block->m_frames.size();
-		for(auto iter = block->m_frames.begin(), end = block->m_frames.end(); iter != end; ++iter)
+		for (int i = 0; i < block->m_frames.size(); ++i)
 		{
 			float l = i * w / (float)m_model->getRoot()->m_frames.size();
-			++i;
-			float t = (h - 1) * (1.0f - *iter / max);
+			float time = block->m_frames[i];
+			float t = (h - 1) * (1.0f - time / max);
 			path.lineTo(l, t);
 		}
 	}
@@ -80,15 +109,22 @@ void ProfilerGraph::paintEvent(QPaintEvent*)
 	gradient.setSpread(QGradient::Spread::ReflectSpread);
 
 	float max = 0;
-	for(auto iter = root->m_frames.begin(), end = root->m_frames.end(); iter != end; ++iter)
+	for (int i = 0; i < root->m_frames.size(); ++i)
 	{
-		max = max < *iter ? *iter : max;
+		ProfileModel::Block* block = root;
+		float time = 0;
+		while (block)
+		{
+			time += block->m_frames[i];
+			block = block->m_next;
+		}
+		max = max < time ? time : max;
 	}
 
 	QPainterPath path;
-	getBlockPath(root, path, max);
+	getRootPath(path, max);
 	painter.fillPath(path, gradient);
-	if(m_block && m_block != root)
+	if(m_block)
 	{
 		QPainterPath detail_path;
 		getBlockPath(m_block, detail_path, max);

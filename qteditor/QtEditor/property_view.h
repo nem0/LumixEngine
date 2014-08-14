@@ -74,6 +74,9 @@ private slots:
 	void on_terrainBrushTextureChanged(int value);
 	void on_TerrainHeightSaveClicked();
 	void on_TerrainSplatSaveClicked();
+    void on_positionX_valueChanged(double arg1);
+    void on_positionY_valueChanged(double arg1);
+    void on_positionZ_valueChanged(double arg1);
 
 private:
 	void clear();
@@ -89,6 +92,7 @@ private:
 	void onScriptCompiled(const Lumix::Path& path, uint32_t status);
 	void setScriptStatus(uint32_t status);
 	void updateValues();
+	void updateSelectedEntityPosition();
 
 private:
 	Ui::PropertyView* m_ui;

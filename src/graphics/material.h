@@ -37,6 +37,8 @@ public:
 	void enableZTest(bool enable) { m_is_z_test = enable; }
 	bool isBackfaceCulling() const { return m_is_backface_culling; }
 	void enableBackfaceCulling(bool enable) { m_is_backface_culling = enable; }
+	bool isAlphaToCoverage() const { return m_is_alpha_to_coverage; }
+	void enableAlphaToCoverage(bool enable) { m_is_alpha_to_coverage = enable; }
 
 	void setShader(Shader* shader);
 	Shader* getShader() const { return m_shader; }
@@ -54,6 +56,7 @@ private:
 		, m_is_z_test(true)
 		, m_is_backface_culling(true)
 		, m_depth_func(DepthFunc::LESS)
+		, m_is_alpha_to_coverage(false)
 	{ }
 
 	~Material();
@@ -94,6 +97,7 @@ private:
 	Array<Uniform> m_uniforms;
 	bool m_is_z_test;
 	bool m_is_backface_culling;
+	bool m_is_alpha_to_coverage;
 	DepthFunc m_depth_func;
 };
 

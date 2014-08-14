@@ -47,6 +47,8 @@ namespace Lumix
 		Geometry* m_geometry;
 		Mesh* m_mesh;
 		const Matrix* m_matrices;
+		int m_matrix_count;
+		int m_mesh_copy_count;
 	};
 
 	struct DebugLine

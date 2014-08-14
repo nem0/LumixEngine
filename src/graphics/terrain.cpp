@@ -294,49 +294,6 @@ namespace Lumix
 		}
 	}
 
-	/*void Terrain::initGrass(const Vec3& camera_position)
-	{
-		PROFILE_FUNCTION();
-		Matrix mtx = m_entity.getMatrix();
-		Matrix inv_mtx = m_entity.getMatrix();
-		inv_mtx.fastInverse();
-		Vec3 local_camera_position = inv_mtx.multiplyPosition(camera_position);
-		float cx = (int)(local_camera_position.x / (GRASS_QUAD_SIZE)) * (float)GRASS_QUAD_SIZE;
-		float cz = (int)(local_camera_position.z / (GRASS_QUAD_SIZE)) * (float)GRASS_QUAD_SIZE;
-		m_grass_quads_world.resize(GRASS_QUADS_HEIGHT);
-		for (int j = 0; j < GRASS_QUADS_HEIGHT; ++j)
-		{
-			m_grass_quads_world[j].resize(GRASS_QUADS_HEIGHT);
-			for (int i = 0; i < GRASS_QUADS_WIDTH; ++i)
-			{
-				float quad_x = cx - (i - (GRASS_QUADS_WIDTH >> 1)) * GRASS_QUAD_SIZE;
-				float quad_z = cz - (j - (GRASS_QUADS_HEIGHT >> 1)) * GRASS_QUAD_SIZE;
-				if (quad_x > -1 && quad_z > -1)
-				{
-					m_grass_quads[i][j].m_matrices.resize(31 * 31);
-					m_grass_quads[i][j].m_x = quad_x;
-					m_grass_quads[i][j].m_z = quad_z;
-					m_grass_quads_world[j][i] = &m_grass_quads[i][j];
-					srand((int)quad_x + (int)quad_z * GRASS_QUADS_WIDTH);
-					int index = 0;
-					for (float dx = 0; dx < GRASS_QUAD_SIZE; dx += 0.333f)
-					{
-						for (float dz = 0; dz < GRASS_QUAD_SIZE; dz += 0.333f)
-						{
-							m_grass_quads[i][j].m_matrices[index] = Matrix::IDENTITY;
-							float x = quad_x + dx + (rand() % 100 - 50) / 100.0f;
-							float z = quad_z + dz + (rand() % 100 - 50) / 100.0f;;
-							m_grass_quads[i][j].m_matrices[index].setTranslation(Vec3(x, getHeight(x / m_xz_scale, z / m_xz_scale), z));
-							m_grass_quads[i][j].m_matrices[index] = mtx * m_grass_quads[i][j].m_matrices[index];
-							++index;
-						}
-					}
-				}
-			}
-		}
-		m_last_camera_position = camera_position;
-	}*/
-
 
 	void Terrain::grassVertexCopyCallback(Array<uint8_t>& data)
 	{
@@ -395,17 +352,28 @@ namespace Lumix
 
 	void Terrain::getGrassInfos(Array<GrassInfo>& infos, const Vec3& camera_position)
 	{
-		if (m_grass_geometry && m_grass_model->isReady())
+		if (m_grass_geometry && m_grass_model->isReady() && m_material->isReady())
 		{
 			updateGrass(camera_position);
 			for (int i = 0; i < m_grass_quads.size(); ++i)
 			{
-				for (int k = 0, kc = m_grass_quads[i]->m_matrices.size() / 50; k < kc; ++k)
+				for (int k = 0, kc = m_grass_quads[i]->m_matrices.size() / COPY_COUNT; k < kc; ++k)
 				{
 					GrassInfo& info = infos.pushEmpty();
 					info.m_geometry = m_grass_geometry;
-					info.m_matrices = &m_grass_quads[i]->m_matrices[50 * k];
+					info.m_matrices = &m_grass_quads[i]->m_matrices[COPY_COUNT * k];
 					info.m_mesh = m_grass_mesh;
+					info.m_matrix_count = COPY_COUNT;
+					info.m_mesh_copy_count = COPY_COUNT;
+				}
+				if (m_grass_quads[i]->m_matrices.size() % COPY_COUNT != 0)
+				{
+					GrassInfo& info = infos.pushEmpty();
+					info.m_geometry = m_grass_geometry;
+					info.m_matrices = &m_grass_quads[i]->m_matrices[COPY_COUNT * (m_grass_quads[i]->m_matrices.size() / COPY_COUNT)];
+					info.m_mesh = m_grass_mesh;
+					info.m_matrix_count = m_grass_quads[i]->m_matrices.size() % COPY_COUNT;
+					info.m_mesh_copy_count = COPY_COUNT;
 				}
 			}
 		}
@@ -517,7 +485,7 @@ namespace Lumix
 		}
 		else
 		{
-			ASSERT(false); TODO("todo");
+			ASSERT(false);
 		}
 		return 0;
 	}
