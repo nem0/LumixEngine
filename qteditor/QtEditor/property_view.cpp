@@ -1010,3 +1010,27 @@ void PropertyView::on_addComponentButton_clicked()
 	}
 	ASSERT(false); // unknown component type
 }
+
+void PropertyView::updateSelectedEntityPosition()
+{
+	Lumix::Entity e = m_world_editor->getSelectedEntity();
+	if (e.isValid())
+	{
+		e.setPosition(Lumix::Vec3((float)m_ui->positionX->value(), (float)m_ui->positionY->value(), (float)m_ui->positionZ->value()));
+	}
+}
+
+void PropertyView::on_positionX_valueChanged(double arg1)
+{
+	updateSelectedEntityPosition();
+}
+
+void PropertyView::on_positionY_valueChanged(double arg1)
+{
+	updateSelectedEntityPosition();
+}
+
+void PropertyView::on_positionZ_valueChanged(double arg1)
+{
+	updateSelectedEntityPosition();
+}

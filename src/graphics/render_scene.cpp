@@ -494,6 +494,7 @@ namespace Lumix
 
 			virtual void getTerrainInfos(Array<TerrainInfo>& infos, int64_t layer_mask) override
 			{
+				PROFILE_FUNCTION();
 				infos.reserve(m_terrains.size());
 				for (int i = 0; i < m_terrains.size(); ++i)
 				{
@@ -511,6 +512,7 @@ namespace Lumix
 
 			virtual void getGrassInfos(Array<GrassInfo>& infos, int64_t layer_mask)
 			{
+				PROFILE_FUNCTION();
 				for (int i = 0; i < m_terrains.size(); ++i)
 				{
 					if ((m_terrains[i]->getLayerMask() & layer_mask) != 0)
@@ -535,6 +537,7 @@ namespace Lumix
 
 			virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) override
 			{
+				PROFILE_FUNCTION();
 				infos.reserve(m_renderables.size() * 2);
 				for (int i = 0; i < m_renderables.size(); ++i)
 				{

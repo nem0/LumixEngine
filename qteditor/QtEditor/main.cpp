@@ -195,6 +195,7 @@ class App
 			return hglrc;
 		}	
 
+
 		void renderPhysics()
 		{
 			Lumix::PhysicsSystem* system = static_cast<Lumix::PhysicsSystem*>(m_world_editor->getEngine().getPluginManager().getPlugin("physics"));
@@ -203,6 +204,7 @@ class App
 				system->getScene()->render();
 			}
 		}
+
 
 		void init(int argc, char* argv[])
 		{
@@ -216,8 +218,8 @@ class App
 
 			HWND hwnd = (HWND)m_main_window->getSceneView()->getViewWidget()->winId();
 			HWND game_hwnd = (HWND)m_main_window->getGameView()->getContentWidget()->winId();
-			HWND hwnds[] = { hwnd, game_hwnd };
-			HGLRC hglrc = createGLContext(hwnds, 2);
+			HWND hwnds[] = { hwnd, game_hwnd, (HWND)m_main_window->getMaterialManager()->getPreview()->winId() };
+			HGLRC hglrc = createGLContext(hwnds, 3);
 
 			m_world_editor = Lumix::WorldEditor::create(QDir::currentPath().toLocal8Bit().data());
 			ASSERT(m_world_editor);

@@ -1,4 +1,5 @@
 #include "graphics/geometry.h"
+#include "core/profiler.h"
 #include "graphics/gl_ext.h"
 #include "graphics/shader.h"
 
@@ -111,6 +112,7 @@ int VertexDef::getPositionOffset() const
 
 void VertexDef::begin(Shader& shader)
 {
+	PROFILE_FUNCTION();
 	int offset = 0;
 	int shader_attrib_idx = 0;
 	for(int i = 0; i < m_attribute_count; ++i)
@@ -167,6 +169,7 @@ void VertexDef::begin(Shader& shader)
 
 void VertexDef::end(Shader& shader)
 {
+	PROFILE_FUNCTION();
 	int shader_attrib_idx = 0;
 	for(int i = 0; i < m_attribute_count; ++i)
 	{
@@ -214,6 +217,7 @@ float Geometry::getBoundingRadius() const
 
 void Geometry::draw(int start, int count, Shader& shader)
 {
+	PROFILE_FUNCTION();
 	glBindBuffer(GL_ARRAY_BUFFER, m_id);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_indices_id);
 	m_vertex_definition.begin(shader);

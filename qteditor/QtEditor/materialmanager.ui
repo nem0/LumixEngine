@@ -22,7 +22,7 @@
       </property>
       <widget class="QTabWidget" name="tabWidget">
        <property name="currentIndex">
-        <number>1</number>
+        <number>0</number>
        </property>
        <widget class="QWidget" name="tab">
         <attribute name="title">
@@ -42,7 +42,7 @@
           <number>0</number>
          </property>
          <item>
-          <widget class="QListView" name="fileListView"/>
+          <widget class="QTreeView" name="fileTreeView"/>
          </item>
         </layout>
        </widget>

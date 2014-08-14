@@ -12,6 +12,11 @@ ProfileModel::Block::Block()
 	{
 		m_frames.push_back(0);
 	}
+	m_hit_counts.reserve(MAX_FRAMES);
+	for (int i = 0; i < MAX_FRAMES; ++i)
+	{
+		m_hit_counts.push_back(0);
+	}
 }
 
 
@@ -19,73 +24,58 @@ ProfileModel::ProfileModel()
 {
 	Lumix::g_profiler.getFrameListeners().bind<ProfileModel, &ProfileModel::onFrame>(this);
 	m_root = NULL;
-	m_frame = 0;
+	m_frame = -1;
 }
 
 void ProfileModel::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_block)
 {
 	ASSERT(my_block->m_name == remote_block->m_name);
 	my_block->m_frames.push_back(remote_block->getLength());
+	my_block->m_hit_counts.push_back(remote_block->getHitCount());
 	if (my_block->m_frames.size() > MAX_FRAMES)
 	{
 		my_block->m_frames.pop_front();
 	}
-	if(!my_block->m_first_child && remote_block->m_first_child)
+	if (my_block->m_hit_counts.size() > MAX_FRAMES)
+	{
+		my_block->m_hit_counts.pop_front();
+	}
+
+	if (!my_block->m_first_child && remote_block->m_first_child)
 	{
 		Lumix::Profiler::Block* remote_child = remote_block->m_first_child;
-		Block* last_new_child = NULL;
-		while(remote_child)
-		{
-			Block* my_child = new Block;
-			my_child->m_function = remote_child->m_function;
-			my_child->m_name = remote_child->m_name;
-			my_child->m_parent = my_block;
-			my_child->m_next = NULL;
-			my_child->m_first_child = NULL;
-			if(last_new_child)
-			{
-				last_new_child->m_next = my_child;
-			}
-			else
-			{
-				my_block->m_first_child = my_child;
-			}
-			last_new_child = my_child;
-			cloneBlock(my_child, remote_child);
-			remote_child = remote_child->m_next;
-		}
+		Block* my_child = new Block;
+		my_child->m_function = remote_child->m_function;
+		my_child->m_name = remote_child->m_name;
+		my_child->m_parent = my_block;
+		my_child->m_next = NULL;
+		my_child->m_first_child = NULL;
+		my_block->m_first_child = my_child;
+		cloneBlock(my_child, remote_child);
 	}
 	else if(my_block->m_first_child)
 	{
 		Lumix::Profiler::Block* remote_child = remote_block->m_first_child;
 		Block* my_child = my_block->m_first_child;
-		Block* prev_my_child = NULL;
-		while(remote_child)
-		{
-			if(my_child->m_name != remote_child->m_name || my_child->m_function != remote_child->m_function)
-			{
-				Block* new_child = new Block;
-				new_child->m_function = remote_child->m_function;
-				new_child->m_name = remote_child->m_name;
-				new_child->m_parent = my_block;
-				new_child->m_next = my_child;
-				new_child->m_first_child = NULL;
-				new_child->m_next = my_child;
-				if (my_child == my_block->m_first_child)
-				{
-					my_block->m_first_child = new_child;
-				}
-				else 
-				{
-					prev_my_child->m_next = new_child;
-				}
-				my_child = new_child;
-			}
-			cloneBlock(my_child, remote_child);
-			remote_child = remote_child->m_next;
-			prev_my_child = my_child;
-			my_child = my_child->m_next;
-		}
+		cloneBlock(my_child, remote_child);
+	}
+
+	if (!my_block->m_next && remote_block->m_next)
+	{
+		Lumix::Profiler::Block* remote_next = remote_block->m_next;
+		Block* my_next = new Block;
+		my_next->m_function = remote_next->m_function;
+		my_next->m_name = remote_next->m_name;
+		my_next->m_parent = my_block->m_parent;
+		my_next->m_next = NULL;
+		my_next->m_first_child = NULL;
+		my_block->m_next = my_next;
+		cloneBlock(my_next, remote_next);
+
+	}
+	else if (my_block->m_next)
+	{
+		cloneBlock(my_block->m_next, remote_block->m_next);
 	}
 }
 
@@ -99,7 +89,6 @@ void ProfileModel::onFrame()
 		m_root->m_parent = NULL;
 		m_root->m_next = NULL;
 		m_root->m_first_child = NULL;
-
 	}
 	if(m_root)
 	{
@@ -132,6 +121,9 @@ QVariant ProfileModel::headerData(int section, Qt::Orientation, int role) const
 				return "Name";
 			case Values::LENGTH:
 				return "Length (ms)";
+			case Values::HIT_COUNT:
+				return "Hit count";
+				break;
 			default:
 				ASSERT(false);
 				return QVariant();
@@ -149,22 +141,21 @@ QModelIndex ProfileModel::index(int row, int column, const QModelIndex& parent) 
 	Block* block = NULL;
 	if(parent.internalPointer() != NULL)
 	{
-		block = static_cast<Block*>(parent.internalPointer());
+		block = static_cast<Block*>(parent.internalPointer())->m_first_child;
 	}
 	else
 	{
-		return createIndex(0, column, m_root);
+		block = m_root;
 	}
 
 	int index = row;
-	Block* child = block->m_first_child;
-	while(child && index > 0)
+	while (block && index > 0)
 	{
-		child = child->m_next;
+		block = block->m_next;
 		--index;
 	}
 
-	return createIndex(row, column, child);
+	return createIndex(row, column, block);
 }
 	
 QModelIndex ProfileModel::parent(const QModelIndex& index) const
@@ -201,7 +192,14 @@ int ProfileModel::rowCount(const QModelIndex& parent_index) const
 
 	if (!parent_index.isValid() || !parent_index.internalPointer())
 	{
-		return 1;
+		int count = 0;
+		Block* root = m_root;
+		while (root)
+		{
+			++count;
+			root = root->m_next;
+		}
+		return count;
 	}
 	else
 	{
@@ -243,9 +241,10 @@ QVariant ProfileModel::data(const QModelIndex& index, int role) const
 		case Values::NAME:
 			return block->m_name;
 		case Values::LENGTH:
-			{
-				return m_frame >= 0 && m_frame < block->m_frames.size() ? block->m_frames[m_frame] : 0;
-			}
+			return m_frame >= 0 && m_frame < block->m_frames.size() ? block->m_frames[m_frame] : (block->m_frames.isEmpty() ? 0 : block->m_frames.back());
+		case Values::HIT_COUNT:
+			return m_frame >= 0 && m_frame < block->m_hit_counts.size() ? block->m_hit_counts[m_frame] : (block->m_hit_counts.isEmpty() ? 0 : block->m_hit_counts.back());
+			break;
 		default:
 			ASSERT(false);
 			return QVariant();

@@ -7,6 +7,7 @@
 #include "core/json_serializer.h"
 #include "core/log.h"
 #include "core/map.h"
+#include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "core/string.h"
@@ -548,13 +549,12 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void renderGrass(int64_t layer_mask)
 	{
+		PROFILE_FUNCTION();
 		if (m_active_camera.isValid())
 		{
 			Material* last_material = NULL;
 			m_grass_infos.clear();
 			m_scene->getGrassInfos(m_grass_infos, layer_mask);
-			glEnable(GL_MULTISAMPLE);
-			glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE_ARB);
 			for (int i = 0; i < m_grass_infos.size(); ++i)
 			{
 				Shader* shader = m_grass_infos[i].m_mesh->getMaterial()->getShader();
@@ -568,18 +568,17 @@ struct PipelineInstanceImpl : public PipelineInstance
 					shader->setUniform("light_dir", m_light_dir);
 					last_material = m_grass_infos[i].m_mesh->getMaterial();
 				}
-				shader->setUniform("grass_matrices", m_grass_infos[i].m_matrices, 50); /// TODO get rid of the constant
+				shader->setUniform("grass_matrices", m_grass_infos[i].m_matrices, m_grass_infos[i].m_matrix_count);
 
 				Mesh& mesh = *m_grass_infos[i].m_mesh;
-				m_grass_infos[i].m_geometry->draw(mesh.getStart(), mesh.getCount(), *shader);
+				m_grass_infos[i].m_geometry->draw(mesh.getStart(), mesh.getCount() / m_grass_infos[i].m_mesh_copy_count * m_grass_infos[i].m_matrix_count, *shader);
 			}
-			glDisable(GL_MULTISAMPLE);
-			glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE_ARB);
 		}
 	}
 
 	void renderTerrains(int64_t layer_mask)
 	{
+		PROFILE_FUNCTION();
 		if (m_active_camera.isValid())
 		{
 			m_terrain_infos.clear();
@@ -613,6 +612,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void renderModels(int64_t layer_mask)
 	{
+		PROFILE_FUNCTION();
 		ASSERT(m_renderer != NULL);
 		static Array<RenderableInfo> infos;
 		infos.clear();
