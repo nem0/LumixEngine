@@ -53,7 +53,7 @@ namespace Lumix
 		PipelineManager m_pipeline_manager;
 		AnimationManager m_animation_manager;
 		MTJD::Manager	m_mtjd_manager;
-		CullingSystem*	m_culling_system;
+//		CullingSystem*	m_culling_system;
 
 		string m_base_path;
 		EditorServer* m_editor_server;
@@ -170,7 +170,7 @@ namespace Lumix
 		m_impl->m_texture_manager.create(ResourceManager::TEXTURE, m_impl->m_resource_manager);
 		m_impl->m_pipeline_manager.create(ResourceManager::PIPELINE, m_impl->m_resource_manager);
 		m_impl->m_animation_manager.create(ResourceManager::ANIMATION, m_impl->m_resource_manager);
-		m_impl->m_culling_system = CullingSystem::create(m_impl->m_mtjd_manager);
+//		m_impl->m_culling_system = CullingSystem::create(m_impl->m_mtjd_manager);
 
 		return true;
 	}
@@ -182,7 +182,7 @@ namespace Lumix
 		Timer::destroy(m_impl->m_fps_timer);
 		m_impl->m_plugin_manager.destroy();
 		Renderer::destroyInstance(*m_impl->m_renderer);
-		CullingSystem::destroy(*m_impl->m_culling_system);
+//		CullingSystem::destroy(*m_impl->m_culling_system);
 
 		m_impl->m_input_system.destroy();
 		m_impl->m_material_manager.destroy();
@@ -303,10 +303,10 @@ namespace Lumix
 	}
 
 
-	CullingSystem& Engine::getCullingSystem() const
-	{
-		return *m_impl->m_culling_system;
-	}
+	//CullingSystem& Engine::getCullingSystem() const
+	//{
+	//	return *m_impl->m_culling_system;
+	//}
 
 
 	ResourceManager& Engine::getResourceManager() const

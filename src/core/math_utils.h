@@ -48,12 +48,6 @@ namespace Lumix
 		}
 
 		template <typename T>
-		LUMIX_FORCE_INLINE T minValue(T a, T b)
-		{
-			return a > b ? b : a;
-		}
-
-		template <typename T>
 		LUMIX_FORCE_INLINE T abs(T a)
 		{
 			return a > 0 ? a : -a;

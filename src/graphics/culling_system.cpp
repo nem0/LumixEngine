@@ -116,6 +116,9 @@ namespace Lumix
 			m_result.clear();
 			m_result.resize(count);
 
+			if (count == 0)
+				return;
+
 			int cpu_count = m_mtjd_manager.getCpuThreadsCount();
 			cpu_count = Math::minValue(count, cpu_count);
 			ASSERT(cpu_count > 0);
@@ -142,6 +145,15 @@ namespace Lumix
 			m_indexes.push(index);
 		}
 
+		virtual void updateBoundingRadius(float radius, int index) override
+		{
+			m_spheres[index].m_radius = radius;
+		}
+
+		virtual void updateBoundingPosition(const Vec3& position, int index) override
+		{
+			m_spheres[index].m_position = position;
+		}
 
 		virtual void insert(const InputSpheres& spheres) override
 		{
@@ -150,6 +162,11 @@ namespace Lumix
 				m_spheres.push(spheres[i]);
 				m_indexes.push(i);
 			}
+		}
+
+		virtual const InputSpheres& getSpheres() override
+		{
+			return m_spheres;
 		}
 
 	private:

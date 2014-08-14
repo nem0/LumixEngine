@@ -46,7 +46,7 @@ namespace Lumix
 			Universe* getUniverse() const;
 			RenderScene* getRenderScene() const;
 			MTJD::Manager& getMTJDManager() const;
-			CullingSystem& getCullingSystem() const;
+//			CullingSystem& getCullingSystem() const;
 
 			ResourceManager& getResourceManager() const;
 
