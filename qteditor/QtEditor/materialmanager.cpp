@@ -385,7 +385,7 @@ void MaterialManager::on_saveMaterialButton_clicked()
 	char tmp_path[LUMIX_MAX_PATH];
 	strcpy(tmp_path, m_impl->m_material->getPath().c_str());
 	strcat(tmp_path, ".tmp");
-	Lumix::FS::IFile* file = fs.open(fs.getDefaultDevice(), tmp_path, Lumix::FS::Mode::RECREATE | Lumix::FS::Mode::WRITE);
+	Lumix::FS::IFile* file = fs.open(fs.getDefaultDevice(), tmp_path, Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE);
 	if(file)
 	{
 		Lumix::JsonSerializer serializer(*file, Lumix::JsonSerializer::AccessMode::WRITE, m_impl->m_material->getPath().c_str());

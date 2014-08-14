@@ -82,9 +82,10 @@ namespace Lumix
 
 			if (1 == job->getDependenceCount())
 			{
+				job->m_scheduled = true;
+
 				pushReadyJob(job);
 
-				job->m_scheduled = true;
 				m_scheduler.dataSignal();
 			}
 

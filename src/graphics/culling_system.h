@@ -34,8 +34,12 @@ namespace Lumix
 
 		virtual void addStatic(const Sphere& sphere, int index) = 0;
 
+		virtual void updateBoundingRadius(float radius, int index) = 0;
+		virtual void updateBoundingPosition(const Vec3& position, int index) = 0;
+
 		//// test
 		virtual void insert(const InputSpheres& spheres) = 0;
+		virtual const InputSpheres& getSpheres() = 0;
 		//// test
 	};
 } // ~namespace Lux
