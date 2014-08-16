@@ -674,9 +674,30 @@ struct WorldEditorImpl : public WorldEditor
 
 				if (cmp.isValid())
 				{
-					uint32_t name_hash = crc32(property);
-					const IPropertyDescriptor& cp = getPropertyDescriptor(cmp.type, name_hash);
-					cp.set(cmp, stream);
+					uint32_t template_hash = m_template_system->getTemplate(m_selected_entity);
+					uint32_t property_name_hash = crc32(property);
+					const IPropertyDescriptor& cp = getPropertyDescriptor(cmp.type, property_name_hash);
+					if (template_hash)
+					{
+						const Array<Entity>& entities = m_template_system->getInstances(template_hash);
+						for (int i = 0, c = entities.size(); i < c; ++i)
+						{
+							stream.rewindForRead();
+							const Entity::ComponentList& cmps = entities[i].getComponents();
+							for (int j = 0, cj = cmps.size(); j < cj; ++j)
+							{
+								if (cmps[j].type == cmp.type)
+								{
+									cp.set(cmps[j], stream);
+									break;
+								}
+							}
+						}
+					}
+					else
+					{
+						cp.set(cmp, stream);
+					}
 				}
 			}
 		}

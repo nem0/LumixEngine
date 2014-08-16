@@ -65,6 +65,29 @@ namespace Lumix
 			}
 
 
+			virtual uint32_t getTemplate(const Entity& entity) override
+			{
+				for (auto iter = m_instances.begin(), end = m_instances.end(); iter != end; ++iter)
+				{
+					Array<Entity>& entities = iter.second();
+					for (int i = 0, c = entities.size(); i < c; ++i)
+					{
+						if (entities[i] == entity)
+						{
+							return iter.first();
+						}
+					}
+				}
+				return 0;
+			}
+
+
+			virtual const Array<Entity>& getInstances(uint32_t template_name_hash) override
+			{
+				return m_instances[template_name_hash];
+			}
+
+
 			virtual Entity createInstance(const char* name) override
 			{
 				uint32_t name_hash = crc32(name);

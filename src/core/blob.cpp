@@ -10,6 +10,17 @@ namespace Lumix
 	}
 
 
+	void Blob::rewindForRead()
+	{
+		m_pos = 0;
+		if (!m_buffer.empty())
+		{
+			m_data = &m_buffer[0];
+			m_size = m_buffer.size();
+		}
+	}
+
+
 	void Blob::write(const void* data, int32_t size)
 	{
 		if(m_size + (int)size > m_buffer.size())
