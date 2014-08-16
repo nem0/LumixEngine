@@ -9,6 +9,7 @@ namespace Lumix
 {
 	
 	class Engine;
+	class EntityTemplateSystem;
 	class IPlugin;
 	class IRenderDevice;
 	class Path;
@@ -65,9 +66,10 @@ namespace Lumix
 			virtual void saveUniverse(const Path& path) = 0;
 			virtual void newUniverse() = 0;
 			virtual Path getUniversePath() const = 0;
-			virtual void addComponent(uint32_t type_crc) = 0;
-			virtual void addEntity() = 0;
-			virtual void addEntityAt(int camera_x, int camera_y) = 0;
+			virtual Component addComponent(uint32_t type_crc) = 0;
+			virtual void cloneComponent(const Component& src, Entity& entity) = 0;
+			virtual Entity addEntity() = 0;
+			virtual Entity addEntityAt(int camera_x, int camera_y) = 0;
 			virtual void snapToTerrain() = 0;
 			virtual void toggleGameMode() = 0;
 			virtual void navigate(float forward, float right, float speed) = 0;
@@ -85,6 +87,7 @@ namespace Lumix
 			virtual DelegateList<void()>& universeDestroyed() = 0;
 			virtual void addPlugin(Plugin* plugin) = 0;
 			virtual void getRelativePath(char* relative_path, int max_length, const Path& source) = 0;
+			virtual EntityTemplateSystem& getEntityTemplateSystem() = 0;
 
 		protected:
 			virtual ~WorldEditor() {}

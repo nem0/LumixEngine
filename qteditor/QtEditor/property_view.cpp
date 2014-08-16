@@ -1020,17 +1020,17 @@ void PropertyView::updateSelectedEntityPosition()
 	}
 }
 
-void PropertyView::on_positionX_valueChanged(double arg1)
+void PropertyView::on_positionX_valueChanged(double)
 {
 	updateSelectedEntityPosition();
 }
 
-void PropertyView::on_positionY_valueChanged(double arg1)
+void PropertyView::on_positionY_valueChanged(double)
 {
 	updateSelectedEntityPosition();
 }
 
-void PropertyView::on_positionZ_valueChanged(double arg1)
+void PropertyView::on_positionZ_valueChanged(double)
 {
 	updateSelectedEntityPosition();
 }
