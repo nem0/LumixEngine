@@ -201,5 +201,8 @@
     <ClInclude Include="..\..\..\src\editor\entity_template_system.h">
       <Filter>editor</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\editor\ieditor_command.h">
+      <Filter>editor</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

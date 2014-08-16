@@ -62,6 +62,8 @@ namespace Lumix
 			virtual class Gizmo& getGizmo() = 0;
 			virtual class FS::TCPFileServer& getTCPFileServer() = 0;
 			virtual void setEditViewRenderDevice(IRenderDevice& render_device) = 0;
+			virtual void undo() = 0;
+			virtual void redo() = 0;
 			virtual void loadUniverse(const Path& path) = 0;
 			virtual void saveUniverse(const Path& path) = 0;
 			virtual void newUniverse() = 0;
@@ -70,6 +72,8 @@ namespace Lumix
 			virtual void cloneComponent(const Component& src, Entity& entity) = 0;
 			virtual Entity addEntity() = 0;
 			virtual Entity addEntityAt(int camera_x, int camera_y) = 0;
+			virtual void setEntityPosition(const Entity& entity, const Vec3& position) = 0;
+			virtual void setEntityPositionAndRotaion(const Entity& entity, const Vec3& position, const Quat& rotation) = 0;
 			virtual void snapToTerrain() = 0;
 			virtual void toggleGameMode() = 0;
 			virtual void navigate(float forward, float right, float speed) = 0;

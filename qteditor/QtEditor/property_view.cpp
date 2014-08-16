@@ -325,6 +325,7 @@ PropertyView::PropertyView(QWidget* parent)
 	: QDockWidget(parent)
 	, m_ui(new Ui::PropertyView)
 	, m_terrain_editor(NULL)
+	, m_is_updating_values(false)
 {
 	m_ui->setupUi(this);
 
@@ -350,39 +351,51 @@ PropertyView::~PropertyView()
 
 void PropertyView::on_checkboxStateChanged()
 {
-	QCheckBox* cb = qobject_cast<QCheckBox*>(QObject::sender());
-	int i = cb->property("cpp_prop").toInt();
-	bool b = cb->isChecked();
-	m_world_editor->setProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), &b, sizeof(b)); 
+	if (!m_is_updating_values)
+	{
+		QCheckBox* cb = qobject_cast<QCheckBox*>(QObject::sender());
+		int i = cb->property("cpp_prop").toInt();
+		bool b = cb->isChecked();
+		m_world_editor->setProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), &b, sizeof(b));
+	}
 }
 
 
 void PropertyView::on_vec3ValueChanged()
 {
-	QDoubleSpinBox* sb = qobject_cast<QDoubleSpinBox*>(QObject::sender());
-	int i = sb->property("cpp_prop").toInt();
-	Lumix::Vec3 v;
-	v.x = (float)qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item->child(0), 1))->value();
-	v.y = (float)qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item->child(1), 1))->value();
-	v.z = (float)qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item->child(2), 1))->value();
-	m_world_editor->setProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), &v, sizeof(v));
+	if (!m_is_updating_values)
+	{
+		QDoubleSpinBox* sb = qobject_cast<QDoubleSpinBox*>(QObject::sender());
+		int i = sb->property("cpp_prop").toInt();
+		Lumix::Vec3 v;
+		v.x = (float)qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item->child(0), 1))->value();
+		v.y = (float)qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item->child(1), 1))->value();
+		v.z = (float)qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item->child(2), 1))->value();
+		m_world_editor->setProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), &v, sizeof(v));
+	}
 }
 
 void PropertyView::on_doubleSpinBoxValueChanged()
 {
-	QDoubleSpinBox* sb = qobject_cast<QDoubleSpinBox*>(QObject::sender());
-	int i = sb->property("cpp_prop").toInt();
-	float f = (float)qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item, 1))->value();
-	m_world_editor->setProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), &f, sizeof(f));
+	if (!m_is_updating_values)
+	{
+		QDoubleSpinBox* sb = qobject_cast<QDoubleSpinBox*>(QObject::sender());
+		int i = sb->property("cpp_prop").toInt();
+		float f = (float)qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item, 1))->value();
+		m_world_editor->setProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), &f, sizeof(f));
+	}
 }
 
 void PropertyView::on_lineEditEditingFinished()
 {
-	QLineEdit* edit = qobject_cast<QLineEdit*>(QObject::sender());
-	int i = edit->property("cpp_prop").toInt();
-	QByteArray byte_array = edit->text().toLatin1();
-	const char* text = byte_array.data();
-	m_world_editor->setProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), text, byte_array.size());
+	if (!m_is_updating_values)
+	{
+		QLineEdit* edit = qobject_cast<QLineEdit*>(QObject::sender());
+		int i = edit->property("cpp_prop").toInt();
+		QByteArray byte_array = edit->text().toLatin1();
+		const char* text = byte_array.data();
+		m_world_editor->setProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), text, byte_array.size());
+	}
 }
 
 void PropertyView::on_browseFilesClicked()
@@ -398,6 +411,7 @@ void PropertyView::on_browseFilesClicked()
 
 void PropertyView::onPropertyValue(Property* property, const void* data, int32_t)
 {
+	m_is_updating_values = true;
 	if(property->m_component_name == "script" && property->m_name == "source")
 	{
 		setScriptStatus(m_compiler->getStatus(static_cast<const char*>(data)));
@@ -449,6 +463,7 @@ void PropertyView::onPropertyValue(Property* property, const void* data, int32_t
 			ASSERT(false);
 			break;
 	}
+	m_is_updating_values = false;
 }
 
 
@@ -1013,11 +1028,7 @@ void PropertyView::on_addComponentButton_clicked()
 
 void PropertyView::updateSelectedEntityPosition()
 {
-	Lumix::Entity e = m_world_editor->getSelectedEntity();
-	if (e.isValid())
-	{
-		e.setPosition(Lumix::Vec3((float)m_ui->positionX->value(), (float)m_ui->positionY->value(), (float)m_ui->positionZ->value()));
-	}
+	m_world_editor->getSelectedEntity().setPosition(Lumix::Vec3((float)m_ui->positionX->value(), (float)m_ui->positionY->value(), (float)m_ui->positionZ->value()));
 }
 
 void PropertyView::on_positionX_valueChanged(double)

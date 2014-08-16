@@ -26,8 +26,12 @@ namespace Lumix
 		if(m_size + (int)size > m_buffer.size())
 		{
 			m_buffer.resize(m_size + size);
+			m_data = &m_buffer[0];
 		}
-		memcpy(&m_buffer[0] + m_size, data, size);
+		if (size)
+		{
+			memcpy(&m_buffer[0] + m_size, data, size);
+		}
 		m_size += size;
 	}
 
