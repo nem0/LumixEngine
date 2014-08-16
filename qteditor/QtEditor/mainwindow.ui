@@ -52,6 +52,7 @@
       <string>Windows</string>
      </property>
      <addaction name="actionAsset_Browser"/>
+     <addaction name="actionEntity_templates"/>
      <addaction name="actionFile_server"/>
      <addaction name="actionGame_view"/>
      <addaction name="actionLog"/>
@@ -88,6 +89,7 @@
      <string>Entity</string>
     </property>
     <addaction name="actionCreate"/>
+    <addaction name="actionSave_as_template"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuView"/>
@@ -225,6 +227,16 @@
    </property>
    <property name="shortcut">
     <string>Ctrl+T</string>
+   </property>
+  </action>
+  <action name="actionSave_as_template">
+   <property name="text">
+    <string>Create template</string>
+   </property>
+  </action>
+  <action name="actionEntity_templates">
+   <property name="text">
+    <string>Entity templates</string>
    </property>
   </action>
  </widget>

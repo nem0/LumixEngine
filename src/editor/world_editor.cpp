@@ -20,6 +20,7 @@
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "editor/editor_icon.h"
+#include "editor/entity_template_system.h"
 #include "editor/gizmo.h"
 #include "editor/property_descriptor.h"
 #include "engine/engine.h"
@@ -272,6 +273,7 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			JsonSerializer serializer(file, JsonSerializer::WRITE, path);
 			m_engine.serialize(serializer);
+			m_template_system->serialize(serializer);
 			g_log_info.log("editor server") << "universe saved";
 		}
 
@@ -290,17 +292,17 @@ struct WorldEditorImpl : public WorldEditor
 			}
 		}
 
-		virtual void addEntity() override
+		virtual Entity addEntity() override
 		{
 			Component cmp = m_camera.getComponent(CAMERA_HASH);
 			float width;
 			float height;
 			m_engine.getRenderScene()->getCameraWidth(cmp, width);
 			m_engine.getRenderScene()->getCameraHeight(cmp, height);
-			addEntityAt((int)width >> 1, (int)height >> 1);
+			return addEntityAt((int)width >> 1, (int)height >> 1);
 		}
 
-		virtual void addEntityAt(int camera_x, int camera_y) override
+		virtual Entity addEntityAt(int camera_x, int camera_y) override
 		{
 			Entity e = m_engine.getUniverse()->createEntity();
 
@@ -321,6 +323,7 @@ struct WorldEditorImpl : public WorldEditor
 			EditorIcon* er = LUMIX_NEW(EditorIcon)();
 			er->create(m_engine, *m_engine.getRenderScene(), m_selected_entity);
 			m_editor_icons.push(er);
+			return e;
 		}
 
 
@@ -349,8 +352,45 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
-		virtual void addComponent(uint32_t type_crc) override
+		virtual EntityTemplateSystem& getEntityTemplateSystem() override
 		{
+			return *m_template_system;
+		}
+
+
+		virtual void cloneComponent(const Component& src, Entity& entity) override
+		{
+			Component clone = Component::INVALID;
+
+			IPlugin* plugin = 0;
+			if (m_creators.find(src.type, plugin))
+			{
+				clone = plugin->createComponent(src.type, entity);
+			}
+			else if (src.type == RENDERABLE_HASH || src.type == TERRAIN_HASH || src.type == CAMERA_HASH || src.type == LIGHT_HASH)
+			{
+				clone = m_engine.getRenderScene()->createComponent(src.type, entity);
+			}
+			else
+			{
+				ASSERT(false);
+			}
+
+			const Array<IPropertyDescriptor*>& properties = m_component_properties[src.type];
+			Blob stream;
+			for (int i = 0; i < properties.size(); ++i)
+			{
+				stream.clearBuffer();
+				properties[i]->get(src, stream);
+				stream.rewindForRead();
+				properties[i]->set(clone, stream);
+			}
+		}
+
+
+		virtual Component addComponent(uint32_t type_crc) override
+		{
+			Component cmp = Component::INVALID;
 			if (m_selected_entity.isValid())
 			{
 				const Entity::ComponentList& cmps = m_selected_entity.getComponents();
@@ -358,18 +398,18 @@ struct WorldEditorImpl : public WorldEditor
 				{
 					if (cmps[i].type == type_crc)
 					{
-						return;
+						return cmps[i];
 					}
 				}
 
 				IPlugin* plugin = 0;
 				if (m_creators.find(type_crc, plugin))
 				{
-					plugin->createComponent(type_crc, m_selected_entity);
+					cmp = plugin->createComponent(type_crc, m_selected_entity);
 				}
 				else if (type_crc == RENDERABLE_HASH || type_crc == TERRAIN_HASH || type_crc == CAMERA_HASH || type_crc == LIGHT_HASH)
 				{
-					m_engine.getRenderScene()->createComponent(type_crc, m_selected_entity);
+					cmp = m_engine.getRenderScene()->createComponent(type_crc, m_selected_entity);
 				}
 				else
 				{
@@ -377,6 +417,7 @@ struct WorldEditorImpl : public WorldEditor
 				}
 				selectEntity(m_selected_entity);
 			}
+			return cmp;
 		}
 
 
@@ -439,6 +480,7 @@ struct WorldEditorImpl : public WorldEditor
 			g_log_info.log("editor server") << "parsing universe...";
 			JsonSerializer serializer(file, JsonSerializer::READ, path);
 			m_engine.deserialize(serializer);
+			m_template_system->deserialize(serializer);
 			m_camera = m_engine.getRenderScene()->getCameraInSlot("editor").entity;
 			g_log_info.log("editor server") << "universe parsed";
 
@@ -517,6 +559,7 @@ struct WorldEditorImpl : public WorldEditor
 
 			registerProperties();
 			createUniverse(true);
+			m_template_system = EntityTemplateSystem::create(*this);
 
 			return true;
 		}
@@ -542,8 +585,8 @@ struct WorldEditorImpl : public WorldEditor
 
 		void destroy()
 		{
-
 			destroyUniverse();
+			EntityTemplateSystem::destroy(m_template_system);
 			m_engine.destroy();
 
 			m_tcp_file_device.disconnect();
@@ -835,6 +878,7 @@ struct WorldEditorImpl : public WorldEditor
 		float m_terrain_brush_strength;
 		Array<Plugin*> m_plugins;
 		Plugin* m_mouse_handling_plugin;
+		EntityTemplateSystem* m_template_system;
 };
 
 
