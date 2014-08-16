@@ -388,9 +388,8 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
-		virtual Component addComponent(uint32_t type_crc) override
+		virtual void addComponent(uint32_t type_crc) override
 		{
-			Component cmp = Component::INVALID;
 			if (m_selected_entity.isValid())
 			{
 				const Entity::ComponentList& cmps = m_selected_entity.getComponents();
@@ -398,26 +397,52 @@ struct WorldEditorImpl : public WorldEditor
 				{
 					if (cmps[i].type == type_crc)
 					{
-						return cmps[i];
+						return;
 					}
 				}
-
-				IPlugin* plugin = 0;
-				if (m_creators.find(type_crc, plugin))
+				
+				uint32_t template_hash = m_template_system->getTemplate(m_selected_entity);
+				if (template_hash == 0)
 				{
-					cmp = plugin->createComponent(type_crc, m_selected_entity);
-				}
-				else if (type_crc == RENDERABLE_HASH || type_crc == TERRAIN_HASH || type_crc == CAMERA_HASH || type_crc == LIGHT_HASH)
-				{
-					cmp = m_engine.getRenderScene()->createComponent(type_crc, m_selected_entity);
+					IPlugin* plugin = 0;
+					if (m_creators.find(type_crc, plugin))
+					{
+						plugin->createComponent(type_crc, m_selected_entity);
+					}
+					else if (type_crc == RENDERABLE_HASH || type_crc == TERRAIN_HASH || type_crc == CAMERA_HASH || type_crc == LIGHT_HASH)
+					{
+						m_engine.getRenderScene()->createComponent(type_crc, m_selected_entity);
+					}
+					else
+					{
+						ASSERT(false);
+					}
 				}
 				else
 				{
-					ASSERT(false);
+					const Array<Entity>& entities = m_template_system->getInstances(template_hash);
+					IPlugin* plugin = 0;
+					if (m_creators.find(type_crc, plugin))
+					{
+						for (int i = 0, c = entities.size(); i < c; ++i)
+						{
+							plugin->createComponent(type_crc, entities[i]);
+						}
+					}
+					else if (type_crc == RENDERABLE_HASH || type_crc == TERRAIN_HASH || type_crc == CAMERA_HASH || type_crc == LIGHT_HASH)
+					{
+						for (int i = 0, c = entities.size(); i < c; ++i)
+						{
+							m_engine.getRenderScene()->createComponent(type_crc, entities[i]);
+						}
+					}
+					else
+					{
+						ASSERT(false);
+					}
 				}
 				selectEntity(m_selected_entity);
 			}
-			return cmp;
 		}
 
 

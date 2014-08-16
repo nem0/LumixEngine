@@ -66,7 +66,7 @@ namespace Lumix
 			virtual void saveUniverse(const Path& path) = 0;
 			virtual void newUniverse() = 0;
 			virtual Path getUniversePath() const = 0;
-			virtual Component addComponent(uint32_t type_crc) = 0;
+			virtual void addComponent(uint32_t type_crc) = 0;
 			virtual void cloneComponent(const Component& src, Entity& entity) = 0;
 			virtual Entity addEntity() = 0;
 			virtual Entity addEntityAt(int camera_x, int camera_y) = 0;
