@@ -139,6 +139,8 @@ namespace Lumix
 
 			virtual void deserialize(ISerializer& serializer) override
 			{
+				m_template_names.clear();
+				m_instances.clear();
 				int32_t count;
 				serializer.deserialize("templates_count", count);
 				serializer.deserializeArrayBegin("template_names");
