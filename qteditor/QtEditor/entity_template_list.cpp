@@ -29,6 +29,7 @@ void EntityTemplateList::setWorldEditor(Lumix::WorldEditor& editor)
 	onSystemUpdated();
 }
 
+
 void EntityTemplateList::onSystemUpdated()
 {
 	Lumix::Array<Lumix::string>& template_names = m_editor->getEntityTemplateSystem().getTemplateNames();
@@ -39,7 +40,17 @@ void EntityTemplateList::onSystemUpdated()
 	}
 }
 
+
 void EntityTemplateList::on_templateList_doubleClicked(const QModelIndex &index)
 {
 	m_editor->getEntityTemplateSystem().createInstance(m_ui->templateList->item(index.row())->text().toLatin1().data());
+}
+
+
+void EntityTemplateList::instantiateTemplate()
+{
+	if (m_ui->templateList->currentIndex().row() >= 0)
+	{
+		m_editor->getEntityTemplateSystem().createInstance(m_ui->templateList->item(m_ui->templateList->currentIndex().row())->text().toLatin1().data());
+	}
 }

@@ -49,6 +49,8 @@ private slots:
 	void on_actionSave_as_template_triggered();
 	void on_actionEntity_templates_triggered();
 
+    void on_actionInstantiate_template_triggered();
+
 private:
 	Ui::MainWindow* m_ui;
 	Lumix::WorldEditor* m_world_editor;

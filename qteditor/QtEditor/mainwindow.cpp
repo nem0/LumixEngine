@@ -230,3 +230,8 @@ void MainWindow::on_actionEntity_templates_triggered()
 {
 	m_entity_template_list_ui->show();
 }
+
+void MainWindow::on_actionInstantiate_template_triggered()
+{
+	m_entity_template_list_ui->instantiateTemplate();
+}
