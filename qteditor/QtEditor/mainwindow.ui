@@ -90,6 +90,7 @@
     </property>
     <addaction name="actionCreate"/>
     <addaction name="actionSave_as_template"/>
+    <addaction name="actionInstantiate_template"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuView"/>
@@ -237,6 +238,14 @@
   <action name="actionEntity_templates">
    <property name="text">
     <string>Entity templates</string>
+   </property>
+  </action>
+  <action name="actionInstantiate_template">
+   <property name="text">
+    <string>Instantiate template</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Q</string>
    </property>
   </action>
  </widget>

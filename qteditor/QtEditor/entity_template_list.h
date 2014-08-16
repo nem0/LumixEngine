@@ -21,6 +21,7 @@ class EntityTemplateList : public QDockWidget
 		~EntityTemplateList();
 
 		void setWorldEditor(Lumix::WorldEditor& editor);
+		void instantiateTemplate();
 
 	private:
 		void onSystemUpdated();
