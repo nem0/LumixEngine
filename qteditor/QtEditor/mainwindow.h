@@ -51,6 +51,10 @@ private slots:
 
     void on_actionInstantiate_template_triggered();
 
+    void on_actionUndo_triggered();
+
+    void on_actionRedo_triggered();
+
 private:
 	Ui::MainWindow* m_ui;
 	Lumix::WorldEditor* m_world_editor;

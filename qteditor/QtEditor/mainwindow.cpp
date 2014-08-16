@@ -235,3 +235,13 @@ void MainWindow::on_actionInstantiate_template_triggered()
 {
 	m_entity_template_list_ui->instantiateTemplate();
 }
+
+void MainWindow::on_actionUndo_triggered()
+{
+	m_world_editor->undo();
+}
+
+void MainWindow::on_actionRedo_triggered()
+{
+	m_world_editor->redo();
+}

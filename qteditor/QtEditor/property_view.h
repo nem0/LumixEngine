@@ -100,6 +100,7 @@ private:
 	ScriptCompiler* m_compiler;
 	Lumix::Entity m_selected_entity;
 	Lumix::WorldEditor* m_world_editor;
+	bool m_is_updating_values;
 	class TerrainEditor* m_terrain_editor;
 };
 

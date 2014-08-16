@@ -205,6 +205,7 @@ namespace Lumix
 				for (int i = 0; i < m_renderables.size(); ++i)
 				{
 					serializer.serializeArrayItem(m_renderables[i]->m_entity.index);
+					serializer.serializeArrayItem(m_renderables[i]->m_layer_mask);
 					if (m_renderables[i]->m_model.getModel())
 					{
 						serializer.serializeArrayItem(m_renderables[i]->m_model.getModel()->getPath().c_str());
@@ -284,6 +285,7 @@ namespace Lumix
 				{
 					serializer.deserializeArrayItem(m_renderables[i]->m_entity.index);
 					m_renderables[i]->m_entity.universe = &m_universe;
+					serializer.deserializeArrayItem(m_renderables[i]->m_layer_mask);
 					char path[LUMIX_MAX_PATH];
 					serializer.deserializeArrayItem(path, LUMIX_MAX_PATH);
 					serializer.deserializeArrayItem(m_renderables[i]->m_scale);

@@ -614,19 +614,20 @@ struct PipelineInstanceImpl : public PipelineInstance
 	{
 		PROFILE_FUNCTION();
 		ASSERT(m_renderer != NULL);
-		static Array<RenderableInfo> infos;
-		infos.clear();
-		m_scene->getRenderableInfos(infos, layer_mask);
-		int count = infos.size();
+		renderTerrains(layer_mask);
+		
+		m_renderable_infos.clear();
+		m_scene->getRenderableInfos(m_renderable_infos, layer_mask);
+		int count = m_renderable_infos.size();
 		Material* last_material = NULL;
 		for (int i = 0; i < count; ++i)
 		{
 			glPushMatrix();
-			Matrix world_matrix = infos[i].m_model ? infos[i].m_model->getMatrix() : *infos[i].m_matrix;
-			world_matrix.multiply3x3(infos[i].m_scale);
+			Matrix world_matrix = m_renderable_infos[i].m_model ? m_renderable_infos[i].m_model->getMatrix() : *m_renderable_infos[i].m_matrix;
+			world_matrix.multiply3x3(m_renderable_infos[i].m_scale);
 			glMultMatrixf(&world_matrix.m11);
 			
-			Mesh& mesh = *infos[i].m_mesh;
+			Mesh& mesh = *m_renderable_infos[i].m_mesh;
 			Material& material = *mesh.getMaterial();
 			if (last_material != &material)
 			{
@@ -640,10 +641,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 				last_material = &material;
 			}
 			static Matrix bone_mtx[64];
-			if (infos[i].m_pose)
+			if (m_renderable_infos[i].m_pose)
 			{
-				const Pose& pose = *infos[i].m_pose;
-				const Model& model = *infos[i].m_model->getModel();
+				const Pose& pose = *m_renderable_infos[i].m_pose;
+				const Model& model = *m_renderable_infos[i].m_model->getModel();
 				Vec3* poss = pose.getPositions();
 				Quat* rots = pose.getRotations();
 				ASSERT(pose.getCount() <= 64);
@@ -656,11 +657,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 				material.getShader()->setUniform("bone_matrices", bone_mtx, pose.getCount());
 			}
 
-			infos[i].m_geometry->draw(mesh.getStart(), mesh.getCount(), *material.getShader());
+			m_renderable_infos[i].m_geometry->draw(mesh.getStart(), mesh.getCount(), *material.getShader());
 			glPopMatrix();
 		}
 
-		renderTerrains(layer_mask);
 		renderGrass(layer_mask);
 	}
 
@@ -709,6 +709,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	Component m_active_camera;
 	Array<TerrainInfo> m_terrain_infos;
 	Array<GrassInfo> m_grass_infos;
+	Array<RenderableInfo> m_renderable_infos;
 
 	private:
 		void operator=(const PipelineInstanceImpl&);
