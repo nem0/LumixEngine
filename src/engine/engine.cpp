@@ -102,7 +102,7 @@ namespace Lumix
 		{
 			return false;
 		}
-		AnimationSystem* anim_system = LUMIX_NEW(AnimationSystem)();
+		AnimationSystem* anim_system = AnimationSystem::createInstance();
 		if(!anim_system->create(owner))
 		{
 			LUMIX_DELETE(anim_system);

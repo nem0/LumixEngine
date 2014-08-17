@@ -41,6 +41,7 @@ namespace Lumix
 		Entity m_entity;
 		int64_t m_layer_mask;
 		float m_scale;
+		bool m_is_free;
 
 		private:
 			Renderable(const Renderable&) {}
@@ -206,6 +207,7 @@ namespace Lumix
 				{
 					serializer.serializeArrayItem(m_renderables[i]->m_entity.index);
 					serializer.serializeArrayItem(m_renderables[i]->m_layer_mask);
+					serializer.serializeArrayItem(m_renderables[i]->m_is_free);
 					if (m_renderables[i]->m_model.getModel())
 					{
 						serializer.serializeArrayItem(m_renderables[i]->m_model.getModel()->getPath().c_str());
@@ -286,6 +288,7 @@ namespace Lumix
 					serializer.deserializeArrayItem(m_renderables[i]->m_entity.index);
 					m_renderables[i]->m_entity.universe = &m_universe;
 					serializer.deserializeArrayItem(m_renderables[i]->m_layer_mask);
+					serializer.deserializeArrayItem(m_renderables[i]->m_is_free);
 					char path[LUMIX_MAX_PATH];
 					serializer.deserializeArrayItem(path, LUMIX_MAX_PATH);
 					serializer.deserializeArrayItem(m_renderables[i]->m_scale);
@@ -346,6 +349,23 @@ namespace Lumix
 				deserializeTerrains(serializer);
 			}
 
+
+			virtual void destroyComponent(const Component& component) override
+			{
+				if (component.type == RENDERABLE_HASH)
+				{
+					m_renderables[component.index]->m_model.setModel(NULL);
+					m_renderables[component.index]->m_is_free = true;
+					m_universe.removeComponent(component);
+					m_universe.componentDestroyed().invoke(component);
+				}
+				else
+				{
+					ASSERT(false);
+				}
+			}
+
+
 			virtual Component createComponent(uint32_t type, const Entity& entity) override
 			{
 				if (type == TERRAIN_HASH)
@@ -375,11 +395,25 @@ namespace Lumix
 				}
 				else if (type == RENDERABLE_HASH)
 				{
-					m_renderables.push(LUMIX_NEW(Renderable));
-					Renderable& r = *m_renderables.back();
+					Renderable* src = NULL;
+					for (int i = 0, c = m_renderables.size(); i < c; ++i)
+					{
+						if (m_renderables[i]->m_is_free)
+						{
+							src = m_renderables[i];
+							break;
+						}
+					}
+					if (!src)
+					{
+						src = LUMIX_NEW(Renderable);
+						m_renderables.push(src);
+					}
+					Renderable& r = *src;
 					r.m_entity = entity;
 					r.m_layer_mask = 1;
 					r.m_scale = 1;
+					r.m_is_free = false;
 					r.m_model.setModel(NULL);
 					Component cmp = m_universe.addComponent(entity, type, this, m_renderables.size() - 1);
 					m_universe.componentCreated().invoke(cmp);
@@ -543,11 +577,12 @@ namespace Lumix
 				infos.reserve(m_renderables.size() * 2);
 				for (int i = 0; i < m_renderables.size(); ++i)
 				{
-					if (m_renderables[i]->m_model.getModel() && (m_renderables[i]->m_layer_mask & layer_mask) != 0)
+					if (!m_renderables[i]->m_is_free)
 					{
-						for (int j = 0, c = m_renderables[i]->m_model.getModel()->getMeshCount(); j < c; ++j)
+						bool is_model_ready = m_renderables[i]->m_model.getModel() && m_renderables[i]->m_model.getModel()->isReady();
+						if (is_model_ready && (m_renderables[i]->m_layer_mask & layer_mask) != 0)
 						{
-							if (m_renderables[i]->m_model.getModel()->getMesh(j).getMaterial()->isReady())
+							for (int j = 0, c = m_renderables[i]->m_model.getModel()->getMeshCount(); j < c; ++j)
 							{
 								RenderableInfo& info = infos.pushEmpty();
 								info.m_scale = m_renderables[i]->m_scale;
@@ -556,8 +591,6 @@ namespace Lumix
 								info.m_pose = &m_renderables[i]->m_model.getPose();
 								info.m_model = &m_renderables[i]->m_model;
 								info.m_matrix = &m_renderables[i]->m_model.getMatrix();
-
-								//m_renderables[i]->m_model.getPose().computeAbsolute(*info.m_model->getModel());
 							}
 						}
 					}

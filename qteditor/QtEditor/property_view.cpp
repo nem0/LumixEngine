@@ -14,8 +14,9 @@
 #include <qdesktopservices.h>
 #include <QDoubleSpinBox>
 #include <QDragEnterEvent>
-#include <QFileDialog>
-#include <QMimeData>
+#include <qfiledialog.h>
+#include <qmenu.h>
+#include <qmimedata.h>
 #include <qlineedit.h>
 #include <qpushbutton.h>
 
@@ -1044,4 +1045,40 @@ void PropertyView::on_positionY_valueChanged(double)
 void PropertyView::on_positionZ_valueChanged(double)
 {
 	updateSelectedEntityPosition();
+}
+
+void PropertyView::on_propertyList_customContextMenuRequested(const QPoint &pos)
+{
+	QMenu* menu = new QMenu("Item actions", NULL);
+	const QModelIndex& index = m_ui->propertyList->indexAt(pos);
+	if (index.isValid() && !index.parent().isValid() && m_selected_entity.isValid())
+	{
+		QAction* remove_component_action = new QAction("Remove component", menu);
+		menu->addAction(remove_component_action);
+		QAction* action = menu->exec(m_ui->propertyList->mapToGlobal(pos));
+		if (action == remove_component_action)
+		{
+			uint32_t cmp_hash = 0;
+			QByteArray label = m_ui->propertyList->itemAt(pos)->text(0).toLatin1();
+			for (int i = 0; i < sizeof(component_map) / sizeof(component_map[0]); i += 2)
+			{
+				if (strcmp(component_map[i], label.data()) == 0)
+				{
+					cmp_hash = crc32(component_map[i + 1]);
+					break;
+				}
+			}
+			const Lumix::Entity::ComponentList& cmps = m_selected_entity.getComponents();
+			for (int i = 0, c = cmps.size(); i < c; ++i)
+			{
+				if (cmps[i].type == cmp_hash)
+				{
+					Lumix::Entity entity = cmps[i].entity;
+					m_world_editor->removeComponent(cmps[i]);
+					m_world_editor->selectEntity(entity);
+					break;
+				}
+			}
+		}
+	}
 }

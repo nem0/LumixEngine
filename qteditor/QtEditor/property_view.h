@@ -78,6 +78,8 @@ private slots:
     void on_positionY_valueChanged(double arg1);
     void on_positionZ_valueChanged(double arg1);
 
+    void on_propertyList_customContextMenuRequested(const QPoint &pos);
+
 private:
 	void clear();
 	void onUniverseCreated();

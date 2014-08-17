@@ -42,6 +42,14 @@ namespace Lumix
 {
 
 
+static const uint32_t RENDERABLE_HASH = crc32("renderable");
+static const uint32_t CAMERA_HASH = crc32("camera");
+static const uint32_t LIGHT_HASH = crc32("light");
+static const uint32_t SCRIPT_HASH = crc32("script");
+static const uint32_t ANIMABLE_HASH = crc32("animable");
+static const uint32_t TERRAIN_HASH = crc32("terrain");
+
+
 class MoveEntityCommand : public IEditorCommand
 {
 	public:
@@ -175,6 +183,9 @@ class SetPropertyCommand : public IEditorCommand
 };
 
 
+
+
+
 struct EditorIconHit
 {
 	EditorIcon* m_icon;
@@ -182,16 +193,160 @@ struct EditorIconHit
 };
 
 
-static const uint32_t RENDERABLE_HASH = crc32("renderable");
-static const uint32_t CAMERA_HASH = crc32("camera");
-static const uint32_t LIGHT_HASH = crc32("light");
-static const uint32_t SCRIPT_HASH = crc32("script");
-static const uint32_t ANIMABLE_HASH = crc32("animable");
-static const uint32_t TERRAIN_HASH = crc32("terrain");
-
-
 struct WorldEditorImpl : public WorldEditor
 {
+	private:
+		class RemoveComponentCommand : public IEditorCommand
+		{
+			public:
+			RemoveComponentCommand(WorldEditorImpl& editor, const Component& component)
+				: m_component(component)
+				, m_editor(editor)
+			{
+			}
+
+
+			virtual void undo() override
+			{
+				uint32_t template_hash = m_editor.m_template_system->getTemplate(m_component.entity);
+				const Array<IPropertyDescriptor*>& props = m_editor.m_component_properties[m_component.type];
+				if (template_hash == 0)
+				{
+					IPlugin* plugin = 0;
+					if (m_editor.m_creators.find(m_component.type, plugin))
+					{
+						plugin->createComponent(m_component.type, m_component.entity);
+					}
+					else if (m_component.type == RENDERABLE_HASH || m_component.type == TERRAIN_HASH || m_component.type == CAMERA_HASH || m_component.type == LIGHT_HASH)
+					{
+						m_editor.m_engine.getRenderScene()->createComponent(m_component.type, m_component.entity);
+					}
+					else
+					{
+						ASSERT(false);
+					}
+					m_old_values.rewindForRead();
+					for (int i = 0; i < props.size(); ++i)
+					{
+						props[i]->set(m_component, m_old_values);
+					}
+				}
+				else
+				{
+					const Array<Entity>& entities = m_editor.m_template_system->getInstances(template_hash);
+					IPlugin* plugin = 0;
+					if (m_editor.m_creators.find(m_component.type == RENDERABLE_HASH, plugin))
+					{
+						for (int i = 0, c = entities.size(); i < c; ++i)
+						{
+							Component cmp_new = plugin->createComponent(m_component.type, entities[i]);
+							m_old_values.rewindForRead();
+							for (int i = 0; i < props.size(); ++i)
+							{
+								props[i]->set(cmp_new, m_old_values);
+							}
+						}
+					}
+					else if (m_component.type == RENDERABLE_HASH || m_component.type == TERRAIN_HASH || m_component.type == CAMERA_HASH || m_component.type == LIGHT_HASH)
+					{
+						for (int i = 0, c = entities.size(); i < c; ++i)
+						{
+							Component new_cmp = m_editor.m_engine.getRenderScene()->createComponent(m_component.type, entities[i]);
+							m_old_values.rewindForRead();
+							for (int i = 0; i < props.size(); ++i)
+							{
+								props[i]->set(new_cmp, m_old_values);
+							}
+						}
+					}
+					else
+					{
+						ASSERT(false);
+					}
+				}
+			}
+
+
+			virtual bool merge(IEditorCommand& command) override
+			{
+				return false;
+			}
+
+
+			virtual uint32_t getType() override
+			{
+				static const uint32_t hash = crc32("remove_component");
+				return hash;
+			}
+
+
+			virtual void execute() override
+			{
+				Array<IPropertyDescriptor*>& props = m_editor.m_component_properties[m_component.type];
+				for (int i = 0; i < props.size(); ++i)
+				{
+					props[i]->get(m_component, m_old_values);
+				}
+				auto iter = m_editor.m_creators.find(m_component.type);
+				uint32_t template_hash = m_editor.getEntityTemplateSystem().getTemplate(m_component.entity);
+				if (iter != m_editor.m_creators.end())
+				{
+					if (template_hash)
+					{
+						const Array<Entity>& instances = m_editor.m_template_system->getInstances(template_hash);
+						for (int i = 0; i < instances.size(); ++i)
+						{
+							const Entity::ComponentList& cmps = instances[i].getComponents();
+							for (int j = 0; j < cmps.size(); ++j)
+							{
+								if (cmps[j].type == m_component.type)
+								{
+									iter.second()->destroyComponent(cmps[j]);
+									break;
+								}
+							}
+						}
+					}
+					else
+					{
+						iter.second()->destroyComponent(m_component);
+					}
+				}
+				else if (m_component.type == RENDERABLE_HASH || m_component.type == TERRAIN_HASH || m_component.type == CAMERA_HASH || m_component.type == LIGHT_HASH)
+				{
+					if (template_hash)
+					{
+						const Array<Entity>& instances = m_editor.m_template_system->getInstances(template_hash);
+						for (int i = 0; i < instances.size(); ++i)
+						{
+							const Entity::ComponentList& cmps = instances[i].getComponents();
+							for (int j = 0; j < cmps.size(); ++j)
+							{
+								if (cmps[j].type == m_component.type)
+								{
+									static_cast<RenderScene*>(m_component.system)->destroyComponent(cmps[j]);
+									break;
+								}
+							}
+						}
+					}
+					else
+					{
+						static_cast<RenderScene*>(m_component.system)->destroyComponent(m_component);
+					}
+				}
+				else
+				{
+					ASSERT(false);
+				}
+			}
+
+			private:
+			Component m_component;
+			WorldEditorImpl& m_editor;
+			Blob m_old_values;
+		};
+
 	public:
 
 		virtual const char* getBasePath() override
@@ -578,6 +733,16 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
+		virtual void removeComponent(const Component& component) override
+		{
+			if (component.isValid())
+			{
+				IEditorCommand* command = LUMIX_NEW(RemoveComponentCommand)(*this, component);
+				executeCommand(command);
+			}
+		}
+
+
 		virtual void addComponent(uint32_t type_crc) override
 		{
 			if (m_selected_entity.isValid())
@@ -917,7 +1082,7 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 	
-		void selectEntity(Entity e) 
+		virtual void selectEntity(Entity e) override
 		{
 			m_selected_entity = e;
 			m_gizmo.setEntity(e);
@@ -941,7 +1106,7 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
-		void onComponentDestroyed(Component& cmp)
+		void onComponentDestroyed(const Component& cmp)
 		{
 			for (int i = 0; i < m_editor_icons.size(); ++i)
 			{
