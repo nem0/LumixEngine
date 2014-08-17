@@ -46,7 +46,7 @@ class LUMIX_ENGINE_API Universe final
 		DelegateList<void(Entity&)>& entityMoved() { return m_entity_moved; }
 		DelegateList<void(Entity&)>& entityDestroyed() { return m_entity_destroyed; }
 		DelegateList<void(Component&)>& componentCreated() { return m_component_created; }
-		DelegateList<void(Component&)>& componentDestroyed() { return m_component_destroyed; }
+		DelegateList<void(const Component&)>& componentDestroyed() { return m_component_destroyed; }
 
 		void serialize(ISerializer& serializer);
 		void deserialize(ISerializer& serializer);
@@ -63,7 +63,7 @@ class LUMIX_ENGINE_API Universe final
 		DelegateList<void(Entity&)> m_entity_moved;
 		DelegateList<void(Entity&)> m_entity_destroyed;
 		DelegateList<void(Component&)> m_component_created;
-		DelegateList<void(Component&)> m_component_destroyed;
+		DelegateList<void(const Component&)> m_component_destroyed;
 };
 
 

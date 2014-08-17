@@ -275,6 +275,12 @@ namespace Lumix
 		}
 
 
+		virtual void destroyComponent(const Component&) override
+		{
+			ASSERT(false);
+		}
+
+
 		virtual Component createComponent(uint32_t type, const Entity& entity) override
 		{
 			if (type == SCRIPT_HASH)
