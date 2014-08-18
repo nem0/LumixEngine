@@ -180,7 +180,9 @@ void Gizmo::transform(Component camera, TransformOperation operation, int x, int
 			{
 				angle = (relx + rely) / 100.0f;
 			}
-			m_editor.setEntityPositionAndRotaion(m_selected_entity, pos, m_selected_entity.getRotation() * Quat(axis, angle));
+			Quat new_rot = m_selected_entity.getRotation() * Quat(axis, angle);
+			new_rot.normalize();
+			m_editor.setEntityPositionAndRotaion(m_selected_entity, pos, new_rot);
 		}
 		else
 		{

@@ -44,13 +44,13 @@ class LUMIX_ENGINE_API Universe final
 		int getEntityCount() const { return m_positions.size(); }
 
 		DelegateList<void(Entity&)>& entityMoved() { return m_entity_moved; }
+		DelegateList<void(Entity&)>& entityCreated() { return m_entity_created; }
 		DelegateList<void(Entity&)>& entityDestroyed() { return m_entity_destroyed; }
 		DelegateList<void(Component&)>& componentCreated() { return m_component_created; }
 		DelegateList<void(const Component&)>& componentDestroyed() { return m_component_destroyed; }
 
 		void serialize(ISerializer& serializer);
 		void deserialize(ISerializer& serializer);
-
 
 	private:
 		void onEvent(Event& event);
@@ -61,6 +61,7 @@ class LUMIX_ENGINE_API Universe final
 		Array<int>		m_free_slots;
 		ComponentList	m_component_list;
 		DelegateList<void(Entity&)> m_entity_moved;
+		DelegateList<void(Entity&)> m_entity_created;
 		DelegateList<void(Entity&)> m_entity_destroyed;
 		DelegateList<void(Component&)> m_component_created;
 		DelegateList<void(const Component&)> m_component_destroyed;
