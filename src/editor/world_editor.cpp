@@ -196,67 +196,225 @@ struct EditorIconHit
 struct WorldEditorImpl : public WorldEditor
 {
 	private:
+		class AddComponentCommand : public IEditorCommand
+		{
+			public:
+				AddComponentCommand(WorldEditorImpl& editor, const Array<Entity>& entities, uint32_t type)
+					: m_editor(editor)
+				{
+					m_type = type;
+					m_entities.reserve(entities.size());
+					for (int i = 0; i < entities.size(); ++i)
+					{
+						m_entities.push(entities[i]);
+					}
+				}
+
+
+				virtual bool merge(IEditorCommand&) override
+				{
+					return false;
+				}
+
+
+				virtual uint32_t getType() override
+				{
+					static const uint32_t hash = crc32("add_component");
+					return hash;
+				}
+
+
+				virtual void execute() override
+				{
+					IPlugin* plugin = 0;
+					if (m_editor.m_creators.find(m_type, plugin))
+					{
+						for (int i = 0; i < m_entities.size(); ++i)
+						{
+							plugin->createComponent(m_type, m_entities[i]);
+						}
+					}
+					else if (m_type == RENDERABLE_HASH || m_type == TERRAIN_HASH || m_type == CAMERA_HASH || m_type == LIGHT_HASH)
+					{
+						for (int i = 0; i < m_entities.size(); ++i)
+						{
+							m_editor.m_engine.getRenderScene()->createComponent(m_type, m_entities[i]);
+						}
+					}
+					else
+					{
+						ASSERT(false);
+					}
+				}
+
+
+				virtual void undo() override
+				{
+					IPlugin* plugin = 0;
+					if (m_editor.m_creators.find(m_type, plugin))
+					{
+						for (int i = 0; i < m_entities.size(); ++i)
+						{
+							plugin->destroyComponent(m_entities[i].getComponent(m_type));
+						}
+					}
+					else if (m_type == RENDERABLE_HASH || m_type == TERRAIN_HASH || m_type == CAMERA_HASH || m_type == LIGHT_HASH)
+					{
+						for (int i = 0; i < m_entities.size(); ++i)
+						{
+							m_editor.m_engine.getRenderScene()->destroyComponent(m_entities[i].getComponent(m_type));
+						}
+					}
+					else
+					{
+						ASSERT(false);
+					}
+				}
+
+
+			private:
+				uint32_t m_type;
+				Array<Entity> m_entities;
+				WorldEditorImpl& m_editor;
+		};
+
 		class RemoveComponentCommand : public IEditorCommand
 		{
 			public:
-			RemoveComponentCommand(WorldEditorImpl& editor, const Component& component)
-				: m_component(component)
-				, m_editor(editor)
-			{
-			}
-
-
-			virtual void undo() override
-			{
-				uint32_t template_hash = m_editor.m_template_system->getTemplate(m_component.entity);
-				const Array<IPropertyDescriptor*>& props = m_editor.m_component_properties[m_component.type];
-				if (template_hash == 0)
+				RemoveComponentCommand(WorldEditorImpl& editor, const Component& component)
+					: m_component(component)
+					, m_editor(editor)
 				{
-					IPlugin* plugin = 0;
-					if (m_editor.m_creators.find(m_component.type, plugin))
+				}
+
+
+				virtual void undo() override
+				{
+					uint32_t template_hash = m_editor.m_template_system->getTemplate(m_component.entity);
+					const Array<IPropertyDescriptor*>& props = m_editor.m_component_properties[m_component.type];
+					if (template_hash == 0)
 					{
-						plugin->createComponent(m_component.type, m_component.entity);
-					}
-					else if (m_component.type == RENDERABLE_HASH || m_component.type == TERRAIN_HASH || m_component.type == CAMERA_HASH || m_component.type == LIGHT_HASH)
-					{
-						m_editor.m_engine.getRenderScene()->createComponent(m_component.type, m_component.entity);
+						IPlugin* plugin = 0;
+						if (m_editor.m_creators.find(m_component.type, plugin))
+						{
+							plugin->createComponent(m_component.type, m_component.entity);
+						}
+						else if (m_component.type == RENDERABLE_HASH || m_component.type == TERRAIN_HASH || m_component.type == CAMERA_HASH || m_component.type == LIGHT_HASH)
+						{
+							m_editor.m_engine.getRenderScene()->createComponent(m_component.type, m_component.entity);
+						}
+						else
+						{
+							ASSERT(false);
+						}
+						m_old_values.rewindForRead();
+						for (int i = 0; i < props.size(); ++i)
+						{
+							props[i]->set(m_component, m_old_values);
+						}
 					}
 					else
 					{
-						ASSERT(false);
+						const Array<Entity>& entities = m_editor.m_template_system->getInstances(template_hash);
+						IPlugin* plugin = 0;
+						if (m_editor.m_creators.find(m_component.type == RENDERABLE_HASH, plugin))
+						{
+							for (int i = 0, c = entities.size(); i < c; ++i)
+							{
+								Component cmp_new = plugin->createComponent(m_component.type, entities[i]);
+								m_old_values.rewindForRead();
+								for (int i = 0; i < props.size(); ++i)
+								{
+									props[i]->set(cmp_new, m_old_values);
+								}
+							}
+						}
+						else if (m_component.type == RENDERABLE_HASH || m_component.type == TERRAIN_HASH || m_component.type == CAMERA_HASH || m_component.type == LIGHT_HASH)
+						{
+							for (int i = 0, c = entities.size(); i < c; ++i)
+							{
+								Component new_cmp = m_editor.m_engine.getRenderScene()->createComponent(m_component.type, entities[i]);
+								m_old_values.rewindForRead();
+								for (int i = 0; i < props.size(); ++i)
+								{
+									props[i]->set(new_cmp, m_old_values);
+								}
+							}
+						}
+						else
+						{
+							ASSERT(false);
+						}
 					}
-					m_old_values.rewindForRead();
+				}
+
+
+				virtual bool merge(IEditorCommand&) override
+				{
+					return false;
+				}
+
+
+				virtual uint32_t getType() override
+				{
+					static const uint32_t hash = crc32("remove_component");
+					return hash;
+				}
+
+
+				virtual void execute() override
+				{
+					Array<IPropertyDescriptor*>& props = m_editor.m_component_properties[m_component.type];
 					for (int i = 0; i < props.size(); ++i)
 					{
-						props[i]->set(m_component, m_old_values);
+						props[i]->get(m_component, m_old_values);
 					}
-				}
-				else
-				{
-					const Array<Entity>& entities = m_editor.m_template_system->getInstances(template_hash);
-					IPlugin* plugin = 0;
-					if (m_editor.m_creators.find(m_component.type == RENDERABLE_HASH, plugin))
+					auto iter = m_editor.m_creators.find(m_component.type);
+					uint32_t template_hash = m_editor.getEntityTemplateSystem().getTemplate(m_component.entity);
+					if (iter != m_editor.m_creators.end())
 					{
-						for (int i = 0, c = entities.size(); i < c; ++i)
+						if (template_hash)
 						{
-							Component cmp_new = plugin->createComponent(m_component.type, entities[i]);
-							m_old_values.rewindForRead();
-							for (int i = 0; i < props.size(); ++i)
+							const Array<Entity>& instances = m_editor.m_template_system->getInstances(template_hash);
+							for (int i = 0; i < instances.size(); ++i)
 							{
-								props[i]->set(cmp_new, m_old_values);
+								const Entity::ComponentList& cmps = instances[i].getComponents();
+								for (int j = 0; j < cmps.size(); ++j)
+								{
+									if (cmps[j].type == m_component.type)
+									{
+										iter.second()->destroyComponent(cmps[j]);
+										break;
+									}
+								}
 							}
+						}
+						else
+						{
+							iter.second()->destroyComponent(m_component);
 						}
 					}
 					else if (m_component.type == RENDERABLE_HASH || m_component.type == TERRAIN_HASH || m_component.type == CAMERA_HASH || m_component.type == LIGHT_HASH)
 					{
-						for (int i = 0, c = entities.size(); i < c; ++i)
+						if (template_hash)
 						{
-							Component new_cmp = m_editor.m_engine.getRenderScene()->createComponent(m_component.type, entities[i]);
-							m_old_values.rewindForRead();
-							for (int i = 0; i < props.size(); ++i)
+							const Array<Entity>& instances = m_editor.m_template_system->getInstances(template_hash);
+							for (int i = 0; i < instances.size(); ++i)
 							{
-								props[i]->set(new_cmp, m_old_values);
+								const Entity::ComponentList& cmps = instances[i].getComponents();
+								for (int j = 0; j < cmps.size(); ++j)
+								{
+									if (cmps[j].type == m_component.type)
+									{
+										static_cast<RenderScene*>(m_component.system)->destroyComponent(cmps[j]);
+										break;
+									}
+								}
 							}
+						}
+						else
+						{
+							static_cast<RenderScene*>(m_component.system)->destroyComponent(m_component);
 						}
 					}
 					else
@@ -264,87 +422,11 @@ struct WorldEditorImpl : public WorldEditor
 						ASSERT(false);
 					}
 				}
-			}
-
-
-			virtual bool merge(IEditorCommand& command) override
-			{
-				return false;
-			}
-
-
-			virtual uint32_t getType() override
-			{
-				static const uint32_t hash = crc32("remove_component");
-				return hash;
-			}
-
-
-			virtual void execute() override
-			{
-				Array<IPropertyDescriptor*>& props = m_editor.m_component_properties[m_component.type];
-				for (int i = 0; i < props.size(); ++i)
-				{
-					props[i]->get(m_component, m_old_values);
-				}
-				auto iter = m_editor.m_creators.find(m_component.type);
-				uint32_t template_hash = m_editor.getEntityTemplateSystem().getTemplate(m_component.entity);
-				if (iter != m_editor.m_creators.end())
-				{
-					if (template_hash)
-					{
-						const Array<Entity>& instances = m_editor.m_template_system->getInstances(template_hash);
-						for (int i = 0; i < instances.size(); ++i)
-						{
-							const Entity::ComponentList& cmps = instances[i].getComponents();
-							for (int j = 0; j < cmps.size(); ++j)
-							{
-								if (cmps[j].type == m_component.type)
-								{
-									iter.second()->destroyComponent(cmps[j]);
-									break;
-								}
-							}
-						}
-					}
-					else
-					{
-						iter.second()->destroyComponent(m_component);
-					}
-				}
-				else if (m_component.type == RENDERABLE_HASH || m_component.type == TERRAIN_HASH || m_component.type == CAMERA_HASH || m_component.type == LIGHT_HASH)
-				{
-					if (template_hash)
-					{
-						const Array<Entity>& instances = m_editor.m_template_system->getInstances(template_hash);
-						for (int i = 0; i < instances.size(); ++i)
-						{
-							const Entity::ComponentList& cmps = instances[i].getComponents();
-							for (int j = 0; j < cmps.size(); ++j)
-							{
-								if (cmps[j].type == m_component.type)
-								{
-									static_cast<RenderScene*>(m_component.system)->destroyComponent(cmps[j]);
-									break;
-								}
-							}
-						}
-					}
-					else
-					{
-						static_cast<RenderScene*>(m_component.system)->destroyComponent(m_component);
-					}
-				}
-				else
-				{
-					ASSERT(false);
-				}
-			}
 
 			private:
-			Component m_component;
-			WorldEditorImpl& m_editor;
-			Blob m_old_values;
+				Component m_component;
+				WorldEditorImpl& m_editor;
+				Blob m_old_values;
 		};
 
 	public:
@@ -668,6 +750,7 @@ struct WorldEditorImpl : public WorldEditor
 			m_undo_stack.push(command);
 			++m_undo_index;
 			command->execute();
+			selectEntity(m_selected_entity);
 			b = false;
 		}
 
@@ -759,44 +842,17 @@ struct WorldEditorImpl : public WorldEditor
 				uint32_t template_hash = m_template_system->getTemplate(m_selected_entity);
 				if (template_hash == 0)
 				{
-					IPlugin* plugin = 0;
-					if (m_creators.find(type_crc, plugin))
-					{
-						plugin->createComponent(type_crc, m_selected_entity);
-					}
-					else if (type_crc == RENDERABLE_HASH || type_crc == TERRAIN_HASH || type_crc == CAMERA_HASH || type_crc == LIGHT_HASH)
-					{
-						m_engine.getRenderScene()->createComponent(type_crc, m_selected_entity);
-					}
-					else
-					{
-						ASSERT(false);
-					}
+					Array<Entity> entities;
+					entities.push(m_selected_entity);
+					IEditorCommand* command = LUMIX_NEW(AddComponentCommand)(*this, entities, type_crc);
+					executeCommand(command);
 				}
 				else
 				{
 					const Array<Entity>& entities = m_template_system->getInstances(template_hash);
-					IPlugin* plugin = 0;
-					if (m_creators.find(type_crc, plugin))
-					{
-						for (int i = 0, c = entities.size(); i < c; ++i)
-						{
-							plugin->createComponent(type_crc, entities[i]);
-						}
-					}
-					else if (type_crc == RENDERABLE_HASH || type_crc == TERRAIN_HASH || type_crc == CAMERA_HASH || type_crc == LIGHT_HASH)
-					{
-						for (int i = 0, c = entities.size(); i < c; ++i)
-						{
-							m_engine.getRenderScene()->createComponent(type_crc, entities[i]);
-						}
-					}
-					else
-					{
-						ASSERT(false);
-					}
+					IEditorCommand* command = LUMIX_NEW(AddComponentCommand)(*this, entities, type_crc);
+					executeCommand(command);
 				}
-				selectEntity(m_selected_entity);
 			}
 		}
 
@@ -1235,6 +1291,7 @@ struct WorldEditorImpl : public WorldEditor
 				m_undo_stack[m_undo_index]->undo();
 				--m_undo_index;
 			}
+			selectEntity(m_selected_entity);
 		}
 
 
@@ -1245,6 +1302,7 @@ struct WorldEditorImpl : public WorldEditor
 				++m_undo_index;
 				m_undo_stack[m_undo_index]->execute();
 			}
+			selectEntity(m_selected_entity);
 		}
 
 
