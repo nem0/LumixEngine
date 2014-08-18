@@ -396,11 +396,13 @@ namespace Lumix
 				else if (type == RENDERABLE_HASH)
 				{
 					Renderable* src = NULL;
+					int index = -1;
 					for (int i = 0, c = m_renderables.size(); i < c; ++i)
 					{
 						if (m_renderables[i]->m_is_free)
 						{
 							src = m_renderables[i];
+							index = i;
 							break;
 						}
 					}
@@ -408,6 +410,7 @@ namespace Lumix
 					{
 						src = LUMIX_NEW(Renderable);
 						m_renderables.push(src);
+						index = m_renderables.size() - 1;
 					}
 					Renderable& r = *src;
 					r.m_entity = entity;
@@ -415,7 +418,7 @@ namespace Lumix
 					r.m_scale = 1;
 					r.m_is_free = false;
 					r.m_model.setModel(NULL);
-					Component cmp = m_universe.addComponent(entity, type, this, m_renderables.size() - 1);
+					Component cmp = m_universe.addComponent(entity, type, this, index);
 					m_universe.componentCreated().invoke(cmp);
 					return cmp;
 				}
