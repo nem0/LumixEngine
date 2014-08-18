@@ -53,22 +53,26 @@ static const uint32_t TERRAIN_HASH = crc32("terrain");
 class MoveEntityCommand : public IEditorCommand
 {
 	public:
-		MoveEntityCommand(Entity entity, Matrix new_pos)
+		MoveEntityCommand(Entity entity, const Vec3& new_position, const Quat& new_rotation)
 			: m_entity(entity)
-			, m_old_pos(entity.getMatrix())
-			, m_new_pos(new_pos)
+			, m_old_position(entity.getPosition())
+			, m_old_rotation(entity.getRotation())
+			, m_new_position(new_position)
+			, m_new_rotation(new_rotation)
 		{}
 
 
 		virtual void execute() override
 		{
-			m_entity.setMatrix(m_new_pos);
+			m_entity.setPosition(m_new_position);
+			m_entity.setRotation(m_new_rotation);
 		}
 
 
 		virtual void undo() override
 		{
-			m_entity.setMatrix(m_old_pos);
+			m_entity.setPosition(m_old_position);
+			m_entity.setRotation(m_old_rotation);
 		}
 
 
@@ -84,7 +88,8 @@ class MoveEntityCommand : public IEditorCommand
 			ASSERT(command.getType() == getType());
 			if (static_cast<MoveEntityCommand&>(command).m_entity == m_entity)
 			{
-				static_cast<MoveEntityCommand&>(command).m_new_pos = m_new_pos;
+				static_cast<MoveEntityCommand&>(command).m_new_position = m_new_position;
+				static_cast<MoveEntityCommand&>(command).m_new_rotation = m_new_rotation;
 				return true;
 			}
 			else
@@ -95,8 +100,10 @@ class MoveEntityCommand : public IEditorCommand
 
 	private:
 		Entity m_entity;
-		Matrix m_old_pos;
-		Matrix m_new_pos;
+		Vec3 m_old_position;
+		Quat m_old_rotation;
+		Vec3 m_new_position;
+		Quat m_new_rotation;
 };
 
 
@@ -278,6 +285,7 @@ struct WorldEditorImpl : public WorldEditor
 				WorldEditorImpl& m_editor;
 		};
 
+
 		class RemoveComponentCommand : public IEditorCommand
 		{
 			public:
@@ -427,6 +435,55 @@ struct WorldEditorImpl : public WorldEditor
 				Component m_component;
 				WorldEditorImpl& m_editor;
 				Blob m_old_values;
+		};
+
+
+		class AddEntityCommand : public IEditorCommand
+		{
+			public:
+				AddEntityCommand(WorldEditorImpl& editor, const Vec3& position)
+					: m_editor(editor)
+				{
+					m_position = position;
+				}
+
+
+				virtual void execute() override
+				{
+					m_entity = m_editor.getEngine().getUniverse()->createEntity();
+					m_entity.setPosition(m_position);
+				}
+
+
+				virtual void undo() override
+				{
+					m_editor.getEngine().getUniverse()->destroyEntity(m_entity);
+				}
+
+
+				virtual bool merge(IEditorCommand&) override
+				{
+					return false;
+				}
+
+
+				virtual uint32_t getType() override
+				{
+					static const uint32_t hash = crc32("add_entity");
+					return hash;
+				}
+
+
+				const Entity& getEntity() const
+				{
+					return m_entity;
+				}
+
+
+			private:
+				WorldEditorImpl& m_editor;
+				Entity m_entity;
+				Vec3 m_position;
 		};
 
 	public:
@@ -676,26 +733,32 @@ struct WorldEditorImpl : public WorldEditor
 
 		virtual Entity addEntityAt(int camera_x, int camera_y) override
 		{
-			Entity e = m_engine.getUniverse()->createEntity();
-
 			RenderScene* scene = m_engine.getRenderScene();
 			Vec3 origin;
 			Vec3 dir;
 			scene->getRay(m_camera.getComponent(CAMERA_HASH), (float)camera_x, (float)camera_y, origin, dir);
-				RayCastModelHit hit = scene->castRay(origin, dir, Component::INVALID);
+			RayCastModelHit hit = scene->castRay(origin, dir, Component::INVALID);
+			Vec3 pos;
 			if (hit.m_is_hit)
 			{
-				e.setPosition(hit.m_origin + hit.m_dir * hit.m_t);
+				pos = hit.m_origin + hit.m_dir * hit.m_t;
 			}
 			else
 			{
-				e.setPosition(m_camera.getPosition() + m_camera.getRotation() * Vec3(0, 0, -2));
+				pos = m_camera.getPosition() + m_camera.getRotation() * Vec3(0, 0, -2);
 			}
-			selectEntity(e);
+			AddEntityCommand* command = LUMIX_NEW(AddEntityCommand)(*this, pos);
+			executeCommand(command);
+
+			return command->getEntity();
+		}
+
+
+		void onEntityCreated(Entity& entity)
+		{
 			EditorIcon* er = LUMIX_NEW(EditorIcon)();
-			er->create(m_engine, *m_engine.getRenderScene(), m_selected_entity);
+			er->create(m_engine, *m_engine.getRenderScene(), entity);
 			m_editor_icons.push(er);
-			return e;
 		}
 
 
@@ -703,9 +766,7 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			if (entity.isValid())
 			{
-				Matrix mtx = entity.getMatrix();
-				mtx.setTranslation(position);
-				IEditorCommand* command = LUMIX_NEW(MoveEntityCommand)(entity, mtx);
+				IEditorCommand* command = LUMIX_NEW(MoveEntityCommand)(entity, position, entity.getRotation());
 				executeCommand(command);
 			}
 		}
@@ -715,10 +776,7 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			if (entity.isValid())
 			{
-				Matrix mtx;
-				rotation.toMatrix(mtx);
-				mtx.setTranslation(position);
-				IEditorCommand* command = LUMIX_NEW(MoveEntityCommand)(entity, mtx);
+				IEditorCommand* command = LUMIX_NEW(MoveEntityCommand)(entity, position, rotation);
 				executeCommand(command);
 			}
 		}
@@ -1274,6 +1332,7 @@ struct WorldEditorImpl : public WorldEditor
 			m_gizmo.setUniverse(universe);
 			m_gizmo.hide();
 
+			universe->entityCreated().bind<WorldEditorImpl, &WorldEditorImpl::onEntityCreated>(this);
 			universe->componentCreated().bind<WorldEditorImpl, &WorldEditorImpl::onComponentCreated>(this);
 			universe->componentDestroyed().bind<WorldEditorImpl, &WorldEditorImpl::onComponentDestroyed>(this);
 			universe->entityDestroyed().bind<WorldEditorImpl, &WorldEditorImpl::onEntityDestroyed>(this);
