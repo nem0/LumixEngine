@@ -55,6 +55,31 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			m_texture_idx = 0;
 		}
 
+		virtual void tick() override
+		{
+			float mouse_x = m_world_editor.getMouseX();
+			float mouse_y = m_world_editor.getMouseY();
+			
+			if (m_world_editor.getSelectedEntity().isValid())
+			{
+				Lumix::Component terrain = m_world_editor.getSelectedEntity().getComponent(crc32("terrain"));
+				if (terrain.isValid())
+				{
+					Lumix::Component camera_cmp = m_world_editor.getEditCamera();
+					Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(camera_cmp.system);
+					Lumix::Vec3 origin, dir;
+					scene->getRay(camera_cmp, (float)mouse_x, (float)mouse_y, origin, dir);
+					Lumix::RayCastModelHit hit = scene->castRay(origin, dir, Lumix::Component::INVALID);
+					if (hit.m_is_hit)
+					{
+						scene->setTerrainBrush(terrain, hit.m_origin + hit.m_dir * hit.m_t, m_terrain_brush_size);
+						return;
+					}
+					scene->setTerrainBrush(terrain, Lumix::Vec3(0, 0, 0), 1);
+				}
+			}
+		}
+
 		virtual bool onEntityMouseDown(const Lumix::RayCastModelHit& hit, int, int) override
 		{
 			if (m_world_editor.getSelectedEntity() == hit.m_component.entity)
@@ -129,12 +154,12 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			float radius = (float)m_terrain_brush_size;
 			float rel_amount = m_terrain_brush_strength;
 			Lumix::string material_path;
-			static_cast<Lumix::RenderScene*>(terrain.system)->getTerrainMaterial(hit.m_component, material_path);
+			static_cast<Lumix::RenderScene*>(terrain.system)->getTerrainMaterial(terrain, material_path);
 			Lumix::Material* material = static_cast<Lumix::Material*>(m_world_editor.getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL)->get(material_path));
 			Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
 			Lumix::Texture* splatmap = material->getTexture(material->getTextureCount() - 1);
 			Lumix::Texture* heightmap = material->getTexture(0);
-			Lumix::Matrix entity_mtx = hit.m_component.entity.getMatrix();
+			Lumix::Matrix entity_mtx = terrain.entity.getMatrix();
 			entity_mtx.fastInverse();
 			Lumix::Vec3 local_pos = entity_mtx.multiplyPosition(hit_pos);
 			float xz_scale;
@@ -222,18 +247,18 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			float radius = (float)m_terrain_brush_size;
 			float rel_amount = m_terrain_brush_strength;
 			Lumix::string material_path;
-			static_cast<Lumix::RenderScene*>(terrain.system)->getTerrainMaterial(hit.m_component, material_path);
+			static_cast<Lumix::RenderScene*>(terrain.system)->getTerrainMaterial(terrain, material_path);
 			Lumix::Material* material = static_cast<Lumix::Material*>(m_world_editor.getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL)->get(material_path));
 			Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
 			Lumix::Texture* heightmap = material->getTexture(0);
-			Lumix::Matrix entity_mtx = hit.m_component.entity.getMatrix();
+			Lumix::Matrix entity_mtx = terrain.entity.getMatrix();
 			entity_mtx.fastInverse();
 			Lumix::Vec3 local_pos = entity_mtx.multiplyPosition(hit_pos);
 			float xz_scale;
 			static_cast<Lumix::RenderScene*>(terrain.system)->getTerrainXZScale(terrain, xz_scale);
 			local_pos = local_pos / xz_scale;
 
-			const float strengt_multiplicator = 0.02f;
+			static const float strengt_multiplicator = 0.02f;
 
 			int w = heightmap->getWidth();
 			if (heightmap->getBytesPerPixel() == 4)

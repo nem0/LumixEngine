@@ -452,6 +452,7 @@ struct WorldEditorImpl : public WorldEditor
 				{
 					m_entity = m_editor.getEngine().getUniverse()->createEntity();
 					m_entity.setPosition(m_position);
+					m_editor.selectEntity(m_entity);
 				}
 
 
@@ -515,6 +516,10 @@ struct WorldEditorImpl : public WorldEditor
 
 		virtual void tick() override
 		{
+			for (int i = 0; i < m_plugins.size(); ++i)
+			{
+				m_plugins[i]->tick();
+			}
 			if (m_toggle_game_mode_requested)
 			{
 				toggleGameMode();
@@ -651,6 +656,8 @@ struct WorldEditorImpl : public WorldEditor
 
 		virtual void onMouseMove(int x, int y, int relx, int rely, int mouse_flags) override
 		{
+			m_mouse_x = x;
+			m_mouse_y = y;
 			switch (m_mouse_mode)
 			{
 				case MouseMode::CUSTOM:
@@ -683,6 +690,18 @@ struct WorldEditorImpl : public WorldEditor
 				m_mouse_handling_plugin = NULL;
 			}
 			m_mouse_mode = MouseMode::NONE;
+		}
+
+
+		virtual float getMouseX() const override
+		{
+			return m_mouse_x;
+		}
+
+
+		virtual float getMouseY() const override
+		{
+			return m_mouse_y;
 		}
 
 
@@ -1384,6 +1403,8 @@ struct WorldEditorImpl : public WorldEditor
 		Map<uint32_t, Array<IPropertyDescriptor*> > m_component_properties;
 		Map<uint32_t, IPlugin*> m_creators;
 		MouseMode::Value m_mouse_mode;
+		float m_mouse_x;
+		float m_mouse_y;
 		Array<EditorIcon*> m_editor_icons;
 		bool m_is_game_mode;
 		FS::IFile* m_game_mode_file;
