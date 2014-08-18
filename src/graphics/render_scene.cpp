@@ -453,11 +453,20 @@ namespace Lumix
 				return m_engine;
 			}
 
+
+			virtual void setTerrainBrush(Component cmp, const Vec3& position, float size) override
+			{
+				m_terrains[cmp.index]->setBrush(position, size);
+				addDebugCross(position, 1, Vec3(1, 0, 0), 0);
+			}
+
+
 			virtual void setTerrainMaterial(Component cmp, const string& path) override
 			{
 				Material* material = static_cast<Material*>(m_engine.getResourceManager().get(ResourceManager::MATERIAL)->load(path.c_str()));
 				m_terrains[cmp.index]->setMaterial(material);
 			}
+
 
 			virtual void getTerrainMaterial(Component cmp, string& path) override
 			{
@@ -471,6 +480,7 @@ namespace Lumix
 				}
 			}
 
+
 			virtual void setTerrainXZScale(Component cmp, const float& scale) override
 			{
 				m_terrains[cmp.index]->setXZScale(scale);
@@ -480,6 +490,7 @@ namespace Lumix
 			{
 				scale = m_terrains[cmp.index]->getXZScale();
 			}
+
 
 			virtual void setTerrainYScale(Component cmp, const float& scale) override
 			{
@@ -491,6 +502,7 @@ namespace Lumix
 				scale = m_terrains[cmp.index]->getYScale();
 			}
 
+
 			virtual Pose& getPose(const Component& cmp) override
 			{
 				return m_renderables[cmp.index]->m_model.getPose();
@@ -500,6 +512,7 @@ namespace Lumix
 			{
 				return m_renderables[cmp.index]->m_model.getModel();
 			}
+
 
 			virtual void getRenderablePath(Component cmp, string& path) override
 			{
@@ -513,6 +526,7 @@ namespace Lumix
 					}
 			}
 
+
 			virtual void setRenderableLayer(Component cmp, const int32_t& layer) override
 			{
 				m_renderables[cmp.index]->m_layer_mask = ((int64_t)1 << (int64_t)layer);
@@ -523,6 +537,7 @@ namespace Lumix
 				m_renderables[cmp.index]->m_scale = scale;
 			}
 
+
 			virtual void setRenderablePath(Component cmp, const string& path) override
 			{
 				Renderable& r = *m_renderables[cmp.index];
@@ -530,6 +545,7 @@ namespace Lumix
 				r.m_model.setModel(model);
 				r.m_model.setMatrix(r.m_entity.getMatrix());
 			}
+
 
 			virtual void getTerrainInfos(Array<TerrainInfo>& infos, int64_t layer_mask) override
 			{
@@ -548,6 +564,7 @@ namespace Lumix
 					}
 				}
 			}
+
 
 			virtual void getGrassInfos(Array<GrassInfo>& infos, int64_t layer_mask)
 			{

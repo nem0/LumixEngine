@@ -58,6 +58,7 @@ class Terrain
 		Path getGrassPath();
 		void setMaterial(Material* material);
 		void getGrassInfos(Array<GrassInfo>& infos, const Vec3& camera_position);
+		void setBrush(const Vec3& position, float size) { m_brush_position = position; m_brush_size = size; }
 
 	private: 
 		void updateGrass(const Vec3& camera_position);
@@ -87,6 +88,8 @@ class Terrain
 		Array<GrassQuad*> m_free_grass_quads;
 		Array<GrassQuad*> m_grass_quads;
 		Vec3 m_last_camera_position;
+		Vec3 m_brush_position;
+		float m_brush_size;
 };
 
 

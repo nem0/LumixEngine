@@ -15,6 +15,7 @@ class ViewWidget : public QWidget
 		ViewWidget(QWidget* parent)
 			: QWidget(parent)
 		{
+			setMouseTracking(true);
 		}
 
 		virtual void mousePressEvent(QMouseEvent* event) override

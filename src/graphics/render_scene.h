@@ -114,6 +114,7 @@ namespace Lumix
 			virtual void getTerrainYScale(Component cmp, float& scale) = 0;
 			virtual void setTerrainGrass(Component cmp, const string& path) = 0;
 			virtual void getTerrainGrass(Component cmp, string& path) = 0;
+			virtual void setTerrainBrush(Component cmp, const Vec3& position, float size) = 0;
 
 		protected:
 			virtual ~RenderScene() {}
