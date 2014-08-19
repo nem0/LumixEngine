@@ -22,31 +22,17 @@ namespace Lumix
 	class LUMIX_ENGINE_API AnimationSystem : public IPlugin
 	{
 		public:
-			AnimationSystem() { m_impl = 0; }
+			static AnimationSystem* createInstance();
 
-			virtual bool create(Engine&) override;
-			virtual void update(float time_delta) override;
-			virtual void onCreateUniverse(Universe& universe) override;
-			virtual void onDestroyUniverse(Universe& universe) override;
-			virtual void serialize(ISerializer& serializer) override;
-			virtual void deserialize(ISerializer& serializer) override;
-			virtual Component createComponent(uint32_t, const Entity&) override;
-			virtual const char* getName() const override { return "animation"; }
+			virtual void setFrame(Component cmp, int frame) = 0;
+			virtual bool isManual(Component cmp) = 0;
+			virtual void setManual(Component cmp, bool is_manual) = 0;
+			virtual void getPreview(Component cmp, string& path) = 0;
+			virtual void setPreview(Component cmp, const string& path) = 0;
 
-			void setFrame(Component cmp, int frame);
-			bool isManual(Component cmp);
-			void setManual(Component cmp, bool is_manual);
-			void getPreview(Component cmp, string& path);
-			void setPreview(Component cmp, const string& path);
-			void destroy();
-			Component createAnimable(const Entity& entity);
-			void playAnimation(const Component& cmp, const char* path);
-			void setAnimationFrame(const Component& cmp, int frame);
-			int getFrameCount(const Component& cmp) const;
-			Animation* loadAnimation(const char* path);
-
-		private:
-			struct AnimationSystemImpl* m_impl;
+			virtual void playAnimation(const Component& cmp, const char* path) = 0;
+			virtual void setAnimationFrame(const Component& cmp, int frame) = 0;
+			virtual int getFrameCount(const Component& cmp) const = 0;
 	};
 
 

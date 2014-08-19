@@ -14,8 +14,9 @@
 #include <qdesktopservices.h>
 #include <QDoubleSpinBox>
 #include <QDragEnterEvent>
-#include <QFileDialog>
-#include <QMimeData>
+#include <qfiledialog.h>
+#include <qmenu.h>
+#include <qmimedata.h>
 #include <qlineedit.h>
 #include <qpushbutton.h>
 
@@ -52,6 +53,31 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			m_terrain_brush_size = 10;
 			m_terrain_brush_strength = 0.1f;
 			m_texture_idx = 0;
+		}
+
+		virtual void tick() override
+		{
+			float mouse_x = m_world_editor.getMouseX();
+			float mouse_y = m_world_editor.getMouseY();
+			
+			if (m_world_editor.getSelectedEntity().isValid())
+			{
+				Lumix::Component terrain = m_world_editor.getSelectedEntity().getComponent(crc32("terrain"));
+				if (terrain.isValid())
+				{
+					Lumix::Component camera_cmp = m_world_editor.getEditCamera();
+					Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(camera_cmp.system);
+					Lumix::Vec3 origin, dir;
+					scene->getRay(camera_cmp, (float)mouse_x, (float)mouse_y, origin, dir);
+					Lumix::RayCastModelHit hit = scene->castRay(origin, dir, Lumix::Component::INVALID);
+					if (hit.m_is_hit)
+					{
+						scene->setTerrainBrush(terrain, hit.m_origin + hit.m_dir * hit.m_t, m_terrain_brush_size);
+						return;
+					}
+					scene->setTerrainBrush(terrain, Lumix::Vec3(0, 0, 0), 1);
+				}
+			}
 		}
 
 		virtual bool onEntityMouseDown(const Lumix::RayCastModelHit& hit, int, int) override
@@ -128,12 +154,12 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			float radius = (float)m_terrain_brush_size;
 			float rel_amount = m_terrain_brush_strength;
 			Lumix::string material_path;
-			static_cast<Lumix::RenderScene*>(terrain.system)->getTerrainMaterial(hit.m_component, material_path);
+			static_cast<Lumix::RenderScene*>(terrain.system)->getTerrainMaterial(terrain, material_path);
 			Lumix::Material* material = static_cast<Lumix::Material*>(m_world_editor.getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL)->get(material_path));
 			Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
 			Lumix::Texture* splatmap = material->getTexture(material->getTextureCount() - 1);
 			Lumix::Texture* heightmap = material->getTexture(0);
-			Lumix::Matrix entity_mtx = hit.m_component.entity.getMatrix();
+			Lumix::Matrix entity_mtx = terrain.entity.getMatrix();
 			entity_mtx.fastInverse();
 			Lumix::Vec3 local_pos = entity_mtx.multiplyPosition(hit_pos);
 			float xz_scale;
@@ -221,18 +247,18 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			float radius = (float)m_terrain_brush_size;
 			float rel_amount = m_terrain_brush_strength;
 			Lumix::string material_path;
-			static_cast<Lumix::RenderScene*>(terrain.system)->getTerrainMaterial(hit.m_component, material_path);
+			static_cast<Lumix::RenderScene*>(terrain.system)->getTerrainMaterial(terrain, material_path);
 			Lumix::Material* material = static_cast<Lumix::Material*>(m_world_editor.getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL)->get(material_path));
 			Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
 			Lumix::Texture* heightmap = material->getTexture(0);
-			Lumix::Matrix entity_mtx = hit.m_component.entity.getMatrix();
+			Lumix::Matrix entity_mtx = terrain.entity.getMatrix();
 			entity_mtx.fastInverse();
 			Lumix::Vec3 local_pos = entity_mtx.multiplyPosition(hit_pos);
 			float xz_scale;
 			static_cast<Lumix::RenderScene*>(terrain.system)->getTerrainXZScale(terrain, xz_scale);
 			local_pos = local_pos / xz_scale;
 
-			const float strengt_multiplicator = 0.02f;
+			static const float strengt_multiplicator = 0.02f;
 
 			int w = heightmap->getWidth();
 			if (heightmap->getBytesPerPixel() == 4)
@@ -325,6 +351,7 @@ PropertyView::PropertyView(QWidget* parent)
 	: QDockWidget(parent)
 	, m_ui(new Ui::PropertyView)
 	, m_terrain_editor(NULL)
+	, m_is_updating_values(false)
 {
 	m_ui->setupUi(this);
 
@@ -350,39 +377,51 @@ PropertyView::~PropertyView()
 
 void PropertyView::on_checkboxStateChanged()
 {
-	QCheckBox* cb = qobject_cast<QCheckBox*>(QObject::sender());
-	int i = cb->property("cpp_prop").toInt();
-	bool b = cb->isChecked();
-	m_world_editor->setProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), &b, sizeof(b)); 
+	if (!m_is_updating_values)
+	{
+		QCheckBox* cb = qobject_cast<QCheckBox*>(QObject::sender());
+		int i = cb->property("cpp_prop").toInt();
+		bool b = cb->isChecked();
+		m_world_editor->setProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), &b, sizeof(b));
+	}
 }
 
 
 void PropertyView::on_vec3ValueChanged()
 {
-	QDoubleSpinBox* sb = qobject_cast<QDoubleSpinBox*>(QObject::sender());
-	int i = sb->property("cpp_prop").toInt();
-	Lumix::Vec3 v;
-	v.x = (float)qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item->child(0), 1))->value();
-	v.y = (float)qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item->child(1), 1))->value();
-	v.z = (float)qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item->child(2), 1))->value();
-	m_world_editor->setProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), &v, sizeof(v));
+	if (!m_is_updating_values)
+	{
+		QDoubleSpinBox* sb = qobject_cast<QDoubleSpinBox*>(QObject::sender());
+		int i = sb->property("cpp_prop").toInt();
+		Lumix::Vec3 v;
+		v.x = (float)qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item->child(0), 1))->value();
+		v.y = (float)qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item->child(1), 1))->value();
+		v.z = (float)qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item->child(2), 1))->value();
+		m_world_editor->setProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), &v, sizeof(v));
+	}
 }
 
 void PropertyView::on_doubleSpinBoxValueChanged()
 {
-	QDoubleSpinBox* sb = qobject_cast<QDoubleSpinBox*>(QObject::sender());
-	int i = sb->property("cpp_prop").toInt();
-	float f = (float)qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item, 1))->value();
-	m_world_editor->setProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), &f, sizeof(f));
+	if (!m_is_updating_values)
+	{
+		QDoubleSpinBox* sb = qobject_cast<QDoubleSpinBox*>(QObject::sender());
+		int i = sb->property("cpp_prop").toInt();
+		float f = (float)qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item, 1))->value();
+		m_world_editor->setProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), &f, sizeof(f));
+	}
 }
 
 void PropertyView::on_lineEditEditingFinished()
 {
-	QLineEdit* edit = qobject_cast<QLineEdit*>(QObject::sender());
-	int i = edit->property("cpp_prop").toInt();
-	QByteArray byte_array = edit->text().toLatin1();
-	const char* text = byte_array.data();
-	m_world_editor->setProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), text, byte_array.size());
+	if (!m_is_updating_values)
+	{
+		QLineEdit* edit = qobject_cast<QLineEdit*>(QObject::sender());
+		int i = edit->property("cpp_prop").toInt();
+		QByteArray byte_array = edit->text().toLatin1();
+		const char* text = byte_array.data();
+		m_world_editor->setProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), text, byte_array.size());
+	}
 }
 
 void PropertyView::on_browseFilesClicked()
@@ -398,6 +437,7 @@ void PropertyView::on_browseFilesClicked()
 
 void PropertyView::onPropertyValue(Property* property, const void* data, int32_t)
 {
+	m_is_updating_values = true;
 	if(property->m_component_name == "script" && property->m_name == "source")
 	{
 		setScriptStatus(m_compiler->getStatus(static_cast<const char*>(data)));
@@ -449,6 +489,7 @@ void PropertyView::onPropertyValue(Property* property, const void* data, int32_t
 			ASSERT(false);
 			break;
 	}
+	m_is_updating_values = false;
 }
 
 
@@ -1013,24 +1054,56 @@ void PropertyView::on_addComponentButton_clicked()
 
 void PropertyView::updateSelectedEntityPosition()
 {
-	Lumix::Entity e = m_world_editor->getSelectedEntity();
-	if (e.isValid())
+	m_world_editor->getSelectedEntity().setPosition(Lumix::Vec3((float)m_ui->positionX->value(), (float)m_ui->positionY->value(), (float)m_ui->positionZ->value()));
+}
+
+void PropertyView::on_positionX_valueChanged(double)
+{
+	updateSelectedEntityPosition();
+}
+
+void PropertyView::on_positionY_valueChanged(double)
+{
+	updateSelectedEntityPosition();
+}
+
+void PropertyView::on_positionZ_valueChanged(double)
+{
+	updateSelectedEntityPosition();
+}
+
+void PropertyView::on_propertyList_customContextMenuRequested(const QPoint &pos)
+{
+	QMenu* menu = new QMenu("Item actions", NULL);
+	const QModelIndex& index = m_ui->propertyList->indexAt(pos);
+	if (index.isValid() && !index.parent().isValid() && m_selected_entity.isValid())
 	{
-		e.setPosition(Lumix::Vec3((float)m_ui->positionX->value(), (float)m_ui->positionY->value(), (float)m_ui->positionZ->value()));
+		QAction* remove_component_action = new QAction("Remove component", menu);
+		menu->addAction(remove_component_action);
+		QAction* action = menu->exec(m_ui->propertyList->mapToGlobal(pos));
+		if (action == remove_component_action)
+		{
+			uint32_t cmp_hash = 0;
+			QByteArray label = m_ui->propertyList->itemAt(pos)->text(0).toLatin1();
+			for (int i = 0; i < sizeof(component_map) / sizeof(component_map[0]); i += 2)
+			{
+				if (strcmp(component_map[i], label.data()) == 0)
+				{
+					cmp_hash = crc32(component_map[i + 1]);
+					break;
+				}
+			}
+			const Lumix::Entity::ComponentList& cmps = m_selected_entity.getComponents();
+			for (int i = 0, c = cmps.size(); i < c; ++i)
+			{
+				if (cmps[i].type == cmp_hash)
+				{
+					Lumix::Entity entity = cmps[i].entity;
+					m_world_editor->removeComponent(cmps[i]);
+					m_world_editor->selectEntity(entity);
+					break;
+				}
+			}
+		}
 	}
-}
-
-void PropertyView::on_positionX_valueChanged(double arg1)
-{
-	updateSelectedEntityPosition();
-}
-
-void PropertyView::on_positionY_valueChanged(double arg1)
-{
-	updateSelectedEntityPosition();
-}
-
-void PropertyView::on_positionZ_valueChanged(double arg1)
-{
-	updateSelectedEntityPosition();
 }

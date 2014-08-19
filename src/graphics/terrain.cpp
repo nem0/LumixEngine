@@ -161,6 +161,8 @@ namespace Lumix
 		, m_grass_mesh(NULL)
 		, m_scene(scene)
 		, m_grass_model(NULL)
+		, m_brush_position(0, 0, 0)
+		, m_brush_size(1)
 	{
 		generateGeometry();
 	}
@@ -442,6 +444,8 @@ namespace Lumix
 			m_entity.getMatrix(world_matrix);
 			world_matrix.fastInverse();
 			Vec3 rel_cam_pos = world_matrix.multiplyPosition(camera_pos) / m_xz_scale;
+			m_mesh->getMaterial()->getShader()->setUniform("brush_position", m_brush_position);
+			m_mesh->getMaterial()->getShader()->setUniform("brush_size", m_brush_size);
 			m_mesh->getMaterial()->getShader()->setUniform("map_size", m_root->m_size);
 			m_mesh->getMaterial()->getShader()->setUniform("camera_pos", rel_cam_pos);
 			m_root->render(m_mesh, m_geometry, rel_cam_pos, *pipeline.getScene());

@@ -16,6 +16,7 @@ class IRenderDevice;
 struct Matrix;
 class Renderer;
 class Universe;
+class WorldEditor;
 
 
 class LUMIX_ENGINE_API Gizmo
@@ -73,7 +74,7 @@ class LUMIX_ENGINE_API Gizmo
 		};
 
 	public:
-		Gizmo();
+		Gizmo(WorldEditor& editor);
 		~Gizmo();
 
 		void create(Renderer& renderer);
@@ -93,6 +94,7 @@ class LUMIX_ENGINE_API Gizmo
 		Vec3 getMousePlaneIntersection(Component camera, int x, int y);
 
 	private:
+		WorldEditor& m_editor;
 		Renderer* m_renderer;
 		Entity m_selected_entity;
 		Universe* m_universe;

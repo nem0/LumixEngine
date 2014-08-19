@@ -68,6 +68,12 @@ void PhysicsSystem::sendMessage(const char* message)
 }
 
 
+void PhysicsSystem::destroyComponent(const Component& component)
+{
+	ASSERT(false);
+}
+
+
 Component PhysicsSystem::createComponent(uint32_t component_type, const Entity& entity)
 {
 	if (component_type == HEIGHTFIELD_HASH)

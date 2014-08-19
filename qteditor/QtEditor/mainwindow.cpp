@@ -1,9 +1,9 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
-#include <qfiledialog.h>
-#include <qsettings.h>
 #include "assetbrowser.h"
+#include "editor/entity_template_system.h"
 #include "editor/world_editor.h"
+#include "entity_template_list.h"
 #include "fileserverwidget.h"
 #include "gameview.h"
 #include "log_widget.h"
@@ -12,6 +12,9 @@
 #include "scripts/scriptcompilerwidget.h"
 #include "materialmanager.h"
 #include "profilerui.h"
+#include <qfiledialog.h>
+#include <qinputdialog.h>
+#include <qsettings.h>
 
 
 MainWindow::MainWindow(QWidget* parent) :
@@ -31,6 +34,7 @@ MainWindow::MainWindow(QWidget* parent) :
 	m_file_server_ui = new FileServerWidget;
 	m_material_manager_ui = new MaterialManager;
 	m_profiler_ui = new ProfilerUI;
+	m_entity_template_list_ui = new EntityTemplateList;
 
 	QSettings settings("Lumix", "QtEditor");
 	restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
@@ -44,6 +48,7 @@ MainWindow::MainWindow(QWidget* parent) :
 	addDockWidget(static_cast<Qt::DockWidgetArea>(2), m_asset_browser);
 	addDockWidget(static_cast<Qt::DockWidgetArea>(8), m_material_manager_ui);
 	addDockWidget(static_cast<Qt::DockWidgetArea>(1), m_profiler_ui);
+	addDockWidget(static_cast<Qt::DockWidgetArea>(2), m_entity_template_list_ui);
 
 	m_property_view->setScriptCompiler(m_script_compiler_ui->getCompiler());
 
@@ -71,16 +76,18 @@ MainWindow::~MainWindow()
 	delete m_file_server_ui;
 	delete m_material_manager_ui;
 	delete m_profiler_ui;
+	delete m_entity_template_list_ui;
 }
 
 
-void MainWindow::setWorldEditor(Lumix::WorldEditor& server)
+void MainWindow::setWorldEditor(Lumix::WorldEditor& editor)
 {
-	m_world_editor = &server;
-	m_file_server_ui->setWorldEditor(server);
-	m_asset_browser->setWorldEditor(server);
-	m_material_manager_ui->setWorldEditor(server);
-	m_property_view->setWorldEditor(server);
+	m_world_editor = &editor;
+	m_file_server_ui->setWorldEditor(editor);
+	m_asset_browser->setWorldEditor(editor);
+	m_material_manager_ui->setWorldEditor(editor);
+	m_property_view->setWorldEditor(editor);
+	m_entity_template_list_ui->setWorldEditor(editor);
 }
 
 GameView* MainWindow::getGameView() const
@@ -166,7 +173,7 @@ void MainWindow::on_actionProfiler_triggered()
 
 void MainWindow::on_actionMaterial_manager_triggered()
 {
-    m_material_manager_ui->show();
+	m_material_manager_ui->show();
 }
 
 void MainWindow::on_actionPolygon_Mode_changed()
@@ -204,4 +211,37 @@ void MainWindow::on_actionSave_triggered()
 void MainWindow::on_actionSnap_to_terrain_triggered()
 {
 	m_world_editor->snapToTerrain();
+}
+
+void MainWindow::on_actionSave_as_template_triggered()
+{
+	if (m_world_editor->getSelectedEntity().isValid())
+	{
+		bool ok = false;
+		QString text = QInputDialog::getText(this, tr("Entity template"), tr("Template name:"), QLineEdit::Normal, tr(""), &ok);
+		if (ok)
+		{
+			m_world_editor->getEntityTemplateSystem().createTemplateFromEntity(text.toLatin1().data(), m_world_editor->getSelectedEntity());
+		}
+	}
+}
+
+void MainWindow::on_actionEntity_templates_triggered()
+{
+	m_entity_template_list_ui->show();
+}
+
+void MainWindow::on_actionInstantiate_template_triggered()
+{
+	m_entity_template_list_ui->instantiateTemplate();
+}
+
+void MainWindow::on_actionUndo_triggered()
+{
+	m_world_editor->undo();
+}
+
+void MainWindow::on_actionRedo_triggered()
+{
+	m_world_editor->redo();
 }
