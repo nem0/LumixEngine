@@ -40,7 +40,7 @@ class LUMIX_ENGINE_API Universe final
 		Vec3 getPosition(int index) { return m_positions[index]; }
 		Quat getRotation(int index) { return m_rotations[index]; }
 		Component addComponent(const Entity& entity, uint32_t component_type, void* system, int index);
-		void removeComponent(const Component& cmp);
+		void destroyComponent(const Component& cmp);
 		int getEntityCount() const { return m_positions.size(); }
 
 		DelegateList<void(Entity&)>& entityMoved() { return m_entity_moved; }

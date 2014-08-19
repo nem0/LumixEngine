@@ -73,7 +73,7 @@ namespace Lumix
 			virtual Path getUniversePath() const = 0;
 			virtual void addComponent(uint32_t type_crc) = 0;
 			virtual void cloneComponent(const Component& src, Entity& entity) = 0;
-			virtual void removeComponent(const Component& crc) = 0;
+			virtual void destroyComponent(const Component& crc) = 0;
 			virtual Entity addEntity() = 0;
 			virtual void selectEntity(Entity e) = 0;
 			virtual Entity addEntityAt(int camera_x, int camera_y) = 0;

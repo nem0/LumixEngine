@@ -1099,7 +1099,7 @@ void PropertyView::on_propertyList_customContextMenuRequested(const QPoint &pos)
 				if (cmps[i].type == cmp_hash)
 				{
 					Lumix::Entity entity = cmps[i].entity;
-					m_world_editor->removeComponent(cmps[i]);
+					m_world_editor->destroyComponent(cmps[i]);
 					break;
 				}
 			}

@@ -286,10 +286,10 @@ struct WorldEditorImpl : public WorldEditor
 		};
 
 
-		class RemoveComponentCommand : public IEditorCommand
+		class DestroyComponentCommand : public IEditorCommand
 		{
 			public:
-				RemoveComponentCommand(WorldEditorImpl& editor, const Component& component)
+				DestroyComponentCommand(WorldEditorImpl& editor, const Component& component)
 					: m_component(component)
 					, m_editor(editor)
 				{
@@ -900,11 +900,11 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
-		virtual void removeComponent(const Component& component) override
+		virtual void destroyComponent(const Component& component) override
 		{
 			if (component.isValid())
 			{
-				IEditorCommand* command = LUMIX_NEW(RemoveComponentCommand)(*this, component);
+				IEditorCommand* command = LUMIX_NEW(DestroyComponentCommand)(*this, component);
 				executeCommand(command);
 			}
 		}

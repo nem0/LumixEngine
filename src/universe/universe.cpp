@@ -138,7 +138,7 @@ void Universe::deserialize(ISerializer& serializer)
 }
 
 
-void Universe::removeComponent(const Component& cmp)
+void Universe::destroyComponent(const Component& cmp)
 {
 	Entity::ComponentList& cmps = m_component_list[cmp.entity.index];
 	for (int i = 0, c = cmps.size(); i < c; ++i)
