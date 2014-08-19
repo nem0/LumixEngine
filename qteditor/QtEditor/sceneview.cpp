@@ -1,16 +1,97 @@
 #include "sceneview.h"
 #include "editor/world_editor.h"
+#include "core/crc32.h"
+#include "editor/ieditor_command.h"
+#include "engine/engine.h"
+#include "engine/iplugin.h"
+#include "graphics/pipeline.h"
+#include "graphics/render_scene.h"
 #include <qapplication.h>
 #include <QDoubleSpinBox>
 #include <QDragEnterEvent>
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QVBoxLayout>
-#include "core/crc32.h"
-#include "graphics/pipeline.h"
+
+
+static const uint32_t RENDERABLE_HASH = crc32("renderable");
+static const uint32_t CAMERA_HASH = crc32("camera");
+static const uint32_t LIGHT_HASH = crc32("light");
+static const uint32_t SCRIPT_HASH = crc32("script");
+static const uint32_t ANIMABLE_HASH = crc32("animable");
+static const uint32_t TERRAIN_HASH = crc32("terrain");
+
 
 class ViewWidget : public QWidget
 {
+	public:
+		class InsertMeshCommand : public Lumix::IEditorCommand
+		{
+			public:
+				InsertMeshCommand(ViewWidget& widget, const Lumix::Vec3& position, const Lumix::Path& mesh_path)
+					: m_mesh_path(mesh_path)
+					, m_position(position)
+					, m_widget(widget)
+				{
+					
+				}
+
+
+				virtual void execute() override
+				{
+					Lumix::Engine& engine = m_widget.m_world_editor->getEngine();
+					m_entity = engine.getUniverse()->createEntity();
+					m_entity.setPosition(m_position);
+					Lumix::Component cmp = engine.getRenderScene()->createComponent(crc32("renderable"), m_entity);
+					char rel_path[LUMIX_MAX_PATH];
+					m_widget.m_world_editor->getRelativePath(rel_path, LUMIX_MAX_PATH, m_mesh_path.c_str());
+					engine.getRenderScene()->setRenderablePath(cmp, Lumix::string(rel_path));
+				}
+
+
+				virtual void undo() override
+				{
+					const Lumix::Entity::ComponentList& cmps = m_entity.getComponents();
+					for (int i = 0; i < cmps.size(); ++i)
+					{
+						if (cmps[i].type == RENDERABLE_HASH || cmps[i].type == TERRAIN_HASH || cmps[i].type == CAMERA_HASH || cmps[i].type == LIGHT_HASH)
+						{
+							m_widget.m_world_editor->getEngine().getRenderScene()->destroyComponent(cmps[i]);
+						}
+						else
+						{
+							Lumix::IPlugin* plugin = m_widget.m_world_editor->getCreator(cmps[i].type);
+							plugin->destroyComponent(cmps[i]);
+						}
+					}
+					m_widget.m_world_editor->getEngine().getUniverse()->destroyEntity(m_entity);
+					m_entity = Lumix::Entity::INVALID;
+				}
+
+
+				virtual uint32_t getType() override
+				{
+					static const uint32_t type = crc32("insert_mesh");
+					return type;
+				}
+
+
+				virtual bool merge(IEditorCommand&)
+				{
+					return false;
+				}
+
+
+				const Lumix::Entity& getEntity() const { return m_entity; }
+
+
+			private:
+				Lumix::Vec3 m_position;
+				Lumix::Path m_mesh_path;
+				Lumix::Entity m_entity;
+				ViewWidget& m_widget;
+		};
+
 	public:
 		ViewWidget(QWidget* parent)
 			: QWidget(parent)
@@ -98,12 +179,24 @@ void SceneView::dropEvent(QDropEvent *event)
 		QString file = list[0].toLocalFile();
 		if(file.endsWith(".msh"))
 		{
-			m_world_editor->addEntityAt(event->pos().x(), event->pos().y());
-			m_world_editor->addComponent(crc32("renderable"));
-			char rel_path[LUMIX_MAX_PATH];
-			m_world_editor->getRelativePath(rel_path, LUMIX_MAX_PATH, file.toLatin1().data());
-			m_world_editor->setProperty("renderable", "source", rel_path, strlen(rel_path));
-			m_world_editor->selectEntity(m_world_editor->getSelectedEntity());
+			Lumix::Vec3 position;
+			Lumix::RenderScene* scene = m_world_editor->getEngine().getRenderScene();
+
+			Lumix::Vec3 origin;
+			Lumix::Vec3 dir;
+			scene->getRay(m_world_editor->getEditCamera(), event->pos().x(), event->pos().y(), origin, dir);
+			Lumix::RayCastModelHit hit = scene->castRay(origin, dir, Lumix::Component::INVALID);
+			if (hit.m_is_hit)
+			{
+				position = hit.m_origin + hit.m_dir * hit.m_t;
+			}
+			else
+			{
+				position.set(0, 0, 0);
+			}
+			ViewWidget::InsertMeshCommand* command = new ViewWidget::InsertMeshCommand(static_cast<ViewWidget&>(*m_view), position, file.toLatin1().data());
+			m_world_editor->executeCommand(command);
+			m_world_editor->selectEntity(command->getEntity());
 		}
 	}
 }
