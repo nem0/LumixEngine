@@ -1100,7 +1100,6 @@ void PropertyView::on_propertyList_customContextMenuRequested(const QPoint &pos)
 				{
 					Lumix::Entity entity = cmps[i].entity;
 					m_world_editor->removeComponent(cmps[i]);
-					m_world_editor->selectEntity(entity);
 					break;
 				}
 			}

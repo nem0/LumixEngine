@@ -4,10 +4,21 @@
 #include "core/iserializer.h"
 #include "core/map.h"
 #include "core/string.h"
+#include "editor/ieditor_command.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
+#include "engine/iplugin.h"
+#include "graphics/render_scene.h"
 #include "universe/entity.h"
 #include "universe/universe.h"
+
+
+static const uint32_t RENDERABLE_HASH = crc32("renderable");
+static const uint32_t CAMERA_HASH = crc32("camera");
+static const uint32_t LIGHT_HASH = crc32("light");
+static const uint32_t SCRIPT_HASH = crc32("script");
+static const uint32_t ANIMABLE_HASH = crc32("animable");
+static const uint32_t TERRAIN_HASH = crc32("terrain");
 
 
 namespace Lumix
@@ -16,6 +27,100 @@ namespace Lumix
 
 	class EntityTemplateSystemImpl : public EntityTemplateSystem
 	{
+		private:
+			class CreateInstanceCommand : public IEditorCommand
+			{
+				public:
+					CreateInstanceCommand(EntityTemplateSystemImpl& entity_system, const char* template_name)
+						: m_entity_system(entity_system)
+						, m_template_name_hash(crc32(template_name))
+					{
+
+						RenderScene* scene = m_entity_system.m_editor.getEngine().getRenderScene();
+						float width;
+						float height;
+						scene->getCameraWidth(m_entity_system.m_editor.getEditCamera(), width);
+						scene->getCameraHeight(m_entity_system.m_editor.getEditCamera(), height);
+
+						Vec3 origin;
+						Vec3 dir;
+						scene->getRay(m_entity_system.m_editor.getEditCamera(), width * 0.5f, height * 0.5f, origin, dir);
+						RayCastModelHit hit = scene->castRay(origin, dir, Component::INVALID);
+						if (hit.m_is_hit)
+						{
+							m_position = hit.m_origin + hit.m_dir * hit.m_t;
+						}
+						else
+						{
+							m_position.set(0, 0, 0);
+						}
+					}
+
+					virtual void execute() override
+					{
+						Map<uint32_t, Array<Entity> >::iterator iter = m_entity_system.m_instances.find(m_template_name_hash);
+						if (iter != m_entity_system.m_instances.end())
+						{
+							m_entity = m_entity_system.m_editor.getEngine().getUniverse()->createEntity();
+							m_entity.setPosition(m_position);
+
+							m_entity_system.m_instances[m_template_name_hash].push(m_entity);
+							Entity template_entity = iter.second()[0];
+							const Entity::ComponentList& template_cmps = template_entity.getComponents();
+							for (int i = 0; i < template_cmps.size(); ++i)
+							{
+								m_entity_system.m_editor.cloneComponent(template_cmps[i], m_entity);
+							}
+						}
+						else
+						{
+							ASSERT(false);
+						}
+					}
+
+
+					virtual void undo() override
+					{
+						const Entity::ComponentList& cmps = m_entity.getComponents();
+						for (int i = 0; i < cmps.size(); ++i)
+						{
+							if (cmps[i].type == RENDERABLE_HASH || cmps[i].type == TERRAIN_HASH || cmps[i].type == CAMERA_HASH || cmps[i].type == LIGHT_HASH)
+							{
+								m_entity_system.m_editor.getEngine().getRenderScene()->destroyComponent(cmps[i]);
+							}
+							else
+							{
+								IPlugin* plugin = m_entity_system.m_editor.getCreator(cmps[i].type);
+								plugin->destroyComponent(cmps[i]);
+							}
+						}
+						m_entity_system.m_universe->destroyEntity(m_entity);
+						m_entity = Entity::INVALID;
+					}
+
+
+					virtual bool merge(IEditorCommand&) override
+					{
+						return false;
+					}
+
+
+					virtual uint32_t getType() override
+					{
+						static const uint32_t hash = crc32("create_entity_template_instance");
+						return hash;
+					}
+
+
+					const Entity& getEntity() const { return m_entity; }
+
+				private:
+					EntityTemplateSystemImpl& m_entity_system;
+					uint32_t m_template_name_hash;
+					Entity m_entity;
+					Vec3 m_position;
+			};
+
 		public:
 			EntityTemplateSystemImpl(WorldEditor& editor)
 				: m_editor(editor)
@@ -90,25 +195,9 @@ namespace Lumix
 
 			virtual Entity createInstance(const char* name) override
 			{
-				uint32_t name_hash = crc32(name);
-				Map<uint32_t, Array<Entity> >::iterator iter = m_instances.find(name_hash);
-				if (iter == m_instances.end())
-				{
-					ASSERT(false);
-					return Entity::INVALID;
-				}
-				else
-				{
-					Entity entity = m_editor.addEntity();
-					m_instances[name_hash].push(entity);
-					Entity template_entity = iter.second()[0];
-					const Entity::ComponentList& template_cmps = template_entity.getComponents();
-					for (int i = 0; i < template_cmps.size(); ++i)
-					{
-						m_editor.cloneComponent(template_cmps[i], entity);
-					}
-					return entity;
-				}
+				CreateInstanceCommand* command = LUMIX_NEW(CreateInstanceCommand)(*this, name);
+				m_editor.executeCommand(command);
+				return command->getEntity();
 			}
 
 
