@@ -59,7 +59,7 @@ namespace Lumix
 			virtual void destroyComponent(const Component& component) override
 			{
 				m_animables[component.index].m_is_free = true;
-				m_universe->removeComponent(component);
+				m_universe->destroyComponent(component);
 				m_universe->componentDestroyed().invoke(component);
 
 			}

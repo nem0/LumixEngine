@@ -356,7 +356,7 @@ namespace Lumix
 				{
 					m_renderables[component.index]->m_model.setModel(NULL);
 					m_renderables[component.index]->m_is_free = true;
-					m_universe.removeComponent(component);
+					m_universe.destroyComponent(component);
 					m_universe.componentDestroyed().invoke(component);
 				}
 				else
