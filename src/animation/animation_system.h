@@ -22,7 +22,7 @@ namespace Lumix
 	class LUMIX_ENGINE_API AnimationSystem : public IPlugin
 	{
 		public:
-		static AnimationSystem* createInstance();
+			static AnimationSystem* createInstance();
 
 			virtual void setFrame(Component cmp, int frame) = 0;
 			virtual bool isManual(Component cmp) = 0;
