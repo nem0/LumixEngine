@@ -514,6 +514,13 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
+		virtual IPlugin* getCreator(uint32_t type) override
+		{
+			IPlugin* plugin;
+			return m_creators.find(type, plugin) ? plugin : NULL;
+		}
+
+
 		virtual void tick() override
 		{
 			for (int i = 0; i < m_plugins.size(); ++i)
@@ -656,8 +663,8 @@ struct WorldEditorImpl : public WorldEditor
 
 		virtual void onMouseMove(int x, int y, int relx, int rely, int mouse_flags) override
 		{
-			m_mouse_x = x;
-			m_mouse_y = y;
+			m_mouse_x = (float)x;
+			m_mouse_y = (float)y;
 			switch (m_mouse_mode)
 			{
 				case MouseMode::CUSTOM:
@@ -801,7 +808,7 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
-		void executeCommand(IEditorCommand* command)
+		virtual void executeCommand(IEditorCommand* command) override
 		{
 			static bool b = false;
 			ASSERT(!b);
