@@ -78,6 +78,8 @@ private slots:
     void on_positionY_valueChanged(double arg1);
     void on_positionZ_valueChanged(double arg1);
 
+    void on_propertyList_customContextMenuRequested(const QPoint &pos);
+
 private:
 	void clear();
 	void onUniverseCreated();
@@ -100,6 +102,7 @@ private:
 	ScriptCompiler* m_compiler;
 	Lumix::Entity m_selected_entity;
 	Lumix::WorldEditor* m_world_editor;
+	bool m_is_updating_values;
 	class TerrainEditor* m_terrain_editor;
 };
 

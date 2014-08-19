@@ -7,6 +7,7 @@
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "editor/gizmo.h"
+#include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "graphics/irender_device.h"
 #include "graphics/model.h"
@@ -18,7 +19,8 @@ namespace Lumix
 {
 
 
-Gizmo::Gizmo()
+Gizmo::Gizmo(WorldEditor& editor)
+	: m_editor(editor)
 {
 	m_model = NULL;
 	m_selected_entity.index = -1;
@@ -178,8 +180,9 @@ void Gizmo::transform(Component camera, TransformOperation operation, int x, int
 			{
 				angle = (relx + rely) / 100.0f;
 			}
-			m_selected_entity.setRotation(m_selected_entity.getRotation() * Quat(axis, angle));
-			m_selected_entity.setPosition(pos);
+			Quat new_rot = m_selected_entity.getRotation() * Quat(axis, angle);
+			new_rot.normalize();
+			m_editor.setEntityPositionAndRotaion(m_selected_entity, pos, new_rot);
 		}
 		else
 		{
@@ -188,7 +191,7 @@ void Gizmo::transform(Component camera, TransformOperation operation, int x, int
 			m_transform_point = intersection;
 			Vec3 pos = m_selected_entity.getPosition();
 			pos += delta;
-			m_selected_entity.setPosition(pos);
+			m_editor.setEntityPosition(m_selected_entity, pos);
 		}
 	}
 }

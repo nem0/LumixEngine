@@ -100,6 +100,9 @@
     <ClCompile Include="..\..\..\src\editor\world_editor.cpp">
       <Filter>editor</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\editor\entity_template_system.cpp">
+      <Filter>editor</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\animation\animation.h">
@@ -193,6 +196,12 @@
       <Filter>graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\editor\world_editor.h">
+      <Filter>editor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\editor\entity_template_system.h">
+      <Filter>editor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\editor\ieditor_command.h">
       <Filter>editor</Filter>
     </ClInclude>
   </ItemGroup>

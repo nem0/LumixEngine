@@ -15,6 +15,7 @@ class ViewWidget : public QWidget
 		ViewWidget(QWidget* parent)
 			: QWidget(parent)
 		{
+			setMouseTracking(true);
 		}
 
 		virtual void mousePressEvent(QMouseEvent* event) override
@@ -102,6 +103,7 @@ void SceneView::dropEvent(QDropEvent *event)
 			char rel_path[LUMIX_MAX_PATH];
 			m_world_editor->getRelativePath(rel_path, LUMIX_MAX_PATH, file.toLatin1().data());
 			m_world_editor->setProperty("renderable", "source", rel_path, strlen(rel_path));
+			m_world_editor->selectEntity(m_world_editor->getSelectedEntity());
 		}
 	}
 }

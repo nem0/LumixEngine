@@ -9,6 +9,7 @@ namespace Lumix
 {
 	
 	class Engine;
+	class EntityTemplateSystem;
 	class IPlugin;
 	class IRenderDevice;
 	class Path;
@@ -42,6 +43,7 @@ namespace Lumix
 				public:
 					virtual ~Plugin() {}
 
+					virtual void tick() = 0;
 					virtual bool onEntityMouseDown(const RayCastModelHit& hit, int x, int y) = 0;
 					virtual void onMouseMove(int x, int y, int rel_x, int rel_y, int mouse_flags) = 0;
 					virtual void onMouseUp(int x, int y, MouseButton::Value button) = 0;
@@ -61,13 +63,20 @@ namespace Lumix
 			virtual class Gizmo& getGizmo() = 0;
 			virtual class FS::TCPFileServer& getTCPFileServer() = 0;
 			virtual void setEditViewRenderDevice(IRenderDevice& render_device) = 0;
+			virtual void undo() = 0;
+			virtual void redo() = 0;
 			virtual void loadUniverse(const Path& path) = 0;
 			virtual void saveUniverse(const Path& path) = 0;
 			virtual void newUniverse() = 0;
 			virtual Path getUniversePath() const = 0;
 			virtual void addComponent(uint32_t type_crc) = 0;
-			virtual void addEntity() = 0;
-			virtual void addEntityAt(int camera_x, int camera_y) = 0;
+			virtual void cloneComponent(const Component& src, Entity& entity) = 0;
+			virtual void removeComponent(const Component& crc) = 0;
+			virtual Entity addEntity() = 0;
+			virtual void selectEntity(Entity e) = 0;
+			virtual Entity addEntityAt(int camera_x, int camera_y) = 0;
+			virtual void setEntityPosition(const Entity& entity, const Vec3& position) = 0;
+			virtual void setEntityPositionAndRotaion(const Entity& entity, const Vec3& position, const Quat& rotation) = 0;
 			virtual void snapToTerrain() = 0;
 			virtual void toggleGameMode() = 0;
 			virtual void navigate(float forward, float right, float speed) = 0;
@@ -75,6 +84,8 @@ namespace Lumix
 			virtual void onMouseDown(int x, int y, MouseButton::Value button) = 0;
 			virtual void onMouseMove(int x, int y, int relx, int rely, int mouse_flags) = 0;
 			virtual void onMouseUp(int x, int y, MouseButton::Value button) = 0;
+			virtual float getMouseX() const = 0;
+			virtual float getMouseY() const = 0;
 			virtual void setWireframe(bool is_wireframe) = 0;
 			virtual void lookAtSelected() = 0;
 			virtual const char* getBasePath() = 0;
@@ -85,6 +96,7 @@ namespace Lumix
 			virtual DelegateList<void()>& universeDestroyed() = 0;
 			virtual void addPlugin(Plugin* plugin) = 0;
 			virtual void getRelativePath(char* relative_path, int max_length, const Path& source) = 0;
+			virtual EntityTemplateSystem& getEntityTemplateSystem() = 0;
 
 		protected:
 			virtual ~WorldEditor() {}
