@@ -26,9 +26,9 @@ namespace Lumix
 {
 
 
-static const uint32_t light_hash = crc32("light");
-static const uint32_t renderable_hash = crc32("renderable");
-static const uint32_t camera_hash = crc32("camera");
+static const uint32_t LIGHT_HASH = crc32("light");
+static const uint32_t RENDERABLE_HASH = crc32("renderable");
+static const uint32_t CAMERA_HASH = crc32("camera");
 
 
 struct RendererImpl : public Renderer
@@ -110,10 +110,32 @@ struct RendererImpl : public Renderer
 	}
 
 
+	virtual void destroyComponent(const Component& component) override
+	{
+		static_cast<RenderScene*>(component.system)->destroyComponent(component);
+	}
+
+
 	virtual Component createComponent(uint32_t, const Entity&) override
 	{
 		return Component::INVALID;
 	}
+
+
+	virtual void enableAlphaToCoverage(bool enable) override
+	{
+		if (enable)
+		{
+			glEnable(GL_MULTISAMPLE);
+			glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+		}
+		else
+		{
+			glDisable(GL_MULTISAMPLE);
+			glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+		}
+	}
+
 
 	virtual void enableZTest(bool enable) override
 	{

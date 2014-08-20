@@ -56,7 +56,7 @@ namespace Lumix
 //		CullingSystem*	m_culling_system;
 
 		string m_base_path;
-		EditorServer* m_editor_server;
+		WorldEditor* m_editor_server;
 		PluginManager m_plugin_manager;
 		Universe* m_universe;
 		RenderScene* m_render_scene;
@@ -113,7 +113,7 @@ namespace Lumix
 		{
 			return false;
 		}
-		AnimationSystem* anim_system = LUMIX_NEW(AnimationSystem)();
+		AnimationSystem* anim_system = AnimationSystem::createInstance();
 		if(!anim_system->create(owner))
 		{
 			LUMIX_DELETE(anim_system);
@@ -128,7 +128,7 @@ namespace Lumix
 	}
 
 	
-	bool Engine::create(const char* base_path, FS::FileSystem* file_system, EditorServer* editor_server)
+	bool Engine::create(const char* base_path, FS::FileSystem* file_system, WorldEditor* editor_server)
 	{
 		g_log_info.getCallback().bind<showLogInVS>();
 		g_log_warning.getCallback().bind<showLogInVS>();
@@ -222,7 +222,7 @@ namespace Lumix
 		}
 	}
 
-	EditorServer* Engine::getEditorServer() const
+	WorldEditor* Engine::getWorldEditor() const
 	{
 		return m_impl->m_editor_server;
 	}

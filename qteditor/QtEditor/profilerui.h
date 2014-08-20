@@ -38,17 +38,21 @@ class ProfileModel : public QAbstractItemModel
 			NAME,
 			FUNCTION,
 			LENGTH,
+			HIT_COUNT,
 			COUNT
 		};
 
 		struct Block
 		{
+			Block();
+
 			const char* m_name;
 			const char* m_function;
 			Block* m_parent;
 			Block* m_first_child;
 			Block* m_next;
 			QList<float> m_frames;
+			QList<int> m_hit_counts;
 		};
 
 	public:

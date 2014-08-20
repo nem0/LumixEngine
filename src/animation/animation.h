@@ -51,6 +51,7 @@ class Animation : public Resource
 		int	m_bone_count;
 		Vec3* m_positions;
 		Quat* m_rotations;
+		uint32_t* m_bones;
 };
 
 

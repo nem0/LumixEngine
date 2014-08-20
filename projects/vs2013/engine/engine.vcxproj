@@ -66,23 +66,23 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <OutDir>$(SolutionDir)\..\..\bin\$(Platform)_$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)\..\..\tmp\$(Platform)_$(Configuration)\$(ProjectName)\</IntDir>
+    <OutDir>$(SolutionDir)..\..\bin\$(Platform)_$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)..\..\tmp\$(Platform)_$(Configuration)\$(ProjectName)\</IntDir>
     <TargetExt>.dll</TargetExt>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <OutDir>$(SolutionDir)\..\..\bin\$(Platform)_$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)\..\..\tmp\$(Platform)_$(Configuration)\$(ProjectName)\</IntDir>
+    <OutDir>$(SolutionDir)..\..\bin\$(Platform)_$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)..\..\tmp\$(Platform)_$(Configuration)\$(ProjectName)\</IntDir>
     <TargetExt>.dll</TargetExt>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <OutDir>$(SolutionDir)\..\..\bin\$(Platform)_$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)\..\..\tmp\$(Platform)_$(Configuration)\$(ProjectName)\</IntDir>
+    <OutDir>$(SolutionDir)..\..\bin\$(Platform)_$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)..\..\tmp\$(Platform)_$(Configuration)\$(ProjectName)\</IntDir>
     <TargetExt>.dll</TargetExt>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>$(SolutionDir)\..\..\bin\$(Platform)_$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)\..\..\tmp\$(Platform)_$(Configuration)\$(ProjectName)\</IntDir>
+    <OutDir>$(SolutionDir)..\..\bin\$(Platform)_$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)..\..\tmp\$(Platform)_$(Configuration)\$(ProjectName)\</IntDir>
     <TargetExt>.dll</TargetExt>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -130,7 +130,7 @@
       </SDLCheck>
       <AdditionalIncludeDirectories>..\..\..\external\physx\include;..\..\..\src;..\..\..\external\glew\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <PreprocessorDefinitions>WIN32;BUILDING_ENGINE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;WIN32;BUILDING_ENGINE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -164,11 +164,10 @@
     <ClCompile Include="..\..\..\src\animation\animation.cpp" />
     <ClCompile Include="..\..\..\src\animation\animation_system.cpp" />
     <ClCompile Include="..\..\..\src\core\new.cpp" />
-    <ClCompile Include="..\..\..\src\editor\editor_client.cpp" />
     <ClCompile Include="..\..\..\src\editor\editor_icon.cpp" />
-    <ClCompile Include="..\..\..\src\editor\editor_server.cpp" />
+    <ClCompile Include="..\..\..\src\editor\entity_template_system.cpp" />
+    <ClCompile Include="..\..\..\src\editor\world_editor.cpp" />
     <ClCompile Include="..\..\..\src\editor\gizmo.cpp" />
-    <ClCompile Include="..\..\..\src\editor\server_message_types.cpp" />
     <ClCompile Include="..\..\..\src\engine\engine.cpp" />
     <ClCompile Include="..\..\..\src\engine\iplugin.cpp" />
     <ClCompile Include="..\..\..\src\engine\plugin_manager.cpp" />
@@ -196,13 +195,12 @@
   <ItemGroup>
     <ClInclude Include="..\..\..\src\animation\animation.h" />
     <ClInclude Include="..\..\..\src\animation\animation_system.h" />
-    <ClInclude Include="..\..\..\src\editor\client_message_types.h" />
-    <ClInclude Include="..\..\..\src\editor\editor_client.h" />
+    <ClInclude Include="..\..\..\src\editor\ieditor_command.h" />
     <ClInclude Include="..\..\..\src\editor\editor_icon.h" />
-    <ClInclude Include="..\..\..\src\editor\editor_server.h" />
+    <ClInclude Include="..\..\..\src\editor\entity_template_system.h" />
+    <ClInclude Include="..\..\..\src\editor\world_editor.h" />
     <ClInclude Include="..\..\..\src\editor\gizmo.h" />
     <ClInclude Include="..\..\..\src\editor\property_descriptor.h" />
-    <ClInclude Include="..\..\..\src\editor\server_message_types.h" />
     <ClInclude Include="..\..\..\src\engine\engine.h" />
     <ClInclude Include="..\..\..\src\engine\iplugin.h" />
     <ClInclude Include="..\..\..\src\engine\plugin_manager.h" />

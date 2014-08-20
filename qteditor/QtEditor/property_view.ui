@@ -84,6 +84,9 @@
     </item>
     <item>
      <widget class="QTreeWidget" name="propertyList">
+      <property name="contextMenuPolicy">
+       <enum>Qt::CustomContextMenu</enum>
+      </property>
       <property name="headerHidden">
        <bool>false</bool>
       </property>

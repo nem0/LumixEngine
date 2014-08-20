@@ -4,6 +4,7 @@
 #include "core/json_serializer.h"
 #include "core/log.h"
 #include "core/path_utils.h"
+#include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "core/timer.h"
@@ -48,6 +49,7 @@ void Material::apply(Renderer& renderer, PipelineInstance& pipeline)
 		{
 			m_textures[i]->apply(i);
 		}
+		renderer.enableAlphaToCoverage(m_is_alpha_to_coverage);
 		renderer.enableZTest(m_is_z_test);
 		for (int i = 0, c = m_uniforms.size(); i < c; ++i)
 		{
@@ -226,6 +228,7 @@ void Material::setShader(Shader* shader)
 
 void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 {
+	PROFILE_FUNCTION();
 	if(success)
 	{
 		JsonSerializer serializer(*file, JsonSerializer::READ, m_path.c_str());
@@ -241,7 +244,7 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			{
 				deserializeUniforms(serializer);
 			}
-			else if (strcmp(label, "texture") == 0 || strcmp(label, "heightmap") == 0)
+			else if (strcmp(label, "texture") == 0 || strcmp(label, "heightmap") == 0 || strcmp(label, "splatmap") == 0)
 			{
 				serializer.deserialize(path, MAX_PATH);
 				if (path[0] != '\0')
@@ -251,6 +254,7 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 					texture_path += path;
 					Texture* texture = static_cast<Texture*>(m_resource_manager.get(ResourceManager::TEXTURE)->load(texture_path.c_str()));
 					bool is_heightmap = label[0] == 'h';
+					bool is_splatmap = label[0] == 's';
 					if (is_heightmap)
 					{
 						if (!m_textures.empty())
@@ -260,9 +264,12 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 							fs.close(file);
 							return;
 						}
+					}
+					if (is_heightmap || is_splatmap)
+					{
 						if (texture->isReady() && !texture->getData())
 						{
-							g_log_error.log("Renderer") << "Heightmap " << m_path.c_str() << " can not be used as an ordinary texture";
+							g_log_error.log("Renderer") << (is_heightmap ? "Heightmap " : "Splatmap ") << m_path.c_str() << " can not be used as an ordinary texture";
 							onFailure();
 							fs.close(file);
 							return;
@@ -272,6 +279,10 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 					m_textures.push(texture);
 					addDependency(*texture);
 				}
+			}
+			else if (strcmp(label, "alpha_to_coverage") == 0)
+			{
+				serializer.deserialize(m_is_alpha_to_coverage);
 			}
 			else if (strcmp(label, "shader") == 0)
 			{

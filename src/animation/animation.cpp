@@ -40,6 +40,7 @@ Animation::Animation(const Path& path, ResourceManager& resource_manager)
 {
 	m_rotations = NULL;
 	m_positions = NULL;
+	m_bones = NULL;
 	m_frame_count = 0;
 }
 
@@ -48,6 +49,7 @@ Animation::~Animation()
 {
 	LUMIX_DELETE_ARRAY(m_positions);
 	LUMIX_DELETE_ARRAY(m_rotations);
+	LUMIX_DELETE_ARRAY(m_bones);
 }
 
 
@@ -70,13 +72,20 @@ void Animation::getPose(float time, Pose& pose, Model& model) const
 		{
 			for(int i = 0; i < m_bone_count; ++i)
 			{
-				lerp(m_positions[off + i], m_positions[off2 + i], &pos[i], t);
-				nlerp(m_rotations[off + i], m_rotations[off2 + i], &rot[i], t);
-				int parent = model.getBone(i).parent_idx;
-				if (parent >= 0)
+				Model::BoneMap::iterator iter = model.getBoneIndex(m_bones[i]);
+				if (iter.isValid())
 				{
-					pos[i] = rot[parent] * pos[i] + pos[parent];
-					rot[i] = rot[i] * rot[parent];
+					int model_bone_index = iter.value();
+					lerp(m_positions[off + i], m_positions[off2 + i], &pos[model_bone_index], t);
+					nlerp(m_rotations[off + i], m_rotations[off2 + i], &rot[model_bone_index], t);
+
+					/*int parent = model.getBone(model_bone_index).parent_idx;
+					ASSERT(parent < model_bone_index);
+					if (parent >= 0)
+					{
+						pos[model_bone_index] = rot[parent] * pos[model_bone_index] + pos[parent];
+						rot[model_bone_index] = rot[model_bone_index] * rot[parent];
+					}*/
 				}
 			}
 		}
@@ -84,16 +93,24 @@ void Animation::getPose(float time, Pose& pose, Model& model) const
 		{
 			for(int i = 0; i < m_bone_count; ++i)
 			{
-				pos[i] = m_positions[off + i];
-				rot[i] = m_rotations[off + i];
-				int parent = model.getBone(i).parent_idx;
-				if (parent >= 0)
+				Model::BoneMap::iterator iter = model.getBoneIndex(m_bones[i]);
+				if (iter.isValid())
 				{
-					pos[i] = rot[parent] * pos[i] + pos[parent];
-					rot[i] = rot[i] * rot[parent];
+					int model_bone_index = iter.value();
+					pos[model_bone_index] = m_positions[off + i];
+					rot[model_bone_index] = m_rotations[off + i];
+					/*int parent = model.getBone(model_bone_index).parent_idx;
+					ASSERT(parent < model_bone_index);
+					if (parent >= 0)
+					{
+						pos[model_bone_index] = rot[parent] * pos[model_bone_index] + pos[parent];
+						rot[model_bone_index] = rot[model_bone_index] * rot[parent];
+					}*/
 				}
 			}
 		}
+		pose.setIsRelative();
+		pose.computeAbsolute(model);
 	}
 }
 
@@ -128,9 +145,11 @@ void Animation::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 
 		m_positions = LUMIX_NEW_ARRAY(Vec3, m_frame_count * m_bone_count);
 		m_rotations = LUMIX_NEW_ARRAY(Quat, m_frame_count * m_bone_count);
+		m_bones = LUMIX_NEW_ARRAY(uint32_t, m_bone_count);
 		file->read(&m_positions[0], sizeof(Vec3)* m_bone_count * m_frame_count);
 		file->read(&m_rotations[0], sizeof(Quat)* m_bone_count * m_frame_count);
-
+		file->read(m_bones, sizeof(m_bones[0]) * m_bone_count);
+		
 		m_size = file->size();
 		decrementDepCount();
 	}

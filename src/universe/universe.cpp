@@ -34,18 +34,16 @@ Universe::Universe()
 }
 
 
-
-
-
 Entity Universe::createEntity()
 {
-	
 	if(m_free_slots.empty())
 	{
 		m_positions.push(Vec3(0, 0, 0));
 		m_rotations.push(Quat(0, 0, 0, 1));
 		m_component_list.pushEmpty();
-		return Entity(this, m_positions.size() - 1);
+		Entity e(this, m_positions.size() - 1);
+		m_entity_created.invoke(e);
+		return e;
 	}
 	else
 	{
@@ -54,6 +52,7 @@ Entity Universe::createEntity()
 		m_positions[e.index].set(0, 0, 0);
 		m_rotations[e.index].set(0, 0, 0, 1);
 		m_component_list[e.index].clear();
+		m_entity_created.invoke(e);
 		return e;
 	}
 }

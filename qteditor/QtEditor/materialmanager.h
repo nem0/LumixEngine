@@ -10,8 +10,8 @@ namespace Ui
 
 namespace Lumix
 {
-	class EditorServer;
-	class EditorClient;
+	class WorldEditor;
+	struct Entity;
 	class Event;
 	struct PropertyListEvent;
 }
@@ -23,18 +23,17 @@ class MaterialManager : public QDockWidget
 	public:
 		explicit MaterialManager(QWidget* parent = NULL);
 		~MaterialManager();
-		void setEditorServer(Lumix::EditorServer& server);
-		void setEditorClient(Lumix::EditorClient& client);
+		void setWorldEditor(Lumix::WorldEditor& server);
 		void updatePreview();
+		QWidget* getPreview() const;
 
 	private:
-		void onPropertyList(Lumix::PropertyListEvent& event);
 		void fillObjectMaterials();
 		void selectMaterial(const char* path);
 		void onMaterialLoaded(Lumix::Resource::State, Lumix::Resource::State);
+		void onEntitySelected(Lumix::Entity& entity);
 
 	private slots:
-		void on_fileListView_doubleClicked(const QModelIndex& index);
 		void on_objectMaterialList_doubleClicked(const QModelIndex& index);
 		void on_saveMaterialButton_clicked();
 		void onBoolPropertyStateChanged(int state);
@@ -42,6 +41,7 @@ class MaterialManager : public QDockWidget
 		void onTextureChanged();
 		void onTextureRemoved();
 		void onTextureAdded();
+        void on_fileTreeView_doubleClicked(const QModelIndex &index);
 
 private:
 		Ui::MaterialManager* m_ui;

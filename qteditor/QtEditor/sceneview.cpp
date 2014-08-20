@@ -1,6 +1,5 @@
 #include "sceneview.h"
-#include "editor/editor_client.h"
-#include "editor/editor_server.h"
+#include "editor/world_editor.h"
 #include <qapplication.h>
 #include <QDoubleSpinBox>
 #include <QDragEnterEvent>
@@ -16,11 +15,12 @@ class ViewWidget : public QWidget
 		ViewWidget(QWidget* parent)
 			: QWidget(parent)
 		{
+			setMouseTracking(true);
 		}
 
 		virtual void mousePressEvent(QMouseEvent* event) override
 		{
-			m_client->mouseDown(event->x(), event->y(), event->button() == Qt::LeftButton ? 0 : 2);
+			m_world_editor->onMouseDown(event->x(), event->y(), event->button() == Qt::RightButton ? Lumix::MouseButton::RIGHT : Lumix::MouseButton::LEFT);
 			m_last_x = event->x();
 			m_last_y = event->y();
 			setFocus();
@@ -29,19 +29,19 @@ class ViewWidget : public QWidget
 		virtual void mouseMoveEvent(QMouseEvent* event) override
 		{
 			int flags = 0;
-			flags |= Qt::ControlModifier & QApplication::keyboardModifiers() ? (int)Lumix::EditorServer::MouseFlags::CONTROL : 0;
-			flags |= Qt::AltModifier & QApplication::keyboardModifiers() ? (int)Lumix::EditorServer::MouseFlags::ALT : 0;
-			m_client->mouseMove(event->x(), event->y(), event->x() - m_last_x, event->y() - m_last_y, flags);
+			flags |= Qt::ControlModifier & QApplication::keyboardModifiers() ? (int)Lumix::WorldEditor::MouseFlags::CONTROL : 0;
+			flags |= Qt::AltModifier & QApplication::keyboardModifiers() ? (int)Lumix::WorldEditor::MouseFlags::ALT : 0;
+			m_world_editor->onMouseMove(event->x(), event->y(), event->x() - m_last_x, event->y() - m_last_y, flags);
 			m_last_x = event->x();
 			m_last_y = event->y();
 		}
 
 		virtual void mouseReleaseEvent(QMouseEvent* event) override
 		{
-			m_client->mouseUp(event->x(), event->y(), event->button() == Qt::LeftButton ? 0 : 2);
+			m_world_editor->onMouseUp(event->x(), event->y(), event->button() == Qt::RightButton ? Lumix::MouseButton::RIGHT : Lumix::MouseButton::LEFT);
 		}
 
-		Lumix::EditorClient* m_client;
+		Lumix::WorldEditor* m_world_editor;
 		int m_last_x;
 		int m_last_y;
 };
@@ -69,10 +69,10 @@ SceneView::SceneView(QWidget* parent) :
 }
 
 
-void SceneView::setEditorClient(Lumix::EditorClient& client)
+void SceneView::setWorldEditor(Lumix::WorldEditor* world_editor)
 {
-	m_client = &client;
-	static_cast<ViewWidget*>(m_view)->m_client = &client;
+	static_cast<ViewWidget*>(m_view)->m_world_editor = world_editor;
+	m_world_editor = world_editor;
 }
 
 
@@ -98,14 +98,12 @@ void SceneView::dropEvent(QDropEvent *event)
 		QString file = list[0].toLocalFile();
 		if(file.endsWith(".msh"))
 		{
-			m_client->addEntity();
-			m_client->addComponent(crc32("renderable"));
-			QString base_path = m_client->getBasePath();
-			if(file.startsWith(base_path))
-			{
-				file.remove(0, base_path.length());
-			}
-			m_client->setComponentProperty("renderable", "source", file.toLatin1().data(), file.length());
+			m_world_editor->addEntityAt(event->pos().x(), event->pos().y());
+			m_world_editor->addComponent(crc32("renderable"));
+			char rel_path[LUMIX_MAX_PATH];
+			m_world_editor->getRelativePath(rel_path, LUMIX_MAX_PATH, file.toLatin1().data());
+			m_world_editor->setProperty("renderable", "source", rel_path, strlen(rel_path));
+			m_world_editor->selectEntity(m_world_editor->getSelectedEntity());
 		}
 	}
 }

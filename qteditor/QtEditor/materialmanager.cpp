@@ -12,9 +12,7 @@
 #include "core/json_serializer.h"
 #include "core/log.h"
 #include "core/profiler.h"
-#include "editor/editor_server.h"
-#include "editor/editor_client.h"
-#include "editor/server_message_types.h"
+#include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "graphics/material.h"
 #include "graphics/model.h"
@@ -37,6 +35,7 @@ class MaterialManagerUI
 		Lumix::Model* m_selected_object_model;
 		QFileSystemModel* m_fs_model;
 		Lumix::Material* m_material;
+		Lumix::WorldEditor* m_world_editor;
 };
 
 
@@ -46,6 +45,7 @@ MaterialManager::MaterialManager(QWidget *parent)
 {
 	m_impl = new MaterialManagerUI();
 	m_impl->m_selected_object_model = NULL;
+	m_impl->m_world_editor = NULL;
 	m_ui->setupUi(this);
 	m_impl->m_fs_model = new QFileSystemModel();
 	m_impl->m_fs_model->setRootPath(QDir::currentPath());
@@ -53,8 +53,8 @@ MaterialManager::MaterialManager(QWidget *parent)
 	filters << "*.mat";
 	m_impl->m_fs_model->setNameFilters(filters);
 	m_impl->m_fs_model->setNameFilterDisables(false);
-	m_ui->fileListView->setModel(m_impl->m_fs_model);
-	m_ui->fileListView->setRootIndex(m_impl->m_fs_model->index(QDir::currentPath()));
+	m_ui->fileTreeView->setModel(m_impl->m_fs_model);
+	m_ui->fileTreeView->setRootIndex(m_impl->m_fs_model->index(QDir::currentPath()));
 	m_impl->m_engine = NULL;
 	m_impl->m_universe = NULL;
 	m_impl->m_render_scene = NULL;
@@ -82,36 +82,38 @@ void MaterialManager::fillObjectMaterials()
 	}
 }
 
-void MaterialManager::onPropertyList(Lumix::PropertyListEvent& event)
+
+QWidget* MaterialManager::getPreview() const
 {
-	if (event.type_hash == crc32("renderable"))
+	return m_ui->previewWidget;
+}
+
+
+void MaterialManager::onEntitySelected(Lumix::Entity& entity)
+{
+	if (entity.isValid())
 	{
-		for (int i = 0; i < event.properties.size(); ++i)
+		Lumix::Component cmp = entity.getComponent(crc32("renderable"));
+		if (cmp.isValid())
 		{
-			if (event.properties[i].name_hash == crc32("source"))
-			{	
-				m_impl->m_selected_object_model = static_cast<Lumix::Model*>(m_impl->m_engine->getResourceManager().get(Lumix::ResourceManager::MODEL)->get((char*)event.properties[i].data));
-				fillObjectMaterials();
-			}
+			m_impl->m_selected_object_model = static_cast<Lumix::RenderScene*>(cmp.system)->getModel(cmp);
+			fillObjectMaterials();
 		}
 	}
 }
 
-void MaterialManager::setEditorClient(Lumix::EditorClient& client)
-{
-	client.propertyListReceived().bind<MaterialManager, &MaterialManager::onPropertyList>(this);
-}
-
-void MaterialManager::setEditorServer(Lumix::EditorServer& server)
+void MaterialManager::setWorldEditor(Lumix::WorldEditor& editor)
 {
 	ASSERT(m_impl->m_engine == NULL);
+	m_impl->m_world_editor = &editor;
 	HWND hwnd = (HWND)m_ui->previewWidget->winId();
-	m_impl->m_engine = &server.getEngine();
+	editor.entitySelected().bind<MaterialManager, &MaterialManager::onEntitySelected>(this);
+	m_impl->m_engine = &editor.getEngine();
 	m_impl->m_universe = new Lumix::Universe();
 	m_impl->m_universe->create();
 
-	m_impl->m_render_scene = Lumix::RenderScene::createInstance(server.getEngine(), *m_impl->m_universe);
-	m_impl->m_render_device = new WGLRenderDevice(server.getEngine(), "pipelines/main.json");
+	m_impl->m_render_scene = Lumix::RenderScene::createInstance(editor.getEngine(), *m_impl->m_universe);
+	m_impl->m_render_device = new WGLRenderDevice(editor.getEngine(), "pipelines/main.json");
 	m_impl->m_render_device->m_hdc = GetDC(hwnd);
 	m_impl->m_render_device->m_opengl_context = wglGetCurrentContext();
 	m_impl->m_render_device->getPipeline().setScene(m_impl->m_render_scene);
@@ -136,41 +138,6 @@ void MaterialManager::setEditorServer(Lumix::EditorServer& server)
 	m_ui->previewWidget->setAttribute(Qt::WA_PaintOnScreen);
 	m_ui->previewWidget->m_render_device = m_impl->m_render_device;
 	m_ui->previewWidget->m_engine = m_impl->m_engine;
-	/// TODO refactor (EditorServer::create)
-	HDC hdc;
-	hdc = GetDC(hwnd);
-	ASSERT(hdc != NULL);
-	PIXELFORMATDESCRIPTOR pfd = 
-	{ 
-		sizeof(PIXELFORMATDESCRIPTOR),  //  size of this pfd  
-		1,                     // version number  
-		PFD_DRAW_TO_WINDOW |   // support window  
-		PFD_SUPPORT_OPENGL |   // support OpenGL  
-		PFD_DOUBLEBUFFER,      // double buffered  
-		PFD_TYPE_RGBA,         // RGBA type  
-		24,                    // 24-bit color depth  
-		0, 0, 0, 0, 0, 0,      // color bits ignored  
-		0,                     // no alpha buffer  
-		0,                     // shift bit ignored  
-		0,                     // no accumulation buffer  
-		0, 0, 0, 0,            // accum bits ignored  
-		32,                    // 32-bit z-buffer      
-		0,                     // no stencil buffer  
-		0,                     // no auxiliary buffer  
-		PFD_MAIN_PLANE,        // main layer  
-		0,                     // reserved  
-		0, 0, 0                // layer masks ignored  
-	}; 
-	int pixelformat = ChoosePixelFormat(hdc, &pfd);
-	if (pixelformat == 0)
-	{
-		ASSERT(false);
-	}
-	BOOL success = SetPixelFormat(hdc, pixelformat, &pfd);
-	if (success == FALSE)
-	{
-		ASSERT(false);
-	}
 }
 
 MaterialManager::~MaterialManager()
@@ -276,7 +243,9 @@ void MaterialManager::onTextureAdded()
 
 void MaterialManager::selectMaterial(const char* path)
 {
-	Lumix::Material* material = static_cast<Lumix::Material*>(m_impl->m_engine->getResourceManager().get(Lumix::ResourceManager::MATERIAL)->load(path));
+	char rel_path[LUMIX_MAX_PATH];
+	m_impl->m_world_editor->getRelativePath(rel_path, LUMIX_MAX_PATH, path);
+	Lumix::Material* material = static_cast<Lumix::Material*>(m_impl->m_engine->getResourceManager().get(Lumix::ResourceManager::MATERIAL)->load(rel_path));
 	material->getObserverCb().bind<MaterialManager, &MaterialManager::onMaterialLoaded>(this);
 	m_impl->m_material = material;
 	if(material->isReady())
@@ -290,6 +259,7 @@ void MaterialManager::onMaterialLoaded(Lumix::Resource::State, Lumix::Resource::
 	ICppObjectProperty* properties[] = 
 	{
 		new CppObjectProperty<bool, Lumix::Material>("Z test", &Lumix::Material::isZTest, &Lumix::Material::enableZTest),
+		new CppObjectProperty<bool, Lumix::Material>("Alpha to coverage", &Lumix::Material::isAlphaToCoverage, &Lumix::Material::enableAlphaToCoverage),
 		new CppObjectProperty<bool, Lumix::Material>("Backface culling", &Lumix::Material::isBackfaceCulling, &Lumix::Material::enableBackfaceCulling),
 		new CppObjectProperty<Lumix::Shader*, Lumix::Material>("Shader", &Lumix::Material::getShader, &Lumix::Material::setShader)
 	};
@@ -366,12 +336,6 @@ void MaterialManager::onTextureRemoved()
 	selectMaterial(m_impl->m_material->getPath().c_str());
 }
 
-void MaterialManager::on_fileListView_doubleClicked(const QModelIndex &index)
-{
-	QString file_path = m_impl->m_fs_model->fileInfo(index).filePath().toLower();
-	selectMaterial(file_path.toLatin1().data());
-}
-
 void MaterialManager::on_objectMaterialList_doubleClicked(const QModelIndex &index)
 {
 	QListWidgetItem* item = m_ui->objectMaterialList->item(index.row());
@@ -399,4 +363,10 @@ void MaterialManager::on_saveMaterialButton_clicked()
 	{
 		Lumix::g_log_error.log("Material manager") << "Could not save file " << m_impl->m_material->getPath().c_str();
 	}
+}
+
+void MaterialManager::on_fileTreeView_doubleClicked(const QModelIndex &index)
+{
+	QString file_path = m_impl->m_fs_model->fileInfo(index).filePath().toLower();
+	selectMaterial(file_path.toLatin1().data());
 }
