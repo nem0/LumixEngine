@@ -12,8 +12,6 @@
 #include "core/mt/transaction.h"
 #include "core/array.h"
 
-TODO("MTJD manager refactor to pimpl or virtual");
-
 namespace Lumix
 {
 	namespace MTJD

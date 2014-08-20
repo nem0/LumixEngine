@@ -27,28 +27,28 @@ namespace Lumix
 			Vec3 nc = position - z * near;
 			Vec3 fc = position - z * Far;
 
-			m_plane[(uint32_t)Sides::Near].set(-z, nc);
-			m_plane[(uint32_t)Sides::Far].set(z, fc);
+			m_plane[(uint32_t)Sides::NEAR].set(-z, nc);
+			m_plane[(uint32_t)Sides::FAR].set(z, fc);
 
 			Vec3 aux = (nc + y * nh) - position;
 			aux.normalize();
 			Vec3 normal = crossProduct(aux, x);
-			m_plane[(uint32_t)Sides::Top].set(normal, nc + y * nh);
+			m_plane[(uint32_t)Sides::TOP].set(normal, nc + y * nh);
 
 			aux = (nc - y * nh) - position;
 			aux.normalize();
 			normal = crossProduct(x, aux);
-			m_plane[(uint32_t)Sides::Bottom].set(normal, nc - y * nh);
+			m_plane[(uint32_t)Sides::BOTTOM].set(normal, nc - y * nh);
 
 			aux = (nc - x * nw) - position;
 			aux.normalize();
 			normal = crossProduct(aux, y);
-			m_plane[(uint32_t)Sides::Left].set(normal, nc - x * nw);
+			m_plane[(uint32_t)Sides::LEFT].set(normal, nc - x * nw);
 
 			aux = (nc + x * nw) - position;
 			aux.normalize();
 			normal = crossProduct(y, aux);
-			m_plane[(uint32_t)Sides::Right].set(normal, nc + x * nw);
+			m_plane[(uint32_t)Sides::RIGHT].set(normal, nc + x * nw);
 		}
 
 		bool sphereInFrustum(const Vec3 &p, float radius) const
@@ -65,7 +65,7 @@ namespace Lumix
 			return true;
 		}
 
-		enum class Sides : uint32_t	{ Near, Far, Left, Right, Top, Bottom, COUNT };
+		enum class Sides : uint32_t	{ NEAR, FAR, LEFT, RIGHT, TOP, BOTTOM, COUNT };
 		Plane m_plane[(uint32_t)Sides::COUNT];
 	};
 }
