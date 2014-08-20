@@ -3,6 +3,7 @@
 #include "core/lumix.h"
 #include "core/array.h"
 #include "core/string.h"
+#include "engine/iplugin.h"
 #include "graphics/ray_cast_model_hit.h"
 #include "universe/component.h"
 
@@ -59,16 +60,12 @@ namespace Lumix
 		float m_life;
 	};
 
-	class LUMIX_ENGINE_API RenderScene
+	class LUMIX_ENGINE_API RenderScene : public IScene
 	{
 		public:
-			static RenderScene* createInstance(Engine& engine, Universe& universe);
+			static RenderScene* createInstance(Renderer& renderer, Engine& engine, Universe& universe);
 			static void destroyInstance(RenderScene* scene);
 
-			virtual void serialize(ISerializer& serializer) = 0;
-			virtual void deserialize(ISerializer& serializer) = 0;
-			virtual Component createComponent(uint32_t type, const Entity& entity) = 0;
-			virtual void destroyComponent(const Component& component) = 0;
 			virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Component& ignore) = 0;
 			virtual void getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) = 0;
 			virtual void applyCamera(Component camera) = 0;

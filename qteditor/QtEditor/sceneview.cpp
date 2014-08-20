@@ -42,10 +42,24 @@ class ViewWidget : public QWidget
 					Lumix::Engine& engine = m_widget.m_world_editor->getEngine();
 					m_entity = engine.getUniverse()->createEntity();
 					m_entity.setPosition(m_position);
-					Lumix::Component cmp = engine.getRenderScene()->createComponent(crc32("renderable"), m_entity);
-					char rel_path[LUMIX_MAX_PATH];
-					m_widget.m_world_editor->getRelativePath(rel_path, LUMIX_MAX_PATH, m_mesh_path.c_str());
-					engine.getRenderScene()->setRenderablePath(cmp, Lumix::string(rel_path));
+					const Lumix::Array<Lumix::IScene*>& scenes = engine.getScenes();
+					Lumix::Component cmp;
+					Lumix::IScene* scene = NULL;
+					for (int i = 0; i < scenes.size(); ++i)
+					{
+						cmp = scenes[i]->createComponent(RENDERABLE_HASH, m_entity);
+						if (cmp.isValid())
+						{
+							scene = scenes[i];
+							break;
+						}
+					}
+					if (cmp.isValid())
+					{
+						char rel_path[LUMIX_MAX_PATH];
+						m_widget.m_world_editor->getRelativePath(rel_path, LUMIX_MAX_PATH, m_mesh_path.c_str());
+						static_cast<Lumix::RenderScene*>(scene)->setRenderablePath(cmp, Lumix::string(rel_path));
+					}
 				}
 
 
@@ -54,15 +68,7 @@ class ViewWidget : public QWidget
 					const Lumix::Entity::ComponentList& cmps = m_entity.getComponents();
 					for (int i = 0; i < cmps.size(); ++i)
 					{
-						if (cmps[i].type == RENDERABLE_HASH || cmps[i].type == TERRAIN_HASH || cmps[i].type == CAMERA_HASH || cmps[i].type == LIGHT_HASH)
-						{
-							m_widget.m_world_editor->getEngine().getRenderScene()->destroyComponent(cmps[i]);
-						}
-						else
-						{
-							Lumix::IPlugin* plugin = m_widget.m_world_editor->getCreator(cmps[i].type);
-							plugin->destroyComponent(cmps[i]);
-						}
+						cmps[i].scene->destroyComponent(cmps[i]);
 					}
 					m_widget.m_world_editor->getEngine().getUniverse()->destroyEntity(m_entity);
 					m_entity = Lumix::Entity::INVALID;
@@ -180,7 +186,7 @@ void SceneView::dropEvent(QDropEvent *event)
 		if(file.endsWith(".msh"))
 		{
 			Lumix::Vec3 position;
-			Lumix::RenderScene* scene = m_world_editor->getEngine().getRenderScene();
+			Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(m_world_editor->getEditCamera().scene);
 
 			Lumix::Vec3 origin;
 			Lumix::Vec3 dir;

@@ -71,7 +71,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 				if (terrain.isValid())
 				{
 					Lumix::Component camera_cmp = m_world_editor.getEditCamera();
-					Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(camera_cmp.system);
+					Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(camera_cmp.scene);
 					Lumix::Vec3 origin, dir;
 					scene->getRay(camera_cmp, (float)mouse_x, (float)mouse_y, origin, dir);
 					Lumix::RayCastModelHit hit = scene->castRay(origin, dir, Lumix::Component::INVALID);
@@ -115,7 +115,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 		{
 			Lumix::Component terrain = m_world_editor.getSelectedEntity().getComponent(crc32("terrain"));
 			Lumix::Component camera_cmp = m_world_editor.getEditCamera();
-			Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(camera_cmp.system);
+			Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(camera_cmp.scene);
 			Lumix::Vec3 origin, dir;
 			scene->getRay(camera_cmp, (float)x, (float)y, origin, dir);
 			Lumix::RayCastModelHit hit = scene->castRay(origin, dir, Lumix::Component::INVALID);
@@ -147,7 +147,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 		Lumix::Material* getMaterial()
 		{
 			Lumix::string material_path;
-			static_cast<Lumix::RenderScene*>(m_component.system)->getTerrainMaterial(m_component, material_path);
+			static_cast<Lumix::RenderScene*>(m_component.scene)->getTerrainMaterial(m_component, material_path);
 			return static_cast<Lumix::Material*>(m_world_editor.getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL)->get(material_path.c_str()));
 		}
 
@@ -159,7 +159,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			float radius = (float)m_terrain_brush_size;
 			float rel_amount = m_terrain_brush_strength;
 			Lumix::string material_path;
-			static_cast<Lumix::RenderScene*>(terrain.system)->getTerrainMaterial(terrain, material_path);
+			static_cast<Lumix::RenderScene*>(terrain.scene)->getTerrainMaterial(terrain, material_path);
 			Lumix::Material* material = static_cast<Lumix::Material*>(m_world_editor.getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL)->get(material_path));
 			Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
 			Lumix::Texture* splatmap = material->getTexture(material->getTextureCount() - 1);
@@ -168,7 +168,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			entity_mtx.fastInverse();
 			Lumix::Vec3 local_pos = entity_mtx.multiplyPosition(hit_pos);
 			float xz_scale;
-			static_cast<Lumix::RenderScene*>(terrain.system)->getTerrainXZScale(terrain, xz_scale);
+			static_cast<Lumix::RenderScene*>(terrain.scene)->getTerrainXZScale(terrain, xz_scale);
 			local_pos = local_pos / xz_scale;
 			local_pos.x *= (float)splatmap->getWidth() / heightmap->getWidth();
 			local_pos.z *= (float)splatmap->getHeight() / heightmap->getHeight();
@@ -252,7 +252,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			float radius = (float)m_terrain_brush_size;
 			float rel_amount = m_terrain_brush_strength;
 			Lumix::string material_path;
-			static_cast<Lumix::RenderScene*>(terrain.system)->getTerrainMaterial(terrain, material_path);
+			static_cast<Lumix::RenderScene*>(terrain.scene)->getTerrainMaterial(terrain, material_path);
 			Lumix::Material* material = static_cast<Lumix::Material*>(m_world_editor.getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL)->get(material_path));
 			Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
 			Lumix::Texture* heightmap = material->getTexture(0);
@@ -260,7 +260,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			entity_mtx.fastInverse();
 			Lumix::Vec3 local_pos = entity_mtx.multiplyPosition(hit_pos);
 			float xz_scale;
-			static_cast<Lumix::RenderScene*>(terrain.system)->getTerrainXZScale(terrain, xz_scale);
+			static_cast<Lumix::RenderScene*>(terrain.scene)->getTerrainXZScale(terrain, xz_scale);
 			local_pos = local_pos / xz_scale;
 
 			static const float strengt_multiplicator = 0.02f;
@@ -809,8 +809,8 @@ void PropertyView::on_animablePlayPause()
 	Lumix::Component cmp = m_world_editor->getSelectedEntity().getComponent(crc32("animable"));
 	if (cmp.isValid())
 	{
-		Lumix::AnimationSystem* anim_system = static_cast<Lumix::AnimationSystem*>(cmp.system);
-		anim_system->setManual(cmp, !anim_system->isManual(cmp));
+		Lumix::AnimationScene* scene = static_cast<Lumix::AnimationScene*>(cmp.scene);
+		scene->setManual(cmp, !scene->isManual(cmp));
 	}
 
 }
@@ -821,7 +821,7 @@ void PropertyView::on_animableTimeSet(int value)
 	Lumix::Component cmp = m_world_editor->getSelectedEntity().getComponent(crc32("animable"));
 	if (cmp.isValid())
 	{
-		static_cast<Lumix::AnimationSystem*>(cmp.system)->setAnimationFrame(cmp, value);
+		static_cast<Lumix::AnimationScene*>(cmp.scene)->setAnimationFrame(cmp, value);
 	}
 }
 
@@ -979,7 +979,7 @@ void PropertyView::addAnimableCustomProperties(const Lumix::Component& cmp)
 	QSlider* slider = new QSlider(Qt::Orientation::Horizontal, widget);
 	slider->setObjectName("animation_frame_slider");
 	slider->setMinimum(0);
-	int frame_count = static_cast<Lumix::AnimationSystem*>(cmp.system)->getFrameCount(cmp);
+	int frame_count = static_cast<Lumix::AnimationScene*>(cmp.scene)->getFrameCount(cmp);
 	slider->setMaximum(frame_count);
 	layout->addWidget(compile_button);
 	layout->addWidget(slider);
@@ -1125,7 +1125,7 @@ void PropertyView::updateValues()
 		Lumix::Component animable = m_selected_entity.getComponent(crc32("animable"));
 		if (animable.isValid())
 		{
-			int frame_count = static_cast<Lumix::AnimationSystem*>(animable.system)->getFrameCount(animable);
+			int frame_count = static_cast<Lumix::AnimationScene*>(animable.scene)->getFrameCount(animable);
 			m_ui->propertyList->findChild<QSlider*>("animation_frame_slider")->setMaximum(frame_count);
 		}
 	}

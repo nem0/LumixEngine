@@ -96,7 +96,7 @@ void MaterialManager::onEntitySelected(Lumix::Entity& entity)
 		Lumix::Component cmp = entity.getComponent(crc32("renderable"));
 		if (cmp.isValid())
 		{
-			m_impl->m_selected_object_model = static_cast<Lumix::RenderScene*>(cmp.system)->getModel(cmp);
+			m_impl->m_selected_object_model = static_cast<Lumix::RenderScene*>(cmp.scene)->getModel(cmp);
 			fillObjectMaterials();
 		}
 	}
@@ -110,9 +110,8 @@ void MaterialManager::setWorldEditor(Lumix::WorldEditor& editor)
 	editor.entitySelected().bind<MaterialManager, &MaterialManager::onEntitySelected>(this);
 	m_impl->m_engine = &editor.getEngine();
 	m_impl->m_universe = new Lumix::Universe();
-	m_impl->m_universe->create();
 
-	m_impl->m_render_scene = Lumix::RenderScene::createInstance(editor.getEngine(), *m_impl->m_universe);
+	m_impl->m_render_scene = Lumix::RenderScene::createInstance(editor.getEngine().getRenderer(), editor.getEngine(), *m_impl->m_universe);
 	m_impl->m_render_device = new WGLRenderDevice(editor.getEngine(), "pipelines/main.json");
 	m_impl->m_render_device->m_hdc = GetDC(hwnd);
 	m_impl->m_render_device->m_opengl_context = wglGetCurrentContext();
@@ -143,7 +142,6 @@ void MaterialManager::setWorldEditor(Lumix::WorldEditor& editor)
 MaterialManager::~MaterialManager()
 {
 	Lumix::RenderScene::destroyInstance(m_impl->m_render_scene);
-	m_impl->m_universe->destroy();
 	delete m_impl->m_render_device;
 	delete m_impl->m_universe;
 	delete m_impl;

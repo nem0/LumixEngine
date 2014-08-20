@@ -32,14 +32,11 @@ class LUMIX_ENGINE_API Universe final
 		Universe();
 		~Universe();
 
-		void create();
-		void destroy();
-
 		Entity createEntity();
 		void destroyEntity(Entity& entity);
 		Vec3 getPosition(int index) { return m_positions[index]; }
 		Quat getRotation(int index) { return m_rotations[index]; }
-		Component addComponent(const Entity& entity, uint32_t component_type, void* system, int index);
+		Component addComponent(const Entity& entity, uint32_t component_type, IScene* scene, int index);
 		void destroyComponent(const Component& cmp);
 		int getEntityCount() const { return m_positions.size(); }
 
