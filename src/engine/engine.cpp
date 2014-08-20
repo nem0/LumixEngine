@@ -67,6 +67,10 @@ namespace Lumix
 
 			bool create()
 			{
+				if (!m_plugin_manager.create(*this))
+				{
+					return false;
+				}
 				m_renderer = Renderer::createInstance();
 				if (!m_renderer)
 				{
@@ -77,10 +81,7 @@ namespace Lumix
 					Renderer::destroyInstance(*m_renderer);
 					return false;
 				}
-				if (!m_plugin_manager.create(*this))
-				{
-					return false;
-				}
+				m_plugin_manager.addPlugin(m_renderer);
 				AnimationSystem* anim_system = AnimationSystem::createInstance();
 				if (!anim_system->create(*this))
 				{
@@ -134,8 +135,6 @@ namespace Lumix
 						m_scenes.push(scene);
 					}
 				}
-				TODO("todo");
-				m_scenes.push(m_renderer->createScene(*m_universe));
 
 				return m_universe;
 			}
@@ -211,14 +210,12 @@ namespace Lumix
 					}
 				}
 				float dt = m_timer->tick();
-				TODO("todo");
-				//m_render_scene->update(dt);
+				for (int i = 0; i < m_scenes.size(); ++i)
+				{
+					m_scenes[i]->update(dt);
+				}
 				if (is_game_running)
 				{
-					for (int i = 0; i < m_scenes.size(); ++i)
-					{
-						m_scenes[i]->update(dt);
-					}
 					m_plugin_manager.update(dt);
 					m_input_system.update(dt);
 				}
