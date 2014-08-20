@@ -198,13 +198,11 @@ class App
 
 		void renderPhysics()
 		{
-			TODO("scene")
-			ASSERT(false);
-			/*Lumix::PhysicsSystem* system = static_cast<Lumix::PhysicsSystem*>(m_world_editor->getEngine().getPluginManager().getPlugin("physics"));
-			if(system && system->getScene())
+			Lumix::PhysicsScene* scene = static_cast<Lumix::PhysicsScene*>(m_world_editor->getEngine().getScene(crc32("physics")));
+			if(scene)
 			{
-				system->getScene()->render();
-			}*/
+				scene->render();
+			}
 		}
 
 
