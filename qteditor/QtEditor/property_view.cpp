@@ -1,12 +1,16 @@
 #include "property_view.h"
 #include "ui_property_view.h"
 #include "animation/animation_system.h"
+#include "assetbrowser.h"
 #include "core/crc32.h"
+#include "core/path_utils.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
+#include "graphics/geometry.h"
 #include "graphics/material.h"
+#include "graphics/model.h"
 #include "graphics/render_scene.h"
 #include "graphics/texture.h"
 #include "scripts/scriptcompiler.h"
@@ -19,6 +23,7 @@
 #include <qmimedata.h>
 #include <qlineedit.h>
 #include <qpushbutton.h>
+#include <qtextstream.h>
 
 
 static const char* component_map[] =
@@ -352,6 +357,7 @@ PropertyView::PropertyView(QWidget* parent)
 	, m_ui(new Ui::PropertyView)
 	, m_terrain_editor(NULL)
 	, m_is_updating_values(false)
+	, m_selected_resource(NULL)
 {
 	m_ui->setupUi(this);
 
@@ -663,6 +669,76 @@ void PropertyView::onUniverseDestroyed()
 	m_world_editor->getEngine().getUniverse()->entityMoved().unbind<PropertyView, &PropertyView::onEntityPosition>(this);
 }
 
+
+void PropertyView::setAssetBrowser(AssetBrowser& asset_browser)
+{
+	m_asset_browser = &asset_browser;
+	connect(m_asset_browser, &AssetBrowser::fileSelected, this, &PropertyView::onAssetBrowserFileSelected);
+}
+
+
+void PropertyView::onAssetBrowserFileSelected(const char* filename)
+{
+	char rel_path[LUMIX_MAX_PATH];
+	m_world_editor->getRelativePath(rel_path, LUMIX_MAX_PATH, filename);
+	Lumix::ResourceManagerBase* manager = NULL;
+	char extension[10];
+	Lumix::PathUtils::getExtension(extension, sizeof(extension), filename);
+	if (strcmp(extension, "msh") == 0)
+	{
+		manager = m_world_editor->getEngine().getResourceManager().get(Lumix::ResourceManager::MODEL);
+	}
+	
+	if (manager != NULL)
+	{
+		setSelectedResource(manager->load(rel_path));
+	}
+	else
+	{
+		setSelectedResource(NULL);
+	}
+}
+
+
+void PropertyView::onSelectedResourceLoaded(Lumix::Resource::State, Lumix::Resource::State new_state)
+{
+	if (new_state == Lumix::Resource::State::READY)
+	{
+		m_selected_entity = Lumix::Entity::INVALID;
+		clear();
+		Lumix::Model* model = dynamic_cast<Lumix::Model*>(m_selected_resource);
+		if (model)
+		{
+			m_ui->propertyList->insertTopLevelItem(0, new QTreeWidgetItem());
+			m_ui->propertyList->topLevelItem(0)->setText(0, "Model");
+
+			QTreeWidgetItem* item = new QTreeWidgetItem(QStringList() << "Bone count" << QString::number(model->getBoneCount()));
+			m_ui->propertyList->topLevelItem(0)->insertChild(0, item);
+
+			item = new QTreeWidgetItem(QStringList() << "Bounding radius" << QString::number(model->getBoundingRadius()));
+			m_ui->propertyList->topLevelItem(0)->insertChild(0, item);
+
+			item = new QTreeWidgetItem(QStringList() << "Size" << QString::number(model->size()));
+			m_ui->propertyList->topLevelItem(0)->insertChild(0, item);
+
+			for (int i = 0; i < model->getMeshCount(); ++i)
+			{
+				item = new QTreeWidgetItem(QStringList() << "Mesh" << model->getMesh(i).getName());
+				m_ui->propertyList->topLevelItem(0)->insertChild(0, item);
+
+				QTreeWidgetItem* subitem = new QTreeWidgetItem(QStringList() << "Triangles" << QString::number(model->getMesh(i).getCount() / 3));
+				item->insertChild(0, subitem);
+
+				subitem = new QTreeWidgetItem(QStringList() << "Material" << model->getMesh(i).getMaterial()->getPath().c_str());
+				item->insertChild(0, subitem);
+			}
+
+			m_ui->propertyList->expandAll();
+		}
+	}
+}
+
+
 void PropertyView::setScriptCompiler(ScriptCompiler* compiler)
 {
 	m_compiler = compiler;
@@ -934,8 +1010,28 @@ void PropertyView::addScriptCustomProperties()
 }
 
 
+void PropertyView::setSelectedResource(Lumix::Resource* resource)
+{
+	clear();
+	if (m_selected_resource)
+	{
+		m_selected_resource->getObserverCb().unbind<PropertyView, &PropertyView::onSelectedResourceLoaded>(this);
+	}
+	m_selected_resource = resource;
+	if (resource)
+	{
+		m_selected_resource->getObserverCb().bind<PropertyView, &PropertyView::onSelectedResourceLoaded>(this);
+		if (m_selected_resource->isReady())
+		{
+			onSelectedResourceLoaded(Lumix::Resource::State::READY, Lumix::Resource::State::READY);
+		}
+	}
+}
+
+
 void PropertyView::onEntitySelected(Lumix::Entity& e)
 {
+	setSelectedResource(NULL);
 	m_selected_entity = e;
 	/// TODO miki
 	clear();
