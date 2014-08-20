@@ -55,7 +55,7 @@ namespace Lumix
 		{
 			float t2 = dotProduct(normal, line_vect);
 
-			if (t2 == 0)
+			if (t2 == 0.f)
 				return false;
 
 			float t = -(dotProduct(normal, line_point) + d) / t2;
@@ -70,7 +70,7 @@ namespace Lumix
 			const float fn11 = other.normal.length();
 			const float det = fn00 * fn11 - fn01 * fn01;
 
-			if (fabs(det) < 0.00000001)
+			if (fabs(det) < 0.00000001f)
 				return false;
 
 			const float invdet = 1.0f / det;

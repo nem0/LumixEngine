@@ -75,7 +75,6 @@ namespace
 		}
 
 		Lumix::CullingSystem::destroy(*culling_system);
-
 	}
 
 	void UT_culling_system_async(const char* params)
@@ -108,7 +107,6 @@ namespace
 			culling_system->cullToFrustumAsync(clipping_frustum);
 
 			const Lumix::CullingSystem::Results& result = culling_system->getResultAsync();
-			//Lumix::g_log_info.log("unit") << "Culling system test async took: " << timer.getTimeSinceStart();
 
 			for (int i = 0; i < result.size(); i++)
 			{

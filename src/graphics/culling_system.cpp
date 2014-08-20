@@ -108,8 +108,6 @@ namespace Lumix
 			doCulling(&m_spheres[0], &m_spheres[count - 1], &m_indexes[0], &frustum, &m_result[0]);
 		}
 
-		// ficni async, mal by si do jobu poslat culling system a zneho potrebne veci precitat.
-		// momentalne je tam chyba a posielaju sa sracky
 		virtual void cullToFrustumAsync(const Frustum& frustum) override
 		{
 			int count = m_spheres.size();
