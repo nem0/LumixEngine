@@ -42,6 +42,15 @@ namespace Lumix
 		float m_scale;
 	};
 
+	struct GrassInfo
+	{
+		Geometry* m_geometry;
+		Mesh* m_mesh;
+		const Matrix* m_matrices;
+		int m_matrix_count;
+		int m_mesh_copy_count;
+	};
+
 	struct DebugLine
 	{
 		Vec3 m_from;
@@ -59,7 +68,8 @@ namespace Lumix
 			virtual void serialize(ISerializer& serializer) = 0;
 			virtual void deserialize(ISerializer& serializer) = 0;
 			virtual Component createComponent(uint32_t type, const Entity& entity) = 0;
-			virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir) = 0;
+			virtual void destroyComponent(const Component& component) = 0;
+			virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Component& ignore) = 0;
 			virtual void getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) = 0;
 			virtual void applyCamera(Component camera) = 0;
 			virtual void update(float dt) = 0;
@@ -93,6 +103,8 @@ namespace Lumix
 			virtual void setRenderablePath(Component cmp, const string& path) = 0;
 			virtual void setRenderableScale(Component cmp, const float& scale) = 0;
 			virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) = 0;
+			
+			virtual void getGrassInfos(Array<GrassInfo>& infos, int64_t layer_mask) = 0;
 			virtual void getTerrainInfos(Array<TerrainInfo>& infos, int64_t layer_mask) = 0;
 			virtual void setTerrainMaterial(Component cmp, const string& path) = 0;
 			virtual void getTerrainMaterial(Component cmp, string& path) = 0;
@@ -100,6 +112,9 @@ namespace Lumix
 			virtual void getTerrainXZScale(Component cmp, float& scale) = 0;
 			virtual void setTerrainYScale(Component cmp, const float& scale) = 0;
 			virtual void getTerrainYScale(Component cmp, float& scale) = 0;
+			virtual void setTerrainGrass(Component cmp, const string& path) = 0;
+			virtual void getTerrainGrass(Component cmp, string& path) = 0;
+			virtual void setTerrainBrush(Component cmp, const Vec3& position, float size) = 0;
 
 		protected:
 			virtual ~RenderScene() {}

@@ -7,6 +7,7 @@
 #include "core/json_serializer.h"
 #include "core/log.h"
 #include "core/map.h"
+#include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "core/string.h"
@@ -546,8 +547,38 @@ struct PipelineInstanceImpl : public PipelineInstance
 		glEnd();
 	}
 
+	void renderGrass(int64_t layer_mask)
+	{
+		PROFILE_FUNCTION();
+		if (m_active_camera.isValid())
+		{
+			Material* last_material = NULL;
+			m_grass_infos.clear();
+			m_scene->getGrassInfos(m_grass_infos, layer_mask);
+			for (int i = 0; i < m_grass_infos.size(); ++i)
+			{
+				Shader* shader = m_grass_infos[i].m_mesh->getMaterial()->getShader();
+				if (m_grass_infos[i].m_mesh->getMaterial() != last_material)
+				{
+					m_grass_infos[i].m_mesh->getMaterial()->apply(*m_renderer, *this);
+					shader->setUniform("shadowmap_matrix0", m_shadow_modelviewprojection[0]);
+					shader->setUniform("shadowmap_matrix1", m_shadow_modelviewprojection[1]);
+					shader->setUniform("shadowmap_matrix2", m_shadow_modelviewprojection[2]);
+					shader->setUniform("shadowmap_matrix3", m_shadow_modelviewprojection[3]);
+					shader->setUniform("light_dir", m_light_dir);
+					last_material = m_grass_infos[i].m_mesh->getMaterial();
+				}
+				shader->setUniform("grass_matrices", m_grass_infos[i].m_matrices, m_grass_infos[i].m_matrix_count);
+
+				Mesh& mesh = *m_grass_infos[i].m_mesh;
+				m_grass_infos[i].m_geometry->draw(mesh.getStart(), mesh.getCount() / m_grass_infos[i].m_mesh_copy_count * m_grass_infos[i].m_matrix_count, *shader);
+			}
+		}
+	}
+
 	void renderTerrains(int64_t layer_mask)
 	{
+		PROFILE_FUNCTION();
 		if (m_active_camera.isValid())
 		{
 			m_terrain_infos.clear();
@@ -560,6 +591,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 					Matrix world_matrix;
 					m_terrain_infos[i].m_entity.getMatrix(world_matrix);
 					Shader* shader = m_terrain_infos[i].m_material->getShader();
+					m_terrain_infos[i].m_material->apply(*m_renderer, *this);
 					shader->setUniform("world_matrix", world_matrix);
 					shader->setUniform("shadowmap_matrix0", m_shadow_modelviewprojection[0]);
 					shader->setUniform("shadowmap_matrix1", m_shadow_modelviewprojection[1]);
@@ -580,20 +612,22 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void renderModels(int64_t layer_mask)
 	{
+		PROFILE_FUNCTION();
 		ASSERT(m_renderer != NULL);
-		static Array<RenderableInfo> infos;
-		infos.clear();
-		m_scene->getRenderableInfos(infos, layer_mask);
-		int count = infos.size();
+		renderTerrains(layer_mask);
+		
+		m_renderable_infos.clear();
+		m_scene->getRenderableInfos(m_renderable_infos, layer_mask);
+		int count = m_renderable_infos.size();
 		Material* last_material = NULL;
 		for (int i = 0; i < count; ++i)
 		{
 			glPushMatrix();
-			Matrix world_matrix = infos[i].m_model ? infos[i].m_model->getMatrix() : *infos[i].m_matrix;
-			world_matrix.multiply3x3(infos[i].m_scale);
+			Matrix world_matrix = m_renderable_infos[i].m_model ? m_renderable_infos[i].m_model->getMatrix() : *m_renderable_infos[i].m_matrix;
+			world_matrix.multiply3x3(m_renderable_infos[i].m_scale);
 			glMultMatrixf(&world_matrix.m11);
 			
-			Mesh& mesh = *infos[i].m_mesh;
+			Mesh& mesh = *m_renderable_infos[i].m_mesh;
 			Material& material = *mesh.getMaterial();
 			if (last_material != &material)
 			{
@@ -607,12 +641,13 @@ struct PipelineInstanceImpl : public PipelineInstance
 				last_material = &material;
 			}
 			static Matrix bone_mtx[64];
-			if (infos[i].m_pose)
+			if (m_renderable_infos[i].m_pose)
 			{
-				const Pose& pose = *infos[i].m_pose;
-				const Model& model = *infos[i].m_model->getModel();
+				const Pose& pose = *m_renderable_infos[i].m_pose;
+				const Model& model = *m_renderable_infos[i].m_model->getModel();
 				Vec3* poss = pose.getPositions();
 				Quat* rots = pose.getRotations();
+				ASSERT(pose.getCount() <= 64);
 				for (int bone_index = 0, bone_count = pose.getCount(); bone_index < bone_count; ++bone_index)
 				{
 					rots[bone_index].toMatrix(bone_mtx[bone_index]);
@@ -622,11 +657,11 @@ struct PipelineInstanceImpl : public PipelineInstance
 				material.getShader()->setUniform("bone_matrices", bone_mtx, pose.getCount());
 			}
 
-			infos[i].m_geometry->draw(mesh.getStart(), mesh.getCount(), *material.getShader());
+			m_renderable_infos[i].m_geometry->draw(mesh.getStart(), mesh.getCount(), *material.getShader());
 			glPopMatrix();
 		}
 
-		renderTerrains(layer_mask);
+		renderGrass(layer_mask);
 	}
 
 	virtual void resize(int w, int h) override
@@ -673,6 +708,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 	Map<uint32_t, CustomCommandHandler> m_custom_commands_handlers;
 	Component m_active_camera;
 	Array<TerrainInfo> m_terrain_infos;
+	Array<GrassInfo> m_grass_infos;
+	Array<RenderableInfo> m_renderable_infos;
 
 	private:
 		void operator=(const PipelineInstanceImpl&);

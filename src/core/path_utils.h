@@ -50,6 +50,21 @@ namespace Lumix
 				}
 			}
 		}
+
+
+		static void getExtension(char* extension, int /*max_length*/, const char* src)
+		{
+			for (int i = strlen(src) - 1; i >= 0; --i)
+			{
+				if (src[i] == '.')
+				{
+					++i;
+					strcpy(extension, src + i);
+					break;
+				}
+			}
+		}
+
 		private:
 			PathUtils();
 			~PathUtils();

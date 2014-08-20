@@ -4,8 +4,7 @@
 #include "core/crc32.h"
 #include "core/resource.h"
 #include "core/resource_manager.h"
-#include "editor/editor_client.h"
-#include "editor/editor_server.h"
+#include "editor/world_editor.h"
 #include "engine/engine.h"
 #include <qfilesystemmodel.h>
 #include <qlistwidget.h>
@@ -33,7 +32,6 @@ AssetBrowser::AssetBrowser(QWidget* parent) :
 	m_watcher = FileSystemWatcher::create(QDir::currentPath().toLatin1().data());
 	m_watcher->getCallback().bind<AssetBrowser, &AssetBrowser::onFileSystemWatcherCallback>(this);
 	m_base_path = QDir::currentPath();
-	m_client = NULL;
 	m_server = NULL;
 	m_ui->setupUi(this);
 	m_model = new QFileSystemModel;
@@ -73,35 +71,22 @@ void AssetBrowser::emitFileChanged(const char* path)
 
 void AssetBrowser::handleDoubleClick(const QFileInfo& file_info)
 {
-	ASSERT(m_client);
 	const QString& suffix = file_info.suffix();
 	QString file =file_info.filePath().toLower();
 	if(suffix == "unv")
 	{
-		m_client->loadUniverse(file.toLatin1().data());
+		m_server->loadUniverse(file.toLatin1().data());
 	}
 	else if(suffix == "msh")
 	{
-		m_client->addEntity();
-		m_client->addComponent(crc32("renderable"));
-		QString base_path = m_client->getBasePath();
-		if(file.startsWith(base_path))
-		{
-			file.remove(0, base_path.length());
-		}
-		m_client->setComponentProperty("renderable", "source", file.toLatin1().data(), file.length());
-		m_client->requestProperties(crc32("renderable"));
+		m_server->addEntity();
+		m_server->addComponent(crc32("renderable"));
+		m_server->setProperty("renderable", "source", file.toLatin1().data(), file.length());
 	}
 	else if(suffix == "ani")
 	{
-		m_client->addComponent(crc32("animable"));
-		QString base_path = m_client->getBasePath();
-		if(file.startsWith(base_path))
-		{
-			file.remove(0, base_path.length());
-		}
-		m_client->setComponentProperty("animable", "preview", file.toLatin1().data(), file.length());
-		m_client->requestProperties(crc32("animable"));
+		m_server->addComponent(crc32("animable"));
+		m_server->setProperty("animable", "preview", file.toLatin1().data(), file.length());
 	}
 }
 

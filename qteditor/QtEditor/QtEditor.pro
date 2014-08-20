@@ -27,7 +27,8 @@ SOURCES += main.cpp\
     materialmanager.cpp \
     profilerui.cpp \
     profilergraph.cpp \
-    pc/file_system_watcher.cpp
+    pc/file_system_watcher.cpp \
+    entity_template_list.cpp
 
 HEADERS  += mainwindow.h \
     sceneview.h \ 
@@ -43,7 +44,8 @@ HEADERS  += mainwindow.h \
     renderdevicewidget.h \
     profilerui.h \
     profilergraph.h \
-    file_system_watcher.h
+    file_system_watcher.h \
+    entity_template_list.h
 
 FORMS    += mainwindow.ui \
     logwidget.ui \
@@ -54,7 +56,8 @@ FORMS    += mainwindow.ui \
     fileserverwidget.ui \
     materialmanager.ui \
     profilerui.ui \
-    profilergraph.ui
+    profilergraph.ui \
+    entity_template_list.ui
 
 win32
 {

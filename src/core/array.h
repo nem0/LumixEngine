@@ -362,6 +362,7 @@ public:
 
 	T& back()
 	{
+		ASSERT(m_size > 0);
 		return m_data[m_size - 1];
 	}
 

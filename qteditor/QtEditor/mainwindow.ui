@@ -52,6 +52,7 @@
       <string>Windows</string>
      </property>
      <addaction name="actionAsset_Browser"/>
+     <addaction name="actionEntity_templates"/>
      <addaction name="actionFile_server"/>
      <addaction name="actionGame_view"/>
      <addaction name="actionLog"/>
@@ -81,14 +82,25 @@
     </property>
     <addaction name="actionGame_mode"/>
     <addaction name="actionCompile_scripts"/>
+    <addaction name="actionSnap_to_terrain"/>
    </widget>
    <widget class="QMenu" name="menuEntity">
     <property name="title">
      <string>Entity</string>
     </property>
     <addaction name="actionCreate"/>
+    <addaction name="actionSave_as_template"/>
+    <addaction name="actionInstantiate_template"/>
+   </widget>
+   <widget class="QMenu" name="menuEdit">
+    <property name="title">
+     <string>Edit</string>
+    </property>
+    <addaction name="actionUndo"/>
+    <addaction name="actionRedo"/>
    </widget>
    <addaction name="menuFile"/>
+   <addaction name="menuEdit"/>
    <addaction name="menuView"/>
    <addaction name="menuTools"/>
    <addaction name="menuEntity"/>
@@ -216,6 +228,48 @@
    </property>
    <property name="shortcut">
     <string>Ctrl+Tab</string>
+   </property>
+  </action>
+  <action name="actionSnap_to_terrain">
+   <property name="text">
+    <string>Snap to terrain</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+T</string>
+   </property>
+  </action>
+  <action name="actionSave_as_template">
+   <property name="text">
+    <string>Create template</string>
+   </property>
+  </action>
+  <action name="actionEntity_templates">
+   <property name="text">
+    <string>Entity templates</string>
+   </property>
+  </action>
+  <action name="actionInstantiate_template">
+   <property name="text">
+    <string>Instantiate template</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Q</string>
+   </property>
+  </action>
+  <action name="actionUndo">
+   <property name="text">
+    <string>Undo</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Z</string>
+   </property>
+  </action>
+  <action name="actionRedo">
+   <property name="text">
+    <string>Redo</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+Z</string>
    </property>
   </action>
  </widget>

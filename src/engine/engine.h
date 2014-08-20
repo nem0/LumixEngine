@@ -8,6 +8,7 @@ namespace Lumix
 			class FileSystem;
 	}
 
+	class WorldEditor;
 	namespace MTJD
 	{
 		class Manager;
@@ -31,13 +32,13 @@ namespace Lumix
 			Engine() { m_impl = NULL; }
 			~Engine() { ASSERT(m_impl == NULL); }
 
-			bool create(const char* base_path, FS::FileSystem* fs, EditorServer* editor_server);
+			bool create(const char* base_path, FS::FileSystem* fs, WorldEditor* editor_server);
 			void destroy();
 
 			Universe* createUniverse();
 			void destroyUniverse();
 
-			EditorServer* getEditorServer() const;
+			WorldEditor* getWorldEditor() const;
 			FS::FileSystem& getFileSystem();
 			Renderer& getRenderer();
 			InputSystem& getInputSystem();

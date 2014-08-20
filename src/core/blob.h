@@ -28,7 +28,7 @@ namespace Lumix
 			template <class T>
 			void read(T& value) { read(&value, sizeof(T)); }
 
-			void rewindForRead() { m_pos = 0; m_data = &m_buffer[0]; m_size = m_buffer.size(); }
+			void rewindForRead();
 
 
 		private:

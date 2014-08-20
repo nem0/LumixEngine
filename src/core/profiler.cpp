@@ -1,4 +1,5 @@
 #include "profiler.h"
+#include "core/log.h"
 
 
 namespace Lumix
@@ -57,22 +58,20 @@ namespace Lumix
 		}
 		if (!m_current_block)
 		{
-			if (m_root_block)
+			Block* root = m_root_block;
+			while (root && (root->m_name != name || root->m_function != function))
 			{
-				if (m_root_block->m_name == name && m_root_block->m_function == function)
-				{
-					m_current_block = m_root_block;
-				}
-				else
-				{
-					ASSERT(false); // there can be only one root
-				}
+				root = root->m_next;
+			}
+			if (root)
+			{
+				m_current_block = root;
 			}
 			else
 			{
 				Block* root = LUMIX_NEW(Block);
 				root->m_parent = NULL;
-				root->m_next = NULL;
+				root->m_next = m_root_block;
 				root->m_first_child = NULL;
 				root->m_name = name;
 				root->m_function = function;
@@ -111,7 +110,8 @@ namespace Lumix
 			return;
 		}
 		ASSERT(m_current_block);
-		m_current_block->m_hits.back().m_length = 1000.0f * (m_timer->getTimeSinceStart() - m_current_block->m_hits.back().m_start);
+		float now = m_timer->getTimeSinceStart();
+		m_current_block->m_hits.back().m_length = 1000.0f * (now - m_current_block->m_hits.back().m_start);
 		m_current_block = m_current_block->m_parent;
 	}
 
