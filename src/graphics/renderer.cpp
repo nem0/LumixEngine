@@ -33,10 +33,14 @@ static const uint32_t CAMERA_HASH = crc32("camera");
 
 struct RendererImpl : public Renderer
 {
-
 	RendererImpl()
 	{
 		m_is_editor_wireframe = false;
+	}
+
+	virtual IScene* createScene(Universe& universe)
+	{
+		return RenderScene::createInstance(*this, *m_engine, universe);
 	}
 
 	virtual void setProjection(float width, float height, float fov, float near_plane, float far_plane, const Matrix& mtx) override
@@ -107,18 +111,6 @@ struct RendererImpl : public Renderer
 	virtual const char* getName() const override
 	{
 		return "renderer";
-	}
-
-
-	virtual void destroyComponent(const Component& component) override
-	{
-		static_cast<RenderScene*>(component.system)->destroyComponent(component);
-	}
-
-
-	virtual Component createComponent(uint32_t, const Entity&) override
-	{
-		return Component::INVALID;
 	}
 
 

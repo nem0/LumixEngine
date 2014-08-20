@@ -147,7 +147,41 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual Component createHeightfield(Entity entity) override
+	virtual IPlugin& getPlugin() const override
+	{
+		return *m_system;
+	}
+
+
+	virtual Component createComponent(uint32_t component_type, const Entity& entity) override
+	{
+		if (component_type == HEIGHTFIELD_HASH)
+		{
+			return createHeightfield(entity);
+		}
+		else if (component_type == CONTROLLER_HASH)
+		{
+			return createController(entity);
+		}
+		else if (component_type == BOX_ACTOR_HASH)
+		{
+			return createBoxRigidActor(entity);
+		}
+		else if (component_type == MESH_ACTOR_HASH)
+		{
+			return createMeshRigidActor(entity);
+		}
+		return Component::INVALID;
+	}
+
+
+	virtual void destroyComponent(const Component& cmp) override
+	{
+		ASSERT(false);
+	}
+
+
+	Component createHeightfield(Entity entity)
 	{
 		Terrain* terrain = LUMIX_NEW(Terrain);
 		m_terrains.push(terrain);
@@ -161,7 +195,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual Component createController(Entity entity) override
+	Component createController(Entity entity)
 	{
 		physx::PxCapsuleControllerDesc cDesc;
 		cDesc.material = m_default_material;
@@ -186,7 +220,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual Component createBoxRigidActor(Entity entity) override
+	Component createBoxRigidActor(Entity entity)
 	{
 		RigidActor* actor = LUMIX_NEW(RigidActor);
 		m_actors.push(actor);
@@ -214,7 +248,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual Component createMeshRigidActor(Entity entity) override
+	Component createMeshRigidActor(Entity entity)
 	{
 		RigidActor* actor = LUMIX_NEW(RigidActor);
 		m_actors.push(actor);

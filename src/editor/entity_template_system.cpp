@@ -35,8 +35,8 @@ namespace Lumix
 						: m_entity_system(entity_system)
 						, m_template_name_hash(crc32(template_name))
 					{
-
-						RenderScene* scene = m_entity_system.m_editor.getEngine().getRenderScene();
+						
+						RenderScene* scene = static_cast<RenderScene*>(m_entity_system.m_editor.getEditCamera().scene);
 						float width;
 						float height;
 						scene->getCameraWidth(m_entity_system.m_editor.getEditCamera(), width);
@@ -84,15 +84,7 @@ namespace Lumix
 						const Entity::ComponentList& cmps = m_entity.getComponents();
 						for (int i = 0; i < cmps.size(); ++i)
 						{
-							if (cmps[i].type == RENDERABLE_HASH || cmps[i].type == TERRAIN_HASH || cmps[i].type == CAMERA_HASH || cmps[i].type == LIGHT_HASH)
-							{
-								m_entity_system.m_editor.getEngine().getRenderScene()->destroyComponent(cmps[i]);
-							}
-							else
-							{
-								IPlugin* plugin = m_entity_system.m_editor.getCreator(cmps[i].type);
-								plugin->destroyComponent(cmps[i]);
-							}
+							cmps[i].scene->destroyComponent(cmps[i]);
 						}
 						m_entity_system.m_universe->destroyEntity(m_entity);
 						m_entity = Entity::INVALID;

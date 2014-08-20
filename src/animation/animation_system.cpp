@@ -15,9 +15,9 @@ namespace Lumix
 	static const uint32_t ANIMABLE_HASH = crc32("animable");
 
 
-	struct AnimationSystemImpl : public AnimationSystem
+	class AnimationSceneImpl : public AnimationScene
 	{
-		public:
+		private:
 			struct Animable
 			{
 				bool m_manual;
@@ -27,28 +27,25 @@ namespace Lumix
 				class Animation* m_animation;
 			};
 
-
-
-			void onCreateUniverse(Universe& universe)
+		public:
+			AnimationSceneImpl(AnimationSystem& anim_system, Engine& engine, Universe& universe)
+				: m_universe(universe)
+				, m_engine(engine)
+				, m_anim_system(anim_system)
 			{
-				ASSERT(!m_universe);
-				m_universe = &universe;
-				m_universe->componentCreated().bind<AnimationSystemImpl, &AnimationSystemImpl::onComponentCreated>(this);
+				m_universe.componentCreated().bind<AnimationSceneImpl, &AnimationSceneImpl::onComponentCreated>(this);
 			}
 
 
-			void onDestroyUniverse(Universe&)
+			~AnimationSceneImpl()
 			{
-				ASSERT(m_universe);
-				m_animables.clear();
-				m_universe->componentCreated().unbind<AnimationSystemImpl, &AnimationSystemImpl::onComponentCreated>(this);
-				m_universe = 0;
+				m_universe.componentCreated().unbind<AnimationSceneImpl, &AnimationSceneImpl::onComponentCreated>(this);
 			}
 
 
-			virtual Component createComponent(uint32_t component_type, const Entity& entity) override
+			virtual Component createComponent(uint32_t type, const Entity& entity) override
 			{
-				if (component_type == ANIMABLE_HASH)
+				if (type == ANIMABLE_HASH)
 				{
 					return createAnimable(entity);
 				}
@@ -56,12 +53,11 @@ namespace Lumix
 			}
 
 
-			virtual void destroyComponent(const Component& component) override
+			virtual void destroyComponent(const Component& component)
 			{
 				m_animables[component.index].m_is_free = true;
-				m_universe->destroyComponent(component);
-				m_universe->componentDestroyed().invoke(component);
-
+				m_universe.destroyComponent(component);
+				m_universe.componentDestroyed().invoke(component);
 			}
 
 
@@ -91,7 +87,7 @@ namespace Lumix
 					serializer.deserializeArrayItem(m_animables[i].m_manual);
 					int entity_index;
 					serializer.deserializeArrayItem(entity_index);
-					Entity e(m_universe, entity_index);
+					Entity e(&m_universe, entity_index);
 					const Entity::ComponentList& cmps = e.getComponents();
 					m_animables[i].m_renderable = Component::INVALID;
 					for (int j = 0; j < cmps.size(); ++j)
@@ -104,67 +100,9 @@ namespace Lumix
 					}
 					serializer.deserializeArrayItem(m_animables[i].m_time);
 					serializer.deserializeArrayItem(m_animables[i].m_is_free);
-					m_universe->addComponent(e, ANIMABLE_HASH, this, i);
+					m_universe.addComponent(e, ANIMABLE_HASH, this, i);
 				}
 				serializer.deserializeArrayEnd();
-			}
-
-
-			void onComponentCreated(Component& cmp)
-			{
-				if (cmp.type == RENDERABLE_HASH)
-				{
-					const Entity::ComponentList& cmps = cmp.entity.getComponents();
-					for (int i = 0; i < cmps.size(); ++i)
-					{
-						if (cmps[i].type == ANIMABLE_HASH)
-						{
-							m_animables[cmps[i].index].m_renderable = cmp;
-							break;
-						}
-					}
-				}
-			}
-
-
-			Component createAnimable(const Entity& entity)
-			{
-				Animable* src = NULL;
-				for (int i = 0, c = m_animables.size(); i < c; ++i)
-				{
-					if (m_animables[i].m_is_free)
-					{
-						src = &m_animables[i];
-						break;
-					}
-				}
-				Animable& animable = src ? *src : m_animables.pushEmpty();
-				animable.m_manual = true;
-				animable.m_time = 0;
-				animable.m_is_free = false;
-				animable.m_renderable = Component::INVALID;
-				animable.m_animation = NULL;
-
-				const Entity::ComponentList& cmps = entity.getComponents();
-				for (int i = 0; i < cmps.size(); ++i)
-				{
-					if (cmps[i].type == RENDERABLE_HASH)
-					{
-						animable.m_renderable = cmps[i];
-						break;
-					}
-				}
-
-				Component cmp = m_universe->addComponent(entity, ANIMABLE_HASH, this, m_animables.size() - 1);
-				m_universe->componentCreated().invoke(cmp);
-				return cmp;
-			}
-
-
-			Animation* loadAnimation(const char* path)
-			{
-				ResourceManager& rm = m_engine->getResourceManager();
-				return static_cast<Animation*>(rm.get(ResourceManager::ANIMATION)->load(path));
 			}
 
 
@@ -224,16 +162,17 @@ namespace Lumix
 				return -1;
 			}
 
+
 			virtual void update(float time_delta) override
 			{
 				if (m_animables.empty())
 					return;
 				for (int i = 0, c = m_animables.size(); i < c; ++i)
 				{
-					AnimationSystemImpl::Animable& animable = m_animables[i];
+					Animable& animable = m_animables[i];
 					if (!animable.m_is_free && animable.m_animation && animable.m_animation->isReady())
 					{
-						RenderScene* scene = static_cast<RenderScene*>(animable.m_renderable.system);
+						RenderScene* scene = static_cast<RenderScene*>(animable.m_renderable.scene);
 						animable.m_animation->getPose(animable.m_time, scene->getPose(animable.m_renderable), *scene->getModel(animable.m_renderable));
 						if (!animable.m_manual)
 						{
@@ -250,6 +189,89 @@ namespace Lumix
 			}
 
 
+		private:
+			Animation* loadAnimation(const char* path)
+			{
+				ResourceManager& rm = m_engine.getResourceManager();
+				return static_cast<Animation*>(rm.get(ResourceManager::ANIMATION)->load(path));
+			}
+
+
+			void onComponentCreated(Component& cmp)
+			{
+				if (cmp.type == RENDERABLE_HASH)
+				{
+					const Entity::ComponentList& cmps = cmp.entity.getComponents();
+					for (int i = 0; i < cmps.size(); ++i)
+					{
+						if (cmps[i].type == ANIMABLE_HASH)
+						{
+							m_animables[cmps[i].index].m_renderable = cmp;
+							break;
+						}
+					}
+				}
+			}
+
+
+			Component createAnimable(const Entity& entity)
+			{
+				Animable* src = NULL;
+				for (int i = 0, c = m_animables.size(); i < c; ++i)
+				{
+					if (m_animables[i].m_is_free)
+					{
+						src = &m_animables[i];
+						break;
+					}
+				}
+				Animable& animable = src ? *src : m_animables.pushEmpty();
+				animable.m_manual = true;
+				animable.m_time = 0;
+				animable.m_is_free = false;
+				animable.m_renderable = Component::INVALID;
+				animable.m_animation = NULL;
+
+				const Entity::ComponentList& cmps = entity.getComponents();
+				for (int i = 0; i < cmps.size(); ++i)
+				{
+					if (cmps[i].type == RENDERABLE_HASH)
+					{
+						animable.m_renderable = cmps[i];
+						break;
+					}
+				}
+
+				Component cmp = m_universe.addComponent(entity, ANIMABLE_HASH, this, m_animables.size() - 1);
+				m_universe.componentCreated().invoke(cmp);
+				return cmp;
+			}
+
+
+			virtual IPlugin& getPlugin() const override
+			{
+				return m_anim_system;
+			}
+
+
+		private:
+			Universe& m_universe;
+			AnimationSystem& m_anim_system;
+			Engine& m_engine;
+			Array<Animable> m_animables;
+	};
+
+
+	struct AnimationSystemImpl : public AnimationSystem
+	{
+		public:
+			virtual IScene* createScene(Universe& universe) override
+			{
+				ASSERT(m_engine);
+				return LUMIX_NEW(AnimationSceneImpl)(*this, *m_engine, universe);
+			}
+
+
 			virtual const char* getName() const override
 			{
 				return "animation";
@@ -259,12 +281,7 @@ namespace Lumix
 			virtual bool create(Engine& engine) override
 			{
 				m_engine = &engine;
-				m_universe = 0;
-				if (engine.getWorldEditor())
-				{
-					engine.getWorldEditor()->registerCreator(ANIMABLE_HASH, *this);
-				}
-				engine.getWorldEditor()->registerProperty("animable", LUMIX_NEW(PropertyDescriptor<AnimationSystem>)(crc32("preview"), &AnimationSystem::getPreview, &AnimationSystem::setPreview, IPropertyDescriptor::FILE));
+				engine.getWorldEditor()->registerProperty("animable", LUMIX_NEW(PropertyDescriptor<AnimationSceneImpl>)(crc32("preview"), &AnimationSceneImpl::getPreview, &AnimationSceneImpl::setPreview, IPropertyDescriptor::FILE));
 				return true;
 			}
 
@@ -273,8 +290,6 @@ namespace Lumix
 			{
 			}
 
-			Array<Animable> m_animables;
-			Universe* m_universe;
 			Engine* m_engine;
 	
 		private:
