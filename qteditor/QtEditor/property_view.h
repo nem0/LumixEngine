@@ -4,16 +4,17 @@
 #include <QDockWidget>
 #include "core/array.h"
 #include "core/string.h"
+#include "core/resource.h"
 #include "universe/entity.h"
 
 namespace Lumix
 {
 	struct Component;
-	class WorldEditor;
 	struct Entity;
 	class Event;
 	class Path;
 	struct PropertyListEvent;
+	class WorldEditor;
 }
 
 namespace Ui
@@ -21,6 +22,7 @@ namespace Ui
 	class PropertyView;
 }
 
+class AssetBrowser;
 class QTreeWidgetItem;
 class ScriptCompiler;
 
@@ -55,6 +57,7 @@ public:
 	~PropertyView();
 	void setWorldEditor(Lumix::WorldEditor& server);
 	void setScriptCompiler(ScriptCompiler* compiler);
+	void setAssetBrowser(AssetBrowser& asset_browser);
 
 private slots:
 	void on_addComponentButton_clicked();
@@ -74,11 +77,10 @@ private slots:
 	void on_terrainBrushTextureChanged(int value);
 	void on_TerrainHeightSaveClicked();
 	void on_TerrainSplatSaveClicked();
-    void on_positionX_valueChanged(double arg1);
-    void on_positionY_valueChanged(double arg1);
-    void on_positionZ_valueChanged(double arg1);
-
-    void on_propertyList_customContextMenuRequested(const QPoint &pos);
+	void on_positionX_valueChanged(double arg1);
+	void on_positionY_valueChanged(double arg1);
+	void on_positionZ_valueChanged(double arg1);
+	void on_propertyList_customContextMenuRequested(const QPoint &pos);
 
 private:
 	void clear();
@@ -86,6 +88,7 @@ private:
 	void onUniverseDestroyed();
 	void onEntitySelected(Lumix::Entity& e);
 	void onEntityPosition(Lumix::Entity& e);
+	void onAssetBrowserFileSelected(const char* filename);
 	void addProperty(const char* component, const char* name, const char* label, Property::Type type, const char* file_type);
 	void onPropertyValue(Property* property, const void* data, int32_t data_size);
 	void addScriptCustomProperties();
@@ -95,6 +98,8 @@ private:
 	void setScriptStatus(uint32_t status);
 	void updateValues();
 	void updateSelectedEntityPosition();
+	void onSelectedResourceLoaded(Lumix::Resource::State old_state, Lumix::Resource::State new_state);
+	void setSelectedResource(Lumix::Resource* resource);
 
 private:
 	Ui::PropertyView* m_ui;
@@ -104,6 +109,8 @@ private:
 	Lumix::WorldEditor* m_world_editor;
 	bool m_is_updating_values;
 	class TerrainEditor* m_terrain_editor;
+	AssetBrowser* m_asset_browser;
+	Lumix::Resource* m_selected_resource;
 };
 
 

@@ -1,6 +1,7 @@
 #pragma once
 
-#include <QDockWidget>
+#include <qdockwidget.h>
+#include <qitemselectionmodel.h>
 
 namespace Lumix
 {
@@ -27,9 +28,11 @@ private:
 	void exportAnimation(const QFileInfo& file_info);
 	void exportModel(const QFileInfo& file_info);
 	void onFileSystemWatcherCallback(const char* path);
+	void onTreeViewSelectionChanged(const QModelIndex& current, const QModelIndex& previous);
 
 signals:
 	void fileChanged(const QString& string);
+	void fileSelected(const char* path);
 
 private slots:
 	void on_treeView_doubleClicked(const QModelIndex &index);

@@ -48,12 +48,25 @@ AssetBrowser::AssetBrowser(QWidget* parent) :
 	m_ui->treeView->hideColumn(4);
 	m_ui->listWidget->hide();
 	connect(this, SIGNAL(fileChanged(const QString&)), this, SLOT(onFileChanged(const QString&)));
+	connect(m_ui->treeView->selectionModel(), &QItemSelectionModel::currentChanged, this, &AssetBrowser::onTreeViewSelectionChanged);
 }
 
 AssetBrowser::~AssetBrowser()
 {
 	delete m_ui;
 	delete m_model;
+}
+
+
+void AssetBrowser::onTreeViewSelectionChanged(const QModelIndex& current, const QModelIndex&)
+{
+	if (current.isValid())
+	{
+		const QFileInfo& file_info = m_model->fileInfo(current);
+		QByteArray byte_array = file_info.filePath().toLower().toLatin1();
+		const char* filename = byte_array.data();
+		emit fileSelected(filename);
+	}
 }
 
 
@@ -72,7 +85,7 @@ void AssetBrowser::emitFileChanged(const char* path)
 void AssetBrowser::handleDoubleClick(const QFileInfo& file_info)
 {
 	const QString& suffix = file_info.suffix();
-	QString file =file_info.filePath().toLower();
+	QString file = file_info.filePath().toLower();
 	if(suffix == "unv")
 	{
 		m_server->loadUniverse(file.toLatin1().data());
