@@ -1,4 +1,5 @@
 #include "render_scene.h"
+
 #include "core/array.h"
 #include "core/crc32.h"
 #include "core/FS/file_system.h"
@@ -10,7 +11,12 @@
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "core/timer.h"
+#include "core/sphere.h"
+#include "core/frustum.h"
+
 #include "engine/engine.h"
+
+#include "graphics/culling_system.h"
 #include "graphics/geometry.h"
 #include "graphics/irender_device.h"
 #include "graphics/material.h"
@@ -21,6 +27,7 @@
 #include "graphics/shader.h"
 #include "graphics/terrain.h"
 #include "graphics/texture.h"
+
 #include "universe/universe.h"
 
 
@@ -83,6 +90,7 @@ namespace Lumix
 			{
 				m_universe.entityMoved().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 				m_timer = Timer::create();
+				m_culling_system = CullingSystem::create(m_engine.getMTJDManager());
 			}
 
 			~RenderSceneImpl()
@@ -92,11 +100,14 @@ namespace Lumix
 				{
 					LUMIX_DELETE(m_renderables[i]);
 				}
+
 				for (int i = 0; i < m_terrains.size(); ++i)
 				{
 					LUMIX_DELETE(m_terrains[i]);
 				}
+
 				Timer::destroy(m_timer);
+				CullingSystem::destroy(*m_culling_system);
 			}
 
 			virtual void getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) override
@@ -124,6 +135,8 @@ namespace Lumix
 
 			virtual void applyCamera(Component cmp) override
 			{
+				//m_debug_lines.clear();
+
 				m_applied_camera = cmp;
 				Matrix mtx;
 				cmp.entity.getMatrix(mtx);
@@ -133,6 +146,68 @@ namespace Lumix
 				float near_plane = m_cameras[cmp.index].m_near;
 				float far_plane = m_cameras[cmp.index].m_far;
 				m_engine.getRenderer().setProjection(width, height, fov, near_plane, far_plane, mtx);
+
+				m_camera_frustum.compute(
+					mtx.getTranslation(),
+					mtx.getZVector(),
+					mtx.getYVector(),
+					fov,
+					width / height,
+					near_plane,
+					far_plane
+					);
+
+				//Vec3 corners[8];
+				//Plane* planes = &m_camera_frustum.m_plane[0];
+
+				//planes[(uint32_t)Frustum::Sides::Far].getIntersectionWithPlanes(planes[(uint32_t)Frustum::Sides::Top], planes[(uint32_t)Frustum::Sides::Left], corners[0]);
+				//planes[(uint32_t)Frustum::Sides::Far].getIntersectionWithPlanes(planes[(uint32_t)Frustum::Sides::Top], planes[(uint32_t)Frustum::Sides::Right], corners[1]);
+				//planes[(uint32_t)Frustum::Sides::Far].getIntersectionWithPlanes(planes[(uint32_t)Frustum::Sides::Bottom], planes[(uint32_t)Frustum::Sides::Left], corners[2]);
+				//planes[(uint32_t)Frustum::Sides::Far].getIntersectionWithPlanes(planes[(uint32_t)Frustum::Sides::Bottom], planes[(uint32_t)Frustum::Sides::Right], corners[3]);
+				//planes[(uint32_t)Frustum::Sides::Near].getIntersectionWithPlanes(planes[(uint32_t)Frustum::Sides::Top], planes[(uint32_t)Frustum::Sides::Left], corners[4]);
+				//planes[(uint32_t)Frustum::Sides::Near].getIntersectionWithPlanes(planes[(uint32_t)Frustum::Sides::Top], planes[(uint32_t)Frustum::Sides::Right], corners[5]);
+				//planes[(uint32_t)Frustum::Sides::Near].getIntersectionWithPlanes(planes[(uint32_t)Frustum::Sides::Bottom], planes[(uint32_t)Frustum::Sides::Left], corners[6]);
+				//planes[(uint32_t)Frustum::Sides::Near].getIntersectionWithPlanes(planes[(uint32_t)Frustum::Sides::Bottom], planes[(uint32_t)Frustum::Sides::Right], corners[7]);
+
+				//Vec3 blue(0.f, 0.f, 1.f);
+
+				//addDebugLine(corners[0], corners[1], blue, 0.001f);
+				//addDebugLine(corners[0], corners[2], blue, 0.001f);
+				//addDebugLine(corners[2], corners[3], blue, 0.001f);
+				//addDebugLine(corners[3], corners[1], blue, 0.001f);
+
+				//addDebugLine(corners[4], corners[5], blue, 0.001f);
+				//addDebugLine(corners[4], corners[6], blue, 0.001f);
+				//addDebugLine(corners[6], corners[7], blue, 0.001f);
+				//addDebugLine(corners[7], corners[5], blue, 0.001f);
+
+				//addDebugLine(corners[0], corners[4], blue, 0.001f);
+				//addDebugLine(corners[1], corners[5], blue, 0.001f);
+				//addDebugLine(corners[2], corners[6], blue, 0.001f);
+				//addDebugLine(corners[3], corners[7], blue, 0.001f);
+
+				//Lux::Array<Lux::Sphere> spheres;
+				//for (float i = 0.f; i < 150.f; i += 15.f)
+				//{
+				// spheres.push(Lux::Sphere(i, 0.f, 50.f, 5.f));
+				//}
+
+				//for (int i = 0; i < spheres.size(); i++)
+				//{
+				// Vec3 pos = (Vec3)spheres[i].m_sphere;
+				// Vec3 to = pos;
+				// to.x += spheres[i].m_sphere.w;
+
+				// Vec3 red(1.f, 0.f, 0.f);
+				// Vec3 mag(1.f, 0.f, 1.f);
+
+				// Vec3 color = cameraFrustum.sphereInFrustum(pos, spheres[i].m_sphere.w) ? mag : red;
+
+				// addDebugLine(pos, Vec3(pos.x + 5, pos.y, pos.z), color, 0.0001f);
+				// addDebugLine(pos, Vec3(pos.x - 5, pos.y, pos.z), color, 0.0001f);
+				// addDebugLine(pos, Vec3(pos.x, pos.y + 5, pos.z), color, 0.0001f);
+				// addDebugLine(pos, Vec3(pos.x, pos.y - 5, pos.z), color, 0.0001f);
+				//}
 			}
 
 			Matrix getProjectionMatrix(Component cmp)
@@ -270,7 +345,7 @@ namespace Lumix
 
 			void deserializeRenderables(ISerializer& serializer)
 			{
-				int32_t size;
+				int32_t size = 0;
 				serializer.deserialize("renderable_count", size);
 				serializer.deserializeArrayBegin("renderables");
 				for (int i = size; i < m_renderables.size(); ++i)
@@ -297,6 +372,8 @@ namespace Lumix
 					{
 						serializer.deserializeArrayItem((&m_renderables[i]->m_model.getMatrix().m11)[j]);
 					}
+
+					m_culling_system->addStatic(Sphere(m_renderables[i]->m_entity.getPosition(), 1.0f), i);
 					m_universe.addComponent(m_renderables[i]->m_entity, RENDERABLE_HASH, this, i);
 				}
 				serializer.deserializeArrayEnd();
@@ -304,7 +381,7 @@ namespace Lumix
 
 			void deserializeLights(ISerializer& serializer)
 			{
-				int32_t size;
+				int32_t size = 0;
 				serializer.deserialize("light_count", size);
 				serializer.deserializeArrayBegin("lights");
 				m_lights.resize(size);
@@ -320,7 +397,7 @@ namespace Lumix
 
 			void deserializeTerrains(ISerializer& serializer)
 			{
-				int32_t size;
+				int32_t size = 0;
 				serializer.deserialize("terrain_count", size);
 				serializer.deserializeArrayBegin("terrains");
 				for (int i = size; i < m_terrains.size(); ++i)
@@ -419,6 +496,7 @@ namespace Lumix
 					r.m_is_free = false;
 					r.m_model.setModel(NULL);
 					Component cmp = m_universe.addComponent(entity, type, this, index);
+					m_culling_system->addStatic(Sphere(entity.getPosition(), 1.0f), m_renderables.size() - 1);
 					m_universe.componentCreated().invoke(cmp);
 					return cmp;
 				}
@@ -443,6 +521,7 @@ namespace Lumix
 					if (cmps[i].type == RENDERABLE_HASH)
 					{
 						m_renderables[cmps[i].index]->m_model.setMatrix(entity.getMatrix());
+						m_culling_system->updateBoundingPosition(entity.getMatrix().getTranslation(), cmps[i].index);
 						break;
 					}
 				}
@@ -541,7 +620,20 @@ namespace Lumix
 			virtual void setRenderablePath(Component cmp, const string& path) override
 			{
 				Renderable& r = *m_renderables[cmp.index];
+
+				Model* old_model = r.m_model.getModel();
+				if (old_model)
+				{
+					old_model->getObserverCb().unbind<RenderSceneImpl, &RenderSceneImpl::modelUpdate>(this);
+				}
+
 				Model* model = static_cast<Model*>(m_engine.getResourceManager().get(ResourceManager::MODEL)->load(path));
+				
+				if (model)
+				{
+					model->getObserverCb().bind<RenderSceneImpl, &RenderSceneImpl::modelUpdate>(this);
+				}
+
 				r.m_model.setModel(model);
 				r.m_model.setMatrix(r.m_entity.getMatrix());
 			}
@@ -594,13 +686,36 @@ namespace Lumix
 			virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) override
 			{
 				PROFILE_FUNCTION();
+
+				if (m_renderables.empty())
+					return;
+
+				m_culling_system->cullToFrustumAsync(m_camera_frustum);
+
+				infos.reserve(m_renderables.size() * 2);
+
+				//const CullingSystem::InputSpheres& spheres = m_culling_system->getSpheres();
+
+				////m_debug_lines.clear();
+				//Vec3 mag(1.f, 0.f, 1.f);
+				//for (int i = 0; i < spheres.size(); i++)
+				//{
+				//	Vec3 center = spheres[i].m_position;
+				//	float radius = spheres[i].m_radius;
+
+				//	//addDebugCircle(center, radius, mag, 0.001f);
+				//	addDebugCross(center, radius, mag, 0.001f);
+				//}
+
+				const CullingSystem::Results& results = m_culling_system->getResultAsync();
+
 				infos.reserve(m_renderables.size() * 2);
 				for (int i = 0; i < m_renderables.size(); ++i)
 				{
 					if (!m_renderables[i]->m_is_free)
 					{
 						bool is_model_ready = m_renderables[i]->m_model.getModel() && m_renderables[i]->m_model.getModel()->isReady();
-						if (is_model_ready && (m_renderables[i]->m_layer_mask & layer_mask) != 0)
+						if (is_model_ready && (m_renderables[i]->m_layer_mask & layer_mask) != 0 && results[i] > -1)
 						{
 							for (int j = 0, c = m_renderables[i]->m_model.getModel()->getMeshCount(); j < c; ++j)
 							{
@@ -813,6 +928,19 @@ namespace Lumix
 			}
 
 		private:
+			// I know, but it's just a proof of concept
+			void modelUpdate(Resource::State, Resource::State)
+			{
+				for (int i = 0; i < m_renderables.size(); ++i)
+				{
+					if (m_renderables[i]->m_model.getModel())
+					{
+						float bounding_radius = m_renderables[i]->m_model.getModel()->getBoundingRadius();
+						m_culling_system->updateBoundingRadius(bounding_radius, i);
+					}
+				}
+			}
+
 			Array<Renderable*> m_renderables;
 			Array<Light> m_lights;
 			Array<Camera> m_cameras;
@@ -822,6 +950,8 @@ namespace Lumix
 			Array<DebugLine> m_debug_lines;
 			Timer* m_timer;
 			Component m_applied_camera;
+			CullingSystem* m_culling_system;
+			Frustum m_camera_frustum;
 	};
 
 
