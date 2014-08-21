@@ -2,8 +2,6 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
-#include "animation/animation.h"
-#include "animation/animation_system.h"
 #include "core/crc32.h"
 #include "core/fs/disk_file_device.h"
 #include "core/fs/file_system.h"
@@ -30,7 +28,7 @@ namespace Lumix
 		public:
 			EngineImpl(const char* base_path, FS::FileSystem* file_system, WorldEditor* world_editor)
 			{
-				m_editor_server = world_editor;
+				m_editor = world_editor;
 				if (NULL == file_system)
 				{
 					m_file_system = FS::FileSystem::create();
@@ -56,7 +54,6 @@ namespace Lumix
 				m_shader_manager.create(ResourceManager::SHADER, m_resource_manager);
 				m_texture_manager.create(ResourceManager::TEXTURE, m_resource_manager);
 				m_pipeline_manager.create(ResourceManager::PIPELINE, m_resource_manager);
-				m_animation_manager.create(ResourceManager::ANIMATION, m_resource_manager);
 
 				m_timer = Timer::create();
 				m_fps_timer = Timer::create();
@@ -82,13 +79,13 @@ namespace Lumix
 					return false;
 				}
 				m_plugin_manager.addPlugin(m_renderer);
-				AnimationSystem* anim_system = AnimationSystem::createInstance();
+				/*AnimationSystem* anim_system = AnimationSystem::createInstance();
 				if (!anim_system->create(*this))
 				{
 					LUMIX_DELETE(anim_system);
 					return false;
 				}
-				m_plugin_manager.addPlugin(anim_system);
+				m_plugin_manager.addPlugin(anim_system);*/
 				if (!m_input_system.create())
 				{
 					return false;
@@ -103,7 +100,6 @@ namespace Lumix
 				m_resource_manager.get(ResourceManager::TEXTURE)->releaseAll();
 				m_resource_manager.get(ResourceManager::MATERIAL)->releaseAll();
 				m_resource_manager.get(ResourceManager::SHADER)->releaseAll();
-				m_resource_manager.get(ResourceManager::ANIMATION)->releaseAll();
 				m_resource_manager.get(ResourceManager::MODEL)->releaseAll();
 				m_resource_manager.get(ResourceManager::PIPELINE)->releaseAll();
 
@@ -176,7 +172,7 @@ namespace Lumix
 
 			virtual WorldEditor* getWorldEditor() const override
 			{
-				return m_editor_server;
+				return m_editor;
 			}
 
 
@@ -292,10 +288,9 @@ namespace Lumix
 			ShaderManager	m_shader_manager;
 			TextureManager	m_texture_manager;
 			PipelineManager m_pipeline_manager;
-			AnimationManager m_animation_manager;
 
 			string m_base_path;
-			WorldEditor* m_editor_server;
+			WorldEditor* m_editor;
 			PluginManager m_plugin_manager;
 			Universe* m_universe;
 			Array<IScene*> m_scenes;
@@ -316,13 +311,14 @@ namespace Lumix
 		OutputDebugString("\n");
 	}
 
-	Engine* Engine::create(const char* base_path, FS::FileSystem* file_system, WorldEditor* editor_server)
+
+	Engine* Engine::create(const char* base_path, FS::FileSystem* file_system, WorldEditor* editor)
 	{
 		g_log_info.getCallback().bind<showLogInVS>();
 		g_log_warning.getCallback().bind<showLogInVS>();
 		g_log_error.getCallback().bind<showLogInVS>();
 
-		EngineImpl* engine = LUMIX_NEW(EngineImpl)(base_path, file_system, editor_server);
+		EngineImpl* engine = LUMIX_NEW(EngineImpl)(base_path, file_system, editor);
 		if (!engine->create())
 		{
 			LUMIX_DELETE(engine);

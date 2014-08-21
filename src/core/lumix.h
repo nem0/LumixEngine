@@ -29,54 +29,60 @@
 const uint32_t LUMIX_MAX_PATH = 260;
 
 #ifndef ASSERT
-#ifdef _WIN32
-#ifdef NDEBUG
-	#define ASSERT(x) { false ? (void)(x) : 0; } 
-#else
-	#define ASSERT(x) { const volatile bool lumix_assert_b____ = !(x); if(lumix_assert_b____) __debugbreak(); } 
-#endif
-#else
-#define ASSERT(x) assert(x)
-#endif
+	#ifdef _WIN32
+		#ifdef NDEBUG
+			#define ASSERT(x) { false ? (void)(x) : 0; } 
+		#else
+			#define ASSERT(x) { const volatile bool lumix_assert_b____ = !(x); if(lumix_assert_b____) __debugbreak(); } 
+		#endif
+	#else
+		#define ASSERT(x) assert(x)
+	#endif
 #endif
 
 #ifndef NULL
-#define NULL nullptr
+	#define NULL nullptr
 #endif
 
 #define LUMIX_FORCE_INLINE __forceinline
 
 #ifdef BUILDING_CORE
-#define LUMIX_CORE_API __declspec(dllexport)
+	#define LUMIX_CORE_API __declspec(dllexport)
 #else
-#define LUMIX_CORE_API __declspec(dllimport)
+	#define LUMIX_CORE_API __declspec(dllimport)
 #endif
 
 
 #ifdef BUILDING_PHYSICS
-#define LUMIX_PHYSICS_API __declspec(dllexport)
+	#define LUMIX_PHYSICS_API __declspec(dllexport)
 #else
-#define LUMIX_PHYSICS_API __declspec(dllimport)
+	#define LUMIX_PHYSICS_API __declspec(dllimport)
 #endif
 
 
 #ifdef BUILDING_NAVIGATION
-#define LUMIX_NAVIGATION_API __declspec(dllexport)
+	#define LUMIX_NAVIGATION_API __declspec(dllexport)
 #else
-#define LUMIX_NAVIGATION_API __declspec(dllimport)
+	#define LUMIX_NAVIGATION_API __declspec(dllimport)
 #endif
 
 
 #ifdef BUILDING_ENGINE
-#define LUMIX_ENGINE_API __declspec(dllexport)
+	#define LUMIX_ENGINE_API __declspec(dllexport)
 #else
-#define LUMIX_ENGINE_API __declspec(dllimport)
+	#define LUMIX_ENGINE_API __declspec(dllimport)
 #endif
 
 #ifdef BUILDING_SCRIPT
-#define LUMIX_SCRIPT_API __declspec(dllexport)
+	#define LUMIX_SCRIPT_API __declspec(dllexport)
 #else
-#define LUMIX_SCRIPT_API __declspec(dllimport)
+	#define LUMIX_SCRIPT_API __declspec(dllimport)
+#endif
+
+#ifdef BUILDING_ANIMATION
+	#define LUMIX_ANIMATION_API __declspec(dllexport)
+#else
+	#define LUMIX_ANIMATION_API __declspec(dllimport)
 #endif
 
 #define LUMIX_RESTRICT __restrict

@@ -23,7 +23,7 @@ class MaterialManager : public QDockWidget
 	public:
 		explicit MaterialManager(QWidget* parent = NULL);
 		~MaterialManager();
-		void setWorldEditor(Lumix::WorldEditor& server);
+		void setWorldEditor(Lumix::WorldEditor& editor);
 		void updatePreview();
 		QWidget* getPreview() const;
 

@@ -55,7 +55,7 @@ public:
 public:
 	explicit PropertyView(QWidget* parent = NULL);
 	~PropertyView();
-	void setWorldEditor(Lumix::WorldEditor& server);
+	void setWorldEditor(Lumix::WorldEditor& editor);
 	void setScriptCompiler(ScriptCompiler* compiler);
 	void setAssetBrowser(AssetBrowser& asset_browser);
 

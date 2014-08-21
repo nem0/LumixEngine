@@ -19,7 +19,7 @@ namespace Lumix
 	class ISerializer;
 	class Universe;
 
-	class AnimationScene : public IScene
+	class LUMIX_ANIMATION_API AnimationScene : public IScene
 	{
 		public:
 			virtual void setFrame(Component cmp, int frame) = 0;
@@ -35,11 +35,16 @@ namespace Lumix
 	};
 
 
-	class LUMIX_ENGINE_API AnimationSystem : public IPlugin
+	class LUMIX_ANIMATION_API AnimationSystem : public IPlugin
 	{
 		public:
 			static AnimationSystem* createInstance();
 	};
 
+
+	extern "C"
+	{
+		LUMIX_ANIMATION_API IPlugin* createPlugin();
+	}
 
 }// ~ namespace Lumix 

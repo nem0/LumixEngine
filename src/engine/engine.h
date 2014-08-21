@@ -29,7 +29,7 @@ namespace Lumix
 		public:
 			virtual ~Engine() {}
 
-			static Engine* create(const char* base_path, FS::FileSystem* fs, WorldEditor* editor_server);
+			static Engine* create(const char* base_path, FS::FileSystem* fs, WorldEditor* editor);
 			static void destroy(Engine* engine);
 
 			virtual Universe* createUniverse() = 0;

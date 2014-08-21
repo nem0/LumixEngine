@@ -51,7 +51,7 @@ namespace Lumix
 
 		public:
 			static WorldEditor* create(const char* base_path);
-			static void destroy(WorldEditor* server);
+			static void destroy(WorldEditor* editor);
 
 			virtual void tick() = 0;
 			virtual void registerProperty(const char* component_type, IPropertyDescriptor* descriptor) = 0;
