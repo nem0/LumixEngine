@@ -466,25 +466,6 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
-		void registerProperties()
-		{
-			m_component_properties[CAMERA_HASH].push(LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("slot"), &RenderScene::getCameraSlot, &RenderScene::setCameraSlot, IPropertyDescriptor::STRING));
-			m_component_properties[CAMERA_HASH].push(LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("fov"), &RenderScene::getCameraFOV, &RenderScene::setCameraFOV));
-			m_component_properties[CAMERA_HASH].push(LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("near"), &RenderScene::getCameraNearPlane, &RenderScene::setCameraNearPlane));
-			m_component_properties[CAMERA_HASH].push(LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("far"), &RenderScene::getCameraFarPlane, &RenderScene::setCameraFarPlane));
-			m_component_properties[RENDERABLE_HASH].push(LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("source"), &RenderScene::getRenderablePath, &RenderScene::setRenderablePath, IPropertyDescriptor::FILE));
-			m_component_properties[TERRAIN_HASH].push(LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("material"), &RenderScene::getTerrainMaterial, &RenderScene::setTerrainMaterial, IPropertyDescriptor::FILE));
-			m_component_properties[TERRAIN_HASH].push(LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("xz_scale"), &RenderScene::getTerrainXZScale, &RenderScene::setTerrainXZScale));
-			m_component_properties[TERRAIN_HASH].push(LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("y_scale"), &RenderScene::getTerrainYScale, &RenderScene::setTerrainYScale));
-			m_component_properties[TERRAIN_HASH].push(LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("grass_mesh"), &RenderScene::getTerrainGrass, &RenderScene::setTerrainGrass, IPropertyDescriptor::FILE));
-			/*m_component_properties[renderable_type].push(LUMIX_NEW(PropertyDescriptor<Renderer>)(crc32("visible"), &Renderer::getVisible, &Renderer::setVisible));
-			m_component_properties[renderable_type].push(LUMIX_NEW(PropertyDescriptor<Renderer>)(crc32("cast shadows"), &Renderer::getCastShadows, &Renderer::setCastShadows));
-			m_component_properties[point_light_type].push(LUMIX_NEW(PropertyDescriptor<Renderer>)(crc32("fov"), &Renderer::getLightFov, &Renderer::setLightFov));
-			m_component_properties[point_light_type].push(LUMIX_NEW(PropertyDescriptor<Renderer>)(crc32("radius"), &Renderer::getLightRadius, &Renderer::setLightRadius));
-			*/
-		}
-
-
 		EditorIconHit raycastEditorIcons(const Vec3& origin, const Vec3& dir)
 		{
 			EditorIconHit hit;
@@ -626,7 +607,7 @@ struct WorldEditorImpl : public WorldEditor
 
 		virtual void saveUniverse(const Path& path) override
 		{
-			g_log_info.log("editor server") << "saving universe " << path.c_str() << "...";
+			g_log_info.log("editor") << "saving universe " << path.c_str() << "...";
 			FS::FileSystem& fs = m_engine->getFileSystem();
 			FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
 			save(*file, path.c_str());
@@ -640,7 +621,7 @@ struct WorldEditorImpl : public WorldEditor
 			JsonSerializer serializer(file, JsonSerializer::WRITE, path);
 			m_engine->serialize(serializer);
 			m_template_system->serialize(serializer);
-			g_log_info.log("editor server") << "universe saved";
+			g_log_info.log("editor") << "universe saved";
 		}
 
 
@@ -867,7 +848,7 @@ struct WorldEditorImpl : public WorldEditor
 		virtual void loadUniverse(const Path& path) override
 		{
 			m_universe_path = path;
-			g_log_info.log("editor server") << "Loading universe " << path.c_str() << "...";
+			g_log_info.log("editor") << "Loading universe " << path.c_str() << "...";
 			FS::FileSystem& fs = m_engine->getFileSystem();
 			FS::ReadCallback file_read_cb;
 			file_read_cb.bind<WorldEditorImpl, &WorldEditorImpl::loadMap>(this);
@@ -902,17 +883,17 @@ struct WorldEditorImpl : public WorldEditor
 			m_universe_path = "";
 			destroyUniverse();
 			createUniverse(true);
-			g_log_info.log("editor server") << "universe created";
+			g_log_info.log("editor") << "universe created";
 		}
 
 		void load(FS::IFile& file, const char* path)
 		{
-			g_log_info.log("editor server") << "parsing universe...";
+			g_log_info.log("editor") << "parsing universe...";
 			JsonSerializer serializer(file, JsonSerializer::READ, path);
 			m_engine->deserialize(serializer);
 			m_template_system->deserialize(serializer);
 			m_camera = static_cast<RenderScene*>(m_engine->getScene(crc32("renderer")))->getCameraInSlot("editor").entity;
-			g_log_info.log("editor server") << "universe parsed";
+			g_log_info.log("editor") << "universe parsed";
 
 			Universe* universe = m_engine->getUniverse();
 			for (int i = 0; i < universe->getEntityCount(); ++i)
@@ -975,6 +956,10 @@ struct WorldEditorImpl : public WorldEditor
 
 			//glPopAttrib();
 
+			if (!m_engine->loadPlugin("animation.dll"))
+			{
+				g_log_info.log("plugins") << "animation plugin has not been loaded";
+			}
 			if (!m_engine->loadPlugin("physics.dll"))
 			{
 				g_log_info.log("plugins") << "physics plugin has not been loaded";
@@ -988,7 +973,6 @@ struct WorldEditorImpl : public WorldEditor
 			g_log_info.log("plugins", "navigation plugin has not been loaded");
 			}*/
 
-			registerProperties();
 			createUniverse(true);
 			m_template_system = EntityTemplateSystem::create(*this);
 
@@ -1375,10 +1359,10 @@ WorldEditor* WorldEditor::create(const char* base_path)
 }
 
 
-void WorldEditor::destroy(WorldEditor* server)
+void WorldEditor::destroy(WorldEditor* editor)
 {
-	static_cast<WorldEditorImpl*>(server)->destroy();
-	LUMIX_DELETE(server);
+	static_cast<WorldEditorImpl*>(editor)->destroy();
+	LUMIX_DELETE(editor);
 }
 
 

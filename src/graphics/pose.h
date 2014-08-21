@@ -14,7 +14,7 @@ struct Quat;
 struct Vec3;
 
 
-class Pose
+class LUMIX_ENGINE_API Pose
 {
 	public:
 		Pose();

@@ -11,6 +11,12 @@
 namespace Lumix
 {
 
+	extern "C" IPlugin* createPlugin()
+	{
+		return AnimationSystem::createInstance();
+	}
+
+
 	static const uint32_t RENDERABLE_HASH = crc32("renderable");
 	static const uint32_t ANIMABLE_HASH = crc32("animable");
 
@@ -282,15 +288,18 @@ namespace Lumix
 			{
 				m_engine = &engine;
 				engine.getWorldEditor()->registerProperty("animable", LUMIX_NEW(PropertyDescriptor<AnimationSceneImpl>)(crc32("preview"), &AnimationSceneImpl::getPreview, &AnimationSceneImpl::setPreview, IPropertyDescriptor::FILE));
+				m_animation_manager.create(ResourceManager::ANIMATION, engine.getResourceManager());
 				return true;
 			}
 
 
 			virtual void destroy() override
 			{
+				m_engine->getResourceManager().get(ResourceManager::ANIMATION)->releaseAll();
 			}
 
 			Engine* m_engine;
+			AnimationManager m_animation_manager;
 	
 		private:
 			void operator=(const AnimationSystemImpl&);

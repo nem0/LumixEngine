@@ -138,7 +138,7 @@ namespace Lumix
 				float height = m_cameras[cmp.index].m_height;
 				float near_plane = m_cameras[cmp.index].m_near;
 				float far_plane = m_cameras[cmp.index].m_far;
-				m_engine.getRenderer().setProjection(width, height, fov, near_plane, far_plane, mtx);
+				m_renderer.setProjection(width, height, fov, near_plane, far_plane, mtx);
 			}
 
 			Matrix getProjectionMatrix(Component cmp)
@@ -437,7 +437,6 @@ namespace Lumix
 					m_universe.componentCreated().invoke(cmp);
 					return cmp;
 				}
-				ASSERT(false);
 				return Component::INVALID;
 			}
 
