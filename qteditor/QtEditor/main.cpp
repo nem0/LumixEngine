@@ -314,6 +314,7 @@ class App
 			{
 				{
 					PROFILE_BLOCK("tick");
+					m_main_window->update();
 					renderEditView();
 					m_world_editor->getEngine().getRenderer().renderGame();
 					m_world_editor->tick();

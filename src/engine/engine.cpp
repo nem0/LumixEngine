@@ -79,13 +79,6 @@ namespace Lumix
 					return false;
 				}
 				m_plugin_manager.addPlugin(m_renderer);
-				/*AnimationSystem* anim_system = AnimationSystem::createInstance();
-				if (!anim_system->create(*this))
-				{
-					LUMIX_DELETE(anim_system);
-					return false;
-				}
-				m_plugin_manager.addPlugin(anim_system);*/
 				if (!m_input_system.create())
 				{
 					return false;
@@ -106,7 +99,6 @@ namespace Lumix
 				Timer::destroy(m_timer);
 				Timer::destroy(m_fps_timer);
 				m_plugin_manager.destroy();
-				Renderer::destroyInstance(*m_renderer);
 				m_input_system.destroy();
 				m_material_manager.destroy();
 
@@ -206,6 +198,7 @@ namespace Lumix
 					}
 				}
 				float dt = m_timer->tick();
+				m_last_time_delta = dt;
 				for (int i = 0; i < m_scenes.size(); ++i)
 				{
 					m_scenes[i]->update(dt);
@@ -276,6 +269,12 @@ namespace Lumix
 			}
 
 
+			virtual float getLastTimeDelta() override
+			{
+				return m_last_time_delta;
+			}
+
+
 		private:
 			Renderer* m_renderer;
 			FS::FileSystem* m_file_system; 
@@ -299,6 +298,7 @@ namespace Lumix
 			Timer* m_fps_timer;
 			int	m_fps_frame;
 			float m_fps;
+			float m_last_time_delta;
 
 		private:
 			void operator=(const EngineImpl&);

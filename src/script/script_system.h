@@ -14,7 +14,7 @@ namespace Lumix
 class Engine;
 class InputSystem;
 class Navigation;
-class Renderer;
+
 
 class LUMIX_SCRIPT_API ScriptScene : public IScene
 {
