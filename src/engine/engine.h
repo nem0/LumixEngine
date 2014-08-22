@@ -52,6 +52,7 @@ namespace Lumix
 			virtual void serialize(ISerializer& serializer) = 0;
 			virtual void deserialize(ISerializer& serializer) = 0;
 			virtual float getFPS() const = 0;
+			virtual float getLastTimeDelta() = 0;
 
 		protected:
 			Engine() {}

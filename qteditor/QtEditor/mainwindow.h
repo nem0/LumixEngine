@@ -20,6 +20,7 @@ public:
 	explicit MainWindow(QWidget* parent = NULL);
 	~MainWindow();
 
+	void update();
 	void setWorldEditor(Lumix::WorldEditor& world_editor);
 	class SceneView* getSceneView() const;
 	class GameView* getGameView() const;
@@ -68,5 +69,6 @@ private:
 	class MaterialManager* m_material_manager_ui;
 	class ProfilerUI* m_profiler_ui;
 	class EntityTemplateList* m_entity_template_list_ui;
+	class Notifications* m_notifications;
 };
 
