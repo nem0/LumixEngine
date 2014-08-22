@@ -16,6 +16,7 @@
 #include "profilerui.h"
 #include <qfiledialog.h>
 #include <qinputdialog.h>
+#include <qevent.h>
 #include <qsettings.h>
 
 
@@ -57,6 +58,12 @@ MainWindow::MainWindow(QWidget* parent) :
 	m_property_view->setAssetBrowser(*m_asset_browser);
 
 	restoreState(settings.value("mainWindowState").toByteArray());
+}
+
+
+void MainWindow::resizeEvent(QResizeEvent* event)
+{
+	m_resized.invoke(event->size());
 }
 
 

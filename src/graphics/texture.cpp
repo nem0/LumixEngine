@@ -863,7 +863,7 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		}
 		if(!loaded)
 		{
-			g_log_error.log("renderer") << "Error loading texture " << m_path.c_str();
+			g_log_warning.log("renderer") << "Error loading texture " << m_path.c_str();
 			onFailure();
 		}
 		else
@@ -874,7 +874,7 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	}
 	else
 	{
-		g_log_error.log("renderer") << "Error loading texture " << m_path.c_str();
+		g_log_warning.log("renderer") << "Error loading texture " << m_path.c_str();
 		onFailure();
 	}
 	
