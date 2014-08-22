@@ -318,7 +318,7 @@ void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	}
 	else
 	{
-		g_log_info.log("renderer") << "Error loading model " << m_path.c_str();
+		g_log_warning.log("renderer") << "Error loading model " << m_path.c_str();
 		onFailure();
 	}
 

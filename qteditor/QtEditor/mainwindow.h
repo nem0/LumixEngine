@@ -1,6 +1,8 @@
 #pragma once
 
 #include <QMainWindow>
+#include "core/delegate_list.h"
+
 
 namespace Lumix
 {
@@ -25,6 +27,7 @@ public:
 	class SceneView* getSceneView() const;
 	class GameView* getGameView() const;
 	class MaterialManager* getMaterialManager() const { return m_material_manager_ui; }
+	Lumix::DelegateList<void(const QSize&)>& resized() { return m_resized; }
 
 private slots:
 	void on_actionLog_triggered();
@@ -49,12 +52,12 @@ private slots:
 	void on_actionSnap_to_terrain_triggered();
 	void on_actionSave_as_template_triggered();
 	void on_actionEntity_templates_triggered();
+	void on_actionInstantiate_template_triggered();
+	void on_actionUndo_triggered();
+	void on_actionRedo_triggered();
 
-    void on_actionInstantiate_template_triggered();
-
-    void on_actionUndo_triggered();
-
-    void on_actionRedo_triggered();
+private:
+	virtual void resizeEvent(QResizeEvent* event) override;
 
 private:
 	Ui::MainWindow* m_ui;
@@ -70,5 +73,6 @@ private:
 	class ProfilerUI* m_profiler_ui;
 	class EntityTemplateList* m_entity_template_list_ui;
 	class Notifications* m_notifications;
+	Lumix::DelegateList<void(const QSize&)> m_resized;
 };
 
