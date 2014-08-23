@@ -116,10 +116,11 @@ namespace Lumix
 		public:
 			EntityTemplateSystemImpl(WorldEditor& editor)
 				: m_editor(editor)
+				, m_universe(NULL)
 			{
-				m_universe = editor.getEngine().getUniverse();
 				editor.universeCreated().bind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseCreated>(this);
 				editor.universeDestroyed().bind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseDestroyed>(this);
+				setUniverse(editor.getEngine().getUniverse());
 			}
 
 
@@ -127,6 +128,21 @@ namespace Lumix
 			{
 				m_editor.universeCreated().unbind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseCreated>(this);
 				m_editor.universeDestroyed().unbind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseDestroyed>(this);
+				setUniverse(NULL);
+			}
+
+
+			void setUniverse(Universe* universe)
+			{
+				if (m_universe)
+				{
+					m_universe->entityDestroyed().unbind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onEntityDestroyed>(this);
+				}
+				m_universe = universe;
+				if (m_universe)
+				{
+					m_universe->entityDestroyed().bind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onEntityDestroyed>(this);
+				}
 			}
 
 
@@ -134,7 +150,7 @@ namespace Lumix
 			{
 				m_instances.clear();
 				m_template_names.clear();
-				m_universe = m_editor.getEngine().getUniverse();
+				setUniverse(m_editor.getEngine().getUniverse());
 			}
 
 
@@ -142,7 +158,30 @@ namespace Lumix
 			{
 				m_instances.clear();
 				m_template_names.clear();
-				m_universe = NULL;
+				setUniverse(NULL);
+			}
+
+
+			void onEntityDestroyed(Entity& entity)
+			{
+				uint32_t tpl = getTemplate(entity);
+				if (tpl != 0)
+				{
+					Array<Entity>& instances = m_instances[tpl];
+					instances.eraseItemFast(entity);
+					if (instances.empty())
+					{
+						m_instances.erase(tpl);
+						for (int i = 0; i < m_template_names.size(); ++i)
+						{
+							if (crc32(m_template_names[i].c_str()) == tpl)
+							{
+								m_template_names.eraseFast(i);
+								break;
+							}
+						}
+					}
+				}
 			}
 
 

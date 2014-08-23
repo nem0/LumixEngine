@@ -475,13 +475,13 @@ void PropertyView::onPropertyValue(Property* property, const void* data, int32_t
 		case Property::FILE:
 			{
 				QLineEdit* edit = qobject_cast<QLineEdit*>(m_ui->propertyList->itemWidget(property->m_tree_item, 1)->children()[0]);
-				edit->setText((char*)data);
+				edit->setText(((char*)data) + sizeof(int));
 			}
 			break;
 		case Property::STRING:
 			{
 				QLineEdit* edit = qobject_cast<QLineEdit*>(m_ui->propertyList->itemWidget(property->m_tree_item, 1));
-				edit->setText((char*)data);
+				edit->setText(((char*)data) + sizeof(int));
 			}
 			break;
 		case Property::DECIMAL:

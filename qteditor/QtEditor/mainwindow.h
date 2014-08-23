@@ -56,6 +56,8 @@ private slots:
 	void on_actionUndo_triggered();
 	void on_actionRedo_triggered();
 
+    void on_actionRemove_triggered();
+
 private:
 	virtual void resizeEvent(QResizeEvent* event) override;
 

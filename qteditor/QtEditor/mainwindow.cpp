@@ -263,3 +263,11 @@ void MainWindow::on_actionRedo_triggered()
 {
 	m_world_editor->redo();
 }
+
+void MainWindow::on_actionRemove_triggered()
+{
+	if (m_world_editor->getSelectedEntity().isValid())
+	{
+		m_world_editor->destroyEntities(&m_world_editor->getSelectedEntity(), 1);
+	}
+}
