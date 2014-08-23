@@ -89,7 +89,6 @@ class PropertyDescriptor : public IPropertyDescriptor
 template <class S>
 void PropertyDescriptor<S>::set(Component cmp, Blob& stream) const
 {
-	int len = stream.getBufferSize();
 	switch(m_type)
 	{
 		case DECIMAL:
@@ -117,6 +116,8 @@ void PropertyDescriptor<S>::set(Component cmp, Blob& stream) const
 		case FILE:
 			{
 				char tmp[301];
+				int len;
+				stream.read(len);
 				ASSERT(len < 300);
 				stream.read(tmp, len);
 				tmp[len] = '\0';
@@ -150,6 +151,7 @@ void PropertyDescriptor<S>::get(Component cmp, Blob& stream) const
 				string value;
 				(static_cast<S*>(cmp.scene)->*m_getter)(cmp, value);
 				len = value.length() + 1;
+				stream.write(len);
 				stream.write(value.c_str(), len);
 			}
 			break;

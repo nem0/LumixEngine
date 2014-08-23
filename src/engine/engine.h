@@ -19,7 +19,6 @@ namespace Lumix
 	class ISerializer;
 	class PluginManager;
 	class Renderer;
-	class RenderScene;
 	class ResourceManager;
 	class Universe;
 

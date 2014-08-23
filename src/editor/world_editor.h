@@ -73,6 +73,7 @@ namespace Lumix
 			virtual void cloneComponent(const Component& src, Entity& entity) = 0;
 			virtual void destroyComponent(const Component& crc) = 0;
 			virtual Entity addEntity() = 0;
+			virtual void destroyEntities(const Entity* entities, int count) = 0;
 			virtual void selectEntity(Entity e) = 0;
 			virtual Entity addEntityAt(int camera_x, int camera_y) = 0;
 			virtual void setEntityPosition(const Entity& entity, const Vec3& position) = 0;

@@ -265,6 +265,113 @@ struct WorldEditorImpl : public WorldEditor
 		};
 
 
+		class DestroyEntitiesCommand : public IEditorCommand
+		{
+			public:
+				DestroyEntitiesCommand(WorldEditorImpl& editor, const Entity* entities, int count)
+					: m_editor(editor)
+				{
+					m_entities.reserve(count);
+					m_positons_rotations.reserve(m_entities.size());
+					for (int i = 0; i < count; ++i)
+					{
+						m_entities.push(entities[i]);
+					}
+				}
+
+
+				virtual void execute() override
+				{
+					m_positons_rotations.clear();
+					m_old_values.clearBuffer();
+					for (int i = 0; i < m_entities.size(); ++i)
+					{
+						const Entity::ComponentList& cmps = m_entities[i].getComponents();
+						PositionRotation pos_rot;
+						pos_rot.m_position = m_entities[i].getPosition();
+						pos_rot.m_rotation = m_entities[i].getRotation();
+						m_positons_rotations.push(pos_rot);
+						m_old_values.write((int)cmps.size());
+						for (int j = cmps.size() - 1; j >= 0; --j)
+						{
+							m_old_values.write(cmps[j].type);
+							Array<IPropertyDescriptor*>& props = m_editor.m_component_properties[cmps[j].type];
+							for (int k = 0; k < props.size(); ++k)
+							{
+								props[k]->get(cmps[j], m_old_values);
+							}
+							cmps[j].scene->destroyComponent(cmps[j]);
+						}
+
+						m_entities[i].universe->destroyEntity(m_entities[i]);
+					}
+				}
+
+
+				virtual bool merge(IEditorCommand&) override
+				{
+					return false;
+				}
+
+
+				virtual void undo() override
+				{
+					const Array<IScene*>& scenes = m_editor.getEngine().getScenes();
+					m_old_values.rewindForRead();
+					for (int i = 0; i < m_entities.size(); ++i)
+					{
+						Entity new_entity = m_editor.getEngine().getUniverse()->createEntity();
+						new_entity.setPosition(m_positons_rotations[i].m_position);
+						new_entity.setRotation(m_positons_rotations[i].m_rotation);
+						int cmps_count;
+						m_old_values.read(cmps_count);
+						for (int j = cmps_count - 1; j >= 0; --j)
+						{
+							Component::Type cmp_type;
+							m_old_values.read(cmp_type);
+							Array<IPropertyDescriptor*>& props = m_editor.m_component_properties[cmp_type];
+							Component new_component;
+							for (int i = 0; i < scenes.size(); ++i)
+							{
+								new_component = scenes[i]->createComponent(cmp_type, new_entity);
+								if (new_component.isValid())
+								{
+									break;
+								}
+							}
+							for (int k = 0; k < props.size(); ++k)
+							{
+								props[k]->set(new_component, m_old_values);
+							}
+						}
+					}
+				}
+
+
+				virtual uint32_t getType() override
+				{
+					static const uint32_t hash = crc32("destroy_entities");
+					return hash;
+				}
+
+
+			private:
+				class PositionRotation
+				{
+					public:
+						Vec3 m_position;
+						Quat m_rotation;
+				};
+
+
+			private:
+				WorldEditorImpl& m_editor;
+				Array<Entity> m_entities;
+				Array<PositionRotation> m_positons_rotations;
+				Blob m_old_values;
+		};
+
+
 		class DestroyComponentCommand : public IEditorCommand
 		{
 			public:
@@ -325,7 +432,7 @@ struct WorldEditorImpl : public WorldEditor
 
 				virtual uint32_t getType() override
 				{
-					static const uint32_t hash = crc32("remove_component");
+					static const uint32_t hash = crc32("destroy_component");
 					return hash;
 				}
 
@@ -638,6 +745,14 @@ struct WorldEditorImpl : public WorldEditor
 				}
 			}
 		}
+
+
+		virtual void destroyEntities(const Entity* entities, int count) override
+		{
+			DestroyEntitiesCommand* command = LUMIX_NEW(DestroyEntitiesCommand)(*this, entities, count);
+			executeCommand(command);
+		}
+
 
 		virtual Entity addEntity() override
 		{
