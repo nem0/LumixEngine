@@ -6,6 +6,7 @@
 #include "core/resource_manager.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
+#include "insert_mesh_command.h"
 #include <qfilesystemmodel.h>
 #include <qlistwidget.h>
 #include <qmenu.h>
@@ -32,7 +33,7 @@ AssetBrowser::AssetBrowser(QWidget* parent) :
 	m_watcher = FileSystemWatcher::create(QDir::currentPath().toLatin1().data());
 	m_watcher->getCallback().bind<AssetBrowser, &AssetBrowser::onFileSystemWatcherCallback>(this);
 	m_base_path = QDir::currentPath();
-	m_server = NULL;
+	m_editor = NULL;
 	m_ui->setupUi(this);
 	m_model = new QFileSystemModel;
 	m_model->setRootPath(QDir::currentPath());
@@ -88,18 +89,17 @@ void AssetBrowser::handleDoubleClick(const QFileInfo& file_info)
 	QString file = file_info.filePath().toLower();
 	if(suffix == "unv")
 	{
-		m_server->loadUniverse(file.toLatin1().data());
+		m_editor->loadUniverse(file.toLatin1().data());
 	}
 	else if(suffix == "msh")
 	{
-		m_server->addEntity();
-		m_server->addComponent(crc32("renderable"));
-		m_server->setProperty("renderable", "source", file.toLatin1().data(), file.length());
+		InsertMeshCommand* command = new InsertMeshCommand(*m_editor, m_editor->getCameraRaycastHit(), file.toLatin1().data());
+		m_editor->executeCommand(command);
 	}
 	else if(suffix == "ani")
 	{
-		m_server->addComponent(crc32("animable"));
-		m_server->setProperty("animable", "preview", file.toLatin1().data(), file.length());
+		m_editor->addComponent(crc32("animable"));
+		m_editor->setProperty("animable", "preview", file.toLatin1().data(), file.length());
 	}
 }
 
@@ -121,9 +121,9 @@ void AssetBrowser::onFileChanged(const QString& path)
 		exportAnimation(result_file_info);
 		exportModel(result_file_info);
 	}
-	else if(m_server)
+	else if(m_editor)
 	{
-		m_server->getEngine().getResourceManager().reload(path.toLatin1().data());
+		m_editor->getEngine().getResourceManager().reload(path.toLatin1().data());
 	}
 }
 

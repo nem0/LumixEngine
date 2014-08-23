@@ -20,7 +20,7 @@ class AssetBrowser : public QDockWidget
 public:
 	explicit AssetBrowser(QWidget* parent = NULL);
 	~AssetBrowser();
-	void setWorldEditor(Lumix::WorldEditor& server) { m_server = &server; }
+	void setWorldEditor(Lumix::WorldEditor& editor) { m_editor = &editor; }
 	void emitFileChanged(const char* path);
 
 private:
@@ -47,6 +47,6 @@ private slots:
 	Ui::AssetBrowser* m_ui;
 	class QFileSystemModel* m_model;
 	class FileSystemWatcher* m_watcher;
-	Lumix::WorldEditor* m_server;
+	Lumix::WorldEditor* m_editor;
 	QString m_base_path;
 };

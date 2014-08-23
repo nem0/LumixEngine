@@ -791,6 +791,34 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
+		virtual Vec3 getCameraRaycastHit() override
+		{
+			Component camera_cmp = m_camera.getComponent(CAMERA_HASH);
+			RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);
+			float camera_x;
+			float camera_y;
+			scene->getCameraWidth(camera_cmp, camera_x);
+			scene->getCameraHeight(camera_cmp, camera_y);
+			camera_x *= 0.5f;
+			camera_y *= 0.5f;
+
+			Vec3 origin;
+			Vec3 dir;
+			scene->getRay(camera_cmp, (float)camera_x, (float)camera_y, origin, dir);
+			RayCastModelHit hit = scene->castRay(origin, dir, Component::INVALID);
+			Vec3 pos;
+			if (hit.m_is_hit)
+			{
+				pos = hit.m_origin + hit.m_dir * hit.m_t;
+			}
+			else
+			{
+				pos = m_camera.getPosition() + m_camera.getRotation() * Vec3(0, 0, -2);
+			}
+			return pos;
+		}
+
+
 		void onEntityCreated(Entity& entity)
 		{
 			EditorIcon* er = LUMIX_NEW(EditorIcon)();

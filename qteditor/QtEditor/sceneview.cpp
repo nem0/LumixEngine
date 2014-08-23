@@ -6,6 +6,7 @@
 #include "engine/iplugin.h"
 #include "graphics/pipeline.h"
 #include "graphics/render_scene.h"
+#include "insert_mesh_command.h"
 #include <qapplication.h>
 #include <QDoubleSpinBox>
 #include <QDragEnterEvent>
@@ -14,90 +15,8 @@
 #include <QVBoxLayout>
 
 
-static const uint32_t RENDERABLE_HASH = crc32("renderable");
-static const uint32_t CAMERA_HASH = crc32("camera");
-static const uint32_t LIGHT_HASH = crc32("light");
-static const uint32_t SCRIPT_HASH = crc32("script");
-static const uint32_t ANIMABLE_HASH = crc32("animable");
-static const uint32_t TERRAIN_HASH = crc32("terrain");
-
-
 class ViewWidget : public QWidget
 {
-	public:
-		class InsertMeshCommand : public Lumix::IEditorCommand
-		{
-			public:
-				InsertMeshCommand(ViewWidget& widget, const Lumix::Vec3& position, const Lumix::Path& mesh_path)
-					: m_mesh_path(mesh_path)
-					, m_position(position)
-					, m_widget(widget)
-				{
-					
-				}
-
-
-				virtual void execute() override
-				{
-					Lumix::Engine& engine = m_widget.m_world_editor->getEngine();
-					m_entity = engine.getUniverse()->createEntity();
-					m_entity.setPosition(m_position);
-					const Lumix::Array<Lumix::IScene*>& scenes = engine.getScenes();
-					Lumix::Component cmp;
-					Lumix::IScene* scene = NULL;
-					for (int i = 0; i < scenes.size(); ++i)
-					{
-						cmp = scenes[i]->createComponent(RENDERABLE_HASH, m_entity);
-						if (cmp.isValid())
-						{
-							scene = scenes[i];
-							break;
-						}
-					}
-					if (cmp.isValid())
-					{
-						char rel_path[LUMIX_MAX_PATH];
-						m_widget.m_world_editor->getRelativePath(rel_path, LUMIX_MAX_PATH, m_mesh_path.c_str());
-						static_cast<Lumix::RenderScene*>(scene)->setRenderablePath(cmp, Lumix::string(rel_path));
-					}
-				}
-
-
-				virtual void undo() override
-				{
-					const Lumix::Entity::ComponentList& cmps = m_entity.getComponents();
-					for (int i = 0; i < cmps.size(); ++i)
-					{
-						cmps[i].scene->destroyComponent(cmps[i]);
-					}
-					m_widget.m_world_editor->getEngine().getUniverse()->destroyEntity(m_entity);
-					m_entity = Lumix::Entity::INVALID;
-				}
-
-
-				virtual uint32_t getType() override
-				{
-					static const uint32_t type = crc32("insert_mesh");
-					return type;
-				}
-
-
-				virtual bool merge(IEditorCommand&)
-				{
-					return false;
-				}
-
-
-				const Lumix::Entity& getEntity() const { return m_entity; }
-
-
-			private:
-				Lumix::Vec3 m_position;
-				Lumix::Path m_mesh_path;
-				Lumix::Entity m_entity;
-				ViewWidget& m_widget;
-		};
-
 	public:
 		ViewWidget(QWidget* parent)
 			: QWidget(parent)
@@ -200,7 +119,7 @@ void SceneView::dropEvent(QDropEvent *event)
 			{
 				position.set(0, 0, 0);
 			}
-			ViewWidget::InsertMeshCommand* command = new ViewWidget::InsertMeshCommand(static_cast<ViewWidget&>(*m_view), position, file.toLatin1().data());
+			InsertMeshCommand* command = new InsertMeshCommand(*static_cast<ViewWidget&>(*m_view).m_world_editor, position, file.toLatin1().data());
 			m_world_editor->executeCommand(command);
 			m_world_editor->selectEntity(command->getEntity());
 		}
