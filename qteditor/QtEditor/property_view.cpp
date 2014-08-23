@@ -12,6 +12,7 @@
 #include "graphics/material.h"
 #include "graphics/model.h"
 #include "graphics/render_scene.h"
+#include "graphics/shader.h"
 #include "graphics/texture.h"
 #include "scripts/scriptcompiler.h"
 #include <qcheckbox.h>
@@ -475,13 +476,13 @@ void PropertyView::onPropertyValue(Property* property, const void* data, int32_t
 		case Property::FILE:
 			{
 				QLineEdit* edit = qobject_cast<QLineEdit*>(m_ui->propertyList->itemWidget(property->m_tree_item, 1)->children()[0]);
-				edit->setText(((char*)data) + sizeof(int));
+				edit->setText((char*)data);
 			}
 			break;
 		case Property::STRING:
 			{
 				QLineEdit* edit = qobject_cast<QLineEdit*>(m_ui->propertyList->itemWidget(property->m_tree_item, 1));
-				edit->setText(((char*)data) + sizeof(int));
+				edit->setText((char*)data);
 			}
 			break;
 		case Property::DECIMAL:
@@ -688,7 +689,11 @@ void PropertyView::onAssetBrowserFileSelected(const char* filename)
 	{
 		manager = m_world_editor->getEngine().getResourceManager().get(Lumix::ResourceManager::MODEL);
 	}
-	
+	else if (strcmp(extension, "mat") == 0)
+	{
+		manager = m_world_editor->getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL);
+	}
+
 	if (manager != NULL)
 	{
 		setSelectedResource(manager->load(rel_path));
@@ -707,6 +712,7 @@ void PropertyView::onSelectedResourceLoaded(Lumix::Resource::State, Lumix::Resou
 		m_selected_entity = Lumix::Entity::INVALID;
 		clear();
 		Lumix::Model* model = dynamic_cast<Lumix::Model*>(m_selected_resource);
+		TODO("refactor");
 		if (model)
 		{
 			m_ui->propertyList->insertTopLevelItem(0, new QTreeWidgetItem());
@@ -732,6 +738,31 @@ void PropertyView::onSelectedResourceLoaded(Lumix::Resource::State, Lumix::Resou
 				subitem = new QTreeWidgetItem(QStringList() << "Material" << model->getMesh(i).getMaterial()->getPath().c_str());
 				item->insertChild(0, subitem);
 			}
+
+			m_ui->propertyList->expandAll();
+		}
+		else if (Lumix::Material* material = dynamic_cast<Lumix::Material*>(m_selected_resource))
+		{
+			m_ui->propertyList->insertTopLevelItem(0, new QTreeWidgetItem());
+			m_ui->propertyList->topLevelItem(0)->setText(0, "Material");
+
+			QTreeWidgetItem* item = new QTreeWidgetItem(QStringList() << "Shader" << material->getShader()->getPath().c_str());
+			m_ui->propertyList->topLevelItem(0)->insertChild(0, item);
+
+			for (int i = 0; i < material->getTextureCount(); ++i)
+			{
+				item = new QTreeWidgetItem(QStringList() << "Texture" << material->getTexture(i)->getPath().c_str());
+				m_ui->propertyList->topLevelItem(0)->insertChild(0, item);
+			}
+
+			item = new QTreeWidgetItem(QStringList() << "Z test" << (material->isZTest() ? "true" : "false"));
+			m_ui->propertyList->topLevelItem(0)->insertChild(0, item);
+
+			item = new QTreeWidgetItem(QStringList() << "Backface culling" << (material->isBackfaceCulling() ? "true" : "false"));
+			m_ui->propertyList->topLevelItem(0)->insertChild(0, item);
+
+			item = new QTreeWidgetItem(QStringList() << "Alpha to coverage" << (material->isAlphaToCoverage() ? "true" : "false"));
+			m_ui->propertyList->topLevelItem(0)->insertChild(0, item);
 
 			m_ui->propertyList->expandAll();
 		}

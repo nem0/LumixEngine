@@ -29,7 +29,8 @@ SOURCES += main.cpp\
     profilergraph.cpp \
     pc/file_system_watcher.cpp \
     entity_template_list.cpp \
-    notifications.cpp
+    notifications.cpp \
+    insert_mesh_command.cpp
 
 HEADERS  += mainwindow.h \
     sceneview.h \ 
@@ -47,7 +48,8 @@ HEADERS  += mainwindow.h \
     profilergraph.h \
     file_system_watcher.h \
     entity_template_list.h \
-    notifications.h
+    notifications.h \
+    insert_mesh_command.h
 
 FORMS    += mainwindow.ui \
     logwidget.ui \

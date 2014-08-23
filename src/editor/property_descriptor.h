@@ -115,12 +115,14 @@ void PropertyDescriptor<S>::set(Component cmp, Blob& stream) const
 		case STRING:
 		case FILE:
 			{
-				char tmp[301];
-				int len;
-				stream.read(len);
-				ASSERT(len < 300);
-				stream.read(tmp, len);
-				tmp[len] = '\0';
+				char tmp[300];
+				char* c = tmp;
+				do
+				{
+					stream.read(c, 1);
+					++c;
+				}
+				while (*c && c - tmp < 300);
 				string s((char*)tmp);
 				(static_cast<S*>(cmp.scene)->*m_setter)(cmp, s);
 			}
@@ -151,7 +153,6 @@ void PropertyDescriptor<S>::get(Component cmp, Blob& stream) const
 				string value;
 				(static_cast<S*>(cmp.scene)->*m_getter)(cmp, value);
 				len = value.length() + 1;
-				stream.write(len);
 				stream.write(value.c_str(), len);
 			}
 			break;
