@@ -13,7 +13,7 @@ namespace Lumix
 	struct Entity;
 	class Event;
 	class Path;
-	struct PropertyListEvent;
+	class Resource;
 	class WorldEditor;
 }
 
@@ -31,6 +31,13 @@ class PropertyView : public QDockWidget
 	Q_OBJECT
 
 public:
+	class IResourcePlugin
+	{
+		public:
+			virtual ~IResourcePlugin() {}
+			virtual bool onResourceLoaded(Ui::PropertyView& property_view, Lumix::Resource* resource) = 0;
+	};
+
 	class Property
 	{
 		public:
@@ -58,6 +65,7 @@ public:
 	void setWorldEditor(Lumix::WorldEditor& editor);
 	void setScriptCompiler(ScriptCompiler* compiler);
 	void setAssetBrowser(AssetBrowser& asset_browser);
+	void addResourcePlugin(IResourcePlugin* plugin);
 
 private slots:
 	void on_addComponentButton_clicked();
@@ -111,6 +119,7 @@ private:
 	class TerrainEditor* m_terrain_editor;
 	AssetBrowser* m_asset_browser;
 	Lumix::Resource* m_selected_resource;
+	Lumix::Array<IResourcePlugin*> m_resource_plugins;
 };
 
 

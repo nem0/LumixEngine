@@ -42,6 +42,92 @@ static const char* component_map[] =
 };
 
 
+class ModelPlugin : public PropertyView::IResourcePlugin
+{
+	public:
+		virtual bool onResourceLoaded(Ui::PropertyView& property_view, Lumix::Resource* resource) override
+		{
+			if (Lumix::Model* model = dynamic_cast<Lumix::Model*>(resource))
+			{
+				property_view.propertyList->insertTopLevelItem(0, new QTreeWidgetItem());
+				property_view.propertyList->topLevelItem(0)->setText(0, "Model");
+				property_view.propertyList->topLevelItem(0)->setText(1, model->getPath().c_str());
+
+				QTreeWidgetItem* item = new QTreeWidgetItem(QStringList() << "Bone count" << QString::number(model->getBoneCount()));
+				property_view.propertyList->topLevelItem(0)->insertChild(0, item);
+
+				item = new QTreeWidgetItem(QStringList() << "Bounding radius" << QString::number(model->getBoundingRadius()));
+				property_view.propertyList->topLevelItem(0)->insertChild(0, item);
+
+				item = new QTreeWidgetItem(QStringList() << "Size" << QString::number(model->size()));
+				property_view.propertyList->topLevelItem(0)->insertChild(0, item);
+
+				for (int i = 0; i < model->getMeshCount(); ++i)
+				{
+					item = new QTreeWidgetItem(QStringList() << "Mesh" << model->getMesh(i).getName());
+					property_view.propertyList->topLevelItem(0)->insertChild(0, item);
+
+					QTreeWidgetItem* subitem = new QTreeWidgetItem(QStringList() << "Triangles" << QString::number(model->getMesh(i).getCount() / 3));
+					item->insertChild(0, subitem);
+
+					subitem = new QTreeWidgetItem(QStringList() << "Material" << model->getMesh(i).getMaterial()->getPath().c_str());
+					item->insertChild(0, subitem);
+				}
+
+				property_view.propertyList->expandAll();
+				return true;
+			}
+			return false;
+		}
+};
+
+
+class MaterialPlugin : public PropertyView::IResourcePlugin
+{
+	public:
+		virtual bool onResourceLoaded(Ui::PropertyView& property_view, Lumix::Resource* resource) override
+		{
+			if (Lumix::Material* material = dynamic_cast<Lumix::Material*>(resource))
+			{
+				property_view.propertyList->insertTopLevelItem(0, new QTreeWidgetItem());
+				property_view.propertyList->topLevelItem(0)->setText(0, "Material");
+				property_view.propertyList->topLevelItem(0)->setText(1, material->getPath().c_str());
+
+				QTreeWidgetItem* item = new QTreeWidgetItem(QStringList() << "Shader" << material->getShader()->getPath().c_str());
+				property_view.propertyList->topLevelItem(0)->insertChild(0, item);
+
+				for (int i = 0; i < material->getTextureCount(); ++i)
+				{
+					item = new QTreeWidgetItem(QStringList() << "Texture" << material->getTexture(i)->getPath().c_str());
+					property_view.propertyList->topLevelItem(0)->insertChild(0, item);
+				}
+
+				item = new QTreeWidgetItem(QStringList() << "Z test");
+				property_view.propertyList->topLevelItem(0)->insertChild(0, item);
+				QCheckBox* checkbox = new QCheckBox();
+				checkbox->setChecked(material->isZTest());
+				property_view.propertyList->setItemWidget(item, 1, checkbox);
+
+				item = new QTreeWidgetItem(QStringList() << "Backface culling");
+				property_view.propertyList->topLevelItem(0)->insertChild(0, item);
+				checkbox = new QCheckBox();
+				checkbox->setChecked(material->isBackfaceCulling());
+				property_view.propertyList->setItemWidget(item, 1, checkbox);
+
+				item = new QTreeWidgetItem(QStringList() << "Alpha to coverage");
+				property_view.propertyList->topLevelItem(0)->insertChild(0, item);
+				checkbox = new QCheckBox();
+				checkbox->setChecked(material->isAlphaToCoverage());
+				property_view.propertyList->setItemWidget(item, 1, checkbox);
+
+				property_view.propertyList->expandAll();
+				return true;
+			}
+			return false;
+		}
+};
+
+
 class TerrainEditor : public Lumix::WorldEditor::Plugin
 {
 	public:
@@ -367,13 +453,19 @@ PropertyView::PropertyView(QWidget* parent)
 	{
 		component_list << component_map[j];
 	}
-	
 	m_ui->componentTypeCombo->insertItems(0, component_list);
+
+	addResourcePlugin(new MaterialPlugin);
+	addResourcePlugin(new ModelPlugin);
 }
 
 
 PropertyView::~PropertyView()
 {
+	for (int i = 0; i < m_resource_plugins.size(); ++i)
+	{
+		delete m_resource_plugins[i];
+	}
 	m_world_editor->entitySelected().unbind<PropertyView, &PropertyView::onEntitySelected>(this);
 	m_world_editor->universeCreated().unbind<PropertyView, &PropertyView::onUniverseCreated>(this);
 	m_world_editor->universeDestroyed().unbind<PropertyView, &PropertyView::onUniverseDestroyed>(this);
@@ -705,66 +797,24 @@ void PropertyView::onAssetBrowserFileSelected(const char* filename)
 }
 
 
+void PropertyView::addResourcePlugin(IResourcePlugin* plugin)
+{
+	m_resource_plugins.push(plugin);
+}
+
+
 void PropertyView::onSelectedResourceLoaded(Lumix::Resource::State, Lumix::Resource::State new_state)
 {
 	if (new_state == Lumix::Resource::State::READY)
 	{
 		m_selected_entity = Lumix::Entity::INVALID;
 		clear();
-		Lumix::Model* model = dynamic_cast<Lumix::Model*>(m_selected_resource);
-		TODO("refactor");
-		if (model)
+		for (int i = 0; i < m_resource_plugins.size(); ++i)
 		{
-			m_ui->propertyList->insertTopLevelItem(0, new QTreeWidgetItem());
-			m_ui->propertyList->topLevelItem(0)->setText(0, "Model");
-
-			QTreeWidgetItem* item = new QTreeWidgetItem(QStringList() << "Bone count" << QString::number(model->getBoneCount()));
-			m_ui->propertyList->topLevelItem(0)->insertChild(0, item);
-
-			item = new QTreeWidgetItem(QStringList() << "Bounding radius" << QString::number(model->getBoundingRadius()));
-			m_ui->propertyList->topLevelItem(0)->insertChild(0, item);
-
-			item = new QTreeWidgetItem(QStringList() << "Size" << QString::number(model->size()));
-			m_ui->propertyList->topLevelItem(0)->insertChild(0, item);
-
-			for (int i = 0; i < model->getMeshCount(); ++i)
+			if (m_resource_plugins[i]->onResourceLoaded(*m_ui, m_selected_resource))
 			{
-				item = new QTreeWidgetItem(QStringList() << "Mesh" << model->getMesh(i).getName());
-				m_ui->propertyList->topLevelItem(0)->insertChild(0, item);
-
-				QTreeWidgetItem* subitem = new QTreeWidgetItem(QStringList() << "Triangles" << QString::number(model->getMesh(i).getCount() / 3));
-				item->insertChild(0, subitem);
-
-				subitem = new QTreeWidgetItem(QStringList() << "Material" << model->getMesh(i).getMaterial()->getPath().c_str());
-				item->insertChild(0, subitem);
+				return;
 			}
-
-			m_ui->propertyList->expandAll();
-		}
-		else if (Lumix::Material* material = dynamic_cast<Lumix::Material*>(m_selected_resource))
-		{
-			m_ui->propertyList->insertTopLevelItem(0, new QTreeWidgetItem());
-			m_ui->propertyList->topLevelItem(0)->setText(0, "Material");
-
-			QTreeWidgetItem* item = new QTreeWidgetItem(QStringList() << "Shader" << material->getShader()->getPath().c_str());
-			m_ui->propertyList->topLevelItem(0)->insertChild(0, item);
-
-			for (int i = 0; i < material->getTextureCount(); ++i)
-			{
-				item = new QTreeWidgetItem(QStringList() << "Texture" << material->getTexture(i)->getPath().c_str());
-				m_ui->propertyList->topLevelItem(0)->insertChild(0, item);
-			}
-
-			item = new QTreeWidgetItem(QStringList() << "Z test" << (material->isZTest() ? "true" : "false"));
-			m_ui->propertyList->topLevelItem(0)->insertChild(0, item);
-
-			item = new QTreeWidgetItem(QStringList() << "Backface culling" << (material->isBackfaceCulling() ? "true" : "false"));
-			m_ui->propertyList->topLevelItem(0)->insertChild(0, item);
-
-			item = new QTreeWidgetItem(QStringList() << "Alpha to coverage" << (material->isAlphaToCoverage() ? "true" : "false"));
-			m_ui->propertyList->topLevelItem(0)->insertChild(0, item);
-
-			m_ui->propertyList->expandAll();
 		}
 	}
 }
