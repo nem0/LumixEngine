@@ -575,6 +575,14 @@ void PropertyView::on_lineEditEditingFinished()
 	}
 }
 
+void PropertyView::on_goResourceClicked()
+{
+	QPushButton* button = qobject_cast<QPushButton*>(QObject::sender());
+	int i = button->property("cpp_prop").toInt();
+	QLineEdit* edit = qobject_cast<QLineEdit*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item, 1)->children()[0]);
+	setSelectedResourceFilename(edit->text().toLatin1().data());
+}
+
 void PropertyView::on_browseFilesClicked()
 {
 	QPushButton* button = qobject_cast<QPushButton*>(QObject::sender());
@@ -617,6 +625,7 @@ void PropertyView::onPropertyValue(Property* property, const void* data, int32_t
 				cb->setChecked(b);
 			}
 			break;
+		case Property::RESOURCE:
 		case Property::FILE:
 			{
 				QLineEdit* edit = qobject_cast<QLineEdit*>(m_ui->propertyList->itemWidget(property->m_tree_item, 1)->children()[0]);
@@ -749,6 +758,7 @@ void PropertyView::addProperty(const char* component, const char* name, const ch
 				connect(sb, (void (QDoubleSpinBox::*)(double))&QDoubleSpinBox::valueChanged, this, &PropertyView::on_vec3ValueChanged);
 			}
 			break;
+		case Property::RESOURCE:
 		case Property::FILE:
 			{
 				QWidget* widget = new QWidget();
@@ -760,8 +770,15 @@ void PropertyView::addProperty(const char* component, const char* name, const ch
 				layout->setContentsMargins(0, 0, 0, 0);
 				QPushButton* button = new QPushButton("...", widget);
 				layout->addWidget(button);
-				button->setProperty("cpp_prop", (int)(m_properties.size() - 1)); 
+				button->setProperty("cpp_prop", (int)(m_properties.size() - 1));
 				connect(button, &QPushButton::clicked, this, &PropertyView::on_browseFilesClicked);
+				if (type == Property::RESOURCE)
+				{
+					QPushButton* button2 = new QPushButton("->", widget);
+					layout->addWidget(button2);
+					button2->setProperty("cpp_prop", (int)(m_properties.size() - 1));
+					connect(button2, &QPushButton::clicked, this, &PropertyView::on_goResourceClicked);
+				}
 				m_ui->propertyList->setItemWidget(item, 1, widget);
 				connect(edit, &QLineEdit::editingFinished, this, &PropertyView::on_lineEditEditingFinished);
 			}
@@ -818,11 +835,11 @@ void PropertyView::onUniverseDestroyed()
 void PropertyView::setAssetBrowser(AssetBrowser& asset_browser)
 {
 	m_asset_browser = &asset_browser;
-	connect(m_asset_browser, &AssetBrowser::fileSelected, this, &PropertyView::onAssetBrowserFileSelected);
+	connect(m_asset_browser, &AssetBrowser::fileSelected, this, &PropertyView::setSelectedResourceFilename);
 }
 
 
-void PropertyView::onAssetBrowserFileSelected(const char* filename)
+void PropertyView::setSelectedResourceFilename(const char* filename)
 {
 	char rel_path[LUMIX_MAX_PATH];
 	m_world_editor->getRelativePath(rel_path, LUMIX_MAX_PATH, filename);
@@ -1194,7 +1211,7 @@ void PropertyView::onEntitySelected(Lumix::Entity& e)
 			}
 			else if (cmps[i].type == crc32("renderable"))
 			{
-				addProperty("renderable", "source", "Source", Property::FILE, "models (*.msh)");
+				addProperty("renderable", "source", "Source", Property::RESOURCE, "models (*.msh)");
 			}
 			else if (cmps[i].type == crc32("script"))
 			{
@@ -1210,10 +1227,10 @@ void PropertyView::onEntitySelected(Lumix::Entity& e)
 			}
 			else if (cmps[i].type == crc32("terrain"))
 			{
-				addProperty("terrain", "material", "Material", Property::FILE, "material (*.mat)");
+				addProperty("terrain", "material", "Material", Property::RESOURCE, "material (*.mat)");
 				addProperty("terrain", "xz_scale", "Meter per texel", Property::DECIMAL, NULL);
 				addProperty("terrain", "y_scale", "Height scale", Property::DECIMAL, NULL);
-				addProperty("terrain", "grass_mesh", "Grass mesh", Property::FILE, "mesh (*.msh)");
+				addProperty("terrain", "grass_mesh", "Grass mesh", Property::RESOURCE, "mesh (*.msh)");
 				addTerrainCustomProperties(cmps[i]);
 			}
 			else if (cmps[i].type == crc32("mesh_rigid_actor"))

@@ -48,7 +48,8 @@ public:
 				STRING,
 				DECIMAL,
 				VEC3,
-				BOOL
+				BOOL,
+				RESOURCE
 			};
 				
 			Type m_type;
@@ -77,6 +78,7 @@ private slots:
 	void on_vec3ValueChanged();
 	void on_lineEditEditingFinished();
 	void on_browseFilesClicked();
+	void on_goResourceClicked();
 	void on_compileScriptClicked();
 	void on_editScriptClicked();
 	void on_animablePlayPause();
@@ -99,7 +101,7 @@ private:
 	void onUniverseDestroyed();
 	void onEntitySelected(Lumix::Entity& e);
 	void onEntityPosition(Lumix::Entity& e);
-	void onAssetBrowserFileSelected(const char* filename);
+	void setSelectedResourceFilename(const char* filename);
 	void addProperty(const char* component, const char* name, const char* label, Property::Type type, const char* file_type);
 	void onPropertyValue(Property* property, const void* data, int32_t data_size);
 	void addScriptCustomProperties();
