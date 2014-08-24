@@ -670,6 +670,8 @@ bool Texture::loadDDS(FS::IFile& file)
 
 	width = hdr.dwWidth;
 	height = hdr.dwHeight;
+	m_width = width;
+	m_height = height;
 	if ((width & (width - 1)) || (height & (height - 1)))
 	{
 		g_log_error.log("renderer") << "Wrong dds format " << m_path.c_str();
