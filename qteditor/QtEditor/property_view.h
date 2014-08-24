@@ -26,6 +26,7 @@ class AssetBrowser;
 class QTreeWidgetItem;
 class ScriptCompiler;
 
+
 class PropertyView : public QDockWidget
 {
 	Q_OBJECT
@@ -66,6 +67,8 @@ public:
 	void setScriptCompiler(ScriptCompiler* compiler);
 	void setAssetBrowser(AssetBrowser& asset_browser);
 	void addResourcePlugin(IResourcePlugin* plugin);
+	Lumix::Resource* getSelectedResource() const { return m_selected_resource; }
+	void setSelectedResource(Lumix::Resource* resource);
 
 private slots:
 	void on_addComponentButton_clicked();
@@ -107,7 +110,6 @@ private:
 	void updateValues();
 	void updateSelectedEntityPosition();
 	void onSelectedResourceLoaded(Lumix::Resource::State old_state, Lumix::Resource::State new_state);
-	void setSelectedResource(Lumix::Resource* resource);
 
 private:
 	Ui::PropertyView* m_ui;
@@ -122,4 +124,47 @@ private:
 	Lumix::Array<IResourcePlugin*> m_resource_plugins;
 };
 
+
+class TexturePlugin : public QObject, public PropertyView::IResourcePlugin
+{
+	Q_OBJECT
+	public:
+		virtual bool onResourceLoaded(Ui::PropertyView& property_view, Lumix::Resource* resource) override;
+};
+
+
+class ModelPlugin : public QObject, public PropertyView::IResourcePlugin
+{
+	Q_OBJECT
+	public:
+		ModelPlugin(PropertyView& view)
+			: m_view(view)
+		{ }
+
+		virtual bool onResourceLoaded(Ui::PropertyView& property_view, Lumix::Resource* resource) override;
+
+	private:
+		void onGoMaterialClicked();
+
+	private:
+		PropertyView& m_view;
+};
+
+class MaterialPlugin : public QObject, public PropertyView::IResourcePlugin
+{
+	Q_OBJECT
+	public:
+		MaterialPlugin(PropertyView& view)
+			: m_view(view)
+		{
+		}
+
+		virtual bool onResourceLoaded(Ui::PropertyView& property_view, Lumix::Resource* resource) override;
+	
+	private:
+		void onGoTextureClicked();
+
+	private:
+		PropertyView& m_view;
+};
 

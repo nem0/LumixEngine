@@ -42,90 +42,141 @@ static const char* component_map[] =
 };
 
 
-class ModelPlugin : public PropertyView::IResourcePlugin
+bool TexturePlugin::onResourceLoaded(Ui::PropertyView& property_view, Lumix::Resource* resource)
 {
-	public:
-		virtual bool onResourceLoaded(Ui::PropertyView& property_view, Lumix::Resource* resource) override
-		{
-			if (Lumix::Model* model = dynamic_cast<Lumix::Model*>(resource))
-			{
-				property_view.propertyList->insertTopLevelItem(0, new QTreeWidgetItem());
-				property_view.propertyList->topLevelItem(0)->setText(0, "Model");
-				property_view.propertyList->topLevelItem(0)->setText(1, model->getPath().c_str());
+	if (Lumix::Texture* texture = dynamic_cast<Lumix::Texture*>(resource))
+	{
+		property_view.propertyList->insertTopLevelItem(0, new QTreeWidgetItem());
+		property_view.propertyList->topLevelItem(0)->setText(0, "Texture");
+		property_view.propertyList->topLevelItem(0)->setText(1, texture->getPath().c_str());
+				
+		QTreeWidgetItem* item = new QTreeWidgetItem(QStringList() << "Width" << QString::number(texture->getWidth()));
+		property_view.propertyList->topLevelItem(0)->insertChild(0, item);
 
-				QTreeWidgetItem* item = new QTreeWidgetItem(QStringList() << "Bone count" << QString::number(model->getBoneCount()));
-				property_view.propertyList->topLevelItem(0)->insertChild(0, item);
+		item = new QTreeWidgetItem(QStringList() << "Height" << QString::number(texture->getHeight()));
+		property_view.propertyList->topLevelItem(0)->insertChild(0, item);
 
-				item = new QTreeWidgetItem(QStringList() << "Bounding radius" << QString::number(model->getBoundingRadius()));
-				property_view.propertyList->topLevelItem(0)->insertChild(0, item);
-
-				item = new QTreeWidgetItem(QStringList() << "Size" << QString::number(model->size()));
-				property_view.propertyList->topLevelItem(0)->insertChild(0, item);
-
-				for (int i = 0; i < model->getMeshCount(); ++i)
-				{
-					item = new QTreeWidgetItem(QStringList() << "Mesh" << model->getMesh(i).getName());
-					property_view.propertyList->topLevelItem(0)->insertChild(0, item);
-
-					QTreeWidgetItem* subitem = new QTreeWidgetItem(QStringList() << "Triangles" << QString::number(model->getMesh(i).getCount() / 3));
-					item->insertChild(0, subitem);
-
-					subitem = new QTreeWidgetItem(QStringList() << "Material" << model->getMesh(i).getMaterial()->getPath().c_str());
-					item->insertChild(0, subitem);
-				}
-
-				property_view.propertyList->expandAll();
-				return true;
-			}
-			return false;
-		}
-};
+		property_view.propertyList->expandAll();
+		return true;
+	}
+	return false;
+}
 
 
-class MaterialPlugin : public PropertyView::IResourcePlugin
+bool ModelPlugin::onResourceLoaded(Ui::PropertyView& property_view, Lumix::Resource* resource)
 {
-	public:
-		virtual bool onResourceLoaded(Ui::PropertyView& property_view, Lumix::Resource* resource) override
+	if (Lumix::Model* model = dynamic_cast<Lumix::Model*>(resource))
+	{
+		property_view.propertyList->insertTopLevelItem(0, new QTreeWidgetItem());
+		property_view.propertyList->topLevelItem(0)->setText(0, "Model");
+		property_view.propertyList->topLevelItem(0)->setText(1, model->getPath().c_str());
+
+		QTreeWidgetItem* item = new QTreeWidgetItem(QStringList() << "Bone count" << QString::number(model->getBoneCount()));
+		property_view.propertyList->topLevelItem(0)->insertChild(0, item);
+
+		item = new QTreeWidgetItem(QStringList() << "Bounding radius" << QString::number(model->getBoundingRadius()));
+		property_view.propertyList->topLevelItem(0)->insertChild(0, item);
+
+		item = new QTreeWidgetItem(QStringList() << "Size" << QString::number(model->size()));
+		property_view.propertyList->topLevelItem(0)->insertChild(0, item);
+
+		for (int i = 0; i < model->getMeshCount(); ++i)
 		{
-			if (Lumix::Material* material = dynamic_cast<Lumix::Material*>(resource))
-			{
-				property_view.propertyList->insertTopLevelItem(0, new QTreeWidgetItem());
-				property_view.propertyList->topLevelItem(0)->setText(0, "Material");
-				property_view.propertyList->topLevelItem(0)->setText(1, material->getPath().c_str());
+			item = new QTreeWidgetItem(QStringList() << "Mesh" << model->getMesh(i).getName());
+			property_view.propertyList->topLevelItem(0)->insertChild(0, item);
 
-				QTreeWidgetItem* item = new QTreeWidgetItem(QStringList() << "Shader" << material->getShader()->getPath().c_str());
-				property_view.propertyList->topLevelItem(0)->insertChild(0, item);
+			QTreeWidgetItem* subitem = new QTreeWidgetItem(QStringList() << "Triangles" << QString::number(model->getMesh(i).getCount() / 3));
+			item->insertChild(0, subitem);
 
-				for (int i = 0; i < material->getTextureCount(); ++i)
-				{
-					item = new QTreeWidgetItem(QStringList() << "Texture" << material->getTexture(i)->getPath().c_str());
-					property_view.propertyList->topLevelItem(0)->insertChild(0, item);
-				}
-
-				item = new QTreeWidgetItem(QStringList() << "Z test");
-				property_view.propertyList->topLevelItem(0)->insertChild(0, item);
-				QCheckBox* checkbox = new QCheckBox();
-				checkbox->setChecked(material->isZTest());
-				property_view.propertyList->setItemWidget(item, 1, checkbox);
-
-				item = new QTreeWidgetItem(QStringList() << "Backface culling");
-				property_view.propertyList->topLevelItem(0)->insertChild(0, item);
-				checkbox = new QCheckBox();
-				checkbox->setChecked(material->isBackfaceCulling());
-				property_view.propertyList->setItemWidget(item, 1, checkbox);
-
-				item = new QTreeWidgetItem(QStringList() << "Alpha to coverage");
-				property_view.propertyList->topLevelItem(0)->insertChild(0, item);
-				checkbox = new QCheckBox();
-				checkbox->setChecked(material->isAlphaToCoverage());
-				property_view.propertyList->setItemWidget(item, 1, checkbox);
-
-				property_view.propertyList->expandAll();
-				return true;
-			}
-			return false;
+			subitem = new QTreeWidgetItem(QStringList() << "Material");
+			QWidget* widget = new QWidget();
+			QHBoxLayout* layout = new QHBoxLayout(widget);
+			QLabel* label = new QLabel(model->getMesh(i).getMaterial()->getPath().c_str());
+			layout->addWidget(label, 1);
+			QPushButton* button = new QPushButton("->");
+			layout->addWidget(button, 0);
+			layout->setContentsMargins(0, 0, 0, 0);
+			item->insertChild(0, subitem);
+			button->setProperty("material_index", i);
+			connect(button, &QPushButton::clicked, this, &ModelPlugin::onGoMaterialClicked);
+			property_view.propertyList->setItemWidget(subitem, 1, widget);
 		}
-};
+
+		property_view.propertyList->expandAll();
+		return true;
+	}
+	return false;
+}
+
+
+void ModelPlugin::onGoMaterialClicked()
+{
+	QPushButton* button = qobject_cast<QPushButton*>(QObject::sender());
+	int material_index = button->property("material_index").toInt();
+	Lumix::Material* material = static_cast<Lumix::Model*>(m_view.getSelectedResource())->getMesh(material_index).getMaterial();
+	m_view.setSelectedResource(material);
+}
+
+
+bool MaterialPlugin::onResourceLoaded(Ui::PropertyView& property_view, Lumix::Resource* resource)
+{
+	if (Lumix::Material* material = dynamic_cast<Lumix::Material*>(resource))
+	{
+		property_view.propertyList->insertTopLevelItem(0, new QTreeWidgetItem());
+		property_view.propertyList->topLevelItem(0)->setText(0, "Material");
+		property_view.propertyList->topLevelItem(0)->setText(1, material->getPath().c_str());
+
+		QTreeWidgetItem* item = new QTreeWidgetItem(QStringList() << "Shader" << material->getShader()->getPath().c_str());
+		property_view.propertyList->topLevelItem(0)->insertChild(0, item);
+
+		for (int i = 0; i < material->getTextureCount(); ++i)
+		{
+			item = new QTreeWidgetItem(QStringList() << "Texture");
+			QWidget* widget = new QWidget();
+			QHBoxLayout* layout = new QHBoxLayout(widget);
+			QLabel* label = new QLabel(material->getTexture(i)->getPath().c_str());
+			layout->addWidget(label, 1);
+			QPushButton* button = new QPushButton("->");
+			layout->addWidget(button, 0);
+			layout->setContentsMargins(0, 0, 0, 0);
+			property_view.propertyList->topLevelItem(0)->insertChild(0, item);
+			button->setProperty("texture_index", i);
+			connect(button, &QPushButton::clicked, this, &MaterialPlugin::onGoTextureClicked);
+			property_view.propertyList->setItemWidget(item, 1, widget);
+		}
+
+		item = new QTreeWidgetItem(QStringList() << "Z test");
+		property_view.propertyList->topLevelItem(0)->insertChild(0, item);
+		QCheckBox* checkbox = new QCheckBox();
+		checkbox->setChecked(material->isZTest());
+		property_view.propertyList->setItemWidget(item, 1, checkbox);
+
+		item = new QTreeWidgetItem(QStringList() << "Backface culling");
+		property_view.propertyList->topLevelItem(0)->insertChild(0, item);
+		checkbox = new QCheckBox();
+		checkbox->setChecked(material->isBackfaceCulling());
+		property_view.propertyList->setItemWidget(item, 1, checkbox);
+
+		item = new QTreeWidgetItem(QStringList() << "Alpha to coverage");
+		property_view.propertyList->topLevelItem(0)->insertChild(0, item);
+		checkbox = new QCheckBox();
+		checkbox->setChecked(material->isAlphaToCoverage());
+		property_view.propertyList->setItemWidget(item, 1, checkbox);
+
+		property_view.propertyList->expandAll();
+		return true;
+	}
+	return false;
+}
+
+
+void MaterialPlugin::onGoTextureClicked()
+{
+	QPushButton* button = qobject_cast<QPushButton*>(QObject::sender());
+	int texture_index = button->property("texture_index").toInt();
+	Lumix::Texture* texture = static_cast<Lumix::Material*>(m_view.getSelectedResource())->getTexture(texture_index);
+	m_view.setSelectedResource(texture);
+}
 
 
 class TerrainEditor : public Lumix::WorldEditor::Plugin
@@ -455,8 +506,9 @@ PropertyView::PropertyView(QWidget* parent)
 	}
 	m_ui->componentTypeCombo->insertItems(0, component_list);
 
-	addResourcePlugin(new MaterialPlugin);
-	addResourcePlugin(new ModelPlugin);
+	addResourcePlugin(new MaterialPlugin(*this));
+	addResourcePlugin(new ModelPlugin(*this));
+	addResourcePlugin(new TexturePlugin);
 }
 
 
@@ -784,6 +836,10 @@ void PropertyView::onAssetBrowserFileSelected(const char* filename)
 	else if (strcmp(extension, "mat") == 0)
 	{
 		manager = m_world_editor->getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL);
+	}
+	else if (strcmp(extension, "dds") == 0 || strcmp(extension, "tga") == 0)
+	{
+		manager = m_world_editor->getEngine().getResourceManager().get(Lumix::ResourceManager::TEXTURE);
 	}
 
 	if (manager != NULL)
