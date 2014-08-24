@@ -22,7 +22,7 @@ struct ProcessInfo
 
 void getDefaultFilters(QStringList& filters)
 {
-	filters << "*.msh" << "*.unv" << "*.ani" << "*.blend" << "*.tga" << "*.mat";
+	filters << "*.msh" << "*.unv" << "*.ani" << "*.blend" << "*.tga" << "*.mat" << "*.dds";
 }
 
 

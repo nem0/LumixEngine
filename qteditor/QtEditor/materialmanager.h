@@ -13,7 +13,6 @@ namespace Lumix
 	class WorldEditor;
 	struct Entity;
 	class Event;
-	struct PropertyListEvent;
 }
 
 class MaterialManager : public QDockWidget
