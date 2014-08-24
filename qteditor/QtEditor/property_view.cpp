@@ -56,6 +56,14 @@ bool TexturePlugin::onResourceLoaded(Ui::PropertyView& property_view, Lumix::Res
 		item = new QTreeWidgetItem(QStringList() << "Height" << QString::number(texture->getHeight()));
 		property_view.propertyList->topLevelItem(0)->insertChild(0, item);
 
+		item = new QTreeWidgetItem(QStringList() << "Image");
+		property_view.propertyList->topLevelItem(0)->insertChild(0, item);
+		QLabel* image_label = new QLabel();
+		property_view.propertyList->setItemWidget(item, 1, image_label);
+		QImage image(texture->getPath().c_str());
+		image_label->setPixmap(QPixmap::fromImage(image));
+		image_label->adjustSize();
+
 		property_view.propertyList->expandAll();
 		return true;
 	}
