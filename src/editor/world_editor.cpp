@@ -1381,6 +1381,22 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
+		Component createComponent(uint32_t hash, const Entity& entity)
+		{
+			const Array<IScene*>& scenes = m_engine->getScenes();
+			Component cmp;
+			for (int i = 0; i < scenes.size(); ++i)
+			{
+				cmp = scenes[i]->createComponent(hash, entity);
+				if (cmp.isValid())
+				{
+					return cmp;
+				}
+			}
+			return Component::INVALID;
+		}
+
+
 		void createUniverse(bool create_basic_entities)
 		{
 			destroyUndoStack();
@@ -1391,15 +1407,8 @@ struct WorldEditorImpl : public WorldEditor
 				m_camera.setPosition(0, 0, -5);
 				m_camera.setRotation(Quat(Vec3(0, 1, 0), -Math::PI));
 				const Array<IScene*>& scenes = m_engine->getScenes();
-				Component cmp;
-				for (int i = 0; i < scenes.size(); ++i)
-				{
-					cmp = scenes[i]->createComponent(CAMERA_HASH, m_camera);
-					if (cmp.isValid())
-					{
-						break;
-					}
-				}
+				Component cmp = createComponent(CAMERA_HASH, m_camera);
+				ASSERT(cmp.isValid());
 				RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 				scene->setCameraSlot(cmp, string("editor"));
 			}
