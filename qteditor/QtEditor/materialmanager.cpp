@@ -36,6 +36,7 @@ class MaterialManagerUI
 		QFileSystemModel* m_fs_model;
 		Lumix::Material* m_material;
 		Lumix::WorldEditor* m_world_editor;
+		Lumix::Timer* m_timer;
 };
 
 
@@ -44,6 +45,7 @@ MaterialManager::MaterialManager(QWidget *parent)
 	, m_ui(new Ui::MaterialManager)
 {
 	m_impl = new MaterialManagerUI();
+	m_impl->m_timer = Lumix::Timer::create();
 	m_impl->m_selected_object_model = NULL;
 	m_impl->m_world_editor = NULL;
 	m_ui->setupUi(this);
@@ -66,7 +68,7 @@ void MaterialManager::updatePreview()
 	m_impl->m_render_device->beginFrame();
 	m_impl->m_engine->getRenderer().render(*m_impl->m_render_device);
 	m_impl->m_render_device->endFrame();
-	m_impl->m_render_scene->update(0.01f); TODO("time");
+	m_impl->m_render_scene->update(m_impl->m_timer->tick());
 }
 
 void MaterialManager::fillObjectMaterials()
@@ -142,6 +144,7 @@ void MaterialManager::setWorldEditor(Lumix::WorldEditor& editor)
 MaterialManager::~MaterialManager()
 {
 	Lumix::RenderScene::destroyInstance(m_impl->m_render_scene);
+	Lumix::Timer::destroy(m_impl->m_timer);
 	delete m_impl->m_render_device;
 	delete m_impl->m_universe;
 	delete m_impl;

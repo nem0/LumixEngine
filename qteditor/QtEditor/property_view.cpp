@@ -42,148 +42,218 @@ static const char* component_map[] =
 };
 
 
-bool TexturePlugin::onResourceLoaded(Ui::PropertyView& property_view, Lumix::Resource* resource)
+template <class Value, class Obj>
+class DelegateObject : public PropertyView::Object
+{
+	public:
+		typedef Value (Obj::*Function)() const;
+		typedef void (*CreateEditor)(QTreeWidgetItem*, Value);
+
+		DelegateObject(const char* name, Obj* object, Function foo, CreateEditor create_editor)
+			: Object(name)
+		{
+			m_object = object;
+			m_foo = foo;
+			m_create_editor = create_editor;
+		}
+
+
+		virtual void createEditor(QTreeWidgetItem* item) override
+		{
+			m_create_editor(item, (m_object->*m_foo)());
+		}
+
+
+	private:
+		Obj* m_object;
+		Function m_foo;
+		CreateEditor m_create_editor;
+};
+
+
+template <class T>
+class InstanceObject : public PropertyView::Object
+{
+	public:
+		typedef void(*CreateEditor)(QTreeWidgetItem*, T*);
+	
+		InstanceObject(const char* name, T* object, CreateEditor create_editor)
+			: Object(name)
+		{
+			m_value = object;
+			m_create_editor = create_editor;
+		}
+
+
+		virtual void createEditor(QTreeWidgetItem* item) override
+		{
+			m_create_editor(item, m_value);
+		}
+
+
+	private:
+		T* m_value;
+		CreateEditor m_create_editor;
+};
+
+
+void createEditor(QTreeWidgetItem* item, int value)
+{
+	item->setText(1, QString::number(value));
+}
+
+
+void createEditor(QTreeWidgetItem* item, size_t value)
+{
+	item->setText(1, QString::number(value));
+}
+
+
+void createEditor(QTreeWidgetItem* item, float value)
+{
+	item->setText(1, QString::number(value));
+}
+
+
+void createEditor(QTreeWidgetItem* item, bool value)
+{
+	QCheckBox* checkbox = new QCheckBox();
+	item->treeWidget()->setItemWidget(item, 1, checkbox);
+	checkbox->setChecked(value);
+}
+
+
+void createEditor(QTreeWidgetItem* item, Lumix::Texture* texture)
+{
+	item->setText(1, texture->getPath().c_str());
+}
+
+
+void createEditor(QTreeWidgetItem* item, Lumix::Shader* shader)
+{
+	item->setText(1, shader->getPath().c_str());
+}
+
+
+void createEditor(QTreeWidgetItem* item, Lumix::Model* model)
+{
+	item->setText(1, model->getPath().c_str());
+}
+
+
+void createImageEditor(QTreeWidgetItem* item, Lumix::Texture* texture)
+{
+	QLabel* image_label = new QLabel();
+	item->treeWidget()->setItemWidget(item, 1, image_label);
+	QImage image(texture->getPath().c_str());
+	image_label->setPixmap(QPixmap::fromImage(image).scaledToHeight(100));
+	image_label->adjustSize();
+}
+
+
+void createEditor(QTreeWidgetItem* item, Lumix::Material* material)
+{
+	item->setText(1, material->getPath().c_str());
+}
+
+
+void createEditor(QTreeWidgetItem* item, Lumix::Mesh* mesh)
+{
+	item->setText(1, mesh->getName());
+}
+
+
+PropertyView::Object::~Object()
+{
+	for (int i = 0; i < m_members.size(); ++i)
+	{
+		delete m_members[i];
+	}
+}
+
+
+PropertyView::Object* createTextureObject(Lumix::Resource* resource)
 {
 	if (Lumix::Texture* texture = dynamic_cast<Lumix::Texture*>(resource))
 	{
-		property_view.propertyList->insertTopLevelItem(0, new QTreeWidgetItem());
-		property_view.propertyList->topLevelItem(0)->setText(0, "Texture");
-		property_view.propertyList->topLevelItem(0)->setText(1, texture->getPath().c_str());
-				
-		QTreeWidgetItem* item = new QTreeWidgetItem(QStringList() << "Width" << QString::number(texture->getWidth()));
-		property_view.propertyList->topLevelItem(0)->insertChild(0, item);
+		InstanceObject<Lumix::Texture>* object = new InstanceObject<Lumix::Texture>("Texture", texture, &createEditor);
 
-		item = new QTreeWidgetItem(QStringList() << "Height" << QString::number(texture->getHeight()));
-		property_view.propertyList->topLevelItem(0)->insertChild(0, item);
+		auto prop = new DelegateObject<int, Lumix::Texture>("width", texture, &Lumix::Texture::getWidth, &createEditor);
+		object->addMember(prop);
+		
+		prop = new DelegateObject<int, Lumix::Texture>("height", texture, &Lumix::Texture::getHeight, &createEditor);
+		object->addMember(prop);
 
-		item = new QTreeWidgetItem(QStringList() << "Image");
-		property_view.propertyList->topLevelItem(0)->insertChild(0, item);
-		QLabel* image_label = new QLabel();
-		property_view.propertyList->setItemWidget(item, 1, image_label);
-		QImage image(texture->getPath().c_str());
-		image_label->setPixmap(QPixmap::fromImage(image));
-		image_label->adjustSize();
+		InstanceObject<Lumix::Texture>* img_object = new InstanceObject<Lumix::Texture>("Image", texture, &createImageEditor);
+		object->addMember(img_object);
 
-		property_view.propertyList->expandAll();
-		return true;
+		return object;
 	}
-	return false;
+	return NULL;
 }
 
 
-bool ModelPlugin::onResourceLoaded(Ui::PropertyView& property_view, Lumix::Resource* resource)
-{
-	if (Lumix::Model* model = dynamic_cast<Lumix::Model*>(resource))
-	{
-		property_view.propertyList->insertTopLevelItem(0, new QTreeWidgetItem());
-		property_view.propertyList->topLevelItem(0)->setText(0, "Model");
-		property_view.propertyList->topLevelItem(0)->setText(1, model->getPath().c_str());
-
-		QTreeWidgetItem* item = new QTreeWidgetItem(QStringList() << "Bone count" << QString::number(model->getBoneCount()));
-		property_view.propertyList->topLevelItem(0)->insertChild(0, item);
-
-		item = new QTreeWidgetItem(QStringList() << "Bounding radius" << QString::number(model->getBoundingRadius()));
-		property_view.propertyList->topLevelItem(0)->insertChild(0, item);
-
-		item = new QTreeWidgetItem(QStringList() << "Size" << QString::number(model->size()));
-		property_view.propertyList->topLevelItem(0)->insertChild(0, item);
-
-		for (int i = 0; i < model->getMeshCount(); ++i)
-		{
-			item = new QTreeWidgetItem(QStringList() << "Mesh" << model->getMesh(i).getName());
-			property_view.propertyList->topLevelItem(0)->insertChild(0, item);
-
-			QTreeWidgetItem* subitem = new QTreeWidgetItem(QStringList() << "Triangles" << QString::number(model->getMesh(i).getCount() / 3));
-			item->insertChild(0, subitem);
-
-			subitem = new QTreeWidgetItem(QStringList() << "Material");
-			QWidget* widget = new QWidget();
-			QHBoxLayout* layout = new QHBoxLayout(widget);
-			QLabel* label = new QLabel(model->getMesh(i).getMaterial()->getPath().c_str());
-			layout->addWidget(label, 1);
-			QPushButton* button = new QPushButton("->");
-			layout->addWidget(button, 0);
-			layout->setContentsMargins(0, 0, 0, 0);
-			item->insertChild(0, subitem);
-			button->setProperty("material_index", i);
-			connect(button, &QPushButton::clicked, this, &ModelPlugin::onGoMaterialClicked);
-			property_view.propertyList->setItemWidget(subitem, 1, widget);
-		}
-
-		property_view.propertyList->expandAll();
-		return true;
-	}
-	return false;
-}
-
-
-void ModelPlugin::onGoMaterialClicked()
-{
-	QPushButton* button = qobject_cast<QPushButton*>(QObject::sender());
-	int material_index = button->property("material_index").toInt();
-	Lumix::Material* material = static_cast<Lumix::Model*>(m_view.getSelectedResource())->getMesh(material_index).getMaterial();
-	m_view.setSelectedResource(material);
-}
-
-
-bool MaterialPlugin::onResourceLoaded(Ui::PropertyView& property_view, Lumix::Resource* resource)
+static PropertyView::Object* createMaterialObject(Lumix::Resource* resource)
 {
 	if (Lumix::Material* material = dynamic_cast<Lumix::Material*>(resource))
 	{
-		property_view.propertyList->insertTopLevelItem(0, new QTreeWidgetItem());
-		property_view.propertyList->topLevelItem(0)->setText(0, "Material");
-		property_view.propertyList->topLevelItem(0)->setText(1, material->getPath().c_str());
+		InstanceObject<Lumix::Material>* object = new InstanceObject<Lumix::Material>("Material", material, &createEditor);
 
-		QTreeWidgetItem* item = new QTreeWidgetItem(QStringList() << "Shader" << material->getShader()->getPath().c_str());
-		property_view.propertyList->topLevelItem(0)->insertChild(0, item);
+		PropertyView::Object* prop = new InstanceObject<Lumix::Shader>("Shader", material->getShader(), &createEditor);
+		object->addMember(prop);
+
+		prop = new DelegateObject<bool, Lumix::Material>("Z test", material, &Lumix::Material::isZTest, &createEditor);
+		object->addMember(prop);
+
+		prop = new DelegateObject<bool, Lumix::Material>("Backface culling", material, &Lumix::Material::isBackfaceCulling, &createEditor);
+		object->addMember(prop);
+
+		prop = new DelegateObject<bool, Lumix::Material>("Alpha to coverage", material, &Lumix::Material::isAlphaToCoverage, &createEditor);
+		object->addMember(prop);
 
 		for (int i = 0; i < material->getTextureCount(); ++i)
 		{
-			item = new QTreeWidgetItem(QStringList() << "Texture");
-			QWidget* widget = new QWidget();
-			QHBoxLayout* layout = new QHBoxLayout(widget);
-			QLabel* label = new QLabel(material->getTexture(i)->getPath().c_str());
-			layout->addWidget(label, 1);
-			QPushButton* button = new QPushButton("->");
-			layout->addWidget(button, 0);
-			layout->setContentsMargins(0, 0, 0, 0);
-			property_view.propertyList->topLevelItem(0)->insertChild(0, item);
-			button->setProperty("texture_index", i);
-			connect(button, &QPushButton::clicked, this, &MaterialPlugin::onGoTextureClicked);
-			property_view.propertyList->setItemWidget(item, 1, widget);
+			prop = createTextureObject(material->getTexture(i));
+			object->addMember(prop);
 		}
 
-		item = new QTreeWidgetItem(QStringList() << "Z test");
-		property_view.propertyList->topLevelItem(0)->insertChild(0, item);
-		QCheckBox* checkbox = new QCheckBox();
-		checkbox->setChecked(material->isZTest());
-		property_view.propertyList->setItemWidget(item, 1, checkbox);
-
-		item = new QTreeWidgetItem(QStringList() << "Backface culling");
-		property_view.propertyList->topLevelItem(0)->insertChild(0, item);
-		checkbox = new QCheckBox();
-		checkbox->setChecked(material->isBackfaceCulling());
-		property_view.propertyList->setItemWidget(item, 1, checkbox);
-
-		item = new QTreeWidgetItem(QStringList() << "Alpha to coverage");
-		property_view.propertyList->topLevelItem(0)->insertChild(0, item);
-		checkbox = new QCheckBox();
-		checkbox->setChecked(material->isAlphaToCoverage());
-		property_view.propertyList->setItemWidget(item, 1, checkbox);
-
-		property_view.propertyList->expandAll();
-		return true;
+		return object;
 	}
-	return false;
+	return NULL;
 }
 
 
-void MaterialPlugin::onGoTextureClicked()
+PropertyView::Object* createModelObject(Lumix::Resource* resource)
 {
-	QPushButton* button = qobject_cast<QPushButton*>(QObject::sender());
-	int texture_index = button->property("texture_index").toInt();
-	Lumix::Texture* texture = static_cast<Lumix::Material*>(m_view.getSelectedResource())->getTexture(texture_index);
-	m_view.setSelectedResource(texture);
+	if (Lumix::Model* model = dynamic_cast<Lumix::Model*>(resource))
+	{
+		InstanceObject<Lumix::Model>* object = new InstanceObject<Lumix::Model>("Model", model, &createEditor);
+
+		PropertyView::Object* prop = new DelegateObject<int, Lumix::Model>("Bone count", model, &Lumix::Model::getBoneCount, &createEditor);
+		object->addMember(prop);
+
+		prop = new DelegateObject<float, Lumix::Model>("Bounding radius", model, &Lumix::Model::getBoundingRadius, &createEditor);
+		object->addMember(prop);
+
+		prop = new DelegateObject<size_t, Lumix::Model>("Size (bytes)", model, &Lumix::Model::size, &createEditor);
+		object->addMember(prop);
+
+		for (int i = 0; i < model->getMeshCount(); ++i)
+		{
+			Lumix::Mesh* mesh = &model->getMesh(i);
+			InstanceObject<Lumix::Mesh>* mesh_object = new InstanceObject<Lumix::Mesh>("Mesh", mesh, &createEditor);
+			object->addMember(mesh_object);
+
+			prop = new DelegateObject<int, Lumix::Mesh>("Triangles", mesh, &Lumix::Mesh::getTriangleCount, &createEditor);
+			mesh_object->addMember(prop);
+
+			prop = createMaterialObject(mesh->getMaterial());
+			mesh_object->addMember(prop);
+		}
+
+		return object;
+	}
+	return NULL;
 }
 
 
@@ -504,6 +574,7 @@ PropertyView::PropertyView(QWidget* parent)
 	, m_terrain_editor(NULL)
 	, m_is_updating_values(false)
 	, m_selected_resource(NULL)
+	, m_object(NULL)
 {
 	m_ui->setupUi(this);
 
@@ -514,18 +585,14 @@ PropertyView::PropertyView(QWidget* parent)
 	}
 	m_ui->componentTypeCombo->insertItems(0, component_list);
 
-	addResourcePlugin(new MaterialPlugin(*this));
-	addResourcePlugin(new ModelPlugin(*this));
-	addResourcePlugin(new TexturePlugin);
+	addResourcePlugin(&createMaterialObject);
+	addResourcePlugin(&createModelObject);
+	addResourcePlugin(&createTextureObject);
 }
 
 
 PropertyView::~PropertyView()
 {
-	for (int i = 0; i < m_resource_plugins.size(); ++i)
-	{
-		delete m_resource_plugins[i];
-	}
 	m_world_editor->entitySelected().unbind<PropertyView, &PropertyView::onEntitySelected>(this);
 	m_world_editor->universeCreated().unbind<PropertyView, &PropertyView::onUniverseCreated>(this);
 	m_world_editor->universeDestroyed().unbind<PropertyView, &PropertyView::onUniverseDestroyed>(this);
@@ -878,7 +945,7 @@ void PropertyView::setSelectedResourceFilename(const char* filename)
 }
 
 
-void PropertyView::addResourcePlugin(IResourcePlugin* plugin)
+void PropertyView::addResourcePlugin(Object::Creator plugin)
 {
 	m_resource_plugins.push(plugin);
 }
@@ -892,8 +959,9 @@ void PropertyView::onSelectedResourceLoaded(Lumix::Resource::State, Lumix::Resou
 		clear();
 		for (int i = 0; i < m_resource_plugins.size(); ++i)
 		{
-			if (m_resource_plugins[i]->onResourceLoaded(*m_ui, m_selected_resource))
+			if (Object* object = m_resource_plugins[i](m_selected_resource))
 			{
+				setObject(object);
 				return;
 			}
 		}
@@ -913,6 +981,9 @@ void PropertyView::setScriptCompiler(ScriptCompiler* compiler)
 
 void PropertyView::clear()
 {
+	delete m_object;
+	m_object = NULL;
+
 	m_ui->propertyList->clear();
 	for(int i = 0; i < m_properties.size(); ++i)
 	{
@@ -1328,6 +1399,37 @@ void PropertyView::on_positionY_valueChanged(double)
 void PropertyView::on_positionZ_valueChanged(double)
 {
 	updateSelectedEntityPosition();
+}
+
+
+void PropertyView::createObjectEditor(QTreeWidgetItem* item, Object* object)
+{
+	item->setText(0, object->getName());
+	object->createEditor(item);
+
+	Object** properties = object->getMembers();
+	for (int i = 0; i < object->getMemberCount(); ++i)
+	{
+		QTreeWidgetItem* subitem = new QTreeWidgetItem();
+		item->insertChild(0, subitem);
+
+		createObjectEditor(subitem, properties[i]);
+	}
+}
+
+
+void PropertyView::setObject(Object* object)
+{
+	clear();
+
+	m_object = object;
+	
+	QTreeWidgetItem* item = new QTreeWidgetItem();
+	m_ui->propertyList->insertTopLevelItem(0, item);
+	createObjectEditor(item, object);
+
+	m_ui->propertyList->expandAll();
+	m_ui->propertyList->resizeColumnToContents(0);
 }
 
 void PropertyView::on_propertyList_customContextMenuRequested(const QPoint &pos)

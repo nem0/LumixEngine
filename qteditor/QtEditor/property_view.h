@@ -32,12 +32,28 @@ class PropertyView : public QDockWidget
 	Q_OBJECT
 
 public:
-	class IResourcePlugin
+	class Object
 	{
 		public:
-			virtual ~IResourcePlugin() {}
-			virtual bool onResourceLoaded(Ui::PropertyView& property_view, Lumix::Resource* resource) = 0;
+			typedef Object* (*Creator)(Lumix::Resource*);
+
+		public:
+			Object(const char* name)
+				: m_name(name)
+			{ }
+			virtual ~Object();
+			const char* getName() const { return m_name.c_str(); }
+			Object** getMembers() { return m_members.empty() ? NULL : &m_members[0]; }
+			int getMemberCount() const { return m_members.size(); }
+			void addMember(Object* member) { m_members.push(member); }
+
+			virtual void createEditor(QTreeWidgetItem* item) = 0;
+
+		private:
+			Lumix::string m_name;
+			Lumix::Array<Object*> m_members;
 	};
+	
 
 	class Property
 	{
@@ -67,9 +83,10 @@ public:
 	void setWorldEditor(Lumix::WorldEditor& editor);
 	void setScriptCompiler(ScriptCompiler* compiler);
 	void setAssetBrowser(AssetBrowser& asset_browser);
-	void addResourcePlugin(IResourcePlugin* plugin);
+	void addResourcePlugin(Object::Creator plugin);
 	Lumix::Resource* getSelectedResource() const { return m_selected_resource; }
 	void setSelectedResource(Lumix::Resource* resource);
+	void setObject(Object* object);
 
 private slots:
 	void on_addComponentButton_clicked();
@@ -96,6 +113,7 @@ private slots:
 	void on_propertyList_customContextMenuRequested(const QPoint &pos);
 
 private:
+	void createObjectEditor(QTreeWidgetItem* item, Object* object);
 	void clear();
 	void onUniverseCreated();
 	void onUniverseDestroyed();
@@ -123,50 +141,8 @@ private:
 	class TerrainEditor* m_terrain_editor;
 	AssetBrowser* m_asset_browser;
 	Lumix::Resource* m_selected_resource;
-	Lumix::Array<IResourcePlugin*> m_resource_plugins;
+	Lumix::Array<Object::Creator> m_resource_plugins;
+	Object* m_object;
 };
 
-
-class TexturePlugin : public QObject, public PropertyView::IResourcePlugin
-{
-	Q_OBJECT
-	public:
-		virtual bool onResourceLoaded(Ui::PropertyView& property_view, Lumix::Resource* resource) override;
-};
-
-
-class ModelPlugin : public QObject, public PropertyView::IResourcePlugin
-{
-	Q_OBJECT
-	public:
-		ModelPlugin(PropertyView& view)
-			: m_view(view)
-		{ }
-
-		virtual bool onResourceLoaded(Ui::PropertyView& property_view, Lumix::Resource* resource) override;
-
-	private:
-		void onGoMaterialClicked();
-
-	private:
-		PropertyView& m_view;
-};
-
-class MaterialPlugin : public QObject, public PropertyView::IResourcePlugin
-{
-	Q_OBJECT
-	public:
-		MaterialPlugin(PropertyView& view)
-			: m_view(view)
-		{
-		}
-
-		virtual bool onResourceLoaded(Ui::PropertyView& property_view, Lumix::Resource* resource) override;
-	
-	private:
-		void onGoTextureClicked();
-
-	private:
-		PropertyView& m_view;
-};
 
