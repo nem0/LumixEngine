@@ -122,7 +122,7 @@ void PropertyDescriptor<S>::set(Component cmp, Blob& stream) const
 					stream.read(c, 1);
 					++c;
 				}
-				while (*c && c - tmp < 300);
+				while (*(c - 1) && (c - 1) - tmp < 300);
 				string s((char*)tmp);
 				(static_cast<S*>(cmp.scene)->*m_setter)(cmp, s);
 			}
