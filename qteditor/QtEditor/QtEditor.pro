@@ -28,7 +28,9 @@ SOURCES += main.cpp\
     profilerui.cpp \
     profilergraph.cpp \
     pc/file_system_watcher.cpp \
-    entity_template_list.cpp
+    entity_template_list.cpp \
+    notifications.cpp \
+    insert_mesh_command.cpp
 
 HEADERS  += mainwindow.h \
     sceneview.h \ 
@@ -45,7 +47,9 @@ HEADERS  += mainwindow.h \
     profilerui.h \
     profilergraph.h \
     file_system_watcher.h \
-    entity_template_list.h
+    entity_template_list.h \
+    notifications.h \
+    insert_mesh_command.h
 
 FORMS    += mainwindow.ui \
     logwidget.ui \
@@ -63,6 +67,6 @@ win32
 {
     INCLUDEPATH = ../../src \
 	../../external/glew/include
-    Release:LIBS = -L../../bin/Win32_Release -lcore -lengine -lopengl32 -lphysics
-    Debug:LIBS = -L../../bin/Win32_Debug -lcore -lengine -lopengl32 -lphysics
+    Release:LIBS = -L../../bin/Win32_Release -lcore -lengine -lopengl32 -lphysics -lanimation
+    Debug:LIBS = -L../../bin/Win32_Debug -lcore -lengine -lopengl32 -lphysics -lanimation
 }

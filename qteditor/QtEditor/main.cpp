@@ -42,8 +42,8 @@ class App
 
 		void onUniverseCreated()
 		{
-			m_edit_render_device->getPipeline().setScene(m_world_editor->getEngine().getRenderScene()); 
-			m_game_render_device->getPipeline().setScene(m_world_editor->getEngine().getRenderScene()); 
+			m_edit_render_device->getPipeline().setScene((Lumix::RenderScene*)m_world_editor->getEngine().getScene(crc32("renderer")));
+			m_game_render_device->getPipeline().setScene((Lumix::RenderScene*)m_world_editor->getEngine().getScene(crc32("renderer")));
 		}
 
 		void onUniverseDestroyed()
@@ -198,10 +198,10 @@ class App
 
 		void renderPhysics()
 		{
-			Lumix::PhysicsSystem* system = static_cast<Lumix::PhysicsSystem*>(m_world_editor->getEngine().getPluginManager().getPlugin("physics"));
-			if(system && system->getScene())
+			Lumix::PhysicsScene* scene = static_cast<Lumix::PhysicsScene*>(m_world_editor->getEngine().getScene(crc32("physics")));
+			if(scene)
 			{
-				system->getScene()->render();
+				scene->render();
 			}
 		}
 
@@ -231,14 +231,14 @@ class App
 			m_edit_render_device = new WGLRenderDevice(m_world_editor->getEngine(), "pipelines/main.json");
 			m_edit_render_device->m_hdc = GetDC(hwnd);
 			m_edit_render_device->m_opengl_context = hglrc;
-			m_edit_render_device->getPipeline().setScene(m_world_editor->getEngine().getRenderScene()); /// TODO manage scene properly
+			m_edit_render_device->getPipeline().setScene((Lumix::RenderScene*)m_world_editor->getEngine().getScene(crc32("renderer")));
 			m_world_editor->setEditViewRenderDevice(*m_edit_render_device);
 			m_edit_render_device->getPipeline().addCustomCommandHandler("render_physics").bind<App, &App::renderPhysics>(this);
 
 			m_game_render_device = new	WGLRenderDevice(m_world_editor->getEngine(), "pipelines/game_view.json");
 			m_game_render_device->m_hdc = GetDC(game_hwnd);
 			m_game_render_device->m_opengl_context = hglrc;
-			m_game_render_device->getPipeline().setScene(m_world_editor->getEngine().getRenderScene()); /// TODO manage scene properly
+			m_game_render_device->getPipeline().setScene((Lumix::RenderScene*)m_world_editor->getEngine().getScene(crc32("renderer")));
 			m_world_editor->getEngine().getRenderer().setRenderDevice(*m_game_render_device);
 
 			m_world_editor->universeCreated().bind<App, &App::onUniverseCreated>(this);
@@ -314,6 +314,7 @@ class App
 			{
 				{
 					PROFILE_BLOCK("tick");
+					m_main_window->update();
 					renderEditView();
 					m_world_editor->getEngine().getRenderer().renderGame();
 					m_world_editor->tick();

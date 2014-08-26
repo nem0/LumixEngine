@@ -1,13 +1,19 @@
 #include "sceneview.h"
 #include "editor/world_editor.h"
+#include "core/crc32.h"
+#include "editor/ieditor_command.h"
+#include "engine/engine.h"
+#include "engine/iplugin.h"
+#include "graphics/pipeline.h"
+#include "graphics/render_scene.h"
+#include "insert_mesh_command.h"
 #include <qapplication.h>
 #include <QDoubleSpinBox>
 #include <QDragEnterEvent>
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QVBoxLayout>
-#include "core/crc32.h"
-#include "graphics/pipeline.h"
+
 
 class ViewWidget : public QWidget
 {
@@ -98,12 +104,24 @@ void SceneView::dropEvent(QDropEvent *event)
 		QString file = list[0].toLocalFile();
 		if(file.endsWith(".msh"))
 		{
-			m_world_editor->addEntityAt(event->pos().x(), event->pos().y());
-			m_world_editor->addComponent(crc32("renderable"));
-			char rel_path[LUMIX_MAX_PATH];
-			m_world_editor->getRelativePath(rel_path, LUMIX_MAX_PATH, file.toLatin1().data());
-			m_world_editor->setProperty("renderable", "source", rel_path, strlen(rel_path));
-			m_world_editor->selectEntity(m_world_editor->getSelectedEntity());
+			Lumix::Vec3 position;
+			Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(m_world_editor->getEditCamera().scene);
+
+			Lumix::Vec3 origin;
+			Lumix::Vec3 dir;
+			scene->getRay(m_world_editor->getEditCamera(), event->pos().x(), event->pos().y(), origin, dir);
+			Lumix::RayCastModelHit hit = scene->castRay(origin, dir, Lumix::Component::INVALID);
+			if (hit.m_is_hit)
+			{
+				position = hit.m_origin + hit.m_dir * hit.m_t;
+			}
+			else
+			{
+				position.set(0, 0, 0);
+			}
+			InsertMeshCommand* command = new InsertMeshCommand(*static_cast<ViewWidget&>(*m_view).m_world_editor, position, file.toLatin1().data());
+			m_world_editor->executeCommand(command);
+			m_world_editor->selectEntity(command->getEntity());
 		}
 	}
 }
