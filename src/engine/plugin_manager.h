@@ -2,6 +2,7 @@
 
 
 #include "core/lumix.h"
+#include "core/array.h"
 
 
 namespace Lumix
@@ -24,9 +25,8 @@ namespace Lumix
 			void update(float dt);
 			void serialize(ISerializer& serializer);
 			void deserialize(ISerializer& serializer);
-			void onDestroyUniverse(Universe& universe);
-			void onCreateUniverse(Universe& universe);
 			IPlugin* getPlugin(const char* name);
+			const Array<IPlugin*>& getPlugins() const;
 
 		private:
 			struct PluginManagerImpl* m_impl;

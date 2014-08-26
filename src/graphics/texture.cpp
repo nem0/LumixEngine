@@ -670,6 +670,8 @@ bool Texture::loadDDS(FS::IFile& file)
 
 	width = hdr.dwWidth;
 	height = hdr.dwHeight;
+	m_width = width;
+	m_height = height;
 	if ((width & (width - 1)) || (height & (height - 1)))
 	{
 		g_log_error.log("renderer") << "Wrong dds format " << m_path.c_str();
@@ -863,7 +865,7 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		}
 		if(!loaded)
 		{
-			g_log_error.log("renderer") << "Error loading texture " << m_path.c_str();
+			g_log_warning.log("renderer") << "Error loading texture " << m_path.c_str();
 			onFailure();
 		}
 		else
@@ -874,7 +876,7 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	}
 	else
 	{
-		g_log_error.log("renderer") << "Error loading texture " << m_path.c_str();
+		g_log_warning.log("renderer") << "Error loading texture " << m_path.c_str();
 		onFailure();
 	}
 	

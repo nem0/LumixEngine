@@ -276,7 +276,7 @@ struct PipelineImpl : public Pipeline
 			}
 			else
 			{
-				g_log_error.log("renderer") << "Unknown pipeline command " << tmp;
+				g_log_error.log("renderer") << "Unknown pipeline command \"" << tmp << "\" in pipeline " << getPath().c_str();
 			}
 		}
 		serializer.deserializeArrayEnd();
@@ -624,15 +624,14 @@ struct PipelineInstanceImpl : public PipelineInstance
 		{
 			glPushMatrix();
 			Matrix world_matrix = m_renderable_infos[i].m_model ? m_renderable_infos[i].m_model->getMatrix() : *m_renderable_infos[i].m_matrix;
-			world_matrix.multiply3x3(m_renderable_infos[i].m_scale);
-			glMultMatrixf(&world_matrix.m11);
+			//world_matrix.multiply3x3(m_renderable_infos[i].m_scale);
+			//glMultMatrixf(&world_matrix.m11);
 			
 			Mesh& mesh = *m_renderable_infos[i].m_mesh;
 			Material& material = *mesh.getMaterial();
 			if (last_material != &material)
 			{
 				material.apply(*m_renderer, *this);
-				material.getShader()->setUniform("world_matrix", world_matrix);
 				material.getShader()->setUniform("shadowmap_matrix0", m_shadow_modelviewprojection[0]);
 				material.getShader()->setUniform("shadowmap_matrix1", m_shadow_modelviewprojection[1]);
 				material.getShader()->setUniform("shadowmap_matrix2", m_shadow_modelviewprojection[2]);
@@ -640,6 +639,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 				material.getShader()->setUniform("light_dir", m_light_dir);
 				last_material = &material;
 			}
+			material.getShader()->setUniform("world_matrix", world_matrix);
 			static Matrix bone_mtx[64];
 			if (m_renderable_infos[i].m_pose)
 			{

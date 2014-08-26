@@ -18,7 +18,7 @@ struct Quat;
 struct Vec3;
 
 
-class LUMIX_ENGINE_API AnimationManager : public ResourceManagerBase
+class LUMIX_ANIMATION_API AnimationManager : public ResourceManagerBase
 {
 public:
 	AnimationManager() : ResourceManagerBase() {}
@@ -30,7 +30,7 @@ protected:
 };
 
 
-class Animation : public Resource
+class LUMIX_ANIMATION_API Animation : public Resource
 {
 	public:
 		Animation(const Path& path, ResourceManager& resource_manager);

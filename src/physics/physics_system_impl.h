@@ -18,7 +18,6 @@ struct PhysicsSystemImpl
 	physx::PxAllocatorCallback*	m_allocator;
 	physx::PxErrorCallback*		m_error_callback;
 	physx::PxCooking*			m_cooking;
-	class PhysicsScene*			m_scene;
 	class Engine*				m_engine;
 };
 

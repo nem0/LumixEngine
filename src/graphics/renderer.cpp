@@ -8,6 +8,7 @@
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "core/vec4.h"
+#include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "graphics/geometry.h"
 #include "graphics/gl_ext.h"
@@ -33,10 +34,14 @@ static const uint32_t CAMERA_HASH = crc32("camera");
 
 struct RendererImpl : public Renderer
 {
-
 	RendererImpl()
 	{
 		m_is_editor_wireframe = false;
+	}
+
+	virtual IScene* createScene(Universe& universe)
+	{
+		return RenderScene::createInstance(*this, *m_engine, universe);
 	}
 
 	virtual void setProjection(float width, float height, float fov, float near_plane, float far_plane, const Matrix& mtx) override
@@ -92,6 +97,16 @@ struct RendererImpl : public Renderer
 
 	virtual bool create(Engine& engine) override
 	{
+		engine.getWorldEditor()->registerProperty("camera", LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("slot"), &RenderScene::getCameraSlot, &RenderScene::setCameraSlot, IPropertyDescriptor::STRING));
+		engine.getWorldEditor()->registerProperty("camera", LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("fov"), &RenderScene::getCameraFOV, &RenderScene::setCameraFOV));
+		engine.getWorldEditor()->registerProperty("camera", LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("near"), &RenderScene::getCameraNearPlane, &RenderScene::setCameraNearPlane));
+		engine.getWorldEditor()->registerProperty("camera", LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("far"), &RenderScene::getCameraFarPlane, &RenderScene::setCameraFarPlane));
+		engine.getWorldEditor()->registerProperty("renderable", LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("source"), &RenderScene::getRenderablePath, &RenderScene::setRenderablePath, IPropertyDescriptor::FILE));
+		engine.getWorldEditor()->registerProperty("terrain", LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("material"), &RenderScene::getTerrainMaterial, &RenderScene::setTerrainMaterial, IPropertyDescriptor::FILE));
+		engine.getWorldEditor()->registerProperty("terrain", LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("xz_scale"), &RenderScene::getTerrainXZScale, &RenderScene::setTerrainXZScale));
+		engine.getWorldEditor()->registerProperty("terrain", LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("y_scale"), &RenderScene::getTerrainYScale, &RenderScene::setTerrainYScale));
+		engine.getWorldEditor()->registerProperty("terrain", LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("grass_mesh"), &RenderScene::getTerrainGrass, &RenderScene::setTerrainGrass, IPropertyDescriptor::FILE));
+
 		m_engine = &engine;
 		glewExperimental = GL_TRUE;
 		GLenum err = glewInit();
@@ -107,18 +122,6 @@ struct RendererImpl : public Renderer
 	virtual const char* getName() const override
 	{
 		return "renderer";
-	}
-
-
-	virtual void destroyComponent(const Component& component) override
-	{
-		static_cast<RenderScene*>(component.system)->destroyComponent(component);
-	}
-
-
-	virtual Component createComponent(uint32_t, const Entity&) override
-	{
-		return Component::INVALID;
 	}
 
 

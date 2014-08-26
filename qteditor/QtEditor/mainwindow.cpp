@@ -3,10 +3,12 @@
 #include "assetbrowser.h"
 #include "editor/entity_template_system.h"
 #include "editor/world_editor.h"
+#include "engine/engine.h"
 #include "entity_template_list.h"
 #include "fileserverwidget.h"
 #include "gameview.h"
 #include "log_widget.h"
+#include "notifications.h"
 #include "property_view.h"
 #include "sceneview.h"
 #include "scripts/scriptcompilerwidget.h"
@@ -14,6 +16,7 @@
 #include "profilerui.h"
 #include <qfiledialog.h>
 #include <qinputdialog.h>
+#include <qevent.h>
 #include <qsettings.h>
 
 
@@ -35,6 +38,7 @@ MainWindow::MainWindow(QWidget* parent) :
 	m_material_manager_ui = new MaterialManager;
 	m_profiler_ui = new ProfilerUI;
 	m_entity_template_list_ui = new EntityTemplateList;
+	m_notifications = Notifications::create(*this);
 
 	QSettings settings("Lumix", "QtEditor");
 	restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
@@ -51,8 +55,21 @@ MainWindow::MainWindow(QWidget* parent) :
 	addDockWidget(static_cast<Qt::DockWidgetArea>(2), m_entity_template_list_ui);
 
 	m_property_view->setScriptCompiler(m_script_compiler_ui->getCompiler());
+	m_property_view->setAssetBrowser(*m_asset_browser);
 
 	restoreState(settings.value("mainWindowState").toByteArray());
+}
+
+
+void MainWindow::resizeEvent(QResizeEvent* event)
+{
+	m_resized.invoke(event->size());
+}
+
+
+void MainWindow::update()
+{
+	m_notifications->update(m_world_editor->getEngine().getLastTimeDelta());
 }
 
 
@@ -77,6 +94,7 @@ MainWindow::~MainWindow()
 	delete m_material_manager_ui;
 	delete m_profiler_ui;
 	delete m_entity_template_list_ui;
+	Notifications::destroy(m_notifications);
 }
 
 
@@ -244,4 +262,12 @@ void MainWindow::on_actionUndo_triggered()
 void MainWindow::on_actionRedo_triggered()
 {
 	m_world_editor->redo();
+}
+
+void MainWindow::on_actionRemove_triggered()
+{
+	if (m_world_editor->getSelectedEntity().isValid())
+	{
+		m_world_editor->destroyEntities(&m_world_editor->getSelectedEntity(), 1);
+	}
 }

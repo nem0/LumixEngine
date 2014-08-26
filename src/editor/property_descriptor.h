@@ -89,46 +89,49 @@ class PropertyDescriptor : public IPropertyDescriptor
 template <class S>
 void PropertyDescriptor<S>::set(Component cmp, Blob& stream) const
 {
-	int len = stream.getBufferSize();
 	switch(m_type)
 	{
 		case DECIMAL:
 			{
 				float f;
 				stream.read(&f, sizeof(f));
-				(static_cast<S*>(cmp.system)->*m_decimal_setter)(cmp, f); 
+				(static_cast<S*>(cmp.scene)->*m_decimal_setter)(cmp, f); 
 			}
 			break;
 		case INTEGER:
 			{
 				int32_t i;
 				stream.read(&i, sizeof(i));
-				(static_cast<S*>(cmp.system)->*m_integer_setter)(cmp, i);
+				(static_cast<S*>(cmp.scene)->*m_integer_setter)(cmp, i);
 			}
 			break;
 		case BOOL:
 			{
 				bool b;
 				stream.read(&b, sizeof(b));
-				(static_cast<S*>(cmp.system)->*m_bool_setter)(cmp, b); 
+				(static_cast<S*>(cmp.scene)->*m_bool_setter)(cmp, b);
 			}
 			break;
 		case STRING:
 		case FILE:
 			{
-				char tmp[301];
-				ASSERT(len < 300);
-				stream.read(tmp, len);
-				tmp[len] = '\0';
+				char tmp[300];
+				char* c = tmp;
+				do
+				{
+					stream.read(c, 1);
+					++c;
+				}
+				while (*c && c - tmp < 300);
 				string s((char*)tmp);
-				(static_cast<S*>(cmp.system)->*m_setter)(cmp, s); 
+				(static_cast<S*>(cmp.scene)->*m_setter)(cmp, s);
 			}
 			break;
 		case VEC3:
 			{
 				Vec3 v;
 				stream.read(&v, sizeof(v));
-				(static_cast<S*>(cmp.system)->*m_vec3_setter)(cmp, v);
+				(static_cast<S*>(cmp.scene)->*m_vec3_setter)(cmp, v);
 			}
 			break;
 		default:
@@ -148,7 +151,7 @@ void PropertyDescriptor<S>::get(Component cmp, Blob& stream) const
 		case FILE:
 			{
 				string value;
-				(static_cast<S*>(cmp.system)->*m_getter)(cmp, value);
+				(static_cast<S*>(cmp.scene)->*m_getter)(cmp, value);
 				len = value.length() + 1;
 				stream.write(value.c_str(), len);
 			}
@@ -156,7 +159,7 @@ void PropertyDescriptor<S>::get(Component cmp, Blob& stream) const
 		case DECIMAL:
 			{
 				float f;
-				(static_cast<S*>(cmp.system)->*m_decimal_getter)(cmp, f);
+				(static_cast<S*>(cmp.scene)->*m_decimal_getter)(cmp, f);
 				len = sizeof(f);
 				stream.write(&f, len);
 			}
@@ -164,7 +167,7 @@ void PropertyDescriptor<S>::get(Component cmp, Blob& stream) const
 		case INTEGER:
 			{
 				int32_t i;
-				(static_cast<S*>(cmp.system)->*m_integer_getter)(cmp, i);
+				(static_cast<S*>(cmp.scene)->*m_integer_getter)(cmp, i);
 				len = sizeof(i);
 				stream.write(&i, len);
 			}
@@ -172,7 +175,7 @@ void PropertyDescriptor<S>::get(Component cmp, Blob& stream) const
 		case BOOL:
 			{
 				bool b;
-				(static_cast<S*>(cmp.system)->*m_bool_getter)(cmp, b);
+				(static_cast<S*>(cmp.scene)->*m_bool_getter)(cmp, b);
 				len = sizeof(b);
 				stream.write(&b, len);
 			}
@@ -180,7 +183,7 @@ void PropertyDescriptor<S>::get(Component cmp, Blob& stream) const
 		case VEC3:
 			{
 				Vec3 v;
-				(static_cast<S*>(cmp.system)->*m_vec3_getter)(cmp, v);
+				(static_cast<S*>(cmp.scene)->*m_vec3_getter)(cmp, v);
 				len = sizeof(v);
 				stream.write(&v, len);
 			}

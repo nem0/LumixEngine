@@ -1,6 +1,7 @@
 #pragma once
 
-#include <QDockWidget>
+#include <qdockwidget.h>
+#include <qitemselectionmodel.h>
 
 namespace Lumix
 {
@@ -19,7 +20,7 @@ class AssetBrowser : public QDockWidget
 public:
 	explicit AssetBrowser(QWidget* parent = NULL);
 	~AssetBrowser();
-	void setWorldEditor(Lumix::WorldEditor& server) { m_server = &server; }
+	void setWorldEditor(Lumix::WorldEditor& editor) { m_editor = &editor; }
 	void emitFileChanged(const char* path);
 
 private:
@@ -27,9 +28,11 @@ private:
 	void exportAnimation(const QFileInfo& file_info);
 	void exportModel(const QFileInfo& file_info);
 	void onFileSystemWatcherCallback(const char* path);
+	void onTreeViewSelectionChanged(const QModelIndex& current, const QModelIndex& previous);
 
 signals:
 	void fileChanged(const QString& string);
+	void fileSelected(const char* path);
 
 private slots:
 	void on_treeView_doubleClicked(const QModelIndex &index);
@@ -44,6 +47,6 @@ private slots:
 	Ui::AssetBrowser* m_ui;
 	class QFileSystemModel* m_model;
 	class FileSystemWatcher* m_watcher;
-	Lumix::WorldEditor* m_server;
+	Lumix::WorldEditor* m_editor;
 	QString m_base_path;
 };

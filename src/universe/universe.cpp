@@ -6,31 +6,21 @@
 namespace Lumix
 {
 
+	
+static const int RESERVED_ENTITIES = 5000;
+
+
 
 Universe::~Universe()
 {
 }
 
 
-void Universe::destroy()
-{
-	m_free_slots.clear();
-	m_positions.clear();
-	m_rotations.clear();
-	m_component_list.clear();
-}
-
-
-void Universe::create()
-{
-	m_positions.reserve(1000);
-	m_rotations.reserve(1000);
-	m_component_list.reserve(1000);
-}
-
-
 Universe::Universe()
 {
+	m_positions.reserve(RESERVED_ENTITIES);
+	m_rotations.reserve(RESERVED_ENTITIES);
+	m_component_list.reserve(RESERVED_ENTITIES);
 }
 
 
@@ -138,7 +128,7 @@ void Universe::deserialize(ISerializer& serializer)
 }
 
 
-void Universe::removeComponent(const Component& cmp)
+void Universe::destroyComponent(const Component& cmp)
 {
 	Entity::ComponentList& cmps = m_component_list[cmp.entity.index];
 	for (int i = 0, c = cmps.size(); i < c; ++i)
@@ -152,9 +142,9 @@ void Universe::removeComponent(const Component& cmp)
 }
 
 
-Component Universe::addComponent(const Entity& entity, uint32_t component_type, void* system, int index)
+Component Universe::addComponent(const Entity& entity, uint32_t component_type, IScene* scene, int index)
 {
-	Component cmp(entity, component_type, system, index);
+	Component cmp(entity, component_type, scene, index);
 	m_component_list[entity.index].push(cmp);
 	return cmp;
 }

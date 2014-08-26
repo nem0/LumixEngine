@@ -16,7 +16,7 @@ class SceneView : public QDockWidget
 	Q_OBJECT
 public:
 	explicit SceneView(QWidget* parent = NULL);
-	void setWorldEditor(Lumix::WorldEditor* server);
+	void setWorldEditor(Lumix::WorldEditor* editor);
 	void setPipeline(Lumix::PipelineInstance& pipeline) { m_pipeline = &pipeline; }
 	QWidget* getViewWidget() { return m_view; }
 	float getNavivationSpeed() const;

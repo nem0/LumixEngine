@@ -77,9 +77,10 @@ namespace Lumix
 	class RenderSceneImpl : public RenderScene
 	{
 		public:
-			RenderSceneImpl(Engine& engine, Universe& universe)
+			RenderSceneImpl(Renderer& renderer, Engine& engine, Universe& universe)
 				: m_engine(engine)
 				, m_universe(universe)
+				, m_renderer(renderer)
 			{
 				m_universe.entityMoved().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 				m_timer = Timer::create();
@@ -97,6 +98,11 @@ namespace Lumix
 					LUMIX_DELETE(m_terrains[i]);
 				}
 				Timer::destroy(m_timer);
+			}
+
+			virtual IPlugin& getPlugin() const override
+			{
+				return m_renderer;
 			}
 
 			virtual void getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) override
@@ -132,7 +138,7 @@ namespace Lumix
 				float height = m_cameras[cmp.index].m_height;
 				float near_plane = m_cameras[cmp.index].m_near;
 				float far_plane = m_cameras[cmp.index].m_far;
-				m_engine.getRenderer().setProjection(width, height, fov, near_plane, far_plane, mtx);
+				m_renderer.setProjection(width, height, fov, near_plane, far_plane, mtx);
 			}
 
 			Matrix getProjectionMatrix(Component cmp)
@@ -356,7 +362,7 @@ namespace Lumix
 				{
 					m_renderables[component.index]->m_model.setModel(NULL);
 					m_renderables[component.index]->m_is_free = true;
-					m_universe.removeComponent(component);
+					m_universe.destroyComponent(component);
 					m_universe.componentDestroyed().invoke(component);
 				}
 				else
@@ -431,7 +437,6 @@ namespace Lumix
 					m_universe.componentCreated().invoke(cmp);
 					return cmp;
 				}
-				ASSERT(false);
 				return Component::INVALID;
 			}
 
@@ -818,6 +823,7 @@ namespace Lumix
 			Array<Camera> m_cameras;
 			Array<Terrain*> m_terrains;
 			Universe& m_universe;
+			Renderer& m_renderer;
 			Engine& m_engine;
 			Array<DebugLine> m_debug_lines;
 			Timer* m_timer;
@@ -825,9 +831,9 @@ namespace Lumix
 	};
 
 
-	RenderScene* RenderScene::createInstance(Engine& engine, Universe& universe)
+	RenderScene* RenderScene::createInstance(Renderer& renderer, Engine& engine, Universe& universe)
 	{
-		return LUMIX_NEW(RenderSceneImpl)(engine, universe);
+		return LUMIX_NEW(RenderSceneImpl)(renderer, engine, universe);
 	}
 
 

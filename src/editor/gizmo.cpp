@@ -74,7 +74,7 @@ void Gizmo::updateScale(Component camera)
 		getMatrix(mtx);
 		Vec3 pos = mtx.getTranslation();
 		float fov;
-		static_cast<RenderScene*>(camera.system)->getCameraFOV(camera, fov);
+		static_cast<RenderScene*>(camera.scene)->getCameraFOV(camera, fov);
 		float scale = tanf(fov * Math::PI / 180 * 0.5f) * (mtx.getTranslation() - camera_mtx.getTranslation()).length() * 2;
 		scale /= 20 * mtx.getXVector().length();
 		m_scale = scale;
@@ -200,7 +200,7 @@ void Gizmo::transform(Component camera, TransformOperation operation, int x, int
 Vec3 Gizmo::getMousePlaneIntersection(Component camera, int x, int y)
 {
 	Vec3 origin, dir;
-	RenderScene* scene = static_cast<RenderScene*>(camera.system);
+	RenderScene* scene = static_cast<RenderScene*>(camera.scene);
 	scene->getRay(camera, (float)x, (float)y, origin, dir);
 	dir.normalize();
 	Matrix camera_mtx;

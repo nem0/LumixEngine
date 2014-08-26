@@ -45,24 +45,9 @@ namespace Lumix
 		}
 	}
 
-
-	void PluginManager::onDestroyUniverse(Universe& universe)
+	const Array<IPlugin*>& PluginManager::getPlugins() const
 	{
-		PluginManagerImpl::PluginList& plugins = m_impl->m_plugins;
-		for(int i = 0, c = plugins.size(); i < c; ++i)
-		{
-			plugins[i]->onDestroyUniverse(universe);
-		}
-	}
-
-
-	void PluginManager::onCreateUniverse(Universe& universe)
-	{
-		PluginManagerImpl::PluginList& plugins = m_impl->m_plugins;
-		for(int i = 0, c = plugins.size(); i < c; ++i)
-		{
-			plugins[i]->onCreateUniverse(universe);
-		}
+		return m_impl->m_plugins;
 	}
 
 	IPlugin* PluginManager::getPlugin(const char* name)

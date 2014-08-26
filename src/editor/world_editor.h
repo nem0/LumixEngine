@@ -51,11 +51,11 @@ namespace Lumix
 
 		public:
 			static WorldEditor* create(const char* base_path);
-			static void destroy(WorldEditor* server);
+			static void destroy(WorldEditor* editor);
 
 			virtual void tick() = 0;
-			virtual void registerCreator(uint32_t type, IPlugin& creator) = 0;
 			virtual void registerProperty(const char* component_type, IPropertyDescriptor* descriptor) = 0;
+			virtual void executeCommand(class IEditorCommand* command) = 0;
 			virtual Engine& getEngine() = 0;
 			virtual void render(IRenderDevice& render_device) = 0;
 			virtual void renderIcons(IRenderDevice& render_device) = 0;
@@ -71,8 +71,9 @@ namespace Lumix
 			virtual Path getUniversePath() const = 0;
 			virtual void addComponent(uint32_t type_crc) = 0;
 			virtual void cloneComponent(const Component& src, Entity& entity) = 0;
-			virtual void removeComponent(const Component& crc) = 0;
+			virtual void destroyComponent(const Component& crc) = 0;
 			virtual Entity addEntity() = 0;
+			virtual void destroyEntities(const Entity* entities, int count) = 0;
 			virtual void selectEntity(Entity e) = 0;
 			virtual Entity addEntityAt(int camera_x, int camera_y) = 0;
 			virtual void setEntityPosition(const Entity& entity, const Vec3& position) = 0;
@@ -97,6 +98,7 @@ namespace Lumix
 			virtual void addPlugin(Plugin* plugin) = 0;
 			virtual void getRelativePath(char* relative_path, int max_length, const Path& source) = 0;
 			virtual EntityTemplateSystem& getEntityTemplateSystem() = 0;
+			virtual Vec3 getCameraRaycastHit() = 0;
 
 		protected:
 			virtual ~WorldEditor() {}
