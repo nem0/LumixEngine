@@ -43,42 +43,58 @@ static const char* component_map[] =
 
 
 template <class Value, class Obj>
-class DelegateObject : public PropertyView::Object
+class GetterSetterObject : public PropertyViewObject
 {
 	public:
-		typedef Value (Obj::*Function)() const;
-		typedef void (*CreateEditor)(QTreeWidgetItem*, Value);
+		typedef Value (Obj::*Getter)() const;
+		typedef void (Obj::*Setter)(Value);
+		typedef void(*CreateEditor)(QTreeWidgetItem*, PropertyViewObject&, Value);
 
-		DelegateObject(const char* name, Obj* object, Function foo, CreateEditor create_editor)
-			: Object(name)
+
+		GetterSetterObject(const char* name, Obj* object, Getter getter, Setter setter, CreateEditor create_editor)
+			: PropertyViewObject(name)
 		{
 			m_object = object;
-			m_foo = foo;
+			m_getter = getter;
+			m_setter = setter;
 			m_create_editor = create_editor;
 		}
 
 
 		virtual void createEditor(QTreeWidgetItem* item) override
 		{
-			m_create_editor(item, (m_object->*m_foo)());
+			m_create_editor(item, *this, (m_object->*m_getter)());
+		}
+
+
+		virtual void onBoolValueChanged(bool state) override
+		{
+			(m_object->*m_setter)(state);
+		}
+
+
+		virtual bool isEditable() const override
+		{
+			return m_setter != NULL;
 		}
 
 
 	private:
 		Obj* m_object;
-		Function m_foo;
+		Getter m_getter;
+		Setter m_setter;
 		CreateEditor m_create_editor;
 };
 
 
 template <class T>
-class InstanceObject : public PropertyView::Object
+class InstanceObject : public PropertyViewObject
 {
 	public:
 		typedef void(*CreateEditor)(QTreeWidgetItem*, T*);
 	
 		InstanceObject(const char* name, T* object, CreateEditor create_editor)
-			: Object(name)
+			: PropertyViewObject(name)
 		{
 			m_value = object;
 			m_create_editor = create_editor;
@@ -90,6 +106,8 @@ class InstanceObject : public PropertyView::Object
 			m_create_editor(item, m_value);
 		}
 
+		virtual bool isEditable() const override { return false; }
+		virtual void onBoolValueChanged(bool) override {}
 
 	private:
 		T* m_value;
@@ -97,29 +115,37 @@ class InstanceObject : public PropertyView::Object
 };
 
 
-void createEditor(QTreeWidgetItem* item, int value)
+void createEditor(QTreeWidgetItem* item, PropertyViewObject& object, int value)
 {
 	item->setText(1, QString::number(value));
 }
 
 
-void createEditor(QTreeWidgetItem* item, size_t value)
+void createEditor(QTreeWidgetItem* item, PropertyViewObject& object, size_t value)
 {
 	item->setText(1, QString::number(value));
 }
 
 
-void createEditor(QTreeWidgetItem* item, float value)
+void createEditor(QTreeWidgetItem* item, PropertyViewObject& object, float value)
 {
 	item->setText(1, QString::number(value));
 }
 
 
-void createEditor(QTreeWidgetItem* item, bool value)
+void createEditor(QTreeWidgetItem* item, PropertyViewObject& object, bool value)
 {
 	QCheckBox* checkbox = new QCheckBox();
 	item->treeWidget()->setItemWidget(item, 1, checkbox);
 	checkbox->setChecked(value);
+	if (object.isEditable())
+	{
+		checkbox->connect(checkbox, &QCheckBox::stateChanged, &object, &PropertyViewObject::onBoolValueChanged);
+	}
+	else
+	{
+		checkbox->setDisabled(true);
+	}
 }
 
 
@@ -163,7 +189,7 @@ void createEditor(QTreeWidgetItem* item, Lumix::Mesh* mesh)
 }
 
 
-PropertyView::Object::~Object()
+PropertyViewObject::~PropertyViewObject()
 {
 	for (int i = 0; i < m_members.size(); ++i)
 	{
@@ -172,16 +198,16 @@ PropertyView::Object::~Object()
 }
 
 
-PropertyView::Object* createTextureObject(Lumix::Resource* resource)
+PropertyViewObject* createTextureObject(Lumix::Resource* resource)
 {
 	if (Lumix::Texture* texture = dynamic_cast<Lumix::Texture*>(resource))
 	{
 		InstanceObject<Lumix::Texture>* object = new InstanceObject<Lumix::Texture>("Texture", texture, &createEditor);
 
-		auto prop = new DelegateObject<int, Lumix::Texture>("width", texture, &Lumix::Texture::getWidth, &createEditor);
+		auto prop = new GetterSetterObject<int, Lumix::Texture>("width", texture, &Lumix::Texture::getWidth, NULL, &createEditor);
 		object->addMember(prop);
 		
-		prop = new DelegateObject<int, Lumix::Texture>("height", texture, &Lumix::Texture::getHeight, &createEditor);
+		prop = new GetterSetterObject<int, Lumix::Texture>("height", texture, &Lumix::Texture::getHeight, NULL, &createEditor);
 		object->addMember(prop);
 
 		InstanceObject<Lumix::Texture>* img_object = new InstanceObject<Lumix::Texture>("Image", texture, &createImageEditor);
@@ -193,22 +219,76 @@ PropertyView::Object* createTextureObject(Lumix::Resource* resource)
 }
 
 
-static PropertyView::Object* createMaterialObject(Lumix::Resource* resource)
+/*
+class TerrainProxy
+{
+	public:
+		TerrainProxy(Lumix::Component cmp)
+			: m_component(cmp)
+		{ }
+
+
+		Lumix::Material* getMaterial()
+		{
+			return static_cast<Lumix::RenderScene*>(m_component.scene)->getTerrainMaterial(m_component);
+		}
+
+
+		void setMaterial(Lumix::Material* material)
+		{
+			static_cast<Lumix::RenderScene*>(m_component.scene)->setTerrainMaterial(m_component, material->getPath().c_str());
+		}
+
+	private:
+		Lumix::Component m_component;
+};
+
+
+static PropertyViewObject* createTerrainObject(Lumix::Component component)
+{
+	TerrainProxy* proxy = new TerrainProxy(component); TODO("memory leak");
+
+	InstanceObject<TerrainProxy>* object = new InstanceObject<TerrainProxy>("Terrain", proxy, NULL);
+	
+	PropertyViewObject* prop = new InstanceObject<Lumix::Material>("Material", proxy->getMaterial(), &createEditor);
+	object->addMember(prop);
+	
+	prop = new DelegateObject<bool, Lumix::Material>("Z test", material, &Lumix::Material::isZTest, &createEditor);
+	object->addMember(prop);
+
+	prop = new DelegateObject<bool, Lumix::Material>("Backface culling", material, &Lumix::Material::isBackfaceCulling, &createEditor);
+	object->addMember(prop);
+
+	prop = new DelegateObject<bool, Lumix::Material>("Alpha to coverage", material, &Lumix::Material::isAlphaToCoverage, &createEditor);
+	object->addMember(prop);
+
+	for (int i = 0; i < material->getTextureCount(); ++i)
+	{
+		prop = createTextureObject(material->getTexture(i));
+		object->addMember(prop);
+	}
+
+	return object;
+}
+*/
+
+
+static PropertyViewObject* createMaterialObject(Lumix::Resource* resource)
 {
 	if (Lumix::Material* material = dynamic_cast<Lumix::Material*>(resource))
 	{
 		InstanceObject<Lumix::Material>* object = new InstanceObject<Lumix::Material>("Material", material, &createEditor);
 
-		PropertyView::Object* prop = new InstanceObject<Lumix::Shader>("Shader", material->getShader(), &createEditor);
+		PropertyViewObject* prop = new InstanceObject<Lumix::Shader>("Shader", material->getShader(), &createEditor);
 		object->addMember(prop);
 
-		prop = new DelegateObject<bool, Lumix::Material>("Z test", material, &Lumix::Material::isZTest, &createEditor);
+		prop = new GetterSetterObject<bool, Lumix::Material>("Z test", material, &Lumix::Material::isZTest, &Lumix::Material::enableZTest, &createEditor);
 		object->addMember(prop);
 
-		prop = new DelegateObject<bool, Lumix::Material>("Backface culling", material, &Lumix::Material::isBackfaceCulling, &createEditor);
+		prop = new GetterSetterObject<bool, Lumix::Material>("Backface culling", material, &Lumix::Material::isBackfaceCulling, &Lumix::Material::enableBackfaceCulling, &createEditor);
 		object->addMember(prop);
 
-		prop = new DelegateObject<bool, Lumix::Material>("Alpha to coverage", material, &Lumix::Material::isAlphaToCoverage, &createEditor);
+		prop = new GetterSetterObject<bool, Lumix::Material>("Alpha to coverage", material, &Lumix::Material::isAlphaToCoverage, &Lumix::Material::enableAlphaToCoverage, &createEditor);
 		object->addMember(prop);
 
 		for (int i = 0; i < material->getTextureCount(); ++i)
@@ -223,19 +303,19 @@ static PropertyView::Object* createMaterialObject(Lumix::Resource* resource)
 }
 
 
-PropertyView::Object* createModelObject(Lumix::Resource* resource)
+PropertyViewObject* createModelObject(Lumix::Resource* resource)
 {
 	if (Lumix::Model* model = dynamic_cast<Lumix::Model*>(resource))
 	{
 		InstanceObject<Lumix::Model>* object = new InstanceObject<Lumix::Model>("Model", model, &createEditor);
 
-		PropertyView::Object* prop = new DelegateObject<int, Lumix::Model>("Bone count", model, &Lumix::Model::getBoneCount, &createEditor);
+		PropertyViewObject* prop = new GetterSetterObject<int, Lumix::Model>("Bone count", model, &Lumix::Model::getBoneCount, NULL, &createEditor);
 		object->addMember(prop);
 
-		prop = new DelegateObject<float, Lumix::Model>("Bounding radius", model, &Lumix::Model::getBoundingRadius, &createEditor);
+		prop = new GetterSetterObject<float, Lumix::Model>("Bounding radius", model, &Lumix::Model::getBoundingRadius, NULL, &createEditor);
 		object->addMember(prop);
 
-		prop = new DelegateObject<size_t, Lumix::Model>("Size (bytes)", model, &Lumix::Model::size, &createEditor);
+		prop = new GetterSetterObject<size_t, Lumix::Model>("Size (bytes)", model, &Lumix::Model::size, NULL, &createEditor);
 		object->addMember(prop);
 
 		for (int i = 0; i < model->getMeshCount(); ++i)
@@ -244,7 +324,7 @@ PropertyView::Object* createModelObject(Lumix::Resource* resource)
 			InstanceObject<Lumix::Mesh>* mesh_object = new InstanceObject<Lumix::Mesh>("Mesh", mesh, &createEditor);
 			object->addMember(mesh_object);
 
-			prop = new DelegateObject<int, Lumix::Mesh>("Triangles", mesh, &Lumix::Mesh::getTriangleCount, &createEditor);
+			prop = new GetterSetterObject<int, Lumix::Mesh>("Triangles", mesh, &Lumix::Mesh::getTriangleCount, NULL, &createEditor);
 			mesh_object->addMember(prop);
 
 			prop = createMaterialObject(mesh->getMaterial());
@@ -945,7 +1025,7 @@ void PropertyView::setSelectedResourceFilename(const char* filename)
 }
 
 
-void PropertyView::addResourcePlugin(Object::Creator plugin)
+void PropertyView::addResourcePlugin(PropertyViewObject::Creator plugin)
 {
 	m_resource_plugins.push(plugin);
 }
@@ -959,7 +1039,7 @@ void PropertyView::onSelectedResourceLoaded(Lumix::Resource::State, Lumix::Resou
 		clear();
 		for (int i = 0; i < m_resource_plugins.size(); ++i)
 		{
-			if (Object* object = m_resource_plugins[i](m_selected_resource))
+			if (PropertyViewObject* object = m_resource_plugins[i](m_selected_resource))
 			{
 				setObject(object);
 				return;
@@ -1402,12 +1482,12 @@ void PropertyView::on_positionZ_valueChanged(double)
 }
 
 
-void PropertyView::createObjectEditor(QTreeWidgetItem* item, Object* object)
+void PropertyView::createObjectEditor(QTreeWidgetItem* item, PropertyViewObject* object)
 {
 	item->setText(0, object->getName());
 	object->createEditor(item);
 
-	Object** properties = object->getMembers();
+	PropertyViewObject** properties = object->getMembers();
 	for (int i = 0; i < object->getMemberCount(); ++i)
 	{
 		QTreeWidgetItem* subitem = new QTreeWidgetItem();
@@ -1418,7 +1498,7 @@ void PropertyView::createObjectEditor(QTreeWidgetItem* item, Object* object)
 }
 
 
-void PropertyView::setObject(Object* object)
+void PropertyView::setObject(PropertyViewObject* object)
 {
 	clear();
 

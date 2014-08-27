@@ -27,34 +27,39 @@ class QTreeWidgetItem;
 class ScriptCompiler;
 
 
+class PropertyViewObject : public QObject
+{
+	Q_OBJECT
+	public:
+		typedef PropertyViewObject* (*Creator)(Lumix::Resource*);
+
+	public:
+		PropertyViewObject(const char* name)
+			: m_name(name)
+		{ }
+		virtual ~PropertyViewObject();
+		const char* getName() const { return m_name.c_str(); }
+		PropertyViewObject** getMembers() { return m_members.empty() ? NULL : &m_members[0]; }
+		int getMemberCount() const { return m_members.size(); }
+		void addMember(PropertyViewObject* member) { m_members.push(member); }
+
+		virtual void createEditor(QTreeWidgetItem* item) = 0;
+		virtual bool isEditable() const = 0;
+
+	public slots:
+		virtual void onBoolValueChanged(bool state) = 0;
+
+	private:
+		Lumix::string m_name;
+		Lumix::Array<PropertyViewObject*> m_members;
+};
+
+
 class PropertyView : public QDockWidget
 {
 	Q_OBJECT
 
 public:
-	class Object
-	{
-		public:
-			typedef Object* (*Creator)(Lumix::Resource*);
-
-		public:
-			Object(const char* name)
-				: m_name(name)
-			{ }
-			virtual ~Object();
-			const char* getName() const { return m_name.c_str(); }
-			Object** getMembers() { return m_members.empty() ? NULL : &m_members[0]; }
-			int getMemberCount() const { return m_members.size(); }
-			void addMember(Object* member) { m_members.push(member); }
-
-			virtual void createEditor(QTreeWidgetItem* item) = 0;
-
-		private:
-			Lumix::string m_name;
-			Lumix::Array<Object*> m_members;
-	};
-	
-
 	class Property
 	{
 		public:
@@ -83,10 +88,10 @@ public:
 	void setWorldEditor(Lumix::WorldEditor& editor);
 	void setScriptCompiler(ScriptCompiler* compiler);
 	void setAssetBrowser(AssetBrowser& asset_browser);
-	void addResourcePlugin(Object::Creator plugin);
+	void addResourcePlugin(PropertyViewObject::Creator plugin);
 	Lumix::Resource* getSelectedResource() const { return m_selected_resource; }
 	void setSelectedResource(Lumix::Resource* resource);
-	void setObject(Object* object);
+	void setObject(PropertyViewObject* object);
 
 private slots:
 	void on_addComponentButton_clicked();
@@ -113,7 +118,7 @@ private slots:
 	void on_propertyList_customContextMenuRequested(const QPoint &pos);
 
 private:
-	void createObjectEditor(QTreeWidgetItem* item, Object* object);
+	void createObjectEditor(QTreeWidgetItem* item, PropertyViewObject* object);
 	void clear();
 	void onUniverseCreated();
 	void onUniverseDestroyed();
@@ -141,8 +146,8 @@ private:
 	class TerrainEditor* m_terrain_editor;
 	AssetBrowser* m_asset_browser;
 	Lumix::Resource* m_selected_resource;
-	Lumix::Array<Object::Creator> m_resource_plugins;
-	Object* m_object;
+	Lumix::Array<PropertyViewObject::Creator> m_resource_plugins;
+	PropertyViewObject* m_object;
 };
 
 
