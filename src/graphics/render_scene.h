@@ -105,6 +105,7 @@ namespace Lumix
 			virtual void getTerrainInfos(Array<TerrainInfo>& infos, int64_t layer_mask) = 0;
 			virtual void setTerrainMaterial(Component cmp, const string& path) = 0;
 			virtual void getTerrainMaterial(Component cmp, string& path) = 0;
+			virtual Material* getTerrainMaterial(Component cmp) = 0;
 			virtual void setTerrainXZScale(Component cmp, const float& scale) = 0;
 			virtual void getTerrainXZScale(Component cmp, float& scale) = 0;
 			virtual void setTerrainYScale(Component cmp, const float& scale) = 0;
