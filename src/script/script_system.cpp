@@ -57,7 +57,10 @@ namespace Lumix
 					serializer.deserializeArrayItem(m_script_entities[i]);
 					serializer.deserializeArrayItem(m_paths[i]);
 					Entity entity(&m_universe, m_script_entities[i]);
-					m_universe.addComponent(entity, SCRIPT_HASH, this, i);
+					if(m_script_entities[i] != -1)
+					{
+						m_universe.addComponent(entity, SCRIPT_HASH, this, i);
+					}
 				}
 				serializer.deserializeArrayEnd();
 				runAll();
@@ -194,31 +197,34 @@ namespace Lumix
 				char full_path[MAX_PATH];
 				for (int i = 0; i < m_script_entities.size(); ++i)
 				{
-					Entity e(&m_universe, m_script_entities[i]);
-					getDll(m_paths[i].c_str(), path, full_path, MAX_PATH);
-					HMODULE h = LoadLibrary(full_path);
-					if (h)
+					if(m_script_entities[i] != -1)
 					{
-						CreateScriptFunction f = (CreateScriptFunction)GetProcAddress(h, TEXT("createScript"));
-						BaseScript* script = f();
-						if (!f)
+						Entity e(&m_universe, m_script_entities[i]);
+						getDll(m_paths[i].c_str(), path, full_path, MAX_PATH);
+						HMODULE h = LoadLibrary(full_path);
+						if (h)
 						{
-							g_log_warning.log("script") << "failed to create script " << m_paths[i].c_str();
-							FreeLibrary(h);
+							CreateScriptFunction f = (CreateScriptFunction)GetProcAddress(h, TEXT("createScript"));
+							BaseScript* script = f();
+							if (!f)
+							{
+								g_log_warning.log("script") << "failed to create script " << m_paths[i].c_str();
+								FreeLibrary(h);
+							}
+							else
+							{
+								RunningScript running_script;
+								running_script.m_entity_idx = e.index;
+								running_script.m_lib = h;
+								running_script.m_script_object = script;
+								m_running_scripts.push(running_script);
+								script->create(*this, e);
+							}
 						}
 						else
 						{
-							RunningScript running_script;
-							running_script.m_entity_idx = e.index;
-							running_script.m_lib = h;
-							running_script.m_script_object = script;
-							m_running_scripts.push(running_script);
-							script->create(*this, e);
+							g_log_warning.log("script") << "failed to load script " << m_paths[i].c_str();
 						}
-					}
-					else
-					{
-						g_log_warning.log("script") << "failed to load script " << m_paths[i].c_str();
 					}
 				}
 			}
@@ -262,7 +268,9 @@ namespace Lumix
 
 			virtual void destroyComponent(const Component& cmp)
 			{
-				ASSERT(false);
+				m_script_entities[cmp.index] = -1;
+				m_universe.destroyComponent(cmp);
+				m_universe.componentDestroyed().invoke(cmp);
 			}
 
 
