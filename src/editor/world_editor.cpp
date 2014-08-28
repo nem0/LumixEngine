@@ -405,11 +405,11 @@ struct WorldEditorImpl : public WorldEditor
 					else
 					{
 						const Array<Entity>& entities = m_editor.m_template_system->getInstances(template_hash);
-						for (int i = 0, c = entities.size(); i < c; ++i)
+						for (int entity_index = 0, c = entities.size(); entity_index < c; ++entity_index)
 						{
-							for (int i = 0; i < scenes.size(); ++i)
+							for (int scene_index = 0; scene_index < scenes.size(); ++scene_index)
 							{
-								Component cmp_new = scenes[i]->createComponent(m_component.type, m_component.entity);
+								Component cmp_new = scenes[scene_index]->createComponent(m_component.type, entities[entity_index]);
 								if (cmp_new.isValid())
 								{
 									m_old_values.rewindForRead();

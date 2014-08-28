@@ -426,6 +426,12 @@ PropertyViewObject::~PropertyViewObject()
 }
 
 
+void createComponentEditor(QTreeWidgetItem* item, Lumix::Component* )
+{
+
+}
+
+
 PropertyViewObject* createComponentObject(Lumix::WorldEditor& editor, Lumix::Component cmp)
 {
 	const char* name = "";
@@ -437,7 +443,7 @@ PropertyViewObject* createComponentObject(Lumix::WorldEditor& editor, Lumix::Com
 		}
 	}
 	auto c = new Lumix::Component(cmp); TODO("memory leak");
-	InstanceObject<Lumix::Component>* object = new InstanceObject<Lumix::Component>(name, c, NULL);
+	InstanceObject<Lumix::Component>* object = new InstanceObject<Lumix::Component>(name, c, &createComponentEditor);
 	
 	auto& descriptors = editor.getPropertyDescriptors(cmp.type);
 	
@@ -1444,7 +1450,7 @@ void PropertyView::on_propertyList_customContextMenuRequested(const QPoint &pos)
 {
 	QMenu* menu = new QMenu("Item actions", NULL);
 	const QModelIndex& index = m_ui->propertyList->indexAt(pos);
-	if (index.isValid() && !index.parent().isValid() && m_selected_entity.isValid())
+	if (index.isValid() && index.parent().isValid() && !index.parent().parent().isValid() && m_selected_entity.isValid())
 	{
 		QAction* remove_component_action = new QAction("Remove component", menu);
 		menu->addAction(remove_component_action);
