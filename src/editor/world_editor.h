@@ -81,7 +81,7 @@ namespace Lumix
 			virtual void snapToTerrain() = 0;
 			virtual void toggleGameMode() = 0;
 			virtual void navigate(float forward, float right, float speed) = 0;
-			virtual void setProperty(const char* component, const char* property, const void* data, int size) = 0;
+			virtual void setProperty(uint32_t component, uint32_t property, const void* data, int size) = 0;
 			virtual void onMouseDown(int x, int y, MouseButton::Value button) = 0;
 			virtual void onMouseMove(int x, int y, int relx, int rely, int mouse_flags) = 0;
 			virtual void onMouseUp(int x, int y, MouseButton::Value button) = 0;
@@ -92,6 +92,7 @@ namespace Lumix
 			virtual const char* getBasePath() = 0;
 			virtual Entity getSelectedEntity() const = 0;
 			virtual const IPropertyDescriptor& getPropertyDescriptor(uint32_t type, uint32_t name_hash) = 0;
+			virtual Array<IPropertyDescriptor*>& getPropertyDescriptors(uint32_t type) = 0;
 			virtual DelegateList<void(Entity&)>& entitySelected() = 0;
 			virtual DelegateList<void()>& universeCreated() = 0;
 			virtual DelegateList<void()>& universeDestroyed() = 0;

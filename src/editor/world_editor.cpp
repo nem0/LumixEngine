@@ -1210,6 +1210,12 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
+		virtual Array<IPropertyDescriptor*>& getPropertyDescriptors(uint32_t type) override
+		{
+			return m_component_properties[type];
+		}
+
+
 		virtual const IPropertyDescriptor& getPropertyDescriptor(uint32_t type, uint32_t name_hash) override
 		{
 			Array<IPropertyDescriptor*>& props = m_component_properties[type];
@@ -1225,15 +1231,15 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
-		virtual void setProperty(const char* component, const char* property, const void* data, int size) override
+		virtual void setProperty(uint32_t component, uint32_t property, const void* data, int size) override
 		{
 			if (m_selected_entity.isValid())
 			{
-				uint32_t component_hash = crc32(component);
+				uint32_t component_hash = component;
 				Component cmp = m_selected_entity.getComponent(component_hash);
 				if (cmp.isValid())
 				{
-					IEditorCommand* command = LUMIX_NEW(SetPropertyCommand)(*this, cmp, getPropertyDescriptor(component_hash, crc32(property)), data, size);
+					IEditorCommand* command = LUMIX_NEW(SetPropertyCommand)(*this, cmp, getPropertyDescriptor(component_hash, property), data, size);
 					executeCommand(command);
 				}
 			}
@@ -1406,7 +1412,6 @@ struct WorldEditorImpl : public WorldEditor
 				m_camera = m_engine->getUniverse()->createEntity();
 				m_camera.setPosition(0, 0, -5);
 				m_camera.setRotation(Quat(Vec3(0, 1, 0), -Math::PI));
-				const Array<IScene*>& scenes = m_engine->getScenes();
 				Component cmp = createComponent(CAMERA_HASH, m_camera);
 				ASSERT(cmp.isValid());
 				RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
