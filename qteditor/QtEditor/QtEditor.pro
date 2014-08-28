@@ -30,7 +30,8 @@ SOURCES += main.cpp\
     pc/file_system_watcher.cpp \
     entity_template_list.cpp \
     notifications.cpp \
-    insert_mesh_command.cpp
+    insert_mesh_command.cpp \
+    entity_list.cpp
 
 HEADERS  += mainwindow.h \
     sceneview.h \ 
@@ -49,7 +50,8 @@ HEADERS  += mainwindow.h \
     file_system_watcher.h \
     entity_template_list.h \
     notifications.h \
-    insert_mesh_command.h
+    insert_mesh_command.h \
+    entity_list.h
 
 FORMS    += mainwindow.ui \
     logwidget.ui \
@@ -61,7 +63,8 @@ FORMS    += mainwindow.ui \
     materialmanager.ui \
     profilerui.ui \
     profilergraph.ui \
-    entity_template_list.ui
+    entity_template_list.ui \
+    entity_list.ui
 
 win32
 {

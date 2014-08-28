@@ -4,6 +4,7 @@
 #include "editor/entity_template_system.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
+#include "entity_list.h"
 #include "entity_template_list.h"
 #include "fileserverwidget.h"
 #include "gameview.h"
@@ -39,6 +40,7 @@ MainWindow::MainWindow(QWidget* parent) :
 	m_profiler_ui = new ProfilerUI;
 	m_entity_template_list_ui = new EntityTemplateList;
 	m_notifications = Notifications::create(*this);
+	m_entity_list = new EntityList(NULL);
 
 	QSettings settings("Lumix", "QtEditor");
 	restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
@@ -53,6 +55,7 @@ MainWindow::MainWindow(QWidget* parent) :
 	addDockWidget(static_cast<Qt::DockWidgetArea>(8), m_material_manager_ui);
 	addDockWidget(static_cast<Qt::DockWidgetArea>(1), m_profiler_ui);
 	addDockWidget(static_cast<Qt::DockWidgetArea>(2), m_entity_template_list_ui);
+	addDockWidget(static_cast<Qt::DockWidgetArea>(2), m_entity_list);
 
 	m_property_view->setScriptCompiler(m_script_compiler_ui->getCompiler());
 	m_property_view->setAssetBrowser(*m_asset_browser);
@@ -107,6 +110,7 @@ void MainWindow::setWorldEditor(Lumix::WorldEditor& editor)
 	m_property_view->setWorldEditor(editor);
 	m_entity_template_list_ui->setWorldEditor(editor);
 	m_game_view->setWorldEditor(editor);
+	m_entity_list->setWorldEditor(editor);
 }
 
 GameView* MainWindow::getGameView() const
@@ -271,4 +275,9 @@ void MainWindow::on_actionRemove_triggered()
 	{
 		m_world_editor->destroyEntities(&m_world_editor->getSelectedEntity(), 1);
 	}
+}
+
+void MainWindow::on_actionEntity_list_triggered()
+{
+	m_entity_list->show();
 }

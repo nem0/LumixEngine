@@ -96,6 +96,7 @@ namespace Lumix
 			virtual DelegateList<void(Entity&)>& entitySelected() = 0;
 			virtual DelegateList<void()>& universeCreated() = 0;
 			virtual DelegateList<void()>& universeDestroyed() = 0;
+			virtual DelegateList<void()>& universeLoaded() = 0;
 			virtual void addPlugin(Plugin* plugin) = 0;
 			virtual void getRelativePath(char* relative_path, int max_length, const Path& source) = 0;
 			virtual EntityTemplateSystem& getEntityTemplateSystem() = 0;

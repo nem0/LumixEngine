@@ -38,7 +38,9 @@ class LUMIX_ENGINE_API Universe final
 		Quat getRotation(int index) { return m_rotations[index]; }
 		Component addComponent(const Entity& entity, uint32_t component_type, IScene* scene, int index);
 		void destroyComponent(const Component& cmp);
-		int getEntityCount() const { return m_positions.size(); }
+		int getEntityCount() const { return m_positions.size() - m_free_slots.size(); }
+		Entity getFirstEntity();
+		Entity getNextEntity(Entity entity);
 
 		DelegateList<void(Entity&)>& entityMoved() { return m_entity_moved; }
 		DelegateList<void(Entity&)>& entityCreated() { return m_entity_created; }
@@ -50,11 +52,8 @@ class LUMIX_ENGINE_API Universe final
 		void deserialize(ISerializer& serializer);
 
 	private:
-		void onEvent(Event& event);
-	
-	private:
-		Array<Vec3>		m_positions;		//< entity positions
-		Array<Quat>		m_rotations;		//< entity rotations
+		Array<Vec3>		m_positions;
+		Array<Quat>		m_rotations;
 		Array<int>		m_free_slots;
 		ComponentList	m_component_list;
 		DelegateList<void(Entity&)> m_entity_moved;

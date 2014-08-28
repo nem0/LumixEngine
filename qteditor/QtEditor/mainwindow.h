@@ -58,6 +58,8 @@ private slots:
 
     void on_actionRemove_triggered();
 
+    void on_actionEntity_list_triggered();
+
 private:
 	virtual void resizeEvent(QResizeEvent* event) override;
 
@@ -75,6 +77,7 @@ private:
 	class ProfilerUI* m_profiler_ui;
 	class EntityTemplateList* m_entity_template_list_ui;
 	class Notifications* m_notifications;
+	class EntityList* m_entity_list;
 	Lumix::DelegateList<void(const QSize&)> m_resized;
 };
 

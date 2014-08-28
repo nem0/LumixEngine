@@ -59,6 +59,50 @@ void Universe::destroyEntity(Entity& entity)
 }
 
 
+Entity Universe::getFirstEntity()
+{
+	for(int i = 0; i < m_positions.size(); ++i)
+	{
+		bool found = false;
+		for(int j = 0, cj = m_free_slots.size(); j < cj; ++j)
+		{
+			if(m_free_slots[j] == i)
+			{
+				found = true;
+				break;
+			}
+		}
+		if(!found)
+		{
+			return Entity(this, i);
+		}
+	}
+	return Entity::INVALID;
+}
+
+
+Entity Universe::getNextEntity(Entity entity)
+{
+	for(int i = entity.index + 1; i < m_positions.size(); ++i)
+	{
+		bool found = false;
+		for(int j = 0, cj = m_free_slots.size(); j < cj; ++j)
+		{
+			if(m_free_slots[j] == i)
+			{
+				found = true;
+				break;
+			}
+		}
+		if(!found)
+		{
+			return Entity(this, i);
+		}
+	}
+	return Entity::INVALID;
+}
+
+
 void Universe::serialize(ISerializer& serializer)
 {
 	serializer.serialize("count", m_positions.size());

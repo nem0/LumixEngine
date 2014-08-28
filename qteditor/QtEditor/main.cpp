@@ -248,6 +248,7 @@ class App
 			m_main_window->getGameView()->setPipeline(m_game_render_device->getPipeline());
 		}
 
+
 		void shutdown()
 		{
 			delete m_game_render_device;
@@ -255,6 +256,7 @@ class App
 			delete m_edit_render_device;
 			m_edit_render_device = NULL;
 		}
+
 
 		void renderEditView()
 		{
@@ -268,6 +270,7 @@ class App
 
 			m_main_window->getMaterialManager()->updatePreview();
 		}
+
 
 		void handleEvents()
 		{
@@ -307,6 +310,7 @@ class App
 				}
 			}
 		}
+
 
 		void run()
 		{
