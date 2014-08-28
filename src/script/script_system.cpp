@@ -305,7 +305,7 @@ namespace Lumix
 		virtual bool create(Engine& engine) override
 		{
 			m_engine = &engine;
-			engine.getWorldEditor()->registerProperty("script", LUMIX_NEW(PropertyDescriptor<ScriptSceneImpl>)(crc32("source"), &ScriptSceneImpl::getScriptPath, &ScriptSceneImpl::setScriptPath, IPropertyDescriptor::FILE));
+			engine.getWorldEditor()->registerProperty("script", LUMIX_NEW(PropertyDescriptor<ScriptSceneImpl>)("source", &ScriptSceneImpl::getScriptPath, &ScriptSceneImpl::setScriptPath, IPropertyDescriptor::FILE));
 			return true;
 		}
 

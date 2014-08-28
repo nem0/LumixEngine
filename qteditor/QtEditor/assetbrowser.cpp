@@ -99,7 +99,7 @@ void AssetBrowser::handleDoubleClick(const QFileInfo& file_info)
 	else if(suffix == "ani")
 	{
 		m_editor->addComponent(crc32("animable"));
-		m_editor->setProperty("animable", "preview", file.toLatin1().data(), file.length());
+		m_editor->setProperty(crc32("animable"), crc32("preview"), file.toLatin1().data(), file.length());
 	}
 }
 

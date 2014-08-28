@@ -97,15 +97,15 @@ struct RendererImpl : public Renderer
 
 	virtual bool create(Engine& engine) override
 	{
-		engine.getWorldEditor()->registerProperty("camera", LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("slot"), &RenderScene::getCameraSlot, &RenderScene::setCameraSlot, IPropertyDescriptor::STRING));
-		engine.getWorldEditor()->registerProperty("camera", LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("fov"), &RenderScene::getCameraFOV, &RenderScene::setCameraFOV));
-		engine.getWorldEditor()->registerProperty("camera", LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("near"), &RenderScene::getCameraNearPlane, &RenderScene::setCameraNearPlane));
-		engine.getWorldEditor()->registerProperty("camera", LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("far"), &RenderScene::getCameraFarPlane, &RenderScene::setCameraFarPlane));
-		engine.getWorldEditor()->registerProperty("renderable", LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("source"), &RenderScene::getRenderablePath, &RenderScene::setRenderablePath, IPropertyDescriptor::FILE));
-		engine.getWorldEditor()->registerProperty("terrain", LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("material"), &RenderScene::getTerrainMaterial, &RenderScene::setTerrainMaterial, IPropertyDescriptor::FILE));
-		engine.getWorldEditor()->registerProperty("terrain", LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("xz_scale"), &RenderScene::getTerrainXZScale, &RenderScene::setTerrainXZScale));
-		engine.getWorldEditor()->registerProperty("terrain", LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("y_scale"), &RenderScene::getTerrainYScale, &RenderScene::setTerrainYScale));
-		engine.getWorldEditor()->registerProperty("terrain", LUMIX_NEW(PropertyDescriptor<RenderScene>)(crc32("grass_mesh"), &RenderScene::getTerrainGrass, &RenderScene::setTerrainGrass, IPropertyDescriptor::FILE));
+		engine.getWorldEditor()->registerProperty("camera", LUMIX_NEW(PropertyDescriptor<RenderScene>)("slot", &RenderScene::getCameraSlot, &RenderScene::setCameraSlot, IPropertyDescriptor::STRING));
+		engine.getWorldEditor()->registerProperty("camera", LUMIX_NEW(PropertyDescriptor<RenderScene>)("fov", &RenderScene::getCameraFOV, &RenderScene::setCameraFOV));
+		engine.getWorldEditor()->registerProperty("camera", LUMIX_NEW(PropertyDescriptor<RenderScene>)("near", &RenderScene::getCameraNearPlane, &RenderScene::setCameraNearPlane));
+		engine.getWorldEditor()->registerProperty("camera", LUMIX_NEW(PropertyDescriptor<RenderScene>)("far", &RenderScene::getCameraFarPlane, &RenderScene::setCameraFarPlane));
+		engine.getWorldEditor()->registerProperty("renderable", LUMIX_NEW(PropertyDescriptor<RenderScene>)("source", &RenderScene::getRenderablePath, &RenderScene::setRenderablePath, IPropertyDescriptor::FILE));
+		engine.getWorldEditor()->registerProperty("terrain", LUMIX_NEW(PropertyDescriptor<RenderScene>)("material", &RenderScene::getTerrainMaterial, &RenderScene::setTerrainMaterial, IPropertyDescriptor::FILE));
+		engine.getWorldEditor()->registerProperty("terrain", LUMIX_NEW(PropertyDescriptor<RenderScene>)("xz_scale", &RenderScene::getTerrainXZScale, &RenderScene::setTerrainXZScale));
+		engine.getWorldEditor()->registerProperty("terrain", LUMIX_NEW(PropertyDescriptor<RenderScene>)("y_scale", &RenderScene::getTerrainYScale, &RenderScene::setTerrainYScale));
+		engine.getWorldEditor()->registerProperty("terrain", LUMIX_NEW(PropertyDescriptor<RenderScene>)("grass_mesh", &RenderScene::getTerrainGrass, &RenderScene::setTerrainGrass, IPropertyDescriptor::FILE));
 
 		m_engine = &engine;
 		glewExperimental = GL_TRUE;

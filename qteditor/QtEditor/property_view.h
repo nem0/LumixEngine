@@ -43,11 +43,8 @@ class PropertyViewObject : public QObject
 		int getMemberCount() const { return m_members.size(); }
 		void addMember(PropertyViewObject* member) { m_members.push(member); }
 
-		virtual void createEditor(QTreeWidgetItem* item) = 0;
+		virtual void createEditor(class PropertyView& view, QTreeWidgetItem* item) = 0;
 		virtual bool isEditable() const = 0;
-
-	public slots:
-		virtual void onBoolValueChanged(bool state) = 0;
 
 	private:
 		Lumix::string m_name;
@@ -60,47 +57,20 @@ class PropertyView : public QDockWidget
 	Q_OBJECT
 
 public:
-	class Property
-	{
-		public:
-			enum Type
-			{
-				FILE,
-				STRING,
-				DECIMAL,
-				VEC3,
-				BOOL,
-				RESOURCE
-			};
-				
-			Type m_type;
-			uint32_t m_component;
-			Lumix::string m_name;
-			Lumix::string m_file_type;
-			Lumix::string m_component_name;
-			uint32_t m_name_hash;
-			QTreeWidgetItem* m_tree_item;
-	};
-
-public:
 	explicit PropertyView(QWidget* parent = NULL);
 	~PropertyView();
 	void setWorldEditor(Lumix::WorldEditor& editor);
+	Lumix::WorldEditor* getWorldEditor();
 	void setScriptCompiler(ScriptCompiler* compiler);
 	void setAssetBrowser(AssetBrowser& asset_browser);
 	void addResourcePlugin(PropertyViewObject::Creator plugin);
 	Lumix::Resource* getSelectedResource() const { return m_selected_resource; }
+	void setSelectedResourceFilename(const char* filename);
 	void setSelectedResource(Lumix::Resource* resource);
 	void setObject(PropertyViewObject* object);
 
 private slots:
 	void on_addComponentButton_clicked();
-	void on_checkboxStateChanged();
-	void on_doubleSpinBoxValueChanged();
-	void on_vec3ValueChanged();
-	void on_lineEditEditingFinished();
-	void on_browseFilesClicked();
-	void on_goResourceClicked();
 	void on_compileScriptClicked();
 	void on_editScriptClicked();
 	void on_animablePlayPause();
@@ -124,9 +94,6 @@ private:
 	void onUniverseDestroyed();
 	void onEntitySelected(Lumix::Entity& e);
 	void onEntityPosition(Lumix::Entity& e);
-	void setSelectedResourceFilename(const char* filename);
-	void addProperty(const char* component, const char* name, const char* label, Property::Type type, const char* file_type);
-	void onPropertyValue(Property* property, const void* data, int32_t data_size);
 	void addScriptCustomProperties();
 	void addAnimableCustomProperties(const Lumix::Component& cmp);
 	void addTerrainCustomProperties(const Lumix::Component& terrain_component);
@@ -138,7 +105,6 @@ private:
 
 private:
 	Ui::PropertyView* m_ui;
-	Lumix::Array<Property*> m_properties;
 	ScriptCompiler* m_compiler;
 	Lumix::Entity m_selected_entity;
 	Lumix::WorldEditor* m_world_editor;
