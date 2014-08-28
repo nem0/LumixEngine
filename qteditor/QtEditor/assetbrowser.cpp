@@ -61,13 +61,13 @@ AssetBrowser::~AssetBrowser()
 
 void AssetBrowser::onTreeViewSelectionChanged(const QModelIndex& current, const QModelIndex&)
 {
-	if (current.isValid())
+    /*if (current.isValid())
 	{
 		const QFileInfo& file_info = m_model->fileInfo(current);
 		QByteArray byte_array = file_info.filePath().toLower().toLatin1();
 		const char* filename = byte_array.data();
 		emit fileSelected(filename);
-	}
+    }*/
 }
 
 
@@ -257,4 +257,15 @@ void AssetBrowser::on_filterComboBox_currentTextChanged(const QString&)
 		filters << "*.mat";
 	}
 	m_model->setNameFilters(filters);
+}
+
+void AssetBrowser::on_treeView_clicked(const QModelIndex &index)
+{
+    if (index.isValid())
+    {
+        const QFileInfo& file_info = m_model->fileInfo(index);
+        QByteArray byte_array = file_info.filePath().toLower().toLatin1();
+        const char* filename = byte_array.data();
+        emit fileSelected(filename);
+    }
 }
