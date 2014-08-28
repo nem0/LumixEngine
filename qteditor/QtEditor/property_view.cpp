@@ -190,7 +190,7 @@ class ComponentPropertyObject : public PropertyViewObject
 							//if (!m_is_updating_values)
 							{
 								QByteArray byte_array = edit->text().toLatin1();
-								view.getWorldEditor()->setProperty(m_component.type, m_descriptor.getNameHash(), byte_array.data(), byte_array.size());
+								view.getWorldEditor()->setProperty(m_component.type, m_descriptor.getNameHash(), byte_array.data(), byte_array.size() + 1);
 							}
 						});
 					}

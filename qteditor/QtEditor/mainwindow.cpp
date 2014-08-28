@@ -106,6 +106,7 @@ void MainWindow::setWorldEditor(Lumix::WorldEditor& editor)
 	m_material_manager_ui->setWorldEditor(editor);
 	m_property_view->setWorldEditor(editor);
 	m_entity_template_list_ui->setWorldEditor(editor);
+	m_game_view->setWorldEditor(editor);
 }
 
 GameView* MainWindow::getGameView() const
