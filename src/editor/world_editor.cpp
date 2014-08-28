@@ -736,7 +736,7 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			if (m_selected_entity.isValid())
 			{
-				Component renderable = m_selected_entity.getComponent(RENDERABLE_HASH);
+				Component renderable = m_selected_entity.getComponent(RENDERABLE_HASH); TODO("what if the selected entity does not have a renderable component?");
 				RenderScene* scene = static_cast<RenderScene*>(renderable.scene);
 				RayCastModelHit hit = scene->castRay(m_selected_entity.getPosition(), Vec3(0, -1, 0), renderable);
 				if (hit.m_is_hit)
@@ -1007,6 +1007,7 @@ struct WorldEditorImpl : public WorldEditor
 			}
 
 			fs.close(file);
+			m_universe_loaded.invoke();
 		}
 
 		virtual void getRelativePath(char* relative_path, int max_length, const Path& source) override
@@ -1380,6 +1381,12 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
+		virtual DelegateList<void()>& universeLoaded() override
+		{
+			return m_universe_loaded;
+		}
+
+
 		void destroyUndoStack()
 		{
 			m_undo_index = -1;
@@ -1485,6 +1492,7 @@ struct WorldEditorImpl : public WorldEditor
 		Entity m_camera;
 		DelegateList<void()> m_universe_destroyed;
 		DelegateList<void()> m_universe_created;
+		DelegateList<void()> m_universe_loaded;
 		DelegateList<void(Entity&)> m_entity_selected;
 
 		FS::FileSystem* m_file_system;
