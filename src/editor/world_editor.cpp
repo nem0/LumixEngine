@@ -450,10 +450,10 @@ struct WorldEditorImpl : public WorldEditor
 						const Array<Entity>& instances = m_editor.m_template_system->getInstances(template_hash);
 						for (int i = 0; i < instances.size(); ++i)
 						{
-							const Entity::ComponentList& cmps = instances[i].getComponents();
-							for (int j = 0; j < cmps.size(); ++j)
+							Component cmp = instances[i].getComponent(m_component.type);
+							if(cmp.isValid())
 							{
-								cmps[j].scene->destroyComponent(cmps[j]);
+								cmp.scene->destroyComponent(cmp);
 							}
 						}
 					}
