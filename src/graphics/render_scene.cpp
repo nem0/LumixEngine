@@ -367,10 +367,7 @@ namespace Lumix
 					serializer.deserializeArrayItem(exists);
 					if(exists)
 					{
-						if(!m_terrains[i])
-						{
-							m_terrains[i] = LUMIX_NEW(Terrain)(Entity::INVALID, *this);
-						}
+						m_terrains[i] = LUMIX_NEW(Terrain)(Entity::INVALID, *this);
 						Terrain* terrain = m_terrains[i];
 						terrain->deserialize(serializer, m_universe, *this, i);
 					}
