@@ -1315,6 +1315,10 @@ struct WorldEditorImpl : public WorldEditor
 
 		void onEntityDestroyed(Entity& entity)
 		{
+			if(m_selected_entity == entity)
+			{
+				m_selected_entity = Entity::INVALID;
+			}
 			for (int i = 0; i < m_editor_icons.size(); ++i)
 			{
 				if (m_editor_icons[i]->getEntity() == entity)

@@ -177,7 +177,29 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	virtual void destroyComponent(const Component& cmp) override
 	{
-		ASSERT(false);
+		if(cmp.type == HEIGHTFIELD_HASH)
+		{
+			LUMIX_DELETE(m_terrains[cmp.index]);
+			m_terrains[cmp.index] = NULL;
+			m_universe->destroyComponent(cmp);
+			m_universe->componentDestroyed().invoke(cmp);
+		}
+		else if(cmp.type == CONTROLLER_HASH)
+		{
+			m_controllers[cmp.index].m_is_free = true;
+			m_universe->destroyComponent(cmp);
+			m_universe->componentDestroyed().invoke(cmp);
+		}
+		else if (cmp.type == MESH_ACTOR_HASH || cmp.type == BOX_ACTOR_HASH)
+		{
+			m_actors[cmp.index]->m_entity.index = -1;
+			m_universe->destroyComponent(cmp);
+			m_universe->componentDestroyed().invoke(cmp);
+		}
+		else
+		{
+			ASSERT(false);
+		}
 	}
 
 
@@ -211,6 +233,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		PhysicsSceneImpl::Controller c;
 		c.m_controller = m_system->m_impl->m_controller_manager->createController(*m_system->m_impl->m_physics, m_scene, cDesc);
 		c.m_entity = entity;
+		c.m_is_free = false;
 
 		m_controllers.push(c);
 
@@ -494,9 +517,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 		physx::PxVec3 g(0, time_delta * -9.8f, 0);
 		for (int i = 0; i < m_controllers.size(); ++i)
 		{
-			const physx::PxExtendedVec3& p = m_controllers[i].m_controller->getPosition();
-			m_controllers[i].m_controller->move(g, 0.0001f, time_delta, physx::PxControllerFilters());
-			m_controllers[i].m_entity.setPosition((float)p.x, (float)p.y, (float)p.z);
+			if(!m_controllers[i].m_is_free)
+			{
+				const physx::PxExtendedVec3& p = m_controllers[i].m_controller->getPosition();
+				m_controllers[i].m_controller->move(g, 0.0001f, time_delta, physx::PxControllerFilters());
+				m_controllers[i].m_entity.setPosition((float)p.x, (float)p.y, (float)p.z);
+			}
 		}
 	}
 
@@ -829,7 +855,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 			serializer.serializeArrayItem(m_actors[i]->m_source);
 			serializer.serializeArrayItem(isDynamic(i));
 			serializer.serializeArrayItem(m_actors[i]->m_entity.index);
-			serializeActor(serializer, i);
+			if(m_actors[i]->m_entity.index != -1)
+			{
+				serializeActor(serializer, i);
+			}
 		}
 		serializer.endArray();
 		serializer.serialize("count", m_controllers.size());
@@ -837,16 +866,25 @@ struct PhysicsSceneImpl : public PhysicsScene
 		for (int i = 0; i < m_controllers.size(); ++i)
 		{
 			serializer.serializeArrayItem(m_controllers[i].m_entity.index);
+			serializer.serializeArrayItem(m_controllers[i].m_is_free);
 		}
 		serializer.endArray();
 		serializer.serialize("count", m_terrains.size());
 		serializer.beginArray("terrains");
 		for (int i = 0; i < m_terrains.size(); ++i)
 		{
-			serializer.serializeArrayItem(m_terrains[i]->m_entity.index);
-			serializer.serializeArrayItem(m_terrains[i]->m_heightmap->getPath().c_str());
-			serializer.serializeArrayItem(m_terrains[i]->m_xz_scale);
-			serializer.serializeArrayItem(m_terrains[i]->m_y_scale);
+			if(m_terrains[i])
+			{
+				serializer.serializeArrayItem(true);
+				serializer.serializeArrayItem(m_terrains[i]->m_entity.index);
+				serializer.serializeArrayItem(m_terrains[i]->m_heightmap->getPath().c_str());
+				serializer.serializeArrayItem(m_terrains[i]->m_xz_scale);
+				serializer.serializeArrayItem(m_terrains[i]->m_y_scale);
+			}
+			else
+			{
+				serializer.serializeArrayItem(false);
+			}
 		}
 		serializer.endArray();
 	}
@@ -873,8 +911,11 @@ struct PhysicsSceneImpl : public PhysicsScene
 				m_dynamic_actors.push(m_actors[i]);
 			}
 			serializer.deserializeArrayItem(m_actors[i]->m_entity.index);
-			m_actors[i]->m_entity.universe = m_universe;
-			deserializeActor(serializer, i);
+			if(m_actors[i]->m_entity.index != -1)
+			{
+				m_actors[i]->m_entity.universe = m_universe;
+				deserializeActor(serializer, i);
+			}
 		}
 		serializer.deserializeArrayEnd();
 	}
@@ -893,26 +934,32 @@ struct PhysicsSceneImpl : public PhysicsScene
 		for (int i = 0; i < count; ++i)
 		{
 			int index;
+			bool is_free;
 			serializer.deserializeArrayItem(index);
+			serializer.deserializeArrayItem(is_free);
 			Entity e(m_universe, index);
 
-			physx::PxCapsuleControllerDesc cDesc;
-			cDesc.material = m_default_material;
-			cDesc.height = 1.8f;
-			cDesc.radius = 0.25f;
-			cDesc.slopeLimit = 0.0f;
-			cDesc.contactOffset = 0.1f;
-			cDesc.stepOffset = 0.02f;
-			cDesc.callback = NULL;
-			cDesc.behaviorCallback = NULL;
-			Vec3 position = e.getPosition();
-			cDesc.position.set(position.x, position.y, position.z);
 			Controller c;
-			c.m_controller = m_system->m_impl->m_controller_manager->createController(*m_system->m_impl->m_physics, m_scene, cDesc);
-			c.m_entity = e;
-
+			c.m_is_free = is_free;
 			m_controllers.push(c);
-			m_universe->addComponent(e, CONTROLLER_HASH, this, i);
+			
+			if(!is_free)
+			{
+				physx::PxCapsuleControllerDesc cDesc;
+				cDesc.material = m_default_material;
+				cDesc.height = 1.8f;
+				cDesc.radius = 0.25f;
+				cDesc.slopeLimit = 0.0f;
+				cDesc.contactOffset = 0.1f;
+				cDesc.stepOffset = 0.02f;
+				cDesc.callback = NULL;
+				cDesc.behaviorCallback = NULL;
+				Vec3 position = e.getPosition();
+				cDesc.position.set(position.x, position.y, position.z);
+				c.m_controller = m_system->m_impl->m_controller_manager->createController(*m_system->m_impl->m_physics, m_scene, cDesc);
+				c.m_entity = e;
+				m_universe->addComponent(e, CONTROLLER_HASH, this, i);
+			}
 		}
 		serializer.deserializeArrayEnd();
 	}
@@ -925,30 +972,36 @@ struct PhysicsSceneImpl : public PhysicsScene
 		for (int i = count; i < m_terrains.size(); ++i)
 		{
 			LUMIX_DELETE(m_terrains[i]);
+			m_terrains[i] = NULL;
 		}
 		int old_size = m_terrains.size();
 		m_terrains.resize(count);
-		for (int i = old_size; i < count; ++i)
-		{
-			m_terrains[i] = LUMIX_NEW(Terrain);
-		}
 		serializer.deserializeArrayBegin("terrains");
 		for (int i = 0; i < count; ++i)
 		{
-			m_terrains[i]->m_scene = this;
-			m_terrains[i]->m_entity.universe = m_universe;
-			serializer.deserializeArrayItem(m_terrains[i]->m_entity.index);
-			char tmp[LUMIX_MAX_PATH];
-			serializer.deserializeArrayItem(tmp, LUMIX_MAX_PATH);
-			serializer.deserializeArrayItem(m_terrains[i]->m_xz_scale);
-			serializer.deserializeArrayItem(m_terrains[i]->m_y_scale);
-
-			Component cmp(m_terrains[i]->m_entity, HEIGHTFIELD_HASH, this, i);
-			if (m_terrains[i]->m_heightmap == NULL || strcmp(tmp, m_terrains[i]->m_heightmap->getPath().c_str()) != 0)
+			bool exists;
+			serializer.deserializeArrayItem(exists);
+			if(exists)
 			{
-				setHeightmap(cmp, string(tmp));
+				if(!m_terrains[i])
+				{
+					m_terrains[i] = LUMIX_NEW(Terrain);
+				}
+				m_terrains[i]->m_scene = this;
+				m_terrains[i]->m_entity.universe = m_universe;
+				serializer.deserializeArrayItem(m_terrains[i]->m_entity.index);
+				char tmp[LUMIX_MAX_PATH];
+				serializer.deserializeArrayItem(tmp, LUMIX_MAX_PATH);
+				serializer.deserializeArrayItem(m_terrains[i]->m_xz_scale);
+				serializer.deserializeArrayItem(m_terrains[i]->m_y_scale);
+
+				Component cmp(m_terrains[i]->m_entity, HEIGHTFIELD_HASH, this, i);
+				if (m_terrains[i]->m_heightmap == NULL || strcmp(tmp, m_terrains[i]->m_heightmap->getPath().c_str()) != 0)
+				{
+					setHeightmap(cmp, string(tmp));
+				}
+				m_universe->addComponent(m_terrains[i]->m_entity, HEIGHTFIELD_HASH, this, i);
 			}
-			m_universe->addComponent(m_terrains[i]->m_entity, HEIGHTFIELD_HASH, this, i);
 		}
 		serializer.deserializeArrayEnd();
 	}
@@ -978,6 +1031,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		physx::PxController* m_controller;
 		Entity m_entity;
+		bool m_is_free;
 	};
 
 	Universe*					m_universe;
