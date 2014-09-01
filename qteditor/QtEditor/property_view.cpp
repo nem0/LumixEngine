@@ -167,7 +167,7 @@ class ComponentPropertyObject : public PropertyViewObject
 						layout->addWidget(button);
 						button->connect(button, &QPushButton::clicked, [this, edit, &view]()
 						{
-							QString str = QFileDialog::getOpenFileName(NULL, QString(), QString(), "*.msh"); TODO("not only msh");
+							QString str = QFileDialog::getOpenFileName(NULL, QString(), QString(), m_descriptor.getFileType());
 							char rel_path[LUMIX_MAX_PATH];
 							QByteArray byte_array = str.toLatin1();
 							const char* text = byte_array.data();
@@ -706,7 +706,6 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 					}
 					break;
 				default:
-					ASSERT(false);
 					break;
 			}
 		}
