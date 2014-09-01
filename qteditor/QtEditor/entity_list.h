@@ -32,13 +32,13 @@ class EntityList : public QDockWidget
 	private slots:
 		void on_entityList_clicked(const QModelIndex& index);
 		void on_comboBox_activated(const QString& arg1);
+		void on_nameFilterEdit_textChanged(const QString &arg1);
 
-        void on_nameFilterEdit_textChanged(const QString &arg1);
-
-private:
+	private:
 		void onUniverseCreated();
 		void onUniverseDestroyed();
 		void onUniverseLoaded();
+		void onEntitySelected(const Lumix::Entity& entity);
 
 	private:
 		Ui::EntityList* m_ui;
