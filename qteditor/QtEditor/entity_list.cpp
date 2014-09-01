@@ -212,6 +212,25 @@ void EntityList::setWorldEditor(Lumix::WorldEditor& editor)
 	{
 		m_ui->comboBox->addItem(component_map[i]);
 	}
+	editor.entitySelected().bind<EntityList, &EntityList::onEntitySelected>(this);
+}
+
+
+void EntityList::onEntitySelected(const Lumix::Entity& entity)
+{
+	m_ui->entityList->selectionModel()->clear();
+	if (entity.isValid())
+	{
+		for (int i = 0, c = m_filter->rowCount(); i < c; ++i)
+		{
+			if (m_filter->data(m_filter->index(i, 0), Qt::UserRole).toInt() == entity.index)
+			{
+				m_ui->entityList->selectionModel()->select(m_filter->index(i, 0), QItemSelectionModel::Select | QItemSelectionModel::Rows);
+				break;
+			}
+
+		}
+	}
 }
 
 
