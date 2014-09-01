@@ -59,7 +59,7 @@ AssetBrowser::~AssetBrowser()
 }
 
 
-void AssetBrowser::onTreeViewSelectionChanged(const QModelIndex& current, const QModelIndex&)
+void AssetBrowser::onTreeViewSelectionChanged(const QModelIndex&, const QModelIndex&)
 {
     /*if (current.isValid())
 	{

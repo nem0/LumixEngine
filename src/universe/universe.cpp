@@ -1,4 +1,5 @@
 #include "universe.h"
+#include "core/crc32.h"
 #include "core/matrix.h"
 #include "core/json_serializer.h"
 
@@ -123,6 +124,16 @@ void Universe::serialize(ISerializer& serializer)
 		serializer.serializeArrayItem(m_rotations[i].w);
 	}
 	serializer.endArray();
+
+	serializer.serialize("name_count", m_id_to_name_map.size());
+	serializer.beginArray("names");
+	for (auto iter = m_id_to_name_map.begin(), end = m_id_to_name_map.end(); iter != end; ++iter)
+	{
+		serializer.serializeArrayItem(iter.key());
+		serializer.serializeArrayItem(iter.value().c_str());
+	}
+	serializer.endArray();
+
 	serializer.serialize("free_slot_count", m_free_slots.size());
 	serializer.beginArray("free_slots");
 	for(int i = 0; i < m_free_slots.size(); ++i)
@@ -158,6 +169,22 @@ void Universe::deserialize(ISerializer& serializer)
 		serializer.deserializeArrayItem(m_rotations[i].y);
 		serializer.deserializeArrayItem(m_rotations[i].z);
 		serializer.deserializeArrayItem(m_rotations[i].w);
+	}
+	serializer.deserializeArrayEnd();
+
+	serializer.deserialize("name_count", count);
+	serializer.deserializeArrayBegin("names");
+	m_id_to_name_map.clear();
+	m_name_to_id_map.clear(); TODO("reserve");
+	for (int i = 0; i < count; ++i)
+	{
+		uint32_t key;
+		static const int MAX_NAME_LENGTH = 50;
+		char name[MAX_NAME_LENGTH];
+		serializer.deserializeArrayItem(key);
+		serializer.deserializeArrayItem(name, MAX_NAME_LENGTH);
+		m_id_to_name_map.insert(key, string(name));
+		m_name_to_id_map.insert(crc32(name), key);
 	}
 	serializer.deserializeArrayEnd();
 

@@ -49,7 +49,7 @@ struct OutputStream : public physx::PxOutputStream
 	{
 		if (size + (int)count > capacity)
 		{
-			int new_capacity = Math::max(size + (int)count, capacity + 4096);
+			int new_capacity = Math::maxValue(size + (int)count, capacity + 4096);
 			uint8_t* new_data = LUMIX_NEW_ARRAY(unsigned char, new_capacity);
 			memcpy(new_data, data, size);
 			LUMIX_DELETE_ARRAY(data);

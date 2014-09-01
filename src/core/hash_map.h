@@ -482,7 +482,10 @@ namespace Lumix
 				node_type* next = n->m_next;
 				destruct(n);
 				construct(n, next ? *next : m_sentinel);
-				destruct(next);
+				if (next)
+				{
+					destruct(next);
+				}
 				m_allocator.deallocate(next);
 			}
 			else
