@@ -87,6 +87,8 @@ private slots:
 	void on_positionZ_valueChanged(double arg1);
 	void on_propertyList_customContextMenuRequested(const QPoint &pos);
 
+    void on_nameEdit_editingFinished();
+
 private:
 	void createObjectEditor(QTreeWidgetItem* item, PropertyViewObject* object);
 	void clear();

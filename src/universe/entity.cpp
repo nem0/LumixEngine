@@ -1,4 +1,5 @@
 #include "universe/entity.h"
+#include "core/crc32.h"
 #include "universe/universe.h"
 
 namespace Lumix
@@ -123,6 +124,29 @@ namespace Lumix
 	{
 		universe->m_rotations[index] = rot;
 		universe->entityMoved().invoke(*this);
+	}
+
+	const char* Entity::getName() const
+	{
+		auto iter = universe->m_id_to_name_map.find(index);
+		return iter == universe->m_id_to_name_map.end() ? "" : iter.value().c_str();
+	}
+
+
+	void Entity::setName(const char* name)
+	{
+		auto iter = universe->m_id_to_name_map.find(index);
+		if (iter != universe->m_id_to_name_map.end())
+		{
+			universe->m_name_to_id_map.erase(crc32(iter.value().c_str()));
+			universe->m_id_to_name_map.erase(iter);
+		}
+
+		if (name && name[0] != '\0')
+		{
+			universe->m_name_to_id_map.insert(crc32(name), index);
+			universe->m_id_to_name_map.insert(index, string(name));
+		}
 	}
 
 

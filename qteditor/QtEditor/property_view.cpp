@@ -1367,6 +1367,7 @@ void PropertyView::onEntitySelected(Lumix::Entity& e)
 		*/
 		m_ui->propertyList->expandAll();
 		onEntityPosition(e);
+		m_ui->nameEdit->setText(e.getName());
 		updateValues();
 	}
 }
@@ -1477,5 +1478,13 @@ void PropertyView::on_propertyList_customContextMenuRequested(const QPoint &pos)
 				}
 			}
 		}
+	}
+}
+
+void PropertyView::on_nameEdit_editingFinished()
+{
+	if (m_selected_entity.isValid())
+	{
+		m_selected_entity.setName(m_ui->nameEdit->text().toLatin1().data());
 	}
 }
