@@ -300,6 +300,7 @@ struct WorldEditorImpl : public WorldEditor
 							}
 						}
 					}
+					m_editor.selectEntity(m_entities[0]);
 				}
 
 
@@ -310,6 +311,7 @@ struct WorldEditorImpl : public WorldEditor
 						const Component& cmp = m_entities[i].getComponent(m_type);
 						cmp.scene->destroyComponent(cmp);
 					}
+					m_editor.selectEntity(m_entities[0]);
 				}
 
 
@@ -476,6 +478,7 @@ struct WorldEditorImpl : public WorldEditor
 							}
 						}
 					}
+					m_editor.selectEntity(m_component.entity);
 				}
 
 
@@ -516,6 +519,7 @@ struct WorldEditorImpl : public WorldEditor
 					{
 						m_component.scene->destroyComponent(m_component);
 					}
+					m_editor.selectEntity(m_component.entity);
 				}
 
 			private:
