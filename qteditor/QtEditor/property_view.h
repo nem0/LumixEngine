@@ -94,8 +94,8 @@ private:
 	void clear();
 	void onUniverseCreated();
 	void onUniverseDestroyed();
-	void onEntitySelected(Lumix::Entity& e);
-	void onEntityPosition(Lumix::Entity& e);
+	void onEntitySelected(const Lumix::Entity& e);
+	void onEntityPosition(const Lumix::Entity& e);
 	void addScriptCustomProperties();
 	void addAnimableCustomProperties(const Lumix::Component& cmp);
 	void addTerrainCustomProperties(const Lumix::Component& terrain_component);

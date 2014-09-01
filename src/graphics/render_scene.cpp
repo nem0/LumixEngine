@@ -487,7 +487,7 @@ namespace Lumix
 				return Component::INVALID;
 			}
 
-			void onEntityMoved(Entity& entity)
+			void onEntityMoved(const Entity& entity)
 			{
 				const Entity::ComponentList& cmps = entity.getComponents();
 				for (int i = 0; i < cmps.size(); ++i)

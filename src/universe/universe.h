@@ -43,11 +43,12 @@ class LUMIX_ENGINE_API Universe final
 		int getEntityCount() const { return m_positions.size() - m_free_slots.size(); }
 		Entity getFirstEntity();
 		Entity getNextEntity(Entity entity);
+		bool nameExists(const char* name) const;
 
-		DelegateList<void(Entity&)>& entityMoved() { return m_entity_moved; }
-		DelegateList<void(Entity&)>& entityCreated() { return m_entity_created; }
-		DelegateList<void(Entity&)>& entityDestroyed() { return m_entity_destroyed; }
-		DelegateList<void(Component&)>& componentCreated() { return m_component_created; }
+		DelegateList<void(const Entity&)>& entityMoved() { return m_entity_moved; }
+		DelegateList<void(const Entity&)>& entityCreated() { return m_entity_created; }
+		DelegateList<void(const Entity&)>& entityDestroyed() { return m_entity_destroyed; }
+		DelegateList<void(const Component&)>& componentCreated() { return m_component_created; }
 		DelegateList<void(const Component&)>& componentDestroyed() { return m_component_destroyed; }
 
 		void serialize(ISerializer& serializer);
@@ -60,10 +61,10 @@ class LUMIX_ENGINE_API Universe final
 		Map<uint32_t, uint32_t> m_name_to_id_map;
 		Map<uint32_t, string> m_id_to_name_map;
 		ComponentList	m_component_list;
-		DelegateList<void(Entity&)> m_entity_moved;
-		DelegateList<void(Entity&)> m_entity_created;
-		DelegateList<void(Entity&)> m_entity_destroyed;
-		DelegateList<void(Component&)> m_component_created;
+		DelegateList<void(const Entity&)> m_entity_moved;
+		DelegateList<void(const Entity&)> m_entity_created;
+		DelegateList<void(const Entity&)> m_entity_destroyed;
+		DelegateList<void(const Component&)> m_component_created;
 		DelegateList<void(const Component&)> m_component_destroyed;
 };
 

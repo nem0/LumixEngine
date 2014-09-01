@@ -33,7 +33,9 @@ class EntityList : public QDockWidget
 		void on_entityList_clicked(const QModelIndex& index);
 		void on_comboBox_activated(const QString& arg1);
 
-	private:
+        void on_nameFilterEdit_textChanged(const QString &arg1);
+
+private:
 		void onUniverseCreated();
 		void onUniverseDestroyed();
 		void onUniverseLoaded();

@@ -21,6 +21,7 @@
 #include <QDragEnterEvent>
 #include <qfiledialog.h>
 #include <qmenu.h>
+#include <qmessagebox.h>
 #include <qmimedata.h>
 #include <qlineedit.h>
 #include <qpushbutton.h>
@@ -957,7 +958,7 @@ PropertyView::~PropertyView()
 }
 
 
-void PropertyView::onEntityPosition(Lumix::Entity& e)
+void PropertyView::onEntityPosition(const Lumix::Entity& e)
 {
 	if (m_selected_entity == e)
 	{
@@ -1351,11 +1352,10 @@ void PropertyView::setSelectedResource(Lumix::Resource* resource)
 }
 
 
-void PropertyView::onEntitySelected(Lumix::Entity& e)
+void PropertyView::onEntitySelected(const Lumix::Entity& e)
 {
 	setSelectedResource(NULL);
 	m_selected_entity = e;
-	/// TODO miki
 	clear();
 	if (e.isValid())
 	{
@@ -1389,6 +1389,7 @@ void PropertyView::on_addComponentButton_clicked()
 		if(strcmp(c, component_map[i]) == 0)
 		{
 			m_world_editor->addComponent(crc32(component_map[i+1]));
+			onEntitySelected(m_selected_entity);
 			return;
 		}
 	}
@@ -1483,8 +1484,21 @@ void PropertyView::on_propertyList_customContextMenuRequested(const QPoint &pos)
 
 void PropertyView::on_nameEdit_editingFinished()
 {
-	if (m_selected_entity.isValid())
+	if (m_selected_entity.isValid() && strcmp(m_ui->nameEdit->text().toLatin1().data(), m_selected_entity.getName()) != 0)
 	{
-		m_selected_entity.setName(m_ui->nameEdit->text().toLatin1().data());
+		if (m_selected_entity.universe->nameExists(m_ui->nameEdit->text().toLatin1().data()))
+		{
+			static bool is = false;
+			if (!is)
+			{
+				is = true;
+				QMessageBox::critical(NULL, "Error", "Name already taken", QMessageBox::StandardButton::Ok, 0);
+				is = false;
+			}
+		}
+		else
+		{
+			m_world_editor->setEntityName(m_selected_entity, m_ui->nameEdit->text().toLatin1().data());
+		}
 	}
 }

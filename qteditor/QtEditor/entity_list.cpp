@@ -26,18 +26,27 @@ class EntityListFilter : public QSortFilterProxyModel
 	public:
 		EntityListFilter(QWidget* parent) : QSortFilterProxyModel(parent), m_component(0) {}
 		void filterComponent(uint32_t component) { m_component = component; }
-		void setUniverse(Lumix::Universe* universe) { m_universe = universe; }
+		void setUniverse(Lumix::Universe* universe) { m_universe = universe; invalidate(); }
+		void setWorldEditor(Lumix::WorldEditor& editor)
+		{
+			editor.entityNameSet().bind<EntityListFilter, &EntityListFilter::onEntityNameSet>(this);
+		}
 
 	protected:
 		virtual bool filterAcceptsRow(int source_row, const QModelIndex &source_parent) const override
 		{
+			QModelIndex index = sourceModel()->index(source_row, 0, source_parent);
 			if (m_component == 0)
 			{
-				return true;
+				return sourceModel()->data(index).toString().contains(filterRegExp());
 			}
-			QModelIndex index = sourceModel()->index(source_row, 0, source_parent);
-			int entity_index = sourceModel()->data(index, Qt::DisplayRole).toInt();
-			return Lumix::Entity(m_universe, entity_index).getComponent(m_component).isValid();
+			int entity_index = sourceModel()->data(index, Qt::UserRole).toInt();
+			return Lumix::Entity(m_universe, entity_index).getComponent(m_component).isValid() && sourceModel()->data(index).toString().contains(filterRegExp());
+		}
+
+		void onEntityNameSet(const Lumix::Entity&, const char*)
+		{
+			invalidate();
 		}
 
 	private:
@@ -100,7 +109,16 @@ class EntityListModel : public QAbstractItemModel
 
 		virtual QVariant data(const QModelIndex& index, int role) const override
 		{
-			return index.isValid() && role == Qt::DisplayRole ? m_entities[index.row()].index : QVariant();
+			if (index.isValid() && role == Qt::DisplayRole)
+			{
+				const char* name = m_entities[index.row()].getName();
+				return name && name[0] != '\0' ? QVariant(name) : QVariant(m_entities[index.row()].index);
+			}
+			else if (index.isValid() && role == Qt::UserRole)
+			{
+				return m_entities[index.row()].index;
+			}
+			return QVariant();
 		}
 
 
@@ -133,14 +151,14 @@ class EntityListModel : public QAbstractItemModel
 
 	
 	private:
-		void onEntityCreated(Lumix::Entity& entity)
+		void onEntityCreated(const Lumix::Entity& entity)
 		{
 			m_entities.push(entity);
 			emit dataChanged(createIndex(0, 0), createIndex(m_entities.size() - 1, 0));
 			m_filter->invalidate();
 		}
 
-		void onEntityDestroyed(Lumix::Entity& entity)
+		void onEntityDestroyed(const Lumix::Entity& entity)
 		{
 			m_entities.eraseItem(entity);
 			emit dataChanged(createIndex(0, 0), createIndex(m_entities.size() - 1, 0));
@@ -187,6 +205,7 @@ void EntityList::setWorldEditor(Lumix::WorldEditor& editor)
 	m_universe = editor.getEngine().getUniverse();
 	m_model->setUniverse(m_universe);
 	m_filter->setSourceModel(m_model);
+	m_filter->setWorldEditor(editor);
 	m_ui->comboBox->clear();
 	m_ui->comboBox->addItem("All");
 	for (int i = 0; i < sizeof(component_map) / sizeof(component_map[0]); i += 2)
@@ -207,6 +226,7 @@ void EntityList::onUniverseLoaded()
 {
 	m_universe = m_editor->getEngine().getUniverse();
 	m_model->setUniverse(m_universe);
+	m_filter->invalidate();
 }
 
 
@@ -219,7 +239,7 @@ void EntityList::onUniverseDestroyed()
 
 void EntityList::on_entityList_clicked(const QModelIndex &index)
 {
-	m_editor->selectEntity(Lumix::Entity(m_universe, m_filter->data(index, Qt::DisplayRole).toInt()));
+	m_editor->selectEntity(Lumix::Entity(m_universe, m_filter->data(index, Qt::UserRole).toInt()));
 	TODO("select entity in the list when m_editor->entitySelected()");
 }
 
@@ -237,4 +257,10 @@ void EntityList::on_comboBox_activated(const QString &arg1)
 	}
 	m_filter->filterComponent(0);
 	m_filter->invalidate();
+}
+
+void EntityList::on_nameFilterEdit_textChanged(const QString &arg1)
+{
+	QRegExp regExp(arg1);
+	m_filter->setFilterRegExp(regExp);
 }

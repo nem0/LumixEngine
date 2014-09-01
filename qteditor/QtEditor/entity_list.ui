@@ -72,6 +72,9 @@
      </widget>
     </item>
     <item>
+     <widget class="QLineEdit" name="nameFilterEdit"/>
+    </item>
+    <item>
      <widget class="QListView" name="entityList">
       <property name="modelColumn">
        <number>0</number>
