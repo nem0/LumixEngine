@@ -38,11 +38,13 @@ class IPropertyDescriptor
 		Type getType() const { return m_type; }
 		const char* getName() const { return m_name.c_str(); }
 		void setName(const char* name) { m_name = name; m_name_hash = crc32(name); }
+		const char* getFileType() const { return m_file_type.c_str(); }
 
 	protected:
 		uint32_t m_name_hash;
 		string m_name;
 		Type m_type;
+		string m_file_type;
 };
 
 
@@ -62,7 +64,7 @@ class PropertyDescriptor : public IPropertyDescriptor
 		typedef void (S::*Vec3Setter)(Component, const Vec3&);
 
 	public:
-		PropertyDescriptor(const char* name, Getter _getter, Setter _setter, Type _type) { setName(name); m_getter = _getter; m_setter = _setter; m_type = _type; }
+		PropertyDescriptor(const char* name, Getter _getter, Setter _setter, Type _type, const char* file_type) { setName(name); m_getter = _getter; m_setter = _setter; m_type = _type; m_file_type = file_type; }
 		PropertyDescriptor(const char* name, BoolGetter _getter, BoolSetter _setter) { setName(name); m_bool_getter = _getter; m_bool_setter = _setter; m_type = BOOL; }
 		PropertyDescriptor(const char* name, DecimalGetter _getter, DecimalSetter _setter) { setName(name); m_decimal_getter = _getter; m_decimal_setter = _setter; m_type = DECIMAL; }
 		PropertyDescriptor(const char* name, IntegerGetter _getter, IntegerSetter _setter) { setName(name); m_integer_getter = _getter; m_integer_setter = _setter; m_type = INTEGER; }

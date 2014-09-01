@@ -1,16 +1,59 @@
 #include "entity_list.h"
 #include "ui_entity_list.h"
+#include "core/crc32.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "universe/entity.h"
 
 
+static const char* component_map[] =
+{
+	"Animable", "animable",
+	"Camera", "camera",
+	"Directional light", "light",
+	"Mesh", "renderable",
+	"Physics Box", "box_rigid_actor",
+	"Physics Controller", "physical_controller",
+	"Physics Mesh", "mesh_rigid_actor",
+	"Physics Heightfield", "physical_heightfield",
+	"Script", "script",
+	"Terrain", "terrain"
+};
+
+
+class EntityListFilter : public QSortFilterProxyModel
+{
+	public:
+		EntityListFilter(QWidget* parent) : QSortFilterProxyModel(parent), m_component(0) {}
+		void filterComponent(uint32_t component) { m_component = component; }
+		void setUniverse(Lumix::Universe* universe) { m_universe = universe; }
+
+	protected:
+		virtual bool filterAcceptsRow(int source_row, const QModelIndex &source_parent) const override
+		{
+			if (m_component == 0)
+			{
+				return true;
+			}
+			QModelIndex index = sourceModel()->index(source_row, 0, source_parent);
+			int entity_index = sourceModel()->data(index, Qt::DisplayRole).toInt();
+			return Lumix::Entity(m_universe, entity_index).getComponent(m_component).isValid();
+		}
+
+	private:
+		uint32_t m_component;
+		Lumix::Universe* m_universe;
+};
+
+
 class EntityListModel : public QAbstractItemModel
 {
 	public:
-		EntityListModel() 
+		EntityListModel(QWidget* parent, EntityListFilter* filter)
+			: QAbstractItemModel(parent)
 		{
 			m_universe = NULL;
+			m_filter = filter;
 		}
 
 		virtual QVariant headerData(int section, Qt::Orientation, int role = Qt::DisplayRole) const override
@@ -31,18 +74,13 @@ class EntityListModel : public QAbstractItemModel
 		}
 		
 		
-		virtual QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const override
+		virtual QModelIndex index(int row, int column, const QModelIndex&) const override
 		{
-			/*if(!hasIndex(row, column, parent))
-			{
-				return QModelIndex();
-			}*/
-
 			return createIndex(row, column);
 		}
 		
 		
-		virtual QModelIndex parent(const QModelIndex& index) const override
+		virtual QModelIndex parent(const QModelIndex&) const override
 		{
 			return QModelIndex();
 		}
@@ -68,6 +106,7 @@ class EntityListModel : public QAbstractItemModel
 
 		void setUniverse(Lumix::Universe* universe)
 		{
+			m_filter->setUniverse(universe);
 			if(m_universe)
 			{
 				m_universe->entityCreated().unbind<EntityListModel, &EntityListModel::onEntityCreated>(this);
@@ -97,18 +136,21 @@ class EntityListModel : public QAbstractItemModel
 		void onEntityCreated(Lumix::Entity& entity)
 		{
 			m_entities.push(entity);
-			emit dataChanged(createIndex(0, 0), createIndex(m_entities.size(), 0));
+			emit dataChanged(createIndex(0, 0), createIndex(m_entities.size() - 1, 0));
+			m_filter->invalidate();
 		}
 
 		void onEntityDestroyed(Lumix::Entity& entity)
 		{
 			m_entities.eraseItem(entity);
-			emit dataChanged(createIndex(0, 0), createIndex(m_entities.size(), 0));
+			emit dataChanged(createIndex(0, 0), createIndex(m_entities.size() - 1, 0));
+			m_filter->invalidate();
 		}
 
 	private:
 		Lumix::Universe* m_universe;
 		Lumix::Array<Lumix::Entity> m_entities;
+		EntityListFilter* m_filter;
 };
 
 
@@ -118,8 +160,11 @@ EntityList::EntityList(QWidget *parent)
 {
 	m_universe = NULL;
 	m_ui->setupUi(this);
-	m_model = new EntityListModel;
-	m_ui->entityList->setModel(m_model);
+	m_filter = new EntityListFilter(this);
+	m_model = new EntityListModel(this, m_filter);
+	m_filter->setDynamicSortFilter(true);
+	m_filter->setSourceModel(m_model);
+	m_ui->entityList->setModel(m_filter);
 }
 
 
@@ -130,7 +175,6 @@ EntityList::~EntityList()
 	m_editor->universeLoaded().unbind<EntityList, &EntityList::onUniverseLoaded>(this);
 
 	delete m_ui;
-	delete m_model;
 }
 
 
@@ -140,7 +184,15 @@ void EntityList::setWorldEditor(Lumix::WorldEditor& editor)
 	editor.universeCreated().bind<EntityList, &EntityList::onUniverseCreated>(this);
 	editor.universeDestroyed().bind<EntityList, &EntityList::onUniverseDestroyed>(this);
 	editor.universeLoaded().bind<EntityList, &EntityList::onUniverseLoaded>(this);
-	m_model->setUniverse(editor.getEngine().getUniverse());
+	m_universe = editor.getEngine().getUniverse();
+	m_model->setUniverse(m_universe);
+	m_filter->setSourceModel(m_model);
+	m_ui->comboBox->clear();
+	m_ui->comboBox->addItem("All");
+	for (int i = 0; i < sizeof(component_map) / sizeof(component_map[0]); i += 2)
+	{
+		m_ui->comboBox->addItem(component_map[i]);
+	}
 }
 
 
@@ -164,8 +216,25 @@ void EntityList::onUniverseDestroyed()
 	m_universe = NULL;
 }
 
+
 void EntityList::on_entityList_clicked(const QModelIndex &index)
 {
-	m_editor->selectEntity(Lumix::Entity(m_universe, m_model->data(index, Qt::DisplayRole).toInt()));
+	m_editor->selectEntity(Lumix::Entity(m_universe, m_filter->data(index, Qt::DisplayRole).toInt()));
 	TODO("select entity in the list when m_editor->entitySelected()");
+}
+
+
+void EntityList::on_comboBox_activated(const QString &arg1)
+{
+	for (int i = 0; i < sizeof(component_map) / sizeof(component_map[0]); i += 2)
+	{
+		if (arg1 == component_map[i])
+		{
+			m_filter->filterComponent(crc32(component_map[i + 1]));
+			m_filter->invalidate();
+			return;
+		}
+	}
+	m_filter->filterComponent(0);
+	m_filter->invalidate();
 }
