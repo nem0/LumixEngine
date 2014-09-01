@@ -194,6 +194,7 @@ EntityList::~EntityList()
 	m_editor->universeCreated().unbind<EntityList, &EntityList::onUniverseCreated>(this);
 	m_editor->universeDestroyed().unbind<EntityList, &EntityList::onUniverseDestroyed>(this);
 	m_editor->universeLoaded().unbind<EntityList, &EntityList::onUniverseLoaded>(this);
+	m_editor->entitySelected().unbind<EntityList, &EntityList::onEntitySelected>(this);
 
 	delete m_ui;
 }
