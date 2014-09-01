@@ -109,14 +109,17 @@ class EntityListModel : public QAbstractItemModel
 
 		virtual QVariant data(const QModelIndex& index, int role) const override
 		{
-			if (index.isValid() && role == Qt::DisplayRole)
+			if (index.row() < m_entities.size())
 			{
-				const char* name = m_entities[index.row()].getName();
-				return name && name[0] != '\0' ? QVariant(name) : QVariant(m_entities[index.row()].index);
-			}
-			else if (index.isValid() && role == Qt::UserRole)
-			{
-				return m_entities[index.row()].index;
+				if (index.isValid() && role == Qt::DisplayRole)
+				{
+					const char* name = m_entities[index.row()].getName();
+					return name && name[0] != '\0' ? QVariant(name) : QVariant(m_entities[index.row()].index);
+				}
+				else if (index.isValid() && role == Qt::UserRole)
+				{
+					return m_entities[index.row()].index;
+				}
 			}
 			return QVariant();
 		}
