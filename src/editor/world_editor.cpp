@@ -50,6 +50,61 @@ static const uint32_t ANIMABLE_HASH = crc32("animable");
 static const uint32_t TERRAIN_HASH = crc32("terrain");
 
 
+class SetEntityNameCommand : public IEditorCommand
+{
+	public:
+		SetEntityNameCommand(WorldEditor& editor, Entity entity, const char* name)
+			: m_entity(entity)
+			, m_new_name(name)
+			, m_old_name(entity.getName())
+			, m_editor(editor)
+		{}
+
+
+		virtual void execute() override
+		{
+			m_entity.setName(m_new_name.c_str());
+			m_editor.entityNameSet().invoke(m_entity, m_new_name.c_str());
+		}
+
+
+		virtual void undo() override
+		{
+			m_entity.setName(m_old_name.c_str());
+			m_editor.entityNameSet().invoke(m_entity, m_old_name.c_str());
+
+		}
+
+
+		virtual uint32_t getType() override
+		{
+			static const uint32_t type = crc32("set_entity_name");
+			return type;
+		}
+
+
+		virtual bool merge(IEditorCommand& command)
+		{
+			ASSERT(command.getType() == getType());
+			if (static_cast<SetEntityNameCommand&>(command).m_entity == m_entity)
+			{
+				static_cast<SetEntityNameCommand&>(command).m_new_name = m_new_name;
+				return true;
+			}
+			else
+			{
+				return false;
+			}
+		}
+
+	private:
+		Entity m_entity;
+		string m_new_name;
+		string m_old_name;
+		WorldEditor& m_editor;
+};
+
+
 class MoveEntityCommand : public IEditorCommand
 {
 	public:
@@ -819,7 +874,7 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
-		void onEntityCreated(Entity& entity)
+		void onEntityCreated(const Entity& entity)
 		{
 			EditorIcon* er = LUMIX_NEW(EditorIcon)();
 			er->create(*m_engine, *static_cast<RenderScene*>(m_camera.getComponent(CAMERA_HASH).scene), entity);
@@ -842,6 +897,16 @@ struct WorldEditorImpl : public WorldEditor
 			if (entity.isValid())
 			{
 				IEditorCommand* command = LUMIX_NEW(MoveEntityCommand)(entity, position, rotation);
+				executeCommand(command);
+			}
+		}
+
+
+		virtual void setEntityName(const Entity& entity, const char* name) override
+		{
+			if (entity.isValid())
+			{
+				IEditorCommand* command = LUMIX_NEW(SetEntityNameCommand)(*this, entity, name);
 				executeCommand(command);
 			}
 		}
@@ -873,7 +938,6 @@ struct WorldEditorImpl : public WorldEditor
 			m_undo_stack.push(command);
 			++m_undo_index;
 			command->execute();
-			selectEntity(m_selected_entity);
 			b = false;
 		}
 
@@ -1277,7 +1341,7 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
-		void onComponentCreated(Component& cmp)
+		void onComponentCreated(const Component& cmp)
 		{
 			for (int i = 0; i < m_editor_icons.size(); ++i)
 			{
@@ -1314,7 +1378,7 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
-		void onEntityDestroyed(Entity& entity)
+		void onEntityDestroyed(const Entity& entity)
 		{
 			if(m_selected_entity == entity)
 			{
@@ -1369,7 +1433,7 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
-		virtual DelegateList<void(Entity&)>& entitySelected() override
+		virtual DelegateList<void(const Entity&)>& entitySelected() override
 		{
 			return m_entity_selected;
 		}
@@ -1384,6 +1448,12 @@ struct WorldEditorImpl : public WorldEditor
 		virtual DelegateList<void()>& universeLoaded() override
 		{
 			return m_universe_loaded;
+		}
+
+
+		virtual DelegateList<void(const Entity&, const char*)>& entityNameSet() override
+		{
+			return m_entity_name_set;
 		}
 
 
@@ -1421,6 +1491,7 @@ struct WorldEditorImpl : public WorldEditor
 			if (create_basic_entities)
 			{
 				m_camera = m_engine->getUniverse()->createEntity();
+				m_camera.setName("editor_camera");
 				m_camera.setPosition(0, 0, -5);
 				m_camera.setRotation(Quat(Vec3(0, 1, 0), -Math::PI));
 				Component cmp = createComponent(CAMERA_HASH, m_camera);
@@ -1493,7 +1564,8 @@ struct WorldEditorImpl : public WorldEditor
 		DelegateList<void()> m_universe_destroyed;
 		DelegateList<void()> m_universe_created;
 		DelegateList<void()> m_universe_loaded;
-		DelegateList<void(Entity&)> m_entity_selected;
+		DelegateList<void(const Entity&)> m_entity_selected;
+		DelegateList<void(const Entity&, const char*)> m_entity_name_set;
 
 		FS::FileSystem* m_file_system;
 		FS::TCPFileServer m_tpc_file_server;

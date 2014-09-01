@@ -204,7 +204,7 @@ namespace Lumix
 			}
 
 
-			void onComponentCreated(Component& cmp)
+			void onComponentCreated(const Component& cmp)
 			{
 				if (cmp.type == RENDERABLE_HASH)
 				{

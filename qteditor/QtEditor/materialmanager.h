@@ -30,7 +30,7 @@ class MaterialManager : public QDockWidget
 		void fillObjectMaterials();
 		void selectMaterial(const char* path);
 		void onMaterialLoaded(Lumix::Resource::State, Lumix::Resource::State);
-		void onEntitySelected(Lumix::Entity& entity);
+		void onEntitySelected(const Lumix::Entity& entity);
 
 	private slots:
 		void on_objectMaterialList_doubleClicked(const QModelIndex& index);
@@ -40,9 +40,9 @@ class MaterialManager : public QDockWidget
 		void onTextureChanged();
 		void onTextureRemoved();
 		void onTextureAdded();
-        void on_fileTreeView_doubleClicked(const QModelIndex &index);
+		void on_fileTreeView_doubleClicked(const QModelIndex &index);
 
-private:
+	private:
 		Ui::MaterialManager* m_ui;
 		class MaterialManagerUI* m_impl;
 };

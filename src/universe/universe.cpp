@@ -221,4 +221,17 @@ Component Universe::addComponent(const Entity& entity, uint32_t component_type, 
 }
 
 
+bool Universe::nameExists(const char* name) const
+{
+	for (auto iter = m_id_to_name_map.begin(), end = m_id_to_name_map.end(); iter != end; ++iter)
+	{
+		if (iter.value() == name)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+
 } // !namespace Lumix

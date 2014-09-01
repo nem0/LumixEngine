@@ -162,7 +162,7 @@ namespace Lumix
 			}
 
 
-			void onEntityDestroyed(Entity& entity)
+			void onEntityDestroyed(const Entity& entity)
 			{
 				uint32_t tpl = getTemplate(entity);
 				if (tpl != 0)

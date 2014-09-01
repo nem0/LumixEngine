@@ -91,7 +91,7 @@ QWidget* MaterialManager::getPreview() const
 }
 
 
-void MaterialManager::onEntitySelected(Lumix::Entity& entity)
+void MaterialManager::onEntitySelected(const Lumix::Entity& entity)
 {
 	if (entity.isValid())
 	{
