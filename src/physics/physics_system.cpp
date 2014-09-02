@@ -60,8 +60,8 @@ bool PhysicsSystem::create(Engine& engine)
 {
 	engine.getWorldEditor()->registerProperty("box_rigid_actor", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)("dynamic", &PhysicsScene::getIsDynamic, &PhysicsScene::setIsDynamic));
 	engine.getWorldEditor()->registerProperty("box_rigid_actor", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)("size", &PhysicsScene::getHalfExtents, &PhysicsScene::setHalfExtents));
-	engine.getWorldEditor()->registerProperty("mesh_rigid_actor", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)("source", &PhysicsScene::getShapeSource, &PhysicsScene::setShapeSource, IPropertyDescriptor::FILE));
-	engine.getWorldEditor()->registerProperty("physical_heightfield", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)("heightmap", &PhysicsScene::getHeightmap, &PhysicsScene::setHeightmap, IPropertyDescriptor::FILE));
+	engine.getWorldEditor()->registerProperty("mesh_rigid_actor", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)("source", &PhysicsScene::getShapeSource, &PhysicsScene::setShapeSource, IPropertyDescriptor::FILE, "Physics (*.pda)"));
+	engine.getWorldEditor()->registerProperty("physical_heightfield", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)("heightmap", &PhysicsScene::getHeightmap, &PhysicsScene::setHeightmap, IPropertyDescriptor::FILE, "Image (*.raw)"));
 	engine.getWorldEditor()->registerProperty("physical_heightfield", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)("xz_scale", &PhysicsScene::getHeightmapXZScale, &PhysicsScene::setHeightmapXZScale));
 	engine.getWorldEditor()->registerProperty("physical_heightfield", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)("y_scale", &PhysicsScene::getHeightmapYScale, &PhysicsScene::setHeightmapYScale));
 

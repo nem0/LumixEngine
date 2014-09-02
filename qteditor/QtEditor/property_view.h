@@ -68,6 +68,7 @@ public:
 	void setSelectedResourceFilename(const char* filename);
 	void setSelectedResource(Lumix::Resource* resource);
 	void setObject(PropertyViewObject* object);
+	void addTerrainCustomProperties(QTreeWidgetItem& item, const Lumix::Component& terrain_component);
 
 private slots:
 	void on_addComponentButton_clicked();
@@ -75,8 +76,6 @@ private slots:
 	void on_editScriptClicked();
 	void on_animablePlayPause();
 	void on_animableTimeSet(int value);
-	void on_terrainBrushSizeChanged(int value);
-	void on_terrainBrushStrengthChanged(int value);
 	void on_TerrainHeightTypeClicked();
 	void on_TerrainTextureTypeClicked();
 	void on_terrainBrushTextureChanged(int value);
@@ -86,20 +85,19 @@ private slots:
 	void on_positionY_valueChanged(double arg1);
 	void on_positionZ_valueChanged(double arg1);
 	void on_propertyList_customContextMenuRequested(const QPoint &pos);
+	void on_nameEdit_editingFinished();
 
 private:
 	void createObjectEditor(QTreeWidgetItem* item, PropertyViewObject* object);
 	void clear();
 	void onUniverseCreated();
 	void onUniverseDestroyed();
-	void onEntitySelected(Lumix::Entity& e);
-	void onEntityPosition(Lumix::Entity& e);
+	void onEntitySelected(const Lumix::Entity& e);
+	void onEntityPosition(const Lumix::Entity& e);
 	void addScriptCustomProperties();
 	void addAnimableCustomProperties(const Lumix::Component& cmp);
-	void addTerrainCustomProperties(const Lumix::Component& terrain_component);
 	void onScriptCompiled(const Lumix::Path& path, uint32_t status);
 	void setScriptStatus(uint32_t status);
-	void updateValues();
 	void updateSelectedEntityPosition();
 	void onSelectedResourceLoaded(Lumix::Resource::State old_state, Lumix::Resource::State new_state);
 
