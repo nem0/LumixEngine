@@ -78,6 +78,7 @@ namespace Lumix
 			virtual Entity addEntityAt(int camera_x, int camera_y) = 0;
 			virtual void setEntityPosition(const Entity& entity, const Vec3& position) = 0;
 			virtual void setEntityPositionAndRotaion(const Entity& entity, const Vec3& position, const Quat& rotation) = 0;
+			virtual void setEntityName(const Entity& entity, const char* name) = 0;
 			virtual void snapToTerrain() = 0;
 			virtual void toggleGameMode() = 0;
 			virtual void navigate(float forward, float right, float speed) = 0;
@@ -93,10 +94,11 @@ namespace Lumix
 			virtual Entity getSelectedEntity() const = 0;
 			virtual const IPropertyDescriptor& getPropertyDescriptor(uint32_t type, uint32_t name_hash) = 0;
 			virtual Array<IPropertyDescriptor*>& getPropertyDescriptors(uint32_t type) = 0;
-			virtual DelegateList<void(Entity&)>& entitySelected() = 0;
+			virtual DelegateList<void(const Entity&)>& entitySelected() = 0;
 			virtual DelegateList<void()>& universeCreated() = 0;
 			virtual DelegateList<void()>& universeDestroyed() = 0;
 			virtual DelegateList<void()>& universeLoaded() = 0;
+			virtual DelegateList<void(const Entity&, const char*)>& entityNameSet() = 0;
 			virtual void addPlugin(Plugin* plugin) = 0;
 			virtual void getRelativePath(char* relative_path, int max_length, const Path& source) = 0;
 			virtual EntityTemplateSystem& getEntityTemplateSystem() = 0;
