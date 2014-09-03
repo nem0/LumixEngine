@@ -24,7 +24,6 @@ SOURCES += main.cpp\
     scripts/scriptcompiler.cpp \
     scripts/scriptcompilerwidget.cpp \
     fileserverwidget.cpp \
-    materialmanager.cpp \
     profilerui.cpp \
     profilergraph.cpp \
     pc/file_system_watcher.cpp \
@@ -42,7 +41,6 @@ HEADERS  += mainwindow.h \
     scripts/scriptcompiler.h \
     scripts/scriptcompilerwidget.h \
     fileserverwidget.h \
-    materialmanager.h \
     wgl_render_device.h \
     renderdevicewidget.h \
     profilerui.h \
@@ -60,7 +58,6 @@ FORMS    += mainwindow.ui \
     assetbrowser.ui \
     scripts/scriptcompilerwidget.ui \
     fileserverwidget.ui \
-    materialmanager.ui \
     profilerui.ui \
     profilergraph.ui \
     entity_template_list.ui \

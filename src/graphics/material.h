@@ -48,6 +48,7 @@ public:
 	void addTexture(Texture* texture);
 	void setTexture(int i, Texture* texture);
 	void removeTexture(int i);
+	bool save(ISerializer& serializer);
 
 private:
 	Material(const Path& path, ResourceManager& resource_manager)
@@ -61,7 +62,6 @@ private:
 
 	~Material();
 
-	bool save(ISerializer& serializer);
 	virtual void doUnload(void) override;
 	virtual FS::ReadCallback getReadCallback() override;
 

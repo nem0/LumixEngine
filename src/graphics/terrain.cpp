@@ -494,6 +494,7 @@ namespace Lumix
 		return 0;
 	}
 
+
 	bool getRayTriangleIntersection(const Vec3& local_origin, const Vec3& local_dir, const Vec3& p0, const Vec3& p1, const Vec3& p2, float& out)
 	{
 		Vec3 normal = crossProduct(p1 - p0, p2 - p0);

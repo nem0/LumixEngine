@@ -31,17 +31,19 @@ class PropertyViewObject : public QObject
 {
 	Q_OBJECT
 	public:
-		typedef PropertyViewObject* (*Creator)(Lumix::Resource*);
+		typedef PropertyViewObject* (*Creator)(PropertyViewObject*, Lumix::Resource*);
 
 	public:
-		PropertyViewObject(const char* name)
+		PropertyViewObject(PropertyViewObject* parent, const char* name)
 			: m_name(name)
+			, m_parent(parent)
 		{ }
 		virtual ~PropertyViewObject();
 		const char* getName() const { return m_name.c_str(); }
 		PropertyViewObject** getMembers() { return m_members.empty() ? NULL : &m_members[0]; }
 		int getMemberCount() const { return m_members.size(); }
 		void addMember(PropertyViewObject* member) { m_members.push(member); }
+		PropertyViewObject* getParent() const { return m_parent; }
 
 		virtual void createEditor(class PropertyView& view, QTreeWidgetItem* item) = 0;
 		virtual bool isEditable() const = 0;
@@ -49,6 +51,7 @@ class PropertyViewObject : public QObject
 	private:
 		Lumix::string m_name;
 		Lumix::Array<PropertyViewObject*> m_members;
+		PropertyViewObject* m_parent;
 };
 
 
@@ -68,6 +71,7 @@ public:
 	void setSelectedResourceFilename(const char* filename);
 	void setSelectedResource(Lumix::Resource* resource);
 	void setObject(PropertyViewObject* object);
+	PropertyViewObject* getObject();
 	void addTerrainCustomProperties(QTreeWidgetItem& item, const Lumix::Component& terrain_component);
 
 private slots:
