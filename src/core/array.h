@@ -86,6 +86,18 @@ class Array<T, Allocator, false>
 			}
 		}
 
+		void eraseItem(const T& item)
+		{
+			for (int i = 0; i < m_size; ++i)
+			{
+				if (m_data[i] == item)
+				{
+					erase(i);
+					return;
+				}
+			}
+		}
+
 		void erase(int index)
 		{
 			if(index >= 0 && index < m_size)

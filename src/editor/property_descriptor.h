@@ -2,6 +2,7 @@
 
 #include "universe\universe.h"
 #include "core/blob.h"
+#include "core/crc32.h"
 #include "core/delegate.h"
 #include "core/string.h"
 
@@ -28,15 +29,22 @@ class IPropertyDescriptor
 		};
 
 	public:
+		virtual ~IPropertyDescriptor() {}
+
 		virtual void set(Component cmp, Blob& stream) const = 0;
 		virtual void get(Component cmp, Blob& stream) const = 0;
 
 		uint32_t getNameHash() const { return m_name_hash; }
 		Type getType() const { return m_type; }
+		const char* getName() const { return m_name.c_str(); }
+		void setName(const char* name) { m_name = name; m_name_hash = crc32(name); }
+		const char* getFileType() const { return m_file_type.c_str(); }
 
 	protected:
 		uint32_t m_name_hash;
+		string m_name;
 		Type m_type;
+		string m_file_type;
 };
 
 
@@ -56,11 +64,11 @@ class PropertyDescriptor : public IPropertyDescriptor
 		typedef void (S::*Vec3Setter)(Component, const Vec3&);
 
 	public:
-		PropertyDescriptor(uint32_t _name_hash, Getter _getter, Setter _setter, Type _type) { m_name_hash = _name_hash; m_getter = _getter; m_setter = _setter; m_type = _type; }
-		PropertyDescriptor(uint32_t _name_hash, BoolGetter _getter, BoolSetter _setter) { m_name_hash = _name_hash; m_bool_getter = _getter; m_bool_setter = _setter; m_type = BOOL; }
-		PropertyDescriptor(uint32_t _name_hash, DecimalGetter _getter, DecimalSetter _setter) { m_name_hash = _name_hash; m_decimal_getter = _getter; m_decimal_setter = _setter; m_type = DECIMAL; }
-		PropertyDescriptor(uint32_t _name_hash, IntegerGetter _getter, IntegerSetter _setter) { m_name_hash = _name_hash; m_integer_getter = _getter; m_integer_setter = _setter; m_type = INTEGER; }
-		PropertyDescriptor(uint32_t _name_hash, Vec3Getter _getter, Vec3Setter _setter) { m_name_hash = _name_hash; m_vec3_getter = _getter; m_vec3_setter = _setter; m_type = VEC3; }
+		PropertyDescriptor(const char* name, Getter _getter, Setter _setter, Type _type, const char* file_type) { setName(name); m_getter = _getter; m_setter = _setter; m_type = _type; m_file_type = file_type; }
+		PropertyDescriptor(const char* name, BoolGetter _getter, BoolSetter _setter) { setName(name); m_bool_getter = _getter; m_bool_setter = _setter; m_type = BOOL; }
+		PropertyDescriptor(const char* name, DecimalGetter _getter, DecimalSetter _setter) { setName(name); m_decimal_getter = _getter; m_decimal_setter = _setter; m_type = DECIMAL; }
+		PropertyDescriptor(const char* name, IntegerGetter _getter, IntegerSetter _setter) { setName(name); m_integer_getter = _getter; m_integer_setter = _setter; m_type = INTEGER; }
+		PropertyDescriptor(const char* name, Vec3Getter _getter, Vec3Setter _setter) { setName(name); m_vec3_getter = _getter; m_vec3_setter = _setter; m_type = VEC3; }
 		virtual void set(Component cmp, Blob& stream) const override;
 		virtual void get(Component cmp, Blob& stream) const override;
 
@@ -122,7 +130,7 @@ void PropertyDescriptor<S>::set(Component cmp, Blob& stream) const
 					stream.read(c, 1);
 					++c;
 				}
-				while (*c && c - tmp < 300);
+				while (*(c - 1) && (c - 1) - tmp < 300);
 				string s((char*)tmp);
 				(static_cast<S*>(cmp.scene)->*m_setter)(cmp, s);
 			}

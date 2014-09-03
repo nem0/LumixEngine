@@ -4,6 +4,7 @@
 #include "editor/entity_template_system.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
+#include "entity_list.h"
 #include "entity_template_list.h"
 #include "fileserverwidget.h"
 #include "gameview.h"
@@ -12,7 +13,6 @@
 #include "property_view.h"
 #include "sceneview.h"
 #include "scripts/scriptcompilerwidget.h"
-#include "materialmanager.h"
 #include "profilerui.h"
 #include <qfiledialog.h>
 #include <qinputdialog.h>
@@ -35,10 +35,10 @@ MainWindow::MainWindow(QWidget* parent) :
 	m_asset_browser = new AssetBrowser;
 	m_script_compiler_ui = new ScriptCompilerWidget;
 	m_file_server_ui = new FileServerWidget;
-	m_material_manager_ui = new MaterialManager;
 	m_profiler_ui = new ProfilerUI;
 	m_entity_template_list_ui = new EntityTemplateList;
 	m_notifications = Notifications::create(*this);
+	m_entity_list = new EntityList(NULL);
 
 	QSettings settings("Lumix", "QtEditor");
 	restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
@@ -50,9 +50,9 @@ MainWindow::MainWindow(QWidget* parent) :
 	addDockWidget(static_cast<Qt::DockWidgetArea>(1), m_property_view);
 	addDockWidget(static_cast<Qt::DockWidgetArea>(2), m_scene_view);
 	addDockWidget(static_cast<Qt::DockWidgetArea>(2), m_asset_browser);
-	addDockWidget(static_cast<Qt::DockWidgetArea>(8), m_material_manager_ui);
 	addDockWidget(static_cast<Qt::DockWidgetArea>(1), m_profiler_ui);
 	addDockWidget(static_cast<Qt::DockWidgetArea>(2), m_entity_template_list_ui);
+	addDockWidget(static_cast<Qt::DockWidgetArea>(2), m_entity_list);
 
 	m_property_view->setScriptCompiler(m_script_compiler_ui->getCompiler());
 	m_property_view->setAssetBrowser(*m_asset_browser);
@@ -91,7 +91,6 @@ MainWindow::~MainWindow()
 	delete m_asset_browser;
 	delete m_script_compiler_ui;
 	delete m_file_server_ui;
-	delete m_material_manager_ui;
 	delete m_profiler_ui;
 	delete m_entity_template_list_ui;
 	Notifications::destroy(m_notifications);
@@ -103,9 +102,10 @@ void MainWindow::setWorldEditor(Lumix::WorldEditor& editor)
 	m_world_editor = &editor;
 	m_file_server_ui->setWorldEditor(editor);
 	m_asset_browser->setWorldEditor(editor);
-	m_material_manager_ui->setWorldEditor(editor);
 	m_property_view->setWorldEditor(editor);
 	m_entity_template_list_ui->setWorldEditor(editor);
+	m_game_view->setWorldEditor(editor);
+	m_entity_list->setWorldEditor(editor);
 }
 
 GameView* MainWindow::getGameView() const
@@ -189,11 +189,6 @@ void MainWindow::on_actionProfiler_triggered()
 	m_profiler_ui->show();
 }
 
-void MainWindow::on_actionMaterial_manager_triggered()
-{
-	m_material_manager_ui->show();
-}
-
 void MainWindow::on_actionPolygon_Mode_changed()
 {
 	m_world_editor->setWireframe(m_ui->actionPolygon_Mode->isChecked());
@@ -270,4 +265,9 @@ void MainWindow::on_actionRemove_triggered()
 	{
 		m_world_editor->destroyEntities(&m_world_editor->getSelectedEntity(), 1);
 	}
+}
+
+void MainWindow::on_actionEntity_list_triggered()
+{
+	m_entity_list->show();
 }

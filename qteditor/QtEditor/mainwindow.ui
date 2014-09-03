@@ -52,11 +52,11 @@
       <string>Windows</string>
      </property>
      <addaction name="actionAsset_Browser"/>
+     <addaction name="actionEntity_list"/>
      <addaction name="actionEntity_templates"/>
      <addaction name="actionFile_server"/>
      <addaction name="actionGame_view"/>
      <addaction name="actionLog"/>
-     <addaction name="actionMaterial_manager"/>
      <addaction name="actionProfiler"/>
      <addaction name="actionProperties"/>
      <addaction name="actionScene_View"/>
@@ -276,6 +276,14 @@
   <action name="actionRemove">
    <property name="text">
     <string>Remove</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+R</string>
+   </property>
+  </action>
+  <action name="actionEntity_list">
+   <property name="text">
+    <string>Entity list</string>
    </property>
   </action>
  </widget>

@@ -25,6 +25,7 @@ public:
 
 	QWidget* getContentWidget() const;
 	void setPipeline(Lumix::PipelineInstance& pipeline) { m_pipeline = &pipeline; }
+	void setWorldEditor(Lumix::WorldEditor& editor) { m_editor = &editor; }
 
 private slots:
 	void on_playButton_clicked();
@@ -35,6 +36,6 @@ private:
 private:
 	Ui::GameView* m_ui;
 	Lumix::PipelineInstance* m_pipeline;
-	Lumix::WorldEditor* m_server;
+	Lumix::WorldEditor* m_editor;
 };
 

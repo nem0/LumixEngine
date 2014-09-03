@@ -26,7 +26,6 @@ public:
 	void setWorldEditor(Lumix::WorldEditor& world_editor);
 	class SceneView* getSceneView() const;
 	class GameView* getGameView() const;
-	class MaterialManager* getMaterialManager() const { return m_material_manager_ui; }
 	Lumix::DelegateList<void(const QSize&)>& resized() { return m_resized; }
 
 private slots:
@@ -43,7 +42,6 @@ private slots:
 	void on_actionScene_View_triggered();
 	virtual void closeEvent(QCloseEvent* event) override;
 	void on_actionProfiler_triggered();
-	void on_actionMaterial_manager_triggered();
 	void on_actionPolygon_Mode_changed();
 	void on_actionGame_mode_triggered();
 	void on_actionLook_at_selected_entity_triggered();
@@ -58,6 +56,8 @@ private slots:
 
     void on_actionRemove_triggered();
 
+    void on_actionEntity_list_triggered();
+
 private:
 	virtual void resizeEvent(QResizeEvent* event) override;
 
@@ -71,10 +71,10 @@ private:
 	class AssetBrowser* m_asset_browser;
 	class ScriptCompilerWidget* m_script_compiler_ui;
 	class FileServerWidget* m_file_server_ui;
-	class MaterialManager* m_material_manager_ui;
 	class ProfilerUI* m_profiler_ui;
 	class EntityTemplateList* m_entity_template_list_ui;
 	class Notifications* m_notifications;
+	class EntityList* m_entity_list;
 	Lumix::DelegateList<void(const QSize&)> m_resized;
 };
 
