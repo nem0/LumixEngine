@@ -30,7 +30,7 @@ class NotificationsImpl : public Notifications
 		}
 
 
-		void onMainWindowResized(const QSize& size)
+		void onMainWindowResized(const QSize&)
 		{
 			updateLayout();
 		}

@@ -36,6 +36,16 @@ class Map
 				this->node = node;
 			}
 
+			Value& value()
+			{
+				return node->value;
+			}
+
+			Key& key()
+			{
+				return node->key;
+			}
+
 			Value& second()
 			{
 				return node->value;
@@ -187,6 +197,11 @@ class Map
 		void erase(const Key& key)
 		{
 			m_root = deleteNode(key, m_root);
+		}
+
+		void erase(iterator& iter)
+		{
+			m_root = deleteNode(iter.key(), m_root);
 		}
 
 	private:

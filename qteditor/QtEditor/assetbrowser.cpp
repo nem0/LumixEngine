@@ -59,15 +59,15 @@ AssetBrowser::~AssetBrowser()
 }
 
 
-void AssetBrowser::onTreeViewSelectionChanged(const QModelIndex& current, const QModelIndex&)
+void AssetBrowser::onTreeViewSelectionChanged(const QModelIndex&, const QModelIndex&)
 {
-	if (current.isValid())
+    /*if (current.isValid())
 	{
 		const QFileInfo& file_info = m_model->fileInfo(current);
 		QByteArray byte_array = file_info.filePath().toLower().toLatin1();
 		const char* filename = byte_array.data();
 		emit fileSelected(filename);
-	}
+    }*/
 }
 
 
@@ -99,7 +99,7 @@ void AssetBrowser::handleDoubleClick(const QFileInfo& file_info)
 	else if(suffix == "ani")
 	{
 		m_editor->addComponent(crc32("animable"));
-		m_editor->setProperty("animable", "preview", file.toLatin1().data(), file.length());
+		m_editor->setProperty(crc32("animable"), crc32("preview"), file.toLatin1().data(), file.length());
 	}
 }
 
@@ -257,4 +257,15 @@ void AssetBrowser::on_filterComboBox_currentTextChanged(const QString&)
 		filters << "*.mat";
 	}
 	m_model->setNameFilters(filters);
+}
+
+void AssetBrowser::on_treeView_clicked(const QModelIndex &index)
+{
+    if (index.isValid())
+    {
+        const QFileInfo& file_info = m_model->fileInfo(index);
+        QByteArray byte_array = file_info.filePath().toLower().toLatin1();
+        const char* filename = byte_array.data();
+        emit fileSelected(filename);
+    }
 }

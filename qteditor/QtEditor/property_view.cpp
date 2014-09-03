@@ -3,6 +3,9 @@
 #include "animation/animation_system.h"
 #include "assetbrowser.h"
 #include "core/crc32.h"
+#include "core/FS/file_system.h"
+#include "core/json_serializer.h"
+#include "core/log.h"
 #include "core/path_utils.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
@@ -21,6 +24,7 @@
 #include <QDragEnterEvent>
 #include <qfiledialog.h>
 #include <qmenu.h>
+#include <qmessagebox.h>
 #include <qmimedata.h>
 #include <qlineedit.h>
 #include <qpushbutton.h>
@@ -31,159 +35,703 @@ static const char* component_map[] =
 {
 	"Animable", "animable",
 	"Camera", "camera",
+	"Directional light", "light",
+	"Mesh", "renderable",
 	"Physics Box", "box_rigid_actor",
 	"Physics Controller", "physical_controller",
 	"Physics Mesh", "mesh_rigid_actor",
 	"Physics Heightfield", "physical_heightfield",
-	"Point Light", "light",
-	"Renderable", "renderable",
 	"Script", "script",
 	"Terrain", "terrain"
 };
 
 
-bool TexturePlugin::onResourceLoaded(Ui::PropertyView& property_view, Lumix::Resource* resource)
+static const uint32_t TERRAIN_HASH = crc32("terrain");
+
+
+class FileEdit : public QLineEdit
+{
+	public:
+		FileEdit(QWidget* parent, PropertyView* property_view)
+			: QLineEdit(parent)
+			, m_property_view(property_view)
+			, m_world_editor(NULL)
+		{
+			setAcceptDrops(true);
+		}
+
+		virtual void dragEnterEvent(QDragEnterEvent* event) override
+		{
+			if (event->mimeData()->hasUrls())
+			{
+				event->acceptProposedAction();
+			}
+		}
+
+		virtual void dropEvent(QDropEvent* event)
+		{
+			ASSERT(m_world_editor);
+			const QList<QUrl>& list = event->mimeData()->urls();
+			if(!list.empty())
+			{
+				QString file = list[0].toLocalFile();
+				if(file.toLower().startsWith(m_world_editor->getBasePath()))
+				{
+					file.remove(0, QString(m_world_editor->getBasePath()).length());
+				}
+				if(file.startsWith("/"))
+				{
+					file.remove(0, 1);
+				}
+				setText(file);
+				emit editingFinished();
+			}
+		}
+
+		void setServer(Lumix::WorldEditor* server)
+		{
+			m_world_editor = server;
+		}
+
+	private:
+		PropertyView* m_property_view;
+		Lumix::WorldEditor* m_world_editor;
+};
+
+
+class ComponentPropertyObject : public PropertyViewObject
+{
+	public:
+		ComponentPropertyObject(PropertyViewObject* parent, const char* name, Lumix::Component cmp, Lumix::IPropertyDescriptor& descriptor)
+			: PropertyViewObject(parent, name)
+			, m_descriptor(descriptor)
+			, m_component(cmp)
+		{
+		}
+
+
+		virtual void createEditor(PropertyView& view, QTreeWidgetItem* item) override
+		{
+			Lumix::Blob stream;
+			m_descriptor.get(m_component, stream);
+			
+			switch (m_descriptor.getType())
+			{
+				case Lumix::IPropertyDescriptor::BOOL:
+					{
+						bool b;
+						stream.read(b);
+						QCheckBox* checkbox = new QCheckBox();
+						item->treeWidget()->setItemWidget(item, 1, checkbox);
+						checkbox->setChecked(b);
+						checkbox->connect(checkbox, &QCheckBox::stateChanged, [this, &view](bool new_value)
+						{
+							view.getWorldEditor()->setProperty(m_component.type, m_descriptor.getNameHash(), &new_value, sizeof(new_value));
+						});
+					}
+					break;
+				case Lumix::IPropertyDescriptor::VEC3:
+					{
+						Lumix::Vec3 value;
+						stream.read(value);
+						item->setText(1, QString("%1; %2; %3").arg(value.x).arg(value.y).arg(value.z));
+
+						QDoubleSpinBox* sb1 = new QDoubleSpinBox();
+						sb1->setValue(value.x);
+						item->insertChild(0, new QTreeWidgetItem(QStringList() << "x"));
+						item->treeWidget()->setItemWidget(item->child(0), 1, sb1);
+
+						QDoubleSpinBox* sb2 = new QDoubleSpinBox();
+						sb2->setValue(value.y);
+						item->insertChild(1, new QTreeWidgetItem(QStringList() << "y"));
+						item->treeWidget()->setItemWidget(item->child(1), 1, sb2);
+
+						QDoubleSpinBox* sb3 = new QDoubleSpinBox();
+						sb3->setValue(value.y);
+						item->insertChild(2, new QTreeWidgetItem(QStringList() << "z"));
+						item->treeWidget()->setItemWidget(item->child(2), 1, sb3);
+
+						sb1->connect(sb1, (void (QDoubleSpinBox::*)(double))&QDoubleSpinBox::valueChanged, [&view, this, sb1, sb2, sb3](double) 
+						{
+							Lumix::Vec3 value;
+							value.set((float)sb1->value(), (float)sb2->value(), (float)sb3->value());
+							view.getWorldEditor()->setProperty(m_component.type, m_descriptor.getNameHash(), &value, sizeof(value));
+						});
+					}
+					break;
+				case Lumix::IPropertyDescriptor::FILE:
+					{
+						char path[LUMIX_MAX_PATH];
+						stream.read(path, stream.getBufferSize());
+						QWidget* widget = new QWidget();
+						FileEdit* edit = new FileEdit(widget, NULL);
+						edit->setText(path);
+						edit->setServer(view.getWorldEditor());
+						QHBoxLayout* layout = new QHBoxLayout(widget);
+						layout->addWidget(edit);
+						layout->setContentsMargins(0, 0, 0, 0);
+						QPushButton* button = new QPushButton("...", widget);
+						layout->addWidget(button);
+						button->connect(button, &QPushButton::clicked, [this, edit, &view]()
+						{
+							QString str = QFileDialog::getOpenFileName(NULL, QString(), QString(), m_descriptor.getFileType());
+							char rel_path[LUMIX_MAX_PATH];
+							QByteArray byte_array = str.toLatin1();
+							const char* text = byte_array.data();
+							view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, text);
+							view.getWorldEditor()->setProperty(m_component.type, m_descriptor.getNameHash(), rel_path, strlen(rel_path) + 1);
+							edit->setText(rel_path);
+						});
+				
+						QPushButton* button2 = new QPushButton("->", widget);
+						layout->addWidget(button2);
+						button2->connect(button2, &QPushButton::clicked, [&view, edit]()
+						{
+							view.setSelectedResourceFilename(edit->text().toLatin1().data());
+						});
+				
+						item->treeWidget()->setItemWidget(item, 1, widget);
+						connect(edit, &QLineEdit::editingFinished, [edit, &view, this]()
+						{
+							QByteArray byte_array = edit->text().toLatin1();
+							view.getWorldEditor()->setProperty(m_component.type, m_descriptor.getNameHash(), byte_array.data(), byte_array.size() + 1);
+						});
+					}
+					break;
+				case Lumix::IPropertyDescriptor::INTEGER:
+					{
+						int value;
+						stream.read(value);
+						QSpinBox* edit = new QSpinBox();
+						edit->setValue(value);
+						item->treeWidget()->setItemWidget(item, 1, edit);
+						edit->setMinimum(INT_MIN);
+						edit->setMaximum(INT_MAX);
+						connect(edit, (void (QSpinBox::*)(int))&QSpinBox::valueChanged, [this, &view](int new_value) 
+						{
+							int value = new_value;
+							view.getWorldEditor()->setProperty(m_component.type, m_descriptor.getNameHash(), &value, sizeof(value));
+						});
+					}
+					break;
+				case Lumix::IPropertyDescriptor::DECIMAL:
+					{
+						float value;
+						stream.read(value);
+						QDoubleSpinBox* edit = new QDoubleSpinBox();
+						edit->setValue(value);
+						item->treeWidget()->setItemWidget(item, 1, edit);
+						edit->setMaximum(FLT_MAX);
+						connect(edit, (void (QDoubleSpinBox::*)(double))&QDoubleSpinBox::valueChanged, [this, &view](double new_value) 
+						{
+							float value = (float)new_value;
+							view.getWorldEditor()->setProperty(m_component.type, m_descriptor.getNameHash(), &value, sizeof(value));
+						});
+					}
+					break;
+				case Lumix::IPropertyDescriptor::STRING:
+					{
+						QLineEdit* edit = new QLineEdit();
+						item->treeWidget()->setItemWidget(item, 1, edit);
+						edit->setText((const char*)stream.getBuffer());
+						connect(edit, &QLineEdit::editingFinished, [edit, this, &view]()
+						{
+							QByteArray byte_array = edit->text().toLatin1();
+							const char* text = byte_array.data();
+							view.getWorldEditor()->setProperty(m_component.type, m_descriptor.getNameHash(), text, strlen(text) + 1);
+						});
+					}
+					break;
+				default:
+					ASSERT(false);
+					break;
+			}
+		}
+
+
+		virtual bool isEditable() const override
+		{
+			return false;
+		}
+
+
+		Lumix::Component getComponent() const { return m_component; }
+
+	private:
+		Lumix::IPropertyDescriptor& m_descriptor;
+		Lumix::Component m_component;
+};
+
+
+
+template <class Value, class Obj>
+class GetterSetterObject : public PropertyViewObject
+{
+	public:
+		typedef Value (Obj::*Getter)() const;
+		typedef void (Obj::*Setter)(Value);
+		typedef void(*CreateEditor)(QTreeWidgetItem*, GetterSetterObject&, Value);
+
+
+		GetterSetterObject(PropertyViewObject* parent, const char* name, Obj* object, Getter getter, Setter setter, CreateEditor create_editor)
+			: PropertyViewObject(parent, name)
+		{
+			m_object = object;
+			m_getter = getter;
+			m_setter = setter;
+			m_create_editor = create_editor;
+		}
+
+
+		virtual void createEditor(PropertyView&, QTreeWidgetItem* item) override
+		{
+			m_create_editor(item, *this, (m_object->*m_getter)());
+		}
+
+
+		virtual bool isEditable() const override
+		{
+			return m_setter != NULL;
+		}
+
+
+		void set(Value value)
+		{
+			(m_object->*m_setter)(value);
+		}
+
+
+	private:
+		Obj* m_object;
+		Getter m_getter;
+		Setter m_setter;
+		CreateEditor m_create_editor;
+};
+
+
+template <class T>
+class InstanceObject : public PropertyViewObject
+{
+	public:
+		typedef void(*CreateEditor)(PropertyView&, QTreeWidgetItem*, InstanceObject<T>*);
+	
+		InstanceObject(PropertyViewObject* parent, const char* name, T* object, CreateEditor create_editor)
+			: PropertyViewObject(parent, name)
+		{
+			m_value = object;
+			m_create_editor = create_editor;
+		}
+
+
+		void setEditor(CreateEditor create_editor)
+		{
+			m_create_editor = create_editor;
+		}
+
+
+		virtual void createEditor(PropertyView& view, QTreeWidgetItem* item) override
+		{
+			if (m_create_editor)
+			{
+				m_create_editor(view, item, this);
+			}
+		}
+
+		virtual bool isEditable() const override { return false; }
+		T* getValue() const { return m_value; }
+
+	private:
+		T* m_value;
+		CreateEditor m_create_editor;
+};
+
+
+
+template<class T>
+void createEditor(QTreeWidgetItem* item, GetterSetterObject<int, T>&, int value)
+{
+	item->setText(1, QString::number(value));
+}
+
+
+template<class T>
+void createEditor(QTreeWidgetItem* item, GetterSetterObject<size_t, T>&, size_t value)
+{
+	item->setText(1, QString::number(value));
+}
+
+
+template<class T>
+void createEditor(QTreeWidgetItem* item, GetterSetterObject<float, T>&, float value)
+{
+	item->setText(1, QString::number(value));
+}
+
+
+template <class T>
+void createEditor(QTreeWidgetItem* item, GetterSetterObject<bool, T>& object, bool value)
+{
+	QCheckBox* checkbox = new QCheckBox();
+	item->treeWidget()->setItemWidget(item, 1, checkbox);
+	checkbox->setChecked(value);
+	if (object.isEditable())
+	{
+		checkbox->connect(checkbox, &QCheckBox::stateChanged, [&object](bool new_state) {
+			object.set(new_state);
+		});
+	}
+	else
+	{
+		checkbox->setDisabled(true);
+	}
+}
+
+
+void createEditor(PropertyView&, QTreeWidgetItem* item, InstanceObject<Lumix::Texture>* texture)
+{
+	item->setText(1, texture->getValue()->getPath().c_str());
+}
+
+
+void createEditor(PropertyView&, QTreeWidgetItem* item, InstanceObject<Lumix::Shader>* shader)
+{
+	item->setText(1, shader->getValue()->getPath().c_str());
+}
+
+
+void createEditor(PropertyView&, QTreeWidgetItem* item, InstanceObject<Lumix::Model>* model)
+{
+	item->setText(1, model->getValue()->getPath().c_str());
+}
+
+
+void createImageEditor(PropertyView&, QTreeWidgetItem* item, InstanceObject<Lumix::Texture>* texture)
+{
+	QLabel* image_label = new QLabel();
+	item->treeWidget()->setItemWidget(item, 1, image_label);
+	QImage image(texture->getValue()->getPath().c_str());
+	image_label->setPixmap(QPixmap::fromImage(image).scaledToHeight(100));
+	image_label->adjustSize();
+}
+
+
+void createEditor(PropertyView& view, QTreeWidgetItem* item, InstanceObject<Lumix::Material>* material)
+{
+	QWidget* widget = new QWidget();
+	QHBoxLayout* layout = new QHBoxLayout(widget);
+	layout->setContentsMargins(0, 0, 0, 0);
+	QLabel* label = new QLabel(material->getValue()->getPath().c_str());
+	layout->addWidget(label);
+	QPushButton* button = new QPushButton("Save");
+	layout->addWidget(button);
+	button->connect(button, &QPushButton::clicked, [material, &view]()
+	{
+		Lumix::FS::FileSystem& fs = view.getWorldEditor()->getEngine().getFileSystem();
+		// use temporary because otherwise the material is reloaded during saving
+		char tmp_path[LUMIX_MAX_PATH];
+		strcpy(tmp_path, material->getValue()->getPath().c_str());
+		strcat(tmp_path, ".tmp");
+		Lumix::FS::IFile* file = fs.open(fs.getDefaultDevice(), tmp_path, Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE);
+		if(file)
+		{
+			Lumix::JsonSerializer serializer(*file, Lumix::JsonSerializer::AccessMode::WRITE, material->getValue()->getPath().c_str());
+			material->getValue()->save(serializer);
+			fs.close(file);
+
+			QFile::remove(material->getValue()->getPath().c_str());
+			QFile::rename(tmp_path, material->getValue()->getPath().c_str());
+		}
+		else
+		{
+			Lumix::g_log_error.log("Material manager") << "Could not save file " << material->getValue()->getPath().c_str();
+		}
+	});
+	item->treeWidget()->setItemWidget(item, 1, widget);
+}
+
+
+void createEditor(PropertyView&, QTreeWidgetItem* item, InstanceObject<Lumix::Mesh>* mesh)
+{
+	item->setText(1, mesh->getValue()->getName());
+}
+
+
+PropertyViewObject::~PropertyViewObject()
+{
+	for (int i = 0; i < m_members.size(); ++i)
+	{
+		delete m_members[i];
+	}
+}
+
+
+void createComponentEditor(PropertyView& view, QTreeWidgetItem* item, InstanceObject<Lumix::Component>* component)
+{
+	if (component->getValue()->type == TERRAIN_HASH)
+	{
+		view.addTerrainCustomProperties(*item, *component->getValue());
+	}
+}
+
+
+PropertyViewObject* createComponentObject(PropertyViewObject* parent, Lumix::WorldEditor& editor, Lumix::Component cmp)
+{
+	const char* name = "";
+	for (int i = 0; i < sizeof(component_map) / sizeof(component_map[0]); i += 2)
+	{
+		if (crc32(component_map[i + 1]) == cmp.type)
+		{
+			name = component_map[i];
+		}
+	}
+	auto c = new Lumix::Component(cmp); TODO("memory leak");
+	InstanceObject<Lumix::Component>* object = new InstanceObject<Lumix::Component>(parent, name, c, &createComponentEditor);
+	
+	auto& descriptors = editor.getPropertyDescriptors(cmp.type);
+	
+	for (int i = 0; i < descriptors.size(); ++i)
+	{
+		auto prop = new ComponentPropertyObject(object, descriptors[i]->getName(), cmp, *descriptors[i]);
+		object->addMember(prop);
+	}
+
+	return object;
+}
+
+
+PropertyViewObject* createEntityObject(Lumix::WorldEditor& editor, Lumix::Entity entity)
+{
+	auto e = new Lumix::Entity(entity); TODO("memory leak");
+	InstanceObject<Lumix::Entity>* object = new InstanceObject<Lumix::Entity>(NULL, "Entity", e, NULL);
+
+	auto& cmps = e->getComponents();
+
+	for (int i = 0; i < cmps.size(); ++i)
+	{
+		auto prop = createComponentObject(object, editor, cmps[i]);
+		object->addMember(prop);
+	}
+
+	return object;
+}
+
+
+PropertyViewObject* createTextureObject(PropertyViewObject* parent, Lumix::Resource* resource)
 {
 	if (Lumix::Texture* texture = dynamic_cast<Lumix::Texture*>(resource))
 	{
-		property_view.propertyList->insertTopLevelItem(0, new QTreeWidgetItem());
-		property_view.propertyList->topLevelItem(0)->setText(0, "Texture");
-		property_view.propertyList->topLevelItem(0)->setText(1, texture->getPath().c_str());
-				
-		QTreeWidgetItem* item = new QTreeWidgetItem(QStringList() << "Width" << QString::number(texture->getWidth()));
-		property_view.propertyList->topLevelItem(0)->insertChild(0, item);
+		InstanceObject<Lumix::Texture>* object = new InstanceObject<Lumix::Texture>(parent, "Texture", texture, &createEditor);
 
-		item = new QTreeWidgetItem(QStringList() << "Height" << QString::number(texture->getHeight()));
-		property_view.propertyList->topLevelItem(0)->insertChild(0, item);
+		auto prop = new GetterSetterObject<int, Lumix::Texture>(object, "width", texture, &Lumix::Texture::getWidth, NULL, &createEditor);
+		object->addMember(prop);
+		
+		prop = new GetterSetterObject<int, Lumix::Texture>(object, "height", texture, &Lumix::Texture::getHeight, NULL, &createEditor);
+		object->addMember(prop);
 
-		item = new QTreeWidgetItem(QStringList() << "Image");
-		property_view.propertyList->topLevelItem(0)->insertChild(0, item);
-		QLabel* image_label = new QLabel();
-		property_view.propertyList->setItemWidget(item, 1, image_label);
-		QImage image(texture->getPath().c_str());
-		image_label->setPixmap(QPixmap::fromImage(image));
-		image_label->adjustSize();
+		InstanceObject<Lumix::Texture>* img_object = new InstanceObject<Lumix::Texture>(object, "Image", texture, &createImageEditor);
+		object->addMember(img_object);
 
-		property_view.propertyList->expandAll();
-		return true;
+		return object;
 	}
-	return false;
+	return NULL;
 }
 
 
-bool ModelPlugin::onResourceLoaded(Ui::PropertyView& property_view, Lumix::Resource* resource)
+/*
+class TerrainProxy
 {
-	if (Lumix::Model* model = dynamic_cast<Lumix::Model*>(resource))
-	{
-		property_view.propertyList->insertTopLevelItem(0, new QTreeWidgetItem());
-		property_view.propertyList->topLevelItem(0)->setText(0, "Model");
-		property_view.propertyList->topLevelItem(0)->setText(1, model->getPath().c_str());
+	public:
+		TerrainProxy(Lumix::Component cmp)
+			: m_component(cmp)
+		{ }
 
-		QTreeWidgetItem* item = new QTreeWidgetItem(QStringList() << "Bone count" << QString::number(model->getBoneCount()));
-		property_view.propertyList->topLevelItem(0)->insertChild(0, item);
 
-		item = new QTreeWidgetItem(QStringList() << "Bounding radius" << QString::number(model->getBoundingRadius()));
-		property_view.propertyList->topLevelItem(0)->insertChild(0, item);
-
-		item = new QTreeWidgetItem(QStringList() << "Size" << QString::number(model->size()));
-		property_view.propertyList->topLevelItem(0)->insertChild(0, item);
-
-		for (int i = 0; i < model->getMeshCount(); ++i)
+		Lumix::Material* getMaterial()
 		{
-			item = new QTreeWidgetItem(QStringList() << "Mesh" << model->getMesh(i).getName());
-			property_view.propertyList->topLevelItem(0)->insertChild(0, item);
-
-			QTreeWidgetItem* subitem = new QTreeWidgetItem(QStringList() << "Triangles" << QString::number(model->getMesh(i).getCount() / 3));
-			item->insertChild(0, subitem);
-
-			subitem = new QTreeWidgetItem(QStringList() << "Material");
-			QWidget* widget = new QWidget();
-			QHBoxLayout* layout = new QHBoxLayout(widget);
-			QLabel* label = new QLabel(model->getMesh(i).getMaterial()->getPath().c_str());
-			layout->addWidget(label, 1);
-			QPushButton* button = new QPushButton("->");
-			layout->addWidget(button, 0);
-			layout->setContentsMargins(0, 0, 0, 0);
-			item->insertChild(0, subitem);
-			button->setProperty("material_index", i);
-			connect(button, &QPushButton::clicked, this, &ModelPlugin::onGoMaterialClicked);
-			property_view.propertyList->setItemWidget(subitem, 1, widget);
+			return static_cast<Lumix::RenderScene*>(m_component.scene)->getTerrainMaterial(m_component);
 		}
 
-		property_view.propertyList->expandAll();
-		return true;
-	}
-	return false;
-}
+
+		void setMaterial(Lumix::Material* material)
+		{
+			static_cast<Lumix::RenderScene*>(m_component.scene)->setTerrainMaterial(m_component, material->getPath().c_str());
+		}
+
+	private:
+		Lumix::Component m_component;
+};
 
 
-void ModelPlugin::onGoMaterialClicked()
+static PropertyViewObject* createTerrainObject(Lumix::Component component)
 {
-	QPushButton* button = qobject_cast<QPushButton*>(QObject::sender());
-	int material_index = button->property("material_index").toInt();
-	Lumix::Material* material = static_cast<Lumix::Model*>(m_view.getSelectedResource())->getMesh(material_index).getMaterial();
-	m_view.setSelectedResource(material);
+	TerrainProxy* proxy = new TerrainProxy(component); TODO("memory leak");
+
+	InstanceObject<TerrainProxy>* object = new InstanceObject<TerrainProxy>("Terrain", proxy, NULL);
+	
+	PropertyViewObject* prop = new InstanceObject<Lumix::Material>("Material", proxy->getMaterial(), &createEditor);
+	object->addMember(prop);
+	
+	prop = new DelegateObject<bool, Lumix::Material>("Z test", material, &Lumix::Material::isZTest, &createEditor);
+	object->addMember(prop);
+
+	prop = new DelegateObject<bool, Lumix::Material>("Backface culling", material, &Lumix::Material::isBackfaceCulling, &createEditor);
+	object->addMember(prop);
+
+	prop = new DelegateObject<bool, Lumix::Material>("Alpha to coverage", material, &Lumix::Material::isAlphaToCoverage, &createEditor);
+	object->addMember(prop);
+
+	for (int i = 0; i < material->getTextureCount(); ++i)
+	{
+		prop = createTextureObject(material->getTexture(i));
+		object->addMember(prop);
+	}
+
+	return object;
+}
+*/
+
+
+void createTextureInMaterialEditor(PropertyView& view, QTreeWidgetItem* item, InstanceObject<Lumix::Texture>* texture)
+{
+	QWidget* widget = new QWidget();
+	QHBoxLayout* layout = new QHBoxLayout(widget);
+	layout->setContentsMargins(0, 0, 0, 0);
+	QLineEdit* edit = new QLineEdit(texture->getValue()->getPath().c_str());
+	layout->addWidget(edit);
+	edit->connect(edit, &QLineEdit::editingFinished, [&view, edit, texture]() 
+	{
+		char rel_path[LUMIX_MAX_PATH];
+		QByteArray byte_array = edit->text().toLatin1();
+		const char* text = byte_array.data();
+		view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, text);
+		auto material = static_cast<InstanceObject<Lumix::Material>* >(texture->getParent())->getValue();
+		for(int i = 0; i < material->getTextureCount(); ++i)
+		{
+			if(material->getTexture(i) == texture->getValue())
+			{
+				Lumix::Texture* new_texture = static_cast<Lumix::Texture*>(material->getResourceManager().get(Lumix::ResourceManager::TEXTURE)->load(rel_path));
+				material->setTexture(i, new_texture);
+				break;
+			}
+		}
+	});
+
+	QPushButton* browse_button = new QPushButton("...");
+	layout->addWidget(browse_button);
+	browse_button->connect(browse_button, &QPushButton::clicked, [&view, edit, texture]()
+	{
+		QString str = QFileDialog::getOpenFileName(NULL, QString(), QString(), "Texture (*.tga; *.dds)");
+		if(str != "")
+		{
+			char rel_path[LUMIX_MAX_PATH];
+			QByteArray byte_array = str.toLatin1();
+			const char* text = byte_array.data();
+			view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, text);
+			auto material = static_cast<InstanceObject<Lumix::Material>* >(texture->getParent())->getValue();
+			for(int i = 0; i < material->getTextureCount(); ++i)
+			{
+				if(material->getTexture(i) == texture->getValue())
+				{
+					Lumix::Texture* new_texture = static_cast<Lumix::Texture*>(material->getResourceManager().get(Lumix::ResourceManager::TEXTURE)->load(rel_path));
+					material->setTexture(i, new_texture);
+					break;
+				}
+			}
+			edit->setText(rel_path);
+		}
+	});
+	
+	QPushButton* remove_button = new QPushButton(" - ");
+	layout->addWidget(remove_button);
+	remove_button->connect(remove_button, &QPushButton::clicked, [texture, &view, item]()
+	{
+		auto material = static_cast<InstanceObject<Lumix::Material>* >(texture->getParent())->getValue();
+		for(int i = 0; i < material->getTextureCount(); ++i)
+		{
+			if(material->getTexture(i) == texture->getValue())
+			{
+				material->removeTexture(i);
+				item->parent()->removeChild(item);
+				break;
+			}
+		}
+	});
+
+	QPushButton* add_button = new QPushButton(" + ");
+	layout->addWidget(add_button);
+	add_button->connect(add_button, &QPushButton::clicked, [texture, &view, item]()
+	{
+		auto material = static_cast<InstanceObject<Lumix::Material>* >(texture->getParent())->getValue();
+		Lumix::Texture* new_texture = static_cast<Lumix::Texture*>(material->getResourceManager().get(Lumix::ResourceManager::TEXTURE)->load("models/editor/default.tga"));
+		material->addTexture(new_texture);
+	});
+
+	item->treeWidget()->setItemWidget(item, 1, widget);
 }
 
 
-bool MaterialPlugin::onResourceLoaded(Ui::PropertyView& property_view, Lumix::Resource* resource)
+static PropertyViewObject* createMaterialObject(PropertyViewObject* parent, Lumix::Resource* resource)
 {
 	if (Lumix::Material* material = dynamic_cast<Lumix::Material*>(resource))
 	{
-		property_view.propertyList->insertTopLevelItem(0, new QTreeWidgetItem());
-		property_view.propertyList->topLevelItem(0)->setText(0, "Material");
-		property_view.propertyList->topLevelItem(0)->setText(1, material->getPath().c_str());
+		InstanceObject<Lumix::Material>* object = new InstanceObject<Lumix::Material>(parent, "Material", material, &createEditor);
 
-		QTreeWidgetItem* item = new QTreeWidgetItem(QStringList() << "Shader" << material->getShader()->getPath().c_str());
-		property_view.propertyList->topLevelItem(0)->insertChild(0, item);
+		PropertyViewObject* prop = new InstanceObject<Lumix::Shader>(object, "Shader", material->getShader(), &createEditor);
+		object->addMember(prop);
+
+		prop = new GetterSetterObject<bool, Lumix::Material>(object, "Z test", material, &Lumix::Material::isZTest, &Lumix::Material::enableZTest, &createEditor);
+		object->addMember(prop);
+
+		prop = new GetterSetterObject<bool, Lumix::Material>(object, "Backface culling", material, &Lumix::Material::isBackfaceCulling, &Lumix::Material::enableBackfaceCulling, &createEditor);
+		object->addMember(prop);
+
+		prop = new GetterSetterObject<bool, Lumix::Material>(object, "Alpha to coverage", material, &Lumix::Material::isAlphaToCoverage, &Lumix::Material::enableAlphaToCoverage, &createEditor);
+		object->addMember(prop);
 
 		for (int i = 0; i < material->getTextureCount(); ++i)
 		{
-			item = new QTreeWidgetItem(QStringList() << "Texture");
-			QWidget* widget = new QWidget();
-			QHBoxLayout* layout = new QHBoxLayout(widget);
-			QLabel* label = new QLabel(material->getTexture(i)->getPath().c_str());
-			layout->addWidget(label, 1);
-			QPushButton* button = new QPushButton("->");
-			layout->addWidget(button, 0);
-			layout->setContentsMargins(0, 0, 0, 0);
-			property_view.propertyList->topLevelItem(0)->insertChild(0, item);
-			button->setProperty("texture_index", i);
-			connect(button, &QPushButton::clicked, this, &MaterialPlugin::onGoTextureClicked);
-			property_view.propertyList->setItemWidget(item, 1, widget);
+			prop = createTextureObject(object, material->getTexture(i));
+			static_cast<InstanceObject<Lumix::Texture>*>(prop)->setEditor(createTextureInMaterialEditor) ;
+			object->addMember(prop);
 		}
 
-		item = new QTreeWidgetItem(QStringList() << "Z test");
-		property_view.propertyList->topLevelItem(0)->insertChild(0, item);
-		QCheckBox* checkbox = new QCheckBox();
-		checkbox->setChecked(material->isZTest());
-		property_view.propertyList->setItemWidget(item, 1, checkbox);
-
-		item = new QTreeWidgetItem(QStringList() << "Backface culling");
-		property_view.propertyList->topLevelItem(0)->insertChild(0, item);
-		checkbox = new QCheckBox();
-		checkbox->setChecked(material->isBackfaceCulling());
-		property_view.propertyList->setItemWidget(item, 1, checkbox);
-
-		item = new QTreeWidgetItem(QStringList() << "Alpha to coverage");
-		property_view.propertyList->topLevelItem(0)->insertChild(0, item);
-		checkbox = new QCheckBox();
-		checkbox->setChecked(material->isAlphaToCoverage());
-		property_view.propertyList->setItemWidget(item, 1, checkbox);
-
-		property_view.propertyList->expandAll();
-		return true;
+		return object;
 	}
-	return false;
+	return NULL;
 }
 
 
-void MaterialPlugin::onGoTextureClicked()
+PropertyViewObject* createModelObject(PropertyViewObject* parent, Lumix::Resource* resource)
 {
-	QPushButton* button = qobject_cast<QPushButton*>(QObject::sender());
-	int texture_index = button->property("texture_index").toInt();
-	Lumix::Texture* texture = static_cast<Lumix::Material*>(m_view.getSelectedResource())->getTexture(texture_index);
-	m_view.setSelectedResource(texture);
+	if (Lumix::Model* model = dynamic_cast<Lumix::Model*>(resource))
+	{
+		InstanceObject<Lumix::Model>* object = new InstanceObject<Lumix::Model>(parent, "Model", model, &createEditor);
+
+		PropertyViewObject* prop = new GetterSetterObject<int, Lumix::Model>(object, "Bone count", model, &Lumix::Model::getBoneCount, NULL, &createEditor);
+		object->addMember(prop);
+
+		prop = new GetterSetterObject<float, Lumix::Model>(object, "Bounding radius", model, &Lumix::Model::getBoundingRadius, NULL, &createEditor);
+		object->addMember(prop);
+
+		prop = new GetterSetterObject<size_t, Lumix::Model>(object, "Size (bytes)", model, &Lumix::Model::size, NULL, &createEditor);
+		object->addMember(prop);
+
+		for (int i = 0; i < model->getMeshCount(); ++i)
+		{
+			Lumix::Mesh* mesh = &model->getMesh(i);
+			InstanceObject<Lumix::Mesh>* mesh_object = new InstanceObject<Lumix::Mesh>(object, "Mesh", mesh, &createEditor);
+			object->addMember(mesh_object);
+
+			prop = new GetterSetterObject<int, Lumix::Mesh>(mesh_object, "Triangles", mesh, &Lumix::Mesh::getTriangleCount, NULL, &createEditor);
+			mesh_object->addMember(prop);
+
+			prop = createMaterialObject(mesh_object, mesh->getMaterial());
+			mesh_object->addMember(prop);
+		}
+
+		return object;
+	}
+	return NULL;
 }
 
 
@@ -280,7 +828,6 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 					}
 					break;
 				default:
-					ASSERT(false);
 					break;
 			}
 		}
@@ -502,8 +1049,8 @@ PropertyView::PropertyView(QWidget* parent)
 	: QDockWidget(parent)
 	, m_ui(new Ui::PropertyView)
 	, m_terrain_editor(NULL)
-	, m_is_updating_values(false)
 	, m_selected_resource(NULL)
+	, m_object(NULL)
 {
 	m_ui->setupUi(this);
 
@@ -514,18 +1061,14 @@ PropertyView::PropertyView(QWidget* parent)
 	}
 	m_ui->componentTypeCombo->insertItems(0, component_list);
 
-	addResourcePlugin(new MaterialPlugin(*this));
-	addResourcePlugin(new ModelPlugin(*this));
-	addResourcePlugin(new TexturePlugin);
+	addResourcePlugin(&createMaterialObject);
+	addResourcePlugin(&createModelObject);
+	addResourcePlugin(&createTextureObject);
 }
 
 
 PropertyView::~PropertyView()
 {
-	for (int i = 0; i < m_resource_plugins.size(); ++i)
-	{
-		delete m_resource_plugins[i];
-	}
 	m_world_editor->entitySelected().unbind<PropertyView, &PropertyView::onEntitySelected>(this);
 	m_world_editor->universeCreated().unbind<PropertyView, &PropertyView::onUniverseCreated>(this);
 	m_world_editor->universeDestroyed().unbind<PropertyView, &PropertyView::onUniverseDestroyed>(this);
@@ -534,134 +1077,8 @@ PropertyView::~PropertyView()
 	delete m_ui;
 }
 
-void PropertyView::on_checkboxStateChanged()
-{
-	if (!m_is_updating_values)
-	{
-		QCheckBox* cb = qobject_cast<QCheckBox*>(QObject::sender());
-		int i = cb->property("cpp_prop").toInt();
-		bool b = cb->isChecked();
-		m_world_editor->setProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), &b, sizeof(b));
-	}
-}
 
-
-void PropertyView::on_vec3ValueChanged()
-{
-	if (!m_is_updating_values)
-	{
-		QDoubleSpinBox* sb = qobject_cast<QDoubleSpinBox*>(QObject::sender());
-		int i = sb->property("cpp_prop").toInt();
-		Lumix::Vec3 v;
-		v.x = (float)qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item->child(0), 1))->value();
-		v.y = (float)qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item->child(1), 1))->value();
-		v.z = (float)qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item->child(2), 1))->value();
-		m_world_editor->setProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), &v, sizeof(v));
-	}
-}
-
-void PropertyView::on_doubleSpinBoxValueChanged()
-{
-	if (!m_is_updating_values)
-	{
-		QDoubleSpinBox* sb = qobject_cast<QDoubleSpinBox*>(QObject::sender());
-		int i = sb->property("cpp_prop").toInt();
-		float f = (float)qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item, 1))->value();
-		m_world_editor->setProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), &f, sizeof(f));
-	}
-}
-
-void PropertyView::on_lineEditEditingFinished()
-{
-	if (!m_is_updating_values)
-	{
-		QLineEdit* edit = qobject_cast<QLineEdit*>(QObject::sender());
-		int i = edit->property("cpp_prop").toInt();
-		QByteArray byte_array = edit->text().toLatin1();
-		const char* text = byte_array.data();
-		m_world_editor->setProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), text, byte_array.size());
-	}
-}
-
-void PropertyView::on_goResourceClicked()
-{
-	QPushButton* button = qobject_cast<QPushButton*>(QObject::sender());
-	int i = button->property("cpp_prop").toInt();
-	QLineEdit* edit = qobject_cast<QLineEdit*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item, 1)->children()[0]);
-	setSelectedResourceFilename(edit->text().toLatin1().data());
-}
-
-void PropertyView::on_browseFilesClicked()
-{
-	QPushButton* button = qobject_cast<QPushButton*>(QObject::sender());
-	int i = button->property("cpp_prop").toInt();
-	QString str = QFileDialog::getOpenFileName(NULL, QString(), QString(), m_properties[i]->m_file_type.c_str());
-	
-	QLineEdit* edit = qobject_cast<QLineEdit*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item, 1)->children()[0]);
-	edit->setText(str);
-	m_world_editor->setProperty(m_properties[i]->m_component_name.c_str(), m_properties[i]->m_name.c_str(), edit->text().toLocal8Bit().data(), edit->text().size());
-}
-
-void PropertyView::onPropertyValue(Property* property, const void* data, int32_t)
-{
-	m_is_updating_values = true;
-	if(property->m_component_name == "script" && property->m_name == "source")
-	{
-		setScriptStatus(m_compiler->getStatus(static_cast<const char*>(data)));
-	}
-
-	switch(property->m_type)
-	{
-		case Property::VEC3:
-			{
-				Lumix::Vec3 v = *(Lumix::Vec3*)data;
-				QString text;
-				text.sprintf("[%f; %f; %f]", v.x, v.y, v.z);
-				property->m_tree_item->setText(1, text);
-				QTreeWidgetItem* item = property->m_tree_item->child(0);
-				qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(item, 1))->setValue(v.x);
-				item = property->m_tree_item->child(1);
-				qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(item, 1))->setValue(v.y);
-				item = property->m_tree_item->child(2);
-				qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(item, 1))->setValue(v.z);
-			}
-			break;
-		case Property::BOOL:
-			{
-				bool b = *(bool*)data; 
-				QCheckBox* cb = qobject_cast<QCheckBox*>(m_ui->propertyList->itemWidget(property->m_tree_item, 1));
-				cb->setChecked(b);
-			}
-			break;
-		case Property::RESOURCE:
-		case Property::FILE:
-			{
-				QLineEdit* edit = qobject_cast<QLineEdit*>(m_ui->propertyList->itemWidget(property->m_tree_item, 1)->children()[0]);
-				edit->setText((char*)data);
-			}
-			break;
-		case Property::STRING:
-			{
-				QLineEdit* edit = qobject_cast<QLineEdit*>(m_ui->propertyList->itemWidget(property->m_tree_item, 1));
-				edit->setText((char*)data);
-			}
-			break;
-		case Property::DECIMAL:
-			{
-				QDoubleSpinBox* edit = qobject_cast<QDoubleSpinBox*>(m_ui->propertyList->itemWidget(property->m_tree_item, 1));
-				float f = *(float*)data;
-				edit->setValue(f);
-			}
-			break;
-		default:
-			ASSERT(false);
-			break;
-	}
-	m_is_updating_values = false;
-}
-
-
-void PropertyView::onEntityPosition(Lumix::Entity& e)
+void PropertyView::onEntityPosition(const Lumix::Entity& e)
 {
 	if (m_selected_entity == e)
 	{
@@ -673,145 +1090,10 @@ void PropertyView::onEntityPosition(Lumix::Entity& e)
 }
 
 
-class FileEdit : public QLineEdit
+
+Lumix::WorldEditor* PropertyView::getWorldEditor()
 {
-	public:
-		FileEdit(QWidget* parent, PropertyView* property_view)
-			: QLineEdit(parent)
-			, m_property_view(property_view)
-		{
-			setAcceptDrops(true);
-		}
-
-		virtual void dragEnterEvent(QDragEnterEvent* event) override
-		{
-			if (event->mimeData()->hasUrls())
-			{
-				event->acceptProposedAction();
-			}
-		}
-
-		virtual void dropEvent(QDropEvent* event)
-		{
-			const QList<QUrl>& list = event->mimeData()->urls();
-			if(!list.empty())
-			{
-				QString file = list[0].toLocalFile();
-				if(file.toLower().startsWith(m_world_editor->getBasePath()))
-				{
-					file.remove(0, QString(m_world_editor->getBasePath()).length());
-				}
-				if(file.startsWith("/"))
-				{
-					file.remove(0, 1);
-				}
-				setText(file);
-				emit editingFinished();
-			}
-		}
-
-		void setServer(Lumix::WorldEditor* server)
-		{
-			m_world_editor = server;
-		}
-
-	private:
-		PropertyView* m_property_view;
-		Lumix::WorldEditor* m_world_editor;
-};
-
-
-void PropertyView::addProperty(const char* component, const char* name, const char* label, Property::Type type, const char* file_type)
-{
-	QTreeWidgetItem* item = new QTreeWidgetItem(QStringList() << label);
-	m_ui->propertyList->topLevelItem(0)->insertChild(0, item);
-	Property* prop = new Property();
-	prop->m_component_name = component;
-	prop->m_component = crc32(component);
-	prop->m_name = name;
-	prop->m_file_type = file_type;
-	prop->m_name_hash = crc32(name);
-	prop->m_type = type;
-	prop->m_tree_item = item;
-	m_properties.push(prop);
-	switch(type)
-	{
-		case Property::BOOL:
-			{
-				QCheckBox* checkbox = new QCheckBox();
-				m_ui->propertyList->setItemWidget(item, 1, checkbox);
-				connect(checkbox, &QCheckBox::stateChanged, this, &PropertyView::on_checkboxStateChanged);
-				checkbox->setProperty("cpp_prop", (int)(m_properties.size() - 1));
-			}
-			break;
-		case Property::VEC3:
-			{
-				item->setText(1, "");
-				QDoubleSpinBox* sb = new QDoubleSpinBox();
-				item->insertChild(0, new QTreeWidgetItem(QStringList() << "x"));
-				m_ui->propertyList->setItemWidget(item->child(0), 1, sb);
-				sb->setProperty("cpp_prop", (int)(m_properties.size() - 1));
-				connect(sb, (void (QDoubleSpinBox::*)(double))&QDoubleSpinBox::valueChanged, this, &PropertyView::on_vec3ValueChanged);
-
-				sb = new QDoubleSpinBox();
-				item->insertChild(1, new QTreeWidgetItem(QStringList() << "y"));
-				m_ui->propertyList->setItemWidget(item->child(1), 1, sb);
-				sb->setProperty("cpp_prop", (int)(m_properties.size() - 1));
-				connect(sb, (void (QDoubleSpinBox::*)(double))&QDoubleSpinBox::valueChanged, this, &PropertyView::on_vec3ValueChanged);
-
-				sb = new QDoubleSpinBox();
-				item->insertChild(2, new QTreeWidgetItem(QStringList() << "z"));
-				m_ui->propertyList->setItemWidget(item->child(2), 1, sb);
-				sb->setProperty("cpp_prop", (int)(m_properties.size() - 1));
-				connect(sb, (void (QDoubleSpinBox::*)(double))&QDoubleSpinBox::valueChanged, this, &PropertyView::on_vec3ValueChanged);
-			}
-			break;
-		case Property::RESOURCE:
-		case Property::FILE:
-			{
-				QWidget* widget = new QWidget();
-				FileEdit* edit = new FileEdit(widget, this);
-				edit->setServer(m_world_editor);
-				edit->setProperty("cpp_prop", (int)(m_properties.size() - 1)); 
-				QHBoxLayout* layout = new QHBoxLayout(widget);
-				layout->addWidget(edit);
-				layout->setContentsMargins(0, 0, 0, 0);
-				QPushButton* button = new QPushButton("...", widget);
-				layout->addWidget(button);
-				button->setProperty("cpp_prop", (int)(m_properties.size() - 1));
-				connect(button, &QPushButton::clicked, this, &PropertyView::on_browseFilesClicked);
-				if (type == Property::RESOURCE)
-				{
-					QPushButton* button2 = new QPushButton("->", widget);
-					layout->addWidget(button2);
-					button2->setProperty("cpp_prop", (int)(m_properties.size() - 1));
-					connect(button2, &QPushButton::clicked, this, &PropertyView::on_goResourceClicked);
-				}
-				m_ui->propertyList->setItemWidget(item, 1, widget);
-				connect(edit, &QLineEdit::editingFinished, this, &PropertyView::on_lineEditEditingFinished);
-			}
-			break;
-		case Property::STRING:
-			{
-				QLineEdit* edit = new QLineEdit();
-				edit->setProperty("cpp_prop", (int)(m_properties.size() - 1)); 
-				m_ui->propertyList->setItemWidget(item, 1, edit);
-				connect(edit, &QLineEdit::editingFinished, this, &PropertyView::on_lineEditEditingFinished);
-			}
-			break;
-		case Property::DECIMAL:
-			{
-				QDoubleSpinBox* edit = new QDoubleSpinBox();
-				edit->setProperty("cpp_prop", (int)(m_properties.size() - 1)); 
-				m_ui->propertyList->setItemWidget(item, 1, edit);
-				edit->setMaximum(FLT_MAX);
-				connect(edit, (void (QDoubleSpinBox::*)(double))&QDoubleSpinBox::valueChanged, this, &PropertyView::on_doubleSpinBoxValueChanged);
-			}
-			break;
-		default:
-			ASSERT(false);
-			break;
-	}
+	return m_world_editor;
 }
 
 
@@ -878,7 +1160,7 @@ void PropertyView::setSelectedResourceFilename(const char* filename)
 }
 
 
-void PropertyView::addResourcePlugin(IResourcePlugin* plugin)
+void PropertyView::addResourcePlugin(PropertyViewObject::Creator plugin)
 {
 	m_resource_plugins.push(plugin);
 }
@@ -892,8 +1174,9 @@ void PropertyView::onSelectedResourceLoaded(Lumix::Resource::State, Lumix::Resou
 		clear();
 		for (int i = 0; i < m_resource_plugins.size(); ++i)
 		{
-			if (m_resource_plugins[i]->onResourceLoaded(*m_ui, m_selected_resource))
+			if (PropertyViewObject* object = m_resource_plugins[i](NULL, m_selected_resource))
 			{
+				setObject(object);
 				return;
 			}
 		}
@@ -914,11 +1197,9 @@ void PropertyView::setScriptCompiler(ScriptCompiler* compiler)
 void PropertyView::clear()
 {
 	m_ui->propertyList->clear();
-	for(int i = 0; i < m_properties.size(); ++i)
-	{
-		delete m_properties[i];
-	}
-	m_properties.clear();
+
+	delete m_object;
+	m_object = NULL;
 }
 
 
@@ -990,7 +1271,7 @@ void PropertyView::on_animableTimeSet(int value)
 
 void PropertyView::on_compileScriptClicked()
 {
-	for(int i = 0; i < m_properties.size(); ++i)
+	/*for(int i = 0; i < m_properties.size(); ++i)
 	{
 		if(m_properties[i]->m_component_name == "script" && m_properties[i]->m_name == "source")
 		{
@@ -998,13 +1279,13 @@ void PropertyView::on_compileScriptClicked()
 			m_compiler->compile(edit->text().toLatin1().data());
 			break;
 		}
-	}
+	}*/
 }
 
 
 void PropertyView::on_editScriptClicked()
 {
-	for(int i = 0; i < m_properties.size(); ++i)
+	/*for(int i = 0; i < m_properties.size(); ++i)
 	{
 		if(m_properties[i]->m_name == "source")
 		{
@@ -1012,19 +1293,19 @@ void PropertyView::on_editScriptClicked()
 			QDesktopServices::openUrl(QUrl::fromLocalFile(edit->text()));
 			break;
 		}
-	}
+	}*/
 }
 
 
-void PropertyView::addTerrainCustomProperties(const Lumix::Component& terrain_component)
+void PropertyView::addTerrainCustomProperties(QTreeWidgetItem& tree_item, const Lumix::Component& terrain_component)
 {
-	m_terrain_editor->m_tree_top_level = m_ui->propertyList->topLevelItem(0);
+	m_terrain_editor->m_tree_top_level = &tree_item;
 	m_terrain_editor->m_component = terrain_component;
 
 	{
 		QWidget* widget = new QWidget();
 		QTreeWidgetItem* item = new QTreeWidgetItem(QStringList() << "Save");
-		m_ui->propertyList->topLevelItem(0)->insertChild(0, item);
+		tree_item.insertChild(0, item);
 		QHBoxLayout* layout = new QHBoxLayout(widget);
 		QPushButton* height_button = new QPushButton("Heightmap", widget);
 		layout->addWidget(height_button);
@@ -1038,23 +1319,29 @@ void PropertyView::addTerrainCustomProperties(const Lumix::Component& terrain_co
 
 	QSlider* slider = new QSlider(Qt::Orientation::Horizontal);
 	QTreeWidgetItem* item = new QTreeWidgetItem(QStringList() << "Brush size");
-	m_ui->propertyList->topLevelItem(0)->insertChild(1, item);
+	tree_item.insertChild(1, item);
 	m_ui->propertyList->setItemWidget(item, 1, slider);
 	slider->setMinimum(1);
 	slider->setMaximum(100);
-	connect(slider, &QSlider::valueChanged, this, &PropertyView::on_terrainBrushSizeChanged);
+	connect(slider, &QSlider::valueChanged, [this](int value)
+	{
+		m_terrain_editor->m_terrain_brush_size = value;
+	});
 
 	slider = new QSlider(Qt::Orientation::Horizontal);
 	item = new QTreeWidgetItem(QStringList() << "Brush strength");
-	m_ui->propertyList->topLevelItem(0)->insertChild(2, item);
+	tree_item.insertChild(2, item);
 	m_ui->propertyList->setItemWidget(item, 1, slider);
 	slider->setMinimum(-100);
 	slider->setMaximum(100);
-	connect(slider, &QSlider::valueChanged, this, &PropertyView::on_terrainBrushStrengthChanged);
+	connect(slider, &QSlider::valueChanged, [this](int value)
+	{
+		m_terrain_editor->m_terrain_brush_strength = value / 100.0f;
+	});
 
 	QWidget* widget = new QWidget();
 	item = new QTreeWidgetItem(QStringList() << "Brush type");
-	m_ui->propertyList->topLevelItem(0)->insertChild(3, item);
+	tree_item.insertChild(3, item);
 	QHBoxLayout* layout = new QHBoxLayout(widget);
 	QPushButton* height_button = new QPushButton("Height", widget);
 	layout->addWidget(height_button);
@@ -1113,20 +1400,10 @@ void PropertyView::on_TerrainTextureTypeClicked()
 	connect(combobox, (void (QComboBox::*)(int))&QComboBox::currentIndexChanged, this, &PropertyView::on_terrainBrushTextureChanged);
 }
 
+
 void PropertyView::on_terrainBrushTextureChanged(int value)
 {
 	m_terrain_editor->m_texture_idx = value;
-}
-
-void PropertyView::on_terrainBrushStrengthChanged(int value)
-{
-	m_terrain_editor->m_terrain_brush_strength = value / 100.0f;
-}
-
-
-void PropertyView::on_terrainBrushSizeChanged(int value)
-{
-	m_terrain_editor->m_terrain_brush_size = value;
 }
 
 
@@ -1183,7 +1460,7 @@ void PropertyView::setSelectedResource(Lumix::Resource* resource)
 	if (resource)
 	{
 		m_selected_resource->getObserverCb().bind<PropertyView, &PropertyView::onSelectedResourceLoaded>(this);
-		if (m_selected_resource->isReady())
+		if (m_selected_resource->isReady() || m_selected_resource->isFailure())
 		{
 			onSelectedResourceLoaded(Lumix::Resource::State::READY, Lumix::Resource::State::READY);
 		}
@@ -1191,105 +1468,22 @@ void PropertyView::setSelectedResource(Lumix::Resource* resource)
 }
 
 
-void PropertyView::onEntitySelected(Lumix::Entity& e)
+void PropertyView::onEntitySelected(const Lumix::Entity& e)
 {
 	setSelectedResource(NULL);
 	m_selected_entity = e;
-	/// TODO miki
 	clear();
 	if (e.isValid())
 	{
-		const Lumix::Entity::ComponentList& cmps = e.getComponents();
-		for (int i = 0; i < cmps.size(); ++i)
-		{
-			for (int j = 0; j < sizeof(component_map) / sizeof(component_map[0]); j += 2)
-			{
-				if (cmps[i].type == crc32(component_map[j + 1]))
-				{
-					m_ui->propertyList->insertTopLevelItem(0, new QTreeWidgetItem());
-					m_ui->propertyList->topLevelItem(0)->setText(0, component_map[j]);
-					break;
-				}
-			}
-			/// TODO refactor
-			if (cmps[i].type == crc32("box_rigid_actor"))
-			{
-				addProperty("box_rigid_actor", "size", "Size", Property::VEC3, NULL);
-				addProperty("box_rigid_actor", "dynamic", "Is dynamic", Property::BOOL, NULL);
-			}
-			else if (cmps[i].type == crc32("renderable"))
-			{
-				addProperty("renderable", "source", "Source", Property::RESOURCE, "models (*.msh)");
-			}
-			else if (cmps[i].type == crc32("script"))
-			{
-				addProperty("script", "source", "Source", Property::FILE, "scripts (*.cpp)");
+		setObject(createEntityObject(*m_world_editor, e));
+		/*
 				addScriptCustomProperties();
-			}
-			else if (cmps[i].type == crc32("camera"))
-			{
-				addProperty("camera", "slot", "Slot", Property::STRING, NULL);
-				addProperty("camera", "near", "Near", Property::DECIMAL, NULL);
-				addProperty("camera", "far", "Far", Property::DECIMAL, NULL);
-				addProperty("camera", "fov", "Field of view", Property::DECIMAL, NULL);
-			}
-			else if (cmps[i].type == crc32("terrain"))
-			{
-				addProperty("terrain", "material", "Material", Property::RESOURCE, "material (*.mat)");
-				addProperty("terrain", "xz_scale", "Meter per texel", Property::DECIMAL, NULL);
-				addProperty("terrain", "y_scale", "Height scale", Property::DECIMAL, NULL);
-				addProperty("terrain", "grass_mesh", "Grass mesh", Property::RESOURCE, "mesh (*.msh)");
 				addTerrainCustomProperties(cmps[i]);
-			}
-			else if (cmps[i].type == crc32("mesh_rigid_actor"))
-			{
-				addProperty("mesh_rigid_actor", "source", "Source", Property::FILE, "Physics (*.pda)");
-			}
-			else if (cmps[i].type == crc32("physical_controller"))
-			{
-			}
-			else if (cmps[i].type == crc32("physical_heightfield"))
-			{
-				addProperty("physical_heightfield", "heightmap", "Heightmap", Property::FILE, "Heightmaps (*.tga *.raw)");
-				addProperty("physical_heightfield", "xz_scale", "Meters per pixel", Property::DECIMAL, NULL);
-				addProperty("physical_heightfield", "y_scale", "Height scale", Property::DECIMAL, NULL);
-			}
-			else if (cmps[i].type == crc32("light"))
-			{
-			}
-			else if (cmps[i].type == crc32("animable"))
-			{
-				addProperty("animable", "preview", "Preview animation", Property::FILE, "Animation (*.ani)");
 				addAnimableCustomProperties(cmps[i]);
-			}
-			else
-			{
-				ASSERT(false);
-			}
-			m_ui->propertyList->expandAll();
-		}
+		*/
+		m_ui->propertyList->expandAll();
 		onEntityPosition(e);
-		updateValues();
-	}
-}
-
-void PropertyView::updateValues()
-{
-	if (m_selected_entity.isValid())
-	{
-		for (int i = 0; i < m_properties.size(); ++i)
-		{
-			Lumix::Blob stream;
-			const Lumix::IPropertyDescriptor& prop = m_world_editor->getPropertyDescriptor(m_properties[i]->m_component, m_properties[i]->m_name_hash);
-			prop.get(m_selected_entity.getComponent(m_properties[i]->m_component), stream);
-			onPropertyValue(m_properties[i], stream.getBuffer(), stream.getBufferSize());
-		}
-		Lumix::Component animable = m_selected_entity.getComponent(crc32("animable"));
-		if (animable.isValid())
-		{
-			int frame_count = static_cast<Lumix::AnimationScene*>(animable.scene)->getFrameCount(animable);
-			m_ui->propertyList->findChild<QSlider*>("animation_frame_slider")->setMaximum(frame_count);
-		}
+		m_ui->nameEdit->setText(e.getName());
 	}
 }
 
@@ -1304,6 +1498,7 @@ void PropertyView::on_addComponentButton_clicked()
 		if(strcmp(c, component_map[i]) == 0)
 		{
 			m_world_editor->addComponent(crc32(component_map[i+1]));
+			onEntitySelected(m_selected_entity);
 			return;
 		}
 	}
@@ -1330,11 +1525,48 @@ void PropertyView::on_positionZ_valueChanged(double)
 	updateSelectedEntityPosition();
 }
 
+
+void PropertyView::createObjectEditor(QTreeWidgetItem* item, PropertyViewObject* object)
+{
+	item->setText(0, object->getName());
+	object->createEditor(*this, item);
+
+	PropertyViewObject** properties = object->getMembers();
+	for (int i = 0; i < object->getMemberCount(); ++i)
+	{
+		QTreeWidgetItem* subitem = new QTreeWidgetItem();
+		item->insertChild(0, subitem);
+
+		createObjectEditor(subitem, properties[i]);
+	}
+}
+
+
+PropertyViewObject* PropertyView::getObject()
+{
+	return m_object;
+}
+
+
+void PropertyView::setObject(PropertyViewObject* object)
+{
+	clear();
+
+	m_object = object;
+	
+	QTreeWidgetItem* item = new QTreeWidgetItem();
+	m_ui->propertyList->insertTopLevelItem(0, item);
+	createObjectEditor(item, object);
+
+	m_ui->propertyList->expandAll();
+	m_ui->propertyList->resizeColumnToContents(0);
+}
+
 void PropertyView::on_propertyList_customContextMenuRequested(const QPoint &pos)
 {
 	QMenu* menu = new QMenu("Item actions", NULL);
 	const QModelIndex& index = m_ui->propertyList->indexAt(pos);
-	if (index.isValid() && !index.parent().isValid() && m_selected_entity.isValid())
+	if (index.isValid() && index.parent().isValid() && !index.parent().parent().isValid() && m_selected_entity.isValid())
 	{
 		QAction* remove_component_action = new QAction("Remove component", menu);
 		menu->addAction(remove_component_action);
@@ -1361,6 +1593,27 @@ void PropertyView::on_propertyList_customContextMenuRequested(const QPoint &pos)
 					break;
 				}
 			}
+		}
+	}
+}
+
+void PropertyView::on_nameEdit_editingFinished()
+{
+	if (m_selected_entity.isValid() && strcmp(m_ui->nameEdit->text().toLatin1().data(), m_selected_entity.getName()) != 0)
+	{
+		if (m_selected_entity.universe->nameExists(m_ui->nameEdit->text().toLatin1().data()))
+		{
+			static bool is = false;
+			if (!is)
+			{
+				is = true;
+				QMessageBox::critical(NULL, "Error", "Name already taken", QMessageBox::StandardButton::Ok, 0);
+				is = false;
+			}
+		}
+		else
+		{
+			m_world_editor->setEntityName(m_selected_entity, m_ui->nameEdit->text().toLatin1().data());
 		}
 	}
 }

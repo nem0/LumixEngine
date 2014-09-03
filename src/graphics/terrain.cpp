@@ -428,7 +428,7 @@ namespace Lumix
 	{
 		serializer.serializeArrayItem(m_entity.index);
 		serializer.serializeArrayItem(m_layer_mask);
-		serializer.serializeArrayItem(m_material->getPath().c_str());
+		serializer.serializeArrayItem(m_material ? m_material->getPath().c_str() : "");
 		serializer.serializeArrayItem(m_xz_scale);
 		serializer.serializeArrayItem(m_y_scale);
 		serializer.serializeArrayItem(m_grass_model ? m_grass_model->getPath().c_str() : "");
@@ -493,6 +493,7 @@ namespace Lumix
 		}
 		return 0;
 	}
+
 
 	bool getRayTriangleIntersection(const Vec3& local_origin, const Vec3& local_dir, const Vec3& p0, const Vec3& p1, const Vec3& p2, float& out)
 	{

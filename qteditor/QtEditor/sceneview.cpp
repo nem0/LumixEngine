@@ -18,8 +18,9 @@
 class ViewWidget : public QWidget
 {
 	public:
-		ViewWidget(QWidget* parent)
+		ViewWidget(SceneView& view, QWidget* parent)
 			: QWidget(parent)
+			, m_view(view)
 		{
 			setMouseTracking(true);
 		}
@@ -30,6 +31,16 @@ class ViewWidget : public QWidget
 			m_last_x = event->x();
 			m_last_y = event->y();
 			setFocus();
+		}
+
+		virtual void wheelEvent(QWheelEvent* event) override
+		{
+			float speed = m_view.getNavivationSpeed();
+			if (QApplication::keyboardModifiers() & Qt::ShiftModifier)
+			{
+				speed *= 10;
+			}
+			m_world_editor->navigate(event->delta() * 0.1f, 0, speed);
 		}
 
 		virtual void mouseMoveEvent(QMouseEvent* event) override
@@ -50,6 +61,7 @@ class ViewWidget : public QWidget
 		Lumix::WorldEditor* m_world_editor;
 		int m_last_x;
 		int m_last_y;
+		SceneView& m_view;
 };
 
 SceneView::SceneView(QWidget* parent) :
@@ -59,7 +71,7 @@ SceneView::SceneView(QWidget* parent) :
 	QWidget* root = new QWidget();
 	QVBoxLayout* vertical_layout = new QVBoxLayout(root);
 	QHBoxLayout* horizontal_layout = new QHBoxLayout(root);
-	m_view = new ViewWidget(root);
+	m_view = new ViewWidget(*this, root);
 	m_speed_input = new QDoubleSpinBox(root);
 	m_speed_input->setSingleStep(0.1f);
 	m_speed_input->setValue(0.1f);

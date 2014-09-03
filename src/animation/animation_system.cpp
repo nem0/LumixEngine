@@ -204,7 +204,7 @@ namespace Lumix
 			}
 
 
-			void onComponentCreated(Component& cmp)
+			void onComponentCreated(const Component& cmp)
 			{
 				if (cmp.type == RENDERABLE_HASH)
 				{
@@ -288,7 +288,7 @@ namespace Lumix
 			virtual bool create(Engine& engine) override
 			{
 				m_engine = &engine;
-				engine.getWorldEditor()->registerProperty("animable", LUMIX_NEW(PropertyDescriptor<AnimationSceneImpl>)(crc32("preview"), &AnimationSceneImpl::getPreview, &AnimationSceneImpl::setPreview, IPropertyDescriptor::FILE));
+				engine.getWorldEditor()->registerProperty("animable", LUMIX_NEW(PropertyDescriptor<AnimationSceneImpl>)("preview", &AnimationSceneImpl::getPreview, &AnimationSceneImpl::setPreview, IPropertyDescriptor::FILE, "Animation (*.ani)"));
 				m_animation_manager.create(ResourceManager::ANIMATION, engine.getResourceManager());
 				return true;
 			}

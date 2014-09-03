@@ -33,6 +33,8 @@ namespace Lumix
 		const Component& getComponent(uint32_t type) const;
 		const ComponentList& getComponents() const;
 		bool existsInUniverse() const;
+		const char* getName() const;
+		void setName(const char* name);
 
 		bool operator ==(const Entity& rhs) const;
 

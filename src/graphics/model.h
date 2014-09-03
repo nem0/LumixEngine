@@ -45,6 +45,7 @@ class Mesh
 		Material* getMaterial() const { return m_material; }
 		void setMaterial(Material* material) { m_material = material; }
 		int getCount() const { return m_count; }
+		int getTriangleCount() const { return m_count / 3; }
 		int getStart() const { return m_start; }
 		uint32_t getNameHash() const { return m_name_hash; }
 		const char* getName() const { return m_name.c_str(); }

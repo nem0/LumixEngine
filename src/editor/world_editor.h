@@ -78,10 +78,11 @@ namespace Lumix
 			virtual Entity addEntityAt(int camera_x, int camera_y) = 0;
 			virtual void setEntityPosition(const Entity& entity, const Vec3& position) = 0;
 			virtual void setEntityPositionAndRotaion(const Entity& entity, const Vec3& position, const Quat& rotation) = 0;
+			virtual void setEntityName(const Entity& entity, const char* name) = 0;
 			virtual void snapToTerrain() = 0;
 			virtual void toggleGameMode() = 0;
 			virtual void navigate(float forward, float right, float speed) = 0;
-			virtual void setProperty(const char* component, const char* property, const void* data, int size) = 0;
+			virtual void setProperty(uint32_t component, uint32_t property, const void* data, int size) = 0;
 			virtual void onMouseDown(int x, int y, MouseButton::Value button) = 0;
 			virtual void onMouseMove(int x, int y, int relx, int rely, int mouse_flags) = 0;
 			virtual void onMouseUp(int x, int y, MouseButton::Value button) = 0;
@@ -92,9 +93,12 @@ namespace Lumix
 			virtual const char* getBasePath() = 0;
 			virtual Entity getSelectedEntity() const = 0;
 			virtual const IPropertyDescriptor& getPropertyDescriptor(uint32_t type, uint32_t name_hash) = 0;
-			virtual DelegateList<void(Entity&)>& entitySelected() = 0;
+			virtual Array<IPropertyDescriptor*>& getPropertyDescriptors(uint32_t type) = 0;
+			virtual DelegateList<void(const Entity&)>& entitySelected() = 0;
 			virtual DelegateList<void()>& universeCreated() = 0;
 			virtual DelegateList<void()>& universeDestroyed() = 0;
+			virtual DelegateList<void()>& universeLoaded() = 0;
+			virtual DelegateList<void(const Entity&, const char*)>& entityNameSet() = 0;
 			virtual void addPlugin(Plugin* plugin) = 0;
 			virtual void getRelativePath(char* relative_path, int max_length, const Path& source) = 0;
 			virtual EntityTemplateSystem& getEntityTemplateSystem() = 0;
