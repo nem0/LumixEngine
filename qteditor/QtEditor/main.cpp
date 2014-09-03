@@ -18,7 +18,6 @@
 #include "sceneview.h"
 #include "gameview.h"
 #include "wgl_render_device.h"
-#include "materialmanager.h"
 
 
 class App
@@ -218,8 +217,8 @@ class App
 
 			HWND hwnd = (HWND)m_main_window->getSceneView()->getViewWidget()->winId();
 			HWND game_hwnd = (HWND)m_main_window->getGameView()->getContentWidget()->winId();
-			HWND hwnds[] = { hwnd, game_hwnd, (HWND)m_main_window->getMaterialManager()->getPreview()->winId() };
-			HGLRC hglrc = createGLContext(hwnds, 3);
+			HWND hwnds[] = { hwnd, game_hwnd };
+			HGLRC hglrc = createGLContext(hwnds, 2);
 
 			m_world_editor = Lumix::WorldEditor::create(QDir::currentPath().toLocal8Bit().data());
 			ASSERT(m_world_editor);
@@ -267,8 +266,6 @@ class App
 			m_world_editor->getGizmo().updateScale(m_world_editor->getEditCamera());
 			m_world_editor->getGizmo().render(m_world_editor->getEngine().getRenderer(), *m_edit_render_device);
 			m_edit_render_device->endFrame();
-
-			m_main_window->getMaterialManager()->updatePreview();
 		}
 
 

@@ -123,6 +123,9 @@ bool Material::save(ISerializer& serializer)
 		PathUtils::getFilename(path, LUMIX_MAX_PATH, m_textures[i]->getPath().c_str());
 		serializer.serialize("texture", path);
 	}
+	serializer.serialize("alpha_to_coverage", m_is_alpha_to_coverage);
+	serializer.serialize("backface_culling", m_is_backface_culling);
+	serializer.serialize("z_test", m_is_z_test);
 	serializer.endObject();
 	return false;
 }
