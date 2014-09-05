@@ -371,6 +371,10 @@ namespace Lumix
 						Terrain* terrain = m_terrains[i];
 						terrain->deserialize(serializer, m_universe, *this, i);
 					}
+					else
+					{
+						m_terrains[i] = NULL;
+					}
 				}
 				serializer.deserializeArrayEnd();
 			}
