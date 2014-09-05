@@ -43,6 +43,7 @@ class IPropertyDescriptor
 		void setName(const char* name) { m_name = name; m_name_hash = crc32(name); }
 		const char* getFileType() const { return m_file_type.c_str(); }
 		void addChild(IPropertyDescriptor* child) { m_children.push(child); }
+		const Array<IPropertyDescriptor*>& getChildren() const { return m_children; }
 		Array<IPropertyDescriptor*>& getChildren() { return m_children; }
 
 	protected:
@@ -104,9 +105,9 @@ class ArrayObjectDescriptor : public IPropertyDescriptor
 class IArrayDescriptor : public IPropertyDescriptor
 {
 	public:
-		virtual void removeArrayItem(Component cmp, int index) = 0;
-		virtual void addArrayItem(Component cmp, int index) = 0;
-		virtual int getCount(Component cmp) = 0;
+		virtual void removeArrayItem(Component cmp, int index) const = 0;
+		virtual void addArrayItem(Component cmp, int index) const = 0;
+		virtual int getCount(Component cmp) const = 0;
 };
 
 
@@ -128,14 +129,14 @@ class ArrayDescriptor : public IArrayDescriptor
 			}
 		}
 
-		virtual void set(Component, Blob&) const override { ASSERT(false); }
-		virtual void get(Component, Blob&) const override { ASSERT(false); }
+		virtual void set(Component, Blob&) const override;
+		virtual void get(Component, Blob&) const override;
 		virtual void set(Component, int, Blob&) const override { ASSERT(false); };
 		virtual void get(Component, int, Blob&) const override { ASSERT(false); };
 
-		virtual int getCount(Component cmp) override { return (static_cast<S*>(cmp.scene)->*m_counter)(cmp); }
-		virtual void addArrayItem(Component cmp, int index) override { (static_cast<S*>(cmp.scene)->*m_adder)(cmp, index); }
-		virtual void removeArrayItem(Component cmp, int index) override { (static_cast<S*>(cmp.scene)->*m_remover)(cmp, index); }
+		virtual int getCount(Component cmp) const override { return (static_cast<S*>(cmp.scene)->*m_counter)(cmp); }
+		virtual void addArrayItem(Component cmp, int index) const override { (static_cast<S*>(cmp.scene)->*m_adder)(cmp, index); }
+		virtual void removeArrayItem(Component cmp, int index) const override { (static_cast<S*>(cmp.scene)->*m_remover)(cmp, index); }
 
 	private:
 		Counter m_counter;
@@ -190,6 +191,44 @@ class PropertyDescriptor : public IPropertyDescriptor
 		};
 
 };
+
+
+template <class S>
+void ArrayDescriptor<S>::set(Component cmp, Blob& stream) const
+{
+	int count;
+	stream.read(count);
+	while(getCount(cmp) < count)
+	{
+		addArrayItem(cmp, -1);
+	}
+	while(getCount(cmp) > count)
+	{
+		removeArrayItem(cmp, getCount(cmp) - 1);
+	}
+	for(int i = 0; i < count; ++i)
+	{
+		for(int j = 0, cj = getChildren().size(); j < cj; ++j)
+		{
+			getChildren()[j]->set(cmp, i, stream);
+		}
+	}
+}
+
+
+template <class S>
+void ArrayDescriptor<S>::get(Component cmp, Blob& stream) const
+{
+	int count = getCount(cmp);
+	stream.write(count);
+	for(int i = 0; i < count; ++i)
+	{
+		for(int j = 0, cj = getChildren().size(); j < cj; ++j)
+		{
+			getChildren()[j]->get(cmp, i, stream);
+		}
+	}
+}
 
 
 template <class S>

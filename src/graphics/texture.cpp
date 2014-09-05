@@ -450,7 +450,7 @@ namespace Lumix
 	}
 
 	
-	uint32_t Texture::getPixel(float x, float y)
+	uint32_t Texture::getPixel(float x, float y) const
 	{
 		if(m_data.empty() || x >= m_width || y >= m_height || x < 0 || y < 0)
 		{

@@ -570,8 +570,10 @@ struct WorldEditorImpl : public WorldEditor
 					{
 						for (int i = 0; i < scenes.size(); ++i)
 						{
-							if (scenes[i]->createComponent(m_component.type, m_component.entity).isValid())
+							const Lumix::Component& cmp = scenes[i]->createComponent(m_component.type, m_component.entity);
+							if (cmp.isValid())
 							{
+								m_component = cmp;
 								break;
 							}
 						}
