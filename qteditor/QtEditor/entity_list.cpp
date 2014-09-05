@@ -263,7 +263,6 @@ void EntityList::onUniverseDestroyed()
 void EntityList::on_entityList_clicked(const QModelIndex &index)
 {
 	m_editor->selectEntity(Lumix::Entity(m_universe, m_filter->data(index, Qt::UserRole).toInt()));
-	TODO("select entity in the list when m_editor->entitySelected()");
 }
 
 

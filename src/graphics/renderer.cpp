@@ -105,7 +105,10 @@ struct RendererImpl : public Renderer
 		engine.getWorldEditor()->registerProperty("terrain", LUMIX_NEW(PropertyDescriptor<RenderScene>)("material", &RenderScene::getTerrainMaterial, &RenderScene::setTerrainMaterial, IPropertyDescriptor::FILE, "Material (*.mat)"));
 		engine.getWorldEditor()->registerProperty("terrain", LUMIX_NEW(PropertyDescriptor<RenderScene>)("xz_scale", &RenderScene::getTerrainXZScale, &RenderScene::setTerrainXZScale));
 		engine.getWorldEditor()->registerProperty("terrain", LUMIX_NEW(PropertyDescriptor<RenderScene>)("y_scale", &RenderScene::getTerrainYScale, &RenderScene::setTerrainYScale));
-		engine.getWorldEditor()->registerProperty("terrain", LUMIX_NEW(PropertyDescriptor<RenderScene>)("grass_mesh", &RenderScene::getTerrainGrass, &RenderScene::setTerrainGrass, IPropertyDescriptor::FILE, "Mesh (*.msh)"));
+		
+		auto grass = LUMIX_NEW(ArrayDescriptor<RenderScene>)("grass", &RenderScene::getGrassCount, &RenderScene::addGrass, &RenderScene::removeGrass);
+		grass->addChild(LUMIX_NEW(ArrayObjectDescriptor<RenderScene>)("mesh", &RenderScene::getGrass, &RenderScene::setGrass, IPropertyDescriptor::FILE, "Mesh (*.msh)"));
+		engine.getWorldEditor()->registerProperty("terrain", grass);
 
 		m_engine = &engine;
 		glewExperimental = GL_TRUE;

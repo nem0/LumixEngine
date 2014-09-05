@@ -43,6 +43,7 @@ class PropertyViewObject : public QObject
 		PropertyViewObject** getMembers() { return m_members.empty() ? NULL : &m_members[0]; }
 		int getMemberCount() const { return m_members.size(); }
 		void addMember(PropertyViewObject* member) { m_members.push(member); }
+		void removeMember(PropertyViewObject* member) { m_members.eraseItem(member); }
 		PropertyViewObject* getParent() const { return m_parent; }
 
 		virtual void createEditor(class PropertyView& view, QTreeWidgetItem* item) = 0;
@@ -73,6 +74,7 @@ public:
 	void setObject(PropertyViewObject* object);
 	PropertyViewObject* getObject();
 	void addTerrainCustomProperties(QTreeWidgetItem& item, const Lumix::Component& terrain_component);
+	void refresh();
 
 private slots:
 	void on_addComponentButton_clicked();

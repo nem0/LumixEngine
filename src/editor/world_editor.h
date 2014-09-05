@@ -82,7 +82,9 @@ namespace Lumix
 			virtual void snapToTerrain() = 0;
 			virtual void toggleGameMode() = 0;
 			virtual void navigate(float forward, float right, float speed) = 0;
-			virtual void setProperty(uint32_t component, uint32_t property, const void* data, int size) = 0;
+			virtual void setProperty(uint32_t component, int index, IPropertyDescriptor& property, const void* data, int size) = 0;
+			virtual void addArrayPropertyItem(const Component& cmp, IArrayDescriptor& property) = 0;
+			virtual void removeArrayPropertyItem(const Component& cmp, int index, IArrayDescriptor& property) = 0;
 			virtual void onMouseDown(int x, int y, MouseButton::Value button) = 0;
 			virtual void onMouseMove(int x, int y, int relx, int rely, int mouse_flags) = 0;
 			virtual void onMouseUp(int x, int y, MouseButton::Value button) = 0;
