@@ -450,6 +450,23 @@ namespace Lumix
 	}
 
 
+	uint32_t Texture::getPixel(int x, int y)
+	{
+		if(m_data.empty() || x >= m_width || y >= m_height || x < 0 || y < 0)
+		{
+			return 0;
+		}
+		switch(m_BPP)
+		{
+			case 4:
+				return *(uint32_t*)&m_data[(x + y * m_width) * 4];
+			default:
+				ASSERT(false);
+				return 0;
+		}
+	}
+
+
 	void Texture::saveTGA()
 	{
 		if (m_BPP != 4 || m_data.empty())

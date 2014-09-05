@@ -114,6 +114,10 @@ namespace Lumix
 
 			virtual void setGrass(Component cmp, int index, const string& path) = 0;
 			virtual void getGrass(Component cmp, int index, string& path) = 0;
+			virtual void setGrassGround(Component cmp, int index, const int& ground) = 0;
+			virtual void getGrassGround(Component cmp, int index, int& ground) = 0;
+			virtual void setGrassDensity(Component cmp, int index, const int& density) = 0;
+			virtual void getGrassDensity(Component cmp, int index, int& density) = 0;
 			virtual int getGrassCount(Component cmp) = 0;
 			virtual void addGrass(Component cmp, int index) = 0;
 			virtual void removeGrass(Component cmp, int index) = 0;
