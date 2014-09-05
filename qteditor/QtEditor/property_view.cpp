@@ -1613,7 +1613,10 @@ void PropertyView::on_addComponentButton_clicked()
 
 void PropertyView::updateSelectedEntityPosition()
 {
-	m_world_editor->getSelectedEntity().setPosition(Lumix::Vec3((float)m_ui->positionX->value(), (float)m_ui->positionY->value(), (float)m_ui->positionZ->value()));
+	if(m_world_editor->getSelectedEntity().isValid())
+	{
+		m_world_editor->getSelectedEntity().setPosition(Lumix::Vec3((float)m_ui->positionX->value(), (float)m_ui->positionY->value(), (float)m_ui->positionZ->value()));
+	}
 }
 
 void PropertyView::on_positionX_valueChanged(double)
