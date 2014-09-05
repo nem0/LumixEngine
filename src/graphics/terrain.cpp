@@ -202,7 +202,7 @@ namespace Lumix
 		m_grass_mesh = NULL;
 		m_grass_model = NULL;
 		m_ground = 0;
-		m_density = 1;
+		m_density = 10;
 	}
 
 
@@ -231,7 +231,7 @@ namespace Lumix
 	{
 		forceGrassUpdate();
 		GrassType& type = *m_grass_types[index];
-		type.m_density = Math::maxValue(0, density);
+		type.m_density = Math::clamp(density, 0, 50);
 	}
 
 
@@ -541,6 +541,8 @@ namespace Lumix
 		for(int i = 0; i < count; ++i)
 		{
 			serializer.deserializeArrayItem(path, LUMIX_MAX_PATH);
+			serializer.deserializeArrayItem(m_grass_types[i]->m_ground);
+			serializer.deserializeArrayItem(m_grass_types[i]->m_density);
 			setGrassTypePath(i, path);
 		}
 		universe.addComponent(m_entity, TERRAIN_HASH, &scene, index);
@@ -559,6 +561,9 @@ namespace Lumix
 		{
 			GrassType& type = *m_grass_types[i];
 			serializer.serializeArrayItem(type.m_grass_model ? type.m_grass_model->getPath().c_str() : "");
+			serializer.serializeArrayItem(type.m_ground);
+			serializer.serializeArrayItem(type.m_density);
+
 		}
 	}
 
