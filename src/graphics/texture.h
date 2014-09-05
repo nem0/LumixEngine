@@ -31,7 +31,7 @@ class LUMIX_ENGINE_API Texture : public Resource
 		void removeDataReference();
 		void onDataUpdated();
 		void save();
-		uint32_t getPixel(float x, float y);
+		uint32_t getPixel(float x, float y) const;
 
 	private:
 		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
