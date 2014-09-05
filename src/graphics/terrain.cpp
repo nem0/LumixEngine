@@ -201,6 +201,8 @@ namespace Lumix
 		m_grass_geometry = NULL;
 		m_grass_mesh = NULL;
 		m_grass_model = NULL;
+		m_ground = 0;
+		m_density = 1;
 	}
 
 
@@ -224,6 +226,36 @@ namespace Lumix
 		m_grass_types.erase(index);
 	}
 
+
+	void Terrain::setGrassTypeDensity(int index, int density)
+	{
+		forceGrassUpdate();
+		GrassType& type = *m_grass_types[index];
+		type.m_density = Math::maxValue(0, density);
+	}
+
+
+	int Terrain::getGrassTypeDensity(int index)
+	{
+		GrassType& type = *m_grass_types[index];
+		return type.m_density;
+	}
+
+
+	void Terrain::setGrassTypeGround(int index, int ground)
+	{
+		ground = Math::clamp(ground, 0, 3);
+		forceGrassUpdate();
+		GrassType& type = *m_grass_types[index];
+		type.m_ground = ground;
+	}
+	
+	
+	int Terrain::getGrassTypeGround(int index)
+	{
+		GrassType& type = *m_grass_types[index];
+		return type.m_ground;
+	}
 
 
 	Path Terrain::getGrassTypePath(int index)
@@ -339,16 +371,26 @@ namespace Lumix
 							if(patch.m_type->m_grass_geometry)
 							{
 								int index = 0;
-								for (float dx = 0; dx < GRASS_QUAD_SIZE; dx += 0.333f)
+								Texture* splat_map = m_material->getTexture(m_material->getTextureCount() - 1);
+								float step = GRASS_QUAD_SIZE / (float)patch.m_type->m_density;
+								for (float dx = 0; dx < GRASS_QUAD_SIZE; dx += step)
 								{
-									for (float dz = 0; dz < GRASS_QUAD_SIZE; dz += 0.333f)
+									for (float dz = 0; dz < GRASS_QUAD_SIZE; dz += step)
 									{
-										Matrix& grass_mtx = patch.m_matrices.pushEmpty();
-										grass_mtx = Matrix::IDENTITY;
-										float x = quad_x + dx + (rand() % 100 - 50) / 100.0f;
-										float z = quad_z + dz + (rand() % 100 - 50) / 100.0f;;
-										grass_mtx.setTranslation(Vec3(x, getHeight(x / m_xz_scale, z / m_xz_scale), z));
-										grass_mtx = mtx * grass_mtx;
+										uint32_t pixel_value = splat_map->getPixel(splat_map->getWidth() * (quad_x + dx) / m_width, splat_map->getHeight() * (quad_z + dz) / m_height);
+										uint8_t count = (pixel_value >> (8 * patch.m_type->m_ground)) & 0xff;
+										float density = count / 255.0f;
+										if(density > 0.25f)
+										{
+											Matrix& grass_mtx = patch.m_matrices.pushEmpty();
+											grass_mtx = Matrix::IDENTITY;
+											float x = quad_x + dx + step * (rand() % 100 - 50) / 100.0f;
+											float z = quad_z + dz + step * (rand() % 100 - 50) / 100.0f;
+											grass_mtx.setTranslation(Vec3(x, getHeight(x / m_xz_scale, z / m_xz_scale), z));
+											grass_mtx = mtx * grass_mtx;
+											grass_mtx.multiply3x3(density + (rand() % 20 - 10) / 100.0f);
+										}
+
 										++index;
 									}
 								}

@@ -40,6 +40,8 @@ class Terrain
 				Mesh* m_grass_mesh;
 				Model* m_grass_model;
 				Terrain& m_terrain;
+				int m_ground;
+				int m_density;
 		};
 		
 		class GrassPatch
@@ -79,6 +81,10 @@ class Terrain
 		Material* getMaterial() const { return m_material; }
 		void setGrassTypePath(int index, const Path& path);
 		Path getGrassTypePath(int index);
+		void setGrassTypeGround(int index, int ground);
+		int getGrassTypeGround(int index);
+		void setGrassTypeDensity(int index, int density);
+		int getGrassTypeDensity(int index);
 		void addGrassType(int index);
 		void removeGrassType(int index);
 		int getGrassTypeCount() const { return m_grass_types.size(); }

@@ -639,6 +639,30 @@ namespace Lumix
 			}
 
 
+			virtual void setGrassDensity(Component cmp, int index, const int& density) override
+			{
+				m_terrains[cmp.index]->setGrassTypeDensity(index, density);
+			}
+			
+			
+			virtual void getGrassDensity(Component cmp, int index, int& density) override
+			{
+				density = m_terrains[cmp.index]->getGrassTypeDensity(index);
+			}
+
+
+			virtual void setGrassGround(Component cmp, int index, const int& ground) override
+			{
+				m_terrains[cmp.index]->setGrassTypeGround(index, ground);
+			}
+			
+
+			virtual void getGrassGround(Component cmp, int index, int& ground) override
+			{
+				ground = m_terrains[cmp.index]->getGrassTypeGround(index);
+			}
+
+
 			virtual void setGrass(Component cmp, int index, const string& path) override
 			{
 				m_terrains[cmp.index]->setGrassTypePath(index, path.c_str());

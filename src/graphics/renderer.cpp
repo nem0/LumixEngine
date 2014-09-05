@@ -108,6 +108,8 @@ struct RendererImpl : public Renderer
 		
 		auto grass = LUMIX_NEW(ArrayDescriptor<RenderScene>)("grass", &RenderScene::getGrassCount, &RenderScene::addGrass, &RenderScene::removeGrass);
 		grass->addChild(LUMIX_NEW(ArrayObjectDescriptor<RenderScene>)("mesh", &RenderScene::getGrass, &RenderScene::setGrass, IPropertyDescriptor::FILE, "Mesh (*.msh)"));
+		grass->addChild(LUMIX_NEW(ArrayObjectDescriptor<RenderScene>)("ground", &RenderScene::getGrassGround, &RenderScene::setGrassGround));
+		grass->addChild(LUMIX_NEW(ArrayObjectDescriptor<RenderScene>)("density", &RenderScene::getGrassDensity, &RenderScene::setGrassDensity));
 		engine.getWorldEditor()->registerProperty("terrain", grass);
 
 		m_engine = &engine;
