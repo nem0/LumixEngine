@@ -409,6 +409,8 @@ namespace Lumix
 				{
 					LUMIX_DELETE(m_terrains[component.index]);
 					m_terrains[component.index] = NULL;
+					m_universe.destroyComponent(component);
+					m_universe.componentDestroyed().invoke(component);
 				}
 				else
 				{
@@ -637,15 +639,33 @@ namespace Lumix
 			}
 
 
-			virtual void setTerrainGrass(Component cmp, const string& path) override
+			virtual void setGrass(Component cmp, int index, const string& path) override
 			{
-				m_terrains[cmp.index]->setGrassPath(path.c_str());
+				m_terrains[cmp.index]->setGrassTypePath(index, path.c_str());
 			}
 
 
-			virtual void getTerrainGrass(Component cmp, string& path) override
+			virtual void getGrass(Component cmp, int index, string& path) override
 			{
-				path = m_terrains[cmp.index]->getGrassPath().c_str();
+				path = m_terrains[cmp.index]->getGrassTypePath(index).c_str();
+			}
+
+
+			virtual int getGrassCount(Component cmp) override
+			{
+				return m_terrains[cmp.index]->getGrassTypeCount();
+			}
+
+
+			virtual void addGrass(Component cmp, int index) override
+			{
+				m_terrains[cmp.index]->addGrassType(index);
+			}
+
+
+			virtual void removeGrass(Component cmp, int index) override
+			{
+				m_terrains[cmp.index]->removeGrassType(index);
 			}
 
 

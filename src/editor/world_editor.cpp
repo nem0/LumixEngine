@@ -162,6 +162,104 @@ class MoveEntityCommand : public IEditorCommand
 };
 
 
+class RemoveArrayPropertyItemCommand : public IEditorCommand
+{
+	
+	public:
+		RemoveArrayPropertyItemCommand(const Component& component, int index, IArrayDescriptor& descriptor)
+			: m_component(component)
+			, m_index(index)
+			, m_descriptor(descriptor)
+		{
+			for(int i = 0, c = m_descriptor.getChildren().size(); i < c; ++i)
+			{
+				m_descriptor.getChildren()[i]->get(component, m_index, m_old_values);
+			}
+		}
+
+
+		virtual void execute() override
+		{
+			m_descriptor.removeArrayItem(m_component, m_index);
+		}
+
+
+		virtual void undo() override
+		{
+			m_descriptor.addArrayItem(m_component, m_index);
+			m_old_values.rewindForRead();
+			for(int i = 0, c = m_descriptor.getChildren().size(); i < c; ++i)
+			{
+				m_descriptor.getChildren()[i]->set(m_component, m_index, m_old_values);
+			}		
+		}
+
+
+		virtual uint32_t getType() override
+		{
+			static const uint32_t hash = crc32("remove_array_property_item");
+			return hash;
+		}
+
+
+		virtual bool merge(IEditorCommand&)
+		{
+			return false;
+		}
+
+	private:
+		Component m_component;
+		int m_index;
+		IArrayDescriptor& m_descriptor;
+		Blob m_old_values;
+};
+
+
+class AddArrayPropertyItemCommand : public IEditorCommand
+{
+	
+	public:
+		AddArrayPropertyItemCommand(const Component& component, IArrayDescriptor& descriptor)
+			: m_component(component)
+			, m_index(-1)
+			, m_descriptor(descriptor)
+		{
+		}
+
+
+		virtual void execute() override
+		{
+			m_descriptor.addArrayItem(m_component, -1);
+			m_index = m_descriptor.getCount(m_component) - 1;
+		}
+
+
+		virtual void undo() override
+		{
+			m_descriptor.removeArrayItem(m_component, m_index);
+		}
+
+
+		virtual uint32_t getType() override
+		{
+			static const uint32_t hash = crc32("add_array_property_item");
+			return hash;
+		}
+
+
+		virtual bool merge(IEditorCommand&)
+		{
+			return false;
+		}
+
+	private:
+		Component m_component;
+		int m_index;
+		IArrayDescriptor& m_descriptor;
+};
+
+
+
 class SetPropertyCommand : public IEditorCommand
 {
 	public:
@@ -170,8 +268,20 @@ class SetPropertyCommand : public IEditorCommand
 			, m_property_descriptor(property_descriptor)
 			, m_editor(editor)
 		{
+			m_index = -1;
 			m_new_value.write(data, size);
 			m_property_descriptor.get(component, m_old_value);
+		}
+
+
+		SetPropertyCommand(WorldEditor& editor, const Component& component, int index, const IPropertyDescriptor& property_descriptor, const void* data, int size)
+			: m_component(component)
+			, m_property_descriptor(property_descriptor)
+			, m_editor(editor)
+		{
+			m_index = index;
+			m_new_value.write(data, size);
+			m_property_descriptor.get(component, m_index, m_old_value);
 		}
 
 
@@ -200,7 +310,7 @@ class SetPropertyCommand : public IEditorCommand
 		{
 			ASSERT(command.getType() == getType());
 			SetPropertyCommand& src = static_cast<SetPropertyCommand&>(command);
-			if (m_component == src.m_component && &src.m_property_descriptor == &m_property_descriptor)
+			if (m_component == src.m_component && &src.m_property_descriptor == &m_property_descriptor && m_index == src.m_index)
 			{
 				src.m_new_value = m_new_value;
 				return true;
@@ -223,7 +333,14 @@ class SetPropertyCommand : public IEditorCommand
 					{
 						if (cmps[j].type == m_component.type)
 						{
-							m_property_descriptor.set(cmps[j], stream);
+							if(m_index >= 0)
+							{
+								m_property_descriptor.set(cmps[j], m_index, stream);
+							}
+							else
+							{
+								m_property_descriptor.set(cmps[j], stream);
+							}
 							break;
 						}
 					}
@@ -231,7 +348,14 @@ class SetPropertyCommand : public IEditorCommand
 			}
 			else
 			{
-				m_property_descriptor.set(m_component, stream);
+				if(m_index >= 0)
+				{
+					m_property_descriptor.set(m_component, m_index, stream);
+				}
+				else
+				{
+					m_property_descriptor.set(m_component, stream);
+				}
 			}
 		}
 
@@ -241,11 +365,9 @@ class SetPropertyCommand : public IEditorCommand
 		Component m_component;
 		Blob m_new_value;
 		Blob m_old_value;
+		int m_index;
 		const IPropertyDescriptor& m_property_descriptor;
 };
-
-
-
 
 
 struct EditorIconHit
@@ -1300,7 +1422,27 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
-		virtual void setProperty(uint32_t component, uint32_t property, const void* data, int size) override
+		virtual void addArrayPropertyItem(const Component& cmp, IArrayDescriptor& property) override
+		{
+			if(cmp.isValid())
+			{
+				IEditorCommand* command = LUMIX_NEW(AddArrayPropertyItemCommand)(cmp, property);
+				executeCommand(command);
+			}
+		}
+
+
+		virtual void removeArrayPropertyItem(const Component& cmp, int index, IArrayDescriptor& property) override
+		{
+			if(cmp.isValid())
+			{
+				IEditorCommand* command = LUMIX_NEW(RemoveArrayPropertyItemCommand)(cmp, index, property);
+				executeCommand(command);
+			}
+		}
+
+
+		virtual void setProperty(uint32_t component, int index, IPropertyDescriptor& property, const void* data, int size) override
 		{
 			if (m_selected_entity.isValid())
 			{
@@ -1308,12 +1450,11 @@ struct WorldEditorImpl : public WorldEditor
 				Component cmp = m_selected_entity.getComponent(component_hash);
 				if (cmp.isValid())
 				{
-					IEditorCommand* command = LUMIX_NEW(SetPropertyCommand)(*this, cmp, getPropertyDescriptor(component_hash, property), data, size);
+					IEditorCommand* command = LUMIX_NEW(SetPropertyCommand)(*this, cmp, index, property, data, size);
 					executeCommand(command);
 				}
 			}
 		}
-
 
 		void rotateCamera(int x, int y)
 		{

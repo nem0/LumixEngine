@@ -99,6 +99,46 @@ class FileEdit : public QLineEdit
 };
 
 
+class ComponentArrayItemObject : public PropertyViewObject
+{
+	public:
+		ComponentArrayItemObject(PropertyViewObject* parent, const char* name, Lumix::IArrayDescriptor& descriptor, Lumix::Component component, int index)
+			: PropertyViewObject(parent, name)
+			, m_descriptor(descriptor)
+			, m_component(component)
+			, m_index(index)
+		{
+		}
+
+		virtual void createEditor(PropertyView& view, QTreeWidgetItem* item) override
+		{
+			QWidget* widget = new QWidget();
+			QHBoxLayout* layout = new QHBoxLayout(widget);
+			layout->setContentsMargins(0, 0, 0, 0);
+			QPushButton* button = new QPushButton(" - ");
+			layout->addWidget(button);
+			layout->addStretch(1);
+			item->treeWidget()->setItemWidget(item, 1, widget);
+			button->connect(button, &QPushButton::clicked, [this, &view]()
+			{
+				view.getWorldEditor()->removeArrayPropertyItem(m_component, m_index, m_descriptor);
+				view.setObject(NULL);
+				view.getWorldEditor()->selectEntity(view.getWorldEditor()->getSelectedEntity());
+			});
+		}
+
+		virtual bool isEditable() const override
+		{
+			return false;
+		}
+
+	private:
+		Lumix::IArrayDescriptor& m_descriptor;
+		Lumix::Component m_component;
+		int m_index;
+};
+
+
 class ComponentPropertyObject : public PropertyViewObject
 {
 	public:
@@ -107,14 +147,42 @@ class ComponentPropertyObject : public PropertyViewObject
 			, m_descriptor(descriptor)
 			, m_component(cmp)
 		{
+			m_array_index = -1;
+			if(descriptor.getType() == Lumix::IPropertyDescriptor::ARRAY)
+			{
+				Lumix::IArrayDescriptor& array_desc = static_cast<Lumix::IArrayDescriptor&>(descriptor);
+				int item_count = array_desc.getCount(cmp);
+				for( int j = 0; j < item_count; ++j)
+				{
+					ComponentArrayItemObject* item = new ComponentArrayItemObject(this, name, array_desc, m_component, j);
+					addMember(item);
+					for(int i = 0; i < descriptor.getChildren().size(); ++i)
+					{
+						auto child = descriptor.getChildren()[i];
+						auto member = new ComponentPropertyObject(this, child->getName(), cmp, *descriptor.getChildren()[i]);
+						member->setArrayIndex(j);
+						item->addMember(member);
+					}
+				}
+			}
 		}
 
 
 		virtual void createEditor(PropertyView& view, QTreeWidgetItem* item) override
 		{
 			Lumix::Blob stream;
-			m_descriptor.get(m_component, stream);
-			
+			if(m_descriptor.getType() != Lumix::IPropertyDescriptor::ARRAY)
+			{
+				if(m_array_index >= 0 )
+				{
+					m_descriptor.get(m_component, m_array_index, stream);
+				}
+				else
+				{
+					m_descriptor.get(m_component, stream);
+				}
+			}
+
 			switch (m_descriptor.getType())
 			{
 				case Lumix::IPropertyDescriptor::BOOL:
@@ -126,7 +194,7 @@ class ComponentPropertyObject : public PropertyViewObject
 						checkbox->setChecked(b);
 						checkbox->connect(checkbox, &QCheckBox::stateChanged, [this, &view](bool new_value)
 						{
-							view.getWorldEditor()->setProperty(m_component.type, m_descriptor.getNameHash(), &new_value, sizeof(new_value));
+							view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, &new_value, sizeof(new_value));
 						});
 					}
 					break;
@@ -155,7 +223,7 @@ class ComponentPropertyObject : public PropertyViewObject
 						{
 							Lumix::Vec3 value;
 							value.set((float)sb1->value(), (float)sb2->value(), (float)sb3->value());
-							view.getWorldEditor()->setProperty(m_component.type, m_descriptor.getNameHash(), &value, sizeof(value));
+							view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, &value, sizeof(value));
 						});
 					}
 					break;
@@ -179,7 +247,7 @@ class ComponentPropertyObject : public PropertyViewObject
 							QByteArray byte_array = str.toLatin1();
 							const char* text = byte_array.data();
 							view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, text);
-							view.getWorldEditor()->setProperty(m_component.type, m_descriptor.getNameHash(), rel_path, strlen(rel_path) + 1);
+							view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, rel_path, strlen(rel_path) + 1);
 							edit->setText(rel_path);
 						});
 				
@@ -193,8 +261,11 @@ class ComponentPropertyObject : public PropertyViewObject
 						item->treeWidget()->setItemWidget(item, 1, widget);
 						connect(edit, &QLineEdit::editingFinished, [edit, &view, this]()
 						{
-							QByteArray byte_array = edit->text().toLatin1();
-							view.getWorldEditor()->setProperty(m_component.type, m_descriptor.getNameHash(), byte_array.data(), byte_array.size() + 1);
+							if(view.getObject())
+							{
+								QByteArray byte_array = edit->text().toLatin1();
+								view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, byte_array.data(), byte_array.size() + 1);
+							}
 						});
 					}
 					break;
@@ -210,7 +281,7 @@ class ComponentPropertyObject : public PropertyViewObject
 						connect(edit, (void (QSpinBox::*)(int))&QSpinBox::valueChanged, [this, &view](int new_value) 
 						{
 							int value = new_value;
-							view.getWorldEditor()->setProperty(m_component.type, m_descriptor.getNameHash(), &value, sizeof(value));
+							view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, &value, sizeof(value));
 						});
 					}
 					break;
@@ -225,7 +296,7 @@ class ComponentPropertyObject : public PropertyViewObject
 						connect(edit, (void (QDoubleSpinBox::*)(double))&QDoubleSpinBox::valueChanged, [this, &view](double new_value) 
 						{
 							float value = (float)new_value;
-							view.getWorldEditor()->setProperty(m_component.type, m_descriptor.getNameHash(), &value, sizeof(value));
+							view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, &value, sizeof(value));
 						});
 					}
 					break;
@@ -238,7 +309,24 @@ class ComponentPropertyObject : public PropertyViewObject
 						{
 							QByteArray byte_array = edit->text().toLatin1();
 							const char* text = byte_array.data();
-							view.getWorldEditor()->setProperty(m_component.type, m_descriptor.getNameHash(), text, strlen(text) + 1);
+							view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, text, strlen(text) + 1);
+						});
+					}
+					break;
+				case Lumix::IPropertyDescriptor::ARRAY:
+					{
+						QWidget* widget = new QWidget();
+						QHBoxLayout* layout = new QHBoxLayout(widget);
+						layout->setContentsMargins(0, 0, 0, 0);
+						QPushButton* button = new QPushButton(" + ");
+						layout->addWidget(button);
+						layout->addStretch(1);
+						item->treeWidget()->setItemWidget(item, 1, widget);
+						button->connect(button, &QPushButton::clicked, [this, &view]()
+						{
+							view.getWorldEditor()->addArrayPropertyItem(m_component, static_cast<Lumix::IArrayDescriptor&>(m_descriptor));
+							view.setObject(NULL);
+							view.getWorldEditor()->selectEntity(view.getWorldEditor()->getSelectedEntity());
 						});
 					}
 					break;
@@ -256,10 +344,12 @@ class ComponentPropertyObject : public PropertyViewObject
 
 
 		Lumix::Component getComponent() const { return m_component; }
+		void setArrayIndex(int index) { m_array_index = index; }
 
 	private:
 		Lumix::IPropertyDescriptor& m_descriptor;
 		Lumix::Component m_component;
+		int m_array_index;
 };
 
 
@@ -657,7 +747,7 @@ void createTextureInMaterialEditor(PropertyView& view, QTreeWidgetItem* item, In
 		}
 	});
 
-	QPushButton* add_button = new QPushButton(" + ");
+	QPushButton* add_button = new QPushButton(" + "); 
 	layout->addWidget(add_button);
 	add_button->connect(add_button, &QPushButton::clicked, [texture, &view, item]()
 	{
@@ -1090,6 +1180,18 @@ void PropertyView::onEntityPosition(const Lumix::Entity& e)
 }
 
 
+void PropertyView::refresh()
+{
+	m_ui->propertyList->clear();
+
+	QTreeWidgetItem* item = new QTreeWidgetItem();
+	m_ui->propertyList->insertTopLevelItem(0, item);
+	createObjectEditor(item, m_object);
+
+	m_ui->propertyList->expandAll();
+	m_ui->propertyList->resizeColumnToContents(0);
+}
+
 
 Lumix::WorldEditor* PropertyView::getWorldEditor()
 {
@@ -1196,10 +1298,10 @@ void PropertyView::setScriptCompiler(ScriptCompiler* compiler)
 
 void PropertyView::clear()
 {
-	m_ui->propertyList->clear();
-
 	delete m_object;
 	m_object = NULL;
+
+	m_ui->propertyList->clear();
 }
 
 
@@ -1451,6 +1553,10 @@ void PropertyView::addScriptCustomProperties()
 
 void PropertyView::setSelectedResource(Lumix::Resource* resource)
 {
+	if(resource)
+	{
+		m_world_editor->selectEntity(Lumix::Entity::INVALID);
+	}
 	clear();
 	if (m_selected_resource)
 	{
@@ -1550,16 +1656,26 @@ PropertyViewObject* PropertyView::getObject()
 
 void PropertyView::setObject(PropertyViewObject* object)
 {
-	clear();
+	if(object != m_object)
+	{
+		clear();
+	}
+	else
+	{
+		m_ui->propertyList->clear();
+	}
 
 	m_object = object;
 	
-	QTreeWidgetItem* item = new QTreeWidgetItem();
-	m_ui->propertyList->insertTopLevelItem(0, item);
-	createObjectEditor(item, object);
+	if(object)
+	{
+		QTreeWidgetItem* item = new QTreeWidgetItem();
+		m_ui->propertyList->insertTopLevelItem(0, item);
+		createObjectEditor(item, object);
 
-	m_ui->propertyList->expandAll();
-	m_ui->propertyList->resizeColumnToContents(0);
+		m_ui->propertyList->expandAll();
+		m_ui->propertyList->resizeColumnToContents(0);
+	}
 }
 
 void PropertyView::on_propertyList_customContextMenuRequested(const QPoint &pos)

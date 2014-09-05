@@ -26,10 +26,33 @@ struct TerrainQuad;
 class Terrain
 {
 	public:
-		class GrassQuad
+		class GrassType
+		{
+			public:
+				GrassType(Terrain& terrain);
+				~GrassType();
+
+				void grassLoaded(Resource::State, Resource::State);
+				void grassVertexCopyCallback(Array<uint8_t>& data);
+				void grassIndexCopyCallback(Array<int>& data);
+	
+				Geometry* m_grass_geometry;
+				Mesh* m_grass_mesh;
+				Model* m_grass_model;
+				Terrain& m_terrain;
+		};
+		
+		class GrassPatch
 		{
 			public:
 				Array<Matrix> m_matrices;
+				GrassType* m_type;
+		};
+
+		class GrassQuad
+		{
+			public:
+				Array<GrassPatch> m_patches;
 				float m_x;
 				float m_z;
 		};
@@ -54,8 +77,11 @@ class Terrain
 		float getYScale() const { return m_y_scale; }
 		Entity getEntity() const { return m_entity; }
 		Material* getMaterial() const { return m_material; }
-		void setGrassPath(const Path& path);
-		Path getGrassPath();
+		void setGrassTypePath(int index, const Path& path);
+		Path getGrassTypePath(int index);
+		void addGrassType(int index);
+		void removeGrassType(int index);
+		int getGrassTypeCount() const { return m_grass_types.size(); }
 		void setMaterial(Material* material);
 		void getGrassInfos(Array<GrassInfo>& infos, const Vec3& camera_position);
 		void setBrush(const Vec3& position, float size) { m_brush_position = position; m_brush_size = size; }
@@ -66,9 +92,7 @@ class Terrain
 		void onMaterialLoaded(Resource::State, Resource::State new_state);
 		float getHeight(int x, int z);
 		float getHeight(float x, float z);
-		void grassLoaded(Resource::State, Resource::State);
-		void grassVertexCopyCallback(Array<uint8_t>& data);
-		void grassIndexCopyCallback(Array<int>& data);
+		void forceGrassUpdate();
 
 	private:
 		Mesh* m_mesh;
@@ -81,15 +105,14 @@ class Terrain
 		float m_y_scale;
 		Entity m_entity;
 		Material* m_material;
-		Geometry* m_grass_geometry;
-		Mesh* m_grass_mesh;
 		RenderScene& m_scene;
-		Model* m_grass_model;
+		Array<GrassType*> m_grass_types;
 		Array<GrassQuad*> m_free_grass_quads;
 		Array<GrassQuad*> m_grass_quads;
 		Vec3 m_last_camera_position;
 		Vec3 m_brush_position;
 		float m_brush_size;
+		bool m_force_grass_update;
 };
 
 
