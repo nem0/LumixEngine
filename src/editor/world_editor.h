@@ -74,10 +74,10 @@ namespace Lumix
 			virtual void destroyComponent(const Component& crc) = 0;
 			virtual Entity addEntity() = 0;
 			virtual void destroyEntities(const Entity* entities, int count) = 0;
-			virtual void selectEntity(Entity e) = 0;
+			virtual void selectEntities(const Entity* entities, int count) = 0;
 			virtual Entity addEntityAt(int camera_x, int camera_y) = 0;
-			virtual void setEntityPosition(const Entity& entity, const Vec3& position) = 0;
-			virtual void setEntityPositionAndRotaion(const Entity& entity, const Vec3& position, const Quat& rotation) = 0;
+			virtual void setEntitiesPositions(const Array<Entity>& entity, const Array<Vec3>& position) = 0;
+			virtual void setEntityPositionAndRotaion(const Array<Entity>& entity, const Array<Vec3>& position, const Array<Quat>& rotation) = 0;
 			virtual void setEntityName(const Entity& entity, const char* name) = 0;
 			virtual void snapToTerrain() = 0;
 			virtual void toggleGameMode() = 0;
@@ -93,10 +93,10 @@ namespace Lumix
 			virtual void setWireframe(bool is_wireframe) = 0;
 			virtual void lookAtSelected() = 0;
 			virtual const char* getBasePath() = 0;
-			virtual Entity getSelectedEntity() const = 0;
+			virtual const Array<Entity>& getSelectedEntities() const = 0;
 			virtual const IPropertyDescriptor& getPropertyDescriptor(uint32_t type, uint32_t name_hash) = 0;
 			virtual Array<IPropertyDescriptor*>& getPropertyDescriptors(uint32_t type) = 0;
-			virtual DelegateList<void(const Entity&)>& entitySelected() = 0;
+			virtual DelegateList<void(const Array<Entity>&)>& entitySelected() = 0;
 			virtual DelegateList<void()>& universeCreated() = 0;
 			virtual DelegateList<void()>& universeDestroyed() = 0;
 			virtual DelegateList<void()>& universeLoaded() = 0;

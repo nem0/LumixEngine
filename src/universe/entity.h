@@ -22,12 +22,12 @@ namespace Lumix
 		void getMatrix(Matrix& mtx) const;
 		void setMatrix(const Vec3& pos, const Quat& rot);
 		void setMatrix(const Matrix& mtx);
-		void setPosition(float x, float y, float z);
-		void setPosition(const Vec3& v);
+		void setPosition(float x, float y, float z) const;
+		void setPosition(const Vec3& v) const;
 		const Vec3& getPosition() const;
 		const Quat& getRotation() const;
-		void setRotation(float x, float y, float z, float w);
-		void setRotation(const Quat& rot);
+		void setRotation(float x, float y, float z, float w) const;
+		void setRotation(const Quat& rot) const;
 		void translate(const Vec3& t);
 		bool isValid() const { return index >= 0; }
 		const Component& getComponent(uint32_t type) const;

@@ -228,13 +228,13 @@ void MainWindow::on_actionSnap_to_terrain_triggered()
 
 void MainWindow::on_actionSave_as_template_triggered()
 {
-	if (m_world_editor->getSelectedEntity().isValid())
+	if (m_world_editor->getSelectedEntities().size() == 1)
 	{
 		bool ok = false;
 		QString text = QInputDialog::getText(this, tr("Entity template"), tr("Template name:"), QLineEdit::Normal, tr(""), &ok);
 		if (ok)
 		{
-			m_world_editor->getEntityTemplateSystem().createTemplateFromEntity(text.toLatin1().data(), m_world_editor->getSelectedEntity());
+			m_world_editor->getEntityTemplateSystem().createTemplateFromEntity(text.toLatin1().data(), m_world_editor->getSelectedEntities()[0]);
 		}
 	}
 }
@@ -261,9 +261,9 @@ void MainWindow::on_actionRedo_triggered()
 
 void MainWindow::on_actionRemove_triggered()
 {
-	if (m_world_editor->getSelectedEntity().isValid())
+	if (!m_world_editor->getSelectedEntities().empty())
 	{
-		m_world_editor->destroyEntities(&m_world_editor->getSelectedEntity(), 1);
+		m_world_editor->destroyEntities(&m_world_editor->getSelectedEntities()[0], m_world_editor->getSelectedEntities().size());
 	}
 }
 
