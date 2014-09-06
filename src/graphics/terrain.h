@@ -91,13 +91,13 @@ class Terrain
 		void setMaterial(Material* material);
 		void getGrassInfos(Array<GrassInfo>& infos, const Vec3& camera_position);
 		void setBrush(const Vec3& position, float size) { m_brush_position = position; m_brush_size = size; }
+		float getHeight(float x, float z);
 
 	private: 
 		void updateGrass(const Vec3& camera_position);
 		void generateGeometry();
 		void onMaterialLoaded(Resource::State, Resource::State new_state);
 		float getHeight(int x, int z);
-		float getHeight(float x, float z);
 		void forceGrassUpdate();
 
 	private:
