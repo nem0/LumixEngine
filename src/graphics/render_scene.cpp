@@ -708,22 +708,23 @@ namespace Lumix
 			{
 				PROFILE_FUNCTION();
 				infos.reserve(m_renderables.size() * 2);
-				for (int i = 0; i < m_renderables.size(); ++i)
+				for (int i = 0, c = m_renderables.size(); i < c; ++i)
 				{
-					if (!m_renderables[i]->m_is_free)
+					const Renderable* LUMIX_RESTRICT renderable = m_renderables[i];
+					if (!renderable->m_is_free)
 					{
-						bool is_model_ready = m_renderables[i]->m_model.getModel() && m_renderables[i]->m_model.getModel()->isReady();
-						if (is_model_ready && (m_renderables[i]->m_layer_mask & layer_mask) != 0)
+						bool is_model_ready = renderable->m_model.getModel() && renderable->m_model.getModel()->isReady();
+						if (is_model_ready && (renderable->m_layer_mask & layer_mask) != 0)
 						{
-							for (int j = 0, c = m_renderables[i]->m_model.getModel()->getMeshCount(); j < c; ++j)
+							for (int j = 0, c = renderable->m_model.getModel()->getMeshCount(); j < c; ++j)
 							{
 								RenderableInfo& info = infos.pushEmpty();
-								info.m_scale = m_renderables[i]->m_scale;
-								info.m_geometry = m_renderables[i]->m_model.getModel()->getGeometry();
-								info.m_mesh = &m_renderables[i]->m_model.getModel()->getMesh(j);
-								info.m_pose = &m_renderables[i]->m_model.getPose();
-								info.m_model = &m_renderables[i]->m_model;
-								info.m_matrix = &m_renderables[i]->m_model.getMatrix();
+								info.m_scale = renderable->m_scale;
+								info.m_geometry = renderable->m_model.getModel()->getGeometry();
+								info.m_mesh = &renderable->m_model.getModel()->getMesh(j);
+								info.m_pose = &renderable->m_model.getPose();
+								info.m_model = &renderable->m_model;
+								info.m_matrix = &renderable->m_model.getMatrix();
 							}
 						}
 					}

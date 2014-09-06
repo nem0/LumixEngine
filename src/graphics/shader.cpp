@@ -38,10 +38,10 @@ void Shader::apply()
 }	
 
 
-void Shader::setUniform(const char* name, int value)
+void Shader::setUniform(const char* name, const uint32_t name_hash, int value)
 {
 	PROFILE_FUNCTION();
-	GLint loc = glGetUniformLocation(m_program_id, name);
+	GLint loc = getUniformLocation(name, name_hash);
 	if(loc >= 0)
 	{
 		//glProgramUniform1i(m_program_id, loc, value);
@@ -51,10 +51,10 @@ void Shader::setUniform(const char* name, int value)
 }
 
 
-void Shader::setUniform(const char* name, const Vec3& value)
+void Shader::setUniform(const char* name, const uint32_t name_hash, const Vec3& value)
 {
 	PROFILE_FUNCTION();
-	GLint loc = glGetUniformLocation(m_program_id, name);
+	GLint loc = getUniformLocation(name, name_hash);
 	if(loc >= 0)
 	{
 		//glProgramUniform3f(m_program_id, loc, value.x, value.y, value.z);
@@ -64,10 +64,10 @@ void Shader::setUniform(const char* name, const Vec3& value)
 }
 
 
-void Shader::setUniform(const char* name, GLfloat value)
+void Shader::setUniform(const char* name, const uint32_t name_hash, GLfloat value)
 {
 	PROFILE_FUNCTION();
-	GLint loc = glGetUniformLocation(m_program_id, name);
+	GLint loc = getUniformLocation(name, name_hash);
 	if(loc >= 0)
 	{
 		//glProgramUniform1f(m_program_id, loc, value);
@@ -76,11 +76,26 @@ void Shader::setUniform(const char* name, GLfloat value)
 	}
 }
 
+GLint Shader::getUniformLocation(const char* name, uint32_t name_hash)
+{
+	for (int i = 0, c = m_uniforms.size(); i < c; ++i)
+	{
+		if (m_uniforms[i].m_name_hash == name_hash)
+		{
+			return m_uniforms[i].m_location;
+		}
+	}
+	CachedUniform& unif = m_uniforms.pushEmpty();
+	unif.m_name_hash = name_hash;
+	unif.m_location = glGetUniformLocation(m_program_id, name);
+	return unif.m_location;
+}
 
-void Shader::setUniform(const char* name, const Matrix& mtx)
+
+void Shader::setUniform(const char* name, uint32_t name_hash, const Matrix& mtx)
 {
 	PROFILE_FUNCTION();
-	GLint loc = glGetUniformLocation(m_program_id, name);
+	GLint loc = getUniformLocation(name, name_hash);
 	if(loc >= 0)
 	{
 		//glProgramUniformMatrix4fv(m_program_id, loc, 1, false, &mtx.m11);
@@ -89,10 +104,10 @@ void Shader::setUniform(const char* name, const Matrix& mtx)
 	}
 }
 
-void Shader::setUniform(const char* name, const Matrix* matrices, int count)
+void Shader::setUniform(const char* name, const uint32_t name_hash, const Matrix* matrices, int count)
 {
 	PROFILE_FUNCTION();
-	GLint loc = glGetUniformLocation(m_program_id, name);
+	GLint loc = getUniformLocation(name, name_hash);
 	if(loc >= 0) // this is here because of bug in some gl implementations
 	{
 		//glProgramUniformMatrix4fv(m_program_id, loc, count, false, &matrices[0].m11);

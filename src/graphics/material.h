@@ -79,6 +79,7 @@ private:
 		};
 		static const int MAX_NAME_LENGTH = 30;
 		char m_name[MAX_NAME_LENGTH + 1];
+		uint32_t m_name_hash;
 		Type m_type;
 		union
 		{

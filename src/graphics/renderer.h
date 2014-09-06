@@ -41,6 +41,7 @@ class LUMIX_ENGINE_API Renderer : public IPlugin
 		virtual void setEditorWireframe(bool is_wireframe) = 0;
 		virtual bool isEditorWireframe() const = 0;
 
+		virtual void renderGeometry(Geometry& geometry, int start, int count, Shader& shader) = 0;
 		virtual void setProjection(float width, float height, float fov, float near_plane, float far_plane, const Matrix& mtx) = 0;
 		virtual Engine& getEngine() = 0;
 		
