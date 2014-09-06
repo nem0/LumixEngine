@@ -80,8 +80,6 @@ private slots:
 	void on_addComponentButton_clicked();
 	void on_compileScriptClicked();
 	void on_editScriptClicked();
-	void on_animablePlayPause();
-	void on_animableTimeSet(int value);
 	void on_TerrainHeightTypeClicked();
 	void on_TerrainTextureTypeClicked();
 	void on_terrainBrushTextureChanged(int value);
@@ -98,10 +96,9 @@ private:
 	void clear();
 	void onUniverseCreated();
 	void onUniverseDestroyed();
-	void onEntitySelected(const Lumix::Entity& e);
+	void onEntitySelected(const Lumix::Array<Lumix::Entity>& e);
 	void onEntityPosition(const Lumix::Entity& e);
 	void addScriptCustomProperties();
-	void addAnimableCustomProperties(const Lumix::Component& cmp);
 	void onScriptCompiled(const Lumix::Path& path, uint32_t status);
 	void setScriptStatus(uint32_t status);
 	void updateSelectedEntityPosition();

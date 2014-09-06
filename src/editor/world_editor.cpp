@@ -108,26 +108,39 @@ class SetEntityNameCommand : public IEditorCommand
 class MoveEntityCommand : public IEditorCommand
 {
 	public:
-		MoveEntityCommand(Entity entity, const Vec3& new_position, const Quat& new_rotation)
-			: m_entity(entity)
-			, m_old_position(entity.getPosition())
-			, m_old_rotation(entity.getRotation())
-			, m_new_position(new_position)
-			, m_new_rotation(new_rotation)
-		{}
+		MoveEntityCommand(const Array<Entity>& entities, const Array<Vec3>& new_positions, const Array<Quat>& new_rotations)
+		{
+			ASSERT(entities.size() == new_positions.size());
+			for(int i = entities.size() - 1; i >= 0; --i)
+			{
+				m_entities.push(entities[i]);
+				m_new_positions.push(new_positions[i]);
+				m_new_rotations.push(new_rotations[i]);
+				m_old_positions.push(entities[i].getPosition());
+				m_old_rotations.push(entities[i].getRotation());
+			}
+		}
 
 
 		virtual void execute() override
 		{
-			m_entity.setPosition(m_new_position);
-			m_entity.setRotation(m_new_rotation);
+			for(int i = 0, c = m_entities.size(); i < c; ++i)
+			{
+				const Entity& entity = m_entities[i];
+				entity.setPosition(m_new_positions[i]);
+				entity.setRotation(m_new_rotations[i]);
+			}
 		}
 
 
 		virtual void undo() override
 		{
-			m_entity.setPosition(m_old_position);
-			m_entity.setRotation(m_old_rotation);
+			for(int i = 0, c = m_entities.size(); i < c; ++i)
+			{
+				const Entity& entity = m_entities[i];
+				entity.setPosition(m_old_positions[i]);
+				entity.setRotation(m_old_rotations[i]);
+			}
 		}
 
 
@@ -141,10 +154,21 @@ class MoveEntityCommand : public IEditorCommand
 		virtual bool merge(IEditorCommand& command)
 		{
 			ASSERT(command.getType() == getType());
-			if (static_cast<MoveEntityCommand&>(command).m_entity == m_entity)
+			MoveEntityCommand& my_command = static_cast<MoveEntityCommand&>(command);
+			if (my_command.m_entities.size() == m_entities.size())
 			{
-				static_cast<MoveEntityCommand&>(command).m_new_position = m_new_position;
-				static_cast<MoveEntityCommand&>(command).m_new_rotation = m_new_rotation;
+				for(int i = 0, c = m_entities.size(); i < c; ++i)
+				{
+					if(m_entities[i].index != my_command.m_entities[i].index)
+					{
+						return false;
+					}
+				}
+				for(int i = 0, c = m_entities.size(); i < c; ++i)
+				{
+					my_command.m_new_positions[i] = m_new_positions[i];
+					my_command.m_new_rotations[i] = m_new_rotations[i];
+				}
 				return true;
 			}
 			else
@@ -154,11 +178,11 @@ class MoveEntityCommand : public IEditorCommand
 		}
 
 	private:
-		Entity m_entity;
-		Vec3 m_old_position;
-		Quat m_old_rotation;
-		Vec3 m_new_position;
-		Quat m_new_rotation;
+		Array<Entity> m_entities;
+		Array<Vec3> m_new_positions;
+		Array<Quat> m_new_rotations;
+		Array<Vec3> m_old_positions;
+		Array<Quat> m_old_rotations;
 };
 
 
@@ -390,7 +414,22 @@ struct WorldEditorImpl : public WorldEditor
 					m_entities.reserve(entities.size());
 					for (int i = 0; i < entities.size(); ++i)
 					{
-						m_entities.push(entities[i]);
+						if(!entities[i].getComponent(type).isValid())
+						{
+							uint32_t tpl = editor.getEntityTemplateSystem().getTemplate(entities[i]);
+							if(tpl == 0)
+							{
+								m_entities.push(entities[i]);
+							}
+							else
+							{
+								const Array<Entity>& instances = editor.getEntityTemplateSystem().getInstances(tpl);
+								for(int i = 0; i < instances.size(); ++i)
+								{
+									m_entities.push(instances[i]);
+								}
+							}
+						}
 					}
 				}
 
@@ -422,7 +461,6 @@ struct WorldEditorImpl : public WorldEditor
 							}
 						}
 					}
-					m_editor.selectEntity(m_entities[0]);
 				}
 
 
@@ -433,7 +471,6 @@ struct WorldEditorImpl : public WorldEditor
 						const Component& cmp = m_entities[i].getComponent(m_type);
 						cmp.scene->destroyComponent(cmp);
 					}
-					m_editor.selectEntity(m_entities[0]);
 				}
 
 
@@ -602,7 +639,6 @@ struct WorldEditorImpl : public WorldEditor
 							}
 						}
 					}
-					m_editor.selectEntity(m_component.entity);
 				}
 
 
@@ -643,7 +679,6 @@ struct WorldEditorImpl : public WorldEditor
 					{
 						m_component.scene->destroyComponent(m_component);
 					}
-					m_editor.selectEntity(m_component.entity);
 				}
 
 			private:
@@ -667,7 +702,7 @@ struct WorldEditorImpl : public WorldEditor
 				{
 					m_entity = m_editor.getEngine().getUniverse()->createEntity();
 					m_entity.setPosition(m_position);
-					m_editor.selectEntity(m_entity);
+					m_editor.selectEntities(&m_entity, 1);
 				}
 
 
@@ -791,7 +826,7 @@ struct WorldEditorImpl : public WorldEditor
 				EditorIconHit icon_hit = raycastEditorIcons(origin, dir);
 				if (gizmo_hit.m_is_hit && (icon_hit.m_t < 0 || gizmo_hit.m_t < icon_hit.m_t))
 				{
-					if (m_selected_entity.isValid())
+					if (!m_selected_entities.empty())
 					{
 						m_mouse_mode = MouseMode::TRANSFORM;
 						if (gizmo_hit.m_mesh->getNameHash() == crc32("x_axis"))
@@ -810,7 +845,15 @@ struct WorldEditorImpl : public WorldEditor
 				}
 				else if (icon_hit.m_t >= 0)
 				{
-					selectEntity(icon_hit.m_icon->getEntity());
+					Entity e = icon_hit.m_icon->getEntity();
+					if(GetAsyncKeyState(VK_LCONTROL) >> 8)
+					{
+						addEntitiesToSelection(&e, 1);
+					}
+					else
+					{
+						selectEntities(&e, 1);
+					}
 				}
 				else if (hit.m_is_hit)
 				{
@@ -838,7 +881,14 @@ struct WorldEditorImpl : public WorldEditor
 					return;
 				}
 			}
-			selectEntity(entity);
+			if(GetAsyncKeyState(VK_LCONTROL) >> 8)
+			{
+				addEntitiesToSelection(&entity, 1);
+			}
+			else
+			{
+				selectEntities(&entity, 1);
+			}
 			m_mouse_mode = MouseMode::TRANSFORM;
 			m_gizmo.startTransform(m_camera.getComponent(CAMERA_HASH), x, y, Gizmo::TransformMode::CAMERA_XZ);
 		}
@@ -917,15 +967,25 @@ struct WorldEditorImpl : public WorldEditor
 
 		virtual void snapToTerrain() override
 		{
-			if (m_selected_entity.isValid())
+			if (!m_selected_entities.empty())
 			{
-				Component renderable = m_selected_entity.getComponent(RENDERABLE_HASH); TODO("what if the selected entity does not have a renderable component?");
-				RenderScene* scene = static_cast<RenderScene*>(renderable.scene);
-				RayCastModelHit hit = scene->castRay(m_selected_entity.getPosition(), Vec3(0, -1, 0), renderable);
-				if (hit.m_is_hit)
+				Array<Vec3> new_positions;
+				for(int i = 0; i < m_selected_entities.size(); ++i)
 				{
-					setEntityPosition(m_selected_entity, hit.m_origin + hit.m_dir * hit.m_t);
+					const Entity& entity = m_selected_entities[i];
+					Component renderable = entity.getComponent(RENDERABLE_HASH); TODO("what if the selected entity does not have a renderable component?");
+					RenderScene* scene = static_cast<RenderScene*>(renderable.scene);
+					RayCastModelHit hit = scene->castRay(entity.getPosition(), Vec3(0, -1, 0), renderable);
+					if (hit.m_is_hit)
+					{
+						new_positions.push(hit.m_origin + hit.m_dir * hit.m_t);
+					}
+					else
+					{
+						new_positions.push(m_selected_entities[i].getPosition());
+					}
 				}
+				setEntitiesPositions(m_selected_entities, new_positions);
 			}
 		}
 
@@ -1010,21 +1070,26 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
-		virtual void setEntityPosition(const Entity& entity, const Vec3& position) override
+		virtual void setEntitiesPositions(const Array<Entity>& entities, const Array<Vec3>& positions) override
 		{
-			if (entity.isValid())
+			if (!entities.empty())
 			{
-				IEditorCommand* command = LUMIX_NEW(MoveEntityCommand)(entity, position, entity.getRotation());
+				Array<Quat> rots;
+				for(int i = 0; i < entities.size(); ++i)
+				{
+					rots.push(entities[i].getRotation());
+				}
+				IEditorCommand* command = LUMIX_NEW(MoveEntityCommand)(entities, positions, rots);
 				executeCommand(command);
 			}
 		}
 
 
-		virtual void setEntityPositionAndRotaion(const Entity& entity, const Vec3& position, const Quat& rotation) override
+		virtual void setEntityPositionAndRotaion(const Array<Entity>& entities, const Array<Vec3>& positions, const Array<Quat>& rotations) override
 		{
-			if (entity.isValid())
+			if (!entities.empty())
 			{
-				IEditorCommand* command = LUMIX_NEW(MoveEntityCommand)(entity, position, rotation);
+				IEditorCommand* command = LUMIX_NEW(MoveEntityCommand)(entities, positions, rotations);
 				executeCommand(command);
 			}
 		}
@@ -1139,42 +1204,21 @@ struct WorldEditorImpl : public WorldEditor
 
 		virtual void addComponent(uint32_t type_crc) override
 		{
-			if (m_selected_entity.isValid())
+			if (!m_selected_entities.empty())
 			{
-				const Entity::ComponentList& cmps = m_selected_entity.getComponents();
-				for (int i = 0; i < cmps.size(); ++i)
-				{
-					if (cmps[i].type == type_crc)
-					{
-						return;
-					}
-				}
-				
-				uint32_t template_hash = m_template_system->getTemplate(m_selected_entity);
-				if (template_hash == 0)
-				{
-					Array<Entity> entities;
-					entities.push(m_selected_entity);
-					IEditorCommand* command = LUMIX_NEW(AddComponentCommand)(*this, entities, type_crc);
-					executeCommand(command);
-				}
-				else
-				{
-					const Array<Entity>& entities = m_template_system->getInstances(template_hash);
-					IEditorCommand* command = LUMIX_NEW(AddComponentCommand)(*this, entities, type_crc);
-					executeCommand(command);
-				}
+				IEditorCommand* command = LUMIX_NEW(AddComponentCommand)(*this, m_selected_entities, type_crc);
+				executeCommand(command);
 			}
 		}
 
 
 		virtual void lookAtSelected() override
 		{
-			if (m_selected_entity.isValid())
+			if (!m_selected_entities.empty())
 			{
 				Matrix camera_mtx = m_camera.getMatrix();
 				Vec3 dir = camera_mtx * Vec3(0, 0, 1);
-				camera_mtx.setTranslation(m_selected_entity.getPosition() + dir * 10);
+				camera_mtx.setTranslation(m_selected_entities[0].getPosition() + dir * 10);
 				m_camera.setMatrix(camera_mtx);
 			}
 		}
@@ -1379,7 +1423,6 @@ struct WorldEditorImpl : public WorldEditor
 			m_undo_index = -1;
 			m_mouse_handling_plugin = NULL;
 			m_is_game_mode = false;
-			m_selected_entity = Entity::INVALID;
 			m_edit_view_render_device = NULL;
 			m_universe_path = "";
 			m_terrain_brush_size = 10;
@@ -1397,9 +1440,9 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
-		virtual Entity getSelectedEntity() const override
+		virtual const Array<Entity>& getSelectedEntities() const override
 		{
-			return m_selected_entity;
+			return m_selected_entities;
 		}
 
 
@@ -1446,10 +1489,10 @@ struct WorldEditorImpl : public WorldEditor
 
 		virtual void setProperty(uint32_t component, int index, IPropertyDescriptor& property, const void* data, int size) override
 		{
-			if (m_selected_entity.isValid())
+			if (m_selected_entities.size() == 1)
 			{
 				uint32_t component_hash = component;
-				Component cmp = m_selected_entity.getComponent(component_hash);
+				Component cmp = m_selected_entities[0].getComponent(component_hash);
 				if (cmp.isValid())
 				{
 					IEditorCommand* command = LUMIX_NEW(SetPropertyCommand)(*this, cmp, index, property, data, size);
@@ -1479,12 +1522,25 @@ struct WorldEditorImpl : public WorldEditor
 			m_camera.setMatrix(camera_mtx);
 		}
 
-	
-		virtual void selectEntity(Entity e) override
+
+		void addEntitiesToSelection(const Entity* entities, int count)
 		{
-			m_selected_entity = e;
-			m_gizmo.setEntity(e);
-			m_entity_selected.invoke(e);
+			for(int i = 0; i < count; ++i)
+			{
+				m_selected_entities.push(entities[i]);
+			}
+			m_entity_selected.invoke(m_selected_entities);
+		}
+
+	
+		virtual void selectEntities(const Entity* entities, int count) override
+		{
+			m_selected_entities.clear();
+			for(int i = 0; i < count; ++i)
+			{
+				m_selected_entities.push(entities[i]);
+			}
+			m_entity_selected.invoke(m_selected_entities);
 		}
 
 
@@ -1527,10 +1583,7 @@ struct WorldEditorImpl : public WorldEditor
 
 		void onEntityDestroyed(const Entity& entity)
 		{
-			if(m_selected_entity == entity)
-			{
-				m_selected_entity = Entity::INVALID;
-			}
+			m_selected_entities.eraseItemFast(entity);
 			for (int i = 0; i < m_editor_icons.size(); ++i)
 			{
 				if (m_editor_icons[i]->getEntity() == entity)
@@ -1553,7 +1606,7 @@ struct WorldEditorImpl : public WorldEditor
 				m_editor_icons[i]->destroy();
 				LUMIX_DELETE(m_editor_icons[i]);
 			}
-			selectEntity(Entity::INVALID);
+			selectEntities(NULL, 0);
 			m_camera = Entity::INVALID;
 			m_editor_icons.clear();
 			m_gizmo.setUniverse(NULL);
@@ -1580,7 +1633,7 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
-		virtual DelegateList<void(const Entity&)>& entitySelected() override
+		virtual DelegateList<void(const Array<Entity>&)>& entitySelected() override
 		{
 			return m_entity_selected;
 		}
@@ -1648,14 +1701,13 @@ struct WorldEditorImpl : public WorldEditor
 			}
 			m_gizmo.create(m_engine->getRenderer());
 			m_gizmo.setUniverse(universe);
-			m_gizmo.hide();
 
 			universe->entityCreated().bind<WorldEditorImpl, &WorldEditorImpl::onEntityCreated>(this);
 			universe->componentCreated().bind<WorldEditorImpl, &WorldEditorImpl::onComponentCreated>(this);
 			universe->componentDestroyed().bind<WorldEditorImpl, &WorldEditorImpl::onComponentDestroyed>(this);
 			universe->entityDestroyed().bind<WorldEditorImpl, &WorldEditorImpl::onEntityDestroyed>(this);
 
-			m_selected_entity = Entity::INVALID;
+			m_selected_entities.clear();
 			m_universe_created.invoke();
 
 		}
@@ -1668,7 +1720,10 @@ struct WorldEditorImpl : public WorldEditor
 				m_undo_stack[m_undo_index]->undo();
 				--m_undo_index;
 			}
-			selectEntity(m_selected_entity);
+			if(!m_selected_entities.empty())
+			{
+				selectEntities(&m_selected_entities[0], m_selected_entities.size());
+			}
 		}
 
 
@@ -1679,7 +1734,10 @@ struct WorldEditorImpl : public WorldEditor
 				++m_undo_index;
 				m_undo_stack[m_undo_index]->execute();
 			}
-			selectEntity(m_selected_entity);
+			if(!m_selected_entities.empty())
+			{
+				selectEntities(&m_selected_entities[0], m_selected_entities.size());
+			}
 		}
 
 
@@ -1698,7 +1756,7 @@ struct WorldEditorImpl : public WorldEditor
 
 		MT::Mutex m_universe_mutex;
 		Gizmo m_gizmo;
-		Entity m_selected_entity;
+		Array<Entity> m_selected_entities;
 		Map<uint32_t, Array<IPropertyDescriptor*> > m_component_properties;
 		MouseMode::Value m_mouse_mode;
 		float m_mouse_x;
@@ -1711,7 +1769,7 @@ struct WorldEditorImpl : public WorldEditor
 		DelegateList<void()> m_universe_destroyed;
 		DelegateList<void()> m_universe_created;
 		DelegateList<void()> m_universe_loaded;
-		DelegateList<void(const Entity&)> m_entity_selected;
+		DelegateList<void(const Array<Entity>&)> m_entity_selected;
 		DelegateList<void(const Entity&, const char*)> m_entity_name_set;
 
 		FS::FileSystem* m_file_system;

@@ -123,7 +123,7 @@ class ComponentArrayItemObject : public PropertyViewObject
 			{
 				view.getWorldEditor()->removeArrayPropertyItem(m_component, m_index, m_descriptor);
 				view.setObject(NULL);
-				view.getWorldEditor()->selectEntity(view.getWorldEditor()->getSelectedEntity());
+				ASSERT(false); // refresh the property view
 			});
 		}
 
@@ -326,7 +326,7 @@ class ComponentPropertyObject : public PropertyViewObject
 						{
 							view.getWorldEditor()->addArrayPropertyItem(m_component, static_cast<Lumix::IArrayDescriptor&>(m_descriptor));
 							view.setObject(NULL);
-							view.getWorldEditor()->selectEntity(view.getWorldEditor()->getSelectedEntity());
+							ASSERT(false); // refresh the property view
 						});
 					}
 					break;
@@ -849,9 +849,9 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			float mouse_x = m_world_editor.getMouseX();
 			float mouse_y = m_world_editor.getMouseY();
 			
-			if (m_world_editor.getSelectedEntity().isValid())
+			for(int i = m_world_editor.getSelectedEntities().size() - 1; i >= 0; --i)
 			{
-				Lumix::Component terrain = m_world_editor.getSelectedEntity().getComponent(crc32("terrain"));
+				Lumix::Component terrain = m_world_editor.getSelectedEntities()[i].getComponent(crc32("terrain"));
 				if (terrain.isValid())
 				{
 					Lumix::Component camera_cmp = m_world_editor.getEditCamera();
@@ -871,12 +871,45 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 
 		virtual bool onEntityMouseDown(const Lumix::RayCastModelHit& hit, int, int) override
 		{
-			if (m_world_editor.getSelectedEntity() == hit.m_component.entity)
+			for(int i = m_world_editor.getSelectedEntities().size() - 1; i >= 0; --i)
+			{
+				if (m_world_editor.getSelectedEntities()[i] == hit.m_component.entity)
+				{
+					Lumix::Component terrain = hit.m_component.entity.getComponent(crc32("terrain"));
+					if (terrain.isValid())
+					{
+						Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
+						switch (m_type)
+						{
+							case HEIGHT:
+								addTerrainLevel(terrain, hit);
+								break;
+							case TEXTURE:
+								addSplatWeight(terrain, hit);
+								break;
+							default:
+								ASSERT(false);
+								break;
+						}
+						return true;
+					}
+				}
+			}
+			return false;
+		}
+
+		virtual void onMouseMove(int x, int y, int /*rel_x*/, int /*rel_y*/, int /*mouse_flags*/) override
+		{
+			Lumix::Component camera_cmp = m_world_editor.getEditCamera();
+			Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(camera_cmp.scene);
+			Lumix::Vec3 origin, dir;
+			scene->getRay(camera_cmp, (float)x, (float)y, origin, dir);
+			Lumix::RayCastModelHit hit = scene->castRay(origin, dir, Lumix::Component::INVALID);
+			if (hit.m_is_hit)
 			{
 				Lumix::Component terrain = hit.m_component.entity.getComponent(crc32("terrain"));
-				if (terrain.isValid())
+				if(terrain.isValid())
 				{
-					Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
 					switch (m_type)
 					{
 						case HEIGHT:
@@ -886,39 +919,9 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 							addSplatWeight(terrain, hit);
 							break;
 						default:
-							ASSERT(false);
 							break;
 					}
-					return true;
 				}
-			}
-			return false;
-		}
-
-		virtual void onMouseMove(int x, int y, int /*rel_x*/, int /*rel_y*/, int /*mouse_flags*/) override
-		{
-			Lumix::Component terrain = m_world_editor.getSelectedEntity().getComponent(crc32("terrain"));
-			Lumix::Component camera_cmp = m_world_editor.getEditCamera();
-			Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(camera_cmp.scene);
-			Lumix::Vec3 origin, dir;
-			scene->getRay(camera_cmp, (float)x, (float)y, origin, dir);
-			Lumix::RayCastModelHit hit = scene->castRay(origin, dir, Lumix::Component::INVALID);
-			switch (m_type)
-			{
-				case HEIGHT:
-					if (hit.m_is_hit)
-					{
-						addTerrainLevel(terrain, hit);
-					}
-					break;
-				case TEXTURE:
-					if (hit.m_is_hit)
-					{
-						addSplatWeight(terrain, hit);
-					}
-					break;
-				default:
-					break;
 			}
 		}
 
@@ -1172,10 +1175,18 @@ void PropertyView::onEntityPosition(const Lumix::Entity& e)
 {
 	if (m_selected_entity == e)
 	{
+		bool b1 = m_ui->positionX->blockSignals(true);
+		bool b2 = m_ui->positionY->blockSignals(true);
+		bool b3 = m_ui->positionZ->blockSignals(true);
+		
 		Lumix::Vec3 pos = e.getPosition();
 		m_ui->positionX->setValue(pos.x);
 		m_ui->positionY->setValue(pos.y);
 		m_ui->positionZ->setValue(pos.z);
+		
+		m_ui->positionX->blockSignals(b1);
+		m_ui->positionY->blockSignals(b2);
+		m_ui->positionZ->blockSignals(b3);
 	}
 }
 
@@ -1349,28 +1360,6 @@ void PropertyView::onScriptCompiled(const Lumix::Path&, uint32_t status)
 }
 
 
-void PropertyView::on_animablePlayPause()
-{
-	Lumix::Component cmp = m_world_editor->getSelectedEntity().getComponent(crc32("animable"));
-	if (cmp.isValid())
-	{
-		Lumix::AnimationScene* scene = static_cast<Lumix::AnimationScene*>(cmp.scene);
-		scene->setManual(cmp, !scene->isManual(cmp));
-	}
-
-}
-
-
-void PropertyView::on_animableTimeSet(int value)
-{
-	Lumix::Component cmp = m_world_editor->getSelectedEntity().getComponent(crc32("animable"));
-	if (cmp.isValid())
-	{
-		static_cast<Lumix::AnimationScene*>(cmp.scene)->setAnimationFrame(cmp, value);
-	}
-}
-
-
 void PropertyView::on_compileScriptClicked()
 {
 	/*for(int i = 0; i < m_properties.size(); ++i)
@@ -1509,27 +1498,6 @@ void PropertyView::on_terrainBrushTextureChanged(int value)
 }
 
 
-void PropertyView::addAnimableCustomProperties(const Lumix::Component& cmp)
-{
-	QTreeWidgetItem* tools_item = new QTreeWidgetItem(QStringList() << "Tools");
-	m_ui->propertyList->topLevelItem(0)->insertChild(0, tools_item);
-	QWidget* widget = new QWidget();
-	QHBoxLayout* layout = new QHBoxLayout(widget);
-	layout->setContentsMargins(0, 0, 0, 0);
-	QPushButton* compile_button = new QPushButton("Play/Pause", widget);
-	QSlider* slider = new QSlider(Qt::Orientation::Horizontal, widget);
-	slider->setObjectName("animation_frame_slider");
-	slider->setMinimum(0);
-	int frame_count = static_cast<Lumix::AnimationScene*>(cmp.scene)->getFrameCount(cmp);
-	slider->setMaximum(frame_count);
-	layout->addWidget(compile_button);
-	layout->addWidget(slider);
-	m_ui->propertyList->setItemWidget(tools_item, 1, widget);
-	connect(compile_button, &QPushButton::clicked, this, &PropertyView::on_animablePlayPause);
-	connect(slider, &QSlider::valueChanged, this, &PropertyView::on_animableTimeSet);
-}
-
-
 void PropertyView::addScriptCustomProperties()
 {
 	QTreeWidgetItem* tools_item = new QTreeWidgetItem(QStringList() << "Tools");
@@ -1555,7 +1523,7 @@ void PropertyView::setSelectedResource(Lumix::Resource* resource)
 {
 	if(resource)
 	{
-		m_world_editor->selectEntity(Lumix::Entity::INVALID);
+		m_world_editor->selectEntities(&Lumix::Entity::INVALID, 1);
 	}
 	clear();
 	if (m_selected_resource)
@@ -1574,22 +1542,17 @@ void PropertyView::setSelectedResource(Lumix::Resource* resource)
 }
 
 
-void PropertyView::onEntitySelected(const Lumix::Entity& e)
+void PropertyView::onEntitySelected(const Lumix::Array<Lumix::Entity>& e)
 {
 	setSelectedResource(NULL);
-	m_selected_entity = e;
+	m_selected_entity = e.empty() ? Lumix::Entity::INVALID : e[0];
 	clear();
-	if (e.isValid())
+	if (e.size() == 1)
 	{
-		setObject(createEntityObject(*m_world_editor, e));
-		/*
-				addScriptCustomProperties();
-				addTerrainCustomProperties(cmps[i]);
-				addAnimableCustomProperties(cmps[i]);
-		*/
+		setObject(createEntityObject(*m_world_editor, e[0]));
 		m_ui->propertyList->expandAll();
-		onEntityPosition(e);
-		m_ui->nameEdit->setText(e.getName());
+		onEntityPosition(e[0]);
+		m_ui->nameEdit->setText(e[0].getName());
 	}
 }
 
@@ -1604,7 +1567,9 @@ void PropertyView::on_addComponentButton_clicked()
 		if(strcmp(c, component_map[i]) == 0)
 		{
 			m_world_editor->addComponent(crc32(component_map[i+1]));
-			onEntitySelected(m_selected_entity);
+			Lumix::Array<Lumix::Entity> tmp;
+			tmp.push(m_selected_entity);
+			onEntitySelected(tmp);
 			return;
 		}
 	}
@@ -1613,9 +1578,11 @@ void PropertyView::on_addComponentButton_clicked()
 
 void PropertyView::updateSelectedEntityPosition()
 {
-	if(m_world_editor->getSelectedEntity().isValid())
+	if(m_world_editor->getSelectedEntities().size() == 1)
 	{
-		m_world_editor->getSelectedEntity().setPosition(Lumix::Vec3((float)m_ui->positionX->value(), (float)m_ui->positionY->value(), (float)m_ui->positionZ->value()));
+		Lumix::Array<Lumix::Vec3> positions;
+		positions.push(Lumix::Vec3((float)m_ui->positionX->value(), (float)m_ui->positionY->value(), (float)m_ui->positionZ->value()));
+		m_world_editor->setEntitiesPositions(m_world_editor->getSelectedEntities(), positions);
 	}
 }
 
@@ -1709,6 +1676,9 @@ void PropertyView::on_propertyList_customContextMenuRequested(const QPoint &pos)
 				{
 					Lumix::Entity entity = cmps[i].entity;
 					m_world_editor->destroyComponent(cmps[i]);
+					Lumix::Array<Lumix::Entity> tmp;
+					tmp.push(m_selected_entity);
+					onEntitySelected(tmp);
 					break;
 				}
 			}
