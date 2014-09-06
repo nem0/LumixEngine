@@ -56,6 +56,7 @@ MainWindow::MainWindow(QWidget* parent) :
 
 	m_property_view->setScriptCompiler(m_script_compiler_ui->getCompiler());
 	m_property_view->setAssetBrowser(*m_asset_browser);
+	m_property_view->setEntityTemplateList(m_entity_template_list_ui);
 
 	restoreState(settings.value("mainWindowState").toByteArray());
 }

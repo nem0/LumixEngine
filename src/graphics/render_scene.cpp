@@ -519,6 +519,13 @@ namespace Lumix
 			}
 
 
+			virtual float getTerrainHeightAt(Component cmp, float x, float z) override
+			{
+				return m_terrains[cmp.index]->getHeight(x, z);
+
+			}
+
+
 			virtual void setTerrainMaterial(Component cmp, const string& path) override
 			{
 				Material* material = static_cast<Material*>(m_engine.getResourceManager().get(ResourceManager::MATERIAL)->load(path.c_str()));

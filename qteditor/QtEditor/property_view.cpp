@@ -11,6 +11,7 @@
 #include "core/resource_manager_base.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
+#include "entity_template_list.h"
 #include "graphics/geometry.h"
 #include "graphics/material.h"
 #include "graphics/model.h"
@@ -832,11 +833,13 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 		enum Type
 		{
 			HEIGHT,
-			TEXTURE
+			TEXTURE,
+			ENTITY
 		};
 
-		TerrainEditor(Lumix::WorldEditor& editor) 
+		TerrainEditor(Lumix::WorldEditor& editor, EntityTemplateList* list) 
 			: m_world_editor(editor)
+			, m_entity_template_list(list)
 		{
 			m_texture_tree_item = NULL;
 			m_tree_top_level = NULL;
@@ -888,6 +891,9 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 							case TEXTURE:
 								addSplatWeight(terrain, hit);
 								break;
+							case ENTITY:
+								paintEntities(terrain, hit);
+								break;
 							default:
 								ASSERT(false);
 								break;
@@ -919,6 +925,9 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 						case TEXTURE:
 							addSplatWeight(terrain, hit);
 							break;
+						case ENTITY:
+							paintEntities(terrain, hit);
+							break;
 						default:
 							break;
 					}
@@ -936,6 +945,22 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			Lumix::string material_path;
 			static_cast<Lumix::RenderScene*>(m_component.scene)->getTerrainMaterial(m_component, material_path);
 			return static_cast<Lumix::Material*>(m_world_editor.getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL)->get(material_path.c_str()));
+		}
+
+
+		void paintEntities(Lumix::Component terrain, const Lumix::RayCastModelHit& hit)
+		{
+			float radius = (float)m_terrain_brush_size;
+			Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(terrain.scene);
+			Lumix::Vec3 center_pos = hit.m_origin + hit.m_dir * hit.m_t;
+			for (int i = 0; i <= m_terrain_brush_strength * 10; ++i)
+			{
+				float angle = (float)(rand() % 365);
+				float dist = (rand() % 100 / 100.0f) * m_terrain_brush_size;
+				Lumix::Vec3 pos(center_pos.x + cos(angle) * dist, 0, center_pos.z + sin(angle) * dist);
+				pos.y = scene->getTerrainHeightAt(terrain, pos.x, pos.z);
+				m_entity_template_list->instantiateTemplateAt(pos);
+			}
 		}
 
 
@@ -1136,6 +1161,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 		float m_terrain_brush_strength;
 		int m_terrain_brush_size;
 		int m_texture_idx;
+		EntityTemplateList* m_entity_template_list;
 };
 
 
@@ -1214,7 +1240,7 @@ Lumix::WorldEditor* PropertyView::getWorldEditor()
 void PropertyView::setWorldEditor(Lumix::WorldEditor& editor)
 {
 	m_world_editor = &editor;
-	m_terrain_editor = new TerrainEditor(editor);
+	m_terrain_editor = new TerrainEditor(editor, m_entity_template_list);
 	m_world_editor->addPlugin(m_terrain_editor);
 	m_world_editor->entitySelected().bind<PropertyView, &PropertyView::onEntitySelected>(this);
 	m_world_editor->universeCreated().bind<PropertyView, &PropertyView::onUniverseCreated>(this);
@@ -1439,11 +1465,21 @@ void PropertyView::addTerrainCustomProperties(QTreeWidgetItem& tree_item, const 
 	layout->addWidget(height_button);
 	QPushButton* texture_button = new QPushButton("Texture", widget);
 	layout->addWidget(texture_button);
+	QPushButton* entity_button = new QPushButton("Entity", widget);
+	layout->addWidget(entity_button);
 	layout->setContentsMargins(2, 2, 2, 2);
 	m_ui->propertyList->setItemWidget(item, 1, widget);
 	m_terrain_editor->m_type = TerrainEditor::HEIGHT;
 	connect(height_button, &QPushButton::clicked, this, &PropertyView::on_TerrainHeightTypeClicked);
 	connect(texture_button, &QPushButton::clicked, this, &PropertyView::on_TerrainTextureTypeClicked);
+	connect(entity_button, &QPushButton::clicked, [this]()
+	{
+		m_terrain_editor->m_type = TerrainEditor::ENTITY;
+		if (m_terrain_editor->m_texture_tree_item)
+		{
+			m_terrain_editor->m_tree_top_level->removeChild(m_terrain_editor->m_texture_tree_item);
+		}
+	});
 
 }
 

@@ -31,12 +31,12 @@ namespace Lumix
 			class CreateInstanceCommand : public IEditorCommand
 			{
 				public:
-					CreateInstanceCommand(EntityTemplateSystemImpl& entity_system, const char* template_name)
+					CreateInstanceCommand(EntityTemplateSystemImpl& entity_system, const char* template_name, const Vec3& position)
 						: m_entity_system(entity_system)
 						, m_template_name_hash(crc32(template_name))
+						, m_position(position)
 					{
-						
-						RenderScene* scene = static_cast<RenderScene*>(m_entity_system.m_editor.getEditCamera().scene);
+						/*RenderScene* scene = static_cast<RenderScene*>(m_entity_system.m_editor.getEditCamera().scene);
 						float width;
 						float height;
 						scene->getCameraWidth(m_entity_system.m_editor.getEditCamera(), width);
@@ -53,7 +53,7 @@ namespace Lumix
 						else
 						{
 							m_position.set(0, 0, 0);
-						}
+						}*/
 					}
 
 					virtual void execute() override
@@ -224,9 +224,9 @@ namespace Lumix
 			}
 
 
-			virtual Entity createInstance(const char* name) override
+			virtual Entity createInstance(const char* name, const Vec3& position) override
 			{
-				CreateInstanceCommand* command = LUMIX_NEW(CreateInstanceCommand)(*this, name);
+				CreateInstanceCommand* command = LUMIX_NEW(CreateInstanceCommand)(*this, name, position);
 				m_editor.executeCommand(command);
 				return command->getEntity();
 			}

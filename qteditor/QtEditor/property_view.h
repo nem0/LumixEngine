@@ -75,6 +75,7 @@ public:
 	PropertyViewObject* getObject();
 	void addTerrainCustomProperties(QTreeWidgetItem& item, const Lumix::Component& terrain_component);
 	void refresh();
+	void setEntityTemplateList(class EntityTemplateList* list) { m_entity_template_list = list; }
 
 private slots:
 	void on_addComponentButton_clicked();
@@ -115,6 +116,7 @@ private:
 	Lumix::Resource* m_selected_resource;
 	Lumix::Array<PropertyViewObject::Creator> m_resource_plugins;
 	PropertyViewObject* m_object;
+	class EntityTemplateList* m_entity_template_list;
 };
 
 
