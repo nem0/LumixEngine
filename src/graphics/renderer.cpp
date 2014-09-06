@@ -36,6 +36,7 @@ struct RendererImpl : public Renderer
 {
 	RendererImpl()
 	{
+		m_last_bind_geometry = NULL;
 		m_is_editor_wireframe = false;
 	}
 
@@ -94,6 +95,25 @@ struct RendererImpl : public Renderer
 		}
 		glActiveTexture(GL_TEXTURE0); 
 	}
+
+
+	virtual void renderGeometry(Geometry& geometry, int start, int count, Shader& shader) override
+	{
+		PROFILE_FUNCTION();
+		if (m_last_bind_geometry != &geometry)
+		{
+			if (m_last_bind_geometry)
+			{
+				m_last_bind_geometry->getVertexDefinition().end(shader);
+			}
+			glBindBuffer(GL_ARRAY_BUFFER, geometry.getID());
+			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, geometry.getIndicesID());
+			m_last_bind_geometry = &geometry;
+			geometry.getVertexDefinition().begin(shader);
+		}
+		glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, (void*)(start * sizeof(GLint)));
+	}
+
 
 	virtual bool create(Engine& engine) override
 	{
@@ -201,6 +221,7 @@ struct RendererImpl : public Renderer
 	Array<Model*> m_models;	
 	IRenderDevice* m_render_device;
 	bool m_is_editor_wireframe;
+	Geometry* m_last_bind_geometry;
 };
 
 

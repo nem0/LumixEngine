@@ -110,7 +110,7 @@ int VertexDef::getPositionOffset() const
 }
 
 
-void VertexDef::begin(Shader& shader)
+void VertexDef::begin(Shader& shader) const 
 {
 	PROFILE_FUNCTION();
 	int offset = 0;
@@ -167,7 +167,7 @@ void VertexDef::begin(Shader& shader)
 }
 
 
-void VertexDef::end(Shader& shader)
+void VertexDef::end(Shader& shader) const
 {
 	PROFILE_FUNCTION();
 	int shader_attrib_idx = 0;

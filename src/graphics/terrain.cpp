@@ -21,6 +21,14 @@ namespace Lumix
 	static const int GRID_SIZE = 16;
 	static const int COPY_COUNT = 50;
 	static const uint32_t TERRAIN_HASH = crc32("terrain");
+	static const uint32_t MORPH_CONST_HASH = crc32("morph_const");
+	static const uint32_t QUAD_SIZE_HASH = crc32("quad_size");
+	static const uint32_t QUAD_MIN_HASH = crc32("quad_min");
+
+	static const uint32_t BRUSH_POSITION_HASH = crc32("brush_position");
+	static const uint32_t BRUSH_SIZE_HASH = crc32("brush_size");
+	static const uint32_t MAP_SIZE_HASH = crc32("map_size");
+	static const uint32_t CAMERA_POS_HASH = crc32("camera_pos");
 
 	struct Sample
 	{
@@ -130,9 +138,9 @@ namespace Lumix
 			{
 				if (!m_children[i] || !m_children[i]->render(mesh, geometry, camera_pos, scene))
 				{
-					shader.setUniform("morph_const", morph_const);
-					shader.setUniform("quad_size", m_size);
-					shader.setUniform("quad_min", m_min);
+					shader.setUniform("morph_const", MORPH_CONST_HASH, morph_const);
+					shader.setUniform("quad_size", QUAD_SIZE_HASH, m_size);
+					shader.setUniform("quad_min", QUAD_MIN_HASH, m_min);
 					geometry.draw(mesh->getCount() / 4 * i, mesh->getCount() / 4, shader);
 				}
 			}
@@ -577,10 +585,10 @@ namespace Lumix
 			m_entity.getMatrix(world_matrix);
 			world_matrix.fastInverse();
 			Vec3 rel_cam_pos = world_matrix.multiplyPosition(camera_pos) / m_xz_scale;
-			m_mesh->getMaterial()->getShader()->setUniform("brush_position", m_brush_position);
-			m_mesh->getMaterial()->getShader()->setUniform("brush_size", m_brush_size);
-			m_mesh->getMaterial()->getShader()->setUniform("map_size", m_root->m_size);
-			m_mesh->getMaterial()->getShader()->setUniform("camera_pos", rel_cam_pos);
+			m_mesh->getMaterial()->getShader()->setUniform("brush_position", BRUSH_POSITION_HASH, m_brush_position);
+			m_mesh->getMaterial()->getShader()->setUniform("brush_size", BRUSH_SIZE_HASH, m_brush_size);
+			m_mesh->getMaterial()->getShader()->setUniform("map_size", MAP_SIZE_HASH, m_root->m_size);
+			m_mesh->getMaterial()->getShader()->setUniform("camera_pos", CAMERA_POS_HASH, rel_cam_pos);
 			m_root->render(m_mesh, m_geometry, rel_cam_pos, *pipeline.getScene());
 		}
 	}

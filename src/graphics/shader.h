@@ -24,11 +24,11 @@ class LUMIX_ENGINE_API Shader : public Resource
 		~Shader();
 
 		void apply();
-		void setUniform(const char* name, GLint value);
-		void setUniform(const char* name, const Vec3& value);
-		void setUniform(const char* name, GLfloat value);
-		void setUniform(const char* name, const Matrix& mtx);
-		void setUniform(const char* name, const Matrix* matrices, int count);
+		void setUniform(const char* name, const uint32_t name_hash, GLint value);
+		void setUniform(const char* name, const uint32_t name_hash, const Vec3& value);
+		void setUniform(const char* name, const uint32_t name_hash, GLfloat value);
+		void setUniform(const char* name, const uint32_t name_hash, const Matrix& mtx);
+		void setUniform(const char* name, const uint32_t name_hash, const Matrix* matrices, int count);
 		GLint getAttribId(int index) const { return m_vertex_attributes_ids[index]; }
 		GLint getPositionAttribId() const { return m_position_attrib_id; }
 		GLint getNormalAttribId() const { return m_normal_attrib_id; }
@@ -40,8 +40,17 @@ class LUMIX_ENGINE_API Shader : public Resource
 		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 		bool deserializeSettings(class ISerializer& serializer, char* attributes[MAX_ATTRIBUTE_COUNT]);
 
+		LUMIX_FORCE_INLINE GLint getUniformLocation(const char* name, uint32_t name_hash);
 		virtual void doUnload(void) override;
 		virtual FS::ReadCallback getReadCallback() override;
+
+	private:
+		class CachedUniform
+		{
+			public:
+				uint32_t m_name_hash;
+				GLint m_location;
+		};
 
 	private:
 		GLuint	m_program_id;
@@ -52,6 +61,7 @@ class LUMIX_ENGINE_API Shader : public Resource
 		GLint	m_normal_attrib_id;
 		GLint	m_tex_coord_attrib_id;
 		bool	m_is_shadowmap_required;
+		Array<CachedUniform> m_uniforms;
 };
 
 
