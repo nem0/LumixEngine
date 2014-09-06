@@ -327,6 +327,7 @@ class ComponentPropertyObject : public PropertyViewObject
 							view.getWorldEditor()->addArrayPropertyItem(m_component, static_cast<Lumix::IArrayDescriptor&>(m_descriptor));
 							view.setObject(NULL);
 							ASSERT(false); // refresh the property view
+							TODO("");
 						});
 					}
 					break;
@@ -1523,7 +1524,7 @@ void PropertyView::setSelectedResource(Lumix::Resource* resource)
 {
 	if(resource)
 	{
-		m_world_editor->selectEntities(&Lumix::Entity::INVALID, 1);
+		m_world_editor->selectEntities(NULL, 0);
 	}
 	clear();
 	if (m_selected_resource)
