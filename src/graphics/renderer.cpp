@@ -37,6 +37,7 @@ struct RendererImpl : public Renderer
 	RendererImpl()
 	{
 		m_last_bind_geometry = NULL;
+		m_last_program_id = 0xffffFFFF;
 		m_is_editor_wireframe = false;
 	}
 
@@ -100,6 +101,95 @@ struct RendererImpl : public Renderer
 	}
 
 
+	virtual void setUniform(Shader& shader, const char* name, const uint32_t name_hash, int value) override
+	{
+		PROFILE_FUNCTION();
+		GLint loc = shader.getUniformLocation(name, name_hash);
+		if (loc >= 0)
+		{
+			if (m_last_program_id != shader.getProgramId())
+			{
+				glUseProgram(shader.getProgramId());
+				m_last_program_id = shader.getProgramId();
+			}
+			glUniform1i(loc, value);
+		}
+	}
+	
+	
+	virtual void setUniform(Shader& shader, const char* name, const uint32_t name_hash, const Vec3& value) override
+	{
+		PROFILE_FUNCTION();
+		GLint loc = shader.getUniformLocation(name, name_hash);
+		if (loc >= 0)
+		{
+			if (m_last_program_id != shader.getProgramId())
+			{
+				glUseProgram(shader.getProgramId());
+				m_last_program_id = shader.getProgramId();
+			}
+			glUniform3f(loc, value.x, value.y, value.z);
+		}
+	}
+
+
+	virtual void setUniform(Shader& shader, const char* name, const uint32_t name_hash, float value) override
+	{
+		PROFILE_FUNCTION();
+		GLint loc = shader.getUniformLocation(name, name_hash);
+		if (loc >= 0)
+		{
+			if (m_last_program_id != shader.getProgramId())
+			{
+				glUseProgram(shader.getProgramId());
+				m_last_program_id = shader.getProgramId();
+			}
+			glUniform1f(loc, value);
+		}
+	}
+
+
+	virtual void setUniform(Shader& shader, const char* name, const uint32_t name_hash, const Matrix& mtx) override
+	{
+		PROFILE_FUNCTION();
+		GLint loc = shader.getUniformLocation(name, name_hash);
+		if (loc >= 0)
+		{
+			//glProgramUniformMatrix4fv(shader.getProgramId(), loc, 1, false, &mtx.m11);
+			if (m_last_program_id != shader.getProgramId())
+			{
+				glUseProgram(shader.getProgramId());
+				m_last_program_id = shader.getProgramId();
+			}
+			glUniformMatrix4fv(loc, 1, false, &mtx.m11);
+		}
+	}
+
+
+	virtual void setUniform(Shader& shader, const char* name, const uint32_t name_hash, const Matrix* matrices, int count) override
+	{
+		PROFILE_FUNCTION();
+		GLint loc = shader.getUniformLocation(name, name_hash);
+		if (loc >= 0)
+		{
+			if (m_last_program_id != shader.getProgramId())
+			{
+				glUseProgram(shader.getProgramId());
+				m_last_program_id = shader.getProgramId();
+			}
+			glUniformMatrix4fv(loc, count, false, (float*)matrices);
+		}
+	}
+
+
+	virtual void applyShader(const Shader& shader) override
+	{
+		GLuint id = shader.getProgramId();
+		m_last_program_id = id;
+		glUseProgram(id);
+	}
+
+
 	virtual void renderGeometry(Geometry& geometry, int start, int count, Shader& shader) override
 	{
 		PROFILE_FUNCTION();
@@ -118,24 +208,32 @@ struct RendererImpl : public Renderer
 	}
 
 
-	virtual bool create(Engine& engine) override
+	void registerPropertyDescriptors(WorldEditor& editor)
 	{
-		engine.getWorldEditor()->registerProperty("camera", LUMIX_NEW(PropertyDescriptor<RenderScene>)("slot", &RenderScene::getCameraSlot, &RenderScene::setCameraSlot, IPropertyDescriptor::STRING, NULL));
-		engine.getWorldEditor()->registerProperty("camera", LUMIX_NEW(PropertyDescriptor<RenderScene>)("fov", &RenderScene::getCameraFOV, &RenderScene::setCameraFOV));
-		engine.getWorldEditor()->registerProperty("camera", LUMIX_NEW(PropertyDescriptor<RenderScene>)("near", &RenderScene::getCameraNearPlane, &RenderScene::setCameraNearPlane));
-		engine.getWorldEditor()->registerProperty("camera", LUMIX_NEW(PropertyDescriptor<RenderScene>)("far", &RenderScene::getCameraFarPlane, &RenderScene::setCameraFarPlane));
-		engine.getWorldEditor()->registerProperty("renderable", LUMIX_NEW(PropertyDescriptor<RenderScene>)("source", &RenderScene::getRenderablePath, &RenderScene::setRenderablePath, IPropertyDescriptor::FILE, "Mesh (*.msh)"));
-		engine.getWorldEditor()->registerProperty("terrain", LUMIX_NEW(PropertyDescriptor<RenderScene>)("material", &RenderScene::getTerrainMaterial, &RenderScene::setTerrainMaterial, IPropertyDescriptor::FILE, "Material (*.mat)"));
-		engine.getWorldEditor()->registerProperty("terrain", LUMIX_NEW(PropertyDescriptor<RenderScene>)("xz_scale", &RenderScene::getTerrainXZScale, &RenderScene::setTerrainXZScale));
-		engine.getWorldEditor()->registerProperty("terrain", LUMIX_NEW(PropertyDescriptor<RenderScene>)("y_scale", &RenderScene::getTerrainYScale, &RenderScene::setTerrainYScale));
-		
+		editor.registerProperty("camera", LUMIX_NEW(StringPropertyDescriptor<RenderScene>)("slot", &RenderScene::getCameraSlot, &RenderScene::setCameraSlot));
+		editor.registerProperty("camera", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("fov", &RenderScene::getCameraFOV, &RenderScene::setCameraFOV));
+		editor.registerProperty("camera", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("near", &RenderScene::getCameraNearPlane, &RenderScene::setCameraNearPlane));
+		editor.registerProperty("camera", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("far", &RenderScene::getCameraFarPlane, &RenderScene::setCameraFarPlane));
+
+		editor.registerProperty("renderable", LUMIX_NEW(FilePropertyDescriptor<RenderScene>)("source", &RenderScene::getRenderablePath, &RenderScene::setRenderablePath, "Mesh (*.msh)"));
+
+		editor.registerProperty("terrain", LUMIX_NEW(FilePropertyDescriptor<RenderScene>)("material", &RenderScene::getTerrainMaterial, &RenderScene::setTerrainMaterial, "Material (*.mat)"));
+		editor.registerProperty("terrain", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("xz_scale", &RenderScene::getTerrainXZScale, &RenderScene::setTerrainXZScale));
+		editor.registerProperty("terrain", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("y_scale", &RenderScene::getTerrainYScale, &RenderScene::setTerrainYScale));
+
 		auto grass = LUMIX_NEW(ArrayDescriptor<RenderScene>)("grass", &RenderScene::getGrassCount, &RenderScene::addGrass, &RenderScene::removeGrass);
-		grass->addChild(LUMIX_NEW(ArrayObjectDescriptor<RenderScene>)("mesh", &RenderScene::getGrass, &RenderScene::setGrass, IPropertyDescriptor::FILE, "Mesh (*.msh)"));
+		grass->addChild(LUMIX_NEW(FileArrayObjectDescriptor<RenderScene>)("mesh", &RenderScene::getGrass, &RenderScene::setGrass, "Mesh (*.msh)"));
 		auto ground = LUMIX_NEW(IntArrayObjectDescriptor<RenderScene>)("ground", &RenderScene::getGrassGround, &RenderScene::setGrassGround);
 		ground->setLimit(0, 4);
 		grass->addChild(ground);
 		grass->addChild(LUMIX_NEW(IntArrayObjectDescriptor<RenderScene>)("density", &RenderScene::getGrassDensity, &RenderScene::setGrassDensity));
-		engine.getWorldEditor()->registerProperty("terrain", grass);
+		editor.registerProperty("terrain", grass);
+	}
+
+
+	virtual bool create(Engine& engine) override
+	{
+		registerPropertyDescriptors(*engine.getWorldEditor());
 
 		m_engine = &engine;
 		glewExperimental = GL_TRUE;
@@ -226,6 +324,7 @@ struct RendererImpl : public Renderer
 	IRenderDevice* m_render_device;
 	bool m_is_editor_wireframe;
 	Geometry* m_last_bind_geometry;
+	GLuint m_last_program_id;
 };
 
 

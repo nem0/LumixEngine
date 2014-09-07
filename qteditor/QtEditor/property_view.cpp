@@ -242,13 +242,16 @@ class ComponentPropertyObject : public PropertyViewObject
 						layout->addWidget(button);
 						button->connect(button, &QPushButton::clicked, [this, edit, &view]()
 						{
-							QString str = QFileDialog::getOpenFileName(NULL, QString(), QString(), m_descriptor.getFileType());
-							char rel_path[LUMIX_MAX_PATH];
-							QByteArray byte_array = str.toLatin1();
-							const char* text = byte_array.data();
-							view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, text);
-							view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, rel_path, strlen(rel_path) + 1);
-							edit->setText(rel_path);
+							QString str = QFileDialog::getOpenFileName(NULL, QString(), QString(), dynamic_cast<Lumix::IFilePropertyDescriptor&>(m_descriptor).getFileType());
+							if (str != "")
+							{
+								char rel_path[LUMIX_MAX_PATH];
+								QByteArray byte_array = str.toLatin1();
+								const char* text = byte_array.data();
+								view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, text);
+								view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, rel_path, strlen(rel_path) + 1);
+								edit->setText(rel_path);
+							}
 						});
 				
 						QPushButton* button2 = new QPushButton("->", widget);
@@ -948,7 +951,6 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 
 		void paintEntities(Lumix::Component terrain, const Lumix::RayCastModelHit& hit)
 		{
-			float radius = (float)m_terrain_brush_size;
 			Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(terrain.scene);
 			Lumix::Vec3 center_pos = hit.m_origin + hit.m_dir * hit.m_t;
 			for (int i = 0; i <= m_terrain_brush_strength * 10; ++i)
