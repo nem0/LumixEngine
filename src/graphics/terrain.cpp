@@ -139,9 +139,9 @@ namespace Lumix
 			{
 				if (!m_children[i] || !m_children[i]->render(renderer, mesh, geometry, camera_pos, scene))
 				{
-					shader.setUniform("morph_const", MORPH_CONST_HASH, morph_const);
-					shader.setUniform("quad_size", QUAD_SIZE_HASH, m_size);
-					shader.setUniform("quad_min", QUAD_MIN_HASH, m_min);
+					renderer->setUniform(shader, "morph_const", MORPH_CONST_HASH, morph_const);
+					renderer->setUniform(shader, "quad_size", QUAD_SIZE_HASH, m_size);
+					renderer->setUniform(shader, "quad_min", QUAD_MIN_HASH, m_min);
 					renderer->renderGeometry(geometry, mesh->getCount() / 4 * i, mesh->getCount() / 4, shader);
 				}
 			}
@@ -586,10 +586,11 @@ namespace Lumix
 			m_entity.getMatrix(world_matrix);
 			world_matrix.fastInverse();
 			Vec3 rel_cam_pos = world_matrix.multiplyPosition(camera_pos) / m_xz_scale;
-			m_mesh->getMaterial()->getShader()->setUniform("brush_position", BRUSH_POSITION_HASH, m_brush_position);
-			m_mesh->getMaterial()->getShader()->setUniform("brush_size", BRUSH_SIZE_HASH, m_brush_size);
-			m_mesh->getMaterial()->getShader()->setUniform("map_size", MAP_SIZE_HASH, m_root->m_size);
-			m_mesh->getMaterial()->getShader()->setUniform("camera_pos", CAMERA_POS_HASH, rel_cam_pos);
+			Shader& shader = *m_mesh->getMaterial()->getShader();
+			renderer.setUniform(shader, "brush_position", BRUSH_POSITION_HASH, m_brush_position);
+			renderer.setUniform(shader, "brush_size", BRUSH_SIZE_HASH, m_brush_size);
+			renderer.setUniform(shader, "map_size", MAP_SIZE_HASH, m_root->m_size);
+			renderer.setUniform(shader, "camera_pos", CAMERA_POS_HASH, rel_cam_pos);
 			m_root->render(&static_cast<Renderer&>(m_scene.getPlugin()), m_mesh, m_geometry, rel_cam_pos, *pipeline.getScene());
 		}
 	}

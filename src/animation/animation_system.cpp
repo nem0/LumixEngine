@@ -288,7 +288,7 @@ namespace Lumix
 			virtual bool create(Engine& engine) override
 			{
 				m_engine = &engine;
-				engine.getWorldEditor()->registerProperty("animable", LUMIX_NEW(PropertyDescriptor<AnimationSceneImpl>)("preview", &AnimationSceneImpl::getPreview, &AnimationSceneImpl::setPreview, IPropertyDescriptor::FILE, "Animation (*.ani)"));
+				engine.getWorldEditor()->registerProperty("animable", LUMIX_NEW(FilePropertyDescriptor<AnimationSceneImpl>)("preview", &AnimationSceneImpl::getPreview, &AnimationSceneImpl::setPreview, "Animation (*.ani)"));
 				m_animation_manager.create(ResourceManager::ANIMATION, engine.getResourceManager());
 				return true;
 			}
