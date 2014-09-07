@@ -127,6 +127,7 @@ namespace Lumix
 
 		bool render(Renderer* renderer, Mesh* mesh, Geometry& geometry, const Vec3& camera_pos, RenderScene& scene)
 		{
+			PROFILE_FUNCTION();
 			float dist = getDistance(camera_pos);
 			float r = getRadiusOuter(m_size);
 			if (dist > r && m_lod > 1)
@@ -139,9 +140,9 @@ namespace Lumix
 			{
 				if (!m_children[i] || !m_children[i]->render(renderer, mesh, geometry, camera_pos, scene))
 				{
-					renderer->setUniform(shader, "morph_const", MORPH_CONST_HASH, morph_const);
-					renderer->setUniform(shader, "quad_size", QUAD_SIZE_HASH, m_size);
-					renderer->setUniform(shader, "quad_min", QUAD_MIN_HASH, m_min);
+					renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::MORPH_CONST, morph_const);
+					renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::QUAD_SIZE, m_size);
+					renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::QUAD_MIN, m_min);
 					renderer->renderGeometry(geometry, mesh->getCount() / 4 * i, mesh->getCount() / 4, shader);
 				}
 			}

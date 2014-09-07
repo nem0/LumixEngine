@@ -127,9 +127,11 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		{
 			m_vertex_attributes_ids[i] = glGetAttribLocation(m_program_id, attributes[i]);
 		}
-		m_position_attrib_id = glGetAttribLocation(m_program_id, "in_position");
-		m_normal_attrib_id = glGetAttribLocation(m_program_id, "in_normal");
-		m_tex_coord_attrib_id = glGetAttribLocation(m_program_id, "in_tex_coord");
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::WORLD_MATRIX] = glGetUniformLocation(m_program_id, "world_matrix");
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::GRASS_MATRICES] = glGetUniformLocation(m_program_id, "grass_matrices");
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::MORPH_CONST] = glGetUniformLocation(m_program_id, "morph_const");
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::QUAD_SIZE] = glGetUniformLocation(m_program_id, "quad_size");
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::QUAD_MIN] = glGetUniformLocation(m_program_id, "quad_min");
 
 		m_size = file->size();
 		decrementDepCount();

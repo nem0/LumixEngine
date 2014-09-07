@@ -32,7 +32,7 @@ public:
 	};
 	
 public:
-	void apply(Renderer& renderer, PipelineInstance& pipeline);
+	void apply(Renderer& renderer, PipelineInstance& pipeline) const;
 	bool isZTest() const { return m_is_z_test; }
 	void enableZTest(bool enable) { m_is_z_test = enable; }
 	bool isBackfaceCulling() const { return m_is_backface_culling; }

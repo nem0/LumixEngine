@@ -36,7 +36,7 @@ namespace Lumix
 	struct RenderableInfo
 	{
 		Geometry* m_geometry;
-		Mesh* m_mesh;
+		const Mesh* m_mesh;
 		const Pose* m_pose;
 		const ModelInstance* m_model;
 		const Matrix* m_matrix;

@@ -37,11 +37,11 @@ namespace Lumix
 	{
 		Renderable() {}
 
+		bool m_is_free;
+		int64_t m_layer_mask;
 		ModelInstance m_model;
 		Entity m_entity;
-		int64_t m_layer_mask;
 		float m_scale;
-		bool m_is_free;
 
 		private:
 			Renderable(const Renderable&) {}
@@ -713,18 +713,20 @@ namespace Lumix
 					const Renderable* LUMIX_RESTRICT renderable = m_renderables[i];
 					if (!renderable->m_is_free)
 					{
-						bool is_model_ready = renderable->m_model.getModel() && renderable->m_model.getModel()->isReady();
+						const ModelInstance& model_instance = renderable->m_model;
+						const Model* model = model_instance.getModel();
+						bool is_model_ready = model && model->isReady();
 						if (is_model_ready && (renderable->m_layer_mask & layer_mask) != 0)
 						{
 							for (int j = 0, c = renderable->m_model.getModel()->getMeshCount(); j < c; ++j)
 							{
 								RenderableInfo& info = infos.pushEmpty();
 								info.m_scale = renderable->m_scale;
-								info.m_geometry = renderable->m_model.getModel()->getGeometry();
-								info.m_mesh = &renderable->m_model.getModel()->getMesh(j);
-								info.m_pose = &renderable->m_model.getPose();
-								info.m_model = &renderable->m_model;
-								info.m_matrix = &renderable->m_model.getMatrix();
+								info.m_geometry = model->getGeometry();
+								info.m_mesh = &model->getMesh(j);
+								info.m_pose = &model_instance.getPose();
+								info.m_model = &model_instance;
+								info.m_matrix = &model_instance.getMatrix();
 							}
 						}
 					}
