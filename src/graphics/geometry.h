@@ -58,7 +58,6 @@ class Geometry
 
 		void copy(const uint8_t* data, int size, const Array<int32_t>& indices, VertexDef vertex_definition);
 		void copy(const Geometry& source, int times, VertexCallback& vertex_callback, IndexCallback& index_callback);
-		void draw(int start, int count, Shader& shader);
 		const Array<Vec3>& getVertices() const { return m_vertices; }
 		const Array<int32_t>& getIndices() const { return m_indices; }
 		float getBoundingRadius() const; 

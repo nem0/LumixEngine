@@ -55,6 +55,51 @@ class IPropertyDescriptor
 };
 
 
+class IIntPropertyDescriptor : public IPropertyDescriptor
+{
+	public:
+		IIntPropertyDescriptor()
+		{
+			m_min = INT_MIN;
+			m_max = INT_MAX;
+		}
+
+		void setLimit(int min, int max) { m_min = min; m_max = max; }
+		int getMin() const { return m_min; }
+		int getMax() const { return m_max; }
+
+	private:
+		int m_min;
+		int m_max;
+};
+
+
+template <class S>
+class IntArrayObjectDescriptor : public IIntPropertyDescriptor
+{
+	public:
+		typedef void (S::*IntegerGetter)(Component, int, int&);
+		typedef void (S::*IntegerSetter)(Component, int, const int&);
+
+	public:
+		IntArrayObjectDescriptor(const char* name, IntegerGetter _getter, IntegerSetter _setter) 
+		{
+			setName(name);
+			m_integer_getter = _getter;
+			m_integer_setter = _setter;
+			m_type = INTEGER;
+		}
+
+		virtual void set(Component cmp, int index, Blob& stream) const override;
+		virtual void get(Component cmp, int index, Blob& stream) const override;
+		virtual void set(Component, Blob&) const {};
+		virtual void get(Component, Blob&) const {};
+
+	private:
+		IntegerGetter m_integer_getter;
+		IntegerSetter m_integer_setter;
+};
+
 
 template <class S>
 class ArrayObjectDescriptor : public IPropertyDescriptor
@@ -66,8 +111,6 @@ class ArrayObjectDescriptor : public IPropertyDescriptor
 		typedef void (S::*BoolSetter)(Component, int, const bool&);
 		typedef void (S::*DecimalGetter)(Component, int, float&);
 		typedef void (S::*DecimalSetter)(Component, int, const float&);
-		typedef void (S::*IntegerGetter)(Component, int, int&);
-		typedef void (S::*IntegerSetter)(Component, int, const int&);
 		typedef void (S::*Vec3Getter)(Component, int, Vec3&);
 		typedef void (S::*Vec3Setter)(Component, int, const Vec3&);
 
@@ -75,7 +118,6 @@ class ArrayObjectDescriptor : public IPropertyDescriptor
 		ArrayObjectDescriptor(const char* name, Getter _getter, Setter _setter, Type _type, const char* file_type) { setName(name); m_getter = _getter; m_setter = _setter; m_type = _type; m_file_type = file_type; }
 		ArrayObjectDescriptor(const char* name, BoolGetter _getter, BoolSetter _setter) { setName(name); m_bool_getter = _getter; m_bool_setter = _setter; m_type = BOOL; }
 		ArrayObjectDescriptor(const char* name, DecimalGetter _getter, DecimalSetter _setter) { setName(name); m_decimal_getter = _getter; m_decimal_setter = _setter; m_type = DECIMAL; }
-		ArrayObjectDescriptor(const char* name, IntegerGetter _getter, IntegerSetter _setter) { setName(name); m_integer_getter = _getter; m_integer_setter = _setter; m_type = INTEGER; }
 		ArrayObjectDescriptor(const char* name, Vec3Getter _getter, Vec3Setter _setter) { setName(name); m_vec3_getter = _getter; m_vec3_setter = _setter; m_type = VEC3; }
 		virtual void set(Component cmp, int index, Blob& stream) const override;
 		virtual void get(Component cmp, int index, Blob& stream) const override;
@@ -88,7 +130,6 @@ class ArrayObjectDescriptor : public IPropertyDescriptor
 			Getter m_getter;
 			BoolGetter m_bool_getter;
 			DecimalGetter m_decimal_getter;
-			IntegerGetter m_integer_getter;
 			Vec3Getter m_vec3_getter;
 		};
 		union 
@@ -96,7 +137,6 @@ class ArrayObjectDescriptor : public IPropertyDescriptor
 			Setter m_setter;
 			BoolSetter m_bool_setter;
 			DecimalSetter m_decimal_setter;
-			IntegerSetter m_integer_setter;
 			Vec3Setter m_vec3_setter;
 		};
 };
@@ -144,6 +184,25 @@ class ArrayDescriptor : public IArrayDescriptor
 		Remover m_remover;
 };
 
+template <class S>
+class IntPropertyDescriptor : public IIntPropertyDescriptor
+{
+	public:
+		typedef void (S::*IntegerGetter)(Component, int&);
+		typedef void (S::*IntegerSetter)(Component, const int&);
+
+	public:
+		IntPropertyDescriptor(const char* name, IntegerGetter _getter, IntegerSetter _setter) { setName(name); m_integer_getter = _getter; m_integer_setter = _setter; m_type = INTEGER; }
+
+		virtual void set(Component cmp, Blob& stream) const override;
+		virtual void get(Component cmp, Blob& stream) const override;
+		virtual void set(Component cmp, int index, Blob& stream) const override { ASSERT(index == -1); set(cmp, stream); };
+		virtual void get(Component cmp, int index, Blob& stream) const override { ASSERT(index == -1); get(cmp, stream); };
+
+	private:
+		IntegerGetter m_integer_getter;
+		IntegerSetter m_integer_setter;
+};
 
 
 template <class S>
@@ -156,8 +215,6 @@ class PropertyDescriptor : public IPropertyDescriptor
 		typedef void (S::*BoolSetter)(Component, const bool&);
 		typedef void (S::*DecimalGetter)(Component, float&);
 		typedef void (S::*DecimalSetter)(Component, const float&);
-		typedef void (S::*IntegerGetter)(Component, int&);
-		typedef void (S::*IntegerSetter)(Component, const int&);
 		typedef void (S::*Vec3Getter)(Component, Vec3&);
 		typedef void (S::*Vec3Setter)(Component, const Vec3&);
 
@@ -165,7 +222,6 @@ class PropertyDescriptor : public IPropertyDescriptor
 		PropertyDescriptor(const char* name, Getter _getter, Setter _setter, Type _type, const char* file_type) { setName(name); m_getter = _getter; m_setter = _setter; m_type = _type; m_file_type = file_type; }
 		PropertyDescriptor(const char* name, BoolGetter _getter, BoolSetter _setter) { setName(name); m_bool_getter = _getter; m_bool_setter = _setter; m_type = BOOL; }
 		PropertyDescriptor(const char* name, DecimalGetter _getter, DecimalSetter _setter) { setName(name); m_decimal_getter = _getter; m_decimal_setter = _setter; m_type = DECIMAL; }
-		PropertyDescriptor(const char* name, IntegerGetter _getter, IntegerSetter _setter) { setName(name); m_integer_getter = _getter; m_integer_setter = _setter; m_type = INTEGER; }
 		PropertyDescriptor(const char* name, Vec3Getter _getter, Vec3Setter _setter) { setName(name); m_vec3_getter = _getter; m_vec3_setter = _setter; m_type = VEC3; }
 		virtual void set(Component cmp, Blob& stream) const override;
 		virtual void get(Component cmp, Blob& stream) const override;
@@ -178,7 +234,6 @@ class PropertyDescriptor : public IPropertyDescriptor
 			Getter m_getter;
 			BoolGetter m_bool_getter;
 			DecimalGetter m_decimal_getter;
-			IntegerGetter m_integer_getter;
 			Vec3Getter m_vec3_getter;
 		};
 		union 
@@ -186,7 +241,6 @@ class PropertyDescriptor : public IPropertyDescriptor
 			Setter m_setter;
 			BoolSetter m_bool_setter;
 			DecimalSetter m_decimal_setter;
-			IntegerSetter m_integer_setter;
 			Vec3Setter m_vec3_setter;
 		};
 
@@ -232,6 +286,15 @@ void ArrayDescriptor<S>::get(Component cmp, Blob& stream) const
 
 
 template <class S>
+void IntArrayObjectDescriptor<S>::set(Component cmp, int index, Blob& stream) const
+{
+	int32_t i;
+	stream.read(&i, sizeof(i));
+	(static_cast<S*>(cmp.scene)->*m_integer_setter)(cmp, index, i);
+}
+
+
+template <class S>
 void ArrayObjectDescriptor<S>::set(Component cmp, int index, Blob& stream) const
 {
 	switch(m_type)
@@ -241,13 +304,6 @@ void ArrayObjectDescriptor<S>::set(Component cmp, int index, Blob& stream) const
 				float f;
 				stream.read(&f, sizeof(f));
 				(static_cast<S*>(cmp.scene)->*m_decimal_setter)(cmp, index, f); 
-			}
-			break;
-		case INTEGER:
-			{
-				int32_t i;
-				stream.read(&i, sizeof(i));
-				(static_cast<S*>(cmp.scene)->*m_integer_setter)(cmp, index, i);
 			}
 			break;
 		case BOOL:
@@ -287,6 +343,16 @@ void ArrayObjectDescriptor<S>::set(Component cmp, int index, Blob& stream) const
 
 
 template <class S>
+void IntArrayObjectDescriptor<S>::get(Component cmp, int index, Blob& stream) const
+{
+	int32_t i;
+	(static_cast<S*>(cmp.scene)->*m_integer_getter)(cmp, index, i);
+	int len = sizeof(i);
+	stream.write(&i, len);
+}
+
+
+template <class S>
 void ArrayObjectDescriptor<S>::get(Component cmp, int index, Blob& stream) const
 {
 	int len = 4;
@@ -307,14 +373,6 @@ void ArrayObjectDescriptor<S>::get(Component cmp, int index, Blob& stream) const
 				(static_cast<S*>(cmp.scene)->*m_decimal_getter)(cmp, index, f);
 				len = sizeof(f);
 				stream.write(&f, len);
-			}
-			break;
-		case INTEGER:
-			{
-				int32_t i;
-				(static_cast<S*>(cmp.scene)->*m_integer_getter)(cmp, index, i);
-				len = sizeof(i);
-				stream.write(&i, len);
 			}
 			break;
 		case BOOL:
@@ -341,6 +399,25 @@ void ArrayObjectDescriptor<S>::get(Component cmp, int index, Blob& stream) const
 
 
 template <class S>
+void IntPropertyDescriptor<S>::set(Component cmp, Blob& stream) const
+{
+	int32_t i;
+	stream.read(&i, sizeof(i));
+	(static_cast<S*>(cmp.scene)->*m_integer_setter)(cmp, i);
+}
+
+
+template <class S>
+void IntPropertyDescriptor<S>::get(Component cmp, Blob& stream) const
+{
+	int32_t i;
+	(static_cast<S*>(cmp.scene)->*m_integer_getter)(cmp, i);
+	len = sizeof(i);
+	stream.write(&i, len);
+}
+
+
+template <class S>
 void PropertyDescriptor<S>::set(Component cmp, Blob& stream) const
 {
 	switch(m_type)
@@ -350,13 +427,6 @@ void PropertyDescriptor<S>::set(Component cmp, Blob& stream) const
 				float f;
 				stream.read(&f, sizeof(f));
 				(static_cast<S*>(cmp.scene)->*m_decimal_setter)(cmp, f); 
-			}
-			break;
-		case INTEGER:
-			{
-				int32_t i;
-				stream.read(&i, sizeof(i));
-				(static_cast<S*>(cmp.scene)->*m_integer_setter)(cmp, i);
 			}
 			break;
 		case BOOL:
@@ -416,14 +486,6 @@ void PropertyDescriptor<S>::get(Component cmp, Blob& stream) const
 				(static_cast<S*>(cmp.scene)->*m_decimal_getter)(cmp, f);
 				len = sizeof(f);
 				stream.write(&f, len);
-			}
-			break;
-		case INTEGER:
-			{
-				int32_t i;
-				(static_cast<S*>(cmp.scene)->*m_integer_getter)(cmp, i);
-				len = sizeof(i);
-				stream.write(&i, len);
 			}
 			break;
 		case BOOL:

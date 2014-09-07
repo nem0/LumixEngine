@@ -123,8 +123,7 @@ class ComponentArrayItemObject : public PropertyViewObject
 			button->connect(button, &QPushButton::clicked, [this, &view]()
 			{
 				view.getWorldEditor()->removeArrayPropertyItem(m_component, m_index, m_descriptor);
-				view.setObject(NULL);
-				ASSERT(false); // refresh the property view
+				view.refresh();
 			});
 		}
 
@@ -272,13 +271,14 @@ class ComponentPropertyObject : public PropertyViewObject
 					break;
 				case Lumix::IPropertyDescriptor::INTEGER:
 					{
+						auto& int_property = static_cast<Lumix::IIntPropertyDescriptor&>(m_descriptor);
 						int value;
 						stream.read(value);
 						QSpinBox* edit = new QSpinBox();
 						edit->setValue(value);
 						item->treeWidget()->setItemWidget(item, 1, edit);
-						edit->setMinimum(INT_MIN);
-						edit->setMaximum(INT_MAX);
+						edit->setMinimum(int_property.getMin());
+						edit->setMaximum(int_property.getMax());
 						connect(edit, (void (QSpinBox::*)(int))&QSpinBox::valueChanged, [this, &view](int new_value) 
 						{
 							int value = new_value;
@@ -326,9 +326,7 @@ class ComponentPropertyObject : public PropertyViewObject
 						button->connect(button, &QPushButton::clicked, [this, &view]()
 						{
 							view.getWorldEditor()->addArrayPropertyItem(m_component, static_cast<Lumix::IArrayDescriptor&>(m_descriptor));
-							view.setObject(NULL);
-							ASSERT(false); // refresh the property view
-							TODO("");
+							view.refresh();
 						});
 					}
 					break;
@@ -1220,14 +1218,8 @@ void PropertyView::onEntityPosition(const Lumix::Entity& e)
 
 void PropertyView::refresh()
 {
-	m_ui->propertyList->clear();
-
-	QTreeWidgetItem* item = new QTreeWidgetItem();
-	m_ui->propertyList->insertTopLevelItem(0, item);
-	createObjectEditor(item, m_object);
-
-	m_ui->propertyList->expandAll();
-	m_ui->propertyList->resizeColumnToContents(0);
+	setObject(NULL);
+	onEntitySelected(getWorldEditor()->getSelectedEntities());
 }
 
 
@@ -1431,8 +1423,16 @@ void PropertyView::addTerrainCustomProperties(QTreeWidgetItem& tree_item, const 
 		layout->addWidget(texture_button);
 		layout->setContentsMargins(2, 2, 2, 2);
 		m_ui->propertyList->setItemWidget(item, 1, widget);
-		connect(height_button, &QPushButton::clicked, this, &PropertyView::on_TerrainHeightSaveClicked);
-		connect(texture_button, &QPushButton::clicked, this, &PropertyView::on_TerrainSplatSaveClicked);
+		connect(height_button, &QPushButton::clicked, [this]()
+		{
+			Lumix::Material* material = m_terrain_editor->getMaterial();
+			material->getTexture(0)->save();
+		});
+		connect(texture_button, &QPushButton::clicked, [this]()
+		{
+			Lumix::Material* material = m_terrain_editor->getMaterial();
+			material->getTexture(material->getTextureCount() - 1)->save();
+		});
 	}
 
 	QSlider* slider = new QSlider(Qt::Orientation::Horizontal);
@@ -1470,7 +1470,14 @@ void PropertyView::addTerrainCustomProperties(QTreeWidgetItem& tree_item, const 
 	layout->setContentsMargins(2, 2, 2, 2);
 	m_ui->propertyList->setItemWidget(item, 1, widget);
 	m_terrain_editor->m_type = TerrainEditor::HEIGHT;
-	connect(height_button, &QPushButton::clicked, this, &PropertyView::on_TerrainHeightTypeClicked);
+	connect(height_button, &QPushButton::clicked, [this]()
+	{
+		m_terrain_editor->m_type = TerrainEditor::HEIGHT;
+		if (m_terrain_editor->m_texture_tree_item)
+		{
+			m_terrain_editor->m_tree_top_level->removeChild(m_terrain_editor->m_texture_tree_item);
+		}
+	});
 	connect(texture_button, &QPushButton::clicked, this, &PropertyView::on_TerrainTextureTypeClicked);
 	connect(entity_button, &QPushButton::clicked, [this]()
 	{
@@ -1483,29 +1490,6 @@ void PropertyView::addTerrainCustomProperties(QTreeWidgetItem& tree_item, const 
 
 }
 
-
-void PropertyView::on_TerrainHeightSaveClicked()
-{
-	Lumix::Material* material = m_terrain_editor->getMaterial();
-	material->getTexture(0)->save();
-}
-
-
-void PropertyView::on_TerrainSplatSaveClicked()
-{
-	Lumix::Material* material = m_terrain_editor->getMaterial();
-	material->getTexture(material->getTextureCount() - 1)->save();
-}
-
-
-void PropertyView::on_TerrainHeightTypeClicked()
-{
-	m_terrain_editor->m_type = TerrainEditor::HEIGHT;
-	if (m_terrain_editor->m_texture_tree_item)
-	{
-		m_terrain_editor->m_tree_top_level->removeChild(m_terrain_editor->m_texture_tree_item);
-	}
-}
 
 void PropertyView::on_TerrainTextureTypeClicked()
 {

@@ -215,17 +215,6 @@ float Geometry::getBoundingRadius() const
 }
 
 
-void Geometry::draw(int start, int count, Shader& shader)
-{
-	PROFILE_FUNCTION();
-	glBindBuffer(GL_ARRAY_BUFFER, m_id);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_indices_id);
-	m_vertex_definition.begin(shader);
-	glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, (void*)(start * sizeof(GLint)));
-	m_vertex_definition.end(shader);
-}
-
-
 Geometry::Geometry()
 {
 	glGenBuffers(1, &m_id);
