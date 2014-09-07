@@ -1,7 +1,8 @@
 #pragma once
 
+#include <QAbstractItemModel>
 #include <QDockWidget>
-#include <qabstractitemmodel.h>
+#include <QSortFilterProxyModel>
 #include "core/profiler.h"
 
 namespace Ui 
@@ -10,6 +11,7 @@ class ProfilerUI;
 }
 
 class ProfileModel;
+
 
 class ProfilerUI : public QDockWidget
 {
@@ -28,7 +30,9 @@ private slots:
 	private:
 	Ui::ProfilerUI* m_ui;
 	ProfileModel* m_model;
+	QSortFilterProxyModel* m_sortable_model;
 };
+
 
 class ProfileModel : public QAbstractItemModel
 {
@@ -57,7 +61,7 @@ class ProfileModel : public QAbstractItemModel
 		};
 
 	public:
-		ProfileModel();
+		ProfileModel(QWidget* parent);
 		Block* getRoot() { return m_root; }
 		void setFrame(int frame) { m_frame = frame; } 
 
