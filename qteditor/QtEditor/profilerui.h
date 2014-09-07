@@ -38,6 +38,7 @@ class ProfileModel : public QAbstractItemModel
 			NAME,
 			FUNCTION,
 			LENGTH,
+			LENGTH_EXCLUSIVE,
 			HIT_COUNT,
 			COUNT
 		};

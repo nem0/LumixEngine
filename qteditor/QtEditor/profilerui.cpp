@@ -121,6 +121,8 @@ QVariant ProfileModel::headerData(int section, Qt::Orientation, int role) const
 				return "Name";
 			case Values::LENGTH:
 				return "Length (ms)";
+			case Values::LENGTH_EXCLUSIVE:
+				return "Length exclusive (ms)";
 			case Values::HIT_COUNT:
 				return "Hit count";
 				break;
@@ -242,6 +244,32 @@ QVariant ProfileModel::data(const QModelIndex& index, int role) const
 			return block->m_name;
 		case Values::LENGTH:
 			return m_frame >= 0 && m_frame < block->m_frames.size() ? block->m_frames[m_frame] : (block->m_frames.isEmpty() ? 0 : block->m_frames.back());
+		case Values::LENGTH_EXCLUSIVE:
+			{
+				if (m_frame >= 0 && m_frame < block->m_frames.size())
+				{
+					float length = block->m_frames[m_frame];
+					Block* child = block->m_first_child;
+					while (child)
+					{
+						length -= m_frame < child->m_frames.size() ? child->m_frames[m_frame] : (child->m_frames.isEmpty() ? 0 : child->m_frames.back());
+						child = child->m_next;
+					}
+					return length;
+				}
+				else
+				{
+					float length = block->m_frames.isEmpty() ? 0 : block->m_frames.back();
+					Block* child = block->m_first_child;
+					while (child)
+					{
+						length -= child->m_frames.isEmpty() ? 0 : child->m_frames.back();
+						child = child->m_next;
+					}
+					return length;
+				}
+			}
+			break;
 		case Values::HIT_COUNT:
 			return m_frame >= 0 && m_frame < block->m_hit_counts.size() ? block->m_hit_counts[m_frame] : (block->m_hit_counts.isEmpty() ? 0 : block->m_hit_counts.back());
 			break;
