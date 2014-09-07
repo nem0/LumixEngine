@@ -294,6 +294,32 @@ public:
 		}
 	}
 
+
+	void eraseItem(const T& item)
+	{
+		for (int i = 0; i < m_size; ++i)
+		{
+			if (m_data[i] == item)
+			{
+				erase(i);
+				return;
+			}
+		}
+	}
+
+
+	void insert(int index, const T& value)
+	{
+		if (m_size == m_capacity)
+		{
+			grow();
+		}
+		memmove(m_data + index + 1, m_data + index, m_size - index);
+		m_data[index] = value;
+		++m_size;
+	}
+
+
 	void push(const T& value)
 	{
 		if (m_size == m_capacity)

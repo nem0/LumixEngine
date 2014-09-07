@@ -79,10 +79,7 @@ class LUMIX_ENGINE_API Gizmo
 
 		void create(Renderer& renderer);
 		void destroy();
-		void hide();
-		void show();
 		void updateScale(Component camera);
-		void setEntity(Entity entity);
 		void setUniverse(Universe* universe);
 		void startTransform(Component camera, int x, int y, TransformMode mode);
 		void transform(Component camera, TransformOperation operation, int x, int y, int relx, int rely, int flags);
@@ -96,7 +93,6 @@ class LUMIX_ENGINE_API Gizmo
 	private:
 		WorldEditor& m_editor;
 		Renderer* m_renderer;
-		Entity m_selected_entity;
 		Universe* m_universe;
 		TransformMode m_transform_mode;
 		Vec3 m_transform_point;

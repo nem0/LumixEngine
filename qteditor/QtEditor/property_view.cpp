@@ -11,6 +11,7 @@
 #include "core/resource_manager_base.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
+#include "entity_template_list.h"
 #include "graphics/geometry.h"
 #include "graphics/material.h"
 #include "graphics/model.h"
@@ -99,6 +100,45 @@ class FileEdit : public QLineEdit
 };
 
 
+class ComponentArrayItemObject : public PropertyViewObject
+{
+	public:
+		ComponentArrayItemObject(PropertyViewObject* parent, const char* name, Lumix::IArrayDescriptor& descriptor, Lumix::Component component, int index)
+			: PropertyViewObject(parent, name)
+			, m_descriptor(descriptor)
+			, m_component(component)
+			, m_index(index)
+		{
+		}
+
+		virtual void createEditor(PropertyView& view, QTreeWidgetItem* item) override
+		{
+			QWidget* widget = new QWidget();
+			QHBoxLayout* layout = new QHBoxLayout(widget);
+			layout->setContentsMargins(0, 0, 0, 0);
+			QPushButton* button = new QPushButton(" - ");
+			layout->addWidget(button);
+			layout->addStretch(1);
+			item->treeWidget()->setItemWidget(item, 1, widget);
+			button->connect(button, &QPushButton::clicked, [this, &view]()
+			{
+				view.getWorldEditor()->removeArrayPropertyItem(m_component, m_index, m_descriptor);
+				view.refresh();
+			});
+		}
+
+		virtual bool isEditable() const override
+		{
+			return false;
+		}
+
+	private:
+		Lumix::IArrayDescriptor& m_descriptor;
+		Lumix::Component m_component;
+		int m_index;
+};
+
+
 class ComponentPropertyObject : public PropertyViewObject
 {
 	public:
@@ -107,14 +147,42 @@ class ComponentPropertyObject : public PropertyViewObject
 			, m_descriptor(descriptor)
 			, m_component(cmp)
 		{
+			m_array_index = -1;
+			if(descriptor.getType() == Lumix::IPropertyDescriptor::ARRAY)
+			{
+				Lumix::IArrayDescriptor& array_desc = static_cast<Lumix::IArrayDescriptor&>(descriptor);
+				int item_count = array_desc.getCount(cmp);
+				for( int j = 0; j < item_count; ++j)
+				{
+					ComponentArrayItemObject* item = new ComponentArrayItemObject(this, name, array_desc, m_component, j);
+					addMember(item);
+					for(int i = 0; i < descriptor.getChildren().size(); ++i)
+					{
+						auto child = descriptor.getChildren()[i];
+						auto member = new ComponentPropertyObject(this, child->getName(), cmp, *descriptor.getChildren()[i]);
+						member->setArrayIndex(j);
+						item->addMember(member);
+					}
+				}
+			}
 		}
 
 
 		virtual void createEditor(PropertyView& view, QTreeWidgetItem* item) override
 		{
 			Lumix::Blob stream;
-			m_descriptor.get(m_component, stream);
-			
+			if(m_descriptor.getType() != Lumix::IPropertyDescriptor::ARRAY)
+			{
+				if(m_array_index >= 0 )
+				{
+					m_descriptor.get(m_component, m_array_index, stream);
+				}
+				else
+				{
+					m_descriptor.get(m_component, stream);
+				}
+			}
+
 			switch (m_descriptor.getType())
 			{
 				case Lumix::IPropertyDescriptor::BOOL:
@@ -126,7 +194,7 @@ class ComponentPropertyObject : public PropertyViewObject
 						checkbox->setChecked(b);
 						checkbox->connect(checkbox, &QCheckBox::stateChanged, [this, &view](bool new_value)
 						{
-							view.getWorldEditor()->setProperty(m_component.type, m_descriptor.getNameHash(), &new_value, sizeof(new_value));
+							view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, &new_value, sizeof(new_value));
 						});
 					}
 					break;
@@ -155,7 +223,7 @@ class ComponentPropertyObject : public PropertyViewObject
 						{
 							Lumix::Vec3 value;
 							value.set((float)sb1->value(), (float)sb2->value(), (float)sb3->value());
-							view.getWorldEditor()->setProperty(m_component.type, m_descriptor.getNameHash(), &value, sizeof(value));
+							view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, &value, sizeof(value));
 						});
 					}
 					break;
@@ -174,13 +242,16 @@ class ComponentPropertyObject : public PropertyViewObject
 						layout->addWidget(button);
 						button->connect(button, &QPushButton::clicked, [this, edit, &view]()
 						{
-							QString str = QFileDialog::getOpenFileName(NULL, QString(), QString(), m_descriptor.getFileType());
-							char rel_path[LUMIX_MAX_PATH];
-							QByteArray byte_array = str.toLatin1();
-							const char* text = byte_array.data();
-							view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, text);
-							view.getWorldEditor()->setProperty(m_component.type, m_descriptor.getNameHash(), rel_path, strlen(rel_path) + 1);
-							edit->setText(rel_path);
+							QString str = QFileDialog::getOpenFileName(NULL, QString(), QString(), dynamic_cast<Lumix::IFilePropertyDescriptor&>(m_descriptor).getFileType());
+							if (str != "")
+							{
+								char rel_path[LUMIX_MAX_PATH];
+								QByteArray byte_array = str.toLatin1();
+								const char* text = byte_array.data();
+								view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, text);
+								view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, rel_path, strlen(rel_path) + 1);
+								edit->setText(rel_path);
+							}
 						});
 				
 						QPushButton* button2 = new QPushButton("->", widget);
@@ -193,24 +264,28 @@ class ComponentPropertyObject : public PropertyViewObject
 						item->treeWidget()->setItemWidget(item, 1, widget);
 						connect(edit, &QLineEdit::editingFinished, [edit, &view, this]()
 						{
-							QByteArray byte_array = edit->text().toLatin1();
-							view.getWorldEditor()->setProperty(m_component.type, m_descriptor.getNameHash(), byte_array.data(), byte_array.size() + 1);
+							if(view.getObject())
+							{
+								QByteArray byte_array = edit->text().toLatin1();
+								view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, byte_array.data(), byte_array.size() + 1);
+							}
 						});
 					}
 					break;
 				case Lumix::IPropertyDescriptor::INTEGER:
 					{
+						auto& int_property = static_cast<Lumix::IIntPropertyDescriptor&>(m_descriptor);
 						int value;
 						stream.read(value);
 						QSpinBox* edit = new QSpinBox();
 						edit->setValue(value);
 						item->treeWidget()->setItemWidget(item, 1, edit);
-						edit->setMinimum(INT_MIN);
-						edit->setMaximum(INT_MAX);
+						edit->setMinimum(int_property.getMin());
+						edit->setMaximum(int_property.getMax());
 						connect(edit, (void (QSpinBox::*)(int))&QSpinBox::valueChanged, [this, &view](int new_value) 
 						{
 							int value = new_value;
-							view.getWorldEditor()->setProperty(m_component.type, m_descriptor.getNameHash(), &value, sizeof(value));
+							view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, &value, sizeof(value));
 						});
 					}
 					break;
@@ -225,7 +300,7 @@ class ComponentPropertyObject : public PropertyViewObject
 						connect(edit, (void (QDoubleSpinBox::*)(double))&QDoubleSpinBox::valueChanged, [this, &view](double new_value) 
 						{
 							float value = (float)new_value;
-							view.getWorldEditor()->setProperty(m_component.type, m_descriptor.getNameHash(), &value, sizeof(value));
+							view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, &value, sizeof(value));
 						});
 					}
 					break;
@@ -238,7 +313,23 @@ class ComponentPropertyObject : public PropertyViewObject
 						{
 							QByteArray byte_array = edit->text().toLatin1();
 							const char* text = byte_array.data();
-							view.getWorldEditor()->setProperty(m_component.type, m_descriptor.getNameHash(), text, strlen(text) + 1);
+							view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, text, strlen(text) + 1);
+						});
+					}
+					break;
+				case Lumix::IPropertyDescriptor::ARRAY:
+					{
+						QWidget* widget = new QWidget();
+						QHBoxLayout* layout = new QHBoxLayout(widget);
+						layout->setContentsMargins(0, 0, 0, 0);
+						QPushButton* button = new QPushButton(" + ");
+						layout->addWidget(button);
+						layout->addStretch(1);
+						item->treeWidget()->setItemWidget(item, 1, widget);
+						button->connect(button, &QPushButton::clicked, [this, &view]()
+						{
+							view.getWorldEditor()->addArrayPropertyItem(m_component, static_cast<Lumix::IArrayDescriptor&>(m_descriptor));
+							view.refresh();
 						});
 					}
 					break;
@@ -256,10 +347,12 @@ class ComponentPropertyObject : public PropertyViewObject
 
 
 		Lumix::Component getComponent() const { return m_component; }
+		void setArrayIndex(int index) { m_array_index = index; }
 
 	private:
 		Lumix::IPropertyDescriptor& m_descriptor;
 		Lumix::Component m_component;
+		int m_array_index;
 };
 
 
@@ -657,7 +750,7 @@ void createTextureInMaterialEditor(PropertyView& view, QTreeWidgetItem* item, In
 		}
 	});
 
-	QPushButton* add_button = new QPushButton(" + ");
+	QPushButton* add_button = new QPushButton(" + "); 
 	layout->addWidget(add_button);
 	add_button->connect(add_button, &QPushButton::clicked, [texture, &view, item]()
 	{
@@ -741,11 +834,13 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 		enum Type
 		{
 			HEIGHT,
-			TEXTURE
+			TEXTURE,
+			ENTITY
 		};
 
-		TerrainEditor(Lumix::WorldEditor& editor) 
+		TerrainEditor(Lumix::WorldEditor& editor, EntityTemplateList* list) 
 			: m_world_editor(editor)
+			, m_entity_template_list(list)
 		{
 			m_texture_tree_item = NULL;
 			m_tree_top_level = NULL;
@@ -759,9 +854,9 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			float mouse_x = m_world_editor.getMouseX();
 			float mouse_y = m_world_editor.getMouseY();
 			
-			if (m_world_editor.getSelectedEntity().isValid())
+			for(int i = m_world_editor.getSelectedEntities().size() - 1; i >= 0; --i)
 			{
-				Lumix::Component terrain = m_world_editor.getSelectedEntity().getComponent(crc32("terrain"));
+				Lumix::Component terrain = m_world_editor.getSelectedEntities()[i].getComponent(crc32("terrain"));
 				if (terrain.isValid())
 				{
 					Lumix::Component camera_cmp = m_world_editor.getEditCamera();
@@ -781,12 +876,48 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 
 		virtual bool onEntityMouseDown(const Lumix::RayCastModelHit& hit, int, int) override
 		{
-			if (m_world_editor.getSelectedEntity() == hit.m_component.entity)
+			for(int i = m_world_editor.getSelectedEntities().size() - 1; i >= 0; --i)
+			{
+				if (m_world_editor.getSelectedEntities()[i] == hit.m_component.entity)
+				{
+					Lumix::Component terrain = hit.m_component.entity.getComponent(crc32("terrain"));
+					if (terrain.isValid())
+					{
+						Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
+						switch (m_type)
+						{
+							case HEIGHT:
+								addTerrainLevel(terrain, hit);
+								break;
+							case TEXTURE:
+								addSplatWeight(terrain, hit);
+								break;
+							case ENTITY:
+								paintEntities(terrain, hit);
+								break;
+							default:
+								ASSERT(false);
+								break;
+						}
+						return true;
+					}
+				}
+			}
+			return false;
+		}
+
+		virtual void onMouseMove(int x, int y, int /*rel_x*/, int /*rel_y*/, int /*mouse_flags*/) override
+		{
+			Lumix::Component camera_cmp = m_world_editor.getEditCamera();
+			Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(camera_cmp.scene);
+			Lumix::Vec3 origin, dir;
+			scene->getRay(camera_cmp, (float)x, (float)y, origin, dir);
+			Lumix::RayCastModelHit hit = scene->castRay(origin, dir, Lumix::Component::INVALID);
+			if (hit.m_is_hit)
 			{
 				Lumix::Component terrain = hit.m_component.entity.getComponent(crc32("terrain"));
-				if (terrain.isValid())
+				if(terrain.isValid())
 				{
-					Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
 					switch (m_type)
 					{
 						case HEIGHT:
@@ -795,40 +926,13 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 						case TEXTURE:
 							addSplatWeight(terrain, hit);
 							break;
+						case ENTITY:
+							paintEntities(terrain, hit);
+							break;
 						default:
-							ASSERT(false);
 							break;
 					}
-					return true;
 				}
-			}
-			return false;
-		}
-
-		virtual void onMouseMove(int x, int y, int /*rel_x*/, int /*rel_y*/, int /*mouse_flags*/) override
-		{
-			Lumix::Component terrain = m_world_editor.getSelectedEntity().getComponent(crc32("terrain"));
-			Lumix::Component camera_cmp = m_world_editor.getEditCamera();
-			Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(camera_cmp.scene);
-			Lumix::Vec3 origin, dir;
-			scene->getRay(camera_cmp, (float)x, (float)y, origin, dir);
-			Lumix::RayCastModelHit hit = scene->castRay(origin, dir, Lumix::Component::INVALID);
-			switch (m_type)
-			{
-				case HEIGHT:
-					if (hit.m_is_hit)
-					{
-						addTerrainLevel(terrain, hit);
-					}
-					break;
-				case TEXTURE:
-					if (hit.m_is_hit)
-					{
-						addSplatWeight(terrain, hit);
-					}
-					break;
-				default:
-					break;
 			}
 		}
 
@@ -842,6 +946,21 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			Lumix::string material_path;
 			static_cast<Lumix::RenderScene*>(m_component.scene)->getTerrainMaterial(m_component, material_path);
 			return static_cast<Lumix::Material*>(m_world_editor.getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL)->get(material_path.c_str()));
+		}
+
+
+		void paintEntities(Lumix::Component terrain, const Lumix::RayCastModelHit& hit)
+		{
+			Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(terrain.scene);
+			Lumix::Vec3 center_pos = hit.m_origin + hit.m_dir * hit.m_t;
+			for (int i = 0; i <= m_terrain_brush_strength * 10; ++i)
+			{
+				float angle = (float)(rand() % 365);
+				float dist = (rand() % 100 / 100.0f) * m_terrain_brush_size;
+				Lumix::Vec3 pos(center_pos.x + cos(angle) * dist, 0, center_pos.z + sin(angle) * dist);
+				pos.y = scene->getTerrainHeightAt(terrain, pos.x, pos.z);
+				m_entity_template_list->instantiateTemplateAt(pos);
+			}
 		}
 
 
@@ -1042,6 +1161,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 		float m_terrain_brush_strength;
 		int m_terrain_brush_size;
 		int m_texture_idx;
+		EntityTemplateList* m_entity_template_list;
 };
 
 
@@ -1082,13 +1202,27 @@ void PropertyView::onEntityPosition(const Lumix::Entity& e)
 {
 	if (m_selected_entity == e)
 	{
+		bool b1 = m_ui->positionX->blockSignals(true);
+		bool b2 = m_ui->positionY->blockSignals(true);
+		bool b3 = m_ui->positionZ->blockSignals(true);
+		
 		Lumix::Vec3 pos = e.getPosition();
 		m_ui->positionX->setValue(pos.x);
 		m_ui->positionY->setValue(pos.y);
 		m_ui->positionZ->setValue(pos.z);
+		
+		m_ui->positionX->blockSignals(b1);
+		m_ui->positionY->blockSignals(b2);
+		m_ui->positionZ->blockSignals(b3);
 	}
 }
 
+
+void PropertyView::refresh()
+{
+	setObject(NULL);
+	onEntitySelected(getWorldEditor()->getSelectedEntities());
+}
 
 
 Lumix::WorldEditor* PropertyView::getWorldEditor()
@@ -1100,7 +1234,7 @@ Lumix::WorldEditor* PropertyView::getWorldEditor()
 void PropertyView::setWorldEditor(Lumix::WorldEditor& editor)
 {
 	m_world_editor = &editor;
-	m_terrain_editor = new TerrainEditor(editor);
+	m_terrain_editor = new TerrainEditor(editor, m_entity_template_list);
 	m_world_editor->addPlugin(m_terrain_editor);
 	m_world_editor->entitySelected().bind<PropertyView, &PropertyView::onEntitySelected>(this);
 	m_world_editor->universeCreated().bind<PropertyView, &PropertyView::onUniverseCreated>(this);
@@ -1196,10 +1330,10 @@ void PropertyView::setScriptCompiler(ScriptCompiler* compiler)
 
 void PropertyView::clear()
 {
-	m_ui->propertyList->clear();
-
 	delete m_object;
 	m_object = NULL;
+
+	m_ui->propertyList->clear();
 }
 
 
@@ -1247,28 +1381,6 @@ void PropertyView::onScriptCompiled(const Lumix::Path&, uint32_t status)
 }
 
 
-void PropertyView::on_animablePlayPause()
-{
-	Lumix::Component cmp = m_world_editor->getSelectedEntity().getComponent(crc32("animable"));
-	if (cmp.isValid())
-	{
-		Lumix::AnimationScene* scene = static_cast<Lumix::AnimationScene*>(cmp.scene);
-		scene->setManual(cmp, !scene->isManual(cmp));
-	}
-
-}
-
-
-void PropertyView::on_animableTimeSet(int value)
-{
-	Lumix::Component cmp = m_world_editor->getSelectedEntity().getComponent(crc32("animable"));
-	if (cmp.isValid())
-	{
-		static_cast<Lumix::AnimationScene*>(cmp.scene)->setAnimationFrame(cmp, value);
-	}
-}
-
-
 void PropertyView::on_compileScriptClicked()
 {
 	/*for(int i = 0; i < m_properties.size(); ++i)
@@ -1313,8 +1425,16 @@ void PropertyView::addTerrainCustomProperties(QTreeWidgetItem& tree_item, const 
 		layout->addWidget(texture_button);
 		layout->setContentsMargins(2, 2, 2, 2);
 		m_ui->propertyList->setItemWidget(item, 1, widget);
-		connect(height_button, &QPushButton::clicked, this, &PropertyView::on_TerrainHeightSaveClicked);
-		connect(texture_button, &QPushButton::clicked, this, &PropertyView::on_TerrainSplatSaveClicked);
+		connect(height_button, &QPushButton::clicked, [this]()
+		{
+			Lumix::Material* material = m_terrain_editor->getMaterial();
+			material->getTexture(0)->save();
+		});
+		connect(texture_button, &QPushButton::clicked, [this]()
+		{
+			Lumix::Material* material = m_terrain_editor->getMaterial();
+			material->getTexture(material->getTextureCount() - 1)->save();
+		});
 	}
 
 	QSlider* slider = new QSlider(Qt::Orientation::Horizontal);
@@ -1347,37 +1467,31 @@ void PropertyView::addTerrainCustomProperties(QTreeWidgetItem& tree_item, const 
 	layout->addWidget(height_button);
 	QPushButton* texture_button = new QPushButton("Texture", widget);
 	layout->addWidget(texture_button);
+	QPushButton* entity_button = new QPushButton("Entity", widget);
+	layout->addWidget(entity_button);
 	layout->setContentsMargins(2, 2, 2, 2);
 	m_ui->propertyList->setItemWidget(item, 1, widget);
 	m_terrain_editor->m_type = TerrainEditor::HEIGHT;
-	connect(height_button, &QPushButton::clicked, this, &PropertyView::on_TerrainHeightTypeClicked);
-	connect(texture_button, &QPushButton::clicked, this, &PropertyView::on_TerrainTextureTypeClicked);
-
-}
-
-
-void PropertyView::on_TerrainHeightSaveClicked()
-{
-	Lumix::Material* material = m_terrain_editor->getMaterial();
-	material->getTexture(0)->save();
-}
-
-
-void PropertyView::on_TerrainSplatSaveClicked()
-{
-	Lumix::Material* material = m_terrain_editor->getMaterial();
-	material->getTexture(material->getTextureCount() - 1)->save();
-}
-
-
-void PropertyView::on_TerrainHeightTypeClicked()
-{
-	m_terrain_editor->m_type = TerrainEditor::HEIGHT;
-	if (m_terrain_editor->m_texture_tree_item)
+	connect(height_button, &QPushButton::clicked, [this]()
 	{
-		m_terrain_editor->m_tree_top_level->removeChild(m_terrain_editor->m_texture_tree_item);
-	}
+		m_terrain_editor->m_type = TerrainEditor::HEIGHT;
+		if (m_terrain_editor->m_texture_tree_item)
+		{
+			m_terrain_editor->m_tree_top_level->removeChild(m_terrain_editor->m_texture_tree_item);
+		}
+	});
+	connect(texture_button, &QPushButton::clicked, this, &PropertyView::on_TerrainTextureTypeClicked);
+	connect(entity_button, &QPushButton::clicked, [this]()
+	{
+		m_terrain_editor->m_type = TerrainEditor::ENTITY;
+		if (m_terrain_editor->m_texture_tree_item)
+		{
+			m_terrain_editor->m_tree_top_level->removeChild(m_terrain_editor->m_texture_tree_item);
+		}
+	});
+
 }
+
 
 void PropertyView::on_TerrainTextureTypeClicked()
 {
@@ -1407,27 +1521,6 @@ void PropertyView::on_terrainBrushTextureChanged(int value)
 }
 
 
-void PropertyView::addAnimableCustomProperties(const Lumix::Component& cmp)
-{
-	QTreeWidgetItem* tools_item = new QTreeWidgetItem(QStringList() << "Tools");
-	m_ui->propertyList->topLevelItem(0)->insertChild(0, tools_item);
-	QWidget* widget = new QWidget();
-	QHBoxLayout* layout = new QHBoxLayout(widget);
-	layout->setContentsMargins(0, 0, 0, 0);
-	QPushButton* compile_button = new QPushButton("Play/Pause", widget);
-	QSlider* slider = new QSlider(Qt::Orientation::Horizontal, widget);
-	slider->setObjectName("animation_frame_slider");
-	slider->setMinimum(0);
-	int frame_count = static_cast<Lumix::AnimationScene*>(cmp.scene)->getFrameCount(cmp);
-	slider->setMaximum(frame_count);
-	layout->addWidget(compile_button);
-	layout->addWidget(slider);
-	m_ui->propertyList->setItemWidget(tools_item, 1, widget);
-	connect(compile_button, &QPushButton::clicked, this, &PropertyView::on_animablePlayPause);
-	connect(slider, &QSlider::valueChanged, this, &PropertyView::on_animableTimeSet);
-}
-
-
 void PropertyView::addScriptCustomProperties()
 {
 	QTreeWidgetItem* tools_item = new QTreeWidgetItem(QStringList() << "Tools");
@@ -1451,6 +1544,10 @@ void PropertyView::addScriptCustomProperties()
 
 void PropertyView::setSelectedResource(Lumix::Resource* resource)
 {
+	if(resource)
+	{
+		m_world_editor->selectEntities(NULL, 0);
+	}
 	clear();
 	if (m_selected_resource)
 	{
@@ -1468,22 +1565,17 @@ void PropertyView::setSelectedResource(Lumix::Resource* resource)
 }
 
 
-void PropertyView::onEntitySelected(const Lumix::Entity& e)
+void PropertyView::onEntitySelected(const Lumix::Array<Lumix::Entity>& e)
 {
 	setSelectedResource(NULL);
-	m_selected_entity = e;
+	m_selected_entity = e.empty() ? Lumix::Entity::INVALID : e[0];
 	clear();
-	if (e.isValid())
+	if (e.size() == 1)
 	{
-		setObject(createEntityObject(*m_world_editor, e));
-		/*
-				addScriptCustomProperties();
-				addTerrainCustomProperties(cmps[i]);
-				addAnimableCustomProperties(cmps[i]);
-		*/
+		setObject(createEntityObject(*m_world_editor, e[0]));
 		m_ui->propertyList->expandAll();
-		onEntityPosition(e);
-		m_ui->nameEdit->setText(e.getName());
+		onEntityPosition(e[0]);
+		m_ui->nameEdit->setText(e[0].getName());
 	}
 }
 
@@ -1498,7 +1590,9 @@ void PropertyView::on_addComponentButton_clicked()
 		if(strcmp(c, component_map[i]) == 0)
 		{
 			m_world_editor->addComponent(crc32(component_map[i+1]));
-			onEntitySelected(m_selected_entity);
+			Lumix::Array<Lumix::Entity> tmp;
+			tmp.push(m_selected_entity);
+			onEntitySelected(tmp);
 			return;
 		}
 	}
@@ -1507,7 +1601,12 @@ void PropertyView::on_addComponentButton_clicked()
 
 void PropertyView::updateSelectedEntityPosition()
 {
-	m_world_editor->getSelectedEntity().setPosition(Lumix::Vec3((float)m_ui->positionX->value(), (float)m_ui->positionY->value(), (float)m_ui->positionZ->value()));
+	if(m_world_editor->getSelectedEntities().size() == 1)
+	{
+		Lumix::Array<Lumix::Vec3> positions;
+		positions.push(Lumix::Vec3((float)m_ui->positionX->value(), (float)m_ui->positionY->value(), (float)m_ui->positionZ->value()));
+		m_world_editor->setEntitiesPositions(m_world_editor->getSelectedEntities(), positions);
+	}
 }
 
 void PropertyView::on_positionX_valueChanged(double)
@@ -1550,16 +1649,26 @@ PropertyViewObject* PropertyView::getObject()
 
 void PropertyView::setObject(PropertyViewObject* object)
 {
-	clear();
+	if(object != m_object)
+	{
+		clear();
+	}
+	else
+	{
+		m_ui->propertyList->clear();
+	}
 
 	m_object = object;
 	
-	QTreeWidgetItem* item = new QTreeWidgetItem();
-	m_ui->propertyList->insertTopLevelItem(0, item);
-	createObjectEditor(item, object);
+	if(object)
+	{
+		QTreeWidgetItem* item = new QTreeWidgetItem();
+		m_ui->propertyList->insertTopLevelItem(0, item);
+		createObjectEditor(item, object);
 
-	m_ui->propertyList->expandAll();
-	m_ui->propertyList->resizeColumnToContents(0);
+		m_ui->propertyList->expandAll();
+		m_ui->propertyList->resizeColumnToContents(0);
+	}
 }
 
 void PropertyView::on_propertyList_customContextMenuRequested(const QPoint &pos)
@@ -1590,6 +1699,9 @@ void PropertyView::on_propertyList_customContextMenuRequested(const QPoint &pos)
 				{
 					Lumix::Entity entity = cmps[i].entity;
 					m_world_editor->destroyComponent(cmps[i]);
+					Lumix::Array<Lumix::Entity> tmp;
+					tmp.push(m_selected_entity);
+					onEntitySelected(tmp);
 					break;
 				}
 			}

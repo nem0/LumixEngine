@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QDockWidget>
+#include "core/vec3.h"
 
 namespace Ui
 {
@@ -22,6 +23,7 @@ class EntityTemplateList : public QDockWidget
 
 		void setWorldEditor(Lumix::WorldEditor& editor);
 		void instantiateTemplate();
+		void instantiateTemplateAt(const Lumix::Vec3& position);
 
 	private:
 		void onSystemUpdated();

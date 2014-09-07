@@ -32,7 +32,7 @@ public:
 	};
 	
 public:
-	void apply(Renderer& renderer, PipelineInstance& pipeline);
+	void apply(Renderer& renderer, PipelineInstance& pipeline) const;
 	bool isZTest() const { return m_is_z_test; }
 	void enableZTest(bool enable) { m_is_z_test = enable; }
 	bool isBackfaceCulling() const { return m_is_backface_culling; }
@@ -79,6 +79,7 @@ private:
 		};
 		static const int MAX_NAME_LENGTH = 30;
 		char m_name[MAX_NAME_LENGTH + 1];
+		uint32_t m_name_hash;
 		Type m_type;
 		union
 		{

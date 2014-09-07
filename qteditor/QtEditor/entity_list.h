@@ -2,6 +2,8 @@
 
 #include <QDockWidget>
 #include <qsortfilterproxymodel.h>
+#include "core/array.h"
+#include "universe/entity.h"
 
 
 namespace Ui 
@@ -38,7 +40,7 @@ class EntityList : public QDockWidget
 		void onUniverseCreated();
 		void onUniverseDestroyed();
 		void onUniverseLoaded();
-		void onEntitySelected(const Lumix::Entity& entity);
+		void onEntitySelected(const Lumix::Array<Lumix::Entity>& entity);
 
 	private:
 		Ui::EntityList* m_ui;

@@ -37,11 +37,11 @@ namespace Lumix
 	{
 		Renderable() {}
 
+		bool m_is_free;
+		int64_t m_layer_mask;
 		ModelInstance m_model;
 		Entity m_entity;
-		int64_t m_layer_mask;
 		float m_scale;
-		bool m_is_free;
 
 		private:
 			Renderable(const Renderable&) {}
@@ -371,6 +371,10 @@ namespace Lumix
 						Terrain* terrain = m_terrains[i];
 						terrain->deserialize(serializer, m_universe, *this, i);
 					}
+					else
+					{
+						m_terrains[i] = NULL;
+					}
 				}
 				serializer.deserializeArrayEnd();
 			}
@@ -409,6 +413,8 @@ namespace Lumix
 				{
 					LUMIX_DELETE(m_terrains[component.index]);
 					m_terrains[component.index] = NULL;
+					m_universe.destroyComponent(component);
+					m_universe.componentDestroyed().invoke(component);
 				}
 				else
 				{
@@ -510,6 +516,13 @@ namespace Lumix
 			{
 				m_terrains[cmp.index]->setBrush(position, size);
 				addDebugCross(position, 1, Vec3(1, 0, 0), 0);
+			}
+
+
+			virtual float getTerrainHeightAt(Component cmp, float x, float z) override
+			{
+				return m_terrains[cmp.index]->getHeight(x, z);
+
 			}
 
 
@@ -637,15 +650,57 @@ namespace Lumix
 			}
 
 
-			virtual void setTerrainGrass(Component cmp, const string& path) override
+			virtual void setGrassDensity(Component cmp, int index, const int& density) override
 			{
-				m_terrains[cmp.index]->setGrassPath(path.c_str());
+				m_terrains[cmp.index]->setGrassTypeDensity(index, density);
+			}
+			
+			
+			virtual void getGrassDensity(Component cmp, int index, int& density) override
+			{
+				density = m_terrains[cmp.index]->getGrassTypeDensity(index);
 			}
 
 
-			virtual void getTerrainGrass(Component cmp, string& path) override
+			virtual void setGrassGround(Component cmp, int index, const int& ground) override
 			{
-				path = m_terrains[cmp.index]->getGrassPath().c_str();
+				m_terrains[cmp.index]->setGrassTypeGround(index, ground);
+			}
+			
+
+			virtual void getGrassGround(Component cmp, int index, int& ground) override
+			{
+				ground = m_terrains[cmp.index]->getGrassTypeGround(index);
+			}
+
+
+			virtual void setGrass(Component cmp, int index, const string& path) override
+			{
+				m_terrains[cmp.index]->setGrassTypePath(index, path.c_str());
+			}
+
+
+			virtual void getGrass(Component cmp, int index, string& path) override
+			{
+				path = m_terrains[cmp.index]->getGrassTypePath(index).c_str();
+			}
+
+
+			virtual int getGrassCount(Component cmp) override
+			{
+				return m_terrains[cmp.index]->getGrassTypeCount();
+			}
+
+
+			virtual void addGrass(Component cmp, int index) override
+			{
+				m_terrains[cmp.index]->addGrassType(index);
+			}
+
+
+			virtual void removeGrass(Component cmp, int index) override
+			{
+				m_terrains[cmp.index]->removeGrassType(index);
 			}
 
 
@@ -653,22 +708,25 @@ namespace Lumix
 			{
 				PROFILE_FUNCTION();
 				infos.reserve(m_renderables.size() * 2);
-				for (int i = 0; i < m_renderables.size(); ++i)
+				for (int i = 0, c = m_renderables.size(); i < c; ++i)
 				{
-					if (!m_renderables[i]->m_is_free)
+					const Renderable* LUMIX_RESTRICT renderable = m_renderables[i];
+					if (!renderable->m_is_free)
 					{
-						bool is_model_ready = m_renderables[i]->m_model.getModel() && m_renderables[i]->m_model.getModel()->isReady();
-						if (is_model_ready && (m_renderables[i]->m_layer_mask & layer_mask) != 0)
+						const ModelInstance& model_instance = renderable->m_model;
+						const Model* model = model_instance.getModel();
+						bool is_model_ready = model && model->isReady();
+						if (is_model_ready && (renderable->m_layer_mask & layer_mask) != 0)
 						{
-							for (int j = 0, c = m_renderables[i]->m_model.getModel()->getMeshCount(); j < c; ++j)
+							for (int j = 0, c = renderable->m_model.getModel()->getMeshCount(); j < c; ++j)
 							{
 								RenderableInfo& info = infos.pushEmpty();
-								info.m_scale = m_renderables[i]->m_scale;
-								info.m_geometry = m_renderables[i]->m_model.getModel()->getGeometry();
-								info.m_mesh = &m_renderables[i]->m_model.getModel()->getMesh(j);
-								info.m_pose = &m_renderables[i]->m_model.getPose();
-								info.m_model = &m_renderables[i]->m_model;
-								info.m_matrix = &m_renderables[i]->m_model.getMatrix();
+								info.m_scale = renderable->m_scale;
+								info.m_geometry = model->getGeometry();
+								info.m_mesh = &model->getMesh(j);
+								info.m_pose = &model_instance.getPose();
+								info.m_model = &model_instance;
+								info.m_matrix = &model_instance.getMatrix();
 							}
 						}
 					}

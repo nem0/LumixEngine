@@ -31,29 +31,11 @@ namespace Lumix
 			class CreateInstanceCommand : public IEditorCommand
 			{
 				public:
-					CreateInstanceCommand(EntityTemplateSystemImpl& entity_system, const char* template_name)
+					CreateInstanceCommand(EntityTemplateSystemImpl& entity_system, const char* template_name, const Vec3& position)
 						: m_entity_system(entity_system)
 						, m_template_name_hash(crc32(template_name))
+						, m_position(position)
 					{
-						
-						RenderScene* scene = static_cast<RenderScene*>(m_entity_system.m_editor.getEditCamera().scene);
-						float width;
-						float height;
-						scene->getCameraWidth(m_entity_system.m_editor.getEditCamera(), width);
-						scene->getCameraHeight(m_entity_system.m_editor.getEditCamera(), height);
-
-						Vec3 origin;
-						Vec3 dir;
-						scene->getRay(m_entity_system.m_editor.getEditCamera(), width * 0.5f, height * 0.5f, origin, dir);
-						RayCastModelHit hit = scene->castRay(origin, dir, Component::INVALID);
-						if (hit.m_is_hit)
-						{
-							m_position = hit.m_origin + hit.m_dir * hit.m_t;
-						}
-						else
-						{
-							m_position.set(0, 0, 0);
-						}
 					}
 
 					virtual void execute() override
@@ -224,9 +206,9 @@ namespace Lumix
 			}
 
 
-			virtual Entity createInstance(const char* name) override
+			virtual Entity createInstance(const char* name, const Vec3& position) override
 			{
-				CreateInstanceCommand* command = LUMIX_NEW(CreateInstanceCommand)(*this, name);
+				CreateInstanceCommand* command = LUMIX_NEW(CreateInstanceCommand)(*this, name, position);
 				m_editor.executeCommand(command);
 				return command->getEntity();
 			}

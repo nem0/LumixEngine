@@ -20,7 +20,8 @@ ProfileModel::Block::Block()
 }
 
 
-ProfileModel::ProfileModel()
+ProfileModel::ProfileModel(QWidget* parent)
+	: QAbstractItemModel(parent)
 {
 	Lumix::g_profiler.getFrameListeners().bind<ProfileModel, &ProfileModel::onFrame>(this);
 	m_root = NULL;
@@ -121,6 +122,8 @@ QVariant ProfileModel::headerData(int section, Qt::Orientation, int role) const
 				return "Name";
 			case Values::LENGTH:
 				return "Length (ms)";
+			case Values::LENGTH_EXCLUSIVE:
+				return "Length exclusive (ms)";
 			case Values::HIT_COUNT:
 				return "Hit count";
 				break;
@@ -222,6 +225,7 @@ int ProfileModel::columnCount(const QModelIndex&) const
 	return (int)Values::COUNT;
 }
 
+
 QVariant ProfileModel::data(const QModelIndex& index, int role) const
 {
 	if (!index.isValid() || !index.internalPointer())
@@ -242,6 +246,32 @@ QVariant ProfileModel::data(const QModelIndex& index, int role) const
 			return block->m_name;
 		case Values::LENGTH:
 			return m_frame >= 0 && m_frame < block->m_frames.size() ? block->m_frames[m_frame] : (block->m_frames.isEmpty() ? 0 : block->m_frames.back());
+		case Values::LENGTH_EXCLUSIVE:
+			{
+				if (m_frame >= 0 && m_frame < block->m_frames.size())
+				{
+					float length = block->m_frames[m_frame];
+					Block* child = block->m_first_child;
+					while (child)
+					{
+						length -= m_frame < child->m_frames.size() ? child->m_frames[m_frame] : (child->m_frames.isEmpty() ? 0 : child->m_frames.back());
+						child = child->m_next;
+					}
+					return length;
+				}
+				else
+				{
+					float length = block->m_frames.isEmpty() ? 0 : block->m_frames.back();
+					Block* child = block->m_first_child;
+					while (child)
+					{
+						length -= child->m_frames.isEmpty() ? 0 : child->m_frames.back();
+						child = child->m_next;
+					}
+					return length;
+				}
+			}
+			break;
 		case Values::HIT_COUNT:
 			return m_frame >= 0 && m_frame < block->m_hit_counts.size() ? block->m_hit_counts[m_frame] : (block->m_hit_counts.isEmpty() ? 0 : block->m_hit_counts.back());
 			break;
@@ -256,9 +286,11 @@ ProfilerUI::ProfilerUI(QWidget* parent)
 	: QDockWidget(parent)
 	, m_ui(new Ui::ProfilerUI)
 {
-	m_model = new ProfileModel;
+	m_sortable_model = new QSortFilterProxyModel(this);
+	m_model = new ProfileModel(this);
+	m_sortable_model->setSourceModel(m_model);
 	m_ui->setupUi(this);
-	m_ui->profileTreeView->setModel(m_model);
+	m_ui->profileTreeView->setModel(m_sortable_model);
 	m_ui->profileTreeView->header()->setSectionResizeMode(0, QHeaderView::ResizeMode::Stretch);
 	m_ui->profileTreeView->header()->setSectionResizeMode(1, QHeaderView::ResizeMode::ResizeToContents);
 	m_ui->profileTreeView->header()->setSectionResizeMode(2, QHeaderView::ResizeMode::ResizeToContents);
@@ -277,14 +309,14 @@ void ProfilerUI::on_dataChanged()
 ProfilerUI::~ProfilerUI()
 {
 	delete m_ui;
-	delete m_model;
 }
 
 void ProfilerUI::on_recordCheckBox_stateChanged(int)
 {
 	Lumix::g_profiler.toggleRecording();
 	m_ui->profileTreeView->setModel(NULL);
-	m_ui->profileTreeView->setModel(m_model);
+	m_sortable_model->setSourceModel(m_model);
+	m_ui->profileTreeView->setModel(m_sortable_model);
 	m_ui->profileTreeView->update();
 }
 

@@ -282,7 +282,7 @@ void JsonSerializer::deserializeRawString(char* buffer, int max_length)
 {
 	strncpy(buffer, m_token, max_length);
 	size_t token_length = strlen(m_token);
-	if (token_length + 2 <= max_length)
+	if (token_length + 2 <= (size_t)max_length)
 	{
 		buffer[token_length] = '\n';
 		buffer[token_length + 1] = m_buffer;
