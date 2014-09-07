@@ -28,7 +28,7 @@ Material::~Material()
 	ASSERT(isEmpty());
 }
 
-void Material::apply(Renderer& renderer, PipelineInstance& pipeline)
+void Material::apply(Renderer& renderer, PipelineInstance& pipeline) const
 {
 	PROFILE_FUNCTION();
 	if(getState() == State::READY)
