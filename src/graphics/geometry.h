@@ -34,8 +34,8 @@ struct VertexDef
 		void parse(const char* data, int size);
 		int getVertexSize() const { return m_vertex_size; }
 		int getPositionOffset() const;
-		void begin(Shader& shader);
-		void end(Shader& shader);
+		void begin(Shader& shader) const;
+		void end(Shader& shader) const;
 		VertexAttributeDef::Type getAttributeType(int i) const { return i < m_attribute_count ? m_attributes[i] : VertexAttributeDef::NONE; }
 
 	private:
@@ -58,11 +58,12 @@ class Geometry
 
 		void copy(const uint8_t* data, int size, const Array<int32_t>& indices, VertexDef vertex_definition);
 		void copy(const Geometry& source, int times, VertexCallback& vertex_callback, IndexCallback& index_callback);
-		void draw(int start, int count, Shader& shader);
 		const Array<Vec3>& getVertices() const { return m_vertices; }
 		const Array<int32_t>& getIndices() const { return m_indices; }
 		float getBoundingRadius() const; 
 		const VertexDef& getVertexDefinition() const { return m_vertex_definition; }
+		GLuint getID() const { return m_id; }
+		GLuint getIndicesID() const { return m_indices_id; }
 
 	private:
 		GLuint m_id;

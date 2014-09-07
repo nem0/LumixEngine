@@ -1,4 +1,5 @@
 #include "graphics/material.h"
+#include "core/crc32.h"
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
 #include "core/json_serializer.h"
@@ -18,16 +19,21 @@
 namespace Lumix
 {
 
+
+static const uint32_t SHADOWMAP_HASH = crc32("shadowmap");
+
+
 Material::~Material()
 {
 	ASSERT(isEmpty());
 }
 
-void Material::apply(Renderer& renderer, PipelineInstance& pipeline)
+void Material::apply(Renderer& renderer, PipelineInstance& pipeline) const
 {
+	PROFILE_FUNCTION();
 	if(getState() == State::READY)
 	{
-		m_shader->apply();
+		renderer.applyShader(*m_shader);
 		switch (m_depth_func)
 		{
 			case DepthFunc::LEQUAL:
@@ -57,16 +63,16 @@ void Material::apply(Renderer& renderer, PipelineInstance& pipeline)
 			switch (uniform.m_type)
 			{
 				case Uniform::FLOAT:
-					m_shader->setUniform(uniform.m_name, uniform.m_float);
+					renderer.setUniform(*m_shader, uniform.m_name, uniform.m_name_hash, uniform.m_float);
 					break;
 				case Uniform::INT:
-					m_shader->setUniform(uniform.m_name, uniform.m_int);
+					renderer.setUniform(*m_shader, uniform.m_name, uniform.m_name_hash, uniform.m_int);
 					break;
 				case Uniform::MATRIX:
-					m_shader->setUniform(uniform.m_name, uniform.m_matrix);
+					renderer.setUniform(*m_shader, uniform.m_name, uniform.m_name_hash, uniform.m_matrix);
 					break;
 				case Uniform::TIME:
-					m_shader->setUniform(uniform.m_name, pipeline.getScene()->getTimer()->getTimeSinceStart());
+					renderer.setUniform(*m_shader, uniform.m_name, uniform.m_name_hash, pipeline.getScene()->getTimer()->getTimeSinceStart());
 					break;
 				default:
 					ASSERT(false);
@@ -79,7 +85,7 @@ void Material::apply(Renderer& renderer, PipelineInstance& pipeline)
 			glActiveTexture(GL_TEXTURE0 + m_textures.size());
 			glEnable(GL_TEXTURE_2D);
 			glBindTexture(GL_TEXTURE_2D, pipeline.getShadowmapFramebuffer()->getDepthTexture());
-			m_shader->setUniform("shadowmap", m_textures.size());
+			renderer.setUniform(*m_shader, "shadowmap", SHADOWMAP_HASH, m_textures.size());
 		}
 
 	}
@@ -145,6 +151,7 @@ void Material::deserializeUniforms(ISerializer& serializer)
 			if (strcmp(label, "name") == 0)
 			{
 				serializer.deserialize(uniform.m_name, Uniform::MAX_NAME_LENGTH);
+				uniform.m_name_hash = crc32(uniform.m_name);
 			}
 			else if (strcmp(label, "int_value") == 0)
 			{

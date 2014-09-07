@@ -43,6 +43,7 @@ class PropertyViewObject : public QObject
 		PropertyViewObject** getMembers() { return m_members.empty() ? NULL : &m_members[0]; }
 		int getMemberCount() const { return m_members.size(); }
 		void addMember(PropertyViewObject* member) { m_members.push(member); }
+		void removeMember(PropertyViewObject* member) { m_members.eraseItem(member); }
 		PropertyViewObject* getParent() const { return m_parent; }
 
 		virtual void createEditor(class PropertyView& view, QTreeWidgetItem* item) = 0;
@@ -73,18 +74,15 @@ public:
 	void setObject(PropertyViewObject* object);
 	PropertyViewObject* getObject();
 	void addTerrainCustomProperties(QTreeWidgetItem& item, const Lumix::Component& terrain_component);
+	void refresh();
+	void setEntityTemplateList(class EntityTemplateList* list) { m_entity_template_list = list; }
 
 private slots:
 	void on_addComponentButton_clicked();
 	void on_compileScriptClicked();
 	void on_editScriptClicked();
-	void on_animablePlayPause();
-	void on_animableTimeSet(int value);
-	void on_TerrainHeightTypeClicked();
 	void on_TerrainTextureTypeClicked();
 	void on_terrainBrushTextureChanged(int value);
-	void on_TerrainHeightSaveClicked();
-	void on_TerrainSplatSaveClicked();
 	void on_positionX_valueChanged(double arg1);
 	void on_positionY_valueChanged(double arg1);
 	void on_positionZ_valueChanged(double arg1);
@@ -96,10 +94,9 @@ private:
 	void clear();
 	void onUniverseCreated();
 	void onUniverseDestroyed();
-	void onEntitySelected(const Lumix::Entity& e);
+	void onEntitySelected(const Lumix::Array<Lumix::Entity>& e);
 	void onEntityPosition(const Lumix::Entity& e);
 	void addScriptCustomProperties();
-	void addAnimableCustomProperties(const Lumix::Component& cmp);
 	void onScriptCompiled(const Lumix::Path& path, uint32_t status);
 	void setScriptStatus(uint32_t status);
 	void updateSelectedEntityPosition();
@@ -116,6 +113,7 @@ private:
 	Lumix::Resource* m_selected_resource;
 	Lumix::Array<PropertyViewObject::Creator> m_resource_plugins;
 	PropertyViewObject* m_object;
+	class EntityTemplateList* m_entity_template_list;
 };
 
 

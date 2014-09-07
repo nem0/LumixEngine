@@ -87,14 +87,14 @@ namespace Lumix
 	}
 
 
-	void Entity::setPosition(float x, float y, float z)
+	void Entity::setPosition(float x, float y, float z) const
 	{
 		universe->m_positions[index].set(x, y, z);
 		universe->entityMoved().invoke(*this);
 	}
 
 
-	void Entity::setPosition(const Vec3& pos)
+	void Entity::setPosition(const Vec3& pos) const
 	{
 		universe->m_positions[index] = pos;
 		universe->entityMoved().invoke(*this);
@@ -113,14 +113,14 @@ namespace Lumix
 	}
 
 
-	void Entity::setRotation(float x, float y, float z, float w)
+	void Entity::setRotation(float x, float y, float z, float w) const
 	{
 		universe->m_rotations[index].set(x, y, z, w);
 		universe->entityMoved().invoke(*this);
 	}
 
 
-	void Entity::setRotation(const Quat& rot)
+	void Entity::setRotation(const Quat& rot) const
 	{
 		universe->m_rotations[index] = rot;
 		universe->entityMoved().invoke(*this);

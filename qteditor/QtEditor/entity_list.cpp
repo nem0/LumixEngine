@@ -220,19 +220,18 @@ void EntityList::setWorldEditor(Lumix::WorldEditor& editor)
 }
 
 
-void EntityList::onEntitySelected(const Lumix::Entity& entity)
+void EntityList::onEntitySelected(const Lumix::Array<Lumix::Entity>& entities)
 {
 	m_ui->entityList->selectionModel()->clear();
-	if (entity.isValid())
+	for(int j = entities.size() - 1; j >= 0; --j)
 	{
 		for (int i = 0, c = m_filter->rowCount(); i < c; ++i)
 		{
-			if (m_filter->data(m_filter->index(i, 0), Qt::UserRole).toInt() == entity.index)
+			if (m_filter->data(m_filter->index(i, 0), Qt::UserRole).toInt() == entities[j].index)
 			{
 				m_ui->entityList->selectionModel()->select(m_filter->index(i, 0), QItemSelectionModel::Select | QItemSelectionModel::Rows);
 				break;
 			}
-
 		}
 	}
 }
@@ -262,8 +261,7 @@ void EntityList::onUniverseDestroyed()
 
 void EntityList::on_entityList_clicked(const QModelIndex &index)
 {
-	m_editor->selectEntity(Lumix::Entity(m_universe, m_filter->data(index, Qt::UserRole).toInt()));
-	TODO("select entity in the list when m_editor->entitySelected()");
+	m_editor->selectEntities(&Lumix::Entity(m_universe, m_filter->data(index, Qt::UserRole).toInt()), 1);
 }
 
 

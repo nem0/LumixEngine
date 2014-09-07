@@ -40,6 +40,19 @@ class LUMIX_ENGINE_API Renderer : public IPlugin
 		virtual void setRenderDevice(IRenderDevice& device) = 0;
 		virtual void setEditorWireframe(bool is_wireframe) = 0;
 		virtual bool isEditorWireframe() const = 0;
+		virtual void cleanup() = 0;
+
+		virtual void renderGeometry(Geometry& geometry, int start, int count, Shader& shader) = 0;
+		virtual void setUniform(Shader& shader, const char* name, const uint32_t name_hash, int value) = 0;
+		virtual void setUniform(Shader& shader, const char* name, const uint32_t name_hash, const Vec3& value) = 0;
+		virtual void setUniform(Shader& shader, const char* name, const uint32_t name_hash, float value) = 0;
+		virtual void setUniform(Shader& shader, const char* name, const uint32_t name_hash, const Matrix& mtx) = 0;
+		virtual void setUniform(Shader& shader, const char* name, const uint32_t name_hash, const Matrix* matrices, int count) = 0;
+		virtual void setFixedCachedUniform(Shader& shader, int name, const Vec3& value) = 0;
+		virtual void setFixedCachedUniform(Shader& shader, int name, float value) = 0;
+		virtual void setFixedCachedUniform(Shader& shader, int name, const Matrix& mtx) = 0;
+		virtual void setFixedCachedUniform(Shader& shader, int name, const Matrix* matrices, int count) = 0;
+		virtual void applyShader(const Shader& shader) = 0;
 
 		virtual void setProjection(float width, float height, float fov, float near_plane, float far_plane, const Matrix& mtx) = 0;
 		virtual Engine& getEngine() = 0;

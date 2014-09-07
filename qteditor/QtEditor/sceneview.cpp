@@ -133,7 +133,7 @@ void SceneView::dropEvent(QDropEvent *event)
 			}
 			InsertMeshCommand* command = new InsertMeshCommand(*static_cast<ViewWidget&>(*m_view).m_world_editor, position, file.toLatin1().data());
 			m_world_editor->executeCommand(command);
-			m_world_editor->selectEntity(command->getEntity());
+			m_world_editor->selectEntities(&command->getEntity(), 1);
 		}
 	}
 }

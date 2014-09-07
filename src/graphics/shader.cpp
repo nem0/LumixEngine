@@ -32,74 +32,22 @@ Shader::~Shader()
 	glDeleteShader(m_fragment_id);
 }
 
-void Shader::apply()
-{
-	glUseProgram(m_program_id);
-}	
 
-
-void Shader::setUniform(const char* name, int value)
+GLint Shader::getUniformLocation(const char* name, uint32_t name_hash)
 {
-	PROFILE_FUNCTION();
-	GLint loc = glGetUniformLocation(m_program_id, name);
-	if(loc >= 0)
+	for (int i = 0, c = m_uniforms.size(); i < c; ++i)
 	{
-		//glProgramUniform1i(m_program_id, loc, value);
-		glUseProgram(m_program_id);
-		glUniform1i(loc, value);
+		if (m_uniforms[i].m_name_hash == name_hash)
+		{
+			return m_uniforms[i].m_location;
+		}
 	}
+	CachedUniform& unif = m_uniforms.pushEmpty();
+	unif.m_name_hash = name_hash;
+	unif.m_location = glGetUniformLocation(m_program_id, name);
+	return unif.m_location;
 }
 
-
-void Shader::setUniform(const char* name, const Vec3& value)
-{
-	PROFILE_FUNCTION();
-	GLint loc = glGetUniformLocation(m_program_id, name);
-	if(loc >= 0)
-	{
-		//glProgramUniform3f(m_program_id, loc, value.x, value.y, value.z);
-		glUseProgram(m_program_id);
-		glUniform3f(loc, value.x, value.y, value.z);
-	}
-}
-
-
-void Shader::setUniform(const char* name, GLfloat value)
-{
-	PROFILE_FUNCTION();
-	GLint loc = glGetUniformLocation(m_program_id, name);
-	if(loc >= 0)
-	{
-		//glProgramUniform1f(m_program_id, loc, value);
-		glUseProgram(m_program_id);
-		glUniform1f(loc, value);
-	}
-}
-
-
-void Shader::setUniform(const char* name, const Matrix& mtx)
-{
-	PROFILE_FUNCTION();
-	GLint loc = glGetUniformLocation(m_program_id, name);
-	if(loc >= 0)
-	{
-		//glProgramUniformMatrix4fv(m_program_id, loc, 1, false, &mtx.m11);
-		glUseProgram(m_program_id);
-		glUniformMatrix4fv(loc, 1, false, &mtx.m11);
-	}
-}
-
-void Shader::setUniform(const char* name, const Matrix* matrices, int count)
-{
-	PROFILE_FUNCTION();
-	GLint loc = glGetUniformLocation(m_program_id, name);
-	if(loc >= 0) // this is here because of bug in some gl implementations
-	{
-		//glProgramUniformMatrix4fv(m_program_id, loc, count, false, &matrices[0].m11);
-		glUseProgram(m_program_id);
-		glUniformMatrix4fv(loc, count, false, &matrices[0].m11);	
-	}
-}
 
 GLuint Shader::attach(GLenum type, const char* src, int32_t length)
 {
@@ -179,9 +127,11 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		{
 			m_vertex_attributes_ids[i] = glGetAttribLocation(m_program_id, attributes[i]);
 		}
-		m_position_attrib_id = glGetAttribLocation(m_program_id, "in_position");
-		m_normal_attrib_id = glGetAttribLocation(m_program_id, "in_normal");
-		m_tex_coord_attrib_id = glGetAttribLocation(m_program_id, "in_tex_coord");
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::WORLD_MATRIX] = glGetUniformLocation(m_program_id, "world_matrix");
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::GRASS_MATRICES] = glGetUniformLocation(m_program_id, "grass_matrices");
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::MORPH_CONST] = glGetUniformLocation(m_program_id, "morph_const");
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::QUAD_SIZE] = glGetUniformLocation(m_program_id, "quad_size");
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::QUAD_MIN] = glGetUniformLocation(m_program_id, "quad_min");
 
 		m_size = file->size();
 		decrementDepCount();

@@ -449,6 +449,43 @@ namespace Lumix
 		glBindTexture(m_is_cubemap ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D, m_id);
 	}
 
+	
+	uint32_t Texture::getPixel(float x, float y) const
+	{
+		if(m_data.empty() || x >= m_width || y >= m_height || x < 0 || y < 0)
+		{
+			return 0;
+		}
+
+		// http://fastcpp.blogspot.sk/2011/06/bilinear-pixel-interpolation-using-sse.html
+		int px = (int)x;
+		int py = (int)y;
+		const uint32_t* p0 = (uint32_t*)&m_data[(px + py * m_width) * 4];
+ 
+		const uint8_t* p1 = (uint8_t*)p0;
+		const uint8_t* p2 = (uint8_t*)(p0 + 1);
+		const uint8_t* p3 = (uint8_t*)(p0 + m_width);
+		const uint8_t* p4 = (uint8_t*)(p0 + 1 + m_width);
+ 
+		float fx = x - px;
+		float fy = y - py;
+		float fx1 = 1.0f - fx;
+		float fy1 = 1.0f - fy;
+  
+		int w1 = (int)(fx1 * fy1 * 256.0f);
+		int w2 = (int)(fx  * fy1 * 256.0f);
+		int w3 = (int)(fx1 * fy  * 256.0f);
+		int w4 = (int)(fx  * fy  * 256.0f);
+ 
+		uint8_t res[4];
+		res[0] = (p1[0] * w1 + p2[0] * w2 + p3[0] * w3 + p4[0] * w4) >> 8;
+		res[1] = (p1[1] * w1 + p2[1] * w2 + p3[1] * w3 + p4[1] * w4) >> 8;
+		res[2] = (p1[2] * w1 + p2[2] * w2 + p3[2] * w3 + p4[2] * w4) >> 8;
+		res[3] = (p1[3] * w1 + p2[3] * w2 + p3[3] * w3 + p4[3] * w4) >> 8;
+ 
+		return *(uint32_t*)res;
+	}
+
 
 	void Texture::saveTGA()
 	{

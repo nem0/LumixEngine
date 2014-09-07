@@ -36,7 +36,7 @@ namespace Lumix
 	struct RenderableInfo
 	{
 		Geometry* m_geometry;
-		Mesh* m_mesh;
+		const Mesh* m_mesh;
 		const Pose* m_pose;
 		const ModelInstance* m_model;
 		const Matrix* m_matrix;
@@ -103,6 +103,7 @@ namespace Lumix
 			
 			virtual void getGrassInfos(Array<GrassInfo>& infos, int64_t layer_mask) = 0;
 			virtual void getTerrainInfos(Array<TerrainInfo>& infos, int64_t layer_mask) = 0;
+			virtual float getTerrainHeightAt(Component cmp, float x, float z) = 0;
 			virtual void setTerrainMaterial(Component cmp, const string& path) = 0;
 			virtual void getTerrainMaterial(Component cmp, string& path) = 0;
 			virtual Material* getTerrainMaterial(Component cmp) = 0;
@@ -110,9 +111,17 @@ namespace Lumix
 			virtual void getTerrainXZScale(Component cmp, float& scale) = 0;
 			virtual void setTerrainYScale(Component cmp, const float& scale) = 0;
 			virtual void getTerrainYScale(Component cmp, float& scale) = 0;
-			virtual void setTerrainGrass(Component cmp, const string& path) = 0;
-			virtual void getTerrainGrass(Component cmp, string& path) = 0;
 			virtual void setTerrainBrush(Component cmp, const Vec3& position, float size) = 0;
+
+			virtual void setGrass(Component cmp, int index, const string& path) = 0;
+			virtual void getGrass(Component cmp, int index, string& path) = 0;
+			virtual void setGrassGround(Component cmp, int index, const int& ground) = 0;
+			virtual void getGrassGround(Component cmp, int index, int& ground) = 0;
+			virtual void setGrassDensity(Component cmp, int index, const int& density) = 0;
+			virtual void getGrassDensity(Component cmp, int index, int& density) = 0;
+			virtual int getGrassCount(Component cmp) = 0;
+			virtual void addGrass(Component cmp, int index) = 0;
+			virtual void removeGrass(Component cmp, int index) = 0;
 
 		protected:
 			virtual ~RenderScene() {}

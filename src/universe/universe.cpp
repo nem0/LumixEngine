@@ -175,7 +175,7 @@ void Universe::deserialize(ISerializer& serializer)
 	serializer.deserialize("name_count", count);
 	serializer.deserializeArrayBegin("names");
 	m_id_to_name_map.clear();
-	m_name_to_id_map.clear(); TODO("reserve");
+	m_name_to_id_map.clear();
 	for (int i = 0; i < count; ++i)
 	{
 		uint32_t key;
