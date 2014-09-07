@@ -20,7 +20,8 @@ ProfileModel::Block::Block()
 }
 
 
-ProfileModel::ProfileModel()
+ProfileModel::ProfileModel(QWidget* parent)
+	: QAbstractItemModel(parent)
 {
 	Lumix::g_profiler.getFrameListeners().bind<ProfileModel, &ProfileModel::onFrame>(this);
 	m_root = NULL;
@@ -224,6 +225,7 @@ int ProfileModel::columnCount(const QModelIndex&) const
 	return (int)Values::COUNT;
 }
 
+
 QVariant ProfileModel::data(const QModelIndex& index, int role) const
 {
 	if (!index.isValid() || !index.internalPointer())
@@ -284,9 +286,11 @@ ProfilerUI::ProfilerUI(QWidget* parent)
 	: QDockWidget(parent)
 	, m_ui(new Ui::ProfilerUI)
 {
-	m_model = new ProfileModel;
+	m_sortable_model = new QSortFilterProxyModel(this);
+	m_model = new ProfileModel(this);
+	m_sortable_model->setSourceModel(m_model);
 	m_ui->setupUi(this);
-	m_ui->profileTreeView->setModel(m_model);
+	m_ui->profileTreeView->setModel(m_sortable_model);
 	m_ui->profileTreeView->header()->setSectionResizeMode(0, QHeaderView::ResizeMode::Stretch);
 	m_ui->profileTreeView->header()->setSectionResizeMode(1, QHeaderView::ResizeMode::ResizeToContents);
 	m_ui->profileTreeView->header()->setSectionResizeMode(2, QHeaderView::ResizeMode::ResizeToContents);
@@ -305,14 +309,14 @@ void ProfilerUI::on_dataChanged()
 ProfilerUI::~ProfilerUI()
 {
 	delete m_ui;
-	delete m_model;
 }
 
 void ProfilerUI::on_recordCheckBox_stateChanged(int)
 {
 	Lumix::g_profiler.toggleRecording();
 	m_ui->profileTreeView->setModel(NULL);
-	m_ui->profileTreeView->setModel(m_model);
+	m_sortable_model->setSourceModel(m_model);
+	m_ui->profileTreeView->setModel(m_sortable_model);
 	m_ui->profileTreeView->update();
 }
 
