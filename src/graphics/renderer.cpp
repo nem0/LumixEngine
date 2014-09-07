@@ -78,14 +78,17 @@ struct RendererImpl : public Renderer
 	virtual void render(IRenderDevice& device) override
 	{
 		PROFILE_FUNCTION();
-		// init
 		glEnable(GL_DEPTH_TEST);
 		glDisable(GL_BLEND);
 
-		// render
 		device.getPipeline().render();
 
-		// cleanup
+		cleanup();
+	}
+
+	virtual void cleanup() override
+	{
+		m_last_bind_geometry = NULL;
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 		glUseProgram(0);
 		for(int i = 0; i < 16; ++i)
@@ -128,8 +131,10 @@ struct RendererImpl : public Renderer
 		
 		auto grass = LUMIX_NEW(ArrayDescriptor<RenderScene>)("grass", &RenderScene::getGrassCount, &RenderScene::addGrass, &RenderScene::removeGrass);
 		grass->addChild(LUMIX_NEW(ArrayObjectDescriptor<RenderScene>)("mesh", &RenderScene::getGrass, &RenderScene::setGrass, IPropertyDescriptor::FILE, "Mesh (*.msh)"));
-		grass->addChild(LUMIX_NEW(ArrayObjectDescriptor<RenderScene>)("ground", &RenderScene::getGrassGround, &RenderScene::setGrassGround));
-		grass->addChild(LUMIX_NEW(ArrayObjectDescriptor<RenderScene>)("density", &RenderScene::getGrassDensity, &RenderScene::setGrassDensity));
+		auto ground = LUMIX_NEW(IntArrayObjectDescriptor<RenderScene>)("ground", &RenderScene::getGrassGround, &RenderScene::setGrassGround);
+		ground->setLimit(0, 4);
+		grass->addChild(ground);
+		grass->addChild(LUMIX_NEW(IntArrayObjectDescriptor<RenderScene>)("density", &RenderScene::getGrassDensity, &RenderScene::setGrassDensity));
 		engine.getWorldEditor()->registerProperty("terrain", grass);
 
 		m_engine = &engine;
@@ -194,7 +199,7 @@ struct RendererImpl : public Renderer
 		{
 			const Mesh& mesh = model.getMesh(i);
 			mesh.getMaterial()->apply(*this, pipeline);
-			model.getGeometry()->draw(mesh.getStart(), mesh.getCount(), *mesh.getMaterial()->getShader());
+			renderGeometry(*model.getGeometry(), mesh.getStart(), mesh.getCount(), *mesh.getMaterial()->getShader());
 		}
 		glPopMatrix();
 	}
@@ -218,7 +223,6 @@ struct RendererImpl : public Renderer
 	}
 
 	Engine* m_engine;
-	Array<Model*> m_models;	
 	IRenderDevice* m_render_device;
 	bool m_is_editor_wireframe;
 	Geometry* m_last_bind_geometry;

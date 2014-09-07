@@ -538,15 +538,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void renderDebugLines()
 	{
-		// cleanup
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
-		glUseProgram(0);
-		for (int i = 0; i < 16; ++i)
-		{
-			glActiveTexture(GL_TEXTURE0 + i);
-			glDisable(GL_TEXTURE_2D);
-		}
-		glActiveTexture(GL_TEXTURE0); 
+		m_renderer->cleanup();
 
 		const Array<DebugLine>& lines = m_scene->getDebugLines();
 		glBegin(GL_LINES);

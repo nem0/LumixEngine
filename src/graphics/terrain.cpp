@@ -10,6 +10,7 @@
 #include "graphics/model.h"
 #include "graphics/pipeline.h"
 #include "graphics/render_scene.h"
+#include "graphics/renderer.h"
 #include "graphics/shader.h"
 #include "graphics/texture.h"
 #include <cfloat>
@@ -124,7 +125,7 @@ namespace Lumix
 		}
 
 
-		bool render(Mesh* mesh, Geometry& geometry, const Vec3& camera_pos, RenderScene& scene)
+		bool render(Renderer* renderer, Mesh* mesh, Geometry& geometry, const Vec3& camera_pos, RenderScene& scene)
 		{
 			float dist = getDistance(camera_pos);
 			float r = getRadiusOuter(m_size);
@@ -136,12 +137,12 @@ namespace Lumix
 			Shader& shader = *mesh->getMaterial()->getShader();
 			for (int i = 0; i < CHILD_COUNT; ++i)
 			{
-				if (!m_children[i] || !m_children[i]->render(mesh, geometry, camera_pos, scene))
+				if (!m_children[i] || !m_children[i]->render(renderer, mesh, geometry, camera_pos, scene))
 				{
 					shader.setUniform("morph_const", MORPH_CONST_HASH, morph_const);
 					shader.setUniform("quad_size", QUAD_SIZE_HASH, m_size);
 					shader.setUniform("quad_min", QUAD_MIN_HASH, m_min);
-					geometry.draw(mesh->getCount() / 4 * i, mesh->getCount() / 4, shader);
+					renderer->renderGeometry(geometry, mesh->getCount() / 4 * i, mesh->getCount() / 4, shader);
 				}
 			}
 			return true;
@@ -589,7 +590,7 @@ namespace Lumix
 			m_mesh->getMaterial()->getShader()->setUniform("brush_size", BRUSH_SIZE_HASH, m_brush_size);
 			m_mesh->getMaterial()->getShader()->setUniform("map_size", MAP_SIZE_HASH, m_root->m_size);
 			m_mesh->getMaterial()->getShader()->setUniform("camera_pos", CAMERA_POS_HASH, rel_cam_pos);
-			m_root->render(m_mesh, m_geometry, rel_cam_pos, *pipeline.getScene());
+			m_root->render(&static_cast<Renderer&>(m_scene.getPlugin()), m_mesh, m_geometry, rel_cam_pos, *pipeline.getScene());
 		}
 	}
 

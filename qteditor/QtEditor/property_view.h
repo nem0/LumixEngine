@@ -81,11 +81,8 @@ private slots:
 	void on_addComponentButton_clicked();
 	void on_compileScriptClicked();
 	void on_editScriptClicked();
-	void on_TerrainHeightTypeClicked();
 	void on_TerrainTextureTypeClicked();
 	void on_terrainBrushTextureChanged(int value);
-	void on_TerrainHeightSaveClicked();
-	void on_TerrainSplatSaveClicked();
 	void on_positionX_valueChanged(double arg1);
 	void on_positionY_valueChanged(double arg1);
 	void on_positionZ_valueChanged(double arg1);
