@@ -89,6 +89,10 @@ struct RendererImpl : public Renderer
 
 	virtual void cleanup() override
 	{
+		if(m_last_bind_geometry)
+		{
+			m_last_bind_geometry->getVertexDefinition().end(*m_last_bind_geometry_shader);
+		}
 		m_last_bind_geometry = NULL;
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 		glUseProgram(0);
@@ -268,6 +272,7 @@ struct RendererImpl : public Renderer
 			glBindBuffer(GL_ARRAY_BUFFER, geometry.getID());
 			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, geometry.getIndicesID());
 			m_last_bind_geometry = &geometry;
+			m_last_bind_geometry_shader = &shader;
 			geometry.getVertexDefinition().begin(shader);
 		}
 		glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, (void*)(start * sizeof(GLint)));
@@ -390,6 +395,7 @@ struct RendererImpl : public Renderer
 	IRenderDevice* m_render_device;
 	bool m_is_editor_wireframe;
 	Geometry* m_last_bind_geometry;
+	Shader* m_last_bind_geometry_shader;
 	GLuint m_last_program_id;
 };
 
