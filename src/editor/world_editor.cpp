@@ -751,6 +751,21 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
+		virtual IPropertyDescriptor* getProperty(const char* component_type, const char* property_name) override
+		{
+			auto& props = m_component_properties[crc32(component_type)];
+			auto name_hash = crc32(property_name);
+			for(int i = 0; i < props.size(); ++i)
+			{
+				if(props[i]->getNameHash() == name_hash)
+				{
+					return props[i];
+				}
+			}
+			return NULL;
+		}
+
+
 		virtual void registerProperty(const char* component_type, IPropertyDescriptor* descriptor) override
 		{
 			ASSERT(descriptor);

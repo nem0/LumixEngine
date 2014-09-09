@@ -16,6 +16,8 @@ namespace Lumix
 	class LUMIX_ENGINE_API IScene abstract
 	{
 		public:
+			virtual ~IScene() {}
+
 			virtual Component createComponent(uint32_t, const Entity&) = 0;
 			virtual void destroyComponent(const Component& component) = 0;
 			virtual void serialize(ISerializer& serializer) = 0;

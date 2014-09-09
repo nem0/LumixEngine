@@ -144,7 +144,6 @@ class AddTerrainLevelCommand : public Lumix::IEditorCommand
 			m_new_data.resize(heightmap->getBytesPerPixel() * (rect.m_to_x - rect.m_from_x) * (rect.m_to_y - rect.m_from_y));
 			memcpy(&m_new_data[0], &m_old_data[0], m_new_data.size());
 
-			int heightmap_width = heightmap->getWidth();
 			for(int item_index = 0; item_index < m_items.size(); ++item_index)
 			{
 				Item& item = m_items[item_index];
@@ -660,17 +659,24 @@ class GetterSetterObject : public PropertyViewObject
 };
 
 
+template <class T, bool own_value> class InstanceObject;
+
 template <class T>
-class InstanceObject : public PropertyViewObject
+class InstanceObject<T, false> : public PropertyViewObject
 {
 	public:
-		typedef void(*CreateEditor)(PropertyView&, QTreeWidgetItem*, InstanceObject<T>*);
+		typedef void(*CreateEditor)(PropertyView&, QTreeWidgetItem*, InstanceObject<T, false>*);
 	
 		InstanceObject(PropertyViewObject* parent, const char* name, T* object, CreateEditor create_editor)
 			: PropertyViewObject(parent, name)
 		{
 			m_value = object;
 			m_create_editor = create_editor;
+		}
+
+
+		~InstanceObject()
+		{
 		}
 
 
@@ -696,6 +702,47 @@ class InstanceObject : public PropertyViewObject
 		CreateEditor m_create_editor;
 };
 
+template <class T>
+class InstanceObject<T, true> : public PropertyViewObject
+{
+	public:
+		typedef void(*CreateEditor)(PropertyView&, QTreeWidgetItem*, InstanceObject<T, true>*);
+	
+		InstanceObject(PropertyViewObject* parent, const char* name, T* object, CreateEditor create_editor)
+			: PropertyViewObject(parent, name)
+		{
+			m_value = object;
+			m_create_editor = create_editor;
+		}
+
+
+		~InstanceObject()
+		{
+			delete m_value;
+		}
+
+
+		void setEditor(CreateEditor create_editor)
+		{
+			m_create_editor = create_editor;
+		}
+
+
+		virtual void createEditor(PropertyView& view, QTreeWidgetItem* item) override
+		{
+			if (m_create_editor)
+			{
+				m_create_editor(view, item, this);
+			}
+		}
+
+		virtual bool isEditable() const override { return false; }
+		T* getValue() const { return m_value; }
+
+	private:
+		T* m_value;
+		CreateEditor m_create_editor;
+};
 
 
 template<class T>
@@ -738,25 +785,25 @@ void createEditor(QTreeWidgetItem* item, GetterSetterObject<bool, T>& object, bo
 }
 
 
-void createEditor(PropertyView&, QTreeWidgetItem* item, InstanceObject<Lumix::Texture>* texture)
+void createEditor(PropertyView&, QTreeWidgetItem* item, InstanceObject<Lumix::Texture, false>* texture)
 {
 	item->setText(1, texture->getValue()->getPath().c_str());
 }
 
 
-void createEditor(PropertyView&, QTreeWidgetItem* item, InstanceObject<Lumix::Shader>* shader)
+void createEditor(PropertyView&, QTreeWidgetItem* item, InstanceObject<Lumix::Shader, false>* shader)
 {
 	item->setText(1, shader->getValue()->getPath().c_str());
 }
 
 
-void createEditor(PropertyView&, QTreeWidgetItem* item, InstanceObject<Lumix::Model>* model)
+void createEditor(PropertyView&, QTreeWidgetItem* item, InstanceObject<Lumix::Model, false>* model)
 {
 	item->setText(1, model->getValue()->getPath().c_str());
 }
 
 
-void createImageEditor(PropertyView&, QTreeWidgetItem* item, InstanceObject<Lumix::Texture>* texture)
+void createImageEditor(PropertyView&, QTreeWidgetItem* item, InstanceObject<Lumix::Texture, false>* texture)
 {
 	QLabel* image_label = new QLabel();
 	item->treeWidget()->setItemWidget(item, 1, image_label);
@@ -766,7 +813,7 @@ void createImageEditor(PropertyView&, QTreeWidgetItem* item, InstanceObject<Lumi
 }
 
 
-void createEditor(PropertyView& view, QTreeWidgetItem* item, InstanceObject<Lumix::Material>* material)
+void createEditor(PropertyView& view, QTreeWidgetItem* item, InstanceObject<Lumix::Material, false>* material)
 {
 	QWidget* widget = new QWidget();
 	QHBoxLayout* layout = new QHBoxLayout(widget);
@@ -801,7 +848,7 @@ void createEditor(PropertyView& view, QTreeWidgetItem* item, InstanceObject<Lumi
 }
 
 
-void createEditor(PropertyView&, QTreeWidgetItem* item, InstanceObject<Lumix::Mesh>* mesh)
+void createEditor(PropertyView&, QTreeWidgetItem* item, InstanceObject<Lumix::Mesh, false>* mesh)
 {
 	item->setText(1, mesh->getValue()->getName());
 }
@@ -816,7 +863,7 @@ PropertyViewObject::~PropertyViewObject()
 }
 
 
-void createComponentEditor(PropertyView& view, QTreeWidgetItem* item, InstanceObject<Lumix::Component>* component)
+void createComponentEditor(PropertyView& view, QTreeWidgetItem* item, InstanceObject<Lumix::Component, true>* component)
 {
 	if (component->getValue()->type == TERRAIN_HASH)
 	{
@@ -835,8 +882,8 @@ PropertyViewObject* createComponentObject(PropertyViewObject* parent, Lumix::Wor
 			name = component_map[i];
 		}
 	}
-	auto c = new Lumix::Component(cmp); TODO("memory leak");
-	InstanceObject<Lumix::Component>* object = new InstanceObject<Lumix::Component>(parent, name, c, &createComponentEditor);
+	auto c = new Lumix::Component(cmp);
+	InstanceObject<Lumix::Component, true>* object = new InstanceObject<Lumix::Component, true>(parent, name, c, &createComponentEditor);
 	
 	auto& descriptors = editor.getPropertyDescriptors(cmp.type);
 	
@@ -852,8 +899,8 @@ PropertyViewObject* createComponentObject(PropertyViewObject* parent, Lumix::Wor
 
 PropertyViewObject* createEntityObject(Lumix::WorldEditor& editor, Lumix::Entity entity)
 {
-	auto e = new Lumix::Entity(entity); TODO("memory leak");
-	InstanceObject<Lumix::Entity>* object = new InstanceObject<Lumix::Entity>(NULL, "Entity", e, NULL);
+	auto e = new Lumix::Entity(entity);
+	InstanceObject<Lumix::Entity, true>* object = new InstanceObject<Lumix::Entity, true>(NULL, "Entity", e, NULL);
 
 	auto& cmps = e->getComponents();
 
@@ -871,7 +918,7 @@ PropertyViewObject* createTextureObject(PropertyViewObject* parent, Lumix::Resou
 {
 	if (Lumix::Texture* texture = dynamic_cast<Lumix::Texture*>(resource))
 	{
-		InstanceObject<Lumix::Texture>* object = new InstanceObject<Lumix::Texture>(parent, "Texture", texture, &createEditor);
+		auto object = new InstanceObject<Lumix::Texture, false>(parent, "Texture", texture, &createEditor);
 
 		auto prop = new GetterSetterObject<int, Lumix::Texture>(object, "width", texture, &Lumix::Texture::getWidth, NULL, &createEditor);
 		object->addMember(prop);
@@ -879,7 +926,7 @@ PropertyViewObject* createTextureObject(PropertyViewObject* parent, Lumix::Resou
 		prop = new GetterSetterObject<int, Lumix::Texture>(object, "height", texture, &Lumix::Texture::getHeight, NULL, &createEditor);
 		object->addMember(prop);
 
-		InstanceObject<Lumix::Texture>* img_object = new InstanceObject<Lumix::Texture>(object, "Image", texture, &createImageEditor);
+		auto img_object = new InstanceObject<Lumix::Texture, false>(object, "Image", texture, &createImageEditor);
 		object->addMember(img_object);
 
 		return object;
@@ -942,7 +989,7 @@ static PropertyViewObject* createTerrainObject(Lumix::Component component)
 */
 
 
-void createTextureInMaterialEditor(PropertyView& view, QTreeWidgetItem* item, InstanceObject<Lumix::Texture>* texture)
+void createTextureInMaterialEditor(PropertyView& view, QTreeWidgetItem* item, InstanceObject<Lumix::Texture, false>* texture)
 {
 	QWidget* widget = new QWidget();
 	QHBoxLayout* layout = new QHBoxLayout(widget);
@@ -955,7 +1002,7 @@ void createTextureInMaterialEditor(PropertyView& view, QTreeWidgetItem* item, In
 		QByteArray byte_array = edit->text().toLatin1();
 		const char* text = byte_array.data();
 		view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, text);
-		auto material = static_cast<InstanceObject<Lumix::Material>* >(texture->getParent())->getValue();
+		auto material = static_cast<InstanceObject<Lumix::Material, false>* >(texture->getParent())->getValue();
 		for(int i = 0; i < material->getTextureCount(); ++i)
 		{
 			if(material->getTexture(i) == texture->getValue())
@@ -978,7 +1025,7 @@ void createTextureInMaterialEditor(PropertyView& view, QTreeWidgetItem* item, In
 			QByteArray byte_array = str.toLatin1();
 			const char* text = byte_array.data();
 			view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, text);
-			auto material = static_cast<InstanceObject<Lumix::Material>* >(texture->getParent())->getValue();
+			auto material = static_cast<InstanceObject<Lumix::Material, false>* >(texture->getParent())->getValue();
 			for(int i = 0; i < material->getTextureCount(); ++i)
 			{
 				if(material->getTexture(i) == texture->getValue())
@@ -996,7 +1043,7 @@ void createTextureInMaterialEditor(PropertyView& view, QTreeWidgetItem* item, In
 	layout->addWidget(remove_button);
 	remove_button->connect(remove_button, &QPushButton::clicked, [texture, &view, item]()
 	{
-		auto material = static_cast<InstanceObject<Lumix::Material>* >(texture->getParent())->getValue();
+		auto material = static_cast<InstanceObject<Lumix::Material, false>* >(texture->getParent())->getValue();
 		for(int i = 0; i < material->getTextureCount(); ++i)
 		{
 			if(material->getTexture(i) == texture->getValue())
@@ -1012,7 +1059,7 @@ void createTextureInMaterialEditor(PropertyView& view, QTreeWidgetItem* item, In
 	layout->addWidget(add_button);
 	add_button->connect(add_button, &QPushButton::clicked, [texture, &view, item]()
 	{
-		auto material = static_cast<InstanceObject<Lumix::Material>* >(texture->getParent())->getValue();
+		auto material = static_cast<InstanceObject<Lumix::Material, false>* >(texture->getParent())->getValue();
 		Lumix::Texture* new_texture = static_cast<Lumix::Texture*>(material->getResourceManager().get(Lumix::ResourceManager::TEXTURE)->load("models/editor/default.tga"));
 		material->addTexture(new_texture);
 	});
@@ -1025,9 +1072,9 @@ static PropertyViewObject* createMaterialObject(PropertyViewObject* parent, Lumi
 {
 	if (Lumix::Material* material = dynamic_cast<Lumix::Material*>(resource))
 	{
-		InstanceObject<Lumix::Material>* object = new InstanceObject<Lumix::Material>(parent, "Material", material, &createEditor);
+		auto object = new InstanceObject<Lumix::Material, false>(parent, "Material", material, &createEditor);
 
-		PropertyViewObject* prop = new InstanceObject<Lumix::Shader>(object, "Shader", material->getShader(), &createEditor);
+		PropertyViewObject* prop = new InstanceObject<Lumix::Shader, false>(object, "Shader", material->getShader(), &createEditor);
 		object->addMember(prop);
 
 		prop = new GetterSetterObject<bool, Lumix::Material>(object, "Z test", material, &Lumix::Material::isZTest, &Lumix::Material::enableZTest, &createEditor);
@@ -1042,7 +1089,7 @@ static PropertyViewObject* createMaterialObject(PropertyViewObject* parent, Lumi
 		for (int i = 0; i < material->getTextureCount(); ++i)
 		{
 			prop = createTextureObject(object, material->getTexture(i));
-			static_cast<InstanceObject<Lumix::Texture>*>(prop)->setEditor(createTextureInMaterialEditor) ;
+			static_cast<InstanceObject<Lumix::Texture, false>*>(prop)->setEditor(createTextureInMaterialEditor) ;
 			object->addMember(prop);
 		}
 
@@ -1056,7 +1103,7 @@ PropertyViewObject* createModelObject(PropertyViewObject* parent, Lumix::Resourc
 {
 	if (Lumix::Model* model = dynamic_cast<Lumix::Model*>(resource))
 	{
-		InstanceObject<Lumix::Model>* object = new InstanceObject<Lumix::Model>(parent, "Model", model, &createEditor);
+		auto* object = new InstanceObject<Lumix::Model, false>(parent, "Model", model, &createEditor);
 
 		PropertyViewObject* prop = new GetterSetterObject<int, Lumix::Model>(object, "Bone count", model, &Lumix::Model::getBoneCount, NULL, &createEditor);
 		object->addMember(prop);
@@ -1070,7 +1117,7 @@ PropertyViewObject* createModelObject(PropertyViewObject* parent, Lumix::Resourc
 		for (int i = 0; i < model->getMeshCount(); ++i)
 		{
 			Lumix::Mesh* mesh = &model->getMesh(i);
-			InstanceObject<Lumix::Mesh>* mesh_object = new InstanceObject<Lumix::Mesh>(object, "Mesh", mesh, &createEditor);
+			auto mesh_object = new InstanceObject<Lumix::Mesh, false>(object, "Mesh", mesh, &createEditor);
 			object->addMember(mesh_object);
 
 			prop = new GetterSetterObject<int, Lumix::Mesh>(mesh_object, "Triangles", mesh, &Lumix::Mesh::getTriangleCount, NULL, &createEditor);
