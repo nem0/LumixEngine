@@ -77,8 +77,7 @@ class AddTerrainLevelCommand : public Lumix::IEditorCommand
 			Lumix::Matrix entity_mtx = terrain.entity.getMatrix();
 			entity_mtx.fastInverse();
 			Lumix::Vec3 local_pos = entity_mtx.multiplyPosition(hit_pos);
-			float xz_scale;
-			static_cast<Lumix::RenderScene*>(terrain.scene)->getTerrainXZScale(terrain, xz_scale);
+			float xz_scale = static_cast<Lumix::RenderScene*>(terrain.scene)->getTerrainXZScale(terrain);
 			local_pos = local_pos / xz_scale;
 
 			Item& item = m_items.pushEmpty();
@@ -1287,8 +1286,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			Lumix::Matrix entity_mtx = terrain.entity.getMatrix();
 			entity_mtx.fastInverse();
 			Lumix::Vec3 local_pos = entity_mtx.multiplyPosition(hit_pos);
-			float xz_scale;
-			static_cast<Lumix::RenderScene*>(terrain.scene)->getTerrainXZScale(terrain, xz_scale);
+			float xz_scale = static_cast<Lumix::RenderScene*>(terrain.scene)->getTerrainXZScale(terrain);
 			local_pos = local_pos / xz_scale;
 			local_pos.x *= (float)splatmap->getWidth() / heightmap->getWidth();
 			local_pos.z *= (float)splatmap->getHeight() / heightmap->getHeight();

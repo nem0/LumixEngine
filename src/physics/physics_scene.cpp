@@ -291,13 +291,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual void getHeightmapXZScale(Component cmp, float& scale) override
+	virtual float getHeightmapXZScale(Component cmp) override
 	{
-		scale = m_terrains[cmp.index]->m_xz_scale;
+		return m_terrains[cmp.index]->m_xz_scale;
 	}
 
 
-	virtual void setHeightmapXZScale(Component cmp, const float& scale) override
+	virtual void setHeightmapXZScale(Component cmp, float scale) override
 	{
 		if (scale != m_terrains[cmp.index]->m_xz_scale)
 		{
@@ -307,13 +307,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual void getHeightmapYScale(Component cmp, float& scale) override
+	virtual float getHeightmapYScale(Component cmp) override
 	{
-		scale = m_terrains[cmp.index]->m_y_scale;
+		return m_terrains[cmp.index]->m_y_scale;
 	}
 
 
-	virtual void setHeightmapYScale(Component cmp, const float& scale) override
+	virtual void setHeightmapYScale(Component cmp, float scale) override
 	{
 		if (scale != m_terrains[cmp.index]->m_y_scale)
 		{
@@ -694,8 +694,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual void getHalfExtents(Component cmp, Vec3& size) override
+	virtual Vec3 getHalfExtents(Component cmp) override
 	{
+		Vec3 size;
 		physx::PxRigidActor* actor = m_actors[cmp.index]->m_physx_actor;
 		physx::PxShape* shapes;
 		if (actor->getNbShapes() == 1 && m_actors[cmp.index]->m_physx_actor->getShapes(&shapes, 1))
@@ -705,6 +706,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			size.y = half.y;
 			size.z = half.z;
 		}
+		return size;
 	}
 
 

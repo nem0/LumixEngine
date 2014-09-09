@@ -60,8 +60,7 @@ void Gizmo::updateScale(Component camera)
 		Matrix mtx;
 		getMatrix(mtx);
 		Vec3 pos = mtx.getTranslation();
-		float fov;
-		static_cast<RenderScene*>(camera.scene)->getCameraFOV(camera, fov);
+		float fov = static_cast<RenderScene*>(camera.scene)->getCameraFOV(camera);
 		float scale = tanf(fov * Math::PI / 180 * 0.5f) * (mtx.getTranslation() - camera_mtx.getTranslation()).length() * 2;
 		scale /= 20 * mtx.getXVector().length();
 		m_scale = scale;

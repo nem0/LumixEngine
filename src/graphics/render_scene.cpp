@@ -551,25 +551,25 @@ namespace Lumix
 			}
 
 
-			virtual void setTerrainXZScale(Component cmp, const float& scale) override
+			virtual void setTerrainXZScale(Component cmp, float scale) override
 			{
 				m_terrains[cmp.index]->setXZScale(scale);
 			}
 
-			virtual void getTerrainXZScale(Component cmp, float& scale) override
+			virtual float getTerrainXZScale(Component cmp) override
 			{
-				scale = m_terrains[cmp.index]->getXZScale();
+				return m_terrains[cmp.index]->getXZScale();
 			}
 
 
-			virtual void setTerrainYScale(Component cmp, const float& scale) override
+			virtual void setTerrainYScale(Component cmp, float scale) override
 			{
 				m_terrains[cmp.index]->setYScale(scale);
 			}
 
-			virtual void getTerrainYScale(Component cmp, float& scale)
+			virtual float getTerrainYScale(Component cmp)
 			{
-				scale = m_terrains[cmp.index]->getYScale();
+				return m_terrains[cmp.index]->getYScale();
 			}
 
 
@@ -602,7 +602,7 @@ namespace Lumix
 				m_renderables[cmp.index]->m_layer_mask = ((int64_t)1 << (int64_t)layer);
 			}
 
-			virtual void setRenderableScale(Component cmp, const float& scale) override
+			virtual void setRenderableScale(Component cmp, float scale) override
 			{
 				m_renderables[cmp.index]->m_scale = scale;
 			}
@@ -649,27 +649,27 @@ namespace Lumix
 			}
 
 
-			virtual void setGrassDensity(Component cmp, int index, const int& density) override
+			virtual void setGrassDensity(Component cmp, int index, int density) override
 			{
 				m_terrains[cmp.index]->setGrassTypeDensity(index, density);
 			}
 			
 			
-			virtual void getGrassDensity(Component cmp, int index, int& density) override
+			virtual int getGrassDensity(Component cmp, int index) override
 			{
-				density = m_terrains[cmp.index]->getGrassTypeDensity(index);
+				return m_terrains[cmp.index]->getGrassTypeDensity(index);
 			}
 
 
-			virtual void setGrassGround(Component cmp, int index, const int& ground) override
+			virtual void setGrassGround(Component cmp, int index, int ground) override
 			{
 				m_terrains[cmp.index]->setGrassTypeGround(index, ground);
 			}
 			
 
-			virtual void getGrassGround(Component cmp, int index, int& ground) override
+			virtual int getGrassGround(Component cmp, int index) override
 			{
-				ground = m_terrains[cmp.index]->getGrassTypeGround(index);
+				return m_terrains[cmp.index]->getGrassTypeGround(index);
 			}
 
 
@@ -742,44 +742,44 @@ namespace Lumix
 				slot = m_cameras[camera.index].m_slot;
 			}
 
-			virtual void getCameraFOV(Component camera, float& fov) override
+			virtual float getCameraFOV(Component camera) override
 			{
-				fov = m_cameras[camera.index].m_fov;
+				return m_cameras[camera.index].m_fov;
 			}
 
-			virtual void setCameraFOV(Component camera, const float& fov) override
+			virtual void setCameraFOV(Component camera, float fov) override
 			{
 				m_cameras[camera.index].m_fov = fov;
 			}
 
-			virtual void setCameraNearPlane(Component camera, const float& near_plane) override
+			virtual void setCameraNearPlane(Component camera, float near_plane) override
 			{
 				m_cameras[camera.index].m_near = near_plane;
 			}
 
-			virtual void getCameraNearPlane(Component camera, float& near_plane) override
+			virtual float getCameraNearPlane(Component camera) override
 			{
-				near_plane = m_cameras[camera.index].m_near;
+				return m_cameras[camera.index].m_near;
 			}
 
-			virtual void setCameraFarPlane(Component camera, const float& far_plane) override
+			virtual void setCameraFarPlane(Component camera, float far_plane) override
 			{
 				m_cameras[camera.index].m_far = far_plane;
 			}
 
-			virtual void getCameraFarPlane(Component camera, float& far_plane) override
+			virtual float getCameraFarPlane(Component camera) override
 			{
-				far_plane = m_cameras[camera.index].m_far;
+				return m_cameras[camera.index].m_far;
 			}
 
-			virtual void getCameraWidth(Component camera, float& width) override
+			virtual float getCameraWidth(Component camera) override
 			{
-				width = m_cameras[camera.index].m_width;
+				return m_cameras[camera.index].m_width;
 			}
 
-			virtual void getCameraHeight(Component camera, float& height) override
+			virtual float getCameraHeight(Component camera) override
 			{
-				height = m_cameras[camera.index].m_height;
+				return m_cameras[camera.index].m_height;
 			}
 
 			virtual void setCameraSize(Component camera, int w, int h) override
