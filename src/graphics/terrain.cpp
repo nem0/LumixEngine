@@ -621,8 +621,8 @@ namespace Lumix
 
 	float Terrain::getHeight(int x, int z)
 	{
-		int texture_x = x / m_xz_scale;
-		int texture_y = z / m_xz_scale;
+		int texture_x = (int)(x / m_xz_scale);
+		int texture_y = (int)(z / m_xz_scale);
 		Texture* t = m_material->getTexture(0);
 		int idx = Math::clamp(texture_x, 0, m_width) + Math::clamp(texture_y, 0, m_height) * m_width;
 		if (t->getBytesPerPixel() == 2)
