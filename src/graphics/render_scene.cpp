@@ -522,7 +522,6 @@ namespace Lumix
 			virtual float getTerrainHeightAt(Component cmp, float x, float z) override
 			{
 				return m_terrains[cmp.index]->getHeight(x, z);
-
 			}
 
 
