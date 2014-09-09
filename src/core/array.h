@@ -261,6 +261,26 @@ public:
 		m_allocator.deallocate(m_data);
 	}
 
+
+	void swap(Array<T, Allocator, true>& rhs)
+	{
+		int i = rhs.m_capacity;
+		rhs.m_capacity = m_capacity;
+		m_capacity = i;
+
+		i = m_size;
+		m_size = rhs.m_size;
+		rhs.m_size = i;
+
+		T* p = rhs.m_data;
+		rhs.m_data = m_data;
+		m_data = p;
+
+		Allocator a = rhs.m_allocator;
+		rhs.m_allocator = m_allocator;
+		m_allocator = a;
+	}
+
 	void eraseFast(int index)
 	{
 		if (index >= 0 && index < m_size)
