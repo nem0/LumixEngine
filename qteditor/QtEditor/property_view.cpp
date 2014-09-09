@@ -790,9 +790,47 @@ void createEditor(PropertyView&, QTreeWidgetItem* item, InstanceObject<Lumix::Te
 }
 
 
-void createEditor(PropertyView&, QTreeWidgetItem* item, InstanceObject<Lumix::Shader, false>* shader)
+void createEditor(PropertyView& view, QTreeWidgetItem* item, InstanceObject<Lumix::Shader, false>* shader)
 {
-	item->setText(1, shader->getValue()->getPath().c_str());
+	QWidget* widget = new QWidget();
+	QHBoxLayout* layout = new QHBoxLayout(widget);
+	FileEdit* edit = new FileEdit(NULL, &view);
+	edit->setText(shader->getValue()->getPath().c_str());
+	layout->addWidget(edit);
+	layout->setContentsMargins(0, 0, 0, 0);
+	item->treeWidget()->setItemWidget(item, 1, widget);
+	edit->connect(edit, &FileEdit::editingFinished, [shader, edit]()
+	{
+		auto material = static_cast<InstanceObject<Lumix::Material, false>* >(shader->getParent())->getValue();
+		auto shader = static_cast<Lumix::Shader*>(material->getResourceManager().get(Lumix::ResourceManager::SHADER)->load(edit->text().toLatin1().data()));
+		material->setShader(shader);
+	});
+	QPushButton* button = new QPushButton("...");
+	layout->addWidget(button);
+	button->connect(button, &QPushButton::clicked, [&view, shader, edit]()
+	{
+		QString str = QFileDialog::getOpenFileName(NULL, QString(), QString(), "Shader (*.shd)");
+		if(str != "")
+		{
+			char rel_path[LUMIX_MAX_PATH];
+			QByteArray byte_array = str.toLatin1();
+			const char* text = byte_array.data();
+			view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, text);
+
+			auto material = static_cast<InstanceObject<Lumix::Material, false>* >(shader->getParent())->getValue();
+			auto shader = static_cast<Lumix::Shader*>(material->getResourceManager().get(Lumix::ResourceManager::SHADER)->load(rel_path));
+			material->setShader(shader);
+
+			edit->setText(rel_path);
+		}
+	});
+
+	QPushButton* go_button = new QPushButton("->");
+	layout->addWidget(go_button);
+	go_button->connect(go_button, &QPushButton::clicked, [edit]()
+	{
+		QDesktopServices::openUrl(QUrl::fromLocalFile(edit->text()));
+	});
 }
 
 
