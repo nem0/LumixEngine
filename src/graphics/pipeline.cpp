@@ -37,6 +37,7 @@ static const uint32_t SHADOW_MATRIX3_HASH = crc32("shadowmap_matrix3");
 static const uint32_t LIGHT_DIR_HASH = crc32("light_dir");
 static const uint32_t TERRAIN_SCALE_HASH = crc32("terrain_scale");
 static const uint32_t BONE_MATRICES_HASH = crc32("bone_matrices");
+static const uint32_t CAMERA_POS_HASH = crc32("camera_pos");
 
 
 struct Command
@@ -573,6 +574,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 					m_renderer->setUniform(*shader, "shadowmap_matrix2", SHADOW_MATRIX2_HASH, m_shadow_modelviewprojection[2]);
 					m_renderer->setUniform(*shader, "shadowmap_matrix3", SHADOW_MATRIX3_HASH, m_shadow_modelviewprojection[3]);
 					m_renderer->setUniform(*shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
+					m_renderer->setUniform(*shader, "camera_pos", CAMERA_POS_HASH, m_active_camera.entity.getPosition());
 					last_material = &material;
 				}
 				m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::GRASS_MATRICES, info.m_matrices, info.m_matrix_count);
