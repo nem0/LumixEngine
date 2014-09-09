@@ -76,8 +76,8 @@ template <class S>
 class IntArrayObjectDescriptor : public IIntPropertyDescriptor
 {
 	public:
-		typedef void (S::*IntegerGetter)(Component, int, int&);
-		typedef void (S::*IntegerSetter)(Component, int, const int&);
+		typedef int (S::*IntegerGetter)(Component, int);
+		typedef void (S::*IntegerSetter)(Component, int, int);
 
 	public:
 		IntArrayObjectDescriptor(const char* name, IntegerGetter _getter, IntegerSetter _setter) 
@@ -99,8 +99,7 @@ class IntArrayObjectDescriptor : public IIntPropertyDescriptor
 
 		virtual void get(Component cmp, int index, Blob& stream) const override
 		{
-			int32_t i;
-			(static_cast<S*>(cmp.scene)->*m_integer_getter)(cmp, index, i);
+			int32_t i = (static_cast<S*>(cmp.scene)->*m_integer_getter)(cmp, index);
 			int len = sizeof(i);
 			stream.write(&i, len);
 		}
@@ -161,8 +160,8 @@ template <class S>
 class DecimalArrayObjectDescriptor : public IPropertyDescriptor
 {
 	public:
-		typedef void (S::*Getter)(Component, int, float&);
-		typedef void (S::*Setter)(Component, int, const float&);
+		typedef float (S::*Getter)(Component, int);
+		typedef void (S::*Setter)(Component, int, float);
 
 	public:
 		DecimalArrayObjectDescriptor(const char* name, Getter _getter, Setter _setter)
@@ -184,8 +183,7 @@ class DecimalArrayObjectDescriptor : public IPropertyDescriptor
 
 		virtual void get(Component cmp, int index, Blob& stream) const override
 		{
-			float f;
-			(static_cast<S*>(cmp.scene)->*m_getter)(cmp, index, f);
+			float f = (static_cast<S*>(cmp.scene)->*m_getter)(cmp, index);
 			stream.write(&f, sizeof(f));
 		}
 
@@ -274,7 +272,7 @@ template <class S>
 class Vec3ArrayObjectDescriptor : public IPropertyDescriptor
 {
 	public:
-		typedef void (S::*Getter)(Component, int, Vec3&);
+		typedef Vec3 (S::*Getter)(Component, int);
 		typedef void (S::*Setter)(Component, int, const Vec3&);
 
 	public:
@@ -291,8 +289,7 @@ class Vec3ArrayObjectDescriptor : public IPropertyDescriptor
 
 		virtual void get(Component cmp, int index, Blob& stream) const override
 		{
-			Vec3 v;
-			(static_cast<S*>(cmp.scene)->*m_vec3_getter)(cmp, index, v);
+			Vec3 v = (static_cast<S*>(cmp.scene)->*m_vec3_getter)(cmp, index);
 			len = sizeof(v);
 			stream.write(&v, len);
 		}
@@ -389,8 +386,8 @@ template <class S>
 class IntPropertyDescriptor : public IIntPropertyDescriptor
 {
 	public:
-		typedef void (S::*IntegerGetter)(Component, int&);
-		typedef void (S::*IntegerSetter)(Component, const int&);
+		typedef int (S::*IntegerGetter)(Component);
+		typedef void (S::*IntegerSetter)(Component, int);
 
 	public:
 		IntPropertyDescriptor(const char* name, IntegerGetter _getter, IntegerSetter _setter) { setName(name); m_integer_getter = _getter; m_integer_setter = _setter; m_type = INTEGER; }
@@ -406,8 +403,7 @@ class IntPropertyDescriptor : public IIntPropertyDescriptor
 
 		virtual void get(Component cmp, Blob& stream) const override
 		{
-			int32_t i;
-			(static_cast<S*>(cmp.scene)->*m_integer_getter)(cmp, i);
+			int32_t i = (static_cast<S*>(cmp.scene)->*m_integer_getter)(cmp);
 			len = sizeof(i);
 			stream.write(&i, len);
 		}
@@ -519,7 +515,7 @@ template <class S>
 class Vec3PropertyDescriptor : public IPropertyDescriptor
 {
 	public:
-		typedef void (S::*Getter)(Component, Vec3&);
+		typedef Vec3 (S::*Getter)(Component);
 		typedef void (S::*Setter)(Component, const Vec3&);
 
 	public:
@@ -542,8 +538,7 @@ class Vec3PropertyDescriptor : public IPropertyDescriptor
 
 		virtual void get(Component cmp, Blob& stream) const override
 		{
-			Vec3 v;
-			(static_cast<S*>(cmp.scene)->*m_getter)(cmp, v);
+			Vec3 v = (static_cast<S*>(cmp.scene)->*m_getter)(cmp);
 			int len = sizeof(v);
 			stream.write(&v, len);
 		}
@@ -591,8 +586,8 @@ template <class S>
 class DecimalPropertyDescriptor : public IPropertyDescriptor
 {
 	public:
-		typedef void (S::*Getter)(Component, float&);
-		typedef void (S::*Setter)(Component, const float&);
+		typedef float (S::*Getter)(Component);
+		typedef void (S::*Setter)(Component, float);
 
 	public:
 		DecimalPropertyDescriptor(const char* name, Getter _getter, Setter _setter) { setName(name); m_getter = _getter; m_setter = _setter; m_type = DECIMAL; }
@@ -608,8 +603,7 @@ class DecimalPropertyDescriptor : public IPropertyDescriptor
 
 		virtual void get(Component cmp, Blob& stream) const override
 		{
-			float f;
-			(static_cast<S*>(cmp.scene)->*m_getter)(cmp, f);
+			float f = (static_cast<S*>(cmp.scene)->*m_getter)(cmp);
 			int len = sizeof(f);
 			stream.write(&f, len);
 		}

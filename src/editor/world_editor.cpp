@@ -1016,10 +1016,8 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			Component cmp = m_camera.getComponent(CAMERA_HASH);
 			RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
-			float width;
-			float height;
-			scene->getCameraWidth(cmp, width);
-			scene->getCameraHeight(cmp, height);
+			float width = scene->getCameraWidth(cmp);
+			float height = scene->getCameraHeight(cmp);
 			return addEntityAt((int)width >> 1, (int)height >> 1);
 		}
 
@@ -1053,10 +1051,8 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			Component camera_cmp = m_camera.getComponent(CAMERA_HASH);
 			RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);
-			float camera_x;
-			float camera_y;
-			scene->getCameraWidth(camera_cmp, camera_x);
-			scene->getCameraHeight(camera_cmp, camera_y);
+			float camera_x = scene->getCameraWidth(camera_cmp);
+			float camera_y = scene->getCameraHeight(camera_cmp);
 			camera_x *= 0.5f;
 			camera_y *= 0.5f;
 

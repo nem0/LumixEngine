@@ -38,16 +38,16 @@ class LUMIX_PHYSICS_API PhysicsScene : public IScene
 		
 		virtual void getIsDynamic(Component cmp, bool& is) = 0;
 		virtual void setIsDynamic(Component cmp, const bool& is) = 0;
-		virtual void getHalfExtents(Component cmp, Vec3& size) = 0;
+		virtual Vec3 getHalfExtents(Component cmp) = 0;
 		virtual void setHalfExtents(Component cmp, const Vec3& size) = 0;
 		virtual void getShapeSource(Component cmp, string& str) = 0;
 		virtual void setShapeSource(Component cmp, const string& str) = 0;
 		virtual void getHeightmap(Component cmp, string& str) = 0;
 		virtual void setHeightmap(Component cmp, const string& str) = 0;
-		virtual void getHeightmapXZScale(Component cmp, float& scale) = 0;
-		virtual void setHeightmapXZScale(Component cmp, const float& scale) = 0;
-		virtual void getHeightmapYScale(Component cmp, float& scale) = 0;
-		virtual void setHeightmapYScale(Component cmp, const float& scale) = 0;
+		virtual float getHeightmapXZScale(Component cmp) = 0;
+		virtual void setHeightmapXZScale(Component cmp, float scale) = 0;
+		virtual float getHeightmapYScale(Component cmp) = 0;
+		virtual void setHeightmapYScale(Component cmp, float scale) = 0;
 
 		virtual void moveController(Component cmp, const Vec3& v, float dt) = 0;
 };
