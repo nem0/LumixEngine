@@ -147,6 +147,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 
 void Shader::doUnload(void)
 {
+	m_uniforms.clear();
 	glDeleteProgram(m_program_id);
 	glDeleteShader(m_vertex_id);
 	glDeleteShader(m_fragment_id);
