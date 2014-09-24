@@ -42,6 +42,7 @@ GLint Shader::getUniformLocation(const char* name, uint32_t name_hash)
 			return m_uniforms[i].m_location;
 		}
 	}
+	ASSERT(isReady());
 	CachedUniform& unif = m_uniforms.pushEmpty();
 	unif.m_name_hash = name_hash;
 	unif.m_location = glGetUniformLocation(m_program_id, name);
