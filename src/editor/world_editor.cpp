@@ -902,10 +902,25 @@ struct WorldEditorImpl : public WorldEditor
 			}
 			else
 			{
-				selectEntities(&entity, 1);
+				bool entity_already_selected = false;
+				for(int i = 0, c = m_selected_entities.size(); i < c; ++i)
+				{
+					if(m_selected_entities[i] == entity)
+					{
+						entity_already_selected = true;
+						break;
+					}
+				}
+				if(entity_already_selected)
+				{
+					m_mouse_mode = MouseMode::TRANSFORM;
+					m_gizmo.startTransform(m_camera.getComponent(CAMERA_HASH), x, y, Gizmo::TransformMode::CAMERA_XZ);
+				}
+				else
+				{
+					selectEntities(&entity, 1);
+				}
 			}
-			m_mouse_mode = MouseMode::TRANSFORM;
-			m_gizmo.startTransform(m_camera.getComponent(CAMERA_HASH), x, y, Gizmo::TransformMode::CAMERA_XZ);
 		}
 
 

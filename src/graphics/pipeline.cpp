@@ -565,21 +565,24 @@ struct PipelineInstanceImpl : public PipelineInstance
 				const GrassInfo& info = m_grass_infos[i];
 				const Mesh& mesh = *info.m_mesh;
 				const Material& material = *mesh.getMaterial();
-				Shader* shader = material.getShader();
-				if (&material != last_material)
+				if (material.isReady())
 				{
-					material.apply(*m_renderer, *this);
-					m_renderer->setUniform(*shader, "shadowmap_matrix0", SHADOW_MATRIX0_HASH, m_shadow_modelviewprojection[0]);
-					m_renderer->setUniform(*shader, "shadowmap_matrix1", SHADOW_MATRIX1_HASH, m_shadow_modelviewprojection[1]);
-					m_renderer->setUniform(*shader, "shadowmap_matrix2", SHADOW_MATRIX2_HASH, m_shadow_modelviewprojection[2]);
-					m_renderer->setUniform(*shader, "shadowmap_matrix3", SHADOW_MATRIX3_HASH, m_shadow_modelviewprojection[3]);
-					m_renderer->setUniform(*shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
-					m_renderer->setUniform(*shader, "camera_pos", CAMERA_POS_HASH, m_active_camera.entity.getPosition());
-					last_material = &material;
-				}
-				m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::GRASS_MATRICES, info.m_matrices, info.m_matrix_count);
+					Shader* shader = material.getShader();
+					if (&material != last_material)
+					{
+						material.apply(*m_renderer, *this);
+						m_renderer->setUniform(*shader, "shadowmap_matrix0", SHADOW_MATRIX0_HASH, m_shadow_modelviewprojection[0]);
+						m_renderer->setUniform(*shader, "shadowmap_matrix1", SHADOW_MATRIX1_HASH, m_shadow_modelviewprojection[1]);
+						m_renderer->setUniform(*shader, "shadowmap_matrix2", SHADOW_MATRIX2_HASH, m_shadow_modelviewprojection[2]);
+						m_renderer->setUniform(*shader, "shadowmap_matrix3", SHADOW_MATRIX3_HASH, m_shadow_modelviewprojection[3]);
+						m_renderer->setUniform(*shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
+						m_renderer->setUniform(*shader, "camera_pos", CAMERA_POS_HASH, m_active_camera.entity.getPosition());
+						last_material = &material;
+					}
+					m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::GRASS_MATRICES, info.m_matrices, info.m_matrix_count);
 
-				m_renderer->renderGeometry(*info.m_geometry, mesh.getStart(), mesh.getCount() / info.m_mesh_copy_count * info.m_matrix_count, *shader);
+					m_renderer->renderGeometry(*info.m_geometry, mesh.getStart(), mesh.getCount() / info.m_mesh_copy_count * info.m_matrix_count, *shader);
+				}
 			}
 		}
 	}
@@ -708,6 +711,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	virtual void setScene(RenderScene* scene) override
 	{
 		m_scene = scene;
+		m_active_camera = Component::INVALID;
 	}
 
 	virtual RenderScene* getScene() override
