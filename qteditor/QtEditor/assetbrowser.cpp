@@ -262,11 +262,14 @@ void AssetBrowser::on_filterComboBox_currentTextChanged(const QString&)
 
 void AssetBrowser::on_treeView_clicked(const QModelIndex &index)
 {
-    if (index.isValid())
-    {
-        const QFileInfo& file_info = m_model->fileInfo(index);
-        QByteArray byte_array = file_info.filePath().toLower().toLatin1();
-        const char* filename = byte_array.data();
-        emit fileSelected(filename);
-    }
+	if (index.isValid())
+	{
+		const QFileInfo& file_info = m_model->fileInfo(index);
+		if(file_info.isFile())
+		{
+			QByteArray byte_array = file_info.filePath().toLower().toLatin1();
+			const char* filename = byte_array.data();
+			emit fileSelected(filename);
+		}
+	}
 }

@@ -35,12 +35,7 @@ class ViewWidget : public QWidget
 
 		virtual void wheelEvent(QWheelEvent* event) override
 		{
-			float speed = m_view.getNavivationSpeed();
-			if (QApplication::keyboardModifiers() & Qt::ShiftModifier)
-			{
-				speed *= 10;
-			}
-			m_world_editor->navigate(event->delta() * 0.1f, 0, speed);
+			m_view.changeNavigationSpeed(event->delta() * 0.001f);
 		}
 
 		virtual void mouseMoveEvent(QMouseEvent* event) override
@@ -94,7 +89,13 @@ void SceneView::setWorldEditor(Lumix::WorldEditor* world_editor)
 }
 
 
-float SceneView::getNavivationSpeed() const
+void SceneView::changeNavigationSpeed(float value)
+{
+	m_speed_input->setValue(Lumix::Math::maxValue(0.1f, (float)m_speed_input->value() + value));
+}
+
+
+float SceneView::getNavigationSpeed() const
 {
 	return m_speed_input->value();
 }

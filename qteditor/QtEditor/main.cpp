@@ -283,7 +283,7 @@ class App
 				/// TODO refactor
 				if(keys[VK_CONTROL] >> 7 == 0)
 				{
-					float speed = m_main_window->getSceneView()->getNavivationSpeed();
+					float speed = m_main_window->getSceneView()->getNavigationSpeed();
 					if (keys[VK_LSHIFT] >> 7)
 					{
 						speed *= 10;
