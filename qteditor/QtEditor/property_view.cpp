@@ -552,6 +552,8 @@ class ComponentPropertyObject : public PropertyViewObject
 						stream.read(value);
 						QDoubleSpinBox* edit = new QDoubleSpinBox();
 						edit->setMaximum(FLT_MAX);
+						edit->setDecimals(4);
+						edit->setSingleStep(0.001);
 						edit->setValue(value);
 						item->treeWidget()->setItemWidget(item, 1, edit);
 						connect(edit, (void (QDoubleSpinBox::*)(double))&QDoubleSpinBox::valueChanged, [this, &view](double new_value) 

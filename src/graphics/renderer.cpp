@@ -304,8 +304,10 @@ struct RendererImpl : public Renderer
 
 		editor.registerProperty("light", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("ambient_intensity", &RenderScene::getLightAmbientIntensity, &RenderScene::setLightAmbientIntensity));
 		editor.registerProperty("light", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("diffuse_intensity", &RenderScene::getLightDiffuseIntensity, &RenderScene::setLightDiffuseIntensity));
+		editor.registerProperty("light", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("fog_density", &RenderScene::getFogDensity, &RenderScene::setFogDensity));
 		editor.registerProperty("light", LUMIX_NEW(ColorPropertyDescriptor<RenderScene>)("ambient_color", &RenderScene::getLightAmbientColor, &RenderScene::setLightAmbientColor));
 		editor.registerProperty("light", LUMIX_NEW(ColorPropertyDescriptor<RenderScene>)("diffuse_color", &RenderScene::getLightDiffuseColor, &RenderScene::setLightDiffuseColor));
+		editor.registerProperty("light", LUMIX_NEW(ColorPropertyDescriptor<RenderScene>)("fog_color", &RenderScene::getFogColor, &RenderScene::setFogColor));
 
 		editor.registerProperty("terrain", LUMIX_NEW(FilePropertyDescriptor<RenderScene>)("material", &RenderScene::getTerrainMaterial, &RenderScene::setTerrainMaterial, "Material (*.mat)"));
 		editor.registerProperty("terrain", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("xz_scale", &RenderScene::getTerrainXZScale, &RenderScene::setTerrainXZScale));

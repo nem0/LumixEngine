@@ -59,6 +59,8 @@ namespace Lumix
 		float m_ambient_intensity;
 		Vec4 m_diffuse_color;
 		float m_diffuse_intensity;
+		Vec4 m_fog_color;
+		float m_fog_density;
 		Type m_type;
 		Entity m_entity;
 		bool m_is_free;
@@ -219,6 +221,11 @@ namespace Lumix
 					serializer.serializeArrayItem(m_lights[i].m_ambient_color.z);
 					serializer.serializeArrayItem(m_lights[i].m_ambient_color.w);
 					serializer.serializeArrayItem(m_lights[i].m_ambient_intensity);
+					serializer.serializeArrayItem(m_lights[i].m_fog_color.x);
+					serializer.serializeArrayItem(m_lights[i].m_fog_color.y);
+					serializer.serializeArrayItem(m_lights[i].m_fog_color.z);
+					serializer.serializeArrayItem(m_lights[i].m_fog_color.w);
+					serializer.serializeArrayItem(m_lights[i].m_fog_density);
 				}
 				serializer.endArray();
 			}
@@ -366,6 +373,11 @@ namespace Lumix
 					serializer.deserializeArrayItem(m_lights[i].m_ambient_color.z);
 					serializer.deserializeArrayItem(m_lights[i].m_ambient_color.w);
 					serializer.deserializeArrayItem(m_lights[i].m_ambient_intensity);
+					serializer.deserializeArrayItem(m_lights[i].m_fog_color.x);
+					serializer.deserializeArrayItem(m_lights[i].m_fog_color.y);
+					serializer.deserializeArrayItem(m_lights[i].m_fog_color.z);
+					serializer.deserializeArrayItem(m_lights[i].m_fog_color.w);
+					serializer.deserializeArrayItem(m_lights[i].m_fog_density);
 					if(!m_lights[i].m_is_free)
 					{
 						m_universe.addComponent(m_lights[i].m_entity, LIGHT_HASH, this, i);
@@ -510,6 +522,12 @@ namespace Lumix
 					light.m_type = Light::Type::DIRECTIONAL;
 					light.m_entity = entity;
 					light.m_is_free = false;
+					light.m_ambient_color.set(1, 1, 1, 1);
+					light.m_diffuse_color.set(1, 1, 1, 1);
+					light.m_fog_color.set(1, 1, 1, 1);
+					light.m_fog_density = 0;
+					light.m_diffuse_intensity = 0;
+					light.m_ambient_intensity = 1;
 					Component cmp = m_universe.addComponent(entity, type, this, m_lights.size() - 1);
 					m_universe.componentCreated().invoke(cmp);
 					return cmp;
@@ -917,6 +935,26 @@ namespace Lumix
 					}
 				}
 				return hit;
+			}
+
+			virtual void setFogDensity(Component cmp, float density) override
+			{
+				m_lights[cmp.index].m_fog_density = density;
+			}
+
+			virtual void setFogColor(Component cmp, const Vec4& color) override
+			{
+				m_lights[cmp.index].m_fog_color = color;
+			}
+
+			virtual float getFogDensity(Component cmp) override
+			{
+				return m_lights[cmp.index].m_fog_density;
+			}
+			
+			virtual Vec4 getFogColor(Component cmp) override
+			{
+				return m_lights[cmp.index].m_fog_color;
 			}
 
 			virtual void setLightDiffuseIntensity(Component cmp, float intensity) override

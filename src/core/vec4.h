@@ -98,7 +98,7 @@ struct LUMIX_CORE_API Vec4
 		this->w = w;
 	}
 
-	void set(float x, float y, float z)
+	void set(float x, float y, float z, float w)
 	{
 		this->x = x;
 		this->y = y;
