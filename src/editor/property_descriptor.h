@@ -26,7 +26,8 @@ class IPropertyDescriptor
 			VEC3,
 			INTEGER,
 			STRING,
-			ARRAY
+			ARRAY,
+			COLOR
 		};
 
 	public:
@@ -604,6 +605,42 @@ class DecimalPropertyDescriptor : public IPropertyDescriptor
 		virtual void get(Component cmp, Blob& stream) const override
 		{
 			float f = (static_cast<S*>(cmp.scene)->*m_getter)(cmp);
+			int len = sizeof(f);
+			stream.write(&f, len);
+		}
+
+
+		virtual void set(Component cmp, int index, Blob& stream) const override { ASSERT(index == -1); set(cmp, stream); };
+		virtual void get(Component cmp, int index, Blob& stream) const override { ASSERT(index == -1); get(cmp, stream);};
+
+	private:
+		Getter m_getter;
+		Setter m_setter;
+};
+
+
+template <class S>
+class ColorPropertyDescriptor : public IPropertyDescriptor
+{
+	public:
+		typedef Vec4 (S::*Getter)(Component);
+		typedef void (S::*Setter)(Component, const Vec4&);
+
+	public:
+		ColorPropertyDescriptor(const char* name, Getter _getter, Setter _setter) { setName(name); m_getter = _getter; m_setter = _setter; m_type = COLOR; }
+		
+		
+		virtual void set(Component cmp, Blob& stream) const override
+		{
+			Vec4 f;
+			stream.read(&f, sizeof(f));
+			(static_cast<S*>(cmp.scene)->*m_setter)(cmp, f);
+		}
+
+
+		virtual void get(Component cmp, Blob& stream) const override
+		{
+			Vec4 f = (static_cast<S*>(cmp.scene)->*m_getter)(cmp);
 			int len = sizeof(f);
 			stream.write(&f, len);
 		}

@@ -342,7 +342,7 @@ namespace Lumix
 			float to_quad_x = cx + (GRASS_QUADS_WIDTH >> 1) * GRASS_QUAD_SIZE;
 			float to_quad_z = cz + (GRASS_QUADS_WIDTH >> 1) * GRASS_QUAD_SIZE;
 
-			float old_bounds[4] = { FLT_MAX, FLT_MIN, FLT_MAX, FLT_MIN };
+			float old_bounds[4] = { FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX };
 			for (int i = m_grass_quads.size() - 1; i >= 0; --i)
 			{
 				GrassQuad* quad = m_grass_quads[i];

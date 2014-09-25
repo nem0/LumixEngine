@@ -201,6 +201,20 @@ struct RendererImpl : public Renderer
 		}
 	}
 
+	virtual void setFixedCachedUniform(Shader& shader, int name, const Vec4& value) override
+	{
+		PROFILE_FUNCTION();
+		GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
+		if (loc >= 0)
+		{
+			if (m_last_program_id != shader.getProgramId())
+			{
+				glUseProgram(shader.getProgramId());
+				m_last_program_id = shader.getProgramId();
+			}
+			glUniform4f(loc, value.x, value.y, value.z, value.w);
+		}
+	}
 
 	virtual void setFixedCachedUniform(Shader& shader, int name, float value) override
 	{
@@ -287,6 +301,11 @@ struct RendererImpl : public Renderer
 		editor.registerProperty("camera", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("far", &RenderScene::getCameraFarPlane, &RenderScene::setCameraFarPlane));
 
 		editor.registerProperty("renderable", LUMIX_NEW(FilePropertyDescriptor<RenderScene>)("source", &RenderScene::getRenderablePath, &RenderScene::setRenderablePath, "Mesh (*.msh)"));
+
+		editor.registerProperty("light", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("ambient_intensity", &RenderScene::getLightAmbientIntensity, &RenderScene::setLightAmbientIntensity));
+		editor.registerProperty("light", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("diffuse_intensity", &RenderScene::getLightDiffuseIntensity, &RenderScene::setLightDiffuseIntensity));
+		editor.registerProperty("light", LUMIX_NEW(ColorPropertyDescriptor<RenderScene>)("ambient_color", &RenderScene::getLightAmbientColor, &RenderScene::setLightAmbientColor));
+		editor.registerProperty("light", LUMIX_NEW(ColorPropertyDescriptor<RenderScene>)("diffuse_color", &RenderScene::getLightDiffuseColor, &RenderScene::setLightDiffuseColor));
 
 		editor.registerProperty("terrain", LUMIX_NEW(FilePropertyDescriptor<RenderScene>)("material", &RenderScene::getTerrainMaterial, &RenderScene::setTerrainMaterial, "Material (*.mat)"));
 		editor.registerProperty("terrain", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("xz_scale", &RenderScene::getTerrainXZScale, &RenderScene::setTerrainXZScale));

@@ -123,6 +123,15 @@ namespace Lumix
 			virtual void addGrass(Component cmp, int index) = 0;
 			virtual void removeGrass(Component cmp, int index) = 0;
 
+			virtual void setLightDiffuseIntensity(Component cmp, float intensity) = 0;
+			virtual void setLightDiffuseColor(Component cmp, const Vec4& color) = 0;
+			virtual void setLightAmbientIntensity(Component cmp, float intensity) = 0;
+			virtual void setLightAmbientColor(Component cmp, const Vec4& color) = 0;
+			virtual float getLightDiffuseIntensity(Component cmp) = 0;
+			virtual Vec4 getLightDiffuseColor(Component cmp) = 0;
+			virtual float getLightAmbientIntensity(Component cmp) = 0;
+			virtual Vec4 getLightAmbientColor(Component cmp) = 0;
+
 		protected:
 			virtual ~RenderScene() {}
 	};
