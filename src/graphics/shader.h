@@ -28,6 +28,8 @@ class LUMIX_ENGINE_API Shader : public Resource
 			AMBIENT_INTENSITY,
 			DIFFUSE_COLOR,
 			DIFFUSE_INTENSITY,
+			FOG_COLOR,
+			FOG_DENSITY,
 			COUNT
 		};
 	
