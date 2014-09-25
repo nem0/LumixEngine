@@ -55,6 +55,10 @@ namespace Lumix
 			DIRECTIONAL
 		};
 
+		Vec4 m_ambient_color;
+		float m_ambient_intensity;
+		Vec4 m_diffuse_color;
+		float m_diffuse_intensity;
 		Type m_type;
 		Entity m_entity;
 		bool m_is_free;
@@ -205,6 +209,16 @@ namespace Lumix
 					serializer.serializeArrayItem(m_lights[i].m_entity.index);
 					serializer.serializeArrayItem((int32_t)m_lights[i].m_type);
 					serializer.serializeArrayItem(m_lights[i].m_is_free);
+					serializer.serializeArrayItem(m_lights[i].m_diffuse_color.x);
+					serializer.serializeArrayItem(m_lights[i].m_diffuse_color.y);
+					serializer.serializeArrayItem(m_lights[i].m_diffuse_color.z);
+					serializer.serializeArrayItem(m_lights[i].m_diffuse_color.w);
+					serializer.serializeArrayItem(m_lights[i].m_diffuse_intensity);
+					serializer.serializeArrayItem(m_lights[i].m_ambient_color.x);
+					serializer.serializeArrayItem(m_lights[i].m_ambient_color.y);
+					serializer.serializeArrayItem(m_lights[i].m_ambient_color.z);
+					serializer.serializeArrayItem(m_lights[i].m_ambient_color.w);
+					serializer.serializeArrayItem(m_lights[i].m_ambient_intensity);
 				}
 				serializer.endArray();
 			}
@@ -342,6 +356,16 @@ namespace Lumix
 					m_lights[i].m_entity.universe = &m_universe;
 					serializer.deserializeArrayItem((int32_t&)m_lights[i].m_type);
 					serializer.deserializeArrayItem(m_lights[i].m_is_free);
+					serializer.deserializeArrayItem(m_lights[i].m_diffuse_color.x);
+					serializer.deserializeArrayItem(m_lights[i].m_diffuse_color.y);
+					serializer.deserializeArrayItem(m_lights[i].m_diffuse_color.z);
+					serializer.deserializeArrayItem(m_lights[i].m_diffuse_color.w);
+					serializer.deserializeArrayItem(m_lights[i].m_diffuse_intensity);
+					serializer.deserializeArrayItem(m_lights[i].m_ambient_color.x);
+					serializer.deserializeArrayItem(m_lights[i].m_ambient_color.y);
+					serializer.deserializeArrayItem(m_lights[i].m_ambient_color.z);
+					serializer.deserializeArrayItem(m_lights[i].m_ambient_color.w);
+					serializer.deserializeArrayItem(m_lights[i].m_ambient_intensity);
 					if(!m_lights[i].m_is_free)
 					{
 						m_universe.addComponent(m_lights[i].m_entity, LIGHT_HASH, this, i);
@@ -893,6 +917,46 @@ namespace Lumix
 					}
 				}
 				return hit;
+			}
+
+			virtual void setLightDiffuseIntensity(Component cmp, float intensity) override
+			{
+				m_lights[cmp.index].m_diffuse_intensity = intensity;
+			}
+			
+			virtual void setLightDiffuseColor(Component cmp, const Vec4& color) override
+			{
+				m_lights[cmp.index].m_diffuse_color = color;
+			}
+
+			virtual void setLightAmbientIntensity(Component cmp, float intensity) override
+			{
+				m_lights[cmp.index].m_ambient_intensity = intensity;
+			}
+
+			virtual void setLightAmbientColor(Component cmp, const Vec4& color) override
+			{
+				m_lights[cmp.index].m_ambient_color = color;
+			}
+
+			virtual float getLightDiffuseIntensity(Component cmp) override
+			{
+				return m_lights[cmp.index].m_diffuse_intensity;
+			}
+			
+			virtual Vec4 getLightDiffuseColor(Component cmp) override
+			{
+				return m_lights[cmp.index].m_diffuse_color;
+			}
+			
+			virtual float getLightAmbientIntensity(Component cmp) override
+			{
+				return m_lights[cmp.index].m_ambient_intensity;
+			}
+
+			virtual Vec4 getLightAmbientColor(Component cmp) override
+			{
+				return m_lights[cmp.index].m_ambient_color;
 			}
 
 			virtual Component getLight(int index) override

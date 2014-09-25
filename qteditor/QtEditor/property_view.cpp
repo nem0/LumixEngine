@@ -21,6 +21,7 @@
 #include "graphics/texture.h"
 #include "scripts/scriptcompiler.h"
 #include <qcheckbox.h>
+#include <QColorDialog>
 #include <qdesktopservices.h>
 #include <QDoubleSpinBox>
 #include <QDragEnterEvent>
@@ -550,9 +551,9 @@ class ComponentPropertyObject : public PropertyViewObject
 						float value;
 						stream.read(value);
 						QDoubleSpinBox* edit = new QDoubleSpinBox();
+						edit->setMaximum(FLT_MAX);
 						edit->setValue(value);
 						item->treeWidget()->setItemWidget(item, 1, edit);
-						edit->setMaximum(FLT_MAX);
 						connect(edit, (void (QDoubleSpinBox::*)(double))&QDoubleSpinBox::valueChanged, [this, &view](double new_value) 
 						{
 							float value = (float)new_value;
@@ -587,6 +588,82 @@ class ComponentPropertyObject : public PropertyViewObject
 							view.getWorldEditor()->addArrayPropertyItem(m_component, static_cast<Lumix::IArrayDescriptor&>(m_descriptor));
 							view.refresh();
 						});
+					}
+					break;
+				case Lumix::IPropertyDescriptor::COLOR:
+					{
+						Lumix::Vec4 value;
+						stream.read(value);
+						QWidget* widget = new QWidget();
+						QHBoxLayout* layout = new QHBoxLayout(widget);
+						QLabel* label = new QLabel(QString("%1; %2; %3; %4").arg((int)(value.x * 255)).arg((int)(value.y * 255)).arg((int)(value.z * 255)).arg((int)(value.w * 255)));
+						layout->setContentsMargins(0, 0, 0, 0);
+						layout->addWidget(label);
+						QPushButton* button = new QPushButton("...");
+						layout->addWidget(button);
+						item->treeWidget()->setItemWidget(item, 1, widget);
+						connect(button, &QPushButton::clicked, [this, &view, label, value]()
+						{
+							QColorDialog* dialog = new QColorDialog(QColor::fromRgbF(value.x, value.y, value.z, value.w));
+							dialog->setModal(false);
+							dialog->connect(dialog, &QColorDialog::currentColorChanged, [this, &view, dialog]()
+							{
+								QColor color = dialog->currentColor();
+								Lumix::Vec4 value;
+								value.x = color.redF(); 
+								value.y = color.greenF(); 
+								value.z = color.blueF(); 
+								value.w = color.alphaF(); 
+								view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, &value, sizeof(value));
+							});
+							dialog->connect(dialog, &QDialog::finished, [&view]()
+							{
+								view.refresh();
+							});
+							dialog->show();
+						});
+
+	/*					char path[LUMIX_MAX_PATH];
+						stream.read(path, stream.getBufferSize());
+						
+						FileEdit* edit = new FileEdit(widget, NULL);
+						edit->setText(path);
+						edit->setServer(view.getWorldEditor());
+						QHBoxLayout* layout = new QHBoxLayout(widget);
+						layout->addWidget(edit);
+						layout->setContentsMargins(0, 0, 0, 0);
+						QPushButton* button = new QPushButton("...", widget);
+						layout->addWidget(button);
+						button->connect(button, &QPushButton::clicked, [this, edit, &view]()
+						{
+							QString str = QFileDialog::getOpenFileName(NULL, QString(), QString(), dynamic_cast<Lumix::IFilePropertyDescriptor&>(m_descriptor).getFileType());
+							if (str != "")
+							{
+								char rel_path[LUMIX_MAX_PATH];
+								QByteArray byte_array = str.toLatin1();
+								const char* text = byte_array.data();
+								view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, text);
+								view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, rel_path, strlen(rel_path) + 1);
+								edit->setText(rel_path);
+							}
+						});
+				
+						QPushButton* button2 = new QPushButton("->", widget);
+						layout->addWidget(button2);
+						button2->connect(button2, &QPushButton::clicked, [&view, edit]()
+						{
+							view.setSelectedResourceFilename(edit->text().toLatin1().data());
+						});
+				
+						
+						connect(edit, &QLineEdit::editingFinished, [edit, &view, this]()
+						{
+							if(view.getObject())
+							{
+								QByteArray byte_array = edit->text().toLatin1();
+								view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, byte_array.data(), byte_array.size() + 1);
+							}
+						});*/
 					}
 					break;
 				default:

@@ -133,7 +133,10 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		m_fixed_cached_uniforms[(int)FixedCachedUniforms::MORPH_CONST] = glGetUniformLocation(m_program_id, "morph_const");
 		m_fixed_cached_uniforms[(int)FixedCachedUniforms::QUAD_SIZE] = glGetUniformLocation(m_program_id, "quad_size");
 		m_fixed_cached_uniforms[(int)FixedCachedUniforms::QUAD_MIN] = glGetUniformLocation(m_program_id, "quad_min");
-
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::AMBIENT_COLOR] = glGetUniformLocation(m_program_id, "ambient_color");
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::AMBIENT_INTENSITY] = glGetUniformLocation(m_program_id, "ambient_intensity");
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::DIFFUSE_COLOR] = glGetUniformLocation(m_program_id, "diffuse_color");
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::DIFFUSE_INTENSITY] = glGetUniformLocation(m_program_id, "diffuse_intensity");
 		m_size = file->size();
 		decrementDepCount();
 	}
