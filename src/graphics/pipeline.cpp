@@ -525,7 +525,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_light_dir = light_mtx.getZVector();
 
 		Frustum frustum;
-		float split_distances[] = {0, 5, 10, 50, 300};
+		float split_distances[] = {0, 5, 20, 100, 300};
 		for(int split_index = 0; split_index < 4; ++split_index)
 		{
 			computeFrustum(camera, &frustum, split_distances[split_index], split_distances[split_index + 1]);
