@@ -40,6 +40,30 @@ static const uint32_t BONE_MATRICES_HASH = crc32("bone_matrices");
 static const uint32_t CAMERA_POS_HASH = crc32("camera_pos");
 
 
+struct Frustum
+{
+	public:
+		Vec3 getCenter() const
+		{
+			Vec3 center = m_points[0];
+			for(int i = 1; i < 8; ++i)
+			{
+				center += m_points[i];
+			}
+			center *= 1/8.0f;
+			return center;
+		}
+
+		float getSize() const
+		{
+			return (m_points[0] - m_points[6]).length();
+		}
+
+	public:
+		Vec3 m_points[8];
+};
+
+
 struct Command
 {
 	virtual ~Command() {}
@@ -449,6 +473,38 @@ struct PipelineInstanceImpl : public PipelineInstance
 		}
 	}
 
+	void computeFrustum(const Component& camera, Frustum* frustum, float from_dist, float to_dist)
+	{
+		RenderScene& scene = static_cast<RenderScene&>(*camera.scene);
+		Matrix entity_mtx = camera.entity.getMatrix();
+		float fov = Math::degreesToRadians(scene.getCameraFOV(camera));
+		float far_dist = scene.getCameraNearPlane(camera) + to_dist;
+		float near_dist = scene.getCameraNearPlane(camera) + from_dist;
+		float ratio = scene.getCameraWidth(camera) / scene.getCameraHeight(camera);
+		Vec3 up = camera.entity.getRotation() * Vec3(0.0f, 1.0f, 0.0f);
+		Vec3 forward = camera.entity.getRotation() * Vec3(0, 0, -1);
+		Vec3 right = crossProduct(forward, up).normalized();
+		up = crossProduct(right, forward).normalized();
+
+		Vec3 fc = camera.entity.getPosition() + forward * far_dist;
+		Vec3 nc = camera.entity.getPosition() + forward * near_dist;
+
+		float near_height = tan(fov * 0.5f) * near_dist;
+		float near_width = near_height * ratio;
+		float far_height = tan(fov * 0.5f) * far_dist;
+		float far_width = far_height * ratio;
+
+		frustum->m_points[0] = nc - up * near_height - right * near_width;
+		frustum->m_points[1] = nc + up * near_height - right * near_width;
+		frustum->m_points[2] = nc + up * near_height + right * near_width;
+		frustum->m_points[3] = nc - up * near_height + right * near_width;
+
+		frustum->m_points[4] = fc - up * far_height - right * far_width;
+		frustum->m_points[5] = fc + up * far_height - right * far_width;
+		frustum->m_points[6] = fc + up * far_height + right * far_width;
+		frustum->m_points[7] = fc - up * far_height + right * far_width;
+	}
+
 	void renderShadowmap(Component camera, int64_t layer_mask)
 	{
 		PROFILE_FUNCTION();
@@ -465,26 +521,30 @@ struct PipelineInstanceImpl : public PipelineInstance
 		glMatrixMode(GL_PROJECTION);
 		glPushMatrix();
 		
+		Matrix light_mtx = light_cmp.entity.getMatrix();
+		m_light_dir = light_mtx.getZVector();
+
+		Frustum frustum;
+		float split_distances[] = {0, 5, 10, 50, 300};
 		for(int split_index = 0; split_index < 4; ++split_index)
 		{
+			computeFrustum(camera, &frustum, split_distances[split_index], split_distances[split_index + 1]);
+			Vec3 shadow_cam_pos = frustum.getCenter();
+			float bb_size = frustum.getSize() * 0.5f;
+			
 			glViewport(1, (GLint)(split_index * m_shadowmap_framebuffer->getHeight() * 0.25f), m_shadowmap_framebuffer->getWidth() - 2, (GLsizei)(m_shadowmap_framebuffer->getHeight() * 0.25f));
 			glMatrixMode(GL_PROJECTION);
 			glLoadIdentity();
 			Matrix projection_matrix;
-			float bb_size = (float)(2 * ((split_index + 1) * (split_index + 1) * (split_index + 1)));
-			getOrthoMatrix(-bb_size, bb_size, -bb_size, bb_size, 0, 100, &projection_matrix);
+			getOrthoMatrix(-bb_size, bb_size, -bb_size, bb_size, 0.01f, 10000, &projection_matrix);
 			glMultMatrixf(&projection_matrix.m11);
 
-			Matrix light_mtx = light_cmp.entity.getMatrix();
-			m_light_dir = light_mtx.getZVector();
 			glMatrixMode(GL_MODELVIEW);
 			glLoadIdentity();
+			Vec3 light_forward = light_mtx.getZVector();
+			shadow_cam_pos -= light_forward * 5000;
 			Matrix modelview_matrix;
-			Vec3 pos = camera.entity.getPosition();
-			Vec3 cam_forward = camera.entity.getRotation() * Vec3(0, 0, 1);
-			pos -= light_mtx.getZVector() * 10;
-			Vec3 up = camera.entity.getMatrix().getXVector();
-			getLookAtMatrix(pos, pos + light_mtx.getZVector(), light_mtx.getYVector(), &modelview_matrix);
+			getLookAtMatrix(shadow_cam_pos, shadow_cam_pos + light_forward, light_mtx.getYVector(), &modelview_matrix);
 			glMultMatrixf(&modelview_matrix.m11);
 			static const Matrix biasMatrix(
 				0.5, 0.0, 0.0, 0.0,
