@@ -381,7 +381,7 @@ namespace Lumix
 							if(patch.m_type->m_grass_geometry)
 							{
 								int index = 0;
-								Texture* splat_map = m_material->getTexture(m_material->getTextureCount() - 1);
+								Texture* splat_map = m_splatmap;
 								float step = GRASS_QUAD_SIZE / (float)patch.m_type->m_density;
 								for (float dx = 0; dx < GRASS_QUAD_SIZE; dx += step)
 								{
@@ -511,6 +511,8 @@ namespace Lumix
 				m_material->getObserverCb().unbind<Terrain, &Terrain::onMaterialLoaded>(this);
 			}
 			m_material = material;
+			m_splatmap = NULL;
+			m_heightmap = NULL;
 			if (m_mesh && m_material)
 			{
 				m_mesh->setMaterial(m_material);
@@ -617,13 +619,13 @@ namespace Lumix
 			return h0 + (h2 - h0) * dec_z + (h1 - h2) * dec_x;
 		}
 	}
-
+	
 
 	float Terrain::getHeight(int x, int z)
 	{
 		int texture_x = (int)(x / m_xz_scale);
 		int texture_y = (int)(z / m_xz_scale);
-		Texture* t = m_material->getTexture(0);
+		Texture* t = m_heightmap;
 		int idx = Math::clamp(texture_x, 0, m_width) + Math::clamp(texture_y, 0, m_height) * m_width;
 		if (t->getBytesPerPixel() == 2)
 		{
@@ -802,9 +804,11 @@ namespace Lumix
 		PROFILE_FUNCTION();
 		if (new_state == Resource::State::READY)
 		{
-			m_width = m_material->getTexture(0)->getWidth();
-			m_height = m_material->getTexture(0)->getHeight();
 			LUMIX_DELETE(m_root);
+			m_heightmap = m_material->getTextureByUniform("hm_texture");
+			m_splatmap = m_material->getTextureByUniform("splat_texture");
+			m_width = m_heightmap->getWidth();
+			m_height = m_heightmap->getHeight();
 			m_root = generateQuadTree((float)m_width);
 		}
 	}
