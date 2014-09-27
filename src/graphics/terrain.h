@@ -21,6 +21,7 @@ class PipelineInstance;
 class Renderer;
 class RenderScene;
 struct TerrainQuad;
+class Texture;
 
 
 class Terrain
@@ -111,6 +112,8 @@ class Terrain
 		float m_y_scale;
 		Entity m_entity;
 		Material* m_material;
+		Texture* m_heightmap;
+		Texture* m_splatmap;
 		RenderScene& m_scene;
 		Array<GrassType*> m_grass_types;
 		Array<GrassQuad*> m_free_grass_quads;
