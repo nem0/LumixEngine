@@ -94,6 +94,16 @@ struct RendererImpl : public Renderer
 		cleanup();
 	}
 
+	virtual const Matrix& getCurrentViewMatrix() override
+	{
+		return m_view_matrix;
+	}
+
+	virtual const Matrix& getCurrentProjectionMatrix() override
+	{
+		return m_projection_matrix;
+	}
+
 	virtual void cleanup() override
 	{
 		if(m_last_bind_geometry)

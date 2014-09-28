@@ -37,6 +37,9 @@ class LUMIX_ENGINE_API Renderer : public IPlugin
 		static void getLookAtMatrix(const Vec3& pos, const Vec3& center, const Vec3& up, Matrix* mtx);
 		static void getProjectionMatrix(float fov, float width, float height, float near_plane, float far_plane, Matrix* mtx);
 
+		virtual const Matrix& getCurrentViewMatrix() = 0;
+		virtual const Matrix& getCurrentProjectionMatrix() = 0;
+
 		virtual void render(IRenderDevice& device) = 0;
 		virtual void renderGame() = 0;
 		virtual void enableAlphaToCoverage(bool enable) = 0;
