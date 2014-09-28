@@ -400,7 +400,7 @@ namespace Lumix
 											grass_mtx = Matrix::IDENTITY;
 											float x = quad_x + dx + step * (rand() % 100 - 50) / 100.0f;
 											float z = quad_z + dz + step * (rand() % 100 - 50) / 100.0f;
-											grass_mtx.setTranslation(Vec3(x, getHeight(x / m_xz_scale, z / m_xz_scale), z));
+											grass_mtx.setTranslation(Vec3(x, getHeight(x, z), z));
 											grass_mtx = mtx * grass_mtx;
 											grass_mtx.multiply3x3(density + (rand() % 20 - 10) / 100.0f);
 										}
@@ -703,18 +703,26 @@ namespace Lumix
 			Vec3 size(m_root->m_size * m_xz_scale, m_y_scale, m_root->m_size * m_xz_scale);
 			if (Math::getRayAABBIntersection(rel_origin, rel_dir, m_root->m_min, size, start))
 			{
-				Vec3 p = start;
-				int hx = (int)(p.x / m_xz_scale);
-				int hz = (int)(p.z / m_xz_scale);
-				while (hx >= 0 && hz >= 0 && hx < m_width - 1 && hz < m_height - 1 && p.y > m_root->m_min.y && p.y < m_root->m_min.y + m_root->m_size)
+				int hx = (int)(start.x / m_xz_scale);
+				int hz = (int)(start.z / m_xz_scale);
+
+				float tMaxX = ((hx + (rel_dir.x < 0 ? 0 : 1)) * m_xz_scale - rel_origin.x) / rel_dir.x;
+				float tMaxZ = ((hz + (rel_dir.z < 0 ? 0 : 1)) * m_xz_scale - rel_origin.z) / rel_dir.z;
+
+				float tDeltaX = m_xz_scale / Math::abs(rel_dir.x);
+				float tDeltaZ = m_xz_scale / Math::abs(rel_dir.z);
+				int stepX = (int)Math::signum(rel_dir.x);
+				int stepZ = (int)Math::signum(rel_dir.z);
+
+				while (hx >= 0 && hz >= 0 && hx < m_width && hz < m_height)
 				{
 					float t;
 					float x = hx * m_xz_scale;
 					float z = hz * m_xz_scale;
-					Vec3 p0(x, getHeight(hx, hz), z);
-					Vec3 p1(x + m_xz_scale, getHeight(hx + 1, hz), z);
-					Vec3 p2(x + m_xz_scale, getHeight(hx + 1, hz + 1), z + m_xz_scale);
-					Vec3 p3(x, getHeight(hx, hz + 1), z + m_xz_scale);
+					Vec3 p0(x, getHeight(x, z), z);
+					Vec3 p1(x + m_xz_scale, getHeight(x + m_xz_scale, z), z);
+					Vec3 p2(x + m_xz_scale, getHeight(x + m_xz_scale, z + m_xz_scale), z + m_xz_scale);
+					Vec3 p3(x, getHeight(x, z + m_xz_scale), z + m_xz_scale);
 					if (getRayTriangleIntersection(rel_origin, rel_dir, p0, p1, p2, t))
 					{
 						hit.m_is_hit = true;
@@ -731,9 +739,16 @@ namespace Lumix
 						hit.m_t = t;
 						return hit;
 					}
-					p += rel_dir;
-					hx = (int)(p.x / m_xz_scale);
-					hz = (int)(p.z / m_xz_scale);
+					if (tMaxX < tMaxZ)
+					{
+						tMaxX += tDeltaX;
+						hx += stepX;
+					}
+					else
+					{
+						tMaxZ += tDeltaZ;
+						hz += stepZ;
+					}
 				}
 			}
 		}
