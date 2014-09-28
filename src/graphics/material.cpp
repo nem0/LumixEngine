@@ -126,8 +126,46 @@ bool Material::save(ISerializer& serializer)
 	{
 		char path[LUMIX_MAX_PATH];
 		PathUtils::getFilename(path, LUMIX_MAX_PATH, m_textures[i].m_texture->getPath().c_str());
-		serializer.serialize("texture", path);
+		serializer.beginObject("texture");
+		serializer.serialize("source", path);
+		serializer.serialize("keep_data", m_textures[i].m_keep_data);
+		if (m_textures[i].m_uniform[0] != '\0')
+		{
+			serializer.serialize("uniform", m_textures[i].m_uniform);
+		}
+		serializer.endObject();
 	}
+	serializer.beginArray("uniforms");
+	for (int i = 0; i < m_uniforms.size(); ++i)
+	{
+		serializer.beginObject();
+		serializer.serialize("name", m_uniforms[i].m_name);
+		switch (m_uniforms[i].m_type)
+		{
+			case Uniform::FLOAT:
+				serializer.serialize("float_value", m_uniforms[i].m_float);
+				break;
+			case Uniform::TIME:
+				serializer.serialize("time", m_uniforms[i].m_float);
+				break;
+			case Uniform::INT:
+				serializer.serialize("int_value", m_uniforms[i].m_int);
+				break;
+			case Uniform::MATRIX:
+				serializer.beginArray("matrix_value");
+				for (int j = 0; j < 16; ++j)
+				{
+					serializer.serializeArrayItem(m_uniforms[i].m_matrix[j]);
+				}
+				serializer.endArray();
+				break;
+			default:
+				ASSERT(false);
+				break;
+		}
+		serializer.endObject();
+	}
+	serializer.endArray();
 	serializer.serialize("alpha_to_coverage", m_is_alpha_to_coverage);
 	serializer.serialize("backface_culling", m_is_backface_culling);
 	serializer.serialize("z_test", m_is_z_test);
