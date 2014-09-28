@@ -706,13 +706,13 @@ namespace Lumix
 				int hx = (int)(start.x / m_xz_scale);
 				int hz = (int)(start.z / m_xz_scale);
 
-				float tMaxX = ((hx + (rel_dir.x < 0 ? 0 : 1)) * m_xz_scale - rel_origin.x) / rel_dir.x;
-				float tMaxZ = ((hz + (rel_dir.z < 0 ? 0 : 1)) * m_xz_scale - rel_origin.z) / rel_dir.z;
+				float next_x = ((hx + (rel_dir.x < 0 ? 0 : 1)) * m_xz_scale - rel_origin.x) / rel_dir.x;
+				float next_z = ((hz + (rel_dir.z < 0 ? 0 : 1)) * m_xz_scale - rel_origin.z) / rel_dir.z;
 
-				float tDeltaX = m_xz_scale / Math::abs(rel_dir.x);
-				float tDeltaZ = m_xz_scale / Math::abs(rel_dir.z);
-				int stepX = (int)Math::signum(rel_dir.x);
-				int stepZ = (int)Math::signum(rel_dir.z);
+				float delta_x = m_xz_scale / Math::abs(rel_dir.x);
+				float delta_z = m_xz_scale / Math::abs(rel_dir.z);
+				int step_x = (int)Math::signum(rel_dir.x);
+				int step_z = (int)Math::signum(rel_dir.z);
 
 				while (hx >= 0 && hz >= 0 && hx < m_width && hz < m_height)
 				{
@@ -739,15 +739,15 @@ namespace Lumix
 						hit.m_t = t;
 						return hit;
 					}
-					if (tMaxX < tMaxZ)
+					if (next_x < next_z)
 					{
-						tMaxX += tDeltaX;
-						hx += stepX;
+						next_x += delta_x;
+						hx += step_x;
 					}
 					else
 					{
-						tMaxZ += tDeltaZ;
-						hz += stepZ;
+						next_z += delta_z;
+						hz += step_z;
 					}
 				}
 			}
