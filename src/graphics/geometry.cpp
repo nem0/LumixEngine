@@ -120,19 +120,22 @@ void VertexDef::begin(Shader& shader) const
 		switch(m_attributes[i])
 		{
 			case VertexAttributeDef::POSITION:
-				glEnableClientState(GL_VERTEX_ARRAY);
-				glVertexPointer(3, GL_FLOAT, m_vertex_size, (GLvoid*)offset);
+				glEnableVertexAttribArray(shader.getAttribId(shader_attrib_idx));
+				glVertexAttribPointer(shader.getAttribId(shader_attrib_idx), 3, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
 				offset += sizeof(GLfloat) * 3;
+				++shader_attrib_idx;
 				break;
 			case VertexAttributeDef::NORMAL:
-				glEnableClientState(GL_NORMAL_ARRAY);
-				glNormalPointer(GL_FLOAT, m_vertex_size, (GLvoid*)offset);
+				glEnableVertexAttribArray(shader.getAttribId(shader_attrib_idx));
+				glVertexAttribPointer(shader.getAttribId(shader_attrib_idx), 3, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
 				offset += sizeof(GLfloat) * 3;
+				++shader_attrib_idx;
 				break;
 			case VertexAttributeDef::TEXTURE_COORDS:
-				glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-				glTexCoordPointer(2, GL_FLOAT, m_vertex_size, (GLvoid*)offset);
+				glEnableVertexAttribArray(shader.getAttribId(shader_attrib_idx));
+				glVertexAttribPointer(shader.getAttribId(shader_attrib_idx), 2, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
 				offset += sizeof(GLfloat) * 2;
+				++shader_attrib_idx;
 				break;
 			case VertexAttributeDef::FLOAT2:
 				glEnableVertexAttribArray(shader.getAttribId(shader_attrib_idx));
@@ -176,14 +179,8 @@ void VertexDef::end(Shader& shader) const
 		switch(m_attributes[i])
 		{
 			case VertexAttributeDef::POSITION:
-				glDisableClientState(GL_VERTEX_ARRAY);
-				break;
 			case VertexAttributeDef::NORMAL:
-				glDisableClientState(GL_NORMAL_ARRAY);
-				break;
 			case VertexAttributeDef::TEXTURE_COORDS:
-				glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-				break;
 			case VertexAttributeDef::INT1:
 			case VertexAttributeDef::INT4:
 			case VertexAttributeDef::FLOAT4:

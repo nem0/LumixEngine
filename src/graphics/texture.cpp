@@ -444,8 +444,6 @@ namespace Lumix
 	void Texture::apply(int unit)
 	{
 		glActiveTexture(GL_TEXTURE0 + unit);
-		//glDisable(m_is_cubemap ? GL_TEXTURE_2D : GL_TEXTURE_CUBE_MAP);
-		glEnable(m_is_cubemap ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D);
 		glBindTexture(m_is_cubemap ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D, m_id);
 	}
 
@@ -765,7 +763,6 @@ bool Texture::loadDDS(FS::IFile& file)
 	TextureManager* manager = static_cast<TextureManager*>(getResourceManager().get(ResourceManager::TEXTURE));
 	if (m_is_cubemap)
 	{
-		glEnable(GL_TEXTURE_CUBE_MAP);
 		glBindTexture(GL_TEXTURE_CUBE_MAP, m_id);
 	}
 	else

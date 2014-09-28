@@ -46,18 +46,25 @@ struct RendererImpl : public Renderer
 		return RenderScene::createInstance(*this, *m_engine, universe);
 	}
 
+	virtual void setViewMatrix(const Matrix& matrix) override
+	{
+		m_view_matrix = matrix;
+	}
+
+	virtual void setProjectionMatrix(const Matrix& matrix) override
+	{
+		m_projection_matrix = matrix;
+	}
+
 	virtual void setProjection(float width, float height, float fov, float near_plane, float far_plane, const Matrix& mtx) override
 	{
 		glViewport(0, 0, (GLsizei)width, (GLsizei)height);
-		glMatrixMode(GL_PROJECTION);
-		glLoadIdentity();
-		gluPerspective(fov, width / height, near_plane, far_plane);
-		glMatrixMode(GL_MODELVIEW);
-		glLoadIdentity();
+		getProjectionMatrix(fov, width, height, near_plane, far_plane, &m_projection_matrix);
+
 		Vec3 pos = mtx.getTranslation();
 		Vec3 center = pos - mtx.getZVector();
 		Vec3 up = mtx.getYVector();
-		gluLookAt(pos.x, pos.y, pos.z, center.x, center.y, center.z, up.x, up.y, up.z);
+		getLookAtMatrix(pos, center, up, &m_view_matrix);
 	}
 
 	virtual void setRenderDevice(IRenderDevice& device) override
@@ -99,7 +106,7 @@ struct RendererImpl : public Renderer
 		for(int i = 0; i < 16; ++i)
 		{
 			glActiveTexture(GL_TEXTURE0 + i);
-			glDisable(GL_TEXTURE_2D);
+			glBindTexture(GL_TEXTURE_2D, 0);
 		}
 		glActiveTexture(GL_TEXTURE0); 
 	}
@@ -186,7 +193,7 @@ struct RendererImpl : public Renderer
 	}
 
 
-	virtual void setFixedCachedUniform(Shader& shader, int name, const Vec3& value) override
+	virtual void setFixedCachedUniform(const Shader& shader, int name, const Vec3& value) override
 	{
 		PROFILE_FUNCTION();
 		GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
@@ -201,7 +208,7 @@ struct RendererImpl : public Renderer
 		}
 	}
 
-	virtual void setFixedCachedUniform(Shader& shader, int name, const Vec4& value) override
+	virtual void setFixedCachedUniform(const Shader& shader, int name, const Vec4& value) override
 	{
 		PROFILE_FUNCTION();
 		GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
@@ -216,7 +223,7 @@ struct RendererImpl : public Renderer
 		}
 	}
 
-	virtual void setFixedCachedUniform(Shader& shader, int name, float value) override
+	virtual void setFixedCachedUniform(const Shader& shader, int name, float value) override
 	{
 		PROFILE_FUNCTION();
 		GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
@@ -233,7 +240,7 @@ struct RendererImpl : public Renderer
 
 
 
-	virtual void setFixedCachedUniform(Shader& shader, int name, const Matrix& mtx) override
+	virtual void setFixedCachedUniform(const Shader& shader, int name, const Matrix& mtx) override
 	{
 		PROFILE_FUNCTION();
 		GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
@@ -250,7 +257,7 @@ struct RendererImpl : public Renderer
 	}
 
 
-	virtual void setFixedCachedUniform(Shader& shader, int name, const Matrix* matrices, int count) override
+	virtual void setFixedCachedUniform(const Shader& shader, int name, const Matrix* matrices, int count) override
 	{
 		PROFILE_FUNCTION();
 		GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
@@ -271,6 +278,8 @@ struct RendererImpl : public Renderer
 		GLuint id = shader.getProgramId();
 		m_last_program_id = id;
 		glUseProgram(id);
+		setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::VIEW_MATRIX, m_view_matrix);
+		setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::PROJECTION_MATRIX, m_projection_matrix);
 	}
 
 
@@ -383,15 +392,13 @@ struct RendererImpl : public Renderer
 
 	virtual void renderModel(const Model& model, const Matrix& transform, PipelineInstance& pipeline) override
 	{
-		glPushMatrix();
-		glMultMatrixf(&transform.m11);
 		for (int i = 0, c = model.getMeshCount(); i < c;  ++i)
 		{
 			const Mesh& mesh = model.getMesh(i);
 			mesh.getMaterial()->apply(*this, pipeline);
+			pipeline.getRenderer().setFixedCachedUniform(*mesh.getMaterial()->getShader(), (int)Shader::FixedCachedUniforms::WORLD_MATRIX, transform);
 			renderGeometry(*model.getGeometry(), mesh.getStart(), mesh.getCount(), *mesh.getMaterial()->getShader());
 		}
-		glPopMatrix();
 	}
 
 	virtual void serialize(ISerializer&) override
@@ -418,6 +425,8 @@ struct RendererImpl : public Renderer
 	Geometry* m_last_bind_geometry;
 	Shader* m_last_bind_geometry_shader;
 	GLuint m_last_program_id;
+	Matrix m_view_matrix;
+	Matrix m_projection_matrix;
 };
 
 
@@ -430,6 +439,55 @@ Renderer* Renderer::createInstance()
 void Renderer::destroyInstance(Renderer& renderer)
 {
 	LUMIX_DELETE(&renderer);
+}
+
+
+void Renderer::getProjectionMatrix(float fov, float width, float height, float near_plane, float far_plane, Matrix* mtx)
+{
+	*mtx = Matrix::IDENTITY;
+	float f = 1 / tanf(Math::degreesToRadians(fov) * 0.5f);
+	mtx->m11 = f / (width / height);
+	mtx->m22 = f;
+	mtx->m33 = (far_plane + near_plane) / (near_plane - far_plane);
+	mtx->m44 = 0;
+	mtx->m43 = (2 * far_plane * near_plane) / (near_plane - far_plane);
+	mtx->m34 = -1;
+}
+
+
+void Renderer::getOrthoMatrix(float left, float right, float bottom, float top, float z_near, float z_far, Matrix* mtx)
+{
+	*mtx = Matrix::IDENTITY;
+	mtx->m11 = 2 / (right - left);
+	mtx->m22 = 2 / (top - bottom);
+	mtx->m33 = -2 / (z_far - z_near);
+	mtx->m41 = -(right + left) / (right - left);
+	mtx->m42 = -(top + bottom) / (top - bottom);
+	mtx->m43 = -(z_far + z_near) / (z_far - z_near);
+	/*		glOrtho(left, right, bottom, top, z_near, z_far);
+	glGetFloatv(GL_PROJECTION_MATRIX, &mtx->m11);
+	*/
+}
+
+
+void Renderer::getLookAtMatrix(const Vec3& pos, const Vec3& center, const Vec3& up, Matrix* mtx)
+{
+	*mtx = Matrix::IDENTITY;
+	Vec3 f = center - pos;
+	f.normalize();
+	Vec3 r = crossProduct(f, up);
+	r.normalize();
+	Vec3 u = crossProduct(r, f);
+	mtx->setXVector(r);
+	mtx->setYVector(u);
+	mtx->setZVector(-f);
+	mtx->transpose();
+	mtx->setTranslation(Vec3(-dotProduct(r, pos), -dotProduct(u, pos), dotProduct(f, pos)));
+	/*glPushMatrix();
+	float m[16];
+	gluLookAt(pos.x, pos.y, pos.z, center.x, center.y, center.z, up.x, up.y, up.z);
+	glGetFloatv(GL_MODELVIEW_MATRIX, m);
+	glPopMatrix();*/
 }
 
 

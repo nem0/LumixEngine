@@ -400,13 +400,13 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void setRenderer(Renderer& renderer)
+	void setRenderer(Renderer& renderer) override
 	{
 		m_renderer = &renderer;
 	}
 
 
-	Renderer& getRenderer()
+	Renderer& getRenderer() override
 	{
 		ASSERT(m_renderer);
 		return *m_renderer;
@@ -429,40 +429,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void getOrthoMatrix(float left, float right, float bottom, float top, float z_near, float z_far, Matrix* mtx)
-	{
-		*mtx = Matrix::IDENTITY;
-		mtx->m11 = 2 / (right - left);
-		mtx->m22 = 2 / (top - bottom);
-		mtx->m33 = -2 / (z_far - z_near);
-		mtx->m41 = -(right + left) / (right - left);
-		mtx->m42 = -(top + bottom) / (top - bottom);
-		mtx->m43 = -(z_far + z_near) / (z_far - z_near);
-		/*		glOrtho(left, right, bottom, top, z_near, z_far);
-		glGetFloatv(GL_PROJECTION_MATRIX, &mtx->m11);
-		*/
-	}
-
-
-	void getLookAtMatrix(const Vec3& pos, const Vec3& center, const Vec3& up, Matrix* mtx)
-	{
-		*mtx = Matrix::IDENTITY;
-		Vec3 f = center - pos;
-		f.normalize();
-		Vec3 r = crossProduct(f, up);
-		r.normalize();
-		Vec3 u = crossProduct(r, f);
-		mtx->setXVector(r);
-		mtx->setYVector(u);
-		mtx->setZVector(-f);
-		mtx->transpose();
-		mtx->setTranslation(Vec3(-dotProduct(r, pos), -dotProduct(u, pos), dotProduct(f, pos)));
-		/*glPushMatrix();
-		float m[16];
-		gluLookAt(pos.x, pos.y, pos.z, center.x, center.y, center.z, up.x, up.y, up.z);
-		glGetFloatv(GL_MODELVIEW_MATRIX, m);
-		glPopMatrix();*/
-	}
 
 	void executeCustomCommand(uint32_t name)
 	{
@@ -518,8 +484,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 		glCullFace(GL_FRONT);
 		m_shadowmap_framebuffer->bind();
 		glClear(GL_DEPTH_BUFFER_BIT);
-		glMatrixMode(GL_PROJECTION);
-		glPushMatrix();
 		
 		Matrix light_mtx = light_cmp.entity.getMatrix();
 		m_light_dir = light_mtx.getZVector();
@@ -533,19 +497,15 @@ struct PipelineInstanceImpl : public PipelineInstance
 			float bb_size = frustum.getSize() * 0.5f;
 			
 			glViewport(1, (GLint)(split_index * m_shadowmap_framebuffer->getHeight() * 0.25f), m_shadowmap_framebuffer->getWidth() - 2, (GLsizei)(m_shadowmap_framebuffer->getHeight() * 0.25f));
-			glMatrixMode(GL_PROJECTION);
-			glLoadIdentity();
 			Matrix projection_matrix;
-			getOrthoMatrix(-bb_size, bb_size, -bb_size, bb_size, 0.01f, 10000, &projection_matrix);
-			glMultMatrixf(&projection_matrix.m11);
+			Renderer::getOrthoMatrix(-bb_size, bb_size, -bb_size, bb_size, 0.01f, 10000, &projection_matrix);
+			m_renderer->setProjectionMatrix(projection_matrix);
 
-			glMatrixMode(GL_MODELVIEW);
-			glLoadIdentity();
 			Vec3 light_forward = light_mtx.getZVector();
 			shadow_cam_pos -= light_forward * 5000;
 			Matrix modelview_matrix;
-			getLookAtMatrix(shadow_cam_pos, shadow_cam_pos + light_forward, light_mtx.getYVector(), &modelview_matrix);
-			glMultMatrixf(&modelview_matrix.m11);
+			Renderer::getLookAtMatrix(shadow_cam_pos, shadow_cam_pos + light_forward, light_mtx.getYVector(), &modelview_matrix);
+			m_renderer->setViewMatrix(modelview_matrix);
 			static const Matrix biasMatrix(
 				0.5, 0.0, 0.0, 0.0,
 				0.0, 0.5, 0.0, 0.0,
@@ -557,9 +517,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 			renderTerrains(layer_mask);
 			renderModels(layer_mask);
 		}
-		glMatrixMode(GL_PROJECTION);
-		glPopMatrix();
-		glMatrixMode(GL_MODELVIEW);
 		FrameBuffer::unbind();
 		glCullFace(GL_BACK);
 	}
@@ -569,16 +526,13 @@ struct PipelineInstanceImpl : public PipelineInstance
 	{
 		glDisable(GL_DEPTH_TEST);
 
-		glMatrixMode(GL_PROJECTION);
-		glPushMatrix();
-		glLoadIdentity();
-		glOrtho(-1, 1, -1, 1, 0, 30);
-		glMatrixMode(GL_MODELVIEW);
-
 		ASSERT(m_renderer != NULL);
+		Matrix mtx;
+		Renderer::getOrthoMatrix(-1, 1, -1, 1, 0, 30, &mtx);
+		m_renderer->setProjectionMatrix(mtx);
+
 		material->apply(*m_renderer, *this);
-		glPushMatrix();
-		glLoadIdentity();
+		m_renderer->setViewMatrix(Matrix::IDENTITY);
 		glBegin(GL_QUADS);
 		glTexCoord2f(0, 0);
 		glVertex3f(-1, -1, -1);
@@ -589,11 +543,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		glTexCoord2f(1, 0);
 		glVertex3f(1, -1, -1);
 		glEnd();
-		glPopMatrix();
 		glEnable(GL_DEPTH_TEST);
-		glMatrixMode(GL_PROJECTION);
-		glPopMatrix();
-		glMatrixMode(GL_MODELVIEW);
 	}
 
 
@@ -1011,7 +961,6 @@ void BindFramebufferTextureCommand::execute(PipelineInstanceImpl& pipeline)
 	if (fb)
 	{
 		glActiveTexture(GL_TEXTURE0 + m_texture_uint);
-		glEnable(GL_TEXTURE_2D);
 		glBindTexture(GL_TEXTURE_2D, fb->getTexture((FrameBuffer::RenderBuffers)m_renderbuffer_index));
 	}
 }
@@ -1033,7 +982,6 @@ void RenderShadowmapCommand::execute(PipelineInstanceImpl& pipeline)
 void BindShadowmapCommand::execute(PipelineInstanceImpl& pipeline)
 {
 	glActiveTexture(GL_TEXTURE0 + 1);
-	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, pipeline.m_shadowmap_framebuffer->getDepthTexture());
 }
 

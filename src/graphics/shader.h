@@ -30,6 +30,8 @@ class LUMIX_ENGINE_API Shader : public Resource
 			DIFFUSE_INTENSITY,
 			FOG_COLOR,
 			FOG_DENSITY,
+			VIEW_MATRIX,
+			PROJECTION_MATRIX,
 			COUNT
 		};
 	
