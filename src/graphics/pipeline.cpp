@@ -552,14 +552,31 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_renderer->cleanup();
 
 		const Array<DebugLine>& lines = m_scene->getDebugLines();
-		glBegin(GL_LINES);
-		for (int i = 0, c = lines.size(); i < c; ++i)
+		Shader& shader = m_renderer->getDebugShader();
+		m_renderer->applyShader(shader);
+
+		for(int j = 0; j <= lines.size() / 256; ++j)
 		{
-			glColor3fv(&lines[i].m_color.x);
-			glVertex3fv(&lines[i].m_from.x);
-			glVertex3fv(&lines[i].m_to.x);
+			Vec3 positions[512];
+			Vec3 colors[512];
+			int indices[512];
+			int offset = j * 256;
+			for (int i = 0, c = Math::minValue(lines.size() - offset, 256); i < c; ++i)
+			{
+				positions[i * 2] = lines[offset + i].m_from;
+				positions[i * 2 + 1] = lines[offset + i].m_to;
+				colors[i * 2] = lines[offset + i].m_color;
+				colors[i * 2 + 1] = lines[offset + i].m_color;
+				indices[i * 2] = i * 2;
+				indices[i * 2 + 1] = i * 2 + 1;
+			}
+
+			glEnableVertexAttribArray(shader.getAttribId(0));
+			glVertexAttribPointer(shader.getAttribId(0), 3, GL_FLOAT, GL_FALSE, sizeof(Vec3), positions);
+			glEnableVertexAttribArray(shader.getAttribId(1));
+			glVertexAttribPointer(shader.getAttribId(1), 3, GL_FLOAT, GL_FALSE, sizeof(Vec3), colors);
+			glDrawElements(GL_LINES, Math::minValue(lines.size() - offset, 256) * 2, GL_UNSIGNED_INT, indices);
 		}
-		glEnd();
 	}
 
 	void renderGrass(int64_t layer_mask)

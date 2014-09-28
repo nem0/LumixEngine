@@ -165,6 +165,10 @@ namespace Lumix
 					{
 						m_debug_lines.eraseFast(i);
 					}
+					else
+					{
+						m_debug_lines[i].m_life = life;
+					}
 				}
 			}
 

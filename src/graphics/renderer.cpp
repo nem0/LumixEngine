@@ -112,6 +112,7 @@ struct RendererImpl : public Renderer
 		}
 		m_last_bind_geometry = NULL;
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 		glUseProgram(0);
 		for(int i = 0; i < 16; ++i)
 		{
@@ -283,6 +284,13 @@ struct RendererImpl : public Renderer
 	}
 
 
+	virtual Shader& getDebugShader() override
+	{
+		ASSERT(m_debug_shader);
+		return *m_debug_shader;
+	}
+
+
 	virtual void applyShader(const Shader& shader) override
 	{
 		GLuint id = shader.getProgramId();
@@ -349,6 +357,7 @@ struct RendererImpl : public Renderer
 		m_engine = &engine;
 		glewExperimental = GL_TRUE;
 		GLenum err = glewInit();
+		m_debug_shader = static_cast<Shader*>(engine.getResourceManager().get(ResourceManager::SHADER)->load("shaders/debug.shd"));
 		return err == GLEW_OK;
 	}
 
@@ -437,6 +446,7 @@ struct RendererImpl : public Renderer
 	GLuint m_last_program_id;
 	Matrix m_view_matrix;
 	Matrix m_projection_matrix;
+	Shader* m_debug_shader;
 };
 
 

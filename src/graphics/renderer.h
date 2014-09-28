@@ -61,6 +61,7 @@ class LUMIX_ENGINE_API Renderer : public IPlugin
 		virtual void setFixedCachedUniform(const Shader& shader, int name, const Matrix& mtx) = 0;
 		virtual void setFixedCachedUniform(const Shader& shader, int name, const Matrix* matrices, int count) = 0;
 		virtual void applyShader(const Shader& shader) = 0;
+		virtual Shader& getDebugShader() = 0;
 
 		virtual void setProjection(float width, float height, float fov, float near_plane, float far_plane, const Matrix& mtx) = 0;
 		virtual void setViewMatrix(const Matrix& matrix) = 0;
