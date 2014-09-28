@@ -139,6 +139,8 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		m_fixed_cached_uniforms[(int)FixedCachedUniforms::DIFFUSE_INTENSITY] = glGetUniformLocation(m_program_id, "diffuse_intensity");
 		m_fixed_cached_uniforms[(int)FixedCachedUniforms::FOG_COLOR] = glGetUniformLocation(m_program_id, "fog_color");
 		m_fixed_cached_uniforms[(int)FixedCachedUniforms::FOG_DENSITY] = glGetUniformLocation(m_program_id, "fog_density");
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::VIEW_MATRIX] = glGetUniformLocation(m_program_id, "view_matrix");
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::PROJECTION_MATRIX] = glGetUniformLocation(m_program_id, "projection_matrix");
 		m_size = file->size();
 		decrementDepCount();
 	}

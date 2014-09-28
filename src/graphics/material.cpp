@@ -83,7 +83,6 @@ void Material::apply(Renderer& renderer, PipelineInstance& pipeline) const
 		if (m_shader->isShadowmapRequired())
 		{
 			glActiveTexture(GL_TEXTURE0 + m_textures.size());
-			glEnable(GL_TEXTURE_2D);
 			glBindTexture(GL_TEXTURE_2D, pipeline.getShadowmapFramebuffer()->getDepthTexture());
 			renderer.setUniform(*m_shader, "shadowmap", SHADOWMAP_HASH, m_textures.size());
 		}

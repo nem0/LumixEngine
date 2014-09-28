@@ -120,7 +120,13 @@ namespace Lumix
 				float height = m_cameras[camera.index].m_height;
 				float nx = 2 * (x / width) - 1;
 				float ny = 2 * ((height - y) / height) - 1;
-				Matrix projection_matrix = getProjectionMatrix(camera);
+
+				float fov = m_cameras[camera.index].m_fov;
+				float near_plane = m_cameras[camera.index].m_near;
+				float far_plane = m_cameras[camera.index].m_far;
+
+				Matrix projection_matrix;
+				Renderer::getProjectionMatrix(fov, width, height, near_plane, far_plane, &projection_matrix);
 				Matrix view_matrix = camera.entity.getMatrix();
 				view_matrix.inverse();
 				Matrix inverted = (projection_matrix * view_matrix);
@@ -148,28 +154,7 @@ namespace Lumix
 				float far_plane = m_cameras[cmp.index].m_far;
 				m_renderer.setProjection(width, height, fov, near_plane, far_plane, mtx);
 			}
-
-			Matrix getProjectionMatrix(Component cmp)
-			{
-				float fov = m_cameras[cmp.index].m_fov;
-				float width = m_cameras[cmp.index].m_width;
-				float height = m_cameras[cmp.index].m_height;
-				float near_plane = m_cameras[cmp.index].m_near;
-				float far_plane = m_cameras[cmp.index].m_far;
-				
-				Matrix mtx;
-				mtx = Matrix::IDENTITY;
-				float f = 1 / tanf(Math::degreesToRadians(fov) * 0.5f);
-				mtx.m11 = f / (width / height);
-				mtx.m22 = f;
-				mtx.m33 = (far_plane + near_plane) / (near_plane - far_plane);
-				mtx.m44 = 0;
-				mtx.m43 = (2 * far_plane * near_plane) / (near_plane - far_plane);
-				mtx.m34 = -1;
-
-				return mtx;
-			}
-
+			
 			void update(float dt) override
 			{
 				for (int i = m_debug_lines.size() - 1; i >= 0; --i)

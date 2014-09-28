@@ -319,6 +319,10 @@ namespace Lumix
 	void Terrain::updateGrass(const Vec3& camera_position)
 	{
 		PROFILE_FUNCTION();
+		if (!m_splatmap)
+		{
+			return;
+		}
 		if (m_free_grass_quads.size() + m_grass_quads.size() < GRASS_QUADS_HEIGHT * GRASS_QUADS_WIDTH)
 		{
 			int new_count = GRASS_QUADS_HEIGHT * GRASS_QUADS_WIDTH - m_grass_quads.size();
