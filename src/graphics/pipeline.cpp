@@ -40,6 +40,30 @@ static const uint32_t BONE_MATRICES_HASH = crc32("bone_matrices");
 static const uint32_t CAMERA_POS_HASH = crc32("camera_pos");
 
 
+struct Frustum
+{
+	public:
+		Vec3 getCenter() const
+		{
+			Vec3 center = m_points[0];
+			for(int i = 1; i < 8; ++i)
+			{
+				center += m_points[i];
+			}
+			center *= 1/8.0f;
+			return center;
+		}
+
+		float getSize() const
+		{
+			return (m_points[0] - m_points[6]).length();
+		}
+
+	public:
+		Vec3 m_points[8];
+};
+
+
 struct Command
 {
 	virtual ~Command() {}
@@ -376,13 +400,13 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void setRenderer(Renderer& renderer)
+	void setRenderer(Renderer& renderer) override
 	{
 		m_renderer = &renderer;
 	}
 
 
-	Renderer& getRenderer()
+	Renderer& getRenderer() override
 	{
 		ASSERT(m_renderer);
 		return *m_renderer;
@@ -405,40 +429,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void getOrthoMatrix(float left, float right, float bottom, float top, float z_near, float z_far, Matrix* mtx)
-	{
-		*mtx = Matrix::IDENTITY;
-		mtx->m11 = 2 / (right - left);
-		mtx->m22 = 2 / (top - bottom);
-		mtx->m33 = -2 / (z_far - z_near);
-		mtx->m41 = -(right + left) / (right - left);
-		mtx->m42 = -(top + bottom) / (top - bottom);
-		mtx->m43 = -(z_far + z_near) / (z_far - z_near);
-		/*		glOrtho(left, right, bottom, top, z_near, z_far);
-		glGetFloatv(GL_PROJECTION_MATRIX, &mtx->m11);
-		*/
-	}
-
-
-	void getLookAtMatrix(const Vec3& pos, const Vec3& center, const Vec3& up, Matrix* mtx)
-	{
-		*mtx = Matrix::IDENTITY;
-		Vec3 f = center - pos;
-		f.normalize();
-		Vec3 r = crossProduct(f, up);
-		r.normalize();
-		Vec3 u = crossProduct(r, f);
-		mtx->setXVector(r);
-		mtx->setYVector(u);
-		mtx->setZVector(-f);
-		mtx->transpose();
-		mtx->setTranslation(Vec3(-dotProduct(r, pos), -dotProduct(u, pos), dotProduct(f, pos)));
-		/*glPushMatrix();
-		float m[16];
-		gluLookAt(pos.x, pos.y, pos.z, center.x, center.y, center.z, up.x, up.y, up.z);
-		glGetFloatv(GL_MODELVIEW_MATRIX, m);
-		glPopMatrix();*/
-	}
 
 	void executeCustomCommand(uint32_t name)
 	{
@@ -447,6 +437,38 @@ struct PipelineInstanceImpl : public PipelineInstance
 		{
 			iter.second().invoke();
 		}
+	}
+
+	void computeFrustum(const Component& camera, Frustum* frustum, float from_dist, float to_dist)
+	{
+		RenderScene& scene = static_cast<RenderScene&>(*camera.scene);
+		Matrix entity_mtx = camera.entity.getMatrix();
+		float fov = Math::degreesToRadians(scene.getCameraFOV(camera));
+		float far_dist = scene.getCameraNearPlane(camera) + to_dist;
+		float near_dist = scene.getCameraNearPlane(camera) + from_dist;
+		float ratio = scene.getCameraWidth(camera) / scene.getCameraHeight(camera);
+		Vec3 up = camera.entity.getRotation() * Vec3(0.0f, 1.0f, 0.0f);
+		Vec3 forward = camera.entity.getRotation() * Vec3(0, 0, -1);
+		Vec3 right = crossProduct(forward, up).normalized();
+		up = crossProduct(right, forward).normalized();
+
+		Vec3 fc = camera.entity.getPosition() + forward * far_dist;
+		Vec3 nc = camera.entity.getPosition() + forward * near_dist;
+
+		float near_height = tan(fov * 0.5f) * near_dist;
+		float near_width = near_height * ratio;
+		float far_height = tan(fov * 0.5f) * far_dist;
+		float far_width = far_height * ratio;
+
+		frustum->m_points[0] = nc - up * near_height - right * near_width;
+		frustum->m_points[1] = nc + up * near_height - right * near_width;
+		frustum->m_points[2] = nc + up * near_height + right * near_width;
+		frustum->m_points[3] = nc - up * near_height + right * near_width;
+
+		frustum->m_points[4] = fc - up * far_height - right * far_width;
+		frustum->m_points[5] = fc + up * far_height - right * far_width;
+		frustum->m_points[6] = fc + up * far_height + right * far_width;
+		frustum->m_points[7] = fc - up * far_height + right * far_width;
 	}
 
 	void renderShadowmap(Component camera, int64_t layer_mask)
@@ -462,30 +484,28 @@ struct PipelineInstanceImpl : public PipelineInstance
 		glCullFace(GL_FRONT);
 		m_shadowmap_framebuffer->bind();
 		glClear(GL_DEPTH_BUFFER_BIT);
-		glMatrixMode(GL_PROJECTION);
-		glPushMatrix();
 		
+		Matrix light_mtx = light_cmp.entity.getMatrix();
+		m_light_dir = light_mtx.getZVector();
+
+		Frustum frustum;
+		float split_distances[] = {0, 5, 20, 100, 300};
 		for(int split_index = 0; split_index < 4; ++split_index)
 		{
+			computeFrustum(camera, &frustum, split_distances[split_index], split_distances[split_index + 1]);
+			Vec3 shadow_cam_pos = frustum.getCenter();
+			float bb_size = frustum.getSize() * 0.5f;
+			
 			glViewport(1, (GLint)(split_index * m_shadowmap_framebuffer->getHeight() * 0.25f), m_shadowmap_framebuffer->getWidth() - 2, (GLsizei)(m_shadowmap_framebuffer->getHeight() * 0.25f));
-			glMatrixMode(GL_PROJECTION);
-			glLoadIdentity();
 			Matrix projection_matrix;
-			float bb_size = (float)(2 * ((split_index + 1) * (split_index + 1) * (split_index + 1)));
-			getOrthoMatrix(-bb_size, bb_size, -bb_size, bb_size, 0, 100, &projection_matrix);
-			glMultMatrixf(&projection_matrix.m11);
+			Renderer::getOrthoMatrix(-bb_size, bb_size, -bb_size, bb_size, 0.01f, 10000, &projection_matrix);
+			m_renderer->setProjectionMatrix(projection_matrix);
 
-			Matrix light_mtx = light_cmp.entity.getMatrix();
-			m_light_dir = light_mtx.getZVector();
-			glMatrixMode(GL_MODELVIEW);
-			glLoadIdentity();
+			Vec3 light_forward = light_mtx.getZVector();
+			shadow_cam_pos -= light_forward * 5000;
 			Matrix modelview_matrix;
-			Vec3 pos = camera.entity.getPosition();
-			Vec3 cam_forward = camera.entity.getRotation() * Vec3(0, 0, 1);
-			pos -= light_mtx.getZVector() * 10;
-			Vec3 up = camera.entity.getMatrix().getXVector();
-			getLookAtMatrix(pos, pos + light_mtx.getZVector(), light_mtx.getYVector(), &modelview_matrix);
-			glMultMatrixf(&modelview_matrix.m11);
+			Renderer::getLookAtMatrix(shadow_cam_pos, shadow_cam_pos + light_forward, light_mtx.getYVector(), &modelview_matrix);
+			m_renderer->setViewMatrix(modelview_matrix);
 			static const Matrix biasMatrix(
 				0.5, 0.0, 0.0, 0.0,
 				0.0, 0.5, 0.0, 0.0,
@@ -497,9 +517,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 			renderTerrains(layer_mask);
 			renderModels(layer_mask);
 		}
-		glMatrixMode(GL_PROJECTION);
-		glPopMatrix();
-		glMatrixMode(GL_MODELVIEW);
 		FrameBuffer::unbind();
 		glCullFace(GL_BACK);
 	}
@@ -509,16 +526,13 @@ struct PipelineInstanceImpl : public PipelineInstance
 	{
 		glDisable(GL_DEPTH_TEST);
 
-		glMatrixMode(GL_PROJECTION);
-		glPushMatrix();
-		glLoadIdentity();
-		glOrtho(-1, 1, -1, 1, 0, 30);
-		glMatrixMode(GL_MODELVIEW);
-
 		ASSERT(m_renderer != NULL);
+		Matrix mtx;
+		Renderer::getOrthoMatrix(-1, 1, -1, 1, 0, 30, &mtx);
+		m_renderer->setProjectionMatrix(mtx);
+
 		material->apply(*m_renderer, *this);
-		glPushMatrix();
-		glLoadIdentity();
+		m_renderer->setViewMatrix(Matrix::IDENTITY);
 		glBegin(GL_QUADS);
 		glTexCoord2f(0, 0);
 		glVertex3f(-1, -1, -1);
@@ -529,11 +543,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		glTexCoord2f(1, 0);
 		glVertex3f(1, -1, -1);
 		glEnd();
-		glPopMatrix();
 		glEnable(GL_DEPTH_TEST);
-		glMatrixMode(GL_PROJECTION);
-		glPopMatrix();
-		glMatrixMode(GL_MODELVIEW);
 	}
 
 
@@ -542,14 +552,31 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_renderer->cleanup();
 
 		const Array<DebugLine>& lines = m_scene->getDebugLines();
-		glBegin(GL_LINES);
-		for (int i = 0, c = lines.size(); i < c; ++i)
+		Shader& shader = m_renderer->getDebugShader();
+		m_renderer->applyShader(shader);
+
+		for(int j = 0; j <= lines.size() / 256; ++j)
 		{
-			glColor3fv(&lines[i].m_color.x);
-			glVertex3fv(&lines[i].m_from.x);
-			glVertex3fv(&lines[i].m_to.x);
+			Vec3 positions[512];
+			Vec3 colors[512];
+			int indices[512];
+			int offset = j * 256;
+			for (int i = 0, c = Math::minValue(lines.size() - offset, 256); i < c; ++i)
+			{
+				positions[i * 2] = lines[offset + i].m_from;
+				positions[i * 2 + 1] = lines[offset + i].m_to;
+				colors[i * 2] = lines[offset + i].m_color;
+				colors[i * 2 + 1] = lines[offset + i].m_color;
+				indices[i * 2] = i * 2;
+				indices[i * 2 + 1] = i * 2 + 1;
+			}
+
+			glEnableVertexAttribArray(shader.getAttribId(0));
+			glVertexAttribPointer(shader.getAttribId(0), 3, GL_FLOAT, GL_FALSE, sizeof(Vec3), positions);
+			glEnableVertexAttribArray(shader.getAttribId(1));
+			glVertexAttribPointer(shader.getAttribId(1), 3, GL_FLOAT, GL_FALSE, sizeof(Vec3), colors);
+			glDrawElements(GL_LINES, Math::minValue(lines.size() - offset, 256) * 2, GL_UNSIGNED_INT, indices);
 		}
-		glEnd();
 	}
 
 	void renderGrass(int64_t layer_mask)
@@ -565,21 +592,34 @@ struct PipelineInstanceImpl : public PipelineInstance
 				const GrassInfo& info = m_grass_infos[i];
 				const Mesh& mesh = *info.m_mesh;
 				const Material& material = *mesh.getMaterial();
-				Shader* shader = material.getShader();
-				if (&material != last_material)
+				if (material.isReady())
 				{
-					material.apply(*m_renderer, *this);
-					m_renderer->setUniform(*shader, "shadowmap_matrix0", SHADOW_MATRIX0_HASH, m_shadow_modelviewprojection[0]);
-					m_renderer->setUniform(*shader, "shadowmap_matrix1", SHADOW_MATRIX1_HASH, m_shadow_modelviewprojection[1]);
-					m_renderer->setUniform(*shader, "shadowmap_matrix2", SHADOW_MATRIX2_HASH, m_shadow_modelviewprojection[2]);
-					m_renderer->setUniform(*shader, "shadowmap_matrix3", SHADOW_MATRIX3_HASH, m_shadow_modelviewprojection[3]);
-					m_renderer->setUniform(*shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
-					m_renderer->setUniform(*shader, "camera_pos", CAMERA_POS_HASH, m_active_camera.entity.getPosition());
-					last_material = &material;
-				}
-				m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::GRASS_MATRICES, info.m_matrices, info.m_matrix_count);
+					Shader* shader = material.getShader();
+					if (&material != last_material)
+					{
+						material.apply(*m_renderer, *this);
+						m_renderer->setUniform(*shader, "shadowmap_matrix0", SHADOW_MATRIX0_HASH, m_shadow_modelviewprojection[0]);
+						m_renderer->setUniform(*shader, "shadowmap_matrix1", SHADOW_MATRIX1_HASH, m_shadow_modelviewprojection[1]);
+						m_renderer->setUniform(*shader, "shadowmap_matrix2", SHADOW_MATRIX2_HASH, m_shadow_modelviewprojection[2]);
+						m_renderer->setUniform(*shader, "shadowmap_matrix3", SHADOW_MATRIX3_HASH, m_shadow_modelviewprojection[3]);
+						m_renderer->setUniform(*shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
+						m_renderer->setUniform(*shader, "camera_pos", CAMERA_POS_HASH, m_active_camera.entity.getPosition());
+						Component light_cmp = m_scene->getLight(0);
+						if(light_cmp.isValid())
+						{
+							m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::AMBIENT_COLOR, m_scene->getLightAmbientColor(light_cmp));
+							m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::AMBIENT_INTENSITY, m_scene->getLightAmbientIntensity(light_cmp));
+							m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::DIFFUSE_COLOR, m_scene->getLightDiffuseColor(light_cmp));
+							m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::DIFFUSE_INTENSITY, m_scene->getLightDiffuseIntensity(light_cmp));
+							m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::FOG_COLOR, m_scene->getFogColor(light_cmp));
+							m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
+						}
+						last_material = &material;
+					}
+					m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::GRASS_MATRICES, info.m_matrices, info.m_matrix_count);
 
-				m_renderer->renderGeometry(*info.m_geometry, mesh.getStart(), mesh.getCount() / info.m_mesh_copy_count * info.m_matrix_count, *shader);
+					m_renderer->renderGeometry(*info.m_geometry, mesh.getStart(), mesh.getCount() / info.m_mesh_copy_count * info.m_matrix_count, *shader);
+				}
 			}
 		}
 	}
@@ -605,6 +645,16 @@ struct PipelineInstanceImpl : public PipelineInstance
 					m_renderer->setUniform(*shader, "shadowmap_matrix1", SHADOW_MATRIX1_HASH, m_shadow_modelviewprojection[1]);
 					m_renderer->setUniform(*shader, "shadowmap_matrix2", SHADOW_MATRIX2_HASH, m_shadow_modelviewprojection[2]);
 					m_renderer->setUniform(*shader, "shadowmap_matrix3", SHADOW_MATRIX3_HASH, m_shadow_modelviewprojection[3]);
+					Component light_cmp = m_scene->getLight(0);
+					if(light_cmp.isValid())
+					{
+						m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::AMBIENT_COLOR, m_scene->getLightAmbientColor(light_cmp));
+						m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::AMBIENT_INTENSITY, m_scene->getLightAmbientIntensity(light_cmp));
+						m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::DIFFUSE_COLOR, m_scene->getLightDiffuseColor(light_cmp));
+						m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::DIFFUSE_INTENSITY, m_scene->getLightDiffuseIntensity(light_cmp));
+						m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::FOG_COLOR, m_scene->getFogColor(light_cmp));
+						m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
+					}
 					m_renderer->setUniform(*shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
 
 					Vec3 scale;
@@ -657,6 +707,16 @@ struct PipelineInstanceImpl : public PipelineInstance
 				m_renderer->setUniform(shader, "shadowmap_matrix1", SHADOW_MATRIX1_HASH, m_shadow_modelviewprojection[1]);
 				m_renderer->setUniform(shader, "shadowmap_matrix2", SHADOW_MATRIX2_HASH, m_shadow_modelviewprojection[2]);
 				m_renderer->setUniform(shader, "shadowmap_matrix3", SHADOW_MATRIX3_HASH, m_shadow_modelviewprojection[3]);
+				Component light_cmp = m_scene->getLight(0);
+				if(light_cmp.isValid())
+				{
+					m_renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::AMBIENT_COLOR, m_scene->getLightAmbientColor(light_cmp));
+					m_renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::AMBIENT_INTENSITY, m_scene->getLightAmbientIntensity(light_cmp));
+					m_renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::DIFFUSE_COLOR, m_scene->getLightDiffuseColor(light_cmp));
+					m_renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::DIFFUSE_INTENSITY, m_scene->getLightDiffuseIntensity(light_cmp));
+					m_renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::FOG_COLOR, m_scene->getFogColor(light_cmp));
+					m_renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
+				}
 				m_renderer->setUniform(shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
 				last_material = &material;
 			}
@@ -708,6 +768,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	virtual void setScene(RenderScene* scene) override
 	{
 		m_scene = scene;
+		m_active_camera = Component::INVALID;
 	}
 
 	virtual RenderScene* getScene() override
@@ -917,7 +978,6 @@ void BindFramebufferTextureCommand::execute(PipelineInstanceImpl& pipeline)
 	if (fb)
 	{
 		glActiveTexture(GL_TEXTURE0 + m_texture_uint);
-		glEnable(GL_TEXTURE_2D);
 		glBindTexture(GL_TEXTURE_2D, fb->getTexture((FrameBuffer::RenderBuffers)m_renderbuffer_index));
 	}
 }
@@ -939,7 +999,6 @@ void RenderShadowmapCommand::execute(PipelineInstanceImpl& pipeline)
 void BindShadowmapCommand::execute(PipelineInstanceImpl& pipeline)
 {
 	glActiveTexture(GL_TEXTURE0 + 1);
-	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, pipeline.m_shadowmap_framebuffer->getDepthTexture());
 }
 

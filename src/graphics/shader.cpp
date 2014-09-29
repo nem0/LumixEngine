@@ -42,6 +42,7 @@ GLint Shader::getUniformLocation(const char* name, uint32_t name_hash)
 			return m_uniforms[i].m_location;
 		}
 	}
+	ASSERT(isReady());
 	CachedUniform& unif = m_uniforms.pushEmpty();
 	unif.m_name_hash = name_hash;
 	unif.m_location = glGetUniformLocation(m_program_id, name);
@@ -132,7 +133,14 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		m_fixed_cached_uniforms[(int)FixedCachedUniforms::MORPH_CONST] = glGetUniformLocation(m_program_id, "morph_const");
 		m_fixed_cached_uniforms[(int)FixedCachedUniforms::QUAD_SIZE] = glGetUniformLocation(m_program_id, "quad_size");
 		m_fixed_cached_uniforms[(int)FixedCachedUniforms::QUAD_MIN] = glGetUniformLocation(m_program_id, "quad_min");
-
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::AMBIENT_COLOR] = glGetUniformLocation(m_program_id, "ambient_color");
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::AMBIENT_INTENSITY] = glGetUniformLocation(m_program_id, "ambient_intensity");
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::DIFFUSE_COLOR] = glGetUniformLocation(m_program_id, "diffuse_color");
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::DIFFUSE_INTENSITY] = glGetUniformLocation(m_program_id, "diffuse_intensity");
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::FOG_COLOR] = glGetUniformLocation(m_program_id, "fog_color");
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::FOG_DENSITY] = glGetUniformLocation(m_program_id, "fog_density");
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::VIEW_MATRIX] = glGetUniformLocation(m_program_id, "view_matrix");
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::PROJECTION_MATRIX] = glGetUniformLocation(m_program_id, "projection_matrix");
 		m_size = file->size();
 		decrementDepCount();
 	}
