@@ -228,7 +228,7 @@
     <string>Look at selected entity</string>
    </property>
    <property name="shortcut">
-    <string>Ctrl+Tab</string>
+    <string>F</string>
    </property>
   </action>
   <action name="actionSnap_to_terrain">
@@ -278,7 +278,7 @@
     <string>Remove</string>
    </property>
    <property name="shortcut">
-    <string>Ctrl+R</string>
+    <string>Del</string>
    </property>
   </action>
   <action name="actionEntity_list">
