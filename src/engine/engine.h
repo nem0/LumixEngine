@@ -50,8 +50,8 @@ namespace Lumix
 			virtual Universe* getUniverse() const = 0;
 			virtual const Array<IScene*>& getScenes() const = 0;
 			virtual IScene* getScene(uint32_t type) const = 0;
-			MTJD::Manager& getMTJDManager() const;
-//			CullingSystem& getCullingSystem() const;
+			virtual MTJD::Manager& getMTJDManager() = 0;
+//			virtual CullingSystem& getCullingSystem() const = 0;
 
 			virtual ResourceManager& getResourceManager() = 0;
 
