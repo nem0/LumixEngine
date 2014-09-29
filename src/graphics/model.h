@@ -39,19 +39,23 @@ class Mesh
 			m_start = start;
 			m_count = count;
 			m_name_hash = crc32(name);
+			m_name = name;
 		}
 
 		Material* getMaterial() const { return m_material; }
 		void setMaterial(Material* material) { m_material = material; }
 		int getCount() const { return m_count; }
+		int getTriangleCount() const { return m_count / 3; }
 		int getStart() const { return m_start; }
 		uint32_t getNameHash() const { return m_name_hash; }
+		const char* getName() const { return m_name.c_str(); }
 
 	private:
 		int32_t	m_start;
 		int32_t	m_count;
 		uint32_t m_name_hash;
 		Material* m_material;
+		string m_name;
 };
 
 

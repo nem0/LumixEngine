@@ -63,7 +63,6 @@ void Pose::computeAbsolute(Model& model, int i, bool* valid)
 
 void Pose::computeAbsolute(Model& model)
 {
-	/// TODO remove recursion
 	if(!m_is_absolute)
 	{
 		ASSERT(m_count < 256);

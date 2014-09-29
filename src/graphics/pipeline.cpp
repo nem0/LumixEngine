@@ -29,6 +29,17 @@ namespace Lumix
 struct PipelineImpl;
 struct PipelineInstanceImpl;
 
+
+static const uint32_t SHADOW_MATRIX0_HASH = crc32("shadowmap_matrix0");
+static const uint32_t SHADOW_MATRIX1_HASH = crc32("shadowmap_matrix1");
+static const uint32_t SHADOW_MATRIX2_HASH = crc32("shadowmap_matrix2");
+static const uint32_t SHADOW_MATRIX3_HASH = crc32("shadowmap_matrix3");
+static const uint32_t LIGHT_DIR_HASH = crc32("light_dir");
+static const uint32_t TERRAIN_SCALE_HASH = crc32("terrain_scale");
+static const uint32_t BONE_MATRICES_HASH = crc32("bone_matrices");
+static const uint32_t CAMERA_POS_HASH = crc32("camera_pos");
+
+
 struct Command
 {
 	virtual ~Command() {}
@@ -276,7 +287,7 @@ struct PipelineImpl : public Pipeline
 			}
 			else
 			{
-				g_log_error.log("renderer") << "Unknown pipeline command " << tmp;
+				g_log_error.log("renderer") << "Unknown pipeline command \"" << tmp << "\" in pipeline " << getPath().c_str();
 			}
 		}
 		serializer.deserializeArrayEnd();
@@ -440,6 +451,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void renderShadowmap(Component camera, int64_t layer_mask)
 	{
+		PROFILE_FUNCTION();
 		ASSERT(m_renderer != NULL);
 		Component light_cmp = m_scene->getLight(0);
 		if (!light_cmp.isValid() || !camera.isValid())
@@ -482,6 +494,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 				);
 			m_shadow_modelviewprojection[split_index] = biasMatrix * (projection_matrix * modelview_matrix);
 
+			renderTerrains(layer_mask);
 			renderModels(layer_mask);
 		}
 		glMatrixMode(GL_PROJECTION);
@@ -526,15 +539,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void renderDebugLines()
 	{
-		// cleanup
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
-		glUseProgram(0);
-		for (int i = 0; i < 16; ++i)
-		{
-			glActiveTexture(GL_TEXTURE0 + i);
-			glDisable(GL_TEXTURE_2D);
-		}
-		glActiveTexture(GL_TEXTURE0); 
+		m_renderer->cleanup();
 
 		const Array<DebugLine>& lines = m_scene->getDebugLines();
 		glBegin(GL_LINES);
@@ -552,26 +557,29 @@ struct PipelineInstanceImpl : public PipelineInstance
 		PROFILE_FUNCTION();
 		if (m_active_camera.isValid())
 		{
-			Material* last_material = NULL;
+			const Material* last_material = NULL;
 			m_grass_infos.clear();
 			m_scene->getGrassInfos(m_grass_infos, layer_mask);
 			for (int i = 0; i < m_grass_infos.size(); ++i)
 			{
-				Shader* shader = m_grass_infos[i].m_mesh->getMaterial()->getShader();
-				if (m_grass_infos[i].m_mesh->getMaterial() != last_material)
+				const GrassInfo& info = m_grass_infos[i];
+				const Mesh& mesh = *info.m_mesh;
+				const Material& material = *mesh.getMaterial();
+				Shader* shader = material.getShader();
+				if (&material != last_material)
 				{
-					m_grass_infos[i].m_mesh->getMaterial()->apply(*m_renderer, *this);
-					shader->setUniform("shadowmap_matrix0", m_shadow_modelviewprojection[0]);
-					shader->setUniform("shadowmap_matrix1", m_shadow_modelviewprojection[1]);
-					shader->setUniform("shadowmap_matrix2", m_shadow_modelviewprojection[2]);
-					shader->setUniform("shadowmap_matrix3", m_shadow_modelviewprojection[3]);
-					shader->setUniform("light_dir", m_light_dir);
-					last_material = m_grass_infos[i].m_mesh->getMaterial();
+					material.apply(*m_renderer, *this);
+					m_renderer->setUniform(*shader, "shadowmap_matrix0", SHADOW_MATRIX0_HASH, m_shadow_modelviewprojection[0]);
+					m_renderer->setUniform(*shader, "shadowmap_matrix1", SHADOW_MATRIX1_HASH, m_shadow_modelviewprojection[1]);
+					m_renderer->setUniform(*shader, "shadowmap_matrix2", SHADOW_MATRIX2_HASH, m_shadow_modelviewprojection[2]);
+					m_renderer->setUniform(*shader, "shadowmap_matrix3", SHADOW_MATRIX3_HASH, m_shadow_modelviewprojection[3]);
+					m_renderer->setUniform(*shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
+					m_renderer->setUniform(*shader, "camera_pos", CAMERA_POS_HASH, m_active_camera.entity.getPosition());
+					last_material = &material;
 				}
-				shader->setUniform("grass_matrices", m_grass_infos[i].m_matrices, m_grass_infos[i].m_matrix_count);
+				m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::GRASS_MATRICES, info.m_matrices, info.m_matrix_count);
 
-				Mesh& mesh = *m_grass_infos[i].m_mesh;
-				m_grass_infos[i].m_geometry->draw(mesh.getStart(), mesh.getCount() / m_grass_infos[i].m_mesh_copy_count * m_grass_infos[i].m_matrix_count, *shader);
+				m_renderer->renderGeometry(*info.m_geometry, mesh.getStart(), mesh.getCount() / info.m_mesh_copy_count * info.m_matrix_count, *shader);
 			}
 		}
 	}
@@ -586,65 +594,79 @@ struct PipelineInstanceImpl : public PipelineInstance
 			Vec3 camera_position = m_active_camera.entity.getPosition();
 			for (int i = 0; i < m_terrain_infos.size(); ++i)
 			{
-				if (m_terrain_infos[i].m_material && m_terrain_infos[i].m_material->getShader())
+				if (m_terrain_infos[i].m_material && m_terrain_infos[i].m_material->isReady())
 				{
 					Matrix world_matrix;
 					m_terrain_infos[i].m_entity.getMatrix(world_matrix);
 					Shader* shader = m_terrain_infos[i].m_material->getShader();
 					m_terrain_infos[i].m_material->apply(*m_renderer, *this);
-					shader->setUniform("world_matrix", world_matrix);
-					shader->setUniform("shadowmap_matrix0", m_shadow_modelviewprojection[0]);
-					shader->setUniform("shadowmap_matrix1", m_shadow_modelviewprojection[1]);
-					shader->setUniform("shadowmap_matrix2", m_shadow_modelviewprojection[2]);
-					shader->setUniform("shadowmap_matrix3", m_shadow_modelviewprojection[3]);
-					shader->setUniform("light_dir", m_light_dir);
+					m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::WORLD_MATRIX, world_matrix);
+					m_renderer->setUniform(*shader, "shadowmap_matrix0", SHADOW_MATRIX0_HASH, m_shadow_modelviewprojection[0]);
+					m_renderer->setUniform(*shader, "shadowmap_matrix1", SHADOW_MATRIX1_HASH, m_shadow_modelviewprojection[1]);
+					m_renderer->setUniform(*shader, "shadowmap_matrix2", SHADOW_MATRIX2_HASH, m_shadow_modelviewprojection[2]);
+					m_renderer->setUniform(*shader, "shadowmap_matrix3", SHADOW_MATRIX3_HASH, m_shadow_modelviewprojection[3]);
+					m_renderer->setUniform(*shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
 
 					Vec3 scale;
 					scale.x = m_terrain_infos[i].m_xz_scale;
 					scale.y = m_terrain_infos[i].m_y_scale;
 					scale.z = scale.x;
-					m_terrain_infos[i].m_material->getShader()->setUniform("terrain_scale", scale);
+					m_renderer->setUniform(*shader, "terrain_scale", TERRAIN_SCALE_HASH, scale);
 					m_scene->renderTerrain(m_terrain_infos[i], *m_renderer, *this, camera_position);
 				}
 			}
 		}
 	}
 
+
+	void sortRenderables(Array<RenderableInfo>& infos)
+	{
+		PROFILE_FUNCTION();
+		if (!infos.empty())
+		{
+			qsort(&infos[0], infos.size(), sizeof(RenderableInfo), [](const void* a, const void* b) -> int
+			{
+				const RenderableInfo* info1 = static_cast<const RenderableInfo*>(a);
+				const RenderableInfo* info2 = static_cast<const RenderableInfo*>(b);
+				return (int)(info1->m_mesh - info2->m_mesh);
+			});
+		}
+	}
+
 	void renderModels(int64_t layer_mask)
 	{
 		PROFILE_FUNCTION();
-		ASSERT(m_renderer != NULL);
-		renderTerrains(layer_mask);
 		
 		m_renderable_infos.clear();
 		m_scene->getRenderableInfos(m_renderable_infos, layer_mask);
 		int count = m_renderable_infos.size();
-		Material* last_material = NULL;
+		const Material* last_material = NULL;
+		sortRenderables(m_renderable_infos);
 		for (int i = 0; i < count; ++i)
 		{
-			glPushMatrix();
-			Matrix world_matrix = m_renderable_infos[i].m_model ? m_renderable_infos[i].m_model->getMatrix() : *m_renderable_infos[i].m_matrix;
-			world_matrix.multiply3x3(m_renderable_infos[i].m_scale);
-			glMultMatrixf(&world_matrix.m11);
+			const RenderableInfo& info = m_renderable_infos[i];
+			const Matrix& world_matrix = info.m_model->getMatrix();
+			const Mesh& mesh = *info.m_mesh;
+			const Material& material = *mesh.getMaterial();
+			Shader& shader = *material.getShader();
 			
-			Mesh& mesh = *m_renderable_infos[i].m_mesh;
-			Material& material = *mesh.getMaterial();
 			if (last_material != &material)
 			{
 				material.apply(*m_renderer, *this);
-				material.getShader()->setUniform("world_matrix", world_matrix);
-				material.getShader()->setUniform("shadowmap_matrix0", m_shadow_modelviewprojection[0]);
-				material.getShader()->setUniform("shadowmap_matrix1", m_shadow_modelviewprojection[1]);
-				material.getShader()->setUniform("shadowmap_matrix2", m_shadow_modelviewprojection[2]);
-				material.getShader()->setUniform("shadowmap_matrix3", m_shadow_modelviewprojection[3]);
-				material.getShader()->setUniform("light_dir", m_light_dir);
+				m_renderer->setUniform(shader, "shadowmap_matrix0", SHADOW_MATRIX0_HASH, m_shadow_modelviewprojection[0]);
+				m_renderer->setUniform(shader, "shadowmap_matrix1", SHADOW_MATRIX1_HASH, m_shadow_modelviewprojection[1]);
+				m_renderer->setUniform(shader, "shadowmap_matrix2", SHADOW_MATRIX2_HASH, m_shadow_modelviewprojection[2]);
+				m_renderer->setUniform(shader, "shadowmap_matrix3", SHADOW_MATRIX3_HASH, m_shadow_modelviewprojection[3]);
+				m_renderer->setUniform(shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
 				last_material = &material;
 			}
+			m_renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::WORLD_MATRIX, world_matrix);
+			
 			static Matrix bone_mtx[64];
-			if (m_renderable_infos[i].m_pose)
+			if (info.m_pose->getCount() > 0)
 			{
-				const Pose& pose = *m_renderable_infos[i].m_pose;
-				const Model& model = *m_renderable_infos[i].m_model->getModel();
+				const Pose& pose = *info.m_pose;
+				const Model& model = *info.m_model->getModel();
 				Vec3* poss = pose.getPositions();
 				Quat* rots = pose.getRotations();
 				ASSERT(pose.getCount() <= 64);
@@ -654,14 +676,11 @@ struct PipelineInstanceImpl : public PipelineInstance
 					bone_mtx[bone_index].translate(poss[bone_index]);
 					bone_mtx[bone_index] = bone_mtx[bone_index] * model.getBone(bone_index).inv_bind_matrix;
 				}
-				material.getShader()->setUniform("bone_matrices", bone_mtx, pose.getCount());
+				m_renderer->setUniform(shader, "bone_matrices", BONE_MATRICES_HASH, bone_mtx, pose.getCount());
 			}
 
-			m_renderable_infos[i].m_geometry->draw(mesh.getStart(), mesh.getCount(), *material.getShader());
-			glPopMatrix();
+			m_renderer->renderGeometry(*m_renderable_infos[i].m_geometry, mesh.getStart(), mesh.getCount(), *material.getShader());
 		}
-
-		renderGrass(layer_mask);
 	}
 
 	virtual void resize(int w, int h) override
@@ -789,7 +808,10 @@ void RenderModelsCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 
 void RenderModelsCommand::execute(PipelineInstanceImpl& pipeline)
 {
+	pipeline.renderTerrains(m_layer_mask);
 	pipeline.renderModels(m_layer_mask);
+	pipeline.renderGrass(m_layer_mask);
+
 }
 
 

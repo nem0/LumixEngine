@@ -43,14 +43,23 @@ void EntityTemplateList::onSystemUpdated()
 
 void EntityTemplateList::on_templateList_doubleClicked(const QModelIndex &index)
 {
-	m_editor->getEntityTemplateSystem().createInstance(m_ui->templateList->item(index.row())->text().toLatin1().data());
+	Lumix::Vec3 pos = m_editor->getCameraRaycastHit();
+	m_editor->getEntityTemplateSystem().createInstance(m_ui->templateList->item(index.row())->text().toLatin1().data(), pos);
 }
 
 
 void EntityTemplateList::instantiateTemplate()
 {
+	instantiateTemplateAt(m_editor->getCameraRaycastHit());
+}
+
+
+void EntityTemplateList::instantiateTemplateAt(const Lumix::Vec3& pos)
+{
 	if (m_ui->templateList->currentIndex().row() >= 0)
 	{
-		m_editor->getEntityTemplateSystem().createInstance(m_ui->templateList->item(m_ui->templateList->currentIndex().row())->text().toLatin1().data());
+		m_editor->getEntityTemplateSystem().createInstance(m_ui->templateList->item(m_ui->templateList->currentIndex().row())->text().toLatin1().data(), pos);
 	}
 }
+
+

@@ -33,78 +33,9 @@ struct CustomErrorCallback : public physx::PxErrorCallback
 	virtual void reportError(physx::PxErrorCode::Enum code, const char* message, const char* file, int line);
 };
 
-
-void PhysicsSystem::onCreateUniverse(Universe& universe)
+IScene* PhysicsSystem::createScene(Universe& universe)
 {
-	m_impl->m_scene = PhysicsScene::create(*this, universe, *m_impl->m_engine);
-}
-
-
-void PhysicsSystem::onDestroyUniverse(Universe& universe)
-{
-	PhysicsScene::destroy(m_impl->m_scene);
-	m_impl->m_scene = NULL;
-}
-
-
-void PhysicsSystem::serialize(ISerializer& serializer)
-{
-	m_impl->m_scene->serialize(serializer);
-}
-
-
-void PhysicsSystem::deserialize(ISerializer& serializer)
-{
-	m_impl->m_scene->deserialize(serializer);
-}
-
-
-void PhysicsSystem::sendMessage(const char* message)
-{
-	if(strcmp("render", message) == 0)
-	{
-		m_impl->m_scene->render();
-	}
-}
-
-
-void PhysicsSystem::destroyComponent(const Component& component)
-{
-	ASSERT(false);
-}
-
-
-Component PhysicsSystem::createComponent(uint32_t component_type, const Entity& entity)
-{
-	if (component_type == HEIGHTFIELD_HASH)
-	{
-		return m_impl->m_scene->createHeightfield(entity);
-	}
-	else if (component_type == CONTROLLER_HASH)
-	{
-		return m_impl->m_scene->createController(entity);
-	}
-	else if (component_type == BOX_ACTOR_HASH)
-	{
-		return m_impl->m_scene->createBoxRigidActor(entity);
-	}
-	else if (component_type == MESH_ACTOR_HASH)
-	{
-		return m_impl->m_scene->createMeshRigidActor(entity);
-	}
-	return Component::INVALID;
-}
-
-
-void PhysicsSystem::update(float dt)
-{
-	m_impl->m_scene->update(dt);
-}
-
-
-PhysicsScene* PhysicsSystem::getScene() const
-{
-	return m_impl->m_scene;
+	return PhysicsScene::create(*this, universe, *m_impl->m_engine);
 }
 
 
@@ -127,16 +58,12 @@ class AssertNullAllocator : public physx::PxAllocatorCallback
 
 bool PhysicsSystem::create(Engine& engine)
 {
-	engine.getWorldEditor()->registerProperty("box_rigid_actor", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("dynamic"), &PhysicsScene::getIsDynamic, &PhysicsScene::setIsDynamic));
-	engine.getWorldEditor()->registerProperty("box_rigid_actor", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("size"), &PhysicsScene::getHalfExtents, &PhysicsScene::setHalfExtents));
-	engine.getWorldEditor()->registerProperty("mesh_rigid_actor", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("source"), &PhysicsScene::getShapeSource, &PhysicsScene::setShapeSource, IPropertyDescriptor::FILE));
-	engine.getWorldEditor()->registerProperty("physical_heightfield", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("heightmap"), &PhysicsScene::getHeightmap, &PhysicsScene::setHeightmap, IPropertyDescriptor::FILE));
-	engine.getWorldEditor()->registerProperty("physical_heightfield", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("xz_scale"), &PhysicsScene::getHeightmapXZScale, &PhysicsScene::setHeightmapXZScale));
-	engine.getWorldEditor()->registerProperty("physical_heightfield", LUMIX_NEW(PropertyDescriptor<PhysicsScene>)(crc32("y_scale"), &PhysicsScene::getHeightmapYScale, &PhysicsScene::setHeightmapYScale));
-	engine.getWorldEditor()->registerCreator(HEIGHTFIELD_HASH, *this);
-	engine.getWorldEditor()->registerCreator(BOX_ACTOR_HASH, *this);
-	engine.getWorldEditor()->registerCreator(MESH_ACTOR_HASH, *this);
-	engine.getWorldEditor()->registerCreator(CONTROLLER_HASH, *this);
+	engine.getWorldEditor()->registerProperty("box_rigid_actor", LUMIX_NEW(BoolPropertyDescriptor<PhysicsScene>)("dynamic", &PhysicsScene::getIsDynamic, &PhysicsScene::setIsDynamic));
+	engine.getWorldEditor()->registerProperty("box_rigid_actor", LUMIX_NEW(Vec3PropertyDescriptor<PhysicsScene>)("size", &PhysicsScene::getHalfExtents, &PhysicsScene::setHalfExtents));
+	engine.getWorldEditor()->registerProperty("mesh_rigid_actor", LUMIX_NEW(FilePropertyDescriptor<PhysicsScene>)("source", &PhysicsScene::getShapeSource, &PhysicsScene::setShapeSource, "Physics (*.pda)"));
+	engine.getWorldEditor()->registerProperty("physical_heightfield", LUMIX_NEW(FilePropertyDescriptor<PhysicsScene>)("heightmap", &PhysicsScene::getHeightmap, &PhysicsScene::setHeightmap, "Image (*.raw)"));
+	engine.getWorldEditor()->registerProperty("physical_heightfield", LUMIX_NEW(DecimalPropertyDescriptor<PhysicsScene>)("xz_scale", &PhysicsScene::getHeightmapXZScale, &PhysicsScene::setHeightmapXZScale));
+	engine.getWorldEditor()->registerProperty("physical_heightfield", LUMIX_NEW(DecimalPropertyDescriptor<PhysicsScene>)("y_scale", &PhysicsScene::getHeightmapYScale, &PhysicsScene::setHeightmapYScale));
 
 	m_impl = LUMIX_NEW(PhysicsSystemImpl);
 	m_impl->m_allocator = LUMIX_NEW(AssertNullAllocator)();

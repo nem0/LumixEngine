@@ -32,7 +32,7 @@ public:
 	};
 	
 public:
-	void apply(Renderer& renderer, PipelineInstance& pipeline);
+	void apply(Renderer& renderer, PipelineInstance& pipeline) const;
 	bool isZTest() const { return m_is_z_test; }
 	void enableZTest(bool enable) { m_is_z_test = enable; }
 	bool isBackfaceCulling() const { return m_is_backface_culling; }
@@ -48,6 +48,7 @@ public:
 	void addTexture(Texture* texture);
 	void setTexture(int i, Texture* texture);
 	void removeTexture(int i);
+	bool save(ISerializer& serializer);
 
 private:
 	Material(const Path& path, ResourceManager& resource_manager)
@@ -61,7 +62,6 @@ private:
 
 	~Material();
 
-	bool save(ISerializer& serializer);
 	virtual void doUnload(void) override;
 	virtual FS::ReadCallback getReadCallback() override;
 
@@ -79,6 +79,7 @@ private:
 		};
 		static const int MAX_NAME_LENGTH = 30;
 		char m_name[MAX_NAME_LENGTH + 1];
+		uint32_t m_name_hash;
 		Type m_type;
 		union
 		{

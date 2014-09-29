@@ -1,4 +1,5 @@
 #include "universe/entity.h"
+#include "core/crc32.h"
 #include "universe/universe.h"
 
 namespace Lumix
@@ -86,14 +87,14 @@ namespace Lumix
 	}
 
 
-	void Entity::setPosition(float x, float y, float z)
+	void Entity::setPosition(float x, float y, float z) const
 	{
 		universe->m_positions[index].set(x, y, z);
 		universe->entityMoved().invoke(*this);
 	}
 
 
-	void Entity::setPosition(const Vec3& pos)
+	void Entity::setPosition(const Vec3& pos) const
 	{
 		universe->m_positions[index] = pos;
 		universe->entityMoved().invoke(*this);
@@ -112,17 +113,40 @@ namespace Lumix
 	}
 
 
-	void Entity::setRotation(float x, float y, float z, float w)
+	void Entity::setRotation(float x, float y, float z, float w) const
 	{
 		universe->m_rotations[index].set(x, y, z, w);
 		universe->entityMoved().invoke(*this);
 	}
 
 
-	void Entity::setRotation(const Quat& rot)
+	void Entity::setRotation(const Quat& rot) const
 	{
 		universe->m_rotations[index] = rot;
 		universe->entityMoved().invoke(*this);
+	}
+
+	const char* Entity::getName() const
+	{
+		auto iter = universe->m_id_to_name_map.find(index);
+		return iter == universe->m_id_to_name_map.end() ? "" : iter.value().c_str();
+	}
+
+
+	void Entity::setName(const char* name)
+	{
+		auto iter = universe->m_id_to_name_map.find(index);
+		if (iter != universe->m_id_to_name_map.end())
+		{
+			universe->m_name_to_id_map.erase(crc32(iter.value().c_str()));
+			universe->m_id_to_name_map.erase(iter);
+		}
+
+		if (name && name[0] != '\0')
+		{
+			universe->m_name_to_id_map.insert(crc32(name), index);
+			universe->m_id_to_name_map.insert(index, string(name));
+		}
 	}
 
 

@@ -1,19 +1,26 @@
 #include "sceneview.h"
 #include "editor/world_editor.h"
+#include "core/crc32.h"
+#include "editor/ieditor_command.h"
+#include "engine/engine.h"
+#include "engine/iplugin.h"
+#include "graphics/pipeline.h"
+#include "graphics/render_scene.h"
+#include "insert_mesh_command.h"
 #include <qapplication.h>
 #include <QDoubleSpinBox>
 #include <QDragEnterEvent>
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QVBoxLayout>
-#include "core/crc32.h"
-#include "graphics/pipeline.h"
+
 
 class ViewWidget : public QWidget
 {
 	public:
-		ViewWidget(QWidget* parent)
+		ViewWidget(SceneView& view, QWidget* parent)
 			: QWidget(parent)
+			, m_view(view)
 		{
 			setMouseTracking(true);
 		}
@@ -24,6 +31,16 @@ class ViewWidget : public QWidget
 			m_last_x = event->x();
 			m_last_y = event->y();
 			setFocus();
+		}
+
+		virtual void wheelEvent(QWheelEvent* event) override
+		{
+			float speed = m_view.getNavivationSpeed();
+			if (QApplication::keyboardModifiers() & Qt::ShiftModifier)
+			{
+				speed *= 10;
+			}
+			m_world_editor->navigate(event->delta() * 0.1f, 0, speed);
 		}
 
 		virtual void mouseMoveEvent(QMouseEvent* event) override
@@ -44,6 +61,7 @@ class ViewWidget : public QWidget
 		Lumix::WorldEditor* m_world_editor;
 		int m_last_x;
 		int m_last_y;
+		SceneView& m_view;
 };
 
 SceneView::SceneView(QWidget* parent) :
@@ -53,7 +71,7 @@ SceneView::SceneView(QWidget* parent) :
 	QWidget* root = new QWidget();
 	QVBoxLayout* vertical_layout = new QVBoxLayout(root);
 	QHBoxLayout* horizontal_layout = new QHBoxLayout(root);
-	m_view = new ViewWidget(root);
+	m_view = new ViewWidget(*this, root);
 	m_speed_input = new QDoubleSpinBox(root);
 	m_speed_input->setSingleStep(0.1f);
 	m_speed_input->setValue(0.1f);
@@ -98,12 +116,24 @@ void SceneView::dropEvent(QDropEvent *event)
 		QString file = list[0].toLocalFile();
 		if(file.endsWith(".msh"))
 		{
-			m_world_editor->addEntityAt(event->pos().x(), event->pos().y());
-			m_world_editor->addComponent(crc32("renderable"));
-			char rel_path[LUMIX_MAX_PATH];
-			m_world_editor->getRelativePath(rel_path, LUMIX_MAX_PATH, file.toLatin1().data());
-			m_world_editor->setProperty("renderable", "source", rel_path, strlen(rel_path));
-			m_world_editor->selectEntity(m_world_editor->getSelectedEntity());
+			Lumix::Vec3 position;
+			Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(m_world_editor->getEditCamera().scene);
+
+			Lumix::Vec3 origin;
+			Lumix::Vec3 dir;
+			scene->getRay(m_world_editor->getEditCamera(), event->pos().x(), event->pos().y(), origin, dir);
+			Lumix::RayCastModelHit hit = scene->castRay(origin, dir, Lumix::Component::INVALID);
+			if (hit.m_is_hit)
+			{
+				position = hit.m_origin + hit.m_dir * hit.m_t;
+			}
+			else
+			{
+				position.set(0, 0, 0);
+			}
+			InsertMeshCommand* command = new InsertMeshCommand(*static_cast<ViewWidget&>(*m_view).m_world_editor, position, file.toLatin1().data());
+			m_world_editor->executeCommand(command);
+			m_world_editor->selectEntities(&command->getEntity(), 1);
 		}
 	}
 }

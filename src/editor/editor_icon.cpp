@@ -93,8 +93,7 @@ void EditorIcon::render(Renderer* renderer, IRenderDevice& render_device)
 		Component camera = m_scene->getCameraInSlot("editor");
 		Lumix::Matrix mtx = camera.entity.getMatrix();
 
-		float fov;
-		static_cast<RenderScene*>(camera.system)->getCameraFOV(camera, fov);
+		float fov = static_cast<RenderScene*>(camera.scene)->getCameraFOV(camera);
 		float scale = tan(fov * Math::PI / 180 * 0.5f) * (m_entity.getPosition() - mtx.getTranslation()).length() / 20;
 
 		mtx.setTranslation(m_entity.getPosition());

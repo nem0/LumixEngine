@@ -26,7 +26,7 @@ namespace Lumix
 			virtual uint32_t getTemplate(const Entity& entity) = 0;
 			virtual const Array<Entity>& getInstances(uint32_t template_name_hash) = 0;
 			virtual class Array<string>& getTemplateNames() = 0;
-			virtual Entity createInstance(const char* name) = 0;
+			virtual Entity createInstance(const char* name, const Vec3& position) = 0;
 
 			virtual DelegateList<void()>& updated() = 0;
 	};

@@ -1,6 +1,10 @@
 #pragma once
 
 
+#include "core/lumix.h"
+#include "core/array.h"
+
+
 namespace Lumix
 {
 	namespace FS
@@ -18,10 +22,10 @@ namespace Lumix
 	class EditorServer;
 	class InputSystem;
 	class IPlugin;
+	class IScene;
 	class ISerializer;
 	class PluginManager;
 	class Renderer;
-	class RenderScene;
 	class ResourceManager;
 	class Universe;
 
@@ -29,36 +33,37 @@ namespace Lumix
 	class LUMIX_ENGINE_API Engine
 	{
 		public:
-			Engine() { m_impl = NULL; }
-			~Engine() { ASSERT(m_impl == NULL); }
+			virtual ~Engine() {}
 
-			bool create(const char* base_path, FS::FileSystem* fs, WorldEditor* editor_server);
-			void destroy();
+			static Engine* create(const char* base_path, FS::FileSystem* fs, WorldEditor* editor);
+			static void destroy(Engine* engine);
 
-			Universe* createUniverse();
-			void destroyUniverse();
+			virtual Universe* createUniverse() = 0;
+			virtual void destroyUniverse() = 0;
 
-			WorldEditor* getWorldEditor() const;
-			FS::FileSystem& getFileSystem();
-			Renderer& getRenderer();
-			InputSystem& getInputSystem();
-			PluginManager& getPluginManager();
-			IPlugin* loadPlugin(const char* name);
-			Universe* getUniverse() const;
-			RenderScene* getRenderScene() const;
+			virtual WorldEditor* getWorldEditor() const = 0;
+			virtual FS::FileSystem& getFileSystem() = 0;
+			virtual Renderer& getRenderer() = 0;
+			virtual InputSystem& getInputSystem() = 0;
+			virtual PluginManager& getPluginManager() = 0;
+			virtual IPlugin* loadPlugin(const char* name) = 0;
+			virtual Universe* getUniverse() const = 0;
+			virtual const Array<IScene*>& getScenes() const = 0;
+			virtual IScene* getScene(uint32_t type) const = 0;
 			MTJD::Manager& getMTJDManager() const;
 //			CullingSystem& getCullingSystem() const;
 
-			ResourceManager& getResourceManager() const;
+			virtual ResourceManager& getResourceManager() = 0;
 
-			const char* getBasePath() const;
-			void update(bool is_game_running);
-			void serialize(ISerializer& serializer);
-			void deserialize(ISerializer& serializer);
-			float getFPS() const;
+			virtual const char* getBasePath() const = 0;
+			virtual void update(bool is_game_running) = 0;
+			virtual void serialize(ISerializer& serializer) = 0;
+			virtual void deserialize(ISerializer& serializer) = 0;
+			virtual float getFPS() const = 0;
+			virtual float getLastTimeDelta() = 0;
 
-		private:
-			struct EngineImpl* m_impl;
+		protected:
+			Engine() {}
 	};
 	
 

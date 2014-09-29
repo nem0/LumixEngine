@@ -18,7 +18,6 @@
 #include "sceneview.h"
 #include "gameview.h"
 #include "wgl_render_device.h"
-#include "materialmanager.h"
 
 
 class App
@@ -42,8 +41,8 @@ class App
 
 		void onUniverseCreated()
 		{
-			m_edit_render_device->getPipeline().setScene(m_world_editor->getEngine().getRenderScene()); 
-			m_game_render_device->getPipeline().setScene(m_world_editor->getEngine().getRenderScene()); 
+			m_edit_render_device->getPipeline().setScene((Lumix::RenderScene*)m_world_editor->getEngine().getScene(crc32("renderer")));
+			m_game_render_device->getPipeline().setScene((Lumix::RenderScene*)m_world_editor->getEngine().getScene(crc32("renderer")));
 		}
 
 		void onUniverseDestroyed()
@@ -198,10 +197,10 @@ class App
 
 		void renderPhysics()
 		{
-			Lumix::PhysicsSystem* system = static_cast<Lumix::PhysicsSystem*>(m_world_editor->getEngine().getPluginManager().getPlugin("physics"));
-			if(system && system->getScene())
+			Lumix::PhysicsScene* scene = static_cast<Lumix::PhysicsScene*>(m_world_editor->getEngine().getScene(crc32("physics")));
+			if(scene)
 			{
-				system->getScene()->render();
+				scene->render();
 			}
 		}
 
@@ -218,8 +217,8 @@ class App
 
 			HWND hwnd = (HWND)m_main_window->getSceneView()->getViewWidget()->winId();
 			HWND game_hwnd = (HWND)m_main_window->getGameView()->getContentWidget()->winId();
-			HWND hwnds[] = { hwnd, game_hwnd, (HWND)m_main_window->getMaterialManager()->getPreview()->winId() };
-			HGLRC hglrc = createGLContext(hwnds, 3);
+			HWND hwnds[] = { hwnd, game_hwnd };
+			HGLRC hglrc = createGLContext(hwnds, 2);
 
 			m_world_editor = Lumix::WorldEditor::create(QDir::currentPath().toLocal8Bit().data());
 			ASSERT(m_world_editor);
@@ -231,14 +230,14 @@ class App
 			m_edit_render_device = new WGLRenderDevice(m_world_editor->getEngine(), "pipelines/main.json");
 			m_edit_render_device->m_hdc = GetDC(hwnd);
 			m_edit_render_device->m_opengl_context = hglrc;
-			m_edit_render_device->getPipeline().setScene(m_world_editor->getEngine().getRenderScene()); /// TODO manage scene properly
+			m_edit_render_device->getPipeline().setScene((Lumix::RenderScene*)m_world_editor->getEngine().getScene(crc32("renderer")));
 			m_world_editor->setEditViewRenderDevice(*m_edit_render_device);
 			m_edit_render_device->getPipeline().addCustomCommandHandler("render_physics").bind<App, &App::renderPhysics>(this);
 
 			m_game_render_device = new	WGLRenderDevice(m_world_editor->getEngine(), "pipelines/game_view.json");
 			m_game_render_device->m_hdc = GetDC(game_hwnd);
 			m_game_render_device->m_opengl_context = hglrc;
-			m_game_render_device->getPipeline().setScene(m_world_editor->getEngine().getRenderScene()); /// TODO manage scene properly
+			m_game_render_device->getPipeline().setScene((Lumix::RenderScene*)m_world_editor->getEngine().getScene(crc32("renderer")));
 			m_world_editor->getEngine().getRenderer().setRenderDevice(*m_game_render_device);
 
 			m_world_editor->universeCreated().bind<App, &App::onUniverseCreated>(this);
@@ -248,6 +247,7 @@ class App
 			m_main_window->getGameView()->setPipeline(m_game_render_device->getPipeline());
 		}
 
+
 		void shutdown()
 		{
 			delete m_game_render_device;
@@ -255,6 +255,7 @@ class App
 			delete m_edit_render_device;
 			m_edit_render_device = NULL;
 		}
+
 
 		void renderEditView()
 		{
@@ -265,9 +266,8 @@ class App
 			m_world_editor->getGizmo().updateScale(m_world_editor->getEditCamera());
 			m_world_editor->getGizmo().render(m_world_editor->getEngine().getRenderer(), *m_edit_render_device);
 			m_edit_render_device->endFrame();
-
-			m_main_window->getMaterialManager()->updatePreview();
 		}
+
 
 		void handleEvents()
 		{
@@ -308,12 +308,14 @@ class App
 			}
 		}
 
+
 		void run()
 		{
 			while (m_main_window->isVisible())
 			{
 				{
 					PROFILE_BLOCK("tick");
+					m_main_window->update();
 					renderEditView();
 					m_world_editor->getEngine().getRenderer().renderGame();
 					m_world_editor->tick();

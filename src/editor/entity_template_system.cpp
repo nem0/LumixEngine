@@ -4,10 +4,21 @@
 #include "core/iserializer.h"
 #include "core/map.h"
 #include "core/string.h"
+#include "editor/ieditor_command.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
+#include "engine/iplugin.h"
+#include "graphics/render_scene.h"
 #include "universe/entity.h"
 #include "universe/universe.h"
+
+
+static const uint32_t RENDERABLE_HASH = crc32("renderable");
+static const uint32_t CAMERA_HASH = crc32("camera");
+static const uint32_t LIGHT_HASH = crc32("light");
+static const uint32_t SCRIPT_HASH = crc32("script");
+static const uint32_t ANIMABLE_HASH = crc32("animable");
+static const uint32_t TERRAIN_HASH = crc32("terrain");
 
 
 namespace Lumix
@@ -16,13 +27,82 @@ namespace Lumix
 
 	class EntityTemplateSystemImpl : public EntityTemplateSystem
 	{
+		private:
+			class CreateInstanceCommand : public IEditorCommand
+			{
+				public:
+					CreateInstanceCommand(EntityTemplateSystemImpl& entity_system, const char* template_name, const Vec3& position)
+						: m_entity_system(entity_system)
+						, m_template_name_hash(crc32(template_name))
+						, m_position(position)
+					{
+					}
+
+					virtual void execute() override
+					{
+						Map<uint32_t, Array<Entity> >::iterator iter = m_entity_system.m_instances.find(m_template_name_hash);
+						if (iter != m_entity_system.m_instances.end())
+						{
+							m_entity = m_entity_system.m_editor.getEngine().getUniverse()->createEntity();
+							m_entity.setPosition(m_position);
+
+							m_entity_system.m_instances[m_template_name_hash].push(m_entity);
+							Entity template_entity = iter.second()[0];
+							const Entity::ComponentList& template_cmps = template_entity.getComponents();
+							for (int i = 0; i < template_cmps.size(); ++i)
+							{
+								m_entity_system.m_editor.cloneComponent(template_cmps[i], m_entity);
+							}
+						}
+						else
+						{
+							ASSERT(false);
+						}
+					}
+
+
+					virtual void undo() override
+					{
+						const Entity::ComponentList& cmps = m_entity.getComponents();
+						for (int i = 0; i < cmps.size(); ++i)
+						{
+							cmps[i].scene->destroyComponent(cmps[i]);
+						}
+						m_entity_system.m_universe->destroyEntity(m_entity);
+						m_entity = Entity::INVALID;
+					}
+
+
+					virtual bool merge(IEditorCommand&) override
+					{
+						return false;
+					}
+
+
+					virtual uint32_t getType() override
+					{
+						static const uint32_t hash = crc32("create_entity_template_instance");
+						return hash;
+					}
+
+
+					const Entity& getEntity() const { return m_entity; }
+
+				private:
+					EntityTemplateSystemImpl& m_entity_system;
+					uint32_t m_template_name_hash;
+					Entity m_entity;
+					Vec3 m_position;
+			};
+
 		public:
 			EntityTemplateSystemImpl(WorldEditor& editor)
 				: m_editor(editor)
+				, m_universe(NULL)
 			{
-				m_universe = editor.getEngine().getUniverse();
 				editor.universeCreated().bind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseCreated>(this);
 				editor.universeDestroyed().bind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseDestroyed>(this);
+				setUniverse(editor.getEngine().getUniverse());
 			}
 
 
@@ -30,6 +110,21 @@ namespace Lumix
 			{
 				m_editor.universeCreated().unbind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseCreated>(this);
 				m_editor.universeDestroyed().unbind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseDestroyed>(this);
+				setUniverse(NULL);
+			}
+
+
+			void setUniverse(Universe* universe)
+			{
+				if (m_universe)
+				{
+					m_universe->entityDestroyed().unbind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onEntityDestroyed>(this);
+				}
+				m_universe = universe;
+				if (m_universe)
+				{
+					m_universe->entityDestroyed().bind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onEntityDestroyed>(this);
+				}
 			}
 
 
@@ -37,7 +132,7 @@ namespace Lumix
 			{
 				m_instances.clear();
 				m_template_names.clear();
-				m_universe = m_editor.getEngine().getUniverse();
+				setUniverse(m_editor.getEngine().getUniverse());
 			}
 
 
@@ -45,7 +140,30 @@ namespace Lumix
 			{
 				m_instances.clear();
 				m_template_names.clear();
-				m_universe = NULL;
+				setUniverse(NULL);
+			}
+
+
+			void onEntityDestroyed(const Entity& entity)
+			{
+				uint32_t tpl = getTemplate(entity);
+				if (tpl != 0)
+				{
+					Array<Entity>& instances = m_instances[tpl];
+					instances.eraseItemFast(entity);
+					if (instances.empty())
+					{
+						m_instances.erase(tpl);
+						for (int i = 0; i < m_template_names.size(); ++i)
+						{
+							if (crc32(m_template_names[i].c_str()) == tpl)
+							{
+								m_template_names.eraseFast(i);
+								break;
+							}
+						}
+					}
+				}
 			}
 
 
@@ -88,27 +206,11 @@ namespace Lumix
 			}
 
 
-			virtual Entity createInstance(const char* name) override
+			virtual Entity createInstance(const char* name, const Vec3& position) override
 			{
-				uint32_t name_hash = crc32(name);
-				Map<uint32_t, Array<Entity> >::iterator iter = m_instances.find(name_hash);
-				if (iter == m_instances.end())
-				{
-					ASSERT(false);
-					return Entity::INVALID;
-				}
-				else
-				{
-					Entity entity = m_editor.addEntity();
-					m_instances[name_hash].push(entity);
-					Entity template_entity = iter.second()[0];
-					const Entity::ComponentList& template_cmps = template_entity.getComponents();
-					for (int i = 0; i < template_cmps.size(); ++i)
-					{
-						m_editor.cloneComponent(template_cmps[i], entity);
-					}
-					return entity;
-				}
+				CreateInstanceCommand* command = LUMIX_NEW(CreateInstanceCommand)(*this, name, position);
+				m_editor.executeCommand(command);
+				return command->getEntity();
 			}
 
 
