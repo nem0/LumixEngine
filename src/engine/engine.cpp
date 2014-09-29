@@ -199,14 +199,24 @@ namespace Lumix
 				}
 				float dt = m_timer->tick();
 				m_last_time_delta = dt;
-				for (int i = 0; i < m_scenes.size(); ++i)
-				{
-					m_scenes[i]->update(dt);
-				}
 				if (is_game_running)
 				{
+					for (int i = 0; i < m_scenes.size(); ++i)
+					{
+						m_scenes[i]->update(dt);
+					}
 					m_plugin_manager.update(dt);
 					m_input_system.update(dt);
+				}
+				else
+				{
+					for (int i = 0; i < m_scenes.size(); ++i)
+					{
+						if(&m_scenes[i]->getPlugin() == m_renderer)
+						{
+							m_scenes[i]->update(dt);
+						}
+					}
 				}
 			}
 
