@@ -3,6 +3,7 @@
 #include "core/lumix.h"
 #include "core/array.h"
 #include "core/string.h"
+#include "engine/iplugin.h"
 #include "graphics/ray_cast_model_hit.h"
 #include "universe/component.h"
 
@@ -35,7 +36,7 @@ namespace Lumix
 	struct RenderableInfo
 	{
 		Geometry* m_geometry;
-		Mesh* m_mesh;
+		const Mesh* m_mesh;
 		const Pose* m_pose;
 		const ModelInstance* m_model;
 		const Matrix* m_matrix;
@@ -59,16 +60,12 @@ namespace Lumix
 		float m_life;
 	};
 
-	class LUMIX_ENGINE_API RenderScene
+	class LUMIX_ENGINE_API RenderScene : public IScene
 	{
 		public:
-			static RenderScene* createInstance(Engine& engine, Universe& universe);
+			static RenderScene* createInstance(Renderer& renderer, Engine& engine, Universe& universe);
 			static void destroyInstance(RenderScene* scene);
 
-			virtual void serialize(ISerializer& serializer) = 0;
-			virtual void deserialize(ISerializer& serializer) = 0;
-			virtual Component createComponent(uint32_t type, const Entity& entity) = 0;
-			virtual void destroyComponent(const Component& component) = 0;
 			virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Component& ignore) = 0;
 			virtual void getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) = 0;
 			virtual void applyCamera(Component camera) = 0;
@@ -86,14 +83,14 @@ namespace Lumix
 			virtual void addDebugCircle(const Vec3& center, float radius, const Vec3& color, float life) = 0;
 			virtual const Array<DebugLine>& getDebugLines() const = 0;
 			virtual Component getCameraInSlot(const char* slot) = 0;
-			virtual void getCameraFOV(Component camera, float& fov) = 0;
-			virtual void setCameraFOV(Component camera, const float& fov) = 0;
-			virtual void setCameraFarPlane(Component camera, const float& far) = 0;
-			virtual void setCameraNearPlane(Component camera, const float& near) = 0;
-			virtual void getCameraFarPlane(Component camera, float& far) = 0;
-			virtual void getCameraNearPlane(Component camera, float& near) = 0;
-			virtual void getCameraWidth(Component camera, float& width) = 0;
-			virtual void getCameraHeight(Component camera, float& height) = 0;
+			virtual float getCameraFOV(Component camera) = 0;
+			virtual void setCameraFOV(Component camera, float fov) = 0;
+			virtual void setCameraFarPlane(Component camera, float far) = 0;
+			virtual void setCameraNearPlane(Component camera, float near) = 0;
+			virtual float getCameraFarPlane(Component camera) = 0;
+			virtual float getCameraNearPlane(Component camera) = 0;
+			virtual float getCameraWidth(Component camera) = 0;
+			virtual float getCameraHeight(Component camera) = 0;
 			virtual void setCameraSlot(Component camera, const string& slot) = 0;
 			virtual void getCameraSlot(Component camera, string& slot) = 0;
 			virtual void setCameraSize(Component camera, int w, int h) = 0;
@@ -101,20 +98,30 @@ namespace Lumix
 			virtual void getRenderablePath(Component cmp, string& path) = 0;
 			virtual void setRenderableLayer(Component cmp, const int32_t& layer) = 0;
 			virtual void setRenderablePath(Component cmp, const string& path) = 0;
-			virtual void setRenderableScale(Component cmp, const float& scale) = 0;
+			virtual void setRenderableScale(Component cmp, float scale) = 0;
 			virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) = 0;
 			
 			virtual void getGrassInfos(Array<GrassInfo>& infos, int64_t layer_mask) = 0;
 			virtual void getTerrainInfos(Array<TerrainInfo>& infos, int64_t layer_mask) = 0;
+			virtual float getTerrainHeightAt(Component cmp, float x, float z) = 0;
 			virtual void setTerrainMaterial(Component cmp, const string& path) = 0;
 			virtual void getTerrainMaterial(Component cmp, string& path) = 0;
-			virtual void setTerrainXZScale(Component cmp, const float& scale) = 0;
-			virtual void getTerrainXZScale(Component cmp, float& scale) = 0;
-			virtual void setTerrainYScale(Component cmp, const float& scale) = 0;
-			virtual void getTerrainYScale(Component cmp, float& scale) = 0;
-			virtual void setTerrainGrass(Component cmp, const string& path) = 0;
-			virtual void getTerrainGrass(Component cmp, string& path) = 0;
+			virtual Material* getTerrainMaterial(Component cmp) = 0;
+			virtual void setTerrainXZScale(Component cmp, float scale) = 0;
+			virtual float getTerrainXZScale(Component cmp) = 0;
+			virtual void setTerrainYScale(Component cmp, float scale) = 0;
+			virtual float getTerrainYScale(Component cmp) = 0;
 			virtual void setTerrainBrush(Component cmp, const Vec3& position, float size) = 0;
+
+			virtual void setGrass(Component cmp, int index, const string& path) = 0;
+			virtual void getGrass(Component cmp, int index, string& path) = 0;
+			virtual void setGrassGround(Component cmp, int index, int ground) = 0;
+			virtual int getGrassGround(Component cmp, int index) = 0;
+			virtual void setGrassDensity(Component cmp, int index, int density) = 0;
+			virtual int getGrassDensity(Component cmp, int index) = 0;
+			virtual int getGrassCount(Component cmp) = 0;
+			virtual void addGrass(Component cmp, int index) = 0;
+			virtual void removeGrass(Component cmp, int index) = 0;
 
 		protected:
 			virtual ~RenderScene() {}

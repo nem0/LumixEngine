@@ -24,6 +24,7 @@ class ModelInstance
 		Matrix& getMatrix() { return m_matrix; }
 		Model* getModel() const { return m_model; }
 		Pose& getPose() { return m_pose; }
+		const Pose& getPose() const { return m_pose; }
 		void setMatrix(const Matrix& mtx);
 
 	private:

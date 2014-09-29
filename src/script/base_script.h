@@ -8,7 +8,7 @@ namespace Lumix
 {
 
 
-class ScriptSystem;
+class ScriptScene;
 class ScriptVisitor;
 
 
@@ -17,7 +17,7 @@ class BaseScript
 	public:
 		virtual ~BaseScript() {}
 
-		virtual void create(ScriptSystem& ctx, Entity e) = 0;
+		virtual void create(ScriptScene& ctx, Entity e) = 0;
 		virtual void update(float) {}
 		virtual void visit(ScriptVisitor&) {}
 };

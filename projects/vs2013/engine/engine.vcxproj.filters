@@ -13,17 +13,8 @@
     <Filter Include="graphics">
       <UniqueIdentifier>{4958eded-acc7-41f8-ac9b-6f6bc47bd0ae}</UniqueIdentifier>
     </Filter>
-    <Filter Include="animation">
-      <UniqueIdentifier>{240998ba-942c-45cf-a31c-06007274bd82}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\src\animation\animation.cpp">
-      <Filter>animation</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\animation\animation_system.cpp">
-      <Filter>animation</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\graphics\frame_buffer.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
@@ -108,12 +99,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\src\animation\animation.h">
-      <Filter>animation</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\animation\animation_system.h">
-      <Filter>animation</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\graphics\frame_buffer.h">
       <Filter>graphics</Filter>
     </ClInclude>

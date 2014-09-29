@@ -19,11 +19,9 @@ namespace Lumix
 	class ISerializer;
 	class Universe;
 
-	class LUMIX_ENGINE_API AnimationSystem : public IPlugin
+	class LUMIX_ANIMATION_API AnimationScene : public IScene
 	{
 		public:
-			static AnimationSystem* createInstance();
-
 			virtual void setFrame(Component cmp, int frame) = 0;
 			virtual bool isManual(Component cmp) = 0;
 			virtual void setManual(Component cmp, bool is_manual) = 0;
@@ -33,7 +31,20 @@ namespace Lumix
 			virtual void playAnimation(const Component& cmp, const char* path) = 0;
 			virtual void setAnimationFrame(const Component& cmp, int frame) = 0;
 			virtual int getFrameCount(const Component& cmp) const = 0;
+			virtual void update(float time_delta) = 0;
 	};
 
+
+	class LUMIX_ANIMATION_API AnimationSystem : public IPlugin
+	{
+		public:
+			static AnimationSystem* createInstance();
+	};
+
+
+	extern "C"
+	{
+		LUMIX_ANIMATION_API IPlugin* createPlugin();
+	}
 
 }// ~ namespace Lumix 
