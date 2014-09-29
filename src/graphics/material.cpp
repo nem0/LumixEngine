@@ -53,7 +53,7 @@ void Material::apply(Renderer& renderer, PipelineInstance& pipeline) const
 		}
 		for (int i = 0, c = m_textures.size(); i < c; ++i)
 		{
-			m_textures[i]->apply(i);
+			m_textures[i].m_texture->apply(i);
 		}
 		renderer.enableAlphaToCoverage(m_is_alpha_to_coverage);
 		renderer.enableZTest(m_is_z_test);
@@ -83,7 +83,6 @@ void Material::apply(Renderer& renderer, PipelineInstance& pipeline) const
 		if (m_shader->isShadowmapRequired())
 		{
 			glActiveTexture(GL_TEXTURE0 + m_textures.size());
-			glEnable(GL_TEXTURE_2D);
 			glBindTexture(GL_TEXTURE_2D, pipeline.getShadowmapFramebuffer()->getDepthTexture());
 			renderer.setUniform(*m_shader, "shadowmap", SHADOWMAP_HASH, m_textures.size());
 		}
@@ -103,8 +102,8 @@ void Material::doUnload(void)
 	ResourceManagerBase* texture_manager = m_resource_manager.get(ResourceManager::TEXTURE);
 	for(int i = 0; i < m_textures.size(); i++)
 	{
-		removeDependency(*m_textures[i]);
-		texture_manager->unload(*m_textures[i]);
+		removeDependency(*m_textures[i].m_texture);
+		texture_manager->unload(*m_textures[i].m_texture);
 	}
 	m_textures.clear();
 
@@ -126,9 +125,47 @@ bool Material::save(ISerializer& serializer)
 	for (int i = 0; i < m_textures.size(); ++i)
 	{
 		char path[LUMIX_MAX_PATH];
-		PathUtils::getFilename(path, LUMIX_MAX_PATH, m_textures[i]->getPath().c_str());
-		serializer.serialize("texture", path);
+		PathUtils::getFilename(path, LUMIX_MAX_PATH, m_textures[i].m_texture->getPath().c_str());
+		serializer.beginObject("texture");
+		serializer.serialize("source", path);
+		serializer.serialize("keep_data", m_textures[i].m_keep_data);
+		if (m_textures[i].m_uniform[0] != '\0')
+		{
+			serializer.serialize("uniform", m_textures[i].m_uniform);
+		}
+		serializer.endObject();
 	}
+	serializer.beginArray("uniforms");
+	for (int i = 0; i < m_uniforms.size(); ++i)
+	{
+		serializer.beginObject();
+		serializer.serialize("name", m_uniforms[i].m_name);
+		switch (m_uniforms[i].m_type)
+		{
+			case Uniform::FLOAT:
+				serializer.serialize("float_value", m_uniforms[i].m_float);
+				break;
+			case Uniform::TIME:
+				serializer.serialize("time", m_uniforms[i].m_float);
+				break;
+			case Uniform::INT:
+				serializer.serialize("int_value", m_uniforms[i].m_int);
+				break;
+			case Uniform::MATRIX:
+				serializer.beginArray("matrix_value");
+				for (int j = 0; j < 16; ++j)
+				{
+					serializer.serializeArrayItem(m_uniforms[i].m_matrix[j]);
+				}
+				serializer.endArray();
+				break;
+			default:
+				ASSERT(false);
+				break;
+		}
+		serializer.endObject();
+	}
+	serializer.endArray();
 	serializer.serialize("alpha_to_coverage", m_is_alpha_to_coverage);
 	serializer.serialize("backface_culling", m_is_backface_culling);
 	serializer.serialize("z_test", m_is_z_test);
@@ -191,26 +228,38 @@ void Material::deserializeUniforms(ISerializer& serializer)
 
 void Material::removeTexture(int i)
 {
-	if (m_textures[i])
+	if (m_textures[i].m_texture)
 	{
-		removeDependency(*m_textures[i]);
-		m_resource_manager.get(ResourceManager::TEXTURE)->unload(*m_textures[i]);
+		removeDependency(*m_textures[i].m_texture);
+		m_resource_manager.get(ResourceManager::TEXTURE)->unload(*m_textures[i].m_texture);
 	}
 	m_textures.erase(i);
 }
 
+Texture* Material::getTextureByUniform(const char* uniform) const
+{
+	for (int i = 0; i < m_textures.size(); ++i)
+	{
+		if (strcmp(m_textures[i].m_uniform, uniform) == 0)
+		{
+			return m_textures[i].m_texture;
+		}
+	}
+	return NULL;
+}
+
 void Material::setTexture(int i, Texture* texture)
 { 
-	if (m_textures[i])
+	if (m_textures[i].m_texture)
 	{
-		removeDependency(*m_textures[i]);
-		m_resource_manager.get(ResourceManager::TEXTURE)->unload(*m_textures[i]);
+		removeDependency(*m_textures[i].m_texture);
+		m_resource_manager.get(ResourceManager::TEXTURE)->unload(*m_textures[i].m_texture);
 	}
 	if (texture)
 	{
 		addDependency(*texture);
 	}
-	m_textures[i] = texture; 
+	m_textures[i].m_texture = texture;
 }
 
 void Material::addTexture(Texture* texture)
@@ -219,7 +268,7 @@ void Material::addTexture(Texture* texture)
 	{
 		addDependency(*texture);
 	}
-	m_textures.push(texture);
+	m_textures.pushEmpty().m_texture = texture;
 }
 
 void Material::setShader(Shader* shader)
@@ -234,6 +283,78 @@ void Material::setShader(Shader* shader)
 	{
 		addDependency(*m_shader);
 	}
+}
+
+bool Material::deserializeTexture(ISerializer& serializer, const char* material_dir)
+{
+	char path[LUMIX_MAX_PATH];
+	TextureInfo& info = m_textures.pushEmpty();
+	serializer.deserializeObjectBegin();
+	char label[256];
+	bool data_kept = false;
+	while (!serializer.isObjectEnd())
+	{
+		serializer.deserializeLabel(label, sizeof(label));
+		if (strcmp(label, "source") == 0)
+		{
+			serializer.deserialize(path, MAX_PATH);
+			if (path[0] != '\0')
+			{
+				base_string<char, StackAllocator<LUMIX_MAX_PATH> > texture_path;
+				texture_path = material_dir;
+				texture_path += path;
+				info.m_texture = static_cast<Texture*>(m_resource_manager.get(ResourceManager::TEXTURE)->load(texture_path.c_str()));
+				addDependency(*info.m_texture);
+
+				if (info.m_keep_data)
+				{
+					if (info.m_texture->isReady() && !info.m_texture->getData())
+					{
+						g_log_error.log("Renderer") << "Cannot keep data for texture " << m_path.c_str() << "because the texture has already been loaded.";
+						return false;
+					}
+					if (!data_kept)
+					{
+						info.m_texture->addDataReference();
+						data_kept = true;
+					}
+				}
+			}
+		}
+		else if (strcmp("uniform", label) == 0)
+		{
+			Uniform& uniform = m_uniforms.pushEmpty();
+			serializer.deserialize(uniform.m_name, Uniform::MAX_NAME_LENGTH);
+			copyString(info.m_uniform, sizeof(info.m_uniform), uniform.m_name);
+			uniform.m_name_hash = crc32(uniform.m_name);
+			uniform.m_type = Uniform::INT;
+			uniform.m_int = info.m_texture ? m_textures.size() - 1 : m_textures.size();
+		}
+		else if (strcmp("keep_data", label) == 0)
+		{
+			serializer.deserialize(info.m_keep_data);
+			if (info.m_keep_data && info.m_texture)
+			{
+				if (info.m_texture->isReady() && !info.m_texture->getData())
+				{
+					g_log_error.log("Renderer") << "Cannot keep data for texture " << info.m_texture->getPath().c_str() << ", it's already loaded.";
+					return false;
+				}
+				if (!data_kept)
+				{
+					data_kept = true;
+					info.m_texture->addDataReference();
+				}
+			}
+		}
+		else
+		{
+			g_log_error.log("Renderer") << "Unknown data \"" << label << "\" in material " << m_path.c_str();
+			return false;
+		}
+	}
+	serializer.deserializeObjectEnd();
+	return true;
 }
 
 void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
@@ -254,41 +375,15 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			{
 				deserializeUniforms(serializer);
 			}
-			else if (strcmp(label, "texture") == 0 || strcmp(label, "heightmap") == 0 || strcmp(label, "splatmap") == 0)
+			else if (strcmp(label, "texture") == 0)
 			{
-				serializer.deserialize(path, MAX_PATH);
-				if (path[0] != '\0')
+				if (!deserializeTexture(serializer, material_dir))
 				{
-					base_string<char, StackAllocator<LUMIX_MAX_PATH> > texture_path;
-					texture_path = material_dir;
-					texture_path += path;
-					Texture* texture = static_cast<Texture*>(m_resource_manager.get(ResourceManager::TEXTURE)->load(texture_path.c_str()));
-					bool is_heightmap = label[0] == 'h';
-					bool is_splatmap = label[0] == 's';
-					if (is_heightmap)
-					{
-						if (!m_textures.empty())
-						{
-							g_log_error.log("Renderer") << "Heightmap must be the first texture in material " << m_path.c_str();
-							onFailure();
-							fs.close(file);
-							return;
-						}
-					}
-					if (is_heightmap || is_splatmap)
-					{
-						if (texture->isReady() && !texture->getData())
-						{
-							g_log_error.log("Renderer") << (is_heightmap ? "Heightmap " : "Splatmap ") << m_path.c_str() << " can not be used as an ordinary texture";
-							onFailure();
-							fs.close(file);
-							return;
-						}
-						texture->addDataReference();
-					}
-					m_textures.push(texture);
-					addDependency(*texture);
+					onFailure();
+					fs.close(file);
+					return;
 				}
+				
 			}
 			else if (strcmp(label, "alpha_to_coverage") == 0)
 			{

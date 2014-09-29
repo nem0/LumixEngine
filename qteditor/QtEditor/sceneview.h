@@ -19,7 +19,8 @@ public:
 	void setWorldEditor(Lumix::WorldEditor* editor);
 	void setPipeline(Lumix::PipelineInstance& pipeline) { m_pipeline = &pipeline; }
 	QWidget* getViewWidget() { return m_view; }
-	float getNavivationSpeed() const;
+	float getNavigationSpeed() const;
+	void changeNavigationSpeed(float value);
 
 private:
 	virtual void resizeEvent(QResizeEvent*) override;

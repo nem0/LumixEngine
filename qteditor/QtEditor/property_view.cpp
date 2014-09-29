@@ -21,6 +21,7 @@
 #include "graphics/texture.h"
 #include "scripts/scriptcompiler.h"
 #include <qcheckbox.h>
+#include <QColorDialog>
 #include <qdesktopservices.h>
 #include <QDoubleSpinBox>
 #include <QDragEnterEvent>
@@ -93,7 +94,7 @@ class AddTerrainLevelCommand : public Lumix::IEditorCommand
 			Lumix::string material_path;
 			static_cast<Lumix::RenderScene*>(m_terrain.scene)->getTerrainMaterial(m_terrain, material_path);
 			Lumix::Material* material = static_cast<Lumix::Material*>(m_world_editor.getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL)->get(material_path));
-			return material->getTexture(0);
+			return material->getTextureByUniform("hm_texture");
 		}
 
 
@@ -550,9 +551,11 @@ class ComponentPropertyObject : public PropertyViewObject
 						float value;
 						stream.read(value);
 						QDoubleSpinBox* edit = new QDoubleSpinBox();
+						edit->setMaximum(FLT_MAX);
+						edit->setDecimals(4);
+						edit->setSingleStep(0.001);
 						edit->setValue(value);
 						item->treeWidget()->setItemWidget(item, 1, edit);
-						edit->setMaximum(FLT_MAX);
 						connect(edit, (void (QDoubleSpinBox::*)(double))&QDoubleSpinBox::valueChanged, [this, &view](double new_value) 
 						{
 							float value = (float)new_value;
@@ -587,6 +590,82 @@ class ComponentPropertyObject : public PropertyViewObject
 							view.getWorldEditor()->addArrayPropertyItem(m_component, static_cast<Lumix::IArrayDescriptor&>(m_descriptor));
 							view.refresh();
 						});
+					}
+					break;
+				case Lumix::IPropertyDescriptor::COLOR:
+					{
+						Lumix::Vec4 value;
+						stream.read(value);
+						QWidget* widget = new QWidget();
+						QHBoxLayout* layout = new QHBoxLayout(widget);
+						QLabel* label = new QLabel(QString("%1; %2; %3; %4").arg((int)(value.x * 255)).arg((int)(value.y * 255)).arg((int)(value.z * 255)).arg((int)(value.w * 255)));
+						layout->setContentsMargins(0, 0, 0, 0);
+						layout->addWidget(label);
+						QPushButton* button = new QPushButton("...");
+						layout->addWidget(button);
+						item->treeWidget()->setItemWidget(item, 1, widget);
+						connect(button, &QPushButton::clicked, [this, &view, label, value]()
+						{
+							QColorDialog* dialog = new QColorDialog(QColor::fromRgbF(value.x, value.y, value.z, value.w));
+							dialog->setModal(false);
+							dialog->connect(dialog, &QColorDialog::currentColorChanged, [this, &view, dialog]()
+							{
+								QColor color = dialog->currentColor();
+								Lumix::Vec4 value;
+								value.x = color.redF(); 
+								value.y = color.greenF(); 
+								value.z = color.blueF(); 
+								value.w = color.alphaF(); 
+								view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, &value, sizeof(value));
+							});
+							dialog->connect(dialog, &QDialog::finished, [&view]()
+							{
+								view.refresh();
+							});
+							dialog->show();
+						});
+
+	/*					char path[LUMIX_MAX_PATH];
+						stream.read(path, stream.getBufferSize());
+						
+						FileEdit* edit = new FileEdit(widget, NULL);
+						edit->setText(path);
+						edit->setServer(view.getWorldEditor());
+						QHBoxLayout* layout = new QHBoxLayout(widget);
+						layout->addWidget(edit);
+						layout->setContentsMargins(0, 0, 0, 0);
+						QPushButton* button = new QPushButton("...", widget);
+						layout->addWidget(button);
+						button->connect(button, &QPushButton::clicked, [this, edit, &view]()
+						{
+							QString str = QFileDialog::getOpenFileName(NULL, QString(), QString(), dynamic_cast<Lumix::IFilePropertyDescriptor&>(m_descriptor).getFileType());
+							if (str != "")
+							{
+								char rel_path[LUMIX_MAX_PATH];
+								QByteArray byte_array = str.toLatin1();
+								const char* text = byte_array.data();
+								view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, text);
+								view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, rel_path, strlen(rel_path) + 1);
+								edit->setText(rel_path);
+							}
+						});
+				
+						QPushButton* button2 = new QPushButton("->", widget);
+						layout->addWidget(button2);
+						button2->connect(button2, &QPushButton::clicked, [&view, edit]()
+						{
+							view.setSelectedResourceFilename(edit->text().toLatin1().data());
+						});
+				
+						
+						connect(edit, &QLineEdit::editingFinished, [edit, &view, this]()
+						{
+							if(view.getObject())
+							{
+								QByteArray byte_array = edit->text().toLatin1();
+								view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, byte_array.data(), byte_array.size() + 1);
+							}
+						});*/
 					}
 					break;
 				default:
@@ -972,60 +1051,6 @@ PropertyViewObject* createTextureObject(PropertyViewObject* parent, Lumix::Resou
 }
 
 
-/*
-class TerrainProxy
-{
-	public:
-		TerrainProxy(Lumix::Component cmp)
-			: m_component(cmp)
-		{ }
-
-
-		Lumix::Material* getMaterial()
-		{
-			return static_cast<Lumix::RenderScene*>(m_component.scene)->getTerrainMaterial(m_component);
-		}
-
-
-		void setMaterial(Lumix::Material* material)
-		{
-			static_cast<Lumix::RenderScene*>(m_component.scene)->setTerrainMaterial(m_component, material->getPath().c_str());
-		}
-
-	private:
-		Lumix::Component m_component;
-};
-
-
-static PropertyViewObject* createTerrainObject(Lumix::Component component)
-{
-	TerrainProxy* proxy = new TerrainProxy(component); TODO("memory leak");
-
-	InstanceObject<TerrainProxy>* object = new InstanceObject<TerrainProxy>("Terrain", proxy, NULL);
-	
-	PropertyViewObject* prop = new InstanceObject<Lumix::Material>("Material", proxy->getMaterial(), &createEditor);
-	object->addMember(prop);
-	
-	prop = new DelegateObject<bool, Lumix::Material>("Z test", material, &Lumix::Material::isZTest, &createEditor);
-	object->addMember(prop);
-
-	prop = new DelegateObject<bool, Lumix::Material>("Backface culling", material, &Lumix::Material::isBackfaceCulling, &createEditor);
-	object->addMember(prop);
-
-	prop = new DelegateObject<bool, Lumix::Material>("Alpha to coverage", material, &Lumix::Material::isAlphaToCoverage, &createEditor);
-	object->addMember(prop);
-
-	for (int i = 0; i < material->getTextureCount(); ++i)
-	{
-		prop = createTextureObject(material->getTexture(i));
-		object->addMember(prop);
-	}
-
-	return object;
-}
-*/
-
-
 void createTextureInMaterialEditor(PropertyView& view, QTreeWidgetItem* item, InstanceObject<Lumix::Texture, false>* texture)
 {
 	QWidget* widget = new QWidget();
@@ -1319,8 +1344,8 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			static_cast<Lumix::RenderScene*>(terrain.scene)->getTerrainMaterial(terrain, material_path);
 			Lumix::Material* material = static_cast<Lumix::Material*>(m_world_editor.getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL)->get(material_path));
 			Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
-			Lumix::Texture* splatmap = material->getTexture(material->getTextureCount() - 1);
-			Lumix::Texture* heightmap = material->getTexture(0);
+			Lumix::Texture* splatmap = material->getTextureByUniform("splat_texture");
+			Lumix::Texture* heightmap = material->getTextureByUniform("hm_texture");
 			Lumix::Matrix entity_mtx = terrain.entity.getMatrix();
 			entity_mtx.fastInverse();
 			Lumix::Vec3 local_pos = entity_mtx.multiplyPosition(hit_pos);
@@ -1685,12 +1710,12 @@ void PropertyView::addTerrainCustomProperties(QTreeWidgetItem& tree_item, const 
 		connect(height_button, &QPushButton::clicked, [this]()
 		{
 			Lumix::Material* material = m_terrain_editor->getMaterial();
-			material->getTexture(0)->save();
+			material->getTextureByUniform("hm_texture")->save();
 		});
 		connect(texture_button, &QPushButton::clicked, [this]()
 		{
 			Lumix::Material* material = m_terrain_editor->getMaterial();
-			material->getTexture(material->getTextureCount() - 1)->save();
+			material->getTextureByUniform("splat_texture")->save();
 		});
 	}
 

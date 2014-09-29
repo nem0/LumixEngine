@@ -93,7 +93,7 @@ void AssetBrowser::handleDoubleClick(const QFileInfo& file_info)
 	}
 	else if(suffix == "msh")
 	{
-		InsertMeshCommand* command = new InsertMeshCommand(*m_editor, m_editor->getCameraRaycastHit(), file.toLatin1().data());
+		InsertMeshCommand* command = new (Lumix::dll_lumix_new(sizeof(InsertMeshCommand), "", 0)) InsertMeshCommand(*m_editor, m_editor->getCameraRaycastHit(), file.toLatin1().data());
 		m_editor->executeCommand(command);
 	}
 	else if(suffix == "ani")
@@ -262,11 +262,14 @@ void AssetBrowser::on_filterComboBox_currentTextChanged(const QString&)
 
 void AssetBrowser::on_treeView_clicked(const QModelIndex &index)
 {
-    if (index.isValid())
-    {
-        const QFileInfo& file_info = m_model->fileInfo(index);
-        QByteArray byte_array = file_info.filePath().toLower().toLatin1();
-        const char* filename = byte_array.data();
-        emit fileSelected(filename);
-    }
+	if (index.isValid())
+	{
+		const QFileInfo& file_info = m_model->fileInfo(index);
+		if(file_info.isFile())
+		{
+			QByteArray byte_array = file_info.filePath().toLower().toLatin1();
+			const char* filename = byte_array.data();
+			emit fileSelected(filename);
+		}
+	}
 }
