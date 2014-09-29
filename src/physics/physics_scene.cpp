@@ -948,9 +948,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 			serializer.deserializeArrayItem(is_free);
 			Entity e(m_universe, index);
 
-			Controller c;
+			Controller& c = m_controllers.pushEmpty();
 			c.m_is_free = is_free;
-			m_controllers.push(c);
 			
 			if(!is_free)
 			{
