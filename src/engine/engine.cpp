@@ -56,8 +56,6 @@ namespace Lumix
 					m_mem_file_device = NULL;
 					m_disk_file_device = NULL;
 				}
-		MTJD::Manager	m_mtjd_manager;
-//		CullingSystem*	m_culling_system;
 
 				m_resource_manager.create(*m_file_system);
 				m_material_manager.create(ResourceManager::MATERIAL, m_resource_manager);
@@ -65,6 +63,8 @@ namespace Lumix
 				m_shader_manager.create(ResourceManager::SHADER, m_resource_manager);
 				m_texture_manager.create(ResourceManager::TEXTURE, m_resource_manager);
 				m_pipeline_manager.create(ResourceManager::PIPELINE, m_resource_manager);
+
+				m_culling_system = CullingSystem::create(m_mtjd_manager);
 
 				m_timer = Timer::create();
 				m_fps_timer = Timer::create();
@@ -152,12 +152,17 @@ namespace Lumix
 			}
 
 
+			virtual MTJD::Manager& getMTJDManager() override
+			{
+				return m_mtjd_manager;
+			}
+
+
 			virtual const Array<IScene*>& getScenes() const override
 			{
 				return m_scenes;
 			}
 
-//		m_impl->m_culling_system = CullingSystem::create(m_impl->m_mtjd_manager);
 
 			virtual void destroyUniverse() override
 			{
@@ -299,6 +304,9 @@ namespace Lumix
 			ShaderManager	m_shader_manager;
 			TextureManager	m_texture_manager;
 			PipelineManager m_pipeline_manager;
+
+			MTJD::Manager	m_mtjd_manager;
+			CullingSystem*	m_culling_system;
 
 			string m_base_path;
 			WorldEditor* m_editor;

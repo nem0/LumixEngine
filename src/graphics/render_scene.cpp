@@ -802,9 +802,6 @@ namespace Lumix
 
 				m_culling_system->cullToFrustumAsync(m_camera_frustum);
 
-				infos.reserve(m_renderables.size() * 2);
-				for (int i = 0, c = m_renderables.size(); i < c; ++i)
-
 				//const CullingSystem::InputSpheres& spheres = m_culling_system->getSpheres();
 
 				////m_debug_lines.clear();
@@ -818,10 +815,12 @@ namespace Lumix
 				//	addDebugCross(center, radius, mag, 0.001f);
 				//}
 
+				//const typename CullingSystem::Results& results = m_culling_system->getResultAsync();
+
 				const CullingSystem::Results& results = m_culling_system->getResultAsync();
 
 				infos.reserve(m_renderables.size() * 2);
-				for (int i = 0; i < m_renderables.size(); ++i)
+				for (int i = 0, c = m_renderables.size(); i < c; ++i)
 				{
 					const Renderable* LUMIX_RESTRICT renderable = m_renderables[i];
 					if (!renderable->m_is_free)
@@ -829,7 +828,8 @@ namespace Lumix
 						const ModelInstance& model_instance = renderable->m_model;
 						const Model* model = model_instance.getModel();
 						bool is_model_ready = model && model->isReady();
-						if (is_model_ready && (renderable->m_layer_mask & layer_mask) != 0 && results[i] > -1)
+						bool culled = results[i] < 0;
+						if (is_model_ready && (renderable->m_layer_mask & layer_mask) != 0 && !culled)
 						{
 							for (int j = 0, c = renderable->m_model.getModel()->getMeshCount(); j < c; ++j)
 							{
