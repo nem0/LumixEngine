@@ -58,6 +58,17 @@ void ProfileModel::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bl
 	{
 		Lumix::Profiler::Block* remote_child = remote_block->m_first_child;
 		Block* my_child = my_block->m_first_child;
+		if(my_child->m_function != remote_child->m_function || my_child->m_name != remote_child->m_name)
+		{
+			Block* my_new_child = new Block;
+			my_new_child->m_function = remote_child->m_function;
+			my_new_child->m_name = remote_child->m_name;
+			my_new_child->m_parent = my_block;
+			my_new_child->m_next = my_child;
+			my_new_child->m_first_child = NULL;
+			my_block->m_first_child = my_new_child;
+			my_child = my_new_child;
+		}
 		cloneBlock(my_child, remote_child);
 	}
 
@@ -76,6 +87,17 @@ void ProfileModel::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bl
 	}
 	else if (my_block->m_next)
 	{
+		if(my_block->m_next->m_function != remote_block->m_next->m_function || my_block->m_next->m_name != remote_block->m_next->m_name)
+		{
+			Block* my_next = new Block;
+			Lumix::Profiler::Block* remote_next = remote_block->m_next;
+			my_next->m_function = remote_next->m_function;
+			my_next->m_name = remote_next->m_name;
+			my_next->m_parent = my_block->m_parent;
+			my_next->m_next = my_block->m_next;
+			my_next->m_first_child = NULL;
+			my_block->m_next = my_next;
+		}
 		cloneBlock(my_block->m_next, remote_block->m_next);
 	}
 }
