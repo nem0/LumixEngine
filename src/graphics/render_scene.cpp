@@ -615,6 +615,12 @@ namespace Lumix
 			}
 
 
+			virtual Model* getRenderableModel(Component cmp) override
+			{
+				return m_renderables[cmp.index]->m_model.getModel();
+			}
+
+
 			virtual void getRenderablePath(Component cmp, string& path) override
 			{
 					if (m_renderables[cmp.index]->m_model.getModel())
@@ -825,29 +831,43 @@ namespace Lumix
 				return m_debug_lines;
 			}
 
-			virtual void addDebugCube(const Vec3& from, float size, const Vec3& color, float life) override
+			virtual void addDebugCube(const Vec3& min, const Vec3& max, const Vec3& color, float life) override
 			{
-				Vec3 a = from;
-				Vec3 b = from;
-				b.x += size;
+				Vec3 a = min;
+				Vec3 b = min;
+				b.x = max.x;
 				addDebugLine(a, b, color, life);
-				a.set(b.x, b.y, b.z + size);
+				a.set(b.x, b.y, max.z);
 				addDebugLine(a, b, color, life);
-				b.set(a.x - size, a.y, a.z);
+				b.set(min.x, a.y, a.z);
 				addDebugLine(a, b, color, life);
-				a.set(b.x, b.y, b.z - size);
+				a.set(b.x, b.y, min.z);
 				addDebugLine(a, b, color, life);
 
-				a = from;
-				a.y += size;
+				a = min;
+				a.y = max.y;
 				b = a;
-				b.x += size;
+				b.x = max.x;
 				addDebugLine(a, b, color, life);
-				a.set(b.x, b.y, b.z + size);
+				a.set(b.x, b.y, max.z);
 				addDebugLine(a, b, color, life);
-				b.set(a.x - size, a.y, a.z);
+				b.set(min.x, a.y, a.z);
 				addDebugLine(a, b, color, life);
-				a.set(b.x, b.y, b.z - size);
+				a.set(b.x, b.y, min.z);
+				addDebugLine(a, b, color, life);
+
+				a = min;
+				b = a;
+				b.y = max.y;
+				addDebugLine(a, b, color, life);
+				a.x = max.x;
+				b.x = max.x;
+				addDebugLine(a, b, color, life);
+				a.z = max.z;
+				b.z = max.z;
+				addDebugLine(a, b, color, life);
+				a.x = min.x;
+				b.x = min.x;
 				addDebugLine(a, b, color, life);
 			}
 
