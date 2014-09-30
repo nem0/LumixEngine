@@ -1,4 +1,5 @@
 #include "graphics/geometry.h"
+#include "core/math_utils.h"
 #include "core/profiler.h"
 #include "graphics/gl_ext.h"
 #include "graphics/shader.h"
@@ -194,6 +195,25 @@ void VertexDef::end(Shader& shader) const
 		}
 	}
 	
+}
+
+
+void Geometry::getAABB(Vec3* out_min, Vec3* out_max) const
+{
+	Vec3 min = m_vertices[0];
+	Vec3 max = m_vertices[0];
+	for(int i = 1, c = m_vertices.size(); i < c; ++i)
+	{
+		min.x = Math::minValue(min.x, m_vertices[i].x);
+		min.y = Math::minValue(min.y, m_vertices[i].y);
+		min.z = Math::minValue(min.z, m_vertices[i].z);
+
+		max.x = Math::maxValue(max.x, m_vertices[i].x);
+		max.y = Math::maxValue(max.y, m_vertices[i].y);
+		max.z = Math::maxValue(max.z, m_vertices[i].z);
+	}
+	*out_min = min;
+	*out_max = max;
 }
 
 

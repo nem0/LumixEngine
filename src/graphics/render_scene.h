@@ -79,7 +79,7 @@ namespace Lumix
 
 			virtual void addDebugLine(const Vec3& from, const Vec3& to, const Vec3& color, float life) = 0;
 			virtual void addDebugCross(const Vec3& center, float size, const Vec3& color, float life) = 0;
-			virtual void addDebugCube(const Vec3& from, float size, const Vec3& color, float life) = 0;
+			virtual void addDebugCube(const Vec3& from, const Vec3& max, const Vec3& color, float life) = 0;
 			virtual void addDebugCircle(const Vec3& center, float radius, const Vec3& color, float life) = 0;
 			virtual const Array<DebugLine>& getDebugLines() const = 0;
 			virtual Component getCameraInSlot(const char* slot) = 0;
@@ -100,6 +100,7 @@ namespace Lumix
 			virtual void setRenderablePath(Component cmp, const string& path) = 0;
 			virtual void setRenderableScale(Component cmp, float scale) = 0;
 			virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) = 0;
+			virtual Model* getRenderableModel(Component cmp) = 0;
 			
 			virtual void getGrassInfos(Array<GrassInfo>& infos, int64_t layer_mask) = 0;
 			virtual void getTerrainInfos(Array<TerrainInfo>& infos, int64_t layer_mask) = 0;

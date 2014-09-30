@@ -94,6 +94,7 @@ class Model : public Resource
 		void		getPose(Pose& pose);
 		float		getBoundingRadius() const { return m_bounding_radius; }
 		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform, float scale);
+		void getAABB(Vec3* min, Vec3* max) const { *min = m_aabb_min; *max = m_aabb_max; }
 
 	private:
 		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
@@ -112,6 +113,8 @@ class Model : public Resource
 		Array<Bone> m_bones;
 		float m_bounding_radius;
 		BoneMap m_bone_map; // maps bone name hash to bone index in m_bones
+		Vec3 m_aabb_min;
+		Vec3 m_aabb_max;
 };
 
 

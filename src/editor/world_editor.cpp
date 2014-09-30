@@ -773,6 +773,73 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
+		void createEditorLines()
+		{
+			Component camera_cmp = m_camera.getComponent(CAMERA_HASH);
+			RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);
+			bool first_found = true;
+			Vec3 all_min;
+			Vec3 all_max;
+			for(int i = 0; i < m_selected_entities.size(); ++i)
+			{
+				Component renderable = m_selected_entities[i].getComponent(RENDERABLE_HASH);
+				if(renderable.isValid())
+				{
+					Model* model = scene->getRenderableModel(renderable);
+					Vec3 aabb[8];
+					model->getAABB(&aabb[0], &aabb[7]);
+					aabb[1].set(aabb[0].x, aabb[0].y, aabb[7].z);
+					aabb[2].set(aabb[0].x, aabb[7].y, aabb[0].z);
+					aabb[3].set(aabb[0].x, aabb[7].y, aabb[7].z);
+					aabb[4].set(aabb[7].x, aabb[0].y, aabb[0].z);
+					aabb[5].set(aabb[7].x, aabb[0].y, aabb[7].z);
+					aabb[6].set(aabb[7].x, aabb[7].y, aabb[0].z);
+					Matrix mtx = m_selected_entities[i].getMatrix();
+
+					for(int i = 0; i < 8; ++i)
+					{
+						aabb[i] = mtx.multiplyPosition(aabb[i]); 
+						if(first_found)
+						{
+							all_min = aabb[0];
+							all_max = aabb[0];
+							first_found = false;
+						}
+
+						all_min.x = Math::minValue(aabb[i].x, all_min.x);
+						all_min.y = Math::minValue(aabb[i].y, all_min.y);
+						all_min.z = Math::minValue(aabb[i].z, all_min.z);
+
+						all_max.x = Math::maxValue(aabb[i].x, all_max.x);
+						all_max.y = Math::maxValue(aabb[i].y, all_max.y);
+						all_max.z = Math::maxValue(aabb[i].z, all_max.z);
+					}
+				}
+				else
+				{
+					Vec3 pos = m_selected_entities[i].getPosition();
+					if(first_found)
+					{
+						first_found = false;
+						all_min = pos - Vec3(0.5f, 0.5f, 0.5f); 
+						all_max = pos + Vec3(0.5f, 0.5f, 0.5f); 
+					}
+					else
+					{
+						all_min.x = Math::minValue(pos.x - 0.1f, all_min.x);
+						all_min.y = Math::minValue(pos.y - 0.1f, all_min.y);
+						all_min.z = Math::minValue(pos.z - 0.1f, all_min.z);
+
+						all_max.x = Math::maxValue(pos.x + 0.1f, all_max.x);
+						all_max.y = Math::maxValue(pos.y + 0.1f, all_max.y);
+						all_max.z = Math::maxValue(pos.z + 0.1f, all_max.z);
+					}
+				}
+			}
+			scene->addDebugCube(all_min, all_max, Vec3(1, 0, 0), 0);
+		}
+
+
 		virtual void tick() override
 		{
 			for (int i = 0; i < m_plugins.size(); ++i)
@@ -784,9 +851,9 @@ struct WorldEditorImpl : public WorldEditor
 				toggleGameMode();
 				m_toggle_game_mode_requested = false;
 			}
-			PROFILE_FUNCTION();
 			m_engine->update(m_is_game_mode);
 			m_engine->getFileSystem().updateAsyncTransactions();
+			createEditorLines();
 		}
 
 	
