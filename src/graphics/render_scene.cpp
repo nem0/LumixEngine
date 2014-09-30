@@ -556,6 +556,12 @@ namespace Lumix
 			}
 
 
+			virtual void getTerrainSize(Component cmp, float* width, float* height) override
+			{
+				m_terrains[cmp.index]->getSize(width, height);
+			}
+
+
 			virtual void setTerrainMaterial(Component cmp, const string& path) override
 			{
 				Material* material = static_cast<Material*>(m_engine.getResourceManager().get(ResourceManager::MATERIAL)->load(path.c_str()));

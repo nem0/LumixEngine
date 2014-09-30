@@ -113,6 +113,7 @@ namespace Lumix
 			virtual void setTerrainYScale(Component cmp, float scale) = 0;
 			virtual float getTerrainYScale(Component cmp) = 0;
 			virtual void setTerrainBrush(Component cmp, const Vec3& position, float size) = 0;
+			virtual void getTerrainSize(Component cmp, float* width, float* height) = 0;
 
 			virtual void setGrass(Component cmp, int index, const string& path) = 0;
 			virtual void getGrass(Component cmp, int index, string& path) = 0;
