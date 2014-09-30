@@ -93,6 +93,7 @@ class Terrain
 		void getGrassInfos(Array<GrassInfo>& infos, const Vec3& camera_position);
 		void setBrush(const Vec3& position, float size) { m_brush_position = position; m_brush_size = size; }
 		float getHeight(float x, float z);
+		void getSize(float* width, float* height) const { *width = m_width * m_xz_scale; *height = m_height * m_xz_scale; }
 
 	private: 
 		void updateGrass(const Vec3& camera_position);

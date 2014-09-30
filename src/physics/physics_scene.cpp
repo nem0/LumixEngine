@@ -908,7 +908,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 			RigidActor* actor = LUMIX_NEW(RigidActor);
 			m_actors[i] = actor;	
 		}
-		RigidActor* actor = LUMIX_NEW(RigidActor);
 		serializer.deserializeArrayBegin("actors");
 		for (int i = 0; i < m_actors.size(); ++i)
 		{
