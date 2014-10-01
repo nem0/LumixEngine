@@ -1324,8 +1324,8 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 		{
 			Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(terrain.scene);
 			Lumix::Vec3 center_pos = hit.m_origin + hit.m_dir * hit.m_t;
-			auto terrain_matrix = terrain.entity.getMatrix();
-			auto inv_terrain_matrix = terrain_matrix;
+			Lumix::Matrix terrain_matrix = terrain.entity.getMatrix();
+			Lumix::Matrix inv_terrain_matrix = terrain_matrix;
 			inv_terrain_matrix.inverse();
 			for (int i = 0; i <= m_terrain_brush_strength * 10; ++i)
 			{
