@@ -32,6 +32,7 @@ void LogWidget::onInfoReceived(const QString& system, const QString& message)
 	QTableWidgetItem* item2 = new QTableWidgetItem;
 	item2->setText(message);
 	m_ui->tableWidget->setItem(row, 1, item2);
+	m_ui->tableWidget->resizeRowToContents(row);
 }
 
 
