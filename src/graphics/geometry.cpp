@@ -1,4 +1,5 @@
 #include "graphics/geometry.h"
+#include "core/math_utils.h"
 #include "core/profiler.h"
 #include "graphics/gl_ext.h"
 #include "graphics/shader.h"
@@ -115,49 +116,51 @@ void VertexDef::begin(Shader& shader) const
 	PROFILE_FUNCTION();
 	int offset = 0;
 	int shader_attrib_idx = 0;
-	for(int i = 0; i < m_attribute_count; ++i)
+	int attribute_count = Math::minValue(m_attribute_count, shader.getAttributeCount());
+	for(int i = 0; i < attribute_count; ++i)
 	{
+		GLint attrib_id = shader.getAttribId(shader_attrib_idx);
 		switch(m_attributes[i])
 		{
 			case VertexAttributeDef::POSITION:
-				glEnableVertexAttribArray(shader.getAttribId(shader_attrib_idx));
-				glVertexAttribPointer(shader.getAttribId(shader_attrib_idx), 3, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
+				glEnableVertexAttribArray(attrib_id);
+				glVertexAttribPointer(attrib_id, 3, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
 				offset += sizeof(GLfloat) * 3;
 				++shader_attrib_idx;
 				break;
 			case VertexAttributeDef::NORMAL:
-				glEnableVertexAttribArray(shader.getAttribId(shader_attrib_idx));
-				glVertexAttribPointer(shader.getAttribId(shader_attrib_idx), 3, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
+				glEnableVertexAttribArray(attrib_id);
+				glVertexAttribPointer(attrib_id, 3, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
 				offset += sizeof(GLfloat) * 3;
 				++shader_attrib_idx;
 				break;
 			case VertexAttributeDef::TEXTURE_COORDS:
-				glEnableVertexAttribArray(shader.getAttribId(shader_attrib_idx));
-				glVertexAttribPointer(shader.getAttribId(shader_attrib_idx), 2, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
+				glEnableVertexAttribArray(attrib_id);
+				glVertexAttribPointer(attrib_id, 2, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
 				offset += sizeof(GLfloat) * 2;
 				++shader_attrib_idx;
 				break;
 			case VertexAttributeDef::FLOAT2:
-				glEnableVertexAttribArray(shader.getAttribId(shader_attrib_idx));
-				glVertexAttribPointer(shader.getAttribId(shader_attrib_idx), 2, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
+				glEnableVertexAttribArray(attrib_id);
+				glVertexAttribPointer(attrib_id, 2, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
 				offset += sizeof(GLfloat) * 2;
 				++shader_attrib_idx;
 				break;
 			case VertexAttributeDef::FLOAT4:
-				glEnableVertexAttribArray(shader.getAttribId(shader_attrib_idx));
-				glVertexAttribPointer(shader.getAttribId(shader_attrib_idx), 4, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
+				glEnableVertexAttribArray(attrib_id);
+				glVertexAttribPointer(attrib_id, 4, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
 				offset += sizeof(GLfloat) * 4;
 				++shader_attrib_idx;
 				break;
 			case VertexAttributeDef::INT4:
-				glEnableVertexAttribArray(shader.getAttribId(shader_attrib_idx));
-				glVertexAttribPointer(shader.getAttribId(shader_attrib_idx), 4, GL_INT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
+				glEnableVertexAttribArray(attrib_id);
+				glVertexAttribPointer(attrib_id, 4, GL_INT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
 				offset += sizeof(GLint) * 4;
 				++shader_attrib_idx;
 				break;
 			case VertexAttributeDef::INT1:
-				glEnableVertexAttribArray(shader.getAttribId(shader_attrib_idx));
-				glVertexAttribPointer(shader.getAttribId(shader_attrib_idx), 1, GL_INT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
+				glEnableVertexAttribArray(attrib_id);
+				glVertexAttribPointer(attrib_id, 1, GL_INT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
 				offset += sizeof(GLint) * 1;
 				++shader_attrib_idx;
 				break;
@@ -194,6 +197,25 @@ void VertexDef::end(Shader& shader) const
 		}
 	}
 	
+}
+
+
+void Geometry::getAABB(Vec3* out_min, Vec3* out_max) const
+{
+	Vec3 min = m_vertices[0];
+	Vec3 max = m_vertices[0];
+	for(int i = 1, c = m_vertices.size(); i < c; ++i)
+	{
+		min.x = Math::minValue(min.x, m_vertices[i].x);
+		min.y = Math::minValue(min.y, m_vertices[i].y);
+		min.z = Math::minValue(min.z, m_vertices[i].z);
+
+		max.x = Math::maxValue(max.x, m_vertices[i].x);
+		max.y = Math::maxValue(max.y, m_vertices[i].y);
+		max.z = Math::maxValue(max.z, m_vertices[i].z);
+	}
+	*out_min = min;
+	*out_max = max;
 }
 
 

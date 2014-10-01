@@ -287,6 +287,10 @@ class AddTerrainLevelCommand : public Lumix::IEditorCommand
 				rect.m_from_y = Lumix::Math::minValue(item.m_texture_center_y - item.m_texture_radius, rect.m_from_y);
 				rect.m_to_y = Lumix::Math::maxValue(item.m_texture_center_y + item.m_texture_radius, rect.m_to_y);
 			}
+			rect.m_from_x = Lumix::Math::maxValue(rect.m_from_x, 0);
+			rect.m_to_x = Lumix::Math::minValue(rect.m_to_x, heightmap->getWidth());
+			rect.m_from_y = Lumix::Math::maxValue(rect.m_from_y, 0);
+			rect.m_to_y = Lumix::Math::minValue(rect.m_to_y, heightmap->getHeight());
 		}
 
 
@@ -1320,7 +1324,8 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 		{
 			Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(terrain.scene);
 			Lumix::Vec3 center_pos = hit.m_origin + hit.m_dir * hit.m_t;
-			auto inv_terrain_matrix = terrain.entity.getMatrix();
+			Lumix::Matrix terrain_matrix = terrain.entity.getMatrix();
+			Lumix::Matrix inv_terrain_matrix = terrain_matrix;
 			inv_terrain_matrix.inverse();
 			for (int i = 0; i <= m_terrain_brush_strength * 10; ++i)
 			{
@@ -1328,8 +1333,13 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 				float dist = (rand() % 100 / 100.0f) * m_terrain_brush_size;
 				Lumix::Vec3 pos(center_pos.x + cos(angle) * dist, 0, center_pos.z + sin(angle) * dist);
 				pos = inv_terrain_matrix.multiplyPosition(pos);
-				pos.y = scene->getTerrainHeightAt(terrain, pos.x, pos.z);
-				m_entity_template_list->instantiateTemplateAt(pos);
+				float w, h;
+				scene->getTerrainSize(terrain, &w, &h);
+				if(pos.x >= 0 && pos.z >= 0 && pos.x < w && pos.z < h)
+				{
+					pos.y = scene->getTerrainHeightAt(terrain, pos.x, pos.z);
+					m_entity_template_list->instantiateTemplateAt(terrain_matrix.multiplyPosition(pos));
+				}
 			}
 		}
 

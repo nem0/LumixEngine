@@ -87,12 +87,12 @@ class NotificationsImpl : public Notifications
 			widget->setObjectName("notification");
 			QLabel* label = new QLabel(widget);
 			label->setMinimumWidth(NOTIFICATION_WIDTH);
-			label->setWordWrap(true);
 			label->setContentsMargins(2, 2, 2, 2);
 			label->setText(text);
-			widget->adjustSize();
+			label->setWordWrap(true);
 			widget->show();
 			widget->raise();
+			widget->adjustSize();
 
 			Notification n;
 			n.m_widget = widget;
