@@ -21,6 +21,7 @@ Shader::Shader(const Path& path, ResourceManager& resource_manager)
 	, m_vertex_id()
 	, m_fragment_id()
 	, m_is_shadowmap_required(true)
+	, m_vertex_attribute_count(0)
 {
 	m_program_id = glCreateProgram();
 }
@@ -87,6 +88,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 					}
 				}
 				serializer.deserializeArrayEnd();
+				m_vertex_attribute_count = attribute_count;
 			}
 			else if (strcmp(label, "shadowmap_required") == 0)
 			{
@@ -119,9 +121,26 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		if (link_status != GL_TRUE)
 		{
 			g_log_error.log("renderer") << "Could not link shader " << m_path.c_str();
+			char buffer[1024];
+			GLsizei info_log_len;
+			glGetProgramInfoLog(m_program_id, sizeof(buffer), &info_log_len, buffer);
+			if(info_log_len)
+			{
+				g_log_error.log("renderer") << "Shader error log: " << buffer;
+			}
 			onFailure();
 			fs.close(file);
 			return;
+		}
+		else
+		{
+			char buffer[1024];
+			GLsizei info_log_len;
+			glGetProgramInfoLog(m_program_id, sizeof(buffer), &info_log_len, buffer);
+			if(info_log_len)
+			{
+				g_log_info.log("renderer") << "Shader log: " << buffer;
+			}
 		}
 
 		for (int i = 0; i < attribute_count; ++i)

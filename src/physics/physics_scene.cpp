@@ -908,7 +908,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 			RigidActor* actor = LUMIX_NEW(RigidActor);
 			m_actors[i] = actor;	
 		}
-		RigidActor* actor = LUMIX_NEW(RigidActor);
 		serializer.deserializeArrayBegin("actors");
 		for (int i = 0; i < m_actors.size(); ++i)
 		{
@@ -948,9 +947,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 			serializer.deserializeArrayItem(is_free);
 			Entity e(m_universe, index);
 
-			Controller c;
+			Controller& c = m_controllers.pushEmpty();
 			c.m_is_free = is_free;
-			m_controllers.push(c);
 			
 			if(!is_free)
 			{
