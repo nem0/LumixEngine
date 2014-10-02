@@ -10,6 +10,7 @@ namespace Lumix
 }
 
 class QDoubleSpinBox;
+class QLabel;
 
 class SceneView : public QDockWidget
 {
@@ -23,6 +24,7 @@ public:
 	void changeNavigationSpeed(float value);
 
 private:
+	void onDistanceMeasured(float distance);
 	virtual void resizeEvent(QResizeEvent*) override;
 	virtual void dragEnterEvent(QDragEnterEvent *event) override;
 	virtual void dropEvent(QDropEvent *event) override;
@@ -32,6 +34,7 @@ private:
 	Lumix::PipelineInstance* m_pipeline;
 	QWidget* m_view;
 	QDoubleSpinBox* m_speed_input;
+	QLabel* m_measure_tool_label;
 	int m_last_x;
 	int m_last_y;
 
