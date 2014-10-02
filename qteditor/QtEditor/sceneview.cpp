@@ -2,6 +2,7 @@
 #include "editor/world_editor.h"
 #include "core/crc32.h"
 #include "editor/ieditor_command.h"
+#include "editor/measure_tool.h"
 #include "engine/engine.h"
 #include "engine/iplugin.h"
 #include "graphics/pipeline.h"
@@ -10,6 +11,7 @@
 #include <qapplication.h>
 #include <QDoubleSpinBox>
 #include <QDragEnterEvent>
+#include <QLabel>
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QVBoxLayout>
@@ -63,6 +65,7 @@ SceneView::SceneView(QWidget* parent) :
 	QDockWidget(parent)
 {
 	m_pipeline = NULL;
+	m_measure_tool_label = new QLabel("");
 	QWidget* root = new QWidget();
 	QVBoxLayout* vertical_layout = new QVBoxLayout(root);
 	QHBoxLayout* horizontal_layout = new QHBoxLayout(root);
@@ -70,8 +73,10 @@ SceneView::SceneView(QWidget* parent) :
 	m_speed_input = new QDoubleSpinBox(root);
 	m_speed_input->setSingleStep(0.1f);
 	m_speed_input->setValue(0.1f);
-	horizontal_layout->addWidget(m_speed_input);
+	horizontal_layout->addWidget(m_measure_tool_label);
 	horizontal_layout->addStretch();
+	horizontal_layout->addWidget(m_speed_input);
+	horizontal_layout->setContentsMargins(0, 0, 0, 0);
 	vertical_layout->addWidget(m_view);
 	vertical_layout->addLayout(horizontal_layout);
 	vertical_layout->setContentsMargins(0, 0, 0, 0);
@@ -86,6 +91,16 @@ void SceneView::setWorldEditor(Lumix::WorldEditor* world_editor)
 {
 	static_cast<ViewWidget*>(m_view)->m_world_editor = world_editor;
 	m_world_editor = world_editor;
+	if (world_editor)
+	{
+		world_editor->getMeasureTool()->distanceMeasured().bind<SceneView, &SceneView::onDistanceMeasured>(this);
+	}
+}
+
+
+void SceneView::onDistanceMeasured(float distance)
+{
+	m_measure_tool_label->setText(QString("Measured distance: %1").arg(distance));
 }
 
 

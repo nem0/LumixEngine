@@ -58,6 +58,8 @@ private slots:
 
     void on_actionEntity_list_triggered();
 
+    void on_actionMeasure_triggered();
+
 private:
 	virtual void resizeEvent(QResizeEvent* event) override;
 
