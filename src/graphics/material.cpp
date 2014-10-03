@@ -140,6 +140,7 @@ bool Material::save(ISerializer& serializer)
 	{
 		serializer.beginObject();
 		serializer.serialize("name", m_uniforms[i].m_name);
+		serializer.serialize("is_editable", m_uniforms[i].m_is_editable);
 		switch (m_uniforms[i].m_type)
 		{
 			case Uniform::FLOAT:
@@ -185,7 +186,11 @@ void Material::deserializeUniforms(ISerializer& serializer)
 		while (!serializer.isObjectEnd())
 		{
 			serializer.deserializeLabel(label, 255);
-			if (strcmp(label, "name") == 0)
+			if (strcmp(label, "is_editable") == 0)
+			{
+				serializer.deserialize(uniform.m_is_editable);
+			}
+			else if (strcmp(label, "name") == 0)
 			{
 				serializer.deserialize(uniform.m_name, Uniform::MAX_NAME_LENGTH);
 				uniform.m_name_hash = crc32(uniform.m_name);
