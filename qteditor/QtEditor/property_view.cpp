@@ -1663,10 +1663,10 @@ void PropertyView::setScriptCompiler(ScriptCompiler* compiler)
 
 void PropertyView::clear()
 {
+	m_ui->propertyList->clear();
+
 	delete m_object;
 	m_object = NULL;
-
-	m_ui->propertyList->clear();
 }
 
 
