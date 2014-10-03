@@ -272,3 +272,8 @@ void MainWindow::on_actionEntity_list_triggered()
 {
 	m_entity_list->show();
 }
+
+void MainWindow::on_actionMeasure_triggered()
+{
+	m_world_editor->toggleMeasure();
+}

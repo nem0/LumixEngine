@@ -23,6 +23,7 @@
 #include "editor/editor_icon.h"
 #include "editor/entity_template_system.h"
 #include "editor/gizmo.h"
+#include "editor/measure_tool.h"
 #include "editor/property_descriptor.h"
 #include "engine/engine.h"
 #include "engine/iplugin.h"
@@ -836,7 +837,11 @@ struct WorldEditorImpl : public WorldEditor
 					}
 				}
 			}
-			scene->addDebugCube(all_min, all_max, Vec3(1, 0, 0), 0);
+			if (!m_selected_entities.empty())
+			{
+				scene->addDebugCube(all_min, all_max, Vec3(1, 0, 0), 0);
+			}
+			m_measure_tool->createEditorLines(*scene);
 		}
 
 
@@ -859,6 +864,7 @@ struct WorldEditorImpl : public WorldEditor
 	
 		virtual ~WorldEditorImpl()
 		{
+			LUMIX_DELETE(m_measure_tool);
 			destroyUndoStack();
 			auto iter = m_component_properties.begin();
 			auto end = m_component_properties.end();
@@ -1520,6 +1526,8 @@ struct WorldEditorImpl : public WorldEditor
 			m_universe_path = "";
 			m_terrain_brush_size = 10;
 			m_terrain_brush_strength = 0.01f;
+			m_measure_tool = LUMIX_NEW(MeasureTool);
+			addPlugin(m_measure_tool);
 		}
 
 
@@ -1834,6 +1842,18 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
+		virtual MeasureTool* getMeasureTool() const override
+		{
+			return m_measure_tool;
+		}
+
+
+		virtual void toggleMeasure() override
+		{
+			m_measure_tool->enable(!m_measure_tool->isEnabled());
+		}
+
+
 	private:
 		struct MouseMode
 		{
@@ -1877,6 +1897,7 @@ struct WorldEditorImpl : public WorldEditor
 		int m_terrain_brush_size;
 		float m_terrain_brush_strength;
 		Array<Plugin*> m_plugins;
+		MeasureTool* m_measure_tool;
 		Plugin* m_mouse_handling_plugin;
 		EntityTemplateSystem* m_template_system;
 		Array<IEditorCommand*> m_undo_stack;

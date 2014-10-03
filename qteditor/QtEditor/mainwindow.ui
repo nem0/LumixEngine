@@ -82,6 +82,7 @@
     </property>
     <addaction name="actionGame_mode"/>
     <addaction name="actionCompile_scripts"/>
+    <addaction name="actionMeasure"/>
     <addaction name="actionSnap_to_terrain"/>
    </widget>
    <widget class="QMenu" name="menuEntity">
@@ -284,6 +285,14 @@
   <action name="actionEntity_list">
    <property name="text">
     <string>Entity list</string>
+   </property>
+  </action>
+  <action name="actionMeasure">
+   <property name="text">
+    <string>Measure</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+M</string>
    </property>
   </action>
  </widget>

@@ -94,6 +94,9 @@
     <ClCompile Include="..\..\..\src\editor\entity_template_system.cpp">
       <Filter>editor</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\editor\measure_tool.cpp">
+      <Filter>editor</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\graphics\frame_buffer.h">
@@ -187,6 +190,9 @@
       <Filter>editor</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\editor\ieditor_command.h">
+      <Filter>editor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\editor\measure_tool.h">
       <Filter>editor</Filter>
     </ClInclude>
   </ItemGroup>
