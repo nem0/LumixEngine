@@ -867,6 +867,31 @@ void createEditor(QTreeWidgetItem* item, GetterSetterObject<bool, T>& object, bo
 }
 
 
+void createEditor(PropertyView&, QTreeWidgetItem* item, InstanceObject<Lumix::Material::Uniform, false>* uniform)
+{
+	switch (uniform->getValue()->m_type)
+	{
+		case Lumix::Material::Uniform::FLOAT:
+			{
+				QDoubleSpinBox* spinbox = new QDoubleSpinBox();
+				spinbox->setValue(uniform->getValue()->m_float);
+				item->treeWidget()->setItemWidget(item, 1, spinbox);
+				spinbox->setMaximum(FLT_MAX);
+				spinbox->setMinimum(-FLT_MAX);
+				spinbox->connect(spinbox, (void (QDoubleSpinBox::*)(double))&QDoubleSpinBox::valueChanged, [uniform](double new_value)
+				{
+					uniform->getValue()->m_float = (float)new_value;
+				});
+			}
+			break;
+		default:
+			ASSERT(false);
+			break;
+	}
+	
+}
+
+
 void createEditor(PropertyView&, QTreeWidgetItem* item, InstanceObject<Lumix::Texture, false>* texture)
 {
 	item->setText(1, texture->getValue()->getPath().c_str());
@@ -941,7 +966,14 @@ void createEditor(PropertyView& view, QTreeWidgetItem* item, InstanceObject<Lumi
 	QLabel* label = new QLabel(material->getValue()->getPath().c_str());
 	layout->addWidget(label);
 	QPushButton* button = new QPushButton("Save");
+	QPushButton* go_button = new QPushButton("->");
 	layout->addWidget(button);
+	layout->addWidget(go_button);
+	go_button->connect(go_button, &QPushButton::clicked, [material]()
+	{
+		QDesktopServices::openUrl(QUrl::fromLocalFile(material->getValue()->getPath().c_str()));
+	});
+
 	button->connect(button, &QPushButton::clicked, [material, &view]()
 	{
 		Lumix::FS::FileSystem& fs = view.getWorldEditor()->getEngine().getFileSystem();
@@ -1159,6 +1191,15 @@ static PropertyViewObject* createMaterialObject(PropertyViewObject* parent, Lumi
 			object->addMember(prop);
 		}
 
+		for (int i = 0; i < material->getUniformCount(); ++i)
+		{
+			Lumix::Material::Uniform& uniform = material->getUniform(i);
+			if (uniform.m_is_editable)
+			{
+				prop = new InstanceObject<Lumix::Material::Uniform, false>(object, uniform.m_name, &uniform, createEditor);
+				object->addMember(prop);
+			}
+		}
 		return object;
 	}
 	return NULL;
