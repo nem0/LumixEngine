@@ -31,6 +31,32 @@ public:
 		LESS
 	};
 	
+	struct Uniform
+	{
+		Uniform() : m_is_editable(false) {}
+
+		enum Type
+		{
+			INT,
+			FLOAT,
+			MATRIX,
+			TIME
+		};
+
+		static const int MAX_NAME_LENGTH = 32;
+		
+		char m_name[MAX_NAME_LENGTH + 1];
+		uint32_t m_name_hash;
+		Type m_type;
+		union
+		{
+			int32_t m_int;
+			float m_float;
+			float m_matrix[16];
+		};
+		bool m_is_editable;
+	};
+
 public:
 	void apply(Renderer& renderer, PipelineInstance& pipeline) const;
 	bool isZTest() const { return m_is_z_test; }
@@ -50,6 +76,8 @@ public:
 	void setTexture(int i, Texture* texture);
 	void removeTexture(int i);
 	bool save(ISerializer& serializer);
+	int getUniformCount() const { return m_uniforms.size(); }
+	Uniform& getUniform(int index) { return m_uniforms[index]; }
 
 private:
 	Material(const Path& path, ResourceManager& resource_manager)
@@ -70,27 +98,6 @@ private:
 	bool deserializeTexture(ISerializer& serializer, const char* material_dir);
 
 private:
-	struct Uniform
-	{
-		enum Type
-		{
-			INT,
-			FLOAT,
-			MATRIX,
-			TIME
-		};
-		static const int MAX_NAME_LENGTH = 32;
-		char m_name[MAX_NAME_LENGTH + 1];
-		uint32_t m_name_hash;
-		Type m_type;
-		union
-		{
-			int32_t m_int;
-			float m_float;
-			float m_matrix[16];
-		};
-	};
-	
 	struct TextureInfo
 	{
 		TextureInfo()
