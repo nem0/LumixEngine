@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstring>
+#include "core/string.h"
 
 namespace Lumix
 {
@@ -33,6 +34,26 @@ namespace Lumix
 				{
 					++i;
 					dir[i] = '\0';
+					break;
+				}
+			}
+		}
+
+		static void getBasename(char* basename, int /*max_length*/, const char* src)
+		{
+			for (int i = strlen(src) - 1; i >= 0; --i)
+			{
+				if (src[i] == '\\' || src[i] == '/')
+				{
+					++i;
+					int j = 0;
+					basename[j] = src[i];
+					while (src[i + j] && src[i + j] != '.')
+					{
+						++j;
+						basename[j] = src[j + i];
+					}
+					basename[j] = '\0';
 					break;
 				}
 			}
