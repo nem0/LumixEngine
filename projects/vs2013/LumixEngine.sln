@@ -32,6 +32,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "unit_tests", "unit_tests\un
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "QtEditor", "..\..\qteditor\QtEditor\QtEditor.vcxproj", "{7EC890C5-3301-3B84-B02A-7BB178DA1DB5}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "fbx_converter", "fbx_converter\fbx_converter.vcxproj", "{DAFC5509-EC74-4309-A9F6-CCB4B4734BD3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -77,6 +79,12 @@ Global
 		{7EC890C5-3301-3B84-B02A-7BB178DA1DB5}.Release|Win32.ActiveCfg = Release|Win32
 		{7EC890C5-3301-3B84-B02A-7BB178DA1DB5}.Release|Win32.Build.0 = Release|Win32
 		{7EC890C5-3301-3B84-B02A-7BB178DA1DB5}.Release|x64.ActiveCfg = Release|Win32
+		{DAFC5509-EC74-4309-A9F6-CCB4B4734BD3}.Debug|Win32.ActiveCfg = Debug|Win32
+		{DAFC5509-EC74-4309-A9F6-CCB4B4734BD3}.Debug|Win32.Build.0 = Debug|Win32
+		{DAFC5509-EC74-4309-A9F6-CCB4B4734BD3}.Debug|x64.ActiveCfg = Debug|Win32
+		{DAFC5509-EC74-4309-A9F6-CCB4B4734BD3}.Release|Win32.ActiveCfg = Release|Win32
+		{DAFC5509-EC74-4309-A9F6-CCB4B4734BD3}.Release|Win32.Build.0 = Release|Win32
+		{DAFC5509-EC74-4309-A9F6-CCB4B4734BD3}.Release|x64.ActiveCfg = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
