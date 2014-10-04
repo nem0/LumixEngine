@@ -32,6 +32,7 @@ class LUMIX_ENGINE_API Shader : public Resource
 			FOG_DENSITY,
 			VIEW_MATRIX,
 			PROJECTION_MATRIX,
+			SHADOWMAP_SPLITS,
 			COUNT
 		};
 	
