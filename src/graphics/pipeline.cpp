@@ -38,7 +38,9 @@ static const uint32_t LIGHT_DIR_HASH = crc32("light_dir");
 static const uint32_t TERRAIN_SCALE_HASH = crc32("terrain_scale");
 static const uint32_t BONE_MATRICES_HASH = crc32("bone_matrices");
 static const uint32_t CAMERA_POS_HASH = crc32("camera_pos");
-
+static float split_distances[] = { 0, 5, 20, 100, 300 };
+static const float SHADOW_CAM_NEAR = 0.1f;
+static const float SHADOW_CAM_FAR = 10000.0f;
 
 struct Frustum
 {
@@ -56,7 +58,7 @@ struct Frustum
 
 		float getSize() const
 		{
-			return (m_points[0] - m_points[6]).length();
+			return Math::maxValue((m_points[0] - m_points[6]).length(), (m_points[4] - m_points[6]).length());
 		}
 
 	public:
@@ -452,23 +454,23 @@ struct PipelineInstanceImpl : public PipelineInstance
 		Vec3 right = crossProduct(forward, up).normalized();
 		up = crossProduct(right, forward).normalized();
 
-		Vec3 fc = camera.entity.getPosition() + forward * far_dist;
-		Vec3 nc = camera.entity.getPosition() + forward * near_dist;
+		Vec3 far_center = camera.entity.getPosition() + forward * far_dist;
+		Vec3 near_center = camera.entity.getPosition() + forward * near_dist;
 
 		float near_height = tan(fov * 0.5f) * near_dist;
 		float near_width = near_height * ratio;
 		float far_height = tan(fov * 0.5f) * far_dist;
 		float far_width = far_height * ratio;
 
-		frustum->m_points[0] = nc - up * near_height - right * near_width;
-		frustum->m_points[1] = nc + up * near_height - right * near_width;
-		frustum->m_points[2] = nc + up * near_height + right * near_width;
-		frustum->m_points[3] = nc - up * near_height + right * near_width;
+		frustum->m_points[0] = near_center - up * near_height - right * near_width;
+		frustum->m_points[1] = near_center + up * near_height - right * near_width;
+		frustum->m_points[2] = near_center + up * near_height + right * near_width;
+		frustum->m_points[3] = near_center - up * near_height + right * near_width;
 
-		frustum->m_points[4] = fc - up * far_height - right * far_width;
-		frustum->m_points[5] = fc + up * far_height - right * far_width;
-		frustum->m_points[6] = fc + up * far_height + right * far_width;
-		frustum->m_points[7] = fc - up * far_height + right * far_width;
+		frustum->m_points[4] = far_center - up * far_height - right * far_width;
+		frustum->m_points[5] = far_center + up * far_height - right * far_width;
+		frustum->m_points[6] = far_center + up * far_height + right * far_width;
+		frustum->m_points[7] = far_center - up * far_height + right * far_width;
 	}
 
 	void renderShadowmap(Component camera, int64_t layer_mask)
@@ -489,20 +491,30 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_light_dir = light_mtx.getZVector();
 
 		Frustum frustum;
-		float split_distances[] = {0, 5, 20, 100, 300};
-		for(int split_index = 0; split_index < 4; ++split_index)
+		float shadowmap_height = (float)m_shadowmap_framebuffer->getHeight();
+		float shadowmap_width = (float)m_shadowmap_framebuffer->getWidth();
+		float viewports[] = 
+			{ 0, 0
+			, 0.5f, 0
+			, 0, 0.5f
+			, 0.5f, 0.5f};
+		for (int split_index = 0; split_index < 4; ++split_index)
 		{
+			float* viewport = viewports + split_index * 2;
+			glViewport((int)(1 + shadowmap_width * viewport[0]), (int)(1 + shadowmap_height * viewport[1]),
+				(int)(0.5f * shadowmap_width - 2), (int)(0.5f * shadowmap_height - 2));
+
 			computeFrustum(camera, &frustum, split_distances[split_index], split_distances[split_index + 1]);
+			(&m_shadowmap_splits.x)[split_index] = split_distances[split_index + 1];
+
 			Vec3 shadow_cam_pos = frustum.getCenter();
 			float bb_size = frustum.getSize() * 0.5f;
-			
-			glViewport(1, (GLint)(split_index * m_shadowmap_framebuffer->getHeight() * 0.25f), m_shadowmap_framebuffer->getWidth() - 2, (GLsizei)(m_shadowmap_framebuffer->getHeight() * 0.25f));
 			Matrix projection_matrix;
-			Renderer::getOrthoMatrix(-bb_size, bb_size, -bb_size, bb_size, 0.01f, 10000, &projection_matrix);
+			Renderer::getOrthoMatrix(-bb_size, bb_size, -bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR, &projection_matrix);
 			m_renderer->setProjectionMatrix(projection_matrix);
 
 			Vec3 light_forward = light_mtx.getZVector();
-			shadow_cam_pos -= light_forward * 5000;
+			shadow_cam_pos -= light_forward * SHADOW_CAM_FAR * 0.5f;
 			Matrix modelview_matrix;
 			Renderer::getLookAtMatrix(shadow_cam_pos, shadow_cam_pos + light_forward, light_mtx.getYVector(), &modelview_matrix);
 			m_renderer->setViewMatrix(modelview_matrix);
@@ -613,6 +625,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 							m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::DIFFUSE_INTENSITY, m_scene->getLightDiffuseIntensity(light_cmp));
 							m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::FOG_COLOR, m_scene->getFogColor(light_cmp));
 							m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
+							m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::SHADOWMAP_SPLITS, m_shadowmap_splits);
 						}
 						last_material = &material;
 					}
@@ -654,6 +667,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 						m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::DIFFUSE_INTENSITY, m_scene->getLightDiffuseIntensity(light_cmp));
 						m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::FOG_COLOR, m_scene->getFogColor(light_cmp));
 						m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
+						m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::SHADOWMAP_SPLITS, m_shadowmap_splits);
 					}
 					m_renderer->setUniform(*shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
 
@@ -716,6 +730,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 					m_renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::DIFFUSE_INTENSITY, m_scene->getLightDiffuseIntensity(light_cmp));
 					m_renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::FOG_COLOR, m_scene->getFogColor(light_cmp));
 					m_renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
+					m_renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::SHADOWMAP_SPLITS, m_shadowmap_splits);
 				}
 				m_renderer->setUniform(shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
 				last_material = &material;
@@ -783,6 +798,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	Matrix m_shadow_modelviewprojection[4];
 	Renderer* m_renderer;
 	Vec3 m_light_dir;
+	Vec4 m_shadowmap_splits;
 	int m_width;
 	int m_height;
 	Map<uint32_t, CustomCommandHandler> m_custom_commands_handlers;
