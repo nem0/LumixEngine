@@ -9,8 +9,10 @@
 #include "insert_mesh_command.h"
 #include <qdesktopservices.h>
 #include <qfilesystemmodel.h>
+#include <qinputdialog.h>
 #include <qlistwidget.h>
 #include <qmenu.h>
+#include <qmessagebox.h>
 #include <qprocess.h>
 #include <qurl.h>
 
@@ -41,6 +43,7 @@ AssetBrowser::AssetBrowser(QWidget* parent) :
 	m_model->setRootPath(QDir::currentPath());
 	QStringList filters;
 	getDefaultFilters(filters);
+	m_model->setReadOnly(false);
 	m_model->setNameFilters(filters);
 	m_model->setNameFilterDisables(false);
 	m_ui->treeView->setModel(m_model);
@@ -239,20 +242,61 @@ void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
 	QMenu *menu = new QMenu("Item actions",NULL);
 	const QModelIndex& index = m_ui->treeView->indexAt(pos);
 	const QFileInfo& file_info = m_model->fileInfo(index);
+	QAction* selected_action = NULL;
+	QAction* delete_file_action = new QAction("Delete", menu);
+	menu->addAction(delete_file_action);
+	QAction* rename_file_action = new QAction("Rename", menu);
+	menu->addAction(rename_file_action);
+
+	QAction* create_dir_action = new QAction("Create directory", menu);
+	QAction* export_anim_action = new QAction("Export Animation", menu);
+	QAction* export_model_action = new QAction("Export Model", menu);
+	if (file_info.isDir())
+	{
+		menu->addAction(create_dir_action);
+	}
 	if (file_info.suffix() == "blend" || file_info.suffix() == "fbx")
 	{
-		QAction* export_anim_action = new QAction("Export Animation", menu);
-		QAction* export_model_action = new QAction("Export Model", menu);
 		menu->addAction(export_anim_action);
 		menu->addAction(export_model_action);
-		QAction* action = menu->exec(mapToGlobal(pos));
-		if(action == export_anim_action)
+	}
+	selected_action = menu->exec(mapToGlobal(pos));
+	if (selected_action == export_anim_action)
+	{
+		exportAnimation(file_info);
+	}
+	else if (selected_action == export_model_action)
+	{
+		exportModel(file_info);
+	}
+	else if (selected_action == delete_file_action)
+	{
+		QMessageBox::StandardButton reply;
+		reply = QMessageBox::question(this, "Delete", "Are you sure?", QMessageBox::Yes | QMessageBox::No);
+		if (reply == QMessageBox::Yes)
 		{
-			exportAnimation(file_info);
+			if (file_info.isFile())
+			{
+				QFile::remove(file_info.absoluteFilePath());
+			}
+			else
+			{
+				QDir dir(file_info.absoluteFilePath());
+				dir.removeRecursively();
+			}
 		}
-		else if(action == export_model_action)
+	}
+	else if (selected_action == rename_file_action)
+	{
+		m_ui->treeView->edit(index);
+	}
+	else if (selected_action == create_dir_action)
+	{
+		bool ok;
+		QString text = QInputDialog::getText(this, "Create directory", "Directory name:", QLineEdit::Normal, QDir::home().dirName(), &ok);
+		if (ok && !text.isEmpty())
 		{
-			exportModel(file_info);
+			QDir().mkdir(file_info.absoluteFilePath() + "/" + text);
 		}
 	}
 }
