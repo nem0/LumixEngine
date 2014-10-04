@@ -7,10 +7,12 @@
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "insert_mesh_command.h"
+#include <qdesktopservices.h>
 #include <qfilesystemmodel.h>
 #include <qlistwidget.h>
 #include <qmenu.h>
 #include <qprocess.h>
+#include <qurl.h>
 
 
 struct ProcessInfo
@@ -22,7 +24,7 @@ struct ProcessInfo
 
 void getDefaultFilters(QStringList& filters)
 {
-	filters << "*.msh" << "*.unv" << "*.ani" << "*.blend" << "*.tga" << "*.mat" << "*.dds";
+	filters << "*.msh" << "*.unv" << "*.ani" << "*.blend" << "*.tga" << "*.mat" << "*.dds" << "*.fbx";
 }
 
 
@@ -100,7 +102,10 @@ void AssetBrowser::handleDoubleClick(const QFileInfo& file_info)
 	{
 		m_editor->addComponent(crc32("animable"));
 		m_editor->setProperty(crc32("animable"), -1, *m_editor->getProperty("animable", "preview"), file.toLatin1().data(), file.length());
-		 
+	}
+	else if (suffix == "blend" || suffix == "tga" || suffix == "dds")
+	{
+		QDesktopServices::openUrl(QUrl::fromLocalFile(file_info.absoluteFilePath()));
 	}
 }
 
@@ -211,12 +216,22 @@ void AssetBrowser::exportModel(const QFileInfo& file_info)
 	process.m_process = new QProcess();
 	//m_processes.push(process);
 	QStringList list;
-	list.push_back("/C");
-	list.push_back("models\\export_mesh.bat");
-	list.push_back(file_info.absoluteFilePath().toLatin1().data());
-	list.push_back(m_base_path.toLatin1().data());
-	connect(process.m_process, (void (QProcess::*)(int))&QProcess::finished, this, &AssetBrowser::on_exportFinished);
-	process.m_process->start("cmd.exe", list);
+	if (file_info.suffix() == "fbx")
+	{
+		list.push_back(file_info.absoluteFilePath());
+		list.push_back(file_info.absolutePath() + "/" + file_info.baseName() + ".msh");
+		connect(process.m_process, (void (QProcess::*)(int))&QProcess::finished, this, &AssetBrowser::on_exportFinished);
+		process.m_process->start("editor/tools/fbx_converter.exe", list);
+	}
+	else
+	{
+		list.push_back("/C");
+		list.push_back("models\\export_mesh.bat");
+		list.push_back(file_info.absoluteFilePath().toLatin1().data());
+		list.push_back(m_base_path.toLatin1().data());
+		connect(process.m_process, (void (QProcess::*)(int))&QProcess::finished, this, &AssetBrowser::on_exportFinished);
+		process.m_process->start("cmd.exe", list);
+	}
 }
 
 void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
@@ -224,7 +239,7 @@ void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
 	QMenu *menu = new QMenu("Item actions",NULL);
 	const QModelIndex& index = m_ui->treeView->indexAt(pos);
 	const QFileInfo& file_info = m_model->fileInfo(index);
-	if(file_info.suffix() == "blend")
+	if (file_info.suffix() == "blend" || file_info.suffix() == "fbx")
 	{
 		QAction* export_anim_action = new QAction("Export Animation", menu);
 		QAction* export_model_action = new QAction("Export Model", menu);
