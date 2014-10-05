@@ -233,6 +233,7 @@ class App
 			m_edit_render_device->getPipeline().setScene((Lumix::RenderScene*)m_world_editor->getEngine().getScene(crc32("renderer")));
 			m_world_editor->setEditViewRenderDevice(*m_edit_render_device);
 			m_edit_render_device->getPipeline().addCustomCommandHandler("render_physics").bind<App, &App::renderPhysics>(this);
+			m_edit_render_device->getPipeline().addCustomCommandHandler("render_gizmos").bind<App, &App::renderGizmos>(this);
 
 			m_game_render_device = new	WGLRenderDevice(m_world_editor->getEngine(), "pipelines/game_view.json");
 			m_game_render_device->m_hdc = GetDC(game_hwnd);
@@ -257,14 +258,19 @@ class App
 		}
 
 
+		void renderGizmos()
+		{
+			m_world_editor->renderIcons(*m_edit_render_device);
+			m_world_editor->getGizmo().updateScale(m_world_editor->getEditCamera());
+			m_world_editor->getGizmo().render(m_world_editor->getEngine().getRenderer(), *m_edit_render_device);
+		}
+
+
 		void renderEditView()
 		{
 			PROFILE_FUNCTION();
 			m_edit_render_device->beginFrame();
 			m_world_editor->render(*m_edit_render_device);
-			/*m_world_editor->renderIcons(*m_edit_render_device);
-			m_world_editor->getGizmo().updateScale(m_world_editor->getEditCamera());
-			m_world_editor->getGizmo().render(m_world_editor->getEngine().getRenderer(), *m_edit_render_device);*/
 			m_world_editor->getEngine().getRenderer().cleanup();
 			m_edit_render_device->endFrame();
 		}
