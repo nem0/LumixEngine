@@ -327,7 +327,7 @@ struct RendererImpl : public Renderer
 		editor.registerProperty("camera", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("near", &RenderScene::getCameraNearPlane, &RenderScene::setCameraNearPlane));
 		editor.registerProperty("camera", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("far", &RenderScene::getCameraFarPlane, &RenderScene::setCameraFarPlane));
 
-		editor.registerProperty("renderable", LUMIX_NEW(FilePropertyDescriptor<RenderScene>)("source", &RenderScene::getRenderablePath, &RenderScene::setRenderablePath, "Mesh (*.msh)"));
+		editor.registerProperty("renderable", LUMIX_NEW(ResourcePropertyDescriptor<RenderScene>)("source", &RenderScene::getRenderablePath, &RenderScene::setRenderablePath, "Mesh (*.msh)"));
 
 		editor.registerProperty("light", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("ambient_intensity", &RenderScene::getLightAmbientIntensity, &RenderScene::setLightAmbientIntensity));
 		editor.registerProperty("light", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("diffuse_intensity", &RenderScene::getLightDiffuseIntensity, &RenderScene::setLightDiffuseIntensity));
@@ -336,7 +336,7 @@ struct RendererImpl : public Renderer
 		editor.registerProperty("light", LUMIX_NEW(ColorPropertyDescriptor<RenderScene>)("diffuse_color", &RenderScene::getLightDiffuseColor, &RenderScene::setLightDiffuseColor));
 		editor.registerProperty("light", LUMIX_NEW(ColorPropertyDescriptor<RenderScene>)("fog_color", &RenderScene::getFogColor, &RenderScene::setFogColor));
 
-		editor.registerProperty("terrain", LUMIX_NEW(FilePropertyDescriptor<RenderScene>)("material", &RenderScene::getTerrainMaterial, &RenderScene::setTerrainMaterial, "Material (*.mat)"));
+		editor.registerProperty("terrain", LUMIX_NEW(ResourcePropertyDescriptor<RenderScene>)("material", &RenderScene::getTerrainMaterial, &RenderScene::setTerrainMaterial, "Material (*.mat)"));
 		editor.registerProperty("terrain", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("xz_scale", &RenderScene::getTerrainXZScale, &RenderScene::setTerrainXZScale));
 		editor.registerProperty("terrain", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("y_scale", &RenderScene::getTerrainYScale, &RenderScene::setTerrainYScale));
 
