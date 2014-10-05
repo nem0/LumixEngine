@@ -7,10 +7,12 @@ obj/
 *.user
 evona_test/
 *.orig
-debug/
-release/
+/debug/
+/release/
 qteditor/qteditor/QtEditor.vcxproj
 qteditor/qteditor/QtEditor.sln
 qteditor/qteditor/QtEditor.vcxproj.filters
 qteditor/QtEditor/Makefile
 qtEditor/QtEditor/ui_*.h
+qtEditor/QtEditor/debug/
+qtEditor/QtEditor/release/
