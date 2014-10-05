@@ -53,8 +53,10 @@ GLint Shader::getUniformLocation(const char* name, uint32_t name_hash)
 
 GLuint Shader::attach(GLenum type, const char* src, int32_t length)
 {
+	const GLchar* strings[] = { type == GL_VERTEX_SHADER ? "#define VERTEX_SHADER" : "#define FRAGMENT_SHADER", src };
+	GLint lengths[] = { strlen(strings[0]), length };
 	GLuint id = glCreateShader(type);
-	glShaderSource(id, 1, (const GLchar**)&src, &length);
+	glShaderSource(id, sizeof(lengths) / sizeof(lengths[0]), strings, lengths);
 	glCompileShader(id);
 	glAttachShader(m_program_id, id);
 	return id;
@@ -103,18 +105,8 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		serializer.deserializeRawString(buf, size);
 		buf[size] = '\0';
 
-		char* end = strstr(buf, "//~VS");		
-		if (!end)
-		{
-			g_log_error.log("renderer") << "Could not process shader file " << m_path.c_str();
-			onFailure();
-			fs.close(file);
-			return;
-		}
-		int32_t vs_len = (int32_t)(end - buf);
-		buf[vs_len-1] = 0;
-		m_vertex_id = attach(GL_VERTEX_SHADER, buf, vs_len);
-		m_fragment_id = attach(GL_FRAGMENT_SHADER, buf + vs_len, size - vs_len);
+		m_vertex_id = attach(GL_VERTEX_SHADER, buf, size);
+		m_fragment_id = attach(GL_FRAGMENT_SHADER, buf, size);
 		glLinkProgram(m_program_id);
 		GLint link_status;
 		glGetProgramiv(m_program_id, GL_LINK_STATUS, &link_status);
