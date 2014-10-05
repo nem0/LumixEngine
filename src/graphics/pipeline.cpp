@@ -131,11 +131,14 @@ struct UnbindFramebufferCommand : public Command
 };
 
 
-struct DrawFullscreenQuadCommand : public Command
+struct DrawScreenQuadCommand : public Command
 {
+	~DrawScreenQuadCommand();
+
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	Material* m_material;
+	Geometry* m_geometry;
 };
 
 
@@ -206,7 +209,7 @@ struct PipelineImpl : public Pipeline
 		addCommandCreator("apply_camera").bind<&CreateCommand<ApplyCameraCommand> >();
 		addCommandCreator("bind_framebuffer").bind<&CreateCommand<BindFramebufferCommand> >();
 		addCommandCreator("unbind_framebuffer").bind<&CreateCommand<UnbindFramebufferCommand> >();
-		addCommandCreator("draw_fullscreen_quad").bind<&CreateCommand<DrawFullscreenQuadCommand> >();
+		addCommandCreator("draw_screen_quad").bind<&CreateCommand<DrawScreenQuadCommand> >();
 		addCommandCreator("bind_framebuffer_texture").bind<&CreateCommand<BindFramebufferTextureCommand> >();
 		addCommandCreator("render_shadowmap").bind<&CreateCommand<RenderShadowmapCommand> >();
 		addCommandCreator("bind_shadowmap").bind<&CreateCommand<BindShadowmapCommand> >();
@@ -534,28 +537,21 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void drawFullscreenQuad(Material* material)
+	void renderScreenGeometry(Geometry* geometry, Material* material)
 	{
-		glDisable(GL_DEPTH_TEST);
-
-		ASSERT(m_renderer != NULL);
-		Matrix mtx;
-		Renderer::getOrthoMatrix(-1, 1, -1, 1, 0, 30, &mtx);
-		m_renderer->setProjectionMatrix(mtx);
-
-		material->apply(*m_renderer, *this);
-		m_renderer->setViewMatrix(Matrix::IDENTITY);
-		glBegin(GL_QUADS);
-		glTexCoord2f(0, 0);
-		glVertex3f(-1, -1, -1);
-		glTexCoord2f(0, 1);
-		glVertex3f(-1, 1, -1);
-		glTexCoord2f(1, 1);
-		glVertex3f(1, 1, -1);
-		glTexCoord2f(1, 0);
-		glVertex3f(1, -1, -1);
-		glEnd();
-		glEnable(GL_DEPTH_TEST);
+		if (material->isReady())
+		{
+			ASSERT(m_renderer != NULL);
+			Shader* shader = material->getShader();
+			Matrix mtx;
+			Renderer::getOrthoMatrix(-1, 1, -1, 1, 0, 30, &mtx);
+			m_renderer->setProjectionMatrix(mtx);
+			m_renderer->setViewMatrix(Matrix::IDENTITY);
+			material->apply(*m_renderer, *this);
+			m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::WORLD_MATRIX, Matrix::IDENTITY);
+			m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::PROJECTION_MATRIX, mtx);
+			m_renderer->renderGeometry(*geometry, 0, 6, *shader);
+		}
 	}
 
 
@@ -944,22 +940,44 @@ void RenderDebugLinesCommand::execute(PipelineInstanceImpl& pipeline)
 }
 
 
-void DrawFullscreenQuadCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer)
+DrawScreenQuadCommand::~DrawScreenQuadCommand()
 {
-	const int MATERIAL_NAME_MAX_LENGTH = 100;
-	char material[MATERIAL_NAME_MAX_LENGTH];
-	serializer.deserializeArrayItem(material, MATERIAL_NAME_MAX_LENGTH);
-	base_string<char, StackAllocator<LUMIX_MAX_PATH> > material_path;
-	material_path = "materials/";
-	material_path += material;
-	material_path += ".mat";
-	m_material = static_cast<Material*>(pipeline.getResourceManager().get(ResourceManager::MATERIAL)->load(material_path.c_str()));
+	LUMIX_DELETE(m_geometry);
 }
 
 
-void DrawFullscreenQuadCommand::execute(PipelineInstanceImpl& pipeline)
+void DrawScreenQuadCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer)
 {
-	pipeline.drawFullscreenQuad(m_material);
+	m_geometry = LUMIX_NEW(Geometry);
+	VertexDef def;
+	def.parse("pt", 2);
+	Array<int> indices;
+	const int GEOMETRY_VERTEX_ATTRIBUTE_COUNT = 20;
+	float v[GEOMETRY_VERTEX_ATTRIBUTE_COUNT];
+	indices.push(0);
+	indices.push(1);
+	indices.push(2);
+	indices.push(0);
+	indices.push(2);
+	indices.push(3);
+	
+	for (int i = 0; i < GEOMETRY_VERTEX_ATTRIBUTE_COUNT; ++i)
+	{
+		serializer.deserializeArrayItem(v[i]);
+	}
+
+	uint8_t* data = (uint8_t*)v;
+	m_geometry->copy(data, sizeof(v), indices, def);
+
+	char material[LUMIX_MAX_PATH];
+	serializer.deserializeArrayItem(material, LUMIX_MAX_PATH);
+	m_material = static_cast<Material*>(pipeline.getResourceManager().get(ResourceManager::MATERIAL)->load(material));
+}
+
+
+void DrawScreenQuadCommand::execute(PipelineInstanceImpl& pipeline)
+{
+	pipeline.renderScreenGeometry(m_geometry, m_material);
 }
 
 
@@ -1014,7 +1032,7 @@ void RenderShadowmapCommand::execute(PipelineInstanceImpl& pipeline)
 
 void BindShadowmapCommand::execute(PipelineInstanceImpl& pipeline)
 {
-	glActiveTexture(GL_TEXTURE0 + 1);
+	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, pipeline.m_shadowmap_framebuffer->getDepthTexture());
 }
 

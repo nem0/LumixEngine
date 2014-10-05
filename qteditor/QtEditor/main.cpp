@@ -262,9 +262,9 @@ class App
 			PROFILE_FUNCTION();
 			m_edit_render_device->beginFrame();
 			m_world_editor->render(*m_edit_render_device);
-			m_world_editor->renderIcons(*m_edit_render_device);
+			/*m_world_editor->renderIcons(*m_edit_render_device);
 			m_world_editor->getGizmo().updateScale(m_world_editor->getEditCamera());
-			m_world_editor->getGizmo().render(m_world_editor->getEngine().getRenderer(), *m_edit_render_device);
+			m_world_editor->getGizmo().render(m_world_editor->getEngine().getRenderer(), *m_edit_render_device);*/
 			m_world_editor->getEngine().getRenderer().cleanup();
 			m_edit_render_device->endFrame();
 		}
