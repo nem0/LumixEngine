@@ -35,6 +35,7 @@ namespace Lumix
 						: m_entity_system(entity_system)
 						, m_template_name_hash(crc32(template_name))
 						, m_position(position)
+						, m_rotation(Vec3(0, 1, 0), Math::degreesToRadians(rand() % 360))
 					{
 					}
 
@@ -45,6 +46,7 @@ namespace Lumix
 						{
 							m_entity = m_entity_system.m_editor.getEngine().getUniverse()->createEntity();
 							m_entity.setPosition(m_position);
+							m_entity.setRotation(m_rotation);
 
 							m_entity_system.m_instances[m_template_name_hash].push(m_entity);
 							Entity template_entity = iter.second()[0];
@@ -93,6 +95,7 @@ namespace Lumix
 					uint32_t m_template_name_hash;
 					Entity m_entity;
 					Vec3 m_position;
+					Quat m_rotation;
 			};
 
 		public:

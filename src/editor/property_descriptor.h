@@ -20,7 +20,8 @@ class IPropertyDescriptor
 	public:
 		enum Type
 		{
-			FILE = 0,
+			RESOURCE = 0,
+			FILE,
 			DECIMAL,
 			BOOL,
 			VEC3,
@@ -568,7 +569,6 @@ class FilePropertyDescriptor : public StringPropertyDescriptor<T>, public IFileP
 		FilePropertyDescriptor(const char* name, Getter getter, Setter setter, const char* file_type)
 			: StringPropertyDescriptor(name, getter, setter)
 			, m_file_type(file_type)
-			
 		{
 			m_type = IPropertyDescriptor::FILE;
 		}
@@ -581,6 +581,19 @@ class FilePropertyDescriptor : public StringPropertyDescriptor<T>, public IFileP
 	private:
 		string m_file_type;
 };
+
+
+template <class T>
+class ResourcePropertyDescriptor : public FilePropertyDescriptor<T>
+{
+	public:
+		ResourcePropertyDescriptor(const char* name, Getter getter, Setter setter, const char* file_type)
+			: FilePropertyDescriptor(name, getter, setter, file_type)
+		{
+			m_type = IPropertyDescriptor::RESOURCE;
+		}
+};
+
 
 
 template <class S>

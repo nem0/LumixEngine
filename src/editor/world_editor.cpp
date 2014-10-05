@@ -774,6 +774,26 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
+		Vec3 minCoords(const Vec3& a, const Vec3& b)
+		{
+			return Vec3(
+				Math::minValue(a.x, b.x),
+				Math::minValue(a.y, b.y),
+				Math::minValue(a.z, b.z)
+			);
+		}
+
+
+		Vec3 maxCoords(const Vec3& a, const Vec3& b)
+		{
+			return Vec3(
+				Math::maxValue(a.x, b.x),
+				Math::maxValue(a.y, b.y),
+				Math::maxValue(a.z, b.z)
+			);
+		}
+
+
 		void createEditorLines()
 		{
 			Component camera_cmp = m_camera.getComponent(CAMERA_HASH);
@@ -797,24 +817,33 @@ struct WorldEditorImpl : public WorldEditor
 					aabb[6].set(aabb[7].x, aabb[7].y, aabb[0].z);
 					Matrix mtx = m_selected_entities[i].getMatrix();
 
-					for(int i = 0; i < 8; ++i)
+					Vec3 this_min, this_max;
+					for(int j = 0; j < 8; ++j)
 					{
-						aabb[i] = mtx.multiplyPosition(aabb[i]); 
-						if(first_found)
-						{
-							all_min = aabb[0];
-							all_max = aabb[0];
-							first_found = false;
-						}
-
-						all_min.x = Math::minValue(aabb[i].x, all_min.x);
-						all_min.y = Math::minValue(aabb[i].y, all_min.y);
-						all_min.z = Math::minValue(aabb[i].z, all_min.z);
-
-						all_max.x = Math::maxValue(aabb[i].x, all_max.x);
-						all_max.y = Math::maxValue(aabb[i].y, all_max.y);
-						all_max.z = Math::maxValue(aabb[i].z, all_max.z);
+						aabb[j] = mtx.multiplyPosition(aabb[j]); 
 					}
+
+					this_min = aabb[0];
+					this_max = aabb[0];
+
+					for(int j = 0; j < 8; ++j)
+					{
+						this_min = minCoords(aabb[j], this_min);
+						this_max = maxCoords(aabb[j], this_max);
+					}
+
+					if(i > 0)
+					{
+						all_min = minCoords(this_min, all_min);
+						all_max = maxCoords(this_max, all_max);
+					}
+					else
+					{
+						all_min = this_min;
+						all_max = this_max;
+					}
+
+					scene->addDebugCube(this_min, this_max, Vec3(1, 0, 0), 0);
 				}
 				else
 				{
@@ -827,19 +856,14 @@ struct WorldEditorImpl : public WorldEditor
 					}
 					else
 					{
-						all_min.x = Math::minValue(pos.x - 0.1f, all_min.x);
-						all_min.y = Math::minValue(pos.y - 0.1f, all_min.y);
-						all_min.z = Math::minValue(pos.z - 0.1f, all_min.z);
-
-						all_max.x = Math::maxValue(pos.x + 0.1f, all_max.x);
-						all_max.y = Math::maxValue(pos.y + 0.1f, all_max.y);
-						all_max.z = Math::maxValue(pos.z + 0.1f, all_max.z);
+						all_min = minCoords(pos - Vec3(0.1f, 0.1f, 0.1f), all_min);
+						all_max = maxCoords(pos - Vec3(0.1f, 0.1f, 0.1f), all_max);
 					}
 				}
 			}
-			if (!m_selected_entities.empty())
+			if (m_selected_entities.size() > 1)
 			{
-				scene->addDebugCube(all_min, all_max, Vec3(1, 0, 0), 0);
+				scene->addDebugCube(all_min, all_max, Vec3(1, 1, 0), 0);
 			}
 			m_measure_tool->createEditorLines(*scene);
 		}

@@ -16,6 +16,7 @@
 #include "graphics/geometry.h"
 #include "graphics/material.h"
 #include "graphics/model.h"
+#include "graphics/model_instance.h"
 #include "graphics/render_scene.h"
 #include "graphics/shader.h"
 #include "graphics/texture.h"
@@ -47,6 +48,10 @@ static const char* component_map[] =
 	"Script", "script",
 	"Terrain", "terrain"
 };
+
+
+
+static const uint32_t RENDERABLE_HASH = crc32("renderable");
 
 
 class AddTerrainLevelCommand : public Lumix::IEditorCommand
@@ -488,6 +493,7 @@ class ComponentPropertyObject : public PropertyViewObject
 						});
 					}
 					break;
+				case Lumix::IPropertyDescriptor::RESOURCE:
 				case Lumix::IPropertyDescriptor::FILE:
 					{
 						char path[LUMIX_MAX_PATH];
@@ -517,10 +523,20 @@ class ComponentPropertyObject : public PropertyViewObject
 				
 						QPushButton* button2 = new QPushButton("->", widget);
 						layout->addWidget(button2);
-						button2->connect(button2, &QPushButton::clicked, [&view, edit]()
+						if(m_descriptor.getType() == Lumix::IPropertyDescriptor::RESOURCE)
 						{
-							view.setSelectedResourceFilename(edit->text().toLatin1().data());
-						});
+							button2->connect(button2, &QPushButton::clicked, [&view, edit]()
+							{
+								view.setSelectedResourceFilename(edit->text().toLatin1().data());
+							});
+						}
+						else
+						{
+							button2->connect(button2, &QPushButton::clicked, [edit]()
+							{
+								QDesktopServices::openUrl(QUrl::fromLocalFile(edit->text()));
+							});
+						}
 				
 						item->treeWidget()->setItemWidget(item, 1, widget);
 						connect(edit, &QLineEdit::editingFinished, [edit, &view, this]()
@@ -628,48 +644,6 @@ class ComponentPropertyObject : public PropertyViewObject
 							});
 							dialog->show();
 						});
-
-	/*					char path[LUMIX_MAX_PATH];
-						stream.read(path, stream.getBufferSize());
-						
-						FileEdit* edit = new FileEdit(widget, NULL);
-						edit->setText(path);
-						edit->setServer(view.getWorldEditor());
-						QHBoxLayout* layout = new QHBoxLayout(widget);
-						layout->addWidget(edit);
-						layout->setContentsMargins(0, 0, 0, 0);
-						QPushButton* button = new QPushButton("...", widget);
-						layout->addWidget(button);
-						button->connect(button, &QPushButton::clicked, [this, edit, &view]()
-						{
-							QString str = QFileDialog::getOpenFileName(NULL, QString(), QString(), dynamic_cast<Lumix::IFilePropertyDescriptor&>(m_descriptor).getFileType());
-							if (str != "")
-							{
-								char rel_path[LUMIX_MAX_PATH];
-								QByteArray byte_array = str.toLatin1();
-								const char* text = byte_array.data();
-								view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, text);
-								view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, rel_path, strlen(rel_path) + 1);
-								edit->setText(rel_path);
-							}
-						});
-				
-						QPushButton* button2 = new QPushButton("->", widget);
-						layout->addWidget(button2);
-						button2->connect(button2, &QPushButton::clicked, [&view, edit]()
-						{
-							view.setSelectedResourceFilename(edit->text().toLatin1().data());
-						});
-				
-						
-						connect(edit, &QLineEdit::editingFinished, [edit, &view, this]()
-						{
-							if(view.getObject())
-							{
-								QByteArray byte_array = edit->text().toLatin1();
-								view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, byte_array.data(), byte_array.size() + 1);
-							}
-						});*/
 					}
 					break;
 				default:
@@ -1361,6 +1335,26 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 		}
 
 
+		bool isXZCollision(Lumix::RenderScene* scene, float x, float z, float min_x, float min_z, float max_x, float max_z)
+		{
+			static Lumix::Array<Lumix::RenderableInfo> infos;
+			infos.clear();
+			scene->getRenderableInfos(infos, ~0);
+			for(int i = 0, c = infos.size(); i < c; ++i)
+			{
+				Lumix::Vec3 pos = infos[i].m_matrix->getTranslation();
+				Lumix::Vec3 min, max;
+				infos[i].m_model->getModel()->getAABB(&min, &max);
+				if (!(x + max_x < pos.x + min_x || z + max_z < pos.z + min.z 
+					|| x + min_x > pos.x + max_x || z + min_z > pos.z + max_z))
+				{
+					return true;
+				}
+			}
+			return false;
+		}
+
+
 		void paintEntities(Lumix::Component terrain, const Lumix::RayCastModelHit& hit)
 		{
 			Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(terrain.scene);
@@ -1368,6 +1362,17 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			Lumix::Matrix terrain_matrix = terrain.entity.getMatrix();
 			Lumix::Matrix inv_terrain_matrix = terrain_matrix;
 			inv_terrain_matrix.inverse();
+			Lumix::Entity tpl = m_entity_template_list->getTemplate();
+			if(!tpl.isValid())
+			{
+				return;
+			}
+			Lumix::Component renderable = tpl.getComponent(RENDERABLE_HASH);
+			Lumix::Vec3 renderable_min, renderable_max;
+			if(renderable.isValid())
+			{
+				scene->getRenderableModel(renderable)->getAABB(&renderable_min, &renderable_max);
+			}
 			for (int i = 0; i <= m_terrain_brush_strength * 10; ++i)
 			{
 				float angle = (float)(rand() % 360);
@@ -1378,8 +1383,11 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 				scene->getTerrainSize(terrain, &w, &h);
 				if(pos.x >= 0 && pos.z >= 0 && pos.x < w && pos.z < h)
 				{
-					pos.y = scene->getTerrainHeightAt(terrain, pos.x, pos.z);
-					m_entity_template_list->instantiateTemplateAt(terrain_matrix.multiplyPosition(pos));
+					if(!renderable.isValid() || !isXZCollision(scene, pos.x, pos.z, renderable_min.x, renderable_min.z, renderable_max.x, renderable_max.z))
+					{
+						pos.y = scene->getTerrainHeightAt(terrain, pos.x, pos.z);
+						m_entity_template_list->instantiateTemplateAt(terrain_matrix.multiplyPosition(pos));
+					}
 				}
 			}
 		}

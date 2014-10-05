@@ -41,6 +41,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "QtEditor", "..\..\qteditor\
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "fbx_converter", "fbx_converter\fbx_converter.vcxproj", "{DAFC5509-EC74-4309-A9F6-CCB4B4734BD3}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "script", "script\script.vcxproj", "{E56A8C15-C73D-43E4-8D7C-04BBFC062ACC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -92,6 +94,14 @@ Global
 		{DAFC5509-EC74-4309-A9F6-CCB4B4734BD3}.Release|Win32.ActiveCfg = Release|Win32
 		{DAFC5509-EC74-4309-A9F6-CCB4B4734BD3}.Release|Win32.Build.0 = Release|Win32
 		{DAFC5509-EC74-4309-A9F6-CCB4B4734BD3}.Release|x64.ActiveCfg = Release|Win32
+		{E56A8C15-C73D-43E4-8D7C-04BBFC062ACC}.Debug|Win32.ActiveCfg = Debug|Win32
+		{E56A8C15-C73D-43E4-8D7C-04BBFC062ACC}.Debug|Win32.Build.0 = Debug|Win32
+		{E56A8C15-C73D-43E4-8D7C-04BBFC062ACC}.Debug|x64.ActiveCfg = Debug|x64
+		{E56A8C15-C73D-43E4-8D7C-04BBFC062ACC}.Debug|x64.Build.0 = Debug|x64
+		{E56A8C15-C73D-43E4-8D7C-04BBFC062ACC}.Release|Win32.ActiveCfg = Release|Win32
+		{E56A8C15-C73D-43E4-8D7C-04BBFC062ACC}.Release|Win32.Build.0 = Release|Win32
+		{E56A8C15-C73D-43E4-8D7C-04BBFC062ACC}.Release|x64.ActiveCfg = Release|x64
+		{E56A8C15-C73D-43E4-8D7C-04BBFC062ACC}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
