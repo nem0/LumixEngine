@@ -1158,6 +1158,12 @@ static PropertyViewObject* createMaterialObject(PropertyViewObject* parent, Lumi
 		prop = new GetterSetterObject<bool, Lumix::Material>(object, "Alpha to coverage", material, &Lumix::Material::isAlphaToCoverage, &Lumix::Material::enableAlphaToCoverage, &createEditor);
 		object->addMember(prop);
 
+		prop = new GetterSetterObject<bool, Lumix::Material>(object, "Shadow receiver", material, &Lumix::Material::isShadowReceiver, &Lumix::Material::enableShadowReceiving, &createEditor);
+		object->addMember(prop);
+
+		prop = new GetterSetterObject<bool, Lumix::Material>(object, "Alpha cutout", material, &Lumix::Material::isAlphaCutout, &Lumix::Material::enableAlphaCutout, &createEditor);
+		object->addMember(prop);
+
 		for (int i = 0; i < material->getTextureCount(); ++i)
 		{
 			prop = createTextureObject(object, material->getTexture(i));

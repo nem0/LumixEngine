@@ -271,6 +271,19 @@ class FileArrayObjectDescriptor : public StringArrayObjectDescriptor<S>, public 
 
 
 template <class S>
+class ResourceArrayObjectDescriptor : public FileArrayObjectDescriptor<S>
+{
+	public:
+		ResourceArrayObjectDescriptor(const char* name, Getter getter, Setter setter, const char* file_type)
+			: FileArrayObjectDescriptor(name, getter, setter, file_type)
+		{
+			m_type = IPropertyDescriptor::RESOURCE;
+		}
+};
+
+
+
+template <class S>
 class Vec3ArrayObjectDescriptor : public IPropertyDescriptor
 {
 	public:
