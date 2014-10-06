@@ -23,6 +23,7 @@
 #include "editor/editor_icon.h"
 #include "editor/entity_template_system.h"
 #include "editor/gizmo.h"
+#include "editor/measure_tool.h"
 #include "editor/property_descriptor.h"
 #include "engine/engine.h"
 #include "engine/iplugin.h"
@@ -773,6 +774,77 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
+		void createEditorLines()
+		{
+			Component camera_cmp = m_camera.getComponent(CAMERA_HASH);
+			RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);
+			bool first_found = true;
+			Vec3 all_min;
+			Vec3 all_max;
+			for(int i = 0; i < m_selected_entities.size(); ++i)
+			{
+				Component renderable = m_selected_entities[i].getComponent(RENDERABLE_HASH);
+				if(renderable.isValid())
+				{
+					Model* model = scene->getRenderableModel(renderable);
+					Vec3 aabb[8];
+					model->getAABB(&aabb[0], &aabb[7]);
+					aabb[1].set(aabb[0].x, aabb[0].y, aabb[7].z);
+					aabb[2].set(aabb[0].x, aabb[7].y, aabb[0].z);
+					aabb[3].set(aabb[0].x, aabb[7].y, aabb[7].z);
+					aabb[4].set(aabb[7].x, aabb[0].y, aabb[0].z);
+					aabb[5].set(aabb[7].x, aabb[0].y, aabb[7].z);
+					aabb[6].set(aabb[7].x, aabb[7].y, aabb[0].z);
+					Matrix mtx = m_selected_entities[i].getMatrix();
+
+					for(int i = 0; i < 8; ++i)
+					{
+						aabb[i] = mtx.multiplyPosition(aabb[i]); 
+						if(first_found)
+						{
+							all_min = aabb[0];
+							all_max = aabb[0];
+							first_found = false;
+						}
+
+						all_min.x = Math::minValue(aabb[i].x, all_min.x);
+						all_min.y = Math::minValue(aabb[i].y, all_min.y);
+						all_min.z = Math::minValue(aabb[i].z, all_min.z);
+
+						all_max.x = Math::maxValue(aabb[i].x, all_max.x);
+						all_max.y = Math::maxValue(aabb[i].y, all_max.y);
+						all_max.z = Math::maxValue(aabb[i].z, all_max.z);
+					}
+				}
+				else
+				{
+					Vec3 pos = m_selected_entities[i].getPosition();
+					if(first_found)
+					{
+						first_found = false;
+						all_min = pos - Vec3(0.5f, 0.5f, 0.5f); 
+						all_max = pos + Vec3(0.5f, 0.5f, 0.5f); 
+					}
+					else
+					{
+						all_min.x = Math::minValue(pos.x - 0.1f, all_min.x);
+						all_min.y = Math::minValue(pos.y - 0.1f, all_min.y);
+						all_min.z = Math::minValue(pos.z - 0.1f, all_min.z);
+
+						all_max.x = Math::maxValue(pos.x + 0.1f, all_max.x);
+						all_max.y = Math::maxValue(pos.y + 0.1f, all_max.y);
+						all_max.z = Math::maxValue(pos.z + 0.1f, all_max.z);
+					}
+				}
+			}
+			if (!m_selected_entities.empty())
+			{
+				scene->addDebugCube(all_min, all_max, Vec3(1, 0, 0), 0);
+			}
+			m_measure_tool->createEditorLines(*scene);
+		}
+
+
 		virtual void tick() override
 		{
 			for (int i = 0; i < m_plugins.size(); ++i)
@@ -784,14 +856,15 @@ struct WorldEditorImpl : public WorldEditor
 				toggleGameMode();
 				m_toggle_game_mode_requested = false;
 			}
-			PROFILE_FUNCTION();
 			m_engine->update(m_is_game_mode);
 			m_engine->getFileSystem().updateAsyncTransactions();
+			createEditorLines();
 		}
 
 	
 		virtual ~WorldEditorImpl()
 		{
+			LUMIX_DELETE(m_measure_tool);
 			destroyUndoStack();
 			auto iter = m_component_properties.begin();
 			auto end = m_component_properties.end();
@@ -902,10 +975,25 @@ struct WorldEditorImpl : public WorldEditor
 			}
 			else
 			{
-				selectEntities(&entity, 1);
+				bool entity_already_selected = false;
+				for(int i = 0, c = m_selected_entities.size(); i < c; ++i)
+				{
+					if(m_selected_entities[i] == entity)
+					{
+						entity_already_selected = true;
+						break;
+					}
+				}
+				if(entity_already_selected)
+				{
+					m_mouse_mode = MouseMode::TRANSFORM;
+					m_gizmo.startTransform(m_camera.getComponent(CAMERA_HASH), x, y, Gizmo::TransformMode::CAMERA_XZ);
+				}
+				else
+				{
+					selectEntities(&entity, 1);
+				}
 			}
-			m_mouse_mode = MouseMode::TRANSFORM;
-			m_gizmo.startTransform(m_camera.getComponent(CAMERA_HASH), x, y, Gizmo::TransformMode::CAMERA_XZ);
 		}
 
 
@@ -1438,6 +1526,8 @@ struct WorldEditorImpl : public WorldEditor
 			m_universe_path = "";
 			m_terrain_brush_size = 10;
 			m_terrain_brush_strength = 0.01f;
+			m_measure_tool = LUMIX_NEW(MeasureTool);
+			addPlugin(m_measure_tool);
 		}
 
 
@@ -1752,6 +1842,18 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
+		virtual MeasureTool* getMeasureTool() const override
+		{
+			return m_measure_tool;
+		}
+
+
+		virtual void toggleMeasure() override
+		{
+			m_measure_tool->enable(!m_measure_tool->isEnabled());
+		}
+
+
 	private:
 		struct MouseMode
 		{
@@ -1795,6 +1897,7 @@ struct WorldEditorImpl : public WorldEditor
 		int m_terrain_brush_size;
 		float m_terrain_brush_strength;
 		Array<Plugin*> m_plugins;
+		MeasureTool* m_measure_tool;
 		Plugin* m_mouse_handling_plugin;
 		EntityTemplateSystem* m_template_system;
 		Array<IEditorCommand*> m_undo_stack;

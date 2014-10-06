@@ -31,6 +31,32 @@ public:
 		LESS
 	};
 	
+	struct Uniform
+	{
+		Uniform() : m_is_editable(false) {}
+
+		enum Type
+		{
+			INT,
+			FLOAT,
+			MATRIX,
+			TIME
+		};
+
+		static const int MAX_NAME_LENGTH = 32;
+		
+		char m_name[MAX_NAME_LENGTH + 1];
+		uint32_t m_name_hash;
+		Type m_type;
+		union
+		{
+			int32_t m_int;
+			float m_float;
+			float m_matrix[16];
+		};
+		bool m_is_editable;
+	};
+
 public:
 	void apply(Renderer& renderer, PipelineInstance& pipeline) const;
 	bool isZTest() const { return m_is_z_test; }
@@ -44,11 +70,14 @@ public:
 	Shader* getShader() const { return m_shader; }
 
 	int getTextureCount() const { return m_textures.size(); }
-	Texture* getTexture(int i) { return m_textures[i]; }
+	Texture* getTexture(int i) const { return m_textures[i].m_texture; }
+	Texture* getTextureByUniform(const char* uniform) const;
 	void addTexture(Texture* texture);
 	void setTexture(int i, Texture* texture);
 	void removeTexture(int i);
 	bool save(ISerializer& serializer);
+	int getUniformCount() const { return m_uniforms.size(); }
+	Uniform& getUniform(int index) { return m_uniforms[index]; }
 
 private:
 	Material(const Path& path, ResourceManager& resource_manager)
@@ -66,27 +95,21 @@ private:
 	virtual FS::ReadCallback getReadCallback() override;
 
 	void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
+	bool deserializeTexture(ISerializer& serializer, const char* material_dir);
 
 private:
-	struct Uniform
+	struct TextureInfo
 	{
-		enum Type
+		TextureInfo()
 		{
-			INT,
-			FLOAT,
-			MATRIX,
-			TIME
-		};
-		static const int MAX_NAME_LENGTH = 30;
-		char m_name[MAX_NAME_LENGTH + 1];
-		uint32_t m_name_hash;
-		Type m_type;
-		union
-		{
-			int32_t m_int;
-			float m_float;
-			float m_matrix[16];
-		};
+			m_texture = NULL;
+			m_keep_data = false;
+			m_uniform[0] = '\0';
+		}
+
+		Texture* m_texture;
+		bool m_keep_data;
+		char m_uniform[Uniform::MAX_NAME_LENGTH];
 	};
 
 private:
@@ -94,7 +117,7 @@ private:
 
 private:
 	Shader*	m_shader;
-	Array<Texture*> m_textures;
+	Array<TextureInfo> m_textures;
 	Array<Uniform> m_uniforms;
 	bool m_is_z_test;
 	bool m_is_backface_culling;

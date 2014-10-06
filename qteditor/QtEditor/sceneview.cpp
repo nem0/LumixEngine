@@ -2,6 +2,7 @@
 #include "editor/world_editor.h"
 #include "core/crc32.h"
 #include "editor/ieditor_command.h"
+#include "editor/measure_tool.h"
 #include "engine/engine.h"
 #include "engine/iplugin.h"
 #include "graphics/pipeline.h"
@@ -10,6 +11,7 @@
 #include <qapplication.h>
 #include <QDoubleSpinBox>
 #include <QDragEnterEvent>
+#include <QLabel>
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QVBoxLayout>
@@ -35,12 +37,7 @@ class ViewWidget : public QWidget
 
 		virtual void wheelEvent(QWheelEvent* event) override
 		{
-			float speed = m_view.getNavivationSpeed();
-			if (QApplication::keyboardModifiers() & Qt::ShiftModifier)
-			{
-				speed *= 10;
-			}
-			m_world_editor->navigate(event->delta() * 0.1f, 0, speed);
+			m_view.changeNavigationSpeed(event->delta() * 0.001f);
 		}
 
 		virtual void mouseMoveEvent(QMouseEvent* event) override
@@ -68,6 +65,7 @@ SceneView::SceneView(QWidget* parent) :
 	QDockWidget(parent)
 {
 	m_pipeline = NULL;
+	m_measure_tool_label = new QLabel("");
 	QWidget* root = new QWidget();
 	QVBoxLayout* vertical_layout = new QVBoxLayout(root);
 	QHBoxLayout* horizontal_layout = new QHBoxLayout(root);
@@ -75,8 +73,10 @@ SceneView::SceneView(QWidget* parent) :
 	m_speed_input = new QDoubleSpinBox(root);
 	m_speed_input->setSingleStep(0.1f);
 	m_speed_input->setValue(0.1f);
-	horizontal_layout->addWidget(m_speed_input);
+	horizontal_layout->addWidget(m_measure_tool_label);
 	horizontal_layout->addStretch();
+	horizontal_layout->addWidget(m_speed_input);
+	horizontal_layout->setContentsMargins(0, 0, 0, 0);
 	vertical_layout->addWidget(m_view);
 	vertical_layout->addLayout(horizontal_layout);
 	vertical_layout->setContentsMargins(0, 0, 0, 0);
@@ -91,10 +91,26 @@ void SceneView::setWorldEditor(Lumix::WorldEditor* world_editor)
 {
 	static_cast<ViewWidget*>(m_view)->m_world_editor = world_editor;
 	m_world_editor = world_editor;
+	if (world_editor)
+	{
+		world_editor->getMeasureTool()->distanceMeasured().bind<SceneView, &SceneView::onDistanceMeasured>(this);
+	}
 }
 
 
-float SceneView::getNavivationSpeed() const
+void SceneView::onDistanceMeasured(float distance)
+{
+	m_measure_tool_label->setText(QString("Measured distance: %1").arg(distance));
+}
+
+
+void SceneView::changeNavigationSpeed(float value)
+{
+	m_speed_input->setValue(Lumix::Math::maxValue(0.1f, (float)m_speed_input->value() + value));
+}
+
+
+float SceneView::getNavigationSpeed() const
 {
 	return m_speed_input->value();
 }
@@ -131,7 +147,7 @@ void SceneView::dropEvent(QDropEvent *event)
 			{
 				position.set(0, 0, 0);
 			}
-			InsertMeshCommand* command = new InsertMeshCommand(*static_cast<ViewWidget&>(*m_view).m_world_editor, position, file.toLatin1().data());
+			InsertMeshCommand* command = new (Lumix::dll_lumix_new(sizeof(InsertMeshCommand), "", 0)) InsertMeshCommand(*static_cast<ViewWidget&>(*m_view).m_world_editor, position, file.toLatin1().data());
 			m_world_editor->executeCommand(command);
 			m_world_editor->selectEntities(&command->getEntity(), 1);
 		}

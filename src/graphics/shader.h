@@ -24,6 +24,14 @@ class LUMIX_ENGINE_API Shader : public Resource
 			MORPH_CONST,
 			QUAD_SIZE,
 			QUAD_MIN,
+			AMBIENT_COLOR,
+			AMBIENT_INTENSITY,
+			DIFFUSE_COLOR,
+			DIFFUSE_INTENSITY,
+			FOG_COLOR,
+			FOG_DENSITY,
+			VIEW_MATRIX,
+			PROJECTION_MATRIX,
 			COUNT
 		};
 	
@@ -39,6 +47,7 @@ class LUMIX_ENGINE_API Shader : public Resource
 		LUMIX_FORCE_INLINE GLint getUniformLocation(const char* name, uint32_t name_hash);
 		GLuint getProgramId() const { return m_program_id; }
 		GLint getFixedCachedUniformLocation(FixedCachedUniforms name) const { return m_fixed_cached_uniforms[(int)name]; }
+		int getAttributeCount() const { return m_vertex_attribute_count; }
 
 	private:
 		GLuint attach(GLenum type, const char* src, int32_t length);
@@ -61,6 +70,7 @@ class LUMIX_ENGINE_API Shader : public Resource
 		GLuint	m_vertex_id;
 		GLuint	m_fragment_id;
 		GLint	m_vertex_attributes_ids[MAX_ATTRIBUTE_COUNT];
+		int		m_vertex_attribute_count;
 		bool	m_is_shadowmap_required;
 		Array<CachedUniform> m_uniforms;
 		GLint m_fixed_cached_uniforms[(int)FixedCachedUniforms::COUNT];

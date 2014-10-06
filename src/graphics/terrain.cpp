@@ -319,6 +319,10 @@ namespace Lumix
 	void Terrain::updateGrass(const Vec3& camera_position)
 	{
 		PROFILE_FUNCTION();
+		if (!m_splatmap)
+		{
+			return;
+		}
 		if (m_free_grass_quads.size() + m_grass_quads.size() < GRASS_QUADS_HEIGHT * GRASS_QUADS_WIDTH)
 		{
 			int new_count = GRASS_QUADS_HEIGHT * GRASS_QUADS_WIDTH - m_grass_quads.size();
@@ -342,7 +346,7 @@ namespace Lumix
 			float to_quad_x = cx + (GRASS_QUADS_WIDTH >> 1) * GRASS_QUAD_SIZE;
 			float to_quad_z = cz + (GRASS_QUADS_WIDTH >> 1) * GRASS_QUAD_SIZE;
 
-			float old_bounds[4] = { FLT_MAX, FLT_MIN, FLT_MAX, FLT_MIN };
+			float old_bounds[4] = { FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX };
 			for (int i = m_grass_quads.size() - 1; i >= 0; --i)
 			{
 				GrassQuad* quad = m_grass_quads[i];
@@ -381,7 +385,7 @@ namespace Lumix
 							if(patch.m_type->m_grass_geometry)
 							{
 								int index = 0;
-								Texture* splat_map = m_material->getTexture(m_material->getTextureCount() - 1);
+								Texture* splat_map = m_splatmap;
 								float step = GRASS_QUAD_SIZE / (float)patch.m_type->m_density;
 								for (float dx = 0; dx < GRASS_QUAD_SIZE; dx += step)
 								{
@@ -396,7 +400,7 @@ namespace Lumix
 											grass_mtx = Matrix::IDENTITY;
 											float x = quad_x + dx + step * (rand() % 100 - 50) / 100.0f;
 											float z = quad_z + dz + step * (rand() % 100 - 50) / 100.0f;
-											grass_mtx.setTranslation(Vec3(x, getHeight(x / m_xz_scale, z / m_xz_scale), z));
+											grass_mtx.setTranslation(Vec3(x, getHeight(x, z), z));
 											grass_mtx = mtx * grass_mtx;
 											grass_mtx.multiply3x3(density + (rand() % 20 - 10) / 100.0f);
 										}
@@ -511,6 +515,8 @@ namespace Lumix
 				m_material->getObserverCb().unbind<Terrain, &Terrain::onMaterialLoaded>(this);
 			}
 			m_material = material;
+			m_splatmap = NULL;
+			m_heightmap = NULL;
 			if (m_mesh && m_material)
 			{
 				m_mesh->setMaterial(m_material);
@@ -617,13 +623,13 @@ namespace Lumix
 			return h0 + (h2 - h0) * dec_z + (h1 - h2) * dec_x;
 		}
 	}
-
+	
 
 	float Terrain::getHeight(int x, int z)
 	{
 		int texture_x = (int)(x / m_xz_scale);
 		int texture_y = (int)(z / m_xz_scale);
-		Texture* t = m_material->getTexture(0);
+		Texture* t = m_heightmap;
 		int idx = Math::clamp(texture_x, 0, m_width) + Math::clamp(texture_y, 0, m_height) * m_width;
 		if (t->getBytesPerPixel() == 2)
 		{
@@ -697,18 +703,26 @@ namespace Lumix
 			Vec3 size(m_root->m_size * m_xz_scale, m_y_scale, m_root->m_size * m_xz_scale);
 			if (Math::getRayAABBIntersection(rel_origin, rel_dir, m_root->m_min, size, start))
 			{
-				Vec3 p = start;
-				int hx = (int)(p.x / m_xz_scale);
-				int hz = (int)(p.z / m_xz_scale);
-				while (hx >= 0 && hz >= 0 && hx < m_width - 1 && hz < m_height - 1 && p.y > m_root->m_min.y && p.y < m_root->m_min.y + m_root->m_size)
+				int hx = (int)(start.x / m_xz_scale);
+				int hz = (int)(start.z / m_xz_scale);
+
+				float next_x = ((hx + (rel_dir.x < 0 ? 0 : 1)) * m_xz_scale - rel_origin.x) / rel_dir.x;
+				float next_z = ((hz + (rel_dir.z < 0 ? 0 : 1)) * m_xz_scale - rel_origin.z) / rel_dir.z;
+
+				float delta_x = m_xz_scale / Math::abs(rel_dir.x);
+				float delta_z = m_xz_scale / Math::abs(rel_dir.z);
+				int step_x = (int)Math::signum(rel_dir.x);
+				int step_z = (int)Math::signum(rel_dir.z);
+
+				while (hx >= 0 && hz >= 0 && hx < m_width && hz < m_height)
 				{
 					float t;
 					float x = hx * m_xz_scale;
 					float z = hz * m_xz_scale;
-					Vec3 p0(x, getHeight(hx, hz), z);
-					Vec3 p1(x + m_xz_scale, getHeight(hx + 1, hz), z);
-					Vec3 p2(x + m_xz_scale, getHeight(hx + 1, hz + 1), z + m_xz_scale);
-					Vec3 p3(x, getHeight(hx, hz + 1), z + m_xz_scale);
+					Vec3 p0(x, getHeight(x, z), z);
+					Vec3 p1(x + m_xz_scale, getHeight(x + m_xz_scale, z), z);
+					Vec3 p2(x + m_xz_scale, getHeight(x + m_xz_scale, z + m_xz_scale), z + m_xz_scale);
+					Vec3 p3(x, getHeight(x, z + m_xz_scale), z + m_xz_scale);
 					if (getRayTriangleIntersection(rel_origin, rel_dir, p0, p1, p2, t))
 					{
 						hit.m_is_hit = true;
@@ -725,9 +739,16 @@ namespace Lumix
 						hit.m_t = t;
 						return hit;
 					}
-					p += rel_dir;
-					hx = (int)(p.x / m_xz_scale);
-					hz = (int)(p.z / m_xz_scale);
+					if (next_x < next_z)
+					{
+						next_x += delta_x;
+						hx += step_x;
+					}
+					else
+					{
+						next_z += delta_z;
+						hz += step_z;
+					}
 				}
 			}
 		}
@@ -802,9 +823,11 @@ namespace Lumix
 		PROFILE_FUNCTION();
 		if (new_state == Resource::State::READY)
 		{
-			m_width = m_material->getTexture(0)->getWidth();
-			m_height = m_material->getTexture(0)->getHeight();
 			LUMIX_DELETE(m_root);
+			m_heightmap = m_material->getTextureByUniform("hm_texture");
+			m_splatmap = m_material->getTextureByUniform("splat_texture");
+			m_width = m_heightmap->getWidth();
+			m_height = m_heightmap->getHeight();
 			m_root = generateQuadTree((float)m_width);
 		}
 	}
