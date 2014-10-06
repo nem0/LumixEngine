@@ -31,6 +31,7 @@ namespace Lumix
 		virtual void cullToFrustumAsync(const Frustum& frustum) = 0;
 
 		virtual void addStatic(const Sphere& sphere, int index) = 0;
+		virtual void removeStatic(int index) = 0;
 
 		virtual void updateBoundingRadius(float radius, int index) = 0;
 		virtual void updateBoundingPosition(const Vec3& position, int index) = 0;

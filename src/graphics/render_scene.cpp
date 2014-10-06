@@ -471,6 +471,7 @@ namespace Lumix
 					m_renderables[component.index]->m_is_free = true;
 					m_universe.destroyComponent(component);
 					m_universe.componentDestroyed().invoke(component);
+					m_culling_system->removeStatic(component.index);
 				}
 				else if (component.type == LIGHT_HASH)
 				{
@@ -700,6 +701,8 @@ namespace Lumix
 				if (model)
 				{
 					model->getObserverCb().bind<RenderSceneImpl, &RenderSceneImpl::modelUpdate>(this);
+
+					updateBoundingRadiuses();
 				}
 
 				r.m_model.setModel(model);
@@ -801,21 +804,6 @@ namespace Lumix
 					return;
 
 				m_culling_system->cullToFrustumAsync(m_camera_frustum);
-
-				//const CullingSystem::InputSpheres& spheres = m_culling_system->getSpheres();
-
-				////m_debug_lines.clear();
-				//Vec3 mag(1.f, 0.f, 1.f);
-				//for (int i = 0; i < spheres.size(); i++)
-				//{
-				//	Vec3 center = spheres[i].m_position;
-				//	float radius = spheres[i].m_radius;
-
-				//	//addDebugCircle(center, radius, mag, 0.001f);
-				//	addDebugCross(center, radius, mag, 0.001f);
-				//}
-
-				//const typename CullingSystem::Results& results = m_culling_system->getResultAsync();
 
 				const CullingSystem::Results& results = m_culling_system->getResultAsync();
 
@@ -1047,6 +1035,11 @@ namespace Lumix
 		private:
 			// I know, but it's just a proof of concept
 			void modelUpdate(Resource::State, Resource::State)
+			{
+				updateBoundingRadiuses();
+			}
+
+			void updateBoundingRadiuses()
 			{
 				for (int i = 0; i < m_renderables.size(); ++i)
 				{

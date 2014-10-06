@@ -12,11 +12,11 @@
 namespace Lumix
 {
 	static void doCulling(
-		const Sphere* __restrict  start,
-		const Sphere* __restrict  end,
-		const int* __restrict indexes, 
-		const Frustum* __restrict frustum,
-		int* __restrict results
+		const Sphere* LUMIX_RESTRICT start,
+		const Sphere* LUMIX_RESTRICT end,
+		const int* LUMIX_RESTRICT indexes,
+		const Frustum* LUMIX_RESTRICT frustum,
+		int* LUMIX_RESTRICT results
 		)
 	{
 		for (const Sphere* sphere = start; sphere <= end; sphere++, indexes++, results++)
@@ -139,8 +139,23 @@ namespace Lumix
 
 		virtual void addStatic(const Sphere& sphere, int index) override
 		{
-			m_spheres.push(sphere);
-			m_indexes.push(index);
+			if (index == m_spheres.size())
+			{
+				m_spheres.push(sphere);
+				m_indexes.push(index);
+			}
+			else
+			{
+				m_spheres[index] = sphere;
+				m_indexes[index] = index;
+			}
+		}
+
+		virtual void removeStatic(int index) override
+		{
+			ASSERT(index <= m_spheres.size());
+
+			m_indexes[index] = -1;
 		}
 
 		virtual void updateBoundingRadius(float radius, int index) override
