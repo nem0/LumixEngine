@@ -54,6 +54,12 @@ namespace Lumix
 		}
 
 		template <typename T>
+		LUMIX_FORCE_INLINE T signum(T a)
+		{
+			return a > 0 ? (T)1 : (a < 0 ? (T)-1 : 0);
+		}
+
+		template <typename T>
 		LUMIX_FORCE_INLINE T clamp(T value, T min_value, T max_value)
 		{
 			return min(max(value, min_value), max_value);

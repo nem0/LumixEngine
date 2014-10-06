@@ -21,6 +21,7 @@ Shader::Shader(const Path& path, ResourceManager& resource_manager)
 	, m_vertex_id()
 	, m_fragment_id()
 	, m_is_shadowmap_required(true)
+	, m_vertex_attribute_count(0)
 {
 	m_program_id = glCreateProgram();
 }
@@ -42,6 +43,7 @@ GLint Shader::getUniformLocation(const char* name, uint32_t name_hash)
 			return m_uniforms[i].m_location;
 		}
 	}
+	ASSERT(isReady());
 	CachedUniform& unif = m_uniforms.pushEmpty();
 	unif.m_name_hash = name_hash;
 	unif.m_location = glGetUniformLocation(m_program_id, name);
@@ -86,6 +88,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 					}
 				}
 				serializer.deserializeArrayEnd();
+				m_vertex_attribute_count = attribute_count;
 			}
 			else if (strcmp(label, "shadowmap_required") == 0)
 			{
@@ -118,9 +121,26 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		if (link_status != GL_TRUE)
 		{
 			g_log_error.log("renderer") << "Could not link shader " << m_path.c_str();
+			char buffer[1024];
+			GLsizei info_log_len;
+			glGetProgramInfoLog(m_program_id, sizeof(buffer), &info_log_len, buffer);
+			if(info_log_len)
+			{
+				g_log_error.log("renderer") << "Shader error log: " << buffer;
+			}
 			onFailure();
 			fs.close(file);
 			return;
+		}
+		else
+		{
+			char buffer[1024];
+			GLsizei info_log_len;
+			glGetProgramInfoLog(m_program_id, sizeof(buffer), &info_log_len, buffer);
+			if(info_log_len)
+			{
+				g_log_info.log("renderer") << "Shader log: " << buffer;
+			}
 		}
 
 		for (int i = 0; i < attribute_count; ++i)
@@ -132,7 +152,14 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		m_fixed_cached_uniforms[(int)FixedCachedUniforms::MORPH_CONST] = glGetUniformLocation(m_program_id, "morph_const");
 		m_fixed_cached_uniforms[(int)FixedCachedUniforms::QUAD_SIZE] = glGetUniformLocation(m_program_id, "quad_size");
 		m_fixed_cached_uniforms[(int)FixedCachedUniforms::QUAD_MIN] = glGetUniformLocation(m_program_id, "quad_min");
-
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::AMBIENT_COLOR] = glGetUniformLocation(m_program_id, "ambient_color");
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::AMBIENT_INTENSITY] = glGetUniformLocation(m_program_id, "ambient_intensity");
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::DIFFUSE_COLOR] = glGetUniformLocation(m_program_id, "diffuse_color");
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::DIFFUSE_INTENSITY] = glGetUniformLocation(m_program_id, "diffuse_intensity");
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::FOG_COLOR] = glGetUniformLocation(m_program_id, "fog_color");
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::FOG_DENSITY] = glGetUniformLocation(m_program_id, "fog_density");
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::VIEW_MATRIX] = glGetUniformLocation(m_program_id, "view_matrix");
+		m_fixed_cached_uniforms[(int)FixedCachedUniforms::PROJECTION_MATRIX] = glGetUniformLocation(m_program_id, "projection_matrix");
 		m_size = file->size();
 		decrementDepCount();
 	}

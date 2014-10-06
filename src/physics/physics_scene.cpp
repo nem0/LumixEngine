@@ -879,7 +879,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			{
 				serializer.serializeArrayItem(true);
 				serializer.serializeArrayItem(m_terrains[i]->m_entity.index);
-				serializer.serializeArrayItem(m_terrains[i]->m_heightmap->getPath().c_str());
+				serializer.serializeArrayItem(m_terrains[i]->m_heightmap ? m_terrains[i]->m_heightmap->getPath().c_str() : "");
 				serializer.serializeArrayItem(m_terrains[i]->m_xz_scale);
 				serializer.serializeArrayItem(m_terrains[i]->m_y_scale);
 			}
@@ -901,7 +901,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			m_actors[i]->m_physx_actor->release();
 		}
+		int old_size = m_actors.size();
 		m_actors.resize(count);
+		for(int i = old_size; i < count; ++i)
+		{
+			RigidActor* actor = LUMIX_NEW(RigidActor);
+			m_actors[i] = actor;	
+		}
 		serializer.deserializeArrayBegin("actors");
 		for (int i = 0; i < m_actors.size(); ++i)
 		{
@@ -941,9 +947,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 			serializer.deserializeArrayItem(is_free);
 			Entity e(m_universe, index);
 
-			Controller c;
+			Controller& c = m_controllers.pushEmpty();
 			c.m_is_free = is_free;
-			m_controllers.push(c);
 			
 			if(!is_free)
 			{
@@ -978,6 +983,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 		}
 		int old_size = m_terrains.size();
 		m_terrains.resize(count);
+		for(int i = old_size; i < count; ++i)
+		{
+			m_terrains[i] = NULL;
+		}
 		serializer.deserializeArrayBegin("terrains");
 		for (int i = 0; i < count; ++i)
 		{

@@ -306,6 +306,7 @@ void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			&& parseMeshes(file))
 		{
 			m_bounding_radius = m_geometry->getBoundingRadius();
+			m_geometry->getAABB(&m_aabb_min, &m_aabb_max);
 			m_size = file->size();
 			decrementDepCount();
 		}

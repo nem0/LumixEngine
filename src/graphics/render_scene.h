@@ -79,7 +79,7 @@ namespace Lumix
 
 			virtual void addDebugLine(const Vec3& from, const Vec3& to, const Vec3& color, float life) = 0;
 			virtual void addDebugCross(const Vec3& center, float size, const Vec3& color, float life) = 0;
-			virtual void addDebugCube(const Vec3& from, float size, const Vec3& color, float life) = 0;
+			virtual void addDebugCube(const Vec3& from, const Vec3& max, const Vec3& color, float life) = 0;
 			virtual void addDebugCircle(const Vec3& center, float radius, const Vec3& color, float life) = 0;
 			virtual const Array<DebugLine>& getDebugLines() const = 0;
 			virtual Component getCameraInSlot(const char* slot) = 0;
@@ -100,6 +100,7 @@ namespace Lumix
 			virtual void setRenderablePath(Component cmp, const string& path) = 0;
 			virtual void setRenderableScale(Component cmp, float scale) = 0;
 			virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) = 0;
+			virtual Model* getRenderableModel(Component cmp) = 0;
 			
 			virtual void getGrassInfos(Array<GrassInfo>& infos, int64_t layer_mask) = 0;
 			virtual void getTerrainInfos(Array<TerrainInfo>& infos, int64_t layer_mask) = 0;
@@ -112,6 +113,7 @@ namespace Lumix
 			virtual void setTerrainYScale(Component cmp, float scale) = 0;
 			virtual float getTerrainYScale(Component cmp) = 0;
 			virtual void setTerrainBrush(Component cmp, const Vec3& position, float size) = 0;
+			virtual void getTerrainSize(Component cmp, float* width, float* height) = 0;
 
 			virtual void setGrass(Component cmp, int index, const string& path) = 0;
 			virtual void getGrass(Component cmp, int index, string& path) = 0;
@@ -122,6 +124,19 @@ namespace Lumix
 			virtual int getGrassCount(Component cmp) = 0;
 			virtual void addGrass(Component cmp, int index) = 0;
 			virtual void removeGrass(Component cmp, int index) = 0;
+
+			virtual void setLightDiffuseIntensity(Component cmp, float intensity) = 0;
+			virtual void setLightDiffuseColor(Component cmp, const Vec4& color) = 0;
+			virtual void setLightAmbientIntensity(Component cmp, float intensity) = 0;
+			virtual void setLightAmbientColor(Component cmp, const Vec4& color) = 0;
+			virtual void setFogDensity(Component cmp, float density) = 0;
+			virtual void setFogColor(Component cmp, const Vec4& color) = 0;
+			virtual float getLightDiffuseIntensity(Component cmp) = 0;
+			virtual Vec4 getLightDiffuseColor(Component cmp) = 0;
+			virtual float getLightAmbientIntensity(Component cmp) = 0;
+			virtual Vec4 getLightAmbientColor(Component cmp) = 0;
+			virtual float getFogDensity(Component cmp) = 0;
+			virtual Vec4 getFogColor(Component cmp) = 0;
 
 		protected:
 			virtual ~RenderScene() {}

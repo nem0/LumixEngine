@@ -64,6 +64,7 @@ class LUMIX_ENGINE_API PipelineInstance abstract
 		static PipelineInstance* create(Pipeline& src);
 		static void destroy(PipelineInstance* pipeline);
 
+		virtual Renderer& getRenderer() = 0;
 		virtual void setRenderer(Renderer& renderer) = 0;
 		virtual void setScene(RenderScene* scene) = 0;
 		virtual RenderScene* getScene() = 0;
