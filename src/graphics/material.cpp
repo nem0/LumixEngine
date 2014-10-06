@@ -33,7 +33,7 @@ void Material::apply(Renderer& renderer, PipelineInstance& pipeline) const
 	PROFILE_FUNCTION();
 	if(getState() == State::READY)
 	{
-		renderer.applyShader(*m_shader);
+		renderer.applyShader(*m_shader, m_shader_combination);
 		switch (m_depth_func)
 		{
 			case DepthFunc::LEQUAL:
@@ -90,13 +90,28 @@ void Material::apply(Renderer& renderer, PipelineInstance& pipeline) const
 	}
 }
 
+
+void Material::updateShaderCombination()
+{
+	static const int MAX_DEFINES_LENGTH = 1024;
+	char defines[MAX_DEFINES_LENGTH];
+	copyString(defines, MAX_DEFINES_LENGTH, m_is_alpha_cutout ? "#define ALPHA_CUTOUT\n" : "" );
+	catCString(defines, MAX_DEFINES_LENGTH, m_is_shadow_receiver ? "#define SHADOW_RECEIVER\n" : "" );
+	m_shader_combination = crc32(defines);
+	if(m_shader && m_shader->isReady())
+	{
+		m_shader->createCombination(defines);
+	}
+}
+
+
 void Material::doUnload(void)
 {
 	if(m_shader)
 	{
 		removeDependency(*m_shader);
 		m_resource_manager.get(ResourceManager::SHADER)->unload(*m_shader);
-		m_shader = NULL;
+		setShader(NULL);
 	}
 
 	ResourceManagerBase* texture_manager = m_resource_manager.get(ResourceManager::TEXTURE);
@@ -169,6 +184,8 @@ bool Material::save(ISerializer& serializer)
 	serializer.endArray();
 	serializer.serialize("alpha_to_coverage", m_is_alpha_to_coverage);
 	serializer.serialize("backface_culling", m_is_backface_culling);
+	serializer.serialize("alpha_cutout", m_is_alpha_cutout);
+	serializer.serialize("shadow_receiver", m_is_shadow_receiver);
 	serializer.serialize("z_test", m_is_z_test);
 	serializer.endObject();
 	return false;
@@ -276,6 +293,11 @@ void Material::addTexture(Texture* texture)
 	m_textures.pushEmpty().m_texture = texture;
 }
 
+void Material::shaderLoaded(Resource::State, Resource::State)
+{
+	updateShaderCombination();
+}
+
 void Material::setShader(Shader* shader)
 {
 	if (m_shader)
@@ -287,6 +309,11 @@ void Material::setShader(Shader* shader)
 	if (m_shader)
 	{
 		addDependency(*m_shader);
+		m_shader->getObserverCb().bind<Material, &Material::shaderLoaded>(this);
+		if(m_shader->isReady())
+		{
+			shaderLoaded(Resource::State::READY, Resource::State::READY);
+		}
 	}
 }
 
@@ -390,6 +417,14 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 				}
 				
 			}
+			else if (strcmp(label, "alpha_cutout") == 0)
+			{
+				serializer.deserialize(m_is_alpha_cutout);
+			}
+			else if (strcmp(label, "shadow_receiver") == 0)
+			{
+				serializer.deserialize(m_is_shadow_receiver);
+			}
 			else if (strcmp(label, "alpha_to_coverage") == 0)
 			{
 				serializer.deserialize(m_is_alpha_to_coverage);
@@ -397,8 +432,7 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			else if (strcmp(label, "shader") == 0)
 			{
 				serializer.deserialize(path, MAX_PATH);
-				m_shader = static_cast<Shader*>(m_resource_manager.get(ResourceManager::SHADER)->load(path));
-				addDependency(*m_shader);
+				setShader(static_cast<Shader*>(m_resource_manager.get(ResourceManager::SHADER)->load(path)));
 			}
 			else if (strcmp(label, "z_test") == 0)
 			{

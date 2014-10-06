@@ -43,20 +43,14 @@ class LUMIX_ENGINE_API Shader : public Resource
 		Shader(const Path& path, ResourceManager& resource_manager);
 		~Shader();
 
-		GLint getAttribId(int index) const { return m_vertex_attributes_ids[index]; }
+		GLint getAttribId(int index) const { return m_current_combination->m_vertex_attributes_ids[index]; }
 		bool isShadowmapRequired() const { return m_is_shadowmap_required; }
 		LUMIX_FORCE_INLINE GLint getUniformLocation(const char* name, uint32_t name_hash);
-		GLuint getProgramId() const { return m_program_id; }
-		GLint getFixedCachedUniformLocation(FixedCachedUniforms name) const { return m_fixed_cached_uniforms[(int)name]; }
-		int getAttributeCount() const { return m_vertex_attribute_count; }
-
-	private:
-		GLuint attach(GLenum type, const char* src, int32_t length);
-		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
-		bool deserializeSettings(class ISerializer& serializer, char* attributes[MAX_ATTRIBUTE_COUNT]);
-
-		virtual void doUnload(void) override;
-		virtual FS::ReadCallback getReadCallback() override;
+		GLuint getProgramId() const { return m_current_combination->m_program_id; }
+		GLint getFixedCachedUniformLocation(FixedCachedUniforms name) const { return m_current_combination->m_fixed_cached_uniforms[(int)name]; }
+		int getAttributeCount() const { return m_attributes.size(); }
+		void createCombination(const char* defines);
+		void setCurrentCombination(uint32_t hash) { m_current_combination = getCombination(hash); }
 
 	private:
 		class CachedUniform
@@ -66,15 +60,33 @@ class LUMIX_ENGINE_API Shader : public Resource
 				GLint m_location;
 		};
 
+		class Combination
+		{
+			public:
+				GLuint	m_program_id;
+				GLuint	m_vertex_id;
+				GLuint	m_fragment_id;
+				uint32_t m_hash;
+				GLint	m_vertex_attributes_ids[MAX_ATTRIBUTE_COUNT];
+				Array<CachedUniform> m_uniforms;
+				GLint m_fixed_cached_uniforms[(int)FixedCachedUniforms::COUNT];
+				string m_defines;
+		};
+
 	private:
-		GLuint	m_program_id;
-		GLuint	m_vertex_id;
-		GLuint	m_fragment_id;
-		GLint	m_vertex_attributes_ids[MAX_ATTRIBUTE_COUNT];
-		int		m_vertex_attribute_count;
-		bool	m_is_shadowmap_required;
-		Array<CachedUniform> m_uniforms;
-		GLint m_fixed_cached_uniforms[(int)FixedCachedUniforms::COUNT];
+		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
+		bool deserializeSettings(class ISerializer& serializer, char* attributes[MAX_ATTRIBUTE_COUNT]);
+		Combination* getCombination(uint32_t hash) const;
+
+		virtual void doUnload(void) override;
+		virtual FS::ReadCallback getReadCallback() override;
+
+	private:
+		Array<string>		m_attributes;
+		Array<Combination*>	m_combinations;
+		Combination*		m_current_combination;
+		bool				m_is_shadowmap_required;
+		string				m_source;
 };
 
 

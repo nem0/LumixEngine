@@ -291,8 +291,9 @@ struct RendererImpl : public Renderer
 	}
 
 
-	virtual void applyShader(const Shader& shader) override
+	virtual void applyShader(Shader& shader, uint32_t combination) override
 	{
+		shader.setCurrentCombination(combination);
 		GLuint id = shader.getProgramId();
 		m_last_program_id = id;
 		glUseProgram(id);
@@ -341,7 +342,7 @@ struct RendererImpl : public Renderer
 		editor.registerProperty("terrain", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("y_scale", &RenderScene::getTerrainYScale, &RenderScene::setTerrainYScale));
 
 		auto grass = LUMIX_NEW(ArrayDescriptor<RenderScene>)("grass", &RenderScene::getGrassCount, &RenderScene::addGrass, &RenderScene::removeGrass);
-		grass->addChild(LUMIX_NEW(FileArrayObjectDescriptor<RenderScene>)("mesh", &RenderScene::getGrass, &RenderScene::setGrass, "Mesh (*.msh)"));
+		grass->addChild(LUMIX_NEW(ResourceArrayObjectDescriptor<RenderScene>)("mesh", &RenderScene::getGrass, &RenderScene::setGrass, "Mesh (*.msh)"));
 		auto ground = LUMIX_NEW(IntArrayObjectDescriptor<RenderScene>)("ground", &RenderScene::getGrassGround, &RenderScene::setGrassGround);
 		ground->setLimit(0, 4);
 		grass->addChild(ground);

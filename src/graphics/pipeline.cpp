@@ -446,7 +446,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void computeFrustum(const Component& camera, Frustum* frustum, float from_dist, float to_dist)
 	{
-		RenderScene& scene = static_cast<RenderScene&>(*camera.scene);
+		RenderScene& scene = *m_scene;
 		Matrix entity_mtx = camera.entity.getMatrix();
 		float fov = Math::degreesToRadians(scene.getCameraFOV(camera));
 		float far_dist = scene.getCameraNearPlane(camera) + to_dist;
@@ -561,7 +561,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 		const Array<DebugLine>& lines = m_scene->getDebugLines();
 		Shader& shader = m_renderer->getDebugShader();
-		m_renderer->applyShader(shader);
+		m_renderer->applyShader(shader, 0);
 
 		for(int j = 0; j <= lines.size() / 256; ++j)
 		{
