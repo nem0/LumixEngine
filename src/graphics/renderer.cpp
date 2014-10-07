@@ -36,6 +36,7 @@ struct RendererImpl : public Renderer
 {
 	RendererImpl()
 	{
+		m_current_pass_hash = crc32("MAIN");
 		m_last_bind_geometry = NULL;
 		m_last_program_id = 0xffffFFFF;
 		m_is_editor_wireframe = false;
@@ -284,6 +285,18 @@ struct RendererImpl : public Renderer
 	}
 
 
+	virtual uint32_t getPass() override
+	{
+		return m_current_pass_hash;
+	}
+
+
+	virtual void setPass(uint32_t pass_hash) override
+	{
+		m_current_pass_hash = pass_hash;
+	}
+
+
 	virtual Shader& getDebugShader() override
 	{
 		ASSERT(m_debug_shader);
@@ -291,8 +304,9 @@ struct RendererImpl : public Renderer
 	}
 
 
-	virtual void applyShader(const Shader& shader) override
+	virtual void applyShader(Shader& shader, uint32_t combination) override
 	{
+		shader.setCurrentCombination(combination, m_current_pass_hash);
 		GLuint id = shader.getProgramId();
 		m_last_program_id = id;
 		glUseProgram(id);
@@ -327,7 +341,7 @@ struct RendererImpl : public Renderer
 		editor.registerProperty("camera", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("near", &RenderScene::getCameraNearPlane, &RenderScene::setCameraNearPlane));
 		editor.registerProperty("camera", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("far", &RenderScene::getCameraFarPlane, &RenderScene::setCameraFarPlane));
 
-		editor.registerProperty("renderable", LUMIX_NEW(FilePropertyDescriptor<RenderScene>)("source", &RenderScene::getRenderablePath, &RenderScene::setRenderablePath, "Mesh (*.msh)"));
+		editor.registerProperty("renderable", LUMIX_NEW(ResourcePropertyDescriptor<RenderScene>)("source", &RenderScene::getRenderablePath, &RenderScene::setRenderablePath, "Mesh (*.msh)"));
 
 		editor.registerProperty("light", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("ambient_intensity", &RenderScene::getLightAmbientIntensity, &RenderScene::setLightAmbientIntensity));
 		editor.registerProperty("light", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("diffuse_intensity", &RenderScene::getLightDiffuseIntensity, &RenderScene::setLightDiffuseIntensity));
@@ -336,12 +350,12 @@ struct RendererImpl : public Renderer
 		editor.registerProperty("light", LUMIX_NEW(ColorPropertyDescriptor<RenderScene>)("diffuse_color", &RenderScene::getLightDiffuseColor, &RenderScene::setLightDiffuseColor));
 		editor.registerProperty("light", LUMIX_NEW(ColorPropertyDescriptor<RenderScene>)("fog_color", &RenderScene::getFogColor, &RenderScene::setFogColor));
 
-		editor.registerProperty("terrain", LUMIX_NEW(FilePropertyDescriptor<RenderScene>)("material", &RenderScene::getTerrainMaterial, &RenderScene::setTerrainMaterial, "Material (*.mat)"));
+		editor.registerProperty("terrain", LUMIX_NEW(ResourcePropertyDescriptor<RenderScene>)("material", &RenderScene::getTerrainMaterial, &RenderScene::setTerrainMaterial, "Material (*.mat)"));
 		editor.registerProperty("terrain", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("xz_scale", &RenderScene::getTerrainXZScale, &RenderScene::setTerrainXZScale));
 		editor.registerProperty("terrain", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("y_scale", &RenderScene::getTerrainYScale, &RenderScene::setTerrainYScale));
 
 		auto grass = LUMIX_NEW(ArrayDescriptor<RenderScene>)("grass", &RenderScene::getGrassCount, &RenderScene::addGrass, &RenderScene::removeGrass);
-		grass->addChild(LUMIX_NEW(FileArrayObjectDescriptor<RenderScene>)("mesh", &RenderScene::getGrass, &RenderScene::setGrass, "Mesh (*.msh)"));
+		grass->addChild(LUMIX_NEW(ResourceArrayObjectDescriptor<RenderScene>)("mesh", &RenderScene::getGrass, &RenderScene::setGrass, "Mesh (*.msh)"));
 		auto ground = LUMIX_NEW(IntArrayObjectDescriptor<RenderScene>)("ground", &RenderScene::getGrassGround, &RenderScene::setGrassGround);
 		ground->setLimit(0, 4);
 		grass->addChild(ground);
@@ -444,6 +458,7 @@ struct RendererImpl : public Renderer
 	Geometry* m_last_bind_geometry;
 	Shader* m_last_bind_geometry_shader;
 	GLuint m_last_program_id;
+	uint32_t m_current_pass_hash;
 	Matrix m_view_matrix;
 	Matrix m_projection_matrix;
 	Shader* m_debug_shader;

@@ -58,7 +58,34 @@ MainWindow::MainWindow(QWidget* parent) :
 	m_property_view->setAssetBrowser(*m_asset_browser);
 	m_property_view->setEntityTemplateList(m_entity_template_list_ui);
 
+	int size = settings.beginReadArray("recent_files");
+	for (int i = 0; i < size; ++i)
+	{
+		settings.setArrayIndex(i);
+		m_recent_files.push_back(settings.value("filename").toString());
+	}
+	settings.endArray();
+	m_recent_files_menu = new QMenu(m_ui->menuFile);
+	m_recent_files_menu->setTitle("Recent Files");
+	m_ui->menuFile->insertMenu(m_ui->actionSave, m_recent_files_menu);
+	m_recent_files_menu->connect(m_recent_files_menu, &QMenu::triggered, [this](QAction* action)
+	{
+		auto path = action->text().toLatin1();
+		m_world_editor->loadUniverse(path.data());
+	});
+	fillRecentFiles();
+
 	restoreState(settings.value("mainWindowState").toByteArray());
+}
+
+
+void MainWindow::fillRecentFiles()
+{
+	m_recent_files_menu->clear();
+	for (auto file : m_recent_files)
+	{
+		m_recent_files_menu->addAction(file);
+	}
 }
 
 
@@ -79,6 +106,15 @@ void MainWindow::closeEvent(QCloseEvent *event)
 	QSettings settings("Lumix", "QtEditor");
 	settings.setValue("mainWindowGeometry", saveGeometry());
 	settings.setValue("mainWindowState", saveState());
+	settings.beginWriteArray("recent_files");
+	int i = 0;
+	for (auto file : m_recent_files)
+	{
+		settings.setArrayIndex(i);
+		settings.setValue("filename", file);
+		++i;
+	}
+	settings.endArray();
 	QMainWindow::closeEvent(event);
 }
 
@@ -107,6 +143,23 @@ void MainWindow::setWorldEditor(Lumix::WorldEditor& editor)
 	m_entity_template_list_ui->setWorldEditor(editor);
 	m_game_view->setWorldEditor(editor);
 	m_entity_list->setWorldEditor(editor);
+
+	m_world_editor->universeLoaded().bind<MainWindow, &MainWindow::onUniverseLoaded>(this);
+}
+
+void MainWindow::onUniverseLoaded()
+{
+	const char* path = m_world_editor->getUniversePath().c_str();
+	
+	if (m_recent_files.indexOf(path, 0) < 0)
+	{
+		m_recent_files.push_back(path);
+		if (m_recent_files.size() > 6)
+		{
+			m_recent_files.pop_front();
+		}
+		fillRecentFiles();
+	}
 }
 
 GameView* MainWindow::getGameView() const
@@ -129,7 +182,8 @@ void MainWindow::on_actionLog_triggered()
 
 void MainWindow::on_actionOpen_triggered()
 {
-	QByteArray path = QFileDialog::getOpenFileName(NULL, QString(), QString(), "universe (*.unv)").toLocal8Bit();
+	QString filename = QFileDialog::getOpenFileName(NULL, QString(), QString(), "universe (*.unv)");
+	QByteArray path = filename.toLocal8Bit();
 	if (!path.isEmpty())
 	{
 		m_world_editor->loadUniverse(path.data());
