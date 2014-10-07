@@ -64,3 +64,15 @@ uint32_t crc32(const char str[])
 	}
 	return ~crc;
 }
+
+uint32_t continueCrc32(uint32_t original_crc, const char str[])
+{
+	const char* c = str;
+	uint32_t crc = ~original_crc;
+	while(*c)
+	{
+		crc = (crc >> 8) ^ crc32Table[crc & 0xFF ^ *c];		
+		++c;
+	}
+	return ~crc;
+}

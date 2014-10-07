@@ -36,6 +36,7 @@ struct RendererImpl : public Renderer
 {
 	RendererImpl()
 	{
+		m_current_pass_hash = crc32("MAIN");
 		m_last_bind_geometry = NULL;
 		m_last_program_id = 0xffffFFFF;
 		m_is_editor_wireframe = false;
@@ -284,6 +285,18 @@ struct RendererImpl : public Renderer
 	}
 
 
+	virtual uint32_t getPass() override
+	{
+		return m_current_pass_hash;
+	}
+
+
+	virtual void setPass(uint32_t pass_hash) override
+	{
+		m_current_pass_hash = pass_hash;
+	}
+
+
 	virtual Shader& getDebugShader() override
 	{
 		ASSERT(m_debug_shader);
@@ -293,7 +306,7 @@ struct RendererImpl : public Renderer
 
 	virtual void applyShader(Shader& shader, uint32_t combination) override
 	{
-		shader.setCurrentCombination(combination);
+		shader.setCurrentCombination(combination, m_current_pass_hash);
 		GLuint id = shader.getProgramId();
 		m_last_program_id = id;
 		glUseProgram(id);
@@ -445,6 +458,7 @@ struct RendererImpl : public Renderer
 	Geometry* m_last_bind_geometry;
 	Shader* m_last_bind_geometry_shader;
 	GLuint m_last_program_id;
+	uint32_t m_current_pass_hash;
 	Matrix m_view_matrix;
 	Matrix m_projection_matrix;
 	Shader* m_debug_shader;

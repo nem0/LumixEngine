@@ -60,6 +60,8 @@ class LUMIX_ENGINE_API Renderer : public IPlugin
 		virtual void setFixedCachedUniform(const Shader& shader, int name, float value) = 0;
 		virtual void setFixedCachedUniform(const Shader& shader, int name, const Matrix& mtx) = 0;
 		virtual void setFixedCachedUniform(const Shader& shader, int name, const Matrix* matrices, int count) = 0;
+		virtual void setPass(uint32_t pass_hash) = 0;
+		virtual uint32_t getPass() = 0;
 		virtual void applyShader(Shader& shader, uint32_t combination) = 0;
 		virtual Shader& getDebugShader() = 0;
 

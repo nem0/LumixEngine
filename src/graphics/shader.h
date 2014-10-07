@@ -50,7 +50,8 @@ class LUMIX_ENGINE_API Shader : public Resource
 		GLint getFixedCachedUniformLocation(FixedCachedUniforms name) const { return m_current_combination->m_fixed_cached_uniforms[(int)name]; }
 		int getAttributeCount() const { return m_attributes.size(); }
 		void createCombination(const char* defines);
-		void setCurrentCombination(uint32_t hash) { m_current_combination = getCombination(hash); }
+		void setCurrentCombination(uint32_t hash, uint32_t pass_hash) { m_current_combination = getCombination(hash, pass_hash); }
+		bool hasPass(uint32_t pass_hash);
 
 	private:
 		class CachedUniform
@@ -67,6 +68,7 @@ class LUMIX_ENGINE_API Shader : public Resource
 				GLuint	m_vertex_id;
 				GLuint	m_fragment_id;
 				uint32_t m_hash;
+				uint32_t m_pass_hash;
 				GLint	m_vertex_attributes_ids[MAX_ATTRIBUTE_COUNT];
 				Array<CachedUniform> m_uniforms;
 				GLint m_fixed_cached_uniforms[(int)FixedCachedUniforms::COUNT];
@@ -76,13 +78,15 @@ class LUMIX_ENGINE_API Shader : public Resource
 	private:
 		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 		bool deserializeSettings(class ISerializer& serializer, char* attributes[MAX_ATTRIBUTE_COUNT]);
-		Combination* getCombination(uint32_t hash) const;
+		Combination* getCombination(uint32_t hash, uint32_t pass_hash) const;
 
 		virtual void doUnload(void) override;
 		virtual FS::ReadCallback getReadCallback() override;
 
 	private:
 		Array<string>		m_attributes;
+		Array<string>		m_passes;
+		Array<uint32_t>		m_pass_hashes;
 		Array<Combination*>	m_combinations;
 		Combination*		m_current_combination;
 		bool				m_is_shadowmap_required;
