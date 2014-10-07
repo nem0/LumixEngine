@@ -38,7 +38,9 @@ static const uint32_t LIGHT_DIR_HASH = crc32("light_dir");
 static const uint32_t TERRAIN_SCALE_HASH = crc32("terrain_scale");
 static const uint32_t BONE_MATRICES_HASH = crc32("bone_matrices");
 static const uint32_t CAMERA_POS_HASH = crc32("camera_pos");
-
+static float split_distances[] = { 0, 5, 20, 100, 300 };
+static const float SHADOW_CAM_NEAR = 0.1f;
+static const float SHADOW_CAM_FAR = 10000.0f;
 
 struct Frustum
 {
@@ -56,7 +58,7 @@ struct Frustum
 
 		float getSize() const
 		{
-			return (m_points[0] - m_points[6]).length();
+			return Math::maxValue((m_points[0] - m_points[6]).length(), (m_points[4] - m_points[6]).length());
 		}
 
 	public:
@@ -86,6 +88,15 @@ struct PolygonModeCommand : public Command
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	
 	bool m_fill;
+};
+
+
+struct SetPassCommand : public Command
+{
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
+	virtual void execute(PipelineInstanceImpl& pipeline) override;
+	
+	uint32_t m_pass_hash;
 };
 
 
@@ -129,11 +140,14 @@ struct UnbindFramebufferCommand : public Command
 };
 
 
-struct DrawFullscreenQuadCommand : public Command
+struct DrawScreenQuadCommand : public Command
 {
+	~DrawScreenQuadCommand();
+
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	Material* m_material;
+	Geometry* m_geometry;
 };
 
 
@@ -204,12 +218,13 @@ struct PipelineImpl : public Pipeline
 		addCommandCreator("apply_camera").bind<&CreateCommand<ApplyCameraCommand> >();
 		addCommandCreator("bind_framebuffer").bind<&CreateCommand<BindFramebufferCommand> >();
 		addCommandCreator("unbind_framebuffer").bind<&CreateCommand<UnbindFramebufferCommand> >();
-		addCommandCreator("draw_fullscreen_quad").bind<&CreateCommand<DrawFullscreenQuadCommand> >();
+		addCommandCreator("draw_screen_quad").bind<&CreateCommand<DrawScreenQuadCommand> >();
 		addCommandCreator("bind_framebuffer_texture").bind<&CreateCommand<BindFramebufferTextureCommand> >();
 		addCommandCreator("render_shadowmap").bind<&CreateCommand<RenderShadowmapCommand> >();
 		addCommandCreator("bind_shadowmap").bind<&CreateCommand<BindShadowmapCommand> >();
 		addCommandCreator("render_debug_lines").bind<&CreateCommand<RenderDebugLinesCommand> >();
 		addCommandCreator("polygon_mode").bind<&CreateCommand<PolygonModeCommand> >();
+		addCommandCreator("set_pass").bind<&CreateCommand<SetPassCommand> >();
 	}
 
 
@@ -441,7 +456,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void computeFrustum(const Component& camera, Frustum* frustum, float from_dist, float to_dist)
 	{
-		RenderScene& scene = static_cast<RenderScene&>(*camera.scene);
+		RenderScene& scene = *m_scene;
 		Matrix entity_mtx = camera.entity.getMatrix();
 		float fov = Math::degreesToRadians(scene.getCameraFOV(camera));
 		float far_dist = scene.getCameraNearPlane(camera) + to_dist;
@@ -452,23 +467,23 @@ struct PipelineInstanceImpl : public PipelineInstance
 		Vec3 right = crossProduct(forward, up).normalized();
 		up = crossProduct(right, forward).normalized();
 
-		Vec3 fc = camera.entity.getPosition() + forward * far_dist;
-		Vec3 nc = camera.entity.getPosition() + forward * near_dist;
+		Vec3 far_center = camera.entity.getPosition() + forward * far_dist;
+		Vec3 near_center = camera.entity.getPosition() + forward * near_dist;
 
 		float near_height = tan(fov * 0.5f) * near_dist;
 		float near_width = near_height * ratio;
 		float far_height = tan(fov * 0.5f) * far_dist;
 		float far_width = far_height * ratio;
 
-		frustum->m_points[0] = nc - up * near_height - right * near_width;
-		frustum->m_points[1] = nc + up * near_height - right * near_width;
-		frustum->m_points[2] = nc + up * near_height + right * near_width;
-		frustum->m_points[3] = nc - up * near_height + right * near_width;
+		frustum->m_points[0] = near_center - up * near_height - right * near_width;
+		frustum->m_points[1] = near_center + up * near_height - right * near_width;
+		frustum->m_points[2] = near_center + up * near_height + right * near_width;
+		frustum->m_points[3] = near_center - up * near_height + right * near_width;
 
-		frustum->m_points[4] = fc - up * far_height - right * far_width;
-		frustum->m_points[5] = fc + up * far_height - right * far_width;
-		frustum->m_points[6] = fc + up * far_height + right * far_width;
-		frustum->m_points[7] = fc - up * far_height + right * far_width;
+		frustum->m_points[4] = far_center - up * far_height - right * far_width;
+		frustum->m_points[5] = far_center + up * far_height - right * far_width;
+		frustum->m_points[6] = far_center + up * far_height + right * far_width;
+		frustum->m_points[7] = far_center - up * far_height + right * far_width;
 	}
 
 	void renderShadowmap(Component camera, int64_t layer_mask)
@@ -489,20 +504,30 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_light_dir = light_mtx.getZVector();
 
 		Frustum frustum;
-		float split_distances[] = {0, 5, 20, 100, 300};
-		for(int split_index = 0; split_index < 4; ++split_index)
+		float shadowmap_height = (float)m_shadowmap_framebuffer->getHeight();
+		float shadowmap_width = (float)m_shadowmap_framebuffer->getWidth();
+		float viewports[] = 
+			{ 0, 0
+			, 0.5f, 0
+			, 0, 0.5f
+			, 0.5f, 0.5f};
+		for (int split_index = 0; split_index < 4; ++split_index)
 		{
+			float* viewport = viewports + split_index * 2;
+			glViewport((int)(1 + shadowmap_width * viewport[0]), (int)(1 + shadowmap_height * viewport[1]),
+				(int)(0.5f * shadowmap_width - 2), (int)(0.5f * shadowmap_height - 2));
+
 			computeFrustum(camera, &frustum, split_distances[split_index], split_distances[split_index + 1]);
+			(&m_shadowmap_splits.x)[split_index] = split_distances[split_index + 1];
+
 			Vec3 shadow_cam_pos = frustum.getCenter();
 			float bb_size = frustum.getSize() * 0.5f;
-			
-			glViewport(1, (GLint)(split_index * m_shadowmap_framebuffer->getHeight() * 0.25f), m_shadowmap_framebuffer->getWidth() - 2, (GLsizei)(m_shadowmap_framebuffer->getHeight() * 0.25f));
 			Matrix projection_matrix;
-			Renderer::getOrthoMatrix(-bb_size, bb_size, -bb_size, bb_size, 0.01f, 10000, &projection_matrix);
+			Renderer::getOrthoMatrix(-bb_size, bb_size, -bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR, &projection_matrix);
 			m_renderer->setProjectionMatrix(projection_matrix);
 
 			Vec3 light_forward = light_mtx.getZVector();
-			shadow_cam_pos -= light_forward * 5000;
+			shadow_cam_pos -= light_forward * SHADOW_CAM_FAR * 0.5f;
 			Matrix modelview_matrix;
 			Renderer::getLookAtMatrix(shadow_cam_pos, shadow_cam_pos + light_forward, light_mtx.getYVector(), &modelview_matrix);
 			m_renderer->setViewMatrix(modelview_matrix);
@@ -522,28 +547,21 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void drawFullscreenQuad(Material* material)
+	void renderScreenGeometry(Geometry* geometry, Material* material)
 	{
-		glDisable(GL_DEPTH_TEST);
-
-		ASSERT(m_renderer != NULL);
-		Matrix mtx;
-		Renderer::getOrthoMatrix(-1, 1, -1, 1, 0, 30, &mtx);
-		m_renderer->setProjectionMatrix(mtx);
-
-		material->apply(*m_renderer, *this);
-		m_renderer->setViewMatrix(Matrix::IDENTITY);
-		glBegin(GL_QUADS);
-		glTexCoord2f(0, 0);
-		glVertex3f(-1, -1, -1);
-		glTexCoord2f(0, 1);
-		glVertex3f(-1, 1, -1);
-		glTexCoord2f(1, 1);
-		glVertex3f(1, 1, -1);
-		glTexCoord2f(1, 0);
-		glVertex3f(1, -1, -1);
-		glEnd();
-		glEnable(GL_DEPTH_TEST);
+		if (material->isReady())
+		{
+			ASSERT(m_renderer != NULL);
+			Shader* shader = material->getShader();
+			Matrix mtx;
+			Renderer::getOrthoMatrix(-1, 1, -1, 1, 0, 30, &mtx);
+			m_renderer->setProjectionMatrix(mtx);
+			m_renderer->setViewMatrix(Matrix::IDENTITY);
+			material->apply(*m_renderer, *this);
+			m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::WORLD_MATRIX, Matrix::IDENTITY);
+			m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::PROJECTION_MATRIX, mtx);
+			m_renderer->renderGeometry(*geometry, 0, 6, *shader);
+		}
 	}
 
 
@@ -553,7 +571,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 		const Array<DebugLine>& lines = m_scene->getDebugLines();
 		Shader& shader = m_renderer->getDebugShader();
-		m_renderer->applyShader(shader);
+		m_renderer->applyShader(shader, 0);
 
 		for(int j = 0; j <= lines.size() / 256; ++j)
 		{
@@ -613,6 +631,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 							m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::DIFFUSE_INTENSITY, m_scene->getLightDiffuseIntensity(light_cmp));
 							m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::FOG_COLOR, m_scene->getFogColor(light_cmp));
 							m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
+							m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::SHADOWMAP_SPLITS, m_shadowmap_splits);
 						}
 						last_material = &material;
 					}
@@ -654,6 +673,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 						m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::DIFFUSE_INTENSITY, m_scene->getLightDiffuseIntensity(light_cmp));
 						m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::FOG_COLOR, m_scene->getFogColor(light_cmp));
 						m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
+						m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::SHADOWMAP_SPLITS, m_shadowmap_splits);
 					}
 					m_renderer->setUniform(*shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
 
@@ -687,6 +707,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	{
 		PROFILE_FUNCTION();
 		
+		uint32_t pass_hash = getRenderer().getPass();
 		m_renderable_infos.clear();
 		m_scene->getRenderableInfos(m_renderable_infos, layer_mask);
 		int count = m_renderable_infos.size();
@@ -702,6 +723,11 @@ struct PipelineInstanceImpl : public PipelineInstance
 			
 			if (last_material != &material)
 			{
+				if(!shader.hasPass(pass_hash))
+				{
+					continue;
+				}
+	
 				material.apply(*m_renderer, *this);
 				m_renderer->setUniform(shader, "shadowmap_matrix0", SHADOW_MATRIX0_HASH, m_shadow_modelviewprojection[0]);
 				m_renderer->setUniform(shader, "shadowmap_matrix1", SHADOW_MATRIX1_HASH, m_shadow_modelviewprojection[1]);
@@ -716,6 +742,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 					m_renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::DIFFUSE_INTENSITY, m_scene->getLightDiffuseIntensity(light_cmp));
 					m_renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::FOG_COLOR, m_scene->getFogColor(light_cmp));
 					m_renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
+					m_renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::SHADOWMAP_SPLITS, m_shadowmap_splits);
 				}
 				m_renderer->setUniform(shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
 				last_material = &material;
@@ -783,6 +810,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	Matrix m_shadow_modelviewprojection[4];
 	Renderer* m_renderer;
 	Vec3 m_light_dir;
+	Vec4 m_shadowmap_splits;
 	int m_width;
 	int m_height;
 	Map<uint32_t, CustomCommandHandler> m_custom_commands_handlers;
@@ -824,6 +852,21 @@ void PolygonModeCommand::execute(PipelineInstanceImpl& pipeline)
 {
 	glPolygonMode(GL_FRONT_AND_BACK, m_fill && !pipeline.getRenderer().isEditorWireframe() ? GL_FILL : GL_LINE);
 }
+
+
+void SetPassCommand::deserialize(PipelineImpl&, ISerializer& serializer)
+{
+	char pass_name[50];
+	serializer.deserializeArrayItem(pass_name, sizeof(pass_name));
+	m_pass_hash = crc32(pass_name);
+}
+
+
+void SetPassCommand::execute(PipelineInstanceImpl& pipeline)
+{
+	pipeline.getRenderer().setPass(m_pass_hash);
+}
+
 
 void ClearCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
@@ -928,22 +971,44 @@ void RenderDebugLinesCommand::execute(PipelineInstanceImpl& pipeline)
 }
 
 
-void DrawFullscreenQuadCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer)
+DrawScreenQuadCommand::~DrawScreenQuadCommand()
 {
-	const int MATERIAL_NAME_MAX_LENGTH = 100;
-	char material[MATERIAL_NAME_MAX_LENGTH];
-	serializer.deserializeArrayItem(material, MATERIAL_NAME_MAX_LENGTH);
-	base_string<char, StackAllocator<LUMIX_MAX_PATH> > material_path;
-	material_path = "materials/";
-	material_path += material;
-	material_path += ".mat";
-	m_material = static_cast<Material*>(pipeline.getResourceManager().get(ResourceManager::MATERIAL)->load(material_path.c_str()));
+	LUMIX_DELETE(m_geometry);
 }
 
 
-void DrawFullscreenQuadCommand::execute(PipelineInstanceImpl& pipeline)
+void DrawScreenQuadCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer)
 {
-	pipeline.drawFullscreenQuad(m_material);
+	m_geometry = LUMIX_NEW(Geometry);
+	VertexDef def;
+	def.parse("pt", 2);
+	Array<int> indices;
+	const int GEOMETRY_VERTEX_ATTRIBUTE_COUNT = 20;
+	float v[GEOMETRY_VERTEX_ATTRIBUTE_COUNT];
+	indices.push(0);
+	indices.push(1);
+	indices.push(2);
+	indices.push(0);
+	indices.push(2);
+	indices.push(3);
+	
+	for (int i = 0; i < GEOMETRY_VERTEX_ATTRIBUTE_COUNT; ++i)
+	{
+		serializer.deserializeArrayItem(v[i]);
+	}
+
+	uint8_t* data = (uint8_t*)v;
+	m_geometry->copy(data, sizeof(v), indices, def);
+
+	char material[LUMIX_MAX_PATH];
+	serializer.deserializeArrayItem(material, LUMIX_MAX_PATH);
+	m_material = static_cast<Material*>(pipeline.getResourceManager().get(ResourceManager::MATERIAL)->load(material));
+}
+
+
+void DrawScreenQuadCommand::execute(PipelineInstanceImpl& pipeline)
+{
+	pipeline.renderScreenGeometry(m_geometry, m_material);
 }
 
 
@@ -998,7 +1063,7 @@ void RenderShadowmapCommand::execute(PipelineInstanceImpl& pipeline)
 
 void BindShadowmapCommand::execute(PipelineInstanceImpl& pipeline)
 {
-	glActiveTexture(GL_TEXTURE0 + 1);
+	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, pipeline.m_shadowmap_framebuffer->getDepthTexture());
 }
 

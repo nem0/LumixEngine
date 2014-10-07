@@ -1,4 +1,5 @@
 #include "graphics/shader.h"
+#include "core/crc32.h"
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
 #include "core/json_serializer.h"
@@ -18,47 +19,147 @@ namespace Lumix
 
 Shader::Shader(const Path& path, ResourceManager& resource_manager)
 	: Resource(path, resource_manager)
-	, m_vertex_id()
-	, m_fragment_id()
 	, m_is_shadowmap_required(true)
-	, m_vertex_attribute_count(0)
 {
-	m_program_id = glCreateProgram();
 }
+
 
 Shader::~Shader()
 {
-	glDeleteProgram(m_program_id);
-	glDeleteShader(m_vertex_id);
-	glDeleteShader(m_fragment_id);
+	for(int i = 0; i < m_combinations.size(); ++i)
+	{	
+		glDeleteProgram(m_combinations[i]->m_program_id);
+		glDeleteShader(m_combinations[i]->m_vertex_id);
+		glDeleteShader(m_combinations[i]->m_fragment_id);
+		LUMIX_DELETE(m_combinations[i]);
+	}
 }
 
 
 GLint Shader::getUniformLocation(const char* name, uint32_t name_hash)
 {
-	for (int i = 0, c = m_uniforms.size(); i < c; ++i)
+	Array<CachedUniform>& uniforms = m_current_combination->m_uniforms;
+	for (int i = 0, c = uniforms.size(); i < c; ++i)
 	{
-		if (m_uniforms[i].m_name_hash == name_hash)
+		if (uniforms[i].m_name_hash == name_hash)
 		{
-			return m_uniforms[i].m_location;
+			return uniforms[i].m_location;
 		}
 	}
 	ASSERT(isReady());
-	CachedUniform& unif = m_uniforms.pushEmpty();
+	CachedUniform& unif = uniforms.pushEmpty();
 	unif.m_name_hash = name_hash;
-	unif.m_location = glGetUniformLocation(m_program_id, name);
+	unif.m_location = glGetUniformLocation(m_current_combination->m_program_id, name);
 	return unif.m_location;
 }
 
 
-GLuint Shader::attach(GLenum type, const char* src, int32_t length)
+Shader::Combination* Shader::getCombination(uint32_t hash, uint32_t pass_hash) const
 {
-	GLuint id = glCreateShader(type);
-	glShaderSource(id, 1, (const GLchar**)&src, &length);
-	glCompileShader(id);
-	glAttachShader(m_program_id, id);
-	return id;
+	for(int i = 0, c = m_combinations.size(); i < c; ++i)
+	{
+		if(m_combinations[i]->m_hash == hash && m_combinations[i]->m_pass_hash == pass_hash)
+		{
+			return m_combinations[i];
+		}
+	}
+	return NULL;
 }
+
+
+bool Shader::hasPass(uint32_t pass_hash)
+{
+	for(int i = 0, c = m_pass_hashes.size(); i < c; ++i)
+	{
+		if(m_pass_hashes[i] == pass_hash)
+			return true;
+	}
+	return false;
+}
+
+
+void Shader::createCombination(const char* defines)
+{
+	ASSERT(isReady());
+	for(int pass_idx = 0; pass_idx < m_passes.size(); ++pass_idx)
+	{
+		uint32_t hash = defines[0] == '\0' ? 0 : crc32(defines);
+		uint32_t pass_hash = crc32(m_passes[pass_idx].c_str());
+
+		if(!getCombination(hash, pass_hash))
+		{
+			Combination* combination = LUMIX_NEW(Combination);
+			m_combinations.push(combination);
+			combination->m_defines = defines;
+			combination->m_program_id = glCreateProgram();
+			combination->m_hash = hash;
+			combination->m_pass_hash = pass_hash;
+
+			char pass_str[1024];
+			copyString(pass_str, sizeof(pass_str), "#define ");
+			catCString(pass_str, sizeof(pass_str), m_passes[pass_idx].c_str());
+			catCString(pass_str, sizeof(pass_str), "_PASS\n");
+
+			combination->m_vertex_id = glCreateShader(GL_VERTEX_SHADER);
+			const GLchar* vs_strings[] = { pass_str, "#define VERTEX_SHADER\n", defines, m_source.c_str() };
+			glShaderSource(combination->m_vertex_id, sizeof(vs_strings) / sizeof(vs_strings[0]), vs_strings, NULL);
+			glCompileShader(combination->m_vertex_id);
+			glAttachShader(combination->m_program_id, combination->m_vertex_id);
+
+			combination->m_fragment_id = glCreateShader(GL_FRAGMENT_SHADER);
+			const GLchar* fs_strings[] = { pass_str, "#define FRAGMENT_SHADER\n", defines, m_source.c_str() };
+			glShaderSource(combination->m_fragment_id, sizeof(fs_strings) / sizeof(fs_strings[0]), fs_strings, NULL);
+			glCompileShader(combination->m_fragment_id);
+			glAttachShader(combination->m_program_id, combination->m_fragment_id);
+
+			glLinkProgram(combination->m_program_id);
+			GLint link_status;
+			glGetProgramiv(combination->m_program_id, GL_LINK_STATUS, &link_status);
+			if (link_status != GL_TRUE)
+			{
+				g_log_error.log("renderer") << "Could not link shader " << m_path.c_str();
+				char buffer[1024];
+				GLsizei info_log_len;
+				glGetProgramInfoLog(combination->m_program_id, sizeof(buffer), &info_log_len, buffer);
+				if(info_log_len)
+				{
+					g_log_error.log("renderer") << "Shader error log: " << buffer;
+				}
+				return;
+			}
+			else
+			{
+				char buffer[1024];
+				GLsizei info_log_len;
+				glGetProgramInfoLog(combination->m_program_id, sizeof(buffer), &info_log_len, buffer);
+				if(info_log_len)
+				{
+					g_log_info.log("renderer") << "Shader log: " << buffer;
+				}
+			}
+		
+			for (int i = 0; i < m_attributes.size(); ++i)
+			{
+				combination->m_vertex_attributes_ids[i] = glGetAttribLocation(combination->m_program_id, m_attributes[i].c_str());
+			}
+			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::WORLD_MATRIX] = glGetUniformLocation(combination->m_program_id, "world_matrix");
+			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::GRASS_MATRICES] = glGetUniformLocation(combination->m_program_id, "grass_matrices");
+			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::MORPH_CONST] = glGetUniformLocation(combination->m_program_id, "morph_const");
+			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::QUAD_SIZE] = glGetUniformLocation(combination->m_program_id, "quad_size");
+			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::QUAD_MIN] = glGetUniformLocation(combination->m_program_id, "quad_min");
+			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::AMBIENT_COLOR] = glGetUniformLocation(combination->m_program_id, "ambient_color");
+			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::AMBIENT_INTENSITY] = glGetUniformLocation(combination->m_program_id, "ambient_intensity");
+			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::DIFFUSE_COLOR] = glGetUniformLocation(combination->m_program_id, "diffuse_color");
+			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::DIFFUSE_INTENSITY] = glGetUniformLocation(combination->m_program_id, "diffuse_intensity");
+			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::FOG_COLOR] = glGetUniformLocation(combination->m_program_id, "fog_color");
+			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::FOG_DENSITY] = glGetUniformLocation(combination->m_program_id, "fog_density");
+			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::SHADOWMAP_SPLITS] = glGetUniformLocation(combination->m_program_id, "shadowmap_splits");
+			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::VIEW_MATRIX] = glGetUniformLocation(combination->m_program_id, "view_matrix");
+			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::PROJECTION_MATRIX] = glGetUniformLocation(combination->m_program_id, "projection_matrix");
+		}
+	}
+}
+
 
 void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 {
@@ -66,8 +167,9 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	{
 		JsonSerializer serializer(*file, JsonSerializer::READ, m_path.c_str());
 		serializer.deserializeObjectBegin();
-		char attributes[MAX_ATTRIBUTE_COUNT][31];
-		int attribute_count = 0;
+		m_passes.clear();
+		m_pass_hashes.clear();
+		m_attributes.clear();
 		while (!serializer.isObjectEnd())
 		{
 			char label[256];
@@ -77,18 +179,21 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 				serializer.deserializeArrayBegin();
 				while (!serializer.isArrayEnd())
 				{
-					serializer.deserializeArrayItem(attributes[attribute_count], 30);
-					++attribute_count;
-					if (attribute_count == MAX_ATTRIBUTE_COUNT)
-					{
-						g_log_error.log("renderer") << "Too many vertex attributes in shader " << m_path.c_str();
-						onFailure();
-						fs.close(file);
-						return;
-					}
+					serializer.deserializeArrayItem(label, sizeof(label));
+					m_attributes.push(string(label)); /// TODO emplace when it is merged
 				}
 				serializer.deserializeArrayEnd();
-				m_vertex_attribute_count = attribute_count;
+			}
+			else if (strcmp(label, "passes") == 0)
+			{
+				serializer.deserializeArrayBegin();
+				while (!serializer.isArrayEnd())
+				{
+					serializer.deserializeArrayItem(label, sizeof(label));
+					m_passes.push(string(label)); /// TODO emplace when it is merged
+					m_pass_hashes.push(crc32(label));
+				}
+				serializer.deserializeArrayEnd();
 			}
 			else if (strcmp(label, "shadowmap_required") == 0)
 			{
@@ -102,66 +207,30 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		char* buf = reinterpret_cast<char*>(manager->getBuffer(size + 1));
 		serializer.deserializeRawString(buf, size);
 		buf[size] = '\0';
-
-		char* end = strstr(buf, "//~VS");		
-		if (!end)
+		m_source = buf;
+		m_size = file->size();
+		decrementDepCount();
+		if(!m_combinations.empty())
 		{
-			g_log_error.log("renderer") << "Could not process shader file " << m_path.c_str();
-			onFailure();
-			fs.close(file);
-			return;
-		}
-		int32_t vs_len = (int32_t)(end - buf);
-		buf[vs_len-1] = 0;
-		m_vertex_id = attach(GL_VERTEX_SHADER, buf, vs_len);
-		m_fragment_id = attach(GL_FRAGMENT_SHADER, buf + vs_len, size - vs_len);
-		glLinkProgram(m_program_id);
-		GLint link_status;
-		glGetProgramiv(m_program_id, GL_LINK_STATUS, &link_status);
-		if (link_status != GL_TRUE)
-		{
-			g_log_error.log("renderer") << "Could not link shader " << m_path.c_str();
-			char buffer[1024];
-			GLsizei info_log_len;
-			glGetProgramInfoLog(m_program_id, sizeof(buffer), &info_log_len, buffer);
-			if(info_log_len)
+			Array<Combination*> old_combinations;
+			for(int i = 0; i < m_combinations.size(); ++i)
 			{
-				g_log_error.log("renderer") << "Shader error log: " << buffer;
+				old_combinations.push(m_combinations[i]);
 			}
-			onFailure();
-			fs.close(file);
-			return;
+			m_combinations.clear();
+			for(int i = 0; i < old_combinations.size(); ++i)
+			{
+				createCombination(old_combinations[i]->m_defines.c_str());
+			}
+			for(int i = 0; i < old_combinations.size(); ++i)
+			{
+				LUMIX_DELETE(old_combinations[i]);
+			}
 		}
 		else
 		{
-			char buffer[1024];
-			GLsizei info_log_len;
-			glGetProgramInfoLog(m_program_id, sizeof(buffer), &info_log_len, buffer);
-			if(info_log_len)
-			{
-				g_log_info.log("renderer") << "Shader log: " << buffer;
-			}
+			createCombination("");
 		}
-
-		for (int i = 0; i < attribute_count; ++i)
-		{
-			m_vertex_attributes_ids[i] = glGetAttribLocation(m_program_id, attributes[i]);
-		}
-		m_fixed_cached_uniforms[(int)FixedCachedUniforms::WORLD_MATRIX] = glGetUniformLocation(m_program_id, "world_matrix");
-		m_fixed_cached_uniforms[(int)FixedCachedUniforms::GRASS_MATRICES] = glGetUniformLocation(m_program_id, "grass_matrices");
-		m_fixed_cached_uniforms[(int)FixedCachedUniforms::MORPH_CONST] = glGetUniformLocation(m_program_id, "morph_const");
-		m_fixed_cached_uniforms[(int)FixedCachedUniforms::QUAD_SIZE] = glGetUniformLocation(m_program_id, "quad_size");
-		m_fixed_cached_uniforms[(int)FixedCachedUniforms::QUAD_MIN] = glGetUniformLocation(m_program_id, "quad_min");
-		m_fixed_cached_uniforms[(int)FixedCachedUniforms::AMBIENT_COLOR] = glGetUniformLocation(m_program_id, "ambient_color");
-		m_fixed_cached_uniforms[(int)FixedCachedUniforms::AMBIENT_INTENSITY] = glGetUniformLocation(m_program_id, "ambient_intensity");
-		m_fixed_cached_uniforms[(int)FixedCachedUniforms::DIFFUSE_COLOR] = glGetUniformLocation(m_program_id, "diffuse_color");
-		m_fixed_cached_uniforms[(int)FixedCachedUniforms::DIFFUSE_INTENSITY] = glGetUniformLocation(m_program_id, "diffuse_intensity");
-		m_fixed_cached_uniforms[(int)FixedCachedUniforms::FOG_COLOR] = glGetUniformLocation(m_program_id, "fog_color");
-		m_fixed_cached_uniforms[(int)FixedCachedUniforms::FOG_DENSITY] = glGetUniformLocation(m_program_id, "fog_density");
-		m_fixed_cached_uniforms[(int)FixedCachedUniforms::VIEW_MATRIX] = glGetUniformLocation(m_program_id, "view_matrix");
-		m_fixed_cached_uniforms[(int)FixedCachedUniforms::PROJECTION_MATRIX] = glGetUniformLocation(m_program_id, "projection_matrix");
-		m_size = file->size();
-		decrementDepCount();
 	}
 	else
 	{
@@ -174,14 +243,13 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 
 void Shader::doUnload(void)
 {
-	m_uniforms.clear();
-	glDeleteProgram(m_program_id);
-	glDeleteShader(m_vertex_id);
-	glDeleteShader(m_fragment_id);
-	m_program_id = glCreateProgram();
-	m_vertex_id = 0;
-	m_fragment_id = 0;
-
+	for(int i = 0; i < m_combinations.size(); ++i)
+	{
+		m_combinations[i]->m_uniforms.clear();
+		glDeleteProgram(m_combinations[i]->m_program_id);
+		glDeleteShader(m_combinations[i]->m_vertex_id);
+		glDeleteShader(m_combinations[i]->m_fragment_id);
+	}
 	m_size = 0;
 	onEmpty();
 }

@@ -62,6 +62,8 @@ private slots:
 
 private:
 	virtual void resizeEvent(QResizeEvent* event) override;
+	void fillRecentFiles();
+	void onUniverseLoaded();
 
 private:
 	Ui::MainWindow* m_ui;
@@ -77,6 +79,8 @@ private:
 	class EntityTemplateList* m_entity_template_list_ui;
 	class Notifications* m_notifications;
 	class EntityList* m_entity_list;
+	QMenu* m_recent_files_menu;
+	QList<QString> m_recent_files;
 	Lumix::DelegateList<void(const QSize&)> m_resized;
 };
 
