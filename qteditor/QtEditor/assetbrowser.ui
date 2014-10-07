@@ -58,13 +58,19 @@
        <enum>Qt::CustomContextMenu</enum>
       </property>
       <property name="editTriggers">
-       <set>QAbstractItemView::NoEditTriggers</set>
+       <set>QAbstractItemView::EditKeyPressed</set>
       </property>
       <property name="dragEnabled">
        <bool>true</bool>
       </property>
       <property name="dragDropMode">
-       <enum>QAbstractItemView::DragOnly</enum>
+       <enum>QAbstractItemView::DragDrop</enum>
+      </property>
+      <property name="defaultDropAction">
+       <enum>Qt::MoveAction</enum>
+      </property>
+      <property name="alternatingRowColors">
+       <bool>true</bool>
       </property>
       <property name="uniformRowHeights">
        <bool>true</bool>

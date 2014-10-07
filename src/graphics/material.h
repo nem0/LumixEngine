@@ -65,6 +65,10 @@ public:
 	void enableBackfaceCulling(bool enable) { m_is_backface_culling = enable; }
 	bool isAlphaToCoverage() const { return m_is_alpha_to_coverage; }
 	void enableAlphaToCoverage(bool enable) { m_is_alpha_to_coverage = enable; }
+	bool isAlphaCutout() const { return m_is_alpha_cutout; }
+	void enableAlphaCutout(bool enable) { m_is_alpha_cutout = enable; updateShaderCombination(); }
+	bool isShadowReceiver() const { return m_is_shadow_receiver; }
+	void enableShadowReceiving(bool enable) { m_is_shadow_receiver = enable; updateShaderCombination(); }
 
 	void setShader(Shader* shader);
 	Shader* getShader() const { return m_shader; }
@@ -87,7 +91,12 @@ private:
 		, m_is_backface_culling(true)
 		, m_depth_func(DepthFunc::LESS)
 		, m_is_alpha_to_coverage(false)
-	{ }
+		, m_is_alpha_cutout(false)
+		, m_shader_combination(0)
+		, m_is_shadow_receiver(true)
+	{ 
+		updateShaderCombination();
+	}
 
 	~Material();
 
@@ -114,6 +123,8 @@ private:
 
 private:
 	void deserializeUniforms(ISerializer& serializer);
+	void updateShaderCombination();
+	void shaderLoaded(Resource::State old_state, Resource::State new_state);
 
 private:
 	Shader*	m_shader;
@@ -122,7 +133,10 @@ private:
 	bool m_is_z_test;
 	bool m_is_backface_culling;
 	bool m_is_alpha_to_coverage;
+	bool m_is_alpha_cutout;
+	bool m_is_shadow_receiver;
 	DepthFunc m_depth_func;
+	uint32_t m_shader_combination;
 };
 
 } // ~namespace Lumix

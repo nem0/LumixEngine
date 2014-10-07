@@ -1,8 +1,11 @@
 #include "entity_list.h"
 #include "ui_entity_list.h"
 #include "core/crc32.h"
+#include "core/path_utils.h"
+#include "core/string.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
+#include "graphics/render_scene.h"
 #include "universe/entity.h"
 
 
@@ -19,6 +22,9 @@ static const char* component_map[] =
 	"Script", "script",
 	"Terrain", "terrain"
 };
+
+
+static const uint32_t RENDERABLE_HASH = crc32("renderable");
 
 
 class EntityListFilter : public QSortFilterProxyModel
@@ -113,6 +119,16 @@ class EntityListModel : public QAbstractItemModel
 			{
 				if (index.isValid() && role == Qt::DisplayRole)
 				{
+					Lumix::Component renderable = m_entities[index.row()].getComponent(RENDERABLE_HASH);
+					if (renderable.isValid())
+					{
+						Lumix::string path;
+						static_cast<Lumix::RenderScene*>(renderable.scene)->getRenderablePath(renderable, path);
+						const char* name = m_entities[index.row()].getName();
+						char basename[LUMIX_MAX_PATH];
+						Lumix::PathUtils::getBasename(basename, LUMIX_MAX_PATH, path.c_str());
+						return name && name[0] != '\0' ? QVariant(QString("%1 - %2").arg(name).arg(basename)) : QVariant(QString("%1 - %2").arg(m_entities[index.row()].index).arg(basename));
+					}
 					const char* name = m_entities[index.row()].getName();
 					return name && name[0] != '\0' ? QVariant(name) : QVariant(m_entities[index.row()].index);
 				}

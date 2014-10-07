@@ -295,6 +295,11 @@
     <string>Ctrl+M</string>
    </property>
   </action>
+  <action name="actionFiles">
+   <property name="text">
+    <string>Files</string>
+   </property>
+  </action>
  </widget>
  <layoutdefault spacing="6" margin="11"/>
  <resources/>
