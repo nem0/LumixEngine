@@ -7,8 +7,6 @@
 
 #include "core/mt/thread.h"
 
-#include "core/log.h"
-
 namespace Lumix
 {
 	namespace MTJD

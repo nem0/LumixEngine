@@ -7,20 +7,20 @@ namespace Lumix
 {
 	struct Plane
 	{
-		inline Plane()
+		Plane()
 		{ }
 
-		inline Plane(const Vec3& normal, float d)
+		Plane(const Vec3& normal, float d)
 			: normal(normal.x, normal.y, normal.z)
 			, d(d)
 		{ }
 
-		inline Plane(const Vec4& rhs)
+		explicit Plane(const Vec4& rhs)
 			: normal(rhs.x, rhs.y, rhs.z)
 			, d(rhs.w)
 		{ }
 
-		inline Plane(const Vec3& point, const Vec3& normal)
+		Plane(const Vec3& point, const Vec3& normal)
 			: normal(normal.x, normal.y, normal.z)
 			, d(-dotProduct(point, normal))
 		{ }
