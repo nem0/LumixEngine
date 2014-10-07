@@ -91,6 +91,15 @@ struct PolygonModeCommand : public Command
 };
 
 
+struct SetPassCommand : public Command
+{
+	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
+	virtual void execute(PipelineInstanceImpl& pipeline) override;
+	
+	uint32_t m_pass_hash;
+};
+
+
 struct ClearCommand : public Command
 {
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
@@ -215,6 +224,7 @@ struct PipelineImpl : public Pipeline
 		addCommandCreator("bind_shadowmap").bind<&CreateCommand<BindShadowmapCommand> >();
 		addCommandCreator("render_debug_lines").bind<&CreateCommand<RenderDebugLinesCommand> >();
 		addCommandCreator("polygon_mode").bind<&CreateCommand<PolygonModeCommand> >();
+		addCommandCreator("set_pass").bind<&CreateCommand<SetPassCommand> >();
 	}
 
 
@@ -697,6 +707,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	{
 		PROFILE_FUNCTION();
 		
+		uint32_t pass_hash = getRenderer().getPass();
 		m_renderable_infos.clear();
 		m_scene->getRenderableInfos(m_renderable_infos, layer_mask);
 		int count = m_renderable_infos.size();
@@ -712,6 +723,11 @@ struct PipelineInstanceImpl : public PipelineInstance
 			
 			if (last_material != &material)
 			{
+				if(!shader.hasPass(pass_hash))
+				{
+					continue;
+				}
+	
 				material.apply(*m_renderer, *this);
 				m_renderer->setUniform(shader, "shadowmap_matrix0", SHADOW_MATRIX0_HASH, m_shadow_modelviewprojection[0]);
 				m_renderer->setUniform(shader, "shadowmap_matrix1", SHADOW_MATRIX1_HASH, m_shadow_modelviewprojection[1]);
@@ -836,6 +852,21 @@ void PolygonModeCommand::execute(PipelineInstanceImpl& pipeline)
 {
 	glPolygonMode(GL_FRONT_AND_BACK, m_fill && !pipeline.getRenderer().isEditorWireframe() ? GL_FILL : GL_LINE);
 }
+
+
+void SetPassCommand::deserialize(PipelineImpl&, ISerializer& serializer)
+{
+	char pass_name[50];
+	serializer.deserializeArrayItem(pass_name, sizeof(pass_name));
+	m_pass_hash = crc32(pass_name);
+}
+
+
+void SetPassCommand::execute(PipelineInstanceImpl& pipeline)
+{
+	pipeline.getRenderer().setPass(m_pass_hash);
+}
+
 
 void ClearCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
