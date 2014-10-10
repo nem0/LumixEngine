@@ -686,7 +686,7 @@ namespace Lumix
 				{
 					if (m_terrains[i] && (m_terrains[i]->getLayerMask() & layer_mask) != 0)
 					{
-						m_terrains[i]->getGrassInfos(infos, m_applied_camera.entity.getPosition());
+						m_terrains[i]->getGrassInfos(infos, m_applied_camera);
 					}
 				}
 			}

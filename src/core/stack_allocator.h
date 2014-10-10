@@ -55,6 +55,7 @@ namespace Lumix
 	void* StackAllocator<SIZE>::reallocate(void* p, size_t n)
 	{
 		ASSERT(p >= m_data && p < m_data + SIZE);
+		ASSERT(p < m_data + SIZE - n);
 		m_end = ((uint8_t*)p) - m_data + n;
 		return p;
 	}

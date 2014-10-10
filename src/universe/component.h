@@ -34,6 +34,7 @@ namespace Lumix
 
 		bool operator ==(const Component& rhs) const { return type == rhs.type && scene == rhs.scene && index == rhs.index; }
 		bool operator !=(const Component& rhs) const { return type != rhs.type || scene != rhs.scene || index != rhs.index; }
+		bool operator <(const Component& rhs) const { ASSERT(type == rhs.type); ASSERT(scene == rhs.scene); return index < rhs.index; }
 		bool isValid() const  { return index >= 0; }
 	}; 
 
