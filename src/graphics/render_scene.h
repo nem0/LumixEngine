@@ -67,6 +67,7 @@ namespace Lumix
 			static void destroyInstance(RenderScene* scene);
 
 			virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Component& ignore) = 0;
+			virtual RayCastModelHit castRayTerrain(const Component& terrain, const Vec3& origin, const Vec3& dir) = 0;
 			virtual void getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) = 0;
 			virtual void applyCamera(Component camera) = 0;
 			virtual void update(float dt) = 0;
