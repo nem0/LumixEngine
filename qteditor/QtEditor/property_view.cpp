@@ -76,9 +76,10 @@ class AddTerrainLevelCommand : public Lumix::IEditorCommand
 		};
 
 
-		AddTerrainLevelCommand(Lumix::WorldEditor& editor, const Lumix::Vec3& hit_pos, float radius, float rel_amount, Lumix::Component terrain)
+		AddTerrainLevelCommand(Lumix::WorldEditor& editor, const Lumix::Vec3& hit_pos, float radius, float rel_amount, Lumix::Component terrain, bool can_be_merged)
 			: m_world_editor(editor)
 			, m_terrain(terrain)
+			, m_can_be_merged(can_be_merged)
 		{
 			Lumix::Matrix entity_mtx = terrain.entity.getMatrix();
 			entity_mtx.fastInverse();
@@ -264,6 +265,10 @@ class AddTerrainLevelCommand : public Lumix::IEditorCommand
 
 		virtual bool merge(IEditorCommand& command) override
 		{
+			if(!m_can_be_merged)
+			{
+				return false;
+			}
 			AddTerrainLevelCommand& my_command = static_cast<AddTerrainLevelCommand&>(command);
 			if(m_terrain == my_command.m_terrain)
 			{
@@ -309,6 +314,7 @@ class AddTerrainLevelCommand : public Lumix::IEditorCommand
 		Lumix::Array<Item> m_items;
 		Lumix::Component m_terrain;
 		Lumix::WorldEditor& m_world_editor;
+		bool m_can_be_merged;
 };
 
 
@@ -1279,7 +1285,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 						switch (m_type)
 						{
 							case HEIGHT:
-								addTerrainLevel(terrain, hit);
+								addTerrainLevel(terrain, hit, true);
 								break;
 							case TEXTURE:
 								addSplatWeight(terrain, hit);
@@ -1313,7 +1319,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 					switch (m_type)
 					{
 						case HEIGHT:
-							addTerrainLevel(terrain, hit);
+							addTerrainLevel(terrain, hit, false);
 							break;
 						case TEXTURE:
 							addSplatWeight(terrain, hit);
@@ -1493,10 +1499,10 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			}
 		}
 
-		void addTerrainLevel(Lumix::Component terrain, const Lumix::RayCastModelHit& hit)
+		void addTerrainLevel(Lumix::Component terrain, const Lumix::RayCastModelHit& hit, bool new_stroke)
 		{
 			Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
-			AddTerrainLevelCommand* command = ::new (Lumix::dll_lumix_new(sizeof(AddTerrainLevelCommand), "", 0)) AddTerrainLevelCommand(m_world_editor, hit_pos, m_terrain_brush_size, m_terrain_brush_strength, terrain);
+			AddTerrainLevelCommand* command = ::new (Lumix::dll_lumix_new(sizeof(AddTerrainLevelCommand), "", 0)) AddTerrainLevelCommand(m_world_editor, hit_pos, m_terrain_brush_size, m_terrain_brush_strength, terrain, !new_stroke);
 			m_world_editor.executeCommand(command);
 		}
 
