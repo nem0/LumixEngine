@@ -40,16 +40,17 @@ class ProfileModel : public QAbstractItemModel
 		enum class Values
 		{
 			NAME,
-			FUNCTION,
 			LENGTH,
 			LENGTH_EXCLUSIVE,
 			HIT_COUNT,
+			FUNCTION,
 			COUNT
 		};
 
 		struct Block
 		{
 			Block();
+			~Block() {}
 
 			const char* m_name;
 			const char* m_function;
