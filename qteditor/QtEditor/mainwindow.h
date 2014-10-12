@@ -57,6 +57,8 @@ private slots:
 	void on_actionEntity_list_triggered();
 	void on_actionMeasure_triggered();
 
+    void on_actionSave_Layout_triggered();
+
 private:
 	class DockInfo
 	{
@@ -70,6 +72,7 @@ private:
 	void fillRecentFiles();
 	void onUniverseLoaded();
 	void addEditorDock(Qt::DockWidgetArea area, QDockWidget* widget, void (MainWindow::*callback)());
+	void createLayoutCombobox();
 
 private:
 	Ui::MainWindow* m_ui;
@@ -87,6 +90,7 @@ private:
 	class EntityList* m_entity_list;
 	QMenu* m_recent_files_menu;
 	QMenu* m_window_menu;
+	class QComboBox* m_layout_combobox;
 	QList<QString> m_recent_files;
 	QList<DockInfo> m_dock_infos;
 	Lumix::DelegateList<void(const QSize&)> m_resized;
