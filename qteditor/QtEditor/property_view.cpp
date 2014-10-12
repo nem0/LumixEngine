@@ -624,9 +624,11 @@ class ComponentPropertyObject : public PropertyViewObject
 						stream.read(value);
 						QWidget* widget = new QWidget();
 						QHBoxLayout* layout = new QHBoxLayout(widget);
-						QLabel* label = new QLabel(QString("%1; %2; %3; %4").arg((int)(value.x * 255)).arg((int)(value.y * 255)).arg((int)(value.z * 255)).arg((int)(value.w * 255)));
+						QColor color((int)(value.x * 255), (int)(value.y * 255), (int)(value.z * 255));
+						QLabel* label = new QLabel(color.name());
 						layout->setContentsMargins(0, 0, 0, 0);
 						layout->addWidget(label);
+						label->setStyleSheet(QString("QLabel { background-color : %1; }").arg(color.name()));
 						QPushButton* button = new QPushButton("...");
 						layout->addWidget(button);
 						item->treeWidget()->setItemWidget(item, 1, widget);
