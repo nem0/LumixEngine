@@ -43,16 +43,25 @@ MainWindow::MainWindow(QWidget* parent) :
 	QSettings settings("Lumix", "QtEditor");
 	restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
 	
-	addDockWidget(static_cast<Qt::DockWidgetArea>(1), m_game_view);
-	addDockWidget(static_cast<Qt::DockWidgetArea>(8), m_log);
-	addDockWidget(static_cast<Qt::DockWidgetArea>(8), m_file_server_ui);
-	addDockWidget(static_cast<Qt::DockWidgetArea>(8), m_script_compiler_ui);
-	addDockWidget(static_cast<Qt::DockWidgetArea>(1), m_property_view);
-	addDockWidget(static_cast<Qt::DockWidgetArea>(2), m_scene_view);
-	addDockWidget(static_cast<Qt::DockWidgetArea>(2), m_asset_browser);
-	addDockWidget(static_cast<Qt::DockWidgetArea>(1), m_profiler_ui);
-	addDockWidget(static_cast<Qt::DockWidgetArea>(2), m_entity_template_list_ui);
-	addDockWidget(static_cast<Qt::DockWidgetArea>(2), m_entity_list);
+	m_window_menu = new QMenu("Windows", m_ui->menuView);
+	m_ui->menuView->addMenu(m_window_menu);
+	m_window_menu->connect(m_window_menu, &QMenu::aboutToShow, [this]()
+	{
+		for (auto info : m_dock_infos)
+		{
+			info.m_action->setChecked(info.m_widget->isVisible());
+		}
+	});
+	addEditorDock(static_cast<Qt::DockWidgetArea>(2), m_asset_browser, &MainWindow::on_actionAsset_Browser_triggered);
+	addEditorDock(static_cast<Qt::DockWidgetArea>(2), m_entity_list, &MainWindow::on_actionEntity_list_triggered);
+	addEditorDock(static_cast<Qt::DockWidgetArea>(2), m_entity_template_list_ui, &MainWindow::on_actionEntity_templates_triggered);
+	addEditorDock(static_cast<Qt::DockWidgetArea>(8), m_file_server_ui, &MainWindow::on_actionFile_server_triggered);
+	addEditorDock(static_cast<Qt::DockWidgetArea>(1), m_game_view, &MainWindow::on_actionGame_view_triggered);
+	addEditorDock(static_cast<Qt::DockWidgetArea>(8), m_log, &MainWindow::on_actionLog_triggered);
+	addEditorDock(static_cast<Qt::DockWidgetArea>(1), m_profiler_ui, &MainWindow::on_actionProfiler_triggered);
+	addEditorDock(static_cast<Qt::DockWidgetArea>(1), m_property_view, &MainWindow::on_actionProperties_triggered);
+	addEditorDock(static_cast<Qt::DockWidgetArea>(2), m_scene_view, &MainWindow::on_actionScene_View_triggered);
+	addEditorDock(static_cast<Qt::DockWidgetArea>(8), m_script_compiler_ui, &MainWindow::on_actionScript_compiler_triggered);
 
 	m_property_view->setScriptCompiler(m_script_compiler_ui->getCompiler());
 	m_property_view->setAssetBrowser(*m_asset_browser);
@@ -76,6 +85,21 @@ MainWindow::MainWindow(QWidget* parent) :
 	fillRecentFiles();
 
 	restoreState(settings.value("mainWindowState").toByteArray());
+	
+}
+
+
+void MainWindow::addEditorDock(Qt::DockWidgetArea area, QDockWidget* widget, void (MainWindow::*callback)())
+{
+	DockInfo info;
+	info.m_widget = widget;
+	QAction* action = new QAction(widget->windowTitle(), m_window_menu);
+	action->setCheckable(true);
+	m_window_menu->addAction(action);
+	info.m_action = action;
+	action->connect(action, &QAction::triggered, this, callback);
+	m_dock_infos.push_back(info);
+	addDockWidget(area, widget);
 }
 
 

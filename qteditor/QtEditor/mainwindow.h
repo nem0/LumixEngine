@@ -53,17 +53,23 @@ private slots:
 	void on_actionInstantiate_template_triggered();
 	void on_actionUndo_triggered();
 	void on_actionRedo_triggered();
+	void on_actionRemove_triggered();
+	void on_actionEntity_list_triggered();
+	void on_actionMeasure_triggered();
 
-    void on_actionRemove_triggered();
-
-    void on_actionEntity_list_triggered();
-
-    void on_actionMeasure_triggered();
+private:
+	class DockInfo
+	{
+		public:
+			QDockWidget* m_widget;
+			QAction* m_action;
+	};
 
 private:
 	virtual void resizeEvent(QResizeEvent* event) override;
 	void fillRecentFiles();
 	void onUniverseLoaded();
+	void addEditorDock(Qt::DockWidgetArea area, QDockWidget* widget, void (MainWindow::*callback)());
 
 private:
 	Ui::MainWindow* m_ui;
@@ -80,7 +86,9 @@ private:
 	class Notifications* m_notifications;
 	class EntityList* m_entity_list;
 	QMenu* m_recent_files_menu;
+	QMenu* m_window_menu;
 	QList<QString> m_recent_files;
+	QList<DockInfo> m_dock_infos;
 	Lumix::DelegateList<void(const QSize&)> m_resized;
 };
 
