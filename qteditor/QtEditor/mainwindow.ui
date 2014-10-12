@@ -48,6 +48,7 @@
      <string>View</string>
     </property>
     <addaction name="actionLook_at_selected_entity"/>
+    <addaction name="actionSave_Layout"/>
     <addaction name="actionPolygon_Mode"/>
    </widget>
    <widget class="QMenu" name="menuFile">
@@ -282,6 +283,11 @@
   <action name="actionFiles">
    <property name="text">
     <string>Files</string>
+   </property>
+  </action>
+  <action name="actionSave_Layout">
+   <property name="text">
+    <string>Save Layout</string>
    </property>
   </action>
  </widget>
