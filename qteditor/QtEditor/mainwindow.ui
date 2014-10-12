@@ -47,24 +47,8 @@
     <property name="title">
      <string>View</string>
     </property>
-    <widget class="QMenu" name="menuWindows">
-     <property name="title">
-      <string>Windows</string>
-     </property>
-     <addaction name="actionAsset_Browser"/>
-     <addaction name="actionEntity_list"/>
-     <addaction name="actionEntity_templates"/>
-     <addaction name="actionFile_server"/>
-     <addaction name="actionGame_view"/>
-     <addaction name="actionLog"/>
-     <addaction name="actionProfiler"/>
-     <addaction name="actionProperties"/>
-     <addaction name="actionScene_View"/>
-     <addaction name="actionScript_compiler"/>
-    </widget>
     <addaction name="actionLook_at_selected_entity"/>
     <addaction name="actionPolygon_Mode"/>
-    <addaction name="menuWindows"/>
    </widget>
    <widget class="QMenu" name="menuFile">
     <property name="title">
