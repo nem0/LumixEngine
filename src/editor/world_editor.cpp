@@ -868,9 +868,28 @@ struct WorldEditorImpl : public WorldEditor
 			m_measure_tool->createEditorLines(*scene);
 		}
 
+		
+		void updateGoTo()
+		{
+			if (m_camera.isValid() && m_go_to_parameters.m_is_active)
+			{
+				float t = Math::easeInOut(m_go_to_parameters.m_t);
+				m_go_to_parameters.m_t += m_engine->getLastTimeDelta() * m_go_to_parameters.m_speed;
+				Vec3 pos = m_go_to_parameters.m_from * (1 - t) + m_go_to_parameters.m_to * t;
+				if (m_go_to_parameters.m_t >= 1)
+				{
+					pos = m_go_to_parameters.m_to;
+					m_go_to_parameters.m_is_active = false;
+				}
+				m_camera.setPosition(pos);
+			}
+		}
+
 
 		virtual void tick() override
 		{
+			updateGoTo();
+
 			for (int i = 0; i < m_plugins.size(); ++i)
 			{
 				m_plugins[i]->tick();
@@ -1339,10 +1358,13 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			if (!m_selected_entities.empty())
 			{
+				m_go_to_parameters.m_is_active = true;
+				m_go_to_parameters.m_t = 0;
+				m_go_to_parameters.m_from = m_camera.getPosition();
 				Matrix camera_mtx = m_camera.getMatrix();
 				Vec3 dir = camera_mtx * Vec3(0, 0, 1);
-				camera_mtx.setTranslation(m_selected_entities[0].getPosition() + dir * 10);
-				m_camera.setMatrix(camera_mtx);
+				m_go_to_parameters.m_to = m_selected_entities[0].getPosition() + dir * 10;
+				m_go_to_parameters.m_speed = Math::maxValue(100.0f / (m_go_to_parameters.m_to - m_go_to_parameters.m_from).length(), 2.0f);
 			}
 		}
 
@@ -1543,6 +1565,7 @@ struct WorldEditorImpl : public WorldEditor
 			, m_toggle_game_mode_requested(false)
 			, m_gizmo(*this)
 		{
+			m_go_to_parameters.m_is_active = false;
 			m_undo_index = -1;
 			m_mouse_handling_plugin = NULL;
 			m_is_game_mode = false;
@@ -1891,6 +1914,16 @@ struct WorldEditorImpl : public WorldEditor
 			};
 		};
 
+		struct GoToParameters
+		{
+			bool m_is_active;
+			Vec3 m_from;
+			Vec3 m_to;
+			float m_t;
+			float m_speed;
+		};
+
+		GoToParameters m_go_to_parameters;
 		MT::Mutex m_universe_mutex;
 		Gizmo m_gizmo;
 		Array<Entity> m_selected_entities;
