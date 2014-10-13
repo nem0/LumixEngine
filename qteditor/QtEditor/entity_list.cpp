@@ -8,6 +8,7 @@
 #include "graphics/render_scene.h"
 #include "universe/entity.h"
 #include "universe/hierarchy.h"
+#include <qmimedata.h>
 
 
 static const char* component_map[] =
@@ -78,6 +79,23 @@ class EntityListModel : public QAbstractItemModel
 					}
 				}
 
+				EntityNode* getNode(const Lumix::Entity& entity)
+				{
+					if(m_entity == entity)
+					{
+						return this;
+					}
+					for(int i = 0; i < m_children.size(); ++i)
+					{
+						EntityNode* node = m_children[i]->getNode(entity);
+						if(node)
+						{
+							return node;
+						}
+					}
+					return NULL;
+				}
+
 				bool removeEntity(const Lumix::Entity& entity)
 				{
 					if(m_entity == entity)
@@ -109,6 +127,91 @@ class EntityListModel : public QAbstractItemModel
 			m_filter = filter;
 		}
 
+
+		virtual Qt::ItemFlags flags(const QModelIndex &index) const override
+		{
+			Qt::ItemFlags defaultFlags = QAbstractItemModel::flags(index);
+
+			if (index.isValid())
+			{
+				return Qt::ItemIsDragEnabled | Qt::ItemIsDropEnabled | defaultFlags;
+			}
+			else
+			{
+				return Qt::ItemIsDropEnabled | defaultFlags;
+			}
+		}
+
+
+		virtual bool dropMimeData(const QMimeData *data, Qt::DropAction action, int row, int column, const QModelIndex &parent) override
+		{
+			if (action == Qt::IgnoreAction)
+			{
+				return true;
+			}
+			if (!data->hasFormat("application/lumix.entity"))
+			{
+				return false;
+			}
+			if (column > 0)
+			{
+				return false;
+			}
+
+			Lumix::Entity parent_entity(m_universe, -1);
+			if (row != -1)
+			{
+				parent_entity.index = parent.data(Qt::UserRole).toInt();
+			}
+			else if (parent.isValid())
+			{
+				parent_entity.index = parent.data(Qt::UserRole).toInt();
+			}
+
+			QByteArray encodedData = data->data("application/lumix.entity");
+			QDataStream stream(&encodedData, QIODevice::ReadOnly);
+			QStringList newItems;
+
+			Lumix::Entity child(m_universe, -1);
+			if (!stream.atEnd()) 
+			{
+				stream >> child.index;
+			}
+
+			m_engine->getHierarchy()->setParent(child, parent_entity);
+
+			return false;
+		}
+
+
+		virtual Qt::DropActions supportedDropActions() const override
+		{
+			return Qt::CopyAction;
+		}
+
+
+		virtual QMimeData* mimeData(const QModelIndexList &indexes) const override
+		{
+			QMimeData *mimeData = new QMimeData();
+			QByteArray encodedData;
+
+			QDataStream stream(&encodedData, QIODevice::WriteOnly);
+
+			stream << indexes.first().data(Qt::UserRole).toInt();
+
+			mimeData->setData("application/lumix.entity", encodedData);
+			return mimeData;
+		}
+
+
+		virtual QStringList mimeTypes() const override
+		{
+			QStringList types;
+			types << "application/lumix.entity";
+			return types;
+		}
+
+
 		virtual QVariant headerData(int section, Qt::Orientation, int role = Qt::DisplayRole) const override
 		{
 			if(role == Qt::DisplayRole)
@@ -131,7 +234,7 @@ class EntityListModel : public QAbstractItemModel
 		{
 			if (!hasIndex(row, column, parent))
 			{
-			return QModelIndex();
+				return QModelIndex();
 			}
 
 			EntityNode *parentItem;
@@ -185,7 +288,8 @@ class EntityListModel : public QAbstractItemModel
 			{
 				return m_root->m_children.size();
 			}
-			return static_cast<EntityNode*>(parent.internalPointer())->m_children.size();
+			EntityNode* node = static_cast<EntityNode*>(parent.internalPointer());
+			return node->m_children.size();
 		}
 		
 		
@@ -197,10 +301,9 @@ class EntityListModel : public QAbstractItemModel
 
 		virtual QVariant data(const QModelIndex& index, int role) const override
 		{
-
 			if (!index.isValid())
 			{
-				 return QVariant();
+				 return QVariant("X");
 			}
 
 			EntityNode *item = static_cast<EntityNode*>(index.internalPointer());
@@ -224,7 +327,7 @@ class EntityListModel : public QAbstractItemModel
 			{
 				return item->m_entity.index;
 			}
-			return QVariant();
+			return role == 6 ? QVariant(QString("AAA")) : QVariant();
 		}
 
 
@@ -249,6 +352,27 @@ class EntityListModel : public QAbstractItemModel
 		}
 
 
+		void onParentSet(const Lumix::Entity& child, const Lumix::Entity& parent)
+		{
+			if(!m_root->m_children.empty())
+			{
+				EntityNode* node = m_root->getNode(child);
+				node->m_parent->m_children.eraseItem(node);
+
+				EntityNode* parent_node = m_root->getNode(parent);
+				if(!parent_node)
+				{
+					parent_node = m_root;
+				}
+				parent_node->m_children.push(node);
+				node->m_parent = parent_node;
+
+				emit dataChanged(createIndex(0, 0, m_root->m_children[0]), createIndex(m_root->m_children.size() - 1, 0, m_root->m_children.back()));
+				m_filter->invalidate();
+			}
+		}
+
+
 		void setUniverse(Lumix::Universe* universe)
 		{
 			m_filter->setUniverse(universe);
@@ -262,6 +386,7 @@ class EntityListModel : public QAbstractItemModel
 			m_universe = universe;
 			if(m_universe)
 			{
+				m_engine->getHierarchy()->parentSet().bind<EntityListModel, &EntityListModel::onParentSet>(this);
 				m_universe->entityCreated().bind<EntityListModel, &EntityListModel::onEntityCreated>(this);
 				m_universe->entityDestroyed().bind<EntityListModel, &EntityListModel::onEntityDestroyed>(this);
 				Lumix::Entity e = m_universe->getFirstEntity();
@@ -279,7 +404,7 @@ class EntityListModel : public QAbstractItemModel
 			}
 			if(m_universe && !m_root->m_children.empty())
 			{
-				emit dataChanged(createIndex(0, 0, m_root->m_children[0]), createIndex(m_root->m_children.size(), 0, m_root->m_children.back()));
+				emit dataChanged(createIndex(0, 0, m_root->m_children[0]), createIndex(m_root->m_children.size() - 1, 0, m_root->m_children.back()));
 			}
 		}
 
@@ -319,6 +444,9 @@ EntityList::EntityList(QWidget *parent)
 	m_filter->setDynamicSortFilter(true);
 	m_filter->setSourceModel(m_model);
 	m_ui->entityList->setModel(m_filter);
+	m_ui->entityList->setDragEnabled(true);
+	m_ui->entityList->setAcceptDrops(true);
+	m_ui->entityList->setDropIndicatorShown(true);
 }
 
 
