@@ -334,8 +334,8 @@ namespace Lumix
 
 		static void flipBlockDXTC5(DXTColBlock *line, int numBlocks)
 		{
-			DXTColBlock *curblock = line;
-			DXT5AlphaBlock *alphablock;
+			DXTColBlock* curblock = line;
+			DXT5AlphaBlock* alphablock;
 
 			for (int i = 0; i < numBlocks; i++)
 			{
