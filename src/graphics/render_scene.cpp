@@ -356,6 +356,7 @@ namespace Lumix
 							serializer.deserializeArrayItem((&m_renderables[i]->m_model.getMatrix().m11)[j]);
 						}
 						m_universe.addComponent(m_renderables[i]->m_entity, RENDERABLE_HASH, this, i);
+						m_culling_system->addStatic(Sphere(m_renderables[i]->m_entity.getPosition(), 1.0f), i);
 					}
 				}
 				serializer.deserializeArrayEnd();

@@ -124,7 +124,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>
       </SDLCheck>
-      <AdditionalIncludeDirectories>..\..\..\external\physx\include;..\..\..\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\external\physx\include;..\..\..\src;..\..\..\src;..\..\..\external\glew\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <PreprocessorDefinitions>WIN32;NDEBUG;BUILDING_PHYSICS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
