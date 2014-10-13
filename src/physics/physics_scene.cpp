@@ -428,7 +428,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			}
 
 			OutputStream writeBuffer;
-			bool status = m_system->m_impl->m_cooking->cookTriangleMesh(meshDesc, writeBuffer);
+			m_system->m_impl->m_cooking->cookTriangleMesh(meshDesc, writeBuffer);
 
 			InputStream readBuffer(writeBuffer.data, writeBuffer.size);
 			geom.triangleMesh = m_system->m_impl->m_physics->createTriangleMesh(readBuffer);
