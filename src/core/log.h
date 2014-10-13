@@ -26,7 +26,7 @@ namespace Lumix
 
 		private:
 			base_string<char, StackAllocator<64> > m_system;
-			base_string<char, StackAllocator<1024> > m_message;
+			base_string<char> m_message;
 			Log& m_log;
 
 			void operator = (const LogProxy&) {}

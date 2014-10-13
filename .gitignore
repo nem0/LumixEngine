@@ -9,6 +9,8 @@ evona_test/
 *.orig
 /debug/
 /release/
+/projects/vs2013/Debug
+/projects/vs2013/Release
 qteditor/qteditor/QtEditor.vcxproj
 qteditor/qteditor/QtEditor.sln
 qteditor/qteditor/QtEditor.vcxproj.filters
