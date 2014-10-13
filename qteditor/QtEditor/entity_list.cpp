@@ -67,6 +67,7 @@ class EntityListModel : public QAbstractItemModel
 		EntityListModel(QWidget* parent, EntityListFilter* filter)
 			: QAbstractItemModel(parent)
 		{
+			m_root = NULL;
 			m_universe = NULL;
 			m_filter = filter;
 		}
@@ -89,21 +90,65 @@ class EntityListModel : public QAbstractItemModel
 		}
 		
 		
-		virtual QModelIndex index(int row, int column, const QModelIndex&) const override
+		virtual QModelIndex index(int row, int column, const QModelIndex& parent) const override
 		{
-			return createIndex(row, column);
-		}
-		
-		
-		virtual QModelIndex parent(const QModelIndex&) const override
-		{
+			if (!hasIndex(row, column, parent))
+			{
+			return QModelIndex();
+			}
+
+			EntityNode *parentItem;
+
+			if (!parent.isValid())
+			{
+				parentItem = m_root;
+			}
+			else
+			{
+				parentItem = static_cast<EntityNode*>(parent.internalPointer());
+			}
+
+			EntityNode *childItem = parentItem->m_children[row];
+			if (childItem)
+			{
+				return createIndex(row, column, childItem);
+			}
 			return QModelIndex();
 		}
 		
 		
-		virtual int rowCount(const QModelIndex& parent_index) const override
+		virtual QModelIndex parent(const QModelIndex& index) const override
 		{
-			return parent_index.isValid() ? 0 : m_entities.size();
+			if (!index.isValid() || !m_root)
+			{
+				return QModelIndex();
+			}
+
+			EntityNode *childItem = static_cast<EntityNode*>(index.internalPointer());
+			EntityNode *parentItem = childItem->m_parent;
+
+			if (parentItem == m_root)
+			{
+				return QModelIndex();
+			}
+
+			int row = parentItem->m_parent->m_children.indexOf(parentItem);
+			return createIndex(row, 0, parentItem);
+		}
+		
+		
+		virtual int rowCount(const QModelIndex& parent) const override
+		{
+			if (parent.column() > 0 || !m_root)
+			{
+				return 0;
+			}
+
+			if (!parent.isValid())
+			{
+				return m_root->m_children.size();
+			}
+			return static_cast<EntityNode*>(parent.internalPointer())->m_children.size();
 		}
 		
 		
@@ -115,27 +160,32 @@ class EntityListModel : public QAbstractItemModel
 
 		virtual QVariant data(const QModelIndex& index, int role) const override
 		{
-			if (index.row() < m_entities.size())
+
+			if (!index.isValid())
 			{
-				if (index.isValid() && role == Qt::DisplayRole)
+				 return QVariant();
+			}
+
+			EntityNode *item = static_cast<EntityNode*>(index.internalPointer());
+
+			if (index.isValid() && role == Qt::DisplayRole)
+			{
+				Lumix::Component renderable = item->m_entity.getComponent(RENDERABLE_HASH);
+				if (renderable.isValid())
 				{
-					Lumix::Component renderable = m_entities[index.row()].getComponent(RENDERABLE_HASH);
-					if (renderable.isValid())
-					{
-						Lumix::string path;
-						static_cast<Lumix::RenderScene*>(renderable.scene)->getRenderablePath(renderable, path);
-						const char* name = m_entities[index.row()].getName();
-						char basename[LUMIX_MAX_PATH];
-						Lumix::PathUtils::getBasename(basename, LUMIX_MAX_PATH, path.c_str());
-						return name && name[0] != '\0' ? QVariant(QString("%1 - %2").arg(name).arg(basename)) : QVariant(QString("%1 - %2").arg(m_entities[index.row()].index).arg(basename));
-					}
-					const char* name = m_entities[index.row()].getName();
-					return name && name[0] != '\0' ? QVariant(name) : QVariant(m_entities[index.row()].index);
+					Lumix::string path;
+					static_cast<Lumix::RenderScene*>(renderable.scene)->getRenderablePath(renderable, path);
+					const char* name = item->m_entity.getName();
+					char basename[LUMIX_MAX_PATH];
+					Lumix::PathUtils::getBasename(basename, LUMIX_MAX_PATH, path.c_str());
+					return name && name[0] != '\0' ? QVariant(QString("%1 - %2").arg(name).arg(basename)) : QVariant(QString("%1 - %2").arg(item->m_entity.index).arg(basename));
 				}
-				else if (index.isValid() && role == Qt::UserRole)
-				{
-					return m_entities[index.row()].index;
-				}
+				const char* name = item->m_entity.getName();
+				return name && name[0] != '\0' ? QVariant(name) : QVariant(item->m_entity.index);
+			}
+			else if (index.isValid() && role == Qt::UserRole)
+			{
+				return item->m_entity.index;
 			}
 			return QVariant();
 		}
@@ -149,7 +199,8 @@ class EntityListModel : public QAbstractItemModel
 				m_universe->entityCreated().unbind<EntityListModel, &EntityListModel::onEntityCreated>(this);
 				m_universe->entityDestroyed().unbind<EntityListModel, &EntityListModel::onEntityDestroyed>(this);
 			}
-			m_entities.clear();
+			delete m_root;
+			m_root = new EntityNode(NULL, Lumix::Entity::INVALID);
 			m_universe = universe;
 			if(m_universe)
 			{
@@ -158,13 +209,13 @@ class EntityListModel : public QAbstractItemModel
 				Lumix::Entity e = m_universe->getFirstEntity();
 				while(e.isValid())
 				{
-					m_entities.push(e);
+					m_root->m_children.push(new EntityNode(m_root, e));
 					e = m_universe->getNextEntity(e);
 				}
 			}
-			if(m_universe)
+			if(m_universe && !m_root->m_children.empty())
 			{
-				emit dataChanged(createIndex(0, 0), createIndex(m_entities.size(), 0));
+				emit dataChanged(createIndex(0, 0, m_root->m_children[0]), createIndex(m_root->m_children.size(), 0, m_root->m_children.back()));
 			}
 		}
 
@@ -172,21 +223,58 @@ class EntityListModel : public QAbstractItemModel
 	private:
 		void onEntityCreated(const Lumix::Entity& entity)
 		{
-			m_entities.push(entity);
-			emit dataChanged(createIndex(0, 0), createIndex(m_entities.size() - 1, 0));
+			EntityNode* node = new EntityNode(m_root, entity);
+			m_root->m_children.push(node);
+			emit dataChanged(createIndex(0, 0, m_root->m_children[0]), createIndex(m_root->m_children.size() - 1, 0, m_root->m_children.back()));
 			m_filter->invalidate();
 		}
 
 		void onEntityDestroyed(const Lumix::Entity& entity)
 		{
-			m_entities.eraseItem(entity);
-			emit dataChanged(createIndex(0, 0), createIndex(m_entities.size() - 1, 0));
+			m_root->removeEntity(entity);
+			emit dataChanged(createIndex(0, 0, m_root->m_children[0]), createIndex(m_root->m_children.size() - 1, 0, m_root->m_children.back()));
 			m_filter->invalidate();
 		}
 
 	private:
+		class EntityNode
+		{
+			public:
+				EntityNode(EntityNode* parent, const Lumix::Entity& entity) : m_entity(entity), m_parent(parent) {}
+
+				~EntityNode()
+				{
+					for(int i = 0; i < m_children.size(); ++i)
+					{
+						delete m_children[i];
+					}
+				}
+
+				bool removeEntity(const Lumix::Entity& entity)
+				{
+					if(m_entity == entity)
+					{
+						return true;
+					}
+					for(int i = 0; i < m_children.size(); ++i)
+					{
+						if(m_children[i]->removeEntity(entity))
+						{
+							m_children.erase(i);
+							return false;
+						}
+					}
+					return false;
+				}
+
+				EntityNode* m_parent;
+				Lumix::Entity m_entity;
+				Lumix::Array<EntityNode*> m_children;
+		};
+
+	private:
 		Lumix::Universe* m_universe;
-		Lumix::Array<Lumix::Entity> m_entities;
+		EntityNode* m_root;
 		EntityListFilter* m_filter;
 };
 
