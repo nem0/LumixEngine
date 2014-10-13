@@ -1100,7 +1100,7 @@ struct WorldEditorImpl : public WorldEditor
 				for(int i = 0; i < m_selected_entities.size(); ++i)
 				{
 					const Entity& entity = m_selected_entities[i];
-					Component renderable = entity.getComponent(RENDERABLE_HASH); TODO("what if the selected entity does not have a renderable component?");
+					Component renderable = entity.getComponent(RENDERABLE_HASH);
 					RenderScene* scene = static_cast<RenderScene*>(renderable.scene);
 					RayCastModelHit hit = scene->castRay(entity.getPosition(), Vec3(0, -1, 0), renderable);
 					if (hit.m_is_hit)

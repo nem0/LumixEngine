@@ -7,6 +7,7 @@
 #include "engine/engine.h"
 #include "graphics/render_scene.h"
 #include "universe/entity.h"
+#include "universe/hierarchy.h"
 
 
 static const char* component_map[] =
@@ -63,6 +64,42 @@ class EntityListFilter : public QSortFilterProxyModel
 
 class EntityListModel : public QAbstractItemModel
 {
+	private:
+		class EntityNode
+		{
+			public:
+				EntityNode(EntityNode* parent, const Lumix::Entity& entity) : m_entity(entity), m_parent(parent) {}
+
+				~EntityNode()
+				{
+					for(int i = 0; i < m_children.size(); ++i)
+					{
+						delete m_children[i];
+					}
+				}
+
+				bool removeEntity(const Lumix::Entity& entity)
+				{
+					if(m_entity == entity)
+					{
+						return true;
+					}
+					for(int i = 0; i < m_children.size(); ++i)
+					{
+						if(m_children[i]->removeEntity(entity))
+						{
+							m_children.erase(i);
+							return false;
+						}
+					}
+					return false;
+				}
+
+				EntityNode* m_parent;
+				Lumix::Entity m_entity;
+				Lumix::Array<EntityNode*> m_children;
+		};
+
 	public:
 		EntityListModel(QWidget* parent, EntityListFilter* filter)
 			: QAbstractItemModel(parent)
@@ -191,6 +228,27 @@ class EntityListModel : public QAbstractItemModel
 		}
 
 
+		void setEngine(Lumix::Engine& engine)
+		{
+			m_engine = &engine;
+		}
+
+
+		void fillChildren(EntityNode* node)
+		{
+			Lumix::Array<Lumix::Hierarchy::Child>* children = m_engine->getHierarchy()->getChildren(node->m_entity);
+			if(children)
+			{
+				for(int i = 0; i < children->size(); ++i)
+				{
+					EntityNode* new_node = new EntityNode(node, Lumix::Entity(m_universe, (*children)[i].m_entity));
+					node->m_children.push(new_node);
+					fillChildren(new_node);
+				}
+			}
+		}
+
+
 		void setUniverse(Lumix::Universe* universe)
 		{
 			m_filter->setUniverse(universe);
@@ -209,7 +267,13 @@ class EntityListModel : public QAbstractItemModel
 				Lumix::Entity e = m_universe->getFirstEntity();
 				while(e.isValid())
 				{
-					m_root->m_children.push(new EntityNode(m_root, e));
+					Lumix::Entity parent = m_engine->getHierarchy()->getParent(e);
+					if(!parent.isValid())
+					{
+						EntityNode* node = new EntityNode(m_root, e);
+						m_root->m_children.push(node);
+						fillChildren(node);
+					}
 					e = m_universe->getNextEntity(e);
 				}
 			}
@@ -237,43 +301,8 @@ class EntityListModel : public QAbstractItemModel
 		}
 
 	private:
-		class EntityNode
-		{
-			public:
-				EntityNode(EntityNode* parent, const Lumix::Entity& entity) : m_entity(entity), m_parent(parent) {}
-
-				~EntityNode()
-				{
-					for(int i = 0; i < m_children.size(); ++i)
-					{
-						delete m_children[i];
-					}
-				}
-
-				bool removeEntity(const Lumix::Entity& entity)
-				{
-					if(m_entity == entity)
-					{
-						return true;
-					}
-					for(int i = 0; i < m_children.size(); ++i)
-					{
-						if(m_children[i]->removeEntity(entity))
-						{
-							m_children.erase(i);
-							return false;
-						}
-					}
-					return false;
-				}
-
-				EntityNode* m_parent;
-				Lumix::Entity m_entity;
-				Lumix::Array<EntityNode*> m_children;
-		};
-
-	private:
 		Lumix::Universe* m_universe;
+		Lumix::Engine* m_engine;
 		EntityNode* m_root;
 		EntityListFilter* m_filter;
 };
@@ -311,6 +340,7 @@ void EntityList::setWorldEditor(Lumix::WorldEditor& editor)
 	editor.universeDestroyed().bind<EntityList, &EntityList::onUniverseDestroyed>(this);
 	editor.universeLoaded().bind<EntityList, &EntityList::onUniverseLoaded>(this);
 	m_universe = editor.getEngine().getUniverse();
+	m_model->setEngine(editor.getEngine());
 	m_model->setUniverse(m_universe);
 	m_filter->setSourceModel(m_model);
 	m_filter->setWorldEditor(editor);
