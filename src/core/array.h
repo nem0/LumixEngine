@@ -61,6 +61,18 @@ class Array<T, Allocator, false>
 			m_allocator.deallocate(m_data);
 		}
 
+		int indexOf(const T& item)
+		{
+			for (int i = 0; i < m_size; ++i)
+			{
+				if (m_data[i] == item)
+				{
+					return i;
+				}
+			}
+			return -1;
+		}
+
 		void eraseItemFast(const T& item)
 		{
 			for (int i = 0; i < m_size; ++i)
@@ -279,6 +291,18 @@ public:
 		Allocator a = rhs.m_allocator;
 		rhs.m_allocator = m_allocator;
 		m_allocator = a;
+	}
+
+	int indexOf(const T& item)
+	{
+		for (int i = 0; i < m_size; ++i)
+		{
+			if (m_data[i] == item)
+			{
+				return i;
+			}
+		}
+		return -1;
 	}
 
 	void eraseFast(int index)

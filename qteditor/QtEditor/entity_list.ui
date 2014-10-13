@@ -75,11 +75,7 @@
      <widget class="QLineEdit" name="nameFilterEdit"/>
     </item>
     <item>
-     <widget class="QListView" name="entityList">
-      <property name="modelColumn">
-       <number>0</number>
-      </property>
-     </widget>
+     <widget class="QTreeView" name="entityList"/>
     </item>
    </layout>
   </widget>
