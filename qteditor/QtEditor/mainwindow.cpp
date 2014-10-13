@@ -119,7 +119,7 @@ void MainWindow::createLayoutCombobox()
 	m_ui->menuBar->setCornerWidget(widget);
 	QDir dir("editor/layouts/");
 	auto files = dir.entryInfoList();
-	for (auto file : files)
+	for (const auto& file : files)
 	{
 		if (file.baseName() != "")
 		{
