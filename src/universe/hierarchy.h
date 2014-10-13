@@ -2,6 +2,7 @@
 
 
 #include "universe/entity.h"
+#include "core/delegate_list.h"
 
 
 namespace Lumix
@@ -33,6 +34,7 @@ namespace Lumix
 			virtual void serialize(ISerializer& serializer) = 0;
 			virtual void deserialize(ISerializer& serializer) = 0;
 			virtual Array<Child>* getChildren(const Entity& parent) = 0;
+			virtual DelegateList<void (const Entity&, const Entity&)>& parentSet() = 0;
 	};
 
 

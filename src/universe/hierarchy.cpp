@@ -63,25 +63,41 @@ class HierarchyImpl : public Hierarchy
 		
 		virtual void setParent(const Entity& child, const Entity& parent) override
 		{
-			Parents::iterator parent_iter = m_parents.find(child.index);
-			if(parent_iter.isValid())
+			Parents::iterator old_parent_iter = m_parents.find(child.index);
+			if(old_parent_iter.isValid())
 			{
-				m_parents.erase(parent_iter);
+				Children::iterator child_iter = m_children.find(old_parent_iter.value());
+				ASSERT(child_iter.isValid());
+				Array<Child>& children = child_iter.value();
+				for(int i = 0; i < children.size(); ++i)
+				{
+					if(children[i].m_entity == child.index)
+					{
+						children.erase(i);
+						break;
+					}
+				}
+				m_parents.erase(old_parent_iter);
+
 			}
 
-			m_parents.insert(child.index, parent.index);
-			
-			Children::iterator child_iter = m_children.find(parent.index);
-			if(!child_iter.isValid())
+			if(parent.index >= 0)
 			{
-				m_children.insert(parent.index, Array<Child>());
-				child_iter = m_children.find(parent.index);
+				m_parents.insert(child.index, parent.index);
+			
+				Children::iterator child_iter = m_children.find(parent.index);
+				if(!child_iter.isValid())
+				{
+					m_children.insert(parent.index, Array<Child>());
+					child_iter = m_children.find(parent.index);
+				}
+				Child& c = child_iter.value().pushEmpty();
+				c.m_entity = child.index;
+				Matrix inv_parent_matrix = parent.getMatrix();
+				inv_parent_matrix.inverse();
+				c.m_local_matrix = inv_parent_matrix * child.getMatrix();
 			}
-			Child& c = child_iter.value().pushEmpty();
-			c.m_entity = child.index;
-			Matrix inv_parent_matrix = parent.getMatrix();
-			inv_parent_matrix.inverse();
-			c.m_local_matrix = inv_parent_matrix * child.getMatrix();
+			m_parent_set.invoke(child, parent);
 		}
 		
 		
@@ -127,6 +143,12 @@ class HierarchyImpl : public Hierarchy
 			serializer.deserializeArrayEnd();
 		}
 
+
+		virtual DelegateList<void (const Entity&, const Entity&)>& parentSet() override
+		{
+			return m_parent_set;
+		}
+
 			
 		virtual Array<Child>* getChildren(const Entity& parent) override
 		{
@@ -142,6 +164,7 @@ class HierarchyImpl : public Hierarchy
 		Universe& m_universe;
 		Parents m_parents;
 		Children m_children;
+		DelegateList<void (const Entity&, const Entity&)> m_parent_set;
 };
 
 
