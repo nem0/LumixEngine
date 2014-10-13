@@ -14,9 +14,12 @@
 #include "sceneview.h"
 #include "scripts/scriptcompilerwidget.h"
 #include "profilerui.h"
+#include <qcombobox.h>
+#include <qdir.h>
+#include <qevent.h>
 #include <qfiledialog.h>
 #include <qinputdialog.h>
-#include <qevent.h>
+#include <qlabel.h>
 #include <qsettings.h>
 
 
@@ -41,18 +44,29 @@ MainWindow::MainWindow(QWidget* parent) :
 	m_entity_list = new EntityList(NULL);
 
 	QSettings settings("Lumix", "QtEditor");
-	restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
+	bool geometry_restored = restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
 	
-	addDockWidget(static_cast<Qt::DockWidgetArea>(1), m_game_view);
-	addDockWidget(static_cast<Qt::DockWidgetArea>(8), m_log);
-	addDockWidget(static_cast<Qt::DockWidgetArea>(8), m_file_server_ui);
-	addDockWidget(static_cast<Qt::DockWidgetArea>(8), m_script_compiler_ui);
-	addDockWidget(static_cast<Qt::DockWidgetArea>(1), m_property_view);
-	addDockWidget(static_cast<Qt::DockWidgetArea>(2), m_scene_view);
-	addDockWidget(static_cast<Qt::DockWidgetArea>(2), m_asset_browser);
-	addDockWidget(static_cast<Qt::DockWidgetArea>(1), m_profiler_ui);
-	addDockWidget(static_cast<Qt::DockWidgetArea>(2), m_entity_template_list_ui);
-	addDockWidget(static_cast<Qt::DockWidgetArea>(2), m_entity_list);
+	m_window_menu = new QMenu("Windows", m_ui->menuView);
+	m_ui->menuView->addMenu(m_window_menu);
+	m_window_menu->connect(m_window_menu, &QMenu::aboutToShow, [this]()
+	{
+		for (auto info : m_dock_infos)
+		{
+			info.m_action->setChecked(info.m_widget->isVisible());
+		}
+	});
+	addEditorDock(static_cast<Qt::DockWidgetArea>(2), m_asset_browser, &MainWindow::on_actionAsset_Browser_triggered);
+	addEditorDock(static_cast<Qt::DockWidgetArea>(2), m_entity_list, &MainWindow::on_actionEntity_list_triggered);
+	addEditorDock(static_cast<Qt::DockWidgetArea>(2), m_entity_template_list_ui, &MainWindow::on_actionEntity_templates_triggered);
+	addEditorDock(static_cast<Qt::DockWidgetArea>(8), m_file_server_ui, &MainWindow::on_actionFile_server_triggered);
+	addEditorDock(static_cast<Qt::DockWidgetArea>(1), m_game_view, &MainWindow::on_actionGame_view_triggered);
+	addEditorDock(static_cast<Qt::DockWidgetArea>(8), m_log, &MainWindow::on_actionLog_triggered);
+	addEditorDock(static_cast<Qt::DockWidgetArea>(1), m_profiler_ui, &MainWindow::on_actionProfiler_triggered);
+	addEditorDock(static_cast<Qt::DockWidgetArea>(1), m_property_view, &MainWindow::on_actionProperties_triggered);
+	addEditorDock(static_cast<Qt::DockWidgetArea>(2), m_scene_view, &MainWindow::on_actionScene_View_triggered);
+	addEditorDock(static_cast<Qt::DockWidgetArea>(8), m_script_compiler_ui, &MainWindow::on_actionScript_compiler_triggered);
+
+	createLayoutCombobox();
 
 	m_property_view->setScriptCompiler(m_script_compiler_ui->getCompiler());
 	m_property_view->setAssetBrowser(*m_asset_browser);
@@ -75,7 +89,71 @@ MainWindow::MainWindow(QWidget* parent) :
 	});
 	fillRecentFiles();
 
-	restoreState(settings.value("mainWindowState").toByteArray());
+	geometry_restored = geometry_restored && restoreState(settings.value("mainWindowState").toByteArray());
+	if (!geometry_restored)
+	{
+		QFile file("editor/layouts/main.bin");
+		if (file.open(QIODevice::ReadWrite))
+		{
+			int size;
+			file.read((char*)&size, sizeof(size));
+			QByteArray geom = file.read(size);
+			restoreGeometry(geom);
+			file.read((char*)&size, sizeof(size));
+			QByteArray state = file.read(size);
+			restoreState(state);
+		}
+	}
+}
+
+
+void MainWindow::createLayoutCombobox()
+{
+	m_layout_combobox = new QComboBox();
+	QWidget* widget = new QWidget(m_ui->menuBar);
+	QHBoxLayout* layout = new QHBoxLayout(widget);
+	QLabel* label = new QLabel("Layout");
+	layout->setContentsMargins(0, 0, 0, 0);
+	layout->addWidget(label);
+	layout->addWidget(m_layout_combobox);
+	m_ui->menuBar->setCornerWidget(widget);
+	QDir dir("editor/layouts/");
+	auto files = dir.entryInfoList();
+	for (const auto& file : files)
+	{
+		if (file.baseName() != "")
+		{
+			m_layout_combobox->addItem(file.baseName());
+		}
+	}
+	connect(m_layout_combobox, &QComboBox::currentTextChanged, [this](const QString & text)
+	{
+		QFile file(QString("editor/layouts/%1.bin").arg(text));
+		if (file.open(QIODevice::ReadWrite))
+		{
+			int size;
+			file.read((char*)&size, sizeof(size));
+			QByteArray geom = file.read(size);
+			restoreGeometry(geom);
+			file.read((char*)&size, sizeof(size));
+			QByteArray state = file.read(size);
+			restoreState(state);
+		}
+	});;
+}
+
+
+void MainWindow::addEditorDock(Qt::DockWidgetArea area, QDockWidget* widget, void (MainWindow::*callback)())
+{
+	DockInfo info;
+	info.m_widget = widget;
+	QAction* action = new QAction(widget->windowTitle(), m_window_menu);
+	action->setCheckable(true);
+	m_window_menu->addAction(action);
+	info.m_action = action;
+	action->connect(action, &QAction::triggered, this, callback);
+	m_dock_infos.push_back(info);
+	addDockWidget(area, widget);
 }
 
 
@@ -330,4 +408,38 @@ void MainWindow::on_actionEntity_list_triggered()
 void MainWindow::on_actionMeasure_triggered()
 {
 	m_world_editor->toggleMeasure();
+}
+
+void MainWindow::on_actionSave_Layout_triggered()
+{
+	bool ok;
+	QString text = QInputDialog::getText(this, "Save layout", "Layout name:", QLineEdit::Normal, "", &ok);
+	if (ok && !text.isEmpty())
+	{
+		QFile file(QString("editor/layouts/%1.bin").arg(text));
+		if (file.open(QIODevice::ReadWrite))
+		{
+			auto geom = saveGeometry();
+			auto state = saveState();
+			int size = geom.size();
+			file.write((const char*)&size, sizeof(size));
+			file.write(geom);
+			size = state.size();
+			file.write((const char*)&size, sizeof(size));
+			file.write(state);
+			bool item_exists = false;
+			for (int i = 0; i < m_layout_combobox->count(); ++i)
+			{
+				if (m_layout_combobox->itemText(i) == text)
+				{
+					item_exists = true;
+					break;
+				}
+			}
+			if (!item_exists)
+			{
+				m_layout_combobox->addItem(text);
+			}
+		}
+	}
 }
