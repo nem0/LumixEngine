@@ -203,8 +203,6 @@ class Array<T, Allocator, false>
 		int capacity() const { return m_capacity; }
 
 	private:
-		void* operator &() { return 0; }
-
 		void grow()
 		{
 			int newCapacity = m_capacity == 0 ? 4 : m_capacity * 2;
@@ -440,8 +438,6 @@ public:
 	int capacity() const { return m_capacity; }
 
 private:
-	void* operator &() { return 0; }
-
 	void grow()
 	{
 		int newCapacity = m_capacity == 0 ? 4 : m_capacity * 2;
