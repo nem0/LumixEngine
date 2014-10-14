@@ -194,9 +194,13 @@ namespace Lumix
 		{
 			LUMIX_DELETE(m_grass_types[i]);
 		}
-		for (int i = 0; i < m_grass_quads.size(); ++i)
+		for(Map<Component, Array<GrassQuad*> >::iterator iter = m_grass_quads.begin(), end = m_grass_quads.end(); iter != end; ++iter)
 		{
-			LUMIX_DELETE(m_grass_quads[i]);
+			Array<GrassQuad*>& quads = iter.value();
+			for (int i = 0; i < quads.size(); ++i)
+			{
+				LUMIX_DELETE(quads[i]);
+			}
 		}
 		for (int i = 0; i < m_free_grass_quads.size(); ++i)
 		{
@@ -308,15 +312,19 @@ namespace Lumix
 	void Terrain::forceGrassUpdate()
 	{
 		m_force_grass_update = true;
-		while(!m_grass_quads.empty())
+		for(Map<Component, Array<GrassQuad*> >::iterator iter = m_grass_quads.begin(), end = m_grass_quads.end(); iter != end; ++iter)
 		{
-			m_free_grass_quads.push(m_grass_quads.back());
-			m_grass_quads.pop();
+			Array<GrassQuad*>& quads = iter.value();
+			while(!quads.empty())
+			{
+				m_free_grass_quads.push(quads.back());
+				quads.pop();
+			}
 		}
 	}
 
 
-	void Terrain::updateGrass(const Vec3& camera_position)
+	void Terrain::updateGrass(const Component& camera)
 	{
 		PROFILE_FUNCTION();
 		if (!m_splatmap)
@@ -332,7 +340,8 @@ namespace Lumix
 			}
 		}
 
-		if ((m_last_camera_position - camera_position).length() > 1 || m_force_grass_update)
+		Vec3 camera_position = camera.entity.getPosition();
+		if ((m_last_camera_position[camera] - camera_position).length() > 1 || m_force_grass_update)
 		{
 			m_force_grass_update = false;
 			Matrix mtx = m_entity.getMatrix();
@@ -347,17 +356,18 @@ namespace Lumix
 			float to_quad_z = cz + (GRASS_QUADS_WIDTH >> 1) * GRASS_QUAD_SIZE;
 
 			float old_bounds[4] = { FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX };
-			for (int i = m_grass_quads.size() - 1; i >= 0; --i)
+			Array<GrassQuad*>& quads = m_grass_quads[camera];
+			for (int i = quads.size() - 1; i >= 0; --i)
 			{
-				GrassQuad* quad = m_grass_quads[i];
+				GrassQuad* quad = quads[i];
 				old_bounds[0] = Math::minValue(old_bounds[0], quad->m_x);
 				old_bounds[1] = Math::maxValue(old_bounds[1], quad->m_x);
 				old_bounds[2] = Math::minValue(old_bounds[2], quad->m_z);
 				old_bounds[3] = Math::maxValue(old_bounds[3], quad->m_z);
 				if (quad->m_x < from_quad_x || quad->m_x > to_quad_x || quad->m_z < from_quad_z || quad->m_z > to_quad_z)
 				{
-					m_free_grass_quads.push(m_grass_quads[i]);
-					m_grass_quads.eraseFast(i);
+					m_free_grass_quads.push(quads[i]);
+					quads.eraseFast(i);
 				}
 			}
 
@@ -370,9 +380,17 @@ namespace Lumix
 				{
 					if (quad_x < old_bounds[0] || quad_x > old_bounds[1] || quad_z < old_bounds[2] || quad_z > old_bounds[3])
 					{
-						GrassQuad* quad = m_free_grass_quads.back();
-						m_free_grass_quads.pop();
-						m_grass_quads.push(quad);
+						GrassQuad* quad = NULL;
+						if(!m_free_grass_quads.empty())
+						{
+							quad = m_free_grass_quads.back();
+							m_free_grass_quads.pop();
+						}
+						else
+						{
+							quad = LUMIX_NEW(GrassQuad);
+						}
+						quads.push(quad);
 						quad->m_x = quad_x;
 						quad->m_z = quad_z;
 						quad->m_patches.clear();
@@ -413,7 +431,7 @@ namespace Lumix
 					}
 				}
 			}
-			m_last_camera_position = camera_position;
+			m_last_camera_position[camera] = camera_position;
 		}
 	}
 
@@ -474,14 +492,15 @@ namespace Lumix
 	}
 
 
-	void Terrain::getGrassInfos(Array<GrassInfo>& infos, const Vec3& camera_position)
+	void Terrain::getGrassInfos(Array<GrassInfo>& infos, const Component& camera)
 	{
-		updateGrass(camera_position);
-		for (int i = 0; i < m_grass_quads.size(); ++i)
+		updateGrass(camera);
+		Array<GrassQuad*>& quads = m_grass_quads[camera];
+		for (int i = 0; i < quads.size(); ++i)
 		{
-			for(int patch_idx = 0; patch_idx < m_grass_quads[i]->m_patches.size(); ++patch_idx)
+			for(int patch_idx = 0; patch_idx < quads[i]->m_patches.size(); ++patch_idx)
 			{
-				GrassPatch& patch = m_grass_quads[i]->m_patches[patch_idx];
+				GrassPatch& patch = quads[i]->m_patches[patch_idx];
 				for (int k = 0, kc = patch.m_matrices.size() / COPY_COUNT; k < kc; ++k)
 				{
 					GrassInfo& info = infos.pushEmpty();

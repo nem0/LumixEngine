@@ -76,5 +76,16 @@ namespace Lumix
 			 return angle * PI / 180.0f;
 		}
 
+
+		inline float easeInOut(float t)
+		{
+			float scaled_t = t * 2;
+			if (scaled_t < 1)
+			{
+				return 0.5f * scaled_t * scaled_t;
+			}
+			--scaled_t;
+			return -0.5f * (scaled_t * (scaled_t - 2) - 1);
+		}
 	}
 }

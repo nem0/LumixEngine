@@ -76,9 +76,10 @@ class AddTerrainLevelCommand : public Lumix::IEditorCommand
 		};
 
 
-		AddTerrainLevelCommand(Lumix::WorldEditor& editor, const Lumix::Vec3& hit_pos, float radius, float rel_amount, Lumix::Component terrain)
+		AddTerrainLevelCommand(Lumix::WorldEditor& editor, const Lumix::Vec3& hit_pos, float radius, float rel_amount, Lumix::Component terrain, bool can_be_merged)
 			: m_world_editor(editor)
 			, m_terrain(terrain)
+			, m_can_be_merged(can_be_merged)
 		{
 			Lumix::Matrix entity_mtx = terrain.entity.getMatrix();
 			entity_mtx.fastInverse();
@@ -264,6 +265,10 @@ class AddTerrainLevelCommand : public Lumix::IEditorCommand
 
 		virtual bool merge(IEditorCommand& command) override
 		{
+			if(!m_can_be_merged)
+			{
+				return false;
+			}
 			AddTerrainLevelCommand& my_command = static_cast<AddTerrainLevelCommand&>(command);
 			if(m_terrain == my_command.m_terrain)
 			{
@@ -309,6 +314,7 @@ class AddTerrainLevelCommand : public Lumix::IEditorCommand
 		Lumix::Array<Item> m_items;
 		Lumix::Component m_terrain;
 		Lumix::WorldEditor& m_world_editor;
+		bool m_can_be_merged;
 };
 
 
@@ -618,9 +624,11 @@ class ComponentPropertyObject : public PropertyViewObject
 						stream.read(value);
 						QWidget* widget = new QWidget();
 						QHBoxLayout* layout = new QHBoxLayout(widget);
-						QLabel* label = new QLabel(QString("%1; %2; %3; %4").arg((int)(value.x * 255)).arg((int)(value.y * 255)).arg((int)(value.z * 255)).arg((int)(value.w * 255)));
+						QColor color((int)(value.x * 255), (int)(value.y * 255), (int)(value.z * 255));
+						QLabel* label = new QLabel(color.name());
 						layout->setContentsMargins(0, 0, 0, 0);
 						layout->addWidget(label);
+						label->setStyleSheet(QString("QLabel { background-color : %1; }").arg(color.name()));
 						QPushButton* button = new QPushButton("...");
 						layout->addWidget(button);
 						item->treeWidget()->setItemWidget(item, 1, widget);
@@ -1279,7 +1287,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 						switch (m_type)
 						{
 							case HEIGHT:
-								addTerrainLevel(terrain, hit);
+								addTerrainLevel(terrain, hit, true);
 								break;
 							case TEXTURE:
 								addSplatWeight(terrain, hit);
@@ -1304,7 +1312,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(camera_cmp.scene);
 			Lumix::Vec3 origin, dir;
 			scene->getRay(camera_cmp, (float)x, (float)y, origin, dir);
-			Lumix::RayCastModelHit hit = scene->castRay(origin, dir, Lumix::Component::INVALID);
+			Lumix::RayCastModelHit hit = scene->castRayTerrain(m_component, origin, dir);
 			if (hit.m_is_hit)
 			{
 				Lumix::Component terrain = hit.m_component.entity.getComponent(crc32("terrain"));
@@ -1313,7 +1321,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 					switch (m_type)
 					{
 						case HEIGHT:
-							addTerrainLevel(terrain, hit);
+							addTerrainLevel(terrain, hit, false);
 							break;
 						case TEXTURE:
 							addSplatWeight(terrain, hit);
@@ -1493,10 +1501,10 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			}
 		}
 
-		void addTerrainLevel(Lumix::Component terrain, const Lumix::RayCastModelHit& hit)
+		void addTerrainLevel(Lumix::Component terrain, const Lumix::RayCastModelHit& hit, bool new_stroke)
 		{
 			Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
-			AddTerrainLevelCommand* command = ::new (Lumix::dll_lumix_new(sizeof(AddTerrainLevelCommand), "", 0)) AddTerrainLevelCommand(m_world_editor, hit_pos, m_terrain_brush_size, m_terrain_brush_strength, terrain);
+			AddTerrainLevelCommand* command = ::new (Lumix::dll_lumix_new(sizeof(AddTerrainLevelCommand), "", 0)) AddTerrainLevelCommand(m_world_editor, hit_pos, m_terrain_brush_size, m_terrain_brush_strength, terrain, !new_stroke);
 			m_world_editor.executeCommand(command);
 		}
 

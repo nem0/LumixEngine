@@ -204,9 +204,10 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		
 		int32_t size = serializer.getRestOfFileSize();
 		ShaderManager* manager = static_cast<ShaderManager*>(getResourceManager().get(ResourceManager::SHADER));
-		char* buf = reinterpret_cast<char*>(manager->getBuffer(size + 1));
+		char* buf = reinterpret_cast<char*>(manager->getBuffer(size + 2));
 		serializer.deserializeRawString(buf, size);
-		buf[size] = '\0';
+		buf[size] = '\n'; // because of a bug in intel drivers
+		buf[size + 1] = '\0';
 		m_source = buf;
 		m_size = file->size();
 		decrementDepCount();

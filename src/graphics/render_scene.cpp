@@ -726,7 +726,7 @@ namespace Lumix
 				{
 					if (m_terrains[i] && (m_terrains[i]->getLayerMask() & layer_mask) != 0)
 					{
-						m_terrains[i]->getGrassInfos(infos, m_applied_camera.entity.getPosition());
+						m_terrains[i]->getGrassInfos(infos, m_applied_camera);
 					}
 				}
 			}
@@ -951,6 +951,7 @@ namespace Lumix
 				addDebugLine(center, Vec3(center.x, center.y, center.z + size), color, life);
 			}
 
+
 			virtual void addDebugLine(const Vec3& from, const Vec3& to, const Vec3& color, float life) override
 			{
 				DebugLine& line = m_debug_lines.pushEmpty();
@@ -959,6 +960,20 @@ namespace Lumix
 				line.m_color = color;
 				line.m_life = life;
 			}
+
+
+			virtual RayCastModelHit castRayTerrain(const Component& terrain, const Vec3& origin, const Vec3& dir) override
+			{
+				RayCastModelHit hit;
+				hit.m_is_hit = false;
+				if(m_terrains[terrain.index])
+				{
+					hit = m_terrains[terrain.index]->castRay(origin, dir);
+					hit.m_component = terrain;
+				}
+				return hit;
+			}
+
 
 			virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Component& ignore) override
 			{
