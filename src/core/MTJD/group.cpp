@@ -32,7 +32,7 @@ namespace Lumix
 		{
 #if TYPE == MULTI_THREAD
 
-			uint32_t count = MT::atomicIncrement(&m_dependency_count);
+			int32_t count = MT::atomicIncrement(&m_dependency_count);
 			if (1 == count)
 			{
 				dependencyNotReady();
@@ -45,7 +45,7 @@ namespace Lumix
 		{
 #if TYPE == MULTI_THREAD
 
-			uint32_t count = MT::atomicDecrement(&m_dependency_count);
+			int32_t count = MT::atomicDecrement(&m_dependency_count);
 			if (0 == count)
 			{
 				dependencyReady();
