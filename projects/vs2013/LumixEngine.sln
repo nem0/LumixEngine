@@ -42,6 +42,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "script", "script\script.vcx
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "animation", "animation\animation.vcxproj", "{63F2E301-5062-4910-87FB-0243772F6852}"
 	ProjectSection(ProjectDependencies) = postProject
+		{E1A0C677-DE71-4AD8-B802-AA7A3332D822} = {E1A0C677-DE71-4AD8-B802-AA7A3332D822}
 		{A0A17BB4-760B-4E34-B1B0-3E43E5F2778A} = {A0A17BB4-760B-4E34-B1B0-3E43E5F2778A}
 	EndProjectSection
 EndProject

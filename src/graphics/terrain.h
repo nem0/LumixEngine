@@ -90,13 +90,13 @@ class Terrain
 		void removeGrassType(int index);
 		int getGrassTypeCount() const { return m_grass_types.size(); }
 		void setMaterial(Material* material);
-		void getGrassInfos(Array<GrassInfo>& infos, const Vec3& camera_position);
+		void getGrassInfos(Array<GrassInfo>& infos, const Component& camera);
 		void setBrush(const Vec3& position, float size) { m_brush_position = position; m_brush_size = size; }
 		float getHeight(float x, float z);
 		void getSize(float* width, float* height) const { ASSERT(width); ASSERT(height); *width = m_width * m_xz_scale; *height = m_height * m_xz_scale; }
 
 	private: 
-		void updateGrass(const Vec3& camera_position);
+		void updateGrass(const Component& camera);
 		void generateGeometry();
 		void onMaterialLoaded(Resource::State, Resource::State new_state);
 		float getHeight(int x, int z);
@@ -118,8 +118,8 @@ class Terrain
 		RenderScene& m_scene;
 		Array<GrassType*> m_grass_types;
 		Array<GrassQuad*> m_free_grass_quads;
-		Array<GrassQuad*> m_grass_quads;
-		Vec3 m_last_camera_position;
+		Map<Component, Array<GrassQuad*> > m_grass_quads;
+		Map<Component, Vec3> m_last_camera_position;
 		Vec3 m_brush_position;
 		float m_brush_size;
 		bool m_force_grass_update;

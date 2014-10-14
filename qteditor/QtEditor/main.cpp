@@ -268,11 +268,14 @@ class App
 
 		void renderEditView()
 		{
-			PROFILE_FUNCTION();
-			m_edit_render_device->beginFrame();
-			m_world_editor->render(*m_edit_render_device);
-			m_world_editor->getEngine().getRenderer().cleanup();
-			m_edit_render_device->endFrame();
+			if (m_main_window->getSceneView()->getViewWidget()->isVisible())
+			{
+				PROFILE_FUNCTION();
+				m_edit_render_device->beginFrame();
+				m_world_editor->render(*m_edit_render_device);
+				m_world_editor->getEngine().getRenderer().cleanup();
+				m_edit_render_device->endFrame();
+			}
 		}
 
 
