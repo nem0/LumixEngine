@@ -33,6 +33,9 @@
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_string.cpp">
       <Filter>core</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\unit_tests\graphics\ut_clipper.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_fixed_lock_free_queue.cpp">
       <Filter>core</Filter>
     </ClCompile>
@@ -63,6 +66,9 @@
     </Filter>
     <Filter Include="suite">
       <UniqueIdentifier>{7613b27e-0d3f-4a31-95a1-a9a7419adb9b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="graphics">
+      <UniqueIdentifier>{4c28bea1-5339-429c-87cf-f4fd6e3f7116}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>
