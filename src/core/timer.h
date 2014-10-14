@@ -1,13 +1,8 @@
 #pragma once
 
 
-#include "core/lumix.h"
-
-
 namespace Lumix
 {
-
-
 	class LUMIX_CORE_API Timer
 	{
 		public:
@@ -21,5 +16,30 @@ namespace Lumix
 			static void destroy(Timer* timer);
 	};
 
+	class ScopedTimer
+	{
+	public:
+		ScopedTimer(const char* name)
+			: m_name(name)
+			, m_timer(Timer::create())
+		{
 
-} // ~namespace Lumix
+		}
+
+		~ScopedTimer()
+		{
+			Timer::destroy(m_timer);
+		}
+
+		float getTimeSinceStart()
+		{
+			return m_timer->getTimeSinceStart();
+		}
+
+		const char* getName() const { return m_name; }
+
+	private:
+		const char* m_name;
+		Timer* m_timer;
+	};
+} // !namespace Lumix

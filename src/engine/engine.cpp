@@ -1,25 +1,34 @@
+#include "core/lumix.h"
 #include "engine/engine.h"
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
+
 
 #include "core/crc32.h"
-#include "core/fs/disk_file_device.h"
-#include "core/fs/file_system.h"
 #include "core/input_system.h"
 #include "core/log.h"
-#include "core/fs/memory_file_device.h"
 #include "core/resource_manager.h"
 #include "core/timer.h"
+
+#include "core/fs/disk_file_device.h"
+#include "core/fs/file_system.h"
+#include "core/fs/memory_file_device.h"
+
+#include "core/mtjd/manager.h"
+
 #include "engine/plugin_manager.h"
+
+#include "graphics/culling_system.h"
 #include "graphics/material_manager.h"
 #include "graphics/model_manager.h"
 #include "graphics/pipeline.h"
 #include "graphics/renderer.h"
 #include "graphics/shader_manager.h"
 #include "graphics/texture_manager.h"
+
 #include "script/script_system.h"
 #include "universe/hierarchy.h"
 
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 
 namespace Lumix
 {
@@ -55,6 +64,8 @@ namespace Lumix
 				m_shader_manager.create(ResourceManager::SHADER, m_resource_manager);
 				m_texture_manager.create(ResourceManager::TEXTURE, m_resource_manager);
 				m_pipeline_manager.create(ResourceManager::PIPELINE, m_resource_manager);
+
+				m_culling_system = CullingSystem::create(m_mtjd_manager);
 
 				m_timer = Timer::create();
 				m_fps_timer = Timer::create();
@@ -141,6 +152,12 @@ namespace Lumix
 					}
 				}
 				return NULL;
+			}
+
+
+			virtual MTJD::Manager& getMTJDManager() override
+			{
+				return m_mtjd_manager;
 			}
 
 
@@ -309,6 +326,9 @@ namespace Lumix
 			ShaderManager	m_shader_manager;
 			TextureManager	m_texture_manager;
 			PipelineManager m_pipeline_manager;
+
+			MTJD::Manager	m_mtjd_manager;
+			CullingSystem*	m_culling_system;
 
 			string m_base_path;
 			WorldEditor* m_editor;

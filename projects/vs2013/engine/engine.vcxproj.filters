@@ -100,6 +100,9 @@
     <ClCompile Include="..\..\..\src\universe\hierarchy.cpp">
       <Filter>universe</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\graphics\culling_system.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\graphics\frame_buffer.h">
@@ -181,6 +184,9 @@
       <Filter>graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\graphics\render_scene.h">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\graphics\culling_system.h">
       <Filter>graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\graphics\terrain.h">
