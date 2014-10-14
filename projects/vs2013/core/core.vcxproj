@@ -158,6 +158,7 @@
     <ClInclude Include="..\..\..\src\core\delegate_list.h" />
     <ClInclude Include="..\..\..\src\core\fifo_allocator.h" />
     <ClInclude Include="..\..\..\src\core\free_list.h" />
+    <ClInclude Include="..\..\..\src\core\frustum.h" />
     <ClInclude Include="..\..\..\src\core\fs\disk_file_device.h" />
     <ClInclude Include="..\..\..\src\core\fs\file_events_device.h" />
     <ClInclude Include="..\..\..\src\core\fs\file_system.h" />
@@ -202,6 +203,7 @@
     <ClInclude Include="..\..\..\src\core\os_file.h" />
     <ClInclude Include="..\..\..\src\core\path.h" />
     <ClInclude Include="..\..\..\src\core\path_utils.h" />
+    <ClInclude Include="..\..\..\src\core\plane.h" />
     <ClInclude Include="..\..\..\src\core\pod_hash_map.h" />
     <ClInclude Include="..\..\..\src\core\profiler.h" />
     <ClInclude Include="..\..\..\src\core\quat.h" />
@@ -209,6 +211,7 @@
     <ClInclude Include="..\..\..\src\core\resource.h" />
     <ClInclude Include="..\..\..\src\core\resource_manager.h" />
     <ClInclude Include="..\..\..\src\core\resource_manager_base.h" />
+    <ClInclude Include="..\..\..\src\core\sphere.h" />
     <ClInclude Include="..\..\..\src\core\stack_allocator.h" />
     <ClInclude Include="..\..\..\src\core\static_array.h" />
     <ClInclude Include="..\..\..\src\core\string.h" />

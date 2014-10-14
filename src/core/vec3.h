@@ -12,6 +12,7 @@ namespace Lumix
 struct LUMIX_CORE_API Vec3
 {
 	Vec3() {}
+
 	Vec3(float a, float b, float c) : x(a), y(b), z(c) {}
 
 	Vec3 operator +(const Vec3& rhs) const

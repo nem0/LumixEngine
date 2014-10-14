@@ -170,6 +170,7 @@
     <ClCompile Include="..\..\..\src\engine\engine.cpp" />
     <ClCompile Include="..\..\..\src\engine\iplugin.cpp" />
     <ClCompile Include="..\..\..\src\engine\plugin_manager.cpp" />
+    <ClCompile Include="..\..\..\src\graphics\culling_system.cpp" />
     <ClCompile Include="..\..\..\src\graphics\frame_buffer.cpp" />
     <ClCompile Include="..\..\..\src\graphics\geometry.cpp" />
     <ClCompile Include="..\..\..\src\graphics\material.cpp" />
@@ -202,6 +203,7 @@
     <ClInclude Include="..\..\..\src\engine\engine.h" />
     <ClInclude Include="..\..\..\src\engine\iplugin.h" />
     <ClInclude Include="..\..\..\src\engine\plugin_manager.h" />
+    <ClInclude Include="..\..\..\src\graphics\culling_system.h" />
     <ClInclude Include="..\..\..\src\graphics\frame_buffer.h" />
     <ClInclude Include="..\..\..\src\graphics\geometry.h" />
     <ClInclude Include="..\..\..\src\graphics\gl_ext.h" />

@@ -90,7 +90,7 @@ namespace Lumix
 				size_t sz = m_size;
 				if(pos + size > cap)
 				{
-					size_t new_cap = pos + size;
+					size_t new_cap = Math::maxValue(cap * 2, pos + size);
 					uint8_t* new_data = LUMIX_NEW_ARRAY(uint8_t, new_cap);
 					memcpy(new_data, m_buffer, sz);
 					LUMIX_DELETE_ARRAY(m_buffer);

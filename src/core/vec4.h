@@ -105,6 +105,14 @@ struct LUMIX_CORE_API Vec4
 		this->z = z;
 		this->w = w;
 	}
+
+	inline void set(const Vec4& rhs)
+	{
+		x = rhs.x;
+		y = rhs.y;
+		z = rhs.z;
+		w = rhs.w;
+	}
 	
 	inline float length() const
 	{

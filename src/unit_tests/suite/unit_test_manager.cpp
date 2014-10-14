@@ -3,6 +3,7 @@
 #include "core/log.h"
 #include "core/mt/lock_free_fixed_queue.h"
 #include "core/mt/task.h"
+#include "core/MT/thread.h"
 #include "core/mt/transaction.h"
 #include "core/queue.h"
 #include "core/array.h"
@@ -135,6 +136,8 @@ namespace Lumix
 						m_task.destroy();
 						spawnWorkerTask();
 					}
+
+					Lumix::MT::yield();
 				}
 
 				m_trans_queue.abort();
