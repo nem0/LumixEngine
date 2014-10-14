@@ -120,6 +120,9 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\profiler.h" />
     <ClInclude Include="..\..\..\src\core\lumix.h" />
+    <ClInclude Include="..\..\..\src\core\plane.h" />
+    <ClInclude Include="..\..\..\src\core\frustum.h" />
+    <ClInclude Include="..\..\..\src\core\sphere.h" />
     <ClInclude Include="..\..\..\src\core\os_file.h">
       <Filter>fs</Filter>
     </ClInclude>
