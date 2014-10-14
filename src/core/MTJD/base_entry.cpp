@@ -43,7 +43,6 @@ namespace Lumix
 		{
 #if TYPE == MULTI_THREAD
 
-			ASSERT(m_dependency_count > 0);
 			ASSERT(NULL != m_sync_event);
 			m_sync_event->wait();
 
