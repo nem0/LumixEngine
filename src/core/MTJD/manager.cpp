@@ -18,7 +18,7 @@ namespace Lumix
 #if TYPE == MULTI_THREAD
 			uint32_t threads_num = getCpuThreadsCount();
 
-			m_scheduler.create("Scheduler");
+			m_scheduler.create("MTJD::Scheduler");
 			m_scheduler.run();
 
 			m_worker_tasks = LUMIX_NEW_ARRAY(WorkerTask, threads_num);
@@ -80,9 +80,10 @@ namespace Lumix
 
 			if (1 == job->getDependenceCount())
 			{
+				job->m_scheduled = true;
+
 				pushReadyJob(job);
 
-				job->m_scheduled = true;
 				m_scheduler.dataSignal();
 			}
 
