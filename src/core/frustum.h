@@ -10,11 +10,11 @@ namespace Lumix
 	{
 		inline Frustum() {}
 
-		inline void compute(const Vec3& position, const Vec3& direction, const Vec3& up, float fov, float ratio, float near, float Far)
+		inline void compute(const Vec3& position, const Vec3& direction, const Vec3& up, float fov, float ratio, float near_distance, float far_distance)
 		{
 			float tang = (float)tan(Math::PI / 180.0f * fov * 0.5f);
-			float nh = near * tang;
-			float nw = nh * ratio;
+			float near_height = near_distance * tang;
+			float near_width = near_height * ratio;
 
 			Vec3 z = direction;
 			z.normalize();
@@ -24,31 +24,42 @@ namespace Lumix
 
 			Vec3 y = crossProduct(z, x);
 
-			Vec3 nc = position - z * near;
-			Vec3 fc = position - z * Far;
+			Vec3 near_center = position - z * near_distance;
+			Vec3 far_center = position - z * far_distance;
+			m_center = position - z * ((near_distance + far_distance)* 0.5f);
 
-			m_plane[(uint32_t)Sides::NEAR].set(-z, nc);
-			m_plane[(uint32_t)Sides::FAR].set(z, fc);
+			m_plane[(uint32_t)Sides::NEAR_PLANE].set(-z, near_center);
+			m_plane[(uint32_t)Sides::FAR_PLANE].set(z, far_center);
 
-			Vec3 aux = (nc + y * nh) - position;
+			Vec3 aux = (near_center + y * near_height) - position;
 			aux.normalize();
 			Vec3 normal = crossProduct(aux, x);
-			m_plane[(uint32_t)Sides::TOP].set(normal, nc + y * nh);
+			m_plane[(uint32_t)Sides::TOP_PLANE].set(normal, near_center + y * near_height);
 
-			aux = (nc - y * nh) - position;
+			aux = (near_center - y * near_height) - position;
 			aux.normalize();
 			normal = crossProduct(x, aux);
-			m_plane[(uint32_t)Sides::BOTTOM].set(normal, nc - y * nh);
+			m_plane[(uint32_t)Sides::BOTTOM_PLANE].set(normal, near_center - y * near_height);
 
-			aux = (nc - x * nw) - position;
+			aux = (near_center - x * near_width) - position;
 			aux.normalize();
 			normal = crossProduct(aux, y);
-			m_plane[(uint32_t)Sides::LEFT].set(normal, nc - x * nw);
+			m_plane[(uint32_t)Sides::LEFT_PLANE].set(normal, near_center - x * near_width);
 
-			aux = (nc + x * nw) - position;
+			aux = (near_center + x * near_width) - position;
 			aux.normalize();
 			normal = crossProduct(y, aux);
-			m_plane[(uint32_t)Sides::RIGHT].set(normal, nc + x * nw);
+			m_plane[(uint32_t)Sides::RIGHT_PLANE].set(normal, near_center + x * near_width);
+
+			float far_height = far_distance * tang;
+			float far_width = far_height * ratio;
+
+			Vec3 corner1 = near_center + x * near_width + y * near_height;
+			Vec3 corner2 = far_center + x * far_width + y * far_height;
+
+			float size = (corner1 - corner2).length();
+			size = Math::maxValue(sqrt(far_width * far_width * 4 + far_height * far_height * 4), size);
+			m_size = size;
 		}
 
 		bool sphereInFrustum(const Vec3 &p, float radius) const
@@ -65,7 +76,9 @@ namespace Lumix
 			return true;
 		}
 
-		enum class Sides : uint32_t	{ NEAR, FAR, LEFT, RIGHT, TOP, BOTTOM, COUNT };
+		enum class Sides : uint32_t	{ NEAR_PLANE, FAR_PLANE, LEFT_PLANE, RIGHT_PLANE, TOP_PLANE, BOTTOM_PLANE, COUNT };
 		Plane m_plane[(uint32_t)Sides::COUNT];
+		Vec3 m_center;
+		float m_size;
 	};
 }
