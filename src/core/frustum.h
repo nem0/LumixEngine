@@ -10,7 +10,29 @@ namespace Lumix
 	{
 		inline Frustum() {}
 
-		inline void compute(const Vec3& position, const Vec3& direction, const Vec3& up, float fov, float ratio, float near_distance, float far_distance)
+		void computeOrtho(const Vec3& position, const Vec3& direction, const Vec3& up, float width, float height, float near_distance, float far_distance)
+		{
+			Vec3 z = direction;
+			z.normalize();
+			Vec3 near_center = position - z * near_distance;
+			Vec3 far_center = position - z * far_distance;
+
+			Vec3 x = crossProduct(up, z);
+			x.normalize();
+			Vec3 y = crossProduct(z, x);
+
+			m_plane[(uint32_t)Sides::NEAR_PLANE].set(-z, near_center);
+			m_plane[(uint32_t)Sides::FAR_PLANE].set(z, far_center);
+			
+			m_plane[(uint32_t)Sides::TOP_PLANE].set(-y, near_center + y * (height * 0.5f));
+			m_plane[(uint32_t)Sides::BOTTOM_PLANE].set(y, near_center - y * (height * 0.5f));
+			
+			m_plane[(uint32_t)Sides::LEFT_PLANE].set(x, near_center - x * (width * 0.5f));
+			m_plane[(uint32_t)Sides::RIGHT_PLANE].set(-x, near_center + x * (width * 0.5f));
+		}
+		
+
+		void compute(const Vec3& position, const Vec3& direction, const Vec3& up, float fov, float ratio, float near_distance, float far_distance)
 		{
 			float tang = (float)tan(Math::PI / 180.0f * fov * 0.5f);
 			float near_height = near_distance * tang;

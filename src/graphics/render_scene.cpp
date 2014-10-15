@@ -792,14 +792,14 @@ namespace Lumix
 			}
 
 
-			virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) override
+			virtual void getRenderableInfos(const Frustum& frustum, Array<RenderableInfo>& infos, int64_t layer_mask) override
 			{
 				PROFILE_FUNCTION();
 
 				if (m_renderables.empty())
 					return;
 
-				m_culling_system->cullToFrustumAsync(m_camera_frustum);
+				m_culling_system->cullToFrustumAsync(frustum);
 
 				const CullingSystem::Results& results = m_culling_system->getResultAsync();
 
@@ -814,6 +814,39 @@ namespace Lumix
 						bool is_model_ready = model && model->isReady();
 						bool culled = results[i] < 0;
 						if (is_model_ready && (renderable->m_layer_mask & layer_mask) != 0 && !culled)
+						{
+							for (int j = 0, c = renderable->m_model.getModel()->getMeshCount(); j < c; ++j)
+							{
+								RenderableInfo& info = infos.pushEmpty();
+								info.m_scale = renderable->m_scale;
+								info.m_geometry = model->getGeometry();
+								info.m_mesh = &model->getMesh(j);
+								info.m_pose = &model_instance.getPose();
+								info.m_model = &model_instance;
+								info.m_matrix = &model_instance.getMatrix();
+							}
+						}
+					}
+				}
+			}
+
+			virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) override
+			{
+				PROFILE_FUNCTION();
+
+				if (m_renderables.empty())
+					return;
+
+				infos.reserve(m_renderables.size() * 2);
+				for (int i = 0, c = m_renderables.size(); i < c; ++i)
+				{
+					const Renderable* LUMIX_RESTRICT renderable = m_renderables[i];
+					if (!renderable->m_is_free)
+					{
+						const ModelInstance& model_instance = renderable->m_model;
+						const Model* model = model_instance.getModel();
+						bool is_model_ready = model && model->isReady();
+						if (is_model_ready && (renderable->m_layer_mask & layer_mask) != 0)
 						{
 							for (int j = 0, c = renderable->m_model.getModel()->getMeshCount(); j < c; ++j)
 							{
