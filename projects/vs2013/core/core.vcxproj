@@ -150,6 +150,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\src\core\aabb.h" />
     <ClInclude Include="..\..\..\src\core\array.h" />
     <ClInclude Include="..\..\..\src\core\blob.h" />
     <ClInclude Include="..\..\..\src\core\crc32.h" />

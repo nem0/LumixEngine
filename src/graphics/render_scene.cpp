@@ -174,7 +174,7 @@ namespace Lumix
 				float far_plane = m_cameras[cmp.index].m_far;
 				m_renderer.setProjection(width, height, fov, near_plane, far_plane, mtx);
 
-				m_camera_frustum.compute(
+				m_camera_frustum.computePerspective(
 					mtx.getTranslation(),
 					mtx.getZVector(),
 					mtx.getYVector(),
@@ -735,14 +735,14 @@ namespace Lumix
 			}
 
 
-			virtual void getGrassInfos(Array<GrassInfo>& infos, int64_t layer_mask)
+			virtual void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, int64_t layer_mask)
 			{
 				PROFILE_FUNCTION();
 				for (int i = 0; i < m_terrains.size(); ++i)
 				{
 					if (m_terrains[i] && (m_terrains[i]->getLayerMask() & layer_mask) != 0)
 					{
-						m_terrains[i]->getGrassInfos(infos, m_applied_camera);
+						m_terrains[i]->getGrassInfos(frustum, infos, m_applied_camera);
 					}
 				}
 			}
@@ -1157,12 +1157,12 @@ namespace Lumix
 				return m_timer;
 			}
 
-			virtual void renderTerrain(const TerrainInfo& info, Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos) override
+			virtual void renderTerrain(const Frustum& frustum, const TerrainInfo& info, Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos) override
 			{
 				int i = info.m_index;
 				if (m_terrains[i]->getMaterial() && m_terrains[i]->getMaterial()->isReady())
 				{
-					m_terrains[i]->render(renderer, pipeline, camera_pos);
+					m_terrains[i]->render(frustum, renderer, pipeline, camera_pos);
 				}
 			}
 

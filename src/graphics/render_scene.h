@@ -11,7 +11,7 @@ namespace Lumix
 {
 
 	class Engine;
-	struct Frustum;
+	class Frustum;
 	class Geometry;
 	class IRenderDevice;
 	class ISerializer;
@@ -73,7 +73,7 @@ namespace Lumix
 			virtual void applyCamera(Component camera) = 0;
 			virtual void update(float dt) = 0;
 			virtual Timer* getTimer() const = 0;
-			virtual void renderTerrain(const TerrainInfo& info, Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos) = 0;
+			virtual void renderTerrain(const Frustum& frustum, const TerrainInfo& info, Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos) = 0;
 			virtual Engine& getEngine() const = 0;
 
 			virtual Pose& getPose(const Component& cmp) = 0;
@@ -105,7 +105,7 @@ namespace Lumix
 			virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) = 0;
 			virtual Model* getRenderableModel(Component cmp) = 0;
 			
-			virtual void getGrassInfos(Array<GrassInfo>& infos, int64_t layer_mask) = 0;
+			virtual void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, int64_t layer_mask) = 0;
 			virtual void getTerrainInfos(Array<TerrainInfo>& infos, int64_t layer_mask) = 0;
 			virtual float getTerrainHeightAt(Component cmp, float x, float z) = 0;
 			virtual void setTerrainMaterial(Component cmp, const string& path) = 0;

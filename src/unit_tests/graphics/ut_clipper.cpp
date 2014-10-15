@@ -44,7 +44,7 @@ namespace
 		}
 
 		Lumix::Frustum clipping_frustum;
-		clipping_frustum.compute(
+		clipping_frustum.computePerspective(
 			test_frustum.pos,
 			test_frustum.dir,
 			test_frustum.up,
@@ -86,7 +86,7 @@ namespace
 		}
 
 		Lumix::Frustum clipping_frustum;
-		clipping_frustum.compute(
+		clipping_frustum.computePerspective(
 			test_frustum.pos,
 			test_frustum.dir,
 			test_frustum.up,

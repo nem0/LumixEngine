@@ -129,6 +129,7 @@
     <ClInclude Include="..\..\..\src\core\mt\thread.h">
       <Filter>mt</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\core\aabb.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\core\blob.cpp" />

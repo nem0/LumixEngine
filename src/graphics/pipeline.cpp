@@ -466,7 +466,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 			Frustum frustum;
 			Matrix camera_matrix = camera.entity.getMatrix();
-			frustum.compute(camera_matrix.getTranslation()
+			frustum.computePerspective(camera_matrix.getTranslation()
 				, camera_matrix.getZVector()
 				, camera_matrix.getYVector()
 				, camera_fov
@@ -476,8 +476,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 			);
 			(&m_shadowmap_splits.x)[split_index] = split_distances[split_index + 1];
 
-			Vec3 shadow_cam_pos = frustum.m_center;
-			float bb_size = frustum.m_size * 0.5f;
+			Vec3 shadow_cam_pos = frustum.getCenter();
+			float bb_size = frustum.getRadius();
 			Matrix projection_matrix;
 			Renderer::getOrthoMatrix(-bb_size, bb_size, -bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR, &projection_matrix);
 			m_renderer->setProjectionMatrix(projection_matrix);
@@ -498,7 +498,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 			Frustum shadow_camera_frustum;
 			shadow_camera_frustum.computeOrtho(shadow_cam_pos, -light_forward, light_mtx.getYVector(), bb_size * 2, bb_size * 2, SHADOW_CAM_NEAR, SHADOW_CAM_FAR);
 
-			renderTerrains(layer_mask);
+			renderTerrains(shadow_camera_frustum, layer_mask);
 			renderModels(shadow_camera_frustum, layer_mask);
 		}
 		FrameBuffer::unbind();
@@ -556,14 +556,14 @@ struct PipelineInstanceImpl : public PipelineInstance
 		}
 	}
 
-	void renderGrass(int64_t layer_mask)
+	void renderGrass(const Frustum& frustum, int64_t layer_mask)
 	{
 		PROFILE_FUNCTION();
 		if (m_active_camera.isValid())
 		{
 			const Material* last_material = NULL;
 			m_grass_infos.clear();
-			m_scene->getGrassInfos(m_grass_infos, layer_mask);
+			m_scene->getGrassInfos(frustum, m_grass_infos, layer_mask);
 			for (int i = 0; i < m_grass_infos.size(); ++i)
 			{
 				const GrassInfo& info = m_grass_infos[i];
@@ -602,7 +602,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		}
 	}
 
-	void renderTerrains(int64_t layer_mask)
+	void renderTerrains(const Frustum& frustum, int64_t layer_mask)
 	{
 		PROFILE_FUNCTION();
 		if (m_active_camera.isValid())
@@ -641,7 +641,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 					scale.y = m_terrain_infos[i].m_y_scale;
 					scale.z = scale.x;
 					m_renderer->setUniform(*shader, "terrain_scale", TERRAIN_SCALE_HASH, scale);
-					m_scene->renderTerrain(m_terrain_infos[i], *m_renderer, *this, camera_position);
+					m_scene->renderTerrain(frustum, m_terrain_infos[i], *m_renderer, *this, camera_position);
 				}
 			}
 		}
@@ -871,9 +871,9 @@ void RenderModelsCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 
 void RenderModelsCommand::execute(PipelineInstanceImpl& pipeline)
 {
-	pipeline.renderTerrains(m_layer_mask);
+	pipeline.renderTerrains(pipeline.getScene()->getFrustum(), m_layer_mask);
 	pipeline.renderModels(pipeline.getScene()->getFrustum(), m_layer_mask);
-	pipeline.renderGrass(m_layer_mask);
+	pipeline.renderGrass(pipeline.getScene()->getFrustum(), m_layer_mask);
 
 }
 

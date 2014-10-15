@@ -21,7 +21,7 @@ namespace Lumix
 	{
 		for (const Sphere* sphere = start; sphere <= end; sphere++, indexes++, results++)
 		{
-			if (frustum->sphereInFrustum(sphere->m_position, sphere->m_radius))
+			if (frustum->isSphereInside(sphere->m_position, sphere->m_radius))
 			{
 				*results = *indexes;
 			}

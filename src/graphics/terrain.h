@@ -61,15 +61,15 @@ class Terrain
 		};
 
 	public:
-		static const int GRASS_QUADS_WIDTH = 5;
-		static const int GRASS_QUADS_HEIGHT = 5;
+		static const int GRASS_QUADS_COLUMNS = 5;
+		static const int GRASS_QUADS_ROWS = 5;
 		static const int GRASS_QUAD_SIZE = 10;
 
 	public:
 		Terrain(const Entity& entity, RenderScene& scene);
 		~Terrain();
 
-		void render(Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos);
+		void render(const Frustum& frustum, Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos);
 		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir);
 		int64_t getLayerMask() const { return m_layer_mask; }
 		void serialize(ISerializer& serializer);
@@ -90,7 +90,7 @@ class Terrain
 		void removeGrassType(int index);
 		int getGrassTypeCount() const { return m_grass_types.size(); }
 		void setMaterial(Material* material);
-		void getGrassInfos(Array<GrassInfo>& infos, const Component& camera);
+		void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, const Component& camera);
 		void setBrush(const Vec3& position, float size) { m_brush_position = position; m_brush_size = size; }
 		float getHeight(float x, float z);
 		void getSize(float* width, float* height) const { ASSERT(width); ASSERT(height); *width = m_width * m_xz_scale; *height = m_height * m_xz_scale; }
