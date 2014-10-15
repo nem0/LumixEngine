@@ -495,8 +495,11 @@ struct PipelineInstanceImpl : public PipelineInstance
 				);
 			m_shadow_modelviewprojection[split_index] = biasMatrix * (projection_matrix * modelview_matrix);
 
+			Frustum shadow_camera_frustum;
+			shadow_camera_frustum.computeOrtho(shadow_cam_pos, -light_forward, light_mtx.getYVector(), bb_size * 2, bb_size * 2, SHADOW_CAM_NEAR, SHADOW_CAM_FAR);
+
 			renderTerrains(layer_mask);
-			renderModels(layer_mask);
+			renderModels(shadow_camera_frustum, layer_mask);
 		}
 		FrameBuffer::unbind();
 		glCullFace(GL_BACK);
@@ -659,13 +662,13 @@ struct PipelineInstanceImpl : public PipelineInstance
 		}
 	}
 
-	void renderModels(int64_t layer_mask)
+	void renderModels(const Frustum& frustum, int64_t layer_mask)
 	{
 		PROFILE_FUNCTION();
 		
 		uint32_t pass_hash = getRenderer().getPass();
 		m_renderable_infos.clear();
-		m_scene->getRenderableInfos(m_renderable_infos, layer_mask);
+		m_scene->getRenderableInfos(frustum, m_renderable_infos, layer_mask);
 		int count = m_renderable_infos.size();
 		const Material* last_material = NULL;
 		sortRenderables(m_renderable_infos);
@@ -869,7 +872,7 @@ void RenderModelsCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 void RenderModelsCommand::execute(PipelineInstanceImpl& pipeline)
 {
 	pipeline.renderTerrains(m_layer_mask);
-	pipeline.renderModels(m_layer_mask);
+	pipeline.renderModels(pipeline.getScene()->getFrustum(), m_layer_mask);
 	pipeline.renderGrass(m_layer_mask);
 
 }
