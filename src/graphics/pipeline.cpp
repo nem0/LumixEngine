@@ -2,6 +2,7 @@
 #include "graphics/gl_ext.h"
 #include "core/array.h"
 #include "core/crc32.h"
+#include "core/frustum.h"
 #include "core/fs/file_system.h"
 #include "core/iserializer.h"
 #include "core/json_serializer.h"
@@ -41,29 +42,6 @@ static const uint32_t CAMERA_POS_HASH = crc32("camera_pos");
 static float split_distances[] = { 0, 5, 20, 100, 300 };
 static const float SHADOW_CAM_NEAR = 0.1f;
 static const float SHADOW_CAM_FAR = 10000.0f;
-
-struct Frustum
-{
-	public:
-		Vec3 getCenter() const
-		{
-			Vec3 center = m_points[0];
-			for(int i = 1; i < 8; ++i)
-			{
-				center += m_points[i];
-			}
-			center *= 1/8.0f;
-			return center;
-		}
-
-		float getSize() const
-		{
-			return Math::maxValue((m_points[0] - m_points[6]).length(), (m_points[4] - m_points[6]).length());
-		}
-
-	public:
-		Vec3 m_points[8];
-};
 
 
 struct Command
@@ -444,7 +422,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-
 	void executeCustomCommand(uint32_t name)
 	{
 		Map<uint32_t, CustomCommandHandler>::iterator iter = m_custom_commands_handlers.find(name);
@@ -454,37 +431,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 		}
 	}
 
-	void computeFrustum(const Component& camera, Frustum* frustum, float from_dist, float to_dist)
-	{
-		RenderScene& scene = *m_scene;
-		Matrix entity_mtx = camera.entity.getMatrix();
-		float fov = Math::degreesToRadians(scene.getCameraFOV(camera));
-		float far_dist = scene.getCameraNearPlane(camera) + to_dist;
-		float near_dist = scene.getCameraNearPlane(camera) + from_dist;
-		float ratio = scene.getCameraWidth(camera) / scene.getCameraHeight(camera);
-		Vec3 up = camera.entity.getRotation() * Vec3(0.0f, 1.0f, 0.0f);
-		Vec3 forward = camera.entity.getRotation() * Vec3(0, 0, -1);
-		Vec3 right = crossProduct(forward, up).normalized();
-		up = crossProduct(right, forward).normalized();
-
-		Vec3 far_center = camera.entity.getPosition() + forward * far_dist;
-		Vec3 near_center = camera.entity.getPosition() + forward * near_dist;
-
-		float near_height = tan(fov * 0.5f) * near_dist;
-		float near_width = near_height * ratio;
-		float far_height = tan(fov * 0.5f) * far_dist;
-		float far_width = far_height * ratio;
-
-		frustum->m_points[0] = near_center - up * near_height - right * near_width;
-		frustum->m_points[1] = near_center + up * near_height - right * near_width;
-		frustum->m_points[2] = near_center + up * near_height + right * near_width;
-		frustum->m_points[3] = near_center - up * near_height + right * near_width;
-
-		frustum->m_points[4] = far_center - up * far_height - right * far_width;
-		frustum->m_points[5] = far_center + up * far_height - right * far_width;
-		frustum->m_points[6] = far_center + up * far_height + right * far_width;
-		frustum->m_points[7] = far_center - up * far_height + right * far_width;
-	}
 
 	void renderShadowmap(Component camera, int64_t layer_mask)
 	{
@@ -503,7 +449,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 		Matrix light_mtx = light_cmp.entity.getMatrix();
 		m_light_dir = light_mtx.getZVector();
 
-		Frustum frustum;
 		float shadowmap_height = (float)m_shadowmap_framebuffer->getHeight();
 		float shadowmap_width = (float)m_shadowmap_framebuffer->getWidth();
 		float viewports[] = 
@@ -511,17 +456,28 @@ struct PipelineInstanceImpl : public PipelineInstance
 			, 0.5f, 0
 			, 0, 0.5f
 			, 0.5f, 0.5f};
+		float camera_fov = m_scene->getCameraFOV(camera);
+		float camera_ratio = m_scene->getCameraWidth(camera) / m_scene->getCameraHeight(camera);
 		for (int split_index = 0; split_index < 4; ++split_index)
 		{
 			float* viewport = viewports + split_index * 2;
 			glViewport((int)(1 + shadowmap_width * viewport[0]), (int)(1 + shadowmap_height * viewport[1]),
 				(int)(0.5f * shadowmap_width - 2), (int)(0.5f * shadowmap_height - 2));
 
-			computeFrustum(camera, &frustum, split_distances[split_index], split_distances[split_index + 1]);
+			Frustum frustum;
+			Matrix camera_matrix = camera.entity.getMatrix();
+			frustum.compute(camera_matrix.getTranslation()
+				, camera_matrix.getZVector()
+				, camera_matrix.getYVector()
+				, camera_fov
+				, camera_ratio
+				, split_distances[split_index]
+				, split_distances[split_index + 1]
+			);
 			(&m_shadowmap_splits.x)[split_index] = split_distances[split_index + 1];
 
-			Vec3 shadow_cam_pos = frustum.getCenter();
-			float bb_size = frustum.getSize() * 0.5f;
+			Vec3 shadow_cam_pos = frustum.m_center;
+			float bb_size = frustum.m_size * 0.5f;
 			Matrix projection_matrix;
 			Renderer::getOrthoMatrix(-bb_size, bb_size, -bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR, &projection_matrix);
 			m_renderer->setProjectionMatrix(projection_matrix);

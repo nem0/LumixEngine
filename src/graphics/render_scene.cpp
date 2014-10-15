@@ -786,6 +786,12 @@ namespace Lumix
 			}
 
 
+			virtual Frustum& getFrustum() override
+			{
+				return m_camera_frustum;
+			}
+
+
 			virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) override
 			{
 				PROFILE_FUNCTION();

@@ -3,6 +3,7 @@
 #include "core/crc32.h"
 #include "core/path_utils.h"
 #include "core/string.h"
+#include "editor/ieditor_command.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "graphics/render_scene.h"
@@ -27,6 +28,50 @@ static const char* component_map[] =
 
 
 static const uint32_t RENDERABLE_HASH = crc32("renderable");
+
+
+class SetParentEditorCommand : public Lumix::IEditorCommand
+{
+	public:
+		SetParentEditorCommand(Lumix::Hierarchy& hierarchy, const Lumix::Entity& child, const Lumix::Entity& parent)
+			: m_new_parent(parent)
+			, m_child(child)
+			, m_old_parent(hierarchy.getParent(child))
+			, m_hierarchy(hierarchy)
+		{
+		}
+
+		virtual void execute() override
+		{
+			m_hierarchy.setParent(m_child, m_new_parent);
+		}
+
+
+		virtual void undo() override
+		{
+			m_hierarchy.setParent(m_child, m_old_parent);
+		}
+
+
+		virtual bool merge(IEditorCommand&) override
+		{
+			return false;
+		}
+
+
+		virtual uint32_t getType() override
+		{
+			static const uint32_t hash = crc32("set_entity_parent");
+			return hash;
+		}
+
+
+	private:
+		Lumix::Entity m_child;
+		Lumix::Entity m_new_parent;
+		Lumix::Entity m_old_parent;
+		Lumix::Hierarchy& m_hierarchy;
+};
 
 
 class EntityListFilter : public QSortFilterProxyModel
@@ -178,7 +223,8 @@ class EntityListModel : public QAbstractItemModel
 				stream >> child.index;
 			}
 
-			m_engine->getHierarchy()->setParent(child, parent_entity);
+			SetParentEditorCommand* command = new (Lumix::dll_lumix_new(sizeof(SetParentEditorCommand), "", 0)) SetParentEditorCommand(*m_engine->getHierarchy(), child, parent_entity);
+			m_engine->getWorldEditor()->executeCommand(command);
 
 			return false;
 		}

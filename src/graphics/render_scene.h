@@ -11,6 +11,7 @@ namespace Lumix
 {
 
 	class Engine;
+	struct Frustum;
 	class Geometry;
 	class IRenderDevice;
 	class ISerializer;
@@ -138,6 +139,7 @@ namespace Lumix
 			virtual Vec4 getLightAmbientColor(Component cmp) = 0;
 			virtual float getFogDensity(Component cmp) = 0;
 			virtual Vec4 getFogColor(Component cmp) = 0;
+			virtual Frustum& getFrustum() = 0;
 
 		protected:
 			virtual ~RenderScene() {}
