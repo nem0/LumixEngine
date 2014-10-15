@@ -105,6 +105,15 @@ namespace Lumix
 			~RenderSceneImpl()
 			{
 				m_universe.entityMoved().unbind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
+
+				for (int i = 0; i < m_renderables.size(); ++i)
+				{
+					if (m_renderables[i]->m_model.getModel())
+					{
+						m_renderables[i]->m_model.getModel()->getObserverCb().unbind<RenderSceneImpl, &RenderSceneImpl::modelUpdate>(this);
+					}
+				}
+
 				for (int i = 0; i < m_renderables.size(); ++i)
 				{
 					LUMIX_DELETE(m_renderables[i]);
