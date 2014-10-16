@@ -88,7 +88,7 @@ namespace Lumix
 			}
 		}
 
-		float getDistance(const Vec3& camera_pos)
+		float getSquaredDistance(const Vec3& camera_pos)
 		{
 			Vec3 _max(m_min.x + m_size, m_min.y, m_min.z + m_size);
 			float dist = 0;
@@ -112,7 +112,7 @@ namespace Lumix
 				float d = _max.z - camera_pos.z;
 				dist += d*d;
 			}
-			return sqrt(dist);
+			return dist;
 		}
 
 		static float getRadiusInner(float size)
@@ -128,14 +128,12 @@ namespace Lumix
 		}
 
 
-		bool render(const Terrain& terrain, const Frustum& frustum, Renderer* renderer, Mesh* mesh, Geometry& geometry, const Vec3& camera_pos, RenderScene& scene)
+		bool render(Renderer* renderer, Mesh* mesh, Geometry& geometry, const Vec3& camera_pos, RenderScene& scene)
 		{
 			PROFILE_FUNCTION();
-			float dist = getDistance(camera_pos);
+			float squared_dist = getSquaredDistance(camera_pos);
 			float r = getRadiusOuter(m_size);
-			AABB aabb(m_min, m_min + Vec3(m_size, terrain.getYScale(), m_size));
-			aabb.transform(terrain.getEntity().getMatrix());
-			if ((dist > r && m_lod > 1) || !frustum.isBoxInside(aabb.getMin(), aabb.getMax()))
+			if (squared_dist > r*r && m_lod > 1)
 			{
 				return false;
 			}
@@ -143,7 +141,7 @@ namespace Lumix
 			Shader& shader = *mesh->getMaterial()->getShader();
 			for (int i = 0; i < CHILD_COUNT; ++i)
 			{
-				if (!m_children[i] || !m_children[i]->render(terrain, frustum, renderer, mesh, geometry, camera_pos, scene))
+				if (!m_children[i] || !m_children[i]->render(renderer, mesh, geometry, camera_pos, scene))
 				{
 					renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::MORPH_CONST, morph_const);
 					renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::QUAD_SIZE, m_size);
@@ -611,7 +609,7 @@ namespace Lumix
 	}
 
 
-	void Terrain::render(const Frustum& frustum, Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos)
+	void Terrain::render(Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos)
 	{
 		if (m_root)
 		{
@@ -627,7 +625,7 @@ namespace Lumix
 			renderer.setUniform(shader, "brush_size", BRUSH_SIZE_HASH, m_brush_size);
 			renderer.setUniform(shader, "map_size", MAP_SIZE_HASH, m_root->m_size);
 			renderer.setUniform(shader, "camera_pos", CAMERA_POS_HASH, rel_cam_pos);
-			m_root->render(*this, frustum, &static_cast<Renderer&>(m_scene.getPlugin()), m_mesh, m_geometry, rel_cam_pos, *pipeline.getScene());
+			m_root->render(&static_cast<Renderer&>(m_scene.getPlugin()), m_mesh, m_geometry, rel_cam_pos, *pipeline.getScene());
 		}
 	}
 

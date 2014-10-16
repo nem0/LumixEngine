@@ -69,7 +69,7 @@ class Terrain
 		Terrain(const Entity& entity, RenderScene& scene);
 		~Terrain();
 
-		void render(const Frustum& frustum, Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos);
+		void render(Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos);
 		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir);
 		int64_t getLayerMask() const { return m_layer_mask; }
 		void serialize(ISerializer& serializer);
