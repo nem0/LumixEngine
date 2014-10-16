@@ -143,9 +143,9 @@ namespace Lumix
 			{
 				if (!m_children[i] || !m_children[i]->render(renderer, mesh, geometry, camera_pos, scene))
 				{
-					renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::MORPH_CONST, morph_const);
-					renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::QUAD_SIZE, m_size);
-					renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::QUAD_MIN, m_min);
+					setFixedCachedUniform(*renderer, shader, (int)Shader::FixedCachedUniforms::MORPH_CONST, morph_const);
+					setFixedCachedUniform(*renderer, shader, (int)Shader::FixedCachedUniforms::QUAD_SIZE, m_size);
+					setFixedCachedUniform(*renderer, shader, (int)Shader::FixedCachedUniforms::QUAD_MIN, m_min);
 					renderer->renderGeometry(geometry, mesh->getCount() / 4 * i, mesh->getCount() / 4, shader);
 				}
 			}
