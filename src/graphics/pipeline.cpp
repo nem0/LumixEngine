@@ -668,11 +668,12 @@ struct PipelineInstanceImpl : public PipelineInstance
 		int count = m_renderable_infos.size();
 		const Material* last_material = NULL;
 		sortRenderables(m_renderable_infos);
-		for (int i = 0; i < count; ++i)
+		const RenderableInfo* info = &m_renderable_infos[0];
+		const RenderableInfo* end = &m_renderable_infos[count];
+		while(info != end)
 		{
-			const RenderableInfo& info = m_renderable_infos[i];
-			const Matrix& world_matrix = info.m_model->getMatrix();
-			const Mesh& mesh = *info.m_mesh;
+			const Matrix& world_matrix = info->m_model->getMatrix();
+			const Mesh& mesh = *info->m_mesh;
 			const Material& material = *mesh.getMaterial();
 			Shader& shader = *material.getShader();
 			
@@ -680,6 +681,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 			{
 				if(!shader.hasPass(pass_hash))
 				{
+					++info;
 					continue;
 				}
 	
@@ -705,10 +707,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 			setFixedCachedUniform(*m_renderer, shader, (int)Shader::FixedCachedUniforms::WORLD_MATRIX, world_matrix);
 			
 			static Matrix bone_mtx[64];
-			if (info.m_pose->getCount() > 0)
+			if (info->m_pose->getCount() > 0)
 			{
-				const Pose& pose = *info.m_pose;
-				const Model& model = *info.m_model->getModel();
+				const Pose& pose = *info->m_pose;
+				const Model& model = *info->m_model->getModel();
 				Vec3* poss = pose.getPositions();
 				Quat* rots = pose.getRotations();
 				ASSERT(pose.getCount() <= 64);
@@ -721,7 +723,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 				m_renderer->setUniform(shader, "bone_matrices", BONE_MATRICES_HASH, bone_mtx, pose.getCount());
 			}
 
-			renderGeometry(*m_renderer, *m_renderable_infos[i].m_geometry, mesh.getStart(), mesh.getCount(), *material.getShader());
+			renderGeometry(*m_renderer, *info->m_geometry, mesh.getStart(), mesh.getCount(), *material.getShader());
+			++info;
 		}
 	}
 
