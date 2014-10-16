@@ -28,6 +28,10 @@ namespace Lumix
 			
 				m_plane[(uint32_t)Sides::LEFT_PLANE].set(x, near_center - x * (width * 0.5f));
 				m_plane[(uint32_t)Sides::RIGHT_PLANE].set(-x, near_center + x * (width * 0.5f));
+
+				m_center = (near_center + far_center) * 0.5f;
+				float z_diff = far_distance - near_distance;
+				m_radius = sqrt(width * width + height * height + z_diff * z_diff) * 0.5f;
 			}
 		
 
@@ -81,19 +85,6 @@ namespace Lumix
 				float size = (corner1 - corner2).length();
 				size = Math::maxValue(sqrt(far_width * far_width * 4 + far_height * far_height * 4), size);
 				m_radius = size * 0.5f;
-			}
-
-
-			bool isBoxInside(const Vec3& min, const Vec3& max) const
-			{
-				for(int i=0; i < (int)Sides::COUNT; ++i) 
-				{
-					if (m_plane[i].distance(positiveVertex(min, max, m_plane[i].normal)) < 0)
-						return false;
-					else if (m_plane[i].distance(negativeVertex(min, max, m_plane[i].normal)) < 0)
-						return true;
-				}
-				return true;
 			}
 
 
