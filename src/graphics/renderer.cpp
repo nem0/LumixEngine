@@ -430,7 +430,7 @@ struct RendererImpl : public Renderer
 			const Mesh& mesh = model.getMesh(i);
 			mesh.getMaterial()->apply(*this, pipeline);
 			RendererImpl::setFixedCachedUniform(*mesh.getMaterial()->getShader(), (int)Shader::FixedCachedUniforms::WORLD_MATRIX, transform);
-			renderGeometry(*model.getGeometry(), mesh.getStart(), mesh.getCount(), *mesh.getMaterial()->getShader());
+			RendererImpl::renderGeometry(*model.getGeometry(), mesh.getStart(), mesh.getCount(), *mesh.getMaterial()->getShader());
 		}
 	}
 
@@ -553,6 +553,12 @@ void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, c
 void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Matrix* matrices, int count)
 {
 	static_cast<RendererImpl&>(renderer).RendererImpl::setFixedCachedUniform(shader, name, matrices, count);
+}
+
+
+void renderGeometry(Renderer& renderer, Geometry& geometry, int start, int count, Shader& shader)
+{
+	static_cast<RendererImpl&>(renderer).RendererImpl::renderGeometry(geometry, start, count, shader);
 }
 
 

@@ -146,7 +146,7 @@ namespace Lumix
 					setFixedCachedUniform(*renderer, shader, (int)Shader::FixedCachedUniforms::MORPH_CONST, morph_const);
 					setFixedCachedUniform(*renderer, shader, (int)Shader::FixedCachedUniforms::QUAD_SIZE, m_size);
 					setFixedCachedUniform(*renderer, shader, (int)Shader::FixedCachedUniforms::QUAD_MIN, m_min);
-					renderer->renderGeometry(geometry, mesh->getCount() / 4 * i, mesh->getCount() / 4, shader);
+					renderGeometry(*renderer, geometry, mesh->getCount() / 4 * i, mesh->getCount() / 4, shader);
 				}
 			}
 			return true;

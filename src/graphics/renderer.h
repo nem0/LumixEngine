@@ -80,6 +80,8 @@ void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, c
 void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, float value);
 void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Matrix& mtx);
 void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Matrix* matrices, int count);
+void renderGeometry(Renderer& renderer, Geometry& geometry, int start, int count, Shader& shader);
+
 
 
 

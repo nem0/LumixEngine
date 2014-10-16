@@ -88,16 +88,32 @@ namespace Lumix
 			}
 
 
-			bool isSphereInside(const Vec3 &p, float radius) const
+			bool isSphereInside(const Vec3 &center, float radius) const
 			{
-				for (int i = 0; i < (uint32_t)Sides::COUNT; i++) 
-				{
-					float distance = m_plane[i].distance(p);
-					if (distance < -radius)
-						return false;
-					else if (distance < radius)
-						return true;
-				}
+				float x = center.x;
+				float y = center.y;
+				float z = center.z;
+				const Plane* plane = &m_plane[0];
+				float distance = x * plane[0].normal.x + y * plane[0].normal.y + z * plane[0].normal.z + plane[0].d;
+				if (distance < -radius)	return false;
+				
+				distance = x * plane[0].normal.x + y * plane[0].normal.y + z * plane[0].normal.z + plane[0].d;
+				if (distance < -radius)	return false;
+
+				distance = x * plane[1].normal.x + y * plane[1].normal.y + z * plane[1].normal.z + plane[1].d;
+				if (distance < -radius)	return false;
+
+				distance = x * plane[2].normal.x + y * plane[2].normal.y + z * plane[2].normal.z + plane[2].d;
+				if (distance < -radius)	return false;
+
+				distance = x * plane[3].normal.x + y * plane[3].normal.y + z * plane[3].normal.z + plane[3].d;
+				if (distance < -radius)	return false;
+
+				distance = x * plane[4].normal.x + y * plane[4].normal.y + z * plane[4].normal.z + plane[4].d;
+				if (distance < -radius)	return false;
+
+				distance = x * plane[5].normal.x + y * plane[5].normal.y + z * plane[5].normal.z + plane[5].d;
+				if (distance < -radius)	return false;
 
 				return true;
 			}
