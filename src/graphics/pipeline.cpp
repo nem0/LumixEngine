@@ -666,10 +666,14 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_renderable_infos.clear();
 		m_scene->getRenderableInfos(frustum, m_renderable_infos, layer_mask);
 		int count = m_renderable_infos.size();
+		if(count == 0)
+		{
+			return;
+		}
 		const Material* last_material = NULL;
 		sortRenderables(m_renderable_infos);
 		const RenderableInfo* info = &m_renderable_infos[0];
-		const RenderableInfo* end = &m_renderable_infos[count];
+		const RenderableInfo* end = &m_renderable_infos[0]+count;
 		while(info != end)
 		{
 			const Matrix& world_matrix = info->m_model->getMatrix();
