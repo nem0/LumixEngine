@@ -75,5 +75,13 @@ class LUMIX_ENGINE_API Renderer : public IPlugin
 }; 
 
 
+void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Vec3& value);
+void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Vec4& value);
+void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, float value);
+void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Matrix& mtx);
+void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Matrix* matrices, int count);
+
+
+
 } // !namespace Lumix
 

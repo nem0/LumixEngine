@@ -310,8 +310,8 @@ struct RendererImpl : public Renderer
 		GLuint id = shader.getProgramId();
 		m_last_program_id = id;
 		glUseProgram(id);
-		setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::VIEW_MATRIX, m_view_matrix);
-		setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::PROJECTION_MATRIX, m_projection_matrix);
+		RendererImpl::setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::VIEW_MATRIX, m_view_matrix);
+		RendererImpl::setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::PROJECTION_MATRIX, m_projection_matrix);
 	}
 
 
@@ -429,7 +429,7 @@ struct RendererImpl : public Renderer
 		{
 			const Mesh& mesh = model.getMesh(i);
 			mesh.getMaterial()->apply(*this, pipeline);
-			pipeline.getRenderer().setFixedCachedUniform(*mesh.getMaterial()->getShader(), (int)Shader::FixedCachedUniforms::WORLD_MATRIX, transform);
+			RendererImpl::setFixedCachedUniform(*mesh.getMaterial()->getShader(), (int)Shader::FixedCachedUniforms::WORLD_MATRIX, transform);
 			renderGeometry(*model.getGeometry(), mesh.getStart(), mesh.getCount(), *mesh.getMaterial()->getShader());
 		}
 	}
@@ -523,6 +523,36 @@ void Renderer::getLookAtMatrix(const Vec3& pos, const Vec3& center, const Vec3& 
 	gluLookAt(pos.x, pos.y, pos.z, center.x, center.y, center.z, up.x, up.y, up.z);
 	glGetFloatv(GL_MODELVIEW_MATRIX, m);
 	glPopMatrix();*/
+}
+
+
+void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Vec3& value)
+{
+	static_cast<RendererImpl&>(renderer).RendererImpl::setFixedCachedUniform(shader, name, value);
+}
+
+
+void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Vec4& value)
+{
+	static_cast<RendererImpl&>(renderer).RendererImpl::setFixedCachedUniform(shader, name, value);
+}
+
+
+void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, float value)
+{
+	static_cast<RendererImpl&>(renderer).RendererImpl::setFixedCachedUniform(shader, name, value);
+}
+
+
+void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Matrix& mtx)
+{
+	static_cast<RendererImpl&>(renderer).RendererImpl::setFixedCachedUniform(shader, name, mtx);
+}
+
+
+void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Matrix* matrices, int count)
+{
+	static_cast<RendererImpl&>(renderer).RendererImpl::setFixedCachedUniform(shader, name, matrices, count);
 }
 
 
