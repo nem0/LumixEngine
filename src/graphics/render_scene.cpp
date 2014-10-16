@@ -839,7 +839,6 @@ namespace Lumix
 								info.m_mesh = &model->getMesh(j);
 								info.m_pose = &model_instance.getPose();
 								info.m_model = &model_instance;
-								info.m_matrix = &model_instance.getMatrix();
 							}
 						}
 					}
@@ -872,7 +871,6 @@ namespace Lumix
 								info.m_mesh = &model->getMesh(j);
 								info.m_pose = &model_instance.getPose();
 								info.m_model = &model_instance;
-								info.m_matrix = &model_instance.getMatrix();
 							}
 						}
 					}

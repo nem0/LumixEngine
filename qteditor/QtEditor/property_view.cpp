@@ -1357,7 +1357,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			scene->getRenderableInfos(infos, ~0);
 			for(int i = 0, c = infos.size(); i < c; ++i)
 			{
-				Lumix::Vec3 pos = infos[i].m_matrix->getTranslation();
+				Lumix::Vec3 pos = infos[i].m_model->getMatrix().getTranslation();
 				const Lumix::AABB& aabb = infos[i].m_model->getModel()->getAABB();
 				if (!(x + max_x < pos.x + aabb.getMin().x || z + max_z < pos.z + aabb.getMin().z 
 					|| x + min_x > pos.x + aabb.getMax().x || z + min_z > pos.z + aabb.getMax().z))
