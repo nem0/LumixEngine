@@ -515,7 +515,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 			material->apply(*m_renderer, *this);
 			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::WORLD_MATRIX, Matrix::IDENTITY);
 			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::PROJECTION_MATRIX, mtx);
-			m_renderer->renderGeometry(*geometry, 0, 6, *shader);
+			renderGeometry(*m_renderer, *geometry, 0, 6, *shader);
 		}
 	}
 
@@ -592,7 +592,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 					}
 					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::GRASS_MATRICES, info.m_matrices, info.m_matrix_count);
 
-					m_renderer->renderGeometry(*info.m_geometry, mesh.getStart(), mesh.getCount() / info.m_mesh_copy_count * info.m_matrix_count, *shader);
+					renderGeometry(*m_renderer, *info.m_geometry, mesh.getStart(), mesh.getCount() / info.m_mesh_copy_count * info.m_matrix_count, *shader);
 				}
 			}
 		}
@@ -721,7 +721,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 				m_renderer->setUniform(shader, "bone_matrices", BONE_MATRICES_HASH, bone_mtx, pose.getCount());
 			}
 
-			m_renderer->renderGeometry(*m_renderable_infos[i].m_geometry, mesh.getStart(), mesh.getCount(), *material.getShader());
+			renderGeometry(*m_renderer, *m_renderable_infos[i].m_geometry, mesh.getStart(), mesh.getCount(), *material.getShader());
 		}
 	}
 
