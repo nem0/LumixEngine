@@ -2,6 +2,7 @@
 #include "ui_property_view.h"
 #include "animation/animation_system.h"
 #include "assetbrowser.h"
+#include "core/aabb.h"
 #include "core/crc32.h"
 #include "core/FS/file_system.h"
 #include "core/json_serializer.h"
@@ -1356,11 +1357,10 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			scene->getRenderableInfos(infos, ~0);
 			for(int i = 0, c = infos.size(); i < c; ++i)
 			{
-				Lumix::Vec3 pos = infos[i].m_matrix->getTranslation();
-				Lumix::Vec3 min, max;
-				infos[i].m_model->getModel()->getAABB(&min, &max);
-				if (!(x + max_x < pos.x + min_x || z + max_z < pos.z + min.z 
-					|| x + min_x > pos.x + max_x || z + min_z > pos.z + max_z))
+				Lumix::Vec3 pos = infos[i].m_model->getMatrix().getTranslation();
+				const Lumix::AABB& aabb = infos[i].m_model->getModel()->getAABB();
+				if (!(x + max_x < pos.x + aabb.getMin().x || z + max_z < pos.z + aabb.getMin().z 
+					|| x + min_x > pos.x + aabb.getMax().x || z + min_z > pos.z + aabb.getMax().z))
 				{
 					return true;
 				}
@@ -1385,7 +1385,9 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			Lumix::Vec3 renderable_min, renderable_max;
 			if(renderable.isValid())
 			{
-				scene->getRenderableModel(renderable)->getAABB(&renderable_min, &renderable_max);
+				const Lumix::AABB& aabb = scene->getRenderableModel(renderable)->getAABB();
+				renderable_min = aabb.getMin();
+				renderable_max = aabb.getMax();
 			}
 			for (int i = 0; i <= m_terrain_brush_strength * 10; ++i)
 			{

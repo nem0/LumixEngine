@@ -9,7 +9,7 @@ namespace Lumix
 	{
 		class Manager;
 	}
-	struct Frustum;
+	class Frustum;
 
 	class LUMIX_ENGINE_API CullingSystem
 	{
