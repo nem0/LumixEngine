@@ -61,6 +61,18 @@ class Array<T, Allocator, false>
 			m_allocator.deallocate(m_data);
 		}
 
+		int indexOf(const T& item)
+		{
+			for (int i = 0; i < m_size; ++i)
+			{
+				if (m_data[i] == item)
+				{
+					return i;
+				}
+			}
+			return -1;
+		}
+
 		void eraseItemFast(const T& item)
 		{
 			for (int i = 0; i < m_size; ++i)
@@ -202,8 +214,6 @@ class Array<T, Allocator, false>
 		int capacity() const { return m_capacity; }
 
 	private:
-		void* operator &() { return 0; }
-
 		void grow()
 		{
 			int newCapacity = m_capacity == 0 ? 4 : m_capacity * 2;
@@ -290,6 +300,18 @@ public:
 		Allocator a = rhs.m_allocator;
 		rhs.m_allocator = m_allocator;
 		m_allocator = a;
+	}
+
+	int indexOf(const T& item)
+	{
+		for (int i = 0; i < m_size; ++i)
+		{
+			if (m_data[i] == item)
+			{
+				return i;
+			}
+		}
+		return -1;
 	}
 
 	void eraseFast(int index)
@@ -427,8 +449,6 @@ public:
 	int capacity() const { return m_capacity; }
 
 private:
-	void* operator &() { return 0; }
-
 	void grow()
 	{
 		int newCapacity = m_capacity == 0 ? 4 : m_capacity * 2;

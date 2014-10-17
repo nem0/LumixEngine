@@ -45,8 +45,8 @@ namespace Lumix
 
 	LogProxy::LogProxy(Log& log, const char* system)
 		: m_log(log)
+		, m_system(system)
 	{
-		m_system = system;
 	}
 
 	LogProxy::~LogProxy()

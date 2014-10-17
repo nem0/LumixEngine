@@ -3,12 +3,6 @@
 
 namespace Lumix
 {
-	struct AllocationHeader
-	{
-		uint8_t* m_next;
-		size_t m_size;
-	};
-
 	FIFOAllocator::FIFOAllocator(size_t buffer_size)
 		: m_mutex(false)
 	{

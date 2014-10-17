@@ -200,7 +200,7 @@ void VertexDef::end(Shader& shader) const
 }
 
 
-void Geometry::getAABB(Vec3* out_min, Vec3* out_max) const
+AABB Geometry::getAABB() const
 {
 	Vec3 min = m_vertices[0];
 	Vec3 max = m_vertices[0];
@@ -214,8 +214,7 @@ void Geometry::getAABB(Vec3* out_min, Vec3* out_max) const
 		max.y = Math::maxValue(max.y, m_vertices[i].y);
 		max.z = Math::maxValue(max.z, m_vertices[i].z);
 	}
-	*out_min = min;
-	*out_max = max;
+	return AABB(min, max);
 }
 
 

@@ -482,7 +482,6 @@ static bool isToken(char c)
 
 void JsonSerializer::deserializeToken()
 {
-	int i = 0;
 	if (m_buffer == '"')
 	{
 		m_is_string_token = true;
@@ -497,6 +496,7 @@ void JsonSerializer::deserializeToken()
 	}
 	else 
 	{
+		int i = 0;
 		while (!isDelimiter(m_buffer) && !isToken(m_buffer))
 		{
 			m_token[i] = m_buffer;

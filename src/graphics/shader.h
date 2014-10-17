@@ -19,7 +19,6 @@ class LUMIX_ENGINE_API Shader : public Resource
 	public:
 		enum class FixedCachedUniforms : int
 		{
-			WORLD_MATRIX,
 			GRASS_MATRICES,
 			MORPH_CONST,
 			QUAD_SIZE,
@@ -33,6 +32,12 @@ class LUMIX_ENGINE_API Shader : public Resource
 			VIEW_MATRIX,
 			PROJECTION_MATRIX,
 			SHADOWMAP_SPLITS,
+			SHADOW_MATRIX0,
+			SHADOW_MATRIX1,
+			SHADOW_MATRIX2,
+			SHADOW_MATRIX3,
+
+			WORLD_MATRIX, // keep this before count
 			COUNT
 		};
 	

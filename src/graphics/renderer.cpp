@@ -205,86 +205,6 @@ struct RendererImpl : public Renderer
 	}
 
 
-	virtual void setFixedCachedUniform(const Shader& shader, int name, const Vec3& value) override
-	{
-		PROFILE_FUNCTION();
-		GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
-		if (loc >= 0)
-		{
-			if (m_last_program_id != shader.getProgramId())
-			{
-				glUseProgram(shader.getProgramId());
-				m_last_program_id = shader.getProgramId();
-			}
-			glUniform3f(loc, value.x, value.y, value.z);
-		}
-	}
-
-	virtual void setFixedCachedUniform(const Shader& shader, int name, const Vec4& value) override
-	{
-		PROFILE_FUNCTION();
-		GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
-		if (loc >= 0)
-		{
-			if (m_last_program_id != shader.getProgramId())
-			{
-				glUseProgram(shader.getProgramId());
-				m_last_program_id = shader.getProgramId();
-			}
-			glUniform4f(loc, value.x, value.y, value.z, value.w);
-		}
-	}
-
-	virtual void setFixedCachedUniform(const Shader& shader, int name, float value) override
-	{
-		PROFILE_FUNCTION();
-		GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
-		if (loc >= 0)
-		{
-			if (m_last_program_id != shader.getProgramId())
-			{
-				glUseProgram(shader.getProgramId());
-				m_last_program_id = shader.getProgramId();
-			}
-			glUniform1f(loc, value);
-		}
-	}
-
-
-
-	virtual void setFixedCachedUniform(const Shader& shader, int name, const Matrix& mtx) override
-	{
-		PROFILE_FUNCTION();
-		GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
-		if (loc >= 0)
-		{
-			//glProgramUniformMatrix4fv(shader.getProgramId(), loc, 1, false, &mtx.m11);
-			if (m_last_program_id != shader.getProgramId())
-			{
-				glUseProgram(shader.getProgramId());
-				m_last_program_id = shader.getProgramId();
-			}
-			glUniformMatrix4fv(loc, 1, false, &mtx.m11);
-		}
-	}
-
-
-	virtual void setFixedCachedUniform(const Shader& shader, int name, const Matrix* matrices, int count) override
-	{
-		PROFILE_FUNCTION();
-		GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
-		if (loc >= 0)
-		{
-			if (m_last_program_id != shader.getProgramId())
-			{
-				glUseProgram(shader.getProgramId());
-				m_last_program_id = shader.getProgramId();
-			}
-			glUniformMatrix4fv(loc, count, false, (float*)matrices);
-		}
-	}
-
-
 	virtual uint32_t getPass() override
 	{
 		return m_current_pass_hash;
@@ -310,27 +230,8 @@ struct RendererImpl : public Renderer
 		GLuint id = shader.getProgramId();
 		m_last_program_id = id;
 		glUseProgram(id);
-		setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::VIEW_MATRIX, m_view_matrix);
-		setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::PROJECTION_MATRIX, m_projection_matrix);
-	}
-
-
-	virtual void renderGeometry(Geometry& geometry, int start, int count, Shader& shader) override
-	{
-		PROFILE_FUNCTION();
-		if (m_last_bind_geometry != &geometry)
-		{
-			if (m_last_bind_geometry)
-			{
-				m_last_bind_geometry->getVertexDefinition().end(shader);
-			}
-			glBindBuffer(GL_ARRAY_BUFFER, geometry.getID());
-			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, geometry.getIndicesID());
-			m_last_bind_geometry = &geometry;
-			m_last_bind_geometry_shader = &shader;
-			geometry.getVertexDefinition().begin(shader);
-		}
-		glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, (void*)(start * sizeof(GLint)));
+		setFixedCachedUniform(*this, shader, (int)Shader::FixedCachedUniforms::VIEW_MATRIX, m_view_matrix);
+		setFixedCachedUniform(*this, shader, (int)Shader::FixedCachedUniforms::PROJECTION_MATRIX, m_projection_matrix);
 	}
 
 
@@ -429,8 +330,8 @@ struct RendererImpl : public Renderer
 		{
 			const Mesh& mesh = model.getMesh(i);
 			mesh.getMaterial()->apply(*this, pipeline);
-			pipeline.getRenderer().setFixedCachedUniform(*mesh.getMaterial()->getShader(), (int)Shader::FixedCachedUniforms::WORLD_MATRIX, transform);
-			renderGeometry(*model.getGeometry(), mesh.getStart(), mesh.getCount(), *mesh.getMaterial()->getShader());
+			setFixedCachedUniform(*this, *mesh.getMaterial()->getShader(), (int)Shader::FixedCachedUniforms::WORLD_MATRIX, transform);
+			renderGeometry(*this, *model.getGeometry(), mesh.getStart(), mesh.getCount(), *mesh.getMaterial()->getShader());
 		}
 	}
 
@@ -523,6 +424,111 @@ void Renderer::getLookAtMatrix(const Vec3& pos, const Vec3& center, const Vec3& 
 	gluLookAt(pos.x, pos.y, pos.z, center.x, center.y, center.z, up.x, up.y, up.z);
 	glGetFloatv(GL_MODELVIEW_MATRIX, m);
 	glPopMatrix();*/
+}
+
+
+void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Vec3& value)
+{
+	PROFILE_FUNCTION();
+	RendererImpl& renderer_impl = static_cast<RendererImpl&>(renderer);
+	GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
+	if (loc >= 0)
+	{
+		if (renderer_impl.m_last_program_id != shader.getProgramId())
+		{
+			glUseProgram(shader.getProgramId());
+			renderer_impl.m_last_program_id = shader.getProgramId();
+		}
+		glUniform3f(loc, value.x, value.y, value.z);
+	}
+}
+
+
+void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Vec4& value)
+{
+	PROFILE_FUNCTION();
+	RendererImpl& renderer_impl = static_cast<RendererImpl&>(renderer);
+	GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
+	if (loc >= 0)
+	{
+		if (renderer_impl.m_last_program_id != shader.getProgramId())
+		{
+			glUseProgram(shader.getProgramId());
+			renderer_impl.m_last_program_id = shader.getProgramId();
+		}
+		glUniform4f(loc, value.x, value.y, value.z, value.w);
+	}
+}
+
+
+void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, float value)
+{
+	PROFILE_FUNCTION();
+	RendererImpl& renderer_impl = static_cast<RendererImpl&>(renderer);
+	GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
+	if (loc >= 0)
+	{
+		if (renderer_impl.m_last_program_id != shader.getProgramId())
+		{
+			glUseProgram(shader.getProgramId());
+			renderer_impl.m_last_program_id = shader.getProgramId();
+		}
+		glUniform1f(loc, value);
+	}
+}
+
+
+void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Matrix& mtx)
+{
+	PROFILE_FUNCTION();
+	RendererImpl& renderer_impl = static_cast<RendererImpl&>(renderer);
+	GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
+	if (loc >= 0)
+	{
+		if (renderer_impl.m_last_program_id != shader.getProgramId())
+		{
+			glUseProgram(shader.getProgramId());
+			renderer_impl.m_last_program_id = shader.getProgramId();
+		}
+		glUniformMatrix4fv(loc, 1, false, &mtx.m11);
+	}
+}
+
+
+void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Matrix* matrices, int count)
+{
+	PROFILE_FUNCTION();
+	RendererImpl& renderer_impl = static_cast<RendererImpl&>(renderer);
+	GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
+	if (loc >= 0)
+	{
+		if (renderer_impl.m_last_program_id != shader.getProgramId())
+		{
+			glUseProgram(shader.getProgramId());
+			renderer_impl.m_last_program_id = shader.getProgramId();
+		}
+		glUniformMatrix4fv(loc, count, false, (float*)matrices);
+	}
+}
+
+
+LUMIX_FORCE_INLINE void renderGeometry(Renderer& renderer, Geometry& geometry, int start, int count, Shader& shader)
+{
+	PROFILE_FUNCTION();
+	RendererImpl& renderer_impl = static_cast<RendererImpl&>(renderer);
+	if (renderer_impl.m_last_bind_geometry != &geometry)
+	{
+		if (renderer_impl.m_last_bind_geometry)
+		{
+			renderer_impl.m_last_bind_geometry->getVertexDefinition().end(shader);
+		}
+		glBindBuffer(GL_ARRAY_BUFFER, geometry.getID());
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, geometry.getIndicesID());
+		renderer_impl.m_last_bind_geometry = &geometry;
+		renderer_impl.m_last_bind_geometry_shader = &shader;
+		geometry.getVertexDefinition().begin(shader);
+	}
+	glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, (void*)(start * sizeof(GLint)));
 }
 
 

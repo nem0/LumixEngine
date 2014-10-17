@@ -105,13 +105,6 @@ namespace Lumix
 			}
 
 		private:
-			enum DeserializePosition
-			{
-				IN_OBJECT,
-				IN_ARRAY
-			};
-
-		private:
 			void operator=(const JsonSerializer&);
 			AccessMode m_access_mode;
 			unsigned char m_buffer;

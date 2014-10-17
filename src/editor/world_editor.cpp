@@ -1,6 +1,7 @@
 #include "world_editor.h"
 
 #include "animation/animation_system.h"
+#include "core/aabb.h"
 #include "core/array.h"
 #include "core/blob.h"
 #include "core/crc32.h"
@@ -807,29 +808,31 @@ struct WorldEditorImpl : public WorldEditor
 				if(renderable.isValid())
 				{
 					Model* model = scene->getRenderableModel(renderable);
-					Vec3 aabb[8];
-					model->getAABB(&aabb[0], &aabb[7]);
-					aabb[1].set(aabb[0].x, aabb[0].y, aabb[7].z);
-					aabb[2].set(aabb[0].x, aabb[7].y, aabb[0].z);
-					aabb[3].set(aabb[0].x, aabb[7].y, aabb[7].z);
-					aabb[4].set(aabb[7].x, aabb[0].y, aabb[0].z);
-					aabb[5].set(aabb[7].x, aabb[0].y, aabb[7].z);
-					aabb[6].set(aabb[7].x, aabb[7].y, aabb[0].z);
+					Vec3 points[8];
+					const AABB& aabb = model->getAABB();
+					points[0] = aabb.getMin();
+					points[7] = aabb.getMax();
+					points[1].set(points[0].x, points[0].y, points[7].z);
+					points[2].set(points[0].x, points[7].y, points[0].z);
+					points[3].set(points[0].x, points[7].y, points[7].z);
+					points[4].set(points[7].x, points[0].y, points[0].z);
+					points[5].set(points[7].x, points[0].y, points[7].z);
+					points[6].set(points[7].x, points[7].y, points[0].z);
 					Matrix mtx = m_selected_entities[i].getMatrix();
 
 					Vec3 this_min, this_max;
 					for(int j = 0; j < 8; ++j)
 					{
-						aabb[j] = mtx.multiplyPosition(aabb[j]); 
+						points[j] = mtx.multiplyPosition(points[j]); 
 					}
 
-					this_min = aabb[0];
-					this_max = aabb[0];
+					this_min = points[0];
+					this_max = points[0];
 
 					for(int j = 0; j < 8; ++j)
 					{
-						this_min = minCoords(aabb[j], this_min);
-						this_max = maxCoords(aabb[j], this_max);
+						this_min = minCoords(points[j], this_min);
+						this_max = maxCoords(points[j], this_max);
 					}
 
 					if(i > 0)
@@ -1119,7 +1122,7 @@ struct WorldEditorImpl : public WorldEditor
 				for(int i = 0; i < m_selected_entities.size(); ++i)
 				{
 					const Entity& entity = m_selected_entities[i];
-					Component renderable = entity.getComponent(RENDERABLE_HASH); TODO("what if the selected entity does not have a renderable component?");
+					Component renderable = entity.getComponent(RENDERABLE_HASH);
 					RenderScene* scene = static_cast<RenderScene*>(renderable.scene);
 					RayCastModelHit hit = scene->castRay(entity.getPosition(), Vec3(0, -1, 0), renderable);
 					if (hit.m_is_hit)

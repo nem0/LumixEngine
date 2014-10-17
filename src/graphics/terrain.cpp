@@ -1,4 +1,6 @@
 #include "terrain.h"
+#include "core/aabb.h"
+#include "core/frustum.h"
 #include "core/iserializer.h"
 #include "core/log.h"
 #include "core/math_utils.h"
@@ -19,6 +21,7 @@
 namespace Lumix
 {
 	
+	static const float GRASS_QUAD_RADIUS = Terrain::GRASS_QUAD_SIZE * 0.7072f;
 	static const int GRID_SIZE = 16;
 	static const int COPY_COUNT = 50;
 	static const uint32_t TERRAIN_HASH = crc32("terrain");
@@ -85,7 +88,7 @@ namespace Lumix
 			}
 		}
 
-		float getDistance(const Vec3& camera_pos)
+		float getSquaredDistance(const Vec3& camera_pos)
 		{
 			Vec3 _max(m_min.x + m_size, m_min.y, m_min.z + m_size);
 			float dist = 0;
@@ -109,7 +112,7 @@ namespace Lumix
 				float d = _max.z - camera_pos.z;
 				dist += d*d;
 			}
-			return sqrt(dist);
+			return dist;
 		}
 
 		static float getRadiusInner(float size)
@@ -128,9 +131,9 @@ namespace Lumix
 		bool render(Renderer* renderer, Mesh* mesh, Geometry& geometry, const Vec3& camera_pos, RenderScene& scene)
 		{
 			PROFILE_FUNCTION();
-			float dist = getDistance(camera_pos);
+			float squared_dist = getSquaredDistance(camera_pos);
 			float r = getRadiusOuter(m_size);
-			if (dist > r && m_lod > 1)
+			if (squared_dist > r*r && m_lod > 1)
 			{
 				return false;
 			}
@@ -140,10 +143,10 @@ namespace Lumix
 			{
 				if (!m_children[i] || !m_children[i]->render(renderer, mesh, geometry, camera_pos, scene))
 				{
-					renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::MORPH_CONST, morph_const);
-					renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::QUAD_SIZE, m_size);
-					renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::QUAD_MIN, m_min);
-					renderer->renderGeometry(geometry, mesh->getCount() / 4 * i, mesh->getCount() / 4, shader);
+					setFixedCachedUniform(*renderer, shader, (int)Shader::FixedCachedUniforms::MORPH_CONST, morph_const);
+					setFixedCachedUniform(*renderer, shader, (int)Shader::FixedCachedUniforms::QUAD_SIZE, m_size);
+					setFixedCachedUniform(*renderer, shader, (int)Shader::FixedCachedUniforms::QUAD_MIN, m_min);
+					renderGeometry(*renderer, geometry, mesh->getCount() / 4 * i, mesh->getCount() / 4, shader);
 				}
 			}
 			return true;
@@ -153,7 +156,6 @@ namespace Lumix
 		Vec3 m_min;
 		float m_size;
 		int m_lod;
-		float m_xz_scale;
 	};
 
 
@@ -331,9 +333,9 @@ namespace Lumix
 		{
 			return;
 		}
-		if (m_free_grass_quads.size() + m_grass_quads.size() < GRASS_QUADS_HEIGHT * GRASS_QUADS_WIDTH)
+		if (m_free_grass_quads.size() + m_grass_quads.size() < GRASS_QUADS_ROWS * GRASS_QUADS_COLUMNS)
 		{
-			int new_count = GRASS_QUADS_HEIGHT * GRASS_QUADS_WIDTH - m_grass_quads.size();
+			int new_count = GRASS_QUADS_ROWS * GRASS_QUADS_COLUMNS - m_grass_quads.size();
 			for (int i = 0; i < new_count; ++i)
 			{
 				m_free_grass_quads.push(LUMIX_NEW(GrassQuad));
@@ -350,10 +352,10 @@ namespace Lumix
 			Vec3 local_camera_position = inv_mtx.multiplyPosition(camera_position);
 			float cx = (int)(local_camera_position.x / (GRASS_QUAD_SIZE)) * (float)GRASS_QUAD_SIZE;
 			float cz = (int)(local_camera_position.z / (GRASS_QUAD_SIZE)) * (float)GRASS_QUAD_SIZE;
-			float from_quad_x = cx - (GRASS_QUADS_WIDTH >> 1) * GRASS_QUAD_SIZE;
-			float from_quad_z = cz - (GRASS_QUADS_HEIGHT >> 1) * GRASS_QUAD_SIZE;
-			float to_quad_x = cx + (GRASS_QUADS_WIDTH >> 1) * GRASS_QUAD_SIZE;
-			float to_quad_z = cz + (GRASS_QUADS_WIDTH >> 1) * GRASS_QUAD_SIZE;
+			float from_quad_x = cx - (GRASS_QUADS_COLUMNS >> 1) * GRASS_QUAD_SIZE;
+			float from_quad_z = cz - (GRASS_QUADS_ROWS >> 1) * GRASS_QUAD_SIZE;
+			float to_quad_x = cx + (GRASS_QUADS_COLUMNS >> 1) * GRASS_QUAD_SIZE;
+			float to_quad_z = cz + (GRASS_QUADS_COLUMNS >> 1) * GRASS_QUAD_SIZE;
 
 			float old_bounds[4] = { FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX };
 			Array<GrassQuad*>& quads = m_grass_quads[camera];
@@ -394,7 +396,7 @@ namespace Lumix
 						quad->m_x = quad_x;
 						quad->m_z = quad_z;
 						quad->m_patches.clear();
-						srand((int)quad_x + (int)quad_z * GRASS_QUADS_WIDTH);
+						srand((int)quad_x + (int)quad_z * GRASS_QUADS_COLUMNS);
 						for(int grass_type_idx = 0; grass_type_idx < m_grass_types.size(); ++grass_type_idx)
 						{
 							GrassPatch& patch = quad->m_patches.pushEmpty();
@@ -492,32 +494,36 @@ namespace Lumix
 	}
 
 
-	void Terrain::getGrassInfos(Array<GrassInfo>& infos, const Component& camera)
+	void Terrain::getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, const Component& camera)
 	{
 		updateGrass(camera);
 		Array<GrassQuad*>& quads = m_grass_quads[camera];
 		for (int i = 0; i < quads.size(); ++i)
 		{
-			for(int patch_idx = 0; patch_idx < quads[i]->m_patches.size(); ++patch_idx)
+			Vec3 quad_center(quads[i]->m_x + GRASS_QUAD_SIZE * 0.5f, 0, quads[i]->m_z + GRASS_QUAD_SIZE * 0.5f);
+			if(frustum.isSphereInside(quad_center, GRASS_QUAD_RADIUS))
 			{
-				GrassPatch& patch = quads[i]->m_patches[patch_idx];
-				for (int k = 0, kc = patch.m_matrices.size() / COPY_COUNT; k < kc; ++k)
+				for(int patch_idx = 0; patch_idx < quads[i]->m_patches.size(); ++patch_idx)
 				{
-					GrassInfo& info = infos.pushEmpty();
-					info.m_geometry = patch.m_type->m_grass_geometry;
-					info.m_matrices = &patch.m_matrices[COPY_COUNT * k];
-					info.m_mesh = patch.m_type->m_grass_mesh;
-					info.m_matrix_count = COPY_COUNT;
-					info.m_mesh_copy_count = COPY_COUNT;
-				}
-				if (patch.m_matrices.size() % COPY_COUNT != 0)
-				{
-					GrassInfo& info = infos.pushEmpty();
-					info.m_geometry = patch.m_type->m_grass_geometry;
-					info.m_matrices = &patch.m_matrices[COPY_COUNT * (patch.m_matrices.size() / COPY_COUNT)];
-					info.m_mesh = patch.m_type->m_grass_mesh;
-					info.m_matrix_count = patch.m_matrices.size() % COPY_COUNT;
-					info.m_mesh_copy_count = COPY_COUNT;
+					GrassPatch& patch = quads[i]->m_patches[patch_idx];
+					for (int k = 0, kc = patch.m_matrices.size() / COPY_COUNT; k < kc; ++k)
+					{
+						GrassInfo& info = infos.pushEmpty();
+						info.m_geometry = patch.m_type->m_grass_geometry;
+						info.m_matrices = &patch.m_matrices[COPY_COUNT * k];
+						info.m_mesh = patch.m_type->m_grass_mesh;
+						info.m_matrix_count = COPY_COUNT;
+						info.m_mesh_copy_count = COPY_COUNT;
+					}
+					if (patch.m_matrices.size() % COPY_COUNT != 0)
+					{
+						GrassInfo& info = infos.pushEmpty();
+						info.m_geometry = patch.m_type->m_grass_geometry;
+						info.m_matrices = &patch.m_matrices[COPY_COUNT * (patch.m_matrices.size() / COPY_COUNT)];
+						info.m_mesh = patch.m_type->m_grass_mesh;
+						info.m_matrix_count = patch.m_matrices.size() % COPY_COUNT;
+						info.m_mesh_copy_count = COPY_COUNT;
+					}
 				}
 			}
 		}
@@ -608,10 +614,12 @@ namespace Lumix
 		if (m_root)
 		{
 			m_material->apply(renderer, pipeline);
+			Matrix inv_world_matrix;
 			Matrix world_matrix;
 			m_entity.getMatrix(world_matrix);
-			world_matrix.fastInverse();
-			Vec3 rel_cam_pos = world_matrix.multiplyPosition(camera_pos) / m_xz_scale;
+			inv_world_matrix = world_matrix;
+			inv_world_matrix.fastInverse();
+			Vec3 rel_cam_pos = inv_world_matrix.multiplyPosition(camera_pos) / m_xz_scale;
 			Shader& shader = *m_mesh->getMaterial()->getShader();
 			renderer.setUniform(shader, "brush_position", BRUSH_POSITION_HASH, m_brush_position);
 			renderer.setUniform(shader, "brush_size", BRUSH_SIZE_HASH, m_brush_size);

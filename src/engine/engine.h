@@ -12,7 +12,7 @@ namespace Lumix
 			class FileSystem;
 	}
 
-	class WorldEditor;
+	class Hierarchy;
 	namespace MTJD
 	{
 		class Manager;
@@ -28,6 +28,7 @@ namespace Lumix
 	class Renderer;
 	class ResourceManager;
 	class Universe;
+	class WorldEditor;
 
 
 	class LUMIX_ENGINE_API Engine
@@ -48,6 +49,7 @@ namespace Lumix
 			virtual PluginManager& getPluginManager() = 0;
 			virtual IPlugin* loadPlugin(const char* name) = 0;
 			virtual Universe* getUniverse() const = 0;
+			virtual Hierarchy* getHierarchy() const = 0;
 			virtual const Array<IScene*>& getScenes() const = 0;
 			virtual IScene* getScene(uint32_t type) const = 0;
 			virtual MTJD::Manager& getMTJDManager() = 0;

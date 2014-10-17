@@ -75,10 +75,22 @@
      <widget class="QLineEdit" name="nameFilterEdit"/>
     </item>
     <item>
-     <widget class="QListView" name="entityList">
-      <property name="modelColumn">
-       <number>0</number>
+     <widget class="QTreeView" name="entityList">
+      <property name="dragEnabled">
+       <bool>true</bool>
       </property>
+      <property name="dragDropMode">
+       <enum>QAbstractItemView::DragDrop</enum>
+      </property>
+      <property name="defaultDropAction">
+       <enum>Qt::MoveAction</enum>
+      </property>
+      <property name="alternatingRowColors">
+       <bool>true</bool>
+      </property>
+      <attribute name="headerVisible">
+       <bool>false</bool>
+      </attribute>
      </widget>
     </item>
    </layout>

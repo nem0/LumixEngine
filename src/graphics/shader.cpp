@@ -156,6 +156,10 @@ void Shader::createCombination(const char* defines)
 			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::SHADOWMAP_SPLITS] = glGetUniformLocation(combination->m_program_id, "shadowmap_splits");
 			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::VIEW_MATRIX] = glGetUniformLocation(combination->m_program_id, "view_matrix");
 			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::PROJECTION_MATRIX] = glGetUniformLocation(combination->m_program_id, "projection_matrix");
+			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::SHADOW_MATRIX0] = glGetUniformLocation(combination->m_program_id, "shadowmap_matrix0");
+			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::SHADOW_MATRIX1] = glGetUniformLocation(combination->m_program_id, "shadowmap_matrix1");
+			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::SHADOW_MATRIX2] = glGetUniformLocation(combination->m_program_id, "shadowmap_matrix2");
+			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::SHADOW_MATRIX3] = glGetUniformLocation(combination->m_program_id, "shadowmap_matrix3");
 		}
 	}
 }

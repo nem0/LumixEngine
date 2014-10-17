@@ -1,4 +1,5 @@
 #pragma once
+#include "core/aabb.h"
 #include "core/array.h"
 #include "core/delegate.h"
 #include "core/vec3.h"
@@ -61,7 +62,7 @@ class Geometry
 		const Array<Vec3>& getVertices() const { return m_vertices; }
 		const Array<int32_t>& getIndices() const { return m_indices; }
 		float getBoundingRadius() const; 
-		void getAABB(Vec3* min, Vec3* max) const; 
+		AABB getAABB() const; 
 		const VertexDef& getVertexDefinition() const { return m_vertex_definition; }
 		GLuint getID() const { return m_id; }
 		GLuint getIndicesID() const { return m_indices_id; }

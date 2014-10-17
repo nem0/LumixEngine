@@ -174,7 +174,7 @@ namespace Lumix
 				float far_plane = m_cameras[cmp.index].m_far;
 				m_renderer.setProjection(width, height, fov, near_plane, far_plane, mtx);
 
-				m_camera_frustum.compute(
+				m_camera_frustum.computePerspective(
 					mtx.getTranslation(),
 					mtx.getZVector(),
 					mtx.getYVector(),
@@ -735,14 +735,14 @@ namespace Lumix
 			}
 
 
-			virtual void getGrassInfos(Array<GrassInfo>& infos, int64_t layer_mask)
+			virtual void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, int64_t layer_mask)
 			{
 				PROFILE_FUNCTION();
 				for (int i = 0; i < m_terrains.size(); ++i)
 				{
 					if (m_terrains[i] && (m_terrains[i]->getLayerMask() & layer_mask) != 0)
 					{
-						m_terrains[i]->getGrassInfos(infos, m_applied_camera);
+						m_terrains[i]->getGrassInfos(frustum, infos, m_applied_camera);
 					}
 				}
 			}
@@ -802,14 +802,20 @@ namespace Lumix
 			}
 
 
-			virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) override
+			virtual Frustum& getFrustum() override
+			{
+				return m_camera_frustum;
+			}
+
+
+			virtual void getRenderableInfos(const Frustum& frustum, Array<RenderableInfo>& infos, int64_t layer_mask) override
 			{
 				PROFILE_FUNCTION();
 
 				if (m_renderables.empty())
 					return;
 
-				m_culling_system->cullToFrustumAsync(m_camera_frustum);
+				m_culling_system->cullToFrustumAsync(frustum);
 
 				const CullingSystem::Results& results = m_culling_system->getResultAsync();
 
@@ -833,7 +839,38 @@ namespace Lumix
 								info.m_mesh = &model->getMesh(j);
 								info.m_pose = &model_instance.getPose();
 								info.m_model = &model_instance;
-								info.m_matrix = &model_instance.getMatrix();
+							}
+						}
+					}
+				}
+			}
+
+			virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) override
+			{
+				PROFILE_FUNCTION();
+
+				if (m_renderables.empty())
+					return;
+
+				infos.reserve(m_renderables.size() * 2);
+				for (int i = 0, c = m_renderables.size(); i < c; ++i)
+				{
+					const Renderable* LUMIX_RESTRICT renderable = m_renderables[i];
+					if (!renderable->m_is_free)
+					{
+						const ModelInstance& model_instance = renderable->m_model;
+						const Model* model = model_instance.getModel();
+						bool is_model_ready = model && model->isReady();
+						if (is_model_ready && (renderable->m_layer_mask & layer_mask) != 0)
+						{
+							for (int j = 0, c = renderable->m_model.getModel()->getMeshCount(); j < c; ++j)
+							{
+								RenderableInfo& info = infos.pushEmpty();
+								info.m_scale = renderable->m_scale;
+								info.m_geometry = model->getGeometry();
+								info.m_mesh = &model->getMesh(j);
+								info.m_pose = &model_instance.getPose();
+								info.m_model = &model_instance;
 							}
 						}
 					}

@@ -11,6 +11,7 @@ namespace Lumix
 {
 
 	class Engine;
+	class Frustum;
 	class Geometry;
 	class IRenderDevice;
 	class ISerializer;
@@ -35,11 +36,10 @@ namespace Lumix
 
 	struct RenderableInfo
 	{
-		Geometry* m_geometry;
-		const Mesh* m_mesh;
-		const Pose* m_pose;
 		const ModelInstance* m_model;
-		const Matrix* m_matrix;
+		const Mesh* m_mesh;
+		Geometry* m_geometry;
+		const Pose* m_pose;
 		float m_scale;
 	};
 
@@ -100,10 +100,11 @@ namespace Lumix
 			virtual void setRenderableLayer(Component cmp, const int32_t& layer) = 0;
 			virtual void setRenderablePath(Component cmp, const string& path) = 0;
 			virtual void setRenderableScale(Component cmp, float scale) = 0;
+			virtual void getRenderableInfos(const Frustum& frustum, Array<RenderableInfo>& infos, int64_t layer_mask) = 0;
 			virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) = 0;
 			virtual Model* getRenderableModel(Component cmp) = 0;
 			
-			virtual void getGrassInfos(Array<GrassInfo>& infos, int64_t layer_mask) = 0;
+			virtual void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, int64_t layer_mask) = 0;
 			virtual void getTerrainInfos(Array<TerrainInfo>& infos, int64_t layer_mask) = 0;
 			virtual float getTerrainHeightAt(Component cmp, float x, float z) = 0;
 			virtual void setTerrainMaterial(Component cmp, const string& path) = 0;
@@ -138,6 +139,7 @@ namespace Lumix
 			virtual Vec4 getLightAmbientColor(Component cmp) = 0;
 			virtual float getFogDensity(Component cmp) = 0;
 			virtual Vec4 getFogColor(Component cmp) = 0;
+			virtual Frustum& getFrustum() = 0;
 
 		protected:
 			virtual ~RenderScene() {}

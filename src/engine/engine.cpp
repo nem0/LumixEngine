@@ -25,6 +25,7 @@
 #include "graphics/texture_manager.h"
 
 #include "script/script_system.h"
+#include "universe/hierarchy.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -68,8 +69,9 @@ namespace Lumix
 
 				m_timer = Timer::create();
 				m_fps_timer = Timer::create();
-				m_fps_frame = 0;
-				m_universe = 0;
+				m_fps_frame = NULL;
+				m_universe = NULL;
+				m_hierarchy = NULL;
 				m_base_path = base_path;
 			}
 
@@ -125,6 +127,7 @@ namespace Lumix
 			virtual Universe* createUniverse() override
 			{
 				m_universe = LUMIX_NEW(Universe)();
+				m_hierarchy = Hierarchy::create(*m_universe);
 				const Array<IPlugin*>& plugins = m_plugin_manager.getPlugins();
 				for (int i = 0; i < plugins.size(); ++i)
 				{
@@ -174,6 +177,8 @@ namespace Lumix
 						LUMIX_DELETE(m_scenes[i]);
 					}
 					m_scenes.clear();
+					Hierarchy::destroy(m_hierarchy);
+					m_hierarchy = NULL;
 					LUMIX_DELETE(m_universe);
 					m_universe = NULL;
 				}
@@ -261,6 +266,11 @@ namespace Lumix
 				return m_universe;
 			}
 
+			virtual Hierarchy* getHierarchy() const override
+			{
+				return m_hierarchy;
+			}
+
 			virtual ResourceManager& getResourceManager() override
 			{
 				return m_resource_manager;
@@ -275,6 +285,7 @@ namespace Lumix
 			virtual void serialize(ISerializer& serializer) override
 			{
 				m_universe->serialize(serializer);
+				m_hierarchy->serialize(serializer);
 				m_renderer->serialize(serializer);
 				m_plugin_manager.serialize(serializer);
 				for (int i = 0; i < m_scenes.size(); ++i)
@@ -287,6 +298,7 @@ namespace Lumix
 			virtual void deserialize(ISerializer& serializer) override
 			{
 				m_universe->deserialize(serializer);
+				m_hierarchy->deserialize(serializer);
 				m_renderer->deserialize(serializer);
 				m_plugin_manager.deserialize(serializer);
 				for (int i = 0; i < m_scenes.size(); ++i)
@@ -322,6 +334,7 @@ namespace Lumix
 			WorldEditor* m_editor;
 			PluginManager m_plugin_manager;
 			Universe* m_universe;
+			Hierarchy* m_hierarchy;
 			Array<IScene*> m_scenes;
 			InputSystem m_input_system;
 			Timer* m_timer;

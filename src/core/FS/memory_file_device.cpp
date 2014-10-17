@@ -120,7 +120,7 @@ namespace Lumix
 				switch(base)
 				{
 				case SeekMode::BEGIN:
-					ASSERT(pos >= 0 && pos <= (int32_t)m_size);
+					ASSERT(pos <= (int32_t)m_size);
 					m_pos = pos;
 					break;
 				case SeekMode::CURRENT:
@@ -128,7 +128,7 @@ namespace Lumix
 					m_pos += pos;
 					break;
 				case SeekMode::END:
-					ASSERT(0 <= pos && pos <= (int32_t)m_size);
+					ASSERT(pos <= (int32_t)m_size);
 					m_pos = m_size - pos;
 					break;
 				default:

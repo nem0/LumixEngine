@@ -189,6 +189,7 @@
     <ClCompile Include="..\..\..\src\graphics\texture_manager.cpp" />
     <ClCompile Include="..\..\..\src\universe\component.cpp" />
     <ClCompile Include="..\..\..\src\universe\entity.cpp" />
+    <ClCompile Include="..\..\..\src\universe\hierarchy.cpp" />
     <ClCompile Include="..\..\..\src\universe\universe.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -224,6 +225,7 @@
     <ClInclude Include="..\..\..\src\graphics\texture_manager.h" />
     <ClInclude Include="..\..\..\src\universe\component.h" />
     <ClInclude Include="..\..\..\src\universe\entity.h" />
+    <ClInclude Include="..\..\..\src\universe\hierarchy.h" />
     <ClInclude Include="..\..\..\src\universe\universe.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
