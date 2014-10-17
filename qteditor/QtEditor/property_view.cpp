@@ -13,6 +13,7 @@
 #include "editor/ieditor_command.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
+#include "entity_list.h"
 #include "entity_template_list.h"
 #include "graphics/geometry.h"
 #include "graphics/material.h"
@@ -1239,9 +1240,10 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			ENTITY
 		};
 
-		TerrainEditor(Lumix::WorldEditor& editor, EntityTemplateList* list) 
+		TerrainEditor(Lumix::WorldEditor& editor, EntityTemplateList* template_list, EntityList* entity_list)
 			: m_world_editor(editor)
-			, m_entity_template_list(list)
+			, m_entity_template_list(template_list)
+			, m_entity_list(entity_list)
 		{
 			m_texture_tree_item = NULL;
 			m_tree_top_level = NULL;
@@ -1294,6 +1296,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 								addSplatWeight(terrain, hit);
 								break;
 							case ENTITY:
+								m_entity_list->enableUpdate(false);
 								paintEntities(terrain, hit);
 								break;
 							default:
@@ -1339,6 +1342,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 
 		virtual void onMouseUp(int, int, Lumix::MouseButton::Value) override
 		{
+			m_entity_list->enableUpdate(true);
 		}
 
 
@@ -1519,6 +1523,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 		int m_terrain_brush_size;
 		int m_texture_idx;
 		EntityTemplateList* m_entity_template_list;
+		EntityList* m_entity_list;
 };
 
 
@@ -1591,7 +1596,7 @@ Lumix::WorldEditor* PropertyView::getWorldEditor()
 void PropertyView::setWorldEditor(Lumix::WorldEditor& editor)
 {
 	m_world_editor = &editor;
-	m_terrain_editor = new TerrainEditor(editor, m_entity_template_list);
+	m_terrain_editor = new TerrainEditor(editor, m_entity_template_list, m_entity_list);
 	m_world_editor->addPlugin(m_terrain_editor);
 	m_world_editor->entitySelected().bind<PropertyView, &PropertyView::onEntitySelected>(this);
 	m_world_editor->universeCreated().bind<PropertyView, &PropertyView::onUniverseCreated>(this);

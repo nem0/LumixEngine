@@ -71,6 +71,7 @@ MainWindow::MainWindow(QWidget* parent) :
 	m_property_view->setScriptCompiler(m_script_compiler_ui->getCompiler());
 	m_property_view->setAssetBrowser(*m_asset_browser);
 	m_property_view->setEntityTemplateList(m_entity_template_list_ui);
+	m_property_view->setEntityList(m_entity_list);
 
 	int size = settings.beginReadArray("recent_files");
 	for (int i = 0; i < size; ++i)

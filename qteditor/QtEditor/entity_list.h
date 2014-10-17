@@ -30,6 +30,7 @@ class EntityList : public QDockWidget
 		explicit EntityList(QWidget* parent);
 		~EntityList();
 		void setWorldEditor(Lumix::WorldEditor& editor);
+		void enableUpdate(bool enable);
 
 	private slots:
 		void on_entityList_clicked(const QModelIndex& index);
@@ -48,5 +49,6 @@ class EntityList : public QDockWidget
 		Lumix::Universe* m_universe;
 		EntityListModel* m_model;
 		EntityListFilter* m_filter;
+		bool m_is_update_enabled;
 };
 

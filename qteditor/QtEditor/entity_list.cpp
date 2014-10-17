@@ -77,12 +77,16 @@ class SetParentEditorCommand : public Lumix::IEditorCommand
 class EntityListFilter : public QSortFilterProxyModel
 {
 	public:
-		EntityListFilter(QWidget* parent) : QSortFilterProxyModel(parent), m_component(0) {}
+		EntityListFilter(QWidget* parent) : QSortFilterProxyModel(parent), m_component(0), m_is_update_enabled(true) {}
 		void filterComponent(uint32_t component) { m_component = component; }
 		void setUniverse(Lumix::Universe* universe) { m_universe = universe; invalidate(); }
 		void setWorldEditor(Lumix::WorldEditor& editor)
 		{
 			editor.entityNameSet().bind<EntityListFilter, &EntityListFilter::onEntityNameSet>(this);
+		}
+		void enableUpdate(bool enable)
+		{
+			m_is_update_enabled = enable;
 		}
 
 	protected:
@@ -99,12 +103,16 @@ class EntityListFilter : public QSortFilterProxyModel
 
 		void onEntityNameSet(const Lumix::Entity&, const char*)
 		{
-			invalidate();
+			if (m_is_update_enabled)
+			{
+				invalidate();
+			}
 		}
 
 	private:
 		uint32_t m_component;
 		Lumix::Universe* m_universe;
+		bool m_is_update_enabled;
 };
 
 
@@ -170,6 +178,13 @@ class EntityListModel : public QAbstractItemModel
 			m_root = NULL;
 			m_universe = NULL;
 			m_filter = filter;
+			m_is_update_enabled = true;
+		}
+
+
+		void enableUpdate(bool enable)
+		{
+			m_is_update_enabled = enable;
 		}
 
 
@@ -413,8 +428,10 @@ class EntityListModel : public QAbstractItemModel
 				parent_node->m_children.push(node);
 				node->m_parent = parent_node;
 
-				emit dataChanged(createIndex(0, 0, m_root->m_children[0]), createIndex(m_root->m_children.size() - 1, 0, m_root->m_children.back()));
-				m_filter->invalidate();
+				if (m_is_update_enabled)
+				{
+					m_filter->invalidate();
+				}
 			}
 		}
 
@@ -448,9 +465,9 @@ class EntityListModel : public QAbstractItemModel
 					e = m_universe->getNextEntity(e);
 				}
 			}
-			if(m_universe && !m_root->m_children.empty())
+			if (m_universe && !m_root->m_children.empty() && m_is_update_enabled)
 			{
-				emit dataChanged(createIndex(0, 0, m_root->m_children[0]), createIndex(m_root->m_children.size() - 1, 0, m_root->m_children.back()));
+				m_filter->invalidate();
 			}
 		}
 
@@ -460,15 +477,19 @@ class EntityListModel : public QAbstractItemModel
 		{
 			EntityNode* node = new EntityNode(m_root, entity);
 			m_root->m_children.push(node);
-			emit dataChanged(createIndex(0, 0, m_root->m_children[0]), createIndex(m_root->m_children.size() - 1, 0, m_root->m_children.back()));
-			m_filter->invalidate();
+			if (m_is_update_enabled)
+			{
+				m_filter->invalidate();
+			}
 		}
 
 		void onEntityDestroyed(const Lumix::Entity& entity)
 		{
 			m_root->removeEntity(entity);
-			emit dataChanged(createIndex(0, 0, m_root->m_children[0]), createIndex(m_root->m_children.size() - 1, 0, m_root->m_children.back()));
-			m_filter->invalidate();
+			if (m_is_update_enabled)
+			{
+				m_filter->invalidate();
+			}
 		}
 
 	private:
@@ -476,6 +497,7 @@ class EntityListModel : public QAbstractItemModel
 		Lumix::Engine* m_engine;
 		EntityNode* m_root;
 		EntityListFilter* m_filter;
+		bool m_is_update_enabled;
 };
 
 
@@ -483,6 +505,7 @@ EntityList::EntityList(QWidget *parent)
 	: QDockWidget(parent)
 	, m_ui(new Ui::EntityList)
 {
+	m_is_update_enabled = true;
 	m_universe = NULL;
 	m_ui->setupUi(this);
 	m_filter = new EntityListFilter(this);
@@ -504,6 +527,15 @@ EntityList::~EntityList()
 	m_editor->entitySelected().unbind<EntityList, &EntityList::onEntitySelected>(this);
 
 	delete m_ui;
+}
+
+
+void EntityList::enableUpdate(bool enable)
+{
+	m_is_update_enabled = enable;
+	m_filter->enableUpdate(enable);
+	m_model->enableUpdate(enable);
+	m_filter->invalidate();
 }
 
 
@@ -556,7 +588,10 @@ void EntityList::onUniverseLoaded()
 {
 	m_universe = m_editor->getEngine().getUniverse();
 	m_model->setUniverse(m_universe);
-	m_filter->invalidate();
+	if (m_is_update_enabled)
+	{
+		m_filter->invalidate();
+	}
 }
 
 
@@ -580,12 +615,18 @@ void EntityList::on_comboBox_activated(const QString &arg1)
 		if (arg1 == component_map[i])
 		{
 			m_filter->filterComponent(crc32(component_map[i + 1]));
-			m_filter->invalidate();
+			if (m_is_update_enabled)
+			{
+				m_filter->invalidate();
+			}
 			return;
 		}
 	}
 	m_filter->filterComponent(0);
-	m_filter->invalidate();
+	if (m_is_update_enabled)
+	{
+		m_filter->invalidate();
+	}
 }
 
 void EntityList::on_nameFilterEdit_textChanged(const QString &arg1)
