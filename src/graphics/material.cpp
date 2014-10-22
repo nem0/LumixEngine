@@ -107,12 +107,7 @@ void Material::updateShaderCombination()
 
 void Material::doUnload(void)
 {
-	if(m_shader)
-	{
-		removeDependency(*m_shader);
-		m_resource_manager.get(ResourceManager::SHADER)->unload(*m_shader);
-		setShader(NULL);
-	}
+	setShader(NULL);
 
 	ResourceManagerBase* texture_manager = m_resource_manager.get(ResourceManager::TEXTURE);
 	for(int i = 0; i < m_textures.size(); i++)
