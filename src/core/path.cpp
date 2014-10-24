@@ -42,4 +42,10 @@ namespace Lumix
 	Path::~Path()
 	{
 	}
+
+	void Path::operator =(const Path& rhs)
+	{
+		m_id = rhs.m_id;
+		copyString(m_path, sizeof(m_path), rhs.m_path);
+	}
 }

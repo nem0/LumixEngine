@@ -345,6 +345,7 @@ namespace Lumix
 
 		private:
 			void operator=(const EngineImpl&);
+			EngineImpl(const EngineImpl&);
 	};
 
 
