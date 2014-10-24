@@ -304,6 +304,7 @@ namespace Lumix
 	
 		private:
 			void operator=(const AnimationSystemImpl&);
+			AnimationSystemImpl(const AnimationSystemImpl&);
 	};
 
 

@@ -30,11 +30,6 @@ namespace Lumix
 				: m_file(NULL), m_line(0), m_alloc_id(0), m_size(0), m_mark(0)
 			{}
 
-			// copy constructor
-			Entry(const Entry& src)
-				: m_file(src.m_file), m_line(src.m_line), m_alloc_id(src.m_alloc_id), m_size(src.m_size), m_mark(src.m_mark)
-			{}
-
 			Entry(const char* file, int line, intptr_t size)
 				: m_file(file), m_line(line), m_alloc_id(MemoryTracker::getAllocID()), m_size(size), m_mark(0)
 			{}
