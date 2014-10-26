@@ -77,7 +77,7 @@ namespace Lumix
 				{
 					LUMIX_DELETE(plugin);
 					ASSERT(false);
-					return false;
+					return NULL;
 				}
 				m_impl->m_plugins.push(plugin);
 				g_log_info.log("plugins") << "plugin loaded";

@@ -130,6 +130,7 @@ namespace Lumix
 
 		private:
 			void operator=(const TCPFile&);
+			TCPFile(const TCPFile&);
 
 			Net::TCPStream* m_stream;
 			MT::SpinMutex& m_spin_mutex;

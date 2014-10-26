@@ -783,6 +783,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	private:
 		void operator=(const PipelineInstanceImpl&);
+		PipelineInstanceImpl(const PipelineInstanceImpl&);
 };
 
 
