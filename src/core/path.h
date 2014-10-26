@@ -18,6 +18,7 @@ namespace Lumix
 		Path(const char* path);
 		Path(const string& path);
 		Path(uint32_t id, const char* path);
+		void operator =(const Path& rhs);
 
 		~Path();
 

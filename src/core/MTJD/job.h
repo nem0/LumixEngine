@@ -36,6 +36,7 @@ namespace Lumix
 
 		private:
 			Job& operator= (const Job& rhs);
+			Job(const Job&);
 
 #ifndef __SOME_MASTER_VERSION
 
