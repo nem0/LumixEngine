@@ -272,6 +272,8 @@ namespace Lumix
 	struct AnimationSystemImpl : public AnimationSystem
 	{
 		public:
+			AnimationSystemImpl() {}
+
 			virtual IScene* createScene(Universe& universe) override
 			{
 				ASSERT(m_engine);
