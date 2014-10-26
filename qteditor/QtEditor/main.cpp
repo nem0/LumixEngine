@@ -268,7 +268,7 @@ class App
 
 		void renderEditView()
 		{
-			if (m_main_window->getSceneView()->getViewWidget()->isVisible())
+			if (m_main_window->getSceneView()->getViewWidget()->isVisible() && !m_main_window->getSceneView()->visibleRegion().isEmpty())
 			{
 				PROFILE_FUNCTION();
 				m_edit_render_device->beginFrame();
@@ -327,7 +327,11 @@ class App
 					PROFILE_BLOCK("tick");
 					m_main_window->update();
 					renderEditView();
-					m_world_editor->getEngine().getRenderer().renderGame();
+
+					if(!m_main_window->getGameView()->getContentWidget()->visibleRegion().isEmpty())
+					{
+						m_world_editor->getEngine().getRenderer().renderGame();
+					}
 					m_world_editor->tick();
 					handleEvents();
 				}

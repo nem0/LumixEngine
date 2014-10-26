@@ -148,7 +148,7 @@ void MainWindow::addEditorDock(Qt::DockWidgetArea area, QDockWidget* widget, voi
 {
 	DockInfo info;
 	info.m_widget = widget;
-	QAction* action = new QAction(widget->windowTitle(), m_window_menu);
+	QAction* action = widget->toggleViewAction();
 	action->setCheckable(true);
 	m_window_menu->addAction(action);
 	info.m_action = action;
