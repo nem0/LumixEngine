@@ -19,10 +19,15 @@ namespace Lumix
 {
 
 
+static const uint32_t RENDERABLE_HASH = crc32("renderable");
+
+
 Gizmo::Gizmo(WorldEditor& editor)
 	: m_editor(editor)
 {
 	m_model = NULL;
+	m_pivot_mode = PivotMode::OBJECT_PIVOT;
+	m_coord_system = CoordSystem::LOCAL;
 }
 
 
@@ -47,7 +52,42 @@ void Gizmo::create(Renderer& renderer)
 
 void Gizmo::getMatrix(Matrix& mtx)
 {
-	m_editor.getSelectedEntities()[0].getMatrix(mtx);
+	getEnityMatrix(mtx, 0);
+}
+
+
+void Gizmo::getEnityMatrix(Matrix& mtx, int selection_index)
+{
+	if(m_pivot_mode == PivotMode::OBJECT_PIVOT)
+	{
+		m_editor.getSelectedEntities()[selection_index].getMatrix(mtx);
+	}
+	else if(m_pivot_mode == PivotMode::CENTER)
+	{
+		m_editor.getSelectedEntities()[selection_index].getMatrix(mtx);
+		Component cmp = m_editor.getSelectedEntities()[selection_index].getComponent(RENDERABLE_HASH);
+		if(cmp.isValid())
+		{
+			Model* model = static_cast<RenderScene*>(cmp.scene)->getRenderableModel(cmp);
+			Vec3 center = (model->getAABB().getMin() + model->getAABB().getMax()) * 0.5f;
+			mtx.translate(mtx * center);
+		}
+		else
+		{
+			m_editor.getSelectedEntities()[selection_index].getMatrix(mtx);
+		}
+	}
+	else
+	{
+		ASSERT(false);
+	}
+
+	if(m_coord_system == CoordSystem::WORLD)
+	{
+		Vec3 pos = mtx.getTranslation();
+		mtx = Matrix::IDENTITY;
+		mtx.setTranslation(pos);
+	}
 }
 
 
@@ -71,6 +111,40 @@ void Gizmo::updateScale(Component camera)
 void Gizmo::setUniverse(Universe* universe)
 {
 	m_universe = universe;
+}
+
+
+void Gizmo::toggleCoordSystem()
+{
+	if(m_coord_system == CoordSystem::LOCAL)
+	{
+		m_coord_system = CoordSystem::WORLD;
+	}
+	else if(m_coord_system == CoordSystem::WORLD)
+	{
+		m_coord_system = CoordSystem::LOCAL;
+	}
+	else
+	{
+		ASSERT(false);
+	}
+}
+
+
+void Gizmo::togglePivotMode()
+{
+	if(m_pivot_mode == PivotMode::CENTER)
+	{
+		m_pivot_mode = PivotMode::OBJECT_PIVOT;
+	}
+	else if(m_pivot_mode == PivotMode::OBJECT_PIVOT)
+	{
+		m_pivot_mode = PivotMode::CENTER;
+	}
+	else
+	{
+		ASSERT(false);
+	}
 }
 
 
@@ -110,60 +184,76 @@ void Gizmo::startTransform(Component camera, int x, int y, TransformMode mode)
 }
 
 
+void Gizmo::rotate(int relx, int rely, int flags)
+{
+	Array<Vec3> new_positions;
+	Array<Quat> new_rotations;
+	for(int i = 0, c = m_editor.getSelectedEntities().size(); i < c; ++i)
+	{
+		Vec3 pos = m_editor.getSelectedEntities()[i].getPosition();
+		Matrix emtx;
+		getEnityMatrix(emtx, i);
+		Vec3 axis;
+		switch(m_transform_mode)
+		{
+			case TransformMode::X:
+				axis = emtx.getXVector();
+				break;
+			case TransformMode::Y:
+				axis = emtx.getYVector();
+				break;
+			case TransformMode::Z:
+				axis = emtx.getZVector();
+				break;
+		}
+		float angle = 0;
+		if(flags & (int)Flags::FIXED_STEP)
+		{
+			m_relx_accum += relx;
+			m_rely_accum += rely;
+			if(m_relx_accum + m_rely_accum > 50)
+			{
+				angle = (float)Math::PI / 4;
+				m_relx_accum = m_rely_accum = 0;
+			}
+			else if(m_relx_accum + m_rely_accum < -50)
+			{
+				angle = -(float)Math::PI / 4;
+				m_relx_accum = m_rely_accum = 0;
+			}
+			else 
+			{
+				angle = 0;
+			}
+		}
+		else
+		{
+			angle = (relx + rely) / 100.0f;
+		}
+		
+		Quat old_rot = m_editor.getSelectedEntities()[i].getRotation();
+		Quat new_rot = old_rot * Quat(axis, angle);
+		new_rot.normalize();
+		new_rotations.push(new_rot);
+
+		Vec3 pdif = emtx.getTranslation() - pos;
+		
+		old_rot.conjugate();
+		pos = -pdif;
+		pos = new_rot * (old_rot * pos);
+		pos += emtx.getTranslation();
+
+		new_positions.push(pos);
+	}
+	m_editor.setEntityPositionAndRotaion(m_editor.getSelectedEntities(), new_positions, new_rotations);
+}
+
+
 void Gizmo::transform(Component camera, TransformOperation operation, int x, int y, int relx, int rely, int flags)
 {
 	if(operation == TransformOperation::ROTATE && m_transform_mode != TransformMode::CAMERA_XZ)
 	{
-		Array<Vec3> new_positions;
-		Array<Quat> new_rotations;
-		for(int i = 0, c = m_editor.getSelectedEntities().size(); i < c; ++i)
-		{
-			Vec3 pos = m_editor.getSelectedEntities()[i].getPosition();
-			Matrix emtx;
-			m_editor.getSelectedEntities()[i].getMatrix(emtx);
-			Vec3 axis;
-			switch(m_transform_mode)
-			{
-				case TransformMode::X:
-					axis = emtx.getXVector();
-					break;
-				case TransformMode::Y:
-					axis = emtx.getYVector();
-					break;
-				case TransformMode::Z:
-					axis = emtx.getZVector();
-					break;
-			}
-			float angle = 0;
-			if(flags & Flags::FIXED_STEP)
-			{
-				m_relx_accum += relx;
-				m_rely_accum += rely;
-				if(m_relx_accum + m_rely_accum > 50)
-				{
-					angle = (float)Math::PI / 4;
-					m_relx_accum = m_rely_accum = 0;
-				}
-				else if(m_relx_accum + m_rely_accum < -50)
-				{
-					angle = -(float)Math::PI / 4;
-					m_relx_accum = m_rely_accum = 0;
-				}
-				else 
-				{
-					angle = 0;
-				}
-			}
-			else
-			{
-				angle = (relx + rely) / 100.0f;
-			}
-			Quat new_rot = m_editor.getSelectedEntities()[i].getRotation() * Quat(axis, angle);
-			new_rot.normalize();
-			new_rotations.push(new_rot);
-			new_positions.push(pos);
-		}
-		m_editor.setEntityPositionAndRotaion(m_editor.getSelectedEntities(), new_positions, new_rotations);
+		rotate(relx, rely, flags);
 	}
 	else
 	{
