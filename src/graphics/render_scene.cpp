@@ -370,11 +370,11 @@ namespace Lumix
 						if (m_renderables[i]->m_model.getModel())
 						{
 							m_renderables[i]->m_model.getModel()->getObserverCb().bind<RenderSceneImpl, &RenderSceneImpl::modelUpdate>(this);
-
-							updateBoundingRadiuses();
 						}
 					}
 				}
+				updateBoundingRadiuses();
+
 				serializer.deserializeArrayEnd();
 			}
 
