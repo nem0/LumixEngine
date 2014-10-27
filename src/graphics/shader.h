@@ -11,8 +11,10 @@ namespace FS
 	class IFile;
 }
 
-struct Vec3;
 struct Matrix;
+struct Vec3;
+class Renderer;
+
 
 class LUMIX_ENGINE_API Shader : public Resource
 {
@@ -45,7 +47,7 @@ class LUMIX_ENGINE_API Shader : public Resource
 		static const int MAX_ATTRIBUTE_COUNT = 16;
 
 	public:
-		Shader(const Path& path, ResourceManager& resource_manager);
+		Shader(const Path& path, ResourceManager& resource_manager, Renderer& renderer);
 		~Shader();
 
 		GLint getAttribId(int index) const { return m_current_combination->m_vertex_attributes_ids[index]; }
@@ -96,6 +98,7 @@ class LUMIX_ENGINE_API Shader : public Resource
 		Combination*		m_current_combination;
 		bool				m_is_shadowmap_required;
 		string				m_source;
+		Renderer&			m_renderer;
 };
 
 
