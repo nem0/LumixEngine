@@ -1119,11 +1119,23 @@ struct WorldEditorImpl : public WorldEditor
 			if (!m_selected_entities.empty())
 			{
 				Array<Vec3> new_positions;
+				RenderScene* scene = NULL;
+				const Array<IScene*>& scenes = m_engine->getScenes();
+
+				for(int j = 0; j < scenes.size(); ++j)
+				{
+					if(&scenes[j]->getPlugin() == &m_engine->getRenderer())
+					{
+						scene = static_cast<RenderScene*>(scenes[j]);
+						break;
+					}
+				}
+
 				for(int i = 0; i < m_selected_entities.size(); ++i)
 				{
 					const Entity& entity = m_selected_entities[i];
-					Component renderable = entity.getComponent(RENDERABLE_HASH);
-					RenderScene* scene = static_cast<RenderScene*>(renderable.scene);
+					
+					Component renderable = m_selected_entities[i].getComponent(RENDERABLE_HASH);
 					RayCastModelHit hit = scene->castRay(entity.getPosition(), Vec3(0, -1, 0), renderable);
 					if (hit.m_is_hit)
 					{
