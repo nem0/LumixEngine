@@ -64,6 +64,8 @@ class LUMIX_ENGINE_API Renderer : public IPlugin
 		virtual void setProjectionMatrix(const Matrix& matrix) = 0;
 		virtual Engine& getEngine() = 0;
 		
+		virtual int getGLSLVersion() const = 0;
+
 		/// "immediate mode"
 		virtual void renderModel(const Model& model, const Matrix& transform, PipelineInstance& pipeline) = 0;
 }; 
