@@ -59,6 +59,10 @@ private slots:
 
     void on_actionSave_Layout_triggered();
 
+    void on_actionCenter_Pivot_triggered();
+
+    void on_actionLocal_Global_triggered();
+
 private:
 	class DockInfo
 	{

@@ -2,6 +2,7 @@
 #include "ui_mainwindow.h"
 #include "assetbrowser.h"
 #include "editor/entity_template_system.h"
+#include "editor/gizmo.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "entity_list.h"
@@ -443,4 +444,16 @@ void MainWindow::on_actionSave_Layout_triggered()
 			}
 		}
 	}
+}
+
+
+void MainWindow::on_actionCenter_Pivot_triggered()
+{
+	m_world_editor->getGizmo().togglePivotMode();
+}
+
+
+void MainWindow::on_actionLocal_Global_triggered()
+{
+	m_world_editor->getGizmo().toggleCoordSystem();
 }

@@ -22,55 +22,35 @@ class WorldEditor;
 class LUMIX_ENGINE_API Gizmo
 {
 	public:
-		struct Flags
+		enum class Flags : uint32_t
 		{
-			enum Value
-			{
-				FIXED_STEP = 1
-			};
-
-			Flags() {}
-			Flags(Value _value) : value(_value) {}
-			Flags(int _value) : value((Value)_value) {}
-		
-			operator Value() const { return value; }
-			operator int() const { return value; }
-
-			Value value;
+			FIXED_STEP = 1
 		};
 
-		struct TransformOperation
+		enum class TransformOperation : uint32_t
 		{
-			enum Value
-			{
-				ROTATE,
-				TRANSLATE
-			};
-
-			TransformOperation() {}
-			TransformOperation(Value _value) : value(_value) {}
-
-			operator Value() const { return value; }
-
-			Value value;
+			ROTATE,
+			TRANSLATE
 		};
 
-		struct TransformMode
+		enum class TransformMode : uint32_t
 		{
-			enum Value
-			{
-				X,
-				Y,
-				Z,
-				CAMERA_XZ
-			};
+			X,
+			Y,
+			Z,
+			CAMERA_XZ
+		};
 
-			TransformMode() {}
-			TransformMode(Value _value) : value(_value) {}
+		enum class PivotMode
+		{
+			CENTER,
+			OBJECT_PIVOT
+		};
 
-			operator Value() const { return value; }
-
-			Value value;
+		enum class CoordSystem
+		{
+			LOCAL,
+			WORLD
 		};
 
 	public:
@@ -85,10 +65,14 @@ class LUMIX_ENGINE_API Gizmo
 		void transform(Component camera, TransformOperation operation, int x, int y, int relx, int rely, int flags);
 		void render(Renderer& renderer, IRenderDevice& render_device);
 		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir);
+		void togglePivotMode();
+		void toggleCoordSystem();
 
 	private:
 		void getMatrix(Matrix& mtx);
+		void getEnityMatrix(Matrix& mtx, int selection_index);
 		Vec3 getMousePlaneIntersection(Component camera, int x, int y);
+		void rotate(int relx, int rely, int flags);
 
 	private:
 		WorldEditor& m_editor;
@@ -100,6 +84,8 @@ class LUMIX_ENGINE_API Gizmo
 		int m_rely_accum;
 		class Model* m_model;
 		float m_scale;
+		PivotMode m_pivot_mode;
+		CoordSystem m_coord_system;
 };
 
 
