@@ -29,8 +29,9 @@ class LUMIX_ENGINE_API Pose
 		void setIsRelative() { m_is_absolute = false; }
 
 	private:
-		Pose(const Pose&) {}
-		void operator =(const Pose&) {}
+		Pose(const Pose&);
+		void operator =(const Pose&);
+		
 		void computeAbsolute(Model& model, int i, bool* valid);
 
 	private:
