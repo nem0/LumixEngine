@@ -67,6 +67,8 @@ private slots:
 
     void on_actionPaste_triggered();
 
+    void on_actionSame_mesh_triggered();
+
 private:
 	class DockInfo
 	{

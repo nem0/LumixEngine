@@ -78,6 +78,7 @@ namespace Lumix
 			virtual Entity addEntity() = 0;
 			virtual void destroyEntities(const Entity* entities, int count) = 0;
 			virtual void selectEntities(const Entity* entities, int count) = 0;
+			virtual void selectEntitiesWithSameMesh() = 0;
 			virtual Entity addEntityAt(int camera_x, int camera_y) = 0;
 			virtual void setEntitiesPositions(const Array<Entity>& entity, const Array<Vec3>& position) = 0;
 			virtual void setEntityPositionAndRotaion(const Array<Entity>& entity, const Array<Vec3>& position, const Array<Quat>& rotation) = 0;

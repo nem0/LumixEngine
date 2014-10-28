@@ -83,6 +83,12 @@
     <property name="title">
      <string>Edit</string>
     </property>
+    <widget class="QMenu" name="menuSelect">
+     <property name="title">
+      <string>Select</string>
+     </property>
+     <addaction name="actionSame_mesh"/>
+    </widget>
     <addaction name="actionUndo"/>
     <addaction name="actionRedo"/>
     <addaction name="separator"/>
@@ -91,6 +97,7 @@
     <addaction name="separator"/>
     <addaction name="actionCenter_Pivot"/>
     <addaction name="actionLocal_Global"/>
+    <addaction name="menuSelect"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuEdit"/>
@@ -320,6 +327,11 @@
    </property>
    <property name="shortcut">
     <string>Ctrl+V</string>
+   </property>
+  </action>
+  <action name="actionSame_mesh">
+   <property name="text">
+    <string>Same mesh</string>
    </property>
   </action>
  </widget>
