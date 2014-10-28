@@ -808,6 +808,28 @@ namespace Lumix
 			}
 
 
+			virtual Component getFirstRenderable() override
+			{
+				for(int i = 0; i < m_renderables.size(); ++i)
+				{
+					if(!m_renderables[i]->m_is_free)
+						return Component(m_renderables[i]->m_entity, RENDERABLE_HASH, this, i);
+				}
+				return Component::INVALID;
+			}
+			
+			
+			virtual Component getNextRenderable(const Component& cmp) override
+			{
+				for(int i = cmp.index + 1; i < m_renderables.size(); ++i)
+				{
+					if(!m_renderables[i]->m_is_free)
+						return Component(m_renderables[i]->m_entity, RENDERABLE_HASH, this, i);
+				}
+				return Component::INVALID;
+			}
+
+
 			virtual void getRenderableInfos(const Frustum& frustum, Array<RenderableInfo>& infos, int64_t layer_mask) override
 			{
 				PROFILE_FUNCTION();

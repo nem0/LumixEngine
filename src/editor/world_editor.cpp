@@ -1786,6 +1786,33 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
+		virtual void selectEntitiesWithSameMesh() override
+		{
+			if(!m_selected_entities.empty())
+			{
+				Component cmp = m_selected_entities[0].getComponent(RENDERABLE_HASH);
+				if(cmp.isValid())
+				{
+					Array<Entity> entities;
+
+					RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
+					Model* model = scene->getRenderableModel(cmp);
+					Component renderable = scene->getFirstRenderable();
+					while(renderable.isValid())
+					{
+						if(model == scene->getRenderableModel(renderable))
+						{
+							entities.push(renderable.entity);
+						}
+						renderable = scene->getNextRenderable(renderable);
+					}
+
+					selectEntities(&entities[0], entities.size());
+				}
+			}
+		}
+
+
 		void onComponentCreated(const Component& cmp)
 		{
 			for (int i = 0; i < m_editor_icons.size(); ++i)

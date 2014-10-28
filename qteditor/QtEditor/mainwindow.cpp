@@ -467,3 +467,8 @@ void MainWindow::on_actionPaste_triggered()
 {
 	m_world_editor->pasteEntity();
 }
+
+void MainWindow::on_actionSame_mesh_triggered()
+{
+    m_world_editor->selectEntitiesWithSameMesh();
+}
