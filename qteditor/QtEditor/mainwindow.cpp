@@ -457,3 +457,13 @@ void MainWindow::on_actionLocal_Global_triggered()
 {
 	m_world_editor->getGizmo().toggleCoordSystem();
 }
+
+void MainWindow::on_actionCopy_triggered()
+{
+	m_world_editor->copyEntity();
+}
+
+void MainWindow::on_actionPaste_triggered()
+{
+	m_world_editor->pasteEntity();
+}

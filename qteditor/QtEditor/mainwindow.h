@@ -63,6 +63,10 @@ private slots:
 
     void on_actionLocal_Global_triggered();
 
+    void on_actionCopy_triggered();
+
+    void on_actionPaste_triggered();
+
 private:
 	class DockInfo
 	{

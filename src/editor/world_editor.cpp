@@ -107,6 +107,54 @@ class SetEntityNameCommand : public IEditorCommand
 };
 
 
+
+class PasteEntityCommand : public IEditorCommand
+{
+	public:
+		PasteEntityCommand(WorldEditor& editor, Blob& blob)
+			: m_blob(blob)
+			, m_editor(editor)
+			, m_position(editor.getCameraRaycastHit())
+			, m_entity(Entity::INVALID)
+		{}
+
+
+		virtual void execute() override;
+
+
+		virtual void undo() override
+		{
+			const Entity::ComponentList& cmps = m_entity.getComponents();
+			for (int i = 0; i < cmps.size(); ++i)
+			{
+				cmps[i].scene->destroyComponent(cmps[i]);
+			}
+			m_editor.getEngine().getUniverse()->destroyEntity(m_entity);
+			m_entity = Entity::INVALID;
+		}
+
+
+		virtual uint32_t getType() override
+		{
+			static const uint32_t type = crc32("paste_entity");
+			return type;
+		}
+
+
+		virtual bool merge(IEditorCommand& command)
+		{
+			ASSERT(command.getType() == getType());
+			return false;
+		}
+
+	private:
+		Blob m_blob;
+		WorldEditor& m_editor;
+		Vec3 m_position;
+		Entity m_entity;
+};
+
+
 class MoveEntityCommand : public IEditorCommand
 {
 	public:
@@ -1323,6 +1371,37 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
+		virtual void copyEntity() override
+		{
+			if(!m_selected_entities.empty())
+			{
+				Entity entity = m_selected_entities[0];
+				m_copy_buffer.clearBuffer();
+				const Entity::ComponentList& cmps = entity.getComponents();
+				int32_t count = cmps.size();
+				m_copy_buffer.write(count);
+				for(int i = 0; i < count; ++i)
+				{
+					uint32_t cmp_type = cmps[i].type;
+					m_copy_buffer.write(cmp_type);
+					Array<IPropertyDescriptor*>& props = m_component_properties[cmps[i].type];
+					int32_t prop_count = props.size(); 
+					for(int j = 0; j < prop_count; ++j)
+					{
+						props[j]->get(cmps[i], m_copy_buffer);
+					}
+				}
+			}
+		}
+		
+		
+		virtual void pasteEntity() override
+		{
+			PasteEntityCommand* command = LUMIX_NEW(PasteEntityCommand)(*this, m_copy_buffer);
+			executeCommand(command);
+		}
+
+
 		virtual void cloneComponent(const Component& src, Entity& entity) override
 		{
 			Component clone = Component::INVALID;
@@ -1974,6 +2053,7 @@ struct WorldEditorImpl : public WorldEditor
 		EntityTemplateSystem* m_template_system;
 		Array<IEditorCommand*> m_undo_stack;
 		int m_undo_index;
+		Blob m_copy_buffer;
 };
 
 
@@ -1996,6 +2076,29 @@ void WorldEditor::destroy(WorldEditor* editor)
 	static_cast<WorldEditorImpl*>(editor)->destroy();
 	LUMIX_DELETE(editor);
 }
+
+
+void PasteEntityCommand::execute()
+{
+	m_blob.rewindForRead();
+	Entity new_entity = m_editor.getEngine().getUniverse()->createEntity();
+	new_entity.setPosition(m_position);
+	int32_t count;
+	m_blob.read(count);
+	for(int i = 0; i < count; ++i)
+	{
+		uint32_t type;
+		m_blob.read(type);
+		Component cmp = static_cast<WorldEditorImpl&>(m_editor).createComponent(type, new_entity);
+		Array<IPropertyDescriptor*>& props = m_editor.getPropertyDescriptors(type);
+		for(int j = 0; j < props.size(); ++j)
+		{
+			props[j]->set(cmp, m_blob);
+		}
+	}
+	m_entity = new_entity;
+}
+
 
 
 } // !namespace Lumix
