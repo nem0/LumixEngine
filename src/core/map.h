@@ -175,7 +175,7 @@ class Map
 			Node* node = _find(key);
 			if(!node || node->key != key)
 			{
-				Node* new_node = new ((Node*)m_allocator.allocate(sizeof(Node))) Node();
+				Node* new_node = new (m_allocator.allocate(sizeof(Node))) Node();
 				++m_size;
 				new_node->key = key;
 				insert(key, m_root, NULL, new_node);

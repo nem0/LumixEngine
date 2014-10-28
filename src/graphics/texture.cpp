@@ -250,7 +250,7 @@ namespace Lumix
 
 			for (int i = 0; i < numBlocks; i++)
 			{
-				alphablock = (DXT3AlphaBlock*)curblock;
+				alphablock = reinterpret_cast<DXT3AlphaBlock*>(curblock);
 
 				swapBytes((uint16_t*)&alphablock->row[0], (uint16_t*)&alphablock->row[3]);
 				swapBytes((uint16_t*)&alphablock->row[1], (uint16_t*)&alphablock->row[2]);
@@ -335,11 +335,10 @@ namespace Lumix
 		static void flipBlockDXTC5(DXTColBlock *line, int numBlocks)
 		{
 			DXTColBlock* curblock = line;
-			DXT5AlphaBlock* alphablock;
 
 			for (int i = 0; i < numBlocks; i++)
 			{
-				alphablock = (DXT5AlphaBlock*)curblock;
+				DXT5AlphaBlock* alphablock = reinterpret_cast<DXT5AlphaBlock*>(curblock);
 
 				flipDXT5Alpha(alphablock);
 
@@ -382,8 +381,8 @@ namespace Lumix
 
 			int linesize = xblocks * blocksize;
 
-			DXTColBlock * LUMIX_RESTRICT top = (DXTColBlock*)surface;
-			DXTColBlock * LUMIX_RESTRICT bottom = (DXTColBlock*)((uint8_t*)surface + ((yblocks - 1) * linesize));
+			DXTColBlock * LUMIX_RESTRICT top = static_cast<DXTColBlock*>(surface);
+			DXTColBlock * LUMIX_RESTRICT bottom = reinterpret_cast<DXTColBlock*>((uint8_t*)surface + ((yblocks - 1) * linesize));
 
 			while (top < bottom)
 			{

@@ -29,7 +29,7 @@ namespace Lumix
 			base_string<char> m_message;
 			Log& m_log;
 
-			void operator = (const LogProxy&) {}
+			void operator = (const LogProxy&);
 	};
 
 	class LUMIX_CORE_API Log
@@ -44,6 +44,10 @@ namespace Lumix
 			LogProxy log(const char* system);
 			Callback& getCallback();
 		
+		private:
+			Log(const Log&);
+			void operator =(const Log&);
+
 		private:
 			struct LogImpl* m_impl;
 	};

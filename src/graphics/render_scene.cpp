@@ -51,8 +51,8 @@ namespace Lumix
 		float m_scale;
 
 		private:
-			Renderable(const Renderable&) {}
-			void operator =(const Renderable&) {}
+			Renderable(const Renderable&);
+			void operator =(const Renderable&);
 	};
 
 	struct Light
