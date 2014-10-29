@@ -676,7 +676,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		const RenderableInfo* end = &m_renderable_infos[0]+count;
 		while(info != end)
 		{
-			const Matrix& world_matrix = info->m_model->getMatrix();
+			const Matrix& world_matrix = *info->m_matrix;
 			const Mesh& mesh = *info->m_mesh;
 			const Material& material = *mesh.getMaterial();
 			Shader& shader = *material.getShader();
@@ -714,7 +714,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 			if (info->m_pose->getCount() > 0)
 			{
 				const Pose& pose = *info->m_pose;
-				const Model& model = *info->m_model->getModel();
+				const Model& model = *info->m_model;
 				Vec3* poss = pose.getPositions();
 				Quat* rots = pose.getRotations();
 				ASSERT(pose.getCount() <= 64);
