@@ -657,6 +657,7 @@ namespace Lumix
 			virtual void setRenderableIsAlwaysVisible(Component cmp, bool value) override
 			{
 				int renderable_index = getRenderable(cmp.index);
+				m_renderables[renderable_index]->m_is_always_visible = value;
 				if(value)
 				{
 					m_culling_system->removeStatic(renderable_index);
