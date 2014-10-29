@@ -95,7 +95,8 @@ namespace Lumix
 			virtual void setCameraSlot(Component camera, const string& slot) = 0;
 			virtual void getCameraSlot(Component camera, string& slot) = 0;
 			virtual void setCameraSize(Component camera, int w, int h) = 0;
-			virtual Model* getModel(Component cmp) = 0;
+			virtual void setRenderableIsAlwaysVisible(Component cmp, bool value) = 0;
+			virtual bool isRenderableAlwaysVisible(Component cmp) = 0;
 			virtual void getRenderablePath(Component cmp, string& path) = 0;
 			virtual void setRenderableLayer(Component cmp, const int32_t& layer) = 0;
 			virtual void setRenderablePath(Component cmp, const string& path) = 0;

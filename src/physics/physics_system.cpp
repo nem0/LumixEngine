@@ -58,7 +58,7 @@ class AssertNullAllocator : public physx::PxAllocatorCallback
 
 bool PhysicsSystem::create(Engine& engine)
 {
-	engine.getWorldEditor()->registerProperty("box_rigid_actor", LUMIX_NEW(BoolPropertyDescriptor<PhysicsScene>)("dynamic", &PhysicsScene::getIsDynamic, &PhysicsScene::setIsDynamic));
+	engine.getWorldEditor()->registerProperty("box_rigid_actor", LUMIX_NEW(BoolPropertyDescriptor<PhysicsScene>)("dynamic", &PhysicsScene::isDynamic, &PhysicsScene::setIsDynamic));
 	engine.getWorldEditor()->registerProperty("box_rigid_actor", LUMIX_NEW(Vec3PropertyDescriptor<PhysicsScene>)("size", &PhysicsScene::getHalfExtents, &PhysicsScene::setHalfExtents));
 	engine.getWorldEditor()->registerProperty("mesh_rigid_actor", LUMIX_NEW(FilePropertyDescriptor<PhysicsScene>)("source", &PhysicsScene::getShapeSource, &PhysicsScene::setShapeSource, "Physics (*.pda)"));
 	engine.getWorldEditor()->registerProperty("physical_heightfield", LUMIX_NEW(ResourcePropertyDescriptor<PhysicsScene>)("heightmap", &PhysicsScene::getHeightmap, &PhysicsScene::setHeightmap, "Image (*.raw)"));

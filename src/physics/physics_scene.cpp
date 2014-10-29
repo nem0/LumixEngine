@@ -351,8 +351,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	virtual void setShapeSource(Component cmp, const string& str) override
 	{
-		bool is_dynamic = false;
-		getIsDynamic(cmp, is_dynamic);
+		bool is_dynamic = isDynamic(cmp);
 		if (m_actors[cmp.index]->m_source == str && (!m_actors[cmp.index]->m_physx_actor || is_dynamic == !m_actors[cmp.index]->m_physx_actor->isRigidStatic()))
 		{
 			return;
@@ -688,9 +687,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual void getIsDynamic(Component cmp, bool& is) override
+	virtual bool isDynamic(Component cmp) override
 	{
-		is = isDynamic(cmp.index);
+		return isDynamic(cmp.index);
 	}
 
 
@@ -728,7 +727,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual void setIsDynamic(Component cmp, const bool& new_value) override
+	virtual void setIsDynamic(Component cmp, bool new_value) override
 	{
 		int dynamic_index = -1;
 		RigidActor* actor = m_actors[cmp.index];
