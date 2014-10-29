@@ -16,7 +16,6 @@ class Engine;
 class IRenderDevice;
 class Material;
 class Model;
-class ModelInstance;
 class Pipeline;
 class PipelineInstance;
 class Pose;
