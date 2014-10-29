@@ -266,6 +266,7 @@ struct RendererImpl : public Renderer
 		editor.registerProperty("camera", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("far", &RenderScene::getCameraFarPlane, &RenderScene::setCameraFarPlane));
 
 		editor.registerProperty("renderable", LUMIX_NEW(ResourcePropertyDescriptor<RenderScene>)("source", &RenderScene::getRenderablePath, &RenderScene::setRenderablePath, "Mesh (*.msh)"));
+		editor.registerProperty("renderable", LUMIX_NEW(BoolPropertyDescriptor<RenderScene>)("is_always_visible", &RenderScene::isRenderableAlwaysVisible, &RenderScene::setRenderableIsAlwaysVisible));
 
 		editor.registerProperty("light", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("ambient_intensity", &RenderScene::getLightAmbientIntensity, &RenderScene::setLightAmbientIntensity));
 		editor.registerProperty("light", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("diffuse_intensity", &RenderScene::getLightDiffuseIntensity, &RenderScene::setLightDiffuseIntensity));
