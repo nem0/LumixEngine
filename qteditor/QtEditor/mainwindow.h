@@ -59,6 +59,16 @@ private slots:
 
     void on_actionSave_Layout_triggered();
 
+    void on_actionCenter_Pivot_triggered();
+
+    void on_actionLocal_Global_triggered();
+
+    void on_actionCopy_triggered();
+
+    void on_actionPaste_triggered();
+
+    void on_actionSame_mesh_triggered();
+
 private:
 	class DockInfo
 	{

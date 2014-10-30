@@ -83,8 +83,21 @@
     <property name="title">
      <string>Edit</string>
     </property>
+    <widget class="QMenu" name="menuSelect">
+     <property name="title">
+      <string>Select</string>
+     </property>
+     <addaction name="actionSame_mesh"/>
+    </widget>
     <addaction name="actionUndo"/>
     <addaction name="actionRedo"/>
+    <addaction name="separator"/>
+    <addaction name="actionCopy"/>
+    <addaction name="actionPaste"/>
+    <addaction name="separator"/>
+    <addaction name="actionCenter_Pivot"/>
+    <addaction name="actionLocal_Global"/>
+    <addaction name="menuSelect"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuEdit"/>
@@ -288,6 +301,37 @@
   <action name="actionSave_Layout">
    <property name="text">
     <string>Save Layout</string>
+   </property>
+  </action>
+  <action name="actionCenter_Pivot">
+   <property name="text">
+    <string>Center/Pivot</string>
+   </property>
+  </action>
+  <action name="actionLocal_Global">
+   <property name="text">
+    <string>Local/Global</string>
+   </property>
+  </action>
+  <action name="actionCopy">
+   <property name="text">
+    <string>Copy</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+C</string>
+   </property>
+  </action>
+  <action name="actionPaste">
+   <property name="text">
+    <string>Paste</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+V</string>
+   </property>
+  </action>
+  <action name="actionSame_mesh">
+   <property name="text">
+    <string>Same mesh</string>
    </property>
   </action>
  </widget>

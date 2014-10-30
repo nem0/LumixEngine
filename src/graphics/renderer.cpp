@@ -42,6 +42,29 @@ struct RendererImpl : public Renderer
 		m_is_editor_wireframe = false;
 	}
 
+	virtual int getGLSLVersion() const override
+	{
+		int version = 0;
+		const GLubyte* version_str = glGetString(GL_SHADING_LANGUAGE_VERSION);
+		if(version_str)
+		{
+			for(int i = 0; i < 2; ++i)
+			{
+				while(*version_str >= '0' && *version_str <= '9')
+				{
+					version *= 10;
+					version += *version_str - '0';
+					++version_str;
+				}
+				if(*version_str == '.')
+				{
+					++version_str;
+				}
+			}
+		}
+		return version;
+	}
+
 	virtual IScene* createScene(Universe& universe)
 	{
 		return RenderScene::createInstance(*this, *m_engine, universe);
@@ -243,6 +266,7 @@ struct RendererImpl : public Renderer
 		editor.registerProperty("camera", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("far", &RenderScene::getCameraFarPlane, &RenderScene::setCameraFarPlane));
 
 		editor.registerProperty("renderable", LUMIX_NEW(ResourcePropertyDescriptor<RenderScene>)("source", &RenderScene::getRenderablePath, &RenderScene::setRenderablePath, "Mesh (*.msh)"));
+		editor.registerProperty("renderable", LUMIX_NEW(BoolPropertyDescriptor<RenderScene>)("is_always_visible", &RenderScene::isRenderableAlwaysVisible, &RenderScene::setRenderableIsAlwaysVisible));
 
 		editor.registerProperty("light", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("ambient_intensity", &RenderScene::getLightAmbientIntensity, &RenderScene::setLightAmbientIntensity));
 		editor.registerProperty("light", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("diffuse_intensity", &RenderScene::getLightDiffuseIntensity, &RenderScene::setLightDiffuseIntensity));

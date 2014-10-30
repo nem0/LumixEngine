@@ -10,6 +10,7 @@
 #include "core/resource_manager_base.h"
 #include "core/vec3.h"
 #include "graphics/gl_ext.h"
+#include "graphics/renderer.h"
 #include "graphics/shader_manager.h"
 
 
@@ -17,9 +18,10 @@ namespace Lumix
 {
 
 
-Shader::Shader(const Path& path, ResourceManager& resource_manager)
+Shader::Shader(const Path& path, ResourceManager& resource_manager, Renderer& renderer)
 	: Resource(path, resource_manager)
 	, m_is_shadowmap_required(true)
+	, m_renderer(renderer)
 {
 }
 
@@ -95,19 +97,22 @@ void Shader::createCombination(const char* defines)
 			combination->m_hash = hash;
 			combination->m_pass_hash = pass_hash;
 
+			char version_str[20];
+			copyString(version_str, sizeof(version_str), m_renderer.getGLSLVersion() >= 330 ? "#version 330\n" : "#version 130\n");
+
 			char pass_str[1024];
 			copyString(pass_str, sizeof(pass_str), "#define ");
 			catCString(pass_str, sizeof(pass_str), m_passes[pass_idx].c_str());
 			catCString(pass_str, sizeof(pass_str), "_PASS\n");
 
 			combination->m_vertex_id = glCreateShader(GL_VERTEX_SHADER);
-			const GLchar* vs_strings[] = { pass_str, "#define VERTEX_SHADER\n", defines, m_source.c_str() };
+			const GLchar* vs_strings[] = { version_str, pass_str, "#define VERTEX_SHADER\n", defines, m_source.c_str() };
 			glShaderSource(combination->m_vertex_id, sizeof(vs_strings) / sizeof(vs_strings[0]), vs_strings, NULL);
 			glCompileShader(combination->m_vertex_id);
 			glAttachShader(combination->m_program_id, combination->m_vertex_id);
 
 			combination->m_fragment_id = glCreateShader(GL_FRAGMENT_SHADER);
-			const GLchar* fs_strings[] = { pass_str, "#define FRAGMENT_SHADER\n", defines, m_source.c_str() };
+			const GLchar* fs_strings[] = { version_str, pass_str, "#define FRAGMENT_SHADER\n", defines, m_source.c_str() };
 			glShaderSource(combination->m_fragment_id, sizeof(fs_strings) / sizeof(fs_strings[0]), fs_strings, NULL);
 			glCompileShader(combination->m_fragment_id);
 			glAttachShader(combination->m_program_id, combination->m_fragment_id);

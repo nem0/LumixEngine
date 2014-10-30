@@ -562,18 +562,20 @@ void EntityList::setWorldEditor(Lumix::WorldEditor& editor)
 
 void EntityList::onEntitySelected(const Lumix::Array<Lumix::Entity>& entities)
 {
-	m_ui->entityList->selectionModel()->clear();
+	QItemSelection* selection = new QItemSelection();
 	for(int j = entities.size() - 1; j >= 0; --j)
 	{
 		for (int i = 0, c = m_filter->rowCount(); i < c; ++i)
 		{
 			if (m_filter->data(m_filter->index(i, 0), Qt::UserRole).toInt() == entities[j].index)
 			{
-				m_ui->entityList->selectionModel()->select(m_filter->index(i, 0), QItemSelectionModel::Select | QItemSelectionModel::Rows);
+				selection->append(QItemSelectionRange(m_filter->index(i, 0)));
 				break;
 			}
 		}
 	}
+	m_ui->entityList->selectionModel()->select(*selection, QItemSelectionModel::SelectionFlag::ClearAndSelect | QItemSelectionModel::SelectionFlag::Rows);
+	delete selection;
 }
 
 
