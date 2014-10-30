@@ -73,6 +73,7 @@ class LUMIX_ENGINE_API Gizmo
 		void getEnityMatrix(Matrix& mtx, int selection_index);
 		Vec3 getMousePlaneIntersection(Component camera, int x, int y);
 		void rotate(int relx, int rely, int flags);
+		float computeRotateAngle(int relx, int rely, int flags);
 
 	private:
 		WorldEditor& m_editor;
