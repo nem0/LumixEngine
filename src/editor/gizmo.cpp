@@ -184,6 +184,36 @@ void Gizmo::startTransform(Component camera, int x, int y, TransformMode mode)
 }
 
 
+
+float Gizmo::computeRotateAngle(int relx, int rely, int flags)
+{
+	float angle = 0;
+	if(flags & (int)Flags::FIXED_STEP)
+	{
+		m_relx_accum += relx;
+		m_rely_accum += rely;
+		if(m_relx_accum + m_rely_accum > 50)
+		{
+			angle = (float)Math::PI / 4;
+			m_relx_accum = m_rely_accum = 0;
+		}
+		else if(m_relx_accum + m_rely_accum < -50)
+		{
+			angle = -(float)Math::PI / 4;
+			m_relx_accum = m_rely_accum = 0;
+		}
+		else 
+		{
+			angle = 0;
+		}
+	}
+	else
+	{
+		angle = (relx + rely) / 100.0f;
+	}
+	return angle;
+}
+
 void Gizmo::rotate(int relx, int rely, int flags)
 {
 	Array<Vec3> new_positions;
@@ -206,30 +236,7 @@ void Gizmo::rotate(int relx, int rely, int flags)
 				axis = emtx.getZVector();
 				break;
 		}
-		float angle = 0;
-		if(flags & (int)Flags::FIXED_STEP)
-		{
-			m_relx_accum += relx;
-			m_rely_accum += rely;
-			if(m_relx_accum + m_rely_accum > 50)
-			{
-				angle = (float)Math::PI / 4;
-				m_relx_accum = m_rely_accum = 0;
-			}
-			else if(m_relx_accum + m_rely_accum < -50)
-			{
-				angle = -(float)Math::PI / 4;
-				m_relx_accum = m_rely_accum = 0;
-			}
-			else 
-			{
-				angle = 0;
-			}
-		}
-		else
-		{
-			angle = (relx + rely) / 100.0f;
-		}
+		float angle = computeRotateAngle(relx, rely, flags);
 		
 		Quat old_rot = m_editor.getSelectedEntities()[i].getRotation();
 		Quat new_rot = old_rot * Quat(axis, angle);
