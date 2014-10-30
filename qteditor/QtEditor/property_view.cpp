@@ -1354,19 +1354,91 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 		}
 
 
-		bool isXZCollision(Lumix::RenderScene* scene, float x, float z, float min_x, float min_z, float max_x, float max_z)
+		static void getProjections(const Lumix::Vec3& axis, const Lumix::Vec3 vertices[8], float& min, float& max)
 		{
+		  min = max = Lumix::dotProduct(vertices[0], axis);
+		  for(int i = 1 ; i < 8; ++i)
+		  {
+			float dot = Lumix::dotProduct(vertices[i], axis);
+			min = dot < min ? dot : min;
+			max = dot > max ? dot : max;
+		  }
+		}
+
+
+		bool overlaps(float min1, float max1, float min2, float max2)
+		{
+			return (min1 <= min2 && min2 <= max1) || (min2 <= min1 && min1 <= max2);
+		}
+
+
+		bool testOBBCollision(const Lumix::Matrix& matrix_a, const Lumix::Model* model_a, const Lumix::Matrix& matrix_b, const Lumix::Model* model_b, float scale)
+		{
+			Lumix::Vec3 box_a_points[8];
+			Lumix::Vec3 box_b_points[8];
+
+			if(fabs(scale - 1.0) < 0.01f)
+			{
+				model_a->getAABB().getCorners(matrix_a, box_a_points);
+				model_b->getAABB().getCorners(matrix_b, box_b_points);
+			}
+			else
+			{
+				Lumix::Matrix scale_matrix_a = matrix_a;
+				scale_matrix_a.multiply3x3(scale);
+				Lumix::Matrix scale_matrix_b = matrix_b;
+				scale_matrix_b.multiply3x3(scale);
+				model_a->getAABB().getCorners(scale_matrix_a, box_a_points);
+				model_b->getAABB().getCorners(scale_matrix_b, box_b_points);
+			}
+
+			Lumix::Vec3 normals[] = { matrix_a.getXVector(), matrix_a.getYVector(), matrix_a.getZVector() };
+			for( int i = 0 ; i < 3; i++ )
+			{
+				float box_a_min, box_a_max, box_b_min, box_b_max;
+				getProjections(normals[i], box_a_points, box_a_min, box_a_max);
+				getProjections(normals[i], box_b_points, box_b_min, box_b_max);
+				if(!overlaps(box_a_min, box_a_max, box_b_min, box_b_max))
+				{
+					return false;
+				}
+			}
+			
+			Lumix::Vec3 normals_b[] = { matrix_b.getXVector(), matrix_b.getYVector(), matrix_b.getZVector() };
+			for( int i = 0 ; i < 3; i++ )
+			{
+				float box_a_min, box_a_max, box_b_min, box_b_max;
+				getProjections(normals_b[i], box_a_points, box_a_min, box_a_max);
+				getProjections(normals_b[i], box_b_points, box_b_min, box_b_max);
+				if(!overlaps(box_a_min, box_a_max, box_b_min, box_b_max))
+				{
+					return false;
+				}
+			}
+
+			return true;
+		}
+
+
+		bool isOBBCollision(Lumix::RenderScene* scene, const Lumix::Matrix& matrix, Lumix::Model* model, float scale)
+		{
+			Lumix::Vec3 pos_a = matrix.getTranslation();
 			static Lumix::Array<Lumix::RenderableInfo> infos;
 			infos.clear();
 			scene->getRenderableInfos(infos, ~0);
+			float radius_a_squared = model->getBoundingRadius();
+			radius_a_squared = radius_a_squared * radius_a_squared;
 			for(int i = 0, c = infos.size(); i < c; ++i)
 			{
-				Lumix::Vec3 pos = infos[i].m_matrix->getTranslation();
-				const Lumix::AABB& aabb = infos[i].m_model->getAABB();
-				if (!(x + max_x < pos.x + aabb.getMin().x || z + max_z < pos.z + aabb.getMin().z 
-					|| x + min_x > pos.x + aabb.getMax().x || z + min_z > pos.z + aabb.getMax().z))
+				Lumix::Vec3 pos_b = infos[i].m_matrix->getTranslation();
+				float radius_b = infos[i].m_model->getBoundingRadius();
+				float radius_squared = radius_a_squared + radius_b * radius_b;
+				if((pos_a - pos_b).squaredLength() < radius_squared * scale * scale)
 				{
-					return true;
+					if(testOBBCollision(matrix, model, *infos[i].m_matrix, infos[i].m_model, scale))
+					{
+						return true;
+					}
 				}
 			}
 			return false;
@@ -1386,27 +1458,27 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 				return;
 			}
 			Lumix::Component renderable = tpl.getComponent(RENDERABLE_HASH);
-			Lumix::Vec3 renderable_min, renderable_max;
 			if(renderable.isValid())
 			{
-				const Lumix::AABB& aabb = scene->getRenderableModel(renderable)->getAABB();
-				renderable_min = aabb.getMin();
-				renderable_max = aabb.getMax();
-			}
-			for (int i = 0; i <= m_terrain_brush_strength * 10; ++i)
-			{
-				float angle = (float)(rand() % 360);
-				float dist = (rand() % 100 / 100.0f) * m_terrain_brush_size;
-				Lumix::Vec3 pos(center_pos.x + cos(angle) * dist, 0, center_pos.z + sin(angle) * dist);
-				pos = inv_terrain_matrix.multiplyPosition(pos);
 				float w, h;
 				scene->getTerrainSize(terrain, &w, &h);
-				if(pos.x >= 0 && pos.z >= 0 && pos.x < w && pos.z < h)
+				float scale = 1.0f - Lumix::Math::maxValue(0.01f, m_terrain_brush_strength);
+				Lumix::Model* model = scene->getRenderableModel(renderable);
+				for (int i = 0; i <= m_terrain_brush_size * m_terrain_brush_size / 1000.0f; ++i)
 				{
-					if(!renderable.isValid() || !isXZCollision(scene, pos.x, pos.z, renderable_min.x, renderable_min.z, renderable_max.x, renderable_max.z))
+					float angle = (float)(rand() % 360);
+					float dist = (rand() % 100 / 100.0f) * m_terrain_brush_size;
+					Lumix::Vec3 pos(center_pos.x + cos(angle) * dist, 0, center_pos.z + sin(angle) * dist);
+					Lumix::Vec3 terrain_pos = inv_terrain_matrix.multiplyPosition(pos);
+					if (terrain_pos.x >= 0 && terrain_pos.z >= 0 && terrain_pos.x <= w && terrain_pos.z <= h)
 					{
-						pos.y = scene->getTerrainHeightAt(terrain, pos.x, pos.z);
-						m_entity_template_list->instantiateTemplateAt(terrain_matrix.multiplyPosition(pos));
+						pos.y = scene->getTerrainHeightAt(terrain, terrain_pos.x, terrain_pos.z);
+						Lumix::Matrix mtx = Lumix::Matrix::IDENTITY;
+						mtx.setTranslation(pos);
+						if(!isOBBCollision(scene, mtx, model, scale))
+						{
+							m_entity_template_list->instantiateTemplateAt(pos);
+						}
 					}
 				}
 			}
