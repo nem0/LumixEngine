@@ -1360,8 +1360,8 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 		  for(int i = 1 ; i < 8; ++i)
 		  {
 			float dot = Lumix::dotProduct(vertices[i], axis);
-			min = dot < min ? dot : min;
-			max = dot > max ? dot : max;
+			min = Lumix::Math::minValue(dot, min);
+			max = Lumix::Math::maxValue(dot, max);
 		  }
 		}
 
