@@ -137,17 +137,29 @@ namespace Lumix
 		}
 
 
+		virtual void enableStatic(int index) override
+		{
+			m_indexes[index] = 1;
+		}
+
+
+		virtual void disableStatic(int index) override
+		{
+			m_indexes[index] = -1;
+		}
+
+
 		virtual void addStatic(const Sphere& sphere, int index) override
 		{
 			if (index == m_spheres.size())
 			{
 				m_spheres.push(sphere);
-				m_indexes.push(index);
+				m_indexes.push(1);
 			}
 			else
 			{
 				m_spheres[index] = sphere;
-				m_indexes[index] = index;
+				m_indexes[index] = 1;
 			}
 		}
 
@@ -155,7 +167,8 @@ namespace Lumix
 		{
 			ASSERT(index <= m_spheres.size());
 
-			m_indexes[index] = -1;
+			m_spheres.erase(index);
+			m_indexes.erase(index);
 		}
 
 		virtual void updateBoundingRadius(float radius, int index) override

@@ -671,13 +671,13 @@ namespace Lumix
 				m_renderables[renderable_index].m_is_always_visible = value;
 				if(value)
 				{
-					m_culling_system->removeStatic(renderable_index);
+					m_culling_system->disableStatic(renderable_index);
 					m_always_visible.push(renderable_index);
 				}
 				else
 				{
 					float bounding_radius = m_renderables[renderable_index].m_model->getBoundingRadius();
-					m_culling_system->addStatic(Sphere(m_renderables[renderable_index].m_entity.getPosition(), bounding_radius), renderable_index);
+					m_culling_system->enableStatic(renderable_index);
 					m_always_visible.eraseItemFast(renderable_index);
 				}
 			}
