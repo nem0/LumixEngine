@@ -86,6 +86,7 @@ namespace Lumix
 				{
 					return false;
 				}
+				m_shader_manager.setRenderer(*m_renderer);
 				if (!m_renderer->create(*this))
 				{
 					Renderer::destroyInstance(*m_renderer);

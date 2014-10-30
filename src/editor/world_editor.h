@@ -70,12 +70,15 @@ namespace Lumix
 			virtual void saveUniverse(const Path& path) = 0;
 			virtual void newUniverse() = 0;
 			virtual Path getUniversePath() const = 0;
+			virtual void copyEntity() = 0;
+			virtual void pasteEntity() = 0;
 			virtual void addComponent(uint32_t type_crc) = 0;
 			virtual void cloneComponent(const Component& src, Entity& entity) = 0;
 			virtual void destroyComponent(const Component& crc) = 0;
 			virtual Entity addEntity() = 0;
 			virtual void destroyEntities(const Entity* entities, int count) = 0;
 			virtual void selectEntities(const Entity* entities, int count) = 0;
+			virtual void selectEntitiesWithSameMesh() = 0;
 			virtual Entity addEntityAt(int camera_x, int camera_y) = 0;
 			virtual void setEntitiesPositions(const Array<Entity>& entity, const Array<Vec3>& position) = 0;
 			virtual void setEntityPositionAndRotaion(const Array<Entity>& entity, const Array<Vec3>& position, const Array<Quat>& rotation) = 0;

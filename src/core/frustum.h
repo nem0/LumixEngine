@@ -125,25 +125,6 @@ namespace Lumix
 			enum class Sides : uint32_t	{ NEAR_PLANE, FAR_PLANE, LEFT_PLANE, RIGHT_PLANE, TOP_PLANE, BOTTOM_PLANE, COUNT };
 		
 		private:
-			Vec3 positiveVertex(const Vec3& min, const Vec3& max, const Vec3& normal) const
-			{
-				Vec3 n;
-				n.x = normal.x >= 0 ? max.x : min.x;
-				n.y = normal.y >= 0 ? max.y : min.y;
-				n.z = normal.z >= 0 ? max.z : min.z;
-				return n;
-			};
-
-			Vec3 negativeVertex(const Vec3& min, const Vec3& max, const Vec3& normal) const
-			{
-				Vec3 n;
-				n.x = normal.x >= 0 ? min.x : max.x;
-				n.y = normal.y >= 0 ? min.y : max.y;
-				n.z = normal.z >= 0 ? min.z : max.z;
-				return n;
-			};
-
-		private:
 			Plane m_plane[(uint32_t)Sides::COUNT];
 			Vec3 m_center;
 			float m_radius;

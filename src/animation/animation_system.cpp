@@ -180,7 +180,7 @@ namespace Lumix
 					if (!animable.m_is_free && animable.m_animation && animable.m_animation->isReady())
 					{
 						RenderScene* scene = static_cast<RenderScene*>(animable.m_renderable.scene);
-						animable.m_animation->getPose(animable.m_time, scene->getPose(animable.m_renderable), *scene->getModel(animable.m_renderable));
+						animable.m_animation->getPose(animable.m_time, scene->getPose(animable.m_renderable), *scene->getRenderableModel(animable.m_renderable));
 						if (!animable.m_manual)
 						{
 							float t = animable.m_time + time_delta;

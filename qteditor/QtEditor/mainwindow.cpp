@@ -2,6 +2,7 @@
 #include "ui_mainwindow.h"
 #include "assetbrowser.h"
 #include "editor/entity_template_system.h"
+#include "editor/gizmo.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "entity_list.h"
@@ -148,7 +149,7 @@ void MainWindow::addEditorDock(Qt::DockWidgetArea area, QDockWidget* widget, voi
 {
 	DockInfo info;
 	info.m_widget = widget;
-	QAction* action = new QAction(widget->windowTitle(), m_window_menu);
+	QAction* action = widget->toggleViewAction();
 	action->setCheckable(true);
 	m_window_menu->addAction(action);
 	info.m_action = action;
@@ -443,4 +444,31 @@ void MainWindow::on_actionSave_Layout_triggered()
 			}
 		}
 	}
+}
+
+
+void MainWindow::on_actionCenter_Pivot_triggered()
+{
+	m_world_editor->getGizmo().togglePivotMode();
+}
+
+
+void MainWindow::on_actionLocal_Global_triggered()
+{
+	m_world_editor->getGizmo().toggleCoordSystem();
+}
+
+void MainWindow::on_actionCopy_triggered()
+{
+	m_world_editor->copyEntity();
+}
+
+void MainWindow::on_actionPaste_triggered()
+{
+	m_world_editor->pasteEntity();
+}
+
+void MainWindow::on_actionSame_mesh_triggered()
+{
+    m_world_editor->selectEntitiesWithSameMesh();
 }

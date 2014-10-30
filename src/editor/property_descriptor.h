@@ -487,8 +487,8 @@ template <class S>
 class BoolPropertyDescriptor : public IPropertyDescriptor
 {
 	public:
-		typedef void (S::*Getter)(Component, bool&);
-		typedef void (S::*Setter)(Component, const bool&);
+		typedef bool (S::*Getter)(Component);
+		typedef void (S::*Setter)(Component, bool);
 
 	public:
 		BoolPropertyDescriptor(const char* name, Getter getter, Setter setter)
@@ -510,8 +510,7 @@ class BoolPropertyDescriptor : public IPropertyDescriptor
 
 		virtual void get(Component cmp, Blob& stream) const override
 		{
-			bool b;
-			(static_cast<S*>(cmp.scene)->*m_getter)(cmp, b);
+			bool b = (static_cast<S*>(cmp.scene)->*m_getter)(cmp);
 			int len = sizeof(b);
 			stream.write(&b, len);
 		}

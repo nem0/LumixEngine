@@ -9,6 +9,7 @@ namespace Lumix
 	ShaderManager::ShaderManager()
 		: ResourceManagerBase()
 	{
+		m_renderer = NULL;
 		m_buffer = NULL;
 		m_buffer_size = -1;
 	}
@@ -22,7 +23,8 @@ namespace Lumix
 
 	Resource* ShaderManager::createResource(const Path& path)
 	{
-		return LUMIX_NEW(Shader)(path, getOwner());
+		ASSERT(m_renderer);
+		return LUMIX_NEW(Shader)(path, getOwner(), *m_renderer);
 	}
 
 	void ShaderManager::destroyResource(Resource& resource)
