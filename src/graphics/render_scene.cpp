@@ -665,6 +665,22 @@ namespace Lumix
 			}
 
 
+			virtual void showRenderable(Component cmp) override
+			{
+				m_culling_system->enableStatic(getRenderable(cmp.index));
+			}
+
+
+			virtual void hideRenderable(Component cmp) override
+			{
+				int renderable_index = getRenderable(cmp.index);
+				if (!m_renderables[renderable_index].m_is_always_visible)
+				{
+					m_culling_system->disableStatic(renderable_index);
+				}
+			}
+
+
 			virtual void setRenderableIsAlwaysVisible(Component cmp, bool value) override
 			{
 				int renderable_index = getRenderable(cmp.index);
