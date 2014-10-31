@@ -98,6 +98,8 @@ namespace Lumix
 			virtual void setCameraSize(Component camera, int w, int h) = 0;
 			virtual void setRenderableIsAlwaysVisible(Component cmp, bool value) = 0;
 			virtual bool isRenderableAlwaysVisible(Component cmp) = 0;
+			virtual void showRenderable(Component cmp) = 0;
+			virtual void hideRenderable(Component cmp) = 0;
 			virtual void getRenderablePath(Component cmp, string& path) = 0;
 			virtual void setRenderableLayer(Component cmp, const int32_t& layer) = 0;
 			virtual void setRenderablePath(Component cmp, const string& path) = 0;

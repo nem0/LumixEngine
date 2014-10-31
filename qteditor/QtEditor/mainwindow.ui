@@ -78,6 +78,8 @@
     <addaction name="actionRemove"/>
     <addaction name="actionSave_as_template"/>
     <addaction name="actionInstantiate_template"/>
+    <addaction name="actionHide"/>
+    <addaction name="actionShow"/>
    </widget>
    <widget class="QMenu" name="menuEdit">
     <property name="title">
@@ -332,6 +334,16 @@
   <action name="actionSame_mesh">
    <property name="text">
     <string>Same mesh</string>
+   </property>
+  </action>
+  <action name="actionHide">
+   <property name="text">
+    <string>Hide</string>
+   </property>
+  </action>
+  <action name="actionShow">
+   <property name="text">
+    <string>Show</string>
    </property>
   </action>
  </widget>

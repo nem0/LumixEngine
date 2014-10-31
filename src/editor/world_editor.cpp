@@ -1371,6 +1371,32 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
+		virtual void showEntities() override
+		{
+			for (int i = 0, c = m_selected_entities.size(); i < c; ++i)
+			{
+				Component cmp = m_selected_entities[i].getComponent(RENDERABLE_HASH);
+				if (cmp.isValid())
+				{
+					static_cast<RenderScene*>(cmp.scene)->showRenderable(cmp);
+				}
+			}
+		}
+
+
+		virtual void hideEntities() override
+		{
+			for (int i = 0, c = m_selected_entities.size(); i < c; ++i)
+			{
+				Component cmp = m_selected_entities[i].getComponent(RENDERABLE_HASH);
+				if (cmp.isValid())
+				{
+					static_cast<RenderScene*>(cmp.scene)->hideRenderable(cmp);
+				}
+			}
+		}
+
+
 		virtual void copyEntity() override
 		{
 			if(!m_selected_entities.empty())

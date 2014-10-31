@@ -70,6 +70,8 @@ namespace Lumix
 			virtual void saveUniverse(const Path& path) = 0;
 			virtual void newUniverse() = 0;
 			virtual Path getUniversePath() const = 0;
+			virtual void showEntities() = 0;
+			virtual void hideEntities() = 0;
 			virtual void copyEntity() = 0;
 			virtual void pasteEntity() = 0;
 			virtual void addComponent(uint32_t type_crc) = 0;
