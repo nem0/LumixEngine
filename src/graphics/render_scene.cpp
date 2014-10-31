@@ -94,6 +94,8 @@ namespace Lumix
 	class RenderSceneImpl : public RenderScene
 	{
 		private:
+			typedef HashMap<int32_t, int> DynamicRenderableCache;
+
 			class ModelLoadedCallback
 			{
 				public:
@@ -566,17 +568,49 @@ namespace Lumix
 				return Component::INVALID;
 			}
 
+
+			virtual Component getRenderable(Entity entity) override
+			{
+				DynamicRenderableCache::iterator iter = m_dynamic_renderable_cache.find(entity.index);
+				if (!iter.isValid())
+				{
+					for (int i = 0, c = m_renderables.size(); i < c; ++i)
+					{
+						if (m_renderables[i].m_entity == entity)
+						{
+							m_dynamic_renderable_cache.insert(entity.index, i);
+							return Component(entity, RENDERABLE_HASH, this, i);
+						}
+					}
+				}
+				else
+				{
+					return Component(entity, RENDERABLE_HASH, this, iter.value());
+				}
+				return Component::INVALID;
+			}
+
+
 			void onEntityMoved(const Entity& entity)
 			{
-				const Entity::ComponentList& cmps = entity.getComponents();
-				for (int i = 0; i < cmps.size(); ++i)
+				DynamicRenderableCache::iterator iter = m_dynamic_renderable_cache.find(entity.index);
+				if (!iter.isValid())
 				{
-					if (cmps[i].type == RENDERABLE_HASH)
+					for (int i = 0, c = m_renderables.size(); i < c; ++i)
 					{
-						m_renderables[cmps[i].index].m_matrix = entity.getMatrix();
-						m_culling_system->updateBoundingPosition(entity.getMatrix().getTranslation(), cmps[i].index);
-						break;
+						if (m_renderables[i].m_entity == entity)
+						{
+							m_dynamic_renderable_cache.insert(entity.index, i);
+							m_renderables[i].m_matrix = entity.getMatrix();
+							m_culling_system->updateBoundingPosition(entity.getMatrix().getTranslation(), i);
+							break;
+						}
 					}
+				}
+				else
+				{
+					m_renderables[iter.value()].m_matrix = entity.getMatrix();
+					m_culling_system->updateBoundingPosition(entity.getMatrix().getTranslation(), iter.value());
 				}
 			}
 
@@ -1319,6 +1353,7 @@ namespace Lumix
 			Component m_applied_camera;
 			CullingSystem* m_culling_system;
 			Frustum m_camera_frustum;
+			DynamicRenderableCache m_dynamic_renderable_cache;
 	};
 
 

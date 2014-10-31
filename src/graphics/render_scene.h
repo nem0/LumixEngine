@@ -100,6 +100,7 @@ namespace Lumix
 			virtual bool isRenderableAlwaysVisible(Component cmp) = 0;
 			virtual void showRenderable(Component cmp) = 0;
 			virtual void hideRenderable(Component cmp) = 0;
+			virtual Component getRenderable(Entity entity) = 0;
 			virtual void getRenderablePath(Component cmp, string& path) = 0;
 			virtual void setRenderableLayer(Component cmp, const int32_t& layer) = 0;
 			virtual void setRenderablePath(Component cmp, const string& path) = 0;
