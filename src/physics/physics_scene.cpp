@@ -561,10 +561,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	void onEntityMoved(const Entity& entity)
 	{
-		const Entity::ComponentList& cmps = entity.getComponents();
-		for (int i = 0, c = cmps.size(); i < c; ++i)
+		for (int i = 0, c = m_dynamic_actors.size(); i < c; ++i)
 		{
-			if (cmps[i].type == BOX_ACTOR_HASH)
+			if (m_dynamic_actors[i]->m_entity == entity)
 			{
 				Vec3 pos = entity.getPosition();
 				physx::PxVec3 pvec(pos.x, pos.y, pos.z);
@@ -572,16 +571,34 @@ struct PhysicsSceneImpl : public PhysicsScene
 				entity.getMatrix().getRotation(q);
 				physx::PxQuat pquat(q.x, q.y, q.z, q.w);
 				physx::PxTransform trans(pvec, pquat);
-				if (m_actors[cmps[i].index])
-				{
-					m_actors[cmps[i].index]->m_physx_actor->setGlobalPose(trans, false);
-				}
+				m_dynamic_actors[i]->m_physx_actor->setGlobalPose(trans, false);
+				return;
 			}
-			else if (cmps[i].type == CONTROLLER_HASH)
+		}
+		
+		for (int i = 0, c = m_controllers.size(); i < c; ++i)
+		{
+			if (m_controllers[i].m_entity == entity)
 			{
 				Vec3 pos = entity.getPosition();
 				physx::PxExtendedVec3 pvec(pos.x, pos.y, pos.z);
-				m_controllers[cmps[i].index].m_controller->setPosition(pvec);
+				m_controllers[i].m_controller->setPosition(pvec);
+				return;
+			}
+		}
+
+		for (int i = 0, c = m_actors.size(); i < c; ++i)
+		{
+			if (m_actors[i]->m_entity == entity)
+			{
+				Vec3 pos = entity.getPosition();
+				physx::PxVec3 pvec(pos.x, pos.y, pos.z);
+				Quat q;
+				entity.getMatrix().getRotation(q);
+				physx::PxQuat pquat(q.x, q.y, q.z, q.w);
+				physx::PxTransform trans(pvec, pquat);
+				m_actors[i]->m_physx_actor->setGlobalPose(trans, false);
+				return;
 			}
 		}
 	}

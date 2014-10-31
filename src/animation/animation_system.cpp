@@ -32,6 +32,7 @@ namespace Lumix
 				Component m_renderable;
 				float m_time;
 				class Animation* m_animation;
+				Entity m_entity;
 			};
 
 		public:
@@ -95,15 +96,10 @@ namespace Lumix
 					int entity_index;
 					serializer.deserializeArrayItem(entity_index);
 					Entity e(&m_universe, entity_index);
-					const Entity::ComponentList& cmps = e.getComponents();
-					m_animables[i].m_renderable = Component::INVALID;
-					for (int j = 0; j < cmps.size(); ++j)
+					Component renderable = m_render_scene->getRenderable(e);
+					if (renderable.isValid())
 					{
-						if (cmps[j].type == RENDERABLE_HASH)
-						{
-							m_animables[i].m_renderable = cmps[j];
-							break;
-						}
+						m_animables[i].m_renderable = renderable;
 					}
 					serializer.deserializeArrayItem(m_animables[i].m_time);
 					serializer.deserializeArrayItem(m_animables[i].m_is_free);
@@ -208,12 +204,11 @@ namespace Lumix
 			{
 				if (cmp.type == RENDERABLE_HASH)
 				{
-					const Entity::ComponentList& cmps = cmp.entity.getComponents();
-					for (int i = 0; i < cmps.size(); ++i)
+					for (int i = 0; i < m_animables.size(); ++i)
 					{
-						if (cmps[i].type == ANIMABLE_HASH)
+						if (m_animables[i].m_entity == cmp.entity)
 						{
-							m_animables[cmps[i].index].m_renderable = cmp;
+							m_animables[i].m_renderable = cmp;
 							break;
 						}
 					}
@@ -238,15 +233,12 @@ namespace Lumix
 				animable.m_is_free = false;
 				animable.m_renderable = Component::INVALID;
 				animable.m_animation = NULL;
+				animable.m_entity = entity;
 
-				const Entity::ComponentList& cmps = entity.getComponents();
-				for (int i = 0; i < cmps.size(); ++i)
+				Component renderable = m_render_scene->getRenderable(entity);
+				if (renderable.isValid())
 				{
-					if (cmps[i].type == RENDERABLE_HASH)
-					{
-						animable.m_renderable = cmps[i];
-						break;
-					}
+					animable.m_renderable = renderable;
 				}
 
 				Component cmp = m_universe.addComponent(entity, ANIMABLE_HASH, this, m_animables.size() - 1);
@@ -266,6 +258,7 @@ namespace Lumix
 			AnimationSystem& m_anim_system;
 			Engine& m_engine;
 			Array<Animable> m_animables;
+			RenderScene* m_render_scene;
 	};
 
 
