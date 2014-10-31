@@ -371,11 +371,11 @@ namespace Lumix
 				for (int i = 0; i < size; ++i)
 				{
 					serializer.deserializeArrayItem(m_renderables[i].m_is_always_visible);
-					if(m_renderables[i].m_is_always_visible)
-					{
-						m_always_visible.push(i);
-					}
 					serializer.deserializeArrayItem(m_renderables[i].m_component_index);
+					if (m_renderables[i].m_is_always_visible)
+					{
+						m_always_visible.push(m_renderables[i].m_component_index);
+					}
 					serializer.deserializeArrayItem(m_renderables[i].m_entity.index);
 					m_renderables[i].m_model = NULL;
 					m_renderables[i].m_entity.universe = &m_universe;
@@ -474,30 +474,26 @@ namespace Lumix
 				{
 					int renderable_index = getRenderable(component.index);
 					setModel(renderable_index, NULL);
-					m_always_visible.eraseItemFast(renderable_index);
+					m_always_visible.eraseItemFast(component.index);
 					m_renderables.erase(renderable_index);
 					m_universe.destroyComponent(component);
-					m_universe.componentDestroyed().invoke(component);
 					m_culling_system->removeStatic(component.index);
 				}
 				else if (component.type == LIGHT_HASH)
 				{
 					m_lights[component.index].m_is_free = true;
 					m_universe.destroyComponent(component);
-					m_universe.componentDestroyed().invoke(component);
 				}
 				else if (component.type == CAMERA_HASH)
 				{
 					m_cameras[component.index].m_is_free = true;
 					m_universe.destroyComponent(component);
-					m_universe.componentDestroyed().invoke(component);
 				}
 				else if(component.type == TERRAIN_HASH)
 				{
 					LUMIX_DELETE(m_terrains[component.index]);
 					m_terrains[component.index] = NULL;
 					m_universe.destroyComponent(component);
-					m_universe.componentDestroyed().invoke(component);
 				}
 				else
 				{
@@ -722,13 +718,13 @@ namespace Lumix
 				if(value)
 				{
 					m_culling_system->disableStatic(renderable_index);
-					m_always_visible.push(renderable_index);
+					m_always_visible.push(cmp.index);
 				}
 				else
 				{
 					float bounding_radius = m_renderables[renderable_index].m_model->getBoundingRadius();
 					m_culling_system->enableStatic(renderable_index);
-					m_always_visible.eraseItemFast(renderable_index);
+					m_always_visible.eraseItemFast(cmp.index);
 				}
 			}
 			
@@ -946,7 +942,7 @@ namespace Lumix
 				}
 				for (int i = 0, c = m_always_visible.size(); i < c; ++i)
 				{
-					const Renderable* LUMIX_RESTRICT renderable = &m_renderables[m_always_visible[i]];
+					const Renderable* LUMIX_RESTRICT renderable = &m_renderables[getRenderable(m_always_visible[i])];
 					const Model* model = renderable->m_model;
 					bool is_model_ready = model && model->isReady();
 					if (is_model_ready && (renderable->m_layer_mask & layer_mask) != 0)

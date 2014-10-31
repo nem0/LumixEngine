@@ -270,7 +270,6 @@ namespace Lumix
 			{
 				m_script_entities[cmp.index] = -1;
 				m_universe.destroyComponent(cmp);
-				m_universe.componentDestroyed().invoke(cmp);
 			}
 
 

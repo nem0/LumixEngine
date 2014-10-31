@@ -82,6 +82,7 @@ class EntityListFilter : public QSortFilterProxyModel
 		void setUniverse(Lumix::Universe* universe) { m_universe = universe; invalidate(); }
 		void setWorldEditor(Lumix::WorldEditor& editor)
 		{
+			m_editor = &editor;
 			editor.entityNameSet().bind<EntityListFilter, &EntityListFilter::onEntityNameSet>(this);
 		}
 		void enableUpdate(bool enable)
@@ -98,7 +99,8 @@ class EntityListFilter : public QSortFilterProxyModel
 				return sourceModel()->data(index).toString().contains(filterRegExp());
 			}
 			int entity_index = sourceModel()->data(index, Qt::UserRole).toInt();
-			return Lumix::Entity(m_universe, entity_index).getComponent(m_component).isValid() && sourceModel()->data(index).toString().contains(filterRegExp());
+			return m_editor->getComponent(Lumix::Entity(m_universe, entity_index), m_component).isValid()
+				&& sourceModel()->data(index).toString().contains(filterRegExp());
 		}
 
 		void onEntityNameSet(const Lumix::Entity&, const char*)
@@ -113,6 +115,7 @@ class EntityListFilter : public QSortFilterProxyModel
 		uint32_t m_component;
 		Lumix::Universe* m_universe;
 		bool m_is_update_enabled;
+		Lumix::WorldEditor* m_editor;
 };
 
 
@@ -371,7 +374,7 @@ class EntityListModel : public QAbstractItemModel
 
 			if (index.isValid() && role == Qt::DisplayRole)
 			{
-				Lumix::Component renderable = item->m_entity.getComponent(RENDERABLE_HASH);
+				Lumix::Component renderable = m_engine->getWorldEditor()->getComponent(item->m_entity, RENDERABLE_HASH);
 				if (renderable.isValid())
 				{
 					Lumix::string path;

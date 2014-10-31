@@ -28,9 +28,6 @@ class LUMIX_ENGINE_API Universe final
 {
 	friend struct Entity;
 	public:
-		typedef Array<Entity::ComponentList> ComponentList;
-
-	public:
 		Universe();
 		~Universe();
 
@@ -51,6 +48,8 @@ class LUMIX_ENGINE_API Universe final
 		DelegateList<void(const Component&)>& componentCreated() { return m_component_created; }
 		DelegateList<void(const Component&)>& componentDestroyed() { return m_component_destroyed; }
 
+		Delegate<void(const Component&)>& componentAdded() { return m_component_added; }
+
 		void serialize(ISerializer& serializer);
 		void deserialize(ISerializer& serializer);
 
@@ -60,12 +59,12 @@ class LUMIX_ENGINE_API Universe final
 		Array<int>		m_free_slots;
 		Map<uint32_t, uint32_t> m_name_to_id_map;
 		Map<uint32_t, string> m_id_to_name_map;
-		ComponentList	m_component_list;
 		DelegateList<void(const Entity&)> m_entity_moved;
 		DelegateList<void(const Entity&)> m_entity_created;
 		DelegateList<void(const Entity&)> m_entity_destroyed;
 		DelegateList<void(const Component&)> m_component_created;
 		DelegateList<void(const Component&)> m_component_destroyed;
+		Delegate<void(const Component&)> m_component_added;
 };
 
 

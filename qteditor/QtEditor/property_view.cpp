@@ -1038,7 +1038,7 @@ PropertyViewObject* createEntityObject(Lumix::WorldEditor& editor, Lumix::Entity
 	auto e = new Lumix::Entity(entity);
 	InstanceObject<Lumix::Entity, true>* object = new InstanceObject<Lumix::Entity, true>(NULL, "Entity", e, NULL);
 
-	auto& cmps = e->getComponents();
+	auto& cmps = editor.getComponents(*e);
 
 	for (int i = 0; i < cmps.size(); ++i)
 	{
@@ -1259,7 +1259,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			
 			for(int i = m_world_editor.getSelectedEntities().size() - 1; i >= 0; --i)
 			{
-				Lumix::Component terrain = m_world_editor.getSelectedEntities()[i].getComponent(crc32("terrain"));
+				Lumix::Component terrain = m_world_editor.getComponent(m_world_editor.getSelectedEntities()[i], crc32("terrain"));
 				if (terrain.isValid())
 				{
 					Lumix::Component camera_cmp = m_world_editor.getEditCamera();
@@ -1283,7 +1283,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			{
 				if (m_world_editor.getSelectedEntities()[i] == hit.m_component.entity)
 				{
-					Lumix::Component terrain = hit.m_component.entity.getComponent(crc32("terrain"));
+					Lumix::Component terrain = m_world_editor.getComponent(hit.m_component.entity, crc32("terrain"));
 					if (terrain.isValid())
 					{
 						Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
@@ -1319,7 +1319,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			Lumix::RayCastModelHit hit = scene->castRayTerrain(m_component, origin, dir);
 			if (hit.m_is_hit)
 			{
-				Lumix::Component terrain = hit.m_component.entity.getComponent(crc32("terrain"));
+				Lumix::Component terrain = m_world_editor.getComponent(hit.m_component.entity, crc32("terrain"));
 				if(terrain.isValid())
 				{
 					switch (m_type)
@@ -1385,7 +1385,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			{
 				return;
 			}
-			Lumix::Component renderable = tpl.getComponent(RENDERABLE_HASH);
+			Lumix::Component renderable = m_world_editor.getComponent(tpl, RENDERABLE_HASH);
 			Lumix::Vec3 renderable_min, renderable_max;
 			if(renderable.isValid())
 			{
@@ -2054,7 +2054,7 @@ void PropertyView::on_propertyList_customContextMenuRequested(const QPoint &pos)
 					break;
 				}
 			}
-			const Lumix::Entity::ComponentList& cmps = m_selected_entity.getComponents();
+			const Lumix::WorldEditor::ComponentList& cmps = m_world_editor->getComponents(m_selected_entity);
 			for (int i = 0, c = cmps.size(); i < c; ++i)
 			{
 				if (cmps[i].type == cmp_hash)

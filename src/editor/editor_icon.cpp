@@ -11,6 +11,7 @@
 #include "graphics/model.h"
 #include "graphics/pipeline.h"
 #include "graphics/renderer.h"
+#include "world_editor.h"
 
 #include <gl/GL.h>
 
@@ -23,7 +24,7 @@ void EditorIcon::create(Engine& engine, RenderScene& scene, const Entity& entity
 	m_scene = &scene;
 	m_entity = entity;
 	m_is_visible = true;
-	const Entity::ComponentList& cmps = entity.getComponents();
+	const WorldEditor::ComponentList& cmps = engine.getWorldEditor()->getComponents(entity);
 	m_type = ENTITY;
 	for (int i = 0; i < cmps.size(); ++i)
 	{
