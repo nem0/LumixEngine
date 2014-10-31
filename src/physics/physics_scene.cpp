@@ -182,19 +182,16 @@ struct PhysicsSceneImpl : public PhysicsScene
 			LUMIX_DELETE(m_terrains[cmp.index]);
 			m_terrains[cmp.index] = NULL;
 			m_universe->destroyComponent(cmp);
-			m_universe->componentDestroyed().invoke(cmp);
 		}
 		else if(cmp.type == CONTROLLER_HASH)
 		{
 			m_controllers[cmp.index].m_is_free = true;
 			m_universe->destroyComponent(cmp);
-			m_universe->componentDestroyed().invoke(cmp);
 		}
 		else if (cmp.type == MESH_ACTOR_HASH || cmp.type == BOX_ACTOR_HASH)
 		{
 			m_actors[cmp.index]->m_entity.index = -1;
 			m_universe->destroyComponent(cmp);
-			m_universe->componentDestroyed().invoke(cmp);
 		}
 		else
 		{

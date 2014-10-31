@@ -32,6 +32,8 @@ namespace Lumix
 	class LUMIX_ENGINE_API WorldEditor
 	{
 		public:
+			typedef Array<Component> ComponentList;
+
 			enum class MouseFlags : int
 			{
 				ALT = 1,
@@ -60,7 +62,7 @@ namespace Lumix
 			virtual Engine& getEngine() = 0;
 			virtual void render(IRenderDevice& render_device) = 0;
 			virtual void renderIcons(IRenderDevice& render_device) = 0;
-			virtual Component getEditCamera() const = 0;
+			virtual Component getEditCamera() = 0;
 			virtual class Gizmo& getGizmo() = 0;
 			virtual class FS::TCPFileServer& getTCPFileServer() = 0;
 			virtual void setEditViewRenderDevice(IRenderDevice& render_device) = 0;
@@ -74,6 +76,8 @@ namespace Lumix
 			virtual void hideEntities() = 0;
 			virtual void copyEntity() = 0;
 			virtual void pasteEntity() = 0;
+			virtual Component getComponent(const Entity& entity, uint32_t type) = 0;
+			virtual const ComponentList& getComponents(const Entity& entity) = 0;
 			virtual void addComponent(uint32_t type_crc) = 0;
 			virtual void cloneComponent(const Component& src, Entity& entity) = 0;
 			virtual void destroyComponent(const Component& crc) = 0;

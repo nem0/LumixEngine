@@ -124,7 +124,7 @@ class PasteEntityCommand : public IEditorCommand
 
 		virtual void undo() override
 		{
-			const Entity::ComponentList& cmps = m_entity.getComponents();
+			const WorldEditor::ComponentList& cmps = m_editor.getComponents(m_entity);
 			for (int i = 0; i < cmps.size(); ++i)
 			{
 				cmps[i].scene->destroyComponent(cmps[i]);
@@ -402,7 +402,7 @@ class SetPropertyCommand : public IEditorCommand
 				for (int i = 0, c = entities.size(); i < c; ++i)
 				{
 					stream.rewindForRead();
-					const Entity::ComponentList& cmps = entities[i].getComponents();
+					const WorldEditor::ComponentList& cmps = m_editor.getComponents(entities[i]);
 					for (int j = 0, cj = cmps.size(); j < cj; ++j)
 					{
 						if (cmps[j].type == m_component.type)
@@ -464,7 +464,7 @@ struct WorldEditorImpl : public WorldEditor
 					m_entities.reserve(entities.size());
 					for (int i = 0; i < entities.size(); ++i)
 					{
-						if(!entities[i].getComponent(type).isValid())
+						if (!m_editor.getComponent(entities[i], type).isValid())
 						{
 							uint32_t tpl = editor.getEntityTemplateSystem().getTemplate(entities[i]);
 							if(tpl == 0)
@@ -518,7 +518,7 @@ struct WorldEditorImpl : public WorldEditor
 				{
 					for (int i = 0; i < m_entities.size(); ++i)
 					{
-						const Component& cmp = m_entities[i].getComponent(m_type);
+						const Component& cmp = m_editor.getComponent(m_entities[i], m_type);
 						cmp.scene->destroyComponent(cmp);
 					}
 				}
@@ -552,7 +552,7 @@ struct WorldEditorImpl : public WorldEditor
 					m_old_values.clearBuffer();
 					for (int i = 0; i < m_entities.size(); ++i)
 					{
-						const Entity::ComponentList& cmps = m_entities[i].getComponents();
+						const WorldEditor::ComponentList& cmps = m_editor.getComponents(m_entities[i]);
 						PositionRotation pos_rot;
 						pos_rot.m_position = m_entities[i].getPosition();
 						pos_rot.m_rotation = m_entities[i].getRotation();
@@ -718,7 +718,7 @@ struct WorldEditorImpl : public WorldEditor
 						const Array<Entity>& instances = m_editor.m_template_system->getInstances(template_hash);
 						for (int i = 0; i < instances.size(); ++i)
 						{
-							Component cmp = instances[i].getComponent(m_component.type);
+							Component cmp = m_editor.getComponent(instances[i], m_component.type);
 							if(cmp.isValid())
 							{
 								cmp.scene->destroyComponent(cmp);
@@ -845,14 +845,14 @@ struct WorldEditorImpl : public WorldEditor
 
 		void createEditorLines()
 		{
-			Component camera_cmp = m_camera.getComponent(CAMERA_HASH);
+			Component camera_cmp = getComponent(m_camera, CAMERA_HASH);
 			RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);
 			bool first_found = true;
 			Vec3 all_min;
 			Vec3 all_max;
 			for(int i = 0; i < m_selected_entities.size(); ++i)
 			{
-				Component renderable = m_selected_entities[i].getComponent(RENDERABLE_HASH);
+				Component renderable = getComponent(m_selected_entities[i], RENDERABLE_HASH);
 				if(renderable.isValid())
 				{
 					Model* model = scene->getRenderableModel(renderable);
@@ -1000,7 +1000,7 @@ struct WorldEditorImpl : public WorldEditor
 			else if (button == MouseButton::LEFT)
 			{
 				Vec3 origin, dir;
-				Component camera_cmp = m_camera.getComponent(CAMERA_HASH);
+				Component camera_cmp = getComponent(m_camera, CAMERA_HASH);
 				RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);
 				scene->getRay(camera_cmp, (float)x, (float)y, origin, dir);
 				RayCastModelHit hit = scene->castRay(origin, dir, Component::INVALID);
@@ -1081,7 +1081,7 @@ struct WorldEditorImpl : public WorldEditor
 				if(entity_already_selected)
 				{
 					m_mouse_mode = MouseMode::TRANSFORM;
-					m_gizmo.startTransform(m_camera.getComponent(CAMERA_HASH), x, y, Gizmo::TransformMode::CAMERA_XZ);
+					m_gizmo.startTransform(getComponent(m_camera, CAMERA_HASH), x, y, Gizmo::TransformMode::CAMERA_XZ);
 				}
 				else
 				{
@@ -1112,7 +1112,7 @@ struct WorldEditorImpl : public WorldEditor
 					{
 					Gizmo::TransformOperation tmode = mouse_flags & (int)MouseFlags::ALT/*GetKeyState(VK_MENU) & 0x8000*/ ? Gizmo::TransformOperation::ROTATE : Gizmo::TransformOperation::TRANSLATE;
 					int flags = mouse_flags & (int)MouseFlags::CONTROL/*GetKeyState(VK_LCONTROL) & 0x8000*/ ? (int)Gizmo::Flags::FIXED_STEP : 0;
-					m_gizmo.transform(m_camera.getComponent(CAMERA_HASH), tmode, x, y, relx, rely, flags);
+					m_gizmo.transform(getComponent(m_camera, CAMERA_HASH), tmode, x, y, relx, rely, flags);
 					}
 					break;
 			}
@@ -1183,7 +1183,7 @@ struct WorldEditorImpl : public WorldEditor
 				{
 					const Entity& entity = m_selected_entities[i];
 					
-					Component renderable = m_selected_entities[i].getComponent(RENDERABLE_HASH);
+					Component renderable = getComponent(m_selected_entities[i], RENDERABLE_HASH);
 					RayCastModelHit hit = scene->castRay(entity.getPosition(), Vec3(0, -1, 0), renderable);
 					if (hit.m_is_hit)
 					{
@@ -1208,7 +1208,7 @@ struct WorldEditorImpl : public WorldEditor
 
 		virtual Entity addEntity() override
 		{
-			Component cmp = m_camera.getComponent(CAMERA_HASH);
+			Component cmp = getComponent(m_camera, CAMERA_HASH);
 			RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 			float width = scene->getCameraWidth(cmp);
 			float height = scene->getCameraHeight(cmp);
@@ -1218,7 +1218,7 @@ struct WorldEditorImpl : public WorldEditor
 
 		virtual Entity addEntityAt(int camera_x, int camera_y) override
 		{
-			Component camera_cmp = m_camera.getComponent(CAMERA_HASH);
+			Component camera_cmp = getComponent(m_camera, CAMERA_HASH);
 			RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);
 			Vec3 origin;
 			Vec3 dir;
@@ -1243,7 +1243,7 @@ struct WorldEditorImpl : public WorldEditor
 
 		virtual Vec3 getCameraRaycastHit() override
 		{
-			Component camera_cmp = m_camera.getComponent(CAMERA_HASH);
+			Component camera_cmp = getComponent(m_camera, CAMERA_HASH);
 			RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);
 			float camera_x = scene->getCameraWidth(camera_cmp);
 			float camera_y = scene->getCameraHeight(camera_cmp);
@@ -1270,7 +1270,7 @@ struct WorldEditorImpl : public WorldEditor
 		void onEntityCreated(const Entity& entity)
 		{
 			EditorIcon* er = LUMIX_NEW(EditorIcon)();
-			er->create(*m_engine, *static_cast<RenderScene*>(m_camera.getComponent(CAMERA_HASH).scene), entity);
+			er->create(*m_engine, *static_cast<RenderScene*>(getComponent(m_camera, CAMERA_HASH).scene), entity);
 			m_editor_icons.push(er);
 		}
 
@@ -1375,7 +1375,7 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			for (int i = 0, c = m_selected_entities.size(); i < c; ++i)
 			{
-				Component cmp = m_selected_entities[i].getComponent(RENDERABLE_HASH);
+				Component cmp = getComponent(m_selected_entities[i], RENDERABLE_HASH);
 				if (cmp.isValid())
 				{
 					static_cast<RenderScene*>(cmp.scene)->showRenderable(cmp);
@@ -1388,7 +1388,7 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			for (int i = 0, c = m_selected_entities.size(); i < c; ++i)
 			{
-				Component cmp = m_selected_entities[i].getComponent(RENDERABLE_HASH);
+				Component cmp = getComponent(m_selected_entities[i], RENDERABLE_HASH);
 				if (cmp.isValid())
 				{
 					static_cast<RenderScene*>(cmp.scene)->hideRenderable(cmp);
@@ -1403,7 +1403,7 @@ struct WorldEditorImpl : public WorldEditor
 			{
 				Entity entity = m_selected_entities[0];
 				m_copy_buffer.clearBuffer();
-				const Entity::ComponentList& cmps = entity.getComponents();
+				const WorldEditor::ComponentList& cmps = getComponents(entity);
 				int32_t count = cmps.size();
 				m_copy_buffer.write(count);
 				for(int i = 0; i < count; ++i)
@@ -1549,9 +1549,29 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
+		virtual const Array<Component>& getComponents(const Entity& entity) override
+		{
+			return m_components[entity.index];
+		}
+
+
+		virtual Component getComponent(const Entity& entity, uint32_t type) override
+		{
+			const Array<Component>& cmps = m_components[entity.index];
+			for (int i = 0; i < cmps.size(); ++i)
+			{
+				if (cmps[i].type == type)
+				{
+					return cmps[i];
+				}
+			}
+			return Component::INVALID;
+		}
+
+
 		void createEditorIcon(const Entity& entity)
 		{
-			const Entity::ComponentList& cmps = entity.getComponents();
+			const WorldEditor::ComponentList& cmps = getComponents(entity);
 
 			bool found_renderable = false;
 			for (int i = 0; i < cmps.size(); ++i)
@@ -1565,7 +1585,7 @@ struct WorldEditorImpl : public WorldEditor
 			if (!found_renderable)
 			{
 				EditorIcon* er = LUMIX_NEW(EditorIcon)();
-				er->create(*m_engine, *static_cast<RenderScene*>(m_camera.getComponent(CAMERA_HASH).scene), entity);
+				er->create(*m_engine, *static_cast<RenderScene*>(getComponent(m_camera, CAMERA_HASH).scene), entity);
 				m_editor_icons.push(er);
 			}
 		}
@@ -1637,9 +1657,9 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
-		virtual Component getEditCamera() const override
+		virtual Component getEditCamera() override
 		{
-			return m_camera.getComponent(CAMERA_HASH);
+			return getComponent(m_camera, CAMERA_HASH);
 		}
 
 
@@ -1760,7 +1780,7 @@ struct WorldEditorImpl : public WorldEditor
 			if (m_selected_entities.size() == 1)
 			{
 				uint32_t component_hash = component;
-				Component cmp = m_selected_entities[0].getComponent(component_hash);
+				Component cmp = getComponent(m_selected_entities[0], component_hash);
 				if (cmp.isValid())
 				{
 					IEditorCommand* command = LUMIX_NEW(SetPropertyCommand)(*this, cmp, index, property, data, size);
@@ -1814,9 +1834,9 @@ struct WorldEditorImpl : public WorldEditor
 
 		virtual void selectEntitiesWithSameMesh() override
 		{
-			if(!m_selected_entities.empty())
+			if(m_selected_entities.size() == 1)
 			{
-				Component cmp = m_selected_entities[0].getComponent(RENDERABLE_HASH);
+				Component cmp = getComponent(m_selected_entities[0], RENDERABLE_HASH);
 				if(cmp.isValid())
 				{
 					Array<Entity> entities;
@@ -1839,8 +1859,15 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
+		void onComponentAdded(const Component& cmp)
+		{
+			m_components[cmp.entity.index].push(cmp);
+		}
+
+
 		void onComponentCreated(const Component& cmp)
 		{
+			m_components[cmp.entity.index].push(cmp);
 			for (int i = 0; i < m_editor_icons.size(); ++i)
 			{
 				if (m_editor_icons[i]->getEntity() == cmp.entity)
@@ -1857,6 +1884,7 @@ struct WorldEditorImpl : public WorldEditor
 
 		void onComponentDestroyed(const Component& cmp)
 		{
+			m_components[cmp.entity.index].eraseItemFast(cmp);
 			for (int i = 0; i < m_editor_icons.size(); ++i)
 			{
 				if (m_editor_icons[i]->getEntity() == cmp.entity)
@@ -1867,10 +1895,10 @@ struct WorldEditorImpl : public WorldEditor
 					break;
 				}
 			}
-			if (cmp.entity.existsInUniverse() && cmp.entity.getComponents().empty())
+			if (cmp.entity.existsInUniverse() && getComponents(cmp.entity).empty())
 			{
 				EditorIcon* er = LUMIX_NEW(EditorIcon)();
-				er->create(*m_engine, *static_cast<RenderScene*>(m_camera.getComponent(CAMERA_HASH).scene), cmp.entity);
+				er->create(*m_engine, *static_cast<RenderScene*>(getComponent(m_camera, CAMERA_HASH).scene), cmp.entity);
 				m_editor_icons.push(er);
 			}
 		}
@@ -2000,6 +2028,7 @@ struct WorldEditorImpl : public WorldEditor
 			universe->entityCreated().bind<WorldEditorImpl, &WorldEditorImpl::onEntityCreated>(this);
 			universe->componentCreated().bind<WorldEditorImpl, &WorldEditorImpl::onComponentCreated>(this);
 			universe->componentDestroyed().bind<WorldEditorImpl, &WorldEditorImpl::onComponentDestroyed>(this);
+			universe->componentAdded().bind<WorldEditorImpl, &WorldEditorImpl::onComponentAdded>(this);
 			universe->entityDestroyed().bind<WorldEditorImpl, &WorldEditorImpl::onEntityDestroyed>(this);
 
 			m_selected_entities.clear();
@@ -2079,6 +2108,7 @@ struct WorldEditorImpl : public WorldEditor
 		float m_mouse_x;
 		float m_mouse_y;
 		Array<EditorIcon*> m_editor_icons;
+		Map<int32_t, Array<Component> > m_components;
 		bool m_is_game_mode;
 		FS::IFile* m_game_mode_file;
 		Engine* m_engine;

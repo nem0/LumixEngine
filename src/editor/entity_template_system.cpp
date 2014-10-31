@@ -31,11 +31,12 @@ namespace Lumix
 			class CreateInstanceCommand : public IEditorCommand
 			{
 				public:
-					CreateInstanceCommand(EntityTemplateSystemImpl& entity_system, const char* template_name, const Vec3& position)
+					CreateInstanceCommand(EntityTemplateSystemImpl& entity_system, WorldEditor& editor, const char* template_name, const Vec3& position)
 						: m_entity_system(entity_system)
 						, m_template_name_hash(crc32(template_name))
 						, m_position(position)
 						, m_rotation(Vec3(0, 1, 0), Math::degreesToRadians((float)(rand() % 360)))
+						, m_editor(editor)
 					{
 					}
 
@@ -50,7 +51,7 @@ namespace Lumix
 
 							m_entity_system.m_instances[m_template_name_hash].push(m_entity);
 							Entity template_entity = iter.second()[0];
-							const Entity::ComponentList& template_cmps = template_entity.getComponents();
+							const WorldEditor::ComponentList& template_cmps = m_editor.getComponents(template_entity);
 							for (int i = 0; i < template_cmps.size(); ++i)
 							{
 								m_entity_system.m_editor.cloneComponent(template_cmps[i], m_entity);
@@ -65,7 +66,7 @@ namespace Lumix
 
 					virtual void undo() override
 					{
-						const Entity::ComponentList& cmps = m_entity.getComponents();
+						const WorldEditor::ComponentList& cmps = m_editor.getComponents(m_entity);
 						for (int i = 0; i < cmps.size(); ++i)
 						{
 							cmps[i].scene->destroyComponent(cmps[i]);
@@ -92,6 +93,7 @@ namespace Lumix
 
 				private:
 					EntityTemplateSystemImpl& m_entity_system;
+					WorldEditor& m_editor;
 					uint32_t m_template_name_hash;
 					Entity m_entity;
 					Vec3 m_position;
@@ -211,7 +213,7 @@ namespace Lumix
 
 			virtual Entity createInstance(const char* name, const Vec3& position) override
 			{
-				CreateInstanceCommand* command = LUMIX_NEW(CreateInstanceCommand)(*this, name, position);
+				CreateInstanceCommand* command = LUMIX_NEW(CreateInstanceCommand)(*this, m_editor, name, position);
 				m_editor.executeCommand(command);
 				return command->getEntity();
 			}

@@ -65,7 +65,7 @@ void Gizmo::getEnityMatrix(Matrix& mtx, int selection_index)
 	else if(m_pivot_mode == PivotMode::CENTER)
 	{
 		m_editor.getSelectedEntities()[selection_index].getMatrix(mtx);
-		Component cmp = m_editor.getSelectedEntities()[selection_index].getComponent(RENDERABLE_HASH);
+		Component cmp = m_editor.getComponent(m_editor.getSelectedEntities()[selection_index], RENDERABLE_HASH);
 		if(cmp.isValid())
 		{
 			Model* model = static_cast<RenderScene*>(cmp.scene)->getRenderableModel(cmp);

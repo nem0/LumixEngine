@@ -44,7 +44,7 @@ void InsertMeshCommand::execute()
 
 void InsertMeshCommand::undo()
 {
-	const Lumix::Entity::ComponentList& cmps = m_entity.getComponents();
+	const Lumix::WorldEditor::ComponentList& cmps = m_editor.getComponents(m_entity);
 	for (int i = 0; i < cmps.size(); ++i)
 	{
 		cmps[i].scene->destroyComponent(cmps[i]);

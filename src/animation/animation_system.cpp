@@ -65,7 +65,6 @@ namespace Lumix
 			{
 				m_animables[component.index].m_is_free = true;
 				m_universe.destroyComponent(component);
-				m_universe.componentDestroyed().invoke(component);
 			}
 
 
