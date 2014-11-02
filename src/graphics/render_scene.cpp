@@ -722,7 +722,6 @@ namespace Lumix
 				}
 				else
 				{
-					float bounding_radius = m_renderables[renderable_index].m_model->getBoundingRadius();
 					m_culling_system->enableStatic(renderable_index);
 					m_always_visible.eraseItemFast(cmp.index);
 				}
