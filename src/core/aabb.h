@@ -48,6 +48,26 @@ namespace Lumix
 				m_max = new_max;
 			}
 
+			void getCorners(const Matrix& matrix, Vec3* points) const
+			{
+				Vec3 p(m_min.x, m_min.y, m_min.z);
+				points[0] = matrix.multiplyPosition(p);
+				p.set(m_min.x, m_min.y, m_max.z);
+				points[1] = matrix.multiplyPosition(p);
+				p.set(m_min.x, m_max.y, m_min.z);
+				points[2] = matrix.multiplyPosition(p);
+				p.set(m_min.x, m_max.y, m_max.z);
+				points[3] = matrix.multiplyPosition(p);
+				p.set(m_max.x, m_min.y, m_min.z);
+				points[4] = matrix.multiplyPosition(p);
+				p.set(m_max.x, m_min.y, m_max.z);
+				points[5] = matrix.multiplyPosition(p);
+				p.set(m_max.x, m_max.y, m_min.z);
+				points[6] = matrix.multiplyPosition(p);
+				p.set(m_max.x, m_max.y, m_max.z);
+				points[7] = matrix.multiplyPosition(p);
+			}
+
 		private:
 			Vec3 minCoords(const Vec3& a, const Vec3& b)
 			{
