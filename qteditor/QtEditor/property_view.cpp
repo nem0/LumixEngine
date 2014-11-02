@@ -1605,6 +1605,7 @@ PropertyView::PropertyView(QWidget* parent)
 	, m_terrain_editor(NULL)
 	, m_selected_resource(NULL)
 	, m_object(NULL)
+	, m_selected_entity(Lumix::Entity::INVALID)
 {
 	m_ui->setupUi(this);
 
@@ -2004,7 +2005,7 @@ void PropertyView::onEntitySelected(const Lumix::Array<Lumix::Entity>& e)
 	setSelectedResource(NULL);
 	m_selected_entity = e.empty() ? Lumix::Entity::INVALID : e[0];
 	clear();
-	if (e.size() == 1)
+	if (e.size() == 1 && e[0].isValid())
 	{
 		setObject(createEntityObject(*m_world_editor, e[0]));
 		m_ui->propertyList->expandAll();
