@@ -355,7 +355,7 @@ void ProfilerUI::on_profileTreeView_clicked(const QModelIndex &index)
 {
 	if(index.internalPointer() != NULL)
 	{
-		m_ui->graphView->setBlock(static_cast<ProfileModel::Block*>(index.internalPointer()));
+		m_ui->graphView->setBlock(static_cast<ProfileModel::Block*>(m_sortable_model->mapToSource(index).internalPointer()));
 		m_ui->graphView->update();
 	}
 }
