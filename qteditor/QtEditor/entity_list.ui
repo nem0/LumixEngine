@@ -88,6 +88,9 @@
       <property name="alternatingRowColors">
        <bool>true</bool>
       </property>
+      <property name="uniformRowHeights">
+       <bool>true</bool>
+      </property>
       <attribute name="headerVisible">
        <bool>false</bool>
       </attribute>

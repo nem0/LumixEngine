@@ -36,6 +36,7 @@ private slots:
 
 class ProfileModel : public QAbstractItemModel
 {
+	Q_OBJECT
 	public:
 		enum class Values
 		{
@@ -69,6 +70,9 @@ class ProfileModel : public QAbstractItemModel
 	private:
 		void cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_block);
 		void onFrame();
+		QModelIndex getIndex(Block* block);
+		int getRow(Block* block);
+		void emitDataChanged(Block* block);
 
 		virtual QVariant headerData(int section, Qt::Orientation, int role = Qt::DisplayRole) const override;
 		virtual QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const override;
