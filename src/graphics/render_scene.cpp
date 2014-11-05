@@ -150,6 +150,14 @@ namespace Lumix
 					LUMIX_DELETE(m_terrains[i]);
 				}
 
+				for(int i = 0; i < m_renderables.size(); ++i)
+				{
+					if(m_renderables[i].m_model)
+					{
+						m_renderables[i].m_model->getResourceManager().get(ResourceManager::MODEL)->unload(*m_renderables[i].m_model);
+					}
+				}
+
 				Timer::destroy(m_timer);
 				CullingSystem::destroy(*m_culling_system);
 			}
