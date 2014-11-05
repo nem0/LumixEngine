@@ -374,6 +374,20 @@ namespace Lumix
 			copyTable(old, &m_sentinel, ids_count);
 
 			m_size = old_size;
+			for(size_type i = 0; i < old_size; ++i)
+			{
+				node_type* n = &old[i]; 
+				if(n->m_next && n->m_next != &m_sentinel)
+				{
+					n = n->m_next;
+					while(n && n->m_next != &m_sentinel)
+					{
+						node_type* old_n = n;
+						n = n->m_next;
+						m_allocator.deallocate(old_n);
+					}
+				}
+			}
 			m_allocator.deallocate(old);
 		}
 

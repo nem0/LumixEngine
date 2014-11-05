@@ -189,7 +189,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 				while (!serializer.isArrayEnd())
 				{
 					serializer.deserializeArrayItem(label, sizeof(label));
-					m_attributes.push(string(label)); /// TODO emplace when it is merged
+					m_attributes.emplace(label);
 				}
 				serializer.deserializeArrayEnd();
 			}
@@ -199,7 +199,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 				while (!serializer.isArrayEnd())
 				{
 					serializer.deserializeArrayItem(label, sizeof(label));
-					m_passes.push(string(label)); /// TODO emplace when it is merged
+					m_passes.emplace(label);
 					m_pass_hashes.push(crc32(label));
 				}
 				serializer.deserializeArrayEnd();
