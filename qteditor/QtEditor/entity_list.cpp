@@ -184,6 +184,11 @@ class EntityListModel : public QAbstractItemModel
 			m_is_update_enabled = true;
 		}
 
+		~EntityListModel()
+		{
+			delete m_root;
+		}
+
 
 		void enableUpdate(bool enable)
 		{

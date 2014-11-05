@@ -116,6 +116,8 @@ namespace Lumix
 				m_input_system.destroy();
 				m_material_manager.destroy();
 
+				CullingSystem::destroy(*m_culling_system);
+
 				if (m_disk_file_device)
 				{
 					FS::FileSystem::destroy(m_file_system);

@@ -132,6 +132,7 @@ namespace Lumix
 		{
 			memTrackerLog("MemoryTracker", "MemoryTracker Detected memory leaks!");
 			memTrackerLog("MemoryTracker", "Dumping objects ->");
+			ASSERT(false);
 		}
 		else
 		{
@@ -188,6 +189,7 @@ namespace Lumix
 		{
 			memTrackerLog("MemoryTracker", "MemoryTracker Detected memory leaks!");
 			memTrackerLog("MemoryTracker", "Dumping objects ->");
+			ASSERT(false);
 		}
 		else
 		{
