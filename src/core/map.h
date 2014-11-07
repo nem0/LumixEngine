@@ -187,7 +187,7 @@ class Map
 
 		void insert(const Key& key, const Value& value)
 		{
-			Node* new_node = new ((Node*)m_allocator.allocate(sizeof(Node))) Node();
+			Node* new_node = new (static_cast<Node*>(m_allocator.allocate(sizeof(Node)))) Node();
 			++m_size;
 			new_node->key = key;
 			new_node->value = value;

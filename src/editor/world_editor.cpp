@@ -1001,45 +1001,48 @@ struct WorldEditorImpl : public WorldEditor
 			{
 				Vec3 origin, dir;
 				Component camera_cmp = getComponent(m_camera, CAMERA_HASH);
-				RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);
-				scene->getRay(camera_cmp, (float)x, (float)y, origin, dir);
-				RayCastModelHit hit = scene->castRay(origin, dir, Component::INVALID);
-				RayCastModelHit gizmo_hit = m_gizmo.castRay(origin, dir);
-				EditorIconHit icon_hit = raycastEditorIcons(origin, dir);
-				if (gizmo_hit.m_is_hit && (icon_hit.m_t < 0 || gizmo_hit.m_t < icon_hit.m_t))
+				if(camera_cmp.isValid())
 				{
-					if (!m_selected_entities.empty())
+					RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);
+					scene->getRay(camera_cmp, (float)x, (float)y, origin, dir);
+					RayCastModelHit hit = scene->castRay(origin, dir, Component::INVALID);
+					RayCastModelHit gizmo_hit = m_gizmo.castRay(origin, dir);
+					EditorIconHit icon_hit = raycastEditorIcons(origin, dir);
+					if (gizmo_hit.m_is_hit && (icon_hit.m_t < 0 || gizmo_hit.m_t < icon_hit.m_t))
 					{
-						m_mouse_mode = MouseMode::TRANSFORM;
-						if (gizmo_hit.m_mesh->getNameHash() == crc32("x_axis"))
+						if (!m_selected_entities.empty())
 						{
-							m_gizmo.startTransform(camera_cmp, x, y, Gizmo::TransformMode::X);
+							m_mouse_mode = MouseMode::TRANSFORM;
+							if (gizmo_hit.m_mesh->getNameHash() == crc32("x_axis"))
+							{
+								m_gizmo.startTransform(camera_cmp, x, y, Gizmo::TransformMode::X);
+							}
+							else if (gizmo_hit.m_mesh->getNameHash() == crc32("y_axis"))
+							{
+								m_gizmo.startTransform(camera_cmp, x, y, Gizmo::TransformMode::Y);
+							}
+							else
+							{
+								m_gizmo.startTransform(camera_cmp, x, y, Gizmo::TransformMode::Z);
+							}
 						}
-						else if (gizmo_hit.m_mesh->getNameHash() == crc32("y_axis"))
+					}
+					else if (icon_hit.m_t >= 0)
+					{
+						Entity e = icon_hit.m_icon->getEntity();
+						if(GetAsyncKeyState(VK_LCONTROL) >> 8)
 						{
-							m_gizmo.startTransform(camera_cmp, x, y, Gizmo::TransformMode::Y);
+							addEntitiesToSelection(&e, 1);
 						}
 						else
 						{
-							m_gizmo.startTransform(camera_cmp, x, y, Gizmo::TransformMode::Z);
+							selectEntities(&e, 1);
 						}
 					}
-				}
-				else if (icon_hit.m_t >= 0)
-				{
-					Entity e = icon_hit.m_icon->getEntity();
-					if(GetAsyncKeyState(VK_LCONTROL) >> 8)
+					else if (hit.m_is_hit)
 					{
-						addEntitiesToSelection(&e, 1);
+						onEntityMouseDown(hit, x, y);
 					}
-					else
-					{
-						selectEntities(&e, 1);
-					}
-				}
-				else if (hit.m_is_hit)
-				{
-					onEntityMouseDown(hit, x, y);
 				}
 			}
 		}
