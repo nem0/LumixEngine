@@ -116,7 +116,6 @@ namespace Lumix
 			virtual float getTerrainHeightAt(Component cmp, float x, float z) = 0;
 			virtual void setTerrainMaterial(Component cmp, const string& path) = 0;
 			virtual void getTerrainMaterial(Component cmp, string& path) = 0;
-			virtual Material* getTerrainMaterial(Component cmp) = 0;
 			virtual void setTerrainXZScale(Component cmp, float scale) = 0;
 			virtual float getTerrainXZScale(Component cmp) = 0;
 			virtual void setTerrainYScale(Component cmp, float scale) = 0;

@@ -65,10 +65,17 @@ struct RendererImpl : public Renderer
 		return version;
 	}
 
-	virtual IScene* createScene(Universe& universe)
+	virtual IScene* createScene(Universe& universe) override
 	{
 		return RenderScene::createInstance(*this, *m_engine, universe);
 	}
+
+
+	virtual void destroyScene(IScene* scene) override
+	{
+		RenderScene::destroyInstance(static_cast<RenderScene*>(scene));
+	}
+
 
 	virtual void setViewMatrix(const Matrix& matrix) override
 	{
@@ -258,40 +265,46 @@ struct RendererImpl : public Renderer
 	}
 
 
-	void registerPropertyDescriptors(WorldEditor& editor)
+	void registerPropertyDescriptors(Engine& engine)
 	{
-		editor.registerProperty("camera", LUMIX_NEW(StringPropertyDescriptor<RenderScene>)("slot", &RenderScene::getCameraSlot, &RenderScene::setCameraSlot));
-		editor.registerProperty("camera", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("fov", &RenderScene::getCameraFOV, &RenderScene::setCameraFOV));
-		editor.registerProperty("camera", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("near", &RenderScene::getCameraNearPlane, &RenderScene::setCameraNearPlane));
-		editor.registerProperty("camera", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("far", &RenderScene::getCameraFarPlane, &RenderScene::setCameraFarPlane));
+		if(engine.getWorldEditor())
+		{
+			WorldEditor& editor = *engine.getWorldEditor();
+			IAllocator& allocator = engine.getAllocator();
+		
+			editor.registerProperty("camera", allocator.newObject<StringPropertyDescriptor<RenderScene> >("slot", &RenderScene::getCameraSlot, &RenderScene::setCameraSlot));
+			editor.registerProperty("camera", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("fov", &RenderScene::getCameraFOV, &RenderScene::setCameraFOV));
+			editor.registerProperty("camera", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("near", &RenderScene::getCameraNearPlane, &RenderScene::setCameraNearPlane));
+			editor.registerProperty("camera", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("far", &RenderScene::getCameraFarPlane, &RenderScene::setCameraFarPlane));
+		
+			editor.registerProperty("renderable", allocator.newObject<ResourcePropertyDescriptor<RenderScene> >("source", &RenderScene::getRenderablePath, &RenderScene::setRenderablePath, "Mesh (*.msh)"));
+			editor.registerProperty("renderable", allocator.newObject<BoolPropertyDescriptor<RenderScene> >("is_always_visible", &RenderScene::isRenderableAlwaysVisible, &RenderScene::setRenderableIsAlwaysVisible));
+		
+			editor.registerProperty("light", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("ambient_intensity", &RenderScene::getLightAmbientIntensity, &RenderScene::setLightAmbientIntensity));
+			editor.registerProperty("light", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("diffuse_intensity", &RenderScene::getLightDiffuseIntensity, &RenderScene::setLightDiffuseIntensity));
+			editor.registerProperty("light", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("fog_density", &RenderScene::getFogDensity, &RenderScene::setFogDensity));
+			editor.registerProperty("light", allocator.newObject<ColorPropertyDescriptor<RenderScene> >("ambient_color", &RenderScene::getLightAmbientColor, &RenderScene::setLightAmbientColor));
+			editor.registerProperty("light", allocator.newObject<ColorPropertyDescriptor<RenderScene> >("diffuse_color", &RenderScene::getLightDiffuseColor, &RenderScene::setLightDiffuseColor));
+			editor.registerProperty("light", allocator.newObject<ColorPropertyDescriptor<RenderScene> >("fog_color", &RenderScene::getFogColor, &RenderScene::setFogColor));
 
-		editor.registerProperty("renderable", LUMIX_NEW(ResourcePropertyDescriptor<RenderScene>)("source", &RenderScene::getRenderablePath, &RenderScene::setRenderablePath, "Mesh (*.msh)"));
-		editor.registerProperty("renderable", LUMIX_NEW(BoolPropertyDescriptor<RenderScene>)("is_always_visible", &RenderScene::isRenderableAlwaysVisible, &RenderScene::setRenderableIsAlwaysVisible));
+			editor.registerProperty("terrain", allocator.newObject<ResourcePropertyDescriptor<RenderScene> >("material", &RenderScene::getTerrainMaterial, &RenderScene::setTerrainMaterial, "Material (*.mat)"));
+			editor.registerProperty("terrain", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("xz_scale", &RenderScene::getTerrainXZScale, &RenderScene::setTerrainXZScale));
+			editor.registerProperty("terrain", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("y_scale", &RenderScene::getTerrainYScale, &RenderScene::setTerrainYScale));
 
-		editor.registerProperty("light", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("ambient_intensity", &RenderScene::getLightAmbientIntensity, &RenderScene::setLightAmbientIntensity));
-		editor.registerProperty("light", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("diffuse_intensity", &RenderScene::getLightDiffuseIntensity, &RenderScene::setLightDiffuseIntensity));
-		editor.registerProperty("light", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("fog_density", &RenderScene::getFogDensity, &RenderScene::setFogDensity));
-		editor.registerProperty("light", LUMIX_NEW(ColorPropertyDescriptor<RenderScene>)("ambient_color", &RenderScene::getLightAmbientColor, &RenderScene::setLightAmbientColor));
-		editor.registerProperty("light", LUMIX_NEW(ColorPropertyDescriptor<RenderScene>)("diffuse_color", &RenderScene::getLightDiffuseColor, &RenderScene::setLightDiffuseColor));
-		editor.registerProperty("light", LUMIX_NEW(ColorPropertyDescriptor<RenderScene>)("fog_color", &RenderScene::getFogColor, &RenderScene::setFogColor));
-
-		editor.registerProperty("terrain", LUMIX_NEW(ResourcePropertyDescriptor<RenderScene>)("material", &RenderScene::getTerrainMaterial, &RenderScene::setTerrainMaterial, "Material (*.mat)"));
-		editor.registerProperty("terrain", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("xz_scale", &RenderScene::getTerrainXZScale, &RenderScene::setTerrainXZScale));
-		editor.registerProperty("terrain", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("y_scale", &RenderScene::getTerrainYScale, &RenderScene::setTerrainYScale));
-
-		auto grass = LUMIX_NEW(ArrayDescriptor<RenderScene>)("grass", &RenderScene::getGrassCount, &RenderScene::addGrass, &RenderScene::removeGrass);
-		grass->addChild(LUMIX_NEW(ResourceArrayObjectDescriptor<RenderScene>)("mesh", &RenderScene::getGrass, &RenderScene::setGrass, "Mesh (*.msh)"));
-		auto ground = LUMIX_NEW(IntArrayObjectDescriptor<RenderScene>)("ground", &RenderScene::getGrassGround, &RenderScene::setGrassGround);
-		ground->setLimit(0, 4);
-		grass->addChild(ground);
-		grass->addChild(LUMIX_NEW(IntArrayObjectDescriptor<RenderScene>)("density", &RenderScene::getGrassDensity, &RenderScene::setGrassDensity));
-		editor.registerProperty("terrain", grass);
+			auto grass = allocator.newObject<ArrayDescriptor<RenderScene> >("grass", &RenderScene::getGrassCount, &RenderScene::addGrass, &RenderScene::removeGrass);
+			grass->addChild(allocator.newObject<ResourceArrayObjectDescriptor<RenderScene> >("mesh", &RenderScene::getGrass, &RenderScene::setGrass, "Mesh (*.msh)"));
+			auto ground = allocator.newObject<IntArrayObjectDescriptor<RenderScene> >("ground", &RenderScene::getGrassGround, &RenderScene::setGrassGround);
+			ground->setLimit(0, 4);
+			grass->addChild(ground);
+			grass->addChild(allocator.newObject<IntArrayObjectDescriptor<RenderScene> >("density", &RenderScene::getGrassDensity, &RenderScene::setGrassDensity));
+			editor.registerProperty("terrain", grass);
+		}
 	}
 
 
 	virtual bool create(Engine& engine) override
 	{
-		registerPropertyDescriptors(*engine.getWorldEditor());
+		registerPropertyDescriptors(engine);
 
 		m_engine = &engine;
 		glewExperimental = GL_TRUE;

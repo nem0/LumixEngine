@@ -230,8 +230,12 @@ class base_string
 			{
 				if(m_cstr)
 				{
-					m_size += base_string<T, Allocator>::strlen(rhs);
-					m_cstr = (T*)m_allocator.reallocate(m_cstr, m_size + 1);
+					int32_t new_size = m_size + base_string<T, Allocator>::strlen(rhs);
+					T* new_cstr = (T*)m_allocator.allocate(new_size + 1);
+					memcpy(new_cstr, m_cstr, sizeof(T) * m_size + 1);
+					m_allocator.deallocate(m_cstr);
+					m_cstr = new_cstr;
+					m_size = new_size;
 					catCString(m_cstr, m_size + 1, rhs);
 				}
 				else
@@ -251,25 +255,19 @@ class base_string
 			}
 			if(m_cstr)
 			{
-				m_size += rhs.length();
-				m_cstr = (T*)m_allocator.reallocate(m_cstr, m_size + 1);
+				int32_t new_size = m_size + rhs.length();
+				T* new_cstr = (T*)m_allocator.allocate(new_size + 1);
+				memcpy(new_cstr, m_cstr, sizeof(T) * m_size + 1);
+				m_allocator.deallocate(m_cstr);
+				m_cstr = new_cstr;
+				m_size = new_size;
+
 				catCString(m_cstr, m_size + 1, rhs.m_cstr);
 			}
 			else
 			{
 				*this = rhs;
 			}
-		}
-
-		void insert(int32_t pos, T value)
-		{
-			m_cstr = (T*)m_allocator.reallocate(m_cstr, m_size + 2);
-			for(int32_t i = m_size + 1; i > pos; --i)
-			{
-				m_cstr[i] = m_cstr[i-1];
-			}
-			m_cstr[pos] = value;
-			++m_size;
 		}
 
 		void erase(int32_t pos)

@@ -12,12 +12,6 @@
 namespace Lumix
 {
 
-	extern "C" IPlugin* createPlugin()
-	{
-		return AnimationSystem::createInstance();
-	}
-
-
 	static const uint32_t RENDERABLE_HASH = crc32("renderable");
 	static const uint32_t ANIMABLE_HASH = crc32("animable");
 
@@ -36,7 +30,7 @@ namespace Lumix
 			};
 
 		public:
-			AnimationSceneImpl(AnimationSystem& anim_system, Engine& engine, Universe& universe)
+			AnimationSceneImpl(IPlugin& anim_system, Engine& engine, Universe& universe)
 				: m_universe(universe)
 				, m_engine(engine)
 				, m_anim_system(anim_system)
@@ -254,14 +248,14 @@ namespace Lumix
 
 		private:
 			Universe& m_universe;
-			AnimationSystem& m_anim_system;
+			IPlugin& m_anim_system;
 			Engine& m_engine;
 			Array<Animable> m_animables;
 			RenderScene* m_render_scene;
 	};
 
 
-	struct AnimationSystemImpl : public AnimationSystem
+	struct AnimationSystemImpl : public IPlugin
 	{
 		public:
 			AnimationSystemImpl() {}
@@ -270,6 +264,12 @@ namespace Lumix
 			{
 				ASSERT(m_engine);
 				return LUMIX_NEW(AnimationSceneImpl)(*this, *m_engine, universe);
+			}
+
+		
+			virtual void destroyScene(IScene* scene) override
+			{
+				LUMIX_DELETE(scene);
 			}
 
 
@@ -282,7 +282,7 @@ namespace Lumix
 			virtual bool create(Engine& engine) override
 			{
 				m_engine = &engine;
-				engine.getWorldEditor()->registerProperty("animable", LUMIX_NEW(FilePropertyDescriptor<AnimationSceneImpl>)("preview", &AnimationSceneImpl::getPreview, &AnimationSceneImpl::setPreview, "Animation (*.ani)"));
+				engine.getWorldEditor()->registerProperty("animable", engine.getAllocator().newObject<FilePropertyDescriptor<AnimationSceneImpl> >("preview", &AnimationSceneImpl::getPreview, &AnimationSceneImpl::setPreview, "Animation (*.ani)"));
 				m_animation_manager.create(ResourceManager::ANIMATION, engine.getResourceManager());
 				return true;
 			}
@@ -302,11 +302,10 @@ namespace Lumix
 	};
 
 
-	AnimationSystem* AnimationSystem::createInstance()
+	extern "C" IPlugin* createPlugin(Engine& engine)
 	{
-		return LUMIX_NEW(AnimationSystemImpl);
+		return engine.getAllocator().newObject<AnimationSystemImpl>();
 	}
-
 
 
 } // ~namespace Lumix

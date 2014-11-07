@@ -35,16 +35,9 @@ namespace Lumix
 	};
 
 
-	class LUMIX_ANIMATION_API AnimationSystem : public IPlugin
-	{
-		public:
-			static AnimationSystem* createInstance();
-	};
-
-
 	extern "C"
 	{
-		LUMIX_ANIMATION_API IPlugin* createPlugin();
+		LUMIX_ANIMATION_API IPlugin* createPlugin(Engine& engine);
 	}
 
 }// ~ namespace Lumix 

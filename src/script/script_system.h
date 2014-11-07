@@ -37,7 +37,7 @@ class LUMIX_SCRIPT_API ScriptSystem : public IPlugin
 
 extern "C"
 {
-	LUMIX_SCRIPT_API IPlugin* createPlugin();
+	LUMIX_SCRIPT_API IPlugin* createPlugin(Engine& engine);
 }
 
 

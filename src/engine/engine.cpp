@@ -127,6 +127,12 @@ namespace Lumix
 			}
 
 
+			virtual IAllocator& getAllocator() override
+			{
+				return m_allocator;
+			}
+
+
 			virtual Universe* createUniverse() override
 			{
 				m_universe = LUMIX_NEW(Universe)();
@@ -177,7 +183,7 @@ namespace Lumix
 				{
 					for (int i = 0; i < m_scenes.size(); ++i)
 					{
-						LUMIX_DELETE(m_scenes[i]);
+						m_scenes[i]->getPlugin().destroyScene(m_scenes[i]);
 					}
 					m_scenes.clear();
 					Hierarchy::destroy(m_hierarchy);
@@ -318,6 +324,8 @@ namespace Lumix
 
 
 		private:
+			DefaultAllocator m_allocator;
+
 			Renderer* m_renderer;
 			FS::FileSystem* m_file_system; 
 			FS::MemoryFileDevice* m_mem_file_device;

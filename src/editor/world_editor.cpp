@@ -958,18 +958,7 @@ struct WorldEditorImpl : public WorldEditor
 	
 		virtual ~WorldEditorImpl()
 		{
-			LUMIX_DELETE(m_measure_tool);
-			destroyUndoStack();
-			auto iter = m_component_properties.begin();
-			auto end = m_component_properties.end();
-			while (iter != end)
-			{
-				for (int i = 0, c = iter.second().size(); i < c; ++i)
-				{
-					LUMIX_DELETE(iter.second()[i]);
-				}
-				++iter;
-			}
+			
 		}
 
 
@@ -1668,6 +1657,19 @@ struct WorldEditorImpl : public WorldEditor
 
 		void destroy()
 		{
+			LUMIX_DELETE(m_measure_tool);
+			destroyUndoStack();
+			auto iter = m_component_properties.begin();
+			auto end = m_component_properties.end();
+			while (iter != end)
+			{
+				for (int i = 0, c = iter.second().size(); i < c; ++i)
+				{
+					m_engine->getAllocator().deleteObject(iter.second()[i]);
+				}
+				++iter;
+			}
+			
 			destroyUniverse();
 			EntityTemplateSystem::destroy(m_template_system);
 			Engine::destroy(m_engine);
