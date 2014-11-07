@@ -202,7 +202,7 @@ class EntityListModel : public QAbstractItemModel
 
 			if (index.isValid())
 			{
-				return Qt::ItemIsDragEnabled | Qt::ItemIsDropEnabled | defaultFlags;
+				return Qt::ItemIsDragEnabled | Qt::ItemIsDropEnabled | Qt::ItemIsEditable | defaultFlags;
 			}
 			else
 			{
@@ -365,6 +365,28 @@ class EntityListModel : public QAbstractItemModel
 		virtual int columnCount(const QModelIndex&) const override
 		{
 			return 1;
+		}
+
+
+		virtual bool setData(const QModelIndex &index, const QVariant &value, int role = Qt::EditRole) override
+		{
+			if(index.isValid() && role == Qt::EditRole)
+			{
+				EntityNode *item = static_cast<EntityNode*>(index.internalPointer());
+				switch(index.column())
+				{
+					case 0:
+						{
+							const QByteArray& name = value.toString().toLatin1();
+							m_engine->getWorldEditor()->setEntityName(item->m_entity, name.data());
+							emit dataChanged(index, index);
+							return true;
+						}
+					default:
+						ASSERT(false);
+				}
+			}
+			return QAbstractItemModel::setData(index, value, role);
 		}
 
 
