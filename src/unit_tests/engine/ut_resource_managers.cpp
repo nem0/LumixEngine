@@ -180,7 +180,8 @@ namespace
 		file_system->setDefaultDevice("memory:disk");
 
 		Lumix::ResourceManager resource_manager;
-		Lumix::AnimationManager animation_manager;
+		Lumix::DefaultAllocator allocator;
+		Lumix::AnimationManager animation_manager(allocator);
 		resource_manager.create(*file_system);
 		animation_manager.create(Lumix::ResourceManager::ANIMATION, resource_manager);
 
@@ -306,7 +307,8 @@ namespace
 		file_system->setDefaultDevice("memory:disk");
 
 		Lumix::ResourceManager resource_manager;
-		Lumix::AnimationManager animation_manager;
+		Lumix::DefaultAllocator allocator;
+		Lumix::AnimationManager animation_manager(allocator);
 		resource_manager.create(*file_system);
 		animation_manager.create(Lumix::ResourceManager::ANIMATION, resource_manager);
 
