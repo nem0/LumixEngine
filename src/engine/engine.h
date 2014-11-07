@@ -53,8 +53,8 @@ namespace Lumix
 			virtual const Array<IScene*>& getScenes() const = 0;
 			virtual IScene* getScene(uint32_t type) const = 0;
 			virtual MTJD::Manager& getMTJDManager() = 0;
-//			virtual CullingSystem& getCullingSystem() const = 0;
 
+			virtual IAllocator& getAllocator() = 0;
 			virtual ResourceManager& getResourceManager() = 0;
 
 			virtual const char* getBasePath() const = 0;

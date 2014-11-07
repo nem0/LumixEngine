@@ -650,12 +650,6 @@ namespace Lumix
 			}
 
 
-			virtual Material* getTerrainMaterial(Component cmp) override
-			{
-				return m_terrains[cmp.index]->getMaterial();
-			}
-
-
 			virtual void getTerrainMaterial(Component cmp, string& path) override
 			{
 				if (m_terrains[cmp.index]->getMaterial())

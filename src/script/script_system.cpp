@@ -303,16 +303,22 @@ namespace Lumix
 		}
 
 
-		virtual IScene* createScene(Universe& universe)
+		virtual IScene* createScene(Universe& universe) override
 		{
 			return LUMIX_NEW(ScriptSceneImpl)(*this, *m_engine, universe);
+		}
+
+
+		virtual void destroyScene(IScene* scene) override
+		{
+			LUMIX_DELETE(scene);
 		}
 
 
 		virtual bool create(Engine& engine) override
 		{
 			m_engine = &engine;
-			engine.getWorldEditor()->registerProperty("script", LUMIX_NEW(FilePropertyDescriptor<ScriptSceneImpl>)("source", &ScriptSceneImpl::getScriptPath, &ScriptSceneImpl::setScriptPath, "Script (*.cpp)"));
+			engine.getWorldEditor()->registerProperty("script", engine.getAllocator().newObject<FilePropertyDescriptor<ScriptSceneImpl> >("source", &ScriptSceneImpl::getScriptPath, &ScriptSceneImpl::setScriptPath, "Script (*.cpp)"));
 			return true;
 		}
 
@@ -331,9 +337,9 @@ namespace Lumix
 	}; // ScriptSystemImpl
 
 
-	extern "C" IPlugin* createPlugin()
+	extern "C" IPlugin* createPlugin(Engine& engine)
 	{
-		return LUMIX_NEW(ScriptSystemImpl)();
+		return engine.getAllocator().newObject<ScriptSystemImpl>();
 	}
 
 } // ~namespace Lumix

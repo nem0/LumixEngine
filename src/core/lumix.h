@@ -44,6 +44,7 @@ const uint32_t LUMIX_MAX_PATH = 260;
 	#define NULL nullptr
 #endif
 
+#define LUMIX_ALIGN_OF(T) __alignof(T)
 #define LUMIX_FORCE_INLINE __forceinline
 
 #ifdef BUILDING_CORE

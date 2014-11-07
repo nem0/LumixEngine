@@ -41,6 +41,7 @@ namespace Lumix
 			virtual void sendMessage(const char*) {};
 
 			virtual IScene* createScene(Universe&) { return NULL; }
+			virtual void destroyScene(IScene*) { ASSERT(false); }
 	};
 
 

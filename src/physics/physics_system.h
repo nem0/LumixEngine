@@ -5,6 +5,16 @@
 #include "engine/iplugin.h"
 
 
+namespace physx
+{
+
+	class PxControllerManager;
+	class PxCooking;
+	class PxPhysics;
+
+} // namespace physx
+
+
 namespace Lumix
 {
 
@@ -14,21 +24,20 @@ class LUMIX_PHYSICS_API PhysicsSystem : public IPlugin
 	friend class PhysicsScene;
 	friend struct PhysicsSceneImpl;
 	public:
-		PhysicsSystem() { m_impl = 0; }
-		
-		virtual bool create(Engine& engine) override;
-		virtual IScene* createScene(Universe& universe) override;
-		virtual void destroy() override;
 		virtual const char* getName() const override { return "physics"; }
+		
+		virtual physx::PxControllerManager* getControllerManager() = 0;
+		virtual physx::PxPhysics* getPhysics() = 0;
+		virtual physx::PxCooking* getCooking() = 0;
 
-	private:
-		struct PhysicsSystemImpl* m_impl;
+	protected:
+		PhysicsSystem() {}
 };
 
 
 extern "C"
 {
-	LUMIX_PHYSICS_API IPlugin* createPlugin();
+	LUMIX_PHYSICS_API IPlugin* createPlugin(Engine& engine);
 }
 
 

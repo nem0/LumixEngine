@@ -1,7 +1,8 @@
 #include "engine/plugin_manager.h"
-#include "engine/iplugin.h"
 #include "core/log.h"
 #include "core/array.h"
+#include "engine/engine.h"
+#include "engine/iplugin.h"
 #include <Windows.h>
 
 
@@ -65,14 +66,14 @@ namespace Lumix
 	IPlugin* PluginManager::load(const char* path)
 	{
 		g_log_info.log("plugins") << "loading plugin " << path;
-		typedef IPlugin* (*PluginCreator)();
+		typedef IPlugin* (*PluginCreator)(Engine&);
 		HMODULE lib = LoadLibrary(TEXT(path));
 		if(lib)
 		{
 			PluginCreator creator = (PluginCreator)GetProcAddress(lib, TEXT("createPlugin"));
 			if(creator)
 			{
-				IPlugin* plugin = creator();
+				IPlugin* plugin = creator(*m_impl->m_engine);
 				if(!plugin->create(*m_impl->m_engine))
 				{
 					LUMIX_DELETE(plugin);
@@ -107,7 +108,7 @@ namespace Lumix
 		for(int i = 0; i < m_impl->m_plugins.size(); ++i)
 		{
 			m_impl->m_plugins[i]->destroy();
-			LUMIX_DELETE(m_impl->m_plugins[i]);
+			m_impl->m_engine->getAllocator().deleteObject(m_impl->m_plugins[i]);
 		}
 		LUMIX_DELETE(m_impl);
 		m_impl = NULL;

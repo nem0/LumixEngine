@@ -130,6 +130,7 @@
       <Filter>mt</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\aabb.h" />
+    <ClInclude Include="..\..\..\src\core\allocator.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\core\blob.cpp" />
