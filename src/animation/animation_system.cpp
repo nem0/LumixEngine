@@ -15,8 +15,19 @@ namespace Lumix
 	static const uint32_t RENDERABLE_HASH = crc32("renderable");
 	static const uint32_t ANIMABLE_HASH = crc32("animable");
 
+	namespace FS
+	{
+		class FileSystem;
+	};
 
-	class AnimationSceneImpl : public AnimationScene
+	class Animation;
+	class Engine;
+	struct Entity;
+	class ISerializer;
+	class Universe;
+
+
+	class AnimationSceneImpl : public IScene
 	{
 		private:
 			struct Animable
@@ -102,37 +113,37 @@ namespace Lumix
 			}
 
 
-			virtual void setFrame(Component cmp, int frame) override
+			virtual void setFrame(Component cmp, int frame)
 			{
 				m_animables[cmp.index].m_time = m_animables[cmp.index].m_animation->getLength() * frame / 30.0f; /// TODO get rid of the constant
 			}
 
 
-			virtual bool isManual(Component cmp) override
+			virtual bool isManual(Component cmp)
 			{
 				return m_animables[cmp.index].m_manual;
 			}
 
 
-			virtual void setManual(Component cmp, bool is_manual) override
+			virtual void setManual(Component cmp, bool is_manual)
 			{
 				m_animables[cmp.index].m_manual = is_manual;
 			}
 
 
-			virtual void getPreview(Component cmp, string& path) override
+			virtual void getPreview(Component cmp, string& path)
 			{
 				path = m_animables[cmp.index].m_animation ? m_animables[cmp.index].m_animation->getPath().c_str() : "";
 			}
 
 
-			virtual void setPreview(Component cmp, const string& path) override
+			virtual void setPreview(Component cmp, const string& path)
 			{
 				playAnimation(cmp, path.c_str());
 			}
 
 
-			virtual void playAnimation(const Component& cmp, const char* path) override
+			virtual void playAnimation(const Component& cmp, const char* path)
 			{
 				m_animables[cmp.index].m_animation = loadAnimation(path);
 				m_animables[cmp.index].m_time = 0;
@@ -140,7 +151,7 @@ namespace Lumix
 			}
 
 
-			virtual void setAnimationFrame(const Component& cmp, int frame) override
+			virtual void setAnimationFrame(const Component& cmp, int frame)
 			{
 				if (m_animables[cmp.index].m_animation)
 				{
@@ -149,7 +160,7 @@ namespace Lumix
 			}
 
 
-			virtual int getFrameCount(const Component& cmp) const override
+			virtual int getFrameCount(const Component& cmp) const
 			{
 				if (m_animables[cmp.index].m_animation)
 				{
@@ -258,18 +269,21 @@ namespace Lumix
 	struct AnimationSystemImpl : public IPlugin
 	{
 		public:
-			AnimationSystemImpl() {}
+			AnimationSystemImpl(Engine& engine)
+				: m_allocator(engine.getAllocator())
+				, m_engine(engine)
+				, m_animation_manager(m_allocator)
+			{}
 
 			virtual IScene* createScene(Universe& universe) override
 			{
-				ASSERT(m_engine);
-				return LUMIX_NEW(AnimationSceneImpl)(*this, *m_engine, universe);
+				return m_allocator.newObject<AnimationSceneImpl>(*this, m_engine, universe);
 			}
 
 		
 			virtual void destroyScene(IScene* scene) override
 			{
-				LUMIX_DELETE(scene);
+				m_allocator.deleteObject(scene);
 			}
 
 
@@ -281,21 +295,21 @@ namespace Lumix
 
 			virtual bool create(Engine& engine) override
 			{
-				m_engine = &engine;
-				engine.getWorldEditor()->registerProperty("animable", engine.getAllocator().newObject<FilePropertyDescriptor<AnimationSceneImpl> >("preview", &AnimationSceneImpl::getPreview, &AnimationSceneImpl::setPreview, "Animation (*.ani)"));
-				m_animation_manager.create(ResourceManager::ANIMATION, engine.getResourceManager());
+				m_engine.getWorldEditor()->registerProperty("animable", m_engine.getAllocator().newObject<FilePropertyDescriptor<AnimationSceneImpl> >("preview", &AnimationSceneImpl::getPreview, &AnimationSceneImpl::setPreview, "Animation (*.ani)"));
+				m_animation_manager.create(ResourceManager::ANIMATION, m_engine.getResourceManager());
 				return true;
 			}
 
 
 			virtual void destroy() override
 			{
-				m_engine->getResourceManager().get(ResourceManager::ANIMATION)->releaseAll();
+				m_engine.getResourceManager().get(ResourceManager::ANIMATION)->releaseAll();
 			}
 
-			Engine* m_engine;
+			Engine& m_engine;
 			AnimationManager m_animation_manager;
-	
+			BaseProxyAllocator m_allocator;
+
 		private:
 			void operator=(const AnimationSystemImpl&);
 			AnimationSystemImpl(const AnimationSystemImpl&);
@@ -304,7 +318,7 @@ namespace Lumix
 
 	extern "C" IPlugin* createPlugin(Engine& engine)
 	{
-		return engine.getAllocator().newObject<AnimationSystemImpl>();
+		return engine.getAllocator().newObject<AnimationSystemImpl>(engine);
 	}
 
 
