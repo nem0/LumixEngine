@@ -9,6 +9,10 @@ namespace Lumix
 
 	struct InputSystemImpl
 	{
+		InputSystemImpl(IAllocator& allocator)
+			: m_actions(allocator)
+		{}
+
 		struct Action
 		{
 			InputSystem::InputType type;
@@ -27,9 +31,9 @@ namespace Lumix
 	}
 
 
-	bool InputSystem::create()
+	bool InputSystem::create(IAllocator& allocator)
 	{
-		m_impl = LUMIX_NEW(InputSystemImpl)();
+		m_impl = LUMIX_NEW(InputSystemImpl)(allocator);
 		m_impl->m_mouse_rel_x = 0;
 		m_impl->m_mouse_rel_y = 0;
 		return true;

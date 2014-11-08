@@ -24,7 +24,7 @@ namespace Lumix
 
 
 		public:
-			static Hierarchy* create(Universe& universe);	
+			static Hierarchy* create(Universe& universe, IAllocator& allocator);
 			static void destroy(Hierarchy* hierarchy);
 
 			virtual ~Hierarchy() {}

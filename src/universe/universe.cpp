@@ -17,7 +17,9 @@ Universe::~Universe()
 }
 
 
-Universe::Universe()
+Universe::Universe(IAllocator& allocator)
+	: m_name_to_id_map(allocator)
+	, m_id_to_name_map(allocator)
 {
 	m_positions.reserve(RESERVED_ENTITIES);
 	m_rotations.reserve(RESERVED_ENTITIES);

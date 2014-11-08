@@ -11,7 +11,7 @@ namespace Lumix
 {
 
 
-template <typename Key, typename Value, typename Allocator = DefaultAllocator>
+template <typename Key, typename Value>
 class Map
 {
 	private:
@@ -104,14 +104,8 @@ class Map
 		};
 
 	public:
-		Map(const Allocator& allocator)
+		Map(IAllocator& allocator)
 			: m_allocator(allocator)
-		{
-			m_root = NULL;
-			m_size = 0;
-		}
-
-		Map()
 		{
 			m_root = NULL;
 			m_size = 0;
@@ -471,7 +465,7 @@ class Map
 	private:
 		Node*	m_root;
 		int		m_size;
-		Allocator m_allocator;
+		IAllocator& m_allocator;
 };
 
 

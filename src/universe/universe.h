@@ -28,7 +28,7 @@ class LUMIX_ENGINE_API Universe final
 {
 	friend struct Entity;
 	public:
-		Universe();
+		Universe(IAllocator& allocator);
 		~Universe();
 
 		Entity createEntity();

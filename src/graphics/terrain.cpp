@@ -173,6 +173,8 @@ namespace Lumix
 		, m_brush_position(0, 0, 0)
 		, m_brush_size(1)
 		, m_allocator(allocator)
+		, m_grass_quads(m_allocator)
+		, m_last_camera_position(m_allocator)
 	{
 		generateGeometry();
 	}
