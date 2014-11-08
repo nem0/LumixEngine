@@ -64,7 +64,7 @@ namespace Lumix
 	class LUMIX_ENGINE_API RenderScene : public IScene
 	{
 		public:
-			static RenderScene* createInstance(Renderer& renderer, Engine& engine, Universe& universe);
+			static RenderScene* createInstance(Renderer& renderer, Engine& engine, Universe& universe, IAllocator& allocator);
 			static void destroyInstance(RenderScene* scene);
 
 			virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Component& ignore) = 0;
@@ -75,6 +75,7 @@ namespace Lumix
 			virtual Timer* getTimer() const = 0;
 			virtual void renderTerrain(const TerrainInfo& info, Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos) = 0;
 			virtual Engine& getEngine() const = 0;
+			virtual IAllocator& getAllocator() = 0;
 
 			virtual Pose& getPose(const Component& cmp) = 0;
 			virtual Component getLight(int index) = 0;

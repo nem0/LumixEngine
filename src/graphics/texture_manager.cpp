@@ -6,8 +6,9 @@
 
 namespace Lumix
 {
-	TextureManager::TextureManager()
+	TextureManager::TextureManager(IAllocator& allocator)
 		: ResourceManagerBase()
+		, m_allocator(allocator)
 	{
 		m_buffer = NULL;
 		m_buffer_size = -1;
@@ -16,31 +17,31 @@ namespace Lumix
 
 	TextureManager::~TextureManager()
 	{
-		LUMIX_DELETE_ARRAY(m_buffer);
+		m_allocator.deallocate(m_buffer);
 	}
 
 
 	Resource* TextureManager::createResource(const Path& path)
 	{
-		return LUMIX_NEW(Texture)(path, getOwner());
+		return m_allocator.newObject<Texture>(path, getOwner());
 	}
 
 	void TextureManager::destroyResource(Resource& resource)
 	{
-		LUMIX_DELETE(static_cast<Texture*>(&resource));
+		m_allocator.deleteObject(static_cast<Texture*>(&resource));
 	}
 
 	uint8_t* TextureManager::getBuffer(int32_t size)
 	{
 		if (m_buffer_size < size)
 		{
-			LUMIX_DELETE_ARRAY(m_buffer);
+			m_allocator.deallocate(m_buffer);
 			m_buffer = NULL;
 			m_buffer_size = -1;
 		}
 		if (m_buffer == NULL)
 		{
-			m_buffer = LUMIX_NEW_ARRAY(uint8_t, size);
+			m_buffer = (uint8_t*)m_allocator.allocate(sizeof(uint8_t) * size);
 			m_buffer_size = size;
 		}
 		return m_buffer;

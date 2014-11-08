@@ -66,7 +66,7 @@ class Terrain
 		static const int GRASS_QUAD_SIZE = 10;
 
 	public:
-		Terrain(const Entity& entity, RenderScene& scene);
+		Terrain(const Entity& entity, RenderScene& scene, IAllocator& allocator);
 		~Terrain();
 
 		void render(Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos);
@@ -123,6 +123,7 @@ class Terrain
 		Vec3 m_brush_position;
 		float m_brush_size;
 		bool m_force_grass_update;
+		IAllocator& m_allocator;
 };
 
 

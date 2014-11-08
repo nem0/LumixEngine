@@ -159,7 +159,7 @@ namespace Lumix
 	};
 
 
-	Terrain::Terrain(const Entity& entity, RenderScene& scene)
+	Terrain::Terrain(const Entity& entity, RenderScene& scene, IAllocator& allocator)
 		: m_mesh(NULL)
 		, m_material(NULL)
 		, m_root(NULL)
@@ -172,6 +172,7 @@ namespace Lumix
 		, m_scene(scene)
 		, m_brush_position(0, 0, 0)
 		, m_brush_size(1)
+		, m_allocator(allocator)
 	{
 		generateGeometry();
 	}
@@ -190,23 +191,23 @@ namespace Lumix
 	Terrain::~Terrain()
 	{
 		setMaterial(NULL);
-		LUMIX_DELETE(m_mesh);
-		LUMIX_DELETE(m_root);
+		m_allocator.deleteObject(m_mesh);
+		m_allocator.deleteObject(m_root);
 		for(int i = 0; i < m_grass_types.size(); ++i)
 		{
-			LUMIX_DELETE(m_grass_types[i]);
+			m_allocator.deleteObject(m_grass_types[i]);
 		}
 		for(Map<Component, Array<GrassQuad*> >::iterator iter = m_grass_quads.begin(), end = m_grass_quads.end(); iter != end; ++iter)
 		{
 			Array<GrassQuad*>& quads = iter.value();
 			for (int i = 0; i < quads.size(); ++i)
 			{
-				LUMIX_DELETE(quads[i]);
+				m_allocator.deleteObject(quads[i]);
 			}
 		}
 		for (int i = 0; i < m_free_grass_quads.size(); ++i)
 		{
-			LUMIX_DELETE(m_free_grass_quads[i]);
+			m_allocator.deleteObject(m_free_grass_quads[i]);
 		}
 	}
 
@@ -226,11 +227,11 @@ namespace Lumix
 	{
 		if(index < 0)
 		{
-			m_grass_types.push(LUMIX_NEW(GrassType)(*this));
+			m_grass_types.push(m_allocator.newObject<GrassType>(*this));
 		}
 		else
 		{
-			m_grass_types.insert(index, LUMIX_NEW(GrassType)(*this));
+			m_grass_types.insert(index, m_allocator.newObject<GrassType>(*this));
 		}
 	}
 
@@ -238,7 +239,7 @@ namespace Lumix
 	void Terrain::removeGrassType(int index)
 	{
 		forceGrassUpdate();
-		LUMIX_DELETE(m_grass_types[index]);
+		m_allocator.deleteObject(m_grass_types[index]);
 		m_grass_types.erase(index);
 	}
 
@@ -294,8 +295,8 @@ namespace Lumix
 			type.m_grass_model->getResourceManager().get(ResourceManager::MODEL)->unload(*type.m_grass_model);
 			type.m_grass_model->getObserverCb().unbind<GrassType, &GrassType::grassLoaded>(&type);
 			type.m_grass_model = NULL;
-			LUMIX_DELETE(type.m_grass_mesh);
-			LUMIX_DELETE(type.m_grass_geometry);
+			m_allocator.deleteObject(type.m_grass_mesh);
+			m_allocator.deleteObject(type.m_grass_geometry);
 			type.m_grass_mesh = NULL;
 			type.m_grass_geometry = NULL;
 		}
@@ -338,7 +339,7 @@ namespace Lumix
 			int new_count = GRASS_QUADS_ROWS * GRASS_QUADS_COLUMNS - m_grass_quads.size();
 			for (int i = 0; i < new_count; ++i)
 			{
-				m_free_grass_quads.push(LUMIX_NEW(GrassQuad));
+				m_free_grass_quads.push(m_allocator.newObject<GrassQuad>());
 			}
 		}
 
@@ -390,7 +391,7 @@ namespace Lumix
 						}
 						else
 						{
-							quad = LUMIX_NEW(GrassQuad);
+							quad = m_allocator.newObject<GrassQuad>();
 						}
 						quads.push(quad);
 						quad->m_x = quad_x;
@@ -827,7 +828,7 @@ namespace Lumix
 
 	void Terrain::generateGeometry()
 	{
-		LUMIX_DELETE(m_mesh);
+		m_allocator.deleteObject(m_mesh);
 		m_mesh = NULL;
 		Array<Sample> points;
 		points.resize(GRID_SIZE * GRID_SIZE * 4);
@@ -842,7 +843,7 @@ namespace Lumix
 		VertexDef vertex_def;
 		vertex_def.parse("pt", 2);
 		m_geometry.copy((const uint8_t*)&points[0], sizeof(points[0]) * points.size(), indices, vertex_def);
-		m_mesh = LUMIX_NEW(Mesh)(m_material, 0, indices.size(), "terrain");
+		m_mesh = m_allocator.newObject<Mesh>(m_material, 0, indices.size(), "terrain");
 	}
 
 	void Terrain::onMaterialLoaded(Resource::State, Resource::State new_state)
@@ -850,7 +851,7 @@ namespace Lumix
 		PROFILE_FUNCTION();
 		if (new_state == Resource::State::READY)
 		{
-			LUMIX_DELETE(m_root);
+			m_allocator.deleteObject(m_root);
 			m_heightmap = m_material->getTextureByUniform("hm_texture");
 			m_splatmap = m_material->getTextureByUniform("splat_texture");
 			m_width = m_heightmap->getWidth();

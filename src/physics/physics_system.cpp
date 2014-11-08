@@ -29,7 +29,7 @@ struct PhysicsSystemImpl : public PhysicsSystem
 		, m_engine(engine)
 	{}
 
-	virtual bool create(Engine& engine) override;
+	virtual bool create() override;
 	virtual IScene* createScene(Universe& universe) override;
 	virtual void destroyScene(IScene* scene) override;
 	virtual void destroy() override;
@@ -120,9 +120,9 @@ void PhysicsSystemImpl::registerProperties(Engine& engine)
 }
 
 
-bool PhysicsSystemImpl::create(Engine& engine)
+bool PhysicsSystemImpl::create()
 {
-	registerProperties(engine);
+	registerProperties(m_engine);
 
 	m_physx_allocator = m_allocator.newObject<AssertNullAllocator>();
 	m_error_callback = m_allocator.newObject<CustomErrorCallback>();

@@ -14,12 +14,16 @@
 #include "graphics/gl_ext.h"
 #include "graphics/irender_device.h"
 #include "graphics/material.h"
+#include "graphics/material_manager.h"
 #include "graphics/model.h"
 #include "graphics/model_instance.h"
+#include "graphics/model_manager.h"
 #include "graphics/pipeline.h"
 #include "graphics/render_scene.h"
 #include "graphics/shader.h"
+#include "graphics/shader_manager.h"
 #include "graphics/texture.h"
+#include "graphics/texture_manager.h"
 #include "universe/universe.h"
 
 
@@ -34,12 +38,34 @@ static const uint32_t CAMERA_HASH = crc32("camera");
 
 struct RendererImpl : public Renderer
 {
-	RendererImpl()
+	RendererImpl(Engine& engine)
+		: m_engine(engine)
+		, m_allocator(engine.getAllocator())
+		, m_texture_manager(m_allocator)
+		, m_model_manager(m_allocator)
+		, m_material_manager(m_allocator)
+		, m_shader_manager(m_allocator)
+		, m_pipeline_manager(m_allocator)
 	{
+		m_texture_manager.create(ResourceManager::TEXTURE, engine.getResourceManager());
+		m_model_manager.create(ResourceManager::MODEL, engine.getResourceManager());
+		m_material_manager.create(ResourceManager::MATERIAL, engine.getResourceManager());
+		m_shader_manager.create(ResourceManager::SHADER, engine.getResourceManager());
+		m_pipeline_manager.create(ResourceManager::PIPELINE, engine.getResourceManager());
+
 		m_current_pass_hash = crc32("MAIN");
 		m_last_bind_geometry = NULL;
 		m_last_program_id = 0xffffFFFF;
 		m_is_editor_wireframe = false;
+	}
+
+	~RendererImpl()
+	{
+		m_texture_manager.destroy();
+		m_model_manager.destroy();
+		m_material_manager.destroy();
+		m_shader_manager.destroy();
+		m_pipeline_manager.destroy();
 	}
 
 	virtual int getGLSLVersion() const override
@@ -67,7 +93,7 @@ struct RendererImpl : public Renderer
 
 	virtual IScene* createScene(Universe& universe) override
 	{
-		return RenderScene::createInstance(*this, *m_engine, universe);
+		return RenderScene::createInstance(*this, m_engine, universe, m_allocator);
 	}
 
 
@@ -302,14 +328,14 @@ struct RendererImpl : public Renderer
 	}
 
 
-	virtual bool create(Engine& engine) override
+	virtual bool create() override
 	{
-		registerPropertyDescriptors(engine);
+		m_shader_manager.setRenderer(*this);
+		registerPropertyDescriptors(m_engine);
 
-		m_engine = &engine;
 		glewExperimental = GL_TRUE;
 		GLenum err = glewInit();
-		m_debug_shader = static_cast<Shader*>(engine.getResourceManager().get(ResourceManager::SHADER)->load("shaders/debug.shd"));
+		m_debug_shader = static_cast<Shader*>(m_engine.getResourceManager().get(ResourceManager::SHADER)->load("shaders/debug.shd"));
 		return err == GLEW_OK;
 	}
 
@@ -357,7 +383,7 @@ struct RendererImpl : public Renderer
 
 	virtual Engine& getEngine() override
 	{
-		return *m_engine;
+		return m_engine;
 	}
 
 
@@ -390,7 +416,13 @@ struct RendererImpl : public Renderer
 		return m_is_editor_wireframe;
 	}
 
-	Engine* m_engine;
+	Engine& m_engine;
+	BaseProxyAllocator m_allocator;
+	TextureManager m_texture_manager;
+	MaterialManager m_material_manager;
+	ShaderManager m_shader_manager;
+	ModelManager m_model_manager;
+	PipelineManager m_pipeline_manager;
 	IRenderDevice* m_render_device;
 	bool m_is_editor_wireframe;
 	Geometry* m_last_bind_geometry;
@@ -403,15 +435,15 @@ struct RendererImpl : public Renderer
 };
 
 
-Renderer* Renderer::createInstance()
+Renderer* Renderer::createInstance(Engine& engine)
 {
-	return LUMIX_NEW(RendererImpl);
+	return engine.getAllocator().newObject<RendererImpl>(engine);
 }
 
 
 void Renderer::destroyInstance(Renderer& renderer)
 {
-	LUMIX_DELETE(&renderer);
+	renderer.getEngine().getAllocator().deleteObject(&renderer);
 }
 
 
