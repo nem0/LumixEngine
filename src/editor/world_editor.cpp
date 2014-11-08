@@ -1934,6 +1934,7 @@ struct WorldEditorImpl : public WorldEditor
 				m_editor_icons[i]->destroy();
 				LUMIX_DELETE(m_editor_icons[i]);
 			}
+			m_components.clear();
 			selectEntities(NULL, 0);
 			m_camera = Entity::INVALID;
 			m_editor_icons.clear();
@@ -2016,17 +2017,6 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			destroyUndoStack();
 			Universe* universe = m_engine->createUniverse();
-			if (create_basic_entities)
-			{
-				m_camera = m_engine->getUniverse()->createEntity();
-				m_camera.setName("editor_camera");
-				m_camera.setPosition(0, 0, -5);
-				m_camera.setRotation(Quat(Vec3(0, 1, 0), -Math::PI));
-				Component cmp = createComponent(CAMERA_HASH, m_camera);
-				ASSERT(cmp.isValid());
-				RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
-				scene->setCameraSlot(cmp, string("editor"));
-			}
 			m_gizmo.create(m_engine->getRenderer());
 			m_gizmo.setUniverse(universe);
 
@@ -2039,6 +2029,17 @@ struct WorldEditorImpl : public WorldEditor
 			m_selected_entities.clear();
 			m_universe_created.invoke();
 
+			if (create_basic_entities)
+			{
+				m_camera = m_engine->getUniverse()->createEntity();
+				m_camera.setName("editor_camera");
+				m_camera.setPosition(0, 0, -5);
+				m_camera.setRotation(Quat(Vec3(0, 1, 0), -Math::PI));
+				Component cmp = createComponent(CAMERA_HASH, m_camera);
+				ASSERT(cmp.isValid());
+				RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
+				scene->setCameraSlot(cmp, string("editor"));
+			}
 		}
 
 
