@@ -101,7 +101,7 @@ namespace Lumix
 		}
 	}
 
-	static void getEntryLog(MemoryTracker::Entry& entry, void* address, base_string<char, StackAllocator<512> >& string)
+	static void getEntryLog(MemoryTracker::Entry& entry, void* address, string& string)
 	{
 		if (entry.file() != NULL)
 		{
@@ -141,7 +141,8 @@ namespace Lumix
 
 		for (EntryTable::iterator it = m_map.begin(); it != m_map.end(); ++it)
 		{
-			base_string<char, StackAllocator<512> > string;
+			StackAllocator<512> allocator;
+			string string(allocator);
 
 			Entry& entry = *it;
 			void* adr = it.key();
@@ -205,7 +206,8 @@ namespace Lumix
 
 		for (map_alloc_order::iterator it = alloc_order_map.begin(); it != alloc_order_map.end(); ++it)
 		{
-			base_string<char, StackAllocator<512> > string;
+			StackAllocator<512> allocator;
+			string string(allocator);
 			Entry& entry = *(it.second());
 			getEntryLog(entry, NULL, string);
 
@@ -243,7 +245,8 @@ namespace Lumix
 
 		for (file_line_map::iterator it = report_map.begin(); it != report_map.end(); ++it)
 		{
-			base_string<char, StackAllocator<512> > string;
+			StackAllocator<512> allocator;
+			string string(allocator);
 
 			const FileLineReport &rep = it.first();
 			intptr_t size = it.second();
@@ -284,7 +287,8 @@ namespace Lumix
 
 		for (file_map::iterator it = report_map.begin(); it != report_map.end(); ++it)
 		{
-			base_string<char, StackAllocator<512> > string;
+			StackAllocator<512> allocator;
+			string string(allocator);
 
 			intptr_t size = it.second();
 			const char *file = it.first();
@@ -331,7 +335,8 @@ namespace Lumix
 
 		for (EntryTable::iterator it = m_map.begin(); it != m_map.end(); ++it)
 		{
-			base_string<char, StackAllocator<512> > string;
+			StackAllocator<512> allocator;
+			string string(allocator);
 
 			Entry& entry = *it;
 			void* adr = it.key();
@@ -372,6 +377,7 @@ namespace Lumix
 		: m_spin_mutex(false)
 		, m_mark(0)
 		, m_allocated_memory(0)
+		, m_map(m_allocator)
 	{
 	}
 

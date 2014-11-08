@@ -99,7 +99,8 @@ class AddTerrainLevelCommand : public Lumix::IEditorCommand
 
 		Lumix::Texture* getHeightmap()
 		{
-			Lumix::string material_path;
+			Lumix::StackAllocator<LUMIX_MAX_PATH> allocator;
+			Lumix::string material_path(allocator);
 			static_cast<Lumix::RenderScene*>(m_terrain.scene)->getTerrainMaterial(m_terrain, material_path);
 			Lumix::Material* material = static_cast<Lumix::Material*>(m_world_editor.getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL)->get(material_path));
 			return material->getTextureByUniform("hm_texture");
@@ -1348,7 +1349,8 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 
 		Lumix::Material* getMaterial()
 		{
-			Lumix::string material_path;
+			Lumix::StackAllocator<LUMIX_MAX_PATH> allocator;
+			Lumix::string material_path(allocator);
 			static_cast<Lumix::RenderScene*>(m_component.scene)->getTerrainMaterial(m_component, material_path);
 			return static_cast<Lumix::Material*>(m_world_editor.getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL)->get(material_path.c_str()));
 		}
@@ -1491,7 +1493,8 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 				return;
 			float radius = (float)m_terrain_brush_size;
 			float rel_amount = m_terrain_brush_strength;
-			Lumix::string material_path;
+			Lumix::StackAllocator<LUMIX_MAX_PATH> allocator;
+			Lumix::string material_path(allocator);
 			static_cast<Lumix::RenderScene*>(terrain.scene)->getTerrainMaterial(terrain, material_path);
 			Lumix::Material* material = static_cast<Lumix::Material*>(m_world_editor.getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL)->get(material_path));
 			Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
@@ -1582,7 +1585,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 		void addTerrainLevel(Lumix::Component terrain, const Lumix::RayCastModelHit& hit, bool new_stroke)
 		{
 			Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
-			AddTerrainLevelCommand* command = ::new (Lumix::dll_lumix_new(sizeof(AddTerrainLevelCommand), "", 0)) AddTerrainLevelCommand(m_world_editor, hit_pos, m_terrain_brush_size, m_terrain_brush_strength, terrain, !new_stroke);
+			AddTerrainLevelCommand* command = m_world_editor.getAllocator().newObject<AddTerrainLevelCommand>(m_world_editor, hit_pos, m_terrain_brush_size, m_terrain_brush_strength, terrain, !new_stroke);
 			m_world_editor.executeCommand(command);
 		}
 

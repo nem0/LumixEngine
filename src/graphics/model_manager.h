@@ -8,7 +8,7 @@ namespace Lumix
 	{
 	public:
 		ModelManager(IAllocator& allocator) 
-			: ResourceManagerBase()
+			: ResourceManagerBase(allocator)
 			, m_allocator(allocator) 
 		{}
 

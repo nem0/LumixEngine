@@ -28,7 +28,7 @@ class LUMIX_ENGINE_API PipelineManager : public ResourceManagerBase
 {
 public:
 	PipelineManager(IAllocator& allocator)
-		: ResourceManagerBase()
+		: ResourceManagerBase(allocator)
 		, m_allocator(allocator)
 	{}
 	~PipelineManager() {}

@@ -81,7 +81,10 @@ namespace Lumix
 		class FileSystemImpl : public FileSystem
 		{
 		public:
-			FileSystemImpl()
+			FileSystemImpl(IAllocator& allocator)
+				: m_allocator(allocator)
+				, m_default_device(m_allocator)
+				, m_save_game_device(m_allocator)
 			{
 				m_task = LUMIX_NEW(FSTask)(&m_transaction_queue);
 				m_task->create("FSTask");
@@ -238,7 +241,8 @@ namespace Lumix
 			IFile* parseDeviceList(const char* device_list)
 			{
 				IFile* prev = NULL;
-				base_string<char, StackAllocator<128>> token, dev_list(device_list);
+				StackAllocator<128> allocators[2];
+				base_string<char> token(allocators[0]), dev_list(device_list, allocators[1]);
 				while(dev_list.length() > 0)
 				{
 					int pos = dev_list.rfind(':');
@@ -276,6 +280,7 @@ namespace Lumix
 			}
 
 		private:
+			BaseProxyAllocator m_allocator;
 			FSTask* m_task;
 			DevicesTable m_devices;
 
@@ -287,9 +292,9 @@ namespace Lumix
 			string m_save_game_device;
 		};
 
-		FileSystem* FileSystem::create()
+		FileSystem* FileSystem::create(IAllocator& allocator)
 		{
-			return LUMIX_NEW(FileSystemImpl)();
+			return LUMIX_NEW(FileSystemImpl)(allocator);
 		}
 
 		void FileSystem::destroy(FileSystem* fs)

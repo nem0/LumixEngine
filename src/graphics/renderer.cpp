@@ -317,7 +317,7 @@ struct RendererImpl : public Renderer
 			editor.registerProperty("terrain", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("xz_scale", &RenderScene::getTerrainXZScale, &RenderScene::setTerrainXZScale));
 			editor.registerProperty("terrain", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("y_scale", &RenderScene::getTerrainYScale, &RenderScene::setTerrainYScale));
 
-			auto grass = allocator.newObject<ArrayDescriptor<RenderScene> >("grass", &RenderScene::getGrassCount, &RenderScene::addGrass, &RenderScene::removeGrass);
+			auto grass = allocator.newObject<ArrayDescriptor<RenderScene> >("grass", &RenderScene::getGrassCount, &RenderScene::addGrass, &RenderScene::removeGrass, allocator);
 			grass->addChild(allocator.newObject<ResourceArrayObjectDescriptor<RenderScene> >("mesh", &RenderScene::getGrass, &RenderScene::setGrass, "Mesh (*.msh)"));
 			auto ground = allocator.newObject<IntArrayObjectDescriptor<RenderScene> >("ground", &RenderScene::getGrassGround, &RenderScene::setGrassGround);
 			ground->setLimit(0, 4);

@@ -67,19 +67,19 @@ namespace Lumix
 		static uint32_t getAllocID() { return s_alloc_counter++; }
 
 	private:
-		typedef PODHashMap<void*, Entry, PODHashFunc<void*>, MemTrackAllocator> EntryTable;
+		typedef PODHashMap<void*, Entry, PODHashFunc<void*> > EntryTable;
 
 		MemoryTracker();
 		~MemoryTracker();
 
 		void dumpEntry(const Entry& entry) const;
 
+		MemTrackAllocator m_allocator;
 		EntryTable m_map;
 
 		MT::SpinMutex m_spin_mutex;
 		intptr_t m_allocated_memory;
 		uint8_t m_mark;
-		MemTrackAllocator m_allocator;
 
 		static MemoryTracker s_instance;
 		static uint32_t s_alloc_counter;

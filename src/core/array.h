@@ -134,7 +134,7 @@ class Array<T, Allocator, false>
 		}
 
 		template<typename P1, typename... Params>
-		void emplace(const P1& p1, Params... params)
+		T& emplace(const P1& p1, Params... params)
 		{
 			if (m_size == m_capacity)
 			{
@@ -142,6 +142,19 @@ class Array<T, Allocator, false>
 			}
 			new ((char*)(m_data + m_size)) T(p1, params...);
 			++m_size;
+			return m_data[m_size - 1];
+		}
+
+		template<typename P1, typename... Params>
+		T& emplace(P1& p1, Params... params)
+		{
+			if (m_size == m_capacity)
+			{
+				grow();
+			}
+			new ((char*)(m_data + m_size)) T(p1, params...);
+			++m_size;
+			return m_data[m_size - 1];
 		}
 
 		bool empty() const { return m_size == 0; }

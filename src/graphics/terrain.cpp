@@ -51,7 +51,8 @@ namespace Lumix
 			CHILD_COUNT
 		};
 
-		TerrainQuad()
+		TerrainQuad(IAllocator& allocator)
+			: m_allocator(allocator)
 		{
 			for (int i = 0; i < CHILD_COUNT; ++i)
 			{
@@ -63,7 +64,7 @@ namespace Lumix
 		{
 			for (int i = 0; i < CHILD_COUNT; ++i)
 			{
-				LUMIX_DELETE(m_children[i]);
+				m_allocator.deleteObject(m_children[i]);
 			}
 		}
 
@@ -73,7 +74,7 @@ namespace Lumix
 			{
 				for (int i = 0; i < CHILD_COUNT; ++i)
 				{
-					m_children[i] = LUMIX_NEW(TerrainQuad);
+					m_children[i] = m_allocator.newObject<TerrainQuad>(m_allocator);
 					m_children[i]->m_lod = m_lod + 1;
 					m_children[i]->m_size = m_size / 2;
 				}
@@ -152,6 +153,7 @@ namespace Lumix
 			return true;
 		}
 
+		IAllocator& m_allocator;
 		TerrainQuad* m_children[CHILD_COUNT];
 		Vec3 m_min;
 		float m_size;
@@ -491,7 +493,7 @@ namespace Lumix
 			index_callback.bind<GrassType, &GrassType::grassIndexCopyCallback>(this);
 			m_grass_geometry->copy(*m_grass_model->getGeometry(), COPY_COUNT, vertex_callback, index_callback);
 			Material* material = m_grass_model->getMesh(0).getMaterial();
-			m_grass_mesh = LUMIX_NEW(Mesh)(material, 0, m_grass_model->getMesh(0).getCount() * COPY_COUNT, "grass");
+			m_grass_mesh = LUMIX_NEW(Mesh)(material, 0, m_grass_model->getMesh(0).getCount() * COPY_COUNT, "grass", m_terrain.m_allocator);
 			m_terrain.forceGrassUpdate();
 		}
 	}
@@ -786,17 +788,6 @@ namespace Lumix
 	}
 
 
-	static TerrainQuad* generateQuadTree(float size)
-	{
-		TerrainQuad* root = LUMIX_NEW(TerrainQuad);
-		root->m_lod = 1;
-		root->m_min.set(0, 0, 0);
-		root->m_size = size;
-		root->createChildren();
-		return root;
-	}
-
-
 	static void generateSubgrid(Array<Sample>& samples, Array<int32_t>& indices, int& indices_offset, int start_x, int start_y)
 	{
 		for (int j = start_y; j < start_y + 8; ++j)
@@ -845,7 +836,17 @@ namespace Lumix
 		VertexDef vertex_def;
 		vertex_def.parse("pt", 2);
 		m_geometry.copy((const uint8_t*)&points[0], sizeof(points[0]) * points.size(), indices, vertex_def);
-		m_mesh = m_allocator.newObject<Mesh>(m_material, 0, indices.size(), "terrain");
+		m_mesh = m_allocator.newObject<Mesh>(m_material, 0, indices.size(), "terrain", m_allocator);
+	}
+
+	TerrainQuad* Terrain::generateQuadTree(float size)
+	{
+		TerrainQuad* root = m_allocator.newObject<TerrainQuad>(m_allocator);
+		root->m_lod = 1;
+		root->m_min.set(0, 0, 0);
+		root->m_size = size;
+		root->createChildren();
+		return root;
 	}
 
 	void Terrain::onMaterialLoaded(Resource::State, Resource::State new_state)

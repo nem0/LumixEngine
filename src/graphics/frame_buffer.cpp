@@ -8,7 +8,7 @@ namespace Lumix
 
 
 FrameBuffer::FrameBuffer(int width, int height, int render_buffers, const char* name)
-	: m_name(name)
+	: m_name(name, m_name_allocator)
 {
 	m_width = width;
 	m_height = height;

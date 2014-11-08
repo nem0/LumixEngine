@@ -22,7 +22,7 @@ class LUMIX_ANIMATION_API AnimationManager : public ResourceManagerBase
 {
 public:
 	AnimationManager(IAllocator& allocator) 
-		: ResourceManagerBase()
+		: ResourceManagerBase(allocator)
 		, m_allocator(allocator)
 	{}
 	~AnimationManager() {}

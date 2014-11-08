@@ -59,8 +59,11 @@ namespace Lumix
 
 			virtual void deallocate(void* ptr) override
 			{
-				MT::atomicDecrement(&m_allocation_count);
-				m_source.deallocate(ptr);
+				if (ptr)
+				{
+					MT::atomicDecrement(&m_allocation_count);
+					m_source.deallocate(ptr);
+				}
 			}
 
 		private:

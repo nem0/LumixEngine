@@ -39,7 +39,7 @@ class PropertyViewObject : public QObject
 			, m_parent(parent)
 		{ }
 		virtual ~PropertyViewObject();
-		const char* getName() const { return m_name.c_str(); }
+		QString getName() const { return m_name; }
 		PropertyViewObject** getMembers() { return m_members.empty() ? NULL : &m_members[0]; }
 		int getMemberCount() const { return m_members.size(); }
 		void addMember(PropertyViewObject* member) { m_members.push(member); }
@@ -50,7 +50,7 @@ class PropertyViewObject : public QObject
 		virtual bool isEditable() const = 0;
 
 	private:
-		Lumix::string m_name;
+		QString m_name;
 		Lumix::Array<PropertyViewObject*> m_members;
 		PropertyViewObject* m_parent;
 };
