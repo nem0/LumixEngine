@@ -74,7 +74,7 @@ namespace Lumix
 			if(creator)
 			{
 				IPlugin* plugin = creator(*m_impl->m_engine);
-				if(!plugin->create(*m_impl->m_engine))
+				if(!plugin->create())
 				{
 					LUMIX_DELETE(plugin);
 					ASSERT(false);
@@ -97,7 +97,7 @@ namespace Lumix
 	
 	bool PluginManager::create(Engine& engine)
 	{
-		m_impl = LUMIX_NEW(PluginManagerImpl)();
+		m_impl = engine.getAllocator().newObject<PluginManagerImpl>();
 		m_impl->m_engine = &engine;
 		return true;
 	}
@@ -110,7 +110,7 @@ namespace Lumix
 			m_impl->m_plugins[i]->destroy();
 			m_impl->m_engine->getAllocator().deleteObject(m_impl->m_plugins[i]);
 		}
-		LUMIX_DELETE(m_impl);
+		m_impl->m_engine->getAllocator().deleteObject(m_impl);
 		m_impl = NULL;
 	}
 

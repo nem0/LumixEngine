@@ -83,7 +83,6 @@ public:
 	int getUniformCount() const { return m_uniforms.size(); }
 	Uniform& getUniform(int index) { return m_uniforms[index]; }
 
-private:
 	Material(const Path& path, ResourceManager& resource_manager)
 		: Resource(path, resource_manager)
 		, m_shader(NULL)
@@ -100,6 +99,7 @@ private:
 
 	~Material();
 
+private:
 	virtual void doUnload(void) override;
 	virtual FS::ReadCallback getReadCallback() override;
 

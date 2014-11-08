@@ -32,7 +32,7 @@ namespace Lumix
 		public:
 			virtual ~IPlugin();
 
-			virtual bool create(Engine& engine) = 0;
+			virtual bool create() = 0;
 			virtual void destroy() = 0;
 			virtual void serialize(ISerializer&) {}
 			virtual void deserialize(ISerializer&) {}

@@ -27,12 +27,18 @@ class IFile;
 class LUMIX_ENGINE_API PipelineManager : public ResourceManagerBase
 {
 public:
-	PipelineManager() : ResourceManagerBase() {}
+	PipelineManager(IAllocator& allocator)
+		: ResourceManagerBase()
+		, m_allocator(allocator)
+	{}
 	~PipelineManager() {}
 
 protected:
 	virtual Resource* createResource(const Path& path) override;
 	virtual void destroyResource(Resource& resource) override;
+
+private:
+	IAllocator& m_allocator;
 };
 
 

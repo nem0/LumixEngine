@@ -43,7 +43,8 @@ namespace
 		file_system->setDefaultDevice("memory:disk");
 
 		Lumix::ResourceManager resource_manager;
-		Lumix::TextureManager texture_manager;
+		Lumix::DefaultAllocator allocator;
+		Lumix::TextureManager texture_manager(allocator);
 		resource_manager.create(*file_system);
 		texture_manager.create(Lumix::ResourceManager::TEXTURE, resource_manager);
 

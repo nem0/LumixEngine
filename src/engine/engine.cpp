@@ -43,8 +43,8 @@ namespace Lumix
 				{
 					m_file_system = FS::FileSystem::create();
 
-					m_mem_file_device = LUMIX_NEW(FS::MemoryFileDevice);
-					m_disk_file_device = LUMIX_NEW(FS::DiskFileDevice);
+					m_mem_file_device = m_allocator.newObject<FS::MemoryFileDevice>();
+					m_disk_file_device = m_allocator.newObject<FS::DiskFileDevice>();
 
 					m_file_system->mount(m_mem_file_device);
 					m_file_system->mount(m_disk_file_device);
@@ -59,12 +59,6 @@ namespace Lumix
 				}
 
 				m_resource_manager.create(*m_file_system);
-				m_material_manager.create(ResourceManager::MATERIAL, m_resource_manager);
-				m_model_manager.create(ResourceManager::MODEL, m_resource_manager);
-				m_shader_manager.create(ResourceManager::SHADER, m_resource_manager);
-				m_texture_manager.create(ResourceManager::TEXTURE, m_resource_manager);
-				m_pipeline_manager.create(ResourceManager::PIPELINE, m_resource_manager);
-
 				m_culling_system = CullingSystem::create(m_mtjd_manager);
 
 				m_timer = Timer::create();
@@ -81,13 +75,12 @@ namespace Lumix
 				{
 					return false;
 				}
-				m_renderer = Renderer::createInstance();
+				m_renderer = Renderer::createInstance(*this);
 				if (!m_renderer)
 				{
 					return false;
 				}
-				m_shader_manager.setRenderer(*m_renderer);
-				if (!m_renderer->create(*this))
+				if (!m_renderer->create())
 				{
 					Renderer::destroyInstance(*m_renderer);
 					return false;
@@ -114,15 +107,14 @@ namespace Lumix
 				Timer::destroy(m_fps_timer);
 				m_plugin_manager.destroy();
 				m_input_system.destroy();
-				m_material_manager.destroy();
 
 				CullingSystem::destroy(*m_culling_system);
 
 				if (m_disk_file_device)
 				{
 					FS::FileSystem::destroy(m_file_system);
-					LUMIX_DELETE(m_mem_file_device);
-					LUMIX_DELETE(m_disk_file_device);
+					m_allocator.deleteObject(m_mem_file_device);
+					m_allocator.deleteObject(m_disk_file_device);
 				}
 			}
 
@@ -135,7 +127,7 @@ namespace Lumix
 
 			virtual Universe* createUniverse() override
 			{
-				m_universe = LUMIX_NEW(Universe)();
+				m_universe = m_allocator.newObject<Universe>();
 				m_hierarchy = Hierarchy::create(*m_universe);
 				const Array<IPlugin*>& plugins = m_plugin_manager.getPlugins();
 				for (int i = 0; i < plugins.size(); ++i)
@@ -188,7 +180,7 @@ namespace Lumix
 					m_scenes.clear();
 					Hierarchy::destroy(m_hierarchy);
 					m_hierarchy = NULL;
-					LUMIX_DELETE(m_universe);
+					m_allocator.deleteObject(m_universe);
 					m_universe = NULL;
 				}
 			}
@@ -332,11 +324,6 @@ namespace Lumix
 			FS::DiskFileDevice* m_disk_file_device;
 
 			ResourceManager m_resource_manager;
-			MaterialManager m_material_manager;
-			ModelManager	m_model_manager;
-			ShaderManager	m_shader_manager;
-			TextureManager	m_texture_manager;
-			PipelineManager m_pipeline_manager;
 
 			MTJD::Manager	m_mtjd_manager;
 			CullingSystem*	m_culling_system;

@@ -29,7 +29,7 @@ class Universe;
 class LUMIX_ENGINE_API Renderer : public IPlugin 
 {
 	public:
-		static Renderer* createInstance();
+		static Renderer* createInstance(Engine& engine);
 		static void destroyInstance(Renderer& renderer);
 
 		static void getOrthoMatrix(float left, float right, float bottom, float top, float z_near, float z_far, Matrix* mtx);

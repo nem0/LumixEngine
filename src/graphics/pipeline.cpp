@@ -1032,13 +1032,13 @@ void BindShadowmapCommand::execute(PipelineInstanceImpl& pipeline)
 
 Resource* PipelineManager::createResource(const Path& path)
 {
-	return LUMIX_NEW(PipelineImpl)(path, getOwner());
+	return m_allocator.newObject<PipelineImpl>(path, getOwner());
 }
 
 
 void PipelineManager::destroyResource(Resource& resource)
 {
-	LUMIX_DELETE(static_cast<PipelineImpl*>(&resource));
+	m_allocator.deleteObject(static_cast<PipelineImpl*>(&resource));
 }
 
 
