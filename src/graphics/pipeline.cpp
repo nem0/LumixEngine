@@ -93,16 +93,27 @@ struct RenderModelsCommand : public Command
 
 struct ApplyCameraCommand : public Command
 {
+	ApplyCameraCommand()
+		: m_camera_slot(m_string_allocator)
+	{ }
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
+	
+	StackAllocator<128> m_string_allocator;
 	string m_camera_slot;
 };
 
 
 struct BindFramebufferCommand : public Command
 {
+	BindFramebufferCommand()
+		: m_buffer_name(m_string_allocator)
+	{ }
+
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
+	
+	StackAllocator<128> m_string_allocator;
 	string m_buffer_name;
 };
 
@@ -134,8 +145,14 @@ struct RenderDebugLinesCommand : public Command
 
 struct BindFramebufferTextureCommand : public Command
 {
+	BindFramebufferTextureCommand()
+		: m_framebuffer_name(m_string_allocator)
+	{ }
+
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
+	
+	StackAllocator<128> m_string_allocator;
 	string m_framebuffer_name;
 	uint32_t m_renderbuffer_index;
 	uint32_t m_texture_uint;
@@ -144,10 +161,15 @@ struct BindFramebufferTextureCommand : public Command
 
 struct RenderShadowmapCommand : public Command
 {
+	RenderShadowmapCommand()
+		: m_camera_slot(m_string_allocator)
+	{}
+
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 
 	int64_t m_layer_mask;
+	StackAllocator<128> m_string_allocator;
 	string m_camera_slot;
 };
 
@@ -163,9 +185,14 @@ struct PipelineImpl : public Pipeline
 {
 	struct FrameBufferDeclaration
 	{
+		FrameBufferDeclaration()
+			: m_name(m_name_allocator)
+		{ }
+
 		int32_t m_width;
 		int32_t m_height;
 		int32_t m_mask;
+		StackAllocator<64> m_name_allocator;
 		string m_name;
 	};
 	

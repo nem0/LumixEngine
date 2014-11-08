@@ -37,11 +37,13 @@ namespace Lumix
 	{
 		public:
 			EngineImpl(const char* base_path, FS::FileSystem* file_system, WorldEditor* world_editor)
+				: m_base_path(m_allocator)
+				, m_resource_manager(m_allocator)
 			{
 				m_editor = world_editor;
 				if (NULL == file_system)
 				{
-					m_file_system = FS::FileSystem::create();
+					m_file_system = FS::FileSystem::create(m_allocator);
 
 					m_mem_file_device = m_allocator.newObject<FS::MemoryFileDevice>();
 					m_disk_file_device = m_allocator.newObject<FS::DiskFileDevice>();
@@ -97,12 +99,6 @@ namespace Lumix
 
 			virtual ~EngineImpl()
 			{
-				m_resource_manager.get(ResourceManager::TEXTURE)->releaseAll();
-				m_resource_manager.get(ResourceManager::MATERIAL)->releaseAll();
-				m_resource_manager.get(ResourceManager::SHADER)->releaseAll();
-				m_resource_manager.get(ResourceManager::MODEL)->releaseAll();
-				m_resource_manager.get(ResourceManager::PIPELINE)->releaseAll();
-
 				Timer::destroy(m_timer);
 				Timer::destroy(m_fps_timer);
 				m_plugin_manager.destroy();

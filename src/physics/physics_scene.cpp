@@ -253,7 +253,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	Component createBoxRigidActor(Entity entity)
 	{
-		RigidActor* actor = m_allocator.newObject<RigidActor>();
+		RigidActor* actor = m_allocator.newObject<RigidActor>(m_allocator);
 		m_actors.push(actor);
 		actor->m_source = "";
 		actor->m_entity = entity;
@@ -281,7 +281,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	Component createMeshRigidActor(Entity entity)
 	{
-		RigidActor* actor = m_allocator.newObject<RigidActor>();
+		RigidActor* actor = m_allocator.newObject<RigidActor>(m_allocator);
 		m_actors.push(actor);
 		actor->m_source = "";
 		actor->m_entity = entity;
@@ -929,7 +929,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		m_actors.resize(count);
 		for(int i = old_size; i < count; ++i)
 		{
-			RigidActor* actor = m_allocator.newObject<RigidActor>();
+			RigidActor* actor = m_allocator.newObject<RigidActor>(m_allocator);
 			m_actors[i] = actor;	
 		}
 		serializer.deserializeArrayBegin("actors");
@@ -1033,7 +1033,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 				Component cmp(m_terrains[i]->m_entity, HEIGHTFIELD_HASH, this, i);
 				if (m_terrains[i]->m_heightmap == NULL || strcmp(tmp, m_terrains[i]->m_heightmap->getPath().c_str()) != 0)
 				{
-					setHeightmap(cmp, string(tmp));
+					setHeightmap(cmp, string(tmp, m_allocator));
 				}
 				m_universe->addComponent(m_terrains[i]->m_entity, HEIGHTFIELD_HASH, this, i);
 			}
@@ -1057,6 +1057,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	struct RigidActor
 	{
+		RigidActor(IAllocator& allocator)
+			: m_source(allocator)
+		{ }
+
 		physx::PxRigidActor* m_physx_actor;
 		string m_source;
 		Entity m_entity;

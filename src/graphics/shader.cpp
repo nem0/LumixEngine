@@ -18,10 +18,12 @@ namespace Lumix
 {
 
 
-Shader::Shader(const Path& path, ResourceManager& resource_manager, Renderer& renderer)
+Shader::Shader(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator)
 	: Resource(path, resource_manager)
 	, m_is_shadowmap_required(true)
 	, m_renderer(renderer)
+	, m_allocator(allocator)
+	, m_source(m_allocator)
 {
 }
 
@@ -33,7 +35,7 @@ Shader::~Shader()
 		glDeleteProgram(m_combinations[i]->m_program_id);
 		glDeleteShader(m_combinations[i]->m_vertex_id);
 		glDeleteShader(m_combinations[i]->m_fragment_id);
-		LUMIX_DELETE(m_combinations[i]);
+		m_allocator.deleteObject(m_combinations[i]);
 	}
 }
 
@@ -90,7 +92,7 @@ void Shader::createCombination(const char* defines)
 
 		if(!getCombination(hash, pass_hash))
 		{
-			Combination* combination = LUMIX_NEW(Combination);
+			Combination* combination = m_allocator.newObject<Combination>(m_allocator);
 			m_combinations.push(combination);
 			combination->m_defines = defines;
 			combination->m_program_id = glCreateProgram();
@@ -189,7 +191,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 				while (!serializer.isArrayEnd())
 				{
 					serializer.deserializeArrayItem(label, sizeof(label));
-					m_attributes.emplace(label);
+					m_attributes.emplace(string(label, m_allocator));
 				}
 				serializer.deserializeArrayEnd();
 			}
@@ -199,7 +201,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 				while (!serializer.isArrayEnd())
 				{
 					serializer.deserializeArrayItem(label, sizeof(label));
-					m_passes.emplace(label);
+					m_passes.push(string(label, m_allocator));
 					m_pass_hashes.push(crc32(label));
 				}
 				serializer.deserializeArrayEnd();
@@ -234,7 +236,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			}
 			for(int i = 0; i < old_combinations.size(); ++i)
 			{
-				LUMIX_DELETE(old_combinations[i]);
+				m_allocator.deleteObject(old_combinations[i]);
 			}
 		}
 		else

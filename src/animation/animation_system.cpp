@@ -303,12 +303,11 @@ namespace Lumix
 
 			virtual void destroy() override
 			{
-				m_engine.getResourceManager().get(ResourceManager::ANIMATION)->releaseAll();
 			}
 
+			BaseProxyAllocator m_allocator;
 			Engine& m_engine;
 			AnimationManager m_animation_manager;
-			BaseProxyAllocator m_allocator;
 
 		private:
 			void operator=(const AnimationSystemImpl&);

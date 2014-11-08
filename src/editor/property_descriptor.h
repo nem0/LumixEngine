@@ -4,6 +4,7 @@
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/delegate.h"
+#include "core/stack_allocator.h"
 #include "core/string.h"
 
 
@@ -32,6 +33,9 @@ class IPropertyDescriptor
 		};
 
 	public:
+		IPropertyDescriptor() 
+			: m_name(m_name_allocator)
+		{ }
 		virtual ~IPropertyDescriptor() {}
 
 		virtual void set(Component cmp, Blob& stream) const = 0;
@@ -49,6 +53,7 @@ class IPropertyDescriptor
 
 	protected:
 		uint32_t m_name_hash;
+		StackAllocator<128> m_name_allocator;
 		string m_name;
 		Type m_type;
 		Array<IPropertyDescriptor*> m_children;
@@ -202,6 +207,9 @@ class DecimalArrayObjectDescriptor : public IPropertyDescriptor
 template <class S>
 class StringArrayObjectDescriptor : public IPropertyDescriptor
 {
+	private:
+		static const int MAX_STRING_SIZE = 300;
+
 	public:
 		typedef void (S::*Getter)(Component, int, string&);
 		typedef void (S::*Setter)(Component, int, const string&);
@@ -218,22 +226,24 @@ class StringArrayObjectDescriptor : public IPropertyDescriptor
 
 		virtual void set(Component cmp, int index, Blob& stream) const override
 		{
-			char tmp[300];
+			char tmp[MAX_STRING_SIZE];
 			char* c = tmp;
 			do
 			{
 				stream.read(c, 1);
 				++c;
 			}
-			while (*(c - 1) && (c - 1) - tmp < 300);
-			string s((char*)tmp);
+			while (*(c - 1) && (c - 1) - tmp < MAX_STRING_SIZE);
+			StackAllocator<MAX_STRING_SIZE> allocator;
+			string s((char*)tmp, allocator);
 			(static_cast<S*>(cmp.scene)->*m_setter)(cmp, index, s);
 		}
 
 
 		virtual void get(Component cmp, int index, Blob& stream) const override
 		{
-			string value;
+			StackAllocator<MAX_STRING_SIZE> allocator;
+			string value(allocator);
 			(static_cast<S*>(cmp.scene)->*m_getter)(cmp, index, value);
 			int len = value.length() + 1;
 			stream.write(value.c_str(), len);
@@ -255,7 +265,7 @@ class FileArrayObjectDescriptor : public StringArrayObjectDescriptor<S>, public 
 	public:
 		FileArrayObjectDescriptor(const char* name, Getter getter, Setter setter, const char* file_type)
 			: StringArrayObjectDescriptor(name, getter, setter)
-			, m_file_type(file_type)
+			, m_file_type(file_type, m_file_type_allocator)
 		{
 			m_type = IPropertyDescriptor::FILE;
 		}
@@ -266,6 +276,7 @@ class FileArrayObjectDescriptor : public StringArrayObjectDescriptor<S>, public 
 		}
 
 	private:
+		StackAllocator<LUMIX_MAX_PATH> m_file_type_allocator;
 		string m_file_type;
 };
 
@@ -337,12 +348,20 @@ class ArrayDescriptor : public IArrayDescriptor
 		typedef void (S::*Remover)(Component, int);
 
 	public:
-		ArrayDescriptor(const char* name, Counter counter, Adder adder, Remover remover) { setName(name); m_type = ARRAY; m_counter = counter; m_adder = adder; m_remover = remover; }
+		ArrayDescriptor(const char* name, Counter counter, Adder adder, Remover remover, IAllocator& allocator) 
+			: m_allocator(allocator)
+		{ 
+			setName(name); 
+			m_type = ARRAY; 
+			m_counter = counter; 
+			m_adder = adder; 
+			m_remover = remover; 
+		}
 		~ArrayDescriptor()
 		{
 			for(int i = 0; i < m_children.size(); ++i)
 			{
-				LUMIX_DELETE(m_children[i]);
+				m_allocator.deleteObject(m_children[i]);
 			}
 		}
 
@@ -391,6 +410,7 @@ class ArrayDescriptor : public IArrayDescriptor
 		virtual void removeArrayItem(Component cmp, int index) const override { (static_cast<S*>(cmp.scene)->*m_remover)(cmp, index); }
 
 	private:
+		IAllocator& m_allocator;
 		Counter m_counter;
 		Adder m_adder;
 		Remover m_remover;
@@ -436,6 +456,9 @@ class IntPropertyDescriptor : public IIntPropertyDescriptor
 template <class S>
 class StringPropertyDescriptor : public IPropertyDescriptor
 {
+	private:
+		static const int MAX_STRING_SIZE = 300;
+
 	public:
 		typedef void (S::*Getter)(Component, string&);
 		typedef void (S::*Setter)(Component, const string&);
@@ -452,22 +475,24 @@ class StringPropertyDescriptor : public IPropertyDescriptor
 
 		virtual void set(Component cmp, Blob& stream) const override
 		{
-			char tmp[300];
+			char tmp[MAX_STRING_SIZE];
 			char* c = tmp;
 			do
 			{
 				stream.read(c, 1);
 				++c;
 			}
-			while (*(c - 1) && (c - 1) - tmp < 300);
-			string s((char*)tmp);
+			while (*(c - 1) && (c - 1) - tmp < MAX_STRING_SIZE);
+			StackAllocator<MAX_STRING_SIZE> allocator;
+			string s((char*)tmp, allocator);
 			(static_cast<S*>(cmp.scene)->*m_setter)(cmp, s);
 		}
 
 
 		virtual void get(Component cmp, Blob& stream) const override
 		{
-			string value;
+			StackAllocator<MAX_STRING_SIZE> allocator;
+			string value(allocator);
 			(static_cast<S*>(cmp.scene)->*m_getter)(cmp, value);
 			int len = value.length() + 1;
 			stream.write(value.c_str(), len);
@@ -580,7 +605,7 @@ class FilePropertyDescriptor : public StringPropertyDescriptor<T>, public IFileP
 	public:
 		FilePropertyDescriptor(const char* name, Getter getter, Setter setter, const char* file_type)
 			: StringPropertyDescriptor(name, getter, setter)
-			, m_file_type(file_type)
+			, m_file_type(file_type, m_file_type_allocator)
 		{
 			m_type = IPropertyDescriptor::FILE;
 		}
@@ -591,6 +616,7 @@ class FilePropertyDescriptor : public StringPropertyDescriptor<T>, public IFileP
 		}
 
 	private:
+		StackAllocator<LUMIX_MAX_PATH> m_file_type_allocator;
 		string m_file_type;
 };
 

@@ -7,7 +7,7 @@
 namespace Lumix
 {
 	TextureManager::TextureManager(IAllocator& allocator)
-		: ResourceManagerBase()
+		: ResourceManagerBase(allocator)
 		, m_allocator(allocator)
 	{
 		m_buffer = NULL;

@@ -1,5 +1,7 @@
 #include "script_system.h"
 #include <Windows.h>
+#include "base_script.h"
+#include "core/allocator.h"
 #include "core/crc32.h"
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
@@ -9,7 +11,6 @@
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "universe/universe.h"
-#include "base_script.h"
 
 
 static const uint32_t SCRIPT_HASH = crc32("script");
@@ -29,6 +30,7 @@ namespace Lumix
 				: m_universe(universe)
 				, m_engine(engine)
 				, m_system(system)
+				, m_allocator(engine.getAllocator())
 			{
 			}
 
@@ -49,11 +51,15 @@ namespace Lumix
 				serializer.deserialize("count", count);
 				serializer.deserializeArrayBegin("scripts");
 				m_script_entities.resize(count);
-				m_paths.resize(count);
+				m_paths.clear();
+				m_paths.reserve(count);
 				for (int i = 0; i < m_script_entities.size(); ++i)
 				{
 					serializer.deserializeArrayItem(m_script_entities[i]);
-					serializer.deserializeArrayItem(m_paths[i]);
+					StackAllocator<LUMIX_MAX_PATH> allocator;
+					string path(allocator);
+					serializer.deserializeArrayItem(path);
+					m_paths.push(path);
 					Entity entity(&m_universe, m_script_entities[i]);
 					if(m_script_entities[i] != -1)
 					{
@@ -178,7 +184,7 @@ namespace Lumix
 				getScriptDefaultPath(entity, path, full_path, LUMIX_MAX_PATH, "cpp");
 
 				m_script_entities.push(entity.index);
-				m_paths.push(string(path));
+				m_paths.push(string(path, m_allocator));
 
 				Component cmp = m_universe.addComponent(entity, SCRIPT_HASH, this, m_script_entities.size() - 1);
 				m_universe.componentCreated().invoke(cmp);
@@ -278,6 +284,7 @@ namespace Lumix
 				int m_entity_idx;
 			};
 
+			IAllocator& m_allocator;
 			Array<RunningScript> m_running_scripts;
 			Array<int> m_script_entities;
 			Array<string> m_paths;

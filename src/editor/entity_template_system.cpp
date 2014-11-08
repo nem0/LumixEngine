@@ -178,7 +178,7 @@ namespace Lumix
 				uint32_t name_hash = crc32(name);
 				if (m_instances.find(name_hash) == m_instances.end())
 				{
-					m_template_names.push(string(name));
+					m_template_names.push(string(name, m_editor.getAllocator()));
 					m_instances[name_hash].push(entity);
 					m_updated.invoke();
 				}
@@ -214,7 +214,7 @@ namespace Lumix
 
 			virtual Entity createInstance(const char* name, const Vec3& position) override
 			{
-				CreateInstanceCommand* command = LUMIX_NEW(CreateInstanceCommand)(*this, m_editor, name, position);
+				CreateInstanceCommand* command = m_editor.getAllocator().newObject<CreateInstanceCommand>(*this, m_editor, name, position);
 				m_editor.executeCommand(command);
 				return command->getEntity();
 			}
@@ -257,7 +257,7 @@ namespace Lumix
 					const int MAX_NAME_LENGTH = 50;
 					char name[MAX_NAME_LENGTH];
 					serializer.deserializeArrayItem(name, MAX_NAME_LENGTH);
-					m_template_names.push(string(name));
+					m_template_names.push(string(name, m_editor.getAllocator()));
 				}
 				serializer.deserializeArrayEnd();
 				serializer.deserialize("instance_count", count);

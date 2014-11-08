@@ -17,6 +17,7 @@ namespace Lumix
 		void sendMessage();
 
 		Log::Callback m_callbacks;
+		DefaultAllocator m_allocator;
 	};
 
 
@@ -34,7 +35,7 @@ namespace Lumix
 
 	LogProxy Log::log(const char* system)
 	{
-		return LogProxy(*this, system);
+		return LogProxy(*this, system, m_impl->m_allocator);
 	}
 
 
@@ -43,9 +44,11 @@ namespace Lumix
 		return m_impl->m_callbacks;
 	}
 
-	LogProxy::LogProxy(Log& log, const char* system)
-		: m_log(log)
-		, m_system(system)
+	LogProxy::LogProxy(Log& log, const char* system, IAllocator& allocator)
+		: m_allocator(allocator)
+		, m_log(log)
+		, m_system(system, m_allocator)
+		, m_message(m_allocator)
 	{
 	}
 

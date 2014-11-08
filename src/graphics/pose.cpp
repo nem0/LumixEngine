@@ -9,7 +9,8 @@ namespace Lumix
 {
 
 
-Pose::Pose()
+Pose::Pose(IAllocator& allocator)
+	: m_allocator(allocator)
 {
 	m_positions = 0;
 	m_rotations = 0;
@@ -20,21 +21,21 @@ Pose::Pose()
 
 Pose::~Pose()
 {
-	LUMIX_DELETE_ARRAY(m_positions);
-	LUMIX_DELETE_ARRAY(m_rotations);
+	m_allocator.deallocate(m_positions);
+	m_allocator.deallocate(m_rotations);
 }
 
 
 void Pose::resize(int count)
 {
 	m_is_absolute = false;
-	LUMIX_DELETE_ARRAY(m_positions);
-	LUMIX_DELETE_ARRAY(m_rotations);
+	m_allocator.deallocate(m_positions);
+	m_allocator.deallocate(m_rotations);
 	m_count = count;
 	if(m_count)
 	{
-		m_positions = LUMIX_NEW_ARRAY(Vec3, count);
-		m_rotations = LUMIX_NEW_ARRAY(Quat, count);
+		m_positions = static_cast<Vec3*>(m_allocator.allocate(sizeof(Vec3) * count));
+		m_rotations = static_cast<Quat*>(m_allocator.allocate(sizeof(Quat) * count));
 	}
 	else
 	{

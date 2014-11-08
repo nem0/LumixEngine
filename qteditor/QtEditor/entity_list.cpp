@@ -246,7 +246,7 @@ class EntityListModel : public QAbstractItemModel
 				stream >> child.index;
 			}
 
-			SetParentEditorCommand* command = new (Lumix::dll_lumix_new(sizeof(SetParentEditorCommand), "", 0)) SetParentEditorCommand(*m_engine->getHierarchy(), child, parent_entity);
+			SetParentEditorCommand* command = m_engine->getWorldEditor()->getAllocator().newObject<SetParentEditorCommand>(*m_engine->getHierarchy(), child, parent_entity);
 			m_engine->getWorldEditor()->executeCommand(command);
 
 			return false;
@@ -404,7 +404,8 @@ class EntityListModel : public QAbstractItemModel
 				Lumix::Component renderable = m_engine->getWorldEditor()->getComponent(item->m_entity, RENDERABLE_HASH);
 				if (renderable.isValid())
 				{
-					Lumix::string path;
+					Lumix::StackAllocator<LUMIX_MAX_PATH> allocator;
+					Lumix::string path(allocator);
 					static_cast<Lumix::RenderScene*>(renderable.scene)->getRenderablePath(renderable, path);
 					const char* name = item->m_entity.getName();
 					char basename[LUMIX_MAX_PATH];

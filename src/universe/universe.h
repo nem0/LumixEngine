@@ -31,6 +31,7 @@ class LUMIX_ENGINE_API Universe final
 		Universe(IAllocator& allocator);
 		~Universe();
 
+		IAllocator& getAllocator() { return m_allocator; }
 		Entity createEntity();
 		void destroyEntity(Entity& entity);
 		Vec3 getPosition(int index) { return m_positions[index]; }
@@ -54,6 +55,7 @@ class LUMIX_ENGINE_API Universe final
 		void deserialize(ISerializer& serializer);
 
 	private:
+		IAllocator&		m_allocator;
 		Array<Vec3>		m_positions;
 		Array<Quat>		m_rotations;
 		Array<int>		m_free_slots;

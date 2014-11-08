@@ -34,7 +34,8 @@ namespace FS
 class Mesh
 {
 	public:
-		Mesh(Material* mat, int start, int count, const char* name)
+		Mesh(Material* mat, int start, int count, const char* name, IAllocator& allocator)
+			: m_name(allocator)
 		{
 			m_material = mat;
 			m_start = start;
@@ -68,6 +69,11 @@ class Model : public Resource
 
 		struct Bone
 		{
+			Bone(IAllocator& allocator)
+				: name(allocator)
+				, parent(allocator)
+			{ }
+
 			string name;
 			string parent;
 			Vec3 position;
@@ -82,6 +88,7 @@ class Model : public Resource
 			, m_geometry()
 			, m_bounding_radius()
 			, m_bone_map(allocator)
+			, m_allocator(allocator)
 		{ }
 
 		~Model();
@@ -110,6 +117,7 @@ class Model : public Resource
 		virtual FS::ReadCallback getReadCallback() override;
 		
 	private:
+		IAllocator& m_allocator;
 		Geometry* m_geometry;
 		Array<Mesh> m_meshes;
 		Array<Bone> m_bones;

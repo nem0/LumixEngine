@@ -8,7 +8,7 @@ namespace Lumix
 	{
 	public:
 		MaterialManager(IAllocator& allocator) 
-			: ResourceManagerBase()
+			: ResourceManagerBase(allocator)
 			, m_allocator(allocator)
 		{}
 		~MaterialManager() {}

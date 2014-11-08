@@ -96,6 +96,7 @@ class Terrain
 		void getSize(float* width, float* height) const { ASSERT(width); ASSERT(height); *width = m_width * m_xz_scale; *height = m_height * m_xz_scale; }
 
 	private: 
+		TerrainQuad* generateQuadTree(float size);
 		void updateGrass(const Component& camera);
 		void generateGeometry();
 		void onMaterialLoaded(Resource::State, Resource::State new_state);

@@ -42,7 +42,7 @@ namespace Lumix
 
 	struct Renderable
 	{
-		Renderable() {}
+		Renderable(IAllocator& allocator) : m_pose(allocator) {}
 
 		int32_t m_component_index;
 		int64_t m_layer_mask;
@@ -376,10 +376,12 @@ namespace Lumix
 				{
 					setModel(i, NULL);
 				}
-				m_renderables.resize(size);
+				m_renderables.clear();
+				m_renderables.reserve(size);
 				m_always_visible.clear();
 				for (int i = 0; i < size; ++i)
 				{
+					m_renderables.emplace(m_allocator);
 					serializer.deserializeArrayItem(m_renderables[i].m_is_always_visible);
 					serializer.deserializeArrayItem(m_renderables[i].m_component_index);
 					if (m_renderables[i].m_is_always_visible)
@@ -543,7 +545,7 @@ namespace Lumix
 				else if (type == RENDERABLE_HASH)
 				{
 					int new_index = m_renderables.empty() ? 0 : m_renderables.back().m_component_index + 1;
-					Renderable& r = m_renderables.pushEmpty();
+					Renderable& r = m_renderables.emplace(m_allocator);
 					r.m_entity = entity;
 					r.m_layer_mask = 1;
 					r.m_scale = 1;

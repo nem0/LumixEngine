@@ -32,7 +32,7 @@ public:
 	void checkFinished();
 	bool isEmpty() const { return m_processes.empty(); }
 	Status getStatus(const Lumix::Path& path);
-	const char* getLog(const Lumix::Path& path);
+	QString getLog(const Lumix::Path& path);
 
 signals:
 	void messageLogged(const QString& message);
@@ -52,6 +52,6 @@ private:
 	Lumix::Path m_base_path;
 	Lumix::Array<ProcessInfo> m_processes;
 	QMap<uint32_t, Status> m_status;
-	QMap<uint32_t, Lumix::string> m_log;
+	QMap<uint32_t, QString> m_log;
 
 };

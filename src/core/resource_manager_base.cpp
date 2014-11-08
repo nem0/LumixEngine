@@ -117,16 +117,9 @@ namespace Lumix
 		}
 	}
 
-	void ResourceManagerBase::releaseAll(void)
-	{
-		for(ResourceTable::iterator it = m_resources.begin(); m_resources.end() != it; ++it)
-		{
-			LUMIX_DELETE(*it);
-		}
-	}
-
-	ResourceManagerBase::ResourceManagerBase()
+	ResourceManagerBase::ResourceManagerBase(IAllocator& allocator)
 		: m_size(0)
+		, m_resources(allocator)
 	{ }
 
 	ResourceManagerBase::~ResourceManagerBase()

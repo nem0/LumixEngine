@@ -127,7 +127,7 @@ void ScriptCompiler::checkFinished()
 }
 
 
-const char* ScriptCompiler::getLog(const Lumix::Path& path)
+QString ScriptCompiler::getLog(const Lumix::Path& path)
 {
 	uint32_t hash;
 	if(strncmp(path.c_str(), m_base_path.c_str(), m_base_path.length()) == 0)
@@ -138,5 +138,5 @@ const char* ScriptCompiler::getLog(const Lumix::Path& path)
 	{
 		hash = crc32(path.c_str());
 	}
-	return m_log[hash].c_str();
+	return m_log[hash];
 }

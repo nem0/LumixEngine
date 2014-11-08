@@ -20,6 +20,7 @@ Universe::~Universe()
 Universe::Universe(IAllocator& allocator)
 	: m_name_to_id_map(allocator)
 	, m_id_to_name_map(allocator)
+	, m_allocator(allocator)
 {
 	m_positions.reserve(RESERVED_ENTITIES);
 	m_rotations.reserve(RESERVED_ENTITIES);
@@ -179,7 +180,7 @@ void Universe::deserialize(ISerializer& serializer)
 		char name[MAX_NAME_LENGTH];
 		serializer.deserializeArrayItem(key);
 		serializer.deserializeArrayItem(name, MAX_NAME_LENGTH);
-		m_id_to_name_map.insert(key, string(name));
+		m_id_to_name_map.insert(key, string(name, m_allocator));
 		m_name_to_id_map.insert(crc32(name), key);
 	}
 	serializer.deserializeArrayEnd();

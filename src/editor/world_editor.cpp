@@ -57,8 +57,8 @@ class SetEntityNameCommand : public IEditorCommand
 	public:
 		SetEntityNameCommand(WorldEditor& editor, Entity entity, const char* name)
 			: m_entity(entity)
-			, m_new_name(name)
-			, m_old_name(entity.getName())
+			, m_new_name(name, m_editor.getAllocator())
+			, m_old_name(entity.getName(), m_editor.getAllocator())
 			, m_editor(editor)
 		{}
 
@@ -1199,7 +1199,7 @@ struct WorldEditorImpl : public WorldEditor
 
 		virtual void destroyEntities(const Entity* entities, int count) override
 		{
-			DestroyEntitiesCommand* command = LUMIX_NEW(DestroyEntitiesCommand)(*this, entities, count);
+			DestroyEntitiesCommand* command = m_allocator.newObject<DestroyEntitiesCommand>(*this, entities, count);
 			executeCommand(command);
 		}
 
@@ -1232,7 +1232,7 @@ struct WorldEditorImpl : public WorldEditor
 			{
 				pos = m_camera.getPosition() + m_camera.getRotation() * Vec3(0, 0, -2);
 			}
-			AddEntityCommand* command = LUMIX_NEW(AddEntityCommand)(*this, pos);
+			AddEntityCommand* command = m_allocator.newObject<AddEntityCommand>(*this, pos);
 			executeCommand(command);
 
 			return command->getEntity();
@@ -1267,7 +1267,7 @@ struct WorldEditorImpl : public WorldEditor
 
 		void onEntityCreated(const Entity& entity)
 		{
-			EditorIcon* er = LUMIX_NEW(EditorIcon)();
+			EditorIcon* er = m_allocator.newObject<EditorIcon>();
 			er->create(*m_engine, *static_cast<RenderScene*>(getComponent(m_camera, CAMERA_HASH).scene), entity);
 			m_editor_icons.push(er);
 		}
@@ -1282,7 +1282,7 @@ struct WorldEditorImpl : public WorldEditor
 				{
 					rots.push(entities[i].getRotation());
 				}
-				IEditorCommand* command = LUMIX_NEW(MoveEntityCommand)(entities, positions, rots);
+				IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(entities, positions, rots);
 				executeCommand(command);
 			}
 		}
@@ -1292,7 +1292,7 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			if (!entities.empty())
 			{
-				IEditorCommand* command = LUMIX_NEW(MoveEntityCommand)(entities, positions, rotations);
+				IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(entities, positions, rotations);
 				executeCommand(command);
 			}
 		}
@@ -1302,7 +1302,7 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			if (entity.isValid())
 			{
-				IEditorCommand* command = LUMIX_NEW(SetEntityNameCommand)(*this, entity, name);
+				IEditorCommand* command = m_allocator.newObject<SetEntityNameCommand>(*this, entity, name);
 				executeCommand(command);
 			}
 		}
@@ -1317,7 +1317,7 @@ struct WorldEditorImpl : public WorldEditor
 			{
 				for (int i = m_undo_stack.size() - 1; i > m_undo_index; --i)
 				{
-					LUMIX_DELETE(m_undo_stack[i]);
+					m_allocator.deleteObject(m_undo_stack[i]);
 				}
 				m_undo_stack.resize(m_undo_index + 1);
 			}
@@ -1326,7 +1326,7 @@ struct WorldEditorImpl : public WorldEditor
 				if (command->merge(*m_undo_stack[m_undo_index]))
 				{
 					m_undo_stack[m_undo_index]->execute();
-					LUMIX_DELETE(command);
+					m_allocator.deleteObject(command);
 					b = false;
 					return;
 				}
@@ -1421,7 +1421,7 @@ struct WorldEditorImpl : public WorldEditor
 		
 		virtual void pasteEntity() override
 		{
-			PasteEntityCommand* command = LUMIX_NEW(PasteEntityCommand)(*this, m_copy_buffer);
+			PasteEntityCommand* command = m_allocator.newObject<PasteEntityCommand>(*this, m_copy_buffer);
 			executeCommand(command);
 		}
 
@@ -1456,7 +1456,7 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			if (component.isValid())
 			{
-				IEditorCommand* command = LUMIX_NEW(DestroyComponentCommand)(*this, component);
+				IEditorCommand* command = m_allocator.newObject<DestroyComponentCommand>(*this, component);
 				executeCommand(command);
 			}
 		}
@@ -1466,7 +1466,7 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			if (!m_selected_entities.empty())
 			{
-				IEditorCommand* command = LUMIX_NEW(AddComponentCommand)(*this, m_selected_entities, type_crc);
+				IEditorCommand* command = m_allocator.newObject<AddComponentCommand>(*this, m_selected_entities, type_crc);
 				executeCommand(command);
 			}
 		}
@@ -1582,7 +1582,7 @@ struct WorldEditorImpl : public WorldEditor
 			}
 			if (!found_renderable)
 			{
-				EditorIcon* er = LUMIX_NEW(EditorIcon)();
+				EditorIcon* er = m_allocator.newObject<EditorIcon>();
 				er->create(*m_engine, *static_cast<RenderScene*>(getComponent(m_camera, CAMERA_HASH).scene), entity);
 				m_editor_icons.push(er);
 			}
@@ -1598,7 +1598,7 @@ struct WorldEditorImpl : public WorldEditor
 
 		bool create(const char* base_path)
 		{
-			m_file_system = FS::FileSystem::create();
+			m_file_system = FS::FileSystem::create(m_allocator);
 			m_tpc_file_server.start(base_path);
 			m_base_path = base_path;
 
@@ -1663,7 +1663,7 @@ struct WorldEditorImpl : public WorldEditor
 
 		void destroy()
 		{
-			LUMIX_DELETE(m_measure_tool);
+			m_allocator.deleteObject(m_measure_tool);
 			destroyUndoStack();
 			auto iter = m_component_properties.begin();
 			auto end = m_component_properties.end();
@@ -1726,7 +1726,7 @@ struct WorldEditorImpl : public WorldEditor
 			m_universe_path = "";
 			m_terrain_brush_size = 10;
 			m_terrain_brush_strength = 0.01f;
-			m_measure_tool = LUMIX_NEW(MeasureTool);
+			m_measure_tool = m_allocator.newObject<MeasureTool>();
 			addPlugin(m_measure_tool);
 		}
 
@@ -1772,7 +1772,7 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			if(cmp.isValid())
 			{
-				IEditorCommand* command = LUMIX_NEW(AddArrayPropertyItemCommand)(cmp, property);
+				IEditorCommand* command = m_allocator.newObject<AddArrayPropertyItemCommand>(cmp, property);
 				executeCommand(command);
 			}
 		}
@@ -1782,7 +1782,7 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			if(cmp.isValid())
 			{
-				IEditorCommand* command = LUMIX_NEW(RemoveArrayPropertyItemCommand)(cmp, index, property);
+				IEditorCommand* command = m_allocator.newObject<RemoveArrayPropertyItemCommand>(cmp, index, property);
 				executeCommand(command);
 			}
 		}
@@ -1796,7 +1796,7 @@ struct WorldEditorImpl : public WorldEditor
 				Component cmp = getComponent(m_selected_entities[0], component_hash);
 				if (cmp.isValid())
 				{
-					IEditorCommand* command = LUMIX_NEW(SetPropertyCommand)(*this, cmp, index, property, data, size);
+					IEditorCommand* command = m_allocator.newObject<SetPropertyCommand>(*this, cmp, index, property, data, size);
 					executeCommand(command);
 				}
 			}
@@ -1886,7 +1886,7 @@ struct WorldEditorImpl : public WorldEditor
 				if (m_editor_icons[i]->getEntity() == cmp.entity)
 				{
 					m_editor_icons[i]->destroy();
-					LUMIX_DELETE(m_editor_icons[i]);
+					m_allocator.deleteObject(m_editor_icons[i]);
 					m_editor_icons.eraseFast(i);
 					break;
 				}
@@ -1903,14 +1903,14 @@ struct WorldEditorImpl : public WorldEditor
 				if (m_editor_icons[i]->getEntity() == cmp.entity)
 				{
 					m_editor_icons[i]->destroy();
-					LUMIX_DELETE(m_editor_icons[i]);
+					m_allocator.deleteObject(m_editor_icons[i]);
 					m_editor_icons.eraseFast(i);
 					break;
 				}
 			}
 			if (cmp.entity.existsInUniverse() && getComponents(cmp.entity).empty())
 			{
-				EditorIcon* er = LUMIX_NEW(EditorIcon)();
+				EditorIcon* er = m_allocator.newObject<EditorIcon>();
 				er->create(*m_engine, *static_cast<RenderScene*>(getComponent(m_camera, CAMERA_HASH).scene), cmp.entity);
 				m_editor_icons.push(er);
 			}
@@ -1925,7 +1925,7 @@ struct WorldEditorImpl : public WorldEditor
 				if (m_editor_icons[i]->getEntity() == entity)
 				{
 					m_editor_icons[i]->destroy();
-					LUMIX_DELETE(m_editor_icons[i]);
+					m_allocator.deleteObject(m_editor_icons[i]);
 					m_editor_icons.eraseFast(i);
 					break;
 				}
@@ -1940,7 +1940,7 @@ struct WorldEditorImpl : public WorldEditor
 			for (int i = 0; i < m_editor_icons.size(); ++i)
 			{
 				m_editor_icons[i]->destroy();
-				LUMIX_DELETE(m_editor_icons[i]);
+				m_allocator.deleteObject(m_editor_icons[i]);
 			}
 			m_components.clear();
 			selectEntities(NULL, 0);
@@ -1999,7 +1999,7 @@ struct WorldEditorImpl : public WorldEditor
 			m_undo_index = -1;
 			for (int i = 0; i < m_undo_stack.size(); ++i)
 			{
-				LUMIX_DELETE(m_undo_stack[i]);
+				m_allocator.deleteObject(m_undo_stack[i]);
 			}
 			m_undo_stack.clear();
 		}
@@ -2046,7 +2046,7 @@ struct WorldEditorImpl : public WorldEditor
 				Component cmp = createComponent(CAMERA_HASH, m_camera);
 				ASSERT(cmp.isValid());
 				RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
-				scene->setCameraSlot(cmp, string("editor"));
+				scene->setCameraSlot(cmp, string("editor", m_allocator));
 			}
 		}
 

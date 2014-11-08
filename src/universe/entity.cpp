@@ -124,7 +124,7 @@ namespace Lumix
 		if (name && name[0] != '\0')
 		{
 			universe->m_name_to_id_map.insert(crc32(name), index);
-			universe->m_id_to_name_map.insert(index, string(name));
+			universe->m_id_to_name_map.insert(index, string(name, universe->getAllocator()));
 		}
 	}
 

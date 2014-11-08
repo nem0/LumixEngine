@@ -25,7 +25,8 @@ namespace
 		Lumix::FS::DiskFileDevice* disk_file_device;
 		Lumix::FS::FileEventsDevice* file_event_device;
 
-		file_system = Lumix::FS::FileSystem::create();
+		Lumix::DefaultAllocator allocator;
+		file_system = Lumix::FS::FileSystem::create(allocator);
 
 		disk_file_device = LUMIX_NEW(Lumix::FS::DiskFileDevice);
 		file_event_device = LUMIX_NEW(Lumix::FS::FileEventsDevice);

@@ -20,7 +20,8 @@ ScriptCompilerWidget::ScriptCompilerWidget(QWidget* parent) :
 	m_ui->scriptListView->setRootIndex(m_model->index(QDir::currentPath() + "/scripts/"));
 	m_compiler = new ScriptCompiler;
 	connect(m_compiler, SIGNAL(messageLogged(const QString&)), this, SLOT(logMessage(const QString&)));
-	m_compiler->setBasePath(m_base_path.c_str());
+	QByteArray base_path = m_base_path.toLatin1();
+	m_compiler->setBasePath(base_path.data());
 	m_compiler->compileAll();
 }
 
@@ -39,7 +40,7 @@ void ScriptCompilerWidget::logMessage(const QString& message)
 void ScriptCompilerWidget::on_scriptListView_clicked(const QModelIndex &index)
 {
 	QString path = m_model->filePath(index);
-	const char* c = m_compiler->getLog(path.toLatin1().data());
+	QString c = m_compiler->getLog(path.toLatin1().data());
 	m_ui->compilerOutputView->setText(c);
 }
 

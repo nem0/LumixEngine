@@ -47,7 +47,7 @@ class LUMIX_ENGINE_API Shader : public Resource
 		static const int MAX_ATTRIBUTE_COUNT = 16;
 
 	public:
-		Shader(const Path& path, ResourceManager& resource_manager, Renderer& renderer);
+		Shader(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator);
 		~Shader();
 
 		GLint getAttribId(int index) const { return m_current_combination->m_vertex_attributes_ids[index]; }
@@ -71,6 +71,10 @@ class LUMIX_ENGINE_API Shader : public Resource
 		class Combination
 		{
 			public:
+				Combination(IAllocator& allocator)
+					: m_defines(allocator)
+				{ }
+
 				GLuint	m_program_id;
 				GLuint	m_vertex_id;
 				GLuint	m_fragment_id;
@@ -91,6 +95,7 @@ class LUMIX_ENGINE_API Shader : public Resource
 		virtual FS::ReadCallback getReadCallback() override;
 
 	private:
+		IAllocator&			m_allocator;
 		Array<string>		m_attributes;
 		Array<string>		m_passes;
 		Array<uint32_t>		m_pass_hashes;

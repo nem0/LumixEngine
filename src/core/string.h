@@ -21,29 +21,24 @@ LUMIX_CORE_API bool fromCString(const char* input, int length, uint32_t* value);
 LUMIX_CORE_API bool copyString(char* destination, int length, const char* source);
 LUMIX_CORE_API bool catCString(char* destination, int length, const char* source);
 
-template <class T, typename Allocator = DefaultAllocator>
+template <class T>
 class base_string
 {
 	public:
-		static base_string<T, Allocator> create(unsigned int length, const char *s)
+		static base_string<T> create(unsigned int length, const char *s, IAllocator& allocator)
 		{
-			return base_string<T, Allocator>(s);
+			return base_string<T>(s, allocator);
 		}
 
-		base_string(const Allocator& allocator)
+		base_string(IAllocator& allocator)
 			: m_allocator(allocator)
 		{
 			m_cstr = NULL;
 			m_size = 0;
 		}
 
-		base_string()
-		{
-			m_cstr = NULL;
-			m_size = 0;
-		}
-
-		base_string(const base_string<T, Allocator>& rhs, int start, int32_t length)
+		base_string(const base_string<T>& rhs, int start, int32_t length)
+			: m_allocator(rhs.m_allocator)
 		{
 			m_size = length - start <= rhs.m_size ? length : rhs.m_size - start;
 			m_cstr = (T*)m_allocator.allocate((m_size + 1) * sizeof(T));
@@ -51,7 +46,8 @@ class base_string
 			m_cstr[m_size] = 0;
 		}
 		
-		base_string(const base_string<T, Allocator>& rhs)
+		base_string(const base_string<T>& rhs)
+			: m_allocator(rhs.m_allocator)
 		{
 			m_cstr = (T*)m_allocator.allocate((rhs.m_size + 1) * sizeof(T));
 			m_size = rhs.m_size;
@@ -59,7 +55,8 @@ class base_string
 			m_cstr[m_size] = 0;
 		}
 
-		explicit base_string(const T* rhs)
+		explicit base_string(const T* rhs, IAllocator& allocator)
+			: m_allocator(allocator)
 		{
 			m_size = strlen(rhs);
 			m_cstr = (T*)m_allocator.allocate((m_size + 1) * sizeof(T));
@@ -77,7 +74,7 @@ class base_string
 			return m_cstr[index];
 		}
 
-		void operator = (const base_string<T, Allocator>& rhs) 
+		void operator = (const base_string<T>& rhs) 
 		{
 			if(&rhs != this)
 			{
@@ -107,7 +104,7 @@ class base_string
 			}
 		}
 
-		bool operator !=(const base_string<T, Allocator>& rhs) const
+		bool operator !=(const base_string<T>& rhs) const
 		{
 			return this->strcmp(rhs.m_cstr) != 0;
 		}
@@ -117,7 +114,7 @@ class base_string
 			return this->strcmp(rhs) != 0;
 		}
 
-		bool operator ==(const base_string<T, Allocator>& rhs) const
+		bool operator ==(const base_string<T>& rhs) const
 		{
 			return this->strcmp(rhs.m_cstr) == 0;
 		}
@@ -127,12 +124,12 @@ class base_string
 			return this->strcmp(rhs) == 0;
 		}
 
-		bool operator <(const base_string<T, Allocator>& rhs) const
+		bool operator <(const base_string<T>& rhs) const
 		{
 			return this->strcmp(rhs.m_cstr) < 0;
 		}
 
-		bool operator >(const base_string<T, Allocator>& rhs) const
+		bool operator >(const base_string<T>& rhs) const
 		{
 			return this->strcmp(rhs.m_cstr) > 0;
 		}
@@ -151,13 +148,13 @@ class base_string
 
 		const T* c_str() const { return m_cstr; }
 		
-		base_string<T, Allocator> substr(int start, int length) const
+		base_string<T> substr(int start, int length) const
 		{
-			return base_string<T, Allocator>(*this, start, length);
+			return base_string<T>(*this, start, length);
 		}
 		
 		template <class V>
-		base_string<T, Allocator>& cat(V value)
+		base_string<T>& cat(V value)
 		{
 			char tmp[30];
 			toCString(value, tmp, 30);
@@ -166,7 +163,7 @@ class base_string
 		}
 
 		template<>
-		base_string<T, Allocator>& cat<float>(float value)
+		base_string<T>& cat<float>(float value)
 		{
 			char tmp[40];
 			toCString(value, tmp, 30, 10);
@@ -175,28 +172,28 @@ class base_string
 		}
 
 		template<>
-		base_string<T, Allocator>& cat<char*>(char* value)
+		base_string<T>& cat<char*>(char* value)
 		{
 			*this += value;
 			return *this;
 		}
 
 		template<>
-		base_string<T, Allocator>& cat<const char*>(const char* value)
+		base_string<T>& cat<const char*>(const char* value)
 		{
 			*this += value;
 			return *this;
 		}
 
 		template <class V1, class V2>
-		base_string<T, Allocator>& cat(V1 v1, V2 v2)
+		base_string<T>& cat(V1 v1, V2 v2)
 		{
 			cat(v1);
 			return cat(v2);
 		}
 
 		template <class V1, class V2, class V3>
-		base_string<T, Allocator>& cat(V1 v1, V2 v2, V3 v3)
+		base_string<T>& cat(V1 v1, V2 v2, V3 v3)
 		{
 			cat(v1);
 			return cat(v2, v3);
@@ -204,21 +201,21 @@ class base_string
 
 
 		template <class V1, class V2, class V3, class V4>
-		base_string<T, Allocator>& cat(V1 v1, V2 v2, V3 v3, V4 v4)
+		base_string<T>& cat(V1 v1, V2 v2, V3 v3, V4 v4)
 		{
 			cat(v1);
 			return cat(v2, v3, v4);
 		}
 
 		template <class V1, class V2, class V3, class V4, class V5>
-		base_string<T, Allocator>& cat(V1 v1, V2 v2, V3 v3, V4 v4, V5 v5)
+		base_string<T>& cat(V1 v1, V2 v2, V3 v3, V4 v4, V5 v5)
 		{
 			cat(v1);
 			return cat(v2, v3, v4, v5);
 		}
 
 		template <class V1, class V2, class V3, class V4, class V5, class V6>
-		base_string<T, Allocator>& cat(V1 v1, V2 v2, V3 v3, V4 v4, V5 v5, V6 v6)
+		base_string<T>& cat(V1 v1, V2 v2, V3 v3, V4 v4, V5 v5, V6 v6)
 		{
 			cat(v1);
 			return cat(v2, v3, v4, v5, v6);
@@ -230,7 +227,7 @@ class base_string
 			{
 				if(m_cstr)
 				{
-					int32_t new_size = m_size + base_string<T, Allocator>::strlen(rhs);
+					int32_t new_size = m_size + base_string<T>::strlen(rhs);
 					T* new_cstr = (T*)m_allocator.allocate(new_size + 1);
 					memcpy(new_cstr, m_cstr, sizeof(T) * m_size + 1);
 					m_allocator.deallocate(m_cstr);
@@ -240,14 +237,14 @@ class base_string
 				}
 				else
 				{
-					m_size = base_string<T, Allocator>::strlen(rhs);
+					m_size = base_string<T>::strlen(rhs);
 					m_cstr = (T*)m_allocator.allocate(m_size + 1);
 					copyString(m_cstr, m_size + 1, rhs);
 				}
 			}
 		}
 
-		void operator += (const base_string<T, Allocator>& rhs)
+		void operator += (const base_string<T>& rhs)
 		{
 			if(!rhs.m_cstr || this == &rhs)
 			{
@@ -314,7 +311,7 @@ class base_string
 	private:
 		int32_t m_size;
 		T*	m_cstr;
-		Allocator m_allocator;
+		IAllocator& m_allocator;
 };
 
 

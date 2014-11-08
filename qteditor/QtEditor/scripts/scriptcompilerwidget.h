@@ -22,13 +22,12 @@ public:
 private slots:
 	void on_scriptListView_clicked(const QModelIndex &index);
 	void logMessage(const QString& message);
-
 	void on_compileAllButton_clicked();
 
 private:
 	Ui::ScriptCompilerWidget* m_ui;
 	class QFileSystemModel* m_model;
 	ScriptCompiler* m_compiler;
-	Lumix::string m_base_path;
+	QString m_base_path;
 };
 
