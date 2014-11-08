@@ -334,9 +334,10 @@ struct PipelineImpl : public Pipeline
 
 struct PipelineInstanceImpl : public PipelineInstance
 {
-	PipelineInstanceImpl(Pipeline& pipeline)
+	PipelineInstanceImpl(Pipeline& pipeline, IAllocator& allocator)
 		: m_source(static_cast<PipelineImpl&>(pipeline))
 		, m_active_camera(Component::INVALID)
+		, m_custom_commands_handlers(allocator)
 	{
 		m_scene = NULL;
 		m_light_dir.set(0, -1, 0);
@@ -793,9 +794,9 @@ Pipeline::Pipeline(const Path& path, ResourceManager& resource_manager)
 }
 
 
-PipelineInstance* PipelineInstance::create(Pipeline& pipeline)
+PipelineInstance* PipelineInstance::create(Pipeline& pipeline, IAllocator& allocator)
 {
-	return LUMIX_NEW(PipelineInstanceImpl)(pipeline);
+	return LUMIX_NEW(PipelineInstanceImpl)(pipeline, allocator);
 }
 
 

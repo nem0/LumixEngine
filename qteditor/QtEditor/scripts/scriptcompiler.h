@@ -2,6 +2,7 @@
 
 
 #include <QObject>
+#include <QMap>
 #include "core/array.h"
 #include "core/delegate_list.h"
 #include "core/map.h"
@@ -50,7 +51,7 @@ private:
 	CompileCallbacks m_delegates;
 	Lumix::Path m_base_path;
 	Lumix::Array<ProcessInfo> m_processes;
-	Lumix::Map<uint32_t, Status> m_status;
-	Lumix::Map<uint32_t, Lumix::string> m_log;
+	QMap<uint32_t, Status> m_status;
+	QMap<uint32_t, Lumix::string> m_log;
 
 };

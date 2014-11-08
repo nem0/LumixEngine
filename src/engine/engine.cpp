@@ -86,7 +86,7 @@ namespace Lumix
 					return false;
 				}
 				m_plugin_manager.addPlugin(m_renderer);
-				if (!m_input_system.create())
+				if (!m_input_system.create(m_allocator))
 				{
 					return false;
 				}
@@ -127,8 +127,8 @@ namespace Lumix
 
 			virtual Universe* createUniverse() override
 			{
-				m_universe = m_allocator.newObject<Universe>();
-				m_hierarchy = Hierarchy::create(*m_universe);
+				m_universe = m_allocator.newObject<Universe>(m_allocator);
+				m_hierarchy = Hierarchy::create(*m_universe, m_allocator);
 				const Array<IPlugin*>& plugins = m_plugin_manager.getPlugins();
 				for (int i = 0; i < plugins.size(); ++i)
 				{

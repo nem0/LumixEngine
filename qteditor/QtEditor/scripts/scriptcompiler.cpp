@@ -100,8 +100,8 @@ ScriptCompiler::Status ScriptCompiler::getStatus(const Lumix::Path& path)
 		hash = crc32(path.c_str());
 	}
 
-	Lumix::Map<uint32_t, Status>::iterator iter = m_status.find(hash);
-	return iter == m_status.end() ? UNKNOWN : iter.second();
+	QMap<uint32_t, Status>::iterator iter = m_status.find(hash);
+	return iter == m_status.end() ? UNKNOWN : iter.value();
 }
 
 

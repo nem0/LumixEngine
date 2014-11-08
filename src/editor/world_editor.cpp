@@ -795,6 +795,12 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
+		virtual IAllocator& getAllocator() override
+		{
+			return m_allocator;
+		}
+
+
 		virtual Engine& getEngine() override
 		{
 			return *m_engine;
@@ -1709,6 +1715,8 @@ struct WorldEditorImpl : public WorldEditor
 			, m_universe_mutex(false)
 			, m_toggle_game_mode_requested(false)
 			, m_gizmo(*this)
+			, m_component_properties(m_allocator)
+			, m_components(m_allocator)
 		{
 			m_go_to_parameters.m_is_active = false;
 			m_undo_index = -1;
@@ -2105,6 +2113,7 @@ struct WorldEditorImpl : public WorldEditor
 			float m_speed;
 		};
 
+		DefaultAllocator m_allocator;
 		GoToParameters m_go_to_parameters;
 		MT::Mutex m_universe_mutex;
 		Gizmo m_gizmo;

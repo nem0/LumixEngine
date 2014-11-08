@@ -7,11 +7,7 @@
 namespace Lumix
 {
 
-	/* action type
-		key pressed
-		key down
-		key down duration
-	*/
+	class IAllocator;
 
 	class LUMIX_CORE_API InputSystem
 	{
@@ -25,7 +21,7 @@ namespace Lumix
 			};
 
 		public:
-			bool create();
+			bool create(IAllocator& allocator);
 			void destroy();
 
 			void update(float dt);

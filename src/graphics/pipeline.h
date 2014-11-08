@@ -67,7 +67,7 @@ class LUMIX_ENGINE_API PipelineInstance abstract
 		virtual void resize(int w, int h) = 0;
 		virtual FrameBuffer* getShadowmapFramebuffer() = 0;
 
-		static PipelineInstance* create(Pipeline& src);
+		static PipelineInstance* create(Pipeline& src, IAllocator& allocator);
 		static void destroy(PipelineInstance* pipeline);
 
 		virtual Renderer& getRenderer() = 0;

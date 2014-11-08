@@ -17,8 +17,10 @@ class HierarchyImpl : public Hierarchy
 		typedef HashMap<int32_t, int32_t> Parents;
 
 	public:
-		HierarchyImpl(Universe& universe)
+		HierarchyImpl(Universe& universe, IAllocator& allocator)
 			: m_universe(universe)
+			, m_parents(allocator)
+			, m_children(allocator)
 		{
 			universe.entityMoved().bind<HierarchyImpl, &HierarchyImpl::onEntityMoved>(this);
 		}
@@ -168,9 +170,9 @@ class HierarchyImpl : public Hierarchy
 };
 
 
-Hierarchy* Hierarchy::create(Universe& universe)
+Hierarchy* Hierarchy::create(Universe& universe, IAllocator& allocator)
 {
-	return LUMIX_NEW(HierarchyImpl)(universe);
+	return LUMIX_NEW(HierarchyImpl)(universe, allocator);
 }
 
 

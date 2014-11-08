@@ -60,6 +60,7 @@ namespace Lumix
 			virtual IPropertyDescriptor* getProperty(const char* component_type, const char* property_name) = 0;
 			virtual void executeCommand(class IEditorCommand* command) = 0;
 			virtual Engine& getEngine() = 0;
+			virtual IAllocator& getAllocator() = 0;
 			virtual void render(IRenderDevice& render_device) = 0;
 			virtual void renderIcons(IRenderDevice& render_device) = 0;
 			virtual Component getEditCamera() = 0;

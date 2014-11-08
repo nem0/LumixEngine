@@ -131,6 +131,7 @@ namespace Lumix
 				, m_universe(universe)
 				, m_renderer(renderer)
 				, m_allocator(allocator)
+				, m_dynamic_renderable_cache(allocator)
 			{
 				m_universe.entityMoved().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 				m_timer = Timer::create();

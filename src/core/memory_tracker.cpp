@@ -62,10 +62,10 @@ namespace Lumix
 		}
 	};
 
-	typedef Map<uint32_t, MemoryTracker::Entry*, MemTrackAllocator> map_alloc_order;
-	typedef Map<FileLineReport, intptr_t, MemTrackAllocator> file_line_map;
-	typedef Map<const char *, intptr_t, MemTrackAllocator> file_map;
-	typedef Map<FileLineReport, uint32_t, MemTrackAllocator> alloc_count_map;
+	typedef Map<uint32_t, MemoryTracker::Entry*> map_alloc_order;
+	typedef Map<FileLineReport, intptr_t> file_line_map;
+	typedef Map<const char *, intptr_t> file_map;
+	typedef Map<FileLineReport, uint32_t> alloc_count_map;
 
 	#pragma init_seg(compiler)
 	MemoryTracker MemoryTracker::s_instance;
@@ -196,7 +196,7 @@ namespace Lumix
 			memTrackerLog("MemoryTracker", "MemoryTracker No leaks detected!");
 		}
 
-		map_alloc_order alloc_order_map;
+		map_alloc_order alloc_order_map(m_allocator);
 		for (EntryTable::iterator it = m_map.begin(); it != m_map.end(); ++it)
 		{
 			Entry& entry = *it;
@@ -222,7 +222,7 @@ namespace Lumix
 	{
 		memTrackerLog("MemoryTracker", "Dumping objects ->");
 
-		file_line_map report_map;
+		file_line_map report_map(m_allocator);
 		{
 			MT::SpinLock lock(m_spin_mutex);
 			for (EntryTable::iterator it = m_map.begin(); it != m_map.end(); ++it)
@@ -266,7 +266,7 @@ namespace Lumix
 	{
 		memTrackerLog("MemoryTracker", "Dumping objects ->");
 
-		file_map report_map;
+		file_map report_map(m_allocator);
 		{
 			MT::SpinLock lock(m_spin_mutex);
 			for (EntryTable::iterator it = m_map.begin(); it != m_map.end(); ++it)

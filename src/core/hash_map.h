@@ -91,15 +91,14 @@ namespace Lumix
 		}
 	};
 
-	template<class K, class T, class Hasher = HashFunc<K>, class Allocator = DefaultAllocator>
+	template<class K, class T, class Hasher = HashFunc<K>>
 	class HashMap
 	{
 	public:
 		typedef T value_type;
 		typedef K key_type;
 		typedef Hasher hasher_type;
-		typedef Allocator allocator_type;
-		typedef HashMap<key_type, value_type, hasher_type, allocator_type> my_type;
+		typedef HashMap<key_type, value_type, hasher_type> my_type;
 		typedef HashNode<key_type, value_type> node_type;
 		typedef uint32_t size_type;
 
@@ -107,17 +106,16 @@ namespace Lumix
 
 		static const size_type s_default_ids_count = 8;
 
-		template <class U, class S, class _Hasher, class _Allocator>
+		template <class U, class S, class _Hasher>
 		class HashMapIterator
 		{
 		public:
 			typedef U key_type;
 			typedef S value_type;
 			typedef _Hasher hasher_type;
-			typedef _Allocator allocator_type;
 			typedef HashNode<key_type, value_type> node_type;
-			typedef HashMap<key_type, value_type, hasher_type, allocator_type> hm_type;
-			typedef HashMapIterator<key_type, value_type, hasher_type, allocator_type> my_type;
+			typedef HashMap<key_type, value_type, hasher_type> hm_type;
+			typedef HashMapIterator<key_type, value_type, hasher_type> my_type;
 
 			friend class hm_type;
 
@@ -201,22 +199,25 @@ namespace Lumix
 			node_type* m_current_node;
 		};
 
-		typedef HashMapIterator<key_type, value_type, hasher_type, allocator_type> iterator;
+		typedef HashMapIterator<key_type, value_type, hasher_type> iterator;
 
-		HashMap()
+		HashMap(IAllocator& allocator)
 			: m_sentinel(&m_sentinel)
+			, m_allocator(allocator)
 		{
 			init();
 		}
 
-		explicit HashMap(size_type buckets)
+		explicit HashMap(size_type buckets, IAllocator& allocator)
 			: m_sentinel(&m_sentinel)
+			, m_allocator(allocator)
 		{
 			init(buckets);
 		}
 
 		HashMap(const my_type& src)
 			: m_sentinel(&m_sentinel)
+			, m_allocator(src.m_allocator)
 		{
 			init(src.m_max_id);
 			copyTableUninitialized(src.m_table, &src.m_sentinel, src.m_max_id);
@@ -532,6 +533,6 @@ namespace Lumix
 		size_type m_size;
 		size_type m_mask;
 		size_type m_max_id;
-		allocator_type m_allocator;
+		IAllocator& m_allocator;
 	};
 } // ~namespace Lumix

@@ -103,6 +103,7 @@ class Terrain
 		void forceGrassUpdate();
 
 	private:
+		IAllocator& m_allocator;
 		Mesh* m_mesh;
 		TerrainQuad* m_root;
 		Geometry m_geometry;
@@ -119,11 +120,10 @@ class Terrain
 		Array<GrassType*> m_grass_types;
 		Array<GrassQuad*> m_free_grass_quads;
 		Map<Component, Array<GrassQuad*> > m_grass_quads;
-		Map<Component, Vec3> m_last_camera_position;
+		Map<Component, Vec3> m_last_camera_position; 
 		Vec3 m_brush_position;
 		float m_brush_size;
 		bool m_force_grass_update;
-		IAllocator& m_allocator;
 };
 
 

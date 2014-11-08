@@ -12,12 +12,11 @@
 
 namespace Lumix
 {
-	class MemTrackAllocator
+	class MemTrackAllocator : public IAllocator
 	{
 	public:
 		void* allocate(size_t n) { return malloc(n); }
 		void deallocate(void* p) { free(p); }
-		void* reallocate(void* p, size_t n) { return realloc(p, n); }
 	};
 
 	class LUMIX_CORE_API MemoryTracker
@@ -80,6 +79,7 @@ namespace Lumix
 		MT::SpinMutex m_spin_mutex;
 		intptr_t m_allocated_memory;
 		uint8_t m_mark;
+		MemTrackAllocator m_allocator;
 
 		static MemoryTracker s_instance;
 		static uint32_t s_alloc_counter;
