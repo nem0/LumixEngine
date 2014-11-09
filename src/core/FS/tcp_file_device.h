@@ -10,6 +10,8 @@ namespace Lumix
 		class TCPStream;
 	}
 
+	class IAllocator;
+
 	namespace FS
 	{
 		class IFile;
@@ -40,10 +42,11 @@ namespace Lumix
 		class LUMIX_CORE_API TCPFileDevice : public IFileDevice
 		{
 		public:
+			virtual void destroyFile(IFile* file) override;
 			virtual IFile* createFile(IFile* child) override;
 			virtual const char* name() const override { return "tcp"; }
 
-			void connect(const char* ip, uint16_t port);
+			void connect(const char* ip, uint16_t port, IAllocator& allocator);
 			void disconnect();
 
 			bool isInitialized() const;

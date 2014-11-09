@@ -87,8 +87,10 @@ class Model : public Resource
 			: Resource(path, resource_manager) 
 			, m_geometry()
 			, m_bounding_radius()
-			, m_bone_map(allocator)
 			, m_allocator(allocator)
+			, m_bone_map(m_allocator)
+			, m_meshes(m_allocator)
+			, m_bones(m_allocator)
 		{ }
 
 		~Model();

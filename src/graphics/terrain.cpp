@@ -187,8 +187,8 @@ namespace Lumix
 		{
 			m_grass_model->getResourceManager().get(ResourceManager::MODEL)->unload(*m_grass_model);
 			m_grass_model->getObserverCb().unbind<GrassType, &GrassType::grassLoaded>(this);
-			LUMIX_DELETE(m_grass_mesh);
-			LUMIX_DELETE(m_grass_geometry);
+			m_terrain.m_allocator.deleteObject(m_grass_mesh);
+			m_terrain.m_allocator.deleteObject(m_grass_geometry);
 		}
 	}
 
@@ -484,16 +484,16 @@ namespace Lumix
 	{
 		if (m_grass_model->isReady())
 		{
-			LUMIX_DELETE(m_grass_geometry);
+			m_terrain.m_allocator.deleteObject(m_grass_geometry);
 
-			m_grass_geometry = LUMIX_NEW(Geometry);
+			m_grass_geometry = m_terrain.m_allocator.newObject<Geometry>();
 			Geometry::VertexCallback vertex_callback;
 			Geometry::IndexCallback index_callback;
 			vertex_callback.bind<GrassType, &GrassType::grassVertexCopyCallback>(this);
 			index_callback.bind<GrassType, &GrassType::grassIndexCopyCallback>(this);
 			m_grass_geometry->copy(*m_grass_model->getGeometry(), COPY_COUNT, vertex_callback, index_callback);
 			Material* material = m_grass_model->getMesh(0).getMaterial();
-			m_grass_mesh = LUMIX_NEW(Mesh)(material, 0, m_grass_model->getMesh(0).getCount() * COPY_COUNT, "grass", m_terrain.m_allocator);
+			m_grass_mesh = m_terrain.m_allocator.newObject<Mesh>(material, 0, m_grass_model->getMesh(0).getCount() * COPY_COUNT, "grass", m_terrain.m_allocator);
 			m_terrain.forceGrassUpdate();
 		}
 	}

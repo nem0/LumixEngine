@@ -1,4 +1,5 @@
 #include "core/net/tcp_connector.h"
+#include "core/allocator.h"
 #include "core/net/tcp_stream.h"
 
 #ifndef DISABLE_NETWORK
@@ -45,7 +46,12 @@ namespace Lumix
 			}
 
 			m_socket = socket;
-			return LUMIX_NEW(TCPStream)(socket);		
+			return m_allocator.newObject<TCPStream>(socket);		
+		}
+
+		void TCPConnector::close(TCPStream* stream)
+		{
+			m_allocator.deleteObject(stream);
 		}
 	} // ~namespace Net
 } // ~namespace Lumix

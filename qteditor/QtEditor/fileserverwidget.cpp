@@ -34,6 +34,7 @@ class FileServerWatcher
 	public:
 		FileServerWatcher(FileServerWidget& widget)
 			: m_widget(widget)
+			, m_fe_device(m_allocator)
 		{
 			m_timer.start();
 			m_fe_device.OnEvent.bind<FileServerWatcher, &FileServerWatcher::fsEventCb>(this);
@@ -49,7 +50,8 @@ class FileServerWatcher
 			return m_fe_device; 
 		}
 
-private:
+	private:
+		Lumix::DefaultAllocator m_allocator;
 		Lumix::FS::FileEventsDevice m_fe_device;
 		QElapsedTimer m_timer;
 		FileServerWidget& m_widget;

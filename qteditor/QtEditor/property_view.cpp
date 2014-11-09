@@ -82,6 +82,9 @@ class AddTerrainLevelCommand : public Lumix::IEditorCommand
 			: m_world_editor(editor)
 			, m_terrain(terrain)
 			, m_can_be_merged(can_be_merged)
+			, m_new_data(editor.getAllocator())
+			, m_old_data(editor.getAllocator())
+			, m_items(editor.getAllocator())
 		{
 			Lumix::Matrix entity_mtx = terrain.entity.getMatrix();
 			entity_mtx.fastInverse();
@@ -232,8 +235,8 @@ class AddTerrainLevelCommand : public Lumix::IEditorCommand
 
 		void resizeData()
 		{
-			Lumix::Array<uint8_t> new_data;
-			Lumix::Array<uint8_t> old_data;
+			Lumix::Array<uint8_t> new_data(m_world_editor.getAllocator());
+			Lumix::Array<uint8_t> old_data(m_world_editor.getAllocator());
 			auto heightmap = getHeightmap();
 			Rectangle rect;
 			getBoundingRectangle(heightmap, rect);

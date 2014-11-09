@@ -1,5 +1,5 @@
 #include "core/fs/file_events_device.h"
-
+#include "core/allocator.h"
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
 #include "core/fs/ifile_system_defines.h"
@@ -13,16 +13,23 @@ namespace Lumix
 		class EventsFile : public IFile
 		{
 		public:
-			EventsFile(IFile& file, FileEventsDevice::EventCallback& cb)
+			EventsFile(IFile& file, FileEventsDevice& device, FileEventsDevice::EventCallback& cb)
 				: m_file(file)
 				, m_cb(cb)
+				, m_device(device)
 			{
 			}
 
 
 			virtual ~EventsFile() 
 			{
-				LUMIX_DELETE(&m_file);
+				m_file.release();
+			}
+
+
+			virtual IFileDevice& getDevice() override
+			{
+				return m_device;
 			}
 
 
@@ -116,15 +123,21 @@ namespace Lumix
 				m_cb.invoke(event);
 			}
 
-
+			FileEventsDevice& m_device;
 			IFile& m_file;
 			FileEventsDevice::EventCallback& m_cb;
 		};
 
 
+		void FileEventsDevice::destroyFile(IFile* file)
+		{
+			m_allocator.deleteObject(file);
+		}
+
+
 		IFile* FileEventsDevice::createFile(IFile* child)
 		{
-			return LUMIX_NEW(EventsFile)(*child, OnEvent);
+			return m_allocator.newObject<EventsFile>(*child, *this, OnEvent);
 		}
 	} // namespace FS
 } // ~namespace Lumix
