@@ -417,7 +417,7 @@ namespace Lumix
 
 
 	Texture::Texture(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
-		: Resource(path, resource_manager)
+		: Resource(path, resource_manager, allocator)
 		, m_data_reference(0)
 		, m_is_cubemap(false)
 		, m_allocator(allocator)

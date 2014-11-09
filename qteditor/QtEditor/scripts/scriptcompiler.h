@@ -14,7 +14,6 @@ class ScriptCompiler : public QObject
 {
 	Q_OBJECT
 public:
-	typedef Lumix::DelegateList<void (const Lumix::Path&, uint32_t)> CompileCallbacks;
 	enum Status
 	{
 		UNKNOWN,
@@ -26,7 +25,6 @@ public:
 public:
 	explicit ScriptCompiler(QObject* parent = NULL);
 	void compile(const Lumix::Path& path);
-	CompileCallbacks& onCompile() { return m_delegates; }
 	void compileAll();
 	void setBasePath(const Lumix::Path& path) { m_base_path = path; }
 	void checkFinished();
@@ -36,6 +34,7 @@ public:
 
 signals:
 	void messageLogged(const QString& message);
+	void compiled(const Lumix::Path&, uint32_t);
 
 public slots:
 	void compilerFinish(int exitCode);
@@ -48,7 +47,6 @@ private:
 	};
 
 private:
-	CompileCallbacks m_delegates;
 	Lumix::Path m_base_path;
 	Lumix::Array<ProcessInfo> m_processes;
 	QMap<uint32_t, Status> m_status;

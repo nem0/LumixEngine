@@ -1764,7 +1764,7 @@ void PropertyView::setScriptCompiler(ScriptCompiler* compiler)
 	m_compiler = compiler;
 	if(m_compiler)
 	{
-		m_compiler->onCompile().bind<PropertyView, &PropertyView::onScriptCompiled>(this);
+		connect(m_compiler, &ScriptCompiler::compiled, this, &PropertyView::on_script_compiled);
 	}
 }
 
@@ -1816,7 +1816,7 @@ void PropertyView::setScriptStatus(uint32_t status)
 }
 
 
-void PropertyView::onScriptCompiled(const Lumix::Path&, uint32_t status)
+void PropertyView::on_script_compiled(const Lumix::Path&, uint32_t status)
 {
 	setScriptStatus(status == 0 ? ScriptCompiler::SUCCESS : ScriptCompiler::FAILURE);
 }

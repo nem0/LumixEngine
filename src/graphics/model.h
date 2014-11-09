@@ -84,7 +84,7 @@ class Model : public Resource
 
 	public:
 		Model(const Path& path, ResourceManager& resource_manager, IAllocator& allocator) 
-			: Resource(path, resource_manager) 
+			: Resource(path, resource_manager, allocator) 
 			, m_geometry()
 			, m_bounding_radius()
 			, m_allocator(allocator)

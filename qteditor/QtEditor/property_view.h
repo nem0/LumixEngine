@@ -89,6 +89,8 @@ private slots:
 	void on_positionZ_valueChanged(double arg1);
 	void on_propertyList_customContextMenuRequested(const QPoint &pos);
 	void on_nameEdit_editingFinished();
+	void on_script_compiled(const Lumix::Path& path, uint32_t status);
+
 
 private:
 	void createObjectEditor(QTreeWidgetItem* item, PropertyViewObject* object);
@@ -98,7 +100,6 @@ private:
 	void onEntitySelected(const Lumix::Array<Lumix::Entity>& e);
 	void onEntityPosition(const Lumix::Entity& e);
 	void addScriptCustomProperties();
-	void onScriptCompiled(const Lumix::Path& path, uint32_t status);
 	void setScriptStatus(uint32_t status);
 	void updateSelectedEntityPosition();
 	void onSelectedResourceLoaded(Lumix::Resource::State old_state, Lumix::Resource::State new_state);

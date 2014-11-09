@@ -17,7 +17,10 @@ class NotificationsImpl : public Notifications
 			//Lumix::g_log_info.getCallback().bind<NotificationsImpl, &NotificationsImpl::onLogInfo>(this);
 			Lumix::g_log_warning.getCallback().bind<NotificationsImpl, &NotificationsImpl::onLogWarning>(this);
 			Lumix::g_log_error.getCallback().bind<NotificationsImpl, &NotificationsImpl::onLogError>(this);
-			m_main_window.resized().bind<NotificationsImpl, &NotificationsImpl::onMainWindowResized>(this);
+			m_main_window.connect(&m_main_window, &MainWindow::resized, [this](const QSize&)
+			{
+				updateLayout();
+			});
 		}
 
 
@@ -26,15 +29,7 @@ class NotificationsImpl : public Notifications
 			//Lumix::g_log_info.getCallback().unbind<NotificationsImpl, &NotificationsImpl::onLogInfo>(this);
 			Lumix::g_log_warning.getCallback().unbind<NotificationsImpl, &NotificationsImpl::onLogWarning>(this);
 			Lumix::g_log_error.getCallback().unbind<NotificationsImpl, &NotificationsImpl::onLogError>(this);
-			m_main_window.resized().unbind<NotificationsImpl, &NotificationsImpl::onMainWindowResized>(this);
 		}
-
-
-		void onMainWindowResized(const QSize&)
-		{
-			updateLayout();
-		}
-
 
 		void updateLayout()
 		{

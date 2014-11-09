@@ -80,7 +80,7 @@ void ScriptCompiler::compilerFinish(int exitCode)
 			{
 				msg.sprintf("Script %s failed to compile", m_processes[i].m_path.c_str());
 			}
-			m_delegates.invoke(m_processes[i].m_path.c_str(), exitCode);
+			emit compiled(m_processes[i].m_path.c_str(), exitCode);
 			emit messageLogged(msg);
 			break;
 		}

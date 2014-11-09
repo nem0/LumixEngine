@@ -1720,6 +1720,12 @@ struct WorldEditorImpl : public WorldEditor
 			, m_components(m_allocator)
 			, m_mem_file_device(m_allocator)
 			, m_disk_file_device(m_allocator)
+			, m_entity_name_set(m_allocator)
+			, m_entity_selected(m_allocator)
+			, m_universe_destroyed(m_allocator)
+			, m_universe_created(m_allocator)
+			, m_universe_loaded(m_allocator)
+
 		{
 			m_go_to_parameters.m_is_active = false;
 			m_undo_index = -1;

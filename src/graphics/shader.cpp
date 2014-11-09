@@ -19,7 +19,7 @@ namespace Lumix
 
 
 Shader::Shader(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator)
-	: Resource(path, resource_manager)
+	: Resource(path, resource_manager, allocator)
 	, m_is_shadowmap_required(true)
 	, m_renderer(renderer)
 	, m_allocator(allocator)
