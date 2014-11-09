@@ -3,7 +3,7 @@
 
 #include <cstdlib>
 #include <new>
-#include "core/default_allocator.h"
+#include "core/allocator.h"
 
 
 
@@ -25,7 +25,7 @@ class Array<T, false>
 		}
 	
 		explicit Array(const Array& rhs)
-			: m_allocator(&rhs.m_allocator == &rhs.m_default_allocator ? m_default_allocator : rhs.m_allocator)
+			: m_allocator(rhs.m_allocator)
 		{
 			m_data = NULL;
 			m_capacity = 0;
@@ -47,14 +47,6 @@ class Array<T, false>
 					new ((char*)(m_data + i)) T(rhs.m_data[i]);
 				}
 			}
-		}
-
-		Array()
-			: m_allocator(m_default_allocator)
-		{
-			m_data = NULL;
-			m_capacity = 0;
-			m_size = 0;
 		}
 
 		~Array()
@@ -250,7 +242,6 @@ class Array<T, false>
 		}
 
 	private:
-		DefaultAllocator m_default_allocator;
 		IAllocator& m_allocator;
 		int m_capacity;
 		int m_size;
