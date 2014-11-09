@@ -28,6 +28,7 @@ Universe::Universe(IAllocator& allocator)
 	, m_entity_created(m_allocator)
 	, m_entity_destroyed(m_allocator)
 	, m_entity_moved(m_allocator)
+	, m_free_slots(m_allocator)
 {
 	m_positions.reserve(RESERVED_ENTITIES);
 	m_rotations.reserve(RESERVED_ENTITIES);

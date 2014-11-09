@@ -41,10 +41,11 @@ namespace Lumix
 			};
 
 		public:
-			AnimationSceneImpl(IPlugin& anim_system, Engine& engine, Universe& universe)
+			AnimationSceneImpl(IPlugin& anim_system, Engine& engine, Universe& universe, IAllocator& allocator)
 				: m_universe(universe)
 				, m_engine(engine)
 				, m_anim_system(anim_system)
+				, m_animables(allocator)
 			{
 				m_universe.componentCreated().bind<AnimationSceneImpl, &AnimationSceneImpl::onComponentCreated>(this);
 			}
@@ -277,7 +278,7 @@ namespace Lumix
 
 			virtual IScene* createScene(Universe& universe) override
 			{
-				return m_allocator.newObject<AnimationSceneImpl>(*this, m_engine, universe);
+				return m_allocator.newObject<AnimationSceneImpl>(*this, m_engine, universe, m_allocator);
 			}
 
 		
@@ -295,7 +296,8 @@ namespace Lumix
 
 			virtual bool create() override
 			{
-				m_engine.getWorldEditor()->registerProperty("animable", m_engine.getAllocator().newObject<FilePropertyDescriptor<AnimationSceneImpl> >("preview", &AnimationSceneImpl::getPreview, &AnimationSceneImpl::setPreview, "Animation (*.ani)"));
+				IAllocator& allocator = m_engine.getWorldEditor()->getAllocator();
+				m_engine.getWorldEditor()->registerProperty("animable", allocator.newObject<FilePropertyDescriptor<AnimationSceneImpl> >(allocator, "preview", &AnimationSceneImpl::getPreview, &AnimationSceneImpl::setPreview, "Animation (*.ani)"));
 				m_animation_manager.create(ResourceManager::ANIMATION, m_engine.getResourceManager());
 				return true;
 			}

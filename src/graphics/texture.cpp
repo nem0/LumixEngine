@@ -421,6 +421,7 @@ namespace Lumix
 		, m_data_reference(0)
 		, m_is_cubemap(false)
 		, m_allocator(allocator)
+		, m_data(m_allocator)
 	{
 		glGenTextures(1, &m_id);
 	}

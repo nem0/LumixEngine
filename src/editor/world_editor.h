@@ -78,7 +78,7 @@ namespace Lumix
 			virtual void copyEntity() = 0;
 			virtual void pasteEntity() = 0;
 			virtual Component getComponent(const Entity& entity, uint32_t type) = 0;
-			virtual const ComponentList& getComponents(const Entity& entity) = 0;
+			virtual ComponentList& getComponents(const Entity& entity) = 0;
 			virtual void addComponent(uint32_t type_crc) = 0;
 			virtual void cloneComponent(const Component& src, Entity& entity) = 0;
 			virtual void destroyComponent(const Component& crc) = 0;

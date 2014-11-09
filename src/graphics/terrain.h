@@ -48,6 +48,10 @@ class Terrain
 		class GrassPatch
 		{
 			public:
+				GrassPatch(IAllocator& allocator)
+					: m_matrices(allocator)
+				{ }
+
 				Array<Matrix> m_matrices;
 				GrassType* m_type;
 		};
@@ -55,6 +59,10 @@ class Terrain
 		class GrassQuad
 		{
 			public:
+				GrassQuad(IAllocator& allocator)
+					: m_patches(allocator)
+				{}
+
 				Array<GrassPatch> m_patches;
 				float m_x;
 				float m_z;
@@ -96,6 +104,7 @@ class Terrain
 		void getSize(float* width, float* height) const { ASSERT(width); ASSERT(height); *width = m_width * m_xz_scale; *height = m_height * m_xz_scale; }
 
 	private: 
+		Array<Terrain::GrassQuad*>& getQuads(const Component& camera);
 		TerrainQuad* generateQuadTree(float size);
 		void updateGrass(const Component& camera);
 		void generateGeometry();

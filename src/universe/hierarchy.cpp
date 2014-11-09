@@ -98,7 +98,7 @@ class HierarchyImpl : public Hierarchy
 				Children::iterator child_iter = m_children.find(parent.index);
 				if(!child_iter.isValid())
 				{
-					m_children.insert(parent.index, Array<Child>());
+					m_children.insert(parent.index, Array<Child>(m_allocator));
 					child_iter = m_children.find(parent.index);
 				}
 				Child& c = child_iter.value().pushEmpty();

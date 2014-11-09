@@ -448,7 +448,7 @@ class ComponentPropertyObject : public PropertyViewObject
 
 		virtual void createEditor(PropertyView& view, QTreeWidgetItem* item) override
 		{
-			Lumix::Blob stream;
+			Lumix::Blob stream(view.getWorldEditor()->getAllocator());
 			if(m_descriptor.getType() != Lumix::IPropertyDescriptor::ARRAY)
 			{
 				if(m_array_index >= 0 )
@@ -1428,7 +1428,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 		bool isOBBCollision(Lumix::RenderScene* scene, const Lumix::Matrix& matrix, Lumix::Model* model, float scale)
 		{
 			Lumix::Vec3 pos_a = matrix.getTranslation();
-			static Lumix::Array<Lumix::RenderableInfo> infos;
+			static Lumix::Array<Lumix::RenderableInfo> infos(m_world_editor.getAllocator());
 			infos.clear();
 			scene->getRenderableInfos(infos, ~0);
 			float radius_a_squared = model->getBoundingRadius();
@@ -1737,7 +1737,7 @@ void PropertyView::setSelectedResourceFilename(const char* filename)
 
 void PropertyView::addResourcePlugin(PropertyViewObject::Creator plugin)
 {
-	m_resource_plugins.push(plugin);
+	m_resource_plugins.push_back(plugin);
 }
 
 
@@ -2031,7 +2031,7 @@ void PropertyView::on_addComponentButton_clicked()
 		if(strcmp(c, component_map[i]) == 0)
 		{
 			m_world_editor->addComponent(crc32(component_map[i+1]));
-			Lumix::Array<Lumix::Entity> tmp;
+			Lumix::Array<Lumix::Entity> tmp(m_world_editor->getAllocator());
 			tmp.push(m_selected_entity);
 			onEntitySelected(tmp);
 			return;
@@ -2044,7 +2044,7 @@ void PropertyView::updateSelectedEntityPosition()
 {
 	if(m_world_editor->getSelectedEntities().size() == 1)
 	{
-		Lumix::Array<Lumix::Vec3> positions;
+		Lumix::Array<Lumix::Vec3> positions(m_world_editor->getAllocator());
 		positions.push(Lumix::Vec3((float)m_ui->positionX->value(), (float)m_ui->positionY->value(), (float)m_ui->positionZ->value()));
 		m_world_editor->setEntitiesPositions(m_world_editor->getSelectedEntities(), positions);
 	}
@@ -2140,7 +2140,7 @@ void PropertyView::on_propertyList_customContextMenuRequested(const QPoint &pos)
 				{
 					Lumix::Entity entity = cmps[i].entity;
 					m_world_editor->destroyComponent(cmps[i]);
-					Lumix::Array<Lumix::Entity> tmp;
+					Lumix::Array<Lumix::Entity> tmp(m_world_editor->getAllocator());
 					tmp.push(m_selected_entity);
 					onEntitySelected(tmp);
 					break;

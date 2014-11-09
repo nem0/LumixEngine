@@ -109,13 +109,13 @@ void PhysicsSystemImpl::registerProperties(Engine& engine)
 	WorldEditor* editor = engine.getWorldEditor();
 	if(editor)
 	{
-		IAllocator& allocator = engine.getAllocator();
-		editor->registerProperty("box_rigid_actor", allocator.newObject<BoolPropertyDescriptor<PhysicsScene> >("dynamic", &PhysicsScene::isDynamic, &PhysicsScene::setIsDynamic));
-		editor->registerProperty("box_rigid_actor", allocator.newObject<Vec3PropertyDescriptor<PhysicsScene> >("size", &PhysicsScene::getHalfExtents, &PhysicsScene::setHalfExtents));
-		editor->registerProperty("mesh_rigid_actor", allocator.newObject<FilePropertyDescriptor<PhysicsScene> >("source", &PhysicsScene::getShapeSource, &PhysicsScene::setShapeSource, "Physics (*.pda)"));
-		editor->registerProperty("physical_heightfield", allocator.newObject<ResourcePropertyDescriptor<PhysicsScene> >("heightmap", &PhysicsScene::getHeightmap, &PhysicsScene::setHeightmap, "Image (*.raw)"));
-		editor->registerProperty("physical_heightfield", allocator.newObject<DecimalPropertyDescriptor<PhysicsScene> >("xz_scale", &PhysicsScene::getHeightmapXZScale, &PhysicsScene::setHeightmapXZScale));
-		editor->registerProperty("physical_heightfield", allocator.newObject<DecimalPropertyDescriptor<PhysicsScene> >("y_scale", &PhysicsScene::getHeightmapYScale, &PhysicsScene::setHeightmapYScale));
+		IAllocator& allocator = editor->getAllocator();
+		editor->registerProperty("box_rigid_actor", allocator.newObject<BoolPropertyDescriptor<PhysicsScene> >(allocator, "dynamic", &PhysicsScene::isDynamic, &PhysicsScene::setIsDynamic));
+		editor->registerProperty("box_rigid_actor", allocator.newObject<Vec3PropertyDescriptor<PhysicsScene> >(allocator, "size", &PhysicsScene::getHalfExtents, &PhysicsScene::setHalfExtents));
+		editor->registerProperty("mesh_rigid_actor", allocator.newObject<FilePropertyDescriptor<PhysicsScene> >(allocator, "source", &PhysicsScene::getShapeSource, &PhysicsScene::setShapeSource, "Physics (*.pda)"));
+		editor->registerProperty("physical_heightfield", allocator.newObject<ResourcePropertyDescriptor<PhysicsScene> >(allocator, "heightmap", &PhysicsScene::getHeightmap, &PhysicsScene::setHeightmap, "Image (*.raw)"));
+		editor->registerProperty("physical_heightfield", allocator.newObject<DecimalPropertyDescriptor<PhysicsScene> >(allocator, "xz_scale", &PhysicsScene::getHeightmapXZScale, &PhysicsScene::setHeightmapXZScale));
+		editor->registerProperty("physical_heightfield", allocator.newObject<DecimalPropertyDescriptor<PhysicsScene> >(allocator, "y_scale", &PhysicsScene::getHeightmapYScale, &PhysicsScene::setHeightmapYScale));
 	}
 }
 

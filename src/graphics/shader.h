@@ -73,6 +73,7 @@ class LUMIX_ENGINE_API Shader : public Resource
 			public:
 				Combination(IAllocator& allocator)
 					: m_defines(allocator)
+					, m_uniforms(allocator)
 				{ }
 
 				GLuint	m_program_id;

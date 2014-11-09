@@ -17,6 +17,7 @@ namespace Lumix
 			, m_trans_queue(allocator)
 			, m_worker_tasks(allocator)
 			, m_allocator(allocator)
+			, m_pending_trans(allocator)
 		{
 #if TYPE == MULTI_THREAD
 			uint32_t threads_num = getCpuThreadsCount();

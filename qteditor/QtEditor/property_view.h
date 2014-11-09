@@ -42,8 +42,7 @@ class PropertyViewObject : public QObject
 		QString getName() const { return m_name; }
 		PropertyViewObject** getMembers() { return m_members.empty() ? NULL : &m_members[0]; }
 		int getMemberCount() const { return m_members.size(); }
-		void addMember(PropertyViewObject* member) { m_members.push(member); }
-		void removeMember(PropertyViewObject* member) { m_members.eraseItem(member); }
+		void addMember(PropertyViewObject* member) { m_members.push_back(member); }
 		PropertyViewObject* getParent() const { return m_parent; }
 
 		virtual void createEditor(class PropertyView& view, QTreeWidgetItem* item) = 0;
@@ -51,7 +50,7 @@ class PropertyViewObject : public QObject
 
 	private:
 		QString m_name;
-		Lumix::Array<PropertyViewObject*> m_members;
+		QVector<PropertyViewObject*> m_members;
 		PropertyViewObject* m_parent;
 };
 
@@ -113,7 +112,7 @@ private:
 	class TerrainEditor* m_terrain_editor;
 	AssetBrowser* m_asset_browser;
 	Lumix::Resource* m_selected_resource;
-	Lumix::Array<PropertyViewObject::Creator> m_resource_plugins;
+	QVector<PropertyViewObject::Creator> m_resource_plugins;
 	PropertyViewObject* m_object;
 	class EntityTemplateList* m_entity_template_list;
 	class EntityList* m_entity_list;

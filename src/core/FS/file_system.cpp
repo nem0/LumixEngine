@@ -87,6 +87,8 @@ namespace Lumix
 				, m_save_game_device(m_allocator)
 				, m_in_progress(m_allocator)
 				, m_transaction_queue(m_allocator)
+				, m_pending(m_allocator)
+				, m_devices(m_allocator)
 			{
 				m_task = m_allocator.newObject<FSTask>(&m_transaction_queue, m_allocator);
 				m_task->create("FSTask");

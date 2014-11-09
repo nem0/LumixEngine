@@ -43,7 +43,7 @@ void ScriptCompiler::compile(const Lumix::Path& path)
 	}
 	process.m_path = rel_path;
 	process.m_process = new QProcess();
-	m_processes.push(process);
+	m_processes.push_back(process);
 	QStringList list;
 	char cmd_line[255];
 	sprintf(cmd_line, "%s\\scripts\\compile.bat %s\\%s", m_base_path.c_str(), m_base_path.c_str(), rel_path.c_str());
@@ -121,7 +121,7 @@ void ScriptCompiler::checkFinished()
 			}
 			m_log[hash] = s.toLatin1().data();
 			delete process.m_process;
-			m_processes.eraseFast(i);
+			m_processes.remove(i);
 		}
 	}
 }

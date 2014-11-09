@@ -54,7 +54,7 @@ class Geometry
 		typedef Delegate<void(Array<int>&)> IndexCallback;
 
 	public:
-		Geometry();
+		Geometry(IAllocator& allocator);
 		~Geometry();
 
 		void copy(const uint8_t* data, int size, const Array<int32_t>& indices, VertexDef vertex_definition);
@@ -68,6 +68,7 @@ class Geometry
 		GLuint getIndicesID() const { return m_indices_id; }
 
 	private:
+		IAllocator& m_allocator;
 		GLuint m_id;
 		GLuint m_indices_id;
 		VertexDef m_vertex_definition;

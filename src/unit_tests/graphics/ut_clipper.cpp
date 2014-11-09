@@ -37,7 +37,8 @@ namespace
 
 	void UT_culling_system(const char* params)
 	{
-		Lumix::Array<Lumix::Sphere> spheres;
+		Lumix::DefaultAllocator allocator;
+		Lumix::Array<Lumix::Sphere> spheres(allocator);
 		for (float i = 0.f; i < 30000000.0f; i += 15.f)
 		{
 			spheres.push(Lumix::Sphere(i, 0.f, 50.f, 5.f));
@@ -80,7 +81,8 @@ namespace
 
 	void UT_culling_system_async(const char* params)
 	{
-		Lumix::Array<Lumix::Sphere> spheres;
+		Lumix::DefaultAllocator allocator;
+		Lumix::Array<Lumix::Sphere> spheres(allocator);
 		for (float i = 0.f; i < 30000000.f; i += 15.f)
 		{
 			spheres.push(Lumix::Sphere(i, 0.f, 50.f, 5.f));

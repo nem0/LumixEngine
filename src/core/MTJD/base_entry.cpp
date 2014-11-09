@@ -10,6 +10,7 @@ namespace Lumix
 		BaseEntry::BaseEntry(int32_t depend_count, bool sync_event, IAllocator& allocator)
 			: m_dependency_count(depend_count)
 			, m_allocator(allocator)
+			, m_dependency_table(m_allocator)
 		{
 #if TYPE == MULTI_THREAD
 

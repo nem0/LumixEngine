@@ -92,7 +92,7 @@ class NotificationsImpl : public Notifications
 			Notification n;
 			n.m_widget = widget;
 			n.m_time = DISPLAY_TIME;
-			m_items.push(n);
+			m_items.push_back(n);
 
 			updateLayout();
 		}
@@ -107,7 +107,7 @@ class NotificationsImpl : public Notifications
 
 	private:
 		MainWindow& m_main_window;
-		Lumix::Array<Notification> m_items;
+		QVector<Notification> m_items;
 };
 
 

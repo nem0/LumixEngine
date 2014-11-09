@@ -216,8 +216,8 @@ float Gizmo::computeRotateAngle(int relx, int rely, int flags)
 
 void Gizmo::rotate(int relx, int rely, int flags)
 {
-	Array<Vec3> new_positions;
-	Array<Quat> new_rotations;
+	Array<Vec3> new_positions(m_editor.getAllocator());
+	Array<Quat> new_rotations(m_editor.getAllocator());
 	for(int i = 0, c = m_editor.getSelectedEntities().size(); i < c; ++i)
 	{
 		Vec3 pos = m_editor.getSelectedEntities()[i].getPosition();
@@ -266,7 +266,7 @@ void Gizmo::transform(Component camera, TransformOperation operation, int x, int
 	{
 		Vec3 intersection = getMousePlaneIntersection(camera, x, y);
 		Vec3 delta = intersection - m_transform_point;
-		Array<Vec3> new_positions;
+		Array<Vec3> new_positions(m_editor.getAllocator());
 		for(int i = 0, ci = m_editor.getSelectedEntities().size(); i < ci; ++i)
 		{
 			Vec3 pos = m_editor.getSelectedEntities()[i].getPosition();

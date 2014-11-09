@@ -230,6 +230,9 @@ struct PipelineImpl : public Pipeline
 	PipelineImpl(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 		: Pipeline(path, resource_manager, allocator)
 		, m_allocator(allocator)
+		, m_commands(allocator)
+		, m_framebuffers(allocator)
+		, m_command_creators(allocator)
 	{
 		addCommandCreator("clear").bind<&CreateCommand<ClearCommand> >();
 		addCommandCreator("custom").bind<&CreateCommand<CustomCommand> >();
@@ -385,6 +388,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 		, m_active_camera(Component::INVALID)
 		, m_custom_commands_handlers(allocator)
 		, m_allocator(allocator)
+		, m_terrain_infos(allocator)
+		, m_framebuffers(allocator)
+		, m_grass_infos(allocator)
+		, m_renderable_infos(allocator)
 	{
 		m_scene = NULL;
 		m_light_dir.set(0, -1, 0);
@@ -990,10 +997,10 @@ DrawScreenQuadCommand::~DrawScreenQuadCommand()
 
 void DrawScreenQuadCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer)
 {
-	m_geometry = m_allocator.newObject<Geometry>();
+	m_geometry = m_allocator.newObject<Geometry>(m_allocator);
 	VertexDef def;
 	def.parse("pt", 2);
-	Array<int> indices;
+	Array<int> indices(m_allocator);
 	const int GEOMETRY_VERTEX_ATTRIBUTE_COUNT = 20;
 	float v[GEOMETRY_VERTEX_ATTRIBUTE_COUNT];
 	indices.push(0);
