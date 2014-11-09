@@ -76,7 +76,7 @@ namespace Lumix
 				IPlugin* plugin = creator(*m_impl->m_engine);
 				if(!plugin->create())
 				{
-					LUMIX_DELETE(plugin);
+					m_impl->m_engine->getAllocator().deleteObject(plugin);
 					ASSERT(false);
 					return NULL;
 				}

@@ -229,6 +229,7 @@
     <ClCompile Include="..\..\..\src\core\fs\disk_file_device.cpp" />
     <ClCompile Include="..\..\..\src\core\fs\file_events_device.cpp" />
     <ClCompile Include="..\..\..\src\core\fs\file_system.cpp" />
+    <ClCompile Include="..\..\..\src\core\FS\ifile.cpp" />
     <ClCompile Include="..\..\..\src\core\fs\memory_file_device.cpp" />
     <ClCompile Include="..\..\..\src\core\fs\tcp_file_device.cpp" />
     <ClCompile Include="..\..\..\src\core\fs\tcp_file_server.cpp" />

@@ -45,7 +45,7 @@ namespace Lumix
 		class FSTask : public MT::Task
 		{
 		public:
-			FSTask(TransQueue* queue) : m_trans_queue(queue) {}
+			FSTask(TransQueue* queue, IAllocator& allocator) : MT::Task(allocator), m_trans_queue(queue) {}
 			~FSTask() {}
 
 			int task()
@@ -85,8 +85,10 @@ namespace Lumix
 				: m_allocator(allocator)
 				, m_default_device(m_allocator)
 				, m_save_game_device(m_allocator)
+				, m_in_progress(m_allocator)
+				, m_transaction_queue(m_allocator)
 			{
-				m_task = LUMIX_NEW(FSTask)(&m_transaction_queue);
+				m_task = m_allocator.newObject<FSTask>(&m_transaction_queue, m_allocator);
 				m_task->create("FSTask");
 				m_task->run();
 			}
@@ -95,7 +97,12 @@ namespace Lumix
 			{
 				m_task->stop();
 				m_task->destroy();
-				LUMIX_DELETE(m_task);
+				m_allocator.deleteObject(m_task);
+			}
+
+			BaseProxyAllocator& getAllocator()
+			{
+				return m_allocator;
 			}
 
 			bool mount(IFileDevice* device) override
@@ -138,7 +145,7 @@ namespace Lumix
 					}
 					else
 					{
-						LUMIX_DELETE(prev);
+						prev->release();
 						return NULL;
 					}
 				}
@@ -166,7 +173,7 @@ namespace Lumix
 			void close(IFile* file) override
 			{
 				file->close();
-				LUMIX_DELETE(file);
+				file->release();
 			}
 
 			void closeAsync(IFile* file) override
@@ -270,7 +277,7 @@ namespace Lumix
 
 			static void closeAsync(IFile* file, bool, FileSystem&)
 			{
-				LUMIX_DELETE(file);
+				file->release();
 			}
 
 			void destroy()
@@ -294,12 +301,12 @@ namespace Lumix
 
 		FileSystem* FileSystem::create(IAllocator& allocator)
 		{
-			return LUMIX_NEW(FileSystemImpl)(allocator);
+			return allocator.newObject<FileSystemImpl>(allocator);
 		}
 
 		void FileSystem::destroy(FileSystem* fs)
 		{
-			LUMIX_DELETE(fs);
+			static_cast<FileSystemImpl*>(fs)->getAllocator().getSourceAllocator().deleteObject(fs);
 		}
 	} // ~namespace FS
 } // ~namespace Lumix

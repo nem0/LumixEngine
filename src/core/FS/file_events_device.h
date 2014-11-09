@@ -10,6 +10,8 @@
 
 namespace Lumix
 {
+	class IAllocator;
+
 	namespace FS
 	{
 		enum class EventType
@@ -42,13 +44,19 @@ namespace Lumix
 		class LUMIX_CORE_API FileEventsDevice : public IFileDevice
 		{
 		public:
+			FileEventsDevice(IAllocator& allocator) : m_allocator(allocator) {}
+
 			typedef Delegate<void(const Event&)>  EventCallback;
 
 			EventCallback OnEvent;
 
+			virtual void destroyFile(IFile* file) override;
 			virtual IFile* createFile(IFile* child) override;
 
 			const char* name() const { return "events"; }
+		
+		private:
+			IAllocator& m_allocator;
 		};
 	} // namespace FS
 } // ~namespace Lumix

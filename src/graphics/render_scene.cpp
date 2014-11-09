@@ -131,11 +131,18 @@ namespace Lumix
 				, m_universe(universe)
 				, m_renderer(renderer)
 				, m_allocator(allocator)
-				, m_dynamic_renderable_cache(allocator)
+				, m_model_loaded_callbacks(m_allocator)
+				, m_dynamic_renderable_cache(m_allocator)
+				, m_renderables(m_allocator)
+				, m_cameras(m_allocator)
+				, m_terrains(m_allocator)
+				, m_lights(m_allocator)
+				, m_debug_lines(m_allocator)
+				, m_always_visible(m_allocator)
 			{
 				m_universe.entityMoved().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
-				m_timer = Timer::create();
-				m_culling_system = CullingSystem::create(m_engine.getMTJDManager());
+				m_timer = Timer::create(m_allocator);
+				m_culling_system = CullingSystem::create(m_engine.getMTJDManager(), m_allocator);
 			}
 
 			~RenderSceneImpl()
@@ -1345,6 +1352,7 @@ namespace Lumix
 			}
 
 		private:
+			IAllocator& m_allocator;
 			Array<ModelLoadedCallback*> m_model_loaded_callbacks;
 			Array<Renderable> m_renderables;
 			Array<int> m_always_visible;
@@ -1353,7 +1361,6 @@ namespace Lumix
 			Array<Terrain*> m_terrains;
 			Universe& m_universe;
 			Renderer& m_renderer;
-			IAllocator& m_allocator;
 			Engine& m_engine;
 			Array<DebugLine> m_debug_lines;
 			Timer* m_timer;

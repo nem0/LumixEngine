@@ -4,6 +4,9 @@
 
 namespace Lumix
 {
+	class IAllocator;
+
+
 	namespace FS
 	{
 		class LUMIX_CORE_API TCPFileServer
@@ -12,7 +15,7 @@ namespace Lumix
 			TCPFileServer();
 			~TCPFileServer();
 
-			void start(const char* base_path);
+			void start(const char* base_path, IAllocator& allocator);
 			void stop();
 			const char* getBasePath() const;
 

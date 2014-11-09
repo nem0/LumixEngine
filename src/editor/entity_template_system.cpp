@@ -120,6 +120,12 @@ namespace Lumix
 			}
 
 
+			WorldEditor& getEditor()
+			{
+				return m_editor;
+			}
+
+
 			void setUniverse(Universe* universe)
 			{
 				if (m_universe)
@@ -306,13 +312,13 @@ namespace Lumix
 
 	EntityTemplateSystem* EntityTemplateSystem::create(WorldEditor& editor)
 	{
-		return LUMIX_NEW(EntityTemplateSystemImpl)(editor);
+		return editor.getAllocator().newObject<EntityTemplateSystemImpl>(editor);
 	}
 
 
 	void EntityTemplateSystem::destroy(EntityTemplateSystem* system)
 	{
-		LUMIX_DELETE(system);
+		static_cast<EntityTemplateSystemImpl*>(system)->getEditor().getAllocator().deleteObject(system);
 	}
 
 

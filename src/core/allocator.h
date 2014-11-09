@@ -66,6 +66,8 @@ namespace Lumix
 				}
 			}
 
+			IAllocator& getSourceAllocator() { return m_source; }
+
 		private:
 			IAllocator& m_source;
 			volatile int32_t m_allocation_count;

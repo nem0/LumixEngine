@@ -10,13 +10,13 @@
 namespace Lumix
 {
 
-template <typename T, typename Allocator = DefaultAllocator, bool is_trivially_copyable = std::is_trivial<T>::value > class Array;
+template <typename T, bool is_trivially_copyable = std::is_trivial<T>::value > class Array;
 
-template <typename T, typename Allocator>
-class Array<T, Allocator, false>
+template <typename T>
+class Array<T, false>
 {
 	public:
-		explicit Array(const Allocator& allocator)
+		explicit Array(IAllocator& allocator)
 			: m_allocator(allocator)
 		{
 			m_data = NULL;
@@ -25,6 +25,7 @@ class Array<T, Allocator, false>
 		}
 	
 		explicit Array(const Array& rhs)
+			: m_allocator(&rhs.m_allocator == &rhs.m_default_allocator ? m_default_allocator : rhs.m_allocator)
 		{
 			m_data = NULL;
 			m_capacity = 0;
@@ -49,6 +50,7 @@ class Array<T, Allocator, false>
 		}
 
 		Array()
+			: m_allocator(m_default_allocator)
 		{
 			m_data = NULL;
 			m_capacity = 0;
@@ -248,19 +250,20 @@ class Array<T, Allocator, false>
 		}
 
 	private:
+		DefaultAllocator m_default_allocator;
+		IAllocator& m_allocator;
 		int m_capacity;
 		int m_size;
 		T* m_data;
-		Allocator m_allocator;
 };
 
 
 
-template <typename T, typename Allocator>
-class Array<T, Allocator, true>
+template <typename T>
+class Array<T, true>
 {
 public:
-	explicit Array(const Allocator& allocator)
+	explicit Array(IAllocator& allocator)
 		: m_allocator(allocator)
 	{
 		m_data = NULL;
@@ -269,6 +272,7 @@ public:
 	}
 
 	explicit Array(const Array& rhs)
+		: m_allocator(&rhs.m_allocator == &rhs.m_default_allocator ? m_default_allocator : rhs.m_allocator)
 	{
 		m_data = NULL;
 		m_capacity = 0;
@@ -289,6 +293,7 @@ public:
 	}
 
 	Array()
+		: m_allocator(m_default_allocator)
 	{
 		m_data = NULL;
 		m_capacity = 0;
@@ -301,8 +306,10 @@ public:
 	}
 
 
-	void swap(Array<T, Allocator, true>& rhs)
+	void swap(Array<T, true>& rhs)
 	{
+		ASSERT(&rhs.m_allocator == &m_allocator);
+
 		int i = rhs.m_capacity;
 		rhs.m_capacity = m_capacity;
 		m_capacity = i;
@@ -314,10 +321,6 @@ public:
 		T* p = rhs.m_data;
 		rhs.m_data = m_data;
 		m_data = p;
-
-		Allocator a = rhs.m_allocator;
-		rhs.m_allocator = m_allocator;
-		m_allocator = a;
 	}
 
 	int indexOf(const T& item)
@@ -478,10 +481,11 @@ private:
 	}
 
 private:
+	DefaultAllocator m_default_allocator;
+	IAllocator& m_allocator;
 	int m_capacity;
 	int m_size;
 	T* m_data;
-	Allocator m_allocator;
 };
 
 

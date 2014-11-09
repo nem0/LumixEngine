@@ -39,8 +39,7 @@ namespace Lumix
 			typedef DelegateList<void (const char*, const char*)> Callback;
 
 		public:
-			Log();
-			~Log();
+			Log() {}
 
 			LogProxy log(const char* system);
 			Callback& getCallback();
@@ -50,7 +49,8 @@ namespace Lumix
 			void operator =(const Log&);
 
 		private:
-			struct LogImpl* m_impl;
+			DefaultAllocator m_allocator;
+			Callback m_callbacks;
 	};
 
 	extern Log LUMIX_CORE_API g_log_info;

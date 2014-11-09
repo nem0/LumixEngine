@@ -11,6 +11,7 @@ namespace Lumix
 	{
 		InputSystemImpl(IAllocator& allocator)
 			: m_actions(allocator)
+			, m_allocator(allocator)
 		{}
 
 		struct Action
@@ -18,6 +19,8 @@ namespace Lumix
 			InputSystem::InputType type;
 			int key;
 		};
+		
+		IAllocator& m_allocator;
 		Map<uint32_t, Action> m_actions;
 		float m_mouse_rel_x;
 		float m_mouse_rel_y;
@@ -33,7 +36,7 @@ namespace Lumix
 
 	bool InputSystem::create(IAllocator& allocator)
 	{
-		m_impl = LUMIX_NEW(InputSystemImpl)(allocator);
+		m_impl = allocator.newObject<InputSystemImpl>(allocator);
 		m_impl->m_mouse_rel_x = 0;
 		m_impl->m_mouse_rel_y = 0;
 		return true;
@@ -42,7 +45,7 @@ namespace Lumix
 
 	void InputSystem::destroy()
 	{
-		LUMIX_DELETE(m_impl);
+		m_impl->m_allocator.deleteObject(m_impl);
 		m_impl = NULL;
 	}
 

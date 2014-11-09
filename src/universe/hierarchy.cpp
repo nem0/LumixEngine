@@ -21,8 +21,15 @@ class HierarchyImpl : public Hierarchy
 			: m_universe(universe)
 			, m_parents(allocator)
 			, m_children(allocator)
+			, m_allocator(allocator)
 		{
 			universe.entityMoved().bind<HierarchyImpl, &HierarchyImpl::onEntityMoved>(this);
+		}
+
+
+		IAllocator& getAllocator()
+		{
+			return m_allocator;
 		}
 
 
@@ -163,6 +170,7 @@ class HierarchyImpl : public Hierarchy
 		}
 
 	private:
+		IAllocator& m_allocator;
 		Universe& m_universe;
 		Parents m_parents;
 		Children m_children;
@@ -172,13 +180,13 @@ class HierarchyImpl : public Hierarchy
 
 Hierarchy* Hierarchy::create(Universe& universe, IAllocator& allocator)
 {
-	return LUMIX_NEW(HierarchyImpl)(universe, allocator);
+	return allocator.newObject<HierarchyImpl>(universe, allocator);
 }
 
 
 void Hierarchy::destroy(Hierarchy* hierarchy)
 {
-	LUMIX_DELETE(hierarchy);
+	static_cast<HierarchyImpl*>(hierarchy)->getAllocator().deleteObject(hierarchy);
 }
 
 

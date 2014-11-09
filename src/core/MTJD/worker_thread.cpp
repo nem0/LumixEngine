@@ -13,7 +13,8 @@ namespace Lumix
 	{
 #if TYPE == MULTI_THREAD
 
-		WorkerTask::WorkerTask()
+		WorkerTask::WorkerTask(IAllocator& allocator)
+			: Task(allocator)
 		{
 		}
 

@@ -150,7 +150,7 @@ bool Model::parseGeometry(FS::IFile* file, const VertexDef& vertex_definition)
 	{
 		return false;
 	}
-	Array<int32_t> indices;
+	Array<int32_t> indices(m_allocator);
 	indices.resize(indices_count);
 	file->read(&indices[0], sizeof(indices[0]) * indices_count);
 	
@@ -160,7 +160,7 @@ bool Model::parseGeometry(FS::IFile* file, const VertexDef& vertex_definition)
 	{
 		return false;
 	}
-	Array<float> vertices;
+	Array<float> vertices(m_allocator);
 	vertices.resize(vertices_count * vertex_definition.getVertexSize() / sizeof(vertices[0]));
 	file->read(&vertices[0], sizeof(vertices[0]) * vertices.size());
 	

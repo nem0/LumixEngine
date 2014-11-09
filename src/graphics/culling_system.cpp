@@ -37,8 +37,8 @@ namespace Lumix
 		friend class ResultsCollectorJob;
 
 	public:
-		CullingJob(const CullingSystem::InputSpheres& spheres, const CullingSystem::Indexes& indexes, CullingSystem::Results& results, int start, int end, const Frustum& frustum, MTJD::Manager& manager)
-			: Job(true, MTJD::Priority::Default, false, manager)
+		CullingJob(const CullingSystem::InputSpheres& spheres, const CullingSystem::Indexes& indexes, CullingSystem::Results& results, int start, int end, const Frustum& frustum, MTJD::Manager& manager, IAllocator& allocator)
+			: Job(true, MTJD::Priority::Default, false, manager, allocator)
 			, m_spheres(spheres)
 			, m_indexes(indexes)
 			, m_results(results)
@@ -72,9 +72,13 @@ namespace Lumix
 	class CullingSystemImpl : public CullingSystem
 	{
 	public:
-		CullingSystemImpl(MTJD::Manager& mtjd_manager)
+		CullingSystemImpl(MTJD::Manager& mtjd_manager, IAllocator& allocator)
 			: m_mtjd_manager(mtjd_manager)
-			, m_sync_point(true)
+			, m_sync_point(true, m_allocator)
+			, m_allocator(allocator)
+			, m_indexes(m_allocator)
+			, m_spheres(m_allocator)
+			, m_result(m_allocator)
 		{
 		}
 
@@ -83,7 +87,10 @@ namespace Lumix
 
 		}
 
-
+		IAllocator& getAllocator()
+		{
+			return m_allocator;
+		}
 
 		virtual const Results& getResult() override
 		{
@@ -125,12 +132,12 @@ namespace Lumix
 			int i = 0;
 			for (; i < cpu_count - 1; i++)
 			{
-				CullingJob* cj = LUMIX_NEW(CullingJob)(m_spheres, m_indexes, m_result, i * step, (i + 1) * step - 1, frustum, m_mtjd_manager);
+				CullingJob* cj = m_allocator.newObject<CullingJob>(m_spheres, m_indexes, m_result, i * step, (i + 1) * step - 1, frustum, m_mtjd_manager, m_allocator);
 				cj->addDependency(&m_sync_point);
 				m_mtjd_manager.schedule(cj);
 			}
 
-			CullingJob* cj = LUMIX_NEW(CullingJob)(m_spheres, m_indexes, m_result, i * step, count - 1, frustum, m_mtjd_manager);
+			CullingJob* cj = m_allocator.newObject<CullingJob>(m_spheres, m_indexes, m_result, i * step, count - 1, frustum, m_mtjd_manager, m_allocator);
 			cj->addDependency(&m_sync_point);
 
 			m_mtjd_manager.schedule(cj);
@@ -196,6 +203,8 @@ namespace Lumix
 		}
 
 	private:
+		IAllocator&		m_allocator;
+
 		InputSpheres	m_spheres;
 		Indexes			m_indexes;
 		Results			m_result;
@@ -205,14 +214,14 @@ namespace Lumix
 	};
 
 
-	CullingSystem* CullingSystem::create(MTJD::Manager& mtjd_manager)
+	CullingSystem* CullingSystem::create(MTJD::Manager& mtjd_manager, IAllocator& allocator)
 	{
-		return LUMIX_NEW(CullingSystemImpl)(mtjd_manager);
+		return allocator.newObject<CullingSystemImpl>(mtjd_manager, allocator);
 	}
 
 
 	void CullingSystem::destroy(CullingSystem& culling_system)
 	{
-		LUMIX_DELETE(&culling_system);
+		static_cast<CullingSystemImpl&>(culling_system).getAllocator().deleteObject(&culling_system);
 	}
 }

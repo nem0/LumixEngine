@@ -52,7 +52,7 @@ namespace Lumix
 			};
 
 		public:
-			static WorldEditor* create(const char* base_path);
+			static WorldEditor* create(const char* base_path, IAllocator& allocator);
 			static void destroy(WorldEditor* editor);
 
 			virtual void tick() = 0;

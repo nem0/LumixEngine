@@ -36,17 +36,19 @@ namespace Lumix
 	class EngineImpl : public Engine
 	{
 		public:
-			EngineImpl(const char* base_path, FS::FileSystem* file_system, WorldEditor* world_editor)
+			EngineImpl(const char* base_path, FS::FileSystem* file_system, WorldEditor* world_editor, IAllocator& allocator)
 				: m_base_path(m_allocator)
 				, m_resource_manager(m_allocator)
+				, m_mtjd_manager(m_allocator)
+				, m_allocator(allocator)
 			{
 				m_editor = world_editor;
 				if (NULL == file_system)
 				{
 					m_file_system = FS::FileSystem::create(m_allocator);
 
-					m_mem_file_device = m_allocator.newObject<FS::MemoryFileDevice>();
-					m_disk_file_device = m_allocator.newObject<FS::DiskFileDevice>();
+					m_mem_file_device = m_allocator.newObject<FS::MemoryFileDevice>(m_allocator);
+					m_disk_file_device = m_allocator.newObject<FS::DiskFileDevice>(m_allocator);
 
 					m_file_system->mount(m_mem_file_device);
 					m_file_system->mount(m_disk_file_device);
@@ -61,10 +63,9 @@ namespace Lumix
 				}
 
 				m_resource_manager.create(*m_file_system);
-				m_culling_system = CullingSystem::create(m_mtjd_manager);
 
-				m_timer = Timer::create();
-				m_fps_timer = Timer::create();
+				m_timer = Timer::create(m_allocator);
+				m_fps_timer = Timer::create(m_allocator);
 				m_fps_frame = NULL;
 				m_universe = NULL;
 				m_hierarchy = NULL;
@@ -103,9 +104,6 @@ namespace Lumix
 				Timer::destroy(m_fps_timer);
 				m_plugin_manager.destroy();
 				m_input_system.destroy();
-
-				CullingSystem::destroy(*m_culling_system);
-
 				if (m_disk_file_device)
 				{
 					FS::FileSystem::destroy(m_file_system);
@@ -312,7 +310,7 @@ namespace Lumix
 
 
 		private:
-			DefaultAllocator m_allocator;
+			IAllocator& m_allocator;
 
 			Renderer* m_renderer;
 			FS::FileSystem* m_file_system; 
@@ -322,7 +320,6 @@ namespace Lumix
 			ResourceManager m_resource_manager;
 
 			MTJD::Manager	m_mtjd_manager;
-			CullingSystem*	m_culling_system;
 
 			string m_base_path;
 			WorldEditor* m_editor;
@@ -350,16 +347,16 @@ namespace Lumix
 	}
 
 
-	Engine* Engine::create(const char* base_path, FS::FileSystem* file_system, WorldEditor* editor)
+	Engine* Engine::create(const char* base_path, FS::FileSystem* file_system, WorldEditor* editor, IAllocator& allocator)
 	{
 		g_log_info.getCallback().bind<showLogInVS>();
 		g_log_warning.getCallback().bind<showLogInVS>();
 		g_log_error.getCallback().bind<showLogInVS>();
 
-		EngineImpl* engine = LUMIX_NEW(EngineImpl)(base_path, file_system, editor);
+		EngineImpl* engine = allocator.newObject<EngineImpl>(base_path, file_system, editor, allocator);
 		if (!engine->create())
 		{
-			LUMIX_DELETE(engine);
+			allocator.deleteObject(engine);
 			return NULL;
 		}
 		return engine;
@@ -368,7 +365,7 @@ namespace Lumix
 
 	void Engine::destroy(Engine* engine)
 	{
-		LUMIX_DELETE(engine);
+		engine->getAllocator().deleteObject(engine);
 	}
 
 

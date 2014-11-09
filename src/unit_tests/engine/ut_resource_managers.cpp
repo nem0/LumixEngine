@@ -36,8 +36,8 @@ namespace
 		Lumix::DefaultAllocator allocator;
 		Lumix::FS::FileSystem* file_system = Lumix::FS::FileSystem::create(allocator);
 
-		Lumix::FS::MemoryFileDevice mem_file_device;
-		Lumix::FS::DiskFileDevice disk_file_device;
+		Lumix::FS::MemoryFileDevice mem_file_device(allocator);
+		Lumix::FS::DiskFileDevice disk_file_device(allocator);
 
 		file_system->mount(&mem_file_device);
 		file_system->mount(&disk_file_device);
@@ -173,8 +173,8 @@ namespace
 		Lumix::DefaultAllocator allocator;
 		Lumix::FS::FileSystem* file_system = Lumix::FS::FileSystem::create(allocator);
 
-		Lumix::FS::MemoryFileDevice mem_file_device;
-		Lumix::FS::DiskFileDevice disk_file_device;
+		Lumix::FS::MemoryFileDevice mem_file_device(allocator);
+		Lumix::FS::DiskFileDevice disk_file_device(allocator);
 
 		file_system->mount(&mem_file_device);
 		file_system->mount(&disk_file_device);
@@ -299,8 +299,8 @@ namespace
 		Lumix::DefaultAllocator allocator;
 		Lumix::FS::FileSystem* file_system = Lumix::FS::FileSystem::create(allocator);
 
-		Lumix::FS::MemoryFileDevice mem_file_device;
-		Lumix::FS::DiskFileDevice disk_file_device;
+		Lumix::FS::MemoryFileDevice mem_file_device(allocator);
+		Lumix::FS::DiskFileDevice disk_file_device(allocator);
 
 		file_system->mount(&mem_file_device);
 		file_system->mount(&disk_file_device);

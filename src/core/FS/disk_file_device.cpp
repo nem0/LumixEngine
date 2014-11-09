@@ -1,5 +1,5 @@
 #include "core/fs/disk_file_device.h"
-
+#include "core/allocator.h"
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
 #include "core/fs/ifile_system_defines.h"
@@ -13,12 +13,16 @@ namespace Lumix
 		class DiskFile : public IFile
 		{
 		public:
-			DiskFile() {}
-			virtual ~DiskFile() {}
+			DiskFile(DiskFileDevice& device, IAllocator& allocator) : m_device(device), m_allocator(allocator) {}
+
+			virtual IFileDevice& getDevice() override
+			{ 
+				return m_device;
+			}
 
 			virtual bool open(const char* path, Mode mode) override
 			{
-				return m_file.open(path, mode);
+				return m_file.open(path, mode, m_allocator);
 			}
 
 			virtual void close() override
@@ -57,12 +61,21 @@ namespace Lumix
 			}
 
 		private:
+			virtual ~DiskFile() {}
+
+			DiskFileDevice& m_device;
+			IAllocator& m_allocator;
 			OsFile m_file;
 		};
 
+		void DiskFileDevice::destroyFile(IFile* file)
+		{
+			m_allocator.deleteObject(file);
+		}
+
 		IFile* DiskFileDevice::createFile(IFile*)
 		{
-			return LUMIX_NEW(DiskFile)();
+			return m_allocator.newObject<DiskFile>(*this, m_allocator);
 		}
 	} // namespace FS
 } // ~namespace Lumix

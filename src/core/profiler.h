@@ -31,6 +31,7 @@ namespace Lumix
 			
 
 		private:
+			DefaultAllocator m_allocator;
 			bool m_is_recording;
 			Block* m_current_block;
 			Block* m_root_block;
@@ -50,6 +51,10 @@ namespace Lumix
 			};
 		
 		public:
+			Block(Profiler& profiler)
+				: m_profiler(profiler)
+			{ }
+
 			~Block();
 			void frame();
 			float getLength();
@@ -61,6 +66,7 @@ namespace Lumix
 			Block* m_first_child;
 			const char* m_name;
 			const char* m_function;
+			Profiler& m_profiler;
 			Array<Hit> m_hits;
 	};
 

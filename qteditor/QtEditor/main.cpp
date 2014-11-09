@@ -220,7 +220,7 @@ class App
 			HWND hwnds[] = { hwnd, game_hwnd };
 			HGLRC hglrc = createGLContext(hwnds, 2);
 
-			m_world_editor = Lumix::WorldEditor::create(QDir::currentPath().toLocal8Bit().data());
+			m_world_editor = Lumix::WorldEditor::create(QDir::currentPath().toLocal8Bit().data(), m_allocator);
 			ASSERT(m_world_editor);
 			m_world_editor->tick();
 
@@ -340,6 +340,7 @@ class App
 		}
 
 	private:
+		Lumix::DefaultAllocator m_allocator;
 		WGLRenderDevice* m_edit_render_device;
 		WGLRenderDevice* m_game_render_device;
 		MainWindow* m_main_window;

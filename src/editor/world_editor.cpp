@@ -1599,10 +1599,10 @@ struct WorldEditorImpl : public WorldEditor
 		bool create(const char* base_path)
 		{
 			m_file_system = FS::FileSystem::create(m_allocator);
-			m_tpc_file_server.start(base_path);
+			m_tpc_file_server.start(base_path, m_allocator);
 			m_base_path = base_path;
 
-			m_tcp_file_device.connect("127.0.0.1", 10001);
+			m_tcp_file_device.connect("127.0.0.1", 10001, m_allocator);
 
 			m_file_system->mount(&m_mem_file_device);
 			m_file_system->mount(&m_disk_file_device);
@@ -1611,7 +1611,7 @@ struct WorldEditorImpl : public WorldEditor
 			m_file_system->setDefaultDevice("memory:disk");
 			m_file_system->setSaveGameDevice("memory:disk");
 
-			m_engine = Engine::create(base_path, m_file_system, this);
+			m_engine = Engine::create(base_path, m_file_system, this, m_allocator.getSourceAllocator());
 			if (!m_engine)
 			{
 				return false;
@@ -1710,13 +1710,16 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
-		WorldEditorImpl()
-			: m_engine(NULL)
+		WorldEditorImpl(IAllocator& allocator)
+			: m_allocator(allocator)
+			, m_engine(NULL)
 			, m_universe_mutex(false)
 			, m_toggle_game_mode_requested(false)
 			, m_gizmo(*this)
 			, m_component_properties(m_allocator)
 			, m_components(m_allocator)
+			, m_mem_file_device(m_allocator)
+			, m_disk_file_device(m_allocator)
 		{
 			m_go_to_parameters.m_is_active = false;
 			m_undo_index = -1;
@@ -2113,7 +2116,7 @@ struct WorldEditorImpl : public WorldEditor
 			float m_speed;
 		};
 
-		DefaultAllocator m_allocator;
+		BaseProxyAllocator m_allocator;
 		GoToParameters m_go_to_parameters;
 		MT::Mutex m_universe_mutex;
 		Gizmo m_gizmo;
@@ -2155,13 +2158,13 @@ struct WorldEditorImpl : public WorldEditor
 };
 
 
-WorldEditor* WorldEditor::create(const char* base_path)
+WorldEditor* WorldEditor::create(const char* base_path, IAllocator& allocator)
 {
-	WorldEditorImpl* impl = LUMIX_NEW(WorldEditorImpl)();
+	WorldEditorImpl* impl = allocator.newObject<WorldEditorImpl>(allocator);
 
 	if (!impl->create(base_path))
 	{
-		LUMIX_DELETE(impl);
+		allocator.deleteObject(impl);
 		return NULL;
 	}
 
@@ -2172,7 +2175,8 @@ WorldEditor* WorldEditor::create(const char* base_path)
 void WorldEditor::destroy(WorldEditor* editor)
 {
 	static_cast<WorldEditorImpl*>(editor)->destroy();
-	LUMIX_DELETE(editor);
+	IAllocator& allocator = editor->getAllocator();
+	static_cast<BaseProxyAllocator&>(allocator).getSourceAllocator().deleteObject(static_cast<WorldEditorImpl*>(editor));
 }
 
 
