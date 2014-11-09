@@ -272,7 +272,7 @@ public:
 	}
 
 	explicit Array(const Array& rhs)
-		: m_allocator(&rhs.m_allocator == &rhs.m_default_allocator ? m_default_allocator : rhs.m_allocator)
+		: m_allocator(rhs.m_allocator)
 	{
 		m_data = NULL;
 		m_capacity = 0;
@@ -292,13 +292,6 @@ public:
 		}
 	}
 
-	Array()
-		: m_allocator(m_default_allocator)
-	{
-		m_data = NULL;
-		m_capacity = 0;
-		m_size = 0;
-	}
 
 	~Array()
 	{
@@ -481,7 +474,6 @@ private:
 	}
 
 private:
-	DefaultAllocator m_default_allocator;
 	IAllocator& m_allocator;
 	int m_capacity;
 	int m_size;

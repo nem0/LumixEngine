@@ -141,6 +141,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	PhysicsSceneImpl(IAllocator& allocator)
 		: m_allocator(allocator)
+		, m_controllers(m_allocator)
+		, m_actors(m_allocator)
+		, m_terrains(m_allocator)
+		, m_dynamic_actors(m_allocator)
 	{
 	}
 
@@ -410,9 +414,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 		fopen_s(&fp, path, "rb");
 		if (fp)
 		{
-			Array<Vec3> verts;
+			Array<Vec3> verts(m_allocator);
 			int num_verts, num_indices;
-			Array<uint32_t> tris;
+			Array<uint32_t> tris(m_allocator);
 
 			fread(&num_verts, sizeof(num_verts), 1, fp);
 			verts.resize(num_verts);
@@ -453,7 +457,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			fseek(fp, 0, SEEK_END);
 			long size = ftell(fp);
 			fseek(fp, 0, SEEK_SET);
-			Array<Vec3> vertices;
+			Array<Vec3> vertices(m_allocator);
 			vertices.resize(size / sizeof(Vec3));
 			fread(&vertices[0], size, 1, fp);
 			fclose(fp);
@@ -615,7 +619,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	void heightmapLoaded(Terrain* terrain)
 	{
 		PROFILE_FUNCTION();
-		Array<physx::PxHeightFieldSample> heights;
+		Array<physx::PxHeightFieldSample> heights(m_allocator);
 
 		int width = terrain->m_heightmap->getWidth();
 		int height = terrain->m_heightmap->getHeight();

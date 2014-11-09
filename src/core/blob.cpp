@@ -3,12 +3,32 @@
 
 namespace Lumix
 {
-	Blob::Blob()
+	Blob::Blob(IAllocator& allocator)
+		: m_allocator(allocator)
+		, m_buffer(allocator)
 	{
 		m_pos = 0;
 		m_size = 0;
 	}
 
+
+	Blob::Blob(const Blob& rhs, IAllocator& allocator)
+		: m_allocator(allocator)
+		, m_buffer(allocator)
+	{
+		m_data = NULL;
+		*this = rhs;
+	}
+
+
+	void Blob::operator =(const Blob& rhs)
+	{
+		m_data = rhs.m_data;
+		m_pos = rhs.m_pos;
+		m_size = rhs.m_size;
+		m_buffer = rhs.m_buffer;
+	}
+	
 
 	void Blob::rewindForRead()
 	{

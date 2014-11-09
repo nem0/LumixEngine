@@ -162,7 +162,7 @@ class EntityListModel : public QAbstractItemModel
 					{
 						if(m_children[i]->removeEntity(entity))
 						{
-							m_children.erase(i);
+							m_children.remove(i);
 							return false;
 						}
 					}
@@ -171,7 +171,7 @@ class EntityListModel : public QAbstractItemModel
 
 				EntityNode* m_parent;
 				Lumix::Entity m_entity;
-				Lumix::Array<EntityNode*> m_children;
+				QVector<EntityNode*> m_children;
 		};
 
 	public:
@@ -437,7 +437,7 @@ class EntityListModel : public QAbstractItemModel
 				for(int i = 0; i < children->size(); ++i)
 				{
 					EntityNode* new_node = new EntityNode(node, Lumix::Entity(m_universe, (*children)[i].m_entity));
-					node->m_children.push(new_node);
+					node->m_children.push_back(new_node);
 					fillChildren(new_node);
 				}
 			}
@@ -449,14 +449,14 @@ class EntityListModel : public QAbstractItemModel
 			if(!m_root->m_children.empty())
 			{
 				EntityNode* node = m_root->getNode(child);
-				node->m_parent->m_children.eraseItem(node);
+				node->m_parent->m_children.remove(node->m_parent->m_children.indexOf(node));
 
 				EntityNode* parent_node = m_root->getNode(parent);
 				if(!parent_node)
 				{
 					parent_node = m_root;
 				}
-				parent_node->m_children.push(node);
+				parent_node->m_children.push_back(node);
 				node->m_parent = parent_node;
 
 				if (m_is_update_enabled)
@@ -490,7 +490,7 @@ class EntityListModel : public QAbstractItemModel
 					if(!parent.isValid())
 					{
 						EntityNode* node = new EntityNode(m_root, e);
-						m_root->m_children.push(node);
+						m_root->m_children.push_back(node);
 						fillChildren(node);
 					}
 					e = m_universe->getNextEntity(e);
@@ -507,7 +507,7 @@ class EntityListModel : public QAbstractItemModel
 		void onEntityCreated(const Lumix::Entity& entity)
 		{
 			EntityNode* node = new EntityNode(m_root, entity);
-			m_root->m_children.push(node);
+			m_root->m_children.push_back(node);
 			if (m_is_update_enabled)
 			{
 				m_filter->invalidate();

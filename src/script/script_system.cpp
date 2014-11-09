@@ -31,6 +31,9 @@ namespace Lumix
 				, m_engine(engine)
 				, m_system(system)
 				, m_allocator(engine.getAllocator())
+				, m_paths(m_allocator)
+				, m_running_scripts(m_allocator)
+				, m_script_entities(m_allocator)
 			{
 			}
 
@@ -320,7 +323,11 @@ namespace Lumix
 
 			virtual bool create() override
 			{
-				m_engine.getWorldEditor()->registerProperty("script", m_engine.getAllocator().newObject<FilePropertyDescriptor<ScriptSceneImpl> >("source", &ScriptSceneImpl::getScriptPath, &ScriptSceneImpl::setScriptPath, "Script (*.cpp)"));
+				if (m_engine.getWorldEditor())
+				{
+					IAllocator& allocator = m_engine.getWorldEditor()->getAllocator();
+					m_engine.getWorldEditor()->registerProperty("script", allocator.newObject<FilePropertyDescriptor<ScriptSceneImpl> >(allocator, "source", &ScriptSceneImpl::getScriptPath, &ScriptSceneImpl::setScriptPath, "Script (*.cpp)"));
+				}
 				return true;
 			}
 

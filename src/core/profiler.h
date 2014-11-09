@@ -53,6 +53,7 @@ namespace Lumix
 		public:
 			Block(Profiler& profiler)
 				: m_profiler(profiler)
+				, m_hits(profiler.m_allocator)
 			{ }
 
 			~Block();

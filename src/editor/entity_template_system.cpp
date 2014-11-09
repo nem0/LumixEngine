@@ -49,7 +49,7 @@ namespace Lumix
 							m_entity.setPosition(m_position);
 							m_entity.setRotation(m_rotation);
 
-							m_entity_system.m_instances[m_template_name_hash].push(m_entity);
+							iter.second().push(m_entity);
 							Entity template_entity = iter.second()[0];
 							const WorldEditor::ComponentList& template_cmps = m_editor.getComponents(template_entity);
 							for (int i = 0; i < template_cmps.size(); ++i)
@@ -106,6 +106,7 @@ namespace Lumix
 				, m_universe(NULL)
 				, m_instances(editor.getAllocator())
 				, m_updated(editor.getAllocator())
+				, m_template_names(editor.getAllocator())
 			{
 				editor.universeCreated().bind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseCreated>(this);
 				editor.universeDestroyed().bind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseDestroyed>(this);
@@ -162,7 +163,7 @@ namespace Lumix
 				uint32_t tpl = getTemplate(entity);
 				if (tpl != 0)
 				{
-					Array<Entity>& instances = m_instances[tpl];
+					Array<Entity>& instances = m_instances.find(tpl).second();
 					instances.eraseItemFast(entity);
 					if (instances.empty())
 					{
@@ -186,7 +187,8 @@ namespace Lumix
 				if (m_instances.find(name_hash) == m_instances.end())
 				{
 					m_template_names.push(string(name, m_editor.getAllocator()));
-					m_instances[name_hash].push(entity);
+					m_instances.insert(name_hash, Array<Entity>(m_editor.getAllocator()));
+					m_instances.find(name_hash).second().push(entity);
 					m_updated.invoke();
 				}
 				else
@@ -215,7 +217,13 @@ namespace Lumix
 
 			virtual const Array<Entity>& getInstances(uint32_t template_name_hash) override
 			{
-				return m_instances[template_name_hash];
+				Map<uint32_t, Array<Entity> >::iterator iter = m_instances.find(template_name_hash);
+				if (iter == m_instances.end())
+				{
+					m_instances.insert(template_name_hash, Array <Entity>(m_editor.getAllocator()));
+					iter = m_instances.find(template_name_hash);
+				}
+				return iter.second();
 			}
 
 
@@ -275,8 +283,8 @@ namespace Lumix
 					serializer.deserializeArrayItem(hash);
 					int32_t instances_per_template;
 					serializer.deserializeArrayItem(instances_per_template);
-					m_instances.insert(hash, Array<Entity>());
-					Array<Entity>& entities = m_instances[hash];
+					m_instances.insert(hash, Array<Entity>(m_editor.getAllocator()));
+					Array<Entity>& entities = m_instances.find(hash).second();
 					for (int j = 0; j < instances_per_template; ++j)
 					{
 						int32_t entity_index;

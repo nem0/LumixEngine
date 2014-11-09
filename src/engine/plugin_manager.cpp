@@ -12,6 +12,10 @@ namespace Lumix
 	{
 		typedef Array<IPlugin*> PluginList;
 
+		PluginManagerImpl(IAllocator& allocator)
+			: m_plugins(allocator)
+		{ }
+
 		Engine* m_engine;
 		PluginList m_plugins;
 	};
@@ -97,7 +101,7 @@ namespace Lumix
 	
 	bool PluginManager::create(Engine& engine)
 	{
-		m_impl = engine.getAllocator().newObject<PluginManagerImpl>();
+		m_impl = engine.getAllocator().newObject<PluginManagerImpl>(engine.getAllocator());
 		m_impl->m_engine = &engine;
 		return true;
 	}

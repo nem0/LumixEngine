@@ -8,6 +8,7 @@ namespace Lumix
 	{
 		Group::Group(bool sync_event, IAllocator& allocator)
 			: BaseEntry(0, sync_event, allocator)
+			, m_static_dependency_table(allocator)
 		{
 		}
 

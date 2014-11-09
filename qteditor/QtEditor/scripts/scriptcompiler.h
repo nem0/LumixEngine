@@ -1,8 +1,9 @@
 #pragma once
 
 
-#include <QObject>
 #include <QMap>
+#include <QObject>
+#include <QVector>
 #include "core/array.h"
 #include "core/delegate_list.h"
 #include "core/map.h"
@@ -48,7 +49,7 @@ private:
 
 private:
 	Lumix::Path m_base_path;
-	Lumix::Array<ProcessInfo> m_processes;
+	QVector<ProcessInfo> m_processes;
 	QMap<uint32_t, Status> m_status;
 	QMap<uint32_t, QString> m_log;
 

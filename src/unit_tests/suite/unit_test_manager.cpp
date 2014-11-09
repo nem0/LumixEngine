@@ -187,6 +187,8 @@ namespace Lumix
 				, m_in_progress(allocator)
 				, m_trans_queue(allocator)
 				, m_allocator(allocator)
+				, m_unit_tests(allocator)
+				, m_failed_tests(allocator)
 			{
 			}
 

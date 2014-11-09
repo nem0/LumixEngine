@@ -93,6 +93,8 @@ public:
 		, m_is_alpha_cutout(false)
 		, m_shader_combination(0)
 		, m_is_shadow_receiver(true)
+		, m_textures(allocator)
+		, m_uniforms(allocator)
 	{ 
 		updateShaderCombination();
 	}

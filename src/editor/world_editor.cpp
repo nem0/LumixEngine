@@ -112,7 +112,7 @@ class PasteEntityCommand : public IEditorCommand
 {
 	public:
 		PasteEntityCommand(WorldEditor& editor, Blob& blob)
-			: m_blob(blob)
+			: m_blob(blob, editor.getAllocator())
 			, m_editor(editor)
 			, m_position(editor.getCameraRaycastHit())
 			, m_entity(Entity::INVALID)
@@ -158,7 +158,12 @@ class PasteEntityCommand : public IEditorCommand
 class MoveEntityCommand : public IEditorCommand
 {
 	public:
-		MoveEntityCommand(const Array<Entity>& entities, const Array<Vec3>& new_positions, const Array<Quat>& new_rotations)
+		MoveEntityCommand(IAllocator& allocator, const Array<Entity>& entities, const Array<Vec3>& new_positions, const Array<Quat>& new_rotations)
+			: m_new_positions(allocator)
+			, m_new_rotations(allocator)
+			, m_old_positions(allocator)
+			, m_old_rotations(allocator)
+			, m_entities(allocator)
 		{
 			ASSERT(entities.size() == new_positions.size());
 			for(int i = entities.size() - 1; i >= 0; --i)
@@ -240,10 +245,11 @@ class RemoveArrayPropertyItemCommand : public IEditorCommand
 {
 	
 	public:
-		RemoveArrayPropertyItemCommand(const Component& component, int index, IArrayDescriptor& descriptor)
+		RemoveArrayPropertyItemCommand(WorldEditor& editor, const Component& component, int index, IArrayDescriptor& descriptor)
 			: m_component(component)
 			, m_index(index)
 			, m_descriptor(descriptor)
+			, m_old_values(editor.getAllocator())
 		{
 			for(int i = 0, c = m_descriptor.getChildren().size(); i < c; ++i)
 			{
@@ -341,6 +347,8 @@ class SetPropertyCommand : public IEditorCommand
 			: m_component(component)
 			, m_property_descriptor(property_descriptor)
 			, m_editor(editor)
+			, m_new_value(editor.getAllocator())
+			, m_old_value(editor.getAllocator())
 		{
 			m_index = -1;
 			m_new_value.write(data, size);
@@ -352,6 +360,8 @@ class SetPropertyCommand : public IEditorCommand
 			: m_component(component)
 			, m_property_descriptor(property_descriptor)
 			, m_editor(editor)
+			, m_new_value(editor.getAllocator())
+			, m_old_value(editor.getAllocator())
 		{
 			m_index = index;
 			m_new_value.write(data, size);
@@ -459,6 +469,7 @@ struct WorldEditorImpl : public WorldEditor
 			public:
 				AddComponentCommand(WorldEditorImpl& editor, const Array<Entity>& entities, uint32_t type)
 					: m_editor(editor)
+					, m_entities(editor.getAllocator())
 				{
 					m_type = type;
 					m_entities.reserve(entities.size());
@@ -536,6 +547,9 @@ struct WorldEditorImpl : public WorldEditor
 			public:
 				DestroyEntitiesCommand(WorldEditorImpl& editor, const Entity* entities, int count)
 					: m_editor(editor)
+					, m_entities(editor.getAllocator())
+					, m_positons_rotations(editor.getAllocator())
+					, m_old_values(editor.getAllocator())
 				{
 					m_entities.reserve(count);
 					m_positons_rotations.reserve(m_entities.size());
@@ -561,10 +575,14 @@ struct WorldEditorImpl : public WorldEditor
 						for (int j = cmps.size() - 1; j >= 0; --j)
 						{
 							m_old_values.write(cmps[j].type);
-							Array<IPropertyDescriptor*>& props = m_editor.m_component_properties[cmps[j].type];
-							for (int k = 0; k < props.size(); ++k)
+							Map<uint32_t, Array<IPropertyDescriptor*> >::iterator iter = m_editor.m_component_properties.find(cmps[j].type);
+							if (iter != m_editor.m_component_properties.end())
 							{
-								props[k]->get(cmps[j], m_old_values);
+								Array<IPropertyDescriptor*>& props = iter.second();
+								for (int k = 0; k < props.size(); ++k)
+								{
+									props[k]->get(cmps[j], m_old_values);
+								}
 							}
 							cmps[j].scene->destroyComponent(cmps[j]);
 						}
@@ -595,7 +613,6 @@ struct WorldEditorImpl : public WorldEditor
 						{
 							Component::Type cmp_type;
 							m_old_values.read(cmp_type);
-							Array<IPropertyDescriptor*>& props = m_editor.m_component_properties[cmp_type];
 							Component new_component;
 							for (int i = 0; i < scenes.size(); ++i)
 							{
@@ -605,9 +622,16 @@ struct WorldEditorImpl : public WorldEditor
 									break;
 								}
 							}
-							for (int k = 0; k < props.size(); ++k)
+							
+							Map<uint32_t, Array<IPropertyDescriptor*> >::iterator iter = m_editor.m_component_properties.find(cmp_type);
+							if (iter != m_editor.m_component_properties.end())
 							{
-								props[k]->set(new_component, m_old_values);
+								Array<IPropertyDescriptor*>& props = iter.second();
+
+								for (int k = 0; k < props.size(); ++k)
+								{
+									props[k]->set(new_component, m_old_values);
+								}
 							}
 						}
 					}
@@ -644,6 +668,7 @@ struct WorldEditorImpl : public WorldEditor
 				DestroyComponentCommand(WorldEditorImpl& editor, const Component& component)
 					: m_component(component)
 					, m_editor(editor)
+					, m_old_values(editor.getAllocator())
 				{
 				}
 
@@ -651,8 +676,8 @@ struct WorldEditorImpl : public WorldEditor
 				virtual void undo() override
 				{
 					uint32_t template_hash = m_editor.m_template_system->getTemplate(m_component.entity);
-					const Array<IPropertyDescriptor*>& props = m_editor.m_component_properties[m_component.type];
 					const Array<IScene*>& scenes = m_editor.m_engine->getScenes();
+					Map<uint32_t, Array<IPropertyDescriptor*> >::iterator iter = m_editor.m_component_properties.find(m_component.type);
 					if (template_hash == 0)
 					{
 						for (int i = 0; i < scenes.size(); ++i)
@@ -665,9 +690,13 @@ struct WorldEditorImpl : public WorldEditor
 							}
 						}
 						m_old_values.rewindForRead();
-						for (int i = 0; i < props.size(); ++i)
+						if (iter != m_editor.m_component_properties.end())
 						{
-							props[i]->set(m_component, m_old_values);
+							const Array<IPropertyDescriptor*>& props = iter.second();
+							for (int i = 0; i < props.size(); ++i)
+							{
+								props[i]->set(m_component, m_old_values);
+							}
 						}
 					}
 					else
@@ -681,9 +710,13 @@ struct WorldEditorImpl : public WorldEditor
 								if (cmp_new.isValid())
 								{
 									m_old_values.rewindForRead();
-									for (int i = 0; i < props.size(); ++i)
+									if (iter != m_editor.m_component_properties.end())
 									{
-										props[i]->set(cmp_new, m_old_values);
+										const Array<IPropertyDescriptor*>& props = iter.second();
+										for (int i = 0; i < props.size(); ++i)
+										{
+											props[i]->set(cmp_new, m_old_values);
+										}
 									}
 								}
 							}
@@ -707,7 +740,7 @@ struct WorldEditorImpl : public WorldEditor
 
 				virtual void execute() override
 				{
-					Array<IPropertyDescriptor*>& props = m_editor.m_component_properties[m_component.type];
+					Array<IPropertyDescriptor*>& props = m_editor.getPropertyDescriptors(m_component.type);
 					for (int i = 0; i < props.size(); ++i)
 					{
 						props[i]->get(m_component, m_old_values);
@@ -788,7 +821,6 @@ struct WorldEditorImpl : public WorldEditor
 		};
 
 	public:
-
 		virtual const char* getBasePath() override
 		{
 			return m_base_path.c_str();
@@ -809,7 +841,7 @@ struct WorldEditorImpl : public WorldEditor
 
 		virtual IPropertyDescriptor* getProperty(const char* component_type, const char* property_name) override
 		{
-			auto& props = m_component_properties[crc32(component_type)];
+			auto& props = getPropertyDescriptors(crc32(component_type));
 			auto name_hash = crc32(property_name);
 			for(int i = 0; i < props.size(); ++i)
 			{
@@ -825,7 +857,7 @@ struct WorldEditorImpl : public WorldEditor
 		virtual void registerProperty(const char* component_type, IPropertyDescriptor* descriptor) override
 		{
 			ASSERT(descriptor);
-			m_component_properties[crc32(component_type)].push(descriptor);
+			getPropertyDescriptors(crc32(component_type)).push(descriptor);
 		}
 
 
@@ -1164,7 +1196,7 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			if (!m_selected_entities.empty())
 			{
-				Array<Vec3> new_positions;
+				Array<Vec3> new_positions(m_allocator);
 				RenderScene* scene = NULL;
 				const Array<IScene*>& scenes = m_engine->getScenes();
 
@@ -1277,12 +1309,12 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			if (!entities.empty())
 			{
-				Array<Quat> rots;
+				Array<Quat> rots(m_allocator);
 				for(int i = 0; i < entities.size(); ++i)
 				{
 					rots.push(entities[i].getRotation());
 				}
-				IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(entities, positions, rots);
+				IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(m_allocator, entities, positions, rots);
 				executeCommand(command);
 			}
 		}
@@ -1292,7 +1324,7 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			if (!entities.empty())
 			{
-				IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(entities, positions, rotations);
+				IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(m_allocator, entities, positions, rotations);
 				executeCommand(command);
 			}
 		}
@@ -1408,7 +1440,7 @@ struct WorldEditorImpl : public WorldEditor
 				{
 					uint32_t cmp_type = cmps[i].type;
 					m_copy_buffer.write(cmp_type);
-					Array<IPropertyDescriptor*>& props = m_component_properties[cmps[i].type];
+					Array<IPropertyDescriptor*>& props = getPropertyDescriptors(cmps[i].type);
 					int32_t prop_count = props.size(); 
 					for(int j = 0; j < prop_count; ++j)
 					{
@@ -1440,8 +1472,8 @@ struct WorldEditorImpl : public WorldEditor
 				}
 			}
 
-			const Array<IPropertyDescriptor*>& properties = m_component_properties[src.type];
-			Blob stream;
+			const Array<IPropertyDescriptor*>& properties = getPropertyDescriptors(src.type);
+			Blob stream(m_allocator);
 			for (int i = 0; i < properties.size(); ++i)
 			{
 				stream.clearBuffer();
@@ -1547,15 +1579,20 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
-		virtual const Array<Component>& getComponents(const Entity& entity) override
+		virtual Array<Component>& getComponents(const Entity& entity) override
 		{
-			return m_components[entity.index];
+			Map<int32_t, Array<Component> >::iterator iter = m_components.find(entity.index);
+			if (iter == m_components.end())
+			{
+				m_components.insert(entity.index, Array<Component>(m_allocator));
+				iter = m_components.find(entity.index);
+			}
+			return iter.second();
 		}
-
 
 		virtual Component getComponent(const Entity& entity, uint32_t type) override
 		{
-			const Array<Component>& cmps = m_components[entity.index];
+			const Array<Component>& cmps = getComponents(entity);
 			for (int i = 0; i < cmps.size(); ++i)
 			{
 				if (cmps[i].type == type)
@@ -1725,7 +1762,11 @@ struct WorldEditorImpl : public WorldEditor
 			, m_universe_destroyed(m_allocator)
 			, m_universe_created(m_allocator)
 			, m_universe_loaded(m_allocator)
-
+			, m_selected_entities(m_allocator)
+			, m_editor_icons(m_allocator)
+			, m_plugins(m_allocator)
+			, m_undo_stack(m_allocator)
+			, m_copy_buffer(m_allocator)
 		{
 			m_go_to_parameters.m_is_active = false;
 			m_undo_index = -1;
@@ -1758,13 +1799,19 @@ struct WorldEditorImpl : public WorldEditor
 
 		virtual Array<IPropertyDescriptor*>& getPropertyDescriptors(uint32_t type) override
 		{
-			return m_component_properties[type];
+			Map<uint32_t, Array<IPropertyDescriptor*> >::iterator iter = m_component_properties.find(type);
+			if (iter == m_component_properties.end())
+			{
+				m_component_properties.insert(type, Array<IPropertyDescriptor*>(m_allocator));
+				iter = m_component_properties.find(type);
+			}
+			return iter.second();
 		}
 
 
 		virtual const IPropertyDescriptor& getPropertyDescriptor(uint32_t type, uint32_t name_hash) override
 		{
-			Array<IPropertyDescriptor*>& props = m_component_properties[type];
+			Array<IPropertyDescriptor*>& props = getPropertyDescriptors(type);
 			for (int i = 0; i < props.size(); ++i)
 			{
 				if (props[i]->getNameHash() == name_hash)
@@ -1773,7 +1820,7 @@ struct WorldEditorImpl : public WorldEditor
 				}
 			}
 			ASSERT(false);
-			return *m_component_properties[type][0];
+			return *props[0];
 		}
 
 
@@ -1791,7 +1838,7 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			if(cmp.isValid())
 			{
-				IEditorCommand* command = m_allocator.newObject<RemoveArrayPropertyItemCommand>(cmp, index, property);
+				IEditorCommand* command = m_allocator.newObject<RemoveArrayPropertyItemCommand>(*this, cmp, index, property);
 				executeCommand(command);
 			}
 		}
@@ -1861,7 +1908,7 @@ struct WorldEditorImpl : public WorldEditor
 				Component cmp = getComponent(m_selected_entities[0], RENDERABLE_HASH);
 				if(cmp.isValid())
 				{
-					Array<Entity> entities;
+					Array<Entity> entities(m_allocator);
 
 					RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 					Model* model = scene->getRenderableModel(cmp);
@@ -1883,13 +1930,13 @@ struct WorldEditorImpl : public WorldEditor
 
 		void onComponentAdded(const Component& cmp)
 		{
-			m_components[cmp.entity.index].push(cmp);
+			getComponents(cmp.entity).push(cmp);
 		}
 
 
 		void onComponentCreated(const Component& cmp)
 		{
-			m_components[cmp.entity.index].push(cmp);
+			getComponents(cmp.entity).push(cmp);
 			for (int i = 0; i < m_editor_icons.size(); ++i)
 			{
 				if (m_editor_icons[i]->getEntity() == cmp.entity)
@@ -1906,7 +1953,7 @@ struct WorldEditorImpl : public WorldEditor
 
 		void onComponentDestroyed(const Component& cmp)
 		{
-			m_components[cmp.entity.index].eraseItemFast(cmp);
+			getComponents(cmp.entity).eraseItemFast(cmp);
 			for (int i = 0; i < m_editor_icons.size(); ++i)
 			{
 				if (m_editor_icons[i]->getEntity() == cmp.entity)

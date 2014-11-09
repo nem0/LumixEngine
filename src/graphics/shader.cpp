@@ -24,6 +24,10 @@ Shader::Shader(const Path& path, ResourceManager& resource_manager, Renderer& re
 	, m_renderer(renderer)
 	, m_allocator(allocator)
 	, m_source(m_allocator)
+	, m_attributes(m_allocator)
+	, m_passes(m_allocator)
+	, m_pass_hashes(m_allocator)
+	, m_combinations(m_allocator)
 {
 }
 
@@ -224,7 +228,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		decrementDepCount();
 		if(!m_combinations.empty())
 		{
-			Array<Combination*> old_combinations;
+			Array<Combination*> old_combinations(m_allocator);
 			for(int i = 0; i < m_combinations.size(); ++i)
 			{
 				old_combinations.push(m_combinations[i]);

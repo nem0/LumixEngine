@@ -164,7 +164,7 @@ bool Model::parseGeometry(FS::IFile* file, const VertexDef& vertex_definition)
 	vertices.resize(vertices_count * vertex_definition.getVertexSize() / sizeof(vertices[0]));
 	file->read(&vertices[0], sizeof(vertices[0]) * vertices.size());
 	
-	m_geometry = m_allocator.newObject<Geometry>();
+	m_geometry = m_allocator.newObject<Geometry>(m_allocator);
 	m_geometry->copy((uint8_t*)&vertices[0], sizeof(float) * vertices.size(), indices, vertex_definition);
 	return true;
 }
