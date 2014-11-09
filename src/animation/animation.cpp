@@ -26,7 +26,7 @@ struct AnimationHeader
 
 Resource* AnimationManager::createResource(const Path& path)
 {
-	return m_allocator.newObject<Animation>(path, getOwner());
+	return m_allocator.newObject<Animation>(path, getOwner(), m_allocator);
 }
 
 
@@ -36,8 +36,8 @@ void AnimationManager::destroyResource(Resource& resource)
 }
 
 
-Animation::Animation(const Path& path, ResourceManager& resource_manager)
-	: Resource(path, resource_manager)
+Animation::Animation(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
+	: Resource(path, resource_manager, allocator)
 {
 	m_rotations = NULL;
 	m_positions = NULL;

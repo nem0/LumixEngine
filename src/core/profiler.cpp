@@ -9,6 +9,7 @@ namespace Lumix
 
 
 	Profiler::Profiler()
+		: m_frame_listeners(m_allocator)
 	{
 		m_timer = Timer::create(m_allocator);
 		m_current_block = NULL;

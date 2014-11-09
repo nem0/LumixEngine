@@ -228,7 +228,7 @@ struct PipelineImpl : public Pipeline
 
 
 	PipelineImpl(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
-		: Pipeline(path, resource_manager)
+		: Pipeline(path, resource_manager, allocator)
 		, m_allocator(allocator)
 	{
 		addCommandCreator("clear").bind<&CreateCommand<ClearCommand> >();
@@ -836,8 +836,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 };
 
 
-Pipeline::Pipeline(const Path& path, ResourceManager& resource_manager)
-	: Resource(path, resource_manager)
+Pipeline::Pipeline(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
+	: Resource(path, resource_manager, allocator)
 {
 }
 

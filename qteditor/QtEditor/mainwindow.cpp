@@ -171,7 +171,7 @@ void MainWindow::fillRecentFiles()
 
 void MainWindow::resizeEvent(QResizeEvent* event)
 {
-	m_resized.invoke(event->size());
+	emit resized(event->size());
 }
 
 

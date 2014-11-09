@@ -105,6 +105,7 @@ namespace Lumix
 				: m_editor(editor)
 				, m_universe(NULL)
 				, m_instances(editor.getAllocator())
+				, m_updated(editor.getAllocator())
 			{
 				editor.universeCreated().bind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseCreated>(this);
 				editor.universeDestroyed().bind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseDestroyed>(this);

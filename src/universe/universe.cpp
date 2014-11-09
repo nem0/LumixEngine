@@ -23,6 +23,11 @@ Universe::Universe(IAllocator& allocator)
 	, m_id_to_name_map(m_allocator)
 	, m_positions(m_allocator)
 	, m_rotations(m_allocator)
+	, m_component_created(m_allocator)
+	, m_component_destroyed(m_allocator)
+	, m_entity_created(m_allocator)
+	, m_entity_destroyed(m_allocator)
+	, m_entity_moved(m_allocator)
 {
 	m_positions.reserve(RESERVED_ENTITIES);
 	m_rotations.reserve(RESERVED_ENTITIES);

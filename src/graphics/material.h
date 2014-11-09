@@ -83,8 +83,8 @@ public:
 	int getUniformCount() const { return m_uniforms.size(); }
 	Uniform& getUniform(int index) { return m_uniforms[index]; }
 
-	Material(const Path& path, ResourceManager& resource_manager)
-		: Resource(path, resource_manager)
+	Material(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
+		: Resource(path, resource_manager, allocator)
 		, m_shader(NULL)
 		, m_is_z_test(true)
 		, m_is_backface_culling(true)

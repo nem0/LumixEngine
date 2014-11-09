@@ -22,6 +22,7 @@ class HierarchyImpl : public Hierarchy
 			, m_parents(allocator)
 			, m_children(allocator)
 			, m_allocator(allocator)
+			, m_parent_set(allocator)
 		{
 			universe.entityMoved().bind<HierarchyImpl, &HierarchyImpl::onEntityMoved>(this);
 		}

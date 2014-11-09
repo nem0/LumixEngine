@@ -40,7 +40,7 @@ private:
 class LUMIX_ANIMATION_API Animation : public Resource
 {
 	public:
-		Animation(const Path& path, ResourceManager& resource_manager);
+		Animation(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 		~Animation();
 
 		void getPose(float time, Pose& pose, Model& model) const;

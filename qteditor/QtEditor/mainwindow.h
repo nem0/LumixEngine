@@ -26,7 +26,9 @@ public:
 	void setWorldEditor(Lumix::WorldEditor& world_editor);
 	class SceneView* getSceneView() const;
 	class GameView* getGameView() const;
-	Lumix::DelegateList<void(const QSize&)>& resized() { return m_resized; }
+
+signals:
+	void resized(const QSize& size);
 
 private slots:
 	void on_actionLog_triggered();
@@ -99,6 +101,5 @@ private:
 	class QComboBox* m_layout_combobox;
 	QList<QString> m_recent_files;
 	QList<DockInfo> m_dock_infos;
-	Lumix::DelegateList<void(const QSize&)> m_resized;
 };
 

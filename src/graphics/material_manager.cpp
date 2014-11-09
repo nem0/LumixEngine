@@ -8,7 +8,7 @@ namespace Lumix
 {
 	Resource* MaterialManager::createResource(const Path& path)
 	{
-		return m_allocator.newObject<Material>(path, getOwner());
+		return m_allocator.newObject<Material>(path, getOwner(), m_allocator);
 	}
 
 	void MaterialManager::destroyResource(Resource& resource)
