@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/allocator.h"
 #include "core/mt/atomic.h"
 #include "core/mt/semaphore.h"
 
@@ -204,15 +205,16 @@ namespace Lumix
 		class LockFreeFixedQueue<T, size, false>
 		{
 		public:
-			LockFreeFixedQueue()
+			LockFreeFixedQueue(IAllocator& allocator)
 				: m_al(0)
 				, m_fr(0)
 				, m_rd(0)
 				, m_wr(0)
 				, m_aborted(false)
 				, m_data_signal(0, size)
+				, m_allocator(allocator)
 			{
-				m_pool = (T*)LUMIX_NEW_ARRAY(char, sizeof(T) * size);
+				m_pool = (T*)m_allocator.allocate(sizeof(T) * size);
 
 				for (int32_t i = 0; i < size; i++)
 				{
@@ -225,7 +227,7 @@ namespace Lumix
 
 			~LockFreeFixedQueue()
 			{
-				LUMIX_DELETE_ARRAY((char*)m_pool);
+				m_allocator.deallocate((char*)m_pool);
 			}
 
 			T* alloc(bool wait)
@@ -385,6 +387,7 @@ namespace Lumix
 				}
 			};
 
+			IAllocator&			m_allocator;
 			volatile int32_t	m_al;
 			volatile int32_t	m_fr;
 			volatile int32_t	m_rd;

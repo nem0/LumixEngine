@@ -50,11 +50,5 @@ namespace Lumix
 		m_start = n + (int32_t)((uint8_t*)p - m_buffer);
 	}
 
-	void* FIFOAllocator::reallocate(void*, size_t)
-	{
-		ASSERT(false); // not supported
-		return NULL;
-	}
-
 
 } // ~namespace Lumix

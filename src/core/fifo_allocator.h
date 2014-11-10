@@ -2,6 +2,7 @@
 
 
 #include "core/lumix.h"
+#include "core/allocator.h"
 #include "core/mt/spin_mutex.h"
 
 
@@ -10,7 +11,7 @@ namespace Lumix
 
 
 	/// FIFOAllocator uses fixed ring buffer to allocate memory in FIFO order.
-	class LUMIX_CORE_API FIFOAllocator
+	class LUMIX_CORE_API FIFOAllocator : public IAllocator
 	{
 		public:
 			FIFOAllocator(size_t buffer_size);
@@ -18,7 +19,6 @@ namespace Lumix
 
 			void* allocate(size_t n);
 			void deallocate(void* p);
-			void* reallocate(void* p, size_t n);
 		
 		private:
 			size_t m_buffer_size;

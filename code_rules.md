@@ -200,8 +200,8 @@ General Rules
 ---
 
 #### Namespaces
-  1. everything in Lux namespace
-  2. there can be subnamespaces in Lux, e.g. Lux::Math
+  1. everything in Lumix namespace
+  2. there can be subnamespaces in Lumix, e.g. Lumix::Math
 
 ---
 

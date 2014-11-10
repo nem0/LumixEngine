@@ -9,7 +9,6 @@
 #include "editor/property_descriptor.h"
 #include "engine/engine.h"
 #include "physics/physics_scene.h"
-#include "physics/physics_system_impl.h"
 
 
 namespace Lumix
@@ -22,9 +21,51 @@ static const uint32_t CONTROLLER_HASH = crc32("physical_controller");
 static const uint32_t HEIGHTFIELD_HASH = crc32("physical_heightfield");
 
 
-extern "C" IPlugin* createPlugin()
+
+struct PhysicsSystemImpl : public PhysicsSystem
 {
-	return LUMIX_NEW(PhysicsSystem)();
+	PhysicsSystemImpl(Engine& engine)
+		: m_allocator(engine.getAllocator())
+		, m_engine(engine)
+	{}
+
+	virtual bool create() override;
+	virtual IScene* createScene(Universe& universe) override;
+	virtual void destroyScene(IScene* scene) override;
+	virtual void destroy() override;
+
+	virtual physx::PxControllerManager* getControllerManager() override
+	{
+		return m_controller_manager;
+	}
+
+	virtual physx::PxPhysics* getPhysics() override
+	{
+		return m_physics;
+	}
+
+	virtual physx::PxCooking* getCooking() override
+	{
+		return m_cooking;
+	}
+
+	bool connect2VisualDebugger();
+	void registerProperties(Engine& engine);
+
+	physx::PxPhysics*			m_physics;
+	physx::PxFoundation*		m_foundation;
+	physx::PxControllerManager*	m_controller_manager;
+	physx::PxAllocatorCallback*	m_physx_allocator;
+	physx::PxErrorCallback*		m_error_callback;
+	physx::PxCooking*			m_cooking;
+	class Engine&				m_engine;
+	class BaseProxyAllocator	m_allocator;
+};
+
+
+extern "C" IPlugin* createPlugin(Engine& engine)
+{
+	return engine.getAllocator().newObject<PhysicsSystemImpl>(engine);
 }
 
 
@@ -33,9 +74,15 @@ struct CustomErrorCallback : public physx::PxErrorCallback
 	virtual void reportError(physx::PxErrorCode::Enum code, const char* message, const char* file, int line);
 };
 
-IScene* PhysicsSystem::createScene(Universe& universe)
+IScene* PhysicsSystemImpl::createScene(Universe& universe)
 {
-	return PhysicsScene::create(*this, universe, *m_impl->m_engine);
+	return PhysicsScene::create(*this, universe, m_engine, m_allocator);
+}
+
+
+void PhysicsSystemImpl::destroyScene(IScene* scene)
+{
+	PhysicsScene::destroy(static_cast<PhysicsScene*>(scene));
 }
 
 
@@ -44,6 +91,7 @@ class AssertNullAllocator : public physx::PxAllocatorCallback
 	public:
 		virtual void* allocate(size_t size, const char* typeName, const char* filename, int line) override
 		{
+			
 			void* ret = _aligned_malloc(size, 16);
 			//g_log_info.log("PhysX") << "Allocated " << size << " bytes for " << typeName << " from " << filename << "(" << line << ")";
 			ASSERT(ret);
@@ -56,48 +104,55 @@ class AssertNullAllocator : public physx::PxAllocatorCallback
 };
 
 
-bool PhysicsSystem::create(Engine& engine)
+void PhysicsSystemImpl::registerProperties(Engine& engine)
 {
-	engine.getWorldEditor()->registerProperty("box_rigid_actor", LUMIX_NEW(BoolPropertyDescriptor<PhysicsScene>)("dynamic", &PhysicsScene::isDynamic, &PhysicsScene::setIsDynamic));
-	engine.getWorldEditor()->registerProperty("box_rigid_actor", LUMIX_NEW(Vec3PropertyDescriptor<PhysicsScene>)("size", &PhysicsScene::getHalfExtents, &PhysicsScene::setHalfExtents));
-	engine.getWorldEditor()->registerProperty("mesh_rigid_actor", LUMIX_NEW(FilePropertyDescriptor<PhysicsScene>)("source", &PhysicsScene::getShapeSource, &PhysicsScene::setShapeSource, "Physics (*.pda)"));
-	engine.getWorldEditor()->registerProperty("physical_heightfield", LUMIX_NEW(ResourcePropertyDescriptor<PhysicsScene>)("heightmap", &PhysicsScene::getHeightmap, &PhysicsScene::setHeightmap, "Image (*.raw)"));
-	engine.getWorldEditor()->registerProperty("physical_heightfield", LUMIX_NEW(DecimalPropertyDescriptor<PhysicsScene>)("xz_scale", &PhysicsScene::getHeightmapXZScale, &PhysicsScene::setHeightmapXZScale));
-	engine.getWorldEditor()->registerProperty("physical_heightfield", LUMIX_NEW(DecimalPropertyDescriptor<PhysicsScene>)("y_scale", &PhysicsScene::getHeightmapYScale, &PhysicsScene::setHeightmapYScale));
+	WorldEditor* editor = engine.getWorldEditor();
+	if(editor)
+	{
+		IAllocator& allocator = editor->getAllocator();
+		editor->registerProperty("box_rigid_actor", allocator.newObject<BoolPropertyDescriptor<PhysicsScene> >(allocator, "dynamic", &PhysicsScene::isDynamic, &PhysicsScene::setIsDynamic));
+		editor->registerProperty("box_rigid_actor", allocator.newObject<Vec3PropertyDescriptor<PhysicsScene> >(allocator, "size", &PhysicsScene::getHalfExtents, &PhysicsScene::setHalfExtents));
+		editor->registerProperty("mesh_rigid_actor", allocator.newObject<FilePropertyDescriptor<PhysicsScene> >(allocator, "source", &PhysicsScene::getShapeSource, &PhysicsScene::setShapeSource, "Physics (*.pda)"));
+		editor->registerProperty("physical_heightfield", allocator.newObject<ResourcePropertyDescriptor<PhysicsScene> >(allocator, "heightmap", &PhysicsScene::getHeightmap, &PhysicsScene::setHeightmap, "Image (*.raw)"));
+		editor->registerProperty("physical_heightfield", allocator.newObject<DecimalPropertyDescriptor<PhysicsScene> >(allocator, "xz_scale", &PhysicsScene::getHeightmapXZScale, &PhysicsScene::setHeightmapXZScale));
+		editor->registerProperty("physical_heightfield", allocator.newObject<DecimalPropertyDescriptor<PhysicsScene> >(allocator, "y_scale", &PhysicsScene::getHeightmapYScale, &PhysicsScene::setHeightmapYScale));
+	}
+}
 
-	m_impl = LUMIX_NEW(PhysicsSystemImpl);
-	m_impl->m_allocator = LUMIX_NEW(AssertNullAllocator)();
-	m_impl->m_error_callback = LUMIX_NEW(CustomErrorCallback)();
-	m_impl->m_engine = &engine;
-	m_impl->m_foundation = PxCreateFoundation(
+
+bool PhysicsSystemImpl::create()
+{
+	registerProperties(m_engine);
+
+	m_physx_allocator = m_allocator.newObject<AssertNullAllocator>();
+	m_error_callback = m_allocator.newObject<CustomErrorCallback>();
+	m_foundation = PxCreateFoundation(
 		PX_PHYSICS_VERSION,
-		*m_impl->m_allocator,
-		*m_impl->m_error_callback
+		*m_physx_allocator,
+		*m_error_callback
 	);
 
-	m_impl->m_physics = PxCreatePhysics(
+	m_physics = PxCreatePhysics(
 		PX_PHYSICS_VERSION,
-		*m_impl->m_foundation,
+		*m_foundation,
 		physx::PxTolerancesScale()
 	);
 	
-	m_impl->m_controller_manager = PxCreateControllerManager(*m_impl->m_foundation);
-	m_impl->m_cooking = PxCreateCooking(PX_PHYSICS_VERSION, *m_impl->m_foundation, physx::PxCookingParams());
-	m_impl->connect2VisualDebugger();
+	m_controller_manager = PxCreateControllerManager(*m_foundation);
+	m_cooking = PxCreateCooking(PX_PHYSICS_VERSION, *m_foundation, physx::PxCookingParams());
+	connect2VisualDebugger();
 	return true;
 }
 
 
-void PhysicsSystem::destroy()
+void PhysicsSystemImpl::destroy()
 {
-	m_impl->m_controller_manager->release();
-	m_impl->m_cooking->release();
-	m_impl->m_physics->release();
-	m_impl->m_foundation->release();
-	LUMIX_DELETE(m_impl->m_allocator);
-	LUMIX_DELETE(m_impl->m_error_callback);
-	LUMIX_DELETE(m_impl);
-	m_impl = 0;
+	m_controller_manager->release();
+	m_cooking->release();
+	m_physics->release();
+	m_foundation->release();
+	m_allocator.deleteObject(m_physx_allocator);
+	m_allocator.deleteObject(m_error_callback);
 }
 
 

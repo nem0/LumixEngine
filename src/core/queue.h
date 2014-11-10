@@ -9,16 +9,17 @@ namespace Lumix
 	class Queue
 	{
 	public:
-		Queue()
+		Queue(IAllocator& allocator)
+			: m_allocator(allocator)
 		{
 			ASSERT(Math::isPowOfTwo(count));
-			m_buffer = (T*)(LUMIX_NEW_ARRAY(char, sizeof(T) * count));
+			m_buffer = (T*)(m_allocator.allocate(sizeof(T) * count));
 			m_wr = m_rd = 0;
 		}
 
 		~Queue()
 		{
-			LUMIX_DELETE_ARRAY(m_buffer);
+			m_allocator.deallocate(m_buffer);
 		}
 
 		bool empty() const { return m_rd == m_wr; } 
@@ -71,6 +72,7 @@ namespace Lumix
 		}
 
 	private:
+		IAllocator& m_allocator;
 		uint32_t m_rd;
 		uint32_t m_wr;
 		T* m_buffer;

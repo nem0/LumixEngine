@@ -11,9 +11,13 @@ namespace Lumix
 {
 	namespace MTJD
 	{
-		Manager::Manager()
+		Manager::Manager(IAllocator& allocator)
 			: m_scheduling_counter(0)
-			, m_scheduler(*this)
+			, m_scheduler(*this, allocator)
+			, m_trans_queue(allocator)
+			, m_worker_tasks(allocator)
+			, m_allocator(allocator)
+			, m_pending_trans(allocator)
 		{
 #if TYPE == MULTI_THREAD
 			uint32_t threads_num = getCpuThreadsCount();
@@ -21,12 +25,13 @@ namespace Lumix
 			m_scheduler.create("MTJD::Scheduler");
 			m_scheduler.run();
 
-			m_worker_tasks = LUMIX_NEW_ARRAY(WorkerTask, threads_num);
+			m_worker_tasks.reserve(threads_num);
 			for (uint32_t i = 0; i < threads_num; ++i)
 			{
-				m_worker_tasks[i].create("MTJD::WorkerTask", this, &m_trans_queue);
-				m_worker_tasks[i].setAffinityMask(getAffinityMask(i));
-				m_worker_tasks[i].run();
+				m_worker_tasks.push(m_allocator.newObject<WorkerTask>(m_allocator));
+				m_worker_tasks[i]->create("MTJD::WorkerTask", this, &m_trans_queue);
+				m_worker_tasks[i]->setAffinityMask(getAffinityMask(i));
+				m_worker_tasks[i]->run();
 			}
 
 #endif //TYPE == MULTI_THREAD
@@ -44,14 +49,13 @@ namespace Lumix
 
 			for (uint32_t i = 0; i < threads_num; ++i)
 			{
-				m_worker_tasks[i].destroy();
+				m_worker_tasks[i]->destroy();
+				m_allocator.deleteObject(m_worker_tasks[i]);
 			}
 
 			m_scheduler.forceExit(false);
 			m_scheduler.dataSignal();
 			m_scheduler.destroy();
-
-			LUMIX_DELETE_ARRAY(m_worker_tasks);
 
 #endif //TYPE == MULTI_THREAD
 		}

@@ -82,6 +82,9 @@ class AddTerrainLevelCommand : public Lumix::IEditorCommand
 			: m_world_editor(editor)
 			, m_terrain(terrain)
 			, m_can_be_merged(can_be_merged)
+			, m_new_data(editor.getAllocator())
+			, m_old_data(editor.getAllocator())
+			, m_items(editor.getAllocator())
 		{
 			Lumix::Matrix entity_mtx = terrain.entity.getMatrix();
 			entity_mtx.fastInverse();
@@ -99,7 +102,8 @@ class AddTerrainLevelCommand : public Lumix::IEditorCommand
 
 		Lumix::Texture* getHeightmap()
 		{
-			Lumix::string material_path;
+			Lumix::StackAllocator<LUMIX_MAX_PATH> allocator;
+			Lumix::string material_path(allocator);
 			static_cast<Lumix::RenderScene*>(m_terrain.scene)->getTerrainMaterial(m_terrain, material_path);
 			Lumix::Material* material = static_cast<Lumix::Material*>(m_world_editor.getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL)->get(material_path));
 			return material->getTextureByUniform("hm_texture");
@@ -231,8 +235,8 @@ class AddTerrainLevelCommand : public Lumix::IEditorCommand
 
 		void resizeData()
 		{
-			Lumix::Array<uint8_t> new_data;
-			Lumix::Array<uint8_t> old_data;
+			Lumix::Array<uint8_t> new_data(m_world_editor.getAllocator());
+			Lumix::Array<uint8_t> old_data(m_world_editor.getAllocator());
 			auto heightmap = getHeightmap();
 			Rectangle rect;
 			getBoundingRectangle(heightmap, rect);
@@ -444,7 +448,7 @@ class ComponentPropertyObject : public PropertyViewObject
 
 		virtual void createEditor(PropertyView& view, QTreeWidgetItem* item) override
 		{
-			Lumix::Blob stream;
+			Lumix::Blob stream(view.getWorldEditor()->getAllocator());
 			if(m_descriptor.getType() != Lumix::IPropertyDescriptor::ARRAY)
 			{
 				if(m_array_index >= 0 )
@@ -1038,7 +1042,7 @@ PropertyViewObject* createEntityObject(Lumix::WorldEditor& editor, Lumix::Entity
 	auto e = new Lumix::Entity(entity);
 	InstanceObject<Lumix::Entity, true>* object = new InstanceObject<Lumix::Entity, true>(NULL, "Entity", e, NULL);
 
-	auto& cmps = e->getComponents();
+	auto& cmps = editor.getComponents(*e);
 
 	for (int i = 0; i < cmps.size(); ++i)
 	{
@@ -1259,7 +1263,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			
 			for(int i = m_world_editor.getSelectedEntities().size() - 1; i >= 0; --i)
 			{
-				Lumix::Component terrain = m_world_editor.getSelectedEntities()[i].getComponent(crc32("terrain"));
+				Lumix::Component terrain = m_world_editor.getComponent(m_world_editor.getSelectedEntities()[i], crc32("terrain"));
 				if (terrain.isValid())
 				{
 					Lumix::Component camera_cmp = m_world_editor.getEditCamera();
@@ -1283,7 +1287,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			{
 				if (m_world_editor.getSelectedEntities()[i] == hit.m_component.entity)
 				{
-					Lumix::Component terrain = hit.m_component.entity.getComponent(crc32("terrain"));
+					Lumix::Component terrain = m_world_editor.getComponent(hit.m_component.entity, crc32("terrain"));
 					if (terrain.isValid())
 					{
 						Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
@@ -1319,7 +1323,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			Lumix::RayCastModelHit hit = scene->castRayTerrain(m_component, origin, dir);
 			if (hit.m_is_hit)
 			{
-				Lumix::Component terrain = hit.m_component.entity.getComponent(crc32("terrain"));
+				Lumix::Component terrain = m_world_editor.getComponent(hit.m_component.entity, crc32("terrain"));
 				if(terrain.isValid())
 				{
 					switch (m_type)
@@ -1348,7 +1352,8 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 
 		Lumix::Material* getMaterial()
 		{
-			Lumix::string material_path;
+			Lumix::StackAllocator<LUMIX_MAX_PATH> allocator;
+			Lumix::string material_path(allocator);
 			static_cast<Lumix::RenderScene*>(m_component.scene)->getTerrainMaterial(m_component, material_path);
 			return static_cast<Lumix::Material*>(m_world_editor.getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL)->get(material_path.c_str()));
 		}
@@ -1423,7 +1428,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 		bool isOBBCollision(Lumix::RenderScene* scene, const Lumix::Matrix& matrix, Lumix::Model* model, float scale)
 		{
 			Lumix::Vec3 pos_a = matrix.getTranslation();
-			static Lumix::Array<Lumix::RenderableInfo> infos;
+			static Lumix::Array<Lumix::RenderableInfo> infos(m_world_editor.getAllocator());
 			infos.clear();
 			scene->getRenderableInfos(infos, ~0);
 			float radius_a_squared = model->getBoundingRadius();
@@ -1457,7 +1462,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			{
 				return;
 			}
-			Lumix::Component renderable = tpl.getComponent(RENDERABLE_HASH);
+			Lumix::Component renderable = m_world_editor.getComponent(tpl, RENDERABLE_HASH);
 			if(renderable.isValid())
 			{
 				float w, h;
@@ -1491,7 +1496,8 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 				return;
 			float radius = (float)m_terrain_brush_size;
 			float rel_amount = m_terrain_brush_strength;
-			Lumix::string material_path;
+			Lumix::StackAllocator<LUMIX_MAX_PATH> allocator;
+			Lumix::string material_path(allocator);
 			static_cast<Lumix::RenderScene*>(terrain.scene)->getTerrainMaterial(terrain, material_path);
 			Lumix::Material* material = static_cast<Lumix::Material*>(m_world_editor.getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL)->get(material_path));
 			Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
@@ -1582,7 +1588,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 		void addTerrainLevel(Lumix::Component terrain, const Lumix::RayCastModelHit& hit, bool new_stroke)
 		{
 			Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
-			AddTerrainLevelCommand* command = ::new (Lumix::dll_lumix_new(sizeof(AddTerrainLevelCommand), "", 0)) AddTerrainLevelCommand(m_world_editor, hit_pos, m_terrain_brush_size, m_terrain_brush_strength, terrain, !new_stroke);
+			AddTerrainLevelCommand* command = m_world_editor.getAllocator().newObject<AddTerrainLevelCommand>(m_world_editor, hit_pos, m_terrain_brush_size, m_terrain_brush_strength, terrain, !new_stroke);
 			m_world_editor.executeCommand(command);
 		}
 
@@ -1605,6 +1611,7 @@ PropertyView::PropertyView(QWidget* parent)
 	, m_terrain_editor(NULL)
 	, m_selected_resource(NULL)
 	, m_object(NULL)
+	, m_selected_entity(Lumix::Entity::INVALID)
 {
 	m_ui->setupUi(this);
 
@@ -1730,7 +1737,7 @@ void PropertyView::setSelectedResourceFilename(const char* filename)
 
 void PropertyView::addResourcePlugin(PropertyViewObject::Creator plugin)
 {
-	m_resource_plugins.push(plugin);
+	m_resource_plugins.push_back(plugin);
 }
 
 
@@ -1757,7 +1764,7 @@ void PropertyView::setScriptCompiler(ScriptCompiler* compiler)
 	m_compiler = compiler;
 	if(m_compiler)
 	{
-		m_compiler->onCompile().bind<PropertyView, &PropertyView::onScriptCompiled>(this);
+		connect(m_compiler, &ScriptCompiler::compiled, this, &PropertyView::on_script_compiled);
 	}
 }
 
@@ -1809,7 +1816,7 @@ void PropertyView::setScriptStatus(uint32_t status)
 }
 
 
-void PropertyView::onScriptCompiled(const Lumix::Path&, uint32_t status)
+void PropertyView::on_script_compiled(const Lumix::Path&, uint32_t status)
 {
 	setScriptStatus(status == 0 ? ScriptCompiler::SUCCESS : ScriptCompiler::FAILURE);
 }
@@ -2004,7 +2011,7 @@ void PropertyView::onEntitySelected(const Lumix::Array<Lumix::Entity>& e)
 	setSelectedResource(NULL);
 	m_selected_entity = e.empty() ? Lumix::Entity::INVALID : e[0];
 	clear();
-	if (e.size() == 1)
+	if (e.size() == 1 && e[0].isValid())
 	{
 		setObject(createEntityObject(*m_world_editor, e[0]));
 		m_ui->propertyList->expandAll();
@@ -2024,7 +2031,7 @@ void PropertyView::on_addComponentButton_clicked()
 		if(strcmp(c, component_map[i]) == 0)
 		{
 			m_world_editor->addComponent(crc32(component_map[i+1]));
-			Lumix::Array<Lumix::Entity> tmp;
+			Lumix::Array<Lumix::Entity> tmp(m_world_editor->getAllocator());
 			tmp.push(m_selected_entity);
 			onEntitySelected(tmp);
 			return;
@@ -2037,7 +2044,7 @@ void PropertyView::updateSelectedEntityPosition()
 {
 	if(m_world_editor->getSelectedEntities().size() == 1)
 	{
-		Lumix::Array<Lumix::Vec3> positions;
+		Lumix::Array<Lumix::Vec3> positions(m_world_editor->getAllocator());
 		positions.push(Lumix::Vec3((float)m_ui->positionX->value(), (float)m_ui->positionY->value(), (float)m_ui->positionZ->value()));
 		m_world_editor->setEntitiesPositions(m_world_editor->getSelectedEntities(), positions);
 	}
@@ -2126,14 +2133,14 @@ void PropertyView::on_propertyList_customContextMenuRequested(const QPoint &pos)
 					break;
 				}
 			}
-			const Lumix::Entity::ComponentList& cmps = m_selected_entity.getComponents();
+			const Lumix::WorldEditor::ComponentList& cmps = m_world_editor->getComponents(m_selected_entity);
 			for (int i = 0, c = cmps.size(); i < c; ++i)
 			{
 				if (cmps[i].type == cmp_hash)
 				{
 					Lumix::Entity entity = cmps[i].entity;
 					m_world_editor->destroyComponent(cmps[i]);
-					Lumix::Array<Lumix::Entity> tmp;
+					Lumix::Array<Lumix::Entity> tmp(m_world_editor->getAllocator());
 					tmp.push(m_selected_entity);
 					onEntitySelected(tmp);
 					break;

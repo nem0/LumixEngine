@@ -20,7 +20,7 @@
 struct ProcessInfo
 {
 	class QProcess* m_process;
-	Lumix::string m_path;
+	QString m_path;
 };
 
 
@@ -98,7 +98,7 @@ void AssetBrowser::handleDoubleClick(const QFileInfo& file_info)
 	}
 	else if(suffix == "msh")
 	{
-		InsertMeshCommand* command = new (Lumix::dll_lumix_new(sizeof(InsertMeshCommand), "", 0)) InsertMeshCommand(*m_editor, m_editor->getCameraRaycastHit(), file.toLatin1().data());
+		InsertMeshCommand* command = m_editor->getAllocator().newObject<InsertMeshCommand>(*m_editor, m_editor->getCameraRaycastHit(), file.toLatin1().data());
 		m_editor->executeCommand(command);
 	}
 	else if(suffix == "ani")

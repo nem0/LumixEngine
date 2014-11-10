@@ -24,20 +24,9 @@ class LUMIX_SCRIPT_API ScriptScene : public IScene
 };
 
 
-class LUMIX_SCRIPT_API ScriptSystem : public IPlugin
-{
-	public:
-		virtual Engine* getEngine() const = 0;
-
-	protected:
-		ScriptSystem() {}
-		virtual ~ScriptSystem() {}
-};
-
-
 extern "C"
 {
-	LUMIX_SCRIPT_API IPlugin* createPlugin();
+	LUMIX_SCRIPT_API IPlugin* createPlugin(Engine& engine);
 }
 
 

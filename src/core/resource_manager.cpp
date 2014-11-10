@@ -5,7 +5,9 @@
 
 namespace Lumix
 {
-	ResourceManager::ResourceManager() 
+	ResourceManager::ResourceManager(IAllocator& allocator) 
+		: m_resource_managers(allocator)
+		, m_allocator(allocator)
 	{
 	}
 
@@ -21,7 +23,7 @@ namespace Lumix
 	void ResourceManager::destroy()
 	{
 	}
-
+	
 	ResourceManagerBase* ResourceManager::get(uint32_t id)
 	{
 		return m_resource_managers[id]; 

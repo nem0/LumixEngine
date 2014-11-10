@@ -8,6 +8,7 @@ namespace Lumix
 {
 
 
+class IAllocator;
 struct Matrix;
 class Model;
 struct Quat;
@@ -17,7 +18,7 @@ struct Vec3;
 class LUMIX_ENGINE_API Pose
 {
 	public:
-		Pose();
+		Pose(IAllocator& allocator);
 		~Pose();
 
 		void resize(int count);
@@ -35,6 +36,7 @@ class LUMIX_ENGINE_API Pose
 		void computeAbsolute(Model& model, int i, bool* valid);
 
 	private:
+		IAllocator& m_allocator;
 		bool m_is_absolute;
 		int32_t m_count;
 		Vec3* m_positions;

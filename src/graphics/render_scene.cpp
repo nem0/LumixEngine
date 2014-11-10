@@ -42,7 +42,7 @@ namespace Lumix
 
 	struct Renderable
 	{
-		Renderable() {}
+		Renderable(IAllocator& allocator) : m_pose(allocator) {}
 
 		int32_t m_component_index;
 		int64_t m_layer_mask;
@@ -94,6 +94,8 @@ namespace Lumix
 	class RenderSceneImpl : public RenderScene
 	{
 		private:
+			typedef HashMap<int32_t, int> DynamicRenderableCache;
+
 			class ModelLoadedCallback
 			{
 				public:
@@ -124,14 +126,23 @@ namespace Lumix
 			};
 
 		public:
-			RenderSceneImpl(Renderer& renderer, Engine& engine, Universe& universe)
+			RenderSceneImpl(Renderer& renderer, Engine& engine, Universe& universe, IAllocator& allocator)
 				: m_engine(engine)
 				, m_universe(universe)
 				, m_renderer(renderer)
+				, m_allocator(allocator)
+				, m_model_loaded_callbacks(m_allocator)
+				, m_dynamic_renderable_cache(m_allocator)
+				, m_renderables(m_allocator)
+				, m_cameras(m_allocator)
+				, m_terrains(m_allocator)
+				, m_lights(m_allocator)
+				, m_debug_lines(m_allocator)
+				, m_always_visible(m_allocator)
 			{
 				m_universe.entityMoved().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
-				m_timer = Timer::create();
-				m_culling_system = CullingSystem::create(m_engine.getMTJDManager());
+				m_timer = Timer::create(m_allocator);
+				m_culling_system = CullingSystem::create(m_engine.getMTJDManager(), m_allocator);
 			}
 
 			~RenderSceneImpl()
@@ -140,12 +151,20 @@ namespace Lumix
 
 				for (int i = 0; i < m_model_loaded_callbacks.size(); ++i)
 				{
-					LUMIX_DELETE(m_model_loaded_callbacks[i]);
+					m_allocator.deleteObject(m_model_loaded_callbacks[i]);
 				}
 
 				for (int i = 0; i < m_terrains.size(); ++i)
 				{
-					LUMIX_DELETE(m_terrains[i]);
+					m_allocator.deleteObject(m_terrains[i]);
+				}
+
+				for(int i = 0; i < m_renderables.size(); ++i)
+				{
+					if(m_renderables[i].m_model)
+					{
+						m_renderables[i].m_model->getResourceManager().get(ResourceManager::MODEL)->unload(*m_renderables[i].m_model);
+					}
 				}
 
 				Timer::destroy(m_timer);
@@ -364,16 +383,18 @@ namespace Lumix
 				{
 					setModel(i, NULL);
 				}
-				m_renderables.resize(size);
+				m_renderables.clear();
+				m_renderables.reserve(size);
 				m_always_visible.clear();
 				for (int i = 0; i < size; ++i)
 				{
+					m_renderables.emplace(m_allocator);
 					serializer.deserializeArrayItem(m_renderables[i].m_is_always_visible);
-					if(m_renderables[i].m_is_always_visible)
-					{
-						m_always_visible.push(i);
-					}
 					serializer.deserializeArrayItem(m_renderables[i].m_component_index);
+					if (m_renderables[i].m_is_always_visible)
+					{
+						m_always_visible.push(m_renderables[i].m_component_index);
+					}
 					serializer.deserializeArrayItem(m_renderables[i].m_entity.index);
 					m_renderables[i].m_model = NULL;
 					m_renderables[i].m_entity.universe = &m_universe;
@@ -435,7 +456,7 @@ namespace Lumix
 				serializer.deserializeArrayBegin("terrains");
 				for (int i = size; i < m_terrains.size(); ++i)
 				{
-					LUMIX_DELETE(m_terrains[i]);
+					m_allocator.deleteObject(m_terrains[i]);
 					m_terrains[i] = NULL;
 				}
 				m_terrains.resize(size);
@@ -445,7 +466,7 @@ namespace Lumix
 					serializer.deserializeArrayItem(exists);
 					if(exists)
 					{
-						m_terrains[i] = LUMIX_NEW(Terrain)(Entity::INVALID, *this);
+						m_terrains[i] = m_allocator.newObject<Terrain>(Entity::INVALID, *this, m_allocator);
 						Terrain* terrain = m_terrains[i];
 						terrain->deserialize(serializer, m_universe, *this, i);
 					}
@@ -472,30 +493,26 @@ namespace Lumix
 				{
 					int renderable_index = getRenderable(component.index);
 					setModel(renderable_index, NULL);
-					m_always_visible.eraseItemFast(renderable_index);
+					m_always_visible.eraseItemFast(component.index);
 					m_renderables.erase(renderable_index);
 					m_universe.destroyComponent(component);
-					m_universe.componentDestroyed().invoke(component);
 					m_culling_system->removeStatic(component.index);
 				}
 				else if (component.type == LIGHT_HASH)
 				{
 					m_lights[component.index].m_is_free = true;
 					m_universe.destroyComponent(component);
-					m_universe.componentDestroyed().invoke(component);
 				}
 				else if (component.type == CAMERA_HASH)
 				{
 					m_cameras[component.index].m_is_free = true;
 					m_universe.destroyComponent(component);
-					m_universe.componentDestroyed().invoke(component);
 				}
 				else if(component.type == TERRAIN_HASH)
 				{
-					LUMIX_DELETE(m_terrains[component.index]);
+					m_allocator.deleteObject(m_terrains[component.index]);
 					m_terrains[component.index] = NULL;
 					m_universe.destroyComponent(component);
-					m_universe.componentDestroyed().invoke(component);
 				}
 				else
 				{
@@ -508,7 +525,7 @@ namespace Lumix
 			{
 				if (type == TERRAIN_HASH)
 				{
-					Terrain* terrain = LUMIX_NEW(Terrain)(entity, *this);
+					Terrain* terrain = m_allocator.newObject<Terrain>(entity, *this, m_allocator);
 					m_terrains.push(terrain);
 					Component cmp = m_universe.addComponent(entity, type, this, m_terrains.size() - 1);
 					m_universe.componentCreated().invoke(cmp);
@@ -535,7 +552,7 @@ namespace Lumix
 				else if (type == RENDERABLE_HASH)
 				{
 					int new_index = m_renderables.empty() ? 0 : m_renderables.back().m_component_index + 1;
-					Renderable& r = m_renderables.pushEmpty();
+					Renderable& r = m_renderables.emplace(m_allocator);
 					r.m_entity = entity;
 					r.m_layer_mask = 1;
 					r.m_scale = 1;
@@ -566,17 +583,49 @@ namespace Lumix
 				return Component::INVALID;
 			}
 
+
+			virtual Component getRenderable(Entity entity) override
+			{
+				DynamicRenderableCache::iterator iter = m_dynamic_renderable_cache.find(entity.index);
+				if (!iter.isValid())
+				{
+					for (int i = 0, c = m_renderables.size(); i < c; ++i)
+					{
+						if (m_renderables[i].m_entity == entity)
+						{
+							m_dynamic_renderable_cache.insert(entity.index, i);
+							return Component(entity, RENDERABLE_HASH, this, i);
+						}
+					}
+				}
+				else
+				{
+					return Component(entity, RENDERABLE_HASH, this, iter.value());
+				}
+				return Component::INVALID;
+			}
+
+
 			void onEntityMoved(const Entity& entity)
 			{
-				const Entity::ComponentList& cmps = entity.getComponents();
-				for (int i = 0; i < cmps.size(); ++i)
+				DynamicRenderableCache::iterator iter = m_dynamic_renderable_cache.find(entity.index);
+				if (!iter.isValid())
 				{
-					if (cmps[i].type == RENDERABLE_HASH)
+					for (int i = 0, c = m_renderables.size(); i < c; ++i)
 					{
-						m_renderables[cmps[i].index].m_matrix = entity.getMatrix();
-						m_culling_system->updateBoundingPosition(entity.getMatrix().getTranslation(), cmps[i].index);
-						break;
+						if (m_renderables[i].m_entity == entity)
+						{
+							m_dynamic_renderable_cache.insert(entity.index, i);
+							m_renderables[i].m_matrix = entity.getMatrix();
+							m_culling_system->updateBoundingPosition(entity.getMatrix().getTranslation(), i);
+							break;
+						}
 					}
+				}
+				else
+				{
+					m_renderables[iter.value()].m_matrix = entity.getMatrix();
+					m_culling_system->updateBoundingPosition(entity.getMatrix().getTranslation(), iter.value());
 				}
 			}
 
@@ -609,12 +658,6 @@ namespace Lumix
 			{
 				Material* material = static_cast<Material*>(m_engine.getResourceManager().get(ResourceManager::MATERIAL)->load(path.c_str()));
 				m_terrains[cmp.index]->setMaterial(material);
-			}
-
-
-			virtual Material* getTerrainMaterial(Component cmp) override
-			{
-				return m_terrains[cmp.index]->getMaterial();
 			}
 
 
@@ -665,6 +708,22 @@ namespace Lumix
 			}
 
 
+			virtual void showRenderable(Component cmp) override
+			{
+				m_culling_system->enableStatic(getRenderable(cmp.index));
+			}
+
+
+			virtual void hideRenderable(Component cmp) override
+			{
+				int renderable_index = getRenderable(cmp.index);
+				if (!m_renderables[renderable_index].m_is_always_visible)
+				{
+					m_culling_system->disableStatic(renderable_index);
+				}
+			}
+
+
 			virtual void setRenderableIsAlwaysVisible(Component cmp, bool value) override
 			{
 				int renderable_index = getRenderable(cmp.index);
@@ -672,12 +731,12 @@ namespace Lumix
 				if(value)
 				{
 					m_culling_system->disableStatic(renderable_index);
-					m_always_visible.push(renderable_index);
+					m_always_visible.push(cmp.index);
 				}
 				else
 				{
 					m_culling_system->enableStatic(renderable_index);
-					m_always_visible.eraseItemFast(renderable_index);
+					m_always_visible.eraseItemFast(cmp.index);
 				}
 			}
 			
@@ -895,7 +954,7 @@ namespace Lumix
 				}
 				for (int i = 0, c = m_always_visible.size(); i < c; ++i)
 				{
-					const Renderable* LUMIX_RESTRICT renderable = &m_renderables[m_always_visible[i]];
+					const Renderable* LUMIX_RESTRICT renderable = &m_renderables[getRenderable(m_always_visible[i])];
 					const Model* model = renderable->m_model;
 					bool is_model_ready = model && model->isReady();
 					if (is_model_ready && (renderable->m_layer_mask & layer_mask) != 0)
@@ -1253,7 +1312,7 @@ namespace Lumix
 						return m_model_loaded_callbacks[i];
 					}
 				}
-				ModelLoadedCallback* new_callback = LUMIX_NEW(ModelLoadedCallback)(*this, model);
+				ModelLoadedCallback* new_callback = m_allocator.newObject<ModelLoadedCallback>(*this, model);
 				m_model_loaded_callbacks.push(new_callback);
 				return new_callback;
 			}
@@ -1287,7 +1346,13 @@ namespace Lumix
 				}
 			}
 
+			virtual IAllocator& getAllocator() override
+			{
+				return m_allocator;
+			}
+
 		private:
+			IAllocator& m_allocator;
 			Array<ModelLoadedCallback*> m_model_loaded_callbacks;
 			Array<Renderable> m_renderables;
 			Array<int> m_always_visible;
@@ -1302,18 +1367,19 @@ namespace Lumix
 			Component m_applied_camera;
 			CullingSystem* m_culling_system;
 			Frustum m_camera_frustum;
+			DynamicRenderableCache m_dynamic_renderable_cache;
 	};
 
 
-	RenderScene* RenderScene::createInstance(Renderer& renderer, Engine& engine, Universe& universe)
+	RenderScene* RenderScene::createInstance(Renderer& renderer, Engine& engine, Universe& universe, IAllocator& allocator)
 	{
-		return LUMIX_NEW(RenderSceneImpl)(renderer, engine, universe);
+		return allocator.newObject<RenderSceneImpl>(renderer, engine, universe, allocator);
 	}
 
 
 	void RenderScene::destroyInstance(RenderScene* scene)
 	{
-		LUMIX_DELETE(scene);
+		scene->getAllocator().deleteObject(static_cast<RenderSceneImpl*>(scene));
 	}
 
 }

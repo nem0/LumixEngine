@@ -13,13 +13,13 @@ namespace Lumix
 			{
 				if (NULL == s_instance)
 				{
-					s_instance = LUMIX_NEW(Manager)();
+					s_instance = s_allocator.newObject<Manager>(s_allocator);
 				}
 
 				return *s_instance;
 			}
 
-			static void release() { LUMIX_DELETE(s_instance); s_instance = NULL; }
+			static void release() { s_allocator.deleteObject(s_instance); s_instance = NULL; }
 
 
 			void registerFunction(const char* name, unitTestFunc func, const char* params);
@@ -30,12 +30,13 @@ namespace Lumix
 
 			void handleFail(const char* file_name, uint32_t line);
 
-		private:
-			Manager();
+			Manager(IAllocator& allocator);
 			~Manager();
-
+		
+		private:
 			struct ManagerImpl* m_impl;
 			static Manager* s_instance;
+			static DefaultAllocator s_allocator;
 		};
 
 		class Helper

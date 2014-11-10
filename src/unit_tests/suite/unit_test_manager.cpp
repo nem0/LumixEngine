@@ -17,6 +17,7 @@ namespace Lumix
 	namespace UnitTest
 	{
 		Manager* Manager::s_instance = NULL;
+		DefaultAllocator Manager::s_allocator;
 
 		static const int32_t C_MAX_TRANS = 16;
 
@@ -40,8 +41,9 @@ namespace Lumix
 		class WorkerTask : public MT::Task
 		{
 		public:
-			WorkerTask(TransQueue* tests_todo)
-				: m_tests_todo(tests_todo)
+			WorkerTask(TransQueue* tests_todo, IAllocator& allocator)
+				: MT::Task(allocator)
+				, m_tests_todo(tests_todo)
 			{
 			}
 
@@ -179,9 +181,14 @@ namespace Lumix
 				m_task.run();
 			}
 
-			ManagerImpl()
+			ManagerImpl(IAllocator& allocator)
 				: m_fails(0)
-				, m_task(&m_trans_queue)
+				, m_task(&m_trans_queue, allocator)
+				, m_in_progress(allocator)
+				, m_trans_queue(allocator)
+				, m_allocator(allocator)
+				, m_unit_tests(allocator)
+				, m_failed_tests(allocator)
 			{
 			}
 
@@ -190,7 +197,10 @@ namespace Lumix
 				m_task.destroy();
 			}
 
+			IAllocator& getAllocator() { return m_allocator; }
+
 		private:
+			IAllocator& m_allocator;
 			uint32_t m_fails;
 
 			UnitTestTable	m_unit_tests;
@@ -226,14 +236,14 @@ namespace Lumix
 			m_impl->handleFail(file_name, line);
 		}
 
-		Manager::Manager()
+		Manager::Manager(IAllocator& allocator)
 		{
-			m_impl = LUMIX_NEW(ManagerImpl)();
+			m_impl = allocator.newObject<ManagerImpl>(allocator);
 		}
 
 		Manager::~Manager()
 		{
-			LUMIX_DELETE(m_impl);
+			m_impl->getAllocator().deleteObject(m_impl);
 		}
 	} //~UnitTest
 } //~UnitTest

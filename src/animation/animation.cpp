@@ -4,6 +4,7 @@
 #include "core/log.h"
 #include "core/matrix.h"
 #include "core/quat.h"
+#include "core/resource_manager.h"
 #include "core/vec3.h"
 #include "graphics/model.h"
 #include "graphics/pose.h"
@@ -25,18 +26,18 @@ struct AnimationHeader
 
 Resource* AnimationManager::createResource(const Path& path)
 {
-	return LUMIX_NEW(Animation)(path, getOwner());
+	return m_allocator.newObject<Animation>(path, getOwner(), m_allocator);
 }
 
 
 void AnimationManager::destroyResource(Resource& resource)
 {
-	LUMIX_DELETE(static_cast<Animation*>(&resource));
+	m_allocator.deleteObject(static_cast<Animation*>(&resource));
 }
 
 
-Animation::Animation(const Path& path, ResourceManager& resource_manager)
-	: Resource(path, resource_manager)
+Animation::Animation(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
+	: Resource(path, resource_manager, allocator)
 {
 	m_rotations = NULL;
 	m_positions = NULL;
@@ -47,9 +48,10 @@ Animation::Animation(const Path& path, ResourceManager& resource_manager)
 
 Animation::~Animation()
 {
-	LUMIX_DELETE_ARRAY(m_positions);
-	LUMIX_DELETE_ARRAY(m_rotations);
-	LUMIX_DELETE_ARRAY(m_bones);
+	IAllocator& allocator = getAllocator();
+	allocator.deallocate(m_positions);
+	allocator.deallocate(m_rotations);
+	allocator.deallocate(m_bones);
 }
 
 
@@ -119,10 +121,13 @@ void Animation::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 {
 	if (success)
 	{
-		LUMIX_DELETE_ARRAY(m_positions);
-		LUMIX_DELETE_ARRAY(m_rotations);
+		IAllocator& allocator = getAllocator();
+		allocator.deallocate(m_positions);
+		allocator.deallocate(m_rotations);
+		allocator.deallocate(m_bones);
 		m_positions = NULL;
 		m_rotations = NULL;
+		m_bones = 0;
 		m_frame_count = m_bone_count = 0;
 		AnimationHeader header;
 		file->read(&header, sizeof(header));
@@ -143,9 +148,9 @@ void Animation::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		file->read(&m_frame_count, sizeof(m_frame_count));
 		file->read(&m_bone_count, sizeof(m_bone_count));
 
-		m_positions = LUMIX_NEW_ARRAY(Vec3, m_frame_count * m_bone_count);
-		m_rotations = LUMIX_NEW_ARRAY(Quat, m_frame_count * m_bone_count);
-		m_bones = LUMIX_NEW_ARRAY(uint32_t, m_bone_count);
+		m_positions = static_cast<Vec3*>(allocator.allocate(sizeof(Vec3) * m_frame_count * m_bone_count));
+		m_rotations = static_cast<Quat*>(allocator.allocate(sizeof(Quat) * m_frame_count * m_bone_count));
+		m_bones = static_cast<uint32_t*>(allocator.allocate(sizeof(uint32_t) * m_bone_count));
 		file->read(&m_positions[0], sizeof(Vec3)* m_bone_count * m_frame_count);
 		file->read(&m_rotations[0], sizeof(Quat)* m_bone_count * m_frame_count);
 		file->read(m_bones, sizeof(m_bones[0]) * m_bone_count);
@@ -162,10 +167,18 @@ void Animation::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 }
 
 
+IAllocator& Animation::getAllocator()
+{
+	return static_cast<AnimationManager*>(m_resource_manager.get(ResourceManager::ANIMATION))->getAllocator();
+}
+
+
 void Animation::doUnload(void)
 {
-	LUMIX_DELETE_ARRAY(m_positions);
-	LUMIX_DELETE_ARRAY(m_rotations);
+	IAllocator& allocator = getAllocator();
+	allocator.deallocate(m_positions);
+	allocator.deallocate(m_rotations);
+	allocator.deallocate(m_bones);
 	m_rotations = NULL;
 	m_positions = NULL;
 	m_frame_count = 0;

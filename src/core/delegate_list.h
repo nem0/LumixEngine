@@ -13,6 +13,10 @@ namespace Lumix
 	class DelegateList<R ()>
 	{
 		public:
+			DelegateList<R()>(IAllocator& allocator)
+				: m_delegates(allocator)
+			{ }
+
 			template <typename C, R (C::*Function)()>
 			void bind(C* instance)
 			{
@@ -52,7 +56,12 @@ namespace Lumix
 	class DelegateList<R (A0)>
 	{
 		public:
-			template <typename C, R (C::*Function)(A0)>
+			DelegateList<R (A0)>(IAllocator& allocator)
+				: m_delegates(allocator)
+			{
+			}
+		
+			template <typename C, R(C::*Function)(A0)>
 			void bind(C* instance)
 			{
 				Delegate<R (A0)> cb;
@@ -91,6 +100,11 @@ namespace Lumix
 	class DelegateList<R (A0, A1)>
 	{
 		public:
+			DelegateList<R (A0, A1)>(IAllocator& allocator)
+				: m_delegates(allocator)
+			{
+			}
+
 			template <R (Function)(A0, A1)>
 			void bind()
 			{

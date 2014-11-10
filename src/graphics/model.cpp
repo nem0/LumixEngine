@@ -150,7 +150,7 @@ bool Model::parseGeometry(FS::IFile* file, const VertexDef& vertex_definition)
 	{
 		return false;
 	}
-	Array<int32_t> indices;
+	Array<int32_t> indices(m_allocator);
 	indices.resize(indices_count);
 	file->read(&indices[0], sizeof(indices[0]) * indices_count);
 	
@@ -160,11 +160,11 @@ bool Model::parseGeometry(FS::IFile* file, const VertexDef& vertex_definition)
 	{
 		return false;
 	}
-	Array<float> vertices;
+	Array<float> vertices(m_allocator);
 	vertices.resize(vertices_count * vertex_definition.getVertexSize() / sizeof(vertices[0]));
 	file->read(&vertices[0], sizeof(vertices[0]) * vertices.size());
 	
-	m_geometry = LUMIX_NEW(Geometry);
+	m_geometry = m_allocator.newObject<Geometry>(m_allocator);
 	m_geometry->copy((uint8_t*)&vertices[0], sizeof(float) * vertices.size(), indices, vertex_definition);
 	return true;
 }
@@ -180,7 +180,7 @@ bool Model::parseBones(FS::IFile* file)
 	m_bones.reserve(bone_count);
 	for (int i = 0; i < bone_count; ++i)
 	{
-		Model::Bone& b = m_bones.pushEmpty();
+		Model::Bone& b = m_bones.emplace(m_allocator);
 		int len;
 		file->read(&len, sizeof(len));
 		char tmp[MAX_PATH];
@@ -268,7 +268,8 @@ bool Model::parseMeshes(FS::IFile* file)
 		}
 		material_name[str_size] = 0;
 		
-		base_string<char, StackAllocator<LUMIX_MAX_PATH> > material_path;
+		StackAllocator<LUMIX_MAX_PATH> allocator;
+		string material_path(allocator);
 		material_path = model_dir;
 		material_path += material_name;
 		material_path += ".mat";
@@ -286,7 +287,7 @@ bool Model::parseMeshes(FS::IFile* file)
 		file->read(mesh_name, str_size);
 
 		Material* material = static_cast<Material*>(m_resource_manager.get(ResourceManager::MATERIAL)->load(material_path.c_str()));
-		Mesh mesh(material, mesh_vertex_offset, mesh_tri_count * 3, mesh_name);
+		Mesh mesh(material, mesh_vertex_offset, mesh_tri_count * 3, mesh_name, m_allocator);
 		mesh_vertex_offset += mesh_tri_count * 3;
 		m_meshes.push(mesh);
 		addDependency(*material);
@@ -335,7 +336,7 @@ void Model::doUnload(void)
 	}
 	m_meshes.clear();
 	m_bones.clear();
-	LUMIX_DELETE(m_geometry);
+	m_allocator.deleteObject(m_geometry);
 	m_geometry = NULL;
 
 	m_size = 0;

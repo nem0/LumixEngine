@@ -327,7 +327,8 @@ bool Material::deserializeTexture(ISerializer& serializer, const char* material_
 			serializer.deserialize(path, MAX_PATH);
 			if (path[0] != '\0')
 			{
-				base_string<char, StackAllocator<LUMIX_MAX_PATH> > texture_path;
+				StackAllocator<LUMIX_MAX_PATH> allocator;
+				string texture_path(allocator);
 				texture_path = material_dir;
 				texture_path += path;
 				info.m_texture = static_cast<Texture*>(m_resource_manager.get(ResourceManager::TEXTURE)->load(texture_path.c_str()));

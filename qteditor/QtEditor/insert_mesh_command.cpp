@@ -37,14 +37,15 @@ void InsertMeshCommand::execute()
 	{
 		char rel_path[LUMIX_MAX_PATH];
 		m_editor.getRelativePath(rel_path, LUMIX_MAX_PATH, m_mesh_path.c_str());
-		static_cast<Lumix::RenderScene*>(scene)->setRenderablePath(cmp, Lumix::string(rel_path));
+		Lumix::StackAllocator<LUMIX_MAX_PATH> allocator;
+		static_cast<Lumix::RenderScene*>(scene)->setRenderablePath(cmp, Lumix::string(rel_path, allocator));
 	}
 }
 
 
 void InsertMeshCommand::undo()
 {
-	const Lumix::Entity::ComponentList& cmps = m_entity.getComponents();
+	const Lumix::WorldEditor::ComponentList& cmps = m_editor.getComponents(m_entity);
 	for (int i = 0; i < cmps.size(); ++i)
 	{
 		cmps[i].scene->destroyComponent(cmps[i]);

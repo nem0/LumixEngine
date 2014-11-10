@@ -9,8 +9,9 @@ namespace Lumix
 
 
 	Profiler::Profiler()
+		: m_frame_listeners(m_allocator)
 	{
-		m_timer = Timer::create();
+		m_timer = Timer::create(m_allocator);
 		m_current_block = NULL;
 		m_root_block = NULL;
 		m_is_recording = false;
@@ -20,7 +21,7 @@ namespace Lumix
 
 	Profiler::~Profiler()
 	{
-		LUMIX_DELETE(m_root_block);
+		m_allocator.deleteObject(m_root_block);
 		Timer::destroy(m_timer);
 	}
 
@@ -69,7 +70,7 @@ namespace Lumix
 			}
 			else
 			{
-				Block* root = LUMIX_NEW(Block);
+				Block* root = m_allocator.newObject<Block>(*this);
 				root->m_parent = NULL;
 				root->m_next = m_root_block;
 				root->m_first_child = NULL;
@@ -87,7 +88,7 @@ namespace Lumix
 			}
 			if (!child)
 			{
-				child = LUMIX_NEW(Block);
+				child = m_allocator.newObject<Block>(*this);
 				child->m_parent = m_current_block;
 				child->m_first_child = NULL;
 				child->m_name = name;
@@ -146,7 +147,7 @@ namespace Lumix
 		while (m_first_child)
 		{
 			Block* child = m_first_child->m_next;
-			LUMIX_DELETE(m_first_child);
+			m_profiler.m_allocator.deleteObject(m_first_child);
 			m_first_child = child;
 		}
 	}

@@ -5,6 +5,8 @@
 
 namespace Lumix
 {
+	class IAllocator;
+
 	namespace FS
 	{
 		class IFile;
@@ -12,9 +14,15 @@ namespace Lumix
 		class LUMIX_CORE_API DiskFileDevice : public IFileDevice
 		{
 		public:
+			DiskFileDevice(IAllocator& allocator) : m_allocator(allocator) {}
+
 			virtual IFile* createFile(IFile* child) override;
-			
+			virtual void destroyFile(IFile* file) override;
+
 			const char* name() const { return "disk"; }
+		
+		private:
+			IAllocator& m_allocator;
 		};
 	} // ~namespace FS
 } // ~namespace Lumix

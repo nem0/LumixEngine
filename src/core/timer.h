@@ -12,16 +12,16 @@ namespace Lumix
 			virtual float tick() = 0;
 			virtual float getTimeSinceStart() = 0;
 
-			static Timer* create();
+			static Timer* create(IAllocator& allocator);
 			static void destroy(Timer* timer);
 	};
 
 	class ScopedTimer
 	{
 	public:
-		ScopedTimer(const char* name)
+		ScopedTimer(const char* name, IAllocator& allocator)
 			: m_name(name)
-			, m_timer(Timer::create())
+			, m_timer(Timer::create(allocator))
 		{
 
 		}

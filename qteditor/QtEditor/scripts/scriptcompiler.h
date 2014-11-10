@@ -1,7 +1,9 @@
 #pragma once
 
 
+#include <QMap>
 #include <QObject>
+#include <QVector>
 #include "core/array.h"
 #include "core/delegate_list.h"
 #include "core/map.h"
@@ -13,7 +15,6 @@ class ScriptCompiler : public QObject
 {
 	Q_OBJECT
 public:
-	typedef Lumix::DelegateList<void (const Lumix::Path&, uint32_t)> CompileCallbacks;
 	enum Status
 	{
 		UNKNOWN,
@@ -25,16 +26,16 @@ public:
 public:
 	explicit ScriptCompiler(QObject* parent = NULL);
 	void compile(const Lumix::Path& path);
-	CompileCallbacks& onCompile() { return m_delegates; }
 	void compileAll();
 	void setBasePath(const Lumix::Path& path) { m_base_path = path; }
 	void checkFinished();
 	bool isEmpty() const { return m_processes.empty(); }
 	Status getStatus(const Lumix::Path& path);
-	const char* getLog(const Lumix::Path& path);
+	QString getLog(const Lumix::Path& path);
 
 signals:
 	void messageLogged(const QString& message);
+	void compiled(const Lumix::Path&, uint32_t);
 
 public slots:
 	void compilerFinish(int exitCode);
@@ -47,10 +48,9 @@ private:
 	};
 
 private:
-	CompileCallbacks m_delegates;
 	Lumix::Path m_base_path;
-	Lumix::Array<ProcessInfo> m_processes;
-	Lumix::Map<uint32_t, Status> m_status;
-	Lumix::Map<uint32_t, Lumix::string> m_log;
+	QVector<ProcessInfo> m_processes;
+	QMap<uint32_t, Status> m_status;
+	QMap<uint32_t, QString> m_log;
 
 };

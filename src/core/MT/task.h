@@ -2,17 +2,16 @@
 
 #include "core/lumix.h"
 
-//#include <windows.h>
-//#include <intrin.h>
-
 namespace Lumix
 {
+	class IAllocator;
+
 	namespace MT
 	{
 		class LUMIX_CORE_API Task
 		{
 		public:
-			Task();
+			Task(IAllocator& allocator);
 			~Task();
 
 			virtual int task() = 0;
@@ -34,6 +33,9 @@ namespace Lumix
 
 			void forceExit(bool wait);
 			void exit(int32_t exit_code);
+
+		protected:
+			IAllocator& getAllocator();
 
 		private:
 			struct TaskImpl* m_implementation;

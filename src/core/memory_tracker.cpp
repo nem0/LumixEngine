@@ -62,10 +62,10 @@ namespace Lumix
 		}
 	};
 
-	typedef Map<uint32_t, MemoryTracker::Entry*, MemTrackAllocator> map_alloc_order;
-	typedef Map<FileLineReport, intptr_t, MemTrackAllocator> file_line_map;
-	typedef Map<const char *, intptr_t, MemTrackAllocator> file_map;
-	typedef Map<FileLineReport, uint32_t, MemTrackAllocator> alloc_count_map;
+	typedef Map<uint32_t, MemoryTracker::Entry*> map_alloc_order;
+	typedef Map<FileLineReport, intptr_t> file_line_map;
+	typedef Map<const char *, intptr_t> file_map;
+	typedef Map<FileLineReport, uint32_t> alloc_count_map;
 
 	#pragma init_seg(compiler)
 	MemoryTracker MemoryTracker::s_instance;
@@ -101,7 +101,7 @@ namespace Lumix
 		}
 	}
 
-	static void getEntryLog(MemoryTracker::Entry& entry, void* address, base_string<char, StackAllocator<512> >& string)
+	static void getEntryLog(MemoryTracker::Entry& entry, void* address, string& string)
 	{
 		if (entry.file() != NULL)
 		{
@@ -140,7 +140,8 @@ namespace Lumix
 
 		for (EntryTable::iterator it = m_map.begin(); it != m_map.end(); ++it)
 		{
-			base_string<char, StackAllocator<512> > string;
+			StackAllocator<512> allocator;
+			string string(allocator);
 
 			Entry& entry = *it;
 			void* adr = it.key();
@@ -188,13 +189,14 @@ namespace Lumix
 		{
 			memTrackerLog("MemoryTracker", "MemoryTracker Detected memory leaks!");
 			memTrackerLog("MemoryTracker", "Dumping objects ->");
+			ASSERT(false);
 		}
 		else
 		{
 			memTrackerLog("MemoryTracker", "MemoryTracker No leaks detected!");
 		}
 
-		map_alloc_order alloc_order_map;
+		map_alloc_order alloc_order_map(m_allocator);
 		for (EntryTable::iterator it = m_map.begin(); it != m_map.end(); ++it)
 		{
 			Entry& entry = *it;
@@ -203,7 +205,8 @@ namespace Lumix
 
 		for (map_alloc_order::iterator it = alloc_order_map.begin(); it != alloc_order_map.end(); ++it)
 		{
-			base_string<char, StackAllocator<512> > string;
+			StackAllocator<512> allocator;
+			string string(allocator);
 			Entry& entry = *(it.second());
 			getEntryLog(entry, NULL, string);
 
@@ -220,7 +223,7 @@ namespace Lumix
 	{
 		memTrackerLog("MemoryTracker", "Dumping objects ->");
 
-		file_line_map report_map;
+		file_line_map report_map(m_allocator);
 		{
 			MT::SpinLock lock(m_spin_mutex);
 			for (EntryTable::iterator it = m_map.begin(); it != m_map.end(); ++it)
@@ -241,7 +244,8 @@ namespace Lumix
 
 		for (file_line_map::iterator it = report_map.begin(); it != report_map.end(); ++it)
 		{
-			base_string<char, StackAllocator<512> > string;
+			StackAllocator<512> allocator;
+			string string(allocator);
 
 			const FileLineReport &rep = it.first();
 			intptr_t size = it.second();
@@ -264,7 +268,7 @@ namespace Lumix
 	{
 		memTrackerLog("MemoryTracker", "Dumping objects ->");
 
-		file_map report_map;
+		file_map report_map(m_allocator);
 		{
 			MT::SpinLock lock(m_spin_mutex);
 			for (EntryTable::iterator it = m_map.begin(); it != m_map.end(); ++it)
@@ -282,7 +286,8 @@ namespace Lumix
 
 		for (file_map::iterator it = report_map.begin(); it != report_map.end(); ++it)
 		{
-			base_string<char, StackAllocator<512> > string;
+			StackAllocator<512> allocator;
+			string string(allocator);
 
 			intptr_t size = it.second();
 			const char *file = it.first();
@@ -329,7 +334,8 @@ namespace Lumix
 
 		for (EntryTable::iterator it = m_map.begin(); it != m_map.end(); ++it)
 		{
-			base_string<char, StackAllocator<512> > string;
+			StackAllocator<512> allocator;
+			string string(allocator);
 
 			Entry& entry = *it;
 			void* adr = it.key();
@@ -370,6 +376,7 @@ namespace Lumix
 		: m_spin_mutex(false)
 		, m_mark(0)
 		, m_allocated_memory(0)
+		, m_map(m_allocator)
 	{
 	}
 

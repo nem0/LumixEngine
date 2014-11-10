@@ -28,6 +28,26 @@ ProfileModel::ProfileModel(QWidget* parent)
 	m_frame = -1;
 }
 
+QModelIndex ProfileModel::getIndex(Block* block)
+{
+	if(!block)
+		return QModelIndex();
+	return createIndex(getRow(block), 0, block);
+}
+
+int ProfileModel::getRow(Block* block)
+{
+	int row = 0;
+	Block* b = block->m_parent ? block->m_parent->m_first_child : m_root;
+	while(b && b != block)
+	{
+		b = b->m_next;
+		++row;
+	}
+	return row;
+}
+
+
 void ProfileModel::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_block)
 {
 	ASSERT(my_block->m_name == remote_block->m_name);
@@ -44,6 +64,7 @@ void ProfileModel::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bl
 
 	if (!my_block->m_first_child && remote_block->m_first_child)
 	{
+		beginInsertRows(getIndex(my_block), 0, 0);
 		Lumix::Profiler::Block* remote_child = remote_block->m_first_child;
 		Block* my_child = new Block;
 		my_child->m_function = remote_child->m_function;
@@ -52,6 +73,7 @@ void ProfileModel::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bl
 		my_child->m_next = NULL;
 		my_child->m_first_child = NULL;
 		my_block->m_first_child = my_child;
+		endInsertRows();
 		cloneBlock(my_child, remote_child);
 	}
 	else if(my_block->m_first_child)
@@ -60,6 +82,7 @@ void ProfileModel::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bl
 		Block* my_child = my_block->m_first_child;
 		if(my_child->m_function != remote_child->m_function || my_child->m_name != remote_child->m_name)
 		{
+			beginInsertRows(getIndex(my_block), 0, 0);
 			Block* my_new_child = new Block;
 			my_new_child->m_function = remote_child->m_function;
 			my_new_child->m_name = remote_child->m_name;
@@ -68,12 +91,15 @@ void ProfileModel::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bl
 			my_new_child->m_first_child = NULL;
 			my_block->m_first_child = my_new_child;
 			my_child = my_new_child;
+			endInsertRows();
 		}
 		cloneBlock(my_child, remote_child);
 	}
 
 	if (!my_block->m_next && remote_block->m_next)
 	{
+		int row = getRow(my_block) + 1;
+		beginInsertRows(getIndex(my_block->m_parent), row, row);
 		Lumix::Profiler::Block* remote_next = remote_block->m_next;
 		Block* my_next = new Block;
 		my_next->m_function = remote_next->m_function;
@@ -82,13 +108,15 @@ void ProfileModel::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bl
 		my_next->m_next = NULL;
 		my_next->m_first_child = NULL;
 		my_block->m_next = my_next;
+		endInsertRows();
 		cloneBlock(my_next, remote_next);
-
 	}
 	else if (my_block->m_next)
 	{
 		if(my_block->m_next->m_function != remote_block->m_next->m_function || my_block->m_next->m_name != remote_block->m_next->m_name)
 		{
+			int row = getRow(my_block) + 1;
+			beginInsertRows(getIndex(my_block->m_parent), row, row);
 			Block* my_next = new Block;
 			Lumix::Profiler::Block* remote_next = remote_block->m_next;
 			my_next->m_function = remote_next->m_function;
@@ -97,6 +125,7 @@ void ProfileModel::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bl
 			my_next->m_next = my_block->m_next;
 			my_next->m_first_child = NULL;
 			my_block->m_next = my_next;
+			endInsertRows();
 		}
 		cloneBlock(my_block->m_next, remote_block->m_next);
 	}
@@ -106,29 +135,63 @@ void ProfileModel::onFrame()
 {
 	if(!m_root && Lumix::g_profiler.getRootBlock())
 	{
+		beginInsertRows(QModelIndex(), 0, 0);
 		m_root = new Block;
 		m_root->m_function = Lumix::g_profiler.getRootBlock()->m_function;
 		m_root->m_name = Lumix::g_profiler.getRootBlock()->m_name;
 		m_root->m_parent = NULL;
 		m_root->m_next = NULL;
 		m_root->m_first_child = NULL;
+		endInsertRows();
+	}
+	else
+	{
+		ASSERT(m_root->m_name == Lumix::g_profiler.getRootBlock()->m_name && m_root->m_function == Lumix::g_profiler.getRootBlock()->m_function);
 	}
 	if(m_root)
 	{
 		cloneBlock(m_root, Lumix::g_profiler.getRootBlock());
 	}
+
 	static int hit = 0;
 	++hit;
 	int count = 0;
-	Block* child = m_root->m_first_child;
-	while(child)
+	Block* block = m_root;
+	Block* last_block = block;
+	while(block)
 	{
 		++count;
-		child = child->m_next;
+		last_block = block;
+		block = block->m_next;
 	}
-	if(hit % 10 == 0)
+
+	if(hit % 10 == 0 && m_root->m_first_child)
 	{
-		emit dataChanged(createIndex(0, 0, m_root), createIndex(count, 0, m_root));
+		emit dataChanged(createIndex(0, 0, m_root), createIndex(count - 1, (int)Values::COUNT - 1, last_block));
+		emitDataChanged(m_root);
+	}
+}
+
+
+void ProfileModel::emitDataChanged(Block* block)
+{
+	if(block->m_first_child)
+	{
+		int row = 0;
+		Block* last_child = block->m_first_child;
+		while(last_child->m_next)
+		{
+			++row;
+			last_child = last_child->m_next;
+		}
+		emit dataChanged(createIndex(0, 0, block->m_first_child), createIndex(row, (int)Values::COUNT - 1, last_child));
+
+		Block* child = block->m_first_child;
+		while(child)
+		{
+			emitDataChanged(child);
+			child = child->m_next;
+		}
 	}
 }
 
@@ -308,11 +371,11 @@ ProfilerUI::ProfilerUI(QWidget* parent)
 	: QDockWidget(parent)
 	, m_ui(new Ui::ProfilerUI)
 {
-	m_sortable_model = new QSortFilterProxyModel(this);
 	m_model = new ProfileModel(this);
+	m_sortable_model = new QSortFilterProxyModel(this);
 	m_sortable_model->setSourceModel(m_model);
 	m_ui->setupUi(this);
-	m_ui->profileTreeView->setModel(m_sortable_model);
+	m_ui->profileTreeView->setModel(m_model);
 	m_ui->profileTreeView->header()->setSectionResizeMode(0, QHeaderView::ResizeMode::Stretch);
 	m_ui->profileTreeView->header()->setSectionResizeMode(1, QHeaderView::ResizeMode::ResizeToContents);
 	m_ui->profileTreeView->header()->setSectionResizeMode(2, QHeaderView::ResizeMode::ResizeToContents);
@@ -336,10 +399,6 @@ ProfilerUI::~ProfilerUI()
 void ProfilerUI::on_recordCheckBox_stateChanged(int)
 {
 	Lumix::g_profiler.toggleRecording();
-	m_ui->profileTreeView->setModel(NULL);
-	m_sortable_model->setSourceModel(m_model);
-	m_ui->profileTreeView->setModel(m_sortable_model);
-	m_ui->profileTreeView->update();
 }
 
 
@@ -355,6 +414,7 @@ void ProfilerUI::on_profileTreeView_clicked(const QModelIndex &index)
 {
 	if(index.internalPointer() != NULL)
 	{
+		//m_ui->graphView->setBlock(static_cast<ProfileModel::Block*>(m_sortable_model->mapToSource(index).internalPointer()));
 		m_ui->graphView->setBlock(static_cast<ProfileModel::Block*>(index.internalPointer()));
 		m_ui->graphView->update();
 	}

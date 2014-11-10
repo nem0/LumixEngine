@@ -1,5 +1,7 @@
 #include "script_system.h"
 #include <Windows.h>
+#include "base_script.h"
+#include "core/allocator.h"
 #include "core/crc32.h"
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
@@ -9,8 +11,6 @@
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "universe/universe.h"
-#include "base_script.h"
-#include "save_script_visitor.h"
 
 
 static const uint32_t SCRIPT_HASH = crc32("script");
@@ -20,14 +20,20 @@ namespace Lumix
 {
 	typedef BaseScript* (*CreateScriptFunction)();
 	typedef void (*DestroyScriptFunction)(BaseScript* script);
-	
+
+	class ScriptSystemImpl;
+
 	class ScriptSceneImpl : public ScriptScene
 	{
 		public:
-			ScriptSceneImpl(ScriptSystem& system, Engine& engine, Universe& universe)
+			ScriptSceneImpl(ScriptSystemImpl& system, Engine& engine, Universe& universe)
 				: m_universe(universe)
 				, m_engine(engine)
 				, m_system(system)
+				, m_allocator(engine.getAllocator())
+				, m_paths(m_allocator)
+				, m_running_scripts(m_allocator)
+				, m_script_entities(m_allocator)
 			{
 			}
 
@@ -38,10 +44,7 @@ namespace Lumix
 			}
 
 
-			virtual IPlugin& getPlugin() const
-			{
-				return m_system;
-			}
+			virtual IPlugin& getPlugin() const;
 
 
 			void deserialize(ISerializer& serializer) override
@@ -51,11 +54,15 @@ namespace Lumix
 				serializer.deserialize("count", count);
 				serializer.deserializeArrayBegin("scripts");
 				m_script_entities.resize(count);
-				m_paths.resize(count);
+				m_paths.clear();
+				m_paths.reserve(count);
 				for (int i = 0; i < m_script_entities.size(); ++i)
 				{
 					serializer.deserializeArrayItem(m_script_entities[i]);
-					serializer.deserializeArrayItem(m_paths[i]);
+					StackAllocator<LUMIX_MAX_PATH> allocator;
+					string path(allocator);
+					serializer.deserializeArrayItem(path);
+					m_paths.push(path);
 					Entity entity(&m_universe, m_script_entities[i]);
 					if(m_script_entities[i] != -1)
 					{
@@ -180,7 +187,7 @@ namespace Lumix
 				getScriptDefaultPath(entity, path, full_path, LUMIX_MAX_PATH, "cpp");
 
 				m_script_entities.push(entity.index);
-				m_paths.push(string(path));
+				m_paths.push(string(path, m_allocator));
 
 				Component cmp = m_universe.addComponent(entity, SCRIPT_HASH, this, m_script_entities.size() - 1);
 				m_universe.componentCreated().invoke(cmp);
@@ -270,7 +277,6 @@ namespace Lumix
 			{
 				m_script_entities[cmp.index] = -1;
 				m_universe.destroyComponent(cmp);
-				m_universe.componentDestroyed().invoke(cmp);
 			}
 
 
@@ -281,60 +287,74 @@ namespace Lumix
 				int m_entity_idx;
 			};
 
+			IAllocator& m_allocator;
 			Array<RunningScript> m_running_scripts;
 			Array<int> m_script_entities;
 			Array<string> m_paths;
 			Universe& m_universe;
 			Engine& m_engine;
-			ScriptSystem& m_system;
+			ScriptSystemImpl& m_system;
 	};
 
-	struct ScriptSystemImpl : public ScriptSystem
+	class ScriptSystemImpl : public IPlugin
 	{
-		Engine* m_engine;
+		public:
+			Engine& m_engine;
+			BaseProxyAllocator m_allocator;
 
-		ScriptSystemImpl()
-		{
-		}
-
-
-		Engine* getEngine() const override
-		{
-			return m_engine;
-		}
+			ScriptSystemImpl(Engine& engine)
+				: m_engine(engine)
+				, m_allocator(engine.getAllocator())
+			{
+			}
 
 
-		virtual IScene* createScene(Universe& universe)
-		{
-			return LUMIX_NEW(ScriptSceneImpl)(*this, *m_engine, universe);
-		}
+			virtual IScene* createScene(Universe& universe) override
+			{
+				return m_allocator.newObject<ScriptSceneImpl>(*this, m_engine, universe);
+			}
 
 
-		virtual bool create(Engine& engine) override
-		{
-			m_engine = &engine;
-			engine.getWorldEditor()->registerProperty("script", LUMIX_NEW(FilePropertyDescriptor<ScriptSceneImpl>)("source", &ScriptSceneImpl::getScriptPath, &ScriptSceneImpl::setScriptPath, "Script (*.cpp)"));
-			return true;
-		}
+			virtual void destroyScene(IScene* scene) override
+			{
+				m_allocator.deleteObject(scene);
+			}
 
 
-		virtual void destroy() override
-		{
-		}
+			virtual bool create() override
+			{
+				if (m_engine.getWorldEditor())
+				{
+					IAllocator& allocator = m_engine.getWorldEditor()->getAllocator();
+					m_engine.getWorldEditor()->registerProperty("script", allocator.newObject<FilePropertyDescriptor<ScriptSceneImpl> >(allocator, "source", &ScriptSceneImpl::getScriptPath, &ScriptSceneImpl::setScriptPath, "Script (*.cpp)"));
+				}
+				return true;
+			}
 
 
-		virtual const char* getName() const override
-		{
-			return "script";
-		}
+			virtual void destroy() override
+			{
+			}
 
+
+			virtual const char* getName() const override
+			{
+				return "script";
+			}
 
 	}; // ScriptSystemImpl
 
 
-	extern "C" IPlugin* createPlugin()
+	IPlugin& ScriptSceneImpl::getPlugin() const
 	{
-		return LUMIX_NEW(ScriptSystemImpl)();
+		return m_system;
+	}
+
+
+
+	extern "C" IPlugin* createPlugin(Engine& engine)
+	{
+		return engine.getAllocator().newObject<ScriptSystemImpl>(engine);
 	}
 
 } // ~namespace Lumix

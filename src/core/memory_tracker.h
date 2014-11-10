@@ -12,12 +12,11 @@
 
 namespace Lumix
 {
-	class MemTrackAllocator
+	class MemTrackAllocator : public IAllocator
 	{
 	public:
 		void* allocate(size_t n) { return malloc(n); }
 		void deallocate(void* p) { free(p); }
-		void* reallocate(void* p, size_t n) { return realloc(p, n); }
 	};
 
 	class LUMIX_CORE_API MemoryTracker
@@ -68,13 +67,14 @@ namespace Lumix
 		static uint32_t getAllocID() { return s_alloc_counter++; }
 
 	private:
-		typedef PODHashMap<void*, Entry, PODHashFunc<void*>, MemTrackAllocator> EntryTable;
+		typedef PODHashMap<void*, Entry, PODHashFunc<void*> > EntryTable;
 
 		MemoryTracker();
 		~MemoryTracker();
 
 		void dumpEntry(const Entry& entry) const;
 
+		MemTrackAllocator m_allocator;
 		EntryTable m_map;
 
 		MT::SpinMutex m_spin_mutex;

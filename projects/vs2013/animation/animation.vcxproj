@@ -148,7 +148,6 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\src\animation\animation.cpp" />
     <ClCompile Include="..\..\..\src\animation\animation_system.cpp" />
-    <ClCompile Include="..\..\..\src\core\new.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\animation\animation.h" />
