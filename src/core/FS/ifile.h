@@ -28,9 +28,11 @@ namespace Lumix
 			virtual size_t seek(SeekMode base, size_t pos) = 0;
 			virtual size_t pos() = 0;
 
+			void release();
+
+		protected:
 			virtual IFileDevice& getDevice() = 0;
 
-			void release();
 		};
 
 	} // ~namespace FS
