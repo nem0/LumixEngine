@@ -114,37 +114,37 @@ namespace Lumix
 			}
 
 
-			virtual void setFrame(Component cmp, int frame)
+			void setFrame(Component cmp, int frame)
 			{
 				m_animables[cmp.index].m_time = m_animables[cmp.index].m_animation->getLength() * frame / 30.0f; /// TODO get rid of the constant
 			}
 
 
-			virtual bool isManual(Component cmp)
+			bool isManual(Component cmp)
 			{
 				return m_animables[cmp.index].m_manual;
 			}
 
 
-			virtual void setManual(Component cmp, bool is_manual)
+			void setManual(Component cmp, bool is_manual)
 			{
 				m_animables[cmp.index].m_manual = is_manual;
 			}
 
 
-			virtual void getPreview(Component cmp, string& path)
+			void getPreview(Component cmp, string& path)
 			{
 				path = m_animables[cmp.index].m_animation ? m_animables[cmp.index].m_animation->getPath().c_str() : "";
 			}
 
 
-			virtual void setPreview(Component cmp, const string& path)
+			void setPreview(Component cmp, const string& path)
 			{
 				playAnimation(cmp, path.c_str());
 			}
 
 
-			virtual void playAnimation(const Component& cmp, const char* path)
+			void playAnimation(const Component& cmp, const char* path)
 			{
 				m_animables[cmp.index].m_animation = loadAnimation(path);
 				m_animables[cmp.index].m_time = 0;
@@ -152,7 +152,7 @@ namespace Lumix
 			}
 
 
-			virtual void setAnimationFrame(const Component& cmp, int frame)
+			void setAnimationFrame(const Component& cmp, int frame)
 			{
 				if (m_animables[cmp.index].m_animation)
 				{
@@ -161,7 +161,7 @@ namespace Lumix
 			}
 
 
-			virtual int getFrameCount(const Component& cmp) const
+			int getFrameCount(const Component& cmp) const
 			{
 				if (m_animables[cmp.index].m_animation)
 				{

@@ -214,7 +214,7 @@ namespace Lumix
 				, m_data_signal(0, size)
 				, m_allocator(allocator)
 			{
-				m_pool = (T*)m_allocator.allocate(sizeof(char) * sizeof(T) * size);
+				m_pool = (T*)m_allocator.allocate(sizeof(T) * size);
 
 				for (int32_t i = 0; i < size; i++)
 				{

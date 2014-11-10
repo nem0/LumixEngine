@@ -13,5 +13,3 @@ namespace Lumix
 
 #define LUMIX_MALLOC(size) Lumix::dll_lumix_new(size, __FILE__, __LINE__)
 #define LUMIX_FREE(ptr) Lumix::dll_lumix_delete(ptr)
-#define LUMIX_MALLOC_ALIGNED(size, alignment) Lumix::dll_lumix_new_aligned(size, alignment, __FILE__, __LINE__)
-#define LUMIX_FREE_ALIGNED(ptr) Lumix::dll_lumix_delete_aligned(ptr)
