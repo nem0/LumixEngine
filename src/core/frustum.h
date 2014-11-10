@@ -97,9 +97,6 @@ namespace Lumix
 				float distance = x * plane[0].normal.x + y * plane[0].normal.y + z * plane[0].normal.z + plane[0].d;
 				if (distance < -radius)	return false;
 				
-				distance = x * plane[0].normal.x + y * plane[0].normal.y + z * plane[0].normal.z + plane[0].d;
-				if (distance < -radius)	return false;
-
 				distance = x * plane[1].normal.x + y * plane[1].normal.y + z * plane[1].normal.z + plane[1].d;
 				if (distance < -radius)	return false;
 

@@ -8,11 +8,11 @@ namespace Lumix
 {
 	Resource* MaterialManager::createResource(const Path& path)
 	{
-		return LUMIX_NEW(Material)(path, getOwner());
+		return m_allocator.newObject<Material>(path, getOwner(), m_allocator);
 	}
 
 	void MaterialManager::destroyResource(Resource& resource)
 	{
-		LUMIX_DELETE(static_cast<Material*>(&resource));
+		m_allocator.deleteObject(static_cast<Material*>(&resource));
 	}
 }

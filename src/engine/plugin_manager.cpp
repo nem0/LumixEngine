@@ -1,7 +1,8 @@
 #include "engine/plugin_manager.h"
-#include "engine/iplugin.h"
 #include "core/log.h"
 #include "core/array.h"
+#include "engine/engine.h"
+#include "engine/iplugin.h"
 #include <Windows.h>
 
 
@@ -10,6 +11,10 @@ namespace Lumix
 	struct PluginManagerImpl
 	{
 		typedef Array<IPlugin*> PluginList;
+
+		PluginManagerImpl(IAllocator& allocator)
+			: m_plugins(allocator)
+		{ }
 
 		Engine* m_engine;
 		PluginList m_plugins;
@@ -65,17 +70,17 @@ namespace Lumix
 	IPlugin* PluginManager::load(const char* path)
 	{
 		g_log_info.log("plugins") << "loading plugin " << path;
-		typedef IPlugin* (*PluginCreator)();
+		typedef IPlugin* (*PluginCreator)(Engine&);
 		HMODULE lib = LoadLibrary(TEXT(path));
 		if(lib)
 		{
 			PluginCreator creator = (PluginCreator)GetProcAddress(lib, TEXT("createPlugin"));
 			if(creator)
 			{
-				IPlugin* plugin = creator();
-				if(!plugin->create(*m_impl->m_engine))
+				IPlugin* plugin = creator(*m_impl->m_engine);
+				if(!plugin->create())
 				{
-					LUMIX_DELETE(plugin);
+					m_impl->m_engine->getAllocator().deleteObject(plugin);
 					ASSERT(false);
 					return NULL;
 				}
@@ -96,7 +101,7 @@ namespace Lumix
 	
 	bool PluginManager::create(Engine& engine)
 	{
-		m_impl = LUMIX_NEW(PluginManagerImpl)();
+		m_impl = engine.getAllocator().newObject<PluginManagerImpl>(engine.getAllocator());
 		m_impl->m_engine = &engine;
 		return true;
 	}
@@ -107,9 +112,9 @@ namespace Lumix
 		for(int i = 0; i < m_impl->m_plugins.size(); ++i)
 		{
 			m_impl->m_plugins[i]->destroy();
-			LUMIX_DELETE(m_impl->m_plugins[i]);
+			m_impl->m_engine->getAllocator().deleteObject(m_impl->m_plugins[i]);
 		}
-		LUMIX_DELETE(m_impl);
+		m_impl->m_engine->getAllocator().deleteObject(m_impl);
 		m_impl = NULL;
 	}
 

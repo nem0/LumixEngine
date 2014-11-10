@@ -11,13 +11,13 @@ namespace Lumix
 {
 
 
-template <typename Key, typename Value, typename Allocator = DefaultAllocator>
+template <typename Key, typename Value>
 class Map
 {
 	private:
 		struct Node
 		{
-			Node() { left = right = NULL; height = 1; }
+			Node(const Key& key, const Value& value) : key(key), value(value) { left = right = NULL; height = 1; }
 			Key		key;
 			Value	value;
 			Node*	left;
@@ -104,14 +104,8 @@ class Map
 		};
 
 	public:
-		Map(const Allocator& allocator)
+		Map(IAllocator& allocator)
 			: m_allocator(allocator)
-		{
-			m_root = NULL;
-			m_size = 0;
-		}
-
-		Map()
 		{
 			m_root = NULL;
 			m_size = 0;
@@ -175,9 +169,8 @@ class Map
 			Node* node = _find(key);
 			if(!node || node->key != key)
 			{
-				Node* new_node = new (m_allocator.allocate(sizeof(Node))) Node();
+				Node* new_node = new (m_allocator.allocate(sizeof(Node))) Node(key, Value());
 				++m_size;
-				new_node->key = key;
 				insert(key, m_root, NULL, new_node);
 				return new_node->value;
 			}
@@ -187,10 +180,8 @@ class Map
 
 		void insert(const Key& key, const Value& value)
 		{
-			Node* new_node = new ((Node*)m_allocator.allocate(sizeof(Node))) Node();
+			Node* new_node = new (static_cast<Node*>(m_allocator.allocate(sizeof(Node)))) Node(key, value);
 			++m_size;
-			new_node->key = key;
-			new_node->value = value;
 			insert(key, m_root, 0, new_node);
 		}
 
@@ -471,7 +462,7 @@ class Map
 	private:
 		Node*	m_root;
 		int		m_size;
-		Allocator m_allocator;
+		IAllocator& m_allocator;
 };
 
 

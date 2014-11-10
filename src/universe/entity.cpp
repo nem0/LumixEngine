@@ -32,27 +32,6 @@ namespace Lumix
 	}
 
 
-	const Entity::ComponentList& Entity::getComponents() const
-	{
-		ASSERT(isValid());
-		return universe->m_component_list[index];
-	}
-
-
-	const Component& Entity::getComponent(uint32_t type) const
-	{
-		const Entity::ComponentList& cmps = getComponents();
-		for(int i = 0, c = cmps.size(); i < c; ++i)
-		{
-			if(cmps[i].type == type)
-			{
-				return cmps[i];
-			}
-		}
-		return Component::INVALID;
-	}
-
-
 	Matrix Entity::getMatrix() const
 	{
 		Matrix mtx;
@@ -145,7 +124,7 @@ namespace Lumix
 		if (name && name[0] != '\0')
 		{
 			universe->m_name_to_id_map.insert(crc32(name), index);
-			universe->m_id_to_name_map.insert(index, string(name));
+			universe->m_id_to_name_map.insert(index, string(name, universe->getAllocator()));
 		}
 	}
 

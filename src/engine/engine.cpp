@@ -36,15 +36,20 @@ namespace Lumix
 	class EngineImpl : public Engine
 	{
 		public:
-			EngineImpl(const char* base_path, FS::FileSystem* file_system, WorldEditor* world_editor)
+			EngineImpl(const char* base_path, FS::FileSystem* file_system, WorldEditor* world_editor, IAllocator& allocator)
+				: m_base_path(m_allocator)
+				, m_resource_manager(m_allocator)
+				, m_mtjd_manager(m_allocator)
+				, m_allocator(allocator)
+				, m_scenes(m_allocator)
 			{
 				m_editor = world_editor;
 				if (NULL == file_system)
 				{
-					m_file_system = FS::FileSystem::create();
+					m_file_system = FS::FileSystem::create(m_allocator);
 
-					m_mem_file_device = LUMIX_NEW(FS::MemoryFileDevice);
-					m_disk_file_device = LUMIX_NEW(FS::DiskFileDevice);
+					m_mem_file_device = m_allocator.newObject<FS::MemoryFileDevice>(m_allocator);
+					m_disk_file_device = m_allocator.newObject<FS::DiskFileDevice>(m_allocator);
 
 					m_file_system->mount(m_mem_file_device);
 					m_file_system->mount(m_disk_file_device);
@@ -59,16 +64,9 @@ namespace Lumix
 				}
 
 				m_resource_manager.create(*m_file_system);
-				m_material_manager.create(ResourceManager::MATERIAL, m_resource_manager);
-				m_model_manager.create(ResourceManager::MODEL, m_resource_manager);
-				m_shader_manager.create(ResourceManager::SHADER, m_resource_manager);
-				m_texture_manager.create(ResourceManager::TEXTURE, m_resource_manager);
-				m_pipeline_manager.create(ResourceManager::PIPELINE, m_resource_manager);
 
-				m_culling_system = CullingSystem::create(m_mtjd_manager);
-
-				m_timer = Timer::create();
-				m_fps_timer = Timer::create();
+				m_timer = Timer::create(m_allocator);
+				m_fps_timer = Timer::create(m_allocator);
 				m_fps_frame = NULL;
 				m_universe = NULL;
 				m_hierarchy = NULL;
@@ -81,19 +79,18 @@ namespace Lumix
 				{
 					return false;
 				}
-				m_renderer = Renderer::createInstance();
+				m_renderer = Renderer::createInstance(*this);
 				if (!m_renderer)
 				{
 					return false;
 				}
-				m_shader_manager.setRenderer(*m_renderer);
-				if (!m_renderer->create(*this))
+				if (!m_renderer->create())
 				{
 					Renderer::destroyInstance(*m_renderer);
 					return false;
 				}
 				m_plugin_manager.addPlugin(m_renderer);
-				if (!m_input_system.create())
+				if (!m_input_system.create(m_allocator))
 				{
 					return false;
 				}
@@ -104,31 +101,29 @@ namespace Lumix
 
 			virtual ~EngineImpl()
 			{
-				m_resource_manager.get(ResourceManager::TEXTURE)->releaseAll();
-				m_resource_manager.get(ResourceManager::MATERIAL)->releaseAll();
-				m_resource_manager.get(ResourceManager::SHADER)->releaseAll();
-				m_resource_manager.get(ResourceManager::MODEL)->releaseAll();
-				m_resource_manager.get(ResourceManager::PIPELINE)->releaseAll();
-
 				Timer::destroy(m_timer);
 				Timer::destroy(m_fps_timer);
 				m_plugin_manager.destroy();
 				m_input_system.destroy();
-				m_material_manager.destroy();
-
 				if (m_disk_file_device)
 				{
 					FS::FileSystem::destroy(m_file_system);
-					LUMIX_DELETE(m_mem_file_device);
-					LUMIX_DELETE(m_disk_file_device);
+					m_allocator.deleteObject(m_mem_file_device);
+					m_allocator.deleteObject(m_disk_file_device);
 				}
+			}
+
+
+			virtual IAllocator& getAllocator() override
+			{
+				return m_allocator;
 			}
 
 
 			virtual Universe* createUniverse() override
 			{
-				m_universe = LUMIX_NEW(Universe)();
-				m_hierarchy = Hierarchy::create(*m_universe);
+				m_universe = m_allocator.newObject<Universe>(m_allocator);
+				m_hierarchy = Hierarchy::create(*m_universe, m_allocator);
 				const Array<IPlugin*>& plugins = m_plugin_manager.getPlugins();
 				for (int i = 0; i < plugins.size(); ++i)
 				{
@@ -175,12 +170,12 @@ namespace Lumix
 				{
 					for (int i = 0; i < m_scenes.size(); ++i)
 					{
-						LUMIX_DELETE(m_scenes[i]);
+						m_scenes[i]->getPlugin().destroyScene(m_scenes[i]);
 					}
 					m_scenes.clear();
 					Hierarchy::destroy(m_hierarchy);
 					m_hierarchy = NULL;
-					LUMIX_DELETE(m_universe);
+					m_allocator.deleteObject(m_universe);
 					m_universe = NULL;
 				}
 			}
@@ -316,20 +311,16 @@ namespace Lumix
 
 
 		private:
+			IAllocator& m_allocator;
+
 			Renderer* m_renderer;
 			FS::FileSystem* m_file_system; 
 			FS::MemoryFileDevice* m_mem_file_device;
 			FS::DiskFileDevice* m_disk_file_device;
 
 			ResourceManager m_resource_manager;
-			MaterialManager m_material_manager;
-			ModelManager	m_model_manager;
-			ShaderManager	m_shader_manager;
-			TextureManager	m_texture_manager;
-			PipelineManager m_pipeline_manager;
 
 			MTJD::Manager	m_mtjd_manager;
-			CullingSystem*	m_culling_system;
 
 			string m_base_path;
 			WorldEditor* m_editor;
@@ -357,16 +348,16 @@ namespace Lumix
 	}
 
 
-	Engine* Engine::create(const char* base_path, FS::FileSystem* file_system, WorldEditor* editor)
+	Engine* Engine::create(const char* base_path, FS::FileSystem* file_system, WorldEditor* editor, IAllocator& allocator)
 	{
 		g_log_info.getCallback().bind<showLogInVS>();
 		g_log_warning.getCallback().bind<showLogInVS>();
 		g_log_error.getCallback().bind<showLogInVS>();
 
-		EngineImpl* engine = LUMIX_NEW(EngineImpl)(base_path, file_system, editor);
+		EngineImpl* engine = allocator.newObject<EngineImpl>(base_path, file_system, editor, allocator);
 		if (!engine->create())
 		{
-			LUMIX_DELETE(engine);
+			allocator.deleteObject(engine);
 			return NULL;
 		}
 		return engine;
@@ -375,7 +366,7 @@ namespace Lumix
 
 	void Engine::destroy(Engine* engine)
 	{
-		LUMIX_DELETE(engine);
+		engine->getAllocator().deleteObject(engine);
 	}
 
 

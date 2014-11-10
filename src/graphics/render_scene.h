@@ -64,7 +64,7 @@ namespace Lumix
 	class LUMIX_ENGINE_API RenderScene : public IScene
 	{
 		public:
-			static RenderScene* createInstance(Renderer& renderer, Engine& engine, Universe& universe);
+			static RenderScene* createInstance(Renderer& renderer, Engine& engine, Universe& universe, IAllocator& allocator);
 			static void destroyInstance(RenderScene* scene);
 
 			virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Component& ignore) = 0;
@@ -75,6 +75,7 @@ namespace Lumix
 			virtual Timer* getTimer() const = 0;
 			virtual void renderTerrain(const TerrainInfo& info, Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos) = 0;
 			virtual Engine& getEngine() const = 0;
+			virtual IAllocator& getAllocator() = 0;
 
 			virtual Pose& getPose(const Component& cmp) = 0;
 			virtual Component getLight(int index) = 0;
@@ -98,6 +99,9 @@ namespace Lumix
 			virtual void setCameraSize(Component camera, int w, int h) = 0;
 			virtual void setRenderableIsAlwaysVisible(Component cmp, bool value) = 0;
 			virtual bool isRenderableAlwaysVisible(Component cmp) = 0;
+			virtual void showRenderable(Component cmp) = 0;
+			virtual void hideRenderable(Component cmp) = 0;
+			virtual Component getRenderable(Entity entity) = 0;
 			virtual void getRenderablePath(Component cmp, string& path) = 0;
 			virtual void setRenderableLayer(Component cmp, const int32_t& layer) = 0;
 			virtual void setRenderablePath(Component cmp, const string& path) = 0;
@@ -113,7 +117,6 @@ namespace Lumix
 			virtual float getTerrainHeightAt(Component cmp, float x, float z) = 0;
 			virtual void setTerrainMaterial(Component cmp, const string& path) = 0;
 			virtual void getTerrainMaterial(Component cmp, string& path) = 0;
-			virtual Material* getTerrainMaterial(Component cmp) = 0;
 			virtual void setTerrainXZScale(Component cmp, float scale) = 0;
 			virtual float getTerrainXZScale(Component cmp) = 0;
 			virtual void setTerrainYScale(Component cmp, float scale) = 0;

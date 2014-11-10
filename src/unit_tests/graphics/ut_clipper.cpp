@@ -37,7 +37,8 @@ namespace
 
 	void UT_culling_system(const char* params)
 	{
-		Lumix::Array<Lumix::Sphere> spheres;
+		Lumix::DefaultAllocator allocator;
+		Lumix::Array<Lumix::Sphere> spheres(allocator);
 		for (float i = 0.f; i < 30000000.0f; i += 15.f)
 		{
 			spheres.push(Lumix::Sphere(i, 0.f, 50.f, 5.f));
@@ -55,12 +56,13 @@ namespace
 
 		Lumix::CullingSystem* culling_system;
 		{
-			Lumix::MTJD::Manager mtjd_manager;
+			Lumix::DefaultAllocator allocator;
+			Lumix::MTJD::Manager mtjd_manager(allocator);
 
-			culling_system = Lumix::CullingSystem::create(mtjd_manager);
+			culling_system = Lumix::CullingSystem::create(mtjd_manager, allocator);
 			culling_system->insert(spheres);
 
-			Lumix::ScopedTimer timer("Culling System");
+			Lumix::ScopedTimer timer("Culling System", allocator);
 
 			culling_system->cullToFrustum(clipping_frustum);
 			const Lumix::CullingSystem::Results& result = culling_system->getResult();
@@ -79,7 +81,8 @@ namespace
 
 	void UT_culling_system_async(const char* params)
 	{
-		Lumix::Array<Lumix::Sphere> spheres;
+		Lumix::DefaultAllocator allocator;
+		Lumix::Array<Lumix::Sphere> spheres(allocator);
 		for (float i = 0.f; i < 30000000.f; i += 15.f)
 		{
 			spheres.push(Lumix::Sphere(i, 0.f, 50.f, 5.f));
@@ -97,12 +100,13 @@ namespace
 
 		Lumix::CullingSystem* culling_system;
 		{
-			Lumix::MTJD::Manager mtjd_manager;
+			Lumix::DefaultAllocator allocator;
+			Lumix::MTJD::Manager mtjd_manager(allocator);
 
-			culling_system = Lumix::CullingSystem::create(mtjd_manager);
+			culling_system = Lumix::CullingSystem::create(mtjd_manager, allocator);
 			culling_system->insert(spheres);
 
-			Lumix::ScopedTimer timer("Culling System Async");
+			Lumix::ScopedTimer timer("Culling System Async", allocator);
 
 			culling_system->cullToFrustumAsync(clipping_frustum);
 

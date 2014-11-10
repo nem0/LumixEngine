@@ -7,13 +7,14 @@ namespace Lumix
 {
 	namespace MTJD
 	{
-		Job::Job(bool auto_destroy, Priority priority, bool sync_event, Manager& manager)
-			: BaseEntry(1, sync_event)
+		Job::Job(bool auto_destroy, Priority priority, bool sync_event, Manager& manager, IAllocator& allocator)
+			: BaseEntry(1, sync_event, allocator)
 			, m_manager(manager)
 			, m_priority(priority)
 			, m_auto_destroy(auto_destroy)
 			, m_scheduled(false)
 			, m_executed(false)
+			, m_allocator(allocator)
 		{
 			setJobName("Unknown Job");
 		}
@@ -54,7 +55,7 @@ namespace Lumix
 
 			if (auto_destroy)
 			{
-				LUMIX_DELETE(this);
+				m_allocator.deleteObject(this);
 			}
 		}
 	} // ~namepsace MTJD

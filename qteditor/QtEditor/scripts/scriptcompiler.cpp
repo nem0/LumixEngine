@@ -43,7 +43,7 @@ void ScriptCompiler::compile(const Lumix::Path& path)
 	}
 	process.m_path = rel_path;
 	process.m_process = new QProcess();
-	m_processes.push(process);
+	m_processes.push_back(process);
 	QStringList list;
 	char cmd_line[255];
 	sprintf(cmd_line, "%s\\scripts\\compile.bat %s\\%s", m_base_path.c_str(), m_base_path.c_str(), rel_path.c_str());
@@ -80,7 +80,7 @@ void ScriptCompiler::compilerFinish(int exitCode)
 			{
 				msg.sprintf("Script %s failed to compile", m_processes[i].m_path.c_str());
 			}
-			m_delegates.invoke(m_processes[i].m_path.c_str(), exitCode);
+			emit compiled(m_processes[i].m_path.c_str(), exitCode);
 			emit messageLogged(msg);
 			break;
 		}
@@ -100,8 +100,8 @@ ScriptCompiler::Status ScriptCompiler::getStatus(const Lumix::Path& path)
 		hash = crc32(path.c_str());
 	}
 
-	Lumix::Map<uint32_t, Status>::iterator iter = m_status.find(hash);
-	return iter == m_status.end() ? UNKNOWN : iter.second();
+	QMap<uint32_t, Status>::iterator iter = m_status.find(hash);
+	return iter == m_status.end() ? UNKNOWN : iter.value();
 }
 
 
@@ -121,13 +121,13 @@ void ScriptCompiler::checkFinished()
 			}
 			m_log[hash] = s.toLatin1().data();
 			delete process.m_process;
-			m_processes.eraseFast(i);
+			m_processes.remove(i);
 		}
 	}
 }
 
 
-const char* ScriptCompiler::getLog(const Lumix::Path& path)
+QString ScriptCompiler::getLog(const Lumix::Path& path)
 {
 	uint32_t hash;
 	if(strncmp(path.c_str(), m_base_path.c_str(), m_base_path.length()) == 0)
@@ -138,5 +138,5 @@ const char* ScriptCompiler::getLog(const Lumix::Path& path)
 	{
 		hash = crc32(path.c_str());
 	}
-	return m_log[hash].c_str();
+	return m_log[hash];
 }

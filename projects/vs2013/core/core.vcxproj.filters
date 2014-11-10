@@ -130,6 +130,7 @@
       <Filter>mt</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\aabb.h" />
+    <ClInclude Include="..\..\..\src\core\allocator.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\core\blob.cpp" />
@@ -221,6 +222,7 @@
     <ClCompile Include="..\..\..\src\core\mt\pc\thread.cpp">
       <Filter>mt</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\core\FS\ifile.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="fs">

@@ -31,11 +31,12 @@ namespace Lumix
 			class CreateInstanceCommand : public IEditorCommand
 			{
 				public:
-					CreateInstanceCommand(EntityTemplateSystemImpl& entity_system, const char* template_name, const Vec3& position)
+					CreateInstanceCommand(EntityTemplateSystemImpl& entity_system, WorldEditor& editor, const char* template_name, const Vec3& position)
 						: m_entity_system(entity_system)
 						, m_template_name_hash(crc32(template_name))
 						, m_position(position)
 						, m_rotation(Vec3(0, 1, 0), Math::degreesToRadians((float)(rand() % 360)))
+						, m_editor(editor)
 					{
 					}
 
@@ -48,9 +49,9 @@ namespace Lumix
 							m_entity.setPosition(m_position);
 							m_entity.setRotation(m_rotation);
 
-							m_entity_system.m_instances[m_template_name_hash].push(m_entity);
+							iter.second().push(m_entity);
 							Entity template_entity = iter.second()[0];
-							const Entity::ComponentList& template_cmps = template_entity.getComponents();
+							const WorldEditor::ComponentList& template_cmps = m_editor.getComponents(template_entity);
 							for (int i = 0; i < template_cmps.size(); ++i)
 							{
 								m_entity_system.m_editor.cloneComponent(template_cmps[i], m_entity);
@@ -65,7 +66,7 @@ namespace Lumix
 
 					virtual void undo() override
 					{
-						const Entity::ComponentList& cmps = m_entity.getComponents();
+						const WorldEditor::ComponentList& cmps = m_editor.getComponents(m_entity);
 						for (int i = 0; i < cmps.size(); ++i)
 						{
 							cmps[i].scene->destroyComponent(cmps[i]);
@@ -92,6 +93,7 @@ namespace Lumix
 
 				private:
 					EntityTemplateSystemImpl& m_entity_system;
+					WorldEditor& m_editor;
 					uint32_t m_template_name_hash;
 					Entity m_entity;
 					Vec3 m_position;
@@ -102,6 +104,9 @@ namespace Lumix
 			EntityTemplateSystemImpl(WorldEditor& editor)
 				: m_editor(editor)
 				, m_universe(NULL)
+				, m_instances(editor.getAllocator())
+				, m_updated(editor.getAllocator())
+				, m_template_names(editor.getAllocator())
 			{
 				editor.universeCreated().bind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseCreated>(this);
 				editor.universeDestroyed().bind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseDestroyed>(this);
@@ -114,6 +119,12 @@ namespace Lumix
 				m_editor.universeCreated().unbind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseCreated>(this);
 				m_editor.universeDestroyed().unbind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseDestroyed>(this);
 				setUniverse(NULL);
+			}
+
+
+			WorldEditor& getEditor()
+			{
+				return m_editor;
 			}
 
 
@@ -152,7 +163,7 @@ namespace Lumix
 				uint32_t tpl = getTemplate(entity);
 				if (tpl != 0)
 				{
-					Array<Entity>& instances = m_instances[tpl];
+					Array<Entity>& instances = m_instances.find(tpl).second();
 					instances.eraseItemFast(entity);
 					if (instances.empty())
 					{
@@ -175,8 +186,9 @@ namespace Lumix
 				uint32_t name_hash = crc32(name);
 				if (m_instances.find(name_hash) == m_instances.end())
 				{
-					m_template_names.push(string(name));
-					m_instances[name_hash].push(entity);
+					m_template_names.push(string(name, m_editor.getAllocator()));
+					m_instances.insert(name_hash, Array<Entity>(m_editor.getAllocator()));
+					m_instances.find(name_hash).second().push(entity);
 					m_updated.invoke();
 				}
 				else
@@ -205,13 +217,19 @@ namespace Lumix
 
 			virtual const Array<Entity>& getInstances(uint32_t template_name_hash) override
 			{
-				return m_instances[template_name_hash];
+				Map<uint32_t, Array<Entity> >::iterator iter = m_instances.find(template_name_hash);
+				if (iter == m_instances.end())
+				{
+					m_instances.insert(template_name_hash, Array <Entity>(m_editor.getAllocator()));
+					iter = m_instances.find(template_name_hash);
+				}
+				return iter.second();
 			}
 
 
 			virtual Entity createInstance(const char* name, const Vec3& position) override
 			{
-				CreateInstanceCommand* command = LUMIX_NEW(CreateInstanceCommand)(*this, name, position);
+				CreateInstanceCommand* command = m_editor.getAllocator().newObject<CreateInstanceCommand>(*this, m_editor, name, position);
 				m_editor.executeCommand(command);
 				return command->getEntity();
 			}
@@ -254,7 +272,7 @@ namespace Lumix
 					const int MAX_NAME_LENGTH = 50;
 					char name[MAX_NAME_LENGTH];
 					serializer.deserializeArrayItem(name, MAX_NAME_LENGTH);
-					m_template_names.push(string(name));
+					m_template_names.push(string(name, m_editor.getAllocator()));
 				}
 				serializer.deserializeArrayEnd();
 				serializer.deserialize("instance_count", count);
@@ -265,8 +283,8 @@ namespace Lumix
 					serializer.deserializeArrayItem(hash);
 					int32_t instances_per_template;
 					serializer.deserializeArrayItem(instances_per_template);
-					m_instances.insert(hash, Array<Entity>());
-					Array<Entity>& entities = m_instances[hash];
+					m_instances.insert(hash, Array<Entity>(m_editor.getAllocator()));
+					Array<Entity>& entities = m_instances.find(hash).second();
 					for (int j = 0; j < instances_per_template; ++j)
 					{
 						int32_t entity_index;
@@ -303,13 +321,13 @@ namespace Lumix
 
 	EntityTemplateSystem* EntityTemplateSystem::create(WorldEditor& editor)
 	{
-		return LUMIX_NEW(EntityTemplateSystemImpl)(editor);
+		return editor.getAllocator().newObject<EntityTemplateSystemImpl>(editor);
 	}
 
 
 	void EntityTemplateSystem::destroy(EntityTemplateSystem* system)
 	{
-		LUMIX_DELETE(system);
+		static_cast<EntityTemplateSystemImpl*>(system)->getEditor().getAllocator().deleteObject(system);
 	}
 
 

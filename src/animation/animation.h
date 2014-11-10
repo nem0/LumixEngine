@@ -21,19 +21,26 @@ struct Vec3;
 class LUMIX_ANIMATION_API AnimationManager : public ResourceManagerBase
 {
 public:
-	AnimationManager() : ResourceManagerBase() {}
+	AnimationManager(IAllocator& allocator) 
+		: ResourceManagerBase(allocator)
+		, m_allocator(allocator)
+	{}
 	~AnimationManager() {}
+	IAllocator& getAllocator() { return m_allocator; }
 
 protected:
 	virtual Resource* createResource(const Path& path) override;
 	virtual void destroyResource(Resource& resource) override;
+
+private:
+	IAllocator& m_allocator;
 };
 
 
 class LUMIX_ANIMATION_API Animation : public Resource
 {
 	public:
-		Animation(const Path& path, ResourceManager& resource_manager);
+		Animation(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 		~Animation();
 
 		void getPose(float time, Pose& pose, Model& model) const;
@@ -42,6 +49,7 @@ class LUMIX_ANIMATION_API Animation : public Resource
 
 	private:
 		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
+		IAllocator& getAllocator();
 
 		virtual void doUnload(void) override;
 		virtual FS::ReadCallback getReadCallback(void) override;

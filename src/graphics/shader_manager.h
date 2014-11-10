@@ -10,7 +10,7 @@ namespace Lumix
 	class LUMIX_ENGINE_API ShaderManager : public ResourceManagerBase
 	{
 	public:
-		ShaderManager();
+		ShaderManager(IAllocator& allocator);
 		~ShaderManager();
 
 		uint8_t* getBuffer(int32_t size);
@@ -24,6 +24,7 @@ namespace Lumix
 		virtual void destroyResource(Resource& resource) override;
 
 	private:
+		IAllocator& m_allocator;
 		Renderer* m_renderer;
 		uint8_t* m_buffer;
 		int32_t m_buffer_size;

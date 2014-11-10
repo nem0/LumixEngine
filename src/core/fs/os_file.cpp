@@ -10,7 +10,12 @@ namespace Lumix
 	{
 		struct OsFileImpl
 		{
+			OsFileImpl(IAllocator* allocator)
+				: m_allocator(allocator)
+			{}
+
 			HANDLE m_file;
+			IAllocator* m_allocator;
 		};
 
 		OsFile::OsFile()
@@ -23,7 +28,7 @@ namespace Lumix
 			ASSERT(NULL == m_impl);
 		}
 
-		bool OsFile::open(const char* path, Mode mode)
+		bool OsFile::open(const char* path, Mode mode, IAllocator& allocator)
 		{
 			HANDLE hnd = INVALID_HANDLE_VALUE;
 			if(Mode::OPEN & mode)
@@ -64,7 +69,7 @@ namespace Lumix
 			if(INVALID_HANDLE_VALUE != hnd)
 			{
 				TODO("lock-free free list");
-				OsFileImpl* impl = LUMIX_NEW(OsFileImpl); 
+				OsFileImpl* impl = allocator.newObject<OsFileImpl>(allocator); 
 				impl->m_file = hnd;
 				m_impl = impl;
 
@@ -79,7 +84,7 @@ namespace Lumix
 			if (NULL != m_impl)
 			{
 				::CloseHandle(m_impl->m_file);
-				LUMIX_DELETE(m_impl);
+				m_impl->m_allocator.deleteObject(m_impl);
 				m_impl = NULL;
 			}
 		}

@@ -51,7 +51,8 @@ namespace Lumix
 			CHILD_COUNT
 		};
 
-		TerrainQuad()
+		TerrainQuad(IAllocator& allocator)
+			: m_allocator(allocator)
 		{
 			for (int i = 0; i < CHILD_COUNT; ++i)
 			{
@@ -63,7 +64,7 @@ namespace Lumix
 		{
 			for (int i = 0; i < CHILD_COUNT; ++i)
 			{
-				LUMIX_DELETE(m_children[i]);
+				m_allocator.deleteObject(m_children[i]);
 			}
 		}
 
@@ -73,7 +74,7 @@ namespace Lumix
 			{
 				for (int i = 0; i < CHILD_COUNT; ++i)
 				{
-					m_children[i] = LUMIX_NEW(TerrainQuad);
+					m_children[i] = m_allocator.newObject<TerrainQuad>(m_allocator);
 					m_children[i]->m_lod = m_lod + 1;
 					m_children[i]->m_size = m_size / 2;
 				}
@@ -152,6 +153,7 @@ namespace Lumix
 			return true;
 		}
 
+		IAllocator& m_allocator;
 		TerrainQuad* m_children[CHILD_COUNT];
 		Vec3 m_min;
 		float m_size;
@@ -159,7 +161,7 @@ namespace Lumix
 	};
 
 
-	Terrain::Terrain(const Entity& entity, RenderScene& scene)
+	Terrain::Terrain(const Entity& entity, RenderScene& scene, IAllocator& allocator)
 		: m_mesh(NULL)
 		, m_material(NULL)
 		, m_root(NULL)
@@ -172,6 +174,12 @@ namespace Lumix
 		, m_scene(scene)
 		, m_brush_position(0, 0, 0)
 		, m_brush_size(1)
+		, m_allocator(allocator)
+		, m_grass_quads(m_allocator)
+		, m_last_camera_position(m_allocator)
+		, m_grass_types(m_allocator)
+		, m_free_grass_quads(m_allocator)
+		, m_geometry(m_allocator)
 	{
 		generateGeometry();
 	}
@@ -182,31 +190,31 @@ namespace Lumix
 		{
 			m_grass_model->getResourceManager().get(ResourceManager::MODEL)->unload(*m_grass_model);
 			m_grass_model->getObserverCb().unbind<GrassType, &GrassType::grassLoaded>(this);
-			LUMIX_DELETE(m_grass_mesh);
-			LUMIX_DELETE(m_grass_geometry);
+			m_terrain.m_allocator.deleteObject(m_grass_mesh);
+			m_terrain.m_allocator.deleteObject(m_grass_geometry);
 		}
 	}
 
 	Terrain::~Terrain()
 	{
 		setMaterial(NULL);
-		LUMIX_DELETE(m_mesh);
-		LUMIX_DELETE(m_root);
+		m_allocator.deleteObject(m_mesh);
+		m_allocator.deleteObject(m_root);
 		for(int i = 0; i < m_grass_types.size(); ++i)
 		{
-			LUMIX_DELETE(m_grass_types[i]);
+			m_allocator.deleteObject(m_grass_types[i]);
 		}
 		for(Map<Component, Array<GrassQuad*> >::iterator iter = m_grass_quads.begin(), end = m_grass_quads.end(); iter != end; ++iter)
 		{
 			Array<GrassQuad*>& quads = iter.value();
 			for (int i = 0; i < quads.size(); ++i)
 			{
-				LUMIX_DELETE(quads[i]);
+				m_allocator.deleteObject(quads[i]);
 			}
 		}
 		for (int i = 0; i < m_free_grass_quads.size(); ++i)
 		{
-			LUMIX_DELETE(m_free_grass_quads[i]);
+			m_allocator.deleteObject(m_free_grass_quads[i]);
 		}
 	}
 
@@ -226,11 +234,11 @@ namespace Lumix
 	{
 		if(index < 0)
 		{
-			m_grass_types.push(LUMIX_NEW(GrassType)(*this));
+			m_grass_types.push(m_allocator.newObject<GrassType>(*this));
 		}
 		else
 		{
-			m_grass_types.insert(index, LUMIX_NEW(GrassType)(*this));
+			m_grass_types.insert(index, m_allocator.newObject<GrassType>(*this));
 		}
 	}
 
@@ -238,7 +246,7 @@ namespace Lumix
 	void Terrain::removeGrassType(int index)
 	{
 		forceGrassUpdate();
-		LUMIX_DELETE(m_grass_types[index]);
+		m_allocator.deleteObject(m_grass_types[index]);
 		m_grass_types.erase(index);
 	}
 
@@ -294,8 +302,8 @@ namespace Lumix
 			type.m_grass_model->getResourceManager().get(ResourceManager::MODEL)->unload(*type.m_grass_model);
 			type.m_grass_model->getObserverCb().unbind<GrassType, &GrassType::grassLoaded>(&type);
 			type.m_grass_model = NULL;
-			LUMIX_DELETE(type.m_grass_mesh);
-			LUMIX_DELETE(type.m_grass_geometry);
+			m_allocator.deleteObject(type.m_grass_mesh);
+			m_allocator.deleteObject(type.m_grass_geometry);
 			type.m_grass_mesh = NULL;
 			type.m_grass_geometry = NULL;
 		}
@@ -325,6 +333,17 @@ namespace Lumix
 		}
 	}
 
+	Array<Terrain::GrassQuad*>& Terrain::getQuads(const Component& camera)
+	{
+		Map<Component, Array<GrassQuad*> >::iterator iter = m_grass_quads.find(camera);
+		if (iter == m_grass_quads.end())
+		{
+			m_grass_quads.insert(camera, Array<GrassQuad*>(m_allocator));
+			iter = m_grass_quads.find(camera);
+		}
+		return iter.second();
+	}
+
 
 	void Terrain::updateGrass(const Component& camera)
 	{
@@ -333,12 +352,15 @@ namespace Lumix
 		{
 			return;
 		}
-		if (m_free_grass_quads.size() + m_grass_quads.size() < GRASS_QUADS_ROWS * GRASS_QUADS_COLUMNS)
+
+		Array<GrassQuad*>& quads = getQuads(camera);
+
+		if (m_free_grass_quads.size() + quads.size() < GRASS_QUADS_ROWS * GRASS_QUADS_COLUMNS)
 		{
-			int new_count = GRASS_QUADS_ROWS * GRASS_QUADS_COLUMNS - m_grass_quads.size();
+			int new_count = GRASS_QUADS_ROWS * GRASS_QUADS_COLUMNS - quads.size();
 			for (int i = 0; i < new_count; ++i)
 			{
-				m_free_grass_quads.push(LUMIX_NEW(GrassQuad));
+				m_free_grass_quads.push(m_allocator.newObject<GrassQuad>(m_allocator));
 			}
 		}
 
@@ -358,7 +380,6 @@ namespace Lumix
 			float to_quad_z = cz + (GRASS_QUADS_COLUMNS >> 1) * GRASS_QUAD_SIZE;
 
 			float old_bounds[4] = { FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX };
-			Array<GrassQuad*>& quads = m_grass_quads[camera];
 			for (int i = quads.size() - 1; i >= 0; --i)
 			{
 				GrassQuad* quad = quads[i];
@@ -390,7 +411,7 @@ namespace Lumix
 						}
 						else
 						{
-							quad = LUMIX_NEW(GrassQuad);
+							quad = m_allocator.newObject<GrassQuad>(m_allocator);
 						}
 						quads.push(quad);
 						quad->m_x = quad_x;
@@ -399,7 +420,7 @@ namespace Lumix
 						srand((int)quad_x + (int)quad_z * GRASS_QUADS_COLUMNS);
 						for(int grass_type_idx = 0; grass_type_idx < m_grass_types.size(); ++grass_type_idx)
 						{
-							GrassPatch& patch = quad->m_patches.pushEmpty();
+							GrassPatch& patch = quad->m_patches.emplace(m_allocator);
 							patch.m_matrices.clear();
 							patch.m_type = m_grass_types[grass_type_idx];
 							if(patch.m_type->m_grass_geometry)
@@ -479,16 +500,16 @@ namespace Lumix
 	{
 		if (m_grass_model->isReady())
 		{
-			LUMIX_DELETE(m_grass_geometry);
+			m_terrain.m_allocator.deleteObject(m_grass_geometry);
 
-			m_grass_geometry = LUMIX_NEW(Geometry);
+			m_grass_geometry = m_terrain.m_allocator.newObject<Geometry>(m_terrain.m_allocator);
 			Geometry::VertexCallback vertex_callback;
 			Geometry::IndexCallback index_callback;
 			vertex_callback.bind<GrassType, &GrassType::grassVertexCopyCallback>(this);
 			index_callback.bind<GrassType, &GrassType::grassIndexCopyCallback>(this);
 			m_grass_geometry->copy(*m_grass_model->getGeometry(), COPY_COUNT, vertex_callback, index_callback);
 			Material* material = m_grass_model->getMesh(0).getMaterial();
-			m_grass_mesh = LUMIX_NEW(Mesh)(material, 0, m_grass_model->getMesh(0).getCount() * COPY_COUNT, "grass");
+			m_grass_mesh = m_terrain.m_allocator.newObject<Mesh>(material, 0, m_grass_model->getMesh(0).getCount() * COPY_COUNT, "grass", m_terrain.m_allocator);
 			m_terrain.forceGrassUpdate();
 		}
 	}
@@ -497,7 +518,7 @@ namespace Lumix
 	void Terrain::getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, const Component& camera)
 	{
 		updateGrass(camera);
-		Array<GrassQuad*>& quads = m_grass_quads[camera];
+		Array<GrassQuad*>& quads = getQuads(camera);
 		for (int i = 0; i < quads.size(); ++i)
 		{
 			Vec3 quad_center(quads[i]->m_x + GRASS_QUAD_SIZE * 0.5f, 0, quads[i]->m_z + GRASS_QUAD_SIZE * 0.5f);
@@ -783,17 +804,6 @@ namespace Lumix
 	}
 
 
-	static TerrainQuad* generateQuadTree(float size)
-	{
-		TerrainQuad* root = LUMIX_NEW(TerrainQuad);
-		root->m_lod = 1;
-		root->m_min.set(0, 0, 0);
-		root->m_size = size;
-		root->createChildren();
-		return root;
-	}
-
-
 	static void generateSubgrid(Array<Sample>& samples, Array<int32_t>& indices, int& indices_offset, int start_x, int start_y)
 	{
 		for (int j = start_y; j < start_y + 8; ++j)
@@ -827,11 +837,11 @@ namespace Lumix
 
 	void Terrain::generateGeometry()
 	{
-		LUMIX_DELETE(m_mesh);
+		m_allocator.deleteObject(m_mesh);
 		m_mesh = NULL;
-		Array<Sample> points;
+		Array<Sample> points(m_allocator);
 		points.resize(GRID_SIZE * GRID_SIZE * 4);
-		Array<int32_t> indices;
+		Array<int32_t> indices(m_allocator);
 		indices.resize(GRID_SIZE * GRID_SIZE * 6);
 		int indices_offset = 0;
 		generateSubgrid(points, indices, indices_offset, 0, 0);
@@ -842,7 +852,17 @@ namespace Lumix
 		VertexDef vertex_def;
 		vertex_def.parse("pt", 2);
 		m_geometry.copy((const uint8_t*)&points[0], sizeof(points[0]) * points.size(), indices, vertex_def);
-		m_mesh = LUMIX_NEW(Mesh)(m_material, 0, indices.size(), "terrain");
+		m_mesh = m_allocator.newObject<Mesh>(m_material, 0, indices.size(), "terrain", m_allocator);
+	}
+
+	TerrainQuad* Terrain::generateQuadTree(float size)
+	{
+		TerrainQuad* root = m_allocator.newObject<TerrainQuad>(m_allocator);
+		root->m_lod = 1;
+		root->m_min.set(0, 0, 0);
+		root->m_size = size;
+		root->createChildren();
+		return root;
 	}
 
 	void Terrain::onMaterialLoaded(Resource::State, Resource::State new_state)
@@ -850,7 +870,7 @@ namespace Lumix
 		PROFILE_FUNCTION();
 		if (new_state == Resource::State::READY)
 		{
-			LUMIX_DELETE(m_root);
+			m_allocator.deleteObject(m_root);
 			m_heightmap = m_material->getTextureByUniform("hm_texture");
 			m_splatmap = m_material->getTextureByUniform("splat_texture");
 			m_width = m_heightmap->getWidth();

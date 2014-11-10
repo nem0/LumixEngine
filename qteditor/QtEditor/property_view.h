@@ -39,19 +39,18 @@ class PropertyViewObject : public QObject
 			, m_parent(parent)
 		{ }
 		virtual ~PropertyViewObject();
-		const char* getName() const { return m_name.c_str(); }
+		QString getName() const { return m_name; }
 		PropertyViewObject** getMembers() { return m_members.empty() ? NULL : &m_members[0]; }
 		int getMemberCount() const { return m_members.size(); }
-		void addMember(PropertyViewObject* member) { m_members.push(member); }
-		void removeMember(PropertyViewObject* member) { m_members.eraseItem(member); }
+		void addMember(PropertyViewObject* member) { m_members.push_back(member); }
 		PropertyViewObject* getParent() const { return m_parent; }
 
 		virtual void createEditor(class PropertyView& view, QTreeWidgetItem* item) = 0;
 		virtual bool isEditable() const = 0;
 
 	private:
-		Lumix::string m_name;
-		Lumix::Array<PropertyViewObject*> m_members;
+		QString m_name;
+		QVector<PropertyViewObject*> m_members;
 		PropertyViewObject* m_parent;
 };
 
@@ -89,6 +88,8 @@ private slots:
 	void on_positionZ_valueChanged(double arg1);
 	void on_propertyList_customContextMenuRequested(const QPoint &pos);
 	void on_nameEdit_editingFinished();
+	void on_script_compiled(const Lumix::Path& path, uint32_t status);
+
 
 private:
 	void createObjectEditor(QTreeWidgetItem* item, PropertyViewObject* object);
@@ -98,7 +99,6 @@ private:
 	void onEntitySelected(const Lumix::Array<Lumix::Entity>& e);
 	void onEntityPosition(const Lumix::Entity& e);
 	void addScriptCustomProperties();
-	void onScriptCompiled(const Lumix::Path& path, uint32_t status);
 	void setScriptStatus(uint32_t status);
 	void updateSelectedEntityPosition();
 	void onSelectedResourceLoaded(Lumix::Resource::State old_state, Lumix::Resource::State new_state);
@@ -112,7 +112,7 @@ private:
 	class TerrainEditor* m_terrain_editor;
 	AssetBrowser* m_asset_browser;
 	Lumix::Resource* m_selected_resource;
-	Lumix::Array<PropertyViewObject::Creator> m_resource_plugins;
+	QVector<PropertyViewObject::Creator> m_resource_plugins;
 	PropertyViewObject* m_object;
 	class EntityTemplateList* m_entity_template_list;
 	class EntityList* m_entity_list;

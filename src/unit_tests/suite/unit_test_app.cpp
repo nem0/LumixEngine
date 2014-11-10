@@ -10,7 +10,8 @@ namespace Lumix
 	{
 		void outputToVS(const char* system, const char* message)
 		{
-			base_string<char, StackAllocator<2048> > tmp;
+			StackAllocator<2048> allocator;
+			string tmp(allocator);
 			tmp = system;
 			tmp += ": ";
 			tmp += message;

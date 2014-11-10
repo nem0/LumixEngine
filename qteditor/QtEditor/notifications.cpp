@@ -17,7 +17,10 @@ class NotificationsImpl : public Notifications
 			//Lumix::g_log_info.getCallback().bind<NotificationsImpl, &NotificationsImpl::onLogInfo>(this);
 			Lumix::g_log_warning.getCallback().bind<NotificationsImpl, &NotificationsImpl::onLogWarning>(this);
 			Lumix::g_log_error.getCallback().bind<NotificationsImpl, &NotificationsImpl::onLogError>(this);
-			m_main_window.resized().bind<NotificationsImpl, &NotificationsImpl::onMainWindowResized>(this);
+			m_main_window.connect(&m_main_window, &MainWindow::resized, [this](const QSize&)
+			{
+				updateLayout();
+			});
 		}
 
 
@@ -26,15 +29,7 @@ class NotificationsImpl : public Notifications
 			//Lumix::g_log_info.getCallback().unbind<NotificationsImpl, &NotificationsImpl::onLogInfo>(this);
 			Lumix::g_log_warning.getCallback().unbind<NotificationsImpl, &NotificationsImpl::onLogWarning>(this);
 			Lumix::g_log_error.getCallback().unbind<NotificationsImpl, &NotificationsImpl::onLogError>(this);
-			m_main_window.resized().unbind<NotificationsImpl, &NotificationsImpl::onMainWindowResized>(this);
 		}
-
-
-		void onMainWindowResized(const QSize&)
-		{
-			updateLayout();
-		}
-
 
 		void updateLayout()
 		{
@@ -97,7 +92,7 @@ class NotificationsImpl : public Notifications
 			Notification n;
 			n.m_widget = widget;
 			n.m_time = DISPLAY_TIME;
-			m_items.push(n);
+			m_items.push_back(n);
 
 			updateLayout();
 		}
@@ -112,7 +107,7 @@ class NotificationsImpl : public Notifications
 
 	private:
 		MainWindow& m_main_window;
-		Lumix::Array<Notification> m_items;
+		QVector<Notification> m_items;
 };
 
 

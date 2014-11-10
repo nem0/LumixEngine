@@ -50,6 +50,8 @@ struct Command
 
 struct CustomCommand : public Command
 {
+	CustomCommand(IAllocator&) {}
+
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	uint32_t m_name;
@@ -58,6 +60,8 @@ struct CustomCommand : public Command
 
 struct PolygonModeCommand : public Command
 {
+	PolygonModeCommand(IAllocator&) {}
+
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	
@@ -67,6 +71,8 @@ struct PolygonModeCommand : public Command
 
 struct SetPassCommand : public Command
 {
+	SetPassCommand(IAllocator&) {}
+
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	
@@ -76,14 +82,19 @@ struct SetPassCommand : public Command
 
 struct ClearCommand : public Command
 {
+	ClearCommand(IAllocator&) {}
+
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
+	
 	uint32_t m_buffers;
 };
 
 
 struct RenderModelsCommand : public Command
 {
+	RenderModelsCommand(IAllocator&) {}
+
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	
@@ -93,22 +104,33 @@ struct RenderModelsCommand : public Command
 
 struct ApplyCameraCommand : public Command
 {
+	ApplyCameraCommand(IAllocator& allocator)
+		: m_camera_slot(allocator)
+	{ }
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
+	
 	string m_camera_slot;
 };
 
 
 struct BindFramebufferCommand : public Command
 {
+	BindFramebufferCommand(IAllocator& allocator)
+		: m_buffer_name(allocator)
+	{ }
+
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
+	
 	string m_buffer_name;
 };
 
 
 struct UnbindFramebufferCommand : public Command
 {
+	UnbindFramebufferCommand(IAllocator&) {}
+
 	virtual void deserialize(PipelineImpl&, ISerializer&) override {}
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 };
@@ -116,10 +138,13 @@ struct UnbindFramebufferCommand : public Command
 
 struct DrawScreenQuadCommand : public Command
 {
+	DrawScreenQuadCommand(IAllocator& allocator) : m_allocator(allocator) {}
 	~DrawScreenQuadCommand();
 
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
+	
+	IAllocator& m_allocator;
 	Material* m_material;
 	Geometry* m_geometry;
 };
@@ -127,6 +152,8 @@ struct DrawScreenQuadCommand : public Command
 
 struct RenderDebugLinesCommand : public Command
 {
+	RenderDebugLinesCommand(IAllocator&) {}
+
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 };
@@ -134,8 +161,13 @@ struct RenderDebugLinesCommand : public Command
 
 struct BindFramebufferTextureCommand : public Command
 {
+	BindFramebufferTextureCommand(IAllocator& allocator)
+		: m_framebuffer_name(allocator)
+	{ }
+
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
+	
 	string m_framebuffer_name;
 	uint32_t m_renderbuffer_index;
 	uint32_t m_texture_uint;
@@ -144,16 +176,23 @@ struct BindFramebufferTextureCommand : public Command
 
 struct RenderShadowmapCommand : public Command
 {
+	RenderShadowmapCommand(IAllocator& allocator)
+		: m_camera_slot(allocator)
+	{}
+
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 
 	int64_t m_layer_mask;
+	StackAllocator<128> m_string_allocator;
 	string m_camera_slot;
 };
 
 
 struct BindShadowmapCommand : public Command
 {
+	BindShadowmapCommand(IAllocator&) {}
+
 	virtual void deserialize(PipelineImpl&, ISerializer&) override {}
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 };
@@ -163,28 +202,37 @@ struct PipelineImpl : public Pipeline
 {
 	struct FrameBufferDeclaration
 	{
+		FrameBufferDeclaration()
+			: m_name(m_name_allocator)
+		{ }
+
 		int32_t m_width;
 		int32_t m_height;
 		int32_t m_mask;
+		StackAllocator<64> m_name_allocator;
 		string m_name;
 	};
 	
 	struct CommandCreator
 	{
-		typedef Delegate<Command*> Creator;
+		typedef Delegate<Command* (IAllocator&)> Creator;
 		Creator m_creator;
 		uint32_t m_type_hash;
 	};
 
 	template <typename T>
-	static Command* CreateCommand()
+	static Command* CreateCommand(IAllocator& allocator)
 	{
-		return LUMIX_NEW(T);
+		return allocator.newObject<T>(allocator);
 	}
 
 
-	PipelineImpl(const Path& path, ResourceManager& resource_manager)
-		: Pipeline(path, resource_manager)
+	PipelineImpl(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
+		: Pipeline(path, resource_manager, allocator)
+		, m_allocator(allocator)
+		, m_commands(allocator)
+		, m_framebuffers(allocator)
+		, m_command_creators(allocator)
 	{
 		addCommandCreator("clear").bind<&CreateCommand<ClearCommand> >();
 		addCommandCreator("custom").bind<&CreateCommand<CustomCommand> >();
@@ -212,7 +260,7 @@ struct PipelineImpl : public Pipeline
 	{
 		for (int i = 0; i < m_commands.size(); ++i)
 		{
-			LUMIX_DELETE(m_commands[i]);
+			m_allocator.deleteObject(m_commands[i]);
 		}
 		m_commands.clear();
 		onEmpty();
@@ -241,7 +289,7 @@ struct PipelineImpl : public Pipeline
 		{
 			if (m_command_creators[i].m_type_hash == type_hash)
 			{
-				return m_command_creators[i].m_creator.invoke();
+				return m_command_creators[i].m_creator.invoke(m_allocator);
 			}
 		}
 		return NULL;
@@ -325,6 +373,7 @@ struct PipelineImpl : public Pipeline
 		fs.close(file);
 	}
 
+	IAllocator& m_allocator;
 	Array<Command*> m_commands;
 	Array<CommandCreator> m_command_creators;
 	Array<FrameBufferDeclaration> m_framebuffers;
@@ -334,9 +383,15 @@ struct PipelineImpl : public Pipeline
 
 struct PipelineInstanceImpl : public PipelineInstance
 {
-	PipelineInstanceImpl(Pipeline& pipeline)
+	PipelineInstanceImpl(Pipeline& pipeline, IAllocator& allocator)
 		: m_source(static_cast<PipelineImpl&>(pipeline))
 		, m_active_camera(Component::INVALID)
+		, m_custom_commands_handlers(allocator)
+		, m_allocator(allocator)
+		, m_terrain_infos(allocator)
+		, m_framebuffers(allocator)
+		, m_grass_infos(allocator)
+		, m_renderable_infos(allocator)
 	{
 		m_scene = NULL;
 		m_light_dir.set(0, -1, 0);
@@ -358,11 +413,11 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_source.getResourceManager().get(ResourceManager::PIPELINE)->unload(m_source);
 		for (int i = 0; i < m_framebuffers.size(); ++i)
 		{
-			LUMIX_DELETE(m_framebuffers[i]);
+			m_allocator.deleteObject(m_framebuffers[i]);
 		}
 		if (m_shadowmap_framebuffer)
 		{
-			LUMIX_DELETE(m_shadowmap_framebuffer);
+			m_allocator.deleteObject(m_shadowmap_framebuffer);
 		}
 	}
 
@@ -407,12 +462,12 @@ struct PipelineInstanceImpl : public PipelineInstance
 		if (old_state != Resource::State::READY && new_state == Resource::State::READY)
 		{
 			PipelineImpl::FrameBufferDeclaration fb = m_source.m_shadowmap_framebuffer;
-			m_shadowmap_framebuffer = LUMIX_NEW(FrameBuffer)(fb.m_width, fb.m_height, fb.m_mask, fb.m_name.c_str());
+			m_shadowmap_framebuffer = m_allocator.newObject<FrameBuffer>(fb.m_width, fb.m_height, fb.m_mask, fb.m_name.c_str());
 			m_framebuffers.reserve(m_source.m_framebuffers.size());
 			for (int i = 0; i < m_source.m_framebuffers.size(); ++i)
 			{
 				fb = m_source.m_framebuffers[i];
-				m_framebuffers.push(LUMIX_NEW(FrameBuffer)(fb.m_width, fb.m_height, fb.m_mask, fb.m_name.c_str()));
+				m_framebuffers.push(m_allocator.newObject<FrameBuffer>(fb.m_width, fb.m_height, fb.m_mask, fb.m_name.c_str()));
 			}
 		}
 	}
@@ -765,6 +820,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		return m_scene;
 	}
 
+	IAllocator& m_allocator;
 	PipelineImpl& m_source;
 	RenderScene* m_scene;
 	Array<FrameBuffer*> m_framebuffers;
@@ -787,21 +843,21 @@ struct PipelineInstanceImpl : public PipelineInstance
 };
 
 
-Pipeline::Pipeline(const Path& path, ResourceManager& resource_manager)
-	: Resource(path, resource_manager)
+Pipeline::Pipeline(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
+	: Resource(path, resource_manager, allocator)
 {
 }
 
 
-PipelineInstance* PipelineInstance::create(Pipeline& pipeline)
+PipelineInstance* PipelineInstance::create(Pipeline& pipeline, IAllocator& allocator)
 {
-	return LUMIX_NEW(PipelineInstanceImpl)(pipeline);
+	return allocator.newObject<PipelineInstanceImpl>(pipeline, allocator);
 }
 
 
 void PipelineInstance::destroy(PipelineInstance* pipeline)
 {
-	LUMIX_DELETE(pipeline);
+	static_cast<PipelineInstanceImpl*>(pipeline)->m_allocator.deleteObject(pipeline);
 }
 
 
@@ -935,16 +991,16 @@ void RenderDebugLinesCommand::execute(PipelineInstanceImpl& pipeline)
 
 DrawScreenQuadCommand::~DrawScreenQuadCommand()
 {
-	LUMIX_DELETE(m_geometry);
+	m_allocator.deleteObject(m_geometry);
 }
 
 
 void DrawScreenQuadCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer)
 {
-	m_geometry = LUMIX_NEW(Geometry);
+	m_geometry = m_allocator.newObject<Geometry>(m_allocator);
 	VertexDef def;
 	def.parse("pt", 2);
-	Array<int> indices;
+	Array<int> indices(m_allocator);
 	const int GEOMETRY_VERTEX_ATTRIBUTE_COUNT = 20;
 	float v[GEOMETRY_VERTEX_ATTRIBUTE_COUNT];
 	indices.push(0);
@@ -1032,13 +1088,13 @@ void BindShadowmapCommand::execute(PipelineInstanceImpl& pipeline)
 
 Resource* PipelineManager::createResource(const Path& path)
 {
-	return LUMIX_NEW(PipelineImpl)(path, getOwner());
+	return m_allocator.newObject<PipelineImpl>(path, getOwner(), m_allocator);
 }
 
 
 void PipelineManager::destroyResource(Resource& resource)
 {
-	LUMIX_DELETE(static_cast<PipelineImpl*>(&resource));
+	m_allocator.deleteObject(static_cast<PipelineImpl*>(&resource));
 }
 
 

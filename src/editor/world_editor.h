@@ -32,6 +32,8 @@ namespace Lumix
 	class LUMIX_ENGINE_API WorldEditor
 	{
 		public:
+			typedef Array<Component> ComponentList;
+
 			enum class MouseFlags : int
 			{
 				ALT = 1,
@@ -50,7 +52,7 @@ namespace Lumix
 			};
 
 		public:
-			static WorldEditor* create(const char* base_path);
+			static WorldEditor* create(const char* base_path, IAllocator& allocator);
 			static void destroy(WorldEditor* editor);
 
 			virtual void tick() = 0;
@@ -58,9 +60,10 @@ namespace Lumix
 			virtual IPropertyDescriptor* getProperty(const char* component_type, const char* property_name) = 0;
 			virtual void executeCommand(class IEditorCommand* command) = 0;
 			virtual Engine& getEngine() = 0;
+			virtual IAllocator& getAllocator() = 0;
 			virtual void render(IRenderDevice& render_device) = 0;
 			virtual void renderIcons(IRenderDevice& render_device) = 0;
-			virtual Component getEditCamera() const = 0;
+			virtual Component getEditCamera() = 0;
 			virtual class Gizmo& getGizmo() = 0;
 			virtual class FS::TCPFileServer& getTCPFileServer() = 0;
 			virtual void setEditViewRenderDevice(IRenderDevice& render_device) = 0;
@@ -70,8 +73,12 @@ namespace Lumix
 			virtual void saveUniverse(const Path& path) = 0;
 			virtual void newUniverse() = 0;
 			virtual Path getUniversePath() const = 0;
+			virtual void showEntities() = 0;
+			virtual void hideEntities() = 0;
 			virtual void copyEntity() = 0;
 			virtual void pasteEntity() = 0;
+			virtual Component getComponent(const Entity& entity, uint32_t type) = 0;
+			virtual ComponentList& getComponents(const Entity& entity) = 0;
 			virtual void addComponent(uint32_t type_crc) = 0;
 			virtual void cloneComponent(const Component& src, Entity& entity) = 0;
 			virtual void destroyComponent(const Component& crc) = 0;

@@ -9,7 +9,7 @@ namespace Lumix
 		class LUMIX_CORE_API Group : public BaseEntry
 		{
 		public:
-			explicit Group(bool sync_event);
+			Group(bool sync_event, IAllocator& allocator);
 			~Group();
 
 			void addStaticDependency(BaseEntry* entry);

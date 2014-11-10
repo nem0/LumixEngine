@@ -1,4 +1,5 @@
 #include "core/lumix.h"
+#include "core/allocator.h"
 #include "core/mt/task.h"
 #include "core/mt/thread.h"
 #include <Windows.h>
@@ -11,6 +12,11 @@ namespace Lumix
 
 		struct TaskImpl
 		{
+			TaskImpl(IAllocator& allocator)
+				: m_allocator(allocator)
+			{ }
+
+			IAllocator& m_allocator;
 			HANDLE m_handle;
 			DWORD m_thread_id;
 			uint32_t m_affinity_mask;
@@ -37,9 +43,9 @@ namespace Lumix
 			return ret;
 		}
 
-		Task::Task()
+		Task::Task(IAllocator& allocator)
 		{
-			TaskImpl* impl = LUMIX_NEW(TaskImpl);
+			TaskImpl* impl = allocator.newObject<TaskImpl>(allocator);
 			impl->m_handle = NULL;
 			impl->m_affinity_mask = getProccessAffinityMask();
 			impl->m_priority = ::GetThreadPriority(GetCurrentThread());
@@ -55,7 +61,7 @@ namespace Lumix
 		Task::~Task()
 		{
 			ASSERT(NULL == m_implementation->m_handle);
-			LUMIX_DELETE(m_implementation);
+			m_implementation->m_allocator.deleteObject(m_implementation);
 		}
 
 		bool Task::create(const char* name)
@@ -135,6 +141,11 @@ namespace Lumix
 		bool Task::isForceExit() const
 		{
 			return m_implementation->m_force_exit;
+		}
+
+		IAllocator& Task::getAllocator()
+		{
+			return m_implementation->m_allocator;
 		}
 
 		void Task::forceExit(bool wait)

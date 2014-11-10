@@ -6,7 +6,8 @@ namespace
 {
 	void UT_insert(const char* params)
 	{
-		Lumix::HashMap<int32_t, int32_t> hash_table;
+		Lumix::DefaultAllocator allocator;
+		Lumix::HashMap<int32_t, int32_t> hash_table(allocator);
 
 		LUMIX_EXPECT_TRUE(hash_table.empty());
 	};

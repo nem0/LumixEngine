@@ -35,9 +35,7 @@ namespace Lumix
 		void reload(const Path& path);
 		void reload(Resource& resource);
 
-		void releaseAll(void);
-
-		ResourceManagerBase(void);
+		ResourceManagerBase(IAllocator& allocator);
 		~ResourceManagerBase(void);
 
 	protected:

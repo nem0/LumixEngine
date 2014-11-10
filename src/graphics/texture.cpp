@@ -198,7 +198,7 @@ namespace Lumix
 			uint8_t row[6];
 		};
 
-		static LUMIX_FORCE_INLINE void swapMemory(void* mem1, void* mem2, size_t size)
+		static LUMIX_FORCE_INLINE void swapMemory(void* mem1, void* mem2, size_t size, IAllocator& allocator)
 		{
 			if (size <= 32768)
 			{
@@ -209,11 +209,11 @@ namespace Lumix
 			}
 			else
 			{
-				uint8_t* tmp = LUMIX_NEW_ARRAY(uint8_t, size);
+				uint8_t* tmp = (uint8_t*)allocator.allocate(sizeof(uint8_t) * size);
 				memcpy(tmp, mem1, size);
 				memcpy(mem1, mem2, size);
 				memcpy(mem2, tmp, size);
-				LUMIX_DELETE_ARRAY(tmp);
+				allocator.deallocate(tmp);
 			}
 		}
 
@@ -352,7 +352,7 @@ namespace Lumix
 		}
 
 		/// from gpu gems
-		static void flipCompressedTexture(int w, int h, int format, void* surface)
+		static void flipCompressedTexture(int w, int h, int format, void* surface, IAllocator& allocator)
 		{
 			PROFILE_FUNCTION();
 			void(*flipBlocksFunction)(DXTColBlock*, int);
@@ -388,7 +388,7 @@ namespace Lumix
 			{
 				(*flipBlocksFunction)(top, xblocks);
 				(*flipBlocksFunction)(bottom, xblocks);
-				swapMemory(bottom, top, linesize);
+				swapMemory(bottom, top, linesize, allocator);
 
 				top = (DXTColBlock*)((uint8_t*)top + linesize);
 				bottom = (DXTColBlock*)((uint8_t*)bottom - linesize);
@@ -416,10 +416,12 @@ namespace Lumix
 #pragma pack()
 
 
-	Texture::Texture(const Path& path, ResourceManager& resource_manager)
-		: Resource(path, resource_manager)
+	Texture::Texture(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
+		: Resource(path, resource_manager, allocator)
 		, m_data_reference(0)
 		, m_is_cubemap(false)
+		, m_allocator(allocator)
+		, m_data(m_allocator)
 	{
 		glGenTextures(1, &m_id);
 	}
@@ -787,7 +789,7 @@ bool Texture::loadDDS(FS::IFile& file)
 				for (uint32_t ix = 0; ix < mipMapCount; ++ix)
 				{
 					file.read(data, size);
-					DDS::flipCompressedTexture(width, height, li->internalFormat, data);
+					DDS::flipCompressedTexture(width, height, li->internalFormat, data, m_allocator);
 					
 					glCompressedTexImage2D(sides[i], ix, li->internalFormat, width, height, 0, size, data);
 					glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
@@ -806,7 +808,7 @@ bool Texture::loadDDS(FS::IFile& file)
 			for (uint32_t ix = 0; ix < mipMapCount; ++ix)
 			{
 				file.read(data, size);
-				DDS::flipCompressedTexture(width, height, li->internalFormat, data);
+				DDS::flipCompressedTexture(width, height, li->internalFormat, data, m_allocator);
 				glCompressedTexImage2D(GL_TEXTURE_2D, ix, li->internalFormat, width, height, 0, size, data);
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -832,7 +834,7 @@ bool Texture::loadDDS(FS::IFile& file)
 			g_log_error.log("renderer") << "Unsupported DDS format or corrupted DDS " << m_path.c_str();
 			return false;
 		}
-		unsigned char * data = LUMIX_NEW_ARRAY(unsigned char, size);
+		unsigned char * data = (unsigned char*)m_allocator.allocate(sizeof(unsigned char) * size);
 		uint32_t palette[256];
 		uint32_t* unpacked = (uint32_t*)manager->getBuffer(size * sizeof(uint32_t));
 		file.read(palette, 4 * 256);
@@ -849,7 +851,7 @@ bool Texture::loadDDS(FS::IFile& file)
 			height = (height + 1) >> 1;
 			size = width * height * li->blockBytes;
 		}
-		LUMIX_DELETE_ARRAY(data);
+		m_allocator.deallocate(data);
 	}
 	else
 	{

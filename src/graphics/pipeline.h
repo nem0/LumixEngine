@@ -27,19 +27,25 @@ class IFile;
 class LUMIX_ENGINE_API PipelineManager : public ResourceManagerBase
 {
 public:
-	PipelineManager() : ResourceManagerBase() {}
+	PipelineManager(IAllocator& allocator)
+		: ResourceManagerBase(allocator)
+		, m_allocator(allocator)
+	{}
 	~PipelineManager() {}
 
 protected:
 	virtual Resource* createResource(const Path& path) override;
 	virtual void destroyResource(Resource& resource) override;
+
+private:
+	IAllocator& m_allocator;
 };
 
 
 class LUMIX_ENGINE_API Pipeline : public Resource
 {
 	public:
-		Pipeline(const Path& path, ResourceManager& resource_manager);
+		Pipeline(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 		virtual ~Pipeline() {}
 
 		virtual bool deserialize(ISerializer& serializer) = 0;
@@ -61,7 +67,7 @@ class LUMIX_ENGINE_API PipelineInstance abstract
 		virtual void resize(int w, int h) = 0;
 		virtual FrameBuffer* getShadowmapFramebuffer() = 0;
 
-		static PipelineInstance* create(Pipeline& src);
+		static PipelineInstance* create(Pipeline& src, IAllocator& allocator);
 		static void destroy(PipelineInstance* pipeline);
 
 		virtual Renderer& getRenderer() = 0;

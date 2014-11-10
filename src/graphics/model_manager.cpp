@@ -8,11 +8,11 @@ namespace Lumix
 {
 	Resource* ModelManager::createResource(const Path& path)
 	{
-		return LUMIX_NEW(Model)(path, getOwner());
+		return m_allocator.newObject<Model>(path, getOwner(), m_allocator);
 	}
 
 	void ModelManager::destroyResource(Resource& resource)
 	{
-		LUMIX_DELETE(static_cast<Model*>(&resource));
+		m_allocator.deleteObject(static_cast<Model*>(&resource));
 	}
 }

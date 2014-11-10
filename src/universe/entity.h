@@ -13,8 +13,6 @@ namespace Lumix
 
 	struct LUMIX_ENGINE_API Entity final
 	{
-		typedef Array<Component, DefaultAllocator, false> ComponentList;
-
 		Entity() {}
 		Entity(Universe* uni, int32_t i) : index(i), universe(uni) {}
 
@@ -30,8 +28,6 @@ namespace Lumix
 		void setRotation(const Quat& rot) const;
 		void translate(const Vec3& t);
 		bool isValid() const { return index >= 0; }
-		const Component& getComponent(uint32_t type) const;
-		const ComponentList& getComponents() const;
 		bool existsInUniverse() const;
 		const char* getName() const;
 		void setName(const char* name);

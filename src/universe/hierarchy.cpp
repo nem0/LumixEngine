@@ -3,6 +3,7 @@
 #include "core/hash_map.h"
 #include "core/iserializer.h"
 #include "core/matrix.h"
+#include "core/pod_hash_map.h"
 #include "universe.h"
 
 
@@ -13,14 +14,35 @@ namespace Lumix
 class HierarchyImpl : public Hierarchy
 {
 	private:
-		typedef HashMap<int32_t, Array<Child> > Children;
+		typedef PODHashMap<int32_t, Array<Child>* > Children;
 		typedef HashMap<int32_t, int32_t> Parents;
 
 	public:
-		HierarchyImpl(Universe& universe)
+		HierarchyImpl(Universe& universe, IAllocator& allocator)
 			: m_universe(universe)
+			, m_parents(allocator)
+			, m_children(allocator)
+			, m_allocator(allocator)
+			, m_parent_set(allocator)
 		{
 			universe.entityMoved().bind<HierarchyImpl, &HierarchyImpl::onEntityMoved>(this);
+		}
+
+
+		~HierarchyImpl()
+		{
+			PODHashMap<int32_t, Array<Child>*>::iterator iter = m_children.begin(), end = m_children.end();
+			while (iter != end)
+			{
+				m_allocator.deleteObject(iter.value());
+				++iter;
+			}
+		}
+
+
+		IAllocator& getAllocator()
+		{
+			return m_allocator;
 		}
 
 
@@ -30,7 +52,7 @@ class HierarchyImpl : public Hierarchy
 			if(iter.isValid())
 			{
 				Matrix parent_matrix = entity.getMatrix();
-				Array<Child>& children = iter.value();
+				Array<Child>& children = *iter.value();
 				for(int i = 0, c = children.size(); i < c; ++i)
 				{
 					Entity e(&m_universe, children[i].m_entity);
@@ -45,7 +67,7 @@ class HierarchyImpl : public Hierarchy
 				Children::iterator child_iter = m_children.find(parent.index);
 				if(child_iter.isValid())
 				{
-					Array<Child>& children = child_iter.value();
+					Array<Child>& children = *child_iter.value();
 					for(int i = 0, c = children.size(); i < c; ++i)
 					{
 						if(children[i].m_entity == entity.index)
@@ -68,7 +90,7 @@ class HierarchyImpl : public Hierarchy
 			{
 				Children::iterator child_iter = m_children.find(old_parent_iter.value());
 				ASSERT(child_iter.isValid());
-				Array<Child>& children = child_iter.value();
+				Array<Child>& children = *child_iter.value();
 				for(int i = 0; i < children.size(); ++i)
 				{
 					if(children[i].m_entity == child.index)
@@ -88,10 +110,10 @@ class HierarchyImpl : public Hierarchy
 				Children::iterator child_iter = m_children.find(parent.index);
 				if(!child_iter.isValid())
 				{
-					m_children.insert(parent.index, Array<Child>());
+					m_children.insert(parent.index, m_allocator.newObject<Array<Child> >(m_allocator));
 					child_iter = m_children.find(parent.index);
 				}
-				Child& c = child_iter.value().pushEmpty();
+				Child& c = child_iter.value()->pushEmpty();
 				c.m_entity = child.index;
 				Matrix inv_parent_matrix = parent.getMatrix();
 				inv_parent_matrix.inverse();
@@ -155,12 +177,13 @@ class HierarchyImpl : public Hierarchy
 			Children::iterator iter = m_children.find(parent.index);
 			if(iter.isValid())
 			{
-				return &iter.value();
+				return iter.value();
 			}
 			return NULL;
 		}
 
 	private:
+		IAllocator& m_allocator;
 		Universe& m_universe;
 		Parents m_parents;
 		Children m_children;
@@ -168,15 +191,15 @@ class HierarchyImpl : public Hierarchy
 };
 
 
-Hierarchy* Hierarchy::create(Universe& universe)
+Hierarchy* Hierarchy::create(Universe& universe, IAllocator& allocator)
 {
-	return LUMIX_NEW(HierarchyImpl)(universe);
+	return allocator.newObject<HierarchyImpl>(universe, allocator);
 }
 
 
 void Hierarchy::destroy(Hierarchy* hierarchy)
 {
-	LUMIX_DELETE(hierarchy);
+	static_cast<HierarchyImpl*>(hierarchy)->getAllocator().deleteObject(hierarchy);
 }
 
 

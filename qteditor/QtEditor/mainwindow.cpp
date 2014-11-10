@@ -171,7 +171,7 @@ void MainWindow::fillRecentFiles()
 
 void MainWindow::resizeEvent(QResizeEvent* event)
 {
-	m_resized.invoke(event->size());
+	emit resized(event->size());
 }
 
 
@@ -470,5 +470,15 @@ void MainWindow::on_actionPaste_triggered()
 
 void MainWindow::on_actionSame_mesh_triggered()
 {
-    m_world_editor->selectEntitiesWithSameMesh();
+	m_world_editor->selectEntitiesWithSameMesh();
+}
+
+void MainWindow::on_actionHide_triggered()
+{
+	m_world_editor->hideEntities();
+}
+
+void MainWindow::on_actionShow_triggered()
+{
+	m_world_editor->showEntities();
 }

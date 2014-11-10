@@ -233,7 +233,10 @@ float Geometry::getBoundingRadius() const
 }
 
 
-Geometry::Geometry()
+Geometry::Geometry(IAllocator& allocator)
+	: m_allocator(allocator)
+	, m_vertices(allocator)
+	, m_indices(allocator)
 {
 	glGenBuffers(1, &m_id);
 	glGenBuffers(1, &m_indices_id);
@@ -254,7 +257,7 @@ void Geometry::copy(const Geometry& source, int times, VertexCallback& vertex_ca
 
 	glBindBuffer(GL_ARRAY_BUFFER, source.m_id);
 	uint8_t* data = (uint8_t*)glMapBuffer(GL_ARRAY_BUFFER, GL_READ_ONLY);
-	Array<uint8_t> data_copy;
+	Array<uint8_t> data_copy(m_allocator);
 	int vertex_size = m_vertex_definition.getVertexSize();
 	int one_size = vertex_size * source.getVertices().size();
 	data_copy.resize(one_size * times);
@@ -268,7 +271,7 @@ void Geometry::copy(const Geometry& source, int times, VertexCallback& vertex_ca
 
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, source.m_indices_id);
 	data = (uint8_t*)glMapBuffer(GL_ELEMENT_ARRAY_BUFFER, GL_READ_ONLY);
-	Array<int> indices_data_copy;
+	Array<int> indices_data_copy(m_allocator);
 	int indices_count = source.getIndices().size();
 	indices_data_copy.resize(indices_count * times);
 	for (int i = 0; i < times; ++i)
