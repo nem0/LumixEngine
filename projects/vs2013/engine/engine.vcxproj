@@ -169,6 +169,7 @@
     <ClCompile Include="..\..\..\src\editor\gizmo.cpp" />
     <ClCompile Include="..\..\..\src\engine\engine.cpp" />
     <ClCompile Include="..\..\..\src\engine\iplugin.cpp" />
+    <ClCompile Include="..\..\..\src\engine\pc\debug.cpp" />
     <ClCompile Include="..\..\..\src\engine\plugin_manager.cpp" />
     <ClCompile Include="..\..\..\src\graphics\culling_system.cpp" />
     <ClCompile Include="..\..\..\src\graphics\frame_buffer.cpp" />
@@ -200,6 +201,7 @@
     <ClInclude Include="..\..\..\src\editor\world_editor.h" />
     <ClInclude Include="..\..\..\src\editor\gizmo.h" />
     <ClInclude Include="..\..\..\src\editor\property_descriptor.h" />
+    <ClInclude Include="..\..\..\src\engine\debug.h" />
     <ClInclude Include="..\..\..\src\engine\engine.h" />
     <ClInclude Include="..\..\..\src\engine\iplugin.h" />
     <ClInclude Include="..\..\..\src\engine\plugin_manager.h" />
