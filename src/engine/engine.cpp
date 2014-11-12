@@ -14,7 +14,8 @@
 
 #include "core/mtjd/manager.h"
 
-#include "engine/debug.h"
+#include "debug/debug.h"
+
 #include "engine/plugin_manager.h"
 
 #include "graphics/culling_system.h"
