@@ -1,5 +1,5 @@
 #include "core/fs/os_file.h"
-#include "core/allocator.h"
+#include "core/iallocator.h"
 #include "core/lumix.h"
 
 #include <assert.h>

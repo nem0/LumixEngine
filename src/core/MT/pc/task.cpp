@@ -1,5 +1,5 @@
 #include "core/lumix.h"
-#include "core/allocator.h"
+#include "core/iallocator.h"
 #include "core/mt/task.h"
 #include "core/mt/thread.h"
 #include <Windows.h>

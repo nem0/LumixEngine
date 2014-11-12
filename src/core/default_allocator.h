@@ -2,7 +2,7 @@
 
 
 #include "core/lumix.h"
-#include "core/allocator.h"
+#include "core/iallocator.h"
 
 
 namespace Lumix

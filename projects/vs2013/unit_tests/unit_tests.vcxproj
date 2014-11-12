@@ -19,7 +19,6 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\src\core\new.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_file_system.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_fixed_lock_free_queue.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_hash_map.cpp">

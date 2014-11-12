@@ -1,10 +1,9 @@
-#include "engine/debug.h"
-
+#include "debug/debug.h"
+#include "core/string.h"
 #include <Windows.h>
 #include <cstdio>
 #include <DbgHelp.h>
 #include <mapi.h>
-#include "core/string.h"
 
 
 #pragma comment(lib, "DbgHelp.lib")

@@ -3,7 +3,7 @@
 
 #include <cstdlib>
 #include <new>
-#include "core/allocator.h"
+#include "core/iallocator.h"
 
 
 

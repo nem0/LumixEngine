@@ -28,7 +28,7 @@ namespace Lumix
 		static void getDir(char* dir, int max_length, const char* src)
 		{
 			copyString(dir, max_length, src);
-			for (int i = strlen(dir) - 1; i >= 0; --i)
+			for (int i = (int)strlen(dir) - 1; i >= 0; --i)
 			{
 				if (dir[i] == '\\' || dir[i] == '/')
 				{

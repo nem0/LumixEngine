@@ -1,5 +1,5 @@
 #include "core/fs/tcp_file_device.h"
-#include "core/allocator.h"
+#include "core/iallocator.h"
 #include "core/blob.h"
 #include "core/fs/ifile.h"
 #include "core/fs/ifile_system_defines.h"
