@@ -23,10 +23,6 @@ namespace Lumix
 			, m_next(src.m_next)
 		{}
 
-		explicit HashNode(my_node* next)
-			: m_next(next)
-		{}
-
 		K m_key;
 		V m_value;
 		my_node* m_next;
@@ -143,7 +139,7 @@ namespace Lumix
 
 			bool isValid() const
 			{
-				return NULL != m_current_node && &m_hash_map->m_sentinel != m_current_node;
+				return NULL != m_current_node && m_hash_map->m_sentinel != m_current_node;
 			}
 
 			key_type& key()
@@ -202,25 +198,25 @@ namespace Lumix
 		typedef HashMapIterator<key_type, value_type, hasher_type> iterator;
 
 		HashMap(IAllocator& allocator)
-			: m_sentinel(&m_sentinel)
-			, m_allocator(allocator)
+			: m_allocator(allocator)
 		{
+			initSentinel();
 			init();
 		}
 
 		explicit HashMap(size_type buckets, IAllocator& allocator)
-			: m_sentinel(&m_sentinel)
-			, m_allocator(allocator)
+			: m_allocator(allocator)
 		{
+			initSentinel();
 			init(buckets);
 		}
 
 		HashMap(const my_type& src)
-			: m_sentinel(&m_sentinel)
-			, m_allocator(src.m_allocator)
+			: m_allocator(src.m_allocator)
 		{
+			initSentinel();
 			init(src.m_max_id);
-			copyTableUninitialized(src.m_table, &src.m_sentinel, src.m_max_id);
+			copyTableUninitialized(src.m_table, src.m_sentinel, src.m_max_id);
 
 			m_mask = src.m_mask;
 			m_size = src.m_size;
@@ -243,7 +239,7 @@ namespace Lumix
 			{
 				clear();
 				init(src.m_max_id);
-				copyTableUninitialized(src.m_table, &src.m_sentinel, src.m_max_id);
+				copyTableUninitialized(src.m_table, src.m_sentinel, src.m_max_id);
 
 				m_mask = src.m_mask;
 				m_size = src.m_size;
@@ -255,7 +251,7 @@ namespace Lumix
 		value_type& operator[](const key_type& key)
 		{
 			node_type* n = _find(key);
-			ASSERT(&m_sentinel != n);
+			ASSERT(m_sentinel != n);
 			return n->m_value;
 		}
 
@@ -277,7 +273,7 @@ namespace Lumix
 			node_type* prev = NULL;
 			node_type* next_it = NULL;
 
-			while(NULL != n && &m_sentinel != n->m_next)
+			while(NULL != n && m_sentinel != n->m_next)
 			{
 				if(n == it.m_current_node)
 				{
@@ -292,7 +288,7 @@ namespace Lumix
 				n = n->m_next;
 			}
 
-			return iterator(&m_sentinel, this);
+			return iterator(m_sentinel, this);
 		}
 
 		size_type erase(const key_type& key)
@@ -302,7 +298,7 @@ namespace Lumix
 			node_type* n = &m_table[idx];
 			node_type* prev = NULL;
 
-			while(NULL != n && &m_sentinel != n->m_next)
+			while(NULL != n && m_sentinel != n->m_next)
 			{
 				if(key == n->m_key)
 				{
@@ -323,7 +319,7 @@ namespace Lumix
 
 		void clear()
 		{
-			for(node_type* n = first(); &m_sentinel != n; )
+			for(node_type* n = first(); m_sentinel != n; )
 			{
 				node_type* dest = n;
 				n = next(n);
@@ -340,7 +336,7 @@ namespace Lumix
 		}
 
 		iterator begin() { return iterator(first(), this); }
-		iterator end() { return iterator(&m_sentinel, this); }
+		iterator end() { return iterator(m_sentinel, this); }
 
 		iterator find(const key_type& key) { return iterator(_find(key), this); }
 
@@ -371,7 +367,7 @@ namespace Lumix
 			ASSERT(Math::isPowOfTwo(ids_count));
 			m_table = (node_type*)m_allocator.allocate(sizeof(node_type) * ids_count);
 			for(node_type* i = m_table; i < &m_table[ids_count]; i++)
-				construct(i, &m_sentinel);
+				construct(i, m_sentinel);
 
 			m_mask = (ids_count - 1);
 			m_max_id = ids_count;
@@ -386,8 +382,8 @@ namespace Lumix
 			node_type* old = m_table;
 
 			init(new_ids_count);
-			copyTableUninitialized(old, &m_sentinel, ids_count);
-			destructTable(old, &m_sentinel, old_ids_count);
+			copyTableUninitialized(old, m_sentinel, ids_count);
+			destructTable(old, m_sentinel, old_ids_count);
 
 			m_size = old_size;
 			m_allocator.deallocate(old);
@@ -400,7 +396,7 @@ namespace Lumix
 
 		node_type* construct(node_type* where, node_type* node)
 		{
-			return new(where) node_type(node);
+			return where->m_next = node;
 		}
 
 		node_type* construct(node_type* where, const node_type& node)
@@ -414,6 +410,12 @@ namespace Lumix
 			n->~node_type();
 		}
 
+		void initSentinel()
+		{
+			m_sentinel = reinterpret_cast<node_type*>(m_allocator.allocate(sizeof(node_type)));
+			m_sentinel->m_next = m_sentinel;
+		}
+
 		void copyUninitialized(node_type* src, node_type* dst)
 		{
 			construct(dst, src->m_key, src->m_value);
@@ -422,41 +424,41 @@ namespace Lumix
 		node_type* getEmptyNode(size_type pos)
 		{
 			node_type* node = &m_table[pos];
-			while (&m_sentinel != node->m_next && NULL != node->m_next)
+			while (m_sentinel != node->m_next && NULL != node->m_next)
 			{
 				node = node->m_next;
 			}
 
-			node->m_next = (NULL == node->m_next ? construct(reinterpret_cast<node_type*>(m_allocator.allocate(sizeof(node_type))), &m_sentinel) : node);
+			node->m_next = (NULL == node->m_next ? construct(reinterpret_cast<node_type*>(m_allocator.allocate(sizeof(node_type))), m_sentinel) : node);
 			return node->m_next;
 		}
 
 		node_type* first()
 		{
 			if(0 == m_size)
-				return &m_sentinel;
+				return m_sentinel;
 
 			for(size_type i = 0; i < m_max_id; i++)
-				if(m_table[i].m_next != &m_sentinel)
+				if(m_table[i].m_next != m_sentinel)
 					return &m_table[i];
 
-			return &m_sentinel;
+			return m_sentinel;
 		}
 
 		node_type* next(node_type* n)
 		{
-			if(0 == m_size || &m_sentinel == n)
-				return &m_sentinel;
+			if(0 == m_size || m_sentinel == n)
+				return m_sentinel;
 
 			node_type* next = n->m_next;
-			if((NULL == next || &m_sentinel == next))
+			if((NULL == next || m_sentinel == next))
 			{
 				size_type idx = getPosition(n->m_key) + 1;
 				for(size_type i = idx; i < m_max_id; i++)
-					if(m_table[i].m_next != &m_sentinel)
+					if(m_table[i].m_next != m_sentinel)
 						return &m_table[i];
 
-				return &m_sentinel;
+				return m_sentinel;
 			}
 			else
 			{
@@ -467,13 +469,13 @@ namespace Lumix
 		node_type* _find(const key_type& key)
 		{
 			size_type pos = getPosition(key);
-			for(node_type* n = &m_table[pos]; NULL != n && &m_sentinel != n->m_next; n = n->m_next)
+			for(node_type* n = &m_table[pos]; NULL != n && m_sentinel != n->m_next; n = n->m_next)
 			{
 				if(n->m_key == key)
 					return n;
 			}
 
-			return &m_sentinel;
+			return m_sentinel;
 		}
 
 		void deleteNode(node_type*& n, node_type* prev)
@@ -482,7 +484,7 @@ namespace Lumix
 			{
 				node_type* next = n->m_next;
 				destruct(n);
-				construct(n, next ? *next : m_sentinel);
+				construct(n, next ? *next : *m_sentinel);
 				if (next)
 				{
 					destruct(next);
@@ -529,7 +531,7 @@ namespace Lumix
 		}
 
 		node_type* m_table;
-		node_type m_sentinel;
+		node_type* m_sentinel;
 		size_type m_size;
 		size_type m_mask;
 		size_type m_max_id;
