@@ -750,7 +750,7 @@ namespace Lumix
 			virtual void getRenderablePath(Component cmp, string& path) override
 			{
 					int index = getRenderable(cmp.index);
-					if (m_renderables[index].m_model)
+					if (index >= 0 && m_renderables[index].m_model)
 					{
 						path = m_renderables[index].m_model->getPath().c_str();
 					}
