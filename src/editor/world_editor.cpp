@@ -21,6 +21,7 @@
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
+#include "debug/allocator.h"
 #include "editor/editor_icon.h"
 #include "editor/entity_template_system.h"
 #include "editor/gizmo.h"
@@ -1708,7 +1709,7 @@ struct WorldEditorImpl : public WorldEditor
 			{
 				for (int i = 0, c = iter.second().size(); i < c; ++i)
 				{
-					m_engine->getAllocator().deleteObject(iter.second()[i]);
+					m_allocator.deleteObject(iter.second()[i]);
 				}
 				++iter;
 			}
@@ -2169,7 +2170,7 @@ struct WorldEditorImpl : public WorldEditor
 			float m_speed;
 		};
 
-		BaseProxyAllocator m_allocator;
+		Debug::Allocator m_allocator;
 		GoToParameters m_go_to_parameters;
 		MT::Mutex m_universe_mutex;
 		Gizmo m_gizmo;

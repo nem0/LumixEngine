@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/allocator.h"
+#include "core/iallocator.h"
 #include "core/mt/atomic.h"
 #include "core/mt/semaphore.h"
 

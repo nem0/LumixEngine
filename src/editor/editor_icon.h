@@ -24,7 +24,11 @@ class EditorIcon
 	{
 		PHYSICAL_CONTROLLER,
 		PHYSICAL_BOX,
-		ENTITY
+		CAMERA,
+		LIGHT,
+		TERRAIN,
+		ENTITY,
+		COUNT
 	};
 	public:
 		void create(Engine& engine, RenderScene& scene, const Entity& entity);

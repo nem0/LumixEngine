@@ -1,7 +1,7 @@
 #include "script_system.h"
 #include <Windows.h>
 #include "base_script.h"
-#include "core/allocator.h"
+#include "core/iallocator.h"
 #include "core/crc32.h"
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"

@@ -14,6 +14,8 @@
 
 #include "core/mtjd/manager.h"
 
+#include "debug/debug.h"
+
 #include "engine/plugin_manager.h"
 
 #include "graphics/culling_system.h"
@@ -350,6 +352,8 @@ namespace Lumix
 
 	Engine* Engine::create(const char* base_path, FS::FileSystem* file_system, WorldEditor* editor, IAllocator& allocator)
 	{
+		installUnhandledExceptionHandler(base_path);
+
 		g_log_info.getCallback().bind<showLogInVS>();
 		g_log_warning.getCallback().bind<showLogInVS>();
 		g_log_error.getCallback().bind<showLogInVS>();
