@@ -12,15 +12,6 @@ namespace Lumix
 namespace Debug
 {
 
-	class AllocationInfo
-	{
-		public:
-			AllocationInfo* m_previous;
-			AllocationInfo* m_next;
-			size_t m_size;
-			StackNode* m_stack_leaf;
-	};
-
 
 	Allocator::Allocator(IAllocator& source)
 		: m_source(source)
@@ -28,16 +19,28 @@ namespace Debug
 		, m_mutex(false)
 		, m_stack_tree(m_source.newObject<Debug::StackTree>())
 	{
+		m_sentinels[0].m_next = &m_sentinels[1];
+		m_sentinels[0].m_previous = NULL;
+		m_sentinels[0].m_stack_leaf = NULL;
+		m_sentinels[0].m_size = 0;
+
+		m_sentinels[1].m_next = NULL;
+		m_sentinels[1].m_previous = &m_sentinels[0];
+		m_sentinels[1].m_stack_leaf = NULL;
+		m_sentinels[1].m_size = 0;
+
+		m_root = &m_sentinels[1];
 	}
 
 
 	Allocator::~Allocator()
 	{
-		if(m_root)
+		AllocationInfo* last_sentinel = &m_sentinels[1];
+		if (m_root != last_sentinel)
 		{
 			OutputDebugString("Memory leaks detected!\n");
 			AllocationInfo* info = m_root;
-			while(info)
+			while (info != last_sentinel)
 			{
 				char tmp[2048];
 				sprintf(tmp, "\nAllocation size : %d\n", info->m_size);
@@ -59,19 +62,20 @@ namespace Debug
 		MT::SpinLock lock(m_mutex);
 		void* ptr = m_source.allocate(sizeof(AllocationInfo) + size);
 		AllocationInfo* info = new (ptr) AllocationInfo();
-		info->m_previous = NULL;
+
+		info->m_previous = m_root->m_previous;
+		m_root->m_previous->m_next = info;
+
 		info->m_next = m_root;
+		m_root->m_previous = info;
+
 		info->m_stack_leaf = m_stack_tree->record();
-		if(m_root)
-		{
-			m_root->m_previous = info;
-		}
 		info->m_size = size;
+
 		m_root = info;
 
 		return (uint8_t*)ptr + sizeof(AllocationInfo);
 	}
-
 
 	void Allocator::deallocate(void* ptr)
 	{
@@ -86,14 +90,8 @@ namespace Debug
 			{
 				m_root = info->m_next;
 			}
-			if(info->m_previous)
-			{
-				info->m_previous->m_next = info->m_next;
-			}
-			if(info->m_next)
-			{
-				info->m_next->m_previous = info->m_previous;
-			}
+			info->m_previous->m_next = info->m_next;
+			info->m_next->m_previous = info->m_previous;
 			info->~AllocationInfo();
 
 			m_source.deallocate((void*)info);
