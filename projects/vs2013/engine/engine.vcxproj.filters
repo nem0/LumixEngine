@@ -69,7 +69,6 @@
     <ClCompile Include="..\..\..\src\universe\universe.cpp">
       <Filter>universe</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\core\new.cpp" />
     <ClCompile Include="..\..\..\src\graphics\material_manager.cpp">
       <Filter>graphics</Filter>
     </ClCompile>

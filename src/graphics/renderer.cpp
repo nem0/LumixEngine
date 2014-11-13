@@ -8,6 +8,7 @@
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "core/vec4.h"
+#include "debug/allocator.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "graphics/geometry.h"
@@ -296,7 +297,7 @@ struct RendererImpl : public Renderer
 		if(engine.getWorldEditor())
 		{
 			WorldEditor& editor = *engine.getWorldEditor();
-			IAllocator& allocator = engine.getAllocator();
+			IAllocator& allocator = editor.getAllocator();
 		
 			editor.registerProperty("camera", allocator.newObject<StringPropertyDescriptor<RenderScene> >(allocator, "slot", &RenderScene::getCameraSlot, &RenderScene::setCameraSlot));
 			editor.registerProperty("camera", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >(allocator, "fov", &RenderScene::getCameraFOV, &RenderScene::setCameraFOV));
@@ -417,7 +418,7 @@ struct RendererImpl : public Renderer
 	}
 
 	Engine& m_engine;
-	BaseProxyAllocator m_allocator;
+	Debug::Allocator m_allocator;
 	TextureManager m_texture_manager;
 	MaterialManager m_material_manager;
 	ShaderManager m_shader_manager;

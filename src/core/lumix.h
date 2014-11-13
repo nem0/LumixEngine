@@ -88,9 +88,6 @@ const uint32_t LUMIX_MAX_PATH = 260;
 
 #define LUMIX_RESTRICT __restrict
 
-#include "core/new.h"
-#include "core/new_macros.h"
-
 #pragma warning(disable : 4251)
 #pragma warning(disable : 4512)
 #pragma warning(disable : 4996)

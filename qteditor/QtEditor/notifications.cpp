@@ -69,7 +69,7 @@ class NotificationsImpl : public Notifications
 				if (m_items[0].m_time < 0)
 				{
 					delete m_items[0].m_widget;
-					m_items.erase(0);
+					m_items.removeAt(0);
 					updateLayout();
 				}
 			}

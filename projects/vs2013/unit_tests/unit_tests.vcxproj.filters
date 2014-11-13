@@ -8,7 +8,6 @@
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_path.cpp">
       <Filter>core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\core\new.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\engine\ut_resource_managers.cpp">
       <Filter>engine</Filter>
     </ClCompile>

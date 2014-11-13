@@ -1,6 +1,7 @@
 #pragma once 
 
 
+#include <new>
 #include "core/lumix.h"
 #include "core/MT/atomic.h"
 
