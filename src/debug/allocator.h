@@ -15,6 +15,7 @@ namespace Debug
 
 
 	class StackNode;
+	class StackTree;
 
 
 	class LUMIX_CORE_API Allocator : public IAllocator
@@ -40,9 +41,9 @@ namespace Debug
 
 		private:
 			IAllocator& m_source;
-			class StackTree* m_stack_tree;
+			StackTree* m_stack_tree;
 			MT::SpinMutex m_mutex;
-			class AllocationInfo* m_root;
+			AllocationInfo* m_root;
 			AllocationInfo m_sentinels[2];
 	};
 
