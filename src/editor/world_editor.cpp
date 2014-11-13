@@ -896,44 +896,47 @@ struct WorldEditorImpl : public WorldEditor
 				{
 					Model* model = scene->getRenderableModel(renderable);
 					Vec3 points[8];
-					const AABB& aabb = model->getAABB();
-					points[0] = aabb.getMin();
-					points[7] = aabb.getMax();
-					points[1].set(points[0].x, points[0].y, points[7].z);
-					points[2].set(points[0].x, points[7].y, points[0].z);
-					points[3].set(points[0].x, points[7].y, points[7].z);
-					points[4].set(points[7].x, points[0].y, points[0].z);
-					points[5].set(points[7].x, points[0].y, points[7].z);
-					points[6].set(points[7].x, points[7].y, points[0].z);
-					Matrix mtx = m_selected_entities[i].getMatrix();
-
-					Vec3 this_min, this_max;
-					for(int j = 0; j < 8; ++j)
+					if (model)
 					{
-						points[j] = mtx.multiplyPosition(points[j]); 
-					}
+						const AABB& aabb = model->getAABB();
+						points[0] = aabb.getMin();
+						points[7] = aabb.getMax();
+						points[1].set(points[0].x, points[0].y, points[7].z);
+						points[2].set(points[0].x, points[7].y, points[0].z);
+						points[3].set(points[0].x, points[7].y, points[7].z);
+						points[4].set(points[7].x, points[0].y, points[0].z);
+						points[5].set(points[7].x, points[0].y, points[7].z);
+						points[6].set(points[7].x, points[7].y, points[0].z);
+						Matrix mtx = m_selected_entities[i].getMatrix();
 
-					this_min = points[0];
-					this_max = points[0];
+						Vec3 this_min, this_max;
+						for (int j = 0; j < 8; ++j)
+						{
+							points[j] = mtx.multiplyPosition(points[j]);
+						}
 
-					for(int j = 0; j < 8; ++j)
-					{
-						this_min = minCoords(points[j], this_min);
-						this_max = maxCoords(points[j], this_max);
-					}
+						this_min = points[0];
+						this_max = points[0];
 
-					if(i > 0)
-					{
-						all_min = minCoords(this_min, all_min);
-						all_max = maxCoords(this_max, all_max);
-					}
-					else
-					{
-						all_min = this_min;
-						all_max = this_max;
-					}
+						for (int j = 0; j < 8; ++j)
+						{
+							this_min = minCoords(points[j], this_min);
+							this_max = maxCoords(points[j], this_max);
+						}
 
-					scene->addDebugCube(this_min, this_max, Vec3(1, 0, 0), 0);
+						if (i > 0)
+						{
+							all_min = minCoords(this_min, all_min);
+							all_max = maxCoords(this_max, all_max);
+						}
+						else
+						{
+							all_min = this_min;
+							all_max = this_max;
+						}
+
+						scene->addDebugCube(this_min, this_max, Vec3(1, 0, 0), 0);
+					}
 				}
 				else
 				{
@@ -1300,9 +1303,12 @@ struct WorldEditorImpl : public WorldEditor
 
 		void onEntityCreated(const Entity& entity)
 		{
-			EditorIcon* er = m_allocator.newObject<EditorIcon>();
-			er->create(*m_engine, *static_cast<RenderScene*>(getComponent(m_camera, CAMERA_HASH).scene), entity);
-			m_editor_icons.push(er);
+			if (m_camera.isValid())
+			{
+				EditorIcon* er = m_allocator.newObject<EditorIcon>();
+				er->create(*m_engine, *static_cast<RenderScene*>(getComponent(m_camera, CAMERA_HASH).scene), entity);
+				m_editor_icons.push(er);
+			}
 		}
 
 
@@ -1768,6 +1774,7 @@ struct WorldEditorImpl : public WorldEditor
 			, m_plugins(m_allocator)
 			, m_undo_stack(m_allocator)
 			, m_copy_buffer(m_allocator)
+			, m_camera(Entity::INVALID)
 		{
 			m_go_to_parameters.m_is_active = false;
 			m_undo_index = -1;
@@ -1937,17 +1944,6 @@ struct WorldEditorImpl : public WorldEditor
 
 		void onComponentCreated(const Component& cmp)
 		{
-			getComponents(cmp.entity).push(cmp);
-			for (int i = 0; i < m_editor_icons.size(); ++i)
-			{
-				if (m_editor_icons[i]->getEntity() == cmp.entity)
-				{
-					m_editor_icons[i]->destroy();
-					m_allocator.deleteObject(m_editor_icons[i]);
-					m_editor_icons.eraseFast(i);
-					break;
-				}
-			}
 			createEditorIcon(cmp.entity);
 		}
 
