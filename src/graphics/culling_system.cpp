@@ -16,18 +16,15 @@ namespace Lumix
 		const Sphere* LUMIX_RESTRICT end,
 		const int* LUMIX_RESTRICT indexes,
 		const Frustum* LUMIX_RESTRICT frustum,
-		int* LUMIX_RESTRICT results
+		CullingSystem::Subresults& results
 		)
 	{
-		for (const Sphere* sphere = start; sphere <= end; sphere++, indexes++, results++)
+		ASSERT(results.empty());
+		for (const Sphere* sphere = start; sphere <= end; sphere++, indexes++)
 		{
 			if (frustum->isSphereInside(sphere->m_position, sphere->m_radius))
 			{
-				*results = *indexes;
-			}
-			else
-			{
-				*results = -1;
+				results.push(*indexes);
 			}
 		}
 	}
@@ -35,7 +32,7 @@ namespace Lumix
 	class CullingJob : public MTJD::Job
 	{
 	public:
-		CullingJob(const CullingSystem::InputSpheres& spheres, const CullingSystem::Indexes& indexes, CullingSystem::Results& results, int start, int end, const Frustum& frustum, MTJD::Manager& manager, IAllocator& allocator)
+		CullingJob(const CullingSystem::InputSpheres& spheres, const CullingSystem::Indexes& indexes, CullingSystem::Subresults& results, int start, int end, const Frustum& frustum, MTJD::Manager& manager, IAllocator& allocator)
 			: Job(true, MTJD::Priority::Default, false, manager, allocator)
 			, m_spheres(spheres)
 			, m_indexes(indexes)
@@ -54,13 +51,13 @@ namespace Lumix
 
 		virtual void execute() override
 		{
-			doCulling(&m_spheres[m_start], &m_spheres[m_end], &m_indexes[m_start], &m_frustum, &m_results[m_start]);
+			doCulling(&m_spheres[m_start], &m_spheres[m_end], &m_indexes[m_start], &m_frustum, m_results);
 		}
 
 	private:
 		const CullingSystem::InputSpheres& m_spheres;
 		const CullingSystem::Indexes& m_indexes;
-		CullingSystem::Results& m_results;
+		CullingSystem::Subresults& m_results;
 		int m_start;
 		int m_end;
 		const Frustum& m_frustum;
@@ -92,7 +89,6 @@ namespace Lumix
 
 		virtual const Results& getResult() override
 		{
-
 			return m_result;
 		}
 
@@ -103,21 +99,23 @@ namespace Lumix
 			return m_result;
 		}
 
+
 		virtual void cullToFrustum(const Frustum& frustum) override
 		{
-
 			int count = m_spheres.size();
-			m_result.clear();
-			m_result.resize(count);
-
-			doCulling(&m_spheres[0], &m_spheres[count - 1], &m_indexes[0], &frustum, &m_result[0]);
+			if (m_result.empty())
+			{
+				m_result.emplace(m_allocator);
+			}
+			m_result[0].clear();
+			doCulling(&m_spheres[0], &m_spheres[count - 1], &m_indexes[0], &frustum, m_result[0]);
 		}
+
 
 		virtual void cullToFrustumAsync(const Frustum& frustum) override
 		{
+			
 			int count = m_spheres.size();
-			m_result.clear();
-			m_result.resize(count);
 
 			if (count == 0)
 				return;
@@ -126,16 +124,21 @@ namespace Lumix
 			cpu_count = Math::minValue(count, cpu_count);
 			ASSERT(cpu_count > 0);
 
+			while (m_result.size() < cpu_count)
+				m_result.emplace(m_allocator);
+
 			int step = count / cpu_count;
 			int i = 0;
 			for (; i < cpu_count - 1; i++)
 			{
-				CullingJob* cj = m_allocator.newObject<CullingJob>(m_spheres, m_indexes, m_result, i * step, (i + 1) * step - 1, frustum, m_mtjd_manager, m_allocator);
+				m_result[i].clear();
+				CullingJob* cj = m_allocator.newObject<CullingJob>(m_spheres, m_indexes, m_result[i], i * step, (i + 1) * step - 1, frustum, m_mtjd_manager, m_allocator);
 				cj->addDependency(&m_sync_point);
 				m_mtjd_manager.schedule(cj);
 			}
 
-			CullingJob* cj = m_allocator.newObject<CullingJob>(m_spheres, m_indexes, m_result, i * step, count - 1, frustum, m_mtjd_manager, m_allocator);
+			m_result[i].clear();
+			CullingJob* cj = m_allocator.newObject<CullingJob>(m_spheres, m_indexes, m_result[i], i * step, count - 1, frustum, m_mtjd_manager, m_allocator);
 			cj->addDependency(&m_sync_point);
 
 			m_mtjd_manager.schedule(cj);
@@ -144,7 +147,7 @@ namespace Lumix
 
 		virtual void enableStatic(int index) override
 		{
-			m_indexes[index] = 1;
+			m_indexes[index] = index;
 		}
 
 
@@ -159,12 +162,12 @@ namespace Lumix
 			if (index == m_spheres.size())
 			{
 				m_spheres.push(sphere);
-				m_indexes.push(1);
+				m_indexes.push(index);
 			}
 			else
 			{
 				m_spheres[index] = sphere;
-				m_indexes[index] = 1;
+				m_indexes[index] = index;
 			}
 		}
 
@@ -191,7 +194,7 @@ namespace Lumix
 			for (int i = 0; i < spheres.size(); i++)
 			{
 				m_spheres.push(spheres[i]);
-				m_indexes.push(i);
+				m_indexes.push(m_indexes.size() - 1);
 			}
 		}
 

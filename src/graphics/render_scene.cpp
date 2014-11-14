@@ -933,22 +933,25 @@ namespace Lumix
 				const CullingSystem::Results& results = m_culling_system->getResultAsync();
 
 				infos.reserve(m_renderables.size() * 2);
-				for (int i = 0, c = m_renderables.size(); i < c; ++i)
+				for (int subresult_index = 0; subresult_index < results.size(); ++subresult_index)
 				{
-					const Renderable* LUMIX_RESTRICT renderable = &m_renderables[i];
-					const Model* model = renderable->m_model;
-					bool is_model_ready = model && model->isReady();
-					bool culled = results[i] < 0;
-					if (is_model_ready && (renderable->m_layer_mask & layer_mask) != 0 && !culled)
+					const CullingSystem::Subresults& subresults = results[subresult_index];
+					for (int i = 0, c = subresults.size(); i < c; ++i)
 					{
-						for (int j = 0, c = renderable->m_model->getMeshCount(); j < c; ++j)
+						const Renderable* LUMIX_RESTRICT renderable = &m_renderables[subresults[i]];
+						const Model* model = renderable->m_model;
+						bool is_model_ready = model && model->isReady();
+						if (is_model_ready && (renderable->m_layer_mask & layer_mask) != 0)
 						{
-							RenderableInfo& info = infos.pushEmpty();
-							info.m_scale = renderable->m_scale;
-							info.m_geometry = model->getGeometry();
-							info.m_mesh = &model->getMesh(j);
-							info.m_pose = &renderable->m_pose;
-							info.m_matrix = &renderable->m_matrix;
+							for (int j = 0, c = renderable->m_model->getMeshCount(); j < c; ++j)
+							{
+								RenderableInfo& info = infos.pushEmpty();
+								info.m_scale = renderable->m_scale;
+								info.m_geometry = model->getGeometry();
+								info.m_mesh = &model->getMesh(j);
+								info.m_pose = &renderable->m_pose;
+								info.m_matrix = &renderable->m_matrix;
+							}
 						}
 					}
 				}
