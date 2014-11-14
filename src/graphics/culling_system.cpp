@@ -34,8 +34,6 @@ namespace Lumix
 
 	class CullingJob : public MTJD::Job
 	{
-		friend class ResultsCollectorJob;
-
 	public:
 		CullingJob(const CullingSystem::InputSpheres& spheres, const CullingSystem::Indexes& indexes, CullingSystem::Results& results, int start, int end, const Frustum& frustum, MTJD::Manager& manager, IAllocator& allocator)
 			: Job(true, MTJD::Priority::Default, false, manager, allocator)
