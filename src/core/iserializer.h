@@ -30,15 +30,15 @@ namespace Lumix
 			virtual void serializeArrayItem(const char* value) = 0;
 			virtual void serializeArrayItem(string& value) = 0;
 
-			virtual void deserialize(const char* label, uint32_t& value) = 0;
-			virtual void deserialize(const char* label, float& value) = 0;
-			virtual void deserialize(const char* label, int32_t& value) = 0;
-			virtual void deserialize(const char* label, char* value, int max_length) = 0;
-			virtual void deserialize(const char* label, bool& value) = 0;
-			virtual void deserialize(char* value, int max_length) = 0;
-			virtual void deserialize(bool& value) = 0;
-			virtual void deserialize(float& value) = 0;
-			virtual void deserialize(int32_t& value) = 0;
+			virtual void deserialize(const char* label, uint32_t& value, uint32_t default_value) = 0;
+			virtual void deserialize(const char* label, float& value, float default_value) = 0;
+			virtual void deserialize(const char* label, int32_t& value, int32_t default_value) = 0;
+			virtual void deserialize(const char* label, char* value, int max_length, const char* default_value) = 0;
+			virtual void deserialize(const char* label, bool& value, bool default_value) = 0;
+			virtual void deserialize(char* value, int max_length, const char* default_value) = 0;
+			virtual void deserialize(bool& value, bool default_value) = 0;
+			virtual void deserialize(float& value, float default_value) = 0;
+			virtual void deserialize(int32_t& value, int32_t default_value) = 0;
 			virtual void deserializeArrayBegin(const char* label) = 0;
 			virtual void deserializeArrayBegin() = 0;
 			virtual void deserializeArrayEnd() = 0;

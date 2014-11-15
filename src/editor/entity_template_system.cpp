@@ -265,7 +265,7 @@ namespace Lumix
 				m_template_names.clear();
 				m_instances.clear();
 				int32_t count;
-				serializer.deserialize("templates_count", count);
+				serializer.deserialize("templates_count", count, 0);
 				serializer.deserializeArrayBegin("template_names");
 				for (int i = 0; i < count; ++i)
 				{
@@ -275,7 +275,7 @@ namespace Lumix
 					m_template_names.push(string(name, m_editor.getAllocator()));
 				}
 				serializer.deserializeArrayEnd();
-				serializer.deserialize("instance_count", count);
+				serializer.deserialize("instance_count", count, 0);
 				serializer.deserializeArrayBegin("instances");
 				for (int i = 0; i < count; ++i)
 				{

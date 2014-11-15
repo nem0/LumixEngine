@@ -300,7 +300,7 @@ struct PipelineImpl : public Pipeline
 	{
 		int32_t count;
 		serializer.deserializeObjectBegin();
-		serializer.deserialize("frame_buffer_count", count);
+		serializer.deserialize("frame_buffer_count", count, 0);
 		serializer.deserializeArrayBegin("frame_buffers");
 		m_framebuffers.resize(count);
 		for(int i = 0; i < count; ++i)
@@ -330,8 +330,8 @@ struct PipelineImpl : public Pipeline
 			m_framebuffers[i].m_mask = mask;
 		}
 		serializer.deserializeArrayEnd();
-		serializer.deserialize("shadowmap_width", m_shadowmap_framebuffer.m_width);
-		serializer.deserialize("shadowmap_height", m_shadowmap_framebuffer.m_height);
+		serializer.deserialize("shadowmap_width", m_shadowmap_framebuffer.m_width, 0);
+		serializer.deserialize("shadowmap_height", m_shadowmap_framebuffer.m_height, 0);
 		m_shadowmap_framebuffer.m_mask = FrameBuffer::DEPTH_BIT;
 		
 		serializer.deserializeArrayBegin("commands");

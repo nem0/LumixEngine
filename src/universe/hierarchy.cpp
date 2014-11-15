@@ -153,7 +153,7 @@ class HierarchyImpl : public Hierarchy
 		virtual void deserialize(ISerializer& serializer) override
 		{
 			int size;
-			serializer.deserialize("hierarchy_size", size);
+			serializer.deserialize("hierarchy_size", size, 0);
 			serializer.deserializeArrayBegin("hierarchy");
 			for(int i = 0; i < size; ++i)
 			{

@@ -350,7 +350,7 @@ namespace Lumix
 			void deserializeCameras(ISerializer& serializer)
 			{
 				int32_t size;
-				serializer.deserialize("camera_count", size);
+				serializer.deserialize("camera_count", size, 0);
 				serializer.deserializeArrayBegin("cameras");
 				m_cameras.resize(size);
 				for (int i = 0; i < size; ++i)
@@ -377,7 +377,7 @@ namespace Lumix
 			void deserializeRenderables(ISerializer& serializer)
 			{
 				int32_t size = 0;
-				serializer.deserialize("renderable_count", size);
+				serializer.deserialize("renderable_count", size, 0);
 				serializer.deserializeArrayBegin("renderables");
 				for(int i = size; i < m_renderables.size(); ++i)
 				{
@@ -417,7 +417,7 @@ namespace Lumix
 			void deserializeLights(ISerializer& serializer)
 			{
 				int32_t size = 0;
-				serializer.deserialize("light_count", size);
+				serializer.deserialize("light_count", size, 0);
 				serializer.deserializeArrayBegin("lights");
 				m_lights.resize(size);
 				for (int i = 0; i < size; ++i)
@@ -452,7 +452,7 @@ namespace Lumix
 			void deserializeTerrains(ISerializer& serializer)
 			{
 				int32_t size = 0;
-				serializer.deserialize("terrain_count", size);
+				serializer.deserialize("terrain_count", size, 0);
 				serializer.deserializeArrayBegin("terrains");
 				for (int i = size; i < m_terrains.size(); ++i)
 				{

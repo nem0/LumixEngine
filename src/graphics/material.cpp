@@ -200,22 +200,22 @@ void Material::deserializeUniforms(ISerializer& serializer)
 			serializer.deserializeLabel(label, 255);
 			if (strcmp(label, "is_editable") == 0)
 			{
-				serializer.deserialize(uniform.m_is_editable);
+				serializer.deserialize(uniform.m_is_editable, false);
 			}
 			else if (strcmp(label, "name") == 0)
 			{
-				serializer.deserialize(uniform.m_name, Uniform::MAX_NAME_LENGTH);
+				serializer.deserialize(uniform.m_name, Uniform::MAX_NAME_LENGTH, "");
 				uniform.m_name_hash = crc32(uniform.m_name);
 			}
 			else if (strcmp(label, "int_value") == 0)
 			{
 				uniform.m_type = Uniform::INT;
-				serializer.deserialize(uniform.m_int);
+				serializer.deserialize(uniform.m_int, 0);
 			}
 			else if (strcmp(label, "float_value") == 0)
 			{
 				uniform.m_type = Uniform::FLOAT;
-				serializer.deserialize(uniform.m_float);
+				serializer.deserialize(uniform.m_float, 0);
 			}
 			else if (strcmp(label, "matrix_value") == 0)
 			{
@@ -231,7 +231,7 @@ void Material::deserializeUniforms(ISerializer& serializer)
 			else if (strcmp(label, "time") == 0)
 			{
 				uniform.m_type = Uniform::TIME;
-				serializer.deserialize(uniform.m_float);
+				serializer.deserialize(uniform.m_float, 0);
 			}
 			else
 			{
@@ -324,7 +324,7 @@ bool Material::deserializeTexture(ISerializer& serializer, const char* material_
 		serializer.deserializeLabel(label, sizeof(label));
 		if (strcmp(label, "source") == 0)
 		{
-			serializer.deserialize(path, MAX_PATH);
+			serializer.deserialize(path, MAX_PATH, "");
 			if (path[0] != '\0')
 			{
 				StackAllocator<LUMIX_MAX_PATH> allocator;
@@ -352,7 +352,7 @@ bool Material::deserializeTexture(ISerializer& serializer, const char* material_
 		else if (strcmp("uniform", label) == 0)
 		{
 			Uniform& uniform = m_uniforms.pushEmpty();
-			serializer.deserialize(uniform.m_name, Uniform::MAX_NAME_LENGTH);
+			serializer.deserialize(uniform.m_name, Uniform::MAX_NAME_LENGTH, "");
 			copyString(info.m_uniform, sizeof(info.m_uniform), uniform.m_name);
 			uniform.m_name_hash = crc32(uniform.m_name);
 			uniform.m_type = Uniform::INT;
@@ -360,7 +360,7 @@ bool Material::deserializeTexture(ISerializer& serializer, const char* material_
 		}
 		else if (strcmp("keep_data", label) == 0)
 		{
-			serializer.deserialize(info.m_keep_data);
+			serializer.deserialize(info.m_keep_data, false);
 			if (info.m_keep_data && info.m_texture)
 			{
 				if (info.m_texture->isReady() && !info.m_texture->getData())
@@ -415,33 +415,33 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			}
 			else if (strcmp(label, "alpha_cutout") == 0)
 			{
-				serializer.deserialize(m_is_alpha_cutout);
+				serializer.deserialize(m_is_alpha_cutout, false);
 			}
 			else if (strcmp(label, "shadow_receiver") == 0)
 			{
-				serializer.deserialize(m_is_shadow_receiver);
+				serializer.deserialize(m_is_shadow_receiver, true);
 			}
 			else if (strcmp(label, "alpha_to_coverage") == 0)
 			{
-				serializer.deserialize(m_is_alpha_to_coverage);
+				serializer.deserialize(m_is_alpha_to_coverage, false);
 			}
 			else if (strcmp(label, "shader") == 0)
 			{
-				serializer.deserialize(path, MAX_PATH);
+				serializer.deserialize(path, MAX_PATH, "");
 				setShader(static_cast<Shader*>(m_resource_manager.get(ResourceManager::SHADER)->load(path)));
 			}
 			else if (strcmp(label, "z_test") == 0)
 			{
-				serializer.deserialize(m_is_z_test);
+				serializer.deserialize(m_is_z_test, true);
 			}
 			else if (strcmp(label, "backface_culling") == 0)
 			{
-				serializer.deserialize(m_is_backface_culling);
+				serializer.deserialize(m_is_backface_culling, true);
 			}
 			else if (strcmp(label, "depth_func") == 0)
 			{
 				char tmp[30];
-				serializer.deserialize(tmp, 30);
+				serializer.deserialize(tmp, 30, "lequal");
 				if (strcmp(tmp, "lequal") == 0)
 				{
 					m_depth_func = DepthFunc::LEQUAL;

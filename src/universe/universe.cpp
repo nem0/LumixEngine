@@ -154,7 +154,7 @@ void Universe::serialize(ISerializer& serializer)
 void Universe::deserialize(ISerializer& serializer)
 {
 	int count;
-	serializer.deserialize("count", count);
+	serializer.deserialize("count", count, 0);
 	m_positions.resize(count);
 	m_rotations.resize(count);
 
@@ -177,7 +177,7 @@ void Universe::deserialize(ISerializer& serializer)
 	}
 	serializer.deserializeArrayEnd();
 
-	serializer.deserialize("name_count", count);
+	serializer.deserialize("name_count", count, 0);
 	serializer.deserializeArrayBegin("names");
 	m_id_to_name_map.clear();
 	m_name_to_id_map.clear();
@@ -193,7 +193,7 @@ void Universe::deserialize(ISerializer& serializer)
 	}
 	serializer.deserializeArrayEnd();
 
-	serializer.deserialize("free_slot_count", count);
+	serializer.deserialize("free_slot_count", count, 0);
 	m_free_slots.resize(count);
 	serializer.deserializeArrayBegin("free_slots");
 	for(int i = 0; i < count; ++i)
