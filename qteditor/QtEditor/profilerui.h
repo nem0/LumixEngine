@@ -44,7 +44,6 @@ class ProfileModel : public QAbstractItemModel
 			LENGTH,
 			LENGTH_EXCLUSIVE,
 			HIT_COUNT,
-			FUNCTION,
 			COUNT
 		};
 
@@ -54,7 +53,6 @@ class ProfileModel : public QAbstractItemModel
 			~Block() {}
 
 			const char* m_name;
-			const char* m_function;
 			Block* m_parent;
 			Block* m_first_child;
 			Block* m_next;
