@@ -223,7 +223,7 @@ void Material::deserializeUniforms(ISerializer& serializer)
 				serializer.deserializeArrayBegin();
 				for (int i = 0; i < 16; ++i)
 				{
-					serializer.deserializeArrayItem(uniform.m_matrix[i]);
+					serializer.deserializeArrayItem(uniform.m_matrix[i], 0);
 					ASSERT(i == 15 || !serializer.isArrayEnd());
 				}
 				serializer.deserializeArrayEnd();
