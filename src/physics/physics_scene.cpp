@@ -835,7 +835,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	void deserializeActor(ISerializer& serializer, int idx)
 	{
 		ActorType type;
-		serializer.deserialize("type", (int32_t&)type);
+		serializer.deserialize("type", (int32_t&)type, 0);
 		physx::PxTransform transform;
 		Matrix mtx;
 		m_actors[idx]->m_entity.getMatrix(mtx);
@@ -847,9 +847,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			case BOX:
 				{
-					serializer.deserialize("x", box_geom.halfExtents.x);
-					serializer.deserialize("y", box_geom.halfExtents.y);
-					serializer.deserialize("z", box_geom.halfExtents.z);
+					serializer.deserialize("x", box_geom.halfExtents.x, 1.0f);
+					serializer.deserialize("y", box_geom.halfExtents.y, 1.0f);
+					serializer.deserialize("z", box_geom.halfExtents.z, 1.0f);
 					geom = &box_geom;
 				}
 				break;
@@ -924,7 +924,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		int32_t count;
 		m_dynamic_actors.clear();
-		serializer.deserialize("count", count);
+		serializer.deserialize("count", count, 0);
 		for (int i = count; i < m_actors.size(); ++i)
 		{
 			m_actors[i]->m_physx_actor->release();
@@ -960,7 +960,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	void deserializeControllers(ISerializer& serializer)
 	{
 		int32_t count;
-		serializer.deserialize("count", count);
+		serializer.deserialize("count", count, 0);
 		for (int i = 0; i < m_controllers.size(); ++i)
 		{
 			m_controllers[i].m_controller->release();
@@ -1003,7 +1003,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	void deserializeTerrains(ISerializer& serializer)
 	{
 		int32_t count;
-		serializer.deserialize("count", count);
+		serializer.deserialize("count", count, 0);
 		for (int i = count; i < m_terrains.size(); ++i)
 		{
 			m_allocator.deleteObject(m_terrains[i]);

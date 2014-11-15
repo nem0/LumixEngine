@@ -92,7 +92,7 @@ namespace Lumix
 			virtual void deserialize(ISerializer& serializer) override
 			{
 				int count;
-				serializer.deserialize("count", count);
+				serializer.deserialize("count", count, 0);
 				serializer.deserializeArrayBegin("animables");
 				m_animables.resize(count);
 				for (int i = 0; i < count; ++i)

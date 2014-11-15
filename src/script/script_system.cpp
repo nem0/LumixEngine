@@ -51,7 +51,7 @@ namespace Lumix
 			{
 				stopAll();
 				int count;
-				serializer.deserialize("count", count);
+				serializer.deserialize("count", count, 0);
 				serializer.deserializeArrayBegin("scripts");
 				m_script_entities.resize(count);
 				m_paths.clear();

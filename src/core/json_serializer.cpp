@@ -7,7 +7,7 @@ namespace Lumix
 {
 
 
-	JsonSerializer::JsonSerializer(FS::IFile& file, AccessMode access_mode, const char* path)
+JsonSerializer::JsonSerializer(FS::IFile& file, AccessMode access_mode, const char* path)
 	: m_file(file)
 	, m_access_mode(access_mode)
 {
@@ -188,52 +188,69 @@ void JsonSerializer::serializeArrayItem(bool value)
 }
 
 
-void JsonSerializer::deserialize(bool& value)
+void JsonSerializer::deserialize(bool& value, bool default_value)
 {
-	logErrorIfNot(!m_is_string_token);
-	value = strcmp(m_token, "true") == 0;
+	value = !m_is_string_token ? (strcmp(m_token, "true") == 0) : default_value;
 	deserializeToken();
 }
 
 
-void JsonSerializer::deserialize(float& value)
+void JsonSerializer::deserialize(float& value, float default_value)
 {
-	logErrorIfNot(!m_is_string_token);
-	value = (float)atof(m_token);
+	if (!m_is_string_token)
+	{
+		value = (float)atof(m_token);
+	}
+	else
+	{
+		value = default_value;
+	}
 	deserializeToken();
 }
 
 
 
-void JsonSerializer::deserialize(int32_t& value)
+void JsonSerializer::deserialize(int32_t& value, int32_t default_value)
 {
-	logErrorIfNot(!m_is_string_token);
-	logErrorIfNot(fromCString(m_token, (int)strlen(m_token), &value));
+	if (m_is_string_token || !fromCString(m_token, (int)strlen(m_token), &value))
+	{
+		value = default_value;
+	}
 	deserializeToken();
 }
 
 
-void JsonSerializer::deserialize(char* value, int max_length)
+void JsonSerializer::deserialize(char* value, int max_length, const char* default_value)
 {
-	logErrorIfNot(m_is_string_token);
-	readStringToken(value, max_length);
+	if (!m_is_string_token || !readStringToken(value, max_length))
+	{
+		copyString(value, max_length, default_value);
+	}
 }
 
 
-void JsonSerializer::deserialize(const char* label, float& value)
+void JsonSerializer::deserialize(const char* label, float& value, float default_value)
 {
 	deserializeLabel(label);
-	logErrorIfNot(!m_is_string_token);
-	value = (float)atof(m_token);
+	if (!m_is_string_token)
+	{
+		value = (float)atof(m_token);
+	}
+	else
+	{
+		value = default_value;
+	}
 	deserializeToken();
 }
 
 
-void JsonSerializer::deserialize(const char* label, uint32_t& value)
+void JsonSerializer::deserialize(const char* label, uint32_t& value, uint32_t default_value)
 {
 	deserializeLabel(label);
-	logErrorIfNot(!m_is_string_token);
-	logErrorIfNot(fromCString(m_token, (int)strlen(m_token), &value));
+	if (m_is_string_token || !fromCString(m_token, (int)strlen(m_token), &value))
+	{
+		value = default_value;
+	}
 	deserializeToken();
 }
 
@@ -244,19 +261,24 @@ bool JsonSerializer::isObjectEnd() const
 }
 
 
-void JsonSerializer::deserialize(const char* label, int32_t& value)
+void JsonSerializer::deserialize(const char* label, int32_t& value, int32_t default_value)
 {
 	deserializeLabel(label);
-	logErrorIfNot(!m_is_string_token);
-	logErrorIfNot(fromCString(m_token, (int)strlen(m_token), &value));
+	if (m_is_string_token || !fromCString(m_token, (int)strlen(m_token), &value))
+	{
+		value = default_value;
+	}
 	deserializeToken();
 }
 
 
-void JsonSerializer::deserialize(const char* label, char* value, int max_length)
+void JsonSerializer::deserialize(const char* label, char* value, int max_length, const char* default_value)
 {
 	deserializeLabel(label);
-	readStringToken(value, max_length);
+	if (!readStringToken(value, max_length))
+	{
+		copyString(value, max_length, default_value);
+	}
 }
 
 
@@ -383,11 +405,17 @@ void JsonSerializer::deserializeArrayItem(bool& value)
 }
 
 
-void JsonSerializer::deserialize(const char* label, bool& value)
+void JsonSerializer::deserialize(const char* label, bool& value, bool default_value)
 {
 	deserializeLabel(label);
-	logErrorIfNot(!m_is_string_token);
-	value = strcmp("true", m_token) == 0;
+	if(!m_is_string_token)
+	{
+		value = strcmp("true", m_token) == 0;
+	}
+	else
+	{
+		value = default_value;
+	}
 	deserializeToken();
 }
 
@@ -436,9 +464,10 @@ bool JsonSerializer::readStringTokenPart(char* tmp, int max_len)
 }
 
 
-void JsonSerializer::readStringToken(char* tmp, int max_len)
+bool JsonSerializer::readStringToken(char* tmp, int max_len)
 {
-	logErrorIfNot(m_is_string_token);
+	if (!m_is_string_token)
+		return false;
 	int i = 0;
 	while (m_file.read(tmp + i, 1) && tmp[i] != '"')
 	{
@@ -448,16 +477,17 @@ void JsonSerializer::readStringToken(char* tmp, int max_len)
 	tmp[i] = '\0';
 	if (!m_file.read(&m_buffer, 1))
 	{
-		return;
+		return true;
 	}
 	while (isDelimiter(m_buffer))
 	{
 		if (!m_file.read(&m_buffer, 1))
 		{
-			return;
+			return true;
 		}
 	}
 	deserializeToken();
+	return true;
 }
 
 void JsonSerializer::deserializeArrayComma()

@@ -212,7 +212,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			}
 			else if (strcmp(label, "shadowmap_required") == 0)
 			{
-				serializer.deserialize(m_is_shadowmap_required);
+				serializer.deserialize(m_is_shadowmap_required, false);
 			}
 		}
 		serializer.deserializeObjectEnd();
