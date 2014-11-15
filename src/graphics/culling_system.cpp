@@ -12,19 +12,20 @@
 namespace Lumix
 {
 	static void doCulling(
+		int start_index,
 		const Sphere* LUMIX_RESTRICT start,
 		const Sphere* LUMIX_RESTRICT end,
-		const int* LUMIX_RESTRICT indexes,
 		const Frustum* LUMIX_RESTRICT frustum,
 		CullingSystem::Subresults& results
 		)
 	{
+		int i = start_index;
 		ASSERT(results.empty());
-		for (const Sphere* sphere = start; sphere <= end; sphere++, indexes++)
+		for (const Sphere* sphere = start; sphere <= end; sphere++, ++i)
 		{
 			if (frustum->isSphereInside(sphere->m_position, sphere->m_radius))
 			{
-				results.push(*indexes);
+				results.push(i);
 			}
 		}
 	}
@@ -43,6 +44,8 @@ namespace Lumix
 		{
 			setJobName("CullingJob");
 			m_results.reserve(end - start);
+			ASSERT(m_results.empty());
+			m_is_executed = false;
 		}
 
 		virtual ~CullingJob()
@@ -51,7 +54,9 @@ namespace Lumix
 
 		virtual void execute() override
 		{
-			doCulling(&m_spheres[m_start], &m_spheres[m_end], &m_indexes[m_start], &m_frustum, m_results);
+			ASSERT(m_results.empty() && !m_is_executed);
+			doCulling(m_start, &m_spheres[m_start], &m_spheres[m_end], &m_frustum, m_results);
+			m_is_executed = true;
 		}
 
 	private:
@@ -61,6 +66,7 @@ namespace Lumix
 		int m_start;
 		int m_end;
 		const Frustum& m_frustum;
+		bool m_is_executed;
 
 	};
 
@@ -108,13 +114,11 @@ namespace Lumix
 				m_result.emplace(m_allocator);
 			}
 			m_result[0].clear();
-			doCulling(&m_spheres[0], &m_spheres[count - 1], &m_indexes[0], &frustum, m_result[0]);
+			doCulling(0, &m_spheres[0], &m_spheres[count - 1], &frustum, m_result[0]);
 		}
-
 
 		virtual void cullToFrustumAsync(const Frustum& frustum) override
 		{
-			
 			int count = m_spheres.size();
 
 			if (count == 0)
@@ -129,19 +133,25 @@ namespace Lumix
 
 			int step = count / cpu_count;
 			int i = 0;
+			CullingJob* jobs[16];
+			ASSERT(sizeof(jobs) / sizeof(jobs[0]) >= cpu_count);
 			for (; i < cpu_count - 1; i++)
 			{
 				m_result[i].clear();
 				CullingJob* cj = m_allocator.newObject<CullingJob>(m_spheres, m_indexes, m_result[i], i * step, (i + 1) * step - 1, frustum, m_mtjd_manager, m_allocator);
 				cj->addDependency(&m_sync_point);
-				m_mtjd_manager.schedule(cj);
+				jobs[i] = cj;
 			}
 
 			m_result[i].clear();
 			CullingJob* cj = m_allocator.newObject<CullingJob>(m_spheres, m_indexes, m_result[i], i * step, count - 1, frustum, m_mtjd_manager, m_allocator);
 			cj->addDependency(&m_sync_point);
+			jobs[i] = cj;
 
-			m_mtjd_manager.schedule(cj);
+			for (i = 0; i < cpu_count; ++i)
+			{
+				m_mtjd_manager.schedule(jobs[i]);
+			}
 		}
 
 
