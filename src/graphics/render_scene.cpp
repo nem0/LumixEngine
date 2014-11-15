@@ -355,17 +355,17 @@ namespace Lumix
 				m_cameras.resize(size);
 				for (int i = 0; i < size; ++i)
 				{
-					serializer.deserializeArrayItem(m_cameras[i].m_is_free);
-					serializer.deserializeArrayItem(m_cameras[i].m_far);
-					serializer.deserializeArrayItem(m_cameras[i].m_near);
-					serializer.deserializeArrayItem(m_cameras[i].m_fov);
-					serializer.deserializeArrayItem(m_cameras[i].m_is_active);
-					serializer.deserializeArrayItem(m_cameras[i].m_width);
-					serializer.deserializeArrayItem(m_cameras[i].m_height);
+					serializer.deserializeArrayItem(m_cameras[i].m_is_free, true);
+					serializer.deserializeArrayItem(m_cameras[i].m_far, 0.01f);
+					serializer.deserializeArrayItem(m_cameras[i].m_near, 1000.0f);
+					serializer.deserializeArrayItem(m_cameras[i].m_fov, 60.0f);
+					serializer.deserializeArrayItem(m_cameras[i].m_is_active, false);
+					serializer.deserializeArrayItem(m_cameras[i].m_width, 800);
+					serializer.deserializeArrayItem(m_cameras[i].m_height, 600);
 					m_cameras[i].m_aspect = m_cameras[i].m_width / m_cameras[i].m_height;
-					serializer.deserializeArrayItem(m_cameras[i].m_entity.index);
+					serializer.deserializeArrayItem(m_cameras[i].m_entity.index, 0);
 					m_cameras[i].m_entity.universe = &m_universe;
-					serializer.deserializeArrayItem(m_cameras[i].m_slot, Camera::MAX_SLOT_LENGTH);
+					serializer.deserializeArrayItem(m_cameras[i].m_slot, Camera::MAX_SLOT_LENGTH, "main");
 					if(!m_cameras[i].m_is_free)
 					{
 						m_universe.addComponent(m_cameras[i].m_entity, CAMERA_HASH, this, i);
@@ -389,24 +389,24 @@ namespace Lumix
 				for (int i = 0; i < size; ++i)
 				{
 					m_renderables.emplace(m_allocator);
-					serializer.deserializeArrayItem(m_renderables[i].m_is_always_visible);
-					serializer.deserializeArrayItem(m_renderables[i].m_component_index);
+					serializer.deserializeArrayItem(m_renderables[i].m_is_always_visible, false);
+					serializer.deserializeArrayItem(m_renderables[i].m_component_index, 0);
 					if (m_renderables[i].m_is_always_visible)
 					{
 						m_always_visible.push(m_renderables[i].m_component_index);
 					}
-					serializer.deserializeArrayItem(m_renderables[i].m_entity.index);
+					serializer.deserializeArrayItem(m_renderables[i].m_entity.index, 0);
 					m_renderables[i].m_model = NULL;
 					m_renderables[i].m_entity.universe = &m_universe;
-					serializer.deserializeArrayItem(m_renderables[i].m_layer_mask);
+					serializer.deserializeArrayItem(m_renderables[i].m_layer_mask, 0);
 					char path[LUMIX_MAX_PATH];
-					serializer.deserializeArrayItem(path, LUMIX_MAX_PATH);
-					serializer.deserializeArrayItem(m_renderables[i].m_scale);
+					serializer.deserializeArrayItem(path, LUMIX_MAX_PATH, "");
+					serializer.deserializeArrayItem(m_renderables[i].m_scale, 0);
 					m_culling_system->addStatic(Sphere(m_renderables[i].m_entity.getPosition(), 1.0f), i);
 					setModel(i, static_cast<Model*>(m_engine.getResourceManager().get(ResourceManager::MODEL)->load(path)));
 					for (int j = 0; j < 16; ++j)
 					{
-						serializer.deserializeArrayItem((&m_renderables[i].m_matrix.m11)[j]);
+						serializer.deserializeArrayItem((&m_renderables[i].m_matrix.m11)[j], i == j ? 1.0f : 0.0f);
 					}
 					m_universe.addComponent(m_renderables[i].m_entity, RENDERABLE_HASH, this, i);
 				}
@@ -422,25 +422,25 @@ namespace Lumix
 				m_lights.resize(size);
 				for (int i = 0; i < size; ++i)
 				{
-					serializer.deserializeArrayItem(m_lights[i].m_entity.index);
+					serializer.deserializeArrayItem(m_lights[i].m_entity.index, 0);
 					m_lights[i].m_entity.universe = &m_universe;
-					serializer.deserializeArrayItem((int32_t&)m_lights[i].m_type);
-					serializer.deserializeArrayItem(m_lights[i].m_is_free);
-					serializer.deserializeArrayItem(m_lights[i].m_diffuse_color.x);
-					serializer.deserializeArrayItem(m_lights[i].m_diffuse_color.y);
-					serializer.deserializeArrayItem(m_lights[i].m_diffuse_color.z);
-					serializer.deserializeArrayItem(m_lights[i].m_diffuse_color.w);
-					serializer.deserializeArrayItem(m_lights[i].m_diffuse_intensity);
-					serializer.deserializeArrayItem(m_lights[i].m_ambient_color.x);
-					serializer.deserializeArrayItem(m_lights[i].m_ambient_color.y);
-					serializer.deserializeArrayItem(m_lights[i].m_ambient_color.z);
-					serializer.deserializeArrayItem(m_lights[i].m_ambient_color.w);
-					serializer.deserializeArrayItem(m_lights[i].m_ambient_intensity);
-					serializer.deserializeArrayItem(m_lights[i].m_fog_color.x);
-					serializer.deserializeArrayItem(m_lights[i].m_fog_color.y);
-					serializer.deserializeArrayItem(m_lights[i].m_fog_color.z);
-					serializer.deserializeArrayItem(m_lights[i].m_fog_color.w);
-					serializer.deserializeArrayItem(m_lights[i].m_fog_density);
+					serializer.deserializeArrayItem((int32_t&)m_lights[i].m_type, 0);
+					serializer.deserializeArrayItem(m_lights[i].m_is_free, true);
+					serializer.deserializeArrayItem(m_lights[i].m_diffuse_color.x, 0);
+					serializer.deserializeArrayItem(m_lights[i].m_diffuse_color.y, 0);
+					serializer.deserializeArrayItem(m_lights[i].m_diffuse_color.z, 0);
+					serializer.deserializeArrayItem(m_lights[i].m_diffuse_color.w, 0);
+					serializer.deserializeArrayItem(m_lights[i].m_diffuse_intensity, 0);
+					serializer.deserializeArrayItem(m_lights[i].m_ambient_color.x, 0);
+					serializer.deserializeArrayItem(m_lights[i].m_ambient_color.y, 0);
+					serializer.deserializeArrayItem(m_lights[i].m_ambient_color.z, 0);
+					serializer.deserializeArrayItem(m_lights[i].m_ambient_color.w, 0);
+					serializer.deserializeArrayItem(m_lights[i].m_ambient_intensity, 0);
+					serializer.deserializeArrayItem(m_lights[i].m_fog_color.x, 0);
+					serializer.deserializeArrayItem(m_lights[i].m_fog_color.y, 0);
+					serializer.deserializeArrayItem(m_lights[i].m_fog_color.z, 0);
+					serializer.deserializeArrayItem(m_lights[i].m_fog_color.w, 0);
+					serializer.deserializeArrayItem(m_lights[i].m_fog_density, 0);
 					if(!m_lights[i].m_is_free)
 					{
 						m_universe.addComponent(m_lights[i].m_entity, LIGHT_HASH, this, i);
@@ -463,7 +463,7 @@ namespace Lumix
 				for (int i = 0; i < size; ++i)
 				{
 					bool exists;
-					serializer.deserializeArrayItem(exists);
+					serializer.deserializeArrayItem(exists, false);
 					if(exists)
 					{
 						m_terrains[i] = m_allocator.newObject<Terrain>(Entity::INVALID, *this, m_allocator);
