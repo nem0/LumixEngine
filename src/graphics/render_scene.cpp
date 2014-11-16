@@ -1358,24 +1358,29 @@ namespace Lumix
 			}
 
 		private:
+			void modelLoaded(Model* model, int renderable_index)
+			{
+				float bounding_radius = m_renderables[renderable_index]->m_model->getBoundingRadius();
+				m_culling_system->updateBoundingRadius(bounding_radius, renderable_index);
+				m_renderables[renderable_index]->m_meshes.clear();
+				for (int j = 0; j < model->getMeshCount(); ++j)
+				{
+					RenderableMesh& info = m_renderables[renderable_index]->m_meshes.pushEmpty();
+					info.m_scale = m_renderables[renderable_index]->m_scale;
+					info.m_mesh = &model->getMesh(j);
+					info.m_pose = &m_renderables[renderable_index]->m_pose;
+					info.m_matrix = &m_renderables[renderable_index]->m_matrix;
+					info.m_model = model;
+				}
+			}
+
 			void modelLoaded(Model* model)
 			{
 				for (int i = 0; i < m_renderables.size(); ++i)
 				{
 					if (m_renderables[i]->m_model == model)
 					{
-						float bounding_radius = m_renderables[i]->m_model->getBoundingRadius();
-						m_culling_system->updateBoundingRadius(bounding_radius, i);
-						m_renderables[i]->m_meshes.clear();
-						for (int j = 0; j < model->getMeshCount(); ++j)
-						{
-							RenderableMesh& info = m_renderables[i]->m_meshes.pushEmpty();
-							info.m_scale = m_renderables[i]->m_scale;
-							info.m_mesh = &model->getMesh(j);
-							info.m_pose = &m_renderables[i]->m_pose;
-							info.m_matrix = &m_renderables[i]->m_matrix;
-							info.m_model = model;
-						}
+						modelLoaded(model, i);
 					}
 				}
 			}
@@ -1417,9 +1422,7 @@ namespace Lumix
 
 					if(model->isReady())
 					{
-						m_culling_system->updateBoundingRadius(model->getBoundingRadius(), renderable_index);
-						m_renderables[renderable_index]->m_pose.resize(model->getBoneCount());
-						model->getPose(m_renderables[renderable_index]->m_pose);
+						modelLoaded(model, renderable_index);
 					}
 				}
 			}
