@@ -7,6 +7,9 @@
 #include "core/iserializer.h"
 #include "core/log.h"
 #include "core/math_utils.h"
+#include "core/mtjd/generic_job.h"
+#include "core/mtjd/job.h"
+#include "core/mtjd/manager.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
@@ -42,7 +45,7 @@ namespace Lumix
 
 	struct Renderable
 	{
-		Renderable(IAllocator& allocator) : m_pose(allocator) {}
+		Renderable(IAllocator& allocator) : m_pose(allocator), m_meshes(allocator) {}
 
 		int32_t m_component_index;
 		int64_t m_layer_mask;
@@ -52,6 +55,7 @@ namespace Lumix
 		Entity m_entity;
 		float m_scale;
 		bool m_is_always_visible;
+		Array<RenderableMesh> m_meshes;
 
 		private:
 			Renderable(const Renderable&);
@@ -116,7 +120,7 @@ namespace Lumix
 					{
 						if(new_state == Resource::State::READY)
 						{
-							m_scene.updateBoundingRadiuses(m_model);
+							m_scene.modelLoaded(m_model);
 						}
 					}
 
@@ -139,6 +143,8 @@ namespace Lumix
 				, m_lights(m_allocator)
 				, m_debug_lines(m_allocator)
 				, m_always_visible(m_allocator)
+				, m_temporary_infos(m_allocator)
+				, m_sync_point(true, m_allocator)
 			{
 				m_universe.entityMoved().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 				m_timer = Timer::create(m_allocator);
@@ -768,7 +774,12 @@ namespace Lumix
 
 			virtual void setRenderableScale(Component cmp, float scale) override
 			{
-				m_renderables[getRenderable(cmp.index)].m_scale = scale;
+				Renderable& r = m_renderables[getRenderable(cmp.index)];
+				r.m_scale = scale;
+				for (int i = 0; i < r.m_meshes.size(); ++i)
+				{
+					r.m_meshes[i].m_scale = scale;
+				}
 			}
 
 
@@ -921,85 +932,131 @@ namespace Lumix
 			}
 
 
-			virtual void getRenderableInfos(const Frustum& frustum, Array<RenderableInfo>& infos, int64_t layer_mask) override
+			const CullingSystem::Results* cull(const Frustum& frustum)
+			{
+				PROFILE_FUNCTION();
+				if (m_renderables.empty())
+					return NULL;
+
+				m_culling_system->cullToFrustumAsync(frustum);
+				return &m_culling_system->getResultAsync();
+			}
+
+
+			void mergeTemporaryInfos(Array<RenderableInfo>& all_infos)
+			{
+				PROFILE_FUNCTION();
+				all_infos.reserve(m_renderables.size() * 2);
+				for (int i = 0; i < m_temporary_infos.size(); ++i)
+				{
+					Array<RenderableInfo>& subinfos = m_temporary_infos[i];
+					if (!subinfos.empty())
+					{
+						int size = all_infos.size();
+						all_infos.resize(size + subinfos.size());
+						memcpy(&all_infos[0] + size, &subinfos[0], sizeof(RenderableInfo) * subinfos.size());
+					}
+				}
+			}
+
+
+			void runJobs(Array<MTJD::Job*>& jobs, MTJD::Group& sync_point)
+			{
+				PROFILE_FUNCTION();
+				for (int i = 0; i < jobs.size(); ++i)
+				{
+					m_engine.getMTJDManager().schedule(jobs[i]);
+				}
+				if (!jobs.empty())
+				{
+					sync_point.sync();
+				}
+			}
+
+
+			void fillTemporaryInfos(const CullingSystem::Results& results, int64_t layer_mask)
+			{
+				PROFILE_FUNCTION();
+				static Array<MTJD::Job*> jobs(m_allocator);
+				jobs.clear();
+
+				while (m_temporary_infos.size() < results.size())
+				{
+					m_temporary_infos.emplace(m_allocator);
+				}
+				for (int subresult_index = 0; subresult_index < results.size(); ++subresult_index)
+				{
+					Array<RenderableInfo>& subinfos = m_temporary_infos[subresult_index];
+					subinfos.clear();
+					MTJD::Job* job = MTJD::makeJob(m_allocator, m_engine.getMTJDManager(), [&subinfos, layer_mask, this, &results, subresult_index]()
+						{
+							const CullingSystem::Subresults& subresults = results[subresult_index];
+							for (int i = 0, c = subresults.size(); i < c; ++i)
+							{
+								const Renderable* LUMIX_RESTRICT renderable = &m_renderables[subresults[i]];
+								if ((renderable->m_layer_mask & layer_mask) != 0)
+								{
+									for (int j = 0, c = renderable->m_meshes.size(); j < c; ++j)
+									{
+										RenderableInfo& info = subinfos.pushEmpty();
+										info.m_mesh = &renderable->m_meshes[j];
+										info.m_key = (int64_t)renderable->m_meshes[j].m_mesh;
+									}
+								}
+							}
+						});
+					job->addDependency(&m_sync_point);
+					jobs.push(job);
+				}
+				runJobs(jobs, m_sync_point);
+			}
+
+			
+			virtual void getRenderableInfos(const Frustum& frustum, Array<RenderableInfo>& all_infos, int64_t layer_mask) override
 			{
 				PROFILE_FUNCTION();
 
-				if (m_renderables.empty())
-					return;
-
-				m_culling_system->cullToFrustumAsync(frustum);
-
-				const CullingSystem::Results& results = m_culling_system->getResultAsync();
-
-				infos.reserve(m_renderables.size() * 2);
-				for (int subresult_index = 0; subresult_index < results.size(); ++subresult_index)
+				const CullingSystem::Results* results = cull(frustum);
+				if (!results)
 				{
-					const CullingSystem::Subresults& subresults = results[subresult_index];
-					for (int i = 0, c = subresults.size(); i < c; ++i)
-					{
-						const Renderable* LUMIX_RESTRICT renderable = &m_renderables[subresults[i]];
-						const Model* model = renderable->m_model;
-						bool is_model_ready = model && model->isReady();
-						if (is_model_ready && (renderable->m_layer_mask & layer_mask) != 0)
-						{
-							for (int j = 0, c = renderable->m_model->getMeshCount(); j < c; ++j)
-							{
-								RenderableInfo& info = infos.pushEmpty();
-								info.m_scale = renderable->m_scale;
-								info.m_geometry = model->getGeometry();
-								info.m_mesh = &model->getMesh(j);
-								info.m_pose = &renderable->m_pose;
-								info.m_matrix = &renderable->m_matrix;
-							}
-						}
-					}
+					return;
 				}
+
+				fillTemporaryInfos(*results, layer_mask);
+				mergeTemporaryInfos(all_infos);
+
 				for (int i = 0, c = m_always_visible.size(); i < c; ++i)
 				{
 					const Renderable* LUMIX_RESTRICT renderable = &m_renderables[getRenderable(m_always_visible[i])];
-					const Model* model = renderable->m_model;
-					bool is_model_ready = model && model->isReady();
-					if (is_model_ready && (renderable->m_layer_mask & layer_mask) != 0)
+					if ((renderable->m_layer_mask & layer_mask) != 0)
 					{
-						for (int j = 0, c = renderable->m_model->getMeshCount(); j < c; ++j)
+						for (int j = 0, c = renderable->m_meshes.size(); j < c; ++j)
 						{
-							RenderableInfo& info = infos.pushEmpty();
-							info.m_scale = renderable->m_scale;
-							info.m_geometry = model->getGeometry();
-							info.m_mesh = &model->getMesh(j);
-							info.m_pose = &renderable->m_pose;
-							info.m_matrix = &renderable->m_matrix;
-							info.m_model = model;
+							RenderableInfo& info = all_infos.pushEmpty();
+							info.m_mesh = &renderable->m_meshes[j];
+							info.m_key = (int64_t)renderable->m_meshes[j].m_mesh;
 						}
 					}
 				}
 			}
 
-			virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) override
+
+			virtual void getRenderableMeshes(Array<RenderableMesh>& meshes, int64_t layer_mask) override
 			{
 				PROFILE_FUNCTION();
 
 				if (m_renderables.empty())
 					return;
 
-				infos.reserve(m_renderables.size() * 2);
+				meshes.reserve(m_renderables.size() * 2);
 				for (int i = 0, c = m_renderables.size(); i < c; ++i)
 				{
 					const Renderable* LUMIX_RESTRICT renderable = &m_renderables[i];
-					const Model* model = renderable->m_model;
-					bool is_model_ready = model && model->isReady();
-					if (is_model_ready && (renderable->m_layer_mask & layer_mask) != 0)
+					if ((renderable->m_layer_mask & layer_mask) != 0)
 					{
-						for (int j = 0, c = renderable->m_model->getMeshCount(); j < c; ++j)
+						for (int j = 0, c = renderable->m_meshes.size(); j < c; ++j)
 						{
-							RenderableInfo& info = infos.pushEmpty();
-							info.m_scale = renderable->m_scale;
-							info.m_geometry = model->getGeometry();
-							info.m_mesh = &model->getMesh(j);
-							info.m_pose = &renderable->m_pose;
-							info.m_matrix = &renderable->m_matrix;
-							info.m_model = model;
+							meshes.push(renderable->m_meshes[j]);
 						}
 					}
 				}
@@ -1293,7 +1350,7 @@ namespace Lumix
 			}
 
 		private:
-			void updateBoundingRadiuses(Model* model)
+			void modelLoaded(Model* model)
 			{
 				for (int i = 0; i < m_renderables.size(); ++i)
 				{
@@ -1301,6 +1358,17 @@ namespace Lumix
 					{
 						float bounding_radius = m_renderables[i].m_model->getBoundingRadius();
 						m_culling_system->updateBoundingRadius(bounding_radius, i);
+						m_renderables[i].m_meshes.clear();
+						for (int j = 0; j < model->getMeshCount(); ++j)
+						{
+							RenderableMesh& info = m_renderables[i].m_meshes.pushEmpty();
+							info.m_scale = m_renderables[i].m_scale;
+							info.m_geometry = model->getGeometry();
+							info.m_mesh = &model->getMesh(j);
+							info.m_pose = &m_renderables[i].m_pose;
+							info.m_matrix = &m_renderables[i].m_matrix;
+							info.m_model = model;
+						}
 					}
 				}
 			}
@@ -1371,6 +1439,8 @@ namespace Lumix
 			CullingSystem* m_culling_system;
 			Frustum m_camera_frustum;
 			DynamicRenderableCache m_dynamic_renderable_cache;
+			Array<Array<RenderableInfo> > m_temporary_infos;
+			MTJD::Group m_sync_point;
 	};
 
 
