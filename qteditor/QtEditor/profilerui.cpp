@@ -67,7 +67,6 @@ void ProfileModel::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bl
 		beginInsertRows(getIndex(my_block), 0, 0);
 		Lumix::Profiler::Block* remote_child = remote_block->m_first_child;
 		Block* my_child = new Block;
-		my_child->m_function = remote_child->m_function;
 		my_child->m_name = remote_child->m_name;
 		my_child->m_parent = my_block;
 		my_child->m_next = NULL;
@@ -80,11 +79,10 @@ void ProfileModel::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bl
 	{
 		Lumix::Profiler::Block* remote_child = remote_block->m_first_child;
 		Block* my_child = my_block->m_first_child;
-		if(my_child->m_function != remote_child->m_function || my_child->m_name != remote_child->m_name)
+		if(my_child->m_name != remote_child->m_name)
 		{
 			beginInsertRows(getIndex(my_block), 0, 0);
 			Block* my_new_child = new Block;
-			my_new_child->m_function = remote_child->m_function;
 			my_new_child->m_name = remote_child->m_name;
 			my_new_child->m_parent = my_block;
 			my_new_child->m_next = my_child;
@@ -102,7 +100,6 @@ void ProfileModel::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bl
 		beginInsertRows(getIndex(my_block->m_parent), row, row);
 		Lumix::Profiler::Block* remote_next = remote_block->m_next;
 		Block* my_next = new Block;
-		my_next->m_function = remote_next->m_function;
 		my_next->m_name = remote_next->m_name;
 		my_next->m_parent = my_block->m_parent;
 		my_next->m_next = NULL;
@@ -113,13 +110,12 @@ void ProfileModel::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bl
 	}
 	else if (my_block->m_next)
 	{
-		if(my_block->m_next->m_function != remote_block->m_next->m_function || my_block->m_next->m_name != remote_block->m_next->m_name)
+		if(my_block->m_next->m_name != remote_block->m_next->m_name)
 		{
 			int row = getRow(my_block) + 1;
 			beginInsertRows(getIndex(my_block->m_parent), row, row);
 			Block* my_next = new Block;
 			Lumix::Profiler::Block* remote_next = remote_block->m_next;
-			my_next->m_function = remote_next->m_function;
 			my_next->m_name = remote_next->m_name;
 			my_next->m_parent = my_block->m_parent;
 			my_next->m_next = my_block->m_next;
@@ -137,7 +133,6 @@ void ProfileModel::onFrame()
 	{
 		beginInsertRows(QModelIndex(), 0, 0);
 		m_root = new Block;
-		m_root->m_function = Lumix::g_profiler.getRootBlock()->m_function;
 		m_root->m_name = Lumix::g_profiler.getRootBlock()->m_name;
 		m_root->m_parent = NULL;
 		m_root->m_next = NULL;
@@ -146,7 +141,7 @@ void ProfileModel::onFrame()
 	}
 	else
 	{
-		ASSERT(m_root->m_name == Lumix::g_profiler.getRootBlock()->m_name && m_root->m_function == Lumix::g_profiler.getRootBlock()->m_function);
+		ASSERT(m_root->m_name == Lumix::g_profiler.getRootBlock()->m_name);
 	}
 	if(m_root)
 	{
@@ -201,8 +196,6 @@ QVariant ProfileModel::headerData(int section, Qt::Orientation, int role) const
 	{
 		switch(section)
 		{
-			case Values::FUNCTION:
-				return "Function";
 			case Values::NAME:
 				return "Name";
 			case Values::LENGTH:
@@ -325,8 +318,6 @@ QVariant ProfileModel::data(const QModelIndex& index, int role) const
 	Block* block = static_cast<Block*>(index.internalPointer());
 	switch(index.column())
 	{
-		case Values::FUNCTION:
-			return block->m_function;
 		case Values::NAME:
 			return block->m_name;
 		case Values::LENGTH:

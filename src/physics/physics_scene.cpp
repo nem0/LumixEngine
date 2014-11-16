@@ -835,7 +835,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	void deserializeActor(ISerializer& serializer, int idx)
 	{
 		ActorType type;
-		serializer.deserialize("type", (int32_t&)type);
+		serializer.deserialize("type", (int32_t&)type, 0);
 		physx::PxTransform transform;
 		Matrix mtx;
 		m_actors[idx]->m_entity.getMatrix(mtx);
@@ -847,9 +847,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			case BOX:
 				{
-					serializer.deserialize("x", box_geom.halfExtents.x);
-					serializer.deserialize("y", box_geom.halfExtents.y);
-					serializer.deserialize("z", box_geom.halfExtents.z);
+					serializer.deserialize("x", box_geom.halfExtents.x, 1.0f);
+					serializer.deserialize("y", box_geom.halfExtents.y, 1.0f);
+					serializer.deserialize("z", box_geom.halfExtents.z, 1.0f);
 					geom = &box_geom;
 				}
 				break;
@@ -924,7 +924,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		int32_t count;
 		m_dynamic_actors.clear();
-		serializer.deserialize("count", count);
+		serializer.deserialize("count", count, 0);
 		for (int i = count; i < m_actors.size(); ++i)
 		{
 			m_actors[i]->m_physx_actor->release();
@@ -939,14 +939,14 @@ struct PhysicsSceneImpl : public PhysicsScene
 		serializer.deserializeArrayBegin("actors");
 		for (int i = 0; i < m_actors.size(); ++i)
 		{
-			serializer.deserializeArrayItem(m_actors[i]->m_source);
+			serializer.deserializeArrayItem(m_actors[i]->m_source, "");
 			bool is_dynamic;
-			serializer.deserializeArrayItem(is_dynamic);
+			serializer.deserializeArrayItem(is_dynamic, false);
 			if (is_dynamic)
 			{
 				m_dynamic_actors.push(m_actors[i]);
 			}
-			serializer.deserializeArrayItem(m_actors[i]->m_entity.index);
+			serializer.deserializeArrayItem(m_actors[i]->m_entity.index, 0);
 			if(m_actors[i]->m_entity.index != -1)
 			{
 				m_actors[i]->m_entity.universe = m_universe;
@@ -960,7 +960,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	void deserializeControllers(ISerializer& serializer)
 	{
 		int32_t count;
-		serializer.deserialize("count", count);
+		serializer.deserialize("count", count, 0);
 		for (int i = 0; i < m_controllers.size(); ++i)
 		{
 			m_controllers[i].m_controller->release();
@@ -971,8 +971,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			int index;
 			bool is_free;
-			serializer.deserializeArrayItem(index);
-			serializer.deserializeArrayItem(is_free);
+			serializer.deserializeArrayItem(index, 0);
+			serializer.deserializeArrayItem(is_free, true);
 			Entity e(m_universe, index);
 
 			Controller& c = m_controllers.pushEmpty();
@@ -1003,7 +1003,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	void deserializeTerrains(ISerializer& serializer)
 	{
 		int32_t count;
-		serializer.deserialize("count", count);
+		serializer.deserialize("count", count, 0);
 		for (int i = count; i < m_terrains.size(); ++i)
 		{
 			m_allocator.deleteObject(m_terrains[i]);
@@ -1019,7 +1019,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		for (int i = 0; i < count; ++i)
 		{
 			bool exists;
-			serializer.deserializeArrayItem(exists);
+			serializer.deserializeArrayItem(exists, false);
 			if(exists)
 			{
 				if(!m_terrains[i])
@@ -1028,11 +1028,11 @@ struct PhysicsSceneImpl : public PhysicsScene
 				}
 				m_terrains[i]->m_scene = this;
 				m_terrains[i]->m_entity.universe = m_universe;
-				serializer.deserializeArrayItem(m_terrains[i]->m_entity.index);
+				serializer.deserializeArrayItem(m_terrains[i]->m_entity.index, 0);
 				char tmp[LUMIX_MAX_PATH];
-				serializer.deserializeArrayItem(tmp, LUMIX_MAX_PATH);
-				serializer.deserializeArrayItem(m_terrains[i]->m_xz_scale);
-				serializer.deserializeArrayItem(m_terrains[i]->m_y_scale);
+				serializer.deserializeArrayItem(tmp, LUMIX_MAX_PATH, "");
+				serializer.deserializeArrayItem(m_terrains[i]->m_xz_scale, 0);
+				serializer.deserializeArrayItem(m_terrains[i]->m_y_scale, 0);
 
 				Component cmp(m_terrains[i]->m_entity, HEIGHTFIELD_HASH, this, i);
 				if (m_terrains[i]->m_heightmap == NULL || strcmp(tmp, m_terrains[i]->m_heightmap->getPath().c_str()) != 0)

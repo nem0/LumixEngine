@@ -581,16 +581,16 @@ namespace Lumix
 
 	void Terrain::deserialize(ISerializer& serializer, Universe& universe, RenderScene& scene, int index)
 	{
-		serializer.deserializeArrayItem(m_entity.index);
+		serializer.deserializeArrayItem(m_entity.index, 0);
 		m_entity.universe = &universe;
-		serializer.deserializeArrayItem(m_layer_mask);
+		serializer.deserializeArrayItem(m_layer_mask, 0);
 		char path[LUMIX_MAX_PATH];
-		serializer.deserializeArrayItem(path, LUMIX_MAX_PATH);
+		serializer.deserializeArrayItem(path, LUMIX_MAX_PATH, "");
 		setMaterial(static_cast<Material*>(scene.getEngine().getResourceManager().get(ResourceManager::MATERIAL)->load(path)));
-		serializer.deserializeArrayItem(m_xz_scale);
-		serializer.deserializeArrayItem(m_y_scale);
+		serializer.deserializeArrayItem(m_xz_scale, 0);
+		serializer.deserializeArrayItem(m_y_scale, 0);
 		int count;
-		serializer.deserializeArrayItem(count);
+		serializer.deserializeArrayItem(count, 0);
 		while(m_grass_types.size() > count)
 		{
 			removeGrassType(m_grass_types.size() - 1);
@@ -602,9 +602,9 @@ namespace Lumix
 		}
 		for(int i = 0; i < count; ++i)
 		{
-			serializer.deserializeArrayItem(path, LUMIX_MAX_PATH);
-			serializer.deserializeArrayItem(m_grass_types[i]->m_ground);
-			serializer.deserializeArrayItem(m_grass_types[i]->m_density);
+			serializer.deserializeArrayItem(path, LUMIX_MAX_PATH, "");
+			serializer.deserializeArrayItem(m_grass_types[i]->m_ground, 0);
+			serializer.deserializeArrayItem(m_grass_types[i]->m_density, 0);
 			setGrassTypePath(i, path);
 		}
 		universe.addComponent(m_entity, TERRAIN_HASH, &scene, index);

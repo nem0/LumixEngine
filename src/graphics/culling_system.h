@@ -16,7 +16,8 @@ namespace Lumix
 	public:
 		typedef Array<Sphere> InputSpheres;
 		typedef Array<int> Indexes;
-		typedef Array<int> Results;
+		typedef Array<int> Subresults;
+		typedef Array<Subresults> Results;
 
 		CullingSystem() { }
 		virtual ~CullingSystem() { }

@@ -92,22 +92,22 @@ namespace Lumix
 			virtual void deserialize(ISerializer& serializer) override
 			{
 				int count;
-				serializer.deserialize("count", count);
+				serializer.deserialize("count", count, 0);
 				serializer.deserializeArrayBegin("animables");
 				m_animables.resize(count);
 				for (int i = 0; i < count; ++i)
 				{
-					serializer.deserializeArrayItem(m_animables[i].m_manual);
+					serializer.deserializeArrayItem(m_animables[i].m_manual, false);
 					int entity_index;
-					serializer.deserializeArrayItem(entity_index);
+					serializer.deserializeArrayItem(entity_index, 0);
 					Entity e(&m_universe, entity_index);
 					Component renderable = m_render_scene->getRenderable(e);
 					if (renderable.isValid())
 					{
 						m_animables[i].m_renderable = renderable;
 					}
-					serializer.deserializeArrayItem(m_animables[i].m_time);
-					serializer.deserializeArrayItem(m_animables[i].m_is_free);
+					serializer.deserializeArrayItem(m_animables[i].m_time, 0);
+					serializer.deserializeArrayItem(m_animables[i].m_is_free, true);
 					m_universe.addComponent(e, ANIMABLE_HASH, this, i);
 				}
 				serializer.deserializeArrayEnd();

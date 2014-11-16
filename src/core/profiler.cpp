@@ -51,7 +51,7 @@ namespace Lumix
 	}
 
 	
-	void Profiler::beginBlock(const char* name, const char* function)
+	void Profiler::beginBlock(const char* name)
 	{
 		if (!m_is_recording)
 		{
@@ -59,8 +59,8 @@ namespace Lumix
 		}
 		if (!m_current_block)
 		{
-			Block* root = m_root_block;
-			while (root && (root->m_name != name || root->m_function != function))
+			Block* LUMIX_RESTRICT root = m_root_block;
+			while (root && root->m_name != name)
 			{
 				root = root->m_next;
 			}
@@ -75,14 +75,13 @@ namespace Lumix
 				root->m_next = m_root_block;
 				root->m_first_child = NULL;
 				root->m_name = name;
-				root->m_function = function;
 				m_root_block = m_current_block = root;
 			}
 		}
 		else
 		{
-			Block* child = m_current_block->m_first_child;
-			while (child && child->m_name != name && child->m_function != function)
+			Block* LUMIX_RESTRICT child = m_current_block->m_first_child;
+			while (child && child->m_name != name)
 			{
 				child = child->m_next;
 			}
@@ -92,7 +91,6 @@ namespace Lumix
 				child->m_parent = m_current_block;
 				child->m_first_child = NULL;
 				child->m_name = name;
-				child->m_function = function;
 				child->m_next = m_current_block->m_first_child;
 				m_current_block->m_first_child = child;
 			}
