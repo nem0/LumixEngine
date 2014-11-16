@@ -495,17 +495,33 @@ namespace Lumix
 			}
 
 
+			void destroyRenderable(const Component& component)
+			{
+				int renderable_index = getRenderable(component.index);
+				setModel(renderable_index, NULL);
+				m_always_visible.eraseItemFast(component.index);
+				m_allocator.deleteObject(m_renderables[renderable_index]);
+				m_renderables.erase(renderable_index);
+				m_culling_system->removeStatic(renderable_index);
+				m_universe.destroyComponent(component);
+
+				Lumix::HashMap<int32_t, int>::iterator iter = m_dynamic_renderable_cache.begin(), end = m_dynamic_renderable_cache.end();
+				while (iter != end)
+				{
+					if (iter.value() > renderable_index)
+					{
+						--iter.value();
+					}
+					++iter;
+				}
+				m_dynamic_renderable_cache.erase(component.entity.index);
+			}
+
 			virtual void destroyComponent(const Component& component) override
 			{
 				if (component.type == RENDERABLE_HASH)
 				{
-					int renderable_index = getRenderable(component.index);
-					setModel(renderable_index, NULL);
-					m_always_visible.eraseItemFast(component.index);
-					m_allocator.deleteObject(m_renderables[renderable_index]);
-					m_renderables.erase(renderable_index);
-					m_culling_system->removeStatic(renderable_index);
-					m_universe.destroyComponent(component);
+					destroyRenderable(component);
 				}
 				else if (component.type == LIGHT_HASH)
 				{
@@ -626,7 +642,7 @@ namespace Lumix
 					{
 						if (m_renderables[i]->m_entity == entity)
 						{
-							m_dynamic_renderable_cache.insert(entity.index, i); ///TODO this is wrong after an entity is removed
+							m_dynamic_renderable_cache.insert(entity.index, i);
 							m_renderables[i]->m_matrix = entity.getMatrix();
 							m_culling_system->updateBoundingPosition(entity.getMatrix().getTranslation(), i);
 							break;
