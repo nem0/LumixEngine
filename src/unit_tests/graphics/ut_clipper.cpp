@@ -71,7 +71,11 @@ namespace
 
 			for (int i = 0; i < result.size(); i++)
 			{
-				LUMIX_EXPECT_EQ(result[i], i < 6 ? result[i] : -1);
+				const Lumix::CullingSystem::Subresults& subresult = result[i];
+				for (int j = 0; j < subresult.size(); ++j)
+				{
+					LUMIX_EXPECT_TRUE(subresult[i] < 6);
+				}
 			}
 
 		}
@@ -110,11 +114,15 @@ namespace
 
 			culling_system->cullToFrustumAsync(clipping_frustum);
 
-			const Lumix::CullingSystem::Results& result = culling_system->getResultAsync();
+			const Lumix::CullingSystem::Results& result = culling_system->getResult();
 
 			for (int i = 0; i < result.size(); i++)
 			{
-				LUMIX_EXPECT_EQ(result[i], i < 6 ? result[i] : -1);
+				const Lumix::CullingSystem::Subresults& subresult = result[i];
+				for (int j = 0; j < subresult.size(); ++j)
+				{
+					LUMIX_EXPECT_TRUE(subresult[i] < 6);
+				}
 			}
 
 		}

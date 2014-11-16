@@ -194,7 +194,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 				serializer.deserializeArrayBegin();
 				while (!serializer.isArrayEnd())
 				{
-					serializer.deserializeArrayItem(label, sizeof(label));
+					serializer.deserializeArrayItem(label, sizeof(label), "");
 					m_attributes.emplace(string(label, m_allocator));
 				}
 				serializer.deserializeArrayEnd();
@@ -204,7 +204,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 				serializer.deserializeArrayBegin();
 				while (!serializer.isArrayEnd())
 				{
-					serializer.deserializeArrayItem(label, sizeof(label));
+					serializer.deserializeArrayItem(label, sizeof(label), "");
 					m_passes.push(string(label, m_allocator));
 					m_pass_hashes.push(crc32(label));
 				}
@@ -212,7 +212,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			}
 			else if (strcmp(label, "shadowmap_required") == 0)
 			{
-				serializer.deserialize(m_is_shadowmap_required);
+				serializer.deserialize(m_is_shadowmap_required, false);
 			}
 		}
 		serializer.deserializeObjectEnd();

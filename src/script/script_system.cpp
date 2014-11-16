@@ -51,17 +51,17 @@ namespace Lumix
 			{
 				stopAll();
 				int count;
-				serializer.deserialize("count", count);
+				serializer.deserialize("count", count, 0);
 				serializer.deserializeArrayBegin("scripts");
 				m_script_entities.resize(count);
 				m_paths.clear();
 				m_paths.reserve(count);
 				for (int i = 0; i < m_script_entities.size(); ++i)
 				{
-					serializer.deserializeArrayItem(m_script_entities[i]);
+					serializer.deserializeArrayItem(m_script_entities[i], 0);
 					StackAllocator<LUMIX_MAX_PATH> allocator;
 					string path(allocator);
-					serializer.deserializeArrayItem(path);
+					serializer.deserializeArrayItem(path, "");
 					m_paths.push(path);
 					Entity entity(&m_universe, m_script_entities[i]);
 					if(m_script_entities[i] != -1)
