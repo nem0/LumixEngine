@@ -31,7 +31,7 @@ namespace Lumix
 		virtual void cullToFrustum(const Frustum& frustum) = 0;
 		virtual void cullToFrustumAsync(const Frustum& frustum) = 0;
 
-		virtual void addStatic(const Sphere& sphere, int index) = 0;
+		virtual void addStatic(const Sphere& sphere) = 0;
 		virtual void removeStatic(int index) = 0;
 
 		virtual void enableStatic(int index) = 0;

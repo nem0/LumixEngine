@@ -47,15 +47,15 @@ namespace Lumix
 	{
 		Renderable(IAllocator& allocator) : m_pose(allocator), m_meshes(allocator) {}
 
-		int32_t m_component_index;
 		int64_t m_layer_mask;
+		Array<RenderableMesh> m_meshes;
+		int32_t m_component_index;
 		Pose m_pose;
 		Model* m_model;
 		Matrix m_matrix;
 		Entity m_entity;
 		float m_scale;
 		bool m_is_always_visible;
-		Array<RenderableMesh> m_meshes;
 
 		private:
 			Renderable(const Renderable&);
@@ -167,10 +167,11 @@ namespace Lumix
 
 				for(int i = 0; i < m_renderables.size(); ++i)
 				{
-					if(m_renderables[i].m_model)
+					if(m_renderables[i]->m_model)
 					{
-						m_renderables[i].m_model->getResourceManager().get(ResourceManager::MODEL)->unload(*m_renderables[i].m_model);
+						m_renderables[i]->m_model->getResourceManager().get(ResourceManager::MODEL)->unload(*m_renderables[i]->m_model);
 					}
+					m_allocator.deleteObject(m_renderables[i]);
 				}
 
 				Timer::destroy(m_timer);
@@ -304,20 +305,20 @@ namespace Lumix
 				serializer.beginArray("renderables");
 				for (int i = 0; i < m_renderables.size(); ++i)
 				{
-					serializer.serializeArrayItem(m_renderables[i].m_is_always_visible);
-					serializer.serializeArrayItem(m_renderables[i].m_component_index);
-					serializer.serializeArrayItem(m_renderables[i].m_entity.index);
-					serializer.serializeArrayItem(m_renderables[i].m_layer_mask);
-					if (m_renderables[i].m_model)
+					serializer.serializeArrayItem(m_renderables[i]->m_is_always_visible);
+					serializer.serializeArrayItem(m_renderables[i]->m_component_index);
+					serializer.serializeArrayItem(m_renderables[i]->m_entity.index);
+					serializer.serializeArrayItem(m_renderables[i]->m_layer_mask);
+					if (m_renderables[i]->m_model)
 					{
-						serializer.serializeArrayItem(m_renderables[i].m_model->getPath().c_str());
+						serializer.serializeArrayItem(m_renderables[i]->m_model->getPath().c_str());
 					}
 					else
 					{
 						serializer.serializeArrayItem("");
 					}
-					serializer.serializeArrayItem(m_renderables[i].m_scale);
-					const Matrix& mtx = m_renderables[i].m_matrix;
+					serializer.serializeArrayItem(m_renderables[i]->m_scale);
+					const Matrix& mtx = m_renderables[i]->m_matrix;
 					for (int j = 0; j < 16; ++j)
 					{
 						serializer.serializeArrayItem((&mtx.m11)[j]);
@@ -394,27 +395,27 @@ namespace Lumix
 				m_always_visible.clear();
 				for (int i = 0; i < size; ++i)
 				{
-					m_renderables.emplace(m_allocator);
-					serializer.deserializeArrayItem(m_renderables[i].m_is_always_visible, false);
-					serializer.deserializeArrayItem(m_renderables[i].m_component_index, 0);
-					if (m_renderables[i].m_is_always_visible)
+					m_renderables.push(m_allocator.newObject<Renderable>(m_allocator));
+					serializer.deserializeArrayItem(m_renderables[i]->m_is_always_visible, false);
+					serializer.deserializeArrayItem(m_renderables[i]->m_component_index, 0);
+					if (m_renderables[i]->m_is_always_visible)
 					{
-						m_always_visible.push(m_renderables[i].m_component_index);
+						m_always_visible.push(m_renderables[i]->m_component_index);
 					}
-					serializer.deserializeArrayItem(m_renderables[i].m_entity.index, 0);
-					m_renderables[i].m_model = NULL;
-					m_renderables[i].m_entity.universe = &m_universe;
-					serializer.deserializeArrayItem(m_renderables[i].m_layer_mask, 0);
+					serializer.deserializeArrayItem(m_renderables[i]->m_entity.index, 0);
+					m_renderables[i]->m_model = NULL;
+					m_renderables[i]->m_entity.universe = &m_universe;
+					serializer.deserializeArrayItem(m_renderables[i]->m_layer_mask, 0);
 					char path[LUMIX_MAX_PATH];
 					serializer.deserializeArrayItem(path, LUMIX_MAX_PATH, "");
-					serializer.deserializeArrayItem(m_renderables[i].m_scale, 0);
-					m_culling_system->addStatic(Sphere(m_renderables[i].m_entity.getPosition(), 1.0f), i);
+					serializer.deserializeArrayItem(m_renderables[i]->m_scale, 0);
+					m_culling_system->addStatic(Sphere(m_renderables[i]->m_entity.getPosition(), 1.0f));
 					setModel(i, static_cast<Model*>(m_engine.getResourceManager().get(ResourceManager::MODEL)->load(path)));
 					for (int j = 0; j < 16; ++j)
 					{
-						serializer.deserializeArrayItem((&m_renderables[i].m_matrix.m11)[j], i == j ? 1.0f : 0.0f);
+						serializer.deserializeArrayItem((&m_renderables[i]->m_matrix.m11)[j], i == j ? 1.0f : 0.0f);
 					}
-					m_universe.addComponent(m_renderables[i].m_entity, RENDERABLE_HASH, this, i);
+					m_universe.addComponent(m_renderables[i]->m_entity, RENDERABLE_HASH, this, i);
 				}
 
 				serializer.deserializeArrayEnd();
@@ -500,9 +501,10 @@ namespace Lumix
 					int renderable_index = getRenderable(component.index);
 					setModel(renderable_index, NULL);
 					m_always_visible.eraseItemFast(component.index);
+					m_allocator.deleteObject(m_renderables[renderable_index]);
 					m_renderables.erase(renderable_index);
+					m_culling_system->removeStatic(renderable_index);
 					m_universe.destroyComponent(component);
-					m_culling_system->removeStatic(component.index);
 				}
 				else if (component.type == LIGHT_HASH)
 				{
@@ -557,16 +559,18 @@ namespace Lumix
 				}
 				else if (type == RENDERABLE_HASH)
 				{
-					int new_index = m_renderables.empty() ? 0 : m_renderables.back().m_component_index + 1;
-					Renderable& r = m_renderables.emplace(m_allocator);
+					int new_index = m_renderables.empty() ? 0 : m_renderables.back()->m_component_index + 1;
+					Renderable& r = *m_allocator.newObject<Renderable>(m_allocator);
+					m_renderables.push(&r);
 					r.m_entity = entity;
 					r.m_layer_mask = 1;
 					r.m_scale = 1;
 					r.m_model = NULL;
 					r.m_component_index = new_index;
 					r.m_is_always_visible = false;
+					r.m_matrix = entity.getMatrix();
 					Component cmp = m_universe.addComponent(entity, type, this, r.m_component_index);
-					m_culling_system->addStatic(Sphere(entity.getPosition(), 1.0f), m_renderables.size() - 1);
+					m_culling_system->addStatic(Sphere(entity.getPosition(), 1.0f));
 					m_universe.componentCreated().invoke(cmp);
 					return cmp;
 				}
@@ -597,7 +601,7 @@ namespace Lumix
 				{
 					for (int i = 0, c = m_renderables.size(); i < c; ++i)
 					{
-						if (m_renderables[i].m_entity == entity)
+						if (m_renderables[i]->m_entity == entity)
 						{
 							m_dynamic_renderable_cache.insert(entity.index, i);
 							return Component(entity, RENDERABLE_HASH, this, i);
@@ -619,10 +623,10 @@ namespace Lumix
 				{
 					for (int i = 0, c = m_renderables.size(); i < c; ++i)
 					{
-						if (m_renderables[i].m_entity == entity)
+						if (m_renderables[i]->m_entity == entity)
 						{
-							m_dynamic_renderable_cache.insert(entity.index, i);
-							m_renderables[i].m_matrix = entity.getMatrix();
+							m_dynamic_renderable_cache.insert(entity.index, i); ///TODO this is wrong after an entity is removed
+							m_renderables[i]->m_matrix = entity.getMatrix();
 							m_culling_system->updateBoundingPosition(entity.getMatrix().getTranslation(), i);
 							break;
 						}
@@ -630,7 +634,7 @@ namespace Lumix
 				}
 				else
 				{
-					m_renderables[iter.value()].m_matrix = entity.getMatrix();
+					m_renderables[iter.value()]->m_matrix = entity.getMatrix();
 					m_culling_system->updateBoundingPosition(entity.getMatrix().getTranslation(), iter.value());
 				}
 			}
@@ -704,13 +708,13 @@ namespace Lumix
 
 			virtual Pose& getPose(const Component& cmp) override
 			{
-				return m_renderables[getRenderable(cmp.index)].m_pose;
+				return m_renderables[getRenderable(cmp.index)]->m_pose;
 			}
 
 
 			virtual Model* getRenderableModel(Component cmp) override
 			{
-				return m_renderables[getRenderable(cmp.index)].m_model;
+				return m_renderables[getRenderable(cmp.index)]->m_model;
 			}
 
 
@@ -723,7 +727,7 @@ namespace Lumix
 			virtual void hideRenderable(Component cmp) override
 			{
 				int renderable_index = getRenderable(cmp.index);
-				if (!m_renderables[renderable_index].m_is_always_visible)
+				if (!m_renderables[renderable_index]->m_is_always_visible)
 				{
 					m_culling_system->disableStatic(renderable_index);
 				}
@@ -733,7 +737,7 @@ namespace Lumix
 			virtual void setRenderableIsAlwaysVisible(Component cmp, bool value) override
 			{
 				int renderable_index = getRenderable(cmp.index);
-				m_renderables[renderable_index].m_is_always_visible = value;
+				m_renderables[renderable_index]->m_is_always_visible = value;
 				if(value)
 				{
 					m_culling_system->disableStatic(renderable_index);
@@ -749,16 +753,16 @@ namespace Lumix
 
 			virtual bool isRenderableAlwaysVisible(Component cmp) override
 			{
-				return m_renderables[getRenderable(cmp.index)].m_is_always_visible;
+				return m_renderables[getRenderable(cmp.index)]->m_is_always_visible;
 			}
 
 
 			virtual void getRenderablePath(Component cmp, string& path) override
 			{
 					int index = getRenderable(cmp.index);
-					if (index >= 0 && m_renderables[index].m_model)
+					if (index >= 0 && m_renderables[index]->m_model)
 					{
-						path = m_renderables[index].m_model->getPath().c_str();
+						path = m_renderables[index]->m_model->getPath().c_str();
 					}
 					else
 					{
@@ -769,12 +773,12 @@ namespace Lumix
 
 			virtual void setRenderableLayer(Component cmp, const int32_t& layer) override
 			{
-				m_renderables[getRenderable(cmp.index)].m_layer_mask = ((int64_t)1 << (int64_t)layer);
+				m_renderables[getRenderable(cmp.index)]->m_layer_mask = ((int64_t)1 << (int64_t)layer);
 			}
 
 			virtual void setRenderableScale(Component cmp, float scale) override
 			{
-				Renderable& r = m_renderables[getRenderable(cmp.index)];
+				Renderable& r = *m_renderables[getRenderable(cmp.index)];
 				r.m_scale = scale;
 				for (int i = 0; i < r.m_meshes.size(); ++i)
 				{
@@ -786,7 +790,7 @@ namespace Lumix
 			virtual void setRenderablePath(Component cmp, const string& path) override
 			{
 				int renderable_index = getRenderable(cmp.index);
-				Renderable& r = m_renderables[renderable_index];
+				Renderable& r = *m_renderables[renderable_index];
 
 				Model* model = static_cast<Model*>(m_engine.getResourceManager().get(ResourceManager::MODEL)->load(path));
 				setModel(renderable_index, model);
@@ -892,7 +896,7 @@ namespace Lumix
 				{
 					return Component::INVALID;
 				}
-				return Component(m_renderables[0].m_entity, RENDERABLE_HASH, this, m_renderables[0].m_component_index);
+				return Component(m_renderables[0]->m_entity, RENDERABLE_HASH, this, m_renderables[0]->m_component_index);
 			}
 			
 
@@ -903,11 +907,11 @@ namespace Lumix
 				while(l <= h)
 				{
 					int m = (l + h) >> 1;
-					if(m_renderables[m].m_component_index < index)
+					if(m_renderables[m]->m_component_index < index)
 					{
 						l = m + 1;
 					}
-					else if (m_renderables[m].m_component_index > index)
+					else if (m_renderables[m]->m_component_index > index)
 					{
 						h = m - 1;
 					}
@@ -926,7 +930,7 @@ namespace Lumix
 				int i = getRenderable(cmp.index);
 				if(i + 1 < m_renderables.size())
 				{
-					return Component(m_renderables[i + 1].m_entity, RENDERABLE_HASH, this, m_renderables[i + 1].m_component_index);
+					return Component(m_renderables[i + 1]->m_entity, RENDERABLE_HASH, this, m_renderables[i + 1]->m_component_index);
 				}
 				return Component::INVALID;
 			}
@@ -984,6 +988,10 @@ namespace Lumix
 				{
 					m_temporary_infos.emplace(m_allocator);
 				}
+				while (m_temporary_infos.size() > results.size())
+				{
+					m_temporary_infos.pop();
+				}
 				for (int subresult_index = 0; subresult_index < results.size(); ++subresult_index)
 				{
 					Array<RenderableInfo>& subinfos = m_temporary_infos[subresult_index];
@@ -993,7 +1001,7 @@ namespace Lumix
 							const CullingSystem::Subresults& subresults = results[subresult_index];
 							for (int i = 0, c = subresults.size(); i < c; ++i)
 							{
-								const Renderable* LUMIX_RESTRICT renderable = &m_renderables[subresults[i]];
+								const Renderable* LUMIX_RESTRICT renderable = m_renderables[subresults[i]];
 								if ((renderable->m_layer_mask & layer_mask) != 0)
 								{
 									for (int j = 0, c = renderable->m_meshes.size(); j < c; ++j)
@@ -1027,7 +1035,7 @@ namespace Lumix
 
 				for (int i = 0, c = m_always_visible.size(); i < c; ++i)
 				{
-					const Renderable* LUMIX_RESTRICT renderable = &m_renderables[getRenderable(m_always_visible[i])];
+					const Renderable* LUMIX_RESTRICT renderable = m_renderables[getRenderable(m_always_visible[i])];
 					if ((renderable->m_layer_mask & layer_mask) != 0)
 					{
 						for (int j = 0, c = renderable->m_meshes.size(); j < c; ++j)
@@ -1051,7 +1059,7 @@ namespace Lumix
 				meshes.reserve(m_renderables.size() * 2);
 				for (int i = 0, c = m_renderables.size(); i < c; ++i)
 				{
-					const Renderable* LUMIX_RESTRICT renderable = &m_renderables[i];
+					const Renderable* LUMIX_RESTRICT renderable = m_renderables[i];
 					if ((renderable->m_layer_mask & layer_mask) != 0)
 					{
 						for (int j = 0, c = renderable->m_meshes.size(); j < c; ++j)
@@ -1221,18 +1229,18 @@ namespace Lumix
 				Terrain* ignore_terrain = ignore.type == TERRAIN_HASH ? m_terrains[ignore_index] : NULL;
 				for (int i = 0; i < m_renderables.size(); ++i)
 				{
-					if (ignore_index != i && m_renderables[i].m_model)
+					if (ignore_index != i && m_renderables[i]->m_model)
 					{
-						const Vec3& pos = m_renderables[i].m_matrix.getTranslation();
-						float radius = m_renderables[i].m_model->getBoundingRadius();
-						float scale = m_renderables[i].m_scale;
+						const Vec3& pos = m_renderables[i]->m_matrix.getTranslation();
+						float radius = m_renderables[i]->m_model->getBoundingRadius();
+						float scale = m_renderables[i]->m_scale;
 						Vec3 intersection;
 						if (dotProduct(pos - origin, pos - origin) < radius * radius || Math::getRaySphereIntersection(origin, dir, pos, radius * scale, intersection))
 						{
-							RayCastModelHit new_hit = m_renderables[i].m_model->castRay(origin, dir, m_renderables[i].m_matrix, scale);
+							RayCastModelHit new_hit = m_renderables[i]->m_model->castRay(origin, dir, m_renderables[i]->m_matrix, scale);
 							if (new_hit.m_is_hit && (!hit.m_is_hit || new_hit.m_t < hit.m_t))
 							{
-								new_hit.m_component = Component(m_renderables[i].m_entity, RENDERABLE_HASH, this, i);
+								new_hit.m_component = Component(m_renderables[i]->m_entity, RENDERABLE_HASH, this, i);
 								hit = new_hit;
 								hit.m_is_hit = true;
 							}
@@ -1354,19 +1362,18 @@ namespace Lumix
 			{
 				for (int i = 0; i < m_renderables.size(); ++i)
 				{
-					if (m_renderables[i].m_model == model)
+					if (m_renderables[i]->m_model == model)
 					{
-						float bounding_radius = m_renderables[i].m_model->getBoundingRadius();
+						float bounding_radius = m_renderables[i]->m_model->getBoundingRadius();
 						m_culling_system->updateBoundingRadius(bounding_radius, i);
-						m_renderables[i].m_meshes.clear();
+						m_renderables[i]->m_meshes.clear();
 						for (int j = 0; j < model->getMeshCount(); ++j)
 						{
-							RenderableMesh& info = m_renderables[i].m_meshes.pushEmpty();
-							info.m_scale = m_renderables[i].m_scale;
-							info.m_geometry = model->getGeometry();
+							RenderableMesh& info = m_renderables[i]->m_meshes.pushEmpty();
+							info.m_scale = m_renderables[i]->m_scale;
 							info.m_mesh = &model->getMesh(j);
-							info.m_pose = &m_renderables[i].m_pose;
-							info.m_matrix = &m_renderables[i].m_matrix;
+							info.m_pose = &m_renderables[i]->m_pose;
+							info.m_matrix = &m_renderables[i]->m_matrix;
 							info.m_model = model;
 						}
 					}
@@ -1391,7 +1398,7 @@ namespace Lumix
 
 			void setModel(int renderable_index, Model* model)
 			{
-				Model* old_model = m_renderables[renderable_index].m_model;
+				Model* old_model = m_renderables[renderable_index]->m_model;
 				if(model == old_model)
 				{
 					return;
@@ -1402,7 +1409,7 @@ namespace Lumix
 					--callback->m_ref_count;
 					old_model->getResourceManager().get(ResourceManager::MODEL)->unload(*old_model);
 				}
-				m_renderables[renderable_index].m_model = model;
+				m_renderables[renderable_index]->m_model = model;
 				if (model)
 				{
 					ModelLoadedCallback* callback = getModelLoadedCallback(model);
@@ -1411,8 +1418,8 @@ namespace Lumix
 					if(model->isReady())
 					{
 						m_culling_system->updateBoundingRadius(model->getBoundingRadius(), renderable_index);
-						m_renderables[renderable_index].m_pose.resize(model->getBoneCount());
-						model->getPose(m_renderables[renderable_index].m_pose);
+						m_renderables[renderable_index]->m_pose.resize(model->getBoneCount());
+						model->getPose(m_renderables[renderable_index]->m_pose);
 					}
 				}
 			}
@@ -1425,7 +1432,7 @@ namespace Lumix
 		private:
 			IAllocator& m_allocator;
 			Array<ModelLoadedCallback*> m_model_loaded_callbacks;
-			Array<Renderable> m_renderables;
+			Array<Renderable*> m_renderables;
 			Array<int> m_always_visible;
 			Array<Light> m_lights;
 			Array<Camera> m_cameras;

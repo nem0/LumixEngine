@@ -27,6 +27,10 @@ namespace Lumix
 			{
 				results.push(i);
 			}
+			else
+			{
+				i = i;
+			}
 		}
 	}
 
@@ -131,6 +135,11 @@ namespace Lumix
 			while (m_result.size() < cpu_count)
 				m_result.emplace(m_allocator);
 
+			while (m_result.size() > cpu_count)
+			{
+				m_result.pop();
+			}
+
 			int step = count / cpu_count;
 			int i = 0;
 			CullingJob* jobs[16];
@@ -157,7 +166,7 @@ namespace Lumix
 
 		virtual void enableStatic(int index) override
 		{
-			m_indexes[index] = index;
+			m_indexes[index] = 1;
 		}
 
 
@@ -167,18 +176,10 @@ namespace Lumix
 		}
 
 
-		virtual void addStatic(const Sphere& sphere, int index) override
+		virtual void addStatic(const Sphere& sphere) override
 		{
-			if (index == m_spheres.size())
-			{
 				m_spheres.push(sphere);
-				m_indexes.push(index);
-			}
-			else
-			{
-				m_spheres[index] = sphere;
-				m_indexes[index] = index;
-			}
+				m_indexes.push(1);
 		}
 
 		virtual void removeStatic(int index) override
@@ -204,7 +205,7 @@ namespace Lumix
 			for (int i = 0; i < spheres.size(); i++)
 			{
 				m_spheres.push(spheres[i]);
-				m_indexes.push(m_indexes.size() - 1);
+				m_indexes.push(1);
 			}
 		}
 

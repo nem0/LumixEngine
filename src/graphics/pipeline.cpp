@@ -820,7 +820,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 					++info;
 					continue;
 				}
-				bindGeometry(*m_renderer, *info->m_mesh->m_geometry, *mesh_context.m_shader);
+				bindGeometry(*m_renderer, *info->m_mesh->m_model->getGeometry(), *mesh_context.m_shader);
 				last_key = info->m_key;
 			}
 

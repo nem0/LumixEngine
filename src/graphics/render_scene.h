@@ -37,7 +37,6 @@ namespace Lumix
 	struct RenderableMesh
 	{
 		const Mesh* m_mesh;
-		Geometry* m_geometry;
 		const Pose* m_pose;
 		float m_scale;
 		const Matrix* m_matrix;
