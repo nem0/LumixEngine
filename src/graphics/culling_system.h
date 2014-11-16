@@ -15,7 +15,6 @@ namespace Lumix
 	{
 	public:
 		typedef Array<Sphere> InputSpheres;
-		typedef Array<int> Indexes;
 		typedef Array<int> Subresults;
 		typedef Array<Subresults> Results;
 
