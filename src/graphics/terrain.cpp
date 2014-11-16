@@ -748,6 +748,10 @@ namespace Lumix
 			mtx.fastInverse();
 			Vec3 rel_origin = mtx.multiplyPosition(origin);
 			Vec3 rel_dir = mtx * dir;
+			if (fabs(rel_dir.x) < 0.01f || fabs(rel_dir.z) < 0.01f)
+			{
+				return hit;
+			}
 			Vec3 start;
 			Vec3 size(m_root->m_size * m_xz_scale, m_y_scale, m_root->m_size * m_xz_scale);
 			if (Math::getRayAABBIntersection(rel_origin, rel_dir, m_root->m_min, size, start))

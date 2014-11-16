@@ -30,10 +30,6 @@ namespace Lumix
 			{
 				results.push(i);
 			}
-			else
-			{
-				i = i;
-			}
 		}
 	}
 
