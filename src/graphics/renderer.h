@@ -75,9 +75,10 @@ void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, c
 void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, float value);
 void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Matrix& mtx);
 void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Matrix* matrices, int count);
-void renderGeometry(Renderer& renderer, Geometry& geometry, int start, int count, Shader& shader);
-
-
+void renderGeometry(int start, int count);
+void bindGeometry(Renderer& renderer, Geometry& geometry, Shader& shader);
+int getUniformLocation(const Shader& shader, int name);
+void setUniform(int location, const Matrix& mtx);
 
 
 } // !namespace Lumix

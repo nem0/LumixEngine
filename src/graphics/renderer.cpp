@@ -380,8 +380,6 @@ struct RendererImpl : public Renderer
 	}
 
 	
-
-
 	virtual Engine& getEngine() override
 	{
 		return m_engine;
@@ -395,7 +393,8 @@ struct RendererImpl : public Renderer
 			const Mesh& mesh = model.getMesh(i);
 			mesh.getMaterial()->apply(*this, pipeline);
 			setFixedCachedUniform(*this, *mesh.getMaterial()->getShader(), (int)Shader::FixedCachedUniforms::WORLD_MATRIX, transform);
-			renderGeometry(*this, *model.getGeometry(), mesh.getStart(), mesh.getCount(), *mesh.getMaterial()->getShader());
+			bindGeometry(*this, *model.getGeometry(), *mesh.getMaterial()->getShader());
+			renderGeometry(mesh.getStart(), mesh.getCount());
 		}
 	}
 
@@ -550,7 +549,6 @@ void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, f
 
 void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Matrix& mtx)
 {
-	PROFILE_FUNCTION();
 	RendererImpl& renderer_impl = static_cast<RendererImpl&>(renderer);
 	GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
 	if (loc >= 0)
@@ -582,9 +580,8 @@ void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, c
 }
 
 
-LUMIX_FORCE_INLINE void renderGeometry(Renderer& renderer, Geometry& geometry, int start, int count, Shader& shader)
+void bindGeometry(Renderer& renderer, Geometry& geometry, Shader& shader)
 {
-	PROFILE_FUNCTION();
 	RendererImpl& renderer_impl = static_cast<RendererImpl&>(renderer);
 	if (renderer_impl.m_last_bind_geometry != &geometry)
 	{
@@ -598,7 +595,24 @@ LUMIX_FORCE_INLINE void renderGeometry(Renderer& renderer, Geometry& geometry, i
 		renderer_impl.m_last_bind_geometry_shader = &shader;
 		geometry.getVertexDefinition().begin(shader);
 	}
+}
+
+
+void renderGeometry(int start, int count)
+{
 	glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, (void*)(start * sizeof(GLint)));
+}
+
+
+int getUniformLocation(const Shader& shader, int name)
+{
+	return shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
+}
+
+
+void setUniform(int location, const Matrix& mtx)
+{
+	glUniformMatrix4fv(location, 1, false, &mtx.m11);
 }
 
 

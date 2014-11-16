@@ -40,6 +40,25 @@ static const float SHADOW_CAM_NEAR = 0.1f;
 static const float SHADOW_CAM_FAR = 10000.0f;
 
 
+struct RenderModelsMeshContext
+{
+	RenderModelsMeshContext()
+		: m_mesh(NULL)
+		, m_shader(NULL)
+		, m_world_matrix_uniform_location(-1)
+		, m_geometry_start(0)
+		, m_geometry_count(0)
+	{
+	}
+
+	const Mesh* m_mesh;
+	Shader* m_shader;
+	int m_world_matrix_uniform_location;
+	int m_geometry_start;
+	int m_geometry_count;
+};
+
+
 struct Command
 {
 	virtual ~Command() {}
@@ -570,7 +589,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 			material->apply(*m_renderer, *this);
 			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::WORLD_MATRIX, Matrix::IDENTITY);
 			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::PROJECTION_MATRIX, mtx);
-			renderGeometry(*m_renderer, *geometry, 0, 6, *shader);
+			bindGeometry(*m_renderer, *geometry, *shader);
+			renderGeometry(0, 6);
 		}
 	}
 
@@ -647,7 +667,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 					}
 					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::GRASS_MATRICES, info.m_matrices, info.m_matrix_count);
 
-					renderGeometry(*m_renderer, *info.m_geometry, mesh.getStart(), mesh.getCount() / info.m_mesh_copy_count * info.m_matrix_count, *shader);
+					bindGeometry(*m_renderer, *info.m_geometry, *shader);
+					renderGeometry(mesh.getStart(), mesh.getCount() / info.m_mesh_copy_count * info.m_matrix_count);
 				}
 			}
 		}
@@ -708,81 +729,111 @@ struct PipelineInstanceImpl : public PipelineInstance
 			{
 				const RenderableInfo* info1 = static_cast<const RenderableInfo*>(a);
 				const RenderableInfo* info2 = static_cast<const RenderableInfo*>(b);
-				return (int)(info1->m_mesh - info2->m_mesh);
+				return (int)(info1->m_key - info2->m_key);
 			});
 		}
 	}
 
+
+	bool setMeshContext(RenderModelsMeshContext* context)
+	{
+		const Material& material = *context->m_mesh->getMaterial();
+		Shader* shader = material.getShader();
+		uint32_t pass_hash = getRenderer().getPass();
+		if (!shader->hasPass(pass_hash))
+		{
+			return false;
+		}
+
+		material.apply(*m_renderer, *this);
+		setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX0, m_shadow_modelviewprojection[0]);
+		setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX1, m_shadow_modelviewprojection[1]);
+		setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX2, m_shadow_modelviewprojection[2]);
+		setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX3, m_shadow_modelviewprojection[3]);
+		Component light_cmp = m_scene->getLight(0);
+		if (light_cmp.isValid())
+		{
+			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::AMBIENT_COLOR, m_scene->getLightAmbientColor(light_cmp));
+			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::AMBIENT_INTENSITY, m_scene->getLightAmbientIntensity(light_cmp));
+			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_COLOR, m_scene->getLightDiffuseColor(light_cmp));
+			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_INTENSITY, m_scene->getLightDiffuseIntensity(light_cmp));
+			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_COLOR, m_scene->getFogColor(light_cmp));
+			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
+			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOWMAP_SPLITS, m_shadowmap_splits);
+		}
+		m_renderer->setUniform(*shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
+		context->m_world_matrix_uniform_location = getUniformLocation(*shader, (int)Shader::FixedCachedUniforms::WORLD_MATRIX);
+		context->m_shader = shader;
+		context->m_geometry_start = context->m_mesh->getStart();
+		context->m_geometry_count = context->m_mesh->getCount();
+		if (context->m_world_matrix_uniform_location < 0)
+		{
+			return false;
+		}
+		return true;
+	}
+
+
+	void setPoseUniform(const RenderableMesh* LUMIX_RESTRICT renderable_mesh, RenderModelsMeshContext& mesh_context)
+	{
+		Matrix bone_mtx[64];
+
+		const Pose& pose = *renderable_mesh->m_pose;
+		const Model& model = *renderable_mesh->m_model;
+		Vec3* poss = pose.getPositions();
+		Quat* rots = pose.getRotations();
+		ASSERT(pose.getCount() <= 64);
+		for (int bone_index = 0, bone_count = pose.getCount(); bone_index < bone_count; ++bone_index)
+		{
+			rots[bone_index].toMatrix(bone_mtx[bone_index]);
+			bone_mtx[bone_index].translate(poss[bone_index]);
+			bone_mtx[bone_index] = bone_mtx[bone_index] * model.getBone(bone_index).inv_bind_matrix;
+		}
+		m_renderer->setUniform(*mesh_context.m_shader, "bone_matrices", BONE_MATRICES_HASH, bone_mtx, pose.getCount());
+	}
+
+
 	void renderModels(const Frustum& frustum, int64_t layer_mask)
 	{
 		PROFILE_FUNCTION();
-		
-		uint32_t pass_hash = getRenderer().getPass();
+
 		m_renderable_infos.clear();
 		m_scene->getRenderableInfos(frustum, m_renderable_infos, layer_mask);
-		int count = m_renderable_infos.size();
-		if(count == 0)
+		if (m_renderable_infos.empty())
 		{
 			return;
 		}
-		const Material* last_material = NULL;
+
 		sortRenderables(m_renderable_infos);
-		const RenderableInfo* info = &m_renderable_infos[0];
-		const RenderableInfo* end = &m_renderable_infos[0]+count;
-		while(info != end)
+
+		const RenderableInfo* LUMIX_RESTRICT info = &m_renderable_infos[0];
+		const RenderableInfo* LUMIX_RESTRICT end = &m_renderable_infos[0] + m_renderable_infos.size();
+		RenderModelsMeshContext mesh_context;
+		int64_t last_key = 0;
+		while (info != end)
 		{
-			const Matrix& world_matrix = *info->m_matrix;
-			const Mesh& mesh = *info->m_mesh;
-			const Material& material = *mesh.getMaterial();
-			Shader& shader = *material.getShader();
-			
-			if (last_material != &material)
+			if (last_key != info->m_key)
 			{
-				if(!shader.hasPass(pass_hash))
+				mesh_context.m_mesh = info->m_mesh->m_mesh;
+				if (!setMeshContext(&mesh_context))
 				{
 					++info;
 					continue;
 				}
-	
-				material.apply(*m_renderer, *this);
-				setFixedCachedUniform(*m_renderer, shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX0, m_shadow_modelviewprojection[0]);
-				setFixedCachedUniform(*m_renderer, shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX1, m_shadow_modelviewprojection[1]);
-				setFixedCachedUniform(*m_renderer, shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX2, m_shadow_modelviewprojection[2]);
-				setFixedCachedUniform(*m_renderer, shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX3, m_shadow_modelviewprojection[3]);
-				Component light_cmp = m_scene->getLight(0);
-				if(light_cmp.isValid())
-				{
-					setFixedCachedUniform(*m_renderer, shader, (int)Shader::FixedCachedUniforms::AMBIENT_COLOR, m_scene->getLightAmbientColor(light_cmp));
-					setFixedCachedUniform(*m_renderer, shader, (int)Shader::FixedCachedUniforms::AMBIENT_INTENSITY, m_scene->getLightAmbientIntensity(light_cmp));
-					setFixedCachedUniform(*m_renderer, shader, (int)Shader::FixedCachedUniforms::DIFFUSE_COLOR, m_scene->getLightDiffuseColor(light_cmp));
-					setFixedCachedUniform(*m_renderer, shader, (int)Shader::FixedCachedUniforms::DIFFUSE_INTENSITY, m_scene->getLightDiffuseIntensity(light_cmp));
-					setFixedCachedUniform(*m_renderer, shader, (int)Shader::FixedCachedUniforms::FOG_COLOR, m_scene->getFogColor(light_cmp));
-					setFixedCachedUniform(*m_renderer, shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
-					setFixedCachedUniform(*m_renderer, shader, (int)Shader::FixedCachedUniforms::SHADOWMAP_SPLITS, m_shadowmap_splits);
-				}
-				m_renderer->setUniform(shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
-				last_material = &material;
-			}
-			setFixedCachedUniform(*m_renderer, shader, (int)Shader::FixedCachedUniforms::WORLD_MATRIX, world_matrix);
-			
-			static Matrix bone_mtx[64];
-			if (info->m_pose->getCount() > 0)
-			{
-				const Pose& pose = *info->m_pose;
-				const Model& model = *info->m_model;
-				Vec3* poss = pose.getPositions();
-				Quat* rots = pose.getRotations();
-				ASSERT(pose.getCount() <= 64);
-				for (int bone_index = 0, bone_count = pose.getCount(); bone_index < bone_count; ++bone_index)
-				{
-					rots[bone_index].toMatrix(bone_mtx[bone_index]);
-					bone_mtx[bone_index].translate(poss[bone_index]);
-					bone_mtx[bone_index] = bone_mtx[bone_index] * model.getBone(bone_index).inv_bind_matrix;
-				}
-				m_renderer->setUniform(shader, "bone_matrices", BONE_MATRICES_HASH, bone_mtx, pose.getCount());
+				bindGeometry(*m_renderer, *info->m_mesh->m_geometry, *mesh_context.m_shader);
+				last_key = info->m_key;
 			}
 
-			renderGeometry(*m_renderer, *info->m_geometry, mesh.getStart(), mesh.getCount(), *material.getShader());
+			const RenderableMesh* LUMIX_RESTRICT renderable_mesh = info->m_mesh;
+			const Matrix& world_matrix = *renderable_mesh->m_matrix;
+			setUniform(mesh_context.m_world_matrix_uniform_location, world_matrix);
+			
+			if (renderable_mesh->m_pose->getCount() > 0)
+			{
+				setPoseUniform(renderable_mesh, mesh_context);
+			}
+			
+			renderGeometry(mesh_context.m_geometry_start, mesh_context.m_geometry_count);
 			++info;
 		}
 	}
