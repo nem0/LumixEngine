@@ -145,6 +145,7 @@ namespace Lumix
 				, m_always_visible(m_allocator)
 				, m_temporary_infos(m_allocator)
 				, m_sync_point(true, m_allocator)
+				, m_jobs(m_allocator)
 			{
 				m_universe.entityMoved().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 				m_timer = Timer::create(m_allocator);
@@ -981,8 +982,7 @@ namespace Lumix
 			void fillTemporaryInfos(const CullingSystem::Results& results, int64_t layer_mask)
 			{
 				PROFILE_FUNCTION();
-				static Array<MTJD::Job*> jobs(m_allocator);
-				jobs.clear();
+				m_jobs.clear();
 
 				while (m_temporary_infos.size() < results.size())
 				{
@@ -1014,9 +1014,9 @@ namespace Lumix
 							}
 						});
 					job->addDependency(&m_sync_point);
-					jobs.push(job);
+					m_jobs.push(job);
 				}
-				runJobs(jobs, m_sync_point);
+				runJobs(m_jobs, m_sync_point);
 			}
 
 			
@@ -1451,6 +1451,7 @@ namespace Lumix
 			DynamicRenderableCache m_dynamic_renderable_cache;
 			Array<Array<RenderableInfo> > m_temporary_infos;
 			MTJD::Group m_sync_point;
+			Array<MTJD::Job*> m_jobs;
 	};
 
 
