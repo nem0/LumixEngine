@@ -1630,6 +1630,19 @@ struct WorldEditorImpl : public WorldEditor
 				er->create(*m_engine, *static_cast<RenderScene*>(getComponent(m_camera, CAMERA_HASH).scene), entity);
 				m_editor_icons.push(er);
 			}
+			else
+			{
+				for (int i = 0; i < m_editor_icons.size(); ++i)
+				{
+					if (m_editor_icons[i]->getEntity() == entity)
+					{
+						m_editor_icons[i]->destroy();
+						m_allocator.deleteObject(m_editor_icons[i]);
+						m_editor_icons.eraseFast(i);
+						break;
+					}
+				}
+			}
 		}
 
 		void resetAndLoad(FS::IFile& file, const char* path)
