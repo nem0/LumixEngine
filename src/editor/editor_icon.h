@@ -19,7 +19,6 @@ class RenderScene;
 
 class EditorIcon
 {
-	friend class EditorApp;
 	enum Type
 	{
 		PHYSICAL_CONTROLLER,
@@ -31,8 +30,8 @@ class EditorIcon
 		COUNT
 	};
 	public:
-		void create(Engine& engine, RenderScene& scene, const Entity& entity);
-		void destroy();
+		EditorIcon(Engine& engine, RenderScene& scene, const Entity& entity);
+		~EditorIcon();
 		void render(Renderer* renderer, IRenderDevice& render_device);
 		void show();
 		void hide();

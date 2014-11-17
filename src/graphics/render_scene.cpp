@@ -963,7 +963,7 @@ namespace Lumix
 					return NULL;
 
 				m_culling_system->cullToFrustumAsync(frustum);
-				return &m_culling_system->getResultAsync();
+				return &m_culling_system->getResult();
 			}
 
 
