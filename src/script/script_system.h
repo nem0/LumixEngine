@@ -21,6 +21,8 @@ class LUMIX_SCRIPT_API ScriptScene : public IScene
 	public:
 		virtual void getScriptPath(Component cmp, string& str) = 0;
 		virtual void setScriptPath(Component cmp, const string& str) = 0;
+
+		virtual Engine& getEngine() = 0;
 };
 
 
