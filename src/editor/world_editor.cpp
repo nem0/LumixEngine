@@ -101,10 +101,10 @@ class SetEntityNameCommand : public IEditorCommand
 		}
 
 	private:
+		WorldEditor& m_editor;
 		Entity m_entity;
 		string m_new_name;
 		string m_old_name;
-		WorldEditor& m_editor;
 };
 
 
