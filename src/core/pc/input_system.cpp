@@ -12,6 +12,7 @@ namespace Lumix
 		InputSystemImpl(IAllocator& allocator)
 			: m_actions(allocator)
 			, m_allocator(allocator)
+			, m_is_enabled(true)
 		{}
 
 		struct Action
@@ -24,7 +25,14 @@ namespace Lumix
 		Map<uint32_t, Action> m_actions;
 		float m_mouse_rel_x;
 		float m_mouse_rel_y;
+		bool m_is_enabled;
 	};
+
+
+	void InputSystem::enable(bool enabled)
+	{
+		m_impl->m_is_enabled = enabled;
+	}
 
 
 	void InputSystem::update(float)
@@ -73,6 +81,10 @@ namespace Lumix
 
 	float InputSystem::getActionValue(uint32_t action)
 	{
+		if (!m_impl->m_is_enabled)
+		{
+			return 0;
+		}
 		InputSystemImpl::Action value;
 		if(m_impl->m_actions.find(action, value))
 		{
