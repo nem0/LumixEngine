@@ -13,6 +13,8 @@ namespace Lumix
 {
 	typedef Array<bool> VisibilityFlags;
 
+	static const int MIN_ENTITIES_PER_THREAD = 50;
+
 	static void doCulling(
 		int start_index,
 		const Sphere* LUMIX_RESTRICT start,
@@ -85,6 +87,11 @@ namespace Lumix
 			, m_visibility_flags(m_allocator)
 		{
 			m_result.emplace(m_allocator);
+			int cpu_count = (int)m_mtjd_manager.getCpuThreadsCount();
+			while (m_result.size() < cpu_count)
+			{
+				m_result.emplace(m_allocator);
+			}
 		}
 
 
@@ -109,21 +116,22 @@ namespace Lumix
 
 		virtual const Results& getResult() override
 		{
-			return m_result;
-		}
-
-
-		virtual const Results& getResultAsync() override
-		{
-			m_sync_point.sync();
+			if (m_is_async_result)
+			{
+				m_sync_point.sync();
+			}
 			return m_result;
 		}
 
 
 		virtual void cullToFrustum(const Frustum& frustum) override
 		{
-			m_result[0].clear();
+			for (int i = 0; i < m_result.size(); ++i)
+			{
+				m_result[i].clear();
+			}
 			doCulling(0, &m_spheres[0], &m_spheres.back(), &m_visibility_flags[0], &frustum, m_result[0]);
+			m_is_async_result = false;
 		}
 
 
@@ -134,20 +142,14 @@ namespace Lumix
 			if (count == 0)
 				return;
 
+			if (count < m_result.size() * MIN_ENTITIES_PER_THREAD)
+			{
+				cullToFrustum(frustum);
+				return;
+			}
+			m_is_async_result = true;
+
 			int cpu_count = m_mtjd_manager.getCpuThreadsCount();
-			cpu_count = Math::minValue(count, cpu_count);
-			ASSERT(cpu_count > 0);
-
-			while (m_result.size() < cpu_count)
-			{
-				m_result.emplace(m_allocator);
-			}
-
-			while (m_result.size() > cpu_count)
-			{
-				m_result.pop();
-			}
-
 			int step = count / cpu_count;
 			int i = 0;
 			CullingJob* jobs[16];
@@ -236,6 +238,7 @@ namespace Lumix
 
 		MTJD::Manager& m_mtjd_manager;
 		MTJD::Group m_sync_point;
+		bool m_is_async_result;
 	};
 
 

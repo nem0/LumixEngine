@@ -1305,8 +1305,7 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			if (m_camera.isValid())
 			{
-				EditorIcon* er = m_allocator.newObject<EditorIcon>();
-				er->create(*m_engine, *static_cast<RenderScene*>(getComponent(m_camera, CAMERA_HASH).scene), entity);
+				EditorIcon* er = m_allocator.newObject<EditorIcon>(*m_engine, *static_cast<RenderScene*>(getComponent(m_camera, CAMERA_HASH).scene), entity);
 				m_editor_icons.push(er);
 			}
 		}
@@ -1624,24 +1623,19 @@ struct WorldEditorImpl : public WorldEditor
 					break;
 				}
 			}
+			for (int i = 0; i < m_editor_icons.size(); ++i)
+			{
+				if (m_editor_icons[i]->getEntity() == entity)
+				{
+					m_allocator.deleteObject(m_editor_icons[i]);
+					m_editor_icons.eraseFast(i);
+					break;
+				}
+			}
 			if (!found_renderable)
 			{
-				EditorIcon* er = m_allocator.newObject<EditorIcon>();
-				er->create(*m_engine, *static_cast<RenderScene*>(getComponent(m_camera, CAMERA_HASH).scene), entity);
+				EditorIcon* er = m_allocator.newObject<EditorIcon>(*m_engine, *static_cast<RenderScene*>(getComponent(m_camera, CAMERA_HASH).scene), entity);
 				m_editor_icons.push(er);
-			}
-			else
-			{
-				for (int i = 0; i < m_editor_icons.size(); ++i)
-				{
-					if (m_editor_icons[i]->getEntity() == entity)
-					{
-						m_editor_icons[i]->destroy();
-						m_allocator.deleteObject(m_editor_icons[i]);
-						m_editor_icons.eraseFast(i);
-						break;
-					}
-				}
 			}
 		}
 
@@ -1968,7 +1962,6 @@ struct WorldEditorImpl : public WorldEditor
 			{
 				if (m_editor_icons[i]->getEntity() == cmp.entity)
 				{
-					m_editor_icons[i]->destroy();
 					m_allocator.deleteObject(m_editor_icons[i]);
 					m_editor_icons.eraseFast(i);
 					break;
@@ -1976,8 +1969,7 @@ struct WorldEditorImpl : public WorldEditor
 			}
 			if (cmp.entity.existsInUniverse() && getComponents(cmp.entity).empty())
 			{
-				EditorIcon* er = m_allocator.newObject<EditorIcon>();
-				er->create(*m_engine, *static_cast<RenderScene*>(getComponent(m_camera, CAMERA_HASH).scene), cmp.entity);
+				EditorIcon* er = m_allocator.newObject<EditorIcon>(*m_engine, *static_cast<RenderScene*>(getComponent(m_camera, CAMERA_HASH).scene), cmp.entity);
 				m_editor_icons.push(er);
 			}
 		}
@@ -1990,7 +1982,6 @@ struct WorldEditorImpl : public WorldEditor
 			{
 				if (m_editor_icons[i]->getEntity() == entity)
 				{
-					m_editor_icons[i]->destroy();
 					m_allocator.deleteObject(m_editor_icons[i]);
 					m_editor_icons.eraseFast(i);
 					break;
@@ -2005,7 +1996,6 @@ struct WorldEditorImpl : public WorldEditor
 			m_universe_destroyed.invoke();
 			for (int i = 0; i < m_editor_icons.size(); ++i)
 			{
-				m_editor_icons[i]->destroy();
 				m_allocator.deleteObject(m_editor_icons[i]);
 			}
 			m_components.clear();

@@ -19,7 +19,7 @@ namespace Lumix
 {
 
 
-void EditorIcon::create(Engine& engine, RenderScene& scene, const Entity& entity)
+EditorIcon::EditorIcon(Engine& engine, RenderScene& scene, const Entity& entity)
 {
 	m_scene = &scene;
 	m_entity = entity;
@@ -66,7 +66,7 @@ void EditorIcon::create(Engine& engine, RenderScene& scene, const Entity& entity
 }
 
 
-void EditorIcon::destroy()
+EditorIcon::~EditorIcon()
 {
 	m_model->getResourceManager().get(ResourceManager::MODEL)->unload(*m_model);
 }

@@ -26,7 +26,6 @@ namespace Lumix
 
 		virtual void clear() = 0;
 		virtual const Results& getResult() = 0;
-		virtual const Results& getResultAsync() = 0;
 
 		virtual void cullToFrustum(const Frustum& frustum) = 0;
 		virtual void cullToFrustumAsync(const Frustum& frustum) = 0;
