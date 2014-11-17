@@ -1569,6 +1569,7 @@ struct WorldEditorImpl : public WorldEditor
 
 		void load(FS::IFile& file, const char* path)
 		{
+			m_components.clear();
 			g_log_info.log("editor") << "parsing universe...";
 			JsonSerializer serializer(file, JsonSerializer::READ, path);
 			m_engine->deserialize(serializer);
