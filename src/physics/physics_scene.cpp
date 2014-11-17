@@ -538,6 +538,19 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
+	virtual Component getController(const Entity& entity) override
+	{
+		for (int i = 0; i < m_controllers.size(); ++i)
+		{
+			if (m_controllers[i].m_entity == entity)
+			{
+				return Component(entity, CONTROLLER_HASH, this, i);
+			}
+		}
+		return Component::INVALID;
+	}
+
+
 	virtual void moveController(Component cmp, const Vec3& v, float dt) override
 	{
 		m_controllers[cmp.index].m_controller->move(physx::PxVec3(v.x, v.y, v.z), 0.001f, dt, physx::PxControllerFilters());
