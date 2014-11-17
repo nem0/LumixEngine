@@ -87,15 +87,25 @@ namespace Lumix
 			m_result.emplace(m_allocator);
 		}
 
+
 		virtual ~CullingSystemImpl()
 		{
 
 		}
 
+
+		virtual void clear() override
+		{
+			m_spheres.clear();
+			m_visibility_flags.clear();
+		}
+
+
 		IAllocator& getAllocator()
 		{
 			return m_allocator;
 		}
+
 
 		virtual const Results& getResult() override
 		{
@@ -115,6 +125,7 @@ namespace Lumix
 			m_result[0].clear();
 			doCulling(0, &m_spheres[0], &m_spheres.back(), &m_visibility_flags[0], &frustum, m_result[0]);
 		}
+
 
 		virtual void cullToFrustumAsync(const Frustum& frustum) override
 		{
@@ -179,6 +190,7 @@ namespace Lumix
 				m_visibility_flags.push(true);
 		}
 
+
 		virtual void removeStatic(int index) override
 		{
 			ASSERT(index <= m_spheres.size());
@@ -187,15 +199,18 @@ namespace Lumix
 			m_visibility_flags.erase(index);
 		}
 
+
 		virtual void updateBoundingRadius(float radius, int index) override
 		{
 			m_spheres[index].m_radius = radius;
 		}
 
+
 		virtual void updateBoundingPosition(const Vec3& position, int index) override
 		{
 			m_spheres[index].m_position = position;
 		}
+
 
 		virtual void insert(const InputSpheres& spheres) override
 		{
@@ -206,10 +221,12 @@ namespace Lumix
 			}
 		}
 
+
 		virtual const InputSpheres& getSpheres() override
 		{
 			return m_spheres;
 		}
+
 
 	private:
 		IAllocator&		m_allocator;

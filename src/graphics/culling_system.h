@@ -24,6 +24,7 @@ namespace Lumix
 		static CullingSystem* create(MTJD::Manager& mtjd_manager, IAllocator& allocator);
 		static void destroy(CullingSystem& culling_system);
 
+		virtual void clear() = 0;
 		virtual const Results& getResult() = 0;
 		virtual const Results& getResultAsync() = 0;
 

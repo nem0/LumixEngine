@@ -45,6 +45,7 @@ namespace Debug
 			MT::SpinMutex m_mutex;
 			AllocationInfo* m_root;
 			AllocationInfo m_sentinels[2];
+			size_t m_total_size;
 	};
 
 
