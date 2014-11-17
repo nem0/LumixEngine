@@ -24,6 +24,7 @@ namespace Lumix
 			bool create(IAllocator& allocator);
 			void destroy();
 
+			void enable(bool enabled);
 			void update(float dt);
 			float getActionValue(uint32_t action);
 			void injectMouseXMove(float value);
