@@ -748,10 +748,6 @@ namespace Lumix
 			mtx.fastInverse();
 			Vec3 rel_origin = mtx.multiplyPosition(origin);
 			Vec3 rel_dir = mtx * dir;
-			if (fabs(rel_dir.x) < 0.01f || fabs(rel_dir.z) < 0.01f)
-			{
-				return hit;
-			}
 			Vec3 start;
 			Vec3 size(m_root->m_size * m_xz_scale, m_y_scale, m_root->m_size * m_xz_scale);
 			if (Math::getRayAABBIntersection(rel_origin, rel_dir, m_root->m_min, size, start))
@@ -759,11 +755,11 @@ namespace Lumix
 				int hx = (int)(start.x / m_xz_scale);
 				int hz = (int)(start.z / m_xz_scale);
 
-				float next_x = ((hx + (rel_dir.x < 0 ? 0 : 1)) * m_xz_scale - rel_origin.x) / rel_dir.x;
-				float next_z = ((hz + (rel_dir.z < 0 ? 0 : 1)) * m_xz_scale - rel_origin.z) / rel_dir.z;
+				float next_x = fabs(rel_dir.x) < 0.01f ? hx : ((hx + (rel_dir.x < 0 ? 0 : 1)) * m_xz_scale - rel_origin.x) / rel_dir.x;
+				float next_z = fabs(rel_dir.z) < 0.01f ? hx : ((hz + (rel_dir.z < 0 ? 0 : 1)) * m_xz_scale - rel_origin.z) / rel_dir.z;
 
-				float delta_x = m_xz_scale / Math::abs(rel_dir.x);
-				float delta_z = m_xz_scale / Math::abs(rel_dir.z);
+				float delta_x = fabs(rel_dir.x) < 0.01f ? 0 : m_xz_scale / Math::abs(rel_dir.x);
+				float delta_z = fabs(rel_dir.z) < 0.01f ? 0 : m_xz_scale / Math::abs(rel_dir.z);
 				int step_x = (int)Math::signum(rel_dir.x);
 				int step_z = (int)Math::signum(rel_dir.z);
 
@@ -801,6 +797,10 @@ namespace Lumix
 					{
 						next_z += delta_z;
 						hz += step_z;
+					}
+					if (delta_x == 0 && delta_z == 0)
+					{
+						return hit;
 					}
 				}
 			}
