@@ -18,6 +18,7 @@ namespace Debug
 		, m_root(NULL)
 		, m_mutex(false)
 		, m_stack_tree(m_source.newObject<Debug::StackTree>())
+		, m_total_size(0)
 	{
 		m_sentinels[0].m_next = &m_sentinels[1];
 		m_sentinels[0].m_previous = NULL;
@@ -74,6 +75,8 @@ namespace Debug
 
 			m_root = info;
 
+			m_total_size += size;
+
 			return (uint8_t*)ptr + sizeof(AllocationInfo);
 		#endif
 	}
@@ -93,6 +96,9 @@ namespace Debug
 				}
 				info->m_previous->m_next = info->m_next;
 				info->m_next->m_previous = info->m_previous;
+				
+				m_total_size -= info->m_size;
+				
 				info->~AllocationInfo();
 
 				m_source.deallocate((void*)info);

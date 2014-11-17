@@ -27,7 +27,10 @@ namespace Lumix
 
 			~MemoryFile() 
 			{ 
-				m_file->release();
+				if (m_file)
+				{
+					m_file->release();
+				}
 				m_allocator.deallocate(m_buffer);
 			}
 

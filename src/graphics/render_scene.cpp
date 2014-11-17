@@ -390,9 +390,12 @@ namespace Lumix
 				for(int i = size; i < m_renderables.size(); ++i)
 				{
 					setModel(i, NULL);
+					m_allocator.deleteObject(m_renderables[i]);
 				}
+				m_culling_system->clear();
 				m_renderables.clear();
 				m_renderables.reserve(size);
+				m_dynamic_renderable_cache = DynamicRenderableCache(m_allocator);
 				m_always_visible.clear();
 				for (int i = 0; i < size; ++i)
 				{
