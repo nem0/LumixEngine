@@ -653,6 +653,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 					int idx2 = j + i * height;
 					heights[idx].height = data[idx2];
 					heights[idx].materialIndex0 = heights[idx].materialIndex1 = 0;
+					heights[idx].setTessFlag();
 					++idx;
 				}
 			}
@@ -669,6 +670,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 					int idx2 = j + i * height;
 					heights[idx].height = data[idx2 * bytes_per_pixel];
 					heights[idx].materialIndex0 = heights[idx].materialIndex1 = 0;
+					heights[idx].setTessFlag();
 				}
 			}
 		}
@@ -1138,13 +1140,14 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system, Universe& universe, En
 		allocator.deleteObject(impl);
 		return NULL;
 	}
-	
-	/*impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_SHAPES, 1.0f);
+	/*
+	impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_SHAPES, 1.0f);
 	impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE, 1.0);
 	impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eACTOR_AXES, 1.0f);
 	impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_AABBS, 1.0f);
 	impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eWORLD_AXES, 1.0f);
-	impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCONTACT_POINT, 1.0f);*/
+	impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCONTACT_POINT, 1.0f);
+	*/
 	impl->m_system = &system;
 	impl->m_default_material = impl->m_system->getPhysics()->createMaterial(0.5,0.5,0.5);
 	return impl;
