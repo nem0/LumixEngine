@@ -335,6 +335,14 @@ namespace Lumix
 			m_mask = 0;
 		}
 
+		void rehash(size_type ids_count)
+		{
+			if (m_max_id < ids_count)
+			{
+				grow(ids_count);
+			}
+		}
+
 		iterator begin() { return iterator(first(), this); }
 		iterator end() { return iterator(m_sentinel, this); }
 
@@ -345,7 +353,7 @@ namespace Lumix
 			node_type* n = _find(key);
 			return n->m_value;
 		}
-
+		
 	private:
 		void checkSize()
 		{
@@ -382,7 +390,7 @@ namespace Lumix
 			node_type* old = m_table;
 
 			init(new_ids_count);
-			copyTableUninitialized(old, m_sentinel, ids_count);
+			copyTableUninitialized(old, m_sentinel, old_ids_count);
 			destructTable(old, m_sentinel, old_ids_count);
 
 			m_size = old_size;
@@ -396,7 +404,8 @@ namespace Lumix
 
 		node_type* construct(node_type* where, node_type* node)
 		{
-			return where->m_next = node;
+			where->m_next = node;
+			return where;
 		}
 
 		node_type* construct(node_type* where, const node_type& node)
