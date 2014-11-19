@@ -300,22 +300,22 @@ struct PipelineImpl : public Pipeline
 	{
 		int32_t count;
 		serializer.deserializeObjectBegin();
-		serializer.deserialize("frame_buffer_count", count);
+		serializer.deserialize("frame_buffer_count", count, 0);
 		serializer.deserializeArrayBegin("frame_buffers");
 		m_framebuffers.resize(count);
 		for(int i = 0; i < count; ++i)
 		{
 			int32_t render_buffer_count;
 			char fb_name[31];
-			serializer.deserializeArrayItem(fb_name, 30);
+			serializer.deserializeArrayItem(fb_name, 30, "");
 			m_framebuffers[i].m_name = fb_name;
 
-			serializer.deserializeArrayItem(render_buffer_count);
+			serializer.deserializeArrayItem(render_buffer_count, 0);
 			int mask = 0;
 			char rb_name[30];
 			for(int j = 0; j < render_buffer_count; ++j)
 			{
-				serializer.deserializeArrayItem(rb_name, 30);
+				serializer.deserializeArrayItem(rb_name, 30, "");
 				if(strcmp(rb_name, "depth") == 0)
 				{
 					mask |= FrameBuffer::DEPTH_BIT;
@@ -325,20 +325,20 @@ struct PipelineImpl : public Pipeline
 					ASSERT(false);
 				}
 			}
-			serializer.deserializeArrayItem(m_framebuffers[i].m_width);
-			serializer.deserializeArrayItem(m_framebuffers[i].m_height);
+			serializer.deserializeArrayItem(m_framebuffers[i].m_width, 800);
+			serializer.deserializeArrayItem(m_framebuffers[i].m_height, 600);
 			m_framebuffers[i].m_mask = mask;
 		}
 		serializer.deserializeArrayEnd();
-		serializer.deserialize("shadowmap_width", m_shadowmap_framebuffer.m_width);
-		serializer.deserialize("shadowmap_height", m_shadowmap_framebuffer.m_height);
+		serializer.deserialize("shadowmap_width", m_shadowmap_framebuffer.m_width, 0);
+		serializer.deserialize("shadowmap_height", m_shadowmap_framebuffer.m_height, 0);
 		m_shadowmap_framebuffer.m_mask = FrameBuffer::DEPTH_BIT;
 		
 		serializer.deserializeArrayBegin("commands");
 		while (!serializer.isArrayEnd())
 		{
 			char tmp[255];
-			serializer.deserializeArrayItem(tmp, 255);
+			serializer.deserializeArrayItem(tmp, 255, "");
 			uint32_t command_type_hash = crc32(tmp);
 			Command* cmd = createCommand(command_type_hash);
 			if(cmd)
@@ -863,7 +863,7 @@ void PipelineInstance::destroy(PipelineInstance* pipeline)
 
 void PolygonModeCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
-	serializer.deserializeArrayItem(m_fill);
+	serializer.deserializeArrayItem(m_fill, true);
 }
 
 
@@ -876,7 +876,7 @@ void PolygonModeCommand::execute(PipelineInstanceImpl& pipeline)
 void SetPassCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
 	char pass_name[50];
-	serializer.deserializeArrayItem(pass_name, sizeof(pass_name));
+	serializer.deserializeArrayItem(pass_name, sizeof(pass_name), "");
 	m_pass_hash = crc32(pass_name);
 }
 
@@ -890,7 +890,7 @@ void SetPassCommand::execute(PipelineInstanceImpl& pipeline)
 void ClearCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
 	char tmp[256];
-	serializer.deserializeArrayItem(tmp, 255);
+	serializer.deserializeArrayItem(tmp, 255, "all");
 	if (strcmp(tmp, "all") == 0)
 	{
 		m_buffers = GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT;
@@ -911,7 +911,7 @@ void ClearCommand::execute(PipelineInstanceImpl&)
 void CustomCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
 	char tmp[256];
-	serializer.deserializeArrayItem(tmp, 255);
+	serializer.deserializeArrayItem(tmp, 255, "");
 	m_name = crc32(tmp);
 }
 
@@ -925,7 +925,7 @@ void CustomCommand::execute(PipelineInstanceImpl& pipeline)
 
 void RenderModelsCommand::deserialize(PipelineImpl&, ISerializer& serializer) 
 {
-	serializer.deserializeArrayItem(m_layer_mask);
+	serializer.deserializeArrayItem(m_layer_mask, 0);
 }
 
 
@@ -939,7 +939,7 @@ void RenderModelsCommand::execute(PipelineInstanceImpl& pipeline)
 
 void ApplyCameraCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
-	serializer.deserializeArrayItem(m_camera_slot);
+	serializer.deserializeArrayItem(m_camera_slot, "main");
 }
 
 
@@ -958,7 +958,7 @@ void ApplyCameraCommand::execute(PipelineInstanceImpl& pipeline)
 
 void BindFramebufferCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
-	serializer.deserializeArrayItem(m_buffer_name);
+	serializer.deserializeArrayItem(m_buffer_name, "");
 }
 
 
@@ -1012,14 +1012,14 @@ void DrawScreenQuadCommand::deserialize(PipelineImpl& pipeline, ISerializer& ser
 	
 	for (int i = 0; i < GEOMETRY_VERTEX_ATTRIBUTE_COUNT; ++i)
 	{
-		serializer.deserializeArrayItem(v[i]);
+		serializer.deserializeArrayItem(v[i], 0);
 	}
 
 	uint8_t* data = (uint8_t*)v;
 	m_geometry->copy(data, sizeof(v), indices, def);
 
 	char material[LUMIX_MAX_PATH];
-	serializer.deserializeArrayItem(material, LUMIX_MAX_PATH);
+	serializer.deserializeArrayItem(material, LUMIX_MAX_PATH, "");
 	m_material = static_cast<Material*>(pipeline.getResourceManager().get(ResourceManager::MATERIAL)->load(material));
 }
 
@@ -1032,9 +1032,9 @@ void DrawScreenQuadCommand::execute(PipelineInstanceImpl& pipeline)
 
 void BindFramebufferTextureCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
-	serializer.deserializeArrayItem(m_framebuffer_name);
+	serializer.deserializeArrayItem(m_framebuffer_name, "");
 	char rb_name[31];
-	serializer.deserializeArrayItem(rb_name, 30);
+	serializer.deserializeArrayItem(rb_name, 30, "");
 	if (stricmp(rb_name, "position") == 0)
 	{
 		m_renderbuffer_index = FrameBuffer::POSITION;
@@ -1051,7 +1051,7 @@ void BindFramebufferTextureCommand::deserialize(PipelineImpl&, ISerializer& seri
 	{
 		m_renderbuffer_index = FrameBuffer::DEPTH;
 	}
-	serializer.deserializeArrayItem(m_texture_uint);
+	serializer.deserializeArrayItem(m_texture_uint, 0);
 }
 
 
@@ -1068,8 +1068,8 @@ void BindFramebufferTextureCommand::execute(PipelineInstanceImpl& pipeline)
 
 void RenderShadowmapCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
-	serializer.deserializeArrayItem(m_layer_mask);
-	serializer.deserializeArrayItem(m_camera_slot);
+	serializer.deserializeArrayItem(m_layer_mask, 0);
+	serializer.deserializeArrayItem(m_camera_slot, 0);
 }
 
 

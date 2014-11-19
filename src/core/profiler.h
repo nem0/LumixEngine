@@ -26,7 +26,7 @@ namespace Lumix
 			DelegateList<void ()>& getFrameListeners() { return m_frame_listeners; }
 			Block* getRootBlock() const { return m_root_block; }
 
-			void beginBlock(const char* name, const char* function);
+			void beginBlock(const char* name);
 			void endBlock();
 			
 
@@ -66,7 +66,6 @@ namespace Lumix
 			Block* m_next;
 			Block* m_first_child;
 			const char* m_name;
-			const char* m_function;
 			Profiler& m_profiler;
 			Array<Hit> m_hits;
 	};
@@ -78,9 +77,9 @@ namespace Lumix
 	class ProfileScope
 	{
 		public:
-			ProfileScope(const char* name, const char* function)
+			ProfileScope(const char* name)
 			{
-				g_profiler.beginBlock(name, function);
+				g_profiler.beginBlock(name);
 			}
 
 			~ProfileScope()
@@ -90,9 +89,9 @@ namespace Lumix
 	};
 
 
-#define BEGIN_PROFILE_BLOCK(name) Lumix::g_profiler.beginBlock(name, __FUNCSIG__)
+#define BEGIN_PROFILE_BLOCK(name) Lumix::g_profiler.beginBlock(name)
 #define END_PROFILE_BLOCK() Lumix::g_profiler.endBlock()
-#define PROFILE_FUNCTION() Lumix::ProfileScope profile_scope(__FUNCTION__, __FUNCSIG__);
-#define PROFILE_BLOCK(name) Lumix::ProfileScope profile_scope(name, __FUNCSIG__);
+#define PROFILE_FUNCTION() Lumix::ProfileScope profile_scope(__FUNCTION__);
+#define PROFILE_BLOCK(name) Lumix::ProfileScope profile_scope(name);
 
 } // namespace Lumix

@@ -402,17 +402,19 @@ class EntityListModel : public QAbstractItemModel
 			if (index.isValid() && role == Qt::DisplayRole)
 			{
 				Lumix::Component renderable = m_engine->getWorldEditor()->getComponent(item->m_entity, RENDERABLE_HASH);
+				const char* name = item->m_entity.getName();
 				if (renderable.isValid())
 				{
 					Lumix::StackAllocator<LUMIX_MAX_PATH> allocator;
 					Lumix::string path(allocator);
 					static_cast<Lumix::RenderScene*>(renderable.scene)->getRenderablePath(renderable, path);
-					const char* name = item->m_entity.getName();
-					char basename[LUMIX_MAX_PATH];
-					Lumix::PathUtils::getBasename(basename, LUMIX_MAX_PATH, path.c_str());
-					return name && name[0] != '\0' ? QVariant(QString("%1 - %2").arg(name).arg(basename)) : QVariant(QString("%1 - %2").arg(item->m_entity.index).arg(basename));
+					if (path.length() != 0)
+					{
+						char basename[LUMIX_MAX_PATH];
+						Lumix::PathUtils::getBasename(basename, LUMIX_MAX_PATH, path.c_str());
+						return name && name[0] != '\0' ? QVariant(QString("%1 - %2").arg(name).arg(basename)) : QVariant(QString("%1 - %2").arg(item->m_entity.index).arg(basename));
+					}
 				}
-				const char* name = item->m_entity.getName();
 				return name && name[0] != '\0' ? QVariant(name) : QVariant(item->m_entity.index);
 			}
 			else if (index.isValid() && role == Qt::UserRole)
