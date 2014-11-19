@@ -147,8 +147,7 @@ namespace Debug
 			}
 		}
 
-		ASSERT(false);
-		return NULL;		
+		return node;		
 	}
 
 

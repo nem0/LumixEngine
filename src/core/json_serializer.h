@@ -48,26 +48,26 @@ namespace Lumix
 			virtual void serializeArrayItem(string& value) override;
 
 			// deserialize		
-			virtual void deserialize(const char* label, uint32_t& value) override;
-			virtual void deserialize(const char* label, float& value) override;
-			virtual void deserialize(const char* label, int32_t& value) override;
-			virtual void deserialize(const char* label, char* value, int max_length) override;
-			virtual void deserialize(const char* label, bool& value) override;
-			virtual void deserialize(char* value, int max_length) override;
-			virtual void deserialize(bool& value) override;
-			virtual void deserialize(float& value) override;
-			virtual void deserialize(int32_t& value) override;
+			virtual void deserialize(const char* label, uint32_t& value, uint32_t default_value) override;
+			virtual void deserialize(const char* label, float& value, float default_value) override;
+			virtual void deserialize(const char* label, int32_t& value, int32_t default_value) override;
+			virtual void deserialize(const char* label, char* value, int max_length, const char* default_value) override;
+			virtual void deserialize(const char* label, bool& value, bool default_value) override;
+			virtual void deserialize(char* value, int max_length, const char* default_value) override;
+			virtual void deserialize(bool& value, bool default_value) override;
+			virtual void deserialize(float& value, float default_value) override;
+			virtual void deserialize(int32_t& value, int32_t default_value) override;
 			virtual void deserializeArrayBegin(const char* label) override;
 			virtual void deserializeArrayBegin() override;
 			virtual void deserializeArrayEnd() override;
 			virtual bool isArrayEnd() const override;
-			virtual void deserializeArrayItem(uint32_t& value) override;
-			virtual void deserializeArrayItem(int32_t& value) override;
-			virtual void deserializeArrayItem(int64_t& value) override;
-			virtual void deserializeArrayItem(float& value) override;
-			virtual void deserializeArrayItem(bool& value) override;
-			virtual void deserializeArrayItem(char* value, int max_length) override;
-			virtual void deserializeArrayItem(string& value) override;
+			virtual void deserializeArrayItem(uint32_t& value, uint32_t default_value) override;
+			virtual void deserializeArrayItem(int32_t& value, int32_t default_value) override;
+			virtual void deserializeArrayItem(int64_t& value, int64_t default_value) override;
+			virtual void deserializeArrayItem(float& value, float default_value) override;
+			virtual void deserializeArrayItem(bool& value, bool default_value) override;
+			virtual void deserializeArrayItem(char* value, int max_length, const char* default_value) override;
+			virtual void deserializeArrayItem(string& value, const char* default_value) override;
 			virtual void deserializeObjectBegin() override;
 			virtual void deserializeObjectEnd() override;
 			virtual void deserializeLabel(char* label, int max_length) override;
@@ -84,7 +84,7 @@ namespace Lumix
 		private:
 			void deserializeLabel(const char* label);
 			void deserializeToken();
-			void readStringToken(char* tmp, int max_len);
+			bool readStringToken(char* tmp, int max_len);
 			bool readStringTokenPart(char* tmp, int max_len);
 			void deserializeArrayComma();
 			void logErrorIfNot(bool condition);
@@ -116,6 +116,7 @@ namespace Lumix
 			FS::IFile& m_file;
 			char m_token[TOKEN_MAX_SIZE];
 			bool m_is_string_token;
+			bool m_is_eof;
 			Path m_path;
 	};
 

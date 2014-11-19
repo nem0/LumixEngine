@@ -154,30 +154,30 @@ void Universe::serialize(ISerializer& serializer)
 void Universe::deserialize(ISerializer& serializer)
 {
 	int count;
-	serializer.deserialize("count", count);
+	serializer.deserialize("count", count, 0);
 	m_positions.resize(count);
 	m_rotations.resize(count);
 
 	serializer.deserializeArrayBegin("positions");
 	for(int i = 0; i < count; ++i)
 	{
-		serializer.deserializeArrayItem(m_positions[i].x);
-		serializer.deserializeArrayItem(m_positions[i].y);
-		serializer.deserializeArrayItem(m_positions[i].z);
+		serializer.deserializeArrayItem(m_positions[i].x, 0);
+		serializer.deserializeArrayItem(m_positions[i].y, 0);
+		serializer.deserializeArrayItem(m_positions[i].z, 0);
 	}
 	serializer.deserializeArrayEnd();
 
 	serializer.deserializeArrayBegin("rotations");
 	for(int i = 0; i < count; ++i)
 	{
-		serializer.deserializeArrayItem(m_rotations[i].x);
-		serializer.deserializeArrayItem(m_rotations[i].y);
-		serializer.deserializeArrayItem(m_rotations[i].z);
-		serializer.deserializeArrayItem(m_rotations[i].w);
+		serializer.deserializeArrayItem(m_rotations[i].x, 0);
+		serializer.deserializeArrayItem(m_rotations[i].y, 0);
+		serializer.deserializeArrayItem(m_rotations[i].z, 0);
+		serializer.deserializeArrayItem(m_rotations[i].w, 1);
 	}
 	serializer.deserializeArrayEnd();
 
-	serializer.deserialize("name_count", count);
+	serializer.deserialize("name_count", count, 0);
 	serializer.deserializeArrayBegin("names");
 	m_id_to_name_map.clear();
 	m_name_to_id_map.clear();
@@ -186,19 +186,19 @@ void Universe::deserialize(ISerializer& serializer)
 		uint32_t key;
 		static const int MAX_NAME_LENGTH = 50;
 		char name[MAX_NAME_LENGTH];
-		serializer.deserializeArrayItem(key);
-		serializer.deserializeArrayItem(name, MAX_NAME_LENGTH);
+		serializer.deserializeArrayItem(key, 0);
+		serializer.deserializeArrayItem(name, MAX_NAME_LENGTH, "");
 		m_id_to_name_map.insert(key, string(name, m_allocator));
 		m_name_to_id_map.insert(crc32(name), key);
 	}
 	serializer.deserializeArrayEnd();
 
-	serializer.deserialize("free_slot_count", count);
+	serializer.deserialize("free_slot_count", count, 0);
 	m_free_slots.resize(count);
 	serializer.deserializeArrayBegin("free_slots");
 	for(int i = 0; i < count; ++i)
 	{
-		serializer.deserializeArrayItem(m_free_slots[i]);
+		serializer.deserializeArrayItem(m_free_slots[i], 0);
 	}
 	serializer.deserializeArrayEnd();
 }
