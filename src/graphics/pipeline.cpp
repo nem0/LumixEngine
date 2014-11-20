@@ -1,13 +1,13 @@
 #include "graphics/pipeline.h"
 #include "graphics/gl_ext.h"
 #include "core/array.h"
+#include "core/associative_array.h"
 #include "core/crc32.h"
 #include "core/frustum.h"
 #include "core/fs/file_system.h"
 #include "core/iserializer.h"
 #include "core/json_serializer.h"
 #include "core/log.h"
-#include "core/map.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
@@ -494,10 +494,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void executeCustomCommand(uint32_t name)
 	{
-		Map<uint32_t, CustomCommandHandler>::iterator iter = m_custom_commands_handlers.find(name);
-		if (iter != m_custom_commands_handlers.end())
+		CustomCommandHandler handler;
+		if (m_custom_commands_handlers.find(name, handler))
 		{
-			iter.second().invoke();
+			handler.invoke();
 		}
 	}
 
@@ -882,7 +882,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	Vec4 m_shadowmap_splits;
 	int m_width;
 	int m_height;
-	Map<uint32_t, CustomCommandHandler> m_custom_commands_handlers;
+	AssociativeArray<uint32_t, CustomCommandHandler> m_custom_commands_handlers;
 	Component m_active_camera;
 	Array<TerrainInfo> m_terrain_infos;
 	Array<GrassInfo> m_grass_infos;

@@ -2,6 +2,7 @@
 
 
 #include "core/array.h"
+#include "core/associative_array.h"
 #include "core/matrix.h"
 #include "core/resource.h"
 #include "core/vec3.h"
@@ -129,8 +130,8 @@ class Terrain
 		RenderScene& m_scene;
 		Array<GrassType*> m_grass_types;
 		Array<GrassQuad*> m_free_grass_quads;
-		Map<Component, Array<GrassQuad*> > m_grass_quads;
-		Map<Component, Vec3> m_last_camera_position; 
+		AssociativeArray<Component, Array<GrassQuad*> > m_grass_quads;
+		AssociativeArray<Component, Vec3> m_last_camera_position; 
 		Vec3 m_brush_position;
 		float m_brush_size;
 		bool m_force_grass_update;

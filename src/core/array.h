@@ -112,7 +112,7 @@ class Array<T, false>
 				grow();
 			}
 			memmove(m_data + index + 1, m_data + index, sizeof(T) * (m_size - index));
-			m_data[index] = value;
+			new (&m_data[index]) T(value);
 			++m_size;
 		}
 

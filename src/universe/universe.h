@@ -3,8 +3,8 @@
 
 #include "core/lumix.h"
 #include "core/array.h"
+#include "core/associative_array.h"
 #include "core/delegate_list.h"
-#include "core/map.h"
 #include "core/quat.h"
 #include "core/string.h"
 #include "core/vec3.h"
@@ -59,8 +59,8 @@ class LUMIX_ENGINE_API Universe final
 		Array<Vec3>		m_positions;
 		Array<Quat>		m_rotations;
 		Array<int>		m_free_slots;
-		Map<uint32_t, uint32_t> m_name_to_id_map;
-		Map<uint32_t, string> m_id_to_name_map;
+		AssociativeArray<uint32_t, uint32_t> m_name_to_id_map;
+		AssociativeArray<uint32_t, string> m_id_to_name_map;
 		DelegateList<void(const Entity&)> m_entity_moved;
 		DelegateList<void(const Entity&)> m_entity_created;
 		DelegateList<void(const Entity&)> m_entity_destroyed;
