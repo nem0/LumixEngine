@@ -140,6 +140,7 @@
     <ClInclude Include="..\..\..\src\core\MTJD\generic_job.h">
       <Filter>mtjd</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\core\sorted_array.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\core\blob.cpp" />
