@@ -176,7 +176,6 @@
     <ClInclude Include="..\..\..\src\core\json_serializer.h" />
     <ClInclude Include="..\..\..\src\core\log.h" />
     <ClInclude Include="..\..\..\src\core\lumix.h" />
-    <ClInclude Include="..\..\..\src\core\map.h" />
     <ClInclude Include="..\..\..\src\core\math_utils.h" />
     <ClInclude Include="..\..\..\src\core\matrix.h" />
     <ClInclude Include="..\..\..\src\core\mtjd\base_entry.h" />
@@ -211,7 +210,7 @@
     <ClInclude Include="..\..\..\src\core\resource.h" />
     <ClInclude Include="..\..\..\src\core\resource_manager.h" />
     <ClInclude Include="..\..\..\src\core\resource_manager_base.h" />
-    <ClInclude Include="..\..\..\src\core\sorted_array.h" />
+    <ClInclude Include="..\..\..\src\core\associative_array.h" />
     <ClInclude Include="..\..\..\src\core\sphere.h" />
     <ClInclude Include="..\..\..\src\core\stack_allocator.h" />
     <ClInclude Include="..\..\..\src\core\static_array.h" />

@@ -13,7 +13,6 @@
     <ClInclude Include="..\..\..\src\core\iserializer.h" />
     <ClInclude Include="..\..\..\src\core\json_serializer.h" />
     <ClInclude Include="..\..\..\src\core\log.h" />
-    <ClInclude Include="..\..\..\src\core\map.h" />
     <ClInclude Include="..\..\..\src\core\math_utils.h" />
     <ClInclude Include="..\..\..\src\core\matrix.h" />
     <ClInclude Include="..\..\..\src\core\pod_hash_map.h" />
@@ -140,7 +139,7 @@
     <ClInclude Include="..\..\..\src\core\MTJD\generic_job.h">
       <Filter>mtjd</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\core\sorted_array.h" />
+    <ClInclude Include="..\..\..\src\core\associative_array.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\core\blob.cpp" />

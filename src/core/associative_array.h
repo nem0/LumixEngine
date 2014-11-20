@@ -41,7 +41,7 @@ namespace Lumix
 				else
 				{
 					int i = index(value);
-					if (i >= 0 && i < m_data.size() && m_data[i] != value)
+					if (i >= 0 && ((i < m_data.size() && m_data[i] != value) || i == m_data.size()))
 					{
 						m_data.insert(i, value);
 						return i;
@@ -57,6 +57,23 @@ namespace Lumix
 				return i < m_data.size() && m_data[i] == value;
 			}
 
+
+			void clear()
+			{
+				m_data.clear();
+			}
+
+
+			void reserve(int capacity)
+			{
+				m_data.reserve(capacity);
+			}
+
+
+			void erase(int index)
+			{
+				m_data.erase(index);
+			}
 
 		private:
 			int index(const T& value) const
@@ -99,6 +116,18 @@ namespace Lumix
 			void insert(const Key& key, const Value& value)
 			{
 				m_data.insert(Pair(key, value));
+			}
+
+
+			bool find(const Key& key, Value& value) const
+			{
+				int i = find(key);
+				if (i < 0)
+				{
+					return false;
+				}
+				value = m_data[i].m_value;
+				return true;
 			}
 
 
@@ -150,6 +179,60 @@ namespace Lumix
 				else
 				{
 					return m_data[m_data.insert(Pair(key, Value()))].m_value;
+				}
+			}
+
+
+			int size()
+			{
+				return m_data.size();
+			}
+
+
+			Value& get(const Key& key)
+			{
+				int index = find(key);
+				ASSERT(index >= 0);
+				return m_data[index].m_value;
+			}
+
+
+			Value& at(int index)
+			{
+				return m_data[index].m_value;
+			}
+
+
+			void clear()
+			{
+				m_data.clear();
+			}
+
+
+			void reserve(int capacity)
+			{
+				m_data.reserve(capacity);
+			}
+
+
+			const Key& getKey(int index)
+			{
+				return m_data[index].m_key;
+			}
+
+
+			void eraseAt(int index)
+			{
+				m_data.erase(index);
+			}
+
+
+			void erase(const Key& key)
+			{
+				int i = find(key);
+				if (i >= 0)
+				{
+					eraseAt(i);
 				}
 			}
 

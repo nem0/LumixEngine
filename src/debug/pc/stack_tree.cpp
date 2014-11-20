@@ -1,6 +1,7 @@
 #include "debug/stack_tree.h"
 #include "core/lumix.h"
 #include "core/MT/atomic.h"
+#include "core/string.h"
 #include <Windows.h>
 #include <cstdio>
 #include <Dbghelp.h>
@@ -65,6 +66,16 @@ namespace Debug
 			symbol->MaxNameLen = 255;
 			symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
 			SymFromAddr(process, (DWORD64)(node->m_instruction), 0, symbol);
+			IMAGEHLP_LINE line;
+			DWORD offset;
+			SymGetLineFromAddr(process, (DWORD64)(node->m_instruction), &offset, &line);
+			OutputDebugString("\t");
+			OutputDebugString(line.FileName);
+			OutputDebugString("(");
+			char tmp[20];
+			toCString((uint32_t)line.LineNumber, tmp, sizeof(tmp));
+			OutputDebugString(tmp);
+			OutputDebugString("):");
 			OutputDebugString("\t");
 			OutputDebugString(symbol->Name);
 			OutputDebugString("\n");
