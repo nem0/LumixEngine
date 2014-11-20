@@ -17,7 +17,6 @@ namespace Lumix
 	namespace UnitTest
 	{
 		Manager* Manager::s_instance = NULL;
-		DefaultAllocator Manager::s_allocator;
 
 		static const int32_t C_MAX_TRANS = 16;
 

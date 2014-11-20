@@ -119,12 +119,14 @@ class Array<T, false>
 
 		void push(const T& value)
 		{
-			if(m_size == m_capacity)
+			int size = m_size;
+			if (size == m_capacity)
 			{
 				grow();
 			}
-			new ((char*)(m_data+m_size)) T(value);
-			++m_size;
+			new ((char*)(m_data + size)) T(value);
+			++size;
+			m_size = size;
 		}
 
 		template<typename P1, typename... Params>
@@ -380,12 +382,14 @@ public:
 
 	void push(const T& value)
 	{
-		if (m_size == m_capacity)
+		int size = m_size;
+		if (size == m_capacity)
 		{
 			grow();
 		}
-		m_data[m_size] = value;
-		++m_size;
+		m_data[size] = value;
+		++size;
+		m_size = size;
 	}
 
 	bool empty() const { return m_size == 0; }

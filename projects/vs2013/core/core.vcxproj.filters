@@ -137,6 +137,9 @@
     <ClInclude Include="..\..\..\src\debug\stack_tree.h">
       <Filter>debug</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\core\MTJD\generic_job.h">
+      <Filter>mtjd</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\core\blob.cpp" />

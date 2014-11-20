@@ -183,6 +183,7 @@
     <ClInclude Include="..\..\..\src\core\mtjd\enums.h" />
     <ClInclude Include="..\..\..\src\core\mtjd\framework.h" />
     <ClInclude Include="..\..\..\src\core\mtjd\group.h" />
+    <ClInclude Include="..\..\..\src\core\MTJD\generic_job.h" />
     <ClInclude Include="..\..\..\src\core\mtjd\job.h" />
     <ClInclude Include="..\..\..\src\core\mtjd\manager.h" />
     <ClInclude Include="..\..\..\src\core\mtjd\scheduler.h" />

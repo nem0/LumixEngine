@@ -246,6 +246,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		c.m_controller = m_system->getControllerManager()->createController(*m_system->getPhysics(), m_scene, cDesc);
 		c.m_entity = entity;
 		c.m_is_free = false;
+		c.m_frame_change.set(0, 0, 0);
 
 		m_controllers.push(c);
 
@@ -525,22 +526,37 @@ struct PhysicsSceneImpl : public PhysicsScene
 			m_dynamic_actors[i]->m_entity.setRotation(trans.q.x, trans.q.y, trans.q.z, trans.q.w);
 
 		}
-		physx::PxVec3 g(0, time_delta * -9.8f, 0);
+		Vec3 g(0, time_delta * -9.8f, 0);
 		for (int i = 0; i < m_controllers.size(); ++i)
 		{
 			if(!m_controllers[i].m_is_free)
 			{
+				Vec3 dif = g + m_controllers[i].m_frame_change;
+				m_controllers[i].m_frame_change.set(0, 0, 0);
 				const physx::PxExtendedVec3& p = m_controllers[i].m_controller->getPosition();
-				m_controllers[i].m_controller->move(g, 0.0001f, time_delta, physx::PxControllerFilters());
+				m_controllers[i].m_controller->move(physx::PxVec3(dif.x, dif.y, dif.z), 0.01f, time_delta, physx::PxControllerFilters());
 				m_controllers[i].m_entity.setPosition((float)p.x, (float)p.y, (float)p.z);
 			}
 		}
 	}
 
 
+	virtual Component getController(const Entity& entity) override
+	{
+		for (int i = 0; i < m_controllers.size(); ++i)
+		{
+			if (m_controllers[i].m_entity == entity)
+			{
+				return Component(entity, CONTROLLER_HASH, this, i);
+			}
+		}
+		return Component::INVALID;
+	}
+
+
 	virtual void moveController(Component cmp, const Vec3& v, float dt) override
 	{
-		m_controllers[cmp.index].m_controller->move(physx::PxVec3(v.x, v.y, v.z), 0.001f, dt, physx::PxControllerFilters());
+		m_controllers[cmp.index].m_frame_change += v;
 	}
 
 
@@ -637,6 +653,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 					int idx2 = j + i * height;
 					heights[idx].height = data[idx2];
 					heights[idx].materialIndex0 = heights[idx].materialIndex1 = 0;
+					heights[idx].setTessFlag();
 					++idx;
 				}
 			}
@@ -653,6 +670,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 					int idx2 = j + i * height;
 					heights[idx].height = data[idx2 * bytes_per_pixel];
 					heights[idx].materialIndex0 = heights[idx].materialIndex1 = 0;
+					heights[idx].setTessFlag();
 				}
 			}
 		}
@@ -1074,6 +1092,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		physx::PxController* m_controller;
 		Entity m_entity;
+		Vec3 m_frame_change;
 		bool m_is_free;
 	};
 
@@ -1121,13 +1140,14 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system, Universe& universe, En
 		allocator.deleteObject(impl);
 		return NULL;
 	}
-	
-	/*impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_SHAPES, 1.0f);
+	/*
+	impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_SHAPES, 1.0f);
 	impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE, 1.0);
 	impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eACTOR_AXES, 1.0f);
 	impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_AABBS, 1.0f);
 	impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eWORLD_AXES, 1.0f);
-	impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCONTACT_POINT, 1.0f);*/
+	impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCONTACT_POINT, 1.0f);
+	*/
 	impl->m_system = &system;
 	impl->m_default_material = impl->m_system->getPhysics()->createMaterial(0.5,0.5,0.5);
 	return impl;

@@ -41,7 +41,7 @@ namespace Lumix
 
 		static void getBasename(char* basename, int /*max_length*/, const char* src)
 		{
-			for (int i = strlen(src) - 1; i >= 0; --i)
+			for (int i = (int)strlen(src) - 1; i >= 0; --i)
 			{
 				if (src[i] == '\\' || src[i] == '/')
 				{
@@ -61,7 +61,7 @@ namespace Lumix
 
 		static void getFilename(char* filename, int /*max_length*/, const char* src)
 		{
-			for (int i = strlen(src) - 1; i >= 0; --i)
+			for (int i = (int)strlen(src) - 1; i >= 0; --i)
 			{
 				if (src[i] == '\\' || src[i] == '/')
 				{
@@ -75,7 +75,7 @@ namespace Lumix
 
 		static void getExtension(char* extension, int /*max_length*/, const char* src)
 		{
-			for (int i = strlen(src) - 1; i >= 0; --i)
+			for (int i = (int)strlen(src) - 1; i >= 0; --i)
 			{
 				if (src[i] == '.')
 				{
