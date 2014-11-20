@@ -147,7 +147,8 @@ namespace Lumix
 					setFixedCachedUniform(*renderer, shader, (int)Shader::FixedCachedUniforms::MORPH_CONST, morph_const);
 					setFixedCachedUniform(*renderer, shader, (int)Shader::FixedCachedUniforms::QUAD_SIZE, m_size);
 					setFixedCachedUniform(*renderer, shader, (int)Shader::FixedCachedUniforms::QUAD_MIN, m_min);
-					renderGeometry(*renderer, geometry, mesh->getCount() / 4 * i, mesh->getCount() / 4, shader);
+					bindGeometry(*renderer, geometry, shader);
+					renderGeometry(mesh->getCount() / 4 * i, mesh->getCount() / 4);
 				}
 			}
 			return true;
@@ -428,11 +429,11 @@ namespace Lumix
 								int index = 0;
 								Texture* splat_map = m_splatmap;
 								float step = GRASS_QUAD_SIZE / (float)patch.m_type->m_density;
-								for (float dx = 0; dx < GRASS_QUAD_SIZE; dx += step)
+								for (float dx = 0.5f * step; dx < GRASS_QUAD_SIZE - 0.5f * step; dx += step)
 								{
-									for (float dz = 0; dz < GRASS_QUAD_SIZE; dz += step)
+									for (float dz = 0.5f * step; dz < GRASS_QUAD_SIZE - 0.5f * step; dz += step)
 									{
-										uint32_t pixel_value = splat_map->getPixel(splat_map->getWidth() * (quad_x + dx) / m_width, splat_map->getHeight() * (quad_z + dz) / m_height);
+										uint32_t pixel_value = splat_map->getPixel(splat_map->getWidth() * (quad_x + dx) / (m_width * m_xz_scale), splat_map->getHeight() * (quad_z + dz) / (m_height * m_xz_scale));
 										uint8_t count = (pixel_value >> (8 * patch.m_type->m_ground)) & 0xff;
 										float density = count / 255.0f;
 										if(density > 0.25f)
@@ -521,8 +522,8 @@ namespace Lumix
 		Array<GrassQuad*>& quads = getQuads(camera);
 		for (int i = 0; i < quads.size(); ++i)
 		{
-			Vec3 quad_center(quads[i]->m_x + GRASS_QUAD_SIZE * 0.5f, 0, quads[i]->m_z + GRASS_QUAD_SIZE * 0.5f);
-			if(frustum.isSphereInside(quad_center, GRASS_QUAD_RADIUS))
+			//Vec3 quad_center(quads[i]->m_x + GRASS_QUAD_SIZE * 0.5f, 0, quads[i]->m_z + GRASS_QUAD_SIZE * 0.5f);
+			//if(frustum.isSphereInside(quad_center, GRASS_QUAD_RADIUS)) 
 			{
 				for(int patch_idx = 0; patch_idx < quads[i]->m_patches.size(); ++patch_idx)
 				{
@@ -652,10 +653,10 @@ namespace Lumix
 
 	float Terrain::getHeight(float x, float z)
 	{
-		int int_x = (int)x;
-		int int_z = (int)z;
-		float dec_x = x - int_x;
-		float dec_z = z - int_z;
+		int int_x = (int)(x / m_xz_scale);
+		int int_z = (int)(z / m_xz_scale);
+		float dec_x = (x - (int_x * m_xz_scale)) / m_xz_scale;
+		float dec_z = (z - (int_z * m_xz_scale)) / m_xz_scale;
 		if (dec_x > dec_z)
 		{
 			float h0 = getHeight(int_x, int_z);
@@ -675,8 +676,8 @@ namespace Lumix
 
 	float Terrain::getHeight(int x, int z)
 	{
-		int texture_x = (int)(x / m_xz_scale);
-		int texture_y = (int)(z / m_xz_scale);
+		int texture_x = x;
+		int texture_y = z;
 		Texture* t = m_heightmap;
 		int idx = Math::clamp(texture_x, 0, m_width) + Math::clamp(texture_y, 0, m_height) * m_width;
 		if (t->getBytesPerPixel() == 2)
@@ -754,11 +755,11 @@ namespace Lumix
 				int hx = (int)(start.x / m_xz_scale);
 				int hz = (int)(start.z / m_xz_scale);
 
-				float next_x = ((hx + (rel_dir.x < 0 ? 0 : 1)) * m_xz_scale - rel_origin.x) / rel_dir.x;
-				float next_z = ((hz + (rel_dir.z < 0 ? 0 : 1)) * m_xz_scale - rel_origin.z) / rel_dir.z;
+				float next_x = fabs(rel_dir.x) < 0.01f ? hx : ((hx + (rel_dir.x < 0 ? 0 : 1)) * m_xz_scale - rel_origin.x) / rel_dir.x;
+				float next_z = fabs(rel_dir.z) < 0.01f ? hx : ((hz + (rel_dir.z < 0 ? 0 : 1)) * m_xz_scale - rel_origin.z) / rel_dir.z;
 
-				float delta_x = m_xz_scale / Math::abs(rel_dir.x);
-				float delta_z = m_xz_scale / Math::abs(rel_dir.z);
+				float delta_x = fabs(rel_dir.x) < 0.01f ? 0 : m_xz_scale / Math::abs(rel_dir.x);
+				float delta_z = fabs(rel_dir.z) < 0.01f ? 0 : m_xz_scale / Math::abs(rel_dir.z);
 				int step_x = (int)Math::signum(rel_dir.x);
 				int step_z = (int)Math::signum(rel_dir.z);
 
@@ -796,6 +797,10 @@ namespace Lumix
 					{
 						next_z += delta_z;
 						hz += step_z;
+					}
+					if (delta_x == 0 && delta_z == 0)
+					{
+						return hit;
 					}
 				}
 			}

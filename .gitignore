@@ -5,6 +5,7 @@ obj/
 *.suo
 *.opensdf
 *.user
+*.nvuser
 evona_test/
 *.orig
 /debug/

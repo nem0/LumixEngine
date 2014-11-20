@@ -59,8 +59,7 @@ namespace Lumix
 				for (int i = 0; i < m_script_entities.size(); ++i)
 				{
 					serializer.deserializeArrayItem(m_script_entities[i], 0);
-					StackAllocator<LUMIX_MAX_PATH> allocator;
-					string path(allocator);
+					string path(m_allocator);
 					serializer.deserializeArrayItem(path, "");
 					m_paths.push(path);
 					Entity entity(&m_universe, m_script_entities[i]);
@@ -91,7 +90,7 @@ namespace Lumix
 
 			void setScriptPath(Component cmp, const string& str) override
 			{
-				m_paths[cmp.index] = str;
+				m_paths[cmp.index] = string(str.c_str(), m_allocator);
 				stopScript(cmp.index);
 				if (!runScript(cmp.index, cmp.entity))
 				{
@@ -277,6 +276,12 @@ namespace Lumix
 			{
 				m_script_entities[cmp.index] = -1;
 				m_universe.destroyComponent(cmp);
+			}
+
+
+			virtual Engine& getEngine() override
+			{
+				return m_engine;
 			}
 
 

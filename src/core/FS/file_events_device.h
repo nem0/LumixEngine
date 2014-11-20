@@ -53,7 +53,7 @@ namespace Lumix
 			virtual void destroyFile(IFile* file) override;
 			virtual IFile* createFile(IFile* child) override;
 
-			const char* name() const { return "events"; }
+			const char* name() const override { return "events"; }
 		
 		private:
 			IAllocator& m_allocator;

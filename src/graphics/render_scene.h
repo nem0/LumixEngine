@@ -34,14 +34,19 @@ namespace Lumix
 		int m_index;
 	};
 
-	struct RenderableInfo
+	struct RenderableMesh
 	{
 		const Mesh* m_mesh;
-		Geometry* m_geometry;
 		const Pose* m_pose;
 		float m_scale;
 		const Matrix* m_matrix;
 		const Model* m_model;
+	};
+
+	struct RenderableInfo
+	{
+		int64_t m_key;
+		const RenderableMesh* m_mesh;
 	};
 
 	struct GrassInfo
@@ -107,7 +112,7 @@ namespace Lumix
 			virtual void setRenderablePath(Component cmp, const string& path) = 0;
 			virtual void setRenderableScale(Component cmp, float scale) = 0;
 			virtual void getRenderableInfos(const Frustum& frustum, Array<RenderableInfo>& infos, int64_t layer_mask) = 0;
-			virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) = 0;
+			virtual void getRenderableMeshes(Array<RenderableMesh>& meshes, int64_t layer_mask) = 0;
 			virtual Component getFirstRenderable() = 0;
 			virtual Component getNextRenderable(const Component& cmp) = 0;
 			virtual Model* getRenderableModel(Component cmp) = 0;

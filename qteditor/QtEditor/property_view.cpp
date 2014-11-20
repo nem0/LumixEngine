@@ -1428,19 +1428,19 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 		bool isOBBCollision(Lumix::RenderScene* scene, const Lumix::Matrix& matrix, Lumix::Model* model, float scale)
 		{
 			Lumix::Vec3 pos_a = matrix.getTranslation();
-			static Lumix::Array<Lumix::RenderableInfo> infos(m_world_editor.getAllocator());
-			infos.clear();
-			scene->getRenderableInfos(infos, ~0);
+			static Lumix::Array<Lumix::RenderableMesh> meshes(m_world_editor.getAllocator());
+			meshes.clear();
+			scene->getRenderableMeshes(meshes, ~0);
 			float radius_a_squared = model->getBoundingRadius();
 			radius_a_squared = radius_a_squared * radius_a_squared;
-			for(int i = 0, c = infos.size(); i < c; ++i)
+			for (int i = 0, c = meshes.size(); i < c; ++i)
 			{
-				Lumix::Vec3 pos_b = infos[i].m_matrix->getTranslation();
-				float radius_b = infos[i].m_model->getBoundingRadius();
+				Lumix::Vec3 pos_b = meshes[i].m_matrix->getTranslation();
+				float radius_b = meshes[i].m_model->getBoundingRadius();
 				float radius_squared = radius_a_squared + radius_b * radius_b;
 				if((pos_a - pos_b).squaredLength() < radius_squared * scale * scale)
 				{
-					if(testOBBCollision(matrix, model, *infos[i].m_matrix, infos[i].m_model, scale))
+					if (testOBBCollision(matrix, model, *meshes[i].m_matrix, meshes[i].m_model, scale))
 					{
 						return true;
 					}

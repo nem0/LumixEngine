@@ -25,6 +25,7 @@ class HierarchyImpl : public Hierarchy
 			, m_allocator(allocator)
 			, m_parent_set(allocator)
 		{
+			m_is_processing = false;
 			universe.entityMoved().bind<HierarchyImpl, &HierarchyImpl::onEntityMoved>(this);
 		}
 
@@ -48,37 +49,42 @@ class HierarchyImpl : public Hierarchy
 
 		void onEntityMoved(const Entity& entity)
 		{
-			Children::iterator iter = m_children.find(entity.index);
-			if(iter.isValid())
+			if (!m_is_processing)
 			{
-				Matrix parent_matrix = entity.getMatrix();
-				Array<Child>& children = *iter.value();
-				for(int i = 0, c = children.size(); i < c; ++i)
+				m_is_processing = true;
+				Children::iterator iter = m_children.find(entity.index);
+				if (iter.isValid())
 				{
-					Entity e(&m_universe, children[i].m_entity);
-					e.setMatrix(parent_matrix * children[i].m_local_matrix);
-				}
-			}
-
-			Parents::iterator parent_iter = m_parents.find(entity.index);
-			if(parent_iter.isValid())
-			{
-				Entity parent(&m_universe, parent_iter.value());
-				Children::iterator child_iter = m_children.find(parent.index);
-				if(child_iter.isValid())
-				{
-					Array<Child>& children = *child_iter.value();
-					for(int i = 0, c = children.size(); i < c; ++i)
+					Matrix parent_matrix = entity.getMatrix();
+					Array<Child>& children = *iter.value();
+					for (int i = 0, c = children.size(); i < c; ++i)
 					{
-						if(children[i].m_entity == entity.index)
+						Entity e(&m_universe, children[i].m_entity);
+						e.setMatrix(parent_matrix * children[i].m_local_matrix);
+					}
+				}
+
+				Parents::iterator parent_iter = m_parents.find(entity.index);
+				if (parent_iter.isValid())
+				{
+					Entity parent(&m_universe, parent_iter.value());
+					Children::iterator child_iter = m_children.find(parent.index);
+					if (child_iter.isValid())
+					{
+						Array<Child>& children = *child_iter.value();
+						for (int i = 0, c = children.size(); i < c; ++i)
 						{
-							Matrix inv_parent_matrix = parent.getMatrix();
-							inv_parent_matrix.inverse();
-							children[i].m_local_matrix = inv_parent_matrix * entity.getMatrix();
-							break;
+							if (children[i].m_entity == entity.index)
+							{
+								Matrix inv_parent_matrix = parent.getMatrix();
+								inv_parent_matrix.inverse();
+								children[i].m_local_matrix = inv_parent_matrix * entity.getMatrix();
+								break;
+							}
 						}
 					}
 				}
+				m_is_processing = false;
 			}
 		}
 
@@ -188,6 +194,7 @@ class HierarchyImpl : public Hierarchy
 		Parents m_parents;
 		Children m_children;
 		DelegateList<void (const Entity&, const Entity&)> m_parent_set;
+		bool m_is_processing;
 };
 
 

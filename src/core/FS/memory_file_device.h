@@ -19,7 +19,7 @@ namespace Lumix
 			virtual void destroyFile(IFile* file) override;
 			virtual IFile* createFile(IFile* child) override;
 
-			const char* name() const { return "memory"; }
+			const char* name() const override { return "memory"; }
 
 		private:
 			IAllocator& m_allocator;

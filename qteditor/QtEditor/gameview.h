@@ -26,6 +26,9 @@ public:
 	QWidget* getContentWidget() const;
 	void setPipeline(Lumix::PipelineInstance& pipeline) { m_pipeline = &pipeline; }
 	void setWorldEditor(Lumix::WorldEditor& editor) { m_editor = &editor; }
+	virtual void mousePressEvent(QMouseEvent* event) override;
+	virtual void mouseMoveEvent(QMouseEvent* event) override;
+	virtual void keyPressEvent(QKeyEvent* event) override;
 
 private slots:
 	void on_playButton_clicked();
