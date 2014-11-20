@@ -7,7 +7,7 @@ namespace Lumix
 
 	void* DefaultAllocator::allocate(size_t n)
 	{
-		return (uint8_t*)malloc(n);
+		return malloc(n);
 	}
 
 
