@@ -9,17 +9,23 @@ namespace Lumix
 		public:
 			typedef void(*unitTestFunc)(const char*);
 
+			static IAllocator& getAllocator()
+			{
+				static DefaultAllocator allocator;
+				return allocator;
+			}
+
 			static Manager& instance()
 			{
 				if (NULL == s_instance)
 				{
-					s_instance = s_allocator.newObject<Manager>(s_allocator);
+					s_instance = getAllocator().newObject<Manager>(getAllocator());
 				}
 
 				return *s_instance;
 			}
 
-			static void release() { s_allocator.deleteObject(s_instance); s_instance = NULL; }
+			static void release() { getAllocator().deleteObject(s_instance); s_instance = NULL; }
 
 
 			void registerFunction(const char* name, unitTestFunc func, const char* params);
@@ -36,7 +42,6 @@ namespace Lumix
 		private:
 			struct ManagerImpl* m_impl;
 			static Manager* s_instance;
-			static DefaultAllocator s_allocator;
 		};
 
 		class Helper
