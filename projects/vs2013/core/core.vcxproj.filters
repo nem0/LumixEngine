@@ -140,6 +140,7 @@
       <Filter>mtjd</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\associative_array.h" />
+    <ClInclude Include="..\..\..\src\core\binary_array.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\core\blob.cpp" />
@@ -238,6 +239,7 @@
     <ClCompile Include="..\..\..\src\debug\pc\stack_tree.cpp">
       <Filter>debug</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\core\binary_array.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="fs">
