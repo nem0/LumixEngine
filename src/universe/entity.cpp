@@ -107,18 +107,19 @@ namespace Lumix
 
 	const char* Entity::getName() const
 	{
-		auto iter = universe->m_id_to_name_map.find(index);
-		return iter == universe->m_id_to_name_map.end() ? "" : iter.value().c_str();
+		int name_index = universe->m_id_to_name_map.find(index);
+		return name_index < 0 ? "" : universe->m_id_to_name_map.at(name_index).c_str();
 	}
 
 
 	void Entity::setName(const char* name)
 	{
-		auto iter = universe->m_id_to_name_map.find(index);
-		if (iter != universe->m_id_to_name_map.end())
+		int name_index = universe->m_id_to_name_map.find(index);
+		if (name_index >= 0)
 		{
-			universe->m_name_to_id_map.erase(crc32(iter.value().c_str()));
-			universe->m_id_to_name_map.erase(iter);
+			uint32_t hash = crc32(universe->m_id_to_name_map.at(name_index).c_str());
+			universe->m_name_to_id_map.erase(hash);
+			universe->m_id_to_name_map.eraseAt(name_index);
 		}
 
 		if (name && name[0] != '\0')

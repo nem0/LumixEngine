@@ -6,7 +6,6 @@
 #include <QVector>
 #include "core/array.h"
 #include "core/delegate_list.h"
-#include "core/map.h"
 #include "core/path.h"
 #include "core/string.h"
 

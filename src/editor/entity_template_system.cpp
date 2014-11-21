@@ -2,7 +2,7 @@
 #include "core/array.h"
 #include "core/crc32.h"
 #include "core/iserializer.h"
-#include "core/map.h"
+#include "core/math_utils.h"
 #include "core/string.h"
 #include "editor/ieditor_command.h"
 #include "editor/world_editor.h"
@@ -42,15 +42,15 @@ namespace Lumix
 
 					virtual void execute() override
 					{
-						Map<uint32_t, Array<Entity> >::iterator iter = m_entity_system.m_instances.find(m_template_name_hash);
-						if (iter != m_entity_system.m_instances.end())
+						int instance_index = m_entity_system.m_instances.find(m_template_name_hash);
+						if (instance_index >= 0)
 						{
 							m_entity = m_entity_system.m_editor.getEngine().getUniverse()->createEntity();
 							m_entity.setPosition(m_position);
 							m_entity.setRotation(m_rotation);
 
-							iter.second().push(m_entity);
-							Entity template_entity = iter.second()[0];
+							m_entity_system.m_instances.at(instance_index).push(m_entity);
+							Entity template_entity = m_entity_system.m_instances.at(instance_index)[0];
 							const WorldEditor::ComponentList& template_cmps = m_editor.getComponents(template_entity);
 							for (int i = 0; i < template_cmps.size(); ++i)
 							{
@@ -163,7 +163,7 @@ namespace Lumix
 				uint32_t tpl = getTemplate(entity);
 				if (tpl != 0)
 				{
-					Array<Entity>& instances = m_instances.find(tpl).second();
+					Array<Entity>& instances = m_instances.get(tpl);
 					instances.eraseItemFast(entity);
 					if (instances.empty())
 					{
@@ -184,11 +184,11 @@ namespace Lumix
 			virtual void createTemplateFromEntity(const char* name, const Entity& entity) override
 			{
 				uint32_t name_hash = crc32(name);
-				if (m_instances.find(name_hash) == m_instances.end())
+				if (m_instances.find(name_hash) >= 0)
 				{
 					m_template_names.push(string(name, m_editor.getAllocator()));
 					m_instances.insert(name_hash, Array<Entity>(m_editor.getAllocator()));
-					m_instances.find(name_hash).second().push(entity);
+					m_instances.get(name_hash).push(entity);
 					m_updated.invoke();
 				}
 				else
@@ -200,14 +200,14 @@ namespace Lumix
 
 			virtual uint32_t getTemplate(const Entity& entity) override
 			{
-				for (auto iter = m_instances.begin(), end = m_instances.end(); iter != end; ++iter)
+				for (int j = 0; j < m_instances.size(); ++j)
 				{
-					Array<Entity>& entities = iter.second();
+					Array<Entity>& entities = m_instances.at(j);
 					for (int i = 0, c = entities.size(); i < c; ++i)
 					{
 						if (entities[i] == entity)
 						{
-							return iter.first();
+							return m_instances.getKey(j);
 						}
 					}
 				}
@@ -217,13 +217,13 @@ namespace Lumix
 
 			virtual const Array<Entity>& getInstances(uint32_t template_name_hash) override
 			{
-				Map<uint32_t, Array<Entity> >::iterator iter = m_instances.find(template_name_hash);
-				if (iter == m_instances.end())
+				int instances_index = m_instances.find(template_name_hash);
+				if (instances_index < 0)
 				{
 					m_instances.insert(template_name_hash, Array <Entity>(m_editor.getAllocator()));
-					iter = m_instances.find(template_name_hash);
+					instances_index = m_instances.find(template_name_hash);
 				}
-				return iter.second();
+				return m_instances.at(instances_index);
 			}
 
 
@@ -246,13 +246,14 @@ namespace Lumix
 				serializer.endArray();
 				serializer.serialize("instance_count", (int32_t)m_instances.size());
 				serializer.beginArray("instances");
-				for (auto i = m_instances.begin(), end = m_instances.end(); i != end; ++i)
+				for (int i = 0; i < m_instances.size(); ++i)
 				{
-					serializer.serializeArrayItem(i.first());
-					serializer.serializeArrayItem((int32_t)i.second().size());
-					for (int j = 0, c = i.second().size(); j < c; ++j)
+					serializer.serializeArrayItem(m_instances.getKey(i));
+					Array<Entity>& entities = m_instances.at(i);
+					serializer.serializeArrayItem((int32_t)entities.size());
+					for (int j = 0, c = entities.size(); j < c; ++j)
 					{
-						serializer.serializeArrayItem(i.second()[j].index);
+						serializer.serializeArrayItem(entities[j].index);
 					}
 				}
 				serializer.endArray();
@@ -284,7 +285,7 @@ namespace Lumix
 					int32_t instances_per_template;
 					serializer.deserializeArrayItem(instances_per_template, 0);
 					m_instances.insert(hash, Array<Entity>(m_editor.getAllocator()));
-					Array<Entity>& entities = m_instances.find(hash).second();
+					Array<Entity>& entities = m_instances.get(hash);
 					for (int j = 0; j < instances_per_template; ++j)
 					{
 						int32_t entity_index;
@@ -310,7 +311,7 @@ namespace Lumix
 
 
 		private:
-			Map<uint32_t, Array<Entity> > m_instances;
+			AssociativeArray<uint32_t, Array<Entity> > m_instances;
 			Array<string> m_template_names;
 			Universe* m_universe;
 			WorldEditor& m_editor;

@@ -2,6 +2,7 @@
 #include "culling_system.h"
 
 #include "core/array.h"
+#include "core/binary_array.h"
 #include "core/frustum.h"
 #include "core/sphere.h"
 
@@ -11,7 +12,7 @@
 
 namespace Lumix
 {
-	typedef Array<bool> VisibilityFlags;
+	typedef BinaryArray VisibilityFlags;
 
 	static const int MIN_ENTITIES_PER_THREAD = 50;
 
@@ -19,7 +20,7 @@ namespace Lumix
 		int start_index,
 		const Sphere* LUMIX_RESTRICT start,
 		const Sphere* LUMIX_RESTRICT end,
-		const bool* LUMIX_RESTRICT visiblity_flags,
+		const VisibilityFlags& visiblity_flags,
 		const Frustum* LUMIX_RESTRICT frustum,
 		CullingSystem::Subresults& results
 		)
@@ -38,7 +39,7 @@ namespace Lumix
 	class CullingJob : public MTJD::Job
 	{
 	public:
-		CullingJob(const CullingSystem::InputSpheres& spheres, VisibilityFlags& visibility_flags, CullingSystem::Subresults& results, int start, int end, const Frustum& frustum, MTJD::Manager& manager, IAllocator& allocator)
+		CullingJob(const CullingSystem::InputSpheres& spheres, const VisibilityFlags& visibility_flags, CullingSystem::Subresults& results, int start, int end, const Frustum& frustum, MTJD::Manager& manager, IAllocator& allocator)
 			: Job(true, MTJD::Priority::Default, false, manager, allocator)
 			, m_spheres(spheres)
 			, m_results(results)
@@ -60,14 +61,14 @@ namespace Lumix
 		virtual void execute() override
 		{
 			ASSERT(m_results.empty() && !m_is_executed);
-			doCulling(m_start, &m_spheres[m_start], &m_spheres[m_end], &m_visibility_flags[0], &m_frustum, m_results);
+			doCulling(m_start, &m_spheres[m_start], &m_spheres[m_end], m_visibility_flags, &m_frustum, m_results);
 			m_is_executed = true;
 		}
 
 	private:
 		const CullingSystem::InputSpheres& m_spheres;
 		CullingSystem::Subresults& m_results;
-		VisibilityFlags& m_visibility_flags;
+		const VisibilityFlags& m_visibility_flags;
 		int m_start;
 		int m_end;
 		const Frustum& m_frustum;
@@ -130,7 +131,7 @@ namespace Lumix
 			{
 				m_result[i].clear();
 			}
-			doCulling(0, &m_spheres[0], &m_spheres.back(), &m_visibility_flags[0], &frustum, m_result[0]);
+			doCulling(0, &m_spheres[0], &m_spheres.back(), m_visibility_flags, &frustum, m_result[0]);
 			m_is_async_result = false;
 		}
 
@@ -188,8 +189,8 @@ namespace Lumix
 
 		virtual void addStatic(const Sphere& sphere) override
 		{
-				m_spheres.push(sphere);
-				m_visibility_flags.push(true);
+			m_spheres.push(sphere);
+			m_visibility_flags.push(true);
 		}
 
 

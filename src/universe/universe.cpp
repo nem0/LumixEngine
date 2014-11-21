@@ -134,10 +134,10 @@ void Universe::serialize(ISerializer& serializer)
 
 	serializer.serialize("name_count", m_id_to_name_map.size());
 	serializer.beginArray("names");
-	for (auto iter = m_id_to_name_map.begin(), end = m_id_to_name_map.end(); iter != end; ++iter)
+	for (int i = 0, c = m_id_to_name_map.size(); i < c; ++i)
 	{
-		serializer.serializeArrayItem(iter.key());
-		serializer.serializeArrayItem(iter.value().c_str());
+		serializer.serializeArrayItem(m_id_to_name_map.getKey(i));
+		serializer.serializeArrayItem(m_id_to_name_map.get(i).c_str());
 	}
 	serializer.endArray();
 
@@ -223,14 +223,7 @@ Component Universe::addComponent(const Entity& entity, uint32_t component_type, 
 
 bool Universe::nameExists(const char* name) const
 {
-	for (auto iter = m_id_to_name_map.begin(), end = m_id_to_name_map.end(); iter != end; ++iter)
-	{
-		if (iter.value() == name)
-		{
-			return true;
-		}
-	}
-	return false;
+	return m_name_to_id_map.find(crc32(name)) != -1;
 }
 
 
