@@ -1,5 +1,5 @@
 #include "core/input_system.h"
-#include "core/map.h"
+#include "core/associative_array.h"
 #include "core/string.h"
 #include <Windows.h>
 
@@ -22,7 +22,7 @@ namespace Lumix
 		};
 		
 		IAllocator& m_allocator;
-		Map<uint32_t, Action> m_actions;
+		AssociativeArray<uint32_t, Action> m_actions;
 		float m_mouse_rel_x;
 		float m_mouse_rel_y;
 		bool m_is_enabled;

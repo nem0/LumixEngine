@@ -3,6 +3,7 @@
 #include "animation/animation_system.h"
 #include "core/aabb.h"
 #include "core/array.h"
+#include "core/associative_array.h"
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/delegate_list.h"
@@ -15,7 +16,6 @@
 #include "core/input_system.h"
 #include "core/json_serializer.h"
 #include "core/log.h"
-#include "core/map.h"
 #include "core/matrix.h"
 #include "core/mt/mutex.h"
 #include "core/profiler.h"
@@ -576,10 +576,10 @@ struct WorldEditorImpl : public WorldEditor
 						for (int j = cmps.size() - 1; j >= 0; --j)
 						{
 							m_old_values.write(cmps[j].type);
-							Map<uint32_t, Array<IPropertyDescriptor*> >::iterator iter = m_editor.m_component_properties.find(cmps[j].type);
-							if (iter != m_editor.m_component_properties.end())
+							int props_index = m_editor.m_component_properties.find(cmps[j].type);
+							if (props_index >= 0)
 							{
-								Array<IPropertyDescriptor*>& props = iter.second();
+								Array<IPropertyDescriptor*>& props = m_editor.m_component_properties.get(props_index);
 								for (int k = 0; k < props.size(); ++k)
 								{
 									props[k]->get(cmps[j], m_old_values);
@@ -623,11 +623,11 @@ struct WorldEditorImpl : public WorldEditor
 									break;
 								}
 							}
-							
-							Map<uint32_t, Array<IPropertyDescriptor*> >::iterator iter = m_editor.m_component_properties.find(cmp_type);
-							if (iter != m_editor.m_component_properties.end())
+
+							int props_index = m_editor.m_component_properties.find(cmp_type);
+							if (props_index >= 0)
 							{
-								Array<IPropertyDescriptor*>& props = iter.second();
+								Array<IPropertyDescriptor*>& props = m_editor.m_component_properties.get(props_index);
 
 								for (int k = 0; k < props.size(); ++k)
 								{
@@ -678,7 +678,8 @@ struct WorldEditorImpl : public WorldEditor
 				{
 					uint32_t template_hash = m_editor.m_template_system->getTemplate(m_component.entity);
 					const Array<IScene*>& scenes = m_editor.m_engine->getScenes();
-					Map<uint32_t, Array<IPropertyDescriptor*> >::iterator iter = m_editor.m_component_properties.find(m_component.type);
+					int props_index = m_editor.m_component_properties.find(m_component.type);
+
 					if (template_hash == 0)
 					{
 						for (int i = 0; i < scenes.size(); ++i)
@@ -691,9 +692,9 @@ struct WorldEditorImpl : public WorldEditor
 							}
 						}
 						m_old_values.rewindForRead();
-						if (iter != m_editor.m_component_properties.end())
+						if (props_index >= 0)
 						{
-							const Array<IPropertyDescriptor*>& props = iter.second();
+							const Array<IPropertyDescriptor*>& props = m_editor.m_component_properties.get(props_index);
 							for (int i = 0; i < props.size(); ++i)
 							{
 								props[i]->set(m_component, m_old_values);
@@ -711,9 +712,9 @@ struct WorldEditorImpl : public WorldEditor
 								if (cmp_new.isValid())
 								{
 									m_old_values.rewindForRead();
-									if (iter != m_editor.m_component_properties.end())
+									if (props_index >= 0)
 									{
-										const Array<IPropertyDescriptor*>& props = iter.second();
+										const Array<IPropertyDescriptor*>& props = m_editor.m_component_properties.get(props_index);
 										for (int i = 0; i < props.size(); ++i)
 										{
 											props[i]->set(cmp_new, m_old_values);
@@ -1570,6 +1571,7 @@ struct WorldEditorImpl : public WorldEditor
 		void load(FS::IFile& file, const char* path)
 		{
 			m_components.clear();
+			m_components.reserve(5000);
 			g_log_info.log("editor") << "parsing universe...";
 			JsonSerializer serializer(file, JsonSerializer::READ, path);
 			m_engine->deserialize(serializer);
@@ -1588,13 +1590,13 @@ struct WorldEditorImpl : public WorldEditor
 
 		virtual Array<Component>& getComponents(const Entity& entity) override
 		{
-			Map<int32_t, Array<Component> >::iterator iter = m_components.find(entity.index);
-			if (iter == m_components.end())
+			int cmps_index = m_components.find(entity.index);
+			if (cmps_index < 0)
 			{
 				m_components.insert(entity.index, Array<Component>(m_allocator));
-				iter = m_components.find(entity.index);
+				cmps_index = m_components.find(entity.index);
 			}
-			return iter.second();
+			return m_components.at(cmps_index);
 		}
 
 		virtual Component getComponent(const Entity& entity, uint32_t type) override
@@ -1717,15 +1719,13 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			m_allocator.deleteObject(m_measure_tool);
 			destroyUndoStack();
-			auto iter = m_component_properties.begin();
-			auto end = m_component_properties.end();
-			while (iter != end)
+			for (int j = 0; j < m_component_properties.size(); ++j)
 			{
-				for (int i = 0, c = iter.second().size(); i < c; ++i)
+				Array<IPropertyDescriptor*>& props = m_component_properties.at(j);
+				for (int i = 0, c = props.size(); i < c; ++i)
 				{
-					m_allocator.deleteObject(iter.second()[i]);
+					m_allocator.deleteObject(props[i]);
 				}
-				++iter;
 			}
 			
 			destroyUniverse();
@@ -1815,13 +1815,13 @@ struct WorldEditorImpl : public WorldEditor
 
 		virtual Array<IPropertyDescriptor*>& getPropertyDescriptors(uint32_t type) override
 		{
-			Map<uint32_t, Array<IPropertyDescriptor*> >::iterator iter = m_component_properties.find(type);
-			if (iter == m_component_properties.end())
+			int props_index = m_component_properties.find(type);
+			if (props_index < 0)
 			{
 				m_component_properties.insert(type, Array<IPropertyDescriptor*>(m_allocator));
-				iter = m_component_properties.find(type);
+				props_index = m_component_properties.find(type);
 			}
-			return iter.second();
+			return m_component_properties.at(props_index);
 		}
 
 
@@ -2175,12 +2175,12 @@ struct WorldEditorImpl : public WorldEditor
 		MT::Mutex m_universe_mutex;
 		Gizmo m_gizmo;
 		Array<Entity> m_selected_entities;
-		Map<uint32_t, Array<IPropertyDescriptor*> > m_component_properties;
+		AssociativeArray<uint32_t, Array<IPropertyDescriptor*> > m_component_properties;
 		MouseMode::Value m_mouse_mode;
 		float m_mouse_x;
 		float m_mouse_y;
 		Array<EditorIcon*> m_editor_icons;
-		Map<int32_t, Array<Component> > m_components;
+		AssociativeArray<int32_t, Array<Component> > m_components;
 		bool m_is_game_mode;
 		FS::IFile* m_game_mode_file;
 		Engine* m_engine;

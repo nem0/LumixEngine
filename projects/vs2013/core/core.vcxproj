@@ -151,6 +151,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\core\aabb.h" />
+    <ClInclude Include="..\..\..\src\core\binary_array.h" />
     <ClInclude Include="..\..\..\src\core\iallocator.h" />
     <ClInclude Include="..\..\..\src\core\array.h" />
     <ClInclude Include="..\..\..\src\core\blob.h" />
@@ -176,7 +177,6 @@
     <ClInclude Include="..\..\..\src\core\json_serializer.h" />
     <ClInclude Include="..\..\..\src\core\log.h" />
     <ClInclude Include="..\..\..\src\core\lumix.h" />
-    <ClInclude Include="..\..\..\src\core\map.h" />
     <ClInclude Include="..\..\..\src\core\math_utils.h" />
     <ClInclude Include="..\..\..\src\core\matrix.h" />
     <ClInclude Include="..\..\..\src\core\mtjd\base_entry.h" />
@@ -211,6 +211,7 @@
     <ClInclude Include="..\..\..\src\core\resource.h" />
     <ClInclude Include="..\..\..\src\core\resource_manager.h" />
     <ClInclude Include="..\..\..\src\core\resource_manager_base.h" />
+    <ClInclude Include="..\..\..\src\core\associative_array.h" />
     <ClInclude Include="..\..\..\src\core\sphere.h" />
     <ClInclude Include="..\..\..\src\core\stack_allocator.h" />
     <ClInclude Include="..\..\..\src\core\static_array.h" />
@@ -223,6 +224,7 @@
     <ClInclude Include="..\..\..\src\debug\stack_tree.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\src\core\binary_array.cpp" />
     <ClCompile Include="..\..\..\src\core\blob.cpp" />
     <ClCompile Include="..\..\..\src\core\crc32.cpp" />
     <ClCompile Include="..\..\..\src\core\default_allocator.cpp" />

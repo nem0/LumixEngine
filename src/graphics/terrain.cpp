@@ -205,9 +205,9 @@ namespace Lumix
 		{
 			m_allocator.deleteObject(m_grass_types[i]);
 		}
-		for(Map<Component, Array<GrassQuad*> >::iterator iter = m_grass_quads.begin(), end = m_grass_quads.end(); iter != end; ++iter)
+		for (int j = 0; j < m_grass_quads.size(); ++j)
 		{
-			Array<GrassQuad*>& quads = iter.value();
+			Array<GrassQuad*>& quads = m_grass_quads.at(j);
 			for (int i = 0; i < quads.size(); ++i)
 			{
 				m_allocator.deleteObject(quads[i]);
@@ -323,9 +323,9 @@ namespace Lumix
 	void Terrain::forceGrassUpdate()
 	{
 		m_force_grass_update = true;
-		for(Map<Component, Array<GrassQuad*> >::iterator iter = m_grass_quads.begin(), end = m_grass_quads.end(); iter != end; ++iter)
+		for (int i = 0; i < m_grass_quads.size(); ++i)
 		{
-			Array<GrassQuad*>& quads = iter.value();
+			Array<GrassQuad*>& quads = m_grass_quads.at(i);
 			while(!quads.empty())
 			{
 				m_free_grass_quads.push(quads.back());
@@ -336,13 +336,13 @@ namespace Lumix
 
 	Array<Terrain::GrassQuad*>& Terrain::getQuads(const Component& camera)
 	{
-		Map<Component, Array<GrassQuad*> >::iterator iter = m_grass_quads.find(camera);
-		if (iter == m_grass_quads.end())
+		int quads_index = m_grass_quads.find(camera);
+		if (quads_index < 0)
 		{
 			m_grass_quads.insert(camera, Array<GrassQuad*>(m_allocator));
-			iter = m_grass_quads.find(camera);
+			quads_index = m_grass_quads.find(camera);
 		}
-		return iter.second();
+		return m_grass_quads.at(quads_index);
 	}
 
 
@@ -516,7 +516,7 @@ namespace Lumix
 	}
 
 
-	void Terrain::getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, const Component& camera)
+	void Terrain::getGrassInfos(const Frustum&, Array<GrassInfo>& infos, const Component& camera)
 	{
 		updateGrass(camera);
 		Array<GrassQuad*>& quads = getQuads(camera);
