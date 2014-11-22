@@ -37,193 +37,199 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <Filter Include="Source Files\QtEditor" />
+    <Filter Include="Source Files\.." />
   </ItemGroup>
   <ItemGroup>
-    <Filter Include="Source Files\QtEditor\pc" />
+    <Filter Include="Source Files\..\.." />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="QtEditor\pc\file_system_watcher.cpp">
-      <Filter>Source Files\QtEditor\pc</Filter>
+    <Filter Include="Source Files\..\..\pc" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\pc\file_system_watcher.cpp">
+      <Filter>Source Files\..\..\pc</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <Filter Include="Source Files\QtEditor\scripts" />
+    <Filter Include="Source Files\..\..\scripts" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="QtEditor\scripts\scriptcompiler.cpp">
-      <Filter>Source Files\QtEditor\scripts</Filter>
+    <ClCompile Include="..\..\scripts\scriptcompiler.cpp">
+      <Filter>Source Files\..\..\scripts</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="QtEditor\scripts\scriptcompilerwidget.cpp">
-      <Filter>Source Files\QtEditor\scripts</Filter>
+    <ClCompile Include="..\..\scripts\scriptcompilerwidget.cpp">
+      <Filter>Source Files\..\..\scripts</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="QtEditor\assetbrowser.cpp">
-      <Filter>Source Files\QtEditor</Filter>
+    <ClCompile Include="..\..\assetbrowser.cpp">
+      <Filter>Source Files\..\..</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="QtEditor\entity_list.cpp">
-      <Filter>Source Files\QtEditor</Filter>
+    <ClCompile Include="..\..\entity_list.cpp">
+      <Filter>Source Files\..\..</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="QtEditor\entity_template_list.cpp">
-      <Filter>Source Files\QtEditor</Filter>
+    <ClCompile Include="..\..\entity_template_list.cpp">
+      <Filter>Source Files\..\..</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="QtEditor\fileserverwidget.cpp">
-      <Filter>Source Files\QtEditor</Filter>
+    <ClCompile Include="..\..\fileserverwidget.cpp">
+      <Filter>Source Files\..\..</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="QtEditor\gameview.cpp">
-      <Filter>Source Files\QtEditor</Filter>
+    <ClCompile Include="..\..\gameview.cpp">
+      <Filter>Source Files\..\..</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="QtEditor\insert_mesh_command.cpp">
-      <Filter>Source Files\QtEditor</Filter>
+    <ClCompile Include="..\..\insert_mesh_command.cpp">
+      <Filter>Source Files\..\..</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="QtEditor\log_widget.cpp">
-      <Filter>Source Files\QtEditor</Filter>
+    <ClCompile Include="..\..\log_widget.cpp">
+      <Filter>Source Files\..\..</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="QtEditor\main.cpp">
-      <Filter>Source Files\QtEditor</Filter>
+    <ClCompile Include="..\..\main.cpp">
+      <Filter>Source Files\..\..</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="QtEditor\mainwindow.cpp">
-      <Filter>Source Files\QtEditor</Filter>
+    <ClCompile Include="..\..\mainwindow.cpp">
+      <Filter>Source Files\..\..</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="QtEditor\notifications.cpp">
-      <Filter>Source Files\QtEditor</Filter>
+    <ClCompile Include="..\..\notifications.cpp">
+      <Filter>Source Files\..\..</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="QtEditor\profilergraph.cpp">
-      <Filter>Source Files\QtEditor</Filter>
+    <ClCompile Include="..\..\profilergraph.cpp">
+      <Filter>Source Files\..\..</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="QtEditor\profilerui.cpp">
-      <Filter>Source Files\QtEditor</Filter>
+    <ClCompile Include="..\..\profilerui.cpp">
+      <Filter>Source Files\..\..</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="QtEditor\property_view.cpp">
-      <Filter>Source Files\QtEditor</Filter>
+    <ClCompile Include="..\..\property_view.cpp">
+      <Filter>Source Files\..\..</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="QtEditor\sceneview.cpp">
-      <Filter>Source Files\QtEditor</Filter>
+    <ClCompile Include="..\..\sceneview.cpp">
+      <Filter>Source Files\..\..</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <Filter Include="Header Files\QtEditor" />
+    <Filter Include="Header Files\.." />
   </ItemGroup>
   <ItemGroup>
-    <Filter Include="Header Files\QtEditor\scripts" />
+    <Filter Include="Header Files\..\.." />
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="QtEditor\scripts\scriptcompiler.h">
-      <Filter>Header Files\QtEditor\scripts</Filter>
+    <Filter Include="Header Files\..\..\scripts" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\..\scripts\scriptcompiler.h">
+      <Filter>Header Files\..\..\scripts</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="QtEditor\scripts\scriptcompilerwidget.h">
-      <Filter>Header Files\QtEditor\scripts</Filter>
+    <CustomBuild Include="..\..\scripts\scriptcompilerwidget.h">
+      <Filter>Header Files\..\..\scripts</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="QtEditor\assetbrowser.h">
-      <Filter>Header Files\QtEditor</Filter>
+    <CustomBuild Include="..\..\assetbrowser.h">
+      <Filter>Header Files\..\..</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="QtEditor\entity_list.h">
-      <Filter>Header Files\QtEditor</Filter>
+    <CustomBuild Include="..\..\entity_list.h">
+      <Filter>Header Files\..\..</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="QtEditor\entity_template_list.h">
-      <Filter>Header Files\QtEditor</Filter>
+    <CustomBuild Include="..\..\entity_template_list.h">
+      <Filter>Header Files\..\..</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="QtEditor\file_system_watcher.h">
-      <Filter>Header Files\QtEditor</Filter>
+    <ClInclude Include="..\..\file_system_watcher.h">
+      <Filter>Header Files\..\..</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="QtEditor\fileserverwidget.h">
-      <Filter>Header Files\QtEditor</Filter>
+    <CustomBuild Include="..\..\fileserverwidget.h">
+      <Filter>Header Files\..\..</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="QtEditor\gameview.h">
-      <Filter>Header Files\QtEditor</Filter>
+    <CustomBuild Include="..\..\gameview.h">
+      <Filter>Header Files\..\..</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="QtEditor\insert_mesh_command.h">
-      <Filter>Header Files\QtEditor</Filter>
+    <ClInclude Include="..\..\insert_mesh_command.h">
+      <Filter>Header Files\..\..</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="QtEditor\log_widget.h">
-      <Filter>Header Files\QtEditor</Filter>
+    <CustomBuild Include="..\..\log_widget.h">
+      <Filter>Header Files\..\..</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="QtEditor\mainwindow.h">
-      <Filter>Header Files\QtEditor</Filter>
+    <CustomBuild Include="..\..\mainwindow.h">
+      <Filter>Header Files\..\..</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="QtEditor\notifications.h">
-      <Filter>Header Files\QtEditor</Filter>
+    <ClInclude Include="..\..\notifications.h">
+      <Filter>Header Files\..\..</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="QtEditor\profilergraph.h">
-      <Filter>Header Files\QtEditor</Filter>
+    <CustomBuild Include="..\..\profilergraph.h">
+      <Filter>Header Files\..\..</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="QtEditor\profilerui.h">
-      <Filter>Header Files\QtEditor</Filter>
+    <CustomBuild Include="..\..\profilerui.h">
+      <Filter>Header Files\..\..</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="QtEditor\property_view.h">
-      <Filter>Header Files\QtEditor</Filter>
+    <CustomBuild Include="..\..\property_view.h">
+      <Filter>Header Files\..\..</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="QtEditor\renderdevicewidget.h">
-      <Filter>Header Files\QtEditor</Filter>
+    <ClInclude Include="..\..\renderdevicewidget.h">
+      <Filter>Header Files\..\..</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="QtEditor\sceneview.h">
-      <Filter>Header Files\QtEditor</Filter>
+    <CustomBuild Include="..\..\sceneview.h">
+      <Filter>Header Files\..\..</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="QtEditor\wgl_render_device.h">
-      <Filter>Header Files\QtEditor</Filter>
+    <ClInclude Include="..\..\wgl_render_device.h">
+      <Filter>Header Files\..\..</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -418,64 +424,67 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <Filter Include="Form Files\QtEditor" />
+    <Filter Include="Form Files\.." />
   </ItemGroup>
   <ItemGroup>
-    <Filter Include="Form Files\QtEditor\scripts" />
+    <Filter Include="Form Files\..\.." />
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="QtEditor\scripts\scriptcompilerwidget.ui">
-      <Filter>Form Files\QtEditor\scripts</Filter>
+    <Filter Include="Form Files\..\..\scripts" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\..\scripts\scriptcompilerwidget.ui">
+      <Filter>Form Files\..\..\scripts</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="QtEditor\assetbrowser.ui">
-      <Filter>Form Files\QtEditor</Filter>
+    <CustomBuild Include="..\..\assetbrowser.ui">
+      <Filter>Form Files\..\..</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="QtEditor\entity_list.ui">
-      <Filter>Form Files\QtEditor</Filter>
+    <CustomBuild Include="..\..\entity_list.ui">
+      <Filter>Form Files\..\..</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="QtEditor\entity_template_list.ui">
-      <Filter>Form Files\QtEditor</Filter>
+    <CustomBuild Include="..\..\entity_template_list.ui">
+      <Filter>Form Files\..\..</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="QtEditor\fileserverwidget.ui">
-      <Filter>Form Files\QtEditor</Filter>
+    <CustomBuild Include="..\..\fileserverwidget.ui">
+      <Filter>Form Files\..\..</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="QtEditor\gameview.ui">
-      <Filter>Form Files\QtEditor</Filter>
+    <CustomBuild Include="..\..\gameview.ui">
+      <Filter>Form Files\..\..</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="QtEditor\logwidget.ui">
-      <Filter>Form Files\QtEditor</Filter>
+    <CustomBuild Include="..\..\logwidget.ui">
+      <Filter>Form Files\..\..</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="QtEditor\mainwindow.ui">
-      <Filter>Form Files\QtEditor</Filter>
+    <CustomBuild Include="..\..\mainwindow.ui">
+      <Filter>Form Files\..\..</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="QtEditor\profilergraph.ui">
-      <Filter>Form Files\QtEditor</Filter>
+    <CustomBuild Include="..\..\profilergraph.ui">
+      <Filter>Form Files\..\..</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="QtEditor\profilerui.ui">
-      <Filter>Form Files\QtEditor</Filter>
+    <CustomBuild Include="..\..\profilerui.ui">
+      <Filter>Form Files\..\..</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="QtEditor\property_view.ui">
-      <Filter>Form Files\QtEditor</Filter>
+    <CustomBuild Include="..\..\property_view.ui">
+      <Filter>Form Files\..\..</Filter>
     </CustomBuild>
   </ItemGroup>
 </Project>
