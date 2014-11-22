@@ -68,14 +68,16 @@ namespace Debug
 			SymFromAddr(process, (DWORD64)(node->m_instruction), 0, symbol);
 			IMAGEHLP_LINE line;
 			DWORD offset;
-			SymGetLineFromAddr(process, (DWORD64)(node->m_instruction), &offset, &line);
-			OutputDebugString("\t");
-			OutputDebugString(line.FileName);
-			OutputDebugString("(");
-			char tmp[20];
-			toCString((uint32_t)line.LineNumber, tmp, sizeof(tmp));
-			OutputDebugString(tmp);
-			OutputDebugString("):");
+			if (SymGetLineFromAddr(process, (DWORD64)(node->m_instruction), &offset, &line))
+			{
+				OutputDebugString("\t");
+				OutputDebugString(line.FileName);
+				OutputDebugString("(");
+				char tmp[20];
+				toCString((uint32_t)line.LineNumber, tmp, sizeof(tmp));
+				OutputDebugString(tmp);
+				OutputDebugString("):");
+			}
 			OutputDebugString("\t");
 			OutputDebugString(symbol->Name);
 			OutputDebugString("\n");
