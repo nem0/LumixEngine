@@ -3,6 +3,7 @@
 #include "core/fs/ifile.h"
 #include "core/log.h"
 #include "core/matrix.h"
+#include "core/profiler.h"
 #include "core/quat.h"
 #include "core/resource_manager.h"
 #include "core/vec3.h"
@@ -60,6 +61,7 @@ static const float ANIMATION_FPS = 30.0f;
 
 void Animation::getPose(float time, Pose& pose, Model& model) const
 {
+	PROFILE_FUNCTION();
 	if(model.isReady())
 	{
 		int frame = (int)(time * ANIMATION_FPS);

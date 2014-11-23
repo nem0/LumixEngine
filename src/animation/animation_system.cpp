@@ -2,6 +2,7 @@
 #include "animation/animation.h"
 #include "core/crc32.h"
 #include "core/json_serializer.h"
+#include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
@@ -174,6 +175,7 @@ namespace Lumix
 
 			virtual void update(float time_delta) override
 			{
+				PROFILE_FUNCTION();
 				if (m_animables.empty())
 					return;
 				for (int i = 0, c = m_animables.size(); i < c; ++i)
