@@ -184,7 +184,7 @@ namespace Lumix
 			virtual void createTemplateFromEntity(const char* name, const Entity& entity) override
 			{
 				uint32_t name_hash = crc32(name);
-				if (m_instances.find(name_hash) >= 0)
+				if (m_instances.find(name_hash) < 0)
 				{
 					m_template_names.push(string(name, m_editor.getAllocator()));
 					m_instances.insert(name_hash, Array<Entity>(m_editor.getAllocator()));
