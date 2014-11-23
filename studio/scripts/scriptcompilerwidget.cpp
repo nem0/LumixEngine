@@ -2,7 +2,7 @@
 #include "ui_scriptcompilerwidget.h"
 #include <qfilesystemmodel.h>
 #include "scriptcompiler.h"
-
+#include "editor/world_editor.h"
 
 ScriptCompilerWidget::ScriptCompilerWidget(QWidget* parent) :
 	QDockWidget(parent),
@@ -30,6 +30,11 @@ ScriptCompilerWidget::~ScriptCompilerWidget()
 	delete m_compiler;
 	delete m_ui;
 	delete m_model;
+}
+
+void ScriptCompilerWidget::setWorldEditor(Lumix::WorldEditor& editor)
+{
+	m_compiler->setWorldEditor(editor);
 }
 
 void ScriptCompilerWidget::logMessage(const QString& message)

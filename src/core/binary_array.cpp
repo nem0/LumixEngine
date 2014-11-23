@@ -46,7 +46,7 @@ namespace Lumix
 		{
 			int major = index >> 5;
 			const int last_major = (m_size - 1) >> 5;
-			m_data[major] = (index & 31 == 0 ? 0 : (m_data[major] & BINARY_MASK[(index & 31) - 1])) | ((m_data[major] & ~BINARY_MASK[index & 31]) << 1);
+			m_data[major] = ((index & 31) == 0 ? 0 : (m_data[major] & BINARY_MASK[(index & 31) - 1])) | ((m_data[major] & ~BINARY_MASK[index & 31]) << 1);
 			if (major < last_major)
 			{
 				m_data[major] |= (m_data[major + 1] & 0x80000000) >> 31;
