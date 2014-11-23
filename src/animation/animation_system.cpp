@@ -47,6 +47,7 @@ namespace Lumix
 				, m_anim_system(anim_system)
 				, m_animables(allocator)
 			{
+				m_render_scene = static_cast<RenderScene*>(engine.getScene(crc32("renderer")));
 				m_universe.componentCreated().bind<AnimationSceneImpl, &AnimationSceneImpl::onComponentCreated>(this);
 			}
 

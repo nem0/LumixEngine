@@ -1382,6 +1382,8 @@ namespace Lumix
 				float bounding_radius = m_renderables[renderable_index]->m_model->getBoundingRadius();
 				m_culling_system->updateBoundingRadius(bounding_radius, renderable_index);
 				m_renderables[renderable_index]->m_meshes.clear();
+				m_renderables[renderable_index]->m_pose.resize(model->getBoneCount());
+				model->getPose(m_renderables[renderable_index]->m_pose);
 				for (int j = 0; j < model->getMeshCount(); ++j)
 				{
 					RenderableMesh& info = m_renderables[renderable_index]->m_meshes.pushEmpty();
