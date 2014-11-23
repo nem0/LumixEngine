@@ -137,7 +137,7 @@ void Universe::serialize(ISerializer& serializer)
 	for (int i = 0, c = m_id_to_name_map.size(); i < c; ++i)
 	{
 		serializer.serializeArrayItem(m_id_to_name_map.getKey(i));
-		serializer.serializeArrayItem(m_id_to_name_map.get(i).c_str());
+		serializer.serializeArrayItem(m_id_to_name_map.at(i).c_str());
 	}
 	serializer.endArray();
 
