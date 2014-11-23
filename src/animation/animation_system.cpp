@@ -86,6 +86,7 @@ namespace Lumix
 					serializer.serializeArrayItem(m_animables[i].m_renderable.entity.index);
 					serializer.serializeArrayItem(m_animables[i].m_time);
 					serializer.serializeArrayItem(m_animables[i].m_is_free);
+					serializer.serializeArrayItem(m_animables[i].m_animation ? m_animables[i].m_animation->getPath().c_str() : "");
 				}
 				serializer.endArray();
 			}
@@ -110,6 +111,9 @@ namespace Lumix
 					}
 					serializer.deserializeArrayItem(m_animables[i].m_time, 0);
 					serializer.deserializeArrayItem(m_animables[i].m_is_free, true);
+					char path[LUMIX_MAX_PATH];
+					serializer.deserializeArrayItem(path, sizeof(path), "");
+					m_animables[i].m_animation = path[0] == '\0' ? NULL : loadAnimation(path);
 					m_universe.addComponent(e, ANIMABLE_HASH, this, i);
 				}
 				serializer.deserializeArrayEnd();
