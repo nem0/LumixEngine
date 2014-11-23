@@ -5,15 +5,24 @@
 #include "core/crc32.h"
 #include "core/log.h"
 #include "core/path.h"
+#include "editor/world_editor.h"
+#include "engine/engine.h"
+#include "script/script_system.h"
 
-ScriptCompiler::ScriptCompiler(QObject* parent) :
-	QObject(parent)
+ScriptCompiler::ScriptCompiler(QObject* parent) 
+	: QObject(parent)
+	, m_editor(NULL)
 {
 }
 
 
 void ScriptCompiler::compileAll()
 {
+	if (m_editor)
+	{
+		Lumix::ScriptScene* scene = static_cast<Lumix::ScriptScene*>(m_editor->getEngine().getScene(crc32("script")));
+		scene->beforeScriptReload();
+	}
 	QDirIterator dirIt(QString(m_base_path.c_str()) + "/scripts/", QDirIterator::Subdirectories);
 	while (dirIt.hasNext()) 
 	{
@@ -28,6 +37,11 @@ void ScriptCompiler::compileAll()
 	}
 }
 
+
+void ScriptCompiler::setWorldEditor(Lumix::WorldEditor& editor)
+{
+	m_editor = &editor;
+}
 
 void ScriptCompiler::compile(const Lumix::Path& path)
 {
@@ -47,6 +61,7 @@ void ScriptCompiler::compile(const Lumix::Path& path)
 	QStringList list;
 	char cmd_line[255];
 	sprintf(cmd_line, "%s\\scripts\\compile.bat %s\\%s", m_base_path.c_str(), m_base_path.c_str(), rel_path.c_str());
+
 	list.push_back("/C");
 	list.push_back(cmd_line);
 	connect(process.m_process, SIGNAL(finished(int)), this, SLOT(compilerFinish(int)));
@@ -82,8 +97,14 @@ void ScriptCompiler::compilerFinish(int exitCode)
 			}
 			emit compiled(m_processes[i].m_path.c_str(), exitCode);
 			emit messageLogged(msg);
+			m_processes.removeAt(i);
 			break;
 		}
+	}
+	if (m_processes.empty())
+	{
+		Lumix::ScriptScene* scene = static_cast<Lumix::ScriptScene*>(m_editor->getEngine().getScene(crc32("script")));
+		scene->afterScriptReload();
 	}
 }
 
@@ -123,6 +144,11 @@ void ScriptCompiler::checkFinished()
 			delete process.m_process;
 			m_processes.remove(i);
 		}
+	}
+	if (m_processes.empty())
+	{
+		Lumix::ScriptScene* scene = static_cast<Lumix::ScriptScene*>(m_editor->getEngine().getScene(crc32("script")));
+		scene->afterScriptReload();
 	}
 }
 

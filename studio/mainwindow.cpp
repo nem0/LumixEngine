@@ -223,6 +223,7 @@ void MainWindow::setWorldEditor(Lumix::WorldEditor& editor)
 	m_entity_template_list_ui->setWorldEditor(editor);
 	m_game_view->setWorldEditor(editor);
 	m_entity_list->setWorldEditor(editor);
+	m_script_compiler_ui->setWorldEditor(editor);
 
 	m_world_editor->universeLoaded().bind<MainWindow, &MainWindow::onUniverseLoaded>(this);
 }

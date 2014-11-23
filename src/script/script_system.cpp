@@ -131,6 +131,19 @@ namespace Lumix
 			}
 
 
+			virtual void beforeScriptReload() override
+			{
+				stopAll();
+				TODO("stop only the scripts affected");
+			}
+
+
+			virtual void afterScriptReload() override
+			{
+				runAll();
+			}
+
+
 			void stopScript(int index)
 			{
 				int entity_idx = m_script_entities[index];
