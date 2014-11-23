@@ -181,6 +181,7 @@ void Animation::doUnload(void)
 	allocator.deallocate(m_bones);
 	m_rotations = NULL;
 	m_positions = NULL;
+	m_bones = NULL;
 	m_frame_count = 0;
 	m_size = 0;
 	onEmpty();
