@@ -69,6 +69,7 @@ namespace Lumix
 			HANDLE handle = CreateThread(NULL, STACK_SIZE, threadFunction, m_implementation, CREATE_SUSPENDED, &m_implementation->m_thread_id);
 			if (handle)
 			{
+				m_implementation->m_exited = false;
 				m_implementation->m_thread_name = name;
 				m_implementation->m_handle = handle;
 			}
