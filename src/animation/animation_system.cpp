@@ -28,7 +28,7 @@ namespace Lumix
 	class Universe;
 
 
-	class AnimationSceneImpl : public IScene
+	class AnimationSceneImpl : public AnimationScene
 	{
 		private:
 			struct Animable
@@ -57,6 +57,20 @@ namespace Lumix
 			{
 				m_universe.componentCreated().unbind<AnimationSceneImpl, &AnimationSceneImpl::onComponentCreated>(this);
 			}
+
+
+			virtual Component getAnimable(const Entity& entity) override
+			{
+				for (int i = 0; i < m_animables.size(); ++i)
+				{
+					if (m_animables[i].m_entity == entity)
+					{
+						return Component(entity, ANIMABLE_HASH, this, i);
+					}
+				}
+				return Component::INVALID;
+			}
+
 
 
 			virtual Component createComponent(uint32_t type, const Entity& entity) override
@@ -104,6 +118,7 @@ namespace Lumix
 					int entity_index;
 					serializer.deserializeArrayItem(entity_index, 0);
 					Entity e(&m_universe, entity_index);
+					m_animables[i].m_entity = e;
 					Component renderable = m_render_scene->getRenderable(e);
 					if (renderable.isValid())
 					{
@@ -150,7 +165,7 @@ namespace Lumix
 			}
 
 
-			void playAnimation(const Component& cmp, const char* path)
+			virtual void playAnimation(const Component& cmp, const char* path) override
 			{
 				m_animables[cmp.index].m_animation = loadAnimation(path);
 				m_animables[cmp.index].m_time = 0;
@@ -288,7 +303,7 @@ namespace Lumix
 				return m_allocator.newObject<AnimationSceneImpl>(*this, m_engine, universe, m_allocator);
 			}
 
-		
+
 			virtual void destroyScene(IScene* scene) override
 			{
 				m_allocator.deleteObject(scene);
