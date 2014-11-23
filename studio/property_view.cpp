@@ -22,6 +22,7 @@
 #include "graphics/render_scene.h"
 #include "graphics/shader.h"
 #include "graphics/texture.h"
+#include "script/script_system.h"
 #include "scripts/scriptcompiler.h"
 #include <qcheckbox.h>
 #include <QColorDialog>
@@ -326,6 +327,7 @@ class AddTerrainLevelCommand : public Lumix::IEditorCommand
 
 
 static const uint32_t TERRAIN_HASH = crc32("terrain");
+static const uint32_t SCRIPT_HASH = crc32("script");
 
 
 class FileEdit : public QLineEdit
@@ -1008,6 +1010,10 @@ void createComponentEditor(PropertyView& view, QTreeWidgetItem* item, InstanceOb
 	if (component->getValue()->type == TERRAIN_HASH)
 	{
 		view.addTerrainCustomProperties(*item, *component->getValue());
+	}
+	else if (component->getValue()->type == SCRIPT_HASH)
+	{
+		view.addScriptCustomProperties(*item, *component->getValue());
 	}
 }
 
@@ -1782,15 +1788,18 @@ void PropertyView::setScriptStatus(uint32_t status)
 {
 	for(int i = 0; i < m_ui->propertyList->topLevelItemCount(); ++i)
 	{
-		QTreeWidgetItem* item = m_ui->propertyList->topLevelItem(i);
-		if(item->text(0) == "Script")
+		QTreeWidgetItem* top_level_item = m_ui->propertyList->topLevelItem(i);
+		for (int k = 0; k < top_level_item->childCount(); ++k)
 		{
-			for(int j = 0; j < item->childCount(); ++j)
+			QTreeWidgetItem* item = m_ui->propertyList->topLevelItem(i)->child(k);
+			if (item->text(0) == "Script")
 			{
-				if(item->child(j)->text(0) == "Status")
+				for (int j = 0; j < item->childCount(); ++j)
 				{
-					switch(status)
+					if (item->child(j)->text(0) == "Status")
 					{
+						switch (status)
+						{
 						case ScriptCompiler::SUCCESS:
 							item->child(j)->setText(1, "Success");
 							break;
@@ -1806,9 +1815,10 @@ void PropertyView::setScriptStatus(uint32_t status)
 						default:
 							ASSERT(false);
 							break;
+						}
+
+						return;
 					}
-					
-					return;
 				}
 			}
 		}
@@ -1822,31 +1832,25 @@ void PropertyView::on_script_compiled(const Lumix::Path&, uint32_t status)
 }
 
 
-void PropertyView::on_compileScriptClicked()
+void PropertyView::addScriptCustomProperties(QTreeWidgetItem& tree_item, const Lumix::Component& script_component)
 {
-	/*for(int i = 0; i < m_properties.size(); ++i)
-	{
-		if(m_properties[i]->m_component_name == "script" && m_properties[i]->m_name == "source")
-		{
-			QLineEdit* edit = qobject_cast<QLineEdit*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item, 1)->children()[0]);
-			m_compiler->compile(edit->text().toLatin1().data());
-			break;
-		}
-	}*/
-}
+	QTreeWidgetItem* tools_item = new QTreeWidgetItem(QStringList() << "Tools");
+	tree_item.insertChild(0, tools_item);
+	QWidget* widget = new QWidget();
+	QHBoxLayout* layout = new QHBoxLayout(widget);
+	layout->setContentsMargins(0, 0, 0, 0);
+	QPushButton* compile_button = new QPushButton("Compile", widget);
+	layout->addWidget(compile_button);
+	m_ui->propertyList->setItemWidget(tools_item, 1, widget);
+	connect(compile_button, &QPushButton::clicked, this, [this, script_component](){
+		Lumix::string path(m_world_editor->getAllocator());
+		static_cast<Lumix::ScriptScene*>(script_component.scene)->getScriptPath(script_component, path);
+		m_compiler->compile(path.c_str());
+	});
 
-
-void PropertyView::on_editScriptClicked()
-{
-	/*for(int i = 0; i < m_properties.size(); ++i)
-	{
-		if(m_properties[i]->m_name == "source")
-		{
-			QLineEdit* edit = qobject_cast<QLineEdit*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item, 1)->children()[0]);
-			QDesktopServices::openUrl(QUrl::fromLocalFile(edit->text()));
-			break;
-		}
-	}*/
+	QTreeWidgetItem* status_item = new QTreeWidgetItem(QStringList() << "Status");
+	tree_item.insertChild(0, status_item);
+	status_item->setText(1, "Unknown");
 }
 
 
@@ -1961,26 +1965,6 @@ void PropertyView::on_terrainBrushTextureChanged(int value)
 	m_terrain_editor->m_texture_idx = value;
 }
 
-
-void PropertyView::addScriptCustomProperties()
-{
-	QTreeWidgetItem* tools_item = new QTreeWidgetItem(QStringList() << "Tools");
-	m_ui->propertyList->topLevelItem(0)->insertChild(0, tools_item);
-	QWidget* widget = new QWidget();
-	QHBoxLayout* layout = new QHBoxLayout(widget);
-	layout->setContentsMargins(0, 0, 0, 0);
-	QPushButton* compile_button = new QPushButton("Compile", widget);
-	QPushButton* edit_button = new QPushButton("Edit", widget);
-	layout->addWidget(compile_button);
-	layout->addWidget(edit_button);
-	m_ui->propertyList->setItemWidget(tools_item, 1, widget);
-	connect(compile_button, &QPushButton::clicked, this, &PropertyView::on_compileScriptClicked);
-	connect(edit_button, &QPushButton::clicked, this, &PropertyView::on_editScriptClicked);
-
-	QTreeWidgetItem* status_item = new QTreeWidgetItem(QStringList() << "Status");
-	m_ui->propertyList->topLevelItem(0)->insertChild(0, status_item);
-	status_item->setText(1, "Unknown");
-}
 
 
 void PropertyView::setSelectedResource(Lumix::Resource* resource)

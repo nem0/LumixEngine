@@ -18,11 +18,6 @@ ScriptCompiler::ScriptCompiler(QObject* parent)
 
 void ScriptCompiler::compileAll()
 {
-	if (m_editor)
-	{
-		Lumix::ScriptScene* scene = static_cast<Lumix::ScriptScene*>(m_editor->getEngine().getScene(crc32("script")));
-		scene->beforeScriptReload();
-	}
 	QDirIterator dirIt(QString(m_base_path.c_str()) + "/scripts/", QDirIterator::Subdirectories);
 	while (dirIt.hasNext()) 
 	{
@@ -45,6 +40,12 @@ void ScriptCompiler::setWorldEditor(Lumix::WorldEditor& editor)
 
 void ScriptCompiler::compile(const Lumix::Path& path)
 {
+	if (m_editor)
+	{
+		Lumix::ScriptScene* scene = static_cast<Lumix::ScriptScene*>(m_editor->getEngine().getScene(crc32("script")));
+		scene->beforeScriptCompiled(path);
+	}
+
 	ProcessInfo process;
 	Lumix::Path rel_path;
 	if(strncmp(path.c_str(), m_base_path.c_str(), m_base_path.length()) == 0)
@@ -64,7 +65,7 @@ void ScriptCompiler::compile(const Lumix::Path& path)
 
 	list.push_back("/C");
 	list.push_back(cmd_line);
-	connect(process.m_process, SIGNAL(finished(int)), this, SLOT(compilerFinish(int)));
+	connect(process.m_process, (void (QProcess::*)(int))&QProcess::finished, this, &ScriptCompiler::compilerFinish);
 	process.m_process->start("cmd.exe", list);
 }
 
@@ -94,17 +95,19 @@ void ScriptCompiler::compilerFinish(int exitCode)
 			else
 			{
 				msg.sprintf("Script %s failed to compile", m_processes[i].m_path.c_str());
+				Lumix::g_log_error.log("script") << "Script " << m_processes[i].m_path.c_str() << " failed to compile";
 			}
 			emit compiled(m_processes[i].m_path.c_str(), exitCode);
 			emit messageLogged(msg);
+			if (m_editor)
+			{
+				Lumix::ScriptScene* scene = static_cast<Lumix::ScriptScene*>(m_editor->getEngine().getScene(crc32("script")));
+				scene->afterScriptCompiled(m_processes[i].m_path);
+			}
 			m_processes.removeAt(i);
+
 			break;
 		}
-	}
-	if (m_processes.empty())
-	{
-		Lumix::ScriptScene* scene = static_cast<Lumix::ScriptScene*>(m_editor->getEngine().getScene(crc32("script")));
-		scene->afterScriptReload();
 	}
 }
 
@@ -147,8 +150,7 @@ void ScriptCompiler::checkFinished()
 	}
 	if (m_processes.empty())
 	{
-		Lumix::ScriptScene* scene = static_cast<Lumix::ScriptScene*>(m_editor->getEngine().getScene(crc32("script")));
-		scene->afterScriptReload();
+		Lumix::g_log_info.log("script") << "All scripts processed";
 	}
 }
 
