@@ -56,7 +56,6 @@ namespace
 
 		Lumix::CullingSystem* culling_system;
 		{
-			Lumix::DefaultAllocator allocator;
 			Lumix::MTJD::Manager mtjd_manager(allocator);
 
 			culling_system = Lumix::CullingSystem::create(mtjd_manager, allocator);
@@ -104,7 +103,6 @@ namespace
 
 		Lumix::CullingSystem* culling_system;
 		{
-			Lumix::DefaultAllocator allocator;
 			Lumix::MTJD::Manager mtjd_manager(allocator);
 
 			culling_system = Lumix::CullingSystem::create(mtjd_manager, allocator);
