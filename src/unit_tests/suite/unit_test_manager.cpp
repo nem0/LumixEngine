@@ -117,13 +117,20 @@ namespace Lumix
 					if(i < c)
 					{
 						UnitTestPair& pair = m_unit_tests[i];
-						AsynTest* test = m_trans_queue.alloc(true);
-						test->data.name = pair.name;
-						test->data.func = pair.func;
-						test->data.parameters = pair.parameters;
-						i++;
-						m_trans_queue.push(test, true);
-						m_in_progress.push(test);
+						AsynTest* test = m_trans_queue.alloc(false);
+						if (test)
+						{
+							test->data.name = pair.name;
+							test->data.func = pair.func;
+							test->data.parameters = pair.parameters;
+							i++;
+							m_trans_queue.push(test, true);
+							m_in_progress.push(test);
+						}
+						else
+						{
+							Lumix::MT::yield();
+						}
 					}
 
 					// fatal error occured. We need to respawn task.
