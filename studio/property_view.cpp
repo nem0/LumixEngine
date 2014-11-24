@@ -1855,7 +1855,7 @@ void PropertyView::addScriptCustomProperties(QTreeWidgetItem& tree_item, const L
 	switch(m_compiler->getStatus(path.c_str()))
 	{
 		case ScriptCompiler::SUCCESS:
-			status_item->setText(1, "Compiler");
+			status_item->setText(1, "Compiled");
 			break;
 		case ScriptCompiler::FAILURE:
 			status_item->setText(1, "Failure");
