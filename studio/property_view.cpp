@@ -1850,7 +1850,20 @@ void PropertyView::addScriptCustomProperties(QTreeWidgetItem& tree_item, const L
 
 	QTreeWidgetItem* status_item = new QTreeWidgetItem(QStringList() << "Status");
 	tree_item.insertChild(0, status_item);
-	status_item->setText(1, "Unknown");
+	Lumix::string path(m_world_editor->getAllocator());
+	static_cast<Lumix::ScriptScene*>(script_component.scene)->getScriptPath(script_component, path);
+	switch(m_compiler->getStatus(path.c_str()))
+	{
+		case ScriptCompiler::SUCCESS:
+			status_item->setText(1, "Compiler");
+			break;
+		case ScriptCompiler::FAILURE:
+			status_item->setText(1, "Failure");
+			break;
+		default:
+			status_item->setText(1, "Unknown");
+			break;
+	}
 }
 
 
