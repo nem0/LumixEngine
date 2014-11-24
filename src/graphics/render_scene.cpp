@@ -47,7 +47,6 @@ namespace Lumix
 	{
 		Renderable(IAllocator& allocator) : m_pose(allocator), m_meshes(allocator) {}
 
-		int64_t m_layer_mask;
 		Array<RenderableMesh> m_meshes;
 		int32_t m_component_index;
 		Pose m_pose;
@@ -309,7 +308,7 @@ namespace Lumix
 					serializer.serializeArrayItem(m_renderables[i]->m_is_always_visible);
 					serializer.serializeArrayItem(m_renderables[i]->m_component_index);
 					serializer.serializeArrayItem(m_renderables[i]->m_entity.index);
-					serializer.serializeArrayItem(m_renderables[i]->m_layer_mask);
+					serializer.serializeArrayItem(m_culling_system->getLayerMask(i));
 					if (m_renderables[i]->m_model)
 					{
 						serializer.serializeArrayItem(m_renderables[i]->m_model->getPath().c_str());
@@ -409,11 +408,13 @@ namespace Lumix
 					serializer.deserializeArrayItem(m_renderables[i]->m_entity.index, 0);
 					m_renderables[i]->m_model = NULL;
 					m_renderables[i]->m_entity.universe = &m_universe;
-					serializer.deserializeArrayItem(m_renderables[i]->m_layer_mask, 0);
+					int64_t layer_mask;
+					serializer.deserializeArrayItem(layer_mask, 1);
 					char path[LUMIX_MAX_PATH];
 					serializer.deserializeArrayItem(path, LUMIX_MAX_PATH, "");
 					serializer.deserializeArrayItem(m_renderables[i]->m_scale, 0);
 					m_culling_system->addStatic(Sphere(m_renderables[i]->m_entity.getPosition(), 1.0f));
+					m_culling_system->setLayerMask(i, layer_mask);
 					setModel(i, static_cast<Model*>(m_engine.getResourceManager().get(ResourceManager::MODEL)->load(path)));
 					for (int j = 0; j < 16; ++j)
 					{
@@ -583,7 +584,6 @@ namespace Lumix
 					Renderable& r = *m_allocator.newObject<Renderable>(m_allocator);
 					m_renderables.push(&r);
 					r.m_entity = entity;
-					r.m_layer_mask = 1;
 					r.m_scale = 1;
 					r.m_model = NULL;
 					r.m_component_index = new_index;
@@ -793,7 +793,7 @@ namespace Lumix
 
 			virtual void setRenderableLayer(Component cmp, const int32_t& layer) override
 			{
-				m_renderables[getRenderable(cmp.index)]->m_layer_mask = ((int64_t)1 << (int64_t)layer);
+				m_culling_system->setLayerMask(getRenderable(cmp.index), (int64_t)1 << (int64_t)layer);
 			}
 
 			virtual void setRenderableScale(Component cmp, float scale) override
@@ -956,13 +956,13 @@ namespace Lumix
 			}
 
 
-			const CullingSystem::Results* cull(const Frustum& frustum)
+			const CullingSystem::Results* cull(const Frustum& frustum, int64_t layer_mask)
 			{
 				PROFILE_FUNCTION();
 				if (m_renderables.empty())
 					return NULL;
 
-				m_culling_system->cullToFrustumAsync(frustum);
+				m_culling_system->cullToFrustumAsync(frustum, layer_mask);
 				return &m_culling_system->getResult();
 			}
 
@@ -1021,14 +1021,11 @@ namespace Lumix
 							for (int i = 0, c = subresults.size(); i < c; ++i)
 							{
 								const Renderable* LUMIX_RESTRICT renderable = m_renderables[subresults[i]];
-								if ((renderable->m_layer_mask & layer_mask) != 0)
+								for (int j = 0, c = renderable->m_meshes.size(); j < c; ++j)
 								{
-									for (int j = 0, c = renderable->m_meshes.size(); j < c; ++j)
-									{
-										RenderableInfo& info = subinfos.pushEmpty();
-										info.m_mesh = &renderable->m_meshes[j];
-										info.m_key = (int64_t)renderable->m_meshes[j].m_mesh;
-									}
+									RenderableInfo& info = subinfos.pushEmpty();
+									info.m_mesh = &renderable->m_meshes[j];
+									info.m_key = (int64_t)renderable->m_meshes[j].m_mesh;
 								}
 							}
 						});
@@ -1043,7 +1040,7 @@ namespace Lumix
 			{
 				PROFILE_FUNCTION();
 
-				const CullingSystem::Results* results = cull(frustum);
+				const CullingSystem::Results* results = cull(frustum, layer_mask);
 				if (!results)
 				{
 					return;
@@ -1054,8 +1051,9 @@ namespace Lumix
 
 				for (int i = 0, c = m_always_visible.size(); i < c; ++i)
 				{
-					const Renderable* LUMIX_RESTRICT renderable = m_renderables[getRenderable(m_always_visible[i])];
-					if ((renderable->m_layer_mask & layer_mask) != 0)
+					int renderable_index = getRenderable(m_always_visible[i]);
+					const Renderable* LUMIX_RESTRICT renderable = m_renderables[renderable_index];
+					if ((m_culling_system->getLayerMask(renderable_index) & layer_mask) != 0)
 					{
 						for (int j = 0, c = renderable->m_meshes.size(); j < c; ++j)
 						{
@@ -1079,7 +1077,7 @@ namespace Lumix
 				for (int i = 0, c = m_renderables.size(); i < c; ++i)
 				{
 					const Renderable* LUMIX_RESTRICT renderable = m_renderables[i];
-					if ((renderable->m_layer_mask & layer_mask) != 0)
+					if ((m_culling_system->getLayerMask(i) & layer_mask) != 0)
 					{
 						for (int j = 0, c = renderable->m_meshes.size(); j < c; ++j)
 						{

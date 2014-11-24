@@ -161,7 +161,7 @@ void JsonSerializer::serializeArrayItem(int value)
 }
 
 
-void JsonSerializer::serializeArrayItem(int64_t& value)
+void JsonSerializer::serializeArrayItem(int64_t value)
 {
 	writeBlockComma();
 	char tmp[30];

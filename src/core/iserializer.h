@@ -24,7 +24,7 @@ namespace Lumix
 			virtual void endArray() = 0;
 			virtual void serializeArrayItem(uint32_t value) = 0;
 			virtual void serializeArrayItem(int32_t value) = 0;
-			virtual void serializeArrayItem(int64_t& value) = 0;
+			virtual void serializeArrayItem(int64_t value) = 0;
 			virtual void serializeArrayItem(float value) = 0;
 			virtual void serializeArrayItem(bool value) = 0;
 			virtual void serializeArrayItem(const char* value) = 0;
