@@ -7,6 +7,7 @@
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "insert_mesh_command.h"
+#include "scripts/scriptcompiler.h"
 #include <qdesktopservices.h>
 #include <qfilesystemmodel.h>
 #include <qinputdialog.h>
@@ -122,7 +123,13 @@ void AssetBrowser::on_treeView_doubleClicked(const QModelIndex &index)
 
 void AssetBrowser::onFileChanged(const QString& path)
 {
-	if(QFileInfo(path).suffix() == "blend@")
+	QFileInfo info(path);
+	if (info.suffix() == "cpp")
+	{
+		auto path = info.filePath().toLatin1();
+		m_compiler->compile(path.data());
+	}
+	else if(info.suffix() == "blend@")
 	{
 		QFileInfo file_info(path);
 		QString base_name = file_info.absolutePath() + "/" + file_info.baseName() + ".blend";
