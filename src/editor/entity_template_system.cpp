@@ -240,7 +240,7 @@ namespace Lumix
 				serializer.write((int32_t)m_template_names.size());
 				for (int i = 0, c = m_template_names.size(); i < c;  ++i)
 				{
-					serializer.write(m_template_names[i].c_str());
+					serializer.writeString(m_template_names[i].c_str());
 				}
 				serializer.write((int32_t)m_instances.size());
 				for (int i = 0; i < m_instances.size(); ++i)

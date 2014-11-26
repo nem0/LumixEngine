@@ -900,7 +900,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		serializer.write((int32_t)m_actors.size());
 		for (int i = 0; i < m_actors.size(); ++i)
 		{
-			serializer.write(m_actors[i]->m_source.c_str());
+			serializer.writeString(m_actors[i]->m_source.c_str());
 			serializer.write(isDynamic(i));
 			serializer.write(m_actors[i]->m_entity.index);
 			if(m_actors[i]->m_entity.index != -1)
@@ -921,7 +921,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			{
 				serializer.write(true);
 				serializer.write(m_terrains[i]->m_entity.index);
-				serializer.write(m_terrains[i]->m_heightmap ? m_terrains[i]->m_heightmap->getPath().c_str() : "");
+				serializer.writeString(m_terrains[i]->m_heightmap ? m_terrains[i]->m_heightmap->getPath().c_str() : "");
 				serializer.write(m_terrains[i]->m_xz_scale);
 				serializer.write(m_terrains[i]->m_y_scale);
 			}

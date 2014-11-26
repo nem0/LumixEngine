@@ -277,7 +277,7 @@ namespace Lumix
 				for (int i = 0; i < m_script_entities.size(); ++i)
 				{
 					serializer.write((int32_t)m_script_entities[i]);
-					serializer.write(m_paths[i].c_str());
+					serializer.writeString(m_paths[i].c_str());
 				}
 			}
 

@@ -276,7 +276,7 @@ namespace Lumix
 					serializer.write(m_renderables[i]->m_scale);
 					serializer.write(m_culling_system->getLayerMask(i));
 					serializer.write(&m_renderables[i]->m_matrix.m11, sizeof(Matrix));
-					serializer.write(m_renderables[i]->m_model ? m_renderables[i]->m_model->getPath().c_str() : "");
+					serializer.writeString(m_renderables[i]->m_model ? m_renderables[i]->m_model->getPath().c_str() : "");
 				}
 			}
 
