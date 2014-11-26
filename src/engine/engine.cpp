@@ -280,7 +280,7 @@ namespace Lumix
 			}
 
 
-			virtual void serialize(ISerializer& serializer) override
+			virtual void serialize(JsonSerializer& serializer) override
 			{
 				m_universe->serialize(serializer);
 				m_hierarchy->serialize(serializer);
@@ -293,7 +293,7 @@ namespace Lumix
 			}
 
 
-			virtual void deserialize(ISerializer& serializer) override
+			virtual void deserialize(JsonSerializer& serializer) override
 			{
 				m_universe->deserialize(serializer);
 				m_hierarchy->deserialize(serializer);

@@ -1190,7 +1190,7 @@ struct WorldEditorImpl : public WorldEditor
 
 		void save(FS::IFile& file, const char* path)
 		{
-			JsonSerializer serializer(file, JsonSerializer::WRITE, path);
+			JsonSerializer serializer(m_allocator, file, JsonSerializer::WRITE, path);
 			m_engine->serialize(serializer);
 			m_template_system->serialize(serializer);
 			g_log_info.log("editor") << "universe saved";
@@ -1573,7 +1573,7 @@ struct WorldEditorImpl : public WorldEditor
 			m_components.clear();
 			m_components.reserve(5000);
 			g_log_info.log("editor") << "parsing universe...";
-			JsonSerializer serializer(file, JsonSerializer::READ, path);
+			JsonSerializer serializer(m_allocator, file, JsonSerializer::READ, path);
 			m_engine->deserialize(serializer);
 			m_template_system->deserialize(serializer);
 			m_camera = static_cast<RenderScene*>(m_engine->getScene(crc32("renderer")))->getCameraInSlot("editor").entity;

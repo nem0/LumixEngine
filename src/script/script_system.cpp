@@ -47,7 +47,7 @@ namespace Lumix
 			virtual IPlugin& getPlugin() const;
 
 
-			void deserialize(ISerializer& serializer) override
+			void deserialize(JsonSerializer& serializer) override
 			{
 				stopAll();
 				int count;
@@ -273,7 +273,7 @@ namespace Lumix
 			}
 
 
-			void serialize(ISerializer& serializer) override
+			void serialize(JsonSerializer& serializer) override
 			{
 				serializer.serialize("count", m_script_entities.size());
 				serializer.beginArray("scripts");

@@ -9,7 +9,7 @@ namespace Lumix
 {
 	class Engine;
 	class IPlugin;
-	class ISerializer;
+	class JsonSerializer;
 	class Universe;
 
 
@@ -20,8 +20,8 @@ namespace Lumix
 
 			virtual Component createComponent(uint32_t, const Entity&) = 0;
 			virtual void destroyComponent(const Component& component) = 0;
-			virtual void serialize(ISerializer& serializer) = 0;
-			virtual void deserialize(ISerializer& serializer) = 0;
+			virtual void serialize(JsonSerializer& serializer) = 0;
+			virtual void deserialize(JsonSerializer& serializer) = 0;
 			virtual IPlugin& getPlugin() const = 0;
 			virtual void update(float time_delta) = 0;
 	};
@@ -34,8 +34,8 @@ namespace Lumix
 
 			virtual bool create() = 0;
 			virtual void destroy() = 0;
-			virtual void serialize(ISerializer&) {}
-			virtual void deserialize(ISerializer&) {}
+			virtual void serialize(JsonSerializer&) {}
+			virtual void deserialize(JsonSerializer&) {}
 			virtual void update(float) {}
 			virtual const char* getName() const = 0;
 			virtual void sendMessage(const char*) {};

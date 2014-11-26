@@ -9,7 +9,7 @@ namespace Lumix
 {
 
 
-	class ISerializer;
+	class JsonSerializer;
 
 
 	class Hierarchy
@@ -31,8 +31,8 @@ namespace Lumix
 
 			virtual void setParent(const Entity& child, const Entity& parent) = 0;
 			virtual Entity getParent(const Entity& child) = 0;
-			virtual void serialize(ISerializer& serializer) = 0;
-			virtual void deserialize(ISerializer& serializer) = 0;
+			virtual void serialize(JsonSerializer& serializer) = 0;
+			virtual void deserialize(JsonSerializer& serializer) = 0;
 			virtual Array<Child>* getChildren(const Entity& parent) = 0;
 			virtual DelegateList<void (const Entity&, const Entity&)>& parentSet() = 0;
 	};

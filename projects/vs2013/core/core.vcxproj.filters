@@ -10,7 +10,6 @@
     <ClInclude Include="..\..\..\src\core\free_list.h" />
     <ClInclude Include="..\..\..\src\core\hash_map.h" />
     <ClInclude Include="..\..\..\src\core\input_system.h" />
-    <ClInclude Include="..\..\..\src\core\iserializer.h" />
     <ClInclude Include="..\..\..\src\core\json_serializer.h" />
     <ClInclude Include="..\..\..\src\core\log.h" />
     <ClInclude Include="..\..\..\src\core\math_utils.h" />
