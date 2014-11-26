@@ -617,14 +617,14 @@ namespace Lumix
 	{
 		serializer.write(m_entity.index);
 		serializer.write(m_layer_mask);
-		serializer.write(m_material ? m_material->getPath().c_str() : "");
+		serializer.writeString(m_material ? m_material->getPath().c_str() : "");
 		serializer.write(m_xz_scale);
 		serializer.write(m_y_scale);
 		serializer.write((int32_t)m_grass_types.size());
 		for(int i = 0; i < m_grass_types.size(); ++i)
 		{
 			GrassType& type = *m_grass_types[i];
-			serializer.write(type.m_grass_model ? type.m_grass_model->getPath().c_str() : "");
+			serializer.writeString(type.m_grass_model ? type.m_grass_model->getPath().c_str() : "");
 			serializer.write(type.m_ground);
 			serializer.write(type.m_density);
 

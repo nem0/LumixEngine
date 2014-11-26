@@ -36,6 +36,8 @@ namespace Lumix
 
 		private:
 			Blob(const Blob& rhs);
+			void write(const char*);
+			void read(const char*);
 
 		private:
 			IAllocator& m_allocator;

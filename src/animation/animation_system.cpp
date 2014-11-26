@@ -99,7 +99,7 @@ namespace Lumix
 					serializer.write(m_animables[i].m_renderable.entity.index);
 					serializer.write(m_animables[i].m_time);
 					serializer.write(m_animables[i].m_is_free);
-					serializer.write(m_animables[i].m_animation ? m_animables[i].m_animation->getPath().c_str() : "");
+					serializer.writeString(m_animables[i].m_animation ? m_animables[i].m_animation->getPath().c_str() : "");
 				}
 			}
 

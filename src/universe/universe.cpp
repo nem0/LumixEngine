@@ -121,7 +121,7 @@ void Universe::serialize(Blob& serializer)
 	for (int i = 0, c = m_id_to_name_map.size(); i < c; ++i)
 	{
 		serializer.write(m_id_to_name_map.getKey(i));
-		serializer.write(m_id_to_name_map.at(i).c_str());
+		serializer.writeString(m_id_to_name_map.at(i).c_str());
 	}
 
 	serializer.write((int32_t)m_free_slots.size());
