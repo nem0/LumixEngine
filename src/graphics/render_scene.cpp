@@ -1347,6 +1347,7 @@ namespace Lumix
 					old_model->getResourceManager().get(ResourceManager::MODEL)->unload(*old_model);
 				}
 				m_renderables[renderable_index]->m_model = model;
+				m_renderables[renderable_index]->m_meshes.clear();
 				if (model)
 				{
 					ModelLoadedCallback* callback = getModelLoadedCallback(model);
