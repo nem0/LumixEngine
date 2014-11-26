@@ -24,7 +24,7 @@ namespace Lumix
 	class Animation;
 	class Engine;
 	struct Entity;
-	class ISerializer;
+	class JsonSerializer;
 	class Universe;
 
 
@@ -90,7 +90,7 @@ namespace Lumix
 			}
 
 
-			virtual void serialize(ISerializer& serializer) override
+			virtual void serialize(JsonSerializer& serializer) override
 			{
 				serializer.serialize("count", m_animables.size());
 				serializer.beginArray("animables");
@@ -106,7 +106,7 @@ namespace Lumix
 			}
 
 
-			virtual void deserialize(ISerializer& serializer) override
+			virtual void deserialize(JsonSerializer& serializer) override
 			{
 				int count;
 				serializer.deserialize("count", count, 0);

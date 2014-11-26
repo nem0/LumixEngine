@@ -1,7 +1,7 @@
 #include "entity_template_system.h"
 #include "core/array.h"
 #include "core/crc32.h"
-#include "core/iserializer.h"
+#include "core/json_serializer.h"
 #include "core/math_utils.h"
 #include "core/string.h"
 #include "editor/ieditor_command.h"
@@ -235,7 +235,7 @@ namespace Lumix
 			}
 
 
-			virtual void serialize(ISerializer& serializer) override
+			virtual void serialize(JsonSerializer& serializer) override
 			{
 				serializer.serialize("templates_count", (int32_t)m_template_names.size());
 				serializer.beginArray("template_names");
@@ -261,7 +261,7 @@ namespace Lumix
 			}
 
 
-			virtual void deserialize(ISerializer& serializer) override
+			virtual void deserialize(JsonSerializer& serializer) override
 			{
 				m_template_names.clear();
 				m_instances.clear();

@@ -15,7 +15,7 @@ namespace Lumix
 {
 
 
-class ISerializer;
+class JsonSerializer;
 class Material;
 class Mesh;
 class PipelineInstance;
@@ -81,8 +81,8 @@ class Terrain
 		void render(Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos);
 		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir);
 		int64_t getLayerMask() const { return m_layer_mask; }
-		void serialize(ISerializer& serializer);
-		void deserialize(ISerializer& serializer, Universe& universe, RenderScene& scene, int index);
+		void serialize(JsonSerializer& serializer);
+		void deserialize(JsonSerializer& serializer, Universe& universe, RenderScene& scene, int index);
 		void setXZScale(float scale) { m_xz_scale = scale; }
 		float getXZScale() const { return m_xz_scale; }
 		void setYScale(float scale) { m_y_scale = scale; }

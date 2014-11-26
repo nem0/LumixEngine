@@ -111,7 +111,7 @@ Entity Universe::getNextEntity(Entity entity)
 }
 
 
-void Universe::serialize(ISerializer& serializer)
+void Universe::serialize(JsonSerializer& serializer)
 {
 	serializer.serialize("count", m_positions.size());
 	serializer.beginArray("positions");
@@ -151,7 +151,7 @@ void Universe::serialize(ISerializer& serializer)
 }
 
 
-void Universe::deserialize(ISerializer& serializer)
+void Universe::deserialize(JsonSerializer& serializer)
 {
 	int count;
 	serializer.deserialize("count", count, 0);

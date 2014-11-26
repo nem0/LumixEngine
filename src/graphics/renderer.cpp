@@ -398,11 +398,11 @@ struct RendererImpl : public Renderer
 		}
 	}
 
-	virtual void serialize(ISerializer&) override
+	virtual void serialize(JsonSerializer&) override
 	{
 	}
 
-	virtual void deserialize(ISerializer&) override
+	virtual void deserialize(JsonSerializer&) override
 	{
 	}
 

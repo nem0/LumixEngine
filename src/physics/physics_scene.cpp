@@ -6,7 +6,7 @@
 #include "core/crc32.h"
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
-#include "core/iserializer.h"
+#include "core/json_serializer.h"
 #include "core/log.h"
 #include "core/matrix.h"
 #include "core/path.h"
@@ -824,7 +824,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void serializeActor(ISerializer& serializer, int idx)
+	void serializeActor(JsonSerializer& serializer, int idx)
 	{
 		physx::PxShape* shapes;
 		if (m_actors[idx]->m_physx_actor->getNbShapes() == 1 && m_actors[idx]->m_physx_actor->getShapes(&shapes, 1))
@@ -850,7 +850,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void deserializeActor(ISerializer& serializer, int idx)
+	void deserializeActor(JsonSerializer& serializer, int idx)
 	{
 		ActorType type;
 		serializer.deserialize("type", (int32_t&)type, 0);
@@ -894,7 +894,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual void serialize(ISerializer& serializer) override
+	virtual void serialize(JsonSerializer& serializer) override
 	{
 		serializer.serialize("count", m_actors.size());
 		serializer.beginArray("actors");
@@ -938,7 +938,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void deserializeActors(ISerializer& serializer)
+	void deserializeActors(JsonSerializer& serializer)
 	{
 		int32_t count;
 		m_dynamic_actors.clear();
@@ -975,7 +975,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void deserializeControllers(ISerializer& serializer)
+	void deserializeControllers(JsonSerializer& serializer)
 	{
 		int32_t count;
 		serializer.deserialize("count", count, 0);
@@ -1018,7 +1018,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void deserializeTerrains(ISerializer& serializer)
+	void deserializeTerrains(JsonSerializer& serializer)
 	{
 		int32_t count;
 		serializer.deserialize("count", count, 0);
@@ -1064,7 +1064,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual void deserialize(ISerializer& serializer) override
+	virtual void deserialize(JsonSerializer& serializer) override
 	{
 		deserializeActors(serializer);
 		deserializeControllers(serializer);

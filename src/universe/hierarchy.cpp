@@ -1,7 +1,7 @@
 #include "hierarchy.h"
 #include "core/array.h"
 #include "core/hash_map.h"
-#include "core/iserializer.h"
+#include "core/json_serializer.h"
 #include "core/matrix.h"
 #include "core/pod_hash_map.h"
 #include "universe.h"
@@ -140,7 +140,7 @@ class HierarchyImpl : public Hierarchy
 		}
 		
 		
-		virtual void serialize(ISerializer& serializer) override
+		virtual void serialize(JsonSerializer& serializer) override
 		{
 			int size = m_parents.size();
 			serializer.serialize("hierarchy_size", size);
@@ -156,7 +156,7 @@ class HierarchyImpl : public Hierarchy
 		}
 		
 		
-		virtual void deserialize(ISerializer& serializer) override
+		virtual void deserialize(JsonSerializer& serializer) override
 		{
 			int size;
 			serializer.deserialize("hierarchy_size", size, 0);

@@ -1,7 +1,7 @@
 #include "terrain.h"
 #include "core/aabb.h"
 #include "core/frustum.h"
-#include "core/iserializer.h"
+#include "core/json_serializer.h"
 #include "core/log.h"
 #include "core/math_utils.h"
 #include "core/profiler.h"
@@ -580,7 +580,7 @@ namespace Lumix
 		}
 	}
 
-	void Terrain::deserialize(ISerializer& serializer, Universe& universe, RenderScene& scene, int index)
+	void Terrain::deserialize(JsonSerializer& serializer, Universe& universe, RenderScene& scene, int index)
 	{
 		serializer.deserializeArrayItem(m_entity.index, 0);
 		m_entity.universe = &universe;
@@ -612,7 +612,7 @@ namespace Lumix
 	}
 
 
-	void Terrain::serialize(ISerializer& serializer)
+	void Terrain::serialize(JsonSerializer& serializer)
 	{
 		serializer.serializeArrayItem(m_entity.index);
 		serializer.serializeArrayItem(m_layer_mask);

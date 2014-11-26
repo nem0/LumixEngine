@@ -4,7 +4,7 @@
 #include "core/crc32.h"
 #include "core/FS/file_system.h"
 #include "core/FS/ifile.h"
-#include "core/iserializer.h"
+#include "core/json_serializer.h"
 #include "core/log.h"
 #include "core/math_utils.h"
 #include "core/mtjd/generic_job.h"
@@ -252,7 +252,7 @@ namespace Lumix
 				}
 			}
 
-			void serializeCameras(ISerializer& serializer)
+			void serializeCameras(JsonSerializer& serializer)
 			{
 				serializer.serialize("camera_count", m_cameras.size());
 				serializer.beginArray("cameras");
@@ -271,7 +271,7 @@ namespace Lumix
 				serializer.endArray();
 			}
 
-			void serializeLights(ISerializer& serializer)
+			void serializeLights(JsonSerializer& serializer)
 			{
 				serializer.serialize("light_count", m_lights.size());
 				serializer.beginArray("lights");
@@ -299,7 +299,7 @@ namespace Lumix
 				serializer.endArray();
 			}
 
-			void serializeRenderables(ISerializer& serializer)
+			void serializeRenderables(JsonSerializer& serializer)
 			{
 				serializer.serialize("renderable_count", m_renderables.size());
 				serializer.beginArray("renderables");
@@ -327,7 +327,7 @@ namespace Lumix
 				serializer.endArray();
 			}
 
-			void serializeTerrains(ISerializer& serializer)
+			void serializeTerrains(JsonSerializer& serializer)
 			{
 				serializer.serialize("terrain_count", m_terrains.size());
 				serializer.beginArray("terrains");
@@ -346,7 +346,7 @@ namespace Lumix
 				serializer.endArray();
 			}
 
-			virtual void serialize(ISerializer& serializer) override
+			virtual void serialize(JsonSerializer& serializer) override
 			{
 				serializeCameras(serializer);
 				serializeRenderables(serializer);
@@ -354,7 +354,7 @@ namespace Lumix
 				serializeTerrains(serializer);
 			}
 
-			void deserializeCameras(ISerializer& serializer)
+			void deserializeCameras(JsonSerializer& serializer)
 			{
 				int32_t size;
 				serializer.deserialize("camera_count", size, 0);
@@ -381,7 +381,7 @@ namespace Lumix
 				serializer.deserializeArrayEnd();
 			}
 
-			void deserializeRenderables(ISerializer& serializer)
+			void deserializeRenderables(JsonSerializer& serializer)
 			{
 				int32_t size = 0;
 				serializer.deserialize("renderable_count", size, 0);
@@ -426,7 +426,7 @@ namespace Lumix
 				serializer.deserializeArrayEnd();
 			}
 
-			void deserializeLights(ISerializer& serializer)
+			void deserializeLights(JsonSerializer& serializer)
 			{
 				int32_t size = 0;
 				serializer.deserialize("light_count", size, 0);
@@ -461,7 +461,7 @@ namespace Lumix
 				serializer.deserializeArrayEnd();
 			}
 
-			void deserializeTerrains(ISerializer& serializer)
+			void deserializeTerrains(JsonSerializer& serializer)
 			{
 				int32_t size = 0;
 				serializer.deserialize("terrain_count", size, 0);
@@ -490,7 +490,7 @@ namespace Lumix
 				serializer.deserializeArrayEnd();
 			}
 
-			virtual void deserialize(ISerializer& serializer) override
+			virtual void deserialize(JsonSerializer& serializer) override
 			{
 				deserializeCameras(serializer);
 				deserializeRenderables(serializer);

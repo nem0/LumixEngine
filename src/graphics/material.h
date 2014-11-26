@@ -13,7 +13,7 @@ namespace FS
 	class IFile;
 }
 
-class ISerializer;
+class JsonSerializer;
 class PipelineInstance;
 class Renderer;
 class ResourceManager;
@@ -79,7 +79,7 @@ public:
 	void addTexture(Texture* texture);
 	void setTexture(int i, Texture* texture);
 	void removeTexture(int i);
-	bool save(ISerializer& serializer);
+	bool save(JsonSerializer& serializer);
 	int getUniformCount() const { return m_uniforms.size(); }
 	Uniform& getUniform(int index) { return m_uniforms[index]; }
 
@@ -95,6 +95,7 @@ public:
 		, m_is_shadow_receiver(true)
 		, m_textures(allocator)
 		, m_uniforms(allocator)
+		, m_allocator(allocator)
 	{ 
 		updateShaderCombination();
 	}
@@ -106,7 +107,7 @@ private:
 	virtual FS::ReadCallback getReadCallback() override;
 
 	void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
-	bool deserializeTexture(ISerializer& serializer, const char* material_dir);
+	bool deserializeTexture(JsonSerializer& serializer, const char* material_dir);
 
 private:
 	struct TextureInfo
@@ -124,7 +125,7 @@ private:
 	};
 
 private:
-	void deserializeUniforms(ISerializer& serializer);
+	void deserializeUniforms(JsonSerializer& serializer);
 	void updateShaderCombination();
 	void shaderLoaded(Resource::State old_state, Resource::State new_state);
 
@@ -139,6 +140,7 @@ private:
 	bool m_is_shadow_receiver;
 	DepthFunc m_depth_func;
 	uint32_t m_shader_combination;
+	IAllocator& m_allocator;
 };
 
 } // ~namespace Lumix

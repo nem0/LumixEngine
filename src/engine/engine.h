@@ -22,7 +22,7 @@ namespace Lumix
 	class InputSystem;
 	class IPlugin;
 	class IScene;
-	class ISerializer;
+	class JsonSerializer;
 	class PluginManager;
 	class Renderer;
 	class ResourceManager;
@@ -58,8 +58,8 @@ namespace Lumix
 
 			virtual const char* getBasePath() const = 0;
 			virtual void update(bool is_game_running) = 0;
-			virtual void serialize(ISerializer& serializer) = 0;
-			virtual void deserialize(ISerializer& serializer) = 0;
+			virtual void serialize(JsonSerializer& serializer) = 0;
+			virtual void deserialize(JsonSerializer& serializer) = 0;
 			virtual float getFPS() const = 0;
 			virtual float getLastTimeDelta() = 0;
 
