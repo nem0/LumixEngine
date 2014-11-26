@@ -16,8 +16,8 @@ namespace Lumix
 {
 
 
+class Blob;
 class Event;
-class JsonSerializer;
 struct Matrix;
 struct Quat;
 class Universe;
@@ -51,8 +51,8 @@ class LUMIX_ENGINE_API Universe final
 
 		Delegate<void(const Component&)>& componentAdded() { return m_component_added; }
 
-		void serialize(JsonSerializer& serializer);
-		void deserialize(JsonSerializer& serializer);
+		void serialize(Blob& serializer);
+		void deserialize(Blob& serializer);
 
 	private:
 		IAllocator&		m_allocator;

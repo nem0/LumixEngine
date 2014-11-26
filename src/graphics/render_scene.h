@@ -14,7 +14,6 @@ namespace Lumix
 	class Frustum;
 	class Geometry;
 	class IRenderDevice;
-	class JsonSerializer;
 	class Material;
 	class Mesh;
 	class Model;

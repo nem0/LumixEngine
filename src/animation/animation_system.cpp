@@ -90,48 +90,42 @@ namespace Lumix
 			}
 
 
-			virtual void serialize(JsonSerializer& serializer) override
+			virtual void serialize(Blob& serializer) override
 			{
-				serializer.serialize("count", m_animables.size());
-				serializer.beginArray("animables");
+				serializer.write((int32_t)m_animables.size());
 				for (int i = 0; i < m_animables.size(); ++i)
 				{
-					serializer.serializeArrayItem(m_animables[i].m_manual);
-					serializer.serializeArrayItem(m_animables[i].m_renderable.entity.index);
-					serializer.serializeArrayItem(m_animables[i].m_time);
-					serializer.serializeArrayItem(m_animables[i].m_is_free);
-					serializer.serializeArrayItem(m_animables[i].m_animation ? m_animables[i].m_animation->getPath().c_str() : "");
+					serializer.write(m_animables[i].m_manual);
+					serializer.write(m_animables[i].m_renderable.entity.index);
+					serializer.write(m_animables[i].m_time);
+					serializer.write(m_animables[i].m_is_free);
+					serializer.write(m_animables[i].m_animation ? m_animables[i].m_animation->getPath().c_str() : "");
 				}
-				serializer.endArray();
 			}
 
 
-			virtual void deserialize(JsonSerializer& serializer) override
+			virtual void deserialize(Blob& serializer) override
 			{
-				int count;
-				serializer.deserialize("count", count, 0);
-				serializer.deserializeArrayBegin("animables");
+				int32_t count;
+				serializer.read(count);
 				m_animables.resize(count);
 				for (int i = 0; i < count; ++i)
 				{
-					serializer.deserializeArrayItem(m_animables[i].m_manual, false);
-					int entity_index;
-					serializer.deserializeArrayItem(entity_index, 0);
-					Entity e(&m_universe, entity_index);
-					m_animables[i].m_entity = e;
-					Component renderable = m_render_scene->getRenderable(e);
+					serializer.read(m_animables[i].m_manual);
+					serializer.read(m_animables[i].m_entity.index);
+					m_animables[i].m_entity.universe = &m_universe;
+					Component renderable = m_render_scene->getRenderable(m_animables[i].m_entity);
 					if (renderable.isValid())
 					{
 						m_animables[i].m_renderable = renderable;
 					}
-					serializer.deserializeArrayItem(m_animables[i].m_time, 0);
-					serializer.deserializeArrayItem(m_animables[i].m_is_free, true);
+					serializer.read(m_animables[i].m_time);
+					serializer.read(m_animables[i].m_is_free);
 					char path[LUMIX_MAX_PATH];
-					serializer.deserializeArrayItem(path, sizeof(path), "");
+					serializer.readString(path, sizeof(path));
 					m_animables[i].m_animation = path[0] == '\0' ? NULL : loadAnimation(path);
-					m_universe.addComponent(e, ANIMABLE_HASH, this, i);
+					m_universe.addComponent(m_animables[i].m_entity, ANIMABLE_HASH, this, i);
 				}
-				serializer.deserializeArrayEnd();
 			}
 
 

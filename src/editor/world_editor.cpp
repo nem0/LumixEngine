@@ -1182,18 +1182,20 @@ struct WorldEditorImpl : public WorldEditor
 			g_log_info.log("editor") << "saving universe " << path.c_str() << "...";
 			FS::FileSystem& fs = m_engine->getFileSystem();
 			FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
-			save(*file, path.c_str());
+			save(*file);
 			fs.close(file);
 			m_universe_path = path;
 		}
 
 
-		void save(FS::IFile& file, const char* path)
+		void save(FS::IFile& file)
 		{
-			JsonSerializer serializer(m_allocator, file, JsonSerializer::WRITE, path);
-			m_engine->serialize(serializer);
-			m_template_system->serialize(serializer);
+			Blob blob(m_allocator);
+			blob.reserve(1 << 20);
+			m_engine->serialize(blob);
+			m_template_system->serialize(blob);
 			g_log_info.log("editor") << "universe saved";
+			file.write(blob.getBuffer(), blob.getBufferSize());
 		}
 
 
@@ -1386,7 +1388,7 @@ struct WorldEditorImpl : public WorldEditor
 			else
 			{
 				m_game_mode_file = m_engine->getFileSystem().open("memory", "", FS::Mode::WRITE);
-				save(*m_game_mode_file, "GameMode");
+				save(*m_game_mode_file);
 				m_is_game_mode = true;
 			}
 		}
@@ -1396,7 +1398,7 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			m_is_game_mode = false;
 			m_game_mode_file->seek(FS::SeekMode::BEGIN, 0);
-			load(*m_game_mode_file, "GameMode");
+			load(*m_game_mode_file);
 			m_engine->getFileSystem().close(m_game_mode_file);
 			m_game_mode_file = NULL;
 		}
@@ -1541,7 +1543,7 @@ struct WorldEditorImpl : public WorldEditor
 			ASSERT(success);
 			if (success)
 			{
-				resetAndLoad(*file, "unknown map"); /// TODO file path
+				resetAndLoad(*file);
 			}
 
 			fs.close(file);
@@ -1568,14 +1570,16 @@ struct WorldEditorImpl : public WorldEditor
 			g_log_info.log("editor") << "universe created";
 		}
 
-		void load(FS::IFile& file, const char* path)
+		void load(FS::IFile& file)
 		{
+			ASSERT(file.getBuffer());
 			m_components.clear();
 			m_components.reserve(5000);
 			g_log_info.log("editor") << "parsing universe...";
-			JsonSerializer serializer(m_allocator, file, JsonSerializer::READ, path);
-			m_engine->deserialize(serializer);
-			m_template_system->deserialize(serializer);
+			Blob blob(m_allocator);
+			blob.create(file.getBuffer(), file.size());
+			m_engine->deserialize(blob);
+			m_template_system->deserialize(blob);
 			m_camera = static_cast<RenderScene*>(m_engine->getScene(crc32("renderer")))->getCameraInSlot("editor").entity;
 			g_log_info.log("editor") << "universe parsed";
 
@@ -1642,11 +1646,11 @@ struct WorldEditorImpl : public WorldEditor
 			}
 		}
 
-		void resetAndLoad(FS::IFile& file, const char* path)
+		void resetAndLoad(FS::IFile& file)
 		{
 			destroyUniverse();
 			createUniverse(false);
-			load(file, path);
+			load(file);
 		}
 
 
