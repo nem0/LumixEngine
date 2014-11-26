@@ -1,4 +1,5 @@
 #include "universe.h"
+#include "core/blob.h"
 #include "core/crc32.h"
 #include "core/matrix.h"
 #include "core/json_serializer.h"
@@ -111,96 +112,55 @@ Entity Universe::getNextEntity(Entity entity)
 }
 
 
-void Universe::serialize(JsonSerializer& serializer)
+void Universe::serialize(Blob& serializer)
 {
-	serializer.serialize("count", m_positions.size());
-	serializer.beginArray("positions");
-	for(int i = 0; i < m_positions.size(); ++i)
-	{
-		serializer.serializeArrayItem(m_positions[i].x);
-		serializer.serializeArrayItem(m_positions[i].y);
-		serializer.serializeArrayItem(m_positions[i].z);
-	}
-	serializer.endArray();
-	serializer.beginArray("rotations");
-	for(int i = 0; i < m_rotations.size(); ++i)
-	{
-		serializer.serializeArrayItem(m_rotations[i].x);
-		serializer.serializeArrayItem(m_rotations[i].y);
-		serializer.serializeArrayItem(m_rotations[i].z);
-		serializer.serializeArrayItem(m_rotations[i].w);
-	}
-	serializer.endArray();
-
-	serializer.serialize("name_count", m_id_to_name_map.size());
-	serializer.beginArray("names");
+	serializer.write((int32_t)m_positions.size());
+	serializer.write(&m_positions[0].x, sizeof(m_positions[0]) * m_positions.size());
+	serializer.write(&m_rotations[0].x, sizeof(m_rotations[0]) * m_rotations.size());
+	serializer.write((int32_t)m_id_to_name_map.size());
 	for (int i = 0, c = m_id_to_name_map.size(); i < c; ++i)
 	{
-		serializer.serializeArrayItem(m_id_to_name_map.getKey(i));
-		serializer.serializeArrayItem(m_id_to_name_map.at(i).c_str());
+		serializer.write(m_id_to_name_map.getKey(i));
+		serializer.write(m_id_to_name_map.at(i).c_str());
 	}
-	serializer.endArray();
 
-	serializer.serialize("free_slot_count", m_free_slots.size());
-	serializer.beginArray("free_slots");
-	for(int i = 0; i < m_free_slots.size(); ++i)
+	serializer.write((int32_t)m_free_slots.size());
+	if (!m_free_slots.empty())
 	{
-		serializer.serializeArrayItem(m_free_slots[i]);
+		serializer.write(&m_free_slots[0], sizeof(m_free_slots[0]) * m_free_slots.size());
 	}
-	serializer.endArray();
 }
 
 
-void Universe::deserialize(JsonSerializer& serializer)
+void Universe::deserialize(Blob& serializer)
 {
-	int count;
-	serializer.deserialize("count", count, 0);
+	int32_t count;
+	serializer.read(count);
 	m_positions.resize(count);
 	m_rotations.resize(count);
 
-	serializer.deserializeArrayBegin("positions");
-	for(int i = 0; i < count; ++i)
-	{
-		serializer.deserializeArrayItem(m_positions[i].x, 0);
-		serializer.deserializeArrayItem(m_positions[i].y, 0);
-		serializer.deserializeArrayItem(m_positions[i].z, 0);
-	}
-	serializer.deserializeArrayEnd();
+	serializer.read(&m_positions[0].x, sizeof(m_positions[0]) * m_positions.size());
+	serializer.read(&m_rotations[0].x, sizeof(m_rotations[0]) * m_rotations.size());
 
-	serializer.deserializeArrayBegin("rotations");
-	for(int i = 0; i < count; ++i)
-	{
-		serializer.deserializeArrayItem(m_rotations[i].x, 0);
-		serializer.deserializeArrayItem(m_rotations[i].y, 0);
-		serializer.deserializeArrayItem(m_rotations[i].z, 0);
-		serializer.deserializeArrayItem(m_rotations[i].w, 1);
-	}
-	serializer.deserializeArrayEnd();
-
-	serializer.deserialize("name_count", count, 0);
-	serializer.deserializeArrayBegin("names");
+	serializer.read(count);
 	m_id_to_name_map.clear();
 	m_name_to_id_map.clear();
 	for (int i = 0; i < count; ++i)
 	{
 		uint32_t key;
-		static const int MAX_NAME_LENGTH = 50;
-		char name[MAX_NAME_LENGTH];
-		serializer.deserializeArrayItem(key, 0);
-		serializer.deserializeArrayItem(name, MAX_NAME_LENGTH, "");
+		char name[50];
+		serializer.read(key);
+		serializer.readString(name, sizeof(name));
 		m_id_to_name_map.insert(key, string(name, m_allocator));
 		m_name_to_id_map.insert(crc32(name), key);
 	}
-	serializer.deserializeArrayEnd();
 
-	serializer.deserialize("free_slot_count", count, 0);
+	serializer.read(count);
 	m_free_slots.resize(count);
-	serializer.deserializeArrayBegin("free_slots");
-	for(int i = 0; i < count; ++i)
+	if (!m_free_slots.empty())
 	{
-		serializer.deserializeArrayItem(m_free_slots[i], 0);
+		serializer.read(&m_free_slots[0], sizeof(m_free_slots[0]) * count);
 	}
-	serializer.deserializeArrayEnd();
 }
 
 

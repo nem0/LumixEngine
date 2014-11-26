@@ -3,6 +3,7 @@
 #include <Windows.h>
 #include <PxPhysicsAPI.h>
 #include "cooking/PxCooking.h"
+#include "core/blob.h"
 #include "core/crc32.h"
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
@@ -824,7 +825,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void serializeActor(JsonSerializer& serializer, int idx)
+	void serializeActor(Blob& serializer, int idx)
 	{
 		physx::PxShape* shapes;
 		if (m_actors[idx]->m_physx_actor->getNbShapes() == 1 && m_actors[idx]->m_physx_actor->getShapes(&shapes, 1))
@@ -833,10 +834,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 			physx::PxHeightFieldGeometry hf_geom;
 			if (shapes->getBoxGeometry(geom))
 			{
-				serializer.serialize("type", (int32_t)BOX);
-				serializer.serialize("x", geom.halfExtents.x);
-				serializer.serialize("y", geom.halfExtents.y);
-				serializer.serialize("z", geom.halfExtents.z);
+				serializer.write((int32_t)BOX);
+				serializer.write(geom.halfExtents.x);
+				serializer.write(geom.halfExtents.y);
+				serializer.write(geom.halfExtents.z);
 			}
 			else
 			{
@@ -850,10 +851,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void deserializeActor(JsonSerializer& serializer, int idx)
+	void deserializeActor(Blob& serializer, int idx)
 	{
 		ActorType type;
-		serializer.deserialize("type", (int32_t&)type, 0);
+		serializer.read((int32_t&)type);
 		physx::PxTransform transform;
 		Matrix mtx;
 		m_actors[idx]->m_entity.getMatrix(mtx);
@@ -865,9 +866,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			case BOX:
 				{
-					serializer.deserialize("x", box_geom.halfExtents.x, 1.0f);
-					serializer.deserialize("y", box_geom.halfExtents.y, 1.0f);
-					serializer.deserialize("z", box_geom.halfExtents.z, 1.0f);
+					serializer.read(box_geom.halfExtents.x);
+					serializer.read(box_geom.halfExtents.y);
+					serializer.read(box_geom.halfExtents.z);
 					geom = &box_geom;
 				}
 				break;
@@ -894,55 +895,49 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual void serialize(JsonSerializer& serializer) override
+	virtual void serialize(Blob& serializer) override
 	{
-		serializer.serialize("count", m_actors.size());
-		serializer.beginArray("actors");
+		serializer.write((int32_t)m_actors.size());
 		for (int i = 0; i < m_actors.size(); ++i)
 		{
-			serializer.serializeArrayItem(m_actors[i]->m_source);
-			serializer.serializeArrayItem(isDynamic(i));
-			serializer.serializeArrayItem(m_actors[i]->m_entity.index);
+			serializer.write(m_actors[i]->m_source.c_str());
+			serializer.write(isDynamic(i));
+			serializer.write(m_actors[i]->m_entity.index);
 			if(m_actors[i]->m_entity.index != -1)
 			{
 				serializeActor(serializer, i);
 			}
 		}
-		serializer.endArray();
-		serializer.serialize("count", m_controllers.size());
-		serializer.beginArray("controllers");
+		serializer.write((int32_t)m_controllers.size());
 		for (int i = 0; i < m_controllers.size(); ++i)
 		{
-			serializer.serializeArrayItem(m_controllers[i].m_entity.index);
-			serializer.serializeArrayItem(m_controllers[i].m_is_free);
+			serializer.write(m_controllers[i].m_entity.index);
+			serializer.write(m_controllers[i].m_is_free);
 		}
-		serializer.endArray();
-		serializer.serialize("count", m_terrains.size());
-		serializer.beginArray("terrains");
+		serializer.write((int32_t)m_terrains.size());
 		for (int i = 0; i < m_terrains.size(); ++i)
 		{
 			if(m_terrains[i])
 			{
-				serializer.serializeArrayItem(true);
-				serializer.serializeArrayItem(m_terrains[i]->m_entity.index);
-				serializer.serializeArrayItem(m_terrains[i]->m_heightmap ? m_terrains[i]->m_heightmap->getPath().c_str() : "");
-				serializer.serializeArrayItem(m_terrains[i]->m_xz_scale);
-				serializer.serializeArrayItem(m_terrains[i]->m_y_scale);
+				serializer.write(true);
+				serializer.write(m_terrains[i]->m_entity.index);
+				serializer.write(m_terrains[i]->m_heightmap ? m_terrains[i]->m_heightmap->getPath().c_str() : "");
+				serializer.write(m_terrains[i]->m_xz_scale);
+				serializer.write(m_terrains[i]->m_y_scale);
 			}
 			else
 			{
-				serializer.serializeArrayItem(false);
+				serializer.write(false);
 			}
 		}
-		serializer.endArray();
 	}
 
 
-	void deserializeActors(JsonSerializer& serializer)
+	void deserializeActors(Blob& serializer)
 	{
 		int32_t count;
 		m_dynamic_actors.clear();
-		serializer.deserialize("count", count, 0);
+		serializer.read(count);
 		for (int i = count; i < m_actors.size(); ++i)
 		{
 			m_actors[i]->m_physx_actor->release();
@@ -954,43 +949,42 @@ struct PhysicsSceneImpl : public PhysicsScene
 			RigidActor* actor = m_allocator.newObject<RigidActor>(m_allocator);
 			m_actors[i] = actor;	
 		}
-		serializer.deserializeArrayBegin("actors");
 		for (int i = 0; i < m_actors.size(); ++i)
 		{
-			serializer.deserializeArrayItem(m_actors[i]->m_source, "");
+			char tmp[LUMIX_MAX_PATH];
+			serializer.readString(tmp, sizeof(tmp));
+			m_actors[i]->m_source = tmp;
 			bool is_dynamic;
-			serializer.deserializeArrayItem(is_dynamic, false);
+			serializer.read(is_dynamic);
 			if (is_dynamic)
 			{
 				m_dynamic_actors.push(m_actors[i]);
 			}
-			serializer.deserializeArrayItem(m_actors[i]->m_entity.index, 0);
+			serializer.read(m_actors[i]->m_entity.index);
 			if(m_actors[i]->m_entity.index != -1)
 			{
 				m_actors[i]->m_entity.universe = m_universe;
 				deserializeActor(serializer, i);
 			}
 		}
-		serializer.deserializeArrayEnd();
 	}
 
 
-	void deserializeControllers(JsonSerializer& serializer)
+	void deserializeControllers(Blob& serializer)
 	{
 		int32_t count;
-		serializer.deserialize("count", count, 0);
+		serializer.read(count);
 		for (int i = 0; i < m_controllers.size(); ++i)
 		{
 			m_controllers[i].m_controller->release();
 		}
 		m_controllers.clear();
-		serializer.deserializeArrayBegin("controllers");
 		for (int i = 0; i < count; ++i)
 		{
-			int index;
+			int32_t index;
 			bool is_free;
-			serializer.deserializeArrayItem(index, 0);
-			serializer.deserializeArrayItem(is_free, true);
+			serializer.read(index);
+			serializer.read(is_free);
 			Entity e(m_universe, index);
 
 			Controller& c = m_controllers.pushEmpty();
@@ -1014,14 +1008,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 				m_universe->addComponent(e, CONTROLLER_HASH, this, i);
 			}
 		}
-		serializer.deserializeArrayEnd();
 	}
 
 
-	void deserializeTerrains(JsonSerializer& serializer)
+	void deserializeTerrains(Blob& serializer)
 	{
 		int32_t count;
-		serializer.deserialize("count", count, 0);
+		serializer.read(count);
 		for (int i = count; i < m_terrains.size(); ++i)
 		{
 			m_allocator.deleteObject(m_terrains[i]);
@@ -1033,11 +1026,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			m_terrains[i] = NULL;
 		}
-		serializer.deserializeArrayBegin("terrains");
 		for (int i = 0; i < count; ++i)
 		{
 			bool exists;
-			serializer.deserializeArrayItem(exists, false);
+			serializer.read(exists);
 			if(exists)
 			{
 				if(!m_terrains[i])
@@ -1046,11 +1038,11 @@ struct PhysicsSceneImpl : public PhysicsScene
 				}
 				m_terrains[i]->m_scene = this;
 				m_terrains[i]->m_entity.universe = m_universe;
-				serializer.deserializeArrayItem(m_terrains[i]->m_entity.index, 0);
+				serializer.read(m_terrains[i]->m_entity.index);
 				char tmp[LUMIX_MAX_PATH];
-				serializer.deserializeArrayItem(tmp, LUMIX_MAX_PATH, "");
-				serializer.deserializeArrayItem(m_terrains[i]->m_xz_scale, 0);
-				serializer.deserializeArrayItem(m_terrains[i]->m_y_scale, 0);
+				serializer.readString(tmp, LUMIX_MAX_PATH);
+				serializer.read(m_terrains[i]->m_xz_scale);
+				serializer.read(m_terrains[i]->m_y_scale);
 
 				Component cmp(m_terrains[i]->m_entity, HEIGHTFIELD_HASH, this, i);
 				if (m_terrains[i]->m_heightmap == NULL || strcmp(tmp, m_terrains[i]->m_heightmap->getPath().c_str()) != 0)
@@ -1060,11 +1052,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 				m_universe->addComponent(m_terrains[i]->m_entity, HEIGHTFIELD_HASH, this, i);
 			}
 		}
-		serializer.deserializeArrayEnd();
 	}
 
 
-	virtual void deserialize(JsonSerializer& serializer) override
+	virtual void deserialize(Blob& serializer) override
 	{
 		deserializeActors(serializer);
 		deserializeControllers(serializer);

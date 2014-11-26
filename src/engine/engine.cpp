@@ -1,7 +1,7 @@
 #include "core/lumix.h"
 #include "engine/engine.h"
 
-
+#include "core/blob.h"
 #include "core/crc32.h"
 #include "core/input_system.h"
 #include "core/log.h"
@@ -280,7 +280,7 @@ namespace Lumix
 			}
 
 
-			virtual void serialize(JsonSerializer& serializer) override
+			virtual void serialize(Blob& serializer) override
 			{
 				m_universe->serialize(serializer);
 				m_hierarchy->serialize(serializer);
@@ -293,7 +293,7 @@ namespace Lumix
 			}
 
 
-			virtual void deserialize(JsonSerializer& serializer) override
+			virtual void deserialize(Blob& serializer) override
 			{
 				m_universe->deserialize(serializer);
 				m_hierarchy->deserialize(serializer);

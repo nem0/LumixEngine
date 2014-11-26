@@ -1,6 +1,7 @@
 #include "render_scene.h"
 
 #include "core/array.h"
+#include "core/blob.h"
 #include "core/crc32.h"
 #include "core/FS/file_system.h"
 #include "core/FS/ifile.h"
@@ -252,101 +253,51 @@ namespace Lumix
 				}
 			}
 
-			void serializeCameras(JsonSerializer& serializer)
+			void serializeCameras(Blob& serializer)
 			{
-				serializer.serialize("camera_count", m_cameras.size());
-				serializer.beginArray("cameras");
-				for (int i = 0; i < m_cameras.size(); ++i)
-				{
-					serializer.serializeArrayItem(m_cameras[i].m_is_free);
-					serializer.serializeArrayItem(m_cameras[i].m_far);
-					serializer.serializeArrayItem(m_cameras[i].m_near);
-					serializer.serializeArrayItem(m_cameras[i].m_fov);
-					serializer.serializeArrayItem(m_cameras[i].m_is_active);
-					serializer.serializeArrayItem(m_cameras[i].m_width);
-					serializer.serializeArrayItem(m_cameras[i].m_height);
-					serializer.serializeArrayItem(m_cameras[i].m_entity.index);
-					serializer.serializeArrayItem(m_cameras[i].m_slot);
-				}
-				serializer.endArray();
+				serializer.write((int32_t)m_cameras.size());
+				serializer.write(&m_cameras[0], sizeof(m_cameras[0]) * m_cameras.size());
 			}
 
-			void serializeLights(JsonSerializer& serializer)
+			void serializeLights(Blob& serializer)
 			{
-				serializer.serialize("light_count", m_lights.size());
-				serializer.beginArray("lights");
-				for (int i = 0; i < m_lights.size(); ++i)
-				{
-					serializer.serializeArrayItem(m_lights[i].m_entity.index);
-					serializer.serializeArrayItem((int32_t)m_lights[i].m_type);
-					serializer.serializeArrayItem(m_lights[i].m_is_free);
-					serializer.serializeArrayItem(m_lights[i].m_diffuse_color.x);
-					serializer.serializeArrayItem(m_lights[i].m_diffuse_color.y);
-					serializer.serializeArrayItem(m_lights[i].m_diffuse_color.z);
-					serializer.serializeArrayItem(m_lights[i].m_diffuse_color.w);
-					serializer.serializeArrayItem(m_lights[i].m_diffuse_intensity);
-					serializer.serializeArrayItem(m_lights[i].m_ambient_color.x);
-					serializer.serializeArrayItem(m_lights[i].m_ambient_color.y);
-					serializer.serializeArrayItem(m_lights[i].m_ambient_color.z);
-					serializer.serializeArrayItem(m_lights[i].m_ambient_color.w);
-					serializer.serializeArrayItem(m_lights[i].m_ambient_intensity);
-					serializer.serializeArrayItem(m_lights[i].m_fog_color.x);
-					serializer.serializeArrayItem(m_lights[i].m_fog_color.y);
-					serializer.serializeArrayItem(m_lights[i].m_fog_color.z);
-					serializer.serializeArrayItem(m_lights[i].m_fog_color.w);
-					serializer.serializeArrayItem(m_lights[i].m_fog_density);
-				}
-				serializer.endArray();
+				serializer.write((int32_t)m_lights.size());
+				serializer.write(&m_lights[0], sizeof(m_lights[0]) * m_lights.size());
 			}
 
-			void serializeRenderables(JsonSerializer& serializer)
+			void serializeRenderables(Blob& serializer)
 			{
-				serializer.serialize("renderable_count", m_renderables.size());
-				serializer.beginArray("renderables");
+				serializer.write((int32_t)m_renderables.size());
 				for (int i = 0; i < m_renderables.size(); ++i)
 				{
-					serializer.serializeArrayItem(m_renderables[i]->m_is_always_visible);
-					serializer.serializeArrayItem(m_renderables[i]->m_component_index);
-					serializer.serializeArrayItem(m_renderables[i]->m_entity.index);
-					serializer.serializeArrayItem(m_culling_system->getLayerMask(i));
-					if (m_renderables[i]->m_model)
-					{
-						serializer.serializeArrayItem(m_renderables[i]->m_model->getPath().c_str());
-					}
-					else
-					{
-						serializer.serializeArrayItem("");
-					}
-					serializer.serializeArrayItem(m_renderables[i]->m_scale);
-					const Matrix& mtx = m_renderables[i]->m_matrix;
-					for (int j = 0; j < 16; ++j)
-					{
-						serializer.serializeArrayItem((&mtx.m11)[j]);
-					}
+					serializer.write(m_renderables[i]->m_is_always_visible);
+					serializer.write(m_renderables[i]->m_component_index);
+					serializer.write(m_renderables[i]->m_entity.index);
+					serializer.write(m_renderables[i]->m_scale);
+					serializer.write(m_culling_system->getLayerMask(i));
+					serializer.write(&m_renderables[i]->m_matrix.m11, sizeof(Matrix));
+					serializer.write(m_renderables[i]->m_model ? m_renderables[i]->m_model->getPath().c_str() : "");
 				}
-				serializer.endArray();
 			}
 
-			void serializeTerrains(JsonSerializer& serializer)
+			void serializeTerrains(Blob& serializer)
 			{
-				serializer.serialize("terrain_count", m_terrains.size());
-				serializer.beginArray("terrains");
+				serializer.write((int32_t)m_terrains.size());
 				for (int i = 0; i < m_terrains.size(); ++i)
 				{
 					if(m_terrains[i])
 					{
-						serializer.serializeArrayItem(true);
+						serializer.write(true);
 						m_terrains[i]->serialize(serializer);
 					}
 					else
 					{
-						serializer.serializeArrayItem(false);
+						serializer.write(false);
 					}
 				}
-				serializer.endArray();
 			}
 
-			virtual void serialize(JsonSerializer& serializer) override
+			virtual void serialize(Blob& serializer) override
 			{
 				serializeCameras(serializer);
 				serializeRenderables(serializer);
@@ -354,38 +305,26 @@ namespace Lumix
 				serializeTerrains(serializer);
 			}
 
-			void deserializeCameras(JsonSerializer& serializer)
+			void deserializeCameras(Blob& serializer)
 			{
 				int32_t size;
-				serializer.deserialize("camera_count", size, 0);
-				serializer.deserializeArrayBegin("cameras");
+				serializer.read(size);
 				m_cameras.resize(size);
+				serializer.read(&m_cameras[0], sizeof(m_cameras[0]) * size);
 				for (int i = 0; i < size; ++i)
 				{
-					serializer.deserializeArrayItem(m_cameras[i].m_is_free, true);
-					serializer.deserializeArrayItem(m_cameras[i].m_far, 0.01f);
-					serializer.deserializeArrayItem(m_cameras[i].m_near, 1000.0f);
-					serializer.deserializeArrayItem(m_cameras[i].m_fov, 60.0f);
-					serializer.deserializeArrayItem(m_cameras[i].m_is_active, false);
-					serializer.deserializeArrayItem(m_cameras[i].m_width, 800);
-					serializer.deserializeArrayItem(m_cameras[i].m_height, 600);
-					m_cameras[i].m_aspect = m_cameras[i].m_width / m_cameras[i].m_height;
-					serializer.deserializeArrayItem(m_cameras[i].m_entity.index, 0);
 					m_cameras[i].m_entity.universe = &m_universe;
-					serializer.deserializeArrayItem(m_cameras[i].m_slot, Camera::MAX_SLOT_LENGTH, "main");
 					if(!m_cameras[i].m_is_free)
 					{
 						m_universe.addComponent(m_cameras[i].m_entity, CAMERA_HASH, this, i);
 					}
 				}
-				serializer.deserializeArrayEnd();
 			}
 
-			void deserializeRenderables(JsonSerializer& serializer)
+			void deserializeRenderables(Blob& serializer)
 			{
 				int32_t size = 0;
-				serializer.deserialize("renderable_count", size, 0);
-				serializer.deserializeArrayBegin("renderables");
+				serializer.read(size);
 				for(int i = size; i < m_renderables.size(); ++i)
 				{
 					setModel(i, NULL);
@@ -399,73 +338,48 @@ namespace Lumix
 				for (int i = 0; i < size; ++i)
 				{
 					m_renderables.push(m_allocator.newObject<Renderable>(m_allocator));
-					serializer.deserializeArrayItem(m_renderables[i]->m_is_always_visible, false);
-					serializer.deserializeArrayItem(m_renderables[i]->m_component_index, 0);
+					serializer.read(m_renderables[i]->m_is_always_visible);
+					serializer.read(m_renderables[i]->m_component_index);
 					if (m_renderables[i]->m_is_always_visible)
 					{
 						m_always_visible.push(m_renderables[i]->m_component_index);
 					}
-					serializer.deserializeArrayItem(m_renderables[i]->m_entity.index, 0);
+					serializer.read(m_renderables[i]->m_entity.index);
+					serializer.read(m_renderables[i]->m_scale);
+					int64_t layer_mask;
+					serializer.read(layer_mask);
 					m_renderables[i]->m_model = NULL;
 					m_renderables[i]->m_entity.universe = &m_universe;
-					int64_t layer_mask;
-					serializer.deserializeArrayItem(layer_mask, 1);
+					serializer.read(&m_renderables[i]->m_matrix.m11, sizeof(Matrix));
 					char path[LUMIX_MAX_PATH];
-					serializer.deserializeArrayItem(path, LUMIX_MAX_PATH, "");
-					serializer.deserializeArrayItem(m_renderables[i]->m_scale, 0);
+					serializer.readString(path, LUMIX_MAX_PATH);
 					m_culling_system->addStatic(Sphere(m_renderables[i]->m_entity.getPosition(), 1.0f));
 					m_culling_system->setLayerMask(i, layer_mask);
 					setModel(i, static_cast<Model*>(m_engine.getResourceManager().get(ResourceManager::MODEL)->load(path)));
-					for (int j = 0; j < 16; ++j)
-					{
-						serializer.deserializeArrayItem((&m_renderables[i]->m_matrix.m11)[j], i == j ? 1.0f : 0.0f);
-					}
 					m_universe.addComponent(m_renderables[i]->m_entity, RENDERABLE_HASH, this, i);
 				}
-
-				serializer.deserializeArrayEnd();
 			}
 
-			void deserializeLights(JsonSerializer& serializer)
+			void deserializeLights(Blob& serializer)
 			{
 				int32_t size = 0;
-				serializer.deserialize("light_count", size, 0);
-				serializer.deserializeArrayBegin("lights");
+				serializer.read(size);
 				m_lights.resize(size);
+				serializer.read(&m_lights[0], sizeof(m_lights[0]) * size);
 				for (int i = 0; i < size; ++i)
 				{
-					serializer.deserializeArrayItem(m_lights[i].m_entity.index, 0);
 					m_lights[i].m_entity.universe = &m_universe;
-					serializer.deserializeArrayItem((int32_t&)m_lights[i].m_type, 0);
-					serializer.deserializeArrayItem(m_lights[i].m_is_free, true);
-					serializer.deserializeArrayItem(m_lights[i].m_diffuse_color.x, 0);
-					serializer.deserializeArrayItem(m_lights[i].m_diffuse_color.y, 0);
-					serializer.deserializeArrayItem(m_lights[i].m_diffuse_color.z, 0);
-					serializer.deserializeArrayItem(m_lights[i].m_diffuse_color.w, 0);
-					serializer.deserializeArrayItem(m_lights[i].m_diffuse_intensity, 0);
-					serializer.deserializeArrayItem(m_lights[i].m_ambient_color.x, 0);
-					serializer.deserializeArrayItem(m_lights[i].m_ambient_color.y, 0);
-					serializer.deserializeArrayItem(m_lights[i].m_ambient_color.z, 0);
-					serializer.deserializeArrayItem(m_lights[i].m_ambient_color.w, 0);
-					serializer.deserializeArrayItem(m_lights[i].m_ambient_intensity, 0);
-					serializer.deserializeArrayItem(m_lights[i].m_fog_color.x, 0);
-					serializer.deserializeArrayItem(m_lights[i].m_fog_color.y, 0);
-					serializer.deserializeArrayItem(m_lights[i].m_fog_color.z, 0);
-					serializer.deserializeArrayItem(m_lights[i].m_fog_color.w, 0);
-					serializer.deserializeArrayItem(m_lights[i].m_fog_density, 0);
 					if(!m_lights[i].m_is_free)
 					{
 						m_universe.addComponent(m_lights[i].m_entity, LIGHT_HASH, this, i);
 					}
 				}
-				serializer.deserializeArrayEnd();
 			}
 
-			void deserializeTerrains(JsonSerializer& serializer)
+			void deserializeTerrains(Blob& serializer)
 			{
 				int32_t size = 0;
-				serializer.deserialize("terrain_count", size, 0);
-				serializer.deserializeArrayBegin("terrains");
+				serializer.read(size);
 				for (int i = size; i < m_terrains.size(); ++i)
 				{
 					m_allocator.deleteObject(m_terrains[i]);
@@ -475,7 +389,7 @@ namespace Lumix
 				for (int i = 0; i < size; ++i)
 				{
 					bool exists;
-					serializer.deserializeArrayItem(exists, false);
+					serializer.read(exists);
 					if(exists)
 					{
 						m_terrains[i] = m_allocator.newObject<Terrain>(Entity::INVALID, *this, m_allocator);
@@ -487,10 +401,9 @@ namespace Lumix
 						m_terrains[i] = NULL;
 					}
 				}
-				serializer.deserializeArrayEnd();
 			}
 
-			virtual void deserialize(JsonSerializer& serializer) override
+			virtual void deserialize(Blob& serializer) override
 			{
 				deserializeCameras(serializer);
 				deserializeRenderables(serializer);

@@ -398,23 +398,18 @@ struct RendererImpl : public Renderer
 		}
 	}
 
-	virtual void serialize(JsonSerializer&) override
-	{
-	}
-
-	virtual void deserialize(JsonSerializer&) override
-	{
-	}
 
 	virtual void setEditorWireframe(bool is_wireframe)
 	{
 		m_is_editor_wireframe = is_wireframe;
 	}
 
+
 	virtual bool isEditorWireframe() const
 	{
 		return m_is_editor_wireframe;
 	}
+
 
 	Engine& m_engine;
 	Debug::Allocator m_allocator;

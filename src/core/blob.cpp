@@ -64,12 +64,25 @@ namespace Lumix
 				((unsigned char*)data)[i] = 0;	
 			return false;
 		}
-		memcpy(data, ((char*)m_data) + m_pos, size);
+		if (size)
+		{
+			memcpy(data, ((char*)m_data) + m_pos, size);
+		}
 		m_pos += size;	
 		return true;
 	}
 
-	void Blob::write(const char* string)
+
+	void Blob::readString(char* out, int max_size)
+	{
+		int32_t size;
+		read(size);
+		ASSERT(size <= max_size);
+		read(out, size < max_size ? size : max_size);
+	}
+
+
+	void Blob::writeString(const char* string)
 	{
 		int32_t size = (int32_t)strlen(string) + 1;
 

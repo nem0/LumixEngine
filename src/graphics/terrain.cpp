@@ -1,5 +1,6 @@
 #include "terrain.h"
 #include "core/aabb.h"
+#include "core/blob.h"
 #include "core/frustum.h"
 #include "core/json_serializer.h"
 #include "core/log.h"
@@ -580,18 +581,18 @@ namespace Lumix
 		}
 	}
 
-	void Terrain::deserialize(JsonSerializer& serializer, Universe& universe, RenderScene& scene, int index)
+	void Terrain::deserialize(Blob& serializer, Universe& universe, RenderScene& scene, int index)
 	{
-		serializer.deserializeArrayItem(m_entity.index, 0);
+		serializer.read(m_entity.index);
 		m_entity.universe = &universe;
-		serializer.deserializeArrayItem(m_layer_mask, 0);
+		serializer.read(m_layer_mask);
 		char path[LUMIX_MAX_PATH];
-		serializer.deserializeArrayItem(path, LUMIX_MAX_PATH, "");
+		serializer.readString(path, LUMIX_MAX_PATH);
 		setMaterial(static_cast<Material*>(scene.getEngine().getResourceManager().get(ResourceManager::MATERIAL)->load(path)));
-		serializer.deserializeArrayItem(m_xz_scale, 0);
-		serializer.deserializeArrayItem(m_y_scale, 0);
-		int count;
-		serializer.deserializeArrayItem(count, 0);
+		serializer.read(m_xz_scale);
+		serializer.read(m_y_scale);
+		int32_t count;
+		serializer.read(count);
 		while(m_grass_types.size() > count)
 		{
 			removeGrassType(m_grass_types.size() - 1);
@@ -603,29 +604,29 @@ namespace Lumix
 		}
 		for(int i = 0; i < count; ++i)
 		{
-			serializer.deserializeArrayItem(path, LUMIX_MAX_PATH, "");
-			serializer.deserializeArrayItem(m_grass_types[i]->m_ground, 0);
-			serializer.deserializeArrayItem(m_grass_types[i]->m_density, 0);
+			serializer.readString(path, LUMIX_MAX_PATH);
+			serializer.read(m_grass_types[i]->m_ground);
+			serializer.read(m_grass_types[i]->m_density);
 			setGrassTypePath(i, path);
 		}
 		universe.addComponent(m_entity, TERRAIN_HASH, &scene, index);
 	}
 
 
-	void Terrain::serialize(JsonSerializer& serializer)
+	void Terrain::serialize(Blob& serializer)
 	{
-		serializer.serializeArrayItem(m_entity.index);
-		serializer.serializeArrayItem(m_layer_mask);
-		serializer.serializeArrayItem(m_material ? m_material->getPath().c_str() : "");
-		serializer.serializeArrayItem(m_xz_scale);
-		serializer.serializeArrayItem(m_y_scale);
-		serializer.serializeArrayItem(m_grass_types.size());
+		serializer.write(m_entity.index);
+		serializer.write(m_layer_mask);
+		serializer.write(m_material ? m_material->getPath().c_str() : "");
+		serializer.write(m_xz_scale);
+		serializer.write(m_y_scale);
+		serializer.write((int32_t)m_grass_types.size());
 		for(int i = 0; i < m_grass_types.size(); ++i)
 		{
 			GrassType& type = *m_grass_types[i];
-			serializer.serializeArrayItem(type.m_grass_model ? type.m_grass_model->getPath().c_str() : "");
-			serializer.serializeArrayItem(type.m_ground);
-			serializer.serializeArrayItem(type.m_density);
+			serializer.write(type.m_grass_model ? type.m_grass_model->getPath().c_str() : "");
+			serializer.write(type.m_ground);
+			serializer.write(type.m_density);
 
 		}
 	}

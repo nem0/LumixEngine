@@ -47,20 +47,19 @@ namespace Lumix
 			virtual IPlugin& getPlugin() const;
 
 
-			void deserialize(JsonSerializer& serializer) override
+			void deserialize(Blob& serializer) override
 			{
 				stopAll();
-				int count;
-				serializer.deserialize("count", count, 0);
-				serializer.deserializeArrayBegin("scripts");
+				int32_t count;
+				serializer.read(count);
 				m_script_entities.resize(count);
 				m_paths.clear();
 				m_paths.reserve(count);
 				for (int i = 0; i < m_script_entities.size(); ++i)
 				{
-					serializer.deserializeArrayItem(m_script_entities[i], 0);
+					serializer.read(m_script_entities[i]);
 					char path[LUMIX_MAX_PATH];
-					serializer.deserializeArrayItem(path, sizeof(path), NULL);
+					serializer.readString(path, sizeof(path));
 					m_paths.push(path);
 					Entity entity(&m_universe, m_script_entities[i]);
 					if(m_script_entities[i] != -1)
@@ -68,7 +67,6 @@ namespace Lumix
 						m_universe.addComponent(entity, SCRIPT_HASH, this, i);
 					}
 				}
-				serializer.deserializeArrayEnd();
 				runAll();
 			}
 
@@ -273,16 +271,14 @@ namespace Lumix
 			}
 
 
-			void serialize(JsonSerializer& serializer) override
+			void serialize(Blob& serializer) override
 			{
-				serializer.serialize("count", m_script_entities.size());
-				serializer.beginArray("scripts");
+				serializer.write((int32_t)m_script_entities.size());
 				for (int i = 0; i < m_script_entities.size(); ++i)
 				{
-					serializer.serializeArrayItem(m_script_entities[i]);
-					serializer.serializeArrayItem(m_paths[i].c_str());
+					serializer.write((int32_t)m_script_entities[i]);
+					serializer.write(m_paths[i].c_str());
 				}
-				serializer.endArray();
 			}
 
 
@@ -318,7 +314,7 @@ namespace Lumix
 
 			IAllocator& m_allocator;
 			Array<RunningScript> m_running_scripts;
-			Array<int> m_script_entities;
+			Array<int32_t> m_script_entities;
 			Array<Path> m_paths;
 			Universe& m_universe;
 			Engine& m_engine;

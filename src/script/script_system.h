@@ -12,8 +12,6 @@ namespace Lumix
 
 
 class Engine;
-class InputSystem;
-class Navigation;
 class Path;
 
 
