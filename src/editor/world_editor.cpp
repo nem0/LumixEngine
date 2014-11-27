@@ -1192,8 +1192,12 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			Blob blob(m_allocator);
 			blob.reserve(1 << 20);
+			uint32_t hash = 0;
+			blob.write(hash);
 			m_engine->serialize(blob);
 			m_template_system->serialize(blob);
+			hash = crc32(blob.getBuffer() + sizeof(hash), blob.getBufferSize() - sizeof(hash));
+			(*(uint32_t*)blob.getBuffer()) = hash;
 			g_log_info.log("editor") << "universe saved";
 			file.write(blob.getBuffer(), blob.getBufferSize());
 		}
@@ -1567,7 +1571,7 @@ struct WorldEditorImpl : public WorldEditor
 			m_universe_path = "";
 			destroyUniverse();
 			createUniverse(true);
-			g_log_info.log("editor") << "universe created";
+			g_log_info.log("editor") << "Universe created.";
 		}
 
 		void load(FS::IFile& file)
@@ -1575,19 +1579,28 @@ struct WorldEditorImpl : public WorldEditor
 			ASSERT(file.getBuffer());
 			m_components.clear();
 			m_components.reserve(5000);
-			g_log_info.log("editor") << "parsing universe...";
+			g_log_info.log("editor") << "Parsing universe...";
 			Blob blob(m_allocator);
 			blob.create(file.getBuffer(), file.size());
-			m_engine->deserialize(blob);
-			m_template_system->deserialize(blob);
-			m_camera = static_cast<RenderScene*>(m_engine->getScene(crc32("renderer")))->getCameraInSlot("editor").entity;
-			g_log_info.log("editor") << "universe parsed";
-
-			Universe* universe = m_engine->getUniverse();
-			for (int i = 0; i < universe->getEntityCount(); ++i)
+			uint32_t hash = 0;
+			blob.read(hash);
+			if (crc32(blob.getData() + sizeof(hash), blob.getBufferSize() - sizeof(hash)) != hash)
 			{
-				Entity e(universe, i);
-				createEditorIcon(e);
+				g_log_error.log("editor") << "Corrupted file.";
+				return;
+			}
+			if(m_engine->deserialize(blob))
+			{
+				m_template_system->deserialize(blob);
+				m_camera = static_cast<RenderScene*>(m_engine->getScene(crc32("renderer")))->getCameraInSlot("editor").entity;
+				g_log_info.log("editor") << "Universe parsed.";
+
+				Universe* universe = m_engine->getUniverse();
+				for (int i = 0; i < universe->getEntityCount(); ++i)
+				{
+					Entity e(universe, i);
+					createEditorIcon(e);
+				}
 			}
 		}
 

@@ -20,6 +20,7 @@ namespace Lumix
 			void write(const void* data, int32_t size);
 			bool read(void* data, int32_t size);
 			const uint8_t* getBuffer() const { return &m_buffer[0]; }
+			const uint8_t* getData() const { return static_cast<const uint8_t*>(m_data); }
 			int getBufferSize() const { return m_size; }
 			void flush() { m_size = 0; }
 			void clearBuffer() { m_buffer.clear(); m_pos = 0; m_size = 0; }
