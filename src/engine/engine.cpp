@@ -319,19 +319,19 @@ namespace Lumix
 			}
 
 
-			virtual void deserialize(Blob& serializer) override
+			virtual bool deserialize(Blob& serializer) override
 			{
 				SerializedEngineHeader header;
 				serializer.read(header);
 				if (header.m_magic != SERIALIZED_ENGINE_MAGIC)
 				{
 					g_log_error.log("engine") << "Wrong or corrupted file";
-					return;
+					return false;
 				}
 				if (header.m_version > SerializedEngineVersion::LAST)
 				{
 					g_log_error.log("engine") << "Unsupported version";
-					return;
+					return false;
 				}
 				m_universe->deserialize(serializer);
 				m_hierarchy->deserialize(serializer);
@@ -341,6 +341,7 @@ namespace Lumix
 				{
 					m_scenes[i]->deserialize(serializer);
 				}
+				return true;
 			}
 
 
