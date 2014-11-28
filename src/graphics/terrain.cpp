@@ -191,7 +191,7 @@ namespace Lumix
 		if (m_grass_model)
 		{
 			m_grass_model->getResourceManager().get(ResourceManager::MODEL)->unload(*m_grass_model);
-			m_grass_model->getObserverCb().unbind<GrassType, &GrassType::grassLoaded>(this);
+			m_grass_model->onLoaded<GrassType, &GrassType::grassLoaded>(this);
 			m_terrain.m_allocator.deleteObject(m_grass_mesh);
 			m_terrain.m_allocator.deleteObject(m_grass_geometry);
 		}
@@ -312,11 +312,7 @@ namespace Lumix
 		if (path.isValid())
 		{
 			type.m_grass_model = static_cast<Model*>(m_scene.getEngine().getResourceManager().get(ResourceManager::MODEL)->load(path));
-			type.m_grass_model->getObserverCb().bind<GrassType, &GrassType::grassLoaded>(&type);
-			if(type.m_grass_model->isReady())
-			{
-				type.grassLoaded(Resource::State::READY, Resource::State::READY);
-			}
+			type.m_grass_model->onLoaded<GrassType, &GrassType::grassLoaded>(&type);
 		}
 	}
 	
@@ -568,11 +564,7 @@ namespace Lumix
 			if (m_mesh && m_material)
 			{
 				m_mesh->setMaterial(m_material);
-				m_material->getObserverCb().bind<Terrain, &Terrain::onMaterialLoaded>(this);
-				if (m_material->isReady())
-				{
-					onMaterialLoaded(Resource::State::READY, Resource::State::READY);
-				}
+				m_material->onLoaded<Terrain, &Terrain::onMaterialLoaded>(this);
 			}
 		}
 		else if(material)

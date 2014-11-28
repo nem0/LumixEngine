@@ -108,7 +108,7 @@ namespace Lumix
 						, m_ref_count(0)
 						, m_model(model)
 					{
-						m_model->getObserverCb().bind<ModelLoadedCallback, &ModelLoadedCallback::callback>(this);
+						m_model->onLoaded<ModelLoadedCallback, &ModelLoadedCallback::callback>(this);
 					}
 
 					~ModelLoadedCallback()

@@ -415,14 +415,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_light_dir.set(0, -1, 0);
 		m_width = m_height = -1;
 		m_shadowmap_framebuffer = NULL;
-		if(pipeline.isReady())
-		{
-			sourceLoaded(Resource::State::EMPTY, Resource::State::READY);
-		}
-		else
-		{
-			pipeline.getObserverCb().bind<PipelineInstanceImpl, &PipelineInstanceImpl::sourceLoaded>(this);
-		}
+		pipeline.onLoaded<PipelineInstanceImpl, &PipelineInstanceImpl::sourceLoaded>(this);
 	}
 
 	~PipelineInstanceImpl()

@@ -304,11 +304,8 @@ void Material::setShader(Shader* shader)
 	if (m_shader)
 	{
 		addDependency(*m_shader);
-		m_shader->getObserverCb().bind<Material, &Material::shaderLoaded>(this);
-		if(m_shader->isReady())
-		{
-			shaderLoaded(Resource::State::READY, Resource::State::READY);
-		}
+
+		m_shader->onLoaded<Material, &Material::shaderLoaded>(this);
 	}
 }
 
