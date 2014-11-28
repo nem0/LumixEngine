@@ -1181,7 +1181,7 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			g_log_info.log("editor") << "saving universe " << path.c_str() << "...";
 			FS::FileSystem& fs = m_engine->getFileSystem();
-			FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
+			FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::CREATE | FS::Mode::WRITE);
 			save(*file);
 			fs.close(file);
 			m_universe_path = path;
