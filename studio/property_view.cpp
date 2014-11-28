@@ -1995,11 +1995,7 @@ void PropertyView::setSelectedResource(Lumix::Resource* resource)
 	m_selected_resource = resource;
 	if (resource)
 	{
-		m_selected_resource->getObserverCb().bind<PropertyView, &PropertyView::onSelectedResourceLoaded>(this);
-		if (m_selected_resource->isReady() || m_selected_resource->isFailure())
-		{
-			onSelectedResourceLoaded(Lumix::Resource::State::READY, Lumix::Resource::State::READY);
-		}
+		m_selected_resource->onLoaded<PropertyView, &PropertyView::onSelectedResourceLoaded>(this);
 	}
 }
 

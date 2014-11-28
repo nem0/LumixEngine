@@ -348,12 +348,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 			m_terrains[cmp.index]->m_heightmap->getObserverCb().unbind<Terrain, &Terrain::heightmapLoaded>(m_terrains[cmp.index]);
 		}
 		m_terrains[cmp.index]->m_heightmap = static_cast<Texture*>(m_engine->getResourceManager().get(ResourceManager::TEXTURE)->load(str.c_str()));
-		m_terrains[cmp.index]->m_heightmap->getObserverCb().bind<Terrain, &Terrain::heightmapLoaded>(m_terrains[cmp.index]);
+		m_terrains[cmp.index]->m_heightmap->onLoaded<Terrain, &Terrain::heightmapLoaded>(m_terrains[cmp.index]);
 		m_terrains[cmp.index]->m_heightmap->addDataReference();
-		if (m_terrains[cmp.index]->m_heightmap->isReady())
-		{
-			m_terrains[cmp.index]->heightmapLoaded(Resource::State::LOADING, Resource::State::READY);
-		}
 	}
 
 
