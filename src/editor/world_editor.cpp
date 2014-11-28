@@ -1587,6 +1587,7 @@ struct WorldEditorImpl : public WorldEditor
 			if (crc32(blob.getData() + sizeof(hash), blob.getBufferSize() - sizeof(hash)) != hash)
 			{
 				g_log_error.log("editor") << "Corrupted file.";
+				newUniverse();
 				return;
 			}
 			if(m_engine->deserialize(blob))
