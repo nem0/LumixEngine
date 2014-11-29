@@ -217,7 +217,7 @@ namespace Lumix
 			Animation* loadAnimation(const char* path)
 			{
 				ResourceManager& rm = m_engine.getResourceManager();
-				return static_cast<Animation*>(rm.get(ResourceManager::ANIMATION)->load(path));
+				return static_cast<Animation*>(rm.get(ResourceManager::ANIMATION)->load(Path(path)));
 			}
 
 

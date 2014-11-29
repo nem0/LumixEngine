@@ -355,7 +355,7 @@ namespace Lumix
 					serializer.readString(path, LUMIX_MAX_PATH);
 					m_culling_system->addStatic(Sphere(m_renderables[i]->m_entity.getPosition(), 1.0f));
 					m_culling_system->setLayerMask(i, layer_mask);
-					setModel(i, static_cast<Model*>(m_engine.getResourceManager().get(ResourceManager::MODEL)->load(path)));
+					setModel(i, static_cast<Model*>(m_engine.getResourceManager().get(ResourceManager::MODEL)->load(Path(path))));
 					m_universe.addComponent(m_renderables[i]->m_entity, RENDERABLE_HASH, this, i);
 				}
 			}
@@ -599,7 +599,7 @@ namespace Lumix
 
 			virtual void setTerrainMaterial(Component cmp, const string& path) override
 			{
-				Material* material = static_cast<Material*>(m_engine.getResourceManager().get(ResourceManager::MATERIAL)->load(path.c_str()));
+				Material* material = static_cast<Material*>(m_engine.getResourceManager().get(ResourceManager::MATERIAL)->load(Path(path.c_str())));
 				m_terrains[cmp.index]->setMaterial(material);
 			}
 
@@ -725,7 +725,7 @@ namespace Lumix
 				int renderable_index = getRenderable(cmp.index);
 				Renderable& r = *m_renderables[renderable_index];
 
-				Model* model = static_cast<Model*>(m_engine.getResourceManager().get(ResourceManager::MODEL)->load(path));
+				Model* model = static_cast<Model*>(m_engine.getResourceManager().get(ResourceManager::MODEL)->load(Path(path.c_str())));
 				setModel(renderable_index, model);
 				r.m_matrix = r.m_entity.getMatrix();
 			}
@@ -789,7 +789,7 @@ namespace Lumix
 
 			virtual void setGrass(Component cmp, int index, const string& path) override
 			{
-				m_terrains[cmp.index]->setGrassTypePath(index, path.c_str());
+				m_terrains[cmp.index]->setGrassTypePath(index, Path(path.c_str()));
 			}
 
 

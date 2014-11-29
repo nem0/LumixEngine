@@ -62,7 +62,7 @@ EditorIcon::EditorIcon(Engine& engine, RenderScene& scene, const Entity& entity)
 		"models/editor/terrain_icon.msh",
 		"models/editor/icon.msh"
 	};
-	m_model = static_cast<Model*>(engine.getResourceManager().get(ResourceManager::MODEL)->load(names[m_type]));
+	m_model = static_cast<Model*>(engine.getResourceManager().get(ResourceManager::MODEL)->load(Path(names[m_type])));
 }
 
 

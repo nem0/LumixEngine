@@ -60,7 +60,7 @@ namespace Lumix
 					serializer.read(m_script_entities[i]);
 					char path[LUMIX_MAX_PATH];
 					serializer.readString(path, sizeof(path));
-					m_paths.push(path);
+					m_paths.push(Path(path));
 					Entity entity(&m_universe, m_script_entities[i]);
 					if(m_script_entities[i] != -1)
 					{
@@ -208,7 +208,7 @@ namespace Lumix
 				getScriptDefaultPath(entity, path, full_path, LUMIX_MAX_PATH, "cpp");
 
 				m_script_entities.push(entity.index);
-				m_paths.push(string(path, m_allocator));
+				m_paths.push(Path(path));
 
 				Component cmp = m_universe.addComponent(entity, SCRIPT_HASH, this, m_script_entities.size() - 1);
 				m_universe.componentCreated().invoke(cmp);
