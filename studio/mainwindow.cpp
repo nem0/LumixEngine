@@ -87,7 +87,7 @@ MainWindow::MainWindow(QWidget* parent) :
 	m_recent_files_menu->connect(m_recent_files_menu, &QMenu::triggered, [this](QAction* action)
 	{
 		auto path = action->text().toLatin1();
-		m_world_editor->loadUniverse(path.data());
+		m_world_editor->loadUniverse(Lumix::Path(path.data()));
 	});
 	fillRecentFiles();
 
@@ -268,7 +268,7 @@ void MainWindow::on_actionOpen_triggered()
 	QByteArray path = filename.toLocal8Bit();
 	if (!path.isEmpty())
 	{
-		m_world_editor->loadUniverse(path.data());
+		m_world_editor->loadUniverse(Lumix::Path(path.data()));
 	}
 }
 
@@ -277,7 +277,7 @@ void MainWindow::on_actionSave_As_triggered()
 	QByteArray path = QFileDialog::getSaveFileName().toLocal8Bit();
 	if (!path.isEmpty())
 	{
-		m_world_editor->saveUniverse(path.data());
+		m_world_editor->saveUniverse(Lumix::Path(path.data()));
 	}
 }
 

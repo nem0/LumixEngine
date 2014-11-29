@@ -1063,7 +1063,7 @@ void DrawScreenQuadCommand::deserialize(PipelineImpl& pipeline, JsonSerializer& 
 
 	char material[LUMIX_MAX_PATH];
 	serializer.deserializeArrayItem(material, LUMIX_MAX_PATH, "");
-	m_material = static_cast<Material*>(pipeline.getResourceManager().get(ResourceManager::MATERIAL)->load(material));
+	m_material = static_cast<Material*>(pipeline.getResourceManager().get(ResourceManager::MATERIAL)->load(Path(material)));
 }
 
 

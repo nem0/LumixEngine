@@ -324,11 +324,10 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 			serializer.deserialize(path, MAX_PATH, "");
 			if (path[0] != '\0')
 			{
-				StackAllocator<LUMIX_MAX_PATH> allocator;
-				string texture_path(allocator);
-				texture_path = material_dir;
-				texture_path += path;
-				info.m_texture = static_cast<Texture*>(m_resource_manager.get(ResourceManager::TEXTURE)->load(texture_path.c_str()));
+				char texture_path[LUMIX_MAX_PATH];
+				copyString(texture_path, sizeof(texture_path), material_dir);
+				catCString(texture_path, sizeof(texture_path), path);
+				info.m_texture = static_cast<Texture*>(m_resource_manager.get(ResourceManager::TEXTURE)->load(Path(texture_path)));
 				addDependency(*info.m_texture);
 
 				if (info.m_keep_data)
@@ -424,8 +423,8 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			}
 			else if (strcmp(label, "shader") == 0)
 			{
-				serializer.deserialize(path, MAX_PATH, "");
-				setShader(static_cast<Shader*>(m_resource_manager.get(ResourceManager::SHADER)->load(path)));
+				serializer.deserialize(path, LUMIX_MAX_PATH, "");
+				setShader(static_cast<Shader*>(m_resource_manager.get(ResourceManager::SHADER)->load(Path(path))));
 			}
 			else if (strcmp(label, "z_test") == 0)
 			{

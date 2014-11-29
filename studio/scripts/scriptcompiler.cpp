@@ -26,7 +26,7 @@ void ScriptCompiler::compileAll()
 		{
 			if (QFileInfo(dirIt.filePath()).suffix() == "cpp")
 			{
-				compile(dirIt.filePath().toLatin1().data());
+				compile(Lumix::Path(dirIt.filePath().toLatin1().data()));
 			}
 		}
 	}
@@ -97,7 +97,7 @@ void ScriptCompiler::compilerFinish(int exitCode)
 				msg.sprintf("Script %s failed to compile", m_processes[i].m_path.c_str());
 				Lumix::g_log_error.log("script") << "Script " << m_processes[i].m_path.c_str() << " failed to compile";
 			}
-			emit compiled(m_processes[i].m_path.c_str(), exitCode);
+			emit compiled(Lumix::Path(m_processes[i].m_path.c_str()), exitCode);
 			emit messageLogged(msg);
 			if (m_editor)
 			{

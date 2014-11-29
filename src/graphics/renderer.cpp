@@ -336,13 +336,14 @@ struct RendererImpl : public Renderer
 
 		glewExperimental = GL_TRUE;
 		GLenum err = glewInit();
-		m_debug_shader = static_cast<Shader*>(m_engine.getResourceManager().get(ResourceManager::SHADER)->load("shaders/debug.shd"));
+		m_debug_shader = static_cast<Shader*>(m_engine.getResourceManager().get(ResourceManager::SHADER)->load(Path("shaders/debug.shd")));
 		return err == GLEW_OK;
 	}
 
 
 	virtual void destroy() override
 	{
+		m_debug_shader->getResourceManager().get(ResourceManager::SHADER)->unload(*m_debug_shader);
 	}
 
 

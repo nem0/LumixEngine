@@ -12,7 +12,7 @@ class WGLRenderDevice : public Lumix::IRenderDevice
 public:
 	WGLRenderDevice(Lumix::Engine& engine, const char* pipeline_path)
 	{
-		Lumix::Pipeline* pipeline_object = static_cast<Lumix::Pipeline*>(engine.getResourceManager().get(Lumix::ResourceManager::PIPELINE)->load(pipeline_path));
+		Lumix::Pipeline* pipeline_object = static_cast<Lumix::Pipeline*>(engine.getResourceManager().get(Lumix::ResourceManager::PIPELINE)->load(Lumix::Path(pipeline_path)));
 		ASSERT(pipeline_object);
 		if(pipeline_object)
 		{

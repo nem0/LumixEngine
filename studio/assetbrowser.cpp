@@ -35,7 +35,7 @@ AssetBrowser::AssetBrowser(QWidget* parent) :
 	QDockWidget(parent),
 	m_ui(new Ui::AssetBrowser)
 {
-	m_watcher = FileSystemWatcher::create(QDir::currentPath().toLatin1().data());
+	m_watcher = FileSystemWatcher::create(Lumix::Path(QDir::currentPath().toLatin1().data()));
 	m_watcher->getCallback().bind<AssetBrowser, &AssetBrowser::onFileSystemWatcherCallback>(this);
 	m_base_path = QDir::currentPath();
 	m_editor = NULL;
@@ -95,11 +95,11 @@ void AssetBrowser::handleDoubleClick(const QFileInfo& file_info)
 	QString file = file_info.filePath().toLower();
 	if(suffix == "unv")
 	{
-		m_editor->loadUniverse(file.toLatin1().data());
+		m_editor->loadUniverse(Lumix::Path(file.toLatin1().data()));
 	}
 	else if(suffix == "msh")
 	{
-		InsertMeshCommand* command = m_editor->getAllocator().newObject<InsertMeshCommand>(*m_editor, m_editor->getCameraRaycastHit(), file.toLatin1().data());
+		InsertMeshCommand* command = m_editor->getAllocator().newObject<InsertMeshCommand>(*m_editor, m_editor->getCameraRaycastHit(), Lumix::Path(file.toLatin1().data()));
 		m_editor->executeCommand(command);
 	}
 	else if(suffix == "ani")
@@ -127,7 +127,7 @@ void AssetBrowser::onFileChanged(const QString& path)
 	if (info.suffix() == "cpp")
 	{
 		auto path = info.filePath().toLatin1();
-		m_compiler->compile(path.data());
+		m_compiler->compile(Lumix::Path(path.data()));
 	}
 	else if(info.suffix() == "blend@")
 	{

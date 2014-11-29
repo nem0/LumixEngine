@@ -46,7 +46,7 @@ void Gizmo::create(Renderer& renderer)
 {
 	m_scale = 1;
 	m_renderer = &renderer;
-	m_model = static_cast<Model*>(renderer.getEngine().getResourceManager().get(ResourceManager::MODEL)->load("models/editor/gizmo.msh"));
+	m_model = static_cast<Model*>(renderer.getEngine().getResourceManager().get(ResourceManager::MODEL)->load(Path("models/editor/gizmo.msh")));
 }
 
 

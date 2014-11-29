@@ -291,7 +291,7 @@ namespace Lumix
 		{
 			return type.m_grass_model->getPath();
 		}
-		return "";
+		return Path("");
 	}
 
 
@@ -580,7 +580,7 @@ namespace Lumix
 		serializer.read(m_layer_mask);
 		char path[LUMIX_MAX_PATH];
 		serializer.readString(path, LUMIX_MAX_PATH);
-		setMaterial(static_cast<Material*>(scene.getEngine().getResourceManager().get(ResourceManager::MATERIAL)->load(path)));
+		setMaterial(static_cast<Material*>(scene.getEngine().getResourceManager().get(ResourceManager::MATERIAL)->load(Path(path))));
 		serializer.read(m_xz_scale);
 		serializer.read(m_y_scale);
 		int32_t count;
@@ -599,7 +599,7 @@ namespace Lumix
 			serializer.readString(path, LUMIX_MAX_PATH);
 			serializer.read(m_grass_types[i]->m_ground);
 			serializer.read(m_grass_types[i]->m_density);
-			setGrassTypePath(i, path);
+			setGrassTypePath(i, Path(path));
 		}
 		universe.addComponent(m_entity, TERRAIN_HASH, &scene, index);
 	}
