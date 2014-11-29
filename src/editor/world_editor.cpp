@@ -1579,6 +1579,7 @@ struct WorldEditorImpl : public WorldEditor
 			ASSERT(file.getBuffer());
 			m_components.clear();
 			m_components.reserve(5000);
+			Timer* timer = Timer::create(m_allocator);
 			g_log_info.log("editor") << "Parsing universe...";
 			Blob blob(m_allocator);
 			blob.create(file.getBuffer(), file.size());
@@ -1586,6 +1587,7 @@ struct WorldEditorImpl : public WorldEditor
 			blob.read(hash);
 			if (crc32(blob.getData() + sizeof(hash), blob.getBufferSize() - sizeof(hash)) != hash)
 			{
+				Timer::destroy(timer);
 				g_log_error.log("editor") << "Corrupted file.";
 				newUniverse();
 				return;
@@ -1594,7 +1596,8 @@ struct WorldEditorImpl : public WorldEditor
 			{
 				m_template_system->deserialize(blob);
 				m_camera = static_cast<RenderScene*>(m_engine->getScene(crc32("renderer")))->getCameraInSlot("editor").entity;
-				g_log_info.log("editor") << "Universe parsed.";
+				g_log_info.log("editor") << "Universe parsed in " << timer->getTimeSinceStart() << " seconds";
+				Timer::destroy(timer);
 
 				Universe* universe = m_engine->getUniverse();
 				for (int i = 0; i < universe->getEntityCount(); ++i)

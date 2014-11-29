@@ -275,8 +275,7 @@ namespace Lumix
 					serializer.write(m_renderables[i]->m_entity.index);
 					serializer.write(m_renderables[i]->m_scale);
 					serializer.write(m_culling_system->getLayerMask(i));
-					serializer.write(&m_renderables[i]->m_matrix.m11, sizeof(Matrix));
-					serializer.writeString(m_renderables[i]->m_model ? m_renderables[i]->m_model->getPath().c_str() : "");
+					serializer.write(m_renderables[i]->m_model->getPath().getHash());
 				}
 			}
 
@@ -350,9 +349,10 @@ namespace Lumix
 					serializer.read(layer_mask);
 					m_renderables[i]->m_model = NULL;
 					m_renderables[i]->m_entity.universe = &m_universe;
-					serializer.read(&m_renderables[i]->m_matrix.m11, sizeof(Matrix));
-					char path[LUMIX_MAX_PATH];
-					serializer.readString(path, LUMIX_MAX_PATH);
+					m_renderables[i]->m_entity.getMatrix(m_renderables[i]->m_matrix);
+
+					uint32_t path;
+					serializer.read(path);
 					m_culling_system->addStatic(Sphere(m_renderables[i]->m_entity.getPosition(), 1.0f));
 					m_culling_system->setLayerMask(i, layer_mask);
 					setModel(i, static_cast<Model*>(m_engine.getResourceManager().get(ResourceManager::MODEL)->load(Path(path))));
