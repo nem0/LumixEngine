@@ -1,6 +1,7 @@
 #include "core/lumix.h"
 #include "core/path.h"
 
+#include "core/blob.h"
 #include "core/crc32.h"
 #include "core/mt/spin_mutex.h"
 #include "core/path_utils.h"
@@ -28,15 +29,68 @@ namespace Lumix
 	}
 
 
+	void PathManager::serialize(Blob& serializer)
+	{
+		MT::SpinLock lock(m_mutex);
+		serializer.write((int32_t)m_paths.size());
+		for (int i = 0; i < m_paths.size(); ++i)
+		{
+			serializer.writeString(m_paths.at(i)->m_path);
+		}
+	}
+
+
+	void PathManager::deserialize(Blob& serializer)
+	{
+		MT::SpinLock lock(m_mutex);
+		int32_t size;
+		serializer.read(size);
+		for (int i = 0; i < size; ++i)
+		{
+			char path[LUMIX_MAX_PATH];
+			serializer.readString(path, sizeof(path));
+			uint32_t hash = crc32(path);
+			PathInternal* internal = getPathMultithreadUnsafe(hash, path);
+			--internal->m_ref_count;
+		}
+	}
+
+
 	Path::Path()
 	{
 		m_data = g_path_manager.getPath(0, "");
 	}
 
 
+	Path::Path(uint32_t hash)
+	{
+		m_data = g_path_manager.getPath(hash);
+		ASSERT(m_data);
+	}
+
+
+	PathInternal* PathManager::getPath(uint32_t hash)
+	{
+		MT::SpinLock lock(m_mutex);
+		int index = m_paths.find(hash);
+		if (index < 0)
+		{
+			return NULL;
+		}
+		++m_paths.at(index)->m_ref_count;
+		return m_paths.at(index);
+	}
+
+
 	PathInternal* PathManager::getPath(uint32_t hash, const char* path)
 	{
 		MT::SpinLock lock(m_mutex);
+		return getPathMultithreadUnsafe(hash, path);
+	}
+
+
+	PathInternal* PathManager::getPathMultithreadUnsafe(uint32_t hash, const char* path)
+	{
 		int index = m_paths.find(hash);
 		if (index < 0)
 		{
@@ -52,7 +106,6 @@ namespace Lumix
 			++m_paths.at(index)->m_ref_count;
 			return m_paths.at(index);
 		}
-		
 	}
 
 

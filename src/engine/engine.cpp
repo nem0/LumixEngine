@@ -308,6 +308,7 @@ namespace Lumix
 				header.m_version = SerializedEngineVersion::LAST;
 				header.m_reserved = 0;
 				serializer.write(header);
+				g_path_manager.serialize(serializer);
 				m_universe->serialize(serializer);
 				m_hierarchy->serialize(serializer);
 				m_renderer->serialize(serializer);
@@ -333,6 +334,7 @@ namespace Lumix
 					g_log_error.log("engine") << "Unsupported version";
 					return false;
 				}
+				g_path_manager.deserialize(serializer);
 				m_universe->deserialize(serializer);
 				m_hierarchy->deserialize(serializer);
 				m_renderer->deserialize(serializer);

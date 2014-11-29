@@ -9,6 +9,8 @@
 namespace Lumix
 {
 
+	class Blob;
+
 	class PathInternal
 	{
 	public:
@@ -25,8 +27,13 @@ namespace Lumix
 			PathManager();
 			~PathManager();
 
+			void serialize(Blob& serializer);
+			void deserialize(Blob& serializer);
+
 		private:
 			PathInternal* getPath(uint32_t hash, const char* path);
+			PathInternal* getPath(uint32_t hash);
+			PathInternal* getPathMultithreadUnsafe(uint32_t hash, const char* path);
 			void incrementRefCount(PathInternal* path);
 			void decrementRefCount(PathInternal* path);
 
@@ -45,6 +52,7 @@ namespace Lumix
 	public:
 		Path();
 		Path(const Path& rhs);
+		explicit Path(uint32_t hash);
 		explicit Path(const char* path);
 		void operator =(const Path& rhs);
 		void operator =(const char* rhs);
@@ -54,7 +62,8 @@ namespace Lumix
 		
 		operator const char*() const { return m_data->m_path; }
 		operator uint32_t() const { return m_data->m_id; }
-		
+		uint32_t getHash() const { return m_data->m_id; }
+
 		const char* c_str() const { return m_data->m_path; }
 		size_t length() const { return strlen(m_data->m_path); }
 		bool isValid() const { return m_data->m_path[0] != '\0'; }
