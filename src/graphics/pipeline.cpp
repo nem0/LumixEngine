@@ -834,35 +834,36 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 		sortRenderables(m_renderable_infos);
 
+		RenderableInfo& sentinel = m_renderable_infos.pushEmpty();
 		const RenderableInfo* LUMIX_RESTRICT info = &m_renderable_infos[0];
-		const RenderableInfo* LUMIX_RESTRICT end = &m_renderable_infos[0] + m_renderable_infos.size();
+		const RenderableInfo* LUMIX_RESTRICT end = &m_renderable_infos[0] + m_renderable_infos.size() - 1;
+		sentinel.m_key = 0;
 		RenderModelsMeshContext mesh_context;
 		int64_t last_key = 0;
 		while (info != end)
 		{
-			if (last_key != info->m_key)
+			mesh_context.m_mesh = info->m_mesh->m_mesh;
+			if (!setMeshContext(&mesh_context))
 			{
-				mesh_context.m_mesh = info->m_mesh->m_mesh;
-				if (!setMeshContext(&mesh_context))
-				{
-					++info;
-					continue;
-				}
-				bindGeometry(*m_renderer, *info->m_mesh->m_model->getGeometry(), *mesh_context.m_shader);
-				last_key = info->m_key;
+				++info;
+				continue;
 			}
+			bindGeometry(*m_renderer, *info->m_mesh->m_model->getGeometry(), *mesh_context.m_shader);
+			last_key = info->m_key;
+			while (last_key == info->m_key)
+			{
+				const RenderableMesh* LUMIX_RESTRICT renderable_mesh = info->m_mesh;
+				const Matrix& world_matrix = *renderable_mesh->m_matrix;
+				setUniform(mesh_context.m_world_matrix_uniform_location, world_matrix);
 
-			const RenderableMesh* LUMIX_RESTRICT renderable_mesh = info->m_mesh;
-			const Matrix& world_matrix = *renderable_mesh->m_matrix;
-			setUniform(mesh_context.m_world_matrix_uniform_location, world_matrix);
-			
-			if (renderable_mesh->m_pose->getCount() > 0)
-			{
-				setPoseUniform(renderable_mesh, mesh_context);
+				if (renderable_mesh->m_pose->getCount() > 0)
+				{
+					setPoseUniform(renderable_mesh, mesh_context);
+				}
+
+				renderGeometry(mesh_context.m_geometry_start, mesh_context.m_geometry_count);
+				++info;
 			}
-			
-			renderGeometry(mesh_context.m_geometry_start, mesh_context.m_geometry_count);
-			++info;
 		}
 	}
 
