@@ -982,6 +982,11 @@ struct WorldEditorImpl : public WorldEditor
 
 		virtual void tick() override
 		{
+			char fps[100];
+			copyString(fps, sizeof(fps), "FPS: ");
+			toCString(m_engine->getFPS(), fps + strlen(fps), sizeof(fps) - strlen(fps), 1);
+			static_cast<RenderScene*>(m_engine->getScene(crc32("renderer")))->setDebugText(m_fps_text, fps);
+
 			updateGoTo();
 
 			for (int i = 0; i < m_plugins.size(); ++i)
@@ -2126,6 +2131,8 @@ struct WorldEditorImpl : public WorldEditor
 				RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 				scene->setCameraSlot(cmp, string("editor", m_allocator));
 			}
+			RenderScene* scene = static_cast<RenderScene*>(m_engine->getScene(crc32("renderer")));
+			m_fps_text = scene->addDebugText("FPS: 0", 0, 0);
 		}
 
 
@@ -2206,6 +2213,7 @@ struct WorldEditorImpl : public WorldEditor
 		FS::IFile* m_game_mode_file;
 		Engine* m_engine;
 		Entity m_camera;
+		int m_fps_text;
 		DelegateList<void()> m_universe_destroyed;
 		DelegateList<void()> m_universe_created;
 		DelegateList<void()> m_universe_loaded;

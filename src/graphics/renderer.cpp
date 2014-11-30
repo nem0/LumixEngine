@@ -11,6 +11,7 @@
 #include "debug/allocator.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
+#include "graphics/bitmap_font.h"
 #include "graphics/geometry.h"
 #include "graphics/gl_ext.h"
 #include "graphics/irender_device.h"
@@ -46,6 +47,7 @@ struct RendererImpl : public Renderer
 		, m_model_manager(m_allocator)
 		, m_material_manager(m_allocator)
 		, m_shader_manager(m_allocator)
+		, m_font_manager(m_allocator)
 		, m_pipeline_manager(m_allocator)
 	{
 		m_texture_manager.create(ResourceManager::TEXTURE, engine.getResourceManager());
@@ -53,6 +55,7 @@ struct RendererImpl : public Renderer
 		m_material_manager.create(ResourceManager::MATERIAL, engine.getResourceManager());
 		m_shader_manager.create(ResourceManager::SHADER, engine.getResourceManager());
 		m_pipeline_manager.create(ResourceManager::PIPELINE, engine.getResourceManager());
+		m_font_manager.create(ResourceManager::BITMAP_FONT, engine.getResourceManager());
 
 		m_current_pass_hash = crc32("MAIN");
 		m_last_bind_geometry = NULL;
@@ -418,6 +421,7 @@ struct RendererImpl : public Renderer
 	MaterialManager m_material_manager;
 	ShaderManager m_shader_manager;
 	ModelManager m_model_manager;
+	BitmapFontManager m_font_manager;
 	PipelineManager m_pipeline_manager;
 	IRenderDevice* m_render_device;
 	bool m_is_editor_wireframe;
@@ -599,6 +603,10 @@ void renderGeometry(int start, int count)
 	glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, (void*)(start * sizeof(GLint)));
 }
 
+void renderQuadGeometry(int start, int count)
+{
+	glDrawElements(GL_QUADS, count, GL_UNSIGNED_INT, (void*)(start * sizeof(GLint)));
+}
 
 int getUniformLocation(const Shader& shader, int name)
 {
