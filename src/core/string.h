@@ -78,6 +78,14 @@ class base_string
 			return m_cstr[index];
 		}
 
+
+		const T operator[](int index) const
+		{
+			ASSERT(index >= 0 && index < m_size);
+			return m_cstr[index];
+		}
+
+
 		void set(const char* rhs, int size)
 		{
 			if (rhs < m_cstr || rhs >= m_cstr + m_size)

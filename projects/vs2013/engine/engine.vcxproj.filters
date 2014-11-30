@@ -102,6 +102,9 @@
     <ClCompile Include="..\..\..\src\graphics\culling_system.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\graphics\bitmap_font.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\graphics\frame_buffer.h">
@@ -205,6 +208,9 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\universe\hierarchy.h">
       <Filter>universe</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\graphics\bitmap_font.h">
+      <Filter>graphics</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

@@ -10,6 +10,7 @@
 namespace Lumix
 {
 
+	class BitmapFont;
 	class Engine;
 	class Frustum;
 	class Geometry;
@@ -18,6 +19,7 @@ namespace Lumix
 	class Mesh;
 	class Model;
 	class ModelInstance;
+	class Path;
 	class PipelineInstance;
 	class Pose;
 	class Renderer;
@@ -57,6 +59,7 @@ namespace Lumix
 		int m_mesh_copy_count;
 	};
 
+	
 	struct DebugLine
 	{
 		Vec3 m_from;
@@ -84,6 +87,10 @@ namespace Lumix
 			virtual Pose& getPose(const Component& cmp) = 0;
 			virtual Component getLight(int index) = 0;
 
+			virtual int addDebugText(const char* text, int x, int y) = 0;
+			virtual void setDebugText(int id, const char* text) = 0;
+			virtual Geometry& getDebugTextGeomtry() = 0;
+			virtual BitmapFont* getDebugTextFont() = 0;
 			virtual void addDebugLine(const Vec3& from, const Vec3& to, const Vec3& color, float life) = 0;
 			virtual void addDebugCross(const Vec3& center, float size, const Vec3& color, float life) = 0;
 			virtual void addDebugCube(const Vec3& from, const Vec3& max, const Vec3& color, float life) = 0;

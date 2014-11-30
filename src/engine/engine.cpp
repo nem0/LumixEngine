@@ -65,6 +65,7 @@ namespace Lumix
 				, m_mtjd_manager(m_allocator)
 				, m_allocator(allocator)
 				, m_scenes(m_allocator)
+				, m_fps(0)
 			{
 				m_editor = world_editor;
 				if (NULL == file_system)

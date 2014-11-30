@@ -20,6 +20,7 @@
 
 #include "engine/engine.h"
 
+#include "graphics/bitmap_font.h"
 #include "graphics/culling_system.h"
 #include "graphics/geometry.h"
 #include "graphics/irender_device.h"
@@ -44,6 +45,165 @@ namespace Lumix
 	static const uint32_t TERRAIN_HASH = crc32("terrain");
 
 
+	class DebugText
+	{
+		public:
+			DebugText(IAllocator& allocator)
+				: m_text(allocator)
+				//, m_mesh(allocator)
+			{}
+
+		public:
+			string m_text;
+			int m_x;
+			int m_y;
+	};
+
+
+	class DebugTextsData
+	{
+		public:
+			DebugTextsData(IAllocator& allocator, Engine& engine)
+				: m_texts(allocator)
+				, m_allocator(allocator)
+				, m_geometry(allocator)
+				, m_font(NULL)
+				, m_engine(engine)
+			{
+				setFont(Path("fonts/debug_font.fnt"));
+			}
+
+
+			~DebugTextsData()
+			{
+				if (m_font)
+				{
+					m_font->getObserverCb().unbind<DebugTextsData, &DebugTextsData::fontLoaded>(this);
+					m_font->getResourceManager().get(ResourceManager::BITMAP_FONT)->unload(*m_font);
+				}
+			}
+
+			int addText(const char* text, int x, int y)
+			{
+				int id = m_texts.size() == 0 ? 0 : m_texts.getKey(m_texts.size() - 1) + 1;
+				DebugText debug_text(m_allocator);
+				debug_text.m_x = x;
+				debug_text.m_y = y;
+				int index = m_texts.insert(id, debug_text);
+				m_texts.at(index).m_text = text;
+				generate();
+				return id;
+			}
+
+
+			void setText(int id, const char* text)
+			{
+				int index = m_texts.find(id);
+				if (index < 0)
+				{
+					return;
+				}
+				m_texts.at(index).m_text = text;
+				generate();
+			}
+
+
+			Geometry& getGeometry() { return m_geometry; }
+
+
+			BitmapFont* getFont() const { return m_font; }
+
+
+			void setFont(const Path& path)
+			{
+				m_font = static_cast<BitmapFont*>(m_engine.getResourceManager().get(ResourceManager::BITMAP_FONT)->load(path));
+				m_font->onLoaded<DebugTextsData, &DebugTextsData::fontLoaded>(this);
+			}
+
+			
+			void fontLoaded(Resource::State, Resource::State new_state)
+			{
+				if (new_state == Resource::State::READY)
+				{
+					generate();
+				}
+			}
+
+
+			void generate()
+			{
+				if (!m_font || !m_font->isReady())
+				{
+					return;
+				}
+				int count = 0;
+				for (int i = 0; i < m_texts.size(); ++i)
+				{
+					count += m_texts.at(i).m_text.length() << 2;
+				}
+				VertexDef vertex_definition;
+				vertex_definition.parse("f2f2", 4);
+				Array<int> indices(m_allocator);
+				Array<float> data(m_allocator);
+				indices.reserve(count);
+				data.reserve(count * 4);
+
+				int index = 0; 
+				for (int i = 0; i < m_texts.size(); ++i)
+				{
+					const DebugText& text = m_texts.at(i);
+					float x = (float)text.m_x;
+					float y = (float)text.m_y;
+					for (int j = 0; j < text.m_text.length(); ++j)
+					{
+						const BitmapFont::Character* c = m_font->getCharacter(text.m_text[j]);
+
+						if (c)
+						{
+							indices.push(index);
+							data.push(x);
+							data.push(y);
+							data.push(c->m_left);
+							data.push(c->m_bottom);
+							++index;
+
+							indices.push(index);
+							data.push(x + c->m_pixel_w);
+							data.push(y);
+							data.push(c->m_right);
+							data.push(c->m_bottom);
+							++index;
+
+							indices.push(index);
+							data.push(x + c->m_pixel_w);
+							data.push(y + c->m_pixel_h);
+							data.push(c->m_right);
+							data.push(c->m_top);
+							++index;
+
+							indices.push(index);
+							data.push(x);
+							data.push(y + c->m_pixel_h);
+							data.push(c->m_left);
+							data.push(c->m_top);
+							++index;
+
+							x += c->m_x_advance;
+						}
+					}
+					m_geometry.copy((const uint8_t*)&data[0], sizeof(data[0]) * data.size(), indices, vertex_definition);
+				}
+			}
+
+		private:
+			IAllocator& m_allocator;
+			Engine& m_engine;
+			AssociativeArray<int, DebugText> m_texts;
+			Geometry m_geometry;
+			BitmapFont* m_font;
+	};
+
+
 	struct Renderable
 	{
 		Renderable(IAllocator& allocator) : m_pose(allocator), m_meshes(allocator) {}
@@ -60,6 +220,7 @@ namespace Lumix
 		private:
 			Renderable(const Renderable&);
 	};
+
 
 	struct Light
 	{
@@ -79,6 +240,7 @@ namespace Lumix
 		bool m_is_free;
 	};
 
+
 	struct Camera
 	{
 		static const int MAX_SLOT_LENGTH = 30;
@@ -94,6 +256,7 @@ namespace Lumix
 		bool m_is_free;
 		char m_slot[MAX_SLOT_LENGTH + 1];
 	};
+
 
 	class RenderSceneImpl : public RenderScene
 	{
@@ -146,10 +309,12 @@ namespace Lumix
 				, m_temporary_infos(m_allocator)
 				, m_sync_point(true, m_allocator)
 				, m_jobs(m_allocator)
+				, m_debug_texts(m_allocator, engine)
 			{
 				m_universe.entityMoved().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 				m_timer = Timer::create(m_allocator);
 				m_culling_system = CullingSystem::create(m_engine.getMTJDManager(), m_allocator);
+			
 			}
 
 			~RenderSceneImpl()
@@ -1045,10 +1210,12 @@ namespace Lumix
 				return m_cameras[camera.index].m_width;
 			}
 
+
 			virtual float getCameraHeight(Component camera) override
 			{
 				return m_cameras[camera.index].m_height;
 			}
+
 
 			virtual void setCameraSize(Component camera, int w, int h) override
 			{
@@ -1057,10 +1224,36 @@ namespace Lumix
 				m_cameras[camera.index].m_aspect = w / (float)h;
 			}
 
+
 			virtual const Array<DebugLine>& getDebugLines() const override
 			{
 				return m_debug_lines;
 			}
+
+
+			virtual int addDebugText(const char* text, int x, int y) override
+			{
+				return m_debug_texts.addText(text, x, y);
+			}
+
+
+			virtual void setDebugText(int id, const char* text) override
+			{
+				return m_debug_texts.setText(id, text);
+			}
+
+
+			virtual Geometry& getDebugTextGeomtry() override
+			{
+				return m_debug_texts.getGeometry();
+			}
+
+
+			virtual BitmapFont* getDebugTextFont() override
+			{
+				return m_debug_texts.getFont();
+			}
+
 
 			virtual void addDebugCube(const Vec3& min, const Vec3& max, const Vec3& color, float life) override
 			{
@@ -1377,6 +1570,7 @@ namespace Lumix
 			Renderer& m_renderer;
 			Engine& m_engine;
 			Array<DebugLine> m_debug_lines;
+			DebugTextsData m_debug_texts;
 			Timer* m_timer;
 			Component m_applied_camera;
 			CullingSystem* m_culling_system;

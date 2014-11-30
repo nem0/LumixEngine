@@ -75,7 +75,9 @@ namespace Lumix
 	{
 		dependent_resource.m_cb.bind<Resource, &Resource::onStateChanged>(this);
 		if (!dependent_resource.isReady())
+		{
 			incrementDepCount();
+		}
 	}
 
 	void Resource::removeDependency(Resource& dependent_resource)

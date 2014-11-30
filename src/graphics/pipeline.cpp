@@ -13,6 +13,7 @@
 #include "core/string.h"
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
+#include "graphics/bitmap_font.h"
 #include "graphics/frame_buffer.h"
 #include "graphics/geometry.h"
 #include "graphics/gl_ext.h"
@@ -177,6 +178,15 @@ struct RenderDebugLinesCommand : public Command
 };
 
 
+struct RenderDebugTextsCommand : public Command
+{
+	RenderDebugTextsCommand(IAllocator&) {}
+
+	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
+	virtual void execute(PipelineInstanceImpl& pipeline) override;
+};
+
+
 struct BindFramebufferTextureCommand : public Command
 {
 	BindFramebufferTextureCommand(IAllocator& allocator)
@@ -263,6 +273,7 @@ struct PipelineImpl : public Pipeline
 		addCommandCreator("render_shadowmap").bind<&CreateCommand<RenderShadowmapCommand> >();
 		addCommandCreator("bind_shadowmap").bind<&CreateCommand<BindShadowmapCommand> >();
 		addCommandCreator("render_debug_lines").bind<&CreateCommand<RenderDebugLinesCommand> >();
+		addCommandCreator("render_debug_texts").bind<&CreateCommand<RenderDebugTextsCommand> >();
 		addCommandCreator("polygon_mode").bind<&CreateCommand<PolygonModeCommand> >();
 		addCommandCreator("set_pass").bind<&CreateCommand<SetPassCommand> >();
 	}
@@ -584,6 +595,31 @@ struct PipelineInstanceImpl : public PipelineInstance
 			bindGeometry(*m_renderer, *geometry, *shader);
 			renderGeometry(0, 6);
 		}
+	}
+
+
+	void renderDebugTexts()
+	{
+		BitmapFont* font = m_scene->getDebugTextFont();
+		if (!font || !font->isReady())
+		{
+			return;
+		}
+		m_renderer->cleanup();
+		Matrix projection_matrix;
+		Renderer::getOrthoMatrix(0, (float)m_width, 0, (float)m_height, 0, 10, &projection_matrix);
+		m_renderer->setProjectionMatrix(projection_matrix);
+		m_renderer->setViewMatrix(Matrix::IDENTITY);
+
+		Geometry& geometry = m_scene->getDebugTextGeomtry();
+		font->getMaterial()->apply(*m_renderer, *this);
+		bindGeometry(*m_renderer, geometry, *font->getMaterial()->getShader());
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glDisable(GL_DEPTH_TEST);
+		renderQuadGeometry(0, geometry.getIndices().size());
+		glDisable(GL_BLEND);
+		glEnable(GL_DEPTH_TEST);
 	}
 
 
@@ -1029,6 +1065,17 @@ void RenderDebugLinesCommand::deserialize(PipelineImpl&, JsonSerializer&)
 void RenderDebugLinesCommand::execute(PipelineInstanceImpl& pipeline)
 {
 	pipeline.renderDebugLines();
+}
+
+
+void RenderDebugTextsCommand::deserialize(PipelineImpl&, JsonSerializer&)
+{
+}
+
+
+void RenderDebugTextsCommand::execute(PipelineInstanceImpl& pipeline)
+{
+	pipeline.renderDebugTexts();
 }
 
 

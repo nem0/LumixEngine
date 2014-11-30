@@ -76,6 +76,7 @@ void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, f
 void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Matrix& mtx);
 void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Matrix* matrices, int count);
 void renderGeometry(int start, int count);
+void renderQuadGeometry(int start, int count);
 void bindGeometry(Renderer& renderer, Geometry& geometry, Shader& shader);
 int getUniformLocation(const Shader& shader, int name);
 void setUniform(int location, const Matrix& mtx);
