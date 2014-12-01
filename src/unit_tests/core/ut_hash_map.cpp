@@ -9,6 +9,20 @@ namespace
 		Lumix::HashMap<int32_t, int32_t> hash_table;
 
 		LUMIX_EXPECT_TRUE(hash_table.empty());
+
+		size_t values[10] = {
+			1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+		};
+
+		for (size_t val : values)
+		{
+			hash_table.insert(val, val);
+		}
+
+		for (size_t val : values)
+		{
+			LUMIX_EXPECT_EQ(hash_table[val], val);
+		}
 	};
 }
 
