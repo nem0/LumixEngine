@@ -107,6 +107,8 @@ namespace Lumix
 				m_resource_manager.get(ResourceManager::MODEL)->releaseAll();
 				m_resource_manager.get(ResourceManager::PIPELINE)->releaseAll();
 
+				CullingSystem::destroy(*m_culling_system);
+
 				Timer::destroy(m_timer);
 				Timer::destroy(m_fps_timer);
 				m_plugin_manager.destroy();
