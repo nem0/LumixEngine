@@ -5,7 +5,7 @@
 namespace Lumix
 {
 	template<class T, int32_t chunk_size>
-	class FreeList
+	class FreeList : public IAllocator
 	{
 	public:
 		explicit FreeList(IAllocator& allocator)
@@ -25,58 +25,16 @@ namespace Lumix
 			m_allocator.deallocate(m_heap);
 		}
 
-		LUMIX_FORCE_INLINE T* alloc(void)
+		void* allocate(size_t size) override
 		{
-			T* p = NULL;
-			if (m_pool_index > 0)
-			{
-				p = m_pool[--m_pool_index];
-				new (p) T();
-			}
-			return p;
+			ASSERT(size == sizeof(T));
+			return m_pool_index > 0 ? m_pool[--m_pool_index] : NULL;
 		}
 
-		template<typename P1>
-		LUMIX_FORCE_INLINE T* alloc(P1 p1)
+		void deallocate(void* ptr) override
 		{
-			T* p = NULL;
-			if (m_pool_index > 0)
-			{
-				p = m_pool[--m_pool_index];
-				new (p) T(p1);
-			}
-			return p;
-		}
-
-		template<typename P1, typename P2>
-		LUMIX_FORCE_INLINE T* alloc(P1 p1, P2 p2)
-		{
-			T* p = NULL;
-			if (m_pool_index > 0)
-			{
-				p = m_pool[--m_pool_index];
-				new (p) T(p1, p2);
-			}
-			return p;
-		}
-
-		template<typename P1, typename P2, typename P3>
-		LUMIX_FORCE_INLINE T* alloc(P1 p1, P2 p2, P3 p3)
-		{
-			T* p = NULL;
-			if (m_pool_index > 0)
-			{
-				p = m_pool[--m_pool_index];
-				new (p) T(p1, p2, p3);
-			}
-			return p;
-		}
-
-		LUMIX_FORCE_INLINE void release(T* p)
-		{
-			ASSERT (((uintptr_t)p >= (uintptr_t)&m_heap[0]) && ((uintptr_t)p < (uintptr_t)&m_heap[chunk_size]));
-			p->~T();
-			m_pool[m_pool_index++] = p;
+			ASSERT(((uintptr_t)ptr >= (uintptr_t)&m_heap[0]) && ((uintptr_t)ptr < (uintptr_t)&m_heap[chunk_size]));
+			m_pool[m_pool_index++] = reinterpret_cast<T*>(ptr);
 		}
 
 	private:
@@ -100,12 +58,12 @@ namespace Lumix
 			}
 		}
 
-		LUMIX_FORCE_INLINE int32_t alloc(void)
+		int32_t alloc(void)
 		{
 			return m_pool_index > 0 ? m_pool[--m_pool_index] : (-1);
 		}
 
-		LUMIX_FORCE_INLINE void release(int32_t id)
+		void release(int32_t id)
 		{
 			ASSERT (id >= 0 && id < chunk_size);
 			m_pool[m_pool_index++] = id;
