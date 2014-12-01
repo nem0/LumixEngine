@@ -161,14 +161,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\src\core\new.cpp" />
     <ClCompile Include="..\..\..\src\physics\physics_scene.cpp" />
     <ClCompile Include="..\..\..\src\physics\physics_system.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\physics\physics_scene.h" />
     <ClInclude Include="..\..\..\src\physics\physics_system.h" />
-    <ClInclude Include="..\..\..\src\physics\physics_system_impl.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -40,8 +40,9 @@ namespace Lumix
 		class WorkerTask : public MT::Task
 		{
 		public:
-			WorkerTask(TransQueue* tests_todo)
-				: m_tests_todo(tests_todo)
+			WorkerTask(TransQueue* tests_todo, IAllocator& allocator)
+				: MT::Task(allocator)
+				, m_tests_todo(tests_todo)
 			{
 			}
 
@@ -116,13 +117,20 @@ namespace Lumix
 					if(i < c)
 					{
 						UnitTestPair& pair = m_unit_tests[i];
-						AsynTest* test = m_trans_queue.alloc(true);
-						test->data.name = pair.name;
-						test->data.func = pair.func;
-						test->data.parameters = pair.parameters;
-						i++;
-						m_trans_queue.push(test, true);
-						m_in_progress.push(test);
+						AsynTest* test = m_trans_queue.alloc(false);
+						if (test)
+						{
+							test->data.name = pair.name;
+							test->data.func = pair.func;
+							test->data.parameters = pair.parameters;
+							i++;
+							m_trans_queue.push(test, true);
+							m_in_progress.push(test);
+						}
+						else
+						{
+							Lumix::MT::yield();
+						}
 					}
 
 					// fatal error occured. We need to respawn task.
@@ -179,9 +187,14 @@ namespace Lumix
 				m_task.run();
 			}
 
-			ManagerImpl()
+			ManagerImpl(IAllocator& allocator)
 				: m_fails(0)
-				, m_task(&m_trans_queue)
+				, m_task(&m_trans_queue, allocator)
+				, m_in_progress(allocator)
+				, m_trans_queue(allocator)
+				, m_allocator(allocator)
+				, m_unit_tests(allocator)
+				, m_failed_tests(allocator)
 			{
 			}
 
@@ -190,7 +203,10 @@ namespace Lumix
 				m_task.destroy();
 			}
 
+			IAllocator& getAllocator() { return m_allocator; }
+
 		private:
+			IAllocator& m_allocator;
 			uint32_t m_fails;
 
 			UnitTestTable	m_unit_tests;
@@ -226,14 +242,14 @@ namespace Lumix
 			m_impl->handleFail(file_name, line);
 		}
 
-		Manager::Manager()
+		Manager::Manager(IAllocator& allocator)
 		{
-			m_impl = LUMIX_NEW(ManagerImpl)();
+			m_impl = allocator.newObject<ManagerImpl>(allocator);
 		}
 
 		Manager::~Manager()
 		{
-			LUMIX_DELETE(m_impl);
+			m_impl->getAllocator().deleteObject(m_impl);
 		}
 	} //~UnitTest
 } //~UnitTest

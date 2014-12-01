@@ -3,20 +3,20 @@
 
 #include <cstdlib>
 #include <new>
-#include "core/default_allocator.h"
+#include "core/iallocator.h"
 
 
 
 namespace Lumix
 {
 
-template <typename T, typename Allocator = DefaultAllocator, bool is_trivially_copyable = std::is_trivial<T>::value > class Array;
+template <typename T, bool is_trivially_copyable = std::is_trivial<T>::value > class Array;
 
-template <typename T, typename Allocator>
-class Array<T, Allocator, false>
+template <typename T>
+class Array<T, false>
 {
 	public:
-		explicit Array(const Allocator& allocator)
+		explicit Array(IAllocator& allocator)
 			: m_allocator(allocator)
 		{
 			m_data = NULL;
@@ -25,6 +25,7 @@ class Array<T, Allocator, false>
 		}
 	
 		explicit Array(const Array& rhs)
+			: m_allocator(rhs.m_allocator)
 		{
 			m_data = NULL;
 			m_capacity = 0;
@@ -48,17 +49,22 @@ class Array<T, Allocator, false>
 			}
 		}
 
-		Array()
-		{
-			m_data = NULL;
-			m_capacity = 0;
-			m_size = 0;
-		}
-
 		~Array()
 		{
 			callDestructors(m_data, m_data + m_size);
 			m_allocator.deallocate(m_data);
+		}
+
+		int indexOf(const T& item)
+		{
+			for (int i = 0; i < m_size; ++i)
+			{
+				if (m_data[i] == item)
+				{
+					return i;
+				}
+			}
+			return -1;
 		}
 
 		void eraseItemFast(const T& item)
@@ -98,15 +104,27 @@ class Array<T, Allocator, false>
 			}
 		}
 
+
+		void insert(int index, const T& value)
+		{
+			if (m_size == m_capacity)
+			{
+				grow();
+			}
+			memmove(m_data + index + 1, m_data + index, sizeof(T) * (m_size - index));
+			new (&m_data[index]) T(value);
+			++m_size;
+		}
+
+
 		void erase(int index)
 		{
 			if(index >= 0 && index < m_size)
 			{
 				m_data[index].~T();
-				for(int i = index + 1; i < m_size; ++i)
+				if(index < m_size - 1)
 				{
-					new ((char*)(m_data + i - 1)) T(m_data[i]);
-					m_data[i].~T();
+					memmove(m_data + index, m_data + index + 1, sizeof(T) * (m_size - index - 1));
 				}
 				--m_size;
 			}
@@ -114,16 +132,18 @@ class Array<T, Allocator, false>
 
 		void push(const T& value)
 		{
-			if(m_size == m_capacity)
+			int size = m_size;
+			if (size == m_capacity)
 			{
 				grow();
 			}
-			new ((char*)(m_data+m_size)) T(value);
-			++m_size;
+			new ((char*)(m_data + size)) T(value);
+			++size;
+			m_size = size;
 		}
 
 		template<typename P1, typename... Params>
-		void emplace(const P1& p1, Params... params)
+		T& emplace(const P1& p1, Params... params)
 		{
 			if (m_size == m_capacity)
 			{
@@ -131,6 +151,19 @@ class Array<T, Allocator, false>
 			}
 			new ((char*)(m_data + m_size)) T(p1, params...);
 			++m_size;
+			return m_data[m_size - 1];
+		}
+
+		template<typename P1, typename... Params>
+		T& emplace(P1& p1, Params... params)
+		{
+			if (m_size == m_capacity)
+			{
+				grow();
+			}
+			new ((char*)(m_data + m_size)) T(p1, params...);
+			++m_size;
+			return m_data[m_size - 1];
 		}
 
 		bool empty() const { return m_size == 0; }
@@ -189,9 +222,12 @@ class Array<T, Allocator, false>
 
 		void reserve(int capacity)
 		{
-			if(capacity > m_capacity)
+			if (capacity > m_capacity)
 			{
-				m_data = (T*)m_allocator.reallocate(m_data, capacity * sizeof(T));
+				T* newData = (T*)m_allocator.allocate(capacity * sizeof(T));
+				memcpy(newData, m_data, sizeof(T)* m_size);
+				m_allocator.deallocate(m_data);
+				m_data = newData;
 				m_capacity = capacity;
 			}
 		}
@@ -202,12 +238,13 @@ class Array<T, Allocator, false>
 		int capacity() const { return m_capacity; }
 
 	private:
-		void* operator &() { return 0; }
-
 		void grow()
 		{
 			int newCapacity = m_capacity == 0 ? 4 : m_capacity * 2;
-			m_data = (T*)m_allocator.reallocate(m_data, newCapacity * sizeof(T));
+			T* new_data = (T*)m_allocator.allocate(newCapacity * sizeof(T));
+			memcpy(new_data, m_data, sizeof(T) * m_size);
+			m_allocator.deallocate(m_data);
+			m_data = new_data;
 			m_capacity = newCapacity;
 		}
 
@@ -220,19 +257,19 @@ class Array<T, Allocator, false>
 		}
 
 	private:
+		IAllocator& m_allocator;
 		int m_capacity;
 		int m_size;
 		T* m_data;
-		Allocator m_allocator;
 };
 
 
 
-template <typename T, typename Allocator>
-class Array<T, Allocator, true>
+template <typename T>
+class Array<T, true>
 {
 public:
-	explicit Array(const Allocator& allocator)
+	explicit Array(IAllocator& allocator)
 		: m_allocator(allocator)
 	{
 		m_data = NULL;
@@ -241,6 +278,7 @@ public:
 	}
 
 	explicit Array(const Array& rhs)
+		: m_allocator(rhs.m_allocator)
 	{
 		m_data = NULL;
 		m_capacity = 0;
@@ -260,12 +298,6 @@ public:
 		}
 	}
 
-	Array()
-	{
-		m_data = NULL;
-		m_capacity = 0;
-		m_size = 0;
-	}
 
 	~Array()
 	{
@@ -273,8 +305,10 @@ public:
 	}
 
 
-	void swap(Array<T, Allocator, true>& rhs)
+	void swap(Array<T, true>& rhs)
 	{
+		ASSERT(&rhs.m_allocator == &m_allocator);
+
 		int i = rhs.m_capacity;
 		rhs.m_capacity = m_capacity;
 		m_capacity = i;
@@ -286,10 +320,18 @@ public:
 		T* p = rhs.m_data;
 		rhs.m_data = m_data;
 		m_data = p;
+	}
 
-		Allocator a = rhs.m_allocator;
-		rhs.m_allocator = m_allocator;
-		m_allocator = a;
+	int indexOf(const T& item)
+	{
+		for (int i = 0; i < m_size; ++i)
+		{
+			if (m_data[i] == item)
+			{
+				return i;
+			}
+		}
+		return -1;
 	}
 
 	void eraseFast(int index)
@@ -345,7 +387,7 @@ public:
 		{
 			grow();
 		}
-		memmove(m_data + index + 1, m_data + index, m_size - index);
+		memmove(m_data + index + 1, m_data + index, sizeof(T) * (m_size - index));
 		m_data[index] = value;
 		++m_size;
 	}
@@ -353,12 +395,14 @@ public:
 
 	void push(const T& value)
 	{
-		if (m_size == m_capacity)
+		int size = m_size;
+		if (size == m_capacity)
 		{
 			grow();
 		}
-		m_data[m_size] = value;
-		++m_size;
+		m_data[size] = value;
+		++size;
+		m_size = size;
 	}
 
 	bool empty() const { return m_size == 0; }
@@ -414,7 +458,7 @@ public:
 		if (capacity > m_capacity)
 		{
 			T* newData = (T*)m_allocator.allocate(capacity * sizeof(T));
-			memmove(newData, m_data, sizeof(T)* m_size);
+			memcpy(newData, m_data, sizeof(T)* m_size);
 			m_allocator.deallocate(m_data);
 			m_data = newData;
 			m_capacity = capacity;
@@ -427,20 +471,21 @@ public:
 	int capacity() const { return m_capacity; }
 
 private:
-	void* operator &() { return 0; }
-
 	void grow()
 	{
 		int newCapacity = m_capacity == 0 ? 4 : m_capacity * 2;
-		m_data = (T*)m_allocator.reallocate(m_data, newCapacity * sizeof(T));
+		T* new_data = (T*)m_allocator.allocate(newCapacity * sizeof(T));
+		memcpy(new_data, m_data, sizeof(T) * m_size);
+		m_allocator.deallocate(m_data);
+		m_data = new_data;
 		m_capacity = newCapacity;
 	}
 
 private:
+	IAllocator& m_allocator;
 	int m_capacity;
 	int m_size;
 	T* m_data;
-	Allocator m_allocator;
 };
 
 

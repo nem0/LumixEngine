@@ -14,6 +14,7 @@ namespace Lumix
 			~IFileDevice() {}
 
 			virtual IFile* createFile(IFile* child) = 0;
+			virtual void destroyFile(IFile* file) = 0;
 
 			virtual const char* name() const = 0;
 		};

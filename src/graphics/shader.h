@@ -11,15 +11,16 @@ namespace FS
 	class IFile;
 }
 
-struct Vec3;
 struct Matrix;
+struct Vec3;
+class Renderer;
+
 
 class LUMIX_ENGINE_API Shader : public Resource
 {
 	public:
 		enum class FixedCachedUniforms : int
 		{
-			WORLD_MATRIX,
 			GRASS_MATRICES,
 			MORPH_CONST,
 			QUAD_SIZE,
@@ -33,6 +34,12 @@ class LUMIX_ENGINE_API Shader : public Resource
 			VIEW_MATRIX,
 			PROJECTION_MATRIX,
 			SHADOWMAP_SPLITS,
+			SHADOW_MATRIX0,
+			SHADOW_MATRIX1,
+			SHADOW_MATRIX2,
+			SHADOW_MATRIX3,
+
+			WORLD_MATRIX, // keep this before count
 			COUNT
 		};
 	
@@ -40,7 +47,7 @@ class LUMIX_ENGINE_API Shader : public Resource
 		static const int MAX_ATTRIBUTE_COUNT = 16;
 
 	public:
-		Shader(const Path& path, ResourceManager& resource_manager);
+		Shader(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator);
 		~Shader();
 
 		GLint getAttribId(int index) const { return m_current_combination->m_vertex_attributes_ids[index]; }
@@ -64,6 +71,11 @@ class LUMIX_ENGINE_API Shader : public Resource
 		class Combination
 		{
 			public:
+				Combination(IAllocator& allocator)
+					: m_defines(allocator)
+					, m_uniforms(allocator)
+				{ }
+
 				GLuint	m_program_id;
 				GLuint	m_vertex_id;
 				GLuint	m_fragment_id;
@@ -84,6 +96,7 @@ class LUMIX_ENGINE_API Shader : public Resource
 		virtual FS::ReadCallback getReadCallback() override;
 
 	private:
+		IAllocator&			m_allocator;
 		Array<string>		m_attributes;
 		Array<string>		m_passes;
 		Array<uint32_t>		m_pass_hashes;
@@ -91,6 +104,7 @@ class LUMIX_ENGINE_API Shader : public Resource
 		Combination*		m_current_combination;
 		bool				m_is_shadowmap_required;
 		string				m_source;
+		Renderer&			m_renderer;
 };
 
 

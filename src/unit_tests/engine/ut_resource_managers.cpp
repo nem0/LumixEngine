@@ -33,17 +33,18 @@ namespace
 
 	void UT_material_manager(const char* params)
 	{
-		Lumix::FS::FileSystem* file_system = Lumix::FS::FileSystem::create();
+		Lumix::DefaultAllocator allocator;
+		Lumix::FS::FileSystem* file_system = Lumix::FS::FileSystem::create(allocator);
 
-		Lumix::FS::MemoryFileDevice mem_file_device;
-		Lumix::FS::DiskFileDevice disk_file_device;
+		Lumix::FS::MemoryFileDevice mem_file_device(allocator);
+		Lumix::FS::DiskFileDevice disk_file_device(allocator);
 
 		file_system->mount(&mem_file_device);
 		file_system->mount(&disk_file_device);
 		file_system->setDefaultDevice("memory:disk");
 
-		Lumix::ResourceManager resource_manager;
-		Lumix::TextureManager texture_manager;
+		Lumix::ResourceManager resource_manager(allocator);
+		Lumix::TextureManager texture_manager(allocator);
 		resource_manager.create(*file_system);
 		texture_manager.create(Lumix::ResourceManager::TEXTURE, resource_manager);
 
@@ -154,7 +155,6 @@ namespace
 		LUMIX_EXPECT_TRUE(texture_fail->isFailure());
 
 		// exit
-		texture_manager.releaseAll();
 		texture_manager.destroy();
 		resource_manager.destroy();
 
@@ -170,17 +170,18 @@ namespace
 
 	void UT_animation_manager(const char* params)
 	{
-		Lumix::FS::FileSystem* file_system = Lumix::FS::FileSystem::create();
+		Lumix::DefaultAllocator allocator;
+		Lumix::FS::FileSystem* file_system = Lumix::FS::FileSystem::create(allocator);
 
-		Lumix::FS::MemoryFileDevice mem_file_device;
-		Lumix::FS::DiskFileDevice disk_file_device;
+		Lumix::FS::MemoryFileDevice mem_file_device(allocator);
+		Lumix::FS::DiskFileDevice disk_file_device(allocator);
 
 		file_system->mount(&mem_file_device);
 		file_system->mount(&disk_file_device);
 		file_system->setDefaultDevice("memory:disk");
 
-		Lumix::ResourceManager resource_manager;
-		Lumix::AnimationManager animation_manager;
+		Lumix::ResourceManager resource_manager(allocator);
+		Lumix::AnimationManager animation_manager(allocator);
 		resource_manager.create(*file_system);
 		animation_manager.create(Lumix::ResourceManager::ANIMATION, resource_manager);
 
@@ -278,7 +279,6 @@ namespace
 		LUMIX_EXPECT_TRUE(animation_fail->isFailure());
 
 		// exit
-		animation_manager.releaseAll();
 		animation_manager.destroy();
 		resource_manager.destroy();
 
@@ -296,17 +296,18 @@ namespace
 
 	void UT_failure_reload(const char* params)
 	{
-		Lumix::FS::FileSystem* file_system = Lumix::FS::FileSystem::create();
+		Lumix::DefaultAllocator allocator;
+		Lumix::FS::FileSystem* file_system = Lumix::FS::FileSystem::create(allocator);
 
-		Lumix::FS::MemoryFileDevice mem_file_device;
-		Lumix::FS::DiskFileDevice disk_file_device;
+		Lumix::FS::MemoryFileDevice mem_file_device(allocator);
+		Lumix::FS::DiskFileDevice disk_file_device(allocator);
 
 		file_system->mount(&mem_file_device);
 		file_system->mount(&disk_file_device);
 		file_system->setDefaultDevice("memory:disk");
 
-		Lumix::ResourceManager resource_manager;
-		Lumix::AnimationManager animation_manager;
+		Lumix::ResourceManager resource_manager(allocator);
+		Lumix::AnimationManager animation_manager(allocator);
 		resource_manager.create(*file_system);
 		animation_manager.create(Lumix::ResourceManager::ANIMATION, resource_manager);
 
@@ -401,7 +402,6 @@ namespace
 
 
 		// exit
-		animation_manager.releaseAll();
 		animation_manager.destroy();
 		resource_manager.destroy();
 

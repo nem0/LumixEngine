@@ -8,12 +8,14 @@
 
 namespace Lumix
 {
+	class IAllocator;
+
 	namespace MTJD
 	{
 		class WorkerTask : public MT::Task
 		{
 		public:
-			WorkerTask();
+			WorkerTask(IAllocator& allocator);
 			~WorkerTask();
 
 			bool create(const char* name, Manager* manager, Manager::JobTransQueue* trans_queue);

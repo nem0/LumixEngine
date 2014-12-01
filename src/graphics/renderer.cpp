@@ -8,18 +8,23 @@
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "core/vec4.h"
+#include "debug/allocator.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "graphics/geometry.h"
 #include "graphics/gl_ext.h"
 #include "graphics/irender_device.h"
 #include "graphics/material.h"
+#include "graphics/material_manager.h"
 #include "graphics/model.h"
 #include "graphics/model_instance.h"
+#include "graphics/model_manager.h"
 #include "graphics/pipeline.h"
 #include "graphics/render_scene.h"
 #include "graphics/shader.h"
+#include "graphics/shader_manager.h"
 #include "graphics/texture.h"
+#include "graphics/texture_manager.h"
 #include "universe/universe.h"
 
 
@@ -34,18 +39,70 @@ static const uint32_t CAMERA_HASH = crc32("camera");
 
 struct RendererImpl : public Renderer
 {
-	RendererImpl()
+	RendererImpl(Engine& engine)
+		: m_engine(engine)
+		, m_allocator(engine.getAllocator())
+		, m_texture_manager(m_allocator)
+		, m_model_manager(m_allocator)
+		, m_material_manager(m_allocator)
+		, m_shader_manager(m_allocator)
+		, m_pipeline_manager(m_allocator)
 	{
+		m_texture_manager.create(ResourceManager::TEXTURE, engine.getResourceManager());
+		m_model_manager.create(ResourceManager::MODEL, engine.getResourceManager());
+		m_material_manager.create(ResourceManager::MATERIAL, engine.getResourceManager());
+		m_shader_manager.create(ResourceManager::SHADER, engine.getResourceManager());
+		m_pipeline_manager.create(ResourceManager::PIPELINE, engine.getResourceManager());
+
 		m_current_pass_hash = crc32("MAIN");
 		m_last_bind_geometry = NULL;
 		m_last_program_id = 0xffffFFFF;
 		m_is_editor_wireframe = false;
 	}
 
-	virtual IScene* createScene(Universe& universe)
+	~RendererImpl()
 	{
-		return RenderScene::createInstance(*this, *m_engine, universe);
+		m_texture_manager.destroy();
+		m_model_manager.destroy();
+		m_material_manager.destroy();
+		m_shader_manager.destroy();
+		m_pipeline_manager.destroy();
 	}
+
+	virtual int getGLSLVersion() const override
+	{
+		int version = 0;
+		const GLubyte* version_str = glGetString(GL_SHADING_LANGUAGE_VERSION);
+		if(version_str)
+		{
+			for(int i = 0; i < 2; ++i)
+			{
+				while(*version_str >= '0' && *version_str <= '9')
+				{
+					version *= 10;
+					version += *version_str - '0';
+					++version_str;
+				}
+				if(*version_str == '.')
+				{
+					++version_str;
+				}
+			}
+		}
+		return version;
+	}
+
+	virtual IScene* createScene(Universe& universe) override
+	{
+		return RenderScene::createInstance(*this, m_engine, universe, m_allocator);
+	}
+
+
+	virtual void destroyScene(IScene* scene) override
+	{
+		RenderScene::destroyInstance(static_cast<RenderScene*>(scene));
+	}
+
 
 	virtual void setViewMatrix(const Matrix& matrix) override
 	{
@@ -205,86 +262,6 @@ struct RendererImpl : public Renderer
 	}
 
 
-	virtual void setFixedCachedUniform(const Shader& shader, int name, const Vec3& value) override
-	{
-		PROFILE_FUNCTION();
-		GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
-		if (loc >= 0)
-		{
-			if (m_last_program_id != shader.getProgramId())
-			{
-				glUseProgram(shader.getProgramId());
-				m_last_program_id = shader.getProgramId();
-			}
-			glUniform3f(loc, value.x, value.y, value.z);
-		}
-	}
-
-	virtual void setFixedCachedUniform(const Shader& shader, int name, const Vec4& value) override
-	{
-		PROFILE_FUNCTION();
-		GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
-		if (loc >= 0)
-		{
-			if (m_last_program_id != shader.getProgramId())
-			{
-				glUseProgram(shader.getProgramId());
-				m_last_program_id = shader.getProgramId();
-			}
-			glUniform4f(loc, value.x, value.y, value.z, value.w);
-		}
-	}
-
-	virtual void setFixedCachedUniform(const Shader& shader, int name, float value) override
-	{
-		PROFILE_FUNCTION();
-		GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
-		if (loc >= 0)
-		{
-			if (m_last_program_id != shader.getProgramId())
-			{
-				glUseProgram(shader.getProgramId());
-				m_last_program_id = shader.getProgramId();
-			}
-			glUniform1f(loc, value);
-		}
-	}
-
-
-
-	virtual void setFixedCachedUniform(const Shader& shader, int name, const Matrix& mtx) override
-	{
-		PROFILE_FUNCTION();
-		GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
-		if (loc >= 0)
-		{
-			//glProgramUniformMatrix4fv(shader.getProgramId(), loc, 1, false, &mtx.m11);
-			if (m_last_program_id != shader.getProgramId())
-			{
-				glUseProgram(shader.getProgramId());
-				m_last_program_id = shader.getProgramId();
-			}
-			glUniformMatrix4fv(loc, 1, false, &mtx.m11);
-		}
-	}
-
-
-	virtual void setFixedCachedUniform(const Shader& shader, int name, const Matrix* matrices, int count) override
-	{
-		PROFILE_FUNCTION();
-		GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
-		if (loc >= 0)
-		{
-			if (m_last_program_id != shader.getProgramId())
-			{
-				glUseProgram(shader.getProgramId());
-				m_last_program_id = shader.getProgramId();
-			}
-			glUniformMatrix4fv(loc, count, false, (float*)matrices);
-		}
-	}
-
-
 	virtual uint32_t getPass() override
 	{
 		return m_current_pass_hash;
@@ -310,68 +287,56 @@ struct RendererImpl : public Renderer
 		GLuint id = shader.getProgramId();
 		m_last_program_id = id;
 		glUseProgram(id);
-		setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::VIEW_MATRIX, m_view_matrix);
-		setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::PROJECTION_MATRIX, m_projection_matrix);
+		setFixedCachedUniform(*this, shader, (int)Shader::FixedCachedUniforms::VIEW_MATRIX, m_view_matrix);
+		setFixedCachedUniform(*this, shader, (int)Shader::FixedCachedUniforms::PROJECTION_MATRIX, m_projection_matrix);
 	}
 
 
-	virtual void renderGeometry(Geometry& geometry, int start, int count, Shader& shader) override
+	void registerPropertyDescriptors(Engine& engine)
 	{
-		PROFILE_FUNCTION();
-		if (m_last_bind_geometry != &geometry)
+		if(engine.getWorldEditor())
 		{
-			if (m_last_bind_geometry)
-			{
-				m_last_bind_geometry->getVertexDefinition().end(shader);
-			}
-			glBindBuffer(GL_ARRAY_BUFFER, geometry.getID());
-			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, geometry.getIndicesID());
-			m_last_bind_geometry = &geometry;
-			m_last_bind_geometry_shader = &shader;
-			geometry.getVertexDefinition().begin(shader);
+			WorldEditor& editor = *engine.getWorldEditor();
+			IAllocator& allocator = editor.getAllocator();
+		
+			editor.registerProperty("camera", allocator.newObject<StringPropertyDescriptor<RenderScene> >(allocator, "slot", &RenderScene::getCameraSlot, &RenderScene::setCameraSlot));
+			editor.registerProperty("camera", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >(allocator, "fov", &RenderScene::getCameraFOV, &RenderScene::setCameraFOV));
+			editor.registerProperty("camera", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >(allocator, "near", &RenderScene::getCameraNearPlane, &RenderScene::setCameraNearPlane));
+			editor.registerProperty("camera", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >(allocator, "far", &RenderScene::getCameraFarPlane, &RenderScene::setCameraFarPlane));
+		
+			editor.registerProperty("renderable", allocator.newObject<ResourcePropertyDescriptor<RenderScene> >(allocator, "source", &RenderScene::getRenderablePath, &RenderScene::setRenderablePath, "Mesh (*.msh)"));
+			editor.registerProperty("renderable", allocator.newObject<BoolPropertyDescriptor<RenderScene> >(allocator, "is_always_visible", &RenderScene::isRenderableAlwaysVisible, &RenderScene::setRenderableIsAlwaysVisible));
+		
+			editor.registerProperty("light", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >(allocator, "ambient_intensity", &RenderScene::getLightAmbientIntensity, &RenderScene::setLightAmbientIntensity));
+			editor.registerProperty("light", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >(allocator, "diffuse_intensity", &RenderScene::getLightDiffuseIntensity, &RenderScene::setLightDiffuseIntensity));
+			editor.registerProperty("light", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >(allocator, "fog_density", &RenderScene::getFogDensity, &RenderScene::setFogDensity));
+			editor.registerProperty("light", allocator.newObject<ColorPropertyDescriptor<RenderScene> >(allocator, "ambient_color", &RenderScene::getLightAmbientColor, &RenderScene::setLightAmbientColor));
+			editor.registerProperty("light", allocator.newObject<ColorPropertyDescriptor<RenderScene> >(allocator, "diffuse_color", &RenderScene::getLightDiffuseColor, &RenderScene::setLightDiffuseColor));
+			editor.registerProperty("light", allocator.newObject<ColorPropertyDescriptor<RenderScene> >(allocator, "fog_color", &RenderScene::getFogColor, &RenderScene::setFogColor));
+
+			editor.registerProperty("terrain", allocator.newObject<ResourcePropertyDescriptor<RenderScene> >(allocator, "material", &RenderScene::getTerrainMaterial, &RenderScene::setTerrainMaterial, "Material (*.mat)"));
+			editor.registerProperty("terrain", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >(allocator, "xz_scale", &RenderScene::getTerrainXZScale, &RenderScene::setTerrainXZScale));
+			editor.registerProperty("terrain", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >(allocator, "y_scale", &RenderScene::getTerrainYScale, &RenderScene::setTerrainYScale));
+
+			auto grass = allocator.newObject<ArrayDescriptor<RenderScene> >(allocator, "grass", &RenderScene::getGrassCount, &RenderScene::addGrass, &RenderScene::removeGrass);
+			grass->addChild(allocator.newObject<ResourceArrayObjectDescriptor<RenderScene> >(allocator, "mesh", &RenderScene::getGrass, &RenderScene::setGrass, "Mesh (*.msh)"));
+			auto ground = allocator.newObject<IntArrayObjectDescriptor<RenderScene> >(allocator, "ground", &RenderScene::getGrassGround, &RenderScene::setGrassGround);
+			ground->setLimit(0, 4);
+			grass->addChild(ground);
+			grass->addChild(allocator.newObject<IntArrayObjectDescriptor<RenderScene> >(allocator, "density", &RenderScene::getGrassDensity, &RenderScene::setGrassDensity));
+			editor.registerProperty("terrain", grass);
 		}
-		glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, (void*)(start * sizeof(GLint)));
 	}
 
 
-	void registerPropertyDescriptors(WorldEditor& editor)
+	virtual bool create() override
 	{
-		editor.registerProperty("camera", LUMIX_NEW(StringPropertyDescriptor<RenderScene>)("slot", &RenderScene::getCameraSlot, &RenderScene::setCameraSlot));
-		editor.registerProperty("camera", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("fov", &RenderScene::getCameraFOV, &RenderScene::setCameraFOV));
-		editor.registerProperty("camera", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("near", &RenderScene::getCameraNearPlane, &RenderScene::setCameraNearPlane));
-		editor.registerProperty("camera", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("far", &RenderScene::getCameraFarPlane, &RenderScene::setCameraFarPlane));
+		m_shader_manager.setRenderer(*this);
+		registerPropertyDescriptors(m_engine);
 
-		editor.registerProperty("renderable", LUMIX_NEW(ResourcePropertyDescriptor<RenderScene>)("source", &RenderScene::getRenderablePath, &RenderScene::setRenderablePath, "Mesh (*.msh)"));
-
-		editor.registerProperty("light", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("ambient_intensity", &RenderScene::getLightAmbientIntensity, &RenderScene::setLightAmbientIntensity));
-		editor.registerProperty("light", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("diffuse_intensity", &RenderScene::getLightDiffuseIntensity, &RenderScene::setLightDiffuseIntensity));
-		editor.registerProperty("light", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("fog_density", &RenderScene::getFogDensity, &RenderScene::setFogDensity));
-		editor.registerProperty("light", LUMIX_NEW(ColorPropertyDescriptor<RenderScene>)("ambient_color", &RenderScene::getLightAmbientColor, &RenderScene::setLightAmbientColor));
-		editor.registerProperty("light", LUMIX_NEW(ColorPropertyDescriptor<RenderScene>)("diffuse_color", &RenderScene::getLightDiffuseColor, &RenderScene::setLightDiffuseColor));
-		editor.registerProperty("light", LUMIX_NEW(ColorPropertyDescriptor<RenderScene>)("fog_color", &RenderScene::getFogColor, &RenderScene::setFogColor));
-
-		editor.registerProperty("terrain", LUMIX_NEW(ResourcePropertyDescriptor<RenderScene>)("material", &RenderScene::getTerrainMaterial, &RenderScene::setTerrainMaterial, "Material (*.mat)"));
-		editor.registerProperty("terrain", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("xz_scale", &RenderScene::getTerrainXZScale, &RenderScene::setTerrainXZScale));
-		editor.registerProperty("terrain", LUMIX_NEW(DecimalPropertyDescriptor<RenderScene>)("y_scale", &RenderScene::getTerrainYScale, &RenderScene::setTerrainYScale));
-
-		auto grass = LUMIX_NEW(ArrayDescriptor<RenderScene>)("grass", &RenderScene::getGrassCount, &RenderScene::addGrass, &RenderScene::removeGrass);
-		grass->addChild(LUMIX_NEW(ResourceArrayObjectDescriptor<RenderScene>)("mesh", &RenderScene::getGrass, &RenderScene::setGrass, "Mesh (*.msh)"));
-		auto ground = LUMIX_NEW(IntArrayObjectDescriptor<RenderScene>)("ground", &RenderScene::getGrassGround, &RenderScene::setGrassGround);
-		ground->setLimit(0, 4);
-		grass->addChild(ground);
-		grass->addChild(LUMIX_NEW(IntArrayObjectDescriptor<RenderScene>)("density", &RenderScene::getGrassDensity, &RenderScene::setGrassDensity));
-		editor.registerProperty("terrain", grass);
-	}
-
-
-	virtual bool create(Engine& engine) override
-	{
-		registerPropertyDescriptors(*engine.getWorldEditor());
-
-		m_engine = &engine;
 		glewExperimental = GL_TRUE;
 		GLenum err = glewInit();
-		m_debug_shader = static_cast<Shader*>(engine.getResourceManager().get(ResourceManager::SHADER)->load("shaders/debug.shd"));
+		m_debug_shader = static_cast<Shader*>(m_engine.getResourceManager().get(ResourceManager::SHADER)->load("shaders/debug.shd"));
 		return err == GLEW_OK;
 	}
 
@@ -415,11 +380,9 @@ struct RendererImpl : public Renderer
 	}
 
 	
-
-
 	virtual Engine& getEngine() override
 	{
-		return *m_engine;
+		return m_engine;
 	}
 
 
@@ -429,8 +392,9 @@ struct RendererImpl : public Renderer
 		{
 			const Mesh& mesh = model.getMesh(i);
 			mesh.getMaterial()->apply(*this, pipeline);
-			pipeline.getRenderer().setFixedCachedUniform(*mesh.getMaterial()->getShader(), (int)Shader::FixedCachedUniforms::WORLD_MATRIX, transform);
-			renderGeometry(*model.getGeometry(), mesh.getStart(), mesh.getCount(), *mesh.getMaterial()->getShader());
+			setFixedCachedUniform(*this, *mesh.getMaterial()->getShader(), (int)Shader::FixedCachedUniforms::WORLD_MATRIX, transform);
+			bindGeometry(*this, *model.getGeometry(), *mesh.getMaterial()->getShader());
+			renderGeometry(mesh.getStart(), mesh.getCount());
 		}
 	}
 
@@ -452,7 +416,13 @@ struct RendererImpl : public Renderer
 		return m_is_editor_wireframe;
 	}
 
-	Engine* m_engine;
+	Engine& m_engine;
+	Debug::Allocator m_allocator;
+	TextureManager m_texture_manager;
+	MaterialManager m_material_manager;
+	ShaderManager m_shader_manager;
+	ModelManager m_model_manager;
+	PipelineManager m_pipeline_manager;
 	IRenderDevice* m_render_device;
 	bool m_is_editor_wireframe;
 	Geometry* m_last_bind_geometry;
@@ -465,15 +435,15 @@ struct RendererImpl : public Renderer
 };
 
 
-Renderer* Renderer::createInstance()
+Renderer* Renderer::createInstance(Engine& engine)
 {
-	return LUMIX_NEW(RendererImpl);
+	return engine.getAllocator().newObject<RendererImpl>(engine);
 }
 
 
 void Renderer::destroyInstance(Renderer& renderer)
 {
-	LUMIX_DELETE(&renderer);
+	renderer.getEngine().getAllocator().deleteObject(&renderer);
 }
 
 
@@ -523,6 +493,126 @@ void Renderer::getLookAtMatrix(const Vec3& pos, const Vec3& center, const Vec3& 
 	gluLookAt(pos.x, pos.y, pos.z, center.x, center.y, center.z, up.x, up.y, up.z);
 	glGetFloatv(GL_MODELVIEW_MATRIX, m);
 	glPopMatrix();*/
+}
+
+
+void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Vec3& value)
+{
+	PROFILE_FUNCTION();
+	RendererImpl& renderer_impl = static_cast<RendererImpl&>(renderer);
+	GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
+	if (loc >= 0)
+	{
+		if (renderer_impl.m_last_program_id != shader.getProgramId())
+		{
+			glUseProgram(shader.getProgramId());
+			renderer_impl.m_last_program_id = shader.getProgramId();
+		}
+		glUniform3f(loc, value.x, value.y, value.z);
+	}
+}
+
+
+void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Vec4& value)
+{
+	PROFILE_FUNCTION();
+	RendererImpl& renderer_impl = static_cast<RendererImpl&>(renderer);
+	GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
+	if (loc >= 0)
+	{
+		if (renderer_impl.m_last_program_id != shader.getProgramId())
+		{
+			glUseProgram(shader.getProgramId());
+			renderer_impl.m_last_program_id = shader.getProgramId();
+		}
+		glUniform4f(loc, value.x, value.y, value.z, value.w);
+	}
+}
+
+
+void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, float value)
+{
+	PROFILE_FUNCTION();
+	RendererImpl& renderer_impl = static_cast<RendererImpl&>(renderer);
+	GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
+	if (loc >= 0)
+	{
+		if (renderer_impl.m_last_program_id != shader.getProgramId())
+		{
+			glUseProgram(shader.getProgramId());
+			renderer_impl.m_last_program_id = shader.getProgramId();
+		}
+		glUniform1f(loc, value);
+	}
+}
+
+
+void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Matrix& mtx)
+{
+	RendererImpl& renderer_impl = static_cast<RendererImpl&>(renderer);
+	GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
+	if (loc >= 0)
+	{
+		if (renderer_impl.m_last_program_id != shader.getProgramId())
+		{
+			glUseProgram(shader.getProgramId());
+			renderer_impl.m_last_program_id = shader.getProgramId();
+		}
+		glUniformMatrix4fv(loc, 1, false, &mtx.m11);
+	}
+}
+
+
+void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Matrix* matrices, int count)
+{
+	PROFILE_FUNCTION();
+	RendererImpl& renderer_impl = static_cast<RendererImpl&>(renderer);
+	GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
+	if (loc >= 0)
+	{
+		if (renderer_impl.m_last_program_id != shader.getProgramId())
+		{
+			glUseProgram(shader.getProgramId());
+			renderer_impl.m_last_program_id = shader.getProgramId();
+		}
+		glUniformMatrix4fv(loc, count, false, (float*)matrices);
+	}
+}
+
+
+void bindGeometry(Renderer& renderer, Geometry& geometry, Shader& shader)
+{
+	RendererImpl& renderer_impl = static_cast<RendererImpl&>(renderer);
+	if (renderer_impl.m_last_bind_geometry != &geometry)
+	{
+		if (renderer_impl.m_last_bind_geometry)
+		{
+			renderer_impl.m_last_bind_geometry->getVertexDefinition().end(shader);
+		}
+		glBindBuffer(GL_ARRAY_BUFFER, geometry.getID());
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, geometry.getIndicesID());
+		renderer_impl.m_last_bind_geometry = &geometry;
+		renderer_impl.m_last_bind_geometry_shader = &shader;
+		geometry.getVertexDefinition().begin(shader);
+	}
+}
+
+
+void renderGeometry(int start, int count)
+{
+	glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, (void*)(start * sizeof(GLint)));
+}
+
+
+int getUniformLocation(const Shader& shader, int name)
+{
+	return shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
+}
+
+
+void setUniform(int location, const Matrix& mtx)
+{
+	glUniformMatrix4fv(location, 1, false, &mtx.m11);
 }
 
 

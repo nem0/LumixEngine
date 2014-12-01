@@ -21,7 +21,7 @@ namespace Lumix
 	{
 		size_t len = strlen(path);
 		ASSERT(len < LUMIX_MAX_PATH);
-		PathUtils::normalize(path, m_path, len + 1);
+		PathUtils::normalize(path, m_path, (uint32_t)len + 1);
 		m_id = crc32(m_path);
 	}
 
@@ -29,7 +29,7 @@ namespace Lumix
 	{
 		size_t len = path.length();
 		ASSERT(len < LUMIX_MAX_PATH);
-		PathUtils::normalize(path.c_str(), m_path, len + 1);
+		PathUtils::normalize(path.c_str(), m_path, (uint32_t)(len + 1));
 		m_id = crc32(m_path);
 	}
 
@@ -41,5 +41,11 @@ namespace Lumix
 
 	Path::~Path()
 	{
+	}
+
+	void Path::operator =(const Path& rhs)
+	{
+		m_id = rhs.m_id;
+		copyString(m_path, sizeof(m_path), rhs.m_path);
 	}
 }

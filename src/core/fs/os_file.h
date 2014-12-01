@@ -5,6 +5,8 @@
 
 namespace Lumix
 {
+	class IAllocator;
+
 	namespace FS
 	{
 		class LUMIX_CORE_API OsFile
@@ -13,7 +15,7 @@ namespace Lumix
 			OsFile();
 			~OsFile();
 
-			bool open(const char* path, Mode mode);
+			bool open(const char* path, Mode mode, IAllocator& allocator);
 			void close();
 
 			bool write(const void* data, size_t size);

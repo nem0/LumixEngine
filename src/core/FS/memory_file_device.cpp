@@ -1,4 +1,5 @@
 #include "core/fs/memory_file_device.h"
+#include "core/iallocator.h"
 #include "core/fs/ifile.h"
 #include "core/fs/ifile_system_defines.h"
 #include "core/math_utils.h"
@@ -12,20 +13,31 @@ namespace Lumix
 		class LUMIX_CORE_API MemoryFile : public IFile
 		{
 		public:
-			MemoryFile(IFile* file)
-				: m_buffer(NULL)
+			MemoryFile(IFile* file, MemoryFileDevice& device, IAllocator& allocator)
+				: m_device(device)
+				, m_buffer(NULL)
 				, m_size(0)
 				, m_capacity(0)
 				, m_pos(0)
 				, m_file(file) 
 				, m_write(false)
+				, m_allocator(allocator)
 			{
 			}
 
 			~MemoryFile() 
 			{ 
-				LUMIX_DELETE(m_file);
-				LUMIX_DELETE_ARRAY(m_buffer);
+				if (m_file)
+				{
+					m_file->release();
+				}
+				m_allocator.deallocate(m_buffer);
+			}
+
+
+			virtual IFileDevice& getDevice() override
+			{
+				return m_device;
 			}
 
 			virtual bool open(const char* path, Mode mode) override
@@ -40,7 +52,7 @@ namespace Lumix
 						if(mode & Mode::READ)
 						{
 							m_capacity = m_size = m_file->size();
-							m_buffer = LUMIX_NEW_ARRAY(uint8_t, m_size);
+							m_buffer = (uint8_t*)m_allocator.allocate(sizeof(uint8_t) * m_size);
 							m_file->read(m_buffer, m_size);
 							m_pos = 0;
 						}
@@ -71,7 +83,7 @@ namespace Lumix
 					m_file->close();
 				}
 
-				LUMIX_DELETE_ARRAY(m_buffer);
+				m_allocator.deallocate(m_buffer);
 				m_buffer = NULL;
 			}
 
@@ -91,9 +103,9 @@ namespace Lumix
 				if(pos + size > cap)
 				{
 					size_t new_cap = Math::maxValue(cap * 2, pos + size);
-					uint8_t* new_data = LUMIX_NEW_ARRAY(uint8_t, new_cap);
+					uint8_t* new_data = (uint8_t*)m_allocator.allocate(sizeof(uint8_t) * new_cap);
 					memcpy(new_data, m_buffer, sz);
-					LUMIX_DELETE_ARRAY(m_buffer);
+					m_allocator.deallocate(m_buffer);
 					m_buffer = new_data;
 					m_capacity = new_cap;
 				}
@@ -120,7 +132,7 @@ namespace Lumix
 				switch(base)
 				{
 				case SeekMode::BEGIN:
-					ASSERT(pos >= 0 && pos <= (int32_t)m_size);
+					ASSERT(pos <= (int32_t)m_size);
 					m_pos = pos;
 					break;
 				case SeekMode::CURRENT:
@@ -128,7 +140,7 @@ namespace Lumix
 					m_pos += pos;
 					break;
 				case SeekMode::END:
-					ASSERT(0 <= pos && pos <= (int32_t)m_size);
+					ASSERT(pos <= (int32_t)m_size);
 					m_pos = m_size - pos;
 					break;
 				default:
@@ -146,6 +158,8 @@ namespace Lumix
 			}
 
 		private:
+			IAllocator& m_allocator;
+			MemoryFileDevice& m_device;
 			uint8_t* m_buffer;
 			size_t m_size;
 			size_t m_capacity;
@@ -154,9 +168,14 @@ namespace Lumix
 			bool m_write;
 		};
 
+		void MemoryFileDevice::destroyFile(IFile* file)
+		{
+			m_allocator.deleteObject(file);
+		}
+
 		IFile* MemoryFileDevice::createFile(IFile* child)
 		{
-			return LUMIX_NEW(MemoryFile)(child);
+			return m_allocator.newObject<MemoryFile>(child, *this, m_allocator);
 		}
 	} // ~namespace FS
 } // ~namespace Lumix

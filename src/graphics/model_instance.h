@@ -16,7 +16,7 @@ class Model;
 class ModelInstance
 {
 	public:
-		ModelInstance();
+		ModelInstance(IAllocator& allocator);
 		~ModelInstance();
 
 		void setModel(Model* model);
@@ -30,7 +30,7 @@ class ModelInstance
 	private:
 		void modelUpdate(Resource::State old_state, Resource::State new_state);
 		void operator=(const ModelInstance&);
-		ModelInstance(const ModelInstance&) {}
+		ModelInstance(const ModelInstance&);
 
 
 	private:

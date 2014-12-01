@@ -4,13 +4,14 @@
 
 namespace Lumix
 {
-	template<class T, int32_t chunk_size, int32_t align_of = sizeof(double)>
+	template<class T, int32_t chunk_size>
 	class FreeList
 	{
 	public:
-		FreeList()
+		explicit FreeList(IAllocator& allocator)
+			: m_allocator(allocator)
 		{
-			m_heap = static_cast<T*>(LUMIX_NEW_ARRAY(char, sizeof(T) * chunk_size));
+			m_heap = static_cast<T*>(allocator.allocate(sizeof(char) * sizeof(T) * chunk_size));
 			m_pool_index = chunk_size;
 
 			for (int32_t i = 0; i < chunk_size; i++)
@@ -21,7 +22,7 @@ namespace Lumix
 
 		~FreeList()
 		{
-			LUMIX_DELETE_ARRAY(m_heap);
+			m_allocator.deallocate(m_heap);
 		}
 
 		LUMIX_FORCE_INLINE T* alloc(void)
@@ -79,13 +80,14 @@ namespace Lumix
 		}
 
 	private:
+		IAllocator&	m_allocator;
 		int32_t		m_pool_index;
 		T*			m_pool[chunk_size];
 		T*			m_heap;
 	};
 
 	template<int32_t chunk_size>
-	class FreeList<int32_t, chunk_size, 8>
+	class FreeList<int32_t, chunk_size>
 	{
 	public:
 		FreeList()

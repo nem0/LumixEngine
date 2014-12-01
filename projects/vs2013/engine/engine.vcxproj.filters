@@ -69,7 +69,6 @@
     <ClCompile Include="..\..\..\src\universe\universe.cpp">
       <Filter>universe</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\core\new.cpp" />
     <ClCompile Include="..\..\..\src\graphics\material_manager.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
@@ -96,6 +95,9 @@
     </ClCompile>
     <ClCompile Include="..\..\..\src\editor\measure_tool.cpp">
       <Filter>editor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\universe\hierarchy.cpp">
+      <Filter>universe</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\graphics\culling_system.cpp">
       <Filter>graphics</Filter>
@@ -200,6 +202,9 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\editor\measure_tool.h">
       <Filter>editor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\universe\hierarchy.h">
+      <Filter>universe</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

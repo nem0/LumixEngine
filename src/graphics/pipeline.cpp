@@ -1,12 +1,13 @@
 #include "graphics/pipeline.h"
 #include "graphics/gl_ext.h"
 #include "core/array.h"
+#include "core/associative_array.h"
 #include "core/crc32.h"
+#include "core/frustum.h"
 #include "core/fs/file_system.h"
 #include "core/iserializer.h"
 #include "core/json_serializer.h"
 #include "core/log.h"
-#include "core/map.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
@@ -30,10 +31,6 @@ struct PipelineImpl;
 struct PipelineInstanceImpl;
 
 
-static const uint32_t SHADOW_MATRIX0_HASH = crc32("shadowmap_matrix0");
-static const uint32_t SHADOW_MATRIX1_HASH = crc32("shadowmap_matrix1");
-static const uint32_t SHADOW_MATRIX2_HASH = crc32("shadowmap_matrix2");
-static const uint32_t SHADOW_MATRIX3_HASH = crc32("shadowmap_matrix3");
 static const uint32_t LIGHT_DIR_HASH = crc32("light_dir");
 static const uint32_t TERRAIN_SCALE_HASH = crc32("terrain_scale");
 static const uint32_t BONE_MATRICES_HASH = crc32("bone_matrices");
@@ -42,27 +39,23 @@ static float split_distances[] = { 0, 5, 20, 100, 300 };
 static const float SHADOW_CAM_NEAR = 0.1f;
 static const float SHADOW_CAM_FAR = 10000.0f;
 
-struct Frustum
+
+struct RenderModelsMeshContext
 {
-	public:
-		Vec3 getCenter() const
-		{
-			Vec3 center = m_points[0];
-			for(int i = 1; i < 8; ++i)
-			{
-				center += m_points[i];
-			}
-			center *= 1/8.0f;
-			return center;
-		}
+	RenderModelsMeshContext()
+		: m_mesh(NULL)
+		, m_shader(NULL)
+		, m_world_matrix_uniform_location(-1)
+		, m_geometry_start(0)
+		, m_geometry_count(0)
+	{
+	}
 
-		float getSize() const
-		{
-			return Math::maxValue((m_points[0] - m_points[6]).length(), (m_points[4] - m_points[6]).length());
-		}
-
-	public:
-		Vec3 m_points[8];
+	const Mesh* m_mesh;
+	Shader* m_shader;
+	int m_world_matrix_uniform_location;
+	int m_geometry_start;
+	int m_geometry_count;
 };
 
 
@@ -76,6 +69,8 @@ struct Command
 
 struct CustomCommand : public Command
 {
+	CustomCommand(IAllocator&) {}
+
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	uint32_t m_name;
@@ -84,6 +79,8 @@ struct CustomCommand : public Command
 
 struct PolygonModeCommand : public Command
 {
+	PolygonModeCommand(IAllocator&) {}
+
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	
@@ -93,6 +90,8 @@ struct PolygonModeCommand : public Command
 
 struct SetPassCommand : public Command
 {
+	SetPassCommand(IAllocator&) {}
+
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	
@@ -102,14 +101,19 @@ struct SetPassCommand : public Command
 
 struct ClearCommand : public Command
 {
+	ClearCommand(IAllocator&) {}
+
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
+	
 	uint32_t m_buffers;
 };
 
 
 struct RenderModelsCommand : public Command
 {
+	RenderModelsCommand(IAllocator&) {}
+
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	
@@ -119,22 +123,33 @@ struct RenderModelsCommand : public Command
 
 struct ApplyCameraCommand : public Command
 {
+	ApplyCameraCommand(IAllocator& allocator)
+		: m_camera_slot(allocator)
+	{ }
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
+	
 	string m_camera_slot;
 };
 
 
 struct BindFramebufferCommand : public Command
 {
+	BindFramebufferCommand(IAllocator& allocator)
+		: m_buffer_name(allocator)
+	{ }
+
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
+	
 	string m_buffer_name;
 };
 
 
 struct UnbindFramebufferCommand : public Command
 {
+	UnbindFramebufferCommand(IAllocator&) {}
+
 	virtual void deserialize(PipelineImpl&, ISerializer&) override {}
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 };
@@ -142,10 +157,13 @@ struct UnbindFramebufferCommand : public Command
 
 struct DrawScreenQuadCommand : public Command
 {
+	DrawScreenQuadCommand(IAllocator& allocator) : m_allocator(allocator) {}
 	~DrawScreenQuadCommand();
 
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
+	
+	IAllocator& m_allocator;
 	Material* m_material;
 	Geometry* m_geometry;
 };
@@ -153,6 +171,8 @@ struct DrawScreenQuadCommand : public Command
 
 struct RenderDebugLinesCommand : public Command
 {
+	RenderDebugLinesCommand(IAllocator&) {}
+
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 };
@@ -160,8 +180,13 @@ struct RenderDebugLinesCommand : public Command
 
 struct BindFramebufferTextureCommand : public Command
 {
+	BindFramebufferTextureCommand(IAllocator& allocator)
+		: m_framebuffer_name(allocator)
+	{ }
+
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
+	
 	string m_framebuffer_name;
 	uint32_t m_renderbuffer_index;
 	uint32_t m_texture_uint;
@@ -170,16 +195,23 @@ struct BindFramebufferTextureCommand : public Command
 
 struct RenderShadowmapCommand : public Command
 {
+	RenderShadowmapCommand(IAllocator& allocator)
+		: m_camera_slot(allocator)
+	{}
+
 	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 
 	int64_t m_layer_mask;
+	StackAllocator<128> m_string_allocator;
 	string m_camera_slot;
 };
 
 
 struct BindShadowmapCommand : public Command
 {
+	BindShadowmapCommand(IAllocator&) {}
+
 	virtual void deserialize(PipelineImpl&, ISerializer&) override {}
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 };
@@ -189,28 +221,37 @@ struct PipelineImpl : public Pipeline
 {
 	struct FrameBufferDeclaration
 	{
+		FrameBufferDeclaration()
+			: m_name(m_name_allocator)
+		{ }
+
 		int32_t m_width;
 		int32_t m_height;
 		int32_t m_mask;
+		StackAllocator<64> m_name_allocator;
 		string m_name;
 	};
 	
 	struct CommandCreator
 	{
-		typedef Delegate<Command*> Creator;
+		typedef Delegate<Command* (IAllocator&)> Creator;
 		Creator m_creator;
 		uint32_t m_type_hash;
 	};
 
 	template <typename T>
-	static Command* CreateCommand()
+	static Command* CreateCommand(IAllocator& allocator)
 	{
-		return LUMIX_NEW(T);
+		return allocator.newObject<T>(allocator);
 	}
 
 
-	PipelineImpl(const Path& path, ResourceManager& resource_manager)
-		: Pipeline(path, resource_manager)
+	PipelineImpl(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
+		: Pipeline(path, resource_manager, allocator)
+		, m_allocator(allocator)
+		, m_commands(allocator)
+		, m_framebuffers(allocator)
+		, m_command_creators(allocator)
 	{
 		addCommandCreator("clear").bind<&CreateCommand<ClearCommand> >();
 		addCommandCreator("custom").bind<&CreateCommand<CustomCommand> >();
@@ -238,7 +279,7 @@ struct PipelineImpl : public Pipeline
 	{
 		for (int i = 0; i < m_commands.size(); ++i)
 		{
-			LUMIX_DELETE(m_commands[i]);
+			m_allocator.deleteObject(m_commands[i]);
 		}
 		m_commands.clear();
 		onEmpty();
@@ -267,7 +308,7 @@ struct PipelineImpl : public Pipeline
 		{
 			if (m_command_creators[i].m_type_hash == type_hash)
 			{
-				return m_command_creators[i].m_creator.invoke();
+				return m_command_creators[i].m_creator.invoke(m_allocator);
 			}
 		}
 		return NULL;
@@ -278,22 +319,22 @@ struct PipelineImpl : public Pipeline
 	{
 		int32_t count;
 		serializer.deserializeObjectBegin();
-		serializer.deserialize("frame_buffer_count", count);
+		serializer.deserialize("frame_buffer_count", count, 0);
 		serializer.deserializeArrayBegin("frame_buffers");
 		m_framebuffers.resize(count);
 		for(int i = 0; i < count; ++i)
 		{
 			int32_t render_buffer_count;
 			char fb_name[31];
-			serializer.deserializeArrayItem(fb_name, 30);
+			serializer.deserializeArrayItem(fb_name, 30, "");
 			m_framebuffers[i].m_name = fb_name;
 
-			serializer.deserializeArrayItem(render_buffer_count);
+			serializer.deserializeArrayItem(render_buffer_count, 0);
 			int mask = 0;
 			char rb_name[30];
 			for(int j = 0; j < render_buffer_count; ++j)
 			{
-				serializer.deserializeArrayItem(rb_name, 30);
+				serializer.deserializeArrayItem(rb_name, 30, "");
 				if(strcmp(rb_name, "depth") == 0)
 				{
 					mask |= FrameBuffer::DEPTH_BIT;
@@ -303,20 +344,20 @@ struct PipelineImpl : public Pipeline
 					ASSERT(false);
 				}
 			}
-			serializer.deserializeArrayItem(m_framebuffers[i].m_width);
-			serializer.deserializeArrayItem(m_framebuffers[i].m_height);
+			serializer.deserializeArrayItem(m_framebuffers[i].m_width, 800);
+			serializer.deserializeArrayItem(m_framebuffers[i].m_height, 600);
 			m_framebuffers[i].m_mask = mask;
 		}
 		serializer.deserializeArrayEnd();
-		serializer.deserialize("shadowmap_width", m_shadowmap_framebuffer.m_width);
-		serializer.deserialize("shadowmap_height", m_shadowmap_framebuffer.m_height);
+		serializer.deserialize("shadowmap_width", m_shadowmap_framebuffer.m_width, 0);
+		serializer.deserialize("shadowmap_height", m_shadowmap_framebuffer.m_height, 0);
 		m_shadowmap_framebuffer.m_mask = FrameBuffer::DEPTH_BIT;
 		
 		serializer.deserializeArrayBegin("commands");
 		while (!serializer.isArrayEnd())
 		{
 			char tmp[255];
-			serializer.deserializeArrayItem(tmp, 255);
+			serializer.deserializeArrayItem(tmp, 255, "");
 			uint32_t command_type_hash = crc32(tmp);
 			Command* cmd = createCommand(command_type_hash);
 			if(cmd)
@@ -351,6 +392,7 @@ struct PipelineImpl : public Pipeline
 		fs.close(file);
 	}
 
+	IAllocator& m_allocator;
 	Array<Command*> m_commands;
 	Array<CommandCreator> m_command_creators;
 	Array<FrameBufferDeclaration> m_framebuffers;
@@ -360,9 +402,15 @@ struct PipelineImpl : public Pipeline
 
 struct PipelineInstanceImpl : public PipelineInstance
 {
-	PipelineInstanceImpl(Pipeline& pipeline)
+	PipelineInstanceImpl(Pipeline& pipeline, IAllocator& allocator)
 		: m_source(static_cast<PipelineImpl&>(pipeline))
 		, m_active_camera(Component::INVALID)
+		, m_custom_commands_handlers(allocator)
+		, m_allocator(allocator)
+		, m_terrain_infos(allocator)
+		, m_framebuffers(allocator)
+		, m_grass_infos(allocator)
+		, m_renderable_infos(allocator)
 	{
 		m_scene = NULL;
 		m_light_dir.set(0, -1, 0);
@@ -384,11 +432,11 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_source.getResourceManager().get(ResourceManager::PIPELINE)->unload(m_source);
 		for (int i = 0; i < m_framebuffers.size(); ++i)
 		{
-			LUMIX_DELETE(m_framebuffers[i]);
+			m_allocator.deleteObject(m_framebuffers[i]);
 		}
 		if (m_shadowmap_framebuffer)
 		{
-			LUMIX_DELETE(m_shadowmap_framebuffer);
+			m_allocator.deleteObject(m_shadowmap_framebuffer);
 		}
 	}
 
@@ -433,58 +481,26 @@ struct PipelineInstanceImpl : public PipelineInstance
 		if (old_state != Resource::State::READY && new_state == Resource::State::READY)
 		{
 			PipelineImpl::FrameBufferDeclaration fb = m_source.m_shadowmap_framebuffer;
-			m_shadowmap_framebuffer = LUMIX_NEW(FrameBuffer)(fb.m_width, fb.m_height, fb.m_mask, fb.m_name.c_str());
+			m_shadowmap_framebuffer = m_allocator.newObject<FrameBuffer>(fb.m_width, fb.m_height, fb.m_mask, fb.m_name.c_str());
 			m_framebuffers.reserve(m_source.m_framebuffers.size());
 			for (int i = 0; i < m_source.m_framebuffers.size(); ++i)
 			{
 				fb = m_source.m_framebuffers[i];
-				m_framebuffers.push(LUMIX_NEW(FrameBuffer)(fb.m_width, fb.m_height, fb.m_mask, fb.m_name.c_str()));
+				m_framebuffers.push(m_allocator.newObject<FrameBuffer>(fb.m_width, fb.m_height, fb.m_mask, fb.m_name.c_str()));
 			}
 		}
 	}
 
 
-
 	void executeCustomCommand(uint32_t name)
 	{
-		Map<uint32_t, CustomCommandHandler>::iterator iter = m_custom_commands_handlers.find(name);
-		if (iter != m_custom_commands_handlers.end())
+		CustomCommandHandler handler;
+		if (m_custom_commands_handlers.find(name, handler))
 		{
-			iter.second().invoke();
+			handler.invoke();
 		}
 	}
 
-	void computeFrustum(const Component& camera, Frustum* frustum, float from_dist, float to_dist)
-	{
-		RenderScene& scene = *m_scene;
-		Matrix entity_mtx = camera.entity.getMatrix();
-		float fov = Math::degreesToRadians(scene.getCameraFOV(camera));
-		float far_dist = scene.getCameraNearPlane(camera) + to_dist;
-		float near_dist = scene.getCameraNearPlane(camera) + from_dist;
-		float ratio = scene.getCameraWidth(camera) / scene.getCameraHeight(camera);
-		Vec3 up = camera.entity.getRotation() * Vec3(0.0f, 1.0f, 0.0f);
-		Vec3 forward = camera.entity.getRotation() * Vec3(0, 0, -1);
-		Vec3 right = crossProduct(forward, up).normalized();
-		up = crossProduct(right, forward).normalized();
-
-		Vec3 far_center = camera.entity.getPosition() + forward * far_dist;
-		Vec3 near_center = camera.entity.getPosition() + forward * near_dist;
-
-		float near_height = tan(fov * 0.5f) * near_dist;
-		float near_width = near_height * ratio;
-		float far_height = tan(fov * 0.5f) * far_dist;
-		float far_width = far_height * ratio;
-
-		frustum->m_points[0] = near_center - up * near_height - right * near_width;
-		frustum->m_points[1] = near_center + up * near_height - right * near_width;
-		frustum->m_points[2] = near_center + up * near_height + right * near_width;
-		frustum->m_points[3] = near_center - up * near_height + right * near_width;
-
-		frustum->m_points[4] = far_center - up * far_height - right * far_width;
-		frustum->m_points[5] = far_center + up * far_height - right * far_width;
-		frustum->m_points[6] = far_center + up * far_height + right * far_width;
-		frustum->m_points[7] = far_center - up * far_height + right * far_width;
-	}
 
 	void renderShadowmap(Component camera, int64_t layer_mask)
 	{
@@ -503,7 +519,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 		Matrix light_mtx = light_cmp.entity.getMatrix();
 		m_light_dir = light_mtx.getZVector();
 
-		Frustum frustum;
 		float shadowmap_height = (float)m_shadowmap_framebuffer->getHeight();
 		float shadowmap_width = (float)m_shadowmap_framebuffer->getWidth();
 		float viewports[] = 
@@ -511,17 +526,28 @@ struct PipelineInstanceImpl : public PipelineInstance
 			, 0.5f, 0
 			, 0, 0.5f
 			, 0.5f, 0.5f};
+		float camera_fov = m_scene->getCameraFOV(camera);
+		float camera_ratio = m_scene->getCameraWidth(camera) / m_scene->getCameraHeight(camera);
 		for (int split_index = 0; split_index < 4; ++split_index)
 		{
 			float* viewport = viewports + split_index * 2;
 			glViewport((int)(1 + shadowmap_width * viewport[0]), (int)(1 + shadowmap_height * viewport[1]),
 				(int)(0.5f * shadowmap_width - 2), (int)(0.5f * shadowmap_height - 2));
 
-			computeFrustum(camera, &frustum, split_distances[split_index], split_distances[split_index + 1]);
+			Frustum frustum;
+			Matrix camera_matrix = camera.entity.getMatrix();
+			frustum.computePerspective(camera_matrix.getTranslation()
+				, camera_matrix.getZVector()
+				, camera_matrix.getYVector()
+				, camera_fov
+				, camera_ratio
+				, split_distances[split_index]
+				, split_distances[split_index + 1]
+			);
 			(&m_shadowmap_splits.x)[split_index] = split_distances[split_index + 1];
 
 			Vec3 shadow_cam_pos = frustum.getCenter();
-			float bb_size = frustum.getSize() * 0.5f;
+			float bb_size = frustum.getRadius();
 			Matrix projection_matrix;
 			Renderer::getOrthoMatrix(-bb_size, bb_size, -bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR, &projection_matrix);
 			m_renderer->setProjectionMatrix(projection_matrix);
@@ -540,7 +566,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 			m_shadow_modelviewprojection[split_index] = biasMatrix * (projection_matrix * modelview_matrix);
 
 			renderTerrains(layer_mask);
-			renderModels(layer_mask);
+
+			Frustum shadow_camera_frustum;
+			shadow_camera_frustum.computeOrtho(shadow_cam_pos, -light_forward, light_mtx.getYVector(), bb_size * 2, bb_size * 2, SHADOW_CAM_NEAR, SHADOW_CAM_FAR);
+			renderModels(shadow_camera_frustum, layer_mask);
 		}
 		FrameBuffer::unbind();
 		glCullFace(GL_BACK);
@@ -558,9 +587,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 			m_renderer->setProjectionMatrix(mtx);
 			m_renderer->setViewMatrix(Matrix::IDENTITY);
 			material->apply(*m_renderer, *this);
-			m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::WORLD_MATRIX, Matrix::IDENTITY);
-			m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::PROJECTION_MATRIX, mtx);
-			m_renderer->renderGeometry(*geometry, 0, 6, *shader);
+			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::WORLD_MATRIX, Matrix::IDENTITY);
+			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::PROJECTION_MATRIX, mtx);
+			bindGeometry(*m_renderer, *geometry, *shader);
+			renderGeometry(0, 6);
 		}
 	}
 
@@ -597,14 +627,14 @@ struct PipelineInstanceImpl : public PipelineInstance
 		}
 	}
 
-	void renderGrass(int64_t layer_mask)
+	void renderGrass(const Frustum& frustum, int64_t layer_mask)
 	{
 		PROFILE_FUNCTION();
 		if (m_active_camera.isValid())
 		{
 			const Material* last_material = NULL;
 			m_grass_infos.clear();
-			m_scene->getGrassInfos(m_grass_infos, layer_mask);
+			m_scene->getGrassInfos(frustum, m_grass_infos, layer_mask);
 			for (int i = 0; i < m_grass_infos.size(); ++i)
 			{
 				const GrassInfo& info = m_grass_infos[i];
@@ -616,28 +646,29 @@ struct PipelineInstanceImpl : public PipelineInstance
 					if (&material != last_material)
 					{
 						material.apply(*m_renderer, *this);
-						m_renderer->setUniform(*shader, "shadowmap_matrix0", SHADOW_MATRIX0_HASH, m_shadow_modelviewprojection[0]);
-						m_renderer->setUniform(*shader, "shadowmap_matrix1", SHADOW_MATRIX1_HASH, m_shadow_modelviewprojection[1]);
-						m_renderer->setUniform(*shader, "shadowmap_matrix2", SHADOW_MATRIX2_HASH, m_shadow_modelviewprojection[2]);
-						m_renderer->setUniform(*shader, "shadowmap_matrix3", SHADOW_MATRIX3_HASH, m_shadow_modelviewprojection[3]);
+						setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX0, m_shadow_modelviewprojection[0]);
+						setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX1, m_shadow_modelviewprojection[1]);
+						setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX2, m_shadow_modelviewprojection[2]);
+						setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX3, m_shadow_modelviewprojection[3]);
 						m_renderer->setUniform(*shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
 						m_renderer->setUniform(*shader, "camera_pos", CAMERA_POS_HASH, m_active_camera.entity.getPosition());
 						Component light_cmp = m_scene->getLight(0);
 						if(light_cmp.isValid())
 						{
-							m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::AMBIENT_COLOR, m_scene->getLightAmbientColor(light_cmp));
-							m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::AMBIENT_INTENSITY, m_scene->getLightAmbientIntensity(light_cmp));
-							m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::DIFFUSE_COLOR, m_scene->getLightDiffuseColor(light_cmp));
-							m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::DIFFUSE_INTENSITY, m_scene->getLightDiffuseIntensity(light_cmp));
-							m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::FOG_COLOR, m_scene->getFogColor(light_cmp));
-							m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
-							m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::SHADOWMAP_SPLITS, m_shadowmap_splits);
+							setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::AMBIENT_COLOR, m_scene->getLightAmbientColor(light_cmp));
+							setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::AMBIENT_INTENSITY, m_scene->getLightAmbientIntensity(light_cmp));
+							setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_COLOR, m_scene->getLightDiffuseColor(light_cmp));
+							setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_INTENSITY, m_scene->getLightDiffuseIntensity(light_cmp));
+							setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_COLOR, m_scene->getFogColor(light_cmp));
+							setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
+							setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOWMAP_SPLITS, m_shadowmap_splits);
 						}
 						last_material = &material;
 					}
-					m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::GRASS_MATRICES, info.m_matrices, info.m_matrix_count);
+					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::GRASS_MATRICES, info.m_matrices, info.m_matrix_count);
 
-					m_renderer->renderGeometry(*info.m_geometry, mesh.getStart(), mesh.getCount() / info.m_mesh_copy_count * info.m_matrix_count, *shader);
+					bindGeometry(*m_renderer, *info.m_geometry, *shader);
+					renderGeometry(mesh.getStart(), mesh.getCount() / info.m_mesh_copy_count * info.m_matrix_count);
 				}
 			}
 		}
@@ -659,21 +690,21 @@ struct PipelineInstanceImpl : public PipelineInstance
 					m_terrain_infos[i].m_entity.getMatrix(world_matrix);
 					Shader* shader = m_terrain_infos[i].m_material->getShader();
 					m_terrain_infos[i].m_material->apply(*m_renderer, *this);
-					m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::WORLD_MATRIX, world_matrix);
-					m_renderer->setUniform(*shader, "shadowmap_matrix0", SHADOW_MATRIX0_HASH, m_shadow_modelviewprojection[0]);
-					m_renderer->setUniform(*shader, "shadowmap_matrix1", SHADOW_MATRIX1_HASH, m_shadow_modelviewprojection[1]);
-					m_renderer->setUniform(*shader, "shadowmap_matrix2", SHADOW_MATRIX2_HASH, m_shadow_modelviewprojection[2]);
-					m_renderer->setUniform(*shader, "shadowmap_matrix3", SHADOW_MATRIX3_HASH, m_shadow_modelviewprojection[3]);
+					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::WORLD_MATRIX, world_matrix);
+					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX0, m_shadow_modelviewprojection[0]);
+					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX1, m_shadow_modelviewprojection[1]);
+					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX2, m_shadow_modelviewprojection[2]);
+					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX3, m_shadow_modelviewprojection[3]);
 					Component light_cmp = m_scene->getLight(0);
 					if(light_cmp.isValid())
 					{
-						m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::AMBIENT_COLOR, m_scene->getLightAmbientColor(light_cmp));
-						m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::AMBIENT_INTENSITY, m_scene->getLightAmbientIntensity(light_cmp));
-						m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::DIFFUSE_COLOR, m_scene->getLightDiffuseColor(light_cmp));
-						m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::DIFFUSE_INTENSITY, m_scene->getLightDiffuseIntensity(light_cmp));
-						m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::FOG_COLOR, m_scene->getFogColor(light_cmp));
-						m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
-						m_renderer->setFixedCachedUniform(*shader, (int)Shader::FixedCachedUniforms::SHADOWMAP_SPLITS, m_shadowmap_splits);
+						setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::AMBIENT_COLOR, m_scene->getLightAmbientColor(light_cmp));
+						setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::AMBIENT_INTENSITY, m_scene->getLightAmbientIntensity(light_cmp));
+						setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_COLOR, m_scene->getLightDiffuseColor(light_cmp));
+						setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_INTENSITY, m_scene->getLightDiffuseIntensity(light_cmp));
+						setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_COLOR, m_scene->getFogColor(light_cmp));
+						setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
+						setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOWMAP_SPLITS, m_shadowmap_splits);
 					}
 					m_renderer->setUniform(*shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
 
@@ -698,75 +729,112 @@ struct PipelineInstanceImpl : public PipelineInstance
 			{
 				const RenderableInfo* info1 = static_cast<const RenderableInfo*>(a);
 				const RenderableInfo* info2 = static_cast<const RenderableInfo*>(b);
-				return (int)(info1->m_mesh - info2->m_mesh);
+				return (int)(info1->m_key - info2->m_key);
 			});
 		}
 	}
 
-	void renderModels(int64_t layer_mask)
+
+	bool setMeshContext(RenderModelsMeshContext* context)
+	{
+		const Material& material = *context->m_mesh->getMaterial();
+		Shader* shader = material.getShader();
+		uint32_t pass_hash = getRenderer().getPass();
+		if (!shader->hasPass(pass_hash))
+		{
+			return false;
+		}
+
+		material.apply(*m_renderer, *this);
+		setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX0, m_shadow_modelviewprojection[0]);
+		setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX1, m_shadow_modelviewprojection[1]);
+		setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX2, m_shadow_modelviewprojection[2]);
+		setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX3, m_shadow_modelviewprojection[3]);
+		Component light_cmp = m_scene->getLight(0);
+		if (light_cmp.isValid())
+		{
+			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::AMBIENT_COLOR, m_scene->getLightAmbientColor(light_cmp));
+			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::AMBIENT_INTENSITY, m_scene->getLightAmbientIntensity(light_cmp));
+			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_COLOR, m_scene->getLightDiffuseColor(light_cmp));
+			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_INTENSITY, m_scene->getLightDiffuseIntensity(light_cmp));
+			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_COLOR, m_scene->getFogColor(light_cmp));
+			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
+			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOWMAP_SPLITS, m_shadowmap_splits);
+		}
+		m_renderer->setUniform(*shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
+		context->m_world_matrix_uniform_location = getUniformLocation(*shader, (int)Shader::FixedCachedUniforms::WORLD_MATRIX);
+		context->m_shader = shader;
+		context->m_geometry_start = context->m_mesh->getStart();
+		context->m_geometry_count = context->m_mesh->getCount();
+		if (context->m_world_matrix_uniform_location < 0)
+		{
+			return false;
+		}
+		return true;
+	}
+
+
+	void setPoseUniform(const RenderableMesh* LUMIX_RESTRICT renderable_mesh, RenderModelsMeshContext& mesh_context)
+	{
+		Matrix bone_mtx[64];
+
+		const Pose& pose = *renderable_mesh->m_pose;
+		const Model& model = *renderable_mesh->m_model;
+		Vec3* poss = pose.getPositions();
+		Quat* rots = pose.getRotations();
+		ASSERT(pose.getCount() <= 64);
+		for (int bone_index = 0, bone_count = pose.getCount(); bone_index < bone_count; ++bone_index)
+		{
+			rots[bone_index].toMatrix(bone_mtx[bone_index]);
+			bone_mtx[bone_index].translate(poss[bone_index]);
+			bone_mtx[bone_index] = bone_mtx[bone_index] * model.getBone(bone_index).inv_bind_matrix;
+		}
+		m_renderer->setUniform(*mesh_context.m_shader, "bone_matrices", BONE_MATRICES_HASH, bone_mtx, pose.getCount());
+	}
+
+
+	void renderModels(const Frustum& frustum, int64_t layer_mask)
 	{
 		PROFILE_FUNCTION();
-		
-		uint32_t pass_hash = getRenderer().getPass();
+
 		m_renderable_infos.clear();
-		m_scene->getRenderableInfos(m_renderable_infos, layer_mask);
-		int count = m_renderable_infos.size();
-		const Material* last_material = NULL;
-		sortRenderables(m_renderable_infos);
-		for (int i = 0; i < count; ++i)
+		m_scene->getRenderableInfos(frustum, m_renderable_infos, layer_mask);
+		if (m_renderable_infos.empty())
 		{
-			const RenderableInfo& info = m_renderable_infos[i];
-			const Matrix& world_matrix = info.m_model->getMatrix();
-			const Mesh& mesh = *info.m_mesh;
-			const Material& material = *mesh.getMaterial();
-			Shader& shader = *material.getShader();
-			
-			if (last_material != &material)
+			return;
+		}
+
+		sortRenderables(m_renderable_infos);
+
+		const RenderableInfo* LUMIX_RESTRICT info = &m_renderable_infos[0];
+		const RenderableInfo* LUMIX_RESTRICT end = &m_renderable_infos[0] + m_renderable_infos.size();
+		RenderModelsMeshContext mesh_context;
+		int64_t last_key = 0;
+		while (info != end)
+		{
+			if (last_key != info->m_key)
 			{
-				if(!shader.hasPass(pass_hash))
+				mesh_context.m_mesh = info->m_mesh->m_mesh;
+				if (!setMeshContext(&mesh_context))
 				{
+					++info;
 					continue;
 				}
-	
-				material.apply(*m_renderer, *this);
-				m_renderer->setUniform(shader, "shadowmap_matrix0", SHADOW_MATRIX0_HASH, m_shadow_modelviewprojection[0]);
-				m_renderer->setUniform(shader, "shadowmap_matrix1", SHADOW_MATRIX1_HASH, m_shadow_modelviewprojection[1]);
-				m_renderer->setUniform(shader, "shadowmap_matrix2", SHADOW_MATRIX2_HASH, m_shadow_modelviewprojection[2]);
-				m_renderer->setUniform(shader, "shadowmap_matrix3", SHADOW_MATRIX3_HASH, m_shadow_modelviewprojection[3]);
-				Component light_cmp = m_scene->getLight(0);
-				if(light_cmp.isValid())
-				{
-					m_renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::AMBIENT_COLOR, m_scene->getLightAmbientColor(light_cmp));
-					m_renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::AMBIENT_INTENSITY, m_scene->getLightAmbientIntensity(light_cmp));
-					m_renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::DIFFUSE_COLOR, m_scene->getLightDiffuseColor(light_cmp));
-					m_renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::DIFFUSE_INTENSITY, m_scene->getLightDiffuseIntensity(light_cmp));
-					m_renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::FOG_COLOR, m_scene->getFogColor(light_cmp));
-					m_renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
-					m_renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::SHADOWMAP_SPLITS, m_shadowmap_splits);
-				}
-				m_renderer->setUniform(shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
-				last_material = &material;
-			}
-			m_renderer->setFixedCachedUniform(shader, (int)Shader::FixedCachedUniforms::WORLD_MATRIX, world_matrix);
-			
-			static Matrix bone_mtx[64];
-			if (info.m_pose->getCount() > 0)
-			{
-				const Pose& pose = *info.m_pose;
-				const Model& model = *info.m_model->getModel();
-				Vec3* poss = pose.getPositions();
-				Quat* rots = pose.getRotations();
-				ASSERT(pose.getCount() <= 64);
-				for (int bone_index = 0, bone_count = pose.getCount(); bone_index < bone_count; ++bone_index)
-				{
-					rots[bone_index].toMatrix(bone_mtx[bone_index]);
-					bone_mtx[bone_index].translate(poss[bone_index]);
-					bone_mtx[bone_index] = bone_mtx[bone_index] * model.getBone(bone_index).inv_bind_matrix;
-				}
-				m_renderer->setUniform(shader, "bone_matrices", BONE_MATRICES_HASH, bone_mtx, pose.getCount());
+				bindGeometry(*m_renderer, *info->m_mesh->m_model->getGeometry(), *mesh_context.m_shader);
+				last_key = info->m_key;
 			}
 
-			m_renderer->renderGeometry(*m_renderable_infos[i].m_geometry, mesh.getStart(), mesh.getCount(), *material.getShader());
+			const RenderableMesh* LUMIX_RESTRICT renderable_mesh = info->m_mesh;
+			const Matrix& world_matrix = *renderable_mesh->m_matrix;
+			setUniform(mesh_context.m_world_matrix_uniform_location, world_matrix);
+			
+			if (renderable_mesh->m_pose->getCount() > 0)
+			{
+				setPoseUniform(renderable_mesh, mesh_context);
+			}
+			
+			renderGeometry(mesh_context.m_geometry_start, mesh_context.m_geometry_count);
+			++info;
 		}
 	}
 
@@ -803,6 +871,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		return m_scene;
 	}
 
+	IAllocator& m_allocator;
 	PipelineImpl& m_source;
 	RenderScene* m_scene;
 	Array<FrameBuffer*> m_framebuffers;
@@ -813,7 +882,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	Vec4 m_shadowmap_splits;
 	int m_width;
 	int m_height;
-	Map<uint32_t, CustomCommandHandler> m_custom_commands_handlers;
+	AssociativeArray<uint32_t, CustomCommandHandler> m_custom_commands_handlers;
 	Component m_active_camera;
 	Array<TerrainInfo> m_terrain_infos;
 	Array<GrassInfo> m_grass_infos;
@@ -821,30 +890,31 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	private:
 		void operator=(const PipelineInstanceImpl&);
+		PipelineInstanceImpl(const PipelineInstanceImpl&);
 };
 
 
-Pipeline::Pipeline(const Path& path, ResourceManager& resource_manager)
-	: Resource(path, resource_manager)
+Pipeline::Pipeline(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
+	: Resource(path, resource_manager, allocator)
 {
 }
 
 
-PipelineInstance* PipelineInstance::create(Pipeline& pipeline)
+PipelineInstance* PipelineInstance::create(Pipeline& pipeline, IAllocator& allocator)
 {
-	return LUMIX_NEW(PipelineInstanceImpl)(pipeline);
+	return allocator.newObject<PipelineInstanceImpl>(pipeline, allocator);
 }
 
 
 void PipelineInstance::destroy(PipelineInstance* pipeline)
 {
-	LUMIX_DELETE(pipeline);
+	static_cast<PipelineInstanceImpl*>(pipeline)->m_allocator.deleteObject(pipeline);
 }
 
 
 void PolygonModeCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
-	serializer.deserializeArrayItem(m_fill);
+	serializer.deserializeArrayItem(m_fill, true);
 }
 
 
@@ -857,7 +927,7 @@ void PolygonModeCommand::execute(PipelineInstanceImpl& pipeline)
 void SetPassCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
 	char pass_name[50];
-	serializer.deserializeArrayItem(pass_name, sizeof(pass_name));
+	serializer.deserializeArrayItem(pass_name, sizeof(pass_name), "");
 	m_pass_hash = crc32(pass_name);
 }
 
@@ -871,7 +941,7 @@ void SetPassCommand::execute(PipelineInstanceImpl& pipeline)
 void ClearCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
 	char tmp[256];
-	serializer.deserializeArrayItem(tmp, 255);
+	serializer.deserializeArrayItem(tmp, 255, "all");
 	if (strcmp(tmp, "all") == 0)
 	{
 		m_buffers = GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT;
@@ -892,7 +962,7 @@ void ClearCommand::execute(PipelineInstanceImpl&)
 void CustomCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
 	char tmp[256];
-	serializer.deserializeArrayItem(tmp, 255);
+	serializer.deserializeArrayItem(tmp, 255, "");
 	m_name = crc32(tmp);
 }
 
@@ -906,22 +976,21 @@ void CustomCommand::execute(PipelineInstanceImpl& pipeline)
 
 void RenderModelsCommand::deserialize(PipelineImpl&, ISerializer& serializer) 
 {
-	serializer.deserializeArrayItem(m_layer_mask);
+	serializer.deserializeArrayItem(m_layer_mask, 0);
 }
 
 
 void RenderModelsCommand::execute(PipelineInstanceImpl& pipeline)
 {
 	pipeline.renderTerrains(m_layer_mask);
-	pipeline.renderModels(m_layer_mask);
-	pipeline.renderGrass(m_layer_mask);
-
+	pipeline.renderModels(pipeline.getScene()->getFrustum(), m_layer_mask);
+	pipeline.renderGrass(pipeline.getScene()->getFrustum(), m_layer_mask);
 }
 
 
 void ApplyCameraCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
-	serializer.deserializeArrayItem(m_camera_slot);
+	serializer.deserializeArrayItem(m_camera_slot, "main");
 }
 
 
@@ -940,7 +1009,7 @@ void ApplyCameraCommand::execute(PipelineInstanceImpl& pipeline)
 
 void BindFramebufferCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
-	serializer.deserializeArrayItem(m_buffer_name);
+	serializer.deserializeArrayItem(m_buffer_name, "");
 }
 
 
@@ -973,16 +1042,16 @@ void RenderDebugLinesCommand::execute(PipelineInstanceImpl& pipeline)
 
 DrawScreenQuadCommand::~DrawScreenQuadCommand()
 {
-	LUMIX_DELETE(m_geometry);
+	m_allocator.deleteObject(m_geometry);
 }
 
 
 void DrawScreenQuadCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer)
 {
-	m_geometry = LUMIX_NEW(Geometry);
+	m_geometry = m_allocator.newObject<Geometry>(m_allocator);
 	VertexDef def;
 	def.parse("pt", 2);
-	Array<int> indices;
+	Array<int> indices(m_allocator);
 	const int GEOMETRY_VERTEX_ATTRIBUTE_COUNT = 20;
 	float v[GEOMETRY_VERTEX_ATTRIBUTE_COUNT];
 	indices.push(0);
@@ -994,14 +1063,14 @@ void DrawScreenQuadCommand::deserialize(PipelineImpl& pipeline, ISerializer& ser
 	
 	for (int i = 0; i < GEOMETRY_VERTEX_ATTRIBUTE_COUNT; ++i)
 	{
-		serializer.deserializeArrayItem(v[i]);
+		serializer.deserializeArrayItem(v[i], 0);
 	}
 
 	uint8_t* data = (uint8_t*)v;
 	m_geometry->copy(data, sizeof(v), indices, def);
 
 	char material[LUMIX_MAX_PATH];
-	serializer.deserializeArrayItem(material, LUMIX_MAX_PATH);
+	serializer.deserializeArrayItem(material, LUMIX_MAX_PATH, "");
 	m_material = static_cast<Material*>(pipeline.getResourceManager().get(ResourceManager::MATERIAL)->load(material));
 }
 
@@ -1014,9 +1083,9 @@ void DrawScreenQuadCommand::execute(PipelineInstanceImpl& pipeline)
 
 void BindFramebufferTextureCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
-	serializer.deserializeArrayItem(m_framebuffer_name);
+	serializer.deserializeArrayItem(m_framebuffer_name, "");
 	char rb_name[31];
-	serializer.deserializeArrayItem(rb_name, 30);
+	serializer.deserializeArrayItem(rb_name, 30, "");
 	if (stricmp(rb_name, "position") == 0)
 	{
 		m_renderbuffer_index = FrameBuffer::POSITION;
@@ -1033,7 +1102,7 @@ void BindFramebufferTextureCommand::deserialize(PipelineImpl&, ISerializer& seri
 	{
 		m_renderbuffer_index = FrameBuffer::DEPTH;
 	}
-	serializer.deserializeArrayItem(m_texture_uint);
+	serializer.deserializeArrayItem(m_texture_uint, 0);
 }
 
 
@@ -1050,8 +1119,8 @@ void BindFramebufferTextureCommand::execute(PipelineInstanceImpl& pipeline)
 
 void RenderShadowmapCommand::deserialize(PipelineImpl&, ISerializer& serializer)
 {
-	serializer.deserializeArrayItem(m_layer_mask);
-	serializer.deserializeArrayItem(m_camera_slot);
+	serializer.deserializeArrayItem(m_layer_mask, 0);
+	serializer.deserializeArrayItem(m_camera_slot, 0);
 }
 
 
@@ -1070,13 +1139,13 @@ void BindShadowmapCommand::execute(PipelineInstanceImpl& pipeline)
 
 Resource* PipelineManager::createResource(const Path& path)
 {
-	return LUMIX_NEW(PipelineImpl)(path, getOwner());
+	return m_allocator.newObject<PipelineImpl>(path, getOwner(), m_allocator);
 }
 
 
 void PipelineManager::destroyResource(Resource& resource)
 {
-	LUMIX_DELETE(static_cast<PipelineImpl*>(&resource));
+	m_allocator.deleteObject(static_cast<PipelineImpl*>(&resource));
 }
 
 

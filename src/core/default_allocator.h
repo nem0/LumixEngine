@@ -2,17 +2,20 @@
 
 
 #include "core/lumix.h"
+#include "core/iallocator.h"
 
 
 namespace Lumix
 {
 
-	class LUMIX_CORE_API DefaultAllocator
+	class LUMIX_CORE_API DefaultAllocator : public IAllocator
 	{
 		public:
-			void* allocate(size_t n);
-			void deallocate(void* p);
-			void* reallocate(void* p, size_t n);
+			DefaultAllocator()
+			{ }
+
+			virtual void* allocate(size_t n) override;
+			virtual void deallocate(void* p) override;
 	};
 
 

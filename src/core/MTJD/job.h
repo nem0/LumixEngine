@@ -15,7 +15,7 @@ namespace Lumix
 			friend class WorkerTask;
 
 		public:
-			Job(bool auto_destroy, Priority priority, bool sync_event, Manager& manager);
+			Job(bool auto_destroy, Priority priority, bool sync_event, Manager& manager, IAllocator& allocator);
 			virtual ~Job();
 
 			virtual void incrementDependency() override;
@@ -28,6 +28,8 @@ namespace Lumix
 			virtual void execute() = 0;
 			virtual void onExecuted();
 
+			IAllocator&	m_allocator;
+
 			Manager&	m_manager;
 			Priority	m_priority;
 			bool		m_auto_destroy;
@@ -36,6 +38,7 @@ namespace Lumix
 
 		private:
 			Job& operator= (const Job& rhs);
+			Job(const Job&);
 
 #ifndef __SOME_MASTER_VERSION
 

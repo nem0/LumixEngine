@@ -12,41 +12,23 @@ namespace Lumix
 	Log g_log_error;
 
 
-	struct LogImpl
-	{
-		void sendMessage();
-
-		Log::Callback m_callbacks;
-	};
-
-
-	Log::Log()
-	{
-		m_impl = LUMIX_NEW(LogImpl)();
-	}
-
-
-	Log::~Log()
-	{
-		LUMIX_DELETE(m_impl);
-	}
-
-
 	LogProxy Log::log(const char* system)
 	{
-		return LogProxy(*this, system);
+		return LogProxy(*this, system, m_allocator);
 	}
 
 
 	Log::Callback& Log::getCallback()
 	{
-		return m_impl->m_callbacks;
+		return m_callbacks;
 	}
 
-	LogProxy::LogProxy(Log& log, const char* system)
-		: m_log(log)
+	LogProxy::LogProxy(Log& log, const char* system, IAllocator& allocator)
+		: m_allocator(allocator)
+		, m_log(log)
+		, m_system(system, m_allocator)
+		, m_message(m_allocator)
 	{
-		m_system = system;
 	}
 
 	LogProxy::~LogProxy()

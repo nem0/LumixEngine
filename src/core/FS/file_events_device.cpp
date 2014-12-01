@@ -1,5 +1,5 @@
 #include "core/fs/file_events_device.h"
-
+#include "core/iallocator.h"
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
 #include "core/fs/ifile_system_defines.h"
@@ -13,16 +13,23 @@ namespace Lumix
 		class EventsFile : public IFile
 		{
 		public:
-			EventsFile(IFile& file, FileEventsDevice::EventCallback& cb)
+			EventsFile(IFile& file, FileEventsDevice& device, FileEventsDevice::EventCallback& cb)
 				: m_file(file)
 				, m_cb(cb)
+				, m_device(device)
 			{
 			}
 
 
 			virtual ~EventsFile() 
 			{
-				LUMIX_DELETE(&m_file);
+				m_file.release();
+			}
+
+
+			virtual IFileDevice& getDevice() override
+			{
+				return m_device;
 			}
 
 
@@ -47,20 +54,20 @@ namespace Lumix
 
 			virtual bool read(void* buffer, size_t size) override
 			{
-				invokeEvent(EventType::READ_BEGIN, "", -1, size);
+				invokeEvent(EventType::READ_BEGIN, "", -1, (int32_t)size);
 				bool ret = m_file.read(buffer, size);
 
-				invokeEvent(EventType::READ_FINISHED, "", ret ? 1 : 0, size);
+				invokeEvent(EventType::READ_FINISHED, "", ret ? 1 : 0, (int32_t)size);
 				return ret;
 			}
 
 
 			virtual bool write(const void* buffer, size_t size) override
 			{
-				invokeEvent(EventType::WRITE_BEGIN, "", -1, size);
+				invokeEvent(EventType::WRITE_BEGIN, "", -1, (int32_t)size);
 				bool ret = m_file.write(buffer, size);
 
-				invokeEvent(EventType::WRITE_FINISHED, "", ret ? 1 : 0, size);
+				invokeEvent(EventType::WRITE_FINISHED, "", ret ? 1 : 0, (int32_t)size);
 				return ret;
 			}
 
@@ -76,17 +83,17 @@ namespace Lumix
 				invokeEvent(EventType::SIZE_BEGIN, "", -1, -1);
 				size_t ret = m_file.size();
 
-				invokeEvent(EventType::SIZE_FINISHED, "", ret, -1);
+				invokeEvent(EventType::SIZE_FINISHED, "", (int32_t)ret, -1);
 				return ret;
 			}
 
 
 			virtual size_t seek(SeekMode base, size_t pos) override
 			{
-				invokeEvent(EventType::SEEK_BEGIN, "", pos, base);
+				invokeEvent(EventType::SEEK_BEGIN, "", (int32_t)pos, base);
 				size_t ret = m_file.seek(base, pos);
 
-				invokeEvent(EventType::SEEK_FINISHED, "", ret, base);
+				invokeEvent(EventType::SEEK_FINISHED, "", (int32_t)ret, base);
 				return ret;
 			}
 
@@ -96,7 +103,7 @@ namespace Lumix
 				invokeEvent(EventType::POS_BEGIN, "", -1, -1);
 				size_t ret = m_file.pos();
 
-				invokeEvent(EventType::POS_FINISHED, "", ret, -1);
+				invokeEvent(EventType::POS_FINISHED, "", (int32_t)ret, -1);
 				return ret;
 			}
 
@@ -116,15 +123,21 @@ namespace Lumix
 				m_cb.invoke(event);
 			}
 
-
+			FileEventsDevice& m_device;
 			IFile& m_file;
 			FileEventsDevice::EventCallback& m_cb;
 		};
 
 
+		void FileEventsDevice::destroyFile(IFile* file)
+		{
+			m_allocator.deleteObject(file);
+		}
+
+
 		IFile* FileEventsDevice::createFile(IFile* child)
 		{
-			return LUMIX_NEW(EventsFile)(*child, OnEvent);
+			return m_allocator.newObject<EventsFile>(*child, *this, OnEvent);
 		}
 	} // namespace FS
 } // ~namespace Lumix

@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include "core/stack_allocator.h"
 #include "core/string.h"
 #include "graphics/gl_ext.h"
 
@@ -46,6 +47,7 @@ class FrameBuffer
 		static void unbind();
 
 	private:
+		StackAllocator<64> m_name_allocator;
 		string m_name;
 		GLuint m_textures[RENDERBUFFERS_COUNT];
 		GLuint m_renderbuffers[RENDERBUFFERS_COUNT];

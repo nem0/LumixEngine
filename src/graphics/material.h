@@ -83,9 +83,8 @@ public:
 	int getUniformCount() const { return m_uniforms.size(); }
 	Uniform& getUniform(int index) { return m_uniforms[index]; }
 
-private:
-	Material(const Path& path, ResourceManager& resource_manager)
-		: Resource(path, resource_manager)
+	Material(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
+		: Resource(path, resource_manager, allocator)
 		, m_shader(NULL)
 		, m_is_z_test(true)
 		, m_is_backface_culling(true)
@@ -94,12 +93,15 @@ private:
 		, m_is_alpha_cutout(false)
 		, m_shader_combination(0)
 		, m_is_shadow_receiver(true)
+		, m_textures(allocator)
+		, m_uniforms(allocator)
 	{ 
 		updateShaderCombination();
 	}
 
 	~Material();
 
+private:
 	virtual void doUnload(void) override;
 	virtual FS::ReadCallback getReadCallback() override;
 

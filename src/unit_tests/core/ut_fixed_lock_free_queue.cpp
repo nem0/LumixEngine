@@ -26,8 +26,9 @@ namespace
 	class TestTaskConsumer : public Lumix::MT::Task
 	{
 	public:
-		TestTaskConsumer(Queue* queue)
-			: m_queue(queue)
+		TestTaskConsumer(Queue* queue, Lumix::IAllocator& allocator)
+			: Lumix::MT::Task(allocator)
+			, m_queue(queue)
 			, m_sum(0)
 		{}
 
@@ -59,8 +60,9 @@ namespace
 
 	void UT_fixed_lock_queue_non_trivial_constructors(const char* params)
 	{
-		Queue queue;
-		TestTaskConsumer testTaskConsumer(&queue);
+		Lumix::DefaultAllocator allocator;
+		Queue queue(allocator);
+		TestTaskConsumer testTaskConsumer(&queue, allocator);
 		testTaskConsumer.create("TestTaskConsumer_Task");
 		testTaskConsumer.run();
 
@@ -72,6 +74,11 @@ namespace
 			queue.push(test, true);
 		}
 
+		while (!queue.isEmpty())
+		{
+			Lumix::MT::yield();
+		}
+
 		queue.abort();
 		testTaskConsumer.destroy();
 
@@ -81,8 +88,9 @@ namespace
 	class TestTaskPodConsumer : public Lumix::MT::Task
 	{
 	public:
-		TestTaskPodConsumer(PodQueue* queue)
-			: m_queue(queue)
+		TestTaskPodConsumer(PodQueue* queue, Lumix::IAllocator& allocator)
+			: Lumix::MT::Task(allocator)
+			, m_queue(queue)
 			, m_sum(0)
 		{}
 
@@ -115,7 +123,8 @@ namespace
 	void UT_fixed_lock_queue_trivial_constructors(const char* params)
 	{
 		PodQueue queue;
-		TestTaskPodConsumer testTaskPodConsumer(&queue);
+		Lumix::DefaultAllocator allocator;
+		TestTaskPodConsumer testTaskPodConsumer(&queue, allocator);
 		testTaskPodConsumer.create("TestTaskPodConsumer_Task");
 		testTaskPodConsumer.run();
 
@@ -127,10 +136,15 @@ namespace
 			queue.push(test, true);
 		}
 
+		while (!queue.isEmpty())
+		{
+			Lumix::MT::yield();
+		}
+
 		queue.abort();
 		testTaskPodConsumer.destroy();
 
-		LUMIX_EXPECT_EQ(7968, testTaskPodConsumer.getSum());
+		LUMIX_EXPECT_EQ(8448, testTaskPodConsumer.getSum());
 	};
 }
 

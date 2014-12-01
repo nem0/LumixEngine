@@ -3,24 +3,18 @@
 
 namespace Lumix
 {
-	struct AllocationHeader
-	{
-		uint8_t* m_next;
-		size_t m_size;
-	};
-
 	FIFOAllocator::FIFOAllocator(size_t buffer_size)
 		: m_mutex(false)
 	{
 		m_buffer_size = buffer_size;
-		m_buffer = static_cast<uint8_t*>(LUMIX_MALLOC(buffer_size));
+		m_buffer = static_cast<uint8_t*>(malloc(buffer_size));
 		m_start = m_end = 0;
 	}
 
 	FIFOAllocator::~FIFOAllocator()
 	{
 		ASSERT(m_start == m_end);
-		LUMIX_FREE(m_buffer);
+		free(m_buffer);
 	}
 
 	void* FIFOAllocator::allocate(size_t n)
@@ -54,12 +48,6 @@ namespace Lumix
 		MT::SpinLock lock(m_mutex);
 		int32_t n = *(((int32_t*)p) - 1);
 		m_start = n + (int32_t)((uint8_t*)p - m_buffer);
-	}
-
-	void* FIFOAllocator::reallocate(void*, size_t)
-	{
-		ASSERT(false); // not supported
-		return NULL;
 	}
 
 

@@ -7,19 +7,14 @@ namespace Lumix
 
 	void* DefaultAllocator::allocate(size_t n)
 	{
-		return LUMIX_MALLOC(n);
+		return malloc(n);
 	}
 
 
 	void DefaultAllocator::deallocate(void* p)
 	{
-		LUMIX_FREE((uint8_t*)p);
+		free(p);
 	}
 
-
-	void* DefaultAllocator::reallocate(void* p, size_t n)
-	{
-		return LUMIX_REALLOC(p, n);
-	}
 
 } // ~namespace Lumix

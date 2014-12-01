@@ -11,6 +11,7 @@
 #include "graphics/model.h"
 #include "graphics/pipeline.h"
 #include "graphics/renderer.h"
+#include "world_editor.h"
 
 #include <gl/GL.h>
 
@@ -18,12 +19,12 @@ namespace Lumix
 {
 
 
-void EditorIcon::create(Engine& engine, RenderScene& scene, const Entity& entity)
+EditorIcon::EditorIcon(Engine& engine, RenderScene& scene, const Entity& entity)
 {
 	m_scene = &scene;
 	m_entity = entity;
 	m_is_visible = true;
-	const Entity::ComponentList& cmps = entity.getComponents();
+	const WorldEditor::ComponentList& cmps = engine.getWorldEditor()->getComponents(entity);
 	m_type = ENTITY;
 	for (int i = 0; i < cmps.size(); ++i)
 	{
@@ -37,23 +38,35 @@ void EditorIcon::create(Engine& engine, RenderScene& scene, const Entity& entity
 			m_type = PHYSICAL_BOX;
 			break;
 		}
+		else if (cmps[i].type == crc32("camera"))
+		{
+			m_type = CAMERA;
+			break;
+		}
+		else if (cmps[i].type == crc32("light"))
+		{
+			m_type = LIGHT;
+			break;
+		}
+		else if (cmps[i].type == crc32("terrain"))
+		{
+			m_type = TERRAIN;
+			break;
+		}
 	}
-	switch (m_type)
-	{
-		case PHYSICAL_CONTROLLER:
-			m_model = static_cast<Model*>(engine.getResourceManager().get(ResourceManager::MODEL)->load("models/editor/phy_controller_icon.msh"));
-			break;
-		case PHYSICAL_BOX:
-			m_model = static_cast<Model*>(engine.getResourceManager().get(ResourceManager::MODEL)->load("models/editor/phy_box_icon.msh"));
-			break;
-		default:
-			m_model = static_cast<Model*>(engine.getResourceManager().get(ResourceManager::MODEL)->load("models/editor/icon.msh"));
-			break;
-	}
+	const char* names[COUNT] = {
+		"models/editor/phy_controller_icon.msh",
+		"models/editor/phy_box_icon.msh",
+		"models/editor/camera_icon.msh",
+		"models/editor/directional_light_icon.msh",
+		"models/editor/terrain_icon.msh",
+		"models/editor/icon.msh"
+	};
+	m_model = static_cast<Model*>(engine.getResourceManager().get(ResourceManager::MODEL)->load(names[m_type]));
 }
 
 
-void EditorIcon::destroy()
+EditorIcon::~EditorIcon()
 {
 	m_model->getResourceManager().get(ResourceManager::MODEL)->unload(*m_model);
 }

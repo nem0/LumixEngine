@@ -13,7 +13,7 @@ namespace Lumix
 		public:
 			typedef Array<BaseEntry*> DependencyTable;
 
-			BaseEntry(int32_t depend_count, bool sync_event);
+			BaseEntry(int32_t depend_count, bool sync_event, IAllocator& allocator);
 			virtual ~BaseEntry();
 
 			void addDependency(BaseEntry* entry);
@@ -29,6 +29,7 @@ namespace Lumix
 
 			void dependencyReady();
 
+			IAllocator&			m_allocator;
 			MT::Event*			m_sync_event;
 			volatile int32_t	m_dependency_count;
 			DependencyTable		m_dependency_table;

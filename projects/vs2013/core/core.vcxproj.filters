@@ -13,12 +13,8 @@
     <ClInclude Include="..\..\..\src\core\iserializer.h" />
     <ClInclude Include="..\..\..\src\core\json_serializer.h" />
     <ClInclude Include="..\..\..\src\core\log.h" />
-    <ClInclude Include="..\..\..\src\core\map.h" />
     <ClInclude Include="..\..\..\src\core\math_utils.h" />
     <ClInclude Include="..\..\..\src\core\matrix.h" />
-    <ClInclude Include="..\..\..\src\core\memory_tracker.h" />
-    <ClInclude Include="..\..\..\src\core\new.h" />
-    <ClInclude Include="..\..\..\src\core\new_macros.h" />
     <ClInclude Include="..\..\..\src\core\pod_hash_map.h" />
     <ClInclude Include="..\..\..\src\core\quat.h" />
     <ClInclude Include="..\..\..\src\core\queue.h" />
@@ -129,6 +125,22 @@
     <ClInclude Include="..\..\..\src\core\mt\thread.h">
       <Filter>mt</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\core\aabb.h" />
+    <ClInclude Include="..\..\..\src\core\iallocator.h" />
+    <ClInclude Include="..\..\..\src\debug\allocator.h">
+      <Filter>debug</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\debug\debug.h">
+      <Filter>debug</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\debug\stack_tree.h">
+      <Filter>debug</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\core\MTJD\generic_job.h">
+      <Filter>mtjd</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\core\associative_array.h" />
+    <ClInclude Include="..\..\..\src\core\binary_array.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\core\blob.cpp" />
@@ -138,9 +150,6 @@
     <ClCompile Include="..\..\..\src\core\log.cpp" />
     <ClCompile Include="..\..\..\src\core\math_utils.cpp" />
     <ClCompile Include="..\..\..\src\core\matrix.cpp" />
-    <ClCompile Include="..\..\..\src\core\memory_tracker.cpp" />
-    <ClCompile Include="..\..\..\src\core\new.cpp" />
-    <ClCompile Include="..\..\..\src\core\new_macros.cpp" />
     <ClCompile Include="..\..\..\src\core\quat.cpp" />
     <ClCompile Include="..\..\..\src\core\timer.cpp" />
     <ClCompile Include="..\..\..\src\core\pc\input_system.cpp" />
@@ -220,6 +229,17 @@
     <ClCompile Include="..\..\..\src\core\mt\pc\thread.cpp">
       <Filter>mt</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\core\FS\ifile.cpp" />
+    <ClCompile Include="..\..\..\src\debug\pc\allocator.cpp">
+      <Filter>debug</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\debug\pc\debug.cpp">
+      <Filter>debug</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\debug\pc\stack_tree.cpp">
+      <Filter>debug</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\core\binary_array.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="fs">
@@ -233,6 +253,9 @@
     </Filter>
     <Filter Include="net">
       <UniqueIdentifier>{129b26b9-e5b8-4ef9-b3f8-e886c1337601}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="debug">
+      <UniqueIdentifier>{7fca9b7c-cc60-4d0d-b3e1-5c9f93c59450}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

@@ -10,6 +10,7 @@
 #include "core/resource_manager_base.h"
 #include "core/vec3.h"
 #include "graphics/gl_ext.h"
+#include "graphics/renderer.h"
 #include "graphics/shader_manager.h"
 
 
@@ -17,9 +18,16 @@ namespace Lumix
 {
 
 
-Shader::Shader(const Path& path, ResourceManager& resource_manager)
-	: Resource(path, resource_manager)
+Shader::Shader(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator)
+	: Resource(path, resource_manager, allocator)
 	, m_is_shadowmap_required(true)
+	, m_renderer(renderer)
+	, m_allocator(allocator)
+	, m_source(m_allocator)
+	, m_attributes(m_allocator)
+	, m_passes(m_allocator)
+	, m_pass_hashes(m_allocator)
+	, m_combinations(m_allocator)
 {
 }
 
@@ -31,7 +39,7 @@ Shader::~Shader()
 		glDeleteProgram(m_combinations[i]->m_program_id);
 		glDeleteShader(m_combinations[i]->m_vertex_id);
 		glDeleteShader(m_combinations[i]->m_fragment_id);
-		LUMIX_DELETE(m_combinations[i]);
+		m_allocator.deleteObject(m_combinations[i]);
 	}
 }
 
@@ -88,12 +96,15 @@ void Shader::createCombination(const char* defines)
 
 		if(!getCombination(hash, pass_hash))
 		{
-			Combination* combination = LUMIX_NEW(Combination);
+			Combination* combination = m_allocator.newObject<Combination>(m_allocator);
 			m_combinations.push(combination);
 			combination->m_defines = defines;
 			combination->m_program_id = glCreateProgram();
 			combination->m_hash = hash;
 			combination->m_pass_hash = pass_hash;
+
+			char version_str[20];
+			copyString(version_str, sizeof(version_str), m_renderer.getGLSLVersion() >= 330 ? "#version 330\n" : "#version 130\n");
 
 			char pass_str[1024];
 			copyString(pass_str, sizeof(pass_str), "#define ");
@@ -101,13 +112,13 @@ void Shader::createCombination(const char* defines)
 			catCString(pass_str, sizeof(pass_str), "_PASS\n");
 
 			combination->m_vertex_id = glCreateShader(GL_VERTEX_SHADER);
-			const GLchar* vs_strings[] = { pass_str, "#define VERTEX_SHADER\n", defines, m_source.c_str() };
+			const GLchar* vs_strings[] = { version_str, pass_str, "#define VERTEX_SHADER\n", defines, m_source.c_str() };
 			glShaderSource(combination->m_vertex_id, sizeof(vs_strings) / sizeof(vs_strings[0]), vs_strings, NULL);
 			glCompileShader(combination->m_vertex_id);
 			glAttachShader(combination->m_program_id, combination->m_vertex_id);
 
 			combination->m_fragment_id = glCreateShader(GL_FRAGMENT_SHADER);
-			const GLchar* fs_strings[] = { pass_str, "#define FRAGMENT_SHADER\n", defines, m_source.c_str() };
+			const GLchar* fs_strings[] = { version_str, pass_str, "#define FRAGMENT_SHADER\n", defines, m_source.c_str() };
 			glShaderSource(combination->m_fragment_id, sizeof(fs_strings) / sizeof(fs_strings[0]), fs_strings, NULL);
 			glCompileShader(combination->m_fragment_id);
 			glAttachShader(combination->m_program_id, combination->m_fragment_id);
@@ -156,6 +167,10 @@ void Shader::createCombination(const char* defines)
 			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::SHADOWMAP_SPLITS] = glGetUniformLocation(combination->m_program_id, "shadowmap_splits");
 			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::VIEW_MATRIX] = glGetUniformLocation(combination->m_program_id, "view_matrix");
 			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::PROJECTION_MATRIX] = glGetUniformLocation(combination->m_program_id, "projection_matrix");
+			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::SHADOW_MATRIX0] = glGetUniformLocation(combination->m_program_id, "shadowmap_matrix0");
+			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::SHADOW_MATRIX1] = glGetUniformLocation(combination->m_program_id, "shadowmap_matrix1");
+			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::SHADOW_MATRIX2] = glGetUniformLocation(combination->m_program_id, "shadowmap_matrix2");
+			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::SHADOW_MATRIX3] = glGetUniformLocation(combination->m_program_id, "shadowmap_matrix3");
 		}
 	}
 }
@@ -179,8 +194,8 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 				serializer.deserializeArrayBegin();
 				while (!serializer.isArrayEnd())
 				{
-					serializer.deserializeArrayItem(label, sizeof(label));
-					m_attributes.push(string(label)); /// TODO emplace when it is merged
+					serializer.deserializeArrayItem(label, sizeof(label), "");
+					m_attributes.emplace(string(label, m_allocator));
 				}
 				serializer.deserializeArrayEnd();
 			}
@@ -189,15 +204,15 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 				serializer.deserializeArrayBegin();
 				while (!serializer.isArrayEnd())
 				{
-					serializer.deserializeArrayItem(label, sizeof(label));
-					m_passes.push(string(label)); /// TODO emplace when it is merged
+					serializer.deserializeArrayItem(label, sizeof(label), "");
+					m_passes.push(string(label, m_allocator));
 					m_pass_hashes.push(crc32(label));
 				}
 				serializer.deserializeArrayEnd();
 			}
 			else if (strcmp(label, "shadowmap_required") == 0)
 			{
-				serializer.deserialize(m_is_shadowmap_required);
+				serializer.deserialize(m_is_shadowmap_required, false);
 			}
 		}
 		serializer.deserializeObjectEnd();
@@ -213,7 +228,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		decrementDepCount();
 		if(!m_combinations.empty())
 		{
-			Array<Combination*> old_combinations;
+			Array<Combination*> old_combinations(m_allocator);
 			for(int i = 0; i < m_combinations.size(); ++i)
 			{
 				old_combinations.push(m_combinations[i]);
@@ -225,7 +240,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			}
 			for(int i = 0; i < old_combinations.size(); ++i)
 			{
-				LUMIX_DELETE(old_combinations[i]);
+				m_allocator.deleteObject(old_combinations[i]);
 			}
 		}
 		else

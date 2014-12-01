@@ -20,8 +20,9 @@ namespace
 	class TestTaskConsumer : public Lumix::MT::Task
 	{
 	public:
-		TestTaskConsumer(TransQueue* queue, Test* array)
-			: m_trans_queue(queue)
+		TestTaskConsumer(TransQueue* queue, Test* array, Lumix::IAllocator& allocator)
+			: Lumix::MT::Task(allocator)
+			, m_trans_queue(queue)
 			, m_array(array)
 		{}
 
@@ -54,8 +55,9 @@ namespace
 	class TestTaskProducer : public Lumix::MT::Task
 	{
 	public:
-		TestTaskProducer(TransQueue* queue, Test* array, size_t size)
-			: m_trans_queue(queue)
+		TestTaskProducer(TransQueue* queue, Test* array, size_t size, Lumix::IAllocator& allocator)
+			: Lumix::MT::Task(allocator)
+			, m_trans_queue(queue)
 			, m_array(array)
 			, m_size(size)
 		{}
@@ -84,8 +86,9 @@ namespace
 
 	void UT_tq_heavy_usage(const char* params)
 	{
+		Lumix::DefaultAllocator allocator;
 		const size_t itemsCount = 1200000;
-		Test* testItems = LUMIX_NEW_ARRAY(Test, itemsCount);
+		Test* testItems = (Test*)allocator.allocate(sizeof(Test) * itemsCount);
 		for (size_t i = 0; i < itemsCount; i++)
 		{
 			testItems[i].idx = i;
@@ -93,12 +96,12 @@ namespace
 			testItems[i].thread_id = Lumix::MT::getCurrentThreadID();
 		}
 
-		TransQueue trans_queue;
+		TransQueue trans_queue(allocator);
 
-		TestTaskConsumer cons1(&trans_queue, testItems);
-		TestTaskConsumer cons2(&trans_queue, testItems);
-		TestTaskConsumer cons3(&trans_queue, testItems);
-		TestTaskConsumer cons4(&trans_queue, testItems);
+		TestTaskConsumer cons1(&trans_queue, testItems, allocator);
+		TestTaskConsumer cons2(&trans_queue, testItems, allocator);
+		TestTaskConsumer cons3(&trans_queue, testItems, allocator);
+		TestTaskConsumer cons4(&trans_queue, testItems, allocator);
 
 		cons1.create("cons1");
 		cons2.create("cons2");
@@ -110,10 +113,10 @@ namespace
 		cons3.run();
 		cons4.run();
 
-		TestTaskProducer prod1(&trans_queue, &testItems[0], itemsCount / 4);
-		TestTaskProducer prod2(&trans_queue, &testItems[itemsCount / 4], itemsCount / 4);
-		TestTaskProducer prod3(&trans_queue, &testItems[itemsCount / 2], itemsCount / 4);
-		TestTaskProducer prod4(&trans_queue, &testItems[3 * itemsCount / 4], itemsCount / 4);
+		TestTaskProducer prod1(&trans_queue, &testItems[0], itemsCount / 4, allocator);
+		TestTaskProducer prod2(&trans_queue, &testItems[itemsCount / 4], itemsCount / 4, allocator);
+		TestTaskProducer prod3(&trans_queue, &testItems[itemsCount / 2], itemsCount / 4, allocator);
+		TestTaskProducer prod4(&trans_queue, &testItems[3 * itemsCount / 4], itemsCount / 4, allocator);
 
 		prod1.create("prod1");
 		prod2.create("prod2");
@@ -157,15 +160,16 @@ namespace
 			LUMIX_EXPECT_NE(testItems[i].thread_id, Lumix::MT::getCurrentThreadID());
 		}
 
-		LUMIX_DELETE_ARRAY(testItems);
+		allocator.deallocate(testItems);
 
 		Lumix::g_log_info.log("unit") << "UT_tq_heavy_usage finished ...";
 	};
 
 	void UT_tq_push(const char* params)
 	{
+		Lumix::DefaultAllocator allocator;
 		const size_t itemsCount = 1200000;
-		Test* testItems = LUMIX_NEW_ARRAY(Test, itemsCount);
+		Test* testItems = (Test*)allocator.allocate(sizeof(Test) * itemsCount);
 		for (size_t i = 0; i < itemsCount; i++)
 		{
 			testItems[i].idx = i;
@@ -173,10 +177,10 @@ namespace
 			testItems[i].thread_id = Lumix::MT::getCurrentThreadID();
 		}
 
-		TransQueue trans_queue;
+		TransQueue trans_queue(allocator);
 
-		TestTaskProducer prod(&trans_queue, &testItems[0], itemsCount);
-		TestTaskConsumer cons(&trans_queue, testItems);
+		TestTaskProducer prod(&trans_queue, &testItems[0], itemsCount, allocator);
+		TestTaskConsumer cons(&trans_queue, testItems, allocator);
 
 		prod.create("producer");
 		cons.create("consumer");
@@ -203,7 +207,7 @@ namespace
 			LUMIX_EXPECT_NE(testItems[i].thread_id, Lumix::MT::getCurrentThreadID());
 		}
 
-		LUMIX_DELETE_ARRAY(testItems);
+		allocator.deallocate(testItems);
 
 		Lumix::g_log_info.log("unit") << "UT_tq_heavy_usage finished ...";
 	}

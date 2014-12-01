@@ -1,5 +1,5 @@
 #include "core/input_system.h"
-#include "core/map.h"
+#include "core/associative_array.h"
 #include "core/string.h"
 #include <Windows.h>
 
@@ -9,15 +9,30 @@ namespace Lumix
 
 	struct InputSystemImpl
 	{
+		InputSystemImpl(IAllocator& allocator)
+			: m_actions(allocator)
+			, m_allocator(allocator)
+			, m_is_enabled(true)
+		{}
+
 		struct Action
 		{
 			InputSystem::InputType type;
 			int key;
 		};
-		Map<uint32_t, Action> m_actions;
+		
+		IAllocator& m_allocator;
+		AssociativeArray<uint32_t, Action> m_actions;
 		float m_mouse_rel_x;
 		float m_mouse_rel_y;
+		bool m_is_enabled;
 	};
+
+
+	void InputSystem::enable(bool enabled)
+	{
+		m_impl->m_is_enabled = enabled;
+	}
 
 
 	void InputSystem::update(float)
@@ -27,9 +42,9 @@ namespace Lumix
 	}
 
 
-	bool InputSystem::create()
+	bool InputSystem::create(IAllocator& allocator)
 	{
-		m_impl = LUMIX_NEW(InputSystemImpl)();
+		m_impl = allocator.newObject<InputSystemImpl>(allocator);
 		m_impl->m_mouse_rel_x = 0;
 		m_impl->m_mouse_rel_y = 0;
 		return true;
@@ -38,7 +53,7 @@ namespace Lumix
 
 	void InputSystem::destroy()
 	{
-		LUMIX_DELETE(m_impl);
+		m_impl->m_allocator.deleteObject(m_impl);
 		m_impl = NULL;
 	}
 
@@ -66,6 +81,10 @@ namespace Lumix
 
 	float InputSystem::getActionValue(uint32_t action)
 	{
+		if (!m_impl->m_is_enabled)
+		{
+			return 0;
+		}
 		InputSystemImpl::Action value;
 		if(m_impl->m_actions.find(action, value))
 		{

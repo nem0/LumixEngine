@@ -1,4 +1,5 @@
 #include "core/fs/tcp_file_device.h"
+#include "core/iallocator.h"
 #include "core/blob.h"
 #include "core/fs/ifile.h"
 #include "core/fs/ifile_system_defines.h"
@@ -15,12 +16,18 @@ namespace Lumix
 		class TCPFile : public IFile
 		{
 		public:
-			TCPFile(Net::TCPStream* stream, MT::SpinMutex& spin_mutex) 
-				: m_stream(stream)
+			TCPFile(Net::TCPStream* stream, TCPFileDevice& device, MT::SpinMutex& spin_mutex) 
+				: m_device(device)
+				, m_stream(stream)
 				, m_spin_mutex(spin_mutex)
 			{}
 
 			~TCPFile() {}
+
+			virtual IFileDevice& getDevice() override
+			{
+				return m_device;
+			}
 
 			virtual bool open(const char* path, Mode mode) override
 			{
@@ -130,7 +137,9 @@ namespace Lumix
 
 		private:
 			void operator=(const TCPFile&);
+			TCPFile(const TCPFile&);
 
+			TCPFileDevice& m_device;
 			Net::TCPStream* m_stream;
 			MT::SpinMutex& m_spin_mutex;
 			uint32_t m_file;
@@ -138,10 +147,13 @@ namespace Lumix
 
 		struct TCPImpl
 		{
-			TCPImpl()
+			TCPImpl(IAllocator& allocator)
 				: m_spin_mutex(false)
+				, m_allocator(allocator)
+				, m_connector(m_allocator)
 			{}
 
+			IAllocator& m_allocator;
 			Net::TCPConnector m_connector;
 			Net::TCPStream* m_stream;
 			MT::SpinMutex m_spin_mutex;
@@ -149,20 +161,25 @@ namespace Lumix
 
 		IFile* TCPFileDevice::createFile(IFile*)
 		{
-			return LUMIX_NEW(TCPFile)(m_impl->m_stream, m_impl->m_spin_mutex);
+			return m_impl->m_allocator.newObject<TCPFile>(m_impl->m_stream, *this, m_impl->m_spin_mutex);
 		}
 
-		void TCPFileDevice::connect(const char* ip, uint16_t port)
+		void TCPFileDevice::destroyFile(IFile* file)
 		{
-			m_impl = LUMIX_NEW(TCPImpl);
+			m_impl->m_allocator.deleteObject(file);
+		}
+
+		void TCPFileDevice::connect(const char* ip, uint16_t port, IAllocator& allocator)
+		{
+			m_impl = allocator.newObject<TCPImpl>(allocator);
 			m_impl->m_stream = m_impl->m_connector.connect(ip, port);
 		}
 
 		void TCPFileDevice::disconnect()
 		{
 			m_impl->m_stream->write(TCPCommand::Disconnect);
-			LUMIX_DELETE(m_impl->m_stream);
-			LUMIX_DELETE(m_impl);
+			m_impl->m_connector.close(m_impl->m_stream);
+			m_impl->m_allocator.deleteObject(m_impl);
 		}
 	} // namespace FS
 } // ~namespace Lumix

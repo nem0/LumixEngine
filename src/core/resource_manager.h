@@ -23,12 +23,13 @@ namespace Lumix
 		static const uint32_t PIPELINE	= 0xbbcf4595; //PIPELINE
 		static const uint32_t ANIMATION = 0xc9909a33; //ANIMATION
 
-		ResourceManager();
+		ResourceManager(IAllocator& allocator);
 		~ResourceManager();
 
 		void create(FS::FileSystem& fs);
 		void destroy(void);
 
+		IAllocator& getAllocator() { return m_allocator; }
 		ResourceManagerBase* get(uint32_t id);
 
 		void add(uint32_t id, ResourceManagerBase* rm);
@@ -38,6 +39,7 @@ namespace Lumix
 		FS::FileSystem& getFileSystem() { return *m_file_system; }
 
 	private:
+		IAllocator& m_allocator;
 		ResourceManagerTable m_resource_managers;
 		FS::FileSystem* m_file_system;
 	};

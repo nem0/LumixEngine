@@ -6,8 +6,9 @@ namespace Lumix
 {
 	namespace MTJD
 	{
-		Group::Group(bool sync_event)
-			: BaseEntry(0, sync_event)
+		Group::Group(bool sync_event, IAllocator& allocator)
+			: BaseEntry(0, sync_event, allocator)
+			, m_static_dependency_table(allocator)
 		{
 		}
 
