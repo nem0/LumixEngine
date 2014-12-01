@@ -103,8 +103,6 @@ namespace Lumix
 
 			virtual ~EngineImpl()
 			{
-				CullingSystem::destroy(*m_culling_system);
-
 				Timer::destroy(m_timer);
 				Timer::destroy(m_fps_timer);
 				m_plugin_manager.destroy();

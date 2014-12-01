@@ -3,6 +3,7 @@
 
 #include "core/array.h"
 #include "core/binary_array.h"
+#include "core/free_list.h"
 #include "core/frustum.h"
 #include "core/sphere.h"
 
@@ -80,12 +81,13 @@ namespace Lumix
 	{
 	public:
 		CullingSystemImpl(MTJD::Manager& mtjd_manager, IAllocator& allocator)
-			: m_mtjd_manager(mtjd_manager)
-			, m_sync_point(true, m_allocator)
-			, m_allocator(allocator)
-			, m_spheres(m_allocator)
-			, m_result(m_allocator)
-			, m_visibility_flags(m_allocator)
+			: m_allocator(allocator) 
+			, m_job_allocator(allocator)
+			, m_visibility_flags(allocator)
+			, m_spheres(allocator)
+			, m_result(allocator)
+			, m_sync_point(true, allocator)
+			, m_mtjd_manager(mtjd_manager)
 		{
 			m_result.emplace(m_allocator);
 			int cpu_count = (int)m_mtjd_manager.getCpuThreadsCount();
@@ -233,6 +235,7 @@ namespace Lumix
 
 	private:
 		IAllocator&		m_allocator;
+		FreeList<CullingJob, 8> m_job_allocator;
 		VisibilityFlags m_visibility_flags;
 		InputSpheres	m_spheres;
 		Results			m_result;
