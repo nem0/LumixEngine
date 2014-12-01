@@ -1,4 +1,5 @@
 #include "core/lumix.h"
+#include "core/iallocator.h"
 #include "core/timer.h"
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -10,7 +11,8 @@ namespace Lumix
 class TimerImpl : public Timer
 {
 	public:
-		TimerImpl()
+		TimerImpl(IAllocator& allocator)
+			: m_allocator(allocator)
 		{
 			QueryPerformanceFrequency(&m_frequency);
 			QueryPerformanceCounter(&m_last_tick);
@@ -34,6 +36,7 @@ class TimerImpl : public Timer
 			return delta;
 		} 
 
+		IAllocator& m_allocator;
 		LARGE_INTEGER m_frequency;
 		LARGE_INTEGER m_last_tick;
 		LARGE_INTEGER m_first_tick;
@@ -41,15 +44,15 @@ class TimerImpl : public Timer
 
 
 
-Timer* Timer::create()
+Timer* Timer::create(IAllocator& allocator)
 {
-	return LUMIX_NEW(TimerImpl);
+	return allocator.newObject<TimerImpl>(allocator);
 }
 
 
 void Timer::destroy(Timer* timer)
 {
-	LUMIX_DELETE(timer);
+	static_cast<TimerImpl*>(timer)->m_allocator.deleteObject(timer);
 }
 
 

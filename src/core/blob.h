@@ -11,7 +11,9 @@ namespace Lumix
 	class LUMIX_CORE_API Blob
 	{
 		public:
-			Blob();
+			explicit Blob(IAllocator& allocator);
+			Blob(const Blob& rhs, IAllocator& allocator);
+			void operator =(const Blob& rhs);
 
 			void create(const void* data, int size) { m_data = data; m_size = size; m_pos = 0; }
 			virtual void write(const void* data, int32_t size);
@@ -30,8 +32,11 @@ namespace Lumix
 
 			void rewindForRead();
 
+		private:
+			Blob(const Blob& rhs);
 
 		private:
+			IAllocator& m_allocator;
 			Array<uint8_t> m_buffer;
 			int m_pos;
 			int m_size;

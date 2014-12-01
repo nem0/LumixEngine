@@ -2,6 +2,7 @@
 
 
 #include "core/array.h"
+#include "core/associative_array.h"
 #include "core/matrix.h"
 #include "core/resource.h"
 #include "core/vec3.h"
@@ -48,6 +49,10 @@ class Terrain
 		class GrassPatch
 		{
 			public:
+				GrassPatch(IAllocator& allocator)
+					: m_matrices(allocator)
+				{ }
+
 				Array<Matrix> m_matrices;
 				GrassType* m_type;
 		};
@@ -55,18 +60,22 @@ class Terrain
 		class GrassQuad
 		{
 			public:
+				GrassQuad(IAllocator& allocator)
+					: m_patches(allocator)
+				{}
+
 				Array<GrassPatch> m_patches;
 				float m_x;
 				float m_z;
 		};
 
 	public:
-		static const int GRASS_QUADS_WIDTH = 5;
-		static const int GRASS_QUADS_HEIGHT = 5;
+		static const int GRASS_QUADS_COLUMNS = 5;
+		static const int GRASS_QUADS_ROWS = 5;
 		static const int GRASS_QUAD_SIZE = 10;
 
 	public:
-		Terrain(const Entity& entity, RenderScene& scene);
+		Terrain(const Entity& entity, RenderScene& scene, IAllocator& allocator);
 		~Terrain();
 
 		void render(Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos);
@@ -90,12 +99,14 @@ class Terrain
 		void removeGrassType(int index);
 		int getGrassTypeCount() const { return m_grass_types.size(); }
 		void setMaterial(Material* material);
-		void getGrassInfos(Array<GrassInfo>& infos, const Component& camera);
+		void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, const Component& camera);
 		void setBrush(const Vec3& position, float size) { m_brush_position = position; m_brush_size = size; }
 		float getHeight(float x, float z);
 		void getSize(float* width, float* height) const { ASSERT(width); ASSERT(height); *width = m_width * m_xz_scale; *height = m_height * m_xz_scale; }
 
 	private: 
+		Array<Terrain::GrassQuad*>& getQuads(const Component& camera);
+		TerrainQuad* generateQuadTree(float size);
 		void updateGrass(const Component& camera);
 		void generateGeometry();
 		void onMaterialLoaded(Resource::State, Resource::State new_state);
@@ -103,6 +114,7 @@ class Terrain
 		void forceGrassUpdate();
 
 	private:
+		IAllocator& m_allocator;
 		Mesh* m_mesh;
 		TerrainQuad* m_root;
 		Geometry m_geometry;
@@ -118,8 +130,8 @@ class Terrain
 		RenderScene& m_scene;
 		Array<GrassType*> m_grass_types;
 		Array<GrassQuad*> m_free_grass_quads;
-		Map<Component, Array<GrassQuad*> > m_grass_quads;
-		Map<Component, Vec3> m_last_camera_position;
+		AssociativeArray<Component, Array<GrassQuad*> > m_grass_quads;
+		AssociativeArray<Component, Vec3> m_last_camera_position; 
 		Vec3 m_brush_position;
 		float m_brush_size;
 		bool m_force_grass_update;

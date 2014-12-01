@@ -7,13 +7,13 @@
 
 namespace Lumix
 {
-	Resource::Resource(const Path& path, ResourceManager& resource_manager)
+	Resource::Resource(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 		: m_ref_count()
 		, m_dep_count(1)
 		, m_state(State::EMPTY)
 		, m_path(path)
 		, m_size()
-		, m_cb()
+		, m_cb(allocator)
 		, m_resource_manager(resource_manager)
 	{ }
 
@@ -81,7 +81,7 @@ namespace Lumix
 	void Resource::removeDependency(Resource& dependent_resource)
 	{
 		dependent_resource.m_cb.unbind<Resource, &Resource::onStateChanged>(this);
-		if(!dependent_resource.isReady())
+		if (!dependent_resource.isReady() && !dependent_resource.isFailure())
 		{
 			decrementDepCount();
 		}
@@ -89,7 +89,7 @@ namespace Lumix
 
 	void Resource::onStateChanged(State old_state, State new_state)
 	{
-		if(State::READY == new_state)
+		if (State::READY == new_state || State::FAILURE == new_state)
 		{
 			decrementDepCount();
 		}

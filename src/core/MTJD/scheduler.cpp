@@ -7,8 +7,9 @@ namespace Lumix
 {
 	namespace MTJD
 	{
-		Scheduler::Scheduler(Manager& manager)
-			: m_data_event(0)
+		Scheduler::Scheduler(Manager& manager, IAllocator& allocator)
+			: MT::Task(allocator)
+			, m_data_event(0)
 			, m_abort_event(0)
 			, m_manager(manager)
 		{

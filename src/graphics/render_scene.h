@@ -11,6 +11,7 @@ namespace Lumix
 {
 
 	class Engine;
+	class Frustum;
 	class Geometry;
 	class IRenderDevice;
 	class ISerializer;
@@ -33,14 +34,19 @@ namespace Lumix
 		int m_index;
 	};
 
-	struct RenderableInfo
+	struct RenderableMesh
 	{
-		Geometry* m_geometry;
 		const Mesh* m_mesh;
 		const Pose* m_pose;
-		const ModelInstance* m_model;
-		const Matrix* m_matrix;
 		float m_scale;
+		const Matrix* m_matrix;
+		const Model* m_model;
+	};
+
+	struct RenderableInfo
+	{
+		int64_t m_key;
+		const RenderableMesh* m_mesh;
 	};
 
 	struct GrassInfo
@@ -63,7 +69,7 @@ namespace Lumix
 	class LUMIX_ENGINE_API RenderScene : public IScene
 	{
 		public:
-			static RenderScene* createInstance(Renderer& renderer, Engine& engine, Universe& universe);
+			static RenderScene* createInstance(Renderer& renderer, Engine& engine, Universe& universe, IAllocator& allocator);
 			static void destroyInstance(RenderScene* scene);
 
 			virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Component& ignore) = 0;
@@ -74,6 +80,7 @@ namespace Lumix
 			virtual Timer* getTimer() const = 0;
 			virtual void renderTerrain(const TerrainInfo& info, Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos) = 0;
 			virtual Engine& getEngine() const = 0;
+			virtual IAllocator& getAllocator() = 0;
 
 			virtual Pose& getPose(const Component& cmp) = 0;
 			virtual Component getLight(int index) = 0;
@@ -95,20 +102,26 @@ namespace Lumix
 			virtual void setCameraSlot(Component camera, const string& slot) = 0;
 			virtual void getCameraSlot(Component camera, string& slot) = 0;
 			virtual void setCameraSize(Component camera, int w, int h) = 0;
-			virtual Model* getModel(Component cmp) = 0;
+			virtual void setRenderableIsAlwaysVisible(Component cmp, bool value) = 0;
+			virtual bool isRenderableAlwaysVisible(Component cmp) = 0;
+			virtual void showRenderable(Component cmp) = 0;
+			virtual void hideRenderable(Component cmp) = 0;
+			virtual Component getRenderable(Entity entity) = 0;
 			virtual void getRenderablePath(Component cmp, string& path) = 0;
 			virtual void setRenderableLayer(Component cmp, const int32_t& layer) = 0;
 			virtual void setRenderablePath(Component cmp, const string& path) = 0;
 			virtual void setRenderableScale(Component cmp, float scale) = 0;
-			virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) = 0;
+			virtual void getRenderableInfos(const Frustum& frustum, Array<RenderableInfo>& infos, int64_t layer_mask) = 0;
+			virtual void getRenderableMeshes(Array<RenderableMesh>& meshes, int64_t layer_mask) = 0;
+			virtual Component getFirstRenderable() = 0;
+			virtual Component getNextRenderable(const Component& cmp) = 0;
 			virtual Model* getRenderableModel(Component cmp) = 0;
 			
-			virtual void getGrassInfos(Array<GrassInfo>& infos, int64_t layer_mask) = 0;
+			virtual void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, int64_t layer_mask) = 0;
 			virtual void getTerrainInfos(Array<TerrainInfo>& infos, int64_t layer_mask) = 0;
 			virtual float getTerrainHeightAt(Component cmp, float x, float z) = 0;
 			virtual void setTerrainMaterial(Component cmp, const string& path) = 0;
 			virtual void getTerrainMaterial(Component cmp, string& path) = 0;
-			virtual Material* getTerrainMaterial(Component cmp) = 0;
 			virtual void setTerrainXZScale(Component cmp, float scale) = 0;
 			virtual float getTerrainXZScale(Component cmp) = 0;
 			virtual void setTerrainYScale(Component cmp, float scale) = 0;
@@ -138,6 +151,7 @@ namespace Lumix
 			virtual Vec4 getLightAmbientColor(Component cmp) = 0;
 			virtual float getFogDensity(Component cmp) = 0;
 			virtual Vec4 getFogColor(Component cmp) = 0;
+			virtual Frustum& getFrustum() = 0;
 
 		protected:
 			virtual ~RenderScene() {}

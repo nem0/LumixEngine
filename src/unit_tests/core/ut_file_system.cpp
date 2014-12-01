@@ -25,10 +25,11 @@ namespace
 		Lumix::FS::DiskFileDevice* disk_file_device;
 		Lumix::FS::FileEventsDevice* file_event_device;
 
-		file_system = Lumix::FS::FileSystem::create();
+		Lumix::DefaultAllocator allocator;
+		file_system = Lumix::FS::FileSystem::create(allocator);
 
-		disk_file_device = LUMIX_NEW(Lumix::FS::DiskFileDevice);
-		file_event_device = LUMIX_NEW(Lumix::FS::FileEventsDevice);
+		disk_file_device = allocator.newObject<Lumix::FS::DiskFileDevice>(allocator);
+		file_event_device = allocator.newObject<Lumix::FS::FileEventsDevice>(allocator);
 		file_event_device->OnEvent.bind<fs_event_cb>();
 
 		file_system->mount(file_event_device);
@@ -117,8 +118,8 @@ namespace
 		LUMIX_EXPECT_TRUE(!!(1 << (uint32_t)Lumix::FS::EventType::CLOSE_BEGIN & occured_event));
 		LUMIX_EXPECT_TRUE(!!(1 << (uint32_t)Lumix::FS::EventType::CLOSE_FINISHED & occured_event));
 
-		LUMIX_DELETE(disk_file_device);
-		LUMIX_DELETE(file_event_device);
+		allocator.deleteObject(disk_file_device);
+		allocator.deleteObject(file_event_device);
 
 		Lumix::FS::FileSystem::destroy(file_system);
 	};

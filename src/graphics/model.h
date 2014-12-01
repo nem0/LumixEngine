@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include "core/aabb.h"
 #include "core/array.h"
 #include "core/crc32.h"
 #include "core/delegate_list.h"
@@ -33,7 +34,8 @@ namespace FS
 class Mesh
 {
 	public:
-		Mesh(Material* mat, int start, int count, const char* name)
+		Mesh(Material* mat, int start, int count, const char* name, IAllocator& allocator)
+			: m_name(allocator)
 		{
 			m_material = mat;
 			m_start = start;
@@ -67,6 +69,11 @@ class Model : public Resource
 
 		struct Bone
 		{
+			Bone(IAllocator& allocator)
+				: name(allocator)
+				, parent(allocator)
+			{ }
+
 			string name;
 			string parent;
 			Vec3 position;
@@ -76,10 +83,14 @@ class Model : public Resource
 		};
 
 	public:
-		Model(const Path& path, ResourceManager& resource_manager) 
-			: Resource(path, resource_manager) 
+		Model(const Path& path, ResourceManager& resource_manager, IAllocator& allocator) 
+			: Resource(path, resource_manager, allocator) 
 			, m_geometry()
 			, m_bounding_radius()
+			, m_allocator(allocator)
+			, m_bone_map(m_allocator)
+			, m_meshes(m_allocator)
+			, m_bones(m_allocator)
 		{ }
 
 		~Model();
@@ -94,7 +105,7 @@ class Model : public Resource
 		void		getPose(Pose& pose);
 		float		getBoundingRadius() const { return m_bounding_radius; }
 		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform, float scale);
-		void getAABB(Vec3* min, Vec3* max) const { *min = m_aabb_min; *max = m_aabb_max; }
+		const AABB& getAABB() const { return m_aabb; } 
 
 	private:
 		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
@@ -108,13 +119,13 @@ class Model : public Resource
 		virtual FS::ReadCallback getReadCallback() override;
 		
 	private:
+		IAllocator& m_allocator;
 		Geometry* m_geometry;
 		Array<Mesh> m_meshes;
 		Array<Bone> m_bones;
 		float m_bounding_radius;
 		BoneMap m_bone_map; // maps bone name hash to bone index in m_bones
-		Vec3 m_aabb_min;
-		Vec3 m_aabb_max;
+		AABB m_aabb;
 };
 
 

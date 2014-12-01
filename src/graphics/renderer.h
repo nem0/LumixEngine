@@ -16,7 +16,6 @@ class Engine;
 class IRenderDevice;
 class Material;
 class Model;
-class ModelInstance;
 class Pipeline;
 class PipelineInstance;
 class Pose;
@@ -30,7 +29,7 @@ class Universe;
 class LUMIX_ENGINE_API Renderer : public IPlugin 
 {
 	public:
-		static Renderer* createInstance();
+		static Renderer* createInstance(Engine& engine);
 		static void destroyInstance(Renderer& renderer);
 
 		static void getOrthoMatrix(float left, float right, float bottom, float top, float z_near, float z_far, Matrix* mtx);
@@ -49,17 +48,11 @@ class LUMIX_ENGINE_API Renderer : public IPlugin
 		virtual bool isEditorWireframe() const = 0;
 		virtual void cleanup() = 0;
 
-		virtual void renderGeometry(Geometry& geometry, int start, int count, Shader& shader) = 0;
 		virtual void setUniform(Shader& shader, const char* name, const uint32_t name_hash, int value) = 0;
 		virtual void setUniform(Shader& shader, const char* name, const uint32_t name_hash, const Vec3& value) = 0;
 		virtual void setUniform(Shader& shader, const char* name, const uint32_t name_hash, float value) = 0;
 		virtual void setUniform(Shader& shader, const char* name, const uint32_t name_hash, const Matrix& mtx) = 0;
 		virtual void setUniform(Shader& shader, const char* name, const uint32_t name_hash, const Matrix* matrices, int count) = 0;
-		virtual void setFixedCachedUniform(const Shader& shader, int name, const Vec3& value) = 0;
-		virtual void setFixedCachedUniform(const Shader& shader, int name, const Vec4& value) = 0;
-		virtual void setFixedCachedUniform(const Shader& shader, int name, float value) = 0;
-		virtual void setFixedCachedUniform(const Shader& shader, int name, const Matrix& mtx) = 0;
-		virtual void setFixedCachedUniform(const Shader& shader, int name, const Matrix* matrices, int count) = 0;
 		virtual void setPass(uint32_t pass_hash) = 0;
 		virtual uint32_t getPass() = 0;
 		virtual void applyShader(Shader& shader, uint32_t combination) = 0;
@@ -70,9 +63,22 @@ class LUMIX_ENGINE_API Renderer : public IPlugin
 		virtual void setProjectionMatrix(const Matrix& matrix) = 0;
 		virtual Engine& getEngine() = 0;
 		
+		virtual int getGLSLVersion() const = 0;
+
 		/// "immediate mode"
 		virtual void renderModel(const Model& model, const Matrix& transform, PipelineInstance& pipeline) = 0;
 }; 
+
+
+void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Vec3& value);
+void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Vec4& value);
+void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, float value);
+void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Matrix& mtx);
+void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Matrix* matrices, int count);
+void renderGeometry(int start, int count);
+void bindGeometry(Renderer& renderer, Geometry& geometry, Shader& shader);
+int getUniformLocation(const Shader& shader, int name);
+void setUniform(int location, const Matrix& mtx);
 
 
 } // !namespace Lumix

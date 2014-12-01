@@ -21,23 +21,14 @@ class LUMIX_SCRIPT_API ScriptScene : public IScene
 	public:
 		virtual void getScriptPath(Component cmp, string& str) = 0;
 		virtual void setScriptPath(Component cmp, const string& str) = 0;
-};
 
-
-class LUMIX_SCRIPT_API ScriptSystem : public IPlugin
-{
-	public:
-		virtual Engine* getEngine() const = 0;
-
-	protected:
-		ScriptSystem() {}
-		virtual ~ScriptSystem() {}
+		virtual Engine& getEngine() = 0;
 };
 
 
 extern "C"
 {
-	LUMIX_SCRIPT_API IPlugin* createPlugin();
+	LUMIX_SCRIPT_API IPlugin* createPlugin(Engine& engine);
 }
 
 

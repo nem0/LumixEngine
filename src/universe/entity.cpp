@@ -32,27 +32,6 @@ namespace Lumix
 	}
 
 
-	const Entity::ComponentList& Entity::getComponents() const
-	{
-		ASSERT(isValid());
-		return universe->m_component_list[index];
-	}
-
-
-	const Component& Entity::getComponent(uint32_t type) const
-	{
-		const Entity::ComponentList& cmps = getComponents();
-		for(int i = 0, c = cmps.size(); i < c; ++i)
-		{
-			if(cmps[i].type == type)
-			{
-				return cmps[i];
-			}
-		}
-		return Component::INVALID;
-	}
-
-
 	Matrix Entity::getMatrix() const
 	{
 		Matrix mtx;
@@ -128,24 +107,25 @@ namespace Lumix
 
 	const char* Entity::getName() const
 	{
-		auto iter = universe->m_id_to_name_map.find(index);
-		return iter == universe->m_id_to_name_map.end() ? "" : iter.value().c_str();
+		int name_index = universe->m_id_to_name_map.find(index);
+		return name_index < 0 ? "" : universe->m_id_to_name_map.at(name_index).c_str();
 	}
 
 
 	void Entity::setName(const char* name)
 	{
-		auto iter = universe->m_id_to_name_map.find(index);
-		if (iter != universe->m_id_to_name_map.end())
+		int name_index = universe->m_id_to_name_map.find(index);
+		if (name_index >= 0)
 		{
-			universe->m_name_to_id_map.erase(crc32(iter.value().c_str()));
-			universe->m_id_to_name_map.erase(iter);
+			uint32_t hash = crc32(universe->m_id_to_name_map.at(name_index).c_str());
+			universe->m_name_to_id_map.erase(hash);
+			universe->m_id_to_name_map.eraseAt(name_index);
 		}
 
 		if (name && name[0] != '\0')
 		{
 			universe->m_name_to_id_map.insert(crc32(name), index);
-			universe->m_id_to_name_map.insert(index, string(name));
+			universe->m_id_to_name_map.insert(index, string(name, universe->getAllocator()));
 		}
 	}
 

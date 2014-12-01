@@ -7,12 +7,14 @@ namespace Lumix
 {
 	namespace MTJD
 	{
-		BaseEntry::BaseEntry(int32_t depend_count, bool sync_event)
+		BaseEntry::BaseEntry(int32_t depend_count, bool sync_event, IAllocator& allocator)
 			: m_dependency_count(depend_count)
+			, m_allocator(allocator)
+			, m_dependency_table(m_allocator)
 		{
 #if TYPE == MULTI_THREAD
 
-			m_sync_event = sync_event ? LUMIX_NEW(MT::Event)(MT::EventFlags::MANUAL_RESET) : NULL;
+			m_sync_event = sync_event ? m_allocator.newObject<MT::Event>(MT::EventFlags::MANUAL_RESET) : NULL;
 
 #endif // TYPE == MULTI_THREAD
 		}
@@ -21,7 +23,7 @@ namespace Lumix
 		{
 #if TYPE == MULTI_THREAD
 
-			LUMIX_DELETE(m_sync_event);
+			m_allocator.deleteObject(m_sync_event);
 
 #endif //TYPE == MULTI_THREAD
 		}

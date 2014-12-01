@@ -3,6 +3,7 @@
 #include "core/array.h"
 #include "core/free_list.h"
 #include "core/path.h"
+#include "core/stack_allocator.h"
 #include "core/static_array.h"
 #include "core/string.h"
 #include "core/fs/os_file.h"
@@ -18,7 +19,9 @@ namespace Lumix
 		class TCPFileServerTask : public MT::Task
 		{
 		public:
-			TCPFileServerTask() 
+			TCPFileServerTask(IAllocator& allocator)
+				: MT::Task(allocator)
+				, m_acceptor(allocator)
 			{}
 
 
@@ -49,10 +52,11 @@ namespace Lumix
 							int32_t id = m_ids.alloc();
 							if(id > 0)
 							{
-								OsFile* file = LUMIX_NEW(OsFile)();
+								OsFile* file = getAllocator().newObject<OsFile>();
 								m_files[id] = file;
 
-								string path;
+								StackAllocator<LUMIX_MAX_PATH> allocator;
+								string path(allocator);
 								if (strncmp(m_buffer.data(), m_base_path.c_str(), m_base_path.length()) != 0)
 								{
 									path = m_base_path.c_str();
@@ -62,7 +66,7 @@ namespace Lumix
 								{
 									path = m_buffer.data();
 								}
-								ret = file->open(path.c_str(), mode) ? id : -1;
+								ret = file->open(path.c_str(), mode, getAllocator()) ? id : -1;
 							}
 							stream->write(ret);
 						}
@@ -75,7 +79,7 @@ namespace Lumix
 							m_ids.release(id);
 
 							file->close();
-							LUMIX_DELETE(file);
+							getAllocator().deleteObject(file);
 						}
 						break;
 					case TCPCommand::Read:
@@ -166,7 +170,7 @@ namespace Lumix
 					}
 				}
 
-				LUMIX_DELETE(stream);
+				m_acceptor.close(stream);
 				return 0;
 			}
 
@@ -176,7 +180,8 @@ namespace Lumix
 
 			void setBasePath(const char* base_path) 
 			{
-				string base_path_str(base_path);
+				StackAllocator<LUMIX_MAX_PATH> allocator;
+				string base_path_str(base_path, allocator);
 				if (base_path_str[base_path_str.length() - 1] != '/')
 				{
 					base_path_str += "/";
@@ -201,6 +206,12 @@ namespace Lumix
 
 		struct TCPFileServerImpl
 		{
+			TCPFileServerImpl(IAllocator& allocator)
+				: m_task(allocator)
+				, m_allocator(allocator)
+			{ }
+
+			IAllocator& m_allocator;
 			TCPFileServerTask m_task;
 		};
 
@@ -213,13 +224,16 @@ namespace Lumix
 
 		TCPFileServer::~TCPFileServer()
 		{
-			LUMIX_DELETE(m_impl);
+			if (m_impl)
+			{
+				m_impl->m_allocator.deleteObject(m_impl);
+			}
 		}
 
 
-		void TCPFileServer::start(const char* base_path)
+		void TCPFileServer::start(const char* base_path, IAllocator& allocator)
 		{
-			m_impl = LUMIX_NEW(TCPFileServerImpl);
+			m_impl = allocator.newObject<TCPFileServerImpl>(allocator);
 			m_impl->m_task.setBasePath(base_path);
 			m_impl->m_task.create("TCP File Server Task");
 			m_impl->m_task.run();
@@ -230,7 +244,7 @@ namespace Lumix
 		{
 			m_impl->m_task.stop();
 			m_impl->m_task.destroy();
-			LUMIX_DELETE(m_impl);
+			m_impl->m_allocator.deleteObject(m_impl);
 			m_impl = NULL;
 		}
 

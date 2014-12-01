@@ -15,7 +15,7 @@ namespace Lumix
 	class LUMIX_CORE_API LogProxy
 	{
 		public:
-			LogProxy(Log& log, const char* system);
+			LogProxy(Log& log, const char* system, IAllocator& allocator);
 			~LogProxy();
 
 			LogProxy& operator <<(const char* message);
@@ -25,11 +25,12 @@ namespace Lumix
 			LogProxy& operator <<(const Path& path);
 
 		private:
-			base_string<char, StackAllocator<64> > m_system;
+			IAllocator& m_allocator;
+			base_string<char> m_system;
 			base_string<char> m_message;
 			Log& m_log;
 
-			void operator = (const LogProxy&) {}
+			void operator = (const LogProxy&);
 	};
 
 	class LUMIX_CORE_API Log
@@ -38,14 +39,18 @@ namespace Lumix
 			typedef DelegateList<void (const char*, const char*)> Callback;
 
 		public:
-			Log();
-			~Log();
+			Log() : m_callbacks(m_allocator) {}
 
 			LogProxy log(const char* system);
 			Callback& getCallback();
 		
 		private:
-			struct LogImpl* m_impl;
+			Log(const Log&);
+			void operator =(const Log&);
+
+		private:
+			DefaultAllocator m_allocator;
+			Callback m_callbacks;
 	};
 
 	extern Log LUMIX_CORE_API g_log_info;

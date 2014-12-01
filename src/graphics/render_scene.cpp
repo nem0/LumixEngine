@@ -7,6 +7,9 @@
 #include "core/iserializer.h"
 #include "core/log.h"
 #include "core/math_utils.h"
+#include "core/mtjd/generic_job.h"
+#include "core/mtjd/job.h"
+#include "core/mtjd/manager.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
@@ -42,17 +45,20 @@ namespace Lumix
 
 	struct Renderable
 	{
-		Renderable() {}
+		Renderable(IAllocator& allocator) : m_pose(allocator), m_meshes(allocator) {}
 
-		bool m_is_free;
 		int64_t m_layer_mask;
-		ModelInstance m_model;
+		Array<RenderableMesh> m_meshes;
+		int32_t m_component_index;
+		Pose m_pose;
+		Model* m_model;
+		Matrix m_matrix;
 		Entity m_entity;
 		float m_scale;
+		bool m_is_always_visible;
 
 		private:
-			Renderable(const Renderable&) {}
-			void operator =(const Renderable&) {}
+			Renderable(const Renderable&);
 	};
 
 	struct Light
@@ -91,37 +97,82 @@ namespace Lumix
 
 	class RenderSceneImpl : public RenderScene
 	{
+		private:
+			typedef HashMap<int32_t, int> DynamicRenderableCache;
+
+			class ModelLoadedCallback
+			{
+				public:
+					ModelLoadedCallback(RenderSceneImpl& scene, Model* model)
+						: m_scene(scene)
+						, m_ref_count(0)
+						, m_model(model)
+					{
+						m_model->getObserverCb().bind<ModelLoadedCallback, &ModelLoadedCallback::callback>(this);
+					}
+
+					~ModelLoadedCallback()
+					{
+						m_model->getObserverCb().unbind<ModelLoadedCallback, &ModelLoadedCallback::callback>(this);
+					}
+
+					void callback(Resource::State, Resource::State new_state)
+					{
+						if(new_state == Resource::State::READY)
+						{
+							m_scene.modelLoaded(m_model);
+						}
+					}
+
+					Model* m_model;
+					int m_ref_count;
+					RenderSceneImpl& m_scene;
+			};
+
 		public:
-			RenderSceneImpl(Renderer& renderer, Engine& engine, Universe& universe)
+			RenderSceneImpl(Renderer& renderer, Engine& engine, Universe& universe, IAllocator& allocator)
 				: m_engine(engine)
 				, m_universe(universe)
 				, m_renderer(renderer)
+				, m_allocator(allocator)
+				, m_model_loaded_callbacks(m_allocator)
+				, m_dynamic_renderable_cache(m_allocator)
+				, m_renderables(m_allocator)
+				, m_cameras(m_allocator)
+				, m_terrains(m_allocator)
+				, m_lights(m_allocator)
+				, m_debug_lines(m_allocator)
+				, m_always_visible(m_allocator)
+				, m_temporary_infos(m_allocator)
+				, m_sync_point(true, m_allocator)
+				, m_jobs(m_allocator)
 			{
 				m_universe.entityMoved().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
-				m_timer = Timer::create();
-				m_culling_system = CullingSystem::create(m_engine.getMTJDManager());
+				m_timer = Timer::create(m_allocator);
+				m_culling_system = CullingSystem::create(m_engine.getMTJDManager(), m_allocator);
 			}
 
 			~RenderSceneImpl()
 			{
 				m_universe.entityMoved().unbind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 
-				for (int i = 0; i < m_renderables.size(); ++i)
+				for (int i = 0; i < m_model_loaded_callbacks.size(); ++i)
 				{
-					if (m_renderables[i]->m_model.getModel())
-					{
-						m_renderables[i]->m_model.getModel()->getObserverCb().unbind<RenderSceneImpl, &RenderSceneImpl::modelUpdate>(this);
-					}
-				}
-
-				for (int i = 0; i < m_renderables.size(); ++i)
-				{
-					LUMIX_DELETE(m_renderables[i]);
+					m_allocator.deleteObject(m_model_loaded_callbacks[i]);
 				}
 
 				for (int i = 0; i < m_terrains.size(); ++i)
 				{
-					LUMIX_DELETE(m_terrains[i]);
+					m_allocator.deleteObject(m_terrains[i]);
+				}
+
+				for(int i = 0; i < m_renderables.size(); ++i)
+				{
+					if(m_renderables[i]->m_model)
+					{
+						m_renderables[i]->m_model->getResourceManager().get(ResourceManager::MODEL)->unload(*m_renderables[i]->m_model);
+					}
+					m_allocator.deleteObject(m_renderables[i]);
 				}
 
 				Timer::destroy(m_timer);
@@ -174,7 +225,7 @@ namespace Lumix
 				float far_plane = m_cameras[cmp.index].m_far;
 				m_renderer.setProjection(width, height, fov, near_plane, far_plane, mtx);
 
-				m_camera_frustum.compute(
+				m_camera_frustum.computePerspective(
 					mtx.getTranslation(),
 					mtx.getZVector(),
 					mtx.getYVector(),
@@ -255,25 +306,23 @@ namespace Lumix
 				serializer.beginArray("renderables");
 				for (int i = 0; i < m_renderables.size(); ++i)
 				{
-					serializer.serializeArrayItem(m_renderables[i]->m_is_free);
-					if(!m_renderables[i]->m_is_free)
+					serializer.serializeArrayItem(m_renderables[i]->m_is_always_visible);
+					serializer.serializeArrayItem(m_renderables[i]->m_component_index);
+					serializer.serializeArrayItem(m_renderables[i]->m_entity.index);
+					serializer.serializeArrayItem(m_renderables[i]->m_layer_mask);
+					if (m_renderables[i]->m_model)
 					{
-						serializer.serializeArrayItem(m_renderables[i]->m_entity.index);
-						serializer.serializeArrayItem(m_renderables[i]->m_layer_mask);
-						if (m_renderables[i]->m_model.getModel())
-						{
-							serializer.serializeArrayItem(m_renderables[i]->m_model.getModel()->getPath().c_str());
-						}
-						else
-						{
-							serializer.serializeArrayItem("");
-						}
-						serializer.serializeArrayItem(m_renderables[i]->m_scale);
-						Matrix mtx = m_renderables[i]->m_model.getMatrix();
-						for (int j = 0; j < 16; ++j)
-						{
-							serializer.serializeArrayItem((&mtx.m11)[j]);
-						}
+						serializer.serializeArrayItem(m_renderables[i]->m_model->getPath().c_str());
+					}
+					else
+					{
+						serializer.serializeArrayItem("");
+					}
+					serializer.serializeArrayItem(m_renderables[i]->m_scale);
+					const Matrix& mtx = m_renderables[i]->m_matrix;
+					for (int j = 0; j < 16; ++j)
+					{
+						serializer.serializeArrayItem((&mtx.m11)[j]);
 					}
 				}
 				serializer.endArray();
@@ -309,22 +358,22 @@ namespace Lumix
 			void deserializeCameras(ISerializer& serializer)
 			{
 				int32_t size;
-				serializer.deserialize("camera_count", size);
+				serializer.deserialize("camera_count", size, 0);
 				serializer.deserializeArrayBegin("cameras");
 				m_cameras.resize(size);
 				for (int i = 0; i < size; ++i)
 				{
-					serializer.deserializeArrayItem(m_cameras[i].m_is_free);
-					serializer.deserializeArrayItem(m_cameras[i].m_far);
-					serializer.deserializeArrayItem(m_cameras[i].m_near);
-					serializer.deserializeArrayItem(m_cameras[i].m_fov);
-					serializer.deserializeArrayItem(m_cameras[i].m_is_active);
-					serializer.deserializeArrayItem(m_cameras[i].m_width);
-					serializer.deserializeArrayItem(m_cameras[i].m_height);
+					serializer.deserializeArrayItem(m_cameras[i].m_is_free, true);
+					serializer.deserializeArrayItem(m_cameras[i].m_far, 0.01f);
+					serializer.deserializeArrayItem(m_cameras[i].m_near, 1000.0f);
+					serializer.deserializeArrayItem(m_cameras[i].m_fov, 60.0f);
+					serializer.deserializeArrayItem(m_cameras[i].m_is_active, false);
+					serializer.deserializeArrayItem(m_cameras[i].m_width, 800);
+					serializer.deserializeArrayItem(m_cameras[i].m_height, 600);
 					m_cameras[i].m_aspect = m_cameras[i].m_width / m_cameras[i].m_height;
-					serializer.deserializeArrayItem(m_cameras[i].m_entity.index);
+					serializer.deserializeArrayItem(m_cameras[i].m_entity.index, 0);
 					m_cameras[i].m_entity.universe = &m_universe;
-					serializer.deserializeArrayItem(m_cameras[i].m_slot, Camera::MAX_SLOT_LENGTH);
+					serializer.deserializeArrayItem(m_cameras[i].m_slot, Camera::MAX_SLOT_LENGTH, "main");
 					if(!m_cameras[i].m_is_free)
 					{
 						m_universe.addComponent(m_cameras[i].m_entity, CAMERA_HASH, this, i);
@@ -336,75 +385,73 @@ namespace Lumix
 			void deserializeRenderables(ISerializer& serializer)
 			{
 				int32_t size = 0;
-				serializer.deserialize("renderable_count", size);
+				serializer.deserialize("renderable_count", size, 0);
 				serializer.deserializeArrayBegin("renderables");
-				for (int i = size; i < m_renderables.size(); ++i)
+				for(int i = size; i < m_renderables.size(); ++i)
 				{
-					LUMIX_DELETE(m_renderables[i]);
+					setModel(i, NULL);
+					m_allocator.deleteObject(m_renderables[i]);
 				}
-				int old_size = m_renderables.size();
-				m_renderables.resize(size);
-				for (int i = old_size; i < size; ++i)
-				{
-					m_renderables[i] = LUMIX_NEW(Renderable);
-				}
+				m_culling_system->clear();
+				m_renderables.clear();
+				m_renderables.reserve(size);
+				m_dynamic_renderable_cache = DynamicRenderableCache(m_allocator);
+				m_always_visible.clear();
 				for (int i = 0; i < size; ++i)
 				{
-					serializer.deserializeArrayItem(m_renderables[i]->m_is_free);
-					if(!m_renderables[i]->m_is_free)
+					m_renderables.push(m_allocator.newObject<Renderable>(m_allocator));
+					serializer.deserializeArrayItem(m_renderables[i]->m_is_always_visible, false);
+					serializer.deserializeArrayItem(m_renderables[i]->m_component_index, 0);
+					if (m_renderables[i]->m_is_always_visible)
 					{
-						serializer.deserializeArrayItem(m_renderables[i]->m_entity.index);
-						m_renderables[i]->m_entity.universe = &m_universe;
-						serializer.deserializeArrayItem(m_renderables[i]->m_layer_mask);
-						char path[LUMIX_MAX_PATH];
-						serializer.deserializeArrayItem(path, LUMIX_MAX_PATH);
-						serializer.deserializeArrayItem(m_renderables[i]->m_scale);
-						m_renderables[i]->m_model.setModel(static_cast<Model*>(m_engine.getResourceManager().get(ResourceManager::MODEL)->load(path)));
-						for (int j = 0; j < 16; ++j)
-						{
-							serializer.deserializeArrayItem((&m_renderables[i]->m_model.getMatrix().m11)[j]);
-						}
-						m_universe.addComponent(m_renderables[i]->m_entity, RENDERABLE_HASH, this, i);
-						m_culling_system->addStatic(Sphere(m_renderables[i]->m_entity.getPosition(), 1.0f), i);
-
-						if (m_renderables[i]->m_model.getModel())
-						{
-							m_renderables[i]->m_model.getModel()->getObserverCb().bind<RenderSceneImpl, &RenderSceneImpl::modelUpdate>(this);
-
-							updateBoundingRadiuses();
-						}
+						m_always_visible.push(m_renderables[i]->m_component_index);
 					}
+					serializer.deserializeArrayItem(m_renderables[i]->m_entity.index, 0);
+					m_renderables[i]->m_model = NULL;
+					m_renderables[i]->m_entity.universe = &m_universe;
+					serializer.deserializeArrayItem(m_renderables[i]->m_layer_mask, 0);
+					char path[LUMIX_MAX_PATH];
+					serializer.deserializeArrayItem(path, LUMIX_MAX_PATH, "");
+					serializer.deserializeArrayItem(m_renderables[i]->m_scale, 0);
+					m_culling_system->addStatic(Sphere(m_renderables[i]->m_entity.getPosition(), 1.0f));
+					setModel(i, static_cast<Model*>(m_engine.getResourceManager().get(ResourceManager::MODEL)->load(path)));
+					for (int j = 0; j < 16; ++j)
+					{
+						serializer.deserializeArrayItem((&m_renderables[i]->m_matrix.m11)[j], i == j ? 1.0f : 0.0f);
+					}
+					m_universe.addComponent(m_renderables[i]->m_entity, RENDERABLE_HASH, this, i);
 				}
+
 				serializer.deserializeArrayEnd();
 			}
 
 			void deserializeLights(ISerializer& serializer)
 			{
 				int32_t size = 0;
-				serializer.deserialize("light_count", size);
+				serializer.deserialize("light_count", size, 0);
 				serializer.deserializeArrayBegin("lights");
 				m_lights.resize(size);
 				for (int i = 0; i < size; ++i)
 				{
-					serializer.deserializeArrayItem(m_lights[i].m_entity.index);
+					serializer.deserializeArrayItem(m_lights[i].m_entity.index, 0);
 					m_lights[i].m_entity.universe = &m_universe;
-					serializer.deserializeArrayItem((int32_t&)m_lights[i].m_type);
-					serializer.deserializeArrayItem(m_lights[i].m_is_free);
-					serializer.deserializeArrayItem(m_lights[i].m_diffuse_color.x);
-					serializer.deserializeArrayItem(m_lights[i].m_diffuse_color.y);
-					serializer.deserializeArrayItem(m_lights[i].m_diffuse_color.z);
-					serializer.deserializeArrayItem(m_lights[i].m_diffuse_color.w);
-					serializer.deserializeArrayItem(m_lights[i].m_diffuse_intensity);
-					serializer.deserializeArrayItem(m_lights[i].m_ambient_color.x);
-					serializer.deserializeArrayItem(m_lights[i].m_ambient_color.y);
-					serializer.deserializeArrayItem(m_lights[i].m_ambient_color.z);
-					serializer.deserializeArrayItem(m_lights[i].m_ambient_color.w);
-					serializer.deserializeArrayItem(m_lights[i].m_ambient_intensity);
-					serializer.deserializeArrayItem(m_lights[i].m_fog_color.x);
-					serializer.deserializeArrayItem(m_lights[i].m_fog_color.y);
-					serializer.deserializeArrayItem(m_lights[i].m_fog_color.z);
-					serializer.deserializeArrayItem(m_lights[i].m_fog_color.w);
-					serializer.deserializeArrayItem(m_lights[i].m_fog_density);
+					serializer.deserializeArrayItem((int32_t&)m_lights[i].m_type, 0);
+					serializer.deserializeArrayItem(m_lights[i].m_is_free, true);
+					serializer.deserializeArrayItem(m_lights[i].m_diffuse_color.x, 0);
+					serializer.deserializeArrayItem(m_lights[i].m_diffuse_color.y, 0);
+					serializer.deserializeArrayItem(m_lights[i].m_diffuse_color.z, 0);
+					serializer.deserializeArrayItem(m_lights[i].m_diffuse_color.w, 0);
+					serializer.deserializeArrayItem(m_lights[i].m_diffuse_intensity, 0);
+					serializer.deserializeArrayItem(m_lights[i].m_ambient_color.x, 0);
+					serializer.deserializeArrayItem(m_lights[i].m_ambient_color.y, 0);
+					serializer.deserializeArrayItem(m_lights[i].m_ambient_color.z, 0);
+					serializer.deserializeArrayItem(m_lights[i].m_ambient_color.w, 0);
+					serializer.deserializeArrayItem(m_lights[i].m_ambient_intensity, 0);
+					serializer.deserializeArrayItem(m_lights[i].m_fog_color.x, 0);
+					serializer.deserializeArrayItem(m_lights[i].m_fog_color.y, 0);
+					serializer.deserializeArrayItem(m_lights[i].m_fog_color.z, 0);
+					serializer.deserializeArrayItem(m_lights[i].m_fog_color.w, 0);
+					serializer.deserializeArrayItem(m_lights[i].m_fog_density, 0);
 					if(!m_lights[i].m_is_free)
 					{
 						m_universe.addComponent(m_lights[i].m_entity, LIGHT_HASH, this, i);
@@ -416,21 +463,21 @@ namespace Lumix
 			void deserializeTerrains(ISerializer& serializer)
 			{
 				int32_t size = 0;
-				serializer.deserialize("terrain_count", size);
+				serializer.deserialize("terrain_count", size, 0);
 				serializer.deserializeArrayBegin("terrains");
 				for (int i = size; i < m_terrains.size(); ++i)
 				{
-					LUMIX_DELETE(m_terrains[i]);
+					m_allocator.deleteObject(m_terrains[i]);
 					m_terrains[i] = NULL;
 				}
 				m_terrains.resize(size);
 				for (int i = 0; i < size; ++i)
 				{
 					bool exists;
-					serializer.deserializeArrayItem(exists);
+					serializer.deserializeArrayItem(exists, false);
 					if(exists)
 					{
-						m_terrains[i] = LUMIX_NEW(Terrain)(Entity::INVALID, *this);
+						m_terrains[i] = m_allocator.newObject<Terrain>(Entity::INVALID, *this, m_allocator);
 						Terrain* terrain = m_terrains[i];
 						terrain->deserialize(serializer, m_universe, *this, i);
 					}
@@ -451,34 +498,49 @@ namespace Lumix
 			}
 
 
+			void destroyRenderable(const Component& component)
+			{
+				int renderable_index = getRenderable(component.index);
+				setModel(renderable_index, NULL);
+				m_always_visible.eraseItemFast(component.index);
+				m_allocator.deleteObject(m_renderables[renderable_index]);
+				m_renderables.erase(renderable_index);
+				m_culling_system->removeStatic(renderable_index);
+				m_universe.destroyComponent(component);
+
+				Lumix::HashMap<int32_t, int>::iterator iter = m_dynamic_renderable_cache.begin(), end = m_dynamic_renderable_cache.end();
+				while (iter != end)
+				{
+					if (iter.value() > renderable_index)
+					{
+						--iter.value();
+					}
+					++iter;
+				}
+				m_dynamic_renderable_cache.erase(component.entity.index);
+			}
+
 			virtual void destroyComponent(const Component& component) override
 			{
 				if (component.type == RENDERABLE_HASH)
 				{
-					m_renderables[component.index]->m_model.setModel(NULL);
-					m_renderables[component.index]->m_is_free = true;
-					m_universe.destroyComponent(component);
-					m_universe.componentDestroyed().invoke(component);
-					m_culling_system->removeStatic(component.index);
+					destroyRenderable(component);
 				}
 				else if (component.type == LIGHT_HASH)
 				{
 					m_lights[component.index].m_is_free = true;
 					m_universe.destroyComponent(component);
-					m_universe.componentDestroyed().invoke(component);
 				}
 				else if (component.type == CAMERA_HASH)
 				{
 					m_cameras[component.index].m_is_free = true;
 					m_universe.destroyComponent(component);
-					m_universe.componentDestroyed().invoke(component);
 				}
 				else if(component.type == TERRAIN_HASH)
 				{
-					LUMIX_DELETE(m_terrains[component.index]);
+					m_allocator.deleteObject(m_terrains[component.index]);
 					m_terrains[component.index] = NULL;
 					m_universe.destroyComponent(component);
-					m_universe.componentDestroyed().invoke(component);
 				}
 				else
 				{
@@ -491,7 +553,7 @@ namespace Lumix
 			{
 				if (type == TERRAIN_HASH)
 				{
-					Terrain* terrain = LUMIX_NEW(Terrain)(entity, *this);
+					Terrain* terrain = m_allocator.newObject<Terrain>(entity, *this, m_allocator);
 					m_terrains.push(terrain);
 					Component cmp = m_universe.addComponent(entity, type, this, m_terrains.size() - 1);
 					m_universe.componentCreated().invoke(cmp);
@@ -517,31 +579,18 @@ namespace Lumix
 				}
 				else if (type == RENDERABLE_HASH)
 				{
-					Renderable* src = NULL;
-					int index = -1;
-					for (int i = 0, c = m_renderables.size(); i < c; ++i)
-					{
-						if (m_renderables[i]->m_is_free)
-						{
-							src = m_renderables[i];
-							index = i;
-							break;
-						}
-					}
-					if (!src)
-					{
-						src = LUMIX_NEW(Renderable);
-						m_renderables.push(src);
-						index = m_renderables.size() - 1;
-					}
-					Renderable& r = *src;
+					int new_index = m_renderables.empty() ? 0 : m_renderables.back()->m_component_index + 1;
+					Renderable& r = *m_allocator.newObject<Renderable>(m_allocator);
+					m_renderables.push(&r);
 					r.m_entity = entity;
 					r.m_layer_mask = 1;
 					r.m_scale = 1;
-					r.m_is_free = false;
-					r.m_model.setModel(NULL);
-					Component cmp = m_universe.addComponent(entity, type, this, index);
-					m_culling_system->addStatic(Sphere(entity.getPosition(), 1.0f), m_renderables.size() - 1);
+					r.m_model = NULL;
+					r.m_component_index = new_index;
+					r.m_is_always_visible = false;
+					r.m_matrix = entity.getMatrix();
+					Component cmp = m_universe.addComponent(entity, type, this, r.m_component_index);
+					m_culling_system->addStatic(Sphere(entity.getPosition(), 1.0f));
 					m_universe.componentCreated().invoke(cmp);
 					return cmp;
 				}
@@ -564,17 +613,49 @@ namespace Lumix
 				return Component::INVALID;
 			}
 
+
+			virtual Component getRenderable(Entity entity) override
+			{
+				DynamicRenderableCache::iterator iter = m_dynamic_renderable_cache.find(entity.index);
+				if (!iter.isValid())
+				{
+					for (int i = 0, c = m_renderables.size(); i < c; ++i)
+					{
+						if (m_renderables[i]->m_entity == entity)
+						{
+							m_dynamic_renderable_cache.insert(entity.index, i);
+							return Component(entity, RENDERABLE_HASH, this, i);
+						}
+					}
+				}
+				else
+				{
+					return Component(entity, RENDERABLE_HASH, this, iter.value());
+				}
+				return Component::INVALID;
+			}
+
+
 			void onEntityMoved(const Entity& entity)
 			{
-				const Entity::ComponentList& cmps = entity.getComponents();
-				for (int i = 0; i < cmps.size(); ++i)
+				DynamicRenderableCache::iterator iter = m_dynamic_renderable_cache.find(entity.index);
+				if (!iter.isValid())
 				{
-					if (cmps[i].type == RENDERABLE_HASH)
+					for (int i = 0, c = m_renderables.size(); i < c; ++i)
 					{
-						m_renderables[cmps[i].index]->m_model.setMatrix(entity.getMatrix());
-						m_culling_system->updateBoundingPosition(entity.getMatrix().getTranslation(), cmps[i].index);
-						break;
+						if (m_renderables[i]->m_entity == entity)
+						{
+							m_dynamic_renderable_cache.insert(entity.index, i);
+							m_renderables[i]->m_matrix = entity.getMatrix();
+							m_culling_system->updateBoundingPosition(entity.getMatrix().getTranslation(), i);
+							break;
+						}
 					}
+				}
+				else
+				{
+					m_renderables[iter.value()]->m_matrix = entity.getMatrix();
+					m_culling_system->updateBoundingPosition(entity.getMatrix().getTranslation(), iter.value());
 				}
 			}
 
@@ -607,12 +688,6 @@ namespace Lumix
 			{
 				Material* material = static_cast<Material*>(m_engine.getResourceManager().get(ResourceManager::MATERIAL)->load(path.c_str()));
 				m_terrains[cmp.index]->setMaterial(material);
-			}
-
-
-			virtual Material* getTerrainMaterial(Component cmp) override
-			{
-				return m_terrains[cmp.index]->getMaterial();
 			}
 
 
@@ -653,26 +728,61 @@ namespace Lumix
 
 			virtual Pose& getPose(const Component& cmp) override
 			{
-				return m_renderables[cmp.index]->m_model.getPose();
-			}
-
-			virtual Model* getModel(Component cmp) override
-			{
-				return m_renderables[cmp.index]->m_model.getModel();
+				return m_renderables[getRenderable(cmp.index)]->m_pose;
 			}
 
 
 			virtual Model* getRenderableModel(Component cmp) override
 			{
-				return m_renderables[cmp.index]->m_model.getModel();
+				return m_renderables[getRenderable(cmp.index)]->m_model;
+			}
+
+
+			virtual void showRenderable(Component cmp) override
+			{
+				m_culling_system->enableStatic(getRenderable(cmp.index));
+			}
+
+
+			virtual void hideRenderable(Component cmp) override
+			{
+				int renderable_index = getRenderable(cmp.index);
+				if (!m_renderables[renderable_index]->m_is_always_visible)
+				{
+					m_culling_system->disableStatic(renderable_index);
+				}
+			}
+
+
+			virtual void setRenderableIsAlwaysVisible(Component cmp, bool value) override
+			{
+				int renderable_index = getRenderable(cmp.index);
+				m_renderables[renderable_index]->m_is_always_visible = value;
+				if(value)
+				{
+					m_culling_system->disableStatic(renderable_index);
+					m_always_visible.push(cmp.index);
+				}
+				else
+				{
+					m_culling_system->enableStatic(renderable_index);
+					m_always_visible.eraseItemFast(cmp.index);
+				}
+			}
+			
+
+			virtual bool isRenderableAlwaysVisible(Component cmp) override
+			{
+				return m_renderables[getRenderable(cmp.index)]->m_is_always_visible;
 			}
 
 
 			virtual void getRenderablePath(Component cmp, string& path) override
 			{
-					if (m_renderables[cmp.index]->m_model.getModel())
+					int index = getRenderable(cmp.index);
+					if (index >= 0 && m_renderables[index]->m_model)
 					{
-						path = m_renderables[cmp.index]->m_model.getModel()->getPath().c_str();
+						path = m_renderables[index]->m_model->getPath().c_str();
 					}
 					else
 					{
@@ -683,36 +793,28 @@ namespace Lumix
 
 			virtual void setRenderableLayer(Component cmp, const int32_t& layer) override
 			{
-				m_renderables[cmp.index]->m_layer_mask = ((int64_t)1 << (int64_t)layer);
+				m_renderables[getRenderable(cmp.index)]->m_layer_mask = ((int64_t)1 << (int64_t)layer);
 			}
 
 			virtual void setRenderableScale(Component cmp, float scale) override
 			{
-				m_renderables[cmp.index]->m_scale = scale;
+				Renderable& r = *m_renderables[getRenderable(cmp.index)];
+				r.m_scale = scale;
+				for (int i = 0; i < r.m_meshes.size(); ++i)
+				{
+					r.m_meshes[i].m_scale = scale;
+				}
 			}
 
 
 			virtual void setRenderablePath(Component cmp, const string& path) override
 			{
-				Renderable& r = *m_renderables[cmp.index];
-
-				Model* old_model = r.m_model.getModel();
-				if (old_model)
-				{
-					old_model->getObserverCb().unbind<RenderSceneImpl, &RenderSceneImpl::modelUpdate>(this);
-				}
+				int renderable_index = getRenderable(cmp.index);
+				Renderable& r = *m_renderables[renderable_index];
 
 				Model* model = static_cast<Model*>(m_engine.getResourceManager().get(ResourceManager::MODEL)->load(path));
-				
-				if (model)
-				{
-					model->getObserverCb().bind<RenderSceneImpl, &RenderSceneImpl::modelUpdate>(this);
-
-					updateBoundingRadiuses();
-				}
-
-				r.m_model.setModel(model);
-				r.m_model.setMatrix(r.m_entity.getMatrix());
+				setModel(renderable_index, model);
+				r.m_matrix = r.m_entity.getMatrix();
 			}
 
 
@@ -735,14 +837,14 @@ namespace Lumix
 			}
 
 
-			virtual void getGrassInfos(Array<GrassInfo>& infos, int64_t layer_mask)
+			virtual void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, int64_t layer_mask)
 			{
 				PROFILE_FUNCTION();
 				for (int i = 0; i < m_terrains.size(); ++i)
 				{
 					if (m_terrains[i] && (m_terrains[i]->getLayerMask() & layer_mask) != 0)
 					{
-						m_terrains[i]->getGrassInfos(infos, m_applied_camera);
+						m_terrains[i]->getGrassInfos(frustum, infos, m_applied_camera);
 					}
 				}
 			}
@@ -802,39 +904,186 @@ namespace Lumix
 			}
 
 
-			virtual void getRenderableInfos(Array<RenderableInfo>& infos, int64_t layer_mask) override
+			virtual Frustum& getFrustum() override
+			{
+				return m_camera_frustum;
+			}
+
+
+			virtual Component getFirstRenderable() override
+			{
+				if(m_renderables.empty())
+				{
+					return Component::INVALID;
+				}
+				return Component(m_renderables[0]->m_entity, RENDERABLE_HASH, this, m_renderables[0]->m_component_index);
+			}
+			
+
+			int getRenderable(int index)
+			{
+				int l = 0; 
+				int h = m_renderables.size() - 1;
+				while(l <= h)
+				{
+					int m = (l + h) >> 1;
+					if(m_renderables[m]->m_component_index < index)
+					{
+						l = m + 1;
+					}
+					else if (m_renderables[m]->m_component_index > index)
+					{
+						h = m - 1;
+					}
+					else
+					{
+						return m;
+					}
+				}
+
+				return -1;
+			}
+
+			
+			virtual Component getNextRenderable(const Component& cmp) override
+			{
+				int i = getRenderable(cmp.index);
+				if(i + 1 < m_renderables.size())
+				{
+					return Component(m_renderables[i + 1]->m_entity, RENDERABLE_HASH, this, m_renderables[i + 1]->m_component_index);
+				}
+				return Component::INVALID;
+			}
+
+
+			const CullingSystem::Results* cull(const Frustum& frustum)
+			{
+				PROFILE_FUNCTION();
+				if (m_renderables.empty())
+					return NULL;
+
+				m_culling_system->cullToFrustumAsync(frustum);
+				return &m_culling_system->getResult();
+			}
+
+
+			void mergeTemporaryInfos(Array<RenderableInfo>& all_infos)
+			{
+				PROFILE_FUNCTION();
+				all_infos.reserve(m_renderables.size() * 2);
+				for (int i = 0; i < m_temporary_infos.size(); ++i)
+				{
+					Array<RenderableInfo>& subinfos = m_temporary_infos[i];
+					if (!subinfos.empty())
+					{
+						int size = all_infos.size();
+						all_infos.resize(size + subinfos.size());
+						memcpy(&all_infos[0] + size, &subinfos[0], sizeof(RenderableInfo) * subinfos.size());
+					}
+				}
+			}
+
+
+			void runJobs(Array<MTJD::Job*>& jobs, MTJD::Group& sync_point)
+			{
+				PROFILE_FUNCTION();
+				for (int i = 0; i < jobs.size(); ++i)
+				{
+					m_engine.getMTJDManager().schedule(jobs[i]);
+				}
+				if (!jobs.empty())
+				{
+					sync_point.sync();
+				}
+			}
+
+
+			void fillTemporaryInfos(const CullingSystem::Results& results, int64_t layer_mask)
+			{
+				PROFILE_FUNCTION();
+				m_jobs.clear();
+
+				while (m_temporary_infos.size() < results.size())
+				{
+					m_temporary_infos.emplace(m_allocator);
+				}
+				while (m_temporary_infos.size() > results.size())
+				{
+					m_temporary_infos.pop();
+				}
+				for (int subresult_index = 0; subresult_index < results.size(); ++subresult_index)
+				{
+					Array<RenderableInfo>& subinfos = m_temporary_infos[subresult_index];
+					subinfos.clear();
+					MTJD::Job* job = MTJD::makeJob(m_allocator, m_engine.getMTJDManager(), [&subinfos, layer_mask, this, &results, subresult_index]()
+						{
+							const CullingSystem::Subresults& subresults = results[subresult_index];
+							for (int i = 0, c = subresults.size(); i < c; ++i)
+							{
+								const Renderable* LUMIX_RESTRICT renderable = m_renderables[subresults[i]];
+								if ((renderable->m_layer_mask & layer_mask) != 0)
+								{
+									for (int j = 0, c = renderable->m_meshes.size(); j < c; ++j)
+									{
+										RenderableInfo& info = subinfos.pushEmpty();
+										info.m_mesh = &renderable->m_meshes[j];
+										info.m_key = (int64_t)renderable->m_meshes[j].m_mesh;
+									}
+								}
+							}
+						});
+					job->addDependency(&m_sync_point);
+					m_jobs.push(job);
+				}
+				runJobs(m_jobs, m_sync_point);
+			}
+
+			
+			virtual void getRenderableInfos(const Frustum& frustum, Array<RenderableInfo>& all_infos, int64_t layer_mask) override
+			{
+				PROFILE_FUNCTION();
+
+				const CullingSystem::Results* results = cull(frustum);
+				if (!results)
+				{
+					return;
+				}
+
+				fillTemporaryInfos(*results, layer_mask);
+				mergeTemporaryInfos(all_infos);
+
+				for (int i = 0, c = m_always_visible.size(); i < c; ++i)
+				{
+					const Renderable* LUMIX_RESTRICT renderable = m_renderables[getRenderable(m_always_visible[i])];
+					if ((renderable->m_layer_mask & layer_mask) != 0)
+					{
+						for (int j = 0, c = renderable->m_meshes.size(); j < c; ++j)
+						{
+							RenderableInfo& info = all_infos.pushEmpty();
+							info.m_mesh = &renderable->m_meshes[j];
+							info.m_key = (int64_t)renderable->m_meshes[j].m_mesh;
+						}
+					}
+				}
+			}
+
+
+			virtual void getRenderableMeshes(Array<RenderableMesh>& meshes, int64_t layer_mask) override
 			{
 				PROFILE_FUNCTION();
 
 				if (m_renderables.empty())
 					return;
 
-				m_culling_system->cullToFrustumAsync(m_camera_frustum);
-
-				const CullingSystem::Results& results = m_culling_system->getResultAsync();
-
-				infos.reserve(m_renderables.size() * 2);
+				meshes.reserve(m_renderables.size() * 2);
 				for (int i = 0, c = m_renderables.size(); i < c; ++i)
 				{
 					const Renderable* LUMIX_RESTRICT renderable = m_renderables[i];
-					if (!renderable->m_is_free)
+					if ((renderable->m_layer_mask & layer_mask) != 0)
 					{
-						const ModelInstance& model_instance = renderable->m_model;
-						const Model* model = model_instance.getModel();
-						bool is_model_ready = model && model->isReady();
-						bool culled = results[i] < 0;
-						if (is_model_ready && (renderable->m_layer_mask & layer_mask) != 0 && !culled)
+						for (int j = 0, c = renderable->m_meshes.size(); j < c; ++j)
 						{
-							for (int j = 0, c = renderable->m_model.getModel()->getMeshCount(); j < c; ++j)
-							{
-								RenderableInfo& info = infos.pushEmpty();
-								info.m_scale = renderable->m_scale;
-								info.m_geometry = model->getGeometry();
-								info.m_mesh = &model->getMesh(j);
-								info.m_pose = &model_instance.getPose();
-								info.m_model = &model_instance;
-								info.m_matrix = &model_instance.getMatrix();
-							}
+							meshes.push(renderable->m_meshes[j]);
 						}
 					}
 				}
@@ -995,19 +1244,19 @@ namespace Lumix
 			{
 				RayCastModelHit hit;
 				hit.m_is_hit = false;
-				Renderable* ignore_renderable = ignore.type == RENDERABLE_HASH ? m_renderables[ignore.index] : NULL;
-				Terrain* ignore_terrain = ignore.type == TERRAIN_HASH ? m_terrains[ignore.index] : NULL;
+				int ignore_index = getRenderable(ignore.index);
+				Terrain* ignore_terrain = ignore.type == TERRAIN_HASH ? m_terrains[ignore_index] : NULL;
 				for (int i = 0; i < m_renderables.size(); ++i)
 				{
-					if (ignore_renderable != m_renderables[i] && m_renderables[i]->m_model.getModel())
+					if (ignore_index != i && m_renderables[i]->m_model)
 					{
-						const Vec3& pos = m_renderables[i]->m_model.getMatrix().getTranslation();
-						float radius = m_renderables[i]->m_model.getModel()->getBoundingRadius();
+						const Vec3& pos = m_renderables[i]->m_matrix.getTranslation();
+						float radius = m_renderables[i]->m_model->getBoundingRadius();
 						float scale = m_renderables[i]->m_scale;
 						Vec3 intersection;
 						if (dotProduct(pos - origin, pos - origin) < radius * radius || Math::getRaySphereIntersection(origin, dir, pos, radius * scale, intersection))
 						{
-							RayCastModelHit new_hit = m_renderables[i]->m_model.getModel()->castRay(origin, dir, m_renderables[i]->m_model.getMatrix(), scale);
+							RayCastModelHit new_hit = m_renderables[i]->m_model->castRay(origin, dir, m_renderables[i]->m_matrix, scale);
 							if (new_hit.m_is_hit && (!hit.m_is_hit || new_hit.m_t < hit.m_t))
 							{
 								new_hit.m_component = Component(m_renderables[i]->m_entity, RENDERABLE_HASH, this, i);
@@ -1128,25 +1377,85 @@ namespace Lumix
 			}
 
 		private:
-			// I know, but it's just a proof of concept
-			void modelUpdate(Resource::State, Resource::State)
+			void modelLoaded(Model* model, int renderable_index)
 			{
-				updateBoundingRadiuses();
+				float bounding_radius = m_renderables[renderable_index]->m_model->getBoundingRadius();
+				m_culling_system->updateBoundingRadius(bounding_radius, renderable_index);
+				m_renderables[renderable_index]->m_meshes.clear();
+				for (int j = 0; j < model->getMeshCount(); ++j)
+				{
+					RenderableMesh& info = m_renderables[renderable_index]->m_meshes.pushEmpty();
+					info.m_scale = m_renderables[renderable_index]->m_scale;
+					info.m_mesh = &model->getMesh(j);
+					info.m_pose = &m_renderables[renderable_index]->m_pose;
+					info.m_matrix = &m_renderables[renderable_index]->m_matrix;
+					info.m_model = model;
+				}
 			}
 
-			void updateBoundingRadiuses()
+			void modelLoaded(Model* model)
 			{
 				for (int i = 0; i < m_renderables.size(); ++i)
 				{
-					if (m_renderables[i]->m_model.getModel())
+					if (m_renderables[i]->m_model == model)
 					{
-						float bounding_radius = m_renderables[i]->m_model.getModel()->getBoundingRadius();
-						m_culling_system->updateBoundingRadius(bounding_radius, i);
+						modelLoaded(model, i);
 					}
 				}
 			}
 
+
+			ModelLoadedCallback* getModelLoadedCallback(Model* model)
+			{
+				for(int i = 0; i < m_model_loaded_callbacks.size(); ++i)
+				{
+					if(m_model_loaded_callbacks[i]->m_model == model)
+					{
+						return m_model_loaded_callbacks[i];
+					}
+				}
+				ModelLoadedCallback* new_callback = m_allocator.newObject<ModelLoadedCallback>(*this, model);
+				m_model_loaded_callbacks.push(new_callback);
+				return new_callback;
+			}
+
+
+			void setModel(int renderable_index, Model* model)
+			{
+				Model* old_model = m_renderables[renderable_index]->m_model;
+				if(model == old_model)
+				{
+					return;
+				}
+				if (old_model)
+				{
+					ModelLoadedCallback* callback = getModelLoadedCallback(old_model);
+					--callback->m_ref_count;
+					old_model->getResourceManager().get(ResourceManager::MODEL)->unload(*old_model);
+				}
+				m_renderables[renderable_index]->m_model = model;
+				if (model)
+				{
+					ModelLoadedCallback* callback = getModelLoadedCallback(model);
+					++callback->m_ref_count;
+
+					if(model->isReady())
+					{
+						modelLoaded(model, renderable_index);
+					}
+				}
+			}
+
+			virtual IAllocator& getAllocator() override
+			{
+				return m_allocator;
+			}
+
+		private:
+			IAllocator& m_allocator;
+			Array<ModelLoadedCallback*> m_model_loaded_callbacks;
 			Array<Renderable*> m_renderables;
+			Array<int> m_always_visible;
 			Array<Light> m_lights;
 			Array<Camera> m_cameras;
 			Array<Terrain*> m_terrains;
@@ -1158,18 +1467,22 @@ namespace Lumix
 			Component m_applied_camera;
 			CullingSystem* m_culling_system;
 			Frustum m_camera_frustum;
+			DynamicRenderableCache m_dynamic_renderable_cache;
+			Array<Array<RenderableInfo> > m_temporary_infos;
+			MTJD::Group m_sync_point;
+			Array<MTJD::Job*> m_jobs;
 	};
 
 
-	RenderScene* RenderScene::createInstance(Renderer& renderer, Engine& engine, Universe& universe)
+	RenderScene* RenderScene::createInstance(Renderer& renderer, Engine& engine, Universe& universe, IAllocator& allocator)
 	{
-		return LUMIX_NEW(RenderSceneImpl)(renderer, engine, universe);
+		return allocator.newObject<RenderSceneImpl>(renderer, engine, universe, allocator);
 	}
 
 
 	void RenderScene::destroyInstance(RenderScene* scene)
 	{
-		LUMIX_DELETE(scene);
+		scene->getAllocator().deleteObject(static_cast<RenderSceneImpl*>(scene));
 	}
 
 }

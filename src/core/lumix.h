@@ -44,6 +44,7 @@ const uint32_t LUMIX_MAX_PATH = 260;
 	#define NULL nullptr
 #endif
 
+#define LUMIX_ALIGN_OF(T) __alignof(T)
 #define LUMIX_FORCE_INLINE __forceinline
 
 #ifdef BUILDING_CORE
@@ -86,9 +87,6 @@ const uint32_t LUMIX_MAX_PATH = 260;
 #endif
 
 #define LUMIX_RESTRICT __restrict
-
-#include "core/new.h"
-#include "core/new_macros.h"
 
 #pragma warning(disable : 4251)
 #pragma warning(disable : 4512)

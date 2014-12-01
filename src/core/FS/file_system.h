@@ -5,6 +5,8 @@
 
 namespace Lumix
 {
+	class IAllocator;
+
 	namespace FS
 	{
 		class IFile;
@@ -13,7 +15,7 @@ namespace Lumix
 		class LUMIX_CORE_API FileSystem abstract
 		{
 		public:
-			static FileSystem* create();
+			static FileSystem* create(IAllocator& allocator);
 			static void destroy(FileSystem* fs);
 
 			FileSystem() {}

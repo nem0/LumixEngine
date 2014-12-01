@@ -17,7 +17,7 @@ namespace FS
 class LUMIX_ENGINE_API Texture : public Resource
 {
 	public:
-		Texture(const Path& path, ResourceManager& resource_manager);
+		Texture(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 		~Texture();
 
 		bool create(int w, int h);
@@ -44,6 +44,7 @@ class LUMIX_ENGINE_API Texture : public Resource
 		virtual FS::ReadCallback getReadCallback() override;
 
 	private:
+		IAllocator& m_allocator;
 		GLuint m_id;
 		int m_width;
 		int m_height;

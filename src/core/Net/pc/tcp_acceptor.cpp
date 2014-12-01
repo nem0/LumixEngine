@@ -1,4 +1,5 @@
 #include "core/net/tcp_acceptor.h"
+#include "core/iallocator.h"
 #include "core/net/tcp_stream.h"
 
 #include <Windows.h>
@@ -45,10 +46,15 @@ namespace Lumix
 			return ::listen(socket, 10) == 0;	
 		}
 
+		void TCPAcceptor::close(TCPStream* stream)
+		{
+			m_allocator.deleteObject(stream);
+		}
+
 		TCPStream* TCPAcceptor::accept()
 		{
 			SOCKET socket = ::accept(m_socket, NULL, NULL);
-			return LUMIX_NEW(TCPStream)(socket);
+			return m_allocator.newObject<TCPStream>(socket);
 		}
 	} // ~namespace Net
 } // ~namespace Lumix

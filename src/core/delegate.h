@@ -93,6 +93,11 @@ namespace Lumix
 				m_stub.second = NULL;
 			}
 
+			bool isValid()
+			{
+				return m_stub.second != NULL;
+			}
+
 			template <R (*Function)(A0)>
 			void bind(void)
 			{

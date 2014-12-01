@@ -149,7 +149,7 @@ namespace Lumix
 			}
 			if (length > 0)
 			{
-				reverse(num_start, c - num_start);
+				reverse(num_start, (int)(c - num_start));
 				*c = 0;
 				return true;
 			}
@@ -209,7 +209,7 @@ namespace Lumix
 			}
 			if (length > 0)
 			{
-				reverse(num_start, c - num_start);
+				reverse(num_start, (int)(c - num_start));
 				*c = 0;
 				return true;
 			}
