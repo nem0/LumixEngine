@@ -111,10 +111,10 @@ int VertexDef::getPositionOffset() const
 }
 
 
-void VertexDef::begin(Shader& shader) const 
+void VertexDef::begin(Shader& shader, int start_offset) const 
 {
 	PROFILE_FUNCTION();
-	int offset = 0;
+	int offset = start_offset;
 	int shader_attrib_idx = 0;
 	int attribute_count = Math::minValue(m_attribute_count, shader.getAttributeCount());
 	for(int i = 0; i < attribute_count; ++i)
@@ -200,120 +200,101 @@ void VertexDef::end(Shader& shader) const
 }
 
 
-AABB Geometry::getAABB() const
+Geometry::Geometry()
 {
-	Vec3 min = m_vertices[0];
-	Vec3 max = m_vertices[0];
-	for(int i = 1, c = m_vertices.size(); i < c; ++i)
-	{
-		min.x = Math::minValue(min.x, m_vertices[i].x);
-		min.y = Math::minValue(min.y, m_vertices[i].y);
-		min.z = Math::minValue(min.z, m_vertices[i].z);
-
-		max.x = Math::maxValue(max.x, m_vertices[i].x);
-		max.y = Math::maxValue(max.y, m_vertices[i].y);
-		max.z = Math::maxValue(max.z, m_vertices[i].z);
-	}
-	return AABB(min, max);
-}
-
-
-float Geometry::getBoundingRadius() const
-{
-	float d = 0;
-	for(int i = 0, c = m_vertices.size(); i < c; ++i)
-	{
-		float l = m_vertices[i].squaredLength();
-		if(l > d)
-		{
-			d = l;
-		}
-	}
-	return sqrtf(d);
-}
-
-
-Geometry::Geometry(IAllocator& allocator)
-	: m_allocator(allocator)
-	, m_vertices(allocator)
-	, m_indices(allocator)
-{
-	glGenBuffers(1, &m_id);
-	glGenBuffers(1, &m_indices_id);
+	glGenBuffers(1, &m_attributes_array_id);
+	glGenBuffers(1, &m_indices_array_id);
+	m_indices_data_size = 0;
+	m_attributes_data_size = 0;
 }
 
 
 Geometry::~Geometry()
 {
-	glDeleteBuffers(1, &m_id);
-	glDeleteBuffers(1, &m_indices_id);
+	glDeleteBuffers(1, &m_attributes_array_id);
+	glDeleteBuffers(1, &m_indices_array_id);
 }
 
 
-void Geometry::copy(const Geometry& source, int times, VertexCallback& vertex_callback, IndexCallback& index_callback)
+void Geometry::copy(IAllocator& allocator, const Geometry& source, int copy_count, IndexCallback index_callback, VertexCallback vertex_callback)
 {
-	ASSERT(!source.m_indices.empty());
-	m_vertex_definition = source.m_vertex_definition;
+	ASSERT(source.m_indices_data_size > 0);
+	ASSERT(m_indices_data_size == 0);
 
-	glBindBuffer(GL_ARRAY_BUFFER, source.m_id);
+	glBindBuffer(GL_ARRAY_BUFFER, source.m_attributes_array_id);
 	uint8_t* data = (uint8_t*)glMapBuffer(GL_ARRAY_BUFFER, GL_READ_ONLY);
-	Array<uint8_t> data_copy(m_allocator);
-	int vertex_size = m_vertex_definition.getVertexSize();
-	int one_size = vertex_size * source.getVertices().size();
-	data_copy.resize(one_size * times);
-	for (int i = 0; i < times; ++i)
+	Array<uint8_t> data_copy(allocator);
+	data_copy.resize(source.m_attributes_data_size * copy_count);
+	for (int i = 0; i < copy_count; ++i)
 	{
-		memcpy(&data_copy[i * one_size], data, one_size);
+		memcpy(&data_copy[i * source.m_attributes_data_size], data, source.m_attributes_data_size);
 	}
-	vertex_callback.invoke(data_copy);
+	vertex_callback.invoke(&data_copy[0], source.m_attributes_data_size, copy_count);
 	glUnmapBuffer(GL_ARRAY_BUFFER);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, source.m_indices_id);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, source.m_indices_array_id);
 	data = (uint8_t*)glMapBuffer(GL_ELEMENT_ARRAY_BUFFER, GL_READ_ONLY);
-	Array<int> indices_data_copy(m_allocator);
-	int indices_count = source.getIndices().size();
-	indices_data_copy.resize(indices_count * times);
-	for (int i = 0; i < times; ++i)
+	Array<uint8_t> indices_data_copy(allocator);
+	indices_data_copy.resize(source.m_indices_data_size * copy_count);
+	for (int i = 0; i < copy_count; ++i)
 	{
-		memcpy(&indices_data_copy[i * indices_count], data, sizeof(int) * indices_count);
+		memcpy(&indices_data_copy[i * source.m_indices_data_size], data, source.m_indices_data_size);
 	}
-	index_callback.invoke(indices_data_copy);
+	index_callback.invoke(&indices_data_copy[0], source.m_indices_data_size, copy_count);
 	glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-	
-	glBindBuffer(GL_ARRAY_BUFFER, m_id);
+
+	glBindBuffer(GL_ARRAY_BUFFER, m_attributes_array_id);
 	glBufferData(GL_ARRAY_BUFFER, data_copy.size() * sizeof(data_copy[0]), &data_copy[0], GL_STATIC_DRAW);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_indices_id);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_indices_array_id);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices_data_copy.size() * sizeof(indices_data_copy[0]), &indices_data_copy[0], GL_STATIC_DRAW);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+	m_indices_data_size = source.m_indices_data_size * copy_count;
+	m_attributes_data_size = source.m_attributes_data_size * copy_count;
 }
 
 
-void Geometry::copy(const uint8_t* data, int size, const Array<int32_t>& indices, VertexDef vertex_definition)
+void Geometry::clear()
 {
-	m_vertex_definition = vertex_definition;
-	int vertex_size = m_vertex_definition.getVertexSize();
-	m_vertices.resize(size / vertex_size);
-	int pos_offset = m_vertex_definition.getPositionOffset();
-	for (int i = 0, c = m_vertices.size(); i < c; ++i)
-	{
-		m_vertices[i] = *reinterpret_cast<const Vec3*>(data + vertex_size * i + pos_offset);
-	}
-	m_indices.resize(indices.size());
-	for (int i = 0, c = m_indices.size(); i < c; ++i)
-	{
-		m_indices[i] = indices[i];
-	}
-	glBindBuffer(GL_ARRAY_BUFFER, m_id);
+	glDeleteBuffers(1, &m_attributes_array_id);
+	glDeleteBuffers(1, &m_indices_array_id);
+
+	glGenBuffers(1, &m_attributes_array_id);
+	glGenBuffers(1, &m_indices_array_id);
+
+	m_indices_data_size = 0;
+	m_attributes_data_size = 0;
+}
+
+
+void Geometry::setAttributesData(const void* data, int size)
+{
+	glBindBuffer(GL_ARRAY_BUFFER, m_attributes_array_id);
 	glBufferData(GL_ARRAY_BUFFER, size, data, GL_STATIC_DRAW);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_indices_id);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(indices[0]), &indices[0], GL_STATIC_DRAW);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	m_attributes_data_size = size;
 }
+
+
+void Geometry::setIndicesData(const void* data, int size)
+{
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_indices_array_id);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, size, data, GL_STATIC_DRAW);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	m_indices_data_size = size;
+}
+
+
+void Geometry::bindBuffers() const
+{
+	glBindBuffer(GL_ARRAY_BUFFER, m_attributes_array_id);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_indices_array_id);
+}
+
 
 
 } // ~namespace Lumix

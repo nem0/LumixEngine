@@ -66,9 +66,9 @@ namespace Lumix
 			DebugTextsData(IAllocator& allocator, Engine& engine)
 				: m_texts(allocator)
 				, m_allocator(allocator)
-				, m_geometry(allocator)
 				, m_font(NULL)
 				, m_engine(engine)
+				, m_mesh(NULL)
 			{
 				setFont(Path("fonts/debug_font.fnt"));
 			}
@@ -81,6 +81,7 @@ namespace Lumix
 					m_font->getObserverCb().unbind<DebugTextsData, &DebugTextsData::fontLoaded>(this);
 					m_font->getResourceManager().get(ResourceManager::BITMAP_FONT)->unload(*m_font);
 				}
+				m_allocator.deleteObject(m_mesh);
 			}
 
 			int addText(const char* text, int x, int y)
@@ -109,6 +110,9 @@ namespace Lumix
 
 
 			Geometry& getGeometry() { return m_geometry; }
+
+
+			Mesh& getMesh() { return *m_mesh; }
 
 
 			BitmapFont* getFont() const { return m_font; }
@@ -191,7 +195,9 @@ namespace Lumix
 							x += c->m_x_advance;
 						}
 					}
-					m_geometry.copy((const uint8_t*)&data[0], sizeof(data[0]) * data.size(), indices, vertex_definition);
+					m_geometry.setAttributesData(&data[0], sizeof(data[0]) * data.size());
+					m_geometry.setIndicesData(&indices[0], sizeof(indices[0]) * indices.size());
+					m_mesh = m_allocator.newObject<Mesh>(m_allocator, vertex_definition, m_font->getMaterial(), 0, sizeof(data[0]) * data.size(), 0, indices.size(), "");
 				}
 			}
 
@@ -200,6 +206,7 @@ namespace Lumix
 			Engine& m_engine;
 			AssociativeArray<int, DebugText> m_texts;
 			Geometry m_geometry;
+			Mesh* m_mesh;
 			BitmapFont* m_font;
 	};
 
@@ -1243,9 +1250,15 @@ namespace Lumix
 			}
 
 
-			virtual Geometry& getDebugTextGeomtry() override
+			virtual Geometry& getDebugTextGeometry() override
 			{
 				return m_debug_texts.getGeometry();
+			}
+
+
+			virtual Mesh& getDebugTextMesh() override
+			{
+				return m_debug_texts.getMesh();
 			}
 
 

@@ -11,18 +11,18 @@
 #include "core/string.h"
 #include "core/vec3.h"
 #include "core/resource.h"
+#include "graphics/geometry.h"
 #include "graphics/ray_cast_model_hit.h"
 
 
 namespace Lumix
 {
 
-class Geometry;
 class Material;
 class Model;
 class Pose;
 class ResourceManager;
-struct VertexDef;
+
 
 namespace FS
 {
@@ -34,27 +34,41 @@ namespace FS
 class Mesh
 {
 	public:
-		Mesh(Material* mat, int start, int count, const char* name, IAllocator& allocator)
+		Mesh(IAllocator& allocator, const VertexDef& def, Material* mat, int attribute_array_offset, int attribute_array_size, int indices_offset, int index_count, const char* name)
 			: m_name(allocator)
+			, m_vertex_def(def)
 		{
 			m_material = mat;
-			m_start = start;
-			m_count = count;
+			m_attribute_array_offset = attribute_array_offset;
+			m_attribute_array_size = attribute_array_size;
+			m_indices_offset = indices_offset;
+			m_index_count = index_count;
 			m_name_hash = crc32(name);
 			m_name = name;
 		}
 
 		Material* getMaterial() const { return m_material; }
 		void setMaterial(Material* material) { m_material = material; }
-		int getCount() const { return m_count; }
-		int getTriangleCount() const { return m_count / 3; }
-		int getStart() const { return m_start; }
+		int getIndicesOffset() const { return m_indices_offset; }
+		int getIndexCount() const { return m_index_count; }
+		int getTriangleCount() const { return m_index_count / 3; }
+		int getAttributeArrayOffset() const { return m_attribute_array_offset; }
+		int getAttributeArraySize() const { return m_attribute_array_size; }
 		uint32_t getNameHash() const { return m_name_hash; }
 		const char* getName() const { return m_name.c_str(); }
+		void setVertexDefinition(const VertexDef& def) { m_vertex_def = def; }
+		const VertexDef& getVertexDefinition() const { return m_vertex_def; }
 
 	private:
-		int32_t	m_start;
-		int32_t	m_count;
+		Mesh(const Mesh&);
+		void operator =(const Mesh&);
+
+	private:
+		VertexDef m_vertex_def;
+		int32_t	m_attribute_array_offset;
+		int32_t m_attribute_array_size;
+		int32_t m_indices_offset;
+		int32_t	m_index_count;
 		uint32_t m_name_hash;
 		Material* m_material;
 		string m_name;
@@ -85,17 +99,18 @@ class Model : public Resource
 	public:
 		Model(const Path& path, ResourceManager& resource_manager, IAllocator& allocator) 
 			: Resource(path, resource_manager, allocator) 
-			, m_geometry()
 			, m_bounding_radius()
 			, m_allocator(allocator)
 			, m_bone_map(m_allocator)
 			, m_meshes(m_allocator)
 			, m_bones(m_allocator)
+			, m_indices(m_allocator)
+			, m_vertices(m_allocator)
 		{ }
 
 		~Model();
 
-		Geometry*	getGeometry() const		{ return m_geometry; }
+		const Geometry& getGeometry() const { return m_geometry_buffer_object; }
 		Mesh&		getMesh(int index) { return m_meshes[index]; }
 		const Mesh&	getMesh(int index) const { return m_meshes[index]; }
 		int			getMeshCount() const { return m_meshes.size(); }
@@ -110,7 +125,7 @@ class Model : public Resource
 	private:
 		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 		bool parseVertexDef(FS::IFile* file, VertexDef* vertex_definition);
-		bool parseGeometry(FS::IFile* file, const VertexDef& vertex_definition);
+		bool parseGeometry(FS::IFile* file);
 		bool parseBones(FS::IFile* file);
 		bool parseMeshes(FS::IFile* file);
 		int getBoneIdx(const char* name);
@@ -120,9 +135,11 @@ class Model : public Resource
 		
 	private:
 		IAllocator& m_allocator;
-		Geometry* m_geometry;
+		Geometry m_geometry_buffer_object;
 		Array<Mesh> m_meshes;
 		Array<Bone> m_bones;
+		Array<int32_t> m_indices;
+		Array<Vec3> m_vertices;
 		float m_bounding_radius;
 		BoneMap m_bone_map; // maps bone name hash to bone index in m_bones
 		AABB m_aabb;
