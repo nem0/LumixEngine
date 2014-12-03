@@ -46,16 +46,16 @@ struct RenderModelsMeshContext
 		: m_mesh(NULL)
 		, m_shader(NULL)
 		, m_world_matrix_uniform_location(-1)
-		, m_geometry_start(0)
-		, m_geometry_count(0)
+		, m_indices_offset(0)
+		, m_vertex_count(0)
 	{
 	}
 
 	const Mesh* m_mesh;
 	Shader* m_shader;
 	int m_world_matrix_uniform_location;
-	int m_geometry_start;
-	int m_geometry_count;
+	int m_indices_offset;
+	int m_vertex_count;
 };
 
 
@@ -164,7 +164,7 @@ struct DrawScreenQuadCommand : public Command
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	
 	IAllocator& m_allocator;
-	Material* m_material;
+	Mesh* m_mesh;
 	Geometry* m_geometry;
 };
 
@@ -579,20 +579,20 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void renderScreenGeometry(Geometry* geometry, Material* material)
+	void renderScreenGeometry(Geometry* geometry, Mesh* mesh)
 	{
-		if (material->isReady())
+		if (mesh->getMaterial()->isReady())
 		{
 			ASSERT(m_renderer != NULL);
-			Shader* shader = material->getShader();
+			Shader* shader = mesh->getMaterial()->getShader();
 			Matrix mtx;
 			Renderer::getOrthoMatrix(-1, 1, -1, 1, 0, 30, &mtx);
 			m_renderer->setProjectionMatrix(mtx);
 			m_renderer->setViewMatrix(Matrix::IDENTITY);
-			material->apply(*m_renderer, *this);
+			mesh->getMaterial()->apply(*m_renderer, *this);
 			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::WORLD_MATRIX, Matrix::IDENTITY);
 			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::PROJECTION_MATRIX, mtx);
-			bindGeometry(*m_renderer, *geometry, *shader);
+			bindGeometry(*m_renderer, *geometry, *mesh);
 			renderGeometry(0, 6);
 		}
 	}
@@ -611,13 +611,14 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_renderer->setProjectionMatrix(projection_matrix);
 		m_renderer->setViewMatrix(Matrix::IDENTITY);
 
-		Geometry& geometry = m_scene->getDebugTextGeomtry();
+		Geometry& geometry = m_scene->getDebugTextGeometry();
+		Mesh& mesh = m_scene->getDebugTextMesh();
 		font->getMaterial()->apply(*m_renderer, *this);
-		bindGeometry(*m_renderer, geometry, *font->getMaterial()->getShader());
+		bindGeometry(*m_renderer, geometry, mesh);
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		glDisable(GL_DEPTH_TEST);
-		renderQuadGeometry(0, geometry.getIndices().size());
+		renderQuadGeometry(0, mesh.getIndexCount());
 		glDisable(GL_BLEND);
 		glEnable(GL_DEPTH_TEST);
 	}
@@ -695,8 +696,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 					}
 					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::GRASS_MATRICES, info.m_matrices, info.m_matrix_count);
 
-					bindGeometry(*m_renderer, *info.m_geometry, *shader);
-					renderGeometry(mesh.getStart(), mesh.getCount() / info.m_mesh_copy_count * info.m_matrix_count);
+					bindGeometry(*m_renderer, *info.m_geometry, mesh);
+					renderGeometry(mesh.getIndicesOffset(), mesh.getIndexCount() / info.m_mesh_copy_count * info.m_matrix_count);
 				}
 			}
 		}
@@ -792,8 +793,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_renderer->setUniform(*shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
 		context->m_world_matrix_uniform_location = getUniformLocation(*shader, (int)Shader::FixedCachedUniforms::WORLD_MATRIX);
 		context->m_shader = shader;
-		context->m_geometry_start = context->m_mesh->getStart();
-		context->m_geometry_count = context->m_mesh->getCount();
+		context->m_indices_offset = context->m_mesh->getIndicesOffset();
+		context->m_vertex_count = context->m_mesh->getIndexCount();
 		if (context->m_world_matrix_uniform_location < 0)
 		{
 			return false;
@@ -848,7 +849,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 				++info;
 				continue;
 			}
-			bindGeometry(*m_renderer, *info->m_mesh->m_model->getGeometry(), *mesh_context.m_shader);
+			bindGeometry(*m_renderer, info->m_mesh->m_model->getGeometry(), *mesh_context.m_mesh);
 			last_key = info->m_key;
 			while (last_key == info->m_key)
 			{
@@ -861,7 +862,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 					setPoseUniform(renderable_mesh, mesh_context);
 				}
 
-				renderGeometry(mesh_context.m_geometry_start, mesh_context.m_geometry_count);
+				renderGeometry(mesh_context.m_indices_offset, mesh_context.m_vertex_count);
 				++info;
 			}
 		}
@@ -1083,41 +1084,37 @@ void RenderDebugTextsCommand::execute(PipelineInstanceImpl& pipeline)
 DrawScreenQuadCommand::~DrawScreenQuadCommand()
 {
 	m_allocator.deleteObject(m_geometry);
+	m_allocator.deleteObject(m_mesh);
 }
 
 
 void DrawScreenQuadCommand::deserialize(PipelineImpl& pipeline, JsonSerializer& serializer)
 {
-	m_geometry = m_allocator.newObject<Geometry>(m_allocator);
+	m_geometry = m_allocator.newObject<Geometry>();
 	VertexDef def;
 	def.parse("pt", 2);
-	Array<int> indices(m_allocator);
+	int indices[6] = { 0, 1, 2, 0, 2, 3 };
 	const int GEOMETRY_VERTEX_ATTRIBUTE_COUNT = 20;
 	float v[GEOMETRY_VERTEX_ATTRIBUTE_COUNT];
-	indices.push(0);
-	indices.push(1);
-	indices.push(2);
-	indices.push(0);
-	indices.push(2);
-	indices.push(3);
 	
 	for (int i = 0; i < GEOMETRY_VERTEX_ATTRIBUTE_COUNT; ++i)
 	{
 		serializer.deserializeArrayItem(v[i], 0);
 	}
 
-	uint8_t* data = (uint8_t*)v;
-	m_geometry->copy(data, sizeof(v), indices, def);
+	m_geometry->setAttributesData(v, sizeof(v));
+	m_geometry->setIndicesData(indices, sizeof(indices));
 
-	char material[LUMIX_MAX_PATH];
-	serializer.deserializeArrayItem(material, LUMIX_MAX_PATH, "");
-	m_material = static_cast<Material*>(pipeline.getResourceManager().get(ResourceManager::MATERIAL)->load(Path(material)));
+	char material_path[LUMIX_MAX_PATH];
+	serializer.deserializeArrayItem(material_path, LUMIX_MAX_PATH, "");
+	Material* material = static_cast<Material*>(pipeline.getResourceManager().get(ResourceManager::MATERIAL)->load(Path(material_path)));
+	m_mesh = m_allocator.newObject<Mesh>(m_allocator, def, material, 0, 0, sizeof(v), 6, "screen_quad");
 }
 
 
 void DrawScreenQuadCommand::execute(PipelineInstanceImpl& pipeline)
 {
-	pipeline.renderScreenGeometry(m_geometry, m_material);
+	pipeline.renderScreenGeometry(m_geometry, m_mesh);
 }
 
 
