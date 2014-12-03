@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Form Files">
@@ -146,6 +146,54 @@
     <CustomBuild Include="..\..\scripts\scriptcompiler.h">
       <Filter>Header Files\..\..\scripts</Filter>
     </CustomBuild>
+    <CustomBuild Include="ui_assetbrowser.h">
+      <Filter>Generated Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="ui_entity_list.h">
+      <Filter>Generated Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="ui_entity_template_list.h">
+      <Filter>Generated Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="ui_fileserverwidget.h">
+      <Filter>Generated Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="ui_gameview.h">
+      <Filter>Generated Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="ui_logwidget.h">
+      <Filter>Generated Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="ui_mainwindow.h">
+      <Filter>Generated Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="ui_profilergraph.h">
+      <Filter>Generated Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="ui_profilerui.h">
+      <Filter>Generated Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="ui_property_view.h">
+      <Filter>Generated Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="ui_scriptcompilerwidget.h">
+      <Filter>Generated Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\file_system_watcher.h">
+      <Filter>Header Files\..\..</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\insert_mesh_command.h">
+      <Filter>Header Files\..\..</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\notifications.h">
+      <Filter>Header Files\..\..</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\renderdevicewidget.h">
+      <Filter>Header Files\..\..</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\wgl_render_device.h">
+      <Filter>Header Files\..\..</Filter>
+    </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\..\scripts\scriptcompilerwidget.h">
@@ -168,11 +216,6 @@
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\file_system_watcher.h">
-      <Filter>Header Files\..\..</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
     <CustomBuild Include="..\..\fileserverwidget.h">
       <Filter>Header Files\..\..</Filter>
     </CustomBuild>
@@ -183,11 +226,6 @@
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\insert_mesh_command.h">
-      <Filter>Header Files\..\..</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
     <CustomBuild Include="..\..\log_widget.h">
       <Filter>Header Files\..\..</Filter>
     </CustomBuild>
@@ -196,11 +234,6 @@
     <CustomBuild Include="..\..\mainwindow.h">
       <Filter>Header Files\..\..</Filter>
     </CustomBuild>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\..\notifications.h">
-      <Filter>Header Files\..\..</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\..\profilergraph.h">
@@ -218,19 +251,9 @@
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\renderdevicewidget.h">
-      <Filter>Header Files\..\..</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
     <CustomBuild Include="..\..\sceneview.h">
       <Filter>Header Files\..\..</Filter>
     </CustomBuild>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\..\wgl_render_device.h">
-      <Filter>Header Files\..\..</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Generated Files\debug" />
@@ -367,61 +390,6 @@
     <ClCompile Include="release\moc_scriptcompilerwidget.cpp">
       <Filter>Generated Files\release</Filter>
     </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="ui_assetbrowser.h">
-      <Filter>Generated Files</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="ui_entity_list.h">
-      <Filter>Generated Files</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="ui_entity_template_list.h">
-      <Filter>Generated Files</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="ui_fileserverwidget.h">
-      <Filter>Generated Files</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="ui_gameview.h">
-      <Filter>Generated Files</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="ui_logwidget.h">
-      <Filter>Generated Files</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="ui_mainwindow.h">
-      <Filter>Generated Files</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="ui_profilergraph.h">
-      <Filter>Generated Files</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="ui_profilerui.h">
-      <Filter>Generated Files</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="ui_property_view.h">
-      <Filter>Generated Files</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="ui_scriptcompilerwidget.h">
-      <Filter>Generated Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Form Files\.." />
