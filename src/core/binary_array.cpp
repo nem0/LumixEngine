@@ -4,6 +4,8 @@
 namespace Lumix
 {
 
+	static const int BITS_IN_BYTE = 8;
+	static const int BITMASK_7BIT = sizeof(int32_t) * BITS_IN_BYTE - 1;
 
 	BinaryArray::StoreType BinaryArray::BINARY_MASK[32];
 	BinaryArray::StoreType BinaryArray::INDEX_BIT[32];
@@ -25,10 +27,10 @@ namespace Lumix
 		if (!init)
 		{
 			init = true;
-			for (int i = 31; i >= 0; --i)
+			for (int i = BITMASK_7BIT; i >= 0; --i)
 			{
-				BINARY_MASK[i] = i == 31 ? 0xffffFFFF : BINARY_MASK[i + 1] << 1;
-				INDEX_BIT[i] = 1 << (31 - i);
+				BINARY_MASK[i] = i == BITMASK_7BIT ? 0xffffFFFF : BINARY_MASK[i + 1] << 1;
+				INDEX_BIT[i] = 1 << (BITMASK_7BIT - i);
 			}
 		}
 	}
@@ -46,17 +48,17 @@ namespace Lumix
 		{
 			int major = index >> 5;
 			const int last_major = (m_size - 1) >> 5;
-			m_data[major] = ((index & 31) == 0 ? 0 : (m_data[major] & BINARY_MASK[(index & 31) - 1])) | ((m_data[major] & ~BINARY_MASK[index & 31]) << 1);
+			m_data[major] = ((index & BITMASK_7BIT) == 0 ? 0 : (m_data[major] & BINARY_MASK[(index & BITMASK_7BIT) - 1])) | ((m_data[major] & ~BINARY_MASK[index & BITMASK_7BIT]) << 1);
 			if (major < last_major)
 			{
-				m_data[major] |= (m_data[major + 1] & 0x80000000) >> 31;
+				m_data[major] |= (m_data[major + 1] & 0x80000000) >> BITMASK_7BIT;
 			}
 			for (int i = major + 1; i <= last_major; ++i)
 			{
 				m_data[i] <<= 1;
 				if (i < (m_size >> 5))
 				{
-					m_data[i] |= (m_data[i + 1] & 0x80000000) >> 31;
+					m_data[i] |= (m_data[i + 1] & 0x80000000) >> BITMASK_7BIT;
 				}
 			}
 			m_data[last_major] <<= 1;
@@ -78,11 +80,11 @@ namespace Lumix
 		}
 		if (value)
 		{
-			m_data[m_size >> 5] |= INDEX_BIT[m_size & 31];
+			m_data[m_size >> 5] |= INDEX_BIT[m_size & BITMASK_7BIT];
 		}
 		else
 		{
-			m_data[m_size >> 5] &= ~INDEX_BIT[m_size & 31];
+			m_data[m_size >> 5] &= ~INDEX_BIT[m_size & BITMASK_7BIT];
 		}
 		++m_size;
 	}
@@ -98,7 +100,7 @@ namespace Lumix
 	bool BinaryArray::operator[](int index) const
 	{
 		ASSERT(index < m_size);
-		return (m_data[index >> 5] | INDEX_BIT[index & 31]) > 0;
+		return (m_data[index >> 5] | INDEX_BIT[index & BITMASK_7BIT]) > 0;
 	}
 
 
@@ -145,7 +147,7 @@ namespace Lumix
 
 	int BinaryArray::getRawSize() const
 	{
-		return (m_size + 31) >> 5;
+		return (m_size + BITMASK_7BIT) >> 5;
 	}
 
 
@@ -154,7 +156,7 @@ namespace Lumix
 		StoreType* new_data = static_cast<StoreType*>(m_allocator.allocate(capacity >> 3));
 		if (m_data)
 		{
-			memcpy(new_data, m_data, sizeof(StoreType) * (m_size + 31) >> 5);
+			memcpy(new_data, m_data, sizeof(StoreType) * (m_size + BITMASK_7BIT) >> 5);
 			m_allocator.deallocate(m_data);
 		}
 		m_data = new_data;
