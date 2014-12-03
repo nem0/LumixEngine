@@ -74,6 +74,11 @@ namespace
 			queue.push(test, true);
 		}
 
+		while (!queue.isEmpty())
+		{
+			Lumix::MT::yield();
+		}
+
 		queue.abort();
 		testTaskConsumer.destroy();
 
@@ -131,10 +136,15 @@ namespace
 			queue.push(test, true);
 		}
 
+		while (!queue.isEmpty())
+		{
+			Lumix::MT::yield();
+		}
+
 		queue.abort();
 		testTaskPodConsumer.destroy();
 
-		LUMIX_EXPECT_EQ(7968, testTaskPodConsumer.getSum());
+		LUMIX_EXPECT_EQ(8448, testTaskPodConsumer.getSum());
 	};
 }
 
