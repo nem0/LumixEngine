@@ -1,6 +1,7 @@
 #include "graphics/pose.h"
 #include "core/matrix.h"
 #include "core/quat.h"
+#include "core/profiler.h"
 #include "core/vec3.h"
 #include "graphics/model.h"
 
@@ -47,7 +48,7 @@ void Pose::resize(int count)
 void Pose::computeAbsolute(Model& model, int i, bool* valid)
 {
 	if (!valid[i])
-	{ 
+	{
 		int parent = model.getBone(i).parent_idx;
 		if (parent >= 0)
 		{
@@ -64,6 +65,7 @@ void Pose::computeAbsolute(Model& model, int i, bool* valid)
 
 void Pose::computeAbsolute(Model& model)
 {
+	PROFILE_FUNCTION();
 	if(!m_is_absolute)
 	{
 		ASSERT(m_count < 256);

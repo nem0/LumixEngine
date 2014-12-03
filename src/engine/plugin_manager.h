@@ -8,9 +8,10 @@
 namespace Lumix
 {
 
+	class Blob;
 	class Engine;
 	class IPlugin;
-	class ISerializer;
+	class JsonSerializer;
 	class Universe;
 
 	class LUMIX_ENGINE_API PluginManager
@@ -23,8 +24,8 @@ namespace Lumix
 			IPlugin* load(const char* path);
 			void addPlugin(IPlugin* plugin);
 			void update(float dt);
-			void serialize(ISerializer& serializer);
-			void deserialize(ISerializer& serializer);
+			void serialize(Blob& serializer);
+			void deserialize(Blob& serializer);
 			IPlugin* getPlugin(const char* name);
 			const Array<IPlugin*>& getPlugins() const;
 

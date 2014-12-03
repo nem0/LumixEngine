@@ -13,6 +13,8 @@ namespace Ui
 	class AssetBrowser;
 }
 
+class ScriptCompiler;
+
 class AssetBrowser : public QDockWidget
 {
 	Q_OBJECT
@@ -22,6 +24,7 @@ public:
 	~AssetBrowser();
 	void setWorldEditor(Lumix::WorldEditor& editor) { m_editor = &editor; }
 	void emitFileChanged(const char* path);
+	void setScriptCompiler(ScriptCompiler* compiler) { m_compiler = compiler; }
 
 private:
 	void handleDoubleClick(const class QFileInfo& file_info);
@@ -51,4 +54,5 @@ private:
 	class FileSystemWatcher* m_watcher;
 	Lumix::WorldEditor* m_editor;
 	QString m_base_path;
+	ScriptCompiler* m_compiler;
 };

@@ -1,7 +1,8 @@
 #include "hierarchy.h"
 #include "core/array.h"
+#include "core/blob.h"
 #include "core/hash_map.h"
-#include "core/iserializer.h"
+#include "core/json_serializer.h"
 #include "core/matrix.h"
 #include "core/pod_hash_map.h"
 #include "universe.h"
@@ -140,35 +141,31 @@ class HierarchyImpl : public Hierarchy
 		}
 		
 		
-		virtual void serialize(ISerializer& serializer) override
+		virtual void serialize(Blob& serializer) override
 		{
 			int size = m_parents.size();
-			serializer.serialize("hierarchy_size", size);
-			serializer.beginArray("hierarchy");
+			serializer.write((int32_t)size);
 			Parents::iterator iter = m_parents.begin(), end = m_parents.end();
 			while(iter != end)
 			{
-				serializer.serializeArrayItem(iter.key());			
-				serializer.serializeArrayItem(iter.value());			
+				serializer.write(iter.key());			
+				serializer.write(iter.value());			
 				++iter;
 			}
-			serializer.endArray();
 		}
 		
 		
-		virtual void deserialize(ISerializer& serializer) override
+		virtual void deserialize(Blob& serializer) override
 		{
-			int size;
-			serializer.deserialize("hierarchy_size", size, 0);
-			serializer.deserializeArrayBegin("hierarchy");
+			int32_t size;
+			serializer.read(size);
 			for(int i = 0; i < size; ++i)
 			{
 				int32_t child, parent;
-				serializer.deserializeArrayItem(child, 0);			
-				serializer.deserializeArrayItem(parent, 0);
+				serializer.read(child);			
+				serializer.read(parent);
 				setParent(Entity(&m_universe, child), Entity(&m_universe, parent));
 			}
-			serializer.deserializeArrayEnd();
 		}
 
 

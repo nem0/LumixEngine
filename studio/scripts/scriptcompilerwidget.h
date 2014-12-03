@@ -8,6 +8,11 @@ namespace Ui
 	class ScriptCompilerWidget;
 }
 
+namespace Lumix
+{
+	class WorldEditor;
+}
+
 class ScriptCompiler;
 
 class ScriptCompilerWidget : public QDockWidget
@@ -18,6 +23,7 @@ public:
 	explicit ScriptCompilerWidget(QWidget* parent = NULL);
 	~ScriptCompilerWidget();
 	ScriptCompiler* getCompiler() const { return m_compiler; }
+	void setWorldEditor(Lumix::WorldEditor& editor);
 
 private slots:
 	void on_scriptListView_clicked(const QModelIndex &index);

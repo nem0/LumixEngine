@@ -268,11 +268,10 @@ bool Model::parseMeshes(FS::IFile* file)
 		}
 		material_name[str_size] = 0;
 		
-		StackAllocator<LUMIX_MAX_PATH> allocator;
-		string material_path(allocator);
-		material_path = model_dir;
-		material_path += material_name;
-		material_path += ".mat";
+		char material_path[LUMIX_MAX_PATH];
+		copyString(material_path, sizeof(material_path), model_dir);
+		catCString(material_path, sizeof(material_path), material_name);
+		catCString(material_path, sizeof(material_path), ".mat");
 
 		int32_t mesh_tri_count = 0;
 		file->read(&mesh_tri_count, sizeof(mesh_tri_count));
@@ -286,7 +285,7 @@ bool Model::parseMeshes(FS::IFile* file)
 		mesh_name[str_size] = 0;
 		file->read(mesh_name, str_size);
 
-		Material* material = static_cast<Material*>(m_resource_manager.get(ResourceManager::MATERIAL)->load(material_path.c_str()));
+		Material* material = static_cast<Material*>(m_resource_manager.get(ResourceManager::MATERIAL)->load(Path(material_path)));
 		Mesh mesh(material, mesh_vertex_offset, mesh_tri_count * 3, mesh_name, m_allocator);
 		mesh_vertex_offset += mesh_tri_count * 3;
 		m_meshes.push(mesh);

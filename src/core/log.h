@@ -23,6 +23,7 @@ namespace Lumix
 			LogProxy& operator <<(int32_t message);
 			LogProxy& operator <<(uint32_t message);
 			LogProxy& operator <<(const Path& path);
+			LogProxy& operator <<(const string& path);
 
 		private:
 			IAllocator& m_allocator;

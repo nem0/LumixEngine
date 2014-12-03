@@ -63,7 +63,7 @@ namespace
 
 			Lumix::ScopedTimer timer("Culling System", allocator);
 
-			culling_system->cullToFrustum(clipping_frustum);
+			culling_system->cullToFrustum(clipping_frustum, 1);
 			const Lumix::CullingSystem::Results& result = culling_system->getResult();
 
 			//Lumix::g_log_info.log("unit") << "Culling system test took: " << timer.getTimeSinceStart();
@@ -110,7 +110,7 @@ namespace
 
 			Lumix::ScopedTimer timer("Culling System Async", allocator);
 
-			culling_system->cullToFrustumAsync(clipping_frustum);
+			culling_system->cullToFrustumAsync(clipping_frustum, 1);
 
 			const Lumix::CullingSystem::Results& result = culling_system->getResult();
 
