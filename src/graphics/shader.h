@@ -89,7 +89,7 @@ class LUMIX_ENGINE_API Shader : public Resource
 
 	private:
 		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
-		bool deserializeSettings(class ISerializer& serializer, char* attributes[MAX_ATTRIBUTE_COUNT]);
+		bool deserializeSettings(class JsonSerializer& serializer, char* attributes[MAX_ATTRIBUTE_COUNT]);
 		Combination* getCombination(uint32_t hash, uint32_t pass_hash) const;
 
 		virtual void doUnload(void) override;

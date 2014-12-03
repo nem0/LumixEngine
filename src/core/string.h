@@ -25,11 +25,6 @@ template <class T>
 class base_string
 {
 	public:
-		static base_string<T> create(unsigned int length, const char *s, IAllocator& allocator)
-		{
-			return base_string<T>(s, allocator);
-		}
-
 		base_string(IAllocator& allocator)
 			: m_allocator(allocator)
 		{
@@ -46,6 +41,15 @@ class base_string
 			m_cstr[m_size] = 0;
 		}
 		
+		base_string(IAllocator& allocator, const char* rhs, int32_t length)
+			: m_allocator(allocator)
+		{
+			m_size = length;
+			m_cstr = (T*)m_allocator.allocate((m_size + 1) * sizeof(T));
+			memcpy(m_cstr, rhs, m_size * sizeof(T));
+			m_cstr[m_size] = 0;
+		}
+
 		base_string(const base_string<T>& rhs)
 			: m_allocator(rhs.m_allocator)
 		{
@@ -72,6 +76,26 @@ class base_string
 		{
 			ASSERT(index >= 0 && index < m_size);
 			return m_cstr[index];
+		}
+
+
+		const T operator[](int index) const
+		{
+			ASSERT(index >= 0 && index < m_size);
+			return m_cstr[index];
+		}
+
+
+		void set(const char* rhs, int size)
+		{
+			if (rhs < m_cstr || rhs >= m_cstr + m_size)
+			{
+				m_allocator.deallocate(m_cstr);
+				m_size = size;
+				m_cstr = (T*)m_allocator.allocate(m_size + 1);
+				memcpy(m_cstr, rhs, size);
+				m_cstr[size] = '\0';
+			}
 		}
 
 		void operator = (const base_string<T>& rhs) 

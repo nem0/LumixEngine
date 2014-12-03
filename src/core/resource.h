@@ -33,6 +33,17 @@ namespace Lumix
 		bool isUnloading()	const { return State::UNLOADING	== m_state; }
 		bool isFailure()	const { return State::FAILURE	== m_state; }
 
+
+		template <typename C, void (C::*Function)(State, State)>
+		void onLoaded(C* instance)
+		{
+			m_cb.bind<C, Function>(instance);
+			if (isReady())
+			{
+				(instance->*Function)(State::READY, State::READY);
+			}
+		}
+
 		ObserverCallback& getObserverCb() { return m_cb; }
 
 		size_t size() const { return m_size; }

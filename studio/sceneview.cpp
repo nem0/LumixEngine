@@ -147,7 +147,7 @@ void SceneView::dropEvent(QDropEvent *event)
 			{
 				position.set(0, 0, 0);
 			}
-			InsertMeshCommand* command = m_world_editor->getAllocator().newObject<InsertMeshCommand>(*static_cast<ViewWidget&>(*m_view).m_world_editor, position, file.toLatin1().data());
+			InsertMeshCommand* command = m_world_editor->getAllocator().newObject<InsertMeshCommand>(*static_cast<ViewWidget&>(*m_view).m_world_editor, position, Lumix::Path(file.toLatin1().data()));
 			m_world_editor->executeCommand(command);
 			m_world_editor->selectEntities(&command->getEntity(), 1);
 		}

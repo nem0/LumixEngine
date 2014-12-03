@@ -128,7 +128,7 @@ FS::ReadCallback Material::getReadCallback()
 	return rc;
 }
 
-bool Material::save(ISerializer& serializer)
+bool Material::save(JsonSerializer& serializer)
 {
 	serializer.beginObject();
 	serializer.serialize("shader", m_shader->getPath().c_str());
@@ -186,7 +186,7 @@ bool Material::save(ISerializer& serializer)
 	return false;
 }
 
-void Material::deserializeUniforms(ISerializer& serializer)
+void Material::deserializeUniforms(JsonSerializer& serializer)
 {
 	serializer.deserializeArrayBegin();
 	while (!serializer.isArrayEnd())
@@ -304,15 +304,12 @@ void Material::setShader(Shader* shader)
 	if (m_shader)
 	{
 		addDependency(*m_shader);
-		m_shader->getObserverCb().bind<Material, &Material::shaderLoaded>(this);
-		if(m_shader->isReady())
-		{
-			shaderLoaded(Resource::State::READY, Resource::State::READY);
-		}
+
+		m_shader->onLoaded<Material, &Material::shaderLoaded>(this);
 	}
 }
 
-bool Material::deserializeTexture(ISerializer& serializer, const char* material_dir)
+bool Material::deserializeTexture(JsonSerializer& serializer, const char* material_dir)
 {
 	char path[LUMIX_MAX_PATH];
 	TextureInfo& info = m_textures.pushEmpty();
@@ -327,11 +324,10 @@ bool Material::deserializeTexture(ISerializer& serializer, const char* material_
 			serializer.deserialize(path, MAX_PATH, "");
 			if (path[0] != '\0')
 			{
-				StackAllocator<LUMIX_MAX_PATH> allocator;
-				string texture_path(allocator);
-				texture_path = material_dir;
-				texture_path += path;
-				info.m_texture = static_cast<Texture*>(m_resource_manager.get(ResourceManager::TEXTURE)->load(texture_path.c_str()));
+				char texture_path[LUMIX_MAX_PATH];
+				copyString(texture_path, sizeof(texture_path), material_dir);
+				catCString(texture_path, sizeof(texture_path), path);
+				info.m_texture = static_cast<Texture*>(m_resource_manager.get(ResourceManager::TEXTURE)->load(Path(texture_path)));
 				addDependency(*info.m_texture);
 
 				if (info.m_keep_data)
@@ -390,7 +386,7 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	PROFILE_FUNCTION();
 	if(success)
 	{
-		JsonSerializer serializer(*file, JsonSerializer::READ, m_path.c_str());
+		JsonSerializer serializer(m_allocator, *file, JsonSerializer::READ, m_path.c_str());
 		serializer.deserializeObjectBegin();
 		char path[LUMIX_MAX_PATH];
 		char label[256];
@@ -427,8 +423,8 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			}
 			else if (strcmp(label, "shader") == 0)
 			{
-				serializer.deserialize(path, MAX_PATH, "");
-				setShader(static_cast<Shader*>(m_resource_manager.get(ResourceManager::SHADER)->load(path)));
+				serializer.deserialize(path, LUMIX_MAX_PATH, "");
+				setShader(static_cast<Shader*>(m_resource_manager.get(ResourceManager::SHADER)->load(Path(path))));
 			}
 			else if (strcmp(label, "z_test") == 0)
 			{

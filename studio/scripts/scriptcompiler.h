@@ -10,6 +10,9 @@
 #include "core/string.h"
 
 
+namespace Lumix { class WorldEditor; }
+
+
 class ScriptCompiler : public QObject
 {
 	Q_OBJECT
@@ -31,6 +34,7 @@ public:
 	bool isEmpty() const { return m_processes.empty(); }
 	Status getStatus(const Lumix::Path& path);
 	QString getLog(const Lumix::Path& path);
+	void setWorldEditor(Lumix::WorldEditor& editor);
 
 signals:
 	void messageLogged(const QString& message);
@@ -51,5 +55,5 @@ private:
 	QVector<ProcessInfo> m_processes;
 	QMap<uint32_t, Status> m_status;
 	QMap<uint32_t, QString> m_log;
-
+	Lumix::WorldEditor* m_editor;
 };

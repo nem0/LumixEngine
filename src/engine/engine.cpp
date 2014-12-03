@@ -1,7 +1,7 @@
 #include "core/lumix.h"
 #include "engine/engine.h"
 
-
+#include "core/blob.h"
 #include "core/crc32.h"
 #include "core/input_system.h"
 #include "core/log.h"
@@ -35,6 +35,27 @@
 namespace Lumix
 {
 
+	static const uint32_t SERIALIZED_ENGINE_MAGIC = 0x5f4c454e; // == '_LEN'
+
+
+	enum class SerializedEngineVersion : int32_t
+	{
+		BASE,
+
+		LAST // must be the last one
+	};
+
+
+	#pragma pack(1)
+	class SerializedEngineHeader
+	{
+		public:
+			uint32_t m_magic;
+			SerializedEngineVersion m_version;
+			uint32_t m_reserved; // for crc
+	};
+	#pragma pack()
+
 	class EngineImpl : public Engine
 	{
 		public:
@@ -44,6 +65,7 @@ namespace Lumix
 				, m_mtjd_manager(m_allocator)
 				, m_allocator(allocator)
 				, m_scenes(m_allocator)
+				, m_fps(0)
 			{
 				m_editor = world_editor;
 				if (NULL == file_system)
@@ -280,8 +302,14 @@ namespace Lumix
 			}
 
 
-			virtual void serialize(ISerializer& serializer) override
+			virtual void serialize(Blob& serializer) override
 			{
+				SerializedEngineHeader header;
+				header.m_magic = SERIALIZED_ENGINE_MAGIC; // == '_LEN'
+				header.m_version = SerializedEngineVersion::LAST;
+				header.m_reserved = 0;
+				serializer.write(header);
+				g_path_manager.serialize(serializer);
 				m_universe->serialize(serializer);
 				m_hierarchy->serialize(serializer);
 				m_renderer->serialize(serializer);
@@ -293,8 +321,21 @@ namespace Lumix
 			}
 
 
-			virtual void deserialize(ISerializer& serializer) override
+			virtual bool deserialize(Blob& serializer) override
 			{
+				SerializedEngineHeader header;
+				serializer.read(header);
+				if (header.m_magic != SERIALIZED_ENGINE_MAGIC)
+				{
+					g_log_error.log("engine") << "Wrong or corrupted file";
+					return false;
+				}
+				if (header.m_version > SerializedEngineVersion::LAST)
+				{
+					g_log_error.log("engine") << "Unsupported version";
+					return false;
+				}
+				g_path_manager.deserialize(serializer);
 				m_universe->deserialize(serializer);
 				m_hierarchy->deserialize(serializer);
 				m_renderer->deserialize(serializer);
@@ -303,6 +344,7 @@ namespace Lumix
 				{
 					m_scenes[i]->deserialize(serializer);
 				}
+				return true;
 			}
 
 

@@ -1,7 +1,7 @@
 #include "entity_template_system.h"
 #include "core/array.h"
 #include "core/crc32.h"
-#include "core/iserializer.h"
+#include "core/json_serializer.h"
 #include "core/math_utils.h"
 #include "core/string.h"
 #include "editor/ieditor_command.h"
@@ -184,7 +184,7 @@ namespace Lumix
 			virtual void createTemplateFromEntity(const char* name, const Entity& entity) override
 			{
 				uint32_t name_hash = crc32(name);
-				if (m_instances.find(name_hash) >= 0)
+				if (m_instances.find(name_hash) < 0)
 				{
 					m_template_names.push(string(name, m_editor.getAllocator()));
 					m_instances.insert(name_hash, Array<Entity>(m_editor.getAllocator()));
@@ -235,65 +235,56 @@ namespace Lumix
 			}
 
 
-			virtual void serialize(ISerializer& serializer) override
+			virtual void serialize(Blob& serializer) override
 			{
-				serializer.serialize("templates_count", (int32_t)m_template_names.size());
-				serializer.beginArray("template_names");
+				serializer.write((int32_t)m_template_names.size());
 				for (int i = 0, c = m_template_names.size(); i < c;  ++i)
 				{
-					serializer.serializeArrayItem(m_template_names[i].c_str());
+					serializer.writeString(m_template_names[i].c_str());
 				}
-				serializer.endArray();
-				serializer.serialize("instance_count", (int32_t)m_instances.size());
-				serializer.beginArray("instances");
+				serializer.write((int32_t)m_instances.size());
 				for (int i = 0; i < m_instances.size(); ++i)
 				{
-					serializer.serializeArrayItem(m_instances.getKey(i));
+					serializer.write(m_instances.getKey(i));
 					Array<Entity>& entities = m_instances.at(i);
-					serializer.serializeArrayItem((int32_t)entities.size());
+					serializer.write((int32_t)entities.size());
 					for (int j = 0, c = entities.size(); j < c; ++j)
 					{
-						serializer.serializeArrayItem(entities[j].index);
+						serializer.write(entities[j].index);
 					}
 				}
-				serializer.endArray();
-
 			}
 
 
-			virtual void deserialize(ISerializer& serializer) override
+			virtual void deserialize(Blob& serializer) override
 			{
 				m_template_names.clear();
 				m_instances.clear();
 				int32_t count;
-				serializer.deserialize("templates_count", count, 0);
-				serializer.deserializeArrayBegin("template_names");
+				serializer.read(count);
 				for (int i = 0; i < count; ++i)
 				{
 					const int MAX_NAME_LENGTH = 50;
 					char name[MAX_NAME_LENGTH];
-					serializer.deserializeArrayItem(name, MAX_NAME_LENGTH, "");
+					serializer.readString(name, MAX_NAME_LENGTH);
 					m_template_names.push(string(name, m_editor.getAllocator()));
 				}
-				serializer.deserializeArrayEnd();
-				serializer.deserialize("instance_count", count, 0);
-				serializer.deserializeArrayBegin("instances");
+				serializer.read(count);
 				for (int i = 0; i < count; ++i)
 				{
 					uint32_t hash;
-					serializer.deserializeArrayItem(hash, 0);
+					serializer.read(hash);
 					int32_t instances_per_template;
-					serializer.deserializeArrayItem(instances_per_template, 0);
+					serializer.read(instances_per_template);
 					m_instances.insert(hash, Array<Entity>(m_editor.getAllocator()));
 					Array<Entity>& entities = m_instances.get(hash);
 					for (int j = 0; j < instances_per_template; ++j)
 					{
 						int32_t entity_index;
-						serializer.deserializeArrayItem(entity_index, 0);
+						serializer.read(entity_index);
 						entities.push(Entity(m_universe, entity_index));
 					}
 				}
-				serializer.deserializeArrayEnd();
 				m_updated.invoke();
 			}
 

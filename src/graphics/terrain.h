@@ -15,7 +15,7 @@ namespace Lumix
 {
 
 
-class ISerializer;
+class Blob;
 class Material;
 class Mesh;
 class PipelineInstance;
@@ -42,8 +42,8 @@ class Terrain
 				Mesh* m_grass_mesh;
 				Model* m_grass_model;
 				Terrain& m_terrain;
-				int m_ground;
-				int m_density;
+				int32_t m_ground;
+				int32_t m_density;
 		};
 		
 		class GrassPatch
@@ -81,8 +81,8 @@ class Terrain
 		void render(Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos);
 		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir);
 		int64_t getLayerMask() const { return m_layer_mask; }
-		void serialize(ISerializer& serializer);
-		void deserialize(ISerializer& serializer, Universe& universe, RenderScene& scene, int index);
+		void serialize(Blob& serializer);
+		void deserialize(Blob& serializer, Universe& universe, RenderScene& scene, int index);
 		void setXZScale(float scale) { m_xz_scale = scale; }
 		float getXZScale() const { return m_xz_scale; }
 		void setYScale(float scale) { m_y_scale = scale; }

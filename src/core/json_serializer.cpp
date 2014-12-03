@@ -1,26 +1,79 @@
 #include "json_serializer.h"
-#include <inttypes.h>
+#include "core/fs/ifile_device.h"
 #include "core/log.h"
+#include "core/math_utils.h"
+#include "core/path.h"
+#include <inttypes.h>
 
 
 namespace Lumix
 {
 
 
-JsonSerializer::JsonSerializer(FS::IFile& file, AccessMode access_mode, const char* path)
+JsonSerializer::ErrorProxy::ErrorProxy(JsonSerializer& serializer)
+	: m_log(g_log_error, "serializer", serializer.m_allocator)
+{
+	const char* c = serializer.m_data;
+	int line = 0;
+	int column = 0;
+	while (c < serializer.m_token)
+	{
+		if (*c == '\n')
+		{
+			++line;
+			column = 0;
+		}
+		++column;
+		++c;
+	}
+
+	m_log << serializer.m_path.c_str() << "(line "<< (line + 1) << ", column " << column << "): ";
+}
+
+
+JsonSerializer::JsonSerializer(IAllocator& allocator, FS::IFile& file, AccessMode access_mode, const char* path)
 	: m_file(file)
 	, m_access_mode(access_mode)
-	, m_is_eof(false)
+	, m_error_message(allocator)
+	, m_allocator(allocator)
 {
 	m_path = path;
 	m_is_first_in_block = true;
+	m_data = NULL;
+	m_is_string_token = false;
 	if(m_access_mode == READ)
 	{
-		m_is_eof = !m_file.read(&m_buffer, 1);
+		m_data_size = file.size();
+		if (file.getBuffer() != NULL)
+		{
+			m_data = (const char*)file.getBuffer();
+			m_own_data = false;
+		}
+		else
+		{
+			int size = m_file.size();
+			char* data = (char*)m_allocator.allocate(size);
+			m_own_data = true;
+			file.read(data, m_data_size);
+			m_data = data;
+		}
+		m_token = m_data;
+		m_token_size = 0;
 		deserializeToken();
 	}
 }
 
+
+JsonSerializer::~JsonSerializer()
+{
+	if (m_access_mode == READ && m_own_data)
+	{
+		m_allocator.deallocate((void*)m_data);
+	}
+}
+
+
+#pragma region serialization
 
 void JsonSerializer::serialize(const char* label, unsigned int value)
 {
@@ -161,7 +214,7 @@ void JsonSerializer::serializeArrayItem(int value)
 }
 
 
-void JsonSerializer::serializeArrayItem(int64_t& value)
+void JsonSerializer::serializeArrayItem(int64_t value)
 {
 	writeBlockComma();
 	char tmp[30];
@@ -188,10 +241,15 @@ void JsonSerializer::serializeArrayItem(bool value)
 	m_is_first_in_block = false;
 }
 
+#pragma endregion
+
+
+#pragma region deserialization
+
 
 void JsonSerializer::deserialize(bool& value, bool default_value)
 {
-	value = !m_is_string_token ? (strcmp(m_token, "true") == 0) : default_value;
+	value = !m_is_string_token ? m_token_size == 4 && (strncmp(m_token, "true", 4) == 0) : default_value;
 	deserializeToken();
 }
 
@@ -200,7 +258,7 @@ void JsonSerializer::deserialize(float& value, float default_value)
 {
 	if (!m_is_string_token)
 	{
-		value = (float)atof(m_token);
+		value = tokenToFloat();
 	}
 	else
 	{
@@ -213,7 +271,7 @@ void JsonSerializer::deserialize(float& value, float default_value)
 
 void JsonSerializer::deserialize(int32_t& value, int32_t default_value)
 {
-	if (m_is_string_token || !fromCString(m_token, (int)strlen(m_token), &value))
+	if (m_is_string_token || !fromCString(m_token, m_token_size, &value))
 	{
 		value = default_value;
 	}
@@ -223,9 +281,16 @@ void JsonSerializer::deserialize(int32_t& value, int32_t default_value)
 
 void JsonSerializer::deserialize(char* value, int max_length, const char* default_value)
 {
-	if (!m_is_string_token || !readStringToken(value, max_length))
+	if (!m_is_string_token)
 	{
 		copyString(value, max_length, default_value);
+	}
+	else
+	{
+		int size = Math::minValue(max_length - 1, m_token_size);
+		memcpy(value, m_token, size);
+		value[size] = '\0';
+		deserializeToken();
 	}
 }
 
@@ -235,37 +300,40 @@ void JsonSerializer::deserialize(const char* label, float& value, float default_
 	deserializeLabel(label);
 	if (!m_is_string_token)
 	{
-		value = (float)atof(m_token);
+		value = tokenToFloat();
+		deserializeToken();
 	}
 	else
 	{
 		value = default_value;
 	}
-	deserializeToken();
 }
 
 
 void JsonSerializer::deserialize(const char* label, uint32_t& value, uint32_t default_value)
 {
 	deserializeLabel(label);
-	if (m_is_string_token || !fromCString(m_token, (int)strlen(m_token), &value))
+	if (m_is_string_token || !fromCString(m_token, m_token_size, &value))
 	{
 		value = default_value;
 	}
-	deserializeToken();
+	else
+	{
+		deserializeToken();
+	}
 }
 
 
 bool JsonSerializer::isObjectEnd() const
 {
-	return m_is_eof || (!m_is_string_token && m_token[0] == '}' && m_token[1] == '\0');
+	return (!m_is_string_token && m_token_size == 1 && m_token[0] == '}');
 }
 
 
 void JsonSerializer::deserialize(const char* label, int32_t& value, int32_t default_value)
 {
 	deserializeLabel(label);
-	if (m_is_string_token || !fromCString(m_token, (int)strlen(m_token), &value))
+	if (m_is_string_token || !fromCString(m_token, m_token_size, &value))
 	{
 		value = default_value;
 	}
@@ -276,9 +344,16 @@ void JsonSerializer::deserialize(const char* label, int32_t& value, int32_t defa
 void JsonSerializer::deserialize(const char* label, char* value, int max_length, const char* default_value)
 {
 	deserializeLabel(label);
-	if (!readStringToken(value, max_length))
+	if (!m_is_string_token)
 	{
 		copyString(value, max_length, default_value);
+	}
+	else
+	{
+		int size = Math::minValue(max_length - 1, m_token_size);
+		memcpy(value, m_token, size);
+		value[size] = '\0';
+		deserializeToken();
 	}
 }
 
@@ -286,15 +361,27 @@ void JsonSerializer::deserialize(const char* label, char* value, int max_length,
 void JsonSerializer::deserializeArrayBegin(const char* label)
 {
 	deserializeLabel(label);
-	logErrorIfNot(!m_is_string_token && m_token[0] == '[' && m_token[1] == '\0');
+	expectToken('[');
 	m_is_first_in_block = true;
 	deserializeToken();
 }
 
 
+void JsonSerializer::expectToken(char expected_token)
+{
+	if (m_is_string_token || m_token_size != 1 || m_token[0] != expected_token)
+	{
+		char tmp[2];
+		tmp[0] = expected_token;
+		tmp[1] = 0;
+		error().log() << "Unexpected token \"" << string(m_allocator, m_token, m_token_size) << "\", expected " << tmp << ".";
+	}
+}
+
+
 void JsonSerializer::deserializeArrayBegin()
 {
-	logErrorIfNot(!m_is_string_token && m_token[0] == '[' && m_token[1] == '\0');
+	expectToken('[');
 	m_is_first_in_block = true;
 	deserializeToken();
 }
@@ -303,14 +390,10 @@ void JsonSerializer::deserializeArrayBegin()
 
 void JsonSerializer::deserializeRawString(char* buffer, int max_length)
 {
-	strncpy(buffer, m_token, max_length);
-	size_t token_length = strlen(m_token);
-	if (token_length + 2 <= (size_t)max_length)
-	{
-		buffer[token_length] = '\n';
-		buffer[token_length + 1] = m_buffer;
-		m_is_eof = !m_file.read(buffer + token_length + 2, max_length - token_length - 2);
-	}
+	int size = Math::minValue(max_length - 1, m_token_size);
+	memcpy(buffer, m_token, size);
+	buffer[size] = '\0';
+	deserializeToken();
 }
 
 
@@ -318,7 +401,7 @@ void JsonSerializer::nextArrayItem()
 {
 	if (!m_is_first_in_block)
 	{
-		logErrorIfNot(!m_is_string_token && m_token[0] == ',' && m_token[1] == '\0');
+		expectToken(',');
 		deserializeToken();
 	}
 }
@@ -326,13 +409,13 @@ void JsonSerializer::nextArrayItem()
 
 bool JsonSerializer::isArrayEnd() const
 {
-	return m_is_eof || (!m_is_string_token && m_token[0] == ']' && m_token[1] == '\0');
+	return (!m_is_string_token && m_token_size == 1 && m_token[0] == ']');
 }
 
 
 void JsonSerializer::deserializeArrayEnd()
 {
-	logErrorIfNot(!m_is_string_token && m_token[0] == ']' && m_token[1] == '\0');
+	expectToken(']');
 	m_is_first_in_block = false;
 	deserializeToken();
 }
@@ -343,10 +426,14 @@ void JsonSerializer::deserializeArrayItem(char* value, int max_length, const cha
 	deserializeArrayComma();
 	if (m_is_string_token)
 	{
-		readStringToken(value, max_length);
+		int size = Math::minValue(max_length - 1, m_token_size);
+		memcpy(value, m_token, size);
+		value[size] = '\0';
+		deserializeToken();
 	}
 	else
 	{
+		error().log() << "Unexpected token \"" << string(m_allocator, m_token, m_token_size) << "\", expected string.";
 		copyString(value, max_length, default_value);
 	}
 }
@@ -357,13 +444,8 @@ void JsonSerializer::deserializeArrayItem(string& value, const char* default_val
 	deserializeArrayComma();
 	if (m_is_string_token)
 	{
-		char tmp[256];
-		value = "";
-		while (readStringTokenPart(tmp, 255))
-		{
-			value += tmp;
-		}
-		value += tmp;
+		value.set(m_token, m_token_size);
+		deserializeToken();
 	}
 	else
 	{
@@ -375,7 +457,7 @@ void JsonSerializer::deserializeArrayItem(string& value, const char* default_val
 void JsonSerializer::deserializeArrayItem(uint32_t& value, uint32_t default_value)
 {
 	deserializeArrayComma();
-	if (m_is_string_token || !fromCString(m_token, (int)strlen(m_token), &value))
+	if (m_is_string_token || !fromCString(m_token, m_token_size, &value))
 	{
 		value = default_value;
 	}
@@ -386,7 +468,7 @@ void JsonSerializer::deserializeArrayItem(uint32_t& value, uint32_t default_valu
 void JsonSerializer::deserializeArrayItem(int32_t& value, int32_t default_value)
 {
 	deserializeArrayComma();
-	if (m_is_string_token || !fromCString(m_token, (int)strlen(m_token), &value))
+	if (m_is_string_token || !fromCString(m_token, m_token_size, &value))
 	{
 		value = default_value;
 	}
@@ -397,7 +479,7 @@ void JsonSerializer::deserializeArrayItem(int32_t& value, int32_t default_value)
 void JsonSerializer::deserializeArrayItem(int64_t& value, int64_t default_value)
 {
 	deserializeArrayComma();
-	if (m_is_string_token || !fromCString(m_token, (int)strlen(m_token), &value))
+	if (m_is_string_token || !fromCString(m_token, m_token_size, &value))
 	{
 		value = default_value;
 	}
@@ -414,7 +496,7 @@ void JsonSerializer::deserializeArrayItem(float& value, float default_value)
 	}
 	else
 	{
-		value = (float)atof(m_token);
+		value = tokenToFloat();
 	}
 	deserializeToken();
 }
@@ -430,7 +512,7 @@ void JsonSerializer::deserializeArrayItem(bool& value, bool default_value)
 	}
 	else
 	{
-		value = strcmp("true", m_token) == 0;
+		value = m_token_size == 4 && strncmp("true", m_token, m_token_size) == 0;
 	}
 	deserializeToken();
 }
@@ -441,7 +523,7 @@ void JsonSerializer::deserialize(const char* label, bool& value, bool default_va
 	deserializeLabel(label);
 	if(!m_is_string_token)
 	{
-		value = strcmp("true", m_token) == 0;
+		value = m_token_size == 4 && strncmp("true", m_token, 4) == 0;
 	}
 	else
 	{
@@ -457,74 +539,6 @@ static bool isDelimiter(char c)
 }
 
 
-bool JsonSerializer::readStringTokenPart(char* tmp, int max_len)
-{
-	logErrorIfNot(m_is_string_token);
-	int i = 0;
-	bool read_status = m_file.read(tmp + i, 1);
-	while (i < max_len && read_status && tmp[i] != '"')
-	{
-		++i;
-		if (i < max_len)
-		{
-			read_status = m_file.read(tmp + i, 1);
-		}
-	}
-	bool is_end = i < max_len || !read_status;
-	tmp[i] = '\0';
-	if (is_end)
-	{
-		if (!m_file.read(&m_buffer, 1))
-		{
-			m_is_eof = true;
-			return false;
-		}
-		while (isDelimiter(m_buffer))
-		{
-			if (!m_file.read(&m_buffer, 1))
-			{
-				m_is_eof = true;
-				return false;
-			}
-		}
-		deserializeToken();
-		return false;
-	}
-	else
-	{
-		return true;
-	}
-}
-
-
-bool JsonSerializer::readStringToken(char* tmp, int max_len)
-{
-	if (!m_is_string_token)
-		return false;
-	int i = 0;
-	while (m_file.read(tmp + i, 1) && tmp[i] != '"')
-	{
-		++i;
-		logErrorIfNot( i < max_len);
-	}
-	tmp[i] = '\0';
-	if (!m_file.read(&m_buffer, 1))
-	{
-		m_is_eof = true;
-		return true;
-	}
-	while (isDelimiter(m_buffer))
-	{
-		if (!m_file.read(&m_buffer, 1))
-		{
-			m_is_eof = true;
-			return true;
-		}
-	}
-	deserializeToken();
-	return true;
-}
-
 void JsonSerializer::deserializeArrayComma()
 {
 	if (m_is_first_in_block)
@@ -533,55 +547,66 @@ void JsonSerializer::deserializeArrayComma()
 	}
 	else
 	{
-		logErrorIfNot(!m_is_string_token && m_token[0] == ',' && m_token[1] == '\0');
+		
+		expectToken(',');
 		deserializeToken();
 	}
 }
 
 
-static bool isToken(char c)
+static bool isSingleCharToken(char c)
 {
-	return c == ',' || c == '[' || c == ']' || c == '{' || c == '}';
+	return c == ',' || c == '[' || c == ']' || c == '{' || c == '}' || c == ':';
 }
 
 
 void JsonSerializer::deserializeToken()
 {
-	if (m_buffer == '"')
+	m_token += m_token_size;
+	if (m_is_string_token)
 	{
+		++m_token;
+	}
+
+	while (m_token < m_data + m_data_size && isDelimiter(*m_token))
+	{
+		++m_token;
+	}
+	if (*m_token == '/' && m_token < m_data + m_data_size - 1 && m_token[1] == '/')
+	{
+		m_token_size = (m_data + m_data_size) - m_token;
+		m_is_string_token = false;
+	}
+	else if (*m_token == '"')
+	{
+		++m_token;
 		m_is_string_token = true;
-		return;
-	}
-	m_is_string_token = false;
-	if (isToken(m_buffer))
-	{
-		m_token[0] = m_buffer;
-		m_token[1] = '\0';
-		m_is_eof = !m_file.read(&m_buffer, 1);
-	}
-	else 
-	{
-		int i = 0;
-		while (!isDelimiter(m_buffer) && !isToken(m_buffer))
+		const char* token_end = m_token;
+		while (token_end < m_data + m_data_size && *token_end != '"')
 		{
-			m_token[i] = m_buffer;
-			++i;
-			if (!m_file.read(&m_buffer, 1))
-			{
-				m_is_eof = true;
-				break;
-			}
-			logErrorIfNot(i < TOKEN_MAX_SIZE); /// TODO not logErrorIfNot
+			++token_end;
 		}
-		m_token[i] = '\0';
-	}
-	while (isDelimiter(m_buffer))
-	{
-		if(!m_file.read(&m_buffer, 1))
+		if (token_end == m_data + m_data_size)
 		{
-			m_is_eof = true;
-			return;
+			error().log() << "Unexpected end of file while looking for \".";
+			m_token_size = 0;
 		}
+		m_token_size = token_end - m_token;
+	}
+	else if (isSingleCharToken(*m_token))
+	{
+		m_is_string_token = false;
+		m_token_size = 1;
+	}
+	else
+	{
+		m_is_string_token = false;
+		const char* token_end = m_token;
+		while (token_end < m_data + m_data_size && !isDelimiter(*token_end) && !isSingleCharToken(*token_end))
+		{
+			++token_end;
+		}
+		m_token_size = token_end - m_token;
 	}
 }
 
@@ -589,13 +614,13 @@ void JsonSerializer::deserializeToken()
 void JsonSerializer::deserializeObjectBegin()
 {
 	m_is_first_in_block = true;
-	logErrorIfNot(!m_is_string_token && m_token[0] == '{' && m_token[1] == '\0');
+	expectToken('{');
 	deserializeToken();
 }
 
 void JsonSerializer::deserializeObjectEnd()
 {
-	logErrorIfNot(!m_is_string_token && m_token[0] == '}' && m_token[1] == '\0');
+	expectToken('}');
 	m_is_first_in_block = false;
 	deserializeToken();
 }
@@ -605,17 +630,29 @@ void JsonSerializer::deserializeLabel(char* label, int max_length)
 {
 	if (!m_is_first_in_block)
 	{
-		logErrorIfNot(!m_is_string_token && m_token[0] == ',' && m_token[1] == '\0');
+		expectToken(',');
 		deserializeToken();
 	}
 	else
 	{
 		m_is_first_in_block = false;
 	}
-	logErrorIfNot(m_is_string_token);
-	readStringToken(label, max_length);
-	logErrorIfNot(!m_is_string_token && m_token[0] == ':' && m_token[1] == '\0');
+	if (!m_is_string_token)
+	{
+		error().log() << "Unexpected token \"" << string(m_allocator, m_token, m_token_size) << "\", expected string.";
+	}
+	int size = Math::minValue(max_length - 1, m_token_size);
+	copyString(label, size, m_token);
+	label[size] = '\0';
 	deserializeToken();
+	expectToken(':');
+	deserializeToken();
+}
+
+
+JsonSerializer::ErrorProxy JsonSerializer::error()
+{
+	return ErrorProxy(*this);
 }
 
 
@@ -623,28 +660,40 @@ void JsonSerializer::deserializeLabel(const char* label)
 {
 	if(!m_is_first_in_block)
 	{
-		logErrorIfNot(!m_is_string_token && m_token[0] == ',' && m_token[1] == '\0');
+		expectToken(',');
 		deserializeToken();
 	}
 	else
 	{
 		m_is_first_in_block = false;
 	}
-	logErrorIfNot(m_is_string_token);
-	char tmp[256];
-	readStringToken(tmp, 255);
-	logErrorIfNot(strcmp(label, tmp) == 0);
-	logErrorIfNot(!m_is_string_token && m_token[0] == ':' && m_token[1] == '\0');
+	if (!m_is_string_token)
+	{
+		error().log() << "Unexpected token \"" << string(m_allocator, m_token, m_token_size) << "\", expected string.";
+	}
+	if (strncmp(label, m_token, m_token_size) != 0)
+	{
+		error().log() << "Unexpected label \"" << string(m_allocator, m_token, m_token_size) << "\", expected \"" << label << "\".";
+	}
+	deserializeToken();
+	if (m_is_string_token || m_token_size != 1 || m_token[0] != ':')
+	{
+		error().log() << "Unexpected label \"" << string(m_allocator, m_token, m_token_size) << "\", expected \"" << label << "\".";
+	}
 	deserializeToken();
 }
 
 
-void JsonSerializer::logErrorIfNot(bool condition)
+#pragma endregion
+
+
+float JsonSerializer::tokenToFloat()
 {
-	if (!condition)
-	{
-		g_log_error.log("serializer") << "Error parsing JSON file " << m_path.c_str();
-	}
+	char tmp[64];
+	int size = Math::minValue((int)sizeof(tmp) - 1, m_token_size);
+	memcpy(tmp, m_token, size);
+	tmp[size] = '\0';
+	return (float)atof(tmp);
 }
 
 
