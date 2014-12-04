@@ -71,6 +71,7 @@ struct RendererImpl : public Renderer
 		m_material_manager.destroy();
 		m_shader_manager.destroy();
 		m_pipeline_manager.destroy();
+		m_font_manager.destroy();
 	}
 
 	virtual int getGLSLVersion() const override

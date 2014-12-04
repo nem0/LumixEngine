@@ -2021,6 +2021,8 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			destroyUndoStack();
 			m_universe_destroyed.invoke();
+			m_gizmo.setUniverse(NULL);
+			m_gizmo.destroy();
 			for (int i = 0; i < m_editor_icons.size(); ++i)
 			{
 				m_allocator.deleteObject(m_editor_icons[i]);
@@ -2029,8 +2031,6 @@ struct WorldEditorImpl : public WorldEditor
 			selectEntities(NULL, 0);
 			m_camera = Entity::INVALID;
 			m_editor_icons.clear();
-			m_gizmo.setUniverse(NULL);
-			m_gizmo.destroy();
 			m_engine->destroyUniverse();
 		}
 
