@@ -104,8 +104,11 @@ namespace Lumix
 				{
 					return;
 				}
-				m_texts.at(index).m_text = text;
-				generate();
+				if (m_texts.at(index).m_text != text)
+				{
+					m_texts.at(index).m_text = text;
+					generate();
+				}
 			}
 
 
@@ -195,10 +198,11 @@ namespace Lumix
 							x += c->m_x_advance;
 						}
 					}
-					m_geometry.setAttributesData(&data[0], sizeof(data[0]) * data.size());
-					m_geometry.setIndicesData(&indices[0], sizeof(indices[0]) * indices.size());
-					m_mesh = m_allocator.newObject<Mesh>(m_allocator, vertex_definition, m_font->getMaterial(), 0, sizeof(data[0]) * data.size(), 0, indices.size(), "");
 				}
+				m_allocator.deleteObject(m_mesh);
+				m_geometry.setAttributesData(&data[0], sizeof(data[0]) * data.size());
+				m_geometry.setIndicesData(&indices[0], sizeof(indices[0]) * indices.size());
+				m_mesh = m_allocator.newObject<Mesh>(m_allocator, vertex_definition, m_font->getMaterial(), 0, sizeof(data[0]) * data.size(), 0, indices.size(), "");
 			}
 
 		private:
@@ -434,7 +438,10 @@ namespace Lumix
 			void serializeLights(Blob& serializer)
 			{
 				serializer.write((int32_t)m_lights.size());
-				serializer.write(&m_lights[0], sizeof(m_lights[0]) * m_lights.size());
+				if (!m_lights.empty())
+				{
+					serializer.write(&m_lights[0], sizeof(m_lights[0]) * m_lights.size());
+				}
 			}
 
 			void serializeRenderables(Blob& serializer)
