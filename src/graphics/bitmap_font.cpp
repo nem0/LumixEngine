@@ -34,8 +34,12 @@ namespace Lumix
 
 	void BitmapFont::doUnload(void)
 	{
-		m_material->getObserverCb().unbind<BitmapFont, &BitmapFont::materialLoaded>(this);
-		removeDependency(*m_material);
+		if (m_material)
+		{
+			m_material->getObserverCb().unbind<BitmapFont, &BitmapFont::materialLoaded>(this);
+			m_material->getResourceManager().get(ResourceManager::MATERIAL)->unload(*m_material);
+			removeDependency(*m_material);
+		}
 		onEmpty();
 	}
 
