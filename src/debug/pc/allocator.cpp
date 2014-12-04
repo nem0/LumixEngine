@@ -13,12 +13,17 @@ namespace Debug
 {
 
 
+	static const uint32_t UNINITIALIZED_MEMORY_PATTERN = 0xCDCDCDCD;
+	static const uint32_t FREED_MEMORY_PATTERN = 0xDDDDDDDD;
+
+
 	Allocator::Allocator(IAllocator& source)
 		: m_source(source)
 		, m_root(NULL)
 		, m_mutex(false)
 		, m_stack_tree(m_source.newObject<Debug::StackTree>())
 		, m_total_size(0)
+		, m_is_fill_enabled(true)
 	{
 		m_sentinels[0].m_next = &m_sentinels[1];
 		m_sentinels[0].m_previous = NULL;
@@ -60,22 +65,30 @@ namespace Debug
 		#ifndef _DEBUG
 			return m_source.allocate(size);
 		#else
-			MT::SpinLock lock(m_mutex);
-			void* ptr = m_source.allocate(sizeof(AllocationInfo) + size);
-			AllocationInfo* info = new (ptr) AllocationInfo();
+			void* ptr;
+			{
+				MT::SpinLock lock(m_mutex);
+				ptr = m_source.allocate(sizeof(AllocationInfo) + size);
+				AllocationInfo* info = new (ptr)AllocationInfo();
 
-			info->m_previous = m_root->m_previous;
-			m_root->m_previous->m_next = info;
+				info->m_previous = m_root->m_previous;
+				m_root->m_previous->m_next = info;
 
-			info->m_next = m_root;
-			m_root->m_previous = info;
+				info->m_next = m_root;
+				m_root->m_previous = info;
 
-			info->m_stack_leaf = m_stack_tree->record();
-			info->m_size = size;
+				info->m_stack_leaf = m_stack_tree->record();
+				info->m_size = size;
 
-			m_root = info;
+				m_root = info;
 
-			m_total_size += size;
+				m_total_size += size;
+			} // because of the SpinLock
+
+			if (m_is_fill_enabled)
+			{
+				memset((uint8_t*)ptr + sizeof(AllocationInfo), UNINITIALIZED_MEMORY_PATTERN, size);
+			}
 
 			return (uint8_t*)ptr + sizeof(AllocationInfo);
 		#endif
@@ -89,6 +102,10 @@ namespace Debug
 			if(ptr)
 			{
 				AllocationInfo* info = reinterpret_cast<AllocationInfo*>((uint8_t*)ptr - sizeof(AllocationInfo));
+				if (m_is_fill_enabled)
+				{
+					memset(ptr, FREED_MEMORY_PATTERN, info->m_size);
+				}
 				MT::SpinLock lock(m_mutex);
 				if(info == m_root)
 				{
