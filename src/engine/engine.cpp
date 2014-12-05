@@ -42,7 +42,7 @@ namespace Lumix
 	{
 		BASE,
 
-		LAST // must be the last one
+		LATEST // must be the last one
 	};
 
 
@@ -306,7 +306,7 @@ namespace Lumix
 			{
 				SerializedEngineHeader header;
 				header.m_magic = SERIALIZED_ENGINE_MAGIC; // == '_LEN'
-				header.m_version = SerializedEngineVersion::LAST;
+				header.m_version = SerializedEngineVersion::LATEST;
 				header.m_reserved = 0;
 				serializer.write(header);
 				g_path_manager.serialize(serializer);
@@ -330,7 +330,7 @@ namespace Lumix
 					g_log_error.log("engine") << "Wrong or corrupted file";
 					return false;
 				}
-				if (header.m_version > SerializedEngineVersion::LAST)
+				if (header.m_version > SerializedEngineVersion::LATEST)
 				{
 					g_log_error.log("engine") << "Unsupported version";
 					return false;
