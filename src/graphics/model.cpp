@@ -27,7 +27,7 @@ enum class ModelFileVersion : uint32_t
 {
 	FIRST,
 	
-	LAST // keep this last
+	LATEST // keep this last
 };
 
 
@@ -355,7 +355,7 @@ void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		ModelFileHeader header;
 		file->read(&header, sizeof(header));
 		if (header.m_magic == MODEL_FILE_MAGIC
-			&& header.m_version <= (uint32_t)ModelFileVersion::LAST
+			&& header.m_version <= (uint32_t)ModelFileVersion::LATEST
 			&& parseMeshes(file)
 			&& parseGeometry(file)
 			&& parseBones(file))

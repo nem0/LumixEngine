@@ -25,7 +25,7 @@ namespace Debug
 		, m_stack_tree(m_source.newObject<Debug::StackTree>())
 		, m_total_size(0)
 		, m_is_fill_enabled(true)
-		, m_are_guard_enabled(true)
+		, m_are_guards_enabled(true)
 	{
 		m_sentinels[0].m_next = &m_sentinels[1];
 		m_sentinels[0].m_previous = NULL;
@@ -64,19 +64,19 @@ namespace Debug
 
 	size_t Allocator::getAllocationOffset()
 	{
-		return sizeof(AllocationInfo) + (m_are_guard_enabled ? sizeof(ALLOCATION_GUARD) : 0);
+		return sizeof(AllocationInfo) + (m_are_guards_enabled ? sizeof(ALLOCATION_GUARD) : 0);
 	}
 
 
 	size_t Allocator::getNeededMemory(size_t size)
 	{
-		return size + sizeof(AllocationInfo) + (m_are_guard_enabled ? sizeof(ALLOCATION_GUARD) << 1 : 0);
+		return size + sizeof(AllocationInfo) + (m_are_guards_enabled ? sizeof(ALLOCATION_GUARD) << 1 : 0);
 	}
 
 
 	Allocator::AllocationInfo* Allocator::getAllocationInfoFromSystem(void* system_ptr)
 	{
-		return (AllocationInfo*)(m_are_guard_enabled ? (uint8_t*)system_ptr + sizeof(ALLOCATION_GUARD) : system_ptr);
+		return (AllocationInfo*)(m_are_guards_enabled ? (uint8_t*)system_ptr + sizeof(ALLOCATION_GUARD) : system_ptr);
 	}
 
 
@@ -88,13 +88,13 @@ namespace Debug
 
 	void* Allocator::getUserFromSystem(void* system_ptr)
 	{
-		return (uint8_t*)system_ptr + (m_are_guard_enabled ? sizeof(ALLOCATION_GUARD) : 0) + sizeof(AllocationInfo);
+		return (uint8_t*)system_ptr + (m_are_guards_enabled ? sizeof(ALLOCATION_GUARD) : 0) + sizeof(AllocationInfo);
 	}
 
 
 	void* Allocator::getSystemFromUser(void* user_ptr)
 	{
-		return (uint8_t*)user_ptr - (m_are_guard_enabled ? sizeof(ALLOCATION_GUARD) : 0) - sizeof(AllocationInfo);
+		return (uint8_t*)user_ptr - (m_are_guards_enabled ? sizeof(ALLOCATION_GUARD) : 0) - sizeof(AllocationInfo);
 	}
 
 
@@ -130,7 +130,7 @@ namespace Debug
 				memset(user_ptr, UNINITIALIZED_MEMORY_PATTERN, size);
 			}
 
-			if (m_are_guard_enabled)
+			if (m_are_guards_enabled)
 			{
 				*(uint32_t*)system_ptr = ALLOCATION_GUARD;
 				*(uint32_t*)((uint8_t*)system_ptr + system_size - sizeof(ALLOCATION_GUARD)) = ALLOCATION_GUARD;
@@ -154,7 +154,7 @@ namespace Debug
 					memset(user_ptr, FREED_MEMORY_PATTERN, info->m_size);
 				}
 				
-				if (m_are_guard_enabled)
+				if (m_are_guards_enabled)
 				{
 					ASSERT(*(uint32_t*)system_ptr == ALLOCATION_GUARD);
 					ASSERT(*(uint32_t*)((uint8_t*)user_ptr + info->m_size) == ALLOCATION_GUARD);
