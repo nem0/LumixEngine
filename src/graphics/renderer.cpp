@@ -59,6 +59,7 @@ struct RendererImpl : public Renderer
 
 		m_current_pass_hash = crc32("MAIN");
 		m_last_bind_geometry = NULL;
+		m_last_bind_geometry_mesh = NULL;
 		m_last_program_id = 0xffffFFFF;
 		m_is_editor_wireframe = false;
 	}
@@ -70,6 +71,7 @@ struct RendererImpl : public Renderer
 		m_material_manager.destroy();
 		m_shader_manager.destroy();
 		m_pipeline_manager.destroy();
+		m_font_manager.destroy();
 	}
 
 	virtual int getGLSLVersion() const override
@@ -169,9 +171,10 @@ struct RendererImpl : public Renderer
 	{
 		if(m_last_bind_geometry)
 		{
-			m_last_bind_geometry->getVertexDefinition().end(*m_last_bind_geometry_shader);
+			m_last_bind_geometry_mesh->getVertexDefinition().end(*m_last_bind_geometry_mesh->getMaterial()->getShader());
 		}
 		m_last_bind_geometry = NULL;
+		m_last_bind_geometry_mesh = NULL;
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 		glUseProgram(0);
@@ -397,9 +400,10 @@ struct RendererImpl : public Renderer
 			const Mesh& mesh = model.getMesh(i);
 			mesh.getMaterial()->apply(*this, pipeline);
 			setFixedCachedUniform(*this, *mesh.getMaterial()->getShader(), (int)Shader::FixedCachedUniforms::WORLD_MATRIX, transform);
-			bindGeometry(*this, *model.getGeometry(), *mesh.getMaterial()->getShader());
-			renderGeometry(mesh.getStart(), mesh.getCount());
+			bindGeometry(*this, model.getGeometry(), mesh);
+			renderGeometry(mesh.getIndicesOffset(), mesh.getIndexCount());
 		}
+		
 	}
 
 
@@ -425,8 +429,8 @@ struct RendererImpl : public Renderer
 	PipelineManager m_pipeline_manager;
 	IRenderDevice* m_render_device;
 	bool m_is_editor_wireframe;
-	Geometry* m_last_bind_geometry;
-	Shader* m_last_bind_geometry_shader;
+	const Geometry* m_last_bind_geometry;
+	const Mesh* m_last_bind_geometry_mesh;
 	GLuint m_last_program_id;
 	uint32_t m_current_pass_hash;
 	Matrix m_view_matrix;
@@ -580,32 +584,32 @@ void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, c
 }
 
 
-void bindGeometry(Renderer& renderer, Geometry& geometry, Shader& shader)
+void bindGeometry(Renderer& renderer, const Geometry& geometry, const Mesh& mesh)
 {
 	RendererImpl& renderer_impl = static_cast<RendererImpl&>(renderer);
-	if (renderer_impl.m_last_bind_geometry != &geometry)
+	if (renderer_impl.m_last_bind_geometry_mesh != &mesh)
 	{
-		if (renderer_impl.m_last_bind_geometry)
+		if (renderer_impl.m_last_bind_geometry_mesh)
 		{
-			renderer_impl.m_last_bind_geometry->getVertexDefinition().end(shader);
+			const Mesh* mesh = renderer_impl.m_last_bind_geometry_mesh;
+			mesh->getVertexDefinition().end(*mesh->getMaterial()->getShader());
 		}
-		glBindBuffer(GL_ARRAY_BUFFER, geometry.getID());
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, geometry.getIndicesID());
+		geometry.bindBuffers();
 		renderer_impl.m_last_bind_geometry = &geometry;
-		renderer_impl.m_last_bind_geometry_shader = &shader;
-		geometry.getVertexDefinition().begin(shader);
+		renderer_impl.m_last_bind_geometry_mesh = &mesh;
+		mesh.getVertexDefinition().begin(*mesh.getMaterial()->getShader(), mesh.getAttributeArrayOffset());
 	}
 }
 
 
-void renderGeometry(int start, int count)
+void renderGeometry(int indices_offset, int vertex_count)
 {
-	glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, (void*)(start * sizeof(GLint)));
+	glDrawElements(GL_TRIANGLES, vertex_count, GL_UNSIGNED_INT, (void*)(indices_offset * sizeof(GLint)));
 }
 
-void renderQuadGeometry(int start, int count)
+void renderQuadGeometry(int indices_offset, int vertex_count)
 {
-	glDrawElements(GL_QUADS, count, GL_UNSIGNED_INT, (void*)(start * sizeof(GLint)));
+	glDrawElements(GL_QUADS, vertex_count, GL_UNSIGNED_INT, (void*)(indices_offset * sizeof(GLint)));
 }
 
 int getUniformLocation(const Shader& shader, int name)

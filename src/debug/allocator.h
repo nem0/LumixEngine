@@ -40,12 +40,22 @@ namespace Debug
 			IAllocator& getSourceAllocator() { return m_source; }
 
 		private:
+			inline size_t getAllocationOffset();
+			inline AllocationInfo* getAllocationInfoFromSystem(void* system_ptr);
+			inline AllocationInfo* getAllocationInfoFromUser(void* user_ptr);
+			inline void* getUserFromSystem(void* system_ptr);
+			inline void* getSystemFromUser(void* user_ptr);
+			inline size_t getNeededMemory(size_t size);
+
+		private:
 			IAllocator& m_source;
 			StackTree* m_stack_tree;
 			MT::SpinMutex m_mutex;
 			AllocationInfo* m_root;
 			AllocationInfo m_sentinels[2];
 			size_t m_total_size;
+			bool m_is_fill_enabled;
+			bool m_are_guards_enabled;
 	};
 
 
