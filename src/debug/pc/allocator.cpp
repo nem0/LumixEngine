@@ -143,7 +143,7 @@ namespace Debug
 	void Allocator::deallocate(void* user_ptr)
 	{
 		#ifndef _DEBUG
-			m_source.deallocate(ptr);
+			m_source.deallocate(user_ptr);
 		#else
 			if (user_ptr)
 			{
