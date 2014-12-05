@@ -19,6 +19,27 @@
 namespace Lumix
 {
 
+
+static const uint32_t MODEL_FILE_MAGIC = 0x5f4c4d4f; // == '_LMO'
+
+
+enum class ModelFileVersion : uint32_t
+{
+	FIRST,
+	
+	LATEST // keep this last
+};
+
+
+#pragma pack(1)
+class ModelFileHeader
+{
+	public:
+		uint32_t m_magic;
+		uint32_t m_version;
+};
+#pragma pack()
+
 	
 Model::~Model()
 {
@@ -30,7 +51,7 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 {
 	RayCastModelHit hit;
 	hit.m_is_hit = false;
-	if(!m_geometry)
+	if(!isReady())
 	{
 		return hit;
 	}
@@ -41,68 +62,60 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 	Vec3 local_origin = inv.multiplyPosition(origin);
 	Vec3 local_dir = static_cast<Vec3>(inv * Vec4(dir.x, dir.y, dir.z, 0));
 
-	const Array<Vec3>& vertices = m_geometry->getVertices();
-	const Array<int32_t>& indices = m_geometry->getIndices();
-
-	int32_t last_hit_index = -1;
-	for(int i = 0; i < indices.size(); i += 3)
+	const Array<Vec3>& vertices = m_vertices;
+	const Array<int32_t>& indices = m_indices;
+	int vertex_offset = 0;
+	for (int mesh_index = 0; mesh_index < m_meshes.size(); ++mesh_index)
 	{
-		Vec3 p0 = vertices[indices[i]];
-		Vec3 p1 = vertices[indices[i+1]];
-		Vec3 p2 = vertices[indices[i+2]];
-		Vec3 normal = crossProduct(p1 - p0, p2 - p0);
-		float q = dotProduct(normal, local_dir);
-		if(q == 0)
+		int indices_end = m_meshes[mesh_index].getIndicesOffset() + m_meshes[mesh_index].getIndexCount();
+		for (int i = m_meshes[mesh_index].getIndicesOffset(); i < indices_end; i += 3)
 		{
-			continue;
-		}
-		float d = -dotProduct(normal, p0);
-		float t = -(dotProduct(normal, local_origin) + d) / q;
-		if(t < 0)
-		{
-			continue;
-		}
-		Vec3 hit_point = local_origin + local_dir * t;
-
-		Vec3 edge0 = p1 - p0;
-		Vec3 VP0 = hit_point - p0;
-		if (dotProduct(normal, crossProduct(edge0, VP0)) < 0)
-		{
-			continue;
-		}
-
-		Vec3 edge1 = p2 - p1;
-		Vec3 VP1 = hit_point - p1;
-		if (dotProduct(normal, crossProduct(edge1, VP1)) < 0)
-		{
-			continue;
-		}
- 
-		Vec3 edge2 = p0 - p2;
-		Vec3 VP2 = hit_point - p2;
-		if (dotProduct(normal, crossProduct(edge2, VP2)) < 0)
-		{
-			continue;
-		}
-
-		if(!hit.m_is_hit || hit.m_t > t)
-		{
-			hit.m_is_hit = true;
-			hit.m_t = t;
-			last_hit_index = i;
-		}
-	}
-
-	if(last_hit_index != -1)
-	{
-		for(int i = 0; i < m_meshes.size(); ++i)
-		{
-			if(last_hit_index < m_meshes[i].getStart() + m_meshes[i].getCount())
+			Vec3 p0 = vertices[vertex_offset + indices[i]];
+			Vec3 p1 = vertices[vertex_offset + indices[i + 1]];
+			Vec3 p2 = vertices[vertex_offset + indices[i + 2]];
+			Vec3 normal = crossProduct(p1 - p0, p2 - p0);
+			float q = dotProduct(normal, local_dir);
+			if (q == 0)
 			{
-				hit.m_mesh = &m_meshes[i];
-				break;
+				continue;
+			}
+			float d = -dotProduct(normal, p0);
+			float t = -(dotProduct(normal, local_origin) + d) / q;
+			if (t < 0)
+			{
+				continue;
+			}
+			Vec3 hit_point = local_origin + local_dir * t;
+
+			Vec3 edge0 = p1 - p0;
+			Vec3 VP0 = hit_point - p0;
+			if (dotProduct(normal, crossProduct(edge0, VP0)) < 0)
+			{
+				continue;
+			}
+
+			Vec3 edge1 = p2 - p1;
+			Vec3 VP1 = hit_point - p1;
+			if (dotProduct(normal, crossProduct(edge1, VP1)) < 0)
+			{
+				continue;
+			}
+
+			Vec3 edge2 = p0 - p2;
+			Vec3 VP2 = hit_point - p2;
+			if (dotProduct(normal, crossProduct(edge2, VP2)) < 0)
+			{
+				continue;
+			}
+
+			if (!hit.m_is_hit || hit.m_t > t)
+			{
+				hit.m_is_hit = true;
+				hit.m_t = t;
+				hit.m_mesh = &m_meshes[mesh_index];
 			}
 		}
+		vertex_offset += m_meshes[mesh_index].getAttributeArraySize() / m_meshes[mesh_index].getVertexDefinition().getVertexSize();
 	}
 	hit.m_origin = origin;
 	hit.m_dir = dir;
@@ -142,7 +155,7 @@ bool Model::parseVertexDef(FS::IFile* file, VertexDef* vertex_definition)
 	return true;
 }
 
-bool Model::parseGeometry(FS::IFile* file, const VertexDef& vertex_definition)
+bool Model::parseGeometry(FS::IFile* file)
 {
 	int32_t indices_count = 0;
 	file->read(&indices_count, sizeof(indices_count));
@@ -150,22 +163,58 @@ bool Model::parseGeometry(FS::IFile* file, const VertexDef& vertex_definition)
 	{
 		return false;
 	}
-	Array<int32_t> indices(m_allocator);
-	indices.resize(indices_count);
-	file->read(&indices[0], sizeof(indices[0]) * indices_count);
+	m_indices.resize(indices_count);
+	file->read(&m_indices[0], sizeof(m_indices[0]) * indices_count);
 	
-	int32_t vertices_count = 0;
-	file->read(&vertices_count, sizeof(vertices_count));
-	if (vertices_count <= 0)
+	int32_t vertices_size = 0;
+	file->read(&vertices_size, sizeof(vertices_size));
+	if (vertices_size <= 0)
 	{
 		return false;
 	}
-	Array<float> vertices(m_allocator);
-	vertices.resize(vertices_count * vertex_definition.getVertexSize() / sizeof(vertices[0]));
+
+	Array<uint8_t> vertices(m_allocator);
+	vertices.resize(vertices_size);
 	file->read(&vertices[0], sizeof(vertices[0]) * vertices.size());
 	
-	m_geometry = m_allocator.newObject<Geometry>(m_allocator);
-	m_geometry->copy((uint8_t*)&vertices[0], sizeof(float) * vertices.size(), indices, vertex_definition);
+	m_geometry_buffer_object.setAttributesData(&vertices[0], vertices.size());
+	m_geometry_buffer_object.setIndicesData(&m_indices[0], m_indices.size() * sizeof(m_indices[0]));
+
+	int vertex_count = 0;
+	for (int i = 0; i < m_meshes.size(); ++i)
+	{
+		vertex_count += m_meshes[i].getAttributeArraySize() / m_meshes[i].getVertexDefinition().getVertexSize();
+	}
+	m_vertices.resize(vertex_count);
+	
+	int index = 0;
+	float bounding_radius_squared = 0;
+	Vec3 min_vertex(0, 0, 0);
+	Vec3 max_vertex(0, 0, 0);
+
+	for (int i = 0; i < m_meshes.size(); ++i)
+	{
+		int mesh_vertex_count = m_meshes[i].getAttributeArraySize() / m_meshes[i].getVertexDefinition().getVertexSize();
+		int mesh_attributes_array_offset = m_meshes[i].getAttributeArrayOffset();
+		int mesh_vertex_size = m_meshes[i].getVertexDefinition().getVertexSize();
+		int mesh_position_attribute_offset = m_meshes[i].getVertexDefinition().getPositionOffset();
+		for (int j = 0; j < mesh_vertex_count; ++j)
+		{
+			m_vertices[index] = *(Vec3*)&vertices[mesh_attributes_array_offset + j * mesh_vertex_size + mesh_position_attribute_offset];
+			bounding_radius_squared = Math::maxValue(bounding_radius_squared, m_vertices[index].squaredLength());
+			min_vertex.x = Math::minValue(min_vertex.x, m_vertices[index].x);
+			min_vertex.y = Math::minValue(min_vertex.y, m_vertices[index].y);
+			min_vertex.z = Math::minValue(min_vertex.z, m_vertices[index].z);
+			max_vertex.x = Math::maxValue(max_vertex.x, m_vertices[index].x);
+			max_vertex.y = Math::maxValue(max_vertex.y, m_vertices[index].y);
+			max_vertex.z = Math::maxValue(max_vertex.z, m_vertices[index].z);
+			++index;
+		}
+	}
+
+	m_bounding_radius = sqrt(bounding_radius_squared);
+	m_aabb = AABB(min_vertex, max_vertex);
+
 	return true;
 }
 
@@ -247,12 +296,10 @@ bool Model::parseMeshes(FS::IFile* file)
 {
 	int object_count = 0;
 	file->read(&object_count, sizeof(object_count));
-	ASSERT(object_count > 0);
 	if (object_count <= 0)
 	{
 		return false;
 	}
-	int32_t mesh_vertex_offset = 0;
 	m_meshes.reserve(object_count);
 	char model_dir[LUMIX_MAX_PATH];
 	PathUtils::getDir(model_dir, LUMIX_MAX_PATH, m_path.c_str());
@@ -272,7 +319,14 @@ bool Model::parseMeshes(FS::IFile* file)
 		copyString(material_path, sizeof(material_path), model_dir);
 		catCString(material_path, sizeof(material_path), material_name);
 		catCString(material_path, sizeof(material_path), ".mat");
+		Material* material = static_cast<Material*>(m_resource_manager.get(ResourceManager::MATERIAL)->load(Path(material_path)));
 
+		int32_t attribute_array_offset = 0;
+		file->read(&attribute_array_offset, sizeof(attribute_array_offset));
+		int32_t attribute_array_size = 0;
+		file->read(&attribute_array_size, sizeof(attribute_array_size));
+		int32_t indices_offset = 0;
+		file->read(&indices_offset, sizeof(indices_offset));
 		int32_t mesh_tri_count = 0;
 		file->read(&mesh_tri_count, sizeof(mesh_tri_count));
 
@@ -285,10 +339,9 @@ bool Model::parseMeshes(FS::IFile* file)
 		mesh_name[str_size] = 0;
 		file->read(mesh_name, str_size);
 
-		Material* material = static_cast<Material*>(m_resource_manager.get(ResourceManager::MATERIAL)->load(Path(material_path)));
-		Mesh mesh(material, mesh_vertex_offset, mesh_tri_count * 3, mesh_name, m_allocator);
-		mesh_vertex_offset += mesh_tri_count * 3;
-		m_meshes.push(mesh);
+		VertexDef def;
+		parseVertexDef(file, &def);
+		m_meshes.emplace(m_allocator, def, material, attribute_array_offset, attribute_array_size, indices_offset, mesh_tri_count * 3, mesh_name);
 		addDependency(*material);
 	}
 	return true;
@@ -299,14 +352,14 @@ void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	PROFILE_FUNCTION();
 	if(success)
 	{
-		VertexDef vertex_definition;
-		if (parseVertexDef(file, &vertex_definition) 
-			&& parseGeometry(file, vertex_definition)
-			&& parseBones(file)
-			&& parseMeshes(file))
+		ModelFileHeader header;
+		file->read(&header, sizeof(header));
+		if (header.m_magic == MODEL_FILE_MAGIC
+			&& header.m_version <= (uint32_t)ModelFileVersion::LATEST
+			&& parseMeshes(file)
+			&& parseGeometry(file)
+			&& parseBones(file))
 		{
-			m_bounding_radius = m_geometry->getBoundingRadius();
-			m_aabb = m_geometry->getAABB();
 			m_size = file->size();
 			decrementDepCount();
 		}
@@ -335,8 +388,7 @@ void Model::doUnload(void)
 	}
 	m_meshes.clear();
 	m_bones.clear();
-	m_allocator.deleteObject(m_geometry);
-	m_geometry = NULL;
+	m_geometry_buffer_object.clear();
 
 	m_size = 0;
 	onEmpty();
@@ -348,7 +400,6 @@ FS::ReadCallback Model::getReadCallback()
 	rc.bind<Model, &Model::loaded>(this);
 	return rc;
 }
-
 
 
 } // ~namespace Lumix

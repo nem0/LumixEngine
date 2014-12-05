@@ -35,8 +35,8 @@ class Terrain
 				~GrassType();
 
 				void grassLoaded(Resource::State, Resource::State);
-				void grassVertexCopyCallback(Array<uint8_t>& data);
-				void grassIndexCopyCallback(Array<int>& data);
+				void grassVertexCopyCallback(void* data, int instance_size, int copy_count);
+				void grassIndexCopyCallback(void* data, int instance_size, int copy_count);
 	
 				Geometry* m_grass_geometry;
 				Mesh* m_grass_mesh;

@@ -225,6 +225,7 @@ namespace Lumix
 		~HashMap()
 		{
 			clear();
+			m_allocator.deallocate(m_sentinel);
 		}
 
 		size_type size() const { return m_size; }

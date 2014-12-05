@@ -89,7 +89,8 @@ namespace Lumix
 
 			virtual int addDebugText(const char* text, int x, int y) = 0;
 			virtual void setDebugText(int id, const char* text) = 0;
-			virtual Geometry& getDebugTextGeomtry() = 0;
+			virtual Geometry& getDebugTextGeometry() = 0;
+			virtual Mesh& getDebugTextMesh() = 0;
 			virtual BitmapFont* getDebugTextFont() = 0;
 			virtual void addDebugLine(const Vec3& from, const Vec3& to, const Vec3& color, float life) = 0;
 			virtual void addDebugCross(const Vec3& center, float size, const Vec3& color, float life) = 0;
