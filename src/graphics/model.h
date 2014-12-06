@@ -18,6 +18,7 @@
 namespace Lumix
 {
 
+class Frustum;
 class Material;
 class Model;
 class Pose;
@@ -75,11 +76,34 @@ class Mesh
 };
 
 
+class LODMeshIndices
+{
+	public:
+		LODMeshIndices(int from, int to) : m_from(from), m_to(to) {}
+
+		int getFrom() const { return m_from; }
+		int getTo() const { return m_to; }
+
+	private:
+		int m_from;
+		int m_to;
+};
+
+
 // group of meshes
 class Model : public Resource
 {
 	public:
 		typedef HashMap<uint32_t, int> BoneMap;
+
+		class LOD
+		{
+			public:
+				int m_from_mesh;
+				int m_to_mesh;
+
+				float m_distance;
+		};
 
 		struct Bone
 		{
@@ -106,10 +130,12 @@ class Model : public Resource
 			, m_bones(m_allocator)
 			, m_indices(m_allocator)
 			, m_vertices(m_allocator)
+			, m_lods(m_allocator)
 		{ }
 
 		~Model();
 
+		LODMeshIndices getLODMeshIndices(float squared_distance) const;
 		const Geometry& getGeometry() const { return m_geometry_buffer_object; }
 		Mesh&		getMesh(int index) { return m_meshes[index]; }
 		const Mesh&	getMesh(int index) const { return m_meshes[index]; }
@@ -129,6 +155,7 @@ class Model : public Resource
 		bool parseBones(FS::IFile* file);
 		bool parseMeshes(FS::IFile* file);
 		int getBoneIdx(const char* name);
+		void createLODs();
 
 		virtual void doUnload(void) override;
 		virtual FS::ReadCallback getReadCallback() override;
@@ -140,6 +167,7 @@ class Model : public Resource
 		Array<Bone> m_bones;
 		Array<int32_t> m_indices;
 		Array<Vec3> m_vertices;
+		Array<LOD> m_lods;
 		float m_bounding_radius;
 		BoneMap m_bone_map; // maps bone name hash to bone index in m_bones
 		AABB m_aabb;

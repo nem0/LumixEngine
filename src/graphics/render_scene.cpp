@@ -214,6 +214,14 @@ namespace Lumix
 			BitmapFont* m_font;
 	};
 
+	
+	class LodMeshes
+	{
+		public:
+			RenderableMesh* m_first;
+			RenderableMesh* m_last;
+	};
+
 
 	struct Renderable
 	{
@@ -892,10 +900,6 @@ namespace Lumix
 			{
 				Renderable& r = *m_renderables[getRenderable(cmp.index)];
 				r.m_scale = scale;
-				for (int i = 0; i < r.m_meshes.size(); ++i)
-				{
-					r.m_meshes[i].m_scale = scale;
-				}
 			}
 
 
@@ -1090,7 +1094,7 @@ namespace Lumix
 			}
 
 
-			void fillTemporaryInfos(const CullingSystem::Results& results, int64_t layer_mask)
+			void fillTemporaryInfos(const CullingSystem::Results& results, const Frustum& frustum, int64_t layer_mask)
 			{
 				PROFILE_FUNCTION();
 				m_jobs.clear();
@@ -1107,17 +1111,25 @@ namespace Lumix
 				{
 					Array<RenderableInfo>& subinfos = m_temporary_infos[subresult_index];
 					subinfos.clear();
-					MTJD::Job* job = MTJD::makeJob(m_allocator, m_engine.getMTJDManager(), [&subinfos, layer_mask, this, &results, subresult_index]()
+					MTJD::Job* job = MTJD::makeJob(m_allocator, m_engine.getMTJDManager(), [&subinfos, layer_mask, this, &results, subresult_index, &frustum]()
 						{
+							Vec3 frustum_position = frustum.getPosition();
 							const CullingSystem::Subresults& subresults = results[subresult_index];
 							for (int i = 0, c = subresults.size(); i < c; ++i)
 							{
 								const Renderable* LUMIX_RESTRICT renderable = m_renderables[subresults[i]];
-								for (int j = 0, c = renderable->m_meshes.size(); j < c; ++j)
+								const Model* LUMIX_RESTRICT model = renderable->m_model;
+								TODO("get rid of this if");
+								if (model->isReady())
 								{
-									RenderableInfo& info = subinfos.pushEmpty();
-									info.m_mesh = &renderable->m_meshes[j];
-									info.m_key = (int64_t)renderable->m_meshes[j].m_mesh;
+									float squared_distance = (renderable->m_matrix.getTranslation() - frustum_position).squaredLength();
+									LODMeshIndices lod = model->getLODMeshIndices(squared_distance);
+									for (int j = lod.getFrom(), c = lod.getTo(); j <= c; ++j)
+									{
+										RenderableInfo& info = subinfos.pushEmpty();
+										info.m_mesh = &renderable->m_meshes[j];
+										info.m_key = (int64_t)renderable->m_meshes[j].m_mesh;
+									}
 								}
 							}
 						});
@@ -1138,7 +1150,7 @@ namespace Lumix
 					return;
 				}
 
-				fillTemporaryInfos(*results, layer_mask);
+				fillTemporaryInfos(*results, frustum, layer_mask);
 				mergeTemporaryInfos(all_infos);
 
 				for (int i = 0, c = m_always_visible.size(); i < c; ++i)
@@ -1511,7 +1523,6 @@ namespace Lumix
 				for (int j = 0; j < model->getMeshCount(); ++j)
 				{
 					RenderableMesh& info = m_renderables[renderable_index]->m_meshes.pushEmpty();
-					info.m_scale = m_renderables[renderable_index]->m_scale;
 					info.m_mesh = &model->getMesh(j);
 					info.m_pose = &m_renderables[renderable_index]->m_pose;
 					info.m_matrix = &m_renderables[renderable_index]->m_matrix;

@@ -39,7 +39,6 @@ namespace Lumix
 	{
 		const Mesh* m_mesh;
 		const Pose* m_pose;
-		float m_scale;
 		const Matrix* m_matrix;
 		const Model* m_model;
 	};
