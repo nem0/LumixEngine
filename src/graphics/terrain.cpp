@@ -1,7 +1,8 @@
 #include "terrain.h"
 #include "core/aabb.h"
+#include "core/blob.h"
 #include "core/frustum.h"
-#include "core/iserializer.h"
+#include "core/json_serializer.h"
 #include "core/log.h"
 #include "core/math_utils.h"
 #include "core/profiler.h"
@@ -147,8 +148,8 @@ namespace Lumix
 					setFixedCachedUniform(*renderer, shader, (int)Shader::FixedCachedUniforms::MORPH_CONST, morph_const);
 					setFixedCachedUniform(*renderer, shader, (int)Shader::FixedCachedUniforms::QUAD_SIZE, m_size);
 					setFixedCachedUniform(*renderer, shader, (int)Shader::FixedCachedUniforms::QUAD_MIN, m_min);
-					bindGeometry(*renderer, geometry, shader);
-					renderGeometry(mesh->getCount() / 4 * i, mesh->getCount() / 4);
+					bindGeometry(*renderer, geometry, *mesh);
+					renderGeometry(mesh->getIndexCount() / 4 * i, mesh->getIndexCount() / 4);
 				}
 			}
 			return true;
@@ -180,7 +181,6 @@ namespace Lumix
 		, m_last_camera_position(m_allocator)
 		, m_grass_types(m_allocator)
 		, m_free_grass_quads(m_allocator)
-		, m_geometry(m_allocator)
 	{
 		generateGeometry();
 	}
@@ -190,7 +190,7 @@ namespace Lumix
 		if (m_grass_model)
 		{
 			m_grass_model->getResourceManager().get(ResourceManager::MODEL)->unload(*m_grass_model);
-			m_grass_model->getObserverCb().unbind<GrassType, &GrassType::grassLoaded>(this);
+			m_grass_model->onLoaded<GrassType, &GrassType::grassLoaded>(this);
 			m_terrain.m_allocator.deleteObject(m_grass_mesh);
 			m_terrain.m_allocator.deleteObject(m_grass_geometry);
 		}
@@ -290,7 +290,7 @@ namespace Lumix
 		{
 			return type.m_grass_model->getPath();
 		}
-		return "";
+		return Path("");
 	}
 
 
@@ -311,11 +311,7 @@ namespace Lumix
 		if (path.isValid())
 		{
 			type.m_grass_model = static_cast<Model*>(m_scene.getEngine().getResourceManager().get(ResourceManager::MODEL)->load(path));
-			type.m_grass_model->getObserverCb().bind<GrassType, &GrassType::grassLoaded>(&type);
-			if(type.m_grass_model->isReady())
-			{
-				type.grassLoaded(Resource::State::READY, Resource::State::READY);
-			}
+			type.m_grass_model->onLoaded<GrassType, &GrassType::grassLoaded>(&type);
 		}
 	}
 	
@@ -460,19 +456,19 @@ namespace Lumix
 	}
 
 
-	void Terrain::GrassType::grassVertexCopyCallback(Array<uint8_t>& data)
+	void Terrain::GrassType::grassVertexCopyCallback(void* data, int instance_size, int copy_count)
 	{
-		bool has_matrix_index_attribute = m_grass_model->getGeometry()->getVertexDefinition().getAttributeType(3) == VertexAttributeDef::INT1;
+		bool has_matrix_index_attribute = m_grass_model->getMesh(0).getVertexDefinition().getAttributeType(3) == VertexAttributeDef::INT1;
 		if (has_matrix_index_attribute)
 		{
-			int vertex_size = m_grass_model->getGeometry()->getVertexDefinition().getVertexSize();
-			int one_size = vertex_size * m_grass_model->getGeometry()->getVertices().size();
+			uint8_t* attributes_data = (uint8_t*)data;
+			int vertex_size = m_grass_model->getMesh(0).getVertexDefinition().getVertexSize();
 			const int i1_offset = 3 * sizeof(float) + 3 * sizeof(float) + 2 * sizeof(float);
-			for (int i = 0; i < COPY_COUNT; ++i)
+			for (int i = 0; i < copy_count; ++i)
 			{
-				for (int j = 0; j < m_grass_model->getGeometry()->getVertices().size(); ++j)
+				for (int j = 0, c = m_grass_model->getMesh(0).getAttributeArraySize() / m_grass_model->getMesh(0).getVertexDefinition().getVertexSize(); j < c; ++j)
 				{
-					data[i * one_size + j * vertex_size + i1_offset] = (uint8_t)i;
+					*(int32_t*)&attributes_data[i * instance_size + j * vertex_size + i1_offset] = i;
 				}
 			}
 		}
@@ -483,15 +479,16 @@ namespace Lumix
 	}
 
 
-	void Terrain::GrassType::grassIndexCopyCallback(Array<int>& data)
+	void Terrain::GrassType::grassIndexCopyCallback(void* data, int instance_size, int copy_count)
 	{
-		int indices_count = m_grass_model->getGeometry()->getIndices().size();
-		int index_offset = m_grass_model->getGeometry()->getVertices().size();
-		for (int i = 0; i < COPY_COUNT; ++i)
+		int32_t* indices = (int32_t*)data;
+		int indices_count = instance_size / sizeof(indices[0]);
+		int index_offset = m_grass_model->getMesh(0).getAttributeArraySize() / m_grass_model->getMesh(0).getVertexDefinition().getVertexSize();
+		for (int i = 0; i < copy_count; ++i)
 		{
 			for (int j = 0, c = indices_count; j < c; ++j)
 			{
-				data[i * indices_count + j] += index_offset * i;
+				indices[i * indices_count + j] += index_offset * i;
 			}
 		}
 	}
@@ -501,16 +498,18 @@ namespace Lumix
 	{
 		if (m_grass_model->isReady())
 		{
-			m_terrain.m_allocator.deleteObject(m_grass_geometry);
+			IAllocator& allocator = m_terrain.m_allocator;
+			allocator.deleteObject(m_grass_geometry);
 
-			m_grass_geometry = m_terrain.m_allocator.newObject<Geometry>(m_terrain.m_allocator);
+			m_grass_geometry = allocator.newObject<Geometry>();
 			Geometry::VertexCallback vertex_callback;
 			Geometry::IndexCallback index_callback;
 			vertex_callback.bind<GrassType, &GrassType::grassVertexCopyCallback>(this);
 			index_callback.bind<GrassType, &GrassType::grassIndexCopyCallback>(this);
-			m_grass_geometry->copy(*m_grass_model->getGeometry(), COPY_COUNT, vertex_callback, index_callback);
+			m_grass_geometry->copy(allocator, m_grass_model->getGeometry(), COPY_COUNT, index_callback, vertex_callback);
 			Material* material = m_grass_model->getMesh(0).getMaterial();
-			m_grass_mesh = m_terrain.m_allocator.newObject<Mesh>(material, 0, m_grass_model->getMesh(0).getCount() * COPY_COUNT, "grass", m_terrain.m_allocator);
+			const Mesh& src_mesh = m_grass_model->getMesh(0);
+			m_grass_mesh = allocator.newObject<Mesh>(allocator, src_mesh.getVertexDefinition(), material, 0, src_mesh.getAttributeArraySize(), 0, src_mesh.getIndexCount() * COPY_COUNT, "grass");
 			m_terrain.forceGrassUpdate();
 		}
 	}
@@ -567,11 +566,7 @@ namespace Lumix
 			if (m_mesh && m_material)
 			{
 				m_mesh->setMaterial(m_material);
-				m_material->getObserverCb().bind<Terrain, &Terrain::onMaterialLoaded>(this);
-				if (m_material->isReady())
-				{
-					onMaterialLoaded(Resource::State::READY, Resource::State::READY);
-				}
+				m_material->onLoaded<Terrain, &Terrain::onMaterialLoaded>(this);
 			}
 		}
 		else if(material)
@@ -580,18 +575,18 @@ namespace Lumix
 		}
 	}
 
-	void Terrain::deserialize(ISerializer& serializer, Universe& universe, RenderScene& scene, int index)
+	void Terrain::deserialize(Blob& serializer, Universe& universe, RenderScene& scene, int index)
 	{
-		serializer.deserializeArrayItem(m_entity.index, 0);
+		serializer.read(m_entity.index);
 		m_entity.universe = &universe;
-		serializer.deserializeArrayItem(m_layer_mask, 0);
+		serializer.read(m_layer_mask);
 		char path[LUMIX_MAX_PATH];
-		serializer.deserializeArrayItem(path, LUMIX_MAX_PATH, "");
-		setMaterial(static_cast<Material*>(scene.getEngine().getResourceManager().get(ResourceManager::MATERIAL)->load(path)));
-		serializer.deserializeArrayItem(m_xz_scale, 0);
-		serializer.deserializeArrayItem(m_y_scale, 0);
-		int count;
-		serializer.deserializeArrayItem(count, 0);
+		serializer.readString(path, LUMIX_MAX_PATH);
+		setMaterial(static_cast<Material*>(scene.getEngine().getResourceManager().get(ResourceManager::MATERIAL)->load(Path(path))));
+		serializer.read(m_xz_scale);
+		serializer.read(m_y_scale);
+		int32_t count;
+		serializer.read(count);
 		while(m_grass_types.size() > count)
 		{
 			removeGrassType(m_grass_types.size() - 1);
@@ -603,29 +598,29 @@ namespace Lumix
 		}
 		for(int i = 0; i < count; ++i)
 		{
-			serializer.deserializeArrayItem(path, LUMIX_MAX_PATH, "");
-			serializer.deserializeArrayItem(m_grass_types[i]->m_ground, 0);
-			serializer.deserializeArrayItem(m_grass_types[i]->m_density, 0);
-			setGrassTypePath(i, path);
+			serializer.readString(path, LUMIX_MAX_PATH);
+			serializer.read(m_grass_types[i]->m_ground);
+			serializer.read(m_grass_types[i]->m_density);
+			setGrassTypePath(i, Path(path));
 		}
 		universe.addComponent(m_entity, TERRAIN_HASH, &scene, index);
 	}
 
 
-	void Terrain::serialize(ISerializer& serializer)
+	void Terrain::serialize(Blob& serializer)
 	{
-		serializer.serializeArrayItem(m_entity.index);
-		serializer.serializeArrayItem(m_layer_mask);
-		serializer.serializeArrayItem(m_material ? m_material->getPath().c_str() : "");
-		serializer.serializeArrayItem(m_xz_scale);
-		serializer.serializeArrayItem(m_y_scale);
-		serializer.serializeArrayItem(m_grass_types.size());
+		serializer.write(m_entity.index);
+		serializer.write(m_layer_mask);
+		serializer.writeString(m_material ? m_material->getPath().c_str() : "");
+		serializer.write(m_xz_scale);
+		serializer.write(m_y_scale);
+		serializer.write((int32_t)m_grass_types.size());
 		for(int i = 0; i < m_grass_types.size(); ++i)
 		{
 			GrassType& type = *m_grass_types[i];
-			serializer.serializeArrayItem(type.m_grass_model ? type.m_grass_model->getPath().c_str() : "");
-			serializer.serializeArrayItem(type.m_ground);
-			serializer.serializeArrayItem(type.m_density);
+			serializer.writeString(type.m_grass_model ? type.m_grass_model->getPath().c_str() : "");
+			serializer.write(type.m_ground);
+			serializer.write(type.m_density);
 
 		}
 	}
@@ -856,8 +851,9 @@ namespace Lumix
 
 		VertexDef vertex_def;
 		vertex_def.parse("pt", 2);
-		m_geometry.copy((const uint8_t*)&points[0], sizeof(points[0]) * points.size(), indices, vertex_def);
-		m_mesh = m_allocator.newObject<Mesh>(m_material, 0, indices.size(), "terrain", m_allocator);
+		m_geometry.setAttributesData(&points[0], sizeof(points[0]) * points.size());
+		m_geometry.setIndicesData(&indices[0], sizeof(indices[0]) * indices.size());
+		m_mesh = m_allocator.newObject<Mesh>(m_allocator, vertex_def, m_material, 0, 0, points.size() * sizeof(points[0]), indices.size(), "terrain");
 	}
 
 	TerrainQuad* Terrain::generateQuadTree(float size)

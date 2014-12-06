@@ -5,7 +5,6 @@
 #include "core/crc32.h"
 #include "core/frustum.h"
 #include "core/fs/file_system.h"
-#include "core/iserializer.h"
 #include "core/json_serializer.h"
 #include "core/log.h"
 #include "core/profiler.h"
@@ -14,6 +13,7 @@
 #include "core/string.h"
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
+#include "graphics/bitmap_font.h"
 #include "graphics/frame_buffer.h"
 #include "graphics/geometry.h"
 #include "graphics/gl_ext.h"
@@ -46,23 +46,23 @@ struct RenderModelsMeshContext
 		: m_mesh(NULL)
 		, m_shader(NULL)
 		, m_world_matrix_uniform_location(-1)
-		, m_geometry_start(0)
-		, m_geometry_count(0)
+		, m_indices_offset(0)
+		, m_vertex_count(0)
 	{
 	}
 
 	const Mesh* m_mesh;
 	Shader* m_shader;
 	int m_world_matrix_uniform_location;
-	int m_geometry_start;
-	int m_geometry_count;
+	int m_indices_offset;
+	int m_vertex_count;
 };
 
 
 struct Command
 {
 	virtual ~Command() {}
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) = 0;
+	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) = 0;
 	virtual void execute(PipelineInstanceImpl& pipeline) = 0;
 };
 
@@ -71,7 +71,7 @@ struct CustomCommand : public Command
 {
 	CustomCommand(IAllocator&) {}
 
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
+	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	uint32_t m_name;
 };
@@ -81,7 +81,7 @@ struct PolygonModeCommand : public Command
 {
 	PolygonModeCommand(IAllocator&) {}
 
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
+	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	
 	bool m_fill;
@@ -92,7 +92,7 @@ struct SetPassCommand : public Command
 {
 	SetPassCommand(IAllocator&) {}
 
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
+	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	
 	uint32_t m_pass_hash;
@@ -103,7 +103,7 @@ struct ClearCommand : public Command
 {
 	ClearCommand(IAllocator&) {}
 
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
+	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	
 	uint32_t m_buffers;
@@ -114,7 +114,7 @@ struct RenderModelsCommand : public Command
 {
 	RenderModelsCommand(IAllocator&) {}
 
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
+	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	
 	int64_t m_layer_mask;
@@ -126,7 +126,7 @@ struct ApplyCameraCommand : public Command
 	ApplyCameraCommand(IAllocator& allocator)
 		: m_camera_slot(allocator)
 	{ }
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
+	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	
 	string m_camera_slot;
@@ -139,7 +139,7 @@ struct BindFramebufferCommand : public Command
 		: m_buffer_name(allocator)
 	{ }
 
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
+	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	
 	string m_buffer_name;
@@ -150,7 +150,7 @@ struct UnbindFramebufferCommand : public Command
 {
 	UnbindFramebufferCommand(IAllocator&) {}
 
-	virtual void deserialize(PipelineImpl&, ISerializer&) override {}
+	virtual void deserialize(PipelineImpl&, JsonSerializer&) override {}
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 };
 
@@ -160,11 +160,11 @@ struct DrawScreenQuadCommand : public Command
 	DrawScreenQuadCommand(IAllocator& allocator) : m_allocator(allocator) {}
 	~DrawScreenQuadCommand();
 
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
+	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	
 	IAllocator& m_allocator;
-	Material* m_material;
+	Mesh* m_mesh;
 	Geometry* m_geometry;
 };
 
@@ -173,7 +173,16 @@ struct RenderDebugLinesCommand : public Command
 {
 	RenderDebugLinesCommand(IAllocator&) {}
 
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
+	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
+	virtual void execute(PipelineInstanceImpl& pipeline) override;
+};
+
+
+struct RenderDebugTextsCommand : public Command
+{
+	RenderDebugTextsCommand(IAllocator&) {}
+
+	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 };
 
@@ -184,7 +193,7 @@ struct BindFramebufferTextureCommand : public Command
 		: m_framebuffer_name(allocator)
 	{ }
 
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
+	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	
 	string m_framebuffer_name;
@@ -199,7 +208,7 @@ struct RenderShadowmapCommand : public Command
 		: m_camera_slot(allocator)
 	{}
 
-	virtual void deserialize(PipelineImpl& pipeline, ISerializer& serializer) override;
+	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 
 	int64_t m_layer_mask;
@@ -212,7 +221,7 @@ struct BindShadowmapCommand : public Command
 {
 	BindShadowmapCommand(IAllocator&) {}
 
-	virtual void deserialize(PipelineImpl&, ISerializer&) override {}
+	virtual void deserialize(PipelineImpl&, JsonSerializer&) override {}
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 };
 
@@ -264,6 +273,7 @@ struct PipelineImpl : public Pipeline
 		addCommandCreator("render_shadowmap").bind<&CreateCommand<RenderShadowmapCommand> >();
 		addCommandCreator("bind_shadowmap").bind<&CreateCommand<BindShadowmapCommand> >();
 		addCommandCreator("render_debug_lines").bind<&CreateCommand<RenderDebugLinesCommand> >();
+		addCommandCreator("render_debug_texts").bind<&CreateCommand<RenderDebugTextsCommand> >();
 		addCommandCreator("polygon_mode").bind<&CreateCommand<PolygonModeCommand> >();
 		addCommandCreator("set_pass").bind<&CreateCommand<SetPassCommand> >();
 	}
@@ -315,7 +325,7 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	virtual bool deserialize(ISerializer& serializer) override
+	virtual bool deserialize(JsonSerializer& serializer) override
 	{
 		int32_t count;
 		serializer.deserializeObjectBegin();
@@ -380,7 +390,7 @@ struct PipelineImpl : public Pipeline
 	{
 		if(success)
 		{
-			JsonSerializer serializer(*file, JsonSerializer::READ, m_path.c_str());
+			JsonSerializer serializer(m_allocator, *file, JsonSerializer::READ, m_path.c_str());
 			deserialize(serializer);
 			decrementDepCount();
 		}
@@ -416,14 +426,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_light_dir.set(0, -1, 0);
 		m_width = m_height = -1;
 		m_shadowmap_framebuffer = NULL;
-		if(pipeline.isReady())
-		{
-			sourceLoaded(Resource::State::EMPTY, Resource::State::READY);
-		}
-		else
-		{
-			pipeline.getObserverCb().bind<PipelineInstanceImpl, &PipelineInstanceImpl::sourceLoaded>(this);
-		}
+		pipeline.onLoaded<PipelineInstanceImpl, &PipelineInstanceImpl::sourceLoaded>(this);
 	}
 
 	~PipelineInstanceImpl()
@@ -576,22 +579,48 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void renderScreenGeometry(Geometry* geometry, Material* material)
+	void renderScreenGeometry(Geometry* geometry, Mesh* mesh)
 	{
-		if (material->isReady())
+		if (mesh->getMaterial()->isReady())
 		{
 			ASSERT(m_renderer != NULL);
-			Shader* shader = material->getShader();
+			Shader* shader = mesh->getMaterial()->getShader();
 			Matrix mtx;
 			Renderer::getOrthoMatrix(-1, 1, -1, 1, 0, 30, &mtx);
 			m_renderer->setProjectionMatrix(mtx);
 			m_renderer->setViewMatrix(Matrix::IDENTITY);
-			material->apply(*m_renderer, *this);
+			mesh->getMaterial()->apply(*m_renderer, *this);
 			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::WORLD_MATRIX, Matrix::IDENTITY);
 			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::PROJECTION_MATRIX, mtx);
-			bindGeometry(*m_renderer, *geometry, *shader);
+			bindGeometry(*m_renderer, *geometry, *mesh);
 			renderGeometry(0, 6);
 		}
+	}
+
+
+	void renderDebugTexts()
+	{
+		BitmapFont* font = m_scene->getDebugTextFont();
+		if (!font || !font->isReady())
+		{
+			return;
+		}
+		m_renderer->cleanup();
+		Matrix projection_matrix;
+		Renderer::getOrthoMatrix(0, (float)m_width, 0, (float)m_height, 0, 10, &projection_matrix);
+		m_renderer->setProjectionMatrix(projection_matrix);
+		m_renderer->setViewMatrix(Matrix::IDENTITY);
+
+		Geometry& geometry = m_scene->getDebugTextGeometry();
+		Mesh& mesh = m_scene->getDebugTextMesh();
+		font->getMaterial()->apply(*m_renderer, *this);
+		bindGeometry(*m_renderer, geometry, mesh);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glDisable(GL_DEPTH_TEST);
+		renderQuadGeometry(0, mesh.getIndexCount());
+		glDisable(GL_BLEND);
+		glEnable(GL_DEPTH_TEST);
 	}
 
 
@@ -667,8 +696,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 					}
 					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::GRASS_MATRICES, info.m_matrices, info.m_matrix_count);
 
-					bindGeometry(*m_renderer, *info.m_geometry, *shader);
-					renderGeometry(mesh.getStart(), mesh.getCount() / info.m_mesh_copy_count * info.m_matrix_count);
+					bindGeometry(*m_renderer, *info.m_geometry, mesh);
+					renderGeometry(mesh.getIndicesOffset(), mesh.getIndexCount() / info.m_mesh_copy_count * info.m_matrix_count);
 				}
 			}
 		}
@@ -764,8 +793,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_renderer->setUniform(*shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
 		context->m_world_matrix_uniform_location = getUniformLocation(*shader, (int)Shader::FixedCachedUniforms::WORLD_MATRIX);
 		context->m_shader = shader;
-		context->m_geometry_start = context->m_mesh->getStart();
-		context->m_geometry_count = context->m_mesh->getCount();
+		context->m_indices_offset = context->m_mesh->getIndicesOffset();
+		context->m_vertex_count = context->m_mesh->getIndexCount();
 		if (context->m_world_matrix_uniform_location < 0)
 		{
 			return false;
@@ -806,35 +835,36 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 		sortRenderables(m_renderable_infos);
 
+		RenderableInfo& sentinel = m_renderable_infos.pushEmpty();
 		const RenderableInfo* LUMIX_RESTRICT info = &m_renderable_infos[0];
-		const RenderableInfo* LUMIX_RESTRICT end = &m_renderable_infos[0] + m_renderable_infos.size();
+		const RenderableInfo* LUMIX_RESTRICT end = &m_renderable_infos[0] + m_renderable_infos.size() - 1;
+		sentinel.m_key = 0;
 		RenderModelsMeshContext mesh_context;
 		int64_t last_key = 0;
 		while (info != end)
 		{
-			if (last_key != info->m_key)
+			mesh_context.m_mesh = info->m_mesh->m_mesh;
+			if (!setMeshContext(&mesh_context))
 			{
-				mesh_context.m_mesh = info->m_mesh->m_mesh;
-				if (!setMeshContext(&mesh_context))
-				{
-					++info;
-					continue;
-				}
-				bindGeometry(*m_renderer, *info->m_mesh->m_model->getGeometry(), *mesh_context.m_shader);
-				last_key = info->m_key;
+				++info;
+				continue;
 			}
+			bindGeometry(*m_renderer, info->m_mesh->m_model->getGeometry(), *mesh_context.m_mesh);
+			last_key = info->m_key;
+			while (last_key == info->m_key)
+			{
+				const RenderableMesh* LUMIX_RESTRICT renderable_mesh = info->m_mesh;
+				const Matrix& world_matrix = *renderable_mesh->m_matrix;
+				setUniform(mesh_context.m_world_matrix_uniform_location, world_matrix);
 
-			const RenderableMesh* LUMIX_RESTRICT renderable_mesh = info->m_mesh;
-			const Matrix& world_matrix = *renderable_mesh->m_matrix;
-			setUniform(mesh_context.m_world_matrix_uniform_location, world_matrix);
-			
-			if (renderable_mesh->m_pose->getCount() > 0)
-			{
-				setPoseUniform(renderable_mesh, mesh_context);
+				if (renderable_mesh->m_pose->getCount() > 0)
+				{
+					setPoseUniform(renderable_mesh, mesh_context);
+				}
+
+				renderGeometry(mesh_context.m_indices_offset, mesh_context.m_vertex_count);
+				++info;
 			}
-			
-			renderGeometry(mesh_context.m_geometry_start, mesh_context.m_geometry_count);
-			++info;
 		}
 	}
 
@@ -912,7 +942,7 @@ void PipelineInstance::destroy(PipelineInstance* pipeline)
 }
 
 
-void PolygonModeCommand::deserialize(PipelineImpl&, ISerializer& serializer)
+void PolygonModeCommand::deserialize(PipelineImpl&, JsonSerializer& serializer)
 {
 	serializer.deserializeArrayItem(m_fill, true);
 }
@@ -924,7 +954,7 @@ void PolygonModeCommand::execute(PipelineInstanceImpl& pipeline)
 }
 
 
-void SetPassCommand::deserialize(PipelineImpl&, ISerializer& serializer)
+void SetPassCommand::deserialize(PipelineImpl&, JsonSerializer& serializer)
 {
 	char pass_name[50];
 	serializer.deserializeArrayItem(pass_name, sizeof(pass_name), "");
@@ -938,7 +968,7 @@ void SetPassCommand::execute(PipelineInstanceImpl& pipeline)
 }
 
 
-void ClearCommand::deserialize(PipelineImpl&, ISerializer& serializer)
+void ClearCommand::deserialize(PipelineImpl&, JsonSerializer& serializer)
 {
 	char tmp[256];
 	serializer.deserializeArrayItem(tmp, 255, "all");
@@ -959,7 +989,7 @@ void ClearCommand::execute(PipelineInstanceImpl&)
 }
 
 
-void CustomCommand::deserialize(PipelineImpl&, ISerializer& serializer)
+void CustomCommand::deserialize(PipelineImpl&, JsonSerializer& serializer)
 {
 	char tmp[256];
 	serializer.deserializeArrayItem(tmp, 255, "");
@@ -974,7 +1004,7 @@ void CustomCommand::execute(PipelineInstanceImpl& pipeline)
 
 
 
-void RenderModelsCommand::deserialize(PipelineImpl&, ISerializer& serializer) 
+void RenderModelsCommand::deserialize(PipelineImpl&, JsonSerializer& serializer) 
 {
 	serializer.deserializeArrayItem(m_layer_mask, 0);
 }
@@ -988,7 +1018,7 @@ void RenderModelsCommand::execute(PipelineInstanceImpl& pipeline)
 }
 
 
-void ApplyCameraCommand::deserialize(PipelineImpl&, ISerializer& serializer)
+void ApplyCameraCommand::deserialize(PipelineImpl&, JsonSerializer& serializer)
 {
 	serializer.deserializeArrayItem(m_camera_slot, "main");
 }
@@ -1007,7 +1037,7 @@ void ApplyCameraCommand::execute(PipelineInstanceImpl& pipeline)
 }
 
 
-void BindFramebufferCommand::deserialize(PipelineImpl&, ISerializer& serializer)
+void BindFramebufferCommand::deserialize(PipelineImpl&, JsonSerializer& serializer)
 {
 	serializer.deserializeArrayItem(m_buffer_name, "");
 }
@@ -1029,7 +1059,7 @@ void UnbindFramebufferCommand::execute(PipelineInstanceImpl&)
 }
 
 
-void RenderDebugLinesCommand::deserialize(PipelineImpl&, ISerializer&)
+void RenderDebugLinesCommand::deserialize(PipelineImpl&, JsonSerializer&)
 {
 }
 
@@ -1040,48 +1070,55 @@ void RenderDebugLinesCommand::execute(PipelineInstanceImpl& pipeline)
 }
 
 
-DrawScreenQuadCommand::~DrawScreenQuadCommand()
+void RenderDebugTextsCommand::deserialize(PipelineImpl&, JsonSerializer&)
 {
-	m_allocator.deleteObject(m_geometry);
 }
 
 
-void DrawScreenQuadCommand::deserialize(PipelineImpl& pipeline, ISerializer& serializer)
+void RenderDebugTextsCommand::execute(PipelineInstanceImpl& pipeline)
 {
-	m_geometry = m_allocator.newObject<Geometry>(m_allocator);
+	pipeline.renderDebugTexts();
+}
+
+
+DrawScreenQuadCommand::~DrawScreenQuadCommand()
+{
+	m_allocator.deleteObject(m_geometry);
+	m_allocator.deleteObject(m_mesh);
+}
+
+
+void DrawScreenQuadCommand::deserialize(PipelineImpl& pipeline, JsonSerializer& serializer)
+{
+	m_geometry = m_allocator.newObject<Geometry>();
 	VertexDef def;
 	def.parse("pt", 2);
-	Array<int> indices(m_allocator);
+	int indices[6] = { 0, 1, 2, 0, 2, 3 };
 	const int GEOMETRY_VERTEX_ATTRIBUTE_COUNT = 20;
 	float v[GEOMETRY_VERTEX_ATTRIBUTE_COUNT];
-	indices.push(0);
-	indices.push(1);
-	indices.push(2);
-	indices.push(0);
-	indices.push(2);
-	indices.push(3);
 	
 	for (int i = 0; i < GEOMETRY_VERTEX_ATTRIBUTE_COUNT; ++i)
 	{
 		serializer.deserializeArrayItem(v[i], 0);
 	}
 
-	uint8_t* data = (uint8_t*)v;
-	m_geometry->copy(data, sizeof(v), indices, def);
+	m_geometry->setAttributesData(v, sizeof(v));
+	m_geometry->setIndicesData(indices, sizeof(indices));
 
-	char material[LUMIX_MAX_PATH];
-	serializer.deserializeArrayItem(material, LUMIX_MAX_PATH, "");
-	m_material = static_cast<Material*>(pipeline.getResourceManager().get(ResourceManager::MATERIAL)->load(material));
+	char material_path[LUMIX_MAX_PATH];
+	serializer.deserializeArrayItem(material_path, LUMIX_MAX_PATH, "");
+	Material* material = static_cast<Material*>(pipeline.getResourceManager().get(ResourceManager::MATERIAL)->load(Path(material_path)));
+	m_mesh = m_allocator.newObject<Mesh>(m_allocator, def, material, 0, 0, sizeof(v), 6, "screen_quad");
 }
 
 
 void DrawScreenQuadCommand::execute(PipelineInstanceImpl& pipeline)
 {
-	pipeline.renderScreenGeometry(m_geometry, m_material);
+	pipeline.renderScreenGeometry(m_geometry, m_mesh);
 }
 
 
-void BindFramebufferTextureCommand::deserialize(PipelineImpl&, ISerializer& serializer)
+void BindFramebufferTextureCommand::deserialize(PipelineImpl&, JsonSerializer& serializer)
 {
 	serializer.deserializeArrayItem(m_framebuffer_name, "");
 	char rb_name[31];
@@ -1117,7 +1154,7 @@ void BindFramebufferTextureCommand::execute(PipelineInstanceImpl& pipeline)
 }
 
 
-void RenderShadowmapCommand::deserialize(PipelineImpl&, ISerializer& serializer)
+void RenderShadowmapCommand::deserialize(PipelineImpl&, JsonSerializer& serializer)
 {
 	serializer.deserializeArrayItem(m_layer_mask, 0);
 	serializer.deserializeArrayItem(m_camera_slot, 0);

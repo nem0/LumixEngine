@@ -113,9 +113,9 @@ namespace Lumix
 			{}
 
 
-			void insert(const Key& key, const Value& value)
+			int insert(const Key& key, const Value& value)
 			{
-				m_data.insert(Pair(key, value));
+				return m_data.insert(Pair(key, value));
 			}
 
 
@@ -183,7 +183,7 @@ namespace Lumix
 			}
 
 
-			int size()
+			int size() const
 			{
 				return m_data.size();
 			}
@@ -198,6 +198,12 @@ namespace Lumix
 
 
 			Value& at(int index)
+			{
+				return m_data[index].m_value;
+			}
+
+
+			const Value& at(int index) const
 			{
 				return m_data[index].m_value;
 			}

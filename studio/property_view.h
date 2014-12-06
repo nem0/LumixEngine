@@ -76,11 +76,10 @@ public:
 	void refresh();
 	void setEntityTemplateList(class EntityTemplateList* list) { m_entity_template_list = list; }
 	void setEntityList(class EntityList* list) { m_entity_list = list; }
+	void addScriptCustomProperties(QTreeWidgetItem& item, const Lumix::Component& terrain_component);
 
 private slots:
 	void on_addComponentButton_clicked();
-	void on_compileScriptClicked();
-	void on_editScriptClicked();
 	void on_TerrainTextureTypeClicked();
 	void on_terrainBrushTextureChanged(int value);
 	void on_positionX_valueChanged(double arg1);
@@ -98,7 +97,6 @@ private:
 	void onUniverseDestroyed();
 	void onEntitySelected(const Lumix::Array<Lumix::Entity>& e);
 	void onEntityPosition(const Lumix::Entity& e);
-	void addScriptCustomProperties();
 	void setScriptStatus(uint32_t status);
 	void updateSelectedEntityPosition();
 	void onSelectedResourceLoaded(Lumix::Resource::State old_state, Lumix::Resource::State new_state);

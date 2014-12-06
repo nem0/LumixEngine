@@ -31,7 +31,7 @@ void ModelInstance::setModel(Model* model)
 	m_model = model;
 	if (m_model)
 	{
-		m_model->getObserverCb().bind<ModelInstance, &ModelInstance::modelUpdate>(this);
+		m_model->onLoaded<ModelInstance, &ModelInstance::modelUpdate>(this);
 		m_pose.resize(m_model->getBoneCount());
 		m_model->getPose(m_pose);
 	}

@@ -982,6 +982,11 @@ struct WorldEditorImpl : public WorldEditor
 
 		virtual void tick() override
 		{
+			char fps[100];
+			copyString(fps, sizeof(fps), "FPS: ");
+			toCString(m_engine->getFPS(), fps + strlen(fps), sizeof(fps) - strlen(fps), 1);
+			static_cast<RenderScene*>(m_engine->getScene(crc32("renderer")))->setDebugText(m_fps_text, fps);
+
 			updateGoTo();
 
 			for (int i = 0; i < m_plugins.size(); ++i)
@@ -1181,19 +1186,25 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			g_log_info.log("editor") << "saving universe " << path.c_str() << "...";
 			FS::FileSystem& fs = m_engine->getFileSystem();
-			FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
-			save(*file, path.c_str());
+			FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::CREATE | FS::Mode::WRITE);
+			save(*file);
 			fs.close(file);
 			m_universe_path = path;
 		}
 
 
-		void save(FS::IFile& file, const char* path)
+		void save(FS::IFile& file)
 		{
-			JsonSerializer serializer(file, JsonSerializer::WRITE, path);
-			m_engine->serialize(serializer);
-			m_template_system->serialize(serializer);
+			Blob blob(m_allocator);
+			blob.reserve(1 << 20);
+			uint32_t hash = 0;
+			blob.write(hash);
+			m_engine->serialize(blob);
+			m_template_system->serialize(blob);
+			hash = crc32(blob.getBuffer() + sizeof(hash), blob.getBufferSize() - sizeof(hash));
+			(*(uint32_t*)blob.getBuffer()) = hash;
 			g_log_info.log("editor") << "universe saved";
+			file.write(blob.getBuffer(), blob.getBufferSize());
 		}
 
 
@@ -1386,7 +1397,7 @@ struct WorldEditorImpl : public WorldEditor
 			else
 			{
 				m_game_mode_file = m_engine->getFileSystem().open("memory", "", FS::Mode::WRITE);
-				save(*m_game_mode_file, "GameMode");
+				save(*m_game_mode_file);
 				m_is_game_mode = true;
 			}
 		}
@@ -1396,7 +1407,7 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			m_is_game_mode = false;
 			m_game_mode_file->seek(FS::SeekMode::BEGIN, 0);
-			load(*m_game_mode_file, "GameMode");
+			load(*m_game_mode_file);
 			m_engine->getFileSystem().close(m_game_mode_file);
 			m_game_mode_file = NULL;
 		}
@@ -1541,7 +1552,7 @@ struct WorldEditorImpl : public WorldEditor
 			ASSERT(success);
 			if (success)
 			{
-				resetAndLoad(*file, "unknown map"); /// TODO file path
+				resetAndLoad(*file);
 			}
 
 			fs.close(file);
@@ -1565,25 +1576,40 @@ struct WorldEditorImpl : public WorldEditor
 			m_universe_path = "";
 			destroyUniverse();
 			createUniverse(true);
-			g_log_info.log("editor") << "universe created";
+			g_log_info.log("editor") << "Universe created.";
 		}
 
-		void load(FS::IFile& file, const char* path)
+		void load(FS::IFile& file)
 		{
+			ASSERT(file.getBuffer());
 			m_components.clear();
 			m_components.reserve(5000);
-			g_log_info.log("editor") << "parsing universe...";
-			JsonSerializer serializer(file, JsonSerializer::READ, path);
-			m_engine->deserialize(serializer);
-			m_template_system->deserialize(serializer);
-			m_camera = static_cast<RenderScene*>(m_engine->getScene(crc32("renderer")))->getCameraInSlot("editor").entity;
-			g_log_info.log("editor") << "universe parsed";
-
-			Universe* universe = m_engine->getUniverse();
-			for (int i = 0; i < universe->getEntityCount(); ++i)
+			Timer* timer = Timer::create(m_allocator);
+			g_log_info.log("editor") << "Parsing universe...";
+			Blob blob(m_allocator);
+			blob.create(file.getBuffer(), file.size());
+			uint32_t hash = 0;
+			blob.read(hash);
+			if (crc32(blob.getData() + sizeof(hash), blob.getBufferSize() - sizeof(hash)) != hash)
 			{
-				Entity e(universe, i);
-				createEditorIcon(e);
+				Timer::destroy(timer);
+				g_log_error.log("editor") << "Corrupted file.";
+				newUniverse();
+				return;
+			}
+			if(m_engine->deserialize(blob))
+			{
+				m_template_system->deserialize(blob);
+				m_camera = static_cast<RenderScene*>(m_engine->getScene(crc32("renderer")))->getCameraInSlot("editor").entity;
+				g_log_info.log("editor") << "Universe parsed in " << timer->getTimeSinceStart() << " seconds";
+				Timer::destroy(timer);
+
+				Universe* universe = m_engine->getUniverse();
+				for (int i = 0; i < universe->getEntityCount(); ++i)
+				{
+					Entity e(universe, i);
+					createEditorIcon(e);
+				}
 			}
 		}
 
@@ -1642,11 +1668,11 @@ struct WorldEditorImpl : public WorldEditor
 			}
 		}
 
-		void resetAndLoad(FS::IFile& file, const char* path)
+		void resetAndLoad(FS::IFile& file)
 		{
 			destroyUniverse();
 			createUniverse(false);
-			load(file, path);
+			load(file);
 		}
 
 
@@ -1995,6 +2021,8 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			destroyUndoStack();
 			m_universe_destroyed.invoke();
+			m_gizmo.setUniverse(NULL);
+			m_gizmo.destroy();
 			for (int i = 0; i < m_editor_icons.size(); ++i)
 			{
 				m_allocator.deleteObject(m_editor_icons[i]);
@@ -2003,8 +2031,6 @@ struct WorldEditorImpl : public WorldEditor
 			selectEntities(NULL, 0);
 			m_camera = Entity::INVALID;
 			m_editor_icons.clear();
-			m_gizmo.setUniverse(NULL);
-			m_gizmo.destroy();
 			m_engine->destroyUniverse();
 		}
 
@@ -2105,6 +2131,8 @@ struct WorldEditorImpl : public WorldEditor
 				RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 				scene->setCameraSlot(cmp, string("editor", m_allocator));
 			}
+			RenderScene* scene = static_cast<RenderScene*>(m_engine->getScene(crc32("renderer")));
+			m_fps_text = scene->addDebugText("FPS: 0", 0, 0);
 		}
 
 
@@ -2185,6 +2213,7 @@ struct WorldEditorImpl : public WorldEditor
 		FS::IFile* m_game_mode_file;
 		Engine* m_engine;
 		Entity m_camera;
+		int m_fps_text;
 		DelegateList<void()> m_universe_destroyed;
 		DelegateList<void()> m_universe_created;
 		DelegateList<void()> m_universe_loaded;

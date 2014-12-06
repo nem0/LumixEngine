@@ -13,19 +13,16 @@ namespace Lumix
 class Shader;
 
 
-struct VertexAttributeDef
+enum class VertexAttributeDef
 {
-	enum Type
-	{
-		FLOAT4,
-		FLOAT2,
-		INT4,
-		INT1,
-		POSITION,
-		NORMAL,
-		TEXTURE_COORDS,
-		NONE
-	};
+	FLOAT4,
+	FLOAT2,
+	INT4,
+	INT1,
+	POSITION,
+	NORMAL,
+	TEXTURE_COORDS,
+	NONE
 };
 
 
@@ -35,45 +32,41 @@ struct VertexDef
 		void parse(const char* data, int size);
 		int getVertexSize() const { return m_vertex_size; }
 		int getPositionOffset() const;
-		void begin(Shader& shader) const;
+		void begin(Shader& shader, int start_offset) const;
 		void end(Shader& shader) const;
-		VertexAttributeDef::Type getAttributeType(int i) const { return i < m_attribute_count ? m_attributes[i] : VertexAttributeDef::NONE; }
+		VertexAttributeDef getAttributeType(int i) const { return i < m_attribute_count ? m_attributes[i] : VertexAttributeDef::NONE; }
 
 	private:
-		VertexAttributeDef::Type m_attributes[16];
+		VertexAttributeDef m_attributes[16];
 		int m_attribute_count;
 		int m_vertex_size;
 };
 
 
-
 class Geometry
 {
 	public:
-		typedef Delegate<void(Array<uint8_t>&)> VertexCallback;
-		typedef Delegate<void(Array<int>&)> IndexCallback;
+		typedef Delegate<void(void*, int, int)> VertexCallback;
+		typedef Delegate<void(void*, int, int)> IndexCallback;
 
 	public:
-		Geometry(IAllocator& allocator);
+		Geometry();
 		~Geometry();
 
-		void copy(const uint8_t* data, int size, const Array<int32_t>& indices, VertexDef vertex_definition);
-		void copy(const Geometry& source, int times, VertexCallback& vertex_callback, IndexCallback& index_callback);
-		const Array<Vec3>& getVertices() const { return m_vertices; }
-		const Array<int32_t>& getIndices() const { return m_indices; }
-		float getBoundingRadius() const; 
-		AABB getAABB() const; 
-		const VertexDef& getVertexDefinition() const { return m_vertex_definition; }
-		GLuint getID() const { return m_id; }
-		GLuint getIndicesID() const { return m_indices_id; }
+		GLuint getAttributesArrayID() const { return m_attributes_array_id; }
+		GLuint getIndicesArrayID() const { return m_indices_array_id; }
+
+		void setAttributesData(const void* data, int size);
+		void setIndicesData(const void* data, int size);
+		void bindBuffers() const;
+		void copy(IAllocator& allocator, const Geometry& source, int copy_count, IndexCallback index_callback, VertexCallback vertex_callback);
+		void clear();
 
 	private:
-		IAllocator& m_allocator;
-		GLuint m_id;
-		GLuint m_indices_id;
-		VertexDef m_vertex_definition;
-		Array<Vec3> m_vertices;
-		Array<int32_t> m_indices;
+		GLuint m_attributes_array_id;
+		GLuint m_indices_array_id;
+		int m_indices_data_size;
+		int m_attributes_data_size;
 };
 
 

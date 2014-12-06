@@ -87,7 +87,7 @@ MainWindow::MainWindow(QWidget* parent) :
 	m_recent_files_menu->connect(m_recent_files_menu, &QMenu::triggered, [this](QAction* action)
 	{
 		auto path = action->text().toLatin1();
-		m_world_editor->loadUniverse(path.data());
+		m_world_editor->loadUniverse(Lumix::Path(path.data()));
 	});
 	fillRecentFiles();
 
@@ -223,6 +223,8 @@ void MainWindow::setWorldEditor(Lumix::WorldEditor& editor)
 	m_entity_template_list_ui->setWorldEditor(editor);
 	m_game_view->setWorldEditor(editor);
 	m_entity_list->setWorldEditor(editor);
+	m_script_compiler_ui->setWorldEditor(editor);
+	m_asset_browser->setScriptCompiler(m_script_compiler_ui->getCompiler());
 
 	m_world_editor->universeLoaded().bind<MainWindow, &MainWindow::onUniverseLoaded>(this);
 }
@@ -266,7 +268,7 @@ void MainWindow::on_actionOpen_triggered()
 	QByteArray path = filename.toLocal8Bit();
 	if (!path.isEmpty())
 	{
-		m_world_editor->loadUniverse(path.data());
+		m_world_editor->loadUniverse(Lumix::Path(path.data()));
 	}
 }
 
@@ -275,7 +277,7 @@ void MainWindow::on_actionSave_As_triggered()
 	QByteArray path = QFileDialog::getSaveFileName().toLocal8Bit();
 	if (!path.isEmpty())
 	{
-		m_world_editor->saveUniverse(path.data());
+		m_world_editor->saveUniverse(Lumix::Path(path.data()));
 	}
 }
 
