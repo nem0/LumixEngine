@@ -47,28 +47,26 @@ namespace Lumix
 			virtual IPlugin& getPlugin() const;
 
 
-			void deserialize(ISerializer& serializer) override
+			void deserialize(Blob& serializer) override
 			{
 				stopAll();
-				int count;
-				serializer.deserialize("count", count, 0);
-				serializer.deserializeArrayBegin("scripts");
+				int32_t count;
+				serializer.read(count);
 				m_script_entities.resize(count);
 				m_paths.clear();
 				m_paths.reserve(count);
 				for (int i = 0; i < m_script_entities.size(); ++i)
 				{
-					serializer.deserializeArrayItem(m_script_entities[i], 0);
-					string path(m_allocator);
-					serializer.deserializeArrayItem(path, "");
-					m_paths.push(path);
+					serializer.read(m_script_entities[i]);
+					char path[LUMIX_MAX_PATH];
+					serializer.readString(path, sizeof(path));
+					m_paths.push(Path(path));
 					Entity entity(&m_universe, m_script_entities[i]);
 					if(m_script_entities[i] != -1)
 					{
 						m_universe.addComponent(entity, SCRIPT_HASH, this, i);
 					}
 				}
-				serializer.deserializeArrayEnd();
 				runAll();
 			}
 
@@ -92,7 +90,7 @@ namespace Lumix
 			{
 				m_paths[cmp.index] = string(str.c_str(), m_allocator);
 				stopScript(cmp.index);
-				if (!runScript(cmp.index, cmp.entity))
+				if (!runScript(cmp.index))
 				{
 					g_log_warning.log("script") << "Could not run script " << str;
 				}
@@ -131,6 +129,30 @@ namespace Lumix
 			}
 
 
+			virtual void beforeScriptCompiled(const Lumix::Path& path) override
+			{
+				for (int i = 0; i < m_paths.size(); ++i)
+				{
+					if (m_paths[i] == path.c_str())
+					{
+						stopScript(i);
+					}
+				}
+			}
+
+
+			virtual void afterScriptCompiled(const Lumix::Path& path) override
+			{
+				for (int i = 0; i < m_paths.size(); ++i)
+				{
+					if (m_paths[i] == path.c_str())
+					{
+						runScript(i);
+					}
+				}
+			}
+
+
 			void stopScript(int index)
 			{
 				int entity_idx = m_script_entities[index];
@@ -149,7 +171,7 @@ namespace Lumix
 			}
 
 
-			bool runScript(int i, Entity entity)
+			bool runScript(int i)
 			{
 				char path[LUMIX_MAX_PATH];
 				char full_path[LUMIX_MAX_PATH];
@@ -168,10 +190,10 @@ namespace Lumix
 					{
 						RunningScript running_script;
 						running_script.m_script_object = script;
-						running_script.m_entity_idx = entity.index;
+						running_script.m_entity_idx = m_script_entities[i];
 						running_script.m_lib = h;
 						m_running_scripts.push(running_script);
-						script->create(*this, entity);
+						script->create(*this, Entity(&m_universe, running_script.m_entity_idx));
 						return true;
 					}
 				}
@@ -186,12 +208,12 @@ namespace Lumix
 				getScriptDefaultPath(entity, path, full_path, LUMIX_MAX_PATH, "cpp");
 
 				m_script_entities.push(entity.index);
-				m_paths.push(string(path, m_allocator));
+				m_paths.push(Path(path));
 
 				Component cmp = m_universe.addComponent(entity, SCRIPT_HASH, this, m_script_entities.size() - 1);
 				m_universe.componentCreated().invoke(cmp);
 
-				runScript(m_paths.size() - 1, entity);
+				runScript(m_paths.size() - 1);
 
 				return cmp;
 			}
@@ -249,16 +271,14 @@ namespace Lumix
 			}
 
 
-			void serialize(ISerializer& serializer) override
+			void serialize(Blob& serializer) override
 			{
-				serializer.serialize("count", m_script_entities.size());
-				serializer.beginArray("scripts");
+				serializer.write((int32_t)m_script_entities.size());
 				for (int i = 0; i < m_script_entities.size(); ++i)
 				{
-					serializer.serializeArrayItem(m_script_entities[i]);
-					serializer.serializeArrayItem(m_paths[i]);
+					serializer.write((int32_t)m_script_entities[i]);
+					serializer.writeString(m_paths[i].c_str());
 				}
-				serializer.endArray();
 			}
 
 
@@ -294,8 +314,8 @@ namespace Lumix
 
 			IAllocator& m_allocator;
 			Array<RunningScript> m_running_scripts;
-			Array<int> m_script_entities;
-			Array<string> m_paths;
+			Array<int32_t> m_script_entities;
+			Array<Path> m_paths;
 			Universe& m_universe;
 			Engine& m_engine;
 			ScriptSystemImpl& m_system;

@@ -5,9 +5,13 @@
 #include "core/crc32.h"
 #include "core/log.h"
 #include "core/path.h"
+#include "editor/world_editor.h"
+#include "engine/engine.h"
+#include "script/script_system.h"
 
-ScriptCompiler::ScriptCompiler(QObject* parent) :
-	QObject(parent)
+ScriptCompiler::ScriptCompiler(QObject* parent) 
+	: QObject(parent)
+	, m_editor(NULL)
 {
 }
 
@@ -22,15 +26,26 @@ void ScriptCompiler::compileAll()
 		{
 			if (QFileInfo(dirIt.filePath()).suffix() == "cpp")
 			{
-				compile(dirIt.filePath().toLatin1().data());
+				compile(Lumix::Path(dirIt.filePath().toLatin1().data()));
 			}
 		}
 	}
 }
 
 
+void ScriptCompiler::setWorldEditor(Lumix::WorldEditor& editor)
+{
+	m_editor = &editor;
+}
+
 void ScriptCompiler::compile(const Lumix::Path& path)
 {
+	if (m_editor)
+	{
+		Lumix::ScriptScene* scene = static_cast<Lumix::ScriptScene*>(m_editor->getEngine().getScene(crc32("script")));
+		scene->beforeScriptCompiled(path);
+	}
+
 	ProcessInfo process;
 	Lumix::Path rel_path;
 	if(strncmp(path.c_str(), m_base_path.c_str(), m_base_path.length()) == 0)
@@ -47,9 +62,10 @@ void ScriptCompiler::compile(const Lumix::Path& path)
 	QStringList list;
 	char cmd_line[255];
 	sprintf(cmd_line, "%s\\scripts\\compile.bat %s\\%s", m_base_path.c_str(), m_base_path.c_str(), rel_path.c_str());
+
 	list.push_back("/C");
 	list.push_back(cmd_line);
-	connect(process.m_process, SIGNAL(finished(int)), this, SLOT(compilerFinish(int)));
+	connect(process.m_process, (void (QProcess::*)(int))&QProcess::finished, this, &ScriptCompiler::compilerFinish);
 	process.m_process->start("cmd.exe", list);
 }
 
@@ -79,9 +95,17 @@ void ScriptCompiler::compilerFinish(int exitCode)
 			else
 			{
 				msg.sprintf("Script %s failed to compile", m_processes[i].m_path.c_str());
+				Lumix::g_log_error.log("script") << "Script " << m_processes[i].m_path.c_str() << " failed to compile";
 			}
-			emit compiled(m_processes[i].m_path.c_str(), exitCode);
+			emit compiled(Lumix::Path(m_processes[i].m_path.c_str()), exitCode);
 			emit messageLogged(msg);
+			if (m_editor)
+			{
+				Lumix::ScriptScene* scene = static_cast<Lumix::ScriptScene*>(m_editor->getEngine().getScene(crc32("script")));
+				scene->afterScriptCompiled(m_processes[i].m_path);
+			}
+			m_processes.removeAt(i);
+
 			break;
 		}
 	}
@@ -123,6 +147,10 @@ void ScriptCompiler::checkFinished()
 			delete process.m_process;
 			m_processes.remove(i);
 		}
+	}
+	if (m_processes.empty())
+	{
+		Lumix::g_log_info.log("script") << "All scripts processed";
 	}
 }
 

@@ -2,7 +2,7 @@
 #include "ui_scriptcompilerwidget.h"
 #include <qfilesystemmodel.h>
 #include "scriptcompiler.h"
-
+#include "editor/world_editor.h"
 
 ScriptCompilerWidget::ScriptCompilerWidget(QWidget* parent) :
 	QDockWidget(parent),
@@ -21,7 +21,7 @@ ScriptCompilerWidget::ScriptCompilerWidget(QWidget* parent) :
 	m_compiler = new ScriptCompiler;
 	connect(m_compiler, SIGNAL(messageLogged(const QString&)), this, SLOT(logMessage(const QString&)));
 	QByteArray base_path = m_base_path.toLatin1();
-	m_compiler->setBasePath(base_path.data());
+	m_compiler->setBasePath(Lumix::Path(base_path.data()));
 	m_compiler->compileAll();
 }
 
@@ -32,6 +32,11 @@ ScriptCompilerWidget::~ScriptCompilerWidget()
 	delete m_model;
 }
 
+void ScriptCompilerWidget::setWorldEditor(Lumix::WorldEditor& editor)
+{
+	m_compiler->setWorldEditor(editor);
+}
+
 void ScriptCompilerWidget::logMessage(const QString& message)
 {
 	m_ui->logView->addItem(message);
@@ -40,7 +45,7 @@ void ScriptCompilerWidget::logMessage(const QString& message)
 void ScriptCompilerWidget::on_scriptListView_clicked(const QModelIndex &index)
 {
 	QString path = m_model->filePath(index);
-	QString c = m_compiler->getLog(path.toLatin1().data());
+	QString c = m_compiler->getLog(Lumix::Path(path.toLatin1().data()));
 	m_ui->compilerOutputView->setText(c);
 }
 

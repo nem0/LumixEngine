@@ -13,6 +13,7 @@ namespace Lumix
 
 
 class Engine;
+class Geometry;
 class IRenderDevice;
 class Material;
 class Model;
@@ -23,6 +24,7 @@ class ResourceManager;
 class Shader;
 class Texture;
 class Universe;
+struct VertexDef;
 
 
 
@@ -75,8 +77,9 @@ void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, c
 void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, float value);
 void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Matrix& mtx);
 void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Matrix* matrices, int count);
-void renderGeometry(int start, int count);
-void bindGeometry(Renderer& renderer, Geometry& geometry, Shader& shader);
+void renderGeometry(int indices_start, int vertex_count);
+void renderQuadGeometry(int start, int count);
+void bindGeometry(Renderer& renderer, const Geometry& geometry, const Mesh& mesh);
 int getUniformLocation(const Shader& shader, int name);
 void setUniform(int location, const Matrix& mtx);
 

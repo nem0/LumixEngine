@@ -22,6 +22,7 @@
 #include "graphics/render_scene.h"
 #include "graphics/shader.h"
 #include "graphics/texture.h"
+#include "script/script_system.h"
 #include "scripts/scriptcompiler.h"
 #include <qcheckbox.h>
 #include <QColorDialog>
@@ -105,7 +106,7 @@ class AddTerrainLevelCommand : public Lumix::IEditorCommand
 			Lumix::StackAllocator<LUMIX_MAX_PATH> allocator;
 			Lumix::string material_path(allocator);
 			static_cast<Lumix::RenderScene*>(m_terrain.scene)->getTerrainMaterial(m_terrain, material_path);
-			Lumix::Material* material = static_cast<Lumix::Material*>(m_world_editor.getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL)->get(material_path));
+			Lumix::Material* material = static_cast<Lumix::Material*>(m_world_editor.getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL)->get(Lumix::Path(material_path.c_str())));
 			return material->getTextureByUniform("hm_texture");
 		}
 
@@ -326,6 +327,7 @@ class AddTerrainLevelCommand : public Lumix::IEditorCommand
 
 
 static const uint32_t TERRAIN_HASH = crc32("terrain");
+static const uint32_t SCRIPT_HASH = crc32("script");
 
 
 class FileEdit : public QLineEdit
@@ -527,7 +529,7 @@ class ComponentPropertyObject : public PropertyViewObject
 								char rel_path[LUMIX_MAX_PATH];
 								QByteArray byte_array = str.toLatin1();
 								const char* text = byte_array.data();
-								view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, text);
+								view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, Lumix::Path(text));
 								view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, rel_path, strlen(rel_path) + 1);
 								edit->setText(rel_path);
 							}
@@ -898,7 +900,7 @@ void createEditor(PropertyView& view, QTreeWidgetItem* item, InstanceObject<Lumi
 	edit->connect(edit, &FileEdit::editingFinished, [shader, edit]()
 	{
 		auto material = static_cast<InstanceObject<Lumix::Material, false>* >(shader->getParent())->getValue();
-		auto shader = static_cast<Lumix::Shader*>(material->getResourceManager().get(Lumix::ResourceManager::SHADER)->load(edit->text().toLatin1().data()));
+		auto shader = static_cast<Lumix::Shader*>(material->getResourceManager().get(Lumix::ResourceManager::SHADER)->load(Lumix::Path(edit->text().toLatin1().data())));
 		material->setShader(shader);
 	});
 	QPushButton* button = new QPushButton("...");
@@ -911,10 +913,10 @@ void createEditor(PropertyView& view, QTreeWidgetItem* item, InstanceObject<Lumi
 			char rel_path[LUMIX_MAX_PATH];
 			QByteArray byte_array = str.toLatin1();
 			const char* text = byte_array.data();
-			view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, text);
+			view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, Lumix::Path(text));
 
 			auto material = static_cast<InstanceObject<Lumix::Material, false>* >(shader->getParent())->getValue();
-			auto shader = static_cast<Lumix::Shader*>(material->getResourceManager().get(Lumix::ResourceManager::SHADER)->load(rel_path));
+			auto shader = static_cast<Lumix::Shader*>(material->getResourceManager().get(Lumix::ResourceManager::SHADER)->load(Lumix::Path(rel_path)));
 			material->setShader(shader);
 
 			edit->setText(rel_path);
@@ -972,7 +974,8 @@ void createEditor(PropertyView& view, QTreeWidgetItem* item, InstanceObject<Lumi
 		Lumix::FS::IFile* file = fs.open(fs.getDefaultDevice(), tmp_path, Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE);
 		if(file)
 		{
-			Lumix::JsonSerializer serializer(*file, Lumix::JsonSerializer::AccessMode::WRITE, material->getValue()->getPath().c_str());
+			Lumix::DefaultAllocator allocator;
+			Lumix::JsonSerializer serializer(allocator, *file, Lumix::JsonSerializer::AccessMode::WRITE, material->getValue()->getPath().c_str());
 			material->getValue()->save(serializer);
 			fs.close(file);
 
@@ -1008,6 +1011,10 @@ void createComponentEditor(PropertyView& view, QTreeWidgetItem* item, InstanceOb
 	if (component->getValue()->type == TERRAIN_HASH)
 	{
 		view.addTerrainCustomProperties(*item, *component->getValue());
+	}
+	else if (component->getValue()->type == SCRIPT_HASH)
+	{
+		view.addScriptCustomProperties(*item, *component->getValue());
 	}
 }
 
@@ -1087,13 +1094,13 @@ void createTextureInMaterialEditor(PropertyView& view, QTreeWidgetItem* item, In
 		char rel_path[LUMIX_MAX_PATH];
 		QByteArray byte_array = edit->text().toLatin1();
 		const char* text = byte_array.data();
-		view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, text);
+		view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, Lumix::Path(text));
 		auto material = static_cast<InstanceObject<Lumix::Material, false>* >(texture->getParent())->getValue();
 		for(int i = 0; i < material->getTextureCount(); ++i)
 		{
 			if(material->getTexture(i) == texture->getValue())
 			{
-				Lumix::Texture* new_texture = static_cast<Lumix::Texture*>(material->getResourceManager().get(Lumix::ResourceManager::TEXTURE)->load(rel_path));
+				Lumix::Texture* new_texture = static_cast<Lumix::Texture*>(material->getResourceManager().get(Lumix::ResourceManager::TEXTURE)->load(Lumix::Path(rel_path)));
 				material->setTexture(i, new_texture);
 				break;
 			}
@@ -1110,13 +1117,13 @@ void createTextureInMaterialEditor(PropertyView& view, QTreeWidgetItem* item, In
 			char rel_path[LUMIX_MAX_PATH];
 			QByteArray byte_array = str.toLatin1();
 			const char* text = byte_array.data();
-			view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, text);
+			view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, Lumix::Path(text));
 			auto material = static_cast<InstanceObject<Lumix::Material, false>* >(texture->getParent())->getValue();
 			for(int i = 0; i < material->getTextureCount(); ++i)
 			{
 				if(material->getTexture(i) == texture->getValue())
 				{
-					Lumix::Texture* new_texture = static_cast<Lumix::Texture*>(material->getResourceManager().get(Lumix::ResourceManager::TEXTURE)->load(rel_path));
+					Lumix::Texture* new_texture = static_cast<Lumix::Texture*>(material->getResourceManager().get(Lumix::ResourceManager::TEXTURE)->load(Lumix::Path(rel_path)));
 					material->setTexture(i, new_texture);
 					break;
 				}
@@ -1146,7 +1153,7 @@ void createTextureInMaterialEditor(PropertyView& view, QTreeWidgetItem* item, In
 	add_button->connect(add_button, &QPushButton::clicked, [texture, &view, item]()
 	{
 		auto material = static_cast<InstanceObject<Lumix::Material, false>* >(texture->getParent())->getValue();
-		Lumix::Texture* new_texture = static_cast<Lumix::Texture*>(material->getResourceManager().get(Lumix::ResourceManager::TEXTURE)->load("models/editor/default.tga"));
+		Lumix::Texture* new_texture = static_cast<Lumix::Texture*>(material->getResourceManager().get(Lumix::ResourceManager::TEXTURE)->load(Lumix::Path("models/editor/default.tga")));
 		material->addTexture(new_texture);
 	});
 
@@ -1355,7 +1362,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			Lumix::StackAllocator<LUMIX_MAX_PATH> allocator;
 			Lumix::string material_path(allocator);
 			static_cast<Lumix::RenderScene*>(m_component.scene)->getTerrainMaterial(m_component, material_path);
-			return static_cast<Lumix::Material*>(m_world_editor.getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL)->get(material_path.c_str()));
+			return static_cast<Lumix::Material*>(m_world_editor.getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL)->get(Lumix::Path(material_path.c_str())));
 		}
 
 
@@ -1499,7 +1506,7 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 			Lumix::StackAllocator<LUMIX_MAX_PATH> allocator;
 			Lumix::string material_path(allocator);
 			static_cast<Lumix::RenderScene*>(terrain.scene)->getTerrainMaterial(terrain, material_path);
-			Lumix::Material* material = static_cast<Lumix::Material*>(m_world_editor.getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL)->get(material_path));
+			Lumix::Material* material = static_cast<Lumix::Material*>(m_world_editor.getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL)->get(Lumix::Path(material_path.c_str())));
 			Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
 			Lumix::Texture* splatmap = material->getTextureByUniform("splat_texture");
 			Lumix::Texture* heightmap = material->getTextureByUniform("hm_texture");
@@ -1707,7 +1714,7 @@ void PropertyView::setAssetBrowser(AssetBrowser& asset_browser)
 void PropertyView::setSelectedResourceFilename(const char* filename)
 {
 	char rel_path[LUMIX_MAX_PATH];
-	m_world_editor->getRelativePath(rel_path, LUMIX_MAX_PATH, filename);
+	m_world_editor->getRelativePath(rel_path, LUMIX_MAX_PATH, Lumix::Path(filename));
 	Lumix::ResourceManagerBase* manager = NULL;
 	char extension[10];
 	Lumix::PathUtils::getExtension(extension, sizeof(extension), filename);
@@ -1726,7 +1733,7 @@ void PropertyView::setSelectedResourceFilename(const char* filename)
 
 	if (manager != NULL)
 	{
-		setSelectedResource(manager->load(rel_path));
+		setSelectedResource(manager->load(Lumix::Path(rel_path)));
 	}
 	else
 	{
@@ -1782,15 +1789,18 @@ void PropertyView::setScriptStatus(uint32_t status)
 {
 	for(int i = 0; i < m_ui->propertyList->topLevelItemCount(); ++i)
 	{
-		QTreeWidgetItem* item = m_ui->propertyList->topLevelItem(i);
-		if(item->text(0) == "Script")
+		QTreeWidgetItem* top_level_item = m_ui->propertyList->topLevelItem(i);
+		for (int k = 0; k < top_level_item->childCount(); ++k)
 		{
-			for(int j = 0; j < item->childCount(); ++j)
+			QTreeWidgetItem* item = m_ui->propertyList->topLevelItem(i)->child(k);
+			if (item->text(0) == "Script")
 			{
-				if(item->child(j)->text(0) == "Status")
+				for (int j = 0; j < item->childCount(); ++j)
 				{
-					switch(status)
+					if (item->child(j)->text(0) == "Status")
 					{
+						switch (status)
+						{
 						case ScriptCompiler::SUCCESS:
 							item->child(j)->setText(1, "Success");
 							break;
@@ -1806,9 +1816,10 @@ void PropertyView::setScriptStatus(uint32_t status)
 						default:
 							ASSERT(false);
 							break;
+						}
+
+						return;
 					}
-					
-					return;
 				}
 			}
 		}
@@ -1822,31 +1833,38 @@ void PropertyView::on_script_compiled(const Lumix::Path&, uint32_t status)
 }
 
 
-void PropertyView::on_compileScriptClicked()
+void PropertyView::addScriptCustomProperties(QTreeWidgetItem& tree_item, const Lumix::Component& script_component)
 {
-	/*for(int i = 0; i < m_properties.size(); ++i)
-	{
-		if(m_properties[i]->m_component_name == "script" && m_properties[i]->m_name == "source")
-		{
-			QLineEdit* edit = qobject_cast<QLineEdit*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item, 1)->children()[0]);
-			m_compiler->compile(edit->text().toLatin1().data());
-			break;
-		}
-	}*/
-}
+	QTreeWidgetItem* tools_item = new QTreeWidgetItem(QStringList() << "Tools");
+	tree_item.insertChild(0, tools_item);
+	QWidget* widget = new QWidget();
+	QHBoxLayout* layout = new QHBoxLayout(widget);
+	layout->setContentsMargins(0, 0, 0, 0);
+	QPushButton* compile_button = new QPushButton("Compile", widget);
+	layout->addWidget(compile_button);
+	m_ui->propertyList->setItemWidget(tools_item, 1, widget);
+	connect(compile_button, &QPushButton::clicked, this, [this, script_component](){
+		Lumix::string path(m_world_editor->getAllocator());
+		static_cast<Lumix::ScriptScene*>(script_component.scene)->getScriptPath(script_component, path);
+		m_compiler->compile(Lumix::Path(path.c_str()));
+	});
 
-
-void PropertyView::on_editScriptClicked()
-{
-	/*for(int i = 0; i < m_properties.size(); ++i)
+	QTreeWidgetItem* status_item = new QTreeWidgetItem(QStringList() << "Status");
+	tree_item.insertChild(0, status_item);
+	Lumix::string path(m_world_editor->getAllocator());
+	static_cast<Lumix::ScriptScene*>(script_component.scene)->getScriptPath(script_component, path);
+	switch (m_compiler->getStatus(Lumix::Path(path.c_str())))
 	{
-		if(m_properties[i]->m_name == "source")
-		{
-			QLineEdit* edit = qobject_cast<QLineEdit*>(m_ui->propertyList->itemWidget(m_properties[i]->m_tree_item, 1)->children()[0]);
-			QDesktopServices::openUrl(QUrl::fromLocalFile(edit->text()));
+		case ScriptCompiler::SUCCESS:
+			status_item->setText(1, "Compiled");
 			break;
-		}
-	}*/
+		case ScriptCompiler::FAILURE:
+			status_item->setText(1, "Failure");
+			break;
+		default:
+			status_item->setText(1, "Unknown");
+			break;
+	}
 }
 
 
@@ -1962,26 +1980,6 @@ void PropertyView::on_terrainBrushTextureChanged(int value)
 }
 
 
-void PropertyView::addScriptCustomProperties()
-{
-	QTreeWidgetItem* tools_item = new QTreeWidgetItem(QStringList() << "Tools");
-	m_ui->propertyList->topLevelItem(0)->insertChild(0, tools_item);
-	QWidget* widget = new QWidget();
-	QHBoxLayout* layout = new QHBoxLayout(widget);
-	layout->setContentsMargins(0, 0, 0, 0);
-	QPushButton* compile_button = new QPushButton("Compile", widget);
-	QPushButton* edit_button = new QPushButton("Edit", widget);
-	layout->addWidget(compile_button);
-	layout->addWidget(edit_button);
-	m_ui->propertyList->setItemWidget(tools_item, 1, widget);
-	connect(compile_button, &QPushButton::clicked, this, &PropertyView::on_compileScriptClicked);
-	connect(edit_button, &QPushButton::clicked, this, &PropertyView::on_editScriptClicked);
-
-	QTreeWidgetItem* status_item = new QTreeWidgetItem(QStringList() << "Status");
-	m_ui->propertyList->topLevelItem(0)->insertChild(0, status_item);
-	status_item->setText(1, "Unknown");
-}
-
 
 void PropertyView::setSelectedResource(Lumix::Resource* resource)
 {
@@ -1997,11 +1995,7 @@ void PropertyView::setSelectedResource(Lumix::Resource* resource)
 	m_selected_resource = resource;
 	if (resource)
 	{
-		m_selected_resource->getObserverCb().bind<PropertyView, &PropertyView::onSelectedResourceLoaded>(this);
-		if (m_selected_resource->isReady() || m_selected_resource->isFailure())
-		{
-			onSelectedResourceLoaded(Lumix::Resource::State::READY, Lumix::Resource::State::READY);
-		}
+		m_selected_resource->onLoaded<PropertyView, &PropertyView::onSelectedResourceLoaded>(this);
 	}
 }
 

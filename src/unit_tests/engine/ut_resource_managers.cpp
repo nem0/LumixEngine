@@ -49,9 +49,9 @@ namespace
 		texture_manager.create(Lumix::ResourceManager::TEXTURE, resource_manager);
 
 		Lumix::g_log_info.log("unit") << "loading ...";
-		Lumix::Resource* texture_tga1 = texture_manager.load(texture_test_tga);
-		Lumix::Resource* texture_tga2 = texture_manager.load(texture_test_tga);
-		Lumix::Resource* texture_tga3 = texture_manager.get(texture_test_tga);
+		Lumix::Resource* texture_tga1 = texture_manager.load(Lumix::Path(texture_test_tga));
+		Lumix::Resource* texture_tga2 = texture_manager.load(Lumix::Path(texture_test_tga));
+		Lumix::Resource* texture_tga3 = texture_manager.get(Lumix::Path(texture_test_tga));
 
 		LUMIX_EXPECT_NOT_NULL(texture_tga1);
 		LUMIX_EXPECT_NOT_NULL(texture_tga2);
@@ -80,7 +80,7 @@ namespace
 
 		Lumix::g_log_info.log("unit") << "unloading ...";
 
-		texture_manager.unload(texture_test_tga);
+		texture_manager.unload(Lumix::Path(texture_test_tga));
 
 		LUMIX_EXPECT_FALSE(texture_tga1->isEmpty());
 		LUMIX_EXPECT_FALSE(texture_tga1->isLoading());
@@ -124,7 +124,7 @@ namespace
 
 		Lumix::g_log_info.log("unit") << "force unloading ...";
 
-		texture_manager.forceUnload(texture_test_tga);
+		texture_manager.forceUnload(Lumix::Path(texture_test_tga));
 
 		LUMIX_EXPECT_TRUE(texture_tga1->isEmpty());
 		LUMIX_EXPECT_FALSE(texture_tga1->isLoading());
@@ -134,7 +134,7 @@ namespace
 
 		LUMIX_EXPECT_EQ(0, texture_tga1->size());
 
-		Lumix::Resource* texture_fail = texture_manager.load(texture_test_failure);
+		Lumix::Resource* texture_fail = texture_manager.load(Lumix::Path(texture_test_failure));
 
 		LUMIX_EXPECT_NOT_NULL(texture_fail);
 
@@ -186,8 +186,8 @@ namespace
 		animation_manager.create(Lumix::ResourceManager::ANIMATION, resource_manager);
 
 		Lumix::g_log_info.log("unit") << "loading ...";
-		Lumix::Resource* animation_1 = animation_manager.load(anim_test);
-		Lumix::Resource* animation_2 = animation_manager.get(anim_test);
+		Lumix::Resource* animation_1 = animation_manager.load(Lumix::Path(anim_test));
+		Lumix::Resource* animation_2 = animation_manager.get(Lumix::Path(anim_test));
 
 		LUMIX_EXPECT_NOT_NULL(animation_1);
 		LUMIX_EXPECT_NOT_NULL(animation_2);
@@ -258,7 +258,7 @@ namespace
 
 		LUMIX_EXPECT_EQ(0, animation_2->size());
 
-		Lumix::Resource* animation_fail = animation_manager.load(anim_test_failure);
+		Lumix::Resource* animation_fail = animation_manager.load(Lumix::Path(anim_test_failure));
 
 		LUMIX_EXPECT_NOT_NULL(animation_fail);
 
@@ -328,7 +328,7 @@ namespace
 		}
 
 		Lumix::g_log_info.log("unit") << "loading ...";
-		Lumix::Resource* animation = animation_manager.load(anim_test_fail);
+		Lumix::Resource* animation = animation_manager.load(Lumix::Path(anim_test_fail));
 
 		LUMIX_EXPECT_NOT_NULL(animation);
 

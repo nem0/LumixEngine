@@ -11,6 +11,7 @@
 #include "debug/allocator.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
+#include "graphics/bitmap_font.h"
 #include "graphics/geometry.h"
 #include "graphics/gl_ext.h"
 #include "graphics/irender_device.h"
@@ -46,6 +47,7 @@ struct RendererImpl : public Renderer
 		, m_model_manager(m_allocator)
 		, m_material_manager(m_allocator)
 		, m_shader_manager(m_allocator)
+		, m_font_manager(m_allocator)
 		, m_pipeline_manager(m_allocator)
 	{
 		m_texture_manager.create(ResourceManager::TEXTURE, engine.getResourceManager());
@@ -53,9 +55,11 @@ struct RendererImpl : public Renderer
 		m_material_manager.create(ResourceManager::MATERIAL, engine.getResourceManager());
 		m_shader_manager.create(ResourceManager::SHADER, engine.getResourceManager());
 		m_pipeline_manager.create(ResourceManager::PIPELINE, engine.getResourceManager());
+		m_font_manager.create(ResourceManager::BITMAP_FONT, engine.getResourceManager());
 
 		m_current_pass_hash = crc32("MAIN");
 		m_last_bind_geometry = NULL;
+		m_last_bind_geometry_mesh = NULL;
 		m_last_program_id = 0xffffFFFF;
 		m_is_editor_wireframe = false;
 	}
@@ -67,6 +71,7 @@ struct RendererImpl : public Renderer
 		m_material_manager.destroy();
 		m_shader_manager.destroy();
 		m_pipeline_manager.destroy();
+		m_font_manager.destroy();
 	}
 
 	virtual int getGLSLVersion() const override
@@ -166,9 +171,10 @@ struct RendererImpl : public Renderer
 	{
 		if(m_last_bind_geometry)
 		{
-			m_last_bind_geometry->getVertexDefinition().end(*m_last_bind_geometry_shader);
+			m_last_bind_geometry_mesh->getVertexDefinition().end(*m_last_bind_geometry_mesh->getMaterial()->getShader());
 		}
 		m_last_bind_geometry = NULL;
+		m_last_bind_geometry_mesh = NULL;
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 		glUseProgram(0);
@@ -336,13 +342,14 @@ struct RendererImpl : public Renderer
 
 		glewExperimental = GL_TRUE;
 		GLenum err = glewInit();
-		m_debug_shader = static_cast<Shader*>(m_engine.getResourceManager().get(ResourceManager::SHADER)->load("shaders/debug.shd"));
+		m_debug_shader = static_cast<Shader*>(m_engine.getResourceManager().get(ResourceManager::SHADER)->load(Path("shaders/debug.shd")));
 		return err == GLEW_OK;
 	}
 
 
 	virtual void destroy() override
 	{
+		m_debug_shader->getResourceManager().get(ResourceManager::SHADER)->unload(*m_debug_shader);
 	}
 
 
@@ -393,28 +400,24 @@ struct RendererImpl : public Renderer
 			const Mesh& mesh = model.getMesh(i);
 			mesh.getMaterial()->apply(*this, pipeline);
 			setFixedCachedUniform(*this, *mesh.getMaterial()->getShader(), (int)Shader::FixedCachedUniforms::WORLD_MATRIX, transform);
-			bindGeometry(*this, *model.getGeometry(), *mesh.getMaterial()->getShader());
-			renderGeometry(mesh.getStart(), mesh.getCount());
+			bindGeometry(*this, model.getGeometry(), mesh);
+			renderGeometry(mesh.getIndicesOffset(), mesh.getIndexCount());
 		}
+		
 	}
 
-	virtual void serialize(ISerializer&) override
-	{
-	}
-
-	virtual void deserialize(ISerializer&) override
-	{
-	}
 
 	virtual void setEditorWireframe(bool is_wireframe)
 	{
 		m_is_editor_wireframe = is_wireframe;
 	}
 
+
 	virtual bool isEditorWireframe() const
 	{
 		return m_is_editor_wireframe;
 	}
+
 
 	Engine& m_engine;
 	Debug::Allocator m_allocator;
@@ -422,11 +425,12 @@ struct RendererImpl : public Renderer
 	MaterialManager m_material_manager;
 	ShaderManager m_shader_manager;
 	ModelManager m_model_manager;
+	BitmapFontManager m_font_manager;
 	PipelineManager m_pipeline_manager;
 	IRenderDevice* m_render_device;
 	bool m_is_editor_wireframe;
-	Geometry* m_last_bind_geometry;
-	Shader* m_last_bind_geometry_shader;
+	const Geometry* m_last_bind_geometry;
+	const Mesh* m_last_bind_geometry_mesh;
 	GLuint m_last_program_id;
 	uint32_t m_current_pass_hash;
 	Matrix m_view_matrix;
@@ -580,29 +584,33 @@ void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, c
 }
 
 
-void bindGeometry(Renderer& renderer, Geometry& geometry, Shader& shader)
+void bindGeometry(Renderer& renderer, const Geometry& geometry, const Mesh& mesh)
 {
 	RendererImpl& renderer_impl = static_cast<RendererImpl&>(renderer);
-	if (renderer_impl.m_last_bind_geometry != &geometry)
+	if (renderer_impl.m_last_bind_geometry_mesh != &mesh)
 	{
-		if (renderer_impl.m_last_bind_geometry)
+		if (renderer_impl.m_last_bind_geometry_mesh)
 		{
-			renderer_impl.m_last_bind_geometry->getVertexDefinition().end(shader);
+			const Mesh* mesh = renderer_impl.m_last_bind_geometry_mesh;
+			mesh->getVertexDefinition().end(*mesh->getMaterial()->getShader());
 		}
-		glBindBuffer(GL_ARRAY_BUFFER, geometry.getID());
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, geometry.getIndicesID());
+		geometry.bindBuffers();
 		renderer_impl.m_last_bind_geometry = &geometry;
-		renderer_impl.m_last_bind_geometry_shader = &shader;
-		geometry.getVertexDefinition().begin(shader);
+		renderer_impl.m_last_bind_geometry_mesh = &mesh;
+		mesh.getVertexDefinition().begin(*mesh.getMaterial()->getShader(), mesh.getAttributeArrayOffset());
 	}
 }
 
 
-void renderGeometry(int start, int count)
+void renderGeometry(int indices_offset, int vertex_count)
 {
-	glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, (void*)(start * sizeof(GLint)));
+	glDrawElements(GL_TRIANGLES, vertex_count, GL_UNSIGNED_INT, (void*)(indices_offset * sizeof(GLint)));
 }
 
+void renderQuadGeometry(int indices_offset, int vertex_count)
+{
+	glDrawElements(GL_QUADS, vertex_count, GL_UNSIGNED_INT, (void*)(indices_offset * sizeof(GLint)));
+}
 
 int getUniformLocation(const Shader& shader, int name)
 {

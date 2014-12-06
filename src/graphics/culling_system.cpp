@@ -14,6 +14,7 @@
 namespace Lumix
 {
 	typedef BinaryArray VisibilityFlags;
+	typedef Array<int64_t> LayerMasks;
 
 	static const int MIN_ENTITIES_PER_THREAD = 50;
 
@@ -23,6 +24,8 @@ namespace Lumix
 		const Sphere* LUMIX_RESTRICT end,
 		const VisibilityFlags& visiblity_flags,
 		const Frustum* LUMIX_RESTRICT frustum,
+		const int64_t* LUMIX_RESTRICT layer_masks,
+		int64_t layer_mask,
 		CullingSystem::Subresults& results
 		)
 	{
@@ -30,7 +33,7 @@ namespace Lumix
 		ASSERT(results.empty());
 		for (const Sphere* sphere = start; sphere <= end; sphere++, ++i)
 		{
-			if (frustum->isSphereInside(sphere->m_position, sphere->m_radius) && visiblity_flags[i])
+			if (frustum->isSphereInside(sphere->m_position, sphere->m_radius) && visiblity_flags[i] && ((layer_masks[i] & layer_mask) != 0))
 			{
 				results.push(i);
 			}
@@ -40,7 +43,9 @@ namespace Lumix
 	class CullingJob : public MTJD::Job
 	{
 	public:
-		CullingJob(const CullingSystem::InputSpheres& spheres, const VisibilityFlags& visibility_flags, CullingSystem::Subresults& results, int start, int end, const Frustum& frustum, MTJD::Manager& manager, IAllocator& allocator)
+		CullingJob(const CullingSystem::InputSpheres& spheres, const VisibilityFlags& visibility_flags, const LayerMasks& layer_masks, int64_t layer_mask,
+			CullingSystem::Subresults& results, int start, int end, const Frustum& frustum, MTJD::Manager& manager, IAllocator& allocator
+			)
 			: Job(true, MTJD::Priority::Default, false, manager, allocator)
 			, m_spheres(spheres)
 			, m_results(results)
@@ -48,6 +53,8 @@ namespace Lumix
 			, m_end(end)
 			, m_frustum(frustum)
 			, m_visibility_flags(visibility_flags)
+			, m_layer_masks(layer_masks)
+			, m_layer_mask(layer_mask)
 		{
 			setJobName("CullingJob");
 			m_results.reserve(end - start);
@@ -62,7 +69,7 @@ namespace Lumix
 		virtual void execute() override
 		{
 			ASSERT(m_results.empty() && !m_is_executed);
-			doCulling(m_start, &m_spheres[m_start], &m_spheres[m_end], m_visibility_flags, &m_frustum, m_results);
+			doCulling(m_start, &m_spheres[m_start], &m_spheres[m_end], m_visibility_flags, &m_frustum, &m_layer_masks[0], m_layer_mask, m_results);
 			m_is_executed = true;
 		}
 
@@ -70,6 +77,8 @@ namespace Lumix
 		const CullingSystem::InputSpheres& m_spheres;
 		CullingSystem::Subresults& m_results;
 		const VisibilityFlags& m_visibility_flags;
+		const LayerMasks& m_layer_masks;
+		int64_t m_layer_mask;
 		int m_start;
 		int m_end;
 		const Frustum& m_frustum;
@@ -88,6 +97,7 @@ namespace Lumix
 			, m_result(allocator)
 			, m_sync_point(true, allocator)
 			, m_mtjd_manager(mtjd_manager)
+			, m_layer_masks(m_allocator)
 		{
 			m_result.emplace(m_allocator);
 			int cpu_count = (int)m_mtjd_manager.getCpuThreadsCount();
@@ -108,6 +118,7 @@ namespace Lumix
 		{
 			m_spheres.clear();
 			m_visibility_flags.clear();
+			m_layer_masks.clear();
 		}
 
 
@@ -127,18 +138,18 @@ namespace Lumix
 		}
 
 
-		virtual void cullToFrustum(const Frustum& frustum) override
+		virtual void cullToFrustum(const Frustum& frustum, int64_t layer_mask) override
 		{
 			for (int i = 0; i < m_result.size(); ++i)
 			{
 				m_result[i].clear();
 			}
-			doCulling(0, &m_spheres[0], &m_spheres.back(), m_visibility_flags, &frustum, m_result[0]);
+			doCulling(0, &m_spheres[0], &m_spheres.back(), m_visibility_flags, &frustum, &m_layer_masks[0], layer_mask, m_result[0]);
 			m_is_async_result = false;
 		}
 
 
-		virtual void cullToFrustumAsync(const Frustum& frustum) override
+		virtual void cullToFrustumAsync(const Frustum& frustum, int64_t layer_mask) override
 		{
 			int count = m_spheres.size();
 
@@ -147,7 +158,7 @@ namespace Lumix
 
 			if (count < m_result.size() * MIN_ENTITIES_PER_THREAD)
 			{
-				cullToFrustum(frustum);
+				cullToFrustum(frustum, layer_mask);
 				return;
 			}
 			m_is_async_result = true;
@@ -160,13 +171,17 @@ namespace Lumix
 			for (; i < cpu_count - 1; i++)
 			{
 				m_result[i].clear();
-				CullingJob* cj = m_allocator.newObject<CullingJob>(m_spheres, m_visibility_flags, m_result[i], i * step, (i + 1) * step - 1, frustum, m_mtjd_manager, m_allocator);
+				CullingJob* cj = m_allocator.newObject<CullingJob>(m_spheres, m_visibility_flags, m_layer_masks
+					, layer_mask, m_result[i], i * step, (i + 1) * step - 1, frustum, m_mtjd_manager, m_allocator
+					);
 				cj->addDependency(&m_sync_point);
 				jobs[i] = cj;
 			}
 
 			m_result[i].clear();
-			CullingJob* cj = m_allocator.newObject<CullingJob>(m_spheres, m_visibility_flags, m_result[i], i * step, count - 1, frustum, m_mtjd_manager, m_allocator);
+			CullingJob* cj = m_allocator.newObject<CullingJob>(m_spheres, m_visibility_flags, m_layer_masks
+				, layer_mask, m_result[i], i * step, count - 1, frustum, m_mtjd_manager, m_allocator
+				);
 			cj->addDependency(&m_sync_point);
 			jobs[i] = cj;
 
@@ -174,6 +189,18 @@ namespace Lumix
 			{
 				m_mtjd_manager.schedule(jobs[i]);
 			}
+		}
+
+
+		virtual void setLayerMask(int index, int64_t layer) override
+		{
+			m_layer_masks[index] = layer;
+		}
+
+
+		virtual int64_t getLayerMask(int index) override
+		{
+			return m_layer_masks[index];
 		}
 
 
@@ -193,6 +220,7 @@ namespace Lumix
 		{
 			m_spheres.push(sphere);
 			m_visibility_flags.push(true);
+			m_layer_masks.push(1);
 		}
 
 
@@ -202,6 +230,7 @@ namespace Lumix
 
 			m_spheres.erase(index);
 			m_visibility_flags.erase(index);
+			m_layer_masks.erase(index);
 		}
 
 
@@ -223,6 +252,7 @@ namespace Lumix
 			{
 				m_spheres.push(spheres[i]);
 				m_visibility_flags.push(true);
+				m_layer_masks.push(1);
 			}
 		}
 
@@ -239,6 +269,7 @@ namespace Lumix
 		VisibilityFlags m_visibility_flags;
 		InputSpheres	m_spheres;
 		Results			m_result;
+		LayerMasks		m_layer_masks;
 
 		MTJD::Manager& m_mtjd_manager;
 		MTJD::Group m_sync_point;

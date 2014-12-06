@@ -60,6 +60,12 @@ namespace Lumix
 		return *this;
 	}
 
+	LogProxy& LogProxy::operator <<(const string& path)
+	{
+		m_message.cat(path.c_str());
+		return *this;
+	}
+
 	LogProxy& LogProxy::operator <<(const Path& path)
 	{
 		m_message.cat(path.c_str());
