@@ -851,19 +851,28 @@ struct PipelineInstanceImpl : public PipelineInstance
 			}
 			bindGeometry(*m_renderer, info->m_mesh->m_model->getGeometry(), *mesh_context.m_mesh);
 			last_key = info->m_key;
-			while (last_key == info->m_key)
+			if (info->m_mesh->m_pose->getCount() > 0)
 			{
-				const RenderableMesh* LUMIX_RESTRICT renderable_mesh = info->m_mesh;
-				const Matrix& world_matrix = *renderable_mesh->m_matrix;
-				setUniform(mesh_context.m_world_matrix_uniform_location, world_matrix);
-
-				if (renderable_mesh->m_pose->getCount() > 0)
+				while (last_key == info->m_key)
 				{
+					const RenderableMesh* LUMIX_RESTRICT renderable_mesh = info->m_mesh;
+					const Matrix& world_matrix = *renderable_mesh->m_matrix;
+					setUniform(mesh_context.m_world_matrix_uniform_location, world_matrix);
 					setPoseUniform(renderable_mesh, mesh_context);
+					renderGeometry(mesh_context.m_indices_offset, mesh_context.m_vertex_count);
+					++info;
 				}
-
-				renderGeometry(mesh_context.m_indices_offset, mesh_context.m_vertex_count);
-				++info;
+			}
+			else
+			{
+				while (last_key == info->m_key)
+				{
+					const RenderableMesh* LUMIX_RESTRICT renderable_mesh = info->m_mesh;
+					const Matrix& world_matrix = *renderable_mesh->m_matrix;
+					setUniform(mesh_context.m_world_matrix_uniform_location, world_matrix);
+					renderGeometry(mesh_context.m_indices_offset, mesh_context.m_vertex_count);
+					++info;
+				}
 			}
 		}
 	}

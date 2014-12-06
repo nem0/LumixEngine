@@ -15,6 +15,8 @@
 #include "graphics/pose.h"
 #include "graphics/renderer.h"
 
+#include <cfloat>
+
 
 namespace Lumix
 {
@@ -121,6 +123,18 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 	hit.m_dir = dir;
 	return hit;
 }
+
+
+LODMeshIndices Model::getLODMeshIndices(float squared_distance) const
+{
+	int i = 0;
+	while (squared_distance >= m_lods[i].m_distance)
+	{
+		++i;
+	}
+	return LODMeshIndices(m_lods[i].m_from_mesh, m_lods[i].m_to_mesh);
+}
+
 
 void Model::getPose(Pose& pose)
 {
@@ -347,6 +361,49 @@ bool Model::parseMeshes(FS::IFile* file)
 	return true;
 }
 
+
+void Model::createLODs()
+{
+	for (int i = 0; i < m_meshes.size(); ++i)
+	{
+		const Mesh& mesh = m_meshes[i];
+		const char* lod_str = strstr(mesh.getName(), "_LOD");
+		if (lod_str)
+		{
+			int lod_num = lod_str[4] - '1';
+			if (m_lods.size() <= lod_num)
+			{
+				LOD& lod = m_lods.pushEmpty();
+				lod.m_distance = (lod_num + 1) * (lod_num + 1) * 100 * 100;
+				lod.m_from_mesh = lod.m_to_mesh = i;
+			}
+			else
+			{
+				++m_lods[lod_num].m_to_mesh;
+			}
+		}
+		else
+		{
+			if (!m_lods.empty())
+			{
+				g_log_error.log("renderer") << "A mesh without a LOD found amongst meshes with a LOD in " << getPath().c_str();
+			}
+
+			LOD& lod2 = m_lods.pushEmpty();
+			lod2.m_distance = FLT_MAX;
+			lod2.m_from_mesh = 0;
+			lod2.m_to_mesh = m_meshes.size() - 1;
+			break;
+		}
+	}
+
+	LOD& final_lod = m_lods.pushEmpty();
+	final_lod.m_distance = FLT_MAX;
+	final_lod.m_from_mesh = 0;
+	final_lod.m_to_mesh = -1;
+
+}
+
 void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 { 
 	PROFILE_FUNCTION();
@@ -360,6 +417,7 @@ void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			&& parseGeometry(file)
 			&& parseBones(file))
 		{
+			createLODs();
 			m_size = file->size();
 			decrementDepCount();
 		}
@@ -388,6 +446,7 @@ void Model::doUnload(void)
 	}
 	m_meshes.clear();
 	m_bones.clear();
+	m_lods.clear();
 	m_geometry_buffer_object.clear();
 
 	m_size = 0;

@@ -13,7 +13,7 @@ namespace Lumix
 class Shader;
 
 
-enum class VertexAttributeDef
+enum class VertexAttributeDef : uint8_t
 {
 	FLOAT4,
 	FLOAT2,
