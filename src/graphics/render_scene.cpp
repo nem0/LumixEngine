@@ -1111,10 +1111,9 @@ namespace Lumix
 							{
 								const Renderable* LUMIX_RESTRICT renderable = m_renderables[subresults[i]];
 								const Model* LUMIX_RESTRICT model = renderable->m_model;
-								TODO("get rid of this if");
-								if (model->isReady())
+								float squared_distance = (renderable->m_matrix.getTranslation() - frustum_position).squaredLength();
+								if (model && model->isReady())
 								{
-									float squared_distance = (renderable->m_matrix.getTranslation() - frustum_position).squaredLength();
 									LODMeshIndices lod = model->getLODMeshIndices(squared_distance);
 									for (int j = lod.getFrom(), c = lod.getTo(); j <= c; ++j)
 									{
