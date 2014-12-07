@@ -430,12 +430,5 @@ void Model::doUnload(void)
 	onEmpty();
 }
 
-FS::ReadCallback Model::getReadCallback()
-{
-	FS::ReadCallback rc;
-	rc.bind<Model, &Model::loaded>(this);
-	return rc;
-}
-
 
 } // ~namespace Lumix

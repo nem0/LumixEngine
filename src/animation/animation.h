@@ -48,11 +48,10 @@ class LUMIX_ANIMATION_API Animation : public Resource
 		float getLength() const { return m_frame_count / 30.0f; }
 
 	private:
-		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 		IAllocator& getAllocator();
 
 		virtual void doUnload(void) override;
-		virtual FS::ReadCallback getReadCallback(void) override;
+		virtual void loaded(FS::IFile* file, bool success, FS::FileSystem& fs) override;
 
 	private:
 		int	m_frame_count;

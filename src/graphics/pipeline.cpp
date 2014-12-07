@@ -296,14 +296,6 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	virtual FS::ReadCallback getReadCallback() override
-	{
-		FS::ReadCallback cb;
-		cb.bind<PipelineImpl, &PipelineImpl::loaded>(this);
-		return cb;
-	}
-
-
 	CommandCreator::Creator& addCommandCreator(const char* type)
 	{
 		CommandCreator& creator = m_command_creators.pushEmpty();
@@ -386,7 +378,7 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void loaded(FS::IFile* file, bool success, FS::FileSystem& fs) 
+	virtual void loaded(FS::IFile* file, bool success, FS::FileSystem& fs) override
 	{
 		if(success)
 		{

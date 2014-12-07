@@ -175,13 +175,4 @@ namespace Lumix
 	}
 
 
-	FS::ReadCallback BitmapFont::getReadCallback(void)
-	{
-		FS::ReadCallback cb;
-		cb.bind<BitmapFont, &BitmapFont::loaded>(this);
-		return cb;
-	}
-
-
-
 } // namespace Lumix

@@ -121,12 +121,6 @@ void Material::doUnload(void)
 	onEmpty();
 }
 
-FS::ReadCallback Material::getReadCallback()
-{
-	FS::ReadCallback rc;
-	rc.bind<Material, &Material::loaded>(this);
-	return rc;
-}
 
 bool Material::save(JsonSerializer& serializer)
 {

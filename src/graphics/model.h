@@ -149,7 +149,6 @@ class Model : public Resource
 		const AABB& getAABB() const { return m_aabb; } 
 
 	private:
-		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 		bool parseVertexDef(FS::IFile* file, VertexDef* vertex_definition);
 		bool parseGeometry(FS::IFile* file);
 		bool parseBones(FS::IFile* file);
@@ -158,8 +157,8 @@ class Model : public Resource
 		int getBoneIdx(const char* name);
 
 		virtual void doUnload(void) override;
-		virtual FS::ReadCallback getReadCallback() override;
-		
+		virtual void loaded(FS::IFile* file, bool success, FS::FileSystem& fs) override;
+
 	private:
 		IAllocator& m_allocator;
 		Geometry m_geometry_buffer_object;
