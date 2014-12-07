@@ -214,14 +214,6 @@ namespace Lumix
 			BitmapFont* m_font;
 	};
 
-	
-	class LodMeshes
-	{
-		public:
-			RenderableMesh* m_first;
-			RenderableMesh* m_last;
-	};
-
 
 	struct Renderable
 	{
