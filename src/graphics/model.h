@@ -154,8 +154,8 @@ class Model : public Resource
 		bool parseGeometry(FS::IFile* file);
 		bool parseBones(FS::IFile* file);
 		bool parseMeshes(FS::IFile* file);
+		bool parseLODs(FS::IFile* file);
 		int getBoneIdx(const char* name);
-		void createLODs();
 
 		virtual void doUnload(void) override;
 		virtual FS::ReadCallback getReadCallback() override;
