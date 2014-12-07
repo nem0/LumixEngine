@@ -389,11 +389,11 @@ void Model::createLODs()
 				g_log_error.log("renderer") << "A mesh without a LOD found amongst meshes with a LOD in " << getPath().c_str();
 			}
 
-			LOD& lod2 = m_lods.pushEmpty();
-			lod2.m_distance = FLT_MAX;
-			lod2.m_from_mesh = 0;
-			lod2.m_to_mesh = m_meshes.size() - 1;
-			break;
+			LOD& lod = m_lods.pushEmpty();
+			lod.m_distance = FLT_MAX;
+			lod.m_from_mesh = 0;
+			lod.m_to_mesh = m_meshes.size() - 1;
+			return;
 		}
 	}
 
