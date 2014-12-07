@@ -362,47 +362,24 @@ bool Model::parseMeshes(FS::IFile* file)
 }
 
 
-void Model::createLODs()
+bool Model::parseLODs(FS::IFile* file)
 {
-	for (int i = 0; i < m_meshes.size(); ++i)
+	int32_t lod_count;
+	file->read(&lod_count, sizeof(lod_count));
+	if (lod_count <= 0)
 	{
-		const Mesh& mesh = m_meshes[i];
-		const char* lod_str = strstr(mesh.getName(), "_LOD");
-		if (lod_str)
-		{
-			int lod_num = lod_str[4] - '1';
-			if (m_lods.size() <= lod_num)
-			{
-				LOD& lod = m_lods.pushEmpty();
-				lod.m_distance = (lod_num + 1) * (lod_num + 1) * 100 * 100;
-				lod.m_from_mesh = lod.m_to_mesh = i;
-			}
-			else
-			{
-				++m_lods[lod_num].m_to_mesh;
-			}
-		}
-		else
-		{
-			if (!m_lods.empty())
-			{
-				g_log_error.log("renderer") << "A mesh without a LOD found amongst meshes with a LOD in " << getPath().c_str();
-			}
-
-			LOD& lod = m_lods.pushEmpty();
-			lod.m_distance = FLT_MAX;
-			lod.m_from_mesh = 0;
-			lod.m_to_mesh = m_meshes.size() - 1;
-			return;
-		}
+		return false;
 	}
-
-	LOD& final_lod = m_lods.pushEmpty();
-	final_lod.m_distance = FLT_MAX;
-	final_lod.m_from_mesh = 0;
-	final_lod.m_to_mesh = -1;
-
+	m_lods.resize(lod_count);
+	for (int i = 0; i < lod_count; ++i)
+	{
+		file->read(&m_lods[i].m_to_mesh, sizeof(m_lods[i].m_to_mesh));
+		file->read(&m_lods[i].m_distance, sizeof(m_lods[i].m_distance));
+		m_lods[i].m_from_mesh = i > 0 ? m_lods[i - 1].m_to_mesh + 1 : 0;
+	}
+	return true;
 }
+
 
 void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 { 
@@ -415,9 +392,9 @@ void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			&& header.m_version <= (uint32_t)ModelFileVersion::LATEST
 			&& parseMeshes(file)
 			&& parseGeometry(file)
-			&& parseBones(file))
+			&& parseBones(file)
+			&& parseLODs(file))
 		{
-			createLODs();
 			m_size = file->size();
 			decrementDepCount();
 		}
