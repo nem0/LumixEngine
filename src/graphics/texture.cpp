@@ -927,11 +927,5 @@ void Texture::doUnload(void)
 	onEmpty();
 }
 
-FS::ReadCallback Texture::getReadCallback()
-{
-	FS::ReadCallback cb;
-	cb.bind<Texture, &Texture::loaded>(this);
-	return cb;
-}
 
 } // ~namespace Lumix

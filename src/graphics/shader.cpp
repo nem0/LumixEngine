@@ -270,12 +270,5 @@ void Shader::doUnload(void)
 	onEmpty();
 }
 
-FS::ReadCallback Shader::getReadCallback()
-{
-	FS::ReadCallback cb;
-	cb.bind<Shader, &Shader::loaded>(this);
-	return cb;
-}
-
 
 } // ~namespace Lumix

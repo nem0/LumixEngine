@@ -68,7 +68,9 @@ namespace Lumix
 	void Resource::doLoad(void)
 	{
 		FS::FileSystem& fs = m_resource_manager.getFileSystem();
-		fs.openAsync(fs.getDefaultDevice(), m_path, FS::Mode::OPEN | FS::Mode::READ, getReadCallback());
+		FS::ReadCallback cb;
+		cb.bind<Resource, &Resource::loaded>(this);
+		fs.openAsync(fs.getDefaultDevice(), m_path, FS::Mode::OPEN | FS::Mode::READ, cb);
 	}
 
 	void Resource::addDependency(Resource& dependent_resource)

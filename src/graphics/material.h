@@ -104,9 +104,8 @@ public:
 
 private:
 	virtual void doUnload(void) override;
-	virtual FS::ReadCallback getReadCallback() override;
+	virtual void loaded(FS::IFile* file, bool success, FS::FileSystem& fs) override;
 
-	void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 	bool deserializeTexture(JsonSerializer& serializer, const char* material_dir);
 
 private:
