@@ -22,6 +22,10 @@
 #include "graphics/render_scene.h"
 #include "graphics/shader.h"
 #include "graphics/texture.h"
+#include "property_view/component_property_object.h"
+#include "property_view/getter_setter_object.h"
+#include "property_view/instance_object.h"
+#include "property_view/terrain_editor.h"
 #include "script/script_system.h"
 #include "scripts/scriptcompiler.h"
 #include <qcheckbox.h>
@@ -53,808 +57,8 @@ static const char* component_map[] =
 };
 
 
-
-static const uint32_t RENDERABLE_HASH = crc32("renderable");
-
-
-class AddTerrainLevelCommand : public Lumix::IEditorCommand
-{
-	private:
-		struct Item
-		{
-			int m_texture_center_x;
-			int m_texture_center_y;
-			int m_texture_radius;
-			float m_amount;
-		};
-
-
-	public:
-		struct Rectangle
-		{
-			int m_from_x;
-			int m_from_y;
-			int m_to_x;
-			int m_to_y;
-		};
-
-
-		AddTerrainLevelCommand(Lumix::WorldEditor& editor, const Lumix::Vec3& hit_pos, float radius, float rel_amount, Lumix::Component terrain, bool can_be_merged)
-			: m_world_editor(editor)
-			, m_terrain(terrain)
-			, m_can_be_merged(can_be_merged)
-			, m_new_data(editor.getAllocator())
-			, m_old_data(editor.getAllocator())
-			, m_items(editor.getAllocator())
-		{
-			Lumix::Matrix entity_mtx = terrain.entity.getMatrix();
-			entity_mtx.fastInverse();
-			Lumix::Vec3 local_pos = entity_mtx.multiplyPosition(hit_pos);
-			float xz_scale = static_cast<Lumix::RenderScene*>(terrain.scene)->getTerrainXZScale(terrain);
-			local_pos = local_pos / xz_scale;
-
-			Item& item = m_items.pushEmpty();
-			item.m_texture_center_x = local_pos.x;
-			item.m_texture_center_y = local_pos.z;
-			item.m_texture_radius = radius;
-			item.m_amount = rel_amount;
-		}
-
-
-		Lumix::Texture* getHeightmap()
-		{
-			Lumix::StackAllocator<LUMIX_MAX_PATH> allocator;
-			Lumix::string material_path(allocator);
-			static_cast<Lumix::RenderScene*>(m_terrain.scene)->getTerrainMaterial(m_terrain, material_path);
-			Lumix::Material* material = static_cast<Lumix::Material*>(m_world_editor.getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL)->get(Lumix::Path(material_path.c_str())));
-			return material->getTextureByUniform("hm_texture");
-		}
-
-
-		void rasterItem(Lumix::Texture* heightmap, Lumix::Array<uint8_t>& data, Item& item)
-		{
-			int heightmap_width = heightmap->getWidth();
-			int from_x = Lumix::Math::maxValue((int)(item.m_texture_center_x - item.m_texture_radius), 0);
-			int to_x = Lumix::Math::minValue((int)(item.m_texture_center_x + item.m_texture_radius), heightmap_width);
-			int from_z = Lumix::Math::maxValue((int)(item.m_texture_center_y - item.m_texture_radius), 0);
-			int to_z = Lumix::Math::minValue((int)(item.m_texture_center_y + item.m_texture_radius), heightmap_width);
-
-			static const float STRENGTH_MULTIPLICATOR = 100.0f;
-
-			float amount = item.m_amount * STRENGTH_MULTIPLICATOR;
-
-			float radius = item.m_texture_radius;
-			for (int i = from_x, end = to_x; i < end; ++i)
-			{
-				for (int j = from_z, end2 = to_z; j < end2; ++j)
-				{
-					float dist = sqrt((item.m_texture_center_x - i) * (item.m_texture_center_x - i) + (item.m_texture_center_y - j) * (item.m_texture_center_y - j));
-					float add_rel = 1.0f - Lumix::Math::minValue(dist / radius, 1.0f);
-					int add = add_rel * amount;
-					if (item.m_amount > 0)
-					{
-						add = Lumix::Math::minValue(add, 255 - heightmap->getData()[4 * (i + j * heightmap_width)]);
-					}
-					else if (item.m_amount < 0)
-					{
-						add = Lumix::Math::maxValue(add, 0 - heightmap->getData()[4 * (i + j * heightmap_width)]);
-					}
-					data[(i - m_x + (j - m_y) * m_width) * 4] += add;
-					data[(i - m_x + (j - m_y) * m_width) * 4 + 1] += add;
-					data[(i - m_x + (j - m_y) * m_width) * 4 + 2] += add;
-					data[(i - m_x + (j - m_y) * m_width) * 4 + 3] += add;
-				}
-			}
-		}
-
-
-		void generateNewData()
-		{
-			auto heightmap = getHeightmap();
-			ASSERT(heightmap->getBytesPerPixel() == 4);
-			Rectangle rect;
-			getBoundingRectangle(heightmap, rect);
-			m_new_data.resize(heightmap->getBytesPerPixel() * (rect.m_to_x - rect.m_from_x) * (rect.m_to_y - rect.m_from_y));
-			memcpy(&m_new_data[0], &m_old_data[0], m_new_data.size());
-
-			for(int item_index = 0; item_index < m_items.size(); ++item_index)
-			{
-				Item& item = m_items[item_index];
-				rasterItem(heightmap, m_new_data, item);
-			}
-		}
-
-
-		void saveOldData()
-		{
-			auto heightmap = getHeightmap();
-			Rectangle rect;
-			getBoundingRectangle(heightmap, rect);
-			m_x = rect.m_from_x;
-			m_y = rect.m_from_y;
-			m_width = rect.m_to_x - rect.m_from_x;
-			m_height = rect.m_to_y - rect.m_from_y;
-			m_old_data.resize(4 * (rect.m_to_x - rect.m_from_x) * (rect.m_to_y - rect.m_from_y));
-
-			ASSERT(heightmap->getBytesPerPixel() == 4);
-
-			int index = 0;
-			for (int j = rect.m_from_y, end2 = rect.m_to_y; j < end2; ++j)
-			{
-				for (int i = rect.m_from_x, end = rect.m_to_x; i < end; ++i)
-				{
-					uint32_t pixel = *(uint32_t*)&heightmap->getData()[(i + j * heightmap->getWidth()) * 4];
-					*(uint32_t*)&m_old_data[index] = pixel;
-					index += 4;
-				}
-			}
-		}
-
-
-		void applyData(Lumix::Array<uint8_t>& data)
-		{
-			auto heightmap = getHeightmap();
-
-			for(int j = m_y; j < m_y + m_height; ++j)
-			{
-				for(int i = m_x; i < m_x + m_width; ++i)
-				{
-					int index = 4 * (i + j * heightmap->getWidth());
-					heightmap->getData()[index + 0] = data[4 * (i - m_x + (j - m_y) * m_width) + 0];
-					heightmap->getData()[index + 1] = data[4 * (i - m_x + (j - m_y) * m_width) + 1];
-					heightmap->getData()[index + 2] = data[4 * (i - m_x + (j - m_y) * m_width) + 2];
-					heightmap->getData()[index + 3] = data[4 * (i - m_x + (j - m_y) * m_width) + 3];
-				}
-			}
-			heightmap->onDataUpdated();
-		}
-
-
-		virtual void execute() override
-		{
-			if(m_new_data.empty())
-			{
-				saveOldData();
-				generateNewData();
-			}
-			applyData(m_new_data);
-		}
-
-
-		virtual void undo() override
-		{
-			applyData(m_old_data);
-		}
-					
-
-		virtual uint32_t getType() override
-		{
-			static const uint32_t type = crc32("add_terrain_level");
-			return type;
-		}
-
-
-		void resizeData()
-		{
-			Lumix::Array<uint8_t> new_data(m_world_editor.getAllocator());
-			Lumix::Array<uint8_t> old_data(m_world_editor.getAllocator());
-			auto heightmap = getHeightmap();
-			Rectangle rect;
-			getBoundingRectangle(heightmap, rect);
-
-			int new_w = rect.m_to_x - rect.m_from_x;
-			new_data.resize(heightmap->getBytesPerPixel() * new_w * (rect.m_to_y - rect.m_from_y));
-			old_data.resize(heightmap->getBytesPerPixel() * new_w * (rect.m_to_y - rect.m_from_y));
-
-			// original
-			for(int row = rect.m_from_y; row < rect.m_to_y; ++row)
-			{
-				memcpy(&new_data[(row - rect.m_from_y) * new_w * 4], &heightmap->getData()[row * 4 * heightmap->getWidth() + rect.m_from_x * 4], 4 * new_w);
-				memcpy(&old_data[(row - rect.m_from_y) * new_w * 4], &heightmap->getData()[row * 4 * heightmap->getWidth() + rect.m_from_x * 4], 4 * new_w);
-			}
-
-			// new
-			for(int row = 0; row < m_height; ++row)
-			{
-				memcpy(&new_data[((row + m_y - rect.m_from_y) * new_w + m_x - rect.m_from_x) * 4], &m_new_data[row * 4 * m_width], 4 * m_width);
-				memcpy(&old_data[((row + m_y - rect.m_from_y) * new_w + m_x - rect.m_from_x) * 4], &m_old_data[row * 4 * m_width], 4 * m_width);
-			}
-
-			m_x = rect.m_from_x;
-			m_y = rect.m_from_y;
-			m_height = rect.m_to_y - rect.m_from_y;
-			m_width = rect.m_to_x - rect.m_from_x;
-			
-			m_new_data.swap(new_data);
-			m_old_data.swap(old_data);
-		}
-
-
-		virtual bool merge(IEditorCommand& command) override
-		{
-			if(!m_can_be_merged)
-			{
-				return false;
-			}
-			AddTerrainLevelCommand& my_command = static_cast<AddTerrainLevelCommand&>(command);
-			if(m_terrain == my_command.m_terrain)
-			{
-				my_command.m_items.push(m_items.back());
-				my_command.resizeData();
-				my_command.rasterItem(getHeightmap(), my_command.m_new_data, m_items.back());
-				return true;
-			}
-			return false;
-		}
-
-
-	private:
-		void getBoundingRectangle(Lumix::Texture* heightmap, Rectangle& rect)
-		{
-			Item& item = m_items[0];
-			rect.m_from_x = Lumix::Math::maxValue(item.m_texture_center_x - item.m_texture_radius, 0);
-			rect.m_to_x = Lumix::Math::minValue(item.m_texture_center_x + item.m_texture_radius, heightmap->getWidth());
-			rect.m_from_y = Lumix::Math::maxValue(item.m_texture_center_y - item.m_texture_radius, 0);
-			rect.m_to_y = Lumix::Math::minValue(item.m_texture_center_y + item.m_texture_radius, heightmap->getHeight());
-			for(int i = 1; i < m_items.size(); ++i)
-			{
-				Item& item = m_items[i];
-				rect.m_from_x = Lumix::Math::minValue(item.m_texture_center_x - item.m_texture_radius, rect.m_from_x);
-				rect.m_to_x = Lumix::Math::maxValue(item.m_texture_center_x + item.m_texture_radius, rect.m_to_x);
-				rect.m_from_y = Lumix::Math::minValue(item.m_texture_center_y - item.m_texture_radius, rect.m_from_y);
-				rect.m_to_y = Lumix::Math::maxValue(item.m_texture_center_y + item.m_texture_radius, rect.m_to_y);
-			}
-			rect.m_from_x = Lumix::Math::maxValue(rect.m_from_x, 0);
-			rect.m_to_x = Lumix::Math::minValue(rect.m_to_x, heightmap->getWidth());
-			rect.m_from_y = Lumix::Math::maxValue(rect.m_from_y, 0);
-			rect.m_to_y = Lumix::Math::minValue(rect.m_to_y, heightmap->getHeight());
-		}
-
-
-	private:
-		Lumix::Array<uint8_t> m_new_data;
-		Lumix::Array<uint8_t> m_old_data;
-		int m_width;
-		int m_height;
-		int m_x;
-		int m_y;
-		Lumix::Array<Item> m_items;
-		Lumix::Component m_terrain;
-		Lumix::WorldEditor& m_world_editor;
-		bool m_can_be_merged;
-};
-
-
-
 static const uint32_t TERRAIN_HASH = crc32("terrain");
 static const uint32_t SCRIPT_HASH = crc32("script");
-
-
-class FileEdit : public QLineEdit
-{
-	public:
-		FileEdit(QWidget* parent, PropertyView* property_view)
-			: QLineEdit(parent)
-			, m_property_view(property_view)
-			, m_world_editor(NULL)
-		{
-			setAcceptDrops(true);
-		}
-
-		virtual void dragEnterEvent(QDragEnterEvent* event) override
-		{
-			if (event->mimeData()->hasUrls())
-			{
-				event->acceptProposedAction();
-			}
-		}
-
-		virtual void dropEvent(QDropEvent* event)
-		{
-			ASSERT(m_world_editor);
-			const QList<QUrl>& list = event->mimeData()->urls();
-			if(!list.empty())
-			{
-				QString file = list[0].toLocalFile();
-				if(file.toLower().startsWith(m_world_editor->getBasePath()))
-				{
-					file.remove(0, QString(m_world_editor->getBasePath()).length());
-				}
-				if(file.startsWith("/"))
-				{
-					file.remove(0, 1);
-				}
-				setText(file);
-				emit editingFinished();
-			}
-		}
-
-		void setServer(Lumix::WorldEditor* server)
-		{
-			m_world_editor = server;
-		}
-
-	private:
-		PropertyView* m_property_view;
-		Lumix::WorldEditor* m_world_editor;
-};
-
-
-class ComponentArrayItemObject : public PropertyViewObject
-{
-	public:
-		ComponentArrayItemObject(PropertyViewObject* parent, const char* name, Lumix::IArrayDescriptor& descriptor, Lumix::Component component, int index)
-			: PropertyViewObject(parent, name)
-			, m_descriptor(descriptor)
-			, m_component(component)
-			, m_index(index)
-		{
-		}
-
-		virtual void createEditor(PropertyView& view, QTreeWidgetItem* item) override
-		{
-			QWidget* widget = new QWidget();
-			QHBoxLayout* layout = new QHBoxLayout(widget);
-			layout->setContentsMargins(0, 0, 0, 0);
-			QPushButton* button = new QPushButton(" - ");
-			layout->addWidget(button);
-			layout->addStretch(1);
-			item->treeWidget()->setItemWidget(item, 1, widget);
-			button->connect(button, &QPushButton::clicked, [this, &view]()
-			{
-				view.getWorldEditor()->removeArrayPropertyItem(m_component, m_index, m_descriptor);
-				view.refresh();
-			});
-		}
-
-		virtual bool isEditable() const override
-		{
-			return false;
-		}
-
-	private:
-		Lumix::IArrayDescriptor& m_descriptor;
-		Lumix::Component m_component;
-		int m_index;
-};
-
-
-class ComponentPropertyObject : public PropertyViewObject
-{
-	public:
-		ComponentPropertyObject(PropertyViewObject* parent, const char* name, Lumix::Component cmp, Lumix::IPropertyDescriptor& descriptor)
-			: PropertyViewObject(parent, name)
-			, m_descriptor(descriptor)
-			, m_component(cmp)
-		{
-			m_array_index = -1;
-			if(descriptor.getType() == Lumix::IPropertyDescriptor::ARRAY)
-			{
-				Lumix::IArrayDescriptor& array_desc = static_cast<Lumix::IArrayDescriptor&>(descriptor);
-				int item_count = array_desc.getCount(cmp);
-				for( int j = 0; j < item_count; ++j)
-				{
-					ComponentArrayItemObject* item = new ComponentArrayItemObject(this, name, array_desc, m_component, j);
-					addMember(item);
-					for(int i = 0; i < descriptor.getChildren().size(); ++i)
-					{
-						auto child = descriptor.getChildren()[i];
-						auto member = new ComponentPropertyObject(this, child->getName(), cmp, *descriptor.getChildren()[i]);
-						member->setArrayIndex(j);
-						item->addMember(member);
-					}
-				}
-			}
-		}
-
-
-		virtual void createEditor(PropertyView& view, QTreeWidgetItem* item) override
-		{
-			Lumix::Blob stream(view.getWorldEditor()->getAllocator());
-			if(m_descriptor.getType() != Lumix::IPropertyDescriptor::ARRAY)
-			{
-				if(m_array_index >= 0 )
-				{
-					m_descriptor.get(m_component, m_array_index, stream);
-				}
-				else
-				{
-					m_descriptor.get(m_component, stream);
-				}
-			}
-
-			switch (m_descriptor.getType())
-			{
-				case Lumix::IPropertyDescriptor::BOOL:
-					{
-						bool b;
-						stream.read(b);
-						QCheckBox* checkbox = new QCheckBox();
-						item->treeWidget()->setItemWidget(item, 1, checkbox);
-						checkbox->setChecked(b);
-						checkbox->connect(checkbox, &QCheckBox::stateChanged, [this, &view](bool new_value)
-						{
-							view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, &new_value, sizeof(new_value));
-						});
-					}
-					break;
-				case Lumix::IPropertyDescriptor::VEC3:
-					{
-						Lumix::Vec3 value;
-						stream.read(value);
-						item->setText(1, QString("%1; %2; %3").arg(value.x).arg(value.y).arg(value.z));
-
-						QDoubleSpinBox* sb1 = new QDoubleSpinBox();
-						sb1->setValue(value.x);
-						item->insertChild(0, new QTreeWidgetItem(QStringList() << "x"));
-						item->treeWidget()->setItemWidget(item->child(0), 1, sb1);
-
-						QDoubleSpinBox* sb2 = new QDoubleSpinBox();
-						sb2->setValue(value.y);
-						item->insertChild(1, new QTreeWidgetItem(QStringList() << "y"));
-						item->treeWidget()->setItemWidget(item->child(1), 1, sb2);
-
-						QDoubleSpinBox* sb3 = new QDoubleSpinBox();
-						sb3->setValue(value.y);
-						item->insertChild(2, new QTreeWidgetItem(QStringList() << "z"));
-						item->treeWidget()->setItemWidget(item->child(2), 1, sb3);
-
-						sb1->connect(sb1, (void (QDoubleSpinBox::*)(double))&QDoubleSpinBox::valueChanged, [&view, this, sb1, sb2, sb3](double) 
-						{
-							Lumix::Vec3 value;
-							value.set((float)sb1->value(), (float)sb2->value(), (float)sb3->value());
-							view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, &value, sizeof(value));
-						});
-					}
-					break;
-				case Lumix::IPropertyDescriptor::RESOURCE:
-				case Lumix::IPropertyDescriptor::FILE:
-					{
-						char path[LUMIX_MAX_PATH];
-						stream.read(path, stream.getBufferSize());
-						QWidget* widget = new QWidget();
-						FileEdit* edit = new FileEdit(widget, NULL);
-						edit->setText(path);
-						edit->setServer(view.getWorldEditor());
-						QHBoxLayout* layout = new QHBoxLayout(widget);
-						layout->addWidget(edit);
-						layout->setContentsMargins(0, 0, 0, 0);
-						QPushButton* button = new QPushButton("...", widget);
-						layout->addWidget(button);
-						button->connect(button, &QPushButton::clicked, [this, edit, &view]()
-						{
-							QString str = QFileDialog::getOpenFileName(NULL, QString(), QString(), dynamic_cast<Lumix::IFilePropertyDescriptor&>(m_descriptor).getFileType());
-							if (str != "")
-							{
-								char rel_path[LUMIX_MAX_PATH];
-								QByteArray byte_array = str.toLatin1();
-								const char* text = byte_array.data();
-								view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, Lumix::Path(text));
-								view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, rel_path, strlen(rel_path) + 1);
-								edit->setText(rel_path);
-							}
-						});
-				
-						QPushButton* button2 = new QPushButton("->", widget);
-						layout->addWidget(button2);
-						if(m_descriptor.getType() == Lumix::IPropertyDescriptor::RESOURCE)
-						{
-							button2->connect(button2, &QPushButton::clicked, [&view, edit]()
-							{
-								view.setSelectedResourceFilename(edit->text().toLatin1().data());
-							});
-						}
-						else
-						{
-							button2->connect(button2, &QPushButton::clicked, [edit]()
-							{
-								QDesktopServices::openUrl(QUrl::fromLocalFile(edit->text()));
-							});
-						}
-				
-						item->treeWidget()->setItemWidget(item, 1, widget);
-						connect(edit, &QLineEdit::editingFinished, [edit, &view, this]()
-						{
-							if(view.getObject())
-							{
-								QByteArray byte_array = edit->text().toLatin1();
-								view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, byte_array.data(), byte_array.size() + 1);
-							}
-						});
-					}
-					break;
-				case Lumix::IPropertyDescriptor::INTEGER:
-					{
-						auto& int_property = static_cast<Lumix::IIntPropertyDescriptor&>(m_descriptor);
-						int value;
-						stream.read(value);
-						QSpinBox* edit = new QSpinBox();
-						edit->setValue(value);
-						item->treeWidget()->setItemWidget(item, 1, edit);
-						edit->setMinimum(int_property.getMin());
-						edit->setMaximum(int_property.getMax());
-						connect(edit, (void (QSpinBox::*)(int))&QSpinBox::valueChanged, [this, &view](int new_value) 
-						{
-							int value = new_value;
-							view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, &value, sizeof(value));
-						});
-					}
-					break;
-				case Lumix::IPropertyDescriptor::DECIMAL:
-					{
-						float value;
-						stream.read(value);
-						QDoubleSpinBox* edit = new QDoubleSpinBox();
-						edit->setMaximum(FLT_MAX);
-						edit->setDecimals(4);
-						edit->setSingleStep(0.001);
-						edit->setValue(value);
-						item->treeWidget()->setItemWidget(item, 1, edit);
-						connect(edit, (void (QDoubleSpinBox::*)(double))&QDoubleSpinBox::valueChanged, [this, &view](double new_value) 
-						{
-							float value = (float)new_value;
-							view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, &value, sizeof(value));
-						});
-					}
-					break;
-				case Lumix::IPropertyDescriptor::STRING:
-					{
-						QLineEdit* edit = new QLineEdit();
-						item->treeWidget()->setItemWidget(item, 1, edit);
-						edit->setText((const char*)stream.getBuffer());
-						connect(edit, &QLineEdit::editingFinished, [edit, this, &view]()
-						{
-							QByteArray byte_array = edit->text().toLatin1();
-							const char* text = byte_array.data();
-							view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, text, strlen(text) + 1);
-						});
-					}
-					break;
-				case Lumix::IPropertyDescriptor::ARRAY:
-					{
-						QWidget* widget = new QWidget();
-						QHBoxLayout* layout = new QHBoxLayout(widget);
-						layout->setContentsMargins(0, 0, 0, 0);
-						QPushButton* button = new QPushButton(" + ");
-						layout->addWidget(button);
-						layout->addStretch(1);
-						item->treeWidget()->setItemWidget(item, 1, widget);
-						button->connect(button, &QPushButton::clicked, [this, &view]()
-						{
-							view.getWorldEditor()->addArrayPropertyItem(m_component, static_cast<Lumix::IArrayDescriptor&>(m_descriptor));
-							view.refresh();
-						});
-					}
-					break;
-				case Lumix::IPropertyDescriptor::COLOR:
-					{
-						Lumix::Vec4 value;
-						stream.read(value);
-						QWidget* widget = new QWidget();
-						QHBoxLayout* layout = new QHBoxLayout(widget);
-						QColor color((int)(value.x * 255), (int)(value.y * 255), (int)(value.z * 255));
-						QLabel* label = new QLabel(color.name());
-						layout->setContentsMargins(0, 0, 0, 0);
-						layout->addWidget(label);
-						label->setStyleSheet(QString("QLabel { background-color : %1; }").arg(color.name()));
-						QPushButton* button = new QPushButton("...");
-						layout->addWidget(button);
-						item->treeWidget()->setItemWidget(item, 1, widget);
-						connect(button, &QPushButton::clicked, [this, &view, label, value]()
-						{
-							QColorDialog* dialog = new QColorDialog(QColor::fromRgbF(value.x, value.y, value.z, value.w));
-							dialog->setModal(false);
-							dialog->connect(dialog, &QColorDialog::currentColorChanged, [this, &view, dialog]()
-							{
-								QColor color = dialog->currentColor();
-								Lumix::Vec4 value;
-								value.x = color.redF(); 
-								value.y = color.greenF(); 
-								value.z = color.blueF(); 
-								value.w = color.alphaF(); 
-								view.getWorldEditor()->setProperty(m_component.type, m_array_index, m_descriptor, &value, sizeof(value));
-							});
-							dialog->connect(dialog, &QDialog::finished, [&view]()
-							{
-								view.refresh();
-							});
-							dialog->show();
-						});
-					}
-					break;
-				default:
-					ASSERT(false);
-					break;
-			}
-		}
-
-
-		virtual bool isEditable() const override
-		{
-			return false;
-		}
-
-
-		Lumix::Component getComponent() const { return m_component; }
-		void setArrayIndex(int index) { m_array_index = index; }
-
-	private:
-		Lumix::IPropertyDescriptor& m_descriptor;
-		Lumix::Component m_component;
-		int m_array_index;
-};
-
-
-
-template <class Value, class Obj>
-class GetterSetterObject : public PropertyViewObject
-{
-	public:
-		typedef Value (Obj::*Getter)() const;
-		typedef void (Obj::*Setter)(Value);
-		typedef void(*CreateEditor)(QTreeWidgetItem*, GetterSetterObject&, Value);
-
-
-		GetterSetterObject(PropertyViewObject* parent, const char* name, Obj* object, Getter getter, Setter setter, CreateEditor create_editor)
-			: PropertyViewObject(parent, name)
-		{
-			m_object = object;
-			m_getter = getter;
-			m_setter = setter;
-			m_create_editor = create_editor;
-		}
-
-
-		virtual void createEditor(PropertyView&, QTreeWidgetItem* item) override
-		{
-			m_create_editor(item, *this, (m_object->*m_getter)());
-		}
-
-
-		virtual bool isEditable() const override
-		{
-			return m_setter != NULL;
-		}
-
-
-		void set(Value value)
-		{
-			(m_object->*m_setter)(value);
-		}
-
-
-	private:
-		Obj* m_object;
-		Getter m_getter;
-		Setter m_setter;
-		CreateEditor m_create_editor;
-};
-
-
-template <class T, bool own_value> class InstanceObject;
-
-template <class T>
-class InstanceObject<T, false> : public PropertyViewObject
-{
-	public:
-		typedef void(*CreateEditor)(PropertyView&, QTreeWidgetItem*, InstanceObject<T, false>*);
-	
-		InstanceObject(PropertyViewObject* parent, const char* name, T* object, CreateEditor create_editor)
-			: PropertyViewObject(parent, name)
-		{
-			m_value = object;
-			m_create_editor = create_editor;
-		}
-
-
-		~InstanceObject()
-		{
-		}
-
-
-		void setEditor(CreateEditor create_editor)
-		{
-			m_create_editor = create_editor;
-		}
-
-
-		virtual void createEditor(PropertyView& view, QTreeWidgetItem* item) override
-		{
-			if (m_create_editor)
-			{
-				m_create_editor(view, item, this);
-			}
-		}
-
-		virtual bool isEditable() const override { return false; }
-		T* getValue() const { return m_value; }
-
-	private:
-		T* m_value;
-		CreateEditor m_create_editor;
-};
-
-template <class T>
-class InstanceObject<T, true> : public PropertyViewObject
-{
-	public:
-		typedef void(*CreateEditor)(PropertyView&, QTreeWidgetItem*, InstanceObject<T, true>*);
-	
-		InstanceObject(PropertyViewObject* parent, const char* name, T* object, CreateEditor create_editor)
-			: PropertyViewObject(parent, name)
-		{
-			m_value = object;
-			m_create_editor = create_editor;
-		}
-
-
-		~InstanceObject()
-		{
-			delete m_value;
-		}
-
-
-		void setEditor(CreateEditor create_editor)
-		{
-			m_create_editor = create_editor;
-		}
-
-
-		virtual void createEditor(PropertyView& view, QTreeWidgetItem* item) override
-		{
-			if (m_create_editor)
-			{
-				m_create_editor(view, item, this);
-			}
-		}
-
-		virtual bool isEditable() const override { return false; }
-		T* getValue() const { return m_value; }
-
-	private:
-		T* m_value;
-		CreateEditor m_create_editor;
-};
-
-
-template<class T>
-void createEditor(QTreeWidgetItem* item, GetterSetterObject<int, T>&, int value)
-{
-	item->setText(1, QString::number(value));
-}
-
-
-template<class T>
-void createEditor(QTreeWidgetItem* item, GetterSetterObject<size_t, T>&, size_t value)
-{
-	item->setText(1, QString::number(value));
-}
-
-
-template<class T>
-void createEditor(QTreeWidgetItem* item, GetterSetterObject<float, T>&, float value)
-{
-	item->setText(1, QString::number(value));
-}
-
-
-template <class T>
-void createEditor(QTreeWidgetItem* item, GetterSetterObject<bool, T>& object, bool value)
-{
-	QCheckBox* checkbox = new QCheckBox();
-	item->treeWidget()->setItemWidget(item, 1, checkbox);
-	checkbox->setChecked(value);
-	if (object.isEditable())
-	{
-		checkbox->connect(checkbox, &QCheckBox::stateChanged, [&object](bool new_state) {
-			object.set(new_state);
-		});
-	}
-	else
-	{
-		checkbox->setDisabled(true);
-	}
-}
 
 
 void createEditor(PropertyView&, QTreeWidgetItem* item, InstanceObject<Lumix::Material::Uniform, false>* uniform)
@@ -997,15 +201,6 @@ void createEditor(PropertyView&, QTreeWidgetItem* item, InstanceObject<Lumix::Me
 }
 
 
-PropertyViewObject::~PropertyViewObject()
-{
-	for (int i = 0; i < m_members.size(); ++i)
-	{
-		delete m_members[i];
-	}
-}
-
-
 void createComponentEditor(PropertyView& view, QTreeWidgetItem* item, InstanceObject<Lumix::Component, true>* component)
 {
 	if (component->getValue()->type == TERRAIN_HASH)
@@ -1016,6 +211,85 @@ void createComponentEditor(PropertyView& view, QTreeWidgetItem* item, InstanceOb
 	{
 		view.addScriptCustomProperties(*item, *component->getValue());
 	}
+}
+
+
+void createTextureInMaterialEditor(PropertyView& view, QTreeWidgetItem* item, InstanceObject<Lumix::Texture, false>* texture)
+{
+	QWidget* widget = new QWidget();
+	QHBoxLayout* layout = new QHBoxLayout(widget);
+	layout->setContentsMargins(0, 0, 0, 0);
+	QLineEdit* edit = new QLineEdit(texture->getValue()->getPath().c_str());
+	layout->addWidget(edit);
+	edit->connect(edit, &QLineEdit::editingFinished, [&view, edit, texture]()
+	{
+		char rel_path[LUMIX_MAX_PATH];
+		QByteArray byte_array = edit->text().toLatin1();
+		const char* text = byte_array.data();
+		view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, Lumix::Path(text));
+		auto material = static_cast<InstanceObject<Lumix::Material, false>* >(texture->getParent())->getValue();
+		for (int i = 0; i < material->getTextureCount(); ++i)
+		{
+			if (material->getTexture(i) == texture->getValue())
+			{
+				Lumix::Texture* new_texture = static_cast<Lumix::Texture*>(material->getResourceManager().get(Lumix::ResourceManager::TEXTURE)->load(Lumix::Path(rel_path)));
+				material->setTexture(i, new_texture);
+				break;
+			}
+		}
+	});
+
+	QPushButton* browse_button = new QPushButton("...");
+	layout->addWidget(browse_button);
+	browse_button->connect(browse_button, &QPushButton::clicked, [&view, edit, texture]()
+	{
+		QString str = QFileDialog::getOpenFileName(NULL, QString(), QString(), "Texture (*.tga; *.dds)");
+		if (str != "")
+		{
+			char rel_path[LUMIX_MAX_PATH];
+			QByteArray byte_array = str.toLatin1();
+			const char* text = byte_array.data();
+			view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, Lumix::Path(text));
+			auto material = static_cast<InstanceObject<Lumix::Material, false>* >(texture->getParent())->getValue();
+			for (int i = 0; i < material->getTextureCount(); ++i)
+			{
+				if (material->getTexture(i) == texture->getValue())
+				{
+					Lumix::Texture* new_texture = static_cast<Lumix::Texture*>(material->getResourceManager().get(Lumix::ResourceManager::TEXTURE)->load(Lumix::Path(rel_path)));
+					material->setTexture(i, new_texture);
+					break;
+				}
+			}
+			edit->setText(rel_path);
+		}
+	});
+
+	QPushButton* remove_button = new QPushButton(" - ");
+	layout->addWidget(remove_button);
+	remove_button->connect(remove_button, &QPushButton::clicked, [texture, &view, item]()
+	{
+		auto material = static_cast<InstanceObject<Lumix::Material, false>* >(texture->getParent())->getValue();
+		for (int i = 0; i < material->getTextureCount(); ++i)
+		{
+			if (material->getTexture(i) == texture->getValue())
+			{
+				material->removeTexture(i);
+				item->parent()->removeChild(item);
+				break;
+			}
+		}
+	});
+
+	QPushButton* add_button = new QPushButton(" + ");
+	layout->addWidget(add_button);
+	add_button->connect(add_button, &QPushButton::clicked, [texture, &view, item]()
+	{
+		auto material = static_cast<InstanceObject<Lumix::Material, false>* >(texture->getParent())->getValue();
+		Lumix::Texture* new_texture = static_cast<Lumix::Texture*>(material->getResourceManager().get(Lumix::ResourceManager::TEXTURE)->load(Lumix::Path("models/editor/default.tga")));
+		material->addTexture(new_texture);
+	});
+
+	item->treeWidget()->setItemWidget(item, 1, widget);
 }
 
 
@@ -1079,85 +353,6 @@ PropertyViewObject* createTextureObject(PropertyViewObject* parent, Lumix::Resou
 		return object;
 	}
 	return NULL;
-}
-
-
-void createTextureInMaterialEditor(PropertyView& view, QTreeWidgetItem* item, InstanceObject<Lumix::Texture, false>* texture)
-{
-	QWidget* widget = new QWidget();
-	QHBoxLayout* layout = new QHBoxLayout(widget);
-	layout->setContentsMargins(0, 0, 0, 0);
-	QLineEdit* edit = new QLineEdit(texture->getValue()->getPath().c_str());
-	layout->addWidget(edit);
-	edit->connect(edit, &QLineEdit::editingFinished, [&view, edit, texture]() 
-	{
-		char rel_path[LUMIX_MAX_PATH];
-		QByteArray byte_array = edit->text().toLatin1();
-		const char* text = byte_array.data();
-		view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, Lumix::Path(text));
-		auto material = static_cast<InstanceObject<Lumix::Material, false>* >(texture->getParent())->getValue();
-		for(int i = 0; i < material->getTextureCount(); ++i)
-		{
-			if(material->getTexture(i) == texture->getValue())
-			{
-				Lumix::Texture* new_texture = static_cast<Lumix::Texture*>(material->getResourceManager().get(Lumix::ResourceManager::TEXTURE)->load(Lumix::Path(rel_path)));
-				material->setTexture(i, new_texture);
-				break;
-			}
-		}
-	});
-
-	QPushButton* browse_button = new QPushButton("...");
-	layout->addWidget(browse_button);
-	browse_button->connect(browse_button, &QPushButton::clicked, [&view, edit, texture]()
-	{
-		QString str = QFileDialog::getOpenFileName(NULL, QString(), QString(), "Texture (*.tga; *.dds)");
-		if(str != "")
-		{
-			char rel_path[LUMIX_MAX_PATH];
-			QByteArray byte_array = str.toLatin1();
-			const char* text = byte_array.data();
-			view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, Lumix::Path(text));
-			auto material = static_cast<InstanceObject<Lumix::Material, false>* >(texture->getParent())->getValue();
-			for(int i = 0; i < material->getTextureCount(); ++i)
-			{
-				if(material->getTexture(i) == texture->getValue())
-				{
-					Lumix::Texture* new_texture = static_cast<Lumix::Texture*>(material->getResourceManager().get(Lumix::ResourceManager::TEXTURE)->load(Lumix::Path(rel_path)));
-					material->setTexture(i, new_texture);
-					break;
-				}
-			}
-			edit->setText(rel_path);
-		}
-	});
-	
-	QPushButton* remove_button = new QPushButton(" - ");
-	layout->addWidget(remove_button);
-	remove_button->connect(remove_button, &QPushButton::clicked, [texture, &view, item]()
-	{
-		auto material = static_cast<InstanceObject<Lumix::Material, false>* >(texture->getParent())->getValue();
-		for(int i = 0; i < material->getTextureCount(); ++i)
-		{
-			if(material->getTexture(i) == texture->getValue())
-			{
-				material->removeTexture(i);
-				item->parent()->removeChild(item);
-				break;
-			}
-		}
-	});
-
-	QPushButton* add_button = new QPushButton(" + "); 
-	layout->addWidget(add_button);
-	add_button->connect(add_button, &QPushButton::clicked, [texture, &view, item]()
-	{
-		auto material = static_cast<InstanceObject<Lumix::Material, false>* >(texture->getParent())->getValue();
-		Lumix::Texture* new_texture = static_cast<Lumix::Texture*>(material->getResourceManager().get(Lumix::ResourceManager::TEXTURE)->load(Lumix::Path("models/editor/default.tga")));
-		material->addTexture(new_texture);
-	});
-
-	item->treeWidget()->setItemWidget(item, 1, widget);
 }
 
 
@@ -1241,375 +436,13 @@ PropertyViewObject* createModelObject(PropertyViewObject* parent, Lumix::Resourc
 }
 
 
-class TerrainEditor : public Lumix::WorldEditor::Plugin
+PropertyViewObject::~PropertyViewObject()
 {
-	public:
-		enum Type
-		{
-			HEIGHT,
-			TEXTURE,
-			ENTITY
-		};
-
-		TerrainEditor(Lumix::WorldEditor& editor, EntityTemplateList* template_list, EntityList* entity_list)
-			: m_world_editor(editor)
-			, m_entity_template_list(template_list)
-			, m_entity_list(entity_list)
-		{
-			m_texture_tree_item = NULL;
-			m_tree_top_level = NULL;
-			m_terrain_brush_size = 10;
-			m_terrain_brush_strength = 0.1f;
-			m_texture_idx = 0;
-		}
-
-		virtual void tick() override
-		{
-			float mouse_x = m_world_editor.getMouseX();
-			float mouse_y = m_world_editor.getMouseY();
-			
-			for(int i = m_world_editor.getSelectedEntities().size() - 1; i >= 0; --i)
-			{
-				Lumix::Component terrain = m_world_editor.getComponent(m_world_editor.getSelectedEntities()[i], crc32("terrain"));
-				if (terrain.isValid())
-				{
-					Lumix::Component camera_cmp = m_world_editor.getEditCamera();
-					Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(camera_cmp.scene);
-					Lumix::Vec3 origin, dir;
-					scene->getRay(camera_cmp, (float)mouse_x, (float)mouse_y, origin, dir);
-					Lumix::RayCastModelHit hit = scene->castRay(origin, dir, Lumix::Component::INVALID);
-					if (hit.m_is_hit)
-					{
-						scene->setTerrainBrush(terrain, hit.m_origin + hit.m_dir * hit.m_t, m_terrain_brush_size);
-						return;
-					}
-					scene->setTerrainBrush(terrain, Lumix::Vec3(0, 0, 0), 1);
-				}
-			}
-		}
-
-		virtual bool onEntityMouseDown(const Lumix::RayCastModelHit& hit, int, int) override
-		{
-			for(int i = m_world_editor.getSelectedEntities().size() - 1; i >= 0; --i)
-			{
-				if (m_world_editor.getSelectedEntities()[i] == hit.m_component.entity)
-				{
-					Lumix::Component terrain = m_world_editor.getComponent(hit.m_component.entity, crc32("terrain"));
-					if (terrain.isValid())
-					{
-						Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
-						switch (m_type)
-						{
-							case HEIGHT:
-								addTerrainLevel(terrain, hit, true);
-								break;
-							case TEXTURE:
-								addSplatWeight(terrain, hit);
-								break;
-							case ENTITY:
-								m_entity_list->enableUpdate(false);
-								paintEntities(terrain, hit);
-								break;
-							default:
-								ASSERT(false);
-								break;
-						}
-						return true;
-					}
-				}
-			}
-			return false;
-		}
-
-		virtual void onMouseMove(int x, int y, int /*rel_x*/, int /*rel_y*/, int /*mouse_flags*/) override
-		{
-			Lumix::Component camera_cmp = m_world_editor.getEditCamera();
-			Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(camera_cmp.scene);
-			Lumix::Vec3 origin, dir;
-			scene->getRay(camera_cmp, (float)x, (float)y, origin, dir);
-			Lumix::RayCastModelHit hit = scene->castRayTerrain(m_component, origin, dir);
-			if (hit.m_is_hit)
-			{
-				Lumix::Component terrain = m_world_editor.getComponent(hit.m_component.entity, crc32("terrain"));
-				if(terrain.isValid())
-				{
-					switch (m_type)
-					{
-						case HEIGHT:
-							addTerrainLevel(terrain, hit, false);
-							break;
-						case TEXTURE:
-							addSplatWeight(terrain, hit);
-							break;
-						case ENTITY:
-							paintEntities(terrain, hit);
-							break;
-						default:
-							break;
-					}
-				}
-			}
-		}
-
-		virtual void onMouseUp(int, int, Lumix::MouseButton::Value) override
-		{
-			m_entity_list->enableUpdate(true);
-		}
-
-
-		Lumix::Material* getMaterial()
-		{
-			Lumix::StackAllocator<LUMIX_MAX_PATH> allocator;
-			Lumix::string material_path(allocator);
-			static_cast<Lumix::RenderScene*>(m_component.scene)->getTerrainMaterial(m_component, material_path);
-			return static_cast<Lumix::Material*>(m_world_editor.getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL)->get(Lumix::Path(material_path.c_str())));
-		}
-
-
-		static void getProjections(const Lumix::Vec3& axis, const Lumix::Vec3 vertices[8], float& min, float& max)
-		{
-		  min = max = Lumix::dotProduct(vertices[0], axis);
-		  for(int i = 1 ; i < 8; ++i)
-		  {
-			float dot = Lumix::dotProduct(vertices[i], axis);
-			min = Lumix::Math::minValue(dot, min);
-			max = Lumix::Math::maxValue(dot, max);
-		  }
-		}
-
-
-		bool overlaps(float min1, float max1, float min2, float max2)
-		{
-			return (min1 <= min2 && min2 <= max1) || (min2 <= min1 && min1 <= max2);
-		}
-
-
-		bool testOBBCollision(const Lumix::Matrix& matrix_a, const Lumix::Model* model_a, const Lumix::Matrix& matrix_b, const Lumix::Model* model_b, float scale)
-		{
-			Lumix::Vec3 box_a_points[8];
-			Lumix::Vec3 box_b_points[8];
-
-			if(fabs(scale - 1.0) < 0.01f)
-			{
-				model_a->getAABB().getCorners(matrix_a, box_a_points);
-				model_b->getAABB().getCorners(matrix_b, box_b_points);
-			}
-			else
-			{
-				Lumix::Matrix scale_matrix_a = matrix_a;
-				scale_matrix_a.multiply3x3(scale);
-				Lumix::Matrix scale_matrix_b = matrix_b;
-				scale_matrix_b.multiply3x3(scale);
-				model_a->getAABB().getCorners(scale_matrix_a, box_a_points);
-				model_b->getAABB().getCorners(scale_matrix_b, box_b_points);
-			}
-
-			Lumix::Vec3 normals[] = { matrix_a.getXVector(), matrix_a.getYVector(), matrix_a.getZVector() };
-			for( int i = 0 ; i < 3; i++ )
-			{
-				float box_a_min, box_a_max, box_b_min, box_b_max;
-				getProjections(normals[i], box_a_points, box_a_min, box_a_max);
-				getProjections(normals[i], box_b_points, box_b_min, box_b_max);
-				if(!overlaps(box_a_min, box_a_max, box_b_min, box_b_max))
-				{
-					return false;
-				}
-			}
-			
-			Lumix::Vec3 normals_b[] = { matrix_b.getXVector(), matrix_b.getYVector(), matrix_b.getZVector() };
-			for( int i = 0 ; i < 3; i++ )
-			{
-				float box_a_min, box_a_max, box_b_min, box_b_max;
-				getProjections(normals_b[i], box_a_points, box_a_min, box_a_max);
-				getProjections(normals_b[i], box_b_points, box_b_min, box_b_max);
-				if(!overlaps(box_a_min, box_a_max, box_b_min, box_b_max))
-				{
-					return false;
-				}
-			}
-
-			return true;
-		}
-
-
-		bool isOBBCollision(Lumix::RenderScene* scene, const Lumix::Matrix& matrix, Lumix::Model* model, float scale)
-		{
-			Lumix::Vec3 pos_a = matrix.getTranslation();
-			static Lumix::Array<Lumix::RenderableMesh> meshes(m_world_editor.getAllocator());
-			meshes.clear();
-			scene->getRenderableMeshes(meshes, ~0);
-			float radius_a_squared = model->getBoundingRadius();
-			radius_a_squared = radius_a_squared * radius_a_squared;
-			for (int i = 0, c = meshes.size(); i < c; ++i)
-			{
-				Lumix::Vec3 pos_b = meshes[i].m_matrix->getTranslation();
-				float radius_b = meshes[i].m_model->getBoundingRadius();
-				float radius_squared = radius_a_squared + radius_b * radius_b;
-				if((pos_a - pos_b).squaredLength() < radius_squared * scale * scale)
-				{
-					if (testOBBCollision(matrix, model, *meshes[i].m_matrix, meshes[i].m_model, scale))
-					{
-						return true;
-					}
-				}
-			}
-			return false;
-		}
-
-
-		void paintEntities(Lumix::Component terrain, const Lumix::RayCastModelHit& hit)
-		{
-			Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(terrain.scene);
-			Lumix::Vec3 center_pos = hit.m_origin + hit.m_dir * hit.m_t;
-			Lumix::Matrix terrain_matrix = terrain.entity.getMatrix();
-			Lumix::Matrix inv_terrain_matrix = terrain_matrix;
-			inv_terrain_matrix.inverse();
-			Lumix::Entity tpl = m_entity_template_list->getTemplate();
-			if(!tpl.isValid())
-			{
-				return;
-			}
-			Lumix::Component renderable = m_world_editor.getComponent(tpl, RENDERABLE_HASH);
-			if(renderable.isValid())
-			{
-				float w, h;
-				scene->getTerrainSize(terrain, &w, &h);
-				float scale = 1.0f - Lumix::Math::maxValue(0.01f, m_terrain_brush_strength);
-				Lumix::Model* model = scene->getRenderableModel(renderable);
-				for (int i = 0; i <= m_terrain_brush_size * m_terrain_brush_size / 1000.0f; ++i)
-				{
-					float angle = (float)(rand() % 360);
-					float dist = (rand() % 100 / 100.0f) * m_terrain_brush_size;
-					Lumix::Vec3 pos(center_pos.x + cos(angle) * dist, 0, center_pos.z + sin(angle) * dist);
-					Lumix::Vec3 terrain_pos = inv_terrain_matrix.multiplyPosition(pos);
-					if (terrain_pos.x >= 0 && terrain_pos.z >= 0 && terrain_pos.x <= w && terrain_pos.z <= h)
-					{
-						pos.y = scene->getTerrainHeightAt(terrain, terrain_pos.x, terrain_pos.z);
-						Lumix::Matrix mtx = Lumix::Matrix::IDENTITY;
-						mtx.setTranslation(pos);
-						if(!isOBBCollision(scene, mtx, model, scale))
-						{
-							m_entity_template_list->instantiateTemplateAt(pos);
-						}
-					}
-				}
-			}
-		}
-
-
-		void addSplatWeight(Lumix::Component terrain, const Lumix::RayCastModelHit& hit)
-		{
-			if (!terrain.isValid())
-				return;
-			float radius = (float)m_terrain_brush_size;
-			float rel_amount = m_terrain_brush_strength;
-			Lumix::StackAllocator<LUMIX_MAX_PATH> allocator;
-			Lumix::string material_path(allocator);
-			static_cast<Lumix::RenderScene*>(terrain.scene)->getTerrainMaterial(terrain, material_path);
-			Lumix::Material* material = static_cast<Lumix::Material*>(m_world_editor.getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL)->get(Lumix::Path(material_path.c_str())));
-			Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
-			Lumix::Texture* splatmap = material->getTextureByUniform("splat_texture");
-			Lumix::Texture* heightmap = material->getTextureByUniform("hm_texture");
-			Lumix::Matrix entity_mtx = terrain.entity.getMatrix();
-			entity_mtx.fastInverse();
-			Lumix::Vec3 local_pos = entity_mtx.multiplyPosition(hit_pos);
-			float xz_scale = static_cast<Lumix::RenderScene*>(terrain.scene)->getTerrainXZScale(terrain);
-			local_pos = local_pos / xz_scale;
-			local_pos.x *= (float)splatmap->getWidth() / heightmap->getWidth();
-			local_pos.z *= (float)splatmap->getHeight() / heightmap->getHeight();
-
-			const float strengt_multiplicator = 1;
-
-			int texture_idx = m_texture_idx;
-			int w = splatmap->getWidth();
-			if (splatmap->getBytesPerPixel() == 4)
-			{
-				int from_x = Lumix::Math::maxValue((int)(local_pos.x - radius), 0);
-				int to_x = Lumix::Math::minValue((int)(local_pos.x + radius), splatmap->getWidth());
-				int from_z = Lumix::Math::maxValue((int)(local_pos.z - radius), 0);
-				int to_z = Lumix::Math::minValue((int)(local_pos.z + radius), splatmap->getHeight());
-
-				float amount = rel_amount * 255 * strengt_multiplicator;
-				amount = amount > 0 ? Lumix::Math::maxValue(amount, 1.1f) : Lumix::Math::minValue(amount, -1.1f);
-
-				for (int i = from_x, end = to_x; i < end; ++i)
-				{
-					for (int j = from_z, end2 = to_z; j < end2; ++j)
-					{
-						float dist = sqrt((local_pos.x - i) * (local_pos.x - i) + (local_pos.z - j) * (local_pos.z - j));
-						float add_rel = 1.0f - Lumix::Math::minValue(dist / radius, 1.0f);
-						int add = add_rel * amount;
-						if (rel_amount > 0)
-						{
-							add = Lumix::Math::minValue(add, 255 - splatmap->getData()[4 * (i + j * w) + texture_idx]);
-						}
-						else if (rel_amount < 0)
-						{
-							add = Lumix::Math::maxValue(add, 0 - splatmap->getData()[4 * (i + j * w) + texture_idx]);
-						}
-						addTexelSplatWeight(
-							splatmap->getData()[4 * (i + j * w) + texture_idx]
-							, splatmap->getData()[4 * (i + j * w) + (texture_idx + 1) % 4]
-							, splatmap->getData()[4 * (i + j * w) + (texture_idx + 2) % 4]
-							, splatmap->getData()[4 * (i + j * w) + (texture_idx + 3) % 4]
-							, add
-						);
-					}
-				}
-			}
-			else
-			{
-				ASSERT(false);
-			}
-			splatmap->onDataUpdated();
-		}
-
-		void addTexelSplatWeight(uint8_t& w1, uint8_t& w2, uint8_t& w3, uint8_t& w4, int value)
-		{
-			int add = value;
-			add = Lumix::Math::minValue(add, 255 - w1);
-			add = Lumix::Math::maxValue(add, -w1);
-			w1 += add;
-			/// TODO get rid of the Vec3 if possible
-			Lumix::Vec3 v(w2, w3, w4);
-			if (v.x + v.y + v.z == 0)
-			{
-				uint8_t rest = (255 - w1) / 3;
-				w2 = rest;
-				w3 = rest;
-				w4 = rest;
-			}
-			else
-			{
-				v *= (255 - w1) / (v.x + v.y + v.z);
-				w2 = v.x;
-				w3 = v.y;
-				w4 = v.z;
-			}
-			if (w1 + w2 + w3 + w4 > 255)
-			{
-				w4 = 255 - w1 - w2 - w3;
-			}
-		}
-
-		void addTerrainLevel(Lumix::Component terrain, const Lumix::RayCastModelHit& hit, bool new_stroke)
-		{
-			Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
-			AddTerrainLevelCommand* command = m_world_editor.getAllocator().newObject<AddTerrainLevelCommand>(m_world_editor, hit_pos, m_terrain_brush_size, m_terrain_brush_strength, terrain, !new_stroke);
-			m_world_editor.executeCommand(command);
-		}
-
-		Lumix::WorldEditor& m_world_editor;
-		Type m_type;
-		QTreeWidgetItem* m_tree_top_level;
-		Lumix::Component m_component;
-		QTreeWidgetItem* m_texture_tree_item;
-		float m_terrain_brush_strength;
-		int m_terrain_brush_size;
-		int m_texture_idx;
-		EntityTemplateList* m_entity_template_list;
-		EntityList* m_entity_list;
-};
+	for (int i = 0; i < m_members.size(); ++i)
+	{
+		delete m_members[i];
+	}
+}
 
 
 PropertyView::PropertyView(QWidget* parent) 
@@ -1693,10 +526,12 @@ void PropertyView::setWorldEditor(Lumix::WorldEditor& editor)
 	}
 }
 
+
 void PropertyView::onUniverseCreated()
 {
 	m_world_editor->getEngine().getUniverse()->entityMoved().bind<PropertyView, &PropertyView::onEntityPosition>(this);
 }
+
 
 void PropertyView::onUniverseDestroyed()
 {
@@ -1980,7 +815,6 @@ void PropertyView::on_terrainBrushTextureChanged(int value)
 }
 
 
-
 void PropertyView::setSelectedResource(Lumix::Resource* resource)
 {
 	if(resource)
@@ -2034,6 +868,7 @@ void PropertyView::on_addComponentButton_clicked()
 	ASSERT(false); // unknown component type
 }
 
+
 void PropertyView::updateSelectedEntityPosition()
 {
 	if(m_world_editor->getSelectedEntities().size() == 1)
@@ -2044,15 +879,18 @@ void PropertyView::updateSelectedEntityPosition()
 	}
 }
 
+
 void PropertyView::on_positionX_valueChanged(double)
 {
 	updateSelectedEntityPosition();
 }
 
+
 void PropertyView::on_positionY_valueChanged(double)
 {
 	updateSelectedEntityPosition();
 }
+
 
 void PropertyView::on_positionZ_valueChanged(double)
 {
@@ -2106,6 +944,7 @@ void PropertyView::setObject(PropertyViewObject* object)
 	}
 }
 
+
 void PropertyView::on_propertyList_customContextMenuRequested(const QPoint &pos)
 {
 	QMenu* menu = new QMenu("Item actions", NULL);
@@ -2144,6 +983,7 @@ void PropertyView::on_propertyList_customContextMenuRequested(const QPoint &pos)
 	}
 }
 
+
 void PropertyView::on_nameEdit_editingFinished()
 {
 	if (m_selected_entity.isValid() && strcmp(m_ui->nameEdit->text().toLatin1().data(), m_selected_entity.getName()) != 0)
@@ -2164,3 +1004,4 @@ void PropertyView::on_nameEdit_editingFinished()
 		}
 	}
 }
+
