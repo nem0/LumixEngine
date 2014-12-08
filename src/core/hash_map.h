@@ -204,7 +204,7 @@ namespace Lumix
 			init();
 		}
 
-		explicit HashMap(size_type buckets, IAllocator& allocator)
+		HashMap(size_type buckets, IAllocator& allocator)
 			: m_allocator(allocator)
 		{
 			initSentinel();

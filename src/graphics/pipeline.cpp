@@ -382,7 +382,7 @@ struct PipelineImpl : public Pipeline
 	{
 		if(success)
 		{
-			JsonSerializer serializer(m_allocator, *file, JsonSerializer::READ, m_path.c_str());
+			JsonSerializer serializer(*file, JsonSerializer::READ, m_path.c_str(), m_allocator);
 			deserialize(serializer);
 			decrementDepCount();
 		}
@@ -1109,7 +1109,7 @@ void DrawScreenQuadCommand::deserialize(PipelineImpl& pipeline, JsonSerializer& 
 	char material_path[LUMIX_MAX_PATH];
 	serializer.deserializeArrayItem(material_path, LUMIX_MAX_PATH, "");
 	Material* material = static_cast<Material*>(pipeline.getResourceManager().get(ResourceManager::MATERIAL)->load(Path(material_path)));
-	m_mesh = m_allocator.newObject<Mesh>(m_allocator, def, material, 0, 0, sizeof(v), 6, "screen_quad");
+	m_mesh = m_allocator.newObject<Mesh>(def, material, 0, 0, sizeof(v), 6, "screen_quad", m_allocator);
 }
 
 

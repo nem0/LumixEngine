@@ -180,7 +180,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 {
 	if(success)
 	{
-		JsonSerializer serializer(m_allocator, *file, JsonSerializer::READ, m_path.c_str());
+		JsonSerializer serializer(*file, JsonSerializer::READ, m_path.c_str(), m_allocator);
 		serializer.deserializeObjectBegin();
 		m_passes.clear();
 		m_pass_hashes.clear();

@@ -159,7 +159,7 @@ class PasteEntityCommand : public IEditorCommand
 class MoveEntityCommand : public IEditorCommand
 {
 	public:
-		MoveEntityCommand(IAllocator& allocator, const Array<Entity>& entities, const Array<Vec3>& new_positions, const Array<Quat>& new_rotations)
+		MoveEntityCommand(const Array<Entity>& entities, const Array<Vec3>& new_positions, const Array<Quat>& new_rotations, IAllocator& allocator)
 			: m_new_positions(allocator)
 			, m_new_rotations(allocator)
 			, m_old_positions(allocator)
@@ -1332,7 +1332,7 @@ struct WorldEditorImpl : public WorldEditor
 				{
 					rots.push(entities[i].getRotation());
 				}
-				IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(m_allocator, entities, positions, rots);
+				IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(entities, positions, rots, m_allocator);
 				executeCommand(command);
 			}
 		}
@@ -1342,7 +1342,7 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			if (!entities.empty())
 			{
-				IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(m_allocator, entities, positions, rotations);
+				IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(entities, positions, rotations, m_allocator);
 				executeCommand(command);
 			}
 		}

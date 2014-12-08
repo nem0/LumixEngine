@@ -206,7 +206,7 @@ Geometry::~Geometry()
 }
 
 
-void Geometry::copy(IAllocator& allocator, const Geometry& source, int copy_count, IndexCallback index_callback, VertexCallback vertex_callback)
+void Geometry::copy(const Geometry& source, int copy_count, IndexCallback index_callback, VertexCallback vertex_callback, IAllocator& allocator)
 {
 	ASSERT(source.m_indices_data_size > 0);
 	ASSERT(m_indices_data_size == 0);

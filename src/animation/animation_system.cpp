@@ -313,7 +313,7 @@ namespace Lumix
 			virtual bool create() override
 			{
 				IAllocator& allocator = m_engine.getWorldEditor()->getAllocator();
-				m_engine.getWorldEditor()->registerProperty("animable", allocator.newObject<FilePropertyDescriptor<AnimationSceneImpl> >(allocator, "preview", &AnimationSceneImpl::getPreview, &AnimationSceneImpl::setPreview, "Animation (*.ani)"));
+				m_engine.getWorldEditor()->registerProperty("animable", allocator.newObject<FilePropertyDescriptor<AnimationSceneImpl> >("preview", &AnimationSceneImpl::getPreview, &AnimationSceneImpl::setPreview, "Animation (*.ani)", allocator));
 				m_animation_manager.create(ResourceManager::ANIMATION, m_engine.getResourceManager());
 				return true;
 			}
