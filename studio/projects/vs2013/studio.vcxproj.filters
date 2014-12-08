@@ -35,6 +35,12 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
+    <Filter Include="Header Files\..\..\property_view">
+      <UniqueIdentifier>{8f5b6976-536d-47bd-ab62-d5dfc3077dca}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\..\..\property_view">
+      <UniqueIdentifier>{526c0ae5-9f02-4cc1-811b-116e91c896c1}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Source Files\.." />
@@ -357,5 +363,22 @@
     <CustomBuild Include="..\..\property_view.ui">
       <Filter>Form Files\..\..</Filter>
     </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\property_view\component_property_object.h">
+      <Filter>Header Files\..\..\property_view</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\property_view\file_edit.h">
+      <Filter>Header Files\..\..\property_view</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\property_view\terrain_editor.h">
+      <Filter>Header Files\..\..\property_view</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\property_view\instance_object.h">
+      <Filter>Header Files\..\..\property_view</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\property_view\getter_setter_object.h">
+      <Filter>Header Files\..\..\property_view</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
