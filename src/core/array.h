@@ -142,26 +142,14 @@ class Array<T, false>
 			m_size = size;
 		}
 
-		template<typename P1, typename... Params>
-		T& emplace(const P1& p1, Params... params)
+		template<typename ...Params>
+		T& emplace(Params&& ...params)
 		{
 			if (m_size == m_capacity)
 			{
 				grow();
 			}
-			new ((char*)(m_data + m_size)) T(p1, params...);
-			++m_size;
-			return m_data[m_size - 1];
-		}
-
-		template<typename P1, typename... Params>
-		T& emplace(P1& p1, Params... params)
-		{
-			if (m_size == m_capacity)
-			{
-				grow();
-			}
-			new ((char*)(m_data + m_size)) T(p1, params...);
+			new ((char*)(m_data + m_size)) T(std::forward<Params>(params)...);
 			++m_size;
 			return m_data[m_size - 1];
 		}

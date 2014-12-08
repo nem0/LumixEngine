@@ -355,7 +355,7 @@ bool Model::parseMeshes(FS::IFile* file)
 
 		VertexDef def;
 		parseVertexDef(file, &def);
-		m_meshes.emplace(m_allocator, def, material, attribute_array_offset, attribute_array_size, indices_offset, mesh_tri_count * 3, mesh_name);
+		m_meshes.emplace(def, material, attribute_array_offset, attribute_array_size, indices_offset, mesh_tri_count * 3, mesh_name, m_allocator);
 		addDependency(*material);
 	}
 	return true;

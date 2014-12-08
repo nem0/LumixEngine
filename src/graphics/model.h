@@ -35,7 +35,7 @@ namespace FS
 class Mesh
 {
 	public:
-		Mesh(IAllocator& allocator, const VertexDef& def, Material* mat, int attribute_array_offset, int attribute_array_size, int indices_offset, int index_count, const char* name)
+		Mesh(const VertexDef& def, Material* mat, int attribute_array_offset, int attribute_array_size, int indices_offset, int index_count, const char* name, IAllocator& allocator)
 			: m_name(allocator)
 			, m_vertex_def(def)
 		{

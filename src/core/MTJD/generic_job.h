@@ -18,7 +18,7 @@ namespace MTJD
 	class GenericJob : public MTJD::Job
 	{
 		public:
-			GenericJob(IAllocator& allocator, MTJD::Manager& manager, T function)
+			GenericJob(MTJD::Manager& manager, T function, IAllocator& allocator)
 				: MTJD::Job(true, MTJD::Priority::Normal, false, manager, allocator)
 				, m_function(function)
 			{
@@ -35,9 +35,9 @@ namespace MTJD
 
 
 	template <class T>
-	MTJD::Job* makeJob(IAllocator& allocator, MTJD::Manager& manager, T function)
+	MTJD::Job* makeJob(MTJD::Manager& manager, T function, IAllocator& allocator)
 	{
-		return allocator.newObject<GenericJob<T> >(allocator, manager, function);
+		return allocator.newObject<GenericJob<T> >(manager, function, allocator);
 	}
 
 

@@ -59,7 +59,7 @@ class Geometry
 		void setAttributesData(const void* data, int size);
 		void setIndicesData(const void* data, int size);
 		void bindBuffers() const;
-		void copy(IAllocator& allocator, const Geometry& source, int copy_count, IndexCallback index_callback, VertexCallback vertex_callback);
+		void copy(const Geometry& source, int copy_count, IndexCallback index_callback, VertexCallback vertex_callback, IAllocator& allocator);
 		void clear();
 
 	private:
