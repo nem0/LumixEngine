@@ -121,12 +121,6 @@ void Material::doUnload(void)
 	onEmpty();
 }
 
-FS::ReadCallback Material::getReadCallback()
-{
-	FS::ReadCallback rc;
-	rc.bind<Material, &Material::loaded>(this);
-	return rc;
-}
 
 bool Material::save(JsonSerializer& serializer)
 {
@@ -386,7 +380,7 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	PROFILE_FUNCTION();
 	if(success)
 	{
-		JsonSerializer serializer(m_allocator, *file, JsonSerializer::READ, m_path.c_str());
+		JsonSerializer serializer(*file, JsonSerializer::READ, m_path.c_str(), m_allocator);
 		serializer.deserializeObjectBegin();
 		char path[LUMIX_MAX_PATH];
 		char label[256];

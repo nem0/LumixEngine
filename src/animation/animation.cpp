@@ -190,11 +190,4 @@ void Animation::doUnload(void)
 }
 
 
-FS::ReadCallback Animation::getReadCallback(void)
-{
-	FS::ReadCallback cb;
-	cb.bind<Animation, &Animation::loaded>(this);
-	return cb;
-}
-
 } // ~namespace Lumix

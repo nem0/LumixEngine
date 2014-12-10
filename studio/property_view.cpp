@@ -975,7 +975,7 @@ void createEditor(PropertyView& view, QTreeWidgetItem* item, InstanceObject<Lumi
 		if(file)
 		{
 			Lumix::DefaultAllocator allocator;
-			Lumix::JsonSerializer serializer(allocator, *file, Lumix::JsonSerializer::AccessMode::WRITE, material->getValue()->getPath().c_str());
+			Lumix::JsonSerializer serializer(*file, Lumix::JsonSerializer::AccessMode::WRITE, material->getValue()->getPath().c_str(), allocator);
 			material->getValue()->save(serializer);
 			fs.close(file);
 

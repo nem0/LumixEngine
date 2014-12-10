@@ -296,14 +296,6 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	virtual FS::ReadCallback getReadCallback() override
-	{
-		FS::ReadCallback cb;
-		cb.bind<PipelineImpl, &PipelineImpl::loaded>(this);
-		return cb;
-	}
-
-
 	CommandCreator::Creator& addCommandCreator(const char* type)
 	{
 		CommandCreator& creator = m_command_creators.pushEmpty();
@@ -386,11 +378,11 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void loaded(FS::IFile* file, bool success, FS::FileSystem& fs) 
+	virtual void loaded(FS::IFile* file, bool success, FS::FileSystem& fs) override
 	{
 		if(success)
 		{
-			JsonSerializer serializer(m_allocator, *file, JsonSerializer::READ, m_path.c_str());
+			JsonSerializer serializer(*file, JsonSerializer::READ, m_path.c_str(), m_allocator);
 			deserialize(serializer);
 			decrementDepCount();
 		}
@@ -851,19 +843,28 @@ struct PipelineInstanceImpl : public PipelineInstance
 			}
 			bindGeometry(*m_renderer, info->m_mesh->m_model->getGeometry(), *mesh_context.m_mesh);
 			last_key = info->m_key;
-			while (last_key == info->m_key)
+			if (info->m_mesh->m_pose->getCount() > 0)
 			{
-				const RenderableMesh* LUMIX_RESTRICT renderable_mesh = info->m_mesh;
-				const Matrix& world_matrix = *renderable_mesh->m_matrix;
-				setUniform(mesh_context.m_world_matrix_uniform_location, world_matrix);
-
-				if (renderable_mesh->m_pose->getCount() > 0)
+				while (last_key == info->m_key)
 				{
+					const RenderableMesh* LUMIX_RESTRICT renderable_mesh = info->m_mesh;
+					const Matrix& world_matrix = *renderable_mesh->m_matrix;
+					setUniform(mesh_context.m_world_matrix_uniform_location, world_matrix);
 					setPoseUniform(renderable_mesh, mesh_context);
+					renderGeometry(mesh_context.m_indices_offset, mesh_context.m_vertex_count);
+					++info;
 				}
-
-				renderGeometry(mesh_context.m_indices_offset, mesh_context.m_vertex_count);
-				++info;
+			}
+			else
+			{
+				while (last_key == info->m_key)
+				{
+					const RenderableMesh* LUMIX_RESTRICT renderable_mesh = info->m_mesh;
+					const Matrix& world_matrix = *renderable_mesh->m_matrix;
+					setUniform(mesh_context.m_world_matrix_uniform_location, world_matrix);
+					renderGeometry(mesh_context.m_indices_offset, mesh_context.m_vertex_count);
+					++info;
+				}
 			}
 		}
 	}
@@ -1108,7 +1109,7 @@ void DrawScreenQuadCommand::deserialize(PipelineImpl& pipeline, JsonSerializer& 
 	char material_path[LUMIX_MAX_PATH];
 	serializer.deserializeArrayItem(material_path, LUMIX_MAX_PATH, "");
 	Material* material = static_cast<Material*>(pipeline.getResourceManager().get(ResourceManager::MATERIAL)->load(Path(material_path)));
-	m_mesh = m_allocator.newObject<Mesh>(m_allocator, def, material, 0, 0, sizeof(v), 6, "screen_quad");
+	m_mesh = m_allocator.newObject<Mesh>(def, material, 0, 0, sizeof(v), 6, "screen_quad", m_allocator);
 }
 
 

@@ -55,12 +55,11 @@ namespace Lumix
 			~BitmapFont() { ASSERT(isEmpty()); }
 
 			virtual void doUnload(void) override;
-			virtual FS::ReadCallback getReadCallback(void) override;
 			const Character* getCharacter(char character) const;
 			Material* getMaterial() const { return m_material; }
 
 		private:
-			void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
+			virtual void loaded(FS::IFile* file, bool success, FS::FileSystem& fs) override;
 			void materialLoaded(Resource::State, Resource::State new_state);
 
 		private:
