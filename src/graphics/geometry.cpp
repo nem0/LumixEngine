@@ -123,11 +123,6 @@ void VertexDef::begin(Shader& shader, int start_offset) const
 		switch(m_attributes[i])
 		{
 			case VertexAttributeDef::POSITION:
-				glEnableVertexAttribArray(attrib_id);
-				glVertexAttribPointer(attrib_id, 3, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
-				offset += sizeof(GLfloat) * 3;
-				++shader_attrib_idx;
-				break;
 			case VertexAttributeDef::NORMAL:
 				glEnableVertexAttribArray(attrib_id);
 				glVertexAttribPointer(attrib_id, 3, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
@@ -135,11 +130,6 @@ void VertexDef::begin(Shader& shader, int start_offset) const
 				++shader_attrib_idx;
 				break;
 			case VertexAttributeDef::TEXTURE_COORDS:
-				glEnableVertexAttribArray(attrib_id);
-				glVertexAttribPointer(attrib_id, 2, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
-				offset += sizeof(GLfloat) * 2;
-				++shader_attrib_idx;
-				break;
 			case VertexAttributeDef::FLOAT2:
 				glEnableVertexAttribArray(attrib_id);
 				glVertexAttribPointer(attrib_id, 2, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
@@ -216,7 +206,7 @@ Geometry::~Geometry()
 }
 
 
-void Geometry::copy(IAllocator& allocator, const Geometry& source, int copy_count, IndexCallback index_callback, VertexCallback vertex_callback)
+void Geometry::copy(const Geometry& source, int copy_count, IndexCallback index_callback, VertexCallback vertex_callback, IAllocator& allocator)
 {
 	ASSERT(source.m_indices_data_size > 0);
 	ASSERT(m_indices_data_size == 0);

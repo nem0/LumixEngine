@@ -15,6 +15,8 @@
 #include "graphics/pose.h"
 #include "graphics/renderer.h"
 
+#include <cfloat>
+
 
 namespace Lumix
 {
@@ -121,6 +123,18 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 	hit.m_dir = dir;
 	return hit;
 }
+
+
+LODMeshIndices Model::getLODMeshIndices(float squared_distance) const
+{
+	int i = 0;
+	while (squared_distance >= m_lods[i].m_distance)
+	{
+		++i;
+	}
+	return LODMeshIndices(m_lods[i].m_from_mesh, m_lods[i].m_to_mesh);
+}
+
 
 void Model::getPose(Pose& pose)
 {
@@ -341,11 +355,31 @@ bool Model::parseMeshes(FS::IFile* file)
 
 		VertexDef def;
 		parseVertexDef(file, &def);
-		m_meshes.emplace(m_allocator, def, material, attribute_array_offset, attribute_array_size, indices_offset, mesh_tri_count * 3, mesh_name);
+		m_meshes.emplace(def, material, attribute_array_offset, attribute_array_size, indices_offset, mesh_tri_count * 3, mesh_name, m_allocator);
 		addDependency(*material);
 	}
 	return true;
 }
+
+
+bool Model::parseLODs(FS::IFile* file)
+{
+	int32_t lod_count;
+	file->read(&lod_count, sizeof(lod_count));
+	if (lod_count <= 0)
+	{
+		return false;
+	}
+	m_lods.resize(lod_count);
+	for (int i = 0; i < lod_count; ++i)
+	{
+		file->read(&m_lods[i].m_to_mesh, sizeof(m_lods[i].m_to_mesh));
+		file->read(&m_lods[i].m_distance, sizeof(m_lods[i].m_distance));
+		m_lods[i].m_from_mesh = i > 0 ? m_lods[i - 1].m_to_mesh + 1 : 0;
+	}
+	return true;
+}
+
 
 void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 { 
@@ -358,7 +392,8 @@ void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			&& header.m_version <= (uint32_t)ModelFileVersion::LATEST
 			&& parseMeshes(file)
 			&& parseGeometry(file)
-			&& parseBones(file))
+			&& parseBones(file)
+			&& parseLODs(file))
 		{
 			m_size = file->size();
 			decrementDepCount();
@@ -388,17 +423,11 @@ void Model::doUnload(void)
 	}
 	m_meshes.clear();
 	m_bones.clear();
+	m_lods.clear();
 	m_geometry_buffer_object.clear();
 
 	m_size = 0;
 	onEmpty();
-}
-
-FS::ReadCallback Model::getReadCallback()
-{
-	FS::ReadCallback rc;
-	rc.bind<Model, &Model::loaded>(this);
-	return rc;
 }
 
 

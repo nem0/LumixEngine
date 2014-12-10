@@ -2,6 +2,7 @@
 #include "ui_assetbrowser.h"
 #include "file_system_watcher.h"
 #include "core/crc32.h"
+#include "core/log.h"
 #include "core/resource.h"
 #include "core/resource_manager.h"
 #include "editor/world_editor.h"
@@ -193,14 +194,19 @@ void AssetBrowser::on_listWidget_activated(const QModelIndex &index)
 	handleDoubleClick(info);
 }
 
-void AssetBrowser::on_exportFinished(int)
+void AssetBrowser::on_exportFinished(int exit_code)
 {
 	QProcess* process = static_cast<QProcess*>(QObject::sender());
-	QString s = process->readAll();;
+	QString s = process->readAll();
 	process->deleteLater();
 	while(process->waitForReadyRead())
 	{
 		s += process->readAll();
+	}
+	if (exit_code != 0)
+	{
+		auto msg = s.toLatin1();
+		Lumix::g_log_error.log("editor") << msg.data();
 	}
 }
 

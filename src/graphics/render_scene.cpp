@@ -63,7 +63,7 @@ namespace Lumix
 	class DebugTextsData
 	{
 		public:
-			DebugTextsData(IAllocator& allocator, Engine& engine)
+			DebugTextsData(Engine& engine, IAllocator& allocator)
 				: m_texts(allocator)
 				, m_allocator(allocator)
 				, m_font(NULL)
@@ -202,7 +202,7 @@ namespace Lumix
 				m_allocator.deleteObject(m_mesh);
 				m_geometry.setAttributesData(&data[0], sizeof(data[0]) * data.size());
 				m_geometry.setIndicesData(&indices[0], sizeof(indices[0]) * indices.size());
-				m_mesh = m_allocator.newObject<Mesh>(m_allocator, vertex_definition, m_font->getMaterial(), 0, sizeof(data[0]) * data.size(), 0, indices.size(), "");
+				m_mesh = m_allocator.newObject<Mesh>(vertex_definition, m_font->getMaterial(), 0, sizeof(data[0]) * data.size(), 0, indices.size(), "debug_texts", m_allocator);
 			}
 
 		private:
@@ -320,7 +320,7 @@ namespace Lumix
 				, m_temporary_infos(m_allocator)
 				, m_sync_point(true, m_allocator)
 				, m_jobs(m_allocator)
-				, m_debug_texts(m_allocator, engine)
+				, m_debug_texts(engine, m_allocator)
 			{
 				m_universe.entityMoved().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 				m_timer = Timer::create(m_allocator);
@@ -892,10 +892,6 @@ namespace Lumix
 			{
 				Renderable& r = *m_renderables[getRenderable(cmp.index)];
 				r.m_scale = scale;
-				for (int i = 0; i < r.m_meshes.size(); ++i)
-				{
-					r.m_meshes[i].m_scale = scale;
-				}
 			}
 
 
@@ -1090,7 +1086,7 @@ namespace Lumix
 			}
 
 
-			void fillTemporaryInfos(const CullingSystem::Results& results, int64_t layer_mask)
+			void fillTemporaryInfos(const CullingSystem::Results& results, const Frustum& frustum, int64_t layer_mask)
 			{
 				PROFILE_FUNCTION();
 				m_jobs.clear();
@@ -1107,20 +1103,29 @@ namespace Lumix
 				{
 					Array<RenderableInfo>& subinfos = m_temporary_infos[subresult_index];
 					subinfos.clear();
-					MTJD::Job* job = MTJD::makeJob(m_allocator, m_engine.getMTJDManager(), [&subinfos, layer_mask, this, &results, subresult_index]()
+					MTJD::Job* job = MTJD::makeJob(m_engine.getMTJDManager(), [&subinfos, layer_mask, this, &results, subresult_index, &frustum]()
 						{
+							Vec3 frustum_position = frustum.getPosition();
 							const CullingSystem::Subresults& subresults = results[subresult_index];
 							for (int i = 0, c = subresults.size(); i < c; ++i)
 							{
 								const Renderable* LUMIX_RESTRICT renderable = m_renderables[subresults[i]];
-								for (int j = 0, c = renderable->m_meshes.size(); j < c; ++j)
+								const Model* LUMIX_RESTRICT model = renderable->m_model;
+								float squared_distance = (renderable->m_matrix.getTranslation() - frustum_position).squaredLength();
+								if (model && model->isReady())
 								{
-									RenderableInfo& info = subinfos.pushEmpty();
-									info.m_mesh = &renderable->m_meshes[j];
-									info.m_key = (int64_t)renderable->m_meshes[j].m_mesh;
+									LODMeshIndices lod = model->getLODMeshIndices(squared_distance);
+									for (int j = lod.getFrom(), c = lod.getTo(); j <= c; ++j)
+									{
+										RenderableInfo& info = subinfos.pushEmpty();
+										info.m_mesh = &renderable->m_meshes[j];
+										info.m_key = (int64_t)renderable->m_meshes[j].m_mesh;
+									}
 								}
 							}
-						});
+						}
+						, m_allocator
+					);
 					job->addDependency(&m_sync_point);
 					m_jobs.push(job);
 				}
@@ -1138,7 +1143,7 @@ namespace Lumix
 					return;
 				}
 
-				fillTemporaryInfos(*results, layer_mask);
+				fillTemporaryInfos(*results, frustum, layer_mask);
 				mergeTemporaryInfos(all_infos);
 
 				for (int i = 0, c = m_always_visible.size(); i < c; ++i)
@@ -1511,7 +1516,6 @@ namespace Lumix
 				for (int j = 0; j < model->getMeshCount(); ++j)
 				{
 					RenderableMesh& info = m_renderables[renderable_index]->m_meshes.pushEmpty();
-					info.m_scale = m_renderables[renderable_index]->m_scale;
 					info.m_mesh = &model->getMesh(j);
 					info.m_pose = &m_renderables[renderable_index]->m_pose;
 					info.m_matrix = &m_renderables[renderable_index]->m_matrix;
