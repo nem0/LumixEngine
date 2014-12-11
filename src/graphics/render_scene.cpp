@@ -544,7 +544,10 @@ namespace Lumix
 				int32_t size = 0;
 				serializer.read(size);
 				m_lights.resize(size);
-				serializer.read(&m_lights[0], sizeof(m_lights[0]) * size);
+				if (!m_lights.empty())
+				{
+					serializer.read(&m_lights[0], sizeof(m_lights[0]) * size);
+				}
 				for (int i = 0; i < size; ++i)
 				{
 					m_lights[i].m_entity.universe = &m_universe;
