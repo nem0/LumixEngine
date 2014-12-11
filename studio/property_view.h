@@ -55,6 +55,20 @@ class PropertyViewObject : public QObject
 };
 
 
+class TypedObject
+{
+	public:
+		TypedObject(void* object, uint32_t type)
+			: m_object(object)
+			, m_type(type)
+		{}
+
+	public:
+		void* m_object;
+		uint32_t m_type;
+};
+
+
 class PropertyView : public QDockWidget
 {
 	Q_OBJECT
@@ -69,8 +83,9 @@ public:
 	void addResourcePlugin(PropertyViewObject::Creator plugin);
 	Lumix::Resource* getSelectedResource() const { return m_selected_resource; }
 	void setSelectedResourceFilename(const char* filename);
+	Lumix::Resource* getResource(const char* name);
 	void setSelectedResource(Lumix::Resource* resource);
-	void setObject(PropertyViewObject* object);
+	void setObject(TypedObject object);
 	PropertyViewObject* getObject();
 	void addTerrainCustomProperties(QTreeWidgetItem& item, const Lumix::Component& terrain_component);
 	void refresh();
@@ -91,7 +106,6 @@ private slots:
 
 
 private:
-	void createObjectEditor(QTreeWidgetItem* item, PropertyViewObject* object);
 	void clear();
 	void onUniverseCreated();
 	void onUniverseDestroyed();
@@ -101,8 +115,10 @@ private:
 	void updateSelectedEntityPosition();
 	void onSelectedResourceLoaded(Lumix::Resource::State old_state, Lumix::Resource::State new_state);
 
-private:
+public:
 	Ui::PropertyView* m_ui;
+
+private:
 	ScriptCompiler* m_compiler;
 	Lumix::Entity m_selected_entity;
 	Lumix::WorldEditor* m_world_editor;

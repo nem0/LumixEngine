@@ -40,6 +40,7 @@
 #include <qlineedit.h>
 #include <qpushbutton.h>
 #include <qtextstream.h>
+#include <functional>
 
 
 static const char* component_map[] =
@@ -61,67 +62,480 @@ static const uint32_t TERRAIN_HASH = crc32("terrain");
 static const uint32_t SCRIPT_HASH = crc32("script");
 
 
-void createEditor(PropertyView&, QTreeWidgetItem* item, InstanceObject<Lumix::Material::Uniform, false>* uniform)
+#pragma region new_props
+
+
+void createComponentPropertyEditor(PropertyView& view, int array_index, Lumix::IPropertyDescriptor* desc, Lumix::Component& cmp, Lumix::Blob& stream, QTreeWidgetItem* property_item);
+
+
+#pragma region object_basic
+
+
+void addEdit(const char* name, QTreeWidgetItem* item, int value)
 {
-	switch (uniform->getValue()->m_type)
+	QTreeWidgetItem* subitem = new QTreeWidgetItem();
+	item->insertChild(0, subitem);
+	subitem->setText(0, name);
+	subitem->setText(1, QString::number(value));
+}
+
+
+void addEdit(const char* name, QTreeWidgetItem* item, float value)
+{
+	QTreeWidgetItem* subitem = new QTreeWidgetItem();
+	item->insertChild(0, subitem);
+	subitem->setText(0, name);
+	subitem->setText(1, QString::number(value));
+}
+
+
+void addEdit(PropertyView& view, const char* name, QTreeWidgetItem* item, Lumix::Component value)
+{
+	QTreeWidgetItem* subitem = new QTreeWidgetItem();
+	item->addChild(subitem);
+	subitem->setText(0, name);
+
+	QWidget* widget = new QWidget();
+	QHBoxLayout* layout = new QHBoxLayout(widget);
+	layout->setContentsMargins(0, 0, 0, 0);
+	QPushButton* button = new QPushButton(" - ");
+	button->connect(button, &QPushButton::clicked, [subitem, &view, value]()
 	{
-		case Lumix::Material::Uniform::FLOAT:
-			{
-				QDoubleSpinBox* spinbox = new QDoubleSpinBox();
-				spinbox->setValue(uniform->getValue()->m_float);
-				item->treeWidget()->setItemWidget(item, 1, spinbox);
-				spinbox->setMaximum(FLT_MAX);
-				spinbox->setMinimum(-FLT_MAX);
-				spinbox->connect(spinbox, (void (QDoubleSpinBox::*)(double))&QDoubleSpinBox::valueChanged, [uniform](double new_value)
-				{
-					uniform->getValue()->m_float = (float)new_value;
-				});
-			}
-			break;
-		default:
-			ASSERT(false);
-			break;
+		subitem->parent()->removeChild(subitem);
+		view.getWorldEditor()->destroyComponent(value);
+	});
+	layout->addStretch(1);
+	layout->addWidget(button);
+	subitem->treeWidget()->setItemWidget(subitem, 1, widget);
+
+
+	Lumix::Blob stream(view.getWorldEditor()->getAllocator());
+	auto& descriptors = view.getWorldEditor()->getPropertyDescriptors(value.type);
+	for (int j = 0; j < descriptors.size(); ++j)
+	{
+		stream.clearBuffer();
+		auto desc = descriptors[j];
+
+		createComponentPropertyEditor(view, -1, desc, value, stream, subitem);
 	}
-	
 }
 
 
-void createEditor(PropertyView&, QTreeWidgetItem* item, InstanceObject<Lumix::Texture, false>* texture)
+template <typename T>
+void addEdit(const char* name, QTreeWidgetItem* item, T* object, bool (T::*getter)() const, void (T::*setter)(bool))
 {
-	item->setText(1, texture->getValue()->getPath().c_str());
+	QTreeWidgetItem* subitem = new QTreeWidgetItem();
+	item->addChild(subitem);
+	subitem->setText(0, name);
+
+	QCheckBox* checkbox = new QCheckBox();
+	checkbox->setChecked((object->*getter)());
+	subitem->treeWidget()->setItemWidget(subitem, 1, checkbox);
+
+	checkbox->connect(checkbox, &QCheckBox::stateChanged, [object, setter](bool new_state){
+		(object->*setter)(new_state);
+	});
 }
 
 
-void createEditor(PropertyView& view, QTreeWidgetItem* item, InstanceObject<Lumix::Shader, false>* shader)
+template <typename Setter>
+void addEdit(const char* name, QTreeWidgetItem* item, bool value, Setter setter)
+{
+	QTreeWidgetItem* subitem = new QTreeWidgetItem();
+	item->addChild(subitem);
+	subitem->setText(0, name);
+
+	QCheckBox* checkbox = new QCheckBox();
+	checkbox->setChecked(value);
+	subitem->treeWidget()->setItemWidget(subitem, 1, checkbox);
+
+	checkbox->connect(checkbox, &QCheckBox::stateChanged, [value, setter](bool new_state){
+		setter(new_state);
+	});
+}
+
+
+template <typename Setter>
+void addResourceEdit(PropertyView& view, const char* name, QTreeWidgetItem* item, Lumix::Resource* value, Setter setter)
+{
+	QTreeWidgetItem* subitem = new QTreeWidgetItem();
+	item->addChild(subitem);
+	subitem->setText(0, name);
+
+	QWidget* widget = new QWidget();
+	FileEdit* edit = new FileEdit(widget, NULL);
+	edit->setText(value->getPath().c_str());
+	edit->setServer(view.getWorldEditor());
+	QHBoxLayout* layout = new QHBoxLayout(widget);
+	layout->addWidget(edit);
+	layout->setContentsMargins(0, 0, 0, 0);
+	QPushButton* button = new QPushButton("...", widget);
+	layout->addWidget(button);
+	button->connect(button, &QPushButton::clicked, [&view, setter, edit]()
+	{
+		QString str = QFileDialog::getOpenFileName(NULL, QString(), QString()/*, dynamic_cast<Lumix::IFilePropertyDescriptor&>(m_descriptor).getFileType()*/); TODO("todo");
+		if (str != "")
+		{
+			char rel_path[LUMIX_MAX_PATH];
+			QByteArray byte_array = str.toLatin1();
+			const char* text = byte_array.data();
+			view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, Lumix::Path(text));
+			setter(rel_path);
+			edit->setText(rel_path);
+		}
+	});
+
+	QPushButton* button2 = new QPushButton("->", widget);
+	layout->addWidget(button2);
+	button2->connect(button2, &QPushButton::clicked, [value, &view, edit]()
+	{
+		view.setObject(TypedObject(value, 1));
+	});
+
+	subitem->treeWidget()->setItemWidget(subitem, 1, widget);
+	edit->connect(edit, &QLineEdit::editingFinished, [setter, edit]()
+	{
+		QByteArray byte_array = edit->text().toLatin1();
+		setter(byte_array.data());
+	});
+}
+
+
+template <typename Setter>
+void addFileEdit(PropertyView& view, const char* name, QTreeWidgetItem* item, const char* value, Setter setter)
+{
+	QTreeWidgetItem* subitem = new QTreeWidgetItem();
+	item->addChild(subitem);
+	subitem->setText(0, name);
+
+	QWidget* widget = new QWidget();
+	FileEdit* edit = new FileEdit(widget, NULL);
+	edit->setText(value);
+	edit->setServer(view.getWorldEditor());
+	QHBoxLayout* layout = new QHBoxLayout(widget);
+	layout->addWidget(edit);
+	layout->setContentsMargins(0, 0, 0, 0);
+	QPushButton* button = new QPushButton("...", widget);
+	layout->addWidget(button);
+	button->connect(button, &QPushButton::clicked, [&view, setter, edit]()
+	{
+		QString str = QFileDialog::getOpenFileName(NULL, QString(), QString()/*, dynamic_cast<Lumix::IFilePropertyDescriptor&>(m_descriptor).getFileType()*/); TODO("todo");
+		if (str != "")
+		{
+			char rel_path[LUMIX_MAX_PATH];
+			QByteArray byte_array = str.toLatin1();
+			const char* text = byte_array.data();
+			view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, Lumix::Path(text));
+			setter(rel_path);
+			edit->setText(rel_path);
+		}
+	});
+
+	QPushButton* button2 = new QPushButton("->", widget);
+	layout->addWidget(button2);
+	/*if (m_descriptor.getType() == Lumix::IPropertyDescriptor::RESOURCE)
+	{
+		button2->connect(button2, &QPushButton::clicked, [&view, edit]()
+		{
+			view.setSelectedResourceFilename(edit->text().toLatin1().data());
+		});
+	}
+	else
+	{*/
+		button2->connect(button2, &QPushButton::clicked, [edit]()
+		{
+			QDesktopServices::openUrl(QUrl::fromLocalFile(edit->text()));
+		});
+	//}
+
+	subitem->treeWidget()->setItemWidget(subitem, 1, widget);
+	edit->connect(edit, &QLineEdit::editingFinished, [setter, edit]()
+	{
+		QByteArray byte_array = edit->text().toLatin1();
+		setter(byte_array.data());
+	});
+}
+
+
+
+template <typename Setter>
+void addEdit(const char* name, QTreeWidgetItem* item, Lumix::Vec3 value, Setter setter)
+{
+	QTreeWidgetItem* subitem = new QTreeWidgetItem();
+	item->addChild(subitem);
+	subitem->setText(0, name);
+
+	subitem->setText(1, QString("%1; %2; %3").arg(value.x).arg(value.y).arg(value.z));
+
+	QDoubleSpinBox* sb1 = new QDoubleSpinBox();
+	sb1->setValue(value.x);
+	subitem->insertChild(0, new QTreeWidgetItem(QStringList() << "x"));
+	subitem->treeWidget()->setItemWidget(subitem->child(0), 1, sb1);
+
+	QDoubleSpinBox* sb2 = new QDoubleSpinBox();
+	sb2->setValue(value.y);
+	subitem->insertChild(1, new QTreeWidgetItem(QStringList() << "y"));
+	subitem->treeWidget()->setItemWidget(subitem->child(1), 1, sb2);
+
+	QDoubleSpinBox* sb3 = new QDoubleSpinBox();
+	sb3->setValue(value.z);
+	subitem->insertChild(2, new QTreeWidgetItem(QStringList() << "z"));
+	subitem->treeWidget()->setItemWidget(subitem->child(2), 1, sb3);
+
+	sb1->connect(sb1, (void (QDoubleSpinBox::*)(double))&QDoubleSpinBox::valueChanged, [setter, sb1, sb2, sb3](double)
+	{
+		Lumix::Vec3 value;
+		value.set((float)sb1->value(), (float)sb2->value(), (float)sb3->value());
+		setter(value);
+	});
+
+	sb2->connect(sb2, (void (QDoubleSpinBox::*)(double))&QDoubleSpinBox::valueChanged, [setter, sb1, sb2, sb3](double)
+	{
+		Lumix::Vec3 value;
+		value.set((float)sb1->value(), (float)sb2->value(), (float)sb3->value());
+		setter(value);
+	});
+
+	sb3->connect(sb3, (void (QDoubleSpinBox::*)(double))&QDoubleSpinBox::valueChanged, [setter, sb1, sb2, sb3](double)
+	{
+		Lumix::Vec3 value;
+		value.set((float)sb1->value(), (float)sb2->value(), (float)sb3->value());
+		setter(value);
+	});
+}
+
+
+template <typename Setter>
+void addEdit(const char* name, QTreeWidgetItem* item, Lumix::Vec4 value, Setter setter)
+{
+	QTreeWidgetItem* subitem = new QTreeWidgetItem();
+	item->addChild(subitem);
+	subitem->setText(0, name);
+
+	QWidget* widget = new QWidget();
+	QHBoxLayout* layout = new QHBoxLayout(widget);
+	QColor color((int)(value.x * 255), (int)(value.y * 255), (int)(value.z * 255));
+	QLabel* label = new QLabel(color.name());
+	layout->setContentsMargins(0, 0, 0, 0);
+	layout->addWidget(label);
+	label->setStyleSheet(QString("QLabel { background-color : %1; }").arg(color.name()));
+	QPushButton* button = new QPushButton("...");
+	layout->addWidget(button);
+	subitem->treeWidget()->setItemWidget(subitem, 1, widget);
+	button->connect(button, &QPushButton::clicked, [setter, label, value]()
+	{
+		QColorDialog* dialog = new QColorDialog(QColor::fromRgbF(value.x, value.y, value.z, value.w));
+		dialog->setModal(false);
+		dialog->connect(dialog, &QColorDialog::currentColorChanged, [setter, label, dialog]()
+		{
+			QColor color = dialog->currentColor();
+			Lumix::Vec4 value;
+			value.x = color.redF();
+			value.y = color.greenF();
+			value.z = color.blueF();
+			value.w = color.alphaF();
+			label->setStyleSheet(QString("QLabel { background-color : %1; }").arg(color.name()));
+
+			setter(value);
+		});
+		dialog->show();
+	});
+}
+
+
+template <typename Setter>
+void addEdit(const char* name, QTreeWidgetItem* item, int value, Setter setter)
+{
+	QTreeWidgetItem* subitem = new QTreeWidgetItem();
+	item->addChild(subitem);
+	subitem->setText(0, name);
+	
+	QSpinBox* edit = new QSpinBox();
+	edit->setValue(value);
+	subitem->treeWidget()->setItemWidget(subitem, 1, edit);
+	edit->connect(edit, (void (QSpinBox::*)(int))&QSpinBox::valueChanged, [setter](int new_value)
+	{
+		setter(new_value);
+	});
+
+}
+
+
+template <typename Setter>
+void addEdit(const char* name, QTreeWidgetItem* item, const char* value, Setter setter)
+{
+	QTreeWidgetItem* subitem = new QTreeWidgetItem();
+	item->addChild(subitem);
+	subitem->setText(0, name);
+
+	QLineEdit* edit = new QLineEdit();
+	subitem->treeWidget()->setItemWidget(subitem, 1, edit);
+	edit->setText(value);
+	edit->connect(edit, &QLineEdit::editingFinished, [edit, setter]()
+	{
+		QByteArray byte_array = edit->text().toLatin1();
+		const char* text = byte_array.data();
+		setter(text);
+	});
+}
+
+
+template <typename Setter>
+void addEdit(const char* name, QTreeWidgetItem* item, float value, Setter setter)
+{
+	QTreeWidgetItem* subitem = new QTreeWidgetItem();
+	item->addChild(subitem);
+	subitem->setText(0, name);
+
+	QDoubleSpinBox* edit = new QDoubleSpinBox();
+	edit->setMaximum(FLT_MAX);
+	edit->setDecimals(4);
+	edit->setSingleStep(0.001);
+	edit->setValue(value);
+	subitem->treeWidget()->setItemWidget(subitem, 1, edit);
+	edit->connect(edit, (void (QDoubleSpinBox::*)(double))&QDoubleSpinBox::valueChanged, [setter](double new_value)
+	{
+		setter((float)new_value);
+	});
+}
+
+
+template <typename T, typename T2>
+void addEdit(PropertyView& view, const char* name, QTreeWidgetItem* item, T* object, T2* (T::*getter)() const, void(*editor_creator)(PropertyView&, QTreeWidgetItem*, TypedObject, const char*))
+{
+	QTreeWidgetItem* subitem = new QTreeWidgetItem();
+	item->addChild(subitem);
+	subitem->setText(0, name);
+	
+	editor_creator(view, subitem, TypedObject(object, 0), name);
+}
+
+
+template <typename Object, typename Setter, typename SelectorCreator>
+void addEdit(PropertyView& view, const char* name, QTreeWidgetItem* item, Object object, Setter setter, SelectorCreator selector_creator, void(*editor_creator)(PropertyView&, QTreeWidgetItem*, TypedObject, const char*))
+{
+	QTreeWidgetItem* subitem = new QTreeWidgetItem();
+	item->addChild(subitem);
+	subitem->setText(0, name);
+
+	selector_creator(view, subitem, object, setter);
+	if (editor_creator)
+	{
+		editor_creator(view, subitem, TypedObject(object, 0), name);
+	}
+}
+
+
+template <typename Getter, typename Namer, typename Counter>
+void addArray(
+	PropertyView& view
+	, const char* name
+	, QTreeWidgetItem* item
+	, Getter getter
+	, Namer namer
+	, Counter counter
+	)
+{
+	QTreeWidgetItem* subitem = new QTreeWidgetItem();
+	subitem->setText(0, name);
+	if (item != NULL)
+	{
+		item->addChild(subitem);
+		subitem->setText(0, name);
+	}
+	else
+	{
+		view.m_ui->propertyList->insertTopLevelItem(0, subitem);
+	}
+
+	for (int i = 0; i < counter(); ++i)
+	{
+		addEdit(view, namer(i), subitem, getter(i));
+	}
+}
+
+template <typename T, typename T2, typename T3, typename SelectorCreator>
+void addArray(
+	PropertyView& view
+	, const char* name
+	, QTreeWidgetItem* item
+	, T* object
+	, T2 (T::*getter)(int) const
+	, void (T::*setter)(int, T3)
+	, int (T::*counter)() const
+	, SelectorCreator selector_creator
+	, void(*editor_creator)(PropertyView&, QTreeWidgetItem*, TypedObject, const char*)
+)
+{
+	QTreeWidgetItem* subitem = new QTreeWidgetItem();
+	item->addChild(subitem);
+	subitem->setText(0, name);
+	subitem->setText(1, QString("%1 items").arg((object->*counter)()));
+
+	for (int i = 0; i < (object->*counter)(); ++i)
+	{
+		auto subsubitem_name = QString::number(i + 1).toLatin1();
+
+		addEdit(view, subsubitem_name, subitem, (object->*getter)(i), [setter, object, i](T3 v) { (object->*setter)(i, v); }, selector_creator, editor_creator);
+	}
+}
+
+
+#pragma endregion
+
+
+#pragma region resources
+
+
+void createTextureEditor(PropertyView& view, QTreeWidgetItem* item, TypedObject object, const char* name)
+{
+	auto* texture = static_cast<Lumix::Texture*>(object.m_object);
+	item->setText(0, name);
+	item->setText(1, texture->getPath().c_str());
+
+	addEdit("Width", item, texture->getWidth());
+	addEdit("Height", item, texture->getHeight());
+	
+	QTreeWidgetItem* subitem = new QTreeWidgetItem();
+	item->addChild(subitem);
+	subitem->setText(0, "Preview");
+	subitem->setText(1, "Loading...");
+	
+	QLabel* image_label = new QLabel();
+	subitem->treeWidget()->setItemWidget(subitem, 1, image_label);
+	QImage image(texture->getPath().c_str());
+	image_label->setPixmap(QPixmap::fromImage(image).scaledToHeight(100));
+	image_label->adjustSize();
+	TODO("Find out why this does not work anymore!");
+}
+
+
+void createResourceSelector(PropertyView& view, QTreeWidgetItem* item, Lumix::Resource* resource, std::function<void (const Lumix::Path&)> setter)
 {
 	QWidget* widget = new QWidget();
 	QHBoxLayout* layout = new QHBoxLayout(widget);
 	FileEdit* edit = new FileEdit(NULL, &view);
-	edit->setText(shader->getValue()->getPath().c_str());
+	edit->setText(resource->getPath().c_str());
 	layout->addWidget(edit);
 	layout->setContentsMargins(0, 0, 0, 0);
 	item->treeWidget()->setItemWidget(item, 1, widget);
-	edit->connect(edit, &FileEdit::editingFinished, [shader, edit]()
+	edit->connect(edit, &FileEdit::editingFinished, [setter, resource, edit]()
 	{
-		auto material = static_cast<InstanceObject<Lumix::Material, false>* >(shader->getParent())->getValue();
-		auto shader = static_cast<Lumix::Shader*>(material->getResourceManager().get(Lumix::ResourceManager::SHADER)->load(Lumix::Path(edit->text().toLatin1().data())));
-		material->setShader(shader);
+		setter(Lumix::Path(edit->text().toLatin1().data()));
 	});
 	QPushButton* button = new QPushButton("...");
 	layout->addWidget(button);
-	button->connect(button, &QPushButton::clicked, [&view, shader, edit]()
+	button->connect(button, &QPushButton::clicked, [setter, &view, resource, edit]()
 	{
-		QString str = QFileDialog::getOpenFileName(NULL, QString(), QString(), "Shader (*.shd)");
-		if(str != "")
+		QString str = QFileDialog::getOpenFileName(NULL, QString(), QString(), "All files (*.*)");
+		if (str != "")
 		{
 			char rel_path[LUMIX_MAX_PATH];
 			QByteArray byte_array = str.toLatin1();
 			const char* text = byte_array.data();
 			view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, Lumix::Path(text));
 
-			auto material = static_cast<InstanceObject<Lumix::Material, false>* >(shader->getParent())->getValue();
-			auto shader = static_cast<Lumix::Shader*>(material->getResourceManager().get(Lumix::ResourceManager::SHADER)->load(Lumix::Path(rel_path)));
-			material->setShader(shader);
+			setter(Lumix::Path(rel_path));
 
 			edit->setText(rel_path);
 		}
@@ -136,28 +550,14 @@ void createEditor(PropertyView& view, QTreeWidgetItem* item, InstanceObject<Lumi
 }
 
 
-void createEditor(PropertyView&, QTreeWidgetItem* item, InstanceObject<Lumix::Model, false>* model)
+void createMaterialEditor(PropertyView& view, QTreeWidgetItem* subitem, TypedObject object, const char* name)
 {
-	item->setText(1, model->getValue()->getPath().c_str());
-}
-
-
-void createImageEditor(PropertyView&, QTreeWidgetItem* item, InstanceObject<Lumix::Texture, false>* texture)
-{
-	QLabel* image_label = new QLabel();
-	item->treeWidget()->setItemWidget(item, 1, image_label);
-	QImage image(texture->getValue()->getPath().c_str());
-	image_label->setPixmap(QPixmap::fromImage(image).scaledToHeight(100));
-	image_label->adjustSize();
-}
-
-
-void createEditor(PropertyView& view, QTreeWidgetItem* item, InstanceObject<Lumix::Material, false>* material)
-{
+	subitem->setText(0, name);
+	Lumix::Material* material = (Lumix::Material*)object.m_object;
 	QWidget* widget = new QWidget();
 	QHBoxLayout* layout = new QHBoxLayout(widget);
 	layout->setContentsMargins(0, 0, 0, 0);
-	QLabel* label = new QLabel(material->getValue()->getPath().c_str());
+	QLabel* label = new QLabel(material->getPath().c_str());
 	layout->addWidget(label);
 	QPushButton* button = new QPushButton("Save");
 	QPushButton* go_button = new QPushButton("->");
@@ -165,7 +565,7 @@ void createEditor(PropertyView& view, QTreeWidgetItem* item, InstanceObject<Lumi
 	layout->addWidget(go_button);
 	go_button->connect(go_button, &QPushButton::clicked, [material]()
 	{
-		QDesktopServices::openUrl(QUrl::fromLocalFile(material->getValue()->getPath().c_str()));
+		QDesktopServices::openUrl(QUrl::fromLocalFile(material->getPath().c_str()));
 	});
 
 	button->connect(button, &QPushButton::clicked, [material, &view]()
@@ -173,267 +573,237 @@ void createEditor(PropertyView& view, QTreeWidgetItem* item, InstanceObject<Lumi
 		Lumix::FS::FileSystem& fs = view.getWorldEditor()->getEngine().getFileSystem();
 		// use temporary because otherwise the material is reloaded during saving
 		char tmp_path[LUMIX_MAX_PATH];
-		strcpy(tmp_path, material->getValue()->getPath().c_str());
+		strcpy(tmp_path, material->getPath().c_str());
 		strcat(tmp_path, ".tmp");
 		Lumix::FS::IFile* file = fs.open(fs.getDefaultDevice(), tmp_path, Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE);
-		if(file)
+		if (file)
 		{
 			Lumix::DefaultAllocator allocator;
-			Lumix::JsonSerializer serializer(*file, Lumix::JsonSerializer::AccessMode::WRITE, material->getValue()->getPath().c_str(), allocator);
-			material->getValue()->save(serializer);
+			Lumix::JsonSerializer serializer(*file, Lumix::JsonSerializer::AccessMode::WRITE, material->getPath().c_str(), allocator);
+			material->save(serializer);
 			fs.close(file);
 
-			QFile::remove(material->getValue()->getPath().c_str());
-			QFile::rename(tmp_path, material->getValue()->getPath().c_str());
+			QFile::remove(material->getPath().c_str());
+			QFile::rename(tmp_path, material->getPath().c_str());
 		}
 		else
 		{
-			Lumix::g_log_error.log("Material manager") << "Could not save file " << material->getValue()->getPath().c_str();
+			Lumix::g_log_error.log("Material manager") << "Could not save file " << material->getPath().c_str();
 		}
 	});
-	item->treeWidget()->setItemWidget(item, 1, widget);
+	subitem->treeWidget()->setItemWidget(subitem, 1, widget);
+
+	addEdit("Alpha cutout", subitem, material, &Lumix::Material::isAlphaCutout, &Lumix::Material::enableAlphaCutout);
+	addEdit("Alpha to coverage", subitem, material, &Lumix::Material::isAlphaToCoverage, &Lumix::Material::enableAlphaToCoverage);
+	addEdit("Backface culling", subitem, material, &Lumix::Material::isBackfaceCulling, &Lumix::Material::enableBackfaceCulling);
+	addEdit("Shadow receiver", subitem, material, &Lumix::Material::isShadowReceiver, &Lumix::Material::enableShadowReceiving);
+	addEdit("Z test", subitem, material, &Lumix::Material::isZTest, &Lumix::Material::enableZTest);
+
+	addEdit(view, "Shader", subitem, material->getShader(), [material](const Lumix::Path& path) { material->setShader(path); }, &createResourceSelector, NULL);
+
+	addArray(view, "Textures", subitem, material, &Lumix::Material::getTexture, &Lumix::Material::setTexturePath, &Lumix::Material::getTextureCount, &createResourceSelector, &createTextureEditor);
+};
+
+
+QTreeWidgetItem* newSubItem(QTreeWidgetItem* parent)
+{
+	QTreeWidgetItem* subitem = new QTreeWidgetItem();
+	parent->addChild(subitem);
+	return subitem;
 }
 
 
-void createEditor(PropertyView&, QTreeWidgetItem* item, InstanceObject<Lumix::Mesh, false>* mesh)
+void createModelEditor(PropertyView& view, QTreeWidgetItem* item, TypedObject object)
 {
-	item->setText(1, mesh->getValue()->getName());
-}
+	item->setText(0, "model");
+	auto* model = static_cast<Lumix::Model*>(object.m_object);
+	addEdit("Bones count", item, model->getBoneCount());
+	addEdit("Bounding radius", item, model->getBoundingRadius());
 
-
-void createComponentEditor(PropertyView& view, QTreeWidgetItem* item, InstanceObject<Lumix::Component, true>* component)
-{
-	if (component->getValue()->type == TERRAIN_HASH)
+	QTreeWidgetItem* meshes_item = new QTreeWidgetItem();
+	item->addChild(meshes_item);
+	meshes_item->setText(0, "Meshes");
+	for (int i = 0; i < model->getMeshCount(); ++i)
 	{
-		view.addTerrainCustomProperties(*item, *component->getValue());
-	}
-	else if (component->getValue()->type == SCRIPT_HASH)
-	{
-		view.addScriptCustomProperties(*item, *component->getValue());
+		auto& mesh = model->getMesh(i);
+		QTreeWidgetItem* mesh_item = new QTreeWidgetItem();
+		meshes_item->addChild(mesh_item);
+		mesh_item->setText(0, "Mesh");
+		mesh_item->setText(1, mesh.getName());
+
+		addEdit("Triangles", mesh_item, mesh.getTriangleCount());
+		createMaterialEditor(view, newSubItem(mesh_item), TypedObject(mesh.getMaterial(), 1), "Material");
 	}
 }
 
 
-void createTextureInMaterialEditor(PropertyView& view, QTreeWidgetItem* item, InstanceObject<Lumix::Texture, false>* texture)
+#pragma endregion
+
+
+#pragma region entity
+
+
+void addComponentArrayPropertyEdit(PropertyView& view, Lumix::IPropertyDescriptor* desc, Lumix::Component& cmp, Lumix::Blob& stream, QTreeWidgetItem* property_item)
 {
+	QTreeWidgetItem* array_item = new QTreeWidgetItem();
+	property_item->addChild(array_item);
+
 	QWidget* widget = new QWidget();
 	QHBoxLayout* layout = new QHBoxLayout(widget);
 	layout->setContentsMargins(0, 0, 0, 0);
-	QLineEdit* edit = new QLineEdit(texture->getValue()->getPath().c_str());
-	layout->addWidget(edit);
-	edit->connect(edit, &QLineEdit::editingFinished, [&view, edit, texture]()
+	QPushButton* button = new QPushButton(" + ");
+	layout->addWidget(button);
+	layout->addStretch(1);
+	array_item->setText(0, desc->getName());
+	array_item->treeWidget()->setItemWidget(array_item, 1, widget);
+	auto& array_desc = static_cast<Lumix::IArrayDescriptor&>(*desc);
+
+	button->connect(button, &QPushButton::clicked, [array_item, cmp, &array_desc, &view]()
 	{
-		char rel_path[LUMIX_MAX_PATH];
-		QByteArray byte_array = edit->text().toLatin1();
-		const char* text = byte_array.data();
-		view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, Lumix::Path(text));
-		auto material = static_cast<InstanceObject<Lumix::Material, false>* >(texture->getParent())->getValue();
-		for (int i = 0; i < material->getTextureCount(); ++i)
+		view.getWorldEditor()->addArrayPropertyItem(cmp, array_desc);
+		
+		QTreeWidgetItem* item = new QTreeWidgetItem();
+		array_item->addChild(item);
+		item->setText(0, QString::number(array_desc.getCount(cmp) - 1));
+		auto& children = array_desc.getChildren();
+		Lumix::Blob stream(view.getWorldEditor()->getAllocator());
+		for (int i = 0; i < children.size(); ++i)
 		{
-			if (material->getTexture(i) == texture->getValue())
-			{
-				Lumix::Texture* new_texture = static_cast<Lumix::Texture*>(material->getResourceManager().get(Lumix::ResourceManager::TEXTURE)->load(Lumix::Path(rel_path)));
-				material->setTexture(i, new_texture);
-				break;
-			}
+			createComponentPropertyEditor(view, array_desc.getCount(cmp) - 1, children[i], Lumix::Component(cmp), stream, item);
 		}
+		item->setExpanded(true);
 	});
 
-	QPushButton* browse_button = new QPushButton("...");
-	layout->addWidget(browse_button);
-	browse_button->connect(browse_button, &QPushButton::clicked, [&view, edit, texture]()
+	auto& children = desc->getChildren();
+	for (int j = 0; j < array_desc.getCount(cmp); ++j)
 	{
-		QString str = QFileDialog::getOpenFileName(NULL, QString(), QString(), "Texture (*.tga; *.dds)");
-		if (str != "")
+		QTreeWidgetItem* item = new QTreeWidgetItem();
+		array_item->addChild(item);
+		item->setText(0, QString::number(j));
+		QWidget* widget = new QWidget();
+		QHBoxLayout* layout = new QHBoxLayout(widget);
+		layout->setContentsMargins(0, 0, 0, 0);
+		QPushButton* button = new QPushButton(" - ");
+		button->connect(button, &QPushButton::clicked, [j, &view, cmp, &array_desc, item]() 
 		{
-			char rel_path[LUMIX_MAX_PATH];
-			QByteArray byte_array = str.toLatin1();
-			const char* text = byte_array.data();
-			view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, Lumix::Path(text));
-			auto material = static_cast<InstanceObject<Lumix::Material, false>* >(texture->getParent())->getValue();
-			for (int i = 0; i < material->getTextureCount(); ++i)
+			item->parent()->removeChild(item);
+			view.getWorldEditor()->removeArrayPropertyItem(cmp, j, array_desc);
+		});
+		layout->addStretch(1);
+		layout->addWidget(button);
+		item->treeWidget()->setItemWidget(item, 1, widget);
+		for (int i = 0; i < children.size(); ++i)
+		{
+			createComponentPropertyEditor(view, j, children[i], cmp, stream, item);
+		}
+	}
+}
+
+
+template <typename T>
+void addComponentPropertyEdit(PropertyView& view, int array_index, Lumix::IPropertyDescriptor* desc, Lumix::Component& cmp, Lumix::Blob& stream, QTreeWidgetItem* item)
+{
+	T v;
+	stream.clearBuffer();
+	desc->get(cmp, array_index, stream);
+	stream.rewindForRead();
+	stream.read(v);
+	addEdit(desc->getName(), item, v, [&view, desc, cmp, array_index](T v) { view.getWorldEditor()->setProperty(cmp.type, array_index, *desc, &v, sizeof(v)); });
+}
+
+
+void addComponentFilePropertyEdit(PropertyView& view, int array_index, Lumix::IPropertyDescriptor* desc, Lumix::Component& cmp, Lumix::Blob& stream, QTreeWidgetItem* item)
+{
+	stream.clearBuffer();
+	desc->get(cmp, array_index, stream);
+	stream.rewindForRead();
+	auto* res = view.getResource((const char*)stream.getBuffer());
+	if (res)
+	{
+		addResourceEdit(view, desc->getName(), item, res, [&view, desc, cmp, array_index](const char* v) { view.getWorldEditor()->setProperty(cmp.type, array_index, *desc, v, strlen(v) + 1); });
+	}
+}
+
+
+void addComponentStringPropertyEdit(PropertyView& view, int array_index, Lumix::IPropertyDescriptor* desc, Lumix::Component& cmp, Lumix::Blob& stream, QTreeWidgetItem* item)
+{
+	stream.clearBuffer();
+	desc->get(cmp, array_index, stream);
+	stream.rewindForRead();
+	addEdit(desc->getName(), item, (const char*)stream.getBuffer(), [&view, desc, cmp, array_index](const char* v) { view.getWorldEditor()->setProperty(cmp.type, array_index, *desc, v, strlen(v) + 1); });
+}
+
+
+void createComponentPropertyEditor(PropertyView& view, int array_index, Lumix::IPropertyDescriptor* desc, Lumix::Component& cmp, Lumix::Blob& stream, QTreeWidgetItem* property_item)
+{
+	switch (desc->getType())
+	{
+		case Lumix::IPropertyDescriptor::ARRAY:
+			addComponentArrayPropertyEdit(view, desc, cmp, stream, property_item);
+			break;
+		case Lumix::IPropertyDescriptor::BOOL:
+			addComponentPropertyEdit<bool>(view, array_index, desc, cmp, stream, property_item);
+			break;
+		case Lumix::IPropertyDescriptor::COLOR:
+			addComponentPropertyEdit<Lumix::Vec4>(view, array_index, desc, cmp, stream, property_item);
+			break;
+		case Lumix::IPropertyDescriptor::DECIMAL:
+			addComponentPropertyEdit<float>(view, array_index, desc, cmp, stream, property_item);
+			break;
+		case Lumix::IPropertyDescriptor::FILE:
+		case Lumix::IPropertyDescriptor::RESOURCE:
+			addComponentFilePropertyEdit(view, array_index, desc, cmp, stream, property_item);
+			break;
+		case Lumix::IPropertyDescriptor::INTEGER:
+			addComponentPropertyEdit<int>(view, array_index, desc, cmp, stream, property_item);
+			break;
+		case Lumix::IPropertyDescriptor::STRING:
+			addComponentStringPropertyEdit(view, array_index, desc, cmp, stream, property_item);
+			break;
+		case Lumix::IPropertyDescriptor::VEC3:
+			addComponentPropertyEdit<Lumix::Vec3>(view, array_index, desc, cmp, stream, property_item);
+			break;
+		default:
+			ASSERT(false);
+			break;
+	}
+}
+
+
+void addEdit(PropertyView& view, QTreeWidgetItem* item, Lumix::Entity e)
+{
+	auto& cmps = view.getWorldEditor()->getComponents(e);
+	addArray(view, "Entity", item,
+		[&](int i)
+		{
+			return cmps[i];
+		}, 
+		
+		[&cmps](int i) 
+		{
+			Lumix::Component cmp = cmps[i];
+			const char* name = "";
+			for (int i = 0; i < sizeof(component_map) / sizeof(component_map[0]); i += 2)
 			{
-				if (material->getTexture(i) == texture->getValue())
+				if (crc32(component_map[i + 1]) == cmp.type)
 				{
-					Lumix::Texture* new_texture = static_cast<Lumix::Texture*>(material->getResourceManager().get(Lumix::ResourceManager::TEXTURE)->load(Lumix::Path(rel_path)));
-					material->setTexture(i, new_texture);
-					break;
+					return component_map[i];
 				}
 			}
-			edit->setText(rel_path);
-		}
-	});
-
-	QPushButton* remove_button = new QPushButton(" - ");
-	layout->addWidget(remove_button);
-	remove_button->connect(remove_button, &QPushButton::clicked, [texture, &view, item]()
-	{
-		auto material = static_cast<InstanceObject<Lumix::Material, false>* >(texture->getParent())->getValue();
-		for (int i = 0; i < material->getTextureCount(); ++i)
-		{
-			if (material->getTexture(i) == texture->getValue())
-			{
-				material->removeTexture(i);
-				item->parent()->removeChild(item);
-				break;
-			}
-		}
-	});
-
-	QPushButton* add_button = new QPushButton(" + ");
-	layout->addWidget(add_button);
-	add_button->connect(add_button, &QPushButton::clicked, [texture, &view, item]()
-	{
-		auto material = static_cast<InstanceObject<Lumix::Material, false>* >(texture->getParent())->getValue();
-		Lumix::Texture* new_texture = static_cast<Lumix::Texture*>(material->getResourceManager().get(Lumix::ResourceManager::TEXTURE)->load(Lumix::Path("models/editor/default.tga")));
-		material->addTexture(new_texture);
-	});
-
-	item->treeWidget()->setItemWidget(item, 1, widget);
-}
+			return (const char*)NULL;
+		}, 
+			
+		[&cmps]() 
+		{ 
+			return cmps.size(); 
+		});
+};
 
 
-PropertyViewObject* createComponentObject(PropertyViewObject* parent, Lumix::WorldEditor& editor, Lumix::Component cmp)
-{
-	const char* name = "";
-	for (int i = 0; i < sizeof(component_map) / sizeof(component_map[0]); i += 2)
-	{
-		if (crc32(component_map[i + 1]) == cmp.type)
-		{
-			name = component_map[i];
-		}
-	}
-	auto c = new Lumix::Component(cmp);
-	InstanceObject<Lumix::Component, true>* object = new InstanceObject<Lumix::Component, true>(parent, name, c, &createComponentEditor);
-	
-	auto& descriptors = editor.getPropertyDescriptors(cmp.type);
-	
-	for (int i = 0; i < descriptors.size(); ++i)
-	{
-		auto prop = new ComponentPropertyObject(object, descriptors[i]->getName(), cmp, *descriptors[i]);
-		object->addMember(prop);
-	}
-
-	return object;
-}
+#pragma endregion
 
 
-PropertyViewObject* createEntityObject(Lumix::WorldEditor& editor, Lumix::Entity entity)
-{
-	auto e = new Lumix::Entity(entity);
-	InstanceObject<Lumix::Entity, true>* object = new InstanceObject<Lumix::Entity, true>(NULL, "Entity", e, NULL);
-
-	auto& cmps = editor.getComponents(*e);
-
-	for (int i = 0; i < cmps.size(); ++i)
-	{
-		auto prop = createComponentObject(object, editor, cmps[i]);
-		object->addMember(prop);
-	}
-
-	return object;
-}
-
-
-PropertyViewObject* createTextureObject(PropertyViewObject* parent, Lumix::Resource* resource)
-{
-	if (Lumix::Texture* texture = dynamic_cast<Lumix::Texture*>(resource))
-	{
-		auto object = new InstanceObject<Lumix::Texture, false>(parent, "Texture", texture, &createEditor);
-
-		auto prop = new GetterSetterObject<int, Lumix::Texture>(object, "width", texture, &Lumix::Texture::getWidth, NULL, &createEditor);
-		object->addMember(prop);
-		
-		prop = new GetterSetterObject<int, Lumix::Texture>(object, "height", texture, &Lumix::Texture::getHeight, NULL, &createEditor);
-		object->addMember(prop);
-
-		auto img_object = new InstanceObject<Lumix::Texture, false>(object, "Image", texture, &createImageEditor);
-		object->addMember(img_object);
-
-		return object;
-	}
-	return NULL;
-}
-
-
-static PropertyViewObject* createMaterialObject(PropertyViewObject* parent, Lumix::Resource* resource)
-{
-	if (Lumix::Material* material = dynamic_cast<Lumix::Material*>(resource))
-	{
-		auto object = new InstanceObject<Lumix::Material, false>(parent, "Material", material, &createEditor);
-
-		PropertyViewObject* prop = new InstanceObject<Lumix::Shader, false>(object, "Shader", material->getShader(), &createEditor);
-		object->addMember(prop);
-
-		prop = new GetterSetterObject<bool, Lumix::Material>(object, "Z test", material, &Lumix::Material::isZTest, &Lumix::Material::enableZTest, &createEditor);
-		object->addMember(prop);
-
-		prop = new GetterSetterObject<bool, Lumix::Material>(object, "Backface culling", material, &Lumix::Material::isBackfaceCulling, &Lumix::Material::enableBackfaceCulling, &createEditor);
-		object->addMember(prop);
-
-		prop = new GetterSetterObject<bool, Lumix::Material>(object, "Alpha to coverage", material, &Lumix::Material::isAlphaToCoverage, &Lumix::Material::enableAlphaToCoverage, &createEditor);
-		object->addMember(prop);
-
-		prop = new GetterSetterObject<bool, Lumix::Material>(object, "Shadow receiver", material, &Lumix::Material::isShadowReceiver, &Lumix::Material::enableShadowReceiving, &createEditor);
-		object->addMember(prop);
-
-		prop = new GetterSetterObject<bool, Lumix::Material>(object, "Alpha cutout", material, &Lumix::Material::isAlphaCutout, &Lumix::Material::enableAlphaCutout, &createEditor);
-		object->addMember(prop);
-
-		for (int i = 0; i < material->getTextureCount(); ++i)
-		{
-			prop = createTextureObject(object, material->getTexture(i));
-			static_cast<InstanceObject<Lumix::Texture, false>*>(prop)->setEditor(createTextureInMaterialEditor) ;
-			object->addMember(prop);
-		}
-
-		for (int i = 0; i < material->getUniformCount(); ++i)
-		{
-			Lumix::Material::Uniform& uniform = material->getUniform(i);
-			if (uniform.m_is_editable)
-			{
-				prop = new InstanceObject<Lumix::Material::Uniform, false>(object, uniform.m_name, &uniform, createEditor);
-				object->addMember(prop);
-			}
-		}
-		return object;
-	}
-	return NULL;
-}
-
-
-PropertyViewObject* createModelObject(PropertyViewObject* parent, Lumix::Resource* resource)
-{
-	if (Lumix::Model* model = dynamic_cast<Lumix::Model*>(resource))
-	{
-		auto* object = new InstanceObject<Lumix::Model, false>(parent, "Model", model, &createEditor);
-
-		PropertyViewObject* prop = new GetterSetterObject<int, Lumix::Model>(object, "Bone count", model, &Lumix::Model::getBoneCount, NULL, &createEditor);
-		object->addMember(prop);
-
-		prop = new GetterSetterObject<float, Lumix::Model>(object, "Bounding radius", model, &Lumix::Model::getBoundingRadius, NULL, &createEditor);
-		object->addMember(prop);
-
-		prop = new GetterSetterObject<size_t, Lumix::Model>(object, "Size (bytes)", model, &Lumix::Model::size, NULL, &createEditor);
-		object->addMember(prop);
-
-		for (int i = 0; i < model->getMeshCount(); ++i)
-		{
-			Lumix::Mesh* mesh = &model->getMesh(i);
-			auto mesh_object = new InstanceObject<Lumix::Mesh, false>(object, "Mesh", mesh, &createEditor);
-			object->addMember(mesh_object);
-
-			prop = new GetterSetterObject<int, Lumix::Mesh>(mesh_object, "Triangles", mesh, &Lumix::Mesh::getTriangleCount, NULL, &createEditor);
-			mesh_object->addMember(prop);
-
-			prop = createMaterialObject(mesh_object, mesh->getMaterial());
-			mesh_object->addMember(prop);
-		}
-
-		return object;
-	}
-	return NULL;
-}
+#pragma endregion
 
 
 PropertyViewObject::~PropertyViewObject()
@@ -462,9 +832,9 @@ PropertyView::PropertyView(QWidget* parent)
 	}
 	m_ui->componentTypeCombo->insertItems(0, component_list);
 
-	addResourcePlugin(&createMaterialObject);
+/*	addResourcePlugin(&createMaterialObject);
 	addResourcePlugin(&createModelObject);
-	addResourcePlugin(&createTextureObject);
+	addResourcePlugin(&createTextureObject);*/
 }
 
 
@@ -501,7 +871,7 @@ void PropertyView::onEntityPosition(const Lumix::Entity& e)
 
 void PropertyView::refresh()
 {
-	setObject(NULL);
+//	setObject(NULL);
 	onEntitySelected(getWorldEditor()->getSelectedEntities());
 }
 
@@ -546,6 +916,37 @@ void PropertyView::setAssetBrowser(AssetBrowser& asset_browser)
 }
 
 
+Lumix::Resource* PropertyView::getResource(const char* filename)
+{
+	char rel_path[LUMIX_MAX_PATH];
+	m_world_editor->getRelativePath(rel_path, LUMIX_MAX_PATH, Lumix::Path(filename));
+	Lumix::ResourceManagerBase* manager = NULL;
+	char extension[10];
+	Lumix::PathUtils::getExtension(extension, sizeof(extension), filename);
+	if (strcmp(extension, "msh") == 0)
+	{
+		manager = m_world_editor->getEngine().getResourceManager().get(Lumix::ResourceManager::MODEL);
+	}
+	else if (strcmp(extension, "mat") == 0)
+	{
+		manager = m_world_editor->getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL);
+	}
+	else if (strcmp(extension, "dds") == 0 || strcmp(extension, "tga") == 0)
+	{
+		manager = m_world_editor->getEngine().getResourceManager().get(Lumix::ResourceManager::TEXTURE);
+	}
+
+	if (manager != NULL)
+	{
+		return manager->load(Lumix::Path(rel_path));
+	}
+	else
+	{
+		return NULL;
+	}
+}
+
+
 void PropertyView::setSelectedResourceFilename(const char* filename)
 {
 	char rel_path[LUMIX_MAX_PATH];
@@ -587,16 +988,9 @@ void PropertyView::onSelectedResourceLoaded(Lumix::Resource::State, Lumix::Resou
 {
 	if (new_state == Lumix::Resource::State::READY)
 	{
-		m_selected_entity = Lumix::Entity::INVALID;
-		clear();
-		for (int i = 0; i < m_resource_plugins.size(); ++i)
-		{
-			if (PropertyViewObject* object = m_resource_plugins[i](NULL, m_selected_resource))
-			{
-				setObject(object);
-				return;
-			}
-		}
+		setObject(TypedObject(m_selected_resource, 1));
+		m_ui->propertyList->expandToDepth(1);
+		m_ui->propertyList->resizeColumnToContents(0);
 	}
 }
 
@@ -841,8 +1235,10 @@ void PropertyView::onEntitySelected(const Lumix::Array<Lumix::Entity>& e)
 	clear();
 	if (e.size() == 1 && e[0].isValid())
 	{
-		setObject(createEntityObject(*m_world_editor, e[0]));
+		Lumix::Entity entity(e[0]);
+		setObject(TypedObject(&entity, 0));
 		m_ui->propertyList->expandAll();
+		m_ui->propertyList->resizeColumnToContents(0);
 		onEntityPosition(e[0]);
 		m_ui->nameEdit->setText(e[0].getName());
 	}
@@ -898,50 +1294,39 @@ void PropertyView::on_positionZ_valueChanged(double)
 }
 
 
-void PropertyView::createObjectEditor(QTreeWidgetItem* item, PropertyViewObject* object)
-{
-	item->setText(0, object->getName());
-	object->createEditor(*this, item);
-
-	PropertyViewObject** properties = object->getMembers();
-	for (int i = 0; i < object->getMemberCount(); ++i)
-	{
-		QTreeWidgetItem* subitem = new QTreeWidgetItem();
-		item->insertChild(0, subitem);
-
-		createObjectEditor(subitem, properties[i]);
-	}
-}
-
-
 PropertyViewObject* PropertyView::getObject()
 {
 	return m_object;
 }
 
 
-void PropertyView::setObject(PropertyViewObject* object)
+void PropertyView::setObject(TypedObject object)
 {
-	if(object != m_object)
+	clear();
+
+	if (object.m_type == 0)
 	{
-		clear();
+		addEdit(*this, NULL, *static_cast<Lumix::Entity*>(object.m_object));
 	}
 	else
 	{
-		m_ui->propertyList->clear();
-	}
-
-	m_object = object;
-	
-	if(object)
-	{
 		QTreeWidgetItem* item = new QTreeWidgetItem();
 		m_ui->propertyList->insertTopLevelItem(0, item);
-		createObjectEditor(item, object);
-
-		m_ui->propertyList->expandAll();
-		m_ui->propertyList->resizeColumnToContents(0);
+		if (dynamic_cast<Lumix::Model*>((Lumix::Resource*)object.m_object))
+		{
+			createModelEditor(*this, item, object);
+		}
+		else if (dynamic_cast<Lumix::Material*>((Lumix::Resource*)object.m_object))
+		{
+			createMaterialEditor(*this, item, object, "material");
+		}
+		else if (dynamic_cast<Lumix::Texture*>((Lumix::Resource*)object.m_object))
+		{
+			createTextureEditor(*this, item, object, "texture");
+		}
 	}
+	m_ui->propertyList->expandToDepth(1);
+	m_ui->propertyList->resizeColumnToContents(0);
 }
 
 
