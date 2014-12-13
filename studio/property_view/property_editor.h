@@ -631,6 +631,31 @@ public:
 
 		addArray(view, "Textures", subitem, material, &Lumix::Material::getTexture, &Lumix::Material::setTexturePath, &Lumix::Material::getTextureCount, &createResourceSelector);
 
+		{
+			auto uniforms_item = newSubItem(subitem);
+			uniforms_item->setText(0, "uniforms");
+			for (int i = 0; i < material->getUniformCount(); ++i)
+			{
+				auto& uniform = material->getUniform(i);
+				if (uniform.m_is_editable)
+				{
+					switch (uniform.m_type)
+					{
+						case Lumix::Material::Uniform::FLOAT:
+							PropertyEditor<float>::create(uniform.m_name, uniforms_item, uniform.m_float, [material, i](float value) {
+								material->getUniform(i).m_float = value;
+							});
+							break;
+						case Lumix::Material::Uniform::INT:
+							PropertyEditor<float>::create(uniform.m_name, uniforms_item, uniform.m_float, [material, i](int value) {
+								material->getUniform(i).m_int = value;
+							});
+							break;
+					}
+				}
+			}
+		}
+
 		return PropertyEditor<Lumix::Material*>();
 	}
 };
