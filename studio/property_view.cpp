@@ -657,6 +657,7 @@ void TerrainComponentPlugin::createEditor(QTreeWidgetItem* component_item, const
 	m_terrain_editor->m_component = component;
 	QTreeWidgetItem* tools_item = new QTreeWidgetItem(QStringList() << "Tools");
 	component_item->addChild(tools_item);
+	m_tools_item = tools_item;
 
 	{
 		QWidget* widget = new QWidget();
@@ -718,6 +719,7 @@ void TerrainComponentPlugin::createEditor(QTreeWidgetItem* component_item, const
 	m_terrain_editor->m_type = TerrainEditor::HEIGHT;
 	height_button->connect(height_button, &QPushButton::clicked, [this]()
 	{
+		resetTools();
 		m_terrain_editor->m_type = TerrainEditor::HEIGHT;
 		if (m_terrain_editor->m_texture_tree_item)
 		{
@@ -727,6 +729,7 @@ void TerrainComponentPlugin::createEditor(QTreeWidgetItem* component_item, const
 	texture_button->connect(texture_button, &QPushButton::clicked, this, &TerrainComponentPlugin::on_TerrainTextureTypeClicked);
 	entity_button->connect(entity_button, &QPushButton::clicked, [this]()
 	{
+		resetTools();
 		m_terrain_editor->m_type = TerrainEditor::ENTITY;
 		if (m_terrain_editor->m_texture_tree_item)
 		{
@@ -736,17 +739,29 @@ void TerrainComponentPlugin::createEditor(QTreeWidgetItem* component_item, const
 }
 
 
+void TerrainComponentPlugin::resetTools()
+{
+	if (m_texture_tool_item)
+	{
+		m_texture_tool_item->parent()->removeChild(m_texture_tool_item);
+		m_texture_tool_item = NULL;
+	}
+}
+
+
 void TerrainComponentPlugin::on_TerrainTextureTypeClicked()
 {
+	resetTools();
 	m_terrain_editor->m_type = TerrainEditor::TEXTURE;
 
 	QComboBox* combobox = new QComboBox();
 	QTreeWidgetItem* item = new QTreeWidgetItem(QStringList() << "Texture");
-	m_terrain_editor->m_tree_top_level->insertChild(4, item);
+	m_texture_tool_item = item;
+	m_tools_item->addChild(item);
 	Lumix::Material* material = m_terrain_editor->getMaterial();
 	if (material && material->isReady())
 	{
-		for (int i = 1; i < material->getTextureCount() - 1; ++i)
+		for (int i = 0; i < material->getTextureCount() - 2; ++i)
 		{
 			combobox->addItem(material->getTexture(i)->getPath().c_str());
 		}
@@ -760,6 +775,7 @@ void TerrainComponentPlugin::on_TerrainTextureTypeClicked()
 
 TerrainComponentPlugin::TerrainComponentPlugin(Lumix::WorldEditor& editor, EntityTemplateList* template_list, EntityList* entity_list)
 {
+	m_texture_tool_item = NULL;
 	m_terrain_editor = new TerrainEditor(editor, template_list, entity_list);
 }
 
