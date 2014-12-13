@@ -22,12 +22,14 @@
 #include "graphics/render_scene.h"
 #include "graphics/shader.h"
 #include "graphics/texture.h"
+#include "mainwindow.h"
 #include "property_view/file_edit.h"
 #include "property_view/property_editor.h"
 #include "property_view/terrain_editor.h"
 #include "script/script_system.h"
 #include "scripts/scriptcompiler.h"
 #include <QColorDialog>
+#include <qcombobox.h>
 #include <QDoubleSpinBox>
 #include <QDragEnterEvent>
 #include <qmenu.h>
@@ -106,27 +108,69 @@ public:
 		auto& cmps = view.getWorldEditor()->getComponents(e);
 		addArray(view, "Entity", item,
 			[&](int i)
-		{
-			return cmps[i];
-		},
+			{
+				return cmps[i];
+			},
 
 			[&cmps](int i)
-		{
-			Lumix::Component cmp = cmps[i];
-			for (int i = 0; i < sizeof(component_map) / sizeof(component_map[0]); i += 2)
 			{
-				if (crc32(component_map[i + 1]) == cmp.type)
+				Lumix::Component cmp = cmps[i];
+				for (int i = 0; i < sizeof(component_map) / sizeof(component_map[0]); i += 2)
 				{
-					return component_map[i];
+					if (crc32(component_map[i + 1]) == cmp.type)
+					{
+						return component_map[i];
+					}
 				}
-			}
-			return (const char*)NULL;
-		},
+				return (const char*)NULL;
+			},
 
 			[&cmps]()
-		{
-			return cmps.size();
-		});
+			{
+				return cmps.size();
+			},
+
+			[&view, e](QPushButton* button)
+			{
+				struct CB : public QComboBox
+				{
+					public:
+						CB(QWidget* parent)
+							: QComboBox(parent)
+						{}
+
+						virtual void hidePopup() override
+						{
+							deleteLater();
+						}
+				};
+
+				CB* combobox = new CB(view.getMainWindow());
+				for (int i = 0; i < sizeof(component_map) / sizeof(component_map[0]); i += 2)
+				{
+					combobox->addItem(component_map[i]);
+				}
+				combobox->connect(combobox, (void (QComboBox::*)(int))&QComboBox::currentIndexChanged, [&view, e, combobox](int value) {
+					for (int i = 0; i < sizeof(component_map) / sizeof(component_map[0]); i += 2)
+					{
+						if (combobox->itemText(value) == component_map[i])
+						{
+							view.getWorldEditor()->addComponent(crc32(component_map[i + 1]));
+							Lumix::Array<Lumix::Entity> tmp(view.getWorldEditor()->getAllocator());
+							tmp.push(e);
+							view.getWorldEditor()->selectEntities(&e, 1);
+							return;
+						}
+					}
+					combobox->deleteLater();
+				});
+				combobox->move(combobox->mapFromGlobal(button->mapToGlobal(button->pos())));
+				combobox->raise();
+				combobox->show();
+				combobox->showPopup();
+				combobox->setFocus();
+			}
+		);
 
 		return PropertyEditor<Lumix::Entity>();
 	};
@@ -315,13 +359,6 @@ PropertyView::PropertyView(QWidget* parent)
 	, m_selected_entity(Lumix::Entity::INVALID)
 {
 	m_ui->setupUi(this);
-
-	QStringList component_list;
-	for(int j = 0; j < sizeof(component_map) / sizeof(component_map[0]); j += 2)
-	{
-		component_list << component_map[j];
-	}
-	m_ui->componentTypeCombo->insertItems(0, component_list);
 }
 
 
@@ -553,26 +590,6 @@ void PropertyView::onEntitySelected(const Lumix::Array<Lumix::Entity>& e)
 		onEntityPosition(e[0]);
 		m_ui->nameEdit->setText(e[0].getName());
 	}
-}
-
-
-void PropertyView::on_addComponentButton_clicked()
-{
-	QByteArray s = m_ui->componentTypeCombo->currentText().toLocal8Bit();
-	const char* c = s.data();
-
-	for(int i = 0; i < sizeof(component_map) / sizeof(component_map[0]); i += 2)
-	{
-		if(strcmp(c, component_map[i]) == 0)
-		{
-			m_world_editor->addComponent(crc32(component_map[i+1]));
-			Lumix::Array<Lumix::Entity> tmp(m_world_editor->getAllocator());
-			tmp.push(m_selected_entity);
-			onEntitySelected(tmp);
-			return;
-		}
-	}
-	ASSERT(false); // unknown component type
 }
 
 
