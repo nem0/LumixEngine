@@ -293,6 +293,7 @@ public:
 		, m_entity_template_list(template_list)
 		, m_entity_list(entity_list)
 	{
+		editor.addPlugin(this);
 		m_texture_tree_item = NULL;
 		m_tree_top_level = NULL;
 		m_terrain_brush_size = 10;
