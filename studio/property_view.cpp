@@ -150,7 +150,7 @@ public:
 				{
 					combobox->addItem(component_map[i]);
 				}
-				combobox->connect(combobox, (void (QComboBox::*)(int))&QComboBox::currentIndexChanged, [&view, e, combobox](int value) {
+				combobox->connect(combobox, (void (QComboBox::*)(int))&QComboBox::activated, [&view, e, combobox](int value) {
 					for (int i = 0; i < sizeof(component_map) / sizeof(component_map[0]); i += 2)
 					{
 						if (combobox->itemText(value) == component_map[i])
