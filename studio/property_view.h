@@ -95,11 +95,16 @@ class TerrainComponentPlugin : public QObject, public PropertyView::IEntityCompo
 		virtual uint32_t getType() override;
 		virtual void createEditor(QTreeWidgetItem* component_item, const Lumix::Component& component) override;
 
+	private:
+		void resetTools();
+
 	private slots:
 		void on_TerrainTextureTypeClicked();
 
 	private:
 		class TerrainEditor* m_terrain_editor;
+		QTreeWidgetItem* m_tools_item;
+		QTreeWidgetItem* m_texture_tool_item;
 };
 
 
