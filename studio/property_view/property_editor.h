@@ -562,9 +562,13 @@ public:
 	template <typename Setter, typename SelectorCreator>
 	static PropertyEditor<Lumix::Texture*> create(PropertyView& view, const char* name, QTreeWidgetItem* item, Lumix::Texture* texture, Setter setter, SelectorCreator selector_creator)
 	{
-		auto editor = create(view, name, item, texture);
+		QTreeWidgetItem* subitem = new QTreeWidgetItem();
+		item->addChild(subitem);
+		subitem->setText(0, name);
 
-		selector_creator(view, item, texture, setter);
+		auto editor = create(view, name, subitem, texture);
+
+		selector_creator(view, subitem, texture, setter);
 
 		return editor;
 	}
