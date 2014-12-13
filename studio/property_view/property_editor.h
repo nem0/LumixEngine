@@ -5,6 +5,7 @@
 #include <qcheckbox.h>
 #include <qdesktopservices.h>
 #include <qfiledialog.h>
+#include <qpushbutton.h>
 
 
 void createResourceSelector(PropertyView& view, QTreeWidgetItem* item, Lumix::Resource* resource, std::function<void(const Lumix::Path&)> setter)
@@ -348,7 +349,7 @@ PropertyEditor<T> makePropertyEditor(PropertyView& view, const char* name, QTree
 }
 
 
-template <typename Getter, typename Namer, typename Counter>
+template <typename Getter, typename Namer, typename Counter, typename Adder>
 void addArray(
 	PropertyView& view
 	, const char* name
@@ -356,24 +357,30 @@ void addArray(
 	, Getter getter
 	, Namer namer
 	, Counter counter
+	, Adder adder
 	)
 {
 	QTreeWidgetItem* subitem = new QTreeWidgetItem();
-	subitem->setText(0, name);
 	if (item != NULL)
 	{
 		item->addChild(subitem);
-		subitem->setText(0, name);
 	}
 	else
 	{
 		view.m_ui->propertyList->insertTopLevelItem(0, subitem);
 	}
+	subitem->setText(0, name);
+	QPushButton* add_button = new QPushButton(" + ");
+	subitem->treeWidget()->setItemWidget(subitem, 1, add_button);
+	add_button->connect(add_button, &QPushButton::clicked, [adder, add_button](){
+		adder(add_button);
+	});
 
 	for (int i = 0; i < counter(); ++i)
 	{
 		makePropertyEditor(view, namer(i), subitem, getter(i));
 	}
+
 }
 
 

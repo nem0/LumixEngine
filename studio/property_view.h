@@ -23,6 +23,7 @@ namespace Ui
 }
 
 class AssetBrowser;
+class MainWindow;
 class QTreeWidgetItem;
 class ScriptCompiler;
 
@@ -54,9 +55,9 @@ class PropertyView : public QDockWidget
 		void refresh();
 		void createCustomProperties(QTreeWidgetItem* item, const Lumix::Component& component);
 		void addEntityComponentPlugin(IEntityComponentPlugin* plugin);
+		MainWindow* getMainWindow() const { return (MainWindow*)parent(); }
 
 	private slots:
-		void on_addComponentButton_clicked();
 		void on_positionX_valueChanged(double arg1);
 		void on_positionY_valueChanged(double arg1);
 		void on_positionZ_valueChanged(double arg1);
