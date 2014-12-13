@@ -190,7 +190,7 @@ namespace Lumix
 		if (m_grass_model)
 		{
 			m_grass_model->getResourceManager().get(ResourceManager::MODEL)->unload(*m_grass_model);
-			m_grass_model->onLoaded<GrassType, &GrassType::grassLoaded>(this);
+			m_grass_model->getObserverCb().unbind<GrassType, &GrassType::grassLoaded>(this);
 			m_terrain.m_allocator.deleteObject(m_grass_mesh);
 			m_terrain.m_allocator.deleteObject(m_grass_geometry);
 		}
