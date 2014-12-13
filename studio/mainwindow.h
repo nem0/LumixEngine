@@ -81,6 +81,7 @@ private:
 	void onUniverseLoaded();
 	void addEditorDock(Qt::DockWidgetArea area, QDockWidget* widget, void (MainWindow::*callback)());
 	void createLayoutCombobox();
+	void installPlugins();
 
 private:
 	Ui::MainWindow* m_ui;
