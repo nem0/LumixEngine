@@ -609,12 +609,14 @@ class Vec3PropertyDescriptor : public IPropertyDescriptor
 class IFilePropertyDescriptor
 {
 	public:
+		virtual ~IFilePropertyDescriptor() {}
+
 		virtual const char* getFileType() = 0;
 };
 
 
 template <class T>
-class FilePropertyDescriptor : public IFilePropertyDescriptor, public StringPropertyDescriptor<T>
+class FilePropertyDescriptor : public StringPropertyDescriptor<T>, public IFilePropertyDescriptor
 {
 	public:
 		FilePropertyDescriptor(const char* name, Getter getter, Setter setter, const char* file_type, IAllocator& allocator)
