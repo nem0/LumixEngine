@@ -614,7 +614,7 @@ class IFilePropertyDescriptor
 
 
 template <class T>
-class FilePropertyDescriptor : public StringPropertyDescriptor<T>, public IFilePropertyDescriptor
+class FilePropertyDescriptor : public IFilePropertyDescriptor, public StringPropertyDescriptor<T>
 {
 	public:
 		FilePropertyDescriptor(const char* name, Getter getter, Setter setter, const char* file_type, IAllocator& allocator)

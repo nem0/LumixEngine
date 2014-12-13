@@ -38,6 +38,7 @@ class PropertyView : public QDockWidget
 
 				virtual uint32_t getType() = 0;
 				virtual void createEditor(QTreeWidgetItem* component_item, const Lumix::Component& component) = 0;
+				virtual void onPropertyViewCleared() = 0;
 		};
 
 	public:
@@ -94,6 +95,7 @@ class TerrainComponentPlugin : public QObject, public PropertyView::IEntityCompo
 
 		virtual uint32_t getType() override;
 		virtual void createEditor(QTreeWidgetItem* component_item, const Lumix::Component& component) override;
+		virtual void onPropertyViewCleared() override;
 
 	private:
 		void resetTools();
@@ -117,6 +119,7 @@ class ScriptComponentPlugin : public QObject, public PropertyView::IEntityCompon
 
 		virtual uint32_t getType() override;
 		virtual void createEditor(QTreeWidgetItem* component_item, const Lumix::Component& component) override;
+		virtual void onPropertyViewCleared() override;
 
 	private:
 		void setScriptStatus(uint32_t status);

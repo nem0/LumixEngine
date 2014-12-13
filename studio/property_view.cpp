@@ -139,7 +139,22 @@ void createComponentResourcePropertyEdit(PropertyView& view, int array_index, Lu
 	desc->get(cmp, array_index, stream);
 	stream.rewindForRead();
 	auto* res = view.getResource((const char*)stream.getBuffer());
-	PropertyEditor<Lumix::Resource*>::create(view, desc->getName(), item, res, [&view, desc, cmp, array_index](const char* v) { view.getWorldEditor()->setProperty(cmp.type, array_index, *desc, v, strlen(v) + 1); });
+	auto editor = PropertyEditor<Lumix::Resource*>::create(view, desc->getName(), item, res, [&view, desc, cmp, array_index](const char* v) { view.getWorldEditor()->setProperty(cmp.type, array_index, *desc, v, strlen(v) + 1); });
+	auto file_desc = dynamic_cast<Lumix::IFilePropertyDescriptor*>(desc);
+	auto filter = file_desc->getFileType();
+	editor->setFilter(filter);
+}
+
+
+void createComponentFilePropertyEdit(PropertyView& view, int array_index, Lumix::IPropertyDescriptor* desc, Lumix::Component& cmp, Lumix::Blob& stream, QTreeWidgetItem* item)
+{
+	stream.clearBuffer();
+	desc->get(cmp, array_index, stream);
+	stream.rewindForRead();
+	auto editor = PropertyEditor<Lumix::Path>::create(view, desc->getName(), item, Lumix::Path((const char*)stream.getBuffer()), [&view, desc, cmp, array_index](const char* v) { view.getWorldEditor()->setProperty(cmp.type, array_index, *desc, v, strlen(v) + 1); });
+	auto file_desc = dynamic_cast<Lumix::IFilePropertyDescriptor*>(desc);
+	auto filter = file_desc->getFileType();
+	editor->setFilter(filter);
 }
 
 
@@ -223,6 +238,8 @@ void createComponentPropertyEditor(PropertyView& view, int array_index, Lumix::I
 			}
 			break;
 		case Lumix::IPropertyDescriptor::FILE:
+			createComponentFilePropertyEdit(view, array_index, desc, cmp, stream, property_item);
+			break;
 		case Lumix::IPropertyDescriptor::RESOURCE:
 			createComponentResourcePropertyEdit(view, array_index, desc, cmp, stream, property_item);
 			break;
@@ -477,6 +494,10 @@ void PropertyView::onSelectedResourceLoaded(Lumix::Resource::State, Lumix::Resou
 void PropertyView::clear()
 {
 	m_ui->propertyList->clear();
+	for (int i = 0; i < m_entity_component_plugins.size(); ++i)
+	{
+		m_entity_component_plugins[i]->onPropertyViewCleared();
+	}
 }
 
 
@@ -651,6 +672,13 @@ uint32_t TerrainComponentPlugin::getType()
 }
 
 
+void TerrainComponentPlugin::onPropertyViewCleared()
+{
+	m_texture_tool_item = NULL;
+	m_tools_item = NULL;
+}
+
+
 void TerrainComponentPlugin::createEditor(QTreeWidgetItem* component_item, const Lumix::Component& component)
 {
 	m_terrain_editor->m_tree_top_level = component_item;
@@ -803,6 +831,11 @@ ScriptComponentPlugin::ScriptComponentPlugin(Lumix::WorldEditor& editor, ScriptC
 }
 
 
+void ScriptComponentPlugin::onPropertyViewCleared()
+{
+	m_status_item = NULL;
+}
+
 
 void ScriptComponentPlugin::createEditor(QTreeWidgetItem* component_item, const Lumix::Component& component)
 {
@@ -843,7 +876,6 @@ void ScriptComponentPlugin::createEditor(QTreeWidgetItem* component_item, const 
 
 void ScriptComponentPlugin::setScriptStatus(uint32_t status)
 {
-	TODO("null m_status_item when gui is destroyed");
 	if (!m_status_item)
 	{
 		return;

@@ -404,61 +404,125 @@ void addArray(
 
 
 template <>
-class PropertyEditor<Lumix::Resource*>
+class PropertyEditor<Lumix::Resource*> : public QWidget
 {
-public:
-	template <typename Setter>
-	static PropertyEditor<Lumix::Resource*> create(PropertyView& view, const char* name, QTreeWidgetItem* item, Lumix::Resource* value, Setter setter)
-	{
-		QTreeWidgetItem* subitem = new QTreeWidgetItem();
-		item->addChild(subitem);
-		subitem->setText(0, name);
+	public:
+		template <typename Setter>
+		static PropertyEditor<Lumix::Resource*>* create(PropertyView& view, const char* name, QTreeWidgetItem* item, Lumix::Resource* value, Setter setter)
+		{
+			QTreeWidgetItem* subitem = new QTreeWidgetItem();
+			item->addChild(subitem);
+			subitem->setText(0, name);
 
-		QWidget* widget = new QWidget();
-		FileEdit* edit = new FileEdit(widget, NULL);
-		if (value)
-		{
-			edit->setText(value->getPath().c_str());
-		}
-		edit->setServer(view.getWorldEditor());
-		QHBoxLayout* layout = new QHBoxLayout(widget);
-		layout->addWidget(edit);
-		layout->setContentsMargins(0, 0, 0, 0);
-		QPushButton* button = new QPushButton("...", widget);
-		layout->addWidget(button);
-		button->connect(button, &QPushButton::clicked, [&view, setter, edit]()
-		{
-			QString str = QFileDialog::getOpenFileName(NULL, QString(), QString()/*, dynamic_cast<Lumix::IFilePropertyDescriptor&>(m_descriptor).getFileType()*/); TODO("todo");
-			if (str != "")
+			PropertyEditor<Lumix::Resource*>* widget = new PropertyEditor<Lumix::Resource*>();
+			FileEdit* edit = new FileEdit(widget, NULL);
+			if (value)
 			{
-				char rel_path[LUMIX_MAX_PATH];
-				QByteArray byte_array = str.toLatin1();
-				const char* text = byte_array.data();
-				view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, Lumix::Path(text));
-				setter(rel_path);
-				edit->setText(rel_path);
+				edit->setText(value->getPath().c_str());
 			}
-		});
+			edit->setServer(view.getWorldEditor());
+			QHBoxLayout* layout = new QHBoxLayout(widget);
+			layout->addWidget(edit);
+			layout->setContentsMargins(0, 0, 0, 0);
+			QPushButton* button = new QPushButton("...", widget);
+			layout->addWidget(button);
+			button->connect(button, &QPushButton::clicked, [&view, setter, edit, widget]()
+			{
+				QString str = QFileDialog::getOpenFileName(NULL, QString(), QString(), widget->m_filter);
+				if (str != "")
+				{
+					char rel_path[LUMIX_MAX_PATH];
+					QByteArray byte_array = str.toLatin1();
+					const char* text = byte_array.data();
+					view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, Lumix::Path(text));
+					setter(rel_path);
+					edit->setText(rel_path);
+				}
+			});
 
-		if (value)
+			if (value)
+			{
+				QPushButton* button2 = new QPushButton("->", widget);
+				layout->addWidget(button2);
+				button2->connect(button2, &QPushButton::clicked, [value, &view, edit]()
+				{
+					view.setSelectedResource(value);
+				});
+			}
+
+			subitem->treeWidget()->setItemWidget(subitem, 1, widget);
+			edit->connect(edit, &QLineEdit::editingFinished, [setter, edit]()
+			{
+				QByteArray byte_array = edit->text().toLatin1();
+				setter(byte_array.data());
+			});
+
+			return widget;
+		}
+
+		void setFilter(const QString& filter) { m_filter = filter; }
+
+	private:
+		QString m_filter;
+};
+
+
+template <>
+class PropertyEditor<Lumix::Path> : public QWidget
+{
+	public:
+		template <typename Setter>
+		static PropertyEditor<Lumix::Path>* create(PropertyView& view, const char* name, QTreeWidgetItem* item, Lumix::Path value, Setter setter)
 		{
+			QTreeWidgetItem* subitem = new QTreeWidgetItem();
+			item->addChild(subitem);
+			subitem->setText(0, name);
+
+			PropertyEditor<Lumix::Path>* widget = new PropertyEditor<Lumix::Path>();
+			widget->m_filter = "";
+			FileEdit* edit = new FileEdit(widget, NULL);
+			edit->setText(value.c_str());
+			edit->setServer(view.getWorldEditor());
+			QHBoxLayout* layout = new QHBoxLayout(widget);
+			layout->addWidget(edit);
+			layout->setContentsMargins(0, 0, 0, 0);
+			QPushButton* button = new QPushButton("...", widget);
+			layout->addWidget(button);
+			button->connect(button, &QPushButton::clicked, [&view, setter, edit, widget]()
+			{
+				QString str = QFileDialog::getOpenFileName(NULL, QString(), QString(), widget->m_filter);
+				if (str != "")
+				{
+					char rel_path[LUMIX_MAX_PATH];
+					QByteArray byte_array = str.toLatin1();
+					const char* text = byte_array.data();
+					view.getWorldEditor()->getRelativePath(rel_path, LUMIX_MAX_PATH, Lumix::Path(text));
+					setter(rel_path);
+					edit->setText(rel_path);
+				}
+			});
+
 			QPushButton* button2 = new QPushButton("->", widget);
 			layout->addWidget(button2);
 			button2->connect(button2, &QPushButton::clicked, [value, &view, edit]()
 			{
-				view.setSelectedResource(value);
+				QDesktopServices::openUrl(QUrl::fromLocalFile(edit->text()));
 			});
+
+			subitem->treeWidget()->setItemWidget(subitem, 1, widget);
+			edit->connect(edit, &QLineEdit::editingFinished, [setter, edit]()
+			{
+				QByteArray byte_array = edit->text().toLatin1();
+				setter(byte_array.data());
+			});
+
+			return widget;
 		}
 
-		subitem->treeWidget()->setItemWidget(subitem, 1, widget);
-		edit->connect(edit, &QLineEdit::editingFinished, [setter, edit]()
-		{
-			QByteArray byte_array = edit->text().toLatin1();
-			setter(byte_array.data());
-		});
+		void setFilter(const QString& filter) {	m_filter = filter; }
 
-		return PropertyEditor<Lumix::Resource*>();
-	}
+	private:
+		QString m_filter;
 };
 
 
@@ -484,7 +548,6 @@ public:
 		QImage image(texture->getPath().c_str());
 		image_label->setPixmap(QPixmap::fromImage(image).scaledToHeight(100));
 		image_label->adjustSize();
-		TODO("Find out why this does not work anymore!");
 
 		return PropertyEditor<Lumix::Texture*>();
 	}
