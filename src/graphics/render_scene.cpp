@@ -1283,6 +1283,46 @@ namespace Lumix
 			}
 
 
+			virtual void addDebugSphere(const Vec3& center, float radius, const Vec3& color, float life) override
+			{
+				static const int COLS = 36;
+				static const int ROWS = COLS >> 1;
+				static const float STEP = (Math::PI / 180.0) * 360.0 / COLS;
+				int p2 = COLS >> 1;
+				int r2 = ROWS >> 1;
+				float prev_ci = 1;
+				float prev_si = 0;
+				for (int y = -r2; y < r2; ++y) {
+					float cy = cos(y * STEP);
+					float cy1 = cos((y + 1) * STEP);
+					float sy = sin(y * STEP);
+					float sy1 = sin((y + 1) * STEP);
+
+					for (int i = -p2; i < p2; ++i) {
+						float ci = cos(i * STEP);
+						float si = sin(i * STEP);
+						addDebugLine(
+							Vec3(center.x + radius * ci * cy, center.y + radius * sy, center.z + radius * si * cy),
+							Vec3(center.x + radius * ci * cy1, center.y + radius * sy1, center.z + radius * si * cy1),
+							color, life
+						);
+						addDebugLine(
+							Vec3(center.x + radius * ci * cy, center.y + radius * sy, center.z + radius * si * cy),
+							Vec3(center.x + radius * prev_ci * cy, center.y + radius * sy, center.z + radius * prev_si * cy),
+							color, life
+						);
+						addDebugLine(
+							Vec3(center.x + radius * prev_ci * cy1, center.y + radius * sy1, center.z + radius * prev_si * cy1),
+							Vec3(center.x + radius * ci * cy1, center.y + radius * sy1, center.z + radius * si * cy1),
+							color, life
+						);
+						prev_ci = ci;
+						prev_si = si;
+					}
+				}
+			}
+
+
 			virtual void addDebugCylinder(const Vec3& position, const Vec3& up, float radius, const Vec3& color, float life) override
 			{
 				Vec3 z_vec(-up.y, up.x, 0);
