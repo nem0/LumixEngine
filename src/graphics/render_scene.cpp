@@ -1283,6 +1283,29 @@ namespace Lumix
 			}
 
 
+			virtual void addDebugCylinder(const Vec3& position, const Vec3& up, float radius, const Vec3& color, float life) override
+			{
+				Vec3 z_vec(-up.y, up.x, 0);
+				Vec3 x_vec = crossProduct(up, z_vec);
+				float prevx = radius;
+				float prevz = 0;
+				z_vec.normalize();
+				x_vec.normalize();
+				Vec3 top = position + up;
+				for (int i = 1; i <= 32; ++i)
+				{
+					float a = i / 32.0f * 2 * Math::PI;
+					float x = cosf(a) * radius;
+					float z = sinf(a) * radius;
+					addDebugLine(position + x_vec * x + z_vec * z, position + x_vec * prevx + z_vec * prevz, color, life);
+					addDebugLine(top + x_vec * x + z_vec * z, top + x_vec * prevx + z_vec * prevz, color, life);
+					addDebugLine(position + x_vec * x + z_vec * z, top + x_vec * x + z_vec * z, color, life);
+					prevx = x;
+					prevz = z;
+				}
+			}
+
+
 			virtual void addDebugCube(const Vec3& min, const Vec3& max, const Vec3& color, float life) override
 			{
 				Vec3 a = min;
@@ -1363,16 +1386,20 @@ namespace Lumix
 
 			}
 
-			virtual void addDebugCircle(const Vec3& center, float radius, const Vec3& color, float life) override
+			virtual void addDebugCircle(const Vec3& center, const Vec3& up, float radius, const Vec3& color, float life) override
 			{
+				Vec3 z_vec(-up.y, up.x, 0);
+				Vec3 x_vec = crossProduct(up, z_vec);
 				float prevx = radius;
 				float prevz = 0;
-				for (int i = 1; i < 64; ++i)
+				z_vec.normalize();
+				x_vec.normalize();
+				for (int i = 1; i <= 64; ++i)
 				{
 					float a = i / 64.0f * 2 * Math::PI;
 					float x = cosf(a) * radius;
 					float z = sinf(a) * radius;
-					addDebugLine(center + Vec3(x, 0, z), center + Vec3(prevx, 0, prevz), color, life);
+					addDebugLine(center + x_vec * x + z_vec * z, center + x_vec * prevx + z_vec * prevz, color, life);
 					prevx = x;
 					prevz = z;
 				}
