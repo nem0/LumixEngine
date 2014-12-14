@@ -95,6 +95,7 @@ namespace Lumix
 			virtual void addDebugCross(const Vec3& center, float size, const Vec3& color, float life) = 0;
 			virtual void addDebugCube(const Vec3& from, const Vec3& max, const Vec3& color, float life) = 0;
 			virtual void addDebugCircle(const Vec3& center, const Vec3& up, float radius, const Vec3& color, float life) = 0;
+			virtual void addDebugSphere(const Vec3& center, float radius, const Vec3& color, float life) = 0;
 			virtual void addDebugFrustum(const Vec3& position, const Vec3& direction, const Vec3& up, float fov, float ratio, float near_distance, float far_distance, const Vec3& color, float life) = 0;
 			virtual void addDebugCylinder(const Vec3& position, const Vec3& up, float radius, const Vec3& color, float life) = 0;
 
