@@ -1323,6 +1323,46 @@ namespace Lumix
 				addDebugLine(a, b, color, life);
 			}
 
+			virtual void addDebugFrustum(const Vec3& position, const Vec3& direction, const Vec3& up, float fov, float ratio, float near_distance, float far_distance, const Vec3& color, float life) override
+			{
+				Vec3 points[8];
+				Vec3 near_center = position + direction * near_distance;
+				Vec3 far_center = position + direction * far_distance;
+				Vec3 right = crossProduct(direction, up);
+				float scale = (float)tan(Math::PI / 180.0f * fov * 0.5f);
+				Vec3 up_near = up * 0.5f * near_distance * scale;
+				Vec3 right_near = right * (0.5f * near_distance * scale * ratio);
+
+				points[0] = near_center + up_near + right_near;
+				points[1] = near_center + up_near - right_near;
+				points[2] = near_center - up_near - right_near;
+				points[3] = near_center - up_near + right_near;
+
+				Vec3 up_far = up * 0.5f * far_distance * scale;
+				Vec3 right_far = right * (0.5f * far_distance * scale * ratio);
+
+				points[4] = far_center + up_far + right_far;
+				points[5] = far_center + up_far - right_far;
+				points[6] = far_center - up_far - right_far;
+				points[7] = far_center - up_far + right_far;
+
+				addDebugLine(points[0], points[1], color, life);
+				addDebugLine(points[1], points[2], color, life);
+				addDebugLine(points[2], points[3], color, life);
+				addDebugLine(points[3], points[0], color, life);
+
+				addDebugLine(points[4], points[5], color, life);
+				addDebugLine(points[5], points[6], color, life);
+				addDebugLine(points[6], points[7], color, life);
+				addDebugLine(points[7], points[4], color, life);
+
+				addDebugLine(points[0], points[4], color, life);
+				addDebugLine(points[1], points[5], color, life);
+				addDebugLine(points[2], points[6], color, life);
+				addDebugLine(points[3], points[7], color, life);
+
+			}
+
 			virtual void addDebugCircle(const Vec3& center, float radius, const Vec3& color, float life) override
 			{
 				float prevx = radius;
