@@ -1287,7 +1287,7 @@ namespace Lumix
 			{
 				static const int COLS = 36;
 				static const int ROWS = COLS >> 1;
-				static const float STEP = (Math::PI / 180.0) * 360.0 / COLS;
+				static const float STEP = (Math::PI / 180.0f) * 360.0f / COLS;
 				int p2 = COLS >> 1;
 				int r2 = ROWS >> 1;
 				float prev_ci = 1;
