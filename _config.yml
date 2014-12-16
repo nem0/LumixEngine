@@ -4,7 +4,7 @@ email:       mikulas.florek@gamedev.sk
 author:      Mikulas Florek
 description: "Game engine development blog"
 baseurl:     ""
-url:         "http://localhost:4000/"
+url:         "http://nem0.github.io/LumixEngine/"
 
 # Google analytics
 google_analytics:
