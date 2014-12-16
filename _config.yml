@@ -1,0 +1,33 @@
+# Site settings
+title:       Lumix Engine
+email:       mikulas.florek@gamedev.sk
+author:      Mikulas Florek
+description: "Game engine development blog"
+baseurl:     ""
+url:         "http://localhost:4000/"
+
+# Google analytics
+google_analytics:
+
+# Optional features
+animated:           false
+show_related_posts: false
+show_post_footers:  false
+
+# Social icons
+show_social_icons: false
+github_username:
+twitter_username:
+google_plus_id:
+linkedin_username:
+bitcoin_url:
+paypal_url:
+flattr_button:
+
+# Build settings
+hightlighter: rouge
+markdown:     kramdown
+permalink:    pretty
+paginate:     3
+sass:
+  compressed: true
