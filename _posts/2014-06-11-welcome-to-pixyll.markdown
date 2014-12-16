@@ -4,6 +4,7 @@ title:      Hello World!
 date:       2014-12-16 22:08:00
 summary:    The is the first post in the long series of posts about game engine development.
 categories: 
+comments: true
 ---
 
 Hello.
