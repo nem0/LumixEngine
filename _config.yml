@@ -3,7 +3,7 @@ title:       Lumix Engine
 email:       mikulas.florek@gamedev.sk
 author:      Mikulas Florek
 description: "Game engine development blog"
-baseurl:     ""
+baseurl:     "http://nem0.github.io/LumixEngine/"
 url:         "http://nem0.github.io/LumixEngine/"
 
 # Google analytics
