@@ -159,6 +159,15 @@ namespace Lumix
 					for (int i = 0; i < m_failed_tests.size(); i++) 
 					{
 						g_log_info.log("unit") << m_failed_tests[i].m_file_name << "(" << m_failed_tests[i].m_line << ")";
+						#ifdef APPVEYOR
+							char tmp[1024];
+							Lumix::copyString(tmp, sizeof(tmp), "appveyor AddTest \"");
+							Lumix::catCString(tmp, sizeof(tmp), m_failed_tests[i].m_file_name);
+							Lumix::catCString(tmp, sizeof(tmp), ": ");
+							toCString(m_failed_tests[i].m_line, tmp + strlen(tmp), sizeof(tmp) - strlen(tmp) - 1);
+							Lumix::catCString(tmp, sizeof(tmp), "\" -Outcome Failed");
+							system(tmp);
+						#endif
 					}
 				}
 				g_log_info.log("unit") << "--------- Results ---------";
