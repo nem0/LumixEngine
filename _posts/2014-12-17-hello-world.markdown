@@ -9,9 +9,7 @@ comments: true
 
 Hello.
 
-Pixyll is a simple, beautiful theme for Jekyll that emphasizes content rather than aesthetic fluff. It's mobile _first_, fluidly responsive, and delightfully lightweight.
-
-It's pretty minimal, but leverages large type and drastic contrast to make a statement, on all devices.
+LumixEngine is yet another game engine. Of course this one is better than all the rest :) This website is aimed at anybody who wants to learn interesting stuff about the game engine development. I'll mostly talk about general ideas such as data-oriented design or editors and less about redering or physics.
 
 <blockquote>
   <p>
@@ -20,8 +18,6 @@ It's pretty minimal, but leverages large type and drastic contrast to make a sta
   <footer><cite title="Antoine de Saint-Exupéry">Antoine de Saint-Exupéry</cite></footer>
 </blockquote>
 
-## Where is it?
+## Source code
 
-Checkout the [Github repository](https://github.com/johnotander/pixyll) to download it, request a feature, or report a bug.
-
-It's free, and open source ([MIT](http://opensource.org/licenses/MIT)).
+You can [checkout](https://github.com/nem0/LumixEngine) the source code of LumixEngine to find out, how things are really implemented.
