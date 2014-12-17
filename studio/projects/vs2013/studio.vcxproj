@@ -1057,6 +1057,11 @@
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">ui_property_view.h;%(Outputs)</Outputs>
     </CustomBuild>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\property_view\file_edit.h" />
+    <ClInclude Include="..\..\property_view\property_editor.h" />
+    <ClInclude Include="..\..\property_view\terrain_editor.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
   <ProjectExtensions>
