@@ -9,6 +9,7 @@
 #include "core/array.h"
 
 #include <Windows.h>
+#include <cstdio>
 
 //#define ASSERT_HANDLE_FAIL
 
@@ -153,22 +154,27 @@ namespace Lumix
 
 			void dumpResults() const
 			{
+				
 				if (m_fails > 0)
 				{
 					g_log_info.log("unit") << "----------Fails----------";
 					for (int i = 0; i < m_failed_tests.size(); i++) 
 					{
 						g_log_info.log("unit") << m_failed_tests[i].m_file_name << "(" << m_failed_tests[i].m_line << ")";
-						#ifdef APPVEYOR
-							char tmp[1024];
-							Lumix::copyString(tmp, sizeof(tmp), "appveyor AddTest \"");
-							Lumix::catCString(tmp, sizeof(tmp), m_failed_tests[i].m_file_name);
-							Lumix::catCString(tmp, sizeof(tmp), ": ");
-							toCString(m_failed_tests[i].m_line, tmp + strlen(tmp), sizeof(tmp) - strlen(tmp) - 1);
-							Lumix::catCString(tmp, sizeof(tmp), "\" -Outcome Failed");
-							system(tmp);
-						#endif
 					}
+					#ifdef APPVEYOR
+						FILE* fout = fopen("tests.xml", "w");
+						fprintf(fout, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+						fprintf(fout, "<testsuite name = \"lumix_tests\" tests = \"1\" errors = \"1\" failures = \"0\" skip = \"0\">");
+						for (int i = 0; i < m_failed_tests.size(); i++)
+						{
+							fprintf(fout, "<testcase classname = \"%s\" name = \"%s\" time = \"0\">", m_failed_tests[i].m_file_name, m_failed_tests[i].m_file_name);
+							fprintf(fout, "<error type = \"exceptions.TypeError\" message = \"oops, wrong type\"></error>");
+							fprintf(fout, "</testcase>");
+						}
+						fprintf(fout, "</testsuite>");
+						fclose(fout);
+					#endif
 				}
 				g_log_info.log("unit") << "--------- Results ---------";
 				g_log_info.log("unit") << "Fails:     " << m_fails;
