@@ -71,6 +71,7 @@ public:
 	void enableShadowReceiving(bool enable) { m_is_shadow_receiver = enable; updateShaderCombination(); }
 
 	void setShader(Shader* shader);
+	void setShader(const Path& path);
 	Shader* getShader() const { return m_shader; }
 
 	int getTextureCount() const { return m_textures.size(); }
@@ -78,6 +79,7 @@ public:
 	Texture* getTextureByUniform(const char* uniform) const;
 	void addTexture(Texture* texture);
 	void setTexture(int i, Texture* texture);
+	void setTexturePath(int i, const Path& path);
 	void removeTexture(int i);
 	bool save(JsonSerializer& serializer);
 	int getUniformCount() const { return m_uniforms.size(); }

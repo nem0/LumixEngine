@@ -544,7 +544,10 @@ namespace Lumix
 				int32_t size = 0;
 				serializer.read(size);
 				m_lights.resize(size);
-				serializer.read(&m_lights[0], sizeof(m_lights[0]) * size);
+				if (!m_lights.empty())
+				{
+					serializer.read(&m_lights[0], sizeof(m_lights[0]) * size);
+				}
 				for (int i = 0; i < size; ++i)
 				{
 					m_lights[i].m_entity.universe = &m_universe;
@@ -1280,6 +1283,69 @@ namespace Lumix
 			}
 
 
+			virtual void addDebugSphere(const Vec3& center, float radius, const Vec3& color, float life) override
+			{
+				static const int COLS = 36;
+				static const int ROWS = COLS >> 1;
+				static const float STEP = (Math::PI / 180.0f) * 360.0f / COLS;
+				int p2 = COLS >> 1;
+				int r2 = ROWS >> 1;
+				float prev_ci = 1;
+				float prev_si = 0;
+				for (int y = -r2; y < r2; ++y) {
+					float cy = cos(y * STEP);
+					float cy1 = cos((y + 1) * STEP);
+					float sy = sin(y * STEP);
+					float sy1 = sin((y + 1) * STEP);
+
+					for (int i = -p2; i < p2; ++i) {
+						float ci = cos(i * STEP);
+						float si = sin(i * STEP);
+						addDebugLine(
+							Vec3(center.x + radius * ci * cy, center.y + radius * sy, center.z + radius * si * cy),
+							Vec3(center.x + radius * ci * cy1, center.y + radius * sy1, center.z + radius * si * cy1),
+							color, life
+						);
+						addDebugLine(
+							Vec3(center.x + radius * ci * cy, center.y + radius * sy, center.z + radius * si * cy),
+							Vec3(center.x + radius * prev_ci * cy, center.y + radius * sy, center.z + radius * prev_si * cy),
+							color, life
+						);
+						addDebugLine(
+							Vec3(center.x + radius * prev_ci * cy1, center.y + radius * sy1, center.z + radius * prev_si * cy1),
+							Vec3(center.x + radius * ci * cy1, center.y + radius * sy1, center.z + radius * si * cy1),
+							color, life
+						);
+						prev_ci = ci;
+						prev_si = si;
+					}
+				}
+			}
+
+
+			virtual void addDebugCylinder(const Vec3& position, const Vec3& up, float radius, const Vec3& color, float life) override
+			{
+				Vec3 z_vec(-up.y, up.x, 0);
+				Vec3 x_vec = crossProduct(up, z_vec);
+				float prevx = radius;
+				float prevz = 0;
+				z_vec.normalize();
+				x_vec.normalize();
+				Vec3 top = position + up;
+				for (int i = 1; i <= 32; ++i)
+				{
+					float a = i / 32.0f * 2 * Math::PI;
+					float x = cosf(a) * radius;
+					float z = sinf(a) * radius;
+					addDebugLine(position + x_vec * x + z_vec * z, position + x_vec * prevx + z_vec * prevz, color, life);
+					addDebugLine(top + x_vec * x + z_vec * z, top + x_vec * prevx + z_vec * prevz, color, life);
+					addDebugLine(position + x_vec * x + z_vec * z, top + x_vec * x + z_vec * z, color, life);
+					prevx = x;
+					prevz = z;
+				}
+			}
+
+
 			virtual void addDebugCube(const Vec3& min, const Vec3& max, const Vec3& color, float life) override
 			{
 				Vec3 a = min;
@@ -1320,16 +1386,67 @@ namespace Lumix
 				addDebugLine(a, b, color, life);
 			}
 
-			virtual void addDebugCircle(const Vec3& center, float radius, const Vec3& color, float life) override
+
+			virtual void addDebugFrustum(const Frustum& frustum, const Vec3& color, float life) override
 			{
+				addDebugFrustum(frustum.getPosition(), frustum.getDirection(), frustum.getUp(), frustum.getFOV(), frustum.getRatio(), frustum.getNearDistance(), frustum.getFarDistance(), color, life);
+			}
+
+
+			virtual void addDebugFrustum(const Vec3& position, const Vec3& direction, const Vec3& up, float fov, float ratio, float near_distance, float far_distance, const Vec3& color, float life) override
+			{
+				Vec3 points[8];
+				Vec3 near_center = position + direction * near_distance;
+				Vec3 far_center = position + direction * far_distance;
+				Vec3 right = crossProduct(direction, up);
+				float scale = (float)tan(Math::PI / 180.0f * fov * 0.5f);
+				Vec3 up_near = up * 0.5f * near_distance * scale;
+				Vec3 right_near = right * (0.5f * near_distance * scale * ratio);
+
+				points[0] = near_center + up_near + right_near;
+				points[1] = near_center + up_near - right_near;
+				points[2] = near_center - up_near - right_near;
+				points[3] = near_center - up_near + right_near;
+
+				Vec3 up_far = up * 0.5f * far_distance * scale;
+				Vec3 right_far = right * (0.5f * far_distance * scale * ratio);
+
+				points[4] = far_center + up_far + right_far;
+				points[5] = far_center + up_far - right_far;
+				points[6] = far_center - up_far - right_far;
+				points[7] = far_center - up_far + right_far;
+
+				addDebugLine(points[0], points[1], color, life);
+				addDebugLine(points[1], points[2], color, life);
+				addDebugLine(points[2], points[3], color, life);
+				addDebugLine(points[3], points[0], color, life);
+
+				addDebugLine(points[4], points[5], color, life);
+				addDebugLine(points[5], points[6], color, life);
+				addDebugLine(points[6], points[7], color, life);
+				addDebugLine(points[7], points[4], color, life);
+
+				addDebugLine(points[0], points[4], color, life);
+				addDebugLine(points[1], points[5], color, life);
+				addDebugLine(points[2], points[6], color, life);
+				addDebugLine(points[3], points[7], color, life);
+
+			}
+
+			virtual void addDebugCircle(const Vec3& center, const Vec3& up, float radius, const Vec3& color, float life) override
+			{
+				Vec3 z_vec(-up.y, up.x, 0);
+				Vec3 x_vec = crossProduct(up, z_vec);
 				float prevx = radius;
 				float prevz = 0;
-				for (int i = 1; i < 64; ++i)
+				z_vec.normalize();
+				x_vec.normalize();
+				for (int i = 1; i <= 64; ++i)
 				{
 					float a = i / 64.0f * 2 * Math::PI;
 					float x = cosf(a) * radius;
 					float z = sinf(a) * radius;
-					addDebugLine(center + Vec3(x, 0, z), center + Vec3(prevx, 0, prevz), color, life);
+					addDebugLine(center + x_vec * x + z_vec * z, center + x_vec * prevx + z_vec * prevz, color, life);
 					prevx = x;
 					prevz = z;
 				}

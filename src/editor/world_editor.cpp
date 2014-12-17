@@ -694,7 +694,7 @@ struct WorldEditorImpl : public WorldEditor
 						m_old_values.rewindForRead();
 						if (props_index >= 0)
 						{
-							const Array<IPropertyDescriptor*>& props = m_editor.m_component_properties.get(props_index);
+							const Array<IPropertyDescriptor*>& props = m_editor.m_component_properties.at(props_index);
 							for (int i = 0; i < props.size(); ++i)
 							{
 								props[i]->set(m_component, m_old_values);
@@ -714,7 +714,7 @@ struct WorldEditorImpl : public WorldEditor
 									m_old_values.rewindForRead();
 									if (props_index >= 0)
 									{
-										const Array<IPropertyDescriptor*>& props = m_editor.m_component_properties.get(props_index);
+										const Array<IPropertyDescriptor*>& props = m_editor.m_component_properties.at(props_index);
 										for (int i = 0; i < props.size(); ++i)
 										{
 											props[i]->set(cmp_new, m_old_values);

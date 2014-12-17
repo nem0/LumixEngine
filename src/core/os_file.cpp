@@ -69,7 +69,6 @@ namespace Lumix
 
 			if(INVALID_HANDLE_VALUE != hnd)
 			{
-				TODO("lock-free free list");
 				OsFileImpl* impl = allocator.newObject<OsFileImpl>(allocator);
 				impl->m_file = hnd;
 				m_impl = impl;
