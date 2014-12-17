@@ -1386,6 +1386,13 @@ namespace Lumix
 				addDebugLine(a, b, color, life);
 			}
 
+
+			virtual void addDebugFrustum(const Frustum& frustum, const Vec3& color, float life) override
+			{
+				addDebugFrustum(frustum.getPosition(), frustum.getDirection(), frustum.getUp(), frustum.getFOV(), frustum.getRatio(), frustum.getNearDistance(), frustum.getFarDistance(), color, life);
+			}
+
+
 			virtual void addDebugFrustum(const Vec3& position, const Vec3& direction, const Vec3& up, float fov, float ratio, float near_distance, float far_distance, const Vec3& color, float life) override
 			{
 				Vec3 points[8];
