@@ -165,14 +165,14 @@ namespace Lumix
 					#ifdef APPVEYOR
 						FILE* fout = fopen("tests.xml", "w");
 						fprintf(fout, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
-						fprintf(fout, "<testsuite name = \"lumix_tests\" tests = \"1\" errors = \"1\" failures = \"0\" skip = \"0\">");
+						fprintf(fout, "<test-results invalid = \"0\" skipped = \"0\" ignored = \"0\" inconclusive = \"0\" not-run = \"0\" failures = \"%d\" errors = \"0\" total = \"%d\" name = \"Pester\">", m_failed_tests.size(), m_failed_tests.size());
+						fprintf(fout, "<test-suite name=\"All tests\" asserts=\"0\" success = \"True\" result = \"Failure\" executed = \"True\" type = \"Powershell\"><results>");
 						for (int i = 0; i < m_failed_tests.size(); i++)
 						{
-							fprintf(fout, "<testcase classname = \"%s\" name = \"%s\" time = \"0\">", m_failed_tests[i].m_file_name, m_failed_tests[i].m_file_name);
-							fprintf(fout, "<error type = \"exceptions.TypeError\" message = \"oops, wrong type\"></error>");
-							fprintf(fout, "</testcase>");
+							fprintf(fout, "<test-case time=\"0\" name=\"test name %d\" asserts=\"0\" success = \"False\" result = \"Failure\" executed=\"True\">", i);
+							fprintf(fout, "<failure><message>no message</message><stack-trace>at line 0 in none.cpp</stack-trace></failure></test-case>");
 						}
-						fprintf(fout, "</testsuite>");
+						fprintf(fout, "</results></test-suite></test-results>");
 						fclose(fout);
 					#endif
 				}
