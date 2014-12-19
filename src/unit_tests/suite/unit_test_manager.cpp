@@ -165,7 +165,7 @@ namespace Lumix
 					#ifdef APPVEYOR
 						FILE* fout = fopen("tests.xml", "w");
 						fprintf(fout, "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"no\"?>");
-						fprintf(fout, "<test-results  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"nunit_schema_2.5.xsd\" name=\"Lumix\" total=\"%d\" errors=\"0\" failures=\"%d\" not-run=\"0\" inconclusive=\"0\" ignored=\"0\" skipped=\"0\" invalid=\"0\"><culture-info current-culture="" current-uiculture="" />", m_failed_tests.size(), m_failed_tests.size());
+						fprintf(fout, "<test-results  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"nunit_schema_2.5.xsd\" name=\"Lumix\" total=\"%d\" errors=\"0\" failures=\"%d\" not-run=\"0\" inconclusive=\"0\" ignored=\"0\" skipped=\"0\" invalid=\"0\"><culture-info current-culture=\"\" current-uiculture=\"\" />", m_failed_tests.size(), m_failed_tests.size());
 						fprintf(fout, "<test-suite type=\"Powershell\" name=\"Lumix Engine suite\" executed=\"True\" result=\"Failure\" success=\"False\" time=\"0\" asserts=\"0\"> <results>");
 						for (int i = 0; i < m_failed_tests.size(); i++)
 						{
