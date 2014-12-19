@@ -164,15 +164,14 @@ namespace Lumix
 					}
 					#ifdef APPVEYOR
 						FILE* fout = fopen("tests.xml", "w");
-						fprintf(fout, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
-						fprintf(fout, "<test-results invalid = \"0\" skipped = \"0\" ignored = \"0\" inconclusive = \"0\" not-run = \"0\" failures = \"%d\" errors = \"0\" total = \"%d\" name = \"Pester\">", m_failed_tests.size(), m_failed_tests.size());
-						fprintf(fout, "<test-suite name=\"All tests\" asserts=\"0\" success = \"True\" result = \"Failure\" executed = \"True\" type = \"Powershell\"><results>");
+						fprintf(fout, "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"no\"?>");
+						fprintf(fout, "<test-results  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"nunit_schema_2.5.xsd\" name=\"Lumix\" total=\"%d\" errors=\"0\" failures=\"%d\" not-run=\"0\" inconclusive=\"0\" ignored=\"0\" skipped=\"0\" invalid=\"0\"><culture-info current-culture="" current-uiculture="" />", m_failed_tests.size(), m_failed_tests.size());
+						fprintf(fout, "<test-suite type=\"Powershell\" name=\"Lumix Engine suite\" executed=\"True\" result=\"Failure\" success=\"False\" time=\"0\" asserts=\"0\"> <results>");
 						for (int i = 0; i < m_failed_tests.size(); i++)
 						{
-							fprintf(fout, "<test-case time=\"0\" name=\"test name %d\" asserts=\"0\" success = \"False\" result = \"Failure\" executed=\"True\">", i);
-							fprintf(fout, "<failure><message>no message</message><stack-trace>at line 0 in none.cpp</stack-trace></failure></test-case>");
+							fprintf(fout, "<test-case name=\"test %d name\" executed=\"True\" result=\"Failure\" success=\"False\" time=\"0\" asserts=\"0\"><failure><message>error message</message><stack-trace></stack-trace></failure></test-case>", i);
 						}
-						fprintf(fout, "</results></test-suite></test-results>");
+						fprintf(fout, "</results> </test-suite>	</test-results>");
 						fclose(fout);
 					#endif
 				}
