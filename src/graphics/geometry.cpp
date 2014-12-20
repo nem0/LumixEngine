@@ -55,9 +55,17 @@ void VertexDef::parse(const char* data, int size)
 				m_attributes[index] = VertexAttributeDef::POSITION;
 				m_vertex_size += 3 * sizeof(float);
 				break;
-			case 'n':
-				m_attributes[index] = VertexAttributeDef::NORMAL;
-				m_vertex_size += 3 * sizeof(float);
+			case 'b':
+				++i;
+				if (data[i] == '4')
+				{
+					m_attributes[index] = VertexAttributeDef::BYTE4;
+					m_vertex_size += 4 * sizeof(char);
+				}
+				else
+				{
+					ASSERT(false);
+				}
 				break;
 			case 't':
 				m_attributes[index] = VertexAttributeDef::TEXTURE_COORDS;
@@ -96,8 +104,8 @@ int VertexDef::getPositionOffset() const
 			case VertexAttributeDef::POSITION:
 				return offset;
 				break;
-			case VertexAttributeDef::NORMAL:
-				offset += 3 * sizeof(float);
+			case VertexAttributeDef::BYTE4:
+				offset += 4 * sizeof(char);
 				break;
 			case VertexAttributeDef::TEXTURE_COORDS:
 				offset += 2 * sizeof(float);
@@ -123,7 +131,6 @@ void VertexDef::begin(Shader& shader, int start_offset) const
 		switch(m_attributes[i])
 		{
 			case VertexAttributeDef::POSITION:
-			case VertexAttributeDef::NORMAL:
 				glEnableVertexAttribArray(attrib_id);
 				glVertexAttribPointer(attrib_id, 3, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
 				offset += sizeof(GLfloat) * 3;
@@ -154,6 +161,12 @@ void VertexDef::begin(Shader& shader, int start_offset) const
 				offset += sizeof(GLint) * 1;
 				++shader_attrib_idx;
 				break;
+			case VertexAttributeDef::BYTE4:
+				glEnableVertexAttribArray(attrib_id);
+				glVertexAttribPointer(attrib_id, 4, GL_BYTE, GL_FALSE, m_vertex_size, (GLvoid*)offset);
+				offset += sizeof(char) * 4;
+				++shader_attrib_idx;
+				break;
 			default:
 				ASSERT(false);
 				break;
@@ -172,7 +185,7 @@ void VertexDef::end(Shader& shader) const
 		switch(m_attributes[i])
 		{
 			case VertexAttributeDef::POSITION:
-			case VertexAttributeDef::NORMAL:
+			case VertexAttributeDef::BYTE4:
 			case VertexAttributeDef::TEXTURE_COORDS:
 			case VertexAttributeDef::INT1:
 			case VertexAttributeDef::INT4:

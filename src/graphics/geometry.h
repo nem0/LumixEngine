@@ -20,8 +20,8 @@ enum class VertexAttributeDef : uint8_t
 	INT4,
 	INT1,
 	POSITION,
-	NORMAL,
 	TEXTURE_COORDS,
+	BYTE4,
 	NONE
 };
 
