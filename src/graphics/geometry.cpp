@@ -67,9 +67,17 @@ void VertexDef::parse(const char* data, int size)
 					ASSERT(false);
 				}
 				break;
-			case 't':
-				m_attributes[index] = VertexAttributeDef::TEXTURE_COORDS;
-				m_vertex_size += 2 * sizeof(float);
+			case 's':
+				++i;
+				if (data[i] == '2')
+				{
+					m_attributes[index] = VertexAttributeDef::SHORT2;
+					m_vertex_size += 2 * sizeof(short);
+				}
+				else
+				{
+					ASSERT(false);
+				}
 				break;
 			default:
 				ASSERT(false);
@@ -107,8 +115,8 @@ int VertexDef::getPositionOffset() const
 			case VertexAttributeDef::BYTE4:
 				offset += 4 * sizeof(char);
 				break;
-			case VertexAttributeDef::TEXTURE_COORDS:
-				offset += 2 * sizeof(float);
+			case VertexAttributeDef::SHORT2:
+				offset += 2 * sizeof(short);
 				break;
 			default:
 				ASSERT(false);
@@ -136,7 +144,12 @@ void VertexDef::begin(Shader& shader, int start_offset) const
 				offset += sizeof(GLfloat) * 3;
 				++shader_attrib_idx;
 				break;
-			case VertexAttributeDef::TEXTURE_COORDS:
+			case VertexAttributeDef::SHORT2:
+				glEnableVertexAttribArray(attrib_id);
+				glVertexAttribPointer(attrib_id, 2, GL_SHORT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
+				offset += sizeof(GLshort) * 2;
+				++shader_attrib_idx;
+				break;
 			case VertexAttributeDef::FLOAT2:
 				glEnableVertexAttribArray(attrib_id);
 				glVertexAttribPointer(attrib_id, 2, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
@@ -186,7 +199,7 @@ void VertexDef::end(Shader& shader) const
 		{
 			case VertexAttributeDef::POSITION:
 			case VertexAttributeDef::BYTE4:
-			case VertexAttributeDef::TEXTURE_COORDS:
+			case VertexAttributeDef::SHORT2:
 			case VertexAttributeDef::INT1:
 			case VertexAttributeDef::INT4:
 			case VertexAttributeDef::FLOAT4:
