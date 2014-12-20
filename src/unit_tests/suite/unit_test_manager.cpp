@@ -164,14 +164,21 @@ namespace Lumix
 					}
 					#ifdef APPVEYOR
 						FILE* fout = fopen("tests.xml", "w");
-						fprintf(fout, "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"no\"?>");
+						
+						fprintf(fout, "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"no\"?>"
+"<test-results  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"nunit_schema_2.5.xsd\" name=\"Lumix\" total=\"1\" errors=\"0\" failures=\"1\" not-run=\"0\" inconclusive=\"0\" ignored=\"0\" skipped=\"0\" invalid=\"0\">"
+"<culture-info current-culture=\"\" current-uiculture=\"\" />"
+"<test-suite type=\"Powershell\" name=\"suite-name\" executed=\"True\" result=\"Failure\" success=\"False\" time=\"0\" asserts=\"0\"> <results>"
+"<test-case name=\"test name\" executed=\"True\" result=\"Failure\" success=\"False\" time=\"0.1443834\" asserts=\"0\"> 	<failure> 		<message>error message</message> 	<stack-trace></stack-trace> 	</failure> </test-case> 	</results> </test-suite>"
+"</test-results>");
+						/*fprintf(fout, "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"no\"?>");
 						fprintf(fout, "<test-results  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"nunit_schema_2.5.xsd\" name=\"Lumix\" total=\"%d\" errors=\"0\" failures=\"%d\" not-run=\"0\" inconclusive=\"0\" ignored=\"0\" skipped=\"0\" invalid=\"0\"><culture-info current-culture=\"\" current-uiculture=\"\" />", m_failed_tests.size(), m_failed_tests.size());
 						fprintf(fout, "<test-suite type=\"Powershell\" name=\"LumixSuite\" executed=\"True\" result=\"Failure\" success=\"False\" time=\"0\" asserts=\"0\"> <results>");
 						for (int i = 0; i < m_failed_tests.size(); i++)
 						{
 							fprintf(fout, "<test-case name=\"test %d name\" executed=\"True\" result=\"Failure\" success=\"False\" time=\"0\" asserts=\"0\"><failure><message>error message</message><stack-trace></stack-trace></failure></test-case>", i);
 						}
-						fprintf(fout, "</results> </test-suite>	</test-results>");
+						fprintf(fout, "</results> </test-suite>	</test-results>");*/
 						fclose(fout);
 					#endif
 				}
