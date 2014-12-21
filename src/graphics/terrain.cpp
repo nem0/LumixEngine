@@ -163,7 +163,7 @@ namespace Lumix
 	};
 
 
-	Terrain::Terrain(const Entity& entity, RenderScene& scene, IAllocator& allocator)
+	Terrain::Terrain(Renderer& renderer, const Entity& entity, RenderScene& scene, IAllocator& allocator)
 		: m_mesh(NULL)
 		, m_material(NULL)
 		, m_root(NULL)
@@ -181,6 +181,7 @@ namespace Lumix
 		, m_last_camera_position(m_allocator)
 		, m_grass_types(m_allocator)
 		, m_free_grass_quads(m_allocator)
+		, m_renderer(renderer)
 	{
 		generateGeometry();
 	}
@@ -850,7 +851,8 @@ namespace Lumix
 		generateSubgrid(points, indices, indices_offset, 8, 8);
 
 		VertexDef vertex_def;
-		vertex_def.parse("pt", 2);
+		vertex_def.addAttribute(m_renderer, "in_position", VertexAttributeDef::POSITION);
+		vertex_def.addAttribute(m_renderer, "in_tex_coords", VertexAttributeDef::SHORT2);
 		m_geometry.setAttributesData(&points[0], sizeof(points[0]) * points.size());
 		m_geometry.setIndicesData(&indices[0], sizeof(indices[0]) * indices.size());
 		m_mesh = m_allocator.newObject<Mesh>(vertex_def, m_material, 0, 0, points.size() * sizeof(points[0]), indices.size(), "terrain", m_allocator);
