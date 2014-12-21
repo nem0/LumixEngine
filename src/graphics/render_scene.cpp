@@ -150,7 +150,7 @@ namespace Lumix
 				}
 				VertexDef vertex_definition;
 				vertex_definition.addAttribute(m_engine.getRenderer(), "in_position", VertexAttributeDef::FLOAT2);
-				vertex_definition.addAttribute(m_engine.getRenderer(), "in_tex_coords", VertexAttributeDef::SHORT2);
+				vertex_definition.addAttribute(m_engine.getRenderer(), "in_tex_coords", VertexAttributeDef::FLOAT2);
 				Array<int> indices(m_allocator);
 				Array<float> data(m_allocator);
 				indices.reserve(count);

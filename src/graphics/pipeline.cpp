@@ -1100,8 +1100,8 @@ void DrawScreenQuadCommand::deserialize(PipelineImpl& pipeline, JsonSerializer& 
 	m_geometry = m_allocator.newObject<Geometry>();
 	VertexDef def;
 	Renderer& renderer = pipeline.getRenderer();
-	def.addAttribute(renderer, "in_position", VertexAttributeDef::POSITION);
-	def.addAttribute(renderer, "in_tex_coords", VertexAttributeDef::SHORT2);
+	def.addAttribute(renderer, "in_position", VertexAttributeDef::FLOAT2);
+	def.addAttribute(renderer, "in_tex_coords", VertexAttributeDef::FLOAT2);
 	int indices[6] = { 0, 1, 2, 0, 2, 3 };
 	const int GEOMETRY_VERTEX_ATTRIBUTE_COUNT = 20;
 	float v[GEOMETRY_VERTEX_ATTRIBUTE_COUNT];
