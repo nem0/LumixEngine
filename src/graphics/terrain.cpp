@@ -852,7 +852,7 @@ namespace Lumix
 
 		VertexDef vertex_def;
 		vertex_def.addAttribute(m_renderer, "in_position", VertexAttributeDef::POSITION);
-		vertex_def.addAttribute(m_renderer, "in_tex_coords", VertexAttributeDef::SHORT2);
+		vertex_def.addAttribute(m_renderer, "in_tex_coords", VertexAttributeDef::FLOAT2);
 		m_geometry.setAttributesData(&points[0], sizeof(points[0]) * points.size());
 		m_geometry.setIndicesData(&indices[0], sizeof(indices[0]) * indices.size());
 		m_mesh = m_allocator.newObject<Mesh>(vertex_def, m_material, 0, 0, points.size() * sizeof(points[0]), indices.size(), "terrain", m_allocator);

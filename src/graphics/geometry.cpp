@@ -10,11 +10,47 @@
 namespace Lumix
 {
 
+	
+static int getAttributeTypeSize(VertexAttributeDef type)
+{
+	switch (type)
+	{
+		case VertexAttributeDef::FLOAT4:
+			return 4 * sizeof(GLfloat);
+		case VertexAttributeDef::POSITION:
+		case VertexAttributeDef::FLOAT3:
+			return 3 * sizeof(GLfloat);
+		case VertexAttributeDef::FLOAT2:
+			return 2 * sizeof(GLfloat);
+		case VertexAttributeDef::FLOAT1:
+			return 1 * sizeof(GLfloat);
+		case VertexAttributeDef::INT4:
+			return 4 * sizeof(GLint);
+		case VertexAttributeDef::INT3:
+			return 3 * sizeof(GLint);
+		case VertexAttributeDef::INT2:
+			return 2 * sizeof(GLint);
+		case VertexAttributeDef::INT1:
+			return sizeof(GLint);
+		case VertexAttributeDef::BYTE4:
+			return 4 * sizeof(GLbyte);
+		case VertexAttributeDef::SHORT4:
+			return 4 * sizeof(GLshort);
+		case VertexAttributeDef::SHORT2:
+			return 2 * sizeof(GLshort);
+		default:
+			ASSERT(false);
+			return -1;
+	}
+}
+
 
 void VertexDef::addAttribute(Renderer& renderer, const char* name, VertexAttributeDef type)
 {
 	m_attributes[m_attribute_count].m_name_index = renderer.getAttributeNameIndex(name);
 	m_attributes[m_attribute_count].m_type = type;
+	++m_attribute_count;
+	m_vertex_size += getAttributeTypeSize(type);
 }
 
 
@@ -40,46 +76,7 @@ bool VertexDef::parse(Renderer& renderer, FS::IFile* file)
 
 		file->read(&m_attributes[i].m_type, sizeof(m_attributes[i].m_type));
 
-		switch (m_attributes[i].m_type)
-		{
-			case VertexAttributeDef::FLOAT4:
-				m_vertex_size += 4 * sizeof(GLfloat);
-				break;
-			case VertexAttributeDef::POSITION:
-			case VertexAttributeDef::FLOAT3:
-				m_vertex_size += 3 * sizeof(GLfloat);
-				break;
-			case VertexAttributeDef::FLOAT2:
-				m_vertex_size += 2 * sizeof(GLfloat);
-				break;
-			case VertexAttributeDef::FLOAT1:
-				m_vertex_size += 1 * sizeof(GLfloat);
-				break;
-			case VertexAttributeDef::INT4:
-				m_vertex_size += 4 * sizeof(GLint);
-				break;
-			case VertexAttributeDef::INT3:
-				m_vertex_size += 3 * sizeof(GLint);
-				break;
-			case VertexAttributeDef::INT2:
-				m_vertex_size += 2 * sizeof(GLint);
-				break;
-			case VertexAttributeDef::INT1:
-				m_vertex_size += sizeof(GLint);
-				break;
-			case VertexAttributeDef::BYTE4:
-				m_vertex_size += 4 * sizeof(GLbyte);
-				break;
-			case VertexAttributeDef::SHORT4:
-				m_vertex_size += 4 * sizeof(GLshort);
-				break;
-			case VertexAttributeDef::SHORT2:
-				m_vertex_size += 2 * sizeof(GLshort);
-				break;
-			default:
-				ASSERT(false);
-				break;
-		}
+		m_vertex_size += getAttributeTypeSize(m_attributes[i].m_type);
 	}
 	m_attribute_count = attribute_count;
 	return true;

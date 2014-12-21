@@ -34,7 +34,7 @@ enum class VertexAttributeDef : uint32_t
 struct VertexDef
 {
 	public:
-		VertexDef() : m_attribute_count(0) {}
+		VertexDef() : m_attribute_count(0), m_vertex_size(0) {}
 		void addAttribute(Renderer& renderer, const char* name, VertexAttributeDef type);
 		bool parse(Renderer& renderer, FS::IFile* file);
 		int getVertexSize() const { return m_vertex_size; }
