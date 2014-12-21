@@ -151,7 +151,8 @@ void Shader::createCombination(const char* defines)
 		
 			for (int i = 0; i < m_attributes.size(); ++i)
 			{
-				combination->m_vertex_attributes_ids[i] = glGetAttribLocation(combination->m_program_id, m_attributes[i].c_str());
+				int attr_idx = m_renderer.getAttributeNameIndex(m_attributes[i].c_str());
+				combination->m_vertex_attributes_ids[attr_idx] = glGetAttribLocation(combination->m_program_id, m_attributes[i].c_str());
 			}
 			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::WORLD_MATRIX] = glGetUniformLocation(combination->m_program_id, "world_matrix");
 			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::GRASS_MATRICES] = glGetUniformLocation(combination->m_program_id, "grass_matrices");

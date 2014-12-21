@@ -27,11 +27,13 @@ class IFile;
 class LUMIX_ENGINE_API PipelineManager : public ResourceManagerBase
 {
 public:
-	PipelineManager(IAllocator& allocator)
+	PipelineManager(IAllocator& allocator, Renderer& renderer)
 		: ResourceManagerBase(allocator)
+		, m_renderer(renderer)
 		, m_allocator(allocator)
 	{}
 	~PipelineManager() {}
+	Renderer& getRenderer() { return m_renderer; }
 
 protected:
 	virtual Resource* createResource(const Path& path) override;
@@ -39,6 +41,7 @@ protected:
 
 private:
 	IAllocator& m_allocator;
+	Renderer& m_renderer;
 };
 
 
