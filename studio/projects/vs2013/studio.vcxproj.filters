@@ -49,6 +49,45 @@
     <ClCompile Include="..\..\pc\file_system_watcher.cpp">
       <Filter>Source Files\..\..\pc</Filter>
     </ClCompile>
+    <ClCompile Include="moc\moc_scriptcompilerwidget.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moc\moc_scriptcompiler.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moc\moc_sceneview.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moc\moc_property_view.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moc\moc_profilerui.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moc\moc_profilergraph.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moc\moc_mainwindow.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moc\moc_log_widget.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moc\moc_gameview.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moc\moc_fileserverwidget.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moc\moc_entity_template_list.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moc\moc_entity_list.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="moc\moc_assetbrowser.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Source Files\..\..\scripts" />
@@ -254,142 +293,6 @@
     <CustomBuild Include="..\..\sceneview.h">
       <Filter>Header Files\..\..</Filter>
     </CustomBuild>
-  </ItemGroup>
-  <ItemGroup>
-    <Filter Include="Generated Files\debug" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="debug\moc_assetbrowser.cpp">
-      <Filter>Generated Files\debug</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="debug\moc_entity_list.cpp">
-      <Filter>Generated Files\debug</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="debug\moc_entity_template_list.cpp">
-      <Filter>Generated Files\debug</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="debug\moc_fileserverwidget.cpp">
-      <Filter>Generated Files\debug</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="debug\moc_gameview.cpp">
-      <Filter>Generated Files\debug</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="debug\moc_log_widget.cpp">
-      <Filter>Generated Files\debug</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="debug\moc_mainwindow.cpp">
-      <Filter>Generated Files\debug</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="debug\moc_profilergraph.cpp">
-      <Filter>Generated Files\debug</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="debug\moc_profilerui.cpp">
-      <Filter>Generated Files\debug</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="debug\moc_property_view.cpp">
-      <Filter>Generated Files\debug</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="debug\moc_sceneview.cpp">
-      <Filter>Generated Files\debug</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="debug\moc_scriptcompiler.cpp">
-      <Filter>Generated Files\debug</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="debug\moc_scriptcompilerwidget.cpp">
-      <Filter>Generated Files\debug</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <Filter Include="Generated Files\release" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="release\moc_assetbrowser.cpp">
-      <Filter>Generated Files\release</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="release\moc_entity_list.cpp">
-      <Filter>Generated Files\release</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="release\moc_entity_template_list.cpp">
-      <Filter>Generated Files\release</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="release\moc_fileserverwidget.cpp">
-      <Filter>Generated Files\release</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="release\moc_gameview.cpp">
-      <Filter>Generated Files\release</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="release\moc_log_widget.cpp">
-      <Filter>Generated Files\release</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="release\moc_mainwindow.cpp">
-      <Filter>Generated Files\release</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="release\moc_profilergraph.cpp">
-      <Filter>Generated Files\release</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="release\moc_profilerui.cpp">
-      <Filter>Generated Files\release</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="release\moc_property_view.cpp">
-      <Filter>Generated Files\release</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="release\moc_sceneview.cpp">
-      <Filter>Generated Files\release</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="release\moc_scriptcompiler.cpp">
-      <Filter>Generated Files\release</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="release\moc_scriptcompilerwidget.cpp">
-      <Filter>Generated Files\release</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Form Files\.." />
