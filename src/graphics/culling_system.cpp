@@ -16,7 +16,7 @@ namespace Lumix
 	typedef BinaryArray VisibilityFlags;
 	typedef Array<int64_t> LayerMasks;
 
-	static const int MIN_ENTITIES_PER_THREAD = 50;
+	static const int MIN_ENTITIES_PER_THREAD = 5;
 
 	static void doCulling(
 		int start_index,
@@ -44,9 +44,9 @@ namespace Lumix
 	{
 	public:
 		CullingJob(const CullingSystem::InputSpheres& spheres, const VisibilityFlags& visibility_flags, const LayerMasks& layer_masks, int64_t layer_mask,
-			CullingSystem::Subresults& results, int start, int end, const Frustum& frustum, MTJD::Manager& manager, IAllocator& allocator
+			CullingSystem::Subresults& results, int start, int end, const Frustum& frustum, MTJD::Manager& manager, IAllocator& allocator, IAllocator& job_allocator
 			)
-			: Job(true, MTJD::Priority::Default, false, manager, allocator)
+			: Job(true, MTJD::Priority::Default, false, manager, allocator, job_allocator)
 			, m_spheres(spheres)
 			, m_results(results)
 			, m_start(start)
@@ -171,16 +171,16 @@ namespace Lumix
 			for (; i < cpu_count - 1; i++)
 			{
 				m_result[i].clear();
-				CullingJob* cj = m_allocator.newObject<CullingJob>(m_spheres, m_visibility_flags, m_layer_masks
-					, layer_mask, m_result[i], i * step, (i + 1) * step - 1, frustum, m_mtjd_manager, m_allocator
+				CullingJob* cj = m_job_allocator.newObject<CullingJob>(m_spheres, m_visibility_flags, m_layer_masks
+					, layer_mask, m_result[i], i * step, (i + 1) * step - 1, frustum, m_mtjd_manager, m_allocator, m_job_allocator
 					);
 				cj->addDependency(&m_sync_point);
 				jobs[i] = cj;
 			}
 
 			m_result[i].clear();
-			CullingJob* cj = m_allocator.newObject<CullingJob>(m_spheres, m_visibility_flags, m_layer_masks
-				, layer_mask, m_result[i], i * step, count - 1, frustum, m_mtjd_manager, m_allocator
+			CullingJob* cj = m_job_allocator.newObject<CullingJob>(m_spheres, m_visibility_flags, m_layer_masks
+				, layer_mask, m_result[i], i * step, count - 1, frustum, m_mtjd_manager, m_allocator, m_job_allocator
 				);
 			cj->addDependency(&m_sync_point);
 			jobs[i] = cj;
