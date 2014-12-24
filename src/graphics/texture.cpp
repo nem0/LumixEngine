@@ -422,6 +422,7 @@ namespace Lumix
 		, m_is_cubemap(false)
 		, m_allocator(allocator)
 		, m_data(m_allocator)
+		, m_BPP(-1)
 	{
 		glGenTextures(1, &m_id);
 	}
@@ -927,11 +928,5 @@ void Texture::doUnload(void)
 	onEmpty();
 }
 
-FS::ReadCallback Texture::getReadCallback()
-{
-	FS::ReadCallback cb;
-	cb.bind<Texture, &Texture::loaded>(this);
-	return cb;
-}
 
 } // ~namespace Lumix

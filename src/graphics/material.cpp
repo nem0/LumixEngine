@@ -121,12 +121,6 @@ void Material::doUnload(void)
 	onEmpty();
 }
 
-FS::ReadCallback Material::getReadCallback()
-{
-	FS::ReadCallback rc;
-	rc.bind<Material, &Material::loaded>(this);
-	return rc;
-}
 
 bool Material::save(JsonSerializer& serializer)
 {
@@ -265,6 +259,14 @@ Texture* Material::getTextureByUniform(const char* uniform) const
 	return NULL;
 }
 
+
+void Material::setTexturePath(int i, const Path& path)
+{
+	Texture* texture = static_cast<Texture*>(m_resource_manager.get(ResourceManager::TEXTURE)->load(path));
+	setTexture(i, texture);
+}
+
+
 void Material::setTexture(int i, Texture* texture)
 { 
 	if (m_textures[i].m_texture)
@@ -292,6 +294,14 @@ void Material::shaderLoaded(Resource::State, Resource::State)
 {
 	updateShaderCombination();
 }
+
+
+void Material::setShader(const Path& path)
+{
+	Shader* shader = static_cast<Shader*>(m_resource_manager.get(ResourceManager::SHADER)->load(path));
+	setShader(shader);
+}
+
 
 void Material::setShader(Shader* shader)
 {
@@ -386,7 +396,7 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	PROFILE_FUNCTION();
 	if(success)
 	{
-		JsonSerializer serializer(m_allocator, *file, JsonSerializer::READ, m_path.c_str());
+		JsonSerializer serializer(*file, JsonSerializer::READ, m_path.c_str(), m_allocator);
 		serializer.deserializeObjectBegin();
 		char path[LUMIX_MAX_PATH];
 		char label[256];

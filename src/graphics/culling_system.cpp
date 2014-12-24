@@ -43,8 +43,8 @@ namespace Lumix
 	class CullingJob : public MTJD::Job
 	{
 	public:
-		CullingJob(const CullingSystem::InputSpheres& spheres, const VisibilityFlags& visibility_flags, const LayerMasks& layer_masks, int64_t layer_mask,
-			CullingSystem::Subresults& results, int start, int end, const Frustum& frustum, MTJD::Manager& manager, IAllocator& allocator, IAllocator& job_allocator
+		CullingJob(const CullingSystem::InputSpheres& spheres, const VisibilityFlags& visibility_flags, const LayerMasks& layer_masks, int64_t layer_mask
+			, CullingSystem::Subresults& results, int start, int end, const Frustum& frustum, MTJD::Manager& manager, IAllocator& allocator, IAllocator& job_allocator
 			)
 			: Job(true, MTJD::Priority::Default, false, manager, allocator, job_allocator)
 			, m_spheres(spheres)

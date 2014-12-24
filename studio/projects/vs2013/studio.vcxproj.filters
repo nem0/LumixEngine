@@ -35,6 +35,12 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
+    <Filter Include="Header Files\..\..\property_view">
+      <UniqueIdentifier>{8f5b6976-536d-47bd-ab62-d5dfc3077dca}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\..\..\property_view">
+      <UniqueIdentifier>{526c0ae5-9f02-4cc1-811b-116e91c896c1}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Source Files\.." />
@@ -49,43 +55,43 @@
     <ClCompile Include="..\..\pc\file_system_watcher.cpp">
       <Filter>Source Files\..\..\pc</Filter>
     </ClCompile>
-    <ClCompile Include="moc\moc_scriptcompilerwidget.cpp">
+    <ClCompile Include="..\..\..\tmp\studio\moc_scriptcompilerwidget.cpp">
       <Filter>Generated Files</Filter>
     </ClCompile>
-    <ClCompile Include="moc\moc_scriptcompiler.cpp">
+    <ClCompile Include="..\..\..\tmp\studio\moc_scriptcompiler.cpp">
       <Filter>Generated Files</Filter>
     </ClCompile>
-    <ClCompile Include="moc\moc_sceneview.cpp">
+    <ClCompile Include="..\..\..\tmp\studio\moc_sceneview.cpp">
       <Filter>Generated Files</Filter>
     </ClCompile>
-    <ClCompile Include="moc\moc_property_view.cpp">
+    <ClCompile Include="..\..\..\tmp\studio\moc_property_view.cpp">
       <Filter>Generated Files</Filter>
     </ClCompile>
-    <ClCompile Include="moc\moc_profilerui.cpp">
+    <ClCompile Include="..\..\..\tmp\studio\moc_profilerui.cpp">
       <Filter>Generated Files</Filter>
     </ClCompile>
-    <ClCompile Include="moc\moc_profilergraph.cpp">
+    <ClCompile Include="..\..\..\tmp\studio\moc_profilergraph.cpp">
       <Filter>Generated Files</Filter>
     </ClCompile>
-    <ClCompile Include="moc\moc_mainwindow.cpp">
+    <ClCompile Include="..\..\..\tmp\studio\moc_mainwindow.cpp">
       <Filter>Generated Files</Filter>
     </ClCompile>
-    <ClCompile Include="moc\moc_log_widget.cpp">
+    <ClCompile Include="..\..\..\tmp\studio\moc_log_widget.cpp">
       <Filter>Generated Files</Filter>
     </ClCompile>
-    <ClCompile Include="moc\moc_gameview.cpp">
+    <ClCompile Include="..\..\..\tmp\studio\moc_gameview.cpp">
       <Filter>Generated Files</Filter>
     </ClCompile>
-    <ClCompile Include="moc\moc_fileserverwidget.cpp">
+    <ClCompile Include="..\..\..\tmp\studio\moc_fileserverwidget.cpp">
       <Filter>Generated Files</Filter>
     </ClCompile>
-    <ClCompile Include="moc\moc_entity_template_list.cpp">
+    <ClCompile Include="..\..\..\tmp\studio\moc_entity_template_list.cpp">
       <Filter>Generated Files</Filter>
     </ClCompile>
-    <ClCompile Include="moc\moc_entity_list.cpp">
+    <ClCompile Include="..\..\..\tmp\studio\moc_entity_list.cpp">
       <Filter>Generated Files</Filter>
     </ClCompile>
-    <ClCompile Include="moc\moc_assetbrowser.cpp">
+    <ClCompile Include="..\..\..\tmp\studio\moc_assetbrowser.cpp">
       <Filter>Generated Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -357,5 +363,16 @@
     <CustomBuild Include="..\..\property_view.ui">
       <Filter>Form Files\..\..</Filter>
     </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\property_view\file_edit.h">
+      <Filter>Header Files\..\..\property_view</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\property_view\terrain_editor.h">
+      <Filter>Header Files\..\..\property_view</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\property_view\property_editor.h">
+      <Filter>Header Files\..\..\property_view</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

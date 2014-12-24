@@ -190,7 +190,7 @@ namespace Lumix
 		if (m_grass_model)
 		{
 			m_grass_model->getResourceManager().get(ResourceManager::MODEL)->unload(*m_grass_model);
-			m_grass_model->onLoaded<GrassType, &GrassType::grassLoaded>(this);
+			m_grass_model->getObserverCb().unbind<GrassType, &GrassType::grassLoaded>(this);
 			m_terrain.m_allocator.deleteObject(m_grass_mesh);
 			m_terrain.m_allocator.deleteObject(m_grass_geometry);
 		}
@@ -506,10 +506,10 @@ namespace Lumix
 			Geometry::IndexCallback index_callback;
 			vertex_callback.bind<GrassType, &GrassType::grassVertexCopyCallback>(this);
 			index_callback.bind<GrassType, &GrassType::grassIndexCopyCallback>(this);
-			m_grass_geometry->copy(allocator, m_grass_model->getGeometry(), COPY_COUNT, index_callback, vertex_callback);
+			m_grass_geometry->copy(m_grass_model->getGeometry(), COPY_COUNT, index_callback, vertex_callback, allocator);
 			Material* material = m_grass_model->getMesh(0).getMaterial();
 			const Mesh& src_mesh = m_grass_model->getMesh(0);
-			m_grass_mesh = allocator.newObject<Mesh>(allocator, src_mesh.getVertexDefinition(), material, 0, src_mesh.getAttributeArraySize(), 0, src_mesh.getIndexCount() * COPY_COUNT, "grass");
+			m_grass_mesh = allocator.newObject<Mesh>(src_mesh.getVertexDefinition(), material, 0, src_mesh.getAttributeArraySize(), 0, src_mesh.getIndexCount() * COPY_COUNT, "grass", allocator);
 			m_terrain.forceGrassUpdate();
 		}
 	}
@@ -853,7 +853,7 @@ namespace Lumix
 		vertex_def.parse("pt", 2);
 		m_geometry.setAttributesData(&points[0], sizeof(points[0]) * points.size());
 		m_geometry.setIndicesData(&indices[0], sizeof(indices[0]) * indices.size());
-		m_mesh = m_allocator.newObject<Mesh>(m_allocator, vertex_def, m_material, 0, 0, points.size() * sizeof(points[0]), indices.size(), "terrain");
+		m_mesh = m_allocator.newObject<Mesh>(vertex_def, m_material, 0, 0, points.size() * sizeof(points[0]), indices.size(), "terrain", m_allocator);
 	}
 
 	TerrainQuad* Terrain::generateQuadTree(float size)

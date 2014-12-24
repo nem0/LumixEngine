@@ -6,6 +6,7 @@
 #include "core/delegate.h"
 #include "core/stack_allocator.h"
 #include "core/string.h"
+#include <cfloat>
 
 
 namespace Lumix
@@ -88,7 +89,7 @@ class IntArrayObjectDescriptor : public IIntPropertyDescriptor
 		typedef void (S::*IntegerSetter)(Component, int, int);
 
 	public:
-		IntArrayObjectDescriptor(IAllocator& allocator, const char* name, IntegerGetter _getter, IntegerSetter _setter)
+		IntArrayObjectDescriptor(const char* name, IntegerGetter _getter, IntegerSetter _setter, IAllocator& allocator)
 			: IIntPropertyDescriptor(allocator)
 		{
 			setName(name);
@@ -131,7 +132,7 @@ class BoolArrayObjectDescriptor : public IPropertyDescriptor
 		typedef void (S::*Setter)(Component, int, const int&);
 
 	public:
-		BoolArrayObjectDescriptor(IAllocator& allocator, const char* name, Getter _getter, Setter _setter)
+		BoolArrayObjectDescriptor(const char* name, Getter _getter, Setter _setter, IAllocator& allocator)
 			: IPropertyDescriptor(allocator)
 		{
 			setName(name);
@@ -174,7 +175,7 @@ class DecimalArrayObjectDescriptor : public IPropertyDescriptor
 		typedef void (S::*Setter)(Component, int, float);
 
 	public:
-		DecimalArrayObjectDescriptor(IAllocator& allocator, const char* name, Getter _getter, Setter _setter)
+		DecimalArrayObjectDescriptor(const char* name, Getter _getter, Setter _setter, IAllocator& allocator)
 			: IPropertyDescriptor(allocator)
 		{
 			setName(name);
@@ -219,7 +220,7 @@ class StringArrayObjectDescriptor : public IPropertyDescriptor
 		typedef void (S::*Setter)(Component, int, const string&);
 
 	public:
-		StringArrayObjectDescriptor(IAllocator& allocator, const char* name, Getter _getter, Setter _setter)
+		StringArrayObjectDescriptor(const char* name, Getter _getter, Setter _setter, IAllocator& allocator)
 			: IPropertyDescriptor(allocator)
 		{
 			setName(name);
@@ -268,8 +269,8 @@ template <class S>
 class FileArrayObjectDescriptor : public StringArrayObjectDescriptor<S>, public IFilePropertyDescriptor
 {
 	public:
-		FileArrayObjectDescriptor(IAllocator& allocator, const char* name, Getter getter, Setter setter, const char* file_type)
-			: StringArrayObjectDescriptor(allocator, name, getter, setter)
+		FileArrayObjectDescriptor(const char* name, Getter getter, Setter setter, const char* file_type, IAllocator& allocator)
+			: StringArrayObjectDescriptor(name, getter, setter, allocator)
 			, m_file_type(file_type, m_file_type_allocator)
 		{
 			m_type = IPropertyDescriptor::FILE;
@@ -290,8 +291,8 @@ template <class S>
 class ResourceArrayObjectDescriptor : public FileArrayObjectDescriptor<S>
 {
 	public:
-		ResourceArrayObjectDescriptor(IAllocator& allocator, const char* name, Getter getter, Setter setter, const char* file_type)
-			: FileArrayObjectDescriptor(allocator, name, getter, setter, file_type)
+		ResourceArrayObjectDescriptor(const char* name, Getter getter, Setter setter, const char* file_type, IAllocator& allocator)
+			: FileArrayObjectDescriptor(name, getter, setter, file_type, allocator)
 		{
 			m_type = IPropertyDescriptor::RESOURCE;
 		}
@@ -357,7 +358,7 @@ class ArrayDescriptor : public IArrayDescriptor
 		typedef void (S::*Remover)(Component, int);
 
 	public:
-		ArrayDescriptor(IAllocator& allocator, const char* name, Counter counter, Adder adder, Remover remover)
+		ArrayDescriptor(const char* name, Counter counter, Adder adder, Remover remover, IAllocator& allocator)
 			: IArrayDescriptor(allocator)
 			, m_allocator(allocator)
 		{ 
@@ -474,7 +475,7 @@ class StringPropertyDescriptor : public IPropertyDescriptor
 		typedef void (S::*Setter)(Component, const string&);
 
 	public:
-		StringPropertyDescriptor(IAllocator& allocator, const char* name, Getter getter, Setter setter)
+		StringPropertyDescriptor(const char* name, Getter getter, Setter setter, IAllocator& allocator)
 			: IPropertyDescriptor(allocator)
 		{
 			setName(name);
@@ -527,7 +528,7 @@ class BoolPropertyDescriptor : public IPropertyDescriptor
 		typedef void (S::*Setter)(Component, bool);
 
 	public:
-		BoolPropertyDescriptor(IAllocator& allocator, const char* name, Getter getter, Setter setter)
+		BoolPropertyDescriptor(const char* name, Getter getter, Setter setter, IAllocator& allocator)
 			: IPropertyDescriptor(allocator)
 		{
 			setName(name);
@@ -570,7 +571,7 @@ class Vec3PropertyDescriptor : public IPropertyDescriptor
 		typedef void (S::*Setter)(Component, const Vec3&);
 
 	public:
-		Vec3PropertyDescriptor(IAllocator& allocator, const char* name, Getter getter, Setter setter)
+		Vec3PropertyDescriptor(const char* name, Getter getter, Setter setter, IAllocator& allocator)
 			: IPropertyDescriptor(allocator)
 		{
 			setName(name);
@@ -608,6 +609,8 @@ class Vec3PropertyDescriptor : public IPropertyDescriptor
 class IFilePropertyDescriptor
 {
 	public:
+		virtual ~IFilePropertyDescriptor() {}
+
 		virtual const char* getFileType() = 0;
 };
 
@@ -616,8 +619,8 @@ template <class T>
 class FilePropertyDescriptor : public StringPropertyDescriptor<T>, public IFilePropertyDescriptor
 {
 	public:
-		FilePropertyDescriptor(IAllocator& allocator, const char* name, Getter getter, Setter setter, const char* file_type)
-			: StringPropertyDescriptor(allocator, name, getter, setter)
+		FilePropertyDescriptor(const char* name, Getter getter, Setter setter, const char* file_type, IAllocator& allocator)
+			: StringPropertyDescriptor(name, getter, setter, allocator)
 			, m_file_type(file_type, m_file_type_allocator)
 		{
 			m_type = IPropertyDescriptor::FILE;
@@ -638,8 +641,8 @@ template <class T>
 class ResourcePropertyDescriptor : public FilePropertyDescriptor<T>
 {
 	public:
-		ResourcePropertyDescriptor(IAllocator& allocator, const char* name, Getter getter, Setter setter, const char* file_type)
-			: FilePropertyDescriptor(allocator, name, getter, setter, file_type)
+		ResourcePropertyDescriptor(const char* name, Getter getter, Setter setter, const char* file_type, IAllocator& allocator)
+			: FilePropertyDescriptor(name, getter, setter, file_type, allocator)
 		{
 			m_type = IPropertyDescriptor::RESOURCE;
 		}
@@ -647,16 +650,42 @@ class ResourcePropertyDescriptor : public FilePropertyDescriptor<T>
 
 
 
+class IDecimalPropertyDescriptor : public IPropertyDescriptor
+{
+	public:
+		IDecimalPropertyDescriptor(IAllocator& allocator)
+			: IPropertyDescriptor(allocator)
+		{
+			m_min = -FLT_MAX;
+			m_max = FLT_MAX;
+			m_step = 0.1f;
+		}
+
+		float getMin() const { return m_min; }
+		float getMax() const { return m_max; }
+		float getStep() const { return m_step; }
+
+		void setMin(float value) { m_min = value; }
+		void setMax(float value) { m_max = value; }
+		void setStep(float value) { m_step = value; }
+
+	private:
+		float m_min;
+		float m_max;
+		float m_step;
+};
+
+
 template <class S>
-class DecimalPropertyDescriptor : public IPropertyDescriptor
+class DecimalPropertyDescriptor : public IDecimalPropertyDescriptor
 {
 	public:
 		typedef float (S::*Getter)(Component);
 		typedef void (S::*Setter)(Component, float);
 
 	public:
-		DecimalPropertyDescriptor(IAllocator& allocator, const char* name, Getter _getter, Setter _setter) 
-			: IPropertyDescriptor(allocator)
+		DecimalPropertyDescriptor(const char* name, Getter _getter, Setter _setter, IAllocator& allocator)
+			: IDecimalPropertyDescriptor(allocator)
 		{ 
 			setName(name);
 			m_getter = _getter;
@@ -698,7 +727,7 @@ class ColorPropertyDescriptor : public IPropertyDescriptor
 		typedef void (S::*Setter)(Component, const Vec4&);
 
 	public:
-		ColorPropertyDescriptor(IAllocator& allocator, const char* name, Getter _getter, Setter _setter)
+		ColorPropertyDescriptor(const char* name, Getter _getter, Setter _setter, IAllocator& allocator)
 			: IPropertyDescriptor(allocator)
 		{
 			setName(name);

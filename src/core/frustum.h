@@ -32,6 +32,7 @@ namespace Lumix
 				m_center = (near_center + far_center) * 0.5f;
 				float z_diff = far_distance - near_distance;
 				m_radius = sqrt(width * width + height * height + z_diff * z_diff) * 0.5f;
+				m_position = position;
 			}
 		
 
@@ -85,6 +86,13 @@ namespace Lumix
 				float size = (corner1 - corner2).length();
 				size = Math::maxValue(sqrt(far_width * far_width * 4 + far_height * far_height * 4), size);
 				m_radius = size * 0.5f;
+				m_position = position;
+				m_direction = direction;
+				m_up = up;
+				m_fov = fov;
+				m_ratio = ratio;
+				m_near_distance = near_distance;
+				m_far_distance = far_distance;
 			}
 
 
@@ -116,6 +124,13 @@ namespace Lumix
 			}
 
 			const Vec3& getCenter() const { return m_center; }
+			const Vec3& getPosition() const { return m_position; }
+			const Vec3& getDirection() const { return m_direction; }
+			const Vec3& getUp() const { return m_up; }
+			float getFOV() const { return m_fov; }
+			float getRatio() const { return m_ratio; }
+			float getNearDistance() const { return m_near_distance; }
+			float getFarDistance() const { return m_far_distance; }
 			float getRadius() const { return m_radius; }
 
 		private:
@@ -124,6 +139,13 @@ namespace Lumix
 		private:
 			Plane m_plane[(uint32_t)Sides::COUNT];
 			Vec3 m_center;
+			Vec3 m_position;
+			Vec3 m_direction;
+			Vec3 m_up;
+			float m_fov;
+			float m_ratio;
+			float m_near_distance;
+			float m_far_distance;
 			float m_radius;
 	};
 }

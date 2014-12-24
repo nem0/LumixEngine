@@ -13,7 +13,7 @@ namespace Lumix
 		class LUMIX_CORE_API Scheduler : public MT::Task
 		{
 		public:
-			explicit Scheduler(Manager& manager, IAllocator& allocator);
+			Scheduler(Manager& manager, IAllocator& allocator);
 			~Scheduler();
 
 			virtual int task() override;

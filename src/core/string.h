@@ -41,7 +41,7 @@ class base_string
 			m_cstr[m_size] = 0;
 		}
 		
-		base_string(IAllocator& allocator, const char* rhs, int32_t length)
+		base_string(const T* rhs, int32_t length, IAllocator& allocator)
 			: m_allocator(allocator)
 		{
 			m_size = length;
@@ -59,7 +59,7 @@ class base_string
 			m_cstr[m_size] = 0;
 		}
 
-		explicit base_string(const T* rhs, IAllocator& allocator)
+		base_string(const T* rhs, IAllocator& allocator)
 			: m_allocator(allocator)
 		{
 			m_size = strlen(rhs);
