@@ -64,7 +64,7 @@ namespace Lumix
 
 		void doLoad(void);
 		virtual void doUnload(void) = 0;
-		virtual FS::ReadCallback getReadCallback(void) = 0;
+		virtual void loaded(FS::IFile* file, bool success, FS::FileSystem& fs) = 0;
 
 		uint32_t addRef(void) { return ++m_ref_count; }
 		uint32_t remRef(void) { return --m_ref_count; }

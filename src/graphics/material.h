@@ -71,6 +71,7 @@ public:
 	void enableShadowReceiving(bool enable) { m_is_shadow_receiver = enable; updateShaderCombination(); }
 
 	void setShader(Shader* shader);
+	void setShader(const Path& path);
 	Shader* getShader() const { return m_shader; }
 
 	int getTextureCount() const { return m_textures.size(); }
@@ -78,6 +79,7 @@ public:
 	Texture* getTextureByUniform(const char* uniform) const;
 	void addTexture(Texture* texture);
 	void setTexture(int i, Texture* texture);
+	void setTexturePath(int i, const Path& path);
 	void removeTexture(int i);
 	bool save(JsonSerializer& serializer);
 	int getUniformCount() const { return m_uniforms.size(); }
@@ -104,9 +106,8 @@ public:
 
 private:
 	virtual void doUnload(void) override;
-	virtual FS::ReadCallback getReadCallback() override;
+	virtual void loaded(FS::IFile* file, bool success, FS::FileSystem& fs) override;
 
-	void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 	bool deserializeTexture(JsonSerializer& serializer, const char* material_dir);
 
 private:

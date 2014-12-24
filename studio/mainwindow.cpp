@@ -69,10 +69,7 @@ MainWindow::MainWindow(QWidget* parent) :
 
 	createLayoutCombobox();
 
-	m_property_view->setScriptCompiler(m_script_compiler_ui->getCompiler());
 	m_property_view->setAssetBrowser(*m_asset_browser);
-	m_property_view->setEntityTemplateList(m_entity_template_list_ui);
-	m_property_view->setEntityList(m_entity_list);
 
 	int size = settings.beginReadArray("recent_files");
 	for (int i = 0; i < size; ++i)
@@ -106,6 +103,13 @@ MainWindow::MainWindow(QWidget* parent) :
 			restoreState(state);
 		}
 	}
+}
+
+
+void MainWindow::installPlugins()
+{
+	m_property_view->addEntityComponentPlugin(new ScriptComponentPlugin(*m_world_editor, *m_script_compiler_ui->getCompiler()));
+	m_property_view->addEntityComponentPlugin(new TerrainComponentPlugin(*m_world_editor, m_entity_template_list_ui, m_entity_list));
 }
 
 
@@ -227,6 +231,8 @@ void MainWindow::setWorldEditor(Lumix::WorldEditor& editor)
 	m_asset_browser->setScriptCompiler(m_script_compiler_ui->getCompiler());
 
 	m_world_editor->universeLoaded().bind<MainWindow, &MainWindow::onUniverseLoaded>(this);
+
+	installPlugins();
 }
 
 void MainWindow::onUniverseLoaded()

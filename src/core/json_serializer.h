@@ -34,7 +34,7 @@ namespace Lumix
 			};
 			
 		public:
-			JsonSerializer(IAllocator& allocator, FS::IFile& file, AccessMode access_mode, const char* path);
+			JsonSerializer(FS::IFile& file, AccessMode access_mode, const char* path, IAllocator& allocator);
 			~JsonSerializer();
 
 			// serialize

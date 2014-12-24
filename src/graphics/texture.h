@@ -34,14 +34,13 @@ class LUMIX_ENGINE_API Texture : public Resource
 		uint32_t getPixel(float x, float y) const;
 
 	private:
-		void loaded(FS::IFile* file, bool success, FS::FileSystem& fs);
 		bool loadDDS(FS::IFile& file);
 		bool loadTGA(FS::IFile& file);
 		bool loadRaw(FS::IFile& file);
 		void saveTGA();
 
 		virtual void doUnload(void) override;
-		virtual FS::ReadCallback getReadCallback() override;
+		virtual void loaded(FS::IFile* file, bool success, FS::FileSystem& fs) override;
 
 	private:
 		IAllocator& m_allocator;

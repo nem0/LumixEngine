@@ -39,7 +39,6 @@ namespace Lumix
 	{
 		const Mesh* m_mesh;
 		const Pose* m_pose;
-		float m_scale;
 		const Matrix* m_matrix;
 		const Model* m_model;
 	};
@@ -95,7 +94,12 @@ namespace Lumix
 			virtual void addDebugLine(const Vec3& from, const Vec3& to, const Vec3& color, float life) = 0;
 			virtual void addDebugCross(const Vec3& center, float size, const Vec3& color, float life) = 0;
 			virtual void addDebugCube(const Vec3& from, const Vec3& max, const Vec3& color, float life) = 0;
-			virtual void addDebugCircle(const Vec3& center, float radius, const Vec3& color, float life) = 0;
+			virtual void addDebugCircle(const Vec3& center, const Vec3& up, float radius, const Vec3& color, float life) = 0;
+			virtual void addDebugSphere(const Vec3& center, float radius, const Vec3& color, float life) = 0;
+			virtual void addDebugFrustum(const Vec3& position, const Vec3& direction, const Vec3& up, float fov, float ratio, float near_distance, float far_distance, const Vec3& color, float life) = 0;
+			virtual void addDebugFrustum(const Frustum& frustum, const Vec3& color, float life) = 0;
+			virtual void addDebugCylinder(const Vec3& position, const Vec3& up, float radius, const Vec3& color, float life) = 0;
+
 			virtual const Array<DebugLine>& getDebugLines() const = 0;
 			virtual Component getCameraInSlot(const char* slot) = 0;
 			virtual float getCameraFOV(Component camera) = 0;
