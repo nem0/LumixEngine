@@ -16,7 +16,7 @@ namespace Lumix
 	typedef BinaryArray VisibilityFlags;
 	typedef Array<int64_t> LayerMasks;
 
-	static const int MIN_ENTITIES_PER_THREAD = 5;
+	static const int MIN_ENTITIES_PER_THREAD = 50;
 
 	static void doCulling(
 		int start_index,
