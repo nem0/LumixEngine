@@ -618,6 +618,16 @@ void bindGeometry(Renderer& renderer, const Geometry& geometry, const Mesh& mesh
 }
 
 
+void renderInstancedGeometry(int indices_offset, int vertex_count, int instance_count, const Shader& shader)
+{
+	for (int i = 0; i < shader.getAttributeCount(); ++i)
+	{
+		glVertexAttribDivisor(shader.getAttribId(i), 0);
+	}
+	glDrawElementsInstanced(GL_TRIANGLES, vertex_count, GL_UNSIGNED_INT, (void*)(indices_offset * sizeof(GLint)), instance_count);
+}
+
+
 void renderGeometry(int indices_offset, int vertex_count)
 {
 	glDrawElements(GL_TRIANGLES, vertex_count, GL_UNSIGNED_INT, (void*)(indices_offset * sizeof(GLint)));
@@ -639,6 +649,12 @@ int getUniformLocation(const Shader& shader, int name)
 void setUniform(int location, const Matrix& mtx)
 {
 	glUniformMatrix4fv(location, 1, false, &mtx.m11);
+}
+
+
+void setUniform(int location, const Matrix* matrices, int count)
+{
+	glUniformMatrix4fv(location, count, false, &matrices[0].m11);
 }
 
 

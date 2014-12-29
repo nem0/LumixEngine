@@ -863,14 +863,20 @@ struct PipelineInstanceImpl : public PipelineInstance
 			}
 			else
 			{
-				while (last_key == info->m_key)
+				int i = 0;
+				Matrix matrices[64];
+				while (last_key == info->m_key && i < 64)
 				{
 					const RenderableMesh* LUMIX_RESTRICT renderable_mesh = info->m_mesh;
 					const Matrix& world_matrix = *renderable_mesh->m_matrix;
-					setUniform(mesh_context.m_world_matrix_uniform_location, world_matrix);
-					renderGeometry(mesh_context.m_indices_offset, mesh_context.m_vertex_count);
+					//setUniform(mesh_context.m_world_matrix_uniform_location, world_matrix);
+					matrices[i] = world_matrix;
+					//renderInstancedGeometry(mesh_context.m_indices_offset, mesh_context.m_vertex_count, 2, *mesh_context.m_shader);
+					++i;
 					++info;
 				}
+				setUniform(mesh_context.m_world_matrix_uniform_location, matrices, i);
+				renderInstancedGeometry(mesh_context.m_indices_offset, mesh_context.m_vertex_count, i, *mesh_context.m_shader);
 			}
 		}
 	}

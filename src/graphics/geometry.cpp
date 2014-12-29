@@ -144,6 +144,7 @@ void VertexDef::begin(Shader& shader, int start_offset) const
 	for(int i = 0; i < attribute_count; ++i)
 	{
 		GLint attrib_id = shader.getAttribId(m_attributes[i].m_name_index);
+		glVertexAttribDivisor(attrib_id, 0);
 		switch (m_attributes[i].m_type)
 		{
 			case VertexAttributeDef::FLOAT4:
