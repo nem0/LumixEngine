@@ -230,14 +230,11 @@ namespace Lumix
 
 			virtual void update(bool is_game_running) override
 			{
-				if (is_game_running)
+				++m_fps_frame;
+				if (m_fps_frame == 30)
 				{
-					++m_fps_frame;
-					if (m_fps_frame == 30)
-					{
-						m_fps = 30.0f / m_fps_timer->tick();
-						m_fps_frame = 0;
-					}
+					m_fps = 30.0f / m_fps_timer->tick();
+					m_fps_frame = 0;
 				}
 				float dt = m_timer->tick();
 				m_last_time_delta = dt;
