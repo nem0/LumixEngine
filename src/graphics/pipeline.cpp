@@ -839,6 +839,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		sentinel.m_key = 0;
 		RenderModelsMeshContext mesh_context;
 		int64_t last_key = 0;
+		Matrix matrices[64];
 		while (info != end)
 		{
 			mesh_context.m_mesh = info->m_mesh->m_mesh;
@@ -863,20 +864,20 @@ struct PipelineInstanceImpl : public PipelineInstance
 			}
 			else
 			{
-				int i = 0;
-				Matrix matrices[64];
-				while (last_key == info->m_key && i < 64)
+				while (last_key == info->m_key)
 				{
-					const RenderableMesh* LUMIX_RESTRICT renderable_mesh = info->m_mesh;
-					const Matrix& world_matrix = *renderable_mesh->m_matrix;
-					//setUniform(mesh_context.m_world_matrix_uniform_location, world_matrix);
-					matrices[i] = world_matrix;
-					//renderInstancedGeometry(mesh_context.m_indices_offset, mesh_context.m_vertex_count, 2, *mesh_context.m_shader);
-					++i;
-					++info;
+					int instance_id = 0;
+					while (last_key == info->m_key && instance_id < sizeof(matrices) / (sizeof(matrices[0])))
+					{
+						const RenderableMesh* LUMIX_RESTRICT renderable_mesh = info->m_mesh;
+						const Matrix& world_matrix = *renderable_mesh->m_matrix;
+						matrices[instance_id] = world_matrix;
+						++instance_id;
+						++info;
+					}
+					setUniform(mesh_context.m_world_matrix_uniform_location, matrices, instance_id);
+					renderInstancedGeometry(mesh_context.m_indices_offset, mesh_context.m_vertex_count, instance_id, *mesh_context.m_shader);
 				}
-				setUniform(mesh_context.m_world_matrix_uniform_location, matrices, i);
-				renderInstancedGeometry(mesh_context.m_indices_offset, mesh_context.m_vertex_count, i, *mesh_context.m_shader);
 			}
 		}
 	}
@@ -889,6 +890,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	virtual void render() override
 	{
+		PROFILE_FUNCTION();
 		if (m_scene)
 		{
 			for (int i = 0; i < m_source.m_commands.size(); ++i)
