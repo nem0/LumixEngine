@@ -44,11 +44,12 @@ struct RendererImpl : public Renderer
 		: m_engine(engine)
 		, m_allocator(engine.getAllocator())
 		, m_texture_manager(m_allocator)
-		, m_model_manager(m_allocator)
+		, m_model_manager(m_allocator, *this)
 		, m_material_manager(m_allocator)
 		, m_shader_manager(m_allocator)
 		, m_font_manager(m_allocator)
-		, m_pipeline_manager(m_allocator)
+		, m_pipeline_manager(m_allocator, *this)
+		, m_attribute_names(m_allocator)
 	{
 		m_texture_manager.create(ResourceManager::TEXTURE, engine.getResourceManager());
 		m_model_manager.create(ResourceManager::MODEL, engine.getResourceManager());
@@ -419,6 +420,20 @@ struct RendererImpl : public Renderer
 	}
 
 
+	virtual int getAttributeNameIndex(const char* name) override
+	{
+		for (int i = 0; i < m_attribute_names.size(); ++i)
+		{
+			if (m_attribute_names[i] == name)
+			{
+				return i;
+			}
+		}
+		m_attribute_names.emplace(name, m_allocator);
+		return m_attribute_names.size() - 1;
+	}
+
+
 	Engine& m_engine;
 	Debug::Allocator m_allocator;
 	TextureManager m_texture_manager;
@@ -436,6 +451,7 @@ struct RendererImpl : public Renderer
 	Matrix m_view_matrix;
 	Matrix m_projection_matrix;
 	Shader* m_debug_shader;
+	Array<string> m_attribute_names;
 };
 
 
@@ -602,15 +618,27 @@ void bindGeometry(Renderer& renderer, const Geometry& geometry, const Mesh& mesh
 }
 
 
+void renderInstancedGeometry(int indices_offset, int vertex_count, int instance_count, const Shader& shader)
+{
+	for (int i = 0; i < shader.getAttributeCount(); ++i)
+	{
+		glVertexAttribDivisor(shader.getAttribId(i), 0);
+	}
+	glDrawElementsInstanced(GL_TRIANGLES, vertex_count, GL_UNSIGNED_INT, (void*)(indices_offset * sizeof(GLint)), instance_count);
+}
+
+
 void renderGeometry(int indices_offset, int vertex_count)
 {
 	glDrawElements(GL_TRIANGLES, vertex_count, GL_UNSIGNED_INT, (void*)(indices_offset * sizeof(GLint)));
 }
 
+
 void renderQuadGeometry(int indices_offset, int vertex_count)
 {
 	glDrawElements(GL_QUADS, vertex_count, GL_UNSIGNED_INT, (void*)(indices_offset * sizeof(GLint)));
 }
+
 
 int getUniformLocation(const Shader& shader, int name)
 {
@@ -621,6 +649,12 @@ int getUniformLocation(const Shader& shader, int name)
 void setUniform(int location, const Matrix& mtx)
 {
 	glUniformMatrix4fv(location, 1, false, &mtx.m11);
+}
+
+
+void setUniform(int location, const Matrix* matrices, int count)
+{
+	glUniformMatrix4fv(location, count, false, &matrices[0].m11);
 }
 
 

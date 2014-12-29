@@ -149,7 +149,8 @@ namespace Lumix
 					count += m_texts.at(i).m_text.length() << 2;
 				}
 				VertexDef vertex_definition;
-				vertex_definition.parse("f2f2", 4);
+				vertex_definition.addAttribute(m_engine.getRenderer(), "in_position", VertexAttributeDef::FLOAT2);
+				vertex_definition.addAttribute(m_engine.getRenderer(), "in_tex_coords", VertexAttributeDef::FLOAT2);
 				Array<int> indices(m_allocator);
 				Array<float> data(m_allocator);
 				indices.reserve(count);
@@ -574,7 +575,7 @@ namespace Lumix
 					serializer.read(exists);
 					if(exists)
 					{
-						m_terrains[i] = m_allocator.newObject<Terrain>(Entity::INVALID, *this, m_allocator);
+						m_terrains[i] = m_allocator.newObject<Terrain>(m_renderer, Entity::INVALID, *this, m_allocator);
 						Terrain* terrain = m_terrains[i];
 						terrain->deserialize(serializer, m_universe, *this, i);
 					}
@@ -649,7 +650,7 @@ namespace Lumix
 			{
 				if (type == TERRAIN_HASH)
 				{
-					Terrain* terrain = m_allocator.newObject<Terrain>(entity, *this, m_allocator);
+					Terrain* terrain = m_allocator.newObject<Terrain>(m_renderer, entity, *this, m_allocator);
 					m_terrains.push(terrain);
 					Component cmp = m_universe.addComponent(entity, type, this, m_terrains.size() - 1);
 					m_universe.componentCreated().invoke(cmp);

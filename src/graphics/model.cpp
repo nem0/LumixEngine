@@ -12,6 +12,7 @@
 #include "core/vec3.h"
 #include "graphics/geometry.h"
 #include "graphics/material.h"
+#include "graphics/model_manager.h"
 #include "graphics/pose.h"
 #include "graphics/renderer.h"
 
@@ -155,18 +156,7 @@ void Model::getPose(Pose& pose)
 bool Model::parseVertexDef(FS::IFile* file, VertexDef* vertex_definition)
 {
 	ASSERT(vertex_definition);
-	int vertex_def_size = 0;
-	file->read(&vertex_def_size, sizeof(vertex_def_size));
-	char tmp[16];
-	ASSERT(vertex_def_size < 16);
-	if (vertex_def_size >= 16)
-	{
-		g_log_error.log("renderer") << "Model file corrupted " << getPath().c_str();
-		return false;
-	}
-	file->read(tmp, vertex_def_size);
-	vertex_definition->parse(tmp, vertex_def_size);
-	return true;
+	return vertex_definition->parse(static_cast<ModelManager*>(m_resource_manager.get(ResourceManager::MODEL))->getRenderer(),  file);
 }
 
 bool Model::parseGeometry(FS::IFile* file)

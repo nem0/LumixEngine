@@ -279,6 +279,12 @@ struct PipelineImpl : public Pipeline
 	}
 
 
+	Renderer& getRenderer()
+	{
+		return static_cast<PipelineManager*>(m_resource_manager.get(ResourceManager::PIPELINE))->getRenderer();
+	}
+
+
 	virtual ~PipelineImpl() override
 	{
 		ASSERT(isEmpty());
@@ -833,6 +839,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		sentinel.m_key = 0;
 		RenderModelsMeshContext mesh_context;
 		int64_t last_key = 0;
+		Matrix matrices[64];
 		while (info != end)
 		{
 			mesh_context.m_mesh = info->m_mesh->m_mesh;
@@ -859,11 +866,18 @@ struct PipelineInstanceImpl : public PipelineInstance
 			{
 				while (last_key == info->m_key)
 				{
-					const RenderableMesh* LUMIX_RESTRICT renderable_mesh = info->m_mesh;
-					const Matrix& world_matrix = *renderable_mesh->m_matrix;
-					setUniform(mesh_context.m_world_matrix_uniform_location, world_matrix);
-					renderGeometry(mesh_context.m_indices_offset, mesh_context.m_vertex_count);
-					++info;
+					Matrix* LUMIX_RESTRICT instance_matrix = matrices;
+					const Matrix* last_instance_matrix = matrices + (sizeof(matrices) / sizeof(matrices[0]));
+					while (last_key == info->m_key && instance_matrix < last_instance_matrix)
+					{
+						const RenderableMesh* LUMIX_RESTRICT renderable_mesh = info->m_mesh;
+						*instance_matrix = *renderable_mesh->m_matrix;
+						++instance_matrix;
+						++info;
+					}
+					int instance_count = instance_matrix - matrices;
+					setUniform(mesh_context.m_world_matrix_uniform_location, matrices, instance_count);
+					renderInstancedGeometry(mesh_context.m_indices_offset, mesh_context.m_vertex_count, instance_count, *mesh_context.m_shader);
 				}
 			}
 		}
@@ -877,6 +891,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	virtual void render() override
 	{
+		PROFILE_FUNCTION();
 		if (m_scene)
 		{
 			for (int i = 0; i < m_source.m_commands.size(); ++i)
@@ -1093,7 +1108,9 @@ void DrawScreenQuadCommand::deserialize(PipelineImpl& pipeline, JsonSerializer& 
 {
 	m_geometry = m_allocator.newObject<Geometry>();
 	VertexDef def;
-	def.parse("pt", 2);
+	Renderer& renderer = pipeline.getRenderer();
+	def.addAttribute(renderer, "in_position", VertexAttributeDef::FLOAT2);
+	def.addAttribute(renderer, "in_tex_coords", VertexAttributeDef::FLOAT2);
 	int indices[6] = { 0, 1, 2, 0, 2, 3 };
 	const int GEOMETRY_VERTEX_ATTRIBUTE_COUNT = 20;
 	float v[GEOMETRY_VERTEX_ATTRIBUTE_COUNT];

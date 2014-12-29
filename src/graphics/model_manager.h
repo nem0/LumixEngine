@@ -4,15 +4,22 @@
 
 namespace Lumix
 {
+
+	class Renderer;
+
+
 	class LUMIX_ENGINE_API ModelManager : public ResourceManagerBase
 	{
 	public:
-		ModelManager(IAllocator& allocator) 
+		ModelManager(IAllocator& allocator, Renderer& renderer)
 			: ResourceManagerBase(allocator)
-			, m_allocator(allocator) 
+			, m_allocator(allocator)
+			, m_renderer(renderer)
 		{}
 
 		~ModelManager() {}
+
+		Renderer& getRenderer() { return m_renderer; }
 
 	protected:
 		virtual Resource* createResource(const Path& path) override;
@@ -20,5 +27,6 @@ namespace Lumix
 
 	private:
 		IAllocator& m_allocator;
+		Renderer& m_renderer;
 	};
 }

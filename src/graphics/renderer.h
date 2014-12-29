@@ -59,6 +59,7 @@ class LUMIX_ENGINE_API Renderer : public IPlugin
 		virtual uint32_t getPass() = 0;
 		virtual void applyShader(Shader& shader, uint32_t combination) = 0;
 		virtual Shader& getDebugShader() = 0;
+		virtual int getAttributeNameIndex(const char* name) = 0;
 
 		virtual void setProjection(float width, float height, float fov, float near_plane, float far_plane, const Matrix& mtx) = 0;
 		virtual void setViewMatrix(const Matrix& matrix) = 0;
@@ -77,12 +78,13 @@ void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, c
 void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, float value);
 void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Matrix& mtx);
 void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Matrix* matrices, int count);
+void renderInstancedGeometry(int indices_offset, int vertex_count, int instance_count, const Shader& shader);
 void renderGeometry(int indices_start, int vertex_count);
 void renderQuadGeometry(int start, int count);
 void bindGeometry(Renderer& renderer, const Geometry& geometry, const Mesh& mesh);
 int getUniformLocation(const Shader& shader, int name);
 void setUniform(int location, const Matrix& mtx);
-
+void setUniform(int location, const Matrix* matrices, int count);
 
 } // !namespace Lumix
 
