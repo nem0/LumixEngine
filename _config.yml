@@ -25,7 +25,7 @@ paypal_url:
 flattr_button:
 
 # Build settings
-hightlighter: rouge
+hightlighter: pygments
 markdown:     kramdown
 permalink:    pretty
 paginate:     3
