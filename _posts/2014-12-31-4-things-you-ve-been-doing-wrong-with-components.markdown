@@ -59,8 +59,8 @@ for(auto component : active_component)
 
 Now we update only components that most likely need to be updated, however
 
-*it can still be **too many virtual** function calls,
-*components with the same type are probably not updated in a row, which can cause an instruction cachce miss.
+- it can still be **too many virtual** function calls,
+- components with the same type are probably not updated in a row, which can cause an instruction cachce miss.
 
 Do we need to have *update* method in a component at all?
 
