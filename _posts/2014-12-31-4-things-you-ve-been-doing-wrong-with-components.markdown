@@ -9,7 +9,7 @@ comments: true
 
 ## 1. Not embracing all the options components offer.
 Let's speek code:
-```
+```cpp
 class BaseComponent
 {
 public:
@@ -28,7 +28,7 @@ class GameObject
 Yes, you are able to compose game objects from components at compile time, even at run time, but you are wasting precious memory, data locality is most likely very poor and things are not very well encapsulated.
 
 ## 2. Having *update* method in each component
-```
+```cpp
 class BaseComponent
 {
 	... 
@@ -45,7 +45,7 @@ for(auto object : objects)
 }
 ```
 A common game contains mostly static meshes. Those trees are moving in the wind, but it's done in a vertex shader. There is no need to call *update* on all of them. Do you want a slightly better solution? 
-```
+```cpp
 for(auto component : active_component)
 {
 	component->update(time_delta);
@@ -56,7 +56,7 @@ Now we update only components that most likely need to be updated, however
 * components with the same type are probably not updated in a row, which can cause an instruction cachce miss.
 
 Do we need to have *update* method in a component at all?
-```
+```cpp
 class PhysicsSystem
 {
 ...
@@ -80,7 +80,7 @@ No virtual calls, no unnecessary calls, happier users.
 
 Since you do not have *update* method in a component now, is it still necessary to store components in a game object? Are connections between systems so tight, that every system needs to know about components of any other system? This is most likely not true. Dependencies between systems are usually a one way relation and system rarely depends on more than one other system.
 An animaiton system probably needs to know about an rendering system to set some matrices, but the rendering system knows nothing about the animation system and none of them know anything about a script system.
-```
+```cpp
 class AnimationScene
 {
 ...
@@ -98,7 +98,7 @@ There is something that needs to know about every component in a game object - a
 
 ## 4. Having component as a class
 
-```
+```cpp
 struct Renderable : public BaseComponent
 {
 ...
@@ -121,7 +121,7 @@ for(auto& renderable : m_renderables)
 }
 ```
 This is most common example of poor [data locality](http://gameprogrammingpatterns.com/data-locality.html). We read all data after *key*, even though quite often we need just a *key*. Straightforward solution is to split *Renderable* into two (or more) parts. This splitting should be based on access patterns.
-```
+```cpp
 for(int i = 0; i < m_renderable_count; ++i)
 {
 	if(m_keys[i] == some_key)
