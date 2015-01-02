@@ -94,6 +94,7 @@
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <TreatWChar_tAsBuiltInType>true</TreatWChar_tAsBuiltInType>
       <WarningLevel>Level3</WarningLevel>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <AdditionalDependencies>qtmain.lib;..\..\..\bin\Win32_Release\core.lib;..\..\..\bin\Win32_Release\engine.lib;opengl32.lib;..\..\..\bin\Win32_Release\physics.lib;..\..\..\bin\Win32_Release\animation.lib;Qt5OpenGL.lib;Qt5Widgets.lib;Qt5Gui.lib;Qt5Core.lib;libEGL.lib;libGLESv2.lib;gdi32.lib;user32.lib;glu32.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -136,6 +137,7 @@
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <TreatWChar_tAsBuiltInType>true</TreatWChar_tAsBuiltInType>
       <WarningLevel>Level3</WarningLevel>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <AdditionalDependencies>qtmain.lib;..\..\..\bin\Win32_Release\core.lib;..\..\..\bin\Win32_Release\engine.lib;opengl32.lib;..\..\..\bin\Win32_Release\physics.lib;..\..\..\bin\Win32_Release\animation.lib;Qt5OpenGL.lib;Qt5Widgets.lib;Qt5Gui.lib;Qt5Core.lib;libEGL.lib;libGLESv2.lib;gdi32.lib;user32.lib;glu32.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -176,6 +178,7 @@
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <TreatWChar_tAsBuiltInType>true</TreatWChar_tAsBuiltInType>
       <WarningLevel>Level3</WarningLevel>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <AdditionalDependencies>qtmaind.lib;..\..\..\bin\Win32_Debug\core.lib;..\..\..\bin\Win32_Debug\engine.lib;opengl32.lib;..\..\..\bin\Win32_Debug\physics.lib;..\..\..\bin\Win32_Debug\animation.lib;Qt5OpenGLd.lib;Qt5Widgetsd.lib;Qt5Guid.lib;Qt5Cored.lib;libEGLd.lib;libGLESv2d.lib;gdi32.lib;user32.lib;glu32.lib;%(AdditionalDependencies)</AdditionalDependencies>

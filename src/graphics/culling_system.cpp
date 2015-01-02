@@ -3,6 +3,7 @@
 
 #include "core/array.h"
 #include "core/binary_array.h"
+#include "core/free_list.h"
 #include "core/frustum.h"
 #include "core/sphere.h"
 
@@ -43,9 +44,9 @@ namespace Lumix
 	{
 	public:
 		CullingJob(const CullingSystem::InputSpheres& spheres, const VisibilityFlags& visibility_flags, const LayerMasks& layer_masks, int64_t layer_mask
-			, CullingSystem::Subresults& results, int start, int end, const Frustum& frustum, MTJD::Manager& manager, IAllocator& allocator
+			, CullingSystem::Subresults& results, int start, int end, const Frustum& frustum, MTJD::Manager& manager, IAllocator& allocator, IAllocator& job_allocator
 			)
-			: Job(true, MTJD::Priority::Default, false, manager, allocator)
+			: Job(true, MTJD::Priority::Default, false, manager, allocator, job_allocator)
 			, m_spheres(spheres)
 			, m_results(results)
 			, m_start(start)
@@ -89,12 +90,13 @@ namespace Lumix
 	{
 	public:
 		CullingSystemImpl(MTJD::Manager& mtjd_manager, IAllocator& allocator)
-			: m_mtjd_manager(mtjd_manager)
-			, m_sync_point(true, m_allocator)
-			, m_allocator(allocator)
-			, m_spheres(m_allocator)
-			, m_result(m_allocator)
-			, m_visibility_flags(m_allocator)
+			: m_allocator(allocator) 
+			, m_job_allocator(allocator)
+			, m_visibility_flags(allocator)
+			, m_spheres(allocator)
+			, m_result(allocator)
+			, m_sync_point(true, allocator)
+			, m_mtjd_manager(mtjd_manager)
 			, m_layer_masks(m_allocator)
 		{
 			m_result.emplace(m_allocator);
@@ -169,16 +171,16 @@ namespace Lumix
 			for (; i < cpu_count - 1; i++)
 			{
 				m_result[i].clear();
-				CullingJob* cj = m_allocator.newObject<CullingJob>(m_spheres, m_visibility_flags, m_layer_masks
-					, layer_mask, m_result[i], i * step, (i + 1) * step - 1, frustum, m_mtjd_manager, m_allocator
+				CullingJob* cj = m_job_allocator.newObject<CullingJob>(m_spheres, m_visibility_flags, m_layer_masks
+					, layer_mask, m_result[i], i * step, (i + 1) * step - 1, frustum, m_mtjd_manager, m_allocator, m_job_allocator
 					);
 				cj->addDependency(&m_sync_point);
 				jobs[i] = cj;
 			}
 
 			m_result[i].clear();
-			CullingJob* cj = m_allocator.newObject<CullingJob>(m_spheres, m_visibility_flags, m_layer_masks
-				, layer_mask, m_result[i], i * step, count - 1, frustum, m_mtjd_manager, m_allocator
+			CullingJob* cj = m_job_allocator.newObject<CullingJob>(m_spheres, m_visibility_flags, m_layer_masks
+				, layer_mask, m_result[i], i * step, count - 1, frustum, m_mtjd_manager, m_allocator, m_job_allocator
 				);
 			cj->addDependency(&m_sync_point);
 			jobs[i] = cj;
@@ -263,6 +265,7 @@ namespace Lumix
 
 	private:
 		IAllocator&		m_allocator;
+		FreeList<CullingJob, 8> m_job_allocator;
 		VisibilityFlags m_visibility_flags;
 		InputSpheres	m_spheres;
 		Results			m_result;

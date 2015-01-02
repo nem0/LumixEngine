@@ -21,7 +21,7 @@ class TestJob : public Lumix::MTJD::Job
 {
 public:
 	TestJob(float* buffer_in1, float* buffer_in2, float* buffer_out, int32_t size, bool auto_destroy, Lumix::MTJD::Manager& manager, Lumix::IAllocator& allocator)
-		: Job(auto_destroy, Lumix::MTJD::Priority::Default, true, manager, allocator)
+		: Job(auto_destroy, Lumix::MTJD::Priority::Default, true, manager, allocator, allocator)
 		, m_buffer_in1(buffer_in1)
 		, m_buffer_in2(buffer_in2)
 		, m_buffer_out(buffer_out)
