@@ -593,20 +593,32 @@ void EntityList::setWorldEditor(Lumix::WorldEditor& editor)
 }
 
 
-void EntityList::onEntitySelected(const Lumix::Array<Lumix::Entity>& entities)
+void EntityList::fillSelection(const QModelIndex& parent, QItemSelection* selection, const Lumix::Array<Lumix::Entity>& entities)
 {
-	QItemSelection* selection = new QItemSelection();
-	for(int j = entities.size() - 1; j >= 0; --j)
+	for (int i = 0, c = m_filter->rowCount(parent); i < c; ++i)
 	{
-		for (int i = 0, c = m_filter->rowCount(); i < c; ++i)
+		auto index = m_filter->index(i, 0, parent);
+		auto entity_index = m_filter->data(index, Qt::UserRole).toInt();
+		for (int j = entities.size() - 1; j >= 0; --j)
 		{
-			if (m_filter->data(m_filter->index(i, 0), Qt::UserRole).toInt() == entities[j].index)
+			if (entity_index == entities[j].index)
 			{
-				selection->append(QItemSelectionRange(m_filter->index(i, 0)));
+				selection->append(QItemSelectionRange(m_filter->index(i, 0, parent)));
 				break;
 			}
 		}
+		if (m_filter->rowCount(index) > 0)
+		{
+			fillSelection(index, selection, entities);
+		}
 	}
+}
+
+
+void EntityList::onEntitySelected(const Lumix::Array<Lumix::Entity>& entities)
+{
+	QItemSelection* selection = new QItemSelection();
+	fillSelection(QModelIndex(), selection, entities);
 	m_ui->entityList->selectionModel()->select(*selection, QItemSelectionModel::SelectionFlag::ClearAndSelect | QItemSelectionModel::SelectionFlag::Rows);
 	delete selection;
 }

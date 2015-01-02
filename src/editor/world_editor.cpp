@@ -579,7 +579,7 @@ struct WorldEditorImpl : public WorldEditor
 							int props_index = m_editor.m_component_properties.find(cmps[j].type);
 							if (props_index >= 0)
 							{
-								Array<IPropertyDescriptor*>& props = m_editor.m_component_properties.get(props_index);
+								Array<IPropertyDescriptor*>& props = m_editor.m_component_properties.at(props_index);
 								for (int k = 0; k < props.size(); ++k)
 								{
 									props[k]->get(cmps[j], m_old_values);
@@ -627,7 +627,7 @@ struct WorldEditorImpl : public WorldEditor
 							int props_index = m_editor.m_component_properties.find(cmp_type);
 							if (props_index >= 0)
 							{
-								Array<IPropertyDescriptor*>& props = m_editor.m_component_properties.get(props_index);
+								Array<IPropertyDescriptor*>& props = m_editor.m_component_properties.at(props_index);
 
 								for (int k = 0; k < props.size(); ++k)
 								{
