@@ -19,7 +19,7 @@ namespace MTJD
 	{
 		public:
 			GenericJob(MTJD::Manager& manager, T function, IAllocator& allocator)
-				: MTJD::Job(true, MTJD::Priority::Normal, false, manager, allocator)
+				: MTJD::Job(true, MTJD::Priority::Normal, false, manager, allocator, allocator)
 				, m_function(function)
 			{
 			}
