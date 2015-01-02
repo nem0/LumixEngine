@@ -42,6 +42,7 @@ class EntityList : public QDockWidget
 		void onUniverseDestroyed();
 		void onUniverseLoaded();
 		void onEntitySelected(const Lumix::Array<Lumix::Entity>& entity);
+		void fillSelection(const QModelIndex& parent, QItemSelection* selection, const Lumix::Array<Lumix::Entity>& entities);
 
 	private:
 		Ui::EntityList* m_ui;
