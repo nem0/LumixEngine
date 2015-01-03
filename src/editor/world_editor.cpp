@@ -1405,11 +1405,18 @@ struct WorldEditorImpl : public WorldEditor
 
 		void stopGameMode()
 		{
+			selectEntities(NULL, 0);
+			for (int i = 0; i < m_editor_icons.size(); ++i)
+			{
+				m_allocator.deleteObject(m_editor_icons[i]);
+			}
+			m_editor_icons.clear();
 			m_is_game_mode = false;
 			m_game_mode_file->seek(FS::SeekMode::BEGIN, 0);
 			load(*m_game_mode_file);
 			m_engine->getFileSystem().close(m_game_mode_file);
 			m_game_mode_file = NULL;
+			m_universe_loaded.invoke();
 		}
 
 
