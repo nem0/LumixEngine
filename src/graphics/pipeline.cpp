@@ -22,6 +22,7 @@
 #include "graphics/model_instance.h"
 #include "graphics/renderer.h"
 #include "graphics/shader.h"
+#include "graphics/texture.h"
 
 
 namespace Lumix
@@ -439,6 +440,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		pipeline.onLoaded<PipelineInstanceImpl, &PipelineInstanceImpl::sourceLoaded>(this);
 	}
 
+
 	~PipelineInstanceImpl()
 	{
 		m_source.getObserverCb().unbind<PipelineInstanceImpl, &PipelineInstanceImpl::sourceLoaded>(this);
@@ -449,15 +451,18 @@ struct PipelineInstanceImpl : public PipelineInstance
 		}
 	}
 
+
 	void setActiveCamera(const Component& cmp)
 	{
 		m_active_camera = cmp;
 	}
 
-	CustomCommandHandler& addCustomCommandHandler(const char* name)
+
+	CustomCommandHandler& addCustomCommandHandler(const char* name) override
 	{
 		return m_custom_commands_handlers[crc32(name)];
 	}
+
 
 	FrameBuffer* getFrameBuffer(const char* name)
 	{
@@ -482,6 +487,18 @@ struct PipelineInstanceImpl : public PipelineInstance
 	{
 		ASSERT(m_renderer);
 		return *m_renderer;
+	}
+
+
+	virtual int getWidth() override
+	{
+		return m_width;
+	}
+
+
+	virtual int getHeight() override
+	{
+		return m_height;
 	}
 
 
