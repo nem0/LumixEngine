@@ -487,40 +487,59 @@ namespace Lumix
 	}
 
 
-	void Texture::saveTGA()
+	bool Texture::saveTGA(IAllocator& allocator, FS::IFile* file, int width, int height, int bytes_per_pixel, const uint8_t* image_dest, const Path& path)
 	{
-		if (m_BPP != 4 || m_data.empty())
+		if (bytes_per_pixel != 4)
 		{
-			g_log_error.log("renderer") << "Texture " << getPath().c_str() << " could not be saved, unsupported TGA format";
-			return;
+			g_log_error.log("renderer") << "Texture " << path.c_str() << " could not be saved, unsupported TGA format";
+			return false;
 		}
 
-		FS::FileSystem& fs = m_resource_manager.getFileSystem();
-		FS::IFile* file = fs.open("disk", getPath().c_str(), FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
+		uint8_t* data = (uint8_t*)allocator.allocate(width * height * 4);
 
 		TGAHeader header;
 		memset(&header, 0, sizeof(header));
-		header.bitsPerPixel = (char)(m_BPP * 8);
-		header.height = (short)m_height;
-		header.width = (short)m_width;
+		header.bitsPerPixel = (char)(bytes_per_pixel * 8);
+		header.height = (short)height;
+		header.width = (short)width;
 		header.dataType = 2;
 
 		file->write(&header, sizeof(header));
 
-		const uint8_t* image_dest = &m_data[0];
 		for (long y = 0; y < header.height; y++)
 		{
 			long read_index = y * header.width * 4;
 			long write_index = ((header.imageDescriptor & 32) != 0) ? read_index : y * header.width * 4;
 			for (long x = 0; x < header.width; x++)
 			{
-				file->write(&image_dest[write_index + 2], sizeof(uint8_t));
-				file->write(&image_dest[write_index + 1], sizeof(uint8_t));
-				file->write(&image_dest[write_index + 0], sizeof(uint8_t));
-				file->write(&image_dest[write_index + 3], sizeof(uint8_t));
+				data[write_index + 0] = image_dest[write_index + 2];
+				data[write_index + 1] = image_dest[write_index + 1];
+				data[write_index + 2] = image_dest[write_index + 0];
+				data[write_index + 3] = image_dest[write_index + 3];
 				write_index += 4;
 			}
 		}
+
+		file->write(data, width * height * 4);
+
+		allocator.deallocate(data);
+
+		return true;
+	}
+
+
+	void Texture::saveTGA()
+	{
+		if (m_data.empty())
+		{
+			g_log_error.log("renderer") << "Texture " << getPath().c_str() << " could not be saved, no data was loaded";
+			return;
+		}
+
+		FS::FileSystem& fs = m_resource_manager.getFileSystem();
+		FS::IFile* file = fs.open("disk", getPath().c_str(), FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
+
+		saveTGA(m_allocator, file, m_width, m_height, m_BPP, &m_data[0], getPath());
 
 		fs.close(file);
 	}

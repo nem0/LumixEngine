@@ -43,6 +43,7 @@ class LUMIX_ENGINE_API Renderer : public IPlugin
 
 		virtual void render(IRenderDevice& device) = 0;
 		virtual void renderGame() = 0;
+		virtual void makeScreenshot(const Path& filename, int width, int height) = 0;
 		virtual void enableAlphaToCoverage(bool enable) = 0;
 		virtual void enableZTest(bool enable) = 0;
 		virtual void setRenderDevice(IRenderDevice& device) = 0;
