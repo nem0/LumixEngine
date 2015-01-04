@@ -52,6 +52,36 @@ public:
 	}
 
 
+	virtual void serialize(Lumix::JsonSerializer& serializer) override
+	{
+		serializer.beginArray("items");
+		for (int i = 0; i < m_items.size(); ++i)
+		{
+			serializer.serializeArrayItem(m_items[i].m_amount);
+			serializer.serializeArrayItem(m_items[i].m_texture_center_x);
+			serializer.serializeArrayItem(m_items[i].m_texture_center_y);
+			serializer.serializeArrayItem(m_items[i].m_texture_radius);
+		}
+		serializer.endArray();
+	}
+
+
+	virtual void deserialize(Lumix::JsonSerializer& serializer) override
+	{
+		m_items.clear();
+		serializer.deserializeArrayBegin("items");
+		while (!serializer.isArrayEnd())
+		{
+			Item& item = m_items.pushEmpty();
+			serializer.deserializeArrayItem(item.m_amount, 0);
+			serializer.deserializeArrayItem(item.m_texture_center_x, 0);
+			serializer.deserializeArrayItem(item.m_texture_center_y, 0);
+			serializer.deserializeArrayItem(item.m_texture_radius, 0);
+		}
+		serializer.deserializeArrayEnd();
+	}
+
+
 	Lumix::Texture* getHeightmap()
 	{
 		Lumix::StackAllocator<LUMIX_MAX_PATH> allocator;

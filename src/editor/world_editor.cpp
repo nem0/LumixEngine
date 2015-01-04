@@ -64,6 +64,24 @@ class SetEntityNameCommand : public IEditorCommand
 		{}
 
 
+		virtual void serialize(JsonSerializer& serializer) override
+		{
+			serializer.serialize("name", m_new_name.c_str());
+			serializer.serialize("entity", m_entity.index);
+		}
+
+
+		virtual void deserialize(JsonSerializer& serializer) override
+		{
+			char name[100];
+			serializer.deserialize("name", name, sizeof(name), "");
+			m_new_name = name;
+			serializer.deserialize("entity", m_entity.index, 0);
+			m_entity.universe = m_editor.getEngine().getUniverse();
+			m_old_name = m_entity.getName();
+		}
+
+
 		virtual void execute() override
 		{
 			m_entity.setName(m_new_name.c_str());
@@ -123,6 +141,43 @@ class PasteEntityCommand : public IEditorCommand
 		virtual void execute() override;
 
 
+		virtual void serialize(JsonSerializer& serializer)
+		{
+			serializer.serialize("pos_x", m_position.x);
+			serializer.serialize("pos_y", m_position.y);
+			serializer.serialize("pos_z", m_position.z);
+			serializer.serialize("entity", m_entity.index);
+			serializer.serialize("size", m_blob.getBufferSize());
+			serializer.beginArray("data");
+			for (int i = 0; i < m_blob.getBufferSize(); ++i)
+			{
+				serializer.serializeArrayItem((int32_t)m_blob.getBuffer()[i]);
+			}
+			serializer.endArray();
+		}
+
+
+		virtual void deserialize(JsonSerializer& serializer)
+		{
+			serializer.deserialize("pos_x", m_position.x, 0);
+			serializer.deserialize("pos_y", m_position.y, 0);
+			serializer.deserialize("pos_z", m_position.z, 0);
+			serializer.deserialize("entity", m_entity.index, 0);
+			m_entity.universe = m_editor.getEngine().getUniverse();
+			int size;
+			serializer.deserialize("size", size, 0);
+			serializer.deserializeArrayBegin("data");
+			m_blob.clearBuffer();
+			for (int i = 0; i < m_blob.getBufferSize(); ++i)
+			{
+				int32_t data;
+				serializer.deserializeArrayItem(data, 0);
+				m_blob.write((uint8_t)data);
+			}
+			serializer.deserializeArrayEnd();
+		}
+
+
 		virtual void undo() override
 		{
 			const WorldEditor::ComponentList& cmps = m_editor.getComponents(m_entity);
@@ -159,12 +214,13 @@ class PasteEntityCommand : public IEditorCommand
 class MoveEntityCommand : public IEditorCommand
 {
 	public:
-		MoveEntityCommand(const Array<Entity>& entities, const Array<Vec3>& new_positions, const Array<Quat>& new_rotations, IAllocator& allocator)
+		MoveEntityCommand(WorldEditor& editor, const Array<Entity>& entities, const Array<Vec3>& new_positions, const Array<Quat>& new_rotations, IAllocator& allocator)
 			: m_new_positions(allocator)
 			, m_new_rotations(allocator)
 			, m_old_positions(allocator)
 			, m_old_rotations(allocator)
 			, m_entities(allocator)
+			, m_editor(editor)
 		{
 			ASSERT(entities.size() == new_positions.size());
 			for(int i = entities.size() - 1; i >= 0; --i)
@@ -175,6 +231,51 @@ class MoveEntityCommand : public IEditorCommand
 				m_old_positions.push(entities[i].getPosition());
 				m_old_rotations.push(entities[i].getRotation());
 			}
+		}
+
+
+		virtual void serialize(JsonSerializer& serializer) override
+		{
+			serializer.serialize("count", m_entities.size());
+			serializer.beginArray("entities");
+			for (int i = 0; i < m_entities.size(); ++i)
+			{
+				serializer.serializeArrayItem(m_entities[i].index);
+				serializer.serializeArrayItem(m_new_positions[i].x);
+				serializer.serializeArrayItem(m_new_positions[i].y);
+				serializer.serializeArrayItem(m_new_positions[i].z);
+				serializer.serializeArrayItem(m_new_rotations[i].x);
+				serializer.serializeArrayItem(m_new_rotations[i].y);
+				serializer.serializeArrayItem(m_new_rotations[i].z);
+				serializer.serializeArrayItem(m_new_rotations[i].w);
+			}
+			serializer.endArray();
+		}
+
+
+		virtual void deserialize(JsonSerializer& serializer) override
+		{
+			int count;
+			serializer.deserialize("count", count, 0);
+			m_entities.resize(count);
+			m_new_positions.resize(count);
+			m_new_rotations.resize(count);
+			serializer.beginArray("entities");
+			for (int i = 0; i < m_entities.size(); ++i)
+			{
+				serializer.deserializeArrayItem(m_entities[i].index, 0);
+				m_entities[i].universe = m_editor.getEngine().getUniverse();
+				serializer.deserializeArrayItem(m_new_positions[i].x, 0);
+				serializer.deserializeArrayItem(m_new_positions[i].y, 0);
+				serializer.deserializeArrayItem(m_new_positions[i].z, 0);
+				serializer.deserializeArrayItem(m_new_rotations[i].x, 0);
+				serializer.deserializeArrayItem(m_new_rotations[i].y, 0);
+				serializer.deserializeArrayItem(m_new_rotations[i].z, 0);
+				serializer.deserializeArrayItem(m_new_rotations[i].w, 0);
+				m_old_positions[i] = m_entities[i].getPosition();
+				m_old_rotations[i] = m_entities[i].getRotation();
+			}
+			serializer.deserializeArrayEnd();
 		}
 
 
@@ -234,6 +335,7 @@ class MoveEntityCommand : public IEditorCommand
 		}
 
 	private:
+		WorldEditor& m_editor;
 		Array<Entity> m_entities;
 		Array<Vec3> m_new_positions;
 		Array<Quat> m_new_rotations;
@@ -249,29 +351,54 @@ class RemoveArrayPropertyItemCommand : public IEditorCommand
 		RemoveArrayPropertyItemCommand(WorldEditor& editor, const Component& component, int index, IArrayDescriptor& descriptor)
 			: m_component(component)
 			, m_index(index)
-			, m_descriptor(descriptor)
+			, m_descriptor(&descriptor)
 			, m_old_values(editor.getAllocator())
+			, m_editor(editor)
 		{
-			for(int i = 0, c = m_descriptor.getChildren().size(); i < c; ++i)
+			for(int i = 0, c = m_descriptor->getChildren().size(); i < c; ++i)
 			{
-				m_descriptor.getChildren()[i]->get(component, m_index, m_old_values);
+				m_descriptor->getChildren()[i]->get(component, m_index, m_old_values);
 			}
+		}
+
+
+		virtual void serialize(JsonSerializer& serializer) override
+		{
+			serializer.serialize("inedx", m_index);
+			serializer.serialize("entity_index", m_component.entity.index);
+			serializer.serialize("component_index", m_component.index);
+			serializer.serialize("component_type", m_component.type);
+			serializer.serialize("property_name_hash", m_descriptor->getNameHash());
+		}
+
+
+		virtual void deserialize(JsonSerializer& serializer) override
+		{
+			serializer.deserialize("inedx", m_index, 0);
+			serializer.deserialize("entity_index", m_component.entity.index, 0);
+			serializer.deserialize("component_index", m_component.index, 0);
+			serializer.deserialize("component_type", m_component.type, 0);
+			m_component.entity.universe = m_editor.getEngine().getUniverse();
+			m_component.scene = m_editor.getEngine().getSceneByComponentType(m_component.type);
+			uint32_t property_name_hash;
+			serializer.deserialize("property_name_hash", property_name_hash, 0);
+			m_descriptor = static_cast<const IArrayDescriptor*>(&m_editor.getPropertyDescriptor(m_component.type, property_name_hash));
 		}
 
 
 		virtual void execute() override
 		{
-			m_descriptor.removeArrayItem(m_component, m_index);
+			m_descriptor->removeArrayItem(m_component, m_index);
 		}
 
 
 		virtual void undo() override
 		{
-			m_descriptor.addArrayItem(m_component, m_index);
+			m_descriptor->addArrayItem(m_component, m_index);
 			m_old_values.rewindForRead();
-			for(int i = 0, c = m_descriptor.getChildren().size(); i < c; ++i)
+			for(int i = 0, c = m_descriptor->getChildren().size(); i < c; ++i)
 			{
-				m_descriptor.getChildren()[i]->set(m_component, m_index, m_old_values);
+				m_descriptor->getChildren()[i]->set(m_component, m_index, m_old_values);
 			}		
 		}
 
@@ -289,9 +416,10 @@ class RemoveArrayPropertyItemCommand : public IEditorCommand
 		}
 
 	private:
+		WorldEditor& m_editor;
 		Component m_component;
 		int m_index;
-		IArrayDescriptor& m_descriptor;
+		const IArrayDescriptor* m_descriptor;
 		Blob m_old_values;
 };
 
@@ -300,24 +428,50 @@ class AddArrayPropertyItemCommand : public IEditorCommand
 {
 	
 	public:
-		AddArrayPropertyItemCommand(const Component& component, IArrayDescriptor& descriptor)
+		AddArrayPropertyItemCommand(WorldEditor& editor, const Component& component, IArrayDescriptor& descriptor)
 			: m_component(component)
 			, m_index(-1)
-			, m_descriptor(descriptor)
+			, m_descriptor(&descriptor)
+			, m_editor(editor)
 		{
 		}
 
 
+		virtual void serialize(JsonSerializer& serializer) override
+		{
+			serializer.serialize("inedx", m_index);
+			serializer.serialize("entity_index", m_component.entity.index);
+			serializer.serialize("component_index", m_component.index);
+			serializer.serialize("component_type", m_component.type);
+			serializer.serialize("property_name_hash", m_descriptor->getNameHash());
+		}
+
+
+		virtual void deserialize(JsonSerializer& serializer) override
+		{
+			serializer.deserialize("inedx", m_index, 0);
+			serializer.deserialize("entity_index", m_component.entity.index, 0);
+			serializer.deserialize("component_index", m_component.index, 0);
+			serializer.deserialize("component_type", m_component.type, 0);
+			m_component.entity.universe = m_editor.getEngine().getUniverse();
+			m_component.scene = m_editor.getEngine().getSceneByComponentType(m_component.type);
+			uint32_t property_name_hash;
+			serializer.deserialize("property_name_hash", property_name_hash, 0);
+			m_descriptor = static_cast<const IArrayDescriptor*>(&m_editor.getPropertyDescriptor(m_component.type, property_name_hash));
+		}
+
+
+
 		virtual void execute() override
 		{
-			m_descriptor.addArrayItem(m_component, -1);
-			m_index = m_descriptor.getCount(m_component) - 1;
+			m_descriptor->addArrayItem(m_component, -1);
+			m_index = m_descriptor->getCount(m_component) - 1;
 		}
 
 
 		virtual void undo() override
 		{
-			m_descriptor.removeArrayItem(m_component, m_index);
+			m_descriptor->removeArrayItem(m_component, m_index);
 		}
 
 
@@ -336,7 +490,8 @@ class AddArrayPropertyItemCommand : public IEditorCommand
 	private:
 		Component m_component;
 		int m_index;
-		IArrayDescriptor& m_descriptor;
+		const IArrayDescriptor* m_descriptor;
+		WorldEditor& m_editor;
 };
 
 
@@ -346,27 +501,66 @@ class SetPropertyCommand : public IEditorCommand
 	public:
 		SetPropertyCommand(WorldEditor& editor, const Component& component, const IPropertyDescriptor& property_descriptor, const void* data, int size)
 			: m_component(component)
-			, m_property_descriptor(property_descriptor)
+			, m_property_descriptor(&property_descriptor)
 			, m_editor(editor)
 			, m_new_value(editor.getAllocator())
 			, m_old_value(editor.getAllocator())
 		{
 			m_index = -1;
 			m_new_value.write(data, size);
-			m_property_descriptor.get(component, m_old_value);
+			m_property_descriptor->get(component, m_old_value);
 		}
 
 
 		SetPropertyCommand(WorldEditor& editor, const Component& component, int index, const IPropertyDescriptor& property_descriptor, const void* data, int size)
 			: m_component(component)
-			, m_property_descriptor(property_descriptor)
+			, m_property_descriptor(&property_descriptor)
 			, m_editor(editor)
 			, m_new_value(editor.getAllocator())
 			, m_old_value(editor.getAllocator())
 		{
 			m_index = index;
 			m_new_value.write(data, size);
-			m_property_descriptor.get(component, m_index, m_old_value);
+			m_property_descriptor->get(component, m_index, m_old_value);
+		}
+
+
+		virtual void serialize(JsonSerializer& serializer) override
+		{
+			serializer.serialize("index", m_index);
+			serializer.serialize("entity_index", m_component.entity.index);
+			serializer.serialize("component_index", m_component.index);
+			serializer.serialize("component_type", m_component.type);
+			serializer.beginArray("data");
+			for (int i = 0; i < m_new_value.getBufferSize(); ++i)
+			{
+				serializer.serializeArrayItem((int)m_new_value.getBuffer()[i]);
+			}
+			serializer.endArray();
+			serializer.serialize("property_name_hash", m_property_descriptor->getNameHash());
+		}
+
+
+		virtual void deserialize(JsonSerializer& serializer) override
+		{
+			serializer.deserialize("index", m_index, 0);
+			serializer.deserialize("entity_index", m_component.entity.index, 0);
+			serializer.deserialize("component_index", m_component.index, 0);
+			serializer.deserialize("component_type", m_component.type, 0);
+			m_component.entity.universe = m_editor.getEngine().getUniverse();
+			m_component.scene = m_editor.getEngine().getSceneByComponentType(m_component.type);
+			serializer.deserializeArrayBegin("data");
+			m_new_value.clearBuffer();
+			while (!serializer.isArrayEnd())
+			{
+				int data;
+				serializer.deserializeArrayItem(data, 0);
+				m_new_value.write((uint8_t)data);
+			}
+			serializer.deserializeArrayEnd();
+			uint32_t property_name_hash;
+			serializer.deserialize("property_name_hash", property_name_hash, 0);
+			m_property_descriptor = &m_editor.getPropertyDescriptor(m_component.type, property_name_hash);
 		}
 
 
@@ -420,11 +614,11 @@ class SetPropertyCommand : public IEditorCommand
 						{
 							if(m_index >= 0)
 							{
-								m_property_descriptor.set(cmps[j], m_index, stream);
+								m_property_descriptor->set(cmps[j], m_index, stream);
 							}
 							else
 							{
-								m_property_descriptor.set(cmps[j], stream);
+								m_property_descriptor->set(cmps[j], stream);
 							}
 							break;
 						}
@@ -435,11 +629,11 @@ class SetPropertyCommand : public IEditorCommand
 			{
 				if(m_index >= 0)
 				{
-					m_property_descriptor.set(m_component, m_index, stream);
+					m_property_descriptor->set(m_component, m_index, stream);
 				}
 				else
 				{
-					m_property_descriptor.set(m_component, stream);
+					m_property_descriptor->set(m_component, stream);
 				}
 			}
 		}
@@ -451,7 +645,7 @@ class SetPropertyCommand : public IEditorCommand
 		Blob m_new_value;
 		Blob m_old_value;
 		int m_index;
-		const IPropertyDescriptor& m_property_descriptor;
+		const IPropertyDescriptor* m_property_descriptor;
 };
 
 
@@ -493,6 +687,33 @@ struct WorldEditorImpl : public WorldEditor
 							}
 						}
 					}
+				}
+
+
+				virtual void serialize(JsonSerializer& serializer) override
+				{
+					serializer.serialize("component_type", m_type);
+					serializer.beginArray("entities");
+					for (int i = 0; i < m_entities.size(); ++i)
+					{
+						serializer.serializeArrayItem(m_entities[i].index);
+					}
+					serializer.endArray();
+				}
+
+
+				virtual void deserialize(JsonSerializer& serializer) override
+				{
+					serializer.deserialize("component_type", m_type, 0);
+					m_entities.clear();
+					serializer.deserializeArrayBegin("entities");
+					while (!serializer.isArrayEnd())
+					{
+						Entity& entity = m_entities.pushEmpty();
+						serializer.deserializeArrayItem(entity.index, 0);
+						entity.universe = m_editor.getEngine().getUniverse();
+					}
+					serializer.deserializeArrayEnd();
 				}
 
 
@@ -558,6 +779,48 @@ struct WorldEditorImpl : public WorldEditor
 					{
 						m_entities.push(entities[i]);
 					}
+				}
+
+
+				virtual void serialize(JsonSerializer& serializer) override
+				{
+					serializer.serialize("count", m_entities.size());
+					serializer.beginArray("entities");
+					for (int i = 0; i < m_entities.size(); ++i)
+					{
+						serializer.serializeArrayItem(m_entities[i].index);
+						serializer.serializeArrayItem(m_positons_rotations[i].m_position.x);
+						serializer.serializeArrayItem(m_positons_rotations[i].m_position.y);
+						serializer.serializeArrayItem(m_positons_rotations[i].m_position.z);
+						serializer.serializeArrayItem(m_positons_rotations[i].m_rotation.x);
+						serializer.serializeArrayItem(m_positons_rotations[i].m_rotation.y);
+						serializer.serializeArrayItem(m_positons_rotations[i].m_rotation.z);
+						serializer.serializeArrayItem(m_positons_rotations[i].m_rotation.w);
+					}
+					serializer.endArray();
+				}
+
+
+				virtual void deserialize(JsonSerializer& serializer) override
+				{
+					int count;
+					serializer.deserialize("count", count, 0);
+					serializer.deserializeArrayBegin("entities");
+					m_entities.resize(count);
+					m_positons_rotations.resize(count);
+					for (int i = 0; i < count; ++i)
+					{
+						serializer.deserializeArrayItem(m_entities[i].index, 0);
+						m_entities[i].universe = m_editor.getEngine().getUniverse();
+						serializer.deserializeArrayItem(m_positons_rotations[i].m_position.x, 0);
+						serializer.deserializeArrayItem(m_positons_rotations[i].m_position.y, 0);
+						serializer.deserializeArrayItem(m_positons_rotations[i].m_position.z, 0);
+						serializer.deserializeArrayItem(m_positons_rotations[i].m_rotation.x, 0);
+						serializer.deserializeArrayItem(m_positons_rotations[i].m_rotation.y, 0);
+						serializer.deserializeArrayItem(m_positons_rotations[i].m_rotation.z, 0);
+						serializer.deserializeArrayItem(m_positons_rotations[i].m_rotation.w, 0);
+					}
+					serializer.deserializeArrayEnd();
 				}
 
 
@@ -671,6 +934,24 @@ struct WorldEditorImpl : public WorldEditor
 					, m_editor(editor)
 					, m_old_values(editor.getAllocator())
 				{
+				}
+
+
+				virtual void serialize(JsonSerializer& serializer)
+				{
+					serializer.serialize("entity", m_component.entity.index);
+					serializer.serialize("component", m_component.index);
+					serializer.serialize("component_type", m_component.type);
+				}
+
+
+				virtual void deserialize(JsonSerializer& serializer)
+				{
+					serializer.deserialize("entity", m_component.entity.index, 0);
+					serializer.deserialize("component", m_component.index, 0);
+					serializer.deserialize("component_type", m_component.type, 0);
+					m_component.entity.universe = m_editor.getEngine().getUniverse();
+					m_component.scene = m_editor.getEngine().getSceneByComponentType(m_component.type);
 				}
 
 
@@ -788,6 +1069,26 @@ struct WorldEditorImpl : public WorldEditor
 					m_entity = m_editor.getEngine().getUniverse()->createEntity();
 					m_entity.setPosition(m_position);
 					m_editor.selectEntities(&m_entity, 1);
+				}
+
+
+				virtual void serialize(JsonSerializer& serializer) override
+				{
+					serializer.beginObject();
+					serializer.serialize("pos_x", m_position.x);
+					serializer.serialize("pos_y", m_position.y);
+					serializer.serialize("pos_z", m_position.z);
+					serializer.endObject();
+				}
+
+
+				virtual void deserialize(JsonSerializer& serializer) override
+				{
+					serializer.deserializeObjectBegin();
+					serializer.deserialize("pos_x", m_position.x, 0);
+					serializer.deserialize("pos_y", m_position.y, 0);
+					serializer.deserialize("pos_z", m_position.z, 0);
+					serializer.deserializeObjectEnd();
 				}
 
 
@@ -1332,7 +1633,7 @@ struct WorldEditorImpl : public WorldEditor
 				{
 					rots.push(entities[i].getRotation());
 				}
-				IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(entities, positions, rots, m_allocator);
+				IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(*this, entities, positions, rots, m_allocator);
 				executeCommand(command);
 			}
 		}
@@ -1342,7 +1643,7 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			if (!entities.empty())
 			{
-				IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(entities, positions, rotations, m_allocator);
+				IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(*this, entities, positions, rotations, m_allocator);
 				executeCommand(command);
 			}
 		}
@@ -1877,7 +2178,7 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			if(cmp.isValid())
 			{
-				IEditorCommand* command = m_allocator.newObject<AddArrayPropertyItemCommand>(cmp, property);
+				IEditorCommand* command = m_allocator.newObject<AddArrayPropertyItemCommand>(*this, cmp, property);
 				executeCommand(command);
 			}
 		}
