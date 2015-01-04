@@ -1,5 +1,6 @@
 #include "insert_mesh_command.h"
 #include "core/crc32.h"
+#include "core/json_serializer.h"
 #include "engine/engine.h"
 #include "graphics/render_scene.h"
 
@@ -13,6 +14,25 @@ InsertMeshCommand::InsertMeshCommand(Lumix::WorldEditor& editor, const Lumix::Ve
 	, m_editor(editor)
 {
 
+}
+
+
+void InsertMeshCommand::serialize(Lumix::JsonSerializer& serializer)
+{
+	serializer.serialize("path", m_mesh_path.c_str());
+	serializer.serialize("pos_x", m_position.x);
+	serializer.serialize("pos_y", m_position.y);
+	serializer.serialize("pos_z", m_position.z);
+}
+
+
+void InsertMeshCommand::deserialize(Lumix::JsonSerializer& serializer)
+{
+	char path[LUMIX_MAX_PATH];
+	serializer.deserialize("path", path, sizeof(path), "");
+	serializer.deserialize("pos_x", m_position.x, 0);
+	serializer.deserialize("pos_y", m_position.y, 0);
+	serializer.deserialize("pos_z", m_position.z, 0);
 }
 
 
