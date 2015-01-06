@@ -31,6 +31,13 @@ namespace Lumix
 			class CreateInstanceCommand : public IEditorCommand
 			{
 				public:
+					CreateInstanceCommand(WorldEditor& editor)
+						: m_entity_system(static_cast<EntityTemplateSystemImpl&>(editor.getEntityTemplateSystem()))
+						, m_editor(editor)
+					{
+					}
+
+
 					CreateInstanceCommand(EntityTemplateSystemImpl& entity_system, WorldEditor& editor, const char* template_name, const Vec3& position)
 						: m_entity_system(entity_system)
 						, m_template_name_hash(crc32(template_name))
@@ -141,6 +148,13 @@ namespace Lumix
 				editor.universeCreated().bind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseCreated>(this);
 				editor.universeDestroyed().bind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseDestroyed>(this);
 				setUniverse(editor.getEngine().getUniverse());
+				editor.registerEditorCommandCreator("create_entity_template_instance", &EntityTemplateSystemImpl::createCreateInstanceCommand);
+			}
+
+
+			static IEditorCommand* createCreateInstanceCommand(WorldEditor& editor)
+			{
+				return editor.getAllocator().newObject<CreateInstanceCommand>(editor);
 			}
 
 
