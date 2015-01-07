@@ -22,6 +22,7 @@ struct AnimationHeader
 {
 	uint32_t magic;
 	uint32_t version;
+	uint32_t fps;
 };
 
 
@@ -44,6 +45,7 @@ Animation::Animation(const Path& path, ResourceManager& resource_manager, IAlloc
 	m_positions = NULL;
 	m_bones = NULL;
 	m_frame_count = 0;
+	m_fps = 30;
 }
 
 
@@ -56,21 +58,18 @@ Animation::~Animation()
 }
 
 
-static const float ANIMATION_FPS = 30.0f;
-
-
 void Animation::getPose(float time, Pose& pose, Model& model) const
 {
 	PROFILE_FUNCTION();
 	if(model.isReady())
 	{
-		int frame = (int)(time * ANIMATION_FPS);
+		int frame = (int)(time * m_fps);
 		frame = frame >= m_frame_count ? m_frame_count - 1 : frame;
 		Vec3* pos = pose.getPositions();
 		Quat* rot = pose.getRotations();
 		int off = frame * m_bone_count;
 		int off2 = off + m_bone_count;
-		float t = (time - frame / ANIMATION_FPS) / (1 / ANIMATION_FPS);
+		float t = (time - frame / m_fps) / (1 / m_fps);
 	
 		if(frame < m_frame_count - 1)
 		{
@@ -147,6 +146,7 @@ void Animation::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			g_log_error.log("animation") << "Unsupported animation version " << header.version << " (" << m_path.c_str() << ")";
 			return;
 		}
+		m_fps = header.fps;
 		file->read(&m_frame_count, sizeof(m_frame_count));
 		file->read(&m_bone_count, sizeof(m_bone_count));
 

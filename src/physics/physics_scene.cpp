@@ -163,6 +163,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
+	virtual bool ownComponentType(uint32_t type) const override
+	{
+		return type == BOX_ACTOR_HASH || type == MESH_ACTOR_HASH || type == HEIGHTFIELD_HASH || type == CONTROLLER_HASH;
+	}
+
+
 	virtual IPlugin& getPlugin() const override
 	{
 		return *m_system;

@@ -11,6 +11,8 @@ class InsertMeshCommand : public Lumix::IEditorCommand
 	public:
 		InsertMeshCommand(Lumix::WorldEditor& editor, const Lumix::Vec3& position, const Lumix::Path& mesh_path);
 
+		virtual void serialize(Lumix::JsonSerializer& serializer) override;
+		virtual void deserialize(Lumix::JsonSerializer& serializer) override;
 		virtual void execute() override;
 		virtual void undo() override;
 		virtual uint32_t getType() override;

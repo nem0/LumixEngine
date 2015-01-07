@@ -31,6 +31,13 @@ namespace Lumix
 			class CreateInstanceCommand : public IEditorCommand
 			{
 				public:
+					CreateInstanceCommand(WorldEditor& editor)
+						: m_entity_system(static_cast<EntityTemplateSystemImpl&>(editor.getEntityTemplateSystem()))
+						, m_editor(editor)
+					{
+					}
+
+
 					CreateInstanceCommand(EntityTemplateSystemImpl& entity_system, WorldEditor& editor, const char* template_name, const Vec3& position)
 						: m_entity_system(entity_system)
 						, m_template_name_hash(crc32(template_name))
@@ -39,6 +46,36 @@ namespace Lumix
 						, m_editor(editor)
 					{
 					}
+
+
+					virtual void serialize(JsonSerializer& serializer) override
+					{
+						serializer.serialize("template_name_hash", m_template_name_hash);
+						serializer.serialize("entity", m_entity.index);
+						serializer.serialize("position_x", m_position.x);
+						serializer.serialize("position_y", m_position.y);
+						serializer.serialize("position_z", m_position.z);
+						serializer.serialize("rotation_x", m_rotation.x);
+						serializer.serialize("rotation_y", m_rotation.y);
+						serializer.serialize("rotation_z", m_rotation.z);
+						serializer.serialize("rotation_w", m_rotation.w);
+					}
+
+
+					virtual void deserialize(JsonSerializer& serializer) override
+					{
+						serializer.deserialize("template_name_hash", m_template_name_hash, 0);
+						serializer.deserialize("entity", m_entity.index, -1);
+						m_entity.universe = m_editor.getEngine().getUniverse();
+						serializer.deserialize("position_x", m_position.x, 0);
+						serializer.deserialize("position_y", m_position.y, 0);
+						serializer.deserialize("position_z", m_position.z, 0);
+						serializer.deserialize("rotation_x", m_rotation.x, 0);
+						serializer.deserialize("rotation_y", m_rotation.y, 0);
+						serializer.deserialize("rotation_z", m_rotation.z, 0);
+						serializer.deserialize("rotation_w", m_rotation.w, 0);
+					}
+
 
 					virtual void execute() override
 					{
@@ -111,6 +148,13 @@ namespace Lumix
 				editor.universeCreated().bind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseCreated>(this);
 				editor.universeDestroyed().bind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseDestroyed>(this);
 				setUniverse(editor.getEngine().getUniverse());
+				editor.registerEditorCommandCreator("create_entity_template_instance", &EntityTemplateSystemImpl::createCreateInstanceCommand);
+			}
+
+
+			static IEditorCommand* createCreateInstanceCommand(WorldEditor& editor)
+			{
+				return editor.getAllocator().newObject<CreateInstanceCommand>(editor);
 			}
 
 

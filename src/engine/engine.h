@@ -52,6 +52,7 @@ namespace Lumix
 			virtual Hierarchy* getHierarchy() const = 0;
 			virtual const Array<IScene*>& getScenes() const = 0;
 			virtual IScene* getScene(uint32_t type) const = 0;
+			virtual IScene* getSceneByComponentType(uint32_t type) const = 0;
 			virtual MTJD::Manager& getMTJDManager() = 0;
 
 			virtual IAllocator& getAllocator() = 0;

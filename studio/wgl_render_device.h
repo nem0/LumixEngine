@@ -22,6 +22,7 @@ public:
 
 	}
 
+
 	~WGLRenderDevice()
 	{
 		if(m_pipeline)
@@ -30,11 +31,13 @@ public:
 		}
 	}
 
+
 	virtual void beginFrame() override
 	{
 		PROFILE_FUNCTION();
 		wglMakeCurrent(m_hdc, m_opengl_context);
 	}
+
 
 	virtual void endFrame() override
 	{
@@ -42,10 +45,24 @@ public:
 		wglSwapLayerBuffers(m_hdc, WGL_SWAP_MAIN_PLANE);
 	}
 
+
 	virtual Lumix::PipelineInstance& getPipeline()
 	{
 		return *m_pipeline;
 	}
+
+
+	virtual int getWidth() const override
+	{
+		return m_pipeline->getWidth();
+	}
+
+
+	virtual int getHeight() const override
+	{
+		return m_pipeline->getHeight();
+	}
+
 
 	Lumix::PipelineInstance* m_pipeline;
 	HDC m_hdc;

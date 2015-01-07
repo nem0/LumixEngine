@@ -33,6 +33,8 @@ class LUMIX_ENGINE_API Texture : public Resource
 		void save();
 		uint32_t getPixel(float x, float y) const;
 
+		static bool saveTGA(IAllocator& allocator, FS::IFile* file, int width, int height, int bits_per_pixel, const uint8_t* data, const Path& path);
+
 	private:
 		bool loadDDS(FS::IFile& file);
 		bool loadTGA(FS::IFile& file);

@@ -44,6 +44,12 @@ namespace Lumix
 			}
 
 
+			virtual bool ownComponentType(uint32_t type) const override
+			{
+				return type == SCRIPT_HASH;
+			}
+
+
 			virtual IPlugin& getPlugin() const;
 
 

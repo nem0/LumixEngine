@@ -155,6 +155,7 @@ namespace
 		LUMIX_EXPECT_TRUE(texture_fail->isFailure());
 
 		// exit
+		texture_manager.unload(*texture_fail);
 		texture_manager.destroy();
 		resource_manager.destroy();
 
@@ -279,6 +280,7 @@ namespace
 		LUMIX_EXPECT_TRUE(animation_fail->isFailure());
 
 		// exit
+		animation_manager.unload(*animation_fail);
 		animation_manager.destroy();
 		resource_manager.destroy();
 
@@ -402,6 +404,7 @@ namespace
 
 
 		// exit
+		animation_manager.unload(*animation);
 		animation_manager.destroy();
 		resource_manager.destroy();
 

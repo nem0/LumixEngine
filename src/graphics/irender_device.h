@@ -17,6 +17,8 @@ class LUMIX_ENGINE_API IRenderDevice abstract
 
 		virtual void beginFrame() = 0;
 		virtual void endFrame() = 0;
+		virtual int getWidth() const = 0;
+		virtual int getHeight() const = 0;
 		virtual PipelineInstance& getPipeline() = 0;
 };
 
