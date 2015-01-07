@@ -77,8 +77,9 @@ class LUMIX_ENGINE_API PipelineInstance abstract
 		virtual void setRenderer(Renderer& renderer) = 0;
 		virtual void setScene(RenderScene* scene) = 0;
 		virtual RenderScene* getScene() = 0;
+		virtual int getWidth() = 0;
+		virtual int getHeight() = 0;
 		virtual CustomCommandHandler& addCustomCommandHandler(const char* name) = 0;
-
 };
 
 

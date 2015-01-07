@@ -329,6 +329,7 @@ namespace Lumix
 			
 			}
 
+
 			~RenderSceneImpl()
 			{
 				m_universe.entityMoved().unbind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
@@ -356,10 +357,18 @@ namespace Lumix
 				CullingSystem::destroy(*m_culling_system);
 			}
 
+			
+			virtual bool ownComponentType(uint32_t type) const override
+			{
+				return type == RENDERABLE_HASH || type == LIGHT_HASH || type == CAMERA_HASH || type == TERRAIN_HASH;
+			}
+
+
 			virtual IPlugin& getPlugin() const override
 			{
 				return m_renderer;
 			}
+
 
 			virtual void getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) override
 			{

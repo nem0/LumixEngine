@@ -24,6 +24,7 @@ namespace Lumix
 			virtual void deserialize(Blob& serializer) = 0;
 			virtual IPlugin& getPlugin() const = 0;
 			virtual void update(float time_delta) = 0;
+			virtual bool ownComponentType(uint32_t type) const = 0;
 	};
 
 

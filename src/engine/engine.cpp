@@ -162,6 +162,19 @@ namespace Lumix
 			}
 
 
+			virtual IScene* getSceneByComponentType(uint32_t type) const override
+			{
+				for (int i = 0; i < m_scenes.size(); ++i)
+				{
+					if (m_scenes[i]->ownComponentType(type))
+					{
+						return m_scenes[i];
+					}
+				}
+				return NULL;
+			}
+
+
 			virtual IScene* getScene(uint32_t type) const override
 			{
 				for (int i = 0; i < m_scenes.size(); ++i)

@@ -1,6 +1,7 @@
 #include "entity_list.h"
 #include "ui_entity_list.h"
 #include "core/crc32.h"
+#include "core/json_serializer.h"
 #include "core/path_utils.h"
 #include "core/string.h"
 #include "editor/ieditor_command.h"
@@ -33,13 +34,32 @@ static const uint32_t RENDERABLE_HASH = crc32("renderable");
 class SetParentEditorCommand : public Lumix::IEditorCommand
 {
 	public:
-		SetParentEditorCommand(Lumix::Hierarchy& hierarchy, const Lumix::Entity& child, const Lumix::Entity& parent)
+		SetParentEditorCommand(Lumix::WorldEditor& editor, Lumix::Hierarchy& hierarchy, const Lumix::Entity& child, const Lumix::Entity& parent)
 			: m_new_parent(parent)
 			, m_child(child)
 			, m_old_parent(hierarchy.getParent(child))
 			, m_hierarchy(hierarchy)
+			, m_editor(editor)
 		{
 		}
+
+
+		virtual void serialize(Lumix::JsonSerializer& serializer)
+		{
+			serializer.serialize("parent", m_new_parent.index);
+			serializer.serialize("child", m_child.index);
+		}
+
+
+		virtual void deserialize(Lumix::JsonSerializer& serializer)
+		{
+			serializer.deserialize("parent", m_new_parent.index, 0);
+			serializer.deserialize("child", m_child.index, 0);
+			m_new_parent.universe = m_editor.getEngine().getUniverse();
+			m_child.universe = m_editor.getEngine().getUniverse();
+			m_old_parent = m_hierarchy.getParent(m_child);
+		}
+
 
 		virtual void execute() override
 		{
@@ -71,6 +91,7 @@ class SetParentEditorCommand : public Lumix::IEditorCommand
 		Lumix::Entity m_new_parent;
 		Lumix::Entity m_old_parent;
 		Lumix::Hierarchy& m_hierarchy;
+		Lumix::WorldEditor& m_editor;
 };
 
 
@@ -246,7 +267,7 @@ class EntityListModel : public QAbstractItemModel
 				stream >> child.index;
 			}
 
-			SetParentEditorCommand* command = m_engine->getWorldEditor()->getAllocator().newObject<SetParentEditorCommand>(*m_engine->getHierarchy(), child, parent_entity);
+			SetParentEditorCommand* command = m_engine->getWorldEditor()->getAllocator().newObject<SetParentEditorCommand>(*m_engine->getWorldEditor(), *m_engine->getHierarchy(), child, parent_entity);
 			m_engine->getWorldEditor()->executeCommand(command);
 
 			return false;
@@ -593,20 +614,32 @@ void EntityList::setWorldEditor(Lumix::WorldEditor& editor)
 }
 
 
-void EntityList::onEntitySelected(const Lumix::Array<Lumix::Entity>& entities)
+void EntityList::fillSelection(const QModelIndex& parent, QItemSelection* selection, const Lumix::Array<Lumix::Entity>& entities)
 {
-	QItemSelection* selection = new QItemSelection();
-	for(int j = entities.size() - 1; j >= 0; --j)
+	for (int i = 0, c = m_filter->rowCount(parent); i < c; ++i)
 	{
-		for (int i = 0, c = m_filter->rowCount(); i < c; ++i)
+		auto index = m_filter->index(i, 0, parent);
+		auto entity_index = m_filter->data(index, Qt::UserRole).toInt();
+		for (int j = entities.size() - 1; j >= 0; --j)
 		{
-			if (m_filter->data(m_filter->index(i, 0), Qt::UserRole).toInt() == entities[j].index)
+			if (entity_index == entities[j].index)
 			{
-				selection->append(QItemSelectionRange(m_filter->index(i, 0)));
+				selection->append(QItemSelectionRange(m_filter->index(i, 0, parent)));
 				break;
 			}
 		}
+		if (m_filter->rowCount(index) > 0)
+		{
+			fillSelection(index, selection, entities);
+		}
 	}
+}
+
+
+void EntityList::onEntitySelected(const Lumix::Array<Lumix::Entity>& entities)
+{
+	QItemSelection* selection = new QItemSelection();
+	fillSelection(QModelIndex(), selection, entities);
 	m_ui->entityList->selectionModel()->select(*selection, QItemSelectionModel::SelectionFlag::ClearAndSelect | QItemSelectionModel::SelectionFlag::Rows);
 	delete selection;
 }

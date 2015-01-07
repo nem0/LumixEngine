@@ -59,6 +59,12 @@ namespace Lumix
 			}
 
 
+			virtual bool ownComponentType(uint32_t type) const override
+			{
+				return type == ANIMABLE_HASH;
+			}
+
+
 			virtual Component getAnimable(const Entity& entity) override
 			{
 				for (int i = 0; i < m_animables.size(); ++i)

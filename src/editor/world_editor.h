@@ -33,6 +33,7 @@ namespace Lumix
 	{
 		public:
 			typedef Array<Component> ComponentList;
+			typedef class IEditorCommand* (*EditorCommandCreator)(WorldEditor&);
 
 			enum class MouseFlags : int
 			{
@@ -58,7 +59,7 @@ namespace Lumix
 			virtual void tick() = 0;
 			virtual void registerProperty(const char* component_type, IPropertyDescriptor* descriptor) = 0;
 			virtual IPropertyDescriptor* getProperty(const char* component_type, const char* property_name) = 0;
-			virtual void executeCommand(class IEditorCommand* command) = 0;
+			virtual void executeCommand(IEditorCommand* command) = 0;
 			virtual Engine& getEngine() = 0;
 			virtual IAllocator& getAllocator() = 0;
 			virtual void render(IRenderDevice& render_device) = 0;
@@ -118,6 +119,10 @@ namespace Lumix
 			virtual Vec3 getCameraRaycastHit() = 0;
 			virtual void toggleMeasure() = 0;
 			virtual class MeasureTool* getMeasureTool() const = 0;
+
+			virtual void saveUndoStack(const Path& path) = 0;
+			virtual bool executeUndoStack(const Path& path) = 0;
+			virtual void registerEditorCommandCreator(const char* command_type, EditorCommandCreator) = 0;
 
 		protected:
 			virtual ~WorldEditor() {}

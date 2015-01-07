@@ -394,6 +394,22 @@ struct RendererImpl : public Renderer
 	}
 
 
+	virtual void makeScreenshot(const Path& filename, int width, int height) override
+	{
+		GLubyte* pixels = (GLubyte*)m_allocator.allocate(width * height * 4);
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+		glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+
+		FS::FileSystem& fs = m_engine.getFileSystem();
+		FS::IFile* file = fs.open("disk", filename, FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
+
+		Texture::saveTGA(m_allocator, file, width, height, 4, pixels, filename);
+
+		fs.close(file);
+		m_allocator.deallocate(pixels);
+	}
+
+
 	virtual void renderModel(const Model& model, const Matrix& transform, PipelineInstance& pipeline) override
 	{
 		for (int i = 0, c = model.getMeshCount(); i < c;  ++i)

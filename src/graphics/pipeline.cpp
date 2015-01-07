@@ -22,6 +22,7 @@
 #include "graphics/model_instance.h"
 #include "graphics/renderer.h"
 #include "graphics/shader.h"
+#include "graphics/texture.h"
 
 
 namespace Lumix
@@ -236,7 +237,8 @@ struct PipelineImpl : public Pipeline
 
 		int32_t m_width;
 		int32_t m_height;
-		int32_t m_mask;
+		int32_t m_color_buffers_count;
+		bool m_is_depth_buffer;
 		StackAllocator<64> m_name_allocator;
 		string m_name;
 	};
@@ -323,44 +325,55 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	virtual bool deserialize(JsonSerializer& serializer) override
+	bool deserialierFramebuffers(JsonSerializer& serializer)
 	{
-		int32_t count;
-		serializer.deserializeObjectBegin();
-		serializer.deserialize("frame_buffer_count", count, 0);
-		serializer.deserializeArrayBegin("frame_buffers");
-		m_framebuffers.resize(count);
-		for(int i = 0; i < count; ++i)
+		while (!serializer.isArrayEnd())
 		{
-			int32_t render_buffer_count;
-			char fb_name[31];
-			serializer.deserializeArrayItem(fb_name, 30, "");
-			m_framebuffers[i].m_name = fb_name;
+			serializer.nextArrayItem();
+			serializer.deserializeObjectBegin();
+			FrameBufferDeclaration& framebuffer = m_framebuffers.pushEmpty();
 
-			serializer.deserializeArrayItem(render_buffer_count, 0);
-			int mask = 0;
-			char rb_name[30];
-			for(int j = 0; j < render_buffer_count; ++j)
+			framebuffer.m_color_buffers_count = 0;
+			framebuffer.m_is_depth_buffer = false;
+			while (!serializer.isObjectEnd())
 			{
-				serializer.deserializeArrayItem(rb_name, 30, "");
-				if(strcmp(rb_name, "depth") == 0)
+				char label[40];
+				serializer.deserializeLabel(label, sizeof(label));
+				if (strcmp(label, "name") == 0)
 				{
-					mask |= FrameBuffer::DEPTH_BIT;
+					serializer.deserialize(label, sizeof(label), "");
+					framebuffer.m_name = label;
 				}
-				else
+				else if (strcmp(label, "width") == 0)
 				{
-					ASSERT(false);
+					serializer.deserialize(framebuffer.m_width, 0);
+				}
+				else if (strcmp(label, "height") == 0)
+				{
+					serializer.deserialize(framebuffer.m_height, 0);
+				}
+				else if (strcmp(label, "color_buffers_count") == 0)
+				{
+					serializer.deserialize(framebuffer.m_color_buffers_count, 0);
+				}
+				else if (strcmp(label, "is_depth_buffer") == 0)
+				{
+					serializer.deserialize(framebuffer.m_is_depth_buffer, false);
 				}
 			}
-			serializer.deserializeArrayItem(m_framebuffers[i].m_width, 800);
-			serializer.deserializeArrayItem(m_framebuffers[i].m_height, 600);
-			m_framebuffers[i].m_mask = mask;
+			serializer.deserializeObjectEnd();
 		}
 		serializer.deserializeArrayEnd();
-		serializer.deserialize("shadowmap_width", m_shadowmap_framebuffer.m_width, 0);
-		serializer.deserialize("shadowmap_height", m_shadowmap_framebuffer.m_height, 0);
-		m_shadowmap_framebuffer.m_mask = FrameBuffer::DEPTH_BIT;
-		
+		return true;
+	}
+
+	virtual bool deserialize(JsonSerializer& serializer) override
+	{
+		serializer.deserializeObjectBegin();
+		serializer.deserializeArrayBegin("frame_buffers");
+		m_framebuffers.clear();
+		bool status = deserialierFramebuffers(serializer);
+	
 		serializer.deserializeArrayBegin("commands");
 		while (!serializer.isArrayEnd())
 		{
@@ -375,12 +388,13 @@ struct PipelineImpl : public Pipeline
 			}
 			else
 			{
+				status = false;
 				g_log_error.log("renderer") << "Unknown pipeline command \"" << tmp << "\" in pipeline " << getPath().c_str();
 			}
 		}
 		serializer.deserializeArrayEnd();
 		serializer.deserializeObjectEnd();
-		return true;
+		return status;
 	}
 
 
@@ -404,7 +418,6 @@ struct PipelineImpl : public Pipeline
 	Array<Command*> m_commands;
 	Array<CommandCreator> m_command_creators;
 	Array<FrameBufferDeclaration> m_framebuffers;
-	FrameBufferDeclaration m_shadowmap_framebuffer;
 };
 
 
@@ -427,6 +440,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		pipeline.onLoaded<PipelineInstanceImpl, &PipelineInstanceImpl::sourceLoaded>(this);
 	}
 
+
 	~PipelineInstanceImpl()
 	{
 		m_source.getObserverCb().unbind<PipelineInstanceImpl, &PipelineInstanceImpl::sourceLoaded>(this);
@@ -435,21 +449,20 @@ struct PipelineInstanceImpl : public PipelineInstance
 		{
 			m_allocator.deleteObject(m_framebuffers[i]);
 		}
-		if (m_shadowmap_framebuffer)
-		{
-			m_allocator.deleteObject(m_shadowmap_framebuffer);
-		}
 	}
+
 
 	void setActiveCamera(const Component& cmp)
 	{
 		m_active_camera = cmp;
 	}
 
-	CustomCommandHandler& addCustomCommandHandler(const char* name)
+
+	CustomCommandHandler& addCustomCommandHandler(const char* name) override
 	{
 		return m_custom_commands_handlers[crc32(name)];
 	}
+
 
 	FrameBuffer* getFrameBuffer(const char* name)
 	{
@@ -477,17 +490,31 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
+	virtual int getWidth() override
+	{
+		return m_width;
+	}
+
+
+	virtual int getHeight() override
+	{
+		return m_height;
+	}
+
+
 	void sourceLoaded(Resource::State old_state, Resource::State new_state)
 	{
 		if (old_state != Resource::State::READY && new_state == Resource::State::READY)
 		{
-			PipelineImpl::FrameBufferDeclaration fb = m_source.m_shadowmap_framebuffer;
-			m_shadowmap_framebuffer = m_allocator.newObject<FrameBuffer>(fb.m_width, fb.m_height, fb.m_mask, fb.m_name.c_str());
 			m_framebuffers.reserve(m_source.m_framebuffers.size());
 			for (int i = 0; i < m_source.m_framebuffers.size(); ++i)
 			{
-				fb = m_source.m_framebuffers[i];
-				m_framebuffers.push(m_allocator.newObject<FrameBuffer>(fb.m_width, fb.m_height, fb.m_mask, fb.m_name.c_str()));
+				PipelineImpl::FrameBufferDeclaration& fb = m_source.m_framebuffers[i];
+				m_framebuffers.push(m_allocator.newObject<FrameBuffer>(fb.m_width, fb.m_height, fb.m_color_buffers_count, fb.m_is_depth_buffer, fb.m_name.c_str()));
+				if (fb.m_name == "shadowmap")
+				{
+					m_shadowmap_framebuffer = m_framebuffers.back();
+				}
 			}
 		}
 	}
@@ -588,6 +615,23 @@ struct PipelineInstanceImpl : public PipelineInstance
 			m_renderer->setProjectionMatrix(mtx);
 			m_renderer->setViewMatrix(Matrix::IDENTITY);
 			mesh->getMaterial()->apply(*m_renderer, *this);
+			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX0, m_shadow_modelviewprojection[0]);
+			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX1, m_shadow_modelviewprojection[1]);
+			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX2, m_shadow_modelviewprojection[2]);
+			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX3, m_shadow_modelviewprojection[3]);
+			m_renderer->setUniform(*shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
+			m_renderer->setUniform(*shader, "camera_pos", CAMERA_POS_HASH, m_active_camera.entity.getPosition());
+			Component light_cmp = m_scene->getLight(0);
+			if (light_cmp.isValid())
+			{
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::AMBIENT_COLOR, m_scene->getLightAmbientColor(light_cmp));
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::AMBIENT_INTENSITY, m_scene->getLightAmbientIntensity(light_cmp));
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_COLOR, m_scene->getLightDiffuseColor(light_cmp));
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_INTENSITY, m_scene->getLightDiffuseIntensity(light_cmp));
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_COLOR, m_scene->getFogColor(light_cmp));
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOWMAP_SPLITS, m_shadowmap_splits);
+			}
 			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::WORLD_MATRIX, Matrix::IDENTITY);
 			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::PROJECTION_MATRIX, mtx);
 			bindGeometry(*m_renderer, *geometry, *mesh);
@@ -1112,7 +1156,7 @@ void DrawScreenQuadCommand::deserialize(PipelineImpl& pipeline, JsonSerializer& 
 	def.addAttribute(renderer, "in_position", VertexAttributeDef::FLOAT2);
 	def.addAttribute(renderer, "in_tex_coords", VertexAttributeDef::FLOAT2);
 	int indices[6] = { 0, 1, 2, 0, 2, 3 };
-	const int GEOMETRY_VERTEX_ATTRIBUTE_COUNT = 20;
+	const int GEOMETRY_VERTEX_ATTRIBUTE_COUNT = 16;
 	float v[GEOMETRY_VERTEX_ATTRIBUTE_COUNT];
 	
 	for (int i = 0; i < GEOMETRY_VERTEX_ATTRIBUTE_COUNT; ++i)
@@ -1139,24 +1183,7 @@ void DrawScreenQuadCommand::execute(PipelineInstanceImpl& pipeline)
 void BindFramebufferTextureCommand::deserialize(PipelineImpl&, JsonSerializer& serializer)
 {
 	serializer.deserializeArrayItem(m_framebuffer_name, "");
-	char rb_name[31];
-	serializer.deserializeArrayItem(rb_name, 30, "");
-	if (stricmp(rb_name, "position") == 0)
-	{
-		m_renderbuffer_index = FrameBuffer::POSITION;
-	}
-	else if (stricmp(rb_name, "diffuse") == 0)
-	{
-		m_renderbuffer_index = FrameBuffer::DIFFUSE;
-	}
-	else if (stricmp(rb_name, "normal") == 0)
-	{
-		m_renderbuffer_index = FrameBuffer::NORMAL;
-	}
-	else if (stricmp(rb_name, "depth") == 0)
-	{
-		m_renderbuffer_index = FrameBuffer::DEPTH;
-	}
+	serializer.deserializeArrayItem(m_renderbuffer_index, 0);
 	serializer.deserializeArrayItem(m_texture_uint, 0);
 }
 
@@ -1167,7 +1194,7 @@ void BindFramebufferTextureCommand::execute(PipelineInstanceImpl& pipeline)
 	if (fb)
 	{
 		glActiveTexture(GL_TEXTURE0 + m_texture_uint);
-		glBindTexture(GL_TEXTURE_2D, fb->getTexture((FrameBuffer::RenderBuffers)m_renderbuffer_index));
+		glBindTexture(GL_TEXTURE_2D, fb->getTexture(m_renderbuffer_index));
 	}
 }
 
