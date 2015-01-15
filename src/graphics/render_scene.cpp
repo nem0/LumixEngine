@@ -442,15 +442,35 @@ namespace Lumix
 			void serializeCameras(Blob& serializer)
 			{
 				serializer.write((int32_t)m_cameras.size());
-				serializer.write(&m_cameras[0], sizeof(m_cameras[0]) * m_cameras.size());
+				for (int i = 0, c = m_cameras.size(); i < c; ++i)
+				{
+					Camera& camera = m_cameras[i];
+					serializer.write(camera.m_entity.index);
+					serializer.write(camera.m_far);
+					serializer.write(camera.m_fov);
+					serializer.write(camera.m_is_active);
+					serializer.write(camera.m_is_free);
+					serializer.write(camera.m_near);
+					serializer.writeString(camera.m_slot);
+				}
+				
 			}
 
 			void serializeLights(Blob& serializer)
 			{
 				serializer.write((int32_t)m_lights.size());
-				if (!m_lights.empty())
+				for (int i = 0, c = m_lights.size(); i < c; ++i)
 				{
-					serializer.write(&m_lights[0], sizeof(m_lights[0]) * m_lights.size());
+					Light& light = m_lights[i];
+					serializer.write(light.m_ambient_color);
+					serializer.write(light.m_ambient_intensity);
+					serializer.write(light.m_diffuse_color);
+					serializer.write(light.m_diffuse_intensity);
+					serializer.write(light.m_entity.index);
+					serializer.write(light.m_fog_color);
+					serializer.write(light.m_fog_density);
+					serializer.write(light.m_is_free);
+					serializer.write(light.m_type);
 				}
 			}
 
@@ -498,11 +518,19 @@ namespace Lumix
 				int32_t size;
 				serializer.read(size);
 				m_cameras.resize(size);
-				serializer.read(&m_cameras[0], sizeof(m_cameras[0]) * size);
 				for (int i = 0; i < size; ++i)
 				{
-					m_cameras[i].m_entity.universe = &m_universe;
-					if(!m_cameras[i].m_is_free)
+					Camera& camera = m_cameras[i];
+					serializer.read(camera.m_entity.index);
+					serializer.read(camera.m_far);
+					serializer.read(camera.m_fov);
+					serializer.read(camera.m_is_active);
+					serializer.read(camera.m_is_free);
+					serializer.read(camera.m_near);
+					serializer.readString(camera.m_slot, sizeof(camera.m_slot));
+
+					camera.m_entity.universe = &m_universe;
+					if(!camera.m_is_free)
 					{
 						m_universe.addComponent(m_cameras[i].m_entity, CAMERA_HASH, this, i);
 					}
@@ -554,12 +582,19 @@ namespace Lumix
 				int32_t size = 0;
 				serializer.read(size);
 				m_lights.resize(size);
-				if (!m_lights.empty())
-				{
-					serializer.read(&m_lights[0], sizeof(m_lights[0]) * size);
-				}
 				for (int i = 0; i < size; ++i)
 				{
+					Light& light = m_lights[i];
+					serializer.read(light.m_ambient_color);
+					serializer.read(light.m_ambient_intensity);
+					serializer.read(light.m_diffuse_color);
+					serializer.read(light.m_diffuse_intensity);
+					serializer.read(light.m_entity.index);
+					serializer.read(light.m_fog_color);
+					serializer.read(light.m_fog_density);
+					serializer.read(light.m_is_free);
+					serializer.read(light.m_type);
+
 					m_lights[i].m_entity.universe = &m_universe;
 					if(!m_lights[i].m_is_free)
 					{
