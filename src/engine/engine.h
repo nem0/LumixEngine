@@ -60,7 +60,7 @@ namespace Lumix
 
 			virtual const char* getBasePath() const = 0;
 			virtual void update(bool is_game_running) = 0;
-			virtual void serialize(Blob& serializer) = 0;
+			virtual uint32_t serialize(Blob& serializer) = 0;
 			virtual bool deserialize(Blob& serializer) = 0;
 			virtual float getFPS() const = 0;
 			virtual float getLastTimeDelta() = 0;
