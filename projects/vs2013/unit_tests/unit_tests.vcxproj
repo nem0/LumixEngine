@@ -27,18 +27,28 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_aabb.cpp" />
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_crc32.cpp" />
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_associative_array.cpp" />
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_array.cpp" />
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_delegate.cpp" />
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_json_serializer.cpp" />
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_math_utils.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_binary_array.cpp" />
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_blob.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_file_system.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_fixed_lock_free_queue.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_hash_map.cpp">
       <PreprocessToFile Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</PreprocessToFile>
       <PreprocessToFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</PreprocessToFile>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_matrix.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_mtjd_framework.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_path.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_quat.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_string.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_transaction_queue.cpp" />
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_vec3.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\engine\ut_resource_managers.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\graphics\ut_clipper.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\main.cpp" />
