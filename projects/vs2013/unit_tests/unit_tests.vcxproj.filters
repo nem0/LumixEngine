@@ -38,7 +38,37 @@
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_fixed_lock_free_queue.cpp">
       <Filter>core</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_matrix.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_math_utils.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_binary_array.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_blob.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_array.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_associative_array.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_crc32.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_vec3.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_json_serializer.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_delegate.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\unit_tests\core\ut_aabb.cpp">
       <Filter>core</Filter>
     </ClCompile>
   </ItemGroup>
