@@ -312,7 +312,7 @@ namespace Lumix
 			}
 
 
-			virtual void serialize(Blob& serializer) override
+			virtual void serialize(OutputBlob& serializer) override
 			{
 				SerializedEngineHeader header;
 				header.m_magic = SERIALIZED_ENGINE_MAGIC; // == '_LEN'
@@ -331,7 +331,7 @@ namespace Lumix
 			}
 
 
-			virtual bool deserialize(Blob& serializer) override
+			virtual bool deserialize(InputBlob& serializer) override
 			{
 				SerializedEngineHeader header;
 				serializer.read(header);

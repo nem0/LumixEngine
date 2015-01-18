@@ -830,7 +830,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void serializeActor(Blob& serializer, int idx)
+	void serializeActor(OutputBlob& serializer, int idx)
 	{
 		physx::PxShape* shapes;
 		if (m_actors[idx]->m_physx_actor->getNbShapes() == 1 && m_actors[idx]->m_physx_actor->getShapes(&shapes, 1))
@@ -856,7 +856,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void deserializeActor(Blob& serializer, int idx)
+	void deserializeActor(InputBlob& serializer, int idx)
 	{
 		ActorType type;
 		serializer.read((int32_t&)type);
@@ -900,7 +900,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual void serialize(Blob& serializer) override
+	virtual void serialize(OutputBlob& serializer) override
 	{
 		serializer.write((int32_t)m_actors.size());
 		for (int i = 0; i < m_actors.size(); ++i)
@@ -938,7 +938,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void deserializeActors(Blob& serializer)
+	void deserializeActors(InputBlob& serializer)
 	{
 		int32_t count;
 		m_dynamic_actors.clear();
@@ -975,7 +975,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void deserializeControllers(Blob& serializer)
+	void deserializeControllers(InputBlob& serializer)
 	{
 		int32_t count;
 		serializer.read(count);
@@ -1016,7 +1016,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	void deserializeTerrains(Blob& serializer)
+	void deserializeTerrains(InputBlob& serializer)
 	{
 		int32_t count;
 		serializer.read(count);
@@ -1060,7 +1060,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual void deserialize(Blob& serializer) override
+	virtual void deserialize(InputBlob& serializer) override
 	{
 		deserializeActors(serializer);
 		deserializeControllers(serializer);
