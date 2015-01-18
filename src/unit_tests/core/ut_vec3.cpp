@@ -78,7 +78,55 @@ void UT_vec3(const char* params)
 		LUMIX_EXPECT_CLOSE_EQ(v3.z, z, 0.001f);
 	}
 
-	ASSERT(false); // TODO
+	for (float f = 0; f < Lumix::Math::PI * 2; f += 0.01f)
+	{
+		float y = cos(f);
+		float z = sin(f);
+		v3.set(0, 1, 0);
+		v3.rotateX(f);
+		LUMIX_EXPECT_CLOSE_EQ(v3.x, 0, 0.001f);
+		LUMIX_EXPECT_CLOSE_EQ(v3.y, y, 0.001f);
+		LUMIX_EXPECT_CLOSE_EQ(v3.z, z, 0.001f);
+	}
+
+	v = -Lumix::Vec3(1, 2, 3);
+	LUMIX_EXPECT_CLOSE_EQ(v.x, -1, 0.001f);
+	LUMIX_EXPECT_CLOSE_EQ(v.y, -2, 0.001f);
+	LUMIX_EXPECT_CLOSE_EQ(v.z, -3, 0.001f);
+
+	v = v + Lumix::Vec3(4, 5, 6);
+	LUMIX_EXPECT_CLOSE_EQ(v.x, 3, 0.001f);
+	LUMIX_EXPECT_CLOSE_EQ(v.y, 3, 0.001f);
+	LUMIX_EXPECT_CLOSE_EQ(v.z, 3, 0.001f);
+
+	v = v * 2;
+	LUMIX_EXPECT_CLOSE_EQ(v.x, 6, 0.001f);
+	LUMIX_EXPECT_CLOSE_EQ(v.y, 6, 0.001f);
+	LUMIX_EXPECT_CLOSE_EQ(v.z, 6, 0.001f);
+
+	LUMIX_EXPECT_CLOSE_EQ(Lumix::dotProduct(Lumix::Vec3(1, 0, 0), Lumix::Vec3(0, 1, 0)), 0, 0.001f);
+	LUMIX_EXPECT_CLOSE_EQ(Lumix::dotProduct(Lumix::Vec3(1, 0, 0), Lumix::Vec3(1, 0, 0)), 1, 0.001f);
+
+	v = Lumix::crossProduct(Lumix::Vec3(1, 0, 0), Lumix::Vec3(0, 1, 0));
+	LUMIX_EXPECT_CLOSE_EQ(v.x, 0, 0.001f);
+	LUMIX_EXPECT_CLOSE_EQ(v.y, 0, 0.001f);
+	LUMIX_EXPECT_CLOSE_EQ(v.z, 1, 0.001f);
+
+	Lumix::lerp(Lumix::Vec3(1, 0, 0), Lumix::Vec3(0, 1, 0), &v, 0);
+	LUMIX_EXPECT_CLOSE_EQ(v.x, 1, 0.001f);
+	LUMIX_EXPECT_CLOSE_EQ(v.y, 0, 0.001f);
+	LUMIX_EXPECT_CLOSE_EQ(v.z, 0, 0.001f);
+
+	Lumix::lerp(Lumix::Vec3(1, 0, 0), Lumix::Vec3(0, 1, 0), &v, 1);
+	LUMIX_EXPECT_CLOSE_EQ(v.x, 0, 0.001f);
+	LUMIX_EXPECT_CLOSE_EQ(v.y, 1, 0.001f);
+	LUMIX_EXPECT_CLOSE_EQ(v.z, 0, 0.001f);
+
+	Lumix::lerp(Lumix::Vec3(1, 0, 0), Lumix::Vec3(0, 1, 0), &v, 0.5f);
+	LUMIX_EXPECT_CLOSE_EQ(v.x, 0.5f, 0.001f);
+	LUMIX_EXPECT_CLOSE_EQ(v.y, 0.5f, 0.001f);
+	LUMIX_EXPECT_CLOSE_EQ(v.z, 0, 0.001f);
+
 }
 
 REGISTER_TEST("unit_tests/core/vec3", UT_vec3, "")
