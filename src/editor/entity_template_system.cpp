@@ -279,7 +279,7 @@ namespace Lumix
 			}
 
 
-			virtual void serialize(Blob& serializer) override
+			virtual void serialize(OutputBlob& serializer) override
 			{
 				serializer.write((int32_t)m_template_names.size());
 				for (int i = 0, c = m_template_names.size(); i < c;  ++i)
@@ -300,7 +300,7 @@ namespace Lumix
 			}
 
 
-			virtual void deserialize(Blob& serializer) override
+			virtual void deserialize(InputBlob& serializer) override
 			{
 				m_template_names.clear();
 				m_instances.clear();

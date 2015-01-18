@@ -31,7 +31,7 @@ namespace Lumix
 	}
 
 
-	void PluginManager::serialize(Blob& serializer)
+	void PluginManager::serialize(OutputBlob& serializer)
 	{
 		PluginManagerImpl::PluginList& plugins = m_impl->m_plugins;
 		for(int i = 0, c = plugins.size(); i < c; ++i)
@@ -41,7 +41,7 @@ namespace Lumix
 	}
 
 
-	void PluginManager::deserialize(Blob& serializer)
+	void PluginManager::deserialize(InputBlob& serializer)
 	{
 		PluginManagerImpl::PluginList& plugins = m_impl->m_plugins;
 		for(int i = 0, c = plugins.size(); i < c; ++i)
