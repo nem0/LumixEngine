@@ -487,6 +487,51 @@ namespace Lumix
 	}
 
 
+	float Texture::compareTGA(IAllocator& allocator, FS::IFile* file1, FS::IFile* file2)
+	{
+		TGAHeader header1, header2;
+		file1->read(&header1, sizeof(header1));
+		file2->read(&header2, sizeof(header2));
+
+		if (header1.bitsPerPixel != header2.bitsPerPixel
+			|| header1.width != header2.width
+			|| header1.height != header2.height
+			|| header1.dataType != header2.dataType
+			|| header1.imageDescriptor != header2.imageDescriptor
+			)
+		{
+			g_log_error.log("renderer") << "Trying to compare textures with different formats";
+			return -1;
+		}
+
+		int color_mode = header1.bitsPerPixel / 8;
+		if (header1.dataType != 2)
+		{
+			g_log_error.log("renderer") << "Unsupported texture format";
+			return -1;
+		}
+
+		// Targa is BGR, swap to RGB, add alpha and flip Y axis
+		double difference = 0;
+		size_t image_size = header1.width * header1.height * color_mode;
+		uint8_t* img1 = (uint8_t*)allocator.allocate(image_size);
+		uint8_t* img2 = (uint8_t*)allocator.allocate(image_size);
+
+		file1->read(img1, image_size);
+		file2->read(img2, image_size);
+
+		for (size_t i = 0; i < image_size; ++i)
+		{
+			difference += (double)Math::abs(img1[i] - img2[i]);
+		}
+
+		allocator.deallocate(img1);
+		allocator.deallocate(img2);
+
+		return (float)(1 - (difference / ((double)header1.width * header1.height * color_mode * 255.0)));
+	}
+
+
 	bool Texture::saveTGA(IAllocator& allocator, FS::IFile* file, int width, int height, int bytes_per_pixel, const uint8_t* image_dest, const Path& path)
 	{
 		if (bytes_per_pixel != 4)
