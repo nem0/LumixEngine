@@ -62,23 +62,23 @@ static const uint32_t SCRIPT_HASH = crc32("script");
 #pragma region new_props
 
 
-void createComponentPropertyEditor(PropertyView& view, int array_index, Lumix::IPropertyDescriptor* desc, Lumix::Component& cmp, Lumix::Blob& stream, QTreeWidgetItem* property_item);
+void createComponentPropertyEditor(PropertyView& view, int array_index, Lumix::IPropertyDescriptor* desc, Lumix::Component& cmp, Lumix::OutputBlob& stream, QTreeWidgetItem* property_item);
 
 
 template <typename T>
-T getPropertyValue(Lumix::IPropertyDescriptor* desc, Lumix::Component& cmp, int array_index, Lumix::Blob& stream)
+T getPropertyValue(Lumix::IPropertyDescriptor* desc, Lumix::Component& cmp, int array_index, Lumix::OutputBlob& stream)
 {
 	T v;
-	stream.clearBuffer();
+	stream.clear();
 	desc->get(cmp, array_index, stream);
-	stream.rewindForRead();
-	stream.read(v);
+	Lumix::InputBlob blob(stream.getData(), stream.getSize());
+	blob.read(v);
 	return v;
 }
 
 
 template <typename T>
-PropertyEditor<T> createComponentPropertyEditor(PropertyView& view, int array_index, Lumix::IPropertyDescriptor* desc, Lumix::Component& cmp, Lumix::Blob& stream, QTreeWidgetItem* item)
+PropertyEditor<T> createComponentPropertyEditor(PropertyView& view, int array_index, Lumix::IPropertyDescriptor* desc, Lumix::Component& cmp, Lumix::OutputBlob& stream, QTreeWidgetItem* item)
 {
 	return PropertyEditor<T>::create(
 		desc->getName(), 
@@ -90,12 +90,12 @@ PropertyEditor<T> createComponentPropertyEditor(PropertyView& view, int array_in
 
 
 template <>
-PropertyEditor<const char*> createComponentPropertyEditor<const char*>(PropertyView& view, int array_index, Lumix::IPropertyDescriptor* desc, Lumix::Component& cmp, Lumix::Blob& stream, QTreeWidgetItem* item)
+PropertyEditor<const char*> createComponentPropertyEditor<const char*>(PropertyView& view, int array_index, Lumix::IPropertyDescriptor* desc, Lumix::Component& cmp, Lumix::OutputBlob& stream, QTreeWidgetItem* item)
 {
-	stream.clearBuffer();
+	stream.clear();
 	desc->get(cmp, array_index, stream);
-	stream.rewindForRead();
-	return PropertyEditor<const char*>::create(desc->getName(), item, (const char*)stream.getBuffer(), [&view, desc, cmp, array_index](const char* v) { view.getWorldEditor()->setProperty(cmp.type, array_index, *desc, v, strlen(v) + 1); });
+	Lumix::InputBlob blob(stream.getData(), stream.getSize());
+	return PropertyEditor<const char*>::create(desc->getName(), item, (const char*)blob.getData(), [&view, desc, cmp, array_index](const char* v) { view.getWorldEditor()->setProperty(cmp.type, array_index, *desc, v, strlen(v) + 1); });
 }
 
 
@@ -177,12 +177,12 @@ public:
 };
 
 
-void createComponentResourcePropertyEdit(PropertyView& view, int array_index, Lumix::IPropertyDescriptor* desc, Lumix::Component& cmp, Lumix::Blob& stream, QTreeWidgetItem* item)
+void createComponentResourcePropertyEdit(PropertyView& view, int array_index, Lumix::IPropertyDescriptor* desc, Lumix::Component& cmp, Lumix::OutputBlob& stream, QTreeWidgetItem* item)
 {
-	stream.clearBuffer();
+	stream.clear();
 	desc->get(cmp, array_index, stream);
-	stream.rewindForRead();
-	auto* res = view.getResource((const char*)stream.getBuffer());
+	Lumix::InputBlob blob(stream.getData(), stream.getSize());
+	auto* res = view.getResource((const char*)blob.getData());
 	auto editor = PropertyEditor<Lumix::Resource*>::create(view, desc->getName(), item, res, [&view, desc, cmp, array_index](const char* v) { view.getWorldEditor()->setProperty(cmp.type, array_index, *desc, v, strlen(v) + 1); });
 	auto file_desc = dynamic_cast<Lumix::IFilePropertyDescriptor*>(desc);
 	auto filter = file_desc->getFileType();
@@ -190,19 +190,19 @@ void createComponentResourcePropertyEdit(PropertyView& view, int array_index, Lu
 }
 
 
-void createComponentFilePropertyEdit(PropertyView& view, int array_index, Lumix::IPropertyDescriptor* desc, Lumix::Component& cmp, Lumix::Blob& stream, QTreeWidgetItem* item)
+void createComponentFilePropertyEdit(PropertyView& view, int array_index, Lumix::IPropertyDescriptor* desc, Lumix::Component& cmp, Lumix::OutputBlob& stream, QTreeWidgetItem* item)
 {
-	stream.clearBuffer();
+	stream.clear();
 	desc->get(cmp, array_index, stream);
-	stream.rewindForRead();
-	auto editor = PropertyEditor<Lumix::Path>::create(view, desc->getName(), item, Lumix::Path((const char*)stream.getBuffer()), [&view, desc, cmp, array_index](const char* v) { view.getWorldEditor()->setProperty(cmp.type, array_index, *desc, v, strlen(v) + 1); });
+	Lumix::InputBlob blob(stream.getData(), stream.getSize());
+	auto editor = PropertyEditor<Lumix::Path>::create(view, desc->getName(), item, Lumix::Path((const char*)blob.getData()), [&view, desc, cmp, array_index](const char* v) { view.getWorldEditor()->setProperty(cmp.type, array_index, *desc, v, strlen(v) + 1); });
 	auto file_desc = dynamic_cast<Lumix::IFilePropertyDescriptor*>(desc);
 	auto filter = file_desc->getFileType();
 	editor->setFilter(filter);
 }
 
 
-void createComponentArrayPropertyEdit(PropertyView& view, Lumix::IPropertyDescriptor* desc, Lumix::Component& cmp, Lumix::Blob& stream, QTreeWidgetItem* property_item)
+void createComponentArrayPropertyEdit(PropertyView& view, Lumix::IPropertyDescriptor* desc, Lumix::Component& cmp, Lumix::OutputBlob& stream, QTreeWidgetItem* property_item)
 {
 	QTreeWidgetItem* array_item = new QTreeWidgetItem();
 	property_item->addChild(array_item);
@@ -225,7 +225,7 @@ void createComponentArrayPropertyEdit(PropertyView& view, Lumix::IPropertyDescri
 		array_item->addChild(item);
 		item->setText(0, QString::number(array_desc.getCount(cmp) - 1));
 		auto& children = array_desc.getChildren();
-		Lumix::Blob stream(view.getWorldEditor()->getAllocator());
+		Lumix::OutputBlob stream(view.getWorldEditor()->getAllocator());
 		for (int i = 0; i < children.size(); ++i)
 		{
 			createComponentPropertyEditor(view, array_desc.getCount(cmp) - 1, children[i], Lumix::Component(cmp), stream, item);
@@ -259,7 +259,7 @@ void createComponentArrayPropertyEdit(PropertyView& view, Lumix::IPropertyDescri
 }
 
 
-void createComponentPropertyEditor(PropertyView& view, int array_index, Lumix::IPropertyDescriptor* desc, Lumix::Component& cmp, Lumix::Blob& stream, QTreeWidgetItem* property_item)
+void createComponentPropertyEditor(PropertyView& view, int array_index, Lumix::IPropertyDescriptor* desc, Lumix::Component& cmp, Lumix::OutputBlob& stream, QTreeWidgetItem* property_item)
 {
 	switch (desc->getType())
 	{
@@ -332,11 +332,11 @@ public:
 		subitem->treeWidget()->setItemWidget(subitem, 1, widget);
 
 
-		Lumix::Blob stream(view.getWorldEditor()->getAllocator());
+		Lumix::OutputBlob stream(view.getWorldEditor()->getAllocator());
 		auto& descriptors = view.getWorldEditor()->getPropertyDescriptors(value.type);
 		for (int j = 0; j < descriptors.size(); ++j)
 		{
-			stream.clearBuffer();
+			stream.clear();
 			auto desc = descriptors[j];
 
 			createComponentPropertyEditor(view, -1, desc, value, stream, subitem);

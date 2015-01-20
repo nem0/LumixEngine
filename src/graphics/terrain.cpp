@@ -576,7 +576,7 @@ namespace Lumix
 		}
 	}
 
-	void Terrain::deserialize(Blob& serializer, Universe& universe, RenderScene& scene, int index)
+	void Terrain::deserialize(InputBlob& serializer, Universe& universe, RenderScene& scene, int index)
 	{
 		serializer.read(m_entity.index);
 		m_entity.universe = &universe;
@@ -608,7 +608,7 @@ namespace Lumix
 	}
 
 
-	void Terrain::serialize(Blob& serializer)
+	void Terrain::serialize(OutputBlob& serializer)
 	{
 		serializer.write(m_entity.index);
 		serializer.write(m_layer_mask);

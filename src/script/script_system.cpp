@@ -53,7 +53,7 @@ namespace Lumix
 			virtual IPlugin& getPlugin() const;
 
 
-			void deserialize(Blob& serializer) override
+			void deserialize(InputBlob& serializer) override
 			{
 				stopAll();
 				int32_t count;
@@ -277,7 +277,7 @@ namespace Lumix
 			}
 
 
-			void serialize(Blob& serializer) override
+			void serialize(OutputBlob& serializer) override
 			{
 				serializer.write((int32_t)m_script_entities.size());
 				for (int i = 0; i < m_script_entities.size(); ++i)

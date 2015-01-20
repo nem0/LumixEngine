@@ -37,6 +37,7 @@ JsonSerializer::JsonSerializer(FS::IFile& file, AccessMode access_mode, const ch
 	, m_error_message(allocator)
 	, m_allocator(allocator)
 {
+	m_is_error = false;
 	m_path = path;
 	m_is_first_in_block = true;
 	m_data = NULL;
@@ -652,6 +653,7 @@ void JsonSerializer::deserializeLabel(char* label, int max_length)
 
 JsonSerializer::ErrorProxy JsonSerializer::error()
 {
+	m_is_error = true;
 	return ErrorProxy(*this);
 }
 

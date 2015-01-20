@@ -96,7 +96,7 @@ namespace Lumix
 			}
 
 
-			virtual void serialize(Blob& serializer) override
+			virtual void serialize(OutputBlob& serializer) override
 			{
 				serializer.write((int32_t)m_animables.size());
 				for (int i = 0; i < m_animables.size(); ++i)
@@ -110,7 +110,7 @@ namespace Lumix
 			}
 
 
-			virtual void deserialize(Blob& serializer) override
+			virtual void deserialize(InputBlob& serializer) override
 			{
 				int32_t count;
 				serializer.read(count);

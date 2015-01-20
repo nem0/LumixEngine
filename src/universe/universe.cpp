@@ -112,7 +112,7 @@ Entity Universe::getNextEntity(Entity entity)
 }
 
 
-void Universe::serialize(Blob& serializer)
+void Universe::serialize(OutputBlob& serializer)
 {
 	serializer.write((int32_t)m_positions.size());
 	serializer.write(&m_positions[0].x, sizeof(m_positions[0]) * m_positions.size());
@@ -132,7 +132,7 @@ void Universe::serialize(Blob& serializer)
 }
 
 
-void Universe::deserialize(Blob& serializer)
+void Universe::deserialize(InputBlob& serializer)
 {
 	int32_t count;
 	serializer.read(count);
