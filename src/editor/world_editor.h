@@ -122,6 +122,7 @@ namespace Lumix
 
 			virtual void saveUndoStack(const Path& path) = 0;
 			virtual bool executeUndoStack(const Path& path) = 0;
+			virtual bool runTest(const Path& undo_stack_path, const Path& result_universe_path) = 0;
 			virtual void registerEditorCommandCreator(const char* command_type, EditorCommandCreator) = 0;
 
 		protected:

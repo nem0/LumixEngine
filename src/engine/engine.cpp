@@ -312,7 +312,7 @@ namespace Lumix
 			}
 
 
-			virtual void serialize(Blob& serializer) override
+			virtual uint32_t serialize(Blob& serializer) override
 			{
 				SerializedEngineHeader header;
 				header.m_magic = SERIALIZED_ENGINE_MAGIC; // == '_LEN'
@@ -320,6 +320,7 @@ namespace Lumix
 				header.m_reserved = 0;
 				serializer.write(header);
 				g_path_manager.serialize(serializer);
+				int pos = serializer.getBufferSize();
 				m_universe->serialize(serializer);
 				m_hierarchy->serialize(serializer);
 				m_renderer->serialize(serializer);
@@ -328,6 +329,8 @@ namespace Lumix
 				{
 					m_scenes[i]->serialize(serializer);
 				}
+				uint32_t crc = crc32(serializer.getData() + pos, serializer.getBufferSize() - pos);
+				return crc;
 			}
 
 

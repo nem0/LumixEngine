@@ -246,6 +246,16 @@ class App
 
 			m_main_window->getSceneView()->setPipeline(m_edit_render_device->getPipeline());
 			m_main_window->getGameView()->setPipeline(m_game_render_device->getPipeline());
+
+			auto command_line_arguments = m_qt_app->arguments();
+			auto index_of_run_test = command_line_arguments.indexOf("-run_test");
+			if (index_of_run_test >= 0 && index_of_run_test + 2 < command_line_arguments.size())
+			{
+				auto undo_stack_path = command_line_arguments[index_of_run_test + 1].toLatin1();
+				auto result_universe_path = command_line_arguments[index_of_run_test + 2].toLatin1();
+				m_world_editor->runTest(Lumix::Path(undo_stack_path.data()), Lumix::Path(result_universe_path.data()));
+			}
+
 		}
 
 
