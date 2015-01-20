@@ -1569,7 +1569,9 @@ struct WorldEditorImpl : public WorldEditor
 			blob.reserve(1 << 20);
 			uint32_t hash = 0;
 			blob.write(hash);
-			m_engine->serialize(blob);
+			blob.write(hash);
+			uint32_t engine_hash = m_engine->serialize(blob);
+			(*(((uint32_t*)blob.getData()) + 1)) = engine_hash;
 			m_template_system->serialize(blob);
 			hash = crc32((const uint8_t*)blob.getData() + sizeof(hash), blob.getSize() - sizeof(hash));
 			(*(uint32_t*)blob.getData()) = hash;
@@ -1966,6 +1968,8 @@ struct WorldEditorImpl : public WorldEditor
 			InputBlob blob(file.getBuffer(), file.size());
 			uint32_t hash = 0;
 			blob.read(hash);
+			uint32_t engine_hash = 0;
+			blob.read(engine_hash);
 			if (crc32((const uint8_t*)blob.getData() + sizeof(hash), blob.getSize() - sizeof(hash)) != hash)
 			{
 				Timer::destroy(timer);
@@ -2592,8 +2596,12 @@ struct WorldEditorImpl : public WorldEditor
 				}
 				serializer.endArray();
 				serializer.endObject();
+				m_engine->getFileSystem().close(file);
 			}
-			m_engine->getFileSystem().close(file);
+			else
+			{
+				g_log_error.log("editor") << "Could not save commands to " << path.c_str();
+			}
 		}
 
 
@@ -2633,6 +2641,7 @@ struct WorldEditorImpl : public WorldEditor
 					IEditorCommand* command = createEditorCommand(type);
 					if (!command)
 					{
+						g_log_error.log("editor") << "Unknown command " << type << " in " << path.c_str();
 						destroyUndoStack();
 						m_undo_index = -1;
 						return false;
@@ -2642,10 +2651,33 @@ struct WorldEditorImpl : public WorldEditor
 					serializer.deserializeObjectEnd();
 				}
 				serializer.deserializeArrayEnd();
-				serializer.deserializeObjectBegin();
+				serializer.deserializeObjectEnd();
+				m_engine->getFileSystem().close(file);
 			}
-			m_engine->getFileSystem().close(file);
 			return file != NULL;
+		}
+
+
+		virtual bool runTest(const Path& undo_stack_path, const Path& result_universe_path) override
+		{
+			newUniverse();
+			executeUndoStack(undo_stack_path);
+			FS::IFile* file = m_engine->getFileSystem().open("memory", "", FS::Mode::CREATE | FS::Mode::WRITE);
+			if (!file)
+			{
+				return false;
+			}
+			FS::IFile* result_file = m_engine->getFileSystem().open("memory:disk", result_universe_path.c_str(), FS::Mode::OPEN | FS::Mode::READ);
+			if (!result_file)
+			{
+				return false;
+			}
+			save(*file);
+			bool is_same = file->size() > 8 && result_file->size() > 8 && *((const uint32_t*)result_file->getBuffer() + 1) == *((const uint32_t*)file->getBuffer() + 1);
+			m_engine->getFileSystem().close(result_file);
+			m_engine->getFileSystem().close(file);
+
+			return is_same;
 		}
 
 

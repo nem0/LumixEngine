@@ -66,6 +66,8 @@ private slots:
 	void on_actionSame_mesh_triggered();
 	void on_actionHide_triggered();
 	void on_actionShow_triggered();
+	void on_actionSave_commands_triggered();
+	void on_actionExecute_commands_triggered();
 
 private:
 	class DockInfo
