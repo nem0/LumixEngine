@@ -66,6 +66,19 @@ AssetBrowser::~AssetBrowser()
 }
 
 
+void AssetBrowser::setWorldEditor(Lumix::WorldEditor& editor)
+{
+	m_editor = &editor;
+	m_editor->registerEditorCommandCreator("insert_mesh", &AssetBrowser::createInsertMeshCommand);
+}
+
+
+Lumix::IEditorCommand* AssetBrowser::createInsertMeshCommand(Lumix::WorldEditor& editor)
+{
+	return editor.getAllocator().newObject<InsertMeshCommand>(editor);
+}
+
+
 void AssetBrowser::onTreeViewSelectionChanged(const QModelIndex&, const QModelIndex&)
 {
     /*if (current.isValid())

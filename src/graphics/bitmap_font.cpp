@@ -27,6 +27,7 @@ namespace Lumix
 		: Resource(path, resource_manager, allocator)
 		, m_allocator(allocator)
 		, m_characters(allocator)
+		, m_material(NULL)
 	{
 
 	}
