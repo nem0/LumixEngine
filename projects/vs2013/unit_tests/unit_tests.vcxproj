@@ -41,6 +41,7 @@
     <ClCompile Include="..\..\..\src\unit_tests\core\ut_transaction_queue.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\engine\ut_resource_managers.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\graphics\ut_clipper.cpp" />
+    <ClCompile Include="..\..\..\src\unit_tests\graphics\ut_texture.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\main.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\suite\unit_test_app.cpp" />
     <ClCompile Include="..\..\..\src\unit_tests\suite\unit_test_manager.cpp" />
