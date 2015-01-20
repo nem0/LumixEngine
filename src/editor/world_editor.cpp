@@ -143,7 +143,7 @@ class PasteEntityCommand : public IEditorCommand
 			, m_editor(editor)
 		{}
 
-		PasteEntityCommand(WorldEditor& editor, Blob& blob)
+		PasteEntityCommand(WorldEditor& editor, OutputBlob& blob)
 			: m_blob(blob, editor.getAllocator())
 			, m_editor(editor)
 			, m_position(editor.getCameraRaycastHit())
@@ -160,11 +160,11 @@ class PasteEntityCommand : public IEditorCommand
 			serializer.serialize("pos_y", m_position.y);
 			serializer.serialize("pos_z", m_position.z);
 			serializer.serialize("entity", m_entity.index);
-			serializer.serialize("size", m_blob.getBufferSize());
+			serializer.serialize("size", m_blob.getSize());
 			serializer.beginArray("data");
-			for (int i = 0; i < m_blob.getBufferSize(); ++i)
+			for (int i = 0; i < m_blob.getSize(); ++i)
 			{
-				serializer.serializeArrayItem((int32_t)m_blob.getBuffer()[i]);
+				serializer.serializeArrayItem((int32_t)((const uint8_t*)m_blob.getData())[i]);
 			}
 			serializer.endArray();
 		}
@@ -180,8 +180,8 @@ class PasteEntityCommand : public IEditorCommand
 			int size;
 			serializer.deserialize("size", size, 0);
 			serializer.deserializeArrayBegin("data");
-			m_blob.clearBuffer();
-			for (int i = 0; i < m_blob.getBufferSize(); ++i)
+			m_blob.clear();
+			for (int i = 0; i < m_blob.getSize(); ++i)
 			{
 				int32_t data;
 				serializer.deserializeArrayItem(data, 0);
@@ -217,7 +217,7 @@ class PasteEntityCommand : public IEditorCommand
 		}
 
 	private:
-		Blob m_blob;
+		OutputBlob m_blob;
 		WorldEditor& m_editor;
 		Vec3 m_position;
 		Entity m_entity;
@@ -427,10 +427,10 @@ class RemoveArrayPropertyItemCommand : public IEditorCommand
 		virtual void undo() override
 		{
 			m_descriptor->addArrayItem(m_component, m_index);
-			m_old_values.rewindForRead();
+			InputBlob old_values(m_old_values.getData(), m_old_values.getSize());
 			for(int i = 0, c = m_descriptor->getChildren().size(); i < c; ++i)
 			{
-				m_descriptor->getChildren()[i]->set(m_component, m_index, m_old_values);
+				m_descriptor->getChildren()[i]->set(m_component, m_index, old_values);
 			}		
 		}
 
@@ -452,7 +452,7 @@ class RemoveArrayPropertyItemCommand : public IEditorCommand
 		Component m_component;
 		int m_index;
 		const IArrayDescriptor* m_descriptor;
-		Blob m_old_values;
+		OutputBlob m_old_values;
 };
 
 
@@ -577,9 +577,9 @@ class SetPropertyCommand : public IEditorCommand
 			serializer.serialize("component_index", m_component.index);
 			serializer.serialize("component_type", m_component.type);
 			serializer.beginArray("data");
-			for (int i = 0; i < m_new_value.getBufferSize(); ++i)
+			for (int i = 0; i < m_new_value.getSize(); ++i)
 			{
-				serializer.serializeArrayItem((int)m_new_value.getBuffer()[i]);
+				serializer.serializeArrayItem((int)((const uint8_t*)m_new_value.getData())[i]);
 			}
 			serializer.endArray();
 			serializer.serialize("property_name_hash", m_property_descriptor->getNameHash());
@@ -595,7 +595,7 @@ class SetPropertyCommand : public IEditorCommand
 			m_component.entity.universe = m_editor.getEngine().getUniverse();
 			m_component.scene = m_editor.getEngine().getSceneByComponentType(m_component.type);
 			serializer.deserializeArrayBegin("data");
-			m_new_value.clearBuffer();
+			m_new_value.clear();
 			while (!serializer.isArrayEnd())
 			{
 				int data;
@@ -611,15 +611,15 @@ class SetPropertyCommand : public IEditorCommand
 
 		virtual void execute() override
 		{
-			m_new_value.rewindForRead();
-			set(m_new_value);
+			InputBlob blob(m_new_value);
+			set(blob);
 		}
 
 
 		virtual void undo() override
 		{
-			m_old_value.rewindForRead();
-			set(m_old_value);
+			InputBlob blob(m_old_value);
+			set(blob);
 		}
 
 
@@ -643,7 +643,7 @@ class SetPropertyCommand : public IEditorCommand
 		}
 
 
-		void set(Blob& stream)
+		void set(InputBlob& stream)
 		{
 			uint32_t template_hash = m_editor.getEntityTemplateSystem().getTemplate(m_component.entity);
 			if (template_hash)
@@ -651,7 +651,7 @@ class SetPropertyCommand : public IEditorCommand
 				const Array<Entity>& entities = m_editor.getEntityTemplateSystem().getInstances(template_hash);
 				for (int i = 0, c = entities.size(); i < c; ++i)
 				{
-					stream.rewindForRead();
+					stream.rewind();
 					const WorldEditor::ComponentList& cmps = m_editor.getComponents(entities[i]);
 					for (int j = 0, cj = cmps.size(); j < cj; ++j)
 					{
@@ -687,8 +687,8 @@ class SetPropertyCommand : public IEditorCommand
 	private:
 		WorldEditor& m_editor;
 		Component m_component;
-		Blob m_new_value;
-		Blob m_old_value;
+		OutputBlob m_new_value;
+		OutputBlob m_old_value;
 		int m_index;
 		const IPropertyDescriptor* m_property_descriptor;
 };
@@ -887,7 +887,7 @@ struct WorldEditorImpl : public WorldEditor
 				virtual void execute() override
 				{
 					m_positons_rotations.clear();
-					m_old_values.clearBuffer();
+					m_old_values.clear();
 					for (int i = 0; i < m_entities.size(); ++i)
 					{
 						const WorldEditor::ComponentList& cmps = m_editor.getComponents(m_entities[i]);
@@ -925,18 +925,18 @@ struct WorldEditorImpl : public WorldEditor
 				virtual void undo() override
 				{
 					const Array<IScene*>& scenes = m_editor.getEngine().getScenes();
-					m_old_values.rewindForRead();
+					InputBlob blob(m_old_values);
 					for (int i = 0; i < m_entities.size(); ++i)
 					{
 						Entity new_entity = m_editor.getEngine().getUniverse()->createEntity();
 						new_entity.setPosition(m_positons_rotations[i].m_position);
 						new_entity.setRotation(m_positons_rotations[i].m_rotation);
 						int cmps_count;
-						m_old_values.read(cmps_count);
+						blob.read(cmps_count);
 						for (int j = cmps_count - 1; j >= 0; --j)
 						{
 							Component::Type cmp_type;
-							m_old_values.read(cmp_type);
+							blob.read(cmp_type);
 							Component new_component;
 							for (int i = 0; i < scenes.size(); ++i)
 							{
@@ -954,7 +954,7 @@ struct WorldEditorImpl : public WorldEditor
 
 								for (int k = 0; k < props.size(); ++k)
 								{
-									props[k]->set(new_component, m_old_values);
+									props[k]->set(new_component, blob);
 								}
 							}
 						}
@@ -982,7 +982,7 @@ struct WorldEditorImpl : public WorldEditor
 				WorldEditorImpl& m_editor;
 				Array<Entity> m_entities;
 				Array<PositionRotation> m_positons_rotations;
-				Blob m_old_values;
+				OutputBlob m_old_values;
 		};
 
 
@@ -1039,13 +1039,13 @@ struct WorldEditorImpl : public WorldEditor
 								break;
 							}
 						}
-						m_old_values.rewindForRead();
+						InputBlob blob(m_old_values);
 						if (props_index >= 0)
 						{
 							const Array<IPropertyDescriptor*>& props = m_editor.m_component_properties.at(props_index);
 							for (int i = 0; i < props.size(); ++i)
 							{
-								props[i]->set(m_component, m_old_values);
+								props[i]->set(m_component, blob);
 							}
 						}
 					}
@@ -1059,13 +1059,13 @@ struct WorldEditorImpl : public WorldEditor
 								Component cmp_new = scenes[scene_index]->createComponent(m_component.type, entities[entity_index]);
 								if (cmp_new.isValid())
 								{
-									m_old_values.rewindForRead();
+									InputBlob blob(m_old_values);
 									if (props_index >= 0)
 									{
 										const Array<IPropertyDescriptor*>& props = m_editor.m_component_properties.at(props_index);
 										for (int i = 0; i < props.size(); ++i)
 										{
-											props[i]->set(cmp_new, m_old_values);
+											props[i]->set(cmp_new, blob);
 										}
 									}
 								}
@@ -1117,7 +1117,7 @@ struct WorldEditorImpl : public WorldEditor
 			private:
 				Component m_component;
 				WorldEditorImpl& m_editor;
-				Blob m_old_values;
+				OutputBlob m_old_values;
 		};
 
 
@@ -1565,18 +1565,18 @@ struct WorldEditorImpl : public WorldEditor
 
 		void save(FS::IFile& file)
 		{
-			Blob blob(m_allocator);
+			OutputBlob blob(m_allocator);
 			blob.reserve(1 << 20);
 			uint32_t hash = 0;
 			blob.write(hash);
 			blob.write(hash);
 			uint32_t engine_hash = m_engine->serialize(blob);
-			(*(((uint32_t*)blob.getBuffer()) + 1)) = engine_hash;
+			(*(((uint32_t*)blob.getData()) + 1)) = engine_hash;
 			m_template_system->serialize(blob);
-			hash = crc32(blob.getBuffer() + sizeof(hash), blob.getBufferSize() - sizeof(hash));
-			(*(uint32_t*)blob.getBuffer()) = hash;
+			hash = crc32((const uint8_t*)blob.getData() + sizeof(hash), blob.getSize() - sizeof(hash));
+			(*(uint32_t*)blob.getData()) = hash;
 			g_log_info.log("editor") << "universe saved";
-			file.write(blob.getBuffer(), blob.getBufferSize());
+			file.write(blob.getData(), blob.getSize());
 		}
 
 
@@ -1829,7 +1829,7 @@ struct WorldEditorImpl : public WorldEditor
 			if(!m_selected_entities.empty())
 			{
 				Entity entity = m_selected_entities[0];
-				m_copy_buffer.clearBuffer();
+				m_copy_buffer.clear();
 				const WorldEditor::ComponentList& cmps = getComponents(entity);
 				int32_t count = cmps.size();
 				m_copy_buffer.write(count);
@@ -1870,13 +1870,13 @@ struct WorldEditorImpl : public WorldEditor
 			}
 
 			const Array<IPropertyDescriptor*>& properties = getPropertyDescriptors(src.type);
-			Blob stream(m_allocator);
+			OutputBlob stream(m_allocator);
 			for (int i = 0; i < properties.size(); ++i)
 			{
-				stream.clearBuffer();
+				stream.clear();
 				properties[i]->get(src, stream);
-				stream.rewindForRead();
-				properties[i]->set(clone, stream);
+				InputBlob blob(stream.getData(), stream.getSize());
+				properties[i]->set(clone, blob);
 			}
 		}
 
@@ -1965,13 +1965,12 @@ struct WorldEditorImpl : public WorldEditor
 			m_components.reserve(5000);
 			Timer* timer = Timer::create(m_allocator);
 			g_log_info.log("editor") << "Parsing universe...";
-			Blob blob(m_allocator);
-			blob.create(file.getBuffer(), file.size());
+			InputBlob blob(file.getBuffer(), file.size());
 			uint32_t hash = 0;
 			blob.read(hash);
 			uint32_t engine_hash = 0;
 			blob.read(engine_hash);
-			if (crc32(blob.getData() + sizeof(hash), blob.getBufferSize() - sizeof(hash)) != hash)
+			if (crc32((const uint8_t*)blob.getData() + sizeof(hash), blob.getSize() - sizeof(hash)) != hash)
 			{
 				Timer::destroy(timer);
 				g_log_error.log("editor") << "Corrupted file.";
@@ -2744,7 +2743,7 @@ struct WorldEditorImpl : public WorldEditor
 		Array<IEditorCommand*> m_undo_stack;
 		AssociativeArray<uint32_t, EditorCommandCreator> m_editor_command_creators;
 		int m_undo_index;
-		Blob m_copy_buffer;
+		OutputBlob m_copy_buffer;
 };
 
 
@@ -2772,20 +2771,20 @@ void WorldEditor::destroy(WorldEditor* editor)
 
 void PasteEntityCommand::execute()
 {
-	m_blob.rewindForRead();
+	InputBlob blob(m_blob.getData(), m_blob.getSize());
 	Entity new_entity = m_editor.getEngine().getUniverse()->createEntity();
 	new_entity.setPosition(m_position);
 	int32_t count;
-	m_blob.read(count);
+	blob.read(count);
 	for(int i = 0; i < count; ++i)
 	{
 		uint32_t type;
-		m_blob.read(type);
+		blob.read(type);
 		Component cmp = static_cast<WorldEditorImpl&>(m_editor).createComponent(type, new_entity);
 		Array<IPropertyDescriptor*>& props = m_editor.getPropertyDescriptors(type);
 		for(int j = 0; j < props.size(); ++j)
 		{
-			props[j]->set(cmp, m_blob);
+			props[j]->set(cmp, blob);
 		}
 	}
 	m_entity = new_entity;

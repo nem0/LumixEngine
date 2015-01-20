@@ -9,7 +9,8 @@
 namespace Lumix
 {
 
-	class Blob;
+	class InputBlob;
+	class OutputBlob;
 
 	class PathInternal
 	{
@@ -27,8 +28,8 @@ namespace Lumix
 			PathManager();
 			~PathManager();
 
-			void serialize(Blob& serializer);
-			void deserialize(Blob& serializer);
+			void serialize(OutputBlob& serializer);
+			void deserialize(InputBlob& serializer);
 
 		private:
 			PathInternal* getPath(uint32_t hash, const char* path);

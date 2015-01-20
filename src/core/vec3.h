@@ -131,14 +131,18 @@ struct LUMIX_CORE_API Vec3
 
 	inline void rotateY(float angle)
 	{
-		x = x * cos(angle) + sin(angle) * z;
-		z = x * - sin(angle) + cos(angle) * z;
+		float x = this->x;
+		float z = this->z;
+		this->x = x * cos(angle) + sin(angle) * z;
+		this->z = x * -sin(angle) + cos(angle) * z;
 	}
 
 	inline void rotateX(float angle)
 	{
-		y = y * cos(angle) - sin(angle) * z;
-		z = y * sin(angle) + cos(angle) * z;
+		float y = this->y;
+		float z = this->z;
+		this->y = y * cos(angle) - sin(angle) * z;
+		this->z = y * sin(angle) + cos(angle) * z;
 	}
 
 

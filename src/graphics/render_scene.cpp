@@ -439,7 +439,7 @@ namespace Lumix
 				}
 			}
 
-			void serializeCameras(Blob& serializer)
+			void serializeCameras(OutputBlob& serializer)
 			{
 				serializer.write((int32_t)m_cameras.size());
 				for (int i = 0, c = m_cameras.size(); i < c; ++i)
@@ -456,7 +456,7 @@ namespace Lumix
 				
 			}
 
-			void serializeLights(Blob& serializer)
+			void serializeLights(OutputBlob& serializer)
 			{
 				serializer.write((int32_t)m_lights.size());
 				for (int i = 0, c = m_lights.size(); i < c; ++i)
@@ -474,7 +474,7 @@ namespace Lumix
 				}
 			}
 
-			void serializeRenderables(Blob& serializer)
+			void serializeRenderables(OutputBlob& serializer)
 			{
 				serializer.write((int32_t)m_renderables.size());
 				for (int i = 0; i < m_renderables.size(); ++i)
@@ -488,7 +488,7 @@ namespace Lumix
 				}
 			}
 
-			void serializeTerrains(Blob& serializer)
+			void serializeTerrains(OutputBlob& serializer)
 			{
 				serializer.write((int32_t)m_terrains.size());
 				for (int i = 0; i < m_terrains.size(); ++i)
@@ -505,7 +505,7 @@ namespace Lumix
 				}
 			}
 
-			virtual void serialize(Blob& serializer) override
+			virtual void serialize(OutputBlob& serializer) override
 			{
 				serializeCameras(serializer);
 				serializeRenderables(serializer);
@@ -513,7 +513,7 @@ namespace Lumix
 				serializeTerrains(serializer);
 			}
 
-			void deserializeCameras(Blob& serializer)
+			void deserializeCameras(InputBlob& serializer)
 			{
 				int32_t size;
 				serializer.read(size);
@@ -537,7 +537,7 @@ namespace Lumix
 				}
 			}
 
-			void deserializeRenderables(Blob& serializer)
+			void deserializeRenderables(InputBlob& serializer)
 			{
 				int32_t size = 0;
 				serializer.read(size);
@@ -577,7 +577,7 @@ namespace Lumix
 				}
 			}
 
-			void deserializeLights(Blob& serializer)
+			void deserializeLights(InputBlob& serializer)
 			{
 				int32_t size = 0;
 				serializer.read(size);
@@ -603,7 +603,7 @@ namespace Lumix
 				}
 			}
 
-			void deserializeTerrains(Blob& serializer)
+			void deserializeTerrains(InputBlob& serializer)
 			{
 				int32_t size = 0;
 				serializer.read(size);
@@ -630,7 +630,7 @@ namespace Lumix
 				}
 			}
 
-			virtual void deserialize(Blob& serializer) override
+			virtual void deserialize(InputBlob& serializer) override
 			{
 				deserializeCameras(serializer);
 				deserializeRenderables(serializer);

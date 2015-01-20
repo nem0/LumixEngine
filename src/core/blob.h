@@ -8,45 +8,46 @@
 namespace Lumix
 {
 
-	class LUMIX_CORE_API Blob
+	class LUMIX_CORE_API OutputBlob
 	{
 		public:
-			explicit Blob(IAllocator& allocator);
-			Blob(const Blob& rhs, IAllocator& allocator);
-			void operator =(const Blob& rhs);
+			explicit OutputBlob(IAllocator& allocator);
+			OutputBlob(const OutputBlob& blob, IAllocator& allocator);
+			void operator =(const OutputBlob& rhs);
+			OutputBlob(const OutputBlob& rhs);
 
-			void reserve(int size) { m_buffer.reserve(size); }
-			void create(const void* data, int size) { m_data = data; m_size = size; m_pos = 0; }
-			void write(const void* data, int32_t size);
-			bool read(void* data, int32_t size);
-			const uint8_t* getBuffer() const { return &m_buffer[0]; }
-			const uint8_t* getData() const { return static_cast<const uint8_t*>(m_data); }
-			int getBufferSize() const { return m_size; }
-			int getPosition() const { return m_pos; }
-			void flush() { m_size = 0; }
-			void clearBuffer() { m_buffer.clear(); m_pos = 0; m_size = 0; }
-
-			template <class T>
-			void write(T value) { write(&value, sizeof(T)); }
+			void reserve(int size) { m_data.reserve(size); }
+			const void* getData() const { return m_data.empty() ? NULL : &m_data[0]; }
+			int getSize() const { return m_data.size(); }
+			void write(const void* data, int size);
 			void writeString(const char* string);
-			void readString(char* out, int max_size);
-			
-			template <class T>
-			void read(T& value) { read(&value, sizeof(T)); }
-
-			void rewindForRead();
+			template <class T> void write(T value) { write(&value, sizeof(T)); }
+			void clear() { m_data.clear(); }
 
 		private:
-			Blob(const Blob& rhs);
-			void write(const char*);
-			void read(const char*);
+			Array<uint8_t> m_data;
+	};
+
+
+	class LUMIX_CORE_API InputBlob
+	{
+		public:
+			InputBlob(const void* data, int size);
+			InputBlob(const OutputBlob& blob);
+
+			bool read(void* data, int size);
+			bool readString(char* data, int max_size);
+			template <class T> void read(T& value) { read(&value, sizeof(T)); }
+			const void* getData() const { return (const void*)m_data; }
+			int getSize() const { return m_size; }
+			void setPosition(int pos) { m_pos = pos; }
+			void rewind() { m_pos = 0; }
+
 
 		private:
-			IAllocator& m_allocator;
-			Array<uint8_t> m_buffer;
-			int m_pos;
+			const uint8_t* m_data;
 			int m_size;
-			const void* m_data; 
+			int m_pos;
 	};
 
 } // !namespace Lumix
