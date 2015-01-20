@@ -412,6 +412,11 @@ struct RendererImpl : public Renderer
 
 	virtual void renderModel(const Model& model, const Matrix& transform, PipelineInstance& pipeline) override
 	{
+		if (!model.isReady())
+		{
+			return;
+		}
+
 		for (int i = 0, c = model.getMeshCount(); i < c;  ++i)
 		{
 			const Mesh& mesh = model.getMesh(i);

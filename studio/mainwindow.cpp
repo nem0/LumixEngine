@@ -490,3 +490,23 @@ void MainWindow::on_actionShow_triggered()
 {
 	m_world_editor->showEntities();
 }
+
+
+void MainWindow::on_actionSave_commands_triggered()
+{
+	QByteArray path = QFileDialog::getSaveFileName().toLocal8Bit();
+	if (!path.isEmpty())
+	{
+		m_world_editor->saveUndoStack(Lumix::Path(path.data()));
+	}
+}
+
+
+void MainWindow::on_actionExecute_commands_triggered()
+{
+	QByteArray path = QFileDialog::getOpenFileName().toLocal8Bit();
+	if (!path.isEmpty())
+	{
+		m_world_editor->executeUndoStack(Lumix::Path(path.data()));
+	}
+}
