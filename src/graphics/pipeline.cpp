@@ -36,7 +36,7 @@ static const uint32_t LIGHT_DIR_HASH = crc32("light_dir");
 static const uint32_t TERRAIN_SCALE_HASH = crc32("terrain_scale");
 static const uint32_t BONE_MATRICES_HASH = crc32("bone_matrices");
 static const uint32_t CAMERA_POS_HASH = crc32("camera_pos");
-static float split_distances[] = { 0, 5, 20, 100, 300 };
+static float split_distances[] = { 0.01f, 5, 20, 100, 300 };
 static const float SHADOW_CAM_NEAR = 0.1f;
 static const float SHADOW_CAM_FAR = 10000.0f;
 
