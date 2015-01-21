@@ -112,7 +112,7 @@ void UT_matrix(const char* params)
 
 	for (int i = 0; i < 16; ++i)
 	{
-		*((&mtx.m11) + i) = i;
+		*((&mtx.m11) + i) = (float)i;
 	}
 
 	old = mtx;

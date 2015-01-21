@@ -140,6 +140,9 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\associative_array.h" />
     <ClInclude Include="..\..\..\src\core\binary_array.h" />
+    <ClInclude Include="..\..\..\src\debug\floating_points.h">
+      <Filter>debug</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\core\blob.cpp" />
@@ -239,6 +242,9 @@
       <Filter>debug</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\core\binary_array.cpp" />
+    <ClCompile Include="..\..\..\src\debug\pc\floating_points.cpp">
+      <Filter>debug</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="fs">

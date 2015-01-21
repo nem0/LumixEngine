@@ -291,6 +291,7 @@
     <ClInclude Include="..\..\..\src\core\vec4.h" />
     <ClInclude Include="..\..\..\src\debug\allocator.h" />
     <ClInclude Include="..\..\..\src\debug\debug.h" />
+    <ClInclude Include="..\..\..\src\debug\floating_points.h" />
     <ClInclude Include="..\..\..\src\debug\stack_tree.h" />
   </ItemGroup>
   <ItemGroup>
@@ -338,6 +339,7 @@
     <ClCompile Include="..\..\..\src\core\timer.cpp" />
     <ClCompile Include="..\..\..\src\debug\pc\allocator.cpp" />
     <ClCompile Include="..\..\..\src\debug\pc\debug.cpp" />
+    <ClCompile Include="..\..\..\src\debug\pc\floating_points.cpp" />
     <ClCompile Include="..\..\..\src\debug\pc\stack_tree.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
