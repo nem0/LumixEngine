@@ -36,9 +36,9 @@ namespace Lumix
 		{
 			Vec3 dirfrac;
 
-			dirfrac.x = 1.0f / dir.x;
-			dirfrac.y = 1.0f / dir.y;
-			dirfrac.z = 1.0f / dir.z;
+			dirfrac.x = 1.0f / (dir.x == 0 ? 0.00000001f : dir.x);
+			dirfrac.y = 1.0f / (dir.y == 0 ? 0.00000001f : dir.y);
+			dirfrac.z = 1.0f / (dir.z == 0 ? 0.00000001f : dir.z);
 
 			Vec3 max = min + size;
 			float t1 = (min.x - origin.x) * dirfrac.x;
