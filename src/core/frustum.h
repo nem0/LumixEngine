@@ -38,6 +38,11 @@ namespace Lumix
 
 			void computePerspective(const Vec3& position, const Vec3& direction, const Vec3& up, float fov, float ratio, float near_distance, float far_distance)
 			{
+				ASSERT(near_distance > 0);
+				ASSERT(far_distance > 0);
+				ASSERT(near_distance < far_distance);
+				ASSERT(fov > 0);
+				ASSERT(ratio > 0);
 				float tang = (float)tan(Math::PI / 180.0f * fov * 0.5f);
 				float near_height = near_distance * tang;
 				float near_width = near_height * ratio;
