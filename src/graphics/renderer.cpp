@@ -659,12 +659,6 @@ void renderGeometry(int indices_offset, int vertex_count)
 }
 
 
-void renderQuadGeometry(int indices_offset, int vertex_count)
-{
-	glDrawElements(GL_QUADS, vertex_count, GL_UNSIGNED_INT, (void*)(indices_offset * sizeof(GLint)));
-}
-
-
 int getUniformLocation(const Shader& shader, int name)
 {
 	return shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
