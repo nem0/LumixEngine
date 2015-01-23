@@ -836,7 +836,6 @@ bool Texture::loadDDS(FS::IFile& file)
 		glBindTexture(GL_TEXTURE_2D, m_id);
 	}
 
-	glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_FALSE);
 	mipMapCount = (hdr.dwFlags & DDS::DDSD_MIPMAPCOUNT) ? hdr.dwMipMapCount : 1;
 	if (li->compressed)
 	{
@@ -938,6 +937,7 @@ bool Texture::loadDDS(FS::IFile& file)
 		glPixelStorei(GL_UNPACK_SWAP_BYTES, GL_FALSE);
 	}
 	glTexParameteri(m_is_cubemap ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, mipMapCount - 1);
+	glGenerateMipmap(GL_TEXTURE_2D);
 
 	return true;
 }
