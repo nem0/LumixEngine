@@ -149,6 +149,11 @@ void Shader::createCombination(const char* defines)
 				}
 			}
 		
+			for (int i = 0; i < sizeof(combination->m_vertex_attributes_ids) / sizeof(combination->m_vertex_attributes_ids[0]); ++i)
+			{
+				combination->m_vertex_attributes_ids[i] = -1;
+			}
+
 			for (int i = 0; i < m_attributes.size(); ++i)
 			{
 				int attr_idx = m_renderer.getAttributeNameIndex(m_attributes[i].c_str());
