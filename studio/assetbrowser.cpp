@@ -8,6 +8,7 @@
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "insert_mesh_command.h"
+#include "notifications.h"
 #include "scripts/scriptcompiler.h"
 #include <qdesktopservices.h>
 #include <qfilesystemmodel.h>
@@ -23,6 +24,7 @@ struct ProcessInfo
 {
 	class QProcess* m_process;
 	QString m_path;
+	int m_notification_id;
 };
 
 
@@ -207,6 +209,7 @@ void AssetBrowser::on_listWidget_activated(const QModelIndex &index)
 	handleDoubleClick(info);
 }
 
+
 void AssetBrowser::on_exportFinished(int exit_code)
 {
 	QProcess* process = static_cast<QProcess*>(QObject::sender());
@@ -221,14 +224,31 @@ void AssetBrowser::on_exportFinished(int exit_code)
 		auto msg = s.toLatin1();
 		Lumix::g_log_error.log("editor") << msg.data();
 	}
+
+	for (auto iter = m_processes.begin(); iter != m_processes.end(); ++iter)
+	{
+		if (iter->m_process == process)
+		{
+			m_notifications->setNotificationTime(iter->m_notification_id, 1.0f);
+			m_notifications->setProgress(iter->m_notification_id, 100);
+			process->deleteLater();
+			m_processes.erase(iter);
+			break;
+		}
+	}
 }
+
 
 void AssetBrowser::exportAnimation(const QFileInfo& file_info)
 {
 	ProcessInfo process;
 	process.m_path = file_info.path().toLatin1().data();
 	process.m_process = new QProcess();
-	//m_processes.push(process);
+	auto message = QString("Exporting animation %1").arg(file_info.fileName()).toLatin1();
+	process.m_notification_id = m_notifications->showProgressNotification(message.data());
+	
+	m_notifications->setProgress(process.m_notification_id, 50);
+	m_processes.append(process);
 	QStringList list;
 	list.push_back("/C");
 	list.push_back("models\\export_anim.bat");
@@ -238,12 +258,16 @@ void AssetBrowser::exportAnimation(const QFileInfo& file_info)
 	process.m_process->start("cmd.exe", list);
 }
 
+
 void AssetBrowser::exportModel(const QFileInfo& file_info)
 {
 	ProcessInfo process;
 	process.m_path = file_info.path().toLatin1().data();
 	process.m_process = new QProcess();
-	//m_processes.push(process);
+	auto message = QString("Exporting model %1").arg(file_info.fileName()).toLatin1();
+	process.m_notification_id = m_notifications->showProgressNotification(message.data());
+	m_notifications->setProgress(process.m_notification_id, 50);
+	m_processes.append(process);
 	QStringList list;
 	if (file_info.suffix() == "fbx")
 	{

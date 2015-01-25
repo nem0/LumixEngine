@@ -2,6 +2,8 @@
 #include "core/log.h"
 #include "mainwindow.h"
 #include <qlabel.h>
+#include <qlayout.h>
+#include <qprogressbar.h>
 
 
 static const float DISPLAY_TIME = 2.0f;
@@ -75,6 +77,75 @@ class NotificationsImpl : public Notifications
 			}
 		}
 		
+
+		virtual void setProgress(int id, int value) override
+		{
+			for (auto iter = m_items.begin(); iter != m_items.end(); ++iter)
+			{
+				if (iter->m_id == id)
+				{
+					ASSERT(iter->m_widget->children().size() > 1);
+					if (iter->m_widget->children().size() > 1)
+					{
+						QProgressBar* progress = qobject_cast<QProgressBar*>(iter->m_widget->children()[1]);
+						ASSERT(progress);
+						if (progress)
+						{
+							progress->setValue(value);
+						}
+						break;
+					}
+				}
+			}
+		}
+
+
+		virtual void setNotificationTime(int id, float time) override
+		{
+			for (auto iter = m_items.begin(); iter != m_items.end(); ++iter)
+			{
+				if (iter->m_id == id)
+				{
+					iter->m_time = time;
+					break;
+				}
+			}
+		}
+
+
+		virtual int showProgressNotification(const char* text) override
+		{
+			QWidget* widget = new QWidget(&m_main_window);
+			widget->setObjectName("notification");
+			QVBoxLayout* layout = new QVBoxLayout(widget);
+			widget->setLayout(layout);
+			
+			QProgressBar* progress = new QProgressBar(widget);
+			progress->setValue(0);
+			progress->setMaximum(100);
+			layout->addWidget(progress);
+			
+			QLabel* label = new QLabel(widget);
+			label->setMinimumWidth(NOTIFICATION_WIDTH);
+			label->setContentsMargins(2, 2, 2, 2);
+			label->setText(text);
+			label->setWordWrap(true);
+			layout->addWidget(label);
+
+			widget->show();
+			widget->raise();
+			widget->adjustSize();
+			
+			Notification n;
+			n.m_id = m_items.empty() ? 0 : m_items.back().m_id + 1;
+			n.m_widget = widget;
+			n.m_time = FLT_MAX;
+			m_items.push_back(n);
+
+			updateLayout();
+			return n.m_id;
+		}
+
 		
 		virtual void showNotification(const char* text) override
 		{
@@ -90,6 +161,7 @@ class NotificationsImpl : public Notifications
 			widget->adjustSize();
 
 			Notification n;
+			n.m_id = m_items.empty() ? 0 : m_items.back().m_id + 1;
 			n.m_widget = widget;
 			n.m_time = DISPLAY_TIME;
 			m_items.push_back(n);
@@ -103,6 +175,7 @@ class NotificationsImpl : public Notifications
 			public:
 				QWidget* m_widget;
 				float m_time;
+				int m_id;
 		};
 
 	private:
