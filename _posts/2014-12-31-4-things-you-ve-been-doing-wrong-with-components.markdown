@@ -2,7 +2,7 @@
 layout:     post
 title:      4 things you've been doing wrong with components
 date:       2014-12-31 19:53:00
-summary:    Even though component-base design is a quite old concept in the game engine developm`ent, there are some things many programmers still get wrong. 
+summary:    Even though component-base design is a quite old concept in the game engine development, there are some things many programmers still get wrong. 
 categories: components
 comments: true
 ---
