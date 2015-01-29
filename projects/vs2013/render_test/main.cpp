@@ -247,6 +247,8 @@ public:
 			Lumix::InputBlob blob(file->getBuffer(), file->size());
 			uint32_t hash = 0;
 			blob.read(hash);
+			uint32_t engine_hash = 0;
+			blob.read(engine_hash);			
 			if (crc32((const uint8_t*)blob.getData() + sizeof(hash), blob.getSize() - sizeof(hash)) != hash)
 			{
 				ASSERT(false);
