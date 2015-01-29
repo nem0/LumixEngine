@@ -8,6 +8,13 @@
 static const uint32_t RENDERABLE_HASH = crc32("renderable");
 
 
+InsertMeshCommand::InsertMeshCommand(Lumix::WorldEditor& editor)
+	: m_editor(editor)
+{
+
+}
+
+
 InsertMeshCommand::InsertMeshCommand(Lumix::WorldEditor& editor, const Lumix::Vec3& position, const Lumix::Path& mesh_path)
 	: m_mesh_path(mesh_path)
 	, m_position(position)
@@ -30,6 +37,7 @@ void InsertMeshCommand::deserialize(Lumix::JsonSerializer& serializer)
 {
 	char path[LUMIX_MAX_PATH];
 	serializer.deserialize("path", path, sizeof(path), "");
+	m_mesh_path = path;
 	serializer.deserialize("pos_x", m_position.x, 0);
 	serializer.deserialize("pos_y", m_position.y, 0);
 	serializer.deserialize("pos_z", m_position.z, 0);

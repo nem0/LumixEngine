@@ -10,7 +10,8 @@
 namespace Lumix
 {
 
-	class Blob;
+	class InputBlob;
+	class OutputBlob;
 	class WorldEditor;
 
 	class LUMIX_ENGINE_API EntityTemplateSystem
@@ -20,8 +21,8 @@ namespace Lumix
 			static void destroy(EntityTemplateSystem* system);
 
 			virtual ~EntityTemplateSystem() {}
-			virtual void serialize(Blob& serializer) = 0;
-			virtual void deserialize(Blob& serializer) = 0;
+			virtual void serialize(OutputBlob& serializer) = 0;
+			virtual void deserialize(InputBlob& serializer) = 0;
 			virtual void createTemplateFromEntity(const char* name, const Entity& entity) = 0;
 			virtual uint32_t getTemplate(const Entity& entity) = 0;
 			virtual const Array<Entity>& getInstances(uint32_t template_name_hash) = 0;

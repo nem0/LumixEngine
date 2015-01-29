@@ -9,7 +9,8 @@ namespace Lumix
 {
 
 
-	class Blob;
+	class InputBlob;
+	class OutputBlob;
 
 
 	class Hierarchy
@@ -31,8 +32,8 @@ namespace Lumix
 
 			virtual void setParent(const Entity& child, const Entity& parent) = 0;
 			virtual Entity getParent(const Entity& child) = 0;
-			virtual void serialize(Blob& serializer) = 0;
-			virtual void deserialize(Blob& serializer) = 0;
+			virtual void serialize(OutputBlob& serializer) = 0;
+			virtual void deserialize(InputBlob& serializer) = 0;
 			virtual Array<Child>* getChildren(const Entity& parent) = 0;
 			virtual DelegateList<void (const Entity&, const Entity&)>& parentSet() = 0;
 	};

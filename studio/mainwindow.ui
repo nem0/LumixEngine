@@ -66,6 +66,10 @@
      <string>Tools</string>
     </property>
     <addaction name="actionGame_mode"/>
+    <addaction name="separator"/>
+    <addaction name="actionExecute_commands"/>
+    <addaction name="actionSave_commands"/>
+    <addaction name="separator"/>
     <addaction name="actionCompile_scripts"/>
     <addaction name="actionMeasure"/>
     <addaction name="actionSnap_to_terrain"/>
@@ -344,6 +348,16 @@
   <action name="actionShow">
    <property name="text">
     <string>Show</string>
+   </property>
+  </action>
+  <action name="actionSave_commands">
+   <property name="text">
+    <string>Save commands</string>
+   </property>
+  </action>
+  <action name="actionExecute_commands">
+   <property name="text">
+    <string>Execute commands</string>
    </property>
   </action>
  </widget>

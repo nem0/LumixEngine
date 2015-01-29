@@ -178,7 +178,7 @@ struct LUMIX_CORE_API Matrix
 	void transpose();
 	Vec3 multiplyPosition(const Vec3& pos) const;
 	void multiply3x3(float scale);
-	static void setIdentity(Matrix& mtx);
+	void setIdentity();
 
 	float m11, m12, m13, m14;
 	float m21, m22, m23, m24;

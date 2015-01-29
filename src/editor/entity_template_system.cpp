@@ -28,6 +28,91 @@ namespace Lumix
 	class EntityTemplateSystemImpl : public EntityTemplateSystem
 	{
 		private:
+			class CreateTemplateCommand : public IEditorCommand
+			{
+				public:
+					CreateTemplateCommand(WorldEditor& editor)
+						: m_entity_system(static_cast<EntityTemplateSystemImpl&>(editor.getEntityTemplateSystem()))
+						, m_editor(editor)
+						, m_name(editor.getAllocator())
+					{
+					}
+
+
+					CreateTemplateCommand(WorldEditor& editor, const char* template_name, const Entity& entity_template)
+						: m_entity_system(static_cast<EntityTemplateSystemImpl&>(editor.getEntityTemplateSystem()))
+						, m_name(template_name, editor.getAllocator())
+						, m_entity(entity_template)
+						, m_editor(editor)
+					{
+					}
+
+
+					virtual void serialize(JsonSerializer& serializer) override
+					{
+						serializer.serialize("template_name", m_name.c_str());
+						serializer.serialize("entity", m_entity.index);
+					}
+
+
+					virtual void deserialize(JsonSerializer& serializer) override
+					{
+						char name[50];
+						serializer.deserialize("template_name", name, sizeof(name), "");
+						m_name = name;
+						serializer.deserialize("entity", m_entity.index, -1);
+						m_entity.universe = m_editor.getEngine().getUniverse();
+					}
+
+
+					virtual void execute() override
+					{
+						uint32_t name_hash = crc32(m_name.c_str());
+						if (m_entity_system.m_instances.find(name_hash) < 0)
+						{
+							m_entity_system.m_template_names.push(m_name);
+							m_entity_system.m_instances.insert(name_hash, Array<Entity>(m_editor.getAllocator()));
+							m_entity_system.m_instances.get(name_hash).push(m_entity);
+							m_entity_system.m_updated.invoke();
+						}
+						else
+						{
+							ASSERT(false);
+						}
+					}
+
+
+					virtual void undo() override
+					{
+						m_entity_system.m_template_names.eraseItem(m_name);
+						uint32_t name_hash = crc32(m_name.c_str());
+						m_entity_system.m_instances.erase(name_hash);
+						m_entity_system.m_updated.invoke();
+					}
+
+
+					virtual bool merge(IEditorCommand&) override
+					{
+						return false;
+					}
+
+
+					virtual uint32_t getType() override
+					{
+						static const uint32_t hash = crc32("create_entity_template");
+						return hash;
+					}
+
+
+					const Entity& getEntity() const { return m_entity; }
+
+				private:
+					EntityTemplateSystemImpl& m_entity_system;
+					WorldEditor& m_editor;
+					string m_name;
+					Entity m_entity;
+			};
+
 			class CreateInstanceCommand : public IEditorCommand
 			{
 				public:
@@ -149,12 +234,19 @@ namespace Lumix
 				editor.universeDestroyed().bind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseDestroyed>(this);
 				setUniverse(editor.getEngine().getUniverse());
 				editor.registerEditorCommandCreator("create_entity_template_instance", &EntityTemplateSystemImpl::createCreateInstanceCommand);
+				editor.registerEditorCommandCreator("create_entity_template", &EntityTemplateSystemImpl::createCreateTemplateCommand);
 			}
 
 
 			static IEditorCommand* createCreateInstanceCommand(WorldEditor& editor)
 			{
 				return editor.getAllocator().newObject<CreateInstanceCommand>(editor);
+			}
+
+
+			static IEditorCommand* createCreateTemplateCommand(WorldEditor& editor)
+			{
+				return editor.getAllocator().newObject<CreateTemplateCommand>(editor);
 			}
 
 
@@ -227,18 +319,8 @@ namespace Lumix
 
 			virtual void createTemplateFromEntity(const char* name, const Entity& entity) override
 			{
-				uint32_t name_hash = crc32(name);
-				if (m_instances.find(name_hash) < 0)
-				{
-					m_template_names.push(string(name, m_editor.getAllocator()));
-					m_instances.insert(name_hash, Array<Entity>(m_editor.getAllocator()));
-					m_instances.get(name_hash).push(entity);
-					m_updated.invoke();
-				}
-				else
-				{
-					ASSERT(false);
-				}
+				CreateTemplateCommand* command = m_editor.getAllocator().newObject<CreateTemplateCommand>(m_editor, name, entity);
+				m_editor.executeCommand(command);
 			}
 
 
@@ -279,7 +361,7 @@ namespace Lumix
 			}
 
 
-			virtual void serialize(Blob& serializer) override
+			virtual void serialize(OutputBlob& serializer) override
 			{
 				serializer.write((int32_t)m_template_names.size());
 				for (int i = 0, c = m_template_names.size(); i < c;  ++i)
@@ -300,7 +382,7 @@ namespace Lumix
 			}
 
 
-			virtual void deserialize(Blob& serializer) override
+			virtual void deserialize(InputBlob& serializer) override
 			{
 				m_template_names.clear();
 				m_instances.clear();

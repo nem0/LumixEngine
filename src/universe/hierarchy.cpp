@@ -141,7 +141,7 @@ class HierarchyImpl : public Hierarchy
 		}
 		
 		
-		virtual void serialize(Blob& serializer) override
+		virtual void serialize(OutputBlob& serializer) override
 		{
 			int size = m_parents.size();
 			serializer.write((int32_t)size);
@@ -155,7 +155,7 @@ class HierarchyImpl : public Hierarchy
 		}
 		
 		
-		virtual void deserialize(Blob& serializer) override
+		virtual void deserialize(InputBlob& serializer) override
 		{
 			int32_t size;
 			serializer.read(size);

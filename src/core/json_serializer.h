@@ -90,6 +90,8 @@ namespace Lumix
 				return m_file.size() - m_file.pos() + NEW_LINE_AND_NULL_TERMINATION_SIZE + strlen(m_token);
 			}
 
+			bool isError() const { return m_is_error; }
+
 		private:
 			void deserializeLabel(const char* label);
 			void deserializeToken();
@@ -131,6 +133,7 @@ namespace Lumix
 			const char* m_data;
 			int m_data_size;
 			bool m_own_data;
+			bool m_is_error;
 	};
 
 

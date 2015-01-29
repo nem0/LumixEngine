@@ -5,6 +5,7 @@
 
 namespace Lumix
 {
+	class IEditorCommand;
 	class WorldEditor;
 }
 
@@ -22,7 +23,7 @@ class AssetBrowser : public QDockWidget
 public:
 	explicit AssetBrowser(QWidget* parent = NULL);
 	~AssetBrowser();
-	void setWorldEditor(Lumix::WorldEditor& editor) { m_editor = &editor; }
+	void setWorldEditor(Lumix::WorldEditor& editor);
 	void emitFileChanged(const char* path);
 	void setScriptCompiler(ScriptCompiler* compiler) { m_compiler = compiler; }
 
@@ -32,6 +33,8 @@ private:
 	void exportModel(const QFileInfo& file_info);
 	void onFileSystemWatcherCallback(const char* path);
 	void onTreeViewSelectionChanged(const QModelIndex& current, const QModelIndex& previous);
+
+	static Lumix::IEditorCommand* createInsertMeshCommand(Lumix::WorldEditor& editor);
 
 signals:
 	void fileChanged(const QString& string);
