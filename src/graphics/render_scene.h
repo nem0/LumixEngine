@@ -78,7 +78,7 @@ namespace Lumix
 			virtual void getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) = 0;
 			virtual void applyCamera(Component camera) = 0;
 			virtual void update(float dt) = 0;
-			virtual Timer* getTimer() const = 0;
+			virtual float getTime() const = 0;
 			virtual void renderTerrain(const TerrainInfo& info, Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos) = 0;
 			virtual Engine& getEngine() const = 0;
 			virtual IAllocator& getAllocator() = 0;
