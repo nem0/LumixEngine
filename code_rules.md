@@ -1,6 +1,7 @@
 General Rules
 --------------------------------------------
 
+* write for readers - code is read and debugged many more times it is changed 
 * any block of code should not be longer than one page (about 40 lines), except namespaces and classes
 
 ---
@@ -77,6 +78,20 @@ General Rules
 		x = 10;
 	#endif
 ```
+
+  4. do not use macros in place of functions - it's hard to read and debug, setting breakpoint to a specific line is almost impossible, does not always do what you would expect
+  	wrong:
+
+```
+	#define min(a, b) ((a) < (b) ? (a) : (b))
+```
+
+	right:
+		
+```
+	inline int min(int a, int b) { return a < b ? a : b; }  
+```	
+
 
 2. sort includes, use following rules (most important to least):
   * precompiled first, if necessary
