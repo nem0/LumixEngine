@@ -244,11 +244,10 @@ public:
 		if (success)
 		{
 			ASSERT(file->getBuffer());
-			Lumix::Blob blob(m_allocator);
-			blob.create(file->getBuffer(), file->size());
+			Lumix::InputBlob blob(file->getBuffer(), file->size());
 			uint32_t hash = 0;
 			blob.read(hash);
-			if (crc32(blob.getData() + sizeof(hash), blob.getBufferSize() - sizeof(hash)) != hash)
+			if (crc32((const uint8_t*)blob.getData() + sizeof(hash), blob.getSize() - sizeof(hash)) != hash)
 			{
 				ASSERT(false);
 				return;
