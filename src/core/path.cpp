@@ -29,7 +29,7 @@ namespace Lumix
 	}
 
 
-	void PathManager::serialize(Blob& serializer)
+	void PathManager::serialize(OutputBlob& serializer)
 	{
 		MT::SpinLock lock(m_mutex);
 		serializer.write((int32_t)m_paths.size());
@@ -40,7 +40,7 @@ namespace Lumix
 	}
 
 
-	void PathManager::deserialize(Blob& serializer)
+	void PathManager::deserialize(InputBlob& serializer)
 	{
 		MT::SpinLock lock(m_mutex);
 		int32_t size;
