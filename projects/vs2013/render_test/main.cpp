@@ -285,6 +285,8 @@ public:
 		m_render_device->getPipeline().setScene((Lumix::RenderScene*)m_engine->getScene(crc32("renderer")));
 		m_engine->getRenderer().setRenderDevice(*m_render_device);
 		m_render_device->getPipeline().resize(600, 400);
+
+		enumerateTests();
 	}
 
 
@@ -302,13 +304,20 @@ public:
 		}
 	}
 
-	
+
+	void enumerateTests()
+	{
+		QDir dir("render_tests");
+		QStringList files = dir.entryList(QStringList() << "*.unv");
+		for (int i = 0; i < files.size(); ++i)
+		{
+			m_tests.push_back(QString("render_tests/") + files[i].left(files[i].size() - 4));
+		}
+	}
+
+
 	bool nextTest()
 	{
-		static const char* tests[] = {
-			"render_tests/1"
-		};
-
 		Lumix::FS::FileSystem& fs = m_engine->getFileSystem();
 
 		bool can_do_next_test = m_current_test == -1 || (!m_engine->getResourceManager().isLoading() && m_is_test_universe_loaded);
@@ -317,12 +326,12 @@ public:
 			char path[LUMIX_MAX_PATH];
 			if (m_current_test >= 0)
 			{
-				Lumix::copyString(path, sizeof(path), tests[m_current_test]);
+				Lumix::copyString(path, sizeof(path), m_tests[m_current_test].toLatin1().data());
 				Lumix::catCString(path, sizeof(path), "_res.tga");
 				m_engine->getRenderer().makeScreenshot(Lumix::Path(path), 500, 500);
 
 				char path_preimage[LUMIX_MAX_PATH];
-				Lumix::copyString(path_preimage, sizeof(path), tests[m_current_test]);
+				Lumix::copyString(path_preimage, sizeof(path), m_tests[m_current_test].toLatin1().data());
 				Lumix::catCString(path_preimage, sizeof(path), ".tga");
 
 				auto file1 = fs.open(fs.getDefaultDevice(), path, Lumix::FS::Mode::OPEN | Lumix::FS::Mode::READ);
@@ -334,9 +343,9 @@ public:
 			}
 
 			++m_current_test;
-			if (m_current_test < sizeof(tests) / sizeof(tests[0]))
+			if (m_current_test < m_tests.size())
 			{
-				Lumix::copyString(path, sizeof(path), tests[m_current_test]);
+				Lumix::copyString(path, sizeof(path), m_tests[m_current_test].toLatin1().data());
 				Lumix::catCString(path, sizeof(path), ".unv");
 				Lumix::FS::ReadCallback file_read_cb;
 				file_read_cb.bind<App, &App::universeFileLoaded>(this);
@@ -379,6 +388,7 @@ private:
 	QApplication* m_qt_app;
 	WGLRenderDevice* m_render_device;
 	QWidget* m_view;
+	QStringList m_tests;
 	int m_current_test;
 	bool m_is_test_universe_loaded;
 };
