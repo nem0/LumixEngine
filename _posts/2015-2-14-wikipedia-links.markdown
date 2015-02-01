@@ -1,11 +1,10 @@
 ---
 layout:     post
 title:      Wikipedia links
-date:       2014-12-31 19:53:00
+date:       2015-2-14 20:00:00
 summary:    
 categories: rants nonprogramming
-comments: true
-published: false
+comments:   true
 ---
 
 Lorem ipsum dolor sit amet ....
