@@ -5,6 +5,7 @@
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
+#include "debug/floating_points.h"
 #include "editor/world_editor.h"
 #include "editor/gizmo.h"
 #include "engine/engine.h"
@@ -19,12 +20,14 @@
 #include "gameview.h"
 #include "wgl_render_device.h"
 
-
 class App
 {
 	public:
 		App()
 		{
+			#ifdef _DEBUG
+				Lumix::enableFloatingPointTraps();
+			#endif
 			m_game_render_device = NULL;
 			m_edit_render_device = NULL;
 			m_qt_app = NULL;
