@@ -269,7 +269,7 @@ namespace Lumix
 			--length;
 		}
 		// int part
-		int exponent = (int)log10(value);
+		int exponent = value == 0 ? 0 : (int)log10(value);
 		float num = value;
 		char* c = output;
 		while ((num >= 1 || exponent >= 0) && length > 0)
