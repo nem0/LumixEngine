@@ -660,7 +660,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		glDisable(GL_DEPTH_TEST);
-		renderQuadGeometry(0, mesh.getIndexCount());
+		renderGeometry(0, mesh.getIndexCount());
 		glDisable(GL_BLEND);
 		glEnable(GL_DEPTH_TEST);
 	}
