@@ -154,7 +154,7 @@ namespace Lumix
 				Array<int> indices(m_allocator);
 				Array<float> data(m_allocator);
 				indices.reserve(count);
-				data.reserve(count * 4);
+				data.reserve(count * 6);
 
 				int index = 0; 
 				for (int i = 0; i < m_texts.size(); ++i)
@@ -179,6 +179,20 @@ namespace Lumix
 							data.push(x + c->m_pixel_w);
 							data.push(y);
 							data.push(c->m_right);
+							data.push(c->m_bottom);
+							++index;
+
+							indices.push(index);
+							data.push(x + c->m_pixel_w);
+							data.push(y + c->m_pixel_h);
+							data.push(c->m_right);
+							data.push(c->m_top);
+							++index;
+
+							indices.push(index);
+							data.push(x);
+							data.push(y);
+							data.push(c->m_left);
 							data.push(c->m_bottom);
 							++index;
 

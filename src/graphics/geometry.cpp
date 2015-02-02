@@ -10,38 +10,31 @@
 namespace Lumix
 {
 
-	
+
+static int vertexAttributeTypeSizes[] =
+{
+	sizeof(GLfloat) * 3,
+	sizeof(GLfloat) * 1,
+	sizeof(GLfloat) * 2,
+	sizeof(GLfloat) * 3,
+	sizeof(GLfloat) * 4,
+	sizeof(GLint) * 1,
+	sizeof(GLint) * 2,
+	sizeof(GLint) * 3,
+	sizeof(GLint) * 4,
+	sizeof(GLshort) * 2,
+	sizeof(GLshort) * 4,
+	sizeof(GLbyte) * 4
+};
+
 static int getAttributeTypeSize(VertexAttributeDef type)
 {
-	switch (type)
+	if ((int)type < sizeof(vertexAttributeTypeSizes) / sizeof(vertexAttributeTypeSizes[0]))
 	{
-		case VertexAttributeDef::FLOAT4:
-			return 4 * sizeof(GLfloat);
-		case VertexAttributeDef::POSITION:
-		case VertexAttributeDef::FLOAT3:
-			return 3 * sizeof(GLfloat);
-		case VertexAttributeDef::FLOAT2:
-			return 2 * sizeof(GLfloat);
-		case VertexAttributeDef::FLOAT1:
-			return 1 * sizeof(GLfloat);
-		case VertexAttributeDef::INT4:
-			return 4 * sizeof(GLint);
-		case VertexAttributeDef::INT3:
-			return 3 * sizeof(GLint);
-		case VertexAttributeDef::INT2:
-			return 2 * sizeof(GLint);
-		case VertexAttributeDef::INT1:
-			return sizeof(GLint);
-		case VertexAttributeDef::BYTE4:
-			return 4 * sizeof(GLbyte);
-		case VertexAttributeDef::SHORT4:
-			return 4 * sizeof(GLshort);
-		case VertexAttributeDef::SHORT2:
-			return 2 * sizeof(GLshort);
-		default:
-			ASSERT(false);
-			return -1;
+		return vertexAttributeTypeSizes[(int)type];
 	}
+	ASSERT(false);
+	return -1;
 }
 
 
@@ -144,69 +137,53 @@ void VertexDef::begin(Shader& shader, int start_offset) const
 	for(int i = 0; i < attribute_count; ++i)
 	{
 		GLint attrib_id = shader.getAttribId(m_attributes[i].m_name_index);
-		glVertexAttribDivisor(attrib_id, 0);
-		switch (m_attributes[i].m_type)
+		VertexAttributeDef type = m_attributes[i].m_type;
+		if (attrib_id >= 0)
 		{
-			case VertexAttributeDef::FLOAT4:
-				glEnableVertexAttribArray(attrib_id);
-				glVertexAttribPointer(attrib_id, 4, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
-				offset += sizeof(GLfloat) * 4;
-				break;
-			case VertexAttributeDef::POSITION:
-			case VertexAttributeDef::FLOAT3:
-				glEnableVertexAttribArray(attrib_id);
-				glVertexAttribPointer(attrib_id, 3, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
-				offset += sizeof(GLfloat) * 3;
-				break;
-			case VertexAttributeDef::FLOAT2:
-				glEnableVertexAttribArray(attrib_id);
-				glVertexAttribPointer(attrib_id, 2, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
-				offset += sizeof(GLfloat) * 2;
-				break;
-			case VertexAttributeDef::FLOAT1:
-				glEnableVertexAttribArray(attrib_id);
-				glVertexAttribPointer(attrib_id, 1, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
-				offset += sizeof(GLfloat) * 1;
-				break;
-			case VertexAttributeDef::SHORT4:
-				glEnableVertexAttribArray(attrib_id);
-				glVertexAttribPointer(attrib_id, 4, GL_SHORT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
-				offset += sizeof(GLshort) * 4;
-				break;
-			case VertexAttributeDef::SHORT2:
-				glEnableVertexAttribArray(attrib_id);
-				glVertexAttribPointer(attrib_id, 2, GL_SHORT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
-				offset += sizeof(GLshort) * 2;
-				break;
-			case VertexAttributeDef::INT4:
-				glEnableVertexAttribArray(attrib_id);
-				glVertexAttribPointer(attrib_id, 4, GL_INT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
-				offset += sizeof(GLint) * 4;
-				break;
-			case VertexAttributeDef::INT3:
-				glEnableVertexAttribArray(attrib_id);
-				glVertexAttribPointer(attrib_id, 3, GL_INT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
-				offset += sizeof(GLint) * 3;
-				break;
-			case VertexAttributeDef::INT2:
-				glEnableVertexAttribArray(attrib_id);
-				glVertexAttribPointer(attrib_id, 2, GL_INT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
-				offset += sizeof(GLint) * 2;
-				break;
-			case VertexAttributeDef::INT1:
-				glEnableVertexAttribArray(attrib_id);
-				glVertexAttribPointer(attrib_id, 1, GL_INT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
-				offset += sizeof(GLint) * 1;
-				break;
-			case VertexAttributeDef::BYTE4:
-				glEnableVertexAttribArray(attrib_id);
-				glVertexAttribPointer(attrib_id, 4, GL_BYTE, GL_FALSE, m_vertex_size, (GLvoid*)offset);
-				offset += sizeof(char) * 4;
-				break;
-			default:
-				ASSERT(false);
-				break;
+			glVertexAttribDivisor(attrib_id, 0);
+			glEnableVertexAttribArray(attrib_id);
+			switch (type)
+			{
+				case VertexAttributeDef::FLOAT4:
+					glVertexAttribPointer(attrib_id, 4, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
+					break;
+				case VertexAttributeDef::POSITION:
+				case VertexAttributeDef::FLOAT3:
+					glVertexAttribPointer(attrib_id, 3, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
+					break;
+				case VertexAttributeDef::FLOAT2:
+					glVertexAttribPointer(attrib_id, 2, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
+					break;
+				case VertexAttributeDef::FLOAT1:
+					glVertexAttribPointer(attrib_id, 1, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
+					break;
+				case VertexAttributeDef::SHORT4:
+					glVertexAttribPointer(attrib_id, 4, GL_SHORT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
+					break;
+				case VertexAttributeDef::SHORT2:
+					glVertexAttribPointer(attrib_id, 2, GL_SHORT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
+					break;
+				case VertexAttributeDef::INT4:
+					glVertexAttribPointer(attrib_id, 4, GL_INT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
+					break;
+				case VertexAttributeDef::INT3:
+					glVertexAttribPointer(attrib_id, 3, GL_INT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
+					break;
+				case VertexAttributeDef::INT2:
+					glVertexAttribPointer(attrib_id, 2, GL_INT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
+					break;
+				case VertexAttributeDef::INT1:
+					glVertexAttribPointer(attrib_id, 1, GL_INT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
+					break;
+				case VertexAttributeDef::BYTE4:
+					glVertexAttribPointer(attrib_id, 4, GL_BYTE, GL_FALSE, m_vertex_size, (GLvoid*)offset);
+					break;
+				default:
+					ASSERT(false);
+					break;
+			}
 		}
+		offset += getAttributeTypeSize(type);
 	}
 	
 }
@@ -217,7 +194,11 @@ void VertexDef::end(Shader& shader) const
 	PROFILE_FUNCTION();
 	for(int i = 0; i < m_attribute_count; ++i)
 	{
-		glDisableVertexAttribArray(shader.getAttribId(m_attributes[i].m_name_index));
+		GLint attr_id = shader.getAttribId(m_attributes[i].m_name_index);
+		if (attr_id >= 0)
+		{
+			glDisableVertexAttribArray(attr_id);
+		}
 	}
 	
 }

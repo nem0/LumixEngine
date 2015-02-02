@@ -643,7 +643,11 @@ void renderInstancedGeometry(int indices_offset, int vertex_count, int instance_
 {
 	for (int i = 0; i < shader.getAttributeCount(); ++i)
 	{
-		glVertexAttribDivisor(shader.getAttribId(i), 0);
+		GLint attr_id = shader.getAttribId(i);
+		if (attr_id >= 0)
+		{
+			glVertexAttribDivisor(attr_id, 0);
+		}
 	}
 	glDrawElementsInstanced(GL_TRIANGLES, vertex_count, GL_UNSIGNED_INT, (void*)(indices_offset * sizeof(GLint)), instance_count);
 }
@@ -652,12 +656,6 @@ void renderInstancedGeometry(int indices_offset, int vertex_count, int instance_
 void renderGeometry(int indices_offset, int vertex_count)
 {
 	glDrawElements(GL_TRIANGLES, vertex_count, GL_UNSIGNED_INT, (void*)(indices_offset * sizeof(GLint)));
-}
-
-
-void renderQuadGeometry(int indices_offset, int vertex_count)
-{
-	glDrawElements(GL_QUADS, vertex_count, GL_UNSIGNED_INT, (void*)(indices_offset * sizeof(GLint)));
 }
 
 

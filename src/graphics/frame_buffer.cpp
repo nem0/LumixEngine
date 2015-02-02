@@ -35,6 +35,7 @@ FrameBuffer::FrameBuffer(int width, int height, int color_buffers_count, bool is
 
 	if (is_depth_buffer)
 	{
+		glBindRenderbuffer(GL_RENDERBUFFER, m_renderbuffers[color_buffers_count]);
 		glRenderbufferStorageEXT(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
 		glFramebufferRenderbufferEXT(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_renderbuffers[color_buffers_count]);
 
