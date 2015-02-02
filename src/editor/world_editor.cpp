@@ -1368,7 +1368,7 @@ struct WorldEditorImpl : public WorldEditor
 				toggleGameMode();
 				m_toggle_game_mode_requested = false;
 			}
-			m_engine->update(m_is_game_mode);
+			m_engine->update(m_is_game_mode, 1);
 			m_engine->getFileSystem().updateAsyncTransactions();
 			createEditorLines();
 		}
@@ -1982,7 +1982,6 @@ struct WorldEditorImpl : public WorldEditor
 				m_template_system->deserialize(blob);
 				m_camera = static_cast<RenderScene*>(m_engine->getScene(crc32("renderer")))->getCameraInSlot("editor").entity;
 				g_log_info.log("editor") << "Universe parsed in " << timer->getTimeSinceStart() << " seconds";
-				Timer::destroy(timer);
 
 				Universe* universe = m_engine->getUniverse();
 				for (int i = 0; i < universe->getEntityCount(); ++i)
@@ -1991,6 +1990,7 @@ struct WorldEditorImpl : public WorldEditor
 					createEditorIcon(e);
 				}
 			}
+			Timer::destroy(timer);
 		}
 
 

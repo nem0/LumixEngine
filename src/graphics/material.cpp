@@ -72,7 +72,7 @@ void Material::apply(Renderer& renderer, PipelineInstance& pipeline) const
 					renderer.setUniform(*m_shader, uniform.m_name, uniform.m_name_hash, uniform.m_matrix);
 					break;
 				case Uniform::TIME:
-					renderer.setUniform(*m_shader, uniform.m_name, uniform.m_name_hash, pipeline.getScene()->getTimer()->getTimeSinceStart());
+					renderer.setUniform(*m_shader, uniform.m_name, uniform.m_name_hash, pipeline.getScene()->getTime());
 					break;
 				default:
 					ASSERT(false);
