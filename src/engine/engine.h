@@ -60,7 +60,7 @@ namespace Lumix
 			virtual ResourceManager& getResourceManager() = 0;
 
 			virtual const char* getBasePath() const = 0;
-			virtual void update(bool is_game_running) = 0;
+			virtual void update(bool is_game_running, float time_delta_multiplier) = 0;
 			virtual uint32_t serialize(OutputBlob& serializer) = 0;
 			virtual bool deserialize(InputBlob& serializer) = 0;
 			virtual float getFPS() const = 0;

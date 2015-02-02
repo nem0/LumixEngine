@@ -25,6 +25,10 @@ namespace Lumix
 		State old_state = m_state;
 		m_state = State::EMPTY;
 		m_cb.invoke(old_state, State::EMPTY);
+		if (old_state == State::LOADING)
+		{
+			m_resource_manager.decrementLoadingResources();
+		}
 	}
 
 	void Resource::onLoading(void)
@@ -32,6 +36,7 @@ namespace Lumix
 		State old_state = m_state;
 		m_state = State::LOADING;
 		m_cb.invoke(old_state, State::LOADING);
+		m_resource_manager.incrementLoadingResources();
 	}
 
 	void Resource::onReady(void)
@@ -39,6 +44,10 @@ namespace Lumix
 		State old_state = m_state;
 		m_state = State::READY;
 		m_cb.invoke(old_state, State::READY);
+		if (old_state == State::LOADING)
+		{
+			m_resource_manager.decrementLoadingResources();
+		}
 	}
 
 	void Resource::onUnloading(void)
@@ -46,6 +55,10 @@ namespace Lumix
 		State old_state = m_state;
 		m_state = State::UNLOADING;
 		m_cb.invoke(old_state, State::UNLOADING);
+		if (old_state == State::LOADING)
+		{
+			m_resource_manager.decrementLoadingResources();
+		}
 	}
 
 	void Resource::onReloading(void)
@@ -56,6 +69,10 @@ namespace Lumix
 
 		m_state = State::UNLOADING;
 		m_cb.invoke(old_state, State::UNLOADING);
+		if (old_state == State::LOADING)
+		{
+			m_resource_manager.decrementLoadingResources();
+		}
 	}
 
 	void Resource::onFailure(void)
@@ -63,6 +80,10 @@ namespace Lumix
 		State old_state = m_state;
 		m_state = State::FAILURE;
 		m_cb.invoke(old_state, State::FAILURE);
+		if (old_state == State::LOADING)
+		{
+			m_resource_manager.decrementLoadingResources();
+		}
 	}
 
 	void Resource::doLoad(void)

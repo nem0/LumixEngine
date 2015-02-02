@@ -201,8 +201,11 @@ namespace Lumix
 					}
 				}
 				m_allocator.deleteObject(m_mesh);
-				m_geometry.setAttributesData(&data[0], sizeof(data[0]) * data.size());
-				m_geometry.setIndicesData(&indices[0], sizeof(indices[0]) * indices.size());
+				if (!data.empty())
+				{
+					m_geometry.setAttributesData(&data[0], sizeof(data[0]) * data.size());
+					m_geometry.setIndicesData(&indices[0], sizeof(indices[0]) * indices.size());
+				}
 				m_mesh = m_allocator.newObject<Mesh>(vertex_definition, m_font->getMaterial(), 0, sizeof(data[0]) * data.size(), 0, indices.size(), "debug_texts", m_allocator);
 			}
 
@@ -324,9 +327,8 @@ namespace Lumix
 				, m_debug_texts(engine, m_allocator)
 			{
 				m_universe.entityMoved().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
-				m_timer = Timer::create(m_allocator);
 				m_culling_system = CullingSystem::create(m_engine.getMTJDManager(), m_allocator);
-			
+				m_time = 0;
 			}
 
 
@@ -353,7 +355,6 @@ namespace Lumix
 					m_allocator.deleteObject(m_renderables[i]);
 				}
 
-				Timer::destroy(m_timer);
 				CullingSystem::destroy(*m_culling_system);
 			}
 
@@ -424,6 +425,7 @@ namespace Lumix
 			
 			void update(float dt) override
 			{
+				m_time += dt;
 				for (int i = m_debug_lines.size() - 1; i >= 0; --i)
 				{
 					float life = m_debug_lines[i].m_life;
@@ -1653,9 +1655,9 @@ namespace Lumix
 				return Component::INVALID;
 			}
 
-			virtual Timer* getTimer() const override
+			virtual float getTime() const override
 			{
-				return m_timer;
+				return m_time;
 			}
 
 			virtual void renderTerrain(const TerrainInfo& info, Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos) override
@@ -1757,7 +1759,6 @@ namespace Lumix
 			Engine& m_engine;
 			Array<DebugLine> m_debug_lines;
 			DebugTextsData m_debug_texts;
-			Timer* m_timer;
 			Component m_applied_camera;
 			CullingSystem* m_culling_system;
 			Frustum m_camera_frustum;
@@ -1765,6 +1766,7 @@ namespace Lumix
 			Array<Array<RenderableInfo> > m_temporary_infos;
 			MTJD::Group m_sync_point;
 			Array<MTJD::Job*> m_jobs;
+			float m_time;
 	};
 
 

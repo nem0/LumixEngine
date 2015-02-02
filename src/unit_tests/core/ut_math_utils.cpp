@@ -80,7 +80,7 @@ void UT_math_utils_degrees_to_radians(const char* params)
 void UT_math_utils_ease_in_out(const char* params)
 {
 	LUMIX_EXPECT_CLOSE_EQ(Lumix::Math::easeInOut(0), 0, 0.001f);
-	LUMIX_EXPECT_CLOSE_EQ(Lumix::Math::easeInOut(0.1f), 0.02, 0.001f);
+	LUMIX_EXPECT_CLOSE_EQ(Lumix::Math::easeInOut(0.1f), 0.02f, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(Lumix::Math::easeInOut(0.25f), 0.125f, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(Lumix::Math::easeInOut(0.5f), 0.5f, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(Lumix::Math::easeInOut(0.75f), 0.875f, 0.001f);

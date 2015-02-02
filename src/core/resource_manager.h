@@ -36,6 +36,9 @@ namespace Lumix
 		void add(uint32_t id, ResourceManagerBase* rm);
 		void remove(uint32_t id);
 		void reload(const char* path);
+		bool isLoading() const;
+		void incrementLoadingResources();
+		void decrementLoadingResources();
 
 		FS::FileSystem& getFileSystem() { return *m_file_system; }
 
@@ -43,5 +46,6 @@ namespace Lumix
 		IAllocator& m_allocator;
 		ResourceManagerTable m_resource_managers;
 		FS::FileSystem* m_file_system;
+		int m_loading_resources_count;
 	};
 }

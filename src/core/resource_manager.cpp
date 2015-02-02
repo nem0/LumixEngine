@@ -8,6 +8,7 @@ namespace Lumix
 	ResourceManager::ResourceManager(IAllocator& allocator) 
 		: m_resource_managers(allocator)
 		, m_allocator(allocator)
+		, m_loading_resources_count(0)
 	{
 	}
 
@@ -45,5 +46,24 @@ namespace Lumix
 		{
 			iter.value()->reload(Path(path));
 		}
+	}
+
+
+	void ResourceManager::incrementLoadingResources()
+	{
+		++m_loading_resources_count;
+	}
+
+
+	void ResourceManager::decrementLoadingResources()
+	{
+		ASSERT(m_loading_resources_count > 0);
+		--m_loading_resources_count;
+	}
+
+	
+	bool ResourceManager::isLoading() const
+	{
+		return m_loading_resources_count > 0;
 	}
 }
