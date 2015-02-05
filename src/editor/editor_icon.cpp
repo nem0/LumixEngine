@@ -43,7 +43,7 @@ EditorIcon::EditorIcon(Engine& engine, RenderScene& scene, const Entity& entity)
 			m_type = CAMERA;
 			break;
 		}
-		else if (cmps[i].type == crc32("light"))
+		else if (cmps[i].type == crc32("global_light") || cmps[i].type == crc32("point_light"))
 		{
 			m_type = LIGHT;
 			break;

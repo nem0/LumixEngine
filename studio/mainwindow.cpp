@@ -110,6 +110,7 @@ void MainWindow::installPlugins()
 {
 	m_property_view->addEntityComponentPlugin(new ScriptComponentPlugin(*m_world_editor, *m_script_compiler_ui->getCompiler()));
 	m_property_view->addEntityComponentPlugin(new TerrainComponentPlugin(*m_world_editor, m_entity_template_list_ui, m_entity_list));
+	m_property_view->addEntityComponentPlugin(new GlobalLightComponentPlugin());
 }
 
 
