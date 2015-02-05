@@ -47,7 +47,8 @@ namespace Lumix
 
 static const uint32_t RENDERABLE_HASH = crc32("renderable");
 static const uint32_t CAMERA_HASH = crc32("camera");
-static const uint32_t LIGHT_HASH = crc32("light");
+static const uint32_t GLOBAL_LIGHT_HASH = crc32("global_light");
+static const uint32_t POINT_LIGHT_HASH = crc32("point_light");
 static const uint32_t SCRIPT_HASH = crc32("script");
 static const uint32_t ANIMABLE_HASH = crc32("animable");
 static const uint32_t TERRAIN_HASH = crc32("terrain");

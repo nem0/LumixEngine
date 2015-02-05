@@ -87,6 +87,15 @@ class PropertyView : public QDockWidget
 
 
 
+class GlobalLightComponentPlugin : public QObject, public PropertyView::IEntityComponentPlugin
+{
+		Q_OBJECT
+	public:
+		virtual uint32_t getType() override;
+		virtual void createEditor(QTreeWidgetItem* component_item, const Lumix::Component& component) override;
+		virtual void onPropertyViewCleared() override {}
+};
+
 class TerrainComponentPlugin : public QObject, public PropertyView::IEntityComponentPlugin
 {
 		Q_OBJECT

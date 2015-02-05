@@ -33,7 +33,8 @@ namespace Lumix
 {
 
 
-static const uint32_t LIGHT_HASH = crc32("light");
+static const uint32_t GLOBAL_LIGHT_HASH = crc32("global_light");
+static const uint32_t POINT_LIGHT_HASH = crc32("point_light");
 static const uint32_t RENDERABLE_HASH = crc32("renderable");
 static const uint32_t CAMERA_HASH = crc32("camera");
 
@@ -314,12 +315,16 @@ struct RendererImpl : public Renderer
 			editor.registerProperty("renderable", allocator.newObject<ResourcePropertyDescriptor<RenderScene> >("source", &RenderScene::getRenderablePath, &RenderScene::setRenderablePath, "Mesh (*.msh)", allocator));
 			editor.registerProperty("renderable", allocator.newObject<BoolPropertyDescriptor<RenderScene> >("is_always_visible", &RenderScene::isRenderableAlwaysVisible, &RenderScene::setRenderableIsAlwaysVisible, allocator));
 		
-			editor.registerProperty("light", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("ambient_intensity", &RenderScene::getLightAmbientIntensity, &RenderScene::setLightAmbientIntensity, allocator));
-			editor.registerProperty("light", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("diffuse_intensity", &RenderScene::getLightDiffuseIntensity, &RenderScene::setLightDiffuseIntensity, allocator));
-			editor.registerProperty("light", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("fog_density", &RenderScene::getFogDensity, &RenderScene::setFogDensity, allocator));
-			editor.registerProperty("light", allocator.newObject<ColorPropertyDescriptor<RenderScene> >("ambient_color", &RenderScene::getLightAmbientColor, &RenderScene::setLightAmbientColor, allocator));
-			editor.registerProperty("light", allocator.newObject<ColorPropertyDescriptor<RenderScene> >("diffuse_color", &RenderScene::getLightDiffuseColor, &RenderScene::setLightDiffuseColor, allocator));
-			editor.registerProperty("light", allocator.newObject<ColorPropertyDescriptor<RenderScene> >("fog_color", &RenderScene::getFogColor, &RenderScene::setFogColor, allocator));
+			editor.registerProperty("global_light", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("ambient_intensity", &RenderScene::getLightAmbientIntensity, &RenderScene::setLightAmbientIntensity, allocator));
+			editor.registerProperty("global_light", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("intensity", &RenderScene::getGlobalLightIntensity, &RenderScene::setGlobalLightIntensity, allocator));
+			editor.registerProperty("global_light", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("fog_density", &RenderScene::getFogDensity, &RenderScene::setFogDensity, allocator));
+			editor.registerProperty("global_light", allocator.newObject<ColorPropertyDescriptor<RenderScene> >("ambient_color", &RenderScene::getLightAmbientColor, &RenderScene::setLightAmbientColor, allocator));
+			editor.registerProperty("global_light", allocator.newObject<ColorPropertyDescriptor<RenderScene> >("color", &RenderScene::getGlobalLightColor, &RenderScene::setGlobalLightColor, allocator));
+			editor.registerProperty("global_light", allocator.newObject<ColorPropertyDescriptor<RenderScene> >("fog_color", &RenderScene::getFogColor, &RenderScene::setFogColor, allocator));
+
+			editor.registerProperty("point_light", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("intensity", &RenderScene::getPointLightIntensity, &RenderScene::setPointLightIntensity, allocator));
+			editor.registerProperty("point_light", allocator.newObject<ColorPropertyDescriptor<RenderScene> >("color", &RenderScene::getPointLightColor, &RenderScene::setPointLightColor, allocator));
+			editor.registerProperty("point_light", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("range", &RenderScene::getLightRange, &RenderScene::setLightRange, allocator));
 
 			editor.registerProperty("terrain", allocator.newObject<ResourcePropertyDescriptor<RenderScene> >("material", &RenderScene::getTerrainMaterial, &RenderScene::setTerrainMaterial, "Material (*.mat)", allocator));
 			editor.registerProperty("terrain", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("xz_scale", &RenderScene::getTerrainXZScale, &RenderScene::setTerrainXZScale, allocator));
