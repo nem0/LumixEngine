@@ -44,12 +44,13 @@ static const char* component_map[] =
 {
 	"Animable", "animable",
 	"Camera", "camera",
-	"Directional light", "light",
+	"Global light", "global_light",
 	"Mesh", "renderable",
 	"Physics Box", "box_rigid_actor",
 	"Physics Controller", "physical_controller",
 	"Physics Mesh", "mesh_rigid_actor",
 	"Physics Heightfield", "physical_heightfield",
+	"Point light", "point_light",
 	"Script", "script",
 	"Terrain", "terrain"
 };
@@ -815,6 +816,36 @@ void TerrainComponentPlugin::on_TerrainTextureTypeClicked()
 
 	m_terrain_editor->m_texture_tree_item = item;
 	combobox->connect(combobox, (void (QComboBox::*)(int))&QComboBox::currentIndexChanged, [this](int value) { m_terrain_editor->m_texture_idx = value; });
+}
+
+
+uint32_t GlobalLightComponentPlugin::getType()
+{
+	return crc32("global_light");
+}
+
+
+void GlobalLightComponentPlugin::createEditor(QTreeWidgetItem* component_item, const Lumix::Component& component)
+{
+	QTreeWidgetItem* group_item = new QTreeWidgetItem(QStringList() << "Active");
+	component_item->addChild(group_item);
+
+	QWidget* widget = new QWidget();
+	QHBoxLayout* layout = new QHBoxLayout(widget);
+	layout->setContentsMargins(0, 0, 0, 0);
+
+	bool is_active = static_cast<Lumix::RenderScene*>(component.scene)->getActiveGlobalLight() == component;
+	QLabel* label = new QLabel(is_active ? "Active" : "Inactive", widget);
+	layout->addWidget(label);
+
+	QPushButton* button = new QPushButton("Activate", widget);
+	layout->addWidget(button);
+	connect(button, &QPushButton::clicked, [component, label]() {
+		static_cast<Lumix::RenderScene*>(component.scene)->setActiveGlobalLight(component);
+		label->setText("Active");
+	});
+
+	group_item->treeWidget()->setItemWidget(group_item, 1, widget);
 }
 
 

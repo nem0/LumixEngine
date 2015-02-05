@@ -84,7 +84,8 @@ namespace Lumix
 			virtual IAllocator& getAllocator() = 0;
 
 			virtual Pose& getPose(const Component& cmp) = 0;
-			virtual Component getLight(int index) = 0;
+			virtual Component getActiveGlobalLight() = 0;
+			virtual void setActiveGlobalLight(const Component& cmp) = 0;
 
 			virtual int addDebugText(const char* text, int x, int y) = 0;
 			virtual void setDebugText(int id, const char* text) = 0;
@@ -150,14 +151,20 @@ namespace Lumix
 			virtual void addGrass(Component cmp, int index) = 0;
 			virtual void removeGrass(Component cmp, int index) = 0;
 
-			virtual void setLightDiffuseIntensity(Component cmp, float intensity) = 0;
-			virtual void setLightDiffuseColor(Component cmp, const Vec4& color) = 0;
+			virtual float getLightRange(Component cmp) = 0;
+			virtual void setLightRange(Component cmp, float range) = 0;
+			virtual void setPointLightIntensity(Component cmp, float intensity) = 0;
+			virtual void setGlobalLightIntensity(Component cmp, float intensity) = 0;
+			virtual void setPointLightColor(Component cmp, const Vec4& color) = 0;
+			virtual void setGlobalLightColor(Component cmp, const Vec4& color) = 0;
 			virtual void setLightAmbientIntensity(Component cmp, float intensity) = 0;
 			virtual void setLightAmbientColor(Component cmp, const Vec4& color) = 0;
 			virtual void setFogDensity(Component cmp, float density) = 0;
 			virtual void setFogColor(Component cmp, const Vec4& color) = 0;
-			virtual float getLightDiffuseIntensity(Component cmp) = 0;
-			virtual Vec4 getLightDiffuseColor(Component cmp) = 0;
+			virtual float getPointLightIntensity(Component cmp) = 0;
+			virtual float getGlobalLightIntensity(Component cmp) = 0;
+			virtual Vec4 getPointLightColor(Component cmp) = 0;
+			virtual Vec4 getGlobalLightColor(Component cmp) = 0;
 			virtual float getLightAmbientIntensity(Component cmp) = 0;
 			virtual Vec4 getLightAmbientColor(Component cmp) = 0;
 			virtual float getFogDensity(Component cmp) = 0;
