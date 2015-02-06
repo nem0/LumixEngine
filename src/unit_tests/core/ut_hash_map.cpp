@@ -67,8 +67,40 @@ namespace
 			hash_table.insert(i, i);
 		}
 	};
+
+	void UT_constIterator(const char* params)
+	{
+		typedef Lumix::HashMap<int32_t, int32_t> HashTableType;
+
+		Lumix::DefaultAllocator allocator;
+		HashTableType hash_table(allocator);
+
+		LUMIX_EXPECT_TRUE(hash_table.empty());
+
+		size_t values[10] = {
+			1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+		};
+
+		for (size_t val : values)
+		{
+			hash_table.insert(val, val);
+		}
+
+		for (size_t val : values)
+		{
+			LUMIX_EXPECT_EQ(hash_table[val], val);
+		}
+
+		const HashTableType& const_hash_table = hash_table;
+		for (HashTableType::constIterator const_it = const_hash_table.begin(); const_it != const_hash_table.end(); ++const_it)
+		{
+			LUMIX_EXPECT_EQ(const_it.value(), values[const_it.key() - 1]);
+		}
+	}
 }
 
 REGISTER_TEST("unit_tests/core/hash_map/insert", UT_insert, "")
 REGISTER_TEST("unit_tests/core/hash_map/array", UT_array, "")
 REGISTER_TEST("unit_tests/core/hash_map/clear", UT_clear, "")
+REGISTER_TEST("unit_tests/core/hash_map/constIterator", UT_constIterator, "")
+

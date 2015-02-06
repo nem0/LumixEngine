@@ -99,6 +99,7 @@ namespace Lumix
 		typedef uint32_t size_type;
 
 		friend class HashMapIterator;
+		friend class ConstHashMapIterator;
 
 		static const size_type s_default_ids_count = 8;
 
@@ -195,7 +196,101 @@ namespace Lumix
 			node_type* m_current_node;
 		};
 
+		template <class U, class S, class _Hasher>
+		class ConstHashMapIterator
+		{
+		public:
+			typedef U key_type;
+			typedef S value_type;
+			typedef _Hasher hasher_type;
+			typedef HashNode<key_type, value_type> node_type;
+			typedef HashMap<key_type, value_type, hasher_type> hm_type;
+			typedef ConstHashMapIterator<key_type, value_type, hasher_type> my_type;
+
+			friend class hm_type;
+
+			ConstHashMapIterator()
+				: m_hash_map(NULL)
+				, m_current_node(NULL)
+			{
+			}
+
+			ConstHashMapIterator(const my_type& src)
+				: m_hash_map(src.m_hash_map)
+				, m_current_node(src.m_current_node)
+			{
+			}
+
+			ConstHashMapIterator(node_type* node, const hm_type* hm)
+				: m_hash_map(hm)
+				, m_current_node(node)
+			{
+			}
+
+			~ConstHashMapIterator()
+			{
+			}
+
+			bool isValid() const
+			{
+				return NULL != m_current_node && m_hash_map->m_sentinel != m_current_node;
+			}
+
+			const key_type& key() const
+			{
+				return m_current_node->m_key;
+			}
+
+			const value_type& value() const
+			{
+				return m_current_node->m_value;
+			}
+
+			const value_type& operator*() const
+			{
+				return value();
+			}
+
+			my_type& operator++()
+			{
+				return preInc();
+			}
+
+			my_type operator++(int)
+			{
+				return postInc();
+			}
+
+			bool operator==(const my_type& it) const
+			{
+				return it.m_current_node == m_current_node;
+			}
+
+			bool operator!=(const my_type& it) const
+			{
+				return it.m_current_node != m_current_node;
+			}
+
+		private:
+			my_type& preInc()
+			{
+				m_current_node = m_hash_map->next(m_current_node);
+				return *this;
+			}
+
+			my_type postInc()
+			{
+				my_type p = *this;
+				m_current_node = m_hash_map->next(m_current_node);
+				return p;
+			}
+
+			const hm_type* m_hash_map;
+			node_type* m_current_node;
+		};
+
 		typedef HashMapIterator<key_type, value_type, hasher_type> iterator;
+		typedef ConstHashMapIterator<key_type, value_type, hasher_type> constIterator;
 
 		HashMap(IAllocator& allocator)
 			: m_allocator(allocator)
@@ -347,7 +442,11 @@ namespace Lumix
 		iterator begin() { return iterator(first(), this); }
 		iterator end() { return iterator(m_sentinel, this); }
 
+		constIterator begin() const { return constIterator(first(), this); }
+		constIterator end() const { return constIterator(m_sentinel, this); }
+
 		iterator find(const key_type& key) { return iterator(_find(key), this); }
+		constIterator find(const key_type& key) const { return constIterator(_find(key), this); }
 
 		value_type& at(const key_type& key)
 		{
@@ -443,7 +542,7 @@ namespace Lumix
 			return node->m_next;
 		}
 
-		node_type* first()
+		node_type* first() const
 		{
 			if(0 == m_size)
 				return m_sentinel;
@@ -455,7 +554,7 @@ namespace Lumix
 			return m_sentinel;
 		}
 
-		node_type* next(node_type* n)
+		node_type* next(node_type* n) const
 		{
 			if(0 == m_size || m_sentinel == n)
 				return m_sentinel;
