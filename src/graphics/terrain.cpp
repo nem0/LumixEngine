@@ -459,12 +459,13 @@ namespace Lumix
 
 	void Terrain::GrassType::grassVertexCopyCallback(void* data, int instance_size, int copy_count)
 	{
-		bool has_matrix_index_attribute = m_grass_model->getMesh(0).getVertexDefinition().getAttributeType(3) == VertexAttributeDef::INT1;
+		bool has_matrix_index_attribute = m_grass_model->getMesh(0).getVertexDefinition().getAttributeType(4) == VertexAttributeDef::INT1;
 		if (has_matrix_index_attribute)
 		{
 			uint8_t* attributes_data = (uint8_t*)data;
 			int vertex_size = m_grass_model->getMesh(0).getVertexDefinition().getVertexSize();
-			const int i1_offset = 3 * sizeof(float) + 3 * sizeof(float) + 2 * sizeof(float);
+			const int i1_offset = 3 * sizeof(GLfloat) + 4 * sizeof(GLbyte) + 4 * sizeof(GLbyte) + 2 * sizeof(GLshort);
+			ASSERT(i1_offset < vertex_size);
 			for (int i = 0; i < copy_count; ++i)
 			{
 				for (int j = 0, c = m_grass_model->getMesh(0).getAttributeArraySize() / m_grass_model->getMesh(0).getVertexDefinition().getVertexSize(); j < c; ++j)
