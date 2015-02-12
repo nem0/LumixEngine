@@ -16,5 +16,8 @@ Features:
 [Data repository](https://github.com/nem0/lumixengine_data)
 
 [Mindmap](https://github.com/nem0/LumixEngine/blob/master/docs/lumix_mindmap.png)
+
+[Terrain video](https://www.youtube.com/watch?v=DirHQUGFoOg)
+
 ![Editor screenshot](https://raw.githubusercontent.com/nem0/LumixEngine/master/docs/editor.png "Editor screenshot")
 
