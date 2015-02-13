@@ -38,8 +38,10 @@ class LUMIX_ENGINE_API Shader : public Resource
 			SHADOW_MATRIX1,
 			SHADOW_MATRIX2,
 			SHADOW_MATRIX3,
+			LIGHT_POSITION,
+			LIGHT_RANGE,
 
-			WORLD_MATRIX, // keep this before count
+			WORLD_MATRIX, // keep this right before count
 			COUNT
 		};
 	
@@ -89,7 +91,7 @@ class LUMIX_ENGINE_API Shader : public Resource
 
 	private:
 		bool deserializeSettings(class JsonSerializer& serializer, char* attributes[MAX_ATTRIBUTE_COUNT]);
-		Combination* getCombination(uint32_t hash, uint32_t pass_hash) const;
+		Combination* getCombination(uint32_t hash, uint32_t pass_hash);
 
 		virtual void doUnload(void) override;
 		virtual void loaded(FS::IFile* file, bool success, FS::FileSystem& fs) override;
@@ -101,6 +103,7 @@ class LUMIX_ENGINE_API Shader : public Resource
 		Array<uint32_t>		m_pass_hashes;
 		Array<Combination*>	m_combinations;
 		Combination*		m_current_combination;
+		Combination			m_default_combination;
 		bool				m_is_shadowmap_required;
 		string				m_source;
 		Renderer&			m_renderer;
