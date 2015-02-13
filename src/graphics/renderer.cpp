@@ -101,7 +101,7 @@ struct RendererImpl : public Renderer
 
 	virtual IScene* createScene(Universe& universe) override
 	{
-		return RenderScene::createInstance(*this, m_engine, universe, m_allocator);
+		return RenderScene::createInstance(*this, m_engine, universe, true, m_allocator);
 	}
 
 
@@ -425,6 +425,7 @@ struct RendererImpl : public Renderer
 		for (int i = 0, c = model.getMeshCount(); i < c;  ++i)
 		{
 			const Mesh& mesh = model.getMesh(i);
+			
 			mesh.getMaterial()->apply(*this, pipeline);
 			setFixedCachedUniform(*this, *mesh.getMaterial()->getShader(), (int)Shader::FixedCachedUniforms::WORLD_MATRIX, transform);
 			bindGeometry(*this, model.getGeometry(), mesh);

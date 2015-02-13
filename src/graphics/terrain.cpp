@@ -654,7 +654,11 @@ namespace Lumix
 		int int_z = (int)(z / m_xz_scale);
 		float dec_x = (x - (int_x * m_xz_scale)) / m_xz_scale;
 		float dec_z = (z - (int_z * m_xz_scale)) / m_xz_scale;
-		if (dec_x > dec_z)
+		if (dec_z == 0 && dec_x == 0)
+		{
+			return getHeight(int_x, int_z);
+		}
+		else if (dec_x > dec_z)
 		{
 			float h0 = getHeight(int_x, int_z);
 			float h1 = getHeight(int_x + 1, int_z);
@@ -760,7 +764,7 @@ namespace Lumix
 				int step_x = (int)Math::signum(rel_dir.x);
 				int step_z = (int)Math::signum(rel_dir.z);
 
-				while (hx >= 0 && hz >= 0 && hx < m_width && hz < m_height)
+				while (hx >= 0 && hz >= 0 && hx + 1 < m_width && hz + 1 < m_height)
 				{
 					float t;
 					float x = hx * m_xz_scale;
