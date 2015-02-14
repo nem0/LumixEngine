@@ -36,7 +36,7 @@ namespace Lumix
 
 					operator bool()
 					{
-						return (m_array.m_data[m_index >> 5] | (1 << (m_index & 31))) > 0;
+						return (m_array.m_data[m_index >> 5] & m_array.INDEX_BIT[m_index & 31]) > 0;
 					}
 
 				private:
