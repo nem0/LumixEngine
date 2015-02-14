@@ -858,6 +858,7 @@ namespace Lumix
 			void onEntityMoved(const Entity& entity)
 			{
 				DynamicRenderableCache::iterator iter = m_dynamic_renderable_cache.find(entity.index);
+				Renderable* renderable = NULL;
 				if (!iter.isValid())
 				{
 					for (int i = 0, c = m_renderables.size(); i < c; ++i)
@@ -867,6 +868,7 @@ namespace Lumix
 							m_dynamic_renderable_cache.insert(entity.index, i);
 							m_renderables[i]->m_matrix = entity.getMatrix();
 							m_culling_system->updateBoundingPosition(entity.getMatrix().getTranslation(), i);
+							renderable = m_renderables[i];
 							break;
 						}
 					}
@@ -874,11 +876,31 @@ namespace Lumix
 				else
 				{
 					m_renderables[iter.value()]->m_matrix = entity.getMatrix();
+					renderable = m_renderables[iter.value()];
 					m_culling_system->updateBoundingPosition(entity.getMatrix().getTranslation(), iter.value());
 				}
 
 				for (int i = 0, c = m_point_lights.size(); i < c; ++i)
 				{
+					Frustum frustum;
+					PointLight& light = m_point_lights[i];
+					frustum.computeOrtho(light.m_entity.getPosition(), Vec3(1, 0, 0), Vec3(0, 1, 0), light.m_range, light.m_range, -light.m_range, light.m_range);
+
+					if (renderable && m_is_forward_rendered)
+					{
+						for (int j = 0; j < m_light_influenced_geometry[i].size(); ++j)
+						{
+							if (m_light_influenced_geometry[i][j] == renderable)
+							{
+								m_light_influenced_geometry[i].eraseFast(j);
+								break;
+							}
+						}
+						if (frustum.isSphereInside(renderable->m_entity.getPosition(), renderable->m_model->getBoundingRadius()))
+						{
+							m_light_influenced_geometry[i].push(renderable);
+						}
+					}
 					if (m_point_lights[i].m_entity == entity)
 					{
 						detectLightInfluencedGeometry(i);
