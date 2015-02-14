@@ -2079,7 +2079,7 @@ struct WorldEditorImpl : public WorldEditor
 			m_file_system->setDefaultDevice("memory:disk");
 			m_file_system->setSaveGameDevice("memory:disk");
 
-			m_engine = Engine::create(base_path, m_file_system, this, m_allocator.getSourceAllocator());
+			m_engine = Engine::create(base_path, m_file_system, this, m_allocator);
 			if (!m_engine)
 			{
 				return false;

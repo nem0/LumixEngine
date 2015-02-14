@@ -22,6 +22,7 @@
 #include "graphics/model_instance.h"
 #include "graphics/renderer.h"
 #include "graphics/shader.h"
+#include "graphics/terrain.h"
 #include "graphics/texture.h"
 
 
@@ -40,25 +41,6 @@ static const uint32_t POINT_LIGHT_HASH = crc32("point_light");
 static float split_distances[] = { 0.01f, 5, 20, 100, 300 };
 static const float SHADOW_CAM_NEAR = 0.1f;
 static const float SHADOW_CAM_FAR = 10000.0f;
-
-
-struct RenderModelsMeshContext
-{
-	RenderModelsMeshContext()
-		: m_mesh(NULL)
-		, m_shader(NULL)
-		, m_world_matrix_uniform_location(-1)
-		, m_indices_offset(0)
-		, m_vertex_count(0)
-	{
-	}
-
-	const Mesh* m_mesh;
-	Shader* m_shader;
-	int m_world_matrix_uniform_location;
-	int m_indices_offset;
-	int m_vertex_count;
-};
 
 
 struct Command
@@ -599,7 +581,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 			Frustum shadow_camera_frustum;
 			shadow_camera_frustum.computeOrtho(shadow_cam_pos, -light_forward, light_mtx.getYVector(), bb_size * 2, bb_size * 2, SHADOW_CAM_NEAR, SHADOW_CAM_FAR);
-			renderModels(shadow_camera_frustum, layer_mask);
+			renderModels(shadow_camera_frustum, layer_mask, true);
 		}
 		FrameBuffer::unbind();
 		glCullFace(GL_BACK);
@@ -707,12 +689,13 @@ struct PipelineInstanceImpl : public PipelineInstance
 		if (m_active_camera.isValid())
 		{
 			const Material* last_material = NULL;
-			m_grass_infos.clear();
-			m_scene->getGrassInfos(frustum, m_grass_infos, layer_mask);
-			for (int i = 0; i < m_grass_infos.size(); ++i)
+			m_renderable_infos.clear();
+			m_scene->getGrassInfos(frustum, m_renderable_infos, layer_mask);
+			for (int i = 0; i < m_renderable_infos.size(); ++i)
 			{
-				const GrassInfo& info = m_grass_infos[i];
-				const Mesh& mesh = *info.m_mesh;
+				const Terrain::GrassPatch* patch = static_cast<const Terrain::GrassPatch*>(m_renderable_infos[i].m_data);
+				patch->m_type->m_grass_mesh->getMaterial();
+				const Mesh& mesh = *patch->m_type->m_grass_mesh;
 				const Material& material = *mesh.getMaterial();
 				if (material.isReady())
 				{
@@ -726,10 +709,19 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 						last_material = &material;
 					}
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::GRASS_MATRICES, info.m_matrices, info.m_matrix_count);
 
-					bindGeometry(*m_renderer, *info.m_geometry, mesh);
-					renderGeometry(mesh.getIndicesOffset(), mesh.getIndexCount() / info.m_mesh_copy_count * info.m_matrix_count);
+					bindGeometry(*m_renderer, *patch->m_type->m_grass_geometry, mesh);
+					const int COPY_COUNT = 50;
+					for (int j = 0; j < patch->m_matrices.size() / COPY_COUNT; ++j)
+					{
+						setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::GRASS_MATRICES, &patch->m_matrices[j * COPY_COUNT], COPY_COUNT);
+						renderGeometry(mesh.getIndicesOffset(), mesh.getIndexCount());
+					}
+					if (patch->m_matrices.size() % 50 != 0)
+					{
+						setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::GRASS_MATRICES, &patch->m_matrices[(patch->m_matrices.size() / COPY_COUNT) * COPY_COUNT], patch->m_matrices.size() % 50);
+						renderGeometry(mesh.getIndicesOffset(), mesh.getIndexCount() / COPY_COUNT * (patch->m_matrices.size() % 50));
+					}
 				}
 			}
 		}
@@ -813,9 +805,30 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	bool setMeshContext(RenderModelsMeshContext* context, const Component& light_cmp)
+	bool beginGrassRenderLoop(const RenderableInfo* info, const Component& light_cmp)
 	{
-		const Material& material = *context->m_mesh->getMaterial();
+		const Terrain::GrassPatch* patch = static_cast<const Terrain::GrassPatch*>(info->m_data);
+		const Mesh& mesh = *patch->m_type->m_grass_mesh;
+		const Material& material = *mesh.getMaterial();
+		Shader* shader = material.getShader();
+		uint32_t pass_hash = getRenderer().getPass();
+		if (!shader->hasPass(pass_hash) || !material.isReady())
+		{
+			return false;
+		}
+		material.apply(*m_renderer, *this);
+		m_renderer->setUniform(*shader, "camera_pos", CAMERA_POS_HASH, m_active_camera.entity.getPosition());
+		setLightUniforms(light_cmp, shader);
+
+		bindGeometry(*m_renderer, *patch->m_type->m_grass_geometry, mesh);
+		return true;
+	}
+
+
+	bool beginRenderLoop(const RenderableInfo* info, const Component& light_cmp)
+	{
+		const Mesh* mesh = static_cast<const RenderableMesh*>(info->m_data)->m_mesh;
+		const Material& material = *mesh->getMaterial();
 		Shader* shader = material.getShader();
 		uint32_t pass_hash = getRenderer().getPass();
 		if (!shader->hasPass(pass_hash) || !material.isReady())
@@ -824,22 +837,13 @@ struct PipelineInstanceImpl : public PipelineInstance
 		}
 
 		material.apply(*m_renderer, *this);
-		
+		m_renderer->setUniform(*shader, "camera_pos", CAMERA_POS_HASH, m_active_camera.entity.getPosition());
 		setLightUniforms(light_cmp, shader);
-		
-		context->m_world_matrix_uniform_location = getUniformLocation(*shader, (int)Shader::FixedCachedUniforms::WORLD_MATRIX);
-		context->m_shader = shader;
-		context->m_indices_offset = context->m_mesh->getIndicesOffset();
-		context->m_vertex_count = context->m_mesh->getIndexCount();
-		if (context->m_world_matrix_uniform_location < 0)
-		{
-			return false;
-		}
 		return true;
 	}
 
 
-	void setPoseUniform(const RenderableMesh* LUMIX_RESTRICT renderable_mesh, RenderModelsMeshContext& mesh_context)
+	void setPoseUniform(const RenderableMesh* LUMIX_RESTRICT renderable_mesh, Shader* shader)
 	{
 		Matrix bone_mtx[64];
 
@@ -854,18 +858,13 @@ struct PipelineInstanceImpl : public PipelineInstance
 			bone_mtx[bone_index].translate(poss[bone_index]);
 			bone_mtx[bone_index] = bone_mtx[bone_index] * model.getBone(bone_index).inv_bind_matrix;
 		}
-		m_renderer->setUniform(*mesh_context.m_shader, "bone_matrices", BONE_MATRICES_HASH, bone_mtx, pose.getCount());
+		m_renderer->setUniform(*shader, "bone_matrices", BONE_MATRICES_HASH, bone_mtx, pose.getCount());
 	}
 
 
 	void renderPointLightInfluencedTerrains(const Frustum& frustum, int64_t layer_mask)
 	{
 		PROFILE_FUNCTION();
-
-		m_renderable_infos.clear();
-
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_ONE, GL_ONE);
 
 		Array<Component> lights(m_allocator);
 		m_scene->getPointLights(frustum, lights);
@@ -874,18 +873,12 @@ struct PipelineInstanceImpl : public PipelineInstance
 			Component light = lights[i];
 			renderTerrains(light, layer_mask);
 		}
-		glDisable(GL_BLEND);
 	}
 
 
 	void renderPointLightInfluencedGeometry(const Frustum& frustum, int64_t layer_mask)
 	{
 		PROFILE_FUNCTION();
-
-		m_renderable_infos.clear();
-
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_ONE, GL_ONE);
 
 		Array<Component> lights(m_allocator);
 		m_scene->getPointLights(frustum, lights);
@@ -894,85 +887,146 @@ struct PipelineInstanceImpl : public PipelineInstance
 			Component light = lights[i];
 			m_renderable_infos.clear();
 			m_scene->getPointLightInfluencedGeometry(light, frustum, m_renderable_infos, layer_mask);
-			if (m_renderable_infos.empty())
-			{
-				continue;
-			}
-
-			sortRenderables(m_renderable_infos);
-
+			m_scene->getGrassInfos(frustum, m_renderable_infos, layer_mask);
 			render(&m_renderable_infos, light);
 		}
-		glDisable(GL_BLEND);
 	}
 
 
-	void renderModels(const Frustum& frustum, int64_t layer_mask)
+	void renderModels(const Frustum& frustum, int64_t layer_mask, bool is_shadowmap)
 	{
 		PROFILE_FUNCTION();
 
 		m_renderable_infos.clear();
 		m_scene->getRenderableInfos(frustum, m_renderable_infos, layer_mask);
-		if (m_renderable_infos.empty())
+		if (!is_shadowmap)
 		{
-			return;
+			m_scene->getGrassInfos(frustum, m_renderable_infos, layer_mask);
 		}
-
-		sortRenderables(m_renderable_infos);
-
 		render(&m_renderable_infos, m_scene->getActiveGlobalLight());
+	}
+
+
+	inline const RenderableInfo* renderLoopSkinned(const RenderableInfo* info)
+	{
+		const RenderableMesh* LUMIX_RESTRICT renderable_mesh = static_cast<const RenderableMesh*>(info->m_data);
+		Shader* shader = renderable_mesh->m_mesh->getMaterial()->getShader();
+		GLint world_matrix_uniform_location = shader->getFixedCachedUniformLocation(Shader::FixedCachedUniforms::WORLD_MATRIX);
+		bindGeometry(*m_renderer, renderable_mesh->m_model->getGeometry(), *renderable_mesh->m_mesh);
+		int64_t last_key = info->m_key;
+		int indices_offset = renderable_mesh->m_mesh->getIndicesOffset();
+		int indices_count = renderable_mesh->m_mesh->getIndexCount();
+		while (last_key == info->m_key)
+		{
+			const RenderableMesh* LUMIX_RESTRICT renderable_mesh = static_cast<const RenderableMesh*>(info->m_data);
+			const Matrix& world_matrix = *renderable_mesh->m_matrix;
+			setUniform(world_matrix_uniform_location, world_matrix);
+			setPoseUniform(renderable_mesh, shader);
+			renderGeometry(indices_offset, indices_count);
+			++info;
+		}
+		return info;
+	}
+
+
+	inline const RenderableInfo* renderLoopRigid(const RenderableInfo* info)
+	{
+		const RenderableMesh* LUMIX_RESTRICT renderable_mesh = static_cast<const RenderableMesh*>(info->m_data);
+		Shader* shader = renderable_mesh->m_mesh->getMaterial()->getShader();
+		GLint world_matrix_uniform_location = shader->getFixedCachedUniformLocation(Shader::FixedCachedUniforms::WORLD_MATRIX);
+		bindGeometry(*m_renderer, renderable_mesh->m_model->getGeometry(), *renderable_mesh->m_mesh);
+		int64_t last_key = info->m_key;
+		int indices_offset = renderable_mesh->m_mesh->getIndicesOffset();
+		int indices_count = renderable_mesh->m_mesh->getIndexCount();
+		Matrix matrices[64];
+		while (last_key == info->m_key)
+		{
+			Matrix* LUMIX_RESTRICT instance_matrix = matrices;
+			const Matrix* last_instance_matrix = matrices + (sizeof(matrices) / sizeof(matrices[0]));
+			while (last_key == info->m_key && instance_matrix < last_instance_matrix)
+			{
+				const RenderableMesh* LUMIX_RESTRICT renderable_mesh = static_cast<const RenderableMesh*>(info->m_data);
+				*instance_matrix = *renderable_mesh->m_matrix;
+				++instance_matrix;
+				++info;
+			}
+			int instance_count = instance_matrix - matrices;
+			setUniform(world_matrix_uniform_location, matrices, instance_count);
+			renderInstancedGeometry(indices_offset, indices_count, instance_count, *shader);
+		}
+		return info;
+	}
+
+
+	const RenderableInfo* renderLoopGrass(const RenderableInfo* info)
+	{
+		const int COPY_COUNT = 50;
+		int64_t last_key = info->m_key;
+		while (last_key == info->m_key)
+		{
+			const Terrain::GrassPatch* patch = static_cast<const Terrain::GrassPatch*>(info->m_data);
+			const Mesh& mesh = *patch->m_type->m_grass_mesh;
+			Shader* shader = mesh.getMaterial()->getShader();
+
+			for (int j = 0; j < patch->m_matrices.size() / COPY_COUNT; ++j)
+			{
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::GRASS_MATRICES, &patch->m_matrices[j * COPY_COUNT], COPY_COUNT);
+				renderGeometry(mesh.getIndicesOffset(), mesh.getIndexCount());
+			}
+			if (patch->m_matrices.size() % 50 != 0)
+			{
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::GRASS_MATRICES, &patch->m_matrices[(patch->m_matrices.size() / COPY_COUNT) * COPY_COUNT], patch->m_matrices.size() % 50);
+				renderGeometry(mesh.getIndicesOffset(), mesh.getIndexCount() / COPY_COUNT * (patch->m_matrices.size() % 50));
+			}
+			++info;
+		}
+		return info;
 	}
 
 
 	void render(Array<RenderableInfo>* renderable_infos, const Component& light)
 	{
 		PROFILE_FUNCTION();
+		if (renderable_infos->empty() || !m_active_camera.isValid())
+		{
+			return;
+		}
+		sortRenderables(*renderable_infos);
 		RenderableInfo& sentinel = renderable_infos->pushEmpty();
 		sentinel.m_key = 0;
 		const RenderableInfo* LUMIX_RESTRICT info = &(*renderable_infos)[0];
 		const RenderableInfo* LUMIX_RESTRICT end = &(*renderable_infos)[0] + renderable_infos->size() - 1;
-		RenderModelsMeshContext mesh_context;
-		int64_t last_key = 0;
-		Matrix matrices[64];
 		while (info != end)
 		{
-			mesh_context.m_mesh = info->m_mesh->m_mesh;
-			if (!setMeshContext(&mesh_context, light))
+			switch (info->m_type)
 			{
-				++info;
-				continue;
-			}
-			bindGeometry(*m_renderer, info->m_mesh->m_model->getGeometry(), *mesh_context.m_mesh);
-			last_key = info->m_key;
-			if (info->m_mesh->m_pose->getCount() > 0)
-			{
-				while (last_key == info->m_key)
-				{
-					const RenderableMesh* LUMIX_RESTRICT renderable_mesh = info->m_mesh;
-					const Matrix& world_matrix = *renderable_mesh->m_matrix;
-					setUniform(mesh_context.m_world_matrix_uniform_location, world_matrix);
-					setPoseUniform(renderable_mesh, mesh_context);
-					renderGeometry(mesh_context.m_indices_offset, mesh_context.m_vertex_count);
-					++info;
-				}
-			}
-			else
-			{
-				while (last_key == info->m_key)
-				{
-					Matrix* LUMIX_RESTRICT instance_matrix = matrices;
-					const Matrix* last_instance_matrix = matrices + (sizeof(matrices) / sizeof(matrices[0]));
-					while (last_key == info->m_key && instance_matrix < last_instance_matrix)
+				case (int32_t)RenderableType::GRASS:	
+					if (!beginGrassRenderLoop(info, light))
 					{
-						const RenderableMesh* LUMIX_RESTRICT renderable_mesh = info->m_mesh;
-						*instance_matrix = *renderable_mesh->m_matrix;
-						++instance_matrix;
 						++info;
+						continue;
 					}
-					int instance_count = instance_matrix - matrices;
-					setUniform(mesh_context.m_world_matrix_uniform_location, matrices, instance_count);
-					renderInstancedGeometry(mesh_context.m_indices_offset, mesh_context.m_vertex_count, instance_count, *mesh_context.m_shader);
-				}
+					info = renderLoopGrass(info);
+					break;
+				case (int32_t)RenderableType::SKINNED_MESH:
+					if (!beginRenderLoop(info, light))
+					{
+						++info;
+						continue;
+					}
+					info = renderLoopSkinned(info);
+					break;
+				case (int32_t)RenderableType::RIGID_MESH:
+					if (!beginRenderLoop(info, light))
+					{
+						++info;
+						continue;
+					}
+					info = renderLoopRigid(info);
+					break;
+				default:
+					ASSERT(false);
+					break;
 			}
 		}
 	}
@@ -1126,14 +1180,18 @@ void RenderModelsCommand::execute(PipelineInstanceImpl& pipeline)
 {
 	if (m_point_light_influenced_geometry)
 	{
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_ONE, GL_ONE);
+
 		pipeline.renderPointLightInfluencedTerrains(pipeline.getScene()->getFrustum(), m_layer_mask);
 		pipeline.renderPointLightInfluencedGeometry(pipeline.getScene()->getFrustum(), m_layer_mask);
+
+		glDisable(GL_BLEND);
 	}
 	else
 	{
 		pipeline.renderTerrains(pipeline.getScene()->getActiveGlobalLight(), m_layer_mask);
-		pipeline.renderModels(pipeline.getScene()->getFrustum(), m_layer_mask);
-		pipeline.renderGrass(pipeline.getScene()->getActiveGlobalLight(), pipeline.getScene()->getFrustum(), m_layer_mask);
+		pipeline.renderModels(pipeline.getScene()->getFrustum(), m_layer_mask, false);
 	}
 }
 
