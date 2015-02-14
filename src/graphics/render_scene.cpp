@@ -1061,7 +1061,7 @@ namespace Lumix
 			}
 
 
-			virtual void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, int64_t layer_mask)
+			virtual void getGrassInfos(const Frustum& frustum, Array<RenderableInfo>& infos, int64_t layer_mask) override
 			{
 				PROFILE_FUNCTION();
 				for (int i = 0; i < m_terrains.size(); ++i)
@@ -1254,7 +1254,8 @@ namespace Lumix
 									for (int j = lod.getFrom(), c = lod.getTo(); j <= c; ++j)
 									{
 										RenderableInfo& info = subinfos.pushEmpty();
-										info.m_mesh = &renderable->m_meshes[j];
+										info.m_data = &renderable->m_meshes[j];
+										info.m_type = (int32_t)(renderable->m_pose.getCount() > 0 ? RenderableType::SKINNED_MESH : RenderableType::RIGID_MESH);
 										info.m_key = (int64_t)renderable->m_meshes[j].m_mesh;
 									}
 								}
@@ -1297,7 +1298,8 @@ namespace Lumix
 						for (int k = 0, kc = renderable->m_meshes.size(); k < kc; ++k)
 						{
 							RenderableInfo& info = infos.pushEmpty();
-							info.m_mesh = &renderable->m_meshes[k];
+							info.m_data = &renderable->m_meshes[k];
+							info.m_type = (int32_t)(renderable->m_pose.getCount() > 0 ? RenderableType::SKINNED_MESH : RenderableType::RIGID_MESH);
 							info.m_key = (int64_t)renderable->m_meshes[k].m_mesh;
 						}
 					}
@@ -1327,7 +1329,8 @@ namespace Lumix
 						for (int j = 0, c = renderable->m_meshes.size(); j < c; ++j)
 						{
 							RenderableInfo& info = all_infos.pushEmpty();
-							info.m_mesh = &renderable->m_meshes[j];
+							info.m_data = &renderable->m_meshes[j];
+							info.m_type = (int32_t)(renderable->m_pose.getCount() > 0 ? RenderableType::SKINNED_MESH : RenderableType::RIGID_MESH);
 							info.m_key = (int64_t)renderable->m_meshes[j].m_mesh;
 						}
 					}

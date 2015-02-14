@@ -46,7 +46,8 @@ namespace Lumix
 	struct RenderableInfo
 	{
 		int64_t m_key;
-		const RenderableMesh* m_mesh;
+		const void* m_data;
+		int32_t m_type;
 	};
 
 	struct GrassInfo
@@ -65,6 +66,14 @@ namespace Lumix
 		Vec3 m_to;
 		Vec3 m_color;
 		float m_life;
+	};
+
+
+	enum class RenderableType
+	{
+		SKINNED_MESH,
+		RIGID_MESH,
+		GRASS
 	};
 
 	class LUMIX_ENGINE_API RenderScene : public IScene
@@ -131,7 +140,7 @@ namespace Lumix
 			virtual Component getNextRenderable(const Component& cmp) = 0;
 			virtual Model* getRenderableModel(Component cmp) = 0;
 			
-			virtual void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, int64_t layer_mask) = 0;
+			virtual void getGrassInfos(const Frustum& frustum, Array<RenderableInfo>& infos, int64_t layer_mask) = 0;
 			virtual void getTerrainInfos(Array<TerrainInfo>& infos, int64_t layer_mask) = 0;
 			virtual float getTerrainHeightAt(Component cmp, float x, float z) = 0;
 			virtual void setTerrainMaterial(Component cmp, const string& path) = 0;
