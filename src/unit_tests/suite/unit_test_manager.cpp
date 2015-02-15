@@ -118,18 +118,22 @@ namespace Lumix
 					if(i < c)
 					{
 						UnitTestPair& pair = m_unit_tests[i];
-						AsynTest* test = m_trans_queue.alloc(false);
-						if (test)
+						if (shouldTest(string(pair.name, m_allocator), string(filter_tests, m_allocator)))
 						{
-							test->data.name = pair.name;
-							test->data.func = pair.func;
-							test->data.parameters = pair.parameters;
-							i++;
-							m_trans_queue.push(test, true);
-							m_in_progress.push(test);
+							AsynTest* test = m_trans_queue.alloc(false);
+							if (test)
+							{
+								test->data.name = pair.name;
+								test->data.func = pair.func;
+								test->data.parameters = pair.parameters;
+								i++;
+								m_trans_queue.push(test, true);
+								m_in_progress.push(test);
+							}
 						}
 						else
 						{
+							++i;
 							Lumix::MT::yield();
 						}
 					}
@@ -227,6 +231,38 @@ namespace Lumix
 			IAllocator& getAllocator() { return m_allocator; }
 
 		private:
+
+			bool shouldTest(const string& name, const string& filter)
+			{
+				if (filter.length() > 1)
+				{
+					if (filter[0] == '*')
+					{
+						string filter_part = filter.substr(1, filter.length() - 1);
+						
+						return name.length() > filter_part.length() 
+							&& (name.substr(name.length() - filter_part.length(), filter_part.length()) == filter_part);
+					}
+					else if (filter[filter.length() - 1] == '*')
+					{
+						string filter_part = filter.substr(0, filter.length() - 1);
+
+						return name.length() > filter_part.length()
+							&& (name.substr(0, filter_part.length()) == filter_part);
+					}
+					else
+					{
+						return name == filter;
+					}
+				}
+				else if (filter == "*")
+				{
+					return true;
+				}
+
+				return false;
+			}
+			
 			IAllocator& m_allocator;
 			uint32_t m_fails;
 
@@ -248,6 +284,11 @@ namespace Lumix
 			m_impl->dumpTests();
 		}
 
+		/// there are four supported modes:
+		// "*" -> runs all tests
+		// "*test_name" -> runs all tests ending with test_names
+		// test_name* -> runs all tests beggining with test_name
+		// test_name -> runs all tests matching test_name
 		void Manager::runTests(const char *filter_tests)
 		{
 			m_impl->runTests(filter_tests);
