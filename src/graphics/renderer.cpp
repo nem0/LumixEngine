@@ -121,9 +121,14 @@ struct RendererImpl : public Renderer
 		m_projection_matrix = matrix;
 	}
 
-	virtual void setProjection(float width, float height, float fov, float near_plane, float far_plane, const Matrix& mtx) override
+	virtual void setViewport(float width, float height) override
 	{
 		glViewport(0, 0, (GLsizei)width, (GLsizei)height);
+	}
+
+	virtual void setProjection(float width, float height, float fov, float near_plane, float far_plane, const Matrix& mtx) override
+	{
+		
 		getProjectionMatrix(fov, width, height, near_plane, far_plane, &m_projection_matrix);
 
 		Vec3 pos = mtx.getTranslation();
@@ -516,9 +521,10 @@ void Renderer::getOrthoMatrix(float left, float right, float bottom, float top, 
 	mtx->m41 = -(right + left) / (right - left);
 	mtx->m42 = -(top + bottom) / (top - bottom);
 	mtx->m43 = -(z_far + z_near) / (z_far - z_near);
-	/*		glOrtho(left, right, bottom, top, z_near, z_far);
+/*	glLoadIdentity();
+	glOrtho(left, right, bottom, top, z_near, z_far);
 	glGetFloatv(GL_PROJECTION_MATRIX, &mtx->m11);
-	*/
+	glLoadIdentity();*/
 }
 
 

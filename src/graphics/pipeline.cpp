@@ -420,6 +420,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_scene = NULL;
 		m_light_dir.set(0, -1, 0);
 		m_width = m_height = -1;
+		m_framebuffer_width = m_framebuffer_height = -1;
 		m_shadowmap_framebuffer = NULL;
 		pipeline.onLoaded<PipelineInstanceImpl, &PipelineInstanceImpl::sourceLoaded>(this);
 	}
@@ -599,23 +600,24 @@ struct PipelineInstanceImpl : public PipelineInstance
 			m_renderer->setProjectionMatrix(mtx);
 			m_renderer->setViewMatrix(Matrix::IDENTITY);
 			mesh->getMaterial()->apply(*m_renderer, *this);
-			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX0, m_shadow_modelviewprojection[0]);
-			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX1, m_shadow_modelviewprojection[1]);
-			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX2, m_shadow_modelviewprojection[2]);
-			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX3, m_shadow_modelviewprojection[3]);
-			m_renderer->setUniform(*shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
-			m_renderer->setUniform(*shader, "camera_pos", CAMERA_POS_HASH, m_active_camera.entity.getPosition());
 			Component light_cmp = m_scene->getActiveGlobalLight();
 			if (light_cmp.isValid())
 			{
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX0, m_shadow_modelviewprojection[0]);
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX1, m_shadow_modelviewprojection[1]);
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX2, m_shadow_modelviewprojection[2]);
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX3, m_shadow_modelviewprojection[3]);
 				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::AMBIENT_COLOR, m_scene->getLightAmbientColor(light_cmp));
 				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::AMBIENT_INTENSITY, m_scene->getLightAmbientIntensity(light_cmp));
 				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_COLOR, m_scene->getGlobalLightColor(light_cmp));
-				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_INTENSITY, m_scene->getPointLightIntensity(light_cmp));
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_INTENSITY, m_scene->getGlobalLightIntensity(light_cmp));
 				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_COLOR, m_scene->getFogColor(light_cmp));
 				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
 				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOWMAP_SPLITS, m_shadowmap_splits);
 			}
+			m_renderer->setUniform(*shader, "camera_pos", CAMERA_POS_HASH, m_active_camera.entity.getPosition());
+			m_renderer->setUniform(*shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
+
 			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::WORLD_MATRIX, Matrix::IDENTITY);
 			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::PROJECTION_MATRIX, mtx);
 			bindGeometry(*m_renderer, *geometry, *mesh);
@@ -1077,6 +1079,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 	Vec4 m_shadowmap_splits;
 	int m_width;
 	int m_height;
+	int m_framebuffer_width;
+	int m_framebuffer_height;
 	AssociativeArray<uint32_t, CustomCommandHandler> m_custom_commands_handlers;
 	Component m_active_camera;
 	Array<TerrainInfo> m_terrain_infos;
@@ -1209,6 +1213,15 @@ void ApplyCameraCommand::execute(PipelineInstanceImpl& pipeline)
 	pipeline.setActiveCamera(cmp);
 	if (cmp.isValid())
 	{
+		if (pipeline.m_framebuffer_width > 0)
+		{
+			pipeline.getRenderer().setViewport(pipeline.m_framebuffer_width, pipeline.m_framebuffer_height);
+		}
+		else
+		{
+			pipeline.getRenderer().setViewport(pipeline.m_width, pipeline.m_height);
+		}
+		
 		pipeline.m_scene->setCameraSize(cmp, pipeline.m_width, pipeline.m_height);
 		pipeline.m_scene->applyCamera(cmp);
 	}
@@ -1227,13 +1240,16 @@ void BindFramebufferCommand::execute(PipelineInstanceImpl& pipeline)
 	if (fb)
 	{
 		fb->bind();
+		pipeline.m_framebuffer_width = fb->getWidth();
+		pipeline.m_framebuffer_height = fb->getHeight();
 	}
 }
 
 	
-void UnbindFramebufferCommand::execute(PipelineInstanceImpl&)
+void UnbindFramebufferCommand::execute(PipelineInstanceImpl& pipeline)
 {
 	FrameBuffer::unbind();
+	pipeline.m_framebuffer_width = pipeline.m_framebuffer_height = -1;
 }
 
 
@@ -1294,6 +1310,7 @@ void DrawScreenQuadCommand::deserialize(PipelineImpl& pipeline, JsonSerializer& 
 
 void DrawScreenQuadCommand::execute(PipelineInstanceImpl& pipeline)
 {
+	pipeline.getRenderer().setViewport(pipeline.m_width, pipeline.m_height);
 	pipeline.renderScreenGeometry(m_geometry, m_mesh);
 }
 

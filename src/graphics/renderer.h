@@ -62,6 +62,7 @@ class LUMIX_ENGINE_API Renderer : public IPlugin
 		virtual Shader& getDebugShader() = 0;
 		virtual int getAttributeNameIndex(const char* name) = 0;
 
+		virtual void setViewport(float width, float height) = 0;
 		virtual void setProjection(float width, float height, float fov, float near_plane, float far_plane, const Matrix& mtx) = 0;
 		virtual void setViewMatrix(const Matrix& matrix) = 0;
 		virtual void setProjectionMatrix(const Matrix& matrix) = 0;
