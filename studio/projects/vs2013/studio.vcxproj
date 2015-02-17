@@ -218,6 +218,7 @@
     <ClCompile Include="..\..\pc\file_system_watcher.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\pc\fps_limiter.cpp" />
     <ClCompile Include="..\..\scripts\scriptcompiler.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -1061,6 +1062,7 @@
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\fps_limiter.h" />
     <ClInclude Include="..\..\property_view\file_edit.h" />
     <ClInclude Include="..\..\property_view\property_editor.h" />
     <ClInclude Include="..\..\property_view\terrain_editor.h" />

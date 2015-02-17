@@ -350,6 +350,7 @@ namespace Lumix
 				, m_global_light_last_uid(-1)
 				, m_point_light_last_uid(-1)
 				, m_is_forward_rendered(is_forward_rendered)
+				, m_applied_camera(Component::INVALID)
 			{
 				m_universe.entityMoved().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 				m_culling_system = CullingSystem::create(m_engine.getMTJDManager(), m_allocator);
@@ -425,6 +426,11 @@ namespace Lumix
 				dir.normalize();
 			}
 
+			virtual Component getAppliedCamera() override
+			{
+				return m_applied_camera;
+			}
+			
 			virtual void applyCamera(Component cmp) override
 			{
 				m_applied_camera = cmp;

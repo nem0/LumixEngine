@@ -10,6 +10,7 @@
 #include "editor/gizmo.h"
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
+#include "fps_limiter.h"
 #include <graphics/gl_ext.h>
 #include "graphics/irender_device.h"
 #include "graphics/pipeline.h"
@@ -334,10 +335,13 @@ class App
 
 		void run()
 		{
+			FPSLimiter* fps_limiter = FPSLimiter::create(60, m_allocator);
+			
 			while (m_main_window->isVisible())
 			{
 				{
 					PROFILE_BLOCK("tick");
+					fps_limiter->beginFrame();
 					m_main_window->update();
 					renderEditView();
 
@@ -347,9 +351,12 @@ class App
 					}
 					m_world_editor->tick();
 					handleEvents();
+					fps_limiter->endFrame();
 				}
 				Lumix::g_profiler.frame();
 			}
+
+			FPSLimiter::destroy(fps_limiter);
 		}
 
 	private:
