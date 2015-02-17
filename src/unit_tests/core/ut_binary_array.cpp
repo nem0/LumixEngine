@@ -24,7 +24,7 @@ void UT_binary_array(const char* params)
 	}
 	for (int i = 100; i < 200; ++i)
 	{
-		LUMIX_EXPECT_TRUE(array[i]);
+		LUMIX_EXPECT_FALSE(array[i]);
 	}
 	LUMIX_EXPECT_EQ(array.size(), 200);
 	for (int i = 0; i < 150; ++i)

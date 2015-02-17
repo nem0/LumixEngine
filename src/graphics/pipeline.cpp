@@ -22,6 +22,7 @@
 #include "graphics/model_instance.h"
 #include "graphics/renderer.h"
 #include "graphics/shader.h"
+#include "graphics/terrain.h"
 #include "graphics/texture.h"
 
 
@@ -36,28 +37,10 @@ static const uint32_t LIGHT_DIR_HASH = crc32("light_dir");
 static const uint32_t TERRAIN_SCALE_HASH = crc32("terrain_scale");
 static const uint32_t BONE_MATRICES_HASH = crc32("bone_matrices");
 static const uint32_t CAMERA_POS_HASH = crc32("camera_pos");
+static const uint32_t POINT_LIGHT_HASH = crc32("point_light");
 static float split_distances[] = { 0.01f, 5, 20, 100, 300 };
 static const float SHADOW_CAM_NEAR = 0.1f;
 static const float SHADOW_CAM_FAR = 10000.0f;
-
-
-struct RenderModelsMeshContext
-{
-	RenderModelsMeshContext()
-		: m_mesh(NULL)
-		, m_shader(NULL)
-		, m_world_matrix_uniform_location(-1)
-		, m_indices_offset(0)
-		, m_vertex_count(0)
-	{
-	}
-
-	const Mesh* m_mesh;
-	Shader* m_shader;
-	int m_world_matrix_uniform_location;
-	int m_indices_offset;
-	int m_vertex_count;
-};
 
 
 struct Command
@@ -113,12 +96,13 @@ struct ClearCommand : public Command
 
 struct RenderModelsCommand : public Command
 {
-	RenderModelsCommand(IAllocator&) {}
+	RenderModelsCommand(IAllocator&) : m_point_light_influenced_geometry(false) {}
 
 	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	
 	int64_t m_layer_mask;
+	bool m_point_light_influenced_geometry;
 };
 
 
@@ -436,6 +420,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_scene = NULL;
 		m_light_dir.set(0, -1, 0);
 		m_width = m_height = -1;
+		m_framebuffer_width = m_framebuffer_height = -1;
 		m_shadowmap_framebuffer = NULL;
 		pipeline.onLoaded<PipelineInstanceImpl, &PipelineInstanceImpl::sourceLoaded>(this);
 	}
@@ -534,7 +519,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	{
 		PROFILE_FUNCTION();
 		ASSERT(m_renderer != NULL);
-		Component light_cmp = m_scene->getLight(0);
+		Component light_cmp = m_scene->getActiveGlobalLight();
 		if (!light_cmp.isValid() || !camera.isValid())
 		{
 			return;
@@ -593,11 +578,11 @@ struct PipelineInstanceImpl : public PipelineInstance
 				);
 			m_shadow_modelviewprojection[split_index] = biasMatrix * (projection_matrix * modelview_matrix);
 
-			renderTerrains(layer_mask);
+			renderTerrains(light_cmp, layer_mask);
 
 			Frustum shadow_camera_frustum;
 			shadow_camera_frustum.computeOrtho(shadow_cam_pos, -light_forward, light_mtx.getYVector(), bb_size * 2, bb_size * 2, SHADOW_CAM_NEAR, SHADOW_CAM_FAR);
-			renderModels(shadow_camera_frustum, layer_mask);
+			renderModels(shadow_camera_frustum, layer_mask, true);
 		}
 		FrameBuffer::unbind();
 		glCullFace(GL_BACK);
@@ -615,23 +600,24 @@ struct PipelineInstanceImpl : public PipelineInstance
 			m_renderer->setProjectionMatrix(mtx);
 			m_renderer->setViewMatrix(Matrix::IDENTITY);
 			mesh->getMaterial()->apply(*m_renderer, *this);
-			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX0, m_shadow_modelviewprojection[0]);
-			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX1, m_shadow_modelviewprojection[1]);
-			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX2, m_shadow_modelviewprojection[2]);
-			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX3, m_shadow_modelviewprojection[3]);
-			m_renderer->setUniform(*shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
-			m_renderer->setUniform(*shader, "camera_pos", CAMERA_POS_HASH, m_active_camera.entity.getPosition());
-			Component light_cmp = m_scene->getLight(0);
+			Component light_cmp = m_scene->getActiveGlobalLight();
 			if (light_cmp.isValid())
 			{
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX0, m_shadow_modelviewprojection[0]);
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX1, m_shadow_modelviewprojection[1]);
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX2, m_shadow_modelviewprojection[2]);
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX3, m_shadow_modelviewprojection[3]);
 				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::AMBIENT_COLOR, m_scene->getLightAmbientColor(light_cmp));
 				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::AMBIENT_INTENSITY, m_scene->getLightAmbientIntensity(light_cmp));
-				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_COLOR, m_scene->getLightDiffuseColor(light_cmp));
-				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_INTENSITY, m_scene->getLightDiffuseIntensity(light_cmp));
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_COLOR, m_scene->getGlobalLightColor(light_cmp));
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_INTENSITY, m_scene->getGlobalLightIntensity(light_cmp));
 				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_COLOR, m_scene->getFogColor(light_cmp));
 				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
 				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOWMAP_SPLITS, m_shadowmap_splits);
 			}
+			m_renderer->setUniform(*shader, "camera_pos", CAMERA_POS_HASH, m_active_camera.entity.getPosition());
+			m_renderer->setUniform(*shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
+
 			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::WORLD_MATRIX, Matrix::IDENTITY);
 			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::PROJECTION_MATRIX, mtx);
 			bindGeometry(*m_renderer, *geometry, *mesh);
@@ -655,6 +641,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 		Geometry& geometry = m_scene->getDebugTextGeometry();
 		Mesh& mesh = m_scene->getDebugTextMesh();
+	
 		font->getMaterial()->apply(*m_renderer, *this);
 		bindGeometry(*m_renderer, geometry, mesh);
 		glEnable(GL_BLEND);
@@ -698,18 +685,19 @@ struct PipelineInstanceImpl : public PipelineInstance
 		}
 	}
 
-	void renderGrass(const Frustum& frustum, int64_t layer_mask)
+	void renderGrass(const Component& light_cmp, const Frustum& frustum, int64_t layer_mask)
 	{
 		PROFILE_FUNCTION();
 		if (m_active_camera.isValid())
 		{
 			const Material* last_material = NULL;
-			m_grass_infos.clear();
-			m_scene->getGrassInfos(frustum, m_grass_infos, layer_mask);
-			for (int i = 0; i < m_grass_infos.size(); ++i)
+			m_renderable_infos.clear();
+			m_scene->getGrassInfos(frustum, m_renderable_infos, layer_mask);
+			for (int i = 0; i < m_renderable_infos.size(); ++i)
 			{
-				const GrassInfo& info = m_grass_infos[i];
-				const Mesh& mesh = *info.m_mesh;
+				const Terrain::GrassPatch* patch = static_cast<const Terrain::GrassPatch*>(m_renderable_infos[i].m_data);
+				patch->m_type->m_grass_mesh->getMaterial();
+				const Mesh& mesh = *patch->m_type->m_grass_mesh;
 				const Material& material = *mesh.getMaterial();
 				if (material.isReady())
 				{
@@ -717,35 +705,31 @@ struct PipelineInstanceImpl : public PipelineInstance
 					if (&material != last_material)
 					{
 						material.apply(*m_renderer, *this);
-						setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX0, m_shadow_modelviewprojection[0]);
-						setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX1, m_shadow_modelviewprojection[1]);
-						setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX2, m_shadow_modelviewprojection[2]);
-						setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX3, m_shadow_modelviewprojection[3]);
-						m_renderer->setUniform(*shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
 						m_renderer->setUniform(*shader, "camera_pos", CAMERA_POS_HASH, m_active_camera.entity.getPosition());
-						Component light_cmp = m_scene->getLight(0);
-						if(light_cmp.isValid())
-						{
-							setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::AMBIENT_COLOR, m_scene->getLightAmbientColor(light_cmp));
-							setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::AMBIENT_INTENSITY, m_scene->getLightAmbientIntensity(light_cmp));
-							setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_COLOR, m_scene->getLightDiffuseColor(light_cmp));
-							setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_INTENSITY, m_scene->getLightDiffuseIntensity(light_cmp));
-							setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_COLOR, m_scene->getFogColor(light_cmp));
-							setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
-							setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOWMAP_SPLITS, m_shadowmap_splits);
-						}
+
+						setLightUniforms(light_cmp, shader);
+
 						last_material = &material;
 					}
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::GRASS_MATRICES, info.m_matrices, info.m_matrix_count);
 
-					bindGeometry(*m_renderer, *info.m_geometry, mesh);
-					renderGeometry(mesh.getIndicesOffset(), mesh.getIndexCount() / info.m_mesh_copy_count * info.m_matrix_count);
+					bindGeometry(*m_renderer, *patch->m_type->m_grass_geometry, mesh);
+					const int COPY_COUNT = 50;
+					for (int j = 0; j < patch->m_matrices.size() / COPY_COUNT; ++j)
+					{
+						setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::GRASS_MATRICES, &patch->m_matrices[j * COPY_COUNT], COPY_COUNT);
+						renderGeometry(mesh.getIndicesOffset(), mesh.getIndexCount());
+					}
+					if (patch->m_matrices.size() % 50 != 0)
+					{
+						setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::GRASS_MATRICES, &patch->m_matrices[(patch->m_matrices.size() / COPY_COUNT) * COPY_COUNT], patch->m_matrices.size() % 50);
+						renderGeometry(mesh.getIndicesOffset(), mesh.getIndexCount() / COPY_COUNT * (patch->m_matrices.size() % 50));
+					}
 				}
 			}
 		}
 	}
 
-	void renderTerrains(int64_t layer_mask)
+	void renderTerrains(const Component& light_cmp, int64_t layer_mask)
 	{
 		PROFILE_FUNCTION();
 		if (m_active_camera.isValid())
@@ -761,24 +745,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 					m_terrain_infos[i].m_entity.getMatrix(world_matrix);
 					Shader* shader = m_terrain_infos[i].m_material->getShader();
 					m_terrain_infos[i].m_material->apply(*m_renderer, *this);
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::WORLD_MATRIX, world_matrix);
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX0, m_shadow_modelviewprojection[0]);
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX1, m_shadow_modelviewprojection[1]);
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX2, m_shadow_modelviewprojection[2]);
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX3, m_shadow_modelviewprojection[3]);
-					Component light_cmp = m_scene->getLight(0);
-					if(light_cmp.isValid())
-					{
-						setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::AMBIENT_COLOR, m_scene->getLightAmbientColor(light_cmp));
-						setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::AMBIENT_INTENSITY, m_scene->getLightAmbientIntensity(light_cmp));
-						setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_COLOR, m_scene->getLightDiffuseColor(light_cmp));
-						setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_INTENSITY, m_scene->getLightDiffuseIntensity(light_cmp));
-						setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_COLOR, m_scene->getFogColor(light_cmp));
-						setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
-						setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOWMAP_SPLITS, m_shadowmap_splits);
-					}
-					m_renderer->setUniform(*shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
+			
+					setLightUniforms(light_cmp, shader);
 
+					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::WORLD_MATRIX, world_matrix);
 					Vec3 scale;
 					scale.x = m_terrain_infos[i].m_xz_scale;
 					scale.y = m_terrain_infos[i].m_y_scale;
@@ -806,46 +776,76 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	bool setMeshContext(RenderModelsMeshContext* context)
+	void setLightUniforms(const Component& light_cmp, Shader* shader)
 	{
-		const Material& material = *context->m_mesh->getMaterial();
+		if (light_cmp.isValid())
+		{
+			if (light_cmp.type == POINT_LIGHT_HASH)
+			{
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_COLOR, m_scene->getPointLightColor(light_cmp));
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_INTENSITY, m_scene->getPointLightIntensity(light_cmp));
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOWMAP_SPLITS, m_shadowmap_splits);
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::LIGHT_POSITION, light_cmp.entity.getPosition());
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::LIGHT_RANGE, m_scene->getLightRange(light_cmp));
+			}
+			else
+			{
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX0, m_shadow_modelviewprojection[0]);
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX1, m_shadow_modelviewprojection[1]);
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX2, m_shadow_modelviewprojection[2]);
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX3, m_shadow_modelviewprojection[3]);
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::AMBIENT_COLOR, m_scene->getLightAmbientColor(light_cmp));
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::AMBIENT_INTENSITY, m_scene->getLightAmbientIntensity(light_cmp));
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_COLOR, m_scene->getGlobalLightColor(light_cmp));
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_INTENSITY, m_scene->getGlobalLightIntensity(light_cmp));
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_COLOR, m_scene->getFogColor(light_cmp));
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOWMAP_SPLITS, m_shadowmap_splits);
+			}
+			m_renderer->setUniform(*shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
+		}
+	}
+
+
+	bool beginGrassRenderLoop(const RenderableInfo* info, const Component& light_cmp)
+	{
+		const Terrain::GrassPatch* patch = static_cast<const Terrain::GrassPatch*>(info->m_data);
+		const Mesh& mesh = *patch->m_type->m_grass_mesh;
+		const Material& material = *mesh.getMaterial();
 		Shader* shader = material.getShader();
 		uint32_t pass_hash = getRenderer().getPass();
-		if (!shader->hasPass(pass_hash))
+		if (!shader->hasPass(pass_hash) || !material.isReady())
+		{
+			return false;
+		}
+		material.apply(*m_renderer, *this);
+		m_renderer->setUniform(*shader, "camera_pos", CAMERA_POS_HASH, m_active_camera.entity.getPosition());
+		setLightUniforms(light_cmp, shader);
+
+		bindGeometry(*m_renderer, *patch->m_type->m_grass_geometry, mesh);
+		return true;
+	}
+
+
+	bool beginRenderLoop(const RenderableInfo* info, const Component& light_cmp)
+	{
+		const Mesh* mesh = static_cast<const RenderableMesh*>(info->m_data)->m_mesh;
+		const Material& material = *mesh->getMaterial();
+		Shader* shader = material.getShader();
+		uint32_t pass_hash = getRenderer().getPass();
+		if (!shader->hasPass(pass_hash) || !material.isReady())
 		{
 			return false;
 		}
 
 		material.apply(*m_renderer, *this);
-		setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX0, m_shadow_modelviewprojection[0]);
-		setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX1, m_shadow_modelviewprojection[1]);
-		setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX2, m_shadow_modelviewprojection[2]);
-		setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX3, m_shadow_modelviewprojection[3]);
-		Component light_cmp = m_scene->getLight(0);
-		if (light_cmp.isValid())
-		{
-			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::AMBIENT_COLOR, m_scene->getLightAmbientColor(light_cmp));
-			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::AMBIENT_INTENSITY, m_scene->getLightAmbientIntensity(light_cmp));
-			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_COLOR, m_scene->getLightDiffuseColor(light_cmp));
-			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_INTENSITY, m_scene->getLightDiffuseIntensity(light_cmp));
-			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_COLOR, m_scene->getFogColor(light_cmp));
-			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
-			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOWMAP_SPLITS, m_shadowmap_splits);
-		}
-		m_renderer->setUniform(*shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
-		context->m_world_matrix_uniform_location = getUniformLocation(*shader, (int)Shader::FixedCachedUniforms::WORLD_MATRIX);
-		context->m_shader = shader;
-		context->m_indices_offset = context->m_mesh->getIndicesOffset();
-		context->m_vertex_count = context->m_mesh->getIndexCount();
-		if (context->m_world_matrix_uniform_location < 0)
-		{
-			return false;
-		}
+		m_renderer->setUniform(*shader, "camera_pos", CAMERA_POS_HASH, m_active_camera.entity.getPosition());
+		setLightUniforms(light_cmp, shader);
 		return true;
 	}
 
 
-	void setPoseUniform(const RenderableMesh* LUMIX_RESTRICT renderable_mesh, RenderModelsMeshContext& mesh_context)
+	void setPoseUniform(const RenderableMesh* LUMIX_RESTRICT renderable_mesh, Shader* shader)
 	{
 		Matrix bone_mtx[64];
 
@@ -860,72 +860,179 @@ struct PipelineInstanceImpl : public PipelineInstance
 			bone_mtx[bone_index].translate(poss[bone_index]);
 			bone_mtx[bone_index] = bone_mtx[bone_index] * model.getBone(bone_index).inv_bind_matrix;
 		}
-		m_renderer->setUniform(*mesh_context.m_shader, "bone_matrices", BONE_MATRICES_HASH, bone_mtx, pose.getCount());
+		m_renderer->setUniform(*shader, "bone_matrices", BONE_MATRICES_HASH, bone_mtx, pose.getCount());
 	}
 
 
-	void renderModels(const Frustum& frustum, int64_t layer_mask)
+	void renderPointLightInfluencedTerrains(const Frustum& frustum, int64_t layer_mask)
+	{
+		PROFILE_FUNCTION();
+
+		Array<Component> lights(m_allocator);
+		m_scene->getPointLights(frustum, lights);
+		for (int i = 0; i < lights.size(); ++i)
+		{
+			Component light = lights[i];
+			renderTerrains(light, layer_mask);
+		}
+	}
+
+
+	void renderPointLightInfluencedGeometry(const Frustum& frustum, int64_t layer_mask)
+	{
+		PROFILE_FUNCTION();
+
+		Array<Component> lights(m_allocator);
+		m_scene->getPointLights(frustum, lights);
+		for (int i = 0; i < lights.size(); ++i)
+		{
+			Component light = lights[i];
+			m_renderable_infos.clear();
+			m_scene->getPointLightInfluencedGeometry(light, frustum, m_renderable_infos, layer_mask);
+			m_scene->getGrassInfos(frustum, m_renderable_infos, layer_mask);
+			render(&m_renderable_infos, light);
+		}
+	}
+
+
+	void renderModels(const Frustum& frustum, int64_t layer_mask, bool is_shadowmap)
 	{
 		PROFILE_FUNCTION();
 
 		m_renderable_infos.clear();
 		m_scene->getRenderableInfos(frustum, m_renderable_infos, layer_mask);
-		if (m_renderable_infos.empty())
+		if (!is_shadowmap)
+		{
+			m_scene->getGrassInfos(frustum, m_renderable_infos, layer_mask);
+		}
+		render(&m_renderable_infos, m_scene->getActiveGlobalLight());
+	}
+
+
+	inline const RenderableInfo* renderLoopSkinned(const RenderableInfo* info)
+	{
+		const RenderableMesh* LUMIX_RESTRICT renderable_mesh = static_cast<const RenderableMesh*>(info->m_data);
+		Shader* shader = renderable_mesh->m_mesh->getMaterial()->getShader();
+		GLint world_matrix_uniform_location = shader->getFixedCachedUniformLocation(Shader::FixedCachedUniforms::WORLD_MATRIX);
+		bindGeometry(*m_renderer, renderable_mesh->m_model->getGeometry(), *renderable_mesh->m_mesh);
+		int64_t last_key = info->m_key;
+		int indices_offset = renderable_mesh->m_mesh->getIndicesOffset();
+		int indices_count = renderable_mesh->m_mesh->getIndexCount();
+		while (last_key == info->m_key)
+		{
+			const RenderableMesh* LUMIX_RESTRICT renderable_mesh = static_cast<const RenderableMesh*>(info->m_data);
+			const Matrix& world_matrix = *renderable_mesh->m_matrix;
+			setUniform(world_matrix_uniform_location, world_matrix);
+			setPoseUniform(renderable_mesh, shader);
+			renderGeometry(indices_offset, indices_count);
+			++info;
+		}
+		return info;
+	}
+
+
+	inline const RenderableInfo* renderLoopRigid(const RenderableInfo* info)
+	{
+		const RenderableMesh* LUMIX_RESTRICT renderable_mesh = static_cast<const RenderableMesh*>(info->m_data);
+		Shader* shader = renderable_mesh->m_mesh->getMaterial()->getShader();
+		GLint world_matrix_uniform_location = shader->getFixedCachedUniformLocation(Shader::FixedCachedUniforms::WORLD_MATRIX);
+		bindGeometry(*m_renderer, renderable_mesh->m_model->getGeometry(), *renderable_mesh->m_mesh);
+		int64_t last_key = info->m_key;
+		int indices_offset = renderable_mesh->m_mesh->getIndicesOffset();
+		int indices_count = renderable_mesh->m_mesh->getIndexCount();
+		Matrix matrices[64];
+		while (last_key == info->m_key)
+		{
+			Matrix* LUMIX_RESTRICT instance_matrix = matrices;
+			const Matrix* last_instance_matrix = matrices + (sizeof(matrices) / sizeof(matrices[0]));
+			while (last_key == info->m_key && instance_matrix < last_instance_matrix)
+			{
+				const RenderableMesh* LUMIX_RESTRICT renderable_mesh = static_cast<const RenderableMesh*>(info->m_data);
+				*instance_matrix = *renderable_mesh->m_matrix;
+				++instance_matrix;
+				++info;
+			}
+			int instance_count = instance_matrix - matrices;
+			setUniform(world_matrix_uniform_location, matrices, instance_count);
+			renderInstancedGeometry(indices_offset, indices_count, instance_count, *shader);
+		}
+		return info;
+	}
+
+
+	const RenderableInfo* renderLoopGrass(const RenderableInfo* info)
+	{
+		const int COPY_COUNT = 50;
+		int64_t last_key = info->m_key;
+		while (last_key == info->m_key)
+		{
+			const Terrain::GrassPatch* patch = static_cast<const Terrain::GrassPatch*>(info->m_data);
+			const Mesh& mesh = *patch->m_type->m_grass_mesh;
+			Shader* shader = mesh.getMaterial()->getShader();
+
+			for (int j = 0; j < patch->m_matrices.size() / COPY_COUNT; ++j)
+			{
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::GRASS_MATRICES, &patch->m_matrices[j * COPY_COUNT], COPY_COUNT);
+				renderGeometry(mesh.getIndicesOffset(), mesh.getIndexCount());
+			}
+			if (patch->m_matrices.size() % 50 != 0)
+			{
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::GRASS_MATRICES, &patch->m_matrices[(patch->m_matrices.size() / COPY_COUNT) * COPY_COUNT], patch->m_matrices.size() % 50);
+				renderGeometry(mesh.getIndicesOffset(), mesh.getIndexCount() / COPY_COUNT * (patch->m_matrices.size() % 50));
+			}
+			++info;
+		}
+		return info;
+	}
+
+
+	void render(Array<RenderableInfo>* renderable_infos, const Component& light)
+	{
+		PROFILE_FUNCTION();
+		if (renderable_infos->empty() || !m_active_camera.isValid())
 		{
 			return;
 		}
-
-		sortRenderables(m_renderable_infos);
-
-		RenderableInfo& sentinel = m_renderable_infos.pushEmpty();
-		const RenderableInfo* LUMIX_RESTRICT info = &m_renderable_infos[0];
-		const RenderableInfo* LUMIX_RESTRICT end = &m_renderable_infos[0] + m_renderable_infos.size() - 1;
+		sortRenderables(*renderable_infos);
+		RenderableInfo& sentinel = renderable_infos->pushEmpty();
 		sentinel.m_key = 0;
-		RenderModelsMeshContext mesh_context;
-		int64_t last_key = 0;
-		Matrix matrices[64];
+		const RenderableInfo* LUMIX_RESTRICT info = &(*renderable_infos)[0];
+		const RenderableInfo* LUMIX_RESTRICT end = &(*renderable_infos)[0] + renderable_infos->size() - 1;
 		while (info != end)
 		{
-			mesh_context.m_mesh = info->m_mesh->m_mesh;
-			if (!setMeshContext(&mesh_context))
+			switch (info->m_type)
 			{
-				++info;
-				continue;
-			}
-			bindGeometry(*m_renderer, info->m_mesh->m_model->getGeometry(), *mesh_context.m_mesh);
-			last_key = info->m_key;
-			if (info->m_mesh->m_pose->getCount() > 0)
-			{
-				while (last_key == info->m_key)
-				{
-					const RenderableMesh* LUMIX_RESTRICT renderable_mesh = info->m_mesh;
-					const Matrix& world_matrix = *renderable_mesh->m_matrix;
-					setUniform(mesh_context.m_world_matrix_uniform_location, world_matrix);
-					setPoseUniform(renderable_mesh, mesh_context);
-					renderGeometry(mesh_context.m_indices_offset, mesh_context.m_vertex_count);
-					++info;
-				}
-			}
-			else
-			{
-				while (last_key == info->m_key)
-				{
-					Matrix* LUMIX_RESTRICT instance_matrix = matrices;
-					const Matrix* last_instance_matrix = matrices + (sizeof(matrices) / sizeof(matrices[0]));
-					while (last_key == info->m_key && instance_matrix < last_instance_matrix)
+				case (int32_t)RenderableType::GRASS:	
+					if (!beginGrassRenderLoop(info, light))
 					{
-						const RenderableMesh* LUMIX_RESTRICT renderable_mesh = info->m_mesh;
-						*instance_matrix = *renderable_mesh->m_matrix;
-						++instance_matrix;
 						++info;
+						continue;
 					}
-					int instance_count = instance_matrix - matrices;
-					setUniform(mesh_context.m_world_matrix_uniform_location, matrices, instance_count);
-					renderInstancedGeometry(mesh_context.m_indices_offset, mesh_context.m_vertex_count, instance_count, *mesh_context.m_shader);
-				}
+					info = renderLoopGrass(info);
+					break;
+				case (int32_t)RenderableType::SKINNED_MESH:
+					if (!beginRenderLoop(info, light))
+					{
+						++info;
+						continue;
+					}
+					info = renderLoopSkinned(info);
+					break;
+				case (int32_t)RenderableType::RIGID_MESH:
+					if (!beginRenderLoop(info, light))
+					{
+						++info;
+						continue;
+					}
+					info = renderLoopRigid(info);
+					break;
+				default:
+					ASSERT(false);
+					break;
 			}
 		}
 	}
+
 
 	virtual void resize(int w, int h) override
 	{
@@ -972,6 +1079,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 	Vec4 m_shadowmap_splits;
 	int m_width;
 	int m_height;
+	int m_framebuffer_width;
+	int m_framebuffer_height;
 	AssociativeArray<uint32_t, CustomCommandHandler> m_custom_commands_handlers;
 	Component m_active_camera;
 	Array<TerrainInfo> m_terrain_infos;
@@ -1067,14 +1176,27 @@ void CustomCommand::execute(PipelineInstanceImpl& pipeline)
 void RenderModelsCommand::deserialize(PipelineImpl&, JsonSerializer& serializer) 
 {
 	serializer.deserializeArrayItem(m_layer_mask, 0);
+	serializer.deserializeArrayItem(m_point_light_influenced_geometry, false);
 }
 
 
 void RenderModelsCommand::execute(PipelineInstanceImpl& pipeline)
 {
-	pipeline.renderTerrains(m_layer_mask);
-	pipeline.renderModels(pipeline.getScene()->getFrustum(), m_layer_mask);
-	pipeline.renderGrass(pipeline.getScene()->getFrustum(), m_layer_mask);
+	if (m_point_light_influenced_geometry)
+	{
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_ONE, GL_ONE);
+
+		pipeline.renderPointLightInfluencedTerrains(pipeline.getScene()->getFrustum(), m_layer_mask);
+		pipeline.renderPointLightInfluencedGeometry(pipeline.getScene()->getFrustum(), m_layer_mask);
+
+		glDisable(GL_BLEND);
+	}
+	else
+	{
+		pipeline.renderTerrains(pipeline.getScene()->getActiveGlobalLight(), m_layer_mask);
+		pipeline.renderModels(pipeline.getScene()->getFrustum(), m_layer_mask, false);
+	}
 }
 
 
@@ -1091,6 +1213,15 @@ void ApplyCameraCommand::execute(PipelineInstanceImpl& pipeline)
 	pipeline.setActiveCamera(cmp);
 	if (cmp.isValid())
 	{
+		if (pipeline.m_framebuffer_width > 0)
+		{
+			pipeline.getRenderer().setViewport((float)pipeline.m_framebuffer_width, (float)pipeline.m_framebuffer_height);
+		}
+		else
+		{
+			pipeline.getRenderer().setViewport((float)pipeline.m_width, (float)pipeline.m_height);
+		}
+		
 		pipeline.m_scene->setCameraSize(cmp, pipeline.m_width, pipeline.m_height);
 		pipeline.m_scene->applyCamera(cmp);
 	}
@@ -1109,13 +1240,16 @@ void BindFramebufferCommand::execute(PipelineInstanceImpl& pipeline)
 	if (fb)
 	{
 		fb->bind();
+		pipeline.m_framebuffer_width = fb->getWidth();
+		pipeline.m_framebuffer_height = fb->getHeight();
 	}
 }
 
 	
-void UnbindFramebufferCommand::execute(PipelineInstanceImpl&)
+void UnbindFramebufferCommand::execute(PipelineInstanceImpl& pipeline)
 {
 	FrameBuffer::unbind();
+	pipeline.m_framebuffer_width = pipeline.m_framebuffer_height = -1;
 }
 
 
@@ -1176,6 +1310,7 @@ void DrawScreenQuadCommand::deserialize(PipelineImpl& pipeline, JsonSerializer& 
 
 void DrawScreenQuadCommand::execute(PipelineInstanceImpl& pipeline)
 {
+	pipeline.getRenderer().setViewport((float)pipeline.m_width, (float)pipeline.m_height);
 	pipeline.renderScreenGeometry(m_geometry, m_mesh);
 }
 

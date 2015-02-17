@@ -17,12 +17,13 @@ static const char* component_map[] =
 {
 	"Animable", "animable",
 	"Camera", "camera",
-	"Directional light", "light",
+	"Global light", "global_light",
 	"Mesh", "renderable",
 	"Physics Box", "box_rigid_actor",
 	"Physics Controller", "physical_controller",
 	"Physics Mesh", "mesh_rigid_actor",
 	"Physics Heightfield", "physical_heightfield",
+	"Point light", "point_light",
 	"Script", "script",
 	"Terrain", "terrain"
 };

@@ -28,7 +28,13 @@ Shader::Shader(const Path& path, ResourceManager& resource_manager, Renderer& re
 	, m_passes(m_allocator)
 	, m_pass_hashes(m_allocator)
 	, m_combinations(m_allocator)
+	, m_default_combination(m_allocator)
 {
+	m_default_combination.m_program_id = 0;
+	m_default_combination.m_pass_hash = 0;
+	m_default_combination.m_hash = 0;
+	m_default_combination.m_vertex_id = 0;
+	m_default_combination.m_fragment_id = 0;
 }
 
 
@@ -62,7 +68,7 @@ GLint Shader::getUniformLocation(const char* name, uint32_t name_hash)
 }
 
 
-Shader::Combination* Shader::getCombination(uint32_t hash, uint32_t pass_hash) const
+Shader::Combination* Shader::getCombination(uint32_t hash, uint32_t pass_hash)
 {
 	for(int i = 0, c = m_combinations.size(); i < c; ++i)
 	{
@@ -71,7 +77,7 @@ Shader::Combination* Shader::getCombination(uint32_t hash, uint32_t pass_hash) c
 			return m_combinations[i];
 		}
 	}
-	return NULL;
+	return &m_default_combination;
 }
 
 
@@ -94,7 +100,8 @@ void Shader::createCombination(const char* defines)
 		uint32_t hash = defines[0] == '\0' ? 0 : crc32(defines);
 		uint32_t pass_hash = crc32(m_passes[pass_idx].c_str());
 
-		if(!getCombination(hash, pass_hash))
+		Shader::Combination* combination = getCombination(hash, pass_hash);
+		if(!combination || combination == &m_default_combination)
 		{
 			Combination* combination = m_allocator.newObject<Combination>(m_allocator);
 			m_combinations.push(combination);
@@ -177,6 +184,8 @@ void Shader::createCombination(const char* defines)
 			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::SHADOW_MATRIX1] = glGetUniformLocation(combination->m_program_id, "shadowmap_matrix1");
 			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::SHADOW_MATRIX2] = glGetUniformLocation(combination->m_program_id, "shadowmap_matrix2");
 			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::SHADOW_MATRIX3] = glGetUniformLocation(combination->m_program_id, "shadowmap_matrix3");
+			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::LIGHT_POSITION] = glGetUniformLocation(combination->m_program_id, "light_pos");
+			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::LIGHT_RANGE] = glGetUniformLocation(combination->m_program_id, "light_range");
 		}
 	}
 }

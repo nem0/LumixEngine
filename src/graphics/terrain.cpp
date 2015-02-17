@@ -459,12 +459,13 @@ namespace Lumix
 
 	void Terrain::GrassType::grassVertexCopyCallback(void* data, int instance_size, int copy_count)
 	{
-		bool has_matrix_index_attribute = m_grass_model->getMesh(0).getVertexDefinition().getAttributeType(3) == VertexAttributeDef::INT1;
+		bool has_matrix_index_attribute = m_grass_model->getMesh(0).getVertexDefinition().getAttributeType(4) == VertexAttributeDef::INT1;
 		if (has_matrix_index_attribute)
 		{
 			uint8_t* attributes_data = (uint8_t*)data;
 			int vertex_size = m_grass_model->getMesh(0).getVertexDefinition().getVertexSize();
-			const int i1_offset = 3 * sizeof(float) + 3 * sizeof(float) + 2 * sizeof(float);
+			const int i1_offset = 3 * sizeof(GLfloat) + 4 * sizeof(GLbyte) + 4 * sizeof(GLbyte) + 2 * sizeof(GLshort);
+			ASSERT(i1_offset < vertex_size);
 			for (int i = 0; i < copy_count; ++i)
 			{
 				for (int j = 0, c = m_grass_model->getMesh(0).getAttributeArraySize() / m_grass_model->getMesh(0).getVertexDefinition().getVertexSize(); j < c; ++j)
@@ -516,7 +517,7 @@ namespace Lumix
 	}
 
 
-	void Terrain::getGrassInfos(const Frustum&, Array<GrassInfo>& infos, const Component& camera)
+	void Terrain::getGrassInfos(const Frustum&, Array<RenderableInfo>& infos, const Component& camera)
 	{
 		updateGrass(camera);
 		Array<GrassQuad*>& quads = getQuads(camera);
@@ -527,25 +528,10 @@ namespace Lumix
 			{
 				for(int patch_idx = 0; patch_idx < quads[i]->m_patches.size(); ++patch_idx)
 				{
-					GrassPatch& patch = quads[i]->m_patches[patch_idx];
-					for (int k = 0, kc = patch.m_matrices.size() / COPY_COUNT; k < kc; ++k)
-					{
-						GrassInfo& info = infos.pushEmpty();
-						info.m_geometry = patch.m_type->m_grass_geometry;
-						info.m_matrices = &patch.m_matrices[COPY_COUNT * k];
-						info.m_mesh = patch.m_type->m_grass_mesh;
-						info.m_matrix_count = COPY_COUNT;
-						info.m_mesh_copy_count = COPY_COUNT;
-					}
-					if (patch.m_matrices.size() % COPY_COUNT != 0)
-					{
-						GrassInfo& info = infos.pushEmpty();
-						info.m_geometry = patch.m_type->m_grass_geometry;
-						info.m_matrices = &patch.m_matrices[COPY_COUNT * (patch.m_matrices.size() / COPY_COUNT)];
-						info.m_mesh = patch.m_type->m_grass_mesh;
-						info.m_matrix_count = patch.m_matrices.size() % COPY_COUNT;
-						info.m_mesh_copy_count = COPY_COUNT;
-					}
+					RenderableInfo& info = infos.pushEmpty();
+					info.m_data = &quads[i]->m_patches[patch_idx];
+					info.m_key = (int64_t)quads[i]->m_patches[patch_idx].m_type;
+					info.m_type = (int32_t)RenderableType::GRASS;
 				}
 			}
 		}
@@ -653,7 +639,11 @@ namespace Lumix
 		int int_z = (int)(z / m_xz_scale);
 		float dec_x = (x - (int_x * m_xz_scale)) / m_xz_scale;
 		float dec_z = (z - (int_z * m_xz_scale)) / m_xz_scale;
-		if (dec_x > dec_z)
+		if (dec_z == 0 && dec_x == 0)
+		{
+			return getHeight(int_x, int_z);
+		}
+		else if (dec_x > dec_z)
 		{
 			float h0 = getHeight(int_x, int_z);
 			float h1 = getHeight(int_x + 1, int_z);
@@ -759,7 +749,7 @@ namespace Lumix
 				int step_x = (int)Math::signum(rel_dir.x);
 				int step_z = (int)Math::signum(rel_dir.z);
 
-				while (hx >= 0 && hz >= 0 && hx < m_width && hz < m_height)
+				while (hx >= 0 && hz >= 0 && hx + 1 < m_width && hz + 1 < m_height)
 				{
 					float t;
 					float x = hx * m_xz_scale;

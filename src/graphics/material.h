@@ -90,7 +90,7 @@ public:
 		, m_shader(NULL)
 		, m_is_z_test(true)
 		, m_is_backface_culling(true)
-		, m_depth_func(DepthFunc::LESS)
+		, m_depth_func(DepthFunc::LEQUAL)
 		, m_is_alpha_to_coverage(false)
 		, m_is_alpha_cutout(false)
 		, m_shader_combination(0)
