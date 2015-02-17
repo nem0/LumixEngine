@@ -106,6 +106,15 @@ struct RenderModelsCommand : public Command
 };
 
 
+struct DeferredPointLightLoopCommand : public Command
+{
+	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
+	virtual void execute(PipelineInstanceImpl& pipeline) override;
+
+	Material* m_material;
+};
+
+
 struct ApplyCameraCommand : public Command
 {
 	ApplyCameraCommand(IAllocator& allocator)
@@ -807,6 +816,13 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
+	void deferredPointLightLoop(Material* material)
+	{
+		TODO("todo");
+		ASSERT(false);
+	}
+
+
 	bool beginGrassRenderLoop(const RenderableInfo* info, const Component& light_cmp)
 	{
 		const Terrain::GrassPatch* patch = static_cast<const Terrain::GrassPatch*>(info->m_data);
@@ -899,13 +915,16 @@ struct PipelineInstanceImpl : public PipelineInstance
 	{
 		PROFILE_FUNCTION();
 
-		m_renderable_infos.clear();
-		m_scene->getRenderableInfos(frustum, m_renderable_infos, layer_mask);
-		if (!is_shadowmap)
+		if (m_scene->getAppliedCamera().isValid())
 		{
-			m_scene->getGrassInfos(frustum, m_renderable_infos, layer_mask);
+			m_renderable_infos.clear();
+			m_scene->getRenderableInfos(frustum, m_renderable_infos, layer_mask);
+			if (!is_shadowmap)
+			{
+				m_scene->getGrassInfos(frustum, m_renderable_infos, layer_mask);
+			}
+			render(&m_renderable_infos, m_scene->getActiveGlobalLight());
 		}
-		render(&m_renderable_infos, m_scene->getActiveGlobalLight());
 	}
 
 
@@ -1171,6 +1190,19 @@ void CustomCommand::execute(PipelineInstanceImpl& pipeline)
 	pipeline.executeCustomCommand(m_name);
 }
 
+
+void DeferredPointLightLoopCommand::deserialize(PipelineImpl& pipeline, JsonSerializer& serializer)
+{
+	char material_path[LUMIX_MAX_PATH];
+	serializer.deserializeArrayItem(material_path, LUMIX_MAX_PATH, "");
+	m_material = static_cast<Material*>(pipeline.getResourceManager().get(ResourceManager::MATERIAL)->load(Path(material_path)));
+}
+
+
+void DeferredPointLightLoopCommand::execute(PipelineInstanceImpl& pipeline)
+{
+	pipeline.deferredPointLightLoop(m_material);
+}
 
 
 void RenderModelsCommand::deserialize(PipelineImpl&, JsonSerializer& serializer) 
