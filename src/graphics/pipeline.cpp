@@ -1215,11 +1215,11 @@ void ApplyCameraCommand::execute(PipelineInstanceImpl& pipeline)
 	{
 		if (pipeline.m_framebuffer_width > 0)
 		{
-			pipeline.getRenderer().setViewport(pipeline.m_framebuffer_width, pipeline.m_framebuffer_height);
+			pipeline.getRenderer().setViewport((float)pipeline.m_framebuffer_width, (float)pipeline.m_framebuffer_height);
 		}
 		else
 		{
-			pipeline.getRenderer().setViewport(pipeline.m_width, pipeline.m_height);
+			pipeline.getRenderer().setViewport((float)pipeline.m_width, (float)pipeline.m_height);
 		}
 		
 		pipeline.m_scene->setCameraSize(cmp, pipeline.m_width, pipeline.m_height);
@@ -1310,7 +1310,7 @@ void DrawScreenQuadCommand::deserialize(PipelineImpl& pipeline, JsonSerializer& 
 
 void DrawScreenQuadCommand::execute(PipelineInstanceImpl& pipeline)
 {
-	pipeline.getRenderer().setViewport(pipeline.m_width, pipeline.m_height);
+	pipeline.getRenderer().setViewport((float)pipeline.m_width, (float)pipeline.m_height);
 	pipeline.renderScreenGeometry(m_geometry, m_mesh);
 }
 
