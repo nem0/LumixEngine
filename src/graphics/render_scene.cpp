@@ -40,7 +40,8 @@ namespace Lumix
 {
 
 	static const uint32_t RENDERABLE_HASH = crc32("renderable");
-	static const uint32_t LIGHT_HASH = crc32("light");
+	static const uint32_t POINT_LIGHT_HASH = crc32("point_light");
+	static const uint32_t GLOBAL_LIGHT_HASH = crc32("global_light");
 	static const uint32_t CAMERA_HASH = crc32("camera");
 	static const uint32_t TERRAIN_HASH = crc32("terrain");
 
@@ -250,23 +251,27 @@ namespace Lumix
 			Renderable(const Renderable&);
 	};
 
-
-	struct Light
+	
+	struct PointLight
 	{
-		enum class Type : int32_t
-		{
-			DIRECTIONAL
-		};
+		Vec4 m_color;
+		float m_intensity;
+		float m_range;
+		Entity m_entity;
+		int m_uid;
+	};
 
+
+	struct GlobalLight
+	{
+		int m_uid;
+		Vec4 m_color;
+		float m_intensity;
 		Vec4 m_ambient_color;
 		float m_ambient_intensity;
-		Vec4 m_diffuse_color;
-		float m_diffuse_intensity;
 		Vec4 m_fog_color;
 		float m_fog_density;
-		Type m_type;
 		Entity m_entity;
-		bool m_is_free;
 	};
 
 
@@ -322,7 +327,7 @@ namespace Lumix
 			};
 
 		public:
-			RenderSceneImpl(Renderer& renderer, Engine& engine, Universe& universe, IAllocator& allocator)
+			RenderSceneImpl(Renderer& renderer, Engine& engine, Universe& universe, bool is_forward_rendered, IAllocator& allocator)
 				: m_engine(engine)
 				, m_universe(universe)
 				, m_renderer(renderer)
@@ -332,13 +337,19 @@ namespace Lumix
 				, m_renderables(m_allocator)
 				, m_cameras(m_allocator)
 				, m_terrains(m_allocator)
-				, m_lights(m_allocator)
+				, m_point_lights(m_allocator)
+				, m_light_influenced_geometry(m_allocator)
+				, m_global_lights(m_allocator)
 				, m_debug_lines(m_allocator)
 				, m_always_visible(m_allocator)
 				, m_temporary_infos(m_allocator)
 				, m_sync_point(true, m_allocator)
 				, m_jobs(m_allocator)
 				, m_debug_texts(engine, m_allocator)
+				, m_active_global_light_uid(-1)
+				, m_global_light_last_uid(-1)
+				, m_point_light_last_uid(-1)
+				, m_is_forward_rendered(is_forward_rendered)
 			{
 				m_universe.entityMoved().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 				m_culling_system = CullingSystem::create(m_engine.getMTJDManager(), m_allocator);
@@ -375,7 +386,7 @@ namespace Lumix
 			
 			virtual bool ownComponentType(uint32_t type) const override
 			{
-				return type == RENDERABLE_HASH || type == LIGHT_HASH || type == CAMERA_HASH || type == TERRAIN_HASH;
+				return type == RENDERABLE_HASH || type == POINT_LIGHT_HASH || type == GLOBAL_LIGHT_HASH || type == CAMERA_HASH || type == TERRAIN_HASH;
 			}
 
 
@@ -474,20 +485,33 @@ namespace Lumix
 
 			void serializeLights(OutputBlob& serializer)
 			{
-				serializer.write((int32_t)m_lights.size());
-				for (int i = 0, c = m_lights.size(); i < c; ++i)
+				serializer.write((int32_t)m_point_lights.size());
+				for (int i = 0, c = m_point_lights.size(); i < c; ++i)
 				{
-					Light& light = m_lights[i];
-					serializer.write(light.m_ambient_color);
-					serializer.write(light.m_ambient_intensity);
-					serializer.write(light.m_diffuse_color);
-					serializer.write(light.m_diffuse_intensity);
-					serializer.write(light.m_entity.index);
-					serializer.write(light.m_fog_color);
-					serializer.write(light.m_fog_density);
-					serializer.write(light.m_is_free);
-					serializer.write(light.m_type);
+					PointLight& point_light = m_point_lights[i];
+					serializer.write(point_light.m_uid);
+					serializer.write(point_light.m_color);
+					serializer.write(point_light.m_intensity);
+					serializer.write(point_light.m_entity.index);
+					serializer.write(point_light.m_range);
 				}
+				serializer.write(m_point_light_last_uid);
+
+				serializer.write((int32_t)m_global_lights.size());
+				for (int i = 0, c = m_global_lights.size(); i < c; ++i)
+				{
+					GlobalLight& global_light = m_global_lights[i];
+					serializer.write(global_light.m_uid);
+					serializer.write(global_light.m_color);
+					serializer.write(global_light.m_intensity);
+					serializer.write(global_light.m_entity.index);
+					serializer.write(global_light.m_ambient_color);
+					serializer.write(global_light.m_ambient_intensity);
+					serializer.write(global_light.m_fog_color);
+					serializer.write(global_light.m_fog_density);
+				}
+				serializer.write((int32_t)m_global_light_last_uid);
+				serializer.write((int32_t)m_active_global_light_uid);
 			}
 
 			void serializeRenderables(OutputBlob& serializer)
@@ -597,26 +621,40 @@ namespace Lumix
 			{
 				int32_t size = 0;
 				serializer.read(size);
-				m_lights.resize(size);
+				m_point_lights.resize(size);
+				m_light_influenced_geometry.clear();
 				for (int i = 0; i < size; ++i)
 				{
-					Light& light = m_lights[i];
+					m_light_influenced_geometry.push(Array<Renderable*>(m_allocator));
+					PointLight& light = m_point_lights[i];
+					serializer.read(light.m_uid);
+					serializer.read(light.m_color);
+					serializer.read(light.m_intensity);
+					serializer.read(light.m_entity.index);
+					serializer.read(light.m_range);
+					light.m_entity.universe = &m_universe;
+					m_universe.addComponent(light.m_entity, POINT_LIGHT_HASH, this, light.m_uid);
+				}
+				serializer.read(m_point_light_last_uid);
+
+				serializer.read(size);
+				m_global_lights.resize(size);
+				for (int i = 0; i < size; ++i)
+				{
+					GlobalLight& light = m_global_lights[i];
+					serializer.read(light.m_uid);
+					serializer.read(light.m_color);
+					serializer.read(light.m_intensity);
+					serializer.read(light.m_entity.index);
 					serializer.read(light.m_ambient_color);
 					serializer.read(light.m_ambient_intensity);
-					serializer.read(light.m_diffuse_color);
-					serializer.read(light.m_diffuse_intensity);
-					serializer.read(light.m_entity.index);
 					serializer.read(light.m_fog_color);
 					serializer.read(light.m_fog_density);
-					serializer.read(light.m_is_free);
-					serializer.read(light.m_type);
-
-					m_lights[i].m_entity.universe = &m_universe;
-					if(!m_lights[i].m_is_free)
-					{
-						m_universe.addComponent(m_lights[i].m_entity, LIGHT_HASH, this, i);
-					}
+					light.m_entity.universe = &m_universe;
+					m_universe.addComponent(light.m_entity, GLOBAL_LIGHT_HASH, this, i);
 				}
+				serializer.read(m_global_light_last_uid);
+				serializer.read(m_active_global_light_uid);
 			}
 
 			void deserializeTerrains(InputBlob& serializer)
@@ -681,11 +719,36 @@ namespace Lumix
 			{
 				if (component.type == RENDERABLE_HASH)
 				{
+					Renderable* renderable = m_renderables[component.index];
+					for (int i = 0; i < m_light_influenced_geometry.size(); ++i)
+					{
+						Array<Renderable*>& influenced_geometry = m_light_influenced_geometry[i];
+						for (int j = 0; j < influenced_geometry.size(); ++j)
+						{
+							if (influenced_geometry[j] == renderable)
+							{
+								influenced_geometry.erase(j);
+								i = m_light_influenced_geometry.size();
+								break; 
+							}
+						}
+					}
 					destroyRenderable(component);
 				}
-				else if (component.type == LIGHT_HASH)
+				else if (component.type == GLOBAL_LIGHT_HASH)
 				{
-					m_lights[component.index].m_is_free = true;
+					m_universe.destroyComponent(component);
+					if (component.index == m_active_global_light_uid)
+					{
+						m_active_global_light_uid = -1;
+					}
+					m_global_lights.eraseFast(getGlobalLightIndex(component));
+				}
+				else if (component.type == POINT_LIGHT_HASH)
+				{
+					int index = getPointLightIndex(component);
+					m_point_lights.eraseFast(index);
+					m_light_influenced_geometry.eraseFast(index);
 					m_universe.destroyComponent(component);
 				}
 				else if (component.type == CAMERA_HASH)
@@ -715,7 +778,6 @@ namespace Lumix
 					Component cmp = m_universe.addComponent(entity, type, this, m_terrains.size() - 1);
 					m_universe.componentCreated().invoke(cmp);
 					return cmp;
-
 				}
 				else if (type == CAMERA_HASH)
 				{
@@ -736,35 +798,32 @@ namespace Lumix
 				}
 				else if (type == RENDERABLE_HASH)
 				{
-					int new_index = m_renderables.empty() ? 0 : m_renderables.back()->m_component_index + 1;
-					Renderable& r = *m_allocator.newObject<Renderable>(m_allocator);
-					m_renderables.push(&r);
-					r.m_entity = entity;
-					r.m_scale = 1;
-					r.m_model = NULL;
-					r.m_component_index = new_index;
-					r.m_is_always_visible = false;
-					r.m_matrix = entity.getMatrix();
-					Component cmp = m_universe.addComponent(entity, type, this, r.m_component_index);
-					m_culling_system->addStatic(Sphere(entity.getPosition(), 1.0f));
+					return createRenderable(entity);
+				}
+				else if (type == GLOBAL_LIGHT_HASH)
+				{
+					GlobalLight& light = m_global_lights.pushEmpty();
+					light.m_entity = entity;
+					light.m_color.set(1, 1, 1, 1);
+					light.m_intensity = 0;
+					light.m_ambient_color.set(1, 1, 1, 1);
+					light.m_ambient_intensity = 1;
+					light.m_fog_color.set(1, 1, 1, 1);
+					light.m_fog_density = 0;
+					light.m_uid = ++m_global_light_last_uid;
+
+					if (m_global_lights.size() == 1)
+					{
+						m_active_global_light_uid = light.m_uid;
+					}
+
+					Component cmp = m_universe.addComponent(entity, type, this, light.m_uid);
 					m_universe.componentCreated().invoke(cmp);
 					return cmp;
 				}
-				else if (type == LIGHT_HASH)
+				else if (type == POINT_LIGHT_HASH)
 				{
-					Light& light = m_lights.pushEmpty();
-					light.m_type = Light::Type::DIRECTIONAL;
-					light.m_entity = entity;
-					light.m_is_free = false;
-					light.m_ambient_color.set(1, 1, 1, 1);
-					light.m_diffuse_color.set(1, 1, 1, 1);
-					light.m_fog_color.set(1, 1, 1, 1);
-					light.m_fog_density = 0;
-					light.m_diffuse_intensity = 0;
-					light.m_ambient_intensity = 1;
-					Component cmp = m_universe.addComponent(entity, type, this, m_lights.size() - 1);
-					m_universe.componentCreated().invoke(cmp);
-					return cmp;
+					return createPointLight(entity);
 				}
 				return Component::INVALID;
 			}
@@ -795,6 +854,7 @@ namespace Lumix
 			void onEntityMoved(const Entity& entity)
 			{
 				DynamicRenderableCache::iterator iter = m_dynamic_renderable_cache.find(entity.index);
+				Renderable* renderable = NULL;
 				if (!iter.isValid())
 				{
 					for (int i = 0, c = m_renderables.size(); i < c; ++i)
@@ -804,6 +864,7 @@ namespace Lumix
 							m_dynamic_renderable_cache.insert(entity.index, i);
 							m_renderables[i]->m_matrix = entity.getMatrix();
 							m_culling_system->updateBoundingPosition(entity.getMatrix().getTranslation(), i);
+							renderable = m_renderables[i];
 							break;
 						}
 					}
@@ -811,7 +872,36 @@ namespace Lumix
 				else
 				{
 					m_renderables[iter.value()]->m_matrix = entity.getMatrix();
+					renderable = m_renderables[iter.value()];
 					m_culling_system->updateBoundingPosition(entity.getMatrix().getTranslation(), iter.value());
+				}
+
+				for (int i = 0, c = m_point_lights.size(); i < c; ++i)
+				{
+					Frustum frustum;
+					PointLight& light = m_point_lights[i];
+					frustum.computeOrtho(light.m_entity.getPosition(), Vec3(1, 0, 0), Vec3(0, 1, 0), light.m_range, light.m_range, -light.m_range, light.m_range);
+
+					if (renderable && m_is_forward_rendered)
+					{
+						for (int j = 0; j < m_light_influenced_geometry[i].size(); ++j)
+						{
+							if (m_light_influenced_geometry[i][j] == renderable)
+							{
+								m_light_influenced_geometry[i].eraseFast(j);
+								break;
+							}
+						}
+						if (frustum.isSphereInside(renderable->m_entity.getPosition(), renderable->m_model->getBoundingRadius()))
+						{
+							m_light_influenced_geometry[i].push(renderable);
+						}
+					}
+					if (m_point_lights[i].m_entity == entity)
+					{
+						detectLightInfluencedGeometry(i);
+						break;
+					}
 				}
 			}
 
@@ -989,7 +1079,7 @@ namespace Lumix
 			}
 
 
-			virtual void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, int64_t layer_mask)
+			virtual void getGrassInfos(const Frustum& frustum, Array<RenderableInfo>& infos, int64_t layer_mask) override
 			{
 				PROFILE_FUNCTION();
 				for (int i = 0; i < m_terrains.size(); ++i)
@@ -1182,7 +1272,8 @@ namespace Lumix
 									for (int j = lod.getFrom(), c = lod.getTo(); j <= c; ++j)
 									{
 										RenderableInfo& info = subinfos.pushEmpty();
-										info.m_mesh = &renderable->m_meshes[j];
+										info.m_data = &renderable->m_meshes[j];
+										info.m_type = (int32_t)(renderable->m_pose.getCount() > 0 ? RenderableType::SKINNED_MESH : RenderableType::RIGID_MESH);
 										info.m_key = (int64_t)renderable->m_meshes[j].m_mesh;
 									}
 								}
@@ -1194,6 +1285,44 @@ namespace Lumix
 					m_jobs.push(job);
 				}
 				runJobs(m_jobs, m_sync_point);
+			}
+
+
+			virtual void getPointLights(const Frustum& frustum, Array<Component>& lights) override
+			{
+				for (int i = 0, ci = m_point_lights.size(); i < ci; ++i)
+				{
+					PointLight& light = m_point_lights[i];
+					
+					if (!frustum.isSphereInside(light.m_entity.getPosition(), light.m_range))
+					{
+						lights.push(Component(light.m_entity, POINT_LIGHT_HASH, this, light.m_uid));
+					}
+				}
+			}
+
+
+			virtual void getPointLightInfluencedGeometry(const Component& light_cmp, const Frustum& frustum, Array<RenderableInfo>& infos, int64_t layer_mask)
+			{
+				PROFILE_FUNCTION();
+
+				int light_index = getPointLightIndex(light_cmp.index);
+				for (int j = 0, cj = m_light_influenced_geometry[light_index].size(); j < cj; ++j)
+				{
+					Renderable* renderable = m_light_influenced_geometry[light_index][j];
+					bool is_layer = (layer_mask & m_culling_system->getLayerMask(renderable->m_component_index)) != 0;
+					const Sphere& sphere = m_culling_system->getSpheres()[renderable->m_component_index];
+					if (is_layer && frustum.isSphereInside(sphere.m_position, sphere.m_radius))
+					{
+						for (int k = 0, kc = renderable->m_meshes.size(); k < kc; ++k)
+						{
+							RenderableInfo& info = infos.pushEmpty();
+							info.m_data = &renderable->m_meshes[k];
+							info.m_type = (int32_t)(renderable->m_pose.getCount() > 0 ? RenderableType::SKINNED_MESH : RenderableType::RIGID_MESH);
+							info.m_key = (int64_t)renderable->m_meshes[k].m_mesh;
+						}
+					}
+				}
 			}
 
 			
@@ -1219,7 +1348,8 @@ namespace Lumix
 						for (int j = 0, c = renderable->m_meshes.size(); j < c; ++j)
 						{
 							RenderableInfo& info = all_infos.pushEmpty();
-							info.m_mesh = &renderable->m_meshes[j];
+							info.m_data = &renderable->m_meshes[j];
+							info.m_type = (int32_t)(renderable->m_pose.getCount() > 0 ? RenderableType::SKINNED_MESH : RenderableType::RIGID_MESH);
 							info.m_key = (int64_t)renderable->m_meshes[j].m_mesh;
 						}
 					}
@@ -1588,73 +1718,150 @@ namespace Lumix
 				return hit;
 			}
 
+
+			int getPointLightIndex(int uid) const
+			{
+				for (int i = 0; i < m_point_lights.size(); ++i)
+				{
+					if (m_point_lights[i].m_uid == uid)
+					{
+						return i;
+					}
+				}
+				return -1;
+			}
+
+
+			int getPointLightIndex(const Component& cmp) const
+			{
+				return getPointLightIndex(cmp.index);
+			}
+
+
+			int getGlobalLightIndex(int uid) const
+			{
+				for (int i = 0; i < m_global_lights.size(); ++i)
+				{
+					if (m_global_lights[i].m_uid == uid)
+					{
+						return i;
+					}
+				}
+				return -1;
+			}
+
+
+			int getGlobalLightIndex(const Component& cmp) const
+			{
+				return getGlobalLightIndex(cmp.index);
+			}
+
+
 			virtual void setFogDensity(Component cmp, float density) override
 			{
-				m_lights[cmp.index].m_fog_density = density;
+				m_global_lights[getGlobalLightIndex(cmp)].m_fog_density = density;
 			}
 
 			virtual void setFogColor(Component cmp, const Vec4& color) override
 			{
-				m_lights[cmp.index].m_fog_color = color;
+				m_global_lights[getGlobalLightIndex(cmp)].m_fog_color = color;
 			}
 
 			virtual float getFogDensity(Component cmp) override
 			{
-				return m_lights[cmp.index].m_fog_density;
+				return m_global_lights[getGlobalLightIndex(cmp)].m_fog_density;
 			}
 			
 			virtual Vec4 getFogColor(Component cmp) override
 			{
-				return m_lights[cmp.index].m_fog_color;
+				return m_global_lights[getGlobalLightIndex(cmp)].m_fog_color;
 			}
 
-			virtual void setLightDiffuseIntensity(Component cmp, float intensity) override
+			virtual float getLightRange(Component cmp) override
 			{
-				m_lights[cmp.index].m_diffuse_intensity = intensity;
+				return m_point_lights[getPointLightIndex(cmp.index)].m_range;
+			}
+
+			virtual void setLightRange(Component cmp, float range) override
+			{
+				int index = getPointLightIndex(cmp.index);
+				m_point_lights[index].m_range = range;
+				detectLightInfluencedGeometry(index);
 			}
 			
-			virtual void setLightDiffuseColor(Component cmp, const Vec4& color) override
+			virtual void setPointLightIntensity(Component cmp, float intensity) override
 			{
-				m_lights[cmp.index].m_diffuse_color = color;
+				m_point_lights[getPointLightIndex(cmp.index)].m_intensity = intensity;
+			}
+			
+			virtual void setGlobalLightIntensity(Component cmp, float intensity) override
+			{
+				m_global_lights[getGlobalLightIndex(cmp)].m_intensity = intensity;
+			}
+
+			virtual void setPointLightColor(Component cmp, const Vec4& color) override
+			{
+				m_point_lights[getPointLightIndex(cmp.index)].m_color = color;
+			}
+
+			virtual void setGlobalLightColor(Component cmp, const Vec4& color) override
+			{
+				m_global_lights[getGlobalLightIndex(cmp)].m_color = color;
 			}
 
 			virtual void setLightAmbientIntensity(Component cmp, float intensity) override
 			{
-				m_lights[cmp.index].m_ambient_intensity = intensity;
+				m_global_lights[getGlobalLightIndex(cmp)].m_ambient_intensity = intensity;
 			}
 
 			virtual void setLightAmbientColor(Component cmp, const Vec4& color) override
 			{
-				m_lights[cmp.index].m_ambient_color = color;
+				m_global_lights[getGlobalLightIndex(cmp)].m_ambient_color = color;
 			}
 
-			virtual float getLightDiffuseIntensity(Component cmp) override
+			virtual float getPointLightIntensity(Component cmp) override
 			{
-				return m_lights[cmp.index].m_diffuse_intensity;
+				return m_point_lights[getPointLightIndex(cmp.index)].m_intensity;
 			}
 			
-			virtual Vec4 getLightDiffuseColor(Component cmp) override
+			virtual float getGlobalLightIntensity(Component cmp) override
 			{
-				return m_lights[cmp.index].m_diffuse_color;
+				return m_global_lights[getGlobalLightIndex(cmp)].m_intensity;
+			}
+
+			virtual Vec4 getPointLightColor(Component cmp) override
+			{
+				return m_point_lights[getPointLightIndex(cmp.index)].m_color;
 			}
 			
+			virtual Vec4 getGlobalLightColor(Component cmp) override
+			{
+				return m_global_lights[getGlobalLightIndex(cmp)].m_color;
+			}
+
 			virtual float getLightAmbientIntensity(Component cmp) override
 			{
-				return m_lights[cmp.index].m_ambient_intensity;
+				return m_global_lights[getGlobalLightIndex(cmp)].m_ambient_intensity;
 			}
 
 			virtual Vec4 getLightAmbientColor(Component cmp) override
 			{
-				return m_lights[cmp.index].m_ambient_color;
+				return m_global_lights[getGlobalLightIndex(cmp)].m_ambient_color;
 			}
 
-			virtual Component getLight(int index) override
+			virtual void setActiveGlobalLight(const Component& cmp) override
 			{
-				if (index >= m_lights.size() || m_lights[index].m_is_free)
+				ASSERT(cmp.type == GLOBAL_LIGHT_HASH);
+				m_active_global_light_uid = cmp.index;
+			}
+
+			virtual Component getActiveGlobalLight() override
+			{
+				if (m_active_global_light_uid == -1)
 				{
 					return Component::INVALID;
 				}
-				return Component(m_lights[index].m_entity, crc32("light"), this, index);
+				return Component(m_global_lights[getGlobalLightIndex(m_active_global_light_uid)].m_entity, GLOBAL_LIGHT_HASH, this, m_active_global_light_uid);
 			};
 
 			virtual Component getCameraInSlot(const char* slot) override
@@ -1760,33 +1967,104 @@ namespace Lumix
 				return m_allocator;
 			}
 
+
+			void detectLightInfluencedGeometry(int light_index)
+			{
+				if (m_is_forward_rendered)
+				{
+					Frustum frustum;
+					PointLight& light = m_point_lights[light_index];
+					frustum.computeOrtho(light.m_entity.getPosition(), Vec3(1, 0, 0), Vec3(0, 1, 0), light.m_range, light.m_range, -light.m_range, light.m_range);
+					m_culling_system->cullToFrustum(frustum, 0xffffFFFF);
+					const CullingSystem::Results& results = m_culling_system->getResult();
+					Array<Renderable*>& influenced_geometry = m_light_influenced_geometry[light_index];
+					influenced_geometry.clear();
+					for (int i = 0; i < results.size(); ++i)
+					{
+						const CullingSystem::Subresults& subresult = results[i];
+						influenced_geometry.reserve(influenced_geometry.size() + subresult.size());
+						for (int j = 0, c = subresult.size(); j < c; ++j)
+						{
+							influenced_geometry.push(m_renderables[subresult[j]]);
+						}
+					}
+				}
+			}
+
+
+			Component createPointLight(const Entity& entity)
+			{
+				PointLight& light = m_point_lights.pushEmpty();
+				m_light_influenced_geometry.push(Array<Renderable*>(m_allocator));
+				light.m_entity = entity;
+				light.m_color.set(1, 1, 1, 1);
+				light.m_intensity = 1;
+				light.m_range = 10;
+				light.m_uid = ++m_point_light_last_uid;
+
+				Component cmp = m_universe.addComponent(entity, POINT_LIGHT_HASH, this, light.m_uid);
+				m_universe.componentCreated().invoke(cmp);
+
+				detectLightInfluencedGeometry(m_point_lights.size() - 1);
+
+				return cmp;
+			}
+
+		
+			Component createRenderable(const Entity& entity)
+			{
+				int new_index = m_renderables.empty() ? 0 : m_renderables.back()->m_component_index + 1;
+				Renderable& r = *m_allocator.newObject<Renderable>(m_allocator);
+				m_renderables.push(&r);
+				r.m_entity = entity;
+				r.m_scale = 1;
+				r.m_model = NULL;
+				r.m_component_index = new_index;
+				r.m_is_always_visible = false;
+				r.m_matrix = entity.getMatrix();
+				Component cmp = m_universe.addComponent(entity, RENDERABLE_HASH, this, r.m_component_index);
+				m_culling_system->addStatic(Sphere(entity.getPosition(), 1.0f));
+				m_universe.componentCreated().invoke(cmp);
+				return cmp;
+			}
+
 		private:
 			IAllocator& m_allocator;
 			Array<ModelLoadedCallback*> m_model_loaded_callbacks;
+			
 			Array<Renderable*> m_renderables;
 			Array<int> m_always_visible;
-			Array<Light> m_lights;
+			
+			int m_point_light_last_uid;
+			Array<PointLight> m_point_lights;
+			Array<Array<Renderable*> > m_light_influenced_geometry;
+			int m_active_global_light_uid;
+			int m_global_light_last_uid;
+			Array<GlobalLight> m_global_lights;
+
 			Array<Camera> m_cameras;
+			Component m_applied_camera;
+			Frustum m_camera_frustum;
+
 			Array<Terrain*> m_terrains;
 			Universe& m_universe;
 			Renderer& m_renderer;
 			Engine& m_engine;
 			Array<DebugLine> m_debug_lines;
 			DebugTextsData m_debug_texts;
-			Component m_applied_camera;
 			CullingSystem* m_culling_system;
-			Frustum m_camera_frustum;
 			DynamicRenderableCache m_dynamic_renderable_cache;
 			Array<Array<RenderableInfo> > m_temporary_infos;
 			MTJD::Group m_sync_point;
 			Array<MTJD::Job*> m_jobs;
 			float m_time;
+			bool m_is_forward_rendered;
 	};
 
 
-	RenderScene* RenderScene::createInstance(Renderer& renderer, Engine& engine, Universe& universe, IAllocator& allocator)
+	RenderScene* RenderScene::createInstance(Renderer& renderer, Engine& engine, Universe& universe, bool is_forward_rendered, IAllocator& allocator)
 	{
-		return allocator.newObject<RenderSceneImpl>(renderer, engine, universe, allocator);
+		return allocator.newObject<RenderSceneImpl>(renderer, engine, universe, is_forward_rendered, allocator);
 	}
 
 

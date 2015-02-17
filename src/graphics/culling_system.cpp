@@ -144,7 +144,10 @@ namespace Lumix
 			{
 				m_result[i].clear();
 			}
-			doCulling(0, &m_spheres[0], &m_spheres.back(), m_visibility_flags, &frustum, &m_layer_masks[0], layer_mask, m_result[0]);
+			if (!m_spheres.empty())
+			{
+				doCulling(0, &m_spheres[0], &m_spheres.back(), m_visibility_flags, &frustum, &m_layer_masks[0], layer_mask, m_result[0]);
+			}
 			m_is_async_result = false;
 		}
 

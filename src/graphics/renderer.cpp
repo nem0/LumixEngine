@@ -33,7 +33,8 @@ namespace Lumix
 {
 
 
-static const uint32_t LIGHT_HASH = crc32("light");
+static const uint32_t GLOBAL_LIGHT_HASH = crc32("global_light");
+static const uint32_t POINT_LIGHT_HASH = crc32("point_light");
 static const uint32_t RENDERABLE_HASH = crc32("renderable");
 static const uint32_t CAMERA_HASH = crc32("camera");
 
@@ -100,7 +101,7 @@ struct RendererImpl : public Renderer
 
 	virtual IScene* createScene(Universe& universe) override
 	{
-		return RenderScene::createInstance(*this, m_engine, universe, m_allocator);
+		return RenderScene::createInstance(*this, m_engine, universe, true, m_allocator);
 	}
 
 
@@ -120,9 +121,14 @@ struct RendererImpl : public Renderer
 		m_projection_matrix = matrix;
 	}
 
-	virtual void setProjection(float width, float height, float fov, float near_plane, float far_plane, const Matrix& mtx) override
+	virtual void setViewport(float width, float height) override
 	{
 		glViewport(0, 0, (GLsizei)width, (GLsizei)height);
+	}
+
+	virtual void setProjection(float width, float height, float fov, float near_plane, float far_plane, const Matrix& mtx) override
+	{
+		
 		getProjectionMatrix(fov, width, height, near_plane, far_plane, &m_projection_matrix);
 
 		Vec3 pos = mtx.getTranslation();
@@ -314,12 +320,16 @@ struct RendererImpl : public Renderer
 			editor.registerProperty("renderable", allocator.newObject<ResourcePropertyDescriptor<RenderScene> >("source", &RenderScene::getRenderablePath, &RenderScene::setRenderablePath, "Mesh (*.msh)", allocator));
 			editor.registerProperty("renderable", allocator.newObject<BoolPropertyDescriptor<RenderScene> >("is_always_visible", &RenderScene::isRenderableAlwaysVisible, &RenderScene::setRenderableIsAlwaysVisible, allocator));
 		
-			editor.registerProperty("light", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("ambient_intensity", &RenderScene::getLightAmbientIntensity, &RenderScene::setLightAmbientIntensity, allocator));
-			editor.registerProperty("light", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("diffuse_intensity", &RenderScene::getLightDiffuseIntensity, &RenderScene::setLightDiffuseIntensity, allocator));
-			editor.registerProperty("light", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("fog_density", &RenderScene::getFogDensity, &RenderScene::setFogDensity, allocator));
-			editor.registerProperty("light", allocator.newObject<ColorPropertyDescriptor<RenderScene> >("ambient_color", &RenderScene::getLightAmbientColor, &RenderScene::setLightAmbientColor, allocator));
-			editor.registerProperty("light", allocator.newObject<ColorPropertyDescriptor<RenderScene> >("diffuse_color", &RenderScene::getLightDiffuseColor, &RenderScene::setLightDiffuseColor, allocator));
-			editor.registerProperty("light", allocator.newObject<ColorPropertyDescriptor<RenderScene> >("fog_color", &RenderScene::getFogColor, &RenderScene::setFogColor, allocator));
+			editor.registerProperty("global_light", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("ambient_intensity", &RenderScene::getLightAmbientIntensity, &RenderScene::setLightAmbientIntensity, allocator));
+			editor.registerProperty("global_light", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("intensity", &RenderScene::getGlobalLightIntensity, &RenderScene::setGlobalLightIntensity, allocator));
+			editor.registerProperty("global_light", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("fog_density", &RenderScene::getFogDensity, &RenderScene::setFogDensity, allocator));
+			editor.registerProperty("global_light", allocator.newObject<ColorPropertyDescriptor<RenderScene> >("ambient_color", &RenderScene::getLightAmbientColor, &RenderScene::setLightAmbientColor, allocator));
+			editor.registerProperty("global_light", allocator.newObject<ColorPropertyDescriptor<RenderScene> >("color", &RenderScene::getGlobalLightColor, &RenderScene::setGlobalLightColor, allocator));
+			editor.registerProperty("global_light", allocator.newObject<ColorPropertyDescriptor<RenderScene> >("fog_color", &RenderScene::getFogColor, &RenderScene::setFogColor, allocator));
+
+			editor.registerProperty("point_light", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("intensity", &RenderScene::getPointLightIntensity, &RenderScene::setPointLightIntensity, allocator));
+			editor.registerProperty("point_light", allocator.newObject<ColorPropertyDescriptor<RenderScene> >("color", &RenderScene::getPointLightColor, &RenderScene::setPointLightColor, allocator));
+			editor.registerProperty("point_light", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("range", &RenderScene::getLightRange, &RenderScene::setLightRange, allocator));
 
 			editor.registerProperty("terrain", allocator.newObject<ResourcePropertyDescriptor<RenderScene> >("material", &RenderScene::getTerrainMaterial, &RenderScene::setTerrainMaterial, "Material (*.mat)", allocator));
 			editor.registerProperty("terrain", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("xz_scale", &RenderScene::getTerrainXZScale, &RenderScene::setTerrainXZScale, allocator));
@@ -420,6 +430,7 @@ struct RendererImpl : public Renderer
 		for (int i = 0, c = model.getMeshCount(); i < c;  ++i)
 		{
 			const Mesh& mesh = model.getMesh(i);
+			
 			mesh.getMaterial()->apply(*this, pipeline);
 			setFixedCachedUniform(*this, *mesh.getMaterial()->getShader(), (int)Shader::FixedCachedUniforms::WORLD_MATRIX, transform);
 			bindGeometry(*this, model.getGeometry(), mesh);
@@ -510,9 +521,10 @@ void Renderer::getOrthoMatrix(float left, float right, float bottom, float top, 
 	mtx->m41 = -(right + left) / (right - left);
 	mtx->m42 = -(top + bottom) / (top - bottom);
 	mtx->m43 = -(z_far + z_near) / (z_far - z_near);
-	/*		glOrtho(left, right, bottom, top, z_near, z_far);
+/*	glLoadIdentity();
+	glOrtho(left, right, bottom, top, z_near, z_far);
 	glGetFloatv(GL_PROJECTION_MATRIX, &mtx->m11);
-	*/
+	glLoadIdentity();*/
 }
 
 

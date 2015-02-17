@@ -100,7 +100,7 @@ namespace Lumix
 	bool BinaryArray::operator[](int index) const
 	{
 		ASSERT(index < m_size);
-		return (m_data[index >> 5] | INDEX_BIT[index & BITMASK_7BIT]) > 0;
+		return (m_data[index >> 5] & INDEX_BIT[index & BITMASK_7BIT]) > 0;
 	}
 
 

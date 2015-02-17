@@ -46,7 +46,8 @@ namespace Lumix
 	struct RenderableInfo
 	{
 		int64_t m_key;
-		const RenderableMesh* m_mesh;
+		const void* m_data;
+		int32_t m_type;
 	};
 
 	struct GrassInfo
@@ -67,10 +68,18 @@ namespace Lumix
 		float m_life;
 	};
 
+
+	enum class RenderableType
+	{
+		SKINNED_MESH,
+		RIGID_MESH,
+		GRASS
+	};
+
 	class LUMIX_ENGINE_API RenderScene : public IScene
 	{
 		public:
-			static RenderScene* createInstance(Renderer& renderer, Engine& engine, Universe& universe, IAllocator& allocator);
+			static RenderScene* createInstance(Renderer& renderer, Engine& engine, Universe& universe, bool is_forward_rendered, IAllocator& allocator);
 			static void destroyInstance(RenderScene* scene);
 
 			virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Component& ignore) = 0;
@@ -84,7 +93,8 @@ namespace Lumix
 			virtual IAllocator& getAllocator() = 0;
 
 			virtual Pose& getPose(const Component& cmp) = 0;
-			virtual Component getLight(int index) = 0;
+			virtual Component getActiveGlobalLight() = 0;
+			virtual void setActiveGlobalLight(const Component& cmp) = 0;
 
 			virtual int addDebugText(const char* text, int x, int y) = 0;
 			virtual void setDebugText(int id, const char* text) = 0;
@@ -122,13 +132,15 @@ namespace Lumix
 			virtual void setRenderableLayer(Component cmp, const int32_t& layer) = 0;
 			virtual void setRenderablePath(Component cmp, const string& path) = 0;
 			virtual void setRenderableScale(Component cmp, float scale) = 0;
+			virtual void getPointLights(const Frustum& frustum, Array<Component>& lights) = 0;
+			virtual void getPointLightInfluencedGeometry(const Component& light_cmp, const Frustum& frustum, Array<RenderableInfo>& infos, int64_t layer_mask) = 0;
 			virtual void getRenderableInfos(const Frustum& frustum, Array<RenderableInfo>& infos, int64_t layer_mask) = 0;
 			virtual void getRenderableMeshes(Array<RenderableMesh>& meshes, int64_t layer_mask) = 0;
 			virtual Component getFirstRenderable() = 0;
 			virtual Component getNextRenderable(const Component& cmp) = 0;
 			virtual Model* getRenderableModel(Component cmp) = 0;
 			
-			virtual void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, int64_t layer_mask) = 0;
+			virtual void getGrassInfos(const Frustum& frustum, Array<RenderableInfo>& infos, int64_t layer_mask) = 0;
 			virtual void getTerrainInfos(Array<TerrainInfo>& infos, int64_t layer_mask) = 0;
 			virtual float getTerrainHeightAt(Component cmp, float x, float z) = 0;
 			virtual void setTerrainMaterial(Component cmp, const string& path) = 0;
@@ -150,14 +162,20 @@ namespace Lumix
 			virtual void addGrass(Component cmp, int index) = 0;
 			virtual void removeGrass(Component cmp, int index) = 0;
 
-			virtual void setLightDiffuseIntensity(Component cmp, float intensity) = 0;
-			virtual void setLightDiffuseColor(Component cmp, const Vec4& color) = 0;
+			virtual float getLightRange(Component cmp) = 0;
+			virtual void setLightRange(Component cmp, float range) = 0;
+			virtual void setPointLightIntensity(Component cmp, float intensity) = 0;
+			virtual void setGlobalLightIntensity(Component cmp, float intensity) = 0;
+			virtual void setPointLightColor(Component cmp, const Vec4& color) = 0;
+			virtual void setGlobalLightColor(Component cmp, const Vec4& color) = 0;
 			virtual void setLightAmbientIntensity(Component cmp, float intensity) = 0;
 			virtual void setLightAmbientColor(Component cmp, const Vec4& color) = 0;
 			virtual void setFogDensity(Component cmp, float density) = 0;
 			virtual void setFogColor(Component cmp, const Vec4& color) = 0;
-			virtual float getLightDiffuseIntensity(Component cmp) = 0;
-			virtual Vec4 getLightDiffuseColor(Component cmp) = 0;
+			virtual float getPointLightIntensity(Component cmp) = 0;
+			virtual float getGlobalLightIntensity(Component cmp) = 0;
+			virtual Vec4 getPointLightColor(Component cmp) = 0;
+			virtual Vec4 getGlobalLightColor(Component cmp) = 0;
 			virtual float getLightAmbientIntensity(Component cmp) = 0;
 			virtual Vec4 getLightAmbientColor(Component cmp) = 0;
 			virtual float getFogDensity(Component cmp) = 0;
