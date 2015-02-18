@@ -108,6 +108,8 @@ struct RenderModelsCommand : public Command
 
 struct DeferredPointLightLoopCommand : public Command
 {
+	DeferredPointLightLoopCommand(IAllocator&) {}
+
 	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 
@@ -271,6 +273,7 @@ struct PipelineImpl : public Pipeline
 		addCommandCreator("render_debug_texts").bind<&CreateCommand<RenderDebugTextsCommand> >();
 		addCommandCreator("polygon_mode").bind<&CreateCommand<PolygonModeCommand> >();
 		addCommandCreator("set_pass").bind<&CreateCommand<SetPassCommand> >();
+		addCommandCreator("deferred_point_light_loop").bind<&CreateCommand<DeferredPointLightLoopCommand> >();
 	}
 
 
@@ -818,8 +821,45 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void deferredPointLightLoop(Material* material)
 	{
-		TODO("todo");
-		ASSERT(false);
+		Array<Component> lights(m_allocator);
+		m_scene->getPointLights(m_scene->getFrustum(), lights);
+		if (!lights.empty() && material->isReady())
+		{
+			Component camera = m_scene->getCameraInSlot("editor");
+			material->apply(*m_renderer, *this);
+			GLint attrib_id = material->getShader()->getAttribId(m_renderer->getAttributeNameIndex("in_position"));
+
+			glEnable(GL_BLEND);
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+
+			for (int i = 0; i < lights.size(); ++i)
+			{
+				float light_range = m_scene->getLightRange(lights[i]);
+				Vec3 light_pos = m_scene->getPointLightEntity(lights[i]).getPosition();
+				Matrix camera_matrix = camera.entity.getMatrix();
+				Vec3 camera_up = camera_matrix.getYVector() * light_range;
+				Vec3 camera_side = camera_matrix.getXVector() * light_range;
+
+				Vec3 pos[6];
+				pos[0] = light_pos - camera_side - camera_up;
+				pos[1] = light_pos + camera_side - camera_up;
+				pos[2] = light_pos + camera_side + camera_up;
+
+				pos[3] = light_pos - camera_side - camera_up;
+				pos[4] = light_pos + camera_side + camera_up;
+				pos[5] = light_pos - camera_side + camera_up;
+
+				setLightUniforms(lights[i], material->getShader());
+
+				glEnableVertexAttribArray(attrib_id);
+				glBindBuffer(GL_ARRAY_BUFFER, 0);
+				glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+				glVertexAttribPointer(attrib_id, 3, GL_FLOAT, GL_FALSE, sizeof(Vec3), pos);
+				glDrawArrays(GL_TRIANGLES, 0, 6);
+			}
+
+			glDisable(GL_BLEND);
+		}
 	}
 
 

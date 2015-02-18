@@ -1294,13 +1294,19 @@ namespace Lumix
 			}
 
 
+			virtual Entity getPointLightEntity(Component cmp) override
+			{
+				return m_point_lights[getPointLightIndex(cmp.index)].m_entity;
+			}
+
+
 			virtual void getPointLights(const Frustum& frustum, Array<Component>& lights) override
 			{
 				for (int i = 0, ci = m_point_lights.size(); i < ci; ++i)
 				{
 					PointLight& light = m_point_lights[i];
 					
-					if (!frustum.isSphereInside(light.m_entity.getPosition(), light.m_range))
+					if (frustum.isSphereInside(light.m_entity.getPosition(), light.m_range))
 					{
 						lights.push(Component(light.m_entity, POINT_LIGHT_HASH, this, light.m_uid));
 					}
