@@ -832,30 +832,43 @@ struct PipelineInstanceImpl : public PipelineInstance
 			glEnable(GL_BLEND);
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 
+			GLubyte indices[] = {
+				0, 1, 2, 2, 3, 0,
+				3, 2, 6, 6, 7, 3,
+				7, 6, 5, 5, 4, 7,
+				4, 5, 1, 1, 0, 4,
+				4, 0, 3, 3, 7, 4,
+				1, 5, 6, 6, 2, 1
+			};
 			for (int i = 0; i < lights.size(); ++i)
 			{
 				float light_range = m_scene->getLightRange(lights[i]);
 				Vec3 light_pos = m_scene->getPointLightEntity(lights[i]).getPosition();
 				Matrix camera_matrix = camera.entity.getMatrix();
-				Vec3 camera_up = camera_matrix.getYVector() * light_range;
-				Vec3 camera_side = camera_matrix.getXVector() * light_range;
+				Vec3 forward(0, 0, light_range);
+				Vec3 up(0, light_range, 0);
+				Vec3 side(light_range, 0, 0);
 
-				Vec3 pos[6];
-				pos[0] = light_pos - camera_side - camera_up;
-				pos[1] = light_pos + camera_side - camera_up;
-				pos[2] = light_pos + camera_side + camera_up;
-
-				pos[3] = light_pos - camera_side - camera_up;
-				pos[4] = light_pos + camera_side + camera_up;
-				pos[5] = light_pos - camera_side + camera_up;
+				Vec3 vertices[] = 
+				{
+					light_pos + forward - up - side,
+					light_pos + forward - up + side,
+					light_pos + forward + up + side,
+					light_pos + forward + up - side,
+					light_pos - forward - up - side,
+					light_pos - forward - up + side,
+					light_pos - forward + up + side,
+					light_pos - forward + up - side
+				};
 
 				setLightUniforms(lights[i], material->getShader());
 
 				glEnableVertexAttribArray(attrib_id);
 				glBindBuffer(GL_ARRAY_BUFFER, 0);
 				glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-				glVertexAttribPointer(attrib_id, 3, GL_FLOAT, GL_FALSE, sizeof(Vec3), pos);
-				glDrawArrays(GL_TRIANGLES, 0, 6);
+				glVertexAttribPointer(attrib_id, 3, GL_FLOAT, GL_FALSE, sizeof(Vec3), vertices);
+				glCullFace(GL_FRONT);
+				glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_BYTE, indices);
 			}
 
 			glDisable(GL_BLEND);
