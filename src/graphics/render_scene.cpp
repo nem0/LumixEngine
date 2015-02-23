@@ -350,6 +350,7 @@ namespace Lumix
 				, m_global_light_last_uid(-1)
 				, m_point_light_last_uid(-1)
 				, m_is_forward_rendered(is_forward_rendered)
+				, m_applied_camera(Component::INVALID)
 			{
 				m_universe.entityMoved().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 				m_culling_system = CullingSystem::create(m_engine.getMTJDManager(), m_allocator);
@@ -425,6 +426,11 @@ namespace Lumix
 				dir.normalize();
 			}
 
+			virtual Component getAppliedCamera() override
+			{
+				return m_applied_camera;
+			}
+			
 			virtual void applyCamera(Component cmp) override
 			{
 				m_applied_camera = cmp;
@@ -1288,13 +1294,19 @@ namespace Lumix
 			}
 
 
+			virtual Entity getPointLightEntity(Component cmp) override
+			{
+				return m_point_lights[getPointLightIndex(cmp.index)].m_entity;
+			}
+
+
 			virtual void getPointLights(const Frustum& frustum, Array<Component>& lights) override
 			{
 				for (int i = 0, ci = m_point_lights.size(); i < ci; ++i)
 				{
 					PointLight& light = m_point_lights[i];
 					
-					if (!frustum.isSphereInside(light.m_entity.getPosition(), light.m_range))
+					if (frustum.isSphereInside(light.m_entity.getPosition(), light.m_range))
 					{
 						lights.push(Component(light.m_entity, POINT_LIGHT_HASH, this, light.m_uid));
 					}

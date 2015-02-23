@@ -106,6 +106,17 @@ struct RenderModelsCommand : public Command
 };
 
 
+struct DeferredPointLightLoopCommand : public Command
+{
+	DeferredPointLightLoopCommand(IAllocator&) {}
+
+	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
+	virtual void execute(PipelineInstanceImpl& pipeline) override;
+
+	Material* m_material;
+};
+
+
 struct ApplyCameraCommand : public Command
 {
 	ApplyCameraCommand(IAllocator& allocator)
@@ -262,6 +273,7 @@ struct PipelineImpl : public Pipeline
 		addCommandCreator("render_debug_texts").bind<&CreateCommand<RenderDebugTextsCommand> >();
 		addCommandCreator("polygon_mode").bind<&CreateCommand<PolygonModeCommand> >();
 		addCommandCreator("set_pass").bind<&CreateCommand<SetPassCommand> >();
+		addCommandCreator("deferred_point_light_loop").bind<&CreateCommand<DeferredPointLightLoopCommand> >();
 	}
 
 
@@ -807,6 +819,63 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
+	void deferredPointLightLoop(Material* material)
+	{
+		Array<Component> lights(m_allocator);
+		m_scene->getPointLights(m_scene->getFrustum(), lights);
+		if (!lights.empty() && material->isReady())
+		{
+			Component camera = m_scene->getCameraInSlot("editor");
+			material->apply(*m_renderer, *this);
+			GLint attrib_id = material->getShader()->getAttribId(m_renderer->getAttributeNameIndex("in_position"));
+
+			glEnable(GL_BLEND);
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+
+			GLubyte indices[] = {
+				0, 1, 2, 2, 3, 0,
+				3, 2, 6, 6, 7, 3,
+				7, 6, 5, 5, 4, 7,
+				4, 5, 1, 1, 0, 4,
+				4, 0, 3, 3, 7, 4,
+				1, 5, 6, 6, 2, 1
+			};
+			for (int i = 0; i < lights.size(); ++i)
+			{
+				float light_range = m_scene->getLightRange(lights[i]);
+				Vec3 light_pos = m_scene->getPointLightEntity(lights[i]).getPosition();
+				Matrix camera_matrix = camera.entity.getMatrix();
+				Vec3 forward(0, 0, light_range);
+				Vec3 up(0, light_range, 0);
+				Vec3 side(light_range, 0, 0);
+
+				Vec3 vertices[] = 
+				{
+					light_pos + forward - up - side,
+					light_pos + forward - up + side,
+					light_pos + forward + up + side,
+					light_pos + forward + up - side,
+					light_pos - forward - up - side,
+					light_pos - forward - up + side,
+					light_pos - forward + up + side,
+					light_pos - forward + up - side
+				};
+
+				setLightUniforms(lights[i], material->getShader());
+
+				glEnableVertexAttribArray(attrib_id);
+				glBindBuffer(GL_ARRAY_BUFFER, 0);
+				glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+				glVertexAttribPointer(attrib_id, 3, GL_FLOAT, GL_FALSE, sizeof(Vec3), vertices);
+				glCullFace(GL_FRONT);
+				glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_BYTE, indices);
+			}
+
+			glDisable(GL_BLEND);
+		}
+	}
+
+
 	bool beginGrassRenderLoop(const RenderableInfo* info, const Component& light_cmp)
 	{
 		const Terrain::GrassPatch* patch = static_cast<const Terrain::GrassPatch*>(info->m_data);
@@ -899,13 +968,16 @@ struct PipelineInstanceImpl : public PipelineInstance
 	{
 		PROFILE_FUNCTION();
 
-		m_renderable_infos.clear();
-		m_scene->getRenderableInfos(frustum, m_renderable_infos, layer_mask);
-		if (!is_shadowmap)
+		if (m_scene->getAppliedCamera().isValid())
 		{
-			m_scene->getGrassInfos(frustum, m_renderable_infos, layer_mask);
+			m_renderable_infos.clear();
+			m_scene->getRenderableInfos(frustum, m_renderable_infos, layer_mask);
+			if (!is_shadowmap)
+			{
+				m_scene->getGrassInfos(frustum, m_renderable_infos, layer_mask);
+			}
+			render(&m_renderable_infos, m_scene->getActiveGlobalLight());
 		}
-		render(&m_renderable_infos, m_scene->getActiveGlobalLight());
 	}
 
 
@@ -1171,6 +1243,19 @@ void CustomCommand::execute(PipelineInstanceImpl& pipeline)
 	pipeline.executeCustomCommand(m_name);
 }
 
+
+void DeferredPointLightLoopCommand::deserialize(PipelineImpl& pipeline, JsonSerializer& serializer)
+{
+	char material_path[LUMIX_MAX_PATH];
+	serializer.deserializeArrayItem(material_path, LUMIX_MAX_PATH, "");
+	m_material = static_cast<Material*>(pipeline.getResourceManager().get(ResourceManager::MATERIAL)->load(Path(material_path)));
+}
+
+
+void DeferredPointLightLoopCommand::execute(PipelineInstanceImpl& pipeline)
+{
+	pipeline.deferredPointLightLoop(m_material);
+}
 
 
 void RenderModelsCommand::deserialize(PipelineImpl&, JsonSerializer& serializer) 

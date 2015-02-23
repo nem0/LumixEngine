@@ -94,6 +94,9 @@
     <ClCompile Include="..\..\..\tmp\studio\moc_assetbrowser.cpp">
       <Filter>Generated Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\pc\fps_limiter.cpp">
+      <Filter>Source Files\..\..\pc</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Source Files\..\..\scripts" />
@@ -373,6 +376,9 @@
     </ClInclude>
     <ClInclude Include="..\..\property_view\property_editor.h">
       <Filter>Header Files\..\..\property_view</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\fps_limiter.h">
+      <Filter>Source Files\..\..</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
