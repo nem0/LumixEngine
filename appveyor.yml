@@ -6,7 +6,7 @@ build:
   verbosity: minimal
 test_script:
 - ps: >-
-    git clone --depth=1  https://github.com/nem0/LumixEngine_data.git
+    git clone --depth=1  https://github.com/nem0/LumixEngine_data.git 2>&1 | % { $_.ToString() } 
 
     cd LumixEngine_data
 
