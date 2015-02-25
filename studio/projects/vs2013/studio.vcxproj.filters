@@ -194,39 +194,6 @@
     <CustomBuild Include="..\..\scripts\scriptcompiler.h">
       <Filter>Header Files\..\..\scripts</Filter>
     </CustomBuild>
-    <CustomBuild Include="ui_assetbrowser.h">
-      <Filter>Generated Files</Filter>
-    </CustomBuild>
-    <CustomBuild Include="ui_entity_list.h">
-      <Filter>Generated Files</Filter>
-    </CustomBuild>
-    <CustomBuild Include="ui_entity_template_list.h">
-      <Filter>Generated Files</Filter>
-    </CustomBuild>
-    <CustomBuild Include="ui_fileserverwidget.h">
-      <Filter>Generated Files</Filter>
-    </CustomBuild>
-    <CustomBuild Include="ui_gameview.h">
-      <Filter>Generated Files</Filter>
-    </CustomBuild>
-    <CustomBuild Include="ui_logwidget.h">
-      <Filter>Generated Files</Filter>
-    </CustomBuild>
-    <CustomBuild Include="ui_mainwindow.h">
-      <Filter>Generated Files</Filter>
-    </CustomBuild>
-    <CustomBuild Include="ui_profilergraph.h">
-      <Filter>Generated Files</Filter>
-    </CustomBuild>
-    <CustomBuild Include="ui_profilerui.h">
-      <Filter>Generated Files</Filter>
-    </CustomBuild>
-    <CustomBuild Include="ui_property_view.h">
-      <Filter>Generated Files</Filter>
-    </CustomBuild>
-    <CustomBuild Include="ui_scriptcompilerwidget.h">
-      <Filter>Generated Files</Filter>
-    </CustomBuild>
     <CustomBuild Include="..\..\file_system_watcher.h">
       <Filter>Header Files\..\..</Filter>
     </CustomBuild>
@@ -379,6 +346,39 @@
     </ClInclude>
     <ClInclude Include="..\..\fps_limiter.h">
       <Filter>Source Files\..\..</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_assetbrowser.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_entity_list.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_entity_template_list.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_fileserverwidget.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_gameview.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_logwidget.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_mainwindow.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_profilergraph.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_profilerui.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_property_view.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_scriptcompilerwidget.h">
+      <Filter>Generated Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
