@@ -8,7 +8,7 @@ test_script:
 - ps: >-
     git clone --depth=1  https://github.com/nem0/LumixEngine_data.git
 
-    & "cd LumixEngine_data"
+    cd LumixEngine_data
 
     & "..\bin\Win32_AppVeyor\unit_tests.exe" | Write-Output
 
