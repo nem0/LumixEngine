@@ -1,0 +1,20 @@
+version: 0.8.{build}
+os: Windows Server 2012 R2
+configuration: AppVeyor
+build:
+  project: projects\vs2013\LumixEngine.sln
+  verbosity: minimal
+test_script:
+- ps: >-
+    git clone --depth=1  https://github.com/nem0/LumixEngine_data.git
+
+    & "cd LumixEngine_data"
+
+    & "..\bin\Win32_AppVeyor\unit_tests.exe" | Write-Output
+
+    $wc = New-Object Net.WebClient
+            $url = "https://ci.appveyor.com/api/testresults/nunit/$Env:APPVEYOR_JOB_ID"
+            $wc.UploadFile($url, (Resolve-Path .\tests.xml))
+artifacts:
+- path: tests.xml
+  name: tests.xml
