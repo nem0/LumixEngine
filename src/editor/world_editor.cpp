@@ -1351,7 +1351,7 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
-		virtual void beforeFrame() override
+		virtual void update() override
 		{
 			char fps[100];
 			copyString(fps, sizeof(fps), "FPS: ");
@@ -1364,22 +1364,11 @@ struct WorldEditorImpl : public WorldEditor
 			{
 				m_plugins[i]->tick();
 			}
-			if (m_toggle_game_mode_requested)
-			{
-				toggleGameMode();
-				m_toggle_game_mode_requested = false;
-			}
-		}
-
-
-		virtual void afterFrame() override
-		{
-			m_engine->getFileSystem().updateAsyncTransactions();
 			createEditorLines();
 		}
 
 
-		virtual void frame(float forced_time_delta, float time_delta_multiplier) override
+		virtual void updateEngine(float forced_time_delta, float time_delta_multiplier) override
 		{
 			m_engine->update(m_is_game_mode, time_delta_multiplier, forced_time_delta);
 		}
@@ -2201,7 +2190,6 @@ struct WorldEditorImpl : public WorldEditor
 			: m_allocator(allocator)
 			, m_engine(NULL)
 			, m_universe_mutex(false)
-			, m_toggle_game_mode_requested(false)
 			, m_gizmo(*this)
 			, m_component_properties(m_allocator)
 			, m_components(m_allocator)
@@ -2742,7 +2730,6 @@ struct WorldEditorImpl : public WorldEditor
 		FS::MemoryFileDevice m_mem_file_device;
 		FS::TCPFileDevice m_tcp_file_device;
 		IRenderDevice* m_edit_view_render_device;
-		bool m_toggle_game_mode_requested;
 		Path m_universe_path;
 		Path m_base_path;
 		int m_terrain_brush_size;
