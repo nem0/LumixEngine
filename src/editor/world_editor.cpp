@@ -1351,7 +1351,7 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
-		virtual void tick() override
+		virtual void beforeFrame() override
 		{
 			char fps[100];
 			copyString(fps, sizeof(fps), "FPS: ");
@@ -1369,12 +1369,22 @@ struct WorldEditorImpl : public WorldEditor
 				toggleGameMode();
 				m_toggle_game_mode_requested = false;
 			}
-			m_engine->update(m_is_game_mode, 1);
+		}
+
+
+		virtual void afterFrame() override
+		{
 			m_engine->getFileSystem().updateAsyncTransactions();
 			createEditorLines();
 		}
 
-	
+
+		virtual void frame(float forced_time_delta, float time_delta_multiplier) override
+		{
+			m_engine->update(m_is_game_mode, time_delta_multiplier, forced_time_delta);
+		}
+
+
 		virtual ~WorldEditorImpl()
 		{
 			
