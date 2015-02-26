@@ -56,7 +56,9 @@ namespace Lumix
 			static WorldEditor* create(const char* base_path, IAllocator& allocator);
 			static void destroy(WorldEditor* editor);
 
-			virtual void tick() = 0;
+			virtual void afterFrame() = 0;
+			virtual void beforeFrame() = 0;
+			virtual void frame(float forced_time_delta, float time_delta_multiplier) = 0;
 			virtual void registerProperty(const char* component_type, IPropertyDescriptor* descriptor) = 0;
 			virtual IPropertyDescriptor* getProperty(const char* component_type, const char* property_name) = 0;
 			virtual void executeCommand(IEditorCommand* command) = 0;

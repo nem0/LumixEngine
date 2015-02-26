@@ -241,15 +241,26 @@ namespace Lumix
 			}
 
 
-			virtual void update(bool is_game_running, float time_delta_multiplier) override
+			virtual void update(bool is_game_running, float time_delta_multiplier, float forced_time_delta) override
 			{
-				++m_fps_frame;
-				if (m_fps_frame == 30)
+				float dt;
+				if (forced_time_delta >= 0)
 				{
-					m_fps = 30.0f / m_fps_timer->tick();
+					dt = forced_time_delta * time_delta_multiplier;
 					m_fps_frame = 0;
+					m_fps = forced_time_delta * time_delta_multiplier == 0 ? 0 : 1.0f / (forced_time_delta * time_delta_multiplier);
+					m_fps_timer->tick();
 				}
-				float dt = m_timer->tick() * time_delta_multiplier;
+				else
+				{
+					++m_fps_frame;
+					if (m_fps_frame == 30)
+					{
+						m_fps = 30.0f / m_fps_timer->tick();
+						m_fps_frame = 0;
+					}
+					dt = m_timer->tick() * time_delta_multiplier;
+				}
 				m_last_time_delta = dt;
 				if (is_game_running)
 				{
