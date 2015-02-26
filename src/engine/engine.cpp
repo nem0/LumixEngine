@@ -281,6 +281,7 @@ namespace Lumix
 						}
 					}
 				}
+				getFileSystem().updateAsyncTransactions();
 			}
 
 

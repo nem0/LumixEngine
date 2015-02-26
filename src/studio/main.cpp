@@ -226,9 +226,8 @@ class App
 
 			m_world_editor = Lumix::WorldEditor::create(QDir::currentPath().toLocal8Bit().data(), m_allocator);
 			ASSERT(m_world_editor);
-			m_world_editor->beforeFrame();
-			m_world_editor->frame(-1, 1);
-			m_world_editor->afterFrame();
+			m_world_editor->update();
+			m_world_editor->updateEngine(-1, 1);
 
 			m_main_window->setWorldEditor(*m_world_editor);
 			m_main_window->getSceneView()->setWorldEditor(m_world_editor);
@@ -351,20 +350,19 @@ class App
 					{
 						m_world_editor->getEngine().getRenderer().renderGame();
 					}
-					m_world_editor->beforeFrame();
+					m_world_editor->update();
 					if (m_main_window->getSceneView()->isFrameDebuggerActive())
 					{
 						if (m_main_window->getSceneView()->isFrameRequested())
 						{
-							m_world_editor->frame(1.0f / 30.0f, m_main_window->getSceneView()->getTimeDeltaMultiplier());
+							m_world_editor->updateEngine(1.0f / 30.0f, m_main_window->getSceneView()->getTimeDeltaMultiplier());
 							m_main_window->getSceneView()->frameServed();
 						}
 					}
 					else
 					{
-						m_world_editor->frame(-1, m_main_window->getSceneView()->getTimeDeltaMultiplier());
+						m_world_editor->updateEngine(-1, m_main_window->getSceneView()->getTimeDeltaMultiplier());
 					}
-					m_world_editor->afterFrame();
 					handleEvents();
 					fps_limiter->endFrame();
 				}

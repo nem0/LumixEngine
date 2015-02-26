@@ -460,13 +460,13 @@ namespace Lumix
 				for (int i = m_debug_lines.size() - 1; i >= 0; --i)
 				{
 					float life = m_debug_lines[i].m_life;
-					life -= dt;
 					if (life < 0)
 					{
 						m_debug_lines.eraseFast(i);
 					}
 					else
 					{
+						life -= dt;
 						m_debug_lines[i].m_life = life;
 					}
 				}
@@ -920,7 +920,6 @@ namespace Lumix
 			virtual void setTerrainBrush(Component cmp, const Vec3& position, float size) override
 			{
 				m_terrains[cmp.index]->setBrush(position, size);
-				addDebugCross(position, 1, Vec3(1, 0, 0), 0);
 			}
 
 
