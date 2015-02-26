@@ -69,7 +69,7 @@ void Animation::getPose(float time, Pose& pose, Model& model) const
 		Quat* rot = pose.getRotations();
 		int off = frame * m_bone_count;
 		int off2 = off + m_bone_count;
-		float t = (time - frame / m_fps) / (1 / m_fps);
+		float t = (time - frame / m_fps) / (1.0f / m_fps);
 	
 		if(frame < m_frame_count - 1)
 		{
