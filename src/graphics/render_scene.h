@@ -15,6 +15,7 @@ namespace Lumix
 	class Frustum;
 	class Geometry;
 	class IRenderDevice;
+	class LIFOAllocator;
 	class Material;
 	class Mesh;
 	class Model;
@@ -23,15 +24,19 @@ namespace Lumix
 	class PipelineInstance;
 	class Pose;
 	class Renderer;
+	class Shader;
+	class Terrain;
 	class Timer;
 	class Universe;
 
 	struct TerrainInfo
 	{
-		Entity m_entity;
-		Material* m_material;
-		float m_xz_scale;
-		float m_y_scale;
+		Shader* m_shader;
+		Terrain* m_terrain;
+		Matrix m_world_matrix;
+		Vec3 m_morph_const;
+		float m_size;
+		Vec3 m_min;
 		int m_index;
 	};
 
@@ -73,7 +78,8 @@ namespace Lumix
 	{
 		SKINNED_MESH,
 		RIGID_MESH,
-		GRASS
+		GRASS,
+		TERRAIN
 	};
 
 	class LUMIX_ENGINE_API RenderScene : public IScene
@@ -143,7 +149,7 @@ namespace Lumix
 			virtual Model* getRenderableModel(Component cmp) = 0;
 			
 			virtual void getGrassInfos(const Frustum& frustum, Array<RenderableInfo>& infos, int64_t layer_mask) = 0;
-			virtual void getTerrainInfos(Array<TerrainInfo>& infos, int64_t layer_mask) = 0;
+			virtual void getTerrainInfos(Array<RenderableInfo>& infos, int64_t layer_mask, const Vec3& camera_pos, LIFOAllocator& allocator) = 0;
 			virtual float getTerrainHeightAt(Component cmp, float x, float z) = 0;
 			virtual void setTerrainMaterial(Component cmp, const string& path) = 0;
 			virtual void getTerrainMaterial(Component cmp, string& path) = 0;

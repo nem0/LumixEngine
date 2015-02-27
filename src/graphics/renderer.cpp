@@ -551,7 +551,6 @@ void Renderer::getLookAtMatrix(const Vec3& pos, const Vec3& center, const Vec3& 
 
 void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Vec3& value)
 {
-	PROFILE_FUNCTION();
 	RendererImpl& renderer_impl = static_cast<RendererImpl&>(renderer);
 	GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
 	if (loc >= 0)
@@ -568,7 +567,6 @@ void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, c
 
 void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Vec4& value)
 {
-	PROFILE_FUNCTION();
 	RendererImpl& renderer_impl = static_cast<RendererImpl&>(renderer);
 	GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
 	if (loc >= 0)
@@ -585,7 +583,6 @@ void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, c
 
 void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, float value)
 {
-	PROFILE_FUNCTION();
 	RendererImpl& renderer_impl = static_cast<RendererImpl&>(renderer);
 	GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
 	if (loc >= 0)
@@ -618,7 +615,6 @@ void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, c
 
 void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Matrix* matrices, int count)
 {
-	PROFILE_FUNCTION();
 	RendererImpl& renderer_impl = static_cast<RendererImpl&>(renderer);
 	GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
 	if (loc >= 0)
@@ -686,6 +682,18 @@ void setUniform(int location, const Matrix& mtx)
 void setUniform(int location, const Matrix* matrices, int count)
 {
 	glUniformMatrix4fv(location, count, false, &matrices[0].m11);
+}
+
+
+void setUniform(int location, const Vec3& value)
+{
+	glUniform3f(location, value.x, value.y, value.z);
+}
+
+
+void setUniform(int location, float value)
+{
+	glUniform1f(location, value);
 }
 
 

@@ -6,6 +6,7 @@
 #include "core/FS/file_system.h"
 #include "core/FS/ifile.h"
 #include "core/json_serializer.h"
+#include "core/lifo_allocator.h"
 #include "core/log.h"
 #include "core/math_utils.h"
 #include "core/mtjd/generic_job.h"
@@ -1065,7 +1066,7 @@ namespace Lumix
 			}
 
 
-			virtual void getTerrainInfos(Array<TerrainInfo>& infos, int64_t layer_mask) override
+			virtual void getTerrainInfos(Array<RenderableInfo>& infos, int64_t layer_mask, const Vec3& camera_pos, LIFOAllocator& frame_allocator) override
 			{
 				PROFILE_FUNCTION();
 				infos.reserve(m_terrains.size());
@@ -1073,12 +1074,7 @@ namespace Lumix
 				{
 					if (m_terrains[i] && (m_terrains[i]->getLayerMask() & layer_mask) != 0)
 					{
-						TerrainInfo& info = infos.pushEmpty();
-						info.m_entity = m_terrains[i]->getEntity();
-						info.m_material = m_terrains[i]->getMaterial();
-						info.m_index = i;
-						info.m_xz_scale = m_terrains[i]->getXZScale();
-						info.m_y_scale = m_terrains[i]->getYScale();
+						m_terrains[i]->getInfos(infos, camera_pos, frame_allocator);
 					}
 				}
 			}
