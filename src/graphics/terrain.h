@@ -79,46 +79,49 @@ class Terrain
 		Terrain(Renderer& renderer, const Entity& entity, RenderScene& scene, IAllocator& allocator);
 		~Terrain();
 
-		float getRootSize() const;
-		Mesh* getMesh() { return m_mesh; }
 		Geometry* getGeometry() { return &m_geometry; }
-		void getInfos(Array<RenderableInfo>& infos, const Vec3& camera_pos, LIFOAllocator& allocator);
-		void render(Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos);
-		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir);
+		Material* getMaterial() const { return m_material; }
 		int64_t getLayerMask() const { return m_layer_mask; }
+		Entity getEntity() const { return m_entity; }
+		float getRootSize() const;
+		float getHeight(float x, float z);
+		float getXZScale() const { return m_scale.x; }
+		float getYScale() const { return m_scale.y; }
+		float getBrushSize() const { return m_brush_size; }
+		Mesh* getMesh() { return m_mesh; }
+		Vec3 getBrushPosition() const { return m_brush_position; }
+		Path getGrassTypePath(int index);
+		Vec3 getScale() const { return m_scale; }
+		void getSize(float* width, float* height) const { ASSERT(width); ASSERT(height); *width = m_width * m_scale.x; *height = m_height * m_scale.z; }
+		int getGrassTypeGround(int index);
+		int getGrassTypeDensity(int index);
+		int getGrassTypeCount() const { return m_grass_types.size(); }
+
+		void setXZScale(float scale) { m_scale.x = scale; m_scale.z = scale; }
+		void setYScale(float scale) { m_scale.y = scale; }
+		void setGrassTypePath(int index, const Path& path);
+		void setGrassTypeGround(int index, int ground);
+		void setGrassTypeDensity(int index, int density);
+		void setMaterial(Material* material);
+		void setBrush(const Vec3& position, float size) { m_brush_position = position; m_brush_size = size; }
+
+		void getInfos(Array<RenderableInfo>& infos, const Vec3& camera_pos, LIFOAllocator& allocator);
+		void getGrassInfos(const Frustum& frustum, Array<RenderableInfo>& infos, const Component& camera);
+
+		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir);
 		void serialize(OutputBlob& serializer);
 		void deserialize(InputBlob& serializer, Universe& universe, RenderScene& scene, int index);
-		Vec3 getScale() const { return m_scale; }
-		void setXZScale(float scale) { m_scale.x = scale; m_scale.z = scale; }
-		float getXZScale() const { return m_scale.x; }
-		void setYScale(float scale) { m_scale.y = scale; }
-		float getYScale() const { return m_scale.y; }
-		Entity getEntity() const { return m_entity; }
-		Material* getMaterial() const { return m_material; }
-		void setGrassTypePath(int index, const Path& path);
-		Path getGrassTypePath(int index);
-		void setGrassTypeGround(int index, int ground);
-		int getGrassTypeGround(int index);
-		void setGrassTypeDensity(int index, int density);
-		int getGrassTypeDensity(int index);
+
 		void addGrassType(int index);
 		void removeGrassType(int index);
-		int getGrassTypeCount() const { return m_grass_types.size(); }
-		void setMaterial(Material* material);
-		void getGrassInfos(const Frustum& frustum, Array<RenderableInfo>& infos, const Component& camera);
-		void setBrush(const Vec3& position, float size) { m_brush_position = position; m_brush_size = size; }
-		float getBrushSize() const { return m_brush_size; }
-		Vec3 getBrushPosition() const { return m_brush_position; }
-		float getHeight(float x, float z);
-		void getSize(float* width, float* height) const { ASSERT(width); ASSERT(height); *width = m_width * m_scale.x; *height = m_height * m_scale.z; }
 
 	private: 
 		Array<Terrain::GrassQuad*>& getQuads(const Component& camera);
 		TerrainQuad* generateQuadTree(float size);
+		float getHeight(int x, int z);
 		void updateGrass(const Component& camera);
 		void generateGeometry();
 		void onMaterialLoaded(Resource::State, Resource::State new_state);
-		float getHeight(int x, int z);
 		void forceGrassUpdate();
 
 	private:

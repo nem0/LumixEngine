@@ -597,8 +597,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 				);
 			m_shadow_modelviewprojection[split_index] = biasMatrix * (projection_matrix * modelview_matrix);
 
-			renderTerrains(light_cmp, layer_mask);
-
 			Frustum shadow_camera_frustum;
 			shadow_camera_frustum.computeOrtho(shadow_cam_pos, -light_forward, light_mtx.getYVector(), bb_size * 2, bb_size * 2, SHADOW_CAM_NEAR, SHADOW_CAM_FAR);
 			renderModels(shadow_camera_frustum, layer_mask, true);
@@ -704,46 +702,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		}
 	}
 
-
-	void renderTerrains(const Component& light_cmp, int64_t layer_mask)
-	{
-		PROFILE_FUNCTION();
-		if (m_active_camera.isValid())
-		{
-			Array<RenderableInfo> infos(m_allocator);
-			m_scene->getTerrainInfos(infos, layer_mask, m_active_camera.entity.getPosition(), m_frame_allocator);
-			sortRenderables(infos);
-
-			if (infos.empty())
-			{
-				return;
-			}
-
-			const RenderableInfo* info = &infos[0];
-			const RenderableInfo* sentinel = info + infos.size();
-			while (info != sentinel)
-			{
-				TerrainInfo* data = (TerrainInfo*)info->m_data;
-
-				Shader* shader = data->m_terrain->getMesh()->getMaterial()->getShader();
-				if (shader->isReady())
-				{
-					data->m_terrain->getMesh()->getMaterial()->apply(*m_renderer, *this);
-					setLightUniforms(light_cmp, shader);
-
-					m_renderer->setUniform(*shader, "terrain_scale", TERRAIN_SCALE_HASH, data->m_terrain->getScale());
-
-					info = renderLoopTerrain(info);
-				}
-				else
-				{
-					++info;
-				}
-			}
-		}
-	}
-
-
+	
 	void sortRenderables(Array<RenderableInfo>& infos)
 	{
 		PROFILE_FUNCTION();
@@ -847,6 +806,24 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
+	bool beginTerrainRenderLoop(const RenderableInfo* info, const Component& light_cmp)
+	{
+		TerrainInfo* data = (TerrainInfo*)info->m_data;
+
+		Shader* shader = data->m_terrain->getMesh()->getMaterial()->getShader();
+		if (shader->isReady())
+		{
+			data->m_terrain->getMesh()->getMaterial()->apply(*m_renderer, *this);
+			setLightUniforms(light_cmp, shader);
+
+			m_renderer->setUniform(*shader, "terrain_scale", TERRAIN_SCALE_HASH, data->m_terrain->getScale());
+
+			return true;
+		}
+		return false;
+	}
+
+
 	bool beginGrassRenderLoop(const RenderableInfo* info, const Component& light_cmp)
 	{
 		const Terrain::GrassPatch* patch = static_cast<const Terrain::GrassPatch*>(info->m_data);
@@ -903,21 +880,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_renderer->setUniform(*shader, "bone_matrices", BONE_MATRICES_HASH, bone_mtx, pose.getCount());
 	}
 
-
-	void renderPointLightInfluencedTerrains(const Frustum& frustum, int64_t layer_mask)
-	{
-		PROFILE_FUNCTION();
-
-		Array<Component> lights(m_allocator);
-		m_scene->getPointLights(frustum, lights);
-		for (int i = 0; i < lights.size(); ++i)
-		{
-			Component light = lights[i];
-			renderTerrains(light, layer_mask);
-		}
-	}
-
-
+	
 	void renderPointLightInfluencedGeometry(const Frustum& frustum, int64_t layer_mask)
 	{
 		PROFILE_FUNCTION();
@@ -930,6 +893,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 			m_renderable_infos.clear();
 			m_scene->getPointLightInfluencedGeometry(light, frustum, m_renderable_infos, layer_mask);
 			m_scene->getGrassInfos(frustum, m_renderable_infos, layer_mask);
+			m_scene->getTerrainInfos(m_renderable_infos, layer_mask, m_scene->getAppliedCamera().entity.getPosition(), m_frame_allocator);
 			render(&m_renderable_infos, light);
 		}
 	}
@@ -943,6 +907,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		{
 			m_renderable_infos.clear();
 			m_scene->getRenderableInfos(frustum, m_renderable_infos, layer_mask);
+			m_scene->getTerrainInfos(m_renderable_infos, layer_mask, m_scene->getAppliedCamera().entity.getPosition(), m_frame_allocator);
 			if (!is_shadowmap)
 			{
 				m_scene->getGrassInfos(frustum, m_renderable_infos, layer_mask);
@@ -1114,6 +1079,14 @@ struct PipelineInstanceImpl : public PipelineInstance
 						continue;
 					}
 					info = renderLoopRigid(info);
+					break;
+				case (int32_t)RenderableType::TERRAIN:
+					if (!beginTerrainRenderLoop(info, light))
+					{
+						++info;
+						continue;
+					}
+					info = renderLoopTerrain(info);
 					break;
 				default:
 					ASSERT(false);
@@ -1294,15 +1267,13 @@ void RenderModelsCommand::execute(PipelineInstanceImpl& pipeline)
 	{
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_ONE, GL_ONE);
-
-		pipeline.renderPointLightInfluencedTerrains(pipeline.getScene()->getFrustum(), m_layer_mask);
+	
 		pipeline.renderPointLightInfluencedGeometry(pipeline.getScene()->getFrustum(), m_layer_mask);
 
 		glDisable(GL_BLEND);
 	}
 	else
 	{
-		pipeline.renderTerrains(pipeline.getScene()->getActiveGlobalLight(), m_layer_mask);
 		pipeline.renderModels(pipeline.getScene()->getFrustum(), m_layer_mask, false);
 	}
 }
