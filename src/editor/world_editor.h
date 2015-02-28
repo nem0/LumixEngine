@@ -120,6 +120,7 @@ namespace Lumix
 			virtual Vec3 getCameraRaycastHit() = 0;
 			virtual void toggleMeasure() = 0;
 			virtual class MeasureTool* getMeasureTool() const = 0;
+			virtual int getFPSText() const = 0;
 
 			virtual void saveUndoStack(const Path& path) = 0;
 			virtual bool executeUndoStack(const Path& path) = 0;

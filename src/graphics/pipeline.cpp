@@ -506,6 +506,18 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
+	virtual int getDrawCalls() const override
+	{
+		return m_draw_calls_count;
+	}
+
+
+	virtual int getRenderedVerticesCount() const override
+	{
+		return m_vertices_count;
+	}
+
+
 	void sourceLoaded(Resource::State old_state, Resource::State new_state)
 	{
 		if (old_state != Resource::State::READY && new_state == Resource::State::READY)
@@ -1002,6 +1014,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 			setUniform(morph_const_location, data->m_morph_const);
 			setUniform(quad_size_location, data->m_size);
 			setUniform(quad_min_location, data->m_min);
+			++m_draw_calls_count;
+			m_vertices_count += mesh_part_indices_count;
 			renderGeometry(mesh_part_indices_count * data->m_index, mesh_part_indices_count);
 			++info;
 		}
