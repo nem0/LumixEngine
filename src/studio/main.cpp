@@ -334,6 +334,19 @@ class App
 		}
 
 
+		void showStats()
+		{
+			char stats[1000];
+			Lumix::copyString(stats, sizeof(stats), "FPS: ");
+			Lumix::toCString(m_world_editor->getEngine().getFPS(), stats + strlen(stats), sizeof(stats) - strlen(stats), 1);
+			Lumix::catCString(stats, sizeof(stats), ", Draw calls: ");
+			Lumix::toCString(m_main_window->getSceneView()->getPipeline()->getDrawCalls(), stats + strlen(stats), sizeof(stats) - strlen(stats));
+			Lumix::catCString(stats, sizeof(stats), ", Vertices: ");
+			Lumix::toCStringPretty(m_main_window->getSceneView()->getPipeline()->getRenderedVerticesCount(), stats + strlen(stats), sizeof(stats) - strlen(stats));
+			static_cast<Lumix::RenderScene*>(m_world_editor->getEngine().getScene(crc32("renderer")))->setDebugText(m_world_editor->getFPSText(), stats);
+		}
+
+
 		void run()
 		{
 			FPSLimiter* fps_limiter = FPSLimiter::create(60, m_allocator);
@@ -350,6 +363,9 @@ class App
 					{
 						m_world_editor->getEngine().getRenderer().renderGame();
 					}
+
+					showStats();
+
 					m_world_editor->update();
 					if (m_main_window->getSceneView()->isFrameDebuggerActive())
 					{

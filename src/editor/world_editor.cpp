@@ -1353,11 +1353,6 @@ struct WorldEditorImpl : public WorldEditor
 
 		virtual void update() override
 		{
-			char fps[100];
-			copyString(fps, sizeof(fps), "FPS: ");
-			toCString(m_engine->getFPS(), fps + strlen(fps), sizeof(fps) - strlen(fps), 1);
-			static_cast<RenderScene*>(m_engine->getScene(crc32("renderer")))->setDebugText(m_fps_text, fps);
-
 			updateGoTo();
 
 			for (int i = 0; i < m_plugins.size(); ++i)
@@ -2654,6 +2649,12 @@ struct WorldEditorImpl : public WorldEditor
 				m_engine->getFileSystem().close(file);
 			}
 			return file != NULL;
+		}
+
+
+		virtual int getFPSText() const override
+		{
+			return m_fps_text;
 		}
 
 
