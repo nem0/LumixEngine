@@ -107,6 +107,69 @@ namespace Lumix
 	}
 
 
+	bool toCStringPretty(int32_t value, char* output, int length)
+	{
+		char* c = output;
+		if (length > 0)
+		{
+			if (value < 0)
+			{
+				value = -value;
+				--length;
+				*c = '-';
+				++c;
+			}
+			return toCStringPretty((unsigned int)value, c, length);
+		}
+		return false;
+	}
+
+
+	bool toCStringPretty(uint32_t value, char* output, int length)
+	{
+		char* c = output;
+		char* num_start = output;
+		if (length > 0)
+		{
+			if (value == 0)
+			{
+				if (length == 1)
+				{
+					return false;
+				}
+				*c = '0';
+				*(c + 1) = 0;
+				return true;
+			}
+			int counter = 0;
+			while (value > 0 && length > 1)
+			{
+				*c = value % 10 + '0';
+				value = value / 10;
+				--length;
+				++c;
+				if ((counter + 1) % 3 == 0 && length > 1 && value > 0)
+				{
+					*c = ' ';
+					++c;
+					counter = 0;
+				}
+				else
+				{
+					++counter;
+				}
+			}
+			if (length > 0)
+			{
+				reverse(num_start, (int)(c - num_start));
+				*c = 0;
+				return true;
+			}
+		}
+		return false;
+	}
+
+
 	bool toCString(int32_t value, char* output, int length)
 	{
 		char* c = output;
