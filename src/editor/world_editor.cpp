@@ -1906,7 +1906,8 @@ struct WorldEditorImpl : public WorldEditor
 				Matrix camera_mtx = m_camera.getMatrix();
 				Vec3 dir = camera_mtx * Vec3(0, 0, 1);
 				m_go_to_parameters.m_to = m_selected_entities[0].getPosition() + dir * 10;
-				m_go_to_parameters.m_speed = Math::maxValue(100.0f / (m_go_to_parameters.m_to - m_go_to_parameters.m_from).length(), 2.0f);
+				float len = (m_go_to_parameters.m_to - m_go_to_parameters.m_from).length();
+				m_go_to_parameters.m_speed = Math::maxValue(100.0f / (len > 0 ? len : 1), 2.0f);
 			}
 		}
 
