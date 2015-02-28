@@ -21,6 +21,18 @@ void UT_string(const char* params)
 		LUMIX_EXPECT_EQ((const char*)tmp, (const char*)tmp2);
 	}
 	
+	Lumix::toCStringPretty(123456, tmp, sizeof(tmp));
+	LUMIX_EXPECT_EQ((const char*)tmp, (const char*)"123 456");
+
+	Lumix::toCStringPretty(-123456, tmp, sizeof(tmp));
+	LUMIX_EXPECT_EQ((const char*)tmp, (const char*)"-123 456");
+
+	Lumix::toCStringPretty(123456789, tmp, sizeof(tmp));
+	LUMIX_EXPECT_EQ((const char*)tmp, (const char*)"123 456 789");
+
+	Lumix::toCStringPretty(3456789, tmp, sizeof(tmp));
+	LUMIX_EXPECT_EQ((const char*)tmp, (const char*)"3 456 789");
+
 	Lumix::toCString((unsigned int)0xffffFFFF, tmp, 1000);
 	sprintf(tmp2, "%u", (unsigned int)0xffffFFFF);
 	LUMIX_EXPECT_EQ((const char*)tmp, (const char*)tmp2);
