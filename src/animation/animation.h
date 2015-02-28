@@ -46,6 +46,7 @@ class LUMIX_ANIMATION_API Animation : public Resource
 		void getPose(float time, Pose& pose, Model& model) const;
 		int getFrameCount() const { return m_frame_count; }
 		float getLength() const { return m_frame_count / (float)m_fps; }
+		int getFPS() const { return m_fps; }
 
 	private:
 		IAllocator& getAllocator();

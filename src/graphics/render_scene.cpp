@@ -1888,14 +1888,6 @@ namespace Lumix
 				return m_time;
 			}
 
-			virtual void renderTerrain(const TerrainInfo& info, Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos) override
-			{
-				int i = info.m_index;
-				if (m_terrains[i]->getMaterial() && m_terrains[i]->getMaterial()->isReady())
-				{
-					m_terrains[i]->render(renderer, pipeline, camera_pos);
-				}
-			}
 
 		private:
 			void modelLoaded(Model* model, int renderable_index)

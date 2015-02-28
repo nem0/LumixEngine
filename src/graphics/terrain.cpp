@@ -164,31 +164,6 @@ namespace Lumix
 		}
 
 
-		bool render(Renderer* renderer, Mesh* mesh, Geometry& geometry, const Vec3& camera_pos, RenderScene& scene)
-		{
-			PROFILE_FUNCTION();
-			float squared_dist = getSquaredDistance(camera_pos);
-			float r = getRadiusOuter(m_size);
-			if (squared_dist > r*r && m_lod > 1)
-			{
-				return false;
-			}
-			Vec3 morph_const(r, getRadiusInner(m_size), 0);
-			Shader& shader = *mesh->getMaterial()->getShader();
-			for (int i = 0; i < CHILD_COUNT; ++i)
-			{
-				if (!m_children[i] || !m_children[i]->render(renderer, mesh, geometry, camera_pos, scene))
-				{
-					setFixedCachedUniform(*renderer, shader, (int)Shader::FixedCachedUniforms::MORPH_CONST, morph_const);
-					setFixedCachedUniform(*renderer, shader, (int)Shader::FixedCachedUniforms::QUAD_SIZE, m_size);
-					setFixedCachedUniform(*renderer, shader, (int)Shader::FixedCachedUniforms::QUAD_MIN, m_min);
-					bindGeometry(*renderer, geometry, *mesh);
-					renderGeometry(mesh->getIndexCount() / 4 * i, mesh->getIndexCount() / 4);
-				}
-			}
-			return true;
-		}
-
 		IAllocator& m_allocator;
 		TerrainQuad* m_children[CHILD_COUNT];
 		Vec3 m_min;
@@ -663,27 +638,7 @@ namespace Lumix
 		}
 	}
 
-
-	void Terrain::render(Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos)
-	{
-		if (m_root)
-		{
-			m_material->apply(renderer, pipeline);
-			Matrix inv_world_matrix;
-			Matrix world_matrix;
-			m_entity.getMatrix(world_matrix);
-			inv_world_matrix = world_matrix;
-			inv_world_matrix.fastInverse();
-			Vec3 rel_cam_pos = inv_world_matrix.multiplyPosition(camera_pos) / m_scale.x;
-			Shader& shader = *m_mesh->getMaterial()->getShader();
-			renderer.setUniform(shader, "brush_position", BRUSH_POSITION_HASH, m_brush_position);
-			renderer.setUniform(shader, "brush_size", BRUSH_SIZE_HASH, m_brush_size);
-			renderer.setUniform(shader, "map_size", MAP_SIZE_HASH, m_root->m_size);
-			renderer.setUniform(shader, "camera_pos", CAMERA_POS_HASH, rel_cam_pos);
-			m_root->render(&static_cast<Renderer&>(m_scene.getPlugin()), m_mesh, m_geometry, rel_cam_pos, *pipeline.getScene());
-		}
-	}
-
+	
 	float Terrain::getHeight(float x, float z)
 	{
 		int int_x = (int)(x / m_scale.x);
