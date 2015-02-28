@@ -822,15 +822,19 @@ struct PipelineInstanceImpl : public PipelineInstance
 	{
 		TerrainInfo* data = (TerrainInfo*)info->m_data;
 
-		Shader* shader = data->m_terrain->getMesh()->getMaterial()->getShader();
-		if (shader->isReady())
+		Material* material = data->m_terrain->getMesh()->getMaterial();
+		if (material->isReady())
 		{
-			data->m_terrain->getMesh()->getMaterial()->apply(*m_renderer, *this);
-			setLightUniforms(light_cmp, shader);
+			Shader* shader = material->getShader();
+			if (shader->isReady())
+			{
+				data->m_terrain->getMesh()->getMaterial()->apply(*m_renderer, *this);
+				setLightUniforms(light_cmp, shader);
 
-			m_renderer->setUniform(*shader, "terrain_scale", TERRAIN_SCALE_HASH, data->m_terrain->getScale());
+				m_renderer->setUniform(*shader, "terrain_scale", TERRAIN_SCALE_HASH, data->m_terrain->getScale());
 
-			return true;
+				return true;
+			}
 		}
 		return false;
 	}
