@@ -146,8 +146,8 @@ namespace Lumix
 			{
 				if (!m_children[i] || !m_children[i]->getInfos(infos, camera_pos, terrain, world_matrix, allocator))
 				{
-					TerrainInfo* data = (TerrainInfo*)allocator.allocate(sizeof(TerrainInfo));
 					RenderableInfo& info = infos.pushEmpty();
+					TerrainInfo* data = (TerrainInfo*)allocator.allocate(sizeof(TerrainInfo));
 					info.m_type = (int32_t)RenderableType::TERRAIN;
 					info.m_key = (int64_t)terrain;
 					info.m_data = data;
@@ -432,6 +432,8 @@ namespace Lumix
 						srand((int)quad_x + (int)quad_z * GRASS_QUADS_COLUMNS);
 						for(int grass_type_idx = 0; grass_type_idx < m_grass_types.size(); ++grass_type_idx)
 						{
+							if (!m_grass_types[grass_type_idx]->m_grass_model->isReady())
+								continue;
 							GrassPatch& patch = quad->m_patches.emplace(m_allocator);
 							patch.m_matrices.clear();
 							patch.m_type = m_grass_types[grass_type_idx];
