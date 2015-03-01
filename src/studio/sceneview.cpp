@@ -25,6 +25,7 @@ class ViewWidget : public QWidget
 			: QWidget(parent)
 			, m_view(view)
 		{
+			setAttribute(Qt::WA_PaintOnScreen);
 			setMouseTracking(true);
 		}
 
@@ -34,6 +35,12 @@ class ViewWidget : public QWidget
 			m_last_x = event->x();
 			m_last_y = event->y();
 			setFocus();
+		}
+
+
+		virtual QPaintEngine* paintEngine() const override
+		{
+			return NULL;
 		}
 
 		virtual void wheelEvent(QWheelEvent* event) override
