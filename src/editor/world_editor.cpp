@@ -1351,30 +1351,24 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
-		virtual void tick() override
+		virtual void update() override
 		{
-			char fps[100];
-			copyString(fps, sizeof(fps), "FPS: ");
-			toCString(m_engine->getFPS(), fps + strlen(fps), sizeof(fps) - strlen(fps), 1);
-			static_cast<RenderScene*>(m_engine->getScene(crc32("renderer")))->setDebugText(m_fps_text, fps);
-
 			updateGoTo();
 
 			for (int i = 0; i < m_plugins.size(); ++i)
 			{
 				m_plugins[i]->tick();
 			}
-			if (m_toggle_game_mode_requested)
-			{
-				toggleGameMode();
-				m_toggle_game_mode_requested = false;
-			}
-			m_engine->update(m_is_game_mode, 1);
-			m_engine->getFileSystem().updateAsyncTransactions();
 			createEditorLines();
 		}
 
-	
+
+		virtual void updateEngine(float forced_time_delta, float time_delta_multiplier) override
+		{
+			m_engine->update(m_is_game_mode, time_delta_multiplier, forced_time_delta);
+		}
+
+
 		virtual ~WorldEditorImpl()
 		{
 			
@@ -1912,7 +1906,8 @@ struct WorldEditorImpl : public WorldEditor
 				Matrix camera_mtx = m_camera.getMatrix();
 				Vec3 dir = camera_mtx * Vec3(0, 0, 1);
 				m_go_to_parameters.m_to = m_selected_entities[0].getPosition() + dir * 10;
-				m_go_to_parameters.m_speed = Math::maxValue(100.0f / (m_go_to_parameters.m_to - m_go_to_parameters.m_from).length(), 2.0f);
+				float len = (m_go_to_parameters.m_to - m_go_to_parameters.m_from).length();
+				m_go_to_parameters.m_speed = Math::maxValue(100.0f / (len > 0 ? len : 1), 2.0f);
 			}
 		}
 
@@ -2191,7 +2186,6 @@ struct WorldEditorImpl : public WorldEditor
 			: m_allocator(allocator)
 			, m_engine(NULL)
 			, m_universe_mutex(false)
-			, m_toggle_game_mode_requested(false)
 			, m_gizmo(*this)
 			, m_component_properties(m_allocator)
 			, m_components(m_allocator)
@@ -2659,6 +2653,12 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
+		virtual int getFPSText() const override
+		{
+			return m_fps_text;
+		}
+
+
 		virtual bool runTest(const Path& undo_stack_path, const Path& result_universe_path) override
 		{
 			newUniverse();
@@ -2732,7 +2732,6 @@ struct WorldEditorImpl : public WorldEditor
 		FS::MemoryFileDevice m_mem_file_device;
 		FS::TCPFileDevice m_tcp_file_device;
 		IRenderDevice* m_edit_view_render_device;
-		bool m_toggle_game_mode_requested;
 		Path m_universe_path;
 		Path m_base_path;
 		int m_terrain_brush_size;

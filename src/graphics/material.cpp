@@ -112,8 +112,11 @@ void Material::doUnload(void)
 	ResourceManagerBase* texture_manager = m_resource_manager.get(ResourceManager::TEXTURE);
 	for(int i = 0; i < m_textures.size(); i++)
 	{
-		removeDependency(*m_textures[i].m_texture);
-		texture_manager->unload(*m_textures[i].m_texture);
+		if (m_textures[i].m_texture)
+		{
+			removeDependency(*m_textures[i].m_texture);
+			texture_manager->unload(*m_textures[i].m_texture);
+		}
 	}
 	m_textures.clear();
 

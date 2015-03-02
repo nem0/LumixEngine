@@ -6,6 +6,7 @@
 #include "core/frustum.h"
 #include "core/fs/file_system.h"
 #include "core/json_serializer.h"
+#include "core/lifo_allocator.h"
 #include "core/log.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
@@ -37,7 +38,10 @@ static const uint32_t LIGHT_DIR_HASH = crc32("light_dir");
 static const uint32_t TERRAIN_SCALE_HASH = crc32("terrain_scale");
 static const uint32_t BONE_MATRICES_HASH = crc32("bone_matrices");
 static const uint32_t CAMERA_POS_HASH = crc32("camera_pos");
+static const uint32_t MAP_SIZE_HASH = crc32("map_size");
 static const uint32_t POINT_LIGHT_HASH = crc32("point_light");
+static const uint32_t BRUSH_SIZE_HASH = crc32("brush_size");
+static const uint32_t BRUSH_POSITION_HASH = crc32("brush_position");
 static float split_distances[] = { 0.01f, 5, 20, 100, 300 };
 static const float SHADOW_CAM_NEAR = 0.1f;
 static const float SHADOW_CAM_FAR = 10000.0f;
@@ -428,7 +432,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 		, m_framebuffers(allocator)
 		, m_grass_infos(allocator)
 		, m_renderable_infos(allocator)
+		, m_frame_allocator(allocator, 1 * 1024 * 1024)
 	{
+		m_draw_calls_count = 0;
+		m_vertices_count = 0;
 		m_scene = NULL;
 		m_light_dir.set(0, -1, 0);
 		m_width = m_height = -1;
@@ -496,6 +503,18 @@ struct PipelineInstanceImpl : public PipelineInstance
 	virtual int getHeight() override
 	{
 		return m_height;
+	}
+
+
+	virtual int getDrawCalls() const override
+	{
+		return m_draw_calls_count;
+	}
+
+
+	virtual int getRenderedVerticesCount() const override
+	{
+		return m_vertices_count;
 	}
 
 
@@ -589,8 +608,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 				0.5, 0.5, 0.5, 1.0
 				);
 			m_shadow_modelviewprojection[split_index] = biasMatrix * (projection_matrix * modelview_matrix);
-
-			renderTerrains(light_cmp, layer_mask);
 
 			Frustum shadow_camera_frustum;
 			shadow_camera_frustum.computeOrtho(shadow_cam_pos, -light_forward, light_mtx.getYVector(), bb_size * 2, bb_size * 2, SHADOW_CAM_NEAR, SHADOW_CAM_FAR);
@@ -697,82 +714,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		}
 	}
 
-	void renderGrass(const Component& light_cmp, const Frustum& frustum, int64_t layer_mask)
-	{
-		PROFILE_FUNCTION();
-		if (m_active_camera.isValid())
-		{
-			const Material* last_material = NULL;
-			m_renderable_infos.clear();
-			m_scene->getGrassInfos(frustum, m_renderable_infos, layer_mask);
-			for (int i = 0; i < m_renderable_infos.size(); ++i)
-			{
-				const Terrain::GrassPatch* patch = static_cast<const Terrain::GrassPatch*>(m_renderable_infos[i].m_data);
-				patch->m_type->m_grass_mesh->getMaterial();
-				const Mesh& mesh = *patch->m_type->m_grass_mesh;
-				const Material& material = *mesh.getMaterial();
-				if (material.isReady())
-				{
-					Shader* shader = material.getShader();
-					if (&material != last_material)
-					{
-						material.apply(*m_renderer, *this);
-						m_renderer->setUniform(*shader, "camera_pos", CAMERA_POS_HASH, m_active_camera.entity.getPosition());
-
-						setLightUniforms(light_cmp, shader);
-
-						last_material = &material;
-					}
-
-					bindGeometry(*m_renderer, *patch->m_type->m_grass_geometry, mesh);
-					const int COPY_COUNT = 50;
-					for (int j = 0; j < patch->m_matrices.size() / COPY_COUNT; ++j)
-					{
-						setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::GRASS_MATRICES, &patch->m_matrices[j * COPY_COUNT], COPY_COUNT);
-						renderGeometry(mesh.getIndicesOffset(), mesh.getIndexCount());
-					}
-					if (patch->m_matrices.size() % 50 != 0)
-					{
-						setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::GRASS_MATRICES, &patch->m_matrices[(patch->m_matrices.size() / COPY_COUNT) * COPY_COUNT], patch->m_matrices.size() % 50);
-						renderGeometry(mesh.getIndicesOffset(), mesh.getIndexCount() / COPY_COUNT * (patch->m_matrices.size() % 50));
-					}
-				}
-			}
-		}
-	}
-
-	void renderTerrains(const Component& light_cmp, int64_t layer_mask)
-	{
-		PROFILE_FUNCTION();
-		if (m_active_camera.isValid())
-		{
-			m_terrain_infos.clear();
-			m_scene->getTerrainInfos(m_terrain_infos, layer_mask);
-			Vec3 camera_position = m_active_camera.entity.getPosition();
-			for (int i = 0; i < m_terrain_infos.size(); ++i)
-			{
-				if (m_terrain_infos[i].m_material && m_terrain_infos[i].m_material->isReady())
-				{
-					Matrix world_matrix;
-					m_terrain_infos[i].m_entity.getMatrix(world_matrix);
-					Shader* shader = m_terrain_infos[i].m_material->getShader();
-					m_terrain_infos[i].m_material->apply(*m_renderer, *this);
-			
-					setLightUniforms(light_cmp, shader);
-
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::WORLD_MATRIX, world_matrix);
-					Vec3 scale;
-					scale.x = m_terrain_infos[i].m_xz_scale;
-					scale.y = m_terrain_infos[i].m_y_scale;
-					scale.z = scale.x;
-					m_renderer->setUniform(*shader, "terrain_scale", TERRAIN_SCALE_HASH, scale);
-					m_scene->renderTerrain(m_terrain_infos[i], *m_renderer, *this, camera_position);
-				}
-			}
-		}
-	}
-
-
+	
 	void sortRenderables(Array<RenderableInfo>& infos)
 	{
 		PROFILE_FUNCTION();
@@ -876,6 +818,28 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
+	bool beginTerrainRenderLoop(const RenderableInfo* info, const Component& light_cmp)
+	{
+		TerrainInfo* data = (TerrainInfo*)info->m_data;
+
+		Material* material = data->m_terrain->getMesh()->getMaterial();
+		if (material->isReady())
+		{
+			Shader* shader = material->getShader();
+			if (shader->isReady())
+			{
+				data->m_terrain->getMesh()->getMaterial()->apply(*m_renderer, *this);
+				setLightUniforms(light_cmp, shader);
+
+				m_renderer->setUniform(*shader, "terrain_scale", TERRAIN_SCALE_HASH, data->m_terrain->getScale());
+
+				return true;
+			}
+		}
+		return false;
+	}
+
+
 	bool beginGrassRenderLoop(const RenderableInfo* info, const Component& light_cmp)
 	{
 		const Terrain::GrassPatch* patch = static_cast<const Terrain::GrassPatch*>(info->m_data);
@@ -932,21 +896,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_renderer->setUniform(*shader, "bone_matrices", BONE_MATRICES_HASH, bone_mtx, pose.getCount());
 	}
 
-
-	void renderPointLightInfluencedTerrains(const Frustum& frustum, int64_t layer_mask)
-	{
-		PROFILE_FUNCTION();
-
-		Array<Component> lights(m_allocator);
-		m_scene->getPointLights(frustum, lights);
-		for (int i = 0; i < lights.size(); ++i)
-		{
-			Component light = lights[i];
-			renderTerrains(light, layer_mask);
-		}
-	}
-
-
+	
 	void renderPointLightInfluencedGeometry(const Frustum& frustum, int64_t layer_mask)
 	{
 		PROFILE_FUNCTION();
@@ -959,6 +909,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 			m_renderable_infos.clear();
 			m_scene->getPointLightInfluencedGeometry(light, frustum, m_renderable_infos, layer_mask);
 			m_scene->getGrassInfos(frustum, m_renderable_infos, layer_mask);
+			m_scene->getTerrainInfos(m_renderable_infos, layer_mask, m_scene->getAppliedCamera().entity.getPosition(), m_frame_allocator);
 			render(&m_renderable_infos, light);
 		}
 	}
@@ -972,6 +923,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		{
 			m_renderable_infos.clear();
 			m_scene->getRenderableInfos(frustum, m_renderable_infos, layer_mask);
+			m_scene->getTerrainInfos(m_renderable_infos, layer_mask, m_scene->getAppliedCamera().entity.getPosition(), m_frame_allocator);
 			if (!is_shadowmap)
 			{
 				m_scene->getGrassInfos(frustum, m_renderable_infos, layer_mask);
@@ -996,6 +948,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 			const Matrix& world_matrix = *renderable_mesh->m_matrix;
 			setUniform(world_matrix_uniform_location, world_matrix);
 			setPoseUniform(renderable_mesh, shader);
+			++m_draw_calls_count;
+			m_vertices_count += indices_count;
 			renderGeometry(indices_offset, indices_count);
 			++info;
 		}
@@ -1026,7 +980,48 @@ struct PipelineInstanceImpl : public PipelineInstance
 			}
 			int instance_count = instance_matrix - matrices;
 			setUniform(world_matrix_uniform_location, matrices, instance_count);
+			++m_draw_calls_count;
+			m_vertices_count += indices_count * instance_count;
 			renderInstancedGeometry(indices_offset, indices_count, instance_count, *shader);
+		}
+		return info;
+	}
+
+
+	const RenderableInfo* renderLoopTerrain(const RenderableInfo* info)
+	{
+		PROFILE_FUNCTION();
+		const TerrainInfo* data = static_cast<const TerrainInfo*>(info->m_data);
+		
+		Matrix inv_world_matrix;
+		inv_world_matrix = data->m_world_matrix;
+		inv_world_matrix.fastInverse();
+		Vec3 camera_pos = m_active_camera.entity.getPosition();
+		Vec3 rel_cam_pos = inv_world_matrix.multiplyPosition(camera_pos) / data->m_terrain->getXZScale();
+		Shader& shader = *data->m_terrain->getMesh()->getMaterial()->getShader();
+		m_renderer->setUniform(shader, "brush_position", BRUSH_POSITION_HASH, data->m_terrain->getBrushPosition());
+		m_renderer->setUniform(shader, "brush_size", BRUSH_SIZE_HASH, data->m_terrain->getBrushSize());
+		m_renderer->setUniform(shader, "map_size", MAP_SIZE_HASH, data->m_terrain->getRootSize());
+		m_renderer->setUniform(shader, "camera_pos", CAMERA_POS_HASH, rel_cam_pos);
+
+		int64_t last_key = info->m_key;
+		bindGeometry(*m_renderer, *data->m_terrain->getGeometry(), *data->m_terrain->getMesh());
+		int world_matrix_location = getUniformLocation(shader, (int)Shader::FixedCachedUniforms::WORLD_MATRIX);
+		int morph_const_location = getUniformLocation(shader, (int)Shader::FixedCachedUniforms::MORPH_CONST);
+		int quad_size_location = getUniformLocation(shader, (int)Shader::FixedCachedUniforms::QUAD_SIZE);
+		int quad_min_location = getUniformLocation(shader, (int)Shader::FixedCachedUniforms::QUAD_MIN);
+		int mesh_part_indices_count = data->m_terrain->getMesh()->getIndexCount() / 4;
+		while (info->m_key == last_key)
+		{
+			const TerrainInfo* data = static_cast<const TerrainInfo*>(info->m_data);
+			setUniform(world_matrix_location, data->m_world_matrix);
+			setUniform(morph_const_location, data->m_morph_const);
+			setUniform(quad_size_location, data->m_size);
+			setUniform(quad_min_location, data->m_min);
+			++m_draw_calls_count;
+			m_vertices_count += mesh_part_indices_count;
+			renderGeometry(mesh_part_indices_count * data->m_index, mesh_part_indices_count);
+			++info;
 		}
 		return info;
 	}
@@ -1045,12 +1040,17 @@ struct PipelineInstanceImpl : public PipelineInstance
 			for (int j = 0; j < patch->m_matrices.size() / COPY_COUNT; ++j)
 			{
 				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::GRASS_MATRICES, &patch->m_matrices[j * COPY_COUNT], COPY_COUNT);
+				++m_draw_calls_count;
+				m_vertices_count += mesh.getIndexCount();
 				renderGeometry(mesh.getIndicesOffset(), mesh.getIndexCount());
 			}
 			if (patch->m_matrices.size() % 50 != 0)
 			{
 				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::GRASS_MATRICES, &patch->m_matrices[(patch->m_matrices.size() / COPY_COUNT) * COPY_COUNT], patch->m_matrices.size() % 50);
-				renderGeometry(mesh.getIndicesOffset(), mesh.getIndexCount() / COPY_COUNT * (patch->m_matrices.size() % 50));
+				++m_draw_calls_count;
+				int vertices_count = mesh.getIndexCount() / COPY_COUNT * (patch->m_matrices.size() % 50);
+				m_vertices_count += vertices_count;
+				renderGeometry(mesh.getIndicesOffset(), vertices_count);
 			}
 			++info;
 		}
@@ -1098,6 +1098,14 @@ struct PipelineInstanceImpl : public PipelineInstance
 					}
 					info = renderLoopRigid(info);
 					break;
+				case (int32_t)RenderableType::TERRAIN:
+					if (!beginTerrainRenderLoop(info, light))
+					{
+						++info;
+						continue;
+					}
+					info = renderLoopTerrain(info);
+					break;
 				default:
 					ASSERT(false);
 					break;
@@ -1115,6 +1123,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 	virtual void render() override
 	{
 		PROFILE_FUNCTION();
+		m_draw_calls_count = 0;
+		m_vertices_count = 0;
 		if (m_scene)
 		{
 			for (int i = 0; i < m_source.m_commands.size(); ++i)
@@ -1122,6 +1132,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 				m_source.m_commands[i]->execute(*this);
 			}
 		}
+		m_frame_allocator.clear();
 	}
 
 	virtual FrameBuffer* getShadowmapFramebuffer() override
@@ -1141,6 +1152,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 	IAllocator& m_allocator;
+	LIFOAllocator m_frame_allocator;
 	PipelineImpl& m_source;
 	RenderScene* m_scene;
 	Array<FrameBuffer*> m_framebuffers;
@@ -1158,6 +1170,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 	Array<TerrainInfo> m_terrain_infos;
 	Array<GrassInfo> m_grass_infos;
 	Array<RenderableInfo> m_renderable_infos;
+	int m_draw_calls_count;
+	int m_vertices_count;
 
 	private:
 		void operator=(const PipelineInstanceImpl&);
@@ -1271,15 +1285,13 @@ void RenderModelsCommand::execute(PipelineInstanceImpl& pipeline)
 	{
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_ONE, GL_ONE);
-
-		pipeline.renderPointLightInfluencedTerrains(pipeline.getScene()->getFrustum(), m_layer_mask);
+	
 		pipeline.renderPointLightInfluencedGeometry(pipeline.getScene()->getFrustum(), m_layer_mask);
 
 		glDisable(GL_BLEND);
 	}
 	else
 	{
-		pipeline.renderTerrains(pipeline.getScene()->getActiveGlobalLight(), m_layer_mask);
 		pipeline.renderModels(pipeline.getScene()->getFrustum(), m_layer_mask, false);
 	}
 }
