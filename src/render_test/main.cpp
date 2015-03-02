@@ -366,7 +366,7 @@ public:
 			{
 				PROFILE_BLOCK("tick");
 				m_engine->getRenderer().renderGame();
-				m_engine->update(false, 0);
+				m_engine->update(false, 1, -1);
 				if (!m_engine->getResourceManager().isLoading())
 				{
 					if (!nextTest())

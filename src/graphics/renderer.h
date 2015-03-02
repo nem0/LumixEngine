@@ -85,6 +85,8 @@ void renderGeometry(int indices_start, int vertex_count);
 void bindGeometry(Renderer& renderer, const Geometry& geometry, const Mesh& mesh);
 int getUniformLocation(const Shader& shader, int name);
 void setUniform(int location, const Matrix& mtx);
+void setUniform(int location, const Vec3& value);
+void setUniform(int location, float value);
 void setUniform(int location, const Matrix* matrices, int count);
 
 } // !namespace Lumix

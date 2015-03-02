@@ -3,6 +3,7 @@
 #include "core/blob.h"
 #include "core/frustum.h"
 #include "core/json_serializer.h"
+#include "core/lifo_allocator.h"
 #include "core/log.h"
 #include "core/math_utils.h"
 #include "core/profiler.h"
@@ -92,11 +93,12 @@ namespace Lumix
 
 		float getSquaredDistance(const Vec3& camera_pos)
 		{
-			Vec3 _max(m_min.x + m_size, m_min.y, m_min.z + m_size);
+			Vec3 _min = m_min;
+			Vec3 _max(_min.x + m_size, _min.y, _min.z + m_size);
 			float dist = 0;
-			if (camera_pos.x < m_min.x)
+			if (camera_pos.x < _min.x)
 			{
-				float d = m_min.x - camera_pos.x;
+				float d = _min.x - camera_pos.x;
 				dist += d*d;
 			}
 			if (camera_pos.x > _max.x)
@@ -104,9 +106,9 @@ namespace Lumix
 				float d = _max.x - camera_pos.x;
 				dist += d*d;
 			}
-			if (camera_pos.z < m_min.z)
+			if (camera_pos.z < _min.z)
 			{
-				float d = m_min.z - camera_pos.z;
+				float d = _min.z - camera_pos.z;
 				dist += d*d;
 			}
 			if (camera_pos.z > _max.z)
@@ -119,41 +121,48 @@ namespace Lumix
 
 		static float getRadiusInner(float size)
 		{
-			float lower_level_size = size / 2;
-			float lower_level_diagonal = sqrt(2 * size / 2 * size / 2);
+			float lower_level_size = size * 0.5f;
+			float lower_level_diagonal = Math::SQRT2 * size * 0.5f;
 			return getRadiusOuter(lower_level_size) + lower_level_diagonal;
 		}
 
 		static float getRadiusOuter(float size)
 		{
-			return (size > 17 ? 2 : 1) * sqrt(2 * size*size) + size * 0.25f;
+			return (size > 17 ? 2.25f : 1.25f) * Math::SQRT2 * size;
 		}
 
-
-		bool render(Renderer* renderer, Mesh* mesh, Geometry& geometry, const Vec3& camera_pos, RenderScene& scene)
+		bool getInfos(Array<RenderableInfo>& infos, const Vec3& camera_pos, Terrain* terrain, const Matrix& world_matrix, LIFOAllocator& allocator)
 		{
-			PROFILE_FUNCTION();
 			float squared_dist = getSquaredDistance(camera_pos);
 			float r = getRadiusOuter(m_size);
 			if (squared_dist > r*r && m_lod > 1)
 			{
 				return false;
 			}
+			
 			Vec3 morph_const(r, getRadiusInner(m_size), 0);
-			Shader& shader = *mesh->getMaterial()->getShader();
+			Shader& shader = *terrain->getMesh()->getMaterial()->getShader();
 			for (int i = 0; i < CHILD_COUNT; ++i)
 			{
-				if (!m_children[i] || !m_children[i]->render(renderer, mesh, geometry, camera_pos, scene))
+				if (!m_children[i] || !m_children[i]->getInfos(infos, camera_pos, terrain, world_matrix, allocator))
 				{
-					setFixedCachedUniform(*renderer, shader, (int)Shader::FixedCachedUniforms::MORPH_CONST, morph_const);
-					setFixedCachedUniform(*renderer, shader, (int)Shader::FixedCachedUniforms::QUAD_SIZE, m_size);
-					setFixedCachedUniform(*renderer, shader, (int)Shader::FixedCachedUniforms::QUAD_MIN, m_min);
-					bindGeometry(*renderer, geometry, *mesh);
-					renderGeometry(mesh->getIndexCount() / 4 * i, mesh->getIndexCount() / 4);
+					RenderableInfo& info = infos.pushEmpty();
+					TerrainInfo* data = (TerrainInfo*)allocator.allocate(sizeof(TerrainInfo));
+					info.m_type = (int32_t)RenderableType::TERRAIN;
+					info.m_key = (int64_t)terrain;
+					info.m_data = data;
+					data->m_morph_const = morph_const;
+					data->m_index = i;
+					data->m_terrain = terrain;
+					data->m_size = m_size;
+					data->m_min = m_min;
+					data->m_shader = &shader;
+					data->m_world_matrix = world_matrix;
 				}
 			}
 			return true;
 		}
+
 
 		IAllocator& m_allocator;
 		TerrainQuad* m_children[CHILD_COUNT];
@@ -170,8 +179,7 @@ namespace Lumix
 		, m_width(0)
 		, m_height(0)
 		, m_layer_mask(1)
-		, m_y_scale(1)
-		, m_xz_scale(1)
+		, m_scale(1, 1, 1)
 		, m_entity(entity)
 		, m_scene(scene)
 		, m_brush_position(0, 0, 0)
@@ -229,6 +237,12 @@ namespace Lumix
 		m_grass_model = NULL;
 		m_ground = 0;
 		m_density = 10;
+	}
+
+
+	float Terrain::getRootSize() const 
+	{
+		return m_root ? m_root->m_size : 0;
 	}
 
 
@@ -418,6 +432,8 @@ namespace Lumix
 						srand((int)quad_x + (int)quad_z * GRASS_QUADS_COLUMNS);
 						for(int grass_type_idx = 0; grass_type_idx < m_grass_types.size(); ++grass_type_idx)
 						{
+							if (!m_grass_types[grass_type_idx]->m_grass_model->isReady())
+								continue;
 							GrassPatch& patch = quad->m_patches.emplace(m_allocator);
 							patch.m_matrices.clear();
 							patch.m_type = m_grass_types[grass_type_idx];
@@ -430,7 +446,7 @@ namespace Lumix
 								{
 									for (float dz = 0.5f * step; dz < GRASS_QUAD_SIZE - 0.5f * step; dz += step)
 									{
-										uint32_t pixel_value = splat_map->getPixel(splat_map->getWidth() * (quad_x + dx) / (m_width * m_xz_scale), splat_map->getHeight() * (quad_z + dz) / (m_height * m_xz_scale));
+										uint32_t pixel_value = splat_map->getPixel(splat_map->getWidth() * (quad_x + dx) / (m_width * m_scale.x), splat_map->getHeight() * (quad_z + dz) / (m_height * m_scale.x));
 										uint8_t count = (pixel_value >> (8 * patch.m_type->m_ground)) & 0xff;
 										float density = count / 255.0f;
 										if(density > 0.25f)
@@ -570,8 +586,8 @@ namespace Lumix
 		char path[LUMIX_MAX_PATH];
 		serializer.readString(path, LUMIX_MAX_PATH);
 		setMaterial(static_cast<Material*>(scene.getEngine().getResourceManager().get(ResourceManager::MATERIAL)->load(Path(path))));
-		serializer.read(m_xz_scale);
-		serializer.read(m_y_scale);
+		serializer.read(m_scale.x);
+		serializer.read(m_scale.y);
 		int32_t count;
 		serializer.read(count);
 		while(m_grass_types.size() > count)
@@ -599,8 +615,8 @@ namespace Lumix
 		serializer.write(m_entity.index);
 		serializer.write(m_layer_mask);
 		serializer.writeString(m_material ? m_material->getPath().c_str() : "");
-		serializer.write(m_xz_scale);
-		serializer.write(m_y_scale);
+		serializer.write(m_scale.x);
+		serializer.write(m_scale.y);
 		serializer.write((int32_t)m_grass_types.size());
 		for(int i = 0; i < m_grass_types.size(); ++i)
 		{
@@ -613,32 +629,24 @@ namespace Lumix
 	}
 
 
-	void Terrain::render(Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos)
+	void Terrain::getInfos(Array<RenderableInfo>& infos, const Vec3& camera_pos, LIFOAllocator& allocator)
 	{
 		if (m_root)
 		{
-			m_material->apply(renderer, pipeline);
-			Matrix inv_world_matrix;
-			Matrix world_matrix;
-			m_entity.getMatrix(world_matrix);
-			inv_world_matrix = world_matrix;
-			inv_world_matrix.fastInverse();
-			Vec3 rel_cam_pos = inv_world_matrix.multiplyPosition(camera_pos) / m_xz_scale;
-			Shader& shader = *m_mesh->getMaterial()->getShader();
-			renderer.setUniform(shader, "brush_position", BRUSH_POSITION_HASH, m_brush_position);
-			renderer.setUniform(shader, "brush_size", BRUSH_SIZE_HASH, m_brush_size);
-			renderer.setUniform(shader, "map_size", MAP_SIZE_HASH, m_root->m_size);
-			renderer.setUniform(shader, "camera_pos", CAMERA_POS_HASH, rel_cam_pos);
-			m_root->render(&static_cast<Renderer&>(m_scene.getPlugin()), m_mesh, m_geometry, rel_cam_pos, *pipeline.getScene());
+			Matrix matrix = m_entity.getMatrix();
+			Matrix inv_matrix = matrix;
+			inv_matrix.fastInverse();
+			m_root->getInfos(infos, inv_matrix.multiplyPosition(camera_pos), this, matrix, allocator);
 		}
 	}
 
+	
 	float Terrain::getHeight(float x, float z)
 	{
-		int int_x = (int)(x / m_xz_scale);
-		int int_z = (int)(z / m_xz_scale);
-		float dec_x = (x - (int_x * m_xz_scale)) / m_xz_scale;
-		float dec_z = (z - (int_z * m_xz_scale)) / m_xz_scale;
+		int int_x = (int)(x / m_scale.x);
+		int int_z = (int)(z / m_scale.x);
+		float dec_x = (x - (int_x * m_scale.x)) / m_scale.x;
+		float dec_z = (z - (int_z * m_scale.x)) / m_scale.x;
 		if (dec_z == 0 && dec_x == 0)
 		{
 			return getHeight(int_x, int_z);
@@ -668,11 +676,11 @@ namespace Lumix
 		int idx = Math::clamp(texture_x, 0, m_width) + Math::clamp(texture_y, 0, m_height) * m_width;
 		if (t->getBytesPerPixel() == 2)
 		{
-			return ((m_y_scale / (256.0f * 256.0f - 1)) * ((uint16_t*)t->getData())[idx]);
+			return ((m_scale.y / (256.0f * 256.0f - 1)) * ((uint16_t*)t->getData())[idx]);
 		}
 		else if(t->getBytesPerPixel() == 4)
 		{
-			return ((m_y_scale / 255.0f) * ((uint8_t*)t->getData())[idx * 4]);
+			return ((m_scale.y / 255.0f) * ((uint8_t*)t->getData())[idx * 4]);
 		}
 		else
 		{
@@ -735,29 +743,29 @@ namespace Lumix
 			Vec3 rel_origin = mtx.multiplyPosition(origin);
 			Vec3 rel_dir = mtx * dir;
 			Vec3 start;
-			Vec3 size(m_root->m_size * m_xz_scale, m_y_scale, m_root->m_size * m_xz_scale);
+			Vec3 size(m_root->m_size * m_scale.x, m_scale.y, m_root->m_size * m_scale.x);
 			if (Math::getRayAABBIntersection(rel_origin, rel_dir, m_root->m_min, size, start))
 			{
-				int hx = (int)(start.x / m_xz_scale);
-				int hz = (int)(start.z / m_xz_scale);
+				int hx = (int)(start.x / m_scale.x);
+				int hz = (int)(start.z / m_scale.x);
 
-				float next_x = fabs(rel_dir.x) < 0.01f ? hx : ((hx + (rel_dir.x < 0 ? 0 : 1)) * m_xz_scale - rel_origin.x) / rel_dir.x;
-				float next_z = fabs(rel_dir.z) < 0.01f ? hx : ((hz + (rel_dir.z < 0 ? 0 : 1)) * m_xz_scale - rel_origin.z) / rel_dir.z;
+				float next_x = fabs(rel_dir.x) < 0.01f ? hx : ((hx + (rel_dir.x < 0 ? 0 : 1)) * m_scale.x - rel_origin.x) / rel_dir.x;
+				float next_z = fabs(rel_dir.z) < 0.01f ? hx : ((hz + (rel_dir.z < 0 ? 0 : 1)) * m_scale.x - rel_origin.z) / rel_dir.z;
 
-				float delta_x = fabs(rel_dir.x) < 0.01f ? 0 : m_xz_scale / Math::abs(rel_dir.x);
-				float delta_z = fabs(rel_dir.z) < 0.01f ? 0 : m_xz_scale / Math::abs(rel_dir.z);
+				float delta_x = fabs(rel_dir.x) < 0.01f ? 0 : m_scale.x / Math::abs(rel_dir.x);
+				float delta_z = fabs(rel_dir.z) < 0.01f ? 0 : m_scale.x / Math::abs(rel_dir.z);
 				int step_x = (int)Math::signum(rel_dir.x);
 				int step_z = (int)Math::signum(rel_dir.z);
 
 				while (hx >= 0 && hz >= 0 && hx + 1 < m_width && hz + 1 < m_height)
 				{
 					float t;
-					float x = hx * m_xz_scale;
-					float z = hz * m_xz_scale;
+					float x = hx * m_scale.x;
+					float z = hz * m_scale.x;
 					Vec3 p0(x, getHeight(x, z), z);
-					Vec3 p1(x + m_xz_scale, getHeight(x + m_xz_scale, z), z);
-					Vec3 p2(x + m_xz_scale, getHeight(x + m_xz_scale, z + m_xz_scale), z + m_xz_scale);
-					Vec3 p3(x, getHeight(x, z + m_xz_scale), z + m_xz_scale);
+					Vec3 p1(x + m_scale.x, getHeight(x + m_scale.x, z), z);
+					Vec3 p2(x + m_scale.x, getHeight(x + m_scale.x, z + m_scale.x), z + m_scale.x);
+					Vec3 p3(x, getHeight(x, z + m_scale.x), z + m_scale.x);
 					if (getRayTriangleIntersection(rel_origin, rel_dir, p0, p1, p2, t))
 					{
 						hit.m_is_hit = true;

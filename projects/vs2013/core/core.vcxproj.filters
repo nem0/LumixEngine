@@ -143,6 +143,7 @@
     <ClInclude Include="..\..\..\src\debug\floating_points.h">
       <Filter>debug</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\core\lifo_allocator.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\core\blob.cpp" />

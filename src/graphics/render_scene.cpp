@@ -6,6 +6,7 @@
 #include "core/FS/file_system.h"
 #include "core/FS/ifile.h"
 #include "core/json_serializer.h"
+#include "core/lifo_allocator.h"
 #include "core/log.h"
 #include "core/math_utils.h"
 #include "core/mtjd/generic_job.h"
@@ -460,13 +461,13 @@ namespace Lumix
 				for (int i = m_debug_lines.size() - 1; i >= 0; --i)
 				{
 					float life = m_debug_lines[i].m_life;
-					life -= dt;
 					if (life < 0)
 					{
 						m_debug_lines.eraseFast(i);
 					}
 					else
 					{
+						life -= dt;
 						m_debug_lines[i].m_life = life;
 					}
 				}
@@ -920,7 +921,6 @@ namespace Lumix
 			virtual void setTerrainBrush(Component cmp, const Vec3& position, float size) override
 			{
 				m_terrains[cmp.index]->setBrush(position, size);
-				addDebugCross(position, 1, Vec3(1, 0, 0), 0);
 			}
 
 
@@ -1066,7 +1066,7 @@ namespace Lumix
 			}
 
 
-			virtual void getTerrainInfos(Array<TerrainInfo>& infos, int64_t layer_mask) override
+			virtual void getTerrainInfos(Array<RenderableInfo>& infos, int64_t layer_mask, const Vec3& camera_pos, LIFOAllocator& frame_allocator) override
 			{
 				PROFILE_FUNCTION();
 				infos.reserve(m_terrains.size());
@@ -1074,12 +1074,7 @@ namespace Lumix
 				{
 					if (m_terrains[i] && (m_terrains[i]->getLayerMask() & layer_mask) != 0)
 					{
-						TerrainInfo& info = infos.pushEmpty();
-						info.m_entity = m_terrains[i]->getEntity();
-						info.m_material = m_terrains[i]->getMaterial();
-						info.m_index = i;
-						info.m_xz_scale = m_terrains[i]->getXZScale();
-						info.m_y_scale = m_terrains[i]->getYScale();
+						m_terrains[i]->getInfos(infos, camera_pos, frame_allocator);
 					}
 				}
 			}
@@ -1893,14 +1888,6 @@ namespace Lumix
 				return m_time;
 			}
 
-			virtual void renderTerrain(const TerrainInfo& info, Renderer& renderer, PipelineInstance& pipeline, const Vec3& camera_pos) override
-			{
-				int i = info.m_index;
-				if (m_terrains[i]->getMaterial() && m_terrains[i]->getMaterial()->isReady())
-				{
-					m_terrains[i]->render(renderer, pipeline, camera_pos);
-				}
-			}
 
 		private:
 			void modelLoaded(Model* model, int renderable_index)

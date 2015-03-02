@@ -137,7 +137,7 @@ namespace Lumix
 
 			void setFrame(Component cmp, int frame)
 			{
-				m_animables[cmp.index].m_time = m_animables[cmp.index].m_animation->getLength() * frame / 30.0f; /// TODO get rid of the constant
+				m_animables[cmp.index].m_time = m_animables[cmp.index].m_animation->getLength() * frame / m_animables[cmp.index].m_animation->getFPS();
 			}
 
 
