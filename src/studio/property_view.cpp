@@ -873,8 +873,8 @@ ScriptComponentPlugin::ScriptComponentPlugin(Lumix::WorldEditor& editor, ScriptC
 	, m_compiler(compiler)
 	, m_status_item(NULL)
 {
-	connect(&m_compiler, &ScriptCompiler::compiled, [this](const Lumix::Path&, uint32_t status){
-		setScriptStatus(status == 0 ? ScriptCompiler::SUCCESS : ScriptCompiler::FAILURE);
+	connect(&m_compiler, &ScriptCompiler::compiled, [this](){
+		setScriptStatus(m_compiler.getStatus());
 	});
 }
 
@@ -898,7 +898,7 @@ void ScriptComponentPlugin::createEditor(QTreeWidgetItem* component_item, const 
 	compile_button->connect(compile_button, &QPushButton::clicked, this, [this, component](){
 		Lumix::string path(m_world_editor.getAllocator());
 		static_cast<Lumix::ScriptScene*>(component.scene)->getScriptPath(component, path);
-		m_compiler.compile(Lumix::Path(path.c_str()));
+		m_compiler.compileAll();
 	});
 
 	QTreeWidgetItem* status_item = new QTreeWidgetItem(QStringList() << "Status");
@@ -906,7 +906,7 @@ void ScriptComponentPlugin::createEditor(QTreeWidgetItem* component_item, const 
 	component_item->addChild(status_item);
 	Lumix::string path(m_world_editor.getAllocator());
 	static_cast<Lumix::ScriptScene*>(component.scene)->getScriptPath(component, path);
-	switch (m_compiler.getStatus(Lumix::Path(path.c_str())))
+	switch (m_compiler.getStatus())
 	{
 	case ScriptCompiler::SUCCESS:
 		status_item->setText(1, "Compiled");
