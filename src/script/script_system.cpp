@@ -1,6 +1,5 @@
 #include "script_system.h"
 #include <Windows.h>
-#include "base_script.h"
 #include "core/iallocator.h"
 #include "core/crc32.h"
 #include "core/fs/file_system.h"
@@ -18,13 +17,14 @@ static const uint32_t SCRIPT_HASH = crc32("script");
 
 namespace Lumix
 {
-	typedef BaseScript* (*CreateScriptFunction)();
-	typedef void (*DestroyScriptFunction)(BaseScript* script);
-
 	class ScriptSystemImpl;
 
 	class ScriptSceneImpl : public ScriptScene
 	{
+		public:
+			typedef void (*InitFunction)(ScriptScene*);
+			typedef void (*UpdateFunction)(float);
+
 		public:
 			ScriptSceneImpl(ScriptSystemImpl& system, Engine& engine, Universe& universe)
 				: m_universe(universe)
@@ -32,15 +32,15 @@ namespace Lumix
 				, m_system(system)
 				, m_allocator(engine.getAllocator())
 				, m_paths(m_allocator)
-				, m_running_scripts(m_allocator)
 				, m_script_entities(m_allocator)
+				, m_script_renamed(m_allocator)
+				, m_module(NULL)
 			{
 			}
 
 
 			~ScriptSceneImpl()
 			{
-				stopAll();
 			}
 
 
@@ -55,7 +55,6 @@ namespace Lumix
 
 			void deserialize(InputBlob& serializer) override
 			{
-				stopAll();
 				int32_t count;
 				serializer.read(count);
 				m_script_entities.resize(count);
@@ -73,137 +72,120 @@ namespace Lumix
 						m_universe.addComponent(entity, SCRIPT_HASH, this, i);
 					}
 				}
-				runAll();
 			}
 
 
-			void update(float dt)
+			void update(float time_delta) override
 			{
-				for (int i = 0; i < m_running_scripts.size(); ++i)
+				if (!m_module)
 				{
-					m_running_scripts[i].m_script_object->update(dt);
+					TODO("some init function");
+					const char* library_path = "scripts/Debug/main.dll";
+					m_module = LoadLibrary(library_path);
+					if (!m_module)
+					{
+						g_log_error.log("script") << "Could not load " << library_path;
+						return;
+					}
+					m_update_function = (UpdateFunction)GetProcAddress(m_module, "update");
+					InitFunction init_function = (InitFunction)GetProcAddress(m_module, "init");
+					if (!m_update_function)
+					{
+						g_log_error.log("script") << "Could not find function update in " << library_path;
+					}
+					if (!init_function)
+					{
+						g_log_error.log("script") << "Could not find function init in " << library_path;
+					}
+					if (init_function)
+					{
+						init_function(this);
+					}
+				}
+				if (m_update_function)
+				{
+					m_update_function(time_delta);
 				}
 			}
 
 
+			virtual const Lumix::Path& getScriptPath(Component cmp) override
+			{
+				return m_paths[cmp.index];
+			}
+
+			
 			void getScriptPath(Component cmp, string& str) override
 			{
 				str = m_paths[cmp.index];
 			}
 
 
+			virtual DelegateList<void(const Path&, const Path&)>& scriptRenamed() override
+			{
+				return m_script_renamed;
+			}
+
+
 			void setScriptPath(Component cmp, const string& str) override
 			{
-				m_paths[cmp.index] = string(str.c_str(), m_allocator);
-				stopScript(cmp.index);
-				if (!runScript(cmp.index))
-				{
-					g_log_warning.log("script") << "Could not run script " << str;
-				}
+				Lumix::Path old_path = m_paths[cmp.index];
+				m_paths[cmp.index] = str.c_str();
+				m_script_renamed.invoke(old_path, m_paths[cmp.index]);
 			}
 
 
-			void getDll(const char* script_path, char* dll_path, char* full_path, int max_length)
+			virtual Component getNextScript(const Component& cmp) override
 			{
-				copyString(dll_path, max_length, script_path);
-				int32_t len = (int32_t)strlen(script_path);
-				if (len > 4)
+				for (int i = cmp.index + 1; i < m_script_entities.size(); ++i)
 				{
-					copyString(dll_path + len - 4, 5, ".dll");
+					if (m_script_entities[i] != -1)
+					{
+						return Component(Entity(&m_universe, m_script_entities[i]), SCRIPT_HASH, this, i);
+					}
 				}
-				copyString(full_path, max_length, m_engine.getBasePath());
-				catCString(full_path, max_length, "\\");
-				catCString(full_path, max_length, dll_path);
+				return Component::INVALID;
+			}
+			
+
+			virtual Component getFirstScript() override
+			{
+				for (int i = 0; i < m_script_entities.size(); ++i)
+				{
+					if (m_script_entities[i] != -1)
+					{
+						return Component(Entity(&m_universe, m_script_entities[i]), SCRIPT_HASH, this, i);
+					}
+				}
+				return Component::INVALID;
 			}
 
-
+			
 			void getScriptDefaultPath(Entity e, char* path, char* full_path, int length, const char* ext)
 			{
 				char tmp[30];
 				toCString(e.index, tmp, 30);
 
 				copyString(full_path, length, m_engine.getBasePath());
-				catCString(full_path, length, "\\scripts\\e");
+				catCString(full_path, length, "e");
 				catCString(full_path, length, tmp);
 				catCString(full_path, length, ".");
 				catCString(full_path, length, ext);
 
-				copyString(path, length, "scripts\\e");
+				copyString(path, length, "e");
 				catCString(path, length, tmp);
 				catCString(path, length, ".");
 				catCString(path, length, ext);
 			}
 
 
-			virtual void beforeScriptCompiled(const Lumix::Path& path) override
+			virtual void beforeScriptCompiled() override
 			{
-				for (int i = 0; i < m_paths.size(); ++i)
-				{
-					if (m_paths[i] == path.c_str())
-					{
-						stopScript(i);
-					}
-				}
 			}
 
 
-			virtual void afterScriptCompiled(const Lumix::Path& path) override
+			virtual void afterScriptCompiled() override
 			{
-				for (int i = 0; i < m_paths.size(); ++i)
-				{
-					if (m_paths[i] == path.c_str())
-					{
-						runScript(i);
-					}
-				}
-			}
-
-
-			void stopScript(int index)
-			{
-				int entity_idx = m_script_entities[index];
-				for (int i = 0; i < m_running_scripts.size(); ++i)
-				{
-					if (m_running_scripts[i].m_entity_idx == entity_idx)
-					{
-						DestroyScriptFunction f = (DestroyScriptFunction)GetProcAddress(m_running_scripts[i].m_lib, "destroyScript");
-						f(m_running_scripts[i].m_script_object);
-						BOOL b = FreeLibrary(m_running_scripts[i].m_lib);
-						ASSERT(b == TRUE);
-						m_running_scripts.eraseFast(i);
-						return;
-					}
-				}
-			}
-
-
-			bool runScript(int i)
-			{
-				char path[LUMIX_MAX_PATH];
-				char full_path[LUMIX_MAX_PATH];
-				getDll(m_paths[i].c_str(), path, full_path, LUMIX_MAX_PATH);
-				HMODULE h = LoadLibrary(full_path);
-				if (h)
-				{
-					CreateScriptFunction f = (CreateScriptFunction)GetProcAddress(h, TEXT("createScript"));
-					BaseScript* script = f();
-					if (!f)
-					{
-						g_log_warning.log("script") << "failed to create script " << m_paths[i].c_str();
-						FreeLibrary(h);
-					}
-					else
-					{
-						RunningScript running_script;
-						running_script.m_script_object = script;
-						running_script.m_entity_idx = m_script_entities[i];
-						running_script.m_lib = h;
-						m_running_scripts.push(running_script);
-						script->create(*this, Entity(&m_universe, running_script.m_entity_idx));
-						return true;
-					}
-				}
-				return false;
 			}
 
 
@@ -219,64 +201,11 @@ namespace Lumix
 				Component cmp = m_universe.addComponent(entity, SCRIPT_HASH, this, m_script_entities.size() - 1);
 				m_universe.componentCreated().invoke(cmp);
 
-				runScript(m_paths.size() - 1);
-
 				return cmp;
 			}
 
 
-			void runAll()
-			{
-				char path[MAX_PATH];
-				char full_path[MAX_PATH];
-				for (int i = 0; i < m_script_entities.size(); ++i)
-				{
-					if(m_script_entities[i] != -1)
-					{
-						Entity e(&m_universe, m_script_entities[i]);
-						getDll(m_paths[i].c_str(), path, full_path, MAX_PATH);
-						HMODULE h = LoadLibrary(full_path);
-						if (h)
-						{
-							CreateScriptFunction f = (CreateScriptFunction)GetProcAddress(h, TEXT("createScript"));
-							BaseScript* script = f();
-							if (!f)
-							{
-								g_log_warning.log("script") << "failed to create script " << m_paths[i].c_str();
-								FreeLibrary(h);
-							}
-							else
-							{
-								RunningScript running_script;
-								running_script.m_entity_idx = e.index;
-								running_script.m_lib = h;
-								running_script.m_script_object = script;
-								m_running_scripts.push(running_script);
-								script->create(*this, e);
-							}
-						}
-						else
-						{
-							g_log_warning.log("script") << "failed to load script " << m_paths[i].c_str();
-						}
-					}
-				}
-			}
-
-
-			void stopAll()
-			{
-				for (int i = 0; i < m_running_scripts.size(); ++i)
-				{
-					DestroyScriptFunction f = (DestroyScriptFunction)GetProcAddress(m_running_scripts[i].m_lib, "destroyScript");
-					f(m_running_scripts[i].m_script_object);
-					BOOL b = FreeLibrary(m_running_scripts[i].m_lib);
-					ASSERT(b == TRUE);
-				}
-				m_running_scripts.clear();
-			}
-
-
+		
 			void serialize(OutputBlob& serializer) override
 			{
 				serializer.write((int32_t)m_script_entities.size());
@@ -310,21 +239,15 @@ namespace Lumix
 				return m_engine;
 			}
 
-
-			struct RunningScript
-			{
-				BaseScript* m_script_object;
-				HMODULE m_lib;
-				int m_entity_idx;
-			};
-
 			IAllocator& m_allocator;
-			Array<RunningScript> m_running_scripts;
 			Array<int32_t> m_script_entities;
 			Array<Path> m_paths;
 			Universe& m_universe;
 			Engine& m_engine;
 			ScriptSystemImpl& m_system;
+			HMODULE m_module;
+			UpdateFunction m_update_function;
+			DelegateList<void(const Path&, const Path&)> m_script_renamed;
 	};
 
 	class ScriptSystemImpl : public IPlugin
@@ -332,6 +255,7 @@ namespace Lumix
 		public:
 			Engine& m_engine;
 			BaseProxyAllocator m_allocator;
+
 
 			ScriptSystemImpl(Engine& engine)
 				: m_engine(engine)
@@ -357,7 +281,7 @@ namespace Lumix
 				if (m_engine.getWorldEditor())
 				{
 					IAllocator& allocator = m_engine.getWorldEditor()->getAllocator();
-					m_engine.getWorldEditor()->registerProperty("script", allocator.newObject<FilePropertyDescriptor<ScriptSceneImpl> >("source", &ScriptSceneImpl::getScriptPath, &ScriptSceneImpl::setScriptPath, "Script (*.cpp)", allocator));
+					m_engine.getWorldEditor()->registerProperty("script", allocator.newObject<FilePropertyDescriptor<ScriptSceneImpl> >("source", (void (ScriptSceneImpl::*)(Component, string&))&ScriptSceneImpl::getScriptPath, &ScriptSceneImpl::setScriptPath, "Script (*.cpp)", allocator));
 				}
 				return true;
 			}
@@ -380,8 +304,7 @@ namespace Lumix
 	{
 		return m_system;
 	}
-
-
+	
 
 	extern "C" IPlugin* createPlugin(Engine& engine)
 	{

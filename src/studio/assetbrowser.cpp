@@ -143,7 +143,7 @@ void AssetBrowser::onFileChanged(const QString& path)
 	if (info.suffix() == "cpp")
 	{
 		auto path = info.filePath().toLatin1();
-		m_compiler->compile(Lumix::Path(path.data()));
+		m_compiler->compileAll();
 	}
 	else if(info.suffix() == "blend@")
 	{

@@ -27,21 +27,22 @@ public:
 
 public:
 	explicit ScriptCompiler(QObject* parent = NULL);
-	void compile(const Lumix::Path& path);
 	void compileAll();
 	void setBasePath(const Lumix::Path& path) { m_base_path = path; }
-	void checkFinished();
 	bool isEmpty() const { return m_processes.empty(); }
-	Status getStatus(const Lumix::Path& path);
-	QString getLog(const Lumix::Path& path);
+	Status getStatus() { return m_status; }
+	QString getLog() { return m_log; }
 	void setWorldEditor(Lumix::WorldEditor& editor);
+	void addScript(const Lumix::Path& path);
+	void onScriptRenamed(const Lumix::Path& old_path, const Lumix::Path& new_path);
+	void removeScript(const Lumix::Path& path);
+	void clearScripts();
+	void setProjectName(const QString& name) { m_project_name = name; }
+	const QString& getProjectName() { return m_project_name; }
+	void setSourcesPath(const QString& path) { m_sources_path = path; }
 
 signals:
-	void messageLogged(const QString& message);
-	void compiled(const Lumix::Path&, uint32_t);
-
-public slots:
-	void compilerFinish(int exitCode);
+	void compiled();
 
 private:
 	struct ProcessInfo
@@ -51,9 +52,15 @@ private:
 	};
 
 private:
+	void emitCompiled() { emit compiled(); }
+
+private:
 	Lumix::Path m_base_path;
 	QVector<ProcessInfo> m_processes;
-	QMap<uint32_t, Status> m_status;
-	QMap<uint32_t, QString> m_log;
+	QVector<Lumix::Path> m_scripts;
 	Lumix::WorldEditor* m_editor;
+	Status m_status;
+	QString m_log;
+	QString m_project_name;
+	QString m_sources_path;
 };
