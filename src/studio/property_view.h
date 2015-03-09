@@ -86,7 +86,6 @@ class PropertyView : public QDockWidget
 };
 
 
-
 class GlobalLightComponentPlugin : public QObject, public PropertyView::IEntityComponentPlugin
 {
 		Q_OBJECT
@@ -95,6 +94,7 @@ class GlobalLightComponentPlugin : public QObject, public PropertyView::IEntityC
 		virtual void createEditor(QTreeWidgetItem* component_item, const Lumix::Component& component) override;
 		virtual void onPropertyViewCleared() override {}
 };
+
 
 class TerrainComponentPlugin : public QObject, public PropertyView::IEntityComponentPlugin
 {
@@ -118,7 +118,6 @@ class TerrainComponentPlugin : public QObject, public PropertyView::IEntityCompo
 		QTreeWidgetItem* m_tools_item;
 		QTreeWidgetItem* m_texture_tool_item;
 };
-
 
 
 class ScriptComponentPlugin : public QObject, public PropertyView::IEntityComponentPlugin

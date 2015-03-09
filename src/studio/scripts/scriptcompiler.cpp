@@ -73,7 +73,7 @@ void ScriptCompiler::compile(const Lumix::Path& path)
 void ScriptCompiler::compilerFinish(int exitCode)
 {
 	QProcess* process = static_cast<QProcess*>(QObject::sender());
-	QString s = process->readAll();;
+	QString s = process->readAll();
 	process->deleteLater();
 	while(process->waitForReadyRead())
 	{

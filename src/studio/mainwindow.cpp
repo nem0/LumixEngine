@@ -1,5 +1,8 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include "animation_editor/animable_component_plugin.h"
+#include "animation_editor/animation_editor.h"
+#include "animation_editor/skeleton_view.h"
 #include "assetbrowser.h"
 #include "editor/entity_template_system.h"
 #include "editor/gizmo.h"
@@ -34,6 +37,8 @@ MainWindow::MainWindow(QWidget* parent) :
 
 	m_log = new LogWidget;
 	m_property_view = new PropertyView;
+	m_animation_editor = new AnimationEditor;
+	m_skeleton_view = new SkeletonView();
 	m_scene_view = new SceneView;
 	m_game_view = new GameView;
 	m_asset_browser = new AssetBrowser;
@@ -56,6 +61,7 @@ MainWindow::MainWindow(QWidget* parent) :
 			info.m_action->setChecked(info.m_widget->isVisible());
 		}
 	});
+	addEditorDock(static_cast<Qt::DockWidgetArea>(1), m_animation_editor, &MainWindow::on_actionAnimation_Editor_triggered);
 	addEditorDock(static_cast<Qt::DockWidgetArea>(2), m_asset_browser, &MainWindow::on_actionAsset_Browser_triggered);
 	addEditorDock(static_cast<Qt::DockWidgetArea>(2), m_entity_list, &MainWindow::on_actionEntity_list_triggered);
 	addEditorDock(static_cast<Qt::DockWidgetArea>(2), m_entity_template_list_ui, &MainWindow::on_actionEntity_templates_triggered);
@@ -66,6 +72,7 @@ MainWindow::MainWindow(QWidget* parent) :
 	addEditorDock(static_cast<Qt::DockWidgetArea>(1), m_property_view, &MainWindow::on_actionProperties_triggered);
 	addEditorDock(static_cast<Qt::DockWidgetArea>(2), m_scene_view, &MainWindow::on_actionScene_View_triggered);
 	addEditorDock(static_cast<Qt::DockWidgetArea>(8), m_script_compiler_ui, &MainWindow::on_actionScript_compiler_triggered);
+	addEditorDock(static_cast<Qt::DockWidgetArea>(1), m_skeleton_view, &MainWindow::on_actionSkeleton_View_triggered);
 
 	createLayoutCombobox();
 
@@ -111,6 +118,7 @@ void MainWindow::installPlugins()
 	m_property_view->addEntityComponentPlugin(new ScriptComponentPlugin(*m_world_editor, *m_script_compiler_ui->getCompiler()));
 	m_property_view->addEntityComponentPlugin(new TerrainComponentPlugin(*m_world_editor, m_entity_template_list_ui, m_entity_list));
 	m_property_view->addEntityComponentPlugin(new GlobalLightComponentPlugin());
+	m_property_view->addEntityComponentPlugin(new AnimableComponentPlugin(*m_animation_editor));
 }
 
 
@@ -183,6 +191,7 @@ void MainWindow::resizeEvent(QResizeEvent* event)
 void MainWindow::update()
 {
 	m_notifications->update(m_world_editor->getEngine().getLastTimeDelta());
+	m_animation_editor->update(m_world_editor->getEngine().getLastTimeDelta());
 }
 
 
@@ -207,6 +216,8 @@ MainWindow::~MainWindow()
 {
 	delete m_log;
 	delete m_ui;
+	delete m_animation_editor;
+	delete m_skeleton_view;
 	delete m_scene_view;
 	delete m_property_view;
 	delete m_game_view;
@@ -231,6 +242,7 @@ void MainWindow::setWorldEditor(Lumix::WorldEditor& editor)
 	m_script_compiler_ui->setWorldEditor(editor);
 	m_asset_browser->setScriptCompiler(m_script_compiler_ui->getCompiler());
 	m_asset_browser->setNotifications(m_notifications);
+	m_skeleton_view->setWorldEditor(editor);
 
 	m_world_editor->universeLoaded().bind<MainWindow, &MainWindow::onUniverseLoaded>(this);
 
@@ -322,6 +334,16 @@ void MainWindow::on_actionFile_server_triggered()
 void MainWindow::on_actionAsset_Browser_triggered()
 {
 	m_asset_browser->show();
+}
+
+void MainWindow::on_actionAnimation_Editor_triggered()
+{
+	m_animation_editor->show();
+}
+
+void MainWindow::on_actionSkeleton_View_triggered()
+{
+	m_skeleton_view->show();
 }
 
 void MainWindow::on_actionScene_View_triggered()
