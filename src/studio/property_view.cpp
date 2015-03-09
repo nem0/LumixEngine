@@ -947,4 +947,3 @@ void ScriptComponentPlugin::setScriptStatus(uint32_t status)
 			break;
 	}	
 }
-

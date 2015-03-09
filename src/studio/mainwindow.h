@@ -14,6 +14,7 @@ namespace Ui
 	class MainWindow;
 }
 
+
 class MainWindow : public QMainWindow
 {
 	Q_OBJECT
@@ -42,6 +43,8 @@ private slots:
 	void on_actionFile_server_triggered();
 	void on_actionAsset_Browser_triggered();
 	void on_actionScene_View_triggered();
+	void on_actionAnimation_Editor_triggered();
+	void on_actionSkeleton_View_triggered();
 	virtual void closeEvent(QCloseEvent* event) override;
 	void on_actionProfiler_triggered();
 	void on_actionPolygon_Mode_changed();
@@ -88,6 +91,8 @@ private:
 private:
 	Ui::MainWindow* m_ui;
 	Lumix::WorldEditor* m_world_editor;
+	class AnimationEditor* m_animation_editor;
+	class SkeletonView* m_skeleton_view;
 	class LogWidget* m_log;
 	class PropertyView* m_property_view;
 	class SceneView* m_scene_view;
