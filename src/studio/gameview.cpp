@@ -5,13 +5,15 @@
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "graphics/pipeline.h"
+#include "mainwindow.h"
 
 #include <QMouseEvent>
 
 
-GameView::GameView(QWidget* parent) :
-	QDockWidget(parent),
-	m_ui(new Ui::GameView)
+GameView::GameView(MainWindow& parent)
+	: QDockWidget(&parent)
+	, m_ui(new Ui::GameView)
+	, m_main_window(parent)
 {
 	m_ui->setupUi(this);
 	m_pipeline = NULL;
@@ -86,6 +88,6 @@ void GameView::keyPressEvent(QKeyEvent* event)
 
 void GameView::on_playButton_clicked()
 {
-	m_editor->toggleGameMode();
+	m_main_window.on_actionGame_mode_triggered();
 }
 
