@@ -61,6 +61,8 @@ void ScriptCompiler::clearScripts()
 
 void ScriptCompiler::compileAll()
 {
+	Lumix::ScriptScene* scene = static_cast<Lumix::ScriptScene*>(m_editor->getEngine().getScene(crc32("script")));
+	scene->beforeScriptCompiled();
 	m_status = NOT_COMPILED;
 	QString sources = QString("		<ClCompile Include=\"%1.cpp\"/>\n").arg(m_project_name);
 	for (int i = 0; i < m_scripts.size(); ++i)
@@ -95,7 +97,7 @@ void ScriptCompiler::compileAll()
 		"		<Link>\n"
 		"			<AdditionalDependencies>core.lib;engine.lib;physics.lib</AdditionalDependencies>\n"
 		"			<AdditionalLibraryDirectories>%1\\bin\\win32_debug</AdditionalLibraryDirectories>\n"
-		"			<GenerateDebugInformation>true</GenerateDebugInformation>"
+		"			<GenerateDebugInformation>false</GenerateDebugInformation>"
 		"		</Link>\n"
 		"	</ItemDefinitionGroup>\n"
 		"	<ItemGroup>\n").arg(m_sources_path).toLatin1().data());
@@ -107,7 +109,7 @@ void ScriptCompiler::compileAll()
 	file.close();
 
 	QProcess* process = new QProcess;
-	process->connect(process, (void (QProcess::*)(int))&QProcess::finished, [this, process](int exit_code){
+	process->connect(process, (void (QProcess::*)(int))&QProcess::finished, [scene, this, process](int exit_code){
 		process->deleteLater();
 		m_log = process->readAll();
 		m_status = exit_code == 0 ? SUCCESS : FAILURE;
@@ -123,4 +125,13 @@ void ScriptCompiler::compileAll()
 void ScriptCompiler::setWorldEditor(Lumix::WorldEditor& editor)
 {
 	m_editor = &editor;
+}
+
+
+void ScriptCompiler::onGameModeToggled(bool was_game_mode)
+{
+	if (!was_game_mode)
+	{
+		compileAll();
+	}
 }

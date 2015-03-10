@@ -53,6 +53,7 @@ private:
 
 private:
 	void emitCompiled() { emit compiled(); }
+	void onGameModeToggled(bool was_game_mode);
 
 private:
 	Lumix::Path m_base_path;

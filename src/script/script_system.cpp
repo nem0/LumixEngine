@@ -181,11 +181,8 @@ namespace Lumix
 
 			virtual void beforeScriptCompiled() override
 			{
-			}
-
-
-			virtual void afterScriptCompiled() override
-			{
+				FreeLibrary(m_module);
+				m_module = NULL;
 			}
 
 

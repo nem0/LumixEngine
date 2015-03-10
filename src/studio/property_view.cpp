@@ -413,7 +413,7 @@ void PropertyView::setWorldEditor(Lumix::WorldEditor& editor)
 	m_world_editor->entitySelected().bind<PropertyView, &PropertyView::onEntitySelected>(this);
 	m_world_editor->universeCreated().bind<PropertyView, &PropertyView::onUniverseCreated>(this);
 	m_world_editor->universeDestroyed().bind<PropertyView, &PropertyView::onUniverseDestroyed>(this);
-	if (m_world_editor->getEngine().getUniverse())
+	if (m_world_editor->getUniverse())
 	{
 		onUniverseCreated();
 	}
@@ -422,13 +422,13 @@ void PropertyView::setWorldEditor(Lumix::WorldEditor& editor)
 
 void PropertyView::onUniverseCreated()
 {
-	m_world_editor->getEngine().getUniverse()->entityMoved().bind<PropertyView, &PropertyView::onEntityPosition>(this);
+	m_world_editor->getUniverse()->entityMoved().bind<PropertyView, &PropertyView::onEntityPosition>(this);
 }
 
 
 void PropertyView::onUniverseDestroyed()
 {
-	m_world_editor->getEngine().getUniverse()->entityMoved().unbind<PropertyView, &PropertyView::onEntityPosition>(this);
+	m_world_editor->getUniverse()->entityMoved().unbind<PropertyView, &PropertyView::onEntityPosition>(this);
 }
 
 

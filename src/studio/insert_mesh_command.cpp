@@ -78,7 +78,7 @@ void InsertMeshCommand::undo()
 	{
 		cmps[i].scene->destroyComponent(cmps[i]);
 	}
-	m_editor.getEngine().getUniverse()->destroyEntity(m_entity);
+	m_editor.getUniverse()->destroyEntity(m_entity);
 	m_entity = Lumix::Entity::INVALID;
 }
 
