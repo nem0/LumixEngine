@@ -27,7 +27,6 @@ ScriptCompilerWidget::ScriptCompilerWidget(QWidget* parent)
 	connect(m_compiler, &ScriptCompiler::compiled, [this](){
 		m_ui->compilerOutputView->setText(m_compiler->getLog());
 	});
-	m_compiler->compileAll();
 	connect(m_ui->scriptListWidget, &QListWidget::itemDoubleClicked, [this](QListWidgetItem * item) {
 		QProcess* process = new QProcess;
 		process->start(QString("cmd.exe /C %1/scripts/edit_in_vs.bat %2").arg(m_editor->getBasePath()).arg(item->text()));
@@ -66,7 +65,7 @@ void ScriptCompilerWidget::setWorldEditor(Lumix::WorldEditor& editor)
 {
 	m_compiler->setWorldEditor(editor);
 	m_editor = &editor;
-	setUniverse(m_editor->getEngine().getUniverse());
+	setUniverse(m_editor->getUniverse());
 	m_editor->universeCreated().bind<ScriptCompilerWidget, &ScriptCompilerWidget::onUniverseCreated>(this);
 	m_editor->universeDestroyed().bind<ScriptCompilerWidget, &ScriptCompilerWidget::onUniverseDestroyed>(this);
 	m_editor->universeLoaded().bind<ScriptCompilerWidget, &ScriptCompilerWidget::onUniverseLoaded>(this);
@@ -75,7 +74,7 @@ void ScriptCompilerWidget::setWorldEditor(Lumix::WorldEditor& editor)
 
 void ScriptCompilerWidget::onUniverseCreated()
 {
-	setUniverse(m_editor->getEngine().getUniverse());
+	setUniverse(m_editor->getUniverse());
 }
 
 
