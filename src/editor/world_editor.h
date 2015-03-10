@@ -127,6 +127,7 @@ namespace Lumix
 			virtual bool executeUndoStack(const Path& path) = 0;
 			virtual bool runTest(const Path& undo_stack_path, const Path& result_universe_path) = 0;
 			virtual void registerEditorCommandCreator(const char* command_type, EditorCommandCreator) = 0;
+			virtual bool isGameMode() const = 0;
 
 		protected:
 			virtual ~WorldEditor() {}

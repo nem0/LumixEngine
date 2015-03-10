@@ -1761,6 +1761,12 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
+		virtual bool isGameMode() const override
+		{
+			return m_is_game_mode;
+		}
+
+
 		virtual void toggleGameMode() override
 		{
 			if (m_is_game_mode)

@@ -14,6 +14,7 @@
 #include "property_view.h"
 #include "sceneview.h"
 #include "scripts/scriptcompilerwidget.h"
+#include "scripts/scriptcompiler.h"
 #include "profilerui.h"
 #include <qcombobox.h>
 #include <qdir.h>
@@ -35,7 +36,7 @@ MainWindow::MainWindow(QWidget* parent) :
 	m_log = new LogWidget;
 	m_property_view = new PropertyView;
 	m_scene_view = new SceneView;
-	m_game_view = new GameView;
+	m_game_view = new GameView(*this);
 	m_asset_browser = new AssetBrowser;
 	m_script_compiler_ui = new ScriptCompilerWidget;
 	m_file_server_ui = new FileServerWidget;
@@ -43,6 +44,9 @@ MainWindow::MainWindow(QWidget* parent) :
 	m_entity_template_list_ui = new EntityTemplateList;
 	m_notifications = Notifications::create(*this);
 	m_entity_list = new EntityList(NULL);
+
+	m_toggle_game_mode_after_compile = false;
+	connect(m_script_compiler_ui->getCompiler(), &ScriptCompiler::compiled, this, &MainWindow::onScriptCompiled);
 
 	QSettings settings("Lumix", "QtEditor");
 	bool geometry_restored = restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
@@ -209,7 +213,6 @@ MainWindow::~MainWindow()
 	delete m_ui;
 	delete m_scene_view;
 	delete m_property_view;
-	delete m_game_view;
 	delete m_asset_browser;
 	delete m_script_compiler_ui;
 	delete m_file_server_ui;
@@ -339,9 +342,26 @@ void MainWindow::on_actionPolygon_Mode_changed()
 	m_world_editor->setWireframe(m_ui->actionPolygon_Mode->isChecked());
 }
 
+void MainWindow::onScriptCompiled()
+{
+	if (m_toggle_game_mode_after_compile)
+	{
+		m_world_editor->toggleGameMode();
+	}
+	m_toggle_game_mode_after_compile = false;
+}
+
 void MainWindow::on_actionGame_mode_triggered()
 {
-	m_world_editor->toggleGameMode();
+	if (!m_world_editor->isGameMode())
+	{
+		m_script_compiler_ui->getCompiler()->compileAll();
+		m_toggle_game_mode_after_compile = true;
+	}
+	else
+	{
+		m_world_editor->toggleGameMode();
+	}
 }
 
 void MainWindow::on_actionLook_at_selected_entity_triggered()

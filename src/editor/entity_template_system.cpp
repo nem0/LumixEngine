@@ -168,7 +168,7 @@ namespace Lumix
 						int instance_index = m_entity_system.m_instances.find(m_template_name_hash);
 						if (instance_index >= 0)
 						{
-							m_entity = m_entity_system.m_editor.getEngine().getUniverse()->createEntity();
+							m_entity = m_entity_system.m_editor.getUniverse()->createEntity();
 							m_entity.setPosition(m_position);
 							m_entity.setRotation(m_rotation);
 
