@@ -24,6 +24,9 @@ namespace Lumix
 		public:
 			typedef void (*InitFunction)(ScriptScene*);
 			typedef void (*UpdateFunction)(float);
+			typedef void (*DoneFunction)();
+			typedef void (*SerializeFunction)(OutputBlob&);
+			typedef void (*DeserializeFunction)(InputBlob&);
 
 		public:
 			ScriptSceneImpl(ScriptSystemImpl& system, Engine& engine, Universe& universe)
@@ -35,6 +38,10 @@ namespace Lumix
 				, m_script_entities(m_allocator)
 				, m_script_renamed(m_allocator)
 				, m_module(NULL)
+				, m_done_function(NULL)
+				, m_deserialize_function(NULL)
+				, m_serialize_function(NULL)
+				, m_update_function(NULL)
 			{
 			}
 
@@ -75,33 +82,31 @@ namespace Lumix
 			}
 
 
+			virtual void serializeScripts(OutputBlob& blob) override
+			{
+				if (m_serialize_function)
+				{
+					m_serialize_function(blob);
+				}
+			}
+
+
+			virtual void deserializeScripts(InputBlob& blob) override
+			{
+				if (m_deserialize_function)
+				{
+					m_deserialize_function(blob);
+				}
+			}
+
+
 			void update(float time_delta) override
 			{
-				if (!m_module)
+				if (m_is_compiling)
 				{
-					TODO("some init function");
-					const char* library_path = "scripts/Debug/main.dll";
-					m_module = LoadLibrary(library_path);
-					if (!m_module)
-					{
-						g_log_error.log("script") << "Could not load " << library_path;
-						return;
-					}
-					m_update_function = (UpdateFunction)GetProcAddress(m_module, "update");
-					InitFunction init_function = (InitFunction)GetProcAddress(m_module, "init");
-					if (!m_update_function)
-					{
-						g_log_error.log("script") << "Could not find function update in " << library_path;
-					}
-					if (!init_function)
-					{
-						g_log_error.log("script") << "Could not find function init in " << library_path;
-					}
-					if (init_function)
-					{
-						init_function(this);
-					}
+					return;
 				}
+				
 				if (m_update_function)
 				{
 					m_update_function(time_delta);
@@ -179,8 +184,42 @@ namespace Lumix
 			}
 
 
+			virtual void afterScriptCompiled() override
+			{
+				if (!m_module)
+				{
+					const char* library_path = "scripts/Debug/entities.dll";
+					m_module = LoadLibrary(library_path);
+					if (!m_module)
+					{
+						g_log_error.log("script") << "Could not load " << library_path;
+						return;
+					}
+					m_update_function = (UpdateFunction)GetProcAddress(m_module, "update");
+					m_done_function = (DoneFunction)GetProcAddress(m_module, "done");
+					m_serialize_function = (SerializeFunction)GetProcAddress(m_module, "serialize");
+					m_deserialize_function = (DeserializeFunction)GetProcAddress(m_module, "deserialize");
+					InitFunction init_function = (InitFunction)GetProcAddress(m_module, "init");
+					if (!m_update_function || !init_function)
+					{
+						g_log_error.log("script") << "Script interface in " << library_path << " is not complete";
+					}
+
+					if (init_function)
+					{
+						init_function(this);
+					}
+				}
+				m_is_compiling = false;
+			}
+
 			virtual void beforeScriptCompiled() override
 			{
+				m_is_compiling = true;
+				if (m_done_function)
+				{
+					m_done_function();
+				}
 				FreeLibrary(m_module);
 				m_module = NULL;
 			}
@@ -244,6 +283,11 @@ namespace Lumix
 			ScriptSystemImpl& m_system;
 			HMODULE m_module;
 			UpdateFunction m_update_function;
+			DoneFunction m_done_function;
+			SerializeFunction m_serialize_function;
+			DeserializeFunction m_deserialize_function;
+			bool m_is_compiling;
+
 			DelegateList<void(const Path&, const Path&)> m_script_renamed;
 	};
 

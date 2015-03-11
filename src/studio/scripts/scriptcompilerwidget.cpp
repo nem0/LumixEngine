@@ -23,9 +23,8 @@ ScriptCompilerWidget::ScriptCompilerWidget(QWidget* parent)
 	m_base_path = QDir::currentPath().toLatin1().data();
 	m_compiler = new ScriptCompiler;
 	QByteArray base_path = m_base_path.toLatin1();
-	m_compiler->setBasePath(Lumix::Path(base_path.data()));
-	connect(m_compiler, &ScriptCompiler::compiled, [this](){
-		m_ui->compilerOutputView->setText(m_compiler->getLog());
+	connect(m_compiler, &ScriptCompiler::compiled, [this](const QString& module_name){
+		m_ui->compilerOutputView->setText(m_compiler->getLog(module_name));
 	});
 	connect(m_ui->scriptListWidget, &QListWidget::itemDoubleClicked, [this](QListWidgetItem * item) {
 		QProcess* process = new QProcess;
@@ -80,19 +79,17 @@ void ScriptCompilerWidget::onUniverseCreated()
 
 void ScriptCompilerWidget::onUniverseLoaded()
 {
-	m_ui->scriptListWidget->clear();
-	m_compiler->clearScripts();
 	Lumix::ScriptScene* scene = static_cast<Lumix::ScriptScene*>(m_editor->getEngine().getScene(crc32("script")));
 	Lumix::Component script = scene->getFirstScript();
+	QFileInfo info(m_editor->getUniversePath().c_str());
+
 	while(script.isValid())
 	{
 		const Lumix::Path& path = scene->getScriptPath(script);
-		m_compiler->addScript(path);
+		m_compiler->addScript(info.baseName(), path);
 		m_ui->scriptListWidget->addItem(path.c_str());
 		script = scene->getNextScript(script);
 	}
-	QFileInfo info(m_editor->getUniversePath().c_str());
-	m_compiler->setProjectName(info.baseName());
 }
 
 
@@ -105,14 +102,15 @@ void ScriptCompilerWidget::onUniverseDestroyed()
 
 void ScriptCompilerWidget::on_compileAllButton_clicked()
 {
-	m_compiler->compileAll();
+	m_compiler->compileAllModules();
 }
 
 
 void ScriptCompilerWidget::on_openInVSButton_clicked()
 {
 	QProcess* process = new QProcess;
-	process->start(QString("cmd.exe /C %1/scripts/open_in_vs.bat %2.vcxproj").arg(m_editor->getBasePath()).arg(m_compiler->getProjectName()));
+	QFileInfo info(m_editor->getUniversePath().c_str());
+	process->start(QString("cmd.exe /C %1/scripts/open_in_vs.bat %2.vcxproj").arg(m_editor->getBasePath()).arg(info.baseName()));
 	process->connect(process, (void (QProcess::*)(int))&QProcess::finished, [process](int) {
 		process->deleteLater();
 	});
@@ -123,9 +121,10 @@ void ScriptCompilerWidget::onComponentCreated(const Lumix::Component& component)
 {
 	if (component.type == SCRIPT_HASH)
 	{
+		QFileInfo info(m_editor->getUniversePath().c_str());
 		Lumix::ScriptScene* scene = static_cast<Lumix::ScriptScene*>(m_editor->getEngine().getScene(crc32("script")));
 		const Lumix::Path& path = scene->getScriptPath(component);
-		m_compiler->addScript(path);
+		m_compiler->addScript(info.baseName(), path);
 		m_ui->scriptListWidget->addItem(path.c_str());
 	}
 }
@@ -166,18 +165,18 @@ void ScriptCompilerWidget::onScriptRenamed(const Lumix::Path& old_path, const Lu
 
 void ScriptCompilerWidget::setUniverse(Lumix::Universe* universe)
 {
-	m_universe = universe;
 	if (universe)
 	{
 		Lumix::ScriptScene* scene = static_cast<Lumix::ScriptScene*>(m_editor->getEngine().getScene(crc32("script")));
 		scene->scriptRenamed().bind<ScriptCompilerWidget, &ScriptCompilerWidget::onScriptRenamed>(this);
-		m_universe->componentCreated().bind<ScriptCompilerWidget, &ScriptCompilerWidget::onComponentCreated>(this);
-		m_universe->componentDestroyed().bind<ScriptCompilerWidget, &ScriptCompilerWidget::onComponentDestroyed>(this);
+		universe->componentCreated().bind<ScriptCompilerWidget, &ScriptCompilerWidget::onComponentCreated>(this);
+		universe->componentDestroyed().bind<ScriptCompilerWidget, &ScriptCompilerWidget::onComponentDestroyed>(this);
 		ASSERT(!scene->getFirstScript().isValid());
 	}
 	else
 	{
 		m_ui->scriptListWidget->clear();
-		m_compiler->clearScripts();
+		m_compiler->destroyModule(QFileInfo(m_editor->getUniversePath().c_str()).baseName());
 	}
+	m_universe = universe;
 }

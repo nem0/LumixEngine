@@ -355,7 +355,7 @@ void MainWindow::on_actionGame_mode_triggered()
 {
 	if (!m_world_editor->isGameMode())
 	{
-		m_script_compiler_ui->getCompiler()->compileAll();
+		m_script_compiler_ui->getCompiler()->compileAllModules();
 		m_toggle_game_mode_after_compile = true;
 	}
 	else
