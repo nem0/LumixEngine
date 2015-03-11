@@ -1,7 +1,13 @@
 #include "animator.h"
+#include "animation/animation.h"
 #include "animation_editor.h"
 #include "animation_editor_commands.h"
 #include "core/log.h"
+#include "core/resource_manager.h"
+#include "core/resource_manager_base.h"
+#include "editor/world_editor.h"
+#include "engine/engine.h"
+#include "graphics/render_scene.h"
 #include <qfile.h>
 #include <qmenu.h>
 #include <qmessagebox.h>
@@ -169,7 +175,7 @@ QString AnimationNodeContent::generateCode()
 		"	public:\n"
 		"		Node%1() { m_time = 0; m_animation = (Animation*)g_animation_manager->load(Path(\"%2\")); }\n"
 		"		void getPose(Pose& pose, Context& context) override { m_animation->getPose(m_time, pose, context.m_model); }\n"
-		"		void update(float time_delta) override { m_time += time_delta; }\n"
+		"		void update(float time_delta) override { m_time += time_delta; m_time = fmod(m_time, m_animation->getLength()); }\n"
 		"	private:\n"
 		"		Animation* m_animation;\n"
 		"		float m_time;\n"
@@ -229,11 +235,18 @@ void AnimationNodeContent::paintContainer(QPainter& painter)
 
 Animator::Animator()
 {
+	m_update_function = NULL;
 	m_last_uid = 0;
 	m_root = createNode(NULL);
 	auto sm = new StateMachineNodeContent(m_root);
 	m_root->setContent(sm);
 	m_root->setName("Root");
+}
+
+
+void Animator::setWorldEditor(Lumix::WorldEditor& editor)
+{
+	m_editor = &editor;
 }
 
 
@@ -269,14 +282,62 @@ AnimatorNode* Animator::createNode(AnimatorNode* parent)
 }
 
 
+void Animator::update(float time_delta)
+{
+	if (m_update_function)
+	{
+		auto& selected = m_editor->getSelectedEntities();
+		if (selected.size() == 1)
+		{
+			auto renderable = m_editor->getComponent(selected[0], crc32("renderable"));
+			if (renderable.isValid())
+			{
+				Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(renderable.scene);
+				auto& pose = scene->getPose(renderable);
+				auto* model = scene->getRenderableModel(renderable);
+				if (model)
+				{
+					m_update_function(m_object, *model, pose, time_delta);
+				}
+			}
+		}
+	}
+}
+
+
+void Animator::run()
+{
+	if (m_update_function)
+	{
+		m_update_function = NULL;
+		m_library.unload();
+	}
+	else
+	{
+		if (!m_library.isLoaded())
+		{
+			m_library.load();
+		}
+		CreateFunction creator = (CreateFunction)m_library.resolve("create");
+		m_update_function = (UpdateFunction)m_library.resolve("update");
+		AnimationManagerSetter setAnimationManager = (AnimationManagerSetter)m_library.resolve("setAnimationManager");
+
+		setAnimationManager((Lumix::AnimationManager*)m_editor->getEngine().getResourceManager().get(Lumix::ResourceManager::ANIMATION));
+		m_object = creator();
+	}
+}
+
+
 bool Animator::compile(const QString& base_path)
 {
 	QString code(
 		"#include \"animation/animation.h\"\n"
 		"#include \"graphics/model.h\"\n"
 		"#include \"graphics/pose.h\"\n"
+		"#include <cmath>\n"
 		"using namespace Lumix;"
 		"struct Context {\n"
+		"	Context(Model& model) : m_model(model) {}\n"
 		"	Model& m_model;\n"
 		"};\n\n"
 		"AnimationManager* g_animation_manager;\n\n"
@@ -287,6 +348,19 @@ bool Animator::compile(const QString& base_path)
 		"};\n\n"
 	);
 	code += m_root->getContent()->generateCode();
+	code += QString(
+		"extern \"C\" __declspec(dllexport) void setAnimationManager(AnimationManager* mng) {\n"
+		"	g_animation_manager = mng;\n"
+		"}\n"
+		"extern \"C\" __declspec(dllexport) void* create() {\n"
+		"	return new Node%1;\n"
+		"}\n"
+		"extern \"C\" __declspec(dllexport) void update(void* object, Model& model, Pose& pose, float time_delta) {\n"
+		"	NodeBase* node = (NodeBase*)object;\n"
+		"	node->update(time_delta);\n"
+		"	Context context(model);\n"
+		"	node->getPose(pose, context);\n"
+		"}").arg(m_root->getUID());
 
 	QFile file(QString("%1/tmp/anim.cpp").arg(base_path));
 	file.open(QIODevice::WriteOnly | QIODevice::Text);
