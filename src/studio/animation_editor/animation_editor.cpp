@@ -1,5 +1,7 @@
 #include "animation_editor.h"
 #include "animator.h"
+#include "property_view/property_editor.h"
+#include "property_view.h"
 #include <qaction.h>
 #include <qevent.h>
 #include <qlayout.h>
@@ -11,7 +13,8 @@ static const QColor GRID_COLOR(60, 60, 60);
 static const int GRID_CELL_SIZE = 32;
 static QLinearGradient ANIMATION_NODE_GRADIENT(0, 0, 0, 100);
 
-AnimationEditor::AnimationEditor()
+AnimationEditor::AnimationEditor(PropertyView& property_view)
+	: m_property_view(property_view)
 {
 	m_animator = new Animator;
 
@@ -106,6 +109,7 @@ void AnimationGraphView::mousePressEvent(QMouseEvent* event)
 		m_dragged_node = node;
 		m_last_mouse_position.setX(event->x());
 		m_last_mouse_position.setY(event->y());
+		node->getContent()->fillPropertyView(m_editor.getPropertyView());
 	}
 }
 

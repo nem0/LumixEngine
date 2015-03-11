@@ -501,6 +501,17 @@ void PropertyView::setSelectedResourceFilename(const char* filename)
 }
 
 
+QTreeWidgetItem* PropertyView::newTopLevelItem()
+{
+	clear();
+	m_selected_entity = Lumix::Entity::INVALID;
+	m_selected_resource = NULL;
+	QTreeWidgetItem* item = new QTreeWidgetItem();
+	m_ui->propertyList->insertTopLevelItem(0, item);
+	return item;
+}
+
+
 void PropertyView::onSelectedResourceLoaded(Lumix::Resource::State, Lumix::Resource::State new_state)
 {
 	if (new_state == Lumix::Resource::State::READY)

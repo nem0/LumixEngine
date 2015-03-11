@@ -11,6 +11,7 @@
 class AnimationEditor;
 class Animator;
 class AnimatorNode;
+class PropertyView;
 
 
 namespace Lumix
@@ -35,6 +36,7 @@ class AnimatorNodeContent
 		virtual int getChildCount() = 0;
 		AnimatorNode* getNode() { return m_node; }
 		virtual QString generateCode() = 0;
+		virtual void fillPropertyView(PropertyView& view) = 0;
 
 	private:
 		friend class Animator;
@@ -49,7 +51,7 @@ class AnimatorNodeContent
 class AnimationNodeContent : public AnimatorNodeContent
 {
 	public:
-		AnimationNodeContent(AnimatorNode* node) : AnimatorNodeContent(node), m_animation_path("models/animals/out.ani") {}
+		AnimationNodeContent(AnimatorNode* node) : AnimatorNodeContent(node) {}
 
 		virtual bool hitTest(int x, int y) override;
 		virtual AnimatorNode* getNodeAt(int x, int y) override;
@@ -60,6 +62,7 @@ class AnimationNodeContent : public AnimatorNodeContent
 		virtual QString generateCode() override;
 		void setAnimationPath(const char* path) { m_animation_path = path; }
 		QString getAnimationPath() const { return m_animation_path; }
+		virtual void fillPropertyView(PropertyView& view) override;
 
 	private:
 		QString m_animation_path;
@@ -80,6 +83,7 @@ class StateMachineNodeContent : public AnimatorNodeContent
 		virtual void showContextMenu(AnimationEditor& editor, QWidget* widget, const QPoint& pos) override;
 		virtual int getChildCount() override { return m_children.size(); }
 		virtual QString generateCode() override;
+		virtual void fillPropertyView(PropertyView&) override {  }
 
 	private:
 		virtual void removeChild(AnimatorNode* node) override;
