@@ -8,6 +8,7 @@
 namespace Lumix
 {
 	struct Component;
+	class WorldEditor;
 }
 
 
@@ -57,6 +58,7 @@ class AnimationEditor : public QDockWidget
 	public:
 		AnimationEditor();
 
+		void setWorldEditor(Lumix::WorldEditor& editor);
 		void setComponent(const Lumix::Component& component);
 		void update(float time_delta);
 		Animator* getAnimator() { return m_animator; }

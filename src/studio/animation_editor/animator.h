@@ -13,6 +13,15 @@ class Animator;
 class AnimatorNode;
 
 
+namespace Lumix
+{
+	class AnimationManager;
+	class Model;
+	class Pose;
+	class WorldEditor;
+}
+
+
 class AnimatorNodeContent
 {
 	public:
@@ -40,7 +49,7 @@ class AnimatorNodeContent
 class AnimationNodeContent : public AnimatorNodeContent
 {
 	public:
-		AnimationNodeContent(AnimatorNode* node) : AnimatorNodeContent(node) {}
+		AnimationNodeContent(AnimatorNode* node) : AnimatorNodeContent(node), m_animation_path("models/animals/out.ani") {}
 
 		virtual bool hitTest(int x, int y) override;
 		virtual AnimatorNode* getNodeAt(int x, int y) override;
@@ -117,15 +126,26 @@ class Animator
 	public:
 		Animator();
 
+		void setWorldEditor(Lumix::WorldEditor& editor);
 		AnimatorNode* getRoot() { return m_root; }
 		AnimatorNode* createNode(AnimatorNode* parent);
 		void destroyNode(int uid);
 		AnimatorNode* getNode(int uid);
 		bool compile(const QString& base_path);
+		void run();
+		void update(float time_delta);
+
+	private:
+		typedef void* (*CreateFunction)();
+		typedef void (*UpdateFunction)(void*, Lumix::Model&, Lumix::Pose&, float);
+		typedef void (*AnimationManagerSetter)(Lumix::AnimationManager*);
 
 	private:
 		int m_last_uid;
 		AnimatorNode* m_root;
 		QList<AnimatorNode*> m_nodes;
 		QLibrary m_library;
+		Lumix::WorldEditor* m_editor;
+		UpdateFunction m_update_function;
+		void* m_object;
 };

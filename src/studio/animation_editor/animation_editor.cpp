@@ -32,7 +32,7 @@ AnimationEditor::AnimationEditor()
 		}
 		else if (action->text() == "run")
 		{
-			Q_ASSERT(false);
+			m_animator->run();
 		}
 
 	});
@@ -44,6 +44,12 @@ AnimationEditor::AnimationEditor()
 	ANIMATION_NODE_GRADIENT.setColorAt(0.0, QColor(0, 255, 0, 128));
 	ANIMATION_NODE_GRADIENT.setColorAt(1.0, QColor(0, 64, 0, 128));
 	ANIMATION_NODE_GRADIENT.setSpread(QGradient::Spread::ReflectSpread);
+}
+
+
+void AnimationEditor::setWorldEditor(Lumix::WorldEditor& editor)
+{
+	m_animator->setWorldEditor(editor);
 }
 
 
@@ -61,7 +67,7 @@ void AnimationEditor::executeCommand(QUndoCommand* command)
 
 void AnimationEditor::update(float time_delta)
 {
-
+	m_animator->update(time_delta);
 }
 
 
