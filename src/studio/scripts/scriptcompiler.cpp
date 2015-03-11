@@ -13,64 +13,98 @@ ScriptCompiler::ScriptCompiler(QObject* parent)
 	: QObject(parent)
 	, m_editor(NULL)
 {
-	m_status = UNKNOWN;
-	m_project_name = "default";
 }
 
 
 void ScriptCompiler::onScriptRenamed(const Lumix::Path& old_path, const Lumix::Path& new_path)
 {
-	for (int i = 0; m_scripts.size(); ++i)
+	for (auto iter = m_modules.begin(), end = m_modules.end(); iter != end; ++iter)
 	{
-		if (m_scripts[i] == old_path)
+		Module& module = *iter;
+		for (int i = 0; module.m_scripts.size(); ++i)
 		{
-			m_scripts[i] = new_path;
-			break;
+			if (module.m_scripts[i] == old_path)
+			{
+				module.m_scripts[i] = new_path;
+				break;
+			}
 		}
 	}
 }
 
 
-void ScriptCompiler::addScript(const Lumix::Path& path)
+void ScriptCompiler::addScript(const QString& module_name, const Lumix::Path& path)
 {
-	m_scripts.push_back(path);
-	m_status = UNKNOWN;
+	if (m_modules.find(module_name) == m_modules.end())
+	{
+		m_modules.insert(module_name, Module(module_name));
+	}
+	m_modules[module_name].m_scripts.push_back(path);
+	m_modules[module_name].m_status = UNKNOWN;
 }
 
 
 void ScriptCompiler::removeScript(const Lumix::Path& path)
 {
-	for (int i = 0; m_scripts.size(); ++i)
+	for (auto iter = m_modules.begin(), end = m_modules.end(); iter != end; ++iter)
 	{
-		if (m_scripts[i] == path)
+		Module& module = *iter;
+		for (int i = 0; module.m_scripts.size(); ++i)
 		{
-			m_scripts.removeAt(i);
-			break;
+			if (module.m_scripts[i] == path)
+			{
+				module.m_scripts.removeAt(i);
+				module.m_status = UNKNOWN;
+				break;
+			}
 		}
 	}
-	m_status = UNKNOWN;
 }
 
 
-void ScriptCompiler::clearScripts()
+void ScriptCompiler::destroyModule(const QString& module_name)
 {
-	m_status = UNKNOWN;
-	m_scripts.clear();
-}
-
-
-void ScriptCompiler::compileAll()
-{
-	Lumix::ScriptScene* scene = static_cast<Lumix::ScriptScene*>(m_editor->getEngine().getScene(crc32("script")));
-	scene->beforeScriptCompiled();
-	m_status = NOT_COMPILED;
-	QString sources = QString("		<ClCompile Include=\"%1.cpp\"/>\n").arg(m_project_name);
-	for (int i = 0; i < m_scripts.size(); ++i)
+	if (m_modules.contains(module_name))
 	{
-		sources += QString("		<ClCompile Include=\"%1\"/>\n").arg(m_scripts[i].c_str());
+		m_modules[module_name].m_status = UNKNOWN;
+		m_modules[module_name].m_scripts.clear();
+	}
+}
+
+
+void ScriptCompiler::compileAllModules()
+{
+	for (auto iter = m_modules.begin(), end = m_modules.end(); iter != end; ++iter)
+	{
+		Module& module = *iter;
+		compileModule(module.m_module_name);
+	}
+}
+
+
+void ScriptCompiler::compileModule(const QString& module_name)
+{
+	if (!m_modules.contains(module_name))
+	{
+		return;
+	}
+	Module& module = m_modules[module_name];
+	Lumix::OutputBlob* out_blob = m_editor->getAllocator().newObject<Lumix::OutputBlob>(m_editor->getAllocator());
+	Lumix::ScriptScene* scene = static_cast<Lumix::ScriptScene*>(m_editor->getEngine().getScene(crc32("script")));
+	if (m_editor->isGameMode())
+	{
+		scene->serializeScripts(*out_blob);
 	}
 
-	QFile file(QString("scripts/%1.vcxproj").arg(m_project_name));
+	scene->beforeScriptCompiled();
+	module.m_status = NOT_COMPILED;
+	QString sources = QString("		<ClCompile Include=\"%1.cpp\"/>\n").arg(module.m_module_name);
+	for (int i = 0; i < module.m_scripts.size(); ++i)
+	{
+		sources += QString("		<ClCompile Include=\"%1\"/>\n").arg(module.m_scripts[i].c_str());
+	}
+
+	QFile file(QString("scripts/%1.vcxproj").arg(module.m_module_name));
 	file.open(QIODevice::Text | QIODevice::WriteOnly);
 	file.write(QString(
 		"<Project DefaultTargets=\"Build\" ToolsVersion=\"12.0\" xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\">\n"
@@ -109,17 +143,54 @@ void ScriptCompiler::compileAll()
 	file.close();
 
 	QProcess* process = new QProcess;
-	process->connect(process, (void (QProcess::*)(int))&QProcess::finished, [scene, this, process](int exit_code){
+	process->connect(process, (void (QProcess::*)(int))&QProcess::finished, [module_name, out_blob, scene, this, process](int exit_code){
 		process->deleteLater();
-		m_log = process->readAll();
-		m_status = exit_code == 0 ? SUCCESS : FAILURE;
-		emitCompiled();
+		m_modules[module_name].m_log = process->readAll();
+		m_modules[module_name].m_status = exit_code == 0 ? SUCCESS : FAILURE;
+		emitCompiled(module_name);
+		scene->afterScriptCompiled();
+		if (m_editor->isGameMode())
+		{
+			Lumix::InputBlob blob(*out_blob);
+			scene->deserializeScripts(blob);
+			m_editor->getAllocator().deleteObject(out_blob);
+		}
 	});
 	QStringList list;
 	list << "/C";
-	list << QString("%1/scripts/compile_all.bat %2").arg(m_base_path.c_str()).arg(file.fileName());
+	list << QString("%1/scripts/compile_all.bat %2").arg(m_editor->getBasePath()).arg(file.fileName());
 	process->start("cmd.exe", list);
 }
+
+
+ScriptCompiler::Status ScriptCompiler::getStatus(const QString& module_name)
+{
+	return m_modules[module_name].m_status;
+}
+
+
+QString ScriptCompiler::getLog(const QString& module_name)
+{
+	return m_modules[module_name].m_log;
+}
+
+
+void ScriptCompiler::onScriptChanged(const QString& path)
+{
+	for (auto iter = m_modules.begin(), end = m_modules.end(); iter != end; ++iter)
+	{
+		Module& module = *iter;
+		for (int i = 0; i < module.m_scripts.size(); ++i)
+		{
+			if (module.m_scripts[i] == path)
+			{
+				compileModule(module.m_module_name);
+				break;
+			}
+		}
+	}
+}
+
 
 
 void ScriptCompiler::setWorldEditor(Lumix::WorldEditor& editor)
@@ -132,6 +203,7 @@ void ScriptCompiler::onGameModeToggled(bool was_game_mode)
 {
 	if (!was_game_mode)
 	{
-		compileAll();
+		QFileInfo info(m_editor->getUniversePath().c_str());
+		compileModule(info.baseName());
 	}
 }

@@ -142,8 +142,7 @@ void AssetBrowser::onFileChanged(const QString& path)
 	QFileInfo info(path);
 	if (info.suffix() == "cpp")
 	{
-		auto path = info.filePath().toLatin1();
-		m_compiler->compileAll();
+		m_compiler->onScriptChanged(info.fileName().toLatin1().data());
 	}
 	else if(info.suffix() == "blend@")
 	{
