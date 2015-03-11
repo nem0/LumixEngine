@@ -16,6 +16,7 @@ class AnimationEditor;
 class AnimationNode;
 class Animator;
 class AnimatorNode;
+class PropertyView;
 
 
 class AnimationGraphView : public QWidget
@@ -56,16 +57,18 @@ class AnimationEditor : public QDockWidget
 {
 	Q_OBJECT
 	public:
-		AnimationEditor();
+		AnimationEditor(PropertyView& property_view);
 
 		void setWorldEditor(Lumix::WorldEditor& editor);
 		void setComponent(const Lumix::Component& component);
 		void update(float time_delta);
 		Animator* getAnimator() { return m_animator; }
 		void executeCommand(QUndoCommand* command);
+		PropertyView& getPropertyView() { return m_property_view; }
 
 	private:
 		QUndoStack m_undo_stack;
 		Animator* m_animator;
 		AnimationGraphView* m_animation_graph_view;
+		PropertyView& m_property_view;
 };

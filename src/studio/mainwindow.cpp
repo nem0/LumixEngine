@@ -37,7 +37,7 @@ MainWindow::MainWindow(QWidget* parent) :
 
 	m_log = new LogWidget;
 	m_property_view = new PropertyView;
-	m_animation_editor = new AnimationEditor;
+	m_animation_editor = new AnimationEditor(*m_property_view);
 	m_skeleton_view = new SkeletonView();
 	m_scene_view = new SceneView;
 	m_game_view = new GameView;

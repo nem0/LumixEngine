@@ -56,6 +56,7 @@ class PropertyView : public QDockWidget
 		void createCustomProperties(QTreeWidgetItem* item, const Lumix::Component& component);
 		void addEntityComponentPlugin(IEntityComponentPlugin* plugin);
 		MainWindow* getMainWindow() const { return (MainWindow*)parent(); }
+		QTreeWidgetItem* newTopLevelItem();
 
 	private slots:
 		void on_positionX_valueChanged(double arg1);
