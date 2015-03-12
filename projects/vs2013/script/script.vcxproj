@@ -221,7 +221,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\src\script\base_script.h" />
     <ClInclude Include="..\..\..\src\script\script_system.h" />
     <ClInclude Include="..\..\..\src\script\script_visitor.h" />
   </ItemGroup>

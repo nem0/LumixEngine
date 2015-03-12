@@ -4,6 +4,9 @@
 #include <QDockWidget>
 
 
+class MainWindow;
+
+
 namespace Lumix
 {
 	class WorldEditor;
@@ -20,7 +23,7 @@ class GameView : public QDockWidget
 	Q_OBJECT
 
 public:
-	explicit GameView(QWidget* parent = NULL);
+	explicit GameView(MainWindow& parent);
 	virtual ~GameView();
 
 	QWidget* getContentWidget() const;
@@ -40,5 +43,6 @@ private:
 	Ui::GameView* m_ui;
 	Lumix::PipelineInstance* m_pipeline;
 	Lumix::WorldEditor* m_editor;
+	MainWindow& m_main_window;
 };
 
