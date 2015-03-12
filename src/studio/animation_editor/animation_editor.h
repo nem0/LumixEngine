@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include <cstdint>
 #include <qdockwidget.h>
 #include <qundostack.h>
 
@@ -14,6 +15,7 @@ namespace Lumix
 
 class AnimationEditor;
 class AnimationNode;
+class AnimatorNodeContent;
 class Animator;
 class AnimatorNode;
 class PropertyView;
@@ -32,6 +34,7 @@ class AnimationGraphView : public QWidget
 	public:
 		AnimationGraphView(AnimationEditor& editor);
 
+		void setNode(AnimatorNode* node) { m_node = node; }
 		virtual void paintEvent(QPaintEvent*) override;
 		virtual void mousePressEvent(QMouseEvent*) override;
 		virtual void mouseMoveEvent(QMouseEvent*) override;
@@ -65,10 +68,15 @@ class AnimationEditor : public QDockWidget
 		Animator* getAnimator() { return m_animator; }
 		void executeCommand(QUndoCommand* command);
 		PropertyView& getPropertyView() { return m_property_view; }
+		AnimatorNodeContent* createContent(AnimatorNode& node, uint32_t content_type);
+		void setGraphPath(const QString& path) { m_graph_path = path; }
+		QString getGraphPath() { return m_graph_path; }
 
 	private:
 		QUndoStack m_undo_stack;
 		Animator* m_animator;
 		AnimationGraphView* m_animation_graph_view;
 		PropertyView& m_property_view;
+		Lumix::WorldEditor* m_editor;
+		QString m_graph_path;
 };

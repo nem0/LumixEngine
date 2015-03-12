@@ -2,6 +2,7 @@
 #include "animation/animation.h"
 #include "animation_editor.h"
 #include "animation_editor_commands.h"
+#include "core/blob.h"
 #include "core/log.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
@@ -15,6 +16,31 @@
 #include <qmessagebox.h>
 #include <qprocess.h>
 #include <qtextstream.h>
+
+
+void AnimatorNode::serialize(Lumix::OutputBlob& blob)
+{
+	blob.write(m_uid);
+	blob.write(m_position);
+	blob.writeString(m_name.toLatin1().data());
+	blob.write(m_content->getType());
+	m_content->serialize(blob);
+}
+
+
+void AnimatorNode::deserialize(AnimationEditor& editor, Lumix::InputBlob& blob)
+{
+	char name[256];
+	blob.read(m_uid);
+	blob.read(m_position);
+	blob.readString(name, sizeof(name));
+	m_name = name;
+	delete m_content;
+	uint32_t content_type;
+	blob.read(content_type);
+	m_content = editor.createContent(*this, content_type);
+	m_content->deserialize(editor, blob);
+}
 
 
 void AnimatorNode::paintContainer(QPainter& painter)
@@ -45,6 +71,30 @@ void AnimatorNode::showContextMenu(AnimationEditor& editor, QWidget* widget, con
 	else
 	{
 		m_content->showContextMenu(editor, widget, pos);
+	}
+}
+
+
+void StateMachineNodeContent::serialize(Lumix::OutputBlob& blob)
+{
+	blob.write(m_default_uid);
+	blob.write((int)m_children.size());
+	for (int i = 0; i < m_children.size(); ++i)
+	{
+		m_children[i]->serialize(blob);
+	}
+}
+
+
+void StateMachineNodeContent::deserialize(AnimationEditor& editor, Lumix::InputBlob& blob)
+{
+	blob.read(m_default_uid);
+	int children_count;
+	blob.read(children_count);
+	for (int i = 0; i < children_count; ++i)
+	{
+		AnimatorNode* node = editor.getAnimator()->createNode(getNode());
+		node->deserialize(editor, blob);
 	}
 }
 
@@ -167,6 +217,32 @@ void StateMachineNodeContent::showContextMenu(AnimationEditor& editor, QWidget* 
 		editor.executeCommand(new CreateAnimatorNodeCommand(CreateAnimatorNodeCommand::STATE_MACHINE, editor.getAnimator(), getNode()->getUID(), pos));
 	}
 
+}
+
+
+uint32_t StateMachineNodeContent::getType() const
+{
+	return crc32("state_machine");
+}
+
+
+void AnimationNodeContent::serialize(Lumix::OutputBlob& blob)
+{
+	blob.writeString(m_animation_path.toLatin1().data());
+}
+
+
+void AnimationNodeContent::deserialize(AnimationEditor&, Lumix::InputBlob& blob)
+{
+	char path[LUMIX_MAX_PATH];
+	blob.readString(path, sizeof(path));
+	m_animation_path = path;
+}
+
+
+uint32_t AnimationNodeContent::getType() const
+{
+	return crc32("animation");
 }
 
 
@@ -294,6 +370,18 @@ AnimatorNode* Animator::createNode(AnimatorNode* parent)
 }
 
 
+void Animator::serialize(Lumix::OutputBlob& blob)
+{
+	m_root->serialize(blob);
+}
+
+
+void Animator::deserialize(AnimationEditor& editor, Lumix::InputBlob& blob)
+{
+	m_root->deserialize(editor, blob);
+}
+
+
 void Animator::update(float time_delta)
 {
 	if (m_update_function)
@@ -330,18 +418,30 @@ void Animator::run()
 		{
 			m_library.load();
 		}
+		if (!m_library.isLoaded())
+		{
+			return;
+		}
 		CreateFunction creator = (CreateFunction)m_library.resolve("create");
 		m_update_function = (UpdateFunction)m_library.resolve("update");
 		AnimationManagerSetter setAnimationManager = (AnimationManagerSetter)m_library.resolve("setAnimationManager");
-
-		setAnimationManager((Lumix::AnimationManager*)m_editor->getEngine().getResourceManager().get(Lumix::ResourceManager::ANIMATION));
-		m_object = creator();
+		if (setAnimationManager)
+		{
+			setAnimationManager((Lumix::AnimationManager*)m_editor->getEngine().getResourceManager().get(Lumix::ResourceManager::ANIMATION));
+			m_object = creator();
+		}
+		else
+		{
+			m_update_function = NULL;
+			m_library.unload();
+		}
 	}
 }
 
 
-bool Animator::compile(const QString& base_path)
+bool Animator::compile(const QString& base_path, const QString& path)
 {
+	QFileInfo info(path);
 	QString code(
 		"#include \"animation/animation.h\"\n"
 		"#include \"graphics/model.h\"\n"
@@ -374,7 +474,7 @@ bool Animator::compile(const QString& base_path)
 		"	node->getPose(pose, context);\n"
 		"}").arg(m_root->getUID());
 
-	QFile file(QString("%1/tmp/anim.cpp").arg(base_path));
+	QFile file(QString("%1/%2.cpp").arg(info.dir().path()).arg(info.baseName()));
 	file.open(QIODevice::WriteOnly | QIODevice::Text);
 	QTextStream out(&file);
 	out << code;
@@ -383,11 +483,11 @@ bool Animator::compile(const QString& base_path)
 	QProcess* process = new QProcess;
 	QStringList list;
 	list << "/C";
-	list << QString("%1/tmp/compile.bat %1/tmp/anim.cpp").arg(base_path);
+	list << QString("%1/tmp/compile.bat %2").arg(base_path, file.fileName());
 	process->start("cmd.exe", list);
 	m_library.unload();
-	process->connect(process, (void (QProcess::*)(int))&QProcess::finished, [process, this, base_path](int exit_code){
-		m_library.setFileName(QString("%1/tmp/anim").arg(base_path));
+	process->connect(process, (void (QProcess::*)(int))&QProcess::finished, [process, this, info](int exit_code){
+		m_library.setFileName(QString("%1/%2").arg(info.dir().path()).arg(info.baseName()));
 		if (exit_code != 0)
 		{
 			QString compile_message = process->readAll();

@@ -17,6 +17,7 @@ AnimationEditor::AnimationEditor(PropertyView& property_view)
 	: m_property_view(property_view)
 {
 	m_animator = new Animator;
+	m_graph_path = "untitled";
 
 	setWindowTitle("Animation editor");
 	setObjectName("animationEditor");
@@ -28,16 +29,49 @@ AnimationEditor::AnimationEditor(PropertyView& property_view)
 	QToolBar* toolbar = new QToolBar(widget);
 	toolbar->addAction("compile");
 	toolbar->addAction("run");
+	toolbar->addAction("save");
+	toolbar->addAction("save as");
+	toolbar->addAction("load");
 	toolbar->connect(toolbar, &QToolBar::actionTriggered, [this](QAction* action){
 		if (action->text() == "compile")
 		{
-			m_animator->compile("d:/projects/lumixengine_data");
+			m_animator->compile("d:/projects/lumixengine_data", m_graph_path);
 		}
 		else if (action->text() == "run")
 		{
 			m_animator->run();
 		}
+		else if (action->text() == "save" || action->text() == "save as")
+		{
+			if (m_graph_path == "untitled" || action->text() == "save as")
+			{
+				m_graph_path = QFileDialog::getSaveFileName(NULL, QString(), QString(), "All files (*.grf)");
+			}
+			Lumix::OutputBlob blob(m_editor->getEngine().getAllocator());
+			m_animator->serialize(blob);
+			QFile file(m_graph_path);
+			file.open(QIODevice::WriteOnly);
+			file.write((const char*)blob.getData(), blob.getSize());
+			file.close();
+		}
+		else if (action->text() == "load")
+		{
+			QString path = QFileDialog::getOpenFileName(NULL, QString(), QString(), "All files (*.grf)");
+			if (!path.isEmpty())
+			{
+				m_graph_path = path;
+				delete m_animator;
+				m_animator = new Animator;
+				m_animator->setWorldEditor(*m_editor);
+				QFile file(m_graph_path);
+				file.open(QIODevice::ReadOnly);
+				QByteArray data = file.readAll();
 
+				Lumix::InputBlob blob(data.data(), data.size());
+				m_animator->deserialize(*this, blob);
+				m_animation_graph_view->setNode(m_animator->getRoot());
+			}
+		}
 	});
 
 	layout->addWidget(toolbar);
@@ -50,13 +84,29 @@ AnimationEditor::AnimationEditor(PropertyView& property_view)
 }
 
 
+AnimatorNodeContent* AnimationEditor::createContent(AnimatorNode& node, uint32_t content_type)
+{
+	TODO("todo");
+	if (content_type == crc32("animation"))
+	{
+		return new AnimationNodeContent(&node);
+	}
+	else if (content_type == crc32("state_machine"))
+	{
+		return new StateMachineNodeContent(&node);
+	}
+	return NULL;
+}
+
+
 void AnimationEditor::setWorldEditor(Lumix::WorldEditor& editor)
 {
+	m_editor = &editor;
 	m_animator->setWorldEditor(editor);
 }
 
 
-void AnimationEditor::setComponent(const Lumix::Component& component)
+void AnimationEditor::setComponent(const Lumix::Component&)
 {
 
 }
