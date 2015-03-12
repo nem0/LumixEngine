@@ -1,6 +1,7 @@
 #pragma once 
 
 
+#include <cstdint>
 #include <qlibrary.h>
 #include <qlist.h>
 #include <qpainter.h>
@@ -17,7 +18,9 @@ class PropertyView;
 namespace Lumix
 {
 	class AnimationManager;
+	class InputBlob;
 	class Model;
+	class OutputBlob;
 	class Pose;
 	class WorldEditor;
 }
@@ -37,6 +40,9 @@ class AnimatorNodeContent
 		AnimatorNode* getNode() { return m_node; }
 		virtual QString generateCode() = 0;
 		virtual void fillPropertyView(PropertyView& view) = 0;
+		virtual uint32_t getType() const = 0;
+		virtual void serialize(Lumix::OutputBlob& blob) = 0;
+		virtual void deserialize(AnimationEditor& editor, Lumix::InputBlob& blob) = 0;
 
 	private:
 		friend class Animator;
@@ -63,6 +69,9 @@ class AnimationNodeContent : public AnimatorNodeContent
 		void setAnimationPath(const char* path) { m_animation_path = path; }
 		QString getAnimationPath() const { return m_animation_path; }
 		virtual void fillPropertyView(PropertyView& view) override;
+		virtual uint32_t getType() const override;
+		virtual void serialize(Lumix::OutputBlob& blob) override;
+		virtual void deserialize(AnimationEditor& editor, Lumix::InputBlob& blob) override;
 
 	private:
 		QString m_animation_path;
@@ -84,6 +93,9 @@ class StateMachineNodeContent : public AnimatorNodeContent
 		virtual int getChildCount() override { return m_children.size(); }
 		virtual QString generateCode() override;
 		virtual void fillPropertyView(PropertyView&) override {  }
+		virtual uint32_t getType() const override;
+		virtual void serialize(Lumix::OutputBlob& blob) override;
+		virtual void deserialize(AnimationEditor& editor, Lumix::InputBlob& blob) override;
 
 	private:
 		virtual void removeChild(AnimatorNode* node) override;
@@ -111,10 +123,12 @@ class AnimatorNode
 		void setPosition(const QPoint& position) { m_position = position; }
 		void showContextMenu(AnimationEditor& editor, QWidget* widget, const QPoint& pos);
 		AnimatorNode* getParent() { return m_parent; }
+		void serialize(Lumix::OutputBlob& blob);
+		void deserialize(AnimationEditor& editor, Lumix::InputBlob& blob);
 
 	private:
 		friend class Animator;
-		AnimatorNode(int uid, AnimatorNode* parent) : m_uid(uid), m_parent(parent) {}
+		AnimatorNode(int uid, AnimatorNode* parent) : m_uid(uid), m_parent(parent), m_content(NULL) {}
 
 	protected:
 		int m_uid;
@@ -135,9 +149,11 @@ class Animator
 		AnimatorNode* createNode(AnimatorNode* parent);
 		void destroyNode(int uid);
 		AnimatorNode* getNode(int uid);
-		bool compile(const QString& base_path);
+		bool compile(const QString& base_path, const QString& path);
 		void run();
 		void update(float time_delta);
+		void serialize(Lumix::OutputBlob& blob);
+		void deserialize(AnimationEditor& editor, Lumix::InputBlob& blob);
 
 	private:
 		typedef void* (*CreateFunction)();
