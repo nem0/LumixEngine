@@ -30,7 +30,11 @@ public:
 signals:
 	void resized(const QSize& size);
 
+public slots:
+	void on_actionGame_mode_triggered();
+
 private slots:
+	void onScriptCompiled();
 	void on_actionLog_triggered();
 	void on_actionOpen_triggered();
 	void on_actionSave_As_triggered();
@@ -42,10 +46,8 @@ private slots:
 	void on_actionFile_server_triggered();
 	void on_actionAsset_Browser_triggered();
 	void on_actionScene_View_triggered();
-	virtual void closeEvent(QCloseEvent* event) override;
 	void on_actionProfiler_triggered();
 	void on_actionPolygon_Mode_changed();
-	void on_actionGame_mode_triggered();
 	void on_actionLook_at_selected_entity_triggered();
 	void on_actionNew_triggered();
 	void on_actionSave_triggered();
@@ -79,6 +81,7 @@ private:
 
 private:
 	virtual void resizeEvent(QResizeEvent* event) override;
+	virtual void closeEvent(QCloseEvent* event) override;
 	void fillRecentFiles();
 	void onUniverseLoaded();
 	void addEditorDock(Qt::DockWidgetArea area, QDockWidget* widget, void (MainWindow::*callback)());
@@ -104,5 +107,6 @@ private:
 	class QComboBox* m_layout_combobox;
 	QList<QString> m_recent_files;
 	QList<DockInfo> m_dock_infos;
+	bool m_toggle_game_mode_after_compile;
 };
 

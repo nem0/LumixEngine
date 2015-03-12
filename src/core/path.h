@@ -58,6 +58,7 @@ namespace Lumix
 		void operator =(const Path& rhs);
 		void operator =(const char* rhs);
 		void operator =(const string& rhs);
+		bool operator ==(const Path& rhs) const { return m_data->m_id == rhs.m_data->m_id; }
 
 		~Path();
 		

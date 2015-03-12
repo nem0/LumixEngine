@@ -62,7 +62,7 @@ namespace Lumix
 						serializer.deserialize("template_name", name, sizeof(name), "");
 						m_name = name;
 						serializer.deserialize("entity", m_entity.index, -1);
-						m_entity.universe = m_editor.getEngine().getUniverse();
+						m_entity.universe = m_editor.getUniverse();
 					}
 
 
@@ -152,7 +152,7 @@ namespace Lumix
 					{
 						serializer.deserialize("template_name_hash", m_template_name_hash, 0);
 						serializer.deserialize("entity", m_entity.index, -1);
-						m_entity.universe = m_editor.getEngine().getUniverse();
+						m_entity.universe = m_editor.getUniverse();
 						serializer.deserialize("position_x", m_position.x, 0);
 						serializer.deserialize("position_y", m_position.y, 0);
 						serializer.deserialize("position_z", m_position.z, 0);
@@ -168,7 +168,7 @@ namespace Lumix
 						int instance_index = m_entity_system.m_instances.find(m_template_name_hash);
 						if (instance_index >= 0)
 						{
-							m_entity = m_entity_system.m_editor.getEngine().getUniverse()->createEntity();
+							m_entity = m_entity_system.m_editor.getUniverse()->createEntity();
 							m_entity.setPosition(m_position);
 							m_entity.setRotation(m_rotation);
 
@@ -233,7 +233,7 @@ namespace Lumix
 			{
 				editor.universeCreated().bind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseCreated>(this);
 				editor.universeDestroyed().bind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseDestroyed>(this);
-				setUniverse(editor.getEngine().getUniverse());
+				setUniverse(editor.getUniverse());
 				editor.registerEditorCommandCreator("create_entity_template_instance", &EntityTemplateSystemImpl::createCreateInstanceCommand);
 				editor.registerEditorCommandCreator("create_entity_template", &EntityTemplateSystemImpl::createCreateTemplateCommand);
 			}
@@ -283,7 +283,7 @@ namespace Lumix
 			{
 				m_instances.clear();
 				m_template_names.clear();
-				setUniverse(m_editor.getEngine().getUniverse());
+				setUniverse(m_editor.getUniverse());
 			}
 
 

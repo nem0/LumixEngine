@@ -134,7 +134,7 @@
   </ImportGroup>
   <ProjectExtensions>
     <VisualStudio>
-      <UserProperties MocDir=".\..\..\..\tmp\render_test" UicDir=".\..\..\..\tmp\render_test\GeneratedFiles" RccDir=".\..\..\..\tmp\render_test\GeneratedFiles" lupdateOptions="" lupdateOnBuild="0" lreleaseOptions="" Qt5Version_x0020_Win32="5.3. msvc2013" MocOptions="" />
+      <UserProperties MocDir=".\..\..\..\tmp\render_test" UicDir=".\..\..\..\tmp\render_test\GeneratedFiles" RccDir=".\..\..\..\tmp\render_test\GeneratedFiles" lupdateOptions="" lupdateOnBuild="0" lreleaseOptions="" Qt5Version_x0020_Win32="$(DefaultQtVersion)" MocOptions="" />
     </VisualStudio>
   </ProjectExtensions>
 </Project>
