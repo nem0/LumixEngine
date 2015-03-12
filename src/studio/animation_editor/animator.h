@@ -13,6 +13,7 @@ class AnimationEditor;
 class Animator;
 class AnimatorNode;
 class PropertyView;
+class ScriptCompiler;
 
 
 namespace Lumix
@@ -142,14 +143,17 @@ class AnimatorNode
 class Animator
 {
 	public:
-		Animator();
+		Animator(ScriptCompiler& compiler);
 
+		void setPath(const QString& path);
+		QString getPath() const { return m_path; }
+		bool isValidPath() const { return !m_path.isEmpty(); }
 		void setWorldEditor(Lumix::WorldEditor& editor);
 		AnimatorNode* getRoot() { return m_root; }
 		AnimatorNode* createNode(AnimatorNode* parent);
 		void destroyNode(int uid);
 		AnimatorNode* getNode(int uid);
-		bool compile(const QString& base_path, const QString& path);
+		bool compile();
 		void run();
 		void update(float time_delta);
 		void serialize(Lumix::OutputBlob& blob);
@@ -161,6 +165,10 @@ class Animator
 		typedef void (*AnimationManagerSetter)(Lumix::AnimationManager*);
 
 	private:
+		QString getCPPFilePath() const;
+		QString getModuleName() const;
+
+	private:
 		int m_last_uid;
 		AnimatorNode* m_root;
 		QList<AnimatorNode*> m_nodes;
@@ -168,4 +176,6 @@ class Animator
 		Lumix::WorldEditor* m_editor;
 		UpdateFunction m_update_function;
 		void* m_object;
+		ScriptCompiler& m_compiler;
+		QString m_path;
 };

@@ -2,9 +2,11 @@
 #include "animator.h"
 #include "property_view/property_editor.h"
 #include "property_view.h"
+#include "scripts/scriptcompiler.h"
 #include <qaction.h>
 #include <qevent.h>
 #include <qlayout.h>
+#include <qmessagebox.h>
 #include <qpainter.h>
 #include <qtoolbar.h>
 
@@ -13,11 +15,11 @@ static const QColor GRID_COLOR(60, 60, 60);
 static const int GRID_CELL_SIZE = 32;
 static QLinearGradient ANIMATION_NODE_GRADIENT(0, 0, 0, 100);
 
-AnimationEditor::AnimationEditor(PropertyView& property_view)
+AnimationEditor::AnimationEditor(PropertyView& property_view, ScriptCompiler& compiler)
 	: m_property_view(property_view)
+	, m_compiler(compiler)
 {
-	m_animator = new Animator;
-	m_graph_path = "tmp/untitled";
+	m_animator = new Animator(compiler);
 
 	setWindowTitle("Animation editor");
 	setObjectName("animationEditor");
@@ -27,60 +29,98 @@ AnimationEditor::AnimationEditor(PropertyView& property_view)
 	m_animation_graph_view = new AnimationGraphView(*this);
 	setWidget(widget);
 	QToolBar* toolbar = new QToolBar(widget);
-	toolbar->addAction("compile");
-	toolbar->addAction("run");
-	toolbar->addAction("save");
-	toolbar->addAction("save as");
-	toolbar->addAction("load");
-	toolbar->connect(toolbar, &QToolBar::actionTriggered, [this](QAction* action){
-		if (action->text() == "compile")
-		{
-			m_animator->compile("d:/projects/lumixengine_data", m_graph_path);
-		}
-		else if (action->text() == "run")
-		{
-			m_animator->run();
-		}
-		else if (action->text() == "save" || action->text() == "save as")
-		{
-			if (m_graph_path == "untitled" || action->text() == "save as")
-			{
-				m_graph_path = QFileDialog::getSaveFileName(NULL, QString(), QString(), "All files (*.grf)");
-			}
-			Lumix::OutputBlob blob(m_editor->getEngine().getAllocator());
-			m_animator->serialize(blob);
-			QFile file(m_graph_path);
-			file.open(QIODevice::WriteOnly);
-			file.write((const char*)blob.getData(), blob.getSize());
-			file.close();
-		}
-		else if (action->text() == "load")
-		{
-			QString path = QFileDialog::getOpenFileName(NULL, QString(), QString(), "All files (*.grf)");
-			if (!path.isEmpty())
-			{
-				m_graph_path = path;
-				delete m_animator;
-				m_animator = new Animator;
-				m_animator->setWorldEditor(*m_editor);
-				QFile file(m_graph_path);
-				file.open(QIODevice::ReadOnly);
-				QByteArray data = file.readAll();
-
-				Lumix::InputBlob blob(data.data(), data.size());
-				m_animator->deserialize(*this, blob);
-				m_animation_graph_view->setNode(m_animator->getRoot());
-			}
-		}
-	});
+	QAction* compile_action = toolbar->addAction("compile");
+	QAction* run_action = toolbar->addAction("run");
+	QAction* save_action = toolbar->addAction("save");
+	QAction* save_as_action = toolbar->addAction("save as");
+	QAction* load_action = toolbar->addAction("load");
+	connect(compile_action, &QAction::triggered, this, &AnimationEditor::onCompileAction);
+	connect(run_action, &QAction::triggered, this, &AnimationEditor::onRunAction);
+	connect(save_action, &QAction::triggered, this, &AnimationEditor::onSaveAction);
+	connect(save_as_action, &QAction::triggered, this, &AnimationEditor::onSaveAsAction);
+	connect(load_action, &QAction::triggered, this, &AnimationEditor::onLoadAction);
 
 	layout->addWidget(toolbar);
 	layout->addWidget(m_animation_graph_view);
-	
 
 	ANIMATION_NODE_GRADIENT.setColorAt(0.0, QColor(0, 255, 0, 128));
 	ANIMATION_NODE_GRADIENT.setColorAt(1.0, QColor(0, 64, 0, 128));
 	ANIMATION_NODE_GRADIENT.setSpread(QGradient::Spread::ReflectSpread);
+}
+
+
+void AnimationEditor::onCompileAction()
+{
+	if (!m_animator->isValidPath())
+	{
+		onSaveAsAction();
+		if (!m_animator->isValidPath())
+		{
+			return;
+		}
+	}
+	m_animator->compile();
+}
+
+
+void AnimationEditor::onRunAction()
+{
+	m_animator->run();
+}
+
+
+void AnimationEditor::onSaveAsAction()
+{
+	QString path = QFileDialog::getSaveFileName(NULL, QString(), QString(), "All files (*.grf)");
+	if (!path.isEmpty())
+	{
+		m_animator->setPath(path);
+		onSaveAction();
+	}
+}
+
+
+void AnimationEditor::onSaveAction()
+{
+	if (!m_animator->isValidPath())
+	{
+		QString path = QFileDialog::getSaveFileName(NULL, QString(), QString(), "All files (*.grf)");
+		if (!path.isEmpty())
+		{
+			m_animator->setPath(path);
+		}
+		else
+		{
+			return;
+		}
+	}
+
+	Lumix::OutputBlob blob(m_editor->getEngine().getAllocator());
+	m_animator->serialize(blob);
+	QFile file(m_animator->getPath());
+	file.open(QIODevice::WriteOnly);
+	file.write((const char*)blob.getData(), blob.getSize());
+	file.close();
+}
+
+
+void AnimationEditor::onLoadAction()
+{
+	QString path = QFileDialog::getOpenFileName(NULL, QString(), QString(), "All files (*.grf)");
+	if (!path.isEmpty())
+	{
+		delete m_animator;
+		m_animator = new Animator(m_compiler);
+		m_animator->setPath(path);
+		m_animator->setWorldEditor(*m_editor);
+		QFile file(path);
+		file.open(QIODevice::ReadOnly);
+		QByteArray data = file.readAll();
+
+		Lumix::InputBlob blob(data.data(), data.size());
+		m_animator->deserialize(*this, blob);
+		m_animation_graph_view->setNode(m_animator->getRoot());
+	}
 }
 
 

@@ -38,12 +38,12 @@ MainWindow::MainWindow(QWidget* parent) :
 
 	m_log = new LogWidget;
 	m_property_view = new PropertyView;
-	m_animation_editor = new AnimationEditor(*m_property_view);
 	m_skeleton_view = new SkeletonView();
 	m_scene_view = new SceneView;
 	m_game_view = new GameView(*this);
 	m_asset_browser = new AssetBrowser;
 	m_script_compiler_ui = new ScriptCompilerWidget;
+	m_animation_editor = new AnimationEditor(*m_property_view, *m_script_compiler_ui->getCompiler());
 	m_file_server_ui = new FileServerWidget;
 	m_profiler_ui = new ProfilerUI;
 	m_entity_template_list_ui = new EntityTemplateList;

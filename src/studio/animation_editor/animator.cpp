@@ -11,6 +11,7 @@
 #include "graphics/render_scene.h"
 #include "property_view.h"
 #include "property_view/property_editor.h"
+#include "scripts/scriptcompiler.h"
 #include <qfile.h>
 #include <qmenu.h>
 #include <qmessagebox.h>
@@ -321,7 +322,8 @@ void AnimationNodeContent::paintContainer(QPainter& painter)
 }
 
 
-Animator::Animator()
+Animator::Animator(ScriptCompiler& compiler)
+	: m_compiler(compiler)
 {
 	m_update_function = NULL;
 	m_last_uid = 0;
@@ -329,6 +331,31 @@ Animator::Animator()
 	auto sm = new StateMachineNodeContent(m_root);
 	m_root->setContent(sm);
 	m_root->setName("Root");
+}
+
+
+QString Animator::getCPPFilePath() const
+{
+	QFileInfo info(m_path);
+	return QString("%1/%2.cpp").arg(info.dir().path()).arg(info.baseName());
+}
+
+
+QString Animator::getModuleName() const
+{
+	QFileInfo info(m_path);
+	return QString("animations/") + info.baseName();
+}
+
+
+void Animator::setPath(const QString& path)
+{
+	m_path = path;
+	QString cpp_file = getCPPFilePath();
+	QString module_name = getModuleName();
+	m_compiler.destroyModule(module_name);
+	m_compiler.addScript(module_name, Lumix::Path(cpp_file.toLatin1().data()));
+#error set output path
 }
 
 
@@ -439,9 +466,9 @@ void Animator::run()
 }
 
 
-bool Animator::compile(const QString& base_path, const QString& path)
+bool Animator::compile()
 {
-	QFileInfo info(path);
+	m_library.unload();
 	QString code(
 		"#include \"animation/animation.h\"\n"
 		"#include \"graphics/model.h\"\n"
@@ -474,31 +501,16 @@ bool Animator::compile(const QString& base_path, const QString& path)
 		"	node->getPose(pose, context);\n"
 		"}").arg(m_root->getUID());
 
-	QFile file(QString("%1/%2.cpp").arg(info.dir().path()).arg(info.baseName()));
-	file.open(QIODevice::WriteOnly | QIODevice::Text);
+	QFile file(getCPPFilePath());
+	if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
+	{
+		return false;
+	}
 	QTextStream out(&file);
 	out << code;
 	file.close();
 
-	QProcess* process = new QProcess;
-	QStringList list;
-	list << "/C";
-	list << QString("%1/tmp/compile.bat %1/%2").arg(base_path).arg(file.fileName());
-	process->start("cmd.exe", list);
-	m_library.unload();
-	process->connect(process, (void (QProcess::*)(int))&QProcess::finished, [process, this, info](int exit_code){
-		m_library.setFileName(QString("%1/%2").arg(info.dir().path()).arg(info.baseName()));
-		if (exit_code != 0)
-		{
-			QString compile_message = process->readAll();
-			Lumix::g_log_error.log("animation") << compile_message.toLatin1().data();
-		}
-		else if (!m_library.load())
-		{
-			Lumix::g_log_error.log("animation") << "Could not load " << m_library.fileName().toLatin1().data();
-		}
-		process->deleteLater();
-	});
+	m_compiler.compileModule(getModuleName());
 	return true;
 }
 

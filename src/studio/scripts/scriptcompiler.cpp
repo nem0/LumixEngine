@@ -98,13 +98,13 @@ void ScriptCompiler::compileModule(const QString& module_name)
 
 	scene->beforeScriptCompiled();
 	module.m_status = NOT_COMPILED;
-	QString sources = QString("		<ClCompile Include=\"%1.cpp\"/>\n").arg(module.m_module_name);
+	QString sources;
 	for (int i = 0; i < module.m_scripts.size(); ++i)
 	{
 		sources += QString("		<ClCompile Include=\"%1\"/>\n").arg(module.m_scripts[i].c_str());
 	}
 
-	QFile file(QString("scripts/%1.vcxproj").arg(module.m_module_name));
+	QFile file(QString("scripts/projects/%1.vcxproj").arg(module.m_module_name));
 	file.open(QIODevice::Text | QIODevice::WriteOnly);
 	file.write(QString(
 		"<Project DefaultTargets=\"Build\" ToolsVersion=\"12.0\" xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\">\n"
@@ -126,15 +126,16 @@ void ScriptCompiler::compileModule(const QString& module_name)
 		"	<Import Project=\"$(VCTargetsPath)\\Microsoft.Cpp.props\"/>\n"
 		"	<ItemDefinitionGroup>\n"
 		"		<ClCompile>\n"
-		"			<AdditionalIncludeDirectories>%1\\src</AdditionalIncludeDirectories>\n"
+		"			<AdditionalIncludeDirectories>%1\\src;%1\\external\\glew\\include</AdditionalIncludeDirectories>\n"
 		"		</ClCompile>\n"
 		"		<Link>\n"
-		"			<AdditionalDependencies>core.lib;engine.lib;physics.lib</AdditionalDependencies>\n"
+		"			<AdditionalDependencies>animation.lib;core.lib;engine.lib;physics.lib</AdditionalDependencies>\n"
 		"			<AdditionalLibraryDirectories>%1\\bin\\win32_debug</AdditionalLibraryDirectories>\n"
 		"			<GenerateDebugInformation>false</GenerateDebugInformation>"
+		"			<OutputFile>../%2.dll</OutputFile>"
 		"		</Link>\n"
 		"	</ItemDefinitionGroup>\n"
-		"	<ItemGroup>\n").arg(m_sources_path).toLatin1().data());
+		"	<ItemGroup>\n").arg(m_sources_path).arg(module.m_module_name).toLatin1().data());
 	file.write(sources.toLatin1().data());
 	file.write(
 		"	</ItemGroup>\n"
