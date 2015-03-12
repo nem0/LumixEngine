@@ -17,7 +17,7 @@ AnimationEditor::AnimationEditor(PropertyView& property_view)
 	: m_property_view(property_view)
 {
 	m_animator = new Animator;
-	m_graph_path = "untitled";
+	m_graph_path = "tmp/untitled";
 
 	setWindowTitle("Animation editor");
 	setObjectName("animationEditor");

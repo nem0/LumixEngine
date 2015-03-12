@@ -483,7 +483,7 @@ bool Animator::compile(const QString& base_path, const QString& path)
 	QProcess* process = new QProcess;
 	QStringList list;
 	list << "/C";
-	list << QString("%1/tmp/compile.bat %2").arg(base_path, file.fileName());
+	list << QString("%1/tmp/compile.bat %1/%2").arg(base_path).arg(file.fileName());
 	process->start("cmd.exe", list);
 	m_library.unload();
 	process->connect(process, (void (QProcess::*)(int))&QProcess::finished, [process, this, info](int exit_code){

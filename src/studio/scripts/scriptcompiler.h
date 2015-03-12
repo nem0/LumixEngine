@@ -3,8 +3,10 @@
 
 #include <QMap>
 #include <QObject>
+#include <QString>
 #include <QVector>
 #include "core/array.h"
+#include "core/blob.h"
 #include "core/delegate_list.h"
 #include "core/path.h"
 #include "core/string.h"
@@ -25,23 +27,24 @@ public:
 		FAILURE
 	};
 
+	class Module;
+
 public:
 	explicit ScriptCompiler(QObject* parent = NULL);
-	void compile(const Lumix::Path& path);
-	void compileAll();
-	void setBasePath(const Lumix::Path& path) { m_base_path = path; }
-	void checkFinished();
-	bool isEmpty() const { return m_processes.empty(); }
-	Status getStatus(const Lumix::Path& path);
-	QString getLog(const Lumix::Path& path);
+	void compileModule(const QString& module_name);
+	void compileAllModules();
+	Status getStatus(const QString& module_name);
+	QString getLog(const QString& module_name);
 	void setWorldEditor(Lumix::WorldEditor& editor);
+	void addScript(const QString& module_name, const Lumix::Path& path);
+	void onScriptRenamed(const Lumix::Path& old_path, const Lumix::Path& new_path);
+	void removeScript(const Lumix::Path& path);
+	void destroyModule(const QString& module_name);
+	void setSourcesPath(const QString& path) { m_sources_path = path; }
+	void onScriptChanged(const QString& path);
 
 signals:
-	void messageLogged(const QString& message);
-	void compiled(const Lumix::Path&, uint32_t);
-
-public slots:
-	void compilerFinish(int exitCode);
+	void compiled(const QString&);
 
 private:
 	struct ProcessInfo
@@ -51,9 +54,25 @@ private:
 	};
 
 private:
-	Lumix::Path m_base_path;
-	QVector<ProcessInfo> m_processes;
-	QMap<uint32_t, Status> m_status;
-	QMap<uint32_t, QString> m_log;
+	void emitCompiled(const QString& module_name) { emit compiled(module_name); }
+	void onGameModeToggled(bool was_game_mode);
+
+private:
 	Lumix::WorldEditor* m_editor;
+	QMap<QString, Module> m_modules;
+	QString m_sources_path;
+};
+
+
+class ScriptCompiler::Module
+{
+	public:
+		Module(const QString& name) : m_module_name(name) {}
+		Module() { Q_ASSERT(false); }
+
+	public:
+		QVector<Lumix::Path> m_scripts;
+		Status m_status;
+		QString m_log;
+		QString m_module_name;
 };

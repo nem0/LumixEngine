@@ -86,7 +86,7 @@ class SetEntityNameCommand : public IEditorCommand
 			serializer.deserialize("name", name, sizeof(name), "");
 			m_new_name = name;
 			serializer.deserialize("entity", m_entity.index, 0);
-			m_entity.universe = m_editor.getEngine().getUniverse();
+			m_entity.universe = m_editor.getUniverse();
 			m_old_name = m_entity.getName();
 		}
 
@@ -177,7 +177,7 @@ class PasteEntityCommand : public IEditorCommand
 			serializer.deserialize("pos_y", m_position.y, 0);
 			serializer.deserialize("pos_z", m_position.z, 0);
 			serializer.deserialize("entity", m_entity.index, 0);
-			m_entity.universe = m_editor.getEngine().getUniverse();
+			m_entity.universe = m_editor.getUniverse();
 			int size;
 			serializer.deserialize("size", size, 0);
 			serializer.deserializeArrayBegin("data");
@@ -199,7 +199,7 @@ class PasteEntityCommand : public IEditorCommand
 			{
 				cmps[i].scene->destroyComponent(cmps[i]);
 			}
-			m_editor.getEngine().getUniverse()->destroyEntity(m_entity);
+			m_editor.getUniverse()->destroyEntity(m_entity);
 			m_entity = Entity::INVALID;
 		}
 
@@ -291,7 +291,7 @@ class MoveEntityCommand : public IEditorCommand
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
 				serializer.deserializeArrayItem(m_entities[i].index, 0);
-				m_entities[i].universe = m_editor.getEngine().getUniverse();
+				m_entities[i].universe = m_editor.getUniverse();
 				serializer.deserializeArrayItem(m_new_positions[i].x, 0);
 				serializer.deserializeArrayItem(m_new_positions[i].y, 0);
 				serializer.deserializeArrayItem(m_new_positions[i].z, 0);
@@ -411,7 +411,7 @@ class RemoveArrayPropertyItemCommand : public IEditorCommand
 			serializer.deserialize("entity_index", m_component.entity.index, 0);
 			serializer.deserialize("component_index", m_component.index, 0);
 			serializer.deserialize("component_type", m_component.type, 0);
-			m_component.entity.universe = m_editor.getEngine().getUniverse();
+			m_component.entity.universe = m_editor.getUniverse();
 			m_component.scene = m_editor.getEngine().getSceneByComponentType(m_component.type);
 			uint32_t property_name_hash;
 			serializer.deserialize("property_name_hash", property_name_hash, 0);
@@ -593,7 +593,7 @@ class SetPropertyCommand : public IEditorCommand
 			serializer.deserialize("entity_index", m_component.entity.index, 0);
 			serializer.deserialize("component_index", m_component.index, 0);
 			serializer.deserialize("component_type", m_component.type, 0);
-			m_component.entity.universe = m_editor.getEngine().getUniverse();
+			m_component.entity.universe = m_editor.getUniverse();
 			m_component.scene = m_editor.getEngine().getSceneByComponentType(m_component.type);
 			serializer.deserializeArrayBegin("data");
 			m_new_value.clear();
@@ -763,7 +763,7 @@ struct WorldEditorImpl : public WorldEditor
 					{
 						Entity& entity = m_entities.pushEmpty();
 						serializer.deserializeArrayItem(entity.index, 0);
-						entity.universe = m_editor.getEngine().getUniverse();
+						entity.universe = m_editor.getUniverse();
 					}
 					serializer.deserializeArrayEnd();
 				}
@@ -872,7 +872,7 @@ struct WorldEditorImpl : public WorldEditor
 					for (int i = 0; i < count; ++i)
 					{
 						serializer.deserializeArrayItem(m_entities[i].index, 0);
-						m_entities[i].universe = m_editor.getEngine().getUniverse();
+						m_entities[i].universe = m_editor.getUniverse();
 						serializer.deserializeArrayItem(m_positons_rotations[i].m_position.x, 0);
 						serializer.deserializeArrayItem(m_positons_rotations[i].m_position.y, 0);
 						serializer.deserializeArrayItem(m_positons_rotations[i].m_position.z, 0);
@@ -929,7 +929,7 @@ struct WorldEditorImpl : public WorldEditor
 					InputBlob blob(m_old_values);
 					for (int i = 0; i < m_entities.size(); ++i)
 					{
-						Entity new_entity = m_editor.getEngine().getUniverse()->createEntity();
+						Entity new_entity = m_editor.getUniverse()->createEntity();
 						new_entity.setPosition(m_positons_rotations[i].m_position);
 						new_entity.setRotation(m_positons_rotations[i].m_rotation);
 						int cmps_count;
@@ -1018,7 +1018,7 @@ struct WorldEditorImpl : public WorldEditor
 					serializer.deserialize("entity", m_component.entity.index, 0);
 					serializer.deserialize("component", m_component.index, 0);
 					serializer.deserialize("component_type", m_component.type, 0);
-					m_component.entity.universe = m_editor.getEngine().getUniverse();
+					m_component.entity.universe = m_editor.getUniverse();
 					m_component.scene = m_editor.getEngine().getSceneByComponentType(m_component.type);
 				}
 
@@ -1140,7 +1140,7 @@ struct WorldEditorImpl : public WorldEditor
 
 				virtual void execute() override
 				{
-					m_entity = m_editor.getEngine().getUniverse()->createEntity();
+					m_entity = m_editor.getUniverse()->createEntity();
 					m_entity.setPosition(m_position);
 					m_editor.selectEntities(&m_entity, 1);
 				}
@@ -1164,7 +1164,7 @@ struct WorldEditorImpl : public WorldEditor
 
 				virtual void undo() override
 				{
-					m_editor.getEngine().getUniverse()->destroyEntity(m_entity);
+					m_editor.getUniverse()->destroyEntity(m_entity);
 				}
 
 
@@ -1203,6 +1203,12 @@ struct WorldEditorImpl : public WorldEditor
 		virtual IAllocator& getAllocator() override
 		{
 			return m_allocator;
+		}
+
+
+		virtual Universe* getUniverse() override
+		{
+			return m_engine->getUniverse();
 		}
 
 
@@ -1755,6 +1761,12 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
+		virtual bool isGameMode() const override
+		{
+			return m_is_game_mode;
+		}
+
+
 		virtual void toggleGameMode() override
 		{
 			if (m_is_game_mode)
@@ -2196,6 +2208,7 @@ struct WorldEditorImpl : public WorldEditor
 			, m_universe_destroyed(m_allocator)
 			, m_universe_created(m_allocator)
 			, m_universe_loaded(m_allocator)
+			, m_game_mode_toggled(m_allocator)
 			, m_selected_entities(m_allocator)
 			, m_editor_icons(m_allocator)
 			, m_plugins(m_allocator)
@@ -2725,6 +2738,7 @@ struct WorldEditorImpl : public WorldEditor
 		DelegateList<void()> m_universe_loaded;
 		DelegateList<void(const Array<Entity>&)> m_entity_selected;
 		DelegateList<void(const Entity&, const char*)> m_entity_name_set;
+		DelegateList<void(bool)> m_game_mode_toggled;
 
 		FS::FileSystem* m_file_system;
 		FS::TCPFileServer m_tpc_file_server;
@@ -2772,7 +2786,7 @@ void WorldEditor::destroy(WorldEditor* editor)
 void PasteEntityCommand::execute()
 {
 	InputBlob blob(m_blob.getData(), m_blob.getSize());
-	Entity new_entity = m_editor.getEngine().getUniverse()->createEntity();
+	Entity new_entity = m_editor.getUniverse()->createEntity();
 	new_entity.setPosition(m_position);
 	int32_t count;
 	blob.read(count);

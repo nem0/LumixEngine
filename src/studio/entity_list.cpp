@@ -56,8 +56,8 @@ class SetParentEditorCommand : public Lumix::IEditorCommand
 		{
 			serializer.deserialize("parent", m_new_parent.index, 0);
 			serializer.deserialize("child", m_child.index, 0);
-			m_new_parent.universe = m_editor.getEngine().getUniverse();
-			m_child.universe = m_editor.getEngine().getUniverse();
+			m_new_parent.universe = m_editor.getUniverse();
+			m_child.universe = m_editor.getUniverse();
 			m_old_parent = m_hierarchy.getParent(m_child);
 		}
 
@@ -600,7 +600,7 @@ void EntityList::setWorldEditor(Lumix::WorldEditor& editor)
 	editor.universeCreated().bind<EntityList, &EntityList::onUniverseCreated>(this);
 	editor.universeDestroyed().bind<EntityList, &EntityList::onUniverseDestroyed>(this);
 	editor.universeLoaded().bind<EntityList, &EntityList::onUniverseLoaded>(this);
-	m_universe = editor.getEngine().getUniverse();
+	m_universe = editor.getUniverse();
 	m_model->setEngine(editor.getEngine());
 	m_model->setUniverse(m_universe);
 	m_filter->setSourceModel(m_model);
@@ -648,14 +648,14 @@ void EntityList::onEntitySelected(const Lumix::Array<Lumix::Entity>& entities)
 
 void EntityList::onUniverseCreated()
 {
-	m_universe = m_editor->getEngine().getUniverse();
+	m_universe = m_editor->getUniverse();
 	m_model->setUniverse(m_universe);
 }
 
 
 void EntityList::onUniverseLoaded()
 {
-	m_universe = m_editor->getEngine().getUniverse();
+	m_universe = m_editor->getUniverse();
 	m_model->setUniverse(m_universe);
 	if (m_is_update_enabled)
 	{
