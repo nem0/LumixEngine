@@ -19,6 +19,7 @@ class AnimatorNodeContent;
 class Animator;
 class AnimatorNode;
 class PropertyView;
+class ScriptCompiler;
 
 
 class AnimationGraphView : public QWidget
@@ -60,7 +61,7 @@ class AnimationEditor : public QDockWidget
 {
 	Q_OBJECT
 	public:
-		AnimationEditor(PropertyView& property_view);
+		AnimationEditor(PropertyView& property_view, ScriptCompiler& compiler);
 
 		void setWorldEditor(Lumix::WorldEditor& editor);
 		void setComponent(const Lumix::Component& component);
@@ -69,8 +70,13 @@ class AnimationEditor : public QDockWidget
 		void executeCommand(QUndoCommand* command);
 		PropertyView& getPropertyView() { return m_property_view; }
 		AnimatorNodeContent* createContent(AnimatorNode& node, uint32_t content_type);
-		void setGraphPath(const QString& path) { m_graph_path = path; }
-		QString getGraphPath() { return m_graph_path; }
+
+	private slots:
+		void onCompileAction();
+		void onRunAction();
+		void onSaveAction();
+		void onSaveAsAction();
+		void onLoadAction();
 
 	private:
 		QUndoStack m_undo_stack;
@@ -78,5 +84,5 @@ class AnimationEditor : public QDockWidget
 		AnimationGraphView* m_animation_graph_view;
 		PropertyView& m_property_view;
 		Lumix::WorldEditor* m_editor;
-		QString m_graph_path;
+		ScriptCompiler& m_compiler;
 };
