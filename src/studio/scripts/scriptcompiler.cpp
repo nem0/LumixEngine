@@ -16,21 +16,181 @@ ScriptCompiler::ScriptCompiler(QObject* parent)
 }
 
 
-void ScriptCompiler::compileAll()
+void ScriptCompiler::onScriptRenamed(const Lumix::Path& old_path, const Lumix::Path& new_path)
 {
-	QDirIterator dirIt(QString(m_base_path.c_str()) + "/scripts/", QDirIterator::Subdirectories);
-	while (dirIt.hasNext()) 
+	for (auto iter = m_modules.begin(), end = m_modules.end(); iter != end; ++iter)
 	{
-		dirIt.next();
-		if (QFileInfo(dirIt.filePath()).isFile())
+		Module& module = *iter;
+		for (int i = 0; module.m_scripts.size(); ++i)
 		{
-			if (QFileInfo(dirIt.filePath()).suffix() == "cpp")
+			if (module.m_scripts[i] == old_path)
 			{
-				compile(Lumix::Path(dirIt.filePath().toLatin1().data()));
+				module.m_scripts[i] = new_path;
+				break;
 			}
 		}
 	}
 }
+
+
+void ScriptCompiler::addScript(const QString& module_name, const Lumix::Path& path)
+{
+	if (m_modules.find(module_name) == m_modules.end())
+	{
+		m_modules.insert(module_name, Module(module_name));
+	}
+	m_modules[module_name].m_scripts.push_back(path);
+	m_modules[module_name].m_status = UNKNOWN;
+}
+
+
+void ScriptCompiler::removeScript(const Lumix::Path& path)
+{
+	for (auto iter = m_modules.begin(), end = m_modules.end(); iter != end; ++iter)
+	{
+		Module& module = *iter;
+		for (int i = 0; module.m_scripts.size(); ++i)
+		{
+			if (module.m_scripts[i] == path)
+			{
+				module.m_scripts.removeAt(i);
+				module.m_status = UNKNOWN;
+				break;
+			}
+		}
+	}
+}
+
+
+void ScriptCompiler::destroyModule(const QString& module_name)
+{
+	if (m_modules.contains(module_name))
+	{
+		m_modules[module_name].m_status = UNKNOWN;
+		m_modules[module_name].m_scripts.clear();
+	}
+}
+
+
+void ScriptCompiler::compileAllModules()
+{
+	for (auto iter = m_modules.begin(), end = m_modules.end(); iter != end; ++iter)
+	{
+		Module& module = *iter;
+		compileModule(module.m_module_name);
+	}
+}
+
+
+void ScriptCompiler::compileModule(const QString& module_name)
+{
+	if (!m_modules.contains(module_name))
+	{
+		return;
+	}
+	Module& module = m_modules[module_name];
+	Lumix::OutputBlob* out_blob = m_editor->getAllocator().newObject<Lumix::OutputBlob>(m_editor->getAllocator());
+	Lumix::ScriptScene* scene = static_cast<Lumix::ScriptScene*>(m_editor->getEngine().getScene(crc32("script")));
+	if (m_editor->isGameMode())
+	{
+		scene->serializeScripts(*out_blob);
+	}
+
+	scene->beforeScriptCompiled();
+	module.m_status = NOT_COMPILED;
+	QString sources = QString("		<ClCompile Include=\"%1.cpp\"/>\n").arg(module.m_module_name);
+	for (int i = 0; i < module.m_scripts.size(); ++i)
+	{
+		sources += QString("		<ClCompile Include=\"%1\"/>\n").arg(module.m_scripts[i].c_str());
+	}
+
+	QFile file(QString("scripts/%1.vcxproj").arg(module.m_module_name));
+	file.open(QIODevice::Text | QIODevice::WriteOnly);
+	file.write(QString(
+		"<Project DefaultTargets=\"Build\" ToolsVersion=\"12.0\" xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\">\n"
+		"	<ItemGroup>\n"
+		"		<ProjectConfiguration Include = \"Debug|Win32\">\n"
+		"			<Configuration>Debug</Configuration>\n"
+		"			<Platform>Win32</Platform>\n"
+		"		</ProjectConfiguration>\n"
+		"		<ProjectConfiguration Include = \"Release|Win32\">\n"
+		"			<Configuration>Release</Configuration>\n"
+		"			<Platform>Win32</Platform>\n"
+		"		</ProjectConfiguration>\n"
+		"	</ItemGroup>\n"
+		"	<Import Project=\"$(VCTargetsPath)\\Microsoft.Cpp.default.props\"/>\n"
+		"	<PropertyGroup>\n"
+		"		<ConfigurationType>DynamicLibrary</ConfigurationType>\n"
+		"		<PlatformToolset>v120</PlatformToolset>\n"
+		"	</PropertyGroup>\n"
+		"	<Import Project=\"$(VCTargetsPath)\\Microsoft.Cpp.props\"/>\n"
+		"	<ItemDefinitionGroup>\n"
+		"		<ClCompile>\n"
+		"			<AdditionalIncludeDirectories>%1\\src</AdditionalIncludeDirectories>\n"
+		"		</ClCompile>\n"
+		"		<Link>\n"
+		"			<AdditionalDependencies>core.lib;engine.lib;physics.lib</AdditionalDependencies>\n"
+		"			<AdditionalLibraryDirectories>%1\\bin\\win32_debug</AdditionalLibraryDirectories>\n"
+		"			<GenerateDebugInformation>false</GenerateDebugInformation>"
+		"		</Link>\n"
+		"	</ItemDefinitionGroup>\n"
+		"	<ItemGroup>\n").arg(m_sources_path).toLatin1().data());
+	file.write(sources.toLatin1().data());
+	file.write(
+		"	</ItemGroup>\n"
+		"	<Import Project=\"$(VCTargetsPath)\\Microsoft.Cpp.Targets\"/>\n"
+		"</Project>\n");
+	file.close();
+
+	QProcess* process = new QProcess;
+	process->connect(process, (void (QProcess::*)(int))&QProcess::finished, [module_name, out_blob, scene, this, process](int exit_code){
+		process->deleteLater();
+		m_modules[module_name].m_log = process->readAll();
+		m_modules[module_name].m_status = exit_code == 0 ? SUCCESS : FAILURE;
+		emitCompiled(module_name);
+		scene->afterScriptCompiled();
+		if (m_editor->isGameMode())
+		{
+			Lumix::InputBlob blob(*out_blob);
+			scene->deserializeScripts(blob);
+			m_editor->getAllocator().deleteObject(out_blob);
+		}
+	});
+	QStringList list;
+	list << "/C";
+	list << QString("%1/scripts/compile_all.bat %2").arg(m_editor->getBasePath()).arg(file.fileName());
+	process->start("cmd.exe", list);
+}
+
+
+ScriptCompiler::Status ScriptCompiler::getStatus(const QString& module_name)
+{
+	return m_modules[module_name].m_status;
+}
+
+
+QString ScriptCompiler::getLog(const QString& module_name)
+{
+	return m_modules[module_name].m_log;
+}
+
+
+void ScriptCompiler::onScriptChanged(const QString& path)
+{
+	for (auto iter = m_modules.begin(), end = m_modules.end(); iter != end; ++iter)
+	{
+		Module& module = *iter;
+		for (int i = 0; i < module.m_scripts.size(); ++i)
+		{
+			if (module.m_scripts[i] == path)
+			{
+				compileModule(module.m_module_name);
+				break;
+			}
+		}
+	}
+}
+
 
 
 void ScriptCompiler::setWorldEditor(Lumix::WorldEditor& editor)
@@ -38,133 +198,12 @@ void ScriptCompiler::setWorldEditor(Lumix::WorldEditor& editor)
 	m_editor = &editor;
 }
 
-void ScriptCompiler::compile(const Lumix::Path& path)
+
+void ScriptCompiler::onGameModeToggled(bool was_game_mode)
 {
-	if (m_editor)
+	if (!was_game_mode)
 	{
-		Lumix::ScriptScene* scene = static_cast<Lumix::ScriptScene*>(m_editor->getEngine().getScene(crc32("script")));
-		scene->beforeScriptCompiled(path);
+		QFileInfo info(m_editor->getUniversePath().c_str());
+		compileModule(info.baseName());
 	}
-
-	ProcessInfo process;
-	Lumix::Path rel_path;
-	if(strncmp(path.c_str(), m_base_path.c_str(), m_base_path.length()) == 0)
-	{
-		rel_path = path.c_str() + m_base_path.length() + 1;
-	}
-	else
-	{
-		rel_path = path;
-	}
-	process.m_path = rel_path;
-	process.m_process = new QProcess();
-	m_processes.push_back(process);
-	QStringList list;
-	char cmd_line[255];
-	sprintf(cmd_line, "%s\\scripts\\compile.bat %s\\%s", m_base_path.c_str(), m_base_path.c_str(), rel_path.c_str());
-
-	list.push_back("/C");
-	list.push_back(cmd_line);
-	connect(process.m_process, (void (QProcess::*)(int))&QProcess::finished, this, &ScriptCompiler::compilerFinish);
-	process.m_process->start("cmd.exe", list);
-}
-
-
-void ScriptCompiler::compilerFinish(int exitCode)
-{
-	QProcess* process = static_cast<QProcess*>(QObject::sender());
-	QString s = process->readAll();;
-	process->deleteLater();
-	while(process->waitForReadyRead())
-	{
-		s += process->readAll();
-	}
-	for(int i = 0; i < m_processes.size(); ++i)
-	{
-		if(m_processes[i].m_process == process)
-		{
-			uint32_t hash = crc32(m_processes[i].m_path.c_str());
-			m_log[hash] = s.toLatin1().data();
-			m_status[hash] = exitCode == 0 ? SUCCESS : FAILURE;
-			
-			QString msg;
-			if(exitCode == 0)
-			{
-				msg.sprintf("Script %s compiled successfully", m_processes[i].m_path.c_str());
-			}
-			else
-			{
-				msg.sprintf("Script %s failed to compile", m_processes[i].m_path.c_str());
-				Lumix::g_log_error.log("script") << "Script " << m_processes[i].m_path.c_str() << " failed to compile";
-			}
-			emit compiled(Lumix::Path(m_processes[i].m_path.c_str()), exitCode);
-			emit messageLogged(msg);
-			if (m_editor)
-			{
-				Lumix::ScriptScene* scene = static_cast<Lumix::ScriptScene*>(m_editor->getEngine().getScene(crc32("script")));
-				scene->afterScriptCompiled(m_processes[i].m_path);
-			}
-			m_processes.removeAt(i);
-
-			break;
-		}
-	}
-}
-
-
-ScriptCompiler::Status ScriptCompiler::getStatus(const Lumix::Path& path)
-{
-	uint32_t hash;
-	if(strncmp(path.c_str(), m_base_path.c_str(), m_base_path.length()) == 0)
-	{
-		hash = crc32(path.c_str() + m_base_path.length() + 1);
-	}
-	else
-	{
-		hash = crc32(path.c_str());
-	}
-
-	QMap<uint32_t, Status>::iterator iter = m_status.find(hash);
-	return iter == m_status.end() ? UNKNOWN : iter.value();
-}
-
-
-void ScriptCompiler::checkFinished()
-{
-	for(int i = m_processes.size() - 1; i >= 0; --i)
-	{
-		ProcessInfo& process = m_processes[i];
-		if(process.m_process->state() == QProcess::NotRunning)
-		{
-			uint32_t hash = crc32(process.m_path.c_str());
-			m_status[hash] = process.m_process->exitCode() == 0 ? SUCCESS : FAILURE;
-			QString s;
-			while(process.m_process->waitForReadyRead())
-			{
-				s += process.m_process->readAll();
-			}
-			m_log[hash] = s.toLatin1().data();
-			delete process.m_process;
-			m_processes.remove(i);
-		}
-	}
-	if (m_processes.empty())
-	{
-		Lumix::g_log_info.log("script") << "All scripts processed";
-	}
-}
-
-
-QString ScriptCompiler::getLog(const Lumix::Path& path)
-{
-	uint32_t hash;
-	if(strncmp(path.c_str(), m_base_path.c_str(), m_base_path.length()) == 0)
-	{
-		hash = crc32(path.c_str() + m_base_path.length() + 1);
-	}
-	else
-	{
-		hash = crc32(path.c_str());
-	}
-	return m_log[hash];
 }

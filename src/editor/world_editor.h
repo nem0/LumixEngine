@@ -62,6 +62,7 @@ namespace Lumix
 			virtual IPropertyDescriptor* getProperty(const char* component_type, const char* property_name) = 0;
 			virtual void executeCommand(IEditorCommand* command) = 0;
 			virtual Engine& getEngine() = 0;
+			virtual Universe* getUniverse() = 0;
 			virtual IAllocator& getAllocator() = 0;
 			virtual void render(IRenderDevice& render_device) = 0;
 			virtual void renderIcons(IRenderDevice& render_device) = 0;
@@ -126,6 +127,7 @@ namespace Lumix
 			virtual bool executeUndoStack(const Path& path) = 0;
 			virtual bool runTest(const Path& undo_stack_path, const Path& result_universe_path) = 0;
 			virtual void registerEditorCommandCreator(const char* command_type, EditorCommandCreator) = 0;
+			virtual bool isGameMode() const = 0;
 
 		protected:
 			virtual ~WorldEditor() {}
