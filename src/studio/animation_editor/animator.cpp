@@ -19,6 +19,10 @@
 #include <qtextstream.h>
 
 
+static const QString MODULE_NAME = "amimation";
+static const QString CPP_FILE_PATH = "tmp/animation.cpp";
+
+
 void AnimatorNode::serialize(Lumix::OutputBlob& blob)
 {
 	blob.write(m_uid);
@@ -334,28 +338,15 @@ Animator::Animator(ScriptCompiler& compiler)
 }
 
 
-QString Animator::getCPPFilePath() const
-{
-	QFileInfo info(m_path);
-	return QString("%1/%2.cpp").arg(info.dir().path()).arg(info.baseName());
-}
-
-
-QString Animator::getModuleName() const
-{
-	QFileInfo info(m_path);
-	return QString("animations/") + info.baseName();
-}
-
-
 void Animator::setPath(const QString& path)
 {
+	QFileInfo info(path);
 	m_path = path;
-	QString cpp_file = getCPPFilePath();
-	QString module_name = getModuleName();
-	m_compiler.destroyModule(module_name);
-	m_compiler.addScript(module_name, Lumix::Path(cpp_file.toLatin1().data()));
-#error set output path
+	m_compiler.destroyModule(MODULE_NAME);
+	m_compiler.addScript(MODULE_NAME, CPP_FILE_PATH);
+	QString output_path = info.path() + "/" + info.baseName();
+	m_compiler.setModuleOutputPath(MODULE_NAME, output_path);
+	m_library.setFileName(output_path);
 }
 
 
@@ -501,7 +492,7 @@ bool Animator::compile()
 		"	node->getPose(pose, context);\n"
 		"}").arg(m_root->getUID());
 
-	QFile file(getCPPFilePath());
+	QFile file(CPP_FILE_PATH);
 	if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
 	{
 		return false;
@@ -510,7 +501,7 @@ bool Animator::compile()
 	out << code;
 	file.close();
 
-	m_compiler.compileModule(getModuleName());
+	m_compiler.compileModule(MODULE_NAME);
 	return true;
 }
 

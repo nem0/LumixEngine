@@ -12,6 +12,7 @@
 
 
 static const unsigned int SCRIPT_HASH = crc32("script");
+static const QString MODULE_NAME = "universe";
 
 
 ScriptCompilerWidget::ScriptCompilerWidget(QWidget* parent) 
@@ -85,11 +86,12 @@ void ScriptCompilerWidget::onUniverseLoaded()
 
 	while(script.isValid())
 	{
-		const Lumix::Path& path = scene->getScriptPath(script);
-		m_compiler->addScript(info.baseName(), path);
-		m_ui->scriptListWidget->addItem(path.c_str());
+		QString path = QString("scripts/") + scene->getScriptPath(script).c_str();
+		m_compiler->addScript(MODULE_NAME, path);
+		m_ui->scriptListWidget->addItem(path);
 		script = scene->getNextScript(script);
 	}
+	m_compiler->setModuleOutputPath(MODULE_NAME, QString("scripts/universes/") + info.baseName());
 }
 
 
@@ -123,9 +125,9 @@ void ScriptCompilerWidget::onComponentCreated(const Lumix::Component& component)
 	{
 		QFileInfo info(m_editor->getUniversePath().c_str());
 		Lumix::ScriptScene* scene = static_cast<Lumix::ScriptScene*>(m_editor->getEngine().getScene(crc32("script")));
-		const Lumix::Path& path = scene->getScriptPath(component);
-		m_compiler->addScript(info.baseName(), path);
-		m_ui->scriptListWidget->addItem(path.c_str());
+		QString path = QString("scripts/") + scene->getScriptPath(component).c_str();
+		m_compiler->addScript(MODULE_NAME, path);
+		m_ui->scriptListWidget->addItem(path);
 	}
 }
 

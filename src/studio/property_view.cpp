@@ -922,7 +922,7 @@ void ScriptComponentPlugin::createEditor(QTreeWidgetItem* component_item, const 
 	Lumix::string path(m_world_editor.getAllocator());
 	static_cast<Lumix::ScriptScene*>(component.scene)->getScriptPath(component, path);
 	QFileInfo info(m_world_editor.getUniversePath().c_str());
-	switch (m_compiler.getStatus(info.baseName()))
+	switch (m_compiler.getStatus("universe"))
 	{
 	case ScriptCompiler::SUCCESS:
 		status_item->setText(1, "Compiled");
