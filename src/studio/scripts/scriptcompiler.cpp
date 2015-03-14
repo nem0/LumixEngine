@@ -33,7 +33,24 @@ void ScriptCompiler::onScriptRenamed(const Lumix::Path& old_path, const Lumix::P
 }
 
 
-void ScriptCompiler::addScript(const QString& module_name, const Lumix::Path& path)
+void ScriptCompiler::setModuleOutputPath(const QString& module_name, const QString& path)
+{
+	if (!m_modules.contains(module_name))
+	{
+		m_modules.insert(module_name, Module(module_name));
+	}
+	if (QFileInfo(path).isAbsolute())
+	{
+		m_modules[module_name].m_output_path = path;
+	}
+	else
+	{
+		m_modules[module_name].m_output_path = QString(m_editor->getBasePath()) + "/" + path;
+	}
+}
+
+
+void ScriptCompiler::addScript(const QString& module_name, const QString& path)
 {
 	if (m_modules.find(module_name) == m_modules.end())
 	{
@@ -89,6 +106,7 @@ void ScriptCompiler::compileModule(const QString& module_name)
 		return;
 	}
 	Module& module = m_modules[module_name];
+	Q_ASSERT(!module.m_output_path.isEmpty());
 	Lumix::OutputBlob* out_blob = m_editor->getAllocator().newObject<Lumix::OutputBlob>(m_editor->getAllocator());
 	Lumix::ScriptScene* scene = static_cast<Lumix::ScriptScene*>(m_editor->getEngine().getScene(crc32("script")));
 	if (m_editor->isGameMode())
@@ -101,10 +119,10 @@ void ScriptCompiler::compileModule(const QString& module_name)
 	QString sources;
 	for (int i = 0; i < module.m_scripts.size(); ++i)
 	{
-		sources += QString("		<ClCompile Include=\"%1\"/>\n").arg(module.m_scripts[i].c_str());
+		sources += QString("		<ClCompile Include=\"%2/%1\"/>\n").arg(module.m_scripts[i]).arg(m_editor->getBasePath());
 	}
 
-	QFile file(QString("scripts/projects/%1.vcxproj").arg(module.m_module_name));
+	QFile file(QString("tmp/%1.vcxproj").arg(module.m_module_name));
 	file.open(QIODevice::Text | QIODevice::WriteOnly);
 	file.write(QString(
 		"<Project DefaultTargets=\"Build\" ToolsVersion=\"12.0\" xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\">\n"
@@ -132,10 +150,10 @@ void ScriptCompiler::compileModule(const QString& module_name)
 		"			<AdditionalDependencies>animation.lib;core.lib;engine.lib;physics.lib</AdditionalDependencies>\n"
 		"			<AdditionalLibraryDirectories>%1\\bin\\win32_debug</AdditionalLibraryDirectories>\n"
 		"			<GenerateDebugInformation>false</GenerateDebugInformation>"
-		"			<OutputFile>../%2.dll</OutputFile>"
+		"			<OutputFile>%2.dll</OutputFile>"
 		"		</Link>\n"
 		"	</ItemDefinitionGroup>\n"
-		"	<ItemGroup>\n").arg(m_sources_path).arg(module.m_module_name).toLatin1().data());
+		"	<ItemGroup>\n").arg(m_sources_path).arg(module.m_output_path).toLatin1().data());
 	file.write(sources.toLatin1().data());
 	file.write(
 		"	</ItemGroup>\n"

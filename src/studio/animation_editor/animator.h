@@ -165,10 +165,6 @@ class Animator
 		typedef void (*AnimationManagerSetter)(Lumix::AnimationManager*);
 
 	private:
-		QString getCPPFilePath() const;
-		QString getModuleName() const;
-
-	private:
 		int m_last_uid;
 		AnimatorNode* m_root;
 		QList<AnimatorNode*> m_nodes;
