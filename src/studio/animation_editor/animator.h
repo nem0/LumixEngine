@@ -53,15 +53,22 @@ class AnimatorInputTypeDelegate : public QItemDelegate
 class AnimatorEdge
 {
 	public:
-		AnimatorEdge(AnimatorNode* from, AnimatorNode* to) : m_from(from), m_to(to) {}
+		AnimatorEdge(int uid, AnimatorNode* from, AnimatorNode* to): m_uid(uid), m_from(from), m_to(to) {}
 		AnimatorNode* getFrom() const { return m_from; }
 		AnimatorNode* getTo() const { return m_to; }
 		QPoint getFromPosition() const;
 		QPoint getToPosition() const;
+		QString getCondition() const { return m_condition; }
+		void setCondition(const QString& condition) { m_condition = condition; }
+		bool hitTest(int x, int y) const;
+		void fillPropertyView(PropertyView& view);
+		int getUID() const { return m_uid; }
 
 	private:
+		int m_uid;
 		AnimatorNode* m_from;
 		AnimatorNode* m_to;
+		QString m_condition;
 };
 
 
@@ -73,6 +80,7 @@ class AnimatorNodeContent
 		virtual void paint(QPainter& painter) = 0;
 		virtual void paintContainer(QPainter& painter) = 0;
 		virtual AnimatorNode* getNodeAt(int x, int y) const = 0;
+		virtual AnimatorEdge* getEdgeAt(int x, int y) const = 0;
 		virtual void showContextMenu(AnimationEditor& editor, QWidget* widget, const QPoint& pos) = 0;
 		virtual bool hitTest(int x, int y) const = 0;
 		virtual int getChildCount() const = 0;
@@ -82,7 +90,8 @@ class AnimatorNodeContent
 		virtual uint32_t getType() const = 0;
 		virtual void serialize(Lumix::OutputBlob& blob) = 0;
 		virtual void deserialize(AnimationEditor& editor, Lumix::InputBlob& blob) = 0;
-
+		virtual QString generateConditionCode() const { return ""; }
+	
 	private:
 		friend class Animator;
 		virtual void addChild(AnimatorNode*) { Q_ASSERT(false); }
@@ -100,6 +109,7 @@ class AnimationNodeContent : public AnimatorNodeContent
 
 		virtual bool hitTest(int x, int y) const override;
 		virtual AnimatorNode* getNodeAt(int x, int y) const override;
+		virtual AnimatorEdge* getEdgeAt(int, int) const override { return NULL; }
 		virtual void paint(QPainter& painter) override;
 		virtual void paintContainer(QPainter& painter) override;
 		virtual void showContextMenu(AnimationEditor& editor, QWidget* widget, const QPoint& pos) override;
@@ -126,6 +136,7 @@ class StateMachineNodeContent : public AnimatorNodeContent
 
 		virtual bool hitTest(int x, int y) const override;
 		virtual AnimatorNode* getNodeAt(int x, int y) const override;
+		virtual AnimatorEdge* getEdgeAt(int x, int y) const override;
 		virtual void paint(QPainter& painter) override;
 		virtual void paintContainer(QPainter& painter) override;
 		virtual void showContextMenu(AnimationEditor& editor, QWidget* widget, const QPoint& pos) override;
@@ -135,7 +146,9 @@ class StateMachineNodeContent : public AnimatorNodeContent
 		virtual uint32_t getType() const override;
 		virtual void serialize(Lumix::OutputBlob& blob) override;
 		virtual void deserialize(AnimationEditor& editor, Lumix::InputBlob& blob) override;
-		void addEdge(AnimatorNode* from, AnimatorNode* to);
+		virtual QString generateConditionCode() const override;
+		
+		void createEdge(Animator& animator, AnimatorNode* from, AnimatorNode* to);
 
 	private:
 		void drawEdges(QPainter& painter);
@@ -143,7 +156,7 @@ class StateMachineNodeContent : public AnimatorNodeContent
 		virtual void addChild(AnimatorNode* node) override { m_children.push_back(node); }
 
 	private:
-		QList<AnimatorEdge> m_edges;
+		QList<AnimatorEdge*> m_edges;
 		QList<AnimatorNode*> m_children;
 		int m_default_uid;
 };
@@ -156,7 +169,7 @@ class AnimatorNode
 		void paintContainer(QPainter& painter);
 		void paintContent(QPainter& painter);
 		void setContent(AnimatorNodeContent* content) { m_content = content; }
-		AnimatorNodeContent* getContent() { return m_content; }
+		AnimatorNodeContent* getContent() const { return m_content; }
 
 		AnimatorNode* getContentNodeAt(int x, int y);
 		void setName(const char* name) { m_name = name; }
@@ -165,15 +178,18 @@ class AnimatorNode
 		QPoint getCenter() const;
 		void setPosition(const QPoint& position) { m_position = position; }
 		void showContextMenu(AnimationEditor& editor, QWidget* widget, const QPoint& pos);
-		AnimatorNode* getParent() { return m_parent; }
+		AnimatorNode* getParent() const { return m_parent; }
 		void serialize(Lumix::OutputBlob& blob);
 		void deserialize(AnimationEditor& editor, Lumix::InputBlob& blob);
+		void edgeAdded(AnimatorEdge* edge) { m_out_edges.push_back(edge); }
+		void edgeRemoved(AnimatorEdge* edge) { m_out_edges.removeOne(edge); }
 
 	private:
 		friend class Animator;
 		AnimatorNode(int uid, AnimatorNode* parent) : m_uid(uid), m_parent(parent), m_content(NULL) {}
 
 	protected:
+		QList<AnimatorEdge*> m_out_edges;
 		int m_uid;
 		QString m_name;
 		QPoint m_position;
@@ -194,6 +210,7 @@ class Animator
 		void setWorldEditor(Lumix::WorldEditor& editor);
 		AnimatorNode* getRoot() { return m_root; }
 		AnimatorNode* createNode(AnimatorNode* parent);
+		AnimatorEdge* createEdge(AnimatorNode* from, AnimatorNode* to);
 		void destroyNode(int uid);
 		AnimatorNode* getNode(int uid);
 		bool compile();
@@ -209,6 +226,9 @@ class Animator
 		typedef void* (*CreateFunction)();
 		typedef void (*UpdateFunction)(void*, Lumix::Model&, Lumix::Pose&, float);
 		typedef void (*AnimationManagerSetter)(Lumix::AnimationManager*);
+
+	private:
+		QString generateInputsCode() const;
 
 	private:
 		int m_last_uid;
