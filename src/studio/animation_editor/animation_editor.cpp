@@ -1,11 +1,16 @@
 #include "animation_editor.h"
+#include "animation_inputs.h"
 #include "animator.h"
+#include "mainwindow.h"
 #include "property_view/property_editor.h"
 #include "property_view.h"
 #include "scripts/scriptcompiler.h"
+#include "skeleton_view.h"
 #include <qaction.h>
 #include <qevent.h>
 #include <qlayout.h>
+#include <qmenu.h>
+#include <qmenubar.h>
 #include <qmessagebox.h>
 #include <qpainter.h>
 #include <qtoolbar.h>
@@ -16,11 +21,13 @@ static const QColor EDGE_COLOR(255, 255, 255);
 static const int GRID_CELL_SIZE = 32;
 static QLinearGradient ANIMATION_NODE_GRADIENT(0, 0, 0, 100);
 
-AnimationEditor::AnimationEditor(PropertyView& property_view, ScriptCompiler& compiler)
-	: m_property_view(property_view)
-	, m_compiler(compiler)
+AnimationEditor::AnimationEditor(MainWindow& main_window)
+	: m_property_view(*main_window.getPropertyView())
+	, m_compiler(*main_window.getScriptCompiler())
+	, m_main_window(main_window)
 {
-	m_animator = new Animator(compiler);
+	m_animator = new Animator(m_compiler);
+	emit animatorCreated();
 
 	setWindowTitle("Animation editor");
 	setObjectName("animationEditor");
@@ -30,23 +37,65 @@ AnimationEditor::AnimationEditor(PropertyView& property_view, ScriptCompiler& co
 	m_animation_graph_view = new AnimationGraphView(*this);
 	setWidget(widget);
 	QToolBar* toolbar = new QToolBar(widget);
-	QAction* compile_action = toolbar->addAction("compile");
-	QAction* run_action = toolbar->addAction("run");
-	QAction* save_action = toolbar->addAction("save");
-	QAction* save_as_action = toolbar->addAction("save as");
-	QAction* load_action = toolbar->addAction("load");
-	connect(compile_action, &QAction::triggered, this, &AnimationEditor::onCompileAction);
-	connect(run_action, &QAction::triggered, this, &AnimationEditor::onRunAction);
-	connect(save_action, &QAction::triggered, this, &AnimationEditor::onSaveAction);
-	connect(save_as_action, &QAction::triggered, this, &AnimationEditor::onSaveAsAction);
-	connect(load_action, &QAction::triggered, this, &AnimationEditor::onLoadAction);
-
+	m_compile_action = toolbar->addAction("Compile");
+	m_run_action = toolbar->addAction("Run");
+	m_save_action = toolbar->addAction("Save");
+	m_save_as_action = toolbar->addAction("Save As");
+	m_load_action = toolbar->addAction("Load");
+	connect(m_compile_action, &QAction::triggered, this, &AnimationEditor::onCompileAction);
+	connect(m_run_action, &QAction::triggered, this, &AnimationEditor::onRunAction);
+	connect(m_save_action, &QAction::triggered, this, &AnimationEditor::onSaveAction);
+	connect(m_save_as_action, &QAction::triggered, this, &AnimationEditor::onSaveAsAction);
+	connect(m_load_action, &QAction::triggered, this, &AnimationEditor::onLoadAction);
 	layout->addWidget(toolbar);
 	layout->addWidget(m_animation_graph_view);
+
+	m_inputs = new AnimationInputs(*this);
+	m_skeleton_view = new SkeletonView();
+	
+	addMenu(main_window);
 
 	ANIMATION_NODE_GRADIENT.setColorAt(0.0, QColor(0, 255, 0, 128));
 	ANIMATION_NODE_GRADIENT.setColorAt(1.0, QColor(0, 64, 0, 128));
 	ANIMATION_NODE_GRADIENT.setSpread(QGradient::Spread::ReflectSpread);
+}
+
+
+void AnimationEditor::addMenu(MainWindow& main_window)
+{
+	QMenuBar* menu_bar = main_window.getMenuBar();
+	QMenu* menu = menu_bar->addMenu("Animation Editor");
+	menu->addAction(m_compile_action);
+	menu->addAction(m_run_action);
+	menu->addAction(m_load_action);
+	menu->addAction(m_save_action);
+	menu->addAction(m_save_as_action);
+	m_view_menu = menu->addMenu("View");
+	addEditorDock(Qt::DockWidgetArea::BottomDockWidgetArea, this);
+	addEditorDock(Qt::DockWidgetArea::BottomDockWidgetArea, m_inputs);
+	addEditorDock(Qt::DockWidgetArea::BottomDockWidgetArea, m_skeleton_view);
+	m_view_menu->connect(m_view_menu, &QMenu::aboutToShow, [this]() {
+		for (auto info : m_dock_infos)
+		{
+			info.m_action->setChecked(info.m_widget->isVisible());
+		}
+	});
+}
+
+
+void AnimationEditor::addEditorDock(Qt::DockWidgetArea area, QDockWidget* widget)
+{
+	DockInfo info;
+	info.m_widget = widget;
+	QAction* action = widget->toggleViewAction();
+	action->setCheckable(true);
+	m_view_menu->addAction(action);
+	info.m_action = action;
+	action->connect(action, &QAction::triggered, this, [widget](){
+		widget->show();
+	});
+	m_dock_infos.push_back(info);
+	m_main_window.addDockWidget(area, widget);
 }
 
 
@@ -121,6 +170,7 @@ void AnimationEditor::onLoadAction()
 		Lumix::InputBlob blob(data.data(), data.size());
 		m_animator->deserialize(*this, blob);
 		m_animation_graph_view->setNode(m_animator->getRoot());
+		emit animatorCreated();
 	}
 }
 
@@ -144,6 +194,7 @@ void AnimationEditor::setWorldEditor(Lumix::WorldEditor& editor)
 {
 	m_editor = &editor;
 	m_animator->setWorldEditor(editor);
+	m_skeleton_view->setWorldEditor(editor);
 }
 
 

@@ -175,6 +175,15 @@
     <ClCompile Include="..\..\..\src\studio\animation_editor\animation_editor_commands.cpp">
       <Filter>Source Files\animation_editor</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\studio\animation_editor\animation_inputs.cpp">
+      <Filter>Source Files\animation_editor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tmp\studio\moc_animation_inputs.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tmp\studio\moc_animator.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\..\..\src\studio\assetbrowser.h">
@@ -261,6 +270,12 @@
     <CustomBuild Include="..\..\..\src\studio\animation_editor\skeleton_view.h">
       <Filter>Header Files\animation_editor</Filter>
     </CustomBuild>
+    <CustomBuild Include="..\..\..\src\studio\animation_editor\animation_inputs.h">
+      <Filter>Header Files\animation_editor</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\src\studio\animation_editor\animator.h">
+      <Filter>Header Files\animation_editor</Filter>
+    </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\studio\file_system_watcher.h">
@@ -325,9 +340,6 @@
     </ClInclude>
     <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_scriptcompilerwidget.h">
       <Filter>Generated Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\studio\animation_editor\animator.h">
-      <Filter>Header Files\animation_editor</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\studio\animation_editor\animation_editor_commands.h">
       <Filter>Header Files\animation_editor</Filter>

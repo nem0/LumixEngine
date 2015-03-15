@@ -2,6 +2,7 @@
 
 
 #include <cstdint>
+#include <qitemdelegate.h>
 #include <qlibrary.h>
 #include <qlist.h>
 #include <qpainter.h>
@@ -11,8 +12,10 @@
 
 class AnimationEditor;
 class Animator;
+class AnimatorInputModel;
 class AnimatorNode;
 class PropertyView;
+class QAbstractItemModel;
 class ScriptCompiler;
 
 
@@ -25,6 +28,26 @@ namespace Lumix
 	class Pose;
 	class WorldEditor;
 }
+
+
+class AnimatorInputType : public QObject
+{
+	Q_OBJECT
+	Q_ENUMS(Type)
+	public:
+		enum Type
+		{
+			STRING,
+			NUMBER
+		};
+};
+
+
+class AnimatorInputTypeDelegate : public QItemDelegate
+{
+	public:
+		QWidget *createEditor(QWidget *parent, const QStyleOptionViewItem &option, const QModelIndex &index) const override;
+};
 
 
 class AnimatorEdge
@@ -159,6 +182,7 @@ class AnimatorNode
 };
 
 
+
 class Animator
 {
 	public:
@@ -178,6 +202,9 @@ class Animator
 		void serialize(Lumix::OutputBlob& blob);
 		void deserialize(AnimationEditor& editor, Lumix::InputBlob& blob);
 
+		void createInput();
+		QAbstractItemModel* getInputModel() const;
+
 	private:
 		typedef void* (*CreateFunction)();
 		typedef void (*UpdateFunction)(void*, Lumix::Model&, Lumix::Pose&, float);
@@ -187,6 +214,7 @@ class Animator
 		int m_last_uid;
 		AnimatorNode* m_root;
 		QList<AnimatorNode*> m_nodes;
+		AnimatorInputModel* m_input_model;
 		QLibrary m_library;
 		Lumix::WorldEditor* m_editor;
 		UpdateFunction m_update_function;

@@ -2,7 +2,6 @@
 #include "ui_mainwindow.h"
 #include "animation_editor/animable_component_plugin.h"
 #include "animation_editor/animation_editor.h"
-#include "animation_editor/skeleton_view.h"
 #include "assetbrowser.h"
 #include "editor/entity_template_system.h"
 #include "editor/gizmo.h"
@@ -38,24 +37,24 @@ MainWindow::MainWindow(QWidget* parent) :
 
 	m_log = new LogWidget;
 	m_property_view = new PropertyView;
-	m_skeleton_view = new SkeletonView();
 	m_scene_view = new SceneView;
 	m_game_view = new GameView(*this);
 	m_asset_browser = new AssetBrowser;
 	m_script_compiler_ui = new ScriptCompilerWidget;
-	m_animation_editor = new AnimationEditor(*m_property_view, *m_script_compiler_ui->getCompiler());
 	m_file_server_ui = new FileServerWidget;
 	m_profiler_ui = new ProfilerUI;
 	m_entity_template_list_ui = new EntityTemplateList;
 	m_notifications = Notifications::create(*this);
 	m_entity_list = new EntityList(NULL);
 
+	m_animation_editor = new AnimationEditor(*this);
+
 	m_toggle_game_mode_after_compile = false;
 	connect(m_script_compiler_ui->getCompiler(), &ScriptCompiler::compiled, this, &MainWindow::onScriptCompiled);
 
 	QSettings settings("Lumix", "QtEditor");
 	bool geometry_restored = restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
-	
+
 	m_window_menu = new QMenu("Windows", m_ui->menuView);
 	m_ui->menuView->addMenu(m_window_menu);
 	m_window_menu->connect(m_window_menu, &QMenu::aboutToShow, [this]()
@@ -65,7 +64,6 @@ MainWindow::MainWindow(QWidget* parent) :
 			info.m_action->setChecked(info.m_widget->isVisible());
 		}
 	});
-	addEditorDock(static_cast<Qt::DockWidgetArea>(1), m_animation_editor, &MainWindow::on_actionAnimation_Editor_triggered);
 	addEditorDock(static_cast<Qt::DockWidgetArea>(2), m_asset_browser, &MainWindow::on_actionAsset_Browser_triggered);
 	addEditorDock(static_cast<Qt::DockWidgetArea>(2), m_entity_list, &MainWindow::on_actionEntity_list_triggered);
 	addEditorDock(static_cast<Qt::DockWidgetArea>(2), m_entity_template_list_ui, &MainWindow::on_actionEntity_templates_triggered);
@@ -76,7 +74,6 @@ MainWindow::MainWindow(QWidget* parent) :
 	addEditorDock(static_cast<Qt::DockWidgetArea>(1), m_property_view, &MainWindow::on_actionProperties_triggered);
 	addEditorDock(static_cast<Qt::DockWidgetArea>(2), m_scene_view, &MainWindow::on_actionScene_View_triggered);
 	addEditorDock(static_cast<Qt::DockWidgetArea>(8), m_script_compiler_ui, &MainWindow::on_actionScript_compiler_triggered);
-	addEditorDock(static_cast<Qt::DockWidgetArea>(1), m_skeleton_view, &MainWindow::on_actionSkeleton_View_triggered);
 
 	createLayoutCombobox();
 
@@ -114,6 +111,18 @@ MainWindow::MainWindow(QWidget* parent) :
 			restoreState(state);
 		}
 	}
+}
+
+
+QMenuBar* MainWindow::getMenuBar() const
+{
+	return m_ui->menuBar;
+}
+
+
+ScriptCompiler* MainWindow::getScriptCompiler() const
+{
+	return m_script_compiler_ui->getCompiler();
 }
 
 
@@ -221,7 +230,6 @@ MainWindow::~MainWindow()
 	delete m_log;
 	delete m_ui;
 	delete m_animation_editor;
-	delete m_skeleton_view;
 	delete m_scene_view;
 	delete m_property_view;
 	delete m_asset_browser;
@@ -246,7 +254,6 @@ void MainWindow::setWorldEditor(Lumix::WorldEditor& editor)
 	m_game_view->setWorldEditor(editor);
 	m_property_view->setWorldEditor(editor);
 	m_script_compiler_ui->setWorldEditor(editor);
-	m_skeleton_view->setWorldEditor(editor);
 
 	m_world_editor->universeLoaded().bind<MainWindow, &MainWindow::onUniverseLoaded>(this);
 
@@ -340,15 +347,6 @@ void MainWindow::on_actionAsset_Browser_triggered()
 	m_asset_browser->show();
 }
 
-void MainWindow::on_actionAnimation_Editor_triggered()
-{
-	m_animation_editor->show();
-}
-
-void MainWindow::on_actionSkeleton_View_triggered()
-{
-	m_skeleton_view->show();
-}
 
 void MainWindow::on_actionScene_View_triggered()
 {
