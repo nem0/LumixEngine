@@ -199,6 +199,7 @@
     <ClCompile Include="..\..\..\src\studio\animation_editor\animable_component_plugin.cpp" />
     <ClCompile Include="..\..\..\src\studio\animation_editor\animation_editor.cpp" />
     <ClCompile Include="..\..\..\src\studio\animation_editor\animation_editor_commands.cpp" />
+    <ClCompile Include="..\..\..\src\studio\animation_editor\animation_inputs.cpp" />
     <ClCompile Include="..\..\..\src\studio\animation_editor\animator.cpp" />
     <ClCompile Include="..\..\..\src\studio\animation_editor\skeleton_view.cpp" />
     <ClCompile Include="..\..\..\src\studio\assetbrowser.cpp" />
@@ -221,6 +222,8 @@
     <ClCompile Include="..\..\..\src\studio\scripts\scriptcompilerwidget.cpp" />
     <ClCompile Include="..\..\..\tmp\studio\moc_animable_component_plugin.cpp" />
     <ClCompile Include="..\..\..\tmp\studio\moc_animation_editor.cpp" />
+    <ClCompile Include="..\..\..\tmp\studio\moc_animation_inputs.cpp" />
+    <ClCompile Include="..\..\..\tmp\studio\moc_animator.cpp" />
     <ClCompile Include="..\..\..\tmp\studio\moc_assetbrowser.cpp" />
     <ClCompile Include="..\..\..\tmp\studio\moc_entity_list.cpp" />
     <ClCompile Include="..\..\..\tmp\studio\moc_entity_template_list.cpp" />
@@ -280,7 +283,34 @@
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"$(QTDIR)\bin\moc.exe"  "%(FullPath)" -o ".\..\..\..\tmp\studio\moc_%(Filename).cpp"  -D_WINDOWS -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_OPENGL_LIB -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -DNDEBUG -DQT_DLL "-I.\..\.." "-I.\..\..\..\src\studio" "-I.\..\..\..\src" "-I.\..\..\..\external\glew\include" "-I$(QTDIR)\include" "-I$(QTDIR)\include\QtOpenGL" "-I$(QTDIR)\include\QtWidgets" "-I$(QTDIR)\include\QtGui" "-I$(QTDIR)\include\QtANGLE" "-I$(QTDIR)\include\QtCore" "-I$(QTDIR)\mkspecs\win32-msvc2013" "-I.\..\..\..\tmp\studio" "-I.\..\..\..\tmp\studio\GeneratedFiles"</Command>
     </CustomBuild>
     <ClInclude Include="..\..\..\src\studio\animation_editor\animation_editor_commands.h" />
-    <ClInclude Include="..\..\..\src\studio\animation_editor\animator.h" />
+    <CustomBuild Include="..\..\..\src\studio\animation_editor\animation_inputs.h">
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='AppVeyor|Win32'">$(QTDIR)\bin\moc.exe;%(FullPath)</AdditionalInputs>
+      <Message Condition="'$(Configuration)|$(Platform)'=='AppVeyor|Win32'">Moc%27ing animation_inputs.h...</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='AppVeyor|Win32'">.\..\..\..\tmp\studio\moc_%(Filename).cpp</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='AppVeyor|Win32'">"$(QTDIR)\bin\moc.exe"  "%(FullPath)" -o ".\..\..\..\tmp\studio\moc_%(Filename).cpp"  -D_WINDOWS -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_OPENGL_LIB -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -DNDEBUG -DQT_DLL "-I.\..\.." "-I.\..\..\..\src\studio" "-I.\..\..\..\src" "-I.\..\..\..\external\glew\include" "-I$(QTDIR)\include" "-I$(QTDIR)\include\QtOpenGL" "-I$(QTDIR)\include\QtWidgets" "-I$(QTDIR)\include\QtGui" "-I$(QTDIR)\include\QtANGLE" "-I$(QTDIR)\include\QtCore" "-I$(QTDIR)\mkspecs\win32-msvc2013" "-I.\..\..\..\tmp\studio" "-I.\..\..\..\tmp\studio\GeneratedFiles"</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(QTDIR)\bin\moc.exe;%(FullPath)</AdditionalInputs>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Moc%27ing animation_inputs.h...</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">.\..\..\..\tmp\studio\moc_%(Filename).cpp</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"$(QTDIR)\bin\moc.exe"  "%(FullPath)" -o ".\..\..\..\tmp\studio\moc_%(Filename).cpp"  -D_WINDOWS -DUNICODE -DWIN32 -DQT_OPENGL_LIB -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -DQT_DLL "-I.\..\.." "-I.\..\..\..\src\studio" "-I.\..\..\..\src" "-I.\..\..\..\external\glew\include" "-I$(QTDIR)\include" "-I$(QTDIR)\include\QtOpenGL" "-I$(QTDIR)\include\QtWidgets" "-I$(QTDIR)\include\QtGui" "-I$(QTDIR)\include\QtANGLE" "-I$(QTDIR)\include\QtCore" "-I.\debug" "-I$(QTDIR)\mkspecs\win32-msvc2013" "-I.\..\..\..\tmp\studio" "-I.\..\..\..\tmp\studio\GeneratedFiles"</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(QTDIR)\bin\moc.exe;%(FullPath)</AdditionalInputs>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Moc%27ing animation_inputs.h...</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">.\..\..\..\tmp\studio\moc_%(Filename).cpp</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"$(QTDIR)\bin\moc.exe"  "%(FullPath)" -o ".\..\..\..\tmp\studio\moc_%(Filename).cpp"  -D_WINDOWS -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_OPENGL_LIB -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -DNDEBUG -DQT_DLL "-I.\..\.." "-I.\..\..\..\src\studio" "-I.\..\..\..\src" "-I.\..\..\..\external\glew\include" "-I$(QTDIR)\include" "-I$(QTDIR)\include\QtOpenGL" "-I$(QTDIR)\include\QtWidgets" "-I$(QTDIR)\include\QtGui" "-I$(QTDIR)\include\QtANGLE" "-I$(QTDIR)\include\QtCore" "-I$(QTDIR)\mkspecs\win32-msvc2013" "-I.\..\..\..\tmp\studio" "-I.\..\..\..\tmp\studio\GeneratedFiles"</Command>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\src\studio\animation_editor\animator.h">
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='AppVeyor|Win32'">$(QTDIR)\bin\moc.exe;%(FullPath)</AdditionalInputs>
+      <Message Condition="'$(Configuration)|$(Platform)'=='AppVeyor|Win32'">Moc%27ing animator.h...</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='AppVeyor|Win32'">.\..\..\..\tmp\studio\moc_%(Filename).cpp</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='AppVeyor|Win32'">"$(QTDIR)\bin\moc.exe"  "%(FullPath)" -o ".\..\..\..\tmp\studio\moc_%(Filename).cpp"  -D_WINDOWS -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_OPENGL_LIB -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -DNDEBUG -DQT_DLL "-I.\..\.." "-I.\..\..\..\src\studio" "-I.\..\..\..\src" "-I.\..\..\..\external\glew\include" "-I$(QTDIR)\include" "-I$(QTDIR)\include\QtOpenGL" "-I$(QTDIR)\include\QtWidgets" "-I$(QTDIR)\include\QtGui" "-I$(QTDIR)\include\QtANGLE" "-I$(QTDIR)\include\QtCore" "-I$(QTDIR)\mkspecs\win32-msvc2013" "-I.\..\..\..\tmp\studio" "-I.\..\..\..\tmp\studio\GeneratedFiles"</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(QTDIR)\bin\moc.exe;%(FullPath)</AdditionalInputs>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Moc%27ing animator.h...</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">.\..\..\..\tmp\studio\moc_%(Filename).cpp</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"$(QTDIR)\bin\moc.exe"  "%(FullPath)" -o ".\..\..\..\tmp\studio\moc_%(Filename).cpp"  -D_WINDOWS -DUNICODE -DWIN32 -DQT_OPENGL_LIB -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -DQT_DLL "-I.\..\.." "-I.\..\..\..\src\studio" "-I.\..\..\..\src" "-I.\..\..\..\external\glew\include" "-I$(QTDIR)\include" "-I$(QTDIR)\include\QtOpenGL" "-I$(QTDIR)\include\QtWidgets" "-I$(QTDIR)\include\QtGui" "-I$(QTDIR)\include\QtANGLE" "-I$(QTDIR)\include\QtCore" "-I.\debug" "-I$(QTDIR)\mkspecs\win32-msvc2013" "-I.\..\..\..\tmp\studio" "-I.\..\..\..\tmp\studio\GeneratedFiles"</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(QTDIR)\bin\moc.exe;%(FullPath)</AdditionalInputs>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Moc%27ing animator.h...</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">.\..\..\..\tmp\studio\moc_%(Filename).cpp</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"$(QTDIR)\bin\moc.exe"  "%(FullPath)" -o ".\..\..\..\tmp\studio\moc_%(Filename).cpp"  -D_WINDOWS -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_OPENGL_LIB -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -DNDEBUG -DQT_DLL "-I.\..\.." "-I.\..\..\..\src\studio" "-I.\..\..\..\src" "-I.\..\..\..\external\glew\include" "-I$(QTDIR)\include" "-I$(QTDIR)\include\QtOpenGL" "-I$(QTDIR)\include\QtWidgets" "-I$(QTDIR)\include\QtGui" "-I$(QTDIR)\include\QtANGLE" "-I$(QTDIR)\include\QtCore" "-I$(QTDIR)\mkspecs\win32-msvc2013" "-I.\..\..\..\tmp\studio" "-I.\..\..\..\tmp\studio\GeneratedFiles"</Command>
+    </CustomBuild>
     <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_assetbrowser.h" />
     <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_entity_list.h" />
     <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_entity_template_list.h" />

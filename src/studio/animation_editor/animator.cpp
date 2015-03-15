@@ -12,9 +12,12 @@
 #include "property_view.h"
 #include "property_view/property_editor.h"
 #include "scripts/scriptcompiler.h"
+#include <qcombobox.h>
 #include <qfile.h>
 #include <qmenu.h>
 #include <qmessagebox.h>
+#include <qmetaobject.h>
+#include <qmetatype.h>
 #include <qprocess.h>
 #include <qtextstream.h>
 
@@ -22,6 +25,154 @@
 static const QString MODULE_NAME = "amimation";
 static const QString CPP_FILE_PATH = "tmp/animation.cpp";
 static const QColor EDGE_COLOR(255, 255, 255);
+
+
+QWidget* AnimatorInputTypeDelegate::createEditor(QWidget *parent, const QStyleOptionViewItem &option, const QModelIndex &index) const
+{
+	if (index.column() == 1)
+	{
+		auto m = AnimatorInputType::staticMetaObject.enumerator(0);
+		QStringList values;
+		for (int i = 0; i < m.keyCount(); ++i)
+		{
+			values << m.key(i);
+		}
+
+		QComboBox* comboBox = new QComboBox(parent);
+		comboBox->addItems(values);
+		comboBox->setCurrentIndex(values.indexOf(index.data().toString()));
+		return comboBox;
+	}
+	else
+	{
+		return QItemDelegate::createEditor(parent, option, index);
+	}
+}
+
+
+class AnimatorInputModel : public QAbstractItemModel
+{
+	public:
+		class Input
+		{
+			public:
+				Input(const QString& name) : m_name(name), m_value(0.0f), m_type(AnimatorInputType::NUMBER) {}
+
+				QString m_name;
+				AnimatorInputType::Type m_type;
+				QVariant m_value;
+		};
+
+		enum Columns
+		{
+			NAME,
+			TYPE,
+			VALUE,
+			COLUMN_COUNT
+		};
+
+	public:
+		virtual QModelIndex index(int row, int column, const QModelIndex &parent = QModelIndex()) const override;
+		virtual QModelIndex parent(const QModelIndex &child) const override;
+		virtual int rowCount(const QModelIndex &parent = QModelIndex()) const override;
+		virtual int columnCount(const QModelIndex &parent = QModelIndex()) const override;
+		virtual QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
+		virtual bool setData(const QModelIndex &index, const QVariant &value, int role = Qt::EditRole) override;
+		virtual Qt::ItemFlags flags(const QModelIndex &index) const override;
+		const QList<Input>& getInputs() const { return m_inputs; }
+		QList<Input>& getInputs() { return m_inputs; }
+
+		void createInput();
+
+	private:
+		QList<Input> m_inputs;
+};
+
+
+Qt::ItemFlags AnimatorInputModel::flags(const QModelIndex &index) const
+{
+	return QAbstractItemModel::flags(index) | Qt::ItemIsEditable;
+}
+
+
+bool AnimatorInputModel::setData(const QModelIndex &index, const QVariant &value, int role)
+{
+	if (role == Qt::EditRole)
+	{
+		switch (index.column())
+		{
+			case NAME:
+				m_inputs[index.row()].m_name = value.toString();
+				emit dataChanged(index, index);
+				return true;
+			case TYPE:
+				m_inputs[index.row()].m_type = (AnimatorInputType::Type)AnimatorInputType::staticMetaObject.enumerator(0).keyToValue(value.toString().toLatin1().data());
+				emit dataChanged(index, index);
+				return true;
+			case VALUE:
+				m_inputs[index.row()].m_value = value;
+				emit dataChanged(index, index);
+				return true;
+			default:
+				return false;
+		}
+	}
+	return false;
+}
+
+
+void AnimatorInputModel::createInput()
+{
+	int row = m_inputs.size();
+	beginInsertRows(QModelIndex(), row, row);
+	m_inputs.push_back(Input("input"));
+	endInsertRows();
+}
+
+
+QModelIndex AnimatorInputModel::index(int row, int column, const QModelIndex&) const
+{
+	return createIndex(row, column);
+}
+
+
+QModelIndex AnimatorInputModel::parent(const QModelIndex&) const
+{
+	return QModelIndex();
+}
+
+
+int AnimatorInputModel::rowCount(const QModelIndex&) const
+{
+	return m_inputs.size();
+}
+
+
+int AnimatorInputModel::columnCount(const QModelIndex&) const
+{
+	return COLUMN_COUNT;
+}
+
+
+QVariant AnimatorInputModel::data(const QModelIndex& index, int role) const
+{
+	if (role == Qt::DisplayRole)
+	{
+		switch (index.column())
+		{
+			case NAME:
+				return m_inputs[index.row()].m_name;
+			case TYPE:
+				return AnimatorInputType::staticMetaObject.enumerator(0).valueToKey(m_inputs[index.row()].m_type);
+			case VALUE:
+				return m_inputs[index.row()].m_value;
+			default:
+				Q_ASSERT(false);
+				break;
+		}
+	}
+	return QVariant();
+}
 
 
 void AnimatorNode::serialize(Lumix::OutputBlob& blob)
@@ -407,6 +558,7 @@ Animator::Animator(ScriptCompiler& compiler)
 	auto sm = new StateMachineNodeContent(m_root);
 	m_root->setContent(sm);
 	m_root->setName("Root");
+	m_input_model = new AnimatorInputModel();
 }
 
 
@@ -463,12 +615,62 @@ AnimatorNode* Animator::createNode(AnimatorNode* parent)
 void Animator::serialize(Lumix::OutputBlob& blob)
 {
 	m_root->serialize(blob);
+
+	const QList<AnimatorInputModel::Input>& inputs = m_input_model->getInputs();
+	blob.write((int32_t)inputs.size());
+	for (int i = 0; i < inputs.size(); ++i)
+	{
+		const AnimatorInputModel::Input& input = inputs[i];
+		blob.writeString(input.m_name.toLatin1().data());
+		blob.write((int32_t)input.m_type);
+		switch (input.m_type)
+		{
+			case AnimatorInputType::STRING:
+				blob.writeString(input.m_value.toString().toLatin1().data());
+				break;
+			case AnimatorInputType::NUMBER:
+				blob.write(input.m_value.toFloat());
+				break;
+			default:
+				Q_ASSERT(false);
+				break;
+		}
+	}
 }
 
 
 void Animator::deserialize(AnimationEditor& editor, Lumix::InputBlob& blob)
 {
 	m_root->deserialize(editor, blob);
+
+	QList<AnimatorInputModel::Input>& inputs = m_input_model->getInputs();
+	int32_t count;
+	blob.read(count);
+	for (int i = 0; i < count; ++i)
+	{
+		char str[100];
+		blob.readString(str, sizeof(str));
+		AnimatorInputModel::Input input(str);
+		int32_t type;
+		blob.read(type);
+		input.m_type = (AnimatorInputType::Type)type;
+		switch (type)
+		{
+			case AnimatorInputType::NUMBER:
+				float f;
+				blob.read(f);
+				input.m_value = f;
+				break;
+			case AnimatorInputType::STRING:
+				blob.readString(str, sizeof(str));
+				input.m_value = str;
+				break;
+			default:
+				Q_ASSERT(false);
+				break;
+		}
+		inputs.push_back(input);
+	}
 }
 
 
@@ -588,6 +790,18 @@ AnimatorNode* Animator::getNode(int uid)
 		}
 	}
 	return NULL;
+}
+
+
+void Animator::createInput()
+{
+	m_input_model->createInput();
+}
+
+
+QAbstractItemModel* Animator::getInputModel() const
+{
+	return m_input_model;
 }
 
 

@@ -14,12 +14,17 @@ namespace Lumix
 
 
 class AnimationEditor;
+class AnimationInputs;
 class AnimationNode;
 class AnimatorNodeContent;
 class Animator;
 class AnimatorNode;
+class MainWindow;
 class PropertyView;
+class QMenu;
+class QAction;
 class ScriptCompiler;
+class SkeletonView;
 
 
 class AnimationGraphView : public QWidget
@@ -65,7 +70,7 @@ class AnimationEditor : public QDockWidget
 {
 	Q_OBJECT
 	public:
-		AnimationEditor(PropertyView& property_view, ScriptCompiler& compiler);
+		AnimationEditor(MainWindow& main_window);
 
 		void setWorldEditor(Lumix::WorldEditor& editor);
 		void setComponent(const Lumix::Component& component);
@@ -75,6 +80,21 @@ class AnimationEditor : public QDockWidget
 		PropertyView& getPropertyView() { return m_property_view; }
 		AnimatorNodeContent* createContent(AnimatorNode& node, uint32_t content_type);
 
+	signals:
+		void animatorCreated();
+
+	private:
+		class DockInfo
+		{
+			public:
+				QDockWidget* m_widget;
+				QAction* m_action;
+		};
+
+	private:
+		void addMenu(MainWindow& main_window);
+		void addEditorDock(Qt::DockWidgetArea area, QDockWidget* widget);
+
 	private slots:
 		void onCompileAction();
 		void onRunAction();
@@ -83,10 +103,21 @@ class AnimationEditor : public QDockWidget
 		void onLoadAction();
 
 	private:
+		MainWindow& m_main_window;
 		QUndoStack m_undo_stack;
 		Animator* m_animator;
 		AnimationGraphView* m_animation_graph_view;
+		AnimationInputs* m_inputs;
+		SkeletonView* m_skeleton_view;
 		PropertyView& m_property_view;
 		Lumix::WorldEditor* m_editor;
 		ScriptCompiler& m_compiler;
+		QList<DockInfo> m_dock_infos;
+		QMenu* m_view_menu;
+		QAction* m_compile_action;
+		QAction* m_run_action;
+		QAction* m_save_action;
+		QAction* m_save_as_action;
+		QAction* m_load_action;
+
 };
