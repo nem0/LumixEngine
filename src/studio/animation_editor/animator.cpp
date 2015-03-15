@@ -53,6 +53,8 @@ QWidget* AnimatorInputTypeDelegate::createEditor(QWidget *parent, const QStyleOp
 class AnimatorInputModel : public QAbstractItemModel
 {
 	public:
+		AnimatorInputModel(Animator& animator) : m_animator(animator) {}
+
 		class Input
 		{
 			public:
@@ -79,14 +81,35 @@ class AnimatorInputModel : public QAbstractItemModel
 		virtual QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
 		virtual bool setData(const QModelIndex &index, const QVariant &value, int role = Qt::EditRole) override;
 		virtual Qt::ItemFlags flags(const QModelIndex &index) const override;
+		virtual QVariant AnimatorInputModel::headerData(int section, Qt::Orientation orientation, int role) const override;
 		const QList<Input>& getInputs() const { return m_inputs; }
 		QList<Input>& getInputs() { return m_inputs; }
 
 		void createInput();
 
 	private:
+		Animator& m_animator;
 		QList<Input> m_inputs;
 };
+
+
+QVariant AnimatorInputModel::headerData(int section, Qt::Orientation orientation, int role) const
+{
+	if (orientation == Qt::Horizontal && role == Qt::DisplayRole)
+	{
+		switch (section)
+		{
+			case NAME: return "Name";	break;
+			case TYPE: return "Type";	break;
+			case VALUE: return "Value";	break;
+			default:
+				Q_ASSERT(false);
+				break;
+		}
+	}
+
+	return QAbstractItemModel::headerData(section, orientation, role);
+}
 
 
 Qt::ItemFlags AnimatorInputModel::flags(const QModelIndex &index) const
@@ -111,6 +134,16 @@ bool AnimatorInputModel::setData(const QModelIndex &index, const QVariant &value
 				return true;
 			case VALUE:
 				m_inputs[index.row()].m_value = value;
+				switch (m_inputs[index.row()].m_type)
+				{
+					case AnimatorInputType::NUMBER:
+						m_animator.setInput(crc32(m_inputs[index.row()].m_name.toLatin1().data()), value.toFloat());
+						break;
+					default:
+						Q_ASSERT(false);
+						break;
+				}
+
 				emit dataChanged(index, index);
 				return true;
 			default:
@@ -386,12 +419,26 @@ QString StateMachineNodeContent::generateCode()
 		"		Node%1() { m_current_node = &m_child%2; m_check_condition = &Node%1::checkCondition%2; }\n"
 		"		void getPose(Pose& pose, Context& context) override { m_current_node->getPose(pose, context); }\n"
 		"		void update(float time_delta, Context& context) override { m_current_node->update(time_delta, context); (this->*m_check_condition)(context); }\n"
-		"	private:\n"
-		"%3"
+		"		bool isReady() const { return "
+	).arg(getNode()->getUID()).arg(m_default_uid);
+
+	if (!m_children.empty())
+	{
+		code += QString(" m_child%1.isReady()").arg(m_children.first()->getUID());
+	}
+	for (const auto* child : m_children)
+	{
+		code += QString(" && m_child%1.isReady()").arg(child->getUID());
+	}
+
+	code += QString(
+	"; }\n"
+	"	private:\n"
+		"%1"
 		"		NodeBase* m_current_node;\n"
 		"		CheckConditionFunction m_check_condition;"
 		"};\n\n"
-	).arg(getNode()->getUID()).arg(m_default_uid).arg(members);
+	).arg(members);
 
 	return code;
 }
@@ -536,6 +583,7 @@ QString AnimationNodeContent::generateCode()
 		"		Node%1() { m_time = 0; m_animation = (Animation*)g_animation_manager->load(Path(\"%2\")); }\n"
 		"		void getPose(Pose& pose, Context& context) override { m_animation->getPose(m_time, pose, *context.m_model); }\n"
 		"		void update(float time_delta, Context& context) override { m_time += time_delta; m_time = fmod(m_time, m_animation->getLength()); }\n"
+		"		bool isReady() const { return m_animation->isReady(); }\n"
 		"	private:\n"
 		"		Animation* m_animation;\n"
 		"		float m_time;\n"
@@ -612,7 +660,7 @@ Animator::Animator(ScriptCompiler& compiler)
 	auto sm = new StateMachineNodeContent(m_root);
 	m_root->setContent(sm);
 	m_root->setName("Root");
-	m_input_model = new AnimatorInputModel();
+	m_input_model = new AnimatorInputModel(*this);
 }
 
 
@@ -699,6 +747,15 @@ void Animator::serialize(Lumix::OutputBlob& blob)
 }
 
 
+void Animator::setInput(unsigned int name_hash, float value)
+{
+	if (m_set_input_function)
+	{
+		m_set_input_function(m_object, name_hash, &value);
+	}
+}
+
+
 void Animator::deserialize(AnimationEditor& editor, Lumix::InputBlob& blob)
 {
 	m_root->deserialize(editor, blob);
@@ -747,7 +804,7 @@ void Animator::update(float time_delta)
 				Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(renderable.scene);
 				auto& pose = scene->getPose(renderable);
 				auto* model = scene->getRenderableModel(renderable);
-				if (model)
+				if (model && m_is_ready_function(m_object))
 				{
 					m_update_function(m_object, *model, pose, time_delta);
 				}
@@ -776,6 +833,8 @@ void Animator::run()
 		}
 		CreateFunction creator = (CreateFunction)m_library.resolve("create");
 		m_update_function = (UpdateFunction)m_library.resolve("update");
+		m_is_ready_function = (IsReadyFunction)m_library.resolve("isReady");
+		m_set_input_function = (SetInputFunction)m_library.resolve("setInput");
 		AnimationManagerSetter setAnimationManager = (AnimationManagerSetter)m_library.resolve("setAnimationManager");
 		if (setAnimationManager)
 		{
@@ -827,6 +886,9 @@ QString Animator::generateInputsCode() const
 
 bool Animator::compile()
 {
+	m_update_function = NULL;
+	m_is_ready_function = NULL;
+	m_set_input_function = NULL;
 	m_library.unload();
 	QString code(
 		"#include \"animation/animation.h\"\n"
@@ -857,6 +919,11 @@ bool Animator::compile()
 		"	Context* context = new Context;\n"
 		"	context->m_root = new Node%1;\n"
 		"	return context;\n"
+		"}\n"
+		"extern \"C\" __declspec(dllexport) bool isReady(void* object) {\n"
+		"	Context* context = (Context*)object;\n"
+		"	Node%1* node = (Node%1*)context->m_root;\n"
+		"	return node->isReady();\n"
 		"}\n"
 		"extern \"C\" __declspec(dllexport) void setInput(void* object, unsigned int name_hash, void* value) {\n"
 		"	Context* context = (Context*)object;\n"
@@ -929,13 +996,26 @@ QPoint AnimatorEdge::getToPosition() const
 
 bool AnimatorEdge::hitTest(int x, int y) const
 {
+	static const float MAX_DIST = 3;
 	QLine line(getFromPosition(), getToPosition());
-	QPointF normal(normalize(QPoint(-line.dy(), line.dx())));
+	QPointF dir = normalize(QPoint(line.dx(), line.dy()));
+	QPointF normal(-dir.y(), dir.x());
 	float c = -QPointF::dotProduct(normal, line.p1());
 	
 	float d = c + QPointF::dotProduct(normal, QPoint(x, y));
-	TODO("crop to line segment");
-	return fabs(d) < 3;
+	if (fabs(d) < MAX_DIST)
+	{
+		float c = -QPointF::dotProduct(dir, line.p1());
+		float d = c + QPointF::dotProduct(dir, QPoint(x, y));
+		if (d < 0)
+			return false;
+		c = -QPointF::dotProduct(-dir, line.p2());
+		d = c + QPointF::dotProduct(-dir, QPoint(x, y));
+		if (d < 0)
+			return false;
+		return true;
+	}
+	return false;
 }
 
 

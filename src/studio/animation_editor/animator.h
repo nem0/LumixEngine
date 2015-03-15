@@ -218,13 +218,16 @@ class Animator
 		void update(float time_delta);
 		void serialize(Lumix::OutputBlob& blob);
 		void deserialize(AnimationEditor& editor, Lumix::InputBlob& blob);
+		void setInput(unsigned int name_hash, float value);
 
 		void createInput();
 		QAbstractItemModel* getInputModel() const;
 
 	private:
 		typedef void* (*CreateFunction)();
+		typedef void* (*SetInputFunction)(void*, unsigned int, void*);
 		typedef void (*UpdateFunction)(void*, Lumix::Model&, Lumix::Pose&, float);
+		typedef bool (*IsReadyFunction)(void*);
 		typedef void (*AnimationManagerSetter)(Lumix::AnimationManager*);
 
 	private:
@@ -238,6 +241,8 @@ class Animator
 		QLibrary m_library;
 		Lumix::WorldEditor* m_editor;
 		UpdateFunction m_update_function;
+		IsReadyFunction m_is_ready_function;
+		SetInputFunction m_set_input_function;
 		void* m_object;
 		ScriptCompiler& m_compiler;
 		QString m_path;

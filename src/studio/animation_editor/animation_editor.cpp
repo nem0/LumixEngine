@@ -284,22 +284,23 @@ void AnimationGraphView::mouseReleaseEvent(QMouseEvent* event)
 
 void AnimationGraphView::mousePressEvent(QMouseEvent* event)
 {
-	AnimatorEdge* edge = m_node->getContent()->getEdgeAt(event->x(), event->y());
-	if (edge)
+	AnimatorNode* node = m_node->getContentNodeAt(event->x(), event->y());
+	if (node && m_node != node)
 	{
-		selectEdge(edge);
+		m_mouse_mode = event->button() == Qt::RightButton ? MouseMode::EDGE : MouseMode::DRAGGING;
+		m_mouse_node = node;
+		m_last_mouse_position.setX(event->x());
+		m_last_mouse_position.setY(event->y());
+		selectNode(node);
 	}
-	else
+	else if (m_node == node)
 	{
-		AnimatorNode* node = m_node->getContentNodeAt(event->x(), event->y());
-		if (node && m_node != node)
+		AnimatorEdge* edge = m_node->getContent()->getEdgeAt(event->x(), event->y());
+		if (edge)
 		{
-			m_mouse_mode = event->button() == Qt::RightButton ? MouseMode::EDGE : MouseMode::DRAGGING;
-			m_mouse_node = node;
-			m_last_mouse_position.setX(event->x());
-			m_last_mouse_position.setY(event->y());
-			selectNode(node);
+			selectEdge(edge);
 		}
+
 	}
 }
 
