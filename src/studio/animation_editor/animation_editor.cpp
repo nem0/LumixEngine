@@ -12,6 +12,7 @@
 
 
 static const QColor GRID_COLOR(60, 60, 60);
+static const QColor EDGE_COLOR(255, 255, 255);
 static const int GRID_CELL_SIZE = 32;
 static QLinearGradient ANIMATION_NODE_GRADIENT(0, 0, 0, 100);
 
@@ -170,7 +171,7 @@ AnimationGraphView::AnimationGraphView(AnimationEditor& editor)
 {
 	m_node = editor.getAnimator()->getRoot();
 	m_mouse_mode = MouseMode::NONE;
-	m_dragged_node = NULL;
+	m_mouse_node = NULL;
 	setContextMenuPolicy(Qt::CustomContextMenu);
 	connect(this, &QWidget::customContextMenuRequested, this, &AnimationGraphView::showContextMenu);
 }
@@ -178,7 +179,12 @@ AnimationGraphView::AnimationGraphView(AnimationEditor& editor)
 
 void AnimationGraphView::showContextMenu(const QPoint& pos)
 {
-	m_node->showContextMenu(m_editor, this, pos);
+	if (m_mouse_mode != MouseMode::EDGE)
+	{
+		m_node->showContextMenu(m_editor, this, pos);
+	}
+	m_mouse_mode = MouseMode::NONE;
+	update();
 }
 
 
@@ -186,20 +192,49 @@ void AnimationGraphView::paintEvent(QPaintEvent*)
 {
 	QPainter painter(this);
 	drawGrid(painter);
+	drawNewEdge(painter);
 	drawNodes(painter);
+}
+
+
+void AnimationGraphView::selectNode(AnimatorNode* node)
+{
+	node->getContent()->fillPropertyView(m_editor.getPropertyView());
+}
+
+
+void AnimationGraphView::mouseReleaseEvent(QMouseEvent* event)
+{
+	AnimatorNode* node = m_node->getContentNodeAt(event->x(), event->y());
+	if (m_mouse_mode == MouseMode::EDGE && node && m_node != node && node != m_mouse_node)
+	{
+		if (m_node->getContent()->getType() == crc32("state_machine"))
+		{
+			static_cast<StateMachineNodeContent*>(m_node->getContent())->addEdge(m_mouse_node, node);
+		}
+	}
+	else
+	{
+		m_mouse_mode = MouseMode::NONE;
+	}
+
+	if (event->button() != Qt::RightButton)
+	{
+		m_mouse_mode = MouseMode::NONE;
+	}
 }
 
 
 void AnimationGraphView::mousePressEvent(QMouseEvent* event)
 {
 	AnimatorNode* node = m_node->getContentNodeAt(event->x(), event->y());
-	if (node)
+	if (node && m_node != node)
 	{
-		m_mouse_mode = MouseMode::DRAGGING;
-		m_dragged_node = node;
+		m_mouse_mode = event->button() == Qt::RightButton ? MouseMode::EDGE : MouseMode::DRAGGING;
+		m_mouse_node = node;
 		m_last_mouse_position.setX(event->x());
 		m_last_mouse_position.setY(event->y());
-		node->getContent()->fillPropertyView(m_editor.getPropertyView());
+		selectNode(node);
 	}
 }
 
@@ -208,10 +243,14 @@ void AnimationGraphView::mouseMoveEvent(QMouseEvent* event)
 {
 	if (m_mouse_mode == MouseMode::DRAGGING)
 	{
-		QPoint new_position = m_dragged_node->getPosition();
+		QPoint new_position = m_mouse_node->getPosition();
 		new_position.setX(new_position.x() + event->x() - m_last_mouse_position.x());
 		new_position.setY(new_position.y() + event->y() - m_last_mouse_position.y());
-		m_dragged_node->setPosition(new_position);
+		m_mouse_node->setPosition(new_position);
+		update();
+	}
+	else if (m_mouse_mode == MouseMode::EDGE)
+	{
 		update();
 	}
 	m_last_mouse_position.setX(event->x());
@@ -231,6 +270,16 @@ void AnimationGraphView::drawGrid(QPainter& painter)
 	for (int i = 0; i < width() / GRID_CELL_SIZE; ++i)
 	{
 		painter.drawLine(i * GRID_CELL_SIZE, 0, i * GRID_CELL_SIZE, height());
+	}
+}
+
+
+void AnimationGraphView::drawNewEdge(QPainter& painter)
+{
+	if (m_mouse_mode == MouseMode::EDGE)
+	{
+		painter.setPen(EDGE_COLOR);
+		painter.drawLine(m_last_mouse_position, m_mouse_node->getCenter());
 	}
 }
 

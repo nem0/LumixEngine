@@ -27,6 +27,21 @@ namespace Lumix
 }
 
 
+class AnimatorEdge
+{
+	public:
+		AnimatorEdge(AnimatorNode* from, AnimatorNode* to) : m_from(from), m_to(to) {}
+		AnimatorNode* getFrom() const { return m_from; }
+		AnimatorNode* getTo() const { return m_to; }
+		QPoint getFromPosition() const;
+		QPoint getToPosition() const;
+
+	private:
+		AnimatorNode* m_from;
+		AnimatorNode* m_to;
+};
+
+
 class AnimatorNodeContent
 {
 	public:
@@ -34,11 +49,11 @@ class AnimatorNodeContent
 
 		virtual void paint(QPainter& painter) = 0;
 		virtual void paintContainer(QPainter& painter) = 0;
-		virtual AnimatorNode* getNodeAt(int x, int y) = 0;
+		virtual AnimatorNode* getNodeAt(int x, int y) const = 0;
 		virtual void showContextMenu(AnimationEditor& editor, QWidget* widget, const QPoint& pos) = 0;
-		virtual bool hitTest(int x, int y) = 0;
-		virtual int getChildCount() = 0;
-		AnimatorNode* getNode() { return m_node; }
+		virtual bool hitTest(int x, int y) const = 0;
+		virtual int getChildCount() const = 0;
+		AnimatorNode* getNode() const { return m_node; }
 		virtual QString generateCode() = 0;
 		virtual void fillPropertyView(PropertyView& view) = 0;
 		virtual uint32_t getType() const = 0;
@@ -60,12 +75,12 @@ class AnimationNodeContent : public AnimatorNodeContent
 	public:
 		AnimationNodeContent(AnimatorNode* node) : AnimatorNodeContent(node) {}
 
-		virtual bool hitTest(int x, int y) override;
-		virtual AnimatorNode* getNodeAt(int x, int y) override;
+		virtual bool hitTest(int x, int y) const override;
+		virtual AnimatorNode* getNodeAt(int x, int y) const override;
 		virtual void paint(QPainter& painter) override;
 		virtual void paintContainer(QPainter& painter) override;
 		virtual void showContextMenu(AnimationEditor& editor, QWidget* widget, const QPoint& pos) override;
-		virtual int getChildCount() override { return 0; }
+		virtual int getChildCount() const override { return 0; }
 		virtual QString generateCode() override;
 		void setAnimationPath(const char* path) { m_animation_path = path; }
 		QString getAnimationPath() const { return m_animation_path; }
@@ -86,23 +101,26 @@ class StateMachineNodeContent : public AnimatorNodeContent
 		StateMachineNodeContent(AnimatorNode* node) : AnimatorNodeContent(node), m_default_uid(0) {}
 		~StateMachineNodeContent();
 
-		virtual bool hitTest(int x, int y) override;
-		virtual AnimatorNode* getNodeAt(int x, int y) override;
+		virtual bool hitTest(int x, int y) const override;
+		virtual AnimatorNode* getNodeAt(int x, int y) const override;
 		virtual void paint(QPainter& painter) override;
 		virtual void paintContainer(QPainter& painter) override;
 		virtual void showContextMenu(AnimationEditor& editor, QWidget* widget, const QPoint& pos) override;
-		virtual int getChildCount() override { return m_children.size(); }
+		virtual int getChildCount() const override { return m_children.size(); }
 		virtual QString generateCode() override;
 		virtual void fillPropertyView(PropertyView&) override {  }
 		virtual uint32_t getType() const override;
 		virtual void serialize(Lumix::OutputBlob& blob) override;
 		virtual void deserialize(AnimationEditor& editor, Lumix::InputBlob& blob) override;
+		void addEdge(AnimatorNode* from, AnimatorNode* to);
 
 	private:
+		void drawEdges(QPainter& painter);
 		virtual void removeChild(AnimatorNode* node) override;
 		virtual void addChild(AnimatorNode* node) override { m_children.push_back(node); }
 
 	private:
+		QList<AnimatorEdge> m_edges;
 		QList<AnimatorNode*> m_children;
 		int m_default_uid;
 };
@@ -120,7 +138,8 @@ class AnimatorNode
 		AnimatorNode* getContentNodeAt(int x, int y);
 		void setName(const char* name) { m_name = name; }
 		const QString& getName() const { return m_name; }
-		QPoint getPosition() { return m_position; }
+		QPoint getPosition() const { return m_position; }
+		QPoint getCenter() const;
 		void setPosition(const QPoint& position) { m_position = position; }
 		void showContextMenu(AnimationEditor& editor, QWidget* widget, const QPoint& pos);
 		AnimatorNode* getParent() { return m_parent; }
