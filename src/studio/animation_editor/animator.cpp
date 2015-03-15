@@ -245,13 +245,28 @@ static QPointF normalize(QPoint point)
 }
 
 
+QString StateMachineNodeContent::generateConditionCode() const
+{
+	QString ret;
+	for (const auto* edge : m_edges)
+	{
+		ret += QString("	bool condition%1() { return %2; }\n").arg(edge->getUID()).arg(edge->getCondition());
+	}
+	for (const auto* child : m_children)
+	{
+		ret += child->getContent()->generateConditionCode();
+	}
+	return ret;
+}
+
+
 void StateMachineNodeContent::drawEdges(QPainter& painter)
 {
 	painter.setPen(EDGE_COLOR);
 	for (int i = 0; i < m_edges.size(); ++i)
 	{
-		QPoint from = m_edges[i].getFromPosition();
-		QPoint to = m_edges[i].getToPosition();
+		QPoint from = m_edges[i]->getFromPosition();
+		QPoint to = m_edges[i]->getToPosition();
 		QPoint center = (from + to) * 0.5f;
 		QPointF dir = normalize(to - from);
 		QPointF ortho(dir.y(), -dir.x());
@@ -262,7 +277,7 @@ void StateMachineNodeContent::drawEdges(QPainter& painter)
 }
 
 
-void StateMachineNodeContent::addEdge(AnimatorNode* from, AnimatorNode* to)
+void StateMachineNodeContent::createEdge(Animator& animator, AnimatorNode* from, AnimatorNode* to)
 {
 	if (from == to)
 	{
@@ -270,12 +285,13 @@ void StateMachineNodeContent::addEdge(AnimatorNode* from, AnimatorNode* to)
 	}
 	for (int i = 0; i < m_edges.size(); ++i)
 	{
-		if (m_edges[i].getFrom() == from && m_edges[i].getTo() == to)
+		if (m_edges[i]->getFrom() == from && m_edges[i]->getTo() == to)
 		{
 			return;
 		}
 	}
-	m_edges.push_back(AnimatorEdge(from, to));
+	m_edges.push_back(animator.createEdge(from, to));
+	from->edgeAdded(m_edges.last());
 }
 
 
@@ -290,8 +306,9 @@ void StateMachineNodeContent::serialize(Lumix::OutputBlob& blob)
 	blob.write((int)m_edges.size());
 	for (int i = 0; i < m_edges.size(); ++i)
 	{
-		blob.write(m_edges[i].getFrom()->getUID());
-		blob.write(m_edges[i].getTo()->getUID());
+		blob.write(m_edges[i]->getFrom()->getUID());
+		blob.write(m_edges[i]->getTo()->getUID());
+		blob.writeString(m_edges[i]->getCondition().toLatin1().data());
 	}
 }
 
@@ -313,7 +330,12 @@ void StateMachineNodeContent::deserialize(AnimationEditor& editor, Lumix::InputB
 		uint32_t uid_from, uid_to;
 		blob.read(uid_from);
 		blob.read(uid_to);
-		m_edges.push_back(AnimatorEdge(editor.getAnimator()->getNode(uid_from), editor.getAnimator()->getNode(uid_to)));
+		char condition[256];
+		blob.readString(condition, sizeof(condition));
+		AnimatorEdge* edge = editor.getAnimator()->createEdge(editor.getAnimator()->getNode(uid_from), editor.getAnimator()->getNode(uid_to));
+		edge->setCondition(condition);
+		edge->getFrom()->edgeAdded(edge);
+		m_edges.push_back(edge);
 	}
 }
 
@@ -331,28 +353,45 @@ QString StateMachineNodeContent::generateCode()
 {
 	QString code = "";
 	QString members = "";
-	int default_idx = 0;
+	bool default_found = false;
 	for (int i = 0; i < m_children.size(); ++i)
 	{
+		default_found = default_found || m_children[i]->getUID() == m_default_uid;
 		code += m_children[i]->getContent()->generateCode();
-		members += QString("		Node%1 m_child%2;\n").arg(m_children[i]->getUID()).arg(i + 1);
-		if (m_children[i]->getUID() == m_default_uid)
+		members += QString(
+			"		Node%1 m_child%1;\n"
+			"		void checkCondition%1(Context& context) {\n"
+		).arg(m_children[i]->getUID());
+		for (const auto* edge : m_edges)
 		{
-			default_idx = i;
+			if (edge->getFrom() == m_children[i])
+			{
+				members += QString("			if(context.m_input.condition%1()) { m_current_node = &m_child%2; m_check_condition = &Node%3::checkCondition%2; return; }\n")
+					.arg(edge->getUID())
+					.arg(edge->getTo()->getUID())
+					.arg(getNode()->getUID());
+			}
 		}
+		members += "		}\n";
+	}
+	if (!default_found)
+	{
+		m_default_uid = m_children[0]->getUID();
 	}
 
 	code += QString(
 		"class Node%1 : public NodeBase {\n"
 		"	public:\n"
-		"		Node%1() { m_current_node = &m_child%2; }\n"
+		"		typedef void (Node%1::*CheckConditionFunction)(Context&);\n"
+		"		Node%1() { m_current_node = &m_child%2; m_check_condition = &Node%1::checkCondition%2; }\n"
 		"		void getPose(Pose& pose, Context& context) override { m_current_node->getPose(pose, context); }\n"
-		"		void update(float time_delta) override { m_current_node->update(time_delta); }\n"
+		"		void update(float time_delta, Context& context) override { m_current_node->update(time_delta, context); (this->*m_check_condition)(context); }\n"
 		"	private:\n"
 		"%3"
 		"		NodeBase* m_current_node;\n"
+		"		CheckConditionFunction m_check_condition;"
 		"};\n\n"
-	).arg(getNode()->getUID()).arg(default_idx + 1).arg(members);
+	).arg(getNode()->getUID()).arg(m_default_uid).arg(members);
 
 	return code;
 }
@@ -363,6 +402,19 @@ bool StateMachineNodeContent::hitTest(int x, int y) const
 	int this_x = getNode()->getPosition().x();
 	int this_y = getNode()->getPosition().y();
 	return x >= this_x && x < this_x + 100 && y > this_y && y < this_y + 20;
+}
+
+
+AnimatorEdge* StateMachineNodeContent::getEdgeAt(int x, int y) const
+{
+	for (auto* edge : m_edges)
+	{
+		if (edge->hitTest(x, y))
+		{
+			return edge;
+		}
+	}
+	return NULL;
 }
 
 
@@ -414,8 +466,10 @@ void StateMachineNodeContent::removeChild(AnimatorNode* node)
 			m_children.removeAt(i);
 			for (int j = m_edges.size() - 1; j >= 0; --j)
 			{
-				if (m_edges[j].getFrom() == node || m_edges[j].getTo() == node)
+				if (m_edges[j]->getFrom() == node || m_edges[j]->getTo() == node)
 				{
+					m_edges[j]->getFrom()->edgeRemoved(m_edges[j]);
+					delete m_edges[j];
 					m_edges.removeAt(j);
 				}
 			}
@@ -480,8 +534,8 @@ QString AnimationNodeContent::generateCode()
 		"class Node%1 : public NodeBase {\n"
 		"	public:\n"
 		"		Node%1() { m_time = 0; m_animation = (Animation*)g_animation_manager->load(Path(\"%2\")); }\n"
-		"		void getPose(Pose& pose, Context& context) override { m_animation->getPose(m_time, pose, context.m_model); }\n"
-		"		void update(float time_delta) override { m_time += time_delta; m_time = fmod(m_time, m_animation->getLength()); }\n"
+		"		void getPose(Pose& pose, Context& context) override { m_animation->getPose(m_time, pose, *context.m_model); }\n"
+		"		void update(float time_delta, Context& context) override { m_time += time_delta; m_time = fmod(m_time, m_animation->getLength()); }\n"
 		"	private:\n"
 		"		Animation* m_animation;\n"
 		"		float m_time;\n"
@@ -596,6 +650,12 @@ void Animator::destroyNode(int uid)
 			break;
 		}
 	}
+}
+
+
+AnimatorEdge* Animator::createEdge(AnimatorNode* from, AnimatorNode* to)
+{
+	return new AnimatorEdge(++m_last_uid, from, to);
 }
 
 
@@ -731,6 +791,40 @@ void Animator::run()
 }
 
 
+QString Animator::generateInputsCode() const
+{
+	QString ret = "struct Inputs {\n";
+	auto typeToString = [](AnimatorInputType::Type type) -> QString {
+		switch (type)
+		{
+			case AnimatorInputType::STRING:
+				return "unsigned int";
+				break;
+			case AnimatorInputType::NUMBER:
+				return "float";
+				break;
+			default:
+				Q_ASSERT(false);
+				return "int";
+		}
+	};
+
+	for (const auto& input : m_input_model->getInputs())
+	{
+		ret += QString("	") + typeToString(input.m_type) + " " + input.m_name + ";\n";
+	}
+	ret += "	void setInput(const unsigned int name_hash, void* value) {\n";
+	for (const auto& input : m_input_model->getInputs())
+	{
+		ret += QString("	if(name_hash == %1) %2 = *(%3*)value;\n").arg(crc32(input.m_name.toLatin1().data())).arg(input.m_name).arg(typeToString(input.m_type));
+	}
+	ret += "	};";
+	ret += m_root->getContent()->generateConditionCode();
+	ret += "};\n";
+	return ret;
+}
+
+
 bool Animator::compile()
 {
 	m_library.unload();
@@ -739,31 +833,41 @@ bool Animator::compile()
 		"#include \"graphics/model.h\"\n"
 		"#include \"graphics/pose.h\"\n"
 		"#include <cmath>\n"
-		"using namespace Lumix;"
+		"using namespace Lumix;\n"
+	);
+	code += generateInputsCode();
+	code +=
 		"struct Context {\n"
-		"	Context(Model& model) : m_model(model) {}\n"
-		"	Model& m_model;\n"
+		"	Model* m_model;\n"
+		"	Inputs m_input;\n"
+		"	void* m_root;\n"
 		"};\n\n"
 		"AnimationManager* g_animation_manager;\n\n"
 		"class NodeBase {\n"
 		"	public:\n"
 		"		virtual void getPose(Pose&, Context&) = 0;\n"
-		"		virtual void update(float time_delta) = 0;\n"
-		"};\n\n"
-	);
-	code += m_root->getContent()->generateCode();
+		"		virtual void update(float time_delta, Context& context) = 0;\n"
+		"};\n\n";
+		code += m_root->getContent()->generateCode();
 	code += QString(
 		"extern \"C\" __declspec(dllexport) void setAnimationManager(AnimationManager* mng) {\n"
 		"	g_animation_manager = mng;\n"
 		"}\n"
 		"extern \"C\" __declspec(dllexport) void* create() {\n"
-		"	return new Node%1;\n"
+		"	Context* context = new Context;\n"
+		"	context->m_root = new Node%1;\n"
+		"	return context;\n"
+		"}\n"
+		"extern \"C\" __declspec(dllexport) void setInput(void* object, unsigned int name_hash, void* value) {\n"
+		"	Context* context = (Context*)object;\n"
+		"	context->m_input.setInput(name_hash, value);\n"
 		"}\n"
 		"extern \"C\" __declspec(dllexport) void update(void* object, Model& model, Pose& pose, float time_delta) {\n"
-		"	NodeBase* node = (NodeBase*)object;\n"
-		"	node->update(time_delta);\n"
-		"	Context context(model);\n"
-		"	node->getPose(pose, context);\n"
+		"	Context* context = (Context*)object;\n"
+		"	NodeBase* node = (NodeBase*)context->m_root;\n"
+		"	node->update(time_delta, *context);\n"
+		"	context->m_model = &model;\n"
+		"	node->getPose(pose, *context);\n"
 		"}").arg(m_root->getUID());
 
 	QFile file(CPP_FILE_PATH);
@@ -820,4 +924,25 @@ QPoint AnimatorEdge::getToPosition() const
 	QPointF dir = 7 * normalize(m_from->getPosition() - pos);
 	return pos + QPoint(-dir.y(), dir.x());
 
+}
+
+
+bool AnimatorEdge::hitTest(int x, int y) const
+{
+	QLine line(getFromPosition(), getToPosition());
+	QPointF normal(normalize(QPoint(-line.dy(), line.dx())));
+	float c = -QPointF::dotProduct(normal, line.p1());
+	
+	float d = c + QPointF::dotProduct(normal, QPoint(x, y));
+	TODO("crop to line segment");
+	return fabs(d) < 3;
+}
+
+
+void AnimatorEdge::fillPropertyView(PropertyView& view)
+{
+	QTreeWidgetItem* item = view.newTopLevelItem();
+	PropertyEditor<const char*>::create("condition", item, getCondition().toLatin1().data(), [this](const char* value) { setCondition(value); });
+	item->setText(0, "Edge");
+	item->treeWidget()->expandToDepth(1);
 }

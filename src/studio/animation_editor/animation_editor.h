@@ -16,6 +16,7 @@ namespace Lumix
 class AnimationEditor;
 class AnimationInputs;
 class AnimationNode;
+class AnimatorEdge;
 class AnimatorNodeContent;
 class Animator;
 class AnimatorNode;
@@ -52,11 +53,13 @@ class AnimationGraphView : public QWidget
 		void drawNodes(QPainter& painter);
 		void drawNewEdge(QPainter& painter);
 		void selectNode(AnimatorNode* node);
+		void selectEdge(AnimatorEdge* node);
 
 	private slots:
 		void showContextMenu(const QPoint& pos);
 
 	private:
+		AnimatorEdge* m_selected_edge;
 		AnimatorNode* m_node;
 		AnimatorNode* m_mouse_node;
 		MouseMode m_mouse_mode;
