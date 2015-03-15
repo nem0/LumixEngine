@@ -29,27 +29,31 @@ class AnimationGraphView : public QWidget
 		enum class MouseMode
 		{
 			NONE,
-			DRAGGING
+			DRAGGING,
+			EDGE
 		};
 
 	public:
 		AnimationGraphView(AnimationEditor& editor);
 
 		void setNode(AnimatorNode* node) { m_node = node; }
+
+	private:
 		virtual void paintEvent(QPaintEvent*) override;
 		virtual void mousePressEvent(QMouseEvent*) override;
 		virtual void mouseMoveEvent(QMouseEvent*) override;
-
-	private:
+		virtual void mouseReleaseEvent(QMouseEvent*) override;
 		void drawGrid(QPainter& painter);
 		void drawNodes(QPainter& painter);
+		void drawNewEdge(QPainter& painter);
+		void selectNode(AnimatorNode* node);
 
 	private slots:
 		void showContextMenu(const QPoint& pos);
 
 	private:
 		AnimatorNode* m_node;
-		AnimatorNode* m_dragged_node;
+		AnimatorNode* m_mouse_node;
 		MouseMode m_mouse_mode;
 		QPoint m_last_mouse_position;
 		AnimationEditor& m_editor;

@@ -21,6 +21,7 @@
 
 static const QString MODULE_NAME = "amimation";
 static const QString CPP_FILE_PATH = "tmp/animation.cpp";
+static const QColor EDGE_COLOR(255, 255, 255);
 
 
 void AnimatorNode::serialize(Lumix::OutputBlob& blob)
@@ -66,6 +67,12 @@ AnimatorNode* AnimatorNode::getContentNodeAt(int x, int y)
 }
 
 
+QPoint AnimatorNode::getCenter() const
+{
+	return m_position + QPoint(50, 10);
+}
+
+
 void AnimatorNode::showContextMenu(AnimationEditor& editor, QWidget* widget, const QPoint& pos)
 {
 	AnimatorNode* node = getContentNodeAt(pos.x(), pos.y());
@@ -80,6 +87,47 @@ void AnimatorNode::showContextMenu(AnimationEditor& editor, QWidget* widget, con
 }
 
 
+static QPointF normalize(QPoint point)
+{
+	float l = QPoint::dotProduct(point, point);
+	return QPointF(point) / sqrtf(l);
+}
+
+
+void StateMachineNodeContent::drawEdges(QPainter& painter)
+{
+	painter.setPen(EDGE_COLOR);
+	for (int i = 0; i < m_edges.size(); ++i)
+	{
+		QPoint from = m_edges[i].getFromPosition();
+		QPoint to = m_edges[i].getToPosition();
+		QPoint center = (from + to) * 0.5f;
+		QPointF dir = normalize(to - from);
+		QPointF ortho(dir.y(), -dir.x());
+		painter.drawLine(from, to);
+		painter.drawLine(center - dir * 5 + ortho * 5, center);
+		painter.drawLine(center - dir * 5 - ortho * 5, center);
+	}
+}
+
+
+void StateMachineNodeContent::addEdge(AnimatorNode* from, AnimatorNode* to)
+{
+	if (from == to)
+	{
+		return;
+	}
+	for (int i = 0; i < m_edges.size(); ++i)
+	{
+		if (m_edges[i].getFrom() == from && m_edges[i].getTo() == to)
+		{
+			return;
+		}
+	}
+	m_edges.push_back(AnimatorEdge(from, to));
+}
+
+
 void StateMachineNodeContent::serialize(Lumix::OutputBlob& blob)
 {
 	blob.write(m_default_uid);
@@ -87,6 +135,12 @@ void StateMachineNodeContent::serialize(Lumix::OutputBlob& blob)
 	for (int i = 0; i < m_children.size(); ++i)
 	{
 		m_children[i]->serialize(blob);
+	}
+	blob.write((int)m_edges.size());
+	for (int i = 0; i < m_edges.size(); ++i)
+	{
+		blob.write(m_edges[i].getFrom()->getUID());
+		blob.write(m_edges[i].getTo()->getUID());
 	}
 }
 
@@ -100,6 +154,15 @@ void StateMachineNodeContent::deserialize(AnimationEditor& editor, Lumix::InputB
 	{
 		AnimatorNode* node = editor.getAnimator()->createNode(getNode());
 		node->deserialize(editor, blob);
+	}
+	int edge_count;
+	blob.read(edge_count);
+	for (int i = 0; i < edge_count; ++i)
+	{
+		uint32_t uid_from, uid_to;
+		blob.read(uid_from);
+		blob.read(uid_to);
+		m_edges.push_back(AnimatorEdge(editor.getAnimator()->getNode(uid_from), editor.getAnimator()->getNode(uid_to)));
 	}
 }
 
@@ -144,7 +207,7 @@ QString StateMachineNodeContent::generateCode()
 }
 
 
-bool StateMachineNodeContent::hitTest(int x, int y)
+bool StateMachineNodeContent::hitTest(int x, int y) const
 {
 	int this_x = getNode()->getPosition().x();
 	int this_y = getNode()->getPosition().y();
@@ -152,7 +215,7 @@ bool StateMachineNodeContent::hitTest(int x, int y)
 }
 
 
-AnimatorNode* StateMachineNodeContent::getNodeAt(int x, int y)
+AnimatorNode* StateMachineNodeContent::getNodeAt(int x, int y) const
 {
 	for (int i = 0; i < m_children.size(); ++i)
 	{
@@ -182,6 +245,8 @@ void StateMachineNodeContent::paintContainer(QPainter& painter)
 
 void StateMachineNodeContent::paint(QPainter& painter)
 {
+	drawEdges(painter);
+
 	for (int i = 0; i < m_children.size(); ++i)
 	{
 		m_children[i]->paintContainer(painter);
@@ -196,6 +261,13 @@ void StateMachineNodeContent::removeChild(AnimatorNode* node)
 		if (m_children[i] == node)
 		{
 			m_children.removeAt(i);
+			for (int j = m_edges.size() - 1; j >= 0; --j)
+			{
+				if (m_edges[j].getFrom() == node || m_edges[j].getTo() == node)
+				{
+					m_edges.removeAt(j);
+				}
+			}
 			break;
 		}
 	}
@@ -289,7 +361,7 @@ void AnimationNodeContent::showContextMenu(AnimationEditor& editor, QWidget* wid
 }
 
 
-AnimatorNode* AnimationNodeContent::getNodeAt(int x, int y)
+AnimatorNode* AnimationNodeContent::getNodeAt(int x, int y) const
 {
 	if (hitTest(x, y))
 		return getNode();
@@ -297,7 +369,7 @@ AnimatorNode* AnimationNodeContent::getNodeAt(int x, int y)
 }
 
 
-bool AnimationNodeContent::hitTest(int x, int y)
+bool AnimationNodeContent::hitTest(int x, int y) const
 {
 	int this_x = getNode()->getPosition().x();
 	int this_y = getNode()->getPosition().y();
@@ -516,4 +588,22 @@ AnimatorNode* Animator::getNode(int uid)
 		}
 	}
 	return NULL;
+}
+
+
+QPoint AnimatorEdge::getFromPosition() const
+{
+	QPoint pos = m_from->getPosition() + QPoint(50, 10);
+	QPoint dir = m_to->getPosition() - pos;
+	dir *= 7 / sqrtf(QPoint::dotProduct(dir, dir));
+	return pos + QPoint(dir.y(), -dir.x());
+}
+
+
+QPoint AnimatorEdge::getToPosition() const
+{
+	QPoint pos = m_to->getPosition() + QPoint(50, 10);
+	QPointF dir = 7 * normalize(m_from->getPosition() - pos);
+	return pos + QPoint(-dir.y(), dir.x());
+
 }
