@@ -53,7 +53,7 @@ class AnimatorInputTypeDelegate : public QItemDelegate
 class AnimatorEdge
 {
 	public:
-		AnimatorEdge(int uid, AnimatorNode* from, AnimatorNode* to): m_uid(uid), m_from(from), m_to(to) {}
+		AnimatorEdge(int uid, AnimatorNode* from, AnimatorNode* to): m_uid(uid), m_from(from), m_to(to), m_duration(0) {}
 		AnimatorNode* getFrom() const { return m_from; }
 		AnimatorNode* getTo() const { return m_to; }
 		QPoint getFromPosition() const;
@@ -63,12 +63,15 @@ class AnimatorEdge
 		bool hitTest(int x, int y) const;
 		void fillPropertyView(PropertyView& view);
 		int getUID() const { return m_uid; }
+		void setDuration(float duration) { m_duration = duration; }
+		float getDuration() const { return m_duration; }
 
 	private:
 		int m_uid;
 		AnimatorNode* m_from;
 		AnimatorNode* m_to;
 		QString m_condition;
+		float m_duration;
 };
 
 

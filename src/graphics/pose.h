@@ -28,6 +28,7 @@ class LUMIX_ENGINE_API Pose
 		Quat* getRotations() const { return m_rotations; }
 		void computeAbsolute(Model& model);
 		void setIsRelative() { m_is_absolute = false; }
+		void blend(Pose& rhs, float weight);
 
 	private:
 		Pose(const Pose&);
