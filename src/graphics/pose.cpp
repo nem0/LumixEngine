@@ -27,6 +27,23 @@ Pose::~Pose()
 }
 
 
+void Pose::blend(Pose& rhs, float weight)
+{
+	ASSERT(m_count == rhs.m_count);
+	if (weight <= 0.001f)
+	{
+		return;
+	}
+	weight = Math::clamp(weight, 0.0f, 1.0f);
+	float inv = 1.0f - weight;
+	for (int i = 0, c = m_count; i < c; ++i)
+	{
+		m_positions[i] = m_positions[i] * inv + rhs.m_positions[i] * weight;
+		nlerp(m_rotations[i], rhs.m_rotations[i], &m_rotations[i], weight);
+	}
+}
+
+
 void Pose::resize(int count)
 {
 	m_is_absolute = false;

@@ -393,19 +393,57 @@ QString StateMachineNodeContent::generateCode()
 		code += m_children[i]->getContent()->generateCode();
 		members += QString(
 			"		Node%1 m_child%1;\n"
-			"		void checkCondition%1(Context& context) {\n"
+			"		void checkNode%1Condition(Context& context) {\n"
 		).arg(m_children[i]->getUID());
 		for (const auto* edge : m_edges)
 		{
 			if (edge->getFrom() == m_children[i])
 			{
-				members += QString("			if(context.m_input.condition%1()) { m_current_node = &m_child%2; m_check_condition = &Node%3::checkCondition%2; return; }\n")
+				members += QString("			if(context.m_input.condition%1()) { m_current_node = &m_edge%1; m_edge%1.enter(); m_check_condition = &Node%2::checkEdge%1End; return; }\n")
 					.arg(edge->getUID())
-					.arg(edge->getTo()->getUID())
 					.arg(getNode()->getUID());
 			}
 		}
 		members += "		}\n";
+	}
+	QString contructor_edges = "";
+	bool first_edge = true;
+	for (const auto* edge : m_edges)
+	{
+		if (first_edge)
+		{
+			first_edge = false;
+			contructor_edges += QString("			: m_edge%1(*this)\n").arg(edge->getUID());
+		}
+		else
+		{
+			contructor_edges += QString("			, m_edge%1(*this)\n").arg(edge->getUID());
+		}
+		members += QString(
+			"		struct Edge%1 : public NodeBase {\n"
+			"			Edge%1(Node%3& node) { m_edge_duration = %5; m_time = 0; m_from = &node.m_child%4; m_to = &node.m_child%2; }\n"
+			"			void enter() { m_time = 0; }\n"
+			"			void getPose(Pose& pose, Context& context) override {\n"
+			"				DefaultAllocator al;\n"
+			"				Pose tmp_pose(al);\n"
+			"				tmp_pose.resize(pose.getCount());\n"
+			"				m_from->getPose(pose, context);\n"
+			"				m_to->getPose(tmp_pose, context);\n"
+			"				pose.blend(tmp_pose, m_time / m_edge_duration);\n"
+			"			}\n"
+			"			void update(float time_delta, Context& context) override { m_time += time_delta; m_from->update(time_delta, context); m_to->update(time_delta, context); }\n"
+			"			NodeBase* m_from;\n"
+			"			NodeBase* m_to;\n"
+			"			float m_time;\n"
+			"			float m_edge_duration;"
+			"		} m_edge%1;\n"
+			"		void checkEdge%1End(Context& context) { if(m_edge%1.m_time > m_edge%1.m_edge_duration) { m_current_node = m_edge%1.m_to; m_check_condition = &Node%3::checkNode%2Condition; } }\n"
+		)
+		.arg(edge->getUID())
+		.arg(edge->getTo()->getUID())
+		.arg(getNode()->getUID())
+		.arg(edge->getFrom()->getUID())
+		.arg(edge->getDuration());
 	}
 	if (!default_found)
 	{
@@ -416,11 +454,15 @@ QString StateMachineNodeContent::generateCode()
 		"class Node%1 : public NodeBase {\n"
 		"	public:\n"
 		"		typedef void (Node%1::*CheckConditionFunction)(Context&);\n"
-		"		Node%1() { m_current_node = &m_child%2; m_check_condition = &Node%1::checkCondition%2; }\n"
+		"		Node%1() %3"
+		"			{ m_current_node = &m_child%2; m_check_condition = &Node%1::checkNode%2Condition; }\n"
 		"		void getPose(Pose& pose, Context& context) override { m_current_node->getPose(pose, context); }\n"
 		"		void update(float time_delta, Context& context) override { m_current_node->update(time_delta, context); (this->*m_check_condition)(context); }\n"
 		"		bool isReady() const { return "
-	).arg(getNode()->getUID()).arg(m_default_uid);
+	)
+	.arg(getNode()->getUID())
+	.arg(m_default_uid)
+	.arg(contructor_edges);
 
 	if (!m_children.empty())
 	{
@@ -1023,6 +1065,7 @@ void AnimatorEdge::fillPropertyView(PropertyView& view)
 {
 	QTreeWidgetItem* item = view.newTopLevelItem();
 	PropertyEditor<const char*>::create("condition", item, getCondition().toLatin1().data(), [this](const char* value) { setCondition(value); });
+	PropertyEditor<float>::create("duration", item, getDuration(), [this](float value) { setDuration(value); });
 	item->setText(0, "Edge");
 	item->treeWidget()->expandToDepth(1);
 }
