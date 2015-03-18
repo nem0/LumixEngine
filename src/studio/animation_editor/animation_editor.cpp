@@ -177,12 +177,13 @@ void AnimationEditor::onLoadAction()
 
 AnimatorNodeContent* AnimationEditor::createContent(AnimatorNode& node, uint32_t content_type)
 {
-	TODO("todo");
-	if (content_type == crc32("animation"))
+	static const uint32_t ANIMATION_HASH = crc32("animation");
+	static const uint32_t STATE_MACHINE_HASH = crc32("state_machine");
+	if (content_type == ANIMATION_HASH)
 	{
 		return new AnimationNodeContent(&node);
 	}
-	else if (content_type == crc32("state_machine"))
+	else if (content_type == STATE_MACHINE_HASH)
 	{
 		return new StateMachineNodeContent(&node);
 	}
