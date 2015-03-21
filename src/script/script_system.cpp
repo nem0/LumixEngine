@@ -196,6 +196,7 @@ namespace Lumix
 					{
 						g_log_error.log("script") << "Could not load " << library_path;
 						Library::destroy(m_library);
+						m_library = NULL;
 						return;
 					}
 					m_update_function = (UpdateFunction)m_library->resolve("update");
@@ -226,8 +227,8 @@ namespace Lumix
 				if (m_library)
 				{
 					Library::destroy(m_library);
+					m_library = NULL;
 				}
-				m_library = NULL;
 			}
 
 
