@@ -34,8 +34,6 @@ class LUMIX_ENGINE_API Pose
 		Pose(const Pose&);
 		void operator =(const Pose&);
 		
-		void computeAbsolute(Model& model, int i, bool* valid);
-
 	private:
 		IAllocator& m_allocator;
 		bool m_is_absolute;

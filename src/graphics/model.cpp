@@ -256,6 +256,7 @@ bool Model::parseBones(FS::IFile* file)
 		file->read(&b.position.x, sizeof(float)* 3);
 		file->read(&b.rotation.x, sizeof(float)* 4);
 	}
+	m_first_nonroot_bone_index = -1;
 	for (int i = 0; i < bone_count; ++i)
 	{
 		Model::Bone& b = m_bones[i];
@@ -266,9 +267,14 @@ bool Model::parseBones(FS::IFile* file)
 		else
 		{
 			b.parent_idx = getBoneIdx(b.parent.c_str());
-			if (b.parent_idx < 0)
+			if (b.parent_idx > i || b.parent_idx < 0)
 			{
 				g_log_error.log("renderer") << "Invalid skeleton in " << getPath().c_str();
+				return false;
+			}
+			if (m_first_nonroot_bone_index == -1)
+			{
+				m_first_nonroot_bone_index = i;
 			}
 		}
 	}

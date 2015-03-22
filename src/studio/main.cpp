@@ -337,8 +337,9 @@ class App
 		void showStats()
 		{
 			char stats[1000];
+			float fps = m_world_editor->getEngine().getFPS();
 			Lumix::copyString(stats, sizeof(stats), "FPS: ");
-			Lumix::toCString(m_world_editor->getEngine().getFPS(), stats + strlen(stats), sizeof(stats) - strlen(stats), 1);
+			Lumix::toCString(fps, stats + strlen(stats), sizeof(stats) - strlen(stats), 1);
 			Lumix::catCString(stats, sizeof(stats), ", Draw calls: ");
 			Lumix::toCString(m_main_window->getSceneView()->getPipeline()->getDrawCalls(), stats + strlen(stats), sizeof(stats) - strlen(stats));
 			Lumix::catCString(stats, sizeof(stats), ", Vertices: ");

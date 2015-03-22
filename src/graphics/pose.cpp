@@ -62,35 +62,17 @@ void Pose::resize(int count)
 	}
 }
 
-void Pose::computeAbsolute(Model& model, int i, bool* valid)
-{
-	if (!valid[i])
-	{
-		int parent = model.getBone(i).parent_idx;
-		if (parent >= 0)
-		{
-			if (!valid[parent])
-			{
-				computeAbsolute(model, parent, valid);
-			}
-			m_positions[i] = m_rotations[parent] * m_positions[i] + m_positions[parent];
-			m_rotations[i] = m_rotations[i] * m_rotations[parent];
-		}
-		valid[i] = true;
-	}
-}
 
 void Pose::computeAbsolute(Model& model)
 {
 	PROFILE_FUNCTION();
 	if(!m_is_absolute)
 	{
-		ASSERT(m_count < 256);
-		bool valid[256];
-		memset(valid, 0, sizeof(bool) * m_count);
-		for (int i = 0; i < m_count; ++i)
+		for (int i = model.getFirstNonrootBoneIndex(); i < m_count; ++i)
 		{
-			computeAbsolute(model, i, valid);
+			int parent = model.getBone(i).parent_idx;
+			m_positions[i] = m_rotations[parent] * m_positions[i] + m_positions[parent];
+			m_rotations[i] = m_rotations[i] * m_rotations[parent];
 		}
 		m_is_absolute = true;
 	}
