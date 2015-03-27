@@ -29,7 +29,10 @@ void SkeletonView::entitySelected(const Lumix::Array<Lumix::Entity>& entities)
 		if (cmp.isValid())
 		{
 			Lumix::Model* model = static_cast<Lumix::RenderScene*>(cmp.scene)->getRenderableModel(cmp);
-			viewModel(model);
+			if (model)
+			{
+				viewModel(model);
+			}
 		}
 	}
 }
