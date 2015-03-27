@@ -1,14 +1,27 @@
 #pragma once
 
 
+#include "core/fs/file_system.h"
+#include "core/json_serializer.h"
+#include "core/resource.h"
+#include "editor/world_editor.h"
+#include "engine/engine.h"
+#include "file_edit.h"
+#include "graphics/material.h"
+#include "graphics/model.h"
+#include "graphics/texture.h"
 #include <functional>
 #include <qcheckbox.h>
 #include <qdesktopservices.h>
 #include <qfiledialog.h>
+#include <qlabel.h>
+#include <qlayout.h>
 #include <qpushbutton.h>
+#include <qspinbox.h>
+#include <qtreewidget.h>
 
 
-void createResourceSelector(PropertyView& view, QTreeWidgetItem* item, Lumix::Resource* resource, std::function<void(const Lumix::Path&)> setter)
+inline void createResourceSelector(PropertyView& view, QTreeWidgetItem* item, Lumix::Resource* resource, std::function<void(const Lumix::Path&)> setter)
 {
 	QWidget* widget = new QWidget();
 	QHBoxLayout* layout = new QHBoxLayout(widget);
@@ -48,7 +61,7 @@ void createResourceSelector(PropertyView& view, QTreeWidgetItem* item, Lumix::Re
 }
 
 
-QTreeWidgetItem* newSubItem(QTreeWidgetItem* parent)
+inline QTreeWidgetItem* newSubItem(QTreeWidgetItem* parent)
 {
 	QTreeWidgetItem* subitem = new QTreeWidgetItem();
 	parent->addChild(subitem);

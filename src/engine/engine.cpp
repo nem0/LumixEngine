@@ -99,7 +99,8 @@ namespace Lumix
 
 			bool create()
 			{
-				if (!m_plugin_manager.create(*this))
+				m_plugin_manager = PluginManager::create(*this);
+				if (!m_plugin_manager)
 				{
 					return false;
 				}
@@ -113,7 +114,7 @@ namespace Lumix
 					Renderer::destroyInstance(*m_renderer);
 					return false;
 				}
-				m_plugin_manager.addPlugin(m_renderer);
+				m_plugin_manager->addPlugin(m_renderer);
 				if (!m_input_system.create(m_allocator))
 				{
 					return false;
@@ -127,7 +128,7 @@ namespace Lumix
 			{
 				Timer::destroy(m_timer);
 				Timer::destroy(m_fps_timer);
-				m_plugin_manager.destroy();
+				PluginManager::destroy(m_plugin_manager);
 				m_input_system.destroy();
 				if (m_disk_file_device)
 				{
@@ -148,7 +149,7 @@ namespace Lumix
 			{
 				m_universe = m_allocator.newObject<Universe>(m_allocator);
 				m_hierarchy = Hierarchy::create(*m_universe, m_allocator);
-				const Array<IPlugin*>& plugins = m_plugin_manager.getPlugins();
+				const Array<IPlugin*>& plugins = m_plugin_manager->getPlugins();
 				for (int i = 0; i < plugins.size(); ++i)
 				{
 					IScene* scene = plugins[i]->createScene(*m_universe);
@@ -225,7 +226,7 @@ namespace Lumix
 
 			virtual PluginManager& getPluginManager() override
 			{
-				return m_plugin_manager;
+				return *m_plugin_manager;
 			}
 
 
@@ -268,7 +269,7 @@ namespace Lumix
 					{
 						m_scenes[i]->update(dt);
 					}
-					m_plugin_manager.update(dt);
+					m_plugin_manager->update(dt);
 					m_input_system.update(dt);
 				}
 				else
@@ -287,7 +288,7 @@ namespace Lumix
 
 			virtual IPlugin* loadPlugin(const char* name) override
 			{
-				return m_plugin_manager.load(name);
+				return m_plugin_manager->load(name);
 			}
 
 
@@ -336,7 +337,7 @@ namespace Lumix
 				m_universe->serialize(serializer);
 				m_hierarchy->serialize(serializer);
 				m_renderer->serialize(serializer);
-				m_plugin_manager.serialize(serializer);
+				m_plugin_manager->serialize(serializer);
 				for (int i = 0; i < m_scenes.size(); ++i)
 				{
 					m_scenes[i]->serialize(serializer);
@@ -364,7 +365,7 @@ namespace Lumix
 				m_universe->deserialize(serializer);
 				m_hierarchy->deserialize(serializer);
 				m_renderer->deserialize(serializer);
-				m_plugin_manager.deserialize(serializer);
+				m_plugin_manager->deserialize(serializer);
 				for (int i = 0; i < m_scenes.size(); ++i)
 				{
 					m_scenes[i]->deserialize(serializer);
@@ -393,7 +394,7 @@ namespace Lumix
 
 			string m_base_path;
 			WorldEditor* m_editor;
-			PluginManager m_plugin_manager;
+			PluginManager* m_plugin_manager;
 			Universe* m_universe;
 			Hierarchy* m_hierarchy;
 			Array<IScene*> m_scenes;

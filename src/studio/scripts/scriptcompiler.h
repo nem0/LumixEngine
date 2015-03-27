@@ -36,10 +36,11 @@ public:
 	Status getStatus(const QString& module_name);
 	QString getLog(const QString& module_name);
 	void setWorldEditor(Lumix::WorldEditor& editor);
-	void addScript(const QString& module_name, const Lumix::Path& path);
+	void addScript(const QString& module_name, const QString& path);
 	void onScriptRenamed(const Lumix::Path& old_path, const Lumix::Path& new_path);
 	void removeScript(const Lumix::Path& path);
 	void destroyModule(const QString& module_name);
+	void setModuleOutputPath(const QString& module_name, const QString& path);
 	void setSourcesPath(const QString& path) { m_sources_path = path; }
 	void onScriptChanged(const QString& path);
 
@@ -71,8 +72,9 @@ class ScriptCompiler::Module
 		Module() { Q_ASSERT(false); }
 
 	public:
-		QVector<Lumix::Path> m_scripts;
+		QVector<QString> m_scripts;
 		Status m_status;
 		QString m_log;
 		QString m_module_name;
+		QString m_output_path;
 };

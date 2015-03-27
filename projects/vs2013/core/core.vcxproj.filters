@@ -144,6 +144,7 @@
       <Filter>debug</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\core\lifo_allocator.h" />
+    <ClInclude Include="..\..\..\src\core\library.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\core\blob.cpp" />
@@ -246,6 +247,7 @@
     <ClCompile Include="..\..\..\src\debug\pc\floating_points.cpp">
       <Filter>debug</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\core\pc\library.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="fs">

@@ -27,6 +27,23 @@ Pose::~Pose()
 }
 
 
+void Pose::blend(Pose& rhs, float weight)
+{
+	ASSERT(m_count == rhs.m_count);
+	if (weight <= 0.001f)
+	{
+		return;
+	}
+	weight = Math::clamp(weight, 0.0f, 1.0f);
+	float inv = 1.0f - weight;
+	for (int i = 0, c = m_count; i < c; ++i)
+	{
+		m_positions[i] = m_positions[i] * inv + rhs.m_positions[i] * weight;
+		nlerp(m_rotations[i], rhs.m_rotations[i], &m_rotations[i], weight);
+	}
+}
+
+
 void Pose::resize(int count)
 {
 	m_is_absolute = false;
@@ -45,35 +62,17 @@ void Pose::resize(int count)
 	}
 }
 
-void Pose::computeAbsolute(Model& model, int i, bool* valid)
-{
-	if (!valid[i])
-	{
-		int parent = model.getBone(i).parent_idx;
-		if (parent >= 0)
-		{
-			if (!valid[parent])
-			{
-				computeAbsolute(model, parent, valid);
-			}
-			m_positions[i] = m_rotations[parent] * m_positions[i] + m_positions[parent];
-			m_rotations[i] = m_rotations[i] * m_rotations[parent];
-		}
-		valid[i] = true;
-	}
-}
 
 void Pose::computeAbsolute(Model& model)
 {
 	PROFILE_FUNCTION();
 	if(!m_is_absolute)
 	{
-		ASSERT(m_count < 256);
-		bool valid[256];
-		memset(valid, 0, sizeof(bool) * m_count);
-		for (int i = 0; i < m_count; ++i)
+		for (int i = model.getFirstNonrootBoneIndex(); i < m_count; ++i)
 		{
-			computeAbsolute(model, i, valid);
+			int parent = model.getBone(i).parent_idx;
+			m_positions[i] = m_rotations[parent] * m_positions[i] + m_positions[parent];
+			m_rotations[i] = m_rotations[i] * m_rotations[parent];
 		}
 		m_is_absolute = true;
 	}

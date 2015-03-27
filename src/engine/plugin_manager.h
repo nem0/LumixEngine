@@ -18,20 +18,18 @@ namespace Lumix
 	class LUMIX_ENGINE_API PluginManager
 	{
 		public:
-			PluginManager() { m_impl = 0; }
+			virtual ~PluginManager() {}
 
-			bool create(Engine& engine);
-			void destroy();
-			IPlugin* load(const char* path);
-			void addPlugin(IPlugin* plugin);
-			void update(float dt);
-			void serialize(OutputBlob& serializer);
-			void deserialize(InputBlob& serializer);
-			IPlugin* getPlugin(const char* name);
-			const Array<IPlugin*>& getPlugins() const;
-
-		private:
-			struct PluginManagerImpl* m_impl;
+			static PluginManager* create(Engine& engine);
+			static void destroy(PluginManager* manager);
+			
+			virtual IPlugin* load(const char* path) = 0;
+			virtual void addPlugin(IPlugin* plugin) = 0;
+			virtual void update(float dt) = 0;
+			virtual void serialize(OutputBlob& serializer) = 0;
+			virtual void deserialize(InputBlob& serializer) = 0;
+			virtual IPlugin* getPlugin(const char* name) = 0;
+			virtual const Array<IPlugin*>& getPlugins() const = 0;
 	};
 
 
