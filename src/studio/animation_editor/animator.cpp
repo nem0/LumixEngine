@@ -581,11 +581,11 @@ void StateMachineNodeContent::showContextMenu(AnimationEditor& editor, QWidget* 
 	}
 	else if (selected_action == add_animation_action)
 	{
-		editor.executeCommand(new CreateAnimatorNodeCommand(CreateAnimatorNodeCommand::ANIMATION, editor.getAnimator(), getNode()->getUID(), pos));
+		editor.executeCommand(new CreateAnimatorNodeCommand(crc32("animation"), editor.getAnimator(), getNode()->getUID(), pos));
 	}
 	else if (selected_action == add_state_machine_action)
 	{
-		editor.executeCommand(new CreateAnimatorNodeCommand(CreateAnimatorNodeCommand::STATE_MACHINE, editor.getAnimator(), getNode()->getUID(), pos));
+		editor.executeCommand(new CreateAnimatorNodeCommand(crc32("state_machine"), editor.getAnimator(), getNode()->getUID(), pos));
 	}
 
 }
@@ -693,8 +693,9 @@ void AnimationNodeContent::paintContainer(QPainter& painter)
 }
 
 
-Animator::Animator(ScriptCompiler& compiler)
+Animator::Animator(AnimationEditor& editor, ScriptCompiler& compiler)
 	: m_compiler(compiler)
+	, m_editor(editor)
 {
 	m_update_function = NULL;
 	m_last_uid = 0;
@@ -720,7 +721,7 @@ void Animator::setPath(const QString& path)
 
 void Animator::setWorldEditor(Lumix::WorldEditor& editor)
 {
-	m_editor = &editor;
+	m_world_editor = &editor;
 }
 
 
@@ -837,10 +838,10 @@ void Animator::update(float time_delta)
 {
 	if (m_update_function)
 	{
-		auto& selected = m_editor->getSelectedEntities();
+		auto& selected = m_world_editor->getSelectedEntities();
 		if (selected.size() == 1)
 		{
-			auto renderable = m_editor->getComponent(selected[0], crc32("renderable"));
+			auto renderable = m_world_editor->getComponent(selected[0], crc32("renderable"));
 			if (renderable.isValid())
 			{
 				Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(renderable.scene);
@@ -880,7 +881,7 @@ void Animator::run()
 		AnimationManagerSetter setAnimationManager = (AnimationManagerSetter)m_library.resolve("setAnimationManager");
 		if (setAnimationManager)
 		{
-			setAnimationManager((Lumix::AnimationManager*)m_editor->getEngine().getResourceManager().get(Lumix::ResourceManager::ANIMATION));
+			setAnimationManager((Lumix::AnimationManager*)m_world_editor->getEngine().getResourceManager().get(Lumix::ResourceManager::ANIMATION));
 			m_object = creator();
 		}
 		else

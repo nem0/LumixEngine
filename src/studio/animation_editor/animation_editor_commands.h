@@ -3,22 +3,17 @@
 
 #include <qpoint.h>
 #include <qundostack.h>
-
-
-class Animator;
+#include <cstdint>
+#include "animator.h"
+#include "core/blob.h"
 
 
 class CreateAnimatorNodeCommand : public QUndoCommand
 {
 	public:
-		enum Type
-		{
-			ANIMATION,
-			STATE_MACHINE,
-		};
 
 	public:
-		CreateAnimatorNodeCommand(Type type, Animator* animator, int parent_uid, const QPoint& position);
+		CreateAnimatorNodeCommand(uint32_t type, Animator* animator, int parent_uid, const QPoint& position);
 
 		virtual void undo() override;
 		virtual void redo() override;
@@ -28,7 +23,7 @@ class CreateAnimatorNodeCommand : public QUndoCommand
 		int m_parent_uid;
 		int m_node_uid;
 		QPoint m_position;
-		Type m_type;
+		uint32_t m_type;
 };
 
 
@@ -43,4 +38,7 @@ class DestroyAnimatorNodeCommand : public QUndoCommand
 	private:
 		Animator* m_animator;
 		int m_uid;
+		int m_parent_uid;
+		uint32_t m_node_content_type;
+		Lumix::OutputBlob m_blob;
 };
