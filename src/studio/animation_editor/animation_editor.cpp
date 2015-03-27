@@ -26,7 +26,7 @@ AnimationEditor::AnimationEditor(MainWindow& main_window)
 	, m_compiler(*main_window.getScriptCompiler())
 	, m_main_window(main_window)
 {
-	m_animator = new Animator(m_compiler);
+	m_animator = new Animator(*this, m_compiler);
 	emit animatorCreated();
 
 	setWindowTitle("Animation editor");
@@ -160,7 +160,7 @@ void AnimationEditor::onLoadAction()
 	if (!path.isEmpty())
 	{
 		delete m_animator;
-		m_animator = new Animator(m_compiler);
+		m_animator = new Animator(*this, m_compiler);
 		m_animator->setPath(path);
 		m_animator->setWorldEditor(*m_editor);
 		QFile file(path);

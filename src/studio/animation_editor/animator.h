@@ -8,6 +8,7 @@
 #include <qpainter.h>
 #include <qpoint.h>
 #include <qstring.h>
+#include "core/default_allocator.h"
 
 
 class AnimationEditor;
@@ -205,8 +206,9 @@ class AnimatorNode
 class Animator
 {
 	public:
-		Animator(ScriptCompiler& compiler);
+		Animator(AnimationEditor& editor, ScriptCompiler& compiler);
 
+		AnimationEditor& getEditor() { return m_editor; }
 		void setPath(const QString& path);
 		QString getPath() const { return m_path; }
 		bool isValidPath() const { return !m_path.isEmpty(); }
@@ -225,6 +227,7 @@ class Animator
 
 		void createInput();
 		QAbstractItemModel* getInputModel() const;
+		Lumix::IAllocator& getAllocator() { return m_allocator; }
 
 	private:
 		typedef void* (*CreateFunction)();
@@ -242,11 +245,13 @@ class Animator
 		QList<AnimatorNode*> m_nodes;
 		AnimatorInputModel* m_input_model;
 		QLibrary m_library;
-		Lumix::WorldEditor* m_editor;
+		Lumix::WorldEditor* m_world_editor;
 		UpdateFunction m_update_function;
 		IsReadyFunction m_is_ready_function;
 		SetInputFunction m_set_input_function;
 		void* m_object;
 		ScriptCompiler& m_compiler;
 		QString m_path;
+		Lumix::DefaultAllocator m_allocator;
+		AnimationEditor& m_editor;
 };
