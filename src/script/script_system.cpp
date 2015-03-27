@@ -5,6 +5,7 @@
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
 #include "core/json_serializer.h"
+#include "core/library.h"
 #include "core/log.h"
 #include "core/array.h"
 #include "editor/world_editor.h"
@@ -37,7 +38,7 @@ namespace Lumix
 				, m_paths(m_allocator)
 				, m_script_entities(m_allocator)
 				, m_script_renamed(m_allocator)
-				, m_module(NULL)
+				, m_library(NULL)
 				, m_done_function(NULL)
 				, m_deserialize_function(NULL)
 				, m_serialize_function(NULL)
@@ -186,20 +187,23 @@ namespace Lumix
 
 			virtual void afterScriptCompiled() override
 			{
-				if (!m_module)
+				if (!m_library)
 				{
-					const char* library_path = "scripts/Debug/entities.dll";
-					m_module = LoadLibrary(library_path);
-					if (!m_module)
+					const char* library_path = "scripts/Debug/main.dll";
+					
+					m_library = Library::create(Path(library_path), m_allocator);
+					if (!m_library->load())
 					{
 						g_log_error.log("script") << "Could not load " << library_path;
+						Library::destroy(m_library);
+						m_library = NULL;
 						return;
 					}
-					m_update_function = (UpdateFunction)GetProcAddress(m_module, "update");
-					m_done_function = (DoneFunction)GetProcAddress(m_module, "done");
-					m_serialize_function = (SerializeFunction)GetProcAddress(m_module, "serialize");
-					m_deserialize_function = (DeserializeFunction)GetProcAddress(m_module, "deserialize");
-					InitFunction init_function = (InitFunction)GetProcAddress(m_module, "init");
+					m_update_function = (UpdateFunction)m_library->resolve("update");
+					m_done_function = (DoneFunction)m_library->resolve("done");
+					m_serialize_function = (SerializeFunction)m_library->resolve("serialize");
+					m_deserialize_function = (DeserializeFunction)m_library->resolve("deserialize");
+					InitFunction init_function = (InitFunction)m_library->resolve("init");
 					if (!m_update_function || !init_function)
 					{
 						g_log_error.log("script") << "Script interface in " << library_path << " is not complete";
@@ -220,8 +224,11 @@ namespace Lumix
 				{
 					m_done_function();
 				}
-				FreeLibrary(m_module);
-				m_module = NULL;
+				if (m_library)
+				{
+					Library::destroy(m_library);
+					m_library = NULL;
+				}
 			}
 
 
@@ -281,7 +288,7 @@ namespace Lumix
 			Universe& m_universe;
 			Engine& m_engine;
 			ScriptSystemImpl& m_system;
-			HMODULE m_module;
+			Library* m_library;
 			UpdateFunction m_update_function;
 			DoneFunction m_done_function;
 			SerializeFunction m_serialize_function;

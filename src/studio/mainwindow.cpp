@@ -1,5 +1,7 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include "animation_editor/animable_component_plugin.h"
+#include "animation_editor/animation_editor.h"
 #include "assetbrowser.h"
 #include "editor/entity_template_system.h"
 #include "editor/gizmo.h"
@@ -45,12 +47,14 @@ MainWindow::MainWindow(QWidget* parent) :
 	m_notifications = Notifications::create(*this);
 	m_entity_list = new EntityList(NULL);
 
+	m_animation_editor = new AnimationEditor(*this);
+
 	m_toggle_game_mode_after_compile = false;
 	connect(m_script_compiler_ui->getCompiler(), &ScriptCompiler::compiled, this, &MainWindow::onScriptCompiled);
 
 	QSettings settings("Lumix", "QtEditor");
 	bool geometry_restored = restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
-	
+
 	m_window_menu = new QMenu("Windows", m_ui->menuView);
 	m_ui->menuView->addMenu(m_window_menu);
 	m_window_menu->connect(m_window_menu, &QMenu::aboutToShow, [this]()
@@ -110,11 +114,24 @@ MainWindow::MainWindow(QWidget* parent) :
 }
 
 
+QMenuBar* MainWindow::getMenuBar() const
+{
+	return m_ui->menuBar;
+}
+
+
+ScriptCompiler* MainWindow::getScriptCompiler() const
+{
+	return m_script_compiler_ui->getCompiler();
+}
+
+
 void MainWindow::installPlugins()
 {
 	m_property_view->addEntityComponentPlugin(new ScriptComponentPlugin(*m_world_editor, *m_script_compiler_ui->getCompiler()));
 	m_property_view->addEntityComponentPlugin(new TerrainComponentPlugin(*m_world_editor, m_entity_template_list_ui, m_entity_list));
 	m_property_view->addEntityComponentPlugin(new GlobalLightComponentPlugin());
+	m_property_view->addEntityComponentPlugin(new AnimableComponentPlugin(*m_animation_editor));
 }
 
 
@@ -187,6 +204,7 @@ void MainWindow::resizeEvent(QResizeEvent* event)
 void MainWindow::update()
 {
 	m_notifications->update(m_world_editor->getEngine().getLastTimeDelta());
+	m_animation_editor->update(m_world_editor->getEngine().getLastTimeDelta());
 }
 
 
@@ -211,6 +229,7 @@ MainWindow::~MainWindow()
 {
 	delete m_log;
 	delete m_ui;
+	delete m_animation_editor;
 	delete m_scene_view;
 	delete m_property_view;
 	delete m_asset_browser;
@@ -225,15 +244,16 @@ MainWindow::~MainWindow()
 void MainWindow::setWorldEditor(Lumix::WorldEditor& editor)
 {
 	m_world_editor = &editor;
-	m_file_server_ui->setWorldEditor(editor);
+	m_animation_editor->setWorldEditor(editor);
 	m_asset_browser->setWorldEditor(editor);
-	m_property_view->setWorldEditor(editor);
-	m_entity_template_list_ui->setWorldEditor(editor);
-	m_game_view->setWorldEditor(editor);
-	m_entity_list->setWorldEditor(editor);
-	m_script_compiler_ui->setWorldEditor(editor);
 	m_asset_browser->setScriptCompiler(m_script_compiler_ui->getCompiler());
 	m_asset_browser->setNotifications(m_notifications);
+	m_entity_list->setWorldEditor(editor);
+	m_entity_template_list_ui->setWorldEditor(editor);
+	m_file_server_ui->setWorldEditor(editor);
+	m_game_view->setWorldEditor(editor);
+	m_property_view->setWorldEditor(editor);
+	m_script_compiler_ui->setWorldEditor(editor);
 
 	m_world_editor->universeLoaded().bind<MainWindow, &MainWindow::onUniverseLoaded>(this);
 
@@ -326,6 +346,7 @@ void MainWindow::on_actionAsset_Browser_triggered()
 {
 	m_asset_browser->show();
 }
+
 
 void MainWindow::on_actionScene_View_triggered()
 {

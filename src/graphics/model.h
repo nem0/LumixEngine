@@ -142,6 +142,7 @@ class Model : public Resource
 		int			getMeshCount() const { return m_meshes.size(); }
 		int			getBoneCount() const	{ return m_bones.size(); }
 		const Bone&	getBone(int i) const		{ return m_bones[i]; }
+		int			getFirstNonrootBoneIndex() const { return m_first_nonroot_bone_index; }
 		BoneMap::iterator	getBoneIndex(uint32_t hash) { return m_bone_map.find(hash); }
 		void		getPose(Pose& pose);
 		float		getBoundingRadius() const { return m_bounding_radius; }
@@ -170,6 +171,7 @@ class Model : public Resource
 		float m_bounding_radius;
 		BoneMap m_bone_map; // maps bone name hash to bone index in m_bones
 		AABB m_aabb;
+		int m_first_nonroot_bone_index;
 };
 
 

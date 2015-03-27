@@ -501,6 +501,17 @@ void PropertyView::setSelectedResourceFilename(const char* filename)
 }
 
 
+QTreeWidgetItem* PropertyView::newTopLevelItem()
+{
+	clear();
+	m_selected_entity = Lumix::Entity::INVALID;
+	m_selected_resource = NULL;
+	QTreeWidgetItem* item = new QTreeWidgetItem();
+	m_ui->propertyList->insertTopLevelItem(0, item);
+	return item;
+}
+
+
 void PropertyView::onSelectedResourceLoaded(Lumix::Resource::State, Lumix::Resource::State new_state)
 {
 	if (new_state == Lumix::Resource::State::READY)
@@ -911,7 +922,7 @@ void ScriptComponentPlugin::createEditor(QTreeWidgetItem* component_item, const 
 	Lumix::string path(m_world_editor.getAllocator());
 	static_cast<Lumix::ScriptScene*>(component.scene)->getScriptPath(component, path);
 	QFileInfo info(m_world_editor.getUniversePath().c_str());
-	switch (m_compiler.getStatus(info.baseName()))
+	switch (m_compiler.getStatus("universe"))
 	{
 	case ScriptCompiler::SUCCESS:
 		status_item->setText(1, "Compiled");
@@ -952,4 +963,3 @@ void ScriptComponentPlugin::setScriptStatus(uint32_t status)
 			break;
 	}	
 }
-

@@ -14,6 +14,10 @@ namespace Ui
 	class MainWindow;
 }
 
+
+class PropertyView;
+
+
 class MainWindow : public QMainWindow
 {
 	Q_OBJECT
@@ -26,6 +30,9 @@ public:
 	void setWorldEditor(Lumix::WorldEditor& world_editor);
 	class SceneView* getSceneView() const;
 	class GameView* getGameView() const;
+	PropertyView* getPropertyView() const { return m_property_view; }
+	class ScriptCompiler* getScriptCompiler() const;
+	QMenuBar* getMenuBar() const;
 
 signals:
 	void resized(const QSize& size);
@@ -91,8 +98,9 @@ private:
 private:
 	Ui::MainWindow* m_ui;
 	Lumix::WorldEditor* m_world_editor;
+	class AnimationEditor* m_animation_editor;
 	class LogWidget* m_log;
-	class PropertyView* m_property_view;
+	PropertyView* m_property_view;
 	class SceneView* m_scene_view;
 	class GameView* m_game_view;
 	class AssetBrowser* m_asset_browser;

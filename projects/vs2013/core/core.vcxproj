@@ -245,6 +245,7 @@
     <ClInclude Include="..\..\..\src\core\hash_map.h" />
     <ClInclude Include="..\..\..\src\core\input_system.h" />
     <ClInclude Include="..\..\..\src\core\json_serializer.h" />
+    <ClInclude Include="..\..\..\src\core\library.h" />
     <ClInclude Include="..\..\..\src\core\lifo_allocator.h" />
     <ClInclude Include="..\..\..\src\core\log.h" />
     <ClInclude Include="..\..\..\src\core\lumix.h" />
@@ -331,6 +332,7 @@
     <ClCompile Include="..\..\..\src\core\os_file.cpp" />
     <ClCompile Include="..\..\..\src\core\path.cpp" />
     <ClCompile Include="..\..\..\src\core\pc\input_system.cpp" />
+    <ClCompile Include="..\..\..\src\core\pc\library.cpp" />
     <ClCompile Include="..\..\..\src\core\quat.cpp" />
     <ClCompile Include="..\..\..\src\core\resource.cpp" />
     <ClCompile Include="..\..\..\src\core\resource_manager.cpp" />

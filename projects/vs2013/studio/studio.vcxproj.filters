@@ -50,6 +50,12 @@
     <Filter Include="Form Files\script">
       <UniqueIdentifier>{1c542ecd-44b4-4519-b7c3-f96b33a9ff74}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\animation_editor">
+      <UniqueIdentifier>{67ec8a1f-a755-4764-ac62-3740efa5bfac}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\animation_editor">
+      <UniqueIdentifier>{af5df830-8218-4ee0-8c7c-5d344f149a10}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\tmp\studio\moc_assetbrowser.cpp">
@@ -145,6 +151,39 @@
     <ClCompile Include="..\..\..\src\studio\sceneview.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\studio\animation_editor\animable_component_plugin.cpp">
+      <Filter>Source Files\animation_editor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tmp\studio\moc_animable_component_plugin.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tmp\studio\moc_animation_editor.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\studio\animation_editor\animation_editor.cpp">
+      <Filter>Source Files\animation_editor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\studio\animation_editor\skeleton_view.cpp">
+      <Filter>Source Files\animation_editor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tmp\studio\moc_skeleton_view.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\studio\animation_editor\animator.cpp">
+      <Filter>Source Files\animation_editor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\studio\animation_editor\animation_editor_commands.cpp">
+      <Filter>Source Files\animation_editor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\studio\animation_editor\animation_inputs.cpp">
+      <Filter>Source Files\animation_editor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tmp\studio\moc_animation_inputs.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tmp\studio\moc_animator.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\..\..\src\studio\assetbrowser.h">
@@ -222,6 +261,21 @@
     <CustomBuild Include="..\..\..\src\studio\scripts\scriptcompilerwidget.ui">
       <Filter>Form Files\script</Filter>
     </CustomBuild>
+    <CustomBuild Include="..\..\..\src\studio\animation_editor\animable_component_plugin.h">
+      <Filter>Header Files\animation_editor</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\src\studio\animation_editor\animation_editor.h">
+      <Filter>Header Files\animation_editor</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\src\studio\animation_editor\skeleton_view.h">
+      <Filter>Header Files\animation_editor</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\src\studio\animation_editor\animation_inputs.h">
+      <Filter>Header Files\animation_editor</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\src\studio\animation_editor\animator.h">
+      <Filter>Header Files\animation_editor</Filter>
+    </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\studio\file_system_watcher.h">
@@ -286,6 +340,9 @@
     </ClInclude>
     <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_scriptcompilerwidget.h">
       <Filter>Generated Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\studio\animation_editor\animation_editor_commands.h">
+      <Filter>Header Files\animation_editor</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
