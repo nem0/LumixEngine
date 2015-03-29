@@ -41,7 +41,11 @@ AnimationEditor::AnimationEditor(MainWindow& main_window)
 	m_run_action = toolbar->addAction("Run");
 	m_save_action = toolbar->addAction("Save");
 	m_save_as_action = toolbar->addAction("Save As");
+	m_undo_action = m_undo_stack.createUndoAction(&m_undo_stack);
+	m_redo_action = m_undo_stack.createRedoAction(&m_undo_stack);
 	m_load_action = toolbar->addAction("Load");
+	toolbar->addAction(m_undo_action);
+	toolbar->addAction(m_redo_action);
 	connect(m_compile_action, &QAction::triggered, this, &AnimationEditor::onCompileAction);
 	connect(m_run_action, &QAction::triggered, this, &AnimationEditor::onRunAction);
 	connect(m_save_action, &QAction::triggered, this, &AnimationEditor::onSaveAction);
@@ -65,6 +69,8 @@ void AnimationEditor::addMenu(MainWindow& main_window)
 {
 	QMenuBar* menu_bar = main_window.getMenuBar();
 	QMenu* menu = menu_bar->addMenu("Animation Editor");
+	menu->addAction(m_undo_action);
+	menu->addAction(m_redo_action);
 	menu->addAction(m_compile_action);
 	menu->addAction(m_run_action);
 	menu->addAction(m_load_action);

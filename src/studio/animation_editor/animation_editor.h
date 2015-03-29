@@ -122,5 +122,6 @@ class AnimationEditor : public QDockWidget
 		QAction* m_save_action;
 		QAction* m_save_as_action;
 		QAction* m_load_action;
-
+		QAction* m_undo_action;
+		QAction* m_redo_action;
 };
