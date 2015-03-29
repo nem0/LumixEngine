@@ -7,6 +7,10 @@
 #include <qmetaobject.h>
 #include <qtableview.h>
 
+
+
+
+
 AnimationInputs::AnimationInputs(AnimationEditor& editor)
 	: m_editor(editor)
 {
@@ -40,10 +44,10 @@ void AnimationInputs::showContextMenu(const QPoint& pos)
 	QAction* selected_action = menu->exec(mapToGlobal(pos));
 	if (selected_action == create_action)
 	{
-		m_editor.executeCommand(new CreateAnimationInputCommand(m_editor.getAnimator()));
+		m_editor.getAnimator()->getInputModel()->insertRow(m_editor.getAnimator()->getInputModel()->rowCount());
 	}
 	else if (selected_action = destroy_action)
 	{
-		m_editor.executeCommand(new DestroyAnimationInputCommand(m_editor.getAnimator(), model_index.row()));
+		m_editor.getAnimator()->getInputModel()->removeRow(model_index.row());
 	}
 }

@@ -24,6 +24,7 @@ namespace Ui
 
 class AssetBrowser;
 class MainWindow;
+class QTreeView;
 class QTreeWidgetItem;
 class ScriptCompiler;
 

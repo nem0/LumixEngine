@@ -82,7 +82,8 @@ class AnimationEditor : public QDockWidget
 		void executeCommand(QUndoCommand* command);
 		PropertyView& getPropertyView() { return m_property_view; }
 		AnimatorNodeContent* createContent(AnimatorNode& node, uint32_t content_type);
-
+		QUndoStack& getUndoStack() { return m_undo_stack; }
+	
 	signals:
 		void animatorCreated();
 
