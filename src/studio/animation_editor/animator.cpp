@@ -76,6 +76,7 @@ class AnimatorInputModel : public QAbstractItemModel
 	public:
 		virtual QModelIndex index(int row, int column, const QModelIndex &parent = QModelIndex()) const override;
 		virtual QModelIndex parent(const QModelIndex &child) const override;
+		virtual bool removeRows(int row, int count, const QModelIndex &parent = QModelIndex()) override;
 		virtual int rowCount(const QModelIndex &parent = QModelIndex()) const override;
 		virtual int columnCount(const QModelIndex &parent = QModelIndex()) const override;
 		virtual QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
@@ -91,6 +92,19 @@ class AnimatorInputModel : public QAbstractItemModel
 		Animator& m_animator;
 		QList<Input> m_inputs;
 };
+
+
+bool AnimatorInputModel::removeRows(int row, int count, const QModelIndex& parent)
+{
+	beginRemoveRows(parent, row, row + count - 1);
+	for (int i = row + count - 1; i >= row; --i)
+	{
+		m_inputs.removeAt(i);
+	}
+	endRemoveRows();
+	return true;
+}
+
 
 
 QVariant AnimatorInputModel::headerData(int section, Qt::Orientation orientation, int role) const
@@ -1010,6 +1024,18 @@ AnimatorNode* Animator::getNode(int uid)
 void Animator::createInput()
 {
 	m_input_model->createInput();
+}
+
+
+int Animator::getInputCount() const
+{
+	return m_input_model->rowCount();
+}
+
+
+void Animator::destroyInput(int index)
+{
+	m_input_model->removeRow(index);
 }
 
 

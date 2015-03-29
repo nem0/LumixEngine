@@ -7,6 +7,54 @@ static const uint32_t ANIMATION_HASH = crc32("animation");
 static const uint32_t STATE_MACHINE_HASH = crc32("state_machine");
 
 
+DestroyAnimationInputCommand::DestroyAnimationInputCommand(Animator* animator, int input_index)
+{
+	m_animator = animator;
+	m_input_index = input_index;
+}
+
+
+void DestroyAnimationInputCommand::redo()
+{
+	auto* model = m_animator->getInputModel();
+	m_data.clear();
+	for (int i = 0; i < model->columnCount(); ++i)
+	{
+		m_data.push_back(model->data(model->index(m_input_index, i)));
+	}
+	m_animator->destroyInput(m_input_index);
+}
+
+
+void DestroyAnimationInputCommand::undo()
+{
+	m_animator->createInput();
+	auto* model = m_animator->getInputModel();
+	for (int i = 0; i < model->columnCount(); ++i)
+	{
+		model->setData(model->index(m_input_index, i), m_data[i]);
+	}
+}
+
+CreateAnimationInputCommand::CreateAnimationInputCommand(Animator* animator)
+{
+	m_animator = animator;
+}
+
+
+void CreateAnimationInputCommand::undo()
+{
+	m_animator->destroyInput(m_input_index);
+}
+
+
+void CreateAnimationInputCommand::redo()
+{
+	m_input_index = m_animator->getInputCount();
+	m_animator->createInput();
+}
+
+
 CreateAnimatorNodeCommand::CreateAnimatorNodeCommand(uint32_t type, Animator* animator, int parent_uid, const QPoint& position)
 {
 	m_animator = animator;

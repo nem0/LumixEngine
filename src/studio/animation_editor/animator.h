@@ -226,6 +226,8 @@ class Animator
 		void setInput(unsigned int name_hash, float value);
 
 		void createInput();
+		void destroyInput(int index);
+		int getInputCount() const;
 		QAbstractItemModel* getInputModel() const;
 		Lumix::IAllocator& getAllocator() { return m_allocator; }
 

@@ -1,11 +1,11 @@
 #include "animation_inputs.h"
 #include "animation_editor.h"
+#include "animation_editor_commands.h"
 #include "animator.h"
 #include <qlayout.h>
 #include <qmenu.h>
 #include <qmetaobject.h>
 #include <qtableview.h>
-
 
 AnimationInputs::AnimationInputs(AnimationEditor& editor)
 	: m_editor(editor)
@@ -33,11 +33,17 @@ AnimationInputs::AnimationInputs(AnimationEditor& editor)
 
 void AnimationInputs::showContextMenu(const QPoint& pos)
 {
+	QModelIndex model_index = m_table_view->indexAt(pos);
 	QMenu* menu = new QMenu();
 	QAction* create_action = menu->addAction("Create");
+	QAction* destroy_action = model_index.isValid() ?  menu->addAction("Remove") : NULL;
 	QAction* selected_action = menu->exec(mapToGlobal(pos));
 	if (selected_action == create_action)
 	{
-		m_editor.getAnimator()->createInput();
+		m_editor.executeCommand(new CreateAnimationInputCommand(m_editor.getAnimator()));
+	}
+	else if (selected_action = destroy_action)
+	{
+		m_editor.executeCommand(new DestroyAnimationInputCommand(m_editor.getAnimator(), model_index.row()));
 	}
 }

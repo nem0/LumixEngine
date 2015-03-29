@@ -8,10 +8,37 @@
 #include "core/blob.h"
 
 
-class CreateAnimatorNodeCommand : public QUndoCommand
+class CreateAnimationInputCommand : public QUndoCommand
 {
 	public:
+		CreateAnimationInputCommand(Animator* animator);
 
+		virtual void undo() override;
+		virtual void redo() override;
+
+	private:
+		Animator* m_animator;
+		int m_input_index;
+};
+
+
+class DestroyAnimationInputCommand : public QUndoCommand
+{
+public:
+	DestroyAnimationInputCommand(Animator* animator, int input_index);
+
+	virtual void undo() override;
+	virtual void redo() override;
+
+private:
+	Animator* m_animator;
+	int m_input_index;
+	QList<QVariant> m_data;
+};
+
+
+class CreateAnimatorNodeCommand : public QUndoCommand
+{
 	public:
 		CreateAnimatorNodeCommand(uint32_t type, Animator* animator, int parent_uid, const QPoint& position);
 
