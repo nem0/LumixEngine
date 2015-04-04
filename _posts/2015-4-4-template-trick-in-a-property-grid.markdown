@@ -24,7 +24,7 @@ Yet again I am rewriting the property grid. I want it to have very fluent API. I
 		.property("Bytes per pixel", &Lumix::Texture::getBytesPerPixel);
 {% endhighlight %}
 
-As you can see, a property must have a getter and it can have a setter. Most of the time they are just pointers to member functions. However sometimes I want to use simple functions or lambdas. These two options differ in signature:
+As you can see, a property must have a getter and it can have a setter. Most of time they are just pointers to member functions. However sometimes I want to use simple functions or lambdas. These two options differ in signature:
 
 {% highlight cpp %}
 template <typename T>
@@ -63,10 +63,10 @@ object
 	.propertyFunction("Shader", [](Material* material) -> const char* { return material->getShader()->getPath().c_str(); });
 {% endhighlight %}
 
-As you can see this is note as fluent as I want it to be. This is where a ugly template trick come in. The only way I found out how to make it better is based on the fact that the function has one argument while the method has none.
+As you can see this is not as fluent as I want it to be. This is where a ugly template trick come in. The only way I found out how to make it better is based on the fact that the function has one argument while the method has none.
 
 {% highlight cpp %}  
-template <typename T>
+	template <typename T>
 	struct FunctionTraits : public FunctionTraits<decltype(&T::operator())>
 	{};
 
