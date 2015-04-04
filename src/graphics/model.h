@@ -139,6 +139,7 @@ class Model : public Resource
 		const Geometry& getGeometry() const { return m_geometry_buffer_object; }
 		Mesh&		getMesh(int index) { return m_meshes[index]; }
 		const Mesh&	getMesh(int index) const { return m_meshes[index]; }
+		const Mesh* getMeshPtr(int index) const { return &m_meshes[index]; }
 		int			getMeshCount() const { return m_meshes.size(); }
 		int			getBoneCount() const	{ return m_bones.size(); }
 		const Bone&	getBone(int i) const		{ return m_bones[i]; }

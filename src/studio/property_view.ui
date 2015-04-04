@@ -199,6 +199,9 @@
       </column>
      </widget>
     </item>
+    <item>
+     <widget class="QTreeView" name="treeView"/>
+    </item>
    </layout>
   </widget>
  </widget>

@@ -184,6 +184,9 @@
     <ClCompile Include="..\..\..\tmp\studio\moc_animator.cpp">
       <Filter>Generated Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\studio\dynamic_object_model.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\..\..\src\studio\assetbrowser.h">
@@ -343,6 +346,9 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\studio\animation_editor\animation_editor_commands.h">
       <Filter>Header Files\animation_editor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\studio\dynamic_object_model.h">
+      <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
