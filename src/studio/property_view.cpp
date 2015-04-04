@@ -10,6 +10,7 @@
 #include "core/path_utils.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
+#include "dynamic_object_model.h"
 #include "editor/ieditor_command.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
@@ -36,7 +37,9 @@
 #include <qmessagebox.h>
 #include <qmimedata.h>
 #include <qlineedit.h>
+#include <qpainter.h>
 #include <qpushbutton.h>
+#include <qstyleditemdelegate.h>
 #include <qtextstream.h>
 
 
@@ -56,11 +59,426 @@ static const char* component_map[] =
 };
 
 
+static const char* getComponentName(Lumix::Component cmp)
+{
+	for (int i = 0; i < sizeof(component_map) / sizeof(component_map[0]); i += 2)
+	{
+		if (cmp.type == crc32(component_map[i + 1]))
+		{
+			return component_map[i];
+		}
+	}
+	return "Unknown component";
+}
+
+
 static const uint32_t TERRAIN_HASH = crc32("terrain");
 static const uint32_t SCRIPT_HASH = crc32("script");
 
 
 #pragma region new_props
+
+
+Q_DECLARE_METATYPE(Lumix::Vec3);
+
+
+class CustomItemDelegate : public QStyledItemDelegate
+{
+	public:
+		CustomItemDelegate(QWidget* parent) : QStyledItemDelegate(parent) {}
+
+
+		void setEditorData(QWidget* editor, const QModelIndex& index) const override
+		{
+			if (index.column() == 1 && index.data().type() == QMetaType::Float)
+			{
+				static_cast<QDoubleSpinBox*>(editor)->setValue(index.data().toFloat());
+				return;
+			}
+			QStyledItemDelegate::setEditorData(editor, index);
+		}
+
+
+		bool editorEvent(QEvent* event, QAbstractItemModel* model, const QStyleOptionViewItem&, const QModelIndex& index) override
+		{
+			if (event->type() == QEvent::MouseButtonRelease)
+			{
+				auto* node = (DynamicObjectModel::Node*)index.internalPointer();
+				if (node->m_adder)
+				{
+					QWidget* widget = qobject_cast<QWidget*>(parent());
+					QPoint pos = widget->mapToGlobal(QPoint(static_cast<QMouseEvent*>(event)->x(), static_cast<QMouseEvent*>(event)->y()));
+					node->m_adder(widget, pos);
+					return true;
+				}
+				if (node->m_remover)
+				{
+					node->m_remover();
+					return true;
+				}
+				if (index.data().type() == QMetaType::Bool)
+				{
+					model->setData(index, !index.data().toBool());
+					return true;
+				}
+			}
+			return false;
+		}
+
+
+		void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override
+		{
+			if (index.column() == 1)
+			{
+				auto* node = (DynamicObjectModel::Node*)index.internalPointer();
+				if (node->m_adder)
+				{
+					painter->save();
+					QStyleOptionButton button_style_option;
+					button_style_option.rect = option.rect;
+					button_style_option.text = "+";
+					QApplication::style()->drawControl(QStyle::CE_PushButton, &button_style_option, painter);
+					painter->restore();
+					return;
+				}
+				if (node->m_remover)
+				{
+					painter->save();
+					QStyleOptionButton button_style_option;
+					button_style_option.rect = option.rect;
+					button_style_option.text = "-";
+					QApplication::style()->drawControl(QStyle::CE_PushButton, &button_style_option, painter);
+					painter->restore();
+					return;
+				}
+				QVariant data = index.data();
+				if (data.type() == QMetaType::Bool)
+				{
+					painter->save();
+					bool checked = data.toBool();
+					QStyleOptionButton check_box_style_option;
+					check_box_style_option.state |= QStyle::State_Enabled;
+					check_box_style_option.state |= checked ? QStyle::State_On : QStyle::State_Off;
+					check_box_style_option.rect = option.rect;
+					QApplication::style()->drawControl(QStyle::CE_CheckBox, &check_box_style_option, painter);
+					painter->restore();
+					return;
+				}
+			}
+			QStyledItemDelegate::paint(painter, option, index);
+		}
+
+
+		QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const override
+		{
+			if (index.column() == 1)
+			{
+				auto node = (DynamicObjectModel::Node*)index.internalPointer();
+				if (node->m_getter().type() == QMetaType::Bool)
+				{
+					return NULL;
+				}
+				else if (node->m_getter().type() == QMetaType::Float)
+				{
+					QDoubleSpinBox* input = new QDoubleSpinBox(parent);
+					return input;
+				}
+			}
+			return QStyledItemDelegate::createEditor(parent, option, index);
+		}
+
+};
+
+
+class EntityModel : public DynamicObjectModel
+{
+	public:
+		EntityModel(Lumix::WorldEditor& editor, Lumix::Entity entity)
+			: m_editor(editor)
+		{
+			m_entity = entity;
+			getRoot().m_name = "Entity";
+			getRoot().m_adder = [this](QWidget* widget, QPoint pos) { addComponent(widget, pos); };
+			Lumix::WorldEditor::ComponentList& cmps = m_editor.getComponents(m_entity);
+			for (int i = 0; i < cmps.size(); ++i)
+			{
+				Lumix::Component cmp = cmps[i];
+				addComponentNode(cmp);
+			}
+		}
+
+		void removeComponent(Lumix::Component cmp)
+		{
+			auto model_index = createIndex(0, 0, &getRoot());
+			int row = m_editor.getComponents(m_entity).indexOf(cmp);
+			beginRemoveRows(model_index, row, row);
+			m_editor.destroyComponent(cmp);
+			delete getRoot().m_children[row];
+			getRoot().m_children.removeAt(row);
+			endRemoveRows();
+		}
+
+		void addComponentNode(Lumix::Component cmp)
+		{
+			Node& node = getRoot().addChild(getComponentName(cmp));
+			node.m_getter = []() -> QVariant { return ""; };
+			node.m_remover = [this, cmp]() { removeComponent(cmp); };
+			auto& descriptors = m_editor.getPropertyDescriptors(cmp.type);
+			for (int j = 0; j < descriptors.size(); ++j)
+			{
+				auto* desc = descriptors[j];
+				Node& child = node.addChild(desc->getName());
+				child.m_getter = [desc, cmp, this]() -> QVariant
+				{
+					return this->get(cmp, -1, desc);
+				};
+				switch (desc->getType())
+				{
+					case Lumix::IPropertyDescriptor::ARRAY:
+					{
+						auto* array_desc = static_cast<Lumix::IArrayDescriptor*>(desc);
+						for (int k = 0; k < array_desc->getCount(cmp); ++k)
+						{
+							Node& array_item_node = child.addChild(QString("%1").arg(k));
+							array_item_node.m_getter = []() -> QVariant { return ""; };
+							for (int l = 0; l < array_desc->getChildren().size(); ++l)
+							{
+								auto* array_item_property_desc = array_desc->getChildren()[l];
+								Node& subchild = array_item_node.addChild(array_item_property_desc->getName());
+								subchild.m_getter = [k, array_item_property_desc, cmp, this]() -> QVariant
+								{
+									return this->get(cmp, k, array_item_property_desc);
+								};
+								subchild.m_setter = [k, array_item_property_desc, cmp, this](const QVariant& value)
+								{
+									this->set(cmp, k, array_item_property_desc, value);
+								};
+							}
+						}
+						break;
+					}
+					case Lumix::IPropertyDescriptor::VEC3:
+					{
+						Node& x_node = child.addChild("x");
+						x_node.m_getter = [desc, cmp]() -> QVariant { return desc->getValue<Lumix::Vec3>(cmp).x; };
+						x_node.m_setter = [desc, cmp](const QVariant& value) { Lumix::Vec3 v = desc->getValue<Lumix::Vec3>(cmp); v.x = value.toFloat(); desc->setValue(cmp, v); };
+						Node& y_node = child.addChild("y");
+						y_node.m_getter = [desc, cmp]() -> QVariant { return desc->getValue<Lumix::Vec3>(cmp).y; };
+						y_node.m_setter = [desc, cmp](const QVariant& value) { Lumix::Vec3 v = desc->getValue<Lumix::Vec3>(cmp); v.y = value.toFloat(); desc->setValue(cmp, v); };
+						Node& z_node = child.addChild("z");
+						z_node.m_getter = [desc, cmp]() -> QVariant { return desc->getValue<Lumix::Vec3>(cmp).z; };
+						z_node.m_setter = [desc, cmp](const QVariant& value) { Lumix::Vec3 v = desc->getValue<Lumix::Vec3>(cmp); v.z = value.toFloat(); desc->setValue(cmp, v); };
+						break;
+					}
+				default:
+					child.m_setter = [desc, cmp, this](const QVariant& value)
+					{
+						this->set(cmp, -1, desc, value);
+					};
+					break;
+				}
+			}
+		}
+
+		void addComponent(QWidget* widget, QPoint pos) 
+		{
+			struct CB : public QComboBox
+			{
+				public:
+					CB(QWidget* parent)
+						: QComboBox(parent)
+					{}
+
+					virtual void hidePopup() override
+					{
+						deleteLater();
+					}
+			};
+
+			CB* combobox = new CB(widget);
+			for (int i = 0; i < sizeof(component_map) / sizeof(component_map[0]); i += 2)
+			{
+				combobox->addItem(component_map[i]);
+			}
+			combobox->connect(combobox, (void (QComboBox::*)(int))&QComboBox::activated, [this, combobox](int value) {
+				for (int i = 0; i < sizeof(component_map) / sizeof(component_map[0]); i += 2)
+				{
+					if (combobox->itemText(value) == component_map[i])
+					{
+						if (!m_editor.getComponent(m_entity, crc32(component_map[i + 1])).isValid())
+						{
+							int row = m_editor.getComponents(m_entity).size();
+							auto model_index = createIndex(0, 0, &getRoot());
+							beginInsertRows(model_index, row, row);
+							m_editor.addComponent(crc32(component_map[i + 1]));
+							addComponentNode(m_editor.getComponents(m_entity).back());
+							endInsertRows();
+						}
+						break;
+					}
+				}
+				combobox->deleteLater();
+				
+			});
+			combobox->move(combobox->mapFromGlobal(pos));
+			combobox->raise();
+			combobox->showPopup();
+			combobox->setFocus();
+		};
+
+		void set(Lumix::Component cmp, int index, Lumix::IPropertyDescriptor* desc, QVariant value)
+		{
+			switch (desc->getType())
+			{
+				case Lumix::IPropertyDescriptor::BOOL:
+					{
+						bool b = value.toBool();
+						Lumix::InputBlob blob(&b, sizeof(b));
+						if (index == -1)
+						{
+							desc->set(cmp, blob);
+						}
+						else
+						{
+							desc->set(cmp, index, blob);
+						}
+						break;
+					}
+				case Lumix::IPropertyDescriptor::COLOR:
+					{
+						QColor color = value.value<QColor>();
+						Lumix::Vec4 v;
+						v.x = color.redF();
+						v.y = color.greenF();
+						v.z = color.blueF();
+						v.w = color.alphaF();
+						Lumix::InputBlob blob(&v, sizeof(v));
+						if (index == -1)
+						{
+							desc->set(cmp, blob);
+						}
+						else
+						{
+							desc->set(cmp, index, blob);
+						}
+						break;
+				}
+				case Lumix::IPropertyDescriptor::DECIMAL:
+					{
+						float f = value.toFloat();
+						Lumix::InputBlob blob(&f, sizeof(f));
+						if (index == -1)
+						{
+							desc->set(cmp, blob);
+						}
+						else
+						{
+							desc->set(cmp, index, blob);
+						}
+						break;
+				}
+				case Lumix::IPropertyDescriptor::INTEGER:
+					{
+						int i = value.toInt();
+						Lumix::InputBlob blob(&i, sizeof(i));
+						if (index == -1)
+						{
+							desc->set(cmp, blob);
+						}
+						else
+						{
+							desc->set(cmp, index, blob);
+						}
+						break;
+					}
+				case Lumix::IPropertyDescriptor::RESOURCE:
+				case Lumix::IPropertyDescriptor::FILE:
+				case Lumix::IPropertyDescriptor::STRING:
+					{
+						auto tmp = value.toString().toLatin1();
+						Lumix::InputBlob blob(tmp.data(), tmp.length());
+						if (index == -1)
+						{
+							desc->set(cmp, blob);
+						}
+						else
+						{
+							desc->set(cmp, index, blob);
+						}
+				}
+					break;
+				default:
+					Q_ASSERT(false);
+					break;
+			}
+		}
+
+		QVariant get(Lumix::Component cmp, int index, Lumix::IPropertyDescriptor* desc)
+		{
+			Lumix::OutputBlob stream(m_editor.getAllocator());
+			if (index == -1)
+			{
+				desc->get(cmp, stream);
+			}
+			else
+			{
+				desc->get(cmp, index, stream);
+			}
+			Lumix::InputBlob input(stream);
+			switch (desc->getType())
+			{
+				case Lumix::IPropertyDescriptor::BOOL:
+					{
+						bool b;
+						input.read(b);
+						return b;
+					}
+				case Lumix::IPropertyDescriptor::DECIMAL:
+					{
+						float f;
+						input.read(f);
+						return f;
+					}
+				case Lumix::IPropertyDescriptor::INTEGER:
+					{
+						int i;
+						input.read(i);
+						return i;
+					}
+				case Lumix::IPropertyDescriptor::COLOR:
+					{
+						Lumix::Vec4 c;
+						input.read(c);
+						QColor color((int)(c.x * 255), (int)(c.y * 255), (int)(c.z * 255));
+						return color;
+					}
+				case Lumix::IPropertyDescriptor::VEC3:
+					{
+						Lumix::Vec3 v;
+						input.read(v);
+						return QString("%1; %2; %3").arg(v.x).arg(v.y).arg(v.z);
+					}
+				case Lumix::IPropertyDescriptor::STRING:
+				case Lumix::IPropertyDescriptor::RESOURCE:
+				case Lumix::IPropertyDescriptor::FILE:
+					{
+						return (const char*)stream.getData();
+					}
+				case Lumix::IPropertyDescriptor::ARRAY:
+					return QString("%1 members").arg(static_cast<Lumix::IArrayDescriptor*>(desc)->getCount(cmp));
+					break;
+				default:
+					Q_ASSERT(false);
+					break;
+			}
+
+			return QVariant();
+		}
+
+	private:
+		Lumix::WorldEditor& m_editor;
+		Lumix::Entity m_entity;
+};
 
 
 void createComponentPropertyEditor(PropertyView& view, int array_index, Lumix::IPropertyDescriptor* desc, Lumix::Component& cmp, Lumix::OutputBlob& stream, QTreeWidgetItem* property_item);
@@ -512,6 +930,19 @@ QTreeWidgetItem* PropertyView::newTopLevelItem()
 }
 
 
+static Lumix::Material::Uniform* getMaterialUniform(Lumix::Material* material, QString name)
+{
+	for (int i = 0; i < material->getUniformCount(); ++i)
+	{
+		if (name == material->getUniform(i).m_name)
+		{
+			return &material->getUniform(i);
+		}
+	}
+	return NULL;
+}
+
+
 void PropertyView::onSelectedResourceLoaded(Lumix::Resource::State, Lumix::Resource::State new_state)
 {
 	if (new_state == Lumix::Resource::State::READY)
@@ -523,14 +954,96 @@ void PropertyView::onSelectedResourceLoaded(Lumix::Resource::State, Lumix::Resou
 		if (dynamic_cast<Lumix::Model*>(m_selected_resource))
 		{
 			PropertyEditor<Lumix::Model*>::create(*this, item, (Lumix::Model*)m_selected_resource);
+
+			using Lumix::Model;
+			Model* model = (Model*)m_selected_resource;
+			DynamicObjectModel* item_model = new DynamicObjectModel;
+			auto object = item_model->object("Model", model);
+			object
+				.property("Bone count", &Model::getBoneCount)
+				.property("Bounding radius", &Model::getBoundingRadius)
+				.array("Meshes", model->getMeshCount(), &Model::getMeshPtr, [](const Lumix::Mesh* mesh) -> const char* { return mesh->getName(); })
+					.property("Triangles", &Lumix::Mesh::getTriangleCount)
+					.property("Material", [](const Lumix::Mesh* mesh) -> const char* { return mesh->getMaterial()->getPath().c_str(); });
+			m_ui->treeView->setItemDelegateForColumn(1, new CustomItemDelegate(m_ui->treeView));
+			m_ui->treeView->setModel(item_model);
+			m_ui->treeView->expandAll();
 		}
 		else if (dynamic_cast<Lumix::Material*>(m_selected_resource))
 		{
 			PropertyEditor<Lumix::Material*>::create(*this, "material", item, (Lumix::Material*)m_selected_resource);
+
+			using Lumix::Material;
+			Material* material = (Material*)m_selected_resource;
+			DynamicObjectModel* model = new DynamicObjectModel;
+			auto object = model->object("Material", material);
+			object
+				.property("Alpha cutout", &Material::isAlphaCutout, &Material::enableAlphaCutout)
+				.property("Alpha to coverage", &Material::isAlphaToCoverage, &Material::enableAlphaToCoverage)
+				.property("Backface culling", &Material::isBackfaceCulling, &Material::enableBackfaceCulling)
+				.property("Shadow receiver", &Material::isShadowReceiver, &Material::enableShadowReceiving)
+				.property("Z test", &Material::isZTest, &Material::enableZTest)
+				.property("Shader", [](Material* material) -> const char* { return material->getShader()->getPath().c_str(); });
+			object
+				.array("Textures", material->getTextureCount(), &Material::getTexture, [](Lumix::Texture* texture) -> const char* { return texture->getPath().c_str(); })
+					.property("Width", &Lumix::Texture::getWidth)
+					.property("Height", &Lumix::Texture::getHeight)
+					.property("Bytes per pixel", &Lumix::Texture::getBytesPerPixel);
+			for (int i = 0; i < material->getUniformCount(); ++i)
+			{
+				auto& uniform = material->getUniform(i);
+				if (uniform.m_is_editable)
+				{
+					QString name = uniform.m_name;
+					object.property(uniform.m_name
+						, [name](Material* material) -> QVariant {
+							Material::Uniform* uniform = getMaterialUniform(material, name);
+							if (uniform)
+							{
+								switch (uniform->m_type)
+								{
+									case Material::Uniform::FLOAT:
+										return uniform->m_float;
+								}
+							}
+							return QVariant(); 
+						}
+						, [name](Material* material, const QVariant& value) {
+							Material::Uniform* uniform = getMaterialUniform(material, name);
+							if (uniform)
+							{
+								switch (uniform->m_type)
+								{
+									case Material::Uniform::FLOAT:
+										uniform->m_float = value.toFloat();
+										break;
+								}
+							}
+						}
+					);
+				}
+			}
+				
+			m_ui->treeView->setItemDelegateForColumn(1, new CustomItemDelegate(m_ui->treeView));
+			m_ui->treeView->setModel(model);
+			m_ui->treeView->expandAll();
 		}
 		else if (dynamic_cast<Lumix::Texture*>(m_selected_resource))
 		{
 			PropertyEditor<Lumix::Texture*>::create(*this, "texture", item, (Lumix::Texture*)m_selected_resource);
+
+			using Lumix::Texture;
+			Texture* texture = (Texture*)m_selected_resource;
+			DynamicObjectModel* model = new DynamicObjectModel;
+			auto object = model->object("Texture", texture);
+			object
+				.property("Width", &Texture::getWidth)
+				.property("Height", &Texture::getHeight)
+				.property("Bytes per pixel", &Texture::getBytesPerPixel);
+
+			m_ui->treeView->setItemDelegateForColumn(1, new CustomItemDelegate(m_ui->treeView));
+			m_ui->treeView->setModel(model);
+			m_ui->treeView->expandAll();
 		}
 		m_ui->propertyList->expandToDepth(1);
 		m_ui->propertyList->resizeColumnToContents(0);
@@ -601,6 +1114,11 @@ void PropertyView::onEntitySelected(const Lumix::Array<Lumix::Entity>& e)
 		m_ui->propertyList->resizeColumnToContents(0);		
 		onEntityPosition(e[0]);
 		m_ui->nameEdit->setText(e[0].getName());
+
+		EntityModel* model = new EntityModel(*m_world_editor, m_selected_entity);
+		m_ui->treeView->setItemDelegateForColumn(1, new CustomItemDelegate(m_ui->treeView));
+		m_ui->treeView->setModel(model);
+		m_ui->treeView->expandAll();
 	}
 }
 
