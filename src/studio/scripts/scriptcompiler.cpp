@@ -66,7 +66,7 @@ void ScriptCompiler::removeScript(const Lumix::Path& path)
 	for (auto iter = m_modules.begin(), end = m_modules.end(); iter != end; ++iter)
 	{
 		Module& module = *iter;
-		for (int i = 0; module.m_scripts.size(); ++i)
+		for (int i = 0; i < module.m_scripts.size(); ++i)
 		{
 			if (module.m_scripts[i] == path)
 			{

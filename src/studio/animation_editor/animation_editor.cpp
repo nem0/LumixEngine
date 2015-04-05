@@ -1,13 +1,15 @@
 #include "animation_editor.h"
 #include "animation_inputs.h"
 #include "animator.h"
+#include "editor/world_editor.h"
+#include "engine/engine.h"
 #include "mainwindow.h"
-#include "property_view/property_editor.h"
 #include "property_view.h"
 #include "scripts/scriptcompiler.h"
 #include "skeleton_view.h"
 #include <qaction.h>
 #include <qevent.h>
+#include <qfiledialog.h>
 #include <qlayout.h>
 #include <qmenu.h>
 #include <qmenubar.h>
