@@ -2,9 +2,21 @@
 
 
 #include <qabstractitemmodel.h>
+#include <qstyleditemdelegate.h>
 #include <functional>
 
-class QPushButton;
+
+class DynamicObjectItemDelegate : public QStyledItemDelegate
+{
+public:
+	DynamicObjectItemDelegate(QWidget* parent);
+	void setEditorData(QWidget* editor, const QModelIndex& index) const override;
+	bool editorEvent(QEvent* event, QAbstractItemModel* model, const QStyleOptionViewItem&, const QModelIndex& index) override;
+	void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
+	QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
+};
+
+
 
 class DynamicObjectModel : public QAbstractItemModel
 {
