@@ -28,7 +28,12 @@ QModelIndex DynamicObjectModel::index(int row, int column, const QModelIndex& pa
 {
 	Node* node = m_root;
 	if (parent.isValid())
-		node = ((Node*)parent.internalPointer())->m_children[row];
+	{
+		auto x = ((Node*)parent.internalPointer());
+		if (row >= x->m_children.size())
+			return QModelIndex();
+		node = x->m_children[row];
+	}
 	return createIndex(row, column, node);
 }
 

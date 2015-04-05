@@ -10,10 +10,10 @@
 #include "engine/engine.h"
 #include "graphics/render_scene.h"
 #include "property_view.h"
-#include "property_view/property_editor.h"
 #include "scripts/scriptcompiler.h"
 #include <qcombobox.h>
 #include <qfile.h>
+#include <qfileinfo.h>
 #include <qmenu.h>
 #include <qmessagebox.h>
 #include <qmetaobject.h>
@@ -546,8 +546,9 @@ static QPointF normalize(QPoint point)
 }
 
 
-void StateMachineNodeContent::fillPropertyView(PropertyView&)
+void StateMachineNodeContent::fillPropertyView(PropertyView& view)
 {
+	view.setModel(new ObjectModel(this));
 }
 
 
@@ -909,11 +910,7 @@ QString AnimationNodeContent::generateCode()
 
 void AnimationNodeContent::fillPropertyView(PropertyView& view)
 {
-	QTreeWidgetItem* item = view.newTopLevelItem();
-	PropertyEditor<const char*>::create("name", item, getNode()->getName().toLatin1().data(), [this](const char* value) { getNode()->setName(value); });
-	PropertyEditor<Lumix::Path>::create(view, "animation", item, Lumix::Path(m_animation_path.toLatin1().data()), [this](const char* value) { m_animation_path = value; });
-	item->setText(0, "Animation node");
-	item->treeWidget()->expandToDepth(1);
+	view.setModel(new ObjectModel(this));
 }
 
 
@@ -1333,9 +1330,5 @@ bool AnimatorEdge::hitTest(int x, int y) const
 
 void AnimatorEdge::fillPropertyView(PropertyView& view)
 {
-	QTreeWidgetItem* item = view.newTopLevelItem();
-	PropertyEditor<const char*>::create("condition", item, getCondition().toLatin1().data(), [this](const char* value) { setCondition(value); });
-	PropertyEditor<float>::create("duration", item, getDuration(), [this](float value) { setDuration(value); });
-	item->setText(0, "Edge");
-	item->treeWidget()->expandToDepth(1);
+	view.setModel(new ObjectModel(this));
 }

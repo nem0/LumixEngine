@@ -53,25 +53,20 @@ class PropertyView : public QDockWidget
 		void setSelectedResourceFilename(const char* filename);
 		Lumix::Resource* getResource(const char* name);
 		void setSelectedResource(Lumix::Resource* resource);
-		void refresh();
 		void createCustomProperties(QTreeWidgetItem* item, const Lumix::Component& component);
 		void addEntityComponentPlugin(IEntityComponentPlugin* plugin);
 		MainWindow* getMainWindow() const { return (MainWindow*)parent(); }
-		QTreeWidgetItem* newTopLevelItem();
+		void setModel(class QAbstractItemModel* model);
 
 	private slots:
 		void on_positionX_valueChanged(double arg1);
 		void on_positionY_valueChanged(double arg1);
 		void on_positionZ_valueChanged(double arg1);
-		void on_propertyList_customContextMenuRequested(const QPoint &pos);
-		void on_nameEdit_editingFinished();
 	
 	private:
-		void clear();
-		void onUniverseCreated();
+		void onEntityDestroyed(const Lumix::Entity& entity);
 		void onUniverseDestroyed();
 		void onEntitySelected(const Lumix::Array<Lumix::Entity>& e);
-		void onEntityPosition(const Lumix::Entity& e);
 		void updateSelectedEntityPosition();
 		void onSelectedResourceLoaded(Lumix::Resource::State old_state, Lumix::Resource::State new_state);
 
