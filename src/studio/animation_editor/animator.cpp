@@ -548,7 +548,7 @@ static QPointF normalize(QPoint point)
 
 void StateMachineNodeContent::fillPropertyView(PropertyView& view)
 {
-	view.setModel(new ObjectModel(this));
+	view.setModel(new ObjectModel(this), NULL);
 }
 
 
@@ -910,7 +910,7 @@ QString AnimationNodeContent::generateCode()
 
 void AnimationNodeContent::fillPropertyView(PropertyView& view)
 {
-	view.setModel(new ObjectModel(this));
+	view.setModel(new ObjectModel(this), NULL);
 }
 
 
@@ -1330,5 +1330,5 @@ bool AnimatorEdge::hitTest(int x, int y) const
 
 void AnimatorEdge::fillPropertyView(PropertyView& view)
 {
-	view.setModel(new ObjectModel(this));
+	view.setModel(new ObjectModel(this), NULL);
 }

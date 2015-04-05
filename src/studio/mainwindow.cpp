@@ -1,6 +1,5 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
-#include "animation_editor/animable_component_plugin.h"
 #include "animation_editor/animation_editor.h"
 #include "assetbrowser.h"
 #include "editor/entity_template_system.h"
@@ -126,15 +125,6 @@ ScriptCompiler* MainWindow::getScriptCompiler() const
 }
 
 
-void MainWindow::installPlugins()
-{
-	m_property_view->addEntityComponentPlugin(new ScriptComponentPlugin(*m_world_editor, *m_script_compiler_ui->getCompiler()));
-	m_property_view->addEntityComponentPlugin(new TerrainComponentPlugin(*m_world_editor, m_entity_template_list_ui, m_entity_list));
-	m_property_view->addEntityComponentPlugin(new GlobalLightComponentPlugin());
-	m_property_view->addEntityComponentPlugin(new AnimableComponentPlugin(*m_animation_editor));
-}
-
-
 void MainWindow::createLayoutCombobox()
 {
 	m_layout_combobox = new QComboBox();
@@ -256,8 +246,6 @@ void MainWindow::setWorldEditor(Lumix::WorldEditor& editor)
 	m_script_compiler_ui->setWorldEditor(editor);
 
 	m_world_editor->universeLoaded().bind<MainWindow, &MainWindow::onUniverseLoaded>(this);
-
-	installPlugins();
 }
 
 void MainWindow::onUniverseLoaded()
