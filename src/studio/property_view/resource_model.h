@@ -7,14 +7,16 @@
 
 namespace Lumix
 {
+	class Material;
 	class Resource;
+	class WorldEditor;
 }
 
 
 class ResourceModel : public DynamicObjectModel
 {
 	public:
-		explicit ResourceModel(Lumix::Resource* resource);
+		explicit ResourceModel(Lumix::WorldEditor& editor, Lumix::Resource* resource);
 		~ResourceModel();
 
 	private:
@@ -22,7 +24,9 @@ class ResourceModel : public DynamicObjectModel
 		void fillModelInfo();
 		void fillMaterialInfo();
 		void fillTextureInfo();
+		void saveMaterial(Lumix::Material* material);
 
 	private:
 		Lumix::Resource* m_resource;
+		Lumix::WorldEditor& m_editor;
 };

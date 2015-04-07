@@ -39,11 +39,6 @@ bool DynamicObjectItemDelegate::editorEvent(QEvent* event, QAbstractItemModel* m
 			node->m_adder(widget, pos);
 			return true;
 		}
-		if (node->m_remover)
-		{
-			node->m_remover();
-			return true;
-		}
 		if (index.data().type() == QMetaType::QColor)
 		{
 			QColorDialog* dialog = new QColorDialog(index.data().value<QColor>());
@@ -86,22 +81,7 @@ void DynamicObjectItemDelegate::paint(QPainter* painter, const QStyleOptionViewI
 		}
 		if (node->m_adder)
 		{
-			painter->save();
-			QStyleOptionButton button_style_option;
-			button_style_option.rect = option.rect;
-			button_style_option.text = "+";
-			QApplication::style()->drawControl(QStyle::CE_PushButton, &button_style_option, painter);
-			painter->restore();
-			return;
-		}
-		if (node->m_remover)
-		{
-			painter->save();
-			QStyleOptionButton button_style_option;
-			button_style_option.rect = option.rect;
-			button_style_option.text = "-";
-			QApplication::style()->drawControl(QStyle::CE_PushButton, &button_style_option, painter);
-			painter->restore();
+			node->m_painter(painter, option);
 			return;
 		}
 		QVariant data = index.data();
