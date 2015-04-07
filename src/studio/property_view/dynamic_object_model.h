@@ -24,7 +24,7 @@ class DynamicObjectModel : public QAbstractItemModel
 		class Node
 		{
 			public:
-				Node(QString name, Node* parent, int index) : m_name(name), m_parent(parent), m_index(index) {}
+				Node(QString name, Node* parent, int index) : m_name(name), m_parent(parent), m_index(index), m_is_file(false) {}
 				~Node();
 
 				Node& addChild(QString name)
@@ -43,12 +43,13 @@ class DynamicObjectModel : public QAbstractItemModel
 
 				std::function<QVariant()> m_getter;
 				std::function<void(const QVariant&)> m_setter;
-				std::function<void(QWidget*, QPoint)> m_adder;
-				std::function<void(QPainter*, const QStyleOptionViewItem&)> m_painter;
+				std::function<void(QWidget*, QPoint)> onClick;
+				std::function<void(QPainter*, const QStyleOptionViewItem&)> onPaint;
 				int m_index;
 				QString m_name;
 				Node* m_parent;
 				QList<Node*> m_children;
+				bool m_is_file;
 		};
 
 		typedef char yes[2];

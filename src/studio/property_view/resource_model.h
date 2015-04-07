@@ -25,6 +25,8 @@ class ResourceModel : public DynamicObjectModel
 		void fillMaterialInfo();
 		void fillTextureInfo();
 		void saveMaterial(Lumix::Material* material);
+		void showFileDialog(DynamicObjectModel::Node* node, QString filter);
+		void setMaterialShader(Lumix::Material* material, QString value);
 
 	private:
 		Lumix::Resource* m_resource;
