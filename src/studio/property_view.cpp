@@ -52,32 +52,7 @@ void PropertyView::setModel(QAbstractItemModel* model, QAbstractItemDelegate* de
 void PropertyView::setWorldEditor(Lumix::WorldEditor& editor)
 {
 	m_world_editor = &editor;
-	m_world_editor->universeDestroyed().bind<PropertyView, &PropertyView::onUniverseDestroyed>(this);
-	m_world_editor->universeCreated().bind<PropertyView, &PropertyView::onUniverseCreated>(this);
-	m_world_editor->getUniverse()->entityDestroyed().bind<PropertyView, &PropertyView::onEntityDestroyed>(this);
 	m_world_editor->entitySelected().bind<PropertyView, &PropertyView::onEntitySelected>(this);
-}
-
-
-void PropertyView::onEntityDestroyed(const Lumix::Entity& entity)
-{
-	if (m_selected_entity == entity)
-	{
-		setModel(NULL, NULL);
-	}
-}
-
-
-void PropertyView::onUniverseCreated()
-{
-	m_world_editor->getUniverse()->entityDestroyed().bind<PropertyView, &PropertyView::onEntityDestroyed>(this);
-}
-
-
-void PropertyView::onUniverseDestroyed()
-{
-	m_world_editor->getUniverse()->entityDestroyed().unbind<PropertyView, &PropertyView::onEntityDestroyed>(this);
-	setModel(NULL, NULL);
 }
 
 
@@ -123,7 +98,7 @@ void PropertyView::setSelectedResource(Lumix::Resource* resource)
 {
 	if (resource)
 	{
-		setModel(new ResourceModel(resource), NULL);
+		setModel(new ResourceModel(*m_world_editor, resource), new DynamicObjectItemDelegate(this));
 	}
 }
 

@@ -545,8 +545,9 @@ class SetPropertyCommand : public IEditorCommand
 		}
 
 
-		SetPropertyCommand(WorldEditor& editor, const Component& component, const IPropertyDescriptor& property_descriptor, const void* data, int size)
-			: m_component(component)
+		SetPropertyCommand(WorldEditor& editor, const Entity& entity, uint32_t component_type, const IPropertyDescriptor& property_descriptor, const void* data, int size)
+			: m_component_type(component_type)
+			, m_entity(entity)
 			, m_property_descriptor(&property_descriptor)
 			, m_editor(editor)
 			, m_new_value(editor.getAllocator())
@@ -554,12 +555,14 @@ class SetPropertyCommand : public IEditorCommand
 		{
 			m_index = -1;
 			m_new_value.write(data, size);
+			Component component = m_editor.getComponent(entity, component_type);
 			m_property_descriptor->get(component, m_old_value);
 		}
 
 
-		SetPropertyCommand(WorldEditor& editor, const Component& component, int index, const IPropertyDescriptor& property_descriptor, const void* data, int size)
-			: m_component(component)
+		SetPropertyCommand(WorldEditor& editor, const Entity& entity, uint32_t component_type, int index, const IPropertyDescriptor& property_descriptor, const void* data, int size)
+			: m_component_type(component_type)
+			, m_entity(entity)
 			, m_property_descriptor(&property_descriptor)
 			, m_editor(editor)
 			, m_new_value(editor.getAllocator())
@@ -567,6 +570,7 @@ class SetPropertyCommand : public IEditorCommand
 		{
 			m_index = index;
 			m_new_value.write(data, size);
+			Component component = m_editor.getComponent(entity, component_type);
 			m_property_descriptor->get(component, m_index, m_old_value);
 		}
 
@@ -574,9 +578,8 @@ class SetPropertyCommand : public IEditorCommand
 		virtual void serialize(JsonSerializer& serializer) override
 		{
 			serializer.serialize("index", m_index);
-			serializer.serialize("entity_index", m_component.entity.index);
-			serializer.serialize("component_index", m_component.index);
-			serializer.serialize("component_type", m_component.type);
+			serializer.serialize("entity_index", m_entity.index);
+			serializer.serialize("component_type", m_component_type);
 			serializer.beginArray("data");
 			for (int i = 0; i < m_new_value.getSize(); ++i)
 			{
@@ -590,11 +593,9 @@ class SetPropertyCommand : public IEditorCommand
 		virtual void deserialize(JsonSerializer& serializer) override
 		{
 			serializer.deserialize("index", m_index, 0);
-			serializer.deserialize("entity_index", m_component.entity.index, 0);
-			serializer.deserialize("component_index", m_component.index, 0);
-			serializer.deserialize("component_type", m_component.type, 0);
-			m_component.entity.universe = m_editor.getUniverse();
-			m_component.scene = m_editor.getEngine().getSceneByComponentType(m_component.type);
+			serializer.deserialize("entity_index", m_entity.index, 0);
+			serializer.deserialize("component_type", m_component_type, 0);
+			m_entity.universe = m_editor.getUniverse();
 			serializer.deserializeArrayBegin("data");
 			m_new_value.clear();
 			while (!serializer.isArrayEnd())
@@ -606,7 +607,7 @@ class SetPropertyCommand : public IEditorCommand
 			serializer.deserializeArrayEnd();
 			uint32_t property_name_hash;
 			serializer.deserialize("property_name_hash", property_name_hash, 0);
-			m_property_descriptor = &m_editor.getPropertyDescriptor(m_component.type, property_name_hash);
+			m_property_descriptor = &m_editor.getPropertyDescriptor(m_component_type, property_name_hash);
 		}
 
 
@@ -635,7 +636,7 @@ class SetPropertyCommand : public IEditorCommand
 		{
 			ASSERT(command.getType() == getType());
 			SetPropertyCommand& src = static_cast<SetPropertyCommand&>(command);
-			if (m_component == src.m_component && &src.m_property_descriptor == &m_property_descriptor && m_index == src.m_index)
+			if (m_component_type == src.m_component_type && m_entity == src.m_entity && &src.m_property_descriptor == &m_property_descriptor && m_index == src.m_index)
 			{
 				src.m_new_value = m_new_value;
 				return true;
@@ -646,7 +647,8 @@ class SetPropertyCommand : public IEditorCommand
 
 		void set(InputBlob& stream)
 		{
-			uint32_t template_hash = m_editor.getEntityTemplateSystem().getTemplate(m_component.entity);
+			Component component = m_editor.getComponent(m_entity, m_component_type);
+			uint32_t template_hash = m_editor.getEntityTemplateSystem().getTemplate(m_entity);
 			if (template_hash)
 			{
 				const Array<Entity>& entities = m_editor.getEntityTemplateSystem().getInstances(template_hash);
@@ -656,7 +658,7 @@ class SetPropertyCommand : public IEditorCommand
 					const WorldEditor::ComponentList& cmps = m_editor.getComponents(entities[i]);
 					for (int j = 0, cj = cmps.size(); j < cj; ++j)
 					{
-						if (cmps[j].type == m_component.type)
+						if (cmps[j].type == m_component_type)
 						{
 							if(m_index >= 0)
 							{
@@ -675,20 +677,21 @@ class SetPropertyCommand : public IEditorCommand
 			{
 				if(m_index >= 0)
 				{
-					m_property_descriptor->set(m_component, m_index, stream);
+					m_property_descriptor->set(component, m_index, stream);
 				}
 				else
 				{
-					m_property_descriptor->set(m_component, stream);
+					m_property_descriptor->set(component, stream);
 				}
 			}
-			m_editor.propertySet().invoke(m_component, *m_property_descriptor);
+			m_editor.propertySet().invoke(component, *m_property_descriptor);
 		}
 
 
 	private:
 		WorldEditor& m_editor;
-		Component m_component;
+		uint32_t m_component_type;
+		Entity m_entity;
 		OutputBlob m_new_value;
 		OutputBlob m_old_value;
 		int m_index;
@@ -1136,6 +1139,7 @@ struct WorldEditorImpl : public WorldEditor
 				AddEntityCommand(WorldEditor& editor)
 					: m_editor(static_cast<WorldEditorImpl&>(editor))
 				{
+					m_entity = Entity::INVALID;
 				}
 
 
@@ -1148,7 +1152,14 @@ struct WorldEditorImpl : public WorldEditor
 
 				virtual void execute() override
 				{
-					m_entity = m_editor.getUniverse()->createEntity();
+					if (!m_entity.isValid())
+					{
+						m_entity = m_editor.getUniverse()->createEntity();
+					}
+					else
+					{
+						m_editor.getUniverse()->createEntity(m_entity);
+					}
 					m_entity.setPosition(m_position);
 					m_editor.selectEntities(&m_entity, 1);
 				}
@@ -1700,6 +1711,21 @@ struct WorldEditorImpl : public WorldEditor
 			{
 				EditorIcon* er = m_allocator.newObject<EditorIcon>(*m_engine, *static_cast<RenderScene*>(getComponent(m_camera, CAMERA_HASH).scene), entity);
 				m_editor_icons.push(er);
+			}
+		}
+
+
+		virtual void setEntitiesRotations(const Array<Entity>& entities, const Array<Quat>& rotations) override
+		{
+			if (!entities.empty())
+			{
+				Array<Vec3> positions(m_allocator);
+				for (int i = 0; i < entities.size(); ++i)
+				{
+					positions.push(entities[i].getPosition());
+				}
+				IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(*this, entities, positions, rotations, m_allocator);
+				executeCommand(command);
 			}
 		}
 
@@ -2312,7 +2338,7 @@ struct WorldEditorImpl : public WorldEditor
 				Component cmp = getComponent(m_selected_entities[0], component_hash);
 				if (cmp.isValid())
 				{
-					IEditorCommand* command = m_allocator.newObject<SetPropertyCommand>(*this, cmp, index, property, data, size);
+					IEditorCommand* command = m_allocator.newObject<SetPropertyCommand>(*this, cmp.entity, cmp.type, index, property, data, size);
 					executeCommand(command);
 				}
 			}

@@ -34,10 +34,17 @@ class DynamicObjectModel : public QAbstractItemModel
 					return *child;
 				}
 
+				Node& addChild(QString name, int row)
+				{
+					Node* child = new Node(name, this, m_children.size());
+					m_children.insert(row, child);
+					return *child;
+				}
+
 				std::function<QVariant()> m_getter;
 				std::function<void(const QVariant&)> m_setter;
 				std::function<void(QWidget*, QPoint)> m_adder;
-				std::function<void()> m_remover;
+				std::function<void(QPainter*, const QStyleOptionViewItem&)> m_painter;
 				int m_index;
 				QString m_name;
 				Node* m_parent;
@@ -164,6 +171,8 @@ class DynamicObjectModel : public QAbstractItemModel
 
 					return Array<Getter, Namer>(m_instance, count, &node, getter, namer);
 				}
+
+				Node& getNode() { return *m_node; }
 
 			private:
 				T* m_instance;

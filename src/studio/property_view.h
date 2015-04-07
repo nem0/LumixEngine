@@ -41,9 +41,6 @@ class PropertyView : public QDockWidget
 	private:
 		void setSelectedResourceFilename(const char* filename);
 		void setSelectedResource(Lumix::Resource* resource);
-		void onEntityDestroyed(const Lumix::Entity& entity);
-		void onUniverseDestroyed();
-		void onUniverseCreated();
 		void onEntitySelected(const Lumix::Array<Lumix::Entity>& e);
 
 	public:

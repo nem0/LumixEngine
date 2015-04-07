@@ -15,6 +15,12 @@ struct Matrix;
 
 struct LUMIX_CORE_API Quat
 {
+	struct AxisAngle
+	{
+		Vec3 axis;
+		float angle;
+	};
+
 	Quat() {}
 	Quat(const Vec3& axis, float angle);
 	Quat(float _x, float _y, float _z, float _w) { x = _x; y = _y; z = _z; w = _w; } 
@@ -22,12 +28,13 @@ struct LUMIX_CORE_API Quat
 
 	float x, y, z, w;
 
+	AxisAngle getAxisAngle() const;
 	void set(float _x, float _y, float _z, float _w) { x = _x; y = _y; z = _z; w = _w; } 
 	void conjugate();
 	void conjugated(Quat& q);
 	void normalize();
 	void toMatrix(Matrix& mtx) const;
-	
+
 	inline Vec3 operator *(const Vec3& v) const;
 	inline Quat operator *(const Quat& q) const;
 	Quat operator -() const;

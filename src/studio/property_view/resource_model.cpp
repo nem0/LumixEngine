@@ -1,11 +1,19 @@
 #include "resource_model.h"
+#include "core/FS/file_system.h"
+#include "core/json_serializer.h"
+#include "editor/world_editor.h"
+#include "engine/engine.h"
 #include "graphics/material.h"
 #include "graphics/model.h"
 #include "graphics/texture.h"
+#include <qapplication.h>
+#include "qfile.h"
+#include <qpainter.h>
 
 
-ResourceModel::ResourceModel(Lumix::Resource* resource)
+ResourceModel::ResourceModel(Lumix::WorldEditor& editor, Lumix::Resource* resource)
 	: m_resource(resource)
+	, m_editor(editor)
 {
 	m_resource->getObserverCb().bind<ResourceModel, &ResourceModel::onResourceLoaded>(this);
 	if (resource->isReady())
@@ -47,10 +55,44 @@ static Lumix::Material::Uniform* getMaterialUniform(Lumix::Material* material, Q
 }
 
 
+void ResourceModel::saveMaterial(Lumix::Material* material)
+{
+	Lumix::FS::FileSystem& fs = m_editor.getEngine().getFileSystem();
+	// use temporary because otherwise the material is reloaded during saving
+	char tmp_path[LUMIX_MAX_PATH];
+	strcpy(tmp_path, material->getPath().c_str());
+	strcat(tmp_path, ".tmp");
+	Lumix::FS::IFile* file = fs.open(fs.getDefaultDevice(), tmp_path, Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE);
+	if (file)
+	{
+		Lumix::DefaultAllocator allocator;
+		Lumix::JsonSerializer serializer(*file, Lumix::JsonSerializer::AccessMode::WRITE, material->getPath().c_str(), allocator);
+		material->save(serializer);
+		fs.close(file);
+
+		QFile::remove(material->getPath().c_str());
+		QFile::rename(tmp_path, material->getPath().c_str());
+	}
+	else
+	{
+		Lumix::g_log_error.log("Material manager") << "Could not save file " << material->getPath().c_str();
+	}
+}
+
+
 void ResourceModel::fillMaterialInfo()
 {
 	Lumix::Material* material = static_cast<Lumix::Material*>(m_resource);
 	auto object = this->object("Material", material);
+	object.getNode().m_adder = [this, material](QWidget*, QPoint) { saveMaterial(material); };
+	object.getNode().m_painter = [](QPainter* painter, const QStyleOptionViewItem& option) {
+		painter->save();
+		QStyleOptionButton button_style_option;
+		button_style_option.rect = option.rect;
+		button_style_option.text = "Save";
+		QApplication::style()->drawControl(QStyle::CE_PushButton, &button_style_option, painter);
+		painter->restore();
+	};
 	object
 		.property("Alpha cutout", &Lumix::Material::isAlphaCutout, &Lumix::Material::enableAlphaCutout)
 		.property("Alpha to coverage", &Lumix::Material::isAlphaToCoverage, &Lumix::Material::enableAlphaToCoverage)
