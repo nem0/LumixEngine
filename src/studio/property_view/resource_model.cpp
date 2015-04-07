@@ -34,6 +34,12 @@ ResourceModel::ResourceModel(Lumix::WorldEditor& editor, const Lumix::Path& path
 	{
 		m_resource_type = Lumix::ResourceManager::TEXTURE;
 	}
+	else
+	{
+		m_resource_type = 0;
+		m_resource = NULL;
+		return;
+	}
 
 	Lumix::ResourceManagerBase* manager = m_editor.getEngine().getResourceManager().get(m_resource_type);
 	m_resource = manager->load(Lumix::Path(rel_path));

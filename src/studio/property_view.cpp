@@ -66,7 +66,11 @@ void PropertyView::setAssetBrowser(AssetBrowser& asset_browser)
 void PropertyView::setSelectedResourceFilename(const char* filename)
 {
 	m_world_editor->selectEntities(NULL, 0);
-	setModel(new ResourceModel(*m_world_editor, Lumix::Path(filename)), new DynamicObjectItemDelegate(this));
+	ResourceModel* model = new ResourceModel(*m_world_editor, Lumix::Path(filename));
+	if (model->getResource())
+	{
+		setModel(model, new DynamicObjectItemDelegate(this));
+	}
 }
 
 

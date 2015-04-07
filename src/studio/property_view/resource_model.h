@@ -19,6 +19,8 @@ class ResourceModel : public DynamicObjectModel
 		ResourceModel(Lumix::WorldEditor& editor, const Lumix::Path& path);
 		~ResourceModel();
 
+		Lumix::Resource* getResource() { return m_resource; }
+
 	private:
 		void onResourceLoaded(Lumix::Resource::State, Lumix::Resource::State new_state);
 		void fillModelInfo();
