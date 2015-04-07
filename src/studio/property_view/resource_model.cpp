@@ -1,6 +1,9 @@
 #include "resource_model.h"
 #include "core/FS/file_system.h"
 #include "core/json_serializer.h"
+#include "core/path_utils.h"
+#include "core/resource_manager.h"
+#include "core/resource_manager_base.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "graphics/material.h"
@@ -12,12 +15,32 @@
 #include <qpainter.h>
 
 
-ResourceModel::ResourceModel(Lumix::WorldEditor& editor, Lumix::Resource* resource)
-	: m_resource(resource)
-	, m_editor(editor)
+ResourceModel::ResourceModel(Lumix::WorldEditor& editor, const Lumix::Path& path)
+	: m_editor(editor)
 {
+	char rel_path[LUMIX_MAX_PATH];
+	m_editor.getRelativePath(rel_path, LUMIX_MAX_PATH, path);
+	char extension[10];
+	Lumix::PathUtils::getExtension(extension, sizeof(extension), path);
+	if (strcmp(extension, "msh") == 0)
+	{
+		m_resource_type = Lumix::ResourceManager::MODEL;
+	}
+	else if (strcmp(extension, "mat") == 0)
+	{
+		m_resource_type = Lumix::ResourceManager::MATERIAL;
+	}
+	else if (strcmp(extension, "dds") == 0 || strcmp(extension, "tga") == 0)
+	{
+		m_resource_type = Lumix::ResourceManager::TEXTURE;
+	}
+
+	Lumix::ResourceManagerBase* manager = m_editor.getEngine().getResourceManager().get(m_resource_type);
+	m_resource = manager->load(Lumix::Path(rel_path));
+	ASSERT(m_resource);
+
 	m_resource->getObserverCb().bind<ResourceModel, &ResourceModel::onResourceLoaded>(this);
-	if (resource->isReady())
+	if (m_resource->isReady())
 	{
 		onResourceLoaded(Lumix::Resource::State::READY, Lumix::Resource::State::READY);
 	}
@@ -26,6 +49,8 @@ ResourceModel::ResourceModel(Lumix::WorldEditor& editor, Lumix::Resource* resour
 
 ResourceModel::~ResourceModel()
 {
+	ASSERT(m_resource);
+	m_resource->getResourceManager().get(m_resource_type)->unload(*m_resource);
 	m_resource->getObserverCb().unbind<ResourceModel, &ResourceModel::onResourceLoaded>(this);
 }
 

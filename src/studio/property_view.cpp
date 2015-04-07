@@ -65,47 +65,13 @@ void PropertyView::setAssetBrowser(AssetBrowser& asset_browser)
 
 void PropertyView::setSelectedResourceFilename(const char* filename)
 {
-	char rel_path[LUMIX_MAX_PATH];
-	m_world_editor->getRelativePath(rel_path, LUMIX_MAX_PATH, Lumix::Path(filename));
-	Lumix::ResourceManagerBase* manager = NULL;
-	char extension[10];
-	Lumix::PathUtils::getExtension(extension, sizeof(extension), filename);
-	if (strcmp(extension, "msh") == 0)
-	{
-		manager = m_world_editor->getEngine().getResourceManager().get(Lumix::ResourceManager::MODEL);
-	}
-	else if (strcmp(extension, "mat") == 0)
-	{
-		manager = m_world_editor->getEngine().getResourceManager().get(Lumix::ResourceManager::MATERIAL);
-	}
-	else if (strcmp(extension, "dds") == 0 || strcmp(extension, "tga") == 0)
-	{
-		manager = m_world_editor->getEngine().getResourceManager().get(Lumix::ResourceManager::TEXTURE);
-	}
-
-	if (manager != NULL)
-	{
-		setSelectedResource(manager->load(Lumix::Path(rel_path)));
-	}
-	else
-	{
-		setSelectedResource(NULL);
-	}
-}
-
-
-void PropertyView::setSelectedResource(Lumix::Resource* resource)
-{
-	if (resource)
-	{
-		setModel(new ResourceModel(*m_world_editor, resource), new DynamicObjectItemDelegate(this));
-	}
+	m_world_editor->selectEntities(NULL, 0);
+	setModel(new ResourceModel(*m_world_editor, Lumix::Path(filename)), new DynamicObjectItemDelegate(this));
 }
 
 
 void PropertyView::onEntitySelected(const Lumix::Array<Lumix::Entity>& e)
 {
-	setSelectedResource(NULL);
 	m_selected_entity = e.empty() ? Lumix::Entity::INVALID : e[0];
 	if (e.size() == 1 && e[0].isValid())
 	{

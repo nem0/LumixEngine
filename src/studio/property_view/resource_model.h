@@ -16,7 +16,7 @@ namespace Lumix
 class ResourceModel : public DynamicObjectModel
 {
 	public:
-		explicit ResourceModel(Lumix::WorldEditor& editor, Lumix::Resource* resource);
+		ResourceModel(Lumix::WorldEditor& editor, const Lumix::Path& path);
 		~ResourceModel();
 
 	private:
@@ -31,4 +31,5 @@ class ResourceModel : public DynamicObjectModel
 	private:
 		Lumix::Resource* m_resource;
 		Lumix::WorldEditor& m_editor;
+		uint32_t m_resource_type;
 };
