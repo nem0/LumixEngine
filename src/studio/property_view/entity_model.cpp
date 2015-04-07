@@ -41,8 +41,8 @@ EntityModel::EntityModel(Lumix::WorldEditor& editor, Lumix::Entity entity)
 {
 	m_entity = entity;
 	getRoot().m_name = "Entity";
-	getRoot().m_adder = [this](QWidget* widget, QPoint pos) { addComponent(widget, pos); };
-	getRoot().m_painter = [](QPainter* painter, const QStyleOptionViewItem& option) {
+	getRoot().onClick = [this](QWidget* widget, QPoint pos) { addComponent(widget, pos); };
+	getRoot().onPaint = [](QPainter* painter, const QStyleOptionViewItem& option) {
 		painter->save();
 		QStyleOptionButton button_style_option;
 		button_style_option.rect = option.rect;
@@ -77,7 +77,7 @@ void EntityModel::reset(const QString& reason)
 		delete getRoot().m_children[i];
 		getRoot().m_children.clear();
 		getRoot().m_getter = [reason]() -> QVariant { return reason; };
-		getRoot().m_adder = (void(*)(QWidget*, QPoint))NULL;
+		getRoot().onClick = (void(*)(QWidget*, QPoint))NULL;
 	}
 	endResetModel();
 }
@@ -271,8 +271,8 @@ void EntityModel::addComponentNode(Lumix::Component cmp, int component_index)
 {
 	Node& node = getRoot().addChild(getComponentName(cmp), component_index + 3);
 	node.m_getter = []() -> QVariant { return ""; };
-	node.m_adder = [this, cmp](QWidget*, QPoint) { m_editor.destroyComponent(cmp); };
-	node.m_painter = [](QPainter* painter, const QStyleOptionViewItem& option) {
+	node.onClick = [this, cmp](QWidget*, QPoint) { m_editor.destroyComponent(cmp); };
+	node.onPaint = [](QPainter* painter, const QStyleOptionViewItem& option) {
 		painter->save();
 		QStyleOptionButton button_style_option;
 		button_style_option.rect = option.rect;

@@ -1,5 +1,6 @@
 #include "dynamic_object_model.h"
 #include "core/vec4.h"
+#include "property_view/file_edit.h"
 #include <qapplication.h>
 #include <qcolordialog.h>
 #include <qevent.h>
@@ -32,11 +33,11 @@ bool DynamicObjectItemDelegate::editorEvent(QEvent* event, QAbstractItemModel* m
 		{
 			return false;
 		}
-		if (node->m_adder)
+		if (node->onClick)
 		{
 			QWidget* widget = qobject_cast<QWidget*>(parent());
 			QPoint pos = widget->mapToGlobal(QPoint(static_cast<QMouseEvent*>(event)->x(), static_cast<QMouseEvent*>(event)->y()));
-			node->m_adder(widget, pos);
+			node->onClick(widget, pos);
 			return true;
 		}
 		if (index.data().type() == QMetaType::QColor)
@@ -79,9 +80,9 @@ void DynamicObjectItemDelegate::paint(QPainter* painter, const QStyleOptionViewI
 			QStyledItemDelegate::paint(painter, option, index);
 			return;
 		}
-		if (node->m_adder)
+		if (node->onPaint)
 		{
-			node->m_painter(painter, option);
+			node->onPaint(painter, option);
 			return;
 		}
 		QVariant data = index.data();

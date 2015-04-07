@@ -218,6 +218,7 @@
     <ClCompile Include="..\..\..\src\studio\property_view.cpp" />
     <ClCompile Include="..\..\..\src\studio\property_view\dynamic_object_model.cpp" />
     <ClCompile Include="..\..\..\src\studio\property_view\entity_model.cpp" />
+    <ClCompile Include="..\..\..\src\studio\property_view\file_edit.cpp" />
     <ClCompile Include="..\..\..\src\studio\property_view\resource_model.cpp" />
     <ClCompile Include="..\..\..\src\studio\sceneview.cpp" />
     <ClCompile Include="..\..\..\src\studio\scripts\scriptcompiler.cpp" />

@@ -7,7 +7,8 @@
 #include "graphics/model.h"
 #include "graphics/texture.h"
 #include <qapplication.h>
-#include "qfile.h"
+#include <qfile.h>
+#include <qfiledialog.h>
 #include <qpainter.h>
 
 
@@ -80,12 +81,31 @@ void ResourceModel::saveMaterial(Lumix::Material* material)
 }
 
 
+void ResourceModel::showFileDialog(DynamicObjectModel::Node* node, QString filter)
+{
+	auto fileName = QFileDialog::getOpenFileName(NULL, "Select file", "", filter);
+	if (!fileName.isEmpty())
+	{
+		node->m_setter(fileName);
+	}
+}
+
+
+void ResourceModel::setMaterialShader(Lumix::Material* material, QString value)
+{
+	char rel_path[LUMIX_MAX_PATH];
+	m_editor.getRelativePath(rel_path, LUMIX_MAX_PATH, Lumix::Path(value.toLatin1().data()));
+	Lumix::StackAllocator<LUMIX_MAX_PATH> allocator;
+	material->setShader(Lumix::Path(rel_path));
+}
+
+
 void ResourceModel::fillMaterialInfo()
 {
 	Lumix::Material* material = static_cast<Lumix::Material*>(m_resource);
 	auto object = this->object("Material", material);
-	object.getNode().m_adder = [this, material](QWidget*, QPoint) { saveMaterial(material); };
-	object.getNode().m_painter = [](QPainter* painter, const QStyleOptionViewItem& option) {
+	object.getNode().onClick = [this, material](QWidget*, QPoint) { saveMaterial(material); };
+	object.getNode().onPaint = [](QPainter* painter, const QStyleOptionViewItem& option) {
 		painter->save();
 		QStyleOptionButton button_style_option;
 		button_style_option.rect = option.rect;
@@ -99,12 +119,18 @@ void ResourceModel::fillMaterialInfo()
 		.property("Backface culling", &Lumix::Material::isBackfaceCulling, &Lumix::Material::enableBackfaceCulling)
 		.property("Shadow receiver", &Lumix::Material::isShadowReceiver, &Lumix::Material::enableShadowReceiving)
 		.property("Z test", &Lumix::Material::isZTest, &Lumix::Material::enableZTest)
-		.property("Shader", [](Lumix::Material* material) -> const char* { return material->getShader()->getPath().c_str(); });
+		.property("Shader", 
+			[](Lumix::Material* material) -> QVariant { return material->getShader()->getPath().c_str(); },
+			[this](Lumix::Material* material, QVariant value) { setMaterialShader(material, value.toString()); }
+		);
+	auto shader_node = object.getNode().m_children.back();
+	object.getNode().m_children.back()->onClick = [shader_node, this](QWidget*, QPoint) { showFileDialog(shader_node, "Shaders (*.shd)"); };
+
 	object
 		.array("Textures", material->getTextureCount(), &Lumix::Material::getTexture, [](Lumix::Texture* texture) -> const char* { return texture->getPath().c_str(); })
-		.property("Width", &Lumix::Texture::getWidth)
-		.property("Height", &Lumix::Texture::getHeight)
-		.property("Bytes per pixel", &Lumix::Texture::getBytesPerPixel);
+			.property("Width", &Lumix::Texture::getWidth)
+			.property("Height", &Lumix::Texture::getHeight)
+			.property("Bytes per pixel", &Lumix::Texture::getBytesPerPixel);
 	for (int i = 0; i < material->getUniformCount(); ++i)
 	{
 		auto& uniform = material->getUniform(i);
@@ -157,6 +183,11 @@ void ResourceModel::onResourceLoaded(Lumix::Resource::State, Lumix::Resource::St
 	if (new_state == Lumix::Resource::State::READY)
 	{
 		beginResetModel();
+		for (int i = 0; i < getRoot().m_children.size(); ++i)
+		{
+			delete getRoot().m_children[i];
+		}
+		getRoot().m_children.clear();
 		if (dynamic_cast<Lumix::Model*>(m_resource))
 		{
 			fillModelInfo();
