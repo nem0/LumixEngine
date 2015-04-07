@@ -260,6 +260,7 @@ namespace Lumix
 		float m_range;
 		Entity m_entity;
 		int m_uid;
+		float m_fov;
 	};
 
 
@@ -501,6 +502,7 @@ namespace Lumix
 					serializer.write(point_light.m_intensity);
 					serializer.write(point_light.m_entity.index);
 					serializer.write(point_light.m_range);
+					serializer.write(point_light.m_fov);
 				}
 				serializer.write(m_point_light_last_uid);
 
@@ -639,6 +641,7 @@ namespace Lumix
 					serializer.read(light.m_intensity);
 					serializer.read(light.m_entity.index);
 					serializer.read(light.m_range);
+					serializer.read(light.m_fov);
 					light.m_entity.universe = &m_universe;
 					m_universe.addComponent(light.m_entity, POINT_LIGHT_HASH, this, light.m_uid);
 				}
@@ -1991,6 +1994,18 @@ namespace Lumix
 			}
 
 
+			virtual float getLightFOV(Component cmp) override
+			{
+				return m_point_lights[getPointLightIndex(cmp.index)].m_fov;
+			}
+
+
+			virtual void setLightFOV(Component cmp, float fov) override
+			{
+				m_point_lights[getPointLightIndex(cmp.index)].m_fov = fov;
+			}
+			
+
 			Component createPointLight(const Entity& entity)
 			{
 				PointLight& light = m_point_lights.pushEmpty();
@@ -2000,6 +2015,7 @@ namespace Lumix
 				light.m_intensity = 1;
 				light.m_range = 10;
 				light.m_uid = ++m_point_light_last_uid;
+				light.m_fov = FLT_MAX;
 
 				Component cmp = m_universe.addComponent(entity, POINT_LIGHT_HASH, this, light.m_uid);
 				m_universe.componentCreated().invoke(cmp);

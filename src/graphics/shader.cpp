@@ -186,6 +186,7 @@ void Shader::createCombination(const char* defines)
 			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::SHADOW_MATRIX3] = glGetUniformLocation(combination->m_program_id, "shadowmap_matrix3");
 			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::LIGHT_POSITION] = glGetUniformLocation(combination->m_program_id, "light_pos");
 			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::LIGHT_RANGE] = glGetUniformLocation(combination->m_program_id, "light_range");
+			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::LIGHT_FOV] = glGetUniformLocation(combination->m_program_id, "light_fov");
 		}
 	}
 }

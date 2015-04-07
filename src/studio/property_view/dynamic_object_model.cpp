@@ -119,6 +119,8 @@ QWidget* DynamicObjectItemDelegate::createEditor(QWidget* parent, const QStyleOp
 		else if (node->m_getter().type() == QMetaType::Float)
 		{
 			QDoubleSpinBox* input = new QDoubleSpinBox(parent);
+			input->setMaximum(FLT_MAX);
+			input->setMinimum(-FLT_MAX);
 			return input;
 		}
 	}
