@@ -742,6 +742,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::LIGHT_POSITION, light_cmp.entity.getPosition());
 				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::LIGHT_RANGE, m_scene->getLightRange(light_cmp));
 				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::LIGHT_FOV, m_scene->getLightFOV(light_cmp));
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::LIGHT_DIR, light_cmp.entity.getRotation() * Vec3(0, 0, 1));
 			}
 			else
 			{
