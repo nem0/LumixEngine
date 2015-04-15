@@ -865,7 +865,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		const Material& material = *mesh->getMaterial();
 		Shader* shader = material.getShader();
 		uint32_t pass_hash = getRenderer().getPass();
-		if (!shader->hasPass(pass_hash) || !material.isReady())
+		if (!material.isReady() || !shader->hasPass(pass_hash))
 		{
 			return false;
 		}
