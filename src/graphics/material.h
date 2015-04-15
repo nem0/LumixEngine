@@ -69,6 +69,8 @@ public:
 	void enableAlphaCutout(bool enable) { m_is_alpha_cutout = enable; updateShaderCombination(); }
 	bool isShadowReceiver() const { return m_is_shadow_receiver; }
 	void enableShadowReceiving(bool enable) { m_is_shadow_receiver = enable; updateShaderCombination(); }
+	bool isNormalMapping() const { return m_is_normal_mapping; }
+	void enableNormalMapping(bool enable) { m_is_normal_mapping = enable; updateShaderCombination(); }
 
 	void setShader(Shader* shader);
 	void setShader(const Path& path);
@@ -95,6 +97,7 @@ public:
 		, m_is_alpha_cutout(false)
 		, m_shader_combination(0)
 		, m_is_shadow_receiver(true)
+		, m_is_normal_mapping(false)
 		, m_textures(allocator)
 		, m_uniforms(allocator)
 		, m_allocator(allocator)
@@ -139,6 +142,7 @@ private:
 	bool m_is_alpha_to_coverage;
 	bool m_is_alpha_cutout;
 	bool m_is_shadow_receiver;
+	bool m_is_normal_mapping;
 	DepthFunc m_depth_func;
 	uint32_t m_shader_combination;
 	IAllocator& m_allocator;
