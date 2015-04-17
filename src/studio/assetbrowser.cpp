@@ -372,7 +372,10 @@ void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
 {
 	QMenu *menu = new QMenu("Item actions",NULL);
 	const QModelIndex& index = m_ui->treeView->indexAt(pos);
-	const QFileInfo& file_info = index.model() == m_model ? m_model->fileInfo(index) : m_flat_filtered_model->fileInfo(index);
+	QFileInfo root_info(QDir::currentPath());
+	const QFileInfo& file_info = index.isValid() 
+		? index.model() == m_model ? m_model->fileInfo(index) : m_flat_filtered_model->fileInfo(index)
+		: root_info;
 	QAction* selected_action = NULL;
 	QAction* delete_file_action = new QAction("Delete", menu);
 	menu->addAction(delete_file_action);
