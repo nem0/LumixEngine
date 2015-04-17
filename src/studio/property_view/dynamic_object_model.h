@@ -10,6 +10,8 @@ class DynamicObjectItemDelegate : public QStyledItemDelegate
 {
 public:
 	DynamicObjectItemDelegate(QWidget* parent);
+	
+	void setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const override;
 	void setEditorData(QWidget* editor, const QModelIndex& index) const override;
 	bool editorEvent(QEvent* event, QAbstractItemModel* model, const QStyleOptionViewItem&, const QModelIndex& index) override;
 	void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
@@ -45,6 +47,9 @@ class DynamicObjectModel : public QAbstractItemModel
 				std::function<void(const QVariant&)> m_setter;
 				std::function<void(QWidget*, QPoint)> onClick;
 				std::function<void(QPainter*, const QStyleOptionViewItem&)> onPaint;
+				std::function<QWidget*(QWidget*, const QStyleOptionViewItem&)> onCreateEditor;
+				std::function<void(QWidget*)> onSetModelData;
+				std::function<bool(const QMimeData*, Qt::DropAction)> onDrop;
 				int m_index;
 				QString m_name;
 				Node* m_parent;
@@ -201,6 +206,9 @@ class DynamicObjectModel : public QAbstractItemModel
 		virtual bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole) override;
 		virtual Qt::ItemFlags flags(const QModelIndex& index) const override;
 		virtual QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
+		virtual Qt::DropActions supportedDropActions() const override;
+		virtual bool dropMimeData(const QMimeData* data, Qt::DropAction action, int row, int column, const QModelIndex& parent) override;
+		virtual QStringList mimeTypes() const override;
 
 		Node& getRoot() { return *m_root; }
 

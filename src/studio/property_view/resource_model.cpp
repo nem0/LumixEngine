@@ -69,8 +69,8 @@ void ResourceModel::fillModelInfo()
 		.property("Bone count", &Lumix::Model::getBoneCount)
 		.property("Bounding radius", &Lumix::Model::getBoundingRadius)
 		.array("Meshes", model->getMeshCount(), &Lumix::Model::getMeshPtr, [](const Lumix::Mesh* mesh) -> const char* { return mesh->getName(); })
-		.property("Triangles", &Lumix::Mesh::getTriangleCount)
-		.property("Material", [](const Lumix::Mesh* mesh) -> const char* { return mesh->getMaterial()->getPath().c_str(); });
+			.property("Triangles", &Lumix::Mesh::getTriangleCount)
+			.property("Material", [](const Lumix::Mesh* mesh) -> const char* { return mesh->getMaterial()->getPath().c_str(); });
 }
 
 

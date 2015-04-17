@@ -7,15 +7,18 @@
 
 namespace Lumix
 {
+	class IArrayDescriptor;
 	class IPropertyDescriptor;
 	class WorldEditor;
 }
+
+class PropertyView;
 
 
 class EntityModel : public DynamicObjectModel
 {
 	public:
-		EntityModel(Lumix::WorldEditor& editor, Lumix::Entity entity);
+		EntityModel(PropertyView& view, Lumix::WorldEditor& editor, Lumix::Entity entity);
 		~EntityModel();
 
 	private:
@@ -26,6 +29,8 @@ class EntityModel : public DynamicObjectModel
 		void onUniverseDestroyed();
 		void onEntityDestroyed(const Lumix::Entity& entity);
 
+		void addArrayProperty(Node& child, Lumix::IArrayDescriptor* desc, Lumix::Component cmp);
+		void addResourceProperty(Node& child, Lumix::IPropertyDescriptor* desc, Lumix::Component cmp);
 		void addNameProperty();
 		void addPositionProperty();
 		void addComponentNode(Lumix::Component cmp, int row);
@@ -39,5 +44,6 @@ class EntityModel : public DynamicObjectModel
 	private:
 		Lumix::WorldEditor& m_editor;
 		Lumix::Entity m_entity;
+		PropertyView& m_view;
 };
 

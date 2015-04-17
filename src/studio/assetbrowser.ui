@@ -70,12 +70,32 @@
       </item>
       <item>
        <property name="text">
+        <string>Animation</string>
+       </property>
+      </item>
+      <item>
+       <property name="text">
         <string>Mesh</string>
        </property>
       </item>
       <item>
        <property name="text">
         <string>Material</string>
+       </property>
+      </item>
+      <item>
+       <property name="text">
+        <string>Pipeline</string>
+       </property>
+      </item>
+      <item>
+       <property name="text">
+        <string>Texture</string>
+       </property>
+      </item>
+      <item>
+       <property name="text">
+        <string>Shader</string>
        </property>
       </item>
      </widget>
@@ -109,13 +129,6 @@
       <attribute name="headerVisible">
        <bool>false</bool>
       </attribute>
-     </widget>
-    </item>
-    <item>
-     <widget class="QListWidget" name="listWidget">
-      <property name="dragEnabled">
-       <bool>true</bool>
-      </property>
      </widget>
     </item>
    </layout>
