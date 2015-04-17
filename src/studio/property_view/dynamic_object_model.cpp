@@ -13,6 +13,17 @@ DynamicObjectItemDelegate::DynamicObjectItemDelegate(QWidget* parent)
 {}
 
 
+void DynamicObjectItemDelegate::setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const
+{
+	auto* node = (DynamicObjectModel::Node*)index.internalPointer();
+	if (node && node->onSetModelData)
+	{
+		node->onSetModelData(editor);
+		return;
+	}
+	QStyledItemDelegate::setModelData(editor, model, index);
+}
+
 void DynamicObjectItemDelegate::setEditorData(QWidget* editor, const QModelIndex& index) const
 {
 	if (index.column() == 1 && index.data().type() == QMetaType::Float)
@@ -123,6 +134,10 @@ QWidget* DynamicObjectItemDelegate::createEditor(QWidget* parent, const QStyleOp
 			input->setMinimum(-FLT_MAX);
 			return input;
 		}
+		else if (node->onCreateEditor)
+		{
+			return node->onCreateEditor(parent, option);
+		}
 	}
 	return QStyledItemDelegate::createEditor(parent, option, index);
 }
@@ -148,6 +163,31 @@ DynamicObjectModel::DynamicObjectModel()
 DynamicObjectModel::~DynamicObjectModel()
 {
 	delete m_root;
+}
+
+
+bool DynamicObjectModel::dropMimeData(const QMimeData* data, Qt::DropAction action, int, int, const QModelIndex& parent)
+{
+	Node* node = (Node*)parent.internalPointer();
+	if (node->onDrop)
+	{
+		return node->onDrop(data, action);
+	}
+	return false;
+}
+
+
+Qt::DropActions DynamicObjectModel::supportedDropActions() const
+{
+	return Qt::CopyAction | Qt::MoveAction;
+}
+
+
+QStringList DynamicObjectModel::mimeTypes() const
+{
+	QStringList types;
+	types << "text/uri-list";
+	return types;
 }
 
 
@@ -224,11 +264,17 @@ bool DynamicObjectModel::setData(const QModelIndex& index, const QVariant& value
 Qt::ItemFlags DynamicObjectModel::flags(const QModelIndex& index) const
 {
 	Node* node = (Node*)index.internalPointer();
+	Qt::ItemFlags flags = QAbstractItemModel::flags(index);
 	if (index.column() == 1 && node->m_setter)
 	{
-		return QAbstractItemModel::flags(index) | Qt::ItemIsEditable;
+		flags |= Qt::ItemIsEditable;
 	}
-	return QAbstractItemModel::flags(index);
+	if (index.column() == 1 && node->onDrop)
+	{
+		flags |= Qt::ItemIsDropEnabled;
+
+	}
+	return flags;
 }
 
 

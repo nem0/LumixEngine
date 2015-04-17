@@ -37,9 +37,9 @@ class PropertyView : public QDockWidget
 		void setWorldEditor(Lumix::WorldEditor& editor);
 		void setAssetBrowser(AssetBrowser& asset_browser);
 		void setModel(class QAbstractItemModel* model, class QAbstractItemDelegate* delegate);
-	
-	private:
 		void setSelectedResourceFilename(const char* filename);
+
+	private:
 		void onEntitySelected(const Lumix::Array<Lumix::Entity>& e);
 
 	public:

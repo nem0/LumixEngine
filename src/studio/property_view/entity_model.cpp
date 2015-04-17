@@ -1,10 +1,17 @@
 #include "entity_model.h"
 #include "core/math_utils.h"
+#include "core/path.h"
 #include "editor/world_editor.h"
+#include "property_view.h"
 #include <qapplication.h>
+#include <qboxlayout.h>
 #include <qcombobox.h>
+#include <qfiledialog.h>
+#include <qlineedit.h>
 #include <qmessagebox.h>
+#include <qmimedata.h>
 #include <qpainter.h>
+#include <qpushbutton.h>
 
 
 static const char* component_map[] =
@@ -36,8 +43,9 @@ static const char* getComponentName(Lumix::Component cmp)
 }
 
 
-EntityModel::EntityModel(Lumix::WorldEditor& editor, Lumix::Entity entity)
+EntityModel::EntityModel(PropertyView& view, Lumix::WorldEditor& editor, Lumix::Entity entity)
 	: m_editor(editor)
+	, m_view(view)
 {
 	m_entity = entity;
 	getRoot().m_name = "Entity";
@@ -267,6 +275,83 @@ void EntityModel::onEntityPosition(const Lumix::Entity& entity)
 }
 
 
+void EntityModel::addResourceProperty(Node& child, Lumix::IPropertyDescriptor* desc, Lumix::Component cmp)
+{
+	child.m_setter = [desc, cmp, this](const QVariant& value)
+	{
+		this->set(cmp.entity, cmp.type, -1, desc, value);
+	};
+	child.onSetModelData = [desc, cmp, this](QWidget* editor){
+		const auto& children = editor->children();
+		auto value = qobject_cast<QLineEdit*>(children[1])->text();
+		this->set(cmp.entity, cmp.type, -1, desc, value);
+	};
+	child.onDrop = [desc, cmp, this](const QMimeData* data, Qt::DropAction){
+		QList<QUrl> urls = data->urls();
+		Q_ASSERT(urls.size() < 2);
+		if (urls.size() == 1)
+		{
+			char rel_path[LUMIX_MAX_PATH];
+			Lumix::Path path(urls[0].toLocalFile().toLatin1().data());
+			m_editor.getRelativePath(rel_path, LUMIX_MAX_PATH, path);
+			this->set(cmp.entity, cmp.type, -1, desc, rel_path);
+			return true;
+		}
+		return false;
+	};
+	child.onCreateEditor = [desc, cmp, this](QWidget* parent, const QStyleOptionViewItem&) -> QWidget* {
+		QWidget* widget = new QWidget(parent);
+		QHBoxLayout* layout = new QHBoxLayout(widget);
+		QLineEdit* edit = new QLineEdit(widget);
+		layout->addWidget(edit); 
+		QPushButton* button = new QPushButton("Browse", widget);
+		connect(button, &QPushButton::clicked, [edit, parent, this](){
+			auto value = QFileDialog::getOpenFileName();
+			if (!value.isEmpty())
+			{
+				char rel_path[LUMIX_MAX_PATH];
+				Lumix::Path path(value.toLatin1().data());
+				m_editor.getRelativePath(rel_path, LUMIX_MAX_PATH, path);
+				edit->setText(rel_path);
+			}
+		});
+		layout->addWidget(button);
+		QPushButton* go_button = new QPushButton("->", widget);
+		connect(go_button, &QPushButton::clicked, [edit, this](){
+			m_view.setSelectedResourceFilename(edit->text().toLatin1().data());
+		});
+		layout->addWidget(go_button);
+		layout->setContentsMargins(0, 0, 0, 0);
+		edit->setText(this->get(cmp.entity, cmp.type, -1, desc).toString());
+		return widget;
+	};
+
+}
+
+
+void EntityModel::addArrayProperty(Node& child, Lumix::IArrayDescriptor* array_desc, Lumix::Component cmp)
+{
+	for (int k = 0; k < array_desc->getCount(cmp); ++k)
+	{
+		Node& array_item_node = child.addChild(QString("%1").arg(k));
+		array_item_node.m_getter = []() -> QVariant { return ""; };
+		for (int l = 0; l < array_desc->getChildren().size(); ++l)
+		{
+			auto* array_item_property_desc = array_desc->getChildren()[l];
+			Node& subchild = array_item_node.addChild(array_item_property_desc->getName());
+			subchild.m_getter = [k, array_item_property_desc, cmp, this]() -> QVariant
+			{
+				return this->get(cmp.entity, cmp.type, k, array_item_property_desc);
+			};
+			subchild.m_setter = [k, array_item_property_desc, cmp, this](const QVariant& value)
+			{
+				this->set(cmp.entity, cmp.type, k, array_item_property_desc, value);
+			};
+		}
+	}
+}
+
+
 void EntityModel::addComponentNode(Lumix::Component cmp, int component_index)
 {
 	Node& node = getRoot().addChild(getComponentName(cmp), component_index + 3);
@@ -293,27 +378,12 @@ void EntityModel::addComponentNode(Lumix::Component cmp, int component_index)
 		{
 			case Lumix::IPropertyDescriptor::ARRAY:
 				{
-					auto* array_desc = static_cast<Lumix::IArrayDescriptor*>(desc);
-					for (int k = 0; k < array_desc->getCount(cmp); ++k)
-					{
-						Node& array_item_node = child.addChild(QString("%1").arg(k));
-						array_item_node.m_getter = []() -> QVariant { return ""; };
-						for (int l = 0; l < array_desc->getChildren().size(); ++l)
-						{
-							auto* array_item_property_desc = array_desc->getChildren()[l];
-							Node& subchild = array_item_node.addChild(array_item_property_desc->getName());
-							subchild.m_getter = [k, array_item_property_desc, cmp, this]() -> QVariant
-							{
-								return this->get(cmp.entity, cmp.type, k, array_item_property_desc);
-							};
-							subchild.m_setter = [k, array_item_property_desc, cmp, this](const QVariant& value)
-							{
-								this->set(cmp.entity, cmp.type, k, array_item_property_desc, value);
-							};
-						}
-					}
+					addArrayProperty(child, static_cast<Lumix::IArrayDescriptor*>(desc), cmp);
 					break;
 				}
+			case Lumix::IPropertyDescriptor::RESOURCE:
+				addResourceProperty(child, desc, cmp);
+				break;
 			case Lumix::IPropertyDescriptor::VEC3:
 				{
 					Node& x_node = child.addChild("x");

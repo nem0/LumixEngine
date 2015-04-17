@@ -70,6 +70,7 @@ void PropertyView::setSelectedResourceFilename(const char* filename)
 	if (model->getResource())
 	{
 		setModel(model, new DynamicObjectItemDelegate(this));
+		m_ui->treeView->expandToDepth(1);
 	}
 }
 
@@ -79,7 +80,7 @@ void PropertyView::onEntitySelected(const Lumix::Array<Lumix::Entity>& e)
 	m_selected_entity = e.empty() ? Lumix::Entity::INVALID : e[0];
 	if (e.size() == 1 && e[0].isValid())
 	{
-		EntityModel* model = new EntityModel(*m_world_editor, m_selected_entity);
+		EntityModel* model = new EntityModel(*this, *m_world_editor, m_selected_entity);
 		setModel(model, new DynamicObjectItemDelegate(m_ui->treeView));
 		m_ui->treeView->expandAll();
 	}
