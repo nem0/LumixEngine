@@ -1,6 +1,5 @@
 #include "dynamic_object_model.h"
 #include "core/vec4.h"
-#include "property_view/file_edit.h"
 #include <qapplication.h>
 #include <qcolordialog.h>
 #include <qevent.h>
@@ -23,6 +22,7 @@ void DynamicObjectItemDelegate::setModelData(QWidget* editor, QAbstractItemModel
 	}
 	QStyledItemDelegate::setModelData(editor, model, index);
 }
+
 
 void DynamicObjectItemDelegate::setEditorData(QWidget* editor, const QModelIndex& index) const
 {
@@ -132,6 +132,10 @@ QWidget* DynamicObjectItemDelegate::createEditor(QWidget* parent, const QStyleOp
 			QDoubleSpinBox* input = new QDoubleSpinBox(parent);
 			input->setMaximum(FLT_MAX);
 			input->setMinimum(-FLT_MAX);
+			connect(input, (void (QDoubleSpinBox::*)(double))&QDoubleSpinBox::valueChanged, [node](double value){
+				node->m_setter(value);
+			});
+			input->setSingleStep(0.1);
 			return input;
 		}
 		else if (node->onCreateEditor)

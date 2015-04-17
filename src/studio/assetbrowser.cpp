@@ -11,10 +11,12 @@
 #include "notifications.h"
 #include "scripts/scriptcompiler.h"
 #include <qdesktopservices.h>
+#include <qfileiconprovider.h>
 #include <qfilesystemmodel.h>
 #include <qinputdialog.h>
 #include <qmenu.h>
 #include <qmessagebox.h>
+#include <qmimedata.h>
 #include <qprocess.h>
 #include <qurl.h>
 
@@ -44,9 +46,46 @@ class FlatFileListModel : public QAbstractItemModel
 		}
 
 
-		QFileInfo fileInfo(const QModelIndex& index) const
+		const QFileInfo& fileInfo(const QModelIndex& index) const
 		{
-			return QFileInfo(m_files[index.row()]);
+			return m_files[index.row()];
+		}
+
+
+		QStringList mimeTypes() const override
+		{
+			QStringList types;
+			types << "text/uri-list";
+			return types;
+		}
+
+
+		virtual Qt::ItemFlags flags(const QModelIndex &index) const override
+		{
+			Qt::ItemFlags default_flags = QAbstractItemModel::flags(index);
+			if (index.isValid())
+				return Qt::ItemIsDragEnabled | default_flags;
+			else
+				return default_flags;
+		}
+
+
+		QMimeData* mimeData(const QModelIndexList &indexes) const override
+		{
+			QMimeData *mime_data = new QMimeData();
+			QList<QUrl> urls;
+			for (auto& index : indexes)
+			{
+				urls.push_back(QUrl::fromLocalFile(m_files[index.row()].filePath()));
+			}
+			mime_data->setUrls(urls);
+			return mime_data;
+		}
+
+
+		virtual Qt::DropActions supportedDragActions() const override
+		{
+			return Qt::CopyAction | Qt::MoveAction;
 		}
 
 
@@ -78,9 +117,13 @@ class FlatFileListModel : public QAbstractItemModel
 
 		virtual QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override
 		{
+			if (Qt::DecorationRole == role && index.column() == 0)
+			{
+				return m_icons[index.row()];
+			}
 			if (Qt::DisplayRole == role)
 			{
-				return QFileInfo(m_files[index.row()]).fileName();
+				return m_files[index.row()].fileName();
 			}
 			return QVariant();
 		}
@@ -93,6 +136,7 @@ class FlatFileListModel : public QAbstractItemModel
 
 			for (int i = 0, c = list.size(); i < c; ++i)
 			{
+				m_icons.append(m_icon_provider.icon(list[i].filePath()));
 				m_files.append(list[i].filePath());
 			}
 
@@ -106,8 +150,10 @@ class FlatFileListModel : public QAbstractItemModel
 		}
 
 	private:
+		QFileIconProvider m_icon_provider;
 		QStringList m_filter;
-		QVector<QString> m_files;
+		QVector<QFileInfo> m_files;
+		QVector<QIcon> m_icons;
 };
 
 
