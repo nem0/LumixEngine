@@ -1,7 +1,7 @@
 ---
 layout:     post
 title:      An electronic oscillator and The Arduino Starter Kit
-date:       2015-28-4 20:00:00
+date:       2015-4-27 20:00:00
 summary:    I bought The Arduino Starter Kit to learn something new and eventually build a spaceship :). I've want to understand fundamental principles behind electronic circuits so I had decided to build an electronic oscillator from components available in The Arduino Starter Kit.
 categories: components
 comments: true
