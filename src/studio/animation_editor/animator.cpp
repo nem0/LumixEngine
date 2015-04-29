@@ -250,7 +250,7 @@ class AnimatorInputModel : public QAbstractItemModel
 		virtual QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
 		virtual bool setData(const QModelIndex &index, const QVariant &value, int role = Qt::EditRole) override;
 		virtual Qt::ItemFlags flags(const QModelIndex &index) const override;
-		virtual QVariant AnimatorInputModel::headerData(int section, Qt::Orientation orientation, int role) const override;
+		virtual QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
 		const QList<Input>& getInputs() const { return m_inputs; }
 		QList<Input>& getInputs() { return m_inputs; }
 

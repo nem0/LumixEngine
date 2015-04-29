@@ -11,7 +11,7 @@ namespace Lumix
 		explicit FreeList(IAllocator& allocator)
 			: m_allocator(allocator)
 		{
-			m_heap = static_cast<T*>(allocator.allocate(sizeof(char) * sizeof(T) * chunk_size));
+			m_heap = static_cast<T*>(allocator.allocate(sizeof(T) * chunk_size));
 			m_pool_index = chunk_size;
 
 			for (int32_t i = 0; i < chunk_size; i++)
