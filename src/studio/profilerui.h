@@ -22,6 +22,7 @@ public:
 	~ProfilerUI();
 
 private slots:
+	void on_filterChanged(const QString& value);
 	void on_recordCheckBox_stateChanged(int arg1);
 	void on_dataChanged();
 	void on_frameSet();
@@ -62,8 +63,8 @@ class ProfileModel : public QAbstractItemModel
 
 	public:
 		ProfileModel(QWidget* parent);
-		Block* getRoot() { return m_root; }
-		void setFrame(int frame) { m_frame = frame; } 
+		Block* getRoot() const { return m_root; }
+		void setFrame(int frame) { m_frame = frame; }
 
 	private:
 		void cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_block);
