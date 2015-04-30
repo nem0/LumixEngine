@@ -73,6 +73,7 @@
     <addaction name="actionCompile_scripts"/>
     <addaction name="actionMeasure"/>
     <addaction name="actionSnap_to_terrain"/>
+    <addaction name="actionImport_asset"/>
    </widget>
    <widget class="QMenu" name="menuEntity">
     <property name="title">
@@ -358,6 +359,11 @@
   <action name="actionExecute_commands">
    <property name="text">
     <string>Execute commands</string>
+   </property>
+  </action>
+  <action name="actionImport_asset">
+   <property name="text">
+    <string>Import asset</string>
    </property>
   </action>
  </widget>

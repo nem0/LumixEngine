@@ -96,6 +96,22 @@ class Model : public Resource
 	public:
 		typedef HashMap<uint32_t, int> BoneMap;
 
+		#pragma pack(1)
+			class FileHeader
+			{
+				public:
+					uint32_t m_magic;
+					uint32_t m_version;
+			};
+		#pragma pack()
+
+		enum class FileVersion : uint32_t
+		{
+			FIRST,
+
+			LATEST // keep this last
+		};
+
 		class LOD
 		{
 			public:
@@ -149,6 +165,9 @@ class Model : public Resource
 		float		getBoundingRadius() const { return m_bounding_radius; }
 		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform, float scale);
 		const AABB& getAABB() const { return m_aabb; } 
+
+	public:
+		static const uint32_t FILE_MAGIC = 0x5f4c4d4f; // == '_LMO'
 
 	private:
 		bool parseVertexDef(FS::IFile* file, VertexDef* vertex_definition);

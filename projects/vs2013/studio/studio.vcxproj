@@ -211,6 +211,7 @@
     <ClCompile Include="..\..\..\src\studio\main.cpp" />
     <ClCompile Include="..\..\..\src\studio\mainwindow.cpp" />
     <ClCompile Include="..\..\..\src\studio\notifications.cpp" />
+    <ClCompile Include="..\..\..\src\studio\obj_file.cpp" />
     <ClCompile Include="..\..\..\src\studio\pc\file_system_watcher.cpp" />
     <ClCompile Include="..\..\..\src\studio\pc\fps_limiter.cpp" />
     <ClCompile Include="..\..\..\src\studio\profilergraph.cpp" />
@@ -298,6 +299,7 @@
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">.\..\..\..\tmp\studio\moc_%(Filename).cpp</Outputs>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"$(QTDIR)\bin\moc.exe"  "%(FullPath)" -o ".\..\..\..\tmp\studio\moc_%(Filename).cpp"  -D_WINDOWS -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_OPENGL_LIB -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -DNDEBUG -DQT_DLL "-I.\..\.." "-I.\..\..\..\src\studio" "-I.\..\..\..\src" "-I.\..\..\..\external\glew\include" "-I$(QTDIR)\include" "-I$(QTDIR)\include\QtOpenGL" "-I$(QTDIR)\include\QtWidgets" "-I$(QTDIR)\include\QtGui" "-I$(QTDIR)\include\QtANGLE" "-I$(QTDIR)\include\QtCore" "-I$(QTDIR)\mkspecs\win32-msvc2013" "-I.\..\..\..\tmp\studio" "-I.\..\..\..\tmp\studio\GeneratedFiles"</Command>
     </CustomBuild>
+    <ClInclude Include="..\..\..\src\studio\obj_file.h" />
     <ClInclude Include="..\..\..\src\studio\property_view\dynamic_object_model.h" />
     <ClInclude Include="..\..\..\src\studio\property_view\resource_model.h" />
     <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_assetbrowser.h" />
@@ -456,6 +458,7 @@
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">.\..\..\..\tmp\studio\moc_%(Filename).cpp</Outputs>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"$(QTDIR)\bin\moc.exe"  "%(FullPath)" -o ".\..\..\..\tmp\studio\moc_%(Filename).cpp"  -D_WINDOWS -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_OPENGL_LIB -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -DNDEBUG -DQT_DLL  "-I.\..\.." "-I.\..\..\..\src\studio" "-I.\..\..\..\src" "-I.\..\..\..\external\glew\include" "-I$(QTDIR)\include" "-I$(QTDIR)\include\QtOpenGL" "-I$(QTDIR)\include\QtWidgets" "-I$(QTDIR)\include\QtGui" "-I$(QTDIR)\include\QtANGLE" "-I$(QTDIR)\include\QtCore" "-I$(QTDIR)\mkspecs\win32-msvc2013" "-I.\..\..\..\tmp\studio" "-I.\..\..\..\tmp\studio\GeneratedFiles"</Command>
     </CustomBuild>
+    <ClInclude Include="..\..\..\src\studio\property_view\file_edit.h" />
     <ClInclude Include="..\..\..\src\studio\property_view\property_editor.h" />
     <ClInclude Include="..\..\..\src\studio\property_view\terrain_editor.h" />
     <ClInclude Include="..\..\..\src\studio\renderdevicewidget.h" />
