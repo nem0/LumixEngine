@@ -661,7 +661,7 @@ namespace Lumix
 					serializer.read(light.m_fog_color);
 					serializer.read(light.m_fog_density);
 					light.m_entity.universe = &m_universe;
-					m_universe.addComponent(light.m_entity, GLOBAL_LIGHT_HASH, this, i);
+					m_universe.addComponent(light.m_entity, GLOBAL_LIGHT_HASH, this, light.m_uid);
 				}
 				serializer.read(m_global_light_last_uid);
 				serializer.read(m_active_global_light_uid);
@@ -2015,7 +2015,7 @@ namespace Lumix
 				light.m_intensity = 1;
 				light.m_range = 10;
 				light.m_uid = ++m_point_light_last_uid;
-				light.m_fov = FLT_MAX;
+				light.m_fov = 999;
 
 				Component cmp = m_universe.addComponent(entity, POINT_LIGHT_HASH, this, light.m_uid);
 				m_universe.componentCreated().invoke(cmp);

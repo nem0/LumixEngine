@@ -22,28 +22,7 @@
 namespace Lumix
 {
 
-
-static const uint32_t MODEL_FILE_MAGIC = 0x5f4c4d4f; // == '_LMO'
-
-
-enum class ModelFileVersion : uint32_t
-{
-	FIRST,
-	
-	LATEST // keep this last
-};
-
-
-#pragma pack(1)
-class ModelFileHeader
-{
-	public:
-		uint32_t m_magic;
-		uint32_t m_version;
-};
-#pragma pack()
-
-	
+		
 Model::~Model()
 {
 	ASSERT(isEmpty());
@@ -382,10 +361,10 @@ void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	PROFILE_FUNCTION();
 	if(success)
 	{
-		ModelFileHeader header;
+		FileHeader header;
 		file->read(&header, sizeof(header));
-		if (header.m_magic == MODEL_FILE_MAGIC
-			&& header.m_version <= (uint32_t)ModelFileVersion::LATEST
+		if (header.m_magic == FILE_MAGIC
+			&& header.m_version <= (uint32_t)FileVersion::LATEST
 			&& parseMeshes(file)
 			&& parseGeometry(file)
 			&& parseBones(file)

@@ -103,7 +103,6 @@ int main(int argc, char** argv)
 
 	FbxInt32 mesh_count = meshes.size();
 	fwrite(&mesh_count, sizeof(mesh_count), 1, fp);
-	FbxInt32 prev_attribute_array_offset = 0;
 	FbxInt32 attribute_array_offset = 0;
 	FbxInt32 indices_offset = 0;
 	int vertex_size = 20;
