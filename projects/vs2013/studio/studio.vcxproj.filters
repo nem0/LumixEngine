@@ -193,6 +193,12 @@
     <ClCompile Include="..\..\..\src\studio\obj_file.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\studio\import_asset_dialog.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tmp\studio\moc_import_asset_dialog.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\..\..\src\studio\assetbrowser.h">
@@ -282,6 +288,12 @@
     <CustomBuild Include="..\..\..\src\studio\animation_editor\animator.h">
       <Filter>Header Files\animation_editor</Filter>
     </CustomBuild>
+    <CustomBuild Include="..\..\..\src\studio\import_asset_dialog.ui">
+      <Filter>Form Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\src\studio\import_asset_dialog.h">
+      <Filter>Header Files</Filter>
+    </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\studio\file_system_watcher.h">
@@ -358,6 +370,9 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\studio\obj_file.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_import_asset_dialog.h">
+      <Filter>Generated Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

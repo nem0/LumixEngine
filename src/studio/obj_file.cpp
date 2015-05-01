@@ -77,6 +77,8 @@ static OBJFile::Triangle parseTriangle(const char* tmp, int length)
 
 bool OBJFile::load(const QString& path)
 {
+	if (path.isEmpty())
+		return false;
 	QFile file(path);
 	if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
 	{

@@ -10,6 +10,7 @@
 #include "entity_template_list.h"
 #include "fileserverwidget.h"
 #include "gameview.h"
+#include "import_asset_dialog.h"
 #include "log_widget.h"
 #include "notifications.h"
 #include "property_view.h"
@@ -117,7 +118,10 @@ MainWindow::MainWindow(QWidget* parent) :
 
 void MainWindow::on_actionImport_asset_triggered()
 {
-	QString source_path = QFileDialog::getOpenFileName(NULL, "Select source", QString(), "Wavefront OBJ (*.obj)");
+	ImportAssetDialog* dialog = new ImportAssetDialog(this);
+	dialog->show();
+
+	/*QString source_path = QFileDialog::getOpenFileName(NULL, "Select source", QString(), "Wavefront OBJ (*.obj)");
 	if (source_path.endsWith(".obj", Qt::CaseInsensitive))
 	{
 		OBJFile file;
@@ -130,7 +134,7 @@ void MainWindow::on_actionImport_asset_triggered()
 				file.saveLumixMesh(dest + "/" + source_info.baseName() + ".msh");
 			}
 		}
-	}
+	}*/
 }
 
 
