@@ -374,6 +374,9 @@
     <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_import_asset_dialog.h">
       <Filter>Generated Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\studio\file_path_edit.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\src\studio\property_view\entity_model.h">

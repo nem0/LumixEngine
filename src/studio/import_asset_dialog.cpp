@@ -11,6 +11,7 @@ ImportAssetDialog::ImportAssetDialog(QWidget* parent)
 	m_ui->setupUi(this);
 	connect(m_ui->sourceInput, &QLineEdit::textChanged, [this](const QString&) { updateStatus(); });
 	connect(m_ui->destinationInput, &QLineEdit::textChanged, [this](const QString&) { updateStatus(); });
+	m_ui->destinationInput->setText(QDir::currentPath());
 	updateStatus();
 }
 
@@ -48,7 +49,7 @@ void ImportAssetDialog::on_importButton_clicked()
 		if (!m_ui->destinationInput->text().isEmpty())
 		{
 			QFileInfo source_info(m_ui->sourceInput->text());
-			if (file.saveLumixMesh(m_ui->destinationInput->text() + "/" + source_info.baseName() + ".msh"));
+			if (file.saveLumixMesh(m_ui->destinationInput->text() + "/" + source_info.baseName() + ".msh"))
 			{
 				m_ui->progressBar->setValue(100);
 				m_ui->statusLabel->setText("Import successful");
