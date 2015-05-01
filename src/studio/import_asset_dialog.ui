@@ -59,7 +59,7 @@
           </widget>
          </item>
          <item row="1" column="1">
-          <widget class="QLineEdit" name="sourceInput"/>
+          <widget class="FilePathEdit" name="sourceInput"/>
          </item>
          <item row="1" column="0">
           <widget class="QLabel" name="label">
@@ -149,6 +149,13 @@
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>FilePathEdit</class>
+   <extends>QLineEdit</extends>
+   <header>file_path_edit.h</header>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>
