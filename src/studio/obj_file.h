@@ -53,7 +53,7 @@ class OBJFile
 	public:
 		bool load(const QString& path);
 		bool saveLumixMesh(const QString& path);
-		bool saveLumixMaterials(const QString& path);
+		bool saveLumixMaterials(const QString& path, bool convertToDDS);
 		int getMeshCount() const { return m_meshes.size(); }
 		const QString& getMaterialName(int i) const { return m_meshes[i].m_material; }
 
