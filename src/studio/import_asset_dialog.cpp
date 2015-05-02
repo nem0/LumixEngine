@@ -103,7 +103,7 @@ void ImportAssetDialog::on_importButton_clicked()
 			QFileInfo source_info(m_ui->sourceInput->text());
 			bool save_mesh_success = file.saveLumixMesh(m_ui->destinationInput->text() + "/" + source_info.baseName() + ".msh");
 			bool save_materials_success = m_ui->materialCombobox->currentText() != "Import materials" 
-				|| file.saveLumixMaterials(m_ui->destinationInput->text() + "/" + source_info.baseName() + ".msh");
+				|| file.saveLumixMaterials(m_ui->destinationInput->text() + "/" + source_info.baseName() + ".msh", m_ui->convertToDDSCheckbox->isChecked());
 			bool create_materials_success = createMaterials(file, m_ui->destinationInput->text());
 			if (save_mesh_success && save_materials_success && create_materials_success)
 			{

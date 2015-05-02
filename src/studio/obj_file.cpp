@@ -5,6 +5,8 @@
 #include <QDir>
 #include <qfile.h>
 #include <qfileinfo.h>
+#include <qimage.h>
+#include <qimagewriter.h>
 
 
 enum class VertexAttributeDef : uint32_t
@@ -418,7 +420,7 @@ bool OBJFile::saveLumixMesh(const QString& path)
 }
 
 
-bool OBJFile::saveLumixMaterials(const QString& path)
+bool OBJFile::saveLumixMaterials(const QString& path, bool convertToDDS)
 {
 	QFileInfo info(path);
 	bool success = true;
@@ -428,19 +430,33 @@ bool OBJFile::saveLumixMaterials(const QString& path)
 		QFile file(info.dir().path() + "/" + material.m_name + ".mat");
 		if (file.open(QIODevice::WriteOnly))
 		{
+			QFileInfo texture_info(m_material_library_dir + "/" + material.m_texture);
 			file.write(
 				QString(
 					"{	\"texture\" : { \"source\" : \"%1\" }, \"shader\" : \"shaders/rigid.shd\" }"
 				)
-				.arg(material.m_texture)
+				.arg(convertToDDS ? texture_info.baseName() + ".dds" :  material.m_texture)
 				.toLatin1().data()
 				);
 			file.close();
 			auto s = info.dir().path();
 			QFile::remove(info.dir().path() + "/" + material.m_texture);
-			if (!material.m_texture.isEmpty() && !QFile::copy(m_material_library_dir + "/" + material.m_texture, info.dir().path() + "/" + material.m_texture))
+			
+			if (convertToDDS && texture_info.suffix() != "dds")
 			{
-				success = false;
+				QImage img(texture_info.absoluteFilePath());
+				QImageWriter writer(info.dir().path() + "/" + texture_info.baseName() + ".dds");
+				if (!writer.write(img.mirrored()))
+				{
+					success = false;
+				}
+			}
+			else
+			{
+				if (!material.m_texture.isEmpty() && !QFile::copy(m_material_library_dir + "/" + material.m_texture, info.dir().path() + "/" + material.m_texture))
+				{
+					success = false;
+				}
 			}
 		}
 		else
