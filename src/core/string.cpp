@@ -45,15 +45,15 @@ namespace Lumix
 		}
 	}
 
-	bool fromCString(const char* input, int length, int32_t* value)
+	const char* fromCString(const char* input, int length, int32_t* value)
 	{
 		int64_t val;
-		bool b = fromCString(input, length, &val);
+		const char* ret = fromCString(input, length, &val);
 		*value = (int32_t)val;
-		return b;
+		return ret;
 	}
 
-	bool fromCString(const char* input, int length, int64_t* value)
+	const char* fromCString(const char* input, int length, int64_t* value)
 	{
 		if (length > 0)
 		{
@@ -65,7 +65,7 @@ namespace Lumix
 				--length;
 				if (!length)
 				{
-					return false;
+					return nullptr;
 				}
 			}
 			while (length && *c >= '0' && *c <= '9')
@@ -79,12 +79,12 @@ namespace Lumix
 			{
 				*value = -*value;
 			}
-			return true;
+			return c;
 		}
-		return false;
+		return nullptr;
 	}
 
-	bool fromCString(const char* input, int length, uint32_t* value)
+	const char* fromCString(const char* input, int length, uint32_t* value)
 	{
 		if (length > 0)
 		{
@@ -92,7 +92,7 @@ namespace Lumix
 			*value = 0;
 			if (*c == '-')
 			{
-				return false;
+				return nullptr;
 			}
 			while (length && *c >= '0' && *c <= '9')
 			{
@@ -101,9 +101,9 @@ namespace Lumix
 				++c;
 				--length;
 			}
-			return true;
+			return c;
 		}
-		return false;
+		return nullptr;
 	}
 
 

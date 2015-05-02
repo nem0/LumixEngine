@@ -5,10 +5,17 @@ namespace Lumix
 {
 
 
-void enableFloatingPointTraps()
+void enableFloatingPointTraps(bool enable)
 {
 	unsigned int cw = _control87(0, 0) & MCW_EM;
-	cw &= ~(_EM_UNDERFLOW | _EM_OVERFLOW | _EM_ZERODIVIDE | _EM_INVALID | _EM_DENORMAL); // can not enable _EM_INEXACT because it is common in QT
+	if (enable)
+	{
+		cw &= ~(_EM_OVERFLOW | _EM_ZERODIVIDE | _EM_INVALID | _EM_DENORMAL); // can not enable _EM_INEXACT because it is common in QT
+	}
+	else
+	{
+		cw |= _EM_OVERFLOW | _EM_INVALID | _EM_DENORMAL; // can not enable _EM_INEXACT because it is common in QT
+	}
 	_control87(cw, MCW_EM);
 }
 

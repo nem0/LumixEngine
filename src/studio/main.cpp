@@ -27,7 +27,7 @@ class App
 		App()
 		{
 			#ifdef _DEBUG
-				Lumix::enableFloatingPointTraps();
+				Lumix::enableFloatingPointTraps(true);
 			#endif
 			m_game_render_device = NULL;
 			m_edit_render_device = NULL;
