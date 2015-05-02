@@ -45,5 +45,6 @@ class EntityModel : public DynamicObjectModel
 		Lumix::WorldEditor& m_editor;
 		Lumix::Entity m_entity;
 		PropertyView& m_view;
+		bool m_is_setting;
 };
 

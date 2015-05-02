@@ -46,6 +46,7 @@ static const char* getComponentName(Lumix::Component cmp)
 EntityModel::EntityModel(PropertyView& view, Lumix::WorldEditor& editor, Lumix::Entity entity)
 	: m_editor(editor)
 	, m_view(view)
+	, m_is_setting(false)
 {
 	m_entity = entity;
 	getRoot().m_name = "Entity";
@@ -148,7 +149,7 @@ void EntityModel::onComponentDestroyed(Lumix::Component component)
 
 void EntityModel::onPropertySet(Lumix::Component component, const Lumix::IPropertyDescriptor& descriptor)
 {
-	if (component.entity == m_entity)
+	if (component.entity == m_entity && !m_is_setting)
 	{
 		auto& cmps = m_editor.getComponents(component.entity);
 		for (int i = 0; i < cmps.size(); ++i)
@@ -450,6 +451,7 @@ void EntityModel::addComponent(QWidget* widget, QPoint pos)
 
 void EntityModel::set(Lumix::Entity entity, uint32_t component_type, int index, Lumix::IPropertyDescriptor* desc, QVariant value)
 {
+	m_is_setting = true;
 	Lumix::Component cmp = m_editor.getComponent(entity, component_type);
 	ASSERT(cmp.isValid());
 	switch (desc->getType())
@@ -495,6 +497,7 @@ void EntityModel::set(Lumix::Entity entity, uint32_t component_type, int index, 
 			Q_ASSERT(false);
 			break;
 	}
+	m_is_setting = false;
 }
 
 QVariant EntityModel::get(Lumix::Entity entity, uint32_t component_type, int index, Lumix::IPropertyDescriptor* desc)

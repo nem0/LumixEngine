@@ -16,10 +16,12 @@ class ImportAssetDialog : public QDialog
 
 	public:
 		explicit ImportAssetDialog(QWidget* parent);
+		void setModelInput(const QString& source, const QString& destination);
 		~ImportAssetDialog();
 
 	private:
 		void updateStatus();
+		bool createMaterials(class OBJFile& file, const QString& path);
 
 	private slots:
 		void on_browseSourceButton_clicked();

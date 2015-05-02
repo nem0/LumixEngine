@@ -7,6 +7,7 @@
 #include "core/resource_manager.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
+#include "import_asset_dialog.h"
 #include "insert_mesh_command.h"
 #include "notifications.h"
 #include "scripts/scriptcompiler.h"
@@ -159,7 +160,7 @@ class FlatFileListModel : public QAbstractItemModel
 
 void getDefaultFilters(QStringList& filters)
 {
-	filters << "*.msh" << "*.unv" << "*.ani" << "*.blend" << "*.tga" << "*.mat" << "*.dds" << "*.fbx" << "*.shd" << "*.json";
+	filters << "*.msh" << "*.unv" << "*.ani" << "*.blend" << "*.obj" << "*.tga" << "*.mat" << "*.dds" << "*.fbx" << "*.shd" << "*.json";
 }
 
 
@@ -241,7 +242,7 @@ void AssetBrowser::handleDoubleClick(const QFileInfo& file_info)
 		m_editor->addComponent(crc32("animable"));
 		m_editor->setProperty(crc32("animable"), -1, *m_editor->getProperty("animable", "preview"), file.toLatin1().data(), file.length());
 	}
-	else if (suffix == "blend" || suffix == "tga" || suffix == "dds")
+	else if (suffix == "blend" || suffix == "tga" || suffix == "dds" || suffix == "*.obj")
 	{
 		QDesktopServices::openUrl(QUrl::fromLocalFile(file_info.absoluteFilePath()));
 	}
@@ -340,6 +341,14 @@ void AssetBrowser::exportAnimation(const QFileInfo& file_info)
 }
 
 
+void AssetBrowser::importAsset(const QFileInfo& file_info)
+{
+	ImportAssetDialog* dlg = new ImportAssetDialog(this);
+	dlg->setModelInput(file_info.filePath(), file_info.dir().path());
+	dlg->show();
+}
+
+
 void AssetBrowser::exportModel(const QFileInfo& file_info)
 {
 	ProcessInfo process;
@@ -385,6 +394,7 @@ void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
 	QAction* create_dir_action = new QAction("Create directory", menu);
 	QAction* export_anim_action = new QAction("Export Animation", menu);
 	QAction* export_model_action = new QAction("Export Model", menu);
+	QAction* import_asset_action = new QAction("Import asset", menu);
 	if (file_info.isDir())
 	{
 		menu->addAction(create_dir_action);
@@ -394,6 +404,10 @@ void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
 		menu->addAction(export_anim_action);
 		menu->addAction(export_model_action);
 	}
+	if (file_info.suffix() == "obj")
+	{
+		menu->addAction(import_asset_action);
+	}
 	selected_action = menu->exec(mapToGlobal(pos));
 	if (selected_action == export_anim_action)
 	{
@@ -402,6 +416,10 @@ void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
 	else if (selected_action == export_model_action)
 	{
 		exportModel(file_info);
+	}
+	else if (selected_action == import_asset_action)
+	{
+		importAsset(file_info);
 	}
 	else if (selected_action == delete_file_action)
 	{

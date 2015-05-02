@@ -1,7 +1,9 @@
 #include "import_asset_dialog.h"
 #include "ui_import_asset_dialog.h"
 #include "obj_file.h"
+#include <qfile.h>
 #include <qfiledialog.h>
+#include <qmessagebox.h>
 
 
 ImportAssetDialog::ImportAssetDialog(QWidget* parent)
@@ -36,6 +38,36 @@ void ImportAssetDialog::on_browseDestinationButton_clicked()
 }
 
 
+bool ImportAssetDialog::createMaterials(OBJFile& file, const QString& path)
+{
+	if (m_ui->materialCombobox->currentText() != "Create materials")
+	{
+		return true;
+	}
+	m_ui->progressBar->setValue(95);
+	m_ui->statusLabel->setText("Creating materials");
+	for (int i = 0; i < file.getMeshCount(); ++i)
+	{
+		QFile output(path + "/" + file.getMaterialName(i) + ".mat");
+		if (!output.open(QIODevice::WriteOnly))
+		{
+			return false;
+		}
+		output.write("{	\"texture\" : { \"source\" : \"texture.dds\" }, \"shader\" : \"shaders/rigid.shd\" }");
+		output.close();
+	}
+	return true;
+}
+
+
+void ImportAssetDialog::setModelInput(const QString& source, const QString& destination)
+{
+	m_ui->tabWidget->setCurrentIndex(0);
+	m_ui->sourceInput->setText(source);
+	m_ui->destinationInput->setText(destination);
+}
+
+
 void ImportAssetDialog::on_importButton_clicked()
 {
 	Q_ASSERT(!m_ui->sourceInput->text().isEmpty());
@@ -43,13 +75,37 @@ void ImportAssetDialog::on_importButton_clicked()
 
 	m_ui->progressBar->setValue(75);
 	m_ui->statusLabel->setText("Importing...");
+	if (!QFileInfo::exists(m_ui->destinationInput->text()))
+	{
+		if (QMessageBox::question(this, "Create destination directory", "Destination directory does not exist. Create it?") == QMessageBox::StandardButton::No)
+		{
+			m_ui->progressBar->setValue(100);
+			m_ui->statusLabel->setText("Destination directory does not exist.");
+			return;
+		}
+		else
+		{
+			QDir dir(m_ui->destinationInput->text());
+			if (!dir.mkpath("."))
+			{
+				m_ui->progressBar->setValue(100);
+				m_ui->statusLabel->setText("Destination directory could not be created.");
+				return;
+			}
+		}
+	}
+
 	OBJFile file;
 	if (file.load(m_ui->sourceInput->text()))
 	{
 		if (!m_ui->destinationInput->text().isEmpty())
 		{
 			QFileInfo source_info(m_ui->sourceInput->text());
-			if (file.saveLumixMesh(m_ui->destinationInput->text() + "/" + source_info.baseName() + ".msh"))
+			bool save_mesh_success = file.saveLumixMesh(m_ui->destinationInput->text() + "/" + source_info.baseName() + ".msh");
+			bool save_materials_success = m_ui->materialCombobox->currentText() != "Import materials" 
+				|| file.saveLumixMaterials(m_ui->destinationInput->text() + "/" + source_info.baseName() + ".msh");
+			bool create_materials_success = createMaterials(file, m_ui->destinationInput->text());
+			if (save_mesh_success && save_materials_success && create_materials_success)
 			{
 				m_ui->progressBar->setValue(100);
 				m_ui->statusLabel->setText("Import successful");
