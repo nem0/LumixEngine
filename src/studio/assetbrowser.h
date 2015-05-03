@@ -31,8 +31,6 @@ public:
 
 private:
 	void handleDoubleClick(const class QFileInfo& file_info);
-	void exportAnimation(const QFileInfo& file_info);
-	void exportModel(const QFileInfo& file_info);
 	void importAsset(const QFileInfo& file_info);
 	void onFileSystemWatcherCallback(const char* path);
 	void setExtentionsFilter(const QStringList& filter);

@@ -15,13 +15,18 @@ class ImportAssetDialog : public QDialog
 	Q_OBJECT
 
 	public:
-		explicit ImportAssetDialog(QWidget* parent);
-		void setModelInput(const QString& source, const QString& destination);
+		ImportAssetDialog(QWidget* parent, const QString& base_path);
+		void setModelSource(const QString& source);
+		void setDestination(const QString& destination);
+		void setAnimationSource(const QString& source);
 		~ImportAssetDialog();
 
 	private:
 		void updateStatus();
 		bool createMaterials(class OBJFile& file, const QString& path);
+		void importOBJ();
+		void importBlender();
+		void importAnimation();
 
 	private slots:
 		void on_browseSourceButton_clicked();
@@ -30,4 +35,5 @@ class ImportAssetDialog : public QDialog
 
 	private:
 		Ui::ImportAssetDialog* m_ui;
+		QString m_base_path;
 };
