@@ -77,6 +77,10 @@ namespace Lumix
 			 return angle * PI / 180.0f;
 		}
 
+		LUMIX_FORCE_INLINE float radiansToDegrees(float angle)
+		{
+			return angle / PI * 180.0f;
+		}
 
 		inline float easeInOut(float t)
 		{

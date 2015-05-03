@@ -5,7 +5,7 @@
 
 int main(int argc, const char * argv[])
 {
-	Lumix::enableFloatingPointTraps();
+	Lumix::enableFloatingPointTraps(true);
 	Lumix::UnitTest::App app;
 	app.init();
 	app.run(argc, argv);

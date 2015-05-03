@@ -77,6 +77,8 @@ private slots:
 	void on_actionShow_triggered();
 	void on_actionSave_commands_triggered();
 	void on_actionExecute_commands_triggered();
+	void on_actionImport_asset_triggered();
+
 
 private:
 	class DockInfo
@@ -93,7 +95,6 @@ private:
 	void onUniverseLoaded();
 	void addEditorDock(Qt::DockWidgetArea area, QDockWidget* widget, void (MainWindow::*callback)());
 	void createLayoutCombobox();
-	void installPlugins();
 
 private:
 	Ui::MainWindow* m_ui;

@@ -51,8 +51,11 @@ class AnimatorInputTypeDelegate : public QItemDelegate
 };
 
 
-class AnimatorEdge
+class AnimatorEdge : public QObject
 {
+	Q_OBJECT
+	Q_PROPERTY(float duration READ getDuration WRITE setDuration)
+	Q_PROPERTY(QString condition READ getCondition WRITE setCondition)
 	public:
 		AnimatorEdge(int uid, AnimatorNode* from, AnimatorNode* to): m_uid(uid), m_from(from), m_to(to), m_duration(0) {}
 		AnimatorNode* getFrom() const { return m_from; }
@@ -76,10 +79,16 @@ class AnimatorEdge
 };
 
 
-class AnimatorNodeContent
+class AnimatorNodeContent : public QObject
 {
+	Q_OBJECT
+	Q_PROPERTY(QString name READ getName WRITE setName)
+
 	public:
 		AnimatorNodeContent(AnimatorNode* node) : m_node(node) {}
+
+		const QString& getName() const;
+		void setName(const QString& name);
 
 		virtual void paint(QPainter& painter) = 0;
 		virtual void paintContainer(QPainter& painter) = 0;
@@ -108,6 +117,9 @@ class AnimatorNodeContent
 
 class AnimationNodeContent : public AnimatorNodeContent
 {
+	Q_OBJECT
+	Q_PROPERTY(QString animation READ getAnimationPath WRITE setAnimationPath)
+	
 	public:
 		AnimationNodeContent(AnimatorNode* node) : AnimatorNodeContent(node) {}
 
@@ -120,6 +132,7 @@ class AnimationNodeContent : public AnimatorNodeContent
 		virtual int getChildCount() const override { return 0; }
 		virtual QString generateCode() override;
 		void setAnimationPath(const char* path) { m_animation_path = path; }
+		void setAnimationPath(const QString& path) { m_animation_path = path.toLatin1().data(); }
 		QString getAnimationPath() const { return m_animation_path; }
 		virtual void fillPropertyView(PropertyView& view) override;
 		virtual uint32_t getType() const override;
@@ -146,7 +159,7 @@ class StateMachineNodeContent : public AnimatorNodeContent
 		virtual void showContextMenu(AnimationEditor& editor, QWidget* widget, const QPoint& pos) override;
 		virtual int getChildCount() const override { return m_children.size(); }
 		virtual QString generateCode() override;
-		virtual void fillPropertyView(PropertyView&) override {  }
+		virtual void fillPropertyView(PropertyView&) override;
 		virtual uint32_t getType() const override;
 		virtual void serialize(Lumix::OutputBlob& blob) override;
 		virtual void deserialize(AnimationEditor& editor, Lumix::InputBlob& blob) override;
@@ -225,7 +238,6 @@ class Animator
 		void deserialize(AnimationEditor& editor, Lumix::InputBlob& blob);
 		void setInput(unsigned int name_hash, float value);
 
-		void createInput();
 		QAbstractItemModel* getInputModel() const;
 		Lumix::IAllocator& getAllocator() { return m_allocator; }
 

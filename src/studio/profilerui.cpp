@@ -5,6 +5,37 @@
 
 static const int MAX_FRAMES = 200;
 
+class ProfilerFilterModel : public QSortFilterProxyModel
+{
+	public:
+		explicit ProfilerFilterModel(QObject *parent)
+			: QSortFilterProxyModel(parent)
+		{}
+
+		bool check(ProfileModel::Block* block, const QRegExp& regexp) const
+		{
+			if (QString(block->m_name).contains(regexp))
+			{
+				return true;
+			}
+			auto* child = block->m_first_child;
+			while (child)
+			{
+				if (check(child, regexp))
+					return true;
+				child = child->m_next;
+			}
+			return false;
+		}
+
+		virtual bool filterAcceptsRow(int source_row, const QModelIndex &source_parent) const
+		{
+			auto* block = static_cast<ProfileModel::Block*>(sourceModel()->index(source_row, 0, source_parent).internalPointer());
+			return check(block, filterRegExp());
+		}
+};
+
+
 ProfileModel::Block::Block()
 {
 	m_frames.reserve(MAX_FRAMES);
@@ -159,10 +190,9 @@ void ProfileModel::onFrame()
 		last_block = block;
 		block = block->m_next;
 	}
-
 	if(hit % 10 == 0 && m_root->m_first_child)
 	{
-		emit dataChanged(createIndex(0, 0, m_root), createIndex(count - 1, (int)Values::COUNT - 1, last_block));
+		emit dataChanged(createIndex(0, 1, m_root), createIndex(count - 1, (int)Values::COUNT - 1, last_block));
 		emitDataChanged(m_root);
 	}
 }
@@ -179,7 +209,7 @@ void ProfileModel::emitDataChanged(Block* block)
 			++row;
 			last_child = last_child->m_next;
 		}
-		emit dataChanged(createIndex(0, 0, block->m_first_child), createIndex(row, (int)Values::COUNT - 1, last_child));
+		emit dataChanged(createIndex(0, 1, block->m_first_child), createIndex(row, (int)Values::COUNT - 1, last_child));
 
 		Block* child = block->m_first_child;
 		while(child)
@@ -363,16 +393,24 @@ ProfilerUI::ProfilerUI(QWidget* parent)
 	, m_ui(new Ui::ProfilerUI)
 {
 	m_model = new ProfileModel(this);
-	m_sortable_model = new QSortFilterProxyModel(this);
+	m_sortable_model = new ProfilerFilterModel(this);
 	m_sortable_model->setSourceModel(m_model);
 	m_ui->setupUi(this);
-	m_ui->profileTreeView->setModel(m_model);
+	m_ui->profileTreeView->setModel(m_sortable_model);
 	m_ui->profileTreeView->header()->setSectionResizeMode(0, QHeaderView::ResizeMode::Stretch);
 	m_ui->profileTreeView->header()->setSectionResizeMode(1, QHeaderView::ResizeMode::ResizeToContents);
 	m_ui->profileTreeView->header()->setSectionResizeMode(2, QHeaderView::ResizeMode::ResizeToContents);
+	connect(m_ui->filterInput, &QLineEdit::textChanged, this, &ProfilerUI::on_filterChanged);
 	connect(m_model, &QAbstractItemModel::dataChanged, this, &ProfilerUI::on_dataChanged);
 	connect(m_ui->graphView, &ProfilerGraph::frameSet, this, &ProfilerUI::on_frameSet);
 	m_ui->graphView->setModel(m_model);
+}
+
+
+void ProfilerUI::on_filterChanged(const QString& value)
+{
+	m_sortable_model->setFilterRegExp(value);
+	m_sortable_model->setFilterCaseSensitivity(Qt::CaseInsensitive);
 }
 
 
@@ -403,10 +441,11 @@ void ProfilerUI::on_frameSet()
 
 void ProfilerUI::on_profileTreeView_clicked(const QModelIndex &index)
 {
-	if(index.internalPointer() != NULL)
+	void* ptr = m_sortable_model->mapToSource(index).internalPointer();
+	if(ptr)
 	{
-		//m_ui->graphView->setBlock(static_cast<ProfileModel::Block*>(m_sortable_model->mapToSource(index).internalPointer()));
-		m_ui->graphView->setBlock(static_cast<ProfileModel::Block*>(index.internalPointer()));
+		m_ui->graphView->setBlock(static_cast<ProfileModel::Block*>(ptr));
+		//m_ui->graphView->setBlock(static_cast<ProfileModel::Block*>(index.internalPointer()));
 		m_ui->graphView->update();
 	}
 }

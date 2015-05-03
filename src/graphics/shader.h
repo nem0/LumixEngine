@@ -40,6 +40,8 @@ class LUMIX_ENGINE_API Shader : public Resource
 			SHADOW_MATRIX3,
 			LIGHT_POSITION,
 			LIGHT_RANGE,
+			LIGHT_FOV,
+			LIGHT_DIR,
 
 			WORLD_MATRIX, // keep this right before count
 			COUNT

@@ -96,7 +96,8 @@ void Material::updateShaderCombination()
 	static const int MAX_DEFINES_LENGTH = 1024;
 	char defines[MAX_DEFINES_LENGTH];
 	copyString(defines, MAX_DEFINES_LENGTH, m_is_alpha_cutout ? "#define ALPHA_CUTOUT\n" : "" );
-	catCString(defines, MAX_DEFINES_LENGTH, m_is_shadow_receiver ? "#define SHADOW_RECEIVER\n" : "" );
+	catCString(defines, MAX_DEFINES_LENGTH, m_is_shadow_receiver ? "#define SHADOW_RECEIVER\n" : "");
+	catCString(defines, MAX_DEFINES_LENGTH, m_is_normal_mapping ? "#define NORMAL_MAPPING\n" : "");
 	m_shader_combination = crc32(defines);
 	if(m_shader && m_shader->isReady())
 	{
@@ -177,6 +178,7 @@ bool Material::save(JsonSerializer& serializer)
 	serializer.serialize("alpha_to_coverage", m_is_alpha_to_coverage);
 	serializer.serialize("backface_culling", m_is_backface_culling);
 	serializer.serialize("alpha_cutout", m_is_alpha_cutout);
+	serializer.serialize("normal_mapping", m_is_normal_mapping);
 	serializer.serialize("shadow_receiver", m_is_shadow_receiver);
 	serializer.serialize("z_test", m_is_z_test);
 	serializer.endObject();
@@ -425,6 +427,10 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			else if (strcmp(label, "alpha_cutout") == 0)
 			{
 				serializer.deserialize(m_is_alpha_cutout, false);
+			}
+			else if (strcmp(label, "normal_mapping") == 0)
+			{
+				serializer.deserialize(m_is_normal_mapping, false);
 			}
 			else if (strcmp(label, "shadow_receiver") == 0)
 			{

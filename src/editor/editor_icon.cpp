@@ -112,7 +112,7 @@ void EditorIcon::render(Renderer* renderer, IRenderDevice& render_device)
 		mtx.setTranslation(m_entity.getPosition());
 		Matrix scale_mtx = Matrix::IDENTITY;
 		m_matrix = mtx;
-		scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = scale;
+		scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = scale > 0 ? scale : 1;
 		mtx = mtx * scale_mtx;
 		m_scale = scale;
 

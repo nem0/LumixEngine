@@ -7,6 +7,7 @@ static const uint32_t ANIMATION_HASH = crc32("animation");
 static const uint32_t STATE_MACHINE_HASH = crc32("state_machine");
 
 
+
 CreateAnimatorNodeCommand::CreateAnimatorNodeCommand(uint32_t type, Animator* animator, int parent_uid, const QPoint& position)
 {
 	m_animator = animator;

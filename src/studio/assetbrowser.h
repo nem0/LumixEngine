@@ -31,10 +31,9 @@ public:
 
 private:
 	void handleDoubleClick(const class QFileInfo& file_info);
-	void exportAnimation(const QFileInfo& file_info);
-	void exportModel(const QFileInfo& file_info);
+	void importAsset(const QFileInfo& file_info);
 	void onFileSystemWatcherCallback(const char* path);
-	void onTreeViewSelectionChanged(const QModelIndex& current, const QModelIndex& previous);
+	void setExtentionsFilter(const QStringList& filter);
 
 	static Lumix::IEditorCommand* createInsertMeshCommand(Lumix::WorldEditor& editor);
 
@@ -46,7 +45,6 @@ private slots:
 	void on_treeView_doubleClicked(const QModelIndex &index);
 	void onFileChanged(const QString& path);
 	void on_searchInput_textEdited(const QString &arg1);
-	void on_listWidget_activated(const QModelIndex &index);
 	void on_treeView_customContextMenuRequested(const QPoint &pos);
 	void on_exportFinished(int);
 	void on_filterComboBox_currentTextChanged(const QString &arg1);
@@ -56,10 +54,12 @@ private slots:
 private:
 	Ui::AssetBrowser* m_ui;
 	class QFileSystemModel* m_model;
+	class FlatFileListModel* m_flat_filtered_model;
 	class FileSystemWatcher* m_watcher;
 	Lumix::WorldEditor* m_editor;
 	QString m_base_path;
 	Notifications* m_notifications;
 	ScriptCompiler* m_compiler;
 	QList<struct ProcessInfo> m_processes;
+	QStringList m_extension_filter;
 };

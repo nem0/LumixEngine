@@ -10,10 +10,10 @@
 #include "engine/engine.h"
 #include "graphics/render_scene.h"
 #include "property_view.h"
-#include "property_view/property_editor.h"
 #include "scripts/scriptcompiler.h"
 #include <qcombobox.h>
 #include <qfile.h>
+#include <qfileinfo.h>
 #include <qmenu.h>
 #include <qmessagebox.h>
 #include <qmetaobject.h>
@@ -25,6 +25,110 @@
 static const QString MODULE_NAME = "amimation";
 static const QString CPP_FILE_PATH = "tmp/animation.cpp";
 static const QColor EDGE_COLOR(255, 255, 255);
+
+
+class ObjectModel : public QAbstractItemModel
+{
+	public:
+		ObjectModel(QObject* object) : m_object(object) {}
+
+		virtual QModelIndex index(int row, int column, const QModelIndex &parent = QModelIndex()) const override;
+		virtual QModelIndex parent(const QModelIndex &child) const override;
+
+		virtual int rowCount(const QModelIndex &parent = QModelIndex()) const override;
+		virtual int columnCount(const QModelIndex &parent = QModelIndex()) const override;
+
+		virtual QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
+		virtual bool setData(const QModelIndex &index, const QVariant &value, int role = Qt::EditRole) override;
+		virtual Qt::ItemFlags flags(const QModelIndex &index) const override;
+		virtual QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
+
+	private:
+		QObject* m_object;
+};
+
+
+QVariant ObjectModel::headerData(int section, Qt::Orientation orientation, int role) const
+{
+	if (orientation == Qt::Horizontal && role == Qt::DisplayRole)
+	{
+		switch (section)
+		{
+			case 0: return "Name";	break;
+			case 1: return "Value";	break;
+			default:
+				Q_ASSERT(false);
+				break;
+		}
+	}
+
+	return QAbstractItemModel::headerData(section, orientation, role);
+}
+
+
+bool ObjectModel::setData(const QModelIndex &index, const QVariant &value, int role)
+{
+	if (role == Qt::EditRole)
+	{
+		QMetaProperty property = m_object->metaObject()->property(index.row() + 1);
+		if (index.column() == 1)
+			property.write(m_object, value);
+	}
+	return false;
+}
+
+
+
+Qt::ItemFlags ObjectModel::flags(const QModelIndex &index) const
+{
+	if (index.column() == 1)
+	{
+		return QAbstractItemModel::flags(index) | Qt::ItemIsEditable;
+	}
+	return QAbstractItemModel::flags(index);
+}
+
+
+QModelIndex ObjectModel::index(int row, int column, const QModelIndex& parent) const
+{
+	if (parent.isValid())
+		return QModelIndex();
+	return createIndex(row, column);
+}
+
+
+QModelIndex ObjectModel::parent(const QModelIndex&) const
+{
+	return QModelIndex();
+}
+
+
+int ObjectModel::rowCount(const QModelIndex& index) const
+{
+	if (index.isValid())
+		return 0;
+	return m_object->metaObject()->propertyCount() - 1;
+}
+
+
+int ObjectModel::columnCount(const QModelIndex&) const
+{
+	return 2;
+}
+
+
+QVariant ObjectModel::data(const QModelIndex &index, int role) const
+{
+	if (role == Qt::DisplayRole)
+	{
+		QMetaProperty property = m_object->metaObject()->property(index.row() + 1);
+		if (index.column() == 0)
+			return property.name();
+		QVariant v = property.read(m_object);
+		return v;
+	}
+	return QVariant();
+}
 
 
 QWidget* AnimatorInputTypeDelegate::createEditor(QWidget *parent, const QStyleOptionViewItem &option, const QModelIndex &index) const
@@ -50,11 +154,21 @@ QWidget* AnimatorInputTypeDelegate::createEditor(QWidget *parent, const QStyleOp
 }
 
 
+const QString& AnimatorNodeContent::getName() const
+{
+	return getNode()->getName();
+}
+
+
+void AnimatorNodeContent::setName(const QString& name)
+{
+	getNode()->setName(name.toLatin1().data());
+}
+
+
 class AnimatorInputModel : public QAbstractItemModel
 {
 	public:
-		AnimatorInputModel(Animator& animator) : m_animator(animator) {}
-
 		class Input
 		{
 			public:
@@ -64,6 +178,59 @@ class AnimatorInputModel : public QAbstractItemModel
 				AnimatorInputType::Type m_type;
 				QVariant m_value;
 		};
+
+
+	private:
+		class SetDataCommand : public QUndoCommand
+		{
+			public:
+				SetDataCommand(AnimatorInputModel* model, const QModelIndex& index, const QVariant& value);
+
+				virtual void undo() override;
+				virtual void redo() override;
+
+			private:
+				QVariant setValue(const QVariant& value);
+
+			private:
+				AnimatorInputModel* m_model;
+				QModelIndex m_index;
+				QVariant m_value;
+				QVariant m_old_value;
+		};
+		
+
+		class CreateAnimationInputCommand : public QUndoCommand
+		{
+			public:
+				CreateAnimationInputCommand(AnimatorInputModel& model);
+
+				virtual void undo() override;
+				virtual void redo() override;
+
+			private:
+				AnimatorInputModel& m_model;
+				int m_row;
+		};
+
+
+		class DestroyAnimationInputCommand : public QUndoCommand
+		{
+			public:
+				DestroyAnimationInputCommand(AnimatorInputModel& model, int input_index);
+
+				virtual void undo() override;
+				virtual void redo() override;
+
+			private:
+				AnimatorInputModel& m_model;
+				int m_input_index;
+				AnimatorInputModel::Input m_data;
+		};
+
+
+	public:
+		AnimatorInputModel(Animator& animator, QUndoStack& undo_stack) : m_animator(animator), m_undo_stack(undo_stack) {}
 
 		enum Columns
 		{
@@ -76,12 +243,14 @@ class AnimatorInputModel : public QAbstractItemModel
 	public:
 		virtual QModelIndex index(int row, int column, const QModelIndex &parent = QModelIndex()) const override;
 		virtual QModelIndex parent(const QModelIndex &child) const override;
+		virtual bool insertRows(int row, int count, const QModelIndex &parent = QModelIndex()) override;
+		virtual bool removeRows(int row, int count, const QModelIndex &parent = QModelIndex()) override;
 		virtual int rowCount(const QModelIndex &parent = QModelIndex()) const override;
 		virtual int columnCount(const QModelIndex &parent = QModelIndex()) const override;
 		virtual QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
 		virtual bool setData(const QModelIndex &index, const QVariant &value, int role = Qt::EditRole) override;
 		virtual Qt::ItemFlags flags(const QModelIndex &index) const override;
-		virtual QVariant AnimatorInputModel::headerData(int section, Qt::Orientation orientation, int role) const override;
+		virtual QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
 		const QList<Input>& getInputs() const { return m_inputs; }
 		QList<Input>& getInputs() { return m_inputs; }
 
@@ -90,7 +259,73 @@ class AnimatorInputModel : public QAbstractItemModel
 	private:
 		Animator& m_animator;
 		QList<Input> m_inputs;
+		QUndoStack& m_undo_stack;
 };
+
+
+AnimatorInputModel::DestroyAnimationInputCommand::DestroyAnimationInputCommand(AnimatorInputModel& model, int input_index)
+	: m_model(model)
+	, m_data(model.m_inputs[input_index])
+{
+	m_input_index = input_index;
+}
+
+
+void AnimatorInputModel::DestroyAnimationInputCommand::redo()
+{
+	m_data = m_model.m_inputs[m_input_index];
+	m_model.beginRemoveRows(QModelIndex(), m_input_index, m_input_index);
+	m_model.m_inputs.removeAt(m_input_index);
+	m_model.endRemoveRows();
+}
+
+
+void AnimatorInputModel::DestroyAnimationInputCommand::undo()
+{
+	m_model.beginInsertRows(QModelIndex(), m_input_index, m_input_index);
+	m_model.m_inputs.insert(m_input_index, m_data);
+	m_model.endInsertRows();
+}
+
+
+AnimatorInputModel::CreateAnimationInputCommand::CreateAnimationInputCommand(AnimatorInputModel& model)
+	: m_model(model)
+{
+	m_row = m_model.rowCount();
+}
+
+
+void AnimatorInputModel::CreateAnimationInputCommand::undo()
+{
+	m_model.beginRemoveRows(QModelIndex(), m_row, m_row);
+	m_model.m_inputs.removeAt(m_row);
+	m_model.endRemoveRows();
+}
+
+
+void AnimatorInputModel::CreateAnimationInputCommand::redo()
+{
+	m_model.beginInsertRows(QModelIndex(), m_row, m_row);
+	m_model.m_inputs.push_back(Input("Input"));
+	m_model.endInsertRows();
+}
+
+
+bool AnimatorInputModel::insertRows(int row, int count, const QModelIndex&)
+{
+	Q_ASSERT(count == 1);
+	Q_ASSERT(row == m_inputs.size());
+	m_undo_stack.push(new CreateAnimationInputCommand(*this));
+	return true;
+}
+
+
+bool AnimatorInputModel::removeRows(int row, int count, const QModelIndex&)
+{
+	Q_ASSERT(count == 1);
+	m_undo_stack.push(new DestroyAnimationInputCommand(*this, row));
+	return true;
+}
 
 
 QVariant AnimatorInputModel::headerData(int section, Qt::Orientation orientation, int role) const
@@ -118,37 +353,70 @@ Qt::ItemFlags AnimatorInputModel::flags(const QModelIndex &index) const
 }
 
 
+AnimatorInputModel::SetDataCommand::SetDataCommand(AnimatorInputModel* model, const QModelIndex& index, const QVariant& value)
+{
+	m_model = model;
+	m_value = value;
+	m_index = index;
+}
+
+
+void AnimatorInputModel::SetDataCommand::undo()
+{
+	m_value = setValue(m_old_value);
+}
+
+
+QVariant AnimatorInputModel::SetDataCommand::setValue(const QVariant& value)
+{
+	QVariant old_value;
+	switch (m_index.column())
+	{
+		case NAME:
+			old_value = m_model->m_inputs[m_index.row()].m_name;
+			m_model->m_inputs[m_index.row()].m_name = value.toString();
+			emit m_model->dataChanged(m_index, m_index);
+			break;
+		case TYPE:
+			old_value = AnimatorInputType::staticMetaObject.enumerator(0).valueToKey(m_model->m_inputs[m_index.row()].m_type);
+			m_model->m_inputs[m_index.row()].m_type = (AnimatorInputType::Type)AnimatorInputType::staticMetaObject.enumerator(0).keyToValue(value.toString().toLatin1().data());
+			emit m_model->dataChanged(m_index, m_index);
+			break;
+		case VALUE:
+			old_value = m_model->m_inputs[m_index.row()].m_value;
+			m_model->m_inputs[m_index.row()].m_value = value;
+			switch (m_model->m_inputs[m_index.row()].m_type)
+			{
+				case AnimatorInputType::NUMBER:
+					m_model->m_animator.setInput(crc32(m_model->m_inputs[m_index.row()].m_name.toLatin1().data()), value.toFloat());
+					break;
+				default:
+					Q_ASSERT(false);
+					break;
+			}
+
+			emit m_model->dataChanged(m_index, m_index);
+			break;
+		default:
+			Q_ASSERT(false);
+			break;
+	}
+	return old_value;
+}
+
+
+void AnimatorInputModel::SetDataCommand::redo()
+{
+	m_old_value = setValue(m_value);
+}
+
+
 bool AnimatorInputModel::setData(const QModelIndex &index, const QVariant &value, int role)
 {
 	if (role == Qt::EditRole)
 	{
-		switch (index.column())
-		{
-			case NAME:
-				m_inputs[index.row()].m_name = value.toString();
-				emit dataChanged(index, index);
-				return true;
-			case TYPE:
-				m_inputs[index.row()].m_type = (AnimatorInputType::Type)AnimatorInputType::staticMetaObject.enumerator(0).keyToValue(value.toString().toLatin1().data());
-				emit dataChanged(index, index);
-				return true;
-			case VALUE:
-				m_inputs[index.row()].m_value = value;
-				switch (m_inputs[index.row()].m_type)
-				{
-					case AnimatorInputType::NUMBER:
-						m_animator.setInput(crc32(m_inputs[index.row()].m_name.toLatin1().data()), value.toFloat());
-						break;
-					default:
-						Q_ASSERT(false);
-						break;
-				}
-
-				emit dataChanged(index, index);
-				return true;
-			default:
-				return false;
-		}
+		m_undo_stack.push(new SetDataCommand(this, index, value));
+		return true;
 	}
 	return false;
 }
@@ -275,6 +543,12 @@ static QPointF normalize(QPoint point)
 {
 	float l = QPoint::dotProduct(point, point);
 	return QPointF(point) / sqrtf(l);
+}
+
+
+void StateMachineNodeContent::fillPropertyView(PropertyView& view)
+{
+	view.setModel(new ObjectModel(this), NULL);
 }
 
 
@@ -636,11 +910,7 @@ QString AnimationNodeContent::generateCode()
 
 void AnimationNodeContent::fillPropertyView(PropertyView& view)
 {
-	QTreeWidgetItem* item = view.newTopLevelItem();
-	PropertyEditor<const char*>::create("name", item, getNode()->getName().toLatin1().data(), [this](const char* value) { getNode()->setName(value); });
-	PropertyEditor<Lumix::Path>::create(view, "animation", item, Lumix::Path(m_animation_path.toLatin1().data()), [this](const char* value) { m_animation_path = value; });
-	item->setText(0, "Animation node");
-	item->treeWidget()->expandToDepth(1);
+	view.setModel(new ObjectModel(this), NULL);
 }
 
 
@@ -698,12 +968,14 @@ Animator::Animator(AnimationEditor& editor, ScriptCompiler& compiler)
 	, m_editor(editor)
 {
 	m_update_function = NULL;
+	m_is_ready_function = NULL;
+	m_set_input_function = NULL;
 	m_last_uid = 0;
 	m_root = createNode(NULL);
 	auto sm = new StateMachineNodeContent(m_root);
 	m_root->setContent(sm);
 	m_root->setName("Root");
-	m_input_model = new AnimatorInputModel(*this);
+	m_input_model = new AnimatorInputModel(*this, editor.getUndoStack());
 }
 
 
@@ -1007,12 +1279,6 @@ AnimatorNode* Animator::getNode(int uid)
 }
 
 
-void Animator::createInput()
-{
-	m_input_model->createInput();
-}
-
-
 QAbstractItemModel* Animator::getInputModel() const
 {
 	return m_input_model;
@@ -1064,9 +1330,5 @@ bool AnimatorEdge::hitTest(int x, int y) const
 
 void AnimatorEdge::fillPropertyView(PropertyView& view)
 {
-	QTreeWidgetItem* item = view.newTopLevelItem();
-	PropertyEditor<const char*>::create("condition", item, getCondition().toLatin1().data(), [this](const char* value) { setCondition(value); });
-	PropertyEditor<float>::create("duration", item, getDuration(), [this](float value) { setDuration(value); });
-	item->setText(0, "Edge");
-	item->treeWidget()->expandToDepth(1);
+	view.setModel(new ObjectModel(this), NULL);
 }

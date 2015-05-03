@@ -56,6 +56,9 @@
     <Filter Include="Header Files\animation_editor">
       <UniqueIdentifier>{af5df830-8218-4ee0-8c7c-5d344f149a10}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\property_view">
+      <UniqueIdentifier>{63aa1a4d-617d-4b7b-892d-f035bd92d110}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\tmp\studio\moc_assetbrowser.cpp">
@@ -151,12 +154,6 @@
     <ClCompile Include="..\..\..\src\studio\sceneview.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\studio\animation_editor\animable_component_plugin.cpp">
-      <Filter>Source Files\animation_editor</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\tmp\studio\moc_animable_component_plugin.cpp">
-      <Filter>Generated Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\tmp\studio\moc_animation_editor.cpp">
       <Filter>Generated Files</Filter>
     </ClCompile>
@@ -182,6 +179,24 @@
       <Filter>Generated Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\tmp\studio\moc_animator.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\studio\property_view\entity_model.cpp">
+      <Filter>Source Files\property_view</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\studio\property_view\resource_model.cpp">
+      <Filter>Source Files\property_view</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\studio\property_view\dynamic_object_model.cpp">
+      <Filter>Source Files\property_view</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\studio\obj_file.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\studio\import_asset_dialog.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tmp\studio\moc_import_asset_dialog.cpp">
       <Filter>Generated Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -261,9 +276,6 @@
     <CustomBuild Include="..\..\..\src\studio\scripts\scriptcompilerwidget.ui">
       <Filter>Form Files\script</Filter>
     </CustomBuild>
-    <CustomBuild Include="..\..\..\src\studio\animation_editor\animable_component_plugin.h">
-      <Filter>Header Files\animation_editor</Filter>
-    </CustomBuild>
     <CustomBuild Include="..\..\..\src\studio\animation_editor\animation_editor.h">
       <Filter>Header Files\animation_editor</Filter>
     </CustomBuild>
@@ -275,6 +287,12 @@
     </CustomBuild>
     <CustomBuild Include="..\..\..\src\studio\animation_editor\animator.h">
       <Filter>Header Files\animation_editor</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\src\studio\import_asset_dialog.ui">
+      <Filter>Form Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\src\studio\import_asset_dialog.h">
+      <Filter>Header Files</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
@@ -344,5 +362,25 @@
     <ClInclude Include="..\..\..\src\studio\animation_editor\animation_editor_commands.h">
       <Filter>Header Files\animation_editor</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\studio\property_view\resource_model.h">
+      <Filter>Header Files\property_view</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\studio\property_view\dynamic_object_model.h">
+      <Filter>Header Files\property_view</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\studio\obj_file.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_import_asset_dialog.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\studio\file_path_edit.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\src\studio\property_view\entity_model.h">
+      <Filter>Header Files\property_view</Filter>
+    </None>
   </ItemGroup>
 </Project>

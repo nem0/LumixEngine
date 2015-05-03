@@ -45,6 +45,25 @@ class IPropertyDescriptor
 		virtual void set(Component cmp, int index, InputBlob& stream) const = 0;
 		virtual void get(Component cmp, int index, OutputBlob& stream) const = 0;
 
+		template <typename T>
+		void setValue(Component cmp, const T& value)
+		{
+			InputBlob stream(&value, sizeof(value));
+			set(cmp, stream);
+		}
+
+		template <typename T>
+		T getValue(Component cmp)
+		{
+			T ret;
+			StackAllocator<sizeof(T)> allocator;
+			OutputBlob stream(allocator);
+			get(cmp, stream);
+			InputBlob input(stream);
+			input.read(ret);
+			return ret;
+		}
+
 		Type getType() const { return m_type; }
 		uint32_t getNameHash() const { return m_name_hash; }
 		const char* getName() const { return m_name.c_str(); }
