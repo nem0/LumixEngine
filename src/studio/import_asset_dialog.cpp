@@ -4,6 +4,7 @@
 #include "core/log.h"
 #include <qfile.h>
 #include <qfiledialog.h>
+#include <qimagewriter.h>
 #include <qmessagebox.h>
 #include <qprocess.h>
 
@@ -17,14 +18,35 @@ ImportAssetDialog::ImportAssetDialog(QWidget* parent, const QString& base_path)
 	connect(m_ui->sourceInput, &QLineEdit::textChanged, [this](const QString&) { updateStatus(); });
 	connect(m_ui->destinationInput, &QLineEdit::textChanged, [this](const QString&) { updateStatus(); });
 	connect(m_ui->animationSourceInput, &QLineEdit::textChanged, [this](const QString&) { updateStatus(); });
+	connect(m_ui->textureSourceInput, &QLineEdit::textChanged, [this](const QString&) { updateStatus(); });
 	m_ui->destinationInput->setText(QDir::currentPath());
 	updateStatus();
 }
 
 
+void ImportAssetDialog::on_browseTextureButton_clicked()
+{
+	QString path = QFileDialog::getOpenFileName(this, "Select source", QString(), "Texture files (*.png)");
+	if (!path.isEmpty())
+	{
+		m_ui->textureSourceInput->setText(path);
+	}
+}
+
+
+void ImportAssetDialog::on_browseAnimationSourceButton_clicked()
+{
+	QString path = QFileDialog::getOpenFileName(this, "Select source", QString(), "Animation files (*.blend)");
+	if (!path.isEmpty())
+	{
+		m_ui->animationSourceInput->setText(path);
+	}
+}
+
+
 void ImportAssetDialog::on_browseSourceButton_clicked()
 {
-	QString path = QFileDialog::getOpenFileName(this, "Select source", QString(), "Model files (*.obj)");
+	QString path = QFileDialog::getOpenFileName(this, "Select source", QString(), "Model files (*.obj, *.blend)");
 	if (!path.isEmpty())
 	{
 		m_ui->sourceInput->setText(path);
@@ -133,9 +155,11 @@ void ImportAssetDialog::importOBJ()
 
 void ImportAssetDialog::importAnimation()
 {
+	Q_ASSERT(!m_ui->animationSourceInput->text().isEmpty());
+
 	m_ui->progressBar->setValue(75);
 	m_ui->statusLabel->setText("Importing...");
-	QFileInfo file_info(m_ui->sourceInput->text());
+	QFileInfo file_info(m_ui->animationSourceInput->text());
 	QProcess* process = new QProcess(this);
 	QStringList list;
 	list.push_back("/C");
@@ -199,15 +223,36 @@ void ImportAssetDialog::importBlender()
 }
 
 
+void ImportAssetDialog::importTexture()
+{
+	Q_ASSERT(!m_ui->textureSourceInput->text().isEmpty());
+
+	m_ui->progressBar->setValue(75);
+	m_ui->statusLabel->setText("Importing...");
+	QFileInfo source_info(m_ui->textureSourceInput->text());
+	QImage img(source_info.absoluteFilePath());
+	QImageWriter writer(m_ui->destinationInput->text() + "/" + source_info.baseName() + ".dds");
+	if (!writer.write(img.mirrored()))
+	{
+		m_ui->statusLabel->setText("Import failed.");
+	}
+	else
+	{
+		m_ui->statusLabel->setText("Import successful.");
+	}
+	m_ui->progressBar->setValue(100);
+}
+
+
 void ImportAssetDialog::on_importButton_clicked()
 {
-	Q_ASSERT(!m_ui->sourceInput->text().isEmpty());
 	Q_ASSERT(!m_ui->destinationInput->text().isEmpty());
 
 	QFileInfo source_info(m_ui->sourceInput->text());
 
 	if (m_ui->tabWidget->currentIndex() == 0)
 	{
+		Q_ASSERT(!m_ui->sourceInput->text().isEmpty());
 		if (source_info.suffix() == "obj")
 		{
 			importOBJ();
@@ -219,9 +264,14 @@ void ImportAssetDialog::on_importButton_clicked()
 			return;
 		}
 	}
-	else
+	else if (m_ui->tabWidget->currentIndex() == 1)
 	{
 		importAnimation();
+		return;
+	}
+	else
+	{
+		importTexture();
 		return;
 	}
 	Q_ASSERT(false);
@@ -266,6 +316,20 @@ void ImportAssetDialog::updateStatus()
 			m_ui->statusLabel->setText("Unsupported file type");
 		}
 		m_ui->importButton->setEnabled(is_blender);
+	}
+
+	if (m_ui->tabWidget->currentIndex() == 2)
+	{
+		bool is_importable = m_ui->textureSourceInput->text().endsWith(".png");
+		if (is_importable)
+		{
+			m_ui->statusLabel->setText("Import possible");
+		}
+		else
+		{
+			m_ui->statusLabel->setText("Unsupported file type");
+		}
+		m_ui->importButton->setEnabled(is_importable);
 	}
 
 	bool is_blender = m_ui->sourceInput->text().endsWith(".blend");

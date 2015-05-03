@@ -27,8 +27,11 @@ class ImportAssetDialog : public QDialog
 		void importOBJ();
 		void importBlender();
 		void importAnimation();
+		void importTexture();
 
 	private slots:
+		void on_browseTextureButton_clicked();
+		void on_browseAnimationSourceButton_clicked();
 		void on_browseSourceButton_clicked();
 		void on_browseDestinationButton_clicked();
 		void on_importButton_clicked();
