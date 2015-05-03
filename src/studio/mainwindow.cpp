@@ -118,7 +118,7 @@ MainWindow::MainWindow(QWidget* parent) :
 
 void MainWindow::on_actionImport_asset_triggered()
 {
-	ImportAssetDialog* dialog = new ImportAssetDialog(this);
+	ImportAssetDialog* dialog = new ImportAssetDialog(this, m_world_editor->getBasePath());
 	dialog->show();
 
 	/*QString source_path = QFileDialog::getOpenFileName(NULL, "Select source", QString(), "Wavefront OBJ (*.obj)");

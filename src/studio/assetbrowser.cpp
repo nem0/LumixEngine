@@ -267,8 +267,7 @@ void AssetBrowser::onFileChanged(const QString& path)
 		QFileInfo file_info(path);
 		QString base_name = file_info.absolutePath() + "/" + file_info.baseName() + ".blend";
 		QFileInfo result_file_info(base_name);
-		exportAnimation(result_file_info);
-		exportModel(result_file_info);
+		importAsset(result_file_info);
 	}
 	else if(m_editor)
 	{
@@ -321,61 +320,15 @@ void AssetBrowser::on_exportFinished(int exit_code)
 }
 
 
-void AssetBrowser::exportAnimation(const QFileInfo& file_info)
-{
-	ProcessInfo process;
-	process.m_path = file_info.path().toLatin1().data();
-	process.m_process = new QProcess();
-	auto message = QString("Exporting animation %1").arg(file_info.fileName()).toLatin1();
-	process.m_notification_id = m_notifications->showProgressNotification(message.data());
-	
-	m_notifications->setProgress(process.m_notification_id, 50);
-	m_processes.append(process);
-	QStringList list;
-	list.push_back("/C");
-	list.push_back("models\\export_anim.bat");
-	list.push_back(file_info.absoluteFilePath().toLatin1().data());
-	list.push_back(m_base_path.toLatin1().data());
-	connect(process.m_process, (void (QProcess::*)(int))&QProcess::finished, this, &AssetBrowser::on_exportFinished);
-	process.m_process->start("cmd.exe", list);
-}
-
-
 void AssetBrowser::importAsset(const QFileInfo& file_info)
 {
-	ImportAssetDialog* dlg = new ImportAssetDialog(this);
-	dlg->setModelInput(file_info.filePath(), file_info.dir().path());
+	ImportAssetDialog* dlg = new ImportAssetDialog(this, m_base_path);
+	dlg->setAnimationSource(file_info.filePath());
+	dlg->setModelSource(file_info.filePath());
+	dlg->setDestination(file_info.dir().path());
 	dlg->show();
 }
 
-
-void AssetBrowser::exportModel(const QFileInfo& file_info)
-{
-	ProcessInfo process;
-	process.m_path = file_info.path().toLatin1().data();
-	process.m_process = new QProcess();
-	auto message = QString("Exporting model %1").arg(file_info.fileName()).toLatin1();
-	process.m_notification_id = m_notifications->showProgressNotification(message.data());
-	m_notifications->setProgress(process.m_notification_id, 50);
-	m_processes.append(process);
-	QStringList list;
-	if (file_info.suffix() == "fbx")
-	{
-		list.push_back(file_info.absoluteFilePath());
-		list.push_back(file_info.absolutePath() + "/" + file_info.baseName() + ".msh");
-		connect(process.m_process, (void (QProcess::*)(int))&QProcess::finished, this, &AssetBrowser::on_exportFinished);
-		process.m_process->start("editor/tools/fbx_converter.exe", list);
-	}
-	else
-	{
-		list.push_back("/C");
-		list.push_back("models\\export_mesh.bat");
-		list.push_back(file_info.absoluteFilePath().toLatin1().data());
-		list.push_back(m_base_path.toLatin1().data());
-		connect(process.m_process, (void (QProcess::*)(int))&QProcess::finished, this, &AssetBrowser::on_exportFinished);
-		process.m_process->start("cmd.exe", list);
-	}
-}
 
 void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
 {
@@ -392,32 +345,17 @@ void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
 	menu->addAction(rename_file_action);
 
 	QAction* create_dir_action = new QAction("Create directory", menu);
-	QAction* export_anim_action = new QAction("Export Animation", menu);
-	QAction* export_model_action = new QAction("Export Model", menu);
 	QAction* import_asset_action = new QAction("Import asset", menu);
 	if (file_info.isDir())
 	{
 		menu->addAction(create_dir_action);
 	}
-	if (file_info.suffix() == "blend" || file_info.suffix() == "fbx")
-	{
-		menu->addAction(export_anim_action);
-		menu->addAction(export_model_action);
-	}
-	if (file_info.suffix() == "obj")
+	if (file_info.suffix() == "obj" || file_info.suffix() == "blend")
 	{
 		menu->addAction(import_asset_action);
 	}
 	selected_action = menu->exec(mapToGlobal(pos));
-	if (selected_action == export_anim_action)
-	{
-		exportAnimation(file_info);
-	}
-	else if (selected_action == export_model_action)
-	{
-		exportModel(file_info);
-	}
-	else if (selected_action == import_asset_action)
+	if (selected_action == import_asset_action)
 	{
 		importAsset(file_info);
 	}
