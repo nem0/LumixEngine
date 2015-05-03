@@ -197,6 +197,7 @@ bool OBJFile::load(const QString& path)
 		}
 	}
 	calculateTangents();
+	qSort(m_meshes.begin(), m_meshes.end(), [](const Mesh& a, const Mesh& b) { return a.m_material < b.m_material; });
 	return loadMaterialLibrary(path);
 }
 
@@ -214,28 +215,43 @@ void writeAttribute(const char* attribute_name, VertexAttributeDef attribute_typ
 
 void OBJFile::writeMeshes(QFile& file)
 {
-	int32_t mesh_count = m_meshes.size();
-	file.write((const char*)&mesh_count, sizeof(mesh_count));
-
-	int32_t attribute_array_offset = 0;
+	int32_t mesh_count = 0;
 	for (int i = 0; i < m_meshes.size(); ++i)
 	{
-		auto material_name = m_meshes[i].m_material.toLatin1();
+		if (i == 0 || m_meshes[i].m_material != m_meshes[i - 1].m_material)
+		{
+			++mesh_count;
+		}
+	}
+
+	file.write((const char*)&mesh_count, sizeof(mesh_count));
+	int32_t attribute_array_offset = 0;
+	int32_t indices_offset = 0;
+	int i = 0;
+	while (i < m_meshes.size())
+	{
+		const Mesh& mesh = m_meshes[i];
+		auto material_name = mesh.m_material.toLatin1();
 		int32_t length = strlen(material_name.data());
 		file.write((const char*)&length, sizeof(length));
 		file.write((const char*)material_name.data(), length);
 
 		file.write((const char*)&attribute_array_offset, sizeof(attribute_array_offset));
-		int32_t attribute_array_size = m_meshes[i].m_index_count * VERTEX_SIZE;
+		int32_t attribute_array_size = 0;
+		while (i < m_meshes.size() && m_meshes[i].m_material == mesh.m_material)
+		{
+			attribute_array_size += m_meshes[i].m_index_count * VERTEX_SIZE;
+			++i;
+		}
 		attribute_array_offset += attribute_array_size;
 		file.write((const char*)&attribute_array_size, sizeof(attribute_array_size));
 
-		int32_t indices_offset = m_meshes[i].m_index_from;
 		file.write((const char*)&indices_offset, sizeof(indices_offset));
-		int32_t mesh_tri_count = m_meshes[i].m_index_count / 3;
+		int32_t mesh_tri_count = attribute_array_size / VERTEX_SIZE / 3;
+		indices_offset += mesh_tri_count * 3;
 		file.write((const char*)&mesh_tri_count, sizeof(mesh_tri_count));
 
-		auto mesh_name = m_meshes[i].m_material.toLatin1();
+		auto mesh_name = mesh.m_material.toLatin1();
 		length = strlen(mesh_name.data());
 		file.write((const char*)&length, sizeof(length));
 		file.write((const char*)mesh_name.data(), length);
@@ -254,10 +270,15 @@ void OBJFile::writeGeometry(QFile& file)
 {
 	int32_t indices_count = m_triangles.size() * 3;
 	file.write((const char*)&indices_count, sizeof(indices_count));
+	int32_t polygon_idx = 0;
 	for (int i = 0; i < m_meshes.size(); ++i)
 	{
 		const Mesh& mesh = m_meshes[i];
-		for (int32_t polygon_idx = 0; polygon_idx < mesh.m_index_count; ++polygon_idx)
+		if (i > 0 && m_meshes[i].m_material != m_meshes[i - 1].m_material)
+		{
+			polygon_idx = 0;
+		}
+		for (int i = 0; i < mesh.m_index_count; ++i, ++polygon_idx)
 		{
 			file.write((const char*)&polygon_idx, sizeof(polygon_idx));
 		}
@@ -266,23 +287,27 @@ void OBJFile::writeGeometry(QFile& file)
 	int32_t vertices_size = m_triangles.size() * 3 * VERTEX_SIZE;
 	file.write((const char*)&vertices_size, sizeof(vertices_size));
 
-	for (int i = 0, c = m_triangles.size(); i < c; ++i)
+	for (auto mesh : m_meshes)
 	{
-		for (int j = 0; j < 3; ++j)
+		for (int i = 0; i < mesh.m_index_count / 3; ++i)
 		{
-			file.write((const char*)&m_positions[m_triangles[i].i[j].position], sizeof(m_positions[0]));
-			
-			auto normal = m_normals[m_triangles[i].i[j].normal];
-			uint8_t byte_normal[4] = { (int8_t)(normal.x * 127), (int8_t)(normal.z * 127), (int8_t)(normal.y * 127), 0 };
-			file.write((const char*)byte_normal, sizeof(byte_normal));
+			for (int j = 0; j < 3; ++j)
+			{
+				int tri_index = mesh.m_index_from / 3 + i;
+				file.write((const char*)&m_positions[m_triangles[tri_index].i[j].position], sizeof(m_positions[0]));
 
-			auto tangent = m_tangents[i * 3 + j];
-			uint8_t byte_tangent[4] = { (int8_t)(tangent.x * 127), (int8_t)(tangent.z * 127), (int8_t)(tangent.y * 127), 0 };
-			file.write((const char*)byte_tangent, sizeof(byte_tangent));
+				auto normal = m_normals[m_triangles[tri_index].i[j].normal];
+				uint8_t byte_normal[4] = { (int8_t)(normal.x * 127), (int8_t)(normal.z * 127), (int8_t)(normal.y * 127), 0 };
+				file.write((const char*)byte_normal, sizeof(byte_normal));
 
-			auto uv = m_tex_coords[m_triangles[i].i[j].tex_coord];
-			short short_uv[2] = { (short)(uv.x * 2048), (short)(uv.y * 2048) };
-			file.write((const char*)short_uv, sizeof(short_uv));
+				auto tangent = m_tangents[tri_index * 3 + j];
+				uint8_t byte_tangent[4] = { (int8_t)(tangent.x * 127), (int8_t)(tangent.z * 127), (int8_t)(tangent.y * 127), 0 };
+				file.write((const char*)byte_tangent, sizeof(byte_tangent));
+
+				auto uv = m_tex_coords[m_triangles[tri_index].i[j].tex_coord];
+				short short_uv[2] = { (short)(uv.x * 2048), (short)(uv.y * 2048) };
+				file.write((const char*)short_uv, sizeof(short_uv));
+			}
 		}
 	}
 }
@@ -410,7 +435,14 @@ bool OBJFile::saveLumixMesh(const QString& path)
 
 	int32_t lod_count = 1;
 	file.write((const char*)&lod_count, sizeof(lod_count));
-	int32_t to_mesh = m_meshes.size() - 1;
+	int32_t to_mesh = -1;
+	for (int i = 0; i < m_meshes.size(); ++i)
+	{
+		if (i == 0 || m_meshes[i].m_material != m_meshes[i - 1].m_material)
+		{
+			++to_mesh;
+		}
+	}
 	file.write((const char*)&to_mesh, sizeof(to_mesh));
 	float distance = FLT_MAX;
 	file.write((const char*)&distance, sizeof(distance));
