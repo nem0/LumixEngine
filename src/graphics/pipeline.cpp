@@ -437,7 +437,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_draw_calls_count = 0;
 		m_vertices_count = 0;
 		m_scene = NULL;
-		m_light_dir.set(0, -1, 0);
 		m_width = m_height = -1;
 		m_framebuffer_width = m_framebuffer_height = -1;
 		m_shadowmap_framebuffer = NULL;
@@ -561,7 +560,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 		glClear(GL_DEPTH_BUFFER_BIT);
 		
 		Matrix light_mtx = light_cmp.entity.getMatrix();
-		m_light_dir = light_mtx.getZVector();
 
 		float shadowmap_height = (float)m_shadowmap_framebuffer->getHeight();
 		float shadowmap_width = (float)m_shadowmap_framebuffer->getWidth();
@@ -643,9 +641,9 @@ struct PipelineInstanceImpl : public PipelineInstance
 				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_COLOR, m_scene->getFogColor(light_cmp));
 				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
 				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOWMAP_SPLITS, m_shadowmap_splits);
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::LIGHT_DIR, light_cmp.entity.getRotation() * Vec3(0, 0, 1));
 			}
 			m_renderer->setUniform(*shader, "camera_pos", CAMERA_POS_HASH, m_active_camera.entity.getPosition());
-			m_renderer->setUniform(*shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
 
 			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::WORLD_MATRIX, Matrix::IDENTITY);
 			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::PROJECTION_MATRIX, mtx);
@@ -741,6 +739,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOWMAP_SPLITS, m_shadowmap_splits);
 				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::LIGHT_POSITION, light_cmp.entity.getPosition());
 				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::LIGHT_RANGE, m_scene->getLightRange(light_cmp));
+				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::LIGHT_FOV, Math::degreesToRadians(m_scene->getLightFOV(light_cmp)));
 			}
 			else
 			{
@@ -756,7 +755,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
 				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOWMAP_SPLITS, m_shadowmap_splits);
 			}
-			m_renderer->setUniform(*shader, "light_dir", LIGHT_DIR_HASH, m_light_dir);
+			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::LIGHT_DIR, light_cmp.entity.getRotation() * Vec3(0, 0, 1));
 		}
 	}
 
@@ -866,7 +865,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		const Material& material = *mesh->getMaterial();
 		Shader* shader = material.getShader();
 		uint32_t pass_hash = getRenderer().getPass();
-		if (!shader->hasPass(pass_hash) || !material.isReady())
+		if (!material.isReady() || !shader->hasPass(pass_hash))
 		{
 			return false;
 		}
@@ -1159,7 +1158,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 	FrameBuffer* m_shadowmap_framebuffer;
 	Matrix m_shadow_modelviewprojection[4];
 	Renderer* m_renderer;
-	Vec3 m_light_dir;
 	Vec4 m_shadowmap_splits;
 	int m_width;
 	int m_height;

@@ -64,6 +64,16 @@
             </property>
            </widget>
           </item>
+          <item>
+           <widget class="QLabel" name="label">
+            <property name="text">
+             <string>Filter:</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLineEdit" name="filterInput"/>
+          </item>
          </layout>
         </widget>
        </item>

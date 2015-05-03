@@ -1,6 +1,5 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
-#include "animation_editor/animable_component_plugin.h"
 #include "animation_editor/animation_editor.h"
 #include "assetbrowser.h"
 #include "editor/entity_template_system.h"
@@ -11,6 +10,7 @@
 #include "entity_template_list.h"
 #include "fileserverwidget.h"
 #include "gameview.h"
+#include "import_asset_dialog.h"
 #include "log_widget.h"
 #include "notifications.h"
 #include "property_view.h"
@@ -113,6 +113,30 @@ MainWindow::MainWindow(QWidget* parent) :
 	}
 }
 
+#include "obj_file.h"
+
+
+void MainWindow::on_actionImport_asset_triggered()
+{
+	ImportAssetDialog* dialog = new ImportAssetDialog(this, m_world_editor->getBasePath());
+	dialog->show();
+
+	/*QString source_path = QFileDialog::getOpenFileName(NULL, "Select source", QString(), "Wavefront OBJ (*.obj)");
+	if (source_path.endsWith(".obj", Qt::CaseInsensitive))
+	{
+		OBJFile file;
+		if (file.load(source_path))
+		{
+			QString dest = QFileDialog::getExistingDirectory(NULL, "Select destination", QDir::currentPath());
+			if (!dest.isEmpty())
+			{
+				QFileInfo source_info(source_path);
+				file.saveLumixMesh(dest + "/" + source_info.baseName() + ".msh");
+			}
+		}
+	}*/
+}
+
 
 QMenuBar* MainWindow::getMenuBar() const
 {
@@ -123,15 +147,6 @@ QMenuBar* MainWindow::getMenuBar() const
 ScriptCompiler* MainWindow::getScriptCompiler() const
 {
 	return m_script_compiler_ui->getCompiler();
-}
-
-
-void MainWindow::installPlugins()
-{
-	m_property_view->addEntityComponentPlugin(new ScriptComponentPlugin(*m_world_editor, *m_script_compiler_ui->getCompiler()));
-	m_property_view->addEntityComponentPlugin(new TerrainComponentPlugin(*m_world_editor, m_entity_template_list_ui, m_entity_list));
-	m_property_view->addEntityComponentPlugin(new GlobalLightComponentPlugin());
-	m_property_view->addEntityComponentPlugin(new AnimableComponentPlugin(*m_animation_editor));
 }
 
 
@@ -256,8 +271,6 @@ void MainWindow::setWorldEditor(Lumix::WorldEditor& editor)
 	m_script_compiler_ui->setWorldEditor(editor);
 
 	m_world_editor->universeLoaded().bind<MainWindow, &MainWindow::onUniverseLoaded>(this);
-
-	installPlugins();
 }
 
 void MainWindow::onUniverseLoaded()

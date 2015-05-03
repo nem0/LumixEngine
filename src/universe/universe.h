@@ -33,6 +33,7 @@ class LUMIX_ENGINE_API Universe final
 		~Universe();
 
 		IAllocator& getAllocator() { return m_allocator; }
+		void createEntity(const Entity& entity);
 		Entity createEntity();
 		void destroyEntity(Entity& entity);
 		Vec3 getPosition(int index) { return m_positions[index]; }

@@ -14,7 +14,7 @@ class AnimationInputs : public QDockWidget
 		AnimationInputs(AnimationEditor& editor);
 
 	private:
-		void AnimationInputs::showContextMenu(const QPoint& pos);
+		void showContextMenu(const QPoint& pos);
 
 	private:
 		AnimationEditor& m_editor;

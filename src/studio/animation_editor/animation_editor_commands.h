@@ -11,8 +11,6 @@
 class CreateAnimatorNodeCommand : public QUndoCommand
 {
 	public:
-
-	public:
 		CreateAnimatorNodeCommand(uint32_t type, Animator* animator, int parent_uid, const QPoint& position);
 
 		virtual void undo() override;

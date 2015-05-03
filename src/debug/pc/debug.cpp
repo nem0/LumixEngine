@@ -20,6 +20,8 @@ BOOL SendFile(LPCSTR lpszSubject, LPCSTR lpszTo,
 	  LPCSTR lpszFullFileName)
 {
 	HINSTANCE hMAPI = ::LoadLibrary("mapi32.dll");
+	if (!hMAPI)
+		return FALSE;
 	LPMAPISENDMAIL lpfnMAPISendMail = 
 		(LPMAPISENDMAIL)::GetProcAddress(hMAPI, "MAPISendMail");
 

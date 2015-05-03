@@ -117,6 +117,7 @@ namespace Lumix
 			virtual void addDebugCylinder(const Vec3& position, const Vec3& up, float radius, const Vec3& color, float life) = 0;
 
 			virtual const Array<DebugLine>& getDebugLines() const = 0;
+			
 			virtual Component getCameraInSlot(const char* slot) = 0;
 			virtual float getCameraFOV(Component camera) = 0;
 			virtual void setCameraFOV(Component camera, float fov) = 0;
@@ -129,6 +130,7 @@ namespace Lumix
 			virtual void setCameraSlot(Component camera, const string& slot) = 0;
 			virtual void getCameraSlot(Component camera, string& slot) = 0;
 			virtual void setCameraSize(Component camera, int w, int h) = 0;
+			
 			virtual void setRenderableIsAlwaysVisible(Component cmp, bool value) = 0;
 			virtual bool isRenderableAlwaysVisible(Component cmp) = 0;
 			virtual void showRenderable(Component cmp) = 0;
@@ -138,15 +140,12 @@ namespace Lumix
 			virtual void setRenderableLayer(Component cmp, const int32_t& layer) = 0;
 			virtual void setRenderablePath(Component cmp, const string& path) = 0;
 			virtual void setRenderableScale(Component cmp, float scale) = 0;
-			virtual Entity getPointLightEntity(Component cmp) = 0;
-			virtual void getPointLights(const Frustum& frustum, Array<Component>& lights) = 0;
-			virtual void getPointLightInfluencedGeometry(const Component& light_cmp, const Frustum& frustum, Array<RenderableInfo>& infos, int64_t layer_mask) = 0;
 			virtual void getRenderableInfos(const Frustum& frustum, Array<RenderableInfo>& infos, int64_t layer_mask) = 0;
 			virtual void getRenderableMeshes(Array<RenderableMesh>& meshes, int64_t layer_mask) = 0;
 			virtual Component getFirstRenderable() = 0;
 			virtual Component getNextRenderable(const Component& cmp) = 0;
 			virtual Model* getRenderableModel(Component cmp) = 0;
-			
+
 			virtual void getGrassInfos(const Frustum& frustum, Array<RenderableInfo>& infos, int64_t layer_mask) = 0;
 			virtual void getTerrainInfos(Array<RenderableInfo>& infos, int64_t layer_mask, const Vec3& camera_pos, LIFOAllocator& allocator) = 0;
 			virtual float getTerrainHeightAt(Component cmp, float x, float z) = 0;
@@ -169,6 +168,11 @@ namespace Lumix
 			virtual void addGrass(Component cmp, int index) = 0;
 			virtual void removeGrass(Component cmp, int index) = 0;
 
+			virtual Entity getPointLightEntity(Component cmp) = 0;
+			virtual void getPointLights(const Frustum& frustum, Array<Component>& lights) = 0;
+			virtual void getPointLightInfluencedGeometry(const Component& light_cmp, const Frustum& frustum, Array<RenderableInfo>& infos, int64_t layer_mask) = 0;
+			virtual float getLightFOV(Component cmp) = 0;
+			virtual void setLightFOV(Component cmp, float fov) = 0;
 			virtual float getLightRange(Component cmp) = 0;
 			virtual void setLightRange(Component cmp, float range) = 0;
 			virtual void setPointLightIntensity(Component cmp, float intensity) = 0;

@@ -82,7 +82,8 @@ class AnimationEditor : public QDockWidget
 		void executeCommand(QUndoCommand* command);
 		PropertyView& getPropertyView() { return m_property_view; }
 		AnimatorNodeContent* createContent(AnimatorNode& node, uint32_t content_type);
-
+		QUndoStack& getUndoStack() { return m_undo_stack; }
+	
 	signals:
 		void animatorCreated();
 
@@ -122,5 +123,6 @@ class AnimationEditor : public QDockWidget
 		QAction* m_save_action;
 		QAction* m_save_as_action;
 		QAction* m_load_action;
-
+		QAction* m_undo_action;
+		QAction* m_redo_action;
 };

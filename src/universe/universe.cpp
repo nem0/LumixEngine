@@ -36,6 +36,25 @@ Universe::Universe(IAllocator& allocator)
 }
 
 
+void Universe::createEntity(const Entity& entity)
+{
+	ASSERT(entity.universe == this);
+	ASSERT(entity.isValid());
+	for (int i = 0; i < m_free_slots.size(); ++i)
+	{
+		if (m_free_slots[i] == entity.index)
+		{
+			m_free_slots.eraseFast(i);
+			m_positions[entity.index].set(0, 0, 0);
+			m_rotations[entity.index].set(0, 0, 0, 1);
+			m_entity_created.invoke(entity);
+			return;
+		}
+	}
+	ASSERT(false);
+}
+
+
 Entity Universe::createEntity()
 {
 	if(m_free_slots.empty())

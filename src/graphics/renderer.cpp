@@ -330,6 +330,7 @@ struct RendererImpl : public Renderer
 			editor.registerProperty("point_light", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("intensity", &RenderScene::getPointLightIntensity, &RenderScene::setPointLightIntensity, allocator));
 			editor.registerProperty("point_light", allocator.newObject<ColorPropertyDescriptor<RenderScene> >("color", &RenderScene::getPointLightColor, &RenderScene::setPointLightColor, allocator));
 			editor.registerProperty("point_light", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("range", &RenderScene::getLightRange, &RenderScene::setLightRange, allocator));
+			editor.registerProperty("point_light", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("FOV", &RenderScene::getLightFOV, &RenderScene::setLightFOV, allocator));
 
 			editor.registerProperty("terrain", allocator.newObject<ResourcePropertyDescriptor<RenderScene> >("material", &RenderScene::getTerrainMaterial, &RenderScene::setTerrainMaterial, "Material (*.mat)", allocator));
 			editor.registerProperty("terrain", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("xz_scale", &RenderScene::getTerrainXZScale, &RenderScene::setTerrainXZScale, allocator));

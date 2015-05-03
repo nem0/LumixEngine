@@ -91,6 +91,7 @@ namespace Lumix
 			virtual void selectEntitiesWithSameMesh() = 0;
 			virtual Entity addEntityAt(int camera_x, int camera_y) = 0;
 			virtual void setEntitiesPositions(const Array<Entity>& entity, const Array<Vec3>& position) = 0;
+			virtual void setEntitiesRotations(const Array<Entity>& entity, const Array<Quat>& rotations) = 0;
 			virtual void setEntityPositionAndRotaion(const Array<Entity>& entity, const Array<Vec3>& position, const Array<Quat>& rotation) = 0;
 			virtual void setEntityName(const Entity& entity, const char* name) = 0;
 			virtual void snapToTerrain() = 0;
@@ -110,11 +111,16 @@ namespace Lumix
 			virtual const Array<Entity>& getSelectedEntities() const = 0;
 			virtual const IPropertyDescriptor& getPropertyDescriptor(uint32_t type, uint32_t name_hash) = 0;
 			virtual Array<IPropertyDescriptor*>& getPropertyDescriptors(uint32_t type) = 0;
+			
 			virtual DelegateList<void(const Array<Entity>&)>& entitySelected() = 0;
 			virtual DelegateList<void()>& universeCreated() = 0;
 			virtual DelegateList<void()>& universeDestroyed() = 0;
 			virtual DelegateList<void()>& universeLoaded() = 0;
 			virtual DelegateList<void(const Entity&, const char*)>& entityNameSet() = 0;
+			virtual DelegateList<void(Component, const IPropertyDescriptor&)>& propertySet() = 0;
+			virtual DelegateList<void(Component)>& componentAdded() = 0;
+			virtual DelegateList<void(Component)>& componentDestroyed() = 0;
+
 			virtual void addPlugin(Plugin* plugin) = 0;
 			virtual void getRelativePath(char* relative_path, int max_length, const Path& source) = 0;
 			virtual EntityTemplateSystem& getEntityTemplateSystem() = 0;
