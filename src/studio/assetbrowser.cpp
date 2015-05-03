@@ -323,9 +323,16 @@ void AssetBrowser::on_exportFinished(int exit_code)
 void AssetBrowser::importAsset(const QFileInfo& file_info)
 {
 	ImportAssetDialog* dlg = new ImportAssetDialog(this, m_base_path);
-	dlg->setAnimationSource(file_info.filePath());
-	dlg->setModelSource(file_info.filePath());
-	dlg->setDestination(file_info.dir().path());
+	if (!file_info.isDir())
+	{
+		dlg->setAnimationSource(file_info.filePath());
+		dlg->setModelSource(file_info.filePath());
+		dlg->setDestination(file_info.dir().path());
+	}
+	else
+	{
+		dlg->setDestination(file_info.absoluteFilePath());
+	}
 	dlg->show();
 }
 
@@ -348,6 +355,7 @@ void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
 	QAction* import_asset_action = new QAction("Import asset", menu);
 	if (file_info.isDir())
 	{
+		menu->addAction(import_asset_action);
 		menu->addAction(create_dir_action);
 	}
 	if (file_info.suffix() == "obj" || file_info.suffix() == "blend")
