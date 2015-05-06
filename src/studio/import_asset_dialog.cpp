@@ -659,38 +659,6 @@ void ImportAssetDialog::importAnimation()
 			file.close();
 		}
 	}
-
-	/*
-	m_ui->progressBar->setValue(75);
-	m_ui->statusLabel->setText("Importing...");
-	QFileInfo file_info(m_ui->animationSourceInput->text());
-	QProcess* process = new QProcess(this);
-	QStringList list;
-	list.push_back("/C");
-	list.push_back("models\\export_anim.bat");
-	list.push_back(file_info.absoluteFilePath());
-	list.push_back(m_ui->destinationInput->text() + "/" + file_info.baseName() + ".ani");
-	list.push_back(m_base_path);
-	connect(process, (void (QProcess::*)(int))&QProcess::finished, [process, this](int exit_code) {
-		QString s = process->readAll();
-		process->deleteLater();
-		while (process->waitForReadyRead())
-		{
-			s += process->readAll();
-		}
-		process->deleteLater();
-		if (exit_code != 0)
-		{
-			Lumix::g_log_error.log("import") << s.toLatin1().data();
-			m_ui->progressBar->setValue(100);
-			m_ui->statusLabel->setText("Import failed.");
-			return;
-		}
-		m_ui->progressBar->setValue(100);
-		m_ui->statusLabel->setText("Import successful.");
-	});
-	process->start("cmd.exe", list);*/
-	TODO("animation");
 }
 
 

@@ -1,5 +1,6 @@
 #include "assetbrowser.h"
 #include "ui_assetbrowser.h"
+#include "assimp/Importer.hpp"
 #include "file_system_watcher.h"
 #include "core/crc32.h"
 #include "core/log.h"
@@ -14,6 +15,7 @@
 #include <qdesktopservices.h>
 #include <qfileiconprovider.h>
 #include <qfilesystemmodel.h>
+#include <qimagereader.h>
 #include <qinputdialog.h>
 #include <qmenu.h>
 #include <qmessagebox.h>
@@ -158,9 +160,25 @@ class FlatFileListModel : public QAbstractItemModel
 };
 
 
-void getDefaultFilters(QStringList& filters)
+static void getTextureFilters(QStringList& filters)
 {
-	filters << "*.msh" << "*.unv" << "*.ani" << "*.blend" << "*.obj" << "*.tga" << "*.mat" << "*.dds" << "*.fbx" << "*.shd" << "*.json";
+	auto image_formats = QImageReader::supportedImageFormats();
+	for (auto format : image_formats)
+	{
+		filters << QString("*.") + format;
+	}
+
+}
+
+
+static void getDefaultFilters(QStringList& filters)
+{
+	filters << "*.msh" << "*.unv" << "*.ani" <<  "*.mat" << "*.fbx" << "*.shd" << "*.json";
+	Assimp::Importer importer;
+	aiString extension_list;
+	importer.GetExtensionList(extension_list);
+	filters << QString(extension_list.C_Str()).split(';');
+	getTextureFilters(filters);
 }
 
 
@@ -177,7 +195,7 @@ AssetBrowser::AssetBrowser(QWidget* parent) :
 	m_model = new QFileSystemModel;
 	m_model->setRootPath(QDir::currentPath());
 	QStringList filters;
-	filters << "*.*";
+	getDefaultFilters(filters);
 	m_model->setReadOnly(false);
 	setExtentionsFilter(filters);
 	m_model->setNameFilterDisables(false);
@@ -409,11 +427,7 @@ void AssetBrowser::setExtentionsFilter(const QStringList& filters)
 void AssetBrowser::on_filterComboBox_currentTextChanged(const QString&)
 {
 	QStringList filters;
-	if (m_ui->filterComboBox->currentText() == "All known")
-	{
-		filters << "*.*";
-	}
-	else if(m_ui->filterComboBox->currentText() == "All known")
+	if(m_ui->filterComboBox->currentText() == "All")
 	{
 		getDefaultFilters(filters);
 	}
@@ -439,7 +453,7 @@ void AssetBrowser::on_filterComboBox_currentTextChanged(const QString&)
 	}
 	else if (m_ui->filterComboBox->currentText() == "Texture")
 	{
-		filters << "*.tga" << "*.dds";
+		getTextureFilters(filters);
 	}
 	setExtentionsFilter(filters);
 }
