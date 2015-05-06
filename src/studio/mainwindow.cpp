@@ -113,28 +113,11 @@ MainWindow::MainWindow(QWidget* parent) :
 	}
 }
 
-#include "obj_file.h"
-
 
 void MainWindow::on_actionImport_asset_triggered()
 {
 	ImportAssetDialog* dialog = new ImportAssetDialog(this, m_world_editor->getBasePath());
 	dialog->show();
-
-	/*QString source_path = QFileDialog::getOpenFileName(NULL, "Select source", QString(), "Wavefront OBJ (*.obj)");
-	if (source_path.endsWith(".obj", Qt::CaseInsensitive))
-	{
-		OBJFile file;
-		if (file.load(source_path))
-		{
-			QString dest = QFileDialog::getExistingDirectory(NULL, "Select destination", QDir::currentPath());
-			if (!dest.isEmpty())
-			{
-				QFileInfo source_info(source_path);
-				file.saveLumixMesh(dest + "/" + source_info.baseName() + ".msh");
-			}
-		}
-	}*/
 }
 
 

@@ -190,9 +190,6 @@
     <ClCompile Include="..\..\..\src\studio\property_view\dynamic_object_model.cpp">
       <Filter>Source Files\property_view</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\studio\obj_file.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\studio\import_asset_dialog.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -367,9 +364,6 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\studio\property_view\dynamic_object_model.h">
       <Filter>Header Files\property_view</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\studio\obj_file.h">
-      <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_import_asset_dialog.h">
       <Filter>Generated Files</Filter>
