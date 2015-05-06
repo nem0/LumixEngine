@@ -177,7 +177,7 @@ AssetBrowser::AssetBrowser(QWidget* parent) :
 	m_model = new QFileSystemModel;
 	m_model->setRootPath(QDir::currentPath());
 	QStringList filters;
-	getDefaultFilters(filters);
+	filters << "*.*";
 	m_model->setReadOnly(false);
 	setExtentionsFilter(filters);
 	m_model->setNameFilterDisables(false);
@@ -325,8 +325,7 @@ void AssetBrowser::importAsset(const QFileInfo& file_info)
 	ImportAssetDialog* dlg = new ImportAssetDialog(this, m_base_path);
 	if (!file_info.isDir())
 	{
-		dlg->setAnimationSource(file_info.filePath());
-		dlg->setModelSource(file_info.filePath());
+		dlg->setSource(file_info.filePath());
 		dlg->setDestination(file_info.dir().path());
 	}
 	else
@@ -358,7 +357,7 @@ void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
 		menu->addAction(import_asset_action);
 		menu->addAction(create_dir_action);
 	}
-	if (file_info.suffix() == "obj" || file_info.suffix() == "blend")
+	if (file_info.suffix() == "obj" || file_info.suffix() == "blend" || file_info.suffix() == "x")
 	{
 		menu->addAction(import_asset_action);
 	}
@@ -410,7 +409,11 @@ void AssetBrowser::setExtentionsFilter(const QStringList& filters)
 void AssetBrowser::on_filterComboBox_currentTextChanged(const QString&)
 {
 	QStringList filters;
-	if(m_ui->filterComboBox->currentText() == "All")
+	if (m_ui->filterComboBox->currentText() == "All known")
+	{
+		filters << "*.*";
+	}
+	else if(m_ui->filterComboBox->currentText() == "All known")
 	{
 		getDefaultFilters(filters);
 	}

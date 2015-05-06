@@ -1,6 +1,4 @@
 #include "mainwindow.h"
-#include <QApplication>
-#include <qdir.h>
 #include "core/log.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
@@ -11,7 +9,7 @@
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
 #include "fps_limiter.h"
-#include <graphics/gl_ext.h>
+#include "graphics/gl_ext.h"
 #include "graphics/irender_device.h"
 #include "graphics/pipeline.h"
 #include "graphics/renderer.h"
@@ -20,6 +18,9 @@
 #include "sceneview.h"
 #include "gameview.h"
 #include "wgl_render_device.h"
+#include <QApplication>
+#include <qdir.h>
+
 
 class App
 {

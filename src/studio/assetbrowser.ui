@@ -70,6 +70,11 @@
       </item>
       <item>
        <property name="text">
+        <string>All known</string>
+       </property>
+      </item>
+      <item>
+       <property name="text">
         <string>Animation</string>
        </property>
       </item>

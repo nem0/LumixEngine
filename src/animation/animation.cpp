@@ -13,18 +13,7 @@
 
 namespace Lumix
 {
-
-
-static const uint32_t ANIMATION_HEADER_MAGIC = 0x5f4c4146; // '_LAF'
-
-
-struct AnimationHeader
-{
-	uint32_t magic;
-	uint32_t version;
-	uint32_t fps;
-};
-
+	
 
 Resource* AnimationManager::createResource(const Path& path)
 {
@@ -81,14 +70,6 @@ void Animation::getPose(float time, Pose& pose, Model& model) const
 					int model_bone_index = iter.value();
 					lerp(m_positions[off + i], m_positions[off2 + i], &pos[model_bone_index], t);
 					nlerp(m_rotations[off + i], m_rotations[off2 + i], &rot[model_bone_index], t);
-
-					/*int parent = model.getBone(model_bone_index).parent_idx;
-					ASSERT(parent < model_bone_index);
-					if (parent >= 0)
-					{
-						pos[model_bone_index] = rot[parent] * pos[model_bone_index] + pos[parent];
-						rot[model_bone_index] = rot[model_bone_index] * rot[parent];
-					}*/
 				}
 			}
 		}
@@ -102,13 +83,6 @@ void Animation::getPose(float time, Pose& pose, Model& model) const
 					int model_bone_index = iter.value();
 					pos[model_bone_index] = m_positions[off + i];
 					rot[model_bone_index] = m_rotations[off + i];
-					/*int parent = model.getBone(model_bone_index).parent_idx;
-					ASSERT(parent < model_bone_index);
-					if (parent >= 0)
-					{
-						pos[model_bone_index] = rot[parent] * pos[model_bone_index] + pos[parent];
-						rot[model_bone_index] = rot[model_bone_index] * rot[parent];
-					}*/
 				}
 			}
 		}
@@ -130,9 +104,9 @@ void Animation::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		m_rotations = NULL;
 		m_bones = 0;
 		m_frame_count = m_bone_count = 0;
-		AnimationHeader header;
+		Header header;
 		file->read(&header, sizeof(header));
-		if (header.magic != ANIMATION_HEADER_MAGIC)
+		if (header.magic != HEADER_MAGIC)
 		{
 			fs.close(file);
 			onFailure();

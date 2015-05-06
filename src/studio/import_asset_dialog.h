@@ -1,7 +1,10 @@
 #pragma once
 
 
-#include<qdialog.h>
+#include "assimp/Importer.hpp"
+#include "assimp/progresshandler.hpp"
+#include <qdialog.h>
+#include <qthread.h>
 
 
 namespace Ui
@@ -10,33 +13,77 @@ namespace Ui
 }
 
 
+class ImportAssetDialog;
+class QFile;
+
+
+class ImportThread : public QThread, public Assimp::ProgressHandler
+{
+	Q_OBJECT
+
+	public:
+		ImportThread(ImportAssetDialog& dialog);
+		~ImportThread();
+	
+		virtual bool Update(float percentage = -1.f) override { emit progress(percentage / 3); return true; }
+		virtual void run() override;
+		void setSource(const QString& source) { m_source = source; }
+		void setDestination(const QString& destination) { m_destination = destination; }
+		void setConvertTexturesToDDS(bool convert) { m_convert_texture_to_DDS = convert; }
+		void setImportMaterials(bool import_materials) { m_import_materials = import_materials; }
+
+	private:
+		void writeSkeleton(QFile& file);
+		void writeMeshes(QFile& file);
+		void writeGeometry(QFile& file);
+		bool saveLumixMaterials();
+		bool saveLumixMesh();
+
+	signals:
+		void progress(float percentage);
+
+	private:
+		QString m_source;
+		QString m_destination;
+		ImportAssetDialog& m_dialog;
+		bool m_import_materials;
+		bool m_convert_texture_to_DDS;
+		Assimp::Importer& m_importer;
+};
+
+
 class ImportAssetDialog : public QDialog
 {
 	Q_OBJECT
 
 	public:
 		ImportAssetDialog(QWidget* parent, const QString& base_path);
-		void setModelSource(const QString& source);
+		void setSource(const QString& source);
 		void setDestination(const QString& destination);
-		void setAnimationSource(const QString& source);
+		Assimp::Importer& getImporter() { return m_importer; }
 		~ImportAssetDialog();
 
 	private:
-		void updateStatus();
-		bool createMaterials(class OBJFile& file, const QString& path);
-		void importOBJ();
-		void importBlender();
+		void importModel();
 		void importAnimation();
 		void importTexture();
+		bool saveLumixMesh(const QString& path);
+		bool saveLumixMaterials(const QString& path);
+		void writeMeshes(QFile& file);
+		void writeGeometry(QFile& file);
 
 	private slots:
-		void on_browseTextureButton_clicked();
-		void on_browseAnimationSourceButton_clicked();
 		void on_browseSourceButton_clicked();
 		void on_browseDestinationButton_clicked();
 		void on_importButton_clicked();
+		void on_progressUpdate(float percentage);
+		void on_importFinished();
+		void on_sourceInput_textChanged(const QString& text);
+		void on_importMaterialsCheckbox_stateChanged(int);
 
 	private:
 		Ui::ImportAssetDialog* m_ui;
 		QString m_base_path;
+		ImportThread* m_import_thread;
+		Assimp::Importer m_importer;
 };
