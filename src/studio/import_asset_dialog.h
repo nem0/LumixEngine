@@ -22,27 +22,16 @@ class ImportThread : public QThread, public Assimp::ProgressHandler
 	Q_OBJECT
 
 	public:
-		enum Status
-		{
-			EMPTY,
-			LOADING_SOURCE,
-			SOURCE_LOADED,
-			SAVING,
-			SAVED,
-			FAIL
-		};
-
-	public:
 		ImportThread(ImportAssetDialog& dialog);
 		virtual ~ImportThread();
 	
-		virtual bool Update(float percentage = -1.f) override { emit progress(percentage / 3); return true; }
+		virtual bool Update(float percentage = -1.f) override { emit progress(percentage, "Importing..."); return true; }
 		virtual void run() override;
 		void setSource(const QString& source) { m_source = source; }
 		void setDestination(const QString& destination) { m_destination = destination; }
 		void setConvertTexturesToDDS(bool convert) { m_convert_texture_to_DDS = convert; }
 		void setImportMaterials(bool import_materials) { m_import_materials = import_materials; }
-		Status getStatus() const { return m_status; }
+		const QString& getErrorMessage() const { return m_error_message; }
 
 	private:
 		void writeSkeleton(QFile& file);
@@ -52,8 +41,7 @@ class ImportThread : public QThread, public Assimp::ProgressHandler
 		bool saveLumixMesh();
 
 	signals:
-		void message(QString message);
-		void progress(float percentage);
+		void progress(float percentage, QString message);
 
 	private:
 		QString m_source;
@@ -63,7 +51,7 @@ class ImportThread : public QThread, public Assimp::ProgressHandler
 		bool m_convert_texture_to_DDS;
 		Assimp::Importer& m_importer;
 		class LogStream* m_log_stream;
-		Status m_status;
+		QString m_error_message;
 };
 
 
@@ -92,11 +80,10 @@ class ImportAssetDialog : public QDialog
 		void on_browseSourceButton_clicked();
 		void on_browseDestinationButton_clicked();
 		void on_importButton_clicked();
-		void on_progressUpdate(float percentage);
+		void on_progressUpdate(float percentage, QString message);
 		void on_importFinished();
 		void on_sourceInput_textChanged(const QString& text);
 		void on_importMaterialsCheckbox_stateChanged(int);
-		void on_importMessage(QString message);
 
 	private:
 		Ui::ImportAssetDialog* m_ui;

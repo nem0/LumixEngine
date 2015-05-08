@@ -7,6 +7,7 @@
 #include "assimp/scene.h"
 #include "core/log.h"
 #include "core/vec3.h"
+#include "crnlib.h"
 #include "debug/floating_points.h"
 #include "graphics/model.h"
 #include <qfile.h>
@@ -24,17 +25,17 @@ static const int SKINNED_VERTEX_SIZE = 56;
 
 class LogStream : public Assimp::LogStream
 {
-public:
-	LogStream(ImportThread& thread)
-		: m_thread(thread)
-	{}
+	public:
+		LogStream(ImportThread& thread)
+			: m_thread(thread)
+		{}
 
-	void write(const char* message) override
-	{
-		emit m_thread.message(message);
-	}
+		void write(const char* message) override
+		{
+			Lumix::g_log_info.log("import") << message;
+		}
 
-	ImportThread& m_thread;
+		ImportThread& m_thread;
 };
 
 
@@ -85,7 +86,7 @@ ImportThread::ImportThread(ImportAssetDialog& dialog)
 	: m_dialog(dialog)
 	, m_importer(dialog.getImporter())
 {
-	Assimp::Logger::LogSeverity severity = Assimp::Logger::VERBOSE;
+	Assimp::Logger::LogSeverity severity = Assimp::Logger::NORMAL;
 	Assimp::DefaultLogger::create("", severity, aiDefaultLogStream_DEBUGGER);
 	m_log_stream = new LogStream(*this);
 	m_importer.SetProgressHandler(this);
@@ -240,7 +241,7 @@ void ImportThread::writeGeometry(QFile& file)
 	QVector<SkinInfo> skin_infos;
 	fillSkinInfo(scene, skin_infos, vertices_size / vertex_size);
 
-	int ii = 0;
+	int skin_index = 0;
 	for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
 	{
 		const aiMesh* mesh = scene->mMeshes[i];
@@ -248,9 +249,9 @@ void ImportThread::writeGeometry(QFile& file)
 		{
 			if (vertex_size == SKINNED_VERTEX_SIZE)
 			{
-				file.write((const char*)skin_infos[ii].weights, sizeof(skin_infos[ii].weights));
-				file.write((const char*)skin_infos[ii].bone_indices, sizeof(skin_infos[ii].bone_indices));
-				++ii;
+				file.write((const char*)skin_infos[skin_index].weights, sizeof(skin_infos[skin_index].weights));
+				file.write((const char*)skin_infos[skin_index].bone_indices, sizeof(skin_infos[skin_index].bone_indices));
+				++skin_index;
 			}
 
 			Lumix::Vec3 position(mesh->mVertices[j].x, mesh->mVertices[j].y, mesh->mVertices[j].z);
@@ -330,9 +331,11 @@ void ImportThread::writeSkeleton(QFile& file)
 bool ImportThread::saveLumixMesh()
 {
 	QFileInfo source_path(m_source);
-	QFile file(m_destination + "/" + source_path.baseName() + ".msh");
+	auto dest = m_destination + "/" + source_path.baseName() + ".msh";
+	QFile file(dest);
 	if (!file.open(QIODevice::WriteOnly))
 	{
+		m_error_message = QString("Failed to open %1").arg(dest);
 		return false;
 	}
 	Lumix::Model::FileHeader header;
@@ -341,9 +344,9 @@ bool ImportThread::saveLumixMesh()
 
 	file.write((const char*)&header, sizeof(header));
 
-	emit progress(1 / 3.0f + 1 / 9.0f);
+	emit progress(1 / 3.0f + 1 / 9.0f, "Saving mesh...");
 	writeMeshes(file);
-	emit progress(1 / 3.0f + 2 / 9.0f);
+	emit progress(1 / 3.0f + 2 / 9.0f, "Saving mesh...");
 	writeGeometry(file);
 
 	writeSkeleton(file);
@@ -356,30 +359,84 @@ bool ImportThread::saveLumixMesh()
 	file.write((const char*)&distance, sizeof(distance));
 
 	file.close();
-	emit progress(2 / 3.0f);
+	emit progress(2 / 3.0f, "Mesh saved.");
 	return true;
+}
+
+
+static bool convertToDDS(const QString& src, const QString& dest, crn_progress_callback_func callback, void* callback_data)
+{
+	QImage image(src);
+	if (image.isNull())
+	{
+		return false;
+	}
+
+	crn_uint32 size;
+	crn_comp_params comp_params;
+	comp_params.m_width = image.width();
+	comp_params.m_height = image.height();
+	comp_params.m_file_type = cCRNFileTypeDDS;
+	comp_params.m_format = cCRNFmtDXT3;
+	comp_params.m_quality_level = cCRNMinQualityLevel;
+	comp_params.m_dxt_quality = cCRNDXTQualityNormal;
+	comp_params.m_dxt_compressor_type = cCRNDXTCompressorRYG;
+	comp_params.m_pProgress_func = callback;
+	comp_params.m_pProgress_func_data = callback_data;
+	QVector<uint32_t> img_data;
+	img_data.resize(image.width() * image.height());
+	for (int j = 0; j < image.height(); ++j)
+	{
+		for (int i = 0; i < image.width(); ++i)
+		{
+			QRgb rgb = image.pixel(i, j);
+			img_data[i + j * image.width()] = qRed(rgb) | (qGreen(rgb) << 8) | (qBlue(rgb) << 16) | (qAlpha(rgb) << 24);
+		}
+	}
+	comp_params.m_pImages[0][0] = &img_data[0];
+	crn_mipmap_params mipmap_params;
+	mipmap_params.m_mode = cCRNMipModeGenerateMips;
+
+	void* data = crn_compress(comp_params, mipmap_params, size);
+
+	QFile file(dest);
+	if (data && file.open(QIODevice::WriteOnly))
+	{
+		file.write((const char*)data, size);
+		file.close();
+		crn_free_block(data);
+		return true;
+	}
+	else
+	{
+		crn_free_block(data);
+		return false;
+	}
 }
 
 
 bool ImportThread::saveLumixMaterials()
 {
+	float progress_from = 0.5f;
+	float progress_length = 0.5f;
+
 	if (!m_import_materials)
 	{
 		return true;
 	}
 
 	QFileInfo source_info(m_source);
-	bool success = true;
 	const aiScene* scene = m_importer.GetScene();
 	int vertex_size = getVertexSize(scene);
 
 	for (unsigned int i = 0; i < scene->mNumMaterials; ++i)
 	{
-		emit progress(2 / 3.0f + i / (3 * (float)scene->mNumMaterials));
 		const aiMaterial* material = scene->mMaterials[i];
 		aiString material_name;
 		material->Get(AI_MATKEY_NAME, material_name);
-		QFile file(m_destination + "/" + material_name.C_Str() + ".mat");
+		emit progress(progress_from + progress_length * i / (float)scene->mNumMaterials, QString("Saving material %1...").arg(material_name.C_Str()));
+		auto output_material_name = m_destination + "/" + material_name.C_Str() + ".mat";
+		QFile file(output_material_name);
 		if (file.open(QIODevice::WriteOnly))
 		{
 			file.write(QString("{ \"shader\" : \"shaders/%1.shd\" ").arg(vertex_size == SKINNED_VERTEX_SIZE ? "skinned" : "rigid").toLatin1().data());
@@ -397,21 +454,33 @@ bool ImportThread::saveLumixMaterials()
 					);
 				if (m_convert_texture_to_DDS && texture_info.suffix() != "dds")
 				{
-					QImage img(source_info.path() + "/" + texture_path.C_Str());
-					QImageWriter writer(m_destination + "/" + texture_info.path() + "/" + texture_info.baseName() + ".dds");
-					if (!writer.write(img.mirrored()))
+					auto source = source_info.path() + "/" + texture_path.C_Str();
+					auto dest = m_destination + "/" + texture_info.path() + "/" + texture_info.baseName() + ".dds";
+					if (!convertToDDS(source, dest, nullptr, nullptr))
 					{
-						auto s = writer.errorString();
-						success = false;
+						m_error_message = QString("Error converting %1 to %2").arg(source).arg(dest);
+						return false;
 					}
 				}
 				else
 				{
 					auto source = source_info.dir().path() + "/" + texture_path.C_Str();
 					auto dest = m_destination + "/" + texture_path.C_Str();
-					if (!QFile::copy(source, dest))
+					if (source != dest)
 					{
-						success = false;
+						QFile afile(dest);
+						if (afile.exists())
+						{
+							auto p = afile.permissions();
+							p |= QFile::WriteOwner;
+							afile.setPermissions(p);
+							afile.remove();
+						}
+						if (!QFile::copy(source, dest))
+						{
+							m_error_message = QString("Error copying %1 to %2").arg(source).arg(dest);
+							return false;
+						}
 					}
 				}
 			}
@@ -420,51 +489,36 @@ bool ImportThread::saveLumixMaterials()
 		}
 		else
 		{
-			success = false;
+			m_error_message = QString("Error writing %1").arg(output_material_name);
+			return false;
 		}
 	}
-	return success;
+	return true;
 }
 
 
 void ImportThread::run()
 {
+	m_error_message = "";
 	Assimp::DefaultLogger::get()->attachStream(m_log_stream);
-	emit progress(0);
 	if (!m_importer.GetScene())
 	{
-		m_status = LOADING_SOURCE;
 		Lumix::enableFloatingPointTraps(false);
 		const aiScene* scene = m_importer.ReadFile(m_source.toLatin1().data(), aiProcess_Triangulate | aiProcess_LimitBoneWeights | aiProcess_OptimizeMeshes | aiProcess_OptimizeGraph | aiProcess_GenSmoothNormals | aiProcess_CalcTangentSpace);
 		if (!scene || !scene->mMeshes || !scene->mMeshes[0]->mTangents)
 		{
-			m_status = FAIL;
+			m_error_message = m_importer.GetErrorString();
 			Lumix::g_log_error.log("import") << m_importer.GetErrorString();
-		}
-		else
-		{
-			m_status = SOURCE_LOADED;
 		}
 		Lumix::enableFloatingPointTraps(true);
 	}
 	else
 	{
-		m_status = SAVING;
 		if (saveLumixMesh())
 		{
-			emit progress(0.5f);
-			if(!saveLumixMaterials())
-			{ 
-				m_status = FAIL;
-			}
+			saveLumixMaterials();
 		}
-		else
-		{
-			m_status = FAIL;
-		}
-		m_status = SAVED;
 	}
-	emit progress(1.0f);
 	Assimp::DefaultLogger::get()->detatchStream(m_log_stream);
 }
 		
@@ -484,14 +538,7 @@ ImportAssetDialog::ImportAssetDialog(QWidget* parent, const QString& base_path)
 
 	connect(m_import_thread, &ImportThread::progress, this, &ImportAssetDialog::on_progressUpdate, Qt::QueuedConnection);
 	connect(m_import_thread, &QThread::finished, this, &ImportAssetDialog::on_importFinished, Qt::QueuedConnection);
-	connect(m_import_thread, &ImportThread::message, this, &ImportAssetDialog::on_importMessage, Qt::QueuedConnection);
 	m_ui->destinationInput->setText(QDir::currentPath());
-}
-
-
-void ImportAssetDialog::on_importMessage(QString message)
-{
-	m_ui->logWidget->addItem(message.trimmed());
 }
 
 
@@ -536,7 +583,7 @@ void ImportAssetDialog::on_sourceInput_textChanged(const QString& text)
 
 void ImportAssetDialog::on_importFinished()
 {
-	if (m_import_thread->getStatus() != ImportThread::FAIL)
+	if (m_import_thread->getErrorMessage().isEmpty())
 	{
 		m_ui->importButton->setEnabled(true);
 		m_ui->importAnimationCheckbox->show();
@@ -549,15 +596,15 @@ void ImportAssetDialog::on_importFinished()
 	}
 	else
 	{
-		m_ui->statusLabel->setText("Failed.");
+		m_ui->statusLabel->setText(m_import_thread->getErrorMessage());
 	}
 	m_ui->progressBar->setValue(100);
 }
 
 
-void ImportAssetDialog::on_progressUpdate(float percentage)
+void ImportAssetDialog::on_progressUpdate(float percentage, QString message)
 {
-	m_ui->statusLabel->setText("Processing...");
+	m_ui->statusLabel->setText(message);
 	m_ui->progressBar->setValue(percentage > 0 ? 100 * percentage : 1);
 }
 
@@ -609,8 +656,7 @@ void ImportAssetDialog::setSource(const QString& source)
 
 void ImportAssetDialog::importModel()
 {
-	m_ui->progressBar->setValue(33);
-	m_ui->statusLabel->setText("Saving...");
+	on_progressUpdate(0.33f, "Saving...");
 	m_import_thread->setDestination(m_ui->destinationInput->text());
 	m_import_thread->setSource(m_ui->sourceInput->text());
 	m_import_thread->setConvertTexturesToDDS(m_ui->convertToDDSCheckbox->isChecked());
@@ -668,6 +714,7 @@ Lumix::Quat getRotation(const aiNodeAnim* channel, float frame)
 
 void ImportAssetDialog::importAnimation()
 {
+	on_progressUpdate(0.9f, "Importing animations...");
 	Q_ASSERT(!m_ui->sourceInput->text().isEmpty());
 
 	QVector<QString> bone_names = getBoneNames(m_importer.GetScene());
@@ -675,6 +722,7 @@ void ImportAssetDialog::importAnimation()
 	for (unsigned int i = 0; i < m_importer.GetScene()->mNumAnimations; ++i)
 	{
 		const aiAnimation* animation = m_importer.GetScene()->mAnimations[0];
+		on_progressUpdate(0.9f + 0.1f * (i / m_importer.GetScene()->mNumAnimations), QString("Importing animation %1...").arg(animation->mName.C_Str()));
 		QFile file(m_ui->destinationInput->text() + "/" + animation->mName.C_Str() + ".ani");
 		if (file.open(QIODevice::WriteOnly))
 		{
@@ -717,27 +765,37 @@ void ImportAssetDialog::importAnimation()
 			file.close();
 		}
 	}
+	on_progressUpdate(1.0f, "Animation imported.");
 }
 
 
 void ImportAssetDialog::importTexture()
 {
+	Lumix::enableFloatingPointTraps(false);
 	Q_ASSERT(!m_ui->sourceInput->text().isEmpty());
 
-	m_ui->progressBar->setValue(75);
-	m_ui->statusLabel->setText("Importing texture...");
+	on_progressUpdate(0.01f, "Importing texture...");
+	QCoreApplication::processEvents();
+
 	QFileInfo source_info(m_ui->sourceInput->text());
-	QImage img(m_ui->sourceInput->text());
-	QImageWriter writer(m_ui->destinationInput->text() + "/" + source_info.baseName() + ".dds");
-	if (!writer.write(img.mirrored()))
+	struct Callback
 	{
-		m_ui->statusLabel->setText("Failed.");
+		static crn_bool foo(crn_uint32 phase_index, crn_uint32 total_phases, crn_uint32 subphase_index, crn_uint32 total_subphases, void* pUser_data_ptr)
+		{
+			static_cast<ImportAssetDialog*>(pUser_data_ptr)->on_progressUpdate(phase_index / (float)total_phases + subphase_index / (float)total_subphases / total_phases, "Importing texture...");
+			QCoreApplication::processEvents();
+			return true;
+		}
+	};
+	if (convertToDDS(m_ui->sourceInput->text(), m_ui->destinationInput->text() + "/" + source_info.baseName() + ".dds", &Callback::foo, this))
+	{
+		on_progressUpdate(1.0f, "Import successful.");
 	}
 	else
 	{
-		m_ui->statusLabel->setText("Success.");
+		on_progressUpdate(1.0f, "Import failed.");
 	}
-	m_ui->progressBar->setValue(100);
+	Lumix::enableFloatingPointTraps(true);
 }
 
 
@@ -762,8 +820,7 @@ void ImportAssetDialog::on_importButton_clicked()
 		return;
 	}
 	Q_ASSERT(false);
-	m_ui->progressBar->setValue(100);
-	m_ui->statusLabel->setText("Error.");
+	on_progressUpdate(1, "Error.");
 }
 
 
