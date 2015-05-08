@@ -15,6 +15,19 @@
 #include <qpainter.h>
 
 
+static QSize getPreviewSize(Lumix::Texture* texture)
+{
+	int w = texture->getWidth();
+	int h = texture->getHeight();
+	if (w > 150)
+	{
+		h *= 150.0f / w;
+		w = 150;
+	}
+	return QSize(w, h);
+}
+
+
 ResourceModel::ResourceModel(Lumix::WorldEditor& editor, const Lumix::Path& path)
 	: m_editor(editor)
 {
@@ -203,10 +216,21 @@ void ResourceModel::fillMaterialInfo()
 void ResourceModel::fillTextureInfo()
 {
 	Lumix::Texture* texture = static_cast<Lumix::Texture*>(m_resource);
-	object("Texture", texture)
+	auto obj = object("Texture", texture)
 		.property("Width", &Lumix::Texture::getWidth)
 		.property("Height", &Lumix::Texture::getHeight)
 		.property("Bytes per pixel", &Lumix::Texture::getBytesPerPixel);
+	auto& preview = obj.getNode().addChild("Preview");
+	preview.m_getter = []() -> QVariant {
+		return "";
+	};
+	preview.m_decoration = [texture]() -> QVariant {
+		QSize size = getPreviewSize(texture);
+		return QImage(texture->getPath().c_str()).scaled(size);
+	};
+	preview.m_size_hint = [texture]() -> QVariant {
+		return getPreviewSize(texture);
+	};
 }
 
 

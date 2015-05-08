@@ -885,7 +885,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 		const Model& model = *renderable_mesh->m_model;
 		Vec3* poss = pose.getPositions();
 		Quat* rots = pose.getRotations();
-		ASSERT(pose.getCount() <= 64);
+
+		ASSERT(pose.getCount() <= sizeof(bone_mtx) / sizeof(bone_mtx[0]));
 		for (int bone_index = 0, bone_count = pose.getCount(); bone_index < bone_count; ++bone_index)
 		{
 			rots[bone_index].toMatrix(bone_mtx[bone_index]);

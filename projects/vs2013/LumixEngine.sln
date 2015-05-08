@@ -57,6 +57,9 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "studio", "studio\studio.vcx
 	EndProjectSection
 EndProject
 Global
+	GlobalSection(CodealikeProperties) = postSolution
+		SolutionGuid = 3f879290-720c-4e38-88b4-d40f0d59e6de
+	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		AppVeyor|Win32 = AppVeyor|Win32
 		AppVeyor|x64 = AppVeyor|x64

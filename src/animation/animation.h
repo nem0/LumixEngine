@@ -40,6 +40,17 @@ private:
 class LUMIX_ANIMATION_API Animation : public Resource
 {
 	public:
+		static const uint32_t HEADER_MAGIC = 0x5f4c4146; // '_LAF'
+
+	public:
+		struct Header
+		{
+			uint32_t magic;
+			uint32_t version;
+			uint32_t fps;
+		};
+
+	public:
 		Animation(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 		~Animation();
 

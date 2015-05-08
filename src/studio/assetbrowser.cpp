@@ -1,5 +1,6 @@
 #include "assetbrowser.h"
 #include "ui_assetbrowser.h"
+#include "assimp/Importer.hpp"
 #include "file_system_watcher.h"
 #include "core/crc32.h"
 #include "core/log.h"
@@ -14,6 +15,7 @@
 #include <qdesktopservices.h>
 #include <qfileiconprovider.h>
 #include <qfilesystemmodel.h>
+#include <qimagereader.h>
 #include <qinputdialog.h>
 #include <qmenu.h>
 #include <qmessagebox.h>
@@ -158,9 +160,34 @@ class FlatFileListModel : public QAbstractItemModel
 };
 
 
-void getDefaultFilters(QStringList& filters)
+static void getTextureFilters(QStringList& filters, bool prepend_asterisk)
 {
-	filters << "*.msh" << "*.unv" << "*.ani" << "*.blend" << "*.obj" << "*.tga" << "*.mat" << "*.dds" << "*.fbx" << "*.shd" << "*.json";
+	auto image_formats = QImageReader::supportedImageFormats();
+	if (prepend_asterisk)
+	{
+		for (auto format : image_formats)
+		{
+			filters << QString("*.") + format;
+		}
+	}
+	else
+	{
+		for (auto format : image_formats)
+		{
+			filters << format;
+		}
+	}
+}
+
+
+static void getDefaultFilters(QStringList& filters)
+{
+	filters << "*.msh" << "*.unv" << "*.ani" <<  "*.mat" << "*.fbx" << "*.shd" << "*.json";
+	Assimp::Importer importer;
+	aiString extension_list;
+	importer.GetExtensionList(extension_list);
+	filters << QString(extension_list.C_Str()).split(';');
+	getTextureFilters(filters, true);
 }
 
 
@@ -323,9 +350,15 @@ void AssetBrowser::on_exportFinished(int exit_code)
 void AssetBrowser::importAsset(const QFileInfo& file_info)
 {
 	ImportAssetDialog* dlg = new ImportAssetDialog(this, m_base_path);
-	dlg->setAnimationSource(file_info.filePath());
-	dlg->setModelSource(file_info.filePath());
-	dlg->setDestination(file_info.dir().path());
+	if (!file_info.isDir())
+	{
+		dlg->setSource(file_info.filePath());
+		dlg->setDestination(file_info.dir().path());
+	}
+	else
+	{
+		dlg->setDestination(file_info.absoluteFilePath());
+	}
 	dlg->show();
 }
 
@@ -348,9 +381,12 @@ void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
 	QAction* import_asset_action = new QAction("Import asset", menu);
 	if (file_info.isDir())
 	{
+		menu->addAction(import_asset_action);
 		menu->addAction(create_dir_action);
 	}
-	if (file_info.suffix() == "obj" || file_info.suffix() == "blend")
+	QStringList texture_filters;
+	getTextureFilters(texture_filters, false);
+	if (file_info.suffix() == "obj" || file_info.suffix() == "blend" || file_info.suffix() == "x" || texture_filters.contains(file_info.suffix()))
 	{
 		menu->addAction(import_asset_action);
 	}
@@ -428,7 +464,7 @@ void AssetBrowser::on_filterComboBox_currentTextChanged(const QString&)
 	}
 	else if (m_ui->filterComboBox->currentText() == "Texture")
 	{
-		filters << "*.tga" << "*.dds";
+		getTextureFilters(filters, true);
 	}
 	setExtentionsFilter(filters);
 }

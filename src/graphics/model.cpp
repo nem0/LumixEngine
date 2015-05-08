@@ -184,7 +184,7 @@ bool Model::parseGeometry(FS::IFile* file)
 		for (int j = 0; j < mesh_vertex_count; ++j)
 		{
 			m_vertices[index] = *(Vec3*)&vertices[mesh_attributes_array_offset + j * mesh_vertex_size + mesh_position_attribute_offset];
-			bounding_radius_squared = Math::maxValue(bounding_radius_squared, m_vertices[index].squaredLength());
+			bounding_radius_squared = Math::maxValue(bounding_radius_squared, dotProduct(m_vertices[index], m_vertices[index]) > 0 ? m_vertices[index].squaredLength() : 0);
 			min_vertex.x = Math::minValue(min_vertex.x, m_vertices[index].x);
 			min_vertex.y = Math::minValue(min_vertex.y, m_vertices[index].y);
 			min_vertex.z = Math::minValue(min_vertex.z, m_vertices[index].z);
