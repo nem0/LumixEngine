@@ -433,21 +433,36 @@ void ImportThread::run()
 	emit progress(0);
 	if (!m_importer.GetScene())
 	{
+		m_status = LOADING_SOURCE;
 		Lumix::enableFloatingPointTraps(false);
-		const aiScene* scene = m_importer.ReadFile(m_source.toLatin1().data(), aiProcess_Triangulate | aiProcess_LimitBoneWeights | aiProcess_OptimizeMeshes | aiProcess_OptimizeGraph | aiProcess_GenNormals | aiProcess_CalcTangentSpace);
+		const aiScene* scene = m_importer.ReadFile(m_source.toLatin1().data(), aiProcess_Triangulate | aiProcess_LimitBoneWeights | aiProcess_OptimizeMeshes | aiProcess_OptimizeGraph | aiProcess_GenSmoothNormals | aiProcess_CalcTangentSpace);
 		if (!scene || !scene->mMeshes || !scene->mMeshes[0]->mTangents)
 		{
+			m_status = FAIL;
 			Lumix::g_log_error.log("import") << m_importer.GetErrorString();
+		}
+		else
+		{
+			m_status = SOURCE_LOADED;
 		}
 		Lumix::enableFloatingPointTraps(true);
 	}
 	else
 	{
+		m_status = SAVING;
 		if (saveLumixMesh())
 		{
 			emit progress(0.5f);
-			saveLumixMaterials();
+			if(!saveLumixMaterials())
+			{ 
+				m_status = FAIL;
+			}
 		}
+		else
+		{
+			m_status = FAIL;
+		}
+		m_status = SAVED;
 	}
 	emit progress(1.0f);
 	Assimp::DefaultLogger::get()->detatchStream(m_log_stream);
@@ -521,14 +536,21 @@ void ImportAssetDialog::on_sourceInput_textChanged(const QString& text)
 
 void ImportAssetDialog::on_importFinished()
 {
-	m_ui->importButton->setEnabled(true);
-	m_ui->importAnimationCheckbox->show();
-	m_ui->importAnimationCheckbox->setEnabled(m_importer.GetScene()->HasAnimations());
-	m_ui->statusLabel->setText("Done.");
-	m_ui->importMaterialsCheckbox->setText(QString("Import %1 materials").arg(m_importer.GetScene()->mNumMaterials));
-	m_ui->importMaterialsCheckbox->show();
-	m_ui->convertToDDSCheckbox->show();
-	m_ui->convertToDDSCheckbox->setEnabled(m_ui->importMaterialsCheckbox->isChecked());
+	if (m_import_thread->getStatus() != ImportThread::FAIL)
+	{
+		m_ui->importButton->setEnabled(true);
+		m_ui->importAnimationCheckbox->show();
+		m_ui->importAnimationCheckbox->setEnabled(m_importer.GetScene()->HasAnimations());
+		m_ui->importMaterialsCheckbox->setText(QString("Import %1 materials").arg(m_importer.GetScene()->mNumMaterials));
+		m_ui->importMaterialsCheckbox->show();
+		m_ui->convertToDDSCheckbox->show();
+		m_ui->convertToDDSCheckbox->setEnabled(m_ui->importMaterialsCheckbox->isChecked());
+		m_ui->statusLabel->setText("Done.");
+	}
+	else
+	{
+		m_ui->statusLabel->setText("Failed.");
+	}
 	m_ui->progressBar->setValue(100);
 }
 
