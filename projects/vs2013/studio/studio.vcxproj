@@ -234,6 +234,7 @@
     <ClCompile Include="..\..\..\tmp\studio\moc_import_asset_dialog.cpp" />
     <ClCompile Include="..\..\..\tmp\studio\moc_log_widget.cpp" />
     <ClCompile Include="..\..\..\tmp\studio\moc_mainwindow.cpp" />
+    <ClCompile Include="..\..\..\tmp\studio\moc_notifications.cpp" />
     <ClCompile Include="..\..\..\tmp\studio\moc_profilergraph.cpp" />
     <ClCompile Include="..\..\..\tmp\studio\moc_profilerui.cpp" />
     <ClCompile Include="..\..\..\tmp\studio\moc_property_view.cpp" />
@@ -431,7 +432,20 @@
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">.\..\..\..\tmp\studio\moc_%(Filename).cpp</Outputs>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"$(QTDIR)\bin\moc.exe"  "%(FullPath)" -o ".\..\..\..\tmp\studio\moc_%(Filename).cpp"  -D_WINDOWS -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_OPENGL_LIB -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -DNDEBUG -DQT_DLL  "-I.\..\.." "-I.\..\..\..\src\studio" "-I.\..\..\..\src" "-I.\..\..\..\external\assimp\include" "-I.\..\..\..\external\glew\include" "-I$(QTDIR)\include" "-I$(QTDIR)\include\QtOpenGL" "-I$(QTDIR)\include\QtWidgets" "-I$(QTDIR)\include\QtGui" "-I$(QTDIR)\include\QtANGLE" "-I$(QTDIR)\include\QtCore" "-I$(QTDIR)\mkspecs\win32-msvc2013" "-I.\..\..\..\tmp\studio" "-I.\..\..\..\tmp\studio\GeneratedFiles"</Command>
     </CustomBuild>
-    <ClInclude Include="..\..\..\src\studio\notifications.h" />
+    <CustomBuild Include="..\..\..\src\studio\notifications.h">
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='AppVeyor|Win32'">$(QTDIR)\bin\moc.exe;%(FullPath)</AdditionalInputs>
+      <Message Condition="'$(Configuration)|$(Platform)'=='AppVeyor|Win32'">Moc%27ing notifications.h...</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='AppVeyor|Win32'">.\..\..\..\tmp\studio\moc_%(Filename).cpp</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='AppVeyor|Win32'">"$(QTDIR)\bin\moc.exe"  "%(FullPath)" -o ".\..\..\..\tmp\studio\moc_%(Filename).cpp"  -D_WINDOWS -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_OPENGL_LIB -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -DNDEBUG -DQT_DLL "-I.\..\.." "-I.\..\..\..\src\studio" "-I.\..\..\..\src" "-I.\..\..\..\external\assimp\include" "-I.\..\..\..\external\glew\include" "-I$(QTDIR)\include" "-I$(QTDIR)\include\QtOpenGL" "-I$(QTDIR)\include\QtWidgets" "-I$(QTDIR)\include\QtGui" "-I$(QTDIR)\include\QtANGLE" "-I$(QTDIR)\include\QtCore" "-I$(QTDIR)\mkspecs\win32-msvc2013" "-I.\..\..\..\tmp\studio" "-I.\..\..\..\tmp\studio\GeneratedFiles"</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(QTDIR)\bin\moc.exe;%(FullPath)</AdditionalInputs>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Moc%27ing notifications.h...</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">.\..\..\..\tmp\studio\moc_%(Filename).cpp</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"$(QTDIR)\bin\moc.exe"  "%(FullPath)" -o ".\..\..\..\tmp\studio\moc_%(Filename).cpp"  -D_WINDOWS -DUNICODE -DWIN32 -DQT_OPENGL_LIB -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -DQT_DLL "-I.\..\.." "-I.\..\..\..\src\studio" "-I.\..\..\..\src" "-I.\..\..\..\external\assimp\include" "-I.\..\..\..\external\glew\include" "-I$(QTDIR)\include" "-I$(QTDIR)\include\QtOpenGL" "-I$(QTDIR)\include\QtWidgets" "-I$(QTDIR)\include\QtGui" "-I$(QTDIR)\include\QtANGLE" "-I$(QTDIR)\include\QtCore" "-I.\debug" "-I$(QTDIR)\mkspecs\win32-msvc2013" "-I.\..\..\..\tmp\studio" "-I.\..\..\..\tmp\studio\GeneratedFiles"</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(QTDIR)\bin\moc.exe;%(FullPath)</AdditionalInputs>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Moc%27ing notifications.h...</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">.\..\..\..\tmp\studio\moc_%(Filename).cpp</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"$(QTDIR)\bin\moc.exe"  "%(FullPath)" -o ".\..\..\..\tmp\studio\moc_%(Filename).cpp"  -D_WINDOWS -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_OPENGL_LIB -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -DNDEBUG -DQT_DLL "-I.\..\.." "-I.\..\..\..\src\studio" "-I.\..\..\..\src" "-I.\..\..\..\external\assimp\include" "-I.\..\..\..\external\glew\include" "-I$(QTDIR)\include" "-I$(QTDIR)\include\QtOpenGL" "-I$(QTDIR)\include\QtWidgets" "-I$(QTDIR)\include\QtGui" "-I$(QTDIR)\include\QtANGLE" "-I$(QTDIR)\include\QtCore" "-I$(QTDIR)\mkspecs\win32-msvc2013" "-I.\..\..\..\tmp\studio" "-I.\..\..\..\tmp\studio\GeneratedFiles"</Command>
+    </CustomBuild>
     <CustomBuild Include="..\..\..\src\studio\profilergraph.h">
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='AppVeyor|Win32'">$(QTDIR)\bin\moc.exe;%(FullPath)</AdditionalInputs>
       <Message Condition="'$(Configuration)|$(Platform)'=='AppVeyor|Win32'">Moc%27ing profilergraph.h...</Message>

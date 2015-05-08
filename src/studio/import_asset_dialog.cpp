@@ -1,6 +1,7 @@
 #include "import_asset_dialog.h"
 #include "ui_import_asset_dialog.h"
 #include "animation/animation.h"
+#include "assimp/defaultlogger.hpp"
 #include "assimp/postprocess.h"
 #include "assimp/progresshandler.hpp"
 #include "assimp/scene.h"
@@ -19,6 +20,22 @@
 
 static const int RIGID_VERTEX_SIZE = 24;
 static const int SKINNED_VERTEX_SIZE = 56;
+
+
+class LogStream : public Assimp::LogStream
+{
+public:
+	LogStream(ImportThread& thread)
+		: m_thread(thread)
+	{}
+
+	void write(const char* message) override
+	{
+		emit m_thread.message(message);
+	}
+
+	ImportThread& m_thread;
+};
 
 
 enum class VertexAttributeDef : uint32_t
@@ -68,6 +85,9 @@ ImportThread::ImportThread(ImportAssetDialog& dialog)
 	: m_dialog(dialog)
 	, m_importer(dialog.getImporter())
 {
+	Assimp::Logger::LogSeverity severity = Assimp::Logger::VERBOSE;
+	Assimp::DefaultLogger::create("", severity, aiDefaultLogStream_DEBUGGER);
+	m_log_stream = new LogStream(*this);
 	m_importer.SetProgressHandler(this);
 }
 
@@ -75,6 +95,7 @@ ImportThread::ImportThread(ImportAssetDialog& dialog)
 ImportThread::~ImportThread()
 {
 	m_importer.SetProgressHandler(nullptr);
+	delete m_log_stream;
 }
 
 
@@ -408,12 +429,12 @@ bool ImportThread::saveLumixMaterials()
 
 void ImportThread::run()
 {
+	Assimp::DefaultLogger::get()->attachStream(m_log_stream);
 	emit progress(0);
 	if (!m_importer.GetScene())
 	{
 		Lumix::enableFloatingPointTraps(false);
-		m_importer.FreeScene();
-		const aiScene* scene = m_importer.ReadFile(m_source.toLatin1().data(), aiProcess_Triangulate | aiProcess_CalcTangentSpace);
+		const aiScene* scene = m_importer.ReadFile(m_source.toLatin1().data(), aiProcess_Triangulate | aiProcess_LimitBoneWeights | aiProcess_OptimizeMeshes | aiProcess_OptimizeGraph | aiProcess_GenNormals | aiProcess_CalcTangentSpace);
 		if (!scene || !scene->mMeshes || !scene->mMeshes[0]->mTangents)
 		{
 			Lumix::g_log_error.log("import") << m_importer.GetErrorString();
@@ -429,6 +450,7 @@ void ImportThread::run()
 		}
 	}
 	emit progress(1.0f);
+	Assimp::DefaultLogger::get()->detatchStream(m_log_stream);
 }
 		
 
@@ -447,7 +469,14 @@ ImportAssetDialog::ImportAssetDialog(QWidget* parent, const QString& base_path)
 
 	connect(m_import_thread, &ImportThread::progress, this, &ImportAssetDialog::on_progressUpdate, Qt::QueuedConnection);
 	connect(m_import_thread, &QThread::finished, this, &ImportAssetDialog::on_importFinished, Qt::QueuedConnection);
+	connect(m_import_thread, &ImportThread::message, this, &ImportAssetDialog::on_importMessage, Qt::QueuedConnection);
 	m_ui->destinationInput->setText(QDir::currentPath());
+}
+
+
+void ImportAssetDialog::on_importMessage(QString message)
+{
+	m_ui->logWidget->addItem(message.trimmed());
 }
 
 
@@ -482,6 +511,7 @@ void ImportAssetDialog::on_sourceInput_textChanged(const QString& text)
 		}
 		else
 		{
+			m_importer.FreeScene();
 			m_import_thread->setSource(text);
 			m_import_thread->start();
 		}

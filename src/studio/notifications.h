@@ -1,18 +1,47 @@
 #pragma once
 
-class Notifications
+
+#include <qobject.h>
+#include <qvector.h>
+
+
+class MainWindow;
+
+
+class Notifications : public QObject
 {
+	Q_OBJECT
 	public:
-		static Notifications* create(class MainWindow& main_window);
-		static void destroy(Notifications* notifications);
+		Notifications(MainWindow& main_window);
+		~Notifications();
 
-		virtual void update(float time_delta) = 0;
-		virtual void showNotification(const char* text) = 0;
-		virtual int showProgressNotification(const char* text) = 0;
-		virtual void setProgress(int id, int value) = 0;
-		virtual void setNotificationTime(int id, float time) = 0;
+		void update(float time_delta);
+		int showProgressNotification(const char* text);
+		void setProgress(int id, int value);
+		void setNotificationTime(int id, float time);
 
-	protected:
-		Notifications() {}
-		virtual ~Notifications() {}
+	public slots:
+		void showNotification(const char* text);
+
+	signals:
+		void notification(const char* text);
+
+	private:
+		class Notification
+		{
+		public:
+			QWidget* m_widget;
+			float m_time;
+			int m_id;
+		};
+
+	private:
+		void onLogInfo(const char*, const char* message);
+		void onLogError(const char*, const char* message);
+		void onLogWarning(const char*, const char* message);
+		void updateLayout();
+
+	private:
+		MainWindow& m_main_window;
+		QVector<Notification> m_items;
 };
