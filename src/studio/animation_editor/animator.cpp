@@ -8,6 +8,7 @@
 #include "core/resource_manager_base.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
+#include "graphics/model.h"
 #include "graphics/render_scene.h"
 #include "property_view.h"
 #include "scripts/scriptcompiler.h"
@@ -1119,7 +1120,7 @@ void Animator::update(float time_delta)
 				Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(renderable.scene);
 				auto& pose = scene->getPose(renderable);
 				auto* model = scene->getRenderableModel(renderable);
-				if (model && m_is_ready_function(m_object))
+				if (model && model->getBoneCount() > 0 && m_is_ready_function(m_object))
 				{
 					m_update_function(m_object, *model, pose, time_delta);
 				}
