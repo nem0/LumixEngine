@@ -160,14 +160,23 @@ class FlatFileListModel : public QAbstractItemModel
 };
 
 
-static void getTextureFilters(QStringList& filters)
+static void getTextureFilters(QStringList& filters, bool prepend_asterisk)
 {
 	auto image_formats = QImageReader::supportedImageFormats();
-	for (auto format : image_formats)
+	if (prepend_asterisk)
 	{
-		filters << QString("*.") + format;
+		for (auto format : image_formats)
+		{
+			filters << QString("*.") + format;
+		}
 	}
-
+	else
+	{
+		for (auto format : image_formats)
+		{
+			filters << format;
+		}
+	}
 }
 
 
@@ -178,7 +187,7 @@ static void getDefaultFilters(QStringList& filters)
 	aiString extension_list;
 	importer.GetExtensionList(extension_list);
 	filters << QString(extension_list.C_Str()).split(';');
-	getTextureFilters(filters);
+	getTextureFilters(filters, true);
 }
 
 
@@ -375,7 +384,9 @@ void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
 		menu->addAction(import_asset_action);
 		menu->addAction(create_dir_action);
 	}
-	if (file_info.suffix() == "obj" || file_info.suffix() == "blend" || file_info.suffix() == "x")
+	QStringList texture_filters;
+	getTextureFilters(texture_filters, false);
+	if (file_info.suffix() == "obj" || file_info.suffix() == "blend" || file_info.suffix() == "x" || texture_filters.contains(file_info.suffix()))
 	{
 		menu->addAction(import_asset_action);
 	}
@@ -453,7 +464,7 @@ void AssetBrowser::on_filterComboBox_currentTextChanged(const QString&)
 	}
 	else if (m_ui->filterComboBox->currentText() == "Texture")
 	{
-		getTextureFilters(filters);
+		getTextureFilters(filters, true);
 	}
 	setExtentionsFilter(filters);
 }
