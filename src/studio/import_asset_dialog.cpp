@@ -80,9 +80,12 @@ ImportThread::~ImportThread()
 
 static int getVertexSize(const aiScene* scene)
 {
-	if (scene->mRootNode->mNumChildren > 0)
+	for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
 	{
-		return SKINNED_VERTEX_SIZE;
+		if (scene->mMeshes[i]->mNumBones > 0)
+		{
+			return SKINNED_VERTEX_SIZE;
+		}
 	}
 	return RIGID_VERTEX_SIZE;
 }
@@ -222,9 +225,12 @@ void ImportThread::writeGeometry(QFile& file)
 		const aiMesh* mesh = scene->mMeshes[i];
 		for (unsigned int j = 0; j < mesh->mNumVertices; ++j)
 		{
-			file.write((const char*)skin_infos[ii].weights, sizeof(skin_infos[ii].weights));
-			file.write((const char*)skin_infos[ii].bone_indices, sizeof(skin_infos[ii].bone_indices));
-			++ii;
+			if (vertex_size == SKINNED_VERTEX_SIZE)
+			{
+				file.write((const char*)skin_infos[ii].weights, sizeof(skin_infos[ii].weights));
+				file.write((const char*)skin_infos[ii].bone_indices, sizeof(skin_infos[ii].bone_indices));
+				++ii;
+			}
 
 			Lumix::Vec3 position(mesh->mVertices[j].x, mesh->mVertices[j].y, mesh->mVertices[j].z);
 			file.write((const char*)&position, sizeof(position));
