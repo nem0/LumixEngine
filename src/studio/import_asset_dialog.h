@@ -22,6 +22,17 @@ class ImportThread : public QThread, public Assimp::ProgressHandler
 	Q_OBJECT
 
 	public:
+		enum Status
+		{
+			EMPTY,
+			LOADING_SOURCE,
+			SOURCE_LOADED,
+			SAVING,
+			SAVED,
+			FAIL
+		};
+
+	public:
 		ImportThread(ImportAssetDialog& dialog);
 		virtual ~ImportThread();
 	
@@ -31,6 +42,7 @@ class ImportThread : public QThread, public Assimp::ProgressHandler
 		void setDestination(const QString& destination) { m_destination = destination; }
 		void setConvertTexturesToDDS(bool convert) { m_convert_texture_to_DDS = convert; }
 		void setImportMaterials(bool import_materials) { m_import_materials = import_materials; }
+		Status getStatus() const { return m_status; }
 
 	private:
 		void writeSkeleton(QFile& file);
@@ -51,6 +63,7 @@ class ImportThread : public QThread, public Assimp::ProgressHandler
 		bool m_convert_texture_to_DDS;
 		Assimp::Importer& m_importer;
 		class LogStream* m_log_stream;
+		Status m_status;
 };
 
 
