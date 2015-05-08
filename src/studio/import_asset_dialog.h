@@ -23,7 +23,7 @@ class ImportThread : public QThread, public Assimp::ProgressHandler
 
 	public:
 		ImportThread(ImportAssetDialog& dialog);
-		~ImportThread();
+		virtual ~ImportThread();
 	
 		virtual bool Update(float percentage = -1.f) override { emit progress(percentage / 3); return true; }
 		virtual void run() override;
@@ -40,6 +40,7 @@ class ImportThread : public QThread, public Assimp::ProgressHandler
 		bool saveLumixMesh();
 
 	signals:
+		void message(QString message);
 		void progress(float percentage);
 
 	private:
@@ -49,6 +50,7 @@ class ImportThread : public QThread, public Assimp::ProgressHandler
 		bool m_import_materials;
 		bool m_convert_texture_to_DDS;
 		Assimp::Importer& m_importer;
+		class LogStream* m_log_stream;
 };
 
 
@@ -58,10 +60,11 @@ class ImportAssetDialog : public QDialog
 
 	public:
 		ImportAssetDialog(QWidget* parent, const QString& base_path);
+		virtual ~ImportAssetDialog();
+
 		void setSource(const QString& source);
 		void setDestination(const QString& destination);
 		Assimp::Importer& getImporter() { return m_importer; }
-		~ImportAssetDialog();
 
 	private:
 		void importModel();
@@ -80,6 +83,7 @@ class ImportAssetDialog : public QDialog
 		void on_importFinished();
 		void on_sourceInput_textChanged(const QString& text);
 		void on_importMaterialsCheckbox_stateChanged(int);
+		void on_importMessage(QString message);
 
 	private:
 		Ui::ImportAssetDialog* m_ui;

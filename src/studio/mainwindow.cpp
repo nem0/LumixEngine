@@ -44,7 +44,7 @@ MainWindow::MainWindow(QWidget* parent) :
 	m_file_server_ui = new FileServerWidget;
 	m_profiler_ui = new ProfilerUI;
 	m_entity_template_list_ui = new EntityTemplateList;
-	m_notifications = Notifications::create(*this);
+	m_notifications = new Notifications(*this);
 	m_entity_list = new EntityList(NULL);
 
 	m_animation_editor = new AnimationEditor(*this);
@@ -235,7 +235,7 @@ MainWindow::~MainWindow()
 	delete m_file_server_ui;
 	delete m_profiler_ui;
 	delete m_entity_template_list_ui;
-	Notifications::destroy(m_notifications);
+	delete m_notifications;
 }
 
 
