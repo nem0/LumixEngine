@@ -44,6 +44,8 @@ class DynamicObjectModel : public QAbstractItemModel
 				}
 
 				std::function<QVariant()> m_getter;
+				std::function<QVariant()> m_decoration;
+				std::function<QVariant()> m_size_hint;
 				std::function<void(const QVariant&)> m_setter;
 				std::function<void(QWidget*, QPoint)> onClick;
 				std::function<void(QPainter*, const QStyleOptionViewItem&)> onPaint;

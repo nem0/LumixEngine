@@ -237,7 +237,23 @@ int DynamicObjectModel::columnCount(const QModelIndex&) const
 
 QVariant DynamicObjectModel::data(const QModelIndex& index, int role) const
 {
-	if (role == Qt::DisplayRole)
+	if (role == Qt::DecorationRole)
+	{
+		Node* node = (Node*)index.internalPointer();
+		if (index.column() == 1 && node->m_decoration)
+		{
+			return node->m_decoration();
+		}
+	}
+	else if (role == Qt::SizeHintRole)
+	{
+		Node* node = (Node*)index.internalPointer();
+		if (index.column() == 1 && node->m_size_hint)
+		{
+			return node->m_size_hint();
+		}
+	}
+	else if (role == Qt::DisplayRole)
 	{
 		Node* node = (Node*)index.internalPointer();
 		if (index.column() == 0)
