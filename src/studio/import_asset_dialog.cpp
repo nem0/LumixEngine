@@ -258,11 +258,11 @@ void ImportThread::writeGeometry(QFile& file)
 			file.write((const char*)&position, sizeof(position));
 
 			auto normal = mesh->mNormals[j];
-			uint8_t byte_normal[4] = { (int8_t)(normal.x * 127), (int8_t)(normal.z * 127), (int8_t)(normal.y * 127), 0 };
+			uint8_t byte_normal[4] = { (int8_t)(normal.x * 127), (int8_t)(normal.y * 127), (int8_t)(normal.z * 127), 0 };
 			file.write((const char*)byte_normal, sizeof(byte_normal));
 
 			auto tangent = mesh->mTangents[j];
-			uint8_t byte_tangent[4] = { (int8_t)(tangent.x * 127), (int8_t)(tangent.z * 127), (int8_t)(tangent.y * 127), 0 };
+			uint8_t byte_tangent[4] = { (int8_t)(tangent.x * 127), (int8_t)(tangent.y * 127), (int8_t)(tangent.z * 127), 0 };
 			file.write((const char*)byte_tangent, sizeof(byte_tangent));
 
 			auto uv = mesh->mTextureCoords[0][j];
@@ -332,6 +332,7 @@ bool ImportThread::saveLumixMesh()
 {
 	QFileInfo source_path(m_source);
 	auto dest = m_destination + "/" + source_path.baseName() + ".msh";
+	QDir().mkpath(m_destination);
 	QFile file(dest);
 	if (!file.open(QIODevice::WriteOnly))
 	{
@@ -383,6 +384,7 @@ static bool convertToDDS(const QString& src, const QString& dest, crn_progress_c
 	comp_params.m_dxt_compressor_type = cCRNDXTCompressorRYG;
 	comp_params.m_pProgress_func = callback;
 	comp_params.m_pProgress_func_data = callback_data;
+	comp_params.m_num_helper_threads = 4;
 	QVector<uint32_t> img_data;
 	img_data.resize(image.width() * image.height());
 	for (int j = 0; j < image.height(); ++j)
@@ -415,10 +417,62 @@ static bool convertToDDS(const QString& src, const QString& dest, crn_progress_c
 }
 
 
+bool ImportThread::saveTexture(const QString& texture_path, const QFileInfo& material_info,  QFile& material_file, bool is_normal_map)
+{
+	QFileInfo texture_info(texture_path);
+
+	QDir().mkpath(m_destination + "/" + texture_info.path());
+	QString texture_entry = QString("\t, \"texture\" : {\n\t\t\"source\" : \"%1\"\n")
+		.arg(m_convert_texture_to_DDS ? texture_info.path() + "/" + texture_info.baseName() + ".dds" : texture_path);
+	if (is_normal_map)
+	{
+		texture_entry += "\t\t, \"uniform\" : \"normalmap\"\n";
+	}
+	texture_entry += "\t}\n";
+	if (is_normal_map)
+	{
+		material_file.write("\t, \"normal_mapping\" : true\n");
+	}
+	material_file.write(texture_entry.toLatin1().data());
+	if (m_convert_texture_to_DDS && texture_info.suffix() != "dds")
+	{
+		auto source = material_info.path() + "/" + texture_path;
+		auto dest = m_destination + "/" + texture_info.path() + "/" + texture_info.baseName() + ".dds";
+		if (!convertToDDS(source, dest, nullptr, nullptr))
+		{
+			m_error_message = QString("Error converting %1 to %2").arg(source).arg(dest);
+			return false;
+		}
+	}
+	else
+	{
+		auto source = material_info.dir().path() + "/" + texture_path;
+		auto dest = m_destination + "/" + texture_path;
+		if (source != dest)
+		{
+			QFile afile(dest);
+			if (afile.exists())
+			{
+				auto p = afile.permissions();
+				p |= QFile::WriteOwner;
+				afile.setPermissions(p);
+				afile.remove();
+			}
+			if (!QFile::copy(source, dest))
+			{
+				m_error_message = QString("Error copying %1 to %2").arg(source).arg(dest);
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+
 bool ImportThread::saveLumixMaterials()
 {
-	float progress_from = 0.5f;
-	float progress_length = 0.5f;
+	static const float PROGRESS_FROM = 0.5f;
+	static const float PROGRESS_LENGTH = 0.5f;
 
 	if (!m_import_materials)
 	{
@@ -434,55 +488,40 @@ bool ImportThread::saveLumixMaterials()
 		const aiMaterial* material = scene->mMaterials[i];
 		aiString material_name;
 		material->Get(AI_MATKEY_NAME, material_name);
-		emit progress(progress_from + progress_length * i / (float)scene->mNumMaterials, QString("Saving material %1...").arg(material_name.C_Str()));
+		emit progress(PROGRESS_FROM + PROGRESS_LENGTH * i / (float)scene->mNumMaterials, QString("Saving material %1...").arg(material_name.C_Str()));
 		auto output_material_name = m_destination + "/" + material_name.C_Str() + ".mat";
 		QFile file(output_material_name);
 		if (file.open(QIODevice::WriteOnly))
 		{
-			file.write(QString("{ \"shader\" : \"shaders/%1.shd\" ").arg(vertex_size == SKINNED_VERTEX_SIZE ? "skinned" : "rigid").toLatin1().data());
-			for (unsigned int j = 0; j < material->GetTextureCount(aiTextureType_DIFFUSE); ++j)
+			file.write(QString("{\n\t\"shader\" : \"shaders/%1.shd\"\n").arg(vertex_size == SKINNED_VERTEX_SIZE ? "skinned" : "rigid").toLatin1().data());
+			if(material->GetTextureCount(aiTextureType_DIFFUSE) == 1)
 			{
 				aiString texture_path;
 				material->GetTexture(aiTextureType_DIFFUSE, 0, &texture_path);
-				QFileInfo texture_info(texture_path.C_Str());
-				QDir().mkpath(m_destination + "/" + texture_info.path());
-				file.write(QString(
-						", \"texture\" : { \"source\" : \"%1\" }"
-					)
-					.arg(m_convert_texture_to_DDS ? texture_info.path() + "/" + texture_info.baseName() + ".dds" : texture_path.C_Str())
-					.toLatin1().data()
-					);
-				if (m_convert_texture_to_DDS && texture_info.suffix() != "dds")
-				{
-					auto source = source_info.path() + "/" + texture_path.C_Str();
-					auto dest = m_destination + "/" + texture_info.path() + "/" + texture_info.baseName() + ".dds";
-					if (!convertToDDS(source, dest, nullptr, nullptr))
-					{
-						m_error_message = QString("Error converting %1 to %2").arg(source).arg(dest);
-						return false;
-					}
-				}
-				else
-				{
-					auto source = source_info.dir().path() + "/" + texture_path.C_Str();
-					auto dest = m_destination + "/" + texture_path.C_Str();
-					if (source != dest)
-					{
-						QFile afile(dest);
-						if (afile.exists())
-						{
-							auto p = afile.permissions();
-							p |= QFile::WriteOwner;
-							afile.setPermissions(p);
-							afile.remove();
-						}
-						if (!QFile::copy(source, dest))
-						{
-							m_error_message = QString("Error copying %1 to %2").arg(source).arg(dest);
-							return false;
-						}
-					}
-				}
+				saveTexture(texture_path.C_Str(), source_info, file, false);
+			}
+			else
+			{
+				saveTexture("undefined.dds", source_info, file, false);
+			}
+
+			if (material->GetTextureCount(aiTextureType_NORMALS) == 1)
+			{
+				aiString texture_path;
+				material->GetTexture(aiTextureType_NORMALS, 0, &texture_path);
+				saveTexture(texture_path.C_Str(), source_info, file, true);
+			}
+			else if (material->GetTextureCount(aiTextureType_HEIGHT) == 1)
+			{
+				aiString texture_path;
+				material->GetTexture(aiTextureType_HEIGHT, 0, &texture_path);
+				saveTexture(texture_path.C_Str(), source_info, file, true);
+			}
+			else if (material->GetTextureCount(aiTextureType_NORMALS) > 1)
+			{
+				m_error_message = QString("Too many normal maps in %1").arg(material_name.C_Str());
+				file.close();
+				return false;
 			}
 			file.write("}");
 			file.close();
@@ -504,7 +543,7 @@ void ImportThread::run()
 	if (!m_importer.GetScene())
 	{
 		Lumix::enableFloatingPointTraps(false);
-		const aiScene* scene = m_importer.ReadFile(m_source.toLatin1().data(), aiProcess_Triangulate | aiProcess_LimitBoneWeights | aiProcess_OptimizeMeshes | aiProcess_OptimizeGraph | aiProcess_GenSmoothNormals | aiProcess_CalcTangentSpace);
+		const aiScene* scene = m_importer.ReadFile(m_source.toLatin1().data(), aiProcess_RemoveRedundantMaterials | aiProcess_Triangulate | aiProcess_LimitBoneWeights | aiProcess_OptimizeMeshes | aiProcess_OptimizeGraph | aiProcess_GenSmoothNormals | aiProcess_CalcTangentSpace);
 		if (!scene || !scene->mMeshes || !scene->mMeshes[0]->mTangents)
 		{
 			m_error_message = m_importer.GetErrorString();
@@ -539,6 +578,7 @@ ImportAssetDialog::ImportAssetDialog(QWidget* parent, const QString& base_path)
 	connect(m_import_thread, &ImportThread::progress, this, &ImportAssetDialog::on_progressUpdate, Qt::QueuedConnection);
 	connect(m_import_thread, &QThread::finished, this, &ImportAssetDialog::on_importFinished, Qt::QueuedConnection);
 	m_ui->destinationInput->setText(QDir::currentPath());
+	on_progressUpdate(1, "");
 }
 
 
@@ -605,7 +645,7 @@ void ImportAssetDialog::on_importFinished()
 void ImportAssetDialog::on_progressUpdate(float percentage, QString message)
 {
 	m_ui->statusLabel->setText(message);
-	m_ui->progressBar->setValue(percentage > 0 ? 100 * percentage : 1);
+	m_ui->progressBar->setValue(percentage > 0 ? 100 * percentage : 5);
 }
 
 
@@ -656,7 +696,6 @@ void ImportAssetDialog::setSource(const QString& source)
 
 void ImportAssetDialog::importModel()
 {
-	on_progressUpdate(0.33f, "Saving...");
 	m_import_thread->setDestination(m_ui->destinationInput->text());
 	m_import_thread->setSource(m_ui->sourceInput->text());
 	m_import_thread->setConvertTexturesToDDS(m_ui->convertToDDSCheckbox->isChecked());
