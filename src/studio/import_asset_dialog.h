@@ -15,6 +15,7 @@ namespace Ui
 
 class ImportAssetDialog;
 class QFile;
+class QFileInfo;
 
 
 class ImportThread : public QThread, public Assimp::ProgressHandler
@@ -38,6 +39,7 @@ class ImportThread : public QThread, public Assimp::ProgressHandler
 		void writeMeshes(QFile& file);
 		void writeGeometry(QFile& file);
 		bool saveLumixMaterials();
+		bool saveTexture(const QString& texture_path, const QFileInfo& material_info, QFile& material_file, bool is_normal_map);
 		bool saveLumixMesh();
 
 	signals:
