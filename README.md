@@ -19,5 +19,7 @@ Features:
 
 [Terrain video](https://www.youtube.com/watch?v=DirHQUGFoOg)
 
+[Normal mapping video](https://www.youtube.com/watch?v=67_gamlrwso)
+
 ![Editor screenshot](https://raw.githubusercontent.com/nem0/LumixEngine/master/docs/editor.png "Editor screenshot")
 
