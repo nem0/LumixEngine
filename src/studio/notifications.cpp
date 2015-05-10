@@ -16,6 +16,7 @@ Notifications::Notifications(MainWindow& main_window)
 	//Lumix::g_log_info.getCallback().bind<Notifications, &Notifications::onLogInfo>(this);
 	Lumix::g_log_warning.getCallback().bind<Notifications, &Notifications::onLogWarning>(this);
 	Lumix::g_log_error.getCallback().bind<Notifications, &Notifications::onLogError>(this);
+	connect(this, &Notifications::notification, this, &Notifications::showNotification);
 	m_main_window.connect(&m_main_window, &MainWindow::resized, [this](const QSize&)
 	{
 		updateLayout();
