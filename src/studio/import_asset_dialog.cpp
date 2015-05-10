@@ -19,10 +19,6 @@
 #include <qthread.h>
 
 
-static const int RIGID_VERTEX_SIZE = 24;
-static const int SKINNED_VERTEX_SIZE = 56;
-
-
 class LogStream : public Assimp::LogStream
 {
 	public:
@@ -100,16 +96,57 @@ ImportThread::~ImportThread()
 }
 
 
-static int getVertexSize(const aiScene* scene)
+static bool isSkinned(const aiMesh* mesh)
+{
+	return mesh->mNumBones > 0;
+}
+
+
+static bool isSkinned(const aiScene* scene, const aiMaterial* material)
 {
 	for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
 	{
-		if (scene->mMeshes[i]->mNumBones > 0)
+		if (scene->mMaterials[scene->mMeshes[i]->mMaterialIndex] == material && isSkinned(scene->mMeshes[i]))
 		{
-			return SKINNED_VERTEX_SIZE;
+			return true;
 		}
 	}
-	return RIGID_VERTEX_SIZE;
+	return false;
+}
+
+
+static int getAttributeCount(const aiMesh* mesh)
+{
+	int count = 3; // position, normal, uv
+	if (isSkinned(mesh))
+	{
+		count += 2;
+	}
+	if (mesh->mTangents)
+	{
+		count += 1;
+	}
+	return count;
+}
+
+
+static int getVertexSize(const aiMesh* mesh)
+{
+	static const int POSITION_SIZE = sizeof(float) * 3;
+	static const int NORMAL_SIZE = sizeof(uint8_t) * 4;
+	static const int TANGENT_SIZE = sizeof(uint8_t) * 4;
+	static const int UV_SIZE = sizeof(short) * 2;
+	static const int BONE_INDICES_WEIGHTS_SIZE = sizeof(float) * 4 + sizeof(int) * 4;
+	int size = POSITION_SIZE + NORMAL_SIZE + UV_SIZE;
+	if (mesh->mTangents)
+	{
+		size += TANGENT_SIZE;
+	}
+	if (isSkinned(mesh))
+	{
+		size += BONE_INDICES_WEIGHTS_SIZE;
+	}
+	return size;
 }
 
 
@@ -117,7 +154,6 @@ void ImportThread::writeMeshes(QFile& file)
 {
 	const aiScene* scene = m_importer.GetScene();
 	int32_t mesh_count = (int32_t)scene->mNumMeshes;
-	int vertex_size = getVertexSize(scene);
 
 	file.write((const char*)&mesh_count, sizeof(mesh_count));
 	int32_t attribute_array_offset = 0;
@@ -125,6 +161,7 @@ void ImportThread::writeMeshes(QFile& file)
 	for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
 	{
 		const aiMesh* mesh = scene->mMeshes[i];
+		int vertex_size = getVertexSize(mesh);
 		aiString material_name;
 		scene->mMaterials[mesh->mMaterialIndex]->Get(AI_MATKEY_NAME, material_name);
 		int32_t length = strlen(material_name.C_Str());
@@ -146,10 +183,10 @@ void ImportThread::writeMeshes(QFile& file)
 		file.write((const char*)&length, sizeof(length));
 		file.write((const char*)mesh_name.C_Str(), length);
 
-		int32_t attribute_count = vertex_size == SKINNED_VERTEX_SIZE ? 6 : 4;
+		int32_t attribute_count = getAttributeCount(mesh);
 		file.write((const char*)&attribute_count, sizeof(attribute_count));
 
-		if (vertex_size == SKINNED_VERTEX_SIZE)
+		if (isSkinned(mesh))
 		{
 			writeAttribute("in_weights", VertexAttributeDef::FLOAT4, file);
 			writeAttribute("in_indices", VertexAttributeDef::INT4, file);
@@ -157,7 +194,10 @@ void ImportThread::writeMeshes(QFile& file)
 
 		writeAttribute("in_position", VertexAttributeDef::POSITION, file);
 		writeAttribute("in_normal", VertexAttributeDef::BYTE4, file);
-		writeAttribute("in_tangents", VertexAttributeDef::BYTE4, file);
+		if (mesh->mTangents)
+		{
+			writeAttribute("in_tangents", VertexAttributeDef::BYTE4, file);
+		}
 		writeAttribute("in_tex_coords", VertexAttributeDef::SHORT2, file);
 	}
 }
@@ -211,13 +251,14 @@ static void fillSkinInfo(const aiScene* scene, QVector<SkinInfo>& infos, int ver
 void ImportThread::writeGeometry(QFile& file)
 {
 	const aiScene* scene = m_importer.GetScene();
-	int vertex_size = getVertexSize(scene);
 	int32_t indices_count = 0;
+	int vertices_count = 0;
 	int32_t vertices_size = 0;
 	for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
 	{
 		indices_count += scene->mMeshes[i]->mNumFaces * 3;
-		vertices_size += scene->mMeshes[i]->mNumVertices * vertex_size;
+		vertices_count += scene->mMeshes[i]->mNumVertices;
+		vertices_size += scene->mMeshes[i]->mNumVertices * getVertexSize(scene->mMeshes[i]);
 	}
 
 	file.write((const char*)&indices_count, sizeof(indices_count));
@@ -239,15 +280,16 @@ void ImportThread::writeGeometry(QFile& file)
 	file.write((const char*)&vertices_size, sizeof(vertices_size));
 
 	QVector<SkinInfo> skin_infos;
-	fillSkinInfo(scene, skin_infos, vertices_size / vertex_size);
+	fillSkinInfo(scene, skin_infos, vertices_count);
 
 	int skin_index = 0;
 	for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
 	{
 		const aiMesh* mesh = scene->mMeshes[i];
+		bool is_skinned = isSkinned(mesh);
 		for (unsigned int j = 0; j < mesh->mNumVertices; ++j)
 		{
-			if (vertex_size == SKINNED_VERTEX_SIZE)
+			if (is_skinned)
 			{
 				file.write((const char*)skin_infos[skin_index].weights, sizeof(skin_infos[skin_index].weights));
 				file.write((const char*)skin_infos[skin_index].bone_indices, sizeof(skin_infos[skin_index].bone_indices));
@@ -261,9 +303,12 @@ void ImportThread::writeGeometry(QFile& file)
 			uint8_t byte_normal[4] = { (int8_t)(normal.x * 127), (int8_t)(normal.y * 127), (int8_t)(normal.z * 127), 0 };
 			file.write((const char*)byte_normal, sizeof(byte_normal));
 
-			auto tangent = mesh->mTangents[j];
-			uint8_t byte_tangent[4] = { (int8_t)(tangent.x * 127), (int8_t)(tangent.y * 127), (int8_t)(tangent.z * 127), 0 };
-			file.write((const char*)byte_tangent, sizeof(byte_tangent));
+			if (mesh->mTangents)
+			{
+				auto tangent = mesh->mTangents[j];
+				uint8_t byte_tangent[4] = { (int8_t)(tangent.x * 127), (int8_t)(tangent.y * 127), (int8_t)(tangent.z * 127), 0 };
+				file.write((const char*)byte_tangent, sizeof(byte_tangent));
+			}
 
 			auto uv = mesh->mTextureCoords[0][j];
 			short short_uv[2] = { (short)(uv.x * 2048), (short)(uv.y * 2048) };
@@ -481,7 +526,6 @@ bool ImportThread::saveLumixMaterials()
 
 	QFileInfo source_info(m_source);
 	const aiScene* scene = m_importer.GetScene();
-	int vertex_size = getVertexSize(scene);
 
 	for (unsigned int i = 0; i < scene->mNumMaterials; ++i)
 	{
@@ -493,7 +537,7 @@ bool ImportThread::saveLumixMaterials()
 		QFile file(output_material_name);
 		if (file.open(QIODevice::WriteOnly))
 		{
-			file.write(QString("{\n\t\"shader\" : \"shaders/%1.shd\"\n").arg(vertex_size == SKINNED_VERTEX_SIZE ? "skinned" : "rigid").toLatin1().data());
+			file.write(QString("{\n\t\"shader\" : \"shaders/%1.shd\"\n").arg(isSkinned(scene, material) ? "skinned" : "rigid").toLatin1().data());
 			if(material->GetTextureCount(aiTextureType_DIFFUSE) == 1)
 			{
 				aiString texture_path;
@@ -543,7 +587,7 @@ void ImportThread::run()
 	if (!m_importer.GetScene())
 	{
 		Lumix::enableFloatingPointTraps(false);
-		const aiScene* scene = m_importer.ReadFile(m_source.toLatin1().data(), aiProcess_RemoveRedundantMaterials | aiProcess_Triangulate | aiProcess_LimitBoneWeights | aiProcess_OptimizeMeshes | aiProcess_OptimizeGraph | aiProcess_GenSmoothNormals | aiProcess_CalcTangentSpace);
+		const aiScene* scene = m_importer.ReadFile(m_source.toLatin1().data(), aiProcess_GenUVCoords | aiProcess_RemoveRedundantMaterials | aiProcess_Triangulate | aiProcess_LimitBoneWeights | aiProcess_OptimizeMeshes | aiProcess_OptimizeGraph | aiProcess_GenSmoothNormals | aiProcess_CalcTangentSpace);
 		if (!scene || !scene->mMeshes || !scene->mMeshes[0]->mTangents)
 		{
 			m_error_message = m_importer.GetErrorString();
@@ -753,15 +797,14 @@ Lumix::Quat getRotation(const aiNodeAnim* channel, float frame)
 
 void ImportAssetDialog::importAnimation()
 {
-	on_progressUpdate(0.9f, "Importing animations...");
 	Q_ASSERT(!m_ui->sourceInput->text().isEmpty());
 
-	QVector<QString> bone_names = getBoneNames(m_importer.GetScene());
-
+	on_progressUpdate(0.9f, "Importing animations...");
+	const aiScene* scene = m_importer.GetScene();
 	for (unsigned int i = 0; i < m_importer.GetScene()->mNumAnimations; ++i)
 	{
-		const aiAnimation* animation = m_importer.GetScene()->mAnimations[0];
-		on_progressUpdate(0.9f + 0.1f * (i / m_importer.GetScene()->mNumAnimations), QString("Importing animation %1...").arg(animation->mName.C_Str()));
+		const aiAnimation* animation = scene->mAnimations[0];
+		on_progressUpdate(0.9f + 0.1f * (i / scene->mNumAnimations), QString("Importing animation %1...").arg(animation->mName.C_Str()));
 		QFile file(m_ui->destinationInput->text() + "/" + animation->mName.C_Str() + ".ani");
 		if (file.open(QIODevice::WriteOnly))
 		{
@@ -785,19 +828,18 @@ void ImportAssetDialog::importAnimation()
 			for (unsigned int channel_idx = 0; channel_idx < animation->mNumChannels; ++channel_idx)
 			{
 				const aiNodeAnim* channel = animation->mChannels[channel_idx];
-				int bone_index = bone_names.indexOf(channel->mNodeName.C_Str());
 				for (int frame = 0; frame < frame_count; ++frame)
 				{
-					positions[frame * bone_count + bone_index] = getPosition(channel, frame);
-					rotations[frame * bone_count + bone_index] = getRotation(channel, frame);
+					positions[frame * bone_count + channel_idx] = getPosition(channel, frame);
+					rotations[frame * bone_count + channel_idx] = getRotation(channel, frame);
 				}
 			}
 			
 			file.write((const char*)&positions[0], sizeof(positions[0]) * positions.size());
 			file.write((const char*)&rotations[0], sizeof(rotations[0]) * rotations.size());
-			for (int i = 0; i < bone_names.size(); ++i)
+			for (int i = 0; i < bone_count; ++i)
 			{
-				uint32_t hash = crc32(bone_names[i].toLatin1().data());
+				uint32_t hash = crc32(animation->mChannels[i]->mNodeName.C_Str());
 				file.write((const char*)&hash, sizeof(hash));
 			}
 
