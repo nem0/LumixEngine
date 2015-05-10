@@ -86,6 +86,8 @@ ImportThread::ImportThread(ImportAssetDialog& dialog)
 	Assimp::DefaultLogger::create("", severity, aiDefaultLogStream_DEBUGGER);
 	m_log_stream = new LogStream(*this);
 	m_importer.SetProgressHandler(this);
+	m_import_model = true;
+	m_import_materials = true;
 }
 
 
@@ -373,11 +375,48 @@ void ImportThread::writeSkeleton(QFile& file)
 }
 
 
-bool ImportThread::saveLumixMesh()
+bool ImportThread::checkModel()
 {
+	const aiScene* scene = m_importer.GetScene();
+	for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
+	{
+		const aiMesh* mesh = scene->mMeshes[i];
+		if (!mesh->HasNormals())
+		{
+			m_error_message = QString("Mesh %1 has no normals.").arg(mesh->mName.C_Str());
+			return false;
+		}
+		if (!mesh->HasPositions())
+		{
+			m_error_message = QString("Mesh %1 has no positions.").arg(mesh->mName.C_Str());
+			return false;
+		}
+		if (!mesh->HasTextureCoords(0))
+		{
+			m_error_message = QString("Mesh %1 has no texture coords.").arg(mesh->mName.C_Str());
+			return false;
+		}
+	}
+	return true;
+}
+
+
+bool ImportThread::saveLumixModel()
+{
+	QDir().mkpath(m_destination);
+	if (!m_import_model)
+	{
+		emit progress(2 / 3.0f, "");
+		return true;
+	}
+
+	if (!checkModel())
+	{
+		return false;
+	}
+
 	QFileInfo source_path(m_source);
 	auto dest = m_destination + "/" + source_path.baseName() + ".msh";
-	QDir().mkpath(m_destination);
 	QFile file(dest);
 	if (!file.open(QIODevice::WriteOnly))
 	{
@@ -464,9 +503,10 @@ static bool convertToDDS(const QImage& image, const QString& dest, crn_progress_
 bool ImportThread::saveTexture(const QString& source_path, const QFileInfo& material_info,  QFile& material_file, bool is_normal_map)
 {
 	QString texture_path = source_path;
-	bool is_embedded = true;
+	bool is_embedded = false;
 	if (source_path[0] == '*')
 	{
+		is_embedded = true;
 		texture_path = m_saved_embedded_textures[source_path.mid(1).toInt()];
 	}
 
@@ -527,6 +567,7 @@ bool ImportThread::saveTexture(const QString& source_path, const QFileInfo& mate
 
 bool ImportThread::saveEmbeddedTextures(const aiScene* scene)
 {
+	emit progress(2 / 3.0f, "Importing embedded textures...");
 	m_saved_embedded_textures.clear();
 	for (unsigned int i = 0; i < scene->mNumTextures; ++i)
 	{
@@ -653,7 +694,7 @@ void ImportThread::run()
 	}
 	else
 	{
-		if (saveLumixMesh())
+		if (saveLumixModel())
 		{
 			saveLumixMaterials();
 		}
@@ -672,6 +713,8 @@ ImportAssetDialog::ImportAssetDialog(QWidget* parent, const QString& base_path)
 
 	m_ui->importMaterialsCheckbox->hide();
 	m_ui->importAnimationCheckbox->hide();
+	m_ui->importMeshCheckbox->hide();
+	m_ui->createDirectoryCheckbox->hide();
 	m_ui->convertToDDSCheckbox->hide();
 	m_ui->importButton->setEnabled(false);
 
@@ -703,6 +746,8 @@ void ImportAssetDialog::on_sourceInput_textChanged(const QString& text)
 	m_ui->importMaterialsCheckbox->hide();
 	m_ui->convertToDDSCheckbox->hide();
 	m_ui->importAnimationCheckbox->hide();
+	m_ui->importMeshCheckbox->hide();
+	m_ui->createDirectoryCheckbox->hide();
 	if (QFile::exists(text))
 	{
 		QFileInfo info(text);
@@ -726,9 +771,12 @@ void ImportAssetDialog::on_importFinished()
 	if (m_import_thread->getErrorMessage().isEmpty())
 	{
 		m_ui->importButton->setEnabled(true);
+		m_ui->importMeshCheckbox->show();
+		m_ui->createDirectoryCheckbox->show();
 		m_ui->importAnimationCheckbox->show();
 		m_ui->importAnimationCheckbox->setEnabled(m_importer.GetScene()->HasAnimations());
 		m_ui->importMaterialsCheckbox->setText(QString("Import %1 materials").arg(m_importer.GetScene()->mNumMaterials));
+		m_ui->importAnimationCheckbox->setText(QString("Import %1 animations").arg(m_importer.GetScene()->mNumAnimations));
 		m_ui->importMaterialsCheckbox->show();
 		m_ui->convertToDDSCheckbox->show();
 		m_ui->convertToDDSCheckbox->setEnabled(m_ui->importMaterialsCheckbox->isChecked());
@@ -796,10 +844,19 @@ void ImportAssetDialog::setSource(const QString& source)
 
 void ImportAssetDialog::importModel()
 {
-	m_import_thread->setDestination(m_ui->destinationInput->text());
+	if (m_ui->createDirectoryCheckbox->isChecked())
+	{
+		QFileInfo info(m_ui->sourceInput->text());
+		m_import_thread->setDestination(m_ui->destinationInput->text() + "/" + info.baseName());
+	}
+	else
+	{
+		m_import_thread->setDestination(m_ui->destinationInput->text());
+	}
 	m_import_thread->setSource(m_ui->sourceInput->text());
 	m_import_thread->setConvertTexturesToDDS(m_ui->convertToDDSCheckbox->isChecked());
 	m_import_thread->setImportMaterials(m_ui->importMaterialsCheckbox->isChecked());
+	m_import_thread->setImpotModel(m_ui->importMeshCheckbox->isChecked());
 	m_import_thread->start();
 }
 
@@ -861,7 +918,12 @@ void ImportAssetDialog::importAnimation()
 	{
 		const aiAnimation* animation = scene->mAnimations[0];
 		on_progressUpdate(0.9f + 0.1f * (i / scene->mNumAnimations), QString("Importing animation %1...").arg(animation->mName.C_Str()));
-		QFile file(m_ui->destinationInput->text() + "/" + animation->mName.C_Str() + ".ani");
+		auto dest_dir = m_ui->destinationInput->text() + "/";
+		if (m_ui->createDirectoryCheckbox->isChecked())
+		{
+
+		}
+		QFile file(dest_dir + animation->mName.C_Str() + ".ani");
 		if (file.open(QIODevice::WriteOnly))
 		{
 			Lumix::Animation::Header header;

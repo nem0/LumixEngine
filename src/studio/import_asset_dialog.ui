@@ -36,9 +36,22 @@
     </layout>
    </item>
    <item>
+    <widget class="QCheckBox" name="importMeshCheckbox">
+     <property name="text">
+      <string>Import mesh</string>
+     </property>
+     <property name="checked">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item>
     <widget class="QCheckBox" name="importAnimationCheckbox">
      <property name="text">
       <string>Import animation</string>
+     </property>
+     <property name="checked">
+      <bool>true</bool>
      </property>
     </widget>
    </item>
@@ -47,12 +60,28 @@
      <property name="text">
       <string>Import materials</string>
      </property>
+     <property name="checked">
+      <bool>true</bool>
+     </property>
     </widget>
    </item>
    <item>
     <widget class="QCheckBox" name="convertToDDSCheckbox">
      <property name="text">
       <string>Convert to DDS</string>
+     </property>
+     <property name="checked">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QCheckBox" name="createDirectoryCheckbox">
+     <property name="text">
+      <string>Create directory </string>
+     </property>
+     <property name="checked">
+      <bool>true</bool>
      </property>
     </widget>
    </item>
