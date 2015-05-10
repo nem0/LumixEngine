@@ -1120,7 +1120,7 @@ void Animator::update(float time_delta)
 				Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(renderable.scene);
 				auto& pose = scene->getPose(renderable);
 				auto* model = scene->getRenderableModel(renderable);
-				if (model && model->getBoneCount() > 0 && m_is_ready_function(m_object))
+				if (model && model->getBoneCount() > 0 && m_is_ready_function(m_object) && model->getBoneCount() > 0)
 				{
 					m_update_function(m_object, *model, pose, time_delta);
 				}

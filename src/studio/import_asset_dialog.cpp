@@ -293,8 +293,8 @@ void ImportThread::writeGeometry(QFile& file)
 			{
 				file.write((const char*)skin_infos[skin_index].weights, sizeof(skin_infos[skin_index].weights));
 				file.write((const char*)skin_infos[skin_index].bone_indices, sizeof(skin_infos[skin_index].bone_indices));
-				++skin_index;
 			}
+			++skin_index;
 
 			Lumix::Vec3 position(mesh->mVertices[j].x, mesh->mVertices[j].y, mesh->mVertices[j].z);
 			file.write((const char*)&position, sizeof(position));
@@ -751,7 +751,7 @@ void ImportAssetDialog::importModel()
 Lumix::Vec3 getPosition(const aiNodeAnim* channel, float frame)
 {
 	unsigned int i = 0;
-	while (frame > (float)channel->mPositionKeys[i].mTime && i < channel->mNumPositionKeys)
+	while (frame > (float)channel->mPositionKeys[i].mTime && i < channel->mNumPositionKeys - 1)
 	{
 		++i;
 	}
@@ -775,7 +775,7 @@ Lumix::Vec3 getPosition(const aiNodeAnim* channel, float frame)
 Lumix::Quat getRotation(const aiNodeAnim* channel, float frame)
 {
 	unsigned int i = 0;
-	while (frame > (float)channel->mRotationKeys[i].mTime && i < channel->mNumRotationKeys)
+	while (frame > (float)channel->mRotationKeys[i].mTime && i < channel->mNumRotationKeys - 1)
 	{
 		++i;
 	}
