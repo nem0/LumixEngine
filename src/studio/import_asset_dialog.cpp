@@ -410,9 +410,8 @@ bool ImportThread::saveLumixMesh()
 }
 
 
-static bool convertToDDS(const QString& src, const QString& dest, crn_progress_callback_func callback, void* callback_data)
+static bool convertToDDS(const QImage& image, const QString& dest, crn_progress_callback_func callback, void* callback_data)
 {
-	QImage image(src);
 	if (image.isNull())
 	{
 		return false;
@@ -462,8 +461,15 @@ static bool convertToDDS(const QString& src, const QString& dest, crn_progress_c
 }
 
 
-bool ImportThread::saveTexture(const QString& texture_path, const QFileInfo& material_info,  QFile& material_file, bool is_normal_map)
+bool ImportThread::saveTexture(const QString& source_path, const QFileInfo& material_info,  QFile& material_file, bool is_normal_map)
 {
+	QString texture_path = source_path;
+	bool is_embedded = true;
+	if (source_path[0] == '*')
+	{
+		texture_path = m_saved_embedded_textures[source_path.mid(1).toInt()];
+	}
+
 	QFileInfo texture_info(texture_path);
 
 	QDir().mkpath(m_destination + "/" + texture_info.path());
@@ -479,11 +485,16 @@ bool ImportThread::saveTexture(const QString& texture_path, const QFileInfo& mat
 		material_file.write("\t, \"normal_mapping\" : true\n");
 	}
 	material_file.write(texture_entry.toLatin1().data());
+
+	if (is_embedded)
+	{
+		return true;
+	}
 	if (m_convert_texture_to_DDS && texture_info.suffix() != "dds")
 	{
 		auto source = material_info.path() + "/" + texture_path;
 		auto dest = m_destination + "/" + texture_info.path() + "/" + texture_info.baseName() + ".dds";
-		if (!convertToDDS(source, dest, nullptr, nullptr))
+		if (!convertToDDS(QImage(source), dest, nullptr, nullptr))
 		{
 			m_error_message = QString("Error converting %1 to %2").arg(source).arg(dest);
 			return false;
@@ -514,6 +525,46 @@ bool ImportThread::saveTexture(const QString& texture_path, const QFileInfo& mat
 }
 
 
+bool ImportThread::saveEmbeddedTextures(const aiScene* scene)
+{
+	m_saved_embedded_textures.clear();
+	for (unsigned int i = 0; i < scene->mNumTextures; ++i)
+	{
+		const aiTexture* texture = scene->mTextures[i];
+		if (texture->mHeight != 0)
+		{
+			m_error_message = "Uncompressed texture embedded. This is not supported.";
+			return false;
+		}
+		if (texture->achFormatHint[0] == '\0')
+		{
+			m_error_message = "Texture of unknown format embedded.";
+			return false;
+		}
+		QImage image;
+		if (!image.loadFromData((const uchar*)texture->pcData, texture->mWidth, texture->achFormatHint))
+		{
+			m_error_message = "Could not load embedded texture.";
+			return false;
+		}
+
+		if (m_convert_texture_to_DDS)
+		{
+			auto texture_name = QString("texture%1.dds").arg(i);
+			m_saved_embedded_textures.push_back(texture_name);
+			convertToDDS(image, m_destination + "/" + texture_name, nullptr, nullptr);
+		}
+		else
+		{
+			auto texture_name = QString("texture%1.%2").arg(i).arg(texture->achFormatHint);
+			m_saved_embedded_textures.push_back(texture_name);
+			image.save(m_destination + "/" + texture_name);
+		}
+	}
+	return true;
+}
+
+
 bool ImportThread::saveLumixMaterials()
 {
 	static const float PROGRESS_FROM = 0.5f;
@@ -526,6 +577,11 @@ bool ImportThread::saveLumixMaterials()
 
 	QFileInfo source_info(m_source);
 	const aiScene* scene = m_importer.GetScene();
+
+	if (!saveEmbeddedTextures(scene))
+	{
+		return false;
+	}
 
 	for (unsigned int i = 0; i < scene->mNumMaterials; ++i)
 	{
@@ -868,7 +924,7 @@ void ImportAssetDialog::importTexture()
 			return true;
 		}
 	};
-	if (convertToDDS(m_ui->sourceInput->text(), m_ui->destinationInput->text() + "/" + source_info.baseName() + ".dds", &Callback::foo, this))
+	if (convertToDDS(QImage(m_ui->sourceInput->text()), m_ui->destinationInput->text() + "/" + source_info.baseName() + ".dds", &Callback::foo, this))
 	{
 		on_progressUpdate(1.0f, "Import successful.");
 	}
