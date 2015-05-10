@@ -41,6 +41,7 @@ class ImportThread : public QThread, public Assimp::ProgressHandler
 		bool saveLumixMaterials();
 		bool saveTexture(const QString& texture_path, const QFileInfo& material_info, QFile& material_file, bool is_normal_map);
 		bool saveLumixMesh();
+		bool saveEmbeddedTextures(const aiScene* scene);
 
 	signals:
 		void progress(float percentage, QString message);
@@ -54,6 +55,7 @@ class ImportThread : public QThread, public Assimp::ProgressHandler
 		Assimp::Importer& m_importer;
 		class LogStream* m_log_stream;
 		QString m_error_message;
+		QVector<QString> m_saved_embedded_textures;
 };
 
 
