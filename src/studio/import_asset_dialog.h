@@ -59,6 +59,7 @@ class ImportThread : public QThread, public Assimp::ProgressHandler
 		class LogStream* m_log_stream;
 		QString m_error_message;
 		QVector<QString> m_saved_embedded_textures;
+		QVector<QString> m_saved_textures;
 };
 
 
