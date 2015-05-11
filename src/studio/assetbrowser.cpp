@@ -180,6 +180,15 @@ static void getTextureFilters(QStringList& filters, bool prepend_asterisk)
 }
 
 
+static bool isAssimpAsset(const QString& suffix)
+{
+	Assimp::Importer importer;
+	aiString extension_list;
+	importer.GetExtensionList(extension_list);
+	return QString(extension_list.C_Str()).split(';').contains(QString("*.") + suffix);
+}
+
+
 static void getDefaultFilters(QStringList& filters)
 {
 	filters << "*.msh" << "*.unv" << "*.ani" <<  "*.mat" << "*.fbx" << "*.shd" << "*.json";
@@ -255,6 +264,9 @@ void AssetBrowser::handleDoubleClick(const QFileInfo& file_info)
 {
 	const QString& suffix = file_info.suffix();
 	QString file = file_info.filePath().toLower();
+	QStringList texture_filters;
+	getTextureFilters(texture_filters, false);
+
 	if(suffix == "unv")
 	{
 		m_editor->loadUniverse(Lumix::Path(file.toLatin1().data()));
@@ -269,7 +281,7 @@ void AssetBrowser::handleDoubleClick(const QFileInfo& file_info)
 		m_editor->addComponent(crc32("animable"));
 		m_editor->setProperty(crc32("animable"), -1, *m_editor->getProperty("animable", "preview"), file.toLatin1().data(), file.length());
 	}
-	else if (suffix == "blend" || suffix == "tga" || suffix == "dds" || suffix == "*.obj")
+	else if (isAssimpAsset(suffix) || texture_filters.contains(suffix))
 	{
 		QDesktopServices::openUrl(QUrl::fromLocalFile(file_info.absoluteFilePath()));
 	}
@@ -386,7 +398,7 @@ void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
 	}
 	QStringList texture_filters;
 	getTextureFilters(texture_filters, false);
-	if (file_info.suffix() == "obj" || file_info.suffix() == "blend" || file_info.suffix() == "x" || texture_filters.contains(file_info.suffix()))
+	if (isAssimpAsset(file_info.suffix()) || texture_filters.contains(file_info.suffix()))
 	{
 		menu->addAction(import_asset_action);
 	}
