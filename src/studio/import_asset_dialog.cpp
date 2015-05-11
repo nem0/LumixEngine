@@ -463,7 +463,7 @@ static bool convertToDDS(const QImage& image, const QString& dest, crn_progress_
 	comp_params.m_file_type = cCRNFileTypeDDS;
 	comp_params.m_format = cCRNFmtDXT3;
 	comp_params.m_quality_level = cCRNMinQualityLevel;
-	comp_params.m_dxt_quality = cCRNDXTQualityNormal;
+	comp_params.m_dxt_quality = cCRNDXTQualitySuperFast;
 	comp_params.m_dxt_compressor_type = cCRNDXTCompressorRYG;
 	comp_params.m_pProgress_func = callback;
 	comp_params.m_pProgress_func_data = callback_data;
@@ -526,7 +526,7 @@ bool ImportThread::saveTexture(const QString& source_path, const QFileInfo& mate
 	}
 	material_file.write(texture_entry.toLatin1().data());
 
-	if (is_embedded)
+	if (is_embedded || m_saved_textures.indexOf(texture_path) >= 0)
 	{
 		return true;
 	}
@@ -561,6 +561,8 @@ bool ImportThread::saveTexture(const QString& source_path, const QFileInfo& mate
 			}
 		}
 	}
+
+	m_saved_textures.push_back(texture_path);
 	return true;
 }
 
@@ -624,6 +626,8 @@ bool ImportThread::saveLumixMaterials()
 		return false;
 	}
 
+	m_saved_textures.clear();
+
 	for (unsigned int i = 0; i < scene->mNumMaterials; ++i)
 	{
 		const aiMaterial* material = scene->mMaterials[i];
@@ -684,7 +688,10 @@ void ImportThread::run()
 	if (!m_importer.GetScene())
 	{
 		Lumix::enableFloatingPointTraps(false);
-		const aiScene* scene = m_importer.ReadFile(m_source.toLatin1().data(), aiProcess_GenUVCoords | aiProcess_RemoveRedundantMaterials | aiProcess_Triangulate | aiProcess_LimitBoneWeights | aiProcess_OptimizeMeshes | aiProcess_OptimizeGraph | aiProcess_GenSmoothNormals | aiProcess_CalcTangentSpace);
+		m_importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS, aiComponent_COLORS | aiComponent_LIGHTS | aiComponent_CAMERAS);
+		const aiScene* scene = m_importer.ReadFile(m_source.toLatin1().data(), 
+			aiProcess_JoinIdenticalVertices | aiProcess_RemoveComponent | aiProcess_GenUVCoords | aiProcess_RemoveRedundantMaterials | aiProcess_Triangulate
+			| aiProcess_LimitBoneWeights | aiProcess_OptimizeMeshes | aiProcess_OptimizeGraph | aiProcess_GenSmoothNormals | aiProcess_CalcTangentSpace);
 		if (!scene || !scene->mMeshes || !scene->mMeshes[0]->mTangents)
 		{
 			m_error_message = m_importer.GetErrorString();
@@ -921,7 +928,7 @@ void ImportAssetDialog::importAnimation()
 		auto dest_dir = m_ui->destinationInput->text() + "/";
 		if (m_ui->createDirectoryCheckbox->isChecked())
 		{
-
+			dest_dir = m_ui->destinationInput->text() + "/" + QFileInfo(m_ui->sourceInput->text()).baseName() + "/";
 		}
 		QFile file(dest_dir + animation->mName.C_Str() + ".ani");
 		if (file.open(QIODevice::WriteOnly))
