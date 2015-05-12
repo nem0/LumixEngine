@@ -149,7 +149,7 @@ void ScriptCompiler::compileModule(const QString& module_name)
 		"		<Link>\n"
 		"			<AdditionalDependencies>animation.lib;core.lib;engine.lib;physics.lib</AdditionalDependencies>\n"
 		"			<AdditionalLibraryDirectories>%1\\bin\\win32_debug</AdditionalLibraryDirectories>\n"
-		"			<GenerateDebugInformation>false</GenerateDebugInformation>"
+		"			<GenerateDebugInformation>true</GenerateDebugInformation>"
 		"			<OutputFile>%2.dll</OutputFile>"
 		"		</Link>\n"
 		"	</ItemDefinitionGroup>\n"

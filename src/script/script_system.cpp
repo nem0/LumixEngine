@@ -189,7 +189,7 @@ namespace Lumix
 			{
 				if (!m_library)
 				{
-					const char* library_path = "scripts/Debug/main.dll";
+					const char* library_path = "scripts/universes/main.dll";
 					
 					m_library = Library::create(Path(library_path), m_allocator);
 					if (!m_library->load())

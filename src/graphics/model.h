@@ -151,6 +151,8 @@ class Model : public Resource
 
 		~Model();
 
+		void create(const VertexDef& def, Material* material, const void* indices_data, int indices_size, const void* attributes_data, int attributes_size);
+		
 		LODMeshIndices getLODMeshIndices(float squared_distance) const;
 		const Geometry& getGeometry() const { return m_geometry_buffer_object; }
 		Mesh&		getMesh(int index) { return m_meshes[index]; }
@@ -176,6 +178,7 @@ class Model : public Resource
 		bool parseMeshes(FS::IFile* file);
 		bool parseLODs(FS::IFile* file);
 		int getBoneIdx(const char* name);
+		void computeRuntimeData(const uint8_t* vertices);
 
 		virtual void doUnload(void) override;
 		virtual void loaded(FS::IFile* file, bool success, FS::FileSystem& fs) override;

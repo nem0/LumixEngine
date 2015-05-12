@@ -31,7 +31,7 @@ enum class VertexAttributeDef : uint32_t
 };
 
 
-struct VertexDef
+struct LUMIX_ENGINE_API VertexDef
 {
 	public:
 		VertexDef() : m_attribute_count(0), m_vertex_size(0) {}
