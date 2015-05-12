@@ -37,6 +37,21 @@ namespace Lumix
 		return NULL;
 	}
 
+	void ResourceManagerBase::add(Resource* resource)
+	{
+		ASSERT(resource)
+
+		m_resources.insert(resource->getPath(), resource);
+
+		if (resource->isEmpty())
+		{
+			resource->onLoading();
+			resource->doLoad();
+		}
+
+		resource->addRef();
+	}
+
 	Resource* ResourceManagerBase::load(const Path& path)
 	{
 		Resource* resource = get(path);
