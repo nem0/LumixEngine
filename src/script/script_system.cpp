@@ -43,12 +43,60 @@ namespace Lumix
 				, m_deserialize_function(NULL)
 				, m_serialize_function(NULL)
 				, m_update_function(NULL)
+				, m_reload_after_compile(false)
 			{
+				if (m_engine.getWorldEditor())
+				{
+					m_engine.getWorldEditor()->gameModeToggled().bind<ScriptSceneImpl, &ScriptSceneImpl::onGameModeToggled>(this);
+				}
 			}
 
 
 			~ScriptSceneImpl()
 			{
+				if (m_engine.getWorldEditor())
+				{
+					m_engine.getWorldEditor()->gameModeToggled().unbind<ScriptSceneImpl, &ScriptSceneImpl::onGameModeToggled>(this);
+				}
+			}
+
+
+			void onGameModeToggled(bool is_starting)
+			{
+				if (is_starting)
+				{
+					if (!m_library)
+					{
+						const char* library_path = "scripts/universes/main.dll";
+
+						m_library = Library::create(Path(library_path), m_allocator);
+						if (!m_library->load())
+						{
+							g_log_error.log("script") << "Could not load " << library_path;
+							Library::destroy(m_library);
+							m_library = NULL;
+							return;
+						}
+						m_update_function = (UpdateFunction)m_library->resolve("update");
+						m_done_function = (DoneFunction)m_library->resolve("done");
+						m_serialize_function = (SerializeFunction)m_library->resolve("serialize");
+						m_deserialize_function = (DeserializeFunction)m_library->resolve("deserialize");
+						InitFunction init_function = (InitFunction)m_library->resolve("init");
+						if (!m_update_function || !init_function)
+						{
+							g_log_error.log("script") << "Script interface in " << library_path << " is not complete";
+						}
+
+						if (init_function)
+						{
+							init_function(this);
+						}
+					}
+				}
+				else
+				{
+					unloadLibrary();
+				}
 			}
 
 
@@ -187,7 +235,7 @@ namespace Lumix
 
 			virtual void afterScriptCompiled() override
 			{
-				if (!m_library)
+				if (!m_library && m_reload_after_compile)
 				{
 					const char* library_path = "scripts/universes/main.dll";
 					
@@ -219,13 +267,22 @@ namespace Lumix
 
 			virtual void beforeScriptCompiled() override
 			{
+				m_reload_after_compile = true;
 				m_is_compiling = true;
+				unloadLibrary();
+			}
+
+
+			void unloadLibrary()
+			{
 				if (m_done_function)
 				{
 					m_done_function();
 				}
 				if (m_library)
 				{
+					m_update_function = nullptr;
+					m_done_function = nullptr;
 					Library::destroy(m_library);
 					m_library = NULL;
 				}
@@ -294,6 +351,7 @@ namespace Lumix
 			SerializeFunction m_serialize_function;
 			DeserializeFunction m_deserialize_function;
 			bool m_is_compiling;
+			bool m_reload_after_compile;
 
 			DelegateList<void(const Path&, const Path&)> m_script_renamed;
 	};

@@ -112,6 +112,7 @@ namespace Lumix
 			virtual const IPropertyDescriptor& getPropertyDescriptor(uint32_t type, uint32_t name_hash) = 0;
 			virtual Array<IPropertyDescriptor*>& getPropertyDescriptors(uint32_t type) = 0;
 			
+			virtual DelegateList<void(bool)>& gameModeToggled() = 0;
 			virtual DelegateList<void(const Array<Entity>&)>& entitySelected() = 0;
 			virtual DelegateList<void()>& universeCreated() = 0;
 			virtual DelegateList<void()>& universeDestroyed() = 0;
