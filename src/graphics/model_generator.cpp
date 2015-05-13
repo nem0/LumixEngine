@@ -17,6 +17,14 @@ namespace Lumix
 	}
 
 
+	void ModelGenerator::destroyModel(Model* model)
+	{
+		m_resource_manager.get(ResourceManager::MODEL)->unload(*model);
+		m_resource_manager.get(ResourceManager::MODEL)->remove(model);
+		m_allocator.deleteObject(model);
+	}
+
+
 	Model* ModelGenerator::createModel(Material* material, const VertexDef& vertex_def, int* indices, int indices_size, unsigned char* attribute_array, int attributes_size)
 	{
 		char path[10];

@@ -729,7 +729,7 @@ namespace Lumix
 			{
 				if (component.type == RENDERABLE_HASH)
 				{
-					Renderable* renderable = m_renderables[component.index];
+					Renderable* renderable = m_renderables[getRenderable(component.index)];
 					for (int i = 0; i < m_light_influenced_geometry.size(); ++i)
 					{
 						Array<Renderable*>& influenced_geometry = m_light_influenced_geometry[i];
