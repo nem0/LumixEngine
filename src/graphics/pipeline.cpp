@@ -76,6 +76,18 @@ struct PolygonModeCommand : public Command
 };
 
 
+struct CullFaceCommand : public Command
+{
+	CullFaceCommand(IAllocator&) {}
+
+	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
+	virtual void execute(PipelineInstanceImpl& pipeline) override;
+
+	bool m_is_front;
+};
+
+
+
 struct SetPassCommand : public Command
 {
 	SetPassCommand(IAllocator&) {}
@@ -262,6 +274,7 @@ struct PipelineImpl : public Pipeline
 		addCommandCreator("render_debug_lines").bind<&CreateCommand<RenderDebugLinesCommand> >();
 		addCommandCreator("render_debug_texts").bind<&CreateCommand<RenderDebugTextsCommand> >();
 		addCommandCreator("polygon_mode").bind<&CreateCommand<PolygonModeCommand> >();
+		addCommandCreator("cull_face").bind<&CreateCommand<CullFaceCommand> >();
 		addCommandCreator("set_pass").bind<&CreateCommand<SetPassCommand> >();
 		addCommandCreator("deferred_point_light_loop").bind<&CreateCommand<DeferredPointLightLoopCommand> >();
 	}
@@ -546,8 +559,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 		{
 			return;
 		}
-		glEnable(GL_CULL_FACE);
-		glCullFace(GL_FRONT);
 		m_shadowmap_framebuffer->bind();
 		glClear(GL_DEPTH_BUFFER_BIT);
 		
@@ -1185,6 +1196,21 @@ PipelineInstance* PipelineInstance::create(Pipeline& pipeline, IAllocator& alloc
 void PipelineInstance::destroy(PipelineInstance* pipeline)
 {
 	static_cast<PipelineInstanceImpl*>(pipeline)->m_allocator.deleteObject(pipeline);
+}
+
+
+void CullFaceCommand::deserialize(PipelineImpl&, JsonSerializer& serializer)
+{
+	char tmp[20];
+	serializer.deserializeArrayItem(tmp, sizeof(tmp), "");
+	m_is_front = strcmp(tmp, "front") == 0;
+}
+
+
+void CullFaceCommand::execute(PipelineInstanceImpl&)
+{
+	glEnable(GL_CULL_FACE);
+	glCullFace(m_is_front ? GL_FRONT : GL_BACK);
 }
 
 
