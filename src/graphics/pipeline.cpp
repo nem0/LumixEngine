@@ -228,20 +228,6 @@ struct BindShadowmapCommand : public Command
 
 struct PipelineImpl : public Pipeline
 {
-	struct FrameBufferDeclaration
-	{
-		FrameBufferDeclaration()
-			: m_name(m_name_allocator)
-		{ }
-
-		int32_t m_width;
-		int32_t m_height;
-		int32_t m_color_buffers_count;
-		bool m_is_depth_buffer;
-		StackAllocator<64> m_name_allocator;
-		string m_name;
-	};
-	
 	struct CommandCreator
 	{
 		typedef Delegate<Command* (IAllocator&)> Creator;
@@ -323,18 +309,17 @@ struct PipelineImpl : public Pipeline
 		}
 		return NULL;
 	}
+	
 
-
-	bool deserialierFramebuffers(JsonSerializer& serializer)
+	bool deserializeFramebuffers(JsonSerializer& serializer)
 	{
 		while (!serializer.isArrayEnd())
 		{
 			serializer.nextArrayItem();
 			serializer.deserializeObjectBegin();
-			FrameBufferDeclaration& framebuffer = m_framebuffers.pushEmpty();
+			FrameBuffer::Declaration& framebuffer = m_framebuffers.pushEmpty();
 
-			framebuffer.m_color_buffers_count = 0;
-			framebuffer.m_is_depth_buffer = false;
+			framebuffer.m_renderbuffers_count = 0;
 			while (!serializer.isObjectEnd())
 			{
 				char label[40];
@@ -352,13 +337,20 @@ struct PipelineImpl : public Pipeline
 				{
 					serializer.deserialize(framebuffer.m_height, 0);
 				}
-				else if (strcmp(label, "color_buffers_count") == 0)
+				else if (strcmp(label, "renderbuffers") == 0)
 				{
-					serializer.deserialize(framebuffer.m_color_buffers_count, 0);
+					serializer.deserializeArrayBegin();
+					while (!serializer.isArrayEnd())
+					{
+						serializer.nextArrayItem();
+						framebuffer.m_renderbuffers[framebuffer.m_renderbuffers_count].deserialize(serializer);
+						++framebuffer.m_renderbuffers_count;
+					}
+					serializer.deserializeArrayEnd();
 				}
-				else if (strcmp(label, "is_depth_buffer") == 0)
+				else
 				{
-					serializer.deserialize(framebuffer.m_is_depth_buffer, false);
+					g_log_error.log("deserialize") << "Unknown label " << label << " found in " << getPath().c_str();
 				}
 			}
 			serializer.deserializeObjectEnd();
@@ -372,7 +364,7 @@ struct PipelineImpl : public Pipeline
 		serializer.deserializeObjectBegin();
 		serializer.deserializeArrayBegin("frame_buffers");
 		m_framebuffers.clear();
-		bool status = deserialierFramebuffers(serializer);
+		bool status = deserializeFramebuffers(serializer);
 	
 		serializer.deserializeArrayBegin("commands");
 		while (!serializer.isArrayEnd())
@@ -417,7 +409,7 @@ struct PipelineImpl : public Pipeline
 	IAllocator& m_allocator;
 	Array<Command*> m_commands;
 	Array<CommandCreator> m_command_creators;
-	Array<FrameBufferDeclaration> m_framebuffers;
+	Array<FrameBuffer::Declaration> m_framebuffers;
 };
 
 
@@ -524,9 +516,9 @@ struct PipelineInstanceImpl : public PipelineInstance
 			m_framebuffers.reserve(m_source.m_framebuffers.size());
 			for (int i = 0; i < m_source.m_framebuffers.size(); ++i)
 			{
-				PipelineImpl::FrameBufferDeclaration& fb = m_source.m_framebuffers[i];
-				m_framebuffers.push(m_allocator.newObject<FrameBuffer>(fb.m_width, fb.m_height, fb.m_color_buffers_count, fb.m_is_depth_buffer, fb.m_name.c_str()));
-				if (fb.m_name == "shadowmap")
+				FrameBuffer::Declaration& decl = m_source.m_framebuffers[i];
+				m_framebuffers.push(m_allocator.newObject<FrameBuffer>(decl));
+				if (decl.m_name == "shadowmap")
 				{
 					m_shadowmap_framebuffer = m_framebuffers.back();
 				}
