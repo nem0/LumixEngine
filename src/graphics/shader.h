@@ -55,7 +55,6 @@ class LUMIX_ENGINE_API Shader : public Resource
 		~Shader();
 
 		GLint getAttribId(int index) const { return m_current_combination->m_vertex_attributes_ids[index]; }
-		bool isShadowmapRequired() const { return m_is_shadowmap_required; }
 		LUMIX_FORCE_INLINE GLint getUniformLocation(const char* name, uint32_t name_hash);
 		GLuint getProgramId() const { return m_current_combination->m_program_id; }
 		GLint getFixedCachedUniformLocation(FixedCachedUniforms name) const { return m_current_combination->m_fixed_cached_uniforms[(int)name]; }
@@ -106,7 +105,6 @@ class LUMIX_ENGINE_API Shader : public Resource
 		Array<Combination*>	m_combinations;
 		Combination*		m_current_combination;
 		Combination			m_default_combination;
-		bool				m_is_shadowmap_required;
 		string				m_source;
 		Renderer&			m_renderer;
 };

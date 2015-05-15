@@ -201,16 +201,15 @@ struct RenderDebugTextsCommand : public Command
 
 struct BindFramebufferTextureCommand : public Command
 {
-	BindFramebufferTextureCommand(IAllocator& allocator)
-		: m_framebuffer_name(allocator)
+	BindFramebufferTextureCommand(IAllocator&)
 	{ }
 
 	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
 	virtual void execute(PipelineInstanceImpl& pipeline) override;
 	
-	string m_framebuffer_name;
 	uint32_t m_renderbuffer_index;
-	uint32_t m_texture_uint;
+	char m_framebuffer_name[20];
+	char m_uniform[20];
 };
 
 
@@ -226,15 +225,6 @@ struct RenderShadowmapCommand : public Command
 	int64_t m_layer_mask;
 	StackAllocator<128> m_string_allocator;
 	string m_camera_slot;
-};
-
-
-struct BindShadowmapCommand : public Command
-{
-	BindShadowmapCommand(IAllocator&) {}
-
-	virtual void deserialize(PipelineImpl&, JsonSerializer&) override {}
-	virtual void execute(PipelineInstanceImpl& pipeline) override;
 };
 
 
@@ -270,7 +260,6 @@ struct PipelineImpl : public Pipeline
 		addCommandCreator("draw_screen_quad").bind<&CreateCommand<DrawScreenQuadCommand> >();
 		addCommandCreator("bind_framebuffer_texture").bind<&CreateCommand<BindFramebufferTextureCommand> >();
 		addCommandCreator("render_shadowmap").bind<&CreateCommand<RenderShadowmapCommand> >();
-		addCommandCreator("bind_shadowmap").bind<&CreateCommand<BindShadowmapCommand> >();
 		addCommandCreator("render_debug_lines").bind<&CreateCommand<RenderDebugLinesCommand> >();
 		addCommandCreator("render_debug_texts").bind<&CreateCommand<RenderDebugTextsCommand> >();
 		addCommandCreator("polygon_mode").bind<&CreateCommand<PolygonModeCommand> >();
@@ -435,6 +424,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		, m_allocator(allocator)
 		, m_terrain_infos(allocator)
 		, m_framebuffers(allocator)
+		, m_global_textures(allocator)
 		, m_grass_infos(allocator)
 		, m_renderable_infos(allocator)
 		, m_frame_allocator(allocator, 1 * 1024 * 1024)
@@ -457,6 +447,12 @@ struct PipelineInstanceImpl : public PipelineInstance
 		{
 			m_allocator.deleteObject(m_framebuffers[i]);
 		}
+	}
+
+
+	void addGlobalTexture(GLuint id, const char* uniform_name)
+	{
+		m_global_textures.emplace(id, uniform_name);
 	}
 
 
@@ -526,6 +522,12 @@ struct PipelineInstanceImpl : public PipelineInstance
 	{
 		if (old_state != Resource::State::READY && new_state == Resource::State::READY)
 		{
+			for (int i = 0; i < m_framebuffers.size(); ++i)
+			{
+				m_allocator.deleteObject(m_framebuffers[i]);
+			}
+			m_framebuffers.clear();
+
 			m_framebuffers.reserve(m_source.m_framebuffers.size());
 			for (int i = 0; i < m_source.m_framebuffers.size(); ++i)
 			{
@@ -619,6 +621,20 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
+	void applyMaterial(const Material& material)
+	{
+		material.apply(*m_renderer, *this);
+		int offset = material.getTextureCount();
+		for (int i = 0, c = m_global_textures.size(); i < c; ++i)
+		{
+			const GlobalTexture& texture = m_global_textures[i];
+			glActiveTexture(GL_TEXTURE0 + i + offset);
+			glBindTexture(GL_TEXTURE_2D, texture.m_texture_id);
+			m_renderer->setUniform(*material.getShader(), texture.m_uniform_name, texture.m_uniform_hash, i + offset);
+		}
+	}
+
+
 	void renderScreenGeometry(Geometry* geometry, Mesh* mesh)
 	{
 		if (mesh->getMaterial()->isReady())
@@ -629,7 +645,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 			Renderer::getOrthoMatrix(-1, 1, -1, 1, 0, 30, &mtx);
 			m_renderer->setProjectionMatrix(mtx);
 			m_renderer->setViewMatrix(Matrix::IDENTITY);
-			mesh->getMaterial()->apply(*m_renderer, *this);
+			applyMaterial(*mesh->getMaterial());
 			Component light_cmp = m_scene->getActiveGlobalLight();
 			if (light_cmp.isValid())
 			{
@@ -672,7 +688,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		Geometry& geometry = m_scene->getDebugTextGeometry();
 		Mesh& mesh = m_scene->getDebugTextMesh();
 	
-		font->getMaterial()->apply(*m_renderer, *this);
+		applyMaterial(*font->getMaterial());
 		bindGeometry(*m_renderer, geometry, mesh);
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -770,7 +786,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		if (!lights.empty() && material->isReady())
 		{
 			Component camera = m_scene->getCameraInSlot("editor");
-			material->apply(*m_renderer, *this);
+			applyMaterial(*material);
 			GLint attrib_id = material->getShader()->getAttribId(m_renderer->getAttributeNameIndex("in_position"));
 
 			glEnable(GL_BLEND);
@@ -830,11 +846,9 @@ struct PipelineInstanceImpl : public PipelineInstance
 			Shader* shader = material->getShader();
 			if (shader->isReady())
 			{
-				data->m_terrain->getMesh()->getMaterial()->apply(*m_renderer, *this);
+				applyMaterial(*data->m_terrain->getMesh()->getMaterial());
 				setLightUniforms(light_cmp, shader);
-
 				m_renderer->setUniform(*shader, "terrain_scale", TERRAIN_SCALE_HASH, data->m_terrain->getScale());
-
 				return true;
 			}
 		}
@@ -853,7 +867,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		{
 			return false;
 		}
-		material.apply(*m_renderer, *this);
+		applyMaterial(material);
 		m_renderer->setUniform(*shader, "camera_pos", CAMERA_POS_HASH, m_active_camera.entity.getPosition());
 		setLightUniforms(light_cmp, shader);
 
@@ -873,7 +887,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 			return false;
 		}
 
-		material.apply(*m_renderer, *this);
+		applyMaterial(material);
 		m_renderer->setUniform(*shader, "camera_pos", CAMERA_POS_HASH, m_active_camera.entity.getPosition());
 		setLightUniforms(light_cmp, shader);
 		return true;
@@ -1135,6 +1149,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 				m_source.m_commands[i]->execute(*this);
 			}
 		}
+		m_global_textures.clear();
 		m_frame_allocator.clear();
 	}
 
@@ -1154,10 +1169,25 @@ struct PipelineInstanceImpl : public PipelineInstance
 		return m_scene;
 	}
 
+	struct GlobalTexture
+	{
+		GlobalTexture(GLuint id, const char* uniform_name)
+		{
+			copyString(m_uniform_name, sizeof(m_uniform_name), uniform_name);
+			m_uniform_hash = crc32(uniform_name);
+			m_texture_id = id;
+		}
+
+		GLuint m_texture_id;
+		char m_uniform_name[20];
+		uint32_t m_uniform_hash;
+	};
+
 	IAllocator& m_allocator;
 	LIFOAllocator m_frame_allocator;
 	PipelineImpl& m_source;
 	RenderScene* m_scene;
+	Array<GlobalTexture> m_global_textures;
 	Array<FrameBuffer*> m_framebuffers;
 	FrameBuffer* m_shadowmap_framebuffer;
 	Matrix m_shadow_modelviewprojection[4];
@@ -1431,19 +1461,18 @@ void DrawScreenQuadCommand::execute(PipelineInstanceImpl& pipeline)
 
 void BindFramebufferTextureCommand::deserialize(PipelineImpl&, JsonSerializer& serializer)
 {
-	serializer.deserializeArrayItem(m_framebuffer_name, "");
+	serializer.deserializeArrayItem(m_framebuffer_name, sizeof(m_framebuffer_name), "");
 	serializer.deserializeArrayItem(m_renderbuffer_index, 0);
-	serializer.deserializeArrayItem(m_texture_uint, 0);
+	serializer.deserializeArrayItem(m_uniform, sizeof(m_uniform), "");
 }
 
 
 void BindFramebufferTextureCommand::execute(PipelineInstanceImpl& pipeline)
 {
-	FrameBuffer* fb = pipeline.getFrameBuffer(m_framebuffer_name.c_str());
+	FrameBuffer* fb = pipeline.getFrameBuffer(m_framebuffer_name);
 	if (fb)
 	{
-		glActiveTexture(GL_TEXTURE0 + m_texture_uint);
-		glBindTexture(GL_TEXTURE_2D, fb->getTexture(m_renderbuffer_index));
+		pipeline.addGlobalTexture(fb->getTexture(m_renderbuffer_index), m_uniform);
 	}
 }
 
@@ -1458,13 +1487,6 @@ void RenderShadowmapCommand::deserialize(PipelineImpl&, JsonSerializer& serializ
 void RenderShadowmapCommand::execute(PipelineInstanceImpl& pipeline)
 {
 	pipeline.renderShadowmap(pipeline.getScene()->getCameraInSlot(m_camera_slot.c_str()), m_layer_mask);
-}
-
-
-void BindShadowmapCommand::execute(PipelineInstanceImpl& pipeline)
-{
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, pipeline.m_shadowmap_framebuffer->getDepthTexture());
 }
 
 
