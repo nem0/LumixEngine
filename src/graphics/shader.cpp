@@ -20,7 +20,6 @@ namespace Lumix
 
 Shader::Shader(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
-	, m_is_shadowmap_required(true)
 	, m_renderer(renderer)
 	, m_allocator(allocator)
 	, m_source(m_allocator)
@@ -226,10 +225,6 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 					m_pass_hashes.push(crc32(label));
 				}
 				serializer.deserializeArrayEnd();
-			}
-			else if (strcmp(label, "shadowmap_required") == 0)
-			{
-				serializer.deserialize(m_is_shadowmap_required, false);
 			}
 		}
 		serializer.deserializeObjectEnd();
