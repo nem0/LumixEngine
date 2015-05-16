@@ -51,8 +51,6 @@ class LUMIX_ENGINE_API Pipeline : public Resource
 		Pipeline(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 		virtual ~Pipeline() {}
 
-		virtual bool deserialize(JsonSerializer& serializer) = 0;
-
 		static Pipeline* create(Renderer& renderer);
 		static void destroy(Pipeline* pipeline);
 };

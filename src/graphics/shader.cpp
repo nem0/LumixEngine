@@ -247,13 +247,10 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 {
 	if(success)
 	{
-		ShaderManager* manager = static_cast<ShaderManager*>(getResourceManager().get(ResourceManager::SHADER));
-		char* text = reinterpret_cast<char*>(manager->getBuffer(file->size() + 1));
-
 		lua_State* L = luaL_newstate();
-		memcpy(text, file->getBuffer(), file->size());
-		text[file->size()] = 0;
-		bool errors = luaL_dostring(L, text);
+		
+		bool errors = luaL_loadbuffer(L, (const char*)file->getBuffer(), file->size(), "") != LUA_OK;
+		errors = errors || lua_pcall(L, 0, LUA_MULTRET, 0) != LUA_OK;
 		if (errors)
 		{
 			g_log_error.log("lua") << getPath().c_str() << ": " << lua_tostring(L, -1);

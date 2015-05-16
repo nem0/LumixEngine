@@ -26,6 +26,8 @@
 #include "graphics/shader.h"
 #include "graphics/terrain.h"
 #include "graphics/texture.h"
+#include <lua.hpp>
+#include <lauxlib.h>
 
 
 namespace Lumix
@@ -48,225 +50,29 @@ static const float SHADOW_CAM_NEAR = 0.1f;
 static const float SHADOW_CAM_FAR = 10000.0f;
 
 
-struct Command
-{
-	virtual ~Command() {}
-	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) = 0;
-	virtual void execute(PipelineInstanceImpl& pipeline) = 0;
-};
-
-
-struct CustomCommand : public Command
-{
-	CustomCommand(IAllocator&) {}
-
-	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
-	virtual void execute(PipelineInstanceImpl& pipeline) override;
-	uint32_t m_name;
-};
-
-
-struct PolygonModeCommand : public Command
-{
-	PolygonModeCommand(IAllocator&) {}
-
-	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
-	virtual void execute(PipelineInstanceImpl& pipeline) override;
-	
-	bool m_fill;
-};
-
-
-struct CullFaceCommand : public Command
-{
-	CullFaceCommand(IAllocator&) {}
-
-	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
-	virtual void execute(PipelineInstanceImpl& pipeline) override;
-
-	bool m_is_front;
-};
-
-
-
-struct SetPassCommand : public Command
-{
-	SetPassCommand(IAllocator&) {}
-
-	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
-	virtual void execute(PipelineInstanceImpl& pipeline) override;
-	
-	uint32_t m_pass_hash;
-};
-
-
-struct ClearCommand : public Command
-{
-	ClearCommand(IAllocator&) {}
-
-	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
-	virtual void execute(PipelineInstanceImpl& pipeline) override;
-	
-	uint32_t m_buffers;
-};
-
-
-struct RenderModelsCommand : public Command
-{
-	RenderModelsCommand(IAllocator&) : m_point_light_influenced_geometry(false) {}
-
-	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
-	virtual void execute(PipelineInstanceImpl& pipeline) override;
-	
-	int64_t m_layer_mask;
-	bool m_point_light_influenced_geometry;
-};
-
-
-struct DeferredPointLightLoopCommand : public Command
-{
-	DeferredPointLightLoopCommand(IAllocator&) {}
-
-	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
-	virtual void execute(PipelineInstanceImpl& pipeline) override;
-
-	Material* m_material;
-};
-
-
-struct ApplyCameraCommand : public Command
-{
-	ApplyCameraCommand(IAllocator& allocator)
-		: m_camera_slot(allocator)
-	{ }
-	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
-	virtual void execute(PipelineInstanceImpl& pipeline) override;
-	
-	string m_camera_slot;
-};
-
-
-struct BindFramebufferCommand : public Command
-{
-	BindFramebufferCommand(IAllocator& allocator)
-		: m_buffer_name(allocator)
-	{ }
-
-	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
-	virtual void execute(PipelineInstanceImpl& pipeline) override;
-	
-	string m_buffer_name;
-};
-
-
-struct UnbindFramebufferCommand : public Command
-{
-	UnbindFramebufferCommand(IAllocator&) {}
-
-	virtual void deserialize(PipelineImpl&, JsonSerializer&) override {}
-	virtual void execute(PipelineInstanceImpl& pipeline) override;
-};
-
-
-struct DrawScreenQuadCommand : public Command
-{
-	DrawScreenQuadCommand(IAllocator& allocator) : m_allocator(allocator) {}
-	~DrawScreenQuadCommand();
-
-	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
-	virtual void execute(PipelineInstanceImpl& pipeline) override;
-	
-	IAllocator& m_allocator;
-	Mesh* m_mesh;
-	Geometry* m_geometry;
-};
-
-
-struct RenderDebugLinesCommand : public Command
-{
-	RenderDebugLinesCommand(IAllocator&) {}
-
-	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
-	virtual void execute(PipelineInstanceImpl& pipeline) override;
-};
-
-
-struct RenderDebugTextsCommand : public Command
-{
-	RenderDebugTextsCommand(IAllocator&) {}
-
-	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
-	virtual void execute(PipelineInstanceImpl& pipeline) override;
-};
-
-
-struct BindFramebufferTextureCommand : public Command
-{
-	BindFramebufferTextureCommand(IAllocator&)
-	{ }
-
-	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
-	virtual void execute(PipelineInstanceImpl& pipeline) override;
-	
-	uint32_t m_renderbuffer_index;
-	char m_framebuffer_name[20];
-	char m_uniform[20];
-};
-
-
-struct RenderShadowmapCommand : public Command
-{
-	RenderShadowmapCommand(IAllocator& allocator)
-		: m_camera_slot(allocator)
-	{}
-
-	virtual void deserialize(PipelineImpl& pipeline, JsonSerializer& serializer) override;
-	virtual void execute(PipelineInstanceImpl& pipeline) override;
-
-	int64_t m_layer_mask;
-	StackAllocator<128> m_string_allocator;
-	string m_camera_slot;
-};
+static int setPass(lua_State* L);
+static int applyCamera(lua_State* L);
+static int clear(lua_State* L);
+static int renderModels(lua_State* L);
+static int renderShadowmap(lua_State* L);
+static int bindFramebufferTexture(lua_State* L);
+static int polygonMode(lua_State* L);
+static int executeCustomCommand(lua_State* L);
+static int renderDebugTexts(lua_State* L);
+static int renderDebugLines(lua_State* L);
+static int cullFaces(lua_State* L);
+static int bindFramebuffer(lua_State* L);
+static int unbindFramebuffer(lua_State* L);
 
 
 struct PipelineImpl : public Pipeline
 {
-	struct CommandCreator
-	{
-		typedef Delegate<Command* (IAllocator&)> Creator;
-		Creator m_creator;
-		uint32_t m_type_hash;
-	};
-
-	template <typename T>
-	static Command* CreateCommand(IAllocator& allocator)
-	{
-		return allocator.newObject<T>(allocator);
-	}
-
-
 	PipelineImpl(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 		: Pipeline(path, resource_manager, allocator)
 		, m_allocator(allocator)
-		, m_commands(allocator)
 		, m_framebuffers(allocator)
-		, m_command_creators(allocator)
+		, m_lua_state(nullptr)
 	{
-		addCommandCreator("clear").bind<&CreateCommand<ClearCommand> >();
-		addCommandCreator("custom").bind<&CreateCommand<CustomCommand> >();
-		addCommandCreator("render_models").bind<&CreateCommand<RenderModelsCommand> >();
-		addCommandCreator("apply_camera").bind<&CreateCommand<ApplyCameraCommand> >();
-		addCommandCreator("bind_framebuffer").bind<&CreateCommand<BindFramebufferCommand> >();
-		addCommandCreator("unbind_framebuffer").bind<&CreateCommand<UnbindFramebufferCommand> >();
-		addCommandCreator("draw_screen_quad").bind<&CreateCommand<DrawScreenQuadCommand> >();
-		addCommandCreator("bind_framebuffer_texture").bind<&CreateCommand<BindFramebufferTextureCommand> >();
-		addCommandCreator("render_shadowmap").bind<&CreateCommand<RenderShadowmapCommand> >();
-		addCommandCreator("render_debug_lines").bind<&CreateCommand<RenderDebugLinesCommand> >();
-		addCommandCreator("render_debug_texts").bind<&CreateCommand<RenderDebugTextsCommand> >();
-		addCommandCreator("polygon_mode").bind<&CreateCommand<PolygonModeCommand> >();
-		addCommandCreator("cull_face").bind<&CreateCommand<CullFaceCommand> >();
-		addCommandCreator("set_pass").bind<&CreateCommand<SetPassCommand> >();
-		addCommandCreator("deferred_point_light_loop").bind<&CreateCommand<DeferredPointLightLoopCommand> >();
 	}
 
 
@@ -278,127 +84,129 @@ struct PipelineImpl : public Pipeline
 
 	virtual ~PipelineImpl() override
 	{
+		if (m_lua_state)
+		{
+			lua_close(m_lua_state);
+		}
 		ASSERT(isEmpty());
 	}
 
 
 	virtual void doUnload(void) override
 	{
-		for (int i = 0; i < m_commands.size(); ++i)
+		if (m_lua_state)
 		{
-			m_allocator.deleteObject(m_commands[i]);
+			lua_close(m_lua_state);
+			m_lua_state = nullptr;
 		}
-		m_commands.clear();
 		onEmpty();
 	}
 
 
-	CommandCreator::Creator& addCommandCreator(const char* type)
+	void parseRenderbuffers(lua_State* L, FrameBuffer::Declaration& decl)
 	{
-		CommandCreator& creator = m_command_creators.pushEmpty();
-		creator.m_type_hash = crc32(type);
-		return creator.m_creator;
-	}
-
-
-	Command* createCommand(uint32_t type_hash)
-	{
-		for (int i = 0; i < m_command_creators.size(); ++i)
+		int len = (int)lua_rawlen(L, -1);
+		for (int i = 0; i < len; ++i)
 		{
-			if (m_command_creators[i].m_type_hash == type_hash)
+			if (lua_rawgeti(L, -1, 1 + i) == LUA_TTABLE)
 			{
-				return m_command_creators[i].m_creator.invoke(m_allocator);
+				FrameBuffer::RenderBuffer& buf = decl.m_renderbuffers[decl.m_renderbuffers_count];
+				buf.parse(L);
+				++decl.m_renderbuffers_count;
 			}
+			lua_pop(L, 1);
 		}
-		return NULL;
 	}
-	
 
-	bool deserializeFramebuffers(JsonSerializer& serializer)
+
+	void parseFramebuffers(lua_State* L)
 	{
-		while (!serializer.isArrayEnd())
+		if (lua_getglobal(L, "framebuffers") == LUA_TTABLE)
 		{
-			serializer.nextArrayItem();
-			serializer.deserializeObjectBegin();
-			FrameBuffer::Declaration& framebuffer = m_framebuffers.pushEmpty();
-
-			framebuffer.m_renderbuffers_count = 0;
-			while (!serializer.isObjectEnd())
+			int len = (int)lua_rawlen(L, -1);
+			m_framebuffers.resize(len);
+			for (int i = 0; i < len; ++i)
 			{
-				char label[40];
-				serializer.deserializeLabel(label, sizeof(label));
-				if (strcmp(label, "name") == 0)
+				if (lua_rawgeti(L, -1, 1 + i) == LUA_TTABLE)
 				{
-					serializer.deserialize(label, sizeof(label), "");
-					framebuffer.m_name = label;
-				}
-				else if (strcmp(label, "width") == 0)
-				{
-					serializer.deserialize(framebuffer.m_width, 0);
-				}
-				else if (strcmp(label, "height") == 0)
-				{
-					serializer.deserialize(framebuffer.m_height, 0);
-				}
-				else if (strcmp(label, "renderbuffers") == 0)
-				{
-					serializer.deserializeArrayBegin();
-					while (!serializer.isArrayEnd())
+					FrameBuffer::Declaration& decl = m_framebuffers[i];
+					if (lua_getfield(L, -1, "name") == LUA_TSTRING)
 					{
-						serializer.nextArrayItem();
-						framebuffer.m_renderbuffers[framebuffer.m_renderbuffers_count].deserialize(serializer);
-						++framebuffer.m_renderbuffers_count;
+						decl.m_name = lua_tostring(L, -1);
 					}
-					serializer.deserializeArrayEnd();
+					lua_pop(L, 1);
+					if (lua_getfield(L, -1, "width") == LUA_TNUMBER)
+					{
+						decl.m_width = (int)lua_tointeger(L, -1);
+					}
+					lua_pop(L, 1);
+					if (lua_getfield(L, -1, "height") == LUA_TNUMBER)
+					{
+						decl.m_height = (int)lua_tointeger(L, -1);
+					}
+					lua_pop(L, 1);
+					if (lua_getfield(L, -1, "renderbuffers") == LUA_TTABLE)
+					{
+						parseRenderbuffers(L, decl);
+					}
+					lua_pop(L, 1);
 				}
-				else
-				{
-					g_log_error.log("deserialize") << "Unknown label " << label << " found in " << getPath().c_str();
-				}
+				lua_pop(L, 1);
 			}
-			serializer.deserializeObjectEnd();
 		}
-		serializer.deserializeArrayEnd();
-		return true;
+		lua_pop(L, 1);
 	}
 
-	virtual bool deserialize(JsonSerializer& serializer) override
+
+	void registerCFunction(const char* name, lua_CFunction function)
 	{
-		serializer.deserializeObjectBegin();
-		serializer.deserializeArrayBegin("frame_buffers");
-		m_framebuffers.clear();
-		bool status = deserializeFramebuffers(serializer);
-	
-		serializer.deserializeArrayBegin("commands");
-		while (!serializer.isArrayEnd())
-		{
-			char tmp[255];
-			serializer.deserializeArrayItem(tmp, 255, "");
-			uint32_t command_type_hash = crc32(tmp);
-			Command* cmd = createCommand(command_type_hash);
-			if(cmd)
-			{
-				cmd->deserialize(*this, serializer);
-				m_commands.push(cmd);
-			}
-			else
-			{
-				status = false;
-				g_log_error.log("renderer") << "Unknown pipeline command \"" << tmp << "\" in pipeline " << getPath().c_str();
-			}
-		}
-		serializer.deserializeArrayEnd();
-		serializer.deserializeObjectEnd();
-		return status;
+		lua_pushcfunction(m_lua_state, function);
+		lua_setglobal(m_lua_state, name);
+	}
+
+
+	void registerCFunctions()
+	{
+		registerCFunction("setPass", setPass);
+		registerCFunction("applyCamera", applyCamera);
+		registerCFunction("clear", clear);
+		registerCFunction("renderModels", renderModels);
+		registerCFunction("renderShadowmap", renderShadowmap);
+		registerCFunction("bindFramebufferTexture", bindFramebufferTexture);
+		registerCFunction("polygonMode", polygonMode);
+		registerCFunction("executeCustomCommand", executeCustomCommand);
+		registerCFunction("renderDebugLines", renderDebugLines);
+		registerCFunction("renderDebugTexts", renderDebugTexts);
+		registerCFunction("cullFaces", cullFaces);
+		registerCFunction("bindFramebuffer", bindFramebuffer);
+		registerCFunction("unbindFramebuffer", unbindFramebuffer);
 	}
 
 
 	virtual void loaded(FS::IFile* file, bool success, FS::FileSystem& fs) override
 	{
+		if (m_lua_state)
+		{
+			lua_close(m_lua_state);
+			m_lua_state = nullptr;
+		}
 		if(success)
 		{
-			JsonSerializer serializer(*file, JsonSerializer::READ, m_path.c_str(), m_allocator);
-			deserialize(serializer);
+			m_lua_state = luaL_newstate();
+			bool errors = luaL_loadbuffer(m_lua_state, (const char*)file->getBuffer(), file->size(), "") != LUA_OK;
+			errors = errors || lua_pcall(m_lua_state, 0, LUA_MULTRET, 0) != LUA_OK;
+			if (errors)
+			{
+				g_log_error.log("lua") << getPath().c_str() << ": " << lua_tostring(m_lua_state, -1);
+				onFailure();
+			}
+			else
+			{
+				parseFramebuffers(m_lua_state);
+			}
+
+			registerCFunctions();
+
 			decrementDepCount();
 		}
 		else
@@ -409,9 +217,8 @@ struct PipelineImpl : public Pipeline
 		fs.close(file);
 	}
 
+	lua_State* m_lua_state;
 	IAllocator& m_allocator;
-	Array<Command*> m_commands;
-	Array<CommandCreator> m_command_creators;
 	Array<FrameBuffer::Declaration> m_framebuffers;
 };
 
@@ -1141,15 +948,23 @@ struct PipelineInstanceImpl : public PipelineInstance
 	virtual void render() override
 	{
 		PROFILE_FUNCTION();
+		
+		if (!m_source.isReady())
+		{
+			return;
+		}
 		m_draw_calls_count = 0;
 		m_vertices_count = 0;
-		if (m_scene)
+		
+		if (lua_getglobal(m_source.m_lua_state, "render") == LUA_TFUNCTION)
 		{
-			for (int i = 0; i < m_source.m_commands.size(); ++i)
+			lua_pushlightuserdata(m_source.m_lua_state, this);
+			if (lua_pcall(m_source.m_lua_state, 1, 0, 0) != LUA_OK)
 			{
-				m_source.m_commands[i]->execute(*this);
+				g_log_error.log("lua") << lua_tostring(m_source.m_lua_state, -1);
 			}
 		}
+
 		m_global_textures.clear();
 		m_frame_allocator.clear();
 	}
@@ -1230,267 +1045,6 @@ void PipelineInstance::destroy(PipelineInstance* pipeline)
 }
 
 
-void CullFaceCommand::deserialize(PipelineImpl&, JsonSerializer& serializer)
-{
-	char tmp[20];
-	serializer.deserializeArrayItem(tmp, sizeof(tmp), "");
-	m_is_front = strcmp(tmp, "front") == 0;
-}
-
-
-void CullFaceCommand::execute(PipelineInstanceImpl&)
-{
-	glEnable(GL_CULL_FACE);
-	glCullFace(m_is_front ? GL_FRONT : GL_BACK);
-}
-
-
-void PolygonModeCommand::deserialize(PipelineImpl&, JsonSerializer& serializer)
-{
-	serializer.deserializeArrayItem(m_fill, true);
-}
-
-
-void PolygonModeCommand::execute(PipelineInstanceImpl& pipeline)
-{
-	glPolygonMode(GL_FRONT_AND_BACK, m_fill && !pipeline.getRenderer().isEditorWireframe() ? GL_FILL : GL_LINE);
-}
-
-
-void SetPassCommand::deserialize(PipelineImpl&, JsonSerializer& serializer)
-{
-	char pass_name[50];
-	serializer.deserializeArrayItem(pass_name, sizeof(pass_name), "");
-	m_pass_hash = crc32(pass_name);
-}
-
-
-void SetPassCommand::execute(PipelineInstanceImpl& pipeline)
-{
-	pipeline.getRenderer().setPass(m_pass_hash);
-}
-
-
-void ClearCommand::deserialize(PipelineImpl&, JsonSerializer& serializer)
-{
-	char tmp[256];
-	serializer.deserializeArrayItem(tmp, 255, "all");
-	if (strcmp(tmp, "all") == 0)
-	{
-		m_buffers = GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT;
-	}
-	else if (strcmp(tmp, "depth") == 0)
-	{
-		m_buffers = GL_DEPTH_BUFFER_BIT;
-	}
-}
-
-
-void ClearCommand::execute(PipelineInstanceImpl&)
-{
-	glClear(m_buffers);
-}
-
-
-void CustomCommand::deserialize(PipelineImpl&, JsonSerializer& serializer)
-{
-	char tmp[256];
-	serializer.deserializeArrayItem(tmp, 255, "");
-	m_name = crc32(tmp);
-}
-
-
-void CustomCommand::execute(PipelineInstanceImpl& pipeline)
-{
-	pipeline.executeCustomCommand(m_name);
-}
-
-
-void DeferredPointLightLoopCommand::deserialize(PipelineImpl& pipeline, JsonSerializer& serializer)
-{
-	char material_path[LUMIX_MAX_PATH];
-	serializer.deserializeArrayItem(material_path, LUMIX_MAX_PATH, "");
-	m_material = static_cast<Material*>(pipeline.getResourceManager().get(ResourceManager::MATERIAL)->load(Path(material_path)));
-}
-
-
-void DeferredPointLightLoopCommand::execute(PipelineInstanceImpl& pipeline)
-{
-	pipeline.deferredPointLightLoop(m_material);
-}
-
-
-void RenderModelsCommand::deserialize(PipelineImpl&, JsonSerializer& serializer) 
-{
-	serializer.deserializeArrayItem(m_layer_mask, 0);
-	serializer.deserializeArrayItem(m_point_light_influenced_geometry, false);
-}
-
-
-void RenderModelsCommand::execute(PipelineInstanceImpl& pipeline)
-{
-	if (m_point_light_influenced_geometry)
-	{
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_ONE, GL_ONE);
-	
-		pipeline.renderPointLightInfluencedGeometry(pipeline.getScene()->getFrustum(), m_layer_mask);
-
-		glDisable(GL_BLEND);
-	}
-	else
-	{
-		pipeline.renderModels(pipeline.getScene()->getFrustum(), m_layer_mask, false);
-	}
-}
-
-
-void ApplyCameraCommand::deserialize(PipelineImpl&, JsonSerializer& serializer)
-{
-	serializer.deserializeArrayItem(m_camera_slot, "main");
-}
-
-
-void ApplyCameraCommand::execute(PipelineInstanceImpl& pipeline)
-{
-	ASSERT(pipeline.m_renderer != NULL);
-	Component cmp = pipeline.m_scene->getCameraInSlot(m_camera_slot.c_str()); 
-	pipeline.setActiveCamera(cmp);
-	if (cmp.isValid())
-	{
-		if (pipeline.m_framebuffer_width > 0)
-		{
-			pipeline.getRenderer().setViewport((float)pipeline.m_framebuffer_width, (float)pipeline.m_framebuffer_height);
-		}
-		else
-		{
-			pipeline.getRenderer().setViewport((float)pipeline.m_width, (float)pipeline.m_height);
-		}
-		
-		pipeline.m_scene->setCameraSize(cmp, pipeline.m_width, pipeline.m_height);
-		pipeline.m_scene->applyCamera(cmp);
-	}
-}
-
-
-void BindFramebufferCommand::deserialize(PipelineImpl&, JsonSerializer& serializer)
-{
-	serializer.deserializeArrayItem(m_buffer_name, "");
-}
-
-
-void BindFramebufferCommand::execute(PipelineInstanceImpl& pipeline)
-{
-	FrameBuffer* fb = pipeline.getFrameBuffer(m_buffer_name.c_str());
-	if (fb)
-	{
-		fb->bind();
-		pipeline.m_framebuffer_width = fb->getWidth();
-		pipeline.m_framebuffer_height = fb->getHeight();
-	}
-}
-
-	
-void UnbindFramebufferCommand::execute(PipelineInstanceImpl& pipeline)
-{
-	FrameBuffer::unbind();
-	pipeline.m_framebuffer_width = pipeline.m_framebuffer_height = -1;
-}
-
-
-void RenderDebugLinesCommand::deserialize(PipelineImpl&, JsonSerializer&)
-{
-}
-
-
-void RenderDebugLinesCommand::execute(PipelineInstanceImpl& pipeline)
-{
-	pipeline.renderDebugLines();
-}
-
-
-void RenderDebugTextsCommand::deserialize(PipelineImpl&, JsonSerializer&)
-{
-}
-
-
-void RenderDebugTextsCommand::execute(PipelineInstanceImpl& pipeline)
-{
-	pipeline.renderDebugTexts();
-}
-
-
-DrawScreenQuadCommand::~DrawScreenQuadCommand()
-{
-	m_allocator.deleteObject(m_geometry);
-	m_allocator.deleteObject(m_mesh);
-}
-
-
-void DrawScreenQuadCommand::deserialize(PipelineImpl& pipeline, JsonSerializer& serializer)
-{
-	m_geometry = m_allocator.newObject<Geometry>();
-	VertexDef def;
-	Renderer& renderer = pipeline.getRenderer();
-	def.addAttribute(renderer, "in_position", VertexAttributeDef::FLOAT2);
-	def.addAttribute(renderer, "in_tex_coords", VertexAttributeDef::FLOAT2);
-	int indices[6] = { 0, 1, 2, 0, 2, 3 };
-	const int GEOMETRY_VERTEX_ATTRIBUTE_COUNT = 16;
-	float v[GEOMETRY_VERTEX_ATTRIBUTE_COUNT];
-	
-	for (int i = 0; i < GEOMETRY_VERTEX_ATTRIBUTE_COUNT; ++i)
-	{
-		serializer.deserializeArrayItem(v[i], 0);
-	}
-
-	m_geometry->setAttributesData(v, sizeof(v));
-	m_geometry->setIndicesData(indices, sizeof(indices));
-
-	char material_path[LUMIX_MAX_PATH];
-	serializer.deserializeArrayItem(material_path, LUMIX_MAX_PATH, "");
-	Material* material = static_cast<Material*>(pipeline.getResourceManager().get(ResourceManager::MATERIAL)->load(Path(material_path)));
-	m_mesh = m_allocator.newObject<Mesh>(def, material, 0, 0, sizeof(v), 6, "screen_quad", m_allocator);
-}
-
-
-void DrawScreenQuadCommand::execute(PipelineInstanceImpl& pipeline)
-{
-	pipeline.getRenderer().setViewport((float)pipeline.m_width, (float)pipeline.m_height);
-	pipeline.renderScreenGeometry(m_geometry, m_mesh);
-}
-
-
-void BindFramebufferTextureCommand::deserialize(PipelineImpl&, JsonSerializer& serializer)
-{
-	serializer.deserializeArrayItem(m_framebuffer_name, sizeof(m_framebuffer_name), "");
-	serializer.deserializeArrayItem(m_renderbuffer_index, 0);
-	serializer.deserializeArrayItem(m_uniform, sizeof(m_uniform), "");
-}
-
-
-void BindFramebufferTextureCommand::execute(PipelineInstanceImpl& pipeline)
-{
-	FrameBuffer* fb = pipeline.getFrameBuffer(m_framebuffer_name);
-	if (fb)
-	{
-		pipeline.addGlobalTexture(fb->getTexture(m_renderbuffer_index), m_uniform);
-	}
-}
-
-
-void RenderShadowmapCommand::deserialize(PipelineImpl&, JsonSerializer& serializer)
-{
-	serializer.deserializeArrayItem(m_layer_mask, 0);
-	serializer.deserializeArrayItem(m_camera_slot, 0);
-}
-
-
-void RenderShadowmapCommand::execute(PipelineInstanceImpl& pipeline)
-{
-	pipeline.renderShadowmap(pipeline.getScene()->getCameraInSlot(m_camera_slot.c_str()), m_layer_mask);
-}
-
-
 Resource* PipelineManager::createResource(const Path& path)
 {
 	return m_allocator.newObject<PipelineImpl>(path, getOwner(), m_allocator);
@@ -1500,6 +1054,234 @@ Resource* PipelineManager::createResource(const Path& path)
 void PipelineManager::destroyResource(Resource& resource)
 {
 	m_allocator.deleteObject(static_cast<PipelineImpl*>(&resource));
+}
+
+
+static int setPass(lua_State* L)
+{
+	PipelineInstanceImpl* pipeline = (PipelineInstanceImpl*)lua_touserdata(L, 1);
+	if (!pipeline)
+	{
+		return 0;
+	}
+	const char* pass = lua_tostring(L, 2);
+	pipeline->getRenderer().setPass(crc32(pass));
+	return 0;
+}
+
+
+static int applyCamera(lua_State* L)
+{
+	PipelineInstanceImpl* pipeline = (PipelineInstanceImpl*)lua_touserdata(L, 1);
+	if (!pipeline)
+	{
+		return 0;
+	}
+	const char* slot = lua_tostring(L, 2);
+	Component cmp = pipeline->m_scene->getCameraInSlot(slot);
+	pipeline->setActiveCamera(cmp);
+	if (cmp.isValid())
+	{
+		if (pipeline->m_framebuffer_width > 0)
+		{
+			pipeline->getRenderer().setViewport((float)pipeline->m_framebuffer_width, (float)pipeline->m_framebuffer_height);
+		}
+		else
+		{
+			pipeline->getRenderer().setViewport((float)pipeline->m_width, (float)pipeline->m_height);
+		}
+
+		pipeline->m_scene->setCameraSize(cmp, pipeline->m_width, pipeline->m_height);
+		pipeline->m_scene->applyCamera(cmp);
+	}
+	return 0;
+}
+
+
+static int polygonMode(lua_State* L)
+{
+	PipelineInstanceImpl* pipeline = (PipelineInstanceImpl*)lua_touserdata(L, 1);
+	if (!pipeline)
+	{
+		return 0;
+	}
+	bool fill = lua_toboolean(L, 2) != 0;
+	glPolygonMode(GL_FRONT_AND_BACK, fill && !pipeline->getRenderer().isEditorWireframe() ? GL_FILL : GL_LINE);
+	return 0;
+}
+
+
+static int clear(lua_State* L)
+{
+	const char* buffers = lua_tostring(L, 1);
+	if (strcmp(buffers, "all") == 0)
+	{
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	}
+	else if (strcmp(buffers, "depth") == 0)
+	{
+		glClear(GL_DEPTH_BUFFER_BIT);
+	}
+	return 0;
+}
+
+
+static int renderModels(lua_State* L)
+{
+	PipelineInstanceImpl* pipeline = (PipelineInstanceImpl*)lua_touserdata(L, 1);
+	if (!pipeline)
+	{
+		return 0;
+	}
+
+	int64_t layer_mask = lua_tointeger(L, 2);
+	bool is_point_light_render = lua_toboolean(L, 3) != 0;
+	if (is_point_light_render)
+	{
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_ONE, GL_ONE);
+
+		pipeline->renderPointLightInfluencedGeometry(pipeline->getScene()->getFrustum(), layer_mask);
+
+		glDisable(GL_BLEND);
+	}
+	else
+	{
+		pipeline->renderModels(pipeline->getScene()->getFrustum(), layer_mask, false);
+	}
+
+
+	return 0;
+}
+
+
+static int bindFramebufferTexture(lua_State* L)
+{
+	PipelineInstanceImpl* pipeline = (PipelineInstanceImpl*)lua_touserdata(L, 1);
+	if (!pipeline)
+	{
+		return 0;
+	}
+
+	const char* framebuffer_name = lua_tostring(L, 2);
+	int renderbuffer_index = (int)lua_tointeger(L, 3);
+	const char* uniform = lua_tostring(L, 4);
+
+	FrameBuffer* fb = pipeline->getFrameBuffer(framebuffer_name);
+	if (fb)
+	{
+		pipeline->addGlobalTexture(fb->getTexture(renderbuffer_index), uniform);
+	}
+
+	return 0;
+}
+
+
+static int executeCustomCommand(lua_State* L)
+{
+	PipelineInstanceImpl* pipeline = (PipelineInstanceImpl*)lua_touserdata(L, 1);
+	if (!pipeline)
+	{
+		return 0;
+	}
+
+	const char* command = lua_tostring(L, 2);
+	pipeline->executeCustomCommand(crc32(command));
+
+	return 0;
+}
+
+
+static int renderDebugLines(lua_State* L)
+{
+	PipelineInstanceImpl* pipeline = (PipelineInstanceImpl*)lua_touserdata(L, 1);
+	if (!pipeline)
+	{
+		return 0;
+	}
+	pipeline->renderDebugLines();
+
+	return 0;
+}
+
+
+static int cullFaces(lua_State* L)
+{
+	glEnable(GL_CULL_FACE);
+	if (strcmp(lua_tostring(L, 1), "front") == 0)
+	{
+		glCullFace(GL_FRONT);
+	}
+	else
+	{
+		glCullFace(GL_BACK);
+	}
+	return 0;
+}
+
+
+static int renderDebugTexts(lua_State* L)
+{
+	PipelineInstanceImpl* pipeline = (PipelineInstanceImpl*)lua_touserdata(L, 1);
+	if (!pipeline)
+	{
+		return 0;
+	}
+	pipeline->renderDebugTexts();
+
+	return 0;
+}
+
+
+static int renderShadowmap(lua_State* L)
+{
+	PipelineInstanceImpl* pipeline = (PipelineInstanceImpl*)lua_touserdata(L, 1);
+	if (!pipeline)
+	{
+		return 0;
+	}
+
+	int64_t layer_mask = lua_tointeger(L, 2);
+	const char* slot = lua_tostring(L, 3);
+
+	pipeline->renderShadowmap(pipeline->getScene()->getCameraInSlot(slot), layer_mask);
+
+	return 0;
+}
+
+
+static int bindFramebuffer(lua_State* L)
+{
+	PipelineInstanceImpl* pipeline = (PipelineInstanceImpl*)lua_touserdata(L, 1);
+	if (!pipeline)
+	{
+		return 0;
+	}
+
+	const char* buffer_name = lua_tostring(L, 2);
+	FrameBuffer* fb = pipeline->getFrameBuffer(buffer_name);
+	if (fb)
+	{
+		fb->bind();
+		pipeline->m_framebuffer_width = fb->getWidth();
+		pipeline->m_framebuffer_height = fb->getHeight();
+	}
+
+	return 0;
+}
+
+
+static int unbindFramebuffer(lua_State* L)
+{
+	PipelineInstanceImpl* pipeline = (PipelineInstanceImpl*)lua_touserdata(L, 1);
+	if (!pipeline)
+	{
+		return 0;
+	}
+
+	FrameBuffer::unbind();
+	pipeline->m_framebuffer_width = pipeline->m_framebuffer_height = -1;
+	return 0;
 }
 
 

@@ -2,6 +2,8 @@
 #include "core/json_serializer.h"
 #include "core/vec3.h"
 #include "graphics/gl_ext.h"
+#include <lua.hpp>
+#include <lauxlib.h>
 
 
 namespace Lumix
@@ -146,28 +148,18 @@ static GLint getGLFormat(const char* format)
 }
 
 
-void FrameBuffer::RenderBuffer::deserialize(JsonSerializer& serializer)
+void FrameBuffer::RenderBuffer::parse(lua_State* L)
 {
-	serializer.deserializeObjectBegin();
-	while (!serializer.isObjectEnd())
+	if (lua_getfield(L, -1, "format") == LUA_TSTRING)
 	{
-		char tmp[50];
-		serializer.deserializeLabel(tmp, sizeof(tmp));
-		if (strcmp(tmp, "format") == 0)
-		{
-			serializer.deserialize(tmp, sizeof(tmp), "rgb");
-			m_format = getGLFormat(tmp);
-		}
-		else if (strcmp(tmp, "is_texture") == 0)
-		{
-			serializer.deserialize(m_is_texture, "false");
-		}
-		else
-		{
-			g_log_error.log("deserialize") << "Unknown renderbuffer format " << tmp;
-		}
+		m_format = getGLFormat(lua_tostring(L, -1));
 	}
-	serializer.deserializeObjectEnd();
+	lua_pop(L, 1);
+	if (lua_getfield(L, -1, "is_texture") == LUA_TBOOLEAN)
+	{
+		m_is_texture = lua_toboolean(L, -1) != 0;
+	}
+	lua_pop(L, 1);
 }
 
 
