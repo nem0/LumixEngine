@@ -4,6 +4,7 @@
 #include "core/associative_array.h"
 #include "core/crc32.h"
 #include "core/frustum.h"
+#include "core/fs/ifile.h"
 #include "core/fs/file_system.h"
 #include "core/json_serializer.h"
 #include "core/lifo_allocator.h"

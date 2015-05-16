@@ -3,6 +3,9 @@
 #include "graphics/gl_ext.h"
 
 
+struct lua_State;
+
+
 namespace Lumix
 {
 namespace FS
@@ -91,7 +94,9 @@ class LUMIX_ENGINE_API Shader : public Resource
 		};
 
 	private:
-		bool deserializeSettings(class JsonSerializer& serializer, char* attributes[MAX_ATTRIBUTE_COUNT]);
+		void parsePasses(lua_State* state);
+		void parseAttributes(lua_State* state);
+		void parseSourceCode(lua_State* state);
 		Combination* getCombination(uint32_t hash, uint32_t pass_hash);
 
 		virtual void doUnload(void) override;
@@ -105,7 +110,8 @@ class LUMIX_ENGINE_API Shader : public Resource
 		Array<Combination*>	m_combinations;
 		Combination*		m_current_combination;
 		Combination			m_default_combination;
-		string				m_source;
+		string				m_vertex_shader_source;
+		string				m_fragment_shader_source;
 		Renderer&			m_renderer;
 };
 
