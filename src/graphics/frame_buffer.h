@@ -6,6 +6,9 @@
 #include "graphics/gl_ext.h"
 
 
+struct lua_State;
+
+
 namespace Lumix
 {
 
@@ -24,7 +27,7 @@ class FrameBuffer
 			bool m_is_texture;
 			GLuint m_id;
 
-			void deserialize(JsonSerializer& serializer);
+			void parse(lua_State* state);
 			bool isDepth() const;
 		};
 
@@ -32,6 +35,7 @@ class FrameBuffer
 		{
 			Declaration()
 				: m_name(m_name_allocator)
+				, m_renderbuffers_count(0)
 			{ }
 
 			static const int MAX_RENDERBUFFERS = 16;
