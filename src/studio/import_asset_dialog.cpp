@@ -9,7 +9,10 @@
 #include "core/vec3.h"
 #include "crnlib.h"
 #include "debug/floating_points.h"
+#include "editor/world_editor.h"
 #include "graphics/model.h"
+#include "mainwindow.h"
+#include "metadata.h"
 #include <qfile.h>
 #include <qfiledialog.h>
 #include <qimagereader.h>
@@ -710,9 +713,10 @@ void ImportThread::run()
 }
 		
 
-ImportAssetDialog::ImportAssetDialog(QWidget* parent, const QString& base_path)
+ImportAssetDialog::ImportAssetDialog(MainWindow& main_window, QWidget* parent, const QString& base_path)
 	: QDialog(parent)
 	, m_base_path(base_path)
+	, m_main_window(main_window)
 {
 	m_import_thread = new ImportThread(*this);
 	m_ui = new Ui::ImportAssetDialog;
@@ -851,20 +855,24 @@ void ImportAssetDialog::setSource(const QString& source)
 
 void ImportAssetDialog::importModel()
 {
+	auto dest = m_ui->destinationInput->text();
 	if (m_ui->createDirectoryCheckbox->isChecked())
 	{
 		QFileInfo info(m_ui->sourceInput->text());
-		m_import_thread->setDestination(m_ui->destinationInput->text() + "/" + info.baseName());
+		dest += "/" + info.baseName();
 	}
-	else
-	{
-		m_import_thread->setDestination(m_ui->destinationInput->text());
-	}
+	m_import_thread->setDestination(dest);
 	m_import_thread->setSource(m_ui->sourceInput->text());
 	m_import_thread->setConvertTexturesToDDS(m_ui->convertToDDSCheckbox->isChecked());
 	m_import_thread->setImportMaterials(m_ui->importMaterialsCheckbox->isChecked());
 	m_import_thread->setImpotModel(m_ui->importMeshCheckbox->isChecked());
 	m_import_thread->start();
+
+	QFileInfo source_path(m_ui->sourceInput->text());
+	auto dest_mesh_file = dest + "/" + source_path.baseName() + ".msh";
+	char relative_path[LUMIX_MAX_PATH];
+	m_main_window.getWorldEditor()->getRelativePath(relative_path, sizeof(relative_path), Lumix::Path(dest_mesh_file.toLatin1().data()));
+	m_main_window.getMetadata()->set(relative_path, "import_source", m_ui->sourceInput->text());
 }
 
 
