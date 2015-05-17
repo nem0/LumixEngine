@@ -248,6 +248,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	if(success)
 	{
 		lua_State* L = luaL_newstate();
+		luaL_openlibs(L);
 		
 		bool errors = luaL_loadbuffer(L, (const char*)file->getBuffer(), file->size(), "") != LUA_OK;
 		errors = errors || lua_pcall(L, 0, LUA_MULTRET, 0) != LUA_OK;

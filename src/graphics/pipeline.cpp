@@ -193,6 +193,7 @@ struct PipelineImpl : public Pipeline
 		if(success)
 		{
 			m_lua_state = luaL_newstate();
+			luaL_openlibs(m_lua_state);
 			bool errors = luaL_loadbuffer(m_lua_state, (const char*)file->getBuffer(), file->size(), "") != LUA_OK;
 			errors = errors || lua_pcall(m_lua_state, 0, LUA_MULTRET, 0) != LUA_OK;
 			if (errors)
