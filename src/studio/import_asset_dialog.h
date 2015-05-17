@@ -14,6 +14,7 @@ namespace Ui
 
 
 class ImportAssetDialog;
+class MainWindow;
 class QFile;
 class QFileInfo;
 
@@ -68,7 +69,7 @@ class ImportAssetDialog : public QDialog
 	Q_OBJECT
 
 	public:
-		ImportAssetDialog(QWidget* parent, const QString& base_path);
+		ImportAssetDialog(MainWindow& main_window, QWidget* parent, const QString& base_path);
 		virtual ~ImportAssetDialog();
 
 		void setSource(const QString& source);
@@ -98,4 +99,5 @@ class ImportAssetDialog : public QDialog
 		QString m_base_path;
 		ImportThread* m_import_thread;
 		Assimp::Importer m_importer;
+		MainWindow& m_main_window;
 };

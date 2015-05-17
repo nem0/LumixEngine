@@ -199,6 +199,9 @@
     <ClCompile Include="..\..\..\tmp\studio\moc_notifications.cpp">
       <Filter>Generated Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\studio\metadata.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\..\..\src\studio\assetbrowser.h">
@@ -372,6 +375,9 @@
       <Filter>Generated Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\studio\file_path_edit.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\studio\metadata.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

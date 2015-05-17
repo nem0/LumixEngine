@@ -10,6 +10,8 @@
 #include "engine/engine.h"
 #include "import_asset_dialog.h"
 #include "insert_mesh_command.h"
+#include "mainwindow.h"
+#include "metadata.h"
 #include "notifications.h"
 #include "scripts/scriptcompiler.h"
 #include <qdesktopservices.h>
@@ -200,9 +202,10 @@ static void getDefaultFilters(QStringList& filters)
 }
 
 
-AssetBrowser::AssetBrowser(QWidget* parent) :
-	QDockWidget(parent),
-	m_ui(new Ui::AssetBrowser)
+AssetBrowser::AssetBrowser(MainWindow& main_window, QWidget* parent)
+	: QDockWidget(parent)
+	, m_ui(new Ui::AssetBrowser)
+	, m_main_window(main_window)
 {
 	m_watcher = FileSystemWatcher::create(Lumix::Path(QDir::currentPath().toLatin1().data()));
 	m_watcher->getCallback().bind<AssetBrowser, &AssetBrowser::onFileSystemWatcherCallback>(this);
@@ -361,7 +364,7 @@ void AssetBrowser::on_exportFinished(int exit_code)
 
 void AssetBrowser::importAsset(const QFileInfo& file_info)
 {
-	ImportAssetDialog* dlg = new ImportAssetDialog(this, m_base_path);
+	ImportAssetDialog* dlg = new ImportAssetDialog(m_main_window, this, m_base_path);
 	if (!file_info.isDir())
 	{
 		dlg->setSource(file_info.filePath());
@@ -375,6 +378,19 @@ void AssetBrowser::importAsset(const QFileInfo& file_info)
 }
 
 
+
+void AssetBrowser::reimportAsset(const QString& filepath)
+{
+	QString import_source = m_main_window.getMetadata()->get(filepath, "import_source").toString();
+
+	ImportAssetDialog* dlg = new ImportAssetDialog(m_main_window, this, m_base_path);
+	dlg->setSource(import_source);
+	dlg->setDestination(filepath);
+	dlg->show();
+}
+
+
+
 void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
 {
 	QMenu *menu = new QMenu("Item actions",NULL);
@@ -385,17 +401,26 @@ void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
 		: root_info;
 	QAction* selected_action = NULL;
 	QAction* delete_file_action = new QAction("Delete", menu);
-	menu->addAction(delete_file_action);
 	QAction* rename_file_action = new QAction("Rename", menu);
-	menu->addAction(rename_file_action);
-
 	QAction* create_dir_action = new QAction("Create directory", menu);
 	QAction* import_asset_action = new QAction("Import asset", menu);
+	QAction* reimport_asset_action = new QAction("Reimport asset", menu);
+
+	menu->addAction(delete_file_action);
+	menu->addAction(rename_file_action);
 	if (file_info.isDir())
 	{
 		menu->addAction(import_asset_action);
 		menu->addAction(create_dir_action);
 	}
+
+	char relative_path[LUMIX_MAX_PATH];
+	m_editor->getRelativePath(relative_path, sizeof(relative_path), Lumix::Path(file_info.absoluteFilePath().toLatin1().data()));
+	if (m_main_window.getMetadata()->exists(relative_path, "import_source"))
+	{
+		menu->addAction(reimport_asset_action);
+	}
+
 	QStringList texture_filters;
 	getTextureFilters(texture_filters, false);
 	if (isAssimpAsset(file_info.suffix()) || texture_filters.contains(file_info.suffix()))
@@ -406,6 +431,10 @@ void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
 	if (selected_action == import_asset_action)
 	{
 		importAsset(file_info);
+	}
+	else if (selected_action == reimport_asset_action)
+	{
+		reimportAsset(relative_path);
 	}
 	else if (selected_action == delete_file_action)
 	{
