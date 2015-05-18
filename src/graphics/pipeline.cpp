@@ -204,11 +204,10 @@ struct PipelineImpl : public Pipeline
 			else
 			{
 				parseFramebuffers(m_lua_state);
+				registerCFunctions();
+				decrementDepCount();
 			}
 
-			registerCFunctions();
-
-			decrementDepCount();
 		}
 		else
 		{

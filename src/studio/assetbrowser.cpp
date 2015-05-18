@@ -193,7 +193,7 @@ static bool isAssimpAsset(const QString& suffix)
 
 static void getDefaultFilters(QStringList& filters)
 {
-	filters << "*.msh" << "*.unv" << "*.ani" <<  "*.mat" << "*.fbx" << "*.shd" << "*.json";
+	filters << "*.msh" << "*.unv" << "*.ani" <<  "*.mat" << "*.fbx" << "*.shd" << "*.json" << "*.phy";
 	Assimp::Importer importer;
 	aiString extension_list;
 	importer.GetExtensionList(extension_list);
@@ -498,6 +498,10 @@ void AssetBrowser::on_filterComboBox_currentTextChanged(const QString&)
 	else if (m_ui->filterComboBox->currentText() == "Pipeline")
 	{
 		filters << "*.json";
+	}
+	else if (m_ui->filterComboBox->currentText() == "Physics")
+	{
+		filters << "*.phy";
 	}
 	else if (m_ui->filterComboBox->currentText() == "Shader")
 	{
