@@ -23,6 +23,7 @@ namespace Lumix
 		static const uint32_t PIPELINE		= 0xbbcf4595; //PIPELINE
 		static const uint32_t ANIMATION		= 0xc9909a33; //ANIMATION
 		static const uint32_t BITMAP_FONT	= 0x89DEEEB4; //BITMAP_FONT
+		static const uint32_t PHYSICS		= 0xE77419F9; //PHYSICS
 
 		ResourceManager(IAllocator& allocator);
 		~ResourceManager();

@@ -33,7 +33,8 @@ class ImportThread : public QThread, public Assimp::ProgressHandler
 		void setDestination(const QString& destination) { m_destination = destination; }
 		void setConvertTexturesToDDS(bool convert) { m_convert_texture_to_DDS = convert; }
 		void setImportMaterials(bool import_materials) { m_import_materials = import_materials; }
-		void setImpotModel(bool import_model) { m_import_model = import_model; }
+		void setImportModel(bool import_model) { m_import_model = import_model; }
+		void setImportPhysics(bool import_physics, bool make_convex) { m_import_physics = import_physics; m_make_convex = make_convex; }
 		const QString& getErrorMessage() const { return m_error_message; }
 
 	private:
@@ -43,6 +44,7 @@ class ImportThread : public QThread, public Assimp::ProgressHandler
 		bool saveLumixMaterials();
 		bool saveTexture(const QString& texture_path, const QFileInfo& material_info, QFile& material_file, bool is_normal_map);
 		bool saveLumixModel();
+		bool saveLumixPhysics();
 		bool saveEmbeddedTextures(const aiScene* scene);
 		bool checkModel();
 
@@ -54,6 +56,8 @@ class ImportThread : public QThread, public Assimp::ProgressHandler
 		QString m_destination;
 		ImportAssetDialog& m_dialog;
 		bool m_import_model;
+		bool m_import_physics;
+		bool m_make_convex;
 		bool m_import_materials;
 		bool m_convert_texture_to_DDS;
 		Assimp::Importer& m_importer;

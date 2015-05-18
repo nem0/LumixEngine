@@ -13,6 +13,7 @@
 #include "graphics/model.h"
 #include "mainwindow.h"
 #include "metadata.h"
+#include "physics/physics_geometry_manager.h"
 #include <qfile.h>
 #include <qfiledialog.h>
 #include <qimagereader.h>
@@ -90,6 +91,7 @@ ImportThread::ImportThread(ImportAssetDialog& dialog)
 	m_log_stream = new LogStream(*this);
 	m_importer.SetProgressHandler(this);
 	m_import_model = true;
+	m_import_physics = false;
 	m_import_materials = true;
 }
 
@@ -404,6 +406,72 @@ bool ImportThread::checkModel()
 }
 
 
+bool ImportThread::saveLumixPhysics()
+{
+	if (!m_import_physics)
+	{
+		return true;
+	}
+	QVector<Lumix::Vec3> vertices;
+
+	QFileInfo source_path(m_source);
+	auto dest = m_destination + "/" + source_path.baseName() + ".phy";
+	QFile file(dest);
+	if (!file.open(QIODevice::WriteOnly))
+	{
+		return false;
+	}
+	const aiScene* scene = m_importer.GetScene();
+
+	Lumix::PhysicsGeometry::Header header;
+	header.m_magic = Lumix::PhysicsGeometry::HEADER_MAGIC;
+	header.m_version = (uint32_t)Lumix::PhysicsGeometry::Versions::LAST;
+	header.m_convex = (uint32_t)m_make_convex;
+	file.write((const char*)&header, sizeof(header));
+
+	int32_t count = 0;
+	for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
+	{
+		count += (int32_t)scene->mMeshes[i]->mNumVertices;
+	}
+	file.write((const char*)&count, sizeof(count));
+	for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
+	{
+		const aiMesh* mesh = scene->mMeshes[i];
+		file.write((const char*)mesh->mVertices, sizeof(mesh->mVertices[0]) * mesh->mNumVertices);
+	}
+	
+	if (!m_make_convex)
+	{
+		count = 0;
+		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
+		{
+			count += (int32_t)scene->mMeshes[i]->mNumFaces * 3;
+		}
+		file.write((const char*)&count, sizeof(count));
+		int offset = 0;
+		for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
+		{
+			const aiMesh* mesh = scene->mMeshes[i];
+			for (unsigned int j = 0; j < mesh->mNumFaces; ++j)
+			{
+				Q_ASSERT(mesh->mFaces[j].mNumIndices == 3);
+				uint32_t index = mesh->mFaces[j].mIndices[0] + offset;
+				file.write((const char*)&index, sizeof(index));
+				index = mesh->mFaces[j].mIndices[1] + offset;
+				file.write((const char*)&index, sizeof(index));
+				index = mesh->mFaces[j].mIndices[2] + offset;
+				file.write((const char*)&index, sizeof(index));
+			}
+			offset += mesh->mNumVertices;
+		}
+	}
+	file.close();
+
+	return true;
+}
+
+
 bool ImportThread::saveLumixModel()
 {
 	QDir().mkpath(m_destination);
@@ -704,7 +772,7 @@ void ImportThread::run()
 	}
 	else
 	{
-		if (saveLumixModel())
+		if (saveLumixPhysics() && saveLumixModel())
 		{
 			saveLumixMaterials();
 		}
@@ -722,12 +790,20 @@ ImportAssetDialog::ImportAssetDialog(MainWindow& main_window, QWidget* parent, c
 	m_ui = new Ui::ImportAssetDialog;
 	m_ui->setupUi(this);
 
+	m_ui->importPhysicsCheckbox->hide();
+	m_ui->convexPhysicsCheckbox->hide();
+	m_ui->convexPhysicsCheckbox->setEnabled(false);
 	m_ui->importMaterialsCheckbox->hide();
 	m_ui->importAnimationCheckbox->hide();
 	m_ui->importMeshCheckbox->hide();
 	m_ui->createDirectoryCheckbox->hide();
 	m_ui->convertToDDSCheckbox->hide();
 	m_ui->importButton->setEnabled(false);
+
+	connect(m_ui->importPhysicsCheckbox, &QCheckBox::stateChanged, [this](){
+		bool enabled = m_ui->importPhysicsCheckbox->isChecked();
+		m_ui->convexPhysicsCheckbox->setEnabled(enabled);
+	});
 
 	connect(m_import_thread, &ImportThread::progress, this, &ImportAssetDialog::on_progressUpdate, Qt::QueuedConnection);
 	connect(m_import_thread, &QThread::finished, this, &ImportAssetDialog::on_importFinished, Qt::QueuedConnection);
@@ -758,6 +834,8 @@ void ImportAssetDialog::on_sourceInput_textChanged(const QString& text)
 	m_ui->convertToDDSCheckbox->hide();
 	m_ui->importAnimationCheckbox->hide();
 	m_ui->importMeshCheckbox->hide();
+	m_ui->importPhysicsCheckbox->hide();
+	m_ui->convexPhysicsCheckbox->hide();
 	m_ui->createDirectoryCheckbox->hide();
 	if (QFile::exists(text))
 	{
@@ -783,6 +861,8 @@ void ImportAssetDialog::on_importFinished()
 	{
 		m_ui->importButton->setEnabled(true);
 		m_ui->importMeshCheckbox->show();
+		m_ui->importPhysicsCheckbox->show();
+		m_ui->convexPhysicsCheckbox->show();
 		m_ui->createDirectoryCheckbox->show();
 		m_ui->importAnimationCheckbox->show();
 		m_ui->importAnimationCheckbox->setEnabled(m_importer.GetScene()->HasAnimations());
@@ -865,7 +945,8 @@ void ImportAssetDialog::importModel()
 	m_import_thread->setSource(m_ui->sourceInput->text());
 	m_import_thread->setConvertTexturesToDDS(m_ui->convertToDDSCheckbox->isChecked());
 	m_import_thread->setImportMaterials(m_ui->importMaterialsCheckbox->isChecked());
-	m_import_thread->setImpotModel(m_ui->importMeshCheckbox->isChecked());
+	m_import_thread->setImportModel(m_ui->importMeshCheckbox->isChecked());
+	m_import_thread->setImportPhysics(m_ui->importPhysicsCheckbox->isChecked(), m_ui->convexPhysicsCheckbox->isChecked());
 	m_import_thread->start();
 
 	QFileInfo source_path(m_ui->sourceInput->text());

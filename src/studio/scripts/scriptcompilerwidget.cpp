@@ -25,7 +25,10 @@ ScriptCompilerWidget::ScriptCompilerWidget(QWidget* parent)
 	m_compiler = new ScriptCompiler;
 	QByteArray base_path = m_base_path.toLatin1();
 	connect(m_compiler, &ScriptCompiler::compiled, [this](const QString& module_name){
-		m_ui->compilerOutputView->setText(m_compiler->getLog(module_name));
+		if (!module_name.isEmpty())
+		{
+			m_ui->compilerOutputView->setText(m_compiler->getLog(module_name));
+		}
 	});
 	connect(m_ui->scriptListWidget, &QListWidget::itemDoubleClicked, [this](QListWidgetItem * item) {
 		QProcess* process = new QProcess;

@@ -46,6 +46,24 @@
     </widget>
    </item>
    <item>
+    <layout class="QHBoxLayout" name="physicsLayout">
+     <item>
+      <widget class="QCheckBox" name="importPhysicsCheckbox">
+       <property name="text">
+        <string>Import physics</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QCheckBox" name="convexPhysicsCheckbox">
+       <property name="text">
+        <string>Make convex</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
     <widget class="QCheckBox" name="importAnimationCheckbox">
      <property name="text">
       <string>Import animation</string>

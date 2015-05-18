@@ -241,10 +241,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\src\physics\physics_geometry_manager.cpp" />
     <ClCompile Include="..\..\..\src\physics\physics_scene.cpp" />
     <ClCompile Include="..\..\..\src\physics\physics_system.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\src\physics\physics_geometry_manager.h" />
     <ClInclude Include="..\..\..\src\physics\physics_scene.h" />
     <ClInclude Include="..\..\..\src\physics\physics_system.h" />
   </ItemGroup>

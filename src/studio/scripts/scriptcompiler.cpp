@@ -96,6 +96,10 @@ void ScriptCompiler::compileAllModules()
 		Module& module = *iter;
 		compileModule(module.m_module_name);
 	}
+	if (m_modules.empty())
+	{
+		emitCompiled("");
+	}
 }
 
 
