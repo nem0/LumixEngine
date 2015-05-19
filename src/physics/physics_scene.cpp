@@ -138,7 +138,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 {
 	enum ActorType
 	{
-		BOX
+		BOX,
+		TRIMESH,
+		CONVEX
 	};
 	
 
@@ -775,13 +777,25 @@ struct PhysicsSceneImpl : public PhysicsScene
 		if (m_actors[idx]->getPhysxActor()->getNbShapes() == 1 && m_actors[idx]->getPhysxActor()->getShapes(&shapes, 1))
 		{
 			physx::PxBoxGeometry geom;
+			physx::PxConvexMeshGeometry convex_geom;
 			physx::PxHeightFieldGeometry hf_geom;
+			physx::PxTriangleMeshGeometry trimesh_geom;
 			if (shapes->getBoxGeometry(geom))
 			{
 				serializer.write((int32_t)BOX);
 				serializer.write(geom.halfExtents.x);
 				serializer.write(geom.halfExtents.y);
 				serializer.write(geom.halfExtents.z);
+			}
+			else if (shapes->getConvexMeshGeometry(convex_geom))
+			{
+				serializer.write((int32_t)CONVEX);
+				serializer.writeString(m_actors[idx]->getResource() ? m_actors[idx]->getResource()->getPath().c_str() : "");
+			}
+			else if (shapes->getTriangleMeshGeometry(trimesh_geom))
+			{
+				serializer.write((int32_t)TRIMESH);
+				serializer.writeString(m_actors[idx]->getResource() ? m_actors[idx]->getResource()->getPath().c_str() : "");
 			}
 			else
 			{
@@ -799,43 +813,50 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		ActorType type;
 		serializer.read((int32_t&)type);
-		physx::PxTransform transform;
-		Matrix mtx;
-		m_actors[idx]->getEntity().getMatrix(mtx);
-		matrix2Transform(mtx, transform);
 
-		physx::PxGeometry* geom;
-		physx::PxBoxGeometry box_geom;
+		ResourceManagerBase* manager = m_engine->getResourceManager().get(ResourceManager::PHYSICS);
+
 		switch (type)
 		{
 			case BOX:
 				{
+					physx::PxBoxGeometry box_geom;
+					physx::PxTransform transform;
+					Matrix mtx;
+					m_actors[idx]->getEntity().getMatrix(mtx);
+					matrix2Transform(mtx, transform);
 					serializer.read(box_geom.halfExtents.x);
 					serializer.read(box_geom.halfExtents.y);
 					serializer.read(box_geom.halfExtents.z);
-					geom = &box_geom;
+					physx::PxRigidActor* actor;
+					if (isDynamic(idx))
+					{
+						actor = PxCreateDynamic(*m_system->getPhysics(), transform, box_geom, *m_default_material, 1.0f);
+					}
+					else
+					{
+						actor = PxCreateStatic(*m_system->getPhysics(), transform, box_geom, *m_default_material);
+					}
+					actor->userData = (void*)m_actors[idx]->getEntity().index;
+					m_scene->addActor(*actor);
+					m_actors[idx]->setPhysxActor(actor);
+					actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
+					m_universe->addComponent(m_actors[idx]->getEntity(), BOX_ACTOR_HASH, this, idx);
+				}
+				break;
+			case TRIMESH:
+			case CONVEX:
+				{
+					char tmp[LUMIX_MAX_PATH];
+					serializer.readString(tmp, sizeof(tmp));
+					m_actors[idx]->setResource(static_cast<PhysicsGeometry*>(manager->load(Lumix::Path(tmp))));
+					m_universe->addComponent(m_actors[idx]->getEntity(), MESH_ACTOR_HASH, this, idx);
 				}
 				break;
 			default:
 				ASSERT(false);
 				break;
 		}
-
-		physx::PxRigidActor* actor;
-		if (isDynamic(idx))
-		{
-			actor = PxCreateDynamic(*m_system->getPhysics(), transform, *geom, *m_default_material, 1.0f);
-		}
-		else
-		{
-			actor = PxCreateStatic(*m_system->getPhysics(), transform, *geom, *m_default_material);
-		}
-		actor->userData = (void*)m_actors[idx]->getEntity().index;
-		m_scene->addActor(*actor);
-		m_actors[idx]->setPhysxActor(actor);
-		actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
-
-		m_universe->addComponent(m_actors[idx]->getEntity(), BOX_ACTOR_HASH, this, idx);
 	}
 
 
@@ -844,7 +865,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 		serializer.write((int32_t)m_actors.size());
 		for (int i = 0; i < m_actors.size(); ++i)
 		{
-			serializer.writeString(m_actors[i]->getResource() ? m_actors[i]->getResource()->getPath().c_str() : "");
 			serializer.write(isDynamic(i));
 			serializer.write(m_actors[i]->getEntity().index);
 			if (m_actors[i]->getEntity().index != -1)
@@ -884,7 +904,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		serializer.read(count);
 		for (int i = count; i < m_actors.size(); ++i)
 		{
-			m_actors[i]->getPhysxActor()->release();
+			m_actors[i]->setPhysxActor(nullptr);
 		}
 		int old_size = m_actors.size();
 		m_actors.resize(count);
@@ -896,10 +916,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 		ResourceManagerBase* manager = m_engine->getResourceManager().get(ResourceManager::PHYSICS);
 		for (int i = 0; i < m_actors.size(); ++i)
 		{
-			char tmp[LUMIX_MAX_PATH];
-			serializer.readString(tmp, sizeof(tmp));
-			
-			m_actors[i]->setResource(static_cast<PhysicsGeometry*>(manager->load(Lumix::Path(tmp))));
 			bool is_dynamic;
 			serializer.read(is_dynamic);
 			if (is_dynamic)
