@@ -1147,6 +1147,7 @@ struct WorldEditorImpl : public WorldEditor
 					: m_editor(editor)
 				{
 					m_position = position;
+					m_entity = Entity::INVALID;
 				}
 
 
