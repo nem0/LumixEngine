@@ -67,12 +67,10 @@ namespace Lumix
 				{
 					if (!m_library)
 					{
-						const char* library_path = "scripts/universes/main.dll";
-
-						m_library = Library::create(Path(library_path), m_allocator);
+						m_library = Library::create(m_library_path, m_allocator);
 						if (!m_library->load())
 						{
-							g_log_error.log("script") << "Could not load " << library_path;
+							g_log_error.log("script") << "Could not load " << m_library_path.c_str();
 							Library::destroy(m_library);
 							m_library = NULL;
 							return;
@@ -84,7 +82,7 @@ namespace Lumix
 						InitFunction init_function = (InitFunction)m_library->resolve("init");
 						if (!m_update_function || !init_function)
 						{
-							g_log_error.log("script") << "Script interface in " << library_path << " is not complete";
+							g_log_error.log("script") << "Script interface in " << m_library_path.c_str() << " is not complete";
 						}
 
 						if (init_function)
@@ -233,16 +231,23 @@ namespace Lumix
 			}
 
 
+			virtual void setModulePath(const char* path) override
+			{
+				char tmp[LUMIX_MAX_PATH];
+				copyString(tmp, sizeof(tmp), path);
+				catCString(tmp, sizeof(tmp), ".dll");
+				m_library_path = tmp;
+			}
+
+
 			virtual void afterScriptCompiled() override
 			{
 				if (!m_library && m_reload_after_compile)
 				{
-					const char* library_path = "scripts/universes/main.dll";
-					
-					m_library = Library::create(Path(library_path), m_allocator);
+					m_library = Library::create(m_library_path, m_allocator);
 					if (!m_library->load())
 					{
-						g_log_error.log("script") << "Could not load " << library_path;
+						g_log_error.log("script") << "Could not load " << m_library_path.c_str();
 						Library::destroy(m_library);
 						m_library = NULL;
 						return;
@@ -254,7 +259,7 @@ namespace Lumix
 					InitFunction init_function = (InitFunction)m_library->resolve("init");
 					if (!m_update_function || !init_function)
 					{
-						g_log_error.log("script") << "Script interface in " << library_path << " is not complete";
+						g_log_error.log("script") << "Script interface in " << m_library_path.c_str() << " is not complete";
 					}
 
 					if (init_function)
@@ -346,6 +351,7 @@ namespace Lumix
 			Engine& m_engine;
 			ScriptSystemImpl& m_system;
 			Library* m_library;
+			Path m_library_path;
 			UpdateFunction m_update_function;
 			DoneFunction m_done_function;
 			SerializeFunction m_serialize_function;

@@ -94,6 +94,8 @@ void ScriptCompilerWidget::onUniverseLoaded()
 		m_ui->scriptListWidget->addItem(path);
 		script = scene->getNextScript(script);
 	}
+	auto path = QString("scripts/universes/") + (info.baseName().isEmpty() ? "default" : info.baseName());
+	scene->setModulePath(path.toLatin1().data());
 	m_compiler->setModuleOutputPath(MODULE_NAME, QString("scripts/universes/") + info.baseName());
 }
 
