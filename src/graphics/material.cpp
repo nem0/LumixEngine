@@ -34,6 +34,7 @@ void Material::apply(Renderer& renderer, PipelineInstance& pipeline) const
 	if(getState() == State::READY)
 	{
 		renderer.applyShader(*m_shader, m_shader_combination);
+
 		switch (m_depth_func)
 		{
 			case DepthFunc::LEQUAL:
@@ -79,14 +80,6 @@ void Material::apply(Renderer& renderer, PipelineInstance& pipeline) const
 					break;
 			}
 		}
-		
-		if (m_shader->isShadowmapRequired())
-		{
-			glActiveTexture(GL_TEXTURE0 + m_textures.size());
-			glBindTexture(GL_TEXTURE_2D, pipeline.getShadowmapFramebuffer()->getDepthTexture());
-			renderer.setUniform(*m_shader, "shadowmap", SHADOWMAP_HASH, m_textures.size());
-		}
-
 	}
 }
 

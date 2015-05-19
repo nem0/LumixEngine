@@ -13,6 +13,7 @@ namespace Lumix
 
 
 class Engine;
+class Renderer;
 
 
 struct RaycastHit
@@ -32,7 +33,7 @@ class LUMIX_PHYSICS_API PhysicsScene : public IScene
 		
 		virtual ~PhysicsScene() {}
 		virtual void update(float time_delta) = 0;
-		virtual void render() = 0;
+		virtual void render(Renderer& renderer) = 0;
 		virtual bool raycast(const Vec3& origin, const Vec3& dir, float distance, RaycastHit& result) = 0;
 		virtual PhysicsSystem& getSystem() const = 0;
 		

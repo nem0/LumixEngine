@@ -25,7 +25,10 @@ ScriptCompilerWidget::ScriptCompilerWidget(QWidget* parent)
 	m_compiler = new ScriptCompiler;
 	QByteArray base_path = m_base_path.toLatin1();
 	connect(m_compiler, &ScriptCompiler::compiled, [this](const QString& module_name){
-		m_ui->compilerOutputView->setText(m_compiler->getLog(module_name));
+		if (!module_name.isEmpty())
+		{
+			m_ui->compilerOutputView->setText(m_compiler->getLog(module_name));
+		}
 	});
 	connect(m_ui->scriptListWidget, &QListWidget::itemDoubleClicked, [this](QListWidgetItem * item) {
 		QProcess* process = new QProcess;
@@ -91,6 +94,8 @@ void ScriptCompilerWidget::onUniverseLoaded()
 		m_ui->scriptListWidget->addItem(path);
 		script = scene->getNextScript(script);
 	}
+	auto path = QString("scripts/universes/") + (info.baseName().isEmpty() ? "default" : info.baseName());
+	scene->setModulePath(path.toLatin1().data());
 	m_compiler->setModuleOutputPath(MODULE_NAME, QString("scripts/universes/") + info.baseName());
 }
 

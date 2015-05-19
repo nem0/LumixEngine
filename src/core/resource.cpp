@@ -114,7 +114,11 @@ namespace Lumix
 
 	void Resource::onStateChanged(State old_state, State new_state)
 	{
-		if (State::READY == new_state || State::FAILURE == new_state)
+		if (State::FAILURE == new_state)
+		{
+			onFailure();
+		}
+		else if (State::READY == new_state)
 		{
 			decrementDepCount();
 		}

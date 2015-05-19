@@ -15,6 +15,7 @@ namespace Ui
 }
 
 
+class Metadata;
 class PropertyView;
 
 
@@ -28,11 +29,13 @@ public:
 
 	void update();
 	void setWorldEditor(Lumix::WorldEditor& world_editor);
+	Lumix::WorldEditor* getWorldEditor() const;
 	class SceneView* getSceneView() const;
 	class GameView* getGameView() const;
 	PropertyView* getPropertyView() const { return m_property_view; }
 	class ScriptCompiler* getScriptCompiler() const;
 	QMenuBar* getMenuBar() const;
+	Metadata* getMetadata() const { return m_metadata; }
 
 signals:
 	void resized(const QSize& size);
@@ -111,6 +114,7 @@ private:
 	class EntityTemplateList* m_entity_template_list_ui;
 	class Notifications* m_notifications;
 	class EntityList* m_entity_list;
+	Metadata* m_metadata;
 	QMenu* m_recent_files_menu;
 	QMenu* m_window_menu;
 	class QComboBox* m_layout_combobox;

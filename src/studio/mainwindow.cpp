@@ -12,6 +12,7 @@
 #include "gameview.h"
 #include "import_asset_dialog.h"
 #include "log_widget.h"
+#include "metadata.h"
 #include "notifications.h"
 #include "property_view.h"
 #include "sceneview.h"
@@ -27,6 +28,9 @@
 #include <qsettings.h>
 
 
+static const QString METADATA_FILE = "metadata.bin";
+
+
 MainWindow::MainWindow(QWidget* parent) :
 	QMainWindow(parent),
 	m_ui(new Ui::MainWindow)
@@ -39,13 +43,15 @@ MainWindow::MainWindow(QWidget* parent) :
 	m_property_view = new PropertyView;
 	m_scene_view = new SceneView;
 	m_game_view = new GameView(*this);
-	m_asset_browser = new AssetBrowser;
+	m_asset_browser = new AssetBrowser(*this, NULL);
 	m_script_compiler_ui = new ScriptCompilerWidget;
 	m_file_server_ui = new FileServerWidget;
 	m_profiler_ui = new ProfilerUI;
 	m_entity_template_list_ui = new EntityTemplateList;
 	m_notifications = new Notifications(*this);
 	m_entity_list = new EntityList(NULL);
+	
+	m_metadata = new Metadata();
 
 	m_animation_editor = new AnimationEditor(*this);
 
@@ -111,12 +117,14 @@ MainWindow::MainWindow(QWidget* parent) :
 			restoreState(state);
 		}
 	}
+
+	m_metadata->load(METADATA_FILE);
 }
 
 
 void MainWindow::on_actionImport_asset_triggered()
 {
-	ImportAssetDialog* dialog = new ImportAssetDialog(this, m_world_editor->getBasePath());
+	ImportAssetDialog* dialog = new ImportAssetDialog(*this, this, m_world_editor->getBasePath());
 	dialog->show();
 }
 
@@ -236,6 +244,14 @@ MainWindow::~MainWindow()
 	delete m_profiler_ui;
 	delete m_entity_template_list_ui;
 	delete m_notifications;
+	m_metadata->save(METADATA_FILE);
+	delete m_metadata;
+}
+
+
+Lumix::WorldEditor* MainWindow::getWorldEditor() const
+{
+	return m_world_editor;
 }
 
 

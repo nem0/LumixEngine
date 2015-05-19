@@ -14,6 +14,7 @@ namespace Ui
 	class AssetBrowser;
 }
 
+class MainWindow;
 class Notifications;
 class ScriptCompiler;
 
@@ -22,7 +23,7 @@ class AssetBrowser : public QDockWidget
 	Q_OBJECT
 
 public:
-	explicit AssetBrowser(QWidget* parent = NULL);
+	AssetBrowser(MainWindow& main_window, QWidget* parent);
 	~AssetBrowser();
 	void setWorldEditor(Lumix::WorldEditor& editor);
 	void emitFileChanged(const char* path);
@@ -32,6 +33,7 @@ public:
 private:
 	void handleDoubleClick(const class QFileInfo& file_info);
 	void importAsset(const QFileInfo& file_info);
+	void reimportAsset(const QString& filepath);
 	void onFileSystemWatcherCallback(const char* path);
 	void setExtentionsFilter(const QStringList& filter);
 
@@ -62,4 +64,5 @@ private:
 	ScriptCompiler* m_compiler;
 	QList<struct ProcessInfo> m_processes;
 	QStringList m_extension_filter;
+	MainWindow& m_main_window;
 };

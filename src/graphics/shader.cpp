@@ -2,7 +2,6 @@
 #include "core/crc32.h"
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
-#include "core/json_serializer.h"
 #include "core/log.h"
 #include "core/matrix.h"
 #include "core/profiler.h"
@@ -12,6 +11,8 @@
 #include "graphics/gl_ext.h"
 #include "graphics/renderer.h"
 #include "graphics/shader_manager.h"
+#include <lua.hpp>
+#include <lauxlib.h>
 
 
 namespace Lumix
@@ -20,10 +21,10 @@ namespace Lumix
 
 Shader::Shader(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
-	, m_is_shadowmap_required(true)
 	, m_renderer(renderer)
 	, m_allocator(allocator)
-	, m_source(m_allocator)
+	, m_fragment_shader_source(m_allocator)
+	, m_vertex_shader_source(m_allocator)
 	, m_attributes(m_allocator)
 	, m_passes(m_allocator)
 	, m_pass_hashes(m_allocator)
@@ -119,13 +120,13 @@ void Shader::createCombination(const char* defines)
 			catCString(pass_str, sizeof(pass_str), "_PASS\n");
 
 			combination->m_vertex_id = glCreateShader(GL_VERTEX_SHADER);
-			const GLchar* vs_strings[] = { version_str, pass_str, "#define VERTEX_SHADER\n", defines, m_source.c_str() };
+			const GLchar* vs_strings[] = { version_str, pass_str, defines, m_vertex_shader_source.c_str() };
 			glShaderSource(combination->m_vertex_id, sizeof(vs_strings) / sizeof(vs_strings[0]), vs_strings, NULL);
 			glCompileShader(combination->m_vertex_id);
 			glAttachShader(combination->m_program_id, combination->m_vertex_id);
 
 			combination->m_fragment_id = glCreateShader(GL_FRAGMENT_SHADER);
-			const GLchar* fs_strings[] = { version_str, pass_str, "#define FRAGMENT_SHADER\n", defines, m_source.c_str() };
+			const GLchar* fs_strings[] = { version_str, pass_str, defines, m_fragment_shader_source.c_str() };
 			glShaderSource(combination->m_fragment_id, sizeof(fs_strings) / sizeof(fs_strings[0]), fs_strings, NULL);
 			glCompileShader(combination->m_fragment_id);
 			glAttachShader(combination->m_program_id, combination->m_fragment_id);
@@ -193,77 +194,101 @@ void Shader::createCombination(const char* defines)
 }
 
 
+void Shader::parseAttributes(lua_State* L)
+{
+	lua_getglobal(L, "attributes");
+	int len = (int)lua_rawlen(L, -1);
+	for (int i = 0; i < len; ++i)
+	{
+		if (lua_rawgeti(L, -1, 1 + i) == LUA_TSTRING)
+		{
+			m_attributes.push(Lumix::string(lua_tostring(L, -1), m_allocator));
+		}
+		lua_pop(L, 1);
+	}
+	lua_pop(L, 1);
+}
+
+
+void Shader::parsePasses(lua_State* L)
+{
+	if (lua_getglobal(L, "passes") == LUA_TTABLE)
+	{
+		int len = (int)lua_rawlen(L, -1);
+		for (int i = 0; i < len; ++i)
+		{
+			if (lua_rawgeti(L, -1, 1 + i) == LUA_TSTRING)
+			{
+				m_passes.push(Lumix::string(lua_tostring(L, -1), m_allocator));
+				m_pass_hashes.push(crc32(m_passes.back().c_str()));
+			}
+			lua_pop(L, 1);
+		}
+	}
+	lua_pop(L, 1);
+}
+
+
+void Shader::parseSourceCode(lua_State* L)
+{
+	if (lua_getglobal(L, "vertex_shader") == LUA_TSTRING)
+	{
+		m_vertex_shader_source = lua_tostring(L, -1);
+	}
+	if (lua_getglobal(L, "fragment_shader") == LUA_TSTRING)
+	{
+		m_fragment_shader_source = lua_tostring(L, -1);
+	}
+	lua_pop(L, 2);
+}
+
+
 void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 {
 	if(success)
 	{
-		JsonSerializer serializer(*file, JsonSerializer::READ, m_path.c_str(), m_allocator);
-		serializer.deserializeObjectBegin();
-		m_passes.clear();
-		m_pass_hashes.clear();
-		m_attributes.clear();
-		while (!serializer.isObjectEnd())
-		{
-			char label[256];
-			serializer.deserializeLabel(label, 255);
-			if (strcmp(label, "attributes") == 0)
-			{
-				serializer.deserializeArrayBegin();
-				while (!serializer.isArrayEnd())
-				{
-					serializer.deserializeArrayItem(label, sizeof(label), "");
-					m_attributes.emplace(string(label, m_allocator));
-				}
-				serializer.deserializeArrayEnd();
-			}
-			else if (strcmp(label, "passes") == 0)
-			{
-				serializer.deserializeArrayBegin();
-				while (!serializer.isArrayEnd())
-				{
-					serializer.deserializeArrayItem(label, sizeof(label), "");
-					m_passes.push(string(label, m_allocator));
-					m_pass_hashes.push(crc32(label));
-				}
-				serializer.deserializeArrayEnd();
-			}
-			else if (strcmp(label, "shadowmap_required") == 0)
-			{
-				serializer.deserialize(m_is_shadowmap_required, false);
-			}
-		}
-		serializer.deserializeObjectEnd();
+		lua_State* L = luaL_newstate();
+		luaL_openlibs(L);
 		
-		int32_t size = serializer.getRestOfFileSize();
-		ShaderManager* manager = static_cast<ShaderManager*>(getResourceManager().get(ResourceManager::SHADER));
-		char* buf = reinterpret_cast<char*>(manager->getBuffer(size + 2));
-		serializer.deserializeRawString(buf, size);
-		buf[size] = '\n'; // because of a bug in intel drivers
-		buf[size + 1] = '\0';
-		m_source = buf;
-		m_size = file->size();
-		decrementDepCount();
-		if(!m_combinations.empty())
+		bool errors = luaL_loadbuffer(L, (const char*)file->getBuffer(), file->size(), "") != LUA_OK;
+		errors = errors || lua_pcall(L, 0, LUA_MULTRET, 0) != LUA_OK;
+		if (errors)
 		{
-			Array<Combination*> old_combinations(m_allocator);
-			for(int i = 0; i < m_combinations.size(); ++i)
-			{
-				old_combinations.push(m_combinations[i]);
-			}
-			m_combinations.clear();
-			for(int i = 0; i < old_combinations.size(); ++i)
-			{
-				createCombination(old_combinations[i]->m_defines.c_str());
-			}
-			for(int i = 0; i < old_combinations.size(); ++i)
-			{
-				m_allocator.deleteObject(old_combinations[i]);
-			}
+			g_log_error.log("lua") << getPath().c_str() << ": " << lua_tostring(L, -1);
+			onFailure();
 		}
 		else
 		{
-			createCombination("");
+			parseSourceCode(L);
+			parsePasses(L);
+			parseAttributes(L);
+
+			m_size = file->size();
+			decrementDepCount();
+
+			if (!m_combinations.empty())
+			{
+				Array<Combination*> old_combinations(m_allocator);
+				for (int i = 0; i < m_combinations.size(); ++i)
+				{
+					old_combinations.push(m_combinations[i]);
+				}
+				m_combinations.clear();
+				for (int i = 0; i < old_combinations.size(); ++i)
+				{
+					createCombination(old_combinations[i]->m_defines.c_str());
+				}
+				for (int i = 0; i < old_combinations.size(); ++i)
+				{
+					m_allocator.deleteObject(old_combinations[i]);
+				}
+			}
+			else
+			{
+				createCombination("");
+			}
 		}
+		lua_close(L);
 	}
 	else
 	{
