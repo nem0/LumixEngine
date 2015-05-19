@@ -6,38 +6,65 @@
 #include "graphics/gl_ext.h"
 
 
+struct lua_State;
+
+
 namespace Lumix
 {
+
+
+class JsonSerializer;
 
 
 class FrameBuffer
 {
 	public:
-		FrameBuffer(int width, int height, int color_buffers_count, bool is_depth_buffer, const char* name);
+		struct RenderBuffer
+		{
+			RenderBuffer() { m_format = 0; m_is_texture = true; m_id = 0; }
+
+			GLint m_format;
+			bool m_is_texture;
+			GLuint m_id;
+
+			void parse(lua_State* state);
+			bool isDepth() const;
+		};
+
+		struct Declaration
+		{
+			Declaration()
+				: m_name(m_name_allocator)
+				, m_renderbuffers_count(0)
+			{ }
+
+			static const int MAX_RENDERBUFFERS = 16;
+
+			int32_t m_width;
+			int32_t m_height;
+			RenderBuffer m_renderbuffers[MAX_RENDERBUFFERS];
+			int32_t m_renderbuffers_count;
+			StackAllocator<64> m_name_allocator;
+			string m_name;
+		};
+
+	public:
+		FrameBuffer(const Declaration& decl);
 		~FrameBuffer();
 		
 		GLuint getId() const { return m_id; }
-		GLuint getTexture(int index) const { return m_textures[index]; }
-		GLuint getColorTexture(int index) const { return m_textures[index]; }
-		GLuint getDepthTexture() const { ASSERT(m_is_depth_buffer); return m_textures[m_color_buffers_count]; }
+		GLuint getTexture(int index) const { return m_declaration.m_renderbuffers[index].m_id; }
+		GLuint getDepthTexture() const;
 		void bind();
-		int getWidth() const { return m_width; }
-		int getHeight() const { return m_height; }
-		const char* getName() { return m_name.c_str(); }
+		int getWidth() const { return m_declaration.m_width; }
+		int getHeight() const { return m_declaration.m_height; }
+		const char* getName() { return m_declaration.m_name.c_str(); }
 		static void unbind();
 
 	private:
-		static const int MAX_RENDERBUFFERS = 16;
 
-		StackAllocator<64> m_name_allocator;
-		string m_name;
-		GLuint m_textures[MAX_RENDERBUFFERS];
-		GLuint m_renderbuffers[MAX_RENDERBUFFERS];
+		Declaration m_declaration;
 		GLuint m_id;
-		int m_color_buffers_count;
-		bool m_is_depth_buffer;
-		int m_width;
-		int m_height;
 };
 
 

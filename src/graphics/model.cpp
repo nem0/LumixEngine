@@ -138,6 +138,62 @@ bool Model::parseVertexDef(FS::IFile* file, VertexDef* vertex_definition)
 	return vertex_definition->parse(static_cast<ModelManager*>(m_resource_manager.get(ResourceManager::MODEL))->getRenderer(),  file);
 }
 
+
+void Model::create(const VertexDef& def, Material* material, const void* indices_data, int indices_size, const void* attributes_data, int attributes_size)
+{
+	m_geometry_buffer_object.setAttributesData(attributes_data, attributes_size);
+	m_geometry_buffer_object.setIndicesData(indices_data, indices_size);
+
+	m_meshes.emplace(def, material, 0, attributes_size, 0, indices_size / sizeof(int), "default", m_allocator);
+
+	Model::LOD lod;
+	lod.m_distance = FLT_MAX;
+	lod.m_from_mesh = 0;
+	lod.m_to_mesh = 0;
+	m_lods.push(lod);
+
+	m_indices.resize(indices_size / sizeof(m_indices[0]));
+	memcpy(&m_indices[0], indices_data, indices_size);
+
+	m_vertices.resize(attributes_size / def.getVertexSize());
+	computeRuntimeData((const uint8_t*)attributes_data);
+
+	onReady();
+}
+
+
+void Model::computeRuntimeData(const uint8_t* vertices)
+{
+	int index = 0;
+	float bounding_radius_squared = 0;
+	Vec3 min_vertex(0, 0, 0);
+	Vec3 max_vertex(0, 0, 0);
+
+	for (int i = 0; i < m_meshes.size(); ++i)
+	{
+		int mesh_vertex_count = m_meshes[i].getAttributeArraySize() / m_meshes[i].getVertexDefinition().getVertexSize();
+		int mesh_attributes_array_offset = m_meshes[i].getAttributeArrayOffset();
+		int mesh_vertex_size = m_meshes[i].getVertexDefinition().getVertexSize();
+		int mesh_position_attribute_offset = m_meshes[i].getVertexDefinition().getPositionOffset();
+		for (int j = 0; j < mesh_vertex_count; ++j)
+		{
+			m_vertices[index] = *(const Vec3*)&vertices[mesh_attributes_array_offset + j * mesh_vertex_size + mesh_position_attribute_offset];
+			bounding_radius_squared = Math::maxValue(bounding_radius_squared, dotProduct(m_vertices[index], m_vertices[index]) > 0 ? m_vertices[index].squaredLength() : 0);
+			min_vertex.x = Math::minValue(min_vertex.x, m_vertices[index].x);
+			min_vertex.y = Math::minValue(min_vertex.y, m_vertices[index].y);
+			min_vertex.z = Math::minValue(min_vertex.z, m_vertices[index].z);
+			max_vertex.x = Math::maxValue(max_vertex.x, m_vertices[index].x);
+			max_vertex.y = Math::maxValue(max_vertex.y, m_vertices[index].y);
+			max_vertex.z = Math::maxValue(max_vertex.z, m_vertices[index].z);
+			++index;
+		}
+	}
+
+	m_bounding_radius = sqrt(bounding_radius_squared);
+	m_aabb = AABB(min_vertex, max_vertex);
+}
+
+
 bool Model::parseGeometry(FS::IFile* file)
 {
 	int32_t indices_count = 0;
@@ -170,33 +226,7 @@ bool Model::parseGeometry(FS::IFile* file)
 	}
 	m_vertices.resize(vertex_count);
 	
-	int index = 0;
-	float bounding_radius_squared = 0;
-	Vec3 min_vertex(0, 0, 0);
-	Vec3 max_vertex(0, 0, 0);
-
-	for (int i = 0; i < m_meshes.size(); ++i)
-	{
-		int mesh_vertex_count = m_meshes[i].getAttributeArraySize() / m_meshes[i].getVertexDefinition().getVertexSize();
-		int mesh_attributes_array_offset = m_meshes[i].getAttributeArrayOffset();
-		int mesh_vertex_size = m_meshes[i].getVertexDefinition().getVertexSize();
-		int mesh_position_attribute_offset = m_meshes[i].getVertexDefinition().getPositionOffset();
-		for (int j = 0; j < mesh_vertex_count; ++j)
-		{
-			m_vertices[index] = *(Vec3*)&vertices[mesh_attributes_array_offset + j * mesh_vertex_size + mesh_position_attribute_offset];
-			bounding_radius_squared = Math::maxValue(bounding_radius_squared, dotProduct(m_vertices[index], m_vertices[index]) > 0 ? m_vertices[index].squaredLength() : 0);
-			min_vertex.x = Math::minValue(min_vertex.x, m_vertices[index].x);
-			min_vertex.y = Math::minValue(min_vertex.y, m_vertices[index].y);
-			min_vertex.z = Math::minValue(min_vertex.z, m_vertices[index].z);
-			max_vertex.x = Math::maxValue(max_vertex.x, m_vertices[index].x);
-			max_vertex.y = Math::maxValue(max_vertex.y, m_vertices[index].y);
-			max_vertex.z = Math::maxValue(max_vertex.z, m_vertices[index].z);
-			++index;
-		}
-	}
-
-	m_bounding_radius = sqrt(bounding_radius_squared);
-	m_aabb = AABB(min_vertex, max_vertex);
+	computeRuntimeData(&vertices[0]);
 
 	return true;
 }

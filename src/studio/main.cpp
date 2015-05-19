@@ -205,7 +205,7 @@ class App
 			Lumix::PhysicsScene* scene = static_cast<Lumix::PhysicsScene*>(m_world_editor->getEngine().getScene(crc32("physics")));
 			if(scene)
 			{
-				scene->render();
+				scene->render(m_world_editor->getEngine().getRenderer());
 			}
 		}
 

@@ -96,6 +96,10 @@ void ScriptCompiler::compileAllModules()
 		Module& module = *iter;
 		compileModule(module.m_module_name);
 	}
+	if (m_modules.empty())
+	{
+		emitCompiled("");
+	}
 }
 
 
@@ -119,7 +123,7 @@ void ScriptCompiler::compileModule(const QString& module_name)
 	QString sources;
 	for (int i = 0; i < module.m_scripts.size(); ++i)
 	{
-		sources += QString("		<ClCompile Include=\"%2/%1\"/>\n").arg(module.m_scripts[i]).arg(m_editor->getBasePath());
+		sources += QString("		<ClCompile Include=\"%2/%1\"></ClCompile>\n").arg(module.m_scripts[i]).arg(m_editor->getBasePath());
 	}
 
 	QFile file(QString("tmp/%1.vcxproj").arg(module.m_module_name));
@@ -149,7 +153,6 @@ void ScriptCompiler::compileModule(const QString& module_name)
 		"		<Link>\n"
 		"			<AdditionalDependencies>animation.lib;core.lib;engine.lib;physics.lib</AdditionalDependencies>\n"
 		"			<AdditionalLibraryDirectories>%1\\bin\\win32_debug</AdditionalLibraryDirectories>\n"
-		"			<GenerateDebugInformation>false</GenerateDebugInformation>"
 		"			<OutputFile>%2.dll</OutputFile>"
 		"		</Link>\n"
 		"	</ItemDefinitionGroup>\n"

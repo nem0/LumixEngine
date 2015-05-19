@@ -325,8 +325,14 @@ void JsonSerializer::deserialize(const char* label, uint32_t& value, uint32_t de
 }
 
 
-bool JsonSerializer::isObjectEnd() const
+bool JsonSerializer::isObjectEnd()
 {
+	if (m_token == m_data + m_data_size)
+	{
+		error().log() << "Unexpected end of file while looking for the end of an object.";
+		return true;
+	}
+
 	return (!m_is_string_token && m_token_size == 1 && m_token[0] == '}');
 }
 
@@ -376,6 +382,7 @@ void JsonSerializer::expectToken(char expected_token)
 		tmp[0] = expected_token;
 		tmp[1] = 0;
 		error().log() << "Unexpected token \"" << string(m_token, m_token_size, m_allocator) << "\", expected " << tmp << ".";
+		deserializeToken();
 	}
 }
 
@@ -408,8 +415,14 @@ void JsonSerializer::nextArrayItem()
 }
 
 
-bool JsonSerializer::isArrayEnd() const
+bool JsonSerializer::isArrayEnd()
 {
+	if (m_token == m_data + m_data_size)
+	{
+		error().log() << "Unexpected end of file while looking for the end of an array.";
+		return true;
+	}
+
 	return (!m_is_string_token && m_token_size == 1 && m_token[0] == ']');
 }
 
@@ -435,6 +448,7 @@ void JsonSerializer::deserializeArrayItem(char* value, int max_length, const cha
 	else
 	{
 		error().log() << "Unexpected token \"" << string(m_token, m_token_size, m_allocator) << "\", expected string.";
+		deserializeToken();
 		copyString(value, max_length, default_value);
 	}
 }
@@ -641,6 +655,7 @@ void JsonSerializer::deserializeLabel(char* label, int max_length)
 	if (!m_is_string_token)
 	{
 		error().log() << "Unexpected token \"" << string(m_token, m_token_size, m_allocator) << "\", expected string.";
+		deserializeToken();
 	}
 	int size = Math::minValue(max_length - 1, m_token_size);
 	copyString(label, size, m_token);
@@ -672,15 +687,18 @@ void JsonSerializer::deserializeLabel(const char* label)
 	if (!m_is_string_token)
 	{
 		error().log() << "Unexpected token \"" << string(m_token, m_token_size, m_allocator) << "\", expected string.";
+		deserializeToken();
 	}
 	if (strncmp(label, m_token, m_token_size) != 0)
 	{
 		error().log() << "Unexpected label \"" << string(m_token, m_token_size, m_allocator) << "\", expected \"" << label << "\".";
+		deserializeToken();
 	}
 	deserializeToken();
 	if (m_is_string_token || m_token_size != 1 || m_token[0] != ':')
 	{
 		error().log() << "Unexpected label \"" << string(m_token, m_token_size, m_allocator) << "\", expected \"" << label << "\".";
+		deserializeToken();
 	}
 	deserializeToken();
 }

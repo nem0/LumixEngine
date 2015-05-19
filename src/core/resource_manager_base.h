@@ -24,6 +24,8 @@ namespace Lumix
 
 		Resource* get(const Path& path);
 		Resource* load(const Path& path);
+		void add(Resource* resource);
+		void remove(Resource* resource);
 		void load(Resource& resource);
 
 		void unload(const Path& path);

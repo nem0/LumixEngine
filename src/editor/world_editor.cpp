@@ -1805,6 +1805,7 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			if (m_is_game_mode)
 			{
+				m_game_mode_toggled.invoke(false);
 				stopGameMode();
 			}
 			else
@@ -1812,6 +1813,7 @@ struct WorldEditorImpl : public WorldEditor
 				m_game_mode_file = m_engine->getFileSystem().open("memory", "", FS::Mode::WRITE);
 				save(*m_game_mode_file);
 				m_is_game_mode = true;
+				m_game_mode_toggled.invoke(true);
 			}
 		}
 
@@ -2240,12 +2242,12 @@ struct WorldEditorImpl : public WorldEditor
 			, m_entity_name_set(m_allocator)
 			, m_entity_selected(m_allocator)
 			, m_universe_destroyed(m_allocator)
+			, m_game_mode_toggled(m_allocator)
 			, m_universe_created(m_allocator)
 			, m_universe_loaded(m_allocator)
 			, m_property_set(m_allocator)
 			, m_component_added(m_allocator)
 			, m_component_destroyed(m_allocator)
-			, m_game_mode_toggled(m_allocator)
 			, m_selected_entities(m_allocator)
 			, m_editor_icons(m_allocator)
 			, m_plugins(m_allocator)
@@ -2496,6 +2498,12 @@ struct WorldEditorImpl : public WorldEditor
 			return m_universe_created;
 		}
 
+
+		virtual DelegateList<void(bool)>& gameModeToggled() override
+		{
+			return m_game_mode_toggled;
+		}
+		
 
 		virtual DelegateList<void(const Array<Entity>&)>& entitySelected() override
 		{

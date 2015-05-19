@@ -211,6 +211,7 @@
     <ClCompile Include="..\..\..\src\studio\log_widget.cpp" />
     <ClCompile Include="..\..\..\src\studio\main.cpp" />
     <ClCompile Include="..\..\..\src\studio\mainwindow.cpp" />
+    <ClCompile Include="..\..\..\src\studio\metadata.cpp" />
     <ClCompile Include="..\..\..\src\studio\notifications.cpp" />
     <ClCompile Include="..\..\..\src\studio\pc\file_system_watcher.cpp" />
     <ClCompile Include="..\..\..\src\studio\pc\fps_limiter.cpp" />
@@ -316,6 +317,7 @@
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(QTDIR)\bin\moc.exe;%(FullPath)</AdditionalInputs>
     </CustomBuild>
     <ClInclude Include="..\..\..\src\studio\file_path_edit.h" />
+    <ClInclude Include="..\..\..\src\studio\metadata.h" />
     <ClInclude Include="..\..\..\src\studio\property_view\dynamic_object_model.h" />
     <ClInclude Include="..\..\..\src\studio\property_view\resource_model.h" />
     <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_assetbrowser.h" />

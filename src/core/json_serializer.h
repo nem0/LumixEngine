@@ -69,7 +69,7 @@ namespace Lumix
 			void deserializeArrayBegin(const char* label);
 			void deserializeArrayBegin();
 			void deserializeArrayEnd();
-			bool isArrayEnd() const;
+			bool isArrayEnd();
 			void deserializeArrayItem(uint32_t& value, uint32_t default_value);
 			void deserializeArrayItem(int32_t& value, int32_t default_value);
 			void deserializeArrayItem(int64_t& value, int64_t default_value);
@@ -82,7 +82,7 @@ namespace Lumix
 			void deserializeLabel(char* label, int max_length);
 			void deserializeRawString(char* buffer, int max_length);
 			void nextArrayItem();
-			bool isObjectEnd() const;
+			bool isObjectEnd();
 
 			size_t getRestOfFileSize()
 			{
