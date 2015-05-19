@@ -403,6 +403,7 @@ int main(int argc, char* argv[])
 {
 	App app;
 	QCoreApplication::addLibraryPath(QDir::currentPath());
+	QCoreApplication::addLibraryPath(QDir::currentPath() + "/bin");
 	app.init(argc, argv);
 	app.run();
 	app.shutdown();
