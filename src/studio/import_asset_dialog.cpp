@@ -375,8 +375,17 @@ void ImportThread::writeSkeleton(QFile& file)
 {
 	const aiScene* scene = m_importer.GetScene();
 	int32_t count = countNodes(scene->mRootNode);
+
+	if (count == 1)
+	{
+		TODO("todo");
+		count = 0;
+	}
 	file.write((const char*)&count, sizeof(count));
-	writeNode(file, scene->mRootNode, aiMatrix4x4());
+	if (count > 0)
+	{
+		writeNode(file, scene->mRootNode, aiMatrix4x4());
+	}
 }
 
 
@@ -924,6 +933,12 @@ void ImportAssetDialog::on_browseDestinationButton_clicked()
 void ImportAssetDialog::setDestination(const QString& destination)
 {
 	m_ui->destinationInput->setText(destination);
+}
+
+
+void ImportAssetDialog::setCreateDirectory(bool create_directory)
+{
+	m_ui->createDirectoryCheckbox->setChecked(create_directory);
 }
 
 

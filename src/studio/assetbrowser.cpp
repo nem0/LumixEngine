@@ -385,7 +385,9 @@ void AssetBrowser::reimportAsset(const QString& filepath)
 
 	ImportAssetDialog* dlg = new ImportAssetDialog(m_main_window, this, m_base_path);
 	dlg->setSource(import_source);
-	dlg->setDestination(filepath);
+	QFileInfo destination_info(filepath);
+	dlg->setCreateDirectory(false);
+	dlg->setDestination(destination_info.absolutePath());
 	dlg->show();
 }
 

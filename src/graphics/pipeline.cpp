@@ -33,6 +33,7 @@
 namespace Lumix
 {
 
+
 struct PipelineImpl;
 struct PipelineInstanceImpl;
 
@@ -48,21 +49,6 @@ static const uint32_t BRUSH_POSITION_HASH = crc32("brush_position");
 static float split_distances[] = { 0.01f, 5, 20, 100, 300 };
 static const float SHADOW_CAM_NEAR = 0.1f;
 static const float SHADOW_CAM_FAR = 10000.0f;
-
-
-static int setPass(lua_State* L);
-static int applyCamera(lua_State* L);
-static int clear(lua_State* L);
-static int renderModels(lua_State* L);
-static int renderShadowmap(lua_State* L);
-static int bindFramebufferTexture(lua_State* L);
-static int polygonMode(lua_State* L);
-static int executeCustomCommand(lua_State* L);
-static int renderDebugTexts(lua_State* L);
-static int renderDebugLines(lua_State* L);
-static int cullFaces(lua_State* L);
-static int bindFramebuffer(lua_State* L);
-static int unbindFramebuffer(lua_State* L);
 
 
 struct PipelineImpl : public Pipeline
@@ -165,22 +151,7 @@ struct PipelineImpl : public Pipeline
 	}
 
 
-	void registerCFunctions()
-	{
-		registerCFunction("setPass", setPass);
-		registerCFunction("applyCamera", applyCamera);
-		registerCFunction("clear", clear);
-		registerCFunction("renderModels", renderModels);
-		registerCFunction("renderShadowmap", renderShadowmap);
-		registerCFunction("bindFramebufferTexture", bindFramebufferTexture);
-		registerCFunction("polygonMode", polygonMode);
-		registerCFunction("executeCustomCommand", executeCustomCommand);
-		registerCFunction("renderDebugLines", renderDebugLines);
-		registerCFunction("renderDebugTexts", renderDebugTexts);
-		registerCFunction("cullFaces", cullFaces);
-		registerCFunction("bindFramebuffer", bindFramebuffer);
-		registerCFunction("unbindFramebuffer", unbindFramebuffer);
-	}
+	void registerCFunctions();
 
 
 	virtual void loaded(FS::IFile* file, bool success, FS::FileSystem& fs) override
@@ -320,9 +291,9 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	virtual int getRenderedVerticesCount() const override
+	virtual int getRenderedTrianglesCount() const override
 	{
-		return m_vertices_count;
+		return m_vertices_count / 3;
 	}
 
 
@@ -1057,27 +1028,18 @@ void PipelineManager::destroyResource(Resource& resource)
 }
 
 
-static int setPass(lua_State* L)
+namespace LuaAPI
 {
-	PipelineInstanceImpl* pipeline = (PipelineInstanceImpl*)lua_touserdata(L, 1);
-	if (!pipeline)
-	{
-		return 0;
-	}
-	const char* pass = lua_tostring(L, 2);
+
+
+void setPass(PipelineInstanceImpl* pipeline, const char* pass)
+{
 	pipeline->getRenderer().setPass(crc32(pass));
-	return 0;
 }
 
 
-static int applyCamera(lua_State* L)
+void applyCamera(PipelineInstanceImpl* pipeline, const char* slot)
 {
-	PipelineInstanceImpl* pipeline = (PipelineInstanceImpl*)lua_touserdata(L, 1);
-	if (!pipeline)
-	{
-		return 0;
-	}
-	const char* slot = lua_tostring(L, 2);
 	Component cmp = pipeline->m_scene->getCameraInSlot(slot);
 	pipeline->setActiveCamera(cmp);
 	if (cmp.isValid())
@@ -1094,26 +1056,17 @@ static int applyCamera(lua_State* L)
 		pipeline->m_scene->setCameraSize(cmp, pipeline->m_width, pipeline->m_height);
 		pipeline->m_scene->applyCamera(cmp);
 	}
-	return 0;
 }
 
 
-static int polygonMode(lua_State* L)
+void polygonMode(PipelineInstanceImpl* pipeline, bool fill)
 {
-	PipelineInstanceImpl* pipeline = (PipelineInstanceImpl*)lua_touserdata(L, 1);
-	if (!pipeline)
-	{
-		return 0;
-	}
-	bool fill = lua_toboolean(L, 2) != 0;
 	glPolygonMode(GL_FRONT_AND_BACK, fill && !pipeline->getRenderer().isEditorWireframe() ? GL_FILL : GL_LINE);
-	return 0;
 }
 
 
-static int clear(lua_State* L)
+void clear(const char* buffers)
 {
-	const char* buffers = lua_tostring(L, 1);
 	if (strcmp(buffers, "all") == 0)
 	{
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -1122,20 +1075,11 @@ static int clear(lua_State* L)
 	{
 		glClear(GL_DEPTH_BUFFER_BIT);
 	}
-	return 0;
 }
 
 
-static int renderModels(lua_State* L)
+void renderModels(PipelineInstanceImpl* pipeline, int64_t layer_mask, bool is_point_light_render)
 {
-	PipelineInstanceImpl* pipeline = (PipelineInstanceImpl*)lua_touserdata(L, 1);
-	if (!pipeline)
-	{
-		return 0;
-	}
-
-	int64_t layer_mask = lua_tointeger(L, 2);
-	bool is_point_light_render = lua_toboolean(L, 3) != 0;
 	if (is_point_light_render)
 	{
 		glEnable(GL_BLEND);
@@ -1149,66 +1093,35 @@ static int renderModels(lua_State* L)
 	{
 		pipeline->renderModels(pipeline->getScene()->getFrustum(), layer_mask, false);
 	}
-
-
-	return 0;
 }
 
 
-static int bindFramebufferTexture(lua_State* L)
+void bindFramebufferTexture(PipelineInstanceImpl* pipeline, const char* framebuffer_name, int renderbuffer_index, const char* uniform)
 {
-	PipelineInstanceImpl* pipeline = (PipelineInstanceImpl*)lua_touserdata(L, 1);
-	if (!pipeline)
-	{
-		return 0;
-	}
-
-	const char* framebuffer_name = lua_tostring(L, 2);
-	int renderbuffer_index = (int)lua_tointeger(L, 3);
-	const char* uniform = lua_tostring(L, 4);
-
 	FrameBuffer* fb = pipeline->getFrameBuffer(framebuffer_name);
 	if (fb)
 	{
 		pipeline->addGlobalTexture(fb->getTexture(renderbuffer_index), uniform);
 	}
-
-	return 0;
 }
 
 
-static int executeCustomCommand(lua_State* L)
+void executeCustomCommand(PipelineInstanceImpl* pipeline, const char* command)
 {
-	PipelineInstanceImpl* pipeline = (PipelineInstanceImpl*)lua_touserdata(L, 1);
-	if (!pipeline)
-	{
-		return 0;
-	}
-
-	const char* command = lua_tostring(L, 2);
 	pipeline->executeCustomCommand(crc32(command));
-
-	return 0;
 }
 
 
-static int renderDebugLines(lua_State* L)
+void renderDebugLines(PipelineInstanceImpl* pipeline)
 {
-	PipelineInstanceImpl* pipeline = (PipelineInstanceImpl*)lua_touserdata(L, 1);
-	if (!pipeline)
-	{
-		return 0;
-	}
 	pipeline->renderDebugLines();
-
-	return 0;
 }
 
 
-static int cullFaces(lua_State* L)
+void cullFaces(const char* face)
 {
 	glEnable(GL_CULL_FACE);
-	if (strcmp(lua_tostring(L, 1), "front") == 0)
+	if (strcmp(face, "front") == 0)
 	{
 		glCullFace(GL_FRONT);
 	}
@@ -1216,49 +1129,23 @@ static int cullFaces(lua_State* L)
 	{
 		glCullFace(GL_BACK);
 	}
-	return 0;
 }
 
 
-static int renderDebugTexts(lua_State* L)
+void renderDebugTexts(PipelineInstanceImpl* pipeline)
 {
-	PipelineInstanceImpl* pipeline = (PipelineInstanceImpl*)lua_touserdata(L, 1);
-	if (!pipeline)
-	{
-		return 0;
-	}
 	pipeline->renderDebugTexts();
-
-	return 0;
 }
 
 
-static int renderShadowmap(lua_State* L)
+void renderShadowmap(PipelineInstanceImpl* pipeline, int64_t layer_mask, const char* slot)
 {
-	PipelineInstanceImpl* pipeline = (PipelineInstanceImpl*)lua_touserdata(L, 1);
-	if (!pipeline)
-	{
-		return 0;
-	}
-
-	int64_t layer_mask = lua_tointeger(L, 2);
-	const char* slot = lua_tostring(L, 3);
-
 	pipeline->renderShadowmap(pipeline->getScene()->getCameraInSlot(slot), layer_mask);
-
-	return 0;
 }
 
 
-static int bindFramebuffer(lua_State* L)
+void bindFramebuffer(PipelineInstanceImpl* pipeline, const char* buffer_name)
 {
-	PipelineInstanceImpl* pipeline = (PipelineInstanceImpl*)lua_touserdata(L, 1);
-	if (!pipeline)
-	{
-		return 0;
-	}
-
-	const char* buffer_name = lua_tostring(L, 2);
 	FrameBuffer* fb = pipeline->getFrameBuffer(buffer_name);
 	if (fb)
 	{
@@ -1266,22 +1153,116 @@ static int bindFramebuffer(lua_State* L)
 		pipeline->m_framebuffer_width = fb->getWidth();
 		pipeline->m_framebuffer_height = fb->getHeight();
 	}
+}
 
+
+void unbindFramebuffer(PipelineInstanceImpl* pipeline)
+{
+	FrameBuffer::unbind();
+	pipeline->m_framebuffer_width = pipeline->m_framebuffer_height = -1;
+}
+
+
+} // namespace LuaAPI
+
+
+namespace LuaWrapper
+{
+
+
+template <typename T> T toType(lua_State* L, int index) { return (T)lua_touserdata(L, index); }
+template <> int toType(lua_State* L, int index) { return (int)lua_tointeger(L, index); }
+template <> int64_t toType(lua_State* L, int index) { return (int64_t)lua_tointeger(L, index); }
+template <> bool toType(lua_State* L, int index) { return lua_toboolean(L, index) != 0; }
+template <> float toType(lua_State* L, int index) { return (float)lua_tonumber(L, index); }
+template <> const char* toType(lua_State* L, int index) { return lua_tostring(L, index); }
+template <> void* toType(lua_State* L, int index) { return lua_touserdata(L, index); }
+
+
+template <typename T> bool isType(lua_State* L, int index) { return lua_islightuserdata(L, index) != 0; }
+template <> bool isType<int>(lua_State* L, int index) { return lua_isinteger(L, index) != 0; }
+template <> bool isType<int64_t>(lua_State* L, int index) { return lua_isinteger(L, index) != 0; }
+template <> bool isType<bool>(lua_State* L, int index) { return lua_isboolean(L, index) != 0; }
+template <> bool isType<float>(lua_State* L, int index) { return lua_isnumber(L, index) != 0; }
+template <> bool isType<const char*>(lua_State* L, int index) { return lua_isstring(L, index) != 0; }
+template <> bool isType<void*>(lua_State* L, int index) { return lua_islightuserdata(L, index) != 0; }
+
+
+template <int N>
+struct FunctionCaller
+{
+	template <typename... ArgsF, typename... Args>
+	static LUMIX_FORCE_INLINE void callFunction(void(*f)(ArgsF...), lua_State* L, Args... args)
+	{
+		typedef std::tuple_element<sizeof...(ArgsF)-N, std::tuple<ArgsF...> >::type T;
+		if (!isType<T>(L, sizeof...(ArgsF)-N + 1))
+		{
+			lua_Debug entry;
+			int depth = 0;
+
+			char tmp[2048];
+			tmp[0] = 0;
+			auto er = g_log_error.log("lua");
+			er << "Wrong arguments in\n";
+			while (lua_getstack(L, depth, &entry))
+			{
+				int status = lua_getinfo(L, "Sln", &entry);
+				ASSERT(status);
+				er << entry.short_src << "(" << entry.currentline << "): " << (entry.name ? entry.name : "?") << "\n";
+				depth++;
+			}
+			return;
+		}
+		T a = toType<T>(L, sizeof...(ArgsF)-N + 1);
+		FunctionCaller<N - 1>::callFunction(f, L, args..., a);
+	}
+};
+
+
+template <>
+struct FunctionCaller<0>
+{
+	template < typename... ArgsF, typename... Args >
+	static LUMIX_FORCE_INLINE void callFunction(void(*f)(ArgsF...), lua_State*, Args... args)
+	{
+		f(args...);
+	}
+};
+
+
+template <typename... ArgsF>
+void LUMIX_FORCE_INLINE callFunction(void(*f)(ArgsF...), lua_State* L)
+{
+	FunctionCaller<sizeof...(ArgsF)>::callFunction(f, L);
+}
+
+
+template <typename T, T t>
+int wrap(lua_State* L)
+{
+	callFunction(t, L);
 	return 0;
 }
 
 
-static int unbindFramebuffer(lua_State* L)
-{
-	PipelineInstanceImpl* pipeline = (PipelineInstanceImpl*)lua_touserdata(L, 1);
-	if (!pipeline)
-	{
-		return 0;
-	}
+} // namespace LuaWrapper
 
-	FrameBuffer::unbind();
-	pipeline->m_framebuffer_width = pipeline->m_framebuffer_height = -1;
-	return 0;
+
+void PipelineImpl::registerCFunctions()
+{
+	registerCFunction("setPass", LuaWrapper::wrap<decltype(&LuaAPI::setPass), LuaAPI::setPass>);
+	registerCFunction("applyCamera", LuaWrapper::wrap<decltype(&LuaAPI::applyCamera), LuaAPI::applyCamera>);
+	registerCFunction("clear", LuaWrapper::wrap<decltype(&LuaAPI::clear), LuaAPI::clear>);
+	registerCFunction("renderModels", LuaWrapper::wrap<decltype(&LuaAPI::renderModels), LuaAPI::renderModels>);
+	registerCFunction("renderShadowmap", LuaWrapper::wrap<decltype(&LuaAPI::renderShadowmap), LuaAPI::renderShadowmap>);
+	registerCFunction("bindFramebufferTexture", LuaWrapper::wrap<decltype(&LuaAPI::bindFramebufferTexture), LuaAPI::bindFramebufferTexture>);
+	registerCFunction("polygonMode", LuaWrapper::wrap<decltype(&LuaAPI::polygonMode), LuaAPI::polygonMode>);
+	registerCFunction("executeCustomCommand", LuaWrapper::wrap<decltype(&LuaAPI::executeCustomCommand), LuaAPI::executeCustomCommand>);
+	registerCFunction("renderDebugLines", LuaWrapper::wrap<decltype(&LuaAPI::renderDebugLines), LuaAPI::renderDebugLines>);
+	registerCFunction("renderDebugTexts", LuaWrapper::wrap<decltype(&LuaAPI::renderDebugTexts), LuaAPI::renderDebugTexts>);
+	registerCFunction("cullFaces", LuaWrapper::wrap<decltype(&LuaAPI::cullFaces), LuaAPI::cullFaces>);
+	registerCFunction("bindFramebuffer", LuaWrapper::wrap<decltype(&LuaAPI::bindFramebuffer), LuaAPI::bindFramebuffer>);
+	registerCFunction("unbindFramebuffer", LuaWrapper::wrap<decltype(&LuaAPI::unbindFramebuffer), LuaAPI::unbindFramebuffer>);
 }
 
 

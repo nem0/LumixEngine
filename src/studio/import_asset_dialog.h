@@ -78,6 +78,7 @@ class ImportAssetDialog : public QDialog
 
 		void setSource(const QString& source);
 		void setDestination(const QString& destination);
+		void setCreateDirectory(bool create_directory);
 		Assimp::Importer& getImporter() { return m_importer; }
 
 	private:
