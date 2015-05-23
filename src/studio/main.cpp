@@ -343,8 +343,8 @@ class App
 			Lumix::toCString(fps, stats + strlen(stats), sizeof(stats) - strlen(stats), 1);
 			Lumix::catCString(stats, sizeof(stats), ", Draw calls: ");
 			Lumix::toCString(m_main_window->getSceneView()->getPipeline()->getDrawCalls(), stats + strlen(stats), sizeof(stats) - strlen(stats));
-			Lumix::catCString(stats, sizeof(stats), ", Vertices: ");
-			Lumix::toCStringPretty(m_main_window->getSceneView()->getPipeline()->getRenderedVerticesCount(), stats + strlen(stats), sizeof(stats) - strlen(stats));
+			Lumix::catCString(stats, sizeof(stats), ", Triangles: ");
+			Lumix::toCStringPretty(m_main_window->getSceneView()->getPipeline()->getRenderedTrianglesCount(), stats + strlen(stats), sizeof(stats) - strlen(stats));
 			static_cast<Lumix::RenderScene*>(m_world_editor->getEngine().getScene(crc32("renderer")))->setDebugText(m_world_editor->getFPSText(), stats);
 		}
 
