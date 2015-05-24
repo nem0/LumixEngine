@@ -20,6 +20,7 @@ class ResourceModel : public DynamicObjectModel
 		~ResourceModel();
 
 		Lumix::Resource* getResource() { return m_resource; }
+		void setResource(const Lumix::Path& path);
 
 	private:
 		void onResourceLoaded(Lumix::Resource::State, Lumix::Resource::State new_state);

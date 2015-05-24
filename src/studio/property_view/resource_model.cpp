@@ -13,6 +13,7 @@
 #include <qfile.h>
 #include <qfiledialog.h>
 #include <qpainter.h>
+#include <qpushbutton.h>
 
 
 static QSize getPreviewSize(Lumix::Texture* texture)
@@ -31,6 +32,19 @@ static QSize getPreviewSize(Lumix::Texture* texture)
 ResourceModel::ResourceModel(Lumix::WorldEditor& editor, const Lumix::Path& path)
 	: m_editor(editor)
 {
+	m_resource = nullptr;
+	setResource(path);
+}
+
+
+void ResourceModel::setResource(const Lumix::Path& path)
+{
+	if (m_resource)
+	{
+		m_resource->getResourceManager().get(m_resource_type)->unload(*m_resource);
+		m_resource->getObserverCb().unbind<ResourceModel, &ResourceModel::onResourceLoaded>(this);
+	}
+
 	char rel_path[LUMIX_MAX_PATH];
 	m_editor.getRelativePath(rel_path, LUMIX_MAX_PATH, path);
 	char extension[10];
@@ -56,13 +70,8 @@ ResourceModel::ResourceModel(Lumix::WorldEditor& editor, const Lumix::Path& path
 
 	Lumix::ResourceManagerBase* manager = m_editor.getEngine().getResourceManager().get(m_resource_type);
 	m_resource = manager->load(Lumix::Path(rel_path));
-	ASSERT(m_resource);
-
 	m_resource->getObserverCb().bind<ResourceModel, &ResourceModel::onResourceLoaded>(this);
-	if (m_resource->isReady())
-	{
-		onResourceLoaded(Lumix::Resource::State::READY, Lumix::Resource::State::READY);
-	}
+	onResourceLoaded(m_resource->getState(), m_resource->getState());
 }
 
 
@@ -80,10 +89,13 @@ void ResourceModel::fillModelInfo()
 	auto object = this->object("Model", model);
 	object
 		.property("Bone count", &Lumix::Model::getBoneCount)
-		.property("Bounding radius", &Lumix::Model::getBoundingRadius)
-		.array("Meshes", model->getMeshCount(), &Lumix::Model::getMeshPtr, [](const Lumix::Mesh* mesh) -> const char* { return mesh->getName(); })
-			.property("Triangles", &Lumix::Mesh::getTriangleCount)
-			.property("Material", [](const Lumix::Mesh* mesh) -> const char* { return mesh->getMaterial()->getPath().c_str(); });
+		.property("Bounding radius", &Lumix::Model::getBoundingRadius);
+	auto meshes = object.array("Meshes", model->getMeshCount(), &Lumix::Model::getMeshPtr, [](const Lumix::Mesh* mesh) -> const char* { return mesh->getName(); });
+		meshes.property("Triangles", &Lumix::Mesh::getTriangleCount);
+		meshes.property("Material", [](const Lumix::Mesh* mesh) -> const char* { return mesh->getMaterial()->getPath().c_str(); });
+		meshes.back().onClick([this, model](int index, QWidget*, QPoint) {
+			setResource(model->getMesh(index).getMaterial()->getPath());
+		});
 }
 
 
@@ -236,14 +248,14 @@ void ResourceModel::fillTextureInfo()
 
 void ResourceModel::onResourceLoaded(Lumix::Resource::State, Lumix::Resource::State new_state)
 {
+	beginResetModel();
+	for (int i = 0; i < getRoot().m_children.size(); ++i)
+	{
+		delete getRoot().m_children[i];
+	}
+	getRoot().m_children.clear();
 	if (new_state == Lumix::Resource::State::READY)
 	{
-		beginResetModel();
-		for (int i = 0; i < getRoot().m_children.size(); ++i)
-		{
-			delete getRoot().m_children[i];
-		}
-		getRoot().m_children.clear();
 		if (dynamic_cast<Lumix::Model*>(m_resource))
 		{
 			fillModelInfo();
@@ -260,6 +272,6 @@ void ResourceModel::onResourceLoaded(Lumix::Resource::State, Lumix::Resource::St
 		{
 			Q_ASSERT(false);
 		}
-		endResetModel();
 	}
+	endResetModel();
 }
