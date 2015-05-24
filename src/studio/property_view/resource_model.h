@@ -9,6 +9,7 @@ namespace Lumix
 {
 	class Material;
 	class Resource;
+	class Texture;
 	class WorldEditor;
 }
 
@@ -25,8 +26,8 @@ class ResourceModel : public DynamicObjectModel
 	private:
 		void onResourceLoaded(Lumix::Resource::State, Lumix::Resource::State new_state);
 		void fillModelInfo();
-		void fillMaterialInfo();
-		void fillTextureInfo();
+		void fillMaterialInfo(Lumix::Material* material, Node& node);
+		void fillTextureInfo(Lumix::Texture*, Node& node);
 		void saveMaterial(Lumix::Material* material);
 		void showFileDialog(DynamicObjectModel::Node* node, QString filter);
 		void setMaterialShader(Lumix::Material* material, QString value);
