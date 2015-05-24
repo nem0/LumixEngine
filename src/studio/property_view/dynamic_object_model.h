@@ -77,6 +77,30 @@ class DynamicObjectModel : public QAbstractItemModel
 		class Object
 		{
 			public:
+				class ArrayProperty
+				{
+					public:
+						ArrayProperty(Node* node, int index)
+							: m_node(node)
+							, m_index(index)
+						{}
+
+
+						template <typename Callback>
+						void onClick(Callback callback)
+						{
+							for (int i = 0; i < m_node->m_children.size(); ++i)
+							{
+								Node* node = m_node->m_children[i]->m_children[m_index];
+								node->onClick = [i, callback](QWidget* widget, QPoint p) { callback(i, widget, p); };
+							}
+						}
+
+					private:
+						Node* m_node;
+						int m_index;
+				};
+
 				template <typename Getter, typename Namer>
 				class Array
 				{
@@ -116,6 +140,10 @@ class DynamicObjectModel : public QAbstractItemModel
 								node.m_getter = [getter, o]() -> QVariant { return (o->*getter)(); };
 							}
 							return *this;
+						}
+
+						ArrayProperty back() {
+							return ArrayProperty(m_node, m_node->m_children[0]->m_children.size() - 1);
 						}
 
 					private:
