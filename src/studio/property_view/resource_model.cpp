@@ -92,9 +92,12 @@ void ResourceModel::fillModelInfo()
 		.property("Bounding radius", &Lumix::Model::getBoundingRadius);
 	auto meshes = object.array("Meshes", model->getMeshCount(), &Lumix::Model::getMeshPtr, [](const Lumix::Mesh* mesh) -> const char* { return mesh->getName(); });
 		meshes.property("Triangles", &Lumix::Mesh::getTriangleCount);
-		meshes.property("Material", [](const Lumix::Mesh* mesh) -> const char* { return mesh->getMaterial()->getPath().c_str(); });
+		/*meshes.property("Material", [](const Lumix::Mesh* mesh) -> const char* { return mesh->getMaterial()->getPath().c_str(); });
 		meshes.back().onClick([this, model](int index, QWidget*, QPoint) {
 			setResource(model->getMesh(index).getMaterial()->getPath());
+		});*/
+		meshes.forEach([this](int, const Lumix::Mesh* mesh, Node& node){
+			fillMaterialInfo(mesh->getMaterial(), node.addChild("material"));
 		});
 }
 
@@ -156,10 +159,11 @@ void ResourceModel::setMaterialShader(Lumix::Material* material, QString value)
 }
 
 
-void ResourceModel::fillMaterialInfo()
+void ResourceModel::fillMaterialInfo(Lumix::Material* material, Node& node)
 {
-	Lumix::Material* material = static_cast<Lumix::Material*>(m_resource);
-	auto object = this->object("Material", material);
+	auto object = Object<Lumix::Material>(material, &node);
+	node.m_getter = [material]() -> QVariant { return material->getPath().c_str(); };
+	node.m_name = "Material";
 	object.getNode().onClick = [this, material](QWidget*, QPoint) { saveMaterial(material); };
 	object.getNode().onPaint = [](QPainter* painter, const QStyleOptionViewItem& option) {
 		painter->save();
@@ -183,11 +187,6 @@ void ResourceModel::fillMaterialInfo()
 	auto shader_node = object.getNode().m_children.back();
 	object.getNode().m_children.back()->onClick = [shader_node, this](QWidget*, QPoint) { showFileDialog(shader_node, "Shaders (*.shd)"); };
 
-	object
-		.array("Textures", material->getTextureCount(), &Lumix::Material::getTexture, [](Lumix::Texture* texture) -> const char* { return texture->getPath().c_str(); })
-			.property("Width", &Lumix::Texture::getWidth)
-			.property("Height", &Lumix::Texture::getHeight)
-			.property("Bytes per pixel", &Lumix::Texture::getBytesPerPixel);
 	for (int i = 0; i < material->getUniformCount(); ++i)
 	{
 		auto& uniform = material->getUniform(i);
@@ -222,13 +221,19 @@ void ResourceModel::fillMaterialInfo()
 			);
 		}
 	}
+	object
+		.array("Textures", material->getTextureCount(), &Lumix::Material::getTexture, [](Lumix::Texture* texture) -> const char* { return texture->getPath().c_str(); })
+		.forEach([this](int i, Lumix::Texture* texture, Node& node) {
+		fillTextureInfo(texture, node);
+		node.m_name = QString("Texture %1").arg(i);
+	});
 }
 
 
-void ResourceModel::fillTextureInfo()
+void ResourceModel::fillTextureInfo(Lumix::Texture* texture, Node& node)
 {
-	Lumix::Texture* texture = static_cast<Lumix::Texture*>(m_resource);
-	auto obj = object("Texture", texture)
+	node.m_name = "Texture";
+	auto obj = Object<Lumix::Texture>(texture, &node)
 		.property("Width", &Lumix::Texture::getWidth)
 		.property("Height", &Lumix::Texture::getHeight)
 		.property("Bytes per pixel", &Lumix::Texture::getBytesPerPixel);
@@ -262,11 +267,11 @@ void ResourceModel::onResourceLoaded(Lumix::Resource::State, Lumix::Resource::St
 		}
 		else if (dynamic_cast<Lumix::Material*>(m_resource))
 		{
-			fillMaterialInfo();
+			fillMaterialInfo(static_cast<Lumix::Material*>(m_resource), getRoot());
 		}
 		else if (dynamic_cast<Lumix::Texture*>(m_resource))
 		{
-			fillTextureInfo();
+			fillTextureInfo(static_cast<Lumix::Texture*>(m_resource), getRoot());
 		}
 		else
 		{

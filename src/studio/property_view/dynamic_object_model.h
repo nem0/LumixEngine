@@ -130,6 +130,17 @@ class DynamicObjectModel : public QAbstractItemModel
 							return *this;
 						}
 
+						template <typename Functor>
+						void forEach(Functor functor)
+						{
+							for (int i = 0; i < m_node->m_children.size(); ++i)
+							{
+								auto o = (m_parent->*m_getter)(i);
+								Node& node = *m_node->m_children[i];
+								functor(i, o, node);
+							}
+						}
+
 						template <typename Getter>
 						typename IsNotFunctor<Getter, Array>::type property(QString name, Getter getter)
 						{
