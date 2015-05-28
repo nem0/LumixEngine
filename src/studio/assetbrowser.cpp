@@ -405,6 +405,7 @@ void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
 	QAction* delete_file_action = new QAction("Delete", menu);
 	QAction* rename_file_action = new QAction("Rename", menu);
 	QAction* create_dir_action = new QAction("Create directory", menu);
+	QAction* create_material_action = new QAction("Create material", menu);
 	QAction* import_asset_action = new QAction("Import asset", menu);
 	QAction* reimport_asset_action = new QAction("Reimport asset", menu);
 
@@ -414,6 +415,7 @@ void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
 	{
 		menu->addAction(import_asset_action);
 		menu->addAction(create_dir_action);
+		menu->addAction(create_material_action);
 	}
 
 	char relative_path[LUMIX_MAX_PATH];
@@ -466,6 +468,20 @@ void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
 		if (ok && !text.isEmpty())
 		{
 			QDir().mkdir(file_info.absoluteFilePath() + "/" + text);
+		}
+	}
+	else if (selected_action == create_material_action)
+	{
+		auto material_name = QInputDialog::getText(nullptr, "Set filename", "Filename", QLineEdit::Normal, ".mat");
+		auto path = file_info.absoluteFilePath() + "/" + material_name;
+		QFile file(path);
+		if (!file.open(QIODevice::WriteOnly))
+		{
+			QMessageBox::warning(nullptr, "Error", QString("Could not create file %1").arg(path), QMessageBox::StandardButton::Ok);
+		}
+		else
+		{
+			file.close();
 		}
 	}
 }

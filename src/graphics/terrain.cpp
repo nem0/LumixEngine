@@ -874,9 +874,12 @@ namespace Lumix
 			m_allocator.deleteObject(m_root);
 			m_heightmap = m_material->getTextureByUniform("hm_texture");
 			m_splatmap = m_material->getTextureByUniform("splat_texture");
-			m_width = m_heightmap->getWidth();
-			m_height = m_heightmap->getHeight();
-			m_root = generateQuadTree((float)m_width);
+			if (m_heightmap && m_splatmap)
+			{
+				m_width = m_heightmap->getWidth();
+				m_height = m_heightmap->getHeight();
+				m_root = generateQuadTree((float)m_width);
+			}
 		}
 	}
 

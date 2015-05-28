@@ -12,8 +12,50 @@
 #include <qapplication.h>
 #include <qfile.h>
 #include <qfiledialog.h>
+#include <qlayout.h>
+#include <qlineedit.h>
 #include <qpainter.h>
 #include <qpushbutton.h>
+
+
+FileInput::FileInput(QWidget* parent)
+	: QWidget(parent)
+{
+	QHBoxLayout* layout = new QHBoxLayout(this);
+	layout->setContentsMargins(0, 0, 0, 0);
+	m_edit = new QLineEdit(this);
+	layout->addWidget(m_edit);
+	QPushButton* browse_button = new QPushButton("...", this);
+	layout->addWidget(browse_button);
+	connect(browse_button, &QPushButton::clicked, this, &FileInput::browseClicked);
+	connect(m_edit, &QLineEdit::editingFinished, this, &FileInput::editingFinished);
+}
+
+
+void FileInput::editingFinished()
+{
+	setValue(m_edit->text());
+}
+
+
+void FileInput::setValue(const QString& path)
+{
+	m_edit->setText(path);
+	emit valueChanged();
+}
+
+
+QString FileInput::value() const 
+{
+	return m_edit->text();
+}
+
+
+void FileInput::browseClicked()
+{
+	auto path = QFileDialog::getOpenFileName(this);
+	setValue(path);
+}
 
 
 static QSize getPreviewSize(Lumix::Texture* texture)
@@ -91,12 +133,9 @@ void ResourceModel::fillModelInfo()
 		.property("Bone count", &Lumix::Model::getBoneCount)
 		.property("Bounding radius", &Lumix::Model::getBoundingRadius);
 	auto meshes = object.array("Meshes", model->getMeshCount(), &Lumix::Model::getMeshPtr, [](const Lumix::Mesh* mesh) -> const char* { return mesh->getName(); });
-		meshes.property("Triangles", &Lumix::Mesh::getTriangleCount);
-		/*meshes.property("Material", [](const Lumix::Mesh* mesh) -> const char* { return mesh->getMaterial()->getPath().c_str(); });
-		meshes.back().onClick([this, model](int index, QWidget*, QPoint) {
-			setResource(model->getMesh(index).getMaterial()->getPath());
-		});*/
 		meshes.forEach([this](int, const Lumix::Mesh* mesh, Node& node){
+			Object<Lumix::Mesh>((Lumix::Mesh*)mesh, &node)
+				.property("Triangles", &Lumix::Mesh::getTriangleCount);
 			fillMaterialInfo(mesh->getMaterial(), node.addChild("material"));
 		});
 }
@@ -140,7 +179,7 @@ void ResourceModel::saveMaterial(Lumix::Material* material)
 }
 
 
-void ResourceModel::showFileDialog(DynamicObjectModel::Node* node, QString filter)
+void ResourceModel::showFileDialog(const DynamicObjectModel::Node* node, QString filter)
 {
 	auto fileName = QFileDialog::getOpenFileName(NULL, "Select file", "", filter);
 	if (!fileName.isEmpty())
@@ -156,6 +195,52 @@ void ResourceModel::setMaterialShader(Lumix::Material* material, QString value)
 	m_editor.getRelativePath(rel_path, LUMIX_MAX_PATH, Lumix::Path(value.toLatin1().data()));
 	Lumix::StackAllocator<LUMIX_MAX_PATH> allocator;
 	material->setShader(Lumix::Path(rel_path));
+}
+
+
+class BaseEditorProperty
+{
+	public:
+		BaseEditorProperty();
+		virtual ~BaseEditorProperty();
+
+		virtual int childCount() const { return m_children.size(); }
+		virtual void addChild(BaseEditorProperty* child);
+		virtual void removeChild(int index);
+		virtual QVariant getValue() const = 0;
+		virtual BaseEditorProperty* getParent() const { return m_parent; }
+
+	private:
+		BaseEditorProperty* m_parent;
+		QVector<BaseEditorProperty*> m_children;
+};
+
+
+BaseEditorProperty::BaseEditorProperty()
+	: m_parent(nullptr)
+{}
+
+
+BaseEditorProperty::~BaseEditorProperty()
+{
+	for (auto child : m_children)
+	{
+		delete child;
+	}
+}
+
+
+void BaseEditorProperty::addChild(BaseEditorProperty* child)
+{
+	child->m_parent = this;
+	m_children.append(child);
+}
+
+
+void BaseEditorProperty::removeChild(int index)
+{
+	delete m_children[index];
+	m_children.removeAt(index);
 }
 
 
@@ -181,7 +266,7 @@ void ResourceModel::fillMaterialInfo(Lumix::Material* material, Node& node)
 		.property("Shadow receiver", &Lumix::Material::isShadowReceiver, &Lumix::Material::enableShadowReceiving)
 		.property("Z test", &Lumix::Material::isZTest, &Lumix::Material::enableZTest)
 		.property("Shader", 
-			[](Lumix::Material* material) -> QVariant { return material->getShader()->getPath().c_str(); },
+		[](Lumix::Material* material) -> QVariant { return material->getShader() ? material->getShader()->getPath().c_str() : ""; },
 			[this](Lumix::Material* material, QVariant value) { setMaterialShader(material, value.toString()); }
 		);
 	auto shader_node = object.getNode().m_children.back();
@@ -190,43 +275,69 @@ void ResourceModel::fillMaterialInfo(Lumix::Material* material, Node& node)
 	for (int i = 0; i < material->getUniformCount(); ++i)
 	{
 		auto& uniform = material->getUniform(i);
-		if (uniform.m_is_editable)
-		{
-			QString name = uniform.m_name;
-			object.property(uniform.m_name
-				, [name](Lumix::Material* material) -> QVariant {
-					Lumix::Material::Uniform* uniform = getMaterialUniform(material, name);
-					if (uniform)
+		QString name = uniform.m_name;
+		object.property(uniform.m_name
+			, [name](Lumix::Material* material) -> QVariant {
+				Lumix::Material::Uniform* uniform = getMaterialUniform(material, name);
+				if (uniform)
+				{
+					switch (uniform->m_type)
 					{
-						switch (uniform->m_type)
-						{
-							case Lumix::Material::Uniform::FLOAT:
-								return uniform->m_float;
-						}
-					}
-					return QVariant();
-				}
-				, [name](Lumix::Material* material, const QVariant& value) {
-					Lumix::Material::Uniform* uniform = getMaterialUniform(material, name);
-					if (uniform)
-					{
-						switch (uniform->m_type)
-						{
-							case Lumix::Material::Uniform::FLOAT:
-								uniform->m_float = value.toFloat();
-								break;
-						}
+						case Lumix::Material::Uniform::FLOAT:
+							return uniform->m_float;
 					}
 				}
-			);
-		}
+				return QVariant();
+			}
+			, [name](Lumix::Material* material, const QVariant& value) {
+				Lumix::Material::Uniform* uniform = getMaterialUniform(material, name);
+				if (uniform)
+				{
+					switch (uniform->m_type)
+					{
+						case Lumix::Material::Uniform::FLOAT:
+							uniform->m_float = value.toFloat();
+							break;
+					}
+				}
+			}
+		);
 	}
+	
 	object
-		.array("Textures", material->getTextureCount(), &Lumix::Material::getTexture, [](Lumix::Texture* texture) -> const char* { return texture->getPath().c_str(); })
-		.forEach([this](int i, Lumix::Texture* texture, Node& node) {
-		fillTextureInfo(texture, node);
-		node.m_name = QString("Texture %1").arg(i);
-	});
+		.array("Textures", material->getTextureCount(), &Lumix::Material::getTexture, 
+			[](Lumix::Texture* texture) -> const char* { return texture->getPath().c_str(); }
+		)
+			.forEach([this, material](int i, Lumix::Texture* texture, Node& node) {
+				fillTextureInfo(texture, node);
+				Object<Lumix::Texture>(texture, &node)
+					.property("uniform"
+						, [material, i](Lumix::Texture*) -> QVariant { return material->getTextureUniform(i); }
+						, [material, i](Lumix::Texture*, QVariant value) { material->setTextureUniform(i, value.toString().toLatin1().data()); }
+					);
+				node.m_name = QString("Texture %1").arg(i);
+				node.onCreateEditor = [&node, i, texture, material](QWidget* parent, const QStyleOptionViewItem&) -> QWidget* {
+					auto input = new FileInput(parent);	
+					input->setValue(texture->getPath().c_str());
+					input->connect(input, &FileInput::valueChanged, [&node, input]() {
+						node.m_setter(input->value());
+					});
+					return input;
+				};
+				node.m_setter = [material, i](const QVariant& value) {
+					if (value.isValid())
+					{
+						material->setTexturePath(i, Lumix::Path(value.toString().toLatin1().data()));
+					}
+				};
+				//node.onClick = [node, this](QWidget*, QPoint) { showFileDialog(&node, "Textures (*.dds|*.tga)"); };
+			}
+			, [material]() {
+				auto texture = static_cast<Lumix::Texture*>(material->getResourceManager().get(Lumix::ResourceManager::TEXTURE)->load(Lumix::Path("texture.dds")));
+				material->addTexture(texture);	
+				return false;
+			}
+		);
 }
 
 
@@ -254,12 +365,19 @@ void ResourceModel::fillTextureInfo(Lumix::Texture* texture, Node& node)
 void ResourceModel::onResourceLoaded(Lumix::Resource::State, Lumix::Resource::State new_state)
 {
 	beginResetModel();
+	/* 
+		endResetModel closes any opened property editor, if this is done in the end of this method
+		it can result in a crash, since the editor can access some destroyed node
+	*/
+	endResetModel(); 
+	beginResetModel();
 	for (int i = 0; i < getRoot().m_children.size(); ++i)
 	{
 		delete getRoot().m_children[i];
 	}
 	getRoot().m_children.clear();
-	if (new_state == Lumix::Resource::State::READY)
+	this->getRoot().m_getter = [new_state]() -> QVariant { return new_state == Lumix::Resource::State::LOADING ? "Loading..." : "Ready"; };
+	if (new_state == Lumix::Resource::State::READY || new_state == Lumix::Resource::State::FAILURE)
 	{
 		if (dynamic_cast<Lumix::Model*>(m_resource))
 		{
@@ -279,4 +397,8 @@ void ResourceModel::onResourceLoaded(Lumix::Resource::State, Lumix::Resource::St
 		}
 	}
 	endResetModel();
+	if (new_state == Lumix::Resource::State::READY || new_state == Lumix::Resource::State::FAILURE)
+	{
+		emit modelReady();
+	}
 }

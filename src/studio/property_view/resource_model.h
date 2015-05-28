@@ -14,8 +14,30 @@ namespace Lumix
 }
 
 
+
+class FileInput : public QWidget
+{
+	Q_OBJECT
+	public:
+		FileInput(QWidget* parent);
+		void setValue(const QString& path);
+		QString value() const;
+
+	signals:
+		void valueChanged();
+
+	private:
+		void editingFinished();
+		void browseClicked();
+
+	private:
+		QLineEdit* m_edit;
+};
+
+
 class ResourceModel : public DynamicObjectModel
 {
+	Q_OBJECT
 	public:
 		ResourceModel(Lumix::WorldEditor& editor, const Lumix::Path& path);
 		~ResourceModel();
@@ -23,13 +45,16 @@ class ResourceModel : public DynamicObjectModel
 		Lumix::Resource* getResource() { return m_resource; }
 		void setResource(const Lumix::Path& path);
 
+	signals:
+		void modelReady();
+
 	private:
 		void onResourceLoaded(Lumix::Resource::State, Lumix::Resource::State new_state);
 		void fillModelInfo();
 		void fillMaterialInfo(Lumix::Material* material, Node& node);
 		void fillTextureInfo(Lumix::Texture*, Node& node);
 		void saveMaterial(Lumix::Material* material);
-		void showFileDialog(DynamicObjectModel::Node* node, QString filter);
+		void showFileDialog(const DynamicObjectModel::Node* node, QString filter);
 		void setMaterialShader(Lumix::Material* material, QString value);
 
 	private:
