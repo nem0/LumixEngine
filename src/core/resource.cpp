@@ -97,7 +97,7 @@ namespace Lumix
 	void Resource::addDependency(Resource& dependent_resource)
 	{
 		dependent_resource.m_cb.bind<Resource, &Resource::onStateChanged>(this);
-		if (!dependent_resource.isReady())
+		if (!dependent_resource.isReady() && !dependent_resource.isFailure())
 		{
 			incrementDepCount();
 		}
@@ -106,7 +106,7 @@ namespace Lumix
 	void Resource::removeDependency(Resource& dependent_resource)
 	{
 		dependent_resource.m_cb.unbind<Resource, &Resource::onStateChanged>(this);
-		if (!dependent_resource.isReady() && !dependent_resource.isFailure())
+		if (!dependent_resource.isReady())
 		{
 			decrementDepCount();
 		}

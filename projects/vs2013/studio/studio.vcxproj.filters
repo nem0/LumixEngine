@@ -202,6 +202,9 @@
     <ClCompile Include="..\..\..\src\studio\metadata.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tmp\studio\moc_resource_model.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\..\..\src\studio\assetbrowser.h">
@@ -300,6 +303,9 @@
     <CustomBuild Include="..\..\..\src\studio\notifications.h">
       <Filter>Header Files</Filter>
     </CustomBuild>
+    <CustomBuild Include="..\..\..\src\studio\property_view\resource_model.h">
+      <Filter>Header Files\property_view</Filter>
+    </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\studio\file_system_watcher.h">
@@ -364,9 +370,6 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\studio\animation_editor\animation_editor_commands.h">
       <Filter>Header Files\animation_editor</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\studio\property_view\resource_model.h">
-      <Filter>Header Files\property_view</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\studio\property_view\dynamic_object_model.h">
       <Filter>Header Files\property_view</Filter>

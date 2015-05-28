@@ -77,29 +77,6 @@ class DynamicObjectModel : public QAbstractItemModel
 		class Object
 		{
 			public:
-				class ArrayProperty
-				{
-					public:
-						ArrayProperty(Node* node, int index)
-							: m_node(node)
-							, m_index(index)
-						{}
-
-
-						template <typename Callback>
-						void onClick(Callback callback)
-						{
-							for (int i = 0; i < m_node->m_children.size(); ++i)
-							{
-								Node* node = m_node->m_children[i]->m_children[m_index];
-								node->onClick = [i, callback](QWidget* widget, QPoint p) { callback(i, widget, p); };
-							}
-						}
-
-					private:
-						Node* m_node;
-						int m_index;
-				};
 
 				template <typename Getter, typename Namer>
 				class Array
@@ -118,20 +95,31 @@ class DynamicObjectModel : public QAbstractItemModel
 							}
 						}
 
-						template <typename Getter>
-						typename IsFunctor<Getter, Array>::type property(QString name, Getter getter)
+						template <typename Functor, typename Adder>
+						Array<Getter, Namer>& forEach(Functor functor, Adder adder)
 						{
-							for (int i = 0; i < m_node->m_children.size(); ++i)
-							{
-								Node& node = m_node->m_children[i]->addChild(name);
-								auto o = (m_parent->*m_getter)(i);
-								node.m_getter = [getter, o]() -> QVariant { return (getter)(o); };
-							}
-							return *this;
+							auto array_node = m_node;
+							auto parent = m_parent;
+							auto getter = m_getter;
+							m_node->onCreateEditor = [=](QWidget* parent_widget, const QStyleOptionViewItem&) -> QWidget* {
+								auto button = new QPushButton(" + ", parent_widget);
+								button->connect(button, &QPushButton::clicked, [=](){
+									if (adder())
+									{
+										int i = array_node->m_children.size();
+										Node& child = array_node->addChild(QString("%1").arg(i));
+										auto o = (parent->*getter)(i);
+										functor(i, o, child);
+									}
+								});
+								return button;
+							};
+							m_node->m_setter = [](const QVariant&) {};
+							return forEach(functor);
 						}
 
 						template <typename Functor>
-						void forEach(Functor functor)
+						Array<Getter, Namer>& forEach(Functor functor)
 						{
 							for (int i = 0; i < m_node->m_children.size(); ++i)
 							{
@@ -139,22 +127,7 @@ class DynamicObjectModel : public QAbstractItemModel
 								Node& node = *m_node->m_children[i];
 								functor(i, o, node);
 							}
-						}
-
-						template <typename Getter>
-						typename IsNotFunctor<Getter, Array>::type property(QString name, Getter getter)
-						{
-							for (int i = 0; i < m_node->m_children.size(); ++i)
-							{
-								Node& node = m_node->m_children[i]->addChild(name);
-								auto o = (m_parent->*m_getter)(i);
-								node.m_getter = [getter, o]() -> QVariant { return (o->*getter)(); };
-							}
 							return *this;
-						}
-
-						ArrayProperty back() {
-							return ArrayProperty(m_node, m_node->m_children[0]->m_children.size() - 1);
 						}
 
 					private:
@@ -181,7 +154,7 @@ class DynamicObjectModel : public QAbstractItemModel
 				}
 
 				template <typename Getter, typename Setter>
-				typename IsFunctor<Getter, Object>::type property(QString name, Getter getter, Setter setter)
+				Object& property(QString name, Getter getter, Setter setter)
 				{
 					Node& node = m_node->addChild(name);
 					T* inst = m_instance;
@@ -191,9 +164,9 @@ class DynamicObjectModel : public QAbstractItemModel
 					};
 					return *this;
 				}
-
+				
 				template <typename Getter>
-				typename IsFunctor<Getter, Object>::type property(QString name, Getter getter)
+				typename IsFunctor<Getter, Object&>::type property(QString name, Getter getter)
 				{
 					Node& node = m_node->addChild(name);
 					T* inst = m_instance;
@@ -202,7 +175,7 @@ class DynamicObjectModel : public QAbstractItemModel
 				}
 
 				template <typename Getter>
-				typename IsNotFunctor<Getter, Object>::type property(QString name, Getter getter)
+				typename IsNotFunctor<Getter, Object&>::type property(QString name, Getter getter)
 				{
 					Node& node = m_node->addChild(name);
 					T* inst = m_instance;
@@ -215,10 +188,16 @@ class DynamicObjectModel : public QAbstractItemModel
 				{
 					Node& node = m_node->addChild(name);
 					node.m_getter = []() -> QVariant { return ""; };
+					/*node.onCreateEditor = [adder, this](QWidget* parent, const QStyleOptionViewItem&) -> QWidget* {
+						auto button = new QPushButton(" + ", parent);
+						connect(button, &QPushButton::clicked, adder);
+						return button;
+					};
+					node.m_setter = [](const QVariant&) {};*/
 
 					return Array<Getter, Namer>(m_instance, count, &node, getter, namer);
 				}
-
+				
 				Node& getNode() { return *m_node; }
 
 			private:

@@ -54,7 +54,12 @@ void Material::apply(Renderer& renderer, PipelineInstance& pipeline) const
 		}
 		for (int i = 0, c = m_textures.size(); i < c; ++i)
 		{
-			m_textures[i].m_texture->apply(i);
+			const TextureInfo& info = m_textures[i];
+			info.m_texture->apply(i);
+			if (info.m_uniform_hash)
+			{
+				renderer.setUniform(*m_shader, m_textures[i].m_uniform, info.m_uniform_hash, i);
+			}
 		}
 		renderer.enableAlphaToCoverage(m_is_alpha_to_coverage);
 		renderer.enableZTest(m_is_z_test);
@@ -122,7 +127,7 @@ void Material::doUnload(void)
 bool Material::save(JsonSerializer& serializer)
 {
 	serializer.beginObject();
-	serializer.serialize("shader", m_shader->getPath().c_str());
+	serializer.serialize("shader", m_shader ? m_shader->getPath().c_str() : "");
 	for (int i = 0; i < m_textures.size(); ++i)
 	{
 		char path[LUMIX_MAX_PATH];
@@ -141,7 +146,6 @@ bool Material::save(JsonSerializer& serializer)
 	{
 		serializer.beginObject();
 		serializer.serialize("name", m_uniforms[i].m_name);
-		serializer.serialize("is_editable", m_uniforms[i].m_is_editable);
 		switch (m_uniforms[i].m_type)
 		{
 			case Uniform::FLOAT:
@@ -190,11 +194,7 @@ void Material::deserializeUniforms(JsonSerializer& serializer)
 		while (!serializer.isObjectEnd())
 		{
 			serializer.deserializeLabel(label, 255);
-			if (strcmp(label, "is_editable") == 0)
-			{
-				serializer.deserialize(uniform.m_is_editable, false);
-			}
-			else if (strcmp(label, "name") == 0)
+			if (strcmp(label, "name") == 0)
 			{
 				serializer.deserialize(uniform.m_name, Uniform::MAX_NAME_LENGTH, "");
 				uniform.m_name_hash = crc32(uniform.m_name);
@@ -235,6 +235,7 @@ void Material::deserializeUniforms(JsonSerializer& serializer)
 	serializer.deserializeArrayEnd();
 }
 
+
 void Material::removeTexture(int i)
 {
 	if (m_textures[i].m_texture)
@@ -244,6 +245,14 @@ void Material::removeTexture(int i)
 	}
 	m_textures.erase(i);
 }
+
+
+void Material::setTextureUniform(int index, const char* uniform)
+{
+	copyString(m_textures[index].m_uniform, sizeof(m_textures[index].m_uniform), uniform);
+	m_textures[index].m_uniform_hash = crc32(uniform);
+}
+
 
 Texture* Material::getTextureByUniform(const char* uniform) const
 {
@@ -267,16 +276,17 @@ void Material::setTexturePath(int i, const Path& path)
 
 void Material::setTexture(int i, Texture* texture)
 { 
-	if (m_textures[i].m_texture)
-	{
-		removeDependency(*m_textures[i].m_texture);
-		m_resource_manager.get(ResourceManager::TEXTURE)->unload(*m_textures[i].m_texture);
-	}
+	Texture* old_texture = m_textures[i].m_texture;
 	if (texture)
 	{
 		addDependency(*texture);
 	}
 	m_textures[i].m_texture = texture;
+	if (old_texture)
+	{
+		removeDependency(*old_texture);
+		m_resource_manager.get(ResourceManager::TEXTURE)->unload(*old_texture);
+	}
 }
 
 void Material::addTexture(Texture* texture)
@@ -355,12 +365,8 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 		}
 		else if (strcmp("uniform", label) == 0)
 		{
-			Uniform& uniform = m_uniforms.pushEmpty();
-			serializer.deserialize(uniform.m_name, Uniform::MAX_NAME_LENGTH, "");
-			copyString(info.m_uniform, sizeof(info.m_uniform), uniform.m_name);
-			uniform.m_name_hash = crc32(uniform.m_name);
-			uniform.m_type = Uniform::INT;
-			uniform.m_int = info.m_texture ? m_textures.size() - 1 : m_textures.size();
+			serializer.deserialize(label, sizeof(label), "");
+			setTextureUniform(m_textures.size() - 1, label);
 		}
 		else if (strcmp("keep_data", label) == 0)
 		{
@@ -394,6 +400,7 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	PROFILE_FUNCTION();
 	if(success)
 	{
+		m_uniforms.clear();
 		JsonSerializer serializer(*file, JsonSerializer::READ, m_path.c_str(), m_allocator);
 		serializer.deserializeObjectBegin();
 		char path[LUMIX_MAX_PATH];

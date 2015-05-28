@@ -33,7 +33,7 @@ public:
 	
 	struct Uniform
 	{
-		Uniform() : m_is_editable(false) {}
+		Uniform() {}
 
 		enum Type
 		{
@@ -54,7 +54,6 @@ public:
 			float m_float;
 			float m_matrix[16];
 		};
-		bool m_is_editable;
 	};
 
 public:
@@ -79,6 +78,8 @@ public:
 	int getTextureCount() const { return m_textures.size(); }
 	Texture* getTexture(int i) const { return m_textures[i].m_texture; }
 	Texture* getTextureByUniform(const char* uniform) const;
+	void setTextureUniform(int i, const char* uniform);
+	const char* getTextureUniform(int i) const { return m_textures[i].m_uniform; }
 	void addTexture(Texture* texture);
 	void setTexture(int i, Texture* texture);
 	void setTexturePath(int i, const Path& path);
@@ -121,10 +122,12 @@ private:
 			m_texture = NULL;
 			m_keep_data = false;
 			m_uniform[0] = '\0';
+			m_uniform_hash = 0;
 		}
 
 		Texture* m_texture;
 		bool m_keep_data;
+		uint32_t m_uniform_hash;
 		char m_uniform[Uniform::MAX_NAME_LENGTH];
 	};
 

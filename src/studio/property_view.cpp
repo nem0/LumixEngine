@@ -67,6 +67,10 @@ void PropertyView::setSelectedResourceFilename(const char* filename)
 {
 	m_world_editor->selectEntities(NULL, 0);
 	ResourceModel* model = new ResourceModel(*m_world_editor, Lumix::Path(filename));
+	connect(model, &ResourceModel::modelReady, [this]()
+	{
+		m_ui->treeView->expandToDepth(1); 
+	});
 	if (model->getResource())
 	{
 		setModel(model, new DynamicObjectItemDelegate(this));
