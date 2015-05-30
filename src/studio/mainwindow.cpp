@@ -10,7 +10,7 @@
 #include "entity_template_list.h"
 #include "fileserverwidget.h"
 #include "gameview.h"
-#include "import_asset_dialog.h"
+#include "dialogs/import_asset_dialog.h"
 #include "log_widget.h"
 #include "metadata.h"
 #include "notifications.h"

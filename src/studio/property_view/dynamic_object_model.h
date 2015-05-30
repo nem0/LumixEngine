@@ -23,10 +23,15 @@ public:
 class DynamicObjectModel : public QAbstractItemModel
 {
 	public:
+		enum UserRoles
+		{
+			PersistentEditorRole = Qt::UserRole + 1
+		};
+
 		class Node
 		{
 			public:
-				Node(QString name, Node* parent, int index) : m_name(name), m_parent(parent), m_index(index), m_is_file(false) {}
+				Node(QString name, Node* parent, int index) : m_name(name), m_parent(parent), m_index(index), m_is_persistent_editor(false){}
 				~Node();
 
 				Node& addChild(QString name)
@@ -56,7 +61,7 @@ class DynamicObjectModel : public QAbstractItemModel
 				QString m_name;
 				Node* m_parent;
 				QList<Node*> m_children;
-				bool m_is_file;
+				bool m_is_persistent_editor;
 		};
 
 		typedef char yes[2];

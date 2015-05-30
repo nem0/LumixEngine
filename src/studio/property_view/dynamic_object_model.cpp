@@ -44,7 +44,7 @@ bool DynamicObjectItemDelegate::editorEvent(QEvent* event, QAbstractItemModel* m
 		{
 			return false;
 		}
-		if (node->onClick)
+		if (node->onClick && index.column() == 1)
 		{
 			QWidget* widget = qobject_cast<QWidget*>(parent());
 			QPoint pos = widget->mapToGlobal(QPoint(static_cast<QMouseEvent*>(event)->x(), static_cast<QMouseEvent*>(event)->y()));
@@ -237,6 +237,11 @@ int DynamicObjectModel::columnCount(const QModelIndex&) const
 
 QVariant DynamicObjectModel::data(const QModelIndex& index, int role) const
 {
+	if (role == PersistentEditorRole)
+	{
+		Node* node = (Node*)index.internalPointer();
+		return node->m_is_persistent_editor;
+	}
 	if (role == Qt::DecorationRole)
 	{
 		Node* node = (Node*)index.internalPointer();

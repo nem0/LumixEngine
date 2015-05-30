@@ -227,7 +227,7 @@ void Material::deserializeUniforms(JsonSerializer& serializer)
 			}
 			else
 			{
-				ASSERT(false);
+				g_log_warning.log("material") << "Unknown label \"" << label << "\"";
 			}
 		}
 		serializer.deserializeObjectEnd();

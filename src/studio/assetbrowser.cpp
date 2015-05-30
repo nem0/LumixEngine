@@ -8,7 +8,8 @@
 #include "core/resource_manager.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
-#include "import_asset_dialog.h"
+#include "dialogs/create_texture_dialog.h"
+#include "dialogs/import_asset_dialog.h"
 #include "insert_mesh_command.h"
 #include "mainwindow.h"
 #include "metadata.h"
@@ -284,7 +285,7 @@ void AssetBrowser::handleDoubleClick(const QFileInfo& file_info)
 		m_editor->addComponent(crc32("animable"));
 		m_editor->setProperty(crc32("animable"), -1, *m_editor->getProperty("animable", "preview"), file.toLatin1().data(), file.length());
 	}
-	else if (isAssimpAsset(suffix) || texture_filters.contains(suffix))
+	else if (isAssimpAsset(suffix) || texture_filters.contains(suffix) || suffix == "shd")
 	{
 		QDesktopServices::openUrl(QUrl::fromLocalFile(file_info.absoluteFilePath()));
 	}
@@ -406,6 +407,7 @@ void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
 	QAction* rename_file_action = new QAction("Rename", menu);
 	QAction* create_dir_action = new QAction("Create directory", menu);
 	QAction* create_material_action = new QAction("Create material", menu);
+	QAction* create_raw_texture_action = new QAction("Create raw texture", menu);
 	QAction* import_asset_action = new QAction("Import asset", menu);
 	QAction* reimport_asset_action = new QAction("Reimport asset", menu);
 
@@ -416,6 +418,7 @@ void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
 		menu->addAction(import_asset_action);
 		menu->addAction(create_dir_action);
 		menu->addAction(create_material_action);
+		menu->addAction(create_raw_texture_action);
 	}
 
 	char relative_path[LUMIX_MAX_PATH];
@@ -484,6 +487,17 @@ void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
 			file.close();
 		}
 	}
+	else if (selected_action == create_raw_texture_action)
+	{
+		createRawTexture(file_info.absoluteFilePath() + "/");
+	}
+}
+
+void AssetBrowser::createRawTexture(const QString& path)
+{
+	auto dlg = new CreateTextureDialog(this, path);
+	dlg->exec();
+	dlg->deleteLater();
 }
 
 void AssetBrowser::setExtentionsFilter(const QStringList& filters)
