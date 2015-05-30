@@ -36,6 +36,7 @@ private:
 	void reimportAsset(const QString& filepath);
 	void onFileSystemWatcherCallback(const char* path);
 	void setExtentionsFilter(const QStringList& filter);
+	void createRawTexture(const QString& path);
 
 	static Lumix::IEditorCommand* createInsertMeshCommand(Lumix::WorldEditor& editor);
 

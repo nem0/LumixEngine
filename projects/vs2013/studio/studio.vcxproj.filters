@@ -59,6 +59,15 @@
     <Filter Include="Source Files\property_view">
       <UniqueIdentifier>{63aa1a4d-617d-4b7b-892d-f035bd92d110}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Form Files\dialogs">
+      <UniqueIdentifier>{9ab9b060-1f8a-45eb-8f44-50b215bc81af}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\dialogs">
+      <UniqueIdentifier>{15175a55-34b0-4abe-bf3a-096b1b126eb5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\dialogs">
+      <UniqueIdentifier>{4a699a62-9fb8-4b33-81ee-f7f9b6041feb}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\tmp\studio\moc_assetbrowser.cpp">
@@ -190,12 +199,6 @@
     <ClCompile Include="..\..\..\src\studio\property_view\dynamic_object_model.cpp">
       <Filter>Source Files\property_view</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\studio\import_asset_dialog.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\tmp\studio\moc_import_asset_dialog.cpp">
-      <Filter>Generated Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\tmp\studio\moc_notifications.cpp">
       <Filter>Generated Files</Filter>
     </ClCompile>
@@ -204,6 +207,15 @@
     </ClCompile>
     <ClCompile Include="..\..\..\tmp\studio\moc_resource_model.cpp">
       <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\studio\dialogs\import_asset_dialog.cpp">
+      <Filter>Source Files\dialogs</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tmp\studio\moc_import_asset_dialog.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\studio\dialogs\create_texture_dialog.cpp">
+      <Filter>Source Files\dialogs</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -294,17 +306,20 @@
     <CustomBuild Include="..\..\..\src\studio\animation_editor\animator.h">
       <Filter>Header Files\animation_editor</Filter>
     </CustomBuild>
-    <CustomBuild Include="..\..\..\src\studio\import_asset_dialog.ui">
-      <Filter>Form Files</Filter>
-    </CustomBuild>
-    <CustomBuild Include="..\..\..\src\studio\import_asset_dialog.h">
-      <Filter>Header Files</Filter>
-    </CustomBuild>
     <CustomBuild Include="..\..\..\src\studio\notifications.h">
       <Filter>Header Files</Filter>
     </CustomBuild>
     <CustomBuild Include="..\..\..\src\studio\property_view\resource_model.h">
       <Filter>Header Files\property_view</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\src\studio\dialogs\create_texture_dialog.ui">
+      <Filter>Form Files\dialogs</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\src\studio\dialogs\import_asset_dialog.ui">
+      <Filter>Form Files\dialogs</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\src\studio\dialogs\import_asset_dialog.h">
+      <Filter>Header Files\dialogs</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
@@ -374,14 +389,20 @@
     <ClInclude Include="..\..\..\src\studio\property_view\dynamic_object_model.h">
       <Filter>Header Files\property_view</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_import_asset_dialog.h">
-      <Filter>Generated Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\studio\file_path_edit.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\studio\metadata.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_create_texture_dialog.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_import_asset_dialog.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\studio\dialogs\create_texture_dialog.h">
+      <Filter>Header Files\dialogs</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

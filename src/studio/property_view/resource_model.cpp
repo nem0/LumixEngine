@@ -54,7 +54,10 @@ QString FileInput::value() const
 void FileInput::browseClicked()
 {
 	auto path = QFileDialog::getOpenFileName(this);
-	setValue(path);
+	if (!path.isEmpty())
+	{
+		setValue(path);
+	}
 }
 
 
@@ -99,7 +102,7 @@ void ResourceModel::setResource(const Lumix::Path& path)
 	{
 		m_resource_type = Lumix::ResourceManager::MATERIAL;
 	}
-	else if (strcmp(extension, "dds") == 0 || strcmp(extension, "tga") == 0)
+	else if (strcmp(extension, "dds") == 0 || strcmp(extension, "tga") == 0 || strcmp(extension, "raw") == 0)
 	{
 		m_resource_type = Lumix::ResourceManager::TEXTURE;
 	}
@@ -266,11 +269,11 @@ void ResourceModel::fillMaterialInfo(Lumix::Material* material, Node& node)
 		.property("Shadow receiver", &Lumix::Material::isShadowReceiver, &Lumix::Material::enableShadowReceiving)
 		.property("Z test", &Lumix::Material::isZTest, &Lumix::Material::enableZTest)
 		.property("Shader", 
-		[](Lumix::Material* material) -> QVariant { return material->getShader() ? material->getShader()->getPath().c_str() : ""; },
+			[](Lumix::Material* material) -> QVariant { return material->getShader() ? material->getShader()->getPath().c_str() : ""; },
 			[this](Lumix::Material* material, QVariant value) { setMaterialShader(material, value.toString()); }
 		);
 	auto shader_node = object.getNode().m_children.back();
-	object.getNode().m_children.back()->onClick = [shader_node, this](QWidget*, QPoint) { showFileDialog(shader_node, "Shaders (*.shd)"); };
+	shader_node->onClick = [shader_node, this](QWidget*, QPoint) { showFileDialog(shader_node, "Shaders (*.shd)"); };
 
 	for (int i = 0; i < material->getUniformCount(); ++i)
 	{
@@ -310,6 +313,7 @@ void ResourceModel::fillMaterialInfo(Lumix::Material* material, Node& node)
 		)
 			.forEach([this, material](int i, Lumix::Texture* texture, Node& node) {
 				fillTextureInfo(texture, node);
+				node.m_is_persistent_editor = true;
 				Object<Lumix::Texture>(texture, &node)
 					.property("uniform"
 						, [material, i](Lumix::Texture*) -> QVariant { return material->getTextureUniform(i); }

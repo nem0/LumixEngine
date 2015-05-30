@@ -46,6 +46,7 @@ void PropertyView::setModel(QAbstractItemModel* model, QAbstractItemDelegate* de
 	{
 		m_ui->treeView->setItemDelegate(new QItemDelegate(this));
 	}
+	openPersistentEditors(model, QModelIndex());
 }
 
 
@@ -67,14 +68,29 @@ void PropertyView::setSelectedResourceFilename(const char* filename)
 {
 	m_world_editor->selectEntities(NULL, 0);
 	ResourceModel* model = new ResourceModel(*m_world_editor, Lumix::Path(filename));
-	connect(model, &ResourceModel::modelReady, [this]()
+	connect(model, &ResourceModel::modelReady, [model, this]()
 	{
+		openPersistentEditors(model, QModelIndex());
 		m_ui->treeView->expandToDepth(1); 
 	});
 	if (model->getResource())
 	{
 		setModel(model, new DynamicObjectItemDelegate(this));
 		m_ui->treeView->expandToDepth(1);
+	}
+}
+
+
+void PropertyView::openPersistentEditors(QAbstractItemModel* model, const QModelIndex& parent)
+{
+	for (int i = 0; i < model->rowCount(parent); ++i)
+	{
+		auto index = model->index(i, 1, parent);
+		if (model->data(index, DynamicObjectModel::PersistentEditorRole).toBool())
+		{
+			m_ui->treeView->openPersistentEditor(index);
+		}
+		openPersistentEditors(model, index);
 	}
 }
 

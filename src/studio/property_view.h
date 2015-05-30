@@ -25,6 +25,7 @@ namespace Ui
 }
 
 
+class QAbstractItemModel;
 class AssetBrowser;
 
 
@@ -36,11 +37,12 @@ class PropertyView : public QDockWidget
 		~PropertyView();
 		void setWorldEditor(Lumix::WorldEditor& editor);
 		void setAssetBrowser(AssetBrowser& asset_browser);
-		void setModel(class QAbstractItemModel* model, class QAbstractItemDelegate* delegate);
+		void setModel(QAbstractItemModel* model, class QAbstractItemDelegate* delegate);
 		void setSelectedResourceFilename(const char* filename);
 
 	private:
 		void onEntitySelected(const Lumix::Array<Lumix::Entity>& e);
+		void openPersistentEditors(QAbstractItemModel* model, const QModelIndex& parent);
 
 	public:
 		Ui::PropertyView* m_ui;
