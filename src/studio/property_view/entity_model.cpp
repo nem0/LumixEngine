@@ -10,7 +10,6 @@
 #include <qlineedit.h>
 #include <qmessagebox.h>
 #include <qmimedata.h>
-#include <qpainter.h>
 #include <qpushbutton.h>
 
 
@@ -50,15 +49,12 @@ EntityModel::EntityModel(PropertyView& view, Lumix::WorldEditor& editor, Lumix::
 {
 	m_entity = entity;
 	getRoot().m_name = "Entity";
-	getRoot().onClick = [this](QWidget* widget, QPoint pos) { addComponent(widget, pos); };
-	getRoot().onPaint = [](QPainter* painter, const QStyleOptionViewItem& option) {
-		painter->save();
-		QStyleOptionButton button_style_option;
-		button_style_option.rect = option.rect;
-		button_style_option.text = "+";
-		QApplication::style()->drawControl(QStyle::CE_PushButton, &button_style_option, painter);
-		painter->restore();
+	getRoot().onCreateEditor = [this](QWidget* parent, const QStyleOptionViewItem&){
+		auto button = new QPushButton(" + ", parent);
+		connect(button, &QPushButton::clicked, [this, button](){ addComponent(button, button->mapToGlobal(button->pos())); });
+		return button;
 	};
+	getRoot().m_is_persistent_editor = true;
 	addNameProperty();
 	addPositionProperty();
 
@@ -86,7 +82,6 @@ void EntityModel::reset(const QString& reason)
 		delete getRoot().m_children[i];
 		getRoot().m_children.clear();
 		getRoot().m_getter = [reason]() -> QVariant { return reason; };
-		getRoot().onClick = (void(*)(QWidget*, QPoint))NULL;
 	}
 	endResetModel();
 }
@@ -357,15 +352,12 @@ void EntityModel::addComponentNode(Lumix::Component cmp, int component_index)
 {
 	Node& node = getRoot().addChild(getComponentName(cmp), component_index + 3);
 	node.m_getter = []() -> QVariant { return ""; };
-	node.onClick = [this, cmp](QWidget*, QPoint) { m_editor.destroyComponent(cmp); };
-	node.onPaint = [](QPainter* painter, const QStyleOptionViewItem& option) {
-		painter->save();
-		QStyleOptionButton button_style_option;
-		button_style_option.rect = option.rect;
-		button_style_option.text = "-";
-		QApplication::style()->drawControl(QStyle::CE_PushButton, &button_style_option, painter);
-		painter->restore();
+	node.onCreateEditor = [this, cmp](QWidget* parent, const QStyleOptionViewItem&) {
+		auto button = new QPushButton(" - ", parent);
+		connect(button, &QPushButton::clicked, [this, cmp](){ m_editor.destroyComponent(cmp); });
+		return button;
 	};
+	node.m_is_persistent_editor = true;
 	auto& descriptors = m_editor.getPropertyDescriptors(cmp.type);
 	for (int j = 0; j < descriptors.size(); ++j)
 	{
@@ -412,15 +404,15 @@ void EntityModel::addComponent(QWidget* widget, QPoint pos)
 {
 	struct CB : public QComboBox
 	{
-	public:
-		CB(QWidget* parent)
-			: QComboBox(parent)
-		{}
+		public:
+			CB(QWidget* parent)
+				: QComboBox(parent)
+			{}
 
-		virtual void hidePopup() override
-		{
-			deleteLater();
-		}
+			virtual void hidePopup() override
+			{
+				deleteLater();
+			}
 	};
 
 	CB* combobox = new CB(widget);

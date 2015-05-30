@@ -135,6 +135,8 @@ class DynamicObjectModel : public QAbstractItemModel
 							return *this;
 						}
 
+						Node& getNode() { return *m_node; }
+
 					private:
 						T* m_parent;
 						Node* m_node;
