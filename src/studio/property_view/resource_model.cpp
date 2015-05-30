@@ -14,7 +14,6 @@
 #include <qfiledialog.h>
 #include <qlayout.h>
 #include <qlineedit.h>
-#include <qpainter.h>
 #include <qpushbutton.h>
 
 
@@ -252,15 +251,12 @@ void ResourceModel::fillMaterialInfo(Lumix::Material* material, Node& node)
 	auto object = Object<Lumix::Material>(material, &node);
 	node.m_getter = [material]() -> QVariant { return material->getPath().c_str(); };
 	node.m_name = "Material";
-	object.getNode().onClick = [this, material](QWidget*, QPoint) { saveMaterial(material); };
-	object.getNode().onPaint = [](QPainter* painter, const QStyleOptionViewItem& option) {
-		painter->save();
-		QStyleOptionButton button_style_option;
-		button_style_option.rect = option.rect;
-		button_style_option.text = "Save";
-		QApplication::style()->drawControl(QStyle::CE_PushButton, &button_style_option, painter);
-		painter->restore();
+	object.getNode().onCreateEditor = [this, material](QWidget* parent, const QStyleOptionViewItem&) -> QWidget* {
+		QPushButton* button = new QPushButton("Save", parent);
+		connect(button, &QPushButton::clicked, [this, material](){ saveMaterial(material); });
+		return button;
 	};
+	object.getNode().m_is_persistent_editor = true;
 	object
 		.property("Alpha cutout", &Lumix::Material::isAlphaCutout, &Lumix::Material::enableAlphaCutout)
 		.property("Alpha to coverage", &Lumix::Material::isAlphaToCoverage, &Lumix::Material::enableAlphaToCoverage)
@@ -273,7 +269,13 @@ void ResourceModel::fillMaterialInfo(Lumix::Material* material, Node& node)
 			[this](Lumix::Material* material, QVariant value) { setMaterialShader(material, value.toString()); }
 		);
 	auto shader_node = object.getNode().m_children.back();
-	shader_node->onClick = [shader_node, this](QWidget*, QPoint) { showFileDialog(shader_node, "Shaders (*.shd)"); };
+	shader_node->m_is_persistent_editor = true;
+	shader_node->onCreateEditor = [shader_node](QWidget* parent, const QStyleOptionViewItem&) {
+		auto input = new FileInput(parent);
+		input->setValue(shader_node->m_getter().toString());
+		input->connect(input, &FileInput::valueChanged, [shader_node, input]() { shader_node->m_setter(input->value()); });
+		return input;
+	};
 
 	for (int i = 0; i < material->getUniformCount(); ++i)
 	{
@@ -311,7 +313,8 @@ void ResourceModel::fillMaterialInfo(Lumix::Material* material, Node& node)
 		.array("Textures", material->getTextureCount(), &Lumix::Material::getTexture, 
 			[](Lumix::Texture* texture) -> const char* { return texture->getPath().c_str(); }
 		)
-			.forEach([this, material](int i, Lumix::Texture* texture, Node& node) {
+		.forEach(
+			[this, material](int i, Lumix::Texture* texture, Node& node) {
 				fillTextureInfo(texture, node);
 				node.m_is_persistent_editor = true;
 				Object<Lumix::Texture>(texture, &node)
@@ -341,7 +344,8 @@ void ResourceModel::fillMaterialInfo(Lumix::Material* material, Node& node)
 				material->addTexture(texture);	
 				return false;
 			}
-		);
+		)
+		.getNode().m_is_persistent_editor = true;;
 }
 
 
