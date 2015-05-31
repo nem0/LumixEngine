@@ -52,13 +52,11 @@ void Material::apply(Renderer& renderer, PipelineInstance& pipeline) const
 		{
 			glDisable(GL_CULL_FACE);
 		}
-		for (int i = 0, c = m_textures.size(); i < c; ++i)
+		for (int i = 0, c = m_texture_count; i < c; ++i)
 		{
-			const TextureInfo& info = m_textures[i];
-			info.m_texture->apply(i);
-			if (info.m_uniform_hash)
+			if (m_textures[i])
 			{
-				renderer.setUniform(*m_shader, m_textures[i].m_uniform, info.m_uniform_hash, i);
+				m_textures[i]->apply(i);
 			}
 		}
 		renderer.enableAlphaToCoverage(m_is_alpha_to_coverage);
@@ -91,15 +89,26 @@ void Material::apply(Renderer& renderer, PipelineInstance& pipeline) const
 
 void Material::updateShaderCombination()
 {
-	static const int MAX_DEFINES_LENGTH = 1024;
-	char defines[MAX_DEFINES_LENGTH];
-	copyString(defines, MAX_DEFINES_LENGTH, m_is_alpha_cutout ? "#define ALPHA_CUTOUT\n" : "" );
-	catCString(defines, MAX_DEFINES_LENGTH, m_is_shadow_receiver ? "#define SHADOW_RECEIVER\n" : "");
-	catCString(defines, MAX_DEFINES_LENGTH, m_is_normal_mapping ? "#define NORMAL_MAPPING\n" : "");
-	m_shader_combination = crc32(defines);
-	if(m_shader && m_shader->isReady())
+	if (isReady())
 	{
-		m_shader->createCombination(defines);
+		static const int MAX_DEFINES_LENGTH = 1024;
+		char defines[MAX_DEFINES_LENGTH];
+		copyString(defines, MAX_DEFINES_LENGTH, m_is_alpha_cutout ? "#define ALPHA_CUTOUT\n" : "");
+		catCString(defines, MAX_DEFINES_LENGTH, m_is_shadow_receiver ? "#define SHADOW_RECEIVER\n" : "");
+		if (m_shader && m_shader->isReady())
+		{
+			for (int i = 0; i < m_shader->getTextureSlotCount(); ++i)
+			{
+				if (m_shader->getTextureSlot(i).m_define[0] != '\0' && m_textures[i])
+				{
+					catCString(defines, MAX_DEFINES_LENGTH, "#define ");
+					catCString(defines, MAX_DEFINES_LENGTH, m_shader->getTextureSlot(i).m_define);
+					catCString(defines, MAX_DEFINES_LENGTH, "\n");
+				}
+			}
+			m_shader->createCombination(defines);
+		}
+		m_shader_combination = crc32(defines);
 	}
 }
 
@@ -109,15 +118,15 @@ void Material::doUnload(void)
 	setShader(NULL);
 
 	ResourceManagerBase* texture_manager = m_resource_manager.get(ResourceManager::TEXTURE);
-	for(int i = 0; i < m_textures.size(); i++)
+	for (int i = 0; i < m_texture_count; i++)
 	{
-		if (m_textures[i].m_texture)
+		if (m_textures[i])
 		{
-			removeDependency(*m_textures[i].m_texture);
-			texture_manager->unload(*m_textures[i].m_texture);
+			removeDependency(*m_textures[i]);
+			texture_manager->unload(*m_textures[i]);
 		}
 	}
-	m_textures.clear();
+	m_texture_count = 0;
 
 	m_size = 0;
 	onEmpty();
@@ -128,17 +137,19 @@ bool Material::save(JsonSerializer& serializer)
 {
 	serializer.beginObject();
 	serializer.serialize("shader", m_shader ? m_shader->getPath().c_str() : "");
-	for (int i = 0; i < m_textures.size(); ++i)
+	for (int i = 0; i < m_texture_count; ++i)
 	{
 		char path[LUMIX_MAX_PATH];
-		PathUtils::getFilename(path, LUMIX_MAX_PATH, m_textures[i].m_texture->getPath().c_str());
+		if (m_textures[i])
+		{
+			PathUtils::getFilename(path, LUMIX_MAX_PATH, m_textures[i]->getPath().c_str());
+		}
+		else
+		{
+			path[0] = '\0';
+		}
 		serializer.beginObject("texture");
 		serializer.serialize("source", path);
-		serializer.serialize("keep_data", m_textures[i].m_keep_data);
-		if (m_textures[i].m_uniform[0] != '\0')
-		{
-			serializer.serialize("uniform", m_textures[i].m_uniform);
-		}
 		serializer.endObject();
 	}
 	serializer.beginArray("uniforms");
@@ -175,7 +186,6 @@ bool Material::save(JsonSerializer& serializer)
 	serializer.serialize("alpha_to_coverage", m_is_alpha_to_coverage);
 	serializer.serialize("backface_culling", m_is_backface_culling);
 	serializer.serialize("alpha_cutout", m_is_alpha_cutout);
-	serializer.serialize("normal_mapping", m_is_normal_mapping);
 	serializer.serialize("shadow_receiver", m_is_shadow_receiver);
 	serializer.serialize("z_test", m_is_z_test);
 	serializer.endObject();
@@ -185,6 +195,7 @@ bool Material::save(JsonSerializer& serializer)
 void Material::deserializeUniforms(JsonSerializer& serializer)
 {
 	serializer.deserializeArrayBegin();
+	m_uniforms.clear();
 	while (!serializer.isArrayEnd())
 	{
 		Uniform& uniform = m_uniforms.pushEmpty();
@@ -236,71 +247,37 @@ void Material::deserializeUniforms(JsonSerializer& serializer)
 }
 
 
-void Material::removeTexture(int i)
-{
-	if (m_textures[i].m_texture)
-	{
-		removeDependency(*m_textures[i].m_texture);
-		m_resource_manager.get(ResourceManager::TEXTURE)->unload(*m_textures[i].m_texture);
-	}
-	m_textures.erase(i);
-}
-
-
-void Material::setTextureUniform(int index, const char* uniform)
-{
-	copyString(m_textures[index].m_uniform, sizeof(m_textures[index].m_uniform), uniform);
-	m_textures[index].m_uniform_hash = crc32(uniform);
-}
-
-
-Texture* Material::getTextureByUniform(const char* uniform) const
-{
-	for (int i = 0; i < m_textures.size(); ++i)
-	{
-		if (strcmp(m_textures[i].m_uniform, uniform) == 0)
-		{
-			return m_textures[i].m_texture;
-		}
-	}
-	return NULL;
-}
-
-
 void Material::setTexturePath(int i, const Path& path)
 {
-	Texture* texture = static_cast<Texture*>(m_resource_manager.get(ResourceManager::TEXTURE)->load(path));
-	setTexture(i, texture);
+	if (path.length() == 0)
+	{
+		setTexture(i, nullptr);
+	}
+	else
+	{
+		Texture* texture = static_cast<Texture*>(m_resource_manager.get(ResourceManager::TEXTURE)->load(path));
+		setTexture(i, texture);
+	}
 }
 
 
 void Material::setTexture(int i, Texture* texture)
 { 
-	Texture* old_texture = m_textures[i].m_texture;
+	Texture* old_texture = m_textures[i];
 	if (texture)
 	{
 		addDependency(*texture);
 	}
-	m_textures[i].m_texture = texture;
+	m_textures[i] = texture;
 	if (old_texture)
 	{
 		removeDependency(*old_texture);
 		m_resource_manager.get(ResourceManager::TEXTURE)->unload(*old_texture);
 	}
-}
-
-void Material::addTexture(Texture* texture)
-{
-	if (texture)
+	if (isReady())
 	{
-		addDependency(*texture);
+		updateShaderCombination();
 	}
-	m_textures.pushEmpty().m_texture = texture;
-}
-
-void Material::shaderLoaded(Resource::State, Resource::State)
-{
-	updateShaderCombination();
 }
 
 
@@ -308,6 +285,13 @@ void Material::setShader(const Path& path)
 {
 	Shader* shader = static_cast<Shader*>(m_resource_manager.get(ResourceManager::SHADER)->load(path));
 	setShader(shader);
+}
+
+
+void Material::onReady()
+{
+	Resource::onReady();
+	updateShaderCombination();
 }
 
 
@@ -323,17 +307,30 @@ void Material::setShader(Shader* shader)
 	{
 		addDependency(*m_shader);
 
-		m_shader->onLoaded<Material, &Material::shaderLoaded>(this);
+		if (m_shader->isReady())
+		{
+			updateShaderCombination();
+		}
 	}
+}
+
+Texture* Material::getTextureByUniform(const char* uniform) const
+{
+	for (int i = 0, c = m_shader->getTextureSlotCount(); i < c; ++i)
+	{
+		if (strcmp(m_shader->getTextureSlot(i).m_uniform, uniform) == 0)
+		{
+			return m_textures[i];
+		}
+	}
+	return nullptr;
 }
 
 bool Material::deserializeTexture(JsonSerializer& serializer, const char* material_dir)
 {
 	char path[LUMIX_MAX_PATH];
-	TextureInfo& info = m_textures.pushEmpty();
 	serializer.deserializeObjectBegin();
 	char label[256];
-	bool data_kept = false;
 	while (!serializer.isObjectEnd())
 	{
 		serializer.deserializeLabel(label, sizeof(label));
@@ -345,53 +342,18 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 				char texture_path[LUMIX_MAX_PATH];
 				copyString(texture_path, sizeof(texture_path), material_dir);
 				catCString(texture_path, sizeof(texture_path), path);
-				info.m_texture = static_cast<Texture*>(m_resource_manager.get(ResourceManager::TEXTURE)->load(Path(texture_path)));
-				addDependency(*info.m_texture);
-
-				if (info.m_keep_data)
-				{
-					if (info.m_texture->isReady() && !info.m_texture->getData())
-					{
-						g_log_error.log("Renderer") << "Cannot keep data for texture " << m_path.c_str() << "because the texture has already been loaded.";
-						return false;
-					}
-					if (!data_kept)
-					{
-						info.m_texture->addDataReference();
-						data_kept = true;
-					}
-				}
-			}
-		}
-		else if (strcmp("uniform", label) == 0)
-		{
-			serializer.deserialize(label, sizeof(label), "");
-			setTextureUniform(m_textures.size() - 1, label);
-		}
-		else if (strcmp("keep_data", label) == 0)
-		{
-			serializer.deserialize(info.m_keep_data, false);
-			if (info.m_keep_data && info.m_texture)
-			{
-				if (info.m_texture->isReady() && !info.m_texture->getData())
-				{
-					g_log_error.log("Renderer") << "Cannot keep data for texture " << info.m_texture->getPath().c_str() << ", it's already loaded.";
-					return false;
-				}
-				if (!data_kept)
-				{
-					data_kept = true;
-					info.m_texture->addDataReference();
-				}
+				m_textures[m_texture_count] = static_cast<Texture*>(m_resource_manager.get(ResourceManager::TEXTURE)->load(Path(texture_path)));
+				addDependency(*m_textures[m_texture_count]);
 			}
 		}
 		else
 		{
-			g_log_error.log("Renderer") << "Unknown data \"" << label << "\" in material " << m_path.c_str();
+			g_log_warning.log("Renderer") << "Unknown data \"" << label << "\" in material " << m_path.c_str();
 			return false;
 		}
 	}
 	serializer.deserializeObjectEnd();
+	++m_texture_count;
 	return true;
 }
 
@@ -427,10 +389,6 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			else if (strcmp(label, "alpha_cutout") == 0)
 			{
 				serializer.deserialize(m_is_alpha_cutout, false);
-			}
-			else if (strcmp(label, "normal_mapping") == 0)
-			{
-				serializer.deserialize(m_is_normal_mapping, false);
 			}
 			else if (strcmp(label, "shadow_receiver") == 0)
 			{

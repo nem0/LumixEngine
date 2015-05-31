@@ -55,9 +55,9 @@ namespace Lumix
 		virtual ~Resource();
 
 		//events
+		virtual void onReady(void);
 		void onEmpty(void);
 		void onLoading(void);
-		void onReady(void);
 		void onUnloading(void);
 		void onReloading(void);
 		void onFailure(void);

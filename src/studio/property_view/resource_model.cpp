@@ -256,12 +256,11 @@ void ResourceModel::fillMaterialInfo(Lumix::Material* material, Node& node)
 		connect(button, &QPushButton::clicked, [this, material](){ saveMaterial(material); });
 		return button;
 	};
-	object.getNode().m_is_persistent_editor = true;
+	object.getNode().enablePeristentEditor();
 	object
 		.property("Alpha cutout", &Lumix::Material::isAlphaCutout, &Lumix::Material::enableAlphaCutout)
 		.property("Alpha to coverage", &Lumix::Material::isAlphaToCoverage, &Lumix::Material::enableAlphaToCoverage)
 		.property("Backface culling", &Lumix::Material::isBackfaceCulling, &Lumix::Material::enableBackfaceCulling)
-		.property("Normal mapping", &Lumix::Material::isNormalMapping, &Lumix::Material::enableNormalMapping)
 		.property("Shadow receiver", &Lumix::Material::isShadowReceiver, &Lumix::Material::enableShadowReceiving)
 		.property("Z test", &Lumix::Material::isZTest, &Lumix::Material::enableZTest)
 		.property("Shader", 
@@ -269,7 +268,7 @@ void ResourceModel::fillMaterialInfo(Lumix::Material* material, Node& node)
 			[this](Lumix::Material* material, QVariant value) { setMaterialShader(material, value.toString()); }
 		);
 	auto shader_node = object.getNode().m_children.back();
-	shader_node->m_is_persistent_editor = true;
+	shader_node->enablePeristentEditor();
 	shader_node->onCreateEditor = [shader_node](QWidget* parent, const QStyleOptionViewItem&) {
 		auto input = new FileInput(parent);
 		input->setValue(shader_node->m_getter().toString());
@@ -309,43 +308,37 @@ void ResourceModel::fillMaterialInfo(Lumix::Material* material, Node& node)
 		);
 	}
 	
-	object
-		.array("Textures", material->getTextureCount(), &Lumix::Material::getTexture, 
-			[](Lumix::Texture* texture) -> const char* { return texture->getPath().c_str(); }
-		)
-		.forEach(
-			[this, material](int i, Lumix::Texture* texture, Node& node) {
-				fillTextureInfo(texture, node);
-				node.m_is_persistent_editor = true;
-				Object<Lumix::Texture>(texture, &node)
-					.property("uniform"
-						, [material, i](Lumix::Texture*) -> QVariant { return material->getTextureUniform(i); }
-						, [material, i](Lumix::Texture*, QVariant value) { material->setTextureUniform(i, value.toString().toLatin1().data()); }
-					);
-				node.m_name = QString("Texture %1").arg(i);
-				node.onCreateEditor = [&node, i, texture, material](QWidget* parent, const QStyleOptionViewItem&) -> QWidget* {
-					auto input = new FileInput(parent);	
-					input->setValue(texture->getPath().c_str());
-					input->connect(input, &FileInput::valueChanged, [&node, input]() {
-						node.m_setter(input->value());
-					});
-					return input;
-				};
-				node.m_setter = [material, i](const QVariant& value) {
-					if (value.isValid())
-					{
-						material->setTexturePath(i, Lumix::Path(value.toString().toLatin1().data()));
-					}
-				};
-				//node.onClick = [node, this](QWidget*, QPoint) { showFileDialog(&node, "Textures (*.dds|*.tga)"); };
+	for (int i = 0; i < material->getShader()->getTextureSlotCount(); ++i)
+	{
+		const auto& slot = material->getShader()->getTextureSlot(i);
+		Object<const Lumix::Shader::TextureSlot> slot_object(&slot, &object.getNode().addChild(slot.m_name));
+		auto& node = slot_object.getNode();
+		auto texture = material->getTexture(i);
+		if (texture)
+		{
+			fillTextureInfo(texture, node);
+		}
+		node.m_name = slot.m_name;
+		node.m_getter = [texture]() -> QVariant {
+			return texture ? texture->getPath().c_str() : "";
+		};
+		node.onCreateEditor = [&node, i, texture, material](QWidget* parent, const QStyleOptionViewItem&) -> QWidget* {
+			auto input = new FileInput(parent);
+			input->setValue(texture ? texture->getPath().c_str() : "");
+			input->connect(input, &FileInput::valueChanged, [&node, input]() {
+				node.m_setter(input->value());
+			});
+			return input;
+		};
+		node.m_setter = [material, i](const QVariant& value) {
+			if (value.isValid())
+			{
+				material->setTexturePath(i, Lumix::Path(value.toString().toLatin1().data()));
 			}
-			, [material]() {
-				auto texture = static_cast<Lumix::Texture*>(material->getResourceManager().get(Lumix::ResourceManager::TEXTURE)->load(Lumix::Path("texture.dds")));
-				material->addTexture(texture);	
-				return false;
-			}
-		)
-		.getNode().m_is_persistent_editor = true;;
+		};
+		node.enablePeristentEditor();
+
+	}
 }
 
 

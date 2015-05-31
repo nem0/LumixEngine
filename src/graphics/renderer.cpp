@@ -302,6 +302,14 @@ struct RendererImpl : public Renderer
 		glUseProgram(id);
 		setFixedCachedUniform(*this, shader, (int)Shader::FixedCachedUniforms::VIEW_MATRIX, m_view_matrix);
 		setFixedCachedUniform(*this, shader, (int)Shader::FixedCachedUniforms::PROJECTION_MATRIX, m_projection_matrix);
+		for (int i = 0, c = shader.getTextureSlotCount(); i < c; ++i)
+		{
+			const Shader::TextureSlot& slot = shader.getTextureSlot(i);
+			if (slot.m_uniform[0] != '\0')
+			{
+				setUniform(shader, slot.m_uniform, slot.m_uniform_hash, i);
+			}
+		}
 	}
 
 

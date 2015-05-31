@@ -48,6 +48,8 @@ class DynamicObjectModel : public QAbstractItemModel
 					return *child;
 				}
 
+				void enablePeristentEditor() { m_is_persistent_editor = true; }
+
 				std::function<QVariant()> m_getter;
 				std::function<QVariant()> m_decoration;
 				std::function<QVariant()> m_size_hint;
