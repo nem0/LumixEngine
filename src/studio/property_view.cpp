@@ -35,8 +35,8 @@ PropertyView::~PropertyView()
 
 void PropertyView::setModel(QAbstractItemModel* model, QAbstractItemDelegate* delegate)
 {
-	delete m_ui->treeView->model();
-	delete m_ui->treeView->itemDelegate();
+	m_ui->treeView->model()->deleteLater();
+	m_ui->treeView->itemDelegate()->deleteLater();
 	m_ui->treeView->setModel(model);
 	if (delegate)
 	{
@@ -71,12 +71,12 @@ void PropertyView::setSelectedResourceFilename(const char* filename)
 	connect(model, &ResourceModel::modelReady, [model, this]()
 	{
 		openPersistentEditors(model, QModelIndex());
-		m_ui->treeView->expandToDepth(1); 
+		m_ui->treeView->expandToDepth(0); 
 	});
 	if (model->getResource())
 	{
 		setModel(model, new DynamicObjectItemDelegate(this));
-		m_ui->treeView->expandToDepth(1);
+		m_ui->treeView->expandToDepth(0);
 	}
 }
 

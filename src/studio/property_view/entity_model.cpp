@@ -54,7 +54,7 @@ EntityModel::EntityModel(PropertyView& view, Lumix::WorldEditor& editor, Lumix::
 		connect(button, &QPushButton::clicked, [this, button](){ addComponent(button, button->mapToGlobal(button->pos())); });
 		return button;
 	};
-	getRoot().m_is_persistent_editor = true;
+	getRoot().enablePeristentEditor();
 	addNameProperty();
 	addPositionProperty();
 
@@ -357,7 +357,7 @@ void EntityModel::addComponentNode(Lumix::Component cmp, int component_index)
 		connect(button, &QPushButton::clicked, [this, cmp](){ m_editor.destroyComponent(cmp); });
 		return button;
 	};
-	node.m_is_persistent_editor = true;
+	node.enablePeristentEditor();
 	auto& descriptors = m_editor.getPropertyDescriptors(cmp.type);
 	for (int j = 0; j < descriptors.size(); ++j)
 	{
