@@ -68,22 +68,16 @@ public:
 	void enableAlphaCutout(bool enable) { m_is_alpha_cutout = enable; updateShaderCombination(); }
 	bool isShadowReceiver() const { return m_is_shadow_receiver; }
 	void enableShadowReceiving(bool enable) { m_is_shadow_receiver = enable; updateShaderCombination(); }
-	bool isNormalMapping() const { return m_is_normal_mapping; }
-	void enableNormalMapping(bool enable) { m_is_normal_mapping = enable; updateShaderCombination(); }
 
 	void setShader(Shader* shader);
 	void setShader(const Path& path);
 	Shader* getShader() const { return m_shader; }
 
-	int getTextureCount() const { return m_textures.size(); }
-	Texture* getTexture(int i) const { return m_textures[i].m_texture; }
+	int getTextureCount() const { return m_texture_count; }
+	Texture* getTexture(int i) const { return i < m_texture_count ? m_textures[i] : nullptr; }
 	Texture* getTextureByUniform(const char* uniform) const;
-	void setTextureUniform(int i, const char* uniform);
-	const char* getTextureUniform(int i) const { return m_textures[i].m_uniform; }
-	void addTexture(Texture* texture);
 	void setTexture(int i, Texture* texture);
 	void setTexturePath(int i, const Path& path);
-	void removeTexture(int i);
 	bool save(JsonSerializer& serializer);
 	int getUniformCount() const { return m_uniforms.size(); }
 	Uniform& getUniform(int index) { return m_uniforms[index]; }
@@ -98,10 +92,9 @@ public:
 		, m_is_alpha_cutout(false)
 		, m_shader_combination(0)
 		, m_is_shadow_receiver(true)
-		, m_is_normal_mapping(false)
-		, m_textures(allocator)
 		, m_uniforms(allocator)
 		, m_allocator(allocator)
+		, m_texture_count(0)
 	{ 
 		updateShaderCombination();
 	}
@@ -109,43 +102,28 @@ public:
 	~Material();
 
 private:
+	virtual void onReady(void) override;
 	virtual void doUnload(void) override;
 	virtual void loaded(FS::IFile* file, bool success, FS::FileSystem& fs) override;
 
 	bool deserializeTexture(JsonSerializer& serializer, const char* material_dir);
 
 private:
-	struct TextureInfo
-	{
-		TextureInfo()
-		{
-			m_texture = NULL;
-			m_keep_data = false;
-			m_uniform[0] = '\0';
-			m_uniform_hash = 0;
-		}
-
-		Texture* m_texture;
-		bool m_keep_data;
-		uint32_t m_uniform_hash;
-		char m_uniform[Uniform::MAX_NAME_LENGTH];
-	};
-
-private:
 	void deserializeUniforms(JsonSerializer& serializer);
 	void updateShaderCombination();
-	void shaderLoaded(Resource::State old_state, Resource::State new_state);
 
 private:
+	static const int MAX_TEXTURE_COUNT = 16;
+
 	Shader*	m_shader;
-	Array<TextureInfo> m_textures;
+	Texture* m_textures[MAX_TEXTURE_COUNT];
+	int m_texture_count;
 	Array<Uniform> m_uniforms;
 	bool m_is_z_test;
 	bool m_is_backface_culling;
 	bool m_is_alpha_to_coverage;
 	bool m_is_alpha_cutout;
 	bool m_is_shadow_receiver;
-	bool m_is_normal_mapping;
 	DepthFunc m_depth_func;
 	uint32_t m_shader_combination;
 	IAllocator& m_allocator;
