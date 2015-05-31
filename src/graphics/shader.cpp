@@ -30,6 +30,7 @@ Shader::Shader(const Path& path, ResourceManager& resource_manager, Renderer& re
 	, m_pass_hashes(m_allocator)
 	, m_combinations(m_allocator)
 	, m_default_combination(m_allocator)
+	, m_texture_slot_count(0)
 {
 	m_default_combination.m_program_id = 0;
 	m_default_combination.m_pass_hash = 0;
@@ -229,6 +230,43 @@ void Shader::parsePasses(lua_State* L)
 }
 
 
+void Shader::parseTextureSlots(lua_State* L)
+{
+	for (int i = 0; i < m_texture_slot_count; ++i)
+	{
+		m_texture_slots[i].reset();
+	}
+	if (lua_getglobal(L, "texture_slots") == LUA_TTABLE)
+	{
+		m_texture_slot_count = (int)lua_rawlen(L, -1);
+		for (int i = 0; i < m_texture_slot_count; ++i)
+		{
+			if (lua_rawgeti(L, -1, 1 + i) == LUA_TTABLE)
+			{
+				if (lua_getfield(L, -1, "name") == LUA_TSTRING)
+				{
+					copyString(m_texture_slots[i].m_name, sizeof(m_texture_slots[i].m_name), lua_tostring(L, -1));
+				}
+				lua_pop(L, 1);
+				if (lua_getfield(L, -1, "uniform") == LUA_TSTRING)
+				{
+					copyString(m_texture_slots[i].m_uniform, sizeof(m_texture_slots[i].m_uniform), lua_tostring(L, -1));
+					m_texture_slots[i].m_uniform_hash = crc32(m_texture_slots[i].m_uniform);
+				}
+				lua_pop(L, 1);
+				if (lua_getfield(L, -1, "define") == LUA_TSTRING)
+				{
+					copyString(m_texture_slots[i].m_define, sizeof(m_texture_slots[i].m_define), lua_tostring(L, -1));
+				}
+				lua_pop(L, 1);
+			}
+			lua_pop(L, 1);
+		}
+	}
+	lua_pop(L, 1);
+}
+
+
 void Shader::parseSourceCode(lua_State* L)
 {
 	if (lua_getglobal(L, "vertex_shader") == LUA_TSTRING)
@@ -259,6 +297,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		}
 		else
 		{
+			parseTextureSlots(L);
 			parseSourceCode(L);
 			parsePasses(L);
 			parseAttributes(L);

@@ -50,8 +50,28 @@ class LUMIX_ENGINE_API Shader : public Resource
 			COUNT
 		};
 	
+		class TextureSlot
+		{
+		public:
+			TextureSlot()
+			{
+				reset();
+			}
+
+			void reset()
+			{
+				m_name[0] = m_uniform[0] = m_define[0] = '\0';
+			}
+
+			char m_name[30];
+			char m_uniform[30];
+			char m_define[30];
+			uint32_t m_uniform_hash;
+		};
+
 	public:
 		static const int MAX_ATTRIBUTE_COUNT = 16;
+		static const int MAX_TEXTURE_SLOT_COUNT = 16;
 
 	public:
 		Shader(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator);
@@ -65,6 +85,8 @@ class LUMIX_ENGINE_API Shader : public Resource
 		void createCombination(const char* defines);
 		void setCurrentCombination(uint32_t hash, uint32_t pass_hash) { m_current_combination = getCombination(hash, pass_hash); }
 		bool hasPass(uint32_t pass_hash);
+		const TextureSlot& getTextureSlot(int index) const { return m_texture_slots[index]; }
+		int getTextureSlotCount() const { return m_texture_slot_count; }
 
 	private:
 		class CachedUniform
@@ -94,6 +116,7 @@ class LUMIX_ENGINE_API Shader : public Resource
 		};
 
 	private:
+		void parseTextureSlots(lua_State* state);
 		void parsePasses(lua_State* state);
 		void parseAttributes(lua_State* state);
 		void parseSourceCode(lua_State* state);
@@ -104,6 +127,8 @@ class LUMIX_ENGINE_API Shader : public Resource
 
 	private:
 		IAllocator&			m_allocator;
+		TextureSlot			m_texture_slots[MAX_TEXTURE_SLOT_COUNT];
+		int					m_texture_slot_count;
 		Array<string>		m_attributes;
 		Array<string>		m_passes;
 		Array<uint32_t>		m_pass_hashes;
