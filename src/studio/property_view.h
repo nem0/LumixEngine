@@ -3,8 +3,10 @@
 
 #include <QDockWidget>
 #include "core/array.h"
+#include "core/delegate_list.h"
 #include "core/string.h"
 #include "core/resource.h"
+#include "property_view/dynamic_object_model.h"
 #include "universe/entity.h"
 
 
@@ -33,19 +35,25 @@ class PropertyView : public QDockWidget
 {
 	Q_OBJECT
 	public:
+
+	public:
 		explicit PropertyView(QWidget* parent = NULL);
 		~PropertyView();
 		void setWorldEditor(Lumix::WorldEditor& editor);
 		void setAssetBrowser(AssetBrowser& asset_browser);
 		void setModel(QAbstractItemModel* model, class QAbstractItemDelegate* delegate);
 		void setSelectedResourceFilename(const char* filename);
+		QAbstractItemModel* getModel() const;
+
+	signals:
+		void componentNodeCreated(DynamicObjectModel::Node&, const Lumix::Component&);
+
+	public:
+		Ui::PropertyView* m_ui;
 
 	private:
 		void onEntitySelected(const Lumix::Array<Lumix::Entity>& e);
 		void openPersistentEditors(QAbstractItemModel* model, const QModelIndex& parent);
-
-	public:
-		Ui::PropertyView* m_ui;
 
 	private:
 		Lumix::Entity m_selected_entity;

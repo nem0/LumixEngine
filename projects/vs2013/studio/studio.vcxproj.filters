@@ -217,6 +217,12 @@
     <ClCompile Include="..\..\..\src\studio\dialogs\create_texture_dialog.cpp">
       <Filter>Source Files\dialogs</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\studio\property_view\terrain_editor.cpp">
+      <Filter>Source Files\property_view</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tmp\studio\moc_terrain_editor.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\..\..\src\studio\assetbrowser.h">
@@ -288,9 +294,6 @@
     <CustomBuild Include="..\..\..\src\studio\property_view.ui">
       <Filter>Form Files</Filter>
     </CustomBuild>
-    <CustomBuild Include="..\..\..\src\studio\terrain_editor.ui">
-      <Filter>Form Files</Filter>
-    </CustomBuild>
     <CustomBuild Include="..\..\..\src\studio\scripts\scriptcompilerwidget.ui">
       <Filter>Form Files\script</Filter>
     </CustomBuild>
@@ -321,6 +324,9 @@
     <CustomBuild Include="..\..\..\src\studio\dialogs\import_asset_dialog.h">
       <Filter>Header Files\dialogs</Filter>
     </CustomBuild>
+    <CustomBuild Include="..\..\..\src\studio\property_view\terrain_editor.h">
+      <Filter>Header Files\property_view</Filter>
+    </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\studio\file_system_watcher.h">
@@ -342,9 +348,6 @@
       <Filter>Header Files\property_view</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\studio\property_view\property_editor.h">
-      <Filter>Header Files\property_view</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\studio\property_view\terrain_editor.h">
       <Filter>Header Files\property_view</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_assetbrowser.h">
@@ -375,9 +378,6 @@
       <Filter>Generated Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_property_view.h">
-      <Filter>Generated Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_terrain_editor.h">
       <Filter>Generated Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_scriptcompilerwidget.h">

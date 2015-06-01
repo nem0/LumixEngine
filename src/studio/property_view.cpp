@@ -33,6 +33,12 @@ PropertyView::~PropertyView()
 }
 
 
+QAbstractItemModel* PropertyView::getModel() const
+{
+	return m_ui->treeView->model();
+}
+
+
 void PropertyView::setModel(QAbstractItemModel* model, QAbstractItemDelegate* delegate)
 {
 	m_ui->treeView->model()->deleteLater();
@@ -46,6 +52,9 @@ void PropertyView::setModel(QAbstractItemModel* model, QAbstractItemDelegate* de
 	{
 		m_ui->treeView->setItemDelegate(new QItemDelegate(this));
 	}
+	connect(model, &QAbstractItemModel::rowsInserted, [this, model](const QModelIndex &parent, int first, int last){
+		openPersistentEditors(model, parent);
+	});
 	openPersistentEditors(model, QModelIndex());
 }
 

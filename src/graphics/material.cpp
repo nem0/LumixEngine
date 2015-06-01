@@ -263,12 +263,16 @@ void Material::setTexturePath(int i, const Path& path)
 
 void Material::setTexture(int i, Texture* texture)
 { 
-	Texture* old_texture = m_textures[i];
+	Texture* old_texture = i < m_texture_count ? m_textures[i] : nullptr;
 	if (texture)
 	{
 		addDependency(*texture);
 	}
 	m_textures[i] = texture;
+	if (i <= m_texture_count)
+	{
+		m_texture_count = i + 1;
+	}
 	if (old_texture)
 	{
 		removeDependency(*old_texture);
@@ -314,6 +318,15 @@ void Material::setShader(Shader* shader)
 	}
 }
 
+const char* Material::getTextureUniform(int i)
+{
+	if (i < m_shader->getTextureSlotCount())
+	{
+		return m_shader->getTextureSlot(i).m_uniform;
+	}
+	return "";
+}
+
 Texture* Material::getTextureByUniform(const char* uniform) const
 {
 	for (int i = 0, c = m_shader->getTextureSlotCount(); i < c; ++i)
@@ -331,6 +344,7 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 	char path[LUMIX_MAX_PATH];
 	serializer.deserializeObjectBegin();
 	char label[256];
+	bool keep_data = false;
 	while (!serializer.isObjectEnd())
 	{
 		serializer.deserializeLabel(label, sizeof(label));
@@ -346,11 +360,19 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 				addDependency(*m_textures[m_texture_count]);
 			}
 		}
+		else if (strcmp(label, "keep_data") == 0)
+		{
+			keep_data = true;
+		}
 		else
 		{
 			g_log_warning.log("Renderer") << "Unknown data \"" << label << "\" in material " << m_path.c_str();
 			return false;
 		}
+	}
+	if (keep_data)
+	{
+		m_textures[m_texture_count]->addDataReference();
 	}
 	serializer.deserializeObjectEnd();
 	++m_texture_count;

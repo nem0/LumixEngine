@@ -3,6 +3,8 @@
 #include <qapplication.h>
 #include <qcolordialog.h>
 #include <qevent.h>
+#include <qlabel.h>
+#include <qlayout.h>
 #include <qpainter.h>
 #include <qspinbox.h>
 
@@ -26,7 +28,7 @@ void DynamicObjectItemDelegate::setModelData(QWidget* editor, QAbstractItemModel
 
 void DynamicObjectItemDelegate::setEditorData(QWidget* editor, const QModelIndex& index) const
 {
-	if (index.column() == 1 && index.data().type() == QMetaType::Float)
+	if (qobject_cast<QDoubleSpinBox*>(editor))
 	{
 		qobject_cast<QDoubleSpinBox*>(editor)->setValue(index.data().toFloat());
 		return;
@@ -123,7 +125,11 @@ QWidget* DynamicObjectItemDelegate::createEditor(QWidget* parent, const QStyleOp
 		{
 			return QStyledItemDelegate::createEditor(parent, option, index);
 		}
-		if (node->m_getter().type() == QMetaType::Bool)
+		if (node->onCreateEditor)
+		{
+			return node->onCreateEditor(parent, option);
+		}
+		else if (node->m_getter().type() == QMetaType::Bool)
 		{
 			return NULL;
 		}
@@ -137,10 +143,6 @@ QWidget* DynamicObjectItemDelegate::createEditor(QWidget* parent, const QStyleOp
 			});
 			input->setSingleStep(0.1);
 			return input;
-		}
-		else if (node->onCreateEditor)
-		{
-			return node->onCreateEditor(parent, option);
 		}
 	}
 	return QStyledItemDelegate::createEditor(parent, option, index);
@@ -192,6 +194,34 @@ QStringList DynamicObjectModel::mimeTypes() const
 	QStringList types;
 	types << "text/uri-list";
 	return types;
+}
+
+
+void DynamicObjectModel::removeNode(Node& node)
+{
+	Q_ASSERT(node.m_parent);
+	beginRemoveRows(getIndex(*node.m_parent), node.m_index, node.m_index);
+	node.m_parent->m_children.removeAt(node.m_index);
+	delete &node;
+	endRemoveRows();
+}
+
+
+void DynamicObjectModel::childAboutToBeAdded(Node& node)
+{
+	beginInsertRows(getIndex(node), node.m_children.size(), node.m_children.size());
+}
+
+
+void DynamicObjectModel::childAdded()
+{
+	endInsertRows();
+}
+
+
+QModelIndex DynamicObjectModel::getIndex(Node& node)
+{
+	return createIndex(node.m_index, 0, &node);
 }
 
 
@@ -314,5 +344,38 @@ QVariant DynamicObjectModel::headerData(int section, Qt::Orientation, int role) 
 		return "Value";
 	}
 	return QVariant();
+}
+
+
+void DynamicObjectModel::setSliderEditor(Node& node, float min, float max, float step)
+{
+	auto value = node.m_getter().toFloat();
+	node.onCreateEditor = [&node, value, min, max, step](QWidget* parent, const QStyleOptionViewItem&) -> QWidget* {
+		QWidget* widget = new QWidget(parent);
+		QHBoxLayout* layout = new QHBoxLayout(widget);
+		layout->setContentsMargins(0, 0, 0, 0);
+		auto slider = new QSlider(Qt::Orientation::Horizontal, widget);
+		slider->setRange(min * 100, max * 100);
+		slider->setSingleStep(step * 100);
+		slider->setPageStep(step * 100);
+		slider->setValue(value * 100);
+		slider->setTracking(true);
+		auto input = new QDoubleSpinBox(widget);
+		input->setRange(min, max);
+		input->setValue(value);
+		input->setDecimals(2);
+		input->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
+		connect(slider, &QSlider::valueChanged, [&node, input](int value){
+			node.m_setter(value * 0.01f);
+			input->setValue(value * 0.01f);
+		});
+		connect(input, (void (QDoubleSpinBox::*)(double))&QDoubleSpinBox::valueChanged, [slider, node](double value){
+			node.m_setter(value);
+			slider->setValue((int)(value * 100));
+		});
+		layout->addWidget(input);
+		layout->addWidget(slider);
+		return widget;
+	};
 }
 

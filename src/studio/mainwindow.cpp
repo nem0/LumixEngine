@@ -15,6 +15,7 @@
 #include "metadata.h"
 #include "notifications.h"
 #include "property_view.h"
+#include "property_view/terrain_editor.h"
 #include "sceneview.h"
 #include "scripts/scriptcompilerwidget.h"
 #include "scripts/scriptcompiler.h"
@@ -35,6 +36,7 @@ MainWindow::MainWindow(QWidget* parent) :
 	QMainWindow(parent),
 	m_ui(new Ui::MainWindow)
 {
+	m_terrain_component_plugin = nullptr;
 	m_ui->setupUi(this);
 	m_ui->centralWidget->hide();
 	setDockOptions(AllowNestedDocks | AnimatedDocks | AllowTabbedDocks);
@@ -119,6 +121,12 @@ MainWindow::MainWindow(QWidget* parent) :
 	}
 
 	m_metadata->load(METADATA_FILE);
+}
+
+
+void MainWindow::installPlugins()
+{
+	m_terrain_component_plugin = new TerrainComponentPlugin(*this);
 }
 
 
@@ -233,6 +241,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
 
 MainWindow::~MainWindow()
 {
+	delete m_terrain_component_plugin;
 	delete m_log;
 	delete m_ui;
 	delete m_animation_editor;
@@ -270,6 +279,8 @@ void MainWindow::setWorldEditor(Lumix::WorldEditor& editor)
 	m_script_compiler_ui->setWorldEditor(editor);
 
 	m_world_editor->universeLoaded().bind<MainWindow, &MainWindow::onUniverseLoaded>(this);
+
+	installPlugins();
 }
 
 void MainWindow::onUniverseLoaded()

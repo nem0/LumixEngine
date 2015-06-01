@@ -120,8 +120,8 @@ void PhysicsSystemImpl::registerProperties(Engine& engine)
 		editor->registerProperty("box_rigid_actor", allocator.newObject<Vec3PropertyDescriptor<PhysicsScene> >("size", &PhysicsScene::getHalfExtents, &PhysicsScene::setHalfExtents, allocator));
 		editor->registerProperty("mesh_rigid_actor", allocator.newObject<ResourcePropertyDescriptor<PhysicsScene> >("source", &PhysicsScene::getShapeSource, &PhysicsScene::setShapeSource, "Physics (*.pda)", allocator));
 		editor->registerProperty("physical_heightfield", allocator.newObject<ResourcePropertyDescriptor<PhysicsScene> >("heightmap", &PhysicsScene::getHeightmap, &PhysicsScene::setHeightmap, "Image (*.raw)", allocator));
-		editor->registerProperty("physical_heightfield", allocator.newObject<DecimalPropertyDescriptor<PhysicsScene> >("xz_scale", &PhysicsScene::getHeightmapXZScale, &PhysicsScene::setHeightmapXZScale, allocator));
-		editor->registerProperty("physical_heightfield", allocator.newObject<DecimalPropertyDescriptor<PhysicsScene> >("y_scale", &PhysicsScene::getHeightmapYScale, &PhysicsScene::setHeightmapYScale, allocator));
+		editor->registerProperty("physical_heightfield", allocator.newObject<DecimalPropertyDescriptor<PhysicsScene> >("xz_scale", &PhysicsScene::getHeightmapXZScale, &PhysicsScene::setHeightmapXZScale, 0.0f, FLT_MAX, 0.0f, allocator));
+		editor->registerProperty("physical_heightfield", allocator.newObject<DecimalPropertyDescriptor<PhysicsScene> >("y_scale", &PhysicsScene::getHeightmapYScale, &PhysicsScene::setHeightmapYScale, 0.0f, FLT_MAX, 0.0f, allocator));
 	}
 }
 

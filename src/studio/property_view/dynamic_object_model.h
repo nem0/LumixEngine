@@ -31,7 +31,7 @@ class DynamicObjectModel : public QAbstractItemModel
 		class Node
 		{
 			public:
-				Node(QString name, Node* parent, int index) : m_name(name), m_parent(parent), m_index(index), m_is_persistent_editor(false){}
+				Node(QString name, Node* parent, int index) : m_name(name), m_parent(parent), m_index(index), m_is_persistent_editor(false) {}
 				~Node();
 
 				Node& addChild(QString name)
@@ -240,6 +240,12 @@ class DynamicObjectModel : public QAbstractItemModel
 		virtual QStringList mimeTypes() const override;
 
 		Node& getRoot() { return *m_root; }
+		void childAboutToBeAdded(Node& node);
+		void childAdded();
+		QModelIndex getIndex(Node& node);
+		void removeNode(Node& node);
+
+		static void setSliderEditor(Node& node, float min, float max, float step);
 
 	private:
 		Node* m_root;
