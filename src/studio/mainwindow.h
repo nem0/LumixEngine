@@ -15,6 +15,8 @@ namespace Ui
 }
 
 
+class EntityTemplateList;
+class EntityList;
 class Metadata;
 class PropertyView;
 
@@ -36,6 +38,8 @@ public:
 	class ScriptCompiler* getScriptCompiler() const;
 	QMenuBar* getMenuBar() const;
 	Metadata* getMetadata() const { return m_metadata; }
+	EntityTemplateList* getEntityTemplateList() { return m_entity_template_list_ui; }
+	EntityList* getEntityList() { return m_entity_list; }
 
 signals:
 	void resized(const QSize& size);
@@ -98,6 +102,7 @@ private:
 	void onUniverseLoaded();
 	void addEditorDock(Qt::DockWidgetArea area, QDockWidget* widget, void (MainWindow::*callback)());
 	void createLayoutCombobox();
+	void installPlugins();
 
 private:
 	Ui::MainWindow* m_ui;
@@ -111,9 +116,9 @@ private:
 	class ScriptCompilerWidget* m_script_compiler_ui;
 	class FileServerWidget* m_file_server_ui;
 	class ProfilerUI* m_profiler_ui;
-	class EntityTemplateList* m_entity_template_list_ui;
+	EntityTemplateList* m_entity_template_list_ui;
 	class Notifications* m_notifications;
-	class EntityList* m_entity_list;
+	EntityList* m_entity_list;
 	Metadata* m_metadata;
 	QMenu* m_recent_files_menu;
 	QMenu* m_window_menu;
@@ -121,5 +126,7 @@ private:
 	QList<QString> m_recent_files;
 	QList<DockInfo> m_dock_infos;
 	bool m_toggle_game_mode_after_compile;
+
+	class TerrainComponentPlugin* m_terrain_component_plugin;
 };
 

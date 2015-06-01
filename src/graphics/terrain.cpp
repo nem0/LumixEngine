@@ -871,9 +871,14 @@ namespace Lumix
 		PROFILE_FUNCTION();
 		if (new_state == Resource::State::READY)
 		{
-			m_allocator.deleteObject(m_root);
 			m_heightmap = m_material->getTextureByUniform("hm_texture");
+			if (m_heightmap && m_heightmap->getData() == nullptr)
+			{
+				m_heightmap->addDataReference();
+				return;
+			}
 			m_splatmap = m_material->getTextureByUniform("splat_texture");
+			m_allocator.deleteObject(m_root);
 			if (m_heightmap && m_splatmap)
 			{
 				m_width = m_heightmap->getWidth();

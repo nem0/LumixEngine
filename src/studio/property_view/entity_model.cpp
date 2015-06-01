@@ -253,6 +253,7 @@ void EntityModel::addPositionProperty()
 		Node& angle_node = rotation_node.addChild("angle");
 		angle_node.m_getter = [this]() -> QVariant { return Lumix::Math::radiansToDegrees(m_entity.getRotation().getAxisAngle().angle); };
 		angle_node.m_setter = [this](const QVariant& value) { setEntityRotation(3, Lumix::Math::degreesToRadians(value.toFloat())); };
+		DynamicObjectModel::setSliderEditor(angle_node, 0, 360, 5);
 	}
 
 	m_editor.getUniverse()->entityMoved().bind<EntityModel, &EntityModel::onEntityPosition>(this);
@@ -374,6 +375,20 @@ void EntityModel::addComponentNode(Lumix::Component cmp, int component_index)
 					addArrayProperty(child, static_cast<Lumix::IArrayDescriptor*>(desc), cmp);
 					break;
 				}
+			case Lumix::IPropertyDescriptor::DECIMAL:
+				{
+					child.m_setter = [desc, cmp, this](const QVariant& value)
+					{
+						this->set(cmp.entity, cmp.type, -1, desc, value);
+					};
+					auto decimal_desc = static_cast<Lumix::IDecimalPropertyDescriptor*>(desc);
+					if (decimal_desc->getStep() > 0)
+					{
+						DynamicObjectModel::setSliderEditor(child, decimal_desc->getMin(), decimal_desc->getMax(), decimal_desc->getStep());
+						child.enablePeristentEditor();
+					}
+					break;
+				}
 			case Lumix::IPropertyDescriptor::RESOURCE:
 				addResourceProperty(child, desc, cmp);
 				break;
@@ -398,6 +413,7 @@ void EntityModel::addComponentNode(Lumix::Component cmp, int component_index)
 				break;
 			}
 	}
+	emit m_view.componentNodeCreated(node, cmp);
 }
 
 void EntityModel::addComponent(QWidget* widget, QPoint pos)

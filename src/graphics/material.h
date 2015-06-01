@@ -75,6 +75,7 @@ public:
 
 	int getTextureCount() const { return m_texture_count; }
 	Texture* getTexture(int i) const { return i < m_texture_count ? m_textures[i] : nullptr; }
+	const char* getTextureUniform(int i);
 	Texture* getTextureByUniform(const char* uniform) const;
 	void setTexture(int i, Texture* texture);
 	void setTexturePath(int i, const Path& path);
@@ -96,6 +97,10 @@ public:
 		, m_allocator(allocator)
 		, m_texture_count(0)
 	{ 
+		for (int i = 0; i < MAX_TEXTURE_COUNT; ++i)
+		{
+			m_textures[i] = nullptr;
+		}
 		updateShaderCombination();
 	}
 

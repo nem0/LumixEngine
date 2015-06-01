@@ -688,7 +688,7 @@ class IDecimalPropertyDescriptor : public IPropertyDescriptor
 		void setMax(float value) { m_max = value; }
 		void setStep(float value) { m_step = value; }
 
-	private:
+	protected:
 		float m_min;
 		float m_max;
 		float m_step;
@@ -703,12 +703,15 @@ class DecimalPropertyDescriptor : public IDecimalPropertyDescriptor
 		typedef void (S::*Setter)(Component, float);
 
 	public:
-		DecimalPropertyDescriptor(const char* name, Getter _getter, Setter _setter, IAllocator& allocator)
+		DecimalPropertyDescriptor(const char* name, Getter _getter, Setter _setter, float min, float max, float step, IAllocator& allocator)
 			: IDecimalPropertyDescriptor(allocator)
 		{ 
 			setName(name);
 			m_getter = _getter;
 			m_setter = _setter;
+			m_min = min;
+			m_max = max;
+			m_step = step;
 			m_type = DECIMAL;
 		}
 		
@@ -727,7 +730,6 @@ class DecimalPropertyDescriptor : public IDecimalPropertyDescriptor
 			int len = sizeof(f);
 			stream.write(&f, len);
 		}
-
 
 		virtual void set(Component cmp, int index, InputBlob& stream) const override { ASSERT(index == -1); set(cmp, stream); };
 		virtual void get(Component cmp, int index, OutputBlob& stream) const override { ASSERT(index == -1); get(cmp, stream);};

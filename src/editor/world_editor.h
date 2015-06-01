@@ -122,7 +122,8 @@ namespace Lumix
 			virtual DelegateList<void(Component)>& componentAdded() = 0;
 			virtual DelegateList<void(Component)>& componentDestroyed() = 0;
 
-			virtual void addPlugin(Plugin* plugin) = 0;
+			virtual void addPlugin(Plugin& plugin) = 0;
+			virtual void removePlugin(Plugin& plugin) = 0;
 			virtual void getRelativePath(char* relative_path, int max_length, const Path& source) = 0;
 			virtual EntityTemplateSystem& getEntityTemplateSystem() = 0;
 			virtual Vec3 getCameraRaycastHit() = 0;

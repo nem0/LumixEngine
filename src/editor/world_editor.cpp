@@ -1476,11 +1476,15 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
-		virtual void addPlugin(Plugin* plugin) override
+		virtual void addPlugin(Plugin& plugin) override
 		{
-			m_plugins.push(plugin);
+			m_plugins.push(&plugin);
 		}
 
+		virtual void removePlugin(Plugin& plugin) override
+		{
+			m_plugins.eraseItemFast(&plugin);
+		}
 
 		void onEntityMouseDown(const RayCastModelHit& hit, int x, int y)
 		{
@@ -2186,6 +2190,7 @@ struct WorldEditorImpl : public WorldEditor
 
 		void destroy()
 		{
+			removePlugin(*m_measure_tool);
 			m_allocator.deleteObject(m_measure_tool);
 			destroyUndoStack();
 			for (int j = 0; j < m_component_properties.size(); ++j)
@@ -2266,7 +2271,7 @@ struct WorldEditorImpl : public WorldEditor
 			m_terrain_brush_size = 10;
 			m_terrain_brush_strength = 0.01f;
 			m_measure_tool = m_allocator.newObject<MeasureTool>();
-			addPlugin(m_measure_tool);
+			addPlugin(*m_measure_tool);
 		}
 
 
