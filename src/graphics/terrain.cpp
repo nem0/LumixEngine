@@ -636,7 +636,10 @@ namespace Lumix
 			Matrix matrix = m_entity.getMatrix();
 			Matrix inv_matrix = matrix;
 			inv_matrix.fastInverse();
-			m_root->getInfos(infos, inv_matrix.multiplyPosition(camera_pos), this, matrix, allocator);
+			Vec3 local_camera_pos = inv_matrix.multiplyPosition(camera_pos);
+			local_camera_pos.x /= m_scale.x;
+			local_camera_pos.z /= m_scale.z;
+			m_root->getInfos(infos, local_camera_pos, this, matrix, allocator);
 		}
 	}
 

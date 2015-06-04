@@ -26,7 +26,9 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 	public:
 		enum Type
 		{
-			HEIGHT,
+			RAISE_HEIGHT,
+			LOWER_HEIGHT,
+			SMOOTH_HEIGHT,
 			TEXTURE,
 			ENTITY,
 			NOT_SET
@@ -39,17 +41,16 @@ class TerrainEditor : public Lumix::WorldEditor::Plugin
 		virtual bool onEntityMouseDown(const Lumix::RayCastModelHit& hit, int, int) override;
 		virtual void onMouseMove(int x, int y, int /*rel_x*/, int /*rel_y*/, int /*mouse_flags*/) override;
 		virtual void onMouseUp(int, int, Lumix::MouseButton::Value) override;
-		Lumix::Material* getMaterial();
 
-		static void getProjections(const Lumix::Vec3& axis, const Lumix::Vec3 vertices[8], float& min, float& max);
+	private:
+		Lumix::Material* getMaterial();
 		bool overlaps(float min1, float max1, float min2, float max2);
 		bool testOBBCollision(const Lumix::Matrix& matrix_a, const Lumix::Model* model_a, const Lumix::Matrix& matrix_b, const Lumix::Model* model_b, float scale);
 		bool isOBBCollision(Lumix::RenderScene* scene, const Lumix::Matrix& matrix, Lumix::Model* model, float scale);
-		void paintEntities(Lumix::Component terrain, const Lumix::RayCastModelHit& hit);
-		void addSplatWeight(Lumix::Component terrain, const Lumix::RayCastModelHit& hit);
-		void addTexelSplatWeight(uint8_t& w1, uint8_t& w2, uint8_t& w3, uint8_t& w4, int value);
-		void addTerrainLevel(Lumix::Component terrain, const Lumix::RayCastModelHit& hit, bool new_stroke);
+		void paintEntities(const Lumix::RayCastModelHit& hit);
+		void paint(const Lumix::RayCastModelHit& hit, TerrainEditor::Type type, bool new_stroke);
 
+		static void getProjections(const Lumix::Vec3& axis, const Lumix::Vec3 vertices[8], float& min, float& max);
 
 	private:
 		Lumix::WorldEditor& m_world_editor;
