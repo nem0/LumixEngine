@@ -269,7 +269,7 @@ void Material::setTexture(int i, Texture* texture)
 		addDependency(*texture);
 	}
 	m_textures[i] = texture;
-	if (i <= m_texture_count)
+	if (i >= m_texture_count)
 	{
 		m_texture_count = i + 1;
 	}

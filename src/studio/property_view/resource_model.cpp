@@ -308,7 +308,7 @@ void ResourceModel::fillMaterialInfo(Lumix::Material* material, Node& node)
 		);
 	}
 	
-	for (int i = 0; i < material->getShader()->getTextureSlotCount(); ++i)
+	for (int i = 0; material->getShader() && i < material->getShader()->getTextureSlotCount(); ++i)
 	{
 		const auto& slot = material->getShader()->getTextureSlot(i);
 		Object<const Lumix::Shader::TextureSlot> slot_object(&slot, &object.getNode().addChild(slot.m_name));
