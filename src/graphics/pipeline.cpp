@@ -91,6 +91,7 @@ struct PipelineImpl : public Pipeline
 
 	void parseRenderbuffers(lua_State* L, FrameBuffer::Declaration& decl)
 	{
+		decl.m_renderbuffers_count = 0;
 		int len = (int)lua_rawlen(L, -1);
 		for (int i = 0; i < len; ++i)
 		{
@@ -450,7 +451,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		}
 	}
 
-
+	
 	void renderDebugTexts()
 	{
 		BitmapFont* font = m_scene->getDebugTextFont();
