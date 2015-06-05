@@ -588,6 +588,7 @@ namespace Lumix
 		setMaterial(static_cast<Material*>(scene.getEngine().getResourceManager().get(ResourceManager::MATERIAL)->load(Path(path))));
 		serializer.read(m_scale.x);
 		serializer.read(m_scale.y);
+		m_scale.z = m_scale.x;
 		int32_t count;
 		serializer.read(count);
 		while(m_grass_types.size() > count)
