@@ -11,6 +11,7 @@
 #include "graphics/gl_ext.h"
 #include "graphics/renderer.h"
 #include "graphics/shader_manager.h"
+#include <bgfx.h>
 #include <lua.hpp>
 #include <lauxlib.h>
 
@@ -251,6 +252,7 @@ void Shader::parseTextureSlots(lua_State* L)
 				if (lua_getfield(L, -1, "uniform") == LUA_TSTRING)
 				{
 					copyString(m_texture_slots[i].m_uniform, sizeof(m_texture_slots[i].m_uniform), lua_tostring(L, -1));
+					m_texture_slots[i].m_uniform_handle = bgfx::createUniform(m_texture_slots[i].m_name, bgfx::UniformType::Int1);
 					m_texture_slots[i].m_uniform_hash = crc32(m_texture_slots[i].m_uniform);
 				}
 				lua_pop(L, 1);

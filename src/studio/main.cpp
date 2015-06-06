@@ -225,6 +225,8 @@ class App
 			HWND hwnds[] = { hwnd, game_hwnd };
 			HGLRC hglrc = createGLContext(hwnds, 2);
 
+			Lumix::Renderer::init(hwnd);
+
 			m_world_editor = Lumix::WorldEditor::create(QDir::currentPath().toLocal8Bit().data(), m_allocator);
 			ASSERT(m_world_editor);
 			m_world_editor->update();

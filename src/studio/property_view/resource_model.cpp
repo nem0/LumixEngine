@@ -8,6 +8,7 @@
 #include "engine/engine.h"
 #include "graphics/material.h"
 #include "graphics/model.h"
+#include "graphics/shader.h"
 #include "graphics/texture.h"
 #include <qapplication.h>
 #include <qfile.h>

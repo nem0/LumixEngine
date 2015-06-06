@@ -1,6 +1,7 @@
 #pragma once
 #include "core/resource.h"
 #include "graphics/gl_ext.h"
+#include <bgfx.h>
 
 
 struct lua_State;
@@ -67,6 +68,7 @@ class LUMIX_ENGINE_API Shader : public Resource
 			char m_uniform[30];
 			char m_define[30];
 			uint32_t m_uniform_hash;
+			bgfx::UniformHandle m_uniform_handle;
 		};
 
 	public:

@@ -28,7 +28,7 @@
 #include "graphics/texture_manager.h"
 #include "universe/universe.h"
 
-
+#if 0
 namespace Lumix
 {
 
@@ -707,3 +707,4 @@ void setUniform(int location, float value)
 
 
 } // ~namespace Lumix
+#endif

@@ -129,7 +129,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>
       </SDLCheck>
-      <AdditionalIncludeDirectories>..\..\..\external\physx\include;..\..\..\src;..\..\..\external\glew\include;..\..\..\external\lua\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\external\bgfx\include;..\..\..\external\physx\include;..\..\..\src;..\..\..\external\glew\include;..\..\..\external\lua\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <PreprocessorDefinitions>WIN32;BUILDING_ENGINE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
@@ -137,8 +137,8 @@
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>..\..\..\bin\$(Platform)_$(Configuration);..\..\..\external\glew\lib\$(Platform);..\..\..\external\lua\lib\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>glew32s.lib;glu32.lib;opengl32.lib;core.lib;lua.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\..\..\bin\$(Platform)_$(Configuration);..\..\..\external\bgfx\lib\;..\..\..\external\glew\lib\$(Platform);..\..\..\external\lua\lib\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glew32s.lib;glu32.lib;opengl32.lib;core.lib;psapi.lib;bgfx$(Configuration).lib;lua.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -166,7 +166,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>
       </SDLCheck>
-      <AdditionalIncludeDirectories>..\..\..\external\physx\include;..\..\..\src;..\..\..\external\glew\include;..\..\..\external\lua\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\external\bgfx\include;..\..\..\external\physx\include;..\..\..\src;..\..\..\external\glew\include;..\..\..\external\lua\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <PreprocessorDefinitions>NDEBUG;WIN32;BUILDING_ENGINE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -176,8 +176,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>..\..\..\bin\$(Platform)_$(Configuration);..\..\..\external\glew\lib\$(Platform);..\..\..\external\lua\lib\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>glew32s.lib;glu32.lib;opengl32.lib;core.lib;lua.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\..\..\bin\$(Platform)_$(Configuration);..\..\..\external\bgfx\lib\;..\..\..\external\glew\lib\$(Platform);..\..\..\external\lua\lib\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glew32s.lib;glu32.lib;opengl32.lib;core.lib;psapi.lib;bgfx$(Configuration).lib;lua.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='AppVeyor|Win32'">
@@ -188,7 +188,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>
       </SDLCheck>
-      <AdditionalIncludeDirectories>..\..\..\external\physx\include;..\..\..\src;..\..\..\external\glew\include;..\..\..\external\lua\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\external\bgfx\include;..\..\..\external\physx\include;..\..\..\src;..\..\..\external\glew\include;..\..\..\external\lua\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <PreprocessorDefinitions>NDEBUG;WIN32;BUILDING_ENGINE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
@@ -196,8 +196,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>..\..\..\bin\$(Platform)_$(Configuration);..\..\..\external\glew\lib\$(Platform);..\..\..\external\lua\lib\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>glew32s.lib;glu32.lib;opengl32.lib;core.lib;lua.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\..\..\bin\$(Platform)_$(Configuration);..\..\..\external\bgfx\lib\;..\..\..\external\glew\lib\$(Platform);..\..\..\external\lua\lib\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glew32s.lib;glu32.lib;opengl32.lib;core.lib;psapi.lib;bgfx$(Configuration).lib;lua.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -249,6 +249,8 @@
     <ClCompile Include="..\..\..\src\engine\engine.cpp" />
     <ClCompile Include="..\..\..\src\engine\iplugin.cpp" />
     <ClCompile Include="..\..\..\src\engine\plugin_manager.cpp" />
+    <ClCompile Include="..\..\..\src\graphics\bgfx_pipeline.cpp" />
+    <ClCompile Include="..\..\..\src\graphics\bgfx_renderer.cpp" />
     <ClCompile Include="..\..\..\src\graphics\bitmap_font.cpp" />
     <ClCompile Include="..\..\..\src\graphics\culling_system.cpp" />
     <ClCompile Include="..\..\..\src\graphics\frame_buffer.cpp" />

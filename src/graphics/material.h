@@ -3,6 +3,7 @@
 
 #include "core/array.h"
 #include "core/resource.h"
+#include <bgfx.h>
 
 
 namespace Lumix
@@ -72,6 +73,7 @@ public:
 	void setShader(Shader* shader);
 	void setShader(const Path& path);
 	Shader* getShader() const { return m_shader; }
+	bgfx::ProgramHandle getProgramID() const { return m_program_id; }
 
 	int getTextureCount() const { return m_texture_count; }
 	Texture* getTexture(int i) const { return i < m_texture_count ? m_textures[i] : nullptr; }
@@ -132,6 +134,7 @@ private:
 	DepthFunc m_depth_func;
 	uint32_t m_shader_combination;
 	IAllocator& m_allocator;
+	bgfx::ProgramHandle m_program_id;
 };
 
 } // ~namespace Lumix

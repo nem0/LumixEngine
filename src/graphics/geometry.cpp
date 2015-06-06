@@ -6,222 +6,29 @@
 #include "graphics/gl_ext.h"
 #include "graphics/renderer.h"
 #include "graphics/shader.h"
+#include <bgfx.h>
+
 
 namespace Lumix
 {
-
-
-static int vertexAttributeTypeSizes[] =
-{
-	sizeof(GLfloat) * 3,
-	sizeof(GLfloat) * 1,
-	sizeof(GLfloat) * 2,
-	sizeof(GLfloat) * 3,
-	sizeof(GLfloat) * 4,
-	sizeof(GLint) * 1,
-	sizeof(GLint) * 2,
-	sizeof(GLint) * 3,
-	sizeof(GLint) * 4,
-	sizeof(GLshort) * 2,
-	sizeof(GLshort) * 4,
-	sizeof(GLbyte) * 4
-};
-
-static int getAttributeTypeSize(VertexAttributeDef type)
-{
-	if ((int)type < sizeof(vertexAttributeTypeSizes) / sizeof(vertexAttributeTypeSizes[0]))
-	{
-		return vertexAttributeTypeSizes[(int)type];
-	}
-	ASSERT(false);
-	return -1;
-}
-
-
-void VertexDef::addAttribute(Renderer& renderer, const char* name, VertexAttributeDef type)
-{
-	m_attributes[m_attribute_count].m_name_index = renderer.getAttributeNameIndex(name);
-	m_attributes[m_attribute_count].m_type = type;
-	++m_attribute_count;
-	m_vertex_size += getAttributeTypeSize(type);
-}
-
-
-bool VertexDef::parse(Renderer& renderer, FS::IFile* file)
-{
-	uint32_t attribute_count;
-	file->read(&attribute_count, sizeof(attribute_count));
 	
-	m_vertex_size = 0;
-	for (uint32_t i = 0; i < attribute_count; ++i)
-	{
-		char tmp[50];
-		uint32_t len;
-		file->read(&len, sizeof(len));
-		if (len > sizeof(tmp) - 1)
-		{
-			return false;
-		}
-		file->read(tmp, len);
-		tmp[len] = '\0';
-
-		m_attributes[i].m_name_index = renderer.getAttributeNameIndex(tmp);
-
-		file->read(&m_attributes[i].m_type, sizeof(m_attributes[i].m_type));
-
-		m_vertex_size += getAttributeTypeSize(m_attributes[i].m_type);
-	}
-	m_attribute_count = attribute_count;
-	return true;
-
-}
-
-
-int VertexDef::getPositionOffset() const
-{
-	int offset = 0;
-	for(int i = 0; i < m_attribute_count; ++i)
-	{
-		switch (m_attributes[i].m_type)
-		{
-			case VertexAttributeDef::FLOAT4:
-				offset += 4 * sizeof(float);
-				break;
-			case VertexAttributeDef::POSITION:
-				return offset;
-				break;
-			case VertexAttributeDef::FLOAT3:
-				offset += 3 * sizeof(float);
-				break;
-			case VertexAttributeDef::FLOAT2:
-				offset += 2 * sizeof(float);
-				break;
-			case VertexAttributeDef::FLOAT1:
-				offset += 1 * sizeof(float);
-				break;
-			case VertexAttributeDef::INT4:
-				offset += 4 * sizeof(int);
-				break;
-			case VertexAttributeDef::INT3:
-				offset += 3 * sizeof(int);
-				break;
-			case VertexAttributeDef::INT2:
-				offset += 2 * sizeof(int);
-				break;
-			case VertexAttributeDef::INT1:
-				offset += 1 * sizeof(int);
-				break;
-			case VertexAttributeDef::BYTE4:
-				offset += 4 * sizeof(char);
-				break;
-			case VertexAttributeDef::SHORT4:
-				offset += 4 * sizeof(short);
-				break;
-			case VertexAttributeDef::SHORT2:
-				offset += 2 * sizeof(short);
-				break;
-			default:
-				ASSERT(false);
-				break;
-		}
-	}
-	return -1;
-}
-
-
-void VertexDef::begin(Shader& shader, int start_offset) const 
-{
-	PROFILE_FUNCTION();
-	int offset = start_offset;
-	int attribute_count = Math::minValue(m_attribute_count, shader.getAttributeCount());
-	for(int i = 0; i < attribute_count; ++i)
-	{
-		GLint attrib_id = shader.getAttribId(m_attributes[i].m_name_index);
-		VertexAttributeDef type = m_attributes[i].m_type;
-		if (attrib_id >= 0)
-		{
-			glVertexAttribDivisor(attrib_id, 0);
-			glEnableVertexAttribArray(attrib_id);
-			switch (type)
-			{
-				case VertexAttributeDef::FLOAT4:
-					glVertexAttribPointer(attrib_id, 4, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
-					break;
-				case VertexAttributeDef::POSITION:
-				case VertexAttributeDef::FLOAT3:
-					glVertexAttribPointer(attrib_id, 3, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
-					break;
-				case VertexAttributeDef::FLOAT2:
-					glVertexAttribPointer(attrib_id, 2, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
-					break;
-				case VertexAttributeDef::FLOAT1:
-					glVertexAttribPointer(attrib_id, 1, GL_FLOAT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
-					break;
-				case VertexAttributeDef::SHORT4:
-					glVertexAttribPointer(attrib_id, 4, GL_SHORT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
-					break;
-				case VertexAttributeDef::SHORT2:
-					glVertexAttribPointer(attrib_id, 2, GL_SHORT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
-					break;
-				case VertexAttributeDef::INT4:
-					glVertexAttribPointer(attrib_id, 4, GL_INT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
-					break;
-				case VertexAttributeDef::INT3:
-					glVertexAttribPointer(attrib_id, 3, GL_INT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
-					break;
-				case VertexAttributeDef::INT2:
-					glVertexAttribPointer(attrib_id, 2, GL_INT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
-					break;
-				case VertexAttributeDef::INT1:
-					glVertexAttribPointer(attrib_id, 1, GL_INT, GL_FALSE, m_vertex_size, (GLvoid*)offset);
-					break;
-				case VertexAttributeDef::BYTE4:
-					glVertexAttribPointer(attrib_id, 4, GL_BYTE, GL_FALSE, m_vertex_size, (GLvoid*)offset);
-					break;
-				default:
-					ASSERT(false);
-					break;
-			}
-		}
-		offset += getAttributeTypeSize(type);
-	}
-	
-}
-
-
-void VertexDef::end(Shader& shader) const
-{
-	PROFILE_FUNCTION();
-	for(int i = 0; i < m_attribute_count; ++i)
-	{
-		GLint attr_id = shader.getAttribId(m_attributes[i].m_name_index);
-		if (attr_id >= 0)
-		{
-			glDisableVertexAttribArray(attr_id);
-		}
-	}
-	
-}
-
 
 Geometry::Geometry()
 {
-	glGenBuffers(1, &m_attributes_array_id);
-	glGenBuffers(1, &m_indices_array_id);
-	m_indices_data_size = 0;
-	m_attributes_data_size = 0;
+	m_indices_array_id = BGFX_INVALID_HANDLE;
+	m_attributes_array_id = BGFX_INVALID_HANDLE;
 }
 
 
 Geometry::~Geometry()
 {
-	glDeleteBuffers(1, &m_attributes_array_id);
-	glDeleteBuffers(1, &m_indices_array_id);
+	clear();
 }
 
 
 void Geometry::copy(const Geometry& source, int copy_count, IndexCallback index_callback, VertexCallback vertex_callback, IAllocator& allocator)
 {
+	/*
 	ASSERT(source.m_indices_data_size > 0);
 	ASSERT(m_indices_data_size == 0);
 
@@ -258,45 +65,55 @@ void Geometry::copy(const Geometry& source, int copy_count, IndexCallback index_
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
 	m_indices_data_size = source.m_indices_data_size * copy_count;
-	m_attributes_data_size = source.m_attributes_data_size * copy_count;
+	m_attributes_data_size = source.m_attributes_data_size * copy_count;*/
+	ASSERT(false);
+	TODO("todo");
 }
 
 
 void Geometry::clear()
 {
-	glDeleteBuffers(1, &m_attributes_array_id);
-	glDeleteBuffers(1, &m_indices_array_id);
+	if (bgfx::isValid(m_indices_array_id))
+	{
+		bgfx::destroyIndexBuffer(m_indices_array_id);
+	}
+	if (bgfx::isValid(m_attributes_array_id))
+	{
+		bgfx::destroyVertexBuffer(m_attributes_array_id);
+	}
 
-	glGenBuffers(1, &m_attributes_array_id);
-	glGenBuffers(1, &m_indices_array_id);
+	m_indices_array_id = BGFX_INVALID_HANDLE;
+	m_attributes_array_id = BGFX_INVALID_HANDLE;
 
 	m_indices_data_size = 0;
 	m_attributes_data_size = 0;
 }
 
 
-void Geometry::setAttributesData(const void* data, int size)
+void Geometry::setAttributesData(const void* data, int size, const bgfx::VertexDecl& decl)
 {
-	glBindBuffer(GL_ARRAY_BUFFER, m_attributes_array_id);
-	glBufferData(GL_ARRAY_BUFFER, size, data, GL_STATIC_DRAW);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	ASSERT(!bgfx::isValid(m_attributes_array_id));
+	const bgfx::Memory* mem = bgfx::alloc(size);
+	memcpy(mem->data, data, size);
+	m_attributes_array_id = bgfx::createVertexBuffer(mem, decl);
 	m_attributes_data_size = size;
 }
 
 
 void Geometry::setIndicesData(const void* data, int size)
 {
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_indices_array_id);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, size, data, GL_STATIC_DRAW);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	ASSERT(!bgfx::isValid(m_indices_array_id));
+	const bgfx::Memory* mem = bgfx::alloc(size);
+	memcpy(mem->data, data, size);
+	m_indices_array_id = bgfx::createIndexBuffer(mem, BGFX_BUFFER_INDEX32);
 	m_indices_data_size = size;
 }
 
 
 void Geometry::bindBuffers() const
 {
-	glBindBuffer(GL_ARRAY_BUFFER, m_attributes_array_id);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_indices_array_id);
+	bgfx::setIndexBuffer(m_indices_array_id);
+	bgfx::setVertexBuffer(m_attributes_array_id);
 }
 
 
