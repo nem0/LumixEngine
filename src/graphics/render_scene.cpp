@@ -80,7 +80,6 @@ namespace Lumix
 			{
 				if (m_font)
 				{
-					m_font->getObserverCb().unbind<DebugTextsData, &DebugTextsData::fontLoaded>(this);
 					m_font->getResourceManager().get(ResourceManager::BITMAP_FONT)->unload(*m_font);
 				}
 				m_allocator.deleteObject(m_mesh);
@@ -94,7 +93,6 @@ namespace Lumix
 				debug_text.m_y = y;
 				int index = m_texts.insert(id, debug_text);
 				m_texts.at(index).m_text = text;
-				generate();
 				return id;
 			}
 
@@ -109,7 +107,6 @@ namespace Lumix
 				if (m_texts.at(index).m_text != text)
 				{
 					m_texts.at(index).m_text = text;
-					generate();
 				}
 			}
 
@@ -126,104 +123,11 @@ namespace Lumix
 			void setFont(const Path& path)
 			{
 				m_font = static_cast<BitmapFont*>(m_engine.getResourceManager().get(ResourceManager::BITMAP_FONT)->load(path));
-				m_font->onLoaded<DebugTextsData, &DebugTextsData::fontLoaded>(this);
 			}
 
 			
-			void fontLoaded(Resource::State, Resource::State new_state)
-			{
-				if (new_state == Resource::State::READY)
-				{
-					generate();
-				}
-			}
 
-
-			void generate()
-			{
-				if (!m_font || !m_font->isReady())
-				{
-					return;
-				}
-				int count = 0;
-				for (int i = 0; i < m_texts.size(); ++i)
-				{
-					count += m_texts.at(i).m_text.length() << 2;
-				}
-				VertexDef vertex_definition;
-				vertex_definition.addAttribute(m_engine.getRenderer(), "in_position", VertexAttributeDef::FLOAT2);
-				vertex_definition.addAttribute(m_engine.getRenderer(), "in_tex_coords", VertexAttributeDef::FLOAT2);
-				Array<int> indices(m_allocator);
-				Array<float> data(m_allocator);
-				indices.reserve(count);
-				data.reserve(count * 6);
-
-				int index = 0; 
-				for (int i = 0; i < m_texts.size(); ++i)
-				{
-					const DebugText& text = m_texts.at(i);
-					float x = (float)text.m_x;
-					float y = (float)text.m_y;
-					for (int j = 0; j < text.m_text.length(); ++j)
-					{
-						const BitmapFont::Character* c = m_font->getCharacter(text.m_text[j]);
-
-						if (c)
-						{
-							indices.push(index);
-							data.push(x);
-							data.push(y);
-							data.push(c->m_left);
-							data.push(c->m_bottom);
-							++index;
-
-							indices.push(index);
-							data.push(x + c->m_pixel_w);
-							data.push(y);
-							data.push(c->m_right);
-							data.push(c->m_bottom);
-							++index;
-
-							indices.push(index);
-							data.push(x + c->m_pixel_w);
-							data.push(y + c->m_pixel_h);
-							data.push(c->m_right);
-							data.push(c->m_top);
-							++index;
-
-							indices.push(index);
-							data.push(x);
-							data.push(y);
-							data.push(c->m_left);
-							data.push(c->m_bottom);
-							++index;
-
-							indices.push(index);
-							data.push(x + c->m_pixel_w);
-							data.push(y + c->m_pixel_h);
-							data.push(c->m_right);
-							data.push(c->m_top);
-							++index;
-
-							indices.push(index);
-							data.push(x);
-							data.push(y + c->m_pixel_h);
-							data.push(c->m_left);
-							data.push(c->m_top);
-							++index;
-
-							x += c->m_x_advance;
-						}
-					}
-				}
-				m_allocator.deleteObject(m_mesh);
-				if (!data.empty())
-				{
-					m_geometry.setAttributesData(&data[0], sizeof(data[0]) * data.size());
-					m_geometry.setIndicesData(&indices[0], sizeof(indices[0]) * indices.size());
-				}
-				m_mesh = m_allocator.newObject<Mesh>(vertex_definition, m_font->getMaterial(), 0, sizeof(data[0]) * data.size(), 0, indices.size(), "debug_texts", m_allocator);
-			}
+			AssociativeArray<int, DebugText>& getTexts() { return m_texts; }
 
 		private:
 			IAllocator& m_allocator;
@@ -1469,6 +1373,14 @@ namespace Lumix
 			virtual Geometry& getDebugTextGeometry() override
 			{
 				return m_debug_texts.getGeometry();
+			}
+
+
+			virtual const char* getDebugText(int index) override
+			{
+				if (index < m_debug_texts.getTexts().size())
+					return m_debug_texts.getTexts().at(index).m_text.c_str();
+				return nullptr;
 			}
 
 

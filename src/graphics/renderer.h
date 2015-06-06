@@ -27,12 +27,14 @@ class Universe;
 struct VertexDef;
 
 
-
 class LUMIX_ENGINE_API Renderer : public IPlugin 
 {
 	public:
 		static Renderer* createInstance(Engine& engine);
 		static void destroyInstance(Renderer& renderer);
+
+		static void frame();
+		static void init(void* data);
 
 		static void getOrthoMatrix(float left, float right, float bottom, float top, float z_near, float z_far, Matrix* mtx);
 		static void getLookAtMatrix(const Vec3& pos, const Vec3& center, const Vec3& up, Matrix* mtx);

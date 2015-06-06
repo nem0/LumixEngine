@@ -8,6 +8,7 @@
 #include "core/resource_manager_base.h"
 #include "graphics/texture.h"
 #include "graphics/texture_manager.h"
+#include <bgfx.h>
 
 namespace Lumix
 {
@@ -424,6 +425,7 @@ namespace Lumix
 		, m_data(m_allocator)
 		, m_BPP(-1)
 	{
+		m_texture_handle = BGFX_INVALID_HANDLE;
 		glGenTextures(1, &m_id);
 	}
 
@@ -717,7 +719,8 @@ bool Texture::loadTGA(FS::IFile& file)
 	}
 	m_BPP = 4;
 
-	glGenTextures(1, &m_id);
+	m_texture_handle = bgfx::createTexture2D(header.width, header.height, 1, bgfx::TextureFormat::RGBA8, 0, bgfx::copy(image_dest, header.width * header.height * 4));
+	/*glGenTextures(1, &m_id);
 	if (m_id == 0)
 	{
 		return false;
@@ -730,7 +733,7 @@ bool Texture::loadTGA(FS::IFile& file)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
+*/
 	return true;
 }
 
@@ -879,6 +882,7 @@ bool Texture::loadDDS(FS::IFile& file)
 		}
 		else
 		{
+			m_texture_handle = bgfx::createTexture(bgfx::copy(file.getBuffer(), file.size()));
 			for (uint32_t ix = 0; ix < mipMapCount; ++ix)
 			{
 				file.read(data, size);

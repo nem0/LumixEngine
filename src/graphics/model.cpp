@@ -97,7 +97,7 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 				hit.m_mesh = &m_meshes[mesh_index];
 			}
 		}
-		vertex_offset += m_meshes[mesh_index].getAttributeArraySize() / m_meshes[mesh_index].getVertexDefinition().getVertexSize();
+		vertex_offset += m_meshes[mesh_index].getAttributeArraySize() / m_meshes[mesh_index].getVertexDefinition().getStride();
 	}
 	hit.m_origin = origin;
 	hit.m_dir = dir;
@@ -132,15 +132,61 @@ void Model::getPose(Pose& pose)
 }
 
 
-bool Model::parseVertexDef(FS::IFile* file, VertexDef* vertex_definition)
+bool Model::parseVertexDef(FS::IFile* file, bgfx::VertexDecl* vertex_definition)
 {
-	ASSERT(vertex_definition);
-	return vertex_definition->parse(static_cast<ModelManager*>(m_resource_manager.get(ResourceManager::MODEL))->getRenderer(),  file);
+	vertex_definition->begin();
+
+	uint32_t attribute_count;
+	file->read(&attribute_count, sizeof(attribute_count));
+
+	for (uint32_t i = 0; i < attribute_count; ++i)
+	{
+		char tmp[50];
+		uint32_t len;
+		file->read(&len, sizeof(len));
+		if (len > sizeof(tmp) - 1)
+		{
+			return false;
+		}
+		file->read(tmp, len);
+		tmp[len] = '\0';
+
+		if (strcmp(tmp, "in_position") == 0)
+		{
+			vertex_definition->add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float);
+		}
+		else if (strcmp(tmp, "in_tex_coords") == 0)
+		{
+			vertex_definition->add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Int16, true, true);
+		}
+		else if (strcmp(tmp, "in_normal") == 0)
+		{
+			vertex_definition->add(bgfx::Attrib::Normal, 4, bgfx::AttribType::Uint8, true, true);
+		}
+		else if (strcmp(tmp, "in_tangents") == 0)
+		{
+			vertex_definition->add(bgfx::Attrib::Tangent, 4, bgfx::AttribType::Uint8, true, true);
+		}
+		else
+		{
+			return false;
+		}
+
+		uint32_t type;
+		file->read(&type, sizeof(type));
+		type = type;
+	}
+
+	vertex_definition->end();
+	return true;
 }
 
 
-void Model::create(const VertexDef& def, Material* material, const void* indices_data, int indices_size, const void* attributes_data, int attributes_size)
+void Model::create(const bgfx::VertexDecl& def, Material* material, const void* indices_data, int indices_size, const void* attributes_data, int attributes_size)
 {
+	ASSERT(false);
+	TODO("Todo");
+	/*
 	m_geometry_buffer_object.setAttributesData(attributes_data, attributes_size);
 	m_geometry_buffer_object.setIndicesData(indices_data, indices_size);
 
@@ -155,10 +201,10 @@ void Model::create(const VertexDef& def, Material* material, const void* indices
 	m_indices.resize(indices_size / sizeof(m_indices[0]));
 	memcpy(&m_indices[0], indices_data, indices_size);
 
-	m_vertices.resize(attributes_size / def.getVertexSize());
+	m_vertices.resize(attributes_size / def.getStride());
 	computeRuntimeData((const uint8_t*)attributes_data);
 
-	onReady();
+	onReady();*/
 }
 
 
@@ -171,10 +217,10 @@ void Model::computeRuntimeData(const uint8_t* vertices)
 
 	for (int i = 0; i < m_meshes.size(); ++i)
 	{
-		int mesh_vertex_count = m_meshes[i].getAttributeArraySize() / m_meshes[i].getVertexDefinition().getVertexSize();
+		int mesh_vertex_count = m_meshes[i].getAttributeArraySize() / m_meshes[i].getVertexDefinition().getStride();
 		int mesh_attributes_array_offset = m_meshes[i].getAttributeArrayOffset();
-		int mesh_vertex_size = m_meshes[i].getVertexDefinition().getVertexSize();
-		int mesh_position_attribute_offset = m_meshes[i].getVertexDefinition().getPositionOffset();
+		int mesh_vertex_size = m_meshes[i].getVertexDefinition().getStride();
+		int mesh_position_attribute_offset = m_meshes[i].getVertexDefinition().getOffset(bgfx::Attrib::Position);
 		for (int j = 0; j < mesh_vertex_count; ++j)
 		{
 			m_vertices[index] = *(const Vec3*)&vertices[mesh_attributes_array_offset + j * mesh_vertex_size + mesh_position_attribute_offset];
@@ -216,13 +262,13 @@ bool Model::parseGeometry(FS::IFile* file)
 	vertices.resize(vertices_size);
 	file->read(&vertices[0], sizeof(vertices[0]) * vertices.size());
 	
-	m_geometry_buffer_object.setAttributesData(&vertices[0], vertices.size());
+	m_geometry_buffer_object.setAttributesData(&vertices[0], vertices.size(), m_meshes[0].getVertexDefinition());
 	m_geometry_buffer_object.setIndicesData(&m_indices[0], m_indices.size() * sizeof(m_indices[0]));
 
 	int vertex_count = 0;
 	for (int i = 0; i < m_meshes.size(); ++i)
 	{
-		vertex_count += m_meshes[i].getAttributeArraySize() / m_meshes[i].getVertexDefinition().getVertexSize();
+		vertex_count += m_meshes[i].getAttributeArraySize() / m_meshes[i].getVertexDefinition().getStride();
 	}
 	m_vertices.resize(vertex_count);
 	
@@ -358,7 +404,7 @@ bool Model::parseMeshes(FS::IFile* file)
 		mesh_name[str_size] = 0;
 		file->read(mesh_name, str_size);
 
-		VertexDef def;
+		bgfx::VertexDecl def;
 		parseVertexDef(file, &def);
 		m_meshes.emplace(def, material, attribute_array_offset, attribute_array_size, indices_offset, mesh_tri_count * 3, mesh_name, m_allocator);
 		addDependency(*material);

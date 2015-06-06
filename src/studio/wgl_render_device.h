@@ -35,14 +35,15 @@ public:
 	virtual void beginFrame() override
 	{
 		PROFILE_FUNCTION();
-		wglMakeCurrent(m_hdc, m_opengl_context);
+		//wglMakeCurrent(m_hdc, m_opengl_context);
 	}
 
 
 	virtual void endFrame() override
 	{
 		PROFILE_FUNCTION();
-		wglSwapLayerBuffers(m_hdc, WGL_SWAP_MAIN_PLANE);
+		Lumix::Renderer::frame();
+		//wglSwapLayerBuffers(m_hdc, WGL_SWAP_MAIN_PLANE);
 	}
 
 

@@ -381,6 +381,28 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 
 void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 {
+	auto fp = fopen("shaders/vs_bump.bin", "rb");
+	fseek(fp, 0, SEEK_END);
+	auto s = ftell(fp);
+	auto* mem = bgfx::alloc(s+1);
+	fseek(fp, 0, SEEK_SET);
+	fread(mem->data, s, 1, fp);
+	mem->data[s] = '\0';
+	auto vs = bgfx::createShader(mem);
+	fclose(fp);
+
+	fp = fopen("shaders/fs_bump.bin", "rb");
+	fseek(fp, 0, SEEK_END);
+	s = ftell(fp);
+	mem = bgfx::alloc(s + 1);
+	fseek(fp, 0, SEEK_SET);
+	fread(mem->data, s, 1, fp);
+	mem->data[s] = '\0';
+	auto ps = bgfx::createShader(mem);
+	fclose(fp);
+
+	m_program_id = bgfx::createProgram(vs, ps, true);
+
 	PROFILE_FUNCTION();
 	if(success)
 	{

@@ -13,6 +13,7 @@
 #include "core/resource.h"
 #include "graphics/geometry.h"
 #include "graphics/ray_cast_model_hit.h"
+#include <bgfx.h>
 
 
 namespace Lumix
@@ -35,7 +36,7 @@ namespace FS
 class Mesh
 {
 	public:
-		Mesh(const VertexDef& def, Material* mat, int attribute_array_offset, int attribute_array_size, int indices_offset, int index_count, const char* name, IAllocator& allocator)
+		Mesh(const bgfx::VertexDecl& def, Material* mat, int attribute_array_offset, int attribute_array_size, int indices_offset, int index_count, const char* name, IAllocator& allocator)
 			: m_name(allocator)
 			, m_vertex_def(def)
 		{
@@ -57,15 +58,15 @@ class Mesh
 		int getAttributeArraySize() const { return m_attribute_array_size; }
 		uint32_t getNameHash() const { return m_name_hash; }
 		const char* getName() const { return m_name.c_str(); }
-		void setVertexDefinition(const VertexDef& def) { m_vertex_def = def; }
-		const VertexDef& getVertexDefinition() const { return m_vertex_def; }
+		void setVertexDefinition(const bgfx::VertexDecl& def) { m_vertex_def = def; }
+		const bgfx::VertexDecl& getVertexDefinition() const { return m_vertex_def; }
 
 	private:
 		Mesh(const Mesh&);
 		void operator =(const Mesh&);
 
 	private:
-		VertexDef m_vertex_def;
+		bgfx::VertexDecl m_vertex_def;
 		int32_t	m_attribute_array_offset;
 		int32_t m_attribute_array_size;
 		int32_t m_indices_offset;
@@ -151,7 +152,7 @@ class Model : public Resource
 
 		~Model();
 
-		void create(const VertexDef& def, Material* material, const void* indices_data, int indices_size, const void* attributes_data, int attributes_size);
+		void create(const bgfx::VertexDecl& def, Material* material, const void* indices_data, int indices_size, const void* attributes_data, int attributes_size);
 		
 		LODMeshIndices getLODMeshIndices(float squared_distance) const;
 		const Geometry& getGeometry() const { return m_geometry_buffer_object; }
@@ -172,7 +173,7 @@ class Model : public Resource
 		static const uint32_t FILE_MAGIC = 0x5f4c4d4f; // == '_LMO'
 
 	private:
-		bool parseVertexDef(FS::IFile* file, VertexDef* vertex_definition);
+		bool parseVertexDef(FS::IFile* file, bgfx::VertexDecl* vertex_definition);
 		bool parseGeometry(FS::IFile* file);
 		bool parseBones(FS::IFile* file);
 		bool parseMeshes(FS::IFile* file);

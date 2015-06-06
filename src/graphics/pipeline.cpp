@@ -29,7 +29,7 @@
 #include <lua.hpp>
 #include <lauxlib.h>
 
-
+#if 0
 namespace Lumix
 {
 
@@ -1268,3 +1268,4 @@ void PipelineImpl::registerCFunctions()
 
 
 } // ~namespace Lumix
+#endif
