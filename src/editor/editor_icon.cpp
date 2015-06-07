@@ -118,7 +118,7 @@ void EditorIcon::render(Renderer* renderer, IRenderDevice& render_device)
 
 		if (m_model->isReady())
 		{
-			renderer->renderModel(*m_model, mtx, render_device.getPipeline());
+			render_device.getPipeline().renderModel(*m_model, mtx);
 		}
 	}
 }

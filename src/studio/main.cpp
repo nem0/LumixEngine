@@ -21,7 +21,6 @@
 #include <QApplication>
 #include <qdir.h>
 
-
 class App
 {
 	public:
@@ -247,7 +246,6 @@ class App
 			m_game_render_device->m_hdc = GetDC(game_hwnd);
 			m_game_render_device->m_opengl_context = hglrc;
 			m_game_render_device->getPipeline().setScene((Lumix::RenderScene*)m_world_editor->getEngine().getScene(crc32("renderer")));
-			m_world_editor->getEngine().getRenderer().setRenderDevice(*m_game_render_device);
 
 			m_world_editor->universeCreated().bind<App, &App::onUniverseCreated>(this);
 			m_world_editor->universeDestroyed().bind<App, &App::onUniverseDestroyed>(this);
@@ -291,7 +289,6 @@ class App
 				PROFILE_FUNCTION();
 				m_edit_render_device->beginFrame();
 				m_world_editor->render(*m_edit_render_device);
-				m_world_editor->getEngine().getRenderer().cleanup();
 				m_edit_render_device->endFrame();
 			}
 		}
@@ -364,7 +361,9 @@ class App
 
 					if(!m_main_window->getGameView()->getContentWidget()->visibleRegion().isEmpty())
 					{
-						m_world_editor->getEngine().getRenderer().renderGame();
+						m_game_render_device->beginFrame();
+						m_game_render_device->getPipeline().render();
+						m_game_render_device->endFrame();
 					}
 
 					showStats();

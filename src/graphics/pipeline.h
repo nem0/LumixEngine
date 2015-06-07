@@ -11,6 +11,8 @@ namespace Lumix
 struct Component;
 class FrameBuffer;
 class JsonSerializer;
+struct Matrix;
+class Model;
 class Renderer;
 class RenderScene;
 
@@ -71,8 +73,6 @@ class LUMIX_ENGINE_API PipelineInstance abstract
 		static PipelineInstance* create(Pipeline& src, IAllocator& allocator);
 		static void destroy(PipelineInstance* pipeline);
 
-		virtual Renderer& getRenderer() = 0;
-		virtual void setRenderer(Renderer& renderer) = 0;
 		virtual void setScene(RenderScene* scene) = 0;
 		virtual RenderScene* getScene() = 0;
 		virtual int getWidth() = 0;
@@ -80,6 +80,8 @@ class LUMIX_ENGINE_API PipelineInstance abstract
 		virtual int getDrawCalls() const = 0;
 		virtual int getRenderedTrianglesCount() const = 0;
 		virtual CustomCommandHandler& addCustomCommandHandler(const char* name) = 0;
+		virtual void setWireframe(bool wireframe) = 0;
+		virtual void renderModel(Model& model, const Matrix& mtx) = 0;
 };
 
 

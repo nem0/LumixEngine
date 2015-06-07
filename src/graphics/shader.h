@@ -23,34 +23,6 @@ class Renderer;
 class LUMIX_ENGINE_API Shader : public Resource
 {
 	public:
-		enum class FixedCachedUniforms : int
-		{
-			GRASS_MATRICES,
-			MORPH_CONST,
-			QUAD_SIZE,
-			QUAD_MIN,
-			AMBIENT_COLOR,
-			AMBIENT_INTENSITY,
-			DIFFUSE_COLOR,
-			DIFFUSE_INTENSITY,
-			FOG_COLOR,
-			FOG_DENSITY,
-			VIEW_MATRIX,
-			PROJECTION_MATRIX,
-			SHADOWMAP_SPLITS,
-			SHADOW_MATRIX0,
-			SHADOW_MATRIX1,
-			SHADOW_MATRIX2,
-			SHADOW_MATRIX3,
-			LIGHT_POSITION,
-			LIGHT_RANGE,
-			LIGHT_FOV,
-			LIGHT_DIR,
-
-			WORLD_MATRIX, // keep this right before count
-			COUNT
-		};
-	
 		class TextureSlot
 		{
 		public:
@@ -82,7 +54,6 @@ class LUMIX_ENGINE_API Shader : public Resource
 		GLint getAttribId(int index) const { return m_current_combination->m_vertex_attributes_ids[index]; }
 		LUMIX_FORCE_INLINE GLint getUniformLocation(const char* name, uint32_t name_hash);
 		GLuint getProgramId() const { return m_current_combination->m_program_id; }
-		GLint getFixedCachedUniformLocation(FixedCachedUniforms name) const { return m_current_combination->m_fixed_cached_uniforms[(int)name]; }
 		int getAttributeCount() const { return m_attributes.size(); }
 		void createCombination(const char* defines);
 		void setCurrentCombination(uint32_t hash, uint32_t pass_hash) { m_current_combination = getCombination(hash, pass_hash); }
@@ -103,7 +74,6 @@ class LUMIX_ENGINE_API Shader : public Resource
 			public:
 				Combination(IAllocator& allocator)
 					: m_defines(allocator)
-					, m_uniforms(allocator)
 				{ }
 
 				GLuint	m_program_id;
@@ -112,8 +82,6 @@ class LUMIX_ENGINE_API Shader : public Resource
 				uint32_t m_hash;
 				uint32_t m_pass_hash;
 				GLint	m_vertex_attributes_ids[MAX_ATTRIBUTE_COUNT];
-				Array<CachedUniform> m_uniforms;
-				GLint m_fixed_cached_uniforms[(int)FixedCachedUniforms::COUNT];
 				string m_defines;
 		};
 

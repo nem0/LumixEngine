@@ -68,7 +68,6 @@ namespace Lumix
 			, m_shader_manager(m_allocator)
 			, m_font_manager(m_allocator)
 			, m_pipeline_manager(m_allocator, *this)
-			, m_attribute_names(m_allocator)
 		{
 			m_texture_manager.create(ResourceManager::TEXTURE, engine.getResourceManager());
 			m_model_manager.create(ResourceManager::MODEL, engine.getResourceManager());
@@ -78,10 +77,6 @@ namespace Lumix
 			m_font_manager.create(ResourceManager::BITMAP_FONT, engine.getResourceManager());
 
 			m_current_pass_hash = crc32("MAIN");
-			m_last_bind_geometry = NULL;
-			m_last_bind_geometry_mesh = NULL;
-			m_last_program_id = 0xffffFFFF;
-			m_is_editor_wireframe = false;
 		}
 
 		~RendererImpl()
@@ -94,28 +89,6 @@ namespace Lumix
 			m_font_manager.destroy();
 		}
 
-		virtual int getGLSLVersion() const override
-		{
-			int version = 0;
-			const GLubyte* version_str = glGetString(GL_SHADING_LANGUAGE_VERSION);
-			if (version_str)
-			{
-				for (int i = 0; i < 2; ++i)
-				{
-					while (*version_str >= '0' && *version_str <= '9')
-					{
-						version *= 10;
-						version += *version_str - '0';
-						++version_str;
-					}
-					if (*version_str == '.')
-					{
-						++version_str;
-					}
-				}
-			}
-			return version;
-		}
 
 		virtual IScene* createScene(Universe& universe) override
 		{
@@ -128,203 +101,7 @@ namespace Lumix
 			RenderScene::destroyInstance(static_cast<RenderScene*>(scene));
 		}
 
-
-		virtual void setViewMatrix(const Matrix& matrix) override
-		{
-			m_view_matrix = matrix;
-		}
-
-		virtual void setProjectionMatrix(const Matrix& matrix) override
-		{
-			m_projection_matrix = matrix;
-		}
-
-		virtual void setViewport(float width, float height) override
-		{
-			bgfx::setViewRect(0, 0, 0, (uint16_t)width, (uint16_t)height);
-		}
-
-		virtual void setProjection(float width, float height, float fov, float near_plane, float far_plane, const Matrix& mtx) override
-		{
-
-			getProjectionMatrix(fov, width, height, near_plane, far_plane, &m_projection_matrix);
-
-			Vec3 pos = mtx.getTranslation();
-			Vec3 center = pos - mtx.getZVector();
-			Vec3 up = mtx.getYVector();
-			getLookAtMatrix(pos, center, up, &m_view_matrix);
-		}
-
-		virtual void setRenderDevice(IRenderDevice& device) override
-		{
-			m_render_device = &device;
-		}
-
-		virtual void renderGame() override
-		{
-			PROFILE_FUNCTION();
-			if (m_render_device)
-			{
-				m_render_device->beginFrame();
-				render(*m_render_device);
-				m_render_device->endFrame();
-			}
-		}
-
-		virtual void render(IRenderDevice& device) override
-		{
-			PROFILE_FUNCTION();
-
-			device.getPipeline().render();
-
-			cleanup();
-		}
-
-		virtual const Matrix& getCurrentViewMatrix() override
-		{
-			return m_view_matrix;
-		}
-
-		virtual const Matrix& getCurrentProjectionMatrix() override
-		{
-			return m_projection_matrix;
-		}
-
-		virtual void cleanup() override
-		{
-			m_last_bind_geometry = NULL;
-			m_last_bind_geometry_mesh = NULL;
-			glBindBuffer(GL_ARRAY_BUFFER, 0);
-			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-			glUseProgram(0);
-			for (int i = 0; i < 16; ++i)
-			{
-				glActiveTexture(GL_TEXTURE0 + i);
-				glBindTexture(GL_TEXTURE_2D, 0);
-			}
-			glActiveTexture(GL_TEXTURE0);
-		}
-
-
-		virtual void setUniform(Shader& shader, const char* name, const uint32_t name_hash, int value) override
-		{
-			PROFILE_FUNCTION();
-			GLint loc = shader.getUniformLocation(name, name_hash);
-			if (loc >= 0)
-			{
-				if (m_last_program_id != shader.getProgramId())
-				{
-					glUseProgram(shader.getProgramId());
-					m_last_program_id = shader.getProgramId();
-				}
-				glUniform1i(loc, value);
-			}
-		}
-
-
-		virtual void setUniform(Shader& shader, const char* name, const uint32_t name_hash, const Vec3& value) override
-		{
-			PROFILE_FUNCTION();
-			GLint loc = shader.getUniformLocation(name, name_hash);
-			if (loc >= 0)
-			{
-				if (m_last_program_id != shader.getProgramId())
-				{
-					glUseProgram(shader.getProgramId());
-					m_last_program_id = shader.getProgramId();
-				}
-				glUniform3f(loc, value.x, value.y, value.z);
-			}
-		}
-
-
-		virtual void setUniform(Shader& shader, const char* name, const uint32_t name_hash, float value) override
-		{
-			PROFILE_FUNCTION();
-			GLint loc = shader.getUniformLocation(name, name_hash);
-			if (loc >= 0)
-			{
-				if (m_last_program_id != shader.getProgramId())
-				{
-					glUseProgram(shader.getProgramId());
-					m_last_program_id = shader.getProgramId();
-				}
-				glUniform1f(loc, value);
-			}
-		}
-
-
-		virtual void setUniform(Shader& shader, const char* name, const uint32_t name_hash, const Matrix& mtx) override
-		{
-			PROFILE_FUNCTION();
-			GLint loc = shader.getUniformLocation(name, name_hash);
-			if (loc >= 0)
-			{
-				//glProgramUniformMatrix4fv(shader.getProgramId(), loc, 1, false, &mtx.m11);
-				if (m_last_program_id != shader.getProgramId())
-				{
-					glUseProgram(shader.getProgramId());
-					m_last_program_id = shader.getProgramId();
-				}
-				glUniformMatrix4fv(loc, 1, false, &mtx.m11);
-			}
-		}
-
-
-		virtual void setUniform(Shader& shader, const char* name, const uint32_t name_hash, const Matrix* matrices, int count) override
-		{
-			PROFILE_FUNCTION();
-			GLint loc = shader.getUniformLocation(name, name_hash);
-			if (loc >= 0)
-			{
-				if (m_last_program_id != shader.getProgramId())
-				{
-					glUseProgram(shader.getProgramId());
-					m_last_program_id = shader.getProgramId();
-				}
-				glUniformMatrix4fv(loc, count, false, (float*)matrices);
-			}
-		}
-
-
-		virtual uint32_t getPass() override
-		{
-			return m_current_pass_hash;
-		}
-
-
-		virtual void setPass(uint32_t pass_hash) override
-		{
-			m_current_pass_hash = pass_hash;
-		}
-
-
-		virtual Shader& getDebugShader() override
-		{
-			ASSERT(m_debug_shader);
-			return *m_debug_shader;
-		}
-
-
-		virtual void applyShader(Shader& shader, uint32_t combination) override
-		{
-			shader.setCurrentCombination(combination, m_current_pass_hash);
-			GLuint id = shader.getProgramId();
-			m_last_program_id = id;
-			glUseProgram(id);
-			setFixedCachedUniform(*this, shader, (int)Shader::FixedCachedUniforms::VIEW_MATRIX, m_view_matrix);
-			setFixedCachedUniform(*this, shader, (int)Shader::FixedCachedUniforms::PROJECTION_MATRIX, m_projection_matrix);
-			for (int i = 0, c = shader.getTextureSlotCount(); i < c; ++i)
-			{
-				const Shader::TextureSlot& slot = shader.getTextureSlot(i);
-				if (slot.m_uniform[0] != '\0')
-				{
-					setUniform(shader, slot.m_uniform, slot.m_uniform_hash, i);
-				}
-			}
-		}
-
-
+		
 		void registerPropertyDescriptors(Engine& engine)
 		{
 			if (engine.getWorldEditor())
@@ -371,51 +148,18 @@ namespace Lumix
 		{
 			m_shader_manager.setRenderer(*this);
 			registerPropertyDescriptors(m_engine);
-
-			glewExperimental = GL_TRUE;
-			GLenum err = glewInit();
-			m_debug_shader = static_cast<Shader*>(m_engine.getResourceManager().get(ResourceManager::SHADER)->load(Path("shaders/debug.shd")));
-			return err == GLEW_OK;
+			return true;
 		}
 
 
 		virtual void destroy() override
 		{
-			m_debug_shader->getResourceManager().get(ResourceManager::SHADER)->unload(*m_debug_shader);
 		}
 
 
 		virtual const char* getName() const override
 		{
 			return "renderer";
-		}
-
-
-		virtual void enableAlphaToCoverage(bool enable) override
-		{
-			if (enable)
-			{
-				glEnable(GL_MULTISAMPLE);
-				glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-			}
-			else
-			{
-				glDisable(GL_MULTISAMPLE);
-				glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-			}
-		}
-
-
-		virtual void enableZTest(bool enable) override
-		{
-			if (enable)
-			{
-				glEnable(GL_DEPTH_TEST);
-			}
-			else
-			{
-				glDisable(GL_DEPTH_TEST);
-			}
 		}
 
 
@@ -441,69 +185,6 @@ namespace Lumix
 		}
 
 
-		virtual void renderModel(const Model& model, const Matrix& transform, PipelineInstance& pipeline) override
-		{
-			if (!model.isReady())
-			{
-				return;
-			}
-
-			bgfx::setViewTransform(0, &m_view_matrix.m11, &m_projection_matrix.m11);
-
-			for (int i = 0, c = model.getMeshCount(); i < c; ++i)
-			{
-				const Mesh& mesh = model.getMesh(i);
-
-				uint64_t state = 0
-					| BGFX_STATE_RGB_WRITE
-					| BGFX_STATE_ALPHA_WRITE
-					| BGFX_STATE_DEPTH_WRITE
-					| BGFX_STATE_DEPTH_TEST_LESS
-					| BGFX_STATE_CULL_CCW
-					| BGFX_STATE_MSAA
-					;
-
-				bgfx::setTransform(&transform.m11);
-				bgfx::setProgram(mesh.getMaterial()->getProgramID());
-				for (int i = 0; i < mesh.getMaterial()->getTextureCount(); ++i)
-				{
-					bgfx::setTexture(0, mesh.getMaterial()->getShader()->getTextureSlot(i).m_uniform_handle, mesh.getMaterial()->getTexture(i)->getTextureHandle());
-				}
-				bgfx::setVertexBuffer(model.getGeometry().getAttributesArrayID(), mesh.getAttributeArrayOffset() / mesh.getVertexDefinition().getStride(), mesh.getAttributeArraySize() / mesh.getVertexDefinition().getStride());
-				bgfx::setIndexBuffer(model.getGeometry().getIndicesArrayID(), mesh.getIndicesOffset(), mesh.getIndexCount());
-				bgfx::setState(state);
-				bgfx::submit(0);
-			}
-
-		}
-
-
-		virtual void setEditorWireframe(bool is_wireframe)
-		{
-			m_is_editor_wireframe = is_wireframe;
-		}
-
-
-		virtual bool isEditorWireframe() const
-		{
-			return m_is_editor_wireframe;
-		}
-
-
-		virtual int getAttributeNameIndex(const char* name) override
-		{
-			for (int i = 0; i < m_attribute_names.size(); ++i)
-			{
-				if (m_attribute_names[i] == name)
-				{
-					return i;
-				}
-			}
-			m_attribute_names.emplace(name, m_allocator);
-			return m_attribute_names.size() - 1;
-		}
-
-
 		Engine& m_engine;
 		Debug::Allocator m_allocator;
 		TextureManager m_texture_manager;
@@ -512,16 +193,7 @@ namespace Lumix
 		ModelManager m_model_manager;
 		BitmapFontManager m_font_manager;
 		PipelineManager m_pipeline_manager;
-		IRenderDevice* m_render_device;
-		bool m_is_editor_wireframe;
-		const Geometry* m_last_bind_geometry;
-		const Mesh* m_last_bind_geometry_mesh;
-		GLuint m_last_program_id;
 		uint32_t m_current_pass_hash;
-		Matrix m_view_matrix;
-		Matrix m_projection_matrix;
-		Shader* m_debug_shader;
-		Array<string> m_attribute_names;
 	};
 
 	
@@ -541,7 +213,7 @@ namespace Lumix
 		bgfx::frame();
 	}
 
-
+	
 	Renderer* Renderer::createInstance(Engine& engine)
 	{
 		return engine.getAllocator().newObject<RendererImpl>(engine);
@@ -553,191 +225,5 @@ namespace Lumix
 		renderer.getEngine().getAllocator().deleteObject(&renderer);
 	}
 
-
-	void Renderer::getProjectionMatrix(float fov, float width, float height, float near_plane, float far_plane, Matrix* mtx)
-	{
-		*mtx = Matrix::IDENTITY;
-		float f = 1 / tanf(Math::degreesToRadians(fov) * 0.5f);
-		mtx->m11 = f / (width / height);
-		mtx->m22 = f;
-		mtx->m33 = (far_plane + near_plane) / (near_plane - far_plane);
-		mtx->m44 = 0;
-		mtx->m43 = (2 * far_plane * near_plane) / (near_plane - far_plane);
-		mtx->m34 = -1;
-	}
-
-
-	void Renderer::getOrthoMatrix(float left, float right, float bottom, float top, float z_near, float z_far, Matrix* mtx)
-	{
-		*mtx = Matrix::IDENTITY;
-		mtx->m11 = 2 / (right - left);
-		mtx->m22 = 2 / (top - bottom);
-		mtx->m33 = -2 / (z_far - z_near);
-		mtx->m41 = -(right + left) / (right - left);
-		mtx->m42 = -(top + bottom) / (top - bottom);
-		mtx->m43 = -(z_far + z_near) / (z_far - z_near);
-		/*	glLoadIdentity();
-		glOrtho(left, right, bottom, top, z_near, z_far);
-		glGetFloatv(GL_PROJECTION_MATRIX, &mtx->m11);
-		glLoadIdentity();*/
-	}
-
-
-	void Renderer::getLookAtMatrix(const Vec3& pos, const Vec3& center, const Vec3& up, Matrix* mtx)
-	{
-		*mtx = Matrix::IDENTITY;
-		Vec3 f = center - pos;
-		f.normalize();
-		Vec3 r = crossProduct(f, up);
-		r.normalize();
-		Vec3 u = crossProduct(r, f);
-		mtx->setXVector(r);
-		mtx->setYVector(u);
-		mtx->setZVector(-f);
-		mtx->transpose();
-		mtx->setTranslation(Vec3(-dotProduct(r, pos), -dotProduct(u, pos), dotProduct(f, pos)));
-		/*glPushMatrix();
-		float m[16];
-		gluLookAt(pos.x, pos.y, pos.z, center.x, center.y, center.z, up.x, up.y, up.z);
-		glGetFloatv(GL_MODELVIEW_MATRIX, m);
-		glPopMatrix();*/
-	}
-
-
-	void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Vec3& value)
-	{
-		RendererImpl& renderer_impl = static_cast<RendererImpl&>(renderer);
-		GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
-		if (loc >= 0)
-		{
-			if (renderer_impl.m_last_program_id != shader.getProgramId())
-			{
-				glUseProgram(shader.getProgramId());
-				renderer_impl.m_last_program_id = shader.getProgramId();
-			}
-			glUniform3f(loc, value.x, value.y, value.z);
-		}
-	}
-
-
-	void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Vec4& value)
-	{
-		RendererImpl& renderer_impl = static_cast<RendererImpl&>(renderer);
-		GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
-		if (loc >= 0)
-		{
-			if (renderer_impl.m_last_program_id != shader.getProgramId())
-			{
-				glUseProgram(shader.getProgramId());
-				renderer_impl.m_last_program_id = shader.getProgramId();
-			}
-			glUniform4f(loc, value.x, value.y, value.z, value.w);
-		}
-	}
-
-
-	void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, float value)
-	{
-		RendererImpl& renderer_impl = static_cast<RendererImpl&>(renderer);
-		GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
-		if (loc >= 0)
-		{
-			if (renderer_impl.m_last_program_id != shader.getProgramId())
-			{
-				glUseProgram(shader.getProgramId());
-				renderer_impl.m_last_program_id = shader.getProgramId();
-			}
-			glUniform1f(loc, value);
-		}
-	}
-
-
-	void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Matrix& mtx)
-	{
-		RendererImpl& renderer_impl = static_cast<RendererImpl&>(renderer);
-		GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
-		if (loc >= 0)
-		{
-			if (renderer_impl.m_last_program_id != shader.getProgramId())
-			{
-				glUseProgram(shader.getProgramId());
-				renderer_impl.m_last_program_id = shader.getProgramId();
-			}
-			glUniformMatrix4fv(loc, 1, false, &mtx.m11);
-		}
-	}
-
-
-	void setFixedCachedUniform(Renderer& renderer, const Shader& shader, int name, const Matrix* matrices, int count)
-	{
-		RendererImpl& renderer_impl = static_cast<RendererImpl&>(renderer);
-		GLint loc = shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
-		if (loc >= 0)
-		{
-			if (renderer_impl.m_last_program_id != shader.getProgramId())
-			{
-				glUseProgram(shader.getProgramId());
-				renderer_impl.m_last_program_id = shader.getProgramId();
-			}
-			glUniformMatrix4fv(loc, count, false, (float*)matrices);
-		}
-	}
-
-
-	void renderInstancedGeometry(int indices_offset, int vertex_count, int instance_count, const Shader& shader)
-	{
-		for (int i = 0; i < shader.getAttributeCount(); ++i)
-		{
-			GLint attr_id = shader.getAttribId(i);
-			if (attr_id >= 0)
-			{
-				glVertexAttribDivisor(attr_id, 0);
-			}
-		}
-		glDrawElementsInstanced(GL_TRIANGLES, vertex_count, GL_UNSIGNED_INT, (void*)(indices_offset * sizeof(GLint)), instance_count);
-	}
-
-
-	void bindGeometry(Renderer& renderer, const Geometry& geometry, const Mesh& mesh)
-	{
-		ASSERT(false);
-	}
-
-
-	void renderGeometry(int indices_offset, int vertex_count)
-	{
-		ASSERT(false);
-	}
-
-
-	int getUniformLocation(const Shader& shader, int name)
-	{
-		return shader.getFixedCachedUniformLocation((Shader::FixedCachedUniforms)name);
-	}
-
-
-	void setUniform(int location, const Matrix& mtx)
-	{
-		glUniformMatrix4fv(location, 1, false, &mtx.m11);
-	}
-
-
-	void setUniform(int location, const Matrix* matrices, int count)
-	{
-		glUniformMatrix4fv(location, count, false, &matrices[0].m11);
-	}
-
-
-	void setUniform(int location, const Vec3& value)
-	{
-		glUniform3f(location, value.x, value.y, value.z);
-	}
-
-
-	void setUniform(int location, float value)
-	{
-		glUniform1f(location, value);
-	}
-
-
+	
 } // ~namespace Lumix

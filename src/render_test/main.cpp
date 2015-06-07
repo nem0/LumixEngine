@@ -18,6 +18,7 @@
 #include "graphics/texture.h"
 #include "physics/physics_scene.h"
 #include "physics/physics_system.h"
+#include "GL/glew.h"
 
 
 class WGLRenderDevice : public Lumix::IRenderDevice
@@ -30,7 +31,6 @@ public:
 		if (pipeline_object)
 		{
 			m_pipeline = Lumix::PipelineInstance::create(*pipeline_object, engine.getAllocator());
-			m_pipeline->setRenderer(engine.getRenderer());
 		}
 
 	}
@@ -283,7 +283,6 @@ public:
 		m_render_device->m_opengl_context = hglrc;
 		m_engine->createUniverse();
 		m_render_device->getPipeline().setScene((Lumix::RenderScene*)m_engine->getScene(crc32("renderer")));
-		m_engine->getRenderer().setRenderDevice(*m_render_device);
 		m_render_device->getPipeline().resize(600, 400);
 
 		enumerateTests();
@@ -365,7 +364,9 @@ public:
 		{
 			{
 				PROFILE_BLOCK("tick");
-				m_engine->getRenderer().renderGame();
+				m_render_device->beginFrame();
+				m_render_device->getPipeline().render();
+				m_render_device->endFrame();
 				m_engine->update(false, 1, -1);
 				if (!m_engine->getResourceManager().isLoading())
 				{

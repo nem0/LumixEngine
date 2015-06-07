@@ -383,7 +383,7 @@ void MainWindow::on_actionProfiler_triggered()
 
 void MainWindow::on_actionPolygon_Mode_changed()
 {
-	m_world_editor->setWireframe(m_ui->actionPolygon_Mode->isChecked());
+	m_scene_view->setWireframe(m_ui->actionPolygon_Mode->isChecked());
 }
 
 void MainWindow::onScriptCompiled()

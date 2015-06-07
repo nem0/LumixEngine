@@ -105,7 +105,6 @@ namespace Lumix
 			virtual void onMouseUp(int x, int y, MouseButton::Value button) = 0;
 			virtual float getMouseX() const = 0;
 			virtual float getMouseY() const = 0;
-			virtual void setWireframe(bool is_wireframe) = 0;
 			virtual void lookAtSelected() = 0;
 			virtual const char* getBasePath() = 0;
 			virtual const Array<Entity>& getSelectedEntities() const = 0;

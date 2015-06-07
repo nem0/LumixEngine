@@ -430,8 +430,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	virtual void render(Renderer& renderer) override
 	{
-		renderer.cleanup();
-		Shader& shader = renderer.getDebugShader();
+		/*Shader& shader = renderer.getDebugShader();
 		renderer.applyShader(shader, 0);
 
 		m_scene->getNbActors(physx::PxActorTypeSelectionFlag::eRIGID_STATIC);
@@ -455,7 +454,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 				glVertex3fv((GLfloat*)&line.pos1);
 			}
 			glEnd();
-		}
+		}*/
+		TODO("bgfx");
 	}
 
 

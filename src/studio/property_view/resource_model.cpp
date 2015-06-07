@@ -260,7 +260,6 @@ void ResourceModel::fillMaterialInfo(Lumix::Material* material, Node& node)
 	object.getNode().enablePeristentEditor();
 	object
 		.property("Alpha cutout", &Lumix::Material::isAlphaCutout, &Lumix::Material::enableAlphaCutout)
-		.property("Alpha to coverage", &Lumix::Material::isAlphaToCoverage, &Lumix::Material::enableAlphaToCoverage)
 		.property("Backface culling", &Lumix::Material::isBackfaceCulling, &Lumix::Material::enableBackfaceCulling)
 		.property("Shadow receiver", &Lumix::Material::isShadowReceiver, &Lumix::Material::enableShadowReceiving)
 		.property("Z test", &Lumix::Material::isZTest, &Lumix::Material::enableZTest)

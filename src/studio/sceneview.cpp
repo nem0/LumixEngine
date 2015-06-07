@@ -129,6 +129,12 @@ void SceneView::setWorldEditor(Lumix::WorldEditor* world_editor)
 }
 
 
+void SceneView::setWireframe(bool wireframe)
+{
+	m_pipeline->setWireframe(wireframe);
+}
+
+
 void SceneView::onDistanceMeasured(float distance)
 {
 	m_measure_tool_label->setText(QString("Measured distance: %1").arg(distance));

@@ -157,7 +157,7 @@ bool Model::parseVertexDef(FS::IFile* file, bgfx::VertexDecl* vertex_definition)
 		}
 		else if (strcmp(tmp, "in_tex_coords") == 0)
 		{
-			vertex_definition->add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Int16, true, true);
+			vertex_definition->add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float);
 		}
 		else if (strcmp(tmp, "in_normal") == 0)
 		{

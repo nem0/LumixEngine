@@ -43,6 +43,8 @@ Shader::Shader(const Path& path, ResourceManager& resource_manager, Renderer& re
 
 Shader::~Shader()
 {
+	TODO("bgfx");
+	/*
 	for(int i = 0; i < m_combinations.size(); ++i)
 	{	
 		glDeleteProgram(m_combinations[i]->m_program_id);
@@ -50,24 +52,7 @@ Shader::~Shader()
 		glDeleteShader(m_combinations[i]->m_fragment_id);
 		m_allocator.deleteObject(m_combinations[i]);
 	}
-}
-
-
-GLint Shader::getUniformLocation(const char* name, uint32_t name_hash)
-{
-	Array<CachedUniform>& uniforms = m_current_combination->m_uniforms;
-	for (int i = 0, c = uniforms.size(); i < c; ++i)
-	{
-		if (uniforms[i].m_name_hash == name_hash)
-		{
-			return uniforms[i].m_location;
-		}
-	}
-	ASSERT(isReady());
-	CachedUniform& unif = uniforms.pushEmpty();
-	unif.m_name_hash = name_hash;
-	unif.m_location = glGetUniformLocation(m_current_combination->m_program_id, name);
-	return unif.m_location;
+	*/
 }
 
 
@@ -97,7 +82,7 @@ bool Shader::hasPass(uint32_t pass_hash)
 
 void Shader::createCombination(const char* defines)
 {
-	ASSERT(isReady());
+	/*ASSERT(isReady());
 	for(int pass_idx = 0; pass_idx < m_passes.size(); ++pass_idx)
 	{
 		uint32_t hash = defines[0] == '\0' ? 0 : crc32(defines);
@@ -113,22 +98,19 @@ void Shader::createCombination(const char* defines)
 			combination->m_hash = hash;
 			combination->m_pass_hash = pass_hash;
 
-			char version_str[20];
-			copyString(version_str, sizeof(version_str), m_renderer.getGLSLVersion() >= 330 ? "#version 330\n" : "#version 130\n");
-
 			char pass_str[1024];
 			copyString(pass_str, sizeof(pass_str), "#define ");
 			catCString(pass_str, sizeof(pass_str), m_passes[pass_idx].c_str());
 			catCString(pass_str, sizeof(pass_str), "_PASS\n");
 
 			combination->m_vertex_id = glCreateShader(GL_VERTEX_SHADER);
-			const GLchar* vs_strings[] = { version_str, pass_str, defines, m_vertex_shader_source.c_str() };
+			const GLchar* vs_strings[] = { pass_str, defines, m_vertex_shader_source.c_str() };
 			glShaderSource(combination->m_vertex_id, sizeof(vs_strings) / sizeof(vs_strings[0]), vs_strings, NULL);
 			glCompileShader(combination->m_vertex_id);
 			glAttachShader(combination->m_program_id, combination->m_vertex_id);
 
 			combination->m_fragment_id = glCreateShader(GL_FRAGMENT_SHADER);
-			const GLchar* fs_strings[] = { version_str, pass_str, defines, m_fragment_shader_source.c_str() };
+			const GLchar* fs_strings[] = { pass_str, defines, m_fragment_shader_source.c_str() };
 			glShaderSource(combination->m_fragment_id, sizeof(fs_strings) / sizeof(fs_strings[0]), fs_strings, NULL);
 			glCompileShader(combination->m_fragment_id);
 			glAttachShader(combination->m_program_id, combination->m_fragment_id);
@@ -163,36 +145,9 @@ void Shader::createCombination(const char* defines)
 			{
 				combination->m_vertex_attributes_ids[i] = -1;
 			}
-
-			for (int i = 0; i < m_attributes.size(); ++i)
-			{
-				int attr_idx = m_renderer.getAttributeNameIndex(m_attributes[i].c_str());
-				combination->m_vertex_attributes_ids[attr_idx] = glGetAttribLocation(combination->m_program_id, m_attributes[i].c_str());
-			}
-			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::WORLD_MATRIX] = glGetUniformLocation(combination->m_program_id, "world_matrix");
-			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::GRASS_MATRICES] = glGetUniformLocation(combination->m_program_id, "grass_matrices");
-			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::MORPH_CONST] = glGetUniformLocation(combination->m_program_id, "morph_const");
-			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::QUAD_SIZE] = glGetUniformLocation(combination->m_program_id, "quad_size");
-			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::QUAD_MIN] = glGetUniformLocation(combination->m_program_id, "quad_min");
-			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::AMBIENT_COLOR] = glGetUniformLocation(combination->m_program_id, "ambient_color");
-			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::AMBIENT_INTENSITY] = glGetUniformLocation(combination->m_program_id, "ambient_intensity");
-			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::DIFFUSE_COLOR] = glGetUniformLocation(combination->m_program_id, "diffuse_color");
-			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::DIFFUSE_INTENSITY] = glGetUniformLocation(combination->m_program_id, "diffuse_intensity");
-			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::FOG_COLOR] = glGetUniformLocation(combination->m_program_id, "fog_color");
-			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::FOG_DENSITY] = glGetUniformLocation(combination->m_program_id, "fog_density");
-			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::SHADOWMAP_SPLITS] = glGetUniformLocation(combination->m_program_id, "shadowmap_splits");
-			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::VIEW_MATRIX] = glGetUniformLocation(combination->m_program_id, "view_matrix");
-			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::PROJECTION_MATRIX] = glGetUniformLocation(combination->m_program_id, "projection_matrix");
-			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::SHADOW_MATRIX0] = glGetUniformLocation(combination->m_program_id, "shadowmap_matrix0");
-			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::SHADOW_MATRIX1] = glGetUniformLocation(combination->m_program_id, "shadowmap_matrix1");
-			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::SHADOW_MATRIX2] = glGetUniformLocation(combination->m_program_id, "shadowmap_matrix2");
-			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::SHADOW_MATRIX3] = glGetUniformLocation(combination->m_program_id, "shadowmap_matrix3");
-			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::LIGHT_POSITION] = glGetUniformLocation(combination->m_program_id, "light_pos");
-			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::LIGHT_RANGE] = glGetUniformLocation(combination->m_program_id, "light_range");
-			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::LIGHT_FOV] = glGetUniformLocation(combination->m_program_id, "light_fov");
-			combination->m_fixed_cached_uniforms[(int)FixedCachedUniforms::LIGHT_DIR] = glGetUniformLocation(combination->m_program_id, "light_dir");
 		}
-	}
+	}*/
+	TODO("bgfx");
 }
 
 
@@ -252,7 +207,7 @@ void Shader::parseTextureSlots(lua_State* L)
 				if (lua_getfield(L, -1, "uniform") == LUA_TSTRING)
 				{
 					copyString(m_texture_slots[i].m_uniform, sizeof(m_texture_slots[i].m_uniform), lua_tostring(L, -1));
-					m_texture_slots[i].m_uniform_handle = bgfx::createUniform(m_texture_slots[i].m_name, bgfx::UniformType::Int1);
+					m_texture_slots[i].m_uniform_handle = bgfx::createUniform(m_texture_slots[i].m_uniform, bgfx::UniformType::Int1);
 					m_texture_slots[i].m_uniform_hash = crc32(m_texture_slots[i].m_uniform);
 				}
 				lua_pop(L, 1);
@@ -342,13 +297,15 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 
 void Shader::doUnload(void)
 {
-	for(int i = 0; i < m_combinations.size(); ++i)
+	TODO("bgfx");
+	/*
+	for (int i = 0; i < m_combinations.size(); ++i)
 	{
-		m_combinations[i]->m_uniforms.clear();
 		glDeleteProgram(m_combinations[i]->m_program_id);
 		glDeleteShader(m_combinations[i]->m_vertex_id);
 		glDeleteShader(m_combinations[i]->m_fragment_id);
 	}
+	*/
 	m_size = 0;
 	onEmpty();
 }

@@ -316,7 +316,7 @@ namespace Lumix
 				float far_plane = m_cameras[camera.index].m_far;
 
 				Matrix projection_matrix;
-				Renderer::getProjectionMatrix(fov, width, height, near_plane, far_plane, &projection_matrix);
+				projection_matrix.setPerspective(Math::degreesToRadians(fov), width, height, near_plane, far_plane);
 				Matrix view_matrix = camera.entity.getMatrix();
 				view_matrix.inverse();
 				Matrix inverted = (projection_matrix * view_matrix);
@@ -342,21 +342,15 @@ namespace Lumix
 				m_applied_camera = cmp;
 				Matrix mtx;
 				cmp.entity.getMatrix(mtx);
-				float fov = m_cameras[cmp.index].m_fov;
-				float width = m_cameras[cmp.index].m_width;
-				float height = m_cameras[cmp.index].m_height;
-				float near_plane = m_cameras[cmp.index].m_near;
-				float far_plane = m_cameras[cmp.index].m_far;
-				m_renderer.setProjection(width, height, fov, near_plane, far_plane, mtx);
-
+				
 				m_camera_frustum.computePerspective(
 					mtx.getTranslation(),
 					mtx.getZVector(),
 					mtx.getYVector(),
-					fov,
-					width / height,
-					near_plane,
-					far_plane
+					m_cameras[cmp.index].m_fov,
+					m_cameras[cmp.index].m_width / m_cameras[cmp.index].m_height,
+					m_cameras[cmp.index].m_near,
+					m_cameras[cmp.index].m_far
 					);
 			}
 			

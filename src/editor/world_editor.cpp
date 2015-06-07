@@ -2213,12 +2213,6 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
-		virtual void setWireframe(bool is_wireframe) override
-		{
-			m_engine->getRenderer().setEditorWireframe(is_wireframe);
-		}
-
-
 		virtual void renderIcons(IRenderDevice& render_device) override
 		{
 			PROFILE_FUNCTION();
@@ -2232,7 +2226,7 @@ struct WorldEditorImpl : public WorldEditor
 		virtual void render(IRenderDevice& render_device) override
 		{
 			PROFILE_FUNCTION();
-			m_engine->getRenderer().render(render_device);
+			render_device.getPipeline().render();
 		}
 
 

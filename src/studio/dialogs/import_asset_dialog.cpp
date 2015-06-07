@@ -142,7 +142,7 @@ static int getVertexSize(const aiMesh* mesh)
 	static const int POSITION_SIZE = sizeof(float) * 3;
 	static const int NORMAL_SIZE = sizeof(uint8_t) * 4;
 	static const int TANGENT_SIZE = sizeof(uint8_t) * 4;
-	static const int UV_SIZE = sizeof(short) * 2;
+	static const int UV_SIZE = sizeof(float) * 2;
 	static const int BONE_INDICES_WEIGHTS_SIZE = sizeof(float) * 4 + sizeof(int) * 4;
 	int size = POSITION_SIZE + NORMAL_SIZE + UV_SIZE;
 	if (mesh->mTangents)
@@ -205,7 +205,7 @@ void ImportThread::writeMeshes(QFile& file)
 		{
 			writeAttribute("in_tangents", VertexAttributeDef::BYTE4, file);
 		}
-		writeAttribute("in_tex_coords", VertexAttributeDef::SHORT2, file);
+		writeAttribute("in_tex_coords", VertexAttributeDef::FLOAT2, file);
 	}
 }
 
@@ -318,8 +318,8 @@ void ImportThread::writeGeometry(QFile& file)
 			}
 
 			auto uv = mesh->mTextureCoords[0][j];
-			short short_uv[2] = { (short)(uv.x * 2048), (short)(uv.y * 2048) };
-			file.write((const char*)short_uv, sizeof(short_uv));
+			uv.y = -uv.y;
+			file.write((const char*)&uv, sizeof(uv.x) + sizeof(uv.y));
 		}
 	}
 }

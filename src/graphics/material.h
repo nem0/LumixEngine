@@ -49,6 +49,7 @@ public:
 		char m_name[MAX_NAME_LENGTH + 1];
 		uint32_t m_name_hash;
 		Type m_type;
+		bgfx::UniformHandle m_handle;
 		union
 		{
 			int32_t m_int;
@@ -59,16 +60,15 @@ public:
 
 public:
 	void apply(Renderer& renderer, PipelineInstance& pipeline) const;
-	bool isZTest() const { return m_is_z_test; }
-	void enableZTest(bool enable) { m_is_z_test = enable; }
-	bool isBackfaceCulling() const { return m_is_backface_culling; }
-	void enableBackfaceCulling(bool enable) { m_is_backface_culling = enable; }
-	bool isAlphaToCoverage() const { return m_is_alpha_to_coverage; }
-	void enableAlphaToCoverage(bool enable) { m_is_alpha_to_coverage = enable; }
+	bool isZTest() const { return (m_render_states & BGFX_STATE_DEPTH_TEST_MASK) != 0; }
+	void enableZTest(bool enable) { setRenderState(enable, BGFX_STATE_DEPTH_TEST_LESS, BGFX_STATE_DEPTH_TEST_MASK); }
+	bool isBackfaceCulling() const { return (m_render_states & BGFX_STATE_CULL_MASK) != 0; }
+	void enableBackfaceCulling(bool enable) { setRenderState(enable, BGFX_STATE_CULL_CW, BGFX_STATE_CULL_MASK); }
 	bool isAlphaCutout() const { return m_is_alpha_cutout; }
 	void enableAlphaCutout(bool enable) { m_is_alpha_cutout = enable; updateShaderCombination(); }
 	bool isShadowReceiver() const { return m_is_shadow_receiver; }
 	void enableShadowReceiving(bool enable) { m_is_shadow_receiver = enable; updateShaderCombination(); }
+	uint64_t getRenderStates() const { return m_render_states; }
 
 	void setShader(Shader* shader);
 	void setShader(const Path& path);
@@ -88,16 +88,14 @@ public:
 	Material(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 		: Resource(path, resource_manager, allocator)
 		, m_shader(NULL)
-		, m_is_z_test(true)
-		, m_is_backface_culling(true)
 		, m_depth_func(DepthFunc::LEQUAL)
-		, m_is_alpha_to_coverage(false)
 		, m_is_alpha_cutout(false)
 		, m_shader_combination(0)
 		, m_is_shadow_receiver(true)
 		, m_uniforms(allocator)
 		, m_allocator(allocator)
 		, m_texture_count(0)
+		, m_render_states(0)
 	{ 
 		for (int i = 0; i < MAX_TEXTURE_COUNT; ++i)
 		{
@@ -118,6 +116,7 @@ private:
 private:
 	void deserializeUniforms(JsonSerializer& serializer);
 	void updateShaderCombination();
+	void setRenderState(bool value, uint64_t state, uint64_t mask);
 
 private:
 	static const int MAX_TEXTURE_COUNT = 16;
@@ -126,15 +125,13 @@ private:
 	Texture* m_textures[MAX_TEXTURE_COUNT];
 	int m_texture_count;
 	Array<Uniform> m_uniforms;
-	bool m_is_z_test;
-	bool m_is_backface_culling;
-	bool m_is_alpha_to_coverage;
 	bool m_is_alpha_cutout;
 	bool m_is_shadow_receiver;
 	DepthFunc m_depth_func;
 	uint32_t m_shader_combination;
 	IAllocator& m_allocator;
 	bgfx::ProgramHandle m_program_id;
+	uint64_t m_render_states;
 };
 
 } // ~namespace Lumix

@@ -172,6 +172,48 @@ struct LUMIX_CORE_API Matrix
 		m43 = t.z;
 	}
 
+
+	void setOrtho(float left, float right, float bottom, float top, float z_near, float z_far)
+	{
+		*this = IDENTITY;
+		m11 = 2 / (right - left);
+		m22 = 2 / (top - bottom);
+		m33 = -2 / (z_far - z_near);
+		m41 = -(right + left) / (right - left);
+		m42 = -(top + bottom) / (top - bottom);
+		m43 = -(z_far + z_near) / (z_far - z_near);
+	}
+
+
+	void setPerspective(float fov, float width, float height, float near_plane, float far_plane)
+	{
+		*this = Matrix::IDENTITY;
+		float f = 1 / tanf(fov * 0.5f);
+		m11 = f / (width / height);
+		m22 = f;
+		m33 = (far_plane + near_plane) / (near_plane - far_plane);
+		m44 = 0;
+		m43 = (2 * far_plane * near_plane) / (near_plane - far_plane);
+		m34 = -1;
+	}
+
+
+	void lookAt(const Vec3& pos, const Vec3& center, const Vec3& up)
+	{
+		*this = Matrix::IDENTITY;
+		Vec3 f = center - pos;
+		f.normalize();
+		Vec3 r = crossProduct(f, up);
+		r.normalize();
+		Vec3 u = crossProduct(r, f);
+		setXVector(r);
+		setYVector(u);
+		setZVector(-f);
+		transpose();
+		setTranslation(Vec3(-dotProduct(r, pos), -dotProduct(u, pos), dotProduct(f, pos)));
+	}
+
+
 	void getTranslation(Vec3& pos) const;
 	Vec3 getTranslation() const;
 	void getRotation(Quat& rot) const;
