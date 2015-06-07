@@ -212,6 +212,10 @@ namespace Lumix
 			, m_renderable_infos(allocator)
 			, m_frame_allocator(allocator, 1 * 1024 * 1024)
 		{
+			m_light_pos_radius_uniform = bgfx::createUniform("u_lightPosRadius", bgfx::UniformType::Vec4);
+			m_light_color_uniform = bgfx::createUniform("u_lightRgbInnerR", bgfx::UniformType::Vec4);
+			m_light_dir_fov_uniform = bgfx::createUniform("u_lightDirFov", bgfx::UniformType::Vec4);
+
 			m_draw_calls_count = 0;
 			m_vertices_count = 0;
 			m_scene = NULL;
@@ -224,12 +228,22 @@ namespace Lumix
 
 		~PipelineInstanceImpl()
 		{
+			bgfx::destroyUniform(m_light_pos_radius_uniform);
+			bgfx::destroyUniform(m_light_color_uniform);
+			bgfx::destroyUniform(m_light_dir_fov_uniform);
+			
 			m_source.getObserverCb().unbind<PipelineInstanceImpl, &PipelineInstanceImpl::sourceLoaded>(this);
 			m_source.getResourceManager().get(ResourceManager::PIPELINE)->unload(m_source);
 			for (int i = 0; i < m_framebuffers.size(); ++i)
 			{
 				m_allocator.deleteObject(m_framebuffers[i]);
 			}
+		}
+
+
+		void setPass(const char* name)
+		{
+			++m_pass_idx;
 		}
 
 
@@ -261,19 +275,6 @@ namespace Lumix
 				}
 			}
 			return NULL;
-		}
-
-
-		void setRenderer(Renderer& renderer) override
-		{
-			m_renderer = &renderer;
-		}
-
-
-		Renderer& getRenderer() override
-		{
-			ASSERT(m_renderer);
-			return *m_renderer;
 		}
 
 
@@ -337,7 +338,8 @@ namespace Lumix
 
 		void renderShadowmap(Component camera, int64_t layer_mask)
 		{
-			PROFILE_FUNCTION();
+			TODO("bgfx");
+			/*PROFILE_FUNCTION();
 			ASSERT(m_renderer != NULL);
 			Component light_cmp = m_scene->getActiveGlobalLight();
 			if (!light_cmp.isValid() || !camera.isValid())
@@ -400,27 +402,14 @@ namespace Lumix
 				renderModels(shadow_camera_frustum, layer_mask, true);
 			}
 			FrameBuffer::unbind();
-			glCullFace(GL_BACK);
-		}
-
-
-		void applyMaterial(const Material& material)
-		{
-			material.apply(*m_renderer, *this);
-			int offset = material.getTextureCount();
-			for (int i = 0, c = m_global_textures.size(); i < c; ++i)
-			{
-				const GlobalTexture& texture = m_global_textures[i];
-				glActiveTexture(GL_TEXTURE0 + i + offset);
-				glBindTexture(GL_TEXTURE_2D, texture.m_texture_id);
-				m_renderer->setUniform(*material.getShader(), texture.m_uniform_name, texture.m_uniform_hash, i + offset);
-			}
+			glCullFace(GL_BACK);*/
 		}
 
 
 		void renderScreenGeometry(Geometry* geometry, Mesh* mesh)
 		{
-			if (mesh->getMaterial()->isReady())
+			TODO("bgfx");
+			/*if (mesh->getMaterial()->isReady())
 			{
 				ASSERT(m_renderer != NULL);
 				Shader* shader = mesh->getMaterial()->getShader();
@@ -451,7 +440,7 @@ namespace Lumix
 				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::PROJECTION_MATRIX, mtx);
 				bindGeometry(*m_renderer, *geometry, *mesh);
 				renderGeometry(0, 6);
-			}
+			}*/
 		}
 
 
@@ -492,6 +481,8 @@ namespace Lumix
 
 		void renderDebugLines()
 		{
+			TODO("bgfx");
+			/*
 			m_renderer->cleanup();
 
 			const Array<DebugLine>& lines = m_scene->getDebugLines();
@@ -519,41 +510,28 @@ namespace Lumix
 				glEnableVertexAttribArray(shader.getAttribId(1));
 				glVertexAttribPointer(shader.getAttribId(1), 3, GL_FLOAT, GL_FALSE, sizeof(Vec3), colors);
 				glDrawElements(GL_LINES, Math::minValue(lines.size() - offset, 256) * 2, GL_UNSIGNED_INT, indices);
-			}
+			}*/
 		}
 
-
-		void sortRenderables(Array<RenderableInfo>& infos)
-		{
-			PROFILE_FUNCTION();
-			if (!infos.empty())
-			{
-				qsort(&infos[0], infos.size(), sizeof(RenderableInfo), [](const void* a, const void* b) -> int
-				{
-					const RenderableInfo* info1 = static_cast<const RenderableInfo*>(a);
-					const RenderableInfo* info2 = static_cast<const RenderableInfo*>(b);
-					return (int)(info1->m_key - info2->m_key);
-				});
-			}
-		}
-
-
-		void setLightUniforms(const Component& light_cmp, Shader* shader)
+		
+		void setLightUniforms(const Component& light_cmp)
 		{
 			if (light_cmp.isValid())
 			{
 				if (light_cmp.type == POINT_LIGHT_HASH)
 				{
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_COLOR, m_scene->getPointLightColor(light_cmp));
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_INTENSITY, m_scene->getPointLightIntensity(light_cmp));
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOWMAP_SPLITS, m_shadowmap_splits);
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::LIGHT_POSITION, light_cmp.entity.getPosition());
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::LIGHT_RANGE, m_scene->getLightRange(light_cmp));
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::LIGHT_FOV, Math::degreesToRadians(m_scene->getLightFOV(light_cmp)));
+					Vec4 light_pos_radius(light_cmp.entity.getPosition(), m_scene->getLightRange(light_cmp));
+					bgfx::setUniform(m_light_pos_radius_uniform, &light_pos_radius);
+
+					Vec4 light_color(m_scene->getPointLightColor(light_cmp) * m_scene->getPointLightIntensity(light_cmp), 1);
+					bgfx::setUniform(m_light_color_uniform, &light_color);
+
+					Vec4 light_dir_fov(light_cmp.entity.getRotation() * Vec3(0, 0, 1), m_scene->getLightFOV(light_cmp));
+					bgfx::setUniform(m_light_dir_fov_uniform, &light_dir_fov);
 				}
 				else
 				{
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX0, m_shadow_modelviewprojection[0]);
+					/*setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX0, m_shadow_modelviewprojection[0]);
 					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX1, m_shadow_modelviewprojection[1]);
 					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX2, m_shadow_modelviewprojection[2]);
 					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX3, m_shadow_modelviewprojection[3]);
@@ -564,14 +542,19 @@ namespace Lumix
 					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_COLOR, m_scene->getFogColor(light_cmp));
 					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
 					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOWMAP_SPLITS, m_shadowmap_splits);
+					bgfx::setUniform(light_color, &m_scene->getLightAmbientColor(light_cmp));
+					float pos_r[] = { 0, 0, 0, 4 };
+					bgfx::setUniform(light_pos, pos_r);*/
 				}
-				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::LIGHT_DIR, light_cmp.entity.getRotation() * Vec3(0, 0, 1));
+				//setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::LIGHT_DIR, light_cmp.entity.getRotation() * Vec3(0, 0, 1));
 			}
 		}
 
 
 		void deferredPointLightLoop(Material* material)
 		{
+			TODO("bgfx");
+			/*
 			Array<Component> lights(m_allocator);
 			m_scene->getPointLights(m_scene->getFrustum(), lights);
 			if (!lights.empty() && material->isReady())
@@ -623,12 +606,15 @@ namespace Lumix
 				}
 
 				glDisable(GL_BLEND);
-			}
+			}*/
 		}
 
 
 		bool beginTerrainRenderLoop(const RenderableInfo* info, const Component& light_cmp)
 		{
+			TODO("bgfx");
+			return false;
+			/*
 			TerrainInfo* data = (TerrainInfo*)info->m_data;
 
 			Material* material = data->m_terrain->getMesh()->getMaterial();
@@ -643,12 +629,14 @@ namespace Lumix
 					return true;
 				}
 			}
-			return false;
+			return false;*/
 		}
 
 
 		bool beginGrassRenderLoop(const RenderableInfo* info, const Component& light_cmp)
 		{
+			TODO("bgfx");
+			/*
 			const Terrain::GrassPatch* patch = static_cast<const Terrain::GrassPatch*>(info->m_data);
 			const Mesh& mesh = *patch->m_type->m_grass_mesh;
 			const Material& material = *mesh.getMaterial();
@@ -663,30 +651,15 @@ namespace Lumix
 			setLightUniforms(light_cmp, shader);
 
 			bindGeometry(*m_renderer, *patch->m_type->m_grass_geometry, mesh);
-			return true;
-		}
-
-
-		bool beginRenderLoop(const RenderableInfo* info, const Component& light_cmp)
-		{
-			const Mesh* mesh = static_cast<const RenderableMesh*>(info->m_data)->m_mesh;
-			const Material& material = *mesh->getMaterial();
-			Shader* shader = material.getShader();
-			uint32_t pass_hash = getRenderer().getPass();
-			if (!material.isReady() || !shader->hasPass(pass_hash))
-			{
-				return false;
-			}
-
-			applyMaterial(material);
-			m_renderer->setUniform(*shader, "camera_pos", CAMERA_POS_HASH, m_active_camera.entity.getPosition());
-			setLightUniforms(light_cmp, shader);
-			return true;
+			return true;*/
+			return false;
 		}
 
 
 		void setPoseUniform(const RenderableMesh* LUMIX_RESTRICT renderable_mesh, Shader* shader)
 		{
+			TODO("bgfx");
+			/*
 			Matrix bone_mtx[64];
 
 			const Pose& pose = *renderable_mesh->m_pose;
@@ -701,7 +674,7 @@ namespace Lumix
 				bone_mtx[bone_index].translate(poss[bone_index]);
 				bone_mtx[bone_index] = bone_mtx[bone_index] * model.getBone(bone_index).inv_bind_matrix;
 			}
-			m_renderer->setUniform(*shader, "bone_matrices", BONE_MATRICES_HASH, bone_mtx, pose.getCount());
+			m_renderer->setUniform(*shader, "bone_matrices", BONE_MATRICES_HASH, bone_mtx, pose.getCount());*/
 		}
 
 
@@ -743,6 +716,9 @@ namespace Lumix
 
 		inline const RenderableInfo* renderLoopSkinned(const RenderableInfo* info)
 		{
+			TODO("bgfx");
+			return nullptr;
+			/*
 			const RenderableMesh* LUMIX_RESTRICT renderable_mesh = static_cast<const RenderableMesh*>(info->m_data);
 			Shader* shader = renderable_mesh->m_mesh->getMaterial()->getShader();
 			GLint world_matrix_uniform_location = shader->getFixedCachedUniformLocation(Shader::FixedCachedUniforms::WORLD_MATRIX);
@@ -761,48 +737,16 @@ namespace Lumix
 				renderGeometry(indices_offset, indices_count);
 				++info;
 			}
-			return info;
-		}
-
-
-		inline const RenderableInfo* renderLoopRigid(const RenderableInfo* info)
-		{
-			/*const RenderableMesh* LUMIX_RESTRICT renderable_mesh = static_cast<const RenderableMesh*>(info->m_data);
-			Shader* shader = renderable_mesh->m_mesh->getMaterial()->getShader();
-			GLint world_matrix_uniform_location = shader->getFixedCachedUniformLocation(Shader::FixedCachedUniforms::WORLD_MATRIX);
-			bindGeometry(*m_renderer, renderable_mesh->m_model->getGeometry(), *renderable_mesh->m_mesh);
-			int64_t last_key = info->m_key;
-			int indices_offset = renderable_mesh->m_mesh->getIndicesOffset();
-			int indices_count = renderable_mesh->m_mesh->getIndexCount();
-			Matrix matrices[64];
-			while (last_key == info->m_key)
-			{
-				Matrix* LUMIX_RESTRICT instance_matrix = matrices;
-				const Matrix* last_instance_matrix = matrices + (sizeof(matrices) / sizeof(matrices[0]));
-				while (last_key == info->m_key && instance_matrix < last_instance_matrix)
-				{
-					const RenderableMesh* LUMIX_RESTRICT renderable_mesh = static_cast<const RenderableMesh*>(info->m_data);
-					*instance_matrix = *renderable_mesh->m_matrix;
-					++instance_matrix;
-					++info;
-				}
-				int instance_count = instance_matrix - matrices;
-				setUniform(world_matrix_uniform_location, matrices, instance_count);
-				++m_draw_calls_count;
-				m_vertices_count += indices_count * instance_count;
-				renderInstancedGeometry(indices_offset, indices_count, instance_count, *shader);
-			}
 			return info;*/
-			const RenderableMesh* LUMIX_RESTRICT renderable_mesh = static_cast<const RenderableMesh*>(info->m_data);
-			m_renderer->renderModel(*renderable_mesh->m_model, *renderable_mesh->m_matrix, *this);
-			++info;
-			return info;
 		}
 
 
 		const RenderableInfo* renderLoopTerrain(const RenderableInfo* info)
 		{
-			PROFILE_FUNCTION();
+			TODO("bgfx");
+			return nullptr;
+
+			/*PROFILE_FUNCTION();
 			const TerrainInfo* data = static_cast<const TerrainInfo*>(info->m_data);
 
 			Matrix inv_world_matrix;
@@ -835,13 +779,15 @@ namespace Lumix
 				renderGeometry(mesh_part_indices_count * data->m_index, mesh_part_indices_count);
 				++info;
 			}
-			return info;
+			return info;*/
 		}
 
 
 		const RenderableInfo* renderLoopGrass(const RenderableInfo* info)
 		{
-			const int COPY_COUNT = 50;
+			TODO("bgfx");
+			return nullptr;
+			/*const int COPY_COUNT = 50;
 			int64_t last_key = info->m_key;
 			while (last_key == info->m_key)
 			{
@@ -866,7 +812,47 @@ namespace Lumix
 				}
 				++info;
 			}
-			return info;
+			return info;*/
+		}
+
+
+		virtual void renderModel(Model& model, const Matrix& mtx) override
+		{
+			RenderableMesh mesh;
+			mesh.m_matrix = &mtx;
+			mesh.m_model = &model;
+			mesh.m_pose = nullptr;
+			for (int i = 0; i < model.getMeshCount(); ++i)
+			{
+				mesh.m_mesh = &model.getMesh(i);
+				renderRigidMesh(mesh);
+			}
+		}
+
+
+		void renderRigidMesh(const RenderableMesh& info)
+		{
+			if (!info.m_model->isReady())
+			{
+				return;
+			}
+
+			const Mesh& mesh = *info.m_mesh;
+			const Model& model = *info.m_model;
+			bgfx::setTransform(&info.m_matrix->m11);
+			bgfx::setProgram(mesh.getMaterial()->getProgramID());
+			for (int i = 0; i < mesh.getMaterial()->getTextureCount(); ++i)
+			{
+				Texture* texture = mesh.getMaterial()->getTexture(i);
+				if (texture)
+				{
+					bgfx::setTexture(i, mesh.getMaterial()->getShader()->getTextureSlot(i).m_uniform_handle, texture->getTextureHandle());
+				}
+			}
+			bgfx::setVertexBuffer(model.getGeometry().getAttributesArrayID(), mesh.getAttributeArrayOffset() / mesh.getVertexDefinition().getStride(), mesh.getAttributeArraySize() / mesh.getVertexDefinition().getStride());
+			bgfx::setIndexBuffer(model.getGeometry().getIndicesArrayID(), mesh.getIndicesOffset(), mesh.getIndexCount());
+			bgfx::setState(m_render_state | mesh.getMaterial()->getRenderStates());
+			bgfx::submit(m_pass_idx);
 		}
 
 
@@ -877,51 +863,27 @@ namespace Lumix
 			{
 				return;
 			}
-			sortRenderables(*renderable_infos);
 			RenderableInfo& sentinel = renderable_infos->pushEmpty();
 			sentinel.m_key = 0;
 			const RenderableInfo* LUMIX_RESTRICT info = &(*renderable_infos)[0];
 			const RenderableInfo* LUMIX_RESTRICT end = &(*renderable_infos)[0] + renderable_infos->size() - 1;
+			setLightUniforms(light);
 			while (info != end)
 			{
 				switch (info->m_type)
 				{
-				case (int32_t)RenderableType::GRASS:
-					if (!beginGrassRenderLoop(info, light))
-					{
-						++info;
-						continue;
-					}
-					info = renderLoopGrass(info);
-					break;
-				case (int32_t)RenderableType::SKINNED_MESH:
-					if (!beginRenderLoop(info, light))
-					{
-						++info;
-						continue;
-					}
-					info = renderLoopSkinned(info);
-					break;
-				case (int32_t)RenderableType::RIGID_MESH:
-					if (!beginRenderLoop(info, light))
-					{
-						++info;
-						continue;
-					}
-					info = renderLoopRigid(info);
-					break;
-				case (int32_t)RenderableType::TERRAIN:
-					if (!beginTerrainRenderLoop(info, light))
-					{
-						++info;
-						continue;
-					}
-					info = renderLoopTerrain(info);
-					break;
-				default:
-					ASSERT(false);
-					break;
+					case (int32_t)RenderableType::RIGID_MESH:
+						{
+							const RenderableMesh* mesh = static_cast<const RenderableMesh*>(info->m_data);
+							renderRigidMesh(*static_cast<const RenderableMesh*>(info->m_data));
+						}
+						break;
+					TODO("bgfx");
+					default:
+						ASSERT(false);
+						break;
 				}
+				++info;
 			}
 		}
 
@@ -941,6 +903,13 @@ namespace Lumix
 			{
 				return;
 			}
+
+			m_render_state = BGFX_STATE_RGB_WRITE
+				| BGFX_STATE_ALPHA_WRITE
+				| BGFX_STATE_DEPTH_WRITE
+				| BGFX_STATE_MSAA
+				;
+			m_pass_idx = -1;
 			m_draw_calls_count = 0;
 			m_vertices_count = 0;
 
@@ -957,10 +926,12 @@ namespace Lumix
 			m_frame_allocator.clear();
 		}
 
+
 		virtual FrameBuffer* getShadowmapFramebuffer() override
 		{
 			return m_shadowmap_framebuffer;
 		}
+
 
 		virtual void setScene(RenderScene* scene) override
 		{
@@ -968,10 +939,18 @@ namespace Lumix
 			m_active_camera = Component::INVALID;
 		}
 
+
 		virtual RenderScene* getScene() override
 		{
 			return m_scene;
 		}
+
+
+		virtual void setWireframe(bool wireframe) override
+		{
+			bgfx::setDebug(wireframe ? BGFX_DEBUG_TEXT : BGFX_DEBUG_WIREFRAME | BGFX_DEBUG_TEXT);
+		}
+
 
 		struct GlobalTexture
 		{
@@ -987,6 +966,8 @@ namespace Lumix
 			uint32_t m_uniform_hash;
 		};
 
+		int m_pass_idx;
+		uint64_t m_render_state;
 		IAllocator& m_allocator;
 		LIFOAllocator m_frame_allocator;
 		PipelineImpl& m_source;
@@ -995,7 +976,6 @@ namespace Lumix
 		Array<FrameBuffer*> m_framebuffers;
 		FrameBuffer* m_shadowmap_framebuffer;
 		Matrix m_shadow_modelviewprojection[4];
-		Renderer* m_renderer;
 		Vec4 m_shadowmap_splits;
 		int m_width;
 		int m_height;
@@ -1006,6 +986,9 @@ namespace Lumix
 		Array<TerrainInfo> m_terrain_infos;
 		Array<GrassInfo> m_grass_infos;
 		Array<RenderableInfo> m_renderable_infos;
+		bgfx::UniformHandle m_light_pos_radius_uniform;
+		bgfx::UniformHandle m_light_color_uniform;
+		bgfx::UniformHandle m_light_dir_fov_uniform;
 		int m_draw_calls_count;
 		int m_vertices_count;
 
@@ -1051,7 +1034,7 @@ namespace Lumix
 
 		void setPass(PipelineInstanceImpl* pipeline, const char* pass)
 		{
-			pipeline->getRenderer().setPass(crc32(pass));
+			pipeline->setPass(pass);
 		}
 
 
@@ -1063,22 +1046,30 @@ namespace Lumix
 			{
 				if (pipeline->m_framebuffer_width > 0)
 				{
-					pipeline->getRenderer().setViewport((float)pipeline->m_framebuffer_width, (float)pipeline->m_framebuffer_height);
+					bgfx::setViewRect(0, 0, 0, (uint16_t)pipeline->m_framebuffer_width, (uint16_t)pipeline->m_framebuffer_height);
 				}
 				else
 				{
-					pipeline->getRenderer().setViewport((float)pipeline->m_width, (float)pipeline->m_height);
+					bgfx::setViewRect(0, 0, 0, (uint16_t)pipeline->m_width, (uint16_t)pipeline->m_height);
 				}
 
 				pipeline->m_scene->setCameraSize(cmp, pipeline->m_width, pipeline->m_height);
 				pipeline->m_scene->applyCamera(cmp);
+				
+				Matrix view_matrix, projection_matrix;
+				float fov = pipeline->getScene()->getCameraFOV(cmp);
+				float near_plane = pipeline->getScene()->getCameraNearPlane(cmp);
+				float far_plane = pipeline->getScene()->getCameraFarPlane(cmp);
+				projection_matrix.setPerspective(Math::degreesToRadians(fov), pipeline->m_width, pipeline->m_height, near_plane, far_plane);
+
+				Matrix mtx = cmp.entity.getMatrix();
+				Vec3 pos = mtx.getTranslation();
+				Vec3 center = pos - mtx.getZVector();
+				Vec3 up = mtx.getYVector();
+				view_matrix.lookAt(pos, center, up);
+
+				bgfx::setViewTransform(0, &view_matrix.m11, &projection_matrix.m11);
 			}
-		}
-
-
-		void polygonMode(PipelineInstanceImpl* pipeline, bool fill)
-		{
-			glPolygonMode(GL_FRONT_AND_BACK, fill && !pipeline->getRenderer().isEditorWireframe() ? GL_FILL : GL_LINE);
 		}
 
 
@@ -1276,7 +1267,6 @@ namespace Lumix
 		registerCFunction("renderModels", LuaWrapper::wrap<decltype(&LuaAPI::renderModels), LuaAPI::renderModels>);
 		registerCFunction("renderShadowmap", LuaWrapper::wrap<decltype(&LuaAPI::renderShadowmap), LuaAPI::renderShadowmap>);
 		registerCFunction("bindFramebufferTexture", LuaWrapper::wrap<decltype(&LuaAPI::bindFramebufferTexture), LuaAPI::bindFramebufferTexture>);
-		registerCFunction("polygonMode", LuaWrapper::wrap<decltype(&LuaAPI::polygonMode), LuaAPI::polygonMode>);
 		registerCFunction("executeCustomCommand", LuaWrapper::wrap<decltype(&LuaAPI::executeCustomCommand), LuaAPI::executeCustomCommand>);
 		registerCFunction("renderDebugLines", LuaWrapper::wrap<decltype(&LuaAPI::renderDebugLines), LuaAPI::renderDebugLines>);
 		registerCFunction("renderDebugTexts", LuaWrapper::wrap<decltype(&LuaAPI::renderDebugTexts), LuaAPI::renderDebugTexts>);

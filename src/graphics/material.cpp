@@ -30,10 +30,10 @@ Material::~Material()
 
 void Material::apply(Renderer& renderer, PipelineInstance& pipeline) const
 {
-	PROFILE_FUNCTION();
+	/*PROFILE_FUNCTION();
 	if(getState() == State::READY)
 	{
-		renderer.applyShader(*m_shader, m_shader_combination);
+		//renderer.applyShader(*m_shader, m_shader_combination);
 
 		switch (m_depth_func)
 		{
@@ -64,26 +64,31 @@ void Material::apply(Renderer& renderer, PipelineInstance& pipeline) const
 		for (int i = 0, c = m_uniforms.size(); i < c; ++i)
 		{
 			const Uniform& uniform = m_uniforms[i];
+			
 			switch (uniform.m_type)
 			{
 				case Uniform::FLOAT:
-					renderer.setUniform(*m_shader, uniform.m_name, uniform.m_name_hash, uniform.m_float);
+					bgfx::setUniform(uniform.m_handle, &uniform.m_float);
 					break;
 				case Uniform::INT:
-					renderer.setUniform(*m_shader, uniform.m_name, uniform.m_name_hash, uniform.m_int);
+					bgfx::setUniform(uniform.m_handle, &uniform.m_int);
 					break;
 				case Uniform::MATRIX:
-					renderer.setUniform(*m_shader, uniform.m_name, uniform.m_name_hash, uniform.m_matrix);
+					bgfx::setUniform(uniform.m_handle, uniform.m_matrix);
 					break;
 				case Uniform::TIME:
-					renderer.setUniform(*m_shader, uniform.m_name, uniform.m_name_hash, pipeline.getScene()->getTime());
+					{
+						float time = pipeline.getScene()->getTime();
+						bgfx::setUniform(uniform.m_handle, &time);
+					}
 					break;
 				default:
 					ASSERT(false);
 					break;
 			}
 		}
-	}
+	}*/
+	TODO("bgfx");
 }
 
 
@@ -183,11 +188,10 @@ bool Material::save(JsonSerializer& serializer)
 		serializer.endObject();
 	}
 	serializer.endArray();
-	serializer.serialize("alpha_to_coverage", m_is_alpha_to_coverage);
-	serializer.serialize("backface_culling", m_is_backface_culling);
+	serializer.serialize("backface_culling", isBackfaceCulling());
 	serializer.serialize("alpha_cutout", m_is_alpha_cutout);
 	serializer.serialize("shadow_receiver", m_is_shadow_receiver);
-	serializer.serialize("z_test", m_is_z_test);
+	serializer.serialize("z_test", isZTest());
 	serializer.endObject();
 	return false;
 }
@@ -202,6 +206,7 @@ void Material::deserializeUniforms(JsonSerializer& serializer)
 		serializer.nextArrayItem();
 		serializer.deserializeObjectBegin();
 		char label[256];
+		auto uniform_type = bgfx::UniformType::End;
 		while (!serializer.isObjectEnd())
 		{
 			serializer.deserializeLabel(label, 255);
@@ -212,16 +217,20 @@ void Material::deserializeUniforms(JsonSerializer& serializer)
 			}
 			else if (strcmp(label, "int_value") == 0)
 			{
+				uniform_type = bgfx::UniformType::Int1;
 				uniform.m_type = Uniform::INT;
 				serializer.deserialize(uniform.m_int, 0);
 			}
 			else if (strcmp(label, "float_value") == 0)
 			{
+				TODO("bgfx");
+				ASSERT(false);
 				uniform.m_type = Uniform::FLOAT;
 				serializer.deserialize(uniform.m_float, 0);
 			}
 			else if (strcmp(label, "matrix_value") == 0)
 			{
+				uniform_type = bgfx::UniformType::Mat4;
 				uniform.m_type = Uniform::MATRIX;
 				serializer.deserializeArrayBegin();
 				for (int i = 0; i < 16; ++i)
@@ -233,6 +242,8 @@ void Material::deserializeUniforms(JsonSerializer& serializer)
 			}
 			else if (strcmp(label, "time") == 0)
 			{
+				TODO("bgfx");
+				ASSERT(false);
 				uniform.m_type = Uniform::TIME;
 				serializer.deserialize(uniform.m_float, 0);
 			}
@@ -241,6 +252,8 @@ void Material::deserializeUniforms(JsonSerializer& serializer)
 				g_log_warning.log("material") << "Unknown label \"" << label << "\"";
 			}
 		}
+		uniform.m_handle = bgfx::createUniform(uniform.m_name, uniform_type);
+
 		serializer.deserializeObjectEnd();
 	}
 	serializer.deserializeArrayEnd();
@@ -379,8 +392,24 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 	return true;
 }
 
+
+void Material::setRenderState(bool value, uint64_t state, uint64_t mask)
+{
+	if (value)
+	{
+		m_render_states |= state;
+	}
+	else
+	{
+		m_render_states &= ~mask;
+	}
+}
+
+
 void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 {
+	m_render_states = 0;
+
 	auto fp = fopen("shaders/vs_bump.bin", "rb");
 	fseek(fp, 0, SEEK_END);
 	auto s = ftell(fp);
@@ -391,7 +420,7 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	auto vs = bgfx::createShader(mem);
 	fclose(fp);
 
-	fp = fopen("shaders/fs_bump.bin", "rb");
+	fp = fopen("shaders/test.bin", "rb");
 	fseek(fp, 0, SEEK_END);
 	s = ftell(fp);
 	mem = bgfx::alloc(s + 1);
@@ -413,6 +442,7 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		char label[256];
 		char material_dir[LUMIX_MAX_PATH];
 		PathUtils::getDir(material_dir, LUMIX_MAX_PATH, m_path.c_str());
+		bool b_value;
 		while (!serializer.isObjectEnd())
 		{
 			serializer.deserializeLabel(label, 255);
@@ -438,10 +468,6 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			{
 				serializer.deserialize(m_is_shadow_receiver, true);
 			}
-			else if (strcmp(label, "alpha_to_coverage") == 0)
-			{
-				serializer.deserialize(m_is_alpha_to_coverage, false);
-			}
 			else if (strcmp(label, "shader") == 0)
 			{
 				serializer.deserialize(path, LUMIX_MAX_PATH, "");
@@ -449,11 +475,13 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			}
 			else if (strcmp(label, "z_test") == 0)
 			{
-				serializer.deserialize(m_is_z_test, true);
+				serializer.deserialize(b_value, true);
+				enableZTest(b_value);
 			}
 			else if (strcmp(label, "backface_culling") == 0)
 			{
-				serializer.deserialize(m_is_backface_culling, true);
+				serializer.deserialize(b_value, true);
+				enableBackfaceCulling(b_value);
 			}
 			else if (strcmp(label, "depth_func") == 0)
 			{

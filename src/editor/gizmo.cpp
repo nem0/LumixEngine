@@ -11,6 +11,7 @@
 #include "engine/engine.h"
 #include "graphics/irender_device.h"
 #include "graphics/model.h"
+#include "graphics/pipeline.h"
 #include "graphics/renderer.h"
 #include "universe/universe.h"
 
@@ -171,7 +172,7 @@ void Gizmo::render(Renderer& renderer, IRenderDevice& render_device)
 		Matrix gizmo_mtx;
 		getMatrix(gizmo_mtx);
 		Matrix mtx = gizmo_mtx * scale_mtx;
-		renderer.renderModel(*m_model, mtx, render_device.getPipeline());
+		render_device.getPipeline().renderModel(*m_model, mtx);
 	}
 }
 
