@@ -16,7 +16,6 @@
 #include "core/resource_manager_base.h"
 #include "engine/engine.h"
 #include "graphics/render_scene.h"
-#include "graphics/renderer.h"
 #include "graphics/texture.h"
 #include "physics/physics_system.h"
 #include "physics/physics_geometry_manager.h"

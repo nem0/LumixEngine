@@ -1,7 +1,6 @@
 #include "graphics/frame_buffer.h"
 #include "core/json_serializer.h"
 #include "core/vec3.h"
-#include "graphics/gl_ext.h"
 #include <lua.hpp>
 #include <lauxlib.h>
 
@@ -61,52 +60,6 @@ FrameBuffer::~FrameBuffer()
 			glDeleteTextures(1, &m_declaration.m_renderbuffers[i].m_id);
 		}
 	}*/
-}
-
-
-void FrameBuffer::bind()
-{
-	TODO("bgfx");
-	/*
-	glBindFramebufferEXT(GL_FRAMEBUFFER, m_id);
-	GLenum buffers[Declaration::MAX_RENDERBUFFERS];
-	ASSERT(m_declaration.m_renderbuffers_count <= sizeof(buffers) / sizeof(buffers[0]));
-	int color_index = 0;
-	for (int i = 0; i < m_declaration.m_renderbuffers_count; ++i)
-	{
-		if (m_declaration.m_renderbuffers[i].isDepth())
-		{
-			buffers[i] = GL_DEPTH_ATTACHMENT;
-		}
-		else
-		{
-			buffers[i] = GL_COLOR_ATTACHMENT0 + color_index;
-			++color_index;
-		}
-	}
-	glDrawBuffers(m_declaration.m_renderbuffers_count, buffers);*/
-}
-
-
-GLuint FrameBuffer::getDepthTexture() const
-{
-	for (int i = 0; i < m_declaration.m_renderbuffers_count; ++i)
-	{
-		if (m_declaration.m_renderbuffers[i].isDepth())
-		{
-			return m_declaration.m_renderbuffers[i].m_id;
-		}
-	}
-	return 0;
-}
-
-
-void FrameBuffer::unbind()
-{
-	TODO("bgfx");
-	/*
-	glBindFramebufferEXT(GL_FRAMEBUFFER, 0);
-	*/
 }
 
 

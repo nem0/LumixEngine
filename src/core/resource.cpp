@@ -29,6 +29,7 @@ namespace Lumix
 		{
 			m_resource_manager.decrementLoadingResources();
 		}
+		m_dep_count = 0;
 	}
 
 	void Resource::onLoading(void)

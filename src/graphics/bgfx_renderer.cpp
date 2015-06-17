@@ -1,6 +1,5 @@
 #include "renderer.h"
 
-#include "graphics/renderer.h"
 #include "core/array.h"
 #include "core/crc32.h"
 #include "core/fs/file_system.h"
@@ -15,7 +14,6 @@
 #include "engine/engine.h"
 #include "graphics/bitmap_font.h"
 #include "graphics/geometry.h"
-#include "graphics/gl_ext.h"
 #include "graphics/irender_device.h"
 #include "graphics/material.h"
 #include "graphics/material_manager.h"
@@ -30,6 +28,7 @@
 #include "graphics/texture_manager.h"
 #include "universe/universe.h"
 #include <bgfx.h>
+#include <Windows.h>
 
 
 namespace bgfx
@@ -65,9 +64,10 @@ namespace Lumix
 			, m_texture_manager(m_allocator)
 			, m_model_manager(m_allocator, *this)
 			, m_material_manager(m_allocator)
-			, m_shader_manager(m_allocator)
+			, m_shader_manager(*this, m_allocator)
 			, m_font_manager(m_allocator)
-			, m_pipeline_manager(m_allocator, *this)
+			, m_pipeline_manager(*this, m_allocator)
+			, m_passes(m_allocator)
 		{
 			m_texture_manager.create(ResourceManager::TEXTURE, engine.getResourceManager());
 			m_model_manager.create(ResourceManager::MODEL, engine.getResourceManager());
@@ -146,7 +146,6 @@ namespace Lumix
 
 		virtual bool create() override
 		{
-			m_shader_manager.setRenderer(*this);
 			registerPropertyDescriptors(m_engine);
 			return true;
 		}
@@ -169,23 +168,30 @@ namespace Lumix
 		}
 
 
-		virtual void makeScreenshot(const Path& filename, int width, int height) override
+		virtual int getPassIdx(const char* pass) override
 		{
-			GLubyte* pixels = (GLubyte*)m_allocator.allocate(width * height * 4);
-			glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-			glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+			for (int i = 0; i < m_passes.size(); ++i)
+			{
+				if (strcmp(m_passes[i], pass) == 0)
+				{
+					return i;
+				}
+			}
 
-			FS::FileSystem& fs = m_engine.getFileSystem();
-			FS::IFile* file = fs.open("disk", filename, FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
+			auto& new_pass = m_passes.pushEmpty();
+			copyString(new_pass, sizeof(new_pass), pass);
+			return m_passes.size() - 1;
+		}
 
-			Texture::saveTGA(m_allocator, file, width, height, 4, pixels, filename);
 
-			fs.close(file);
-			m_allocator.deallocate(pixels);
+		virtual void makeScreenshot(const Path& filename) override
+		{
+			bgfx::saveScreenShot(filename.c_str());
 		}
 
 
 		Engine& m_engine;
+		Lumix::Array<ShaderCombinations::Pass> m_passes;
 		Debug::Allocator m_allocator;
 		TextureManager m_texture_manager;
 		MaterialManager m_material_manager;

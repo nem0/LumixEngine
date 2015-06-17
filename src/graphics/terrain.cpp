@@ -14,7 +14,6 @@
 #include "graphics/model.h"
 #include "graphics/pipeline.h"
 #include "graphics/render_scene.h"
-#include "graphics/renderer.h"
 #include "graphics/shader.h"
 #include "graphics/texture.h"
 #include <cfloat>

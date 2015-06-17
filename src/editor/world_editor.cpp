@@ -34,11 +34,12 @@
 #include "graphics/material.h"
 #include "graphics/model.h"
 #include "graphics/pipeline.h"
-#include "graphics/renderer.h"
+#include "graphics/render_scene.h"
 #include "graphics/texture.h"
 #include "ieditor_command.h"
 #include "script/script_system.h"
 #include "universe/universe.h"
+#include <Windows.h>
 
 
 namespace Lumix
@@ -1610,17 +1611,7 @@ struct WorldEditorImpl : public WorldEditor
 			if (!m_selected_entities.empty())
 			{
 				Array<Vec3> new_positions(m_allocator);
-				RenderScene* scene = NULL;
-				const Array<IScene*>& scenes = m_engine->getScenes();
-
-				for(int j = 0; j < scenes.size(); ++j)
-				{
-					if(&scenes[j]->getPlugin() == &m_engine->getRenderer())
-					{
-						scene = static_cast<RenderScene*>(scenes[j]);
-						break;
-					}
-				}
+				RenderScene* scene = static_cast<RenderScene*>(m_engine->getScene(crc32("renderer")));
 
 				for(int i = 0; i < m_selected_entities.size(); ++i)
 				{
@@ -2070,6 +2061,11 @@ struct WorldEditorImpl : public WorldEditor
 
 		void createEditorIcon(const Entity& entity)
 		{
+			if(m_camera == entity)
+			{
+				return;
+			}
+
 			const WorldEditor::ComponentList& cmps = getComponents(entity);
 
 			bool found_renderable = false;
@@ -2218,7 +2214,7 @@ struct WorldEditorImpl : public WorldEditor
 			PROFILE_FUNCTION();
 			for (int i = 0, c = m_editor_icons.size(); i < c; ++i)
 			{
-				m_editor_icons[i]->render(&m_engine->getRenderer(), render_device);
+				m_editor_icons[i]->render(render_device);
 			}
 
 		}
@@ -2578,7 +2574,7 @@ struct WorldEditorImpl : public WorldEditor
 		{
 			destroyUndoStack();
 			Universe* universe = m_engine->createUniverse();
-			m_gizmo.create(m_engine->getRenderer());
+			m_gizmo.create();
 			m_gizmo.setUniverse(universe);
 
 			universe->entityCreated().bind<WorldEditorImpl, &WorldEditorImpl::onEntityCreated>(this);

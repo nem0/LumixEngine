@@ -1,5 +1,5 @@
 #include "scriptcompiler.h"
-#include <qdiriterator.h>
+#include <qfileinfo.h>
 #include <qprocess.h>
 #include <qtextstream.h>
 #include "core/crc32.h"

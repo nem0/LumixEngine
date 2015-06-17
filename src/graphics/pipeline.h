@@ -29,7 +29,7 @@ class IFile;
 class LUMIX_ENGINE_API PipelineManager : public ResourceManagerBase
 {
 public:
-	PipelineManager(IAllocator& allocator, Renderer& renderer)
+	PipelineManager(Renderer& renderer, IAllocator& allocator)
 		: ResourceManagerBase(allocator)
 		, m_renderer(renderer)
 		, m_allocator(allocator)

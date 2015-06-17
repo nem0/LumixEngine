@@ -3,8 +3,6 @@
 #include "core/log.h"
 #include "core/math_utils.h"
 #include "core/profiler.h"
-#include "graphics/gl_ext.h"
-#include "graphics/renderer.h"
 #include "graphics/shader.h"
 #include <bgfx.h>
 

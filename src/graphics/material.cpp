@@ -11,7 +11,6 @@
 #include "core/timer.h"
 #include "graphics/frame_buffer.h"
 #include "graphics/pipeline.h"
-#include "graphics/renderer.h"
 #include "graphics/shader.h"
 #include "graphics/texture.h"
 
@@ -28,92 +27,31 @@ Material::~Material()
 	ASSERT(isEmpty());
 }
 
-void Material::apply(Renderer& renderer, PipelineInstance& pipeline) const
-{
-	/*PROFILE_FUNCTION();
-	if(getState() == State::READY)
-	{
-		//renderer.applyShader(*m_shader, m_shader_combination);
 
-		switch (m_depth_func)
-		{
-			case DepthFunc::LEQUAL:
-				glDepthFunc(GL_LEQUAL);
-				break;
-			default:
-				glDepthFunc(GL_LESS);
-				break;
-		}
-		if (m_is_backface_culling)
-		{
-			glEnable(GL_CULL_FACE);
-		}
-		else
-		{
-			glDisable(GL_CULL_FACE);
-		}
-		for (int i = 0, c = m_texture_count; i < c; ++i)
-		{
-			if (m_textures[i])
-			{
-				m_textures[i]->apply(i);
-			}
-		}
-		renderer.enableAlphaToCoverage(m_is_alpha_to_coverage);
-		renderer.enableZTest(m_is_z_test);
-		for (int i = 0, c = m_uniforms.size(); i < c; ++i)
-		{
-			const Uniform& uniform = m_uniforms[i];
-			
-			switch (uniform.m_type)
-			{
-				case Uniform::FLOAT:
-					bgfx::setUniform(uniform.m_handle, &uniform.m_float);
-					break;
-				case Uniform::INT:
-					bgfx::setUniform(uniform.m_handle, &uniform.m_int);
-					break;
-				case Uniform::MATRIX:
-					bgfx::setUniform(uniform.m_handle, uniform.m_matrix);
-					break;
-				case Uniform::TIME:
-					{
-						float time = pipeline.getScene()->getTime();
-						bgfx::setUniform(uniform.m_handle, &time);
-					}
-					break;
-				default:
-					ASSERT(false);
-					break;
-			}
-		}
-	}*/
-	TODO("bgfx");
-}
-
-
-void Material::updateShaderCombination()
+void Material::updateShaderInstance()
 {
 	if (isReady())
 	{
-		static const int MAX_DEFINES_LENGTH = 1024;
-		char defines[MAX_DEFINES_LENGTH];
-		copyString(defines, MAX_DEFINES_LENGTH, m_is_alpha_cutout ? "#define ALPHA_CUTOUT\n" : "");
-		catCString(defines, MAX_DEFINES_LENGTH, m_is_shadow_receiver ? "#define SHADOW_RECEIVER\n" : "");
 		if (m_shader && m_shader->isReady())
 		{
+			uint32_t mask = 0;
+			if (m_is_alpha_cutout)
+			{
+				mask |= m_shader->getDefineMask("ALPHA_CUTOUT");
+			}
+			if (m_is_shadow_receiver)
+			{
+				mask |= m_shader->getDefineMask("SHADOW_RECEIVER");
+			}
 			for (int i = 0; i < m_shader->getTextureSlotCount(); ++i)
 			{
 				if (m_shader->getTextureSlot(i).m_define[0] != '\0' && m_textures[i])
 				{
-					catCString(defines, MAX_DEFINES_LENGTH, "#define ");
-					catCString(defines, MAX_DEFINES_LENGTH, m_shader->getTextureSlot(i).m_define);
-					catCString(defines, MAX_DEFINES_LENGTH, "\n");
+					mask |= m_shader->getDefineMask(m_shader->getTextureSlot(i).m_define);
 				}
 			}
-			m_shader->createCombination(defines);
+			m_shader_instance = &m_shader->getInstance(mask);
 		}
-		m_shader_combination = crc32(defines);
 	}
 }
 
@@ -293,7 +231,7 @@ void Material::setTexture(int i, Texture* texture)
 	}
 	if (isReady())
 	{
-		updateShaderCombination();
+		updateShaderInstance();
 	}
 }
 
@@ -308,7 +246,7 @@ void Material::setShader(const Path& path)
 void Material::onReady()
 {
 	Resource::onReady();
-	updateShaderCombination();
+	updateShaderInstance();
 }
 
 
@@ -326,10 +264,11 @@ void Material::setShader(Shader* shader)
 
 		if (m_shader->isReady())
 		{
-			updateShaderCombination();
+			updateShaderInstance();
 		}
 	}
 }
+
 
 const char* Material::getTextureUniform(int i)
 {
@@ -339,6 +278,7 @@ const char* Material::getTextureUniform(int i)
 	}
 	return "";
 }
+
 
 Texture* Material::getTextureByUniform(const char* uniform) const
 {
@@ -363,7 +303,7 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 		serializer.deserializeLabel(label, sizeof(label));
 		if (strcmp(label, "source") == 0)
 		{
-			serializer.deserialize(path, MAX_PATH, "");
+			serializer.deserialize(path, LUMIX_MAX_PATH, "");
 			if (path[0] != '\0')
 			{
 				char texture_path[LUMIX_MAX_PATH];
@@ -409,7 +349,7 @@ void Material::setRenderState(bool value, uint64_t state, uint64_t mask)
 void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 {
 	m_render_states = 0;
-
+	/*
 	auto fp = fopen("shaders/vs_bump.bin", "rb");
 	fseek(fp, 0, SEEK_END);
 	auto s = ftell(fp);
@@ -420,7 +360,7 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	auto vs = bgfx::createShader(mem);
 	fclose(fp);
 
-	fp = fopen("shaders/test.bin", "rb");
+	fp = fopen("shaders/fs_bump.bin", "rb");
 	fseek(fp, 0, SEEK_END);
 	s = ftell(fp);
 	mem = bgfx::alloc(s + 1);
@@ -431,7 +371,7 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	fclose(fp);
 
 	m_program_id = bgfx::createProgram(vs, ps, true);
-
+	*/
 	PROFILE_FUNCTION();
 	if(success)
 	{

@@ -10,10 +10,8 @@
 #include "graphics/material.h"
 #include "graphics/model.h"
 #include "graphics/pipeline.h"
-#include "graphics/renderer.h"
+#include "graphics/render_scene.h"
 #include "world_editor.h"
-
-#include <gl/GL.h>
 
 namespace Lumix
 {
@@ -21,6 +19,7 @@ namespace Lumix
 
 EditorIcon::EditorIcon(Engine& engine, RenderScene& scene, const Entity& entity)
 {
+	m_scale = 1;
 	m_scene = &scene;
 	m_entity = entity;
 	m_is_visible = true;
@@ -99,7 +98,7 @@ float EditorIcon::hit(const Vec3& origin, const Vec3& dir) const
 }
 
 
-void EditorIcon::render(Renderer* renderer, IRenderDevice& render_device)
+void EditorIcon::render(IRenderDevice& render_device)
 {
 	if (m_is_visible)
 	{

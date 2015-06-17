@@ -1,7 +1,6 @@
 #include "pipeline.h"
 
 #include "graphics/pipeline.h"
-#include "graphics/gl_ext.h"
 #include "core/array.h"
 #include "core/associative_array.h"
 #include "core/crc32.h"
@@ -20,7 +19,6 @@
 #include "graphics/bitmap_font.h"
 #include "graphics/frame_buffer.h"
 #include "graphics/geometry.h"
-#include "graphics/gl_ext.h"
 #include "graphics/material.h"
 #include "graphics/model.h"
 #include "graphics/model_instance.h"
@@ -207,10 +205,10 @@ namespace Lumix
 			, m_allocator(allocator)
 			, m_terrain_infos(allocator)
 			, m_framebuffers(allocator)
-			, m_global_textures(allocator)
 			, m_grass_infos(allocator)
 			, m_renderable_infos(allocator)
 			, m_frame_allocator(allocator, 1 * 1024 * 1024)
+			, m_renderer(static_cast<PipelineImpl&>(pipeline).getRenderer())
 		{
 			m_light_pos_radius_uniform = bgfx::createUniform("u_lightPosRadius", bgfx::UniformType::Vec4);
 			m_light_color_uniform = bgfx::createUniform("u_lightRgbInnerR", bgfx::UniformType::Vec4);
@@ -243,16 +241,10 @@ namespace Lumix
 
 		void setPass(const char* name)
 		{
-			++m_pass_idx;
+			m_pass_idx = m_renderer.getPassIdx(name);
 		}
 
-
-		void addGlobalTexture(GLuint id, const char* uniform_name)
-		{
-			m_global_textures.emplace(id, uniform_name);
-		}
-
-
+		
 		void setActiveCamera(const Component& cmp)
 		{
 			m_active_camera = cmp;
@@ -267,13 +259,15 @@ namespace Lumix
 
 		FrameBuffer* getFrameBuffer(const char* name)
 		{
+			TODO("bgfx");
+			/*
 			for (int i = 0, c = m_framebuffers.size(); i < c; ++i)
 			{
 				if (strcmp(m_framebuffers[i]->getName(), name) == 0)
 				{
 					return m_framebuffers[i];
 				}
-			}
+			}*/
 			return NULL;
 		}
 
@@ -531,6 +525,7 @@ namespace Lumix
 				}
 				else
 				{
+					TODO("bgfx");
 					/*setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX0, m_shadow_modelviewprojection[0]);
 					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX1, m_shadow_modelviewprojection[1]);
 					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX2, m_shadow_modelviewprojection[2]);
@@ -830,6 +825,12 @@ namespace Lumix
 		}
 
 
+		void renderSkinnedMesh(const RenderableMesh& info)
+		{
+			TODO("bgfx");
+			ASSERT(false);
+		}
+
 		void renderRigidMesh(const RenderableMesh& info)
 		{
 			if (!info.m_model->isReady())
@@ -840,7 +841,7 @@ namespace Lumix
 			const Mesh& mesh = *info.m_mesh;
 			const Model& model = *info.m_model;
 			bgfx::setTransform(&info.m_matrix->m11);
-			bgfx::setProgram(mesh.getMaterial()->getProgramID());
+			bgfx::setProgram(mesh.getMaterial()->getShaderInstance().m_program_handles[m_pass_idx]);
 			for (int i = 0; i < mesh.getMaterial()->getTextureCount(); ++i)
 			{
 				Texture* texture = mesh.getMaterial()->getTexture(i);
@@ -878,7 +879,13 @@ namespace Lumix
 							renderRigidMesh(*static_cast<const RenderableMesh*>(info->m_data));
 						}
 						break;
-					TODO("bgfx");
+					case (int32_t)RenderableType::SKINNED_MESH:
+						{
+							const RenderableMesh* mesh = static_cast<const RenderableMesh*>(info->m_data);
+							renderSkinnedMesh(*static_cast<const RenderableMesh*>(info->m_data));
+						}
+						break;
+						TODO("bgfx");
 					default:
 						ASSERT(false);
 						break;
@@ -922,7 +929,6 @@ namespace Lumix
 				}
 			}
 
-			m_global_textures.clear();
 			m_frame_allocator.clear();
 		}
 
@@ -952,27 +958,13 @@ namespace Lumix
 		}
 
 
-		struct GlobalTexture
-		{
-			GlobalTexture(GLuint id, const char* uniform_name)
-			{
-				copyString(m_uniform_name, sizeof(m_uniform_name), uniform_name);
-				m_uniform_hash = crc32(uniform_name);
-				m_texture_id = id;
-			}
-
-			GLuint m_texture_id;
-			char m_uniform_name[20];
-			uint32_t m_uniform_hash;
-		};
-
 		int m_pass_idx;
 		uint64_t m_render_state;
 		IAllocator& m_allocator;
+		Renderer& m_renderer;
 		LIFOAllocator m_frame_allocator;
 		PipelineImpl& m_source;
 		RenderScene* m_scene;
-		Array<GlobalTexture> m_global_textures;
 		Array<FrameBuffer*> m_framebuffers;
 		FrameBuffer* m_shadowmap_framebuffer;
 		Matrix m_shadow_modelviewprojection[4];
@@ -1093,12 +1085,14 @@ namespace Lumix
 		{
 			if (is_point_light_render)
 			{
+				TODO("bgfx");
+				/*
 				glEnable(GL_BLEND);
 				glBlendFunc(GL_ONE, GL_ONE);
-
+				*/
 				pipeline->renderPointLightInfluencedGeometry(pipeline->getScene()->getFrustum(), layer_mask);
 
-				glDisable(GL_BLEND);
+				//glDisable(GL_BLEND);
 			}
 			else
 			{
@@ -1109,11 +1103,14 @@ namespace Lumix
 
 		void bindFramebufferTexture(PipelineInstanceImpl* pipeline, const char* framebuffer_name, int renderbuffer_index, const char* uniform)
 		{
+			TODO("bgfx");
+			/*
 			FrameBuffer* fb = pipeline->getFrameBuffer(framebuffer_name);
 			if (fb)
 			{
 				pipeline->addGlobalTexture(fb->getTexture(renderbuffer_index), uniform);
 			}
+			*/
 		}
 
 
@@ -1126,20 +1123,6 @@ namespace Lumix
 		void renderDebugLines(PipelineInstanceImpl* pipeline)
 		{
 			pipeline->renderDebugLines();
-		}
-
-
-		void cullFaces(const char* face)
-		{
-			glEnable(GL_CULL_FACE);
-			if (strcmp(face, "front") == 0)
-			{
-				glCullFace(GL_FRONT);
-			}
-			else
-			{
-				glCullFace(GL_BACK);
-			}
 		}
 
 
@@ -1157,20 +1140,24 @@ namespace Lumix
 
 		void bindFramebuffer(PipelineInstanceImpl* pipeline, const char* buffer_name)
 		{
-			FrameBuffer* fb = pipeline->getFrameBuffer(buffer_name);
+			TODO("bgfx");
+			/*FrameBuffer* fb = pipeline->getFrameBuffer(buffer_name);
 			if (fb)
 			{
 				fb->bind();
 				pipeline->m_framebuffer_width = fb->getWidth();
 				pipeline->m_framebuffer_height = fb->getHeight();
-			}
+			}*/
 		}
 
 
 		void unbindFramebuffer(PipelineInstanceImpl* pipeline)
 		{
+			TODO("bgfx");
+			/*
 			FrameBuffer::unbind();
 			pipeline->m_framebuffer_width = pipeline->m_framebuffer_height = -1;
+			*/
 		}
 
 
@@ -1270,7 +1257,6 @@ namespace Lumix
 		registerCFunction("executeCustomCommand", LuaWrapper::wrap<decltype(&LuaAPI::executeCustomCommand), LuaAPI::executeCustomCommand>);
 		registerCFunction("renderDebugLines", LuaWrapper::wrap<decltype(&LuaAPI::renderDebugLines), LuaAPI::renderDebugLines>);
 		registerCFunction("renderDebugTexts", LuaWrapper::wrap<decltype(&LuaAPI::renderDebugTexts), LuaAPI::renderDebugTexts>);
-		registerCFunction("cullFaces", LuaWrapper::wrap<decltype(&LuaAPI::cullFaces), LuaAPI::cullFaces>);
 		registerCFunction("bindFramebuffer", LuaWrapper::wrap<decltype(&LuaAPI::bindFramebuffer), LuaAPI::bindFramebuffer>);
 		registerCFunction("unbindFramebuffer", LuaWrapper::wrap<decltype(&LuaAPI::unbindFramebuffer), LuaAPI::unbindFramebuffer>);
 	}

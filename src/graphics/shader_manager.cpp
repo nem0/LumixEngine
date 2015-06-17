@@ -6,11 +6,11 @@
 
 namespace Lumix
 {
-	ShaderManager::ShaderManager(IAllocator& allocator)
+	ShaderManager::ShaderManager(Renderer& renderer, IAllocator& allocator)
 		: ResourceManagerBase(allocator)
 		, m_allocator(allocator)
+		, m_renderer(renderer)
 	{
-		m_renderer = NULL;
 		m_buffer = NULL;
 		m_buffer_size = -1;
 	}
@@ -24,8 +24,7 @@ namespace Lumix
 
 	Resource* ShaderManager::createResource(const Path& path)
 	{
-		ASSERT(m_renderer);
-		return m_allocator.newObject<Shader>(path, getOwner(), *m_renderer, m_allocator);
+		return m_allocator.newObject<Shader>(path, getOwner(), m_allocator);
 	}
 
 	void ShaderManager::destroyResource(Resource& resource)
