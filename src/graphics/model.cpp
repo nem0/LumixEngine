@@ -14,7 +14,6 @@
 #include "graphics/material.h"
 #include "graphics/model_manager.h"
 #include "graphics/pose.h"
-#include "graphics/renderer.h"
 
 #include <cfloat>
 
@@ -167,8 +166,17 @@ bool Model::parseVertexDef(FS::IFile* file, bgfx::VertexDecl* vertex_definition)
 		{
 			vertex_definition->add(bgfx::Attrib::Tangent, 4, bgfx::AttribType::Uint8, true, true);
 		}
+		else if (strcmp(tmp, "in_weights") == 0)
+		{
+			vertex_definition->add(bgfx::Attrib::Weight, 4, bgfx::AttribType::Float);
+		}
+		else if (strcmp(tmp, "in_indices") == 0)
+		{
+			vertex_definition->add(bgfx::Attrib::Indices, 4, bgfx::AttribType::Int16, false, true);
+		}
 		else
 		{
+			ASSERT(false);
 			return false;
 		}
 
@@ -291,8 +299,8 @@ bool Model::parseBones(FS::IFile* file)
 		Model::Bone& b = m_bones.emplace(m_allocator);
 		int len;
 		file->read(&len, sizeof(len));
-		char tmp[MAX_PATH];
-		if (len >= MAX_PATH)
+		char tmp[LUMIX_MAX_PATH];
+		if (len >= LUMIX_MAX_PATH)
 		{
 			return false;
 		}
@@ -301,7 +309,7 @@ bool Model::parseBones(FS::IFile* file)
 		b.name = tmp;
 		m_bone_map.insert(crc32(b.name.c_str()), m_bones.size() - 1);
 		file->read(&len, sizeof(len));
-		if (len >= MAX_PATH)
+		if (len >= LUMIX_MAX_PATH)
 		{
 			return false;
 		}

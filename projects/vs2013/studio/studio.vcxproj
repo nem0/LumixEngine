@@ -225,6 +225,7 @@
     <ClCompile Include="..\..\..\src\studio\sceneview.cpp" />
     <ClCompile Include="..\..\..\src\studio\scripts\scriptcompiler.cpp" />
     <ClCompile Include="..\..\..\src\studio\scripts\scriptcompilerwidget.cpp" />
+    <ClCompile Include="..\..\..\src\studio\shader_compiler.cpp" />
     <ClCompile Include="..\..\..\tmp\studio\moc_animation_editor.cpp" />
     <ClCompile Include="..\..\..\tmp\studio\moc_animation_inputs.cpp" />
     <ClCompile Include="..\..\..\tmp\studio\moc_animator.cpp" />
@@ -248,6 +249,7 @@
     <ClCompile Include="..\..\..\tmp\studio\moc_terrain_editor.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_shader_compiler.h" />
     <CustomBuild Include="..\..\..\src\studio\animation_editor\animation_editor.h">
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='AppVeyor|Win32'">$(QTDIR)\bin\moc.exe;%(FullPath)</AdditionalInputs>
       <Message Condition="'$(Configuration)|$(Platform)'=='AppVeyor|Win32'">Moc%27ing animation_editor.h...</Message>
@@ -337,6 +339,7 @@
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">.\..\..\..\tmp\studio\moc_%(Filename).cpp</Outputs>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"$(QTDIR)\bin\moc.exe"  "%(FullPath)" -o ".\..\..\..\tmp\studio\moc_%(Filename).cpp"  -D_WINDOWS -DUNICODE -DWIN32 -DQT_NO_DEBUG -DQT_OPENGL_LIB -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_OPENGL_ES_2 -DQT_OPENGL_ES_2_ANGLE -DNDEBUG -DQT_DLL  "-I.\..\.." "-I.\..\..\..\src\studio" "-I.\..\..\..\src" "-I.\..\..\..\external\bgfx\include" "-I.\..\..\..\external\crunch\include" "-I.\..\..\..\external\assimp\include" "-I.\..\..\..\external\glew\include" "-I$(QTDIR)\include" "-I$(QTDIR)\include\QtOpenGL" "-I$(QTDIR)\include\QtWidgets" "-I$(QTDIR)\include\QtGui" "-I$(QTDIR)\include\QtANGLE" "-I$(QTDIR)\include\QtCore" "-I$(QTDIR)\mkspecs\win32-msvc2013" "-I.\..\..\..\tmp\studio" "-I.\..\..\..\tmp\studio\GeneratedFiles"</Command>
     </CustomBuild>
+    <ClInclude Include="..\..\..\src\studio\shader_compiler.h" />
     <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_assetbrowser.h" />
     <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_create_texture_dialog.h" />
     <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_entity_list.h" />
@@ -774,6 +777,20 @@
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"$(QTDIR)\bin\uic.exe" -o ".\..\..\..\tmp\studio\GeneratedFiles\ui_%(Filename).h" "%(FullPath)"</Command>
     </CustomBuild>
     <None Include="..\..\..\src\studio\property_view\entity_model.h" />
+    <CustomBuild Include="..\..\..\src\studio\shader_compiler.ui">
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='AppVeyor|Win32'">$(QTDIR)\bin\uic.exe;%(AdditionalInputs)</AdditionalInputs>
+      <Message Condition="'$(Configuration)|$(Platform)'=='AppVeyor|Win32'">Uic%27ing %(Identity)...</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='AppVeyor|Win32'">.\..\..\..\tmp\studio\GeneratedFiles\ui_%(Filename).h;%(Outputs)</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='AppVeyor|Win32'">"$(QTDIR)\bin\uic.exe" -o ".\..\..\..\tmp\studio\GeneratedFiles\ui_%(Filename).h" "%(FullPath)"</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(QTDIR)\bin\uic.exe;%(AdditionalInputs)</AdditionalInputs>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Uic%27ing %(Identity)...</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">.\..\..\..\tmp\studio\GeneratedFiles\ui_%(Filename).h;%(Outputs)</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"$(QTDIR)\bin\uic.exe" -o ".\..\..\..\tmp\studio\GeneratedFiles\ui_%(Filename).h" "%(FullPath)"</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(QTDIR)\bin\uic.exe;%(AdditionalInputs)</AdditionalInputs>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Uic%27ing %(Identity)...</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">.\..\..\..\tmp\studio\GeneratedFiles\ui_%(Filename).h;%(Outputs)</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"$(QTDIR)\bin\uic.exe" -o ".\..\..\..\tmp\studio\GeneratedFiles\ui_%(Filename).h" "%(FullPath)"</Command>
+    </CustomBuild>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

@@ -34,7 +34,6 @@ public:
 	virtual void beginFrame() override
 	{
 		PROFILE_FUNCTION();
-		//wglMakeCurrent(m_hdc, m_opengl_context);
 	}
 
 
@@ -42,7 +41,6 @@ public:
 	{
 		PROFILE_FUNCTION();
 		Lumix::Renderer::frame();
-		//wglSwapLayerBuffers(m_hdc, WGL_SWAP_MAIN_PLANE);
 	}
 
 
@@ -65,6 +63,4 @@ public:
 
 
 	Lumix::PipelineInstance* m_pipeline;
-	HDC m_hdc;
-	HGLRC m_opengl_context;
 };

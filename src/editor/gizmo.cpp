@@ -12,7 +12,7 @@
 #include "graphics/irender_device.h"
 #include "graphics/model.h"
 #include "graphics/pipeline.h"
-#include "graphics/renderer.h"
+#include "graphics/render_scene.h"
 #include "universe/universe.h"
 
 
@@ -39,15 +39,14 @@ Gizmo::~Gizmo()
 
 void Gizmo::destroy()
 {
-	m_renderer->getEngine().getResourceManager().get(ResourceManager::MODEL)->unload(*m_model);
+	m_editor.getEngine().getResourceManager().get(ResourceManager::MODEL)->unload(*m_model);
 }
 
 
-void Gizmo::create(Renderer& renderer)
+void Gizmo::create()
 {
 	m_scale = 1;
-	m_renderer = &renderer;
-	m_model = static_cast<Model*>(renderer.getEngine().getResourceManager().get(ResourceManager::MODEL)->load(Path("models/editor/gizmo.msh")));
+	m_model = static_cast<Model*>(m_editor.getEngine().getResourceManager().get(ResourceManager::MODEL)->load(Path("models/editor/gizmo.msh")));
 }
 
 
@@ -163,7 +162,7 @@ RayCastModelHit Gizmo::castRay(const Vec3& origin, const Vec3& dir)
 }
 
 
-void Gizmo::render(Renderer& renderer, IRenderDevice& render_device)
+void Gizmo::render(IRenderDevice& render_device)
 {
 	if(!m_editor.getSelectedEntities().empty())
 	{

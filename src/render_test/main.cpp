@@ -11,14 +11,12 @@
 #include "editor/gizmo.h"
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
-#include "graphics/gl_ext.h"
 #include "graphics/irender_device.h"
 #include "graphics/pipeline.h"
 #include "graphics/renderer.h"
 #include "graphics/texture.h"
 #include "physics/physics_scene.h"
 #include "physics/physics_system.h"
-#include "GL/glew.h"
 
 
 class WGLRenderDevice : public Lumix::IRenderDevice
@@ -48,14 +46,13 @@ public:
 	virtual void beginFrame() override
 	{
 		PROFILE_FUNCTION();
-		wglMakeCurrent(m_hdc, m_opengl_context);
 	}
 
 
 	virtual void endFrame() override
 	{
 		PROFILE_FUNCTION();
-		wglSwapLayerBuffers(m_hdc, WGL_SWAP_MAIN_PLANE);
+		Lumix::Renderer::frame();
 	}
 
 
@@ -78,8 +75,6 @@ public:
 
 
 	Lumix::PipelineInstance* m_pipeline;
-	HDC m_hdc;
-	HGLRC m_opengl_context;
 };
 
 
@@ -101,143 +96,6 @@ public:
 	}
 
 
-	HGLRC createGLContext(HWND hwnd[], int count)
-	{
-		ASSERT(count > 0);
-		QWidget* widget = new QWidget();
-		HWND gl_hwnd = (HWND)widget->winId();
-		HDC hdc;
-		hdc = GetDC(gl_hwnd);
-		ASSERT(hdc != NULL);
-		if (hdc == NULL)
-		{
-			Lumix::g_log_error.log("renderer") << "Could not get the device context";
-			return NULL;
-		}
-		BOOL success;
-		PIXELFORMATDESCRIPTOR pfd =
-		{
-			sizeof(PIXELFORMATDESCRIPTOR),  //  size of this pfd  
-			1,                     // version number  
-			PFD_DRAW_TO_WINDOW |   // support window  
-			PFD_SUPPORT_OPENGL |   // support OpenGL  
-			PFD_DOUBLEBUFFER,      // double buffered  
-			PFD_TYPE_RGBA,         // RGBA type  
-			24,                    // 24-bit color depth  
-			0, 0, 0, 0, 0, 0,      // color bits ignored  
-			0,                     // no alpha buffer  
-			0,                     // shift bit ignored  
-			0,                     // no accumulation buffer  
-			0, 0, 0, 0,            // accum bits ignored  
-			32,                    // 32-bit z-buffer      
-			0,                     // no stencil buffer  
-			0,                     // no auxiliary buffer  
-			PFD_MAIN_PLANE,        // main layer  
-			0,                     // reserved  
-			0, 0, 0                // layer masks ignored  
-		};
-		int pixelformat = ChoosePixelFormat(hdc, &pfd);
-		if (pixelformat == 0)
-		{
-			delete widget;
-			ASSERT(false);
-			Lumix::g_log_error.log("renderer") << "Could not choose a pixel format";
-			return NULL;
-		}
-		success = SetPixelFormat(hdc, pixelformat, &pfd);
-		if (success == FALSE)
-		{
-			delete widget;
-			ASSERT(false);
-			Lumix::g_log_error.log("renderer") << "Could not set a pixel format";
-			return NULL;
-		}
-		HGLRC hglrc = wglCreateContext(hdc);
-		if (hglrc == NULL)
-		{
-			delete widget;
-			ASSERT(false);
-			Lumix::g_log_error.log("renderer") << "Could not create an opengl context";
-			return NULL;
-		}
-		success = wglMakeCurrent(hdc, hglrc);
-		if (success == FALSE)
-		{
-			delete widget;
-			ASSERT(false);
-			Lumix::g_log_error.log("renderer") << "Could not make the opengl context current rendering context";
-			return NULL;
-		}
-
-			{
-				UINT numFormats;
-				int atrribs[] =
-				{
-					WGL_DRAW_TO_WINDOW_ARB, GL_TRUE,
-					WGL_SUPPORT_OPENGL_ARB, GL_TRUE,
-					WGL_DOUBLE_BUFFER_ARB, GL_TRUE,
-					WGL_PIXEL_TYPE_ARB, WGL_TYPE_RGBA_ARB,
-					WGL_COLOR_BITS_ARB, 32,
-					WGL_DEPTH_BITS_ARB, 24,
-					WGL_ACCELERATION_ARB, WGL_FULL_ACCELERATION_ARB,
-					WGL_SAMPLE_BUFFERS_ARB, GL_TRUE,
-					WGL_SAMPLES_ARB, 4,
-					0
-				};
-				PFNWGLCHOOSEPIXELFORMATARBPROC foo;
-				foo = (PFNWGLCHOOSEPIXELFORMATARBPROC)wglGetProcAddress("wglChoosePixelFormatARB");
-				if (!foo)
-				{
-					delete widget;
-					ASSERT(false);
-					Lumix::g_log_error.log("renderer") << "Could not get function wglChoosePixelFormatARB";
-					return NULL;
-				}
-				success = foo(hdc, atrribs, NULL, 1, &pixelformat, &numFormats);
-			}
-			wglDeleteContext(hglrc);
-			hglrc = NULL;
-			delete widget;
-
-			for (int i = 0; i < count; ++i)
-			{
-				if (hwnd[i])
-				{
-					hdc = GetDC(hwnd[i]);
-					ChoosePixelFormat(hdc, &pfd);
-					if (hdc == NULL)
-					{
-						ASSERT(false);
-						Lumix::g_log_error.log("renderer") << "Could not get the device context";
-						return NULL;
-					}
-					SetPixelFormat(hdc, pixelformat, &pfd);
-
-					if (!hglrc)
-					{
-						hglrc = wglCreateContext(hdc);
-						if (hglrc == NULL)
-						{
-							ASSERT(false);
-							Lumix::g_log_error.log("renderer") << "Could not create an opengl context";
-							return NULL;
-						}
-						success = wglMakeCurrent(hdc, hglrc);
-						if (success == FALSE)
-						{
-							ASSERT(false);
-							Lumix::g_log_error.log("renderer") << "Could not make the opengl context current rendering context";
-							return NULL;
-						}
-					}
-				}
-			}
-
-
-			return hglrc;
-	}
-
-	
 	void universeFileLoaded(Lumix::FS::IFile* file, bool success, Lumix::FS::FileSystem& fs)
 	{
 		ASSERT(success);
@@ -274,13 +132,11 @@ public:
 		m_main_window->show();
 		
 		HWND hwnd = (HWND)m_main_window->centralWidget()->winId();
-		HWND hwnds[] = { hwnd };
-		HGLRC hglrc = createGLContext(hwnds, sizeof(hwnds) / sizeof(hwnds[0]));
+		Lumix::Renderer::init(hwnd);
+
 
 		m_engine = Lumix::Engine::create("", NULL, NULL, m_allocator);
 		m_render_device = new WGLRenderDevice(*m_engine, "pipelines/main.json");
-		m_render_device->m_hdc = GetDC(hwnd);
-		m_render_device->m_opengl_context = hglrc;
 		m_engine->createUniverse();
 		m_render_device->getPipeline().setScene((Lumix::RenderScene*)m_engine->getScene(crc32("renderer")));
 		m_render_device->getPipeline().resize(600, 400);
@@ -327,7 +183,7 @@ public:
 			{
 				Lumix::copyString(path, sizeof(path), m_tests[m_current_test].toLatin1().data());
 				Lumix::catCString(path, sizeof(path), "_res.tga");
-				m_engine->getRenderer().makeScreenshot(Lumix::Path(path), 500, 500);
+				m_engine->getRenderer().makeScreenshot(Lumix::Path(path));
 
 				char path_preimage[LUMIX_MAX_PATH];
 				Lumix::copyString(path_preimage, sizeof(path), m_tests[m_current_test].toLatin1().data());

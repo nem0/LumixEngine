@@ -8,6 +8,7 @@
 
 namespace Lumix
 {
+
 namespace FS
 {
 	class FileSystem;
@@ -16,9 +17,9 @@ namespace FS
 
 class JsonSerializer;
 class PipelineInstance;
-class Renderer;
 class ResourceManager;
 class Shader;
+class ShaderInstance;
 class Texture;
 
 
@@ -59,21 +60,19 @@ public:
 	};
 
 public:
-	void apply(Renderer& renderer, PipelineInstance& pipeline) const;
 	bool isZTest() const { return (m_render_states & BGFX_STATE_DEPTH_TEST_MASK) != 0; }
 	void enableZTest(bool enable) { setRenderState(enable, BGFX_STATE_DEPTH_TEST_LESS, BGFX_STATE_DEPTH_TEST_MASK); }
 	bool isBackfaceCulling() const { return (m_render_states & BGFX_STATE_CULL_MASK) != 0; }
 	void enableBackfaceCulling(bool enable) { setRenderState(enable, BGFX_STATE_CULL_CW, BGFX_STATE_CULL_MASK); }
 	bool isAlphaCutout() const { return m_is_alpha_cutout; }
-	void enableAlphaCutout(bool enable) { m_is_alpha_cutout = enable; updateShaderCombination(); }
+	void enableAlphaCutout(bool enable) { m_is_alpha_cutout = enable; updateShaderInstance(); }
 	bool isShadowReceiver() const { return m_is_shadow_receiver; }
-	void enableShadowReceiving(bool enable) { m_is_shadow_receiver = enable; updateShaderCombination(); }
+	void enableShadowReceiving(bool enable) { m_is_shadow_receiver = enable; updateShaderInstance(); }
 	uint64_t getRenderStates() const { return m_render_states; }
 
 	void setShader(Shader* shader);
 	void setShader(const Path& path);
 	Shader* getShader() const { return m_shader; }
-	bgfx::ProgramHandle getProgramID() const { return m_program_id; }
 
 	int getTextureCount() const { return m_texture_count; }
 	Texture* getTexture(int i) const { return i < m_texture_count ? m_textures[i] : nullptr; }
@@ -84,24 +83,25 @@ public:
 	bool save(JsonSerializer& serializer);
 	int getUniformCount() const { return m_uniforms.size(); }
 	Uniform& getUniform(int index) { return m_uniforms[index]; }
+	ShaderInstance& getShaderInstance() { ASSERT(m_shader_instance); return *m_shader_instance; }
 
 	Material(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 		: Resource(path, resource_manager, allocator)
 		, m_shader(NULL)
 		, m_depth_func(DepthFunc::LEQUAL)
 		, m_is_alpha_cutout(false)
-		, m_shader_combination(0)
 		, m_is_shadow_receiver(true)
 		, m_uniforms(allocator)
 		, m_allocator(allocator)
 		, m_texture_count(0)
 		, m_render_states(0)
+		, m_shader_instance(nullptr)
 	{ 
 		for (int i = 0; i < MAX_TEXTURE_COUNT; ++i)
 		{
 			m_textures[i] = nullptr;
 		}
-		updateShaderCombination();
+		updateShaderInstance();
 	}
 
 	~Material();
@@ -115,20 +115,20 @@ private:
 
 private:
 	void deserializeUniforms(JsonSerializer& serializer);
-	void updateShaderCombination();
+	void updateShaderInstance();
 	void setRenderState(bool value, uint64_t state, uint64_t mask);
 
 private:
 	static const int MAX_TEXTURE_COUNT = 16;
 
 	Shader*	m_shader;
+	ShaderInstance* m_shader_instance;
 	Texture* m_textures[MAX_TEXTURE_COUNT];
 	int m_texture_count;
 	Array<Uniform> m_uniforms;
 	bool m_is_alpha_cutout;
 	bool m_is_shadow_receiver;
 	DepthFunc m_depth_func;
-	uint32_t m_shader_combination;
 	IAllocator& m_allocator;
 	bgfx::ProgramHandle m_program_id;
 	uint64_t m_render_states;

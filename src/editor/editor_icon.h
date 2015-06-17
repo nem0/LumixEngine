@@ -13,7 +13,6 @@ class Engine;
 struct Entity;
 class IRenderDevice;
 class Model;
-class Renderer;
 class RenderScene;
 
 
@@ -32,7 +31,7 @@ class EditorIcon
 	public:
 		EditorIcon(Engine& engine, RenderScene& scene, const Entity& entity);
 		~EditorIcon();
-		void render(Renderer* renderer, IRenderDevice& render_device);
+		void render(IRenderDevice& render_device);
 		void show();
 		void hide();
 		float hit(const Vec3& origin, const Vec3& dir) const;

@@ -3,7 +3,6 @@
 #include "core/array.h"
 #include "core/delegate.h"
 #include "core/vec3.h"
-#include "graphics/gl_ext.h"
 #include <bgfx.h>
 
 
@@ -16,7 +15,6 @@ namespace FS
 	class IFile;
 }
 
-class Renderer;
 class Shader;
 
 

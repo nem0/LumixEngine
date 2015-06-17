@@ -66,7 +66,7 @@ struct SkinInfo
 	}
 
 	float weights[4];
-	int bone_indices[4];
+	uint16_t bone_indices[4];
 	int index;
 };
 
@@ -143,7 +143,7 @@ static int getVertexSize(const aiMesh* mesh)
 	static const int NORMAL_SIZE = sizeof(uint8_t) * 4;
 	static const int TANGENT_SIZE = sizeof(uint8_t) * 4;
 	static const int UV_SIZE = sizeof(float) * 2;
-	static const int BONE_INDICES_WEIGHTS_SIZE = sizeof(float) * 4 + sizeof(int) * 4;
+	static const int BONE_INDICES_WEIGHTS_SIZE = sizeof(float) * 4 + sizeof(uint16_t) * 4;
 	int size = POSITION_SIZE + NORMAL_SIZE + UV_SIZE;
 	if (mesh->mTangents)
 	{
@@ -185,7 +185,7 @@ void ImportThread::writeMeshes(QFile& file)
 		indices_offset += mesh->mNumFaces * 3;
 		file.write((const char*)&mesh_tri_count, sizeof(mesh_tri_count));
 
-		aiString mesh_name = material_name;
+		aiString mesh_name = mesh->mName;
 		length = strlen(mesh_name.C_Str());
 		file.write((const char*)&length, sizeof(length));
 		file.write((const char*)mesh_name.C_Str(), length);
@@ -196,7 +196,7 @@ void ImportThread::writeMeshes(QFile& file)
 		if (isSkinned(mesh))
 		{
 			writeAttribute("in_weights", VertexAttributeDef::FLOAT4, file);
-			writeAttribute("in_indices", VertexAttributeDef::INT4, file);
+			writeAttribute("in_indices", VertexAttributeDef::SHORT4, file);
 		}
 
 		writeAttribute("in_position", VertexAttributeDef::POSITION, file);
@@ -255,6 +255,33 @@ static void fillSkinInfo(const aiScene* scene, QVector<SkinInfo>& infos, int ver
 }
 
 
+static uint32_t packUint32(uint8_t _x, uint8_t _y, uint8_t _z, uint8_t _w)
+{
+	union
+	{
+		uint32_t ui32;
+		uint8_t arr[4];
+	} un;
+
+	un.arr[0] = _x;
+	un.arr[1] = _y;
+	un.arr[2] = _z;
+	un.arr[3] = _w;
+
+	return un.ui32;
+}
+
+
+static uint32_t packF4u(const aiVector3D& vec)
+{
+	const uint8_t xx = uint8_t(vec.x*127.0f + 128.0f);
+	const uint8_t yy = uint8_t(vec.y*127.0f + 128.0f);
+	const uint8_t zz = uint8_t(vec.z*127.0f + 128.0f);
+	const uint8_t ww = uint8_t(0);
+	return packUint32(xx, yy, zz, ww);
+}
+
+
 void ImportThread::writeGeometry(QFile& file)
 {
 	const aiScene* scene = m_importer.GetScene();
@@ -307,14 +334,14 @@ void ImportThread::writeGeometry(QFile& file)
 			file.write((const char*)&position, sizeof(position));
 
 			auto normal = mesh->mNormals[j];
-			uint8_t byte_normal[4] = { (int8_t)(normal.x * 127), (int8_t)(normal.y * 127), (int8_t)(normal.z * 127), 0 };
-			file.write((const char*)byte_normal, sizeof(byte_normal));
+			uint32_t int_normal = packF4u(normal);
+			file.write((const char*)&int_normal, sizeof(int_normal));
 
 			if (mesh->mTangents)
 			{
 				auto tangent = mesh->mTangents[j];
-				uint8_t byte_tangent[4] = { (int8_t)(tangent.x * 127), (int8_t)(tangent.y * 127), (int8_t)(tangent.z * 127), 0 };
-				file.write((const char*)byte_tangent, sizeof(byte_tangent));
+				uint32_t int_tangent = packF4u(tangent);
+				file.write((const char*)&int_tangent, sizeof(int_tangent));
 			}
 
 			auto uv = mesh->mTextureCoords[0][j];
@@ -771,7 +798,7 @@ void ImportThread::run()
 		m_importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS, aiComponent_COLORS | aiComponent_LIGHTS | aiComponent_CAMERAS);
 		const aiScene* scene = m_importer.ReadFile(m_source.toLatin1().data(), 
 			aiProcess_JoinIdenticalVertices | aiProcess_RemoveComponent | aiProcess_GenUVCoords | aiProcess_RemoveRedundantMaterials | aiProcess_Triangulate
-			| aiProcess_LimitBoneWeights | aiProcess_OptimizeMeshes | aiProcess_OptimizeGraph | aiProcess_GenSmoothNormals | aiProcess_CalcTangentSpace);
+			| aiProcess_LimitBoneWeights | aiProcess_OptimizeGraph | aiProcess_OptimizeMeshes | aiProcess_GenSmoothNormals | aiProcess_CalcTangentSpace);
 		if (!scene || !scene->mMeshes || !scene->mMeshes[0]->mTangents)
 		{
 			m_error_message = m_importer.GetErrorString();

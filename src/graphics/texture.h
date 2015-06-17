@@ -3,7 +3,6 @@
 
 #include "core/string.h"
 #include "core/resource.h"
-#include "graphics/gl_ext.h"
 #include <bgfx.h>
 
 

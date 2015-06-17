@@ -6,7 +6,7 @@
 #include "core/resource_manager.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
-#include "graphics/renderer.h"
+#include "graphics/render_scene.h"
 #include "universe/universe.h"
 
 
