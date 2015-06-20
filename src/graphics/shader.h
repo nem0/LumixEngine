@@ -105,7 +105,7 @@ class LUMIX_ENGINE_API Shader : public Resource
 
 	private:
 		void parseTextureSlots(lua_State* state);
-		void generateInstances();
+		bool generateInstances();
 		Renderer& getRenderer();
 		bgfx::ProgramHandle createProgram(int pass_idx, int mask) const;
 

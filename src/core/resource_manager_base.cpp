@@ -95,7 +95,10 @@ namespace Lumix
 	{
 		if(0 == resource.remRef())
 		{
-			resource.incrementDepCount();
+			if (resource.isReady() || resource.isFailure() || resource.isEmpty())
+			{
+				resource.incrementDepCount();
+			}
 			resource.onUnloading();
 			resource.doUnload();
 		}
@@ -112,7 +115,10 @@ namespace Lumix
 
 	void ResourceManagerBase::forceUnload(Resource& resource)
 	{
-		resource.incrementDepCount();
+		if (resource.isReady() || resource.isFailure() || resource.isEmpty())
+		{
+			resource.incrementDepCount();
+		}
 		resource.onUnloading();
 		resource.doUnload();
 		resource.m_ref_count = 0;
@@ -131,6 +137,10 @@ namespace Lumix
 	{
 		if (resource.isReady() || resource.isFailure() || resource.isEmpty())
 		{
+			if (!resource.isFailure())
+			{
+				resource.incrementDepCount();
+			}
 			resource.onReloading();
 			resource.doUnload();
 			resource.onLoading();

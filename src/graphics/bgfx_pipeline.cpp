@@ -213,6 +213,7 @@ namespace Lumix
 			m_light_pos_radius_uniform = bgfx::createUniform("u_lightPosRadius", bgfx::UniformType::Vec4);
 			m_light_color_uniform = bgfx::createUniform("u_lightRgbInnerR", bgfx::UniformType::Vec4);
 			m_light_dir_fov_uniform = bgfx::createUniform("u_lightDirFov", bgfx::UniformType::Vec4);
+			m_ambient_color_uniform = bgfx::createUniform("u_ambientColor", bgfx::UniformType::Vec4);
 
 			m_draw_calls_count = 0;
 			m_vertices_count = 0;
@@ -229,7 +230,8 @@ namespace Lumix
 			bgfx::destroyUniform(m_light_pos_radius_uniform);
 			bgfx::destroyUniform(m_light_color_uniform);
 			bgfx::destroyUniform(m_light_dir_fov_uniform);
-			
+			bgfx::destroyUniform(m_ambient_color_uniform);
+
 			m_source.getObserverCb().unbind<PipelineInstanceImpl, &PipelineInstanceImpl::sourceLoaded>(this);
 			m_source.getResourceManager().get(ResourceManager::PIPELINE)->unload(m_source);
 			for (int i = 0; i < m_framebuffers.size(); ++i)
@@ -467,7 +469,7 @@ namespace Lumix
 			int i = 0;
 			while (const char* text = m_scene->getDebugText(i))
 			{
-				bgfx::dbgTextPrintf(0, 1, 0x4f, text);
+				bgfx::dbgTextPrintf(m_pass_idx, 1, 0x4f, text);
 				++i;
 			}
 		}
@@ -507,6 +509,45 @@ namespace Lumix
 			}*/
 		}
 
+
+		void setPointLightUniforms(const Component& light_cmp)
+		{
+			Vec4 light_pos_radius(light_cmp.entity.getPosition(), m_scene->getLightRange(light_cmp));
+			bgfx::setUniform(m_light_pos_radius_uniform, &light_pos_radius);
+
+			float innerRadius = 0;
+			Vec4 light_color(m_scene->getPointLightColor(light_cmp) * m_scene->getPointLightIntensity(light_cmp), innerRadius);
+			bgfx::setUniform(m_light_color_uniform, &light_color);
+
+			Vec4 light_dir_fov(light_cmp.entity.getRotation() * Vec3(0, 0, 1), m_scene->getLightFOV(light_cmp));
+			bgfx::setUniform(m_light_dir_fov_uniform, &light_dir_fov);
+		}
+
+
+		void setDirectionalLightUniforms(const Component& light_cmp)
+		{
+			Vec4 diffuse_light_color(m_scene->getGlobalLightColor(light_cmp) * m_scene->getGlobalLightIntensity(light_cmp), 1);
+			bgfx::setUniform(m_light_color_uniform, &diffuse_light_color);
+
+			Vec4 ambient_light_color(m_scene->getLightAmbientColor(light_cmp) * m_scene->getLightAmbientIntensity(light_cmp), 1);
+			bgfx::setUniform(m_ambient_color_uniform, &ambient_light_color);
+
+			Vec4 light_dir_fov(light_cmp.entity.getRotation() * Vec3(0, 0, 1), 0);
+			bgfx::setUniform(m_light_dir_fov_uniform, &light_dir_fov);
+
+			TODO("bgfx");
+			/*setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX0, m_shadow_modelviewprojection[0]);
+			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX1, m_shadow_modelviewprojection[1]);
+			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX2, m_shadow_modelviewprojection[2]);
+			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX3, m_shadow_modelviewprojection[3]);
+			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_COLOR, m_scene->getFogColor(light_cmp));
+			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
+			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOWMAP_SPLITS, m_shadowmap_splits);
+			bgfx::setUniform(light_color, &m_scene->getLightAmbientColor(light_cmp));
+			float pos_r[] = { 0, 0, 0, 4 };
+			bgfx::setUniform(light_pos, pos_r);*/
+		}
+
 		
 		void setLightUniforms(const Component& light_cmp)
 		{
@@ -514,34 +555,12 @@ namespace Lumix
 			{
 				if (light_cmp.type == POINT_LIGHT_HASH)
 				{
-					Vec4 light_pos_radius(light_cmp.entity.getPosition(), m_scene->getLightRange(light_cmp));
-					bgfx::setUniform(m_light_pos_radius_uniform, &light_pos_radius);
-
-					Vec4 light_color(m_scene->getPointLightColor(light_cmp) * m_scene->getPointLightIntensity(light_cmp), 1);
-					bgfx::setUniform(m_light_color_uniform, &light_color);
-
-					Vec4 light_dir_fov(light_cmp.entity.getRotation() * Vec3(0, 0, 1), m_scene->getLightFOV(light_cmp));
-					bgfx::setUniform(m_light_dir_fov_uniform, &light_dir_fov);
+					setPointLightUniforms(light_cmp);
 				}
 				else
 				{
-					TODO("bgfx");
-					/*setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX0, m_shadow_modelviewprojection[0]);
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX1, m_shadow_modelviewprojection[1]);
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX2, m_shadow_modelviewprojection[2]);
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX3, m_shadow_modelviewprojection[3]);
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::AMBIENT_COLOR, m_scene->getLightAmbientColor(light_cmp));
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::AMBIENT_INTENSITY, m_scene->getLightAmbientIntensity(light_cmp));
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_COLOR, m_scene->getGlobalLightColor(light_cmp));
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_INTENSITY, m_scene->getGlobalLightIntensity(light_cmp));
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_COLOR, m_scene->getFogColor(light_cmp));
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOWMAP_SPLITS, m_shadowmap_splits);
-					bgfx::setUniform(light_color, &m_scene->getLightAmbientColor(light_cmp));
-					float pos_r[] = { 0, 0, 0, 4 };
-					bgfx::setUniform(light_pos, pos_r);*/
+					setDirectionalLightUniforms(light_cmp);
 				}
-				//setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::LIGHT_DIR, light_cmp.entity.getRotation() * Vec3(0, 0, 1));
 			}
 		}
 
@@ -670,6 +689,19 @@ namespace Lumix
 				bone_mtx[bone_index] = bone_mtx[bone_index] * model.getBone(bone_index).inv_bind_matrix;
 			}
 			m_renderer->setUniform(*shader, "bone_matrices", BONE_MATRICES_HASH, bone_mtx, pose.getCount());*/
+		}
+
+
+		void enableBlending()
+		{
+			m_render_state |= BGFX_STATE_BLEND_ADD;
+		}
+
+
+#error gizmo z test
+		void disableBlending()
+		{
+			m_render_state &= ~BGFX_STATE_BLEND_MASK;
 		}
 
 
@@ -980,6 +1012,7 @@ namespace Lumix
 		Array<RenderableInfo> m_renderable_infos;
 		bgfx::UniformHandle m_light_pos_radius_uniform;
 		bgfx::UniformHandle m_light_color_uniform;
+		bgfx::UniformHandle m_ambient_color_uniform;
 		bgfx::UniformHandle m_light_dir_fov_uniform;
 		int m_draw_calls_count;
 		int m_vertices_count;
@@ -1030,6 +1063,18 @@ namespace Lumix
 		}
 
 
+		void enableBlending(PipelineInstanceImpl* pipeline)
+		{
+			pipeline->enableBlending();
+		}
+
+
+		void disableBlending(PipelineInstanceImpl* pipeline)
+		{
+			pipeline->disableBlending();
+		}
+
+
 		void applyCamera(PipelineInstanceImpl* pipeline, const char* slot)
 		{
 			Component cmp = pipeline->m_scene->getCameraInSlot(slot);
@@ -1038,11 +1083,11 @@ namespace Lumix
 			{
 				if (pipeline->m_framebuffer_width > 0)
 				{
-					bgfx::setViewRect(0, 0, 0, (uint16_t)pipeline->m_framebuffer_width, (uint16_t)pipeline->m_framebuffer_height);
+					bgfx::setViewRect(pipeline->m_pass_idx, 0, 0, (uint16_t)pipeline->m_framebuffer_width, (uint16_t)pipeline->m_framebuffer_height);
 				}
 				else
 				{
-					bgfx::setViewRect(0, 0, 0, (uint16_t)pipeline->m_width, (uint16_t)pipeline->m_height);
+					bgfx::setViewRect(pipeline->m_pass_idx, 0, 0, (uint16_t)pipeline->m_width, (uint16_t)pipeline->m_height);
 				}
 
 				pipeline->m_scene->setCameraSize(cmp, pipeline->m_width, pipeline->m_height);
@@ -1060,12 +1105,12 @@ namespace Lumix
 				Vec3 up = mtx.getYVector();
 				view_matrix.lookAt(pos, center, up);
 
-				bgfx::setViewTransform(0, &view_matrix.m11, &projection_matrix.m11);
+				bgfx::setViewTransform(pipeline->m_pass_idx, &view_matrix.m11, &projection_matrix.m11);
 			}
 		}
 
 
-		void clear(const char* buffers)
+		void clear(PipelineInstanceImpl* pipeline, const char* buffers)
 		{
 			uint16_t flags = 0;
 			if (strcmp(buffers, "all") == 0)
@@ -1076,8 +1121,8 @@ namespace Lumix
 			{
 				flags = BGFX_CLEAR_DEPTH;
 			}
-			bgfx::setViewClear(0, flags, 0x303030ff, 1.0f, 0);
-			bgfx::submit(0);
+			bgfx::setViewClear(pipeline->m_pass_idx, flags, 0x303030ff, 1.0f, 0);
+			bgfx::submit(pipeline->m_pass_idx);
 		}
 
 
@@ -1090,6 +1135,7 @@ namespace Lumix
 				glEnable(GL_BLEND);
 				glBlendFunc(GL_ONE, GL_ONE);
 				*/
+
 				pipeline->renderPointLightInfluencedGeometry(pipeline->getScene()->getFrustum(), layer_mask);
 
 				//glDisable(GL_BLEND);
@@ -1248,6 +1294,8 @@ namespace Lumix
 
 	void PipelineImpl::registerCFunctions()
 	{
+		registerCFunction("enableBlending", LuaWrapper::wrap<decltype(&LuaAPI::enableBlending), LuaAPI::enableBlending>);
+		registerCFunction("disableBlending", LuaWrapper::wrap<decltype(&LuaAPI::disableBlending), LuaAPI::disableBlending>);
 		registerCFunction("setPass", LuaWrapper::wrap<decltype(&LuaAPI::setPass), LuaAPI::setPass>);
 		registerCFunction("applyCamera", LuaWrapper::wrap<decltype(&LuaAPI::applyCamera), LuaAPI::applyCamera>);
 		registerCFunction("clear", LuaWrapper::wrap<decltype(&LuaAPI::clear), LuaAPI::clear>);
