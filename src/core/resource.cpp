@@ -29,7 +29,6 @@ namespace Lumix
 		{
 			m_resource_manager.decrementLoadingResources();
 		}
-		m_dep_count = 0;
 	}
 
 	void Resource::onLoading(void)
@@ -65,8 +64,6 @@ namespace Lumix
 	void Resource::onReloading(void)
 	{
 		State old_state = m_state;
-		if (State::READY == old_state)
-			++m_dep_count;
 
 		m_state = State::UNLOADING;
 		m_cb.invoke(old_state, State::UNLOADING);

@@ -4,6 +4,7 @@
 #include "core/fs/ifile.h"
 #include "core/log.h"
 #include "core/matrix.h"
+#include "core/path_utils.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
@@ -122,9 +123,15 @@ void Shader::parseTextureSlots(lua_State* L)
 
 bgfx::ProgramHandle Shader::createProgram(int pass_idx, int mask) const
 {
+	TODO("bgfx"); // get rid of fopen
+	char shader_name[LUMIX_MAX_PATH];
+	PathUtils::getBasename(shader_name, sizeof(shader_name), getPath().c_str());
+
 	const char* pass = m_combintions.m_passes[pass_idx];
 	char path[LUMIX_MAX_PATH];
-	copyString(path, sizeof(path), "shaders/compiled/rigid_");
+	copyString(path, sizeof(path), "shaders/compiled/");
+	catCString(path, sizeof(path), shader_name);
+	catCString(path, sizeof(path), "_");
 	catCString(path, sizeof(path), pass);
 	char mask_str[10];
 	int actual_mask = mask & m_combintions.m_vs_combinations[pass_idx];
@@ -133,6 +140,10 @@ bgfx::ProgramHandle Shader::createProgram(int pass_idx, int mask) const
 	catCString(path, sizeof(path), "_vs.shb");
 	
 	auto fp = fopen(path, "rb");
+	if (!fp)
+	{
+		return BGFX_INVALID_HANDLE;
+	}
 	fseek(fp, 0, SEEK_END);
 	auto s = ftell(fp);
 	auto* mem = bgfx::alloc(s + 1);
@@ -142,8 +153,9 @@ bgfx::ProgramHandle Shader::createProgram(int pass_idx, int mask) const
 	auto vs = bgfx::createShader(mem);
 	fclose(fp);
 
-	TODO("bgfx"); // rigid
-	copyString(path, sizeof(path), "shaders/compiled/rigid_");
+	copyString(path, sizeof(path), "shaders/compiled/");
+	catCString(path, sizeof(path), shader_name);
+	catCString(path, sizeof(path), "_");
 	catCString(path, sizeof(path), pass);
 	actual_mask = mask & m_combintions.m_fs_combinations[pass_idx];
 	toCString(actual_mask, mask_str, sizeof(mask_str));
@@ -151,6 +163,10 @@ bgfx::ProgramHandle Shader::createProgram(int pass_idx, int mask) const
 	catCString(path, sizeof(path), "_fs.shb");
 
 	fp = fopen(path, "rb");
+	if (!fp)
+	{
+		return BGFX_INVALID_HANDLE;
+	}
 	fseek(fp, 0, SEEK_END);
 	s = ftell(fp);
 	mem = bgfx::alloc(s + 1);
@@ -170,7 +186,7 @@ Renderer& Shader::getRenderer()
 }
 
 
-void Shader::generateInstances()
+bool Shader::generateInstances()
 {
 
 	for (int i = 0; i < m_instances.size(); ++i)
@@ -191,9 +207,15 @@ void Shader::generateInstances()
 		{
 			int global_idx = renderer.getPassIdx(m_combintions.m_passes[pass_idx]);
 			instance->m_program_handles[global_idx] = createProgram(pass_idx, mask);
+			if (!bgfx::isValid(instance->m_program_handles[global_idx]))
+			{
+				m_allocator.deleteObject(instance);
+				return false;
+			}
 		}
 		m_instances.push(instance);
 	}
+	return true;
 }
 
 
@@ -225,10 +247,16 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			parseTextureSlots(L);
 			m_combintions.parse(L);
 			getShaderCombinations((const char*)file->getBuffer(), &m_combintions); /// TODO use lua state
-			generateInstances();
-
-			m_size = file->size();
-			decrementDepCount();
+			if (!generateInstances())
+			{
+				g_log_error.log("renderer") << "Could not load instances of shader " << m_path.c_str();
+				onFailure();
+			}
+			else
+			{
+				m_size = file->size();
+				decrementDepCount();
+			}
 		}
 		lua_close(L);
 	}
