@@ -52,6 +52,21 @@ namespace Lumix
 	static const float SHADOW_CAM_FAR = 10000.0f;
 
 
+	class BaseVertex
+	{
+		public:
+			float m_x, m_y, m_z;
+			uint32_t m_rgba;
+			float m_u;
+			float m_v;
+
+			static bgfx::VertexDecl s_vertex_decl;
+	};
+
+
+	bgfx::VertexDecl BaseVertex::s_vertex_decl;
+
+
 	struct PipelineImpl : public Pipeline
 	{
 		PipelineImpl(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
@@ -207,6 +222,8 @@ namespace Lumix
 			, m_framebuffers(allocator)
 			, m_grass_infos(allocator)
 			, m_renderable_infos(allocator)
+			, m_uniforms(allocator)
+			, m_global_textures(allocator)
 			, m_frame_allocator(allocator, 1 * 1024 * 1024)
 			, m_renderer(static_cast<PipelineImpl&>(pipeline).getRenderer())
 		{
@@ -214,13 +231,14 @@ namespace Lumix
 			m_light_color_uniform = bgfx::createUniform("u_lightRgbInnerR", bgfx::UniformType::Vec4);
 			m_light_dir_fov_uniform = bgfx::createUniform("u_lightDirFov", bgfx::UniformType::Vec4);
 			m_ambient_color_uniform = bgfx::createUniform("u_ambientColor", bgfx::UniformType::Vec4);
+			m_shadowmap_matrices_uniform = bgfx::createUniform("u_shadowmapMatrices", bgfx::UniformType::Mat4);
+			m_shadowmap_splits_uniform = bgfx::createUniform("u_shadowmapSplits", bgfx::UniformType::Vec4);
 
 			m_draw_calls_count = 0;
 			m_vertices_count = 0;
 			m_scene = NULL;
 			m_width = m_height = -1;
 			m_framebuffer_width = m_framebuffer_height = -1;
-			m_shadowmap_framebuffer = NULL;
 			pipeline.onLoaded<PipelineInstanceImpl, &PipelineInstanceImpl::sourceLoaded>(this);
 		}
 
@@ -231,6 +249,13 @@ namespace Lumix
 			bgfx::destroyUniform(m_light_color_uniform);
 			bgfx::destroyUniform(m_light_dir_fov_uniform);
 			bgfx::destroyUniform(m_ambient_color_uniform);
+			bgfx::destroyUniform(m_shadowmap_matrices_uniform);
+			bgfx::destroyUniform(m_shadowmap_splits_uniform);
+
+			for (int i = 0; i < m_uniforms.size(); ++i)
+			{
+				bgfx::destroyUniform(m_uniforms[i]);
+			}
 
 			m_source.getObserverCb().unbind<PipelineInstanceImpl, &PipelineInstanceImpl::sourceLoaded>(this);
 			m_source.getResourceManager().get(ResourceManager::PIPELINE)->unload(m_source);
@@ -244,6 +269,20 @@ namespace Lumix
 		void setPass(const char* name)
 		{
 			m_pass_idx = m_renderer.getPassIdx(name);
+			for (int i = 0; i < sizeof(m_view2pass_map) / sizeof(m_view2pass_map[0]); ++i)
+			{
+				if (m_view2pass_map[i] == m_pass_idx)
+				{
+					m_view_idx = i;
+					break;
+				}
+				else if (m_view2pass_map[i] == 0xff)
+				{
+					m_view2pass_map[i] = m_pass_idx;
+					m_view_idx = i;
+					break;
+				}
+			}
 		}
 
 		
@@ -259,18 +298,38 @@ namespace Lumix
 		}
 
 
-		FrameBuffer* getFrameBuffer(const char* name)
+		FrameBuffer* getFramebuffer(const char* framebuffer_name)
 		{
-			TODO("bgfx");
-			/*
 			for (int i = 0, c = m_framebuffers.size(); i < c; ++i)
 			{
-				if (strcmp(m_framebuffers[i]->getName(), name) == 0)
+				if (strcmp(m_framebuffers[i]->getName(), framebuffer_name) == 0)
 				{
 					return m_framebuffers[i];
 				}
-			}*/
-			return NULL;
+			}
+			return nullptr;
+		}
+
+
+		void setCurrentFramebuffer(const char* framebuffer_name)
+		{
+			m_current_framebuffer = getFramebuffer(framebuffer_name);
+			if (!m_current_framebuffer)
+			{
+				g_log_warning.log("renderer") << "Framebuffer " << framebuffer_name << " not found";
+			}
+		}
+
+
+		void bindFramebufferTexture(const char* framebuffer_name, int renderbuffer_idx, int uniform_idx)
+		{
+			FrameBuffer* fb = getFramebuffer(framebuffer_name);
+			if (fb)
+			{
+				GlobalTexture& t = m_global_textures.pushEmpty();
+				t.m_texture = fb->getRenderbufferHandle(renderbuffer_idx);
+				t.m_uniform = m_uniforms[uniform_idx];
+			}
 		}
 
 
@@ -313,9 +372,14 @@ namespace Lumix
 				{
 					FrameBuffer::Declaration& decl = m_source.m_framebuffers[i];
 					m_framebuffers.push(m_allocator.newObject<FrameBuffer>(decl));
-					if (decl.m_name == "shadowmap")
+				}
+				
+				if (lua_getglobal(m_source.m_lua_state, "init") == LUA_TFUNCTION)
+				{
+					lua_pushlightuserdata(m_source.m_lua_state, this);
+					if (lua_pcall(m_source.m_lua_state, 1, 0, 0) != LUA_OK)
 					{
-						m_shadowmap_framebuffer = m_framebuffers.back();
+						g_log_error.log("lua") << lua_tostring(m_source.m_lua_state, -1);
 					}
 				}
 			}
@@ -334,33 +398,35 @@ namespace Lumix
 
 		void renderShadowmap(Component camera, int64_t layer_mask)
 		{
-			TODO("bgfx");
-			/*PROFILE_FUNCTION();
-			ASSERT(m_renderer != NULL);
 			Component light_cmp = m_scene->getActiveGlobalLight();
 			if (!light_cmp.isValid() || !camera.isValid())
 			{
 				return;
 			}
-			m_shadowmap_framebuffer->bind();
-			glClear(GL_DEPTH_BUFFER_BIT);
-
 			Matrix light_mtx = light_cmp.entity.getMatrix();
 
-			float shadowmap_height = (float)m_shadowmap_framebuffer->getHeight();
-			float shadowmap_width = (float)m_shadowmap_framebuffer->getWidth();
+			float shadowmap_height = (float)m_current_framebuffer->getHeight();
+			float shadowmap_width = (float)m_current_framebuffer->getWidth();
 			float viewports[] =
 			{ 0, 0
 			, 0.5f, 0
 			, 0, 0.5f
 			, 0.5f, 0.5f };
+
 			float camera_fov = m_scene->getCameraFOV(camera);
 			float camera_ratio = m_scene->getCameraWidth(camera) / m_scene->getCameraHeight(camera);
 			for (int split_index = 0; split_index < 4; ++split_index)
 			{
+				if (split_index > 0)
+				{
+					++m_view_idx;
+					m_view2pass_map[m_view_idx] = m_pass_idx;
+				}
 				float* viewport = viewports + split_index * 2;
-				glViewport((int)(1 + shadowmap_width * viewport[0]), (int)(1 + shadowmap_height * viewport[1]),
-					(int)(0.5f * shadowmap_width - 2), (int)(0.5f * shadowmap_height - 2));
+				bgfx::setViewRect(m_view_idx
+					, (uint16_t)(1 + shadowmap_width * viewport[0])
+					, (uint16_t)(1 + shadowmap_height * viewport[1])
+					, (uint16_t)(0.5f * shadowmap_width - 2), (uint16_t)(0.5f * shadowmap_height - 2));
 
 				Frustum frustum;
 				Matrix camera_matrix = camera.entity.getMatrix();
@@ -377,28 +443,25 @@ namespace Lumix
 				Vec3 shadow_cam_pos = frustum.getCenter();
 				float bb_size = frustum.getRadius();
 				Matrix projection_matrix;
-				Renderer::getOrthoMatrix(-bb_size, bb_size, -bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR, &projection_matrix);
-				m_renderer->setProjectionMatrix(projection_matrix);
+				projection_matrix.setOrtho(-bb_size, bb_size, -bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR);
 
 				Vec3 light_forward = light_mtx.getZVector();
 				shadow_cam_pos -= light_forward * SHADOW_CAM_FAR * 0.5f;
-				Matrix modelview_matrix;
-				Renderer::getLookAtMatrix(shadow_cam_pos, shadow_cam_pos + light_forward, light_mtx.getYVector(), &modelview_matrix);
-				m_renderer->setViewMatrix(modelview_matrix);
+				Matrix view_matrix;
+				view_matrix.lookAt(shadow_cam_pos, shadow_cam_pos + light_forward, light_mtx.getYVector());
+				bgfx::setViewTransform(m_view_idx, &view_matrix.m11, &projection_matrix.m11);
 				static const Matrix biasMatrix(
 					0.5, 0.0, 0.0, 0.0,
 					0.0, 0.5, 0.0, 0.0,
 					0.0, 0.0, 0.5, 0.0,
 					0.5, 0.5, 0.5, 1.0
 					);
-				m_shadow_modelviewprojection[split_index] = biasMatrix * (projection_matrix * modelview_matrix);
+				m_shadow_modelviewprojection[split_index] = biasMatrix * (projection_matrix * view_matrix);
 
 				Frustum shadow_camera_frustum;
 				shadow_camera_frustum.computeOrtho(shadow_cam_pos, -light_forward, light_mtx.getYVector(), bb_size * 2, bb_size * 2, SHADOW_CAM_NEAR, SHADOW_CAM_FAR);
 				renderModels(shadow_camera_frustum, layer_mask, true);
 			}
-			FrameBuffer::unbind();
-			glCullFace(GL_BACK);*/
 		}
 
 
@@ -442,34 +505,11 @@ namespace Lumix
 
 		void renderDebugTexts()
 		{
-			/*BitmapFont* font = m_scene->getDebugTextFont();
-			if (!font || !font->isReady())
-			{
-				return;
-			}
-			m_renderer->cleanup();
-			Matrix projection_matrix;
-			Renderer::getOrthoMatrix(0, (float)m_width, 0, (float)m_height, 0, 10, &projection_matrix);
-			m_renderer->setProjectionMatrix(projection_matrix);
-			m_renderer->setViewMatrix(Matrix::IDENTITY);
-
-			Geometry& geometry = m_scene->getDebugTextGeometry();
-			Mesh& mesh = m_scene->getDebugTextMesh();
-
-			applyMaterial(*font->getMaterial());
-			bindGeometry(*m_renderer, geometry, mesh);
-			glEnable(GL_BLEND);
-			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-			glDisable(GL_DEPTH_TEST);
-			renderGeometry(0, mesh.getIndexCount());
-			glDisable(GL_BLEND);
-			glEnable(GL_DEPTH_TEST);*/
-			
 			bgfx::dbgTextClear();
 			int i = 0;
 			while (const char* text = m_scene->getDebugText(i))
 			{
-				bgfx::dbgTextPrintf(m_pass_idx, 1, 0x4f, text);
+				bgfx::dbgTextPrintf(1, 1, 0x4f, text);
 				++i;
 			}
 		}
@@ -535,17 +575,14 @@ namespace Lumix
 			Vec4 light_dir_fov(light_cmp.entity.getRotation() * Vec3(0, 0, 1), 0);
 			bgfx::setUniform(m_light_dir_fov_uniform, &light_dir_fov);
 
+			bgfx::setUniform(m_shadowmap_matrices_uniform, &m_shadow_modelviewprojection);
+			bgfx::setUniform(m_shadowmap_splits_uniform, &m_shadowmap_splits);
+
 			TODO("bgfx");
-			/*setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX0, m_shadow_modelviewprojection[0]);
-			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX1, m_shadow_modelviewprojection[1]);
-			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX2, m_shadow_modelviewprojection[2]);
-			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX3, m_shadow_modelviewprojection[3]);
+			/*
 			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_COLOR, m_scene->getFogColor(light_cmp));
 			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
-			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOWMAP_SPLITS, m_shadowmap_splits);
-			bgfx::setUniform(light_color, &m_scene->getLightAmbientColor(light_cmp));
-			float pos_r[] = { 0, 0, 0, 4 };
-			bgfx::setUniform(light_pos, pos_r);*/
+			*/
 		}
 
 		
@@ -698,7 +735,6 @@ namespace Lumix
 		}
 
 
-#error gizmo z test
 		void disableBlending()
 		{
 			m_render_state &= ~BGFX_STATE_BLEND_MASK;
@@ -723,10 +759,45 @@ namespace Lumix
 		}
 
 
+		void drawQuad()
+		{
+			if (bgfx::checkAvailTransientVertexBuffer(3, BaseVertex::s_vertex_decl))
+			{
+				bgfx::TransientVertexBuffer vb;
+				bgfx::allocTransientVertexBuffer(&vb, 3, BaseVertex::s_vertex_decl);
+				BaseVertex* vertex = (BaseVertex*)vb.data;
+
+				vertex[0].m_x = 0;
+				vertex[0].m_y = 0;
+				vertex[0].m_z = 0;
+				vertex[0].m_rgba = 0xffffffff;
+				vertex[0].m_u = 0;
+				vertex[0].m_v = 0;
+
+				vertex[1].m_x = 1;
+				vertex[1].m_y = 0;
+				vertex[1].m_z = 0;
+				vertex[1].m_rgba = 0xffffffff;
+				vertex[1].m_u = 1;
+				vertex[1].m_v = 0;
+
+				vertex[2].m_x = 1;
+				vertex[2].m_y = 1;
+				vertex[2].m_z = 0;
+				vertex[2].m_rgba = 0xffffffff;
+				vertex[2].m_u = 1;
+				vertex[2].m_v = 1;
+
+				bgfx::setVertexBuffer(&vb);
+				bgfx::submit(m_view_idx);
+			}
+		}
+
+
 		void renderModels(const Frustum& frustum, int64_t layer_mask, bool is_shadowmap)
 		{
 			PROFILE_FUNCTION();
-
+			
 			if (m_scene->getAppliedCamera().isValid())
 			{
 				m_renderable_infos.clear();
@@ -882,10 +953,17 @@ namespace Lumix
 					bgfx::setTexture(i, mesh.getMaterial()->getShader()->getTextureSlot(i).m_uniform_handle, texture->getTextureHandle());
 				}
 			}
+			int global_texture_offset = mesh.getMaterial()->getTextureCount();
+			for (int i = 0; i < m_global_textures.size(); ++i)
+			{
+				const GlobalTexture& t = m_global_textures[i];
+				bgfx::setTexture(i + global_texture_offset, t.m_uniform, t.m_texture);
+			}
+
 			bgfx::setVertexBuffer(model.getGeometry().getAttributesArrayID(), mesh.getAttributeArrayOffset() / mesh.getVertexDefinition().getStride(), mesh.getAttributeArraySize() / mesh.getVertexDefinition().getStride());
 			bgfx::setIndexBuffer(model.getGeometry().getIndicesArrayID(), mesh.getIndicesOffset(), mesh.getIndexCount());
 			bgfx::setState(m_render_state | mesh.getMaterial()->getRenderStates());
-			bgfx::submit(m_pass_idx);
+			bgfx::submit(m_view_idx);
 		}
 
 
@@ -934,6 +1012,7 @@ namespace Lumix
 			m_height = h;
 		}
 
+
 		virtual void render() override
 		{
 			PROFILE_FUNCTION();
@@ -948,9 +1027,13 @@ namespace Lumix
 				| BGFX_STATE_DEPTH_WRITE
 				| BGFX_STATE_MSAA
 				;
+			m_view_idx = -1;
 			m_pass_idx = -1;
 			m_draw_calls_count = 0;
 			m_vertices_count = 0;
+			m_current_framebuffer = nullptr;
+			m_global_textures.clear();
+			memset(m_view2pass_map, 0xffffFFFF, sizeof(m_view2pass_map));
 
 			if (lua_getglobal(m_source.m_lua_state, "render") == LUA_TFUNCTION)
 			{
@@ -962,12 +1045,6 @@ namespace Lumix
 			}
 
 			m_frame_allocator.clear();
-		}
-
-
-		virtual FrameBuffer* getShadowmapFramebuffer() override
-		{
-			return m_shadowmap_framebuffer;
 		}
 
 
@@ -990,15 +1067,29 @@ namespace Lumix
 		}
 
 
+		class GlobalTexture
+		{
+			public:
+				bgfx::TextureHandle m_texture;
+				bgfx::UniformHandle m_uniform;
+		};
+
+
+		TODO("bgfx"); // check for unused members;
+		uint8_t m_view_idx;
 		int m_pass_idx;
+		uint8_t m_view2pass_map[16];
 		uint64_t m_render_state;
 		IAllocator& m_allocator;
 		Renderer& m_renderer;
 		LIFOAllocator m_frame_allocator;
 		PipelineImpl& m_source;
 		RenderScene* m_scene;
+		FrameBuffer* m_current_framebuffer;
 		Array<FrameBuffer*> m_framebuffers;
-		FrameBuffer* m_shadowmap_framebuffer;
+		Array<GlobalTexture> m_global_textures;
+		Array<bgfx::UniformHandle> m_uniforms;
+
 		Matrix m_shadow_modelviewprojection[4];
 		Vec4 m_shadowmap_splits;
 		int m_width;
@@ -1014,6 +1105,8 @@ namespace Lumix
 		bgfx::UniformHandle m_light_color_uniform;
 		bgfx::UniformHandle m_ambient_color_uniform;
 		bgfx::UniformHandle m_light_dir_fov_uniform;
+		bgfx::UniformHandle m_shadowmap_matrices_uniform;
+		bgfx::UniformHandle m_shadowmap_splits_uniform;
 		int m_draw_calls_count;
 		int m_vertices_count;
 
@@ -1026,6 +1119,14 @@ namespace Lumix
 	Pipeline::Pipeline(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 		: Resource(path, resource_manager, allocator)
 	{
+		if (BaseVertex::s_vertex_decl.getStride() == 0)
+		{
+			BaseVertex::s_vertex_decl.begin();
+				BaseVertex::s_vertex_decl.add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float);
+				BaseVertex::s_vertex_decl.add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8);
+				BaseVertex::s_vertex_decl.add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float);
+			BaseVertex::s_vertex_decl.end();
+		}
 	}
 
 
@@ -1063,6 +1164,12 @@ namespace Lumix
 		}
 
 
+		void setFramebuffer(PipelineInstanceImpl* pipeline, const char* framebuffer_name)
+		{
+			pipeline->setCurrentFramebuffer(framebuffer_name);
+		}
+
+
 		void enableBlending(PipelineInstanceImpl* pipeline)
 		{
 			pipeline->enableBlending();
@@ -1083,11 +1190,11 @@ namespace Lumix
 			{
 				if (pipeline->m_framebuffer_width > 0)
 				{
-					bgfx::setViewRect(pipeline->m_pass_idx, 0, 0, (uint16_t)pipeline->m_framebuffer_width, (uint16_t)pipeline->m_framebuffer_height);
+					bgfx::setViewRect(pipeline->m_view_idx, 0, 0, (uint16_t)pipeline->m_framebuffer_width, (uint16_t)pipeline->m_framebuffer_height);
 				}
 				else
 				{
-					bgfx::setViewRect(pipeline->m_pass_idx, 0, 0, (uint16_t)pipeline->m_width, (uint16_t)pipeline->m_height);
+					bgfx::setViewRect(pipeline->m_view_idx, 0, 0, (uint16_t)pipeline->m_width, (uint16_t)pipeline->m_height);
 				}
 
 				pipeline->m_scene->setCameraSize(cmp, pipeline->m_width, pipeline->m_height);
@@ -1105,7 +1212,7 @@ namespace Lumix
 				Vec3 up = mtx.getYVector();
 				view_matrix.lookAt(pos, center, up);
 
-				bgfx::setViewTransform(pipeline->m_pass_idx, &view_matrix.m11, &projection_matrix.m11);
+				bgfx::setViewTransform(pipeline->m_view_idx, &view_matrix.m11, &projection_matrix.m11);
 			}
 		}
 
@@ -1121,8 +1228,8 @@ namespace Lumix
 			{
 				flags = BGFX_CLEAR_DEPTH;
 			}
-			bgfx::setViewClear(pipeline->m_pass_idx, flags, 0x303030ff, 1.0f, 0);
-			bgfx::submit(pipeline->m_pass_idx);
+			bgfx::setViewClear(pipeline->m_view_idx, flags, 0x303030ff, 1.0f, 0);
+			bgfx::submit(pipeline->m_view_idx);
 		}
 
 
@@ -1130,15 +1237,7 @@ namespace Lumix
 		{
 			if (is_point_light_render)
 			{
-				TODO("bgfx");
-				/*
-				glEnable(GL_BLEND);
-				glBlendFunc(GL_ONE, GL_ONE);
-				*/
-
 				pipeline->renderPointLightInfluencedGeometry(pipeline->getScene()->getFrustum(), layer_mask);
-
-				//glDisable(GL_BLEND);
 			}
 			else
 			{
@@ -1147,16 +1246,9 @@ namespace Lumix
 		}
 
 
-		void bindFramebufferTexture(PipelineInstanceImpl* pipeline, const char* framebuffer_name, int renderbuffer_index, const char* uniform)
+		void bindFramebufferTexture(PipelineInstanceImpl* pipeline, const char* framebuffer_name, int renderbuffer_index, int uniform_idx)
 		{
-			TODO("bgfx");
-			/*
-			FrameBuffer* fb = pipeline->getFrameBuffer(framebuffer_name);
-			if (fb)
-			{
-				pipeline->addGlobalTexture(fb->getTexture(renderbuffer_index), uniform);
-			}
-			*/
+			pipeline->bindFramebufferTexture(framebuffer_name, renderbuffer_index, uniform_idx);
 		}
 
 
@@ -1183,27 +1275,18 @@ namespace Lumix
 			pipeline->renderShadowmap(pipeline->getScene()->getCameraInSlot(slot), layer_mask);
 		}
 
-
-		void bindFramebuffer(PipelineInstanceImpl* pipeline, const char* buffer_name)
+		
+		int createUniform(PipelineInstanceImpl* pipeline, const char* name)
 		{
-			TODO("bgfx");
-			/*FrameBuffer* fb = pipeline->getFrameBuffer(buffer_name);
-			if (fb)
-			{
-				fb->bind();
-				pipeline->m_framebuffer_width = fb->getWidth();
-				pipeline->m_framebuffer_height = fb->getHeight();
-			}*/
+			bgfx::UniformHandle handle = bgfx::createUniform(name, bgfx::UniformType::Int1);
+			pipeline->m_uniforms.push(handle);
+			return pipeline->m_uniforms.size() - 1;
 		}
 
 
-		void unbindFramebuffer(PipelineInstanceImpl* pipeline)
+		void print(int x, int y, const char* text)
 		{
-			TODO("bgfx");
-			/*
-			FrameBuffer::unbind();
-			pipeline->m_framebuffer_width = pipeline->m_framebuffer_height = -1;
-			*/
+			bgfx::dbgTextPrintf(x, y, 0x4f, text);
 		}
 
 
@@ -1235,8 +1318,8 @@ namespace Lumix
 		template <int N>
 		struct FunctionCaller
 		{
-			template <typename... ArgsF, typename... Args>
-			static LUMIX_FORCE_INLINE void callFunction(void(*f)(ArgsF...), lua_State* L, Args... args)
+			template <typename R, typename... ArgsF, typename... Args>
+			static LUMIX_FORCE_INLINE R callFunction(R (*f)(ArgsF...), lua_State* L, Args... args)
 			{
 				typedef std::tuple_element<sizeof...(ArgsF)-N, std::tuple<ArgsF...> >::type T;
 				if (!isType<T>(L, sizeof...(ArgsF)-N + 1))
@@ -1255,10 +1338,10 @@ namespace Lumix
 						er << entry.short_src << "(" << entry.currentline << "): " << (entry.name ? entry.name : "?") << "\n";
 						depth++;
 					}
-					return;
+					return R();
 				}
 				T a = toType<T>(L, sizeof...(ArgsF)-N + 1);
-				FunctionCaller<N - 1>::callFunction(f, L, args..., a);
+				return FunctionCaller<N - 1>::callFunction(f, L, args..., a);
 			}
 		};
 
@@ -1266,26 +1349,33 @@ namespace Lumix
 		template <>
 		struct FunctionCaller<0>
 		{
-			template < typename... ArgsF, typename... Args >
-			static LUMIX_FORCE_INLINE void callFunction(void(*f)(ArgsF...), lua_State*, Args... args)
+			template <typename R, typename... ArgsF, typename... Args>
+			static LUMIX_FORCE_INLINE R callFunction(R (*f)(ArgsF...), lua_State*, Args... args)
 			{
-				f(args...);
+				return f(args...);
 			}
 		};
 
 
-		template <typename... ArgsF>
-		void LUMIX_FORCE_INLINE callFunction(void(*f)(ArgsF...), lua_State* L)
+		template <typename R, typename... ArgsF>
+		int LUMIX_FORCE_INLINE callFunction(R (*f)(ArgsF...), lua_State* L)
 		{
-			FunctionCaller<sizeof...(ArgsF)>::callFunction(f, L);
+			R v = FunctionCaller<sizeof...(ArgsF)>::callFunction(f, L);
+			lua_pushinteger(L, v);
+			return 1;
 		}
 
+		template <typename... ArgsF>
+		int LUMIX_FORCE_INLINE callFunction(void (*f)(ArgsF...), lua_State* L)
+		{
+			FunctionCaller<sizeof...(ArgsF)>::callFunction(f, L);
+			return 0;
+		}
 
 		template <typename T, T t>
 		int wrap(lua_State* L)
 		{
-			callFunction(t, L);
-			return 0;
+			return callFunction(t, L);
 		}
 
 
@@ -1294,6 +1384,9 @@ namespace Lumix
 
 	void PipelineImpl::registerCFunctions()
 	{
+		registerCFunction("print", LuaWrapper::wrap<decltype(&LuaAPI::print), LuaAPI::print>);
+		registerCFunction("createUniform", LuaWrapper::wrap<decltype(&LuaAPI::createUniform), LuaAPI::createUniform>);
+		registerCFunction("setFramebuffer", LuaWrapper::wrap<decltype(&LuaAPI::setFramebuffer), LuaAPI::setFramebuffer>);
 		registerCFunction("enableBlending", LuaWrapper::wrap<decltype(&LuaAPI::enableBlending), LuaAPI::enableBlending>);
 		registerCFunction("disableBlending", LuaWrapper::wrap<decltype(&LuaAPI::disableBlending), LuaAPI::disableBlending>);
 		registerCFunction("setPass", LuaWrapper::wrap<decltype(&LuaAPI::setPass), LuaAPI::setPass>);
@@ -1305,8 +1398,6 @@ namespace Lumix
 		registerCFunction("executeCustomCommand", LuaWrapper::wrap<decltype(&LuaAPI::executeCustomCommand), LuaAPI::executeCustomCommand>);
 		registerCFunction("renderDebugLines", LuaWrapper::wrap<decltype(&LuaAPI::renderDebugLines), LuaAPI::renderDebugLines>);
 		registerCFunction("renderDebugTexts", LuaWrapper::wrap<decltype(&LuaAPI::renderDebugTexts), LuaAPI::renderDebugTexts>);
-		registerCFunction("bindFramebuffer", LuaWrapper::wrap<decltype(&LuaAPI::bindFramebuffer), LuaAPI::bindFramebuffer>);
-		registerCFunction("unbindFramebuffer", LuaWrapper::wrap<decltype(&LuaAPI::unbindFramebuffer), LuaAPI::unbindFramebuffer>);
 	}
 
 
