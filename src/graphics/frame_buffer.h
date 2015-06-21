@@ -3,6 +3,7 @@
 
 #include "core/stack_allocator.h"
 #include "core/string.h"
+#include <bgfx.h>
 
 
 struct lua_State;
@@ -20,9 +21,8 @@ class FrameBuffer
 	public:
 		struct RenderBuffer
 		{
-			RenderBuffer() { m_is_texture = true; }
-
-			bool m_is_texture;
+			bgfx::TextureFormat::Enum m_format;
+			bgfx::TextureHandle m_handle;
 
 			void parse(lua_State* state);
 			bool isDepth() const;
@@ -49,15 +49,15 @@ class FrameBuffer
 		FrameBuffer(const Declaration& decl);
 		~FrameBuffer();
 		
-		//GLuint getTexture(int index) const { return m_declaration.m_renderbuffers[index].m_id; }
-		//void bind();
-		//int getWidth() const { return m_declaration.m_width; }
-		//int getHeight() const { return m_declaration.m_height; }
-		//const char* getName() { return m_declaration.m_name.c_str(); }
-		//static void unbind();
+		bgfx::FrameBufferHandle getHandle() const { return m_handle; }
+		int getWidth() const { return m_declaration.m_width; }
+		int getHeight() const { return m_declaration.m_height; }
+		const char* getName() { return m_declaration.m_name.c_str(); }
+		bgfx::TextureHandle getRenderbufferHandle(int idx) const { return m_declaration.m_renderbuffers[idx].m_handle; }
 
 	private:
 
+		bgfx::FrameBufferHandle m_handle;
 		Declaration m_declaration;
 };
 
