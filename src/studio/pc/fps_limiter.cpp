@@ -11,7 +11,7 @@ class FPSLimiterPC : public FPSLimiter
 			: m_allocator(allocator)
 		{
 			m_fps = fps;
-			m_timer = CreateWaitableTimer(NULL, TRUE, L"fps timer");
+			m_timer = CreateWaitableTimer(NULL, TRUE, "fps timer");
 		}
 
 
