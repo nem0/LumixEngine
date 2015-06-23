@@ -24,7 +24,7 @@ class FileSystemWatcherPC : public FileSystemWatcher
 			dest[len / sizeof(WCHAR)] = '\0';
 		}
 
-		void start(LPCWSTR path)
+		void start(LPCSTR path)
 		{
 			m_overlapped.hEvent = this;
 			m_handle = CreateFile(path, FILE_LIST_DIRECTORY, FILE_SHARE_DELETE | FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, NULL);

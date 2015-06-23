@@ -226,6 +226,7 @@ namespace Lumix
 			, m_global_textures(allocator)
 			, m_frame_allocator(allocator, 1 * 1024 * 1024)
 			, m_renderer(static_cast<PipelineImpl&>(pipeline).getRenderer())
+			, m_screen_space_material(nullptr)
 		{
 			m_light_pos_radius_uniform = bgfx::createUniform("u_lightPosRadius", bgfx::UniformType::Vec4);
 			m_light_color_uniform = bgfx::createUniform("u_lightRgbInnerR", bgfx::UniformType::Vec4);
@@ -233,6 +234,9 @@ namespace Lumix
 			m_ambient_color_uniform = bgfx::createUniform("u_ambientColor", bgfx::UniformType::Vec4);
 			m_shadowmap_matrices_uniform = bgfx::createUniform("u_shadowmapMatrices", bgfx::UniformType::Mat4);
 			m_shadowmap_splits_uniform = bgfx::createUniform("u_shadowmapSplits", bgfx::UniformType::Vec4);
+
+			ResourceManagerBase* material_manager = pipeline.getResourceManager().get(ResourceManager::MATERIAL);
+			m_screen_space_material = static_cast<Material*>(material_manager->load(Lumix::Path("models/editor/screen_space.mat")));
 
 			m_draw_calls_count = 0;
 			m_vertices_count = 0;
@@ -422,6 +426,10 @@ namespace Lumix
 					++m_view_idx;
 					m_view2pass_map[m_view_idx] = m_pass_idx;
 				}
+				
+				bgfx::setViewFrameBuffer(m_view_idx, m_current_framebuffer->getHandle());
+				bgfx::setViewClear(m_view_idx, BGFX_CLEAR_DEPTH, 0, 0.8f + split_index * 0.05f, 0);
+				bgfx::submit(m_view_idx);
 				float* viewport = viewports + split_index * 2;
 				bgfx::setViewRect(m_view_idx
 					, (uint16_t)(1 + shadowmap_width * viewport[0])
@@ -461,6 +469,7 @@ namespace Lumix
 				Frustum shadow_camera_frustum;
 				shadow_camera_frustum.computeOrtho(shadow_cam_pos, -light_forward, light_mtx.getYVector(), bb_size * 2, bb_size * 2, SHADOW_CAM_NEAR, SHADOW_CAM_FAR);
 				renderModels(shadow_camera_frustum, layer_mask, true);
+				TODO("bgfx"); //shader
 			}
 		}
 
@@ -759,35 +768,70 @@ namespace Lumix
 		}
 
 
-		void drawQuad()
+		void drawQuad(float x, float y, float w, float h)
 		{
-			if (bgfx::checkAvailTransientVertexBuffer(3, BaseVertex::s_vertex_decl))
+			if (m_screen_space_material->isReady() && bgfx::checkAvailTransientVertexBuffer(3, BaseVertex::s_vertex_decl))
 			{
-				bgfx::TransientVertexBuffer vb;
-				bgfx::allocTransientVertexBuffer(&vb, 3, BaseVertex::s_vertex_decl);
-				BaseVertex* vertex = (BaseVertex*)vb.data;
+				Matrix projection_mtx;
+				projection_mtx.setOrtho(-1, 1, -1, 1, 0, 30);
+				bgfx::setViewTransform(m_view_idx, &Matrix::IDENTITY.m11, &projection_mtx.m11);
+				bgfx::setViewRect(m_view_idx, 0, 0, (uint16_t)m_width, (uint16_t)m_height);
 
-				vertex[0].m_x = 0;
-				vertex[0].m_y = 0;
+				bgfx::TransientVertexBuffer vb;
+				bgfx::allocTransientVertexBuffer(&vb, 6, BaseVertex::s_vertex_decl);
+				BaseVertex* vertex = (BaseVertex*)vb.data;
+				float x2 = x + w;
+				float y2 = y + h;
+
+				vertex[0].m_x = x;
+				vertex[0].m_y = y;
 				vertex[0].m_z = 0;
 				vertex[0].m_rgba = 0xffffffff;
 				vertex[0].m_u = 0;
 				vertex[0].m_v = 0;
 
-				vertex[1].m_x = 1;
-				vertex[1].m_y = 0;
+				vertex[1].m_x = x2;
+				vertex[1].m_y = y;
 				vertex[1].m_z = 0;
 				vertex[1].m_rgba = 0xffffffff;
 				vertex[1].m_u = 1;
 				vertex[1].m_v = 0;
 
-				vertex[2].m_x = 1;
-				vertex[2].m_y = 1;
+				vertex[2].m_x = x2;
+				vertex[2].m_y = y2;
 				vertex[2].m_z = 0;
 				vertex[2].m_rgba = 0xffffffff;
 				vertex[2].m_u = 1;
 				vertex[2].m_v = 1;
 
+				vertex[3].m_x = x;
+				vertex[3].m_y = y;
+				vertex[3].m_z = 0;
+				vertex[3].m_rgba = 0xffffffff;
+				vertex[3].m_u = 0;
+				vertex[3].m_v = 0;
+
+				vertex[4].m_x = x2;
+				vertex[4].m_y = y2;
+				vertex[4].m_z = 0;
+				vertex[4].m_rgba = 0xffffffff;
+				vertex[4].m_u = 1;
+				vertex[4].m_v = 1;
+
+				vertex[5].m_x = x;
+				vertex[5].m_y = y2;
+				vertex[5].m_z = 0;
+				vertex[5].m_rgba = 0xffffffff;
+				vertex[5].m_u = 0;
+				vertex[5].m_v = 1;
+
+				for (int i = 0; i < m_global_textures.size(); ++i)
+				{
+					const GlobalTexture& t = m_global_textures[i];
+					bgfx::setTexture(i, t.m_uniform, t.m_texture);
+				}
+				
+				bgfx::setProgram(m_screen_space_material->getShaderInstance().m_program_handles[m_pass_idx]);
 				bgfx::setVertexBuffer(&vb);
 				bgfx::submit(m_view_idx);
 			}
@@ -1109,6 +1153,7 @@ namespace Lumix
 		bgfx::UniformHandle m_shadowmap_splits_uniform;
 		int m_draw_calls_count;
 		int m_vertices_count;
+		Material* m_screen_space_material;
 
 	private:
 		void operator=(const PipelineInstanceImpl&);
@@ -1284,6 +1329,12 @@ namespace Lumix
 		}
 
 
+		void drawQuad(PipelineInstanceImpl* pipeline, float x, float y, float w, float h)
+		{
+			pipeline->drawQuad(x, y, w, h);
+		}
+
+
 		void print(int x, int y, const char* text)
 		{
 			bgfx::dbgTextPrintf(x, y, 0x4f, text);
@@ -1384,6 +1435,7 @@ namespace Lumix
 
 	void PipelineImpl::registerCFunctions()
 	{
+		registerCFunction("drawQuad", LuaWrapper::wrap<decltype(&LuaAPI::drawQuad), LuaAPI::drawQuad>);
 		registerCFunction("print", LuaWrapper::wrap<decltype(&LuaAPI::print), LuaAPI::print>);
 		registerCFunction("createUniform", LuaWrapper::wrap<decltype(&LuaAPI::createUniform), LuaAPI::createUniform>);
 		registerCFunction("setFramebuffer", LuaWrapper::wrap<decltype(&LuaAPI::setFramebuffer), LuaAPI::setFramebuffer>);
