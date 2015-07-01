@@ -50,7 +50,7 @@ namespace Lumix
 	static float split_distances[] = { 0.01f, 5, 20, 100, 300 };
 	static const float SHADOW_CAM_NEAR = 0.1f;
 	static const float SHADOW_CAM_FAR = 10000.0f;
-
+	static const uint32_t BASE_DEBUG_FLAGS = BGFX_DEBUG_TEXT;
 
 	class BaseVertex
 	{
@@ -228,11 +228,12 @@ namespace Lumix
 			, m_renderer(static_cast<PipelineImpl&>(pipeline).getRenderer())
 			, m_screen_space_material(nullptr)
 		{
+			m_fog_color_density_uniform = bgfx::createUniform("u_fogColorDensity", bgfx::UniformType::Vec4);
 			m_light_pos_radius_uniform = bgfx::createUniform("u_lightPosRadius", bgfx::UniformType::Vec4);
 			m_light_color_uniform = bgfx::createUniform("u_lightRgbInnerR", bgfx::UniformType::Vec4);
 			m_light_dir_fov_uniform = bgfx::createUniform("u_lightDirFov", bgfx::UniformType::Vec4);
 			m_ambient_color_uniform = bgfx::createUniform("u_ambientColor", bgfx::UniformType::Vec4);
-			m_shadowmap_matrices_uniform = bgfx::createUniform("u_shadowmapMatrices", bgfx::UniformType::Mat4);
+			m_shadowmap_matrices_uniform = bgfx::createUniform("u_shadowmapMatrices", bgfx::UniformType::Mat4, 4);
 			m_shadowmap_splits_uniform = bgfx::createUniform("u_shadowmapSplits", bgfx::UniformType::Vec4);
 
 			ResourceManagerBase* material_manager = pipeline.getResourceManager().get(ResourceManager::MATERIAL);
@@ -249,6 +250,7 @@ namespace Lumix
 
 		~PipelineInstanceImpl()
 		{
+			bgfx::destroyUniform(m_fog_color_density_uniform);
 			bgfx::destroyUniform(m_light_pos_radius_uniform);
 			bgfx::destroyUniform(m_light_color_uniform);
 			bgfx::destroyUniform(m_light_dir_fov_uniform);
@@ -428,7 +430,7 @@ namespace Lumix
 				}
 				
 				bgfx::setViewFrameBuffer(m_view_idx, m_current_framebuffer->getHandle());
-				bgfx::setViewClear(m_view_idx, BGFX_CLEAR_DEPTH, 0, 0.8f + split_index * 0.05f, 0);
+				bgfx::setViewClear(m_view_idx, BGFX_CLEAR_DEPTH, 0, 1.0f, 0);
 				bgfx::submit(m_view_idx);
 				float* viewport = viewports + split_index * 2;
 				bgfx::setViewRect(m_view_idx
@@ -584,14 +586,11 @@ namespace Lumix
 			Vec4 light_dir_fov(light_cmp.entity.getRotation() * Vec3(0, 0, 1), 0);
 			bgfx::setUniform(m_light_dir_fov_uniform, &light_dir_fov);
 
-			bgfx::setUniform(m_shadowmap_matrices_uniform, &m_shadow_modelviewprojection);
+			bgfx::setUniform(m_shadowmap_matrices_uniform, &m_shadow_modelviewprojection, 4);
 			bgfx::setUniform(m_shadowmap_splits_uniform, &m_shadowmap_splits);
 
-			TODO("bgfx");
-			/*
-			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_COLOR, m_scene->getFogColor(light_cmp));
-			setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
-			*/
+			Vec4 fog_color_density(m_scene->getFogColor(light_cmp), m_scene->getFogDensity(light_cmp));
+			bgfx::setUniform(m_fog_color_density_uniform, &fog_color_density);
 		}
 
 		
@@ -1107,7 +1106,7 @@ namespace Lumix
 
 		virtual void setWireframe(bool wireframe) override
 		{
-			bgfx::setDebug(wireframe ? BGFX_DEBUG_TEXT : BGFX_DEBUG_WIREFRAME | BGFX_DEBUG_TEXT);
+			bgfx::setDebug(BASE_DEBUG_FLAGS | (wireframe ? 0 : BGFX_DEBUG_WIREFRAME));
 		}
 
 
@@ -1145,6 +1144,7 @@ namespace Lumix
 		Array<TerrainInfo> m_terrain_infos;
 		Array<GrassInfo> m_grass_infos;
 		Array<RenderableInfo> m_renderable_infos;
+		bgfx::UniformHandle m_fog_color_density_uniform;
 		bgfx::UniformHandle m_light_pos_radius_uniform;
 		bgfx::UniformHandle m_light_color_uniform;
 		bgfx::UniformHandle m_ambient_color_uniform;
