@@ -190,12 +190,9 @@ bool Model::parseVertexDef(FS::IFile* file, bgfx::VertexDecl* vertex_definition)
 }
 
 
-void Model::create(const bgfx::VertexDecl& def, Material* material, const void* indices_data, int indices_size, const void* attributes_data, int attributes_size)
+void Model::create(const bgfx::VertexDecl& def, Material* material, const int* indices_data, int indices_size, const void* attributes_data, int attributes_size)
 {
-	ASSERT(false);
-	TODO("Todo");
-	/*
-	m_geometry_buffer_object.setAttributesData(attributes_data, attributes_size);
+	m_geometry_buffer_object.setAttributesData(attributes_data, attributes_size, def);
 	m_geometry_buffer_object.setIndicesData(indices_data, indices_size);
 
 	m_meshes.emplace(def, material, 0, attributes_size, 0, indices_size / sizeof(int), "default", m_allocator);
@@ -212,7 +209,7 @@ void Model::create(const bgfx::VertexDecl& def, Material* material, const void* 
 	m_vertices.resize(attributes_size / def.getStride());
 	computeRuntimeData((const uint8_t*)attributes_data);
 
-	onReady();*/
+	onReady();
 }
 
 

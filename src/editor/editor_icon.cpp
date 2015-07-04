@@ -17,6 +17,40 @@ namespace Lumix
 {
 
 
+static const char* ICON_NAMES[EditorIcon::COUNT] = {
+	"models/editor/phy_controller_icon.msh",
+	"models/editor/phy_box_icon.msh",
+	"models/editor/camera_icon.msh",
+	"models/editor/directional_light_icon.msh",
+	"models/editor/terrain_icon.msh",
+	"models/editor/icon.msh"
+};
+
+
+static Model* icon_models[EditorIcon::COUNT];
+
+
+bool EditorIcon::loadIcons(Engine& engine)
+{
+	bool status = true;
+	for (int i = 0; i < sizeof(ICON_NAMES) / sizeof(ICON_NAMES[0]); ++i)
+	{
+		icon_models[i] = static_cast<Model*>(engine.getResourceManager().get(ResourceManager::MODEL)->load(Path(ICON_NAMES[i])));
+		status = status && icon_models[i];
+	}
+	return status;
+}
+
+
+void EditorIcon::unloadIcons()
+{
+	for (int i = 0; i < sizeof(icon_models) / sizeof(icon_models[0]); ++i)
+	{
+		icon_models[i]->getResourceManager().get(ResourceManager::MODEL)->unload(*icon_models[i]);
+	}
+}
+
+
 EditorIcon::EditorIcon(Engine& engine, RenderScene& scene, const Entity& entity)
 {
 	m_scale = 1;
@@ -53,15 +87,7 @@ EditorIcon::EditorIcon(Engine& engine, RenderScene& scene, const Entity& entity)
 			break;
 		}
 	}
-	const char* names[COUNT] = {
-		"models/editor/phy_controller_icon.msh",
-		"models/editor/phy_box_icon.msh",
-		"models/editor/camera_icon.msh",
-		"models/editor/directional_light_icon.msh",
-		"models/editor/terrain_icon.msh",
-		"models/editor/icon.msh"
-	};
-	m_model = static_cast<Model*>(engine.getResourceManager().get(ResourceManager::MODEL)->load(Path(names[m_type])));
+	m_model = static_cast<Model*>(engine.getResourceManager().get(ResourceManager::MODEL)->load(Path(ICON_NAMES[m_type])));
 }
 
 

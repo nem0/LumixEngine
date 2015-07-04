@@ -228,7 +228,7 @@ void Texture::save()
 
 void Texture::onDataUpdated()
 {
-	bgfx::updateTexture2D(m_texture_handle, 0, 0, 0, m_width, m_height, bgfx::copy(&m_data[0], m_data.size() * sizeof(m_data)));
+	bgfx::updateTexture2D(m_texture_handle, 0, 0, 0, m_width, m_height, bgfx::copy(&m_data[0], m_data.size() * sizeof(m_data[0])));
 }
 
 

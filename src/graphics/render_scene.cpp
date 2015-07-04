@@ -1575,10 +1575,22 @@ namespace Lumix
 				DebugLine& line = m_debug_lines.pushEmpty();
 				line.m_from = from;
 				line.m_to = to;
-				line.m_color = color;
+				line.m_color = ((uint8_t)(color.x * 255) << 24)
+					| ((uint8_t)(color.y * 255) << 16)
+					| ((uint8_t)(color.z * 255) << 8) 
+					| 255;
 				line.m_life = life;
 			}
 
+
+			virtual void addDebugLine(const Vec3& from, const Vec3& to, uint32_t color, float life) override
+			{
+				DebugLine& line = m_debug_lines.pushEmpty();
+				line.m_from = from;
+				line.m_to = to;
+				line.m_color = color;
+				line.m_life = life;
+			}
 
 			virtual RayCastModelHit castRayTerrain(const Component& terrain, const Vec3& origin, const Vec3& dir) override
 			{

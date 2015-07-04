@@ -152,7 +152,7 @@ class Model : public Resource
 
 		~Model();
 
-		void create(const bgfx::VertexDecl& def, Material* material, const void* indices_data, int indices_size, const void* attributes_data, int attributes_size);
+		void create(const bgfx::VertexDecl& def, Material* material, const int* indices_data, int indices_size, const void* attributes_data, int attributes_size);
 		
 		LODMeshIndices getLODMeshIndices(float squared_distance) const;
 		const Geometry& getGeometry() const { return m_geometry_buffer_object; }

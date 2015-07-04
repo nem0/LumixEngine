@@ -184,7 +184,7 @@ target_link_libraries(studio Qt5::Core)
 target_link_libraries(studio Qt5::Gui)
 target_link_libraries(studio Qt5::Widgets)
 target_link_libraries(studio Qt5::WinMain)
-target_link_libraries(studio ${EXTERNAL_PATH}assimp/lib/win32/assimp-vc120-mt.lib)
+target_link_libraries(studio ${EXTERNAL_PATH}assimp/lib/win32/assimp-vc120-mtd.lib)
 target_link_libraries(studio ${EXTERNAL_PATH}crunch/lib/win32/crnlib${CMAKE_CFG_INTDIR}.lib)
 set_target_properties(studio PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
  
@@ -197,7 +197,7 @@ endif()
 
 add_custom_command(TARGET studio POST_BUILD        
     COMMAND ${CMAKE_COMMAND} -E copy_if_different  
-        "${EXTERNAL_PATH}assimp/dll/win32/assimp-vc120-mt.dll"
+        "${EXTERNAL_PATH}assimp/dll/win32/assimp-vc120-mtd.dll"
         $<TARGET_FILE_DIR:studio>)
 
 add_custom_command(TARGET studio POST_BUILD        

@@ -69,7 +69,7 @@ namespace Lumix
 	{
 		Vec3 m_from;
 		Vec3 m_to;
-		Vec3 m_color;
+		uint32_t m_color;
 		float m_life;
 	};
 
@@ -110,6 +110,7 @@ namespace Lumix
 
 			virtual BitmapFont* getDebugTextFont() = 0;
 			virtual void addDebugLine(const Vec3& from, const Vec3& to, const Vec3& color, float life) = 0;
+			virtual void addDebugLine(const Vec3& from, const Vec3& to, uint32_t color, float life) = 0;
 			virtual void addDebugCross(const Vec3& center, float size, const Vec3& color, float life) = 0;
 			virtual void addDebugCube(const Vec3& from, const Vec3& max, const Vec3& color, float life) = 0;
 			virtual void addDebugCircle(const Vec3& center, const Vec3& up, float radius, const Vec3& color, float life) = 0;
