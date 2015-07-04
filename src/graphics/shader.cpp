@@ -123,7 +123,6 @@ void Shader::parseTextureSlots(lua_State* L)
 
 bgfx::ProgramHandle Shader::createProgram(int pass_idx, int mask) const
 {
-	TODO("bgfx"); // get rid of fopen
 	char shader_name[LUMIX_MAX_PATH];
 	PathUtils::getBasename(shader_name, sizeof(shader_name), getPath().c_str());
 
@@ -246,7 +245,6 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		{
 			parseTextureSlots(L);
 			m_combintions.parse(L);
-			getShaderCombinations((const char*)file->getBuffer(), &m_combintions); /// TODO use lua state
 			if (!generateInstances())
 			{
 				g_log_error.log("renderer") << "Could not load instances of shader " << m_path.c_str();

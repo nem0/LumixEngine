@@ -76,8 +76,6 @@ class LUMIX_ENGINE_API PipelineInstance abstract
 		virtual RenderScene* getScene() = 0;
 		virtual int getWidth() = 0;
 		virtual int getHeight() = 0;
-		virtual int getDrawCalls() const = 0;
-		virtual int getRenderedTrianglesCount() const = 0;
 		virtual CustomCommandHandler& addCustomCommandHandler(const char* name) = 0;
 		virtual void setWireframe(bool wireframe) = 0;
 		virtual void renderModel(Model& model, const Matrix& mtx) = 0;

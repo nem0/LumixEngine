@@ -2162,6 +2162,8 @@ struct WorldEditorImpl : public WorldEditor
 			m_editor_command_creators.insert(crc32("destroy_component"), &WorldEditorImpl::constructEditorCommand<DestroyComponentCommand>);
 			m_editor_command_creators.insert(crc32("add_entity"), &WorldEditorImpl::constructEditorCommand<AddEntityCommand>);
 
+			EditorIcon::loadIcons(*m_engine);
+
 			return true;
 		}
 
@@ -2186,6 +2188,7 @@ struct WorldEditorImpl : public WorldEditor
 
 		void destroy()
 		{
+			EditorIcon::unloadIcons();
 			removePlugin(*m_measure_tool);
 			m_allocator.deleteObject(m_measure_tool);
 			destroyUndoStack();

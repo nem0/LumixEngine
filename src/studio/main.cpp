@@ -64,10 +64,11 @@ class App
 
 		void renderPhysics()
 		{
+			Lumix::RenderScene* render_scene = (Lumix::RenderScene*)m_world_editor->getEngine().getScene(crc32("renderer"));
 			Lumix::PhysicsScene* scene = static_cast<Lumix::PhysicsScene*>(m_world_editor->getEngine().getScene(crc32("physics")));
-			if(scene)
+			if (scene && render_scene)
 			{
-				scene->render(m_world_editor->getEngine().getRenderer());
+				scene->render(*render_scene);
 			}
 		}
 
@@ -194,10 +195,6 @@ class App
 			float fps = m_world_editor->getEngine().getFPS();
 			Lumix::copyString(stats, sizeof(stats), "FPS: ");
 			Lumix::toCString(fps, stats + strlen(stats), sizeof(stats) - strlen(stats), 1);
-			Lumix::catCString(stats, sizeof(stats), ", Draw calls: ");
-			Lumix::toCString(m_main_window->getSceneView()->getPipeline()->getDrawCalls(), stats + strlen(stats), sizeof(stats) - strlen(stats));
-			Lumix::catCString(stats, sizeof(stats), ", Triangles: ");
-			Lumix::toCStringPretty(m_main_window->getSceneView()->getPipeline()->getRenderedTrianglesCount(), stats + strlen(stats), sizeof(stats) - strlen(stats));
 			static_cast<Lumix::RenderScene*>(m_world_editor->getEngine().getScene(crc32("renderer")))->setDebugText(m_world_editor->getFPSText(), stats);
 		}
 

@@ -161,8 +161,6 @@ void Material::deserializeUniforms(JsonSerializer& serializer)
 			}
 			else if (strcmp(label, "float_value") == 0)
 			{
-				TODO("bgfx");
-				ASSERT(false);
 				uniform.m_type = Uniform::FLOAT;
 				serializer.deserialize(uniform.m_float, 0);
 			}
@@ -180,8 +178,6 @@ void Material::deserializeUniforms(JsonSerializer& serializer)
 			}
 			else if (strcmp(label, "time") == 0)
 			{
-				TODO("bgfx");
-				ASSERT(false);
 				uniform.m_type = Uniform::TIME;
 				serializer.deserialize(uniform.m_float, 0);
 			}

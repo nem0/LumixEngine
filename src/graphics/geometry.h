@@ -21,10 +21,6 @@ class Shader;
 class Geometry
 {
 	public:
-		typedef Delegate<void(void*, int, int)> VertexCallback;
-		typedef Delegate<void(void*, int, int)> IndexCallback;
-
-	public:
 		Geometry();
 		~Geometry();
 
@@ -32,9 +28,9 @@ class Geometry
 		bgfx::IndexBufferHandle getIndicesArrayID() const { return m_indices_array_id; }
 
 		void setAttributesData(const void* data, int size, const bgfx::VertexDecl& decl);
-		void setIndicesData(const void* data, int size);
+		void setIndicesData(const int* data, int size);
+		void setIndicesData(const short* data, int size);
 		void bindBuffers() const;
-		void copy(const Geometry& source, int copy_count, IndexCallback index_callback, VertexCallback vertex_callback, IAllocator& allocator);
 		void clear();
 
 	private:

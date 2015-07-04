@@ -227,7 +227,13 @@ namespace Lumix
 			, m_frame_allocator(allocator, 1 * 1024 * 1024)
 			, m_renderer(static_cast<PipelineImpl&>(pipeline).getRenderer())
 			, m_screen_space_material(nullptr)
+			, m_debug_line_material(nullptr)
 		{
+			m_terrain_scale_uniform = bgfx::createUniform("u_terrainScale", bgfx::UniformType::Vec4);
+			m_morph_const_uniform = bgfx::createUniform("u_morphConst", bgfx::UniformType::Vec4);
+			m_rel_camera_pos_uniform = bgfx::createUniform("u_relCamPos", bgfx::UniformType::Vec4);
+			m_map_size_uniform = bgfx::createUniform("u_mapSize", bgfx::UniformType::Vec4);
+			m_quad_min_and_size_uniform = bgfx::createUniform("u_quadMinAndSize", bgfx::UniformType::Vec4);
 			m_fog_color_density_uniform = bgfx::createUniform("u_fogColorDensity", bgfx::UniformType::Vec4);
 			m_light_pos_radius_uniform = bgfx::createUniform("u_lightPosRadius", bgfx::UniformType::Vec4);
 			m_light_color_uniform = bgfx::createUniform("u_lightRgbInnerR", bgfx::UniformType::Vec4);
@@ -235,12 +241,12 @@ namespace Lumix
 			m_ambient_color_uniform = bgfx::createUniform("u_ambientColor", bgfx::UniformType::Vec4);
 			m_shadowmap_matrices_uniform = bgfx::createUniform("u_shadowmapMatrices", bgfx::UniformType::Mat4, 4);
 			m_shadowmap_splits_uniform = bgfx::createUniform("u_shadowmapSplits", bgfx::UniformType::Vec4);
+			m_bone_matrices_uniform = bgfx::createUniform("u_boneMatrices", bgfx::UniformType::Mat4, 64);
 
 			ResourceManagerBase* material_manager = pipeline.getResourceManager().get(ResourceManager::MATERIAL);
-			m_screen_space_material = static_cast<Material*>(material_manager->load(Lumix::Path("models/editor/screen_space.mat")));
+			m_screen_space_material = static_cast<Material*>(material_manager->load(Lumix::Path("models/editor/screen_space.mat"))); 
+			m_debug_line_material = static_cast<Material*>(material_manager->load(Lumix::Path("models/editor/debug_line.mat")));
 
-			m_draw_calls_count = 0;
-			m_vertices_count = 0;
 			m_scene = NULL;
 			m_width = m_height = -1;
 			m_framebuffer_width = m_framebuffer_height = -1;
@@ -250,6 +256,16 @@ namespace Lumix
 
 		~PipelineInstanceImpl()
 		{
+			ResourceManagerBase* material_manager = m_source.getResourceManager().get(ResourceManager::MATERIAL);
+			material_manager->unload(*m_screen_space_material);
+			material_manager->unload(*m_debug_line_material);
+
+			bgfx::destroyUniform(m_bone_matrices_uniform);
+			bgfx::destroyUniform(m_terrain_scale_uniform);
+			bgfx::destroyUniform(m_morph_const_uniform);
+			bgfx::destroyUniform(m_rel_camera_pos_uniform);
+			bgfx::destroyUniform(m_map_size_uniform);
+			bgfx::destroyUniform(m_quad_min_and_size_uniform);
 			bgfx::destroyUniform(m_fog_color_density_uniform);
 			bgfx::destroyUniform(m_light_pos_radius_uniform);
 			bgfx::destroyUniform(m_light_color_uniform);
@@ -350,19 +366,7 @@ namespace Lumix
 			return m_height;
 		}
 
-
-		virtual int getDrawCalls() const override
-		{
-			return m_draw_calls_count;
-		}
-
-
-		virtual int getRenderedTrianglesCount() const override
-		{
-			return m_vertices_count / 3;
-		}
-
-
+		
 		void sourceLoaded(Resource::State old_state, Resource::State new_state)
 		{
 			if (old_state != Resource::State::READY && new_state == Resource::State::READY)
@@ -471,46 +475,7 @@ namespace Lumix
 				Frustum shadow_camera_frustum;
 				shadow_camera_frustum.computeOrtho(shadow_cam_pos, -light_forward, light_mtx.getYVector(), bb_size * 2, bb_size * 2, SHADOW_CAM_NEAR, SHADOW_CAM_FAR);
 				renderModels(shadow_camera_frustum, layer_mask, true);
-				TODO("bgfx"); //shader
 			}
-		}
-
-
-		void renderScreenGeometry(Geometry* geometry, Mesh* mesh)
-		{
-			TODO("bgfx");
-			/*if (mesh->getMaterial()->isReady())
-			{
-				ASSERT(m_renderer != NULL);
-				Shader* shader = mesh->getMaterial()->getShader();
-				Matrix mtx;
-				Renderer::getOrthoMatrix(-1, 1, -1, 1, 0, 30, &mtx);
-				m_renderer->setProjectionMatrix(mtx);
-				m_renderer->setViewMatrix(Matrix::IDENTITY);
-				applyMaterial(*mesh->getMaterial());
-				Component light_cmp = m_scene->getActiveGlobalLight();
-				if (light_cmp.isValid())
-				{
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX0, m_shadow_modelviewprojection[0]);
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX1, m_shadow_modelviewprojection[1]);
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX2, m_shadow_modelviewprojection[2]);
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOW_MATRIX3, m_shadow_modelviewprojection[3]);
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::AMBIENT_COLOR, m_scene->getLightAmbientColor(light_cmp));
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::AMBIENT_INTENSITY, m_scene->getLightAmbientIntensity(light_cmp));
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_COLOR, m_scene->getGlobalLightColor(light_cmp));
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::DIFFUSE_INTENSITY, m_scene->getGlobalLightIntensity(light_cmp));
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_COLOR, m_scene->getFogColor(light_cmp));
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::FOG_DENSITY, m_scene->getFogDensity(light_cmp));
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::SHADOWMAP_SPLITS, m_shadowmap_splits);
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::LIGHT_DIR, light_cmp.entity.getRotation() * Vec3(0, 0, 1));
-				}
-				m_renderer->setUniform(*shader, "camera_pos", CAMERA_POS_HASH, m_active_camera.entity.getPosition());
-
-				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::WORLD_MATRIX, Matrix::IDENTITY);
-				setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::PROJECTION_MATRIX, mtx);
-				bindGeometry(*m_renderer, *geometry, *mesh);
-				renderGeometry(0, 6);
-			}*/
 		}
 
 
@@ -528,36 +493,47 @@ namespace Lumix
 
 		void renderDebugLines()
 		{
-			TODO("bgfx");
-			/*
-			m_renderer->cleanup();
-
 			const Array<DebugLine>& lines = m_scene->getDebugLines();
-			Shader& shader = m_renderer->getDebugShader();
-			m_renderer->applyShader(shader, 0);
-
-			for (int j = 0; j <= lines.size() / 256; ++j)
+			if (lines.empty() || !m_debug_line_material->isReady())
 			{
-				Vec3 positions[512];
-				Vec3 colors[512];
-				int indices[512];
-				int offset = j * 256;
-				for (int i = 0, c = Math::minValue(lines.size() - offset, 256); i < c; ++i)
+				return;
+			}
+			bgfx::TransientVertexBuffer tvb;
+			bgfx::TransientIndexBuffer tib;
+			if (bgfx::allocTransientBuffers(&tvb, BaseVertex::s_vertex_decl, lines.size() * 2, &tib, lines.size() * 2))
+			{
+				BaseVertex* vertex = (BaseVertex*)tvb.data;
+				uint16_t* indices = (uint16_t*)tib.data;
+				for (int i = 0; i < lines.size(); ++i)
 				{
-					positions[i * 2] = lines[offset + i].m_from;
-					positions[i * 2 + 1] = lines[offset + i].m_to;
-					colors[i * 2] = lines[offset + i].m_color;
-					colors[i * 2 + 1] = lines[offset + i].m_color;
-					indices[i * 2] = i * 2;
-					indices[i * 2 + 1] = i * 2 + 1;
+					const DebugLine& line = lines[i];
+					vertex[0].m_rgba = line.m_color;
+					vertex[0].m_x = line.m_from.x;
+					vertex[0].m_y = line.m_from.y;
+					vertex[0].m_z = line.m_from.z;
+					vertex[0].m_u = vertex[0].m_v = 0;
+
+					vertex[1].m_rgba = line.m_color;
+					vertex[1].m_x = line.m_to.x;
+					vertex[1].m_y = line.m_to.y;
+					vertex[1].m_z = line.m_to.z;
+					vertex[1].m_u = vertex[0].m_v = 0;
+
+					indices[0] = i * 2;
+					indices[1] = i * 2 + 1;
+					vertex += 2;
+					indices += 2;
 				}
 
-				glEnableVertexAttribArray(shader.getAttribId(0));
-				glVertexAttribPointer(shader.getAttribId(0), 3, GL_FLOAT, GL_FALSE, sizeof(Vec3), positions);
-				glEnableVertexAttribArray(shader.getAttribId(1));
-				glVertexAttribPointer(shader.getAttribId(1), 3, GL_FLOAT, GL_FALSE, sizeof(Vec3), colors);
-				glDrawElements(GL_LINES, Math::minValue(lines.size() - offset, 256) * 2, GL_UNSIGNED_INT, indices);
-			}*/
+				bgfx::setProgram(m_debug_line_material->getShaderInstance().m_program_handles[m_pass_idx]);
+				bgfx::setVertexBuffer(&tvb);
+				bgfx::setIndexBuffer(&tib);
+				bgfx::setState(m_render_state 
+					| m_debug_line_material->getRenderStates()
+					| BGFX_STATE_PT_LINES
+					);
+				bgfx::submit(m_view_idx);
+			}
 		}
 
 
@@ -609,134 +585,7 @@ namespace Lumix
 			}
 		}
 
-
-		void deferredPointLightLoop(Material* material)
-		{
-			TODO("bgfx");
-			/*
-			Array<Component> lights(m_allocator);
-			m_scene->getPointLights(m_scene->getFrustum(), lights);
-			if (!lights.empty() && material->isReady())
-			{
-				Component camera = m_scene->getCameraInSlot("editor");
-				applyMaterial(*material);
-				GLint attrib_id = material->getShader()->getAttribId(m_renderer->getAttributeNameIndex("in_position"));
-
-				glEnable(GL_BLEND);
-				glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-
-				GLubyte indices[] = {
-					0, 1, 2, 2, 3, 0,
-					3, 2, 6, 6, 7, 3,
-					7, 6, 5, 5, 4, 7,
-					4, 5, 1, 1, 0, 4,
-					4, 0, 3, 3, 7, 4,
-					1, 5, 6, 6, 2, 1
-				};
-				for (int i = 0; i < lights.size(); ++i)
-				{
-					float light_range = m_scene->getLightRange(lights[i]);
-					Vec3 light_pos = m_scene->getPointLightEntity(lights[i]).getPosition();
-					Matrix camera_matrix = camera.entity.getMatrix();
-					Vec3 forward(0, 0, light_range);
-					Vec3 up(0, light_range, 0);
-					Vec3 side(light_range, 0, 0);
-
-					Vec3 vertices[] =
-					{
-						light_pos + forward - up - side,
-						light_pos + forward - up + side,
-						light_pos + forward + up + side,
-						light_pos + forward + up - side,
-						light_pos - forward - up - side,
-						light_pos - forward - up + side,
-						light_pos - forward + up + side,
-						light_pos - forward + up - side
-					};
-
-					setLightUniforms(lights[i], material->getShader());
-
-					glEnableVertexAttribArray(attrib_id);
-					glBindBuffer(GL_ARRAY_BUFFER, 0);
-					glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-					glVertexAttribPointer(attrib_id, 3, GL_FLOAT, GL_FALSE, sizeof(Vec3), vertices);
-					glCullFace(GL_FRONT);
-					glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_BYTE, indices);
-				}
-
-				glDisable(GL_BLEND);
-			}*/
-		}
-
-
-		bool beginTerrainRenderLoop(const RenderableInfo* info, const Component& light_cmp)
-		{
-			TODO("bgfx");
-			return false;
-			/*
-			TerrainInfo* data = (TerrainInfo*)info->m_data;
-
-			Material* material = data->m_terrain->getMesh()->getMaterial();
-			if (material->isReady())
-			{
-				Shader* shader = material->getShader();
-				if (shader->isReady())
-				{
-					applyMaterial(*data->m_terrain->getMesh()->getMaterial());
-					setLightUniforms(light_cmp, shader);
-					m_renderer->setUniform(*shader, "terrain_scale", TERRAIN_SCALE_HASH, data->m_terrain->getScale());
-					return true;
-				}
-			}
-			return false;*/
-		}
-
-
-		bool beginGrassRenderLoop(const RenderableInfo* info, const Component& light_cmp)
-		{
-			TODO("bgfx");
-			/*
-			const Terrain::GrassPatch* patch = static_cast<const Terrain::GrassPatch*>(info->m_data);
-			const Mesh& mesh = *patch->m_type->m_grass_mesh;
-			const Material& material = *mesh.getMaterial();
-			Shader* shader = material.getShader();
-			uint32_t pass_hash = getRenderer().getPass();
-			if (!shader->hasPass(pass_hash) || !material.isReady())
-			{
-				return false;
-			}
-			applyMaterial(material);
-			m_renderer->setUniform(*shader, "camera_pos", CAMERA_POS_HASH, m_active_camera.entity.getPosition());
-			setLightUniforms(light_cmp, shader);
-
-			bindGeometry(*m_renderer, *patch->m_type->m_grass_geometry, mesh);
-			return true;*/
-			return false;
-		}
-
-
-		void setPoseUniform(const RenderableMesh* LUMIX_RESTRICT renderable_mesh, Shader* shader)
-		{
-			TODO("bgfx");
-			/*
-			Matrix bone_mtx[64];
-
-			const Pose& pose = *renderable_mesh->m_pose;
-			const Model& model = *renderable_mesh->m_model;
-			Vec3* poss = pose.getPositions();
-			Quat* rots = pose.getRotations();
-
-			ASSERT(pose.getCount() <= sizeof(bone_mtx) / sizeof(bone_mtx[0]));
-			for (int bone_index = 0, bone_count = pose.getCount(); bone_index < bone_count; ++bone_index)
-			{
-				rots[bone_index].toMatrix(bone_mtx[bone_index]);
-				bone_mtx[bone_index].translate(poss[bone_index]);
-				bone_mtx[bone_index] = bone_mtx[bone_index] * model.getBone(bone_index).inv_bind_matrix;
-			}
-			m_renderer->setUniform(*shader, "bone_matrices", BONE_MATRICES_HASH, bone_mtx, pose.getCount());*/
-		}
-
-
+		
 		void enableBlending()
 		{
 			m_render_state |= BGFX_STATE_BLEND_ADD;
@@ -855,108 +704,6 @@ namespace Lumix
 		}
 
 
-		inline const RenderableInfo* renderLoopSkinned(const RenderableInfo* info)
-		{
-			TODO("bgfx");
-			return nullptr;
-			/*
-			const RenderableMesh* LUMIX_RESTRICT renderable_mesh = static_cast<const RenderableMesh*>(info->m_data);
-			Shader* shader = renderable_mesh->m_mesh->getMaterial()->getShader();
-			GLint world_matrix_uniform_location = shader->getFixedCachedUniformLocation(Shader::FixedCachedUniforms::WORLD_MATRIX);
-			bindGeometry(*m_renderer, renderable_mesh->m_model->getGeometry(), *renderable_mesh->m_mesh);
-			int64_t last_key = info->m_key;
-			int indices_offset = renderable_mesh->m_mesh->getIndicesOffset();
-			int indices_count = renderable_mesh->m_mesh->getIndexCount();
-			while (last_key == info->m_key)
-			{
-				const RenderableMesh* LUMIX_RESTRICT renderable_mesh = static_cast<const RenderableMesh*>(info->m_data);
-				const Matrix& world_matrix = *renderable_mesh->m_matrix;
-				setUniform(world_matrix_uniform_location, world_matrix);
-				setPoseUniform(renderable_mesh, shader);
-				++m_draw_calls_count;
-				m_vertices_count += indices_count;
-				renderGeometry(indices_offset, indices_count);
-				++info;
-			}
-			return info;*/
-		}
-
-
-		const RenderableInfo* renderLoopTerrain(const RenderableInfo* info)
-		{
-			TODO("bgfx");
-			return nullptr;
-
-			/*PROFILE_FUNCTION();
-			const TerrainInfo* data = static_cast<const TerrainInfo*>(info->m_data);
-
-			Matrix inv_world_matrix;
-			inv_world_matrix = data->m_world_matrix;
-			inv_world_matrix.fastInverse();
-			Vec3 camera_pos = m_active_camera.entity.getPosition();
-			Vec3 rel_cam_pos = inv_world_matrix.multiplyPosition(camera_pos) / data->m_terrain->getXZScale();
-			Shader& shader = *data->m_terrain->getMesh()->getMaterial()->getShader();
-			m_renderer->setUniform(shader, "brush_position", BRUSH_POSITION_HASH, data->m_terrain->getBrushPosition());
-			m_renderer->setUniform(shader, "brush_size", BRUSH_SIZE_HASH, data->m_terrain->getBrushSize());
-			m_renderer->setUniform(shader, "map_size", MAP_SIZE_HASH, data->m_terrain->getRootSize());
-			m_renderer->setUniform(shader, "camera_pos", CAMERA_POS_HASH, rel_cam_pos);
-
-			int64_t last_key = info->m_key;
-			bindGeometry(*m_renderer, *data->m_terrain->getGeometry(), *data->m_terrain->getMesh());
-			int world_matrix_location = getUniformLocation(shader, (int)Shader::FixedCachedUniforms::WORLD_MATRIX);
-			int morph_const_location = getUniformLocation(shader, (int)Shader::FixedCachedUniforms::MORPH_CONST);
-			int quad_size_location = getUniformLocation(shader, (int)Shader::FixedCachedUniforms::QUAD_SIZE);
-			int quad_min_location = getUniformLocation(shader, (int)Shader::FixedCachedUniforms::QUAD_MIN);
-			int mesh_part_indices_count = data->m_terrain->getMesh()->getIndexCount() / 4;
-			while (info->m_key == last_key)
-			{
-				const TerrainInfo* data = static_cast<const TerrainInfo*>(info->m_data);
-				setUniform(world_matrix_location, data->m_world_matrix);
-				setUniform(morph_const_location, data->m_morph_const);
-				setUniform(quad_size_location, data->m_size);
-				setUniform(quad_min_location, data->m_min);
-				++m_draw_calls_count;
-				m_vertices_count += mesh_part_indices_count;
-				renderGeometry(mesh_part_indices_count * data->m_index, mesh_part_indices_count);
-				++info;
-			}
-			return info;*/
-		}
-
-
-		const RenderableInfo* renderLoopGrass(const RenderableInfo* info)
-		{
-			TODO("bgfx");
-			return nullptr;
-			/*const int COPY_COUNT = 50;
-			int64_t last_key = info->m_key;
-			while (last_key == info->m_key)
-			{
-				const Terrain::GrassPatch* patch = static_cast<const Terrain::GrassPatch*>(info->m_data);
-				const Mesh& mesh = *patch->m_type->m_grass_mesh;
-				Shader* shader = mesh.getMaterial()->getShader();
-
-				for (int j = 0; j < patch->m_matrices.size() / COPY_COUNT; ++j)
-				{
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::GRASS_MATRICES, &patch->m_matrices[j * COPY_COUNT], COPY_COUNT);
-					++m_draw_calls_count;
-					m_vertices_count += mesh.getIndexCount();
-					renderGeometry(mesh.getIndicesOffset(), mesh.getIndexCount());
-				}
-				if (patch->m_matrices.size() % 50 != 0)
-				{
-					setFixedCachedUniform(*m_renderer, *shader, (int)Shader::FixedCachedUniforms::GRASS_MATRICES, &patch->m_matrices[(patch->m_matrices.size() / COPY_COUNT) * COPY_COUNT], patch->m_matrices.size() % 50);
-					++m_draw_calls_count;
-					int vertices_count = mesh.getIndexCount() / COPY_COUNT * (patch->m_matrices.size() % 50);
-					m_vertices_count += vertices_count;
-					renderGeometry(mesh.getIndicesOffset(), vertices_count);
-				}
-				++info;
-			}
-			return info;*/
-		}
-
-
 		virtual void renderModel(Model& model, const Matrix& mtx) override
 		{
 			RenderableMesh mesh;
@@ -971,11 +718,60 @@ namespace Lumix
 		}
 
 
+		void setPoseUniform(const RenderableMesh& renderable_mesh) const
+		{
+			Matrix bone_mtx[64];
+
+			const Pose& pose = *renderable_mesh.m_pose;
+			const Model& model = *renderable_mesh.m_model;
+			Vec3* poss = pose.getPositions();
+			Quat* rots = pose.getRotations();
+
+			ASSERT(pose.getCount() <= sizeof(bone_mtx) / sizeof(bone_mtx[0]));
+			for (int bone_index = 0, bone_count = pose.getCount(); bone_index < bone_count; ++bone_index)
+			{
+				rots[bone_index].toMatrix(bone_mtx[bone_index]);
+				bone_mtx[bone_index].translate(poss[bone_index]);
+				bone_mtx[bone_index] = bone_mtx[bone_index] * model.getBone(bone_index).inv_bind_matrix;
+			}
+			bgfx::setUniform(m_bone_matrices_uniform, bone_mtx, pose.getCount());
+		}
+
+
 		void renderSkinnedMesh(const RenderableMesh& info)
 		{
-			TODO("bgfx");
-			ASSERT(false);
+			if (!info.m_model->isReady())
+			{
+				return;
+			}
+
+			const Mesh& mesh = *info.m_mesh;
+			const Model& model = *info.m_model;
+			bgfx::setTransform(&info.m_matrix->m11);
+			bgfx::setProgram(mesh.getMaterial()->getShaderInstance().m_program_handles[m_pass_idx]);
+			for (int i = 0; i < mesh.getMaterial()->getTextureCount(); ++i)
+			{
+				Texture* texture = mesh.getMaterial()->getTexture(i);
+				if (texture)
+				{
+					bgfx::setTexture(i, mesh.getMaterial()->getShader()->getTextureSlot(i).m_uniform_handle, texture->getTextureHandle());
+				}
+			}
+			int global_texture_offset = mesh.getMaterial()->getTextureCount();
+			for (int i = 0; i < m_global_textures.size(); ++i)
+			{
+				const GlobalTexture& t = m_global_textures[i];
+				bgfx::setTexture(i + global_texture_offset, t.m_uniform, t.m_texture);
+			}
+
+			setPoseUniform(info);
+
+			bgfx::setVertexBuffer(model.getGeometry().getAttributesArrayID(), mesh.getAttributeArrayOffset() / mesh.getVertexDefinition().getStride(), mesh.getAttributeArraySize() / mesh.getVertexDefinition().getStride());
+			bgfx::setIndexBuffer(model.getGeometry().getIndicesArrayID(), mesh.getIndicesOffset(), mesh.getIndexCount());
+			bgfx::setState(m_render_state | mesh.getMaterial()->getRenderStates());
+			bgfx::submit(m_view_idx);
 		}
+
 
 		void renderRigidMesh(const RenderableMesh& info)
 		{
@@ -1010,6 +806,88 @@ namespace Lumix
 		}
 
 
+		void renderTerrain(const TerrainInfo& info)
+		{
+			Material* material = info.m_terrain->getMaterial();
+			if (!material->isReady())
+			{
+				return;
+			}
+			Matrix inv_world_matrix;
+			inv_world_matrix = info.m_world_matrix;
+			inv_world_matrix.fastInverse();
+			Vec3 camera_pos = m_active_camera.entity.getPosition();
+			Vec3 rel_cam_pos = inv_world_matrix.multiplyPosition(camera_pos) / info.m_terrain->getXZScale();
+
+			const Geometry& geometry = *info.m_terrain->getGeometry();
+			const Mesh& mesh = *info.m_terrain->getMesh();
+
+			Vec4 map_size(info.m_terrain->getRootSize(), 0, 0, 0);
+			bgfx::setUniform(m_map_size_uniform, &map_size);
+
+			Vec4 quad_min_and_size(info.m_min, info.m_size);
+			bgfx::setUniform(m_quad_min_and_size_uniform, &quad_min_and_size);
+
+			bgfx::setUniform(m_morph_const_uniform, &Vec4(info.m_morph_const, 0));
+			bgfx::setUniform(m_rel_camera_pos_uniform, &Vec4(rel_cam_pos, 0));
+			bgfx::setUniform(m_terrain_scale_uniform, &Vec4(info.m_terrain->getScale(), 0));
+
+			for (int i = 0; i < material->getUniformCount(); ++i)
+			{
+				const Material::Uniform& uniform = material->getUniform(i);
+				
+				switch (uniform.m_type)
+				{
+					case Material::Uniform::FLOAT:
+						{
+							Vec4 v(uniform.m_float, 0, 0, 0);
+							bgfx::setUniform(uniform.m_handle, &v);
+						}
+						break;
+					case Material::Uniform::TIME:
+						{
+							Vec4 v(m_scene->getTime(), 0, 0, 0);
+							bgfx::setUniform(uniform.m_handle, &v);
+						}
+						break;
+					default:
+						ASSERT(false);
+						break;
+				}
+				
+			}
+
+			for (int i = 0; i < material->getTextureCount(); ++i)
+			{
+				Texture* texture = material->getTexture(i);
+				if (texture)
+				{
+					bgfx::setTexture(i, material->getShader()->getTextureSlot(i).m_uniform_handle, texture->getTextureHandle());
+				}
+			}
+			int global_texture_offset = mesh.getMaterial()->getTextureCount();
+			for (int i = 0; i < m_global_textures.size(); ++i)
+			{
+				const GlobalTexture& t = m_global_textures[i];
+				bgfx::setTexture(i + global_texture_offset, t.m_uniform, t.m_texture);
+			}
+
+			bgfx::setTransform(&info.m_world_matrix.m11);
+			bgfx::setProgram(material->getShaderInstance().m_program_handles[m_pass_idx]);
+			bgfx::setVertexBuffer(geometry.getAttributesArrayID(), mesh.getAttributeArrayOffset() / mesh.getVertexDefinition().getStride(), mesh.getAttributeArraySize() / mesh.getVertexDefinition().getStride());
+			int mesh_part_indices_count = mesh.getIndexCount() / 4;
+			bgfx::setIndexBuffer(geometry.getIndicesArrayID(), info.m_index * mesh_part_indices_count, mesh_part_indices_count);
+			bgfx::setState(m_render_state | mesh.getMaterial()->getRenderStates());
+			bgfx::submit(m_view_idx);
+		}
+
+
+		void renderGrass(const Terrain::GrassPatch& grass_path)
+		{
+			ASSERT(false);
+		}
+
+
 		void render(Array<RenderableInfo>* renderable_infos, const Component& light)
 		{
 			PROFILE_FUNCTION();
@@ -1027,18 +905,17 @@ namespace Lumix
 				switch (info->m_type)
 				{
 					case (int32_t)RenderableType::RIGID_MESH:
-						{
-							const RenderableMesh* mesh = static_cast<const RenderableMesh*>(info->m_data);
-							renderRigidMesh(*static_cast<const RenderableMesh*>(info->m_data));
-						}
+						renderRigidMesh(*static_cast<const RenderableMesh*>(info->m_data));
 						break;
 					case (int32_t)RenderableType::SKINNED_MESH:
-						{
-							const RenderableMesh* mesh = static_cast<const RenderableMesh*>(info->m_data);
-							renderSkinnedMesh(*static_cast<const RenderableMesh*>(info->m_data));
-						}
+						renderSkinnedMesh(*static_cast<const RenderableMesh*>(info->m_data));
 						break;
-						TODO("bgfx");
+					case (int32_t)RenderableType::TERRAIN:
+						renderTerrain(*static_cast<const TerrainInfo*>(info->m_data));
+						break;
+					case (int32_t)RenderableType::GRASS:
+						renderGrass(*static_cast<const Terrain::GrassPatch*>(info->m_data));
+						break;
 					default:
 						ASSERT(false);
 						break;
@@ -1072,8 +949,6 @@ namespace Lumix
 				;
 			m_view_idx = -1;
 			m_pass_idx = -1;
-			m_draw_calls_count = 0;
-			m_vertices_count = 0;
 			m_current_framebuffer = nullptr;
 			m_global_textures.clear();
 			memset(m_view2pass_map, 0xffffFFFF, sizeof(m_view2pass_map));
@@ -1118,7 +993,6 @@ namespace Lumix
 		};
 
 
-		TODO("bgfx"); // check for unused members;
 		uint8_t m_view_idx;
 		int m_pass_idx;
 		uint8_t m_view2pass_map[16];
@@ -1144,6 +1018,12 @@ namespace Lumix
 		Array<TerrainInfo> m_terrain_infos;
 		Array<GrassInfo> m_grass_infos;
 		Array<RenderableInfo> m_renderable_infos;
+		bgfx::UniformHandle m_bone_matrices_uniform;
+		bgfx::UniformHandle m_terrain_scale_uniform;
+		bgfx::UniformHandle m_morph_const_uniform;
+		bgfx::UniformHandle m_rel_camera_pos_uniform;
+		bgfx::UniformHandle m_map_size_uniform;
+		bgfx::UniformHandle m_quad_min_and_size_uniform;
 		bgfx::UniformHandle m_fog_color_density_uniform;
 		bgfx::UniformHandle m_light_pos_radius_uniform;
 		bgfx::UniformHandle m_light_color_uniform;
@@ -1151,9 +1031,8 @@ namespace Lumix
 		bgfx::UniformHandle m_light_dir_fov_uniform;
 		bgfx::UniformHandle m_shadowmap_matrices_uniform;
 		bgfx::UniformHandle m_shadowmap_splits_uniform;
-		int m_draw_calls_count;
-		int m_vertices_count;
 		Material* m_screen_space_material;
+		Material* m_debug_line_material;
 
 	private:
 		void operator=(const PipelineInstanceImpl&);
@@ -1249,7 +1128,7 @@ namespace Lumix
 				float fov = pipeline->getScene()->getCameraFOV(cmp);
 				float near_plane = pipeline->getScene()->getCameraNearPlane(cmp);
 				float far_plane = pipeline->getScene()->getCameraFarPlane(cmp);
-				projection_matrix.setPerspective(Math::degreesToRadians(fov), pipeline->m_width, pipeline->m_height, near_plane, far_plane);
+				projection_matrix.setPerspective(Math::degreesToRadians(fov), (float)pipeline->m_width, (float)pipeline->m_height, near_plane, far_plane);
 
 				Matrix mtx = cmp.entity.getMatrix();
 				Vec3 pos = mtx.getTranslation();
