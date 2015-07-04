@@ -96,6 +96,7 @@ namespace Lumix
 			virtual void setEntityName(const Entity& entity, const char* name) = 0;
 			virtual void snapToTerrain() = 0;
 			virtual void toggleGameMode() = 0;
+			virtual void toggleStats() = 0;
 			virtual void navigate(float forward, float right, float speed) = 0;
 			virtual void setProperty(uint32_t component, int index, IPropertyDescriptor& property, const void* data, int size) = 0;
 			virtual void addArrayPropertyItem(const Component& cmp, IArrayDescriptor& property) = 0;

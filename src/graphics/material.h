@@ -83,7 +83,9 @@ public:
 	bool save(JsonSerializer& serializer);
 	int getUniformCount() const { return m_uniforms.size(); }
 	Uniform& getUniform(int index) { return m_uniforms[index]; }
+	const Uniform& getUniform(int index) const { return m_uniforms[index]; }
 	ShaderInstance& getShaderInstance() { ASSERT(m_shader_instance); return *m_shader_instance; }
+	const ShaderInstance& getShaderInstance() const { ASSERT(m_shader_instance); return *m_shader_instance; }
 
 	Material(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 		: Resource(path, resource_manager, allocator)

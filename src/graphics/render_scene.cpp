@@ -967,7 +967,7 @@ namespace Lumix
 			}
 
 
-			virtual void getTerrainInfos(Array<RenderableInfo>& infos, int64_t layer_mask, const Vec3& camera_pos, LIFOAllocator& frame_allocator) override
+			virtual void getTerrainInfos(Array<const TerrainInfo*>& infos, int64_t layer_mask, const Vec3& camera_pos, LIFOAllocator& frame_allocator) override
 			{
 				PROFILE_FUNCTION();
 				infos.reserve(m_terrains.size());
@@ -981,7 +981,7 @@ namespace Lumix
 			}
 
 
-			virtual void getGrassInfos(const Frustum& frustum, Array<RenderableInfo>& infos, int64_t layer_mask) override
+			virtual void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, int64_t layer_mask) override
 			{
 				PROFILE_FUNCTION();
 				for (int i = 0; i < m_terrains.size(); ++i)
@@ -1111,18 +1111,18 @@ namespace Lumix
 			}
 
 
-			void mergeTemporaryInfos(Array<RenderableInfo>& all_infos)
+			void mergeTemporaryInfos(Array<const RenderableMesh*>& all_infos)
 			{
 				PROFILE_FUNCTION();
 				all_infos.reserve(m_renderables.size() * 2);
 				for (int i = 0; i < m_temporary_infos.size(); ++i)
 				{
-					Array<RenderableInfo>& subinfos = m_temporary_infos[i];
+					Array<const RenderableMesh*>& subinfos = m_temporary_infos[i];
 					if (!subinfos.empty())
 					{
 						int size = all_infos.size();
 						all_infos.resize(size + subinfos.size());
-						memcpy(&all_infos[0] + size, &subinfos[0], sizeof(RenderableInfo) * subinfos.size());
+						memcpy(&all_infos[0] + size, &subinfos[0], sizeof(subinfos[0]) * subinfos.size());
 					}
 				}
 			}
@@ -1157,7 +1157,7 @@ namespace Lumix
 				}
 				for (int subresult_index = 0; subresult_index < results.size(); ++subresult_index)
 				{
-					Array<RenderableInfo>& subinfos = m_temporary_infos[subresult_index];
+					Array<const RenderableMesh*>& subinfos = m_temporary_infos[subresult_index];
 					subinfos.clear();
 					MTJD::Job* job = MTJD::makeJob(m_engine.getMTJDManager(), [&subinfos, layer_mask, this, &results, subresult_index, &frustum]()
 						{
@@ -1173,10 +1173,7 @@ namespace Lumix
 									LODMeshIndices lod = model->getLODMeshIndices(squared_distance);
 									for (int j = lod.getFrom(), c = lod.getTo(); j <= c; ++j)
 									{
-										RenderableInfo& info = subinfos.pushEmpty();
-										info.m_data = &renderable->m_meshes[j];
-										info.m_type = (int32_t)(renderable->m_pose.getCount() > 0 ? RenderableType::SKINNED_MESH : RenderableType::RIGID_MESH);
-										info.m_key = (int64_t)renderable->m_meshes[j].m_mesh;
+										subinfos.push(&renderable->m_meshes[j]);
 									}
 								}
 							}
@@ -1210,7 +1207,7 @@ namespace Lumix
 			}
 
 
-			virtual void getPointLightInfluencedGeometry(const Component& light_cmp, const Frustum& frustum, Array<RenderableInfo>& infos, int64_t layer_mask)
+			virtual void getPointLightInfluencedGeometry(const Component& light_cmp, const Frustum& frustum, Array<const RenderableMesh*>& infos, int64_t layer_mask)
 			{
 				PROFILE_FUNCTION();
 
@@ -1224,17 +1221,14 @@ namespace Lumix
 					{
 						for (int k = 0, kc = renderable->m_meshes.size(); k < kc; ++k)
 						{
-							RenderableInfo& info = infos.pushEmpty();
-							info.m_data = &renderable->m_meshes[k];
-							info.m_type = (int32_t)(renderable->m_pose.getCount() > 0 ? RenderableType::SKINNED_MESH : RenderableType::RIGID_MESH);
-							info.m_key = (int64_t)renderable->m_meshes[k].m_mesh;
+							infos.push(&renderable->m_meshes[k]);
 						}
 					}
 				}
 			}
 
 			
-			virtual void getRenderableInfos(const Frustum& frustum, Array<RenderableInfo>& all_infos, int64_t layer_mask) override
+			virtual void getRenderableInfos(const Frustum& frustum, Array<const RenderableMesh*>& meshes, int64_t layer_mask) override
 			{
 				PROFILE_FUNCTION();
 
@@ -1245,7 +1239,7 @@ namespace Lumix
 				}
 
 				fillTemporaryInfos(*results, frustum, layer_mask);
-				mergeTemporaryInfos(all_infos);
+				mergeTemporaryInfos(meshes);
 
 				for (int i = 0, c = m_always_visible.size(); i < c; ++i)
 				{
@@ -1255,10 +1249,7 @@ namespace Lumix
 					{
 						for (int j = 0, c = renderable->m_meshes.size(); j < c; ++j)
 						{
-							RenderableInfo& info = all_infos.pushEmpty();
-							info.m_data = &renderable->m_meshes[j];
-							info.m_type = (int32_t)(renderable->m_pose.getCount() > 0 ? RenderableType::SKINNED_MESH : RenderableType::RIGID_MESH);
-							info.m_key = (int64_t)renderable->m_meshes[j].m_mesh;
+							meshes.push(&renderable->m_meshes[j]);
 						}
 					}
 				}
@@ -1987,7 +1978,7 @@ namespace Lumix
 			DebugTextsData m_debug_texts;
 			CullingSystem* m_culling_system;
 			DynamicRenderableCache m_dynamic_renderable_cache;
-			Array<Array<RenderableInfo> > m_temporary_infos;
+			Array<Array<const RenderableMesh*> > m_temporary_infos;
 			MTJD::Group m_sync_point;
 			Array<MTJD::Job*> m_jobs;
 			float m_time;

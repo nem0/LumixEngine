@@ -130,7 +130,7 @@ namespace Lumix
 			return (size > 17 ? 2.25f : 1.25f) * Math::SQRT2 * size;
 		}
 
-		bool getInfos(Array<RenderableInfo>& infos, const Vec3& camera_pos, Terrain* terrain, const Matrix& world_matrix, LIFOAllocator& allocator)
+		bool getInfos(Array<const TerrainInfo*>& infos, const Vec3& camera_pos, Terrain* terrain, const Matrix& world_matrix, LIFOAllocator& allocator)
 		{
 			float squared_dist = getSquaredDistance(camera_pos);
 			float r = getRadiusOuter(m_size);
@@ -145,11 +145,7 @@ namespace Lumix
 			{
 				if (!m_children[i] || !m_children[i]->getInfos(infos, camera_pos, terrain, world_matrix, allocator))
 				{
-					RenderableInfo& info = infos.pushEmpty();
 					TerrainInfo* data = (TerrainInfo*)allocator.allocate(sizeof(TerrainInfo));
-					info.m_type = (int32_t)RenderableType::TERRAIN;
-					info.m_key = (int64_t)terrain;
-					info.m_data = data;
 					data->m_morph_const = morph_const;
 					data->m_index = i;
 					data->m_terrain = terrain;
@@ -157,6 +153,7 @@ namespace Lumix
 					data->m_min = m_min;
 					data->m_shader = &shader;
 					data->m_world_matrix = world_matrix;
+					infos.push(data);
 				}
 			}
 			return true;
@@ -493,7 +490,7 @@ namespace Lumix
 	}
 
 
-	void Terrain::getGrassInfos(const Frustum&, Array<RenderableInfo>& infos, const Component& camera)
+	void Terrain::getGrassInfos(const Frustum&, Array<GrassInfo>& infos, const Component& camera)
 	{
 		updateGrass(camera);
 		Array<GrassQuad*>& quads = getQuads(camera);
@@ -504,10 +501,12 @@ namespace Lumix
 			{
 				for(int patch_idx = 0; patch_idx < quads[i]->m_patches.size(); ++patch_idx)
 				{
-					RenderableInfo& info = infos.pushEmpty();
-					info.m_data = &quads[i]->m_patches[patch_idx];
-					info.m_key = (int64_t)quads[i]->m_patches[patch_idx].m_type;
-					info.m_type = (int32_t)RenderableType::GRASS;
+					const GrassPatch& patch = quads[i]->m_patches[patch_idx];
+					GrassInfo info = infos.pushEmpty();
+					info.m_geometry = patch.m_type->m_grass_geometry;
+					info.m_matrices = &patch.m_matrices[0];
+					info.m_matrix_count = patch.m_matrices.size();
+					info.m_mesh = patch.m_type->m_grass_mesh;
 				}
 			}
 		}
@@ -590,7 +589,7 @@ namespace Lumix
 	}
 
 
-	void Terrain::getInfos(Array<RenderableInfo>& infos, const Vec3& camera_pos, LIFOAllocator& allocator)
+	void Terrain::getInfos(Array<const TerrainInfo*>& infos, const Vec3& camera_pos, LIFOAllocator& allocator)
 	{
 		if (m_root)
 		{

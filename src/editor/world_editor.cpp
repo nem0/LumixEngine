@@ -1797,6 +1797,12 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
+		virtual void toggleStats() override
+		{
+			m_edit_view_render_device->getPipeline().toggleStats();
+		}
+
+
 		virtual void toggleGameMode() override
 		{
 			if (m_is_game_mode)

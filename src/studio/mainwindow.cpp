@@ -133,6 +133,12 @@ void MainWindow::installPlugins()
 }
 
 
+void MainWindow::on_actionStats_triggered()
+{
+	m_world_editor->toggleStats();
+}
+
+
 void MainWindow::on_actionImport_asset_triggered()
 {
 	ImportAssetDialog* dialog = new ImportAssetDialog(*this, this, m_world_editor->getBasePath());
