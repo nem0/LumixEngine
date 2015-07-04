@@ -86,6 +86,7 @@ private slots:
 	void on_actionSave_commands_triggered();
 	void on_actionExecute_commands_triggered();
 	void on_actionImport_asset_triggered();
+	void on_actionStats_triggered();
 
 
 private:
