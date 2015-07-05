@@ -61,7 +61,7 @@ public:
 
 public:
 	bool isZTest() const { return (m_render_states & BGFX_STATE_DEPTH_TEST_MASK) != 0; }
-	void enableZTest(bool enable) { setRenderState(enable, BGFX_STATE_DEPTH_TEST_LESS, BGFX_STATE_DEPTH_TEST_MASK); }
+	void enableZTest(bool enable) { setRenderState(enable, BGFX_STATE_DEPTH_TEST_LEQUAL, BGFX_STATE_DEPTH_TEST_MASK); }
 	bool isBackfaceCulling() const { return (m_render_states & BGFX_STATE_CULL_MASK) != 0; }
 	void enableBackfaceCulling(bool enable) { setRenderState(enable, BGFX_STATE_CULL_CW, BGFX_STATE_CULL_MASK); }
 	bool isAlphaCutout() const { return m_is_alpha_cutout; }

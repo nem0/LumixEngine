@@ -28,7 +28,7 @@ class ShaderInstance
 	public:
 		ShaderInstance(IAllocator&)
 		{
-			for (int i = 0; i < sizeof(m_program_handles) / sizeof(m_program_handles[0]); ++i)
+			for (int i = 0; i < lengthOf(m_program_handles); ++i)
 			{
 				m_program_handles[i] = BGFX_INVALID_HANDLE;
 			}

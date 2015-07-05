@@ -30,96 +30,6 @@
 #include <lua.hpp>
 #include <lauxlib.h>
 
-static const uint8_t vs_drawstress_glsl[325] =
-{
-	0x56, 0x53, 0x48, 0x04, 0xa4, 0x8b, 0xef, 0x49, 0x01, 0x00, 0x0f, 0x75, 0x5f, 0x6d, 0x6f, 0x64, // VSH....I...u_mod
-	0x65, 0x6c, 0x56, 0x69, 0x65, 0x77, 0x50, 0x72, 0x6f, 0x6a, 0x04, 0x01, 0x00, 0x00, 0x01, 0x00, // elViewProj......
-	0x20, 0x01, 0x00, 0x00, 0x61, 0x74, 0x74, 0x72, 0x69, 0x62, 0x75, 0x74, 0x65, 0x20, 0x68, 0x69, //  ...attribute hi
-	0x67, 0x68, 0x70, 0x20, 0x76, 0x65, 0x63, 0x34, 0x20, 0x61, 0x5f, 0x63, 0x6f, 0x6c, 0x6f, 0x72, // ghp vec4 a_color
-	0x30, 0x3b, 0x0a, 0x61, 0x74, 0x74, 0x72, 0x69, 0x62, 0x75, 0x74, 0x65, 0x20, 0x68, 0x69, 0x67, // 0;.attribute hig
-	0x68, 0x70, 0x20, 0x76, 0x65, 0x63, 0x33, 0x20, 0x61, 0x5f, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x69, // hp vec3 a_positi
-	0x6f, 0x6e, 0x3b, 0x0a, 0x76, 0x61, 0x72, 0x79, 0x69, 0x6e, 0x67, 0x20, 0x68, 0x69, 0x67, 0x68, // on;.varying high
-	0x70, 0x20, 0x76, 0x65, 0x63, 0x34, 0x20, 0x76, 0x5f, 0x63, 0x6f, 0x6c, 0x6f, 0x72, 0x30, 0x3b, // p vec4 v_color0;
-	0x0a, 0x75, 0x6e, 0x69, 0x66, 0x6f, 0x72, 0x6d, 0x20, 0x68, 0x69, 0x67, 0x68, 0x70, 0x20, 0x6d, // .uniform highp m
-	0x61, 0x74, 0x34, 0x20, 0x75, 0x5f, 0x6d, 0x6f, 0x64, 0x65, 0x6c, 0x56, 0x69, 0x65, 0x77, 0x50, // at4 u_modelViewP
-	0x72, 0x6f, 0x6a, 0x3b, 0x0a, 0x76, 0x6f, 0x69, 0x64, 0x20, 0x6d, 0x61, 0x69, 0x6e, 0x20, 0x28, // roj;.void main (
-	0x29, 0x0a, 0x7b, 0x0a, 0x20, 0x20, 0x68, 0x69, 0x67, 0x68, 0x70, 0x20, 0x76, 0x65, 0x63, 0x34, // ).{.  highp vec4
-	0x20, 0x74, 0x6d, 0x70, 0x76, 0x61, 0x72, 0x5f, 0x31, 0x3b, 0x0a, 0x20, 0x20, 0x74, 0x6d, 0x70, //  tmpvar_1;.  tmp
-	0x76, 0x61, 0x72, 0x5f, 0x31, 0x2e, 0x77, 0x20, 0x3d, 0x20, 0x31, 0x2e, 0x30, 0x3b, 0x0a, 0x20, // var_1.w = 1.0;. 
-	0x20, 0x74, 0x6d, 0x70, 0x76, 0x61, 0x72, 0x5f, 0x31, 0x2e, 0x78, 0x79, 0x7a, 0x20, 0x3d, 0x20, //  tmpvar_1.xyz = 
-	0x61, 0x5f, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x69, 0x6f, 0x6e, 0x3b, 0x0a, 0x20, 0x20, 0x67, 0x6c, // a_position;.  gl
-	0x5f, 0x50, 0x6f, 0x73, 0x69, 0x74, 0x69, 0x6f, 0x6e, 0x20, 0x3d, 0x20, 0x28, 0x75, 0x5f, 0x6d, // _Position = (u_m
-	0x6f, 0x64, 0x65, 0x6c, 0x56, 0x69, 0x65, 0x77, 0x50, 0x72, 0x6f, 0x6a, 0x20, 0x2a, 0x20, 0x74, // odelViewProj * t
-	0x6d, 0x70, 0x76, 0x61, 0x72, 0x5f, 0x31, 0x29, 0x3b, 0x0a, 0x20, 0x20, 0x76, 0x5f, 0x63, 0x6f, // mpvar_1);.  v_co
-	0x6c, 0x6f, 0x72, 0x30, 0x20, 0x3d, 0x20, 0x61, 0x5f, 0x63, 0x6f, 0x6c, 0x6f, 0x72, 0x30, 0x3b, // lor0 = a_color0;
-	0x0a, 0x7d, 0x0a, 0x0a, 0x00,                                                                   // .}...
-};
-static const uint8_t fs_drawstress_glsl[89] =
-{
-	0x46, 0x53, 0x48, 0x04, 0xa4, 0x8b, 0xef, 0x49, 0x00, 0x00, 0x4a, 0x00, 0x00, 0x00, 0x76, 0x61, // FSH....I..J...va
-	0x72, 0x79, 0x69, 0x6e, 0x67, 0x20, 0x68, 0x69, 0x67, 0x68, 0x70, 0x20, 0x76, 0x65, 0x63, 0x34, // rying highp vec4
-	0x20, 0x76, 0x5f, 0x63, 0x6f, 0x6c, 0x6f, 0x72, 0x30, 0x3b, 0x0a, 0x76, 0x6f, 0x69, 0x64, 0x20, //  v_color0;.void 
-	0x6d, 0x61, 0x69, 0x6e, 0x20, 0x28, 0x29, 0x0a, 0x7b, 0x0a, 0x20, 0x20, 0x67, 0x6c, 0x5f, 0x46, // main ().{.  gl_F
-	0x72, 0x61, 0x67, 0x43, 0x6f, 0x6c, 0x6f, 0x72, 0x20, 0x3d, 0x20, 0x76, 0x5f, 0x63, 0x6f, 0x6c, // ragColor = v_col
-	0x6f, 0x72, 0x30, 0x3b, 0x0a, 0x7d, 0x0a, 0x0a, 0x00,                                           // or0;.}...
-};
-
-bgfx::ProgramHandle program;
-bgfx::VertexBufferHandle vbh;
-bgfx::IndexBufferHandle ibh;
-
-
-
-struct PosColorVertex
-{
-	float m_x;
-	float m_y;
-	float m_z;
-	uint32_t m_abgr;
-
-	static void init()
-	{
-		ms_decl
-			.begin()
-			.add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float)
-			.add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true)
-			.end();
-	}
-
-	static bgfx::VertexDecl ms_decl;
-};
-
-bgfx::VertexDecl PosColorVertex::ms_decl;
-
-static PosColorVertex s_cubeVertices[8] =
-{
-	{ -1.0f, 1.0f, 1.0f, 0xff000000 },
-	{ 1.0f, 1.0f, 1.0f, 0xff0000ff },
-	{ -1.0f, -1.0f, 1.0f, 0xff00ff00 },
-	{ 1.0f, -1.0f, 1.0f, 0xff00ffff },
-	{ -1.0f, 1.0f, -1.0f, 0xffff0000 },
-	{ 1.0f, 1.0f, -1.0f, 0xffff00ff },
-	{ -1.0f, -1.0f, -1.0f, 0xffffff00 },
-	{ 1.0f, -1.0f, -1.0f, 0xffffffff },
-};
-
-static const uint16_t s_cubeIndices[36] =
-{
-	0, 1, 2, // 0
-	1, 3, 2,
-	4, 6, 5, // 2
-	5, 6, 7,
-	0, 2, 4, // 4
-	4, 2, 6,
-	1, 5, 3, // 6
-	5, 7, 3,
-	0, 4, 1, // 8
-	4, 5, 1,
-	2, 3, 6, // 10
-	6, 3, 7,
-};
-/************************************/
-
 
 namespace Lumix
 {
@@ -141,6 +51,17 @@ namespace Lumix
 	static const float SHADOW_CAM_NEAR = 0.1f;
 	static const float SHADOW_CAM_FAR = 10000.0f;
 	
+	class InstanceData
+	{
+		public:
+			static const int MAX_INSTANCE_COUNT = 32;
+
+		public:
+			const bgfx::InstanceDataBuffer* m_buffer;
+			int m_instance_count;
+			RenderableMesh m_mesh;
+	};
+
 	class BaseVertex
 	{
 		public:
@@ -164,28 +85,6 @@ namespace Lumix
 			, m_framebuffers(allocator)
 			, m_lua_state(nullptr)
 		{
-			PosColorVertex::init();
-
-			const bgfx::Memory* mem;
-			mem = bgfx::makeRef(s_cubeVertices, sizeof(s_cubeVertices));
-			vbh = bgfx::createVertexBuffer(mem, PosColorVertex::ms_decl);
-
-			// Create static index buffer.
-			mem = bgfx::makeRef(s_cubeIndices, sizeof(s_cubeIndices));
-			ibh = bgfx::createIndexBuffer(mem);
-
-			const bgfx::Memory* vs_drawstress;
-			const bgfx::Memory* fs_drawstress;
-
-			vs_drawstress = bgfx::makeRef(vs_drawstress_glsl, sizeof(vs_drawstress_glsl));
-			fs_drawstress = bgfx::makeRef(fs_drawstress_glsl, sizeof(fs_drawstress_glsl));
-
-			// Create program from shaders.
-			program = bgfx::createProgram(
-				bgfx::createShader(vs_drawstress)
-				, bgfx::createShader(fs_drawstress)
-				, true /* destroy shaders when program is destroyed */
-				);
 		}
 
 
@@ -399,11 +298,45 @@ namespace Lumix
 			}
 		}
 
+		void finishInstances(int idx)
+		{
+			if (m_instances_data[idx].m_buffer)
+			{
+				const RenderableMesh& info = m_instances_data[idx].m_mesh;
+				const Mesh& mesh = *info.m_mesh;
+				const Model& model = *info.m_model;
+				const Geometry& geometry = model.getGeometry();
+				const Material* material = mesh.getMaterial();
+
+				setMaterial(material);
+				bgfx::setProgram(info.m_mesh->getMaterial()->getShaderInstance().m_program_handles[m_pass_idx]);
+				bgfx::setVertexBuffer(geometry.getAttributesArrayID(), mesh.getAttributeArrayOffset() / mesh.getVertexDefinition().getStride(), mesh.getAttributeArraySize() / mesh.getVertexDefinition().getStride());
+				bgfx::setIndexBuffer(geometry.getIndicesArrayID(), mesh.getIndicesOffset(), mesh.getIndexCount());
+				bgfx::setState(m_render_state | material->getRenderStates());
+				bgfx::setInstanceDataBuffer(m_instances_data[idx].m_buffer, m_instances_data[idx].m_instance_count);
+				bgfx::submit(m_view_idx);
+				m_instances_data[idx].m_buffer = nullptr;
+				m_instances_data[idx].m_instance_count = 0;
+				m_instances_data[idx].m_mesh.m_mesh->setInstanceIdx(-1);
+			}
+		}
+
+
+		void finishInstances()
+		{
+			for (int i = 0; i < lengthOf(m_instances_data); ++i)
+			{
+				finishInstances(i);
+			}
+			m_instance_data_idx = 0;
+		}
+
 
 		void setPass(const char* name)
 		{
+			finishInstances();
 			m_pass_idx = m_renderer.getPassIdx(name);
-			for (int i = 0; i < sizeof(m_view2pass_map) / sizeof(m_view2pass_map[0]); ++i)
+			for (int i = 0; i < lengthOf(m_view2pass_map); ++i)
 			{
 				if (m_view2pass_map[i] == m_pass_idx)
 				{
@@ -586,7 +519,7 @@ namespace Lumix
 
 				Frustum shadow_camera_frustum;
 				shadow_camera_frustum.computeOrtho(shadow_cam_pos, -light_forward, light_mtx.getYVector(), bb_size * 2, bb_size * 2, SHADOW_CAM_NEAR, SHADOW_CAM_FAR);
-				renderModels(shadow_camera_frustum, layer_mask, true);
+				renderAll(shadow_camera_frustum, layer_mask, true);
 			}
 		}
 
@@ -730,6 +663,7 @@ namespace Lumix
 				renderMeshes(m_tmp_meshes);
 				renderTerrains(m_tmp_terrains);
 				renderGrasses(m_tmp_grasses);
+				finishInstances();
 			}
 		}
 
@@ -804,7 +738,7 @@ namespace Lumix
 		}
 
 
-		void renderModels(const Frustum& frustum, int64_t layer_mask, bool is_shadowmap)
+		void renderAll(const Frustum& frustum, int64_t layer_mask, bool is_shadowmap)
 		{
 			PROFILE_FUNCTION();
 			
@@ -825,6 +759,7 @@ namespace Lumix
 					m_scene->getGrassInfos(frustum, m_tmp_grasses, layer_mask);
 					renderGrasses(m_tmp_grasses);
 				}
+				finishInstances();
 			}
 		}
 
@@ -859,7 +794,7 @@ namespace Lumix
 			Vec3* poss = pose.getPositions();
 			Quat* rots = pose.getRotations();
 
-			ASSERT(pose.getCount() <= sizeof(bone_mtx) / sizeof(bone_mtx[0]));
+			ASSERT(pose.getCount() <= lengthOf(bone_mtx));
 			for (int bone_index = 0, bone_count = pose.getCount(); bone_index < bone_count; ++bone_index)
 			{
 				rots[bone_index].toMatrix(bone_mtx[bone_index]);
@@ -872,38 +807,44 @@ namespace Lumix
 
 		void renderMesh(const RenderableMesh& info)
 		{
-			// Set model matrix for rendering.
-			bgfx::setTransform(&info.m_matrix->m11);
-
-			// Set vertex and fragment shaders.
-			bgfx::setProgram(program);
-
-			// Set vertex and index buffer.
-			bgfx::setVertexBuffer(vbh);
-			bgfx::setIndexBuffer(ibh);	
-
-			// Set render states.
-			bgfx::setState(BGFX_STATE_DEFAULT);
-
-			// Submit primitive for rendering to view 0.
-			bgfx::submit(m_view_idx);
-			/*
-			const Mesh& mesh = *info.m_mesh;
-			const Model& model = *info.m_model;
-			const Geometry& geometry = model.getGeometry();
-			const Material* material = mesh.getMaterial();
-			bgfx::setTransform(&info.m_matrix->m11);
-			setMaterial(material);
-			
-			if (info.m_pose)
+			int instance_idx = info.m_mesh->getInstanceIdx();
+			if (instance_idx == -1)
 			{
-				setPoseUniform(info);
+				instance_idx = m_instance_data_idx;
+				m_instance_data_idx = (m_instance_data_idx + 1) % lengthOf(m_instances_data);
+				if (m_instances_data[instance_idx].m_buffer)
+				{
+					finishInstances(instance_idx);
+				}
+				info.m_mesh->setInstanceIdx(instance_idx);
 			}
+			InstanceData& data = m_instances_data[instance_idx];
+			if (!data.m_buffer)
+			{
+				data.m_buffer = bgfx::allocInstanceDataBuffer(InstanceData::MAX_INSTANCE_COUNT, sizeof(Matrix));
+				data.m_instance_count = 0;
+				data.m_mesh = info;
+			}
+			Matrix* mtcs = (Matrix*)data.m_buffer->data;
+			mtcs[data.m_instance_count] = *info.m_matrix;
+			++data.m_instance_count;
+			if (data.m_instance_count == InstanceData::MAX_INSTANCE_COUNT)
+			{
+				const Mesh& mesh = *info.m_mesh;
+				const Geometry& geometry = info.m_model->getGeometry();
+				const Material* material = mesh.getMaterial();
 
-			bgfx::setVertexBuffer(geometry.getAttributesArrayID(), mesh.getAttributeArrayOffset() / mesh.getVertexDefinition().getStride(), mesh.getAttributeArraySize() / mesh.getVertexDefinition().getStride());
-			bgfx::setIndexBuffer(geometry.getIndicesArrayID(), mesh.getIndicesOffset(), mesh.getIndexCount());
-			bgfx::setState(m_render_state | material->getRenderStates());
-			//bgfx::submit(m_view_idx);*/
+				setMaterial(material);
+				bgfx::setProgram(info.m_mesh->getMaterial()->getShaderInstance().m_program_handles[m_pass_idx]);
+				bgfx::setVertexBuffer(geometry.getAttributesArrayID(), mesh.getAttributeArrayOffset() / mesh.getVertexDefinition().getStride(), mesh.getAttributeArraySize() / mesh.getVertexDefinition().getStride());
+				bgfx::setIndexBuffer(geometry.getIndicesArrayID(), mesh.getIndicesOffset(), mesh.getIndexCount());
+				bgfx::setState(m_render_state | material->getRenderStates());
+				bgfx::setInstanceDataBuffer(data.m_buffer, data.m_instance_count);
+				bgfx::submit(m_view_idx);
+				data.m_mesh.m_mesh->setInstanceIdx(-1);
+				data.m_buffer = nullptr;
+				data.m_instance_count = 0;
+			}
 		}
 
 
@@ -1054,6 +995,12 @@ namespace Lumix
 			m_current_framebuffer = nullptr;
 			m_global_textures.clear();
 			memset(m_view2pass_map, 0xffffFFFF, sizeof(m_view2pass_map));
+			m_instance_data_idx = 0;
+			for (int i = 0; i < lengthOf(m_instances_data); ++i)
+			{
+				m_instances_data[i].m_buffer = nullptr;
+				m_instances_data[i].m_instance_count = 0;
+			}
 
 			if (lua_getglobal(m_source.m_lua_state, "render") == LUA_TFUNCTION)
 			{
@@ -1063,6 +1010,7 @@ namespace Lumix
 					g_log_error.log("lua") << lua_tostring(m_source.m_lua_state, -1);
 				}
 			}
+			finishInstances();
 
 			m_frame_allocator.clear();
 		}
@@ -1117,6 +1065,8 @@ namespace Lumix
 		Array<FrameBuffer*> m_framebuffers;
 		Array<GlobalTexture> m_global_textures;
 		Array<bgfx::UniformHandle> m_uniforms;
+		InstanceData m_instances_data[128];
+		int m_instance_data_idx;
 
 		Matrix m_shadow_modelviewprojection[4];
 		Vec4 m_shadowmap_splits;
@@ -1276,7 +1226,7 @@ namespace Lumix
 			}
 			else
 			{
-				pipeline->renderModels(pipeline->getScene()->getFrustum(), layer_mask, false);
+				pipeline->renderAll(pipeline->getScene()->getFrustum(), layer_mask, false);
 			}
 		}
 
