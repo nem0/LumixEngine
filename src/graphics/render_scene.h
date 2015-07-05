@@ -53,8 +53,7 @@ namespace Lumix
 
 	struct GrassInfo
 	{
-		Geometry* m_geometry;
-		Mesh* m_mesh;
+		Model* m_model;
 		const Matrix* m_matrices;
 		int m_matrix_count;
 	};

@@ -328,6 +328,13 @@ void EntityModel::addResourceProperty(Node& child, Lumix::IPropertyDescriptor* d
 
 void EntityModel::addArrayProperty(Node& child, Lumix::IArrayDescriptor* array_desc, Lumix::Component cmp)
 {
+	child.onCreateEditor = [cmp, array_desc](QWidget* parent, const QStyleOptionViewItem&) {
+		auto button = new QPushButton(" + ", parent);
+		connect(button, &QPushButton::clicked, [cmp, array_desc](){ array_desc->addArrayItem(cmp, -1); });
+		return button;
+	};
+	child.m_setter = [](const QVariant&){};
+	child.m_is_persistent_editor = true;
 	for (int k = 0; k < array_desc->getCount(cmp); ++k)
 	{
 		Node& array_item_node = child.addChild(QString("%1").arg(k));

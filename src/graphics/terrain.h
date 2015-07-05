@@ -37,8 +37,6 @@ class Terrain
 
 				void grassLoaded(Resource::State, Resource::State);
 	
-				Geometry* m_grass_geometry;
-				Mesh* m_grass_mesh;
 				Model* m_grass_model;
 				Terrain& m_terrain;
 				int32_t m_ground;

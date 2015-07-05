@@ -934,7 +934,19 @@ namespace Lumix
 
 		void renderGrass(const GrassInfo& grass)
 		{
-			ASSERT(false);
+			const bgfx::InstanceDataBuffer* idb = bgfx::allocInstanceDataBuffer(grass.m_matrix_count, sizeof(Matrix));
+			memcpy(idb->data, &grass.m_matrices[0], grass.m_matrix_count * sizeof(Matrix));
+			const Mesh& mesh = grass.m_model->getMesh(0);
+			const Geometry& geometry = grass.m_model->getGeometry();
+			const Material* material = mesh.getMaterial();
+
+			setMaterial(material);
+			bgfx::setProgram(material->getShaderInstance().m_program_handles[m_pass_idx]);
+			bgfx::setVertexBuffer(geometry.getAttributesArrayID(), mesh.getAttributeArrayOffset() / mesh.getVertexDefinition().getStride(), mesh.getAttributeArraySize() / mesh.getVertexDefinition().getStride());
+			bgfx::setIndexBuffer(geometry.getIndicesArrayID(), mesh.getIndicesOffset(), mesh.getIndexCount());
+			bgfx::setState(m_render_state | material->getRenderStates());
+			bgfx::setInstanceDataBuffer(idb, grass.m_matrix_count);
+			bgfx::submit(m_view_idx);
 		}
 
 
