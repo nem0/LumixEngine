@@ -344,30 +344,7 @@ void Material::setRenderState(bool value, uint64_t state, uint64_t mask)
 
 void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 {
-	m_render_states = 0;
-	/*
-	auto fp = fopen("shaders/vs_bump.bin", "rb");
-	fseek(fp, 0, SEEK_END);
-	auto s = ftell(fp);
-	auto* mem = bgfx::alloc(s+1);
-	fseek(fp, 0, SEEK_SET);
-	fread(mem->data, s, 1, fp);
-	mem->data[s] = '\0';
-	auto vs = bgfx::createShader(mem);
-	fclose(fp);
-
-	fp = fopen("shaders/fs_bump.bin", "rb");
-	fseek(fp, 0, SEEK_END);
-	s = ftell(fp);
-	mem = bgfx::alloc(s + 1);
-	fseek(fp, 0, SEEK_SET);
-	fread(mem->data, s, 1, fp);
-	mem->data[s] = '\0';
-	auto ps = bgfx::createShader(mem);
-	fclose(fp);
-
-	m_program_id = bgfx::createProgram(vs, ps, true);
-	*/
+	m_render_states = BGFX_STATE_DEPTH_TEST_LEQUAL | BGFX_STATE_CULL_CW;
 	PROFILE_FUNCTION();
 	if(success)
 	{
