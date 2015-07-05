@@ -196,8 +196,6 @@ namespace Lumix
 		{
 			m_grass_model->getResourceManager().get(ResourceManager::MODEL)->unload(*m_grass_model);
 			m_grass_model->getObserverCb().unbind<GrassType, &GrassType::grassLoaded>(this);
-			m_terrain.m_allocator.deleteObject(m_grass_mesh);
-			m_terrain.m_allocator.deleteObject(m_grass_geometry);
 		}
 	}
 
@@ -228,9 +226,7 @@ namespace Lumix
 	Terrain::GrassType::GrassType(Terrain& terrain)
 		: m_terrain(terrain)
 	{
-		m_grass_geometry = NULL;
-		m_grass_mesh = NULL;
-		m_grass_model = NULL;
+		m_grass_model = nullptr;
 		m_ground = 0;
 		m_density = 10;
 	}
@@ -314,10 +310,6 @@ namespace Lumix
 			type.m_grass_model->getResourceManager().get(ResourceManager::MODEL)->unload(*type.m_grass_model);
 			type.m_grass_model->getObserverCb().unbind<GrassType, &GrassType::grassLoaded>(&type);
 			type.m_grass_model = NULL;
-			m_allocator.deleteObject(type.m_grass_mesh);
-			m_allocator.deleteObject(type.m_grass_geometry);
-			type.m_grass_mesh = NULL;
-			type.m_grass_geometry = NULL;
 		}
 		if (path.isValid())
 		{
@@ -433,7 +425,7 @@ namespace Lumix
 							GrassPatch& patch = quad->m_patches.emplace(m_allocator);
 							patch.m_matrices.clear();
 							patch.m_type = m_grass_types[grass_type_idx];
-							if(patch.m_type->m_grass_geometry)
+							if (patch.m_type->m_grass_model && patch.m_type->m_grass_model->isReady())
 							{
 								int index = 0;
 								Texture* splat_map = m_splatmap;
@@ -473,18 +465,6 @@ namespace Lumix
 	{
 		if (m_grass_model->isReady())
 		{
-			IAllocator& allocator = m_terrain.m_allocator;
-			allocator.deleteObject(m_grass_geometry);
-
-			m_grass_geometry = allocator.newObject<Geometry>();
-/*			Geometry::VertexCallback vertex_callback;
-			Geometry::IndexCallback index_callback;
-			vertex_callback.bind<GrassType, &GrassType::grassVertexCopyCallback>(this);
-			index_callback.bind<GrassType, &GrassType::grassIndexCopyCallback>(this);
-			m_grass_geometry->copy(m_grass_model->getGeometry(), COPY_COUNT, index_callback, vertex_callback, allocator);
-*/			Material* material = m_grass_model->getMesh(0).getMaterial();
-			const Mesh& src_mesh = m_grass_model->getMesh(0);
-			m_grass_mesh = allocator.newObject<Mesh>(src_mesh.getVertexDefinition(), material, 0, src_mesh.getAttributeArraySize(), 0, src_mesh.getIndexCount() * COPY_COUNT, "grass", allocator);
 			m_terrain.forceGrassUpdate();
 		}
 	}
@@ -502,11 +482,13 @@ namespace Lumix
 				for(int patch_idx = 0; patch_idx < quads[i]->m_patches.size(); ++patch_idx)
 				{
 					const GrassPatch& patch = quads[i]->m_patches[patch_idx];
-					GrassInfo info = infos.pushEmpty();
-					info.m_geometry = patch.m_type->m_grass_geometry;
-					info.m_matrices = &patch.m_matrices[0];
-					info.m_matrix_count = patch.m_matrices.size();
-					info.m_mesh = patch.m_type->m_grass_mesh;
+					if (!patch.m_matrices.empty())
+					{
+						GrassInfo& info = infos.pushEmpty();
+						info.m_matrices = &patch.m_matrices[0];
+						info.m_matrix_count = patch.m_matrices.size();
+						info.m_model = patch.m_type->m_grass_model;
+					}
 				}
 			}
 		}
