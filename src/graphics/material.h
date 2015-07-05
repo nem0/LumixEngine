@@ -99,6 +99,9 @@ public:
 		, m_render_states(0)
 		, m_shader_instance(nullptr)
 	{ 
+		enableZTest(true);
+		enableBackfaceCulling(true);
+		enableShadowReceiving(true);
 		for (int i = 0; i < MAX_TEXTURE_COUNT; ++i)
 		{
 			m_textures[i] = nullptr;
