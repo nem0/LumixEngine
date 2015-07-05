@@ -430,9 +430,9 @@ namespace Lumix
 								int index = 0;
 								Texture* splat_map = m_splatmap;
 								float step = GRASS_QUAD_SIZE / (float)patch.m_type->m_density;
-								for (float dx = 0.5f * step; dx < GRASS_QUAD_SIZE - 0.5f * step; dx += step)
+								for (float dx = 0; dx < GRASS_QUAD_SIZE; dx += step)
 								{
-									for (float dz = 0.5f * step; dz < GRASS_QUAD_SIZE - 0.5f * step; dz += step)
+									for (float dz = 0; dz < GRASS_QUAD_SIZE; dz += step)
 									{
 										uint32_t pixel_value = splat_map->getPixel(splat_map->getWidth() * (quad_x + dx) / (m_width * m_scale.x), splat_map->getHeight() * (quad_z + dz) / (m_height * m_scale.x));
 										uint8_t count = (pixel_value >> (8 * patch.m_type->m_ground)) & 0xff;
