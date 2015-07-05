@@ -27,6 +27,7 @@ public:
 	bool isFrameDebuggerActive() const { return m_is_frame_debugger_active; }
 	bool isFrameRequested() const { return m_is_frame_requested; }
 	void frameServed() { m_is_frame_requested = false; }
+	void setWireframe(bool wireframe);
 
 private:
 	void onDistanceMeasured(float distance);

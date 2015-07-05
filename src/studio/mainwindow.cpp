@@ -14,12 +14,13 @@
 #include "log_widget.h"
 #include "metadata.h"
 #include "notifications.h"
+#include "profilerui.h"
 #include "property_view.h"
 #include "property_view/terrain_editor.h"
 #include "sceneview.h"
 #include "scripts/scriptcompilerwidget.h"
 #include "scripts/scriptcompiler.h"
-#include "profilerui.h"
+#include "shader_compiler.h"
 #include <qcombobox.h>
 #include <qdir.h>
 #include <qevent.h>
@@ -42,6 +43,7 @@ MainWindow::MainWindow(QWidget* parent) :
 	setDockOptions(AllowNestedDocks | AnimatedDocks | AllowTabbedDocks);
 
 	m_log = new LogWidget;
+	m_shader_compiler = new ShaderCompiler;
 	m_property_view = new PropertyView;
 	m_scene_view = new SceneView;
 	m_game_view = new GameView(*this);
@@ -82,6 +84,7 @@ MainWindow::MainWindow(QWidget* parent) :
 	addEditorDock(static_cast<Qt::DockWidgetArea>(1), m_property_view, &MainWindow::on_actionProperties_triggered);
 	addEditorDock(static_cast<Qt::DockWidgetArea>(2), m_scene_view, &MainWindow::on_actionScene_View_triggered);
 	addEditorDock(static_cast<Qt::DockWidgetArea>(8), m_script_compiler_ui, &MainWindow::on_actionScript_compiler_triggered);
+	addEditorDock(static_cast<Qt::DockWidgetArea>(8), m_shader_compiler, &MainWindow::on_actionShader_compiler_triggered);
 
 	createLayoutCombobox();
 
@@ -127,6 +130,12 @@ MainWindow::MainWindow(QWidget* parent) :
 void MainWindow::installPlugins()
 {
 	m_terrain_component_plugin = new TerrainComponentPlugin(*this);
+}
+
+
+void MainWindow::on_actionStats_triggered()
+{
+	m_world_editor->toggleStats();
 }
 
 
@@ -242,6 +251,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
 MainWindow::~MainWindow()
 {
 	delete m_terrain_component_plugin;
+	delete m_shader_compiler;
 	delete m_log;
 	delete m_ui;
 	delete m_animation_editor;
@@ -270,6 +280,7 @@ void MainWindow::setWorldEditor(Lumix::WorldEditor& editor)
 	m_animation_editor->setWorldEditor(editor);
 	m_asset_browser->setWorldEditor(editor);
 	m_asset_browser->setScriptCompiler(m_script_compiler_ui->getCompiler());
+	m_asset_browser->setShaderCompiler(m_shader_compiler);
 	m_asset_browser->setNotifications(m_notifications);
 	m_entity_list->setWorldEditor(editor);
 	m_entity_template_list_ui->setWorldEditor(editor);
@@ -277,6 +288,7 @@ void MainWindow::setWorldEditor(Lumix::WorldEditor& editor)
 	m_game_view->setWorldEditor(editor);
 	m_property_view->setWorldEditor(editor);
 	m_script_compiler_ui->setWorldEditor(editor);
+	m_shader_compiler->setWorldEditor(editor);
 
 	m_world_editor->universeLoaded().bind<MainWindow, &MainWindow::onUniverseLoaded>(this);
 
@@ -360,6 +372,11 @@ void MainWindow::on_actionScript_compiler_triggered()
 	m_script_compiler_ui->show();
 }
 
+void MainWindow::on_actionShader_compiler_triggered()
+{
+	m_shader_compiler->show();
+}
+
 void MainWindow::on_actionFile_server_triggered()
 {
 	m_file_server_ui->show();
@@ -383,7 +400,7 @@ void MainWindow::on_actionProfiler_triggered()
 
 void MainWindow::on_actionPolygon_Mode_changed()
 {
-	m_world_editor->setWireframe(m_ui->actionPolygon_Mode->isChecked());
+	m_scene_view->setWireframe(m_ui->actionPolygon_Mode->isChecked());
 }
 
 void MainWindow::onScriptCompiled()

@@ -108,6 +108,12 @@
     <ClCompile Include="..\..\..\src\graphics\model_generator.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\graphics\bgfx_renderer.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\graphics\bgfx_pipeline.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\graphics\frame_buffer.h">

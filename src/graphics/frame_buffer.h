@@ -3,7 +3,7 @@
 
 #include "core/stack_allocator.h"
 #include "core/string.h"
-#include "graphics/gl_ext.h"
+#include <bgfx.h>
 
 
 struct lua_State;
@@ -15,17 +15,14 @@ namespace Lumix
 
 class JsonSerializer;
 
-
+/**/
 class FrameBuffer
 {
 	public:
 		struct RenderBuffer
 		{
-			RenderBuffer() { m_format = 0; m_is_texture = true; m_id = 0; }
-
-			GLint m_format;
-			bool m_is_texture;
-			GLuint m_id;
+			bgfx::TextureFormat::Enum m_format;
+			bgfx::TextureHandle m_handle;
 
 			void parse(lua_State* state);
 			bool isDepth() const;
@@ -52,19 +49,16 @@ class FrameBuffer
 		FrameBuffer(const Declaration& decl);
 		~FrameBuffer();
 		
-		GLuint getId() const { return m_id; }
-		GLuint getTexture(int index) const { return m_declaration.m_renderbuffers[index].m_id; }
-		GLuint getDepthTexture() const;
-		void bind();
+		bgfx::FrameBufferHandle getHandle() const { return m_handle; }
 		int getWidth() const { return m_declaration.m_width; }
 		int getHeight() const { return m_declaration.m_height; }
 		const char* getName() { return m_declaration.m_name.c_str(); }
-		static void unbind();
+		bgfx::TextureHandle getRenderbufferHandle(int idx) const { return m_declaration.m_renderbuffers[idx].m_handle; }
 
 	private:
 
+		bgfx::FrameBufferHandle m_handle;
 		Declaration m_declaration;
-		GLuint m_id;
 };
 
 

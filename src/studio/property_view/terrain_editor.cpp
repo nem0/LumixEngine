@@ -28,8 +28,8 @@
 
 
 static const uint32_t RENDERABLE_HASH = crc32("renderable");
-static const char* HEIGHTMAP_UNIFORM = "hm_texture";
-static const char* SPLATMAP_UNIFORM = "splat_texture";
+static const char* HEIGHTMAP_UNIFORM = "u_heightmap";
+static const char* SPLATMAP_UNIFORM = "u_splatmap";
 
 
 class PaintTerrainCommand : public Lumix::IEditorCommand
@@ -508,7 +508,7 @@ TerrainComponentPlugin::~TerrainComponentPlugin()
 void TerrainComponentPlugin::createEditor(DynamicObjectModel::Node& node, const Lumix::Component& component)
 {
 	m_terrain_editor->m_component = component;
-	if (!m_terrain_editor->getMaterial())
+	if (!m_terrain_editor->getMaterial() || !m_terrain_editor->getMaterial()->isReady())
 	{
 		return;
 	}

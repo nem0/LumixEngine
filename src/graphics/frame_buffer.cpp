@@ -1,7 +1,7 @@
 #include "graphics/frame_buffer.h"
 #include "core/json_serializer.h"
 #include "core/vec3.h"
-#include "graphics/gl_ext.h"
+#include <bgfx.h>
 #include <lua.hpp>
 #include <lauxlib.h>
 
@@ -13,137 +13,51 @@ namespace Lumix
 FrameBuffer::FrameBuffer(const Declaration& decl)
 {
 	m_declaration = decl;
-	glGenFramebuffersEXT(1, &m_id);
+	bgfx::TextureHandle texture_handles[16];
 
-	glBindFramebufferEXT(GL_FRAMEBUFFER, m_id);
 	for (int i = 0; i < decl.m_renderbuffers_count; ++i)
 	{
 		const RenderBuffer& renderbuffer = decl.m_renderbuffers[i];
-		if (renderbuffer.m_is_texture)
-		{
-			glGenTextures(1, &m_declaration.m_renderbuffers[i].m_id);
-			glBindTexture(GL_TEXTURE_2D, m_declaration.m_renderbuffers[i].m_id);
-
-			glTexStorage2D(GL_TEXTURE_2D, 1, renderbuffer.m_format, decl.m_width, decl.m_height);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-			GLenum attachment = renderbuffer.isDepth() ? GL_DEPTH_ATTACHMENT : GL_COLOR_ATTACHMENT0 + i;
-			glFramebufferTexture2DEXT(GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, m_declaration.m_renderbuffers[i].m_id, 0);
-		}
-		else
-		{
-			glGenRenderbuffersEXT(1, &m_declaration.m_renderbuffers[i].m_id);
-			glBindRenderbuffer(GL_RENDERBUFFER, m_declaration.m_renderbuffers[i].m_id);
-			glRenderbufferStorageEXT(GL_RENDERBUFFER, renderbuffer.m_format, decl.m_width, decl.m_height);
-			glFramebufferRenderbufferEXT(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_RENDERBUFFER, m_declaration.m_renderbuffers[i].m_id);
-		}
+		texture_handles[i] = bgfx::createTexture2D(decl.m_width, decl.m_height, 1, renderbuffer.m_format, renderbuffer.isDepth() ? 0 : 0);
+		m_declaration.m_renderbuffers[i].m_handle = texture_handles[i];
 	}
 
-	//GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER_EXT);
-	glBindFramebufferEXT(GL_FRAMEBUFFER, 0);
+	m_handle = bgfx::createFrameBuffer(decl.m_renderbuffers_count, texture_handles);
 }
 
 
 FrameBuffer::~FrameBuffer()
 {
-	glDeleteFramebuffers(1, &m_id);
-	for (int i = 0; i < m_declaration.m_renderbuffers_count; ++i)
-	{
-		if (m_declaration.m_renderbuffers[i].m_is_texture)
-		{
-			glDeleteTextures(1, &m_declaration.m_renderbuffers[i].m_id);
-		}
-	}
-}
-
-
-void FrameBuffer::bind()
-{
-	glBindFramebufferEXT(GL_FRAMEBUFFER, m_id);
-	GLenum buffers[Declaration::MAX_RENDERBUFFERS];
-	ASSERT(m_declaration.m_renderbuffers_count <= sizeof(buffers) / sizeof(buffers[0]));
-	int color_index = 0;
-	for (int i = 0; i < m_declaration.m_renderbuffers_count; ++i)
-	{
-		if (m_declaration.m_renderbuffers[i].isDepth())
-		{
-			buffers[i] = GL_DEPTH_ATTACHMENT;
-		}
-		else
-		{
-			buffers[i] = GL_COLOR_ATTACHMENT0 + color_index;
-			++color_index;
-		}
-	}
-	glDrawBuffers(m_declaration.m_renderbuffers_count, buffers);
-}
-
-
-GLuint FrameBuffer::getDepthTexture() const
-{
-	for (int i = 0; i < m_declaration.m_renderbuffers_count; ++i)
-	{
-		if (m_declaration.m_renderbuffers[i].isDepth())
-		{
-			return m_declaration.m_renderbuffers[i].m_id;
-		}
-	}
-	return 0;
-}
-
-
-void FrameBuffer::unbind()
-{
-	glBindFramebufferEXT(GL_FRAMEBUFFER, 0);
+	bgfx::destroyFrameBuffer(m_handle);
 }
 
 
 bool FrameBuffer::RenderBuffer::isDepth() const
 {
-	return m_format == GL_DEPTH_COMPONENT16 || m_format == GL_DEPTH_COMPONENT24 || m_format == GL_DEPTH_COMPONENT32;
+	switch(m_format)
+	{
+		case bgfx::TextureFormat::D32:
+		case bgfx::TextureFormat::D24:
+			return true;
+	}
+	return false;
 }
 
 
-static GLint getGLFormat(const char* format) 
+static bgfx::TextureFormat::Enum getFormat(const char* name) 
 {
-	if (stricmp(format, "rg16") == 0)
+	if (strcmp(name, "depth32") == 0)
 	{
-		return GL_RG16F;
+		return bgfx::TextureFormat::D32;
 	}
-	else if (stricmp(format, "rgb32") == 0)
+	else if (strcmp(name, "depth24") == 0)
 	{
-		return GL_RGB32F;
-	}
-	else if (stricmp(format, "rgba32") == 0)
-	{
-		return GL_RGBA32F;
-	}
-	else if (stricmp(format, "rgb") == 0)
-	{
-		return GL_RGB8;
-	}
-	else if (stricmp(format, "rgba") == 0)
-	{
-		return GL_RGBA8;
-	}
-	else if (stricmp(format, "depth16") == 0)
-	{
-		return GL_DEPTH_COMPONENT16;
-	}
-	else if (stricmp(format, "depth24") == 0)
-	{
-		return GL_DEPTH_COMPONENT24;
-	}
-	else if (stricmp(format, "depth32") == 0)
-	{
-		return GL_DEPTH_COMPONENT32;
+		return bgfx::TextureFormat::D24;
 	}
 	else
 	{
-		return 0;
+		g_log_error.log("Renderer") << "Uknown texture format " << name;
+		return bgfx::TextureFormat::RGBA8;
 	}
 }
 
@@ -152,12 +66,11 @@ void FrameBuffer::RenderBuffer::parse(lua_State* L)
 {
 	if (lua_getfield(L, -1, "format") == LUA_TSTRING)
 	{
-		m_format = getGLFormat(lua_tostring(L, -1));
+		m_format = getFormat(lua_tostring(L, -1));
 	}
-	lua_pop(L, 1);
-	if (lua_getfield(L, -1, "is_texture") == LUA_TBOOLEAN)
+	else
 	{
-		m_is_texture = lua_toboolean(L, -1) != 0;
+		m_format = bgfx::TextureFormat::RGBA8;
 	}
 	lua_pop(L, 1);
 }

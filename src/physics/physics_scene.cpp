@@ -16,7 +16,6 @@
 #include "core/resource_manager_base.h"
 #include "engine/engine.h"
 #include "graphics/render_scene.h"
-#include "graphics/renderer.h"
 #include "graphics/texture.h"
 #include "physics/physics_system.h"
 #include "physics/physics_geometry_manager.h"
@@ -428,12 +427,14 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual void render(Renderer& renderer) override
+	static Vec3 toVec3(const physx::PxVec3& v)
 	{
-		renderer.cleanup();
-		Shader& shader = renderer.getDebugShader();
-		renderer.applyShader(shader, 0);
+		return Vec3(v.x, v.y, v.z);
+	}
 
+
+	virtual void render(RenderScene& render_scene) override
+	{
 		m_scene->getNbActors(physx::PxActorTypeSelectionFlag::eRIGID_STATIC);
 		const physx::PxRenderBuffer& rb = m_scene->getRenderBuffer();
 		const physx::PxU32 num_lines = rb.getNbLines();
@@ -441,20 +442,14 @@ struct PhysicsSceneImpl : public PhysicsScene
 		const physx::PxU32 num_tri = rb.getNbTriangles();
 		if (num_lines)
 		{
-			glBegin(GL_LINES);
 			const physx::PxDebugLine* PX_RESTRICT lines = rb.getLines();
 			for (physx::PxU32 i = 0; i < num_lines; ++i)
 			{
 				const physx::PxDebugLine& line = lines[i];
-				GLubyte bytes[3];
-				bytes[0] = (GLubyte)((line.color0 >> 16) & 0xff);
-				bytes[1] = (GLubyte)((line.color0 >> 8) & 0xff);
-				bytes[2] = (GLubyte)((line.color0) & 0xff);
-				glColor3ubv(bytes);
-				glVertex3fv((GLfloat*)&line.pos0);
-				glVertex3fv((GLfloat*)&line.pos1);
+				Vec3 from = toVec3(line.pos0);
+				Vec3 to = toVec3(line.pos1);
+				render_scene.addDebugLine(from, to, line.color0, 0);
 			}
-			glEnd();
 		}
 	}
 

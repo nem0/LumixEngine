@@ -36,8 +36,6 @@ class Terrain
 				~GrassType();
 
 				void grassLoaded(Resource::State, Resource::State);
-				void grassVertexCopyCallback(void* data, int instance_size, int copy_count);
-				void grassIndexCopyCallback(void* data, int instance_size, int copy_count);
 	
 				Geometry* m_grass_geometry;
 				Mesh* m_grass_mesh;
@@ -105,8 +103,8 @@ class Terrain
 		void setMaterial(Material* material);
 		void setBrush(const Vec3& position, float size) { m_brush_position = position; m_brush_size = size; }
 
-		void getInfos(Array<RenderableInfo>& infos, const Vec3& camera_pos, LIFOAllocator& allocator);
-		void getGrassInfos(const Frustum& frustum, Array<RenderableInfo>& infos, const Component& camera);
+		void getInfos(Array<const TerrainInfo*>& infos, const Vec3& camera_pos, LIFOAllocator& allocator);
+		void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, const Component& camera);
 
 		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir);
 		void serialize(OutputBlob& serializer);

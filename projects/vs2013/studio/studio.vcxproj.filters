@@ -223,6 +223,9 @@
     <ClCompile Include="..\..\..\tmp\studio\moc_terrain_editor.cpp">
       <Filter>Generated Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\studio\shader_compiler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\..\..\src\studio\assetbrowser.h">
@@ -327,6 +330,9 @@
     <CustomBuild Include="..\..\..\src\studio\property_view\terrain_editor.h">
       <Filter>Header Files\property_view</Filter>
     </CustomBuild>
+    <CustomBuild Include="..\..\..\src\studio\shader_compiler.ui">
+      <Filter>Form Files</Filter>
+    </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\studio\file_system_watcher.h">
@@ -403,6 +409,12 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\studio\dialogs\create_texture_dialog.h">
       <Filter>Header Files\dialogs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\studio\shader_compiler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tmp\studio\GeneratedFiles\ui_shader_compiler.h">
+      <Filter>Generated Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

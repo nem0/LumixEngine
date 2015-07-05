@@ -17,6 +17,7 @@ namespace Ui
 class MainWindow;
 class Notifications;
 class ScriptCompiler;
+class ShaderCompiler;
 
 class AssetBrowser : public QDockWidget
 {
@@ -27,7 +28,8 @@ public:
 	~AssetBrowser();
 	void setWorldEditor(Lumix::WorldEditor& editor);
 	void emitFileChanged(const char* path);
-	void setScriptCompiler(ScriptCompiler* compiler) { m_compiler = compiler; }
+	void setScriptCompiler(ScriptCompiler* compiler) { m_script_compiler = compiler; }
+	void setShaderCompiler(ShaderCompiler* compiler) { m_shader_compiler = compiler; }
 	void setNotifications(Notifications* notifications) { m_notifications = notifications; }
 
 private:
@@ -62,7 +64,8 @@ private:
 	Lumix::WorldEditor* m_editor;
 	QString m_base_path;
 	Notifications* m_notifications;
-	ScriptCompiler* m_compiler;
+	ScriptCompiler* m_script_compiler;
+	ShaderCompiler* m_shader_compiler;
 	QList<struct ProcessInfo> m_processes;
 	QStringList m_extension_filter;
 	MainWindow& m_main_window;

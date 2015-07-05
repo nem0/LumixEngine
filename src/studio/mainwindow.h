@@ -56,6 +56,7 @@ private slots:
 	void on_actionProperties_triggered();
 	void on_actionE_xit_triggered();
 	void on_actionGame_view_triggered();
+	void on_actionShader_compiler_triggered();
 	void on_actionScript_compiler_triggered();
 	void on_actionFile_server_triggered();
 	void on_actionAsset_Browser_triggered();
@@ -85,6 +86,7 @@ private slots:
 	void on_actionSave_commands_triggered();
 	void on_actionExecute_commands_triggered();
 	void on_actionImport_asset_triggered();
+	void on_actionStats_triggered();
 
 
 private:
@@ -109,6 +111,7 @@ private:
 	Lumix::WorldEditor* m_world_editor;
 	class AnimationEditor* m_animation_editor;
 	class LogWidget* m_log;
+	class ShaderCompiler* m_shader_compiler;
 	PropertyView* m_property_view;
 	class SceneView* m_scene_view;
 	class GameView* m_game_view;

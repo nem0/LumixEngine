@@ -15,6 +15,7 @@
 #include "metadata.h"
 #include "notifications.h"
 #include "scripts/scriptcompiler.h"
+#include "shader_compiler.h"
 #include <qdesktopservices.h>
 #include <qfileiconprovider.h>
 #include <qfilesystemmodel.h>
@@ -208,7 +209,7 @@ AssetBrowser::AssetBrowser(MainWindow& main_window, QWidget* parent)
 	, m_ui(new Ui::AssetBrowser)
 	, m_main_window(main_window)
 {
-	m_watcher = FileSystemWatcher::create(Lumix::Path(QDir::currentPath().toLatin1().data()));
+	m_watcher = FileSystemWatcher::create(QDir::currentPath());
 	m_watcher->getCallback().bind<AssetBrowser, &AssetBrowser::onFileSystemWatcherCallback>(this);
 	m_base_path = QDir::currentPath();
 	m_editor = NULL;
@@ -233,6 +234,7 @@ AssetBrowser::AssetBrowser(MainWindow& main_window, QWidget* parent)
 
 AssetBrowser::~AssetBrowser()
 {
+	FileSystemWatcher::destroy(m_watcher);
 	delete m_ui;
 	delete m_model;
 	delete m_flat_filtered_model;
@@ -303,7 +305,7 @@ void AssetBrowser::onFileChanged(const QString& path)
 	QFileInfo info(path);
 	if (info.suffix() == "cpp")
 	{
-		m_compiler->onScriptChanged(info.fileName().toLatin1().data());
+		m_script_compiler->onScriptChanged(info.fileName().toLatin1().data());
 	}
 	else if(info.suffix() == "blend@")
 	{
