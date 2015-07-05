@@ -119,7 +119,7 @@ static void compilePass(QFileInfo& shader_file_info
 	, int define_mask
 	, const Lumix::ShaderCombinations::Defines& all_defines)
 {
-	for (int mask = 0; mask < 1 << sizeof(all_defines) / sizeof(all_defines[0]); ++mask)
+	for (int mask = 0; mask < 1 << lengthOf(all_defines); ++mask)
 	{
 		if ((mask & (~define_mask)) == 0)
 		{
@@ -142,7 +142,7 @@ static void compilePass(QFileInfo& shader_file_info
 			cmd.append(is_vertex_shader ? "vertex" : "fragment");
 			cmd.append(" -D ");
 			cmd.append(pass);
-			for (int i = 0; i < sizeof(all_defines) / sizeof(all_defines[0]); ++i)
+			for (int i = 0; i < lengthOf(all_defines); ++i)
 			{
 				if (mask & (1 << i))
 				{

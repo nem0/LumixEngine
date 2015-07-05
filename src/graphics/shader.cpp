@@ -37,7 +37,7 @@ Shader::~Shader()
 
 uint32_t Shader::getDefineMask(const char* define) const
 {
-	int c = sizeof(m_combintions.m_defines) / sizeof(m_combintions.m_defines[0]);
+	int c = lengthOf(m_combintions.m_defines);
 	for (int i = 0; i < c; ++i)
 	{
 		if (strcmp(define, m_combintions.m_defines[i]) == 0)
@@ -282,7 +282,7 @@ void Shader::doUnload(void)
 
 ShaderInstance::~ShaderInstance()
 {
-	for (int i = 0; i < sizeof(m_program_handles) / sizeof(m_program_handles[0]); ++i)
+	for (int i = 0; i < lengthOf(m_program_handles); ++i)
 	{
 		if (bgfx::isValid(m_program_handles[i]))
 		{
@@ -294,7 +294,7 @@ ShaderInstance::~ShaderInstance()
 
 static int indexOf(const ShaderCombinations::Passes& passes, const char* pass)
 {
-	for (int i = 0; i < sizeof(passes) / sizeof(passes[0]); ++i)
+	for (int i = 0; i < lengthOf(passes); ++i)
 	{
 		if (strcmp(passes[i], pass) == 0)
 		{

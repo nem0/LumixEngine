@@ -47,6 +47,7 @@ class Mesh
 			m_index_count = index_count;
 			m_name_hash = crc32(name);
 			m_name = name;
+			m_instance_idx = -1;
 		}
 
 		Material* getMaterial() const { return m_material; }
@@ -60,6 +61,8 @@ class Mesh
 		const char* getName() const { return m_name.c_str(); }
 		void setVertexDefinition(const bgfx::VertexDecl& def) { m_vertex_def = def; }
 		const bgfx::VertexDecl& getVertexDefinition() const { return m_vertex_def; }
+		int getInstanceIdx() const { return m_instance_idx; }
+		void setInstanceIdx(int value) { m_instance_idx = value; }
 
 	private:
 		Mesh(const Mesh&);
@@ -67,6 +70,7 @@ class Mesh
 
 	private:
 		bgfx::VertexDecl m_vertex_def;
+		int32_t m_instance_idx;
 		int32_t	m_attribute_array_offset;
 		int32_t m_attribute_array_size;
 		int32_t m_indices_offset;

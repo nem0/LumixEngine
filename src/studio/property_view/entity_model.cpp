@@ -31,7 +31,7 @@ static const char* component_map[] =
 
 static const char* getComponentName(Lumix::Component cmp)
 {
-	for (int i = 0; i < sizeof(component_map) / sizeof(component_map[0]); i += 2)
+	for (int i = 0; i < lengthOf(component_map); i += 2)
 	{
 		if (cmp.type == crc32(component_map[i + 1]))
 		{
@@ -432,12 +432,12 @@ void EntityModel::addComponent(QWidget* widget, QPoint pos)
 	};
 
 	CB* combobox = new CB(widget);
-	for (int i = 0; i < sizeof(component_map) / sizeof(component_map[0]); i += 2)
+	for (int i = 0; i < lengthOf(component_map); i += 2)
 	{
 		combobox->addItem(component_map[i]);
 	}
 	combobox->connect(combobox, (void (QComboBox::*)(int))&QComboBox::activated, [this, combobox](int value) {
-		for (int i = 0; i < sizeof(component_map) / sizeof(component_map[0]); i += 2)
+		for (int i = 0; i < lengthOf(component_map); i += 2)
 		{
 			if (combobox->itemText(value) == component_map[i])
 			{

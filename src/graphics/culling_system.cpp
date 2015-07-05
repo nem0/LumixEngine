@@ -170,7 +170,7 @@ namespace Lumix
 			int step = count / cpu_count;
 			int i = 0;
 			CullingJob* jobs[16];
-			ASSERT(sizeof(jobs) / sizeof(jobs[0]) >= cpu_count);
+			ASSERT(lengthOf(jobs) >= cpu_count);
 			for (; i < cpu_count - 1; i++)
 			{
 				m_result[i].clear();

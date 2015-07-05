@@ -44,7 +44,7 @@ bool EditorIcon::loadIcons(Engine& engine)
 
 void EditorIcon::unloadIcons()
 {
-	for (int i = 0; i < sizeof(icon_models) / sizeof(icon_models[0]); ++i)
+	for (int i = 0; i < lengthOf(icon_models); ++i)
 	{
 		icon_models[i]->getResourceManager().get(ResourceManager::MODEL)->unload(*icon_models[i]);
 	}
