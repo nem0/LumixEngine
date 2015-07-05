@@ -28,6 +28,12 @@
 
 const uint32_t LUMIX_MAX_PATH = 260;
 
+template <typename T, int count>
+int lengthOf(const T(&)[count])
+{
+	return count;
+};
+
 #ifndef ASSERT
 	#ifdef _WIN32
 		#ifdef NDEBUG

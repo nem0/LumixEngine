@@ -1,5 +1,5 @@
 #include "scriptcompiler.h"
-#include <qdiriterator.h>
+#include <qfileinfo.h>
 #include <qprocess.h>
 #include <qtextstream.h>
 #include "core/crc32.h"
@@ -148,7 +148,7 @@ void ScriptCompiler::compileModule(const QString& module_name)
 		"	<Import Project=\"$(VCTargetsPath)\\Microsoft.Cpp.props\"/>\n"
 		"	<ItemDefinitionGroup>\n"
 		"		<ClCompile>\n"
-		"			<AdditionalIncludeDirectories>%1\\src;%1\\external\\glew\\include</AdditionalIncludeDirectories>\n"
+		"			<AdditionalIncludeDirectories>%1\\src;</AdditionalIncludeDirectories>\n"
 		"		</ClCompile>\n"
 		"		<Link>\n"
 		"			<AdditionalDependencies>animation.lib;core.lib;engine.lib;physics.lib</AdditionalDependencies>\n"

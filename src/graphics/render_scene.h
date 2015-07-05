@@ -29,6 +29,7 @@ namespace Lumix
 	class Timer;
 	class Universe;
 
+
 	struct TerrainInfo
 	{
 		Shader* m_shader;
@@ -40,20 +41,15 @@ namespace Lumix
 		int m_index;
 	};
 
+
 	struct RenderableMesh
 	{
-		const Mesh* m_mesh;
+		Mesh* m_mesh;
 		const Pose* m_pose;
 		const Matrix* m_matrix;
 		const Model* m_model;
 	};
 
-	struct RenderableInfo
-	{
-		int64_t m_key;
-		const void* m_data;
-		int32_t m_type;
-	};
 
 	struct GrassInfo
 	{
@@ -61,7 +57,6 @@ namespace Lumix
 		Mesh* m_mesh;
 		const Matrix* m_matrices;
 		int m_matrix_count;
-		int m_mesh_copy_count;
 	};
 
 	
@@ -69,7 +64,7 @@ namespace Lumix
 	{
 		Vec3 m_from;
 		Vec3 m_to;
-		Vec3 m_color;
+		uint32_t m_color;
 		float m_life;
 	};
 
@@ -106,8 +101,11 @@ namespace Lumix
 			virtual void setDebugText(int id, const char* text) = 0;
 			virtual Geometry& getDebugTextGeometry() = 0;
 			virtual Mesh& getDebugTextMesh() = 0;
+			virtual const char* getDebugText(int index) = 0;
+
 			virtual BitmapFont* getDebugTextFont() = 0;
 			virtual void addDebugLine(const Vec3& from, const Vec3& to, const Vec3& color, float life) = 0;
+			virtual void addDebugLine(const Vec3& from, const Vec3& to, uint32_t color, float life) = 0;
 			virtual void addDebugCross(const Vec3& center, float size, const Vec3& color, float life) = 0;
 			virtual void addDebugCube(const Vec3& from, const Vec3& max, const Vec3& color, float life) = 0;
 			virtual void addDebugCircle(const Vec3& center, const Vec3& up, float radius, const Vec3& color, float life) = 0;
@@ -140,14 +138,14 @@ namespace Lumix
 			virtual void setRenderableLayer(Component cmp, const int32_t& layer) = 0;
 			virtual void setRenderablePath(Component cmp, const string& path) = 0;
 			virtual void setRenderableScale(Component cmp, float scale) = 0;
-			virtual void getRenderableInfos(const Frustum& frustum, Array<RenderableInfo>& infos, int64_t layer_mask) = 0;
+			virtual void getRenderableInfos(const Frustum& frustum, Array<const RenderableMesh*>& meshes, int64_t layer_mask) = 0;
 			virtual void getRenderableMeshes(Array<RenderableMesh>& meshes, int64_t layer_mask) = 0;
 			virtual Component getFirstRenderable() = 0;
 			virtual Component getNextRenderable(const Component& cmp) = 0;
 			virtual Model* getRenderableModel(Component cmp) = 0;
 
-			virtual void getGrassInfos(const Frustum& frustum, Array<RenderableInfo>& infos, int64_t layer_mask) = 0;
-			virtual void getTerrainInfos(Array<RenderableInfo>& infos, int64_t layer_mask, const Vec3& camera_pos, LIFOAllocator& allocator) = 0;
+			virtual void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, int64_t layer_mask) = 0;
+			virtual void getTerrainInfos(Array<const TerrainInfo*>& infos, int64_t layer_mask, const Vec3& camera_pos, LIFOAllocator& allocator) = 0;
 			virtual float getTerrainHeightAt(Component cmp, float x, float z) = 0;
 			virtual void setTerrainMaterial(Component cmp, const string& path) = 0;
 			virtual void getTerrainMaterial(Component cmp, string& path) = 0;
@@ -170,7 +168,7 @@ namespace Lumix
 
 			virtual Entity getPointLightEntity(Component cmp) = 0;
 			virtual void getPointLights(const Frustum& frustum, Array<Component>& lights) = 0;
-			virtual void getPointLightInfluencedGeometry(const Component& light_cmp, const Frustum& frustum, Array<RenderableInfo>& infos, int64_t layer_mask) = 0;
+			virtual void getPointLightInfluencedGeometry(const Component& light_cmp, const Frustum& frustum, Array<const RenderableMesh*>& infos, int64_t layer_mask) = 0;
 			virtual float getLightFOV(Component cmp) = 0;
 			virtual void setLightFOV(Component cmp, float fov) = 0;
 			virtual float getLightRange(Component cmp) = 0;

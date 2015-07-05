@@ -607,7 +607,7 @@ void EntityList::setWorldEditor(Lumix::WorldEditor& editor)
 	m_filter->setWorldEditor(editor);
 	m_ui->comboBox->clear();
 	m_ui->comboBox->addItem("All");
-	for (int i = 0; i < sizeof(component_map) / sizeof(component_map[0]); i += 2)
+	for (int i = 0; i < lengthOf(component_map); i += 2)
 	{
 		m_ui->comboBox->addItem(component_map[i]);
 	}
@@ -679,7 +679,7 @@ void EntityList::on_entityList_clicked(const QModelIndex &index)
 
 void EntityList::on_comboBox_activated(const QString &arg1)
 {
-	for (int i = 0; i < sizeof(component_map) / sizeof(component_map[0]); i += 2)
+	for (int i = 0; i < lengthOf(component_map); i += 2)
 	{
 		if (arg1 == component_map[i])
 		{

@@ -1,4 +1,5 @@
-#include "core/os_file.h"
+#include "core/fs/os_file.h"
+#include "core/iallocator.h"
 #include "core/lumix.h"
 
 #include <assert.h>
@@ -10,12 +11,12 @@ namespace Lumix
 	{
 		struct OsFileImpl
 		{
-			OsFileImpl(IAllocator* allocator)
+			OsFileImpl(IAllocator& allocator)
 				: m_allocator(allocator)
-			{}
+			{ }
 
+			IAllocator& m_allocator;
 			HANDLE m_file;
-			IAllocator* m_allocator;
 		};
 
 		OsFile::OsFile()
@@ -51,7 +52,7 @@ namespace Lumix
 					FILE_ATTRIBUTE_NORMAL,
 					NULL);
 			}
-			else if(Mode::RECREATE & mode)
+			else if (Mode::CREATE & mode)
 			{
 				hnd = ::CreateFile(path, 
 					Mode::WRITE & mode ? GENERIC_WRITE : 0 | Mode::READ & mode ? GENERIC_READ : 0,
@@ -68,8 +69,7 @@ namespace Lumix
 
 			if(INVALID_HANDLE_VALUE != hnd)
 			{
-				TODO("lock-free free list");
-				OsFileImpl* impl = allocator.newObject<OsFileImpl>(allocator); 
+				OsFileImpl* impl = allocator.newObject<OsFileImpl>(allocator);
 				impl->m_file = hnd;
 				m_impl = impl;
 

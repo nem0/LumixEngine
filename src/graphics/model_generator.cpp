@@ -25,7 +25,7 @@ namespace Lumix
 	}
 
 
-	Model* ModelGenerator::createModel(Material* material, const VertexDef& vertex_def, int* indices, int indices_size, unsigned char* attribute_array, int attributes_size)
+	Model* ModelGenerator::createModel(Material* material, const bgfx::VertexDecl& vertex_def, int* indices, int indices_size, unsigned char* attribute_array, int attributes_size)
 	{
 		char path[10];
 		path[0] = '*';

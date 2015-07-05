@@ -80,7 +80,6 @@ namespace Lumix
 			{
 				if (m_font)
 				{
-					m_font->getObserverCb().unbind<DebugTextsData, &DebugTextsData::fontLoaded>(this);
 					m_font->getResourceManager().get(ResourceManager::BITMAP_FONT)->unload(*m_font);
 				}
 				m_allocator.deleteObject(m_mesh);
@@ -94,7 +93,6 @@ namespace Lumix
 				debug_text.m_y = y;
 				int index = m_texts.insert(id, debug_text);
 				m_texts.at(index).m_text = text;
-				generate();
 				return id;
 			}
 
@@ -109,7 +107,6 @@ namespace Lumix
 				if (m_texts.at(index).m_text != text)
 				{
 					m_texts.at(index).m_text = text;
-					generate();
 				}
 			}
 
@@ -126,104 +123,11 @@ namespace Lumix
 			void setFont(const Path& path)
 			{
 				m_font = static_cast<BitmapFont*>(m_engine.getResourceManager().get(ResourceManager::BITMAP_FONT)->load(path));
-				m_font->onLoaded<DebugTextsData, &DebugTextsData::fontLoaded>(this);
 			}
 
 			
-			void fontLoaded(Resource::State, Resource::State new_state)
-			{
-				if (new_state == Resource::State::READY)
-				{
-					generate();
-				}
-			}
 
-
-			void generate()
-			{
-				if (!m_font || !m_font->isReady())
-				{
-					return;
-				}
-				int count = 0;
-				for (int i = 0; i < m_texts.size(); ++i)
-				{
-					count += m_texts.at(i).m_text.length() << 2;
-				}
-				VertexDef vertex_definition;
-				vertex_definition.addAttribute(m_engine.getRenderer(), "in_position", VertexAttributeDef::FLOAT2);
-				vertex_definition.addAttribute(m_engine.getRenderer(), "in_tex_coords", VertexAttributeDef::FLOAT2);
-				Array<int> indices(m_allocator);
-				Array<float> data(m_allocator);
-				indices.reserve(count);
-				data.reserve(count * 6);
-
-				int index = 0; 
-				for (int i = 0; i < m_texts.size(); ++i)
-				{
-					const DebugText& text = m_texts.at(i);
-					float x = (float)text.m_x;
-					float y = (float)text.m_y;
-					for (int j = 0; j < text.m_text.length(); ++j)
-					{
-						const BitmapFont::Character* c = m_font->getCharacter(text.m_text[j]);
-
-						if (c)
-						{
-							indices.push(index);
-							data.push(x);
-							data.push(y);
-							data.push(c->m_left);
-							data.push(c->m_bottom);
-							++index;
-
-							indices.push(index);
-							data.push(x + c->m_pixel_w);
-							data.push(y);
-							data.push(c->m_right);
-							data.push(c->m_bottom);
-							++index;
-
-							indices.push(index);
-							data.push(x + c->m_pixel_w);
-							data.push(y + c->m_pixel_h);
-							data.push(c->m_right);
-							data.push(c->m_top);
-							++index;
-
-							indices.push(index);
-							data.push(x);
-							data.push(y);
-							data.push(c->m_left);
-							data.push(c->m_bottom);
-							++index;
-
-							indices.push(index);
-							data.push(x + c->m_pixel_w);
-							data.push(y + c->m_pixel_h);
-							data.push(c->m_right);
-							data.push(c->m_top);
-							++index;
-
-							indices.push(index);
-							data.push(x);
-							data.push(y + c->m_pixel_h);
-							data.push(c->m_left);
-							data.push(c->m_top);
-							++index;
-
-							x += c->m_x_advance;
-						}
-					}
-				}
-				m_allocator.deleteObject(m_mesh);
-				if (!data.empty())
-				{
-					m_geometry.setAttributesData(&data[0], sizeof(data[0]) * data.size());
-					m_geometry.setIndicesData(&indices[0], sizeof(indices[0]) * indices.size());
-				}
-				m_mesh = m_allocator.newObject<Mesh>(vertex_definition, m_font->getMaterial(), 0, sizeof(data[0]) * data.size(), 0, indices.size(), "debug_texts", m_allocator);
-			}
+			AssociativeArray<int, DebugText>& getTexts() { return m_texts; }
 
 		private:
 			IAllocator& m_allocator;
@@ -412,7 +316,7 @@ namespace Lumix
 				float far_plane = m_cameras[camera.index].m_far;
 
 				Matrix projection_matrix;
-				Renderer::getProjectionMatrix(fov, width, height, near_plane, far_plane, &projection_matrix);
+				projection_matrix.setPerspective(Math::degreesToRadians(fov), width, height, near_plane, far_plane);
 				Matrix view_matrix = camera.entity.getMatrix();
 				view_matrix.inverse();
 				Matrix inverted = (projection_matrix * view_matrix);
@@ -438,21 +342,15 @@ namespace Lumix
 				m_applied_camera = cmp;
 				Matrix mtx;
 				cmp.entity.getMatrix(mtx);
-				float fov = m_cameras[cmp.index].m_fov;
-				float width = m_cameras[cmp.index].m_width;
-				float height = m_cameras[cmp.index].m_height;
-				float near_plane = m_cameras[cmp.index].m_near;
-				float far_plane = m_cameras[cmp.index].m_far;
-				m_renderer.setProjection(width, height, fov, near_plane, far_plane, mtx);
-
+				
 				m_camera_frustum.computePerspective(
 					mtx.getTranslation(),
 					mtx.getZVector(),
 					mtx.getYVector(),
-					fov,
-					width / height,
-					near_plane,
-					far_plane
+					m_cameras[cmp.index].m_fov,
+					m_cameras[cmp.index].m_width / m_cameras[cmp.index].m_height,
+					m_cameras[cmp.index].m_near,
+					m_cameras[cmp.index].m_far
 					);
 			}
 			
@@ -1069,7 +967,7 @@ namespace Lumix
 			}
 
 
-			virtual void getTerrainInfos(Array<RenderableInfo>& infos, int64_t layer_mask, const Vec3& camera_pos, LIFOAllocator& frame_allocator) override
+			virtual void getTerrainInfos(Array<const TerrainInfo*>& infos, int64_t layer_mask, const Vec3& camera_pos, LIFOAllocator& frame_allocator) override
 			{
 				PROFILE_FUNCTION();
 				infos.reserve(m_terrains.size());
@@ -1083,7 +981,7 @@ namespace Lumix
 			}
 
 
-			virtual void getGrassInfos(const Frustum& frustum, Array<RenderableInfo>& infos, int64_t layer_mask) override
+			virtual void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, int64_t layer_mask) override
 			{
 				PROFILE_FUNCTION();
 				for (int i = 0; i < m_terrains.size(); ++i)
@@ -1213,18 +1111,18 @@ namespace Lumix
 			}
 
 
-			void mergeTemporaryInfos(Array<RenderableInfo>& all_infos)
+			void mergeTemporaryInfos(Array<const RenderableMesh*>& all_infos)
 			{
 				PROFILE_FUNCTION();
 				all_infos.reserve(m_renderables.size() * 2);
 				for (int i = 0; i < m_temporary_infos.size(); ++i)
 				{
-					Array<RenderableInfo>& subinfos = m_temporary_infos[i];
+					Array<const RenderableMesh*>& subinfos = m_temporary_infos[i];
 					if (!subinfos.empty())
 					{
 						int size = all_infos.size();
 						all_infos.resize(size + subinfos.size());
-						memcpy(&all_infos[0] + size, &subinfos[0], sizeof(RenderableInfo) * subinfos.size());
+						memcpy(&all_infos[0] + size, &subinfos[0], sizeof(subinfos[0]) * subinfos.size());
 					}
 				}
 			}
@@ -1259,7 +1157,7 @@ namespace Lumix
 				}
 				for (int subresult_index = 0; subresult_index < results.size(); ++subresult_index)
 				{
-					Array<RenderableInfo>& subinfos = m_temporary_infos[subresult_index];
+					Array<const RenderableMesh*>& subinfos = m_temporary_infos[subresult_index];
 					subinfos.clear();
 					MTJD::Job* job = MTJD::makeJob(m_engine.getMTJDManager(), [&subinfos, layer_mask, this, &results, subresult_index, &frustum]()
 						{
@@ -1275,10 +1173,7 @@ namespace Lumix
 									LODMeshIndices lod = model->getLODMeshIndices(squared_distance);
 									for (int j = lod.getFrom(), c = lod.getTo(); j <= c; ++j)
 									{
-										RenderableInfo& info = subinfos.pushEmpty();
-										info.m_data = &renderable->m_meshes[j];
-										info.m_type = (int32_t)(renderable->m_pose.getCount() > 0 ? RenderableType::SKINNED_MESH : RenderableType::RIGID_MESH);
-										info.m_key = (int64_t)renderable->m_meshes[j].m_mesh;
+										subinfos.push(&renderable->m_meshes[j]);
 									}
 								}
 							}
@@ -1312,7 +1207,7 @@ namespace Lumix
 			}
 
 
-			virtual void getPointLightInfluencedGeometry(const Component& light_cmp, const Frustum& frustum, Array<RenderableInfo>& infos, int64_t layer_mask)
+			virtual void getPointLightInfluencedGeometry(const Component& light_cmp, const Frustum& frustum, Array<const RenderableMesh*>& infos, int64_t layer_mask)
 			{
 				PROFILE_FUNCTION();
 
@@ -1326,17 +1221,14 @@ namespace Lumix
 					{
 						for (int k = 0, kc = renderable->m_meshes.size(); k < kc; ++k)
 						{
-							RenderableInfo& info = infos.pushEmpty();
-							info.m_data = &renderable->m_meshes[k];
-							info.m_type = (int32_t)(renderable->m_pose.getCount() > 0 ? RenderableType::SKINNED_MESH : RenderableType::RIGID_MESH);
-							info.m_key = (int64_t)renderable->m_meshes[k].m_mesh;
+							infos.push(&renderable->m_meshes[k]);
 						}
 					}
 				}
 			}
 
 			
-			virtual void getRenderableInfos(const Frustum& frustum, Array<RenderableInfo>& all_infos, int64_t layer_mask) override
+			virtual void getRenderableInfos(const Frustum& frustum, Array<const RenderableMesh*>& meshes, int64_t layer_mask) override
 			{
 				PROFILE_FUNCTION();
 
@@ -1347,7 +1239,7 @@ namespace Lumix
 				}
 
 				fillTemporaryInfos(*results, frustum, layer_mask);
-				mergeTemporaryInfos(all_infos);
+				mergeTemporaryInfos(meshes);
 
 				for (int i = 0, c = m_always_visible.size(); i < c; ++i)
 				{
@@ -1357,10 +1249,7 @@ namespace Lumix
 					{
 						for (int j = 0, c = renderable->m_meshes.size(); j < c; ++j)
 						{
-							RenderableInfo& info = all_infos.pushEmpty();
-							info.m_data = &renderable->m_meshes[j];
-							info.m_type = (int32_t)(renderable->m_pose.getCount() > 0 ? RenderableType::SKINNED_MESH : RenderableType::RIGID_MESH);
-							info.m_key = (int64_t)renderable->m_meshes[j].m_mesh;
+							meshes.push(&renderable->m_meshes[j]);
 						}
 					}
 				}
@@ -1469,6 +1358,14 @@ namespace Lumix
 			virtual Geometry& getDebugTextGeometry() override
 			{
 				return m_debug_texts.getGeometry();
+			}
+
+
+			virtual const char* getDebugText(int index) override
+			{
+				if (index < m_debug_texts.getTexts().size())
+					return m_debug_texts.getTexts().at(index).m_text.c_str();
+				return nullptr;
 			}
 
 
@@ -1669,10 +1566,22 @@ namespace Lumix
 				DebugLine& line = m_debug_lines.pushEmpty();
 				line.m_from = from;
 				line.m_to = to;
-				line.m_color = color;
+				line.m_color = ((uint8_t)(color.x * 255) << 24)
+					| ((uint8_t)(color.y * 255) << 16)
+					| ((uint8_t)(color.z * 255) << 8) 
+					| 255;
 				line.m_life = life;
 			}
 
+
+			virtual void addDebugLine(const Vec3& from, const Vec3& to, uint32_t color, float life) override
+			{
+				DebugLine& line = m_debug_lines.pushEmpty();
+				line.m_from = from;
+				line.m_to = to;
+				line.m_color = color;
+				line.m_life = life;
+			}
 
 			virtual RayCastModelHit castRayTerrain(const Component& terrain, const Vec3& origin, const Vec3& dir) override
 			{
@@ -2069,7 +1978,7 @@ namespace Lumix
 			DebugTextsData m_debug_texts;
 			CullingSystem* m_culling_system;
 			DynamicRenderableCache m_dynamic_renderable_cache;
-			Array<Array<RenderableInfo> > m_temporary_infos;
+			Array<Array<const RenderableMesh*> > m_temporary_infos;
 			MTJD::Group m_sync_point;
 			Array<MTJD::Job*> m_jobs;
 			float m_time;

@@ -50,6 +50,7 @@
     <addaction name="actionLook_at_selected_entity"/>
     <addaction name="actionSave_Layout"/>
     <addaction name="actionPolygon_Mode"/>
+    <addaction name="actionStats"/>
    </widget>
    <widget class="QMenu" name="menuFile">
     <property name="title">
@@ -364,6 +365,11 @@
   <action name="actionImport_asset">
    <property name="text">
     <string>Import asset</string>
+   </property>
+  </action>
+  <action name="actionStats">
+   <property name="text">
+    <string>Stats</string>
    </property>
   </action>
  </widget>

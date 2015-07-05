@@ -13,30 +13,34 @@ class Engine;
 struct Entity;
 class IRenderDevice;
 class Model;
-class Renderer;
 class RenderScene;
 
 
 class EditorIcon
 {
-	enum Type
-	{
-		PHYSICAL_CONTROLLER,
-		PHYSICAL_BOX,
-		CAMERA,
-		LIGHT,
-		TERRAIN,
-		ENTITY,
-		COUNT
-	};
+	public:
+		enum Type
+		{
+			PHYSICAL_CONTROLLER,
+			PHYSICAL_BOX,
+			CAMERA,
+			LIGHT,
+			TERRAIN,
+			ENTITY,
+			COUNT
+		};
+
 	public:
 		EditorIcon(Engine& engine, RenderScene& scene, const Entity& entity);
 		~EditorIcon();
-		void render(Renderer* renderer, IRenderDevice& render_device);
+		void render(IRenderDevice& render_device);
 		void show();
 		void hide();
 		float hit(const Vec3& origin, const Vec3& dir) const;
 		Entity getEntity() const { return m_entity; }
+
+		static bool loadIcons(Engine& engine);
+		static void unloadIcons();
 
 	private:
 		RenderScene* m_scene;

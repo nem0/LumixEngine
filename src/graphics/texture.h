@@ -3,7 +3,7 @@
 
 #include "core/string.h"
 #include "core/resource.h"
-#include "graphics/gl_ext.h"
+#include <bgfx.h>
 
 
 namespace Lumix
@@ -21,7 +21,6 @@ class LUMIX_ENGINE_API Texture : public Resource
 		~Texture();
 
 		bool create(int w, int h);
-		void apply(int unit = 0);
 		int getWidth() const { return m_width; }
 		int getHeight() const { return m_height; }
 		int getBytesPerPixel() const { return m_BPP; }
@@ -32,6 +31,7 @@ class LUMIX_ENGINE_API Texture : public Resource
 		void onDataUpdated();
 		void save();
 		uint32_t getPixel(float x, float y) const;
+		bgfx::TextureHandle getTextureHandle() const { return m_texture_handle; }
 
 		static bool saveTGA(IAllocator& allocator, FS::IFile* file, int width, int height, int bits_per_pixel, const uint8_t* data, const Path& path);
 		static unsigned int compareTGA(IAllocator& allocator, FS::IFile* file1, FS::IFile* file2, int difference);
@@ -47,13 +47,12 @@ class LUMIX_ENGINE_API Texture : public Resource
 
 	private:
 		IAllocator& m_allocator;
-		GLuint m_id;
 		int m_width;
 		int m_height;
 		int m_BPP;
 		int m_data_reference;
 		Array<uint8_t> m_data;
-		bool m_is_cubemap;
+		bgfx::TextureHandle m_texture_handle;
 };
 
 

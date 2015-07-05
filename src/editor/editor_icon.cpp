@@ -10,17 +10,50 @@
 #include "graphics/material.h"
 #include "graphics/model.h"
 #include "graphics/pipeline.h"
-#include "graphics/renderer.h"
+#include "graphics/render_scene.h"
 #include "world_editor.h"
-
-#include <gl/GL.h>
 
 namespace Lumix
 {
 
 
+static const char* ICON_NAMES[EditorIcon::COUNT] = {
+	"models/editor/phy_controller_icon.msh",
+	"models/editor/phy_box_icon.msh",
+	"models/editor/camera_icon.msh",
+	"models/editor/directional_light_icon.msh",
+	"models/editor/terrain_icon.msh",
+	"models/editor/icon.msh"
+};
+
+
+static Model* icon_models[EditorIcon::COUNT];
+
+
+bool EditorIcon::loadIcons(Engine& engine)
+{
+	bool status = true;
+	for (int i = 0; i < sizeof(ICON_NAMES) / sizeof(ICON_NAMES[0]); ++i)
+	{
+		icon_models[i] = static_cast<Model*>(engine.getResourceManager().get(ResourceManager::MODEL)->load(Path(ICON_NAMES[i])));
+		status = status && icon_models[i];
+	}
+	return status;
+}
+
+
+void EditorIcon::unloadIcons()
+{
+	for (int i = 0; i < lengthOf(icon_models); ++i)
+	{
+		icon_models[i]->getResourceManager().get(ResourceManager::MODEL)->unload(*icon_models[i]);
+	}
+}
+
+
 EditorIcon::EditorIcon(Engine& engine, RenderScene& scene, const Entity& entity)
 {
+	m_scale = 1;
 	m_scene = &scene;
 	m_entity = entity;
 	m_is_visible = true;
@@ -54,15 +87,7 @@ EditorIcon::EditorIcon(Engine& engine, RenderScene& scene, const Entity& entity)
 			break;
 		}
 	}
-	const char* names[COUNT] = {
-		"models/editor/phy_controller_icon.msh",
-		"models/editor/phy_box_icon.msh",
-		"models/editor/camera_icon.msh",
-		"models/editor/directional_light_icon.msh",
-		"models/editor/terrain_icon.msh",
-		"models/editor/icon.msh"
-	};
-	m_model = static_cast<Model*>(engine.getResourceManager().get(ResourceManager::MODEL)->load(Path(names[m_type])));
+	m_model = static_cast<Model*>(engine.getResourceManager().get(ResourceManager::MODEL)->load(Path(ICON_NAMES[m_type])));
 }
 
 
@@ -99,7 +124,7 @@ float EditorIcon::hit(const Vec3& origin, const Vec3& dir) const
 }
 
 
-void EditorIcon::render(Renderer* renderer, IRenderDevice& render_device)
+void EditorIcon::render(IRenderDevice& render_device)
 {
 	if (m_is_visible)
 	{
@@ -118,7 +143,7 @@ void EditorIcon::render(Renderer* renderer, IRenderDevice& render_device)
 
 		if (m_model->isReady())
 		{
-			renderer->renderModel(*m_model, mtx, render_device.getPipeline());
+			render_device.getPipeline().renderModel(*m_model, mtx);
 		}
 	}
 }

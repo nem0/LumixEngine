@@ -11,7 +11,8 @@
 #include "engine/engine.h"
 #include "graphics/irender_device.h"
 #include "graphics/model.h"
-#include "graphics/renderer.h"
+#include "graphics/pipeline.h"
+#include "graphics/render_scene.h"
 #include "universe/universe.h"
 
 
@@ -38,15 +39,14 @@ Gizmo::~Gizmo()
 
 void Gizmo::destroy()
 {
-	m_renderer->getEngine().getResourceManager().get(ResourceManager::MODEL)->unload(*m_model);
+	m_editor.getEngine().getResourceManager().get(ResourceManager::MODEL)->unload(*m_model);
 }
 
 
-void Gizmo::create(Renderer& renderer)
+void Gizmo::create()
 {
 	m_scale = 1;
-	m_renderer = &renderer;
-	m_model = static_cast<Model*>(renderer.getEngine().getResourceManager().get(ResourceManager::MODEL)->load(Path("models/editor/gizmo.msh")));
+	m_model = static_cast<Model*>(m_editor.getEngine().getResourceManager().get(ResourceManager::MODEL)->load(Path("models/editor/gizmo.msh")));
 }
 
 
@@ -162,7 +162,7 @@ RayCastModelHit Gizmo::castRay(const Vec3& origin, const Vec3& dir)
 }
 
 
-void Gizmo::render(Renderer& renderer, IRenderDevice& render_device)
+void Gizmo::render(IRenderDevice& render_device)
 {
 	if(!m_editor.getSelectedEntities().empty())
 	{
@@ -171,7 +171,7 @@ void Gizmo::render(Renderer& renderer, IRenderDevice& render_device)
 		Matrix gizmo_mtx;
 		getMatrix(gizmo_mtx);
 		Matrix mtx = gizmo_mtx * scale_mtx;
-		renderer.renderModel(*m_model, mtx, render_device.getPipeline());
+		render_device.getPipeline().renderModel(*m_model, mtx);
 	}
 }
 

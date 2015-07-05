@@ -17,7 +17,6 @@ public:
 		if(pipeline_object)
 		{
 			m_pipeline = Lumix::PipelineInstance::create(*pipeline_object, engine.getAllocator());
-			m_pipeline->setRenderer(engine.getRenderer());
 		}
 
 	}
@@ -35,14 +34,13 @@ public:
 	virtual void beginFrame() override
 	{
 		PROFILE_FUNCTION();
-		wglMakeCurrent(m_hdc, m_opengl_context);
 	}
 
 
 	virtual void endFrame() override
 	{
 		PROFILE_FUNCTION();
-		wglSwapLayerBuffers(m_hdc, WGL_SWAP_MAIN_PLANE);
+		Lumix::Renderer::frame();
 	}
 
 
@@ -65,6 +63,4 @@ public:
 
 
 	Lumix::PipelineInstance* m_pipeline;
-	HDC m_hdc;
-	HGLRC m_opengl_context;
 };
