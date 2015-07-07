@@ -444,7 +444,7 @@ namespace Lumix
 											float x = quad_x + dx + step * (rand() % 100 - 50) / 100.0f;
 											float z = quad_z + dz + step * (rand() % 100 - 50) / 100.0f;
 											grass_mtx.setTranslation(Vec3(x, getHeight(x, z), z));
-											Quat q(Vec3(0, 1, 0), Math::degreesToRadians(rand() % 360));
+											Quat q(Vec3(0, 1, 0), Math::degreesToRadians((float)(rand() % 360)));
 											Matrix rotMatrix;
 											q.toMatrix(rotMatrix);
 											grass_mtx = mtx * grass_mtx * rotMatrix;

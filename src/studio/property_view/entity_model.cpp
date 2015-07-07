@@ -330,7 +330,7 @@ void EntityModel::addArrayProperty(Node& child, Lumix::IArrayDescriptor* array_d
 {
 	child.onCreateEditor = [cmp, array_desc](QWidget* parent, const QStyleOptionViewItem&) {
 		auto button = new QPushButton(" + ", parent);
-		connect(button, &QPushButton::clicked, [cmp, array_desc](){ array_desc->addArrayItem(cmp, -1); });
+		button->connect(button, &QPushButton::clicked, [cmp, array_desc](){ array_desc->addArrayItem(cmp, -1); });
 		return button;
 	};
 	child.m_setter = [](const QVariant&){};
