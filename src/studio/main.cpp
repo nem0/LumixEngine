@@ -195,7 +195,8 @@ class App
 			float fps = m_world_editor->getEngine().getFPS();
 			Lumix::copyString(stats, sizeof(stats), "FPS: ");
 			Lumix::toCString(fps, stats + strlen(stats), sizeof(stats) - strlen(stats), 1);
-			static_cast<Lumix::RenderScene*>(m_world_editor->getEngine().getScene(crc32("renderer")))->setDebugText(m_world_editor->getFPSText(), stats);
+			
+			static_cast<Lumix::RenderScene*>(m_world_editor->getEngine().getScene(crc32("renderer")))->addDebugText(stats, 0, 0);
 		}
 
 
