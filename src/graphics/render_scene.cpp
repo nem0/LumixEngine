@@ -61,84 +61,7 @@ namespace Lumix
 			int m_y;
 	};
 
-
-	class DebugTextsData
-	{
-		public:
-			DebugTextsData(Engine& engine, IAllocator& allocator)
-				: m_texts(allocator)
-				, m_allocator(allocator)
-				, m_font(NULL)
-				, m_engine(engine)
-				, m_mesh(NULL)
-			{
-				setFont(Path("fonts/debug_font.fnt"));
-			}
-
-
-			~DebugTextsData()
-			{
-				if (m_font)
-				{
-					m_font->getResourceManager().get(ResourceManager::BITMAP_FONT)->unload(*m_font);
-				}
-				m_allocator.deleteObject(m_mesh);
-			}
-
-			int addText(const char* text, int x, int y)
-			{
-				int id = m_texts.size() == 0 ? 0 : m_texts.getKey(m_texts.size() - 1) + 1;
-				DebugText debug_text(m_allocator);
-				debug_text.m_x = x;
-				debug_text.m_y = y;
-				int index = m_texts.insert(id, debug_text);
-				m_texts.at(index).m_text = text;
-				return id;
-			}
-
-
-			void setText(int id, const char* text)
-			{
-				int index = m_texts.find(id);
-				if (index < 0)
-				{
-					return;
-				}
-				if (m_texts.at(index).m_text != text)
-				{
-					m_texts.at(index).m_text = text;
-				}
-			}
-
-
-			Geometry& getGeometry() { return m_geometry; }
-
-
-			Mesh& getMesh() { return *m_mesh; }
-
-
-			BitmapFont* getFont() const { return m_font; }
-
-
-			void setFont(const Path& path)
-			{
-				m_font = static_cast<BitmapFont*>(m_engine.getResourceManager().get(ResourceManager::BITMAP_FONT)->load(path));
-			}
-
-			
-
-			AssociativeArray<int, DebugText>& getTexts() { return m_texts; }
-
-		private:
-			IAllocator& m_allocator;
-			Engine& m_engine;
-			AssociativeArray<int, DebugText> m_texts;
-			Geometry m_geometry;
-			Mesh* m_mesh;
-			BitmapFont* m_font;
-	};
-
-
+	
 	struct Renderable
 	{
 		Renderable(IAllocator& allocator) : m_pose(allocator), m_meshes(allocator) {}
@@ -251,7 +174,6 @@ namespace Lumix
 				, m_temporary_infos(m_allocator)
 				, m_sync_point(true, m_allocator)
 				, m_jobs(m_allocator)
-				, m_debug_texts(engine, m_allocator)
 				, m_active_global_light_uid(-1)
 				, m_global_light_last_uid(-1)
 				, m_point_light_last_uid(-1)
@@ -1343,41 +1265,9 @@ namespace Lumix
 			}
 
 
-			virtual int addDebugText(const char* text, int x, int y) override
+			virtual void addDebugText(const char* text, int x, int y) override
 			{
-				return m_debug_texts.addText(text, x, y);
-			}
-
-
-			virtual void setDebugText(int id, const char* text) override
-			{
-				return m_debug_texts.setText(id, text);
-			}
-
-
-			virtual Geometry& getDebugTextGeometry() override
-			{
-				return m_debug_texts.getGeometry();
-			}
-
-
-			virtual const char* getDebugText(int index) override
-			{
-				if (index < m_debug_texts.getTexts().size())
-					return m_debug_texts.getTexts().at(index).m_text.c_str();
-				return nullptr;
-			}
-
-
-			virtual Mesh& getDebugTextMesh() override
-			{
-				return m_debug_texts.getMesh();
-			}
-
-
-			virtual BitmapFont* getDebugTextFont() override
-			{
-				return m_debug_texts.getFont();
+				bgfx::dbgTextPrintf(x, y, 0x4f, text);
 			}
 
 
@@ -1975,7 +1865,6 @@ namespace Lumix
 			Renderer& m_renderer;
 			Engine& m_engine;
 			Array<DebugLine> m_debug_lines;
-			DebugTextsData m_debug_texts;
 			CullingSystem* m_culling_system;
 			DynamicRenderableCache m_dynamic_renderable_cache;
 			Array<Array<const RenderableMesh*> > m_temporary_infos;

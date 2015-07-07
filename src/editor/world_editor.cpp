@@ -2607,7 +2607,6 @@ struct WorldEditorImpl : public WorldEditor
 				scene->setCameraSlot(cmp, string("editor", m_allocator));
 			}
 			RenderScene* scene = static_cast<RenderScene*>(m_engine->getScene(crc32("renderer")));
-			m_fps_text = scene->addDebugText("FPS: 0", 0, 0);
 		}
 
 
@@ -2726,12 +2725,6 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
-		virtual int getFPSText() const override
-		{
-			return m_fps_text;
-		}
-
-
 		virtual bool runTest(const Path& undo_stack_path, const Path& result_universe_path) override
 		{
 			newUniverse();
@@ -2792,7 +2785,6 @@ struct WorldEditorImpl : public WorldEditor
 		FS::IFile* m_game_mode_file;
 		Engine* m_engine;
 		Entity m_camera;
-		int m_fps_text;
 		DelegateList<void()> m_universe_destroyed;
 		DelegateList<void()> m_universe_created;
 		DelegateList<void()> m_universe_loaded;

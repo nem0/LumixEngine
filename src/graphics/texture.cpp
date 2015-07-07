@@ -375,7 +375,10 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 
 void Texture::doUnload(void)
 {
-	bgfx::destroyTexture(m_texture_handle);
+	if (bgfx::isValid(m_texture_handle))
+	{
+		bgfx::destroyTexture(m_texture_handle);
+	}
 	m_data.clear();
 	m_size = 0;
 	onEmpty();

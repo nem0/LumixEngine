@@ -524,18 +524,6 @@ namespace Lumix
 		}
 
 
-		void renderDebugTexts()
-		{
-			bgfx::dbgTextClear();
-			int i = 0;
-			while (const char* text = m_scene->getDebugText(i))
-			{
-				bgfx::dbgTextPrintf(1, 1, 0x4f, text);
-				++i;
-			}
-		}
-
-
 		void renderDebugLines()
 		{
 			const Array<DebugLine>& lines = m_scene->getDebugLines();
@@ -1261,12 +1249,6 @@ namespace Lumix
 		}
 
 
-		void renderDebugTexts(PipelineInstanceImpl* pipeline)
-		{
-			pipeline->renderDebugTexts();
-		}
-
-
 		void renderShadowmap(PipelineInstanceImpl* pipeline, int64_t layer_mask, const char* slot)
 		{
 			pipeline->renderShadowmap(pipeline->getScene()->getCameraInSlot(slot), layer_mask);
@@ -1401,7 +1383,6 @@ namespace Lumix
 		registerCFunction("bindFramebufferTexture", LuaWrapper::wrap<decltype(&LuaAPI::bindFramebufferTexture), LuaAPI::bindFramebufferTexture>);
 		registerCFunction("executeCustomCommand", LuaWrapper::wrap<decltype(&LuaAPI::executeCustomCommand), LuaAPI::executeCustomCommand>);
 		registerCFunction("renderDebugLines", LuaWrapper::wrap<decltype(&LuaAPI::renderDebugLines), LuaAPI::renderDebugLines>);
-		registerCFunction("renderDebugTexts", LuaWrapper::wrap<decltype(&LuaAPI::renderDebugTexts), LuaAPI::renderDebugTexts>);
 	}
 
 

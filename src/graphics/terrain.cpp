@@ -444,7 +444,10 @@ namespace Lumix
 											float x = quad_x + dx + step * (rand() % 100 - 50) / 100.0f;
 											float z = quad_z + dz + step * (rand() % 100 - 50) / 100.0f;
 											grass_mtx.setTranslation(Vec3(x, getHeight(x, z), z));
-											grass_mtx = mtx * grass_mtx;
+											Quat q(Vec3(0, 1, 0), Math::degreesToRadians(rand() % 360));
+											Matrix rotMatrix;
+											q.toMatrix(rotMatrix);
+											grass_mtx = mtx * grass_mtx * rotMatrix;
 											grass_mtx.multiply3x3(density + (rand() % 20 - 10) / 100.0f);
 										}
 
@@ -819,18 +822,27 @@ namespace Lumix
 		if (new_state == Resource::State::READY)
 		{
 			m_heightmap = m_material->getTextureByUniform("u_heightmap");
+			bool is_data_ready = true;
 			if (m_heightmap && m_heightmap->getData() == nullptr)
 			{
 				m_heightmap->addDataReference();
-				return;
+				is_data_ready = false;
 			}
 			m_splatmap = m_material->getTextureByUniform("u_splatmap");
-			m_allocator.deleteObject(m_root);
-			if (m_heightmap && m_splatmap)
+			if (m_splatmap && m_splatmap->getData() == nullptr)
 			{
-				m_width = m_heightmap->getWidth();
-				m_height = m_heightmap->getHeight();
-				m_root = generateQuadTree((float)m_width);
+				m_splatmap->addDataReference();
+				is_data_ready = false;
+			}
+			if (is_data_ready)
+			{
+				m_allocator.deleteObject(m_root);
+				if (m_heightmap && m_splatmap)
+				{
+					m_width = m_heightmap->getWidth();
+					m_height = m_heightmap->getHeight();
+					m_root = generateQuadTree((float)m_width);
+				}
 			}
 		}
 	}
