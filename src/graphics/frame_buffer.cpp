@@ -18,7 +18,7 @@ FrameBuffer::FrameBuffer(const Declaration& decl)
 	for (int i = 0; i < decl.m_renderbuffers_count; ++i)
 	{
 		const RenderBuffer& renderbuffer = decl.m_renderbuffers[i];
-		texture_handles[i] = bgfx::createTexture2D(decl.m_width, decl.m_height, 1, renderbuffer.m_format, renderbuffer.isDepth() ? 0 : 0);
+		texture_handles[i] = bgfx::createTexture2D(decl.m_width, decl.m_height, 1, renderbuffer.m_format, 0);
 		m_declaration.m_renderbuffers[i].m_handle = texture_handles[i];
 	}
 

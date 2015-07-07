@@ -138,7 +138,7 @@ static void compilePass(QFileInfo& shader_file_info
 			cmd.append(shader_file_info.baseName() + "_" + pass);
 			cmd.append(QString::number(mask));
 			cmd.append(is_vertex_shader ? "_vs.shb" : "_fs.shb");
-			cmd.append(" --depends --platform linux --profile 100 --type ");
+			cmd.append(" --depends --platform linux --profile 130 --type ");
 			cmd.append(is_vertex_shader ? "vertex" : "fragment");
 			cmd.append(" -D ");
 			cmd.append(pass);
