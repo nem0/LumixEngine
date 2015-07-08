@@ -121,62 +121,119 @@ void Shader::parseTextureSlots(lua_State* L)
 }
 
 
-bgfx::ProgramHandle Shader::createProgram(int pass_idx, int mask) const
+struct ShaderLoader
 {
-	char shader_name[LUMIX_MAX_PATH];
-	PathUtils::getBasename(shader_name, sizeof(shader_name), getPath().c_str());
-
-	const char* pass = m_combintions.m_passes[pass_idx];
-	char path[LUMIX_MAX_PATH];
-	copyString(path, sizeof(path), "shaders/compiled/");
-	catCString(path, sizeof(path), shader_name);
-	catCString(path, sizeof(path), "_");
-	catCString(path, sizeof(path), pass);
-	char mask_str[10];
-	int actual_mask = mask & m_combintions.m_vs_combinations[pass_idx];
-	toCString(actual_mask, mask_str, sizeof(mask_str));
-	catCString(path, sizeof(path), mask_str);
-	catCString(path, sizeof(path), "_vs.shb");
-	
-	auto fp = fopen(path, "rb");
-	if (!fp)
+	ShaderLoader(Shader& shader, int pass_idx, int mask, ShaderInstance* instance, int global_idx, IAllocator& allocator)
+		: m_allocator(allocator)
+		, m_shader(shader)
+		, m_pass_idx(pass_idx)
+		, m_mask(mask)
+		, m_shader_instance(instance)
+		, m_global_idx(global_idx)
 	{
-		return BGFX_INVALID_HANDLE;
+		m_loaded = 0;
+		m_fs_callback.bind<ShaderLoader, &ShaderLoader::onFSLoaded>(this);
+		m_vs_callback.bind<ShaderLoader, &ShaderLoader::onVSLoaded>(this);
+		m_fragment_shader = BGFX_INVALID_HANDLE;
+		m_vertex_shader = BGFX_INVALID_HANDLE;
 	}
-	fseek(fp, 0, SEEK_END);
-	auto s = ftell(fp);
-	auto* mem = bgfx::alloc(s + 1);
-	fseek(fp, 0, SEEK_SET);
-	fread(mem->data, s, 1, fp);
-	mem->data[s] = '\0';
-	auto vs = bgfx::createShader(mem);
-	fclose(fp);
 
-	copyString(path, sizeof(path), "shaders/compiled/");
-	catCString(path, sizeof(path), shader_name);
-	catCString(path, sizeof(path), "_");
-	catCString(path, sizeof(path), pass);
-	actual_mask = mask & m_combintions.m_fs_combinations[pass_idx];
-	toCString(actual_mask, mask_str, sizeof(mask_str));
-	catCString(path, sizeof(path), mask_str);
-	catCString(path, sizeof(path), "_fs.shb");
-
-	fp = fopen(path, "rb");
-	if (!fp)
+	bool load()
 	{
-		return BGFX_INVALID_HANDLE;
-	}
-	fseek(fp, 0, SEEK_END);
-	s = ftell(fp);
-	mem = bgfx::alloc(s + 1);
-	fseek(fp, 0, SEEK_SET);
-	fread(mem->data, s, 1, fp);
-	mem->data[s] = '\0';
-	auto ps = bgfx::createShader(mem);
-	fclose(fp);
+		char shader_name[LUMIX_MAX_PATH];
+		PathUtils::getBasename(shader_name, sizeof(shader_name), m_shader.getPath().c_str());
 
-	return bgfx::createProgram(vs, ps, false);
-}
+		const char* pass = m_shader.m_combintions.m_passes[m_pass_idx];
+		char path[LUMIX_MAX_PATH];
+		copyString(path, sizeof(path), "shaders/compiled/");
+		catCString(path, sizeof(path), shader_name);
+		catCString(path, sizeof(path), "_");
+		catCString(path, sizeof(path), pass);
+		char mask_str[10];
+		int actual_mask = m_mask & m_shader.m_combintions.m_vs_combinations[m_pass_idx];
+		toCString(actual_mask, mask_str, sizeof(mask_str));
+		catCString(path, sizeof(path), mask_str);
+		catCString(path, sizeof(path), "_vs.shb");
+
+		FS::FileSystem& fs = m_shader.m_resource_manager.getFileSystem();
+		bool success = fs.openAsync(fs.getDefaultDevice(), path, FS::Mode::READ | FS::Mode::OPEN, m_vs_callback);
+		if (!success)
+		{
+			++m_loaded;
+		}
+
+		copyString(path, sizeof(path), "shaders/compiled/");
+		catCString(path, sizeof(path), shader_name);
+		catCString(path, sizeof(path), "_");
+		catCString(path, sizeof(path), pass);
+		actual_mask = m_mask & m_shader.m_combintions.m_fs_combinations[m_pass_idx];
+		toCString(actual_mask, mask_str, sizeof(mask_str));
+		catCString(path, sizeof(path), mask_str);
+		catCString(path, sizeof(path), "_fs.shb");
+
+		if (!fs.openAsync(fs.getDefaultDevice(), path, FS::Mode::READ | FS::Mode::OPEN, m_fs_callback))
+		{
+			success = false;
+			checkFinish();
+		}
+		m_shader.incrementDepCount();
+		return success;
+	}
+
+	void onFSLoaded(FS::IFile* file, bool success, FS::FileSystem& fs)
+	{
+		if (success)
+		{
+			auto* mem = bgfx::alloc(file->size() + 1);
+			file->read(mem->data, file->size());
+			mem->data[file->size()] = '\0';
+			m_fragment_shader = bgfx::createShader(mem);
+		}
+		checkFinish();
+	}
+
+	void onVSLoaded(FS::IFile* file, bool success, FS::FileSystem& fs)
+	{
+		if (success)
+		{
+			auto* mem = bgfx::alloc(file->size() + 1);
+			file->read(mem->data, file->size());
+			mem->data[file->size()] = '\0';
+			m_vertex_shader = bgfx::createShader(mem);
+		}
+		checkFinish();
+	}
+
+	void checkFinish()
+	{
+		++m_loaded;
+		if (m_loaded == 2)
+		{
+			if (bgfx::isValid(m_vertex_shader) && bgfx::isValid(m_fragment_shader))
+			{
+				m_shader.decrementDepCount();
+				m_shader_instance->m_program_handles[m_global_idx] = bgfx::createProgram(m_vertex_shader, m_fragment_shader, false);
+			}
+			else
+			{
+				m_shader.onFailure();
+			}
+			m_allocator.deleteObject(this);
+		}
+	}
+
+	IAllocator& m_allocator;
+	Shader& m_shader;
+	int m_pass_idx;
+	int m_mask;
+	ShaderInstance* m_shader_instance;
+	int m_global_idx;
+	int m_loaded;
+	bgfx::ShaderHandle m_fragment_shader;
+	bgfx::ShaderHandle m_vertex_shader;
+	FS::ReadCallback m_fs_callback;
+	FS::ReadCallback m_vs_callback;
+};
 
 
 Renderer& Shader::getRenderer()
@@ -187,7 +244,6 @@ Renderer& Shader::getRenderer()
 
 bool Shader::generateInstances()
 {
-
 	for (int i = 0; i < m_instances.size(); ++i)
 	{
 		m_allocator.deleteObject(m_instances[i]);
@@ -199,20 +255,19 @@ bool Shader::generateInstances()
 	for (int mask = 0; mask < count; ++mask)
 	{
 		ShaderInstance* instance = m_allocator.newObject<ShaderInstance>(m_allocator);
+		m_instances.push(instance);
 
 		instance->m_combination = mask;
 
 		for (int pass_idx = 0; pass_idx < m_combintions.m_pass_count; ++pass_idx)
 		{
 			int global_idx = renderer.getPassIdx(m_combintions.m_passes[pass_idx]);
-			instance->m_program_handles[global_idx] = createProgram(pass_idx, mask);
-			if (!bgfx::isValid(instance->m_program_handles[global_idx]))
+			ShaderLoader* loader = m_allocator.newObject<ShaderLoader>(*this, pass_idx, mask, instance, global_idx, m_allocator);
+			if (!loader->load())
 			{
-				m_allocator.deleteObject(instance);
 				return false;
 			}
 		}
-		m_instances.push(instance);
 	}
 	return true;
 }
