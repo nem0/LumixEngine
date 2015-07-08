@@ -226,6 +226,7 @@ void MainWindow::resizeEvent(QResizeEvent* event)
 
 void MainWindow::update()
 {
+	PROFILE_FUNCTION();
 	m_notifications->update(m_world_editor->getEngine().getLastTimeDelta());
 	m_animation_editor->update(m_world_editor->getEngine().getLastTimeDelta());
 }

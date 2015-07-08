@@ -5,6 +5,7 @@
 #include "core/crc32.h"
 #include "core/input_system.h"
 #include "core/log.h"
+#include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/timer.h"
 
@@ -242,8 +243,21 @@ namespace Lumix
 			}
 
 
+			void updateGame(float dt)
+			{
+				PROFILE_FUNCTION();
+				for (int i = 0; i < m_scenes.size(); ++i)
+				{
+					m_scenes[i]->update(dt);
+				}
+				m_plugin_manager->update(dt);
+				m_input_system.update(dt);
+			}
+
+
 			virtual void update(bool is_game_running, float time_delta_multiplier, float forced_time_delta) override
 			{
+				PROFILE_FUNCTION();
 				float dt;
 				if (forced_time_delta >= 0)
 				{
@@ -265,12 +279,8 @@ namespace Lumix
 				m_last_time_delta = dt;
 				if (is_game_running)
 				{
-					for (int i = 0; i < m_scenes.size(); ++i)
-					{
-						m_scenes[i]->update(dt);
-					}
-					m_plugin_manager->update(dt);
-					m_input_system.update(dt);
+					
+					updateGame(dt);
 				}
 				else
 				{

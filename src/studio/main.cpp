@@ -191,6 +191,7 @@ class App
 
 		void showStats()
 		{
+			PROFILE_FUNCTION();
 			char stats[1000];
 			float fps = m_world_editor->getEngine().getFPS();
 			Lumix::copyString(stats, sizeof(stats), "FPS: ");
@@ -214,6 +215,7 @@ class App
 
 					if(!m_main_window->getGameView()->getContentWidget()->visibleRegion().isEmpty())
 					{
+						PROFILE_BLOCK("render_game_view");
 						m_game_render_device->beginFrame();
 						m_game_render_device->getPipeline().render();
 						m_game_render_device->endFrame();
