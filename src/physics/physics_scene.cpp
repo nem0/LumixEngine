@@ -454,21 +454,39 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual void update(float time_delta) override
+	void updateDynamicActors()
 	{
-		time_delta = 0.01f;
-		m_scene->simulate(time_delta);
-		m_scene->fetchResults(true);
+		PROFILE_FUNCTION();
 		for (int i = 0; i < m_dynamic_actors.size(); ++i)
 		{
 			physx::PxTransform trans = m_dynamic_actors[i]->getPhysxActor()->getGlobalPose();
 			m_dynamic_actors[i]->getEntity().setPosition(trans.p.x, trans.p.y, trans.p.z);
 			m_dynamic_actors[i]->getEntity().setRotation(trans.q.x, trans.q.y, trans.q.z, trans.q.w);
 		}
+	}
+
+
+	void simulateScene(float time_delta)
+	{
+		PROFILE_FUNCTION();
+		m_scene->simulate(time_delta);
+	}
+
+
+	void fetchResults()
+	{
+		PROFILE_FUNCTION();
+		m_scene->fetchResults(true);
+	}
+
+
+	void updateControllers(float time_delta)
+	{
+		PROFILE_FUNCTION();
 		Vec3 g(0, time_delta * -9.8f, 0);
 		for (int i = 0; i < m_controllers.size(); ++i)
 		{
-			if(!m_controllers[i].m_is_free)
+			if (!m_controllers[i].m_is_free)
 			{
 				Vec3 dif = g + m_controllers[i].m_frame_change;
 				m_controllers[i].m_frame_change.set(0, 0, 0);
@@ -477,6 +495,16 @@ struct PhysicsSceneImpl : public PhysicsScene
 				m_controllers[i].m_entity.setPosition((float)p.x, (float)p.y, (float)p.z);
 			}
 		}
+	}
+
+
+	virtual void update(float time_delta) override
+	{
+		time_delta = Math::minValue(0.01f, time_delta);
+		simulateScene(time_delta);
+		fetchResults();
+		updateDynamicActors();
+		updateControllers(time_delta);
 	}
 
 
@@ -946,6 +974,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 			Controller& c = m_controllers.pushEmpty();
 			c.m_is_free = is_free;
+			c.m_frame_change.set(0, 0, 0);
 			
 			if(!is_free)
 			{

@@ -278,6 +278,7 @@ namespace Lumix
 			
 			void update(float dt) override
 			{
+				PROFILE_FUNCTION();
 				m_time += dt;
 				for (int i = m_debug_lines.size() - 1; i >= 0; --i)
 				{

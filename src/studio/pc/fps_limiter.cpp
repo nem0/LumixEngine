@@ -2,6 +2,7 @@
 
 #include <Windows.h>
 #include "core/iallocator.h"
+#include "core/profiler.h"
 
 
 class FPSLimiterPC : public FPSLimiter
@@ -31,6 +32,7 @@ class FPSLimiterPC : public FPSLimiter
 
 		virtual void endFrame()
 		{
+			PROFILE_BLOCK("fps_limiter");
 			WaitForSingleObject(m_timer, 1000 / m_fps);
 		}
 
