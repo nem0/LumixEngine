@@ -66,6 +66,7 @@ class ShaderCombinations
 
 class LUMIX_ENGINE_API Shader : public Resource
 {
+	friend struct ShaderLoader;
 	public:
 		class TextureSlot
 		{
@@ -107,7 +108,6 @@ class LUMIX_ENGINE_API Shader : public Resource
 		void parseTextureSlots(lua_State* state);
 		bool generateInstances();
 		Renderer& getRenderer();
-		bgfx::ProgramHandle createProgram(int pass_idx, int mask) const;
 
 		virtual void doUnload(void) override;
 		virtual void loaded(FS::IFile* file, bool success, FS::FileSystem& fs) override;

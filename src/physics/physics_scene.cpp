@@ -1077,7 +1077,7 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system, Universe& universe, En
 	{
 		allocator.deleteObject(impl);
 		return NULL;
-	}
+	}/*
 	
 	impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_SHAPES, 1.0f);
 	impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE, 1.0);
@@ -1085,7 +1085,7 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system, Universe& universe, En
 	impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_AABBS, 1.0f);
 	impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eWORLD_AXES, 1.0f);
 	impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCONTACT_POINT, 1.0f);
-	
+	*/
 	impl->m_system = &system;
 	impl->m_default_material = impl->m_system->getPhysics()->createMaterial(0.5,0.5,0.5);
 	return impl;
