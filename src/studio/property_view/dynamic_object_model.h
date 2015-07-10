@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include "core/vec3.h"
 #include <qabstractitemmodel.h>
 #include <qstyleditemdelegate.h>
 #include <functional>
@@ -150,6 +151,24 @@ class DynamicObjectModel : public QAbstractItemModel
 					: m_instance(instance) 
 					, m_node(node)
 				{
+				}
+
+				Object& propertyColor(QString name, Lumix::Vec3(T::*getter)() const, void (T::*setter)(const Lumix::Vec3&))
+				{
+					Node& node = m_node->addChild(name);
+					T* inst = m_instance;
+					node.m_getter = [getter, inst]() -> QVariant {
+						Lumix::Vec3 v = (inst->*getter)();
+						return QColor(v.x * 255, v.y * 255, v.z * 255);
+					};
+					node.m_setter = [inst, setter](const QVariant& value) { 
+						Lumix::Vec3 c;
+						c.x = qvariant_cast<QColor>(value).redF();
+						c.y = qvariant_cast<QColor>(value).greenF();
+						c.z = qvariant_cast<QColor>(value).blueF();
+						(inst->*setter)(c);
+					};
+					return *this;
 				}
 
 				template <typename Getter, typename PropertyType>

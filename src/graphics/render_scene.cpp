@@ -82,7 +82,8 @@ namespace Lumix
 	
 	struct PointLight
 	{
-		Vec4 m_color;
+		Vec3 m_color;
+		Vec3 m_specular_color;
 		float m_intensity;
 		float m_range;
 		Entity m_entity;
@@ -94,11 +95,11 @@ namespace Lumix
 	struct GlobalLight
 	{
 		int m_uid;
-		Vec4 m_color;
+		Vec3 m_color;
 		float m_intensity;
-		Vec4 m_ambient_color;
+		Vec3 m_ambient_color;
 		float m_ambient_intensity;
-		Vec4 m_fog_color;
+		Vec3 m_fog_color;
 		float m_fog_density;
 		Entity m_entity;
 	};
@@ -324,6 +325,7 @@ namespace Lumix
 					serializer.write(point_light.m_entity.index);
 					serializer.write(point_light.m_range);
 					serializer.write(point_light.m_fov);
+					serializer.write(point_light.m_specular_color);
 				}
 				serializer.write(m_point_light_last_uid);
 
@@ -463,6 +465,7 @@ namespace Lumix
 					serializer.read(light.m_entity.index);
 					serializer.read(light.m_range);
 					serializer.read(light.m_fov);
+					serializer.read(light.m_specular_color);
 					light.m_entity.universe = &m_universe;
 					m_universe.addComponent(light.m_entity, POINT_LIGHT_HASH, this, light.m_uid);
 				}
@@ -521,6 +524,10 @@ namespace Lumix
 				deserializeRenderables(serializer);
 				deserializeLights(serializer);
 				deserializeTerrains(serializer);
+				for (int i = 0; i < m_point_lights.size(); ++i)
+				{
+					detectLightInfluencedGeometry(i);
+				}
 			}
 
 
@@ -633,24 +640,7 @@ namespace Lumix
 				}
 				else if (type == GLOBAL_LIGHT_HASH)
 				{
-					GlobalLight& light = m_global_lights.pushEmpty();
-					light.m_entity = entity;
-					light.m_color.set(1, 1, 1, 1);
-					light.m_intensity = 0;
-					light.m_ambient_color.set(1, 1, 1, 1);
-					light.m_ambient_intensity = 1;
-					light.m_fog_color.set(1, 1, 1, 1);
-					light.m_fog_density = 0;
-					light.m_uid = ++m_global_light_last_uid;
-
-					if (m_global_lights.size() == 1)
-					{
-						m_active_global_light_uid = light.m_uid;
-					}
-
-					Component cmp = m_universe.addComponent(entity, type, this, light.m_uid);
-					m_universe.componentCreated().invoke(cmp);
-					return cmp;
+					return createGlobalLight(entity);
 				}
 				else if (type == POINT_LIGHT_HASH)
 				{
@@ -1572,7 +1562,7 @@ namespace Lumix
 				m_global_lights[getGlobalLightIndex(cmp)].m_fog_density = density;
 			}
 
-			virtual void setFogColor(Component cmp, const Vec4& color) override
+			virtual void setFogColor(Component cmp, const Vec3& color) override
 			{
 				m_global_lights[getGlobalLightIndex(cmp)].m_fog_color = color;
 			}
@@ -1582,7 +1572,7 @@ namespace Lumix
 				return m_global_lights[getGlobalLightIndex(cmp)].m_fog_density;
 			}
 			
-			virtual Vec4 getFogColor(Component cmp) override
+			virtual Vec3 getFogColor(Component cmp) override
 			{
 				return m_global_lights[getGlobalLightIndex(cmp)].m_fog_color;
 			}
@@ -1609,12 +1599,12 @@ namespace Lumix
 				m_global_lights[getGlobalLightIndex(cmp)].m_intensity = intensity;
 			}
 
-			virtual void setPointLightColor(Component cmp, const Vec4& color) override
+			virtual void setPointLightColor(Component cmp, const Vec3& color) override
 			{
 				m_point_lights[getPointLightIndex(cmp.index)].m_color = color;
 			}
 
-			virtual void setGlobalLightColor(Component cmp, const Vec4& color) override
+			virtual void setGlobalLightColor(Component cmp, const Vec3& color) override
 			{
 				m_global_lights[getGlobalLightIndex(cmp)].m_color = color;
 			}
@@ -1624,7 +1614,7 @@ namespace Lumix
 				m_global_lights[getGlobalLightIndex(cmp)].m_ambient_intensity = intensity;
 			}
 
-			virtual void setLightAmbientColor(Component cmp, const Vec4& color) override
+			virtual void setLightAmbientColor(Component cmp, const Vec3& color) override
 			{
 				m_global_lights[getGlobalLightIndex(cmp)].m_ambient_color = color;
 			}
@@ -1639,12 +1629,22 @@ namespace Lumix
 				return m_global_lights[getGlobalLightIndex(cmp)].m_intensity;
 			}
 
-			virtual Vec4 getPointLightColor(Component cmp) override
+			virtual Vec3 getPointLightColor(Component cmp) override
 			{
 				return m_point_lights[getPointLightIndex(cmp.index)].m_color;
 			}
 			
-			virtual Vec4 getGlobalLightColor(Component cmp) override
+			virtual void setPointLightSpecularColor(Component cmp, const Vec3& color) override
+			{
+				m_point_lights[getPointLightIndex(cmp.index)].m_specular_color = color;
+			}
+
+			virtual Vec3 getPointLightSpecularColor(Component cmp) override
+			{
+				return m_point_lights[getPointLightIndex(cmp.index)].m_specular_color;
+			}
+
+			virtual Vec3 getGlobalLightColor(Component cmp) override
 			{
 				return m_global_lights[getGlobalLightIndex(cmp)].m_color;
 			}
@@ -1654,7 +1654,7 @@ namespace Lumix
 				return m_global_lights[getGlobalLightIndex(cmp)].m_ambient_intensity;
 			}
 
-			virtual Vec4 getLightAmbientColor(Component cmp) override
+			virtual Vec3 getLightAmbientColor(Component cmp) override
 			{
 				return m_global_lights[getGlobalLightIndex(cmp)].m_ambient_color;
 			}
@@ -1806,16 +1806,41 @@ namespace Lumix
 			}
 			
 
+			
+			Component createGlobalLight(const Entity& entity)
+			{
+				GlobalLight& light = m_global_lights.pushEmpty();
+				light.m_entity = entity;
+				light.m_color.set(1, 1, 1);
+				light.m_intensity = 0;
+				light.m_ambient_color.set(1, 1, 1);
+				light.m_ambient_intensity = 1;
+				light.m_fog_color.set(1, 1, 1);
+				light.m_fog_density = 0;
+				light.m_uid = ++m_global_light_last_uid;
+
+				if (m_global_lights.size() == 1)
+				{
+					m_active_global_light_uid = light.m_uid;
+				}
+
+				Component cmp = m_universe.addComponent(entity, GLOBAL_LIGHT_HASH, this, light.m_uid);
+				m_universe.componentCreated().invoke(cmp);
+				return cmp;
+			}
+
+
 			Component createPointLight(const Entity& entity)
 			{
 				PointLight& light = m_point_lights.pushEmpty();
 				m_light_influenced_geometry.push(Array<Renderable*>(m_allocator));
 				light.m_entity = entity;
-				light.m_color.set(1, 1, 1, 1);
+				light.m_color.set(1, 1, 1);
 				light.m_intensity = 1;
 				light.m_range = 10;
 				light.m_uid = ++m_point_light_last_uid;
 				light.m_fov = 999;
+				light.m_specular_color.set(1, 1, 1);
 
 				Component cmp = m_universe.addComponent(entity, POINT_LIGHT_HASH, this, light.m_uid);
 				m_universe.componentCreated().invoke(cmp);

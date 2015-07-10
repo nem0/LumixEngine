@@ -480,11 +480,10 @@ void EntityModel::set(Lumix::Entity entity, uint32_t component_type, int index, 
 		case Lumix::IPropertyDescriptor::COLOR:
 			{
 				QColor color = value.value<QColor>();
-				Lumix::Vec4 v;
+				Lumix::Vec3 v;
 				v.x = color.redF();
 				v.y = color.greenF();
 				v.z = color.blueF();
-				v.w = color.alphaF();
 				m_editor.setProperty(cmp.type, index, *desc, &v, sizeof(v));
 				break;
 			}
@@ -552,7 +551,7 @@ QVariant EntityModel::get(Lumix::Entity entity, uint32_t component_type, int ind
 			}
 		case Lumix::IPropertyDescriptor::COLOR:
 			{
-				Lumix::Vec4 c;
+				Lumix::Vec3 c;
 				input.read(c);
 				QColor color((int)(c.x * 255), (int)(c.y * 255), (int)(c.z * 255));
 				return color;

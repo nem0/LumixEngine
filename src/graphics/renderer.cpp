@@ -126,6 +126,7 @@ namespace Lumix
 
 				editor.registerProperty("point_light", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("intensity", &RenderScene::getPointLightIntensity, &RenderScene::setPointLightIntensity, 0.0f, 1.0f, 0.05f, allocator));
 				editor.registerProperty("point_light", allocator.newObject<ColorPropertyDescriptor<RenderScene> >("color", &RenderScene::getPointLightColor, &RenderScene::setPointLightColor, allocator));
+				editor.registerProperty("point_light", allocator.newObject<ColorPropertyDescriptor<RenderScene> >("specular", &RenderScene::getPointLightSpecularColor, &RenderScene::setPointLightSpecularColor, allocator));
 				editor.registerProperty("point_light", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("range", &RenderScene::getLightRange, &RenderScene::setLightRange, 0.0f, FLT_MAX, 0.0f, allocator));
 				editor.registerProperty("point_light", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("FOV", &RenderScene::getLightFOV, &RenderScene::setLightFOV, 0.0f, 360.0f, 5.0f, allocator));
 

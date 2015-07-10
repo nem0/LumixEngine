@@ -129,6 +129,12 @@ bool Material::save(JsonSerializer& serializer)
 	serializer.serialize("backface_culling", isBackfaceCulling());
 	serializer.serialize("alpha_cutout", m_is_alpha_cutout);
 	serializer.serialize("shadow_receiver", m_is_shadow_receiver);
+	serializer.serialize("shininess", m_shininess);
+	serializer.beginArray("specular");
+	serializer.serializeArrayItem(m_specular.x);
+	serializer.serializeArrayItem(m_specular.y);
+	serializer.serializeArrayItem(m_specular.z);
+	serializer.endArray();
 	serializer.serialize("z_test", isZTest());
 	serializer.endObject();
 	return false;
@@ -376,6 +382,18 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			else if (strcmp(label, "alpha_cutout") == 0)
 			{
 				serializer.deserialize(m_is_alpha_cutout, false);
+			}
+			else if (strcmp(label, "specular") == 0)
+			{
+				serializer.deserializeArrayBegin();
+				serializer.deserializeArrayItem(m_specular.x, 1.0f);
+				serializer.deserializeArrayItem(m_specular.y, 1.0f);
+				serializer.deserializeArrayItem(m_specular.z, 1.0f);
+				serializer.deserializeArrayEnd();
+			}
+			else if (strcmp(label, "shininess") == 0)
+			{
+				serializer.deserialize(m_shininess, 4.0f);
 			}
 			else if (strcmp(label, "shadow_receiver") == 0)
 			{

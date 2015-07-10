@@ -744,8 +744,8 @@ template <class S>
 class ColorPropertyDescriptor : public IPropertyDescriptor
 {
 	public:
-		typedef Vec4 (S::*Getter)(Component);
-		typedef void (S::*Setter)(Component, const Vec4&);
+		typedef Vec3 (S::*Getter)(Component);
+		typedef void (S::*Setter)(Component, const Vec3&);
 
 	public:
 		ColorPropertyDescriptor(const char* name, Getter _getter, Setter _setter, IAllocator& allocator)
@@ -760,7 +760,7 @@ class ColorPropertyDescriptor : public IPropertyDescriptor
 		
 		virtual void set(Component cmp, InputBlob& stream) const override
 		{
-			Vec4 f;
+			Vec3 f;
 			stream.read(&f, sizeof(f));
 			(static_cast<S*>(cmp.scene)->*m_setter)(cmp, f);
 		}
@@ -768,7 +768,7 @@ class ColorPropertyDescriptor : public IPropertyDescriptor
 
 		virtual void get(Component cmp, OutputBlob& stream) const override
 		{
-			Vec4 f = (static_cast<S*>(cmp.scene)->*m_getter)(cmp);
+			Vec3 f = (static_cast<S*>(cmp.scene)->*m_getter)(cmp);
 			int len = sizeof(f);
 			stream.write(&f, len);
 		}
