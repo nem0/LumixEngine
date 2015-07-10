@@ -244,6 +244,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			m_actors[cmp.index]->getEntity().index = -1;
 			m_actors[cmp.index]->setPhysxActor(nullptr);
+			m_dynamic_actors.eraseItem(m_actors[cmp.index]);
 			m_universe->destroyComponent(cmp);
 		}
 		else
