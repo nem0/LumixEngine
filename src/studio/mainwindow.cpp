@@ -84,7 +84,6 @@ MainWindow::MainWindow(QWidget* parent) :
 	addEditorDock(static_cast<Qt::DockWidgetArea>(1), m_property_view, &MainWindow::on_actionProperties_triggered);
 	addEditorDock(static_cast<Qt::DockWidgetArea>(2), m_scene_view, &MainWindow::on_actionScene_View_triggered);
 	addEditorDock(static_cast<Qt::DockWidgetArea>(8), m_script_compiler_ui, &MainWindow::on_actionScript_compiler_triggered);
-	addEditorDock(static_cast<Qt::DockWidgetArea>(8), m_shader_compiler, &MainWindow::on_actionShader_compiler_triggered);
 
 	createLayoutCombobox();
 
@@ -373,11 +372,6 @@ void MainWindow::on_actionScript_compiler_triggered()
 	m_script_compiler_ui->show();
 }
 
-void MainWindow::on_actionShader_compiler_triggered()
-{
-	m_shader_compiler->show();
-}
-
 void MainWindow::on_actionFile_server_triggered()
 {
 	m_file_server_ui->show();
@@ -492,6 +486,11 @@ void MainWindow::on_actionRemove_triggered()
 	{
 		m_world_editor->destroyEntities(&m_world_editor->getSelectedEntities()[0], m_world_editor->getSelectedEntities().size());
 	}
+}
+
+void MainWindow::on_actionCompile_shaders_triggered()
+{
+	m_shader_compiler->compileAll();
 }
 
 void MainWindow::on_actionEntity_list_triggered()

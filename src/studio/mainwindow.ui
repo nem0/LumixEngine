@@ -75,6 +75,7 @@
     <addaction name="actionMeasure"/>
     <addaction name="actionSnap_to_terrain"/>
     <addaction name="actionImport_asset"/>
+    <addaction name="actionCompile_shaders"/>
    </widget>
    <widget class="QMenu" name="menuEntity">
     <property name="title">
@@ -370,6 +371,11 @@
   <action name="actionStats">
    <property name="text">
     <string>Stats</string>
+   </property>
+  </action>
+  <action name="actionCompile_shaders">
+   <property name="text">
+    <string>Compile shaders</string>
    </property>
   </action>
  </widget>

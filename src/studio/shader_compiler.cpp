@@ -8,41 +8,99 @@
 #include "engine/engine.h"
 #include "file_system_watcher.h"
 #include "graphics/shader.h"
+#include <qdatetime.h>
 #include <qdir.h>
 #include <qfilesystemmodel.h>
 #include <qprocess.h>
 
 
 ShaderCompiler::ShaderCompiler()
-	: QDockWidget(nullptr)
-	, m_editor(nullptr)
+	: m_editor(nullptr)
 {
 	m_is_compiling = false;
 	m_watcher = FileSystemWatcher::create("shaders");
 	m_watcher->getCallback().bind<ShaderCompiler, &ShaderCompiler::onFileChanged>(this);
-	m_ui = new Ui::ShaderCompiler;
-	m_ui->setupUi(this);
-	connect(m_ui->compileAllButton, &QPushButton::clicked, this, &ShaderCompiler::compileAll);
-
-	auto* model = new QFileSystemModel(m_ui->shaderList);
-	model->setRootPath(QDir::currentPath() + "/shaders");
-	model->setReadOnly(false);
-	model->setNameFilters(QStringList() << "*.shd");
-	model->setNameFilterDisables(false);
-	model->setFilter(QDir::Filter::Files);
-
-	m_ui->shaderList->setModel(model);
-	m_ui->shaderList->setRootIndex(model->index(QDir::currentPath() + "/shaders"));
 
 	parseDependencies();
+	makeUpToDate();
 }
 
 
 static QString getSourceFromBinaryBasename(const QString& binary_basename)
 {
 	QString ret = binary_basename.mid(0, binary_basename.indexOf('_'));
-	ret += binary_basename.mid(binary_basename.length() - 3);
+	ret += binary_basename.mid(binary_basename.length() - 3); 
 	return ret;
+}
+
+
+void ShaderCompiler::makeUpToDate()
+{
+	QStringList src_list;
+
+	QDir dir("shaders");
+	for (auto source_info : dir.entryInfoList())
+	{
+		if (source_info.suffix() == "shd")
+		{
+			QFile file(source_info.filePath());
+			if (file.open(QIODevice::ReadOnly))
+			{
+				auto content = file.readAll();
+				Lumix::ShaderCombinations combinations;
+				Lumix::Shader::getShaderCombinations(content.data(), &combinations);
+
+				QString bin_base_path = QString("shaders/compiled/%1_").arg(source_info.baseName());
+				for (int i = 0; i < combinations.m_pass_count; ++i)
+				{
+					QString pass_path = bin_base_path + combinations.m_passes[i];
+					for (int j = 0; j < 1 << lengthOf(combinations.m_defines); ++j)
+					{
+						if ((j & (~combinations.m_vs_combinations[i])) == 0)
+						{
+							QFileInfo vs_bin_info(pass_path + QString::number(j) + "_vs.shb");
+							if (!vs_bin_info.exists() || vs_bin_info.lastModified() < source_info.lastModified())
+							{
+								src_list.push_back(source_info.baseName());
+								break;
+							}
+						}
+						if ((j & (~combinations.m_fs_combinations[i])) == 0)
+						{
+							QFileInfo fs_bin_info(pass_path + QString::number(j) + "_fs.shb");
+							if (!fs_bin_info.exists() || fs_bin_info.lastModified() < source_info.lastModified())
+							{
+								src_list.push_back(source_info.baseName());
+								break;
+							}
+						}
+					}
+				}
+
+				file.close();
+			}
+		}
+	}
+
+	for (auto iter = m_dependencies.begin(), end = m_dependencies.end(); iter != end; ++iter)
+	{
+		QFileInfo source_info(iter.key());
+		for (auto bin : iter.value())
+		{
+			QFileInfo bin_info(bin);
+			if (!bin_info.exists() || bin_info.lastModified() < source_info.lastModified())
+			{
+				auto src = getSourceFromBinaryBasename(bin_info.baseName());
+				src = src.left(src.length() - 3);
+				src_list.push_back(src);
+			}
+		}
+	}
+	src_list.removeDuplicates();
+	for (auto src : src_list)
+	{
+		compile(QString("shaders/") + src + ".shd");
+	}
 }
 
 
@@ -51,11 +109,14 @@ void ShaderCompiler::onFileChanged(const char* path)
 	QFileInfo info(path);
 	if (info.suffix() == "shb")
 	{
-		auto shader_manager = m_editor->getEngine().getResourceManager().get(Lumix::ResourceManager::SHADER);
-		QString shader_path("shaders/");
-		QString source_basename = getSourceFromBinaryBasename(info.baseName());
-		shader_path += source_basename.mid(0, source_basename.length() - 3) + ".shd";
-		shader_manager->reload(Lumix::Path(shader_path.toLatin1().data()));
+		if (m_editor)
+		{
+			auto shader_manager = m_editor->getEngine().getResourceManager().get(Lumix::ResourceManager::SHADER);
+			QString shader_path("shaders/");
+			QString source_basename = getSourceFromBinaryBasename(info.baseName());
+			shader_path += source_basename.mid(0, source_basename.length() - 3) + ".shd";
+			shader_manager->reload(Lumix::Path(shader_path.toLatin1().data()));
+		}
 	}
 	else
 	{
@@ -109,7 +170,6 @@ void ShaderCompiler::parseDependencies()
 
 ShaderCompiler::~ShaderCompiler()
 {
-	delete m_ui;
 }
 
 
@@ -197,7 +257,6 @@ void ShaderCompiler::compileAll()
 	QDir dir("shaders");
 	dir.mkpath("compiled");
 	auto list = dir.entryInfoList(QStringList() << "*.shd");
-	m_ui->progressBar->setValue(1);
 	m_to_compile = list.size() * 2;
 	for (auto file : list)
 	{
