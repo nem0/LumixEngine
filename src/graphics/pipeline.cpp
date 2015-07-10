@@ -249,10 +249,12 @@ namespace Lumix
 			m_light_pos_radius_uniform = bgfx::createUniform("u_lightPosRadius", bgfx::UniformType::Vec4);
 			m_light_color_uniform = bgfx::createUniform("u_lightRgbInnerR", bgfx::UniformType::Vec4);
 			m_light_dir_fov_uniform = bgfx::createUniform("u_lightDirFov", bgfx::UniformType::Vec4);
+			m_light_specular_uniform = bgfx::createUniform("u_lightSpecular", bgfx::UniformType::Mat4, 64);
 			m_ambient_color_uniform = bgfx::createUniform("u_ambientColor", bgfx::UniformType::Vec4);
 			m_shadowmap_matrices_uniform = bgfx::createUniform("u_shadowmapMatrices", bgfx::UniformType::Mat4, 4);
 			m_shadowmap_splits_uniform = bgfx::createUniform("u_shadowmapSplits", bgfx::UniformType::Vec4);
 			m_bone_matrices_uniform = bgfx::createUniform("u_boneMatrices", bgfx::UniformType::Mat4, 64);
+			m_specular_shininess_uniform = bgfx::createUniform("u_materialSpecularShininess", bgfx::UniformType::Vec4);
 
 			ResourceManagerBase* material_manager = pipeline.getResourceManager().get(ResourceManager::MATERIAL);
 			m_screen_space_material = static_cast<Material*>(material_manager->load(Lumix::Path("models/editor/screen_space.mat"))); 
@@ -271,6 +273,7 @@ namespace Lumix
 			material_manager->unload(*m_screen_space_material);
 			material_manager->unload(*m_debug_line_material);
 
+			bgfx::destroyUniform(m_specular_shininess_uniform);
 			bgfx::destroyUniform(m_bone_matrices_uniform);
 			bgfx::destroyUniform(m_terrain_scale_uniform);
 			bgfx::destroyUniform(m_morph_const_uniform);
@@ -284,6 +287,7 @@ namespace Lumix
 			bgfx::destroyUniform(m_ambient_color_uniform);
 			bgfx::destroyUniform(m_shadowmap_matrices_uniform);
 			bgfx::destroyUniform(m_shadowmap_splits_uniform);
+			bgfx::destroyUniform(m_light_specular_uniform);
 
 			for (int i = 0; i < m_uniforms.size(); ++i)
 			{
@@ -581,6 +585,9 @@ namespace Lumix
 
 			Vec4 light_dir_fov(light_cmp.entity.getRotation() * Vec3(0, 0, 1), m_scene->getLightFOV(light_cmp));
 			bgfx::setUniform(m_light_dir_fov_uniform, &light_dir_fov);
+
+			Vec4 light_specular(m_scene->getPointLightSpecularColor(light_cmp), 1.0);
+			bgfx::setUniform(m_light_specular_uniform, &light_specular);
 		}
 
 
@@ -795,6 +802,10 @@ namespace Lumix
 
 		void renderMesh(const RenderableMesh& info)
 		{
+			if (!info.m_model->isReady())
+			{
+				return;
+			}
 			int instance_idx = info.m_mesh->getInstanceIdx();
 			if (instance_idx == -1)
 			{
@@ -872,6 +883,9 @@ namespace Lumix
 					bgfx::setTexture(i, material->getShader()->getTextureSlot(i).m_uniform_handle, texture->getTextureHandle());
 				}
 			}
+
+			Vec4 specular_shininess(material->getSpecular(), material->getShininess());
+			bgfx::setUniform(m_specular_shininess_uniform, &specular_shininess);
 
 			int global_texture_offset = material->getTextureCount();
 			for (int i = 0; i < m_global_textures.size(); ++i)
@@ -1079,6 +1093,7 @@ namespace Lumix
 		Array<const RenderableMesh*> m_tmp_meshes;
 		Array<const TerrainInfo*> m_tmp_terrains;
 		Array<GrassInfo> m_tmp_grasses;
+		bgfx::UniformHandle m_specular_shininess_uniform;
 		bgfx::UniformHandle m_bone_matrices_uniform;
 		bgfx::UniformHandle m_terrain_scale_uniform;
 		bgfx::UniformHandle m_morph_const_uniform;
@@ -1092,6 +1107,7 @@ namespace Lumix
 		bgfx::UniformHandle m_light_dir_fov_uniform;
 		bgfx::UniformHandle m_shadowmap_matrices_uniform;
 		bgfx::UniformHandle m_shadowmap_splits_uniform;
+		bgfx::UniformHandle m_light_specular_uniform;
 		Material* m_screen_space_material;
 		Material* m_debug_line_material;
 

@@ -3,6 +3,7 @@
 
 #include "core/array.h"
 #include "core/resource.h"
+#include "core/vec3.h"
 #include <bgfx.h>
 
 
@@ -68,6 +69,10 @@ public:
 	void enableAlphaCutout(bool enable) { m_is_alpha_cutout = enable; updateShaderInstance(); }
 	bool isShadowReceiver() const { return m_is_shadow_receiver; }
 	void enableShadowReceiving(bool enable) { m_is_shadow_receiver = enable; updateShaderInstance(); }
+	float getShininess() const { return m_shininess; }
+	void setShininess(float value) { m_shininess = value; }
+	Vec3 getSpecular() const { return m_specular; }
+	void setSpecular(const Vec3& specular) { m_specular = specular; }
 	uint64_t getRenderStates() const { return m_render_states; }
 
 	void setShader(Shader* shader);
@@ -97,8 +102,10 @@ public:
 		, m_allocator(allocator)
 		, m_texture_count(0)
 		, m_render_states(0)
+		, m_specular(1, 1, 1)
+		, m_shininess(4)
 		, m_shader_instance(nullptr)
-	{ 
+	{
 		enableZTest(true);
 		enableBackfaceCulling(true);
 		enableShadowReceiving(true);
@@ -137,6 +144,8 @@ private:
 	IAllocator& m_allocator;
 	bgfx::ProgramHandle m_program_id;
 	uint64_t m_render_states;
+	Vec3 m_specular;
+	float m_shininess;
 };
 
 } // ~namespace Lumix

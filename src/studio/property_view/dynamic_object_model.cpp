@@ -64,11 +64,10 @@ bool DynamicObjectItemDelegate::editorEvent(QEvent* event, QAbstractItemModel* m
 			dialog->connect(dialog, &QColorDialog::currentColorChanged, [model, index, dialog]()
 			{
 				QColor color = dialog->currentColor();
-				Lumix::Vec4 value;
+				Lumix::Vec3 value;
 				value.x = color.redF();
 				value.y = color.greenF();
 				value.z = color.blueF();
-				value.w = color.alphaF();
 				model->setData(index, color);
 			});
 			dialog->show();

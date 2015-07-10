@@ -169,21 +169,23 @@ namespace Lumix
 			virtual void setLightRange(Component cmp, float range) = 0;
 			virtual void setPointLightIntensity(Component cmp, float intensity) = 0;
 			virtual void setGlobalLightIntensity(Component cmp, float intensity) = 0;
-			virtual void setPointLightColor(Component cmp, const Vec4& color) = 0;
-			virtual void setGlobalLightColor(Component cmp, const Vec4& color) = 0;
+			virtual void setPointLightColor(Component cmp, const Vec3& color) = 0;
+			virtual void setGlobalLightColor(Component cmp, const Vec3& color) = 0;
 			virtual void setLightAmbientIntensity(Component cmp, float intensity) = 0;
-			virtual void setLightAmbientColor(Component cmp, const Vec4& color) = 0;
+			virtual void setLightAmbientColor(Component cmp, const Vec3& color) = 0;
 			virtual void setFogDensity(Component cmp, float density) = 0;
-			virtual void setFogColor(Component cmp, const Vec4& color) = 0;
+			virtual void setFogColor(Component cmp, const Vec3& color) = 0;
 			virtual float getPointLightIntensity(Component cmp) = 0;
 			virtual float getGlobalLightIntensity(Component cmp) = 0;
-			virtual Vec4 getPointLightColor(Component cmp) = 0;
-			virtual Vec4 getGlobalLightColor(Component cmp) = 0;
+			virtual Vec3 getPointLightColor(Component cmp) = 0;
+			virtual Vec3 getGlobalLightColor(Component cmp) = 0;
 			virtual float getLightAmbientIntensity(Component cmp) = 0;
-			virtual Vec4 getLightAmbientColor(Component cmp) = 0;
+			virtual Vec3 getLightAmbientColor(Component cmp) = 0;
 			virtual float getFogDensity(Component cmp) = 0;
-			virtual Vec4 getFogColor(Component cmp) = 0;
+			virtual Vec3 getFogColor(Component cmp) = 0;
 			virtual Frustum& getFrustum() = 0;
+			virtual Vec3 getPointLightSpecularColor(Component cmp) = 0;
+			virtual void setPointLightSpecularColor(Component cmp, const Vec3& color) = 0;
 
 		protected:
 			virtual ~RenderScene() {}

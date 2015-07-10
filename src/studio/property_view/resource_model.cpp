@@ -262,6 +262,8 @@ void ResourceModel::fillMaterialInfo(Lumix::Material* material, Node& node)
 		.property("Alpha cutout", &Lumix::Material::isAlphaCutout, &Lumix::Material::enableAlphaCutout)
 		.property("Backface culling", &Lumix::Material::isBackfaceCulling, &Lumix::Material::enableBackfaceCulling)
 		.property("Shadow receiver", &Lumix::Material::isShadowReceiver, &Lumix::Material::enableShadowReceiving)
+		.property("Shininess", &Lumix::Material::getShininess, &Lumix::Material::setShininess)
+		.propertyColor("Specular", &Lumix::Material::getSpecular, &Lumix::Material::setSpecular)
 		.property("Z test", &Lumix::Material::isZTest, &Lumix::Material::enableZTest)
 		.property("Shader", 
 			[](Lumix::Material* material) -> QVariant { return material->getShader() ? material->getShader()->getPath().c_str() : ""; },

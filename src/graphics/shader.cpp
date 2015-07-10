@@ -188,6 +188,8 @@ struct ShaderLoader
 			file->read(mem->data, file->size());
 			mem->data[file->size()] = '\0';
 			m_fragment_shader = bgfx::createShader(mem);
+			ASSERT(bgfx::isValid(m_fragment_shader));
+			fs.close(file);
 		}
 		checkFinish();
 	}
@@ -200,6 +202,8 @@ struct ShaderLoader
 			file->read(mem->data, file->size());
 			mem->data[file->size()] = '\0';
 			m_vertex_shader = bgfx::createShader(mem);
+			ASSERT(bgfx::isValid(m_vertex_shader));
+			fs.close(file);
 		}
 		checkFinish();
 	}
@@ -212,7 +216,7 @@ struct ShaderLoader
 			if (bgfx::isValid(m_vertex_shader) && bgfx::isValid(m_fragment_shader))
 			{
 				m_shader.decrementDepCount();
-				m_shader_instance->m_program_handles[m_global_idx] = bgfx::createProgram(m_vertex_shader, m_fragment_shader, false);
+				m_shader_instance->m_program_handles[m_global_idx] = bgfx::createProgram(m_vertex_shader, m_fragment_shader, true);
 			}
 			else
 			{
