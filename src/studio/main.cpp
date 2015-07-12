@@ -85,23 +85,18 @@ class App
 
 			HWND hwnd = (HWND)m_main_window->getSceneView()->getViewWidget()->winId();
 			Lumix::Renderer::init(hwnd);
-
 			m_world_editor = Lumix::WorldEditor::create(QDir::currentPath().toLocal8Bit().data(), m_allocator);
 			ASSERT(m_world_editor);
 			m_world_editor->update();
 			m_world_editor->updateEngine(-1, 1);
 
 			m_main_window->setWorldEditor(*m_world_editor);
-			m_main_window->getSceneView()->setWorldEditor(m_world_editor);
 
 			m_edit_render_device = new WGLRenderDevice(m_world_editor->getEngine(), "pipelines/main.json");
-			m_edit_render_device->getPipeline().setScene((Lumix::RenderScene*)m_world_editor->getEngine().getScene(crc32("renderer")));
-			m_world_editor->setEditViewRenderDevice(*m_edit_render_device);
 			m_edit_render_device->getPipeline().addCustomCommandHandler("render_physics").bind<App, &App::renderPhysics>(this);
 			m_edit_render_device->getPipeline().addCustomCommandHandler("render_gizmos").bind<App, &App::renderGizmos>(this);
 
-			m_game_render_device = new	WGLRenderDevice(m_world_editor->getEngine(), "pipelines/game_view.json");
-			m_game_render_device->getPipeline().setScene((Lumix::RenderScene*)m_world_editor->getEngine().getScene(crc32("renderer")));
+			m_game_render_device = new WGLRenderDevice(m_world_editor->getEngine(), "pipelines/game_view.json");
 
 			m_world_editor->universeCreated().bind<App, &App::onUniverseCreated>(this);
 			m_world_editor->universeDestroyed().bind<App, &App::onUniverseDestroyed>(this);
@@ -188,19 +183,7 @@ class App
 			}
 		}
 
-
-		void showStats()
-		{
-			PROFILE_FUNCTION();
-			char stats[1000];
-			float fps = m_world_editor->getEngine().getFPS();
-			Lumix::copyString(stats, sizeof(stats), "FPS: ");
-			Lumix::toCString(fps, stats + strlen(stats), sizeof(stats) - strlen(stats), 1);
-			
-			static_cast<Lumix::RenderScene*>(m_world_editor->getEngine().getScene(crc32("renderer")))->addDebugText(stats, 0, 0);
-		}
-
-
+		
 		void run()
 		{
 			FPSLimiter* fps_limiter = FPSLimiter::create(60, m_allocator);
@@ -220,8 +203,6 @@ class App
 						m_game_render_device->getPipeline().render();
 						m_game_render_device->endFrame();
 					}
-
-					showStats();
 
 					m_world_editor->update();
 					if (m_main_window->getSceneView()->isFrameDebuggerActive())

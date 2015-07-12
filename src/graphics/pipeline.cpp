@@ -354,6 +354,14 @@ namespace Lumix
 					break;
 				}
 			}
+			if (m_current_framebuffer)
+			{
+				bgfx::setViewFrameBuffer(m_view_idx, m_current_framebuffer->getHandle());
+			}
+			else
+			{
+				bgfx::setViewFrameBuffer(m_view_idx, BGFX_INVALID_HANDLE);
+			}
 		}
 
 		
@@ -384,8 +392,18 @@ namespace Lumix
 
 		void setCurrentFramebuffer(const char* framebuffer_name)
 		{
+			if (strcmp(framebuffer_name, "default") == 0)
+			{
+				m_current_framebuffer = nullptr;
+				bgfx::setViewFrameBuffer(m_view_idx, BGFX_INVALID_HANDLE);
+				return;
+			}
 			m_current_framebuffer = getFramebuffer(framebuffer_name);
-			if (!m_current_framebuffer)
+			if (m_current_framebuffer)
+			{
+				bgfx::setViewFrameBuffer(m_view_idx, m_current_framebuffer->getHandle());
+			}
+			else
 			{
 				g_log_warning.log("renderer") << "Framebuffer " << framebuffer_name << " not found";
 			}
@@ -1287,6 +1305,12 @@ namespace Lumix
 		}
 
 
+		float getFPS(PipelineInstanceImpl* pipeline)
+		{
+			return pipeline->m_renderer.getEngine().getFPS();
+		}
+
+
 		void renderDebugLines(PipelineInstanceImpl* pipeline)
 		{
 			pipeline->renderDebugLines();
@@ -1343,6 +1367,9 @@ namespace Lumix
 		template <> bool isType<const char*>(lua_State* L, int index) { return lua_isstring(L, index) != 0; }
 		template <> bool isType<void*>(lua_State* L, int index) { return lua_islightuserdata(L, index) != 0; }
 
+		template <typename T> void pushLua(lua_State* L, T value) { return lua_pushnumber(L, value); }
+		template <> void pushLua(lua_State* L, float value) { return lua_pushnumber(L, value); }
+		template <> void pushLua(lua_State* L, int value) { return lua_pushinteger(L, value); }
 
 		template <int N>
 		struct FunctionCaller
@@ -1390,7 +1417,7 @@ namespace Lumix
 		int LUMIX_FORCE_INLINE callFunction(R (*f)(ArgsF...), lua_State* L)
 		{
 			R v = FunctionCaller<sizeof...(ArgsF)>::callFunction(f, L);
-			lua_pushinteger(L, v);
+			pushLua(L, v);
 			return 1;
 		}
 
@@ -1427,6 +1454,7 @@ namespace Lumix
 		registerCFunction("bindFramebufferTexture", LuaWrapper::wrap<decltype(&LuaAPI::bindFramebufferTexture), LuaAPI::bindFramebufferTexture>);
 		registerCFunction("executeCustomCommand", LuaWrapper::wrap<decltype(&LuaAPI::executeCustomCommand), LuaAPI::executeCustomCommand>);
 		registerCFunction("renderDebugLines", LuaWrapper::wrap<decltype(&LuaAPI::renderDebugLines), LuaAPI::renderDebugLines>);
+		registerCFunction("getFPS", LuaWrapper::wrap<decltype(&LuaAPI::getFPS), LuaAPI::getFPS>);
 	}
 
 

@@ -17,7 +17,9 @@ public:
 		if(pipeline_object)
 		{
 			m_pipeline = Lumix::PipelineInstance::create(*pipeline_object, engine.getAllocator());
+			m_pipeline->setScene((Lumix::RenderScene*)engine.getScene(crc32("renderer")));
 		}
+
 
 	}
 

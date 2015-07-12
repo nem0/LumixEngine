@@ -1797,12 +1797,6 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
-		virtual void toggleStats() override
-		{
-			m_edit_view_render_device->getPipeline().toggleStats();
-		}
-
-
 		virtual void toggleGameMode() override
 		{
 			if (m_is_game_mode)
@@ -2265,7 +2259,6 @@ struct WorldEditorImpl : public WorldEditor
 			m_undo_index = -1;
 			m_mouse_handling_plugin = NULL;
 			m_is_game_mode = false;
-			m_edit_view_render_device = NULL;
 			m_universe_path = "";
 			m_terrain_brush_size = 10;
 			m_terrain_brush_strength = 0.01f;
@@ -2483,12 +2476,6 @@ struct WorldEditorImpl : public WorldEditor
 			m_camera = Entity::INVALID;
 			m_editor_icons.clear();
 			m_engine->destroyUniverse();
-		}
-
-
-		virtual void setEditViewRenderDevice(IRenderDevice& render_device) override
-		{
-			m_edit_view_render_device = &render_device;
 		}
 
 
@@ -2800,7 +2787,6 @@ struct WorldEditorImpl : public WorldEditor
 		FS::DiskFileDevice m_disk_file_device;
 		FS::MemoryFileDevice m_mem_file_device;
 		FS::TCPFileDevice m_tcp_file_device;
-		IRenderDevice* m_edit_view_render_device;
 		Path m_universe_path;
 		Path m_base_path;
 		int m_terrain_brush_size;

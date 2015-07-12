@@ -118,14 +118,11 @@ SceneView::SceneView(QWidget* parent)
 }
 
 
-void SceneView::setWorldEditor(Lumix::WorldEditor* world_editor)
+void SceneView::setWorldEditor(Lumix::WorldEditor& world_editor)
 {
-	static_cast<ViewWidget*>(m_view)->m_world_editor = world_editor;
-	m_world_editor = world_editor;
-	if (world_editor)
-	{
-		world_editor->getMeasureTool()->distanceMeasured().bind<SceneView, &SceneView::onDistanceMeasured>(this);
-	}
+	static_cast<ViewWidget*>(m_view)->m_world_editor = &world_editor;
+	m_world_editor = &world_editor;
+	world_editor.getMeasureTool()->distanceMeasured().bind<SceneView, &SceneView::onDistanceMeasured>(this);
 }
 
 
