@@ -775,7 +775,7 @@ namespace Lumix
 			for (int i = 0; i < model.getMeshCount(); ++i)
 			{
 				mesh.m_mesh = &model.getMesh(i);
-				renderMesh(mesh);
+				renderRigidMesh(mesh);
 			}
 		}
 
@@ -800,7 +800,28 @@ namespace Lumix
 		}
 
 
-		void renderMesh(const RenderableMesh& info)
+		void renderSkinnedMesh(const RenderableMesh& info)
+		{
+			if (!info.m_model->isReady())
+			{
+				return;
+			}
+			const Mesh& mesh = *info.m_mesh;
+			const Geometry& geometry = info.m_model->getGeometry();
+			const Material* material = mesh.getMaterial();
+
+			setPoseUniform(info);
+			setMaterial(material);
+			bgfx::setTransform(info.m_matrix);
+			bgfx::setProgram(info.m_mesh->getMaterial()->getShaderInstance().m_program_handles[m_pass_idx]);
+			bgfx::setVertexBuffer(geometry.getAttributesArrayID(), mesh.getAttributeArrayOffset() / mesh.getVertexDefinition().getStride(), mesh.getAttributeArraySize() / mesh.getVertexDefinition().getStride());
+			bgfx::setIndexBuffer(geometry.getIndicesArrayID(), mesh.getIndicesOffset(), mesh.getIndexCount());
+			bgfx::setState(m_render_state | material->getRenderStates());
+			bgfx::submit(m_view_idx);
+		}
+
+
+		void renderRigidMesh(const RenderableMesh& info)
 		{
 			if (!info.m_model->isReady())
 			{
@@ -977,7 +998,14 @@ namespace Lumix
 			PROFILE_FUNCTION();
 			for (auto* mesh : meshes)
 			{
-				renderMesh(*mesh);
+				if (mesh->m_pose && mesh->m_pose->getCount() > 0)
+				{
+					renderSkinnedMesh(*mesh);
+				}
+				else
+				{
+					renderRigidMesh(*mesh);
+				}
 			}
 		}
 
