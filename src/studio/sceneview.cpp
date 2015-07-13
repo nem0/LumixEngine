@@ -8,6 +8,7 @@
 #include "graphics/pipeline.h"
 #include "graphics/render_scene.h"
 #include "insert_mesh_command.h"
+#include "wgl_render_device.h"
 #include <qapplication.h>
 #include <QDoubleSpinBox>
 #include <QDragEnterEvent>
@@ -73,8 +74,8 @@ SceneView::SceneView(QWidget* parent)
 	: QDockWidget(parent)
 	, m_is_frame_requested(false)
 	, m_is_frame_debugger_active(false)
+	, m_render_device(nullptr)
 {
-	m_pipeline = NULL;
 	m_measure_tool_label = new QLabel("");
 	QWidget* root = new QWidget();
 	QVBoxLayout* vertical_layout = new QVBoxLayout(root);
@@ -118,17 +119,39 @@ SceneView::SceneView(QWidget* parent)
 }
 
 
+SceneView::~SceneView()
+{
+	delete m_render_device;
+}
+
+
+void SceneView::render()
+{
+	if (!visibleRegion().isEmpty())
+	{
+		getPipeline()->render();
+	}
+}
+
+
 void SceneView::setWorldEditor(Lumix::WorldEditor& world_editor)
 {
 	static_cast<ViewWidget*>(m_view)->m_world_editor = &world_editor;
 	m_world_editor = &world_editor;
+	m_render_device = new WGLRenderDevice(m_world_editor->getEngine(), "pipelines/main.json");
 	world_editor.getMeasureTool()->distanceMeasured().bind<SceneView, &SceneView::onDistanceMeasured>(this);
+}
+
+
+Lumix::PipelineInstance* SceneView::getPipeline() const
+{
+	return m_render_device ? &m_render_device->getPipeline() : nullptr;
 }
 
 
 void SceneView::setWireframe(bool wireframe)
 {
-	m_pipeline->setWireframe(wireframe);
+	getPipeline()->setWireframe(wireframe);
 }
 
 
@@ -198,8 +221,8 @@ void SceneView::dropEvent(QDropEvent *event)
 
 void SceneView::resizeEvent(QResizeEvent*)
 {
-	if (m_pipeline)
+	if (getPipeline())
 	{
-		m_pipeline->resize(m_view->width(), m_view->height());
+		getPipeline()->resize(m_view->width(), m_view->height());
 	}
 }

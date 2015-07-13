@@ -27,8 +27,8 @@ public:
 	virtual ~GameView();
 
 	QWidget* getContentWidget() const;
-	void setPipeline(Lumix::PipelineInstance& pipeline) { m_pipeline = &pipeline; }
-	void setWorldEditor(Lumix::WorldEditor& editor) { m_editor = &editor; }
+	void setWorldEditor(Lumix::WorldEditor& editor);
+	void render();
 	virtual void mousePressEvent(QMouseEvent* event) override;
 	virtual void mouseMoveEvent(QMouseEvent* event) override;
 	virtual void keyPressEvent(QKeyEvent* event) override;
@@ -41,8 +41,8 @@ private:
 
 private:
 	Ui::GameView* m_ui;
-	Lumix::PipelineInstance* m_pipeline;
 	Lumix::WorldEditor* m_editor;
 	MainWindow& m_main_window;
+	class WGLRenderDevice* m_render_device;
 };
 

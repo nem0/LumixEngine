@@ -17,9 +17,10 @@ class SceneView : public QDockWidget
 	Q_OBJECT
 public:
 	explicit SceneView(QWidget* parent = NULL);
+	~SceneView();
+
 	void setWorldEditor(Lumix::WorldEditor& editor);
-	void setPipeline(Lumix::PipelineInstance& pipeline) { m_pipeline = &pipeline; }
-	Lumix::PipelineInstance* getPipeline() const { return m_pipeline; }
+	Lumix::PipelineInstance* getPipeline() const;
 	QWidget* getViewWidget() { return m_view; }
 	float getNavigationSpeed() const;
 	void changeNavigationSpeed(float value);
@@ -28,6 +29,7 @@ public:
 	bool isFrameRequested() const { return m_is_frame_requested; }
 	void frameServed() { m_is_frame_requested = false; }
 	void setWireframe(bool wireframe);
+	void render();
 
 private:
 	void onDistanceMeasured(float distance);
@@ -37,7 +39,6 @@ private:
 
 private:	
 	Lumix::WorldEditor* m_world_editor;
-	Lumix::PipelineInstance* m_pipeline;
 	QWidget* m_view;
 	QDoubleSpinBox* m_speed_input;
 	QDoubleSpinBox* m_time_delta_multiplier_input;
@@ -46,10 +47,6 @@ private:
 	int m_last_y;
 	bool m_is_frame_requested;
 	bool m_is_frame_debugger_active;
-
-signals:
-
-public slots:
-
+	class WGLRenderDevice* m_render_device;
 };
 

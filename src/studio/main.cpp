@@ -9,7 +9,6 @@
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
 #include "fps_limiter.h"
-#include "graphics/irender_device.h"
 #include "graphics/pipeline.h"
 #include "graphics/renderer.h"
 #include "physics/physics_scene.h"
@@ -19,6 +18,7 @@
 #include "wgl_render_device.h"
 #include <QApplication>
 #include <qdir.h>
+#include <Windows.h>
 
 class App
 {
@@ -28,8 +28,6 @@ class App
 			#ifdef _DEBUG
 				Lumix::enableFloatingPointTraps(true);
 			#endif
-			m_game_render_device = NULL;
-			m_edit_render_device = NULL;
 			m_qt_app = NULL;
 			m_main_window = NULL;
 			m_world_editor = NULL;
@@ -41,26 +39,7 @@ class App
 			delete m_qt_app;
 			Lumix::WorldEditor::destroy(m_world_editor);
 		}
-
-		void onUniverseCreated()
-		{
-			m_edit_render_device->getPipeline().setScene((Lumix::RenderScene*)m_world_editor->getEngine().getScene(crc32("renderer")));
-			m_game_render_device->getPipeline().setScene((Lumix::RenderScene*)m_world_editor->getEngine().getScene(crc32("renderer")));
-		}
-
-		void onUniverseDestroyed()
-		{
-			if(m_edit_render_device)
-			{
-				m_edit_render_device->getPipeline().setScene(NULL); 
-			}
-			if(m_game_render_device)
-			{
-				m_game_render_device->getPipeline().setScene(NULL); 
-			}
-			
-		}
-
+		
 
 		void renderPhysics()
 		{
@@ -92,17 +71,8 @@ class App
 
 			m_main_window->setWorldEditor(*m_world_editor);
 
-			m_edit_render_device = new WGLRenderDevice(m_world_editor->getEngine(), "pipelines/main.json");
-			m_edit_render_device->getPipeline().addCustomCommandHandler("render_physics").bind<App, &App::renderPhysics>(this);
-			m_edit_render_device->getPipeline().addCustomCommandHandler("render_gizmos").bind<App, &App::renderGizmos>(this);
-
-			m_game_render_device = new WGLRenderDevice(m_world_editor->getEngine(), "pipelines/game_view.json");
-
-			m_world_editor->universeCreated().bind<App, &App::onUniverseCreated>(this);
-			m_world_editor->universeDestroyed().bind<App, &App::onUniverseDestroyed>(this);
-
-			m_main_window->getSceneView()->setPipeline(m_edit_render_device->getPipeline());
-			m_main_window->getGameView()->setPipeline(m_game_render_device->getPipeline());
+			m_main_window->getSceneView()->getPipeline()->addCustomCommandHandler("render_physics").bind<App, &App::renderPhysics>(this);
+			m_main_window->getSceneView()->getPipeline()->addCustomCommandHandler("render_gizmos").bind<App, &App::renderGizmos>(this);
 
 			auto command_line_arguments = m_qt_app->arguments();
 			auto index_of_run_test = command_line_arguments.indexOf("-run_test");
@@ -118,33 +88,17 @@ class App
 
 		void shutdown()
 		{
-			delete m_game_render_device;
-			m_game_render_device = NULL;
-			delete m_edit_render_device;
-			m_edit_render_device = NULL;
 		}
 
 
 		void renderGizmos()
 		{
-			m_world_editor->renderIcons(*m_edit_render_device);
+			m_world_editor->renderIcons(*m_main_window->getSceneView()->getPipeline());
 			m_world_editor->getGizmo().updateScale(m_world_editor->getEditCamera());
-			m_world_editor->getGizmo().render(*m_edit_render_device);
+			m_world_editor->getGizmo().render(*m_main_window->getSceneView()->getPipeline());
 		}
 
-
-		void renderEditView()
-		{
-			if (m_main_window->getSceneView()->getViewWidget()->isVisible() && !m_main_window->getSceneView()->visibleRegion().isEmpty())
-			{
-				PROFILE_FUNCTION();
-				m_edit_render_device->beginFrame();
-				m_world_editor->render(*m_edit_render_device);
-				m_edit_render_device->endFrame();
-			}
-		}
-
-
+		
 		void handleEvents()
 		{
 			PROFILE_FUNCTION();
@@ -193,16 +147,12 @@ class App
 				{
 					PROFILE_BLOCK("tick");
 					fps_limiter->beginFrame();
+					
 					m_main_window->update();
-					renderEditView();
+					m_main_window->getSceneView()->render();
+					m_main_window->getGameView()->render();
 
-					if(!m_main_window->getGameView()->getContentWidget()->visibleRegion().isEmpty())
-					{
-						PROFILE_BLOCK("render_game_view");
-						m_game_render_device->beginFrame();
-						m_game_render_device->getPipeline().render();
-						m_game_render_device->endFrame();
-					}
+					Lumix::Renderer::frame();
 
 					m_world_editor->update();
 					if (m_main_window->getSceneView()->isFrameDebuggerActive())
@@ -218,6 +168,7 @@ class App
 						m_world_editor->updateEngine(-1, m_main_window->getSceneView()->getTimeDeltaMultiplier());
 					}
 					handleEvents();
+
 					fps_limiter->endFrame();
 				}
 				Lumix::g_profiler.frame();
@@ -228,8 +179,6 @@ class App
 
 	private:
 		Lumix::DefaultAllocator m_allocator;
-		WGLRenderDevice* m_edit_render_device;
-		WGLRenderDevice* m_game_render_device;
 		MainWindow* m_main_window;
 		Lumix::WorldEditor* m_world_editor;
 		QApplication* m_qt_app;

@@ -14,7 +14,6 @@ namespace Lumix
 	class Engine;
 	class Frustum;
 	class Geometry;
-	class IRenderDevice;
 	class LIFOAllocator;
 	class Material;
 	class Mesh;

@@ -11,8 +11,8 @@ namespace Lumix
 	class Engine;
 	class EntityTemplateSystem;
 	class IPlugin;
-	class IRenderDevice;
 	class Path;
+	class PipelineInstance;
 	class RayCastModelHit;
 	namespace FS
 	{
@@ -64,8 +64,7 @@ namespace Lumix
 			virtual Engine& getEngine() = 0;
 			virtual Universe* getUniverse() = 0;
 			virtual IAllocator& getAllocator() = 0;
-			virtual void render(IRenderDevice& render_device) = 0;
-			virtual void renderIcons(IRenderDevice& render_device) = 0;
+			virtual void renderIcons(PipelineInstance& pipeline) = 0;
 			virtual Component getEditCamera() = 0;
 			virtual class Gizmo& getGizmo() = 0;
 			virtual class FS::TCPFileServer& getTCPFileServer() = 0;

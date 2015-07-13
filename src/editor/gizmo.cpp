@@ -9,7 +9,6 @@
 #include "editor/gizmo.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
-#include "graphics/irender_device.h"
 #include "graphics/model.h"
 #include "graphics/pipeline.h"
 #include "graphics/render_scene.h"
@@ -162,7 +161,7 @@ RayCastModelHit Gizmo::castRay(const Vec3& origin, const Vec3& dir)
 }
 
 
-void Gizmo::render(IRenderDevice& render_device)
+void Gizmo::render(PipelineInstance& pipeline)
 {
 	if(!m_editor.getSelectedEntities().empty())
 	{
@@ -171,7 +170,7 @@ void Gizmo::render(IRenderDevice& render_device)
 		Matrix gizmo_mtx;
 		getMatrix(gizmo_mtx);
 		Matrix mtx = gizmo_mtx * scale_mtx;
-		render_device.getPipeline().renderModel(*m_model, mtx);
+		pipeline.renderModel(*m_model, mtx);
 	}
 }
 

@@ -5,7 +5,6 @@
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "engine/engine.h"
-#include "graphics/irender_device.h"
 #include "graphics/geometry.h"
 #include "graphics/material.h"
 #include "graphics/model.h"
@@ -124,7 +123,7 @@ float EditorIcon::hit(const Vec3& origin, const Vec3& dir) const
 }
 
 
-void EditorIcon::render(IRenderDevice& render_device)
+void EditorIcon::render(PipelineInstance& pipeline)
 {
 	if (m_is_visible)
 	{
@@ -143,7 +142,7 @@ void EditorIcon::render(IRenderDevice& render_device)
 
 		if (m_model->isReady())
 		{
-			render_device.getPipeline().renderModel(*m_model, mtx);
+			pipeline.renderModel(*m_model, mtx);
 		}
 	}
 }

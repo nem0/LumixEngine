@@ -24,7 +24,6 @@
 #include "graphics/bitmap_font.h"
 #include "graphics/culling_system.h"
 #include "graphics/geometry.h"
-#include "graphics/irender_device.h"
 #include "graphics/material.h"
 #include "graphics/model.h"
 #include "graphics/model_instance.h"
