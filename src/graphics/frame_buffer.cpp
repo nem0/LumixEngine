@@ -22,13 +22,38 @@ FrameBuffer::FrameBuffer(const Declaration& decl)
 		m_declaration.m_renderbuffers[i].m_handle = texture_handles[i];
 	}
 
+	m_window_handle = nullptr;
 	m_handle = bgfx::createFrameBuffer(decl.m_renderbuffers_count, texture_handles);
+}
+
+
+FrameBuffer::FrameBuffer(const char* name, int width, int height, void* window_handle)
+{
+	copyString(m_declaration.m_name, sizeof(m_declaration.m_name), name);
+	m_declaration.m_width = width;
+	m_declaration.m_height = height;
+	m_declaration.m_renderbuffers_count = 0;
+	m_window_handle = window_handle;
+	m_handle = bgfx::createFrameBuffer(window_handle, width, height);
 }
 
 
 FrameBuffer::~FrameBuffer()
 {
 	bgfx::destroyFrameBuffer(m_handle);
+}
+
+
+void FrameBuffer::resize(int width, int height)
+{
+	ASSERT(m_window_handle);
+	if (bgfx::isValid(m_handle))
+	{
+		bgfx::destroyFrameBuffer(m_handle);
+	}
+	m_declaration.m_width = width;
+	m_declaration.m_height = height;
+	m_handle = bgfx::createFrameBuffer(m_window_handle, width, height);
 }
 
 

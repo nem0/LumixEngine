@@ -80,6 +80,7 @@ class LUMIX_ENGINE_API PipelineInstance abstract
 		virtual void setWireframe(bool wireframe) = 0;
 		virtual void renderModel(Model& model, const Matrix& mtx) = 0;
 		virtual void toggleStats() = 0;
+		virtual void setWindowHandle(void* data) = 0;
 };
 
 

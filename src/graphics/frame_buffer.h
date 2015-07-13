@@ -31,8 +31,7 @@ class FrameBuffer
 		struct Declaration
 		{
 			Declaration()
-				: m_name(m_name_allocator)
-				, m_renderbuffers_count(0)
+				: m_renderbuffers_count(0)
 			{ }
 
 			static const int MAX_RENDERBUFFERS = 16;
@@ -41,22 +40,23 @@ class FrameBuffer
 			int32_t m_height;
 			RenderBuffer m_renderbuffers[MAX_RENDERBUFFERS];
 			int32_t m_renderbuffers_count;
-			StackAllocator<64> m_name_allocator;
-			string m_name;
+			char m_name[64];
 		};
 
 	public:
-		FrameBuffer(const Declaration& decl);
+		explicit FrameBuffer(const Declaration& decl);
+		FrameBuffer(const char* name, int width, int height, void* window_handle);
 		~FrameBuffer();
 		
 		bgfx::FrameBufferHandle getHandle() const { return m_handle; }
 		int getWidth() const { return m_declaration.m_width; }
 		int getHeight() const { return m_declaration.m_height; }
-		const char* getName() { return m_declaration.m_name.c_str(); }
+		void resize(int width, int height);
+		const char* getName() { return m_declaration.m_name; }
 		bgfx::TextureHandle getRenderbufferHandle(int idx) const { return m_declaration.m_renderbuffers[idx].m_handle; }
 
 	private:
-
+		void* m_window_handle;
 		bgfx::FrameBufferHandle m_handle;
 		Declaration m_declaration;
 };

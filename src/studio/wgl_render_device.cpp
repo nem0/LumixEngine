@@ -36,7 +36,8 @@ WGLRenderDevice::~WGLRenderDevice()
 void WGLRenderDevice::setWidget(QWidget& widget)
 {
 	auto handle = (HWND)widget.winId();
-	//getPipeline()->setWindowHandle(handle); // create framebuffer from window handle
+	getPipeline().resize(widget.width(), widget.height());
+	getPipeline().setWindowHandle(handle);
 }
 
 

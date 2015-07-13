@@ -145,7 +145,7 @@ namespace Lumix
 						FrameBuffer::Declaration& decl = m_framebuffers[i];
 						if (lua_getfield(L, -1, "name") == LUA_TSTRING)
 						{
-							decl.m_name = lua_tostring(L, -1);
+							copyString(decl.m_name, sizeof(decl.m_name), lua_tostring(L, -1));
 						}
 						lua_pop(L, 1);
 						if (lua_getfield(L, -1, "width") == LUA_TNUMBER)
@@ -237,6 +237,7 @@ namespace Lumix
 			, m_frame_allocator(allocator, 10 * 1024 * 1024)
 			, m_renderer(static_cast<PipelineImpl&>(pipeline).getRenderer())
 			, m_screen_space_material(nullptr)
+			, m_default_framebuffer(nullptr)
 			, m_debug_line_material(nullptr)
 			, m_debug_flags(BGFX_DEBUG_TEXT)
 		{
@@ -272,7 +273,6 @@ namespace Lumix
 			ResourceManagerBase* material_manager = m_source.getResourceManager().get(ResourceManager::MATERIAL);
 			material_manager->unload(*m_screen_space_material);
 			material_manager->unload(*m_debug_line_material);
-
 			bgfx::destroyUniform(m_specular_shininess_uniform);
 			bgfx::destroyUniform(m_bone_matrices_uniform);
 			bgfx::destroyUniform(m_terrain_scale_uniform);
@@ -300,6 +300,7 @@ namespace Lumix
 			{
 				m_allocator.deleteObject(m_framebuffers[i]);
 			}
+			m_allocator.deleteObject(m_default_framebuffer);
 		}
 
 		void finishInstances(int idx)
@@ -394,8 +395,15 @@ namespace Lumix
 		{
 			if (strcmp(framebuffer_name, "default") == 0)
 			{
-				m_current_framebuffer = nullptr;
-				bgfx::setViewFrameBuffer(m_view_idx, BGFX_INVALID_HANDLE);
+				m_current_framebuffer = m_default_framebuffer;
+				if (m_current_framebuffer)
+				{
+					bgfx::setViewFrameBuffer(m_view_idx, m_current_framebuffer->getHandle());
+				}
+				else
+				{
+					bgfx::setViewFrameBuffer(m_view_idx, BGFX_INVALID_HANDLE);
+				}
 				return;
 			}
 			m_current_framebuffer = getFramebuffer(framebuffer_name);
@@ -784,6 +792,12 @@ namespace Lumix
 		}
 
 
+		virtual void setWindowHandle(void* data) override
+		{
+			m_default_framebuffer = m_allocator.newObject<FrameBuffer>("default", m_width, m_height, data);
+		}
+
+
 		virtual void renderModel(Model& model, const Matrix& mtx) override
 		{
 			RenderableMesh mesh;
@@ -1030,7 +1044,14 @@ namespace Lumix
 
 		virtual void resize(int w, int h) override
 		{
-			bgfx::reset(w, h);
+			if (m_default_framebuffer)
+			{
+				m_default_framebuffer->resize(w, h);
+			}
+			else
+			{
+				bgfx::reset(w, h);
+			}
 			m_width = w;
 			m_height = h;
 		}
@@ -1052,7 +1073,7 @@ namespace Lumix
 				;
 			m_view_idx = -1;
 			m_pass_idx = -1;
-			m_current_framebuffer = nullptr;
+			m_current_framebuffer = m_default_framebuffer;
 			m_global_textures.clear();
 			memset(m_view2pass_map, 0xffffFFFF, sizeof(m_view2pass_map));
 			m_instance_data_idx = 0;
@@ -1122,6 +1143,7 @@ namespace Lumix
 		PipelineImpl& m_source;
 		RenderScene* m_scene;
 		FrameBuffer* m_current_framebuffer;
+		FrameBuffer* m_default_framebuffer;
 		Array<FrameBuffer*> m_framebuffers;
 		Array<GlobalTexture> m_global_textures;
 		Array<bgfx::UniformHandle> m_uniforms;
