@@ -12,8 +12,8 @@ namespace Lumix
 
 
 class Event;
-class IRenderDevice;
 struct Matrix;
+class PipelineInstance;
 class Universe;
 class WorldEditor;
 
@@ -62,7 +62,7 @@ class LUMIX_ENGINE_API Gizmo
 		void setUniverse(Universe* universe);
 		void startTransform(Component camera, int x, int y, TransformMode mode);
 		void transform(Component camera, TransformOperation operation, int x, int y, int relx, int rely, int flags);
-		void render(IRenderDevice& render_device);
+		void render(PipelineInstance& pipeline);
 		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir);
 		void togglePivotMode();
 		void toggleCoordSystem();

@@ -11,8 +11,8 @@ namespace Lumix
 struct Component;
 class Engine;
 struct Entity;
-class IRenderDevice;
 class Model;
+class PipelineInstance;
 class RenderScene;
 
 
@@ -33,7 +33,7 @@ class EditorIcon
 	public:
 		EditorIcon(Engine& engine, RenderScene& scene, const Entity& entity);
 		~EditorIcon();
-		void render(IRenderDevice& render_device);
+		void render(PipelineInstance& pipeline);
 		void show();
 		void hide();
 		float hit(const Vec3& origin, const Vec3& dir) const;

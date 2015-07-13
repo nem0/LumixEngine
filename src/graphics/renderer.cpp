@@ -14,7 +14,6 @@
 #include "engine/engine.h"
 #include "graphics/bitmap_font.h"
 #include "graphics/geometry.h"
-#include "graphics/irender_device.h"
 #include "graphics/material.h"
 #include "graphics/material_manager.h"
 #include "graphics/model.h"

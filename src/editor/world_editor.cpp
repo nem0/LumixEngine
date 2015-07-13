@@ -30,7 +30,6 @@
 #include "engine/engine.h"
 #include "engine/iplugin.h"
 #include "engine/plugin_manager.h"
-#include "graphics/irender_device.h"
 #include "graphics/material.h"
 #include "graphics/model.h"
 #include "graphics/pipeline.h"
@@ -2212,22 +2211,16 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
-		virtual void renderIcons(IRenderDevice& render_device) override
+		virtual void renderIcons(PipelineInstance& pipeline) override
 		{
 			PROFILE_FUNCTION();
 			for (int i = 0, c = m_editor_icons.size(); i < c; ++i)
 			{
-				m_editor_icons[i]->render(render_device);
+				m_editor_icons[i]->render(pipeline);
 			}
 
 		}
-
-		virtual void render(IRenderDevice& render_device) override
-		{
-			PROFILE_FUNCTION();
-			render_device.getPipeline().render();
-		}
-
+		
 
 		WorldEditorImpl(IAllocator& allocator)
 			: m_allocator(allocator)

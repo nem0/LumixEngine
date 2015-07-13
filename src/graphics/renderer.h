@@ -14,7 +14,6 @@ namespace Lumix
 
 class Engine;
 class Geometry;
-class IRenderDevice;
 class Material;
 class Model;
 class Pipeline;

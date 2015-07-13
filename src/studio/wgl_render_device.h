@@ -1,68 +1,29 @@
 #pragma once
 
-#include <Windows.h>
-#include "core/profiler.h"
-#include "core/resource_manager.h"
-#include "core/resource_manager_base.h"
-#include "graphics/irender_device.h"
 
-
-class WGLRenderDevice : public Lumix::IRenderDevice
+namespace Lumix
 {
-public:
-	WGLRenderDevice(Lumix::Engine& engine, const char* pipeline_path)
-	{
-		Lumix::Pipeline* pipeline_object = static_cast<Lumix::Pipeline*>(engine.getResourceManager().get(Lumix::ResourceManager::PIPELINE)->load(Lumix::Path(pipeline_path)));
-		ASSERT(pipeline_object);
-		if(pipeline_object)
-		{
-			m_pipeline = Lumix::PipelineInstance::create(*pipeline_object, engine.getAllocator());
-			m_pipeline->setScene((Lumix::RenderScene*)engine.getScene(crc32("renderer")));
-		}
+	class Engine;
+	class PipelineInstance;
+}
 
 
-	}
+class WGLRenderDevice
+{
+	public:
+		WGLRenderDevice(Lumix::Engine& engine, const char* pipeline_path);
+		virtual ~WGLRenderDevice();
 
+		Lumix::PipelineInstance& getPipeline();
+		int getWidth() const;
+		int getHeight() const;
+		void setWidget(class QWidget& widget);
 
-	~WGLRenderDevice()
-	{
-		if(m_pipeline)
-		{
-			Lumix::PipelineInstance::destroy(m_pipeline);
-		}
-	}
+	private:
+		void onUniverseCreated();
+		void onUniverseDestroyed();
 
-
-	virtual void beginFrame() override
-	{
-		PROFILE_FUNCTION();
-	}
-
-
-	virtual void endFrame() override
-	{
-		PROFILE_FUNCTION();
-		Lumix::Renderer::frame();
-	}
-
-
-	virtual Lumix::PipelineInstance& getPipeline()
-	{
-		return *m_pipeline;
-	}
-
-
-	virtual int getWidth() const override
-	{
-		return m_pipeline->getWidth();
-	}
-
-
-	virtual int getHeight() const override
-	{
-		return m_pipeline->getHeight();
-	}
-
-
-	Lumix::PipelineInstance* m_pipeline;
+	private:
+		Lumix::PipelineInstance* m_pipeline;
+		Lumix::Engine& m_engine;
 };

@@ -6,6 +6,7 @@
 #include "engine/engine.h"
 #include "graphics/pipeline.h"
 #include "mainwindow.h"
+#include "wgl_render_device.h"
 
 #include <QMouseEvent>
 
@@ -16,13 +17,33 @@ GameView::GameView(MainWindow& parent)
 	, m_main_window(parent)
 {
 	m_ui->setupUi(this);
-	m_pipeline = NULL;
+	m_editor = nullptr;
+	m_render_device = nullptr;
 }
 
 
 GameView::~GameView()
 {
+	delete m_render_device;
 	delete m_ui;
+}
+
+
+void GameView::render()
+{
+	if (!getContentWidget()->visibleRegion().isEmpty() && m_render_device)
+	{
+		m_render_device->getPipeline().render();
+	}
+}
+
+
+void GameView::setWorldEditor(Lumix::WorldEditor& editor)
+{
+	ASSERT(m_editor == nullptr);
+	m_editor = &editor;
+	m_render_device = new WGLRenderDevice(m_editor->getEngine(), "pipelines/game_view.json");
+	m_render_device->setWidget(*this);
 }
 
 
@@ -36,9 +57,9 @@ void GameView::resizeEvent(QResizeEvent* event)
 {
 	int w = event->size().width();
 	int h = event->size().height();
-	if (m_pipeline)
+	if (m_render_device)
 	{
-		m_pipeline->resize(w, h);
+		m_render_device->getPipeline().resize(w, h);
 	}
 }
 
