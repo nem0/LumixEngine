@@ -61,7 +61,11 @@ namespace Lumix
 					m_data[i] |= (m_data[i + 1] & 0x80000000) >> BITMASK_7BIT;
 				}
 			}
-			m_data[last_major] <<= 1;
+			if (major < last_major)
+			{
+				m_data[last_major] <<= 1;
+			}
+			--m_size;
 		}
 	}
 
