@@ -339,7 +339,6 @@ namespace Lumix
 
 		void setPass(const char* name)
 		{
-			finishInstances();
 			m_pass_idx = m_renderer.getPassIdx(name);
 			for (int i = 0; i < lengthOf(m_view2pass_map); ++i)
 			{
@@ -600,7 +599,7 @@ namespace Lumix
 		}
 
 
-		void setPointLightUniforms(const Component& light_cmp)
+		void setPointLightUniforms(const Component& light_cmp) const
 		{
 			Vec4 light_pos_radius(light_cmp.entity.getPosition(), m_scene->getLightRange(light_cmp));
 			bgfx::setUniform(m_light_pos_radius_uniform, &light_pos_radius);
@@ -617,7 +616,7 @@ namespace Lumix
 		}
 
 
-		void setDirectionalLightUniforms(const Component& light_cmp)
+		void setDirectionalLightUniforms(const Component& light_cmp) const
 		{
 			Vec4 diffuse_light_color(m_scene->getGlobalLightColor(light_cmp) * m_scene->getGlobalLightIntensity(light_cmp), 1);
 			bgfx::setUniform(m_light_color_uniform, &diffuse_light_color);
@@ -636,7 +635,7 @@ namespace Lumix
 		}
 
 		
-		void setLightUniforms(const Component& light_cmp)
+		void setLightUniforms(const Component& light_cmp) const
 		{
 			if (light_cmp.isValid())
 			{
@@ -649,6 +648,7 @@ namespace Lumix
 					setDirectionalLightUniforms(light_cmp);
 				}
 			}
+			bgfx::submit(m_view_idx);
 		}
 
 		
@@ -684,7 +684,6 @@ namespace Lumix
 				renderMeshes(m_tmp_meshes);
 				renderTerrains(m_tmp_terrains);
 				renderGrasses(m_tmp_grasses);
-				finishInstances();
 			}
 		}
 
@@ -771,7 +770,6 @@ namespace Lumix
 
 				m_scene->getRenderableInfos(frustum, m_tmp_meshes, layer_mask);
 				m_scene->getTerrainInfos(m_tmp_terrains, layer_mask, m_scene->getAppliedCamera().entity.getPosition(), m_frame_allocator);
-
 				setLightUniforms(m_scene->getActiveGlobalLight());
 				renderMeshes(m_tmp_meshes);
 				renderTerrains(m_tmp_terrains);
@@ -780,7 +778,6 @@ namespace Lumix
 					m_scene->getGrassInfos(frustum, m_tmp_grasses, layer_mask);
 					renderGrasses(m_tmp_grasses);
 				}
-				finishInstances();
 			}
 		}
 
@@ -1039,6 +1036,7 @@ namespace Lumix
 					renderRigidMesh(*mesh);
 				}
 			}
+			finishInstances();
 		}
 
 
