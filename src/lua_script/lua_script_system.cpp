@@ -1,6 +1,5 @@
-#include "script_system.h"
-#include <Windows.h>
 #include "core/iallocator.h"
+#include "core/binary_array.h"
 #include "core/crc32.h"
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
@@ -10,6 +9,7 @@
 #include "core/array.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
+#include "engine/iplugin.h"
 #include "universe/universe.h"
 
 
@@ -18,9 +18,9 @@ static const uint32_t SCRIPT_HASH = crc32("script");
 
 namespace Lumix
 {
-	class ScriptSystemImpl;
-
-	class ScriptSceneImpl : public ScriptScene
+	class LuaScriptSystemImpl;
+	/*
+	class ScriptSceneImpl
 	{
 		public:
 			typedef void (*InitFunction)(ScriptScene*);
@@ -30,7 +30,7 @@ namespace Lumix
 			typedef void (*DeserializeFunction)(InputBlob&);
 
 		public:
-			ScriptSceneImpl(ScriptSystemImpl& system, Engine& engine, Universe& universe)
+			ScriptSceneImpl(LuaScriptSystemImpl& system, Engine& engine, Universe& universe)
 				: m_universe(universe)
 				, m_engine(engine)
 				, m_system(system)
@@ -349,7 +349,7 @@ namespace Lumix
 			Array<Path> m_paths;
 			Universe& m_universe;
 			Engine& m_engine;
-			ScriptSystemImpl& m_system;
+			LuaScriptSystemImpl& m_system;
 			Library* m_library;
 			Path m_library_path;
 			UpdateFunction m_update_function;
@@ -360,68 +360,180 @@ namespace Lumix
 			bool m_reload_after_compile;
 
 			DelegateList<void(const Path&, const Path&)> m_script_renamed;
-	};
 
-	class ScriptSystemImpl : public IPlugin
+	};*/
+
+	static const uint32_t LUA_SCRIPT_HASH = crc32("lua_script");
+
+
+	class LuaScriptSystem : public IPlugin
 	{
 		public:
 			Engine& m_engine;
 			BaseProxyAllocator m_allocator;
 
+			LuaScriptSystem(Engine& engine);
+			IAllocator& getAllocator();
+			virtual IScene* createScene(Universe& universe) override;
+			virtual void destroyScene(IScene* scene) override;
+			virtual bool create() override;
+			virtual void destroy() override;
+			virtual const char* getName() const override;
+	};
 
-			ScriptSystemImpl(Engine& engine)
-				: m_engine(engine)
-				, m_allocator(engine.getAllocator())
+
+	class LuaScriptScene : public IScene
+	{
+		public:
+			LuaScriptScene(LuaScriptSystem& system, Engine& engine, Universe& universe)
+				: m_system(system)
+				, m_universe(universe)
+				, m_scripts(system.getAllocator())
+				, m_valid(system.getAllocator())
 			{
 			}
 
 
-			virtual IScene* createScene(Universe& universe) override
+			virtual Component createComponent(uint32_t type, const Entity& entity) override
 			{
-				return m_allocator.newObject<ScriptSceneImpl>(*this, m_engine, universe);
-			}
-
-
-			virtual void destroyScene(IScene* scene) override
-			{
-				m_allocator.deleteObject(scene);
-			}
-
-
-			virtual bool create() override
-			{
-				if (m_engine.getWorldEditor())
+				if (type == LUA_SCRIPT_HASH)
 				{
-					IAllocator& allocator = m_engine.getWorldEditor()->getAllocator();
-#error todo m_engine.getWorldEditor()->registerComponentType(...
-					m_engine.getWorldEditor()->registerProperty("script", allocator.newObject<FilePropertyDescriptor<ScriptSceneImpl> >("source", (void (ScriptSceneImpl::*)(Component, string&))&ScriptSceneImpl::getScriptPath, &ScriptSceneImpl::setScriptPath, "Script (*.cpp)", allocator));
+					LuaScriptScene::Script& script = m_scripts.pushEmpty();
+					script.m_entity = entity.index;
+					script.m_path = "";
+					m_valid.push(true);
+					Component cmp = m_universe.addComponent(entity, type, this, m_scripts.size() - 1);
+					m_universe.componentCreated().invoke(cmp);
+					return cmp;
 				}
-				return true;
+				return Component::INVALID;
 			}
 
 
-			virtual void destroy() override
+			virtual void destroyComponent(const Component& component) override
+			{
+				if (component.type == LUA_SCRIPT_HASH)
+				{
+					m_universe.destroyComponent(component);
+					m_valid[component.index] = false;
+				}
+			}
+
+
+			virtual void serialize(OutputBlob& serializer) override
+			{
+				ASSERT(false);
+			}
+
+
+			virtual void deserialize(InputBlob& serializer) override
+			{
+				ASSERT(false);
+			}
+
+
+			virtual IPlugin& getPlugin() const override
+			{
+				return m_system;
+			}
+
+
+			virtual void update(float time_delta) override
 			{
 			}
 
 
-			virtual const char* getName() const override
+			virtual bool ownComponentType(uint32_t type) const override
 			{
-				return "script";
+				return type == LUA_SCRIPT_HASH;
 			}
 
-	}; // ScriptSystemImpl
+
+			void getScriptPath(Component cmp, string& path)
+			{
+				path = m_scripts[cmp.index].m_path.c_str();
+			}
 
 
-	IPlugin& ScriptSceneImpl::getPlugin() const
+			void setScriptPath(Component cmp, const string& path)
+			{
+				m_scripts[cmp.index].m_path = path;
+			}
+
+		private:
+			class Script
+			{
+				public:
+					Lumix::Path m_path;
+					int m_entity;
+			};
+
+		private:
+			LuaScriptSystem& m_system;
+			
+			BinaryArray m_valid;
+			Array<Script> m_scripts;
+			Universe& m_universe;
+	};
+
+
+	LuaScriptSystem::LuaScriptSystem(Engine& engine)
+		: m_engine(engine)
+		, m_allocator(engine.getAllocator())
 	{
-		return m_system;
 	}
-	
 
-	extern "C" IPlugin* createPlugin(Engine& engine)
+
+	IAllocator& LuaScriptSystem::getAllocator()
 	{
-		return engine.getAllocator().newObject<ScriptSystemImpl>(engine);
+		return m_allocator;
+	}
+
+
+	IScene* LuaScriptSystem::createScene(Universe& universe)
+	{
+		return m_allocator.newObject<LuaScriptScene>(*this, m_engine, universe);
+	}
+
+
+	void LuaScriptSystem::destroyScene(IScene* scene)
+	{
+		m_allocator.deleteObject(scene);
+	}
+
+
+	bool LuaScriptSystem::create()
+	{
+		if (m_engine.getWorldEditor())
+		{
+			IAllocator& allocator = m_engine.getWorldEditor()->getAllocator();
+			m_engine.getWorldEditor()->registerComponentType("lua_script", "Lua script");
+			m_engine.getWorldEditor()->registerProperty("lua_script"
+				, allocator.newObject<FilePropertyDescriptor<LuaScriptScene> >("source"
+					, (void (LuaScriptScene::*)(Component, string&))&LuaScriptScene::getScriptPath
+					, &LuaScriptScene::setScriptPath
+					, "Lua (*.lua)"
+					, allocator)
+			);
+		}
+		return true;
+	}
+
+
+	void LuaScriptSystem::destroy()
+	{
+	}
+
+
+	const char* LuaScriptSystem::getName() const
+	{
+		return "lua_script";
+	}
+
+
+	extern "C" LUMIX_LIBRARY_EXPORT IPlugin* createPlugin(Engine& engine)
+	{
+		return engine.getAllocator().newObject<LuaScriptSystem>(engine);
 	}
 
 } // ~namespace Lumix

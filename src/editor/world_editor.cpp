@@ -1253,6 +1253,32 @@ struct WorldEditorImpl : public WorldEditor
 		}
 
 
+		virtual const char* getComponentTypeName(int index) override
+		{
+			return m_component_types[index].m_name.c_str();
+		}
+
+
+		virtual const char* getComponentTypeID(int index) override
+		{
+			return m_component_types[index].m_id.c_str();
+		}
+
+
+		virtual int getComponentTypesCount() const override
+		{
+			return m_component_types.size();
+		}
+
+
+		virtual void registerComponentType(const char* id, const char* name) override
+		{
+			ComponentType& type = m_component_types.emplace(m_allocator);
+			type.m_name = name;
+			type.m_id = id;
+		}
+
+
 		virtual void registerProperty(const char* component_type, IPropertyDescriptor* descriptor) override
 		{
 			ASSERT(descriptor);
@@ -2138,6 +2164,10 @@ struct WorldEditorImpl : public WorldEditor
 			{
 				g_log_info.log("plugins") << "physics plugin has not been loaded";
 			}
+			if (!m_engine->loadPlugin("lua_script.dll"))
+			{
+				g_log_info.log("plugins") << "lua_script plugin has not been loaded";
+			}
 			if (!m_engine->loadPlugin("script.dll"))
 			{
 				g_log_info.log("plugins") << "script plugin has not been loaded";
@@ -2247,6 +2277,7 @@ struct WorldEditorImpl : public WorldEditor
 			, m_copy_buffer(m_allocator)
 			, m_camera(Entity::INVALID)
 			, m_editor_command_creators(m_allocator)
+			, m_component_types(m_allocator)
 		{
 			m_go_to_parameters.m_is_active = false;
 			m_undo_index = -1;
@@ -2750,10 +2781,22 @@ struct WorldEditorImpl : public WorldEditor
 			float m_speed;
 		};
 
+		struct ComponentType
+		{
+			ComponentType(IAllocator& allocator)
+				: m_name(allocator)
+				, m_id(allocator)
+			{}
+
+			string m_name;
+			string m_id;
+		};
+
 		Debug::Allocator m_allocator;
 		GoToParameters m_go_to_parameters;
 		MT::Mutex m_universe_mutex;
 		Gizmo m_gizmo;
+		Array<ComponentType> m_component_types;
 		Array<Entity> m_selected_entities;
 		AssociativeArray<uint32_t, Array<IPropertyDescriptor*> > m_component_properties;
 		MouseMode::Value m_mouse_mode;

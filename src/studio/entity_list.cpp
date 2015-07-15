@@ -13,22 +13,6 @@
 #include <qmimedata.h>
 
 
-static const char* component_map[] =
-{
-	"Animable", "animable",
-	"Camera", "camera",
-	"Global light", "global_light",
-	"Mesh", "renderable",
-	"Physics Box", "box_rigid_actor",
-	"Physics Controller", "physical_controller",
-	"Physics Mesh", "mesh_rigid_actor",
-	"Physics Heightfield", "physical_heightfield",
-	"Point light", "point_light",
-	"Script", "script",
-	"Terrain", "terrain"
-};
-
-
 static const uint32_t RENDERABLE_HASH = crc32("renderable");
 
 
@@ -607,9 +591,9 @@ void EntityList::setWorldEditor(Lumix::WorldEditor& editor)
 	m_filter->setWorldEditor(editor);
 	m_ui->comboBox->clear();
 	m_ui->comboBox->addItem("All");
-	for (int i = 0; i < lengthOf(component_map); i += 2)
+	for (int i = 0; i < m_editor->getComponentTypesCount(); ++i)
 	{
-		m_ui->comboBox->addItem(component_map[i]);
+		m_ui->comboBox->addItem(m_editor->getComponentTypeName(i));
 	}
 	editor.entitySelected().bind<EntityList, &EntityList::onEntitySelected>(this);
 }
@@ -679,11 +663,11 @@ void EntityList::on_entityList_clicked(const QModelIndex &index)
 
 void EntityList::on_comboBox_activated(const QString &arg1)
 {
-	for (int i = 0; i < lengthOf(component_map); i += 2)
+	for (int i = 0; i < m_editor->getComponentTypesCount(); ++i)
 	{
-		if (arg1 == component_map[i])
+		if (arg1 == m_editor->getComponentTypeName(i))
 		{
-			m_filter->filterComponent(crc32(component_map[i + 1]));
+			m_filter->filterComponent(crc32(m_editor->getComponentTypeID(i)));
 			if (m_is_update_enabled)
 			{
 				m_filter->invalidate();
