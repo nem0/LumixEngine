@@ -326,7 +326,11 @@ void Texture::removeDataReference()
 
 bool Texture::loadDDS(FS::IFile& file)
 {
-	m_texture_handle = bgfx::createTexture(bgfx::copy(file.getBuffer(), file.size()));
+	bgfx::TextureInfo info;
+	m_texture_handle = bgfx::createTexture(bgfx::copy(file.getBuffer(), file.size()), 0, 0, &info);
+	m_BPP = -1;
+	m_width = info.width;
+	m_height = info.height;
 	return bgfx::isValid(m_texture_handle);
 }
 
@@ -378,6 +382,7 @@ void Texture::doUnload(void)
 	if (bgfx::isValid(m_texture_handle))
 	{
 		bgfx::destroyTexture(m_texture_handle);
+		m_texture_handle = BGFX_INVALID_HANDLE;
 	}
 	m_data.clear();
 	m_size = 0;

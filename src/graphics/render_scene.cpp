@@ -456,7 +456,7 @@ namespace Lumix
 				m_light_influenced_geometry.clear();
 				for (int i = 0; i < size; ++i)
 				{
-					m_light_influenced_geometry.push(Array<Renderable*>(m_allocator));
+					m_light_influenced_geometry.push(Array<int>(m_allocator));
 					PointLight& light = m_point_lights[i];
 					serializer.read(light.m_uid);
 					serializer.read(light.m_color);
@@ -523,16 +523,29 @@ namespace Lumix
 				deserializeRenderables(serializer);
 				deserializeLights(serializer);
 				deserializeTerrains(serializer);
-				for (int i = 0; i < m_point_lights.size(); ++i)
-				{
-					detectLightInfluencedGeometry(i);
-				}
 			}
 
 
 			void destroyRenderable(const Component& component)
 			{
 				int renderable_index = getRenderable(component.index);
+				for (int i = 0; i < m_light_influenced_geometry.size(); ++i)
+				{
+					Array<int>& influenced_geometry = m_light_influenced_geometry[i];
+					for (int j = 0; j < influenced_geometry.size(); ++j)
+					{
+						if (influenced_geometry[j] == renderable_index)
+						{
+							influenced_geometry.erase(j);
+							--j;
+						}
+						else if (influenced_geometry[j] > renderable_index)
+						{
+							--influenced_geometry[j];
+						}
+					}
+				}
+
 				setModel(renderable_index, NULL);
 				m_always_visible.eraseItemFast(component.index);
 				m_allocator.deleteObject(m_renderables[renderable_index]);
@@ -556,20 +569,6 @@ namespace Lumix
 			{
 				if (component.type == RENDERABLE_HASH)
 				{
-					Renderable* renderable = m_renderables[getRenderable(component.index)];
-					for (int i = 0; i < m_light_influenced_geometry.size(); ++i)
-					{
-						Array<Renderable*>& influenced_geometry = m_light_influenced_geometry[i];
-						for (int j = 0; j < influenced_geometry.size(); ++j)
-						{
-							if (influenced_geometry[j] == renderable)
-							{
-								influenced_geometry.erase(j);
-								i = m_light_influenced_geometry.size();
-								break; 
-							}
-						}
-					}
 					destroyRenderable(component);
 				}
 				else if (component.type == GLOBAL_LIGHT_HASH)
@@ -674,7 +673,7 @@ namespace Lumix
 			void onEntityMoved(const Entity& entity)
 			{
 				DynamicRenderableCache::iterator iter = m_dynamic_renderable_cache.find(entity.index);
-				Renderable* renderable = NULL;
+				int renderable_index = -1;
 				if (!iter.isValid())
 				{
 					for (int i = 0, c = m_renderables.size(); i < c; ++i)
@@ -684,7 +683,7 @@ namespace Lumix
 							m_dynamic_renderable_cache.insert(entity.index, i);
 							m_renderables[i]->m_matrix = entity.getMatrix();
 							m_culling_system->updateBoundingPosition(entity.getMatrix().getTranslation(), i);
-							renderable = m_renderables[i];
+							renderable_index = i;
 							break;
 						}
 					}
@@ -692,7 +691,7 @@ namespace Lumix
 				else
 				{
 					m_renderables[iter.value()]->m_matrix = entity.getMatrix();
-					renderable = m_renderables[iter.value()];
+					renderable_index = iter.value();
 					m_culling_system->updateBoundingPosition(entity.getMatrix().getTranslation(), iter.value());
 				}
 
@@ -702,19 +701,19 @@ namespace Lumix
 					PointLight& light = m_point_lights[i];
 					frustum.computeOrtho(light.m_entity.getPosition(), Vec3(1, 0, 0), Vec3(0, 1, 0), light.m_range, light.m_range, -light.m_range, light.m_range);
 
-					if (renderable && m_is_forward_rendered)
+					if (renderable_index >= 0 && m_is_forward_rendered)
 					{
 						for (int j = 0; j < m_light_influenced_geometry[i].size(); ++j)
 						{
-							if (m_light_influenced_geometry[i][j] == renderable)
+							if (m_light_influenced_geometry[i][j] == renderable_index)
 							{
 								m_light_influenced_geometry[i].eraseFast(j);
 								break;
 							}
 						}
-						if (frustum.isSphereInside(renderable->m_entity.getPosition(), renderable->m_model->getBoundingRadius()))
+						if (frustum.isSphereInside(m_renderables[renderable_index]->m_entity.getPosition(), m_renderables[renderable_index]->m_model->getBoundingRadius()))
 						{
-							m_light_influenced_geometry[i].push(renderable);
+							m_light_influenced_geometry[i].push(renderable_index);
 						}
 					}
 					if (m_point_lights[i].m_entity == entity)
@@ -1126,9 +1125,10 @@ namespace Lumix
 				int light_index = getPointLightIndex(light_cmp.index);
 				for (int j = 0, cj = m_light_influenced_geometry[light_index].size(); j < cj; ++j)
 				{
-					Renderable* renderable = m_light_influenced_geometry[light_index][j];
-					bool is_layer = (layer_mask & m_culling_system->getLayerMask(renderable->m_component_index)) != 0;
-					const Sphere& sphere = m_culling_system->getSpheres()[renderable->m_component_index];
+					int renderable_index = m_light_influenced_geometry[light_index][j];
+					Renderable* renderable = m_renderables[renderable_index];
+					bool is_layer = (layer_mask & m_culling_system->getLayerMask(renderable_index)) != 0;
+					const Sphere& sphere = m_culling_system->getSpheres()[renderable_index];
 					if (is_layer && frustum.isSphereInside(sphere.m_position, sphere.m_radius))
 					{
 						for (int k = 0, kc = renderable->m_meshes.size(); k < kc; ++k)
@@ -1707,6 +1707,18 @@ namespace Lumix
 					info.m_matrix = &m_renderables[renderable_index]->m_matrix;
 					info.m_model = model;
 				}
+				
+				for (int i = 0; i < m_point_lights.size(); ++i)
+				{
+					PointLight& light = m_point_lights[i];
+					Renderable* renderable = m_renderables[renderable_index];
+					Vec3 t = renderable->m_matrix.getTranslation();
+					float r = renderable->m_model->getBoundingRadius();
+					if ((t - light.m_entity.getPosition()).squaredLength() < (r + light.m_range) * (r + light.m_range))
+					{
+						m_light_influenced_geometry[i].push(renderable_index);
+					}
+				}
 			}
 
 			void modelLoaded(Model* model)
@@ -1778,7 +1790,7 @@ namespace Lumix
 					frustum.computeOrtho(light.m_entity.getPosition(), Vec3(1, 0, 0), Vec3(0, 1, 0), light.m_range, light.m_range, -light.m_range, light.m_range);
 					m_culling_system->cullToFrustum(frustum, 0xffffFFFF);
 					const CullingSystem::Results& results = m_culling_system->getResult();
-					Array<Renderable*>& influenced_geometry = m_light_influenced_geometry[light_index];
+					Array<int>& influenced_geometry = m_light_influenced_geometry[light_index];
 					influenced_geometry.clear();
 					for (int i = 0; i < results.size(); ++i)
 					{
@@ -1786,7 +1798,7 @@ namespace Lumix
 						influenced_geometry.reserve(influenced_geometry.size() + subresult.size());
 						for (int j = 0, c = subresult.size(); j < c; ++j)
 						{
-							influenced_geometry.push(m_renderables[subresult[j]]);
+							influenced_geometry.push(subresult[j]);
 						}
 					}
 				}
@@ -1832,7 +1844,7 @@ namespace Lumix
 			Component createPointLight(const Entity& entity)
 			{
 				PointLight& light = m_point_lights.pushEmpty();
-				m_light_influenced_geometry.push(Array<Renderable*>(m_allocator));
+				m_light_influenced_geometry.push(Array<int>(m_allocator));
 				light.m_entity = entity;
 				light.m_color.set(1, 1, 1);
 				light.m_intensity = 1;
@@ -1876,7 +1888,7 @@ namespace Lumix
 			
 			int m_point_light_last_uid;
 			Array<PointLight> m_point_lights;
-			Array<Array<Renderable*> > m_light_influenced_geometry;
+			Array<Array<int> > m_light_influenced_geometry;
 			int m_active_global_light_uid;
 			int m_global_light_last_uid;
 			Array<GlobalLight> m_global_lights;
