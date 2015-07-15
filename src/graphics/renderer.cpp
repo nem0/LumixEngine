@@ -108,6 +108,13 @@ namespace Lumix
 				WorldEditor& editor = *engine.getWorldEditor();
 				IAllocator& allocator = editor.getAllocator();
 
+				editor.registerComponentType("camera", "Camera");
+				editor.registerComponentType("global_light", "Global light");
+				editor.registerComponentType("renderable", "Mesh");
+				editor.registerComponentType("point_light", "Point light");
+				editor.registerComponentType("terrain", "Terrain");
+
+
 				editor.registerProperty("camera", allocator.newObject<StringPropertyDescriptor<RenderScene> >("slot", &RenderScene::getCameraSlot, &RenderScene::setCameraSlot, allocator));
 				editor.registerProperty("camera", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("fov", &RenderScene::getCameraFOV, &RenderScene::setCameraFOV, 0.0f, 360.0f, 1.0f, allocator));
 				editor.registerProperty("camera", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("near", &RenderScene::getCameraNearPlane, &RenderScene::setCameraNearPlane, 0.0f, FLT_MAX, 0.0f, allocator));

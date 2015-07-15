@@ -13,29 +13,13 @@
 #include <qpushbutton.h>
 
 
-static const char* component_map[] =
+const char* EntityModel::getComponentName(Lumix::Component cmp) const
 {
-	"Animable", "animable",
-	"Camera", "camera",
-	"Global light", "global_light",
-	"Mesh", "renderable",
-	"Physics Box", "box_rigid_actor",
-	"Physics Controller", "physical_controller",
-	"Physics Mesh", "mesh_rigid_actor",
-	"Physics Heightfield", "physical_heightfield",
-	"Point light", "point_light",
-	"Script", "script",
-	"Terrain", "terrain"
-};
-
-
-static const char* getComponentName(Lumix::Component cmp)
-{
-	for (int i = 0; i < lengthOf(component_map); i += 2)
+	for (int i = 0; i < m_editor.getComponentTypesCount(); ++i)
 	{
-		if (cmp.type == crc32(component_map[i + 1]))
+		if (cmp.type == crc32(m_editor.getComponentTypeID(i)))
 		{
-			return component_map[i];
+			return m_editor.getComponentTypeName(i);
 		}
 	}
 	return "Unknown component";
@@ -439,18 +423,18 @@ void EntityModel::addComponent(QWidget* widget, QPoint pos)
 	};
 
 	CB* combobox = new CB(widget);
-	for (int i = 0; i < lengthOf(component_map); i += 2)
+	for (int i = 0; i < m_editor.getComponentTypesCount(); ++i)
 	{
-		combobox->addItem(component_map[i]);
+		combobox->addItem(m_editor.getComponentTypeName(i));
 	}
 	combobox->connect(combobox, (void (QComboBox::*)(int))&QComboBox::activated, [this, combobox](int value) {
-		for (int i = 0; i < lengthOf(component_map); i += 2)
+		for (int i = 0; i < m_editor.getComponentTypesCount(); ++i)
 		{
-			if (combobox->itemText(value) == component_map[i])
+			if (combobox->itemText(value) == m_editor.getComponentTypeName(i))
 			{
-				if (!m_editor.getComponent(m_entity, crc32(component_map[i + 1])).isValid())
+				if (!m_editor.getComponent(m_entity, crc32(m_editor.getComponentTypeID(i))).isValid())
 				{
-					m_editor.addComponent(crc32(component_map[i + 1]));
+					m_editor.addComponent(crc32(m_editor.getComponentTypeID(i)));
 				}
 				break;
 			}

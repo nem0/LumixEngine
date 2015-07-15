@@ -99,6 +99,7 @@ target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/x86/PhysX3CookingCHECKED
 
 ###################### SCRIPT ######################
 
+#[[
 file(GLOB SCRIPT_ROOT_FILES ${SRC_PATH}script/*.cpp ${SRC_PATH}script/*.h)
 
 source_group("" FILES ${SCRIPT_ROOT_FILES})
@@ -113,7 +114,7 @@ set_target_properties (script PROPERTIES COMPILE_DEFINITIONS "BUILDING_SCRIPT")
 
 target_link_libraries(script core)
 target_link_libraries(script engine)
-
+]]
 
 ###################### ANIMATION ######################
 
@@ -132,6 +133,24 @@ set_target_properties (animation PROPERTIES COMPILE_DEFINITIONS "BUILDING_ANIMAT
 target_link_libraries(animation core)
 target_link_libraries(animation engine)
 
+###################### LUA_SCRIPT ######################
+
+file(GLOB LUA_SCRIPT_ROOT_FILES ${SRC_PATH}lua_script/*.cpp ${SRC_PATH}lua_script/*.h)
+
+include_directories(${EXTERNAL_PATH}lua/include)
+source_group("" FILES ${LUA_SCRIPT_ROOT_FILES})
+
+include_directories(${SRC_PATH})
+
+add_library(lua_script SHARED
+	${LUA_SCRIPT_ROOT_FILES}
+)
+
+set_target_properties (lua_script PROPERTIES COMPILE_DEFINITIONS "BUILDING_LUA_SCRIPT")
+
+target_link_libraries(lua_script ${EXTERNAL_PATH}lua/lib/debug/lua.lib)
+target_link_libraries(lua_script core)
+target_link_libraries(lua_script engine)
 
 ###################### STUDIO ######################
 
@@ -177,7 +196,7 @@ add_executable(studio
 
 target_link_libraries(studio core)
 target_link_libraries(studio engine)
-target_link_libraries(studio script)
+# target_link_libraries(studio script)
 target_link_libraries(studio physics)
 target_link_libraries(studio animation)
 target_link_libraries(studio Qt5::Core)
@@ -189,7 +208,6 @@ target_link_libraries(studio debug ${EXTERNAL_PATH}assimp/lib/win32/assimp-vc120
 target_link_libraries(studio ${EXTERNAL_PATH}crunch/lib/win32/crnlib${CMAKE_CFG_INTDIR}.lib)
 set_target_properties(studio PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
  
-
 ###################### COPY_DLLS ######################
 
 if (NOT DEFINED ENV{QTDIR})

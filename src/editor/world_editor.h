@@ -59,6 +59,10 @@ namespace Lumix
 			virtual void update() = 0;
 			virtual void updateEngine(float forced_time_delta, float time_delta_multiplier) = 0;
 			virtual void registerProperty(const char* component_type, IPropertyDescriptor* descriptor) = 0;
+			virtual int getComponentTypesCount() const = 0;
+			virtual const char* getComponentTypeName(int index) = 0;
+			virtual const char* getComponentTypeID(int index) = 0;
+			virtual void registerComponentType(const char* id, const char* name) = 0;
 			virtual IPropertyDescriptor* getProperty(const char* component_type, const char* property_name) = 0;
 			virtual void executeCommand(IEditorCommand* command) = 0;
 			virtual Engine& getEngine() = 0;

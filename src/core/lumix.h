@@ -50,46 +50,48 @@ int lengthOf(const T(&)[count])
 	#define NULL nullptr
 #endif
 
+#define LUMIX_LIBRARY_EXPORT __declspec(dllexport)
+#define LUMIX_LIBRARY_IMPORT __declspec(dllimport)
 #define LUMIX_ALIGN_OF(T) __alignof(T)
 #define LUMIX_FORCE_INLINE __forceinline
 
 #ifdef BUILDING_CORE
-	#define LUMIX_CORE_API __declspec(dllexport)
+	#define LUMIX_CORE_API LUMIX_LIBRARY_EXPORT
 #else
-	#define LUMIX_CORE_API __declspec(dllimport)
+	#define LUMIX_CORE_API LUMIX_LIBRARY_IMPORT
 #endif
 
 
 #ifdef BUILDING_PHYSICS
-	#define LUMIX_PHYSICS_API __declspec(dllexport)
+	#define LUMIX_PHYSICS_API LUMIX_LIBRARY_EXPORT
 #else
-	#define LUMIX_PHYSICS_API __declspec(dllimport)
+	#define LUMIX_PHYSICS_API LUMIX_LIBRARY_IMPORT
 #endif
 
 
 #ifdef BUILDING_NAVIGATION
-	#define LUMIX_NAVIGATION_API __declspec(dllexport)
+	#define LUMIX_NAVIGATION_API LUMIX_LIBRARY_EXPORT
 #else
-	#define LUMIX_NAVIGATION_API __declspec(dllimport)
+	#define LUMIX_NAVIGATION_API LUMIX_LIBRARY_IMPORT
 #endif
 
 
 #ifdef BUILDING_ENGINE
-	#define LUMIX_ENGINE_API __declspec(dllexport)
+	#define LUMIX_ENGINE_API LUMIX_LIBRARY_EXPORT
 #else
-	#define LUMIX_ENGINE_API __declspec(dllimport)
+	#define LUMIX_ENGINE_API LUMIX_LIBRARY_IMPORT
 #endif
 
 #ifdef BUILDING_SCRIPT
-	#define LUMIX_SCRIPT_API __declspec(dllexport)
+	#define LUMIX_SCRIPT_API LUMIX_LIBRARY_EXPORT
 #else
-	#define LUMIX_SCRIPT_API __declspec(dllimport)
+	#define LUMIX_SCRIPT_API LUMIX_LIBRARY_IMPORT
 #endif
 
 #ifdef BUILDING_ANIMATION
-	#define LUMIX_ANIMATION_API __declspec(dllexport)
+	#define LUMIX_ANIMATION_API LUMIX_LIBRARY_EXPORT
 #else
-	#define LUMIX_ANIMATION_API __declspec(dllimport)
+	#define LUMIX_ANIMATION_API LUMIX_LIBRARY_IMPORT
 #endif
 
 #define LUMIX_RESTRICT __restrict
