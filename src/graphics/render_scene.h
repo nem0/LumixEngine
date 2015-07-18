@@ -95,8 +95,6 @@ namespace Lumix
 			virtual Component getActiveGlobalLight() = 0;
 			virtual void setActiveGlobalLight(const Component& cmp) = 0;
 
-			virtual void addDebugText(const char* text, int x, int y) = 0;
-
 			virtual void addDebugLine(const Vec3& from, const Vec3& to, const Vec3& color, float life) = 0;
 			virtual void addDebugLine(const Vec3& from, const Vec3& to, uint32_t color, float life) = 0;
 			virtual void addDebugCross(const Vec3& center, float size, const Vec3& color, float life) = 0;

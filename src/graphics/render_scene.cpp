@@ -1255,12 +1255,6 @@ namespace Lumix
 			}
 
 
-			virtual void addDebugText(const char* text, int x, int y) override
-			{
-				bgfx::dbgTextPrintf(x, y, 0x4f, text);
-			}
-
-
 			virtual void addDebugSphere(const Vec3& center, float radius, const Vec3& color, float life) override
 			{
 				static const int COLS = 36;

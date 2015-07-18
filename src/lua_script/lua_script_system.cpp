@@ -11,6 +11,8 @@
 #include "engine/engine.h"
 #include "engine/iplugin.h"
 #include "universe/universe.h"
+#include <lua.hpp>
+#include <lauxlib.h>
 
 
 static const uint32_t SCRIPT_HASH = crc32("script");
@@ -19,349 +21,97 @@ static const uint32_t SCRIPT_HASH = crc32("script");
 namespace Lumix
 {
 	class LuaScriptSystemImpl;
-	/*
-	class ScriptSceneImpl
+
+
+	namespace LuaWrapper
 	{
-		public:
-			typedef void (*InitFunction)(ScriptScene*);
-			typedef void (*UpdateFunction)(float);
-			typedef void (*DoneFunction)();
-			typedef void (*SerializeFunction)(OutputBlob&);
-			typedef void (*DeserializeFunction)(InputBlob&);
+		template <typename T> T toType(lua_State* L, int index) { return (T)lua_touserdata(L, index); }
+		template <> int toType(lua_State* L, int index) { return (int)lua_tointeger(L, index); }
+		template <> int64_t toType(lua_State* L, int index) { return (int64_t)lua_tointeger(L, index); }
+		template <> bool toType(lua_State* L, int index) { return lua_toboolean(L, index) != 0; }
+		template <> float toType(lua_State* L, int index) { return (float)lua_tonumber(L, index); }
+		template <> const char* toType(lua_State* L, int index) { return lua_tostring(L, index); }
+		template <> void* toType(lua_State* L, int index) { return lua_touserdata(L, index); }
 
-		public:
-			ScriptSceneImpl(LuaScriptSystemImpl& system, Engine& engine, Universe& universe)
-				: m_universe(universe)
-				, m_engine(engine)
-				, m_system(system)
-				, m_allocator(engine.getAllocator())
-				, m_paths(m_allocator)
-				, m_script_entities(m_allocator)
-				, m_script_renamed(m_allocator)
-				, m_library(NULL)
-				, m_done_function(NULL)
-				, m_deserialize_function(NULL)
-				, m_serialize_function(NULL)
-				, m_update_function(NULL)
-				, m_reload_after_compile(false)
+
+		template <typename T> bool isType(lua_State* L, int index) { return lua_islightuserdata(L, index) != 0; }
+		template <> bool isType<int>(lua_State* L, int index) { return lua_isinteger(L, index) != 0; }
+		template <> bool isType<int64_t>(lua_State* L, int index) { return lua_isinteger(L, index) != 0; }
+		template <> bool isType<bool>(lua_State* L, int index) { return lua_isboolean(L, index) != 0; }
+		template <> bool isType<float>(lua_State* L, int index) { return lua_isnumber(L, index) != 0; }
+		template <> bool isType<const char*>(lua_State* L, int index) { return lua_isstring(L, index) != 0; }
+		template <> bool isType<void*>(lua_State* L, int index) { return lua_islightuserdata(L, index) != 0; }
+
+		template <typename T> void pushLua(lua_State* L, T value) { return lua_pushnumber(L, value); }
+		template <> void pushLua(lua_State* L, float value) { return lua_pushnumber(L, value); }
+		template <> void pushLua(lua_State* L, int value) { return lua_pushinteger(L, value); }
+
+		template <int N>
+		struct FunctionCaller
+		{
+			template <typename R, typename... ArgsF, typename... Args>
+			static LUMIX_FORCE_INLINE R callFunction(R(*f)(ArgsF...), lua_State* L, Args... args)
 			{
-				if (m_engine.getWorldEditor())
+				typedef std::tuple_element<sizeof...(ArgsF)-N, std::tuple<ArgsF...> >::type T;
+				if (!isType<T>(L, sizeof...(ArgsF)-N + 1))
 				{
-					m_engine.getWorldEditor()->gameModeToggled().bind<ScriptSceneImpl, &ScriptSceneImpl::onGameModeToggled>(this);
-				}
-			}
+					lua_Debug entry;
+					int depth = 0;
 
-
-			~ScriptSceneImpl()
-			{
-				if (m_engine.getWorldEditor())
-				{
-					m_engine.getWorldEditor()->gameModeToggled().unbind<ScriptSceneImpl, &ScriptSceneImpl::onGameModeToggled>(this);
-				}
-			}
-
-
-			void onGameModeToggled(bool is_starting)
-			{
-				if (is_starting)
-				{
-					if (!m_library)
+					char tmp[2048];
+					tmp[0] = 0;
+					auto er = g_log_error.log("lua");
+					er << "Wrong arguments in\n";
+					while (lua_getstack(L, depth, &entry))
 					{
-						m_library = Library::create(m_library_path, m_allocator);
-						if (!m_library->load())
-						{
-							g_log_error.log("script") << "Could not load " << m_library_path.c_str();
-							Library::destroy(m_library);
-							m_library = NULL;
-							return;
-						}
-						m_update_function = (UpdateFunction)m_library->resolve("update");
-						m_done_function = (DoneFunction)m_library->resolve("done");
-						m_serialize_function = (SerializeFunction)m_library->resolve("serialize");
-						m_deserialize_function = (DeserializeFunction)m_library->resolve("deserialize");
-						InitFunction init_function = (InitFunction)m_library->resolve("init");
-						if (!m_update_function || !init_function)
-						{
-							g_log_error.log("script") << "Script interface in " << m_library_path.c_str() << " is not complete";
-						}
-
-						if (init_function)
-						{
-							init_function(this);
-						}
+						int status = lua_getinfo(L, "Sln", &entry);
+						ASSERT(status);
+						er << entry.short_src << "(" << entry.currentline << "): " << (entry.name ? entry.name : "?") << "\n";
+						depth++;
 					}
+					return R();
 				}
-				else
-				{
-					unloadLibrary();
-				}
+				T a = toType<T>(L, sizeof...(ArgsF)-N + 1);
+				return FunctionCaller<N - 1>::callFunction(f, L, args..., a);
 			}
+		};
 
 
-			virtual bool ownComponentType(uint32_t type) const override
+		template <>
+		struct FunctionCaller<0>
+		{
+			template <typename R, typename... ArgsF, typename... Args>
+			static LUMIX_FORCE_INLINE R callFunction(R(*f)(ArgsF...), lua_State*, Args... args)
 			{
-				return type == SCRIPT_HASH;
+				return f(args...);
 			}
+		};
 
 
-			virtual IPlugin& getPlugin() const;
+		template <typename R, typename... ArgsF>
+		int LUMIX_FORCE_INLINE callFunction(R(*f)(ArgsF...), lua_State* L)
+		{
+			R v = FunctionCaller<sizeof...(ArgsF)>::callFunction(f, L);
+			pushLua(L, v);
+			return 1;
+		}
+
+		template <typename... ArgsF>
+		int LUMIX_FORCE_INLINE callFunction(void(*f)(ArgsF...), lua_State* L)
+		{
+			FunctionCaller<sizeof...(ArgsF)>::callFunction(f, L);
+			return 0;
+		}
+
+		template <typename T, T t>
+		int wrap(lua_State* L)
+		{
+			return callFunction(t, L);
+		}
 
 
-			void deserialize(InputBlob& serializer) override
-			{
-				int32_t count;
-				serializer.read(count);
-				m_script_entities.resize(count);
-				m_paths.clear();
-				m_paths.reserve(count);
-				for (int i = 0; i < m_script_entities.size(); ++i)
-				{
-					serializer.read(m_script_entities[i]);
-					char path[LUMIX_MAX_PATH];
-					serializer.readString(path, sizeof(path));
-					m_paths.push(Path(path));
-					Entity entity(&m_universe, m_script_entities[i]);
-					if(m_script_entities[i] != -1)
-					{
-						m_universe.addComponent(entity, SCRIPT_HASH, this, i);
-					}
-				}
-			}
+	} // namespace LuaWrapper
 
-
-			virtual void serializeScripts(OutputBlob& blob) override
-			{
-				if (m_serialize_function)
-				{
-					m_serialize_function(blob);
-				}
-			}
-
-
-			virtual void deserializeScripts(InputBlob& blob) override
-			{
-				if (m_deserialize_function)
-				{
-					m_deserialize_function(blob);
-				}
-			}
-
-
-			void update(float time_delta) override
-			{
-				if (m_is_compiling)
-				{
-					return;
-				}
-				
-				if (m_update_function)
-				{
-					m_update_function(time_delta);
-				}
-			}
-
-
-			virtual const Lumix::Path& getScriptPath(Component cmp) override
-			{
-				return m_paths[cmp.index];
-			}
-
-			
-			void getScriptPath(Component cmp, string& str) override
-			{
-				str = m_paths[cmp.index];
-			}
-
-
-			virtual DelegateList<void(const Path&, const Path&)>& scriptRenamed() override
-			{
-				return m_script_renamed;
-			}
-
-
-			void setScriptPath(Component cmp, const string& str) override
-			{
-				Lumix::Path old_path = m_paths[cmp.index];
-				m_paths[cmp.index] = str.c_str();
-				m_script_renamed.invoke(old_path, m_paths[cmp.index]);
-			}
-
-
-			virtual Component getNextScript(const Component& cmp) override
-			{
-				for (int i = cmp.index + 1; i < m_script_entities.size(); ++i)
-				{
-					if (m_script_entities[i] != -1)
-					{
-						return Component(Entity(&m_universe, m_script_entities[i]), SCRIPT_HASH, this, i);
-					}
-				}
-				return Component::INVALID;
-			}
-			
-
-			virtual Component getFirstScript() override
-			{
-				for (int i = 0; i < m_script_entities.size(); ++i)
-				{
-					if (m_script_entities[i] != -1)
-					{
-						return Component(Entity(&m_universe, m_script_entities[i]), SCRIPT_HASH, this, i);
-					}
-				}
-				return Component::INVALID;
-			}
-
-			
-			void getScriptDefaultPath(Entity e, char* path, char* full_path, int length, const char* ext)
-			{
-				char tmp[30];
-				toCString(e.index, tmp, 30);
-
-				copyString(full_path, length, m_engine.getBasePath());
-				catCString(full_path, length, "e");
-				catCString(full_path, length, tmp);
-				catCString(full_path, length, ".");
-				catCString(full_path, length, ext);
-
-				copyString(path, length, "e");
-				catCString(path, length, tmp);
-				catCString(path, length, ".");
-				catCString(path, length, ext);
-			}
-
-
-			virtual void setModulePath(const char* path) override
-			{
-				char tmp[LUMIX_MAX_PATH];
-				copyString(tmp, sizeof(tmp), path);
-				catCString(tmp, sizeof(tmp), ".dll");
-				m_library_path = tmp;
-			}
-
-
-			virtual void afterScriptCompiled() override
-			{
-				if (!m_library && m_reload_after_compile)
-				{
-					m_library = Library::create(m_library_path, m_allocator);
-					if (!m_library->load())
-					{
-						g_log_error.log("script") << "Could not load " << m_library_path.c_str();
-						Library::destroy(m_library);
-						m_library = NULL;
-						return;
-					}
-					m_update_function = (UpdateFunction)m_library->resolve("update");
-					m_done_function = (DoneFunction)m_library->resolve("done");
-					m_serialize_function = (SerializeFunction)m_library->resolve("serialize");
-					m_deserialize_function = (DeserializeFunction)m_library->resolve("deserialize");
-					InitFunction init_function = (InitFunction)m_library->resolve("init");
-					if (!m_update_function || !init_function)
-					{
-						g_log_error.log("script") << "Script interface in " << m_library_path.c_str() << " is not complete";
-					}
-
-					if (init_function)
-					{
-						init_function(this);
-					}
-				}
-				m_is_compiling = false;
-			}
-
-			virtual void beforeScriptCompiled() override
-			{
-				m_reload_after_compile = true;
-				m_is_compiling = true;
-				unloadLibrary();
-			}
-
-
-			void unloadLibrary()
-			{
-				if (m_done_function)
-				{
-					m_done_function();
-				}
-				if (m_library)
-				{
-					m_update_function = nullptr;
-					m_done_function = nullptr;
-					Library::destroy(m_library);
-					m_library = NULL;
-				}
-			}
-
-
-			Component createScript(Entity entity)
-			{
-				char path[LUMIX_MAX_PATH];
-				char full_path[LUMIX_MAX_PATH];
-				getScriptDefaultPath(entity, path, full_path, LUMIX_MAX_PATH, "cpp");
-
-				m_script_entities.push(entity.index);
-				m_paths.push(Path(path));
-
-				Component cmp = m_universe.addComponent(entity, SCRIPT_HASH, this, m_script_entities.size() - 1);
-				m_universe.componentCreated().invoke(cmp);
-
-				return cmp;
-			}
-
-
-		
-			void serialize(OutputBlob& serializer) override
-			{
-				serializer.write((int32_t)m_script_entities.size());
-				for (int i = 0; i < m_script_entities.size(); ++i)
-				{
-					serializer.write((int32_t)m_script_entities[i]);
-					serializer.writeString(m_paths[i].c_str());
-				}
-			}
-
-
-			virtual Component createComponent(uint32_t type, const Entity& entity)
-			{
-				if (type == SCRIPT_HASH)
-				{
-					return createScript(entity);
-				}
-				return Component::INVALID;
-			}
-
-
-			virtual void destroyComponent(const Component& cmp)
-			{
-				m_script_entities[cmp.index] = -1;
-				m_universe.destroyComponent(cmp);
-			}
-
-
-			virtual Engine& getEngine() override
-			{
-				return m_engine;
-			}
-
-			IAllocator& m_allocator;
-			Array<int32_t> m_script_entities;
-			Array<Path> m_paths;
-			Universe& m_universe;
-			Engine& m_engine;
-			LuaScriptSystemImpl& m_system;
-			Library* m_library;
-			Path m_library_path;
-			UpdateFunction m_update_function;
-			DoneFunction m_done_function;
-			SerializeFunction m_serialize_function;
-			DeserializeFunction m_deserialize_function;
-			bool m_is_compiling;
-			bool m_reload_after_compile;
-
-			DelegateList<void(const Path&, const Path&)> m_script_renamed;
-
-	};*/
 
 	static const uint32_t LUA_SCRIPT_HASH = crc32("lua_script");
 
@@ -382,6 +132,19 @@ namespace Lumix
 	};
 
 
+	namespace LuaAPI
+	{
+
+
+		void setEntityPosition(Universe* univ, int entity_index, float x, float y, float z)
+		{
+			Entity(univ, entity_index).setPosition(x, y, z);
+		}
+
+
+	} // namespace LuaAPI
+
+
 	class LuaScriptScene : public IScene
 	{
 		public:
@@ -391,6 +154,91 @@ namespace Lumix
 				, m_scripts(system.getAllocator())
 				, m_valid(system.getAllocator())
 			{
+				if (system.m_engine.getWorldEditor())
+				{
+					system.m_engine.getWorldEditor()->gameModeToggled().bind<LuaScriptScene, &LuaScriptScene::onGameModeToggled>(this);
+				}
+			}
+
+
+			~LuaScriptScene()
+			{
+				if (m_system.m_engine.getWorldEditor())
+				{
+					m_system.m_engine.getWorldEditor()->gameModeToggled().unbind<LuaScriptScene, &LuaScriptScene::onGameModeToggled>(this);
+				}
+			}
+
+
+			void registerCFunction(const char* name, lua_CFunction function) const
+			{
+				lua_pushcfunction(m_global_state, function);
+				lua_setglobal(m_global_state, name);
+			}
+
+
+			void registerAPI(lua_State* L)
+			{
+				lua_pushlightuserdata(L, &m_universe);
+				lua_setglobal(L, "g_universe");
+
+				lua_pushlightuserdata(L, this);
+				lua_setglobal(L, "g_scene");
+				
+				registerCFunction("setEntityPosition", LuaWrapper::wrap<decltype(&LuaAPI::setEntityPosition), LuaAPI::setEntityPosition>);
+			}
+
+
+			void startGame()
+			{
+				m_global_state = luaL_newstate();
+				luaL_openlibs(m_global_state);
+				registerAPI(m_global_state);
+				for (int i = 0; i < m_scripts.size(); ++i)
+				{
+					if (m_valid[i])
+					{
+						Script& script = m_scripts[i];
+						script.m_state = lua_newthread(m_global_state);
+
+						FILE* fp = fopen(script.m_path.c_str(), "r");
+						if (fp)
+						{
+							fseek(fp, 0, SEEK_END);
+							long size = ftell(fp);
+							fseek(fp, 0, SEEK_SET);
+							Array<char> content(m_system.getAllocator());
+							content.resize(size);
+							fread(&content[0], 1, size, fp);
+							bool errors = luaL_loadbuffer(script.m_state, &content[0], size, "") != LUA_OK;
+							errors = errors || lua_pcall(script.m_state, 0, LUA_MULTRET, 0) != LUA_OK;
+							if (errors)
+							{
+								g_log_error.log("lua") << script.m_path.c_str() << ": " << lua_tostring(script.m_state, -1);
+							}
+							fclose(fp);
+						}
+					}
+				}
+			}
+
+
+			void stopGame()
+			{
+				lua_close(m_global_state);
+			}
+
+
+			void onGameModeToggled(bool is_game_mode)
+			{
+				if (is_game_mode)
+				{
+					startGame();
+				}
+				else
+				{
+					stopGame();
+				}
 			}
 
 
@@ -401,6 +249,7 @@ namespace Lumix
 					LuaScriptScene::Script& script = m_scripts.pushEmpty();
 					script.m_entity = entity.index;
 					script.m_path = "";
+					script.m_state = nullptr;
 					m_valid.push(true);
 					Component cmp = m_universe.addComponent(entity, type, this, m_scripts.size() - 1);
 					m_universe.componentCreated().invoke(cmp);
@@ -422,13 +271,34 @@ namespace Lumix
 
 			virtual void serialize(OutputBlob& serializer) override
 			{
-				ASSERT(false);
+				serializer.write(m_scripts.size());
+				for (int i = 0; i < m_scripts.size(); ++i)
+				{
+					serializer.write(m_scripts[i].m_entity);
+					serializer.writeString(m_scripts[i].m_path.c_str());
+					serializer.write((bool)m_valid[i]);
+				}
 			}
 
 
 			virtual void deserialize(InputBlob& serializer) override
 			{
-				ASSERT(false);
+				int len = serializer.read<int>();
+				m_scripts.resize(len);
+				m_valid.resize(len);
+				for (int i = 0; i < m_scripts.size(); ++i)
+				{
+					serializer.read(m_scripts[i].m_entity);
+					char tmp[LUMIX_MAX_PATH];
+					serializer.readString(tmp, LUMIX_MAX_PATH);
+					m_valid[i] = serializer.read<bool>();
+					m_scripts[i].m_path = tmp;
+					m_scripts[i].m_state = nullptr;
+					if (m_valid[i])
+					{
+						m_universe.addComponent(Entity(&m_universe, m_scripts[i].m_entity), LUA_SCRIPT_HASH, this, i);
+					}
+				}
 			}
 
 
@@ -440,6 +310,15 @@ namespace Lumix
 
 			virtual void update(float time_delta) override
 			{
+				if (lua_getglobal(m_global_state, "update") == LUA_TFUNCTION)
+				{
+					lua_pushnumber(m_global_state, time_delta);
+					if (lua_pcall(m_global_state, 1, 0, 0) != LUA_OK)
+					{
+						g_log_error.log("lua") << lua_tostring(m_global_state, -1);
+					}
+				}
+
 			}
 
 
@@ -466,6 +345,7 @@ namespace Lumix
 				public:
 					Lumix::Path m_path;
 					int m_entity;
+					lua_State* m_state;
 			};
 
 		private:
@@ -473,6 +353,7 @@ namespace Lumix
 			
 			BinaryArray m_valid;
 			Array<Script> m_scripts;
+			lua_State* m_global_state;
 			Universe& m_universe;
 	};
 
