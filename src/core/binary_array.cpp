@@ -136,10 +136,17 @@ namespace Lumix
 
 	void BinaryArray::reserve(int capacity)
 	{
-		if ((m_capacity >> 5) < (capacity >> 5))
+		if (((m_capacity + BITMASK_7BIT) >> 5) < ((capacity + BITMASK_7BIT) >> 5))
 		{
 			grow(capacity);
 		}
+	}
+
+
+	void BinaryArray::resize(int size)
+	{
+		reserve(size);
+		m_size = size;
 	}
 
 

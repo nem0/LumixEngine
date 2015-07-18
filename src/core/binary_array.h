@@ -53,6 +53,7 @@ namespace Lumix
 			bool back() const;
 			bool operator[](int index) const;
 			void reserve(int capacity);
+			void resize(int capacity);
 			void erase(int index);
 			void clear();
 			void push(bool value);

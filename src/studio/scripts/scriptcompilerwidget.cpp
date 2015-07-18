@@ -84,6 +84,10 @@ void ScriptCompilerWidget::onUniverseCreated()
 void ScriptCompilerWidget::onUniverseLoaded()
 {
 	Lumix::ScriptScene* scene = static_cast<Lumix::ScriptScene*>(m_editor->getEngine().getScene(crc32("script")));
+	if (!scene)
+	{
+		return;
+	}
 	Lumix::Component script = scene->getFirstScript();
 	QFileInfo info(m_editor->getUniversePath().c_str());
 
@@ -175,10 +179,13 @@ void ScriptCompilerWidget::setUniverse(Lumix::Universe* universe)
 	if (universe)
 	{
 		Lumix::ScriptScene* scene = static_cast<Lumix::ScriptScene*>(m_editor->getEngine().getScene(crc32("script")));
+		if (scene)
+		{
 		scene->scriptRenamed().bind<ScriptCompilerWidget, &ScriptCompilerWidget::onScriptRenamed>(this);
 		universe->componentCreated().bind<ScriptCompilerWidget, &ScriptCompilerWidget::onComponentCreated>(this);
 		universe->componentDestroyed().bind<ScriptCompilerWidget, &ScriptCompilerWidget::onComponentDestroyed>(this);
 		ASSERT(!scene->getFirstScript().isValid());
+	}
 	}
 	else
 	{

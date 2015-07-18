@@ -1368,8 +1368,6 @@ namespace Lumix
 
 	namespace LuaWrapper
 	{
-
-
 		template <typename T> T toType(lua_State* L, int index) { return (T)lua_touserdata(L, index); }
 		template <> int toType(lua_State* L, int index) { return (int)lua_tointeger(L, index); }
 		template <> int64_t toType(lua_State* L, int index) { return (int64_t)lua_tointeger(L, index); }
