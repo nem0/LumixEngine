@@ -9,7 +9,7 @@ namespace Lumix
 
 	namespace FS
 	{
-		class LUMIX_CORE_API TCPFileServer
+		class LUMIX_ENGINE_API TCPFileServer
 		{
 		public:
 			TCPFileServer();

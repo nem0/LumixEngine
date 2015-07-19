@@ -9,7 +9,7 @@ namespace Lumix
 
 	class IAllocator;
 
-	class LUMIX_CORE_API InputSystem
+	class LUMIX_ENGINE_API InputSystem
 	{
 		public:
 			enum InputType 

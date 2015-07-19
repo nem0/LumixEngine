@@ -55,12 +55,6 @@ int lengthOf(const T(&)[count])
 #define LUMIX_ALIGN_OF(T) __alignof(T)
 #define LUMIX_FORCE_INLINE __forceinline
 
-#ifdef BUILDING_CORE
-	#define LUMIX_CORE_API LUMIX_LIBRARY_EXPORT
-#else
-	#define LUMIX_CORE_API LUMIX_LIBRARY_IMPORT
-#endif
-
 
 #ifdef BUILDING_PHYSICS
 	#define LUMIX_PHYSICS_API LUMIX_LIBRARY_EXPORT

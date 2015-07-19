@@ -21,7 +21,7 @@ namespace Lumix
 	};
 
 
-	class LUMIX_CORE_API PathManager
+	class LUMIX_ENGINE_API PathManager
 	{
 		friend class Path;
 		public:
@@ -45,10 +45,10 @@ namespace Lumix
 	};
 
 
-	extern PathManager LUMIX_CORE_API g_path_manager;
+	extern PathManager LUMIX_ENGINE_API g_path_manager;
 
 
-	class LUMIX_CORE_API Path
+	class LUMIX_ENGINE_API Path
 	{
 	public:
 		Path();

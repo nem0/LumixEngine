@@ -59,6 +59,12 @@ namespace Lumix
 			}
 
 
+			virtual Universe& getUniverse() override
+			{
+				return m_universe;
+			}
+
+
 			virtual bool ownComponentType(uint32_t type) const override
 			{
 				return type == ANIMABLE_HASH;

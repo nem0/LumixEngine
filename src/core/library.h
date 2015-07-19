@@ -8,7 +8,7 @@ namespace Lumix
 {
 
 
-class LUMIX_CORE_API Library
+class LUMIX_ENGINE_API Library
 {
 	public:
 		static Library* create(const Path& path, class IAllocator& allocator);

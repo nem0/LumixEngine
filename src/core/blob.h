@@ -8,7 +8,7 @@
 namespace Lumix
 {
 
-	class LUMIX_CORE_API OutputBlob
+	class LUMIX_ENGINE_API OutputBlob
 	{
 		public:
 			explicit OutputBlob(IAllocator& allocator);
@@ -30,7 +30,7 @@ namespace Lumix
 	};
 
 
-	class LUMIX_CORE_API InputBlob
+	class LUMIX_ENGINE_API InputBlob
 	{
 		public:
 			InputBlob(const void* data, int size);

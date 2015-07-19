@@ -8,7 +8,7 @@ namespace Lumix
 {
 
 
-LUMIX_CORE_API void enableFloatingPointTraps(bool enable);
+LUMIX_ENGINE_API void enableFloatingPointTraps(bool enable);
 
 
 } // namespace Lumix

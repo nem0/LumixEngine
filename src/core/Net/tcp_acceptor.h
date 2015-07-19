@@ -10,7 +10,7 @@ namespace Lumix
 	{
 		class TCPStream;
 
-		class LUMIX_CORE_API TCPAcceptor
+		class LUMIX_ENGINE_API TCPAcceptor
 		{
 		public:
 			TCPAcceptor(IAllocator& allocator) : m_allocator(allocator) {}

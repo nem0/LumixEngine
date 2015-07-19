@@ -39,7 +39,7 @@ namespace Lumix
 			int32_t value;
 		};
 
-		class LUMIX_CORE_API TCPFileDevice : public IFileDevice
+		class LUMIX_ENGINE_API TCPFileDevice : public IFileDevice
 		{
 		public:
 			virtual void destroyFile(IFile* file) override;

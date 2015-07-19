@@ -7,7 +7,7 @@ namespace Lumix
 	{
 		typedef void* SemaphoreHandle;
 
-		class LUMIX_CORE_API Semaphore
+		class LUMIX_ENGINE_API Semaphore
 		{
 		public:
 			Semaphore(int init_count, int max_count);

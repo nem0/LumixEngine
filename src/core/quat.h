@@ -13,7 +13,7 @@ struct Vec3;
 struct Matrix;
 
 
-struct LUMIX_CORE_API Quat
+struct LUMIX_ENGINE_API Quat
 {
 	struct AxisAngle
 	{
@@ -41,7 +41,7 @@ struct LUMIX_CORE_API Quat
 };
 
 
-LUMIX_CORE_API void nlerp(const Quat& q1, const Quat& q2, Quat* out, float t);
+LUMIX_ENGINE_API void nlerp(const Quat& q1, const Quat& q2, Quat* out, float t);
 
 
 Vec3 Quat::operator *(const Vec3& v) const

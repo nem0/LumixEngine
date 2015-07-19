@@ -7,7 +7,7 @@ namespace Lumix
 {
 	namespace Net
 	{
-		class LUMIX_CORE_API TCPStream
+		class LUMIX_ENGINE_API TCPStream
 		{
 		public:
 			TCPStream(uintptr_t socket) : m_socket(socket) { } 
