@@ -26,6 +26,7 @@ namespace Lumix
 			virtual IPlugin& getPlugin() const = 0;
 			virtual void update(float time_delta) = 0;
 			virtual bool ownComponentType(uint32_t type) const = 0;
+			virtual Universe& getUniverse() = 0;
 	};
 
 

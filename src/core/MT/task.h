@@ -8,7 +8,7 @@ namespace Lumix
 
 	namespace MT
 	{
-		class LUMIX_CORE_API Task
+		class LUMIX_ENGINE_API Task
 		{
 		public:
 			Task(IAllocator& allocator);

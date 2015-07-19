@@ -10,7 +10,7 @@ namespace Lumix
 	{
 		class Manager;
 
-		class LUMIX_CORE_API Scheduler : public MT::Task
+		class LUMIX_ENGINE_API Scheduler : public MT::Task
 		{
 		public:
 			Scheduler(Manager& manager, IAllocator& allocator);

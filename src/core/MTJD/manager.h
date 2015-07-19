@@ -19,7 +19,7 @@ namespace Lumix
 		class Job;
 		class WorkerTask;
 
-		class LUMIX_CORE_API Manager
+		class LUMIX_ENGINE_API Manager
 		{
 			friend class Scheduler;
 			friend class SpuHelperTask;

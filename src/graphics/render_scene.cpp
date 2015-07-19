@@ -212,6 +212,12 @@ namespace Lumix
 				CullingSystem::destroy(*m_culling_system);
 			}
 
+
+			virtual Universe& getUniverse() override
+			{
+				return m_universe;
+			}
+
 			
 			virtual bool ownComponentType(uint32_t type) const override
 			{
