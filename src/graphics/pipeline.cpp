@@ -241,10 +241,8 @@ namespace Lumix
 			, m_debug_flags(BGFX_DEBUG_TEXT)
 		{
 			m_terrain_scale_uniform = bgfx::createUniform("u_terrainScale", bgfx::UniformType::Vec4);
-			m_morph_const_uniform = bgfx::createUniform("u_morphConst", bgfx::UniformType::Vec4);
 			m_rel_camera_pos_uniform = bgfx::createUniform("u_relCamPos", bgfx::UniformType::Vec4);
 			m_map_size_uniform = bgfx::createUniform("u_mapSize", bgfx::UniformType::Vec4);
-			m_quad_min_and_size_uniform = bgfx::createUniform("u_quadMinAndSize", bgfx::UniformType::Vec4);
 			m_fog_color_density_uniform = bgfx::createUniform("u_fogColorDensity", bgfx::UniformType::Vec4);
 			m_light_pos_radius_uniform = bgfx::createUniform("u_lightPosRadius", bgfx::UniformType::Vec4);
 			m_light_color_uniform = bgfx::createUniform("u_lightRgbInnerR", bgfx::UniformType::Vec4);
@@ -255,6 +253,7 @@ namespace Lumix
 			m_shadowmap_splits_uniform = bgfx::createUniform("u_shadowmapSplits", bgfx::UniformType::Vec4);
 			m_bone_matrices_uniform = bgfx::createUniform("u_boneMatrices", bgfx::UniformType::Mat4, 64);
 			m_specular_shininess_uniform = bgfx::createUniform("u_materialSpecularShininess", bgfx::UniformType::Vec4);
+			m_terrain_matrix_uniform = bgfx::createUniform("u_terrainMatrix", bgfx::UniformType::Mat4);
 
 			ResourceManagerBase* material_manager = pipeline.getResourceManager().get(ResourceManager::MATERIAL);
 			m_screen_space_material = static_cast<Material*>(material_manager->load(Lumix::Path("models/editor/screen_space.mat"))); 
@@ -272,13 +271,12 @@ namespace Lumix
 			ResourceManagerBase* material_manager = m_source.getResourceManager().get(ResourceManager::MATERIAL);
 			material_manager->unload(*m_screen_space_material);
 			material_manager->unload(*m_debug_line_material);
+			bgfx::destroyUniform(m_terrain_matrix_uniform);
 			bgfx::destroyUniform(m_specular_shininess_uniform);
 			bgfx::destroyUniform(m_bone_matrices_uniform);
 			bgfx::destroyUniform(m_terrain_scale_uniform);
-			bgfx::destroyUniform(m_morph_const_uniform);
 			bgfx::destroyUniform(m_rel_camera_pos_uniform);
 			bgfx::destroyUniform(m_map_size_uniform);
-			bgfx::destroyUniform(m_quad_min_and_size_uniform);
 			bgfx::destroyUniform(m_fog_color_density_uniform);
 			bgfx::destroyUniform(m_light_pos_radius_uniform);
 			bgfx::destroyUniform(m_light_color_uniform);
@@ -947,6 +945,28 @@ namespace Lumix
 
 		void renderTerrain(const TerrainInfo& info)
 		{
+			auto& inst = m_terrain_instances[info.m_index];
+			if ((inst.m_count > 0 && inst.m_infos[0]->m_terrain != info.m_terrain) || inst.m_count == lengthOf(inst.m_infos))
+			{
+				finishTerrainInstances(info.m_index);
+			}
+			inst.m_infos[inst.m_count] = &info;
+			++inst.m_count;
+		}
+		
+
+		void finishTerrainInstances(int index)
+		{
+			if (m_terrain_instances[index].m_count == 0)
+			{
+				return;
+			}
+			struct TerrainInstanceData
+			{
+				Vec4 m_quad_min_and_size;
+				Vec4 m_morph_const;
+			};
+			const TerrainInfo& info = *m_terrain_instances[index].m_infos[0];
 			Material* material = info.m_terrain->getMaterial();
 			if (!material->isReady())
 			{
@@ -964,22 +984,29 @@ namespace Lumix
 			Vec4 map_size(info.m_terrain->getRootSize(), 0, 0, 0);
 			bgfx::setUniform(m_map_size_uniform, &map_size);
 
-			Vec4 quad_min_and_size(info.m_min, info.m_size);
-			bgfx::setUniform(m_quad_min_and_size_uniform, &quad_min_and_size);
-
-			bgfx::setUniform(m_morph_const_uniform, &Vec4(info.m_morph_const, 0));
 			bgfx::setUniform(m_rel_camera_pos_uniform, &Vec4(rel_cam_pos, 0));
 			bgfx::setUniform(m_terrain_scale_uniform, &Vec4(info.m_terrain->getScale(), 0));
+			bgfx::setUniform(m_terrain_matrix_uniform, &info.m_world_matrix.m11);
 
 			setMaterial(material);
-
-			bgfx::setTransform(&info.m_world_matrix.m11);
 			bgfx::setProgram(material->getShaderInstance().m_program_handles[m_pass_idx]);
+
+			const bgfx::InstanceDataBuffer* instance_buffer = bgfx::allocInstanceDataBuffer(m_terrain_instances[index].m_count, sizeof(TerrainInstanceData));
+			TerrainInstanceData* instance_data = (TerrainInstanceData*)instance_buffer->data;
+			for (int i = 0; i < m_terrain_instances[index].m_count; ++i)
+			{
+				const TerrainInfo& info = *m_terrain_instances[index].m_infos[i];
+				instance_data[i].m_quad_min_and_size.set(info.m_min.x, info.m_min.y, info.m_min.z, info.m_size);
+				instance_data[i].m_morph_const.set(info.m_morph_const.x, info.m_morph_const.y, info.m_morph_const.z, 0);
+			}
+			
 			bgfx::setVertexBuffer(geometry.getAttributesArrayID(), mesh.getAttributeArrayOffset() / mesh.getVertexDefinition().getStride(), mesh.getAttributeArraySize() / mesh.getVertexDefinition().getStride());
 			int mesh_part_indices_count = mesh.getIndexCount() / 4;
 			bgfx::setIndexBuffer(geometry.getIndicesArrayID(), info.m_index * mesh_part_indices_count, mesh_part_indices_count);
 			bgfx::setState(m_render_state | mesh.getMaterial()->getRenderStates());
+			bgfx::setInstanceDataBuffer(instance_buffer, m_terrain_instances[index].m_count);
 			bgfx::submit(m_view_idx);
+			m_terrain_instances[index].m_count = 0;
 		}
 
 
@@ -1014,9 +1041,13 @@ namespace Lumix
 		void renderTerrains(const Array<const TerrainInfo*>& terrains)
 		{
 			PROFILE_FUNCTION();
-			for (auto* terrain : terrains)
+			for (auto* info : terrains)
 			{
-				renderTerrain(*terrain);
+				renderTerrain(*info);
+			}
+			for (int i = 0; i < lengthOf(m_terrain_instances); ++i)
+			{
+				finishTerrainInstances(i);
 			}
 		}
 
@@ -1074,6 +1105,10 @@ namespace Lumix
 			m_global_textures.clear();
 			memset(m_view2pass_map, 0xffffFFFF, sizeof(m_view2pass_map));
 			m_instance_data_idx = 0;
+			for (int i = 0; i < lengthOf(m_terrain_instances); ++i)
+			{
+				m_terrain_instances[i].m_count = 0;
+			}
 			for (int i = 0; i < lengthOf(m_instances_data); ++i)
 			{
 				m_instances_data[i].m_buffer = nullptr;
@@ -1129,6 +1164,14 @@ namespace Lumix
 		};
 
 
+		class TerrainInstance
+		{
+			public:
+				int m_count;
+				const TerrainInfo* m_infos[64];
+		};
+
+		TerrainInstance m_terrain_instances[4];
 		uint32_t m_debug_flags;
 		uint8_t m_view_idx;
 		int m_pass_idx;
@@ -1161,10 +1204,8 @@ namespace Lumix
 		bgfx::UniformHandle m_specular_shininess_uniform;
 		bgfx::UniformHandle m_bone_matrices_uniform;
 		bgfx::UniformHandle m_terrain_scale_uniform;
-		bgfx::UniformHandle m_morph_const_uniform;
 		bgfx::UniformHandle m_rel_camera_pos_uniform;
 		bgfx::UniformHandle m_map_size_uniform;
-		bgfx::UniformHandle m_quad_min_and_size_uniform;
 		bgfx::UniformHandle m_fog_color_density_uniform;
 		bgfx::UniformHandle m_light_pos_radius_uniform;
 		bgfx::UniformHandle m_light_color_uniform;
@@ -1173,6 +1214,7 @@ namespace Lumix
 		bgfx::UniformHandle m_shadowmap_matrices_uniform;
 		bgfx::UniformHandle m_shadowmap_splits_uniform;
 		bgfx::UniformHandle m_light_specular_uniform;
+		bgfx::UniformHandle m_terrain_matrix_uniform;
 		Material* m_screen_space_material;
 		Material* m_debug_line_material;
 
