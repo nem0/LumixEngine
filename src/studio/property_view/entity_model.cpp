@@ -34,7 +34,7 @@ EntityModel::EntityModel(PropertyView& view, Lumix::WorldEditor& editor, Lumix::
 	m_entity = entity;
 	getRoot().m_name = "Entity";
 	getRoot().onCreateEditor = [this](QWidget* parent, const QStyleOptionViewItem&){
-		auto button = new QPushButton(" + ", parent);
+		auto button = new QPushButton("Add", parent);
 		connect(button, &QPushButton::clicked, [this, button](){ addComponent(button, button->mapToGlobal(button->pos())); });
 		return button;
 	};
@@ -345,9 +345,14 @@ void EntityModel::addComponentNode(Lumix::Component cmp, int component_index)
 	Node& node = getRoot().addChild(getComponentName(cmp), component_index + 3);
 	node.m_getter = []() -> QVariant { return ""; };
 	node.onCreateEditor = [this, cmp](QWidget* parent, const QStyleOptionViewItem&) {
-		auto button = new QPushButton(" - ", parent);
+		auto widget = new QWidget(parent);
+		QHBoxLayout* layout = new QHBoxLayout(widget);
+		layout->setContentsMargins(0, 0, 0, 0);
+		layout->addStretch(1);
+		auto button = new QPushButton("Remove", widget);
 		connect(button, &QPushButton::clicked, [this, cmp](){ m_editor.destroyComponent(cmp); });
-		return button;
+		layout->addWidget(button);
+		return widget;
 	};
 	node.enablePeristentEditor();
 	auto& descriptors = m_editor.getPropertyDescriptors(cmp.type);

@@ -945,6 +945,10 @@ namespace Lumix
 
 		void renderTerrain(const TerrainInfo& info)
 		{
+			if (!info.m_terrain->getMaterial()->isReady())
+			{
+				return;
+			}
 			auto& inst = m_terrain_instances[info.m_index];
 			if ((inst.m_count > 0 && inst.m_infos[0]->m_terrain != info.m_terrain) || inst.m_count == lengthOf(inst.m_infos))
 			{

@@ -128,6 +128,7 @@ namespace Lumix
 			virtual void getRenderablePath(Component cmp, string& path) = 0;
 			virtual void setRenderableLayer(Component cmp, const int32_t& layer) = 0;
 			virtual void setRenderablePath(Component cmp, const string& path) = 0;
+			virtual void setRenderablePath(int cmp_index, const string& path) = 0;
 			virtual void setRenderableScale(Component cmp, float scale) = 0;
 			virtual void getRenderableInfos(const Frustum& frustum, Array<const RenderableMesh*>& meshes, int64_t layer_mask) = 0;
 			virtual void getRenderableMeshes(Array<RenderableMesh>& meshes, int64_t layer_mask) = 0;

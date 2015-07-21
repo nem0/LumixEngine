@@ -829,6 +829,7 @@ ImportAssetDialog::ImportAssetDialog(MainWindow& main_window, QWidget* parent, c
 	m_ui->importPhysicsCheckbox->hide();
 	m_ui->convexPhysicsCheckbox->hide();
 	m_ui->convexPhysicsCheckbox->setEnabled(false);
+	m_ui->convertToRawCheckbox->hide();
 	m_ui->importMaterialsCheckbox->hide();
 	m_ui->importAnimationCheckbox->hide();
 	m_ui->importMeshCheckbox->hide();
@@ -866,6 +867,7 @@ static bool isTexture(const QFileInfo& info)
 void ImportAssetDialog::on_sourceInput_textChanged(const QString& text)
 {
 	m_ui->importButton->setEnabled(false); 
+	m_ui->convertToRawCheckbox->hide();
 	m_ui->importMaterialsCheckbox->hide();
 	m_ui->convertToDDSCheckbox->hide();
 	m_ui->importAnimationCheckbox->hide();
@@ -880,6 +882,7 @@ void ImportAssetDialog::on_sourceInput_textChanged(const QString& text)
 		if (isTexture(info))
 		{
 			m_ui->importButton->setEnabled(true);
+			m_ui->convertToRawCheckbox->show();
 		}
 		else
 		{
@@ -1106,6 +1109,29 @@ void ImportAssetDialog::importAnimation()
 }
 
 
+static bool convertToRaw(const QImage& image, const QString& dest)
+{
+	QVector<uint16_t> img_data;
+	img_data.resize(image.width() * image.height());
+	for (int j = 0; j < image.height(); ++j)
+	{
+		for (int i = 0; i < image.width(); ++i)
+		{
+			QRgb rgb = image.pixel(i, j);
+			img_data[i + j * image.width()] = (uint16_t)qRed(rgb);
+		}
+	}
+	QFile output(dest);
+	if (!output.open(QIODevice::WriteOnly))
+	{
+		return false;
+	}
+	output.write((const char*)&img_data[0], sizeof(img_data[0]) * img_data.size());
+	output.close();
+	return true;
+}
+
+
 void ImportAssetDialog::importTexture()
 {
 	Lumix::enableFloatingPointTraps(false);
@@ -1113,24 +1139,38 @@ void ImportAssetDialog::importTexture()
 
 	on_progressUpdate(0.01f, "Importing texture...");
 	QCoreApplication::processEvents();
-
 	QFileInfo source_info(m_ui->sourceInput->text());
-	struct Callback
+
+	if (m_ui->convertToRawCheckbox->isChecked())
 	{
-		static crn_bool foo(crn_uint32 phase_index, crn_uint32 total_phases, crn_uint32 subphase_index, crn_uint32 total_subphases, void* pUser_data_ptr)
+		if (convertToRaw(QImage(m_ui->sourceInput->text()), m_ui->destinationInput->text() + "/" + source_info.baseName() + ".raw"))
 		{
-			static_cast<ImportAssetDialog*>(pUser_data_ptr)->on_progressUpdate(phase_index / (float)total_phases + subphase_index / (float)total_subphases / total_phases, "Importing texture...");
-			QCoreApplication::processEvents();
-			return true;
+			on_progressUpdate(1.0f, "Import successful.");
 		}
-	};
-	if (convertToDDS(QImage(m_ui->sourceInput->text()), m_ui->destinationInput->text() + "/" + source_info.baseName() + ".dds", &Callback::foo, this))
-	{
-		on_progressUpdate(1.0f, "Import successful.");
+		else
+		{
+			on_progressUpdate(1.0f, "Import failed.");
+		}
 	}
 	else
 	{
-		on_progressUpdate(1.0f, "Import failed.");
+		struct Callback
+		{
+			static crn_bool foo(crn_uint32 phase_index, crn_uint32 total_phases, crn_uint32 subphase_index, crn_uint32 total_subphases, void* pUser_data_ptr)
+			{
+				static_cast<ImportAssetDialog*>(pUser_data_ptr)->on_progressUpdate(phase_index / (float)total_phases + subphase_index / (float)total_subphases / total_phases, "Importing texture...");
+				QCoreApplication::processEvents();
+				return true;
+			}
+		};
+		if (convertToDDS(QImage(m_ui->sourceInput->text()), m_ui->destinationInput->text() + "/" + source_info.baseName() + ".dds", &Callback::foo, this))
+		{
+			on_progressUpdate(1.0f, "Import successful.");
+		}
+		else
+		{
+			on_progressUpdate(1.0f, "Import failed.");
+		}
 	}
 	Lumix::enableFloatingPointTraps(true);
 }
