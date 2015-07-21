@@ -53,6 +53,12 @@ QWidget* GameView::getContentWidget() const
 }
 
 
+void GameView::shutdown()
+{
+	m_render_device->shutdown();
+}
+
+
 void GameView::resizeEvent(QResizeEvent* event)
 {
 	int w = event->size().width();
