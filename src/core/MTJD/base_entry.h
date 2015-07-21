@@ -8,7 +8,7 @@ namespace Lumix
 {
 	namespace MTJD
 	{
-		class LUMIX_CORE_API BaseEntry abstract
+		class LUMIX_ENGINE_API BaseEntry abstract
 		{
 		public:
 			typedef Array<BaseEntry*> DependencyTable;

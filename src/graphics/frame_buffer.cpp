@@ -12,6 +12,7 @@ namespace Lumix
 
 FrameBuffer::FrameBuffer(const Declaration& decl)
 {
+	m_autodestroy_handle = true;
 	m_declaration = decl;
 	bgfx::TextureHandle texture_handles[16];
 
@@ -29,6 +30,7 @@ FrameBuffer::FrameBuffer(const Declaration& decl)
 
 FrameBuffer::FrameBuffer(const char* name, int width, int height, void* window_handle)
 {
+	m_autodestroy_handle = false;
 	copyString(m_declaration.m_name, sizeof(m_declaration.m_name), name);
 	m_declaration.m_width = width;
 	m_declaration.m_height = height;
@@ -40,7 +42,10 @@ FrameBuffer::FrameBuffer(const char* name, int width, int height, void* window_h
 
 FrameBuffer::~FrameBuffer()
 {
-	bgfx::destroyFrameBuffer(m_handle);
+	if (m_autodestroy_handle)
+	{
+		bgfx::destroyFrameBuffer(m_handle);
+	}
 }
 
 

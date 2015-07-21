@@ -14,7 +14,7 @@ namespace Lumix
 {
 
 
-	class LUMIX_CORE_API JsonSerializer
+	class LUMIX_ENGINE_API JsonSerializer
 	{
 		public:
 			class ErrorProxy

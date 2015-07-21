@@ -34,9 +34,9 @@
 static const QString METADATA_FILE = "metadata.bin";
 
 
-MainWindow::MainWindow(QWidget* parent) :
-	QMainWindow(parent),
-	m_ui(new Ui::MainWindow)
+MainWindow::MainWindow(QWidget* parent)
+	: QMainWindow(parent)
+	, m_ui(new Ui::MainWindow)
 {
 	m_terrain_component_plugin = nullptr;
 	m_ui->setupUi(this);
@@ -55,36 +55,63 @@ MainWindow::MainWindow(QWidget* parent) :
 	m_entity_template_list_ui = new EntityTemplateList;
 	m_notifications = new Notifications(*this);
 	m_entity_list = new EntityList(NULL);
-	
+
 	m_metadata = new Metadata();
 
 	m_animation_editor = new AnimationEditor(*this);
 
 	m_toggle_game_mode_after_compile = false;
-	connect(m_script_compiler_ui->getCompiler(), &ScriptCompiler::compiled, this, &MainWindow::onScriptCompiled);
+	connect(m_script_compiler_ui->getCompiler(),
+			&ScriptCompiler::compiled,
+			this,
+			&MainWindow::onScriptCompiled);
 
 	QSettings settings("Lumix", "QtEditor");
-	bool geometry_restored = restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
+	bool geometry_restored =
+		restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
 
 	m_window_menu = new QMenu("Windows", m_ui->menuView);
 	m_ui->menuView->addMenu(m_window_menu);
-	m_window_menu->connect(m_window_menu, &QMenu::aboutToShow, [this]()
-	{
-		for (auto info : m_dock_infos)
-		{
-			info.m_action->setChecked(info.m_widget->isVisible());
-		}
-	});
-	addEditorDock(static_cast<Qt::DockWidgetArea>(2), m_asset_browser, &MainWindow::on_actionAsset_Browser_triggered);
-	addEditorDock(static_cast<Qt::DockWidgetArea>(2), m_entity_list, &MainWindow::on_actionEntity_list_triggered);
-	addEditorDock(static_cast<Qt::DockWidgetArea>(2), m_entity_template_list_ui, &MainWindow::on_actionEntity_templates_triggered);
-	addEditorDock(static_cast<Qt::DockWidgetArea>(8), m_file_server_ui, &MainWindow::on_actionFile_server_triggered);
-	addEditorDock(static_cast<Qt::DockWidgetArea>(1), m_game_view, &MainWindow::on_actionGame_view_triggered);
-	addEditorDock(static_cast<Qt::DockWidgetArea>(8), m_log, &MainWindow::on_actionLog_triggered);
-	addEditorDock(static_cast<Qt::DockWidgetArea>(1), m_profiler_ui, &MainWindow::on_actionProfiler_triggered);
-	addEditorDock(static_cast<Qt::DockWidgetArea>(1), m_property_view, &MainWindow::on_actionProperties_triggered);
-	addEditorDock(static_cast<Qt::DockWidgetArea>(2), m_scene_view, &MainWindow::on_actionScene_View_triggered);
-	addEditorDock(static_cast<Qt::DockWidgetArea>(8), m_script_compiler_ui, &MainWindow::on_actionScript_compiler_triggered);
+	m_window_menu->connect(m_window_menu,
+						   &QMenu::aboutToShow,
+						   [this]()
+						   {
+							   for (auto info : m_dock_infos)
+							   {
+								   info.m_action->setChecked(
+									   info.m_widget->isVisible());
+							   }
+						   });
+	addEditorDock(static_cast<Qt::DockWidgetArea>(2),
+				  m_asset_browser,
+				  &MainWindow::on_actionAsset_Browser_triggered);
+	addEditorDock(static_cast<Qt::DockWidgetArea>(2),
+				  m_entity_list,
+				  &MainWindow::on_actionEntity_list_triggered);
+	addEditorDock(static_cast<Qt::DockWidgetArea>(2),
+				  m_entity_template_list_ui,
+				  &MainWindow::on_actionEntity_templates_triggered);
+	addEditorDock(static_cast<Qt::DockWidgetArea>(8),
+				  m_file_server_ui,
+				  &MainWindow::on_actionFile_server_triggered);
+	addEditorDock(static_cast<Qt::DockWidgetArea>(1),
+				  m_game_view,
+				  &MainWindow::on_actionGame_view_triggered);
+	addEditorDock(static_cast<Qt::DockWidgetArea>(8),
+				  m_log,
+				  &MainWindow::on_actionLog_triggered);
+	addEditorDock(static_cast<Qt::DockWidgetArea>(1),
+				  m_profiler_ui,
+				  &MainWindow::on_actionProfiler_triggered);
+	addEditorDock(static_cast<Qt::DockWidgetArea>(1),
+				  m_property_view,
+				  &MainWindow::on_actionProperties_triggered);
+	addEditorDock(static_cast<Qt::DockWidgetArea>(2),
+				  m_scene_view,
+				  &MainWindow::on_actionScene_View_triggered);
+	addEditorDock(static_cast<Qt::DockWidgetArea>(8),
+				  m_script_compiler_ui,
+				  &MainWindow::on_actionScript_compiler_triggered);
 
 	createLayoutCombobox();
 
@@ -100,14 +127,19 @@ MainWindow::MainWindow(QWidget* parent) :
 	m_recent_files_menu = new QMenu(m_ui->menuFile);
 	m_recent_files_menu->setTitle("Recent Files");
 	m_ui->menuFile->insertMenu(m_ui->actionSave, m_recent_files_menu);
-	m_recent_files_menu->connect(m_recent_files_menu, &QMenu::triggered, [this](QAction* action)
-	{
-		auto path = action->text().toLatin1();
-		m_world_editor->loadUniverse(Lumix::Path(path.data()));
-	});
+	m_recent_files_menu->connect(m_recent_files_menu,
+								 &QMenu::triggered,
+								 [this](QAction* action)
+								 {
+									 auto path = action->text().toLatin1();
+									 m_world_editor->loadUniverse(
+										 Lumix::Path(path.data()));
+								 });
 	fillRecentFiles();
 
-	geometry_restored = geometry_restored && restoreState(settings.value("mainWindowState").toByteArray());
+	geometry_restored =
+		geometry_restored &&
+		restoreState(settings.value("mainWindowState").toByteArray());
 	if (!geometry_restored)
 	{
 		QFile file("editor/layouts/main.bin");
@@ -141,7 +173,8 @@ void MainWindow::on_actionStats_triggered()
 
 void MainWindow::on_actionImport_asset_triggered()
 {
-	ImportAssetDialog* dialog = new ImportAssetDialog(*this, this, m_world_editor->getBasePath());
+	ImportAssetDialog* dialog =
+		new ImportAssetDialog(*this, this, m_world_editor->getBasePath());
 	dialog->show();
 }
 
@@ -177,24 +210,29 @@ void MainWindow::createLayoutCombobox()
 			m_layout_combobox->addItem(file.baseName());
 		}
 	}
-	connect(m_layout_combobox, &QComboBox::currentTextChanged, [this](const QString & text)
-	{
-		QFile file(QString("editor/layouts/%1.bin").arg(text));
-		if (file.open(QIODevice::ReadWrite))
-		{
-			int size;
-			file.read((char*)&size, sizeof(size));
-			QByteArray geom = file.read(size);
-			restoreGeometry(geom);
-			file.read((char*)&size, sizeof(size));
-			QByteArray state = file.read(size);
-			restoreState(state);
-		}
-	});;
+	connect(m_layout_combobox,
+			&QComboBox::currentTextChanged,
+			[this](const QString& text)
+			{
+				QFile file(QString("editor/layouts/%1.bin").arg(text));
+				if (file.open(QIODevice::ReadWrite))
+				{
+					int size;
+					file.read((char*)&size, sizeof(size));
+					QByteArray geom = file.read(size);
+					restoreGeometry(geom);
+					file.read((char*)&size, sizeof(size));
+					QByteArray state = file.read(size);
+					restoreState(state);
+				}
+			});
+	;
 }
 
 
-void MainWindow::addEditorDock(Qt::DockWidgetArea area, QDockWidget* widget, void (MainWindow::*callback)())
+void MainWindow::addEditorDock(Qt::DockWidgetArea area,
+							   QDockWidget* widget,
+							   void (MainWindow::*callback)())
 {
 	DockInfo info;
 	info.m_widget = widget;
@@ -232,7 +270,48 @@ void MainWindow::update()
 }
 
 
-void MainWindow::closeEvent(QCloseEvent *event)
+void MainWindow::shutdown()
+{
+	m_world_editor->universeLoaded()
+		.unbind<MainWindow, &MainWindow::onUniverseLoaded>(this);
+
+	m_scene_view->shutdown();
+	m_game_view->shutdown();
+	delete m_terrain_component_plugin;
+	delete m_shader_compiler;
+	delete m_log;
+	delete m_ui;
+	delete m_animation_editor;
+	delete m_scene_view;
+	delete m_property_view;
+	delete m_asset_browser;
+	delete m_script_compiler_ui;
+	delete m_file_server_ui;
+	delete m_profiler_ui;
+	delete m_entity_template_list_ui;
+	delete m_notifications;
+	m_metadata->save(METADATA_FILE);
+	delete m_metadata;
+
+	m_terrain_component_plugin = nullptr;
+	m_shader_compiler = nullptr;
+	m_log = nullptr;
+	m_ui = nullptr;
+	m_animation_editor = nullptr;
+	m_scene_view = nullptr;
+	m_property_view = nullptr;
+	m_asset_browser = nullptr;
+	m_script_compiler_ui = nullptr;
+	m_file_server_ui = nullptr;
+	m_profiler_ui = nullptr;
+	m_entity_template_list_ui = nullptr;
+	m_notifications = nullptr;
+	m_metadata = nullptr;
+	m_world_editor = nullptr;
+}
+
+
+void MainWindow::closeEvent(QCloseEvent* event)
 {
 	QSettings settings("Lumix", "QtEditor");
 	settings.setValue("mainWindowGeometry", saveGeometry());
@@ -251,21 +330,20 @@ void MainWindow::closeEvent(QCloseEvent *event)
 
 MainWindow::~MainWindow()
 {
-	delete m_terrain_component_plugin;
-	delete m_shader_compiler;
-	delete m_log;
-	delete m_ui;
-	delete m_animation_editor;
-	delete m_scene_view;
-	delete m_property_view;
-	delete m_asset_browser;
-	delete m_script_compiler_ui;
-	delete m_file_server_ui;
-	delete m_profiler_ui;
-	delete m_entity_template_list_ui;
-	delete m_notifications;
-	m_metadata->save(METADATA_FILE);
-	delete m_metadata;
+	ASSERT(!m_terrain_component_plugin);
+	ASSERT(!m_shader_compiler);
+	ASSERT(!m_log);
+	ASSERT(!m_ui);
+	ASSERT(!m_animation_editor);
+	ASSERT(!m_scene_view);
+	ASSERT(!m_property_view);
+	ASSERT(!m_asset_browser);
+	ASSERT(!m_script_compiler_ui);
+	ASSERT(!m_file_server_ui);
+	ASSERT(!m_profiler_ui);
+	ASSERT(!m_entity_template_list_ui);
+	ASSERT(!m_notifications);
+	ASSERT(!m_metadata);
 }
 
 
@@ -292,7 +370,8 @@ void MainWindow::setWorldEditor(Lumix::WorldEditor& editor)
 	m_shader_compiler->setWorldEditor(editor);
 	m_scene_view->setWorldEditor(editor);
 
-	m_world_editor->universeLoaded().bind<MainWindow, &MainWindow::onUniverseLoaded>(this);
+	m_world_editor->universeLoaded()
+		.bind<MainWindow, &MainWindow::onUniverseLoaded>(this);
 
 	installPlugins();
 }
@@ -300,7 +379,7 @@ void MainWindow::setWorldEditor(Lumix::WorldEditor& editor)
 void MainWindow::onUniverseLoaded()
 {
 	const char* path = m_world_editor->getUniversePath().c_str();
-	
+
 	if (m_recent_files.indexOf(path, 0) < 0)
 	{
 		m_recent_files.push_back(path);
@@ -332,7 +411,8 @@ void MainWindow::on_actionLog_triggered()
 
 void MainWindow::on_actionOpen_triggered()
 {
-	QString filename = QFileDialog::getOpenFileName(NULL, QString(), QString(), "universe (*.unv)");
+	QString filename = QFileDialog::getOpenFileName(
+		NULL, QString(), QString(), "universe (*.unv)");
 	QByteArray path = filename.toLocal8Bit();
 	if (!path.isEmpty())
 	{
@@ -454,10 +534,17 @@ void MainWindow::on_actionSave_as_template_triggered()
 	if (m_world_editor->getSelectedEntities().size() == 1)
 	{
 		bool ok = false;
-		QString text = QInputDialog::getText(this, tr("Entity template"), tr("Template name:"), QLineEdit::Normal, tr(""), &ok);
+		QString text = QInputDialog::getText(this,
+											 tr("Entity template"),
+											 tr("Template name:"),
+											 QLineEdit::Normal,
+											 tr(""),
+											 &ok);
 		if (ok)
 		{
-			m_world_editor->getEntityTemplateSystem().createTemplateFromEntity(text.toLatin1().data(), m_world_editor->getSelectedEntities()[0]);
+			m_world_editor->getEntityTemplateSystem().createTemplateFromEntity(
+				text.toLatin1().data(),
+				m_world_editor->getSelectedEntities()[0]);
 		}
 	}
 }
@@ -486,7 +573,9 @@ void MainWindow::on_actionRemove_triggered()
 {
 	if (!m_world_editor->getSelectedEntities().empty())
 	{
-		m_world_editor->destroyEntities(&m_world_editor->getSelectedEntities()[0], m_world_editor->getSelectedEntities().size());
+		m_world_editor->destroyEntities(
+			&m_world_editor->getSelectedEntities()[0],
+			m_world_editor->getSelectedEntities().size());
 	}
 }
 
@@ -508,7 +597,8 @@ void MainWindow::on_actionMeasure_triggered()
 void MainWindow::on_actionSave_Layout_triggered()
 {
 	bool ok;
-	QString text = QInputDialog::getText(this, "Save layout", "Layout name:", QLineEdit::Normal, "", &ok);
+	QString text = QInputDialog::getText(
+		this, "Save layout", "Layout name:", QLineEdit::Normal, "", &ok);
 	if (ok && !text.isEmpty())
 	{
 		QFile file(QString("editor/layouts/%1.bin").arg(text));

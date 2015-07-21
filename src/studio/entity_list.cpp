@@ -13,550 +13,579 @@
 #include <qmimedata.h>
 
 
-static const char* component_map[] =
-{
-	"Animable", "animable",
-	"Camera", "camera",
-	"Global light", "global_light",
-	"Mesh", "renderable",
-	"Physics Box", "box_rigid_actor",
-	"Physics Controller", "physical_controller",
-	"Physics Mesh", "mesh_rigid_actor",
-	"Physics Heightfield", "physical_heightfield",
-	"Point light", "point_light",
-	"Script", "script",
-	"Terrain", "terrain"
-};
-
-
 static const uint32_t RENDERABLE_HASH = crc32("renderable");
 
 
 class SetParentEditorCommand : public Lumix::IEditorCommand
 {
-	public:
-		SetParentEditorCommand(Lumix::WorldEditor& editor, Lumix::Hierarchy& hierarchy, const Lumix::Entity& child, const Lumix::Entity& parent)
-			: m_new_parent(parent)
-			, m_child(child)
-			, m_old_parent(hierarchy.getParent(child))
-			, m_hierarchy(hierarchy)
-			, m_editor(editor)
-		{
-		}
+public:
+	SetParentEditorCommand(Lumix::WorldEditor& editor,
+						   Lumix::Hierarchy& hierarchy,
+						   const Lumix::Entity& child,
+						   const Lumix::Entity& parent)
+		: m_new_parent(parent)
+		, m_child(child)
+		, m_old_parent(hierarchy.getParent(child))
+		, m_hierarchy(hierarchy)
+		, m_editor(editor)
+	{
+	}
 
 
-		virtual void serialize(Lumix::JsonSerializer& serializer)
-		{
-			serializer.serialize("parent", m_new_parent.index);
-			serializer.serialize("child", m_child.index);
-		}
+	virtual void serialize(Lumix::JsonSerializer& serializer)
+	{
+		serializer.serialize("parent", m_new_parent.index);
+		serializer.serialize("child", m_child.index);
+	}
 
 
-		virtual void deserialize(Lumix::JsonSerializer& serializer)
-		{
-			serializer.deserialize("parent", m_new_parent.index, 0);
-			serializer.deserialize("child", m_child.index, 0);
-			m_new_parent.universe = m_editor.getUniverse();
-			m_child.universe = m_editor.getUniverse();
-			m_old_parent = m_hierarchy.getParent(m_child);
-		}
+	virtual void deserialize(Lumix::JsonSerializer& serializer)
+	{
+		serializer.deserialize("parent", m_new_parent.index, 0);
+		serializer.deserialize("child", m_child.index, 0);
+		m_new_parent.universe = m_editor.getUniverse();
+		m_child.universe = m_editor.getUniverse();
+		m_old_parent = m_hierarchy.getParent(m_child);
+	}
 
 
-		virtual void execute() override
-		{
-			m_hierarchy.setParent(m_child, m_new_parent);
-		}
+	virtual void execute() override
+	{
+		m_hierarchy.setParent(m_child, m_new_parent);
+	}
 
 
-		virtual void undo() override
-		{
-			m_hierarchy.setParent(m_child, m_old_parent);
-		}
+	virtual void undo() override
+	{
+		m_hierarchy.setParent(m_child, m_old_parent);
+	}
 
 
-		virtual bool merge(IEditorCommand&) override
-		{
-			return false;
-		}
+	virtual bool merge(IEditorCommand&) override { return false; }
 
 
-		virtual uint32_t getType() override
-		{
-			static const uint32_t hash = crc32("set_entity_parent");
-			return hash;
-		}
+	virtual uint32_t getType() override
+	{
+		static const uint32_t hash = crc32("set_entity_parent");
+		return hash;
+	}
 
 
-	private:
-		Lumix::Entity m_child;
-		Lumix::Entity m_new_parent;
-		Lumix::Entity m_old_parent;
-		Lumix::Hierarchy& m_hierarchy;
-		Lumix::WorldEditor& m_editor;
+private:
+	Lumix::Entity m_child;
+	Lumix::Entity m_new_parent;
+	Lumix::Entity m_old_parent;
+	Lumix::Hierarchy& m_hierarchy;
+	Lumix::WorldEditor& m_editor;
 };
 
 
 class EntityListFilter : public QSortFilterProxyModel
 {
-	public:
-		EntityListFilter(QWidget* parent) : QSortFilterProxyModel(parent), m_component(0), m_is_update_enabled(true) {}
-		void filterComponent(uint32_t component) { m_component = component; }
-		void setUniverse(Lumix::Universe* universe) { m_universe = universe; invalidate(); }
-		void setWorldEditor(Lumix::WorldEditor& editor)
-		{
-			m_editor = &editor;
-			editor.entityNameSet().bind<EntityListFilter, &EntityListFilter::onEntityNameSet>(this);
-		}
-		void enableUpdate(bool enable)
-		{
-			m_is_update_enabled = enable;
-		}
+public:
+	EntityListFilter(QWidget* parent)
+		: QSortFilterProxyModel(parent)
+		, m_component(0)
+		, m_is_update_enabled(true)
+	{
+	}
+	void filterComponent(uint32_t component) { m_component = component; }
+	void setUniverse(Lumix::Universe* universe)
+	{
+		m_universe = universe;
+		invalidate();
+	}
+	void setWorldEditor(Lumix::WorldEditor& editor)
+	{
+		m_editor = &editor;
+		editor.entityNameSet()
+			.bind<EntityListFilter, &EntityListFilter::onEntityNameSet>(this);
+	}
+	void enableUpdate(bool enable) { m_is_update_enabled = enable; }
 
-	protected:
-		virtual bool filterAcceptsRow(int source_row, const QModelIndex &source_parent) const override
+protected:
+	virtual bool
+	filterAcceptsRow(int source_row,
+					 const QModelIndex& source_parent) const override
+	{
+		QModelIndex index = sourceModel()->index(source_row, 0, source_parent);
+		if (m_component == 0)
 		{
-			QModelIndex index = sourceModel()->index(source_row, 0, source_parent);
-			if (m_component == 0)
-			{
-				return sourceModel()->data(index).toString().contains(filterRegExp());
-			}
-			int entity_index = sourceModel()->data(index, Qt::UserRole).toInt();
-			return m_editor->getComponent(Lumix::Entity(m_universe, entity_index), m_component).isValid()
-				&& sourceModel()->data(index).toString().contains(filterRegExp());
+			return sourceModel()->data(index).toString().contains(
+				filterRegExp());
 		}
+		int entity_index = sourceModel()->data(index, Qt::UserRole).toInt();
+		return m_editor->getComponent(Lumix::Entity(m_universe, entity_index),
+									  m_component)
+				   .isValid() &&
+			   sourceModel()->data(index).toString().contains(filterRegExp());
+	}
 
-		void onEntityNameSet(const Lumix::Entity&, const char*)
+	void onEntityNameSet(const Lumix::Entity&, const char*)
+	{
+		if (m_is_update_enabled)
 		{
-			if (m_is_update_enabled)
-			{
-				invalidate();
-			}
+			invalidate();
 		}
+	}
 
-	private:
-		uint32_t m_component;
-		Lumix::Universe* m_universe;
-		bool m_is_update_enabled;
-		Lumix::WorldEditor* m_editor;
+private:
+	uint32_t m_component;
+	Lumix::Universe* m_universe;
+	bool m_is_update_enabled;
+	Lumix::WorldEditor* m_editor;
 };
 
 
 class EntityListModel : public QAbstractItemModel
 {
-	private:
-		class EntityNode
-		{
-			public:
-				EntityNode(EntityNode* parent, const Lumix::Entity& entity) : m_entity(entity), m_parent(parent) {}
-
-				~EntityNode()
-				{
-					for(int i = 0; i < m_children.size(); ++i)
-					{
-						delete m_children[i];
-					}
-				}
-
-				EntityNode* getNode(const Lumix::Entity& entity)
-				{
-					if(m_entity == entity)
-					{
-						return this;
-					}
-					for(int i = 0; i < m_children.size(); ++i)
-					{
-						EntityNode* node = m_children[i]->getNode(entity);
-						if(node)
-						{
-							return node;
-						}
-					}
-					return NULL;
-				}
-
-				bool removeEntity(const Lumix::Entity& entity)
-				{
-					if(m_entity == entity)
-					{
-						return true;
-					}
-					for(int i = 0; i < m_children.size(); ++i)
-					{
-						if(m_children[i]->removeEntity(entity))
-						{
-							m_children.remove(i);
-							return false;
-						}
-					}
-					return false;
-				}
-
-				EntityNode* m_parent;
-				Lumix::Entity m_entity;
-				QVector<EntityNode*> m_children;
-		};
-
+private:
+	class EntityNode
+	{
 	public:
-		EntityListModel(QWidget* parent, EntityListFilter* filter)
-			: QAbstractItemModel(parent)
+		EntityNode(EntityNode* parent, const Lumix::Entity& entity)
+			: m_entity(entity)
+			, m_parent(parent)
 		{
-			m_root = NULL;
-			m_universe = NULL;
-			m_filter = filter;
-			m_is_update_enabled = true;
 		}
 
-		~EntityListModel()
+		~EntityNode()
 		{
-			delete m_root;
-		}
-
-
-		void enableUpdate(bool enable)
-		{
-			m_is_update_enabled = enable;
-		}
-
-
-		virtual Qt::ItemFlags flags(const QModelIndex &index) const override
-		{
-			Qt::ItemFlags defaultFlags = QAbstractItemModel::flags(index);
-
-			if (index.isValid())
+			for (int i = 0; i < m_children.size(); ++i)
 			{
-				return Qt::ItemIsDragEnabled | Qt::ItemIsDropEnabled | Qt::ItemIsEditable | defaultFlags;
-			}
-			else
-			{
-				return Qt::ItemIsDropEnabled | defaultFlags;
+				delete m_children[i];
 			}
 		}
 
-
-		virtual bool dropMimeData(const QMimeData *data, Qt::DropAction action, int row, int column, const QModelIndex &parent) override
+		EntityNode* getNode(const Lumix::Entity& entity)
 		{
-			if (action == Qt::IgnoreAction)
+			if (m_entity == entity)
+			{
+				return this;
+			}
+			for (int i = 0; i < m_children.size(); ++i)
+			{
+				EntityNode* node = m_children[i]->getNode(entity);
+				if (node)
+				{
+					return node;
+				}
+			}
+			return NULL;
+		}
+
+		bool removeEntity(const Lumix::Entity& entity)
+		{
+			if (m_entity == entity)
 			{
 				return true;
 			}
-			if (!data->hasFormat("application/lumix.entity"))
+			for (int i = 0; i < m_children.size(); ++i)
 			{
-				return false;
+				if (m_children[i]->removeEntity(entity))
+				{
+					m_children.remove(i);
+					return false;
+				}
 			}
-			if (column > 0)
-			{
-				return false;
-			}
-
-			Lumix::Entity parent_entity(m_universe, -1);
-			if (row != -1)
-			{
-				parent_entity.index = parent.data(Qt::UserRole).toInt();
-			}
-			else if (parent.isValid())
-			{
-				parent_entity.index = parent.data(Qt::UserRole).toInt();
-			}
-
-			QByteArray encodedData = data->data("application/lumix.entity");
-			QDataStream stream(&encodedData, QIODevice::ReadOnly);
-			QStringList newItems;
-
-			Lumix::Entity child(m_universe, -1);
-			if (!stream.atEnd()) 
-			{
-				stream >> child.index;
-			}
-
-			SetParentEditorCommand* command = m_engine->getWorldEditor()->getAllocator().newObject<SetParentEditorCommand>(*m_engine->getWorldEditor(), *m_engine->getHierarchy(), child, parent_entity);
-			m_engine->getWorldEditor()->executeCommand(command);
-
 			return false;
 		}
 
+		EntityNode* m_parent;
+		Lumix::Entity m_entity;
+		QVector<EntityNode*> m_children;
+	};
 
-		virtual Qt::DropActions supportedDropActions() const override
+public:
+	EntityListModel(QWidget* parent, EntityListFilter* filter)
+		: QAbstractItemModel(parent)
+	{
+		m_root = NULL;
+		m_universe = NULL;
+		m_filter = filter;
+		m_is_update_enabled = true;
+	}
+
+	~EntityListModel() { delete m_root; }
+
+
+	void enableUpdate(bool enable) { m_is_update_enabled = enable; }
+
+
+	virtual Qt::ItemFlags flags(const QModelIndex& index) const override
+	{
+		Qt::ItemFlags defaultFlags = QAbstractItemModel::flags(index);
+
+		if (index.isValid())
 		{
-			return Qt::CopyAction;
+			return Qt::ItemIsDragEnabled | Qt::ItemIsDropEnabled |
+				   Qt::ItemIsEditable | defaultFlags;
+		}
+		else
+		{
+			return Qt::ItemIsDropEnabled | defaultFlags;
+		}
+	}
+
+
+	virtual bool dropMimeData(const QMimeData* data,
+							  Qt::DropAction action,
+							  int row,
+							  int column,
+							  const QModelIndex& parent) override
+	{
+		if (action == Qt::IgnoreAction)
+		{
+			return true;
+		}
+		if (!data->hasFormat("application/lumix.entity"))
+		{
+			return false;
+		}
+		if (column > 0)
+		{
+			return false;
 		}
 
-
-		virtual QMimeData* mimeData(const QModelIndexList &indexes) const override
+		Lumix::Entity parent_entity(m_universe, -1);
+		if (row != -1)
 		{
-			QMimeData *mimeData = new QMimeData();
-			QByteArray encodedData;
-
-			QDataStream stream(&encodedData, QIODevice::WriteOnly);
-
-			stream << indexes.first().data(Qt::UserRole).toInt();
-
-			mimeData->setData("application/lumix.entity", encodedData);
-			return mimeData;
+			parent_entity.index = parent.data(Qt::UserRole).toInt();
+		}
+		else if (parent.isValid())
+		{
+			parent_entity.index = parent.data(Qt::UserRole).toInt();
 		}
 
+		QByteArray encodedData = data->data("application/lumix.entity");
+		QDataStream stream(&encodedData, QIODevice::ReadOnly);
+		QStringList newItems;
 
-		virtual QStringList mimeTypes() const override
+		Lumix::Entity child(m_universe, -1);
+		if (!stream.atEnd())
 		{
-			QStringList types;
-			types << "application/lumix.entity";
-			return types;
+			stream >> child.index;
 		}
 
+		SetParentEditorCommand* command =
+			m_engine->getWorldEditor()
+				->getAllocator()
+				.newObject<SetParentEditorCommand>(*m_engine->getWorldEditor(),
+												   *m_engine->getHierarchy(),
+												   child,
+												   parent_entity);
+		m_engine->getWorldEditor()->executeCommand(command);
 
-		virtual QVariant headerData(int section, Qt::Orientation, int role = Qt::DisplayRole) const override
+		return false;
+	}
+
+
+	virtual Qt::DropActions supportedDropActions() const override
+	{
+		return Qt::CopyAction;
+	}
+
+
+	virtual QMimeData* mimeData(const QModelIndexList& indexes) const override
+	{
+		QMimeData* mimeData = new QMimeData();
+		QByteArray encodedData;
+
+		QDataStream stream(&encodedData, QIODevice::WriteOnly);
+
+		stream << indexes.first().data(Qt::UserRole).toInt();
+
+		mimeData->setData("application/lumix.entity", encodedData);
+		return mimeData;
+	}
+
+
+	virtual QStringList mimeTypes() const override
+	{
+		QStringList types;
+		types << "application/lumix.entity";
+		return types;
+	}
+
+
+	virtual QVariant headerData(int section,
+								Qt::Orientation,
+								int role = Qt::DisplayRole) const override
+	{
+		if (role == Qt::DisplayRole)
 		{
-			if(role == Qt::DisplayRole)
+			switch (section)
 			{
-				switch(section)
-				{
-					case 0:
-						return "ID";
-						break;
-					default:
-						ASSERT(false);
-						return QVariant();
-				}
+				case 0:
+					return "ID";
+					break;
+				default:
+					ASSERT(false);
+					return QVariant();
 			}
-			return QVariant();
 		}
-		
-		
-		virtual QModelIndex index(int row, int column, const QModelIndex& parent) const override
+		return QVariant();
+	}
+
+
+	virtual QModelIndex
+	index(int row, int column, const QModelIndex& parent) const override
+	{
+		if (!hasIndex(row, column, parent))
 		{
-			if (!hasIndex(row, column, parent))
-			{
-				return QModelIndex();
-			}
-
-			EntityNode *parentItem;
-
-			if (!parent.isValid())
-			{
-				parentItem = m_root;
-			}
-			else
-			{
-				parentItem = static_cast<EntityNode*>(parent.internalPointer());
-			}
-
-			EntityNode *childItem = parentItem->m_children[row];
-			if (childItem)
-			{
-				return createIndex(row, column, childItem);
-			}
 			return QModelIndex();
 		}
-		
-		
-		virtual QModelIndex parent(const QModelIndex& index) const override
+
+		EntityNode* parentItem;
+
+		if (!parent.isValid())
 		{
-			if (!index.isValid() || !m_root)
-			{
-				return QModelIndex();
-			}
-
-			EntityNode *childItem = static_cast<EntityNode*>(index.internalPointer());
-			EntityNode *parentItem = childItem->m_parent;
-
-			if (parentItem == m_root)
-			{
-				return QModelIndex();
-			}
-
-			int row = parentItem->m_parent->m_children.indexOf(parentItem);
-			return createIndex(row, 0, parentItem);
+			parentItem = m_root;
 		}
-		
-		
-		virtual int rowCount(const QModelIndex& parent) const override
+		else
 		{
-			if (parent.column() > 0 || !m_root)
-			{
-				return 0;
-			}
-
-			if (!parent.isValid())
-			{
-				return m_root->m_children.size();
-			}
-			EntityNode* node = static_cast<EntityNode*>(parent.internalPointer());
-			return node->m_children.size();
-		}
-		
-		
-		virtual int columnCount(const QModelIndex&) const override
-		{
-			return 1;
+			parentItem = static_cast<EntityNode*>(parent.internalPointer());
 		}
 
-
-		virtual bool setData(const QModelIndex &index, const QVariant &value, int role = Qt::EditRole) override
+		EntityNode* childItem = parentItem->m_children[row];
+		if (childItem)
 		{
-			if(index.isValid() && role == Qt::EditRole)
+			return createIndex(row, column, childItem);
+		}
+		return QModelIndex();
+	}
+
+
+	virtual QModelIndex parent(const QModelIndex& index) const override
+	{
+		if (!index.isValid() || !m_root)
+		{
+			return QModelIndex();
+		}
+
+		EntityNode* childItem =
+			static_cast<EntityNode*>(index.internalPointer());
+		EntityNode* parentItem = childItem->m_parent;
+
+		if (parentItem == m_root)
+		{
+			return QModelIndex();
+		}
+
+		int row = parentItem->m_parent->m_children.indexOf(parentItem);
+		return createIndex(row, 0, parentItem);
+	}
+
+
+	virtual int rowCount(const QModelIndex& parent) const override
+	{
+		if (parent.column() > 0 || !m_root)
+		{
+			return 0;
+		}
+
+		if (!parent.isValid())
+		{
+			return m_root->m_children.size();
+		}
+		EntityNode* node = static_cast<EntityNode*>(parent.internalPointer());
+		return node->m_children.size();
+	}
+
+
+	virtual int columnCount(const QModelIndex&) const override { return 1; }
+
+
+	virtual bool setData(const QModelIndex& index,
+						 const QVariant& value,
+						 int role = Qt::EditRole) override
+	{
+		if (index.isValid() && role == Qt::EditRole)
+		{
+			EntityNode* item =
+				static_cast<EntityNode*>(index.internalPointer());
+			switch (index.column())
 			{
-				EntityNode *item = static_cast<EntityNode*>(index.internalPointer());
-				switch(index.column())
+				case 0:
 				{
-					case 0:
-						{
-							const QByteArray& name = value.toString().toLatin1();
-							m_engine->getWorldEditor()->setEntityName(item->m_entity, name.data());
-							emit dataChanged(index, index);
-							return true;
-						}
-					default:
-						ASSERT(false);
+					const QByteArray& name = value.toString().toLatin1();
+					m_engine->getWorldEditor()->setEntityName(item->m_entity,
+															  name.data());
+					emit dataChanged(index, index);
+					return true;
+				}
+				default:
+					ASSERT(false);
+			}
+		}
+		return QAbstractItemModel::setData(index, value, role);
+	}
+
+
+	virtual QVariant data(const QModelIndex& index, int role) const override
+	{
+		if (!index.isValid())
+		{
+			return QVariant("X");
+		}
+
+		EntityNode* item = static_cast<EntityNode*>(index.internalPointer());
+
+		if (index.isValid() && role == Qt::DisplayRole)
+		{
+			Lumix::Component renderable =
+				m_engine->getWorldEditor()->getComponent(item->m_entity,
+														 RENDERABLE_HASH);
+			const char* name = item->m_entity.getName();
+			if (renderable.isValid())
+			{
+				Lumix::StackAllocator<LUMIX_MAX_PATH> allocator;
+				Lumix::string path(allocator);
+				static_cast<Lumix::RenderScene*>(renderable.scene)
+					->getRenderablePath(renderable, path);
+				if (path.length() != 0)
+				{
+					char basename[LUMIX_MAX_PATH];
+					Lumix::PathUtils::getBasename(
+						basename, LUMIX_MAX_PATH, path.c_str());
+					return name && name[0] != '\0'
+							   ? QVariant(
+									 QString("%1 - %2").arg(name).arg(basename))
+							   : QVariant(QString("%1 - %2")
+											  .arg(item->m_entity.index)
+											  .arg(basename));
 				}
 			}
-			return QAbstractItemModel::setData(index, value, role);
+			return name && name[0] != '\0' ? QVariant(name)
+										   : QVariant(item->m_entity.index);
 		}
-
-
-		virtual QVariant data(const QModelIndex& index, int role) const override
+		else if (index.isValid() && role == Qt::UserRole)
 		{
-			if (!index.isValid())
-			{
-				 return QVariant("X");
-			}
-
-			EntityNode *item = static_cast<EntityNode*>(index.internalPointer());
-
-			if (index.isValid() && role == Qt::DisplayRole)
-			{
-				Lumix::Component renderable = m_engine->getWorldEditor()->getComponent(item->m_entity, RENDERABLE_HASH);
-				const char* name = item->m_entity.getName();
-				if (renderable.isValid())
-				{
-					Lumix::StackAllocator<LUMIX_MAX_PATH> allocator;
-					Lumix::string path(allocator);
-					static_cast<Lumix::RenderScene*>(renderable.scene)->getRenderablePath(renderable, path);
-					if (path.length() != 0)
-					{
-						char basename[LUMIX_MAX_PATH];
-						Lumix::PathUtils::getBasename(basename, LUMIX_MAX_PATH, path.c_str());
-						return name && name[0] != '\0' ? QVariant(QString("%1 - %2").arg(name).arg(basename)) : QVariant(QString("%1 - %2").arg(item->m_entity.index).arg(basename));
-					}
-				}
-				return name && name[0] != '\0' ? QVariant(name) : QVariant(item->m_entity.index);
-			}
-			else if (index.isValid() && role == Qt::UserRole)
-			{
-				return item->m_entity.index;
-			}
-			return role == 6 ? QVariant(QString("AAA")) : QVariant();
+			return item->m_entity.index;
 		}
+		return role == 6 ? QVariant(QString("AAA")) : QVariant();
+	}
 
 
-		void setEngine(Lumix::Engine& engine)
+	void setEngine(Lumix::Engine& engine) { m_engine = &engine; }
+
+
+	void fillChildren(EntityNode* node)
+	{
+		Lumix::Array<Lumix::Hierarchy::Child>* children =
+			m_engine->getHierarchy()->getChildren(node->m_entity);
+		if (children)
 		{
-			m_engine = &engine;
-		}
-
-
-		void fillChildren(EntityNode* node)
-		{
-			Lumix::Array<Lumix::Hierarchy::Child>* children = m_engine->getHierarchy()->getChildren(node->m_entity);
-			if(children)
+			for (int i = 0; i < children->size(); ++i)
 			{
-				for(int i = 0; i < children->size(); ++i)
-				{
-					EntityNode* new_node = new EntityNode(node, Lumix::Entity(m_universe, (*children)[i].m_entity));
-					node->m_children.push_back(new_node);
-					fillChildren(new_node);
-				}
+				EntityNode* new_node = new EntityNode(
+					node, Lumix::Entity(m_universe, (*children)[i].m_entity));
+				node->m_children.push_back(new_node);
+				fillChildren(new_node);
 			}
 		}
+	}
 
 
-		void onParentSet(const Lumix::Entity& child, const Lumix::Entity& parent)
+	void onParentSet(const Lumix::Entity& child, const Lumix::Entity& parent)
+	{
+		if (!m_root->m_children.empty())
 		{
-			if(!m_root->m_children.empty())
+			EntityNode* node = m_root->getNode(child);
+			node->m_parent->m_children.remove(
+				node->m_parent->m_children.indexOf(node));
+
+			EntityNode* parent_node = m_root->getNode(parent);
+			if (!parent_node)
 			{
-				EntityNode* node = m_root->getNode(child);
-				node->m_parent->m_children.remove(node->m_parent->m_children.indexOf(node));
-
-				EntityNode* parent_node = m_root->getNode(parent);
-				if(!parent_node)
-				{
-					parent_node = m_root;
-				}
-				parent_node->m_children.push_back(node);
-				node->m_parent = parent_node;
-
-				if (m_is_update_enabled)
-				{
-					m_filter->invalidate();
-				}
+				parent_node = m_root;
 			}
-		}
+			parent_node->m_children.push_back(node);
+			node->m_parent = parent_node;
 
-
-		void setUniverse(Lumix::Universe* universe)
-		{
-			m_filter->setUniverse(universe);
-			if(m_universe)
-			{
-				m_universe->entityCreated().unbind<EntityListModel, &EntityListModel::onEntityCreated>(this);
-				m_universe->entityDestroyed().unbind<EntityListModel, &EntityListModel::onEntityDestroyed>(this);
-			}
-			delete m_root;
-			m_root = new EntityNode(NULL, Lumix::Entity::INVALID);
-			m_universe = universe;
-			if(m_universe)
-			{
-				m_engine->getHierarchy()->parentSet().bind<EntityListModel, &EntityListModel::onParentSet>(this);
-				m_universe->entityCreated().bind<EntityListModel, &EntityListModel::onEntityCreated>(this);
-				m_universe->entityDestroyed().bind<EntityListModel, &EntityListModel::onEntityDestroyed>(this);
-				Lumix::Entity e = m_universe->getFirstEntity();
-				while(e.isValid())
-				{
-					Lumix::Entity parent = m_engine->getHierarchy()->getParent(e);
-					if(!parent.isValid())
-					{
-						EntityNode* node = new EntityNode(m_root, e);
-						m_root->m_children.push_back(node);
-						fillChildren(node);
-					}
-					e = m_universe->getNextEntity(e);
-				}
-			}
-			if (m_universe && !m_root->m_children.empty() && m_is_update_enabled)
-			{
-				m_filter->invalidate();
-			}
-		}
-
-	
-	private:
-		void onEntityCreated(const Lumix::Entity& entity)
-		{
-			EntityNode* node = new EntityNode(m_root, entity);
-			m_root->m_children.push_back(node);
 			if (m_is_update_enabled)
 			{
 				m_filter->invalidate();
 			}
 		}
+	}
 
-		void onEntityDestroyed(const Lumix::Entity& entity)
+
+	void setUniverse(Lumix::Universe* universe)
+	{
+		m_filter->setUniverse(universe);
+		if (m_universe)
 		{
-			m_root->removeEntity(entity);
-			if (m_is_update_enabled)
+			m_universe->entityCreated()
+				.unbind<EntityListModel, &EntityListModel::onEntityCreated>(
+					this);
+			m_universe->entityDestroyed()
+				.unbind<EntityListModel, &EntityListModel::onEntityDestroyed>(
+					this);
+		}
+		delete m_root;
+		m_root = new EntityNode(NULL, Lumix::Entity::INVALID);
+		m_universe = universe;
+		if (m_universe)
+		{
+			m_engine->getHierarchy()
+				->parentSet()
+				.bind<EntityListModel, &EntityListModel::onParentSet>(this);
+			m_universe->entityCreated()
+				.bind<EntityListModel, &EntityListModel::onEntityCreated>(this);
+			m_universe->entityDestroyed()
+				.bind<EntityListModel, &EntityListModel::onEntityDestroyed>(
+					this);
+			Lumix::Entity e = m_universe->getFirstEntity();
+			while (e.isValid())
 			{
-				m_filter->invalidate();
+				Lumix::Entity parent = m_engine->getHierarchy()->getParent(e);
+				if (!parent.isValid())
+				{
+					EntityNode* node = new EntityNode(m_root, e);
+					m_root->m_children.push_back(node);
+					fillChildren(node);
+				}
+				e = m_universe->getNextEntity(e);
 			}
 		}
+		if (m_universe && !m_root->m_children.empty() && m_is_update_enabled)
+		{
+			m_filter->invalidate();
+		}
+	}
 
-	private:
-		Lumix::Universe* m_universe;
-		Lumix::Engine* m_engine;
-		EntityNode* m_root;
-		EntityListFilter* m_filter;
-		bool m_is_update_enabled;
+
+private:
+	void onEntityCreated(const Lumix::Entity& entity)
+	{
+		EntityNode* node = new EntityNode(m_root, entity);
+		m_root->m_children.push_back(node);
+		if (m_is_update_enabled)
+		{
+			m_filter->invalidate();
+		}
+	}
+
+	void onEntityDestroyed(const Lumix::Entity& entity)
+	{
+		m_root->removeEntity(entity);
+		if (m_is_update_enabled)
+		{
+			m_filter->invalidate();
+		}
+	}
+
+private:
+	Lumix::Universe* m_universe;
+	Lumix::Engine* m_engine;
+	EntityNode* m_root;
+	EntityListFilter* m_filter;
+	bool m_is_update_enabled;
 };
 
 
-EntityList::EntityList(QWidget *parent) 
+EntityList::EntityList(QWidget* parent)
 	: QDockWidget(parent)
 	, m_ui(new Ui::EntityList)
 {
@@ -574,13 +603,21 @@ EntityList::EntityList(QWidget *parent)
 }
 
 
+void EntityList::shutdown()
+{
+	m_editor->universeCreated()
+		.unbind<EntityList, &EntityList::onUniverseCreated>(this);
+	m_editor->universeDestroyed()
+		.unbind<EntityList, &EntityList::onUniverseDestroyed>(this);
+	m_editor->universeLoaded()
+		.unbind<EntityList, &EntityList::onUniverseLoaded>(this);
+	m_editor->entitySelected()
+		.unbind<EntityList, &EntityList::onEntitySelected>(this);
+}
+
+
 EntityList::~EntityList()
 {
-	m_editor->universeCreated().unbind<EntityList, &EntityList::onUniverseCreated>(this);
-	m_editor->universeDestroyed().unbind<EntityList, &EntityList::onUniverseDestroyed>(this);
-	m_editor->universeLoaded().unbind<EntityList, &EntityList::onUniverseLoaded>(this);
-	m_editor->entitySelected().unbind<EntityList, &EntityList::onEntitySelected>(this);
-
 	delete m_ui;
 }
 
@@ -597,9 +634,12 @@ void EntityList::enableUpdate(bool enable)
 void EntityList::setWorldEditor(Lumix::WorldEditor& editor)
 {
 	m_editor = &editor;
-	editor.universeCreated().bind<EntityList, &EntityList::onUniverseCreated>(this);
-	editor.universeDestroyed().bind<EntityList, &EntityList::onUniverseDestroyed>(this);
-	editor.universeLoaded().bind<EntityList, &EntityList::onUniverseLoaded>(this);
+	editor.universeCreated().bind<EntityList, &EntityList::onUniverseCreated>(
+		this);
+	editor.universeDestroyed()
+		.bind<EntityList, &EntityList::onUniverseDestroyed>(this);
+	editor.universeLoaded().bind<EntityList, &EntityList::onUniverseLoaded>(
+		this);
 	m_universe = editor.getUniverse();
 	m_model->setEngine(editor.getEngine());
 	m_model->setUniverse(m_universe);
@@ -607,15 +647,18 @@ void EntityList::setWorldEditor(Lumix::WorldEditor& editor)
 	m_filter->setWorldEditor(editor);
 	m_ui->comboBox->clear();
 	m_ui->comboBox->addItem("All");
-	for (int i = 0; i < lengthOf(component_map); i += 2)
+	for (int i = 0; i < m_editor->getComponentTypesCount(); ++i)
 	{
-		m_ui->comboBox->addItem(component_map[i]);
+		m_ui->comboBox->addItem(m_editor->getComponentTypeName(i));
 	}
-	editor.entitySelected().bind<EntityList, &EntityList::onEntitySelected>(this);
+	editor.entitySelected().bind<EntityList, &EntityList::onEntitySelected>(
+		this);
 }
 
 
-void EntityList::fillSelection(const QModelIndex& parent, QItemSelection* selection, const Lumix::Array<Lumix::Entity>& entities)
+void EntityList::fillSelection(const QModelIndex& parent,
+							   QItemSelection* selection,
+							   const Lumix::Array<Lumix::Entity>& entities)
 {
 	for (int i = 0, c = m_filter->rowCount(parent); i < c; ++i)
 	{
@@ -625,7 +668,8 @@ void EntityList::fillSelection(const QModelIndex& parent, QItemSelection* select
 		{
 			if (entity_index == entities[j].index)
 			{
-				selection->append(QItemSelectionRange(m_filter->index(i, 0, parent)));
+				selection->append(
+					QItemSelectionRange(m_filter->index(i, 0, parent)));
 				break;
 			}
 		}
@@ -641,7 +685,10 @@ void EntityList::onEntitySelected(const Lumix::Array<Lumix::Entity>& entities)
 {
 	QItemSelection* selection = new QItemSelection();
 	fillSelection(QModelIndex(), selection, entities);
-	m_ui->entityList->selectionModel()->select(*selection, QItemSelectionModel::SelectionFlag::ClearAndSelect | QItemSelectionModel::SelectionFlag::Rows);
+	m_ui->entityList->selectionModel()->select(
+		*selection,
+		QItemSelectionModel::SelectionFlag::ClearAndSelect |
+			QItemSelectionModel::SelectionFlag::Rows);
 	delete selection;
 }
 
@@ -671,19 +718,21 @@ void EntityList::onUniverseDestroyed()
 }
 
 
-void EntityList::on_entityList_clicked(const QModelIndex &index)
+void EntityList::on_entityList_clicked(const QModelIndex& index)
 {
-	m_editor->selectEntities(&Lumix::Entity(m_universe, m_filter->data(index, Qt::UserRole).toInt()), 1);
+	m_editor->selectEntities(
+		&Lumix::Entity(m_universe, m_filter->data(index, Qt::UserRole).toInt()),
+		1);
 }
 
 
-void EntityList::on_comboBox_activated(const QString &arg1)
+void EntityList::on_comboBox_activated(const QString& arg1)
 {
-	for (int i = 0; i < lengthOf(component_map); i += 2)
+	for (int i = 0; i < m_editor->getComponentTypesCount(); ++i)
 	{
-		if (arg1 == component_map[i])
+		if (arg1 == m_editor->getComponentTypeName(i))
 		{
-			m_filter->filterComponent(crc32(component_map[i + 1]));
+			m_filter->filterComponent(crc32(m_editor->getComponentTypeID(i)));
 			if (m_is_update_enabled)
 			{
 				m_filter->invalidate();
@@ -698,7 +747,7 @@ void EntityList::on_comboBox_activated(const QString &arg1)
 	}
 }
 
-void EntityList::on_nameFilterEdit_textChanged(const QString &arg1)
+void EntityList::on_nameFilterEdit_textChanged(const QString& arg1)
 {
 	QRegExp regExp(arg1);
 	m_filter->setFilterRegExp(regExp);

@@ -59,6 +59,12 @@ namespace Lumix
 			}
 
 
+			virtual Universe& getUniverse() override
+			{
+				return m_universe;
+			}
+
+
 			virtual bool ownComponentType(uint32_t type) const override
 			{
 				return type == ANIMABLE_HASH;
@@ -318,8 +324,12 @@ namespace Lumix
 
 			virtual bool create() override
 			{
-				IAllocator& allocator = m_engine.getWorldEditor()->getAllocator();
-				m_engine.getWorldEditor()->registerProperty("animable", allocator.newObject<FilePropertyDescriptor<AnimationSceneImpl> >("preview", &AnimationSceneImpl::getPreview, &AnimationSceneImpl::setPreview, "Animation (*.ani)", allocator));
+				if (m_engine.getWorldEditor())
+				{
+					IAllocator& allocator = m_engine.getWorldEditor()->getAllocator();
+					m_engine.getWorldEditor()->registerComponentType("animable", "Animable");
+					m_engine.getWorldEditor()->registerProperty("animable", allocator.newObject<FilePropertyDescriptor<AnimationSceneImpl> >("preview", &AnimationSceneImpl::getPreview, &AnimationSceneImpl::setPreview, "Animation (*.ani)", allocator));
+				}
 				m_animation_manager.create(ResourceManager::ANIMATION, m_engine.getResourceManager());
 				return true;
 			}

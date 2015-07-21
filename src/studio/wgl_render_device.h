@@ -14,6 +14,7 @@ class WGLRenderDevice
 		WGLRenderDevice(Lumix::Engine& engine, const char* pipeline_path);
 		virtual ~WGLRenderDevice();
 
+		void shutdown();
 		Lumix::PipelineInstance& getPipeline();
 		int getWidth() const;
 		int getHeight() const;

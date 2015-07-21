@@ -31,6 +31,7 @@ class EntityList : public QDockWidget
 		~EntityList();
 		void setWorldEditor(Lumix::WorldEditor& editor);
 		void enableUpdate(bool enable);
+		void shutdown();
 
 	private slots:
 		void on_entityList_clicked(const QModelIndex& index);

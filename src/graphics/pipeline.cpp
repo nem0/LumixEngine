@@ -15,6 +15,7 @@
 #include "core/resource_manager_base.h"
 #include "core/string.h"
 #include "engine/engine.h"
+#include "engine/lua_wrapper.h"
 #include "engine/plugin_manager.h"
 #include "graphics/bitmap_font.h"
 #include "graphics/frame_buffer.h"
@@ -27,8 +28,6 @@
 #include "graphics/terrain.h"
 #include "graphics/texture.h"
 #include <bgfx.h>
-#include <lua.hpp>
-#include <lauxlib.h>
 
 
 namespace Lumix
@@ -242,10 +241,8 @@ namespace Lumix
 			, m_debug_flags(BGFX_DEBUG_TEXT)
 		{
 			m_terrain_scale_uniform = bgfx::createUniform("u_terrainScale", bgfx::UniformType::Vec4);
-			m_morph_const_uniform = bgfx::createUniform("u_morphConst", bgfx::UniformType::Vec4);
 			m_rel_camera_pos_uniform = bgfx::createUniform("u_relCamPos", bgfx::UniformType::Vec4);
 			m_map_size_uniform = bgfx::createUniform("u_mapSize", bgfx::UniformType::Vec4);
-			m_quad_min_and_size_uniform = bgfx::createUniform("u_quadMinAndSize", bgfx::UniformType::Vec4);
 			m_fog_color_density_uniform = bgfx::createUniform("u_fogColorDensity", bgfx::UniformType::Vec4);
 			m_light_pos_radius_uniform = bgfx::createUniform("u_lightPosRadius", bgfx::UniformType::Vec4);
 			m_light_color_uniform = bgfx::createUniform("u_lightRgbInnerR", bgfx::UniformType::Vec4);
@@ -256,6 +253,7 @@ namespace Lumix
 			m_shadowmap_splits_uniform = bgfx::createUniform("u_shadowmapSplits", bgfx::UniformType::Vec4);
 			m_bone_matrices_uniform = bgfx::createUniform("u_boneMatrices", bgfx::UniformType::Mat4, 64);
 			m_specular_shininess_uniform = bgfx::createUniform("u_materialSpecularShininess", bgfx::UniformType::Vec4);
+			m_terrain_matrix_uniform = bgfx::createUniform("u_terrainMatrix", bgfx::UniformType::Mat4);
 
 			ResourceManagerBase* material_manager = pipeline.getResourceManager().get(ResourceManager::MATERIAL);
 			m_screen_space_material = static_cast<Material*>(material_manager->load(Lumix::Path("models/editor/screen_space.mat"))); 
@@ -273,13 +271,12 @@ namespace Lumix
 			ResourceManagerBase* material_manager = m_source.getResourceManager().get(ResourceManager::MATERIAL);
 			material_manager->unload(*m_screen_space_material);
 			material_manager->unload(*m_debug_line_material);
+			bgfx::destroyUniform(m_terrain_matrix_uniform);
 			bgfx::destroyUniform(m_specular_shininess_uniform);
 			bgfx::destroyUniform(m_bone_matrices_uniform);
 			bgfx::destroyUniform(m_terrain_scale_uniform);
-			bgfx::destroyUniform(m_morph_const_uniform);
 			bgfx::destroyUniform(m_rel_camera_pos_uniform);
 			bgfx::destroyUniform(m_map_size_uniform);
-			bgfx::destroyUniform(m_quad_min_and_size_uniform);
 			bgfx::destroyUniform(m_fog_color_density_uniform);
 			bgfx::destroyUniform(m_light_pos_radius_uniform);
 			bgfx::destroyUniform(m_light_color_uniform);
@@ -948,6 +945,32 @@ namespace Lumix
 
 		void renderTerrain(const TerrainInfo& info)
 		{
+			if (!info.m_terrain->getMaterial()->isReady())
+			{
+				return;
+			}
+			auto& inst = m_terrain_instances[info.m_index];
+			if ((inst.m_count > 0 && inst.m_infos[0]->m_terrain != info.m_terrain) || inst.m_count == lengthOf(inst.m_infos))
+			{
+				finishTerrainInstances(info.m_index);
+			}
+			inst.m_infos[inst.m_count] = &info;
+			++inst.m_count;
+		}
+		
+
+		void finishTerrainInstances(int index)
+		{
+			if (m_terrain_instances[index].m_count == 0)
+			{
+				return;
+			}
+			struct TerrainInstanceData
+			{
+				Vec4 m_quad_min_and_size;
+				Vec4 m_morph_const;
+			};
+			const TerrainInfo& info = *m_terrain_instances[index].m_infos[0];
 			Material* material = info.m_terrain->getMaterial();
 			if (!material->isReady())
 			{
@@ -965,22 +988,29 @@ namespace Lumix
 			Vec4 map_size(info.m_terrain->getRootSize(), 0, 0, 0);
 			bgfx::setUniform(m_map_size_uniform, &map_size);
 
-			Vec4 quad_min_and_size(info.m_min, info.m_size);
-			bgfx::setUniform(m_quad_min_and_size_uniform, &quad_min_and_size);
-
-			bgfx::setUniform(m_morph_const_uniform, &Vec4(info.m_morph_const, 0));
 			bgfx::setUniform(m_rel_camera_pos_uniform, &Vec4(rel_cam_pos, 0));
 			bgfx::setUniform(m_terrain_scale_uniform, &Vec4(info.m_terrain->getScale(), 0));
+			bgfx::setUniform(m_terrain_matrix_uniform, &info.m_world_matrix.m11);
 
 			setMaterial(material);
-
-			bgfx::setTransform(&info.m_world_matrix.m11);
 			bgfx::setProgram(material->getShaderInstance().m_program_handles[m_pass_idx]);
+
+			const bgfx::InstanceDataBuffer* instance_buffer = bgfx::allocInstanceDataBuffer(m_terrain_instances[index].m_count, sizeof(TerrainInstanceData));
+			TerrainInstanceData* instance_data = (TerrainInstanceData*)instance_buffer->data;
+			for (int i = 0; i < m_terrain_instances[index].m_count; ++i)
+			{
+				const TerrainInfo& info = *m_terrain_instances[index].m_infos[i];
+				instance_data[i].m_quad_min_and_size.set(info.m_min.x, info.m_min.y, info.m_min.z, info.m_size);
+				instance_data[i].m_morph_const.set(info.m_morph_const.x, info.m_morph_const.y, info.m_morph_const.z, 0);
+			}
+			
 			bgfx::setVertexBuffer(geometry.getAttributesArrayID(), mesh.getAttributeArrayOffset() / mesh.getVertexDefinition().getStride(), mesh.getAttributeArraySize() / mesh.getVertexDefinition().getStride());
 			int mesh_part_indices_count = mesh.getIndexCount() / 4;
 			bgfx::setIndexBuffer(geometry.getIndicesArrayID(), info.m_index * mesh_part_indices_count, mesh_part_indices_count);
 			bgfx::setState(m_render_state | mesh.getMaterial()->getRenderStates());
+			bgfx::setInstanceDataBuffer(instance_buffer, m_terrain_instances[index].m_count);
 			bgfx::submit(m_view_idx);
+			m_terrain_instances[index].m_count = 0;
 		}
 
 
@@ -1015,9 +1045,13 @@ namespace Lumix
 		void renderTerrains(const Array<const TerrainInfo*>& terrains)
 		{
 			PROFILE_FUNCTION();
-			for (auto* terrain : terrains)
+			for (auto* info : terrains)
 			{
-				renderTerrain(*terrain);
+				renderTerrain(*info);
+			}
+			for (int i = 0; i < lengthOf(m_terrain_instances); ++i)
+			{
+				finishTerrainInstances(i);
 			}
 		}
 
@@ -1075,6 +1109,10 @@ namespace Lumix
 			m_global_textures.clear();
 			memset(m_view2pass_map, 0xffffFFFF, sizeof(m_view2pass_map));
 			m_instance_data_idx = 0;
+			for (int i = 0; i < lengthOf(m_terrain_instances); ++i)
+			{
+				m_terrain_instances[i].m_count = 0;
+			}
 			for (int i = 0; i < lengthOf(m_instances_data); ++i)
 			{
 				m_instances_data[i].m_buffer = nullptr;
@@ -1130,6 +1168,14 @@ namespace Lumix
 		};
 
 
+		class TerrainInstance
+		{
+			public:
+				int m_count;
+				const TerrainInfo* m_infos[64];
+		};
+
+		TerrainInstance m_terrain_instances[4];
 		uint32_t m_debug_flags;
 		uint8_t m_view_idx;
 		int m_pass_idx;
@@ -1162,10 +1208,8 @@ namespace Lumix
 		bgfx::UniformHandle m_specular_shininess_uniform;
 		bgfx::UniformHandle m_bone_matrices_uniform;
 		bgfx::UniformHandle m_terrain_scale_uniform;
-		bgfx::UniformHandle m_morph_const_uniform;
 		bgfx::UniformHandle m_rel_camera_pos_uniform;
 		bgfx::UniformHandle m_map_size_uniform;
-		bgfx::UniformHandle m_quad_min_and_size_uniform;
 		bgfx::UniformHandle m_fog_color_density_uniform;
 		bgfx::UniformHandle m_light_pos_radius_uniform;
 		bgfx::UniformHandle m_light_color_uniform;
@@ -1174,6 +1218,7 @@ namespace Lumix
 		bgfx::UniformHandle m_shadowmap_matrices_uniform;
 		bgfx::UniformHandle m_shadowmap_splits_uniform;
 		bgfx::UniformHandle m_light_specular_uniform;
+		bgfx::UniformHandle m_terrain_matrix_uniform;
 		Material* m_screen_space_material;
 		Material* m_debug_line_material;
 
@@ -1364,98 +1409,6 @@ namespace Lumix
 
 
 	} // namespace LuaAPI
-
-
-	namespace LuaWrapper
-	{
-
-
-		template <typename T> T toType(lua_State* L, int index) { return (T)lua_touserdata(L, index); }
-		template <> int toType(lua_State* L, int index) { return (int)lua_tointeger(L, index); }
-		template <> int64_t toType(lua_State* L, int index) { return (int64_t)lua_tointeger(L, index); }
-		template <> bool toType(lua_State* L, int index) { return lua_toboolean(L, index) != 0; }
-		template <> float toType(lua_State* L, int index) { return (float)lua_tonumber(L, index); }
-		template <> const char* toType(lua_State* L, int index) { return lua_tostring(L, index); }
-		template <> void* toType(lua_State* L, int index) { return lua_touserdata(L, index); }
-
-
-		template <typename T> bool isType(lua_State* L, int index) { return lua_islightuserdata(L, index) != 0; }
-		template <> bool isType<int>(lua_State* L, int index) { return lua_isinteger(L, index) != 0; }
-		template <> bool isType<int64_t>(lua_State* L, int index) { return lua_isinteger(L, index) != 0; }
-		template <> bool isType<bool>(lua_State* L, int index) { return lua_isboolean(L, index) != 0; }
-		template <> bool isType<float>(lua_State* L, int index) { return lua_isnumber(L, index) != 0; }
-		template <> bool isType<const char*>(lua_State* L, int index) { return lua_isstring(L, index) != 0; }
-		template <> bool isType<void*>(lua_State* L, int index) { return lua_islightuserdata(L, index) != 0; }
-
-		template <typename T> void pushLua(lua_State* L, T value) { return lua_pushnumber(L, value); }
-		template <> void pushLua(lua_State* L, float value) { return lua_pushnumber(L, value); }
-		template <> void pushLua(lua_State* L, int value) { return lua_pushinteger(L, value); }
-
-		template <int N>
-		struct FunctionCaller
-		{
-			template <typename R, typename... ArgsF, typename... Args>
-			static LUMIX_FORCE_INLINE R callFunction(R (*f)(ArgsF...), lua_State* L, Args... args)
-			{
-				typedef std::tuple_element<sizeof...(ArgsF)-N, std::tuple<ArgsF...> >::type T;
-				if (!isType<T>(L, sizeof...(ArgsF)-N + 1))
-				{
-					lua_Debug entry;
-					int depth = 0;
-
-					char tmp[2048];
-					tmp[0] = 0;
-					auto er = g_log_error.log("lua");
-					er << "Wrong arguments in\n";
-					while (lua_getstack(L, depth, &entry))
-					{
-						int status = lua_getinfo(L, "Sln", &entry);
-						ASSERT(status);
-						er << entry.short_src << "(" << entry.currentline << "): " << (entry.name ? entry.name : "?") << "\n";
-						depth++;
-					}
-					return R();
-				}
-				T a = toType<T>(L, sizeof...(ArgsF)-N + 1);
-				return FunctionCaller<N - 1>::callFunction(f, L, args..., a);
-			}
-		};
-
-
-		template <>
-		struct FunctionCaller<0>
-		{
-			template <typename R, typename... ArgsF, typename... Args>
-			static LUMIX_FORCE_INLINE R callFunction(R (*f)(ArgsF...), lua_State*, Args... args)
-			{
-				return f(args...);
-			}
-		};
-
-
-		template <typename R, typename... ArgsF>
-		int LUMIX_FORCE_INLINE callFunction(R (*f)(ArgsF...), lua_State* L)
-		{
-			R v = FunctionCaller<sizeof...(ArgsF)>::callFunction(f, L);
-			pushLua(L, v);
-			return 1;
-		}
-
-		template <typename... ArgsF>
-		int LUMIX_FORCE_INLINE callFunction(void (*f)(ArgsF...), lua_State* L)
-		{
-			FunctionCaller<sizeof...(ArgsF)>::callFunction(f, L);
-			return 0;
-		}
-
-		template <typename T, T t>
-		int wrap(lua_State* L)
-		{
-			return callFunction(t, L);
-		}
-
-
-	} // namespace LuaWrapper
 
 
 	void PipelineImpl::registerCFunctions()

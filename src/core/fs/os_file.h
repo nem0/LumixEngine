@@ -9,7 +9,7 @@ namespace Lumix
 
 	namespace FS
 	{
-		class LUMIX_CORE_API OsFile
+		class LUMIX_ENGINE_API OsFile
 		{
 		public:
 			OsFile();

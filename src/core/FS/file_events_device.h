@@ -41,7 +41,7 @@ namespace Lumix
 			int32_t param;
 		};	
 
-		class LUMIX_CORE_API FileEventsDevice : public IFileDevice
+		class LUMIX_ENGINE_API FileEventsDevice : public IFileDevice
 		{
 		public:
 			FileEventsDevice(IAllocator& allocator) : m_allocator(allocator) {}

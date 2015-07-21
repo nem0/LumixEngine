@@ -12,7 +12,7 @@
 namespace Lumix
 {
 
-	PathManager LUMIX_CORE_API g_path_manager;
+	PathManager LUMIX_ENGINE_API g_path_manager;
 
 
 	PathManager::PathManager()

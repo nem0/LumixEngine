@@ -33,6 +33,19 @@ class Array<T, false>
 			*this = rhs;
 		}
 
+
+		T* begin() const
+		{
+			return m_data;
+		}
+
+
+		T* end() const
+		{
+			return m_data + m_size;
+		}
+
+
 		void operator =(const Array& rhs)
 		{
 			if(this != &rhs)

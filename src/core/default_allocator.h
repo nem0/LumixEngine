@@ -8,7 +8,7 @@
 namespace Lumix
 {
 
-	class LUMIX_CORE_API DefaultAllocator : public IAllocator
+	class LUMIX_ENGINE_API DefaultAllocator : public IAllocator
 	{
 		public:
 			DefaultAllocator()

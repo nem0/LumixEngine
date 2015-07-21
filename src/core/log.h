@@ -12,7 +12,7 @@ namespace Lumix
 	class Log;
 	class Path;
 
-	class LUMIX_CORE_API LogProxy
+	class LUMIX_ENGINE_API LogProxy
 	{
 		public:
 			LogProxy(Log& log, const char* system, IAllocator& allocator);
@@ -34,7 +34,7 @@ namespace Lumix
 			void operator = (const LogProxy&);
 	};
 
-	class LUMIX_CORE_API Log
+	class LUMIX_ENGINE_API Log
 	{
 		public:
 			typedef DelegateList<void (const char*, const char*)> Callback;
@@ -54,9 +54,9 @@ namespace Lumix
 			Callback m_callbacks;
 	};
 
-	extern Log LUMIX_CORE_API g_log_info;
-	extern Log LUMIX_CORE_API g_log_warning;
-	extern Log LUMIX_CORE_API g_log_error;
+	extern Log LUMIX_ENGINE_API g_log_info;
+	extern Log LUMIX_ENGINE_API g_log_warning;
+	extern Log LUMIX_ENGINE_API g_log_error;
 
 
 } // ~namespace Lumix

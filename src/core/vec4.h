@@ -10,7 +10,7 @@ namespace Lumix
 {
 
 
-struct LUMIX_CORE_API Vec4
+struct LUMIX_ENGINE_API Vec4
 {
 	Vec4() {}
 	Vec4(float a, float b, float c, float d) : x(a), y(b), z(c), w(d) {}

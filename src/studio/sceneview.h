@@ -19,6 +19,7 @@ public:
 	explicit SceneView(QWidget* parent = NULL);
 	~SceneView();
 
+	void shutdown();
 	void setWorldEditor(Lumix::WorldEditor& editor);
 	Lumix::PipelineInstance* getPipeline() const;
 	QWidget* getViewWidget() { return m_view; }

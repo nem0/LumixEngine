@@ -29,6 +29,7 @@ class EntityModel : public DynamicObjectModel
 		void onUniverseDestroyed();
 		void onEntityDestroyed(const Lumix::Entity& entity);
 
+		const char* getComponentName(Lumix::Component cmp) const;
 		void addArrayProperty(Node& child, Lumix::IArrayDescriptor* desc, Lumix::Component cmp);
 		void addResourceProperty(Node& child, Lumix::IPropertyDescriptor* desc, Lumix::Component cmp);
 		void addNameProperty();

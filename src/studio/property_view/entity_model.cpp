@@ -13,29 +13,13 @@
 #include <qpushbutton.h>
 
 
-static const char* component_map[] =
+const char* EntityModel::getComponentName(Lumix::Component cmp) const
 {
-	"Animable", "animable",
-	"Camera", "camera",
-	"Global light", "global_light",
-	"Mesh", "renderable",
-	"Physics Box", "box_rigid_actor",
-	"Physics Controller", "physical_controller",
-	"Physics Mesh", "mesh_rigid_actor",
-	"Physics Heightfield", "physical_heightfield",
-	"Point light", "point_light",
-	"Script", "script",
-	"Terrain", "terrain"
-};
-
-
-static const char* getComponentName(Lumix::Component cmp)
-{
-	for (int i = 0; i < lengthOf(component_map); i += 2)
+	for (int i = 0; i < m_editor.getComponentTypesCount(); ++i)
 	{
-		if (cmp.type == crc32(component_map[i + 1]))
+		if (cmp.type == crc32(m_editor.getComponentTypeID(i)))
 		{
-			return component_map[i];
+			return m_editor.getComponentTypeName(i);
 		}
 	}
 	return "Unknown component";
@@ -50,7 +34,7 @@ EntityModel::EntityModel(PropertyView& view, Lumix::WorldEditor& editor, Lumix::
 	m_entity = entity;
 	getRoot().m_name = "Entity";
 	getRoot().onCreateEditor = [this](QWidget* parent, const QStyleOptionViewItem&){
-		auto button = new QPushButton(" + ", parent);
+		auto button = new QPushButton("Add", parent);
 		connect(button, &QPushButton::clicked, [this, button](){ addComponent(button, button->mapToGlobal(button->pos())); });
 		return button;
 	};
@@ -361,9 +345,14 @@ void EntityModel::addComponentNode(Lumix::Component cmp, int component_index)
 	Node& node = getRoot().addChild(getComponentName(cmp), component_index + 3);
 	node.m_getter = []() -> QVariant { return ""; };
 	node.onCreateEditor = [this, cmp](QWidget* parent, const QStyleOptionViewItem&) {
-		auto button = new QPushButton(" - ", parent);
+		auto widget = new QWidget(parent);
+		QHBoxLayout* layout = new QHBoxLayout(widget);
+		layout->setContentsMargins(0, 0, 0, 0);
+		layout->addStretch(1);
+		auto button = new QPushButton("Remove", widget);
 		connect(button, &QPushButton::clicked, [this, cmp](){ m_editor.destroyComponent(cmp); });
-		return button;
+		layout->addWidget(button);
+		return widget;
 	};
 	node.enablePeristentEditor();
 	auto& descriptors = m_editor.getPropertyDescriptors(cmp.type);
@@ -439,18 +428,18 @@ void EntityModel::addComponent(QWidget* widget, QPoint pos)
 	};
 
 	CB* combobox = new CB(widget);
-	for (int i = 0; i < lengthOf(component_map); i += 2)
+	for (int i = 0; i < m_editor.getComponentTypesCount(); ++i)
 	{
-		combobox->addItem(component_map[i]);
+		combobox->addItem(m_editor.getComponentTypeName(i));
 	}
 	combobox->connect(combobox, (void (QComboBox::*)(int))&QComboBox::activated, [this, combobox](int value) {
-		for (int i = 0; i < lengthOf(component_map); i += 2)
+		for (int i = 0; i < m_editor.getComponentTypesCount(); ++i)
 		{
-			if (combobox->itemText(value) == component_map[i])
+			if (combobox->itemText(value) == m_editor.getComponentTypeName(i))
 			{
-				if (!m_editor.getComponent(m_entity, crc32(component_map[i + 1])).isValid())
+				if (!m_editor.getComponent(m_entity, crc32(m_editor.getComponentTypeID(i))).isValid())
 				{
-					m_editor.addComponent(crc32(component_map[i + 1]));
+					m_editor.addComponent(crc32(m_editor.getComponentTypeID(i)));
 				}
 				break;
 			}
