@@ -37,7 +37,7 @@ static QString getSourceFromBinaryBasename(const QString& binary_basename)
 void ShaderCompiler::makeUpToDate()
 {
 	QStringList src_list;
-
+	QDir().mkpath("shaders/compiled");
 	QDir dir("shaders");
 	for (auto source_info : dir.entryInfoList())
 	{
