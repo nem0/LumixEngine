@@ -5,7 +5,7 @@
 namespace Lumix
 {
 
-	LUMIX_CORE_API Profiler g_profiler;
+	LUMIX_ENGINE_API Profiler g_profiler;
 
 
 	Profiler::Profiler()

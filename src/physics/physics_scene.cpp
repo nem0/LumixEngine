@@ -170,12 +170,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 	};
 
 
-	PhysicsSceneImpl(IAllocator& allocator)
+	PhysicsSceneImpl(Universe& universe, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_controllers(m_allocator)
 		, m_actors(m_allocator)
 		, m_terrains(m_allocator)
 		, m_dynamic_actors(m_allocator)
+		, m_universe(universe)
 	{
 	}
 
@@ -190,6 +191,12 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			m_allocator.deleteObject(m_terrains[i]);
 		}
+	}
+
+
+	virtual Universe& getUniverse() override
+	{
+		return m_universe;
 	}
 
 
@@ -233,19 +240,19 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			m_allocator.deleteObject(m_terrains[cmp.index]);
 			m_terrains[cmp.index] = NULL;
-			m_universe->destroyComponent(cmp);
+			m_universe.destroyComponent(cmp);
 		}
 		else if(cmp.type == CONTROLLER_HASH)
 		{
 			m_controllers[cmp.index].m_is_free = true;
-			m_universe->destroyComponent(cmp);
+			m_universe.destroyComponent(cmp);
 		}
 		else if (cmp.type == MESH_ACTOR_HASH || cmp.type == BOX_ACTOR_HASH)
 		{
 			m_actors[cmp.index]->getEntity().index = -1;
 			m_actors[cmp.index]->setPhysxActor(nullptr);
 			m_dynamic_actors.eraseItem(m_actors[cmp.index]);
-			m_universe->destroyComponent(cmp);
+			m_universe.destroyComponent(cmp);
 		}
 		else
 		{
@@ -262,8 +269,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 		terrain->m_scene = this;
 		terrain->m_actor = NULL;
 		terrain->m_entity = entity;
-		Component cmp = m_universe->addComponent(entity, HEIGHTFIELD_HASH, this, m_terrains.size() - 1);
-		m_universe->componentCreated().invoke(cmp);
+		Component cmp = m_universe.addComponent(entity, HEIGHTFIELD_HASH, this, m_terrains.size() - 1);
+		m_universe.componentCreated().invoke(cmp);
 		return cmp;
 	}
 
@@ -289,8 +296,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 		m_controllers.push(c);
 
-		Component cmp = m_universe->addComponent(entity, CONTROLLER_HASH, this, m_controllers.size() - 1);
-		m_universe->componentCreated().invoke(cmp);
+		Component cmp = m_universe.addComponent(entity, CONTROLLER_HASH, this, m_controllers.size() - 1);
+		m_universe.componentCreated().invoke(cmp);
 		return cmp;
 	}
 
@@ -316,8 +323,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 		actor->setPhysxActor(physx_actor);
 		physx_actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
 
-		Component cmp = m_universe->addComponent(entity, BOX_ACTOR_HASH, this, m_actors.size() - 1);
-		m_universe->componentCreated().invoke(cmp);
+		Component cmp = m_universe.addComponent(entity, BOX_ACTOR_HASH, this, m_actors.size() - 1);
+		m_universe.componentCreated().invoke(cmp);
 		return cmp;
 	}
 
@@ -328,8 +335,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 		m_actors.push(actor);
 		actor->setEntity(entity);
 
-		Component cmp = m_universe->addComponent(entity, MESH_ACTOR_HASH, this, m_actors.size() - 1);
-		m_universe->componentCreated().invoke(cmp);
+		Component cmp = m_universe.addComponent(entity, MESH_ACTOR_HASH, this, m_actors.size() - 1);
+		m_universe.componentCreated().invoke(cmp);
 		return cmp;
 	}
 
@@ -865,7 +872,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 					m_scene->addActor(*actor);
 					m_actors[idx]->setPhysxActor(actor);
 					actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
-					m_universe->addComponent(m_actors[idx]->getEntity(), BOX_ACTOR_HASH, this, idx);
+					m_universe.addComponent(m_actors[idx]->getEntity(), BOX_ACTOR_HASH, this, idx);
 				}
 				break;
 			case TRIMESH:
@@ -874,7 +881,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 					char tmp[LUMIX_MAX_PATH];
 					serializer.readString(tmp, sizeof(tmp));
 					m_actors[idx]->setResource(static_cast<PhysicsGeometry*>(manager->load(Lumix::Path(tmp))));
-					m_universe->addComponent(m_actors[idx]->getEntity(), MESH_ACTOR_HASH, this, idx);
+					m_universe.addComponent(m_actors[idx]->getEntity(), MESH_ACTOR_HASH, this, idx);
 				}
 				break;
 			default:
@@ -949,7 +956,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			serializer.read(m_actors[i]->getEntity().index);
 			if (m_actors[i]->getEntity().index != -1)
 			{
-				m_actors[i]->getEntity().universe = m_universe;
+				m_actors[i]->getEntity().universe = &m_universe;
 				deserializeActor(serializer, i);
 			}
 		}
@@ -971,7 +978,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			bool is_free;
 			serializer.read(index);
 			serializer.read(is_free);
-			Entity e(m_universe, index);
+			Entity e(&m_universe, index);
 
 			Controller& c = m_controllers.pushEmpty();
 			c.m_is_free = is_free;
@@ -992,7 +999,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 				cDesc.position.set(position.x, position.y, position.z);
 				c.m_controller = m_system->getControllerManager()->createController(*m_system->getPhysics(), m_scene, cDesc);
 				c.m_entity = e;
-				m_universe->addComponent(e, CONTROLLER_HASH, this, i);
+				m_universe.addComponent(e, CONTROLLER_HASH, this, i);
 			}
 		}
 	}
@@ -1024,7 +1031,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 					m_terrains[i] = m_allocator.newObject<Terrain>();
 				}
 				m_terrains[i]->m_scene = this;
-				m_terrains[i]->m_entity.universe = m_universe;
+				m_terrains[i]->m_entity.universe = &m_universe;
 				serializer.read(m_terrains[i]->m_entity.index);
 				char tmp[LUMIX_MAX_PATH];
 				serializer.readString(tmp, LUMIX_MAX_PATH);
@@ -1036,7 +1043,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 				{
 					setHeightmap(cmp, string(tmp, m_allocator));
 				}
-				m_universe->addComponent(m_terrains[i]->m_entity, HEIGHTFIELD_HASH, this, i);
+				m_universe.addComponent(m_terrains[i]->m_entity, HEIGHTFIELD_HASH, this, i);
 			}
 		}
 	}
@@ -1066,7 +1073,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	IAllocator&					m_allocator;
 
-	Universe*					m_universe;
+	Universe&					m_universe;
 	Engine*						m_engine;
 	physx::PxScene*				m_scene;
 	PhysicsSystem*				m_system;
@@ -1082,9 +1089,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 	
 PhysicsScene* PhysicsScene::create(PhysicsSystem& system, Universe& universe, Engine& engine, IAllocator& allocator)
 {
-	PhysicsSceneImpl* impl = allocator.newObject<PhysicsSceneImpl>(allocator);
-	impl->m_universe = &universe;
-	impl->m_universe->entityMoved().bind<PhysicsSceneImpl, &PhysicsSceneImpl::onEntityMoved>(impl);
+	PhysicsSceneImpl* impl = allocator.newObject<PhysicsSceneImpl>(universe, allocator);
+	impl->m_universe.entityMoved().bind<PhysicsSceneImpl, &PhysicsSceneImpl::onEntityMoved>(impl);
 	impl->m_engine = &engine;
 	physx::PxSceneDesc sceneDesc(system.getPhysics()->getTolerancesScale());
 	sceneDesc.gravity = physx::PxVec3(0.0f, -9.8f, 0.0f);

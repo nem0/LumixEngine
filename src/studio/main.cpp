@@ -35,9 +35,9 @@ class App
 
 		~App()
 		{
-			delete m_main_window;
-			delete m_qt_app;
-			Lumix::WorldEditor::destroy(m_world_editor);
+			ASSERT(!m_world_editor);
+			ASSERT(!m_main_window);
+			ASSERT(!m_qt_app);
 		}
 		
 
@@ -88,6 +88,14 @@ class App
 
 		void shutdown()
 		{
+			m_main_window->shutdown();
+			Lumix::WorldEditor::destroy(m_world_editor);
+			Lumix::Renderer::shutdown();
+			delete m_main_window;
+			delete m_qt_app;
+			m_main_window = nullptr;
+			m_qt_app = nullptr;
+			m_world_editor = nullptr;
 		}
 
 

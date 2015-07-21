@@ -3,7 +3,7 @@
 
 namespace Lumix
 {
-	class LUMIX_CORE_API Timer
+	class LUMIX_ENGINE_API Timer
 	{
 		public:
 			virtual ~Timer() {}

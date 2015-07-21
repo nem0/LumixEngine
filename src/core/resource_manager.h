@@ -12,7 +12,7 @@ namespace Lumix
 
 	class ResourceManagerBase;
 
-	class LUMIX_CORE_API ResourceManager final
+	class LUMIX_ENGINE_API ResourceManager final
 	{
 		typedef PODHashMap<uint32_t, ResourceManagerBase*> ResourceManagerTable;
 	public:

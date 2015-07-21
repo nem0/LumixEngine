@@ -10,7 +10,7 @@ namespace Lumix
 {
 
 
-	class LUMIX_CORE_API IAllocator
+	class LUMIX_ENGINE_API IAllocator
 	{
 		public:
 			virtual ~IAllocator() {}

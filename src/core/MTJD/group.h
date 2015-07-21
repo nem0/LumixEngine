@@ -6,7 +6,7 @@ namespace Lumix
 {
 	namespace MTJD
 	{
-		class LUMIX_CORE_API Group : public BaseEntry
+		class LUMIX_ENGINE_API Group : public BaseEntry
 		{
 		public:
 			Group(bool sync_event, IAllocator& allocator);

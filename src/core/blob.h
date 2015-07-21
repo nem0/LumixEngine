@@ -8,7 +8,7 @@
 namespace Lumix
 {
 
-	class LUMIX_CORE_API OutputBlob
+	class LUMIX_ENGINE_API OutputBlob
 	{
 		public:
 			explicit OutputBlob(IAllocator& allocator);
@@ -22,6 +22,7 @@ namespace Lumix
 			void write(const void* data, int size);
 			void writeString(const char* string);
 			template <class T> void write(T value) { write(&value, sizeof(T)); }
+			template <> void write<bool>(bool value) { uint8_t v = value; write(&v, sizeof(v)); }
 			void clear() { m_data.clear(); }
 
 		private:
@@ -29,7 +30,7 @@ namespace Lumix
 	};
 
 
-	class LUMIX_CORE_API InputBlob
+	class LUMIX_ENGINE_API InputBlob
 	{
 		public:
 			InputBlob(const void* data, int size);
@@ -38,6 +39,8 @@ namespace Lumix
 			bool read(void* data, int size);
 			bool readString(char* data, int max_size);
 			template <class T> void read(T& value) { read(&value, sizeof(T)); }
+			template <class T> T read() { T v; read(&v, sizeof(v)); return v; }
+			template <> bool read<bool>() { uint8_t v; read(&v, sizeof(v)); return v != 0; }
 			const void* getData() const { return (const void*)m_data; }
 			int getSize() const { return m_size; }
 			void setPosition(int pos) { m_pos = pos; }

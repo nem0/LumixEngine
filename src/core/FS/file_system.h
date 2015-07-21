@@ -12,7 +12,7 @@ namespace Lumix
 		class IFile;
 		class IFileDevice;
 
-		class LUMIX_CORE_API FileSystem abstract
+		class LUMIX_ENGINE_API FileSystem abstract
 		{
 		public:
 			static FileSystem* create(IAllocator& allocator);

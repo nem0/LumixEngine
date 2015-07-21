@@ -9,7 +9,7 @@ namespace Lumix
 	{
 		class Manager;
 
-		class LUMIX_CORE_API Job : public BaseEntry
+		class LUMIX_ENGINE_API Job : public BaseEntry
 		{
 			friend class Manager;
 			friend class WorkerTask;

@@ -115,6 +115,11 @@ void PhysicsSystemImpl::registerProperties(Engine& engine)
 	WorldEditor* editor = engine.getWorldEditor();
 	if(editor)
 	{
+		editor->registerComponentType("box_rigid_actor", "Physics Box");
+		editor->registerComponentType("physical_controller", "Physics Controller");
+		editor->registerComponentType("mesh_rigid_actor", "Physics Mesh");
+		editor->registerComponentType("physical_heightfield", "Physics Heightfield");
+
 		IAllocator& allocator = editor->getAllocator();
 		editor->registerProperty("box_rigid_actor", allocator.newObject<BoolPropertyDescriptor<PhysicsScene> >("dynamic", &PhysicsScene::isDynamic, &PhysicsScene::setIsDynamic, allocator));
 		editor->registerProperty("box_rigid_actor", allocator.newObject<Vec3PropertyDescriptor<PhysicsScene> >("size", &PhysicsScene::getHalfExtents, &PhysicsScene::setHalfExtents, allocator));

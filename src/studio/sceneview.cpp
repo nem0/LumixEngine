@@ -125,6 +125,12 @@ SceneView::~SceneView()
 }
 
 
+void SceneView::shutdown()
+{
+	m_render_device->shutdown();
+}
+
+
 void SceneView::render()
 {
 	if (!visibleRegion().isEmpty())

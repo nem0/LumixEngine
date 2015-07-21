@@ -18,7 +18,7 @@ namespace Debug
 	class StackTree;
 
 
-	class LUMIX_CORE_API Allocator : public IAllocator
+	class LUMIX_ENGINE_API Allocator : public IAllocator
 	{
 		private:
 			class AllocationInfo

@@ -29,6 +29,7 @@ public:
 	explicit MainWindow(QWidget* parent = NULL);
 	~MainWindow();
 
+	void shutdown();
 	void update();
 	void setWorldEditor(Lumix::WorldEditor& world_editor);
 	Lumix::WorldEditor* getWorldEditor() const;

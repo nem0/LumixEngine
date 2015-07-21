@@ -7,7 +7,7 @@ namespace Lumix
 	{
 		typedef void* MutexHandle;
 
-		class LUMIX_CORE_API Mutex
+		class LUMIX_ENGINE_API Mutex
 		{
 		public:
 			explicit Mutex(bool locked);

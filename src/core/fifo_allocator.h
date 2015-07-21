@@ -11,7 +11,7 @@ namespace Lumix
 
 
 	/// FIFOAllocator uses fixed ring buffer to allocate memory in FIFO order.
-	class LUMIX_CORE_API FIFOAllocator : public IAllocator
+	class LUMIX_ENGINE_API FIFOAllocator : public IAllocator
 	{
 		public:
 			FIFOAllocator(size_t buffer_size);

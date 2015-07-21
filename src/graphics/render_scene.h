@@ -95,8 +95,6 @@ namespace Lumix
 			virtual Component getActiveGlobalLight() = 0;
 			virtual void setActiveGlobalLight(const Component& cmp) = 0;
 
-			virtual void addDebugText(const char* text, int x, int y) = 0;
-
 			virtual void addDebugLine(const Vec3& from, const Vec3& to, const Vec3& color, float life) = 0;
 			virtual void addDebugLine(const Vec3& from, const Vec3& to, uint32_t color, float life) = 0;
 			virtual void addDebugCross(const Vec3& center, float size, const Vec3& color, float life) = 0;
@@ -130,6 +128,7 @@ namespace Lumix
 			virtual void getRenderablePath(Component cmp, string& path) = 0;
 			virtual void setRenderableLayer(Component cmp, const int32_t& layer) = 0;
 			virtual void setRenderablePath(Component cmp, const string& path) = 0;
+			virtual void setRenderablePath(int cmp_index, const string& path) = 0;
 			virtual void setRenderableScale(Component cmp, float scale) = 0;
 			virtual void getRenderableInfos(const Frustum& frustum, Array<const RenderableMesh*>& meshes, int64_t layer_mask) = 0;
 			virtual void getRenderableMeshes(Array<RenderableMesh>& meshes, int64_t layer_mask) = 0;
