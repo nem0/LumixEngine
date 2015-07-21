@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <new>
 #include "core/iallocator.h"
+#include <cstring>
 
 
 

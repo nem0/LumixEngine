@@ -10,6 +10,7 @@
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "engine/iplugin.h"
+#include "engine/plugin_manager.h"
 #include "engine/lua_wrapper.h"
 #include "universe/universe.h"
 
@@ -23,6 +24,7 @@ class LuaScriptSystemImpl;
 
 
 void registerEngineLuaAPI(Engine&, Universe&, lua_State* L);
+void registerPhysicsLuaAPI(Engine&, Universe&, lua_State* L);
 
 
 static const uint32_t LUA_SCRIPT_HASH = crc32("lua_script");
@@ -41,6 +43,7 @@ public:
 	virtual bool create() override;
 	virtual void destroy() override;
 	virtual const char* getName() const override;
+	virtual void setWorldEditor(WorldEditor& editor) override;
 };
 
 
@@ -52,6 +55,7 @@ public:
 		, m_universe(universe)
 		, m_scripts(system.getAllocator())
 		, m_valid(system.getAllocator())
+		, m_global_state(nullptr)
 	{
 		if (system.m_engine.getWorldEditor())
 		{
@@ -80,6 +84,10 @@ public:
 	void registerAPI(lua_State* L)
 	{
 		registerEngineLuaAPI(m_system.m_engine, m_universe, L);
+		if (m_system.m_engine.getPluginManager().getPlugin("physics"))
+		{
+			registerPhysicsLuaAPI(m_system.m_engine, m_universe, L);
+		}
 	}
 
 
@@ -93,13 +101,13 @@ public:
 			if (m_valid[i])
 			{
 				Script& script = m_scripts[i];
-				script.m_state = lua_newthread(m_global_state);
-				lua_pushinteger(script.m_state, script.m_entity);
-				lua_setglobal(script.m_state, "this");
 
 				FILE* fp = fopen(script.m_path.c_str(), "rb");
 				if (fp)
 				{
+					script.m_state = lua_newthread(m_global_state);
+					lua_pushinteger(script.m_state, script.m_entity);
+					lua_setglobal(script.m_state, "this");
 					fseek(fp, 0, SEEK_END);
 					long size = ftell(fp);
 					fseek(fp, 0, SEEK_SET);
@@ -120,6 +128,11 @@ public:
 							<< lua_tostring(script.m_state, -1);
 					}
 					fclose(fp);
+				}
+				else
+				{
+					script.m_state = nullptr;
+					g_log_error.log("lua script") << "error loading " << script.m_path.c_str();
 				}
 			}
 		}
@@ -213,15 +226,14 @@ public:
 
 	virtual void update(float time_delta) override
 	{
-		/*if (lua_getglobal(m_global_state, "update") == LUA_TFUNCTION)
-	{
-		lua_pushnumber(m_global_state, time_delta);
-		if (lua_pcall(m_global_state, 1, 0, 0) != LUA_OK)
+		if (lua_getglobal(m_global_state, "update") == LUA_TFUNCTION)
 		{
-			g_log_error.log("lua") << lua_tostring(m_global_state,
-	-1);
+			lua_pushnumber(m_global_state, time_delta);
+			if (lua_pcall(m_global_state, 1, 0, 0) != LUA_OK)
+			{
+				g_log_error.log("lua") << lua_tostring(m_global_state, -1);
+			}
 		}
-	}*/
 	}
 
 
@@ -290,22 +302,23 @@ void LuaScriptSystem::destroyScene(IScene* scene)
 
 bool LuaScriptSystem::create()
 {
-	if (m_engine.getWorldEditor())
-	{
-		IAllocator& allocator = m_engine.getWorldEditor()->getAllocator();
-		m_engine.getWorldEditor()->registerComponentType("lua_script",
-														 "Lua script");
-		m_engine.getWorldEditor()->registerProperty(
-			"lua_script",
-			allocator.newObject<FilePropertyDescriptor<LuaScriptScene>>(
-				"source",
-				(void (LuaScriptScene::*)(Component, string&)) &
-					LuaScriptScene::getScriptPath,
-				&LuaScriptScene::setScriptPath,
-				"Lua (*.lua)",
-				allocator));
-	}
 	return true;
+}
+
+
+void LuaScriptSystem::setWorldEditor(WorldEditor& editor)
+{
+	IAllocator& allocator = editor.getAllocator();
+	editor.registerComponentType("lua_script", "Lua script");
+	editor.registerProperty(
+		"lua_script",
+		allocator.newObject<FilePropertyDescriptor<LuaScriptScene>>(
+			"source",
+			(void (LuaScriptScene::*)(Component, string&)) &
+				LuaScriptScene::getScriptPath,
+			&LuaScriptScene::setScriptPath,
+			"Lua (*.lua)",
+			allocator));
 }
 
 

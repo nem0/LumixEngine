@@ -54,8 +54,13 @@ struct PhysicsSystemImpl : public PhysicsSystem
 		return m_cooking;
 	}
 
+	virtual void setWorldEditor(WorldEditor& editor) override
+	{
+		registerProperties();
+	}
+
 	bool connect2VisualDebugger();
-	void registerProperties(Engine& engine);
+	void registerProperties();
 
 	physx::PxPhysics*			m_physics;
 	physx::PxFoundation*		m_foundation;
@@ -110,9 +115,9 @@ class AssertNullAllocator : public physx::PxAllocatorCallback
 };
 
 
-void PhysicsSystemImpl::registerProperties(Engine& engine)
+void PhysicsSystemImpl::registerProperties()
 {
-	WorldEditor* editor = engine.getWorldEditor();
+	WorldEditor* editor = m_engine.getWorldEditor();
 	if(editor)
 	{
 		editor->registerComponentType("box_rigid_actor", "Physics Box");
@@ -133,8 +138,6 @@ void PhysicsSystemImpl::registerProperties(Engine& engine)
 
 bool PhysicsSystemImpl::create()
 {
-	registerProperties(m_engine);
-
 	m_physx_allocator = m_allocator.newObject<AssertNullAllocator>();
 	m_error_callback = m_allocator.newObject<CustomErrorCallback>();
 	m_foundation = PxCreateFoundation(

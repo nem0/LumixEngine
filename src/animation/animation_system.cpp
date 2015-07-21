@@ -322,14 +322,16 @@ namespace Lumix
 			}
 
 
+			virtual void setWorldEditor(WorldEditor& editor) override
+			{
+				IAllocator& allocator = editor.getAllocator();
+				editor.registerComponentType("animable", "Animable");
+				editor.registerProperty("animable", allocator.newObject<FilePropertyDescriptor<AnimationSceneImpl> >("preview", &AnimationSceneImpl::getPreview, &AnimationSceneImpl::setPreview, "Animation (*.ani)", allocator));
+			}
+
+
 			virtual bool create() override
 			{
-				if (m_engine.getWorldEditor())
-				{
-					IAllocator& allocator = m_engine.getWorldEditor()->getAllocator();
-					m_engine.getWorldEditor()->registerComponentType("animable", "Animable");
-					m_engine.getWorldEditor()->registerProperty("animable", allocator.newObject<FilePropertyDescriptor<AnimationSceneImpl> >("preview", &AnimationSceneImpl::getPreview, &AnimationSceneImpl::setPreview, "Animation (*.ani)", allocator));
-				}
 				m_animation_manager.create(ResourceManager::ANIMATION, m_engine.getResourceManager());
 				return true;
 			}

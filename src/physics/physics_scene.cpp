@@ -531,8 +531,15 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	virtual void moveController(Component cmp, const Vec3& v, float dt) override
 	{
-		m_controllers[cmp.index].m_frame_change += v;
+		PhysicsSceneImpl::moveController(cmp.index, v, dt);
 	}
+
+
+	virtual void moveController(int cmp_indx, const Vec3& v, float dt) override
+	{
+		m_controllers[cmp_indx].m_frame_change += v;
+	}
+
 
 
 	virtual bool raycast(const Vec3& origin, const Vec3& dir, float distance, RaycastHit& result) override

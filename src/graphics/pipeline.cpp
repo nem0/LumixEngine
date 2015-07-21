@@ -224,7 +224,6 @@ namespace Lumix
 	{
 		PipelineInstanceImpl(Pipeline& pipeline, IAllocator& allocator)
 			: m_source(static_cast<PipelineImpl&>(pipeline))
-			, m_active_camera(Component::INVALID)
 			, m_custom_commands_handlers(allocator)
 			, m_allocator(allocator)
 			, m_tmp_terrains(allocator)
@@ -362,12 +361,6 @@ namespace Lumix
 		}
 
 		
-		void setActiveCamera(const Component& cmp)
-		{
-			m_active_camera = cmp;
-		}
-
-
 		CustomCommandHandler& addCustomCommandHandler(const char* name) override
 		{
 			return m_custom_commands_handlers[crc32(name)];
@@ -979,7 +972,7 @@ namespace Lumix
 			Matrix inv_world_matrix;
 			inv_world_matrix = info.m_world_matrix;
 			inv_world_matrix.fastInverse();
-			Vec3 camera_pos = m_active_camera.entity.getPosition();
+			Vec3 camera_pos = m_scene->getAppliedCamera().entity.getPosition();
 			Vec3 rel_cam_pos = inv_world_matrix.multiplyPosition(camera_pos) / info.m_terrain->getXZScale();
 
 			const Geometry& geometry = *info.m_terrain->getGeometry();
@@ -1136,7 +1129,6 @@ namespace Lumix
 		virtual void setScene(RenderScene* scene) override
 		{
 			m_scene = scene;
-			m_active_camera = Component::INVALID;
 		}
 
 
@@ -1201,7 +1193,6 @@ namespace Lumix
 		int m_framebuffer_width;
 		int m_framebuffer_height;
 		AssociativeArray<uint32_t, CustomCommandHandler> m_custom_commands_handlers;
-		Component m_active_camera;
 		Array<const RenderableMesh*> m_tmp_meshes;
 		Array<const TerrainInfo*> m_tmp_terrains;
 		Array<GrassInfo> m_tmp_grasses;
@@ -1297,7 +1288,6 @@ namespace Lumix
 		void applyCamera(PipelineInstanceImpl* pipeline, const char* slot)
 		{
 			Component cmp = pipeline->m_scene->getCameraInSlot(slot);
-			pipeline->setActiveCamera(cmp);
 			if (cmp.isValid())
 			{
 				if (pipeline->m_framebuffer_width > 0)

@@ -1,4 +1,5 @@
 #include "binary_array.h"
+#include <cstring>
 
 
 namespace Lumix

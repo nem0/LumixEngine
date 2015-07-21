@@ -50,6 +50,7 @@ class LUMIX_PHYSICS_API PhysicsScene : public IScene
 		virtual float getHeightmapYScale(Component cmp) = 0;
 		virtual void setHeightmapYScale(Component cmp, float scale) = 0;
 
+		virtual void moveController(int cmp_indx, const Vec3& v, float dt) = 0;
 		virtual void moveController(Component cmp, const Vec3& v, float dt) = 0;
 		virtual Component getController(const Entity& entity) = 0;
 };

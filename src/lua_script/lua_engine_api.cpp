@@ -1,5 +1,6 @@
 #include "engine/lua_wrapper.h"
 #include "core/crc32.h"
+#include "core/input_system.h"
 #include "engine/engine.h"
 #include "engine/iplugin.h"
 #include "graphics/render_scene.h"
@@ -14,27 +15,18 @@ namespace LuaAPI
 {
 
 
-static void* getScene(lua_State* L, const char* name)
+static void* getScene(Engine* engine, const char* name)
 {
-	if (lua_getglobal(L, "g_engine") == LUA_TLIGHTUSERDATA)
+	if (engine)
 	{
-		Engine* engine = (Engine*)lua_touserdata(L, -1);
-		lua_pop(L, 1);
-		if (engine)
-		{
-			return engine->getScene(crc32(name));
-		}
+		return engine->getScene(crc32(name));
 	}
 	return nullptr;
 }
 
 
-static int createComponent(lua_State* L,
-						   const char* scene_name,
-						   const char* type,
-						   int entity_idx)
+static int createComponent(IScene* scene, const char* type, int entity_idx)
 {
-	IScene* scene = (IScene*)getScene(L, scene_name);
 	if (!scene)
 	{
 		return -1;
@@ -45,21 +37,30 @@ static int createComponent(lua_State* L,
 
 
 static void
-setEntityPosition(lua_State* L, int entity_index, float x, float y, float z)
+setEntityPosition(Universe* univ, int entity_index, float x, float y, float z)
 {
-	if (lua_getglobal(L, "g_universe") == LUA_TLIGHTUSERDATA)
-	{
-		Universe* univ = (Universe*)lua_touserdata(L, -1);
-		lua_pop(L, 1);
-		Entity(univ, entity_index).setPosition(x, y, z);
-	}
+	Entity(univ, entity_index).setPosition(x, y, z);
 }
 
 
 static void setRenderablePath(IScene* scene, int component, const char* path)
 {
 	RenderScene* render_scene = (RenderScene*)scene;
-	render_scene->setRenderablePath(component, string(path, render_scene->getAllocator()));
+	render_scene->setRenderablePath(component,
+									string(path, render_scene->getAllocator()));
+}
+
+
+static float getInputActionValue(Engine* engine, uint32_t action)
+{
+	return engine->getInputSystem().getActionValue(action);
+}
+
+
+static void addInputAction(Engine* engine, uint32_t action, int type, int key)
+{
+	engine->getInputSystem().addAction(
+		action, Lumix::InputSystem::InputType(type), key);
 }
 
 
@@ -100,6 +101,15 @@ void registerEngineLuaAPI(Engine& engine, Universe& universe, lua_State* L)
 					  "setRenderablePath",
 					  LuaWrapper::wrap<decltype(&LuaAPI::setRenderablePath),
 									   LuaAPI::setRenderablePath>);
+
+	registerCFunction(L,
+					  "getInputActionValue",
+					  LuaWrapper::wrap<decltype(&LuaAPI::getInputActionValue),
+									   LuaAPI::getInputActionValue>);
+	registerCFunction(L,
+					  "addInputAction",
+					  LuaWrapper::wrap<decltype(&LuaAPI::addInputAction),
+									   LuaAPI::addInputAction>);
 }
 
 
