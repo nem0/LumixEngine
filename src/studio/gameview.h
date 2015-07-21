@@ -26,6 +26,7 @@ public:
 	explicit GameView(MainWindow& parent);
 	virtual ~GameView();
 
+	void shutdown();
 	QWidget* getContentWidget() const;
 	void setWorldEditor(Lumix::WorldEditor& editor);
 	void render();

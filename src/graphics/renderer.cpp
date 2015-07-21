@@ -198,8 +198,8 @@ namespace Lumix
 
 
 		Engine& m_engine;
-		Lumix::Array<ShaderCombinations::Pass> m_passes;
 		Debug::Allocator m_allocator;
+		Lumix::Array<ShaderCombinations::Pass> m_passes;
 		TextureManager m_texture_manager;
 		MaterialManager m_material_manager;
 		ShaderManager m_shader_manager;
@@ -218,6 +218,14 @@ namespace Lumix
 		bgfx::init();
 		bgfx::reset(800, 600);
 		bgfx::setDebug(BGFX_DEBUG_TEXT);
+	}
+
+
+	void Renderer::shutdown()
+	{
+		bgfx::frame();
+		bgfx::frame();
+		bgfx::shutdown();
 	}
 
 
