@@ -101,12 +101,12 @@ namespace Lumix
 		}
 
 		
-		void registerPropertyDescriptors(Engine& engine)
+		void registerPropertyDescriptors()
 		{
-			if (engine.getWorldEditor())
+			if (m_engine.getWorldEditor())
 			{
-				WorldEditor& editor = *engine.getWorldEditor();
-				IAllocator& allocator = editor.getAllocator();
+				WorldEditor& editor = *m_engine.getWorldEditor();
+				IAllocator& allocator = m_engine.getAllocator();
 
 				editor.registerComponentType("camera", "Camera");
 				editor.registerComponentType("global_light", "Global light");
@@ -153,7 +153,6 @@ namespace Lumix
 
 		virtual bool create() override
 		{
-			registerPropertyDescriptors(m_engine);
 			return true;
 		}
 
@@ -188,6 +187,12 @@ namespace Lumix
 			auto& new_pass = m_passes.pushEmpty();
 			copyString(new_pass, sizeof(new_pass), pass);
 			return m_passes.size() - 1;
+		}
+
+
+		virtual void setWorldEditor(WorldEditor& editor) override
+		{
+			registerPropertyDescriptors();
 		}
 
 

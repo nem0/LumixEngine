@@ -25,6 +25,10 @@ template <> inline int64_t toType(lua_State* L, int index)
 {
 	return (int64_t)lua_tointeger(L, index);
 }
+template <> inline uint32_t toType(lua_State* L, int index)
+{
+	return (uint32_t)lua_tointeger(L, index);
+}
 template <> inline bool toType(lua_State* L, int index)
 {
 	return lua_toboolean(L, index) != 0;
@@ -48,6 +52,10 @@ template <typename T> inline bool isType(lua_State* L, int index)
 	return lua_islightuserdata(L, index) != 0;
 }
 template <> inline bool isType<int>(lua_State* L, int index)
+{
+	return lua_isinteger(L, index) != 0;
+}
+template <> inline bool isType<uint32_t>(lua_State* L, int index)
 {
 	return lua_isinteger(L, index) != 0;
 }
@@ -105,8 +113,6 @@ template <int N> struct FunctionCaller
 			lua_Debug entry;
 			int depth = 0;
 
-			char tmp[2048];
-			tmp[0] = 0;
 			auto er = g_log_error.log("lua");
 			er << "Wrong arguments in\n";
 			while (lua_getstack(L, depth, &entry))
@@ -135,8 +141,6 @@ template <int N> struct FunctionCaller
 			lua_Debug entry;
 			int depth = 0;
 
-			char tmp[2048];
-			tmp[0] = 0;
 			auto er = g_log_error.log("lua");
 			er << "Wrong arguments in\n";
 			while (lua_getstack(L, depth, &entry))

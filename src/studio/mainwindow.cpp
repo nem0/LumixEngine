@@ -422,7 +422,7 @@ void MainWindow::on_actionOpen_triggered()
 
 void MainWindow::on_actionSave_As_triggered()
 {
-	QByteArray path = QFileDialog::getSaveFileName().toLocal8Bit();
+	QByteArray path = QFileDialog::getSaveFileName(nullptr, "Select save file", QString(), "Universes (*.unv)").toLocal8Bit();
 	if (!path.isEmpty())
 	{
 		m_world_editor->saveUniverse(Lumix::Path(path.data()));
