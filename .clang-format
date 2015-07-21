@@ -1,0 +1,33 @@
+BasedOnStyle: LLVM
+
+AllowAllParametersOfDeclarationOnNextLine  : true
+AccessModifierOffset : -4
+AllowShortFunctionsOnASingleLine : Inline
+AllowShortIfStatementsOnASingleLine : false
+AlwaysBreakAfterDefinitionReturnType : None
+BinPackArguments : false
+BinPackParameters : false
+BreakBeforeBraces : Allman
+BreakConstructorInitializersBeforeComma  : true
+ConstructorInitializerIndentWidth : 4
+ContinuationIndentWidth : 4
+IndentCaseLabels : true
+IndentWidth : 4
+KeepEmptyLinesAtTheStartOfBlocks  : true
+MaxEmptyLinesToKeep : 2
+NamespaceIndentation : None
+PointerAlignment : Left
+SpaceAfterCStyleCast  : false
+SpaceBeforeAssignmentOperators : true
+SpaceBeforeParens : true
+SpaceInEmptyParentheses : false
+SpacesBeforeTrailingComments : 1
+SpacesInAngles : false
+SpacesInCStyleCastParentheses : false
+SpacesInParentheses : false
+SpacesInSquareBrackets : false
+Standard : Cpp11
+TabWidth : 4
+UseTab : true
+
+
