@@ -117,7 +117,7 @@ public:
 					content[size] = '\0';
 					bool errors =
 						luaL_loadbuffer(
-							script.m_state, &content[0], size, "") != LUA_OK;
+							script.m_state, &content[0], size, script.m_path.c_str()) != LUA_OK;
 					errors =
 						errors ||
 						lua_pcall(script.m_state, 0, LUA_MULTRET, 0) != LUA_OK;
@@ -126,6 +126,7 @@ public:
 						g_log_error.log("lua")
 							<< script.m_path.c_str() << ": "
 							<< lua_tostring(script.m_state, -1);
+						lua_pop(script.m_state, 1);
 					}
 					fclose(fp);
 				}

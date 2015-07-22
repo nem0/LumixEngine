@@ -37,7 +37,7 @@ registerCFunction(lua_State* L, const char* name, lua_CFunction func)
 void registerPhysicsLuaAPI(Engine& engine, Universe& universe, lua_State* L)
 {
 	registerCFunction(L,
-					  "moveController",
+					  "API_moveController",
 					  LuaWrapper::wrap<decltype(&LuaAPI::moveController),
 									   LuaAPI::moveController>);
 }
