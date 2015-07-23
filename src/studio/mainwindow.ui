@@ -71,7 +71,6 @@
     <addaction name="actionExecute_commands"/>
     <addaction name="actionSave_commands"/>
     <addaction name="separator"/>
-    <addaction name="actionCompile_scripts"/>
     <addaction name="actionMeasure"/>
     <addaction name="actionSnap_to_terrain"/>
     <addaction name="actionImport_asset"/>

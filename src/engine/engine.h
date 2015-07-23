@@ -37,7 +37,8 @@ class LUMIX_ENGINE_API Engine
 public:
 	virtual ~Engine() {}
 
-	static Engine* create(const char* base_path, FS::FileSystem* fs, IAllocator& allocator);
+	static Engine*
+	create(const char* base_path, FS::FileSystem* fs, IAllocator& allocator);
 	static void destroy(Engine* engine);
 
 	virtual Universe* createUniverse() = 0;
