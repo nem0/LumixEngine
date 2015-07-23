@@ -8,9 +8,8 @@ namespace Lumix
 {
 
 
-struct Component;
+struct ComponentOld;
 class Engine;
-struct Entity;
 class Model;
 class PipelineInstance;
 class RenderScene;

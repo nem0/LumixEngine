@@ -27,7 +27,6 @@ struct Vec3;
 
 class LUMIX_ENGINE_API Universe final
 {
-	friend struct Entity;
 	public:
 		Universe(IAllocator& allocator);
 		~Universe();
@@ -36,22 +35,32 @@ class LUMIX_ENGINE_API Universe final
 		void createEntity(const Entity& entity);
 		Entity createEntity();
 		void destroyEntity(Entity& entity);
-		Vec3 getPosition(int index) { return m_positions[index]; }
-		Quat getRotation(int index) { return m_rotations[index]; }
-		Component addComponent(const Entity& entity, uint32_t component_type, IScene* scene, int index);
-		void destroyComponent(const Component& cmp);
+		ComponentOld addComponent(const Entity& entity, uint32_t component_type, IScene* scene, int index);
+		void destroyComponent(const ComponentOld& cmp);
 		int getEntityCount() const { return m_positions.size() - m_free_slots.size(); }
 		Entity getFirstEntity();
 		Entity getNextEntity(Entity entity);
 		bool nameExists(const char* name) const;
+		const char* getEntityName(Entity entity) const;
+		void setEntityName(Entity entity, const char* name);
+		bool hasEntity(Entity entity) const;
+
+		void setMatrix(int entity_index, const Matrix& mtx);
+		Matrix getMatrix(int entity_index) const;
+		void setRotation(int entity_index, float x, float y, float z, float w);
+		void setRotation(int entity_index, const Quat& rot);
+		void setPosition(int entity_index, float x, float y, float z);
+		void setPosition(int entity_index, const Vec3& pos);
+		const Vec3& getPosition(int index) const { return m_positions[index]; }
+		const Quat& getRotation(int index) const { return m_rotations[index]; }
 
 		DelegateList<void(const Entity&)>& entityMoved() { return m_entity_moved; }
 		DelegateList<void(const Entity&)>& entityCreated() { return m_entity_created; }
 		DelegateList<void(const Entity&)>& entityDestroyed() { return m_entity_destroyed; }
-		DelegateList<void(const Component&)>& componentCreated() { return m_component_created; }
-		DelegateList<void(const Component&)>& componentDestroyed() { return m_component_destroyed; }
+		DelegateList<void(const ComponentOld&)>& componentCreated() { return m_component_created; }
+		DelegateList<void(const ComponentOld&)>& componentDestroyed() { return m_component_destroyed; }
 
-		Delegate<void(const Component&)>& componentAdded() { return m_component_added; }
+		Delegate<void(const ComponentOld&)>& componentAdded() { return m_component_added; }
 
 		void serialize(OutputBlob& serializer);
 		void deserialize(InputBlob& serializer);
@@ -66,9 +75,9 @@ class LUMIX_ENGINE_API Universe final
 		DelegateList<void(const Entity&)> m_entity_moved;
 		DelegateList<void(const Entity&)> m_entity_created;
 		DelegateList<void(const Entity&)> m_entity_destroyed;
-		DelegateList<void(const Component&)> m_component_created;
-		DelegateList<void(const Component&)> m_component_destroyed;
-		Delegate<void(const Component&)> m_component_added;
+		DelegateList<void(const ComponentOld&)> m_component_created;
+		DelegateList<void(const ComponentOld&)> m_component_destroyed;
+		Delegate<void(const ComponentOld&)> m_component_added;
 };
 
 

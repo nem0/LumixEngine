@@ -54,14 +54,14 @@ void EntityTemplateList::instantiateTemplate()
 }
 
 
-const Lumix::Entity& EntityTemplateList::getTemplate() const
+int EntityTemplateList::getTemplate() const
 {
 	if (m_ui->templateList->currentIndex().row() >= 0)
 	{
 		uint32_t hash = crc32(m_ui->templateList->item(m_ui->templateList->currentIndex().row())->text().toLatin1().data());
 		return m_editor->getEntityTemplateSystem().getInstances(hash)[0];
 	}
-	return Lumix::Entity::INVALID;
+	return Lumix::NEW_INVALID_ENTITY;
 }
 
 

@@ -58,10 +58,10 @@ class LUMIX_ENGINE_API Gizmo
 
 		void create();
 		void destroy();
-		void updateScale(Component camera);
+		void updateScale(ComponentOld camera);
 		void setUniverse(Universe* universe);
-		void startTransform(Component camera, int x, int y, TransformMode mode);
-		void transform(Component camera, TransformOperation operation, int x, int y, int relx, int rely, int flags);
+		void startTransform(ComponentOld camera, int x, int y, TransformMode mode);
+		void transform(ComponentOld camera, TransformOperation operation, int x, int y, int relx, int rely, int flags);
 		void render(PipelineInstance& pipeline);
 		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir);
 		void togglePivotMode();
@@ -70,7 +70,7 @@ class LUMIX_ENGINE_API Gizmo
 	private:
 		void getMatrix(Matrix& mtx);
 		void getEnityMatrix(Matrix& mtx, int selection_index);
-		Vec3 getMousePlaneIntersection(Component camera, int x, int y);
+		Vec3 getMousePlaneIntersection(ComponentOld camera, int x, int y);
 		void rotate(int relx, int rely, int flags);
 		float computeRotateAngle(int relx, int rely, int flags);
 

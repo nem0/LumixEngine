@@ -206,8 +206,8 @@ void SceneView::dropEvent(QDropEvent *event)
 
 			Lumix::Vec3 origin;
 			Lumix::Vec3 dir;
-			scene->getRay(m_world_editor->getEditCamera(), event->pos().x(), event->pos().y(), origin, dir);
-			Lumix::RayCastModelHit hit = scene->castRay(origin, dir, Lumix::Component::INVALID);
+			scene->getRay(m_world_editor->getEditCamera().index, event->pos().x(), event->pos().y(), origin, dir);
+			Lumix::RayCastModelHit hit = scene->castRay(origin, dir, Lumix::ComponentOld::INVALID);
 			if (hit.m_is_hit)
 			{
 				position = hit.m_origin + hit.m_dir * hit.m_t;

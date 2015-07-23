@@ -114,13 +114,14 @@ namespace Lumix
 				editor.registerComponentType("point_light", "Point light");
 				editor.registerComponentType("terrain", "Terrain");
 
-
+				TODO("todo");
+				/*
 				editor.registerProperty("camera", allocator.newObject<StringPropertyDescriptor<RenderScene> >("slot", &RenderScene::getCameraSlot, &RenderScene::setCameraSlot, allocator));
 				editor.registerProperty("camera", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("fov", &RenderScene::getCameraFOV, &RenderScene::setCameraFOV, 0.0f, 360.0f, 1.0f, allocator));
 				editor.registerProperty("camera", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("near", &RenderScene::getCameraNearPlane, &RenderScene::setCameraNearPlane, 0.0f, FLT_MAX, 0.0f, allocator));
 				editor.registerProperty("camera", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("far", &RenderScene::getCameraFarPlane, &RenderScene::setCameraFarPlane, 0.0f, FLT_MAX, 0.0f, allocator));
 
-				editor.registerProperty("renderable", allocator.newObject<ResourcePropertyDescriptor<RenderScene> >("source", &RenderScene::getRenderablePath, (void (RenderScene::*)(Component, const string&))&RenderScene::setRenderablePath, "Mesh (*.msh)", allocator));
+				editor.registerProperty("renderable", allocator.newObject<ResourcePropertyDescriptor<RenderScene> >("source", &RenderScene::getRenderablePath, (void (RenderScene::*)(ComponentOld, const string&))&RenderScene::setRenderablePath, "Mesh (*.msh)", allocator));
 				editor.registerProperty("renderable", allocator.newObject<BoolPropertyDescriptor<RenderScene> >("is_always_visible", &RenderScene::isRenderableAlwaysVisible, &RenderScene::setRenderableIsAlwaysVisible, allocator));
 
 				editor.registerProperty("global_light", allocator.newObject<DecimalPropertyDescriptor<RenderScene> >("ambient_intensity", &RenderScene::getLightAmbientIntensity, &RenderScene::setLightAmbientIntensity, 0.0f, 1.0f, 0.05f, allocator));
@@ -147,6 +148,7 @@ namespace Lumix
 				grass->addChild(ground);
 				grass->addChild(allocator.newObject<IntArrayObjectDescriptor<RenderScene> >("density", &RenderScene::getGrassDensity, &RenderScene::setGrassDensity, allocator));
 				editor.registerProperty("terrain", grass);
+				*/
 			}
 		}
 

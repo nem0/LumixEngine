@@ -12,8 +12,7 @@
 
 namespace Lumix
 {
-	struct Component;
-	struct Entity;
+	struct ComponentOld;
 	class Event;
 	class Path;
 	class Resource;
@@ -46,7 +45,7 @@ class PropertyView : public QDockWidget
 		QAbstractItemModel* getModel() const;
 
 	signals:
-		void componentNodeCreated(DynamicObjectModel::Node&, const Lumix::Component&);
+		void componentNodeCreated(DynamicObjectModel::Node&, const Lumix::ComponentOld&);
 
 	public:
 		Ui::PropertyView* m_ui;

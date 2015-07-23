@@ -16,7 +16,7 @@ namespace Lumix
 			Vec3 m_origin;
 			Vec3 m_dir;
 			class Mesh* m_mesh;
-			Component m_component;
+			ComponentOld m_component;
 	};
 
 } // ~ namespace Lumix

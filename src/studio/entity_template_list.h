@@ -10,7 +10,6 @@ namespace Ui
 
 namespace Lumix
 {
-	struct Entity;
 	class WorldEditor;
 }
 
@@ -25,7 +24,7 @@ class EntityTemplateList : public QDockWidget
 		void setWorldEditor(Lumix::WorldEditor& editor);
 		void instantiateTemplate();
 		void instantiateTemplateAt(const Lumix::Vec3& position);
-		const Lumix::Entity& getTemplate() const;
+		int getTemplate() const;
 
 	private:
 		void onSystemUpdated();

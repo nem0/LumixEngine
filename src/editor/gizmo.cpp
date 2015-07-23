@@ -59,12 +59,14 @@ void Gizmo::getEnityMatrix(Matrix& mtx, int selection_index)
 {
 	if(m_pivot_mode == PivotMode::OBJECT_PIVOT)
 	{
-		m_editor.getSelectedEntities()[selection_index].getMatrix(mtx);
+		mtx = m_universe->getMatrix(
+			m_editor.getSelectedEntities()[selection_index]);
 	}
 	else if(m_pivot_mode == PivotMode::CENTER)
 	{
-		m_editor.getSelectedEntities()[selection_index].getMatrix(mtx);
-		Component cmp = m_editor.getComponent(m_editor.getSelectedEntities()[selection_index], RENDERABLE_HASH);
+		mtx = m_universe->getMatrix(
+			m_editor.getSelectedEntities()[selection_index]);
+		ComponentOld cmp = m_editor.getComponent(m_editor.getSelectedEntities()[selection_index], RENDERABLE_HASH);
 		if(cmp.isValid())
 		{
 			Model* model = static_cast<RenderScene*>(cmp.scene)->getRenderableModel(cmp);
@@ -73,7 +75,8 @@ void Gizmo::getEnityMatrix(Matrix& mtx, int selection_index)
 		}
 		else
 		{
-			m_editor.getSelectedEntities()[selection_index].getMatrix(mtx);
+			mtx = m_universe->getMatrix(
+				m_editor.getSelectedEntities()[selection_index]);
 		}
 	}
 	else
@@ -90,17 +93,16 @@ void Gizmo::getEnityMatrix(Matrix& mtx, int selection_index)
 }
 
 
-void Gizmo::updateScale(Component camera)
+void Gizmo::updateScale(ComponentOld camera)
 {
 	if (!m_editor.getSelectedEntities().empty())
 	{
-		Matrix camera_mtx;
-		camera.entity.getMatrix(camera_mtx);
+		Vec3 camera_pos = m_universe->getPosition(camera.entity);
 		Matrix mtx;
 		getMatrix(mtx);
 		Vec3 pos = mtx.getTranslation();
-		float fov = static_cast<RenderScene*>(camera.scene)->getCameraFOV(camera);
-		float scale = tanf(fov * Math::PI / 180 * 0.5f) * (mtx.getTranslation() - camera_mtx.getTranslation()).length() * 2;
+		float fov = static_cast<RenderScene*>(camera.scene)->getCameraFOV(camera.index);
+		float scale = tanf(fov * Math::PI / 180 * 0.5f) * (mtx.getTranslation() - camera_pos).length() * 2;
 		scale /= 20 * mtx.getXVector().length();
 		m_scale = scale;
 	}
@@ -175,7 +177,7 @@ void Gizmo::render(PipelineInstance& pipeline)
 }
 
 
-void Gizmo::startTransform(Component camera, int x, int y, TransformMode mode)
+void Gizmo::startTransform(ComponentOld camera, int x, int y, TransformMode mode)
 {
 	m_transform_mode = mode;
 	m_transform_point = getMousePlaneIntersection(camera, x, y);
@@ -215,11 +217,12 @@ float Gizmo::computeRotateAngle(int relx, int rely, int flags)
 
 void Gizmo::rotate(int relx, int rely, int flags)
 {
+	Universe* universe = m_editor.getUniverse();
 	Array<Vec3> new_positions(m_editor.getAllocator());
 	Array<Quat> new_rotations(m_editor.getAllocator());
 	for(int i = 0, c = m_editor.getSelectedEntities().size(); i < c; ++i)
 	{
-		Vec3 pos = m_editor.getSelectedEntities()[i].getPosition();
+		Vec3 pos = universe->getPosition(m_editor.getSelectedEntities()[i]);
 		Matrix emtx;
 		getEnityMatrix(emtx, i);
 		Vec3 axis;
@@ -237,7 +240,7 @@ void Gizmo::rotate(int relx, int rely, int flags)
 		}
 		float angle = computeRotateAngle(relx, rely, flags);
 		
-		Quat old_rot = m_editor.getSelectedEntities()[i].getRotation();
+		Quat old_rot = universe->getRotation(m_editor.getSelectedEntities()[i]);
 		Quat new_rot = old_rot * Quat(axis, angle);
 		new_rot.normalize();
 		new_rotations.push(new_rot);
@@ -255,7 +258,7 @@ void Gizmo::rotate(int relx, int rely, int flags)
 }
 
 
-void Gizmo::transform(Component camera, TransformOperation operation, int x, int y, int relx, int rely, int flags)
+void Gizmo::transform(ComponentOld camera, TransformOperation operation, int x, int y, int relx, int rely, int flags)
 {
 	if(operation == TransformOperation::ROTATE && m_transform_mode != TransformMode::CAMERA_XZ)
 	{
@@ -268,7 +271,7 @@ void Gizmo::transform(Component camera, TransformOperation operation, int x, int
 		Array<Vec3> new_positions(m_editor.getAllocator());
 		for(int i = 0, ci = m_editor.getSelectedEntities().size(); i < ci; ++i)
 		{
-			Vec3 pos = m_editor.getSelectedEntities()[i].getPosition();
+			Vec3 pos = m_editor.getUniverse()->getPosition(m_editor.getSelectedEntities()[i]);
 			pos += delta;
 			new_positions.push(pos);
 		}
@@ -278,14 +281,13 @@ void Gizmo::transform(Component camera, TransformOperation operation, int x, int
 }
 
 
-Vec3 Gizmo::getMousePlaneIntersection(Component camera, int x, int y)
+Vec3 Gizmo::getMousePlaneIntersection(ComponentOld camera, int x, int y)
 {
 	Vec3 origin, dir;
 	RenderScene* scene = static_cast<RenderScene*>(camera.scene);
-	scene->getRay(camera, (float)x, (float)y, origin, dir);
+	scene->getRay(camera.index, (float)x, (float)y, origin, dir);
 	dir.normalize();
-	Matrix camera_mtx;
-	camera.entity.getMatrix(camera_mtx);
+	Matrix camera_mtx = m_universe->getMatrix(camera.entity);
 	Matrix gizmo_mtx;
 	getMatrix(gizmo_mtx);
 	if(m_transform_mode == TransformMode::CAMERA_XZ)

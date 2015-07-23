@@ -13,7 +13,7 @@
 #include <qpushbutton.h>
 
 
-const char* EntityModel::getComponentName(Lumix::Component cmp) const
+const char* EntityModel::getComponentName(Lumix::ComponentOld cmp) const
 {
 	for (int i = 0; i < m_editor.getComponentTypesCount(); ++i)
 	{
@@ -26,16 +26,25 @@ const char* EntityModel::getComponentName(Lumix::Component cmp) const
 }
 
 
-EntityModel::EntityModel(PropertyView& view, Lumix::WorldEditor& editor, Lumix::Entity entity)
+EntityModel::EntityModel(PropertyView& view,
+						 Lumix::WorldEditor& editor,
+						 Lumix::Entity entity)
 	: m_editor(editor)
 	, m_view(view)
 	, m_is_setting(false)
 {
 	m_entity = entity;
 	getRoot().m_name = "Entity";
-	getRoot().onCreateEditor = [this](QWidget* parent, const QStyleOptionViewItem&){
+	getRoot().onCreateEditor = [this](QWidget* parent,
+									  const QStyleOptionViewItem&)
+	{
 		auto button = new QPushButton("Add", parent);
-		connect(button, &QPushButton::clicked, [this, button](){ addComponent(button, button->mapToGlobal(button->pos())); });
+		connect(button,
+				&QPushButton::clicked,
+				[this, button]()
+				{
+					addComponent(button, button->mapToGlobal(button->pos()));
+				});
 		return button;
 	};
 	getRoot().enablePeristentEditor();
@@ -45,27 +54,35 @@ EntityModel::EntityModel(PropertyView& view, Lumix::WorldEditor& editor, Lumix::
 	Lumix::WorldEditor::ComponentList& cmps = m_editor.getComponents(m_entity);
 	for (int i = 0; i < cmps.size(); ++i)
 	{
-		Lumix::Component cmp = cmps[i];
+		Lumix::ComponentOld cmp = cmps[i];
 		addComponentNode(cmp, i);
 	}
 
-	m_editor.getUniverse()->entityDestroyed().bind<EntityModel, &EntityModel::onEntityDestroyed>(this);
-	m_editor.universeDestroyed().bind<EntityModel, &EntityModel::onUniverseDestroyed>(this);
+	m_editor.getUniverse()
+		->entityDestroyed()
+		.bind<EntityModel, &EntityModel::onEntityDestroyed>(this);
+	m_editor.universeDestroyed()
+		.bind<EntityModel, &EntityModel::onUniverseDestroyed>(this);
 	m_editor.propertySet().bind<EntityModel, &EntityModel::onPropertySet>(this);
-	m_editor.componentAdded().bind<EntityModel, &EntityModel::onComponentAdded>(this);
-	m_editor.componentDestroyed().bind<EntityModel, &EntityModel::onComponentDestroyed>(this);
+	m_editor.componentAdded().bind<EntityModel, &EntityModel::onComponentAdded>(
+		this);
+	m_editor.componentDestroyed()
+		.bind<EntityModel, &EntityModel::onComponentDestroyed>(this);
 }
 
 
 void EntityModel::reset(const QString& reason)
 {
 	beginResetModel();
-	m_entity = Lumix::Entity::INVALID;
+	m_entity = Lumix::NEW_INVALID_ENTITY;
 	for (int i = 0; i < getRoot().m_children.size(); ++i)
 	{
 		delete getRoot().m_children[i];
 		getRoot().m_children.clear();
-		getRoot().m_getter = [reason]() -> QVariant { return reason; };
+		getRoot().m_getter = [reason]() -> QVariant
+		{
+			return reason;
+		};
 	}
 	endResetModel();
 }
@@ -88,16 +105,24 @@ void EntityModel::onUniverseDestroyed()
 
 EntityModel::~EntityModel()
 {
-	m_editor.getUniverse()->entityDestroyed().unbind<EntityModel, &EntityModel::onEntityDestroyed>(this);
-	m_editor.universeDestroyed().unbind<EntityModel, &EntityModel::onUniverseDestroyed>(this);
-	m_editor.componentAdded().unbind<EntityModel, &EntityModel::onComponentAdded>(this);
-	m_editor.componentDestroyed().unbind<EntityModel, &EntityModel::onComponentDestroyed>(this);
-	m_editor.propertySet().unbind<EntityModel, &EntityModel::onPropertySet>(this);
-	m_editor.getUniverse()->entityMoved().unbind<EntityModel, &EntityModel::onEntityPosition>(this);
+	m_editor.getUniverse()
+		->entityDestroyed()
+		.unbind<EntityModel, &EntityModel::onEntityDestroyed>(this);
+	m_editor.universeDestroyed()
+		.unbind<EntityModel, &EntityModel::onUniverseDestroyed>(this);
+	m_editor.componentAdded()
+		.unbind<EntityModel, &EntityModel::onComponentAdded>(this);
+	m_editor.componentDestroyed()
+		.unbind<EntityModel, &EntityModel::onComponentDestroyed>(this);
+	m_editor.propertySet().unbind<EntityModel, &EntityModel::onPropertySet>(
+		this);
+	m_editor.getUniverse()
+		->entityMoved()
+		.unbind<EntityModel, &EntityModel::onEntityPosition>(this);
 }
 
 
-void EntityModel::onComponentAdded(Lumix::Component component)
+void EntityModel::onComponentAdded(Lumix::ComponentOld component)
 {
 	if (m_entity == component.entity)
 	{
@@ -111,7 +136,7 @@ void EntityModel::onComponentAdded(Lumix::Component component)
 }
 
 
-void EntityModel::onComponentDestroyed(Lumix::Component component)
+void EntityModel::onComponentDestroyed(Lumix::ComponentOld component)
 {
 	if (component.entity == m_entity)
 	{
@@ -126,7 +151,8 @@ void EntityModel::onComponentDestroyed(Lumix::Component component)
 }
 
 
-void EntityModel::onPropertySet(Lumix::Component component, const Lumix::IPropertyDescriptor& descriptor)
+void EntityModel::onPropertySet(Lumix::ComponentOld component,
+								const Lumix::IPropertyDescriptor& descriptor)
 {
 	if (component.entity == m_entity && !m_is_setting)
 	{
@@ -135,13 +161,15 @@ void EntityModel::onPropertySet(Lumix::Component component, const Lumix::IProper
 		{
 			if (cmps[i].type == component.type)
 			{
-				auto& descriptors = m_editor.getPropertyDescriptors(component.type);
+				auto& descriptors =
+					m_editor.getPropertyDescriptors(component.type);
 				auto* node = getRoot().m_children[i + 3];
 				for (int j = 0; j < node->m_children.size(); ++j)
 				{
 					if (descriptors[j] == &descriptor)
 					{
-						QModelIndex index = createIndex(j, 1, node->m_children[j]);
+						QModelIndex index =
+							createIndex(j, 1, node->m_children[j]);
 						emit dataChanged(index, index);
 						return;
 					}
@@ -155,15 +183,24 @@ void EntityModel::onPropertySet(Lumix::Component component, const Lumix::IProper
 void EntityModel::addNameProperty()
 {
 	Node& name_node = getRoot().addChild("name");
-	name_node.m_getter = [this]() -> QVariant { return m_entity.getName(); };
-	name_node.m_setter = [this](const QVariant& value) {
-		if (m_editor.getUniverse()->nameExists(value.toString().toLatin1().data()))
+	name_node.m_getter = [this]() -> QVariant
+	{
+		return m_editor.getUniverse()->getEntityName(m_entity);
+	};
+	name_node.m_setter = [this](const QVariant& value)
+	{
+		if (m_editor.getUniverse()->nameExists(
+				value.toString().toLatin1().data()))
 		{
-			QMessageBox::warning(NULL, "Warning", "Entity with this name already exists!", QMessageBox::Ok);
+			QMessageBox::warning(NULL,
+								 "Warning",
+								 "Entity with this name already exists!",
+								 QMessageBox::Ok);
 		}
 		else
 		{
-			m_editor.setEntityName(m_entity, value.toString().toLatin1().data());
+			m_editor.setEntityName(m_entity,
+								   value.toString().toLatin1().data());
 		}
 	};
 }
@@ -171,7 +208,7 @@ void EntityModel::addNameProperty()
 
 void EntityModel::setEntityRotation(int index, float value)
 {
-	auto axis_angle = m_entity.getRotation().getAxisAngle();
+	auto axis_angle = getUniverse()->getRotation(m_entity).getAxisAngle();
 	((float*)&axis_angle)[index] = value;
 	axis_angle.axis.normalize();
 	Lumix::StackAllocator<256> allocator;
@@ -185,7 +222,7 @@ void EntityModel::setEntityRotation(int index, float value)
 
 void EntityModel::setEntityPosition(int index, float value)
 {
-	Lumix::Vec3 v = m_entity.getPosition();
+	Lumix::Vec3 v = getUniverse()->getPosition(m_entity);
 	((float*)&v)[index] = value;
 	Lumix::StackAllocator<256> allocator;
 	Lumix::Array<Lumix::Entity> entities(allocator);
@@ -196,27 +233,56 @@ void EntityModel::setEntityPosition(int index, float value)
 }
 
 
+Lumix::Universe* EntityModel::getUniverse()
+{
+	return m_editor.getUniverse();
+}
+
+
 void EntityModel::addPositionProperty()
 {
 	Node& position_node = getRoot().addChild("position");
-	position_node.m_getter = [this]() -> QVariant {
-		Lumix::Vec3 pos = m_entity.getPosition();
-		return QString("%1; %2; %3").arg(pos.x, 0, 'f', 6).arg(pos.y, 0, 'f', 6).arg(pos.z, 0, 'f', 6);
+	position_node.m_getter = [this]() -> QVariant
+	{
+		Lumix::Vec3 pos = getUniverse()->getPosition(m_entity);
+		return QString("%1; %2; %3")
+			.arg(pos.x, 0, 'f', 6)
+			.arg(pos.y, 0, 'f', 6)
+			.arg(pos.z, 0, 'f', 6);
 	};
 
 	Node& x_node = position_node.addChild("x");
-	x_node.m_getter = [this]() -> QVariant { return m_entity.getPosition().x; };
-	x_node.m_setter = [this](const QVariant& value) { setEntityPosition(0, value.toFloat()); };
+	x_node.m_getter = [this]() -> QVariant
+	{
+		return getUniverse()->getPosition(m_entity).x;
+	};
+	x_node.m_setter = [this](const QVariant& value)
+	{
+		setEntityPosition(0, value.toFloat());
+	};
 	Node& y_node = position_node.addChild("y");
-	y_node.m_getter = [this]() -> QVariant { return m_entity.getPosition().y; };
-	y_node.m_setter = [this](const QVariant& value) { setEntityPosition(1, value.toFloat()); };
+	y_node.m_getter = [this]() -> QVariant
+	{
+		return getUniverse()->getPosition(m_entity).y;
+	};
+	y_node.m_setter = [this](const QVariant& value)
+	{
+		setEntityPosition(1, value.toFloat());
+	};
 	Node& z_node = position_node.addChild("z");
-	z_node.m_getter = [this]() -> QVariant { return m_entity.getPosition().z; };
-	z_node.m_setter = [this](const QVariant& value) { setEntityPosition(2, value.toFloat()); };
+	z_node.m_getter = [this]() -> QVariant
+	{
+		return getUniverse()->getPosition(m_entity).z;
+	};
+	z_node.m_setter = [this](const QVariant& value)
+	{
+		setEntityPosition(2, value.toFloat());
+	};
 
 	Node& rotation_node = getRoot().addChild("rotation");
-	rotation_node.m_getter = [this]() -> QVariant {
-		auto rot = m_entity.getRotation().getAxisAngle();
+	rotation_node.m_getter = [this]() -> QVariant
+	{
+		auto rot = getUniverse()->getRotation(m_entity).getAxisAngle();
 		return QString("[%1; %2; %3] %4")
 			.arg(rot.axis.x, 0, 'f', 6)
 			.arg(rot.axis.y, 0, 'f', 6)
@@ -226,21 +292,61 @@ void EntityModel::addPositionProperty()
 
 	{
 		Node& x_node = rotation_node.addChild("x");
-		x_node.m_getter = [this]() -> QVariant { return m_entity.getRotation().getAxisAngle().axis.x; };
-		x_node.m_setter = [this](const QVariant& value) { setEntityRotation(0, value.toFloat()); };
+		x_node.m_getter = [this]() -> QVariant
+		{
+			return getUniverse()
+				->getRotation(m_entity)
+				.getAxisAngle()
+				.axis.x;
+		};
+		x_node.m_setter = [this](const QVariant& value)
+		{
+			setEntityRotation(0, value.toFloat());
+		};
 		Node& y_node = rotation_node.addChild("y");
-		y_node.m_getter = [this]() -> QVariant { return m_entity.getRotation().getAxisAngle().axis.y; };
-		y_node.m_setter = [this](const QVariant& value) { setEntityRotation(1, value.toFloat());  };
+		y_node.m_getter = [this]() -> QVariant
+		{
+			return getUniverse()
+				->getRotation(m_entity)
+				.getAxisAngle()
+				.axis.y;
+		};
+		y_node.m_setter = [this](const QVariant& value)
+		{
+			setEntityRotation(1, value.toFloat());
+		};
 		Node& z_node = rotation_node.addChild("z");
-		z_node.m_getter = [this]() -> QVariant { return m_entity.getRotation().getAxisAngle().axis.z; };
-		z_node.m_setter = [this](const QVariant& value) { setEntityRotation(2, value.toFloat()); };
+		z_node.m_getter = [this]() -> QVariant
+		{
+			return getUniverse()
+				->getRotation(m_entity)
+				.getAxisAngle()
+				.axis.z;
+		};
+		z_node.m_setter = [this](const QVariant& value)
+		{
+			setEntityRotation(2, value.toFloat());
+		};
 		Node& angle_node = rotation_node.addChild("angle");
-		angle_node.m_getter = [this]() -> QVariant { return Lumix::Math::radiansToDegrees(m_entity.getRotation().getAxisAngle().angle); };
-		angle_node.m_setter = [this](const QVariant& value) { setEntityRotation(3, Lumix::Math::degreesToRadians(value.toFloat())); };
+		angle_node.m_getter = [this]() -> QVariant
+		{
+			return Lumix::Math::radiansToDegrees(
+				getUniverse()
+					->getRotation(m_entity)
+					.getAxisAngle()
+					.angle);
+		};
+		angle_node.m_setter = [this](const QVariant& value)
+		{
+			setEntityRotation(3,
+							  Lumix::Math::degreesToRadians(value.toFloat()));
+		};
 		DynamicObjectModel::setSliderEditor(angle_node, 0, 360, 5);
 	}
 
-	m_editor.getUniverse()->entityMoved().bind<EntityModel, &EntityModel::onEntityPosition>(this);
+	m_editor.getUniverse()
+		->entityMoved()
+		.bind<EntityModel, &EntityModel::onEntityPosition>(this);
 }
 
 void EntityModel::onEntityPosition(const Lumix::Entity& entity)
@@ -248,26 +354,32 @@ void EntityModel::onEntityPosition(const Lumix::Entity& entity)
 	if (entity == m_entity)
 	{
 		QModelIndex index = createIndex(1, 1, getRoot().m_children[1]);
-		QModelIndex index_x = createIndex(0, 1, getRoot().m_children[1]->m_children[0]);
-		QModelIndex index_z = createIndex(2, 1, getRoot().m_children[1]->m_children[2]);
+		QModelIndex index_x =
+			createIndex(0, 1, getRoot().m_children[1]->m_children[0]);
+		QModelIndex index_z =
+			createIndex(2, 1, getRoot().m_children[1]->m_children[2]);
 		emit dataChanged(index, index);
 		emit dataChanged(index_x, index_z);
 	}
 }
 
 
-void EntityModel::addResourceProperty(Node& child, Lumix::IPropertyDescriptor* desc, Lumix::Component cmp)
+void EntityModel::addResourceProperty(Node& child,
+									  Lumix::IPropertyDescriptor* desc,
+									  Lumix::ComponentOld cmp)
 {
 	child.m_setter = [desc, cmp, this](const QVariant& value)
 	{
 		this->set(cmp.entity, cmp.type, -1, desc, value);
 	};
-	child.onSetModelData = [desc, cmp, this](QWidget* editor){
+	child.onSetModelData = [desc, cmp, this](QWidget* editor)
+	{
 		const auto& children = editor->children();
 		auto value = qobject_cast<QLineEdit*>(children[1])->text();
 		this->set(cmp.entity, cmp.type, -1, desc, value);
 	};
-	child.onDrop = [desc, cmp, this](const QMimeData* data, Qt::DropAction){
+	child.onDrop = [desc, cmp, this](const QMimeData* data, Qt::DropAction)
+	{
 		QList<QUrl> urls = data->urls();
 		Q_ASSERT(urls.size() < 2);
 		if (urls.size() == 1)
@@ -280,77 +392,115 @@ void EntityModel::addResourceProperty(Node& child, Lumix::IPropertyDescriptor* d
 		}
 		return false;
 	};
-	child.onCreateEditor = [desc, cmp, this](QWidget* parent, const QStyleOptionViewItem&) -> QWidget* {
+	child.onCreateEditor = [desc, cmp, this](
+		QWidget* parent, const QStyleOptionViewItem&) -> QWidget*
+	{
 		QWidget* widget = new QWidget(parent);
 		QHBoxLayout* layout = new QHBoxLayout(widget);
 		QLineEdit* edit = new QLineEdit(widget);
-		layout->addWidget(edit); 
+		layout->addWidget(edit);
 		QPushButton* button = new QPushButton("Browse", widget);
-		connect(button, &QPushButton::clicked, [edit, parent, this](){
-			auto value = QFileDialog::getOpenFileName();
-			if (!value.isEmpty())
-			{
-				char rel_path[LUMIX_MAX_PATH];
-				Lumix::Path path(value.toLatin1().data());
-				m_editor.getRelativePath(rel_path, LUMIX_MAX_PATH, path);
-				edit->setText(rel_path);
-			}
-		});
+		connect(button,
+				&QPushButton::clicked,
+				[edit, parent, this]()
+				{
+					auto value = QFileDialog::getOpenFileName();
+					if (!value.isEmpty())
+					{
+						char rel_path[LUMIX_MAX_PATH];
+						Lumix::Path path(value.toLatin1().data());
+						m_editor.getRelativePath(
+							rel_path, LUMIX_MAX_PATH, path);
+						edit->setText(rel_path);
+					}
+				});
 		layout->addWidget(button);
 		QPushButton* go_button = new QPushButton("->", widget);
-		connect(go_button, &QPushButton::clicked, [edit, this](){
-			m_view.setSelectedResourceFilename(edit->text().toLatin1().data());
-		});
+		connect(go_button,
+				&QPushButton::clicked,
+				[edit, this]()
+				{
+					m_view.setSelectedResourceFilename(
+						edit->text().toLatin1().data());
+				});
 		layout->addWidget(go_button);
 		layout->setContentsMargins(0, 0, 0, 0);
 		edit->setText(this->get(cmp.entity, cmp.type, -1, desc).toString());
 		return widget;
 	};
-
 }
 
 
-void EntityModel::addArrayProperty(Node& child, Lumix::IArrayDescriptor* array_desc, Lumix::Component cmp)
+void EntityModel::addArrayProperty(Node& child,
+								   Lumix::IArrayDescriptor* array_desc,
+								   Lumix::ComponentOld cmp)
 {
-	child.onCreateEditor = [cmp, array_desc](QWidget* parent, const QStyleOptionViewItem&) {
+	child.onCreateEditor = [cmp, array_desc](QWidget* parent,
+											 const QStyleOptionViewItem&)
+	{
 		auto button = new QPushButton(" + ", parent);
-		button->connect(button, &QPushButton::clicked, [cmp, array_desc](){ array_desc->addArrayItem(cmp, -1); });
+		button->connect(button,
+						&QPushButton::clicked,
+						[cmp, array_desc]()
+						{
+							array_desc->addArrayItem(cmp, -1);
+						});
 		return button;
 	};
-	child.m_setter = [](const QVariant&){};
+	child.m_setter = [](const QVariant&)
+	{
+	};
 	child.m_is_persistent_editor = true;
 	for (int k = 0; k < array_desc->getCount(cmp); ++k)
 	{
 		Node& array_item_node = child.addChild(QString("%1").arg(k));
-		array_item_node.m_getter = []() -> QVariant { return ""; };
+		array_item_node.m_getter = []() -> QVariant
+		{
+			return "";
+		};
 		for (int l = 0; l < array_desc->getChildren().size(); ++l)
 		{
 			auto* array_item_property_desc = array_desc->getChildren()[l];
-			Node& subchild = array_item_node.addChild(array_item_property_desc->getName());
-			subchild.m_getter = [k, array_item_property_desc, cmp, this]() -> QVariant
+			Node& subchild =
+				array_item_node.addChild(array_item_property_desc->getName());
+			subchild.m_getter =
+				[k, array_item_property_desc, cmp, this]() -> QVariant
 			{
-				return this->get(cmp.entity, cmp.type, k, array_item_property_desc);
+				return this->get(
+					cmp.entity, cmp.type, k, array_item_property_desc);
 			};
-			subchild.m_setter = [k, array_item_property_desc, cmp, this](const QVariant& value)
+			subchild.m_setter =
+				[k, array_item_property_desc, cmp, this](const QVariant& value)
 			{
-				this->set(cmp.entity, cmp.type, k, array_item_property_desc, value);
+				this->set(
+					cmp.entity, cmp.type, k, array_item_property_desc, value);
 			};
 		}
 	}
 }
 
 
-void EntityModel::addComponentNode(Lumix::Component cmp, int component_index)
+void EntityModel::addComponentNode(Lumix::ComponentOld cmp, int component_index)
 {
 	Node& node = getRoot().addChild(getComponentName(cmp), component_index + 3);
-	node.m_getter = []() -> QVariant { return ""; };
-	node.onCreateEditor = [this, cmp](QWidget* parent, const QStyleOptionViewItem&) {
+	node.m_getter = []() -> QVariant
+	{
+		return "";
+	};
+	node.onCreateEditor = [this, cmp](QWidget* parent,
+									  const QStyleOptionViewItem&)
+	{
 		auto widget = new QWidget(parent);
 		QHBoxLayout* layout = new QHBoxLayout(widget);
 		layout->setContentsMargins(0, 0, 0, 0);
 		layout->addStretch(1);
 		auto button = new QPushButton("Remove", widget);
-		connect(button, &QPushButton::clicked, [this, cmp](){ m_editor.destroyComponent(cmp); });
+		connect(button,
+				&QPushButton::clicked,
+				[this, cmp]()
+				{
+					m_editor.destroyComponent(cmp);
+				});
 		layout->addWidget(button);
 		return widget;
 	};
@@ -367,47 +517,77 @@ void EntityModel::addComponentNode(Lumix::Component cmp, int component_index)
 		switch (desc->getType())
 		{
 			case Lumix::IPropertyDescriptor::ARRAY:
-				{
-					addArrayProperty(child, static_cast<Lumix::IArrayDescriptor*>(desc), cmp);
-					break;
-				}
+			{
+				addArrayProperty(
+					child, static_cast<Lumix::IArrayDescriptor*>(desc), cmp);
+				break;
+			}
 			case Lumix::IPropertyDescriptor::DECIMAL:
+			{
+				child.m_setter = [desc, cmp, this](const QVariant& value)
 				{
-					child.m_setter = [desc, cmp, this](const QVariant& value)
-					{
-						this->set(cmp.entity, cmp.type, -1, desc, value);
-					};
-					auto decimal_desc = static_cast<Lumix::IDecimalPropertyDescriptor*>(desc);
-					if (decimal_desc->getStep() > 0)
-					{
-						DynamicObjectModel::setSliderEditor(child, decimal_desc->getMin(), decimal_desc->getMax(), decimal_desc->getStep());
-						child.enablePeristentEditor();
-					}
-					break;
+					this->set(cmp.entity, cmp.type, -1, desc, value);
+				};
+				auto decimal_desc =
+					static_cast<Lumix::IDecimalPropertyDescriptor*>(desc);
+				if (decimal_desc->getStep() > 0)
+				{
+					DynamicObjectModel::setSliderEditor(
+						child,
+						decimal_desc->getMin(),
+						decimal_desc->getMax(),
+						decimal_desc->getStep());
+					child.enablePeristentEditor();
 				}
+				break;
+			}
 			case Lumix::IPropertyDescriptor::RESOURCE:
 				addResourceProperty(child, desc, cmp);
 				break;
 			case Lumix::IPropertyDescriptor::VEC3:
+			{
+				Node& x_node = child.addChild("x");
+				x_node.m_getter = [desc, cmp]() -> QVariant
 				{
-					Node& x_node = child.addChild("x");
-					x_node.m_getter = [desc, cmp]() -> QVariant { return desc->getValue<Lumix::Vec3>(cmp).x; };
-					x_node.m_setter = [desc, cmp](const QVariant& value) { Lumix::Vec3 v = desc->getValue<Lumix::Vec3>(cmp); v.x = value.toFloat(); desc->setValue(cmp, v); };
-					Node& y_node = child.addChild("y");
-					y_node.m_getter = [desc, cmp]() -> QVariant { return desc->getValue<Lumix::Vec3>(cmp).y; };
-					y_node.m_setter = [desc, cmp](const QVariant& value) { Lumix::Vec3 v = desc->getValue<Lumix::Vec3>(cmp); v.y = value.toFloat(); desc->setValue(cmp, v); };
-					Node& z_node = child.addChild("z");
-					z_node.m_getter = [desc, cmp]() -> QVariant { return desc->getValue<Lumix::Vec3>(cmp).z; };
-					z_node.m_setter = [desc, cmp](const QVariant& value) { Lumix::Vec3 v = desc->getValue<Lumix::Vec3>(cmp); v.z = value.toFloat(); desc->setValue(cmp, v); };
-					break;
-				}
+					return desc->getValue<Lumix::Vec3>(cmp).x;
+				};
+				x_node.m_setter = [desc, cmp](const QVariant& value)
+				{
+					Lumix::Vec3 v = desc->getValue<Lumix::Vec3>(cmp);
+					v.x = value.toFloat();
+					desc->setValue(cmp, v);
+				};
+				Node& y_node = child.addChild("y");
+				y_node.m_getter = [desc, cmp]() -> QVariant
+				{
+					return desc->getValue<Lumix::Vec3>(cmp).y;
+				};
+				y_node.m_setter = [desc, cmp](const QVariant& value)
+				{
+					Lumix::Vec3 v = desc->getValue<Lumix::Vec3>(cmp);
+					v.y = value.toFloat();
+					desc->setValue(cmp, v);
+				};
+				Node& z_node = child.addChild("z");
+				z_node.m_getter = [desc, cmp]() -> QVariant
+				{
+					return desc->getValue<Lumix::Vec3>(cmp).z;
+				};
+				z_node.m_setter = [desc, cmp](const QVariant& value)
+				{
+					Lumix::Vec3 v = desc->getValue<Lumix::Vec3>(cmp);
+					v.z = value.toFloat();
+					desc->setValue(cmp, v);
+				};
+				break;
+			}
 			default:
 				child.m_setter = [desc, cmp, this](const QVariant& value)
 				{
 					this->set(cmp.entity, cmp.type, -1, desc, value);
 				};
 				break;
-			}
+		}
 	}
 	emit m_view.componentNodeCreated(node, cmp);
 }
@@ -416,15 +596,13 @@ void EntityModel::addComponent(QWidget* widget, QPoint pos)
 {
 	struct CB : public QComboBox
 	{
-		public:
-			CB(QWidget* parent)
-				: QComboBox(parent)
-			{}
+	public:
+		CB(QWidget* parent)
+			: QComboBox(parent)
+		{
+		}
 
-			virtual void hidePopup() override
-			{
-				deleteLater();
-			}
+		virtual void hidePopup() override { deleteLater(); }
 	};
 
 	CB* combobox = new CB(widget);
@@ -432,69 +610,83 @@ void EntityModel::addComponent(QWidget* widget, QPoint pos)
 	{
 		combobox->addItem(m_editor.getComponentTypeName(i));
 	}
-	combobox->connect(combobox, (void (QComboBox::*)(int))&QComboBox::activated, [this, combobox](int value) {
-		for (int i = 0; i < m_editor.getComponentTypesCount(); ++i)
+	combobox->connect(
+		combobox,
+		(void (QComboBox::*)(int)) & QComboBox::activated,
+		[this, combobox](int value)
 		{
-			if (combobox->itemText(value) == m_editor.getComponentTypeName(i))
+			for (int i = 0; i < m_editor.getComponentTypesCount(); ++i)
 			{
-				if (!m_editor.getComponent(m_entity, crc32(m_editor.getComponentTypeID(i))).isValid())
+				if (combobox->itemText(value) ==
+					m_editor.getComponentTypeName(i))
 				{
-					m_editor.addComponent(crc32(m_editor.getComponentTypeID(i)));
+					if (!m_editor.getComponent(
+									 m_entity,
+									 crc32(m_editor.getComponentTypeID(i)))
+							 .isValid())
+					{
+						m_editor.addComponent(
+							crc32(m_editor.getComponentTypeID(i)));
+					}
+					break;
 				}
-				break;
 			}
-		}
-		combobox->deleteLater();
+			combobox->deleteLater();
 
-	});
+		});
 	combobox->move(combobox->mapFromGlobal(pos));
 	combobox->raise();
 	combobox->showPopup();
 	combobox->setFocus();
 };
 
-void EntityModel::set(Lumix::Entity entity, uint32_t component_type, int index, Lumix::IPropertyDescriptor* desc, QVariant value)
+void EntityModel::set(Lumix::Entity entity,
+					  uint32_t component_type,
+					  int index,
+					  Lumix::IPropertyDescriptor* desc,
+					  QVariant value)
 {
 	m_is_setting = true;
-	Lumix::Component cmp = m_editor.getComponent(entity, component_type);
+	Lumix::ComponentOld cmp = m_editor.getComponent(entity, component_type);
 	ASSERT(cmp.isValid());
 	switch (desc->getType())
 	{
 		case Lumix::IPropertyDescriptor::BOOL:
-			{
-				bool b = value.toBool();
-				m_editor.setProperty(cmp.type, index, *desc, &b, sizeof(b));
-				break;
-			}
+		{
+			bool b = value.toBool();
+			m_editor.setProperty(cmp.type, index, *desc, &b, sizeof(b));
+			break;
+		}
 		case Lumix::IPropertyDescriptor::COLOR:
-			{
-				QColor color = value.value<QColor>();
-				Lumix::Vec3 v;
-				v.x = color.redF();
-				v.y = color.greenF();
-				v.z = color.blueF();
-				m_editor.setProperty(cmp.type, index, *desc, &v, sizeof(v));
-				break;
-			}
+		{
+			QColor color = value.value<QColor>();
+			Lumix::Vec3 v;
+			v.x = color.redF();
+			v.y = color.greenF();
+			v.z = color.blueF();
+			m_editor.setProperty(cmp.type, index, *desc, &v, sizeof(v));
+			break;
+		}
 		case Lumix::IPropertyDescriptor::DECIMAL:
-			{
-				float f = value.toFloat();
-				m_editor.setProperty(cmp.type, index, *desc, &f, sizeof(f));
-				break;
-			}
+		{
+			float f = value.toFloat();
+			m_editor.setProperty(cmp.type, index, *desc, &f, sizeof(f));
+			break;
+		}
 		case Lumix::IPropertyDescriptor::INTEGER:
-			{
-				int i = value.toInt();
-				m_editor.setProperty(cmp.type, index, *desc, &i, sizeof(i));
-				break;
-			}
+		{
+			int i = value.toInt();
+			m_editor.setProperty(cmp.type, index, *desc, &i, sizeof(i));
+			break;
+		}
 		case Lumix::IPropertyDescriptor::RESOURCE:
 		case Lumix::IPropertyDescriptor::FILE:
 		case Lumix::IPropertyDescriptor::STRING:
-			{
-				auto tmp = value.toString().toLatin1();
-				m_editor.setProperty(cmp.type, index, *desc, tmp.data(), tmp.length());
-			}
+		{
+			auto tmp = value.toString().toLatin1();
+			m_editor.setProperty(
+				cmp.type, index, *desc, tmp.data(), tmp.length());
+		}
 		break;
 		default:
 			Q_ASSERT(false);
@@ -503,9 +695,12 @@ void EntityModel::set(Lumix::Entity entity, uint32_t component_type, int index, 
 	m_is_setting = false;
 }
 
-QVariant EntityModel::get(Lumix::Entity entity, uint32_t component_type, int index, Lumix::IPropertyDescriptor* desc)
+QVariant EntityModel::get(Lumix::Entity entity,
+						  uint32_t component_type,
+						  int index,
+						  Lumix::IPropertyDescriptor* desc)
 {
-	Lumix::Component cmp = m_editor.getComponent(entity, component_type);
+	Lumix::ComponentOld cmp = m_editor.getComponent(entity, component_type);
 	ASSERT(cmp.isValid());
 	Lumix::StackAllocator<256> allocator;
 	Lumix::OutputBlob stream(allocator);
@@ -521,44 +716,46 @@ QVariant EntityModel::get(Lumix::Entity entity, uint32_t component_type, int ind
 	switch (desc->getType())
 	{
 		case Lumix::IPropertyDescriptor::BOOL:
-			{
-				bool b;
-				input.read(b);
-				return b;
-			}
+		{
+			bool b;
+			input.read(b);
+			return b;
+		}
 		case Lumix::IPropertyDescriptor::DECIMAL:
-			{
-				float f;
-				input.read(f);
-				return f;
-			}
+		{
+			float f;
+			input.read(f);
+			return f;
+		}
 		case Lumix::IPropertyDescriptor::INTEGER:
-			{
-				int i;
-				input.read(i);
-				return i;
-			}
+		{
+			int i;
+			input.read(i);
+			return i;
+		}
 		case Lumix::IPropertyDescriptor::COLOR:
-			{
-				Lumix::Vec3 c;
-				input.read(c);
-				QColor color((int)(c.x * 255), (int)(c.y * 255), (int)(c.z * 255));
-				return color;
-			}
+		{
+			Lumix::Vec3 c;
+			input.read(c);
+			QColor color((int)(c.x * 255), (int)(c.y * 255), (int)(c.z * 255));
+			return color;
+		}
 		case Lumix::IPropertyDescriptor::VEC3:
-			{
-				Lumix::Vec3 v;
-				input.read(v);
-				return QString("%1; %2; %3").arg(v.x).arg(v.y).arg(v.z);
-			}
+		{
+			Lumix::Vec3 v;
+			input.read(v);
+			return QString("%1; %2; %3").arg(v.x).arg(v.y).arg(v.z);
+		}
 		case Lumix::IPropertyDescriptor::STRING:
 		case Lumix::IPropertyDescriptor::RESOURCE:
 		case Lumix::IPropertyDescriptor::FILE:
-			{
-				return (const char*)stream.getData();
-			}
+		{
+			return (const char*)stream.getData();
+		}
 		case Lumix::IPropertyDescriptor::ARRAY:
-			return QString("%1 members").arg(static_cast<Lumix::IArrayDescriptor*>(desc)->getCount(cmp));
+			return QString("%1 members")
+				.arg(
+					static_cast<Lumix::IArrayDescriptor*>(desc)->getCount(cmp));
 		default:
 			Q_ASSERT(false);
 			break;
@@ -566,4 +763,3 @@ QVariant EntityModel::get(Lumix::Entity entity, uint32_t component_type, int ind
 
 	return QVariant();
 }
-
