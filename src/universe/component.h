@@ -7,36 +7,55 @@
 
 namespace Lumix
 {
-	struct Entity;
-	class IScene;
 
 
-	struct LUMIX_ENGINE_API Component final
+class IScene;
+
+
+typedef int ComponentNew;
+extern LUMIX_ENGINE_API int NEW_INVALID_COMPONENT;
+
+
+struct LUMIX_ENGINE_API ComponentOld final
+{
+
+	typedef uint32_t Type;
+
+	ComponentOld() { index = -1; }
+	ComponentOld(const Entity& _entity,
+				 uint32_t _type,
+				 IScene* _scene,
+				 int _index)
+		: entity(_entity)
+		, type(_type)
+		, scene(_scene)
+		, index(_index)
 	{
+	}
 
-		typedef uint32_t Type;
+	Entity entity; 
+	Type type;
+	IScene* scene;
+	int index;
 
-		Component() { index = -1; }
-		Component(const Entity& _entity, uint32_t _type, IScene* _scene, int _index)
-			: entity(_entity)
-			, type(_type)
-			, scene(_scene)
-			, index(_index)
-		{
-		}
+	static const ComponentOld INVALID;
 
-		Entity entity;
-		Type type;
-		IScene* scene;
-		int index;
-
-		static const Component INVALID;
-
-		bool operator ==(const Component& rhs) const { return type == rhs.type && scene == rhs.scene && index == rhs.index; }
-		bool operator !=(const Component& rhs) const { return type != rhs.type || scene != rhs.scene || index != rhs.index; }
-		bool operator <(const Component& rhs) const { ASSERT(type == rhs.type); ASSERT(scene == rhs.scene); return index < rhs.index; }
-		bool isValid() const  { return index >= 0; }
-	}; 
+	bool operator==(const ComponentOld& rhs) const
+	{
+		return type == rhs.type && scene == rhs.scene && index == rhs.index;
+	}
+	bool operator!=(const ComponentOld& rhs) const
+	{
+		return type != rhs.type || scene != rhs.scene || index != rhs.index;
+	}
+	bool operator<(const ComponentOld& rhs) const
+	{
+		ASSERT(type == rhs.type);
+		ASSERT(scene == rhs.scene);
+		return index < rhs.index;
+	}
+	bool isValid() const { return index >= 0; }
+};
 
 
 } // ~namespace Lumix

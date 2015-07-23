@@ -190,7 +190,7 @@ public:
 		, m_global_light_last_uid(-1)
 		, m_point_light_last_uid(-1)
 		, m_is_forward_rendered(is_forward_rendered)
-		, m_applied_camera(Component::INVALID)
+		, m_applied_camera(NEW_INVALID_COMPONENT)
 	{
 		m_universe.entityMoved()
 			.bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
@@ -245,23 +245,24 @@ public:
 	virtual IPlugin& getPlugin() const override { return m_renderer; }
 
 
-	virtual void
-	getRay(Component camera, float x, float y, Vec3& origin, Vec3& dir) override
+	virtual void getRay(
+		ComponentNew camera, float x, float y, Vec3& origin, Vec3& dir) override
 	{
-		Vec3 camera_pos = camera.entity.getPosition();
-		float width = m_cameras[camera.index].m_width;
-		float height = m_cameras[camera.index].m_height;
+		Vec3 camera_pos =
+			m_universe.getPosition(m_cameras[camera].m_entity);
+		float width = m_cameras[camera].m_width;
+		float height = m_cameras[camera].m_height;
 		float nx = 2 * (x / width) - 1;
 		float ny = 2 * ((height - y) / height) - 1;
 
-		float fov = m_cameras[camera.index].m_fov;
-		float near_plane = m_cameras[camera.index].m_near;
-		float far_plane = m_cameras[camera.index].m_far;
+		float fov = m_cameras[camera].m_fov;
+		float near_plane = m_cameras[camera].m_near;
+		float far_plane = m_cameras[camera].m_far;
 
 		Matrix projection_matrix;
 		projection_matrix.setPerspective(
 			Math::degreesToRadians(fov), width, height, near_plane, far_plane);
-		Matrix view_matrix = camera.entity.getMatrix();
+		Matrix view_matrix = m_universe.getMatrix(m_cameras[camera].m_entity);
 		view_matrix.inverse();
 		Matrix inverted = (projection_matrix * view_matrix);
 		inverted.inverse();
@@ -280,22 +281,31 @@ public:
 		dir.normalize();
 	}
 
-	virtual Component getAppliedCamera() override { return m_applied_camera; }
+	virtual ComponentOld getAppliedCamera() override
+	{
+		if (m_applied_camera == NEW_INVALID_COMPONENT)
+		{
+			return ComponentOld::INVALID;
+		}
+		return ComponentOld(m_cameras[m_applied_camera].m_entity,
+							CAMERA_HASH,
+							this,
+							m_applied_camera);
+	}
 
-	virtual void applyCamera(Component cmp) override
+	virtual void applyCamera(ComponentNew cmp) override
 	{
 		m_applied_camera = cmp;
-		Matrix mtx;
-		cmp.entity.getMatrix(mtx);
+		Matrix mtx = getUniverse().getMatrix(m_cameras[cmp].m_entity);
 
 		m_camera_frustum.computePerspective(mtx.getTranslation(),
 											mtx.getZVector(),
 											mtx.getYVector(),
-											m_cameras[cmp.index].m_fov,
-											m_cameras[cmp.index].m_width /
-												m_cameras[cmp.index].m_height,
-											m_cameras[cmp.index].m_near,
-											m_cameras[cmp.index].m_far);
+											m_cameras[cmp].m_fov,
+											m_cameras[cmp].m_width /
+												m_cameras[cmp].m_height,
+											m_cameras[cmp].m_near,
+											m_cameras[cmp].m_far);
 	}
 
 	void update(float dt) override
@@ -323,7 +333,7 @@ public:
 		for (int i = 0, c = m_cameras.size(); i < c; ++i)
 		{
 			Camera& camera = m_cameras[i];
-			serializer.write(camera.m_entity.index);
+			serializer.write(camera.m_entity);
 			serializer.write(camera.m_far);
 			serializer.write(camera.m_fov);
 			serializer.write(camera.m_is_active);
@@ -342,7 +352,7 @@ public:
 			serializer.write(point_light.m_uid);
 			serializer.write(point_light.m_color);
 			serializer.write(point_light.m_intensity);
-			serializer.write(point_light.m_entity.index);
+			serializer.write(point_light.m_entity);
 			serializer.write(point_light.m_range);
 			serializer.write(point_light.m_fov);
 			serializer.write(point_light.m_specular_color);
@@ -356,7 +366,7 @@ public:
 			serializer.write(global_light.m_uid);
 			serializer.write(global_light.m_color);
 			serializer.write(global_light.m_intensity);
-			serializer.write(global_light.m_entity.index);
+			serializer.write(global_light.m_entity);
 			serializer.write(global_light.m_ambient_color);
 			serializer.write(global_light.m_ambient_intensity);
 			serializer.write(global_light.m_fog_color);
@@ -373,7 +383,7 @@ public:
 		{
 			serializer.write(m_renderables[i]->m_is_always_visible);
 			serializer.write(m_renderables[i]->m_component_index);
-			serializer.write(m_renderables[i]->m_entity.index);
+			serializer.write(m_renderables[i]->m_entity);
 			serializer.write(m_renderables[i]->m_scale);
 			serializer.write(m_culling_system->getLayerMask(i));
 			serializer.write(m_renderables[i]->m_model->getPath().getHash());
@@ -413,7 +423,7 @@ public:
 		for (int i = 0; i < size; ++i)
 		{
 			Camera& camera = m_cameras[i];
-			serializer.read(camera.m_entity.index);
+			serializer.read(camera.m_entity);
 			serializer.read(camera.m_far);
 			serializer.read(camera.m_fov);
 			serializer.read(camera.m_is_active);
@@ -421,7 +431,6 @@ public:
 			serializer.read(camera.m_near);
 			serializer.readString(camera.m_slot, sizeof(camera.m_slot));
 
-			camera.m_entity.universe = &m_universe;
 			if (!camera.m_is_free)
 			{
 				m_universe.addComponent(
@@ -453,23 +462,27 @@ public:
 			{
 				m_always_visible.push(m_renderables[i]->m_component_index);
 			}
-			serializer.read(m_renderables[i]->m_entity.index);
+			serializer.read(m_renderables[i]->m_entity);
 			serializer.read(m_renderables[i]->m_scale);
 			int64_t layer_mask;
 			serializer.read(layer_mask);
 			m_renderables[i]->m_model = NULL;
-			m_renderables[i]->m_entity.universe = &m_universe;
-			m_renderables[i]->m_entity.getMatrix(m_renderables[i]->m_matrix);
+			m_renderables[i]->m_matrix =
+				m_universe.getMatrix(m_renderables[i]->m_entity);
 
 			uint32_t path;
 			serializer.read(path);
 			m_culling_system->addStatic(
-				Sphere(m_renderables[i]->m_entity.getPosition(), 1.0f));
+				Sphere(m_universe.getPosition(m_renderables[i]->m_entity),
+					   1.0f));
+
 			m_culling_system->setLayerMask(i, layer_mask);
+
 			setModel(i,
 					 static_cast<Model*>(m_engine.getResourceManager()
 											 .get(ResourceManager::MODEL)
 											 ->load(Path(path))));
+
 			m_universe.addComponent(
 				m_renderables[i]->m_entity, RENDERABLE_HASH, this, i);
 		}
@@ -488,11 +501,10 @@ public:
 			serializer.read(light.m_uid);
 			serializer.read(light.m_color);
 			serializer.read(light.m_intensity);
-			serializer.read(light.m_entity.index);
+			serializer.read(light.m_entity);
 			serializer.read(light.m_range);
 			serializer.read(light.m_fov);
 			serializer.read(light.m_specular_color);
-			light.m_entity.universe = &m_universe;
 			m_universe.addComponent(
 				light.m_entity, POINT_LIGHT_HASH, this, light.m_uid);
 		}
@@ -506,12 +518,11 @@ public:
 			serializer.read(light.m_uid);
 			serializer.read(light.m_color);
 			serializer.read(light.m_intensity);
-			serializer.read(light.m_entity.index);
+			serializer.read(light.m_entity);
 			serializer.read(light.m_ambient_color);
 			serializer.read(light.m_ambient_intensity);
 			serializer.read(light.m_fog_color);
 			serializer.read(light.m_fog_density);
-			light.m_entity.universe = &m_universe;
 			m_universe.addComponent(
 				light.m_entity, GLOBAL_LIGHT_HASH, this, light.m_uid);
 		}
@@ -536,7 +547,7 @@ public:
 			if (exists)
 			{
 				m_terrains[i] = m_allocator.newObject<Terrain>(
-					m_renderer, Entity::INVALID, *this, m_allocator);
+					m_renderer, NEW_INVALID_ENTITY, *this, m_allocator);
 				Terrain* terrain = m_terrains[i];
 				terrain->deserialize(serializer, m_universe, *this, i);
 			}
@@ -556,9 +567,10 @@ public:
 	}
 
 
-	void destroyRenderable(const Component& component)
+	void destroyRenderable(ComponentNew component)
 	{
-		int renderable_index = getRenderable(component.index);
+		int renderable_index = getRenderable(component);
+		Entity entity = m_renderables[renderable_index]->m_entity;
 		for (int i = 0; i < m_light_influenced_geometry.size(); ++i)
 		{
 			Array<int>& influenced_geometry = m_light_influenced_geometry[i];
@@ -577,11 +589,12 @@ public:
 		}
 
 		setModel(renderable_index, NULL);
-		m_always_visible.eraseItemFast(component.index);
+		m_always_visible.eraseItemFast(component);
 		m_allocator.deleteObject(m_renderables[renderable_index]);
 		m_renderables.erase(renderable_index);
 		m_culling_system->removeStatic(renderable_index);
-		m_universe.destroyComponent(component);
+		m_universe.destroyComponent(
+			ComponentOld(entity, RENDERABLE_HASH, this, component));
 
 		Lumix::HashMap<int32_t, int>::iterator
 			iter = m_dynamic_renderable_cache.begin(),
@@ -594,41 +607,54 @@ public:
 			}
 			++iter;
 		}
-		m_dynamic_renderable_cache.erase(component.entity.index);
+		m_dynamic_renderable_cache.erase(entity);
 	}
 
-	virtual void destroyComponent(const Component& component) override
+	virtual void destroyComponent(ComponentNew component,
+								  uint32_t type) override
 	{
-		if (component.type == RENDERABLE_HASH)
+		if (type == RENDERABLE_HASH)
 		{
 			destroyRenderable(component);
 		}
-		else if (component.type == GLOBAL_LIGHT_HASH)
+		else if (type == GLOBAL_LIGHT_HASH)
 		{
-			m_universe.destroyComponent(component);
-			if (component.index == m_active_global_light_uid)
+			Entity entity =
+				m_global_lights[getGlobalLightIndex(component)].m_entity;
+
+			m_universe.destroyComponent(
+				ComponentOld(entity, type, this, component));
+
+			if (component == m_active_global_light_uid)
 			{
 				m_active_global_light_uid = -1;
 			}
 			m_global_lights.eraseFast(getGlobalLightIndex(component));
 		}
-		else if (component.type == POINT_LIGHT_HASH)
+		else if (type == POINT_LIGHT_HASH)
 		{
 			int index = getPointLightIndex(component);
+			Entity entity =
+				m_point_lights[getPointLightIndex(component)].m_entity;
 			m_point_lights.eraseFast(index);
 			m_light_influenced_geometry.eraseFast(index);
-			m_universe.destroyComponent(component);
+			m_universe.destroyComponent(
+				ComponentOld(entity, type, this, component));
 		}
-		else if (component.type == CAMERA_HASH)
+		else if (type == CAMERA_HASH)
 		{
-			m_cameras[component.index].m_is_free = true;
-			m_universe.destroyComponent(component);
+			Entity entity = m_cameras[component].m_entity;
+			m_cameras[component].m_is_free = true;
+			m_universe.destroyComponent(
+				ComponentOld(entity, type, this, component));
 		}
-		else if (component.type == TERRAIN_HASH)
+		else if (type == TERRAIN_HASH)
 		{
-			m_allocator.deleteObject(m_terrains[component.index]);
-			m_terrains[component.index] = NULL;
-			m_universe.destroyComponent(component);
+			Entity entity = m_cameras[component].m_entity;
+			m_allocator.deleteObject(m_terrains[component]);
+			m_terrains[component] = NULL;
+			m_universe.destroyComponent(
+				ComponentOld(entity, type, this, component));
 		}
 		else
 		{
@@ -637,18 +663,18 @@ public:
 	}
 
 
-	virtual Component createComponent(uint32_t type,
-									  const Entity& entity) override
+	virtual ComponentNew createComponent(uint32_t type,
+										 const Entity& entity) override
 	{
 		if (type == TERRAIN_HASH)
 		{
 			Terrain* terrain = m_allocator.newObject<Terrain>(
 				m_renderer, entity, *this, m_allocator);
 			m_terrains.push(terrain);
-			Component cmp = m_universe.addComponent(
+			ComponentOld cmp = m_universe.addComponent(
 				entity, type, this, m_terrains.size() - 1);
 			m_universe.componentCreated().invoke(cmp);
-			return cmp;
+			return cmp.index;
 		}
 		else if (type == CAMERA_HASH)
 		{
@@ -663,54 +689,54 @@ public:
 			camera.m_near = 0.1f;
 			camera.m_far = 10000.0f;
 			camera.m_slot[0] = '\0';
-			Component cmp = m_universe.addComponent(
+			ComponentOld cmp = m_universe.addComponent(
 				entity, type, this, m_cameras.size() - 1);
 			m_universe.componentCreated().invoke(cmp);
-			return cmp;
+			return cmp.index;
 		}
 		else if (type == RENDERABLE_HASH)
 		{
-			return createRenderable(entity);
+			return createRenderable(entity).index;
 		}
 		else if (type == GLOBAL_LIGHT_HASH)
 		{
-			return createGlobalLight(entity);
+			return createGlobalLight(entity).index;
 		}
 		else if (type == POINT_LIGHT_HASH)
 		{
-			return createPointLight(entity);
+			return createPointLight(entity).index;
 		}
-		return Component::INVALID;
+		return NEW_INVALID_COMPONENT;
 	}
 
 
-	virtual Component getRenderable(Entity entity) override
+	virtual ComponentOld getRenderableComponent(Entity entity) override
 	{
 		DynamicRenderableCache::iterator iter =
-			m_dynamic_renderable_cache.find(entity.index);
+			m_dynamic_renderable_cache.find(entity);
 		if (!iter.isValid())
 		{
 			for (int i = 0, c = m_renderables.size(); i < c; ++i)
 			{
 				if (m_renderables[i]->m_entity == entity)
 				{
-					m_dynamic_renderable_cache.insert(entity.index, i);
-					return Component(entity, RENDERABLE_HASH, this, i);
+					m_dynamic_renderable_cache.insert(entity, i);
+					return ComponentOld(entity, RENDERABLE_HASH, this, i);
 				}
 			}
 		}
 		else
 		{
-			return Component(entity, RENDERABLE_HASH, this, iter.value());
+			return ComponentOld(entity, RENDERABLE_HASH, this, iter.value());
 		}
-		return Component::INVALID;
+		return ComponentOld::INVALID;
 	}
 
 
 	void onEntityMoved(const Entity& entity)
 	{
 		DynamicRenderableCache::iterator iter =
-			m_dynamic_renderable_cache.find(entity.index);
+			m_dynamic_renderable_cache.find(entity);
 		int renderable_index = -1;
 		if (!iter.isValid())
 		{
@@ -718,10 +744,11 @@ public:
 			{
 				if (m_renderables[i]->m_entity == entity)
 				{
-					m_dynamic_renderable_cache.insert(entity.index, i);
-					m_renderables[i]->m_matrix = entity.getMatrix();
+					m_dynamic_renderable_cache.insert(entity, i);
+					m_renderables[i]->m_matrix =
+						m_universe.getMatrix(entity);
 					m_culling_system->updateBoundingPosition(
-						entity.getMatrix().getTranslation(), i);
+						m_universe.getPosition(entity), i);
 					renderable_index = i;
 					break;
 				}
@@ -729,17 +756,21 @@ public:
 		}
 		else
 		{
-			m_renderables[iter.value()]->m_matrix = entity.getMatrix();
+			m_renderables[iter.value()]->m_matrix =
+				m_universe.getMatrix(entity);
+
 			renderable_index = iter.value();
+
 			m_culling_system->updateBoundingPosition(
-				entity.getMatrix().getTranslation(), iter.value());
+				m_universe.getPosition(entity), iter.value());
 		}
 
 		for (int i = 0, c = m_point_lights.size(); i < c; ++i)
 		{
 			Frustum frustum;
 			PointLight& light = m_point_lights[i];
-			frustum.computeOrtho(light.m_entity.getPosition(),
+
+			frustum.computeOrtho(m_universe.getPosition(light.m_entity),
 								 Vec3(1, 0, 0),
 								 Vec3(0, 1, 0),
 								 light.m_range,
@@ -758,7 +789,8 @@ public:
 					}
 				}
 				if (frustum.isSphereInside(
-						m_renderables[renderable_index]->m_entity.getPosition(),
+						m_universe.getPosition(
+							m_renderables[renderable_index]->m_entity),
 						m_renderables[renderable_index]
 							->m_model->getBoundingRadius()))
 				{
@@ -777,26 +809,28 @@ public:
 
 
 	virtual void
-	setTerrainBrush(Component cmp, const Vec3& position, float size) override
+	setTerrainBrush(ComponentOld cmp, const Vec3& position, float size) override
 	{
 		m_terrains[cmp.index]->setBrush(position, size);
 	}
 
 
-	virtual float getTerrainHeightAt(Component cmp, float x, float z) override
+	virtual float
+	getTerrainHeightAt(ComponentOld cmp, float x, float z) override
 	{
 		return m_terrains[cmp.index]->getHeight(x, z);
 	}
 
 
 	virtual void
-	getTerrainSize(Component cmp, float* width, float* height) override
+	getTerrainSize(ComponentOld cmp, float* width, float* height) override
 	{
 		m_terrains[cmp.index]->getSize(width, height);
 	}
 
 
-	virtual void setTerrainMaterial(Component cmp, const string& path) override
+	virtual void setTerrainMaterial(ComponentOld cmp,
+									const string& path) override
 	{
 		Material* material =
 			static_cast<Material*>(m_engine.getResourceManager()
@@ -806,7 +840,7 @@ public:
 	}
 
 
-	virtual void getTerrainMaterial(Component cmp, string& path) override
+	virtual void getTerrainMaterial(ComponentOld cmp, string& path) override
 	{
 		if (m_terrains[cmp.index]->getMaterial())
 		{
@@ -819,47 +853,47 @@ public:
 	}
 
 
-	virtual void setTerrainXZScale(Component cmp, float scale) override
+	virtual void setTerrainXZScale(ComponentOld cmp, float scale) override
 	{
 		m_terrains[cmp.index]->setXZScale(scale);
 	}
 
-	virtual float getTerrainXZScale(Component cmp) override
+	virtual float getTerrainXZScale(ComponentOld cmp) override
 	{
 		return m_terrains[cmp.index]->getXZScale();
 	}
 
 
-	virtual void setTerrainYScale(Component cmp, float scale) override
+	virtual void setTerrainYScale(ComponentOld cmp, float scale) override
 	{
 		m_terrains[cmp.index]->setYScale(scale);
 	}
 
-	virtual float getTerrainYScale(Component cmp)
+	virtual float getTerrainYScale(ComponentOld cmp)
 	{
 		return m_terrains[cmp.index]->getYScale();
 	}
 
 
-	virtual Pose& getPose(const Component& cmp) override
+	virtual Pose& getPose(const ComponentNew& cmp) override
 	{
-		return m_renderables[getRenderable(cmp.index)]->m_pose;
+		return m_renderables[getRenderable(cmp)]->m_pose;
 	}
 
 
-	virtual Model* getRenderableModel(Component cmp) override
+	virtual Model* getRenderableModel(ComponentOld cmp) override
 	{
 		return m_renderables[getRenderable(cmp.index)]->m_model;
 	}
 
 
-	virtual void showRenderable(Component cmp) override
+	virtual void showRenderable(ComponentOld cmp) override
 	{
 		m_culling_system->enableStatic(getRenderable(cmp.index));
 	}
 
 
-	virtual void hideRenderable(Component cmp) override
+	virtual void hideRenderable(ComponentOld cmp) override
 	{
 		int renderable_index = getRenderable(cmp.index);
 		if (!m_renderables[renderable_index]->m_is_always_visible)
@@ -869,7 +903,7 @@ public:
 	}
 
 
-	virtual void setRenderableIsAlwaysVisible(Component cmp,
+	virtual void setRenderableIsAlwaysVisible(ComponentOld cmp,
 											  bool value) override
 	{
 		int renderable_index = getRenderable(cmp.index);
@@ -887,13 +921,13 @@ public:
 	}
 
 
-	virtual bool isRenderableAlwaysVisible(Component cmp) override
+	virtual bool isRenderableAlwaysVisible(ComponentOld cmp) override
 	{
 		return m_renderables[getRenderable(cmp.index)]->m_is_always_visible;
 	}
 
 
-	virtual void getRenderablePath(Component cmp, string& path) override
+	virtual void getRenderablePath(ComponentOld cmp, string& path) override
 	{
 		int index = getRenderable(cmp.index);
 		if (index >= 0 && m_renderables[index]->m_model)
@@ -907,14 +941,14 @@ public:
 	}
 
 
-	virtual void setRenderableLayer(Component cmp,
+	virtual void setRenderableLayer(ComponentOld cmp,
 									const int32_t& layer) override
 	{
 		m_culling_system->setLayerMask(getRenderable(cmp.index),
 									   (int64_t)1 << (int64_t)layer);
 	}
 
-	virtual void setRenderableScale(Component cmp, float scale) override
+	virtual void setRenderableScale(ComponentOld cmp, float scale) override
 	{
 		Renderable& r = *m_renderables[getRenderable(cmp.index)];
 		r.m_scale = scale;
@@ -930,11 +964,12 @@ public:
 											   .get(ResourceManager::MODEL)
 											   ->load(Path(path.c_str())));
 		setModel(renderable_index, model);
-		r.m_matrix = r.m_entity.getMatrix();
+		r.m_matrix = m_universe.getMatrix(r.m_entity);
 	}
 
 
-	virtual void setRenderablePath(Component cmp, const string& path) override
+	virtual void setRenderablePath(ComponentOld cmp,
+								   const string& path) override
 	{
 		RenderSceneImpl::setRenderablePath(cmp.index, path);
 	}
@@ -968,61 +1003,65 @@ public:
 			if (m_terrains[i] &&
 				(m_terrains[i]->getLayerMask() & layer_mask) != 0)
 			{
-				m_terrains[i]->getGrassInfos(frustum, infos, m_applied_camera);
+				m_terrains[i]->getGrassInfos(
+					frustum, infos, getAppliedCamera());
 			}
 		}
 	}
 
 
-	virtual void setGrassDensity(Component cmp, int index, int density) override
+	virtual void
+	setGrassDensity(ComponentOld cmp, int index, int density) override
 	{
 		m_terrains[cmp.index]->setGrassTypeDensity(index, density);
 	}
 
 
-	virtual int getGrassDensity(Component cmp, int index) override
+	virtual int getGrassDensity(ComponentOld cmp, int index) override
 	{
 		return m_terrains[cmp.index]->getGrassTypeDensity(index);
 	}
 
 
-	virtual void setGrassGround(Component cmp, int index, int ground) override
+	virtual void
+	setGrassGround(ComponentOld cmp, int index, int ground) override
 	{
 		m_terrains[cmp.index]->setGrassTypeGround(index, ground);
 	}
 
 
-	virtual int getGrassGround(Component cmp, int index) override
+	virtual int getGrassGround(ComponentOld cmp, int index) override
 	{
 		return m_terrains[cmp.index]->getGrassTypeGround(index);
 	}
 
 
-	virtual void setGrass(Component cmp, int index, const string& path) override
+	virtual void
+	setGrass(ComponentOld cmp, int index, const string& path) override
 	{
 		m_terrains[cmp.index]->setGrassTypePath(index, Path(path.c_str()));
 	}
 
 
-	virtual void getGrass(Component cmp, int index, string& path) override
+	virtual void getGrass(ComponentOld cmp, int index, string& path) override
 	{
 		path = m_terrains[cmp.index]->getGrassTypePath(index).c_str();
 	}
 
 
-	virtual int getGrassCount(Component cmp) override
+	virtual int getGrassCount(ComponentOld cmp) override
 	{
 		return m_terrains[cmp.index]->getGrassTypeCount();
 	}
 
 
-	virtual void addGrass(Component cmp, int index) override
+	virtual void addGrass(ComponentOld cmp, int index) override
 	{
 		m_terrains[cmp.index]->addGrassType(index);
 	}
 
 
-	virtual void removeGrass(Component cmp, int index) override
+	virtual void removeGrass(ComponentOld cmp, int index) override
 	{
 		m_terrains[cmp.index]->removeGrassType(index);
 	}
@@ -1031,16 +1070,16 @@ public:
 	virtual Frustum& getFrustum() override { return m_camera_frustum; }
 
 
-	virtual Component getFirstRenderable() override
+	virtual ComponentOld getFirstRenderable() override
 	{
 		if (m_renderables.empty())
 		{
-			return Component::INVALID;
+			return ComponentOld::INVALID;
 		}
-		return Component(m_renderables[0]->m_entity,
-						 RENDERABLE_HASH,
-						 this,
-						 m_renderables[0]->m_component_index);
+		return ComponentOld(m_renderables[0]->m_entity,
+							RENDERABLE_HASH,
+							this,
+							m_renderables[0]->m_component_index);
 	}
 
 
@@ -1069,17 +1108,17 @@ public:
 	}
 
 
-	virtual Component getNextRenderable(const Component& cmp) override
+	virtual ComponentOld getNextRenderable(const ComponentOld& cmp) override
 	{
 		int i = getRenderable(cmp.index);
 		if (i + 1 < m_renderables.size())
 		{
-			return Component(m_renderables[i + 1]->m_entity,
-							 RENDERABLE_HASH,
-							 this,
-							 m_renderables[i + 1]->m_component_index);
+			return ComponentOld(m_renderables[i + 1]->m_entity,
+								RENDERABLE_HASH,
+								this,
+								m_renderables[i + 1]->m_component_index);
 		}
-		return Component::INVALID;
+		return ComponentOld::INVALID;
 	}
 
 
@@ -1190,23 +1229,24 @@ public:
 	}
 
 
-	virtual Entity getPointLightEntity(Component cmp) override
+	virtual Entity getPointLightEntity(ComponentOld cmp) override
 	{
 		return m_point_lights[getPointLightIndex(cmp.index)].m_entity;
 	}
 
 
 	virtual void getPointLights(const Frustum& frustum,
-								Array<Component>& lights) override
+								Array<ComponentOld>& lights) override
 	{
 		for (int i = 0, ci = m_point_lights.size(); i < ci; ++i)
 		{
 			PointLight& light = m_point_lights[i];
 
-			if (frustum.isSphereInside(light.m_entity.getPosition(),
-									   light.m_range))
+			if (frustum.isSphereInside(
+					m_universe.getPosition(light.m_entity),
+					light.m_range))
 			{
-				lights.push(Component(
+				lights.push(ComponentOld(
 					light.m_entity, POINT_LIGHT_HASH, this, light.m_uid));
 			}
 		}
@@ -1214,7 +1254,7 @@ public:
 
 
 	virtual void
-	getPointLightInfluencedGeometry(const Component& light_cmp,
+	getPointLightInfluencedGeometry(const ComponentOld& light_cmp,
 									const Frustum& frustum,
 									Array<const RenderableMesh*>& infos,
 									int64_t layer_mask)
@@ -1299,65 +1339,66 @@ public:
 		}
 	}
 
-	virtual void setCameraSlot(Component camera, const string& slot) override
+	virtual void setCameraSlot(ComponentNew camera, const string& slot) override
 	{
-		copyString(m_cameras[camera.index].m_slot,
-				   Camera::MAX_SLOT_LENGTH,
-				   slot.c_str());
+		copyString(
+			m_cameras[camera].m_slot, Camera::MAX_SLOT_LENGTH, slot.c_str());
 	}
 
-	virtual void getCameraSlot(Component camera, string& slot) override
+	virtual void getCameraSlot(ComponentNew camera, string& slot) override
 	{
-		slot = m_cameras[camera.index].m_slot;
+		slot = m_cameras[camera].m_slot;
 	}
 
-	virtual float getCameraFOV(Component camera) override
+	virtual float getCameraFOV(ComponentNew camera) override
 	{
-		return m_cameras[camera.index].m_fov;
+		return m_cameras[camera].m_fov;
 	}
 
-	virtual void setCameraFOV(Component camera, float fov) override
+	virtual void setCameraFOV(ComponentNew camera, float fov) override
 	{
-		m_cameras[camera.index].m_fov = fov;
+		m_cameras[camera].m_fov = fov;
 	}
 
-	virtual void setCameraNearPlane(Component camera, float near_plane) override
+	virtual void setCameraNearPlane(ComponentNew camera,
+									float near_plane) override
 	{
-		m_cameras[camera.index].m_near = near_plane;
+		m_cameras[camera].m_near = near_plane;
 	}
 
-	virtual float getCameraNearPlane(Component camera) override
+	virtual float getCameraNearPlane(ComponentNew camera) override
 	{
-		return m_cameras[camera.index].m_near;
+		return m_cameras[camera].m_near;
 	}
 
-	virtual void setCameraFarPlane(Component camera, float far_plane) override
+	virtual void setCameraFarPlane(ComponentNew camera,
+								   float far_plane) override
 	{
-		m_cameras[camera.index].m_far = far_plane;
+		m_cameras[camera].m_far = far_plane;
 	}
 
-	virtual float getCameraFarPlane(Component camera) override
+	virtual float getCameraFarPlane(ComponentNew camera) override
 	{
-		return m_cameras[camera.index].m_far;
+		return m_cameras[camera].m_far;
 	}
 
-	virtual float getCameraWidth(Component camera) override
+	virtual float getCameraWidth(ComponentNew camera) override
 	{
-		return m_cameras[camera.index].m_width;
-	}
-
-
-	virtual float getCameraHeight(Component camera) override
-	{
-		return m_cameras[camera.index].m_height;
+		return m_cameras[camera].m_width;
 	}
 
 
-	virtual void setCameraSize(Component camera, int w, int h) override
+	virtual float getCameraHeight(ComponentNew camera) override
 	{
-		m_cameras[camera.index].m_width = (float)w;
-		m_cameras[camera.index].m_height = (float)h;
-		m_cameras[camera.index].m_aspect = w / (float)h;
+		return m_cameras[camera].m_height;
+	}
+
+
+	virtual void setCameraSize(ComponentNew camera, int w, int h) override
+	{
+		m_cameras[camera].m_width = (float)w;
+		m_cameras[camera].m_height = (float)h;
+		m_cameras[camera].m_aspect = w / (float)h;
 	}
 
 
@@ -1637,16 +1678,18 @@ public:
 		line.m_life = life;
 	}
 
-	virtual RayCastModelHit castRayTerrain(const Component& terrain,
+
+	virtual RayCastModelHit castRayTerrain(const ComponentNew& terrain,
 										   const Vec3& origin,
 										   const Vec3& dir) override
 	{
 		RayCastModelHit hit;
 		hit.m_is_hit = false;
-		if (m_terrains[terrain.index])
+		if (m_terrains[terrain])
 		{
-			hit = m_terrains[terrain.index]->castRay(origin, dir);
-			hit.m_component = terrain;
+			hit = m_terrains[terrain]->castRay(origin, dir);
+			hit.m_component = ComponentOld(
+				m_terrains[terrain]->getEntity(), TERRAIN_HASH, this, terrain);
 		}
 		return hit;
 	}
@@ -1654,7 +1697,7 @@ public:
 
 	virtual RayCastModelHit castRay(const Vec3& origin,
 									const Vec3& dir,
-									const Component& ignore) override
+									const ComponentOld& ignore) override
 	{
 		RayCastModelHit hit;
 		hit.m_is_hit = false;
@@ -1680,10 +1723,10 @@ public:
 						(!hit.m_is_hit || new_hit.m_t < hit.m_t))
 					{
 						new_hit.m_component =
-							Component(m_renderables[i]->m_entity,
-									  RENDERABLE_HASH,
-									  this,
-									  i);
+							ComponentOld(m_renderables[i]->m_entity,
+										 RENDERABLE_HASH,
+										 this,
+										 i);
 						hit = new_hit;
 						hit.m_is_hit = true;
 					}
@@ -1699,7 +1742,7 @@ public:
 				if (terrain_hit.m_is_hit && ignore_terrain != m_terrains[i] &&
 					(!hit.m_is_hit || terrain_hit.m_t < hit.m_t))
 				{
-					terrain_hit.m_component = Component(
+					terrain_hit.m_component = ComponentOld(
 						m_terrains[i]->getEntity(), TERRAIN_HASH, this, i);
 					hit = terrain_hit;
 				}
@@ -1722,7 +1765,7 @@ public:
 	}
 
 
-	int getPointLightIndex(const Component& cmp) const
+	int getPointLightIndex(const ComponentOld& cmp) const
 	{
 		return getPointLightIndex(cmp.index);
 	}
@@ -1741,131 +1784,135 @@ public:
 	}
 
 
-	int getGlobalLightIndex(const Component& cmp) const
+	int getGlobalLightIndex(const ComponentOld& cmp) const
 	{
 		return getGlobalLightIndex(cmp.index);
 	}
 
 
-	virtual void setFogDensity(Component cmp, float density) override
+	virtual void setFogDensity(ComponentOld cmp, float density) override
 	{
 		m_global_lights[getGlobalLightIndex(cmp)].m_fog_density = density;
 	}
 
-	virtual void setFogColor(Component cmp, const Vec3& color) override
+	virtual void setFogColor(ComponentOld cmp, const Vec3& color) override
 	{
 		m_global_lights[getGlobalLightIndex(cmp)].m_fog_color = color;
 	}
 
-	virtual float getFogDensity(Component cmp) override
+	virtual float getFogDensity(ComponentOld cmp) override
 	{
 		return m_global_lights[getGlobalLightIndex(cmp)].m_fog_density;
 	}
 
-	virtual Vec3 getFogColor(Component cmp) override
+	virtual Vec3 getFogColor(ComponentOld cmp) override
 	{
 		return m_global_lights[getGlobalLightIndex(cmp)].m_fog_color;
 	}
 
-	virtual float getLightRange(Component cmp) override
+	virtual float getLightRange(ComponentOld cmp) override
 	{
 		return m_point_lights[getPointLightIndex(cmp.index)].m_range;
 	}
 
-	virtual void setLightRange(Component cmp, float range) override
+	virtual void setLightRange(ComponentOld cmp, float range) override
 	{
 		int index = getPointLightIndex(cmp.index);
 		m_point_lights[index].m_range = range;
 		detectLightInfluencedGeometry(index);
 	}
 
-	virtual void setPointLightIntensity(Component cmp, float intensity) override
+	virtual void setPointLightIntensity(ComponentOld cmp,
+										float intensity) override
 	{
 		m_point_lights[getPointLightIndex(cmp.index)].m_intensity = intensity;
 	}
 
-	virtual void setGlobalLightIntensity(Component cmp,
+	virtual void setGlobalLightIntensity(ComponentOld cmp,
 										 float intensity) override
 	{
 		m_global_lights[getGlobalLightIndex(cmp)].m_intensity = intensity;
 	}
 
-	virtual void setPointLightColor(Component cmp, const Vec3& color) override
+	virtual void setPointLightColor(ComponentOld cmp,
+									const Vec3& color) override
 	{
 		m_point_lights[getPointLightIndex(cmp.index)].m_color = color;
 	}
 
-	virtual void setGlobalLightColor(Component cmp, const Vec3& color) override
+	virtual void setGlobalLightColor(ComponentOld cmp,
+									 const Vec3& color) override
 	{
 		m_global_lights[getGlobalLightIndex(cmp)].m_color = color;
 	}
 
-	virtual void setLightAmbientIntensity(Component cmp,
+	virtual void setLightAmbientIntensity(ComponentOld cmp,
 										  float intensity) override
 	{
 		m_global_lights[getGlobalLightIndex(cmp)].m_ambient_intensity =
 			intensity;
 	}
 
-	virtual void setLightAmbientColor(Component cmp, const Vec3& color) override
+	virtual void setLightAmbientColor(ComponentOld cmp,
+									  const Vec3& color) override
 	{
 		m_global_lights[getGlobalLightIndex(cmp)].m_ambient_color = color;
 	}
 
-	virtual float getPointLightIntensity(Component cmp) override
+	virtual float getPointLightIntensity(ComponentOld cmp) override
 	{
 		return m_point_lights[getPointLightIndex(cmp.index)].m_intensity;
 	}
 
-	virtual float getGlobalLightIntensity(Component cmp) override
+	virtual float getGlobalLightIntensity(ComponentOld cmp) override
 	{
 		return m_global_lights[getGlobalLightIndex(cmp)].m_intensity;
 	}
 
-	virtual Vec3 getPointLightColor(Component cmp) override
+	virtual Vec3 getPointLightColor(ComponentOld cmp) override
 	{
 		return m_point_lights[getPointLightIndex(cmp.index)].m_color;
 	}
 
-	virtual void setPointLightSpecularColor(Component cmp,
+	virtual void setPointLightSpecularColor(ComponentOld cmp,
 											const Vec3& color) override
 	{
 		m_point_lights[getPointLightIndex(cmp.index)].m_specular_color = color;
 	}
 
-	virtual Vec3 getPointLightSpecularColor(Component cmp) override
+	virtual Vec3 getPointLightSpecularColor(ComponentOld cmp) override
 	{
 		return m_point_lights[getPointLightIndex(cmp.index)].m_specular_color;
 	}
 
-	virtual Vec3 getGlobalLightColor(Component cmp) override
+	virtual Vec3 getGlobalLightColor(ComponentOld cmp) override
 	{
 		return m_global_lights[getGlobalLightIndex(cmp)].m_color;
 	}
 
-	virtual float getLightAmbientIntensity(Component cmp) override
+	virtual float getLightAmbientIntensity(ComponentOld cmp) override
 	{
 		return m_global_lights[getGlobalLightIndex(cmp)].m_ambient_intensity;
 	}
 
-	virtual Vec3 getLightAmbientColor(Component cmp) override
+	virtual Vec3 getLightAmbientColor(ComponentOld cmp) override
 	{
 		return m_global_lights[getGlobalLightIndex(cmp)].m_ambient_color;
 	}
 
-	virtual void setActiveGlobalLight(const Component& cmp) override
+	virtual void setActiveGlobalLight(const ComponentNew& cmp) override
 	{
-		ASSERT(cmp.type == GLOBAL_LIGHT_HASH);
-		m_active_global_light_uid = cmp.index;
+		ASSERT(cmp == GLOBAL_LIGHT_HASH);
+		m_active_global_light_uid = cmp;
 	}
 
-	virtual Component getActiveGlobalLight() override
+	virtual ComponentOld getActiveGlobalLight() override
 	{
 		if (m_active_global_light_uid == -1)
 		{
-			return Component::INVALID;
+			return ComponentOld::INVALID;
 		}
-		return Component(
+		return ComponentOld(
 			m_global_lights[getGlobalLightIndex(m_active_global_light_uid)]
 				.m_entity,
 			GLOBAL_LIGHT_HASH,
@@ -1873,17 +1920,18 @@ public:
 			m_active_global_light_uid);
 	};
 
-	virtual Component getCameraInSlot(const char* slot) override
+	virtual ComponentOld getCameraInSlot(const char* slot) override
 	{
 		for (int i = 0, c = m_cameras.size(); i < c; ++i)
 		{
 			if (!m_cameras[i].m_is_free &&
 				strcmp(m_cameras[i].m_slot, slot) == 0)
 			{
-				return Component(m_cameras[i].m_entity, CAMERA_HASH, this, i);
+				return ComponentOld(
+					m_cameras[i].m_entity, CAMERA_HASH, this, i);
 			}
 		}
-		return Component::INVALID;
+		return ComponentOld::INVALID;
 	}
 
 	virtual float getTime() const override { return m_time; }
@@ -1915,7 +1963,8 @@ private:
 			Renderable* renderable = m_renderables[renderable_index];
 			Vec3 t = renderable->m_matrix.getTranslation();
 			float r = renderable->m_model->getBoundingRadius();
-			if ((t - light.m_entity.getPosition()).squaredLength() <
+			if ((t - m_universe.getPosition(light.m_entity))
+					.squaredLength() <
 				(r + light.m_range) * (r + light.m_range))
 			{
 				m_light_influenced_geometry[i].push(renderable_index);
@@ -1989,7 +2038,7 @@ private:
 		{
 			Frustum frustum;
 			PointLight& light = m_point_lights[light_index];
-			frustum.computeOrtho(light.m_entity.getPosition(),
+			frustum.computeOrtho(m_universe.getPosition(light.m_entity),
 								 Vec3(1, 0, 0),
 								 Vec3(0, 1, 0),
 								 light.m_range,
@@ -2016,19 +2065,19 @@ private:
 	}
 
 
-	virtual float getLightFOV(Component cmp) override
+	virtual float getLightFOV(ComponentOld cmp) override
 	{
 		return m_point_lights[getPointLightIndex(cmp.index)].m_fov;
 	}
 
 
-	virtual void setLightFOV(Component cmp, float fov) override
+	virtual void setLightFOV(ComponentOld cmp, float fov) override
 	{
 		m_point_lights[getPointLightIndex(cmp.index)].m_fov = fov;
 	}
 
 
-	Component createGlobalLight(const Entity& entity)
+	ComponentOld createGlobalLight(const Entity& entity)
 	{
 		GlobalLight& light = m_global_lights.pushEmpty();
 		light.m_entity = entity;
@@ -2045,14 +2094,14 @@ private:
 			m_active_global_light_uid = light.m_uid;
 		}
 
-		Component cmp = m_universe.addComponent(
+		ComponentOld cmp = m_universe.addComponent(
 			entity, GLOBAL_LIGHT_HASH, this, light.m_uid);
 		m_universe.componentCreated().invoke(cmp);
 		return cmp;
 	}
 
 
-	Component createPointLight(const Entity& entity)
+	ComponentOld createPointLight(const Entity& entity)
 	{
 		PointLight& light = m_point_lights.pushEmpty();
 		m_light_influenced_geometry.push(Array<int>(m_allocator));
@@ -2064,7 +2113,7 @@ private:
 		light.m_fov = 999;
 		light.m_specular_color.set(1, 1, 1);
 
-		Component cmp = m_universe.addComponent(
+		ComponentOld cmp = m_universe.addComponent(
 			entity, POINT_LIGHT_HASH, this, light.m_uid);
 		m_universe.componentCreated().invoke(cmp);
 
@@ -2074,7 +2123,7 @@ private:
 	}
 
 
-	Component createRenderable(const Entity& entity)
+	ComponentOld createRenderable(const Entity& entity)
 	{
 		int new_index = m_renderables.empty()
 							? 0
@@ -2086,10 +2135,11 @@ private:
 		r.m_model = NULL;
 		r.m_component_index = new_index;
 		r.m_is_always_visible = false;
-		r.m_matrix = entity.getMatrix();
-		Component cmp = m_universe.addComponent(
+		r.m_matrix = m_universe.getMatrix(entity);
+		ComponentOld cmp = m_universe.addComponent(
 			entity, RENDERABLE_HASH, this, r.m_component_index);
-		m_culling_system->addStatic(Sphere(entity.getPosition(), 1.0f));
+		m_culling_system->addStatic(
+			Sphere(m_universe.getPosition(entity), 1.0f));
 		m_universe.componentCreated().invoke(cmp);
 		return cmp;
 	}
@@ -2109,7 +2159,7 @@ private:
 	Array<GlobalLight> m_global_lights;
 
 	Array<Camera> m_cameras;
-	Component m_applied_camera;
+	ComponentNew m_applied_camera;
 	Frustum m_camera_frustum;
 
 	Array<Terrain*> m_terrains;

@@ -20,7 +20,7 @@
 PropertyView::PropertyView(QWidget* parent) 
 	: QDockWidget(parent)
 	, m_ui(new Ui::PropertyView)
-	, m_selected_entity(Lumix::Entity::INVALID)
+	, m_selected_entity(Lumix::NEW_INVALID_ENTITY)
 {
 	m_ui->setupUi(this);
 }
@@ -106,8 +106,8 @@ void PropertyView::openPersistentEditors(QAbstractItemModel* model, const QModel
 
 void PropertyView::onEntitySelected(const Lumix::Array<Lumix::Entity>& e)
 {
-	m_selected_entity = e.empty() ? Lumix::Entity::INVALID : e[0];
-	if (e.size() == 1 && e[0].isValid())
+	m_selected_entity = e.empty() ? Lumix::NEW_INVALID_ENTITY : e[0];
+	if (e.size() == 1 && e[0] >= 0)
 	{
 		EntityModel* model = new EntityModel(*this, *m_world_editor, m_selected_entity);
 		setModel(model, new DynamicObjectItemDelegate(m_ui->treeView));

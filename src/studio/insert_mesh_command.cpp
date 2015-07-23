@@ -47,14 +47,20 @@ void InsertMeshCommand::deserialize(Lumix::JsonSerializer& serializer)
 void InsertMeshCommand::execute()
 {
 	Lumix::Engine& engine = m_editor.getEngine();
-	m_entity = engine.getUniverse()->createEntity();
-	m_entity.setPosition(m_position);
+	Lumix::Universe* universe = engine.getUniverse();
+	m_entity = universe->createEntity();
+	universe->setPosition(m_entity, m_position);
 	const Lumix::Array<Lumix::IScene*>& scenes = engine.getScenes();
-	Lumix::Component cmp;
+	Lumix::ComponentOld cmp;
 	Lumix::IScene* scene = NULL;
 	for (int i = 0; i < scenes.size(); ++i)
 	{
-		cmp = scenes[i]->createComponent(RENDERABLE_HASH, m_entity);
+		cmp = Lumix::ComponentOld(
+			m_entity,
+			RENDERABLE_HASH,
+			scenes[i],
+			scenes[i]->createComponent(RENDERABLE_HASH, m_entity));
+
 		if (cmp.isValid())
 		{
 			scene = scenes[i];
@@ -76,10 +82,10 @@ void InsertMeshCommand::undo()
 	const Lumix::WorldEditor::ComponentList& cmps = m_editor.getComponents(m_entity);
 	for (int i = 0; i < cmps.size(); ++i)
 	{
-		cmps[i].scene->destroyComponent(cmps[i]);
+		cmps[i].scene->destroyComponent(cmps[i].index, cmps[i].type);
 	}
 	m_editor.getUniverse()->destroyEntity(m_entity);
-	m_entity = Lumix::Entity::INVALID;
+	m_entity = Lumix::NEW_INVALID_ENTITY;
 }
 
 

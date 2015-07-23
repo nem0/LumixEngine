@@ -27,7 +27,6 @@
 #include "graphics/shader_manager.h"
 #include "graphics/texture_manager.h"
 
-#include "script/script_system.h"
 #include "universe/hierarchy.h"
 
 #define WIN32_LEAN_AND_MEAN

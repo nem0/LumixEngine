@@ -34,17 +34,15 @@ public:
 
 	virtual void serialize(Lumix::JsonSerializer& serializer)
 	{
-		serializer.serialize("parent", m_new_parent.index);
-		serializer.serialize("child", m_child.index);
+		serializer.serialize("parent", m_new_parent);
+		serializer.serialize("child", m_child);
 	}
 
 
 	virtual void deserialize(Lumix::JsonSerializer& serializer)
 	{
-		serializer.deserialize("parent", m_new_parent.index, 0);
-		serializer.deserialize("child", m_child.index, 0);
-		m_new_parent.universe = m_editor.getUniverse();
-		m_child.universe = m_editor.getUniverse();
+		serializer.deserialize("parent", m_new_parent, 0);
+		serializer.deserialize("child", m_child, 0);
 		m_old_parent = m_hierarchy.getParent(m_child);
 	}
 
@@ -115,8 +113,7 @@ protected:
 				filterRegExp());
 		}
 		int entity_index = sourceModel()->data(index, Qt::UserRole).toInt();
-		return m_editor->getComponent(Lumix::Entity(m_universe, entity_index),
-									  m_component)
+		return m_editor->getComponent(Lumix::Entity(entity_index), m_component)
 				   .isValid() &&
 			   sourceModel()->data(index).toString().contains(filterRegExp());
 	}
@@ -247,24 +244,24 @@ public:
 			return false;
 		}
 
-		Lumix::Entity parent_entity(m_universe, -1);
+		Lumix::Entity parent_entity(-1);
 		if (row != -1)
 		{
-			parent_entity.index = parent.data(Qt::UserRole).toInt();
+			parent_entity = parent.data(Qt::UserRole).toInt();
 		}
 		else if (parent.isValid())
 		{
-			parent_entity.index = parent.data(Qt::UserRole).toInt();
+			parent_entity = parent.data(Qt::UserRole).toInt();
 		}
 
 		QByteArray encodedData = data->data("application/lumix.entity");
 		QDataStream stream(&encodedData, QIODevice::ReadOnly);
 		QStringList newItems;
 
-		Lumix::Entity child(m_universe, -1);
+		Lumix::Entity child(-1);
 		if (!stream.atEnd())
 		{
-			stream >> child.index;
+			stream >> child;
 		}
 
 		SetParentEditorCommand* command =
@@ -433,10 +430,12 @@ public:
 
 		if (index.isValid() && role == Qt::DisplayRole)
 		{
-			Lumix::Component renderable =
+			Lumix::ComponentOld renderable =
 				m_engine->getWorldEditor()->getComponent(item->m_entity,
 														 RENDERABLE_HASH);
-			const char* name = item->m_entity.getName();
+			const char* name =
+				m_engine->getWorldEditor()->getUniverse()->getEntityName(
+					item->m_entity);
 			if (renderable.isValid())
 			{
 				Lumix::StackAllocator<LUMIX_MAX_PATH> allocator;
@@ -452,16 +451,16 @@ public:
 							   ? QVariant(
 									 QString("%1 - %2").arg(name).arg(basename))
 							   : QVariant(QString("%1 - %2")
-											  .arg(item->m_entity.index)
+											  .arg(item->m_entity)
 											  .arg(basename));
 				}
 			}
 			return name && name[0] != '\0' ? QVariant(name)
-										   : QVariant(item->m_entity.index);
+										   : QVariant(item->m_entity);
 		}
 		else if (index.isValid() && role == Qt::UserRole)
 		{
-			return item->m_entity.index;
+			return item->m_entity;
 		}
 		return role == 6 ? QVariant(QString("AAA")) : QVariant();
 	}
@@ -479,7 +478,7 @@ public:
 			for (int i = 0; i < children->size(); ++i)
 			{
 				EntityNode* new_node = new EntityNode(
-					node, Lumix::Entity(m_universe, (*children)[i].m_entity));
+					node, Lumix::Entity((*children)[i].m_entity));
 				node->m_children.push_back(new_node);
 				fillChildren(new_node);
 			}
@@ -524,7 +523,7 @@ public:
 					this);
 		}
 		delete m_root;
-		m_root = new EntityNode(NULL, Lumix::Entity::INVALID);
+		m_root = new EntityNode(NULL, Lumix::NEW_INVALID_ENTITY);
 		m_universe = universe;
 		if (m_universe)
 		{
@@ -537,10 +536,10 @@ public:
 				.bind<EntityListModel, &EntityListModel::onEntityDestroyed>(
 					this);
 			Lumix::Entity e = m_universe->getFirstEntity();
-			while (e.isValid())
+			while (e >= 0)
 			{
 				Lumix::Entity parent = m_engine->getHierarchy()->getParent(e);
-				if (!parent.isValid())
+				if (parent < 0)
 				{
 					EntityNode* node = new EntityNode(m_root, e);
 					m_root->m_children.push_back(node);
@@ -666,7 +665,7 @@ void EntityList::fillSelection(const QModelIndex& parent,
 		auto entity_index = m_filter->data(index, Qt::UserRole).toInt();
 		for (int j = entities.size() - 1; j >= 0; --j)
 		{
-			if (entity_index == entities[j].index)
+			if (entity_index == entities[j])
 			{
 				selection->append(
 					QItemSelectionRange(m_filter->index(i, 0, parent)));
@@ -720,9 +719,8 @@ void EntityList::onUniverseDestroyed()
 
 void EntityList::on_entityList_clicked(const QModelIndex& index)
 {
-	m_editor->selectEntities(
-		&Lumix::Entity(m_universe, m_filter->data(index, Qt::UserRole).toInt()),
-		1);
+	Lumix::Entity e(m_filter->data(index, Qt::UserRole).toInt());
+	m_editor->selectEntities(&e, 1);
 }
 
 

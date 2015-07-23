@@ -13,7 +13,6 @@ namespace Ui
 
 namespace Lumix
 {
-	struct Entity;
 	class Universe;
 	class WorldEditor;
 }

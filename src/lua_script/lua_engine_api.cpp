@@ -31,8 +31,8 @@ static int createComponent(IScene* scene, const char* type, int entity_idx)
 	{
 		return -1;
 	}
-	Entity e(&scene->getUniverse(), entity_idx);
-	return scene->createComponent(crc32(type), e).index;
+	Entity e(entity_idx);
+	return scene->createComponent(crc32(type), e);
 }
 
 
@@ -81,14 +81,14 @@ static void logInfo(const char* text)
 static void
 setEntityPosition(Universe* univ, int entity_index, float x, float y, float z)
 {
-	Entity(univ, entity_index).setPosition(x, y, z);
+	univ->setPosition(entity_index, x, y, z);
 }
 
 
 static void setEntityRotation(
 	Universe* univ, int entity_index, float x, float y, float z, float angle)
 {
-	Entity(univ, entity_index).setRotation(Quat(Vec3(x, y, z), angle));
+	univ->setRotation(entity_index, Quat(Vec3(x, y, z), angle));
 }
 
 

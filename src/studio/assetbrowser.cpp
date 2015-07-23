@@ -14,7 +14,6 @@
 #include "mainwindow.h"
 #include "metadata.h"
 #include "notifications.h"
-#include "scripts/scriptcompiler.h"
 #include "shader_compiler.h"
 #include <qdesktopservices.h>
 #include <qfileiconprovider.h>

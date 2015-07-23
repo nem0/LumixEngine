@@ -32,7 +32,7 @@ struct MouseButton
 class LUMIX_ENGINE_API WorldEditor
 {
 public:
-	typedef Array<Component> ComponentList;
+	typedef Array<ComponentOld> ComponentList;
 	typedef class IEditorCommand* (*EditorCommandCreator)(WorldEditor&);
 
 	enum class MouseFlags : int
@@ -74,7 +74,7 @@ public:
 	virtual Universe* getUniverse() = 0;
 	virtual IAllocator& getAllocator() = 0;
 	virtual void renderIcons(PipelineInstance& pipeline) = 0;
-	virtual Component getEditCamera() = 0;
+	virtual ComponentOld getEditCamera() = 0;
 	virtual class Gizmo& getGizmo() = 0;
 	virtual class FS::TCPFileServer& getTCPFileServer() = 0;
 	virtual void undo() = 0;
@@ -87,11 +87,11 @@ public:
 	virtual void hideEntities() = 0;
 	virtual void copyEntity() = 0;
 	virtual void pasteEntity() = 0;
-	virtual Component getComponent(const Entity& entity, uint32_t type) = 0;
+	virtual ComponentOld getComponent(const Entity& entity, uint32_t type) = 0;
 	virtual ComponentList& getComponents(const Entity& entity) = 0;
 	virtual void addComponent(uint32_t type_crc) = 0;
-	virtual void cloneComponent(const Component& src, Entity& entity) = 0;
-	virtual void destroyComponent(const Component& crc) = 0;
+	virtual void cloneComponent(const ComponentOld& src, Entity& entity) = 0;
+	virtual void destroyComponent(const ComponentOld& crc) = 0;
 	virtual Entity addEntity() = 0;
 	virtual void destroyEntities(const Entity* entities, int count) = 0;
 	virtual void selectEntities(const Entity* entities, int count) = 0;
@@ -113,9 +113,9 @@ public:
 							 IPropertyDescriptor& property,
 							 const void* data,
 							 int size) = 0;
-	virtual void addArrayPropertyItem(const Component& cmp,
+	virtual void addArrayPropertyItem(const ComponentOld& cmp,
 									  IArrayDescriptor& property) = 0;
-	virtual void removeArrayPropertyItem(const Component& cmp,
+	virtual void removeArrayPropertyItem(const ComponentOld& cmp,
 										 int index,
 										 IArrayDescriptor& property) = 0;
 	virtual void onMouseDown(int x, int y, MouseButton::Value button) = 0;
@@ -138,10 +138,10 @@ public:
 	virtual DelegateList<void()>& universeDestroyed() = 0;
 	virtual DelegateList<void()>& universeLoaded() = 0;
 	virtual DelegateList<void(const Entity&, const char*)>& entityNameSet() = 0;
-	virtual DelegateList<void(Component, const IPropertyDescriptor&)>&
+	virtual DelegateList<void(ComponentOld, const IPropertyDescriptor&)>&
 	propertySet() = 0;
-	virtual DelegateList<void(Component)>& componentAdded() = 0;
-	virtual DelegateList<void(Component)>& componentDestroyed() = 0;
+	virtual DelegateList<void(ComponentOld)>& componentAdded() = 0;
+	virtual DelegateList<void(ComponentOld)>& componentDestroyed() = 0;
 
 	virtual void addPlugin(Plugin& plugin) = 0;
 	virtual void removePlugin(Plugin& plugin) = 0;

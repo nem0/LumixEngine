@@ -127,13 +127,14 @@ void EditorIcon::render(PipelineInstance& pipeline)
 {
 	if (m_is_visible)
 	{
-		Component camera = m_scene->getCameraInSlot("editor");
-		Lumix::Matrix mtx = camera.entity.getMatrix();
+		const Universe& universe = m_scene->getUniverse();
+		ComponentOld camera = m_scene->getCameraInSlot("editor");
+		Lumix::Matrix mtx = universe.getMatrix(camera.entity);
 
-		float fov = static_cast<RenderScene*>(camera.scene)->getCameraFOV(camera);
-		float scale = tan(fov * Math::PI / 180 * 0.5f) * (m_entity.getPosition() - mtx.getTranslation()).length() / 20;
+		float fov = static_cast<RenderScene*>(camera.scene)->getCameraFOV(camera.index);
+		float scale = tan(fov * Math::PI / 180 * 0.5f) * (universe.getPosition(m_entity) - mtx.getTranslation()).length() / 20;
 
-		mtx.setTranslation(m_entity.getPosition());
+		mtx.setTranslation(universe.getPosition(m_entity));
 		Matrix scale_mtx = Matrix::IDENTITY;
 		m_matrix = mtx;
 		scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = scale > 0 ? scale : 1;
