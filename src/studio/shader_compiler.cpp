@@ -8,6 +8,7 @@
 #include "engine/engine.h"
 #include "file_system_watcher.h"
 #include "graphics/shader.h"
+#include "notifications.h"
 #include <qdatetime.h>
 #include <qdir.h>
 #include <qfilesystemmodel.h>
@@ -16,10 +17,16 @@
 
 ShaderCompiler::ShaderCompiler()
 	: m_editor(nullptr)
+	, m_notifications(nullptr)
+
 {
+	m_compiled = 0;
+	m_to_compile = 0;
+	m_notifications_id = -1;
 	m_is_compiling = false;
 	m_watcher = FileSystemWatcher::create("shaders");
-	m_watcher->getCallback().bind<ShaderCompiler, &ShaderCompiler::onFileChanged>(this);
+	m_watcher->getCallback()
+		.bind<ShaderCompiler, &ShaderCompiler::onFileChanged>(this);
 
 	parseDependencies();
 	makeUpToDate();
@@ -29,7 +36,7 @@ ShaderCompiler::ShaderCompiler()
 static QString getSourceFromBinaryBasename(const QString& binary_basename)
 {
 	QString ret = binary_basename.mid(0, binary_basename.indexOf('_'));
-	ret += binary_basename.mid(binary_basename.length() - 3); 
+	ret += binary_basename.mid(binary_basename.length() - 3);
 	return ret;
 }
 
@@ -48,18 +55,25 @@ void ShaderCompiler::makeUpToDate()
 			{
 				auto content = file.readAll();
 				Lumix::ShaderCombinations combinations;
-				Lumix::Shader::getShaderCombinations(content.data(), &combinations);
+				Lumix::Shader::getShaderCombinations(content.data(),
+													 &combinations);
 
-				QString bin_base_path = QString("shaders/compiled/%1_").arg(source_info.baseName());
+				QString bin_base_path =
+					QString("shaders/compiled/%1_").arg(source_info.baseName());
 				for (int i = 0; i < combinations.m_pass_count; ++i)
 				{
-					QString pass_path = bin_base_path + combinations.m_passes[i];
-					for (int j = 0; j < 1 << lengthOf(combinations.m_defines); ++j)
+					QString pass_path =
+						bin_base_path + combinations.m_passes[i];
+					for (int j = 0; j < 1 << lengthOf(combinations.m_defines);
+						 ++j)
 					{
 						if ((j & (~combinations.m_vs_combinations[i])) == 0)
 						{
-							QFileInfo vs_bin_info(pass_path + QString::number(j) + "_vs.shb");
-							if (!vs_bin_info.exists() || vs_bin_info.lastModified() < source_info.lastModified())
+							QFileInfo vs_bin_info(
+								pass_path + QString::number(j) + "_vs.shb");
+							if (!vs_bin_info.exists() ||
+								vs_bin_info.lastModified() <
+									source_info.lastModified())
 							{
 								src_list.push_back(source_info.baseName());
 								break;
@@ -67,8 +81,11 @@ void ShaderCompiler::makeUpToDate()
 						}
 						if ((j & (~combinations.m_fs_combinations[i])) == 0)
 						{
-							QFileInfo fs_bin_info(pass_path + QString::number(j) + "_fs.shb");
-							if (!fs_bin_info.exists() || fs_bin_info.lastModified() < source_info.lastModified())
+							QFileInfo fs_bin_info(
+								pass_path + QString::number(j) + "_fs.shb");
+							if (!fs_bin_info.exists() ||
+								fs_bin_info.lastModified() <
+									source_info.lastModified())
 							{
 								src_list.push_back(source_info.baseName());
 								break;
@@ -82,13 +99,16 @@ void ShaderCompiler::makeUpToDate()
 		}
 	}
 
-	for (auto iter = m_dependencies.begin(), end = m_dependencies.end(); iter != end; ++iter)
+	for (auto iter = m_dependencies.begin(), end = m_dependencies.end();
+		 iter != end;
+		 ++iter)
 	{
 		QFileInfo source_info(iter.key());
 		for (auto bin : iter.value())
 		{
 			QFileInfo bin_info(bin);
-			if (!bin_info.exists() || bin_info.lastModified() < source_info.lastModified())
+			if (!bin_info.exists() ||
+				bin_info.lastModified() < source_info.lastModified())
 			{
 				auto src = getSourceFromBinaryBasename(bin_info.baseName());
 				src = src.left(src.length() - 3);
@@ -111,10 +131,14 @@ void ShaderCompiler::onFileChanged(const char* path)
 	{
 		if (m_editor)
 		{
-			auto shader_manager = m_editor->getEngine().getResourceManager().get(Lumix::ResourceManager::SHADER);
+			auto shader_manager =
+				m_editor->getEngine().getResourceManager().get(
+					Lumix::ResourceManager::SHADER);
 			QString shader_path("shaders/");
-			QString source_basename = getSourceFromBinaryBasename(info.baseName());
-			shader_path += source_basename.mid(0, source_basename.length() - 3) + ".shd";
+			QString source_basename =
+				getSourceFromBinaryBasename(info.baseName());
+			shader_path +=
+				source_basename.mid(0, source_basename.length() - 3) + ".shd";
 			shader_manager->reload(Lumix::Path(shader_path.toLatin1().data()));
 		}
 	}
@@ -131,11 +155,19 @@ void ShaderCompiler::onFileChanged(const char* path)
 }
 
 
+void ShaderCompiler::setNotifications(Notifications& notifications)
+{
+	m_notifications = &notifications;
+}
+
+
 void ShaderCompiler::parseDependencies()
 {
 	m_dependencies.clear();
 	QDir dir("shaders/compiled");
-	auto list = dir.entryInfoList(QStringList() << "*.shb.d", QDir::Files | QDir::NoDotAndDotDot, QDir::NoSort);
+	auto list = dir.entryInfoList(QStringList() << "*.shb.d",
+								  QDir::Files | QDir::NoDotAndDotDot,
+								  QDir::NoSort);
 	for (auto info : list)
 	{
 		QFile file(info.absoluteFilePath());
@@ -143,7 +175,8 @@ void ShaderCompiler::parseDependencies()
 		{
 			int end = 0;
 			QString first_line(file.readLine().trimmed());
-			while (end < first_line.length() && first_line[end].toLatin1() != ' ')
+			while (end < first_line.length() &&
+				   first_line[end].toLatin1() != ' ')
 			{
 				++end;
 			}
@@ -161,7 +194,9 @@ void ShaderCompiler::parseDependencies()
 				m_dependencies[line].push_back(first_line);
 			}
 			QFileInfo info(first_line);
-			m_dependencies[QString("shaders/") + getSourceFromBinaryBasename(info.baseName()) + ".sc"].push_back(first_line);
+			m_dependencies[QString("shaders/") +
+						   getSourceFromBinaryBasename(info.baseName()) + ".sc"]
+				.push_back(first_line);
 			file.close();
 		}
 	}
@@ -173,26 +208,82 @@ ShaderCompiler::~ShaderCompiler()
 }
 
 
-static void compilePass(QFileInfo& shader_file_info
-	, bool is_vertex_shader
-	, const char* pass
-	, int define_mask
-	, const Lumix::ShaderCombinations::Defines& all_defines)
+void ShaderCompiler::reloadShaders()
 {
+	m_to_reload.removeDuplicates();
+
+	if (m_editor)
+	{
+		auto shader_manager = m_editor->getEngine().getResourceManager().get(
+			Lumix::ResourceManager::SHADER);
+		for (auto& path : m_to_reload)
+		{
+			shader_manager->reload(Lumix::Path(path.toLatin1().data()));
+		}
+	}
+
+	m_to_reload.clear();
+}
+
+
+void ShaderCompiler::updateNotifications()
+{
+	if (m_notifications)
+	{
+		if (m_notifications_id < 0)
+		{
+			m_notifications_id = m_notifications->showProgressNotification(
+				"Compiling shaders...");
+		}
+
+		m_notifications->setProgress(m_notifications_id,
+									 qMax(100 * m_compiled / m_to_compile, 1));
+
+		if (m_to_compile == m_compiled)
+		{
+			reloadShaders();
+			m_to_compile = m_compiled = 0;
+			m_notifications->setNotificationTime(m_notifications_id, 3.0f);
+			m_notifications_id = -1;
+		}
+	}
+}
+
+
+void ShaderCompiler::compilePass(
+	QFileInfo& shader_file_info,
+	bool is_vertex_shader,
+	const char* pass,
+	int define_mask,
+	const Lumix::ShaderCombinations::Defines& all_defines)
+{
+	++m_to_compile;
+
+	updateNotifications();
+
+
 	for (int mask = 0; mask < 1 << lengthOf(all_defines); ++mask)
 	{
 		if ((mask & (~define_mask)) == 0)
 		{
 			QProcess* process = new QProcess;
-			process->connect(process, (void (QProcess::*)(int))&QProcess::finished, [process](int value){
-				if (value != 0)
+			process->connect(
+				process,
+				(void (QProcess::*)(int)) & QProcess::finished,
+				[process, this](int value)
 				{
-					Lumix::g_log_error.log("shader compiler") << process->readAllStandardError().data();
-				}
-			});
+					++m_compiled;
+					updateNotifications();
+					if (value != 0)
+					{
+						Lumix::g_log_error.log("shader compiler")
+							<< process->readAllStandardError().data();
+					}
+				});
 
 			QString cmd = "shaders/shaderc.exe -f ";
-			cmd.append(shader_file_info.dir().path() + "/" + shader_file_info.baseName());
+			cmd.append(shader_file_info.dir().path() + "/" +
+					   shader_file_info.baseName());
 			cmd.append(is_vertex_shader ? "_vs.sc" : "_fs.sc");
 			cmd.append(" -o shaders/compiled/");
 			cmd.append(shader_file_info.baseName() + "_" + pass);
@@ -210,27 +301,36 @@ static void compilePass(QFileInfo& shader_file_info
 					cmd.append(all_defines[i]);
 				}
 			}
+			QFile::remove(QString("shaders/compiled/") +
+						  shader_file_info.baseName() + "_" + pass +
+						  QString::number(mask) +
+						  (is_vertex_shader ? "_vs.shb" : "_fs.shb"));
 			process->start(cmd);
 		}
 	}
 }
 
 
-static void compileAllPasses(QFileInfo& shader_file_info
-	, bool is_vertex_shader
-	, const int* define_masks
-	, const Lumix::ShaderCombinations& combinations
-)
+void ShaderCompiler::compileAllPasses(
+	QFileInfo& shader_file_info,
+	bool is_vertex_shader,
+	const int* define_masks,
+	const Lumix::ShaderCombinations& combinations)
 {
 	for (int i = 0; i < combinations.m_pass_count; ++i)
 	{
-		compilePass(shader_file_info, is_vertex_shader, combinations.m_passes[i], define_masks[i], combinations.m_defines);
+		compilePass(shader_file_info,
+					is_vertex_shader,
+					combinations.m_passes[i],
+					define_masks[i],
+					combinations.m_defines);
 	}
 }
 
 
 void ShaderCompiler::compile(const QString& path)
 {
+	m_to_reload.push_back(path);
 	QFileInfo file(path);
 	QFile shader_file(path);
 	if (shader_file.open(QIODevice::ReadOnly))
@@ -239,8 +339,10 @@ void ShaderCompiler::compile(const QString& path)
 		Lumix::ShaderCombinations combinations;
 		Lumix::Shader::getShaderCombinations(content.data(), &combinations);
 
-		compileAllPasses(file, false, combinations.m_fs_combinations, combinations);
-		compileAllPasses(file, true, combinations.m_vs_combinations, combinations);
+		compileAllPasses(
+			file, false, combinations.m_fs_combinations, combinations);
+		compileAllPasses(
+			file, true, combinations.m_vs_combinations, combinations);
 
 		shader_file.close();
 	}
@@ -257,7 +359,6 @@ void ShaderCompiler::compileAll()
 	QDir dir("shaders");
 	dir.mkpath("compiled");
 	auto list = dir.entryInfoList(QStringList() << "*.shd");
-	m_to_compile = list.size() * 2;
 	for (auto file : list)
 	{
 		QFile shader_file(file.filePath());
@@ -267,8 +368,10 @@ void ShaderCompiler::compileAll()
 			Lumix::ShaderCombinations combinations;
 			Lumix::Shader::getShaderCombinations(content.data(), &combinations);
 
-			compileAllPasses(file, false, combinations.m_fs_combinations, combinations);
-			compileAllPasses(file, true, combinations.m_vs_combinations, combinations);
+			compileAllPasses(
+				file, false, combinations.m_fs_combinations, combinations);
+			compileAllPasses(
+				file, true, combinations.m_vs_combinations, combinations);
 
 			shader_file.close();
 		}

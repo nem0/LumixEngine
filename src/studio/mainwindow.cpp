@@ -1,6 +1,5 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
-#include "animation_editor/animation_editor.h"
 #include "assetbrowser.h"
 #include "editor/entity_template_system.h"
 #include "editor/gizmo.h"
@@ -19,8 +18,6 @@
 #include "property_view.h"
 #include "property_view/terrain_editor.h"
 #include "sceneview.h"
-#include "scripts/scriptcompilerwidget.h"
-#include "scripts/scriptcompiler.h"
 #include "shader_compiler.h"
 #include <qcombobox.h>
 #include <qdir.h>
@@ -49,7 +46,6 @@ MainWindow::MainWindow(QWidget* parent)
 	m_scene_view = new SceneView;
 	m_game_view = new GameView(*this);
 	m_asset_browser = new AssetBrowser(*this, NULL);
-	m_script_compiler_ui = new ScriptCompilerWidget;
 	m_file_server_ui = new FileServerWidget;
 	m_profiler_ui = new ProfilerUI;
 	m_entity_template_list_ui = new EntityTemplateList;
@@ -57,14 +53,6 @@ MainWindow::MainWindow(QWidget* parent)
 	m_entity_list = new EntityList(NULL);
 
 	m_metadata = new Metadata();
-
-	m_animation_editor = new AnimationEditor(*this);
-
-	m_toggle_game_mode_after_compile = false;
-	connect(m_script_compiler_ui->getCompiler(),
-			&ScriptCompiler::compiled,
-			this,
-			&MainWindow::onScriptCompiled);
 
 	QSettings settings("Lumix", "QtEditor");
 	bool geometry_restored =
@@ -109,9 +97,6 @@ MainWindow::MainWindow(QWidget* parent)
 	addEditorDock(static_cast<Qt::DockWidgetArea>(2),
 				  m_scene_view,
 				  &MainWindow::on_actionScene_View_triggered);
-	addEditorDock(static_cast<Qt::DockWidgetArea>(8),
-				  m_script_compiler_ui,
-				  &MainWindow::on_actionScript_compiler_triggered);
 
 	createLayoutCombobox();
 
@@ -182,12 +167,6 @@ void MainWindow::on_actionImport_asset_triggered()
 QMenuBar* MainWindow::getMenuBar() const
 {
 	return m_ui->menuBar;
-}
-
-
-ScriptCompiler* MainWindow::getScriptCompiler() const
-{
-	return m_script_compiler_ui->getCompiler();
 }
 
 
@@ -266,7 +245,6 @@ void MainWindow::update()
 {
 	PROFILE_FUNCTION();
 	m_notifications->update(m_world_editor->getEngine().getLastTimeDelta());
-	m_animation_editor->update(m_world_editor->getEngine().getLastTimeDelta());
 }
 
 
@@ -281,11 +259,9 @@ void MainWindow::shutdown()
 	delete m_shader_compiler;
 	delete m_log;
 	delete m_ui;
-	delete m_animation_editor;
 	delete m_scene_view;
 	delete m_property_view;
 	delete m_asset_browser;
-	delete m_script_compiler_ui;
 	delete m_file_server_ui;
 	delete m_profiler_ui;
 	delete m_entity_template_list_ui;
@@ -297,11 +273,9 @@ void MainWindow::shutdown()
 	m_shader_compiler = nullptr;
 	m_log = nullptr;
 	m_ui = nullptr;
-	m_animation_editor = nullptr;
 	m_scene_view = nullptr;
 	m_property_view = nullptr;
 	m_asset_browser = nullptr;
-	m_script_compiler_ui = nullptr;
 	m_file_server_ui = nullptr;
 	m_profiler_ui = nullptr;
 	m_entity_template_list_ui = nullptr;
@@ -334,11 +308,9 @@ MainWindow::~MainWindow()
 	ASSERT(!m_shader_compiler);
 	ASSERT(!m_log);
 	ASSERT(!m_ui);
-	ASSERT(!m_animation_editor);
 	ASSERT(!m_scene_view);
 	ASSERT(!m_property_view);
 	ASSERT(!m_asset_browser);
-	ASSERT(!m_script_compiler_ui);
 	ASSERT(!m_file_server_ui);
 	ASSERT(!m_profiler_ui);
 	ASSERT(!m_entity_template_list_ui);
@@ -356,17 +328,15 @@ Lumix::WorldEditor* MainWindow::getWorldEditor() const
 void MainWindow::setWorldEditor(Lumix::WorldEditor& editor)
 {
 	m_world_editor = &editor;
-	m_animation_editor->setWorldEditor(editor);
 	m_asset_browser->setWorldEditor(editor);
-	m_asset_browser->setScriptCompiler(m_script_compiler_ui->getCompiler());
 	m_asset_browser->setShaderCompiler(m_shader_compiler);
 	m_asset_browser->setNotifications(m_notifications);
+	m_shader_compiler->setNotifications(*m_notifications);
 	m_entity_list->setWorldEditor(editor);
 	m_entity_template_list_ui->setWorldEditor(editor);
 	m_file_server_ui->setWorldEditor(editor);
 	m_game_view->setWorldEditor(editor);
 	m_property_view->setWorldEditor(editor);
-	m_script_compiler_ui->setWorldEditor(editor);
 	m_shader_compiler->setWorldEditor(editor);
 	m_scene_view->setWorldEditor(editor);
 
@@ -422,7 +392,10 @@ void MainWindow::on_actionOpen_triggered()
 
 void MainWindow::on_actionSave_As_triggered()
 {
-	QByteArray path = QFileDialog::getSaveFileName(nullptr, "Select save file", QString(), "Universes (*.unv)").toLocal8Bit();
+	QByteArray path =
+		QFileDialog::getSaveFileName(
+			nullptr, "Select save file", QString(), "Universes (*.unv)")
+			.toLocal8Bit();
 	if (!path.isEmpty())
 	{
 		m_world_editor->saveUniverse(Lumix::Path(path.data()));
@@ -447,11 +420,6 @@ void MainWindow::on_actionE_xit_triggered()
 void MainWindow::on_actionGame_view_triggered()
 {
 	m_game_view->show();
-}
-
-void MainWindow::on_actionScript_compiler_triggered()
-{
-	m_script_compiler_ui->show();
 }
 
 void MainWindow::on_actionFile_server_triggered()
@@ -480,26 +448,9 @@ void MainWindow::on_actionPolygon_Mode_changed()
 	m_scene_view->setWireframe(m_ui->actionPolygon_Mode->isChecked());
 }
 
-void MainWindow::onScriptCompiled()
-{
-	if (m_toggle_game_mode_after_compile)
-	{
-		m_world_editor->toggleGameMode();
-	}
-	m_toggle_game_mode_after_compile = false;
-}
-
 void MainWindow::on_actionGame_mode_triggered()
 {
-	if (!m_world_editor->isGameMode())
-	{
-		m_script_compiler_ui->getCompiler()->compileAllModules();
-		m_toggle_game_mode_after_compile = true;
-	}
-	else
-	{
-		m_world_editor->toggleGameMode();
-	}
+	m_world_editor->toggleGameMode();
 }
 
 void MainWindow::on_actionLook_at_selected_entity_triggered()

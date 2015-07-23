@@ -303,11 +303,7 @@ void AssetBrowser::on_treeView_doubleClicked(const QModelIndex& index)
 void AssetBrowser::onFileChanged(const QString& path)
 {
 	QFileInfo info(path);
-	if (info.suffix() == "cpp")
-	{
-		m_script_compiler->onScriptChanged(info.fileName().toLatin1().data());
-	}
-	else if(info.suffix() == "blend@")
+	if(info.suffix() == "blend@")
 	{
 		QFileInfo file_info(path);
 		QString base_name = file_info.absolutePath() + "/" + file_info.baseName() + ".blend";

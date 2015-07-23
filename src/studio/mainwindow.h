@@ -36,7 +36,6 @@ public:
 	class SceneView* getSceneView() const;
 	class GameView* getGameView() const;
 	PropertyView* getPropertyView() const { return m_property_view; }
-	class ScriptCompiler* getScriptCompiler() const;
 	QMenuBar* getMenuBar() const;
 	Metadata* getMetadata() const { return m_metadata; }
 	EntityTemplateList* getEntityTemplateList() { return m_entity_template_list_ui; }
@@ -49,7 +48,6 @@ public slots:
 	void on_actionGame_mode_triggered();
 
 private slots:
-	void onScriptCompiled();
 	void on_actionLog_triggered();
 	void on_actionOpen_triggered();
 	void on_actionSave_As_triggered();
@@ -57,7 +55,6 @@ private slots:
 	void on_actionProperties_triggered();
 	void on_actionE_xit_triggered();
 	void on_actionGame_view_triggered();
-	void on_actionScript_compiler_triggered();
 	void on_actionFile_server_triggered();
 	void on_actionAsset_Browser_triggered();
 	void on_actionScene_View_triggered();
@@ -110,14 +107,12 @@ private:
 private:
 	Ui::MainWindow* m_ui;
 	Lumix::WorldEditor* m_world_editor;
-	class AnimationEditor* m_animation_editor;
 	class LogWidget* m_log;
 	class ShaderCompiler* m_shader_compiler;
 	PropertyView* m_property_view;
 	class SceneView* m_scene_view;
 	class GameView* m_game_view;
 	class AssetBrowser* m_asset_browser;
-	class ScriptCompilerWidget* m_script_compiler_ui;
 	class FileServerWidget* m_file_server_ui;
 	class ProfilerUI* m_profiler_ui;
 	EntityTemplateList* m_entity_template_list_ui;
@@ -129,7 +124,6 @@ private:
 	class QComboBox* m_layout_combobox;
 	QList<QString> m_recent_files;
 	QList<DockInfo> m_dock_infos;
-	bool m_toggle_game_mode_after_compile;
 
 	class TerrainComponentPlugin* m_terrain_component_plugin;
 };
