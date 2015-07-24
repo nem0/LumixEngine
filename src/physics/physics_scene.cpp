@@ -227,7 +227,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			return createMeshRigidActor(entity);
 		}
-		return NEW_INVALID_COMPONENT;
+		return INVALID_COMPONENT;
 	}
 
 
@@ -238,13 +238,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 			Entity entity = m_terrains[cmp]->m_entity;
 			m_allocator.deleteObject(m_terrains[cmp]);
 			m_terrains[cmp] = NULL;
-			m_universe.destroyComponent(ComponentOld(entity, type, this, cmp));
+			m_universe.destroyComponent(entity, type, this, cmp);
 		}
 		else if (type == CONTROLLER_HASH)
 		{
 			Entity entity = m_controllers[cmp].m_entity;
 			m_controllers[cmp].m_is_free = true;
-			m_universe.destroyComponent(ComponentOld(entity, type, this, cmp));
+			m_universe.destroyComponent(entity, type, this, cmp);
 		}
 		else if (type == MESH_ACTOR_HASH || type == BOX_ACTOR_HASH)
 		{
@@ -252,7 +252,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			m_actors[cmp]->setEntity(INVALID_ENTITY);
 			m_actors[cmp]->setPhysxActor(nullptr);
 			m_dynamic_actors.eraseItem(m_actors[cmp]);
-			m_universe.destroyComponent(ComponentOld(entity, type, this, cmp));
+			m_universe.destroyComponent(entity, type, this, cmp);
 		}
 		else
 		{
@@ -271,7 +271,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 		terrain->m_entity = entity;
 		ComponentOld cmp = m_universe.addComponent(
 			entity, HEIGHTFIELD_HASH, this, m_terrains.size() - 1);
-		m_universe.componentCreated().invoke(cmp);
 		return cmp.index;
 	}
 
@@ -300,7 +299,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 		ComponentOld cmp = m_universe.addComponent(
 			entity, CONTROLLER_HASH, this, m_controllers.size() - 1);
-		m_universe.componentCreated().invoke(cmp);
 		return cmp.index;
 	}
 
@@ -329,7 +327,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 		ComponentOld cmp = m_universe.addComponent(
 			entity, BOX_ACTOR_HASH, this, m_actors.size() - 1);
-		m_universe.componentCreated().invoke(cmp);
 		return cmp.index;
 	}
 
@@ -343,7 +340,6 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 		ComponentOld cmp = m_universe.addComponent(
 			entity, MESH_ACTOR_HASH, this, m_actors.size() - 1);
-		m_universe.componentCreated().invoke(cmp);
 		return cmp.index;
 	}
 
@@ -489,12 +485,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 		for (auto* actor : m_dynamic_actors)
 		{
 			physx::PxTransform trans = actor->getPhysxActor()->getGlobalPose();
-			m_universe.setPosition(actor->getEntity(), trans.p.x, trans.p.y, trans.p.z);
-			m_universe.setRotation(actor->getEntity(),
-									  trans.q.x,
-									  trans.q.y,
-									  trans.q.z,
-									  trans.q.w);
+			m_universe.setPosition(
+				actor->getEntity(), trans.p.x, trans.p.y, trans.p.z);
+			m_universe.setRotation(
+				actor->getEntity(), trans.q.x, trans.q.y, trans.q.z, trans.q.w);
 		}
 	}
 
@@ -558,7 +552,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 				return i;
 			}
 		}
-		return NEW_INVALID_COMPONENT;
+		return INVALID_COMPONENT;
 	}
 
 
@@ -835,8 +829,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 				physx::PxGeometryHolder geom = shapes->getGeometry();
 
 				physx::PxTransform transform;
-				matrix2Transform(m_universe.getMatrix(m_actors[cmp]->getEntity()),
-								 transform);
+				matrix2Transform(
+					m_universe.getMatrix(m_actors[cmp]->getEntity()),
+					transform);
 
 				physx::PxRigidActor* actor;
 				if (new_value)
@@ -1034,7 +1029,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			{
 				m_dynamic_actors.push(m_actors[i]);
 			}
-			
+
 			Entity e;
 			serializer.read(e);
 			m_actors[i]->setEntity(e);

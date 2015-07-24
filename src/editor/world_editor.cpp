@@ -1108,7 +1108,7 @@ private:
 				{
 					ComponentIndex cmp = scenes[i]->createComponent(
 						m_component.type, m_component.entity);
-					if (cmp != NEW_INVALID_COMPONENT)
+					if (cmp != INVALID_COMPONENT)
 					{
 						m_component.index = cmp;
 						m_component.scene = scenes[i];
@@ -2193,6 +2193,7 @@ public:
 
 	void load(FS::IFile& file)
 	{
+		m_is_loading = true;
 		ASSERT(file.getBuffer());
 		m_components.clear();
 		m_components.reserve(5000);
@@ -2209,6 +2210,7 @@ public:
 			Timer::destroy(timer);
 			g_log_error.log("editor") << "Corrupted file.";
 			newUniverse();
+			m_is_loading = false;
 			return;
 		}
 		if (m_engine->deserialize(blob))
@@ -2232,6 +2234,7 @@ public:
 			}
 		}
 		Timer::destroy(timer);
+		m_is_loading = false;
 	}
 
 
@@ -2365,6 +2368,7 @@ public:
 		, m_camera(INVALID_ENTITY)
 		, m_editor_command_creators(m_allocator)
 		, m_component_types(m_allocator)
+		, m_is_loading(false)
 	{
 		m_go_to_parameters.m_is_active = false;
 		m_undo_index = -1;
@@ -2605,12 +2609,12 @@ public:
 
 				RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 				Model* model = scene->getRenderableModel(cmp.index);
-				ComponentOld renderable = scene->getFirstRenderable();
-				while (renderable.isValid())
+				ComponentIndex renderable = scene->getFirstRenderable();
+				while (renderable >= 0)
 				{
-					if (model == scene->getRenderableModel(renderable.index))
+					if (model == scene->getRenderableModel(renderable))
 					{
-						entities.push(renderable.entity);
+						entities.push(scene->getRenderableEntity(renderable));
 					}
 					renderable = scene->getNextRenderable(renderable);
 				}
@@ -2623,14 +2627,12 @@ public:
 
 	void onComponentAdded(const ComponentOld& cmp)
 	{
-		TODO("why note use the one from universe");
+		TODO("why not use the one from universe");
 		getComponents(cmp.entity).push(cmp);
-	}
-
-
-	void onComponentCreated(const ComponentOld& cmp)
-	{
-		createEditorIcon(cmp.entity);
+		if (!m_is_loading)
+		{
+			createEditorIcon(cmp.entity);
+		}
 	}
 
 
@@ -2791,13 +2793,10 @@ public:
 
 		universe->entityCreated()
 			.bind<WorldEditorImpl, &WorldEditorImpl::onEntityCreated>(this);
-		universe->componentCreated()
-			.bind<WorldEditorImpl, &WorldEditorImpl::onComponentCreated>(this);
-		universe->componentDestroyed()
-			.bind<WorldEditorImpl, &WorldEditorImpl::onComponentDestroyed>(
-				this);
 		universe->componentAdded()
 			.bind<WorldEditorImpl, &WorldEditorImpl::onComponentAdded>(this);
+		universe->componentDestroyed()
+			.bind<WorldEditorImpl, &WorldEditorImpl::onComponentDestroyed>(this);
 		universe->entityDestroyed()
 			.bind<WorldEditorImpl, &WorldEditorImpl::onEntityDestroyed>(this);
 
@@ -3052,6 +3051,7 @@ private:
 	AssociativeArray<uint32_t, EditorCommandCreator> m_editor_command_creators;
 	int m_undo_index;
 	OutputBlob m_copy_buffer;
+	bool m_is_loading;
 };
 
 

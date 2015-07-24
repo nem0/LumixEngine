@@ -171,10 +171,9 @@ public:
 			m_valid.push(true);
 			ComponentOld cmp = m_universe.addComponent(
 				entity, type, this, m_scripts.size() - 1);
-			m_universe.componentCreated().invoke(cmp);
 			return cmp.index;
 		}
-		return NEW_INVALID_COMPONENT;
+		return INVALID_COMPONENT;
 	}
 
 
@@ -183,8 +182,8 @@ public:
 	{
 		if (type == LUA_SCRIPT_HASH)
 		{
-			m_universe.destroyComponent(ComponentOld(
-				Entity(m_scripts[component].m_entity), type, this, component));
+			m_universe.destroyComponent(
+				Entity(m_scripts[component].m_entity), type, this, component);
 			m_valid[component] = false;
 		}
 	}

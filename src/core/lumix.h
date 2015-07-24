@@ -31,8 +31,10 @@ const uint32_t LUMIX_MAX_PATH = 260;
 
 namespace Lumix
 {
+	typedef int ComponentIndex;
 	typedef int Entity;
 	const int INVALID_ENTITY = -1;
+	const int INVALID_COMPONENT = -1;
 }
 
 

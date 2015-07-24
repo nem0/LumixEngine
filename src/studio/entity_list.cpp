@@ -483,7 +483,7 @@ public:
 			}
 		}
 	}
-
+	 
 
 	void onParentSet(Lumix::Entity child, Lumix::Entity parent)
 	{

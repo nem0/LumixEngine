@@ -39,6 +39,7 @@
 namespace Lumix
 {
 
+
 static const uint32_t RENDERABLE_HASH = crc32("renderable");
 static const uint32_t POINT_LIGHT_HASH = crc32("point_light");
 static const uint32_t GLOBAL_LIGHT_HASH = crc32("global_light");
@@ -190,7 +191,9 @@ public:
 		, m_global_light_last_uid(-1)
 		, m_point_light_last_uid(-1)
 		, m_is_forward_rendered(is_forward_rendered)
-		, m_applied_camera(NEW_INVALID_COMPONENT)
+		, m_applied_camera(INVALID_COMPONENT)
+		, m_renderable_created(m_allocator)
+		, m_renderable_destroyed(m_allocator)
 	{
 		m_universe.entityMoved()
 			.bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
@@ -245,8 +248,11 @@ public:
 	virtual IPlugin& getPlugin() const override { return m_renderer; }
 
 
-	virtual void getRay(
-		ComponentIndex camera, float x, float y, Vec3& origin, Vec3& dir) override
+	virtual void getRay(ComponentIndex camera,
+						float x,
+						float y,
+						Vec3& origin,
+						Vec3& dir) override
 	{
 		Vec3 camera_pos = m_universe.getPosition(m_cameras[camera].m_entity);
 		float width = m_cameras[camera].m_width;
@@ -562,6 +568,7 @@ public:
 
 	void destroyRenderable(ComponentIndex component)
 	{
+		m_renderable_destroyed.invoke(component);
 		int renderable_index = getRenderable(component);
 		Entity entity = m_renderables[renderable_index]->m_entity;
 		for (int i = 0; i < m_light_influenced_geometry.size(); ++i)
@@ -586,8 +593,7 @@ public:
 		m_allocator.deleteObject(m_renderables[renderable_index]);
 		m_renderables.erase(renderable_index);
 		m_culling_system->removeStatic(renderable_index);
-		m_universe.destroyComponent(
-			ComponentOld(entity, RENDERABLE_HASH, this, component));
+		m_universe.destroyComponent(entity, RENDERABLE_HASH, this, component);
 
 		Lumix::HashMap<int32_t, int>::iterator
 			iter = m_dynamic_renderable_cache.begin(),
@@ -615,8 +621,7 @@ public:
 			Entity entity =
 				m_global_lights[getGlobalLightIndex(component)].m_entity;
 
-			m_universe.destroyComponent(
-				ComponentOld(entity, type, this, component));
+			m_universe.destroyComponent(entity, type, this, component);
 
 			if (component == m_active_global_light_uid)
 			{
@@ -631,23 +636,20 @@ public:
 				m_point_lights[getPointLightIndex(component)].m_entity;
 			m_point_lights.eraseFast(index);
 			m_light_influenced_geometry.eraseFast(index);
-			m_universe.destroyComponent(
-				ComponentOld(entity, type, this, component));
+			m_universe.destroyComponent(entity, type, this, component);
 		}
 		else if (type == CAMERA_HASH)
 		{
 			Entity entity = m_cameras[component].m_entity;
 			m_cameras[component].m_is_free = true;
-			m_universe.destroyComponent(
-				ComponentOld(entity, type, this, component));
+			m_universe.destroyComponent(entity, type, this, component);
 		}
 		else if (type == TERRAIN_HASH)
 		{
 			Entity entity = m_cameras[component].m_entity;
 			m_allocator.deleteObject(m_terrains[component]);
 			m_terrains[component] = NULL;
-			m_universe.destroyComponent(
-				ComponentOld(entity, type, this, component));
+			m_universe.destroyComponent(entity, type, this, component);
 		}
 		else
 		{
@@ -666,7 +668,6 @@ public:
 			m_terrains.push(terrain);
 			ComponentOld cmp = m_universe.addComponent(
 				entity, type, this, m_terrains.size() - 1);
-			m_universe.componentCreated().invoke(cmp);
 			return cmp.index;
 		}
 		else if (type == CAMERA_HASH)
@@ -684,7 +685,6 @@ public:
 			camera.m_slot[0] = '\0';
 			ComponentOld cmp = m_universe.addComponent(
 				entity, type, this, m_cameras.size() - 1);
-			m_universe.componentCreated().invoke(cmp);
 			return cmp.index;
 		}
 		else if (type == RENDERABLE_HASH)
@@ -699,11 +699,11 @@ public:
 		{
 			return createPointLight(entity).index;
 		}
-		return NEW_INVALID_COMPONENT;
+		return INVALID_COMPONENT;
 	}
 
 
-	virtual ComponentOld getRenderableComponent(Entity entity) override
+	virtual ComponentIndex getRenderableComponent(Entity entity) override
 	{
 		DynamicRenderableCache::iterator iter =
 			m_dynamic_renderable_cache.find(entity);
@@ -714,15 +714,15 @@ public:
 				if (m_renderables[i]->m_entity == entity)
 				{
 					m_dynamic_renderable_cache.insert(entity, i);
-					return ComponentOld(entity, RENDERABLE_HASH, this, i);
+					return i;
 				}
 			}
 		}
 		else
 		{
-			return ComponentOld(entity, RENDERABLE_HASH, this, iter.value());
+			return iter.value();
 		}
-		return ComponentOld::INVALID;
+		return INVALID_COMPONENT;
 	}
 
 
@@ -800,8 +800,9 @@ public:
 	virtual Engine& getEngine() const override { return m_engine; }
 
 
-	virtual void
-	setTerrainBrush(ComponentIndex cmp, const Vec3& position, float size) override
+	virtual void setTerrainBrush(ComponentIndex cmp,
+								 const Vec3& position,
+								 float size) override
 	{
 		m_terrains[cmp]->setBrush(position, size);
 	}
@@ -870,6 +871,12 @@ public:
 	virtual Pose& getPose(ComponentIndex cmp) override
 	{
 		return m_renderables[getRenderable(cmp)]->m_pose;
+	}
+
+
+	virtual Entity getRenderableEntity(ComponentIndex cmp) override
+	{
+		return m_renderables[getRenderable(cmp)]->m_entity;
 	}
 
 
@@ -1057,16 +1064,13 @@ public:
 	virtual Frustum& getFrustum() override { return m_camera_frustum; }
 
 
-	virtual ComponentOld getFirstRenderable() override
+	virtual ComponentIndex getFirstRenderable() override
 	{
 		if (m_renderables.empty())
 		{
-			return ComponentOld::INVALID;
+			return INVALID_COMPONENT;
 		}
-		return ComponentOld(m_renderables[0]->m_entity,
-							RENDERABLE_HASH,
-							this,
-							m_renderables[0]->m_component_index);
+		return m_renderables[0]->m_component_index;
 	}
 
 
@@ -1095,17 +1099,14 @@ public:
 	}
 
 
-	virtual ComponentOld getNextRenderable(const ComponentOld& cmp) override
+	virtual ComponentIndex getNextRenderable(ComponentIndex cmp) override
 	{
-		int i = getRenderable(cmp.index);
+		int i = getRenderable(cmp);
 		if (i + 1 < m_renderables.size())
 		{
-			return ComponentOld(m_renderables[i + 1]->m_entity,
-								RENDERABLE_HASH,
-								this,
-								m_renderables[i + 1]->m_component_index);
+			return m_renderables[i + 1]->m_component_index;
 		}
-		return ComponentOld::INVALID;
+		return INVALID_COMPONENT;
 	}
 
 
@@ -1232,7 +1233,7 @@ public:
 	}
 
 
-	virtual Entity getCameraEntity(ComponentIndex camera) const override 
+	virtual Entity getCameraEntity(ComponentIndex camera) const override
 	{
 		return m_cameras[camera].m_entity;
 	}
@@ -1324,7 +1325,8 @@ public:
 		}
 	}
 
-	virtual void setCameraSlot(ComponentIndex camera, const string& slot) override
+	virtual void setCameraSlot(ComponentIndex camera,
+							   const string& slot) override
 	{
 		copyString(
 			m_cameras[camera].m_slot, Camera::MAX_SLOT_LENGTH, slot.c_str());
@@ -1913,7 +1915,7 @@ public:
 				return i;
 			}
 		}
-		return NEW_INVALID_COMPONENT;
+		return INVALID_COMPONENT;
 	}
 
 	virtual float getTime() const override { return m_time; }
@@ -2046,6 +2048,18 @@ private:
 	}
 
 
+	virtual DelegateList<void(ComponentIndex)>& renderableCreated() override
+	{
+		return m_renderable_created;
+	}
+
+
+	virtual DelegateList<void(ComponentIndex)>& renderableDestroyed() override
+	{
+		return m_renderable_destroyed;
+	}
+
+
 	virtual float getLightFOV(ComponentIndex cmp) override
 	{
 		return m_point_lights[getPointLightIndex(cmp)].m_fov;
@@ -2077,7 +2091,6 @@ private:
 
 		ComponentOld cmp = m_universe.addComponent(
 			entity, GLOBAL_LIGHT_HASH, this, light.m_uid);
-		m_universe.componentCreated().invoke(cmp);
 		return cmp;
 	}
 
@@ -2096,7 +2109,6 @@ private:
 
 		ComponentOld cmp = m_universe.addComponent(
 			entity, POINT_LIGHT_HASH, this, light.m_uid);
-		m_universe.componentCreated().invoke(cmp);
 
 		detectLightInfluencedGeometry(m_point_lights.size() - 1);
 
@@ -2121,7 +2133,7 @@ private:
 			entity, RENDERABLE_HASH, this, r.m_component_index);
 		m_culling_system->addStatic(
 			Sphere(m_universe.getPosition(entity), 1.0f));
-		m_universe.componentCreated().invoke(cmp);
+		m_renderable_created.invoke(r.m_component_index);
 		return cmp;
 	}
 
@@ -2155,6 +2167,8 @@ private:
 	Array<MTJD::Job*> m_jobs;
 	float m_time;
 	bool m_is_forward_rendered;
+	DelegateList<void(ComponentIndex)> m_renderable_created;
+	DelegateList<void(ComponentIndex)> m_renderable_destroyed;
 };
 
 
