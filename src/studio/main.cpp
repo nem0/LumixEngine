@@ -117,7 +117,7 @@ public:
 	{
 		m_world_editor->renderIcons(
 			*m_main_window->getSceneView()->getPipeline());
-		m_world_editor->getGizmo().updateScale(m_world_editor->getEditCamera());
+		m_world_editor->getGizmo().updateScale(m_world_editor->getEditCamera().index);
 		m_world_editor->getGizmo().render(
 			*m_main_window->getSceneView()->getPipeline());
 	}

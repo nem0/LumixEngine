@@ -269,9 +269,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 		terrain->m_scene = this;
 		terrain->m_actor = NULL;
 		terrain->m_entity = entity;
-		ComponentOld cmp = m_universe.addComponent(
+		m_universe.addComponent(
 			entity, HEIGHTFIELD_HASH, this, m_terrains.size() - 1);
-		return cmp.index;
+		return m_terrains.size() - 1;
 	}
 
 
@@ -297,9 +297,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 		m_controllers.push(c);
 
-		ComponentOld cmp = m_universe.addComponent(
+		m_universe.addComponent(
 			entity, CONTROLLER_HASH, this, m_controllers.size() - 1);
-		return cmp.index;
+		return m_controllers.size() - 1;
 	}
 
 
@@ -325,9 +325,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 		actor->setPhysxActor(physx_actor);
 		physx_actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
 
-		ComponentOld cmp = m_universe.addComponent(
+		m_universe.addComponent(
 			entity, BOX_ACTOR_HASH, this, m_actors.size() - 1);
-		return cmp.index;
+		return m_actors.size() - 1;
 	}
 
 
@@ -338,9 +338,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 		m_actors.push(actor);
 		actor->setEntity(entity);
 
-		ComponentOld cmp = m_universe.addComponent(
+		m_universe.addComponent(
 			entity, MESH_ACTOR_HASH, this, m_actors.size() - 1);
-		return cmp.index;
+		return m_actors.size() - 1;
 	}
 
 

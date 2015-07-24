@@ -27,12 +27,11 @@ class JsonSerializer;
 class Universe;
 
 
-class AnimationSceneImpl : public AnimationScene
+class AnimationSceneImpl : public IScene
 {
 private:
 	struct Animable
 	{
-		bool m_manual;
 		bool m_is_free;
 		ComponentIndex m_renderable;
 		float m_time;
@@ -62,7 +61,7 @@ public:
 	}
 
 
-	~AnimationSceneImpl() 
+	~AnimationSceneImpl()
 	{
 		m_render_scene->renderableCreated()
 			.unbind<AnimationSceneImpl,
@@ -82,25 +81,12 @@ public:
 	}
 
 
-	virtual ComponentOld getAnimable(Entity entity) override
-	{
-		for (int i = 0; i < m_animables.size(); ++i)
-		{
-			if (m_animables[i].m_entity == entity)
-			{
-				return ComponentOld(entity, ANIMABLE_HASH, this, i);
-			}
-		}
-		return ComponentOld::INVALID;
-	}
-
-
 	virtual ComponentIndex createComponent(uint32_t type,
 										   Entity entity) override
 	{
 		if (type == ANIMABLE_HASH)
 		{
-			return createAnimable(entity).index;
+			return createAnimable(entity);
 		}
 		return INVALID_COMPONENT;
 	}
@@ -122,7 +108,6 @@ public:
 		serializer.write((int32_t)m_animables.size());
 		for (int i = 0; i < m_animables.size(); ++i)
 		{
-			serializer.write(m_animables[i].m_manual);
 			serializer.write(m_animables[i].m_entity);
 			serializer.write(m_animables[i].m_time);
 			serializer.write(m_animables[i].m_is_free);
@@ -141,7 +126,6 @@ public:
 		m_animables.resize(count);
 		for (int i = 0; i < count; ++i)
 		{
-			serializer.read(m_animables[i].m_manual);
 			serializer.read(m_animables[i].m_entity);
 			ComponentIndex renderable =
 				m_render_scene->getRenderableComponent(m_animables[i].m_entity);
@@ -161,23 +145,6 @@ public:
 	}
 
 
-	void setFrame(ComponentOld cmp, int frame)
-	{
-		m_animables[cmp.index].m_time =
-			m_animables[cmp.index].m_animation->getLength() * frame /
-			m_animables[cmp.index].m_animation->getFPS();
-	}
-
-
-	bool isManual(ComponentOld cmp) { return m_animables[cmp.index].m_manual; }
-
-
-	void setManual(ComponentOld cmp, bool is_manual)
-	{
-		m_animables[cmp.index].m_manual = is_manual;
-	}
-
-
 	void getPreview(ComponentIndex cmp, string& path)
 	{
 		path = m_animables[cmp].m_animation
@@ -192,32 +159,10 @@ public:
 	}
 
 
-	virtual void playAnimation(ComponentIndex cmp, const char* path) override
+	void playAnimation(ComponentIndex cmp, const char* path)
 	{
 		m_animables[cmp].m_animation = loadAnimation(path);
 		m_animables[cmp].m_time = 0;
-		m_animables[cmp].m_manual = false;
-	}
-
-
-	void setAnimationFrame(const ComponentOld& cmp, int frame)
-	{
-		if (m_animables[cmp.index].m_animation)
-		{
-			m_animables[cmp.index].m_time =
-				m_animables[cmp.index].m_animation->getLength() * frame /
-				m_animables[cmp.index].m_animation->getFrameCount();
-		}
-	}
-
-
-	int getFrameCount(const ComponentOld& cmp) const
-	{
-		if (m_animables[cmp.index].m_animation)
-		{
-			return m_animables[cmp.index].m_animation->getFrameCount();
-		}
-		return -1;
 	}
 
 
@@ -236,16 +181,13 @@ public:
 					animable.m_time,
 					m_render_scene->getPose(animable.m_renderable),
 					*m_render_scene->getRenderableModel(animable.m_renderable));
-				if (!animable.m_manual)
+				float t = animable.m_time + time_delta;
+				float l = animable.m_animation->getLength();
+				while (t > l)
 				{
-					float t = animable.m_time + time_delta;
-					float l = animable.m_animation->getLength();
-					while (t > l)
-					{
-						t -= l;
-					}
-					animable.m_time = t;
+					t -= l;
 				}
+				animable.m_time = t;
 			}
 		}
 	}
@@ -288,7 +230,7 @@ private:
 	}
 
 
-	ComponentOld createAnimable(Entity entity)
+	ComponentIndex createAnimable(Entity entity)
 	{
 		Animable* src = NULL;
 		for (int i = 0, c = m_animables.size(); i < c; ++i)
@@ -300,7 +242,6 @@ private:
 			}
 		}
 		Animable& animable = src ? *src : m_animables.pushEmpty();
-		animable.m_manual = true;
 		animable.m_time = 0;
 		animable.m_is_free = false;
 		animable.m_renderable = INVALID_COMPONENT;
@@ -314,9 +255,9 @@ private:
 			animable.m_renderable = renderable;
 		}
 
-		ComponentOld cmp = m_universe.addComponent(
+		m_universe.addComponent(
 			entity, ANIMABLE_HASH, this, m_animables.size() - 1);
-		return cmp;
+		return m_animables.size() - 1;
 	}
 
 

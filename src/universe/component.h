@@ -11,13 +11,13 @@ namespace Lumix
 class IScene;
 
 
-struct LUMIX_ENGINE_API ComponentOld final
+struct LUMIX_ENGINE_API ComponentUID final
 {
 
 	typedef uint32_t Type;
 
-	ComponentOld() { index = -1; }
-	ComponentOld(Entity _entity,
+	ComponentUID() { index = -1; }
+	ComponentUID(Entity _entity,
 				 uint32_t _type,
 				 IScene* _scene,
 				 int _index)
@@ -33,17 +33,17 @@ struct LUMIX_ENGINE_API ComponentOld final
 	IScene* scene;
 	int index;
 
-	static const ComponentOld INVALID;
+	static const ComponentUID INVALID;
 
-	bool operator==(const ComponentOld& rhs) const
+	bool operator==(const ComponentUID& rhs) const
 	{
 		return type == rhs.type && scene == rhs.scene && index == rhs.index;
 	}
-	bool operator!=(const ComponentOld& rhs) const
+	bool operator!=(const ComponentUID& rhs) const
 	{
 		return type != rhs.type || scene != rhs.scene || index != rhs.index;
 	}
-	bool operator<(const ComponentOld& rhs) const
+	bool operator<(const ComponentUID& rhs) const
 	{
 		ASSERT(type == rhs.type);
 		ASSERT(scene == rhs.scene);

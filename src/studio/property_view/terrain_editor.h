@@ -50,7 +50,7 @@ public:
 
 private:
 	void drawCursor(Lumix::RenderScene& scene,
-					const Lumix::ComponentOld& cmp,
+					const Lumix::ComponentUID& cmp,
 					const Lumix::Vec3& center);
 	Lumix::Material* getMaterial();
 	bool overlaps(float min1, float max1, float min2, float max2);
@@ -77,7 +77,7 @@ private:
 	Lumix::WorldEditor& m_world_editor;
 	MainWindow& m_main_window;
 	Type m_type;
-	Lumix::ComponentOld m_component;
+	Lumix::ComponentUID m_component;
 	QTreeWidgetItem* m_texture_tree_item;
 	float m_terrain_brush_strength;
 	int m_terrain_brush_size;
@@ -94,7 +94,7 @@ public:
 	~TerrainComponentPlugin();
 
 	void createEditor(DynamicObjectModel::Node& parent_widget,
-					  const Lumix::ComponentOld& component);
+					  const Lumix::ComponentUID& component);
 
 private:
 	void addEntityTemplateNode(DynamicObjectModel::Node& node);

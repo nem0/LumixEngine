@@ -25,19 +25,19 @@ class EntityModel : public DynamicObjectModel
 	private:
 		Lumix::Universe* getUniverse();
 
-		void onComponentAdded(Lumix::ComponentOld component);
-		void onComponentDestroyed(Lumix::ComponentOld component);
-		void onPropertySet(Lumix::ComponentOld component, const Lumix::IPropertyDescriptor& descriptor);
+		void onComponentAdded(Lumix::ComponentUID component);
+		void onComponentDestroyed(Lumix::ComponentUID component);
+		void onPropertySet(Lumix::ComponentUID component, const Lumix::IPropertyDescriptor& descriptor);
 		void onEntityPosition(Lumix::Entity entity);
 		void onUniverseDestroyed();
 		void onEntityDestroyed(Lumix::Entity entity);
 
-		const char* getComponentName(Lumix::ComponentOld cmp) const;
-		void addArrayProperty(Node& child, Lumix::IArrayDescriptor* desc, Lumix::ComponentOld cmp);
-		void addResourceProperty(Node& child, Lumix::IPropertyDescriptor* desc, Lumix::ComponentOld cmp);
+		const char* getComponentName(Lumix::ComponentUID cmp) const;
+		void addArrayProperty(Node& child, Lumix::IArrayDescriptor* desc, Lumix::ComponentUID cmp);
+		void addResourceProperty(Node& child, Lumix::IPropertyDescriptor* desc, Lumix::ComponentUID cmp);
 		void addNameProperty();
 		void addPositionProperty();
-		void addComponentNode(Lumix::ComponentOld cmp, int row);
+		void addComponentNode(Lumix::ComponentUID cmp, int row);
 		void addComponent(QWidget* widget, QPoint pos);
 		void setEntityPosition(int index, float value);
 		void setEntityRotation(int index, float value);

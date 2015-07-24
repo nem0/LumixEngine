@@ -429,7 +429,7 @@ public:
 
 		if (index.isValid() && role == Qt::DisplayRole)
 		{
-			Lumix::ComponentOld renderable =
+			Lumix::ComponentUID renderable =
 				m_engine->getWorldEditor()->getComponent(item->m_entity,
 														 RENDERABLE_HASH);
 			const char* name =

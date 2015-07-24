@@ -666,9 +666,8 @@ public:
 			Terrain* terrain = m_allocator.newObject<Terrain>(
 				m_renderer, entity, *this, m_allocator);
 			m_terrains.push(terrain);
-			ComponentOld cmp = m_universe.addComponent(
-				entity, type, this, m_terrains.size() - 1);
-			return cmp.index;
+			m_universe.addComponent(entity, type, this, m_terrains.size() - 1);
+			return m_terrains.size() - 1;
 		}
 		else if (type == CAMERA_HASH)
 		{
@@ -683,21 +682,20 @@ public:
 			camera.m_near = 0.1f;
 			camera.m_far = 10000.0f;
 			camera.m_slot[0] = '\0';
-			ComponentOld cmp = m_universe.addComponent(
-				entity, type, this, m_cameras.size() - 1);
-			return cmp.index;
+			m_universe.addComponent(entity, type, this, m_cameras.size() - 1);
+			return m_cameras.size() - 1;
 		}
 		else if (type == RENDERABLE_HASH)
 		{
-			return createRenderable(entity).index;
+			return createRenderable(entity);
 		}
 		else if (type == GLOBAL_LIGHT_HASH)
 		{
-			return createGlobalLight(entity).index;
+			return createGlobalLight(entity);
 		}
 		else if (type == POINT_LIGHT_HASH)
 		{
-			return createPointLight(entity).index;
+			return createPointLight(entity);
 		}
 		return INVALID_COMPONENT;
 	}
@@ -1675,8 +1673,9 @@ public:
 		if (m_terrains[terrain])
 		{
 			hit = m_terrains[terrain]->castRay(origin, dir);
-			hit.m_component = ComponentOld(
-				m_terrains[terrain]->getEntity(), TERRAIN_HASH, this, terrain);
+			hit.m_component = terrain;
+			hit.m_component_type = TERRAIN_HASH;
+			hit.m_entity = m_terrains[terrain]->getEntity();
 		}
 		return hit;
 	}
@@ -1684,13 +1683,11 @@ public:
 
 	virtual RayCastModelHit castRay(const Vec3& origin,
 									const Vec3& dir,
-									const ComponentOld& ignore) override
+									ComponentIndex ignored_renderable) override
 	{
 		RayCastModelHit hit;
 		hit.m_is_hit = false;
-		int ignore_index = getRenderable(ignore.index);
-		Terrain* ignore_terrain =
-			ignore.type == TERRAIN_HASH ? m_terrains[ignore_index] : NULL;
+		int ignore_index = getRenderable(ignored_renderable);
 		for (int i = 0; i < m_renderables.size(); ++i)
 		{
 			if (ignore_index != i && m_renderables[i]->m_model)
@@ -1709,11 +1706,9 @@ public:
 					if (new_hit.m_is_hit &&
 						(!hit.m_is_hit || new_hit.m_t < hit.m_t))
 					{
-						new_hit.m_component =
-							ComponentOld(m_renderables[i]->m_entity,
-										 RENDERABLE_HASH,
-										 this,
-										 i);
+						new_hit.m_component = i;
+						new_hit.m_entity = m_renderables[i]->m_entity;
+						new_hit.m_component_type = RENDERABLE_HASH;
 						hit = new_hit;
 						hit.m_is_hit = true;
 					}
@@ -1726,11 +1721,12 @@ public:
 			{
 				RayCastModelHit terrain_hit =
 					m_terrains[i]->castRay(origin, dir);
-				if (terrain_hit.m_is_hit && ignore_terrain != m_terrains[i] &&
+				if (terrain_hit.m_is_hit &&
 					(!hit.m_is_hit || terrain_hit.m_t < hit.m_t))
 				{
-					terrain_hit.m_component = ComponentOld(
-						m_terrains[i]->getEntity(), TERRAIN_HASH, this, i);
+					terrain_hit.m_component = i;
+					terrain_hit.m_component_type = TERRAIN_HASH;
+					terrain_hit.m_entity = m_terrains[i]->getEntity();
 					hit = terrain_hit;
 				}
 			}
@@ -1739,11 +1735,11 @@ public:
 	}
 
 
-	int getPointLightIndex(int uid) const
+	int getPointLightIndex(ComponentIndex cmp) const
 	{
 		for (int i = 0; i < m_point_lights.size(); ++i)
 		{
-			if (m_point_lights[i].m_uid == uid)
+			if (m_point_lights[i].m_uid == cmp)
 			{
 				return i;
 			}
@@ -1751,13 +1747,7 @@ public:
 		return -1;
 	}
 
-
-	int getPointLightIndex(const ComponentOld& cmp) const
-	{
-		return getPointLightIndex(cmp.index);
-	}
-
-
+	
 	int getGlobalLightIndex(int uid) const
 	{
 		for (int i = 0; i < m_global_lights.size(); ++i)
@@ -2072,7 +2062,7 @@ private:
 	}
 
 
-	ComponentOld createGlobalLight(Entity entity)
+	ComponentIndex createGlobalLight(Entity entity)
 	{
 		GlobalLight& light = m_global_lights.pushEmpty();
 		light.m_entity = entity;
@@ -2089,13 +2079,12 @@ private:
 			m_active_global_light_uid = light.m_uid;
 		}
 
-		ComponentOld cmp = m_universe.addComponent(
-			entity, GLOBAL_LIGHT_HASH, this, light.m_uid);
-		return cmp;
+		m_universe.addComponent(entity, GLOBAL_LIGHT_HASH, this, light.m_uid);
+		return light.m_uid;
 	}
 
 
-	ComponentOld createPointLight(Entity entity)
+	ComponentIndex createPointLight(Entity entity)
 	{
 		PointLight& light = m_point_lights.pushEmpty();
 		m_light_influenced_geometry.push(Array<int>(m_allocator));
@@ -2107,16 +2096,15 @@ private:
 		light.m_fov = 999;
 		light.m_specular_color.set(1, 1, 1);
 
-		ComponentOld cmp = m_universe.addComponent(
-			entity, POINT_LIGHT_HASH, this, light.m_uid);
+		m_universe.addComponent(entity, POINT_LIGHT_HASH, this, light.m_uid);
 
 		detectLightInfluencedGeometry(m_point_lights.size() - 1);
 
-		return cmp;
+		return light.m_uid;
 	}
 
 
-	ComponentOld createRenderable(Entity entity)
+	ComponentIndex createRenderable(Entity entity)
 	{
 		int new_index = m_renderables.empty()
 							? 0
@@ -2129,12 +2117,12 @@ private:
 		r.m_component_index = new_index;
 		r.m_is_always_visible = false;
 		r.m_matrix = m_universe.getMatrix(entity);
-		ComponentOld cmp = m_universe.addComponent(
+		m_universe.addComponent(
 			entity, RENDERABLE_HASH, this, r.m_component_index);
 		m_culling_system->addStatic(
 			Sphere(m_universe.getPosition(entity), 1.0f));
 		m_renderable_created.invoke(r.m_component_index);
-		return cmp;
+		return r.m_component_index;
 	}
 
 private:

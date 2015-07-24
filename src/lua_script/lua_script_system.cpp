@@ -169,9 +169,8 @@ public:
 			script.m_path = "";
 			script.m_state = nullptr;
 			m_valid.push(true);
-			ComponentOld cmp = m_universe.addComponent(
-				entity, type, this, m_scripts.size() - 1);
-			return cmp.index;
+			m_universe.addComponent(entity, type, this, m_scripts.size() - 1);
+			return m_scripts.size() - 1;
 		}
 		return INVALID_COMPONENT;
 	}

@@ -34,10 +34,10 @@ public:
 	void createEntity(Entity entity);
 	Entity createEntity();
 	void destroyEntity(Entity entity);
-	ComponentOld addComponent(Entity entity,
-							  uint32_t component_type,
-							  IScene* scene,
-							  int index);
+	void addComponent(Entity entity,
+					  uint32_t component_type,
+					  IScene* scene,
+					  int index);
 	void destroyComponent(Entity entity,
 						  uint32_t component_type,
 						  IScene* scene,
@@ -67,12 +67,12 @@ public:
 	DelegateList<void(Entity)>& entityCreated() { return m_entity_created; }
 	DelegateList<void(Entity)>& entityDestroyed() { return m_entity_destroyed; }
 
-	DelegateList<void(const ComponentOld&)>& componentDestroyed()
+	DelegateList<void(const ComponentUID&)>& componentDestroyed()
 	{
 		return m_component_destroyed;
 	}
 
-	Delegate<void(const ComponentOld&)>& componentAdded()
+	Delegate<void(const ComponentUID&)>& componentAdded()
 	{
 		return m_component_added;
 	}
@@ -90,8 +90,8 @@ private:
 	DelegateList<void(Entity)> m_entity_moved;
 	DelegateList<void(Entity)> m_entity_created;
 	DelegateList<void(Entity)> m_entity_destroyed;
-	DelegateList<void(const ComponentOld&)> m_component_destroyed;
-	Delegate<void(const ComponentOld&)> m_component_added;
+	DelegateList<void(const ComponentUID&)> m_component_destroyed;
+	Delegate<void(const ComponentUID&)> m_component_added;
 };
 
 
