@@ -75,7 +75,7 @@ public:
 	}
 
 
-	virtual ComponentOld getAnimable(const Entity& entity) override
+	virtual ComponentOld getAnimable(Entity entity) override
 	{
 		for (int i = 0; i < m_animables.size(); ++i)
 		{
@@ -88,8 +88,8 @@ public:
 	}
 
 
-	virtual ComponentNew createComponent(uint32_t type,
-										 const Entity& entity) override
+	virtual ComponentIndex createComponent(uint32_t type,
+										   Entity entity) override
 	{
 		if (type == ANIMABLE_HASH)
 		{
@@ -99,7 +99,7 @@ public:
 	}
 
 
-	virtual void destroyComponent(ComponentNew component, uint32_t type)
+	virtual void destroyComponent(ComponentIndex component, uint32_t type)
 	{
 		if (type == ANIMABLE_HASH)
 		{
@@ -171,26 +171,25 @@ public:
 	}
 
 
-	void getPreview(ComponentOld cmp, string& path)
+	void getPreview(ComponentIndex cmp, string& path)
 	{
-		path = m_animables[cmp.index].m_animation
-				   ? m_animables[cmp.index].m_animation->getPath().c_str()
+		path = m_animables[cmp].m_animation
+				   ? m_animables[cmp].m_animation->getPath().c_str()
 				   : "";
 	}
 
 
-	void setPreview(ComponentOld cmp, const string& path)
+	void setPreview(ComponentIndex cmp, const string& path)
 	{
 		playAnimation(cmp, path.c_str());
 	}
 
 
-	virtual void playAnimation(const ComponentOld& cmp,
-							   const char* path) override
+	virtual void playAnimation(ComponentIndex cmp, const char* path) override
 	{
-		m_animables[cmp.index].m_animation = loadAnimation(path);
-		m_animables[cmp.index].m_time = 0;
-		m_animables[cmp.index].m_manual = false;
+		m_animables[cmp].m_animation = loadAnimation(path);
+		m_animables[cmp].m_time = 0;
+		m_animables[cmp].m_manual = false;
 	}
 
 
@@ -231,7 +230,7 @@ public:
 				animable.m_animation->getPose(
 					animable.m_time,
 					scene->getPose(animable.m_renderable.index),
-					*scene->getRenderableModel(animable.m_renderable));
+					*scene->getRenderableModel(animable.m_renderable.index));
 				if (!animable.m_manual)
 				{
 					float t = animable.m_time + time_delta;
@@ -272,7 +271,7 @@ private:
 	}
 
 
-	ComponentOld createAnimable(const Entity& entity)
+	ComponentOld createAnimable(Entity entity)
 	{
 		Animable* src = NULL;
 		for (int i = 0, c = m_animables.size(); i < c; ++i)

@@ -51,23 +51,19 @@ void InsertMeshCommand::execute()
 	m_entity = universe->createEntity();
 	universe->setPosition(m_entity, m_position);
 	const Lumix::Array<Lumix::IScene*>& scenes = engine.getScenes();
-	Lumix::ComponentOld cmp;
+	Lumix::ComponentIndex cmp;
 	Lumix::IScene* scene = NULL;
 	for (int i = 0; i < scenes.size(); ++i)
 	{
-		cmp = Lumix::ComponentOld(
-			m_entity,
-			RENDERABLE_HASH,
-			scenes[i],
-			scenes[i]->createComponent(RENDERABLE_HASH, m_entity));
+		cmp = scenes[i]->createComponent(RENDERABLE_HASH, m_entity);
 
-		if (cmp.isValid())
+		if (cmp >= 0)
 		{
 			scene = scenes[i];
 			break;
 		}
 	}
-	if (cmp.isValid())
+	if (cmp >= 0)
 	{
 		char rel_path[LUMIX_MAX_PATH];
 		m_editor.getRelativePath(rel_path, LUMIX_MAX_PATH, Lumix::Path(m_mesh_path.c_str()));
@@ -85,7 +81,7 @@ void InsertMeshCommand::undo()
 		cmps[i].scene->destroyComponent(cmps[i].index, cmps[i].type);
 	}
 	m_editor.getUniverse()->destroyEntity(m_entity);
-	m_entity = Lumix::NEW_INVALID_ENTITY;
+	m_entity = Lumix::INVALID_ENTITY;
 }
 
 

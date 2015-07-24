@@ -74,7 +74,7 @@ EntityModel::EntityModel(PropertyView& view,
 void EntityModel::reset(const QString& reason)
 {
 	beginResetModel();
-	m_entity = Lumix::NEW_INVALID_ENTITY;
+	m_entity = Lumix::INVALID_ENTITY;
 	for (int i = 0; i < getRoot().m_children.size(); ++i)
 	{
 		delete getRoot().m_children[i];
@@ -88,7 +88,7 @@ void EntityModel::reset(const QString& reason)
 }
 
 
-void EntityModel::onEntityDestroyed(const Lumix::Entity& entity)
+void EntityModel::onEntityDestroyed(Lumix::Entity entity)
 {
 	if (entity == m_entity)
 	{
@@ -349,7 +349,7 @@ void EntityModel::addPositionProperty()
 		.bind<EntityModel, &EntityModel::onEntityPosition>(this);
 }
 
-void EntityModel::onEntityPosition(const Lumix::Entity& entity)
+void EntityModel::onEntityPosition(Lumix::Entity entity)
 {
 	if (entity == m_entity)
 	{

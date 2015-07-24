@@ -18,7 +18,7 @@ class InsertMeshCommand : public Lumix::IEditorCommand
 		virtual void undo() override;
 		virtual uint32_t getType() override;
 		virtual bool merge(IEditorCommand&);
-		const Lumix::Entity& getEntity() const { return m_entity; }
+		Lumix::Entity getEntity() const { return m_entity; }
 
 	private:
 		Lumix::Vec3 m_position;

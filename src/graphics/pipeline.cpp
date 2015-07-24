@@ -516,23 +516,24 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void renderShadowmap(ComponentOld camera, int64_t layer_mask)
+	void renderShadowmap(ComponentIndex camera, int64_t layer_mask)
 	{
 		Universe& universe = m_scene->getUniverse();
-		ComponentOld light_cmp = m_scene->getActiveGlobalLight();
-		if (!light_cmp.isValid() || !camera.isValid())
+		ComponentIndex light_cmp = m_scene->getActiveGlobalLight();
+		if (light_cmp < 0 || camera < 0)
 		{
 			return;
 		}
-		Matrix light_mtx = universe.getMatrix(light_cmp.entity);
+		Matrix light_mtx =
+			universe.getMatrix(m_scene->getGlobalLightEntity(light_cmp));
 
 		float shadowmap_height = (float)m_current_framebuffer->getHeight();
 		float shadowmap_width = (float)m_current_framebuffer->getWidth();
 		float viewports[] = {0, 0, 0.5f, 0, 0, 0.5f, 0.5f, 0.5f};
 
-		float camera_fov = m_scene->getCameraFOV(camera.index);
-		float camera_ratio = m_scene->getCameraWidth(camera.index) /
-							 m_scene->getCameraHeight(camera.index);
+		float camera_fov = m_scene->getCameraFOV(camera);
+		float camera_ratio = m_scene->getCameraWidth(camera) /
+							 m_scene->getCameraHeight(camera);
 		for (int split_index = 0; split_index < 4; ++split_index)
 		{
 			if (split_index > 0)
@@ -553,7 +554,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 							  (uint16_t)(0.5f * shadowmap_height - 2));
 
 			Frustum frustum;
-			Matrix camera_matrix = universe.getMatrix(camera.entity);
+			Matrix camera_matrix =
+				universe.getMatrix(m_scene->getCameraEntity(camera));
 			frustum.computePerspective(camera_matrix.getTranslation(),
 									   camera_matrix.getZVector(),
 									   camera_matrix.getYVector(),
@@ -664,11 +666,17 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void setPointLightUniforms(const ComponentOld& light_cmp) const
+	void setPointLightUniforms(ComponentIndex light_cmp) const
 	{
-		Universe& universe = m_scene->getUniverse();
+		if (light_cmp < 0)
+		{
+			return;
+		}
 
-		Vec4 light_pos_radius(universe.getPosition(light_cmp.entity),
+		Universe& universe = m_scene->getUniverse();
+		Entity entity = m_scene->getPointLightEntity(light_cmp);
+
+		Vec4 light_pos_radius(universe.getPosition(entity),
 							  m_scene->getLightRange(light_cmp));
 		bgfx::setUniform(m_light_pos_radius_uniform, &light_pos_radius);
 
@@ -678,20 +686,28 @@ struct PipelineInstanceImpl : public PipelineInstance
 						 innerRadius);
 		bgfx::setUniform(m_light_color_uniform, &light_color);
 
-		Vec4 light_dir_fov(universe.getRotation(light_cmp.entity) *
+		Vec4 light_dir_fov(universe.getRotation(entity) *
 							   Vec3(0, 0, 1),
 						   m_scene->getLightFOV(light_cmp));
 		bgfx::setUniform(m_light_dir_fov_uniform, &light_dir_fov);
 
-		Vec4 light_specular(m_scene->getPointLightSpecularColor(light_cmp),
-							1.0);
+		Vec4 light_specular(
+			m_scene->getPointLightSpecularColor(light_cmp), 1.0);
 		bgfx::setUniform(m_light_specular_uniform, &light_specular);
+
+		bgfx::submit(m_view_idx);
 	}
 
 
-	void setDirectionalLightUniforms(const ComponentOld& light_cmp) const
+	void setDirectionalLightUniforms(ComponentIndex light_cmp) const
 	{
+		if (light_cmp < 0)
+		{
+			return;
+		}
+
 		Universe& universe = m_scene->getUniverse();
+		Entity entity = m_scene->getGlobalLightEntity(light_cmp);
 
 		Vec4 diffuse_light_color(
 			m_scene->getGlobalLightColor(light_cmp) *
@@ -705,7 +721,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 			1);
 		bgfx::setUniform(m_ambient_color_uniform, &ambient_light_color);
 
-		Vec4 light_dir_fov(universe.getRotation(light_cmp.entity) * Vec3(0, 0, 1), 0);
+		Vec4 light_dir_fov(
+			universe.getRotation(entity) * Vec3(0, 0, 1), 0);
 		bgfx::setUniform(m_light_dir_fov_uniform, &light_dir_fov);
 
 		bgfx::setUniform(
@@ -715,22 +732,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		Vec4 fog_color_density(m_scene->getFogColor(light_cmp),
 							   m_scene->getFogDensity(light_cmp));
 		bgfx::setUniform(m_fog_color_density_uniform, &fog_color_density);
-	}
 
-
-	void setLightUniforms(const ComponentOld& light_cmp) const
-	{
-		if (light_cmp.isValid())
-		{
-			if (light_cmp.type == POINT_LIGHT_HASH)
-			{
-				setPointLightUniforms(light_cmp);
-			}
-			else
-			{
-				setDirectionalLightUniforms(light_cmp);
-			}
-		}
 		bgfx::submit(m_view_idx);
 	}
 
@@ -746,7 +748,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	{
 		PROFILE_FUNCTION();
 
-		Array<ComponentOld> lights(m_allocator);
+		Array<ComponentIndex> lights(m_allocator);
 		m_scene->getPointLights(frustum, lights);
 		for (int i = 0; i < lights.size(); ++i)
 		{
@@ -754,7 +756,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 			m_tmp_meshes.clear();
 			m_tmp_terrains.clear();
 
-			ComponentOld light = lights[i];
+			ComponentIndex light = lights[i];
 			m_scene->getPointLightInfluencedGeometry(
 				light, frustum, m_tmp_meshes, layer_mask);
 
@@ -762,11 +764,11 @@ struct PipelineInstanceImpl : public PipelineInstance
 				m_tmp_terrains,
 				layer_mask,
 				m_scene->getUniverse().getPosition(
-					m_scene->getAppliedCamera().entity),
+					m_scene->getCameraEntity(m_scene->getAppliedCamera())),
 				m_frame_allocator);
 
 			m_scene->getGrassInfos(frustum, m_tmp_grasses, layer_mask);
-			setLightUniforms(light);
+			setPointLightUniforms(light);
 			renderMeshes(m_tmp_meshes);
 			renderTerrains(m_tmp_terrains);
 			renderGrasses(m_tmp_grasses);
@@ -853,7 +855,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	{
 		PROFILE_FUNCTION();
 
-		if (m_scene->getAppliedCamera().isValid())
+		if (m_scene->getAppliedCamera() >= 0)
 		{
 			m_tmp_grasses.clear();
 			m_tmp_meshes.clear();
@@ -864,9 +866,9 @@ struct PipelineInstanceImpl : public PipelineInstance
 				m_tmp_terrains,
 				layer_mask,
 				m_scene->getUniverse().getPosition(
-					m_scene->getAppliedCamera().entity),
+					m_scene->getCameraEntity(m_scene->getAppliedCamera())),
 				m_frame_allocator);
-			setLightUniforms(m_scene->getActiveGlobalLight());
+			setDirectionalLightUniforms(m_scene->getActiveGlobalLight());
 			renderMeshes(m_tmp_meshes);
 			renderTerrains(m_tmp_terrains);
 			if (!is_shadowmap)
@@ -1109,7 +1111,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 		inv_world_matrix = info.m_world_matrix;
 		inv_world_matrix.fastInverse();
 		Vec3 camera_pos = m_scene->getUniverse().getPosition(
-			m_scene->getAppliedCamera().entity);
+			m_scene->getCameraEntity(m_scene->getAppliedCamera()));
+
 		Vec3 rel_cam_pos = inv_world_matrix.multiplyPosition(camera_pos) /
 						   info.m_terrain->getXZScale();
 
@@ -1451,8 +1454,8 @@ void disableBlending(PipelineInstanceImpl* pipeline)
 
 void applyCamera(PipelineInstanceImpl* pipeline, const char* slot)
 {
-	ComponentOld cmp = pipeline->m_scene->getCameraInSlot(slot);
-	if (cmp.isValid())
+	ComponentIndex cmp = pipeline->m_scene->getCameraInSlot(slot);
+	if (cmp >= 0)
 	{
 		if (pipeline->m_framebuffer_width > 0)
 		{
@@ -1472,20 +1475,21 @@ void applyCamera(PipelineInstanceImpl* pipeline, const char* slot)
 		}
 
 		pipeline->m_scene->setCameraSize(
-			cmp.index, pipeline->m_width, pipeline->m_height);
-		pipeline->m_scene->applyCamera(cmp.index);
+			cmp, pipeline->m_width, pipeline->m_height);
+		pipeline->m_scene->applyCamera(cmp);
 
 		Matrix view_matrix, projection_matrix;
-		float fov = pipeline->getScene()->getCameraFOV(cmp.index);
-		float near_plane = pipeline->getScene()->getCameraNearPlane(cmp.index);
-		float far_plane = pipeline->getScene()->getCameraFarPlane(cmp.index);
+		float fov = pipeline->getScene()->getCameraFOV(cmp);
+		float near_plane = pipeline->getScene()->getCameraNearPlane(cmp);
+		float far_plane = pipeline->getScene()->getCameraFarPlane(cmp);
 		projection_matrix.setPerspective(Math::degreesToRadians(fov),
 										 (float)pipeline->m_width,
 										 (float)pipeline->m_height,
 										 near_plane,
 										 far_plane);
 
-		Matrix mtx = pipeline->getScene()->getUniverse().getMatrix(cmp.entity);
+		Matrix mtx = pipeline->getScene()->getUniverse().getMatrix(
+			pipeline->getScene()->getCameraEntity(cmp));
 		Vec3 pos = mtx.getTranslation();
 		Vec3 center = pos - mtx.getZVector();
 		Vec3 up = mtx.getYVector();

@@ -8,7 +8,6 @@
 namespace Lumix
 {
 	
-struct ComponentOld;
 class FrameBuffer;
 class JsonSerializer;
 struct Matrix;

@@ -37,21 +37,21 @@ class LUMIX_PHYSICS_API PhysicsScene : public IScene
 		virtual bool raycast(const Vec3& origin, const Vec3& dir, float distance, RaycastHit& result) = 0;
 		virtual PhysicsSystem& getSystem() const = 0;
 		
-		virtual bool isDynamic(ComponentNew cmp) = 0;
-		virtual void setIsDynamic(ComponentNew cmp, bool) = 0;
-		virtual Vec3 getHalfExtents(ComponentNew cmp) = 0;
-		virtual void setHalfExtents(ComponentNew cmp, const Vec3& size) = 0;
-		virtual void getShapeSource(ComponentNew cmp, string& str) = 0;
-		virtual void setShapeSource(ComponentNew cmp, const string& str) = 0;
-		virtual void getHeightmap(ComponentNew cmp, string& str) = 0;
-		virtual void setHeightmap(ComponentNew cmp, const string& str) = 0;
-		virtual float getHeightmapXZScale(ComponentNew cmp) = 0;
-		virtual void setHeightmapXZScale(ComponentNew cmp, float scale) = 0;
-		virtual float getHeightmapYScale(ComponentNew cmp) = 0;
-		virtual void setHeightmapYScale(ComponentNew cmp, float scale) = 0;
+		virtual bool isDynamic(ComponentIndex cmp) = 0;
+		virtual void setIsDynamic(ComponentIndex cmp, bool) = 0;
+		virtual Vec3 getHalfExtents(ComponentIndex cmp) = 0;
+		virtual void setHalfExtents(ComponentIndex cmp, const Vec3& size) = 0;
+		virtual void getShapeSource(ComponentIndex cmp, string& str) = 0;
+		virtual void setShapeSource(ComponentIndex cmp, const string& str) = 0;
+		virtual void getHeightmap(ComponentIndex cmp, string& str) = 0;
+		virtual void setHeightmap(ComponentIndex cmp, const string& str) = 0;
+		virtual float getHeightmapXZScale(ComponentIndex cmp) = 0;
+		virtual void setHeightmapXZScale(ComponentIndex cmp, float scale) = 0;
+		virtual float getHeightmapYScale(ComponentIndex cmp) = 0;
+		virtual void setHeightmapYScale(ComponentIndex cmp, float scale) = 0;
 
-		virtual void moveController(ComponentNew cmp, const Vec3& v, float dt) = 0;
-		virtual ComponentNew getController(const Entity& entity) = 0;
+		virtual void moveController(ComponentIndex cmp, const Vec3& v, float dt) = 0;
+		virtual ComponentIndex getController(Entity entity) = 0;
 };
 
 

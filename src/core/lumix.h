@@ -28,11 +28,20 @@
 
 const uint32_t LUMIX_MAX_PATH = 260;
 
+
+namespace Lumix
+{
+	typedef int Entity;
+	const int INVALID_ENTITY = -1;
+}
+
+
 template <typename T, int count>
 int lengthOf(const T(&)[count])
 {
 	return count;
 };
+
 
 #ifndef ASSERT
 	#ifdef _WIN32
@@ -61,14 +70,6 @@ int lengthOf(const T(&)[count])
 #else
 	#define LUMIX_PHYSICS_API LUMIX_LIBRARY_IMPORT
 #endif
-
-
-#ifdef BUILDING_NAVIGATION
-	#define LUMIX_NAVIGATION_API LUMIX_LIBRARY_EXPORT
-#else
-	#define LUMIX_NAVIGATION_API LUMIX_LIBRARY_IMPORT
-#endif
-
 
 #ifdef BUILDING_ENGINE
 	#define LUMIX_ENGINE_API LUMIX_LIBRARY_EXPORT

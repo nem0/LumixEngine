@@ -126,7 +126,7 @@ void PhysicsSystemImpl::registerProperties()
 		editor->registerComponentType("mesh_rigid_actor", "Physics Mesh");
 		editor->registerComponentType("physical_heightfield",
 									  "Physics Heightfield");
-		/*
+
 		IAllocator& allocator = editor->getAllocator();
 		editor->registerProperty(
 			"box_rigid_actor",
@@ -177,7 +177,7 @@ void PhysicsSystemImpl::registerProperties()
 				0.0f,
 				FLT_MAX,
 				0.0f,
-				allocator));*/
+				allocator));
 	}
 }
 

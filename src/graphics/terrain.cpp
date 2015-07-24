@@ -168,7 +168,7 @@ namespace Lumix
 	};
 
 
-	Terrain::Terrain(Renderer& renderer, const Entity& entity, RenderScene& scene, IAllocator& allocator)
+	Terrain::Terrain(Renderer& renderer, Entity entity, RenderScene& scene, IAllocator& allocator)
 		: m_mesh(NULL)
 		, m_material(NULL)
 		, m_root(NULL)
@@ -333,7 +333,7 @@ namespace Lumix
 		}
 	}
 
-	Array<Terrain::GrassQuad*>& Terrain::getQuads(const ComponentOld& camera)
+	Array<Terrain::GrassQuad*>& Terrain::getQuads(ComponentIndex camera)
 	{
 		int quads_index = m_grass_quads.find(camera);
 		if (quads_index < 0)
@@ -345,7 +345,7 @@ namespace Lumix
 	}
 
 
-	void Terrain::updateGrass(const ComponentOld& camera)
+	void Terrain::updateGrass(ComponentIndex camera)
 	{
 		PROFILE_FUNCTION();
 		if (!m_splatmap)
@@ -365,7 +365,8 @@ namespace Lumix
 		}
 
 		Universe& universe = m_scene.getUniverse();
-		Vec3 camera_position = universe.getPosition(camera.entity);
+		Entity camera_entity = m_scene.getCameraEntity(camera);
+		Vec3 camera_position = universe.getPosition(camera_entity);
 		if ((m_last_camera_position[camera] - camera_position).length() > 1 || m_force_grass_update)
 		{
 			m_force_grass_update = false;
@@ -474,7 +475,7 @@ namespace Lumix
 	}
 
 
-	void Terrain::getGrassInfos(const Frustum&, Array<GrassInfo>& infos, const ComponentOld& camera)
+	void Terrain::getGrassInfos(const Frustum&, Array<GrassInfo>& infos, ComponentIndex camera)
 	{
 		updateGrass(camera);
 		Array<GrassQuad*>& quads = getQuads(camera);

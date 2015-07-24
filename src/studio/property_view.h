@@ -7,7 +7,6 @@
 #include "core/string.h"
 #include "core/resource.h"
 #include "property_view/dynamic_object_model.h"
-#include "universe/entity.h"
 
 
 namespace Lumix

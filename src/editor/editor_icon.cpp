@@ -50,7 +50,7 @@ void EditorIcon::unloadIcons()
 }
 
 
-EditorIcon::EditorIcon(Engine& engine, RenderScene& scene, const Entity& entity)
+EditorIcon::EditorIcon(Engine& engine, RenderScene& scene, Entity entity)
 {
 	m_scale = 1;
 	m_scene = &scene;
@@ -128,10 +128,10 @@ void EditorIcon::render(PipelineInstance& pipeline)
 	if (m_is_visible)
 	{
 		const Universe& universe = m_scene->getUniverse();
-		ComponentOld camera = m_scene->getCameraInSlot("editor");
-		Lumix::Matrix mtx = universe.getMatrix(camera.entity);
+		ComponentIndex camera = m_scene->getCameraInSlot("editor");
+		Lumix::Matrix mtx = universe.getMatrix(m_scene->getCameraEntity(camera));
 
-		float fov = static_cast<RenderScene*>(camera.scene)->getCameraFOV(camera.index);
+		float fov = m_scene->getCameraFOV(camera);
 		float scale = tan(fov * Math::PI / 180 * 0.5f) * (universe.getPosition(m_entity) - mtx.getTranslation()).length() / 20;
 
 		mtx.setTranslation(universe.getPosition(m_entity));

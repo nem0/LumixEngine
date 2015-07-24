@@ -119,7 +119,7 @@ const char* Universe::getEntityName(Entity entity) const
 }
 
 
-void Universe::createEntity(const Entity& entity)
+void Universe::createEntity(Entity entity)
 {
 	ASSERT(entity >= 0);
 	for (int i = 0; i < m_free_slots.size(); ++i)
@@ -159,7 +159,7 @@ Entity Universe::createEntity()
 }
 
 
-void Universe::destroyEntity(Entity& entity)
+void Universe::destroyEntity(Entity entity)
 {
 	if (entity >= 0)
 	{
@@ -187,7 +187,7 @@ Entity Universe::getFirstEntity()
 			return Entity(i);
 		}
 	}
-	return NEW_INVALID_ENTITY;
+	return INVALID_ENTITY;
 }
 
 
@@ -209,7 +209,7 @@ Entity Universe::getNextEntity(Entity entity)
 			return Entity(i);
 		}
 	}
-	return NEW_INVALID_ENTITY;
+	return INVALID_ENTITY;
 }
 
 
@@ -276,7 +276,7 @@ void Universe::destroyComponent(const ComponentOld& cmp)
 }
 
 
-ComponentOld Universe::addComponent(const Entity& entity,
+ComponentOld Universe::addComponent(Entity entity,
 									uint32_t component_type,
 									IScene* scene,
 									int index)
