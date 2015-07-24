@@ -13,7 +13,7 @@
 #include <qpushbutton.h>
 
 
-const char* EntityModel::getComponentName(Lumix::ComponentOld cmp) const
+const char* EntityModel::getComponentName(Lumix::ComponentUID cmp) const
 {
 	for (int i = 0; i < m_editor.getComponentTypesCount(); ++i)
 	{
@@ -54,7 +54,7 @@ EntityModel::EntityModel(PropertyView& view,
 	Lumix::WorldEditor::ComponentList& cmps = m_editor.getComponents(m_entity);
 	for (int i = 0; i < cmps.size(); ++i)
 	{
-		Lumix::ComponentOld cmp = cmps[i];
+		Lumix::ComponentUID cmp = cmps[i];
 		addComponentNode(cmp, i);
 	}
 
@@ -122,7 +122,7 @@ EntityModel::~EntityModel()
 }
 
 
-void EntityModel::onComponentAdded(Lumix::ComponentOld component)
+void EntityModel::onComponentAdded(Lumix::ComponentUID component)
 {
 	if (m_entity == component.entity)
 	{
@@ -136,7 +136,7 @@ void EntityModel::onComponentAdded(Lumix::ComponentOld component)
 }
 
 
-void EntityModel::onComponentDestroyed(Lumix::ComponentOld component)
+void EntityModel::onComponentDestroyed(Lumix::ComponentUID component)
 {
 	if (component.entity == m_entity)
 	{
@@ -151,7 +151,7 @@ void EntityModel::onComponentDestroyed(Lumix::ComponentOld component)
 }
 
 
-void EntityModel::onPropertySet(Lumix::ComponentOld component,
+void EntityModel::onPropertySet(Lumix::ComponentUID component,
 								const Lumix::IPropertyDescriptor& descriptor)
 {
 	if (component.entity == m_entity && !m_is_setting)
@@ -366,7 +366,7 @@ void EntityModel::onEntityPosition(Lumix::Entity entity)
 
 void EntityModel::addResourceProperty(Node& child,
 									  Lumix::IPropertyDescriptor* desc,
-									  Lumix::ComponentOld cmp)
+									  Lumix::ComponentUID cmp)
 {
 	child.m_setter = [desc, cmp, this](const QVariant& value)
 	{
@@ -433,7 +433,7 @@ void EntityModel::addResourceProperty(Node& child,
 
 void EntityModel::addArrayProperty(Node& child,
 								   Lumix::IArrayDescriptor* array_desc,
-								   Lumix::ComponentOld cmp)
+								   Lumix::ComponentUID cmp)
 {
 	child.onCreateEditor = [cmp, array_desc](QWidget* parent,
 											 const QStyleOptionViewItem&)
@@ -480,7 +480,7 @@ void EntityModel::addArrayProperty(Node& child,
 }
 
 
-void EntityModel::addComponentNode(Lumix::ComponentOld cmp, int component_index)
+void EntityModel::addComponentNode(Lumix::ComponentUID cmp, int component_index)
 {
 	Node& node = getRoot().addChild(getComponentName(cmp), component_index + 3);
 	node.m_getter = []() -> QVariant
@@ -647,7 +647,7 @@ void EntityModel::set(Lumix::Entity entity,
 					  QVariant value)
 {
 	m_is_setting = true;
-	Lumix::ComponentOld cmp = m_editor.getComponent(entity, component_type);
+	Lumix::ComponentUID cmp = m_editor.getComponent(entity, component_type);
 	ASSERT(cmp.isValid());
 	switch (desc->getType())
 	{
@@ -700,7 +700,7 @@ QVariant EntityModel::get(Lumix::Entity entity,
 						  int index,
 						  Lumix::IPropertyDescriptor* desc)
 {
-	Lumix::ComponentOld cmp = m_editor.getComponent(entity, component_type);
+	Lumix::ComponentUID cmp = m_editor.getComponent(entity, component_type);
 	ASSERT(cmp.isValid());
 	Lumix::StackAllocator<256> allocator;
 	Lumix::OutputBlob stream(allocator);

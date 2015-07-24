@@ -6,7 +6,7 @@
 #include "core/string.h"
 #include "engine/iplugin.h"
 #include "graphics/ray_cast_model_hit.h"
-#include "universe/component.h"
+
 
 namespace Lumix
 {
@@ -88,12 +88,15 @@ public:
 
 	virtual RayCastModelHit castRay(const Vec3& origin,
 									const Vec3& dir,
-									const ComponentOld& ignore) = 0;
+									ComponentIndex ignore) = 0;
+
 	virtual RayCastModelHit castRayTerrain(ComponentIndex terrain,
 										   const Vec3& origin,
 										   const Vec3& dir) = 0;
+
 	virtual void getRay(
 		ComponentIndex camera, float x, float y, Vec3& origin, Vec3& dir) = 0;
+
 	virtual void applyCamera(ComponentIndex camera) = 0;
 	virtual ComponentIndex getAppliedCamera() const = 0;
 	virtual void update(float dt) = 0;
@@ -139,8 +142,10 @@ public:
 								 float far_distance,
 								 const Vec3& color,
 								 float life) = 0;
+
 	virtual void
 	addDebugFrustum(const Frustum& frustum, const Vec3& color, float life) = 0;
+
 	virtual void addDebugCylinder(const Vec3& position,
 								  const Vec3& up,
 								  float radius,

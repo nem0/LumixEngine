@@ -59,7 +59,7 @@ public:
 						const Lumix::Vec3& hit_pos,
 						float radius,
 						float rel_amount,
-						Lumix::ComponentOld terrain,
+						Lumix::ComponentUID terrain,
 						bool can_be_merged)
 		: m_world_editor(editor)
 		, m_terrain(terrain)
@@ -70,7 +70,8 @@ public:
 		, m_type(type)
 		, m_texture_idx(0)
 	{
-		Lumix::Matrix entity_mtx = editor.getUniverse()->getMatrix(terrain.entity);
+		Lumix::Matrix entity_mtx =
+			editor.getUniverse()->getMatrix(terrain.entity);
 		entity_mtx.fastInverse();
 		Lumix::Vec3 local_pos = entity_mtx.multiplyPosition(hit_pos);
 		float xz_scale = static_cast<Lumix::RenderScene*>(terrain.scene)
@@ -91,7 +92,7 @@ public:
 						const Lumix::Vec3& hit_pos,
 						float radius,
 						float rel_amount,
-						Lumix::ComponentOld terrain,
+						Lumix::ComponentUID terrain,
 						bool can_be_merged)
 		: m_world_editor(editor)
 		, m_terrain(terrain)
@@ -102,7 +103,8 @@ public:
 		, m_type(type)
 		, m_texture_idx(texture_idx)
 	{
-		Lumix::Matrix entity_mtx = editor.getUniverse()->getMatrix(terrain.entity);
+		Lumix::Matrix entity_mtx =
+			editor.getUniverse()->getMatrix(terrain.entity);
 		entity_mtx.fastInverse();
 		Lumix::Vec3 local_pos = entity_mtx.multiplyPosition(hit_pos);
 		float xz_scale = static_cast<Lumix::RenderScene*>(terrain.scene)
@@ -569,7 +571,7 @@ private:
 	int m_y;
 	TerrainEditor::Type m_type;
 	Lumix::Array<Item> m_items;
-	Lumix::ComponentOld m_terrain;
+	Lumix::ComponentUID m_terrain;
 	Lumix::WorldEditor& m_world_editor;
 	bool m_can_be_merged;
 };
@@ -580,15 +582,16 @@ TerrainComponentPlugin::TerrainComponentPlugin(MainWindow& main_window)
 {
 	m_terrain_editor =
 		new TerrainEditor(*main_window.getWorldEditor(), main_window);
-	connect(main_window.getPropertyView(),
-			&PropertyView::componentNodeCreated,
-			[this](DynamicObjectModel::Node& node, const Lumix::ComponentOld& cmp)
+	connect(
+		main_window.getPropertyView(),
+		&PropertyView::componentNodeCreated,
+		[this](DynamicObjectModel::Node& node, const Lumix::ComponentUID& cmp)
+		{
+			if (cmp.type == crc32("terrain"))
 			{
-				if (cmp.type == crc32("terrain"))
-				{
-					createEditor(node, cmp);
-				}
-			});
+				createEditor(node, cmp);
+			}
+		});
 }
 
 
@@ -599,7 +602,7 @@ TerrainComponentPlugin::~TerrainComponentPlugin()
 
 
 void TerrainComponentPlugin::createEditor(DynamicObjectModel::Node& node,
-										  const Lumix::ComponentOld& component)
+										  const Lumix::ComponentUID& component)
 {
 	m_terrain_editor->m_component = component;
 	if (!m_terrain_editor->getMaterial() ||
@@ -835,7 +838,7 @@ TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor,
 
 
 void TerrainEditor::drawCursor(Lumix::RenderScene& scene,
-							   const Lumix::ComponentOld& terrain,
+							   const Lumix::ComponentUID& terrain,
 							   const Lumix::Vec3& center)
 {
 	/*for (int i = 0; i < 20; ++i)
@@ -869,18 +872,21 @@ void TerrainEditor::tick()
 		for (int i = m_world_editor.getSelectedEntities().size() - 1; i >= 0;
 			 --i)
 		{
-			Lumix::ComponentOld terrain = m_world_editor.getComponent(
+			Lumix::ComponentUID terrain = m_world_editor.getComponent(
 				m_world_editor.getSelectedEntities()[i], crc32("terrain"));
 			if (terrain.isValid())
 			{
-				Lumix::ComponentOld camera_cmp = m_world_editor.getEditCamera();
+				Lumix::ComponentUID camera_cmp = m_world_editor.getEditCamera();
 				Lumix::RenderScene* scene =
 					static_cast<Lumix::RenderScene*>(camera_cmp.scene);
 				Lumix::Vec3 origin, dir;
-				scene->getRay(
-					camera_cmp.index, (float)mouse_x, (float)mouse_y, origin, dir);
+				scene->getRay(camera_cmp.index,
+							  (float)mouse_x,
+							  (float)mouse_y,
+							  origin,
+							  dir);
 				Lumix::RayCastModelHit hit =
-					scene->castRay(origin, dir, Lumix::ComponentOld::INVALID);
+					scene->castRay(origin, dir, Lumix::INVALID_COMPONENT);
 				if (hit.m_is_hit)
 				{
 					Lumix::Vec3 center = hit.m_origin + hit.m_dir * hit.m_t;
@@ -902,10 +908,10 @@ bool TerrainEditor::onEntityMouseDown(const Lumix::RayCastModelHit& hit,
 {
 	for (int i = m_world_editor.getSelectedEntities().size() - 1; i >= 0; --i)
 	{
-		if (m_world_editor.getSelectedEntities()[i] == hit.m_component.entity)
+		if (m_world_editor.getSelectedEntities()[i] == hit.m_entity)
 		{
-			Lumix::ComponentOld terrain = m_world_editor.getComponent(
-				hit.m_component.entity, crc32("terrain"));
+			Lumix::ComponentUID terrain =
+				m_world_editor.getComponent(hit.m_entity, crc32("terrain"));
 			if (terrain.isValid())
 			{
 				Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
@@ -936,7 +942,7 @@ bool TerrainEditor::onEntityMouseDown(const Lumix::RayCastModelHit& hit,
 void TerrainEditor::onMouseMove(
 	int x, int y, int /*rel_x*/, int /*rel_y*/, int /*mouse_flags*/)
 {
-	Lumix::ComponentOld camera_cmp = m_world_editor.getEditCamera();
+	Lumix::ComponentUID camera_cmp = m_world_editor.getEditCamera();
 	Lumix::RenderScene* scene =
 		static_cast<Lumix::RenderScene*>(camera_cmp.scene);
 	Lumix::Vec3 origin, dir;
@@ -945,8 +951,8 @@ void TerrainEditor::onMouseMove(
 		scene->castRayTerrain(m_component.index, origin, dir);
 	if (hit.m_is_hit)
 	{
-		Lumix::ComponentOld terrain = m_world_editor.getComponent(
-			hit.m_component.entity, crc32("terrain"));
+		Lumix::ComponentUID terrain =
+			m_world_editor.getComponent(hit.m_entity, crc32("terrain"));
 		if (terrain.isValid())
 		{
 			switch (m_type)
@@ -1102,7 +1108,8 @@ void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
 	Lumix::RenderScene* scene =
 		static_cast<Lumix::RenderScene*>(m_component.scene);
 	Lumix::Vec3 center_pos = hit.m_origin + hit.m_dir * hit.m_t;
-	Lumix::Matrix terrain_matrix = m_world_editor.getUniverse()->getMatrix(m_component.entity);
+	Lumix::Matrix terrain_matrix =
+		m_world_editor.getUniverse()->getMatrix(m_component.entity);
 	Lumix::Matrix inv_terrain_matrix = terrain_matrix;
 	inv_terrain_matrix.inverse();
 	if (m_selected_entity_template.isEmpty())
@@ -1115,7 +1122,7 @@ void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
 	{
 		return;
 	}
-	Lumix::ComponentOld renderable =
+	Lumix::ComponentUID renderable =
 		m_world_editor.getComponent(tpl, RENDERABLE_HASH);
 	if (renderable.isValid())
 	{

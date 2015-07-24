@@ -275,21 +275,20 @@ void Universe::destroyComponent(Entity entity,
 								int index)
 {
 	m_component_destroyed.invoke(
-		ComponentOld(entity, component_type, scene, index));
+		ComponentUID(entity, component_type, scene, index));
 }
 
 
-ComponentOld Universe::addComponent(Entity entity,
+void Universe::addComponent(Entity entity,
 									uint32_t component_type,
 									IScene* scene,
 									int index)
 {
-	ComponentOld cmp(entity, component_type, scene, index);
+	ComponentUID cmp(entity, component_type, scene, index);
 	if (m_component_added.isValid())
 	{
 		m_component_added.invoke(cmp);
 	}
-	return cmp;
 }
 
 

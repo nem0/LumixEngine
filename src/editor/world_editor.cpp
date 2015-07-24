@@ -390,7 +390,7 @@ public:
 	}
 
 	RemoveArrayPropertyItemCommand(WorldEditor& editor,
-								   const ComponentOld& component,
+								   const ComponentUID& component,
 								   int index,
 								   IArrayDescriptor& descriptor)
 		: m_component(component)
@@ -462,7 +462,7 @@ public:
 
 private:
 	WorldEditor& m_editor;
-	ComponentOld m_component;
+	ComponentUID m_component;
 	int m_index;
 	const IArrayDescriptor* m_descriptor;
 	OutputBlob m_old_values;
@@ -479,7 +479,7 @@ public:
 	}
 
 	AddArrayPropertyItemCommand(WorldEditor& editor,
-								const ComponentOld& component,
+								const ComponentUID& component,
 								IArrayDescriptor& descriptor)
 		: m_component(component)
 		, m_index(-1)
@@ -538,7 +538,7 @@ public:
 	virtual bool merge(IEditorCommand&) { return false; }
 
 private:
-	ComponentOld m_component;
+	ComponentUID m_component;
 	int m_index;
 	const IArrayDescriptor* m_descriptor;
 	WorldEditor& m_editor;
@@ -571,7 +571,7 @@ public:
 	{
 		m_index = -1;
 		m_new_value.write(data, size);
-		ComponentOld component = m_editor.getComponent(entity, component_type);
+		ComponentUID component = m_editor.getComponent(entity, component_type);
 		m_property_descriptor->get(component, m_old_value);
 	}
 
@@ -592,7 +592,7 @@ public:
 	{
 		m_index = index;
 		m_new_value.write(data, size);
-		ComponentOld component = m_editor.getComponent(entity, component_type);
+		ComponentUID component = m_editor.getComponent(entity, component_type);
 		m_property_descriptor->get(component, m_index, m_old_value);
 	}
 
@@ -674,7 +674,7 @@ public:
 
 	void set(InputBlob& stream)
 	{
-		ComponentOld component =
+		ComponentUID component =
 			m_editor.getComponent(m_entity, m_component_type);
 		uint32_t template_hash =
 			m_editor.getEntityTemplateSystem().getTemplate(m_entity);
@@ -826,7 +826,7 @@ private:
 			{
 				for (int i = 0; i < scenes.size(); ++i)
 				{
-					ComponentOld cmp(
+					ComponentUID cmp(
 						m_entities[j],
 						m_type,
 						scenes[i],
@@ -845,7 +845,7 @@ private:
 		{
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
-				const ComponentOld& cmp =
+				const ComponentUID& cmp =
 					m_editor.getComponent(m_entities[i], m_type);
 				m_editor.componentDestroyed().invoke(cmp);
 				cmp.scene->destroyComponent(cmp.index, cmp.type);
@@ -1000,9 +1000,9 @@ private:
 				blob.read(cmps_count);
 				for (int j = cmps_count - 1; j >= 0; --j)
 				{
-					ComponentOld::Type cmp_type;
+					ComponentUID::Type cmp_type;
 					blob.read(cmp_type);
-					ComponentOld new_component;
+					ComponentUID new_component;
 					for (int i = 0; i < scenes.size(); ++i)
 					{
 						new_component.index =
@@ -1068,7 +1068,7 @@ private:
 
 
 		DestroyComponentCommand(WorldEditorImpl& editor,
-								const ComponentOld& component)
+								const ComponentUID& component)
 			: m_component(component)
 			, m_editor(editor)
 			, m_old_values(editor.getAllocator())
@@ -1138,7 +1138,7 @@ private:
 					for (int scene_index = 0; scene_index < scenes.size();
 						 ++scene_index)
 					{
-						ComponentOld cmp_new(
+						ComponentUID cmp_new(
 							entities[entity_index],
 							m_component.type,
 							scenes[scene_index],
@@ -1192,7 +1192,7 @@ private:
 					m_editor.m_template_system->getInstances(template_hash);
 				for (int i = 0; i < instances.size(); ++i)
 				{
-					ComponentOld cmp =
+					ComponentUID cmp =
 						m_editor.getComponent(instances[i], m_component.type);
 					if (cmp.isValid())
 					{
@@ -1210,7 +1210,7 @@ private:
 		}
 
 	private:
-		ComponentOld m_component;
+		ComponentUID m_component;
 		WorldEditorImpl& m_editor;
 		OutputBlob m_old_values;
 	};
@@ -1372,7 +1372,7 @@ public:
 
 	void createEditorLines()
 	{
-		ComponentOld camera_cmp = getComponent(m_camera, CAMERA_HASH);
+		ComponentUID camera_cmp = getComponent(m_camera, CAMERA_HASH);
 		RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);
 		Universe* universe = getUniverse();
 		bool first_found = true;
@@ -1380,7 +1380,7 @@ public:
 		Vec3 all_max;
 		for (int i = 0; i < m_selected_entities.size(); ++i)
 		{
-			ComponentOld renderable =
+			ComponentUID renderable =
 				getComponent(m_selected_entities[i], RENDERABLE_HASH);
 			if (renderable.isValid())
 			{
@@ -1542,7 +1542,7 @@ public:
 		else if (button == MouseButton::LEFT)
 		{
 			Vec3 origin, dir;
-			ComponentOld camera_cmp = getComponent(m_camera, CAMERA_HASH);
+			ComponentUID camera_cmp = getComponent(m_camera, CAMERA_HASH);
 			if (camera_cmp.isValid())
 			{
 				RenderScene* scene =
@@ -1550,7 +1550,7 @@ public:
 				scene->getRay(
 					camera_cmp.index, (float)x, (float)y, origin, dir);
 				RayCastModelHit hit =
-					scene->castRay(origin, dir, ComponentOld::INVALID);
+					scene->castRay(origin, dir, INVALID_COMPONENT);
 				RayCastModelHit gizmo_hit = m_gizmo.castRay(origin, dir);
 				EditorIconHit icon_hit = raycastEditorIcons(origin, dir);
 				if (gizmo_hit.m_is_hit &&
@@ -1562,18 +1562,18 @@ public:
 						if (gizmo_hit.m_mesh->getNameHash() == crc32("x_axis"))
 						{
 							m_gizmo.startTransform(
-								camera_cmp, x, y, Gizmo::TransformMode::X);
+								camera_cmp.index, x, y, Gizmo::TransformMode::X);
 						}
 						else if (gizmo_hit.m_mesh->getNameHash() ==
 								 crc32("y_axis"))
 						{
 							m_gizmo.startTransform(
-								camera_cmp, x, y, Gizmo::TransformMode::Y);
+								camera_cmp.index, x, y, Gizmo::TransformMode::Y);
 						}
 						else
 						{
 							m_gizmo.startTransform(
-								camera_cmp, x, y, Gizmo::TransformMode::Z);
+								camera_cmp.index, x, y, Gizmo::TransformMode::Z);
 						}
 					}
 				}
@@ -1609,7 +1609,7 @@ public:
 
 	void onEntityMouseDown(const RayCastModelHit& hit, int x, int y)
 	{
-		Entity entity = hit.m_component.entity;
+		Entity entity = hit.m_entity;
 		for (int i = 0; i < m_plugins.size(); ++i)
 		{
 			if (m_plugins[i]->onEntityMouseDown(hit, x, y))
@@ -1637,7 +1637,7 @@ public:
 			if (entity_already_selected)
 			{
 				m_mouse_mode = MouseMode::TRANSFORM;
-				m_gizmo.startTransform(getComponent(m_camera, CAMERA_HASH),
+				m_gizmo.startTransform(getComponent(m_camera, CAMERA_HASH).index,
 									   x,
 									   y,
 									   Gizmo::TransformMode::CAMERA_XZ);
@@ -1682,7 +1682,7 @@ public:
 								CONTROL /*GetKeyState(VK_LCONTROL) & 0x8000*/
 						? (int)Gizmo::Flags::FIXED_STEP
 						: 0;
-				m_gizmo.transform(getComponent(m_camera, CAMERA_HASH),
+				m_gizmo.transform(getComponent(m_camera, CAMERA_HASH).index,
 								  tmode,
 								  x,
 								  y,
@@ -1755,10 +1755,10 @@ public:
 			{
 				Entity entity = m_selected_entities[i];
 
-				ComponentOld renderable =
+				ComponentUID renderable =
 					getComponent(m_selected_entities[i], RENDERABLE_HASH);
 				RayCastModelHit hit = scene->castRay(
-					universe->getPosition(entity), Vec3(0, -1, 0), renderable);
+					universe->getPosition(entity), Vec3(0, -1, 0), renderable.index);
 				if (hit.m_is_hit)
 				{
 					new_positions.push(hit.m_origin + hit.m_dir * hit.m_t);
@@ -1785,7 +1785,7 @@ public:
 
 	virtual Entity addEntity() override
 	{
-		ComponentOld cmp = getComponent(m_camera, CAMERA_HASH);
+		ComponentUID cmp = getComponent(m_camera, CAMERA_HASH);
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 		float width = scene->getCameraWidth(cmp.index);
 		float height = scene->getCameraHeight(cmp.index);
@@ -1795,7 +1795,7 @@ public:
 
 	virtual Entity addEntityAt(int camera_x, int camera_y) override
 	{
-		ComponentOld camera_cmp = getComponent(m_camera, CAMERA_HASH);
+		ComponentUID camera_cmp = getComponent(m_camera, CAMERA_HASH);
 		RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);
 		Universe* universe = getUniverse();
 		Vec3 origin;
@@ -1804,7 +1804,7 @@ public:
 		scene->getRay(
 			camera_cmp.index, (float)camera_x, (float)camera_y, origin, dir);
 		RayCastModelHit hit =
-			scene->castRay(origin, dir, ComponentOld::INVALID);
+			scene->castRay(origin, dir, INVALID_COMPONENT);
 		Vec3 pos;
 		if (hit.m_is_hit)
 		{
@@ -1825,7 +1825,7 @@ public:
 
 	virtual Vec3 getCameraRaycastHit() override
 	{
-		ComponentOld camera_cmp = getComponent(m_camera, CAMERA_HASH);
+		ComponentUID camera_cmp = getComponent(m_camera, CAMERA_HASH);
 		RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);
 		Universe* universe = getUniverse();
 		float camera_x = scene->getCameraWidth(camera_cmp.index);
@@ -1838,7 +1838,7 @@ public:
 		scene->getRay(
 			camera_cmp.index, (float)camera_x, (float)camera_y, origin, dir);
 		RayCastModelHit hit =
-			scene->castRay(origin, dir, ComponentOld::INVALID);
+			scene->castRay(origin, dir, INVALID_COMPONENT);
 		Vec3 pos;
 		if (hit.m_is_hit)
 		{
@@ -2008,7 +2008,7 @@ public:
 	{
 		for (int i = 0, c = m_selected_entities.size(); i < c; ++i)
 		{
-			ComponentOld cmp =
+			ComponentUID cmp =
 				getComponent(m_selected_entities[i], RENDERABLE_HASH);
 			if (cmp.isValid())
 			{
@@ -2022,7 +2022,7 @@ public:
 	{
 		for (int i = 0, c = m_selected_entities.size(); i < c; ++i)
 		{
-			ComponentOld cmp =
+			ComponentUID cmp =
 				getComponent(m_selected_entities[i], RENDERABLE_HASH);
 			if (cmp.isValid())
 			{
@@ -2065,15 +2065,15 @@ public:
 	}
 
 
-	virtual void cloneComponent(const ComponentOld& src,
+	virtual void cloneComponent(const ComponentUID& src,
 								Entity entity) override
 	{
-		ComponentOld clone = ComponentOld::INVALID;
+		ComponentUID clone = ComponentUID::INVALID;
 
 		const Array<IScene*>& scenes = m_engine->getScenes();
 		for (int i = 0; i < scenes.size(); ++i)
 		{
-			clone = ComponentOld(entity,
+			clone = ComponentUID(entity,
 								 src.type,
 								 scenes[i],
 								 scenes[i]->createComponent(src.type, entity));
@@ -2096,7 +2096,7 @@ public:
 	}
 
 
-	virtual void destroyComponent(const ComponentOld& component) override
+	virtual void destroyComponent(const ComponentUID& component) override
 	{
 		if (component.isValid())
 		{
@@ -2238,21 +2238,21 @@ public:
 	}
 
 
-	virtual Array<ComponentOld>& getComponents(Entity entity) override
+	virtual Array<ComponentUID>& getComponents(Entity entity) override
 	{
 		int cmps_index = m_components.find(entity);
 		if (cmps_index < 0)
 		{
-			m_components.insert(entity, Array<ComponentOld>(m_allocator));
+			m_components.insert(entity, Array<ComponentUID>(m_allocator));
 			cmps_index = m_components.find(entity);
 		}
 		return m_components.at(cmps_index);
 	}
 
-	virtual ComponentOld getComponent(Entity entity,
+	virtual ComponentUID getComponent(Entity entity,
 									  uint32_t type) override
 	{
-		const Array<ComponentOld>& cmps = getComponents(entity);
+		const Array<ComponentUID>& cmps = getComponents(entity);
 		for (int i = 0; i < cmps.size(); ++i)
 		{
 			if (cmps[i].type == type)
@@ -2260,7 +2260,7 @@ public:
 				return cmps[i];
 			}
 		}
-		return ComponentOld::INVALID;
+		return ComponentUID::INVALID;
 	}
 
 
@@ -2326,7 +2326,7 @@ public:
 	}
 
 
-	virtual ComponentOld getEditCamera() override
+	virtual ComponentUID getEditCamera() override
 	{
 		return getComponent(m_camera, CAMERA_HASH);
 	}
@@ -2500,7 +2500,7 @@ public:
 	}
 
 
-	virtual void addArrayPropertyItem(const ComponentOld& cmp,
+	virtual void addArrayPropertyItem(const ComponentUID& cmp,
 									  IArrayDescriptor& property) override
 	{
 		if (cmp.isValid())
@@ -2513,7 +2513,7 @@ public:
 	}
 
 
-	virtual void removeArrayPropertyItem(const ComponentOld& cmp,
+	virtual void removeArrayPropertyItem(const ComponentUID& cmp,
 										 int index,
 										 IArrayDescriptor& property) override
 	{
@@ -2536,7 +2536,7 @@ public:
 		if (m_selected_entities.size() == 1)
 		{
 			uint32_t component_hash = component;
-			ComponentOld cmp =
+			ComponentUID cmp =
 				getComponent(m_selected_entities[0], component_hash);
 			if (cmp.isValid())
 			{
@@ -2601,7 +2601,7 @@ public:
 	{
 		if (m_selected_entities.size() == 1)
 		{
-			ComponentOld cmp =
+			ComponentUID cmp =
 				getComponent(m_selected_entities[0], RENDERABLE_HASH);
 			if (cmp.isValid())
 			{
@@ -2625,9 +2625,8 @@ public:
 	}
 
 
-	void onComponentAdded(const ComponentOld& cmp)
+	void onComponentAdded(const ComponentUID& cmp)
 	{
-		TODO("why not use the one from universe");
 		getComponents(cmp.entity).push(cmp);
 		if (!m_is_loading)
 		{
@@ -2636,7 +2635,7 @@ public:
 	}
 
 
-	void onComponentDestroyed(const ComponentOld& cmp)
+	void onComponentDestroyed(const ComponentUID& cmp)
 	{
 		getComponents(cmp.entity).eraseItemFast(cmp);
 		for (int i = 0; i < m_editor_icons.size(); ++i)
@@ -2727,19 +2726,19 @@ public:
 	}
 
 
-	virtual DelegateList<void(ComponentOld)>& componentAdded() override
+	virtual DelegateList<void(ComponentUID)>& componentAdded() override
 	{
 		return m_component_added;
 	}
 
 
-	virtual DelegateList<void(ComponentOld)>& componentDestroyed() override
+	virtual DelegateList<void(ComponentUID)>& componentDestroyed() override
 	{
 		return m_component_destroyed;
 	}
 
 
-	virtual DelegateList<void(ComponentOld, const IPropertyDescriptor&)>&
+	virtual DelegateList<void(ComponentUID, const IPropertyDescriptor&)>&
 	propertySet() override
 	{
 		return m_property_set;
@@ -2764,13 +2763,13 @@ public:
 	}
 
 
-	ComponentOld createComponent(uint32_t hash, Entity entity)
+	ComponentUID createComponent(uint32_t hash, Entity entity)
 	{
 		const Array<IScene*>& scenes = m_engine->getScenes();
-		ComponentOld cmp;
+		ComponentUID cmp;
 		for (int i = 0; i < scenes.size(); ++i)
 		{
-			cmp = ComponentOld(entity,
+			cmp = ComponentUID(entity,
 							   hash,
 							   scenes[i],
 							   scenes[i]->createComponent(hash, entity));
@@ -2780,7 +2779,7 @@ public:
 				return cmp;
 			}
 		}
-		return ComponentOld::INVALID;
+		return ComponentUID::INVALID;
 	}
 
 
@@ -2809,7 +2808,7 @@ public:
 			universe->setEntityName(m_camera, "editor_camera");
 			universe->setPosition(m_camera, 0, 0, -5);
 			universe->setRotation(m_camera, Quat(Vec3(0, 1, 0), -Math::PI));
-			ComponentOld cmp = createComponent(CAMERA_HASH, m_camera);
+			ComponentUID cmp = createComponent(CAMERA_HASH, m_camera);
 			ASSERT(cmp.isValid());
 			RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 			scene->setCameraSlot(cmp.index, string("editor", m_allocator));
@@ -3019,7 +3018,7 @@ private:
 	float m_mouse_x;
 	float m_mouse_y;
 	Array<EditorIcon*> m_editor_icons;
-	AssociativeArray<int32_t, Array<ComponentOld>> m_components;
+	AssociativeArray<int32_t, Array<ComponentUID>> m_components;
 	bool m_is_game_mode;
 	FS::IFile* m_game_mode_file;
 	Engine* m_engine;
@@ -3027,9 +3026,9 @@ private:
 	DelegateList<void()> m_universe_destroyed;
 	DelegateList<void()> m_universe_created;
 	DelegateList<void()> m_universe_loaded;
-	DelegateList<void(ComponentOld)> m_component_added;
-	DelegateList<void(ComponentOld)> m_component_destroyed;
-	DelegateList<void(ComponentOld, const IPropertyDescriptor&)> m_property_set;
+	DelegateList<void(ComponentUID)> m_component_added;
+	DelegateList<void(ComponentUID)> m_component_destroyed;
+	DelegateList<void(ComponentUID, const IPropertyDescriptor&)> m_property_set;
 	DelegateList<void(const Array<Entity>&)> m_entity_selected;
 	DelegateList<void(Entity, const char*)> m_entity_name_set;
 	DelegateList<void(bool)> m_game_mode_toggled;
@@ -3080,7 +3079,7 @@ void PasteEntityCommand::execute()
 	{
 		uint32_t type;
 		blob.read(type);
-		ComponentOld cmp = static_cast<WorldEditorImpl&>(m_editor)
+		ComponentUID cmp = static_cast<WorldEditorImpl&>(m_editor)
 							   .createComponent(type, new_entity);
 		Array<IPropertyDescriptor*>& props =
 			m_editor.getPropertyDescriptors(type);

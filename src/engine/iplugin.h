@@ -2,7 +2,6 @@
 
 
 #include "core/lumix.h"
-#include "universe/component.h"
 
 
 namespace Lumix
