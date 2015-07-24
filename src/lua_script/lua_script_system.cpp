@@ -116,8 +116,10 @@ public:
 					fread(&content[0], 1, size, fp);
 					content[size] = '\0';
 					bool errors =
-						luaL_loadbuffer(
-							script.m_state, &content[0], size, script.m_path.c_str()) != LUA_OK;
+						luaL_loadbuffer(script.m_state,
+										&content[0],
+										size,
+										script.m_path.c_str()) != LUA_OK;
 					errors =
 						errors ||
 						lua_pcall(script.m_state, 0, LUA_MULTRET, 0) != LUA_OK;
@@ -133,7 +135,8 @@ public:
 				else
 				{
 					script.m_state = nullptr;
-					g_log_error.log("lua script") << "error loading " << script.m_path.c_str();
+					g_log_error.log("lua script") << "error loading "
+												  << script.m_path.c_str();
 				}
 			}
 		}
@@ -156,8 +159,8 @@ public:
 	}
 
 
-	virtual ComponentNew createComponent(uint32_t type,
-									  const Entity& entity) override
+	virtual ComponentIndex createComponent(uint32_t type,
+										   Entity entity) override
 	{
 		if (type == LUA_SCRIPT_HASH)
 		{
@@ -175,7 +178,7 @@ public:
 	}
 
 
-	virtual void destroyComponent(ComponentNew component,
+	virtual void destroyComponent(ComponentIndex component,
 								  uint32_t type) override
 	{
 		if (type == LUA_SCRIPT_HASH)
@@ -215,10 +218,7 @@ public:
 			if (m_valid[i])
 			{
 				m_universe.addComponent(
-					Entity(m_scripts[i].m_entity),
-					LUA_SCRIPT_HASH,
-					this,
-					i);
+					Entity(m_scripts[i].m_entity), LUA_SCRIPT_HASH, this, i);
 			}
 		}
 	}
@@ -246,13 +246,13 @@ public:
 	}
 
 
-	void getScriptPath(ComponentNew cmp, string& path)
+	void getScriptPath(ComponentIndex cmp, string& path)
 	{
 		path = m_scripts[cmp].m_path.c_str();
 	}
 
 
-	void setScriptPath(ComponentNew cmp, const string& path)
+	void setScriptPath(ComponentIndex cmp, const string& path)
 	{
 		m_scripts[cmp].m_path = path;
 	}
@@ -313,18 +313,15 @@ void LuaScriptSystem::setWorldEditor(WorldEditor& editor)
 {
 	IAllocator& allocator = editor.getAllocator();
 	editor.registerComponentType("lua_script", "Lua script");
-	TODO("todo");
-	/*
 	editor.registerProperty(
 		"lua_script",
 		allocator.newObject<FilePropertyDescriptor<LuaScriptScene>>(
 			"source",
-			(void (LuaScriptScene::*)(ComponentOld, string&)) &
+			(void (LuaScriptScene::*)(ComponentIndex, string&)) &
 				LuaScriptScene::getScriptPath,
 			&LuaScriptScene::setScriptPath,
 			"Lua (*.lua)",
 			allocator));
-			*/
 }
 
 

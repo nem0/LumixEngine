@@ -8,7 +8,6 @@
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "graphics/render_scene.h"
-#include "universe/entity.h"
 #include "universe/hierarchy.h"
 #include <qmimedata.h>
 
@@ -21,8 +20,8 @@ class SetParentEditorCommand : public Lumix::IEditorCommand
 public:
 	SetParentEditorCommand(Lumix::WorldEditor& editor,
 						   Lumix::Hierarchy& hierarchy,
-						   const Lumix::Entity& child,
-						   const Lumix::Entity& parent)
+						   Lumix::Entity child,
+						   Lumix::Entity parent)
 		: m_new_parent(parent)
 		, m_child(child)
 		, m_old_parent(hierarchy.getParent(child))
@@ -118,7 +117,7 @@ protected:
 			   sourceModel()->data(index).toString().contains(filterRegExp());
 	}
 
-	void onEntityNameSet(const Lumix::Entity&, const char*)
+	void onEntityNameSet(Lumix::Entity, const char*)
 	{
 		if (m_is_update_enabled)
 		{
@@ -140,7 +139,7 @@ private:
 	class EntityNode
 	{
 	public:
-		EntityNode(EntityNode* parent, const Lumix::Entity& entity)
+		EntityNode(EntityNode* parent, Lumix::Entity entity)
 			: m_entity(entity)
 			, m_parent(parent)
 		{
@@ -154,7 +153,7 @@ private:
 			}
 		}
 
-		EntityNode* getNode(const Lumix::Entity& entity)
+		EntityNode* getNode(Lumix::Entity entity)
 		{
 			if (m_entity == entity)
 			{
@@ -171,7 +170,7 @@ private:
 			return NULL;
 		}
 
-		bool removeEntity(const Lumix::Entity& entity)
+		bool removeEntity(Lumix::Entity entity)
 		{
 			if (m_entity == entity)
 			{
@@ -441,7 +440,7 @@ public:
 				Lumix::StackAllocator<LUMIX_MAX_PATH> allocator;
 				Lumix::string path(allocator);
 				static_cast<Lumix::RenderScene*>(renderable.scene)
-					->getRenderablePath(renderable, path);
+					->getRenderablePath(renderable.index, path);
 				if (path.length() != 0)
 				{
 					char basename[LUMIX_MAX_PATH];
@@ -486,7 +485,7 @@ public:
 	}
 
 
-	void onParentSet(const Lumix::Entity& child, const Lumix::Entity& parent)
+	void onParentSet(Lumix::Entity child, Lumix::Entity parent)
 	{
 		if (!m_root->m_children.empty())
 		{
@@ -523,7 +522,7 @@ public:
 					this);
 		}
 		delete m_root;
-		m_root = new EntityNode(NULL, Lumix::NEW_INVALID_ENTITY);
+		m_root = new EntityNode(NULL, Lumix::INVALID_ENTITY);
 		m_universe = universe;
 		if (m_universe)
 		{
@@ -556,7 +555,7 @@ public:
 
 
 private:
-	void onEntityCreated(const Lumix::Entity& entity)
+	void onEntityCreated(Lumix::Entity entity)
 	{
 		EntityNode* node = new EntityNode(m_root, entity);
 		m_root->m_children.push_back(node);
@@ -566,7 +565,7 @@ private:
 		}
 	}
 
-	void onEntityDestroyed(const Lumix::Entity& entity)
+	void onEntityDestroyed(Lumix::Entity entity)
 	{
 		m_root->removeEntity(entity);
 		if (m_is_update_enabled)

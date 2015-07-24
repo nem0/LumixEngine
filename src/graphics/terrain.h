@@ -8,7 +8,6 @@
 #include "core/vec3.h"
 #include "graphics/geometry.h"
 #include "graphics/render_scene.h"
-#include "universe/entity.h"
 
 
 namespace Lumix
@@ -72,7 +71,7 @@ class Terrain
 		static const int GRASS_QUAD_SIZE = 10;
 
 	public:
-		Terrain(Renderer& renderer, const Entity& entity, RenderScene& scene, IAllocator& allocator);
+		Terrain(Renderer& renderer, Entity entity, RenderScene& scene, IAllocator& allocator);
 		~Terrain();
 
 		Geometry* getGeometry() { return &m_geometry; }
@@ -102,7 +101,7 @@ class Terrain
 		void setBrush(const Vec3& position, float size) { m_brush_position = position; m_brush_size = size; }
 
 		void getInfos(Array<const TerrainInfo*>& infos, const Vec3& camera_pos, LIFOAllocator& allocator);
-		void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, const ComponentOld& camera);
+		void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, ComponentIndex camera);
 
 		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir);
 		void serialize(OutputBlob& serializer);
@@ -112,10 +111,10 @@ class Terrain
 		void removeGrassType(int index);
 
 	private: 
-		Array<Terrain::GrassQuad*>& getQuads(const ComponentOld& camera);
+		Array<Terrain::GrassQuad*>& getQuads(ComponentIndex camera);
 		TerrainQuad* generateQuadTree(float size);
 		float getHeight(int x, int z);
-		void updateGrass(const ComponentOld& camera);
+		void updateGrass(ComponentIndex camera);
 		void generateGeometry();
 		void onMaterialLoaded(Resource::State, Resource::State new_state);
 		void forceGrassUpdate();
@@ -136,8 +135,8 @@ class Terrain
 		RenderScene& m_scene;
 		Array<GrassType*> m_grass_types;
 		Array<GrassQuad*> m_free_grass_quads;
-		AssociativeArray<ComponentOld, Array<GrassQuad*> > m_grass_quads;
-		AssociativeArray<ComponentOld, Vec3> m_last_camera_position; 
+		AssociativeArray<ComponentIndex, Array<GrassQuad*> > m_grass_quads;
+		AssociativeArray<ComponentIndex, Vec3> m_last_camera_position;
 		Vec3 m_brush_position;
 		float m_brush_size;
 		bool m_force_grass_update;

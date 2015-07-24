@@ -3,13 +3,13 @@
 
 #include "dynamic_object_model.h"
 #include "universe/component.h"
-#include "universe/entity.h"
 
 
 namespace Lumix
 {
 	class IArrayDescriptor;
 	class IPropertyDescriptor;
+	class Universe;
 	class WorldEditor;
 }
 
@@ -28,9 +28,9 @@ class EntityModel : public DynamicObjectModel
 		void onComponentAdded(Lumix::ComponentOld component);
 		void onComponentDestroyed(Lumix::ComponentOld component);
 		void onPropertySet(Lumix::ComponentOld component, const Lumix::IPropertyDescriptor& descriptor);
-		void onEntityPosition(const Lumix::Entity& entity);
+		void onEntityPosition(Lumix::Entity entity);
 		void onUniverseDestroyed();
-		void onEntityDestroyed(const Lumix::Entity& entity);
+		void onEntityDestroyed(Lumix::Entity entity);
 
 		const char* getComponentName(Lumix::ComponentOld cmp) const;
 		void addArrayProperty(Node& child, Lumix::IArrayDescriptor* desc, Lumix::ComponentOld cmp);

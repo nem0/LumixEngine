@@ -87,10 +87,10 @@ public:
 	virtual void hideEntities() = 0;
 	virtual void copyEntity() = 0;
 	virtual void pasteEntity() = 0;
-	virtual ComponentOld getComponent(const Entity& entity, uint32_t type) = 0;
-	virtual ComponentList& getComponents(const Entity& entity) = 0;
+	virtual ComponentOld getComponent(Entity entity, uint32_t type) = 0;
+	virtual ComponentList& getComponents(Entity entity) = 0;
 	virtual void addComponent(uint32_t type_crc) = 0;
-	virtual void cloneComponent(const ComponentOld& src, Entity& entity) = 0;
+	virtual void cloneComponent(const ComponentOld& src, Entity entity) = 0;
 	virtual void destroyComponent(const ComponentOld& crc) = 0;
 	virtual Entity addEntity() = 0;
 	virtual void destroyEntities(const Entity* entities, int count) = 0;
@@ -104,7 +104,7 @@ public:
 	virtual void setEntityPositionAndRotaion(const Array<Entity>& entity,
 											 const Array<Vec3>& position,
 											 const Array<Quat>& rotation) = 0;
-	virtual void setEntityName(const Entity& entity, const char* name) = 0;
+	virtual void setEntityName(Entity entity, const char* name) = 0;
 	virtual void snapToTerrain() = 0;
 	virtual void toggleGameMode() = 0;
 	virtual void navigate(float forward, float right, float speed) = 0;
@@ -137,10 +137,10 @@ public:
 	virtual DelegateList<void()>& universeCreated() = 0;
 	virtual DelegateList<void()>& universeDestroyed() = 0;
 	virtual DelegateList<void()>& universeLoaded() = 0;
-	virtual DelegateList<void(const Entity&, const char*)>& entityNameSet() = 0;
+	virtual DelegateList<void(Entity, const char*)>& entityNameSet() = 0;
 	virtual DelegateList<void(ComponentOld, const IPropertyDescriptor&)>&
 	propertySet() = 0;
-	virtual DelegateList<void(ComponentOld)>& componentAdded() = 0;
+	virtual DelegateList<void(ComponentOld)>& componentAdded() = 0; 
 	virtual DelegateList<void(ComponentOld)>& componentDestroyed() = 0;
 
 	virtual void addPlugin(Plugin& plugin) = 0;

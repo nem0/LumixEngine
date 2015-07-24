@@ -146,7 +146,7 @@ public:
 		: m_blob(blob, editor.getAllocator())
 		, m_editor(editor)
 		, m_position(editor.getCameraRaycastHit())
-		, m_entity(NEW_INVALID_ENTITY)
+		, m_entity(INVALID_ENTITY)
 	{
 	}
 
@@ -200,7 +200,7 @@ public:
 			cmps[i].scene->destroyComponent(cmps[i].index, cmps[i].type);
 		}
 		m_editor.getUniverse()->destroyEntity(m_entity);
-		m_entity = NEW_INVALID_ENTITY;
+		m_entity = INVALID_ENTITY;
 	}
 
 
@@ -316,7 +316,7 @@ public:
 		Universe* universe = m_editor.getUniverse();
 		for (int i = 0, c = m_entities.size(); i < c; ++i)
 		{
-			const Entity& entity = m_entities[i];
+			Entity entity = m_entities[i];
 			universe->setPosition(entity, m_new_positions[i]);
 			universe->setRotation(entity, m_new_rotations[i]);
 		}
@@ -328,7 +328,7 @@ public:
 		Universe* universe = m_editor.getUniverse();
 		for (int i = 0, c = m_entities.size(); i < c; ++i)
 		{
-			const Entity& entity = m_entities[i];
+			Entity entity = m_entities[i];
 			universe->setPosition(entity, m_old_positions[i]);
 			universe->setRotation(entity, m_old_rotations[i]);
 		}
@@ -557,7 +557,7 @@ public:
 
 
 	SetPropertyCommand(WorldEditor& editor,
-					   const Entity& entity,
+					   Entity entity,
 					   uint32_t component_type,
 					   const IPropertyDescriptor& property_descriptor,
 					   const void* data,
@@ -577,7 +577,7 @@ public:
 
 
 	SetPropertyCommand(WorldEditor& editor,
-					   const Entity& entity,
+					   Entity entity,
 					   uint32_t component_type,
 					   int index,
 					   const IPropertyDescriptor& property_descriptor,
@@ -1106,7 +1106,7 @@ private:
 			{
 				for (int i = 0; i < scenes.size(); ++i)
 				{
-					const Lumix::ComponentNew& cmp = scenes[i]->createComponent(
+					ComponentIndex cmp = scenes[i]->createComponent(
 						m_component.type, m_component.entity);
 					if (cmp != NEW_INVALID_COMPONENT)
 					{
@@ -1222,7 +1222,7 @@ private:
 		AddEntityCommand(WorldEditor& editor)
 			: m_editor(static_cast<WorldEditorImpl&>(editor))
 		{
-			m_entity = NEW_INVALID_ENTITY;
+			m_entity = INVALID_ENTITY;
 		}
 
 
@@ -1230,7 +1230,7 @@ private:
 			: m_editor(editor)
 		{
 			m_position = position;
-			m_entity = NEW_INVALID_ENTITY;
+			m_entity = INVALID_ENTITY;
 		}
 
 
@@ -1281,7 +1281,7 @@ private:
 		}
 
 
-		const Entity& getEntity() const { return m_entity; }
+		Entity getEntity() const { return m_entity; }
 
 
 	private:
@@ -1384,7 +1384,7 @@ public:
 				getComponent(m_selected_entities[i], RENDERABLE_HASH);
 			if (renderable.isValid())
 			{
-				Model* model = scene->getRenderableModel(renderable);
+				Model* model = scene->getRenderableModel(renderable.index);
 				Vec3 points[8];
 				if (model)
 				{
@@ -1753,14 +1753,12 @@ public:
 
 			for (int i = 0; i < m_selected_entities.size(); ++i)
 			{
-				const Entity& entity = m_selected_entities[i];
+				Entity entity = m_selected_entities[i];
 
 				ComponentOld renderable =
 					getComponent(m_selected_entities[i], RENDERABLE_HASH);
-				RayCastModelHit hit =
-					scene->castRay(universe->getPosition(entity),
-								   Vec3(0, -1, 0),
-								   renderable);
+				RayCastModelHit hit = scene->castRay(
+					universe->getPosition(entity), Vec3(0, -1, 0), renderable);
 				if (hit.m_is_hit)
 				{
 					new_positions.push(hit.m_origin + hit.m_dir * hit.m_t);
@@ -1855,7 +1853,7 @@ public:
 	}
 
 
-	void onEntityCreated(const Entity& entity)
+	void onEntityCreated(Entity entity)
 	{
 		if (m_camera >= 0)
 		{
@@ -1919,7 +1917,7 @@ public:
 	}
 
 
-	virtual void setEntityName(const Entity& entity, const char* name) override
+	virtual void setEntityName(Entity entity, const char* name) override
 	{
 		if (entity >= 0)
 		{
@@ -2014,7 +2012,7 @@ public:
 				getComponent(m_selected_entities[i], RENDERABLE_HASH);
 			if (cmp.isValid())
 			{
-				static_cast<RenderScene*>(cmp.scene)->showRenderable(cmp);
+				static_cast<RenderScene*>(cmp.scene)->showRenderable(cmp.index);
 			}
 		}
 	}
@@ -2028,7 +2026,7 @@ public:
 				getComponent(m_selected_entities[i], RENDERABLE_HASH);
 			if (cmp.isValid())
 			{
-				static_cast<RenderScene*>(cmp.scene)->hideRenderable(cmp);
+				static_cast<RenderScene*>(cmp.scene)->hideRenderable(cmp.index);
 			}
 		}
 	}
@@ -2068,7 +2066,7 @@ public:
 
 
 	virtual void cloneComponent(const ComponentOld& src,
-								Entity& entity) override
+								Entity entity) override
 	{
 		ComponentOld clone = ComponentOld::INVALID;
 
@@ -2216,10 +2214,12 @@ public:
 		if (m_engine->deserialize(blob))
 		{
 			m_template_system->deserialize(blob);
-			m_camera =
-				static_cast<RenderScene*>(m_engine->getScene(crc32("renderer")))
-					->getCameraInSlot("editor")
-					.entity;
+			auto* render_scene = static_cast<RenderScene*>(
+				m_engine->getScene(crc32("renderer")));
+
+			m_camera = render_scene->getCameraEntity(
+				render_scene->getCameraInSlot("editor"));
+
 			g_log_info.log("editor") << "Universe parsed in "
 									 << timer->getTimeSinceStart()
 									 << " seconds";
@@ -2235,7 +2235,7 @@ public:
 	}
 
 
-	virtual Array<ComponentOld>& getComponents(const Entity& entity) override
+	virtual Array<ComponentOld>& getComponents(Entity entity) override
 	{
 		int cmps_index = m_components.find(entity);
 		if (cmps_index < 0)
@@ -2246,7 +2246,7 @@ public:
 		return m_components.at(cmps_index);
 	}
 
-	virtual ComponentOld getComponent(const Entity& entity,
+	virtual ComponentOld getComponent(Entity entity,
 									  uint32_t type) override
 	{
 		const Array<ComponentOld>& cmps = getComponents(entity);
@@ -2261,7 +2261,7 @@ public:
 	}
 
 
-	void createEditorIcon(const Entity& entity)
+	void createEditorIcon(Entity entity)
 	{
 		if (m_camera == entity)
 		{
@@ -2362,7 +2362,7 @@ public:
 		, m_plugins(m_allocator)
 		, m_undo_stack(m_allocator)
 		, m_copy_buffer(m_allocator)
-		, m_camera(NEW_INVALID_ENTITY)
+		, m_camera(INVALID_ENTITY)
 		, m_editor_command_creators(m_allocator)
 		, m_component_types(m_allocator)
 	{
@@ -2604,11 +2604,11 @@ public:
 				Array<Entity> entities(m_allocator);
 
 				RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
-				Model* model = scene->getRenderableModel(cmp);
+				Model* model = scene->getRenderableModel(cmp.index);
 				ComponentOld renderable = scene->getFirstRenderable();
 				while (renderable.isValid())
 				{
-					if (model == scene->getRenderableModel(renderable))
+					if (model == scene->getRenderableModel(renderable.index))
 					{
 						entities.push(renderable.entity);
 					}
@@ -2623,6 +2623,7 @@ public:
 
 	void onComponentAdded(const ComponentOld& cmp)
 	{
+		TODO("why note use the one from universe");
 		getComponents(cmp.entity).push(cmp);
 	}
 
@@ -2645,7 +2646,8 @@ public:
 				break;
 			}
 		}
-		if (getUniverse()->hasEntity(cmp.entity) && getComponents(cmp.entity).empty())
+		if (getUniverse()->hasEntity(cmp.entity) &&
+			getComponents(cmp.entity).empty())
 		{
 			EditorIcon* er = m_allocator.newObject<EditorIcon>(
 				*m_engine,
@@ -2657,7 +2659,7 @@ public:
 	}
 
 
-	void onEntityDestroyed(const Entity& entity)
+	void onEntityDestroyed(Entity entity)
 	{
 		m_selected_entities.eraseItemFast(entity);
 		for (int i = 0; i < m_editor_icons.size(); ++i)
@@ -2684,7 +2686,7 @@ public:
 		}
 		m_components.clear();
 		selectEntities(NULL, 0);
-		m_camera = NEW_INVALID_ENTITY;
+		m_camera = INVALID_ENTITY;
 		m_editor_icons.clear();
 		m_engine->destroyUniverse();
 	}
@@ -2742,7 +2744,7 @@ public:
 	}
 
 
-	virtual DelegateList<void(const Entity&, const char*)>&
+	virtual DelegateList<void(Entity, const char*)>&
 	entityNameSet() override
 	{
 		return m_entity_name_set;
@@ -2760,7 +2762,7 @@ public:
 	}
 
 
-	ComponentOld createComponent(uint32_t hash, const Entity& entity)
+	ComponentOld createComponent(uint32_t hash, Entity entity)
 	{
 		const Array<IScene*>& scenes = m_engine->getScenes();
 		ComponentOld cmp;
@@ -2807,8 +2809,7 @@ public:
 			m_camera = universe->createEntity();
 			universe->setEntityName(m_camera, "editor_camera");
 			universe->setPosition(m_camera, 0, 0, -5);
-			universe->setRotation(m_camera,
-								  Quat(Vec3(0, 1, 0), -Math::PI));
+			universe->setRotation(m_camera, Quat(Vec3(0, 1, 0), -Math::PI));
 			ComponentOld cmp = createComponent(CAMERA_HASH, m_camera);
 			ASSERT(cmp.isValid());
 			RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
@@ -3031,7 +3032,7 @@ private:
 	DelegateList<void(ComponentOld)> m_component_destroyed;
 	DelegateList<void(ComponentOld, const IPropertyDescriptor&)> m_property_set;
 	DelegateList<void(const Array<Entity>&)> m_entity_selected;
-	DelegateList<void(const Entity&, const char*)> m_entity_name_set;
+	DelegateList<void(Entity, const char*)> m_entity_name_set;
 	DelegateList<void(bool)> m_game_mode_toggled;
 
 	FS::FileSystem* m_file_system;

@@ -9,7 +9,6 @@
 #include "engine/engine.h"
 #include "engine/iplugin.h"
 #include "graphics/render_scene.h"
-#include "universe/entity.h"
 #include "universe/universe.h"
 
 
@@ -43,7 +42,7 @@ private:
 
 		CreateTemplateCommand(WorldEditor& editor,
 							  const char* template_name,
-							  const Entity& entity_template)
+							  Entity entity_template)
 			: m_entity_system(static_cast<EntityTemplateSystemImpl&>(
 				  editor.getEntityTemplateSystem()))
 			, m_name(template_name, editor.getAllocator())
@@ -106,7 +105,7 @@ private:
 		}
 
 
-		const Entity& getEntity() const { return m_entity; }
+		Entity getEntity() const { return m_entity; }
 
 	private:
 		EntityTemplateSystemImpl& m_entity_system;
@@ -207,7 +206,7 @@ private:
 				cmps[i].scene->destroyComponent(cmps[i].index, cmps[i].type);
 			}
 			m_entity_system.m_universe->destroyEntity(m_entity);
-			m_entity = NEW_INVALID_ENTITY;
+			m_entity = INVALID_ENTITY;
 		}
 
 
@@ -222,7 +221,7 @@ private:
 		}
 
 
-		const Entity& getEntity() const { return m_entity; }
+		Entity getEntity() const { return m_entity; }
 
 	private:
 		EntityTemplateSystemImpl& m_entity_system;
@@ -318,7 +317,7 @@ public:
 	}
 
 
-	void onEntityDestroyed(const Entity& entity)
+	void onEntityDestroyed(Entity entity)
 	{
 		uint32_t tpl = getTemplate(entity);
 		if (tpl != 0)
@@ -342,7 +341,7 @@ public:
 
 
 	virtual void createTemplateFromEntity(const char* name,
-										  const Entity& entity) override
+										  Entity entity) override
 	{
 		CreateTemplateCommand* command =
 			m_editor.getAllocator().newObject<CreateTemplateCommand>(
@@ -351,7 +350,7 @@ public:
 	}
 
 
-	virtual uint32_t getTemplate(const Entity& entity) override
+	virtual uint32_t getTemplate(Entity entity) override
 	{
 		for (int j = 0; j < m_instances.size(); ++j)
 		{

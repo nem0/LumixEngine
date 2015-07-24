@@ -19,8 +19,8 @@ namespace Lumix
 		public:
 			virtual ~IScene() {}
 
-			virtual ComponentNew createComponent(uint32_t, const Entity&) = 0;
-			virtual void destroyComponent(ComponentNew component, uint32_t type) = 0;
+			virtual ComponentIndex createComponent(uint32_t, Entity) = 0;
+			virtual void destroyComponent(ComponentIndex component, uint32_t type) = 0;
 			virtual void serialize(OutputBlob& serializer) = 0;
 			virtual void deserialize(InputBlob& serializer) = 0;
 			virtual IPlugin& getPlugin() const = 0;

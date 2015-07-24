@@ -2,7 +2,6 @@
 
 
 #include "core/lumix.h"
-#include "universe/entity.h"
 
 
 namespace Lumix
@@ -12,7 +11,7 @@ namespace Lumix
 class IScene;
 
 
-typedef int ComponentNew;
+typedef int ComponentIndex;
 extern LUMIX_ENGINE_API int NEW_INVALID_COMPONENT;
 
 
@@ -22,7 +21,7 @@ struct LUMIX_ENGINE_API ComponentOld final
 	typedef uint32_t Type;
 
 	ComponentOld() { index = -1; }
-	ComponentOld(const Entity& _entity,
+	ComponentOld(Entity _entity,
 				 uint32_t _type,
 				 IScene* _scene,
 				 int _index)

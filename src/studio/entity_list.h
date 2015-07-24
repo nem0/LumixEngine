@@ -3,7 +3,6 @@
 #include <QDockWidget>
 #include <qsortfilterproxymodel.h>
 #include "core/array.h"
-#include "universe/entity.h"
 
 
 namespace Ui 

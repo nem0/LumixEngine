@@ -47,7 +47,7 @@ public:
 	IAllocator& getAllocator() { return m_allocator; }
 
 
-	void onEntityMoved(const Entity& entity)
+	void onEntityMoved(Entity entity)
 	{
 		if (!m_is_processing)
 		{
@@ -92,7 +92,7 @@ public:
 	}
 
 
-	virtual void setParent(const Entity& child, const Entity& parent) override
+	virtual void setParent(Entity child, Entity parent) override
 	{
 		Parents::iterator old_parent_iter = m_parents.find(child);
 		if (old_parent_iter.isValid())
@@ -134,14 +134,14 @@ public:
 	}
 
 
-	virtual Entity getParent(const Entity& child) override
+	virtual Entity getParent(Entity child) override
 	{
 		Parents::iterator parent_iter = m_parents.find(child);
 		if (parent_iter.isValid())
 		{
 			return Entity(parent_iter.value());
 		}
-		return NEW_INVALID_ENTITY;
+		return INVALID_ENTITY;
 	}
 
 
@@ -173,14 +173,14 @@ public:
 	}
 
 
-	virtual DelegateList<void(const Entity&, const Entity&)>&
+	virtual DelegateList<void(Entity, Entity)>&
 	parentSet() override
 	{
 		return m_parent_set;
 	}
 
 
-	virtual Array<Child>* getChildren(const Entity& parent) override
+	virtual Array<Child>* getChildren(Entity parent) override
 	{
 		Children::iterator iter = m_children.find(parent);
 		if (iter.isValid())
@@ -195,7 +195,7 @@ private:
 	Universe& m_universe;
 	Parents m_parents;
 	Children m_children;
-	DelegateList<void(const Entity&, const Entity&)> m_parent_set;
+	DelegateList<void(Entity, Entity)> m_parent_set;
 	bool m_is_processing;
 };
 

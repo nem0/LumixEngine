@@ -74,7 +74,7 @@ public:
 		entity_mtx.fastInverse();
 		Lumix::Vec3 local_pos = entity_mtx.multiplyPosition(hit_pos);
 		float xz_scale = static_cast<Lumix::RenderScene*>(terrain.scene)
-							 ->getTerrainXZScale(terrain);
+							 ->getTerrainXZScale(terrain.index);
 		local_pos = local_pos / xz_scale;
 
 		Item& item = m_items.pushEmpty();
@@ -106,7 +106,7 @@ public:
 		entity_mtx.fastInverse();
 		Lumix::Vec3 local_pos = entity_mtx.multiplyPosition(hit_pos);
 		float xz_scale = static_cast<Lumix::RenderScene*>(terrain.scene)
-							 ->getTerrainXZScale(terrain);
+							 ->getTerrainXZScale(terrain.index);
 		local_pos = local_pos / xz_scale;
 		auto hm = getMaterial()->getTextureByUniform(HEIGHTMAP_UNIFORM);
 		auto texture = getDestinationTexture();
@@ -205,7 +205,7 @@ private:
 		Lumix::StackAllocator<LUMIX_MAX_PATH> allocator;
 		Lumix::string material_path(allocator);
 		static_cast<Lumix::RenderScene*>(m_terrain.scene)
-			->getTerrainMaterial(m_terrain, material_path);
+			->getTerrainMaterial(m_terrain.index, material_path);
 		return static_cast<Lumix::Material*>(
 			m_world_editor.getEngine()
 				.getResourceManager()
@@ -885,11 +885,11 @@ void TerrainEditor::tick()
 				{
 					Lumix::Vec3 center = hit.m_origin + hit.m_dir * hit.m_t;
 					scene->setTerrainBrush(
-						terrain, center, m_terrain_brush_size);
+						terrain.index, center, m_terrain_brush_size);
 					drawCursor(*scene, terrain, center);
 					return;
 				}
-				scene->setTerrainBrush(terrain, Lumix::Vec3(0, 0, 0), 1);
+				scene->setTerrainBrush(terrain.index, Lumix::Vec3(0, 0, 0), 1);
 			}
 		}
 	}
@@ -980,7 +980,7 @@ Lumix::Material* TerrainEditor::getMaterial()
 	Lumix::StackAllocator<LUMIX_MAX_PATH> allocator;
 	Lumix::string material_path(allocator);
 	static_cast<Lumix::RenderScene*>(m_component.scene)
-		->getTerrainMaterial(m_component, material_path);
+		->getTerrainMaterial(m_component.index, material_path);
 	return static_cast<Lumix::Material*>(
 		m_world_editor.getEngine()
 			.getResourceManager()
@@ -1120,10 +1120,10 @@ void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
 	if (renderable.isValid())
 	{
 		float w, h;
-		scene->getTerrainSize(m_component, &w, &h);
+		scene->getTerrainSize(m_component.index, &w, &h);
 		float scale =
 			1.0f - Lumix::Math::maxValue(0.01f, m_terrain_brush_strength);
-		Lumix::Model* model = scene->getRenderableModel(renderable);
+		Lumix::Model* model = scene->getRenderableModel(renderable.index);
 		for (int i = 0;
 			 i <= m_terrain_brush_size * m_terrain_brush_size / 1000.0f;
 			 ++i)
@@ -1138,7 +1138,7 @@ void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
 				terrain_pos.x <= w && terrain_pos.z <= h)
 			{
 				pos.y = scene->getTerrainHeightAt(
-					m_component, terrain_pos.x, terrain_pos.z);
+					m_component.index, terrain_pos.x, terrain_pos.z);
 				Lumix::Matrix mtx = Lumix::Matrix::IDENTITY;
 				mtx.setTranslation(pos);
 				if (!isOBBCollision(scene, mtx, model, scale))

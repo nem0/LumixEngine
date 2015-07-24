@@ -69,7 +69,7 @@ void Gizmo::getEnityMatrix(Matrix& mtx, int selection_index)
 		ComponentOld cmp = m_editor.getComponent(m_editor.getSelectedEntities()[selection_index], RENDERABLE_HASH);
 		if(cmp.isValid())
 		{
-			Model* model = static_cast<RenderScene*>(cmp.scene)->getRenderableModel(cmp);
+			Model* model = static_cast<RenderScene*>(cmp.scene)->getRenderableModel(cmp.index);
 			Vec3 center = (model->getAABB().getMin() + model->getAABB().getMax()) * 0.5f;
 			mtx.translate(mtx * center);
 		}
