@@ -163,12 +163,14 @@ public:
 	virtual void getCameraSlot(ComponentIndex camera, string& slot) = 0;
 	virtual void setCameraSize(ComponentIndex camera, int w, int h) = 0;
 
+	virtual DelegateList<void(ComponentIndex)>& renderableCreated() = 0;
+	virtual DelegateList<void(ComponentIndex)>& renderableDestroyed() = 0;
 	virtual void setRenderableIsAlwaysVisible(ComponentIndex cmp,
 											  bool value) = 0;
 	virtual bool isRenderableAlwaysVisible(ComponentIndex cmp) = 0;
 	virtual void showRenderable(ComponentIndex cmp) = 0;
 	virtual void hideRenderable(ComponentIndex cmp) = 0;
-	virtual ComponentOld getRenderableComponent(Entity entity) = 0;
+	virtual ComponentIndex getRenderableComponent(Entity entity) = 0;
 	virtual void getRenderablePath(ComponentIndex cmp, string& path) = 0;
 	virtual void setRenderableLayer(ComponentIndex cmp,
 									const int32_t& layer) = 0;
@@ -179,8 +181,9 @@ public:
 									int64_t layer_mask) = 0;
 	virtual void getRenderableMeshes(Array<RenderableMesh>& meshes,
 									 int64_t layer_mask) = 0;
-	virtual ComponentOld getFirstRenderable() = 0;
-	virtual ComponentOld getNextRenderable(const ComponentOld& cmp) = 0;
+	virtual Entity getRenderableEntity(ComponentIndex cmp) = 0;
+	virtual ComponentIndex getFirstRenderable() = 0;
+	virtual ComponentIndex getNextRenderable(ComponentIndex cmp) = 0;
 	virtual Model* getRenderableModel(ComponentIndex cmp) = 0;
 
 	virtual void getGrassInfos(const Frustum& frustum,

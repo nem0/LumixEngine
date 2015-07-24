@@ -34,7 +34,7 @@ private:
 	{
 		bool m_manual;
 		bool m_is_free;
-		ComponentOld m_renderable;
+		ComponentIndex m_renderable;
 		float m_time;
 		class Animation* m_animation;
 		Entity m_entity;
@@ -50,19 +50,26 @@ public:
 		, m_anim_system(anim_system)
 		, m_animables(allocator)
 	{
-		m_render_scene =
-			static_cast<RenderScene*>(engine.getScene(crc32("renderer")));
-		m_universe.componentCreated()
-			.bind<AnimationSceneImpl, &AnimationSceneImpl::onComponentCreated>(
+		IScene* scene = engine.getScene(crc32("renderer"));
+		ASSERT(scene);
+		m_render_scene = static_cast<RenderScene*>(scene);
+		m_render_scene->renderableCreated()
+			.bind<AnimationSceneImpl, &AnimationSceneImpl::onRenderableCreated>(
 				this);
+		m_render_scene->renderableDestroyed()
+			.bind<AnimationSceneImpl,
+				  &AnimationSceneImpl::onRenderableDestroyed>(this);
 	}
 
 
-	~AnimationSceneImpl()
+	~AnimationSceneImpl() 
 	{
-		m_universe.componentCreated()
+		m_render_scene->renderableCreated()
 			.unbind<AnimationSceneImpl,
-					&AnimationSceneImpl::onComponentCreated>(this);
+					&AnimationSceneImpl::onRenderableCreated>(this);
+		m_render_scene->renderableDestroyed()
+			.unbind<AnimationSceneImpl,
+					&AnimationSceneImpl::onRenderableDestroyed>(this);
 	}
 
 
@@ -95,7 +102,7 @@ public:
 		{
 			return createAnimable(entity).index;
 		}
-		return NEW_INVALID_COMPONENT;
+		return INVALID_COMPONENT;
 	}
 
 
@@ -104,8 +111,8 @@ public:
 		if (type == ANIMABLE_HASH)
 		{
 			m_animables[component].m_is_free = true;
-			m_universe.destroyComponent(ComponentOld(
-				m_animables[component].m_entity, type, this, component));
+			m_universe.destroyComponent(
+				m_animables[component].m_entity, type, this, component);
 		}
 	}
 
@@ -116,7 +123,7 @@ public:
 		for (int i = 0; i < m_animables.size(); ++i)
 		{
 			serializer.write(m_animables[i].m_manual);
-			serializer.write(m_animables[i].m_renderable.entity);
+			serializer.write(m_animables[i].m_entity);
 			serializer.write(m_animables[i].m_time);
 			serializer.write(m_animables[i].m_is_free);
 			serializer.writeString(
@@ -136,9 +143,9 @@ public:
 		{
 			serializer.read(m_animables[i].m_manual);
 			serializer.read(m_animables[i].m_entity);
-			ComponentOld renderable =
+			ComponentIndex renderable =
 				m_render_scene->getRenderableComponent(m_animables[i].m_entity);
-			if (renderable.isValid())
+			if (renderable >= 0)
 			{
 				m_animables[i].m_renderable = renderable;
 			}
@@ -225,12 +232,10 @@ public:
 			if (!animable.m_is_free && animable.m_animation &&
 				animable.m_animation->isReady())
 			{
-				RenderScene* scene =
-					static_cast<RenderScene*>(animable.m_renderable.scene);
 				animable.m_animation->getPose(
 					animable.m_time,
-					scene->getPose(animable.m_renderable.index),
-					*scene->getRenderableModel(animable.m_renderable.index));
+					m_render_scene->getPose(animable.m_renderable),
+					*m_render_scene->getRenderableModel(animable.m_renderable));
 				if (!animable.m_manual)
 				{
 					float t = animable.m_time + time_delta;
@@ -255,17 +260,29 @@ private:
 	}
 
 
-	void onComponentCreated(const ComponentOld& cmp)
+	void onRenderableCreated(ComponentIndex cmp)
 	{
-		if (cmp.type == RENDERABLE_HASH)
+		Entity entity = m_render_scene->getRenderableEntity(cmp);
+		for (int i = 0; i < m_animables.size(); ++i)
 		{
-			for (int i = 0; i < m_animables.size(); ++i)
+			if (m_animables[i].m_entity == entity)
 			{
-				if (m_animables[i].m_entity == cmp.entity)
-				{
-					m_animables[i].m_renderable = cmp;
-					break;
-				}
+				m_animables[i].m_renderable = cmp;
+				break;
+			}
+		}
+	}
+
+
+	void onRenderableDestroyed(ComponentIndex cmp)
+	{
+		Entity entity = m_render_scene->getRenderableEntity(cmp);
+		for (int i = 0; i < m_animables.size(); ++i)
+		{
+			if (m_animables[i].m_entity == entity)
+			{
+				m_animables[i].m_renderable = INVALID_COMPONENT;
+				break;
 			}
 		}
 	}
@@ -286,19 +303,19 @@ private:
 		animable.m_manual = true;
 		animable.m_time = 0;
 		animable.m_is_free = false;
-		animable.m_renderable = ComponentOld::INVALID;
+		animable.m_renderable = INVALID_COMPONENT;
 		animable.m_animation = NULL;
 		animable.m_entity = entity;
 
-		ComponentOld renderable = m_render_scene->getRenderableComponent(entity);
-		if (renderable.isValid())
+		ComponentIndex renderable =
+			m_render_scene->getRenderableComponent(entity);
+		if (renderable >= 0)
 		{
 			animable.m_renderable = renderable;
 		}
 
 		ComponentOld cmp = m_universe.addComponent(
 			entity, ANIMABLE_HASH, this, m_animables.size() - 1);
-		m_universe.componentCreated().invoke(cmp);
 		return cmp;
 	}
 

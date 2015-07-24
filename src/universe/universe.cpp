@@ -23,7 +23,6 @@ Universe::Universe(IAllocator& allocator)
 	, m_id_to_name_map(m_allocator)
 	, m_positions(m_allocator)
 	, m_rotations(m_allocator)
-	, m_component_created(m_allocator)
 	, m_component_destroyed(m_allocator)
 	, m_entity_created(m_allocator)
 	, m_entity_destroyed(m_allocator)
@@ -270,9 +269,13 @@ void Universe::deserialize(InputBlob& serializer)
 }
 
 
-void Universe::destroyComponent(const ComponentOld& cmp)
+void Universe::destroyComponent(Entity entity,
+								uint32_t component_type,
+								IScene* scene,
+								int index)
 {
-	m_component_destroyed.invoke(cmp);
+	m_component_destroyed.invoke(
+		ComponentOld(entity, component_type, scene, index));
 }
 
 

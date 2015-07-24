@@ -11,10 +11,6 @@ namespace Lumix
 class IScene;
 
 
-typedef int ComponentIndex;
-extern LUMIX_ENGINE_API int NEW_INVALID_COMPONENT;
-
-
 struct LUMIX_ENGINE_API ComponentOld final
 {
 

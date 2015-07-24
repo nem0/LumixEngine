@@ -149,9 +149,9 @@ public:
 		m_universe = m_allocator.newObject<Universe>(m_allocator);
 		m_hierarchy = Hierarchy::create(*m_universe, m_allocator);
 		const Array<IPlugin*>& plugins = m_plugin_manager->getPlugins();
-		for (int i = 0; i < plugins.size(); ++i)
+		for (auto* plugin : plugins)
 		{
-			IScene* scene = plugins[i]->createScene(*m_universe);
+			IScene* scene = plugin->createScene(*m_universe);
 			if (scene)
 			{
 				m_scenes.push(scene);
@@ -202,7 +202,7 @@ public:
 		ASSERT(m_universe);
 		if (m_universe)
 		{
-			for (int i = 0; i < m_scenes.size(); ++i)
+			for (int i = m_scenes.size() - 1; i >= 0; --i)
 			{
 				m_scenes[i]->getPlugin().destroyScene(m_scenes[i]);
 			}

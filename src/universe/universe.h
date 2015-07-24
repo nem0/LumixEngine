@@ -38,7 +38,10 @@ public:
 							  uint32_t component_type,
 							  IScene* scene,
 							  int index);
-	void destroyComponent(const ComponentOld& cmp);
+	void destroyComponent(Entity entity,
+						  uint32_t component_type,
+						  IScene* scene,
+						  int index);
 	int getEntityCount() const
 	{
 		return m_positions.size() - m_free_slots.size();
@@ -63,10 +66,6 @@ public:
 	DelegateList<void(Entity)>& entityMoved() { return m_entity_moved; }
 	DelegateList<void(Entity)>& entityCreated() { return m_entity_created; }
 	DelegateList<void(Entity)>& entityDestroyed() { return m_entity_destroyed; }
-	DelegateList<void(const ComponentOld&)>& componentCreated()
-	{
-		return m_component_created;
-	}
 
 	DelegateList<void(const ComponentOld&)>& componentDestroyed()
 	{
@@ -91,7 +90,6 @@ private:
 	DelegateList<void(Entity)> m_entity_moved;
 	DelegateList<void(Entity)> m_entity_created;
 	DelegateList<void(Entity)> m_entity_destroyed;
-	DelegateList<void(const ComponentOld&)> m_component_created;
 	DelegateList<void(const ComponentOld&)> m_component_destroyed;
 	Delegate<void(const ComponentOld&)> m_component_added;
 };
