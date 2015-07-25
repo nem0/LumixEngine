@@ -257,15 +257,13 @@ void ShaderCompiler::compilePass(
 	int define_mask,
 	const Lumix::ShaderCombinations::Defines& all_defines)
 {
-	++m_to_compile;
-
 	updateNotifications();
-
 
 	for (int mask = 0; mask < 1 << lengthOf(all_defines); ++mask)
 	{
 		if ((mask & (~define_mask)) == 0)
 		{
+			++m_to_compile;
 			QProcess* process = new QProcess;
 			process->connect(
 				process,

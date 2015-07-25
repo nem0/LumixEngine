@@ -21,56 +21,70 @@
 
 class ViewWidget : public QWidget
 {
-	public:
-		ViewWidget(SceneView& view, QWidget* parent)
-			: QWidget(parent)
-			, m_view(view)
-		{
-			setAttribute(Qt::WA_PaintOnScreen);
-			setMouseTracking(true);
-		}
+public:
+	ViewWidget(SceneView& view, QWidget* parent)
+		: QWidget(parent)
+		, m_view(view)
+		, m_world_editor(nullptr)
+	{
+		setAttribute(Qt::WA_PaintOnScreen);
+		setMouseTracking(true);
+	}
 
-		virtual void mousePressEvent(QMouseEvent* event) override
-		{
-			m_world_editor->onMouseDown(event->x(), event->y(), event->button() == Qt::RightButton ? Lumix::MouseButton::RIGHT : Lumix::MouseButton::LEFT);
-			m_last_x = event->x();
-			m_last_y = event->y();
-			setFocus();
-		}
+	virtual void mousePressEvent(QMouseEvent* event) override
+	{
+		m_world_editor->onMouseDown(event->x(),
+									event->y(),
+									event->button() == Qt::RightButton
+										? Lumix::MouseButton::RIGHT
+										: Lumix::MouseButton::LEFT);
+		m_last_x = event->x();
+		m_last_y = event->y();
+		setFocus();
+	}
 
 
-		virtual QPaintEngine* paintEngine() const override
-		{
-			return nullptr;
-		}
+	virtual QPaintEngine* paintEngine() const override { return nullptr; }
 
-		virtual void wheelEvent(QWheelEvent* event) override
-		{
-			m_view.changeNavigationSpeed(event->delta() * 0.001f);
-		}
+	virtual void wheelEvent(QWheelEvent* event) override
+	{
+		m_view.changeNavigationSpeed(event->delta() * 0.001f);
+	}
 
-		virtual void mouseMoveEvent(QMouseEvent* event) override
-		{
-			int flags = 0;
-			flags |= Qt::ControlModifier & QApplication::keyboardModifiers() ? (int)Lumix::WorldEditor::MouseFlags::CONTROL : 0;
-			flags |= Qt::AltModifier & QApplication::keyboardModifiers() ? (int)Lumix::WorldEditor::MouseFlags::ALT : 0;
-			m_world_editor->onMouseMove(event->x(), event->y(), event->x() - m_last_x, event->y() - m_last_y, flags);
-			m_last_x = event->x();
-			m_last_y = event->y();
-		}
+	virtual void mouseMoveEvent(QMouseEvent* event) override
+	{
+		int flags = 0;
+		flags |= Qt::ControlModifier & QApplication::keyboardModifiers()
+					 ? (int)Lumix::WorldEditor::MouseFlags::CONTROL
+					 : 0;
+		flags |= Qt::AltModifier & QApplication::keyboardModifiers()
+					 ? (int)Lumix::WorldEditor::MouseFlags::ALT
+					 : 0;
+		m_world_editor->onMouseMove(event->x(),
+									event->y(),
+									event->x() - m_last_x,
+									event->y() - m_last_y,
+									flags);
+		m_last_x = event->x();
+		m_last_y = event->y();
+	}
 
-		virtual void mouseReleaseEvent(QMouseEvent* event) override
-		{
-			m_world_editor->onMouseUp(event->x(), event->y(), event->button() == Qt::RightButton ? Lumix::MouseButton::RIGHT : Lumix::MouseButton::LEFT);
-		}
+	virtual void mouseReleaseEvent(QMouseEvent* event) override
+	{
+		m_world_editor->onMouseUp(event->x(),
+								  event->y(),
+								  event->button() == Qt::RightButton
+									  ? Lumix::MouseButton::RIGHT
+									  : Lumix::MouseButton::LEFT);
+	}
 
-		Lumix::WorldEditor* m_world_editor;
-		int m_last_x;
-		int m_last_y;
-		SceneView& m_view;
+	Lumix::WorldEditor* m_world_editor;
+	int m_last_x;
+	int m_last_y;
+	SceneView& m_view;
 };
 
-SceneView::SceneView(QWidget* parent) 
+SceneView::SceneView(QWidget* parent)
 	: QDockWidget(parent)
 	, m_is_frame_requested(false)
 	, m_is_frame_debugger_active(false)
@@ -84,7 +98,7 @@ SceneView::SceneView(QWidget* parent)
 	m_speed_input = new QDoubleSpinBox(root);
 	m_speed_input->setSingleStep(0.1f);
 	m_speed_input->setValue(0.1f);
-	
+
 	QPushButton* stop_button = new QPushButton("Stop", root);
 	QPushButton* next_button = new QPushButton("Next", root);
 	m_time_delta_multiplier_input = new QDoubleSpinBox(root);
@@ -92,14 +106,19 @@ SceneView::SceneView(QWidget* parent)
 	m_time_delta_multiplier_input->setValue(1.0);
 	m_time_delta_multiplier_input->setSingleStep(0.1);
 	m_time_delta_multiplier_input->setMinimumWidth(60);
-	stop_button->connect(stop_button, &QPushButton::clicked, [this]()
-	{
-		m_is_frame_debugger_active = !m_is_frame_debugger_active;
-	});
-	next_button->connect(next_button, &QPushButton::clicked, [this]()
-	{
-		m_is_frame_requested = true;
-	});
+	stop_button->connect(stop_button,
+						 &QPushButton::clicked,
+						 [this]()
+						 {
+							 m_is_frame_debugger_active =
+								 !m_is_frame_debugger_active;
+						 });
+	next_button->connect(next_button,
+						 &QPushButton::clicked,
+						 [this]()
+						 {
+							 m_is_frame_requested = true;
+						 });
 
 	horizontal_layout->addWidget(stop_button);
 	horizontal_layout->addWidget(next_button);
@@ -144,8 +163,11 @@ void SceneView::setWorldEditor(Lumix::WorldEditor& world_editor)
 {
 	static_cast<ViewWidget*>(m_view)->m_world_editor = &world_editor;
 	m_world_editor = &world_editor;
-	m_render_device = new WGLRenderDevice(m_world_editor->getEngine(), "pipelines/main.json");
-	world_editor.getMeasureTool()->distanceMeasured().bind<SceneView, &SceneView::onDistanceMeasured>(this);
+	m_render_device =
+		new WGLRenderDevice(m_world_editor->getEngine(), "pipelines/main.json");
+	world_editor.getMeasureTool()
+		->distanceMeasured()
+		.bind<SceneView, &SceneView::onDistanceMeasured>(this);
 }
 
 
@@ -163,13 +185,15 @@ void SceneView::setWireframe(bool wireframe)
 
 void SceneView::onDistanceMeasured(float distance)
 {
-	m_measure_tool_label->setText(QString("Measured distance: %1").arg(distance));
+	m_measure_tool_label->setText(
+		QString("Measured distance: %1").arg(distance));
 }
 
 
 void SceneView::changeNavigationSpeed(float value)
 {
-	m_speed_input->setValue(Lumix::Math::maxValue(0.1f, (float)m_speed_input->value() + value));
+	m_speed_input->setValue(
+		Lumix::Math::maxValue(0.1f, (float)m_speed_input->value() + value));
 }
 
 
@@ -184,7 +208,7 @@ float SceneView::getNavigationSpeed() const
 	return m_speed_input->value();
 }
 
-void SceneView::dragEnterEvent(QDragEnterEvent *event)
+void SceneView::dragEnterEvent(QDragEnterEvent* event)
 {
 	if (event->mimeData()->hasUrls())
 	{
@@ -193,21 +217,27 @@ void SceneView::dragEnterEvent(QDragEnterEvent *event)
 }
 
 
-void SceneView::dropEvent(QDropEvent *event)
+void SceneView::dropEvent(QDropEvent* event)
 {
 	const QList<QUrl>& list = event->mimeData()->urls();
-	if(!list.empty())
+	if (!list.empty())
 	{
 		QString file = list[0].toLocalFile();
-		if(file.endsWith(".msh"))
+		if (file.endsWith(".msh"))
 		{
 			Lumix::Vec3 position;
-			Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(m_world_editor->getEditCamera().scene);
+			Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(
+				m_world_editor->getEditCamera().scene);
 
 			Lumix::Vec3 origin;
 			Lumix::Vec3 dir;
-			scene->getRay(m_world_editor->getEditCamera().index, event->pos().x(), event->pos().y(), origin, dir);
-			Lumix::RayCastModelHit hit = scene->castRay(origin, dir, Lumix::INVALID_COMPONENT);
+			scene->getRay(m_world_editor->getEditCamera().index,
+						  event->pos().x(),
+						  event->pos().y(),
+						  origin,
+						  dir);
+			Lumix::RayCastModelHit hit =
+				scene->castRay(origin, dir, Lumix::INVALID_COMPONENT);
 			if (hit.m_is_hit)
 			{
 				position = hit.m_origin + hit.m_dir * hit.m_t;
@@ -216,14 +246,17 @@ void SceneView::dropEvent(QDropEvent *event)
 			{
 				position.set(0, 0, 0);
 			}
-			InsertMeshCommand* command = m_world_editor->getAllocator().newObject<InsertMeshCommand>(*static_cast<ViewWidget&>(*m_view).m_world_editor, position, Lumix::Path(file.toLatin1().data()));
+			InsertMeshCommand* command =
+				m_world_editor->getAllocator().newObject<InsertMeshCommand>(
+					*static_cast<ViewWidget&>(*m_view).m_world_editor,
+					position,
+					Lumix::Path(file.toLatin1().data()));
 			m_world_editor->executeCommand(command);
 			Lumix::Entity entity = command->getEntity();
 			m_world_editor->selectEntities(&entity, 1);
 		}
 	}
 }
-
 
 
 void SceneView::resizeEvent(QResizeEvent*)
