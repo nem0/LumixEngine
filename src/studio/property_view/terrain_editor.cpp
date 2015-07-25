@@ -841,24 +841,49 @@ void TerrainEditor::drawCursor(Lumix::RenderScene& scene,
 							   const Lumix::ComponentUID& terrain,
 							   const Lumix::Vec3& center)
 {
-	/*for (int i = 0; i < 20; ++i)
+	static const int SLICE_COUNT = 30;
+
+	Lumix::Matrix terrain_matrix =
+		m_world_editor.getUniverse()->getMatrix(m_component.entity);
+	Lumix::Matrix inv_terrain_matrix = terrain_matrix;
+	inv_terrain_matrix.inverse();
+
+	float w, h;
+	scene.getTerrainSize(terrain.index, &w, &h);
+
+	for (int i = 0; i < SLICE_COUNT + 1; ++i)
 	{
-		float angle_step = 18;
+		float angle_step = Lumix::Math::PI * 2 / SLICE_COUNT;
 		float angle = i * angle_step;
+		float next_angle = i * angle_step + angle_step;
 		Lumix::Vec3 from =
 			center +
 			Lumix::Vec3(cos(angle), 0, sin(angle)) * m_terrain_brush_size;
-		Lumix::Vec3 to =
-			center +
-			Lumix::Vec3(cos(angle + angle_step), 0, sin(angle + angle_step)) *
-				m_terrain_brush_size;
+		Lumix::Vec3 to = center +
+						 Lumix::Vec3(cos(next_angle), 0, sin(next_angle)) *
+							 m_terrain_brush_size;
+
+
+		Lumix::Vec3 local_from = inv_terrain_matrix.multiplyPosition(from);
+		if (local_from.x >= 0 && local_from.z >= 0 && local_from.x <= w &&
+			local_from.z <= h)
+		{
+			from.y = 0.25f +
+					 scene.getTerrainHeightAt(
+						 terrain.index, local_from.x, local_from.z);
+		}
+
+		Lumix::Vec3 local_to = inv_terrain_matrix.multiplyPosition(to);
+		if (local_to.x >= 0 && local_to.z >= 0 && local_to.x <= w &&
+			local_to.z <= h)
+		{
+			to.y =
+				0.25f +
+				scene.getTerrainHeightAt(terrain.index, local_to.x, local_to.z);
+		}
+
 		scene.addDebugLine(from, to, 0xffff0000, 0);
-	}*/
-	scene.addDebugCircle(center,
-						 Lumix::Vec3(0, 1, 0),
-						 m_terrain_brush_size,
-						 Lumix::Vec3(1, 0, 0),
-						 0);
+	}
 }
 
 

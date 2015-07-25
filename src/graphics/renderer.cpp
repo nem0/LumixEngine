@@ -133,15 +133,11 @@ struct RendererImpl : public Renderer
 
 		ResourceManager& manager = engine.getResourceManager();
 		m_texture_manager.create(ResourceManager::TEXTURE, manager);
-		m_model_manager.create(ResourceManager::MODEL,manager);
-		m_material_manager.create(ResourceManager::MATERIAL,
-			manager);
-		m_shader_manager.create(ResourceManager::SHADER,
-			manager);
-		m_pipeline_manager.create(ResourceManager::PIPELINE,
-			manager);
-		m_font_manager.create(ResourceManager::BITMAP_FONT,
-			manager);
+		m_model_manager.create(ResourceManager::MODEL, manager);
+		m_material_manager.create(ResourceManager::MATERIAL, manager);
+		m_shader_manager.create(ResourceManager::SHADER, manager);
+		m_pipeline_manager.create(ResourceManager::PIPELINE, manager);
+		m_font_manager.create(ResourceManager::BITMAP_FONT, manager);
 
 		m_current_pass_hash = crc32("MAIN");
 	}
