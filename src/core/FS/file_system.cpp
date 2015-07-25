@@ -268,7 +268,7 @@ namespace Lumix
 					}
 
 					IFileDevice* dev = getDevice(token.c_str());
-					if (!dev)
+					if (dev)
 					{
 						prev = dev->createFile(prev);
 					}
