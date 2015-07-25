@@ -13,8 +13,8 @@ namespace Debug
 {
 
 
-	static const uint32_t UNINITIALIZED_MEMORY_PATTERN = 0xCDCDCDCD;
-	static const uint32_t FREED_MEMORY_PATTERN = 0xDDDDDDDD;
+	static const uint32_t UNINITIALIZED_MEMORY_PATTERN = 0xCD;
+	static const uint32_t FREED_MEMORY_PATTERN = 0xDD;
 	static const uint32_t ALLOCATION_GUARD = 0xFDFDFDFD;
 
 

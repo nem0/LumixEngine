@@ -1264,7 +1264,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_pass_idx = -1;
 		m_current_framebuffer = m_default_framebuffer;
 		m_global_textures.clear();
-		memset(m_view2pass_map, 0xffffFFFF, sizeof(m_view2pass_map));
+		memset(m_view2pass_map, 0xFF, sizeof(m_view2pass_map));
 		m_instance_data_idx = 0;
 		for (int i = 0; i < lengthOf(m_terrain_instances); ++i)
 		{
