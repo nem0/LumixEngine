@@ -54,7 +54,7 @@ namespace Lumix
 	void InputSystem::destroy()
 	{
 		m_impl->m_allocator.deleteObject(m_impl);
-		m_impl = NULL;
+		m_impl = nullptr;
 	}
 
 

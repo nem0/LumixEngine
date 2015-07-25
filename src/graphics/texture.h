@@ -24,8 +24,8 @@ class LUMIX_ENGINE_API Texture : public Resource
 		int getWidth() const { return m_width; }
 		int getHeight() const { return m_height; }
 		int getBytesPerPixel() const { return m_BPP; }
-		const uint8_t* getData() const { return m_data.empty() ? NULL : &m_data[0]; }
-		uint8_t* getData() { return m_data.empty() ? NULL : &m_data[0]; }
+		const uint8_t* getData() const { return m_data.empty() ? nullptr : &m_data[0]; }
+		uint8_t* getData() { return m_data.empty() ? nullptr : &m_data[0]; }
 		void addDataReference();
 		void removeDataReference();
 		void onDataUpdated();

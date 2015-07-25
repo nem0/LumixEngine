@@ -2,13 +2,14 @@
 
 
 #include "dynamic_object_model.h"
-#include "universe/entity.h"
+#include "universe/component.h"
 
 
 namespace Lumix
 {
 	class IArrayDescriptor;
 	class IPropertyDescriptor;
+	class Universe;
 	class WorldEditor;
 }
 
@@ -22,19 +23,21 @@ class EntityModel : public DynamicObjectModel
 		~EntityModel();
 
 	private:
-		void onComponentAdded(Lumix::Component component);
-		void onComponentDestroyed(Lumix::Component component);
-		void onPropertySet(Lumix::Component component, const Lumix::IPropertyDescriptor& descriptor);
-		void onEntityPosition(const Lumix::Entity& entity);
-		void onUniverseDestroyed();
-		void onEntityDestroyed(const Lumix::Entity& entity);
+		Lumix::Universe* getUniverse();
 
-		const char* getComponentName(Lumix::Component cmp) const;
-		void addArrayProperty(Node& child, Lumix::IArrayDescriptor* desc, Lumix::Component cmp);
-		void addResourceProperty(Node& child, Lumix::IPropertyDescriptor* desc, Lumix::Component cmp);
+		void onComponentAdded(Lumix::ComponentUID component);
+		void onComponentDestroyed(Lumix::ComponentUID component);
+		void onPropertySet(Lumix::ComponentUID component, const Lumix::IPropertyDescriptor& descriptor);
+		void onEntityPosition(Lumix::Entity entity);
+		void onUniverseDestroyed();
+		void onEntityDestroyed(Lumix::Entity entity);
+
+		const char* getComponentName(Lumix::ComponentUID cmp) const;
+		void addArrayProperty(Node& child, Lumix::IArrayDescriptor* desc, Lumix::ComponentUID cmp);
+		void addResourceProperty(Node& child, Lumix::IPropertyDescriptor* desc, Lumix::ComponentUID cmp);
 		void addNameProperty();
 		void addPositionProperty();
-		void addComponentNode(Lumix::Component cmp, int row);
+		void addComponentNode(Lumix::ComponentUID cmp, int row);
 		void addComponent(QWidget* widget, QPoint pos);
 		void setEntityPosition(int index, float value);
 		void setEntityRotation(int index, float value);

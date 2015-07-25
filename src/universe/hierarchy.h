@@ -1,8 +1,9 @@
 #pragma once
 
 
-#include "universe/entity.h"
 #include "core/delegate_list.h"
+#include "core/lumix.h"
+#include "core/matrix.h"
 
 
 namespace Lumix
@@ -11,6 +12,7 @@ namespace Lumix
 
 	class InputBlob;
 	class OutputBlob;
+	class Universe;
 
 
 	class Hierarchy
@@ -30,12 +32,12 @@ namespace Lumix
 
 			virtual ~Hierarchy() {}
 
-			virtual void setParent(const Entity& child, const Entity& parent) = 0;
-			virtual Entity getParent(const Entity& child) = 0;
+			virtual void setParent(Entity child, Entity parent) = 0;
+			virtual Entity getParent(Entity child) = 0;
 			virtual void serialize(OutputBlob& serializer) = 0;
 			virtual void deserialize(InputBlob& serializer) = 0;
-			virtual Array<Child>* getChildren(const Entity& parent) = 0;
-			virtual DelegateList<void (const Entity&, const Entity&)>& parentSet() = 0;
+			virtual Array<Child>* getChildren(Entity parent) = 0;
+			virtual DelegateList<void (Entity, Entity)>& parentSet() = 0;
 	};
 
 

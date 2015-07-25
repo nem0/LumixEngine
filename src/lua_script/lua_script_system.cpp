@@ -116,8 +116,10 @@ public:
 					fread(&content[0], 1, size, fp);
 					content[size] = '\0';
 					bool errors =
-						luaL_loadbuffer(
-							script.m_state, &content[0], size, script.m_path.c_str()) != LUA_OK;
+						luaL_loadbuffer(script.m_state,
+										&content[0],
+										size,
+										script.m_path.c_str()) != LUA_OK;
 					errors =
 						errors ||
 						lua_pcall(script.m_state, 0, LUA_MULTRET, 0) != LUA_OK;
@@ -133,7 +135,8 @@ public:
 				else
 				{
 					script.m_state = nullptr;
-					g_log_error.log("lua script") << "error loading " << script.m_path.c_str();
+					g_log_error.log("lua script") << "error loading "
+												  << script.m_path.c_str();
 				}
 			}
 		}
@@ -156,31 +159,31 @@ public:
 	}
 
 
-	virtual Component createComponent(uint32_t type,
-									  const Entity& entity) override
+	virtual ComponentIndex createComponent(uint32_t type,
+										   Entity entity) override
 	{
 		if (type == LUA_SCRIPT_HASH)
 		{
 			LuaScriptScene::Script& script = m_scripts.pushEmpty();
-			script.m_entity = entity.index;
+			script.m_entity = entity;
 			script.m_path = "";
 			script.m_state = nullptr;
 			m_valid.push(true);
-			Component cmp = m_universe.addComponent(
-				entity, type, this, m_scripts.size() - 1);
-			m_universe.componentCreated().invoke(cmp);
-			return cmp;
+			m_universe.addComponent(entity, type, this, m_scripts.size() - 1);
+			return m_scripts.size() - 1;
 		}
-		return Component::INVALID;
+		return INVALID_COMPONENT;
 	}
 
 
-	virtual void destroyComponent(const Component& component) override
+	virtual void destroyComponent(ComponentIndex component,
+								  uint32_t type) override
 	{
-		if (component.type == LUA_SCRIPT_HASH)
+		if (type == LUA_SCRIPT_HASH)
 		{
-			m_universe.destroyComponent(component);
-			m_valid[component.index] = false;
+			m_universe.destroyComponent(
+				Entity(m_scripts[component].m_entity), type, this, component);
+			m_valid[component] = false;
 		}
 	}
 
@@ -213,10 +216,7 @@ public:
 			if (m_valid[i])
 			{
 				m_universe.addComponent(
-					Entity(&m_universe, m_scripts[i].m_entity),
-					LUA_SCRIPT_HASH,
-					this,
-					i);
+					Entity(m_scripts[i].m_entity), LUA_SCRIPT_HASH, this, i);
 			}
 		}
 	}
@@ -235,6 +235,10 @@ public:
 				g_log_error.log("lua") << lua_tostring(m_global_state, -1);
 			}
 		}
+		else
+		{
+			lua_pop(m_global_state, 1);
+		}
 	}
 
 
@@ -244,15 +248,15 @@ public:
 	}
 
 
-	void getScriptPath(Component cmp, string& path)
+	void getScriptPath(ComponentIndex cmp, string& path)
 	{
-		path = m_scripts[cmp.index].m_path.c_str();
+		path = m_scripts[cmp].m_path.c_str();
 	}
 
 
-	void setScriptPath(Component cmp, const string& path)
+	void setScriptPath(ComponentIndex cmp, const string& path)
 	{
-		m_scripts[cmp.index].m_path = path;
+		m_scripts[cmp].m_path = path;
 	}
 
 
@@ -315,7 +319,7 @@ void LuaScriptSystem::setWorldEditor(WorldEditor& editor)
 		"lua_script",
 		allocator.newObject<FilePropertyDescriptor<LuaScriptScene>>(
 			"source",
-			(void (LuaScriptScene::*)(Component, string&)) &
+			(void (LuaScriptScene::*)(ComponentIndex, string&)) &
 				LuaScriptScene::getScriptPath,
 			&LuaScriptScene::setScriptPath,
 			"Lua (*.lua)",

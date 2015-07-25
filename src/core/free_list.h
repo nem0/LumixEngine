@@ -28,7 +28,7 @@ namespace Lumix
 		void* allocate(size_t size) override
 		{
 			ASSERT(size == sizeof(T));
-			return m_pool_index > 0 ? m_pool[--m_pool_index] : NULL;
+			return m_pool_index > 0 ? m_pool[--m_pool_index] : nullptr;
 		}
 
 		void deallocate(void* ptr) override

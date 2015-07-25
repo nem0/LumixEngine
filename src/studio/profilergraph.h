@@ -13,7 +13,7 @@ class ProfilerGraph : public QWidget
 		Q_OBJECT
 
 	public:
-		explicit ProfilerGraph(QWidget* parent = NULL);
+		explicit ProfilerGraph(QWidget* parent = nullptr);
 		~ProfilerGraph();
 
 		virtual void paintEvent(QPaintEvent*) override;

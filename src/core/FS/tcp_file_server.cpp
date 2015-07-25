@@ -218,7 +218,7 @@ namespace Lumix
 
 		TCPFileServer::TCPFileServer()
 		{
-			m_impl = NULL;
+			m_impl = nullptr;
 		}
 
 
@@ -245,7 +245,7 @@ namespace Lumix
 			m_impl->m_task.stop();
 			m_impl->m_task.destroy();
 			m_impl->m_allocator.deleteObject(m_impl);
-			m_impl = NULL;
+			m_impl = nullptr;
 		}
 
 		const char* TCPFileServer::getBasePath() const

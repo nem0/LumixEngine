@@ -20,7 +20,7 @@ class Array<T, false>
 		explicit Array(IAllocator& allocator)
 			: m_allocator(allocator)
 		{
-			m_data = NULL;
+			m_data = nullptr;
 			m_capacity = 0;
 			m_size = 0;
 		}
@@ -28,7 +28,7 @@ class Array<T, false>
 		explicit Array(const Array& rhs)
 			: m_allocator(rhs.m_allocator)
 		{
-			m_data = NULL;
+			m_data = nullptr;
 			m_capacity = 0;
 			m_size = 0;
 			*this = rhs;
@@ -274,7 +274,7 @@ public:
 	explicit Array(IAllocator& allocator)
 		: m_allocator(allocator)
 	{
-		m_data = NULL;
+		m_data = nullptr;
 		m_capacity = 0;
 		m_size = 0;
 	}
@@ -282,7 +282,7 @@ public:
 	explicit Array(const Array& rhs)
 		: m_allocator(rhs.m_allocator)
 	{
-		m_data = NULL;
+		m_data = nullptr;
 		m_capacity = 0;
 		m_size = 0;
 		*this = rhs;

@@ -17,7 +17,7 @@ namespace Lumix
 			OutputBlob(const OutputBlob& rhs);
 
 			void reserve(int size) { m_data.reserve(size); }
-			const void* getData() const { return m_data.empty() ? NULL : &m_data[0]; }
+			const void* getData() const { return m_data.empty() ? nullptr : &m_data[0]; }
 			int getSize() const { return m_data.size(); }
 			void write(const void* data, int size);
 			void writeString(const char* string);

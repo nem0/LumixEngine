@@ -11,13 +11,13 @@ namespace Lumix
 class LibraryPC : public Library
 {
 	public:
-		LibraryPC(const Path& path, IAllocator& allocator) : m_allocator(allocator), m_path(path), m_module(NULL) {}
+		LibraryPC(const Path& path, IAllocator& allocator) : m_allocator(allocator), m_path(path), m_module(nullptr) {}
 		~LibraryPC() { unload(); }
 		IAllocator& getAllocator() { return m_allocator; }
 	
 		virtual bool isLoaded() const override
 		{
-			return m_module != NULL;
+			return m_module != nullptr;
 		}
 
 
@@ -25,7 +25,7 @@ class LibraryPC : public Library
 		{
 			ASSERT(!isLoaded());
 			m_module = LoadLibrary(m_path.c_str());
-			return m_module != NULL;
+			return m_module != nullptr;
 		}
 
 
@@ -34,7 +34,7 @@ class LibraryPC : public Library
 			bool status = FreeLibrary(m_module) == TRUE;
 			if (status)
 			{
-				m_module = NULL;
+				m_module = nullptr;
 			}
 			return status;
 		}

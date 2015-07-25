@@ -2,7 +2,6 @@
 
 
 #include "core/lumix.h"
-#include "universe/component.h"
 
 
 namespace Lumix
@@ -19,8 +18,8 @@ namespace Lumix
 		public:
 			virtual ~IScene() {}
 
-			virtual Component createComponent(uint32_t, const Entity&) = 0;
-			virtual void destroyComponent(const Component& component) = 0;
+			virtual ComponentIndex createComponent(uint32_t, Entity) = 0;
+			virtual void destroyComponent(ComponentIndex component, uint32_t type) = 0;
 			virtual void serialize(OutputBlob& serializer) = 0;
 			virtual void deserialize(InputBlob& serializer) = 0;
 			virtual IPlugin& getPlugin() const = 0;
@@ -44,7 +43,7 @@ namespace Lumix
 			virtual void sendMessage(const char*) {};
 			virtual void setWorldEditor(class WorldEditor& editor) {}
 
-			virtual IScene* createScene(Universe&) { return NULL; }
+			virtual IScene* createScene(Universe&) { return nullptr; }
 			virtual void destroyScene(IScene*) { ASSERT(false); }
 	};
 

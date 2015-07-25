@@ -27,11 +27,8 @@
 #include "graphics/shader_manager.h"
 #include "graphics/texture_manager.h"
 
-#include "script/script_system.h"
 #include "universe/hierarchy.h"
 
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
 
 namespace Lumix
 {
@@ -86,17 +83,17 @@ public:
 		else
 		{
 			m_file_system = fs;
-			m_mem_file_device = NULL;
-			m_disk_file_device = NULL;
+			m_mem_file_device = nullptr;
+			m_disk_file_device = nullptr;
 		}
 
 		m_resource_manager.create(*m_file_system);
 
 		m_timer = Timer::create(m_allocator);
 		m_fps_timer = Timer::create(m_allocator);
-		m_fps_frame = NULL;
-		m_universe = NULL;
-		m_hierarchy = NULL;
+		m_fps_frame = 0;
+		m_universe = nullptr;
+		m_hierarchy = nullptr;
 		m_base_path = base_path;
 	}
 
@@ -150,9 +147,9 @@ public:
 		m_universe = m_allocator.newObject<Universe>(m_allocator);
 		m_hierarchy = Hierarchy::create(*m_universe, m_allocator);
 		const Array<IPlugin*>& plugins = m_plugin_manager->getPlugins();
-		for (int i = 0; i < plugins.size(); ++i)
+		for (auto* plugin : plugins)
 		{
-			IScene* scene = plugins[i]->createScene(*m_universe);
+			IScene* scene = plugin->createScene(*m_universe);
 			if (scene)
 			{
 				m_scenes.push(scene);
@@ -172,7 +169,7 @@ public:
 				return m_scenes[i];
 			}
 		}
-		return NULL;
+		return nullptr;
 	}
 
 
@@ -185,7 +182,7 @@ public:
 				return m_scenes[i];
 			}
 		}
-		return NULL;
+		return nullptr;
 	}
 
 
@@ -203,15 +200,15 @@ public:
 		ASSERT(m_universe);
 		if (m_universe)
 		{
-			for (int i = 0; i < m_scenes.size(); ++i)
+			for (int i = m_scenes.size() - 1; i >= 0; --i)
 			{
 				m_scenes[i]->getPlugin().destroyScene(m_scenes[i]);
 			}
 			m_scenes.clear();
 			Hierarchy::destroy(m_hierarchy);
-			m_hierarchy = NULL;
+			m_hierarchy = nullptr;
 			m_allocator.deleteObject(m_universe);
-			m_universe = NULL;
+			m_universe = nullptr;
 		}
 	}
 
@@ -413,8 +410,8 @@ private:
 
 void showLogInVS(const char*, const char* message)
 {
-	OutputDebugString(message);
-	OutputDebugString("\n");
+	Debug::debugOutput(message);
+	Debug::debugOutput("\n");
 }
 
 
@@ -432,7 +429,7 @@ Engine::create(const char* base_path, FS::FileSystem* fs, IAllocator& allocator)
 	if (!engine->create())
 	{
 		allocator.deleteObject(engine);
-		return NULL;
+		return nullptr;
 	}
 	return engine;
 }

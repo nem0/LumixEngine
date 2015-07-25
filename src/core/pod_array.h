@@ -19,14 +19,14 @@ class PODArray
 		explicit PODArray(const Allocator& allocator)
 			: m_allocator(allocator)
 		{
-			m_data = NULL;
+			m_data = nullptr;
 			m_capacity = 0;
 			m_size = 0;
 		}
 
 		explicit PODArray(const PODArray& rhs)
 		{
-			m_data = NULL;
+			m_data = nullptr;
 			m_capacity = 0;
 			m_size = 0;
 			*this = rhs;
@@ -46,7 +46,7 @@ class PODArray
 
 		PODArray()
 		{
-			m_data = NULL;
+			m_data = nullptr;
 			m_capacity = 0;
 			m_size = 0;
 		}

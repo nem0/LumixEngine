@@ -11,7 +11,7 @@ namespace Lumix
 		, m_allocator(allocator)
 		, m_renderer(renderer)
 	{
-		m_buffer = NULL;
+		m_buffer = nullptr;
 		m_buffer_size = -1;
 	}
 
@@ -37,10 +37,10 @@ namespace Lumix
 		if (m_buffer_size < size)
 		{
 			m_allocator.deleteObject(m_buffer);
-			m_buffer = NULL;
+			m_buffer = nullptr;
 			m_buffer_size = -1;
 		}
-		if (m_buffer == NULL)
+		if (m_buffer == nullptr)
 		{
 			m_buffer = (uint8_t*)m_allocator.allocate(sizeof(uint8_t) * size);
 			m_buffer_size = size;

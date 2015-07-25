@@ -86,7 +86,7 @@ namespace Lumix
 
 			size_t getRestOfFileSize()
 			{
-				const size_t NEW_LINE_AND_NULL_TERMINATION_SIZE = sizeof('\n') + sizeof('\0');
+				const size_t NEW_LINE_AND_NULL_TERMINATION_SIZE = sizeof(char) + sizeof(char);
 				return m_file.size() - m_file.pos() + NEW_LINE_AND_NULL_TERMINATION_SIZE + strlen(m_token);
 			}
 

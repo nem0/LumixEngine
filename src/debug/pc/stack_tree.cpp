@@ -35,11 +35,11 @@ namespace Debug
 
 	StackTree::StackTree()
 	{
-		m_root = NULL;
+		m_root = nullptr;
 		if(MT::atomicIncrement(&m_instances) == 1)
 		{
 			HANDLE process = GetCurrentProcess();
-			SymInitialize(process, NULL, TRUE);
+			SymInitialize(process, nullptr, TRUE);
 		}
 	}
 
@@ -94,8 +94,8 @@ namespace Debug
 			StackNode* new_node = new StackNode();
 			node->m_first_child = new_node;
 			new_node->m_parent = node;
-			new_node->m_next = NULL;
-			new_node->m_first_child = NULL;
+			new_node->m_next = nullptr;
+			new_node->m_first_child = nullptr;
 			new_node->m_instruction = *instruction;
 			node = new_node;
 			--instruction;
@@ -115,9 +115,9 @@ namespace Debug
 		{
 			m_root = new StackNode();
 			m_root->m_instruction = *ptr;
-			m_root->m_first_child = NULL;
-			m_root->m_next = NULL;
-			m_root->m_parent = NULL;
+			m_root->m_first_child = nullptr;
+			m_root->m_next = nullptr;
+			m_root->m_parent = nullptr;
 			--ptr;
 			return insertChildren(m_root, ptr, stack);
 		}
@@ -134,8 +134,8 @@ namespace Debug
 				node->m_next = new StackNode;
 				node->m_next->m_parent = node->m_parent;
 				node->m_next->m_instruction = *ptr;
-				node->m_next->m_next = NULL;
-				node->m_next->m_first_child = NULL;
+				node->m_next->m_next = nullptr;
+				node->m_next->m_first_child = nullptr;
 				--ptr;
 				return insertChildren(node, ptr, stack);
 			}
@@ -148,8 +148,8 @@ namespace Debug
 			{
 				node->m_first_child = new StackNode;
 				node->m_first_child->m_parent = node;
-				node->m_next = NULL;
-				node->m_first_child = NULL;
+				node->m_next = nullptr;
+				node->m_first_child = nullptr;
 				node->m_instruction = *ptr;
 				--ptr;
 				return insertChildren(node, ptr, stack);

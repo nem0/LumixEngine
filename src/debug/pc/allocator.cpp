@@ -13,14 +13,14 @@ namespace Debug
 {
 
 
-	static const uint32_t UNINITIALIZED_MEMORY_PATTERN = 0xCDCDCDCD;
-	static const uint32_t FREED_MEMORY_PATTERN = 0xDDDDDDDD;
+	static const uint32_t UNINITIALIZED_MEMORY_PATTERN = 0xCD;
+	static const uint32_t FREED_MEMORY_PATTERN = 0xDD;
 	static const uint32_t ALLOCATION_GUARD = 0xFDFDFDFD;
 
 
 	Allocator::Allocator(IAllocator& source)
 		: m_source(source)
-		, m_root(NULL)
+		, m_root(nullptr)
 		, m_mutex(false)
 		, m_stack_tree(m_source.newObject<Debug::StackTree>())
 		, m_total_size(0)
@@ -28,13 +28,13 @@ namespace Debug
 		, m_are_guards_enabled(true)
 	{
 		m_sentinels[0].m_next = &m_sentinels[1];
-		m_sentinels[0].m_previous = NULL;
-		m_sentinels[0].m_stack_leaf = NULL;
+		m_sentinels[0].m_previous = nullptr;
+		m_sentinels[0].m_stack_leaf = nullptr;
 		m_sentinels[0].m_size = 0;
 
-		m_sentinels[1].m_next = NULL;
+		m_sentinels[1].m_next = nullptr;
 		m_sentinels[1].m_previous = &m_sentinels[0];
-		m_sentinels[1].m_stack_leaf = NULL;
+		m_sentinels[1].m_stack_leaf = nullptr;
 		m_sentinels[1].m_size = 0;
 
 		m_root = &m_sentinels[1];

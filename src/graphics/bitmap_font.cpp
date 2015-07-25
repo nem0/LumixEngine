@@ -27,7 +27,7 @@ namespace Lumix
 		: Resource(path, resource_manager, allocator)
 		, m_allocator(allocator)
 		, m_characters(allocator)
-		, m_material(NULL)
+		, m_material(nullptr)
 	{
 
 	}
@@ -50,7 +50,7 @@ namespace Lumix
 		int index = m_characters.find(character);
 		if (index < 0)
 		{
-			return NULL;
+			return nullptr;
 		}
 		return &m_characters.at(index);
 	}
@@ -59,7 +59,7 @@ namespace Lumix
 	static bool readLine(FS::IFile* file, char buffer[], int max_size)
 	{
 		int i = 0;
-		while (file->read(buffer + i, 1) && buffer[i] != '\n' && buffer[i] != '\0' && i < max_size - 1)
+		while (i < max_size - 1 && file->read(buffer + i, 1) && buffer[i] != '\n' && buffer[i] != '\0')
 		{
 			++i;
 		}

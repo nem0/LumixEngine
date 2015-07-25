@@ -3,7 +3,6 @@
 #include <QDockWidget>
 #include <qsortfilterproxymodel.h>
 #include "core/array.h"
-#include "universe/entity.h"
 
 
 namespace Ui 
@@ -13,7 +12,6 @@ namespace Ui
 
 namespace Lumix
 {
-	struct Entity;
 	class Universe;
 	class WorldEditor;
 }

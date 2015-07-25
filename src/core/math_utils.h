@@ -17,8 +17,8 @@ namespace Lumix
 {
 	namespace Math
 	{
-		static const float PI = 3.14159265f;
-		static const float SQRT2 = 1.41421356237f;
+		const float PI = 3.14159265f;
+		const float SQRT2 = 1.41421356237f;
 
 		LUMIX_ENGINE_API bool getRayPlaneIntersecion(const Vec3& origin, const Vec3& dir, const Vec3& plane_point, const Vec3& normal, float& out);
 		LUMIX_ENGINE_API bool getRaySphereIntersection(const Vec3& origin, const Vec3& dir, const Vec3& center, float radius, Vec3& out);

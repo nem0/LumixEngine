@@ -45,12 +45,12 @@ MainWindow::MainWindow(QWidget* parent)
 	m_property_view = new PropertyView;
 	m_scene_view = new SceneView;
 	m_game_view = new GameView(*this);
-	m_asset_browser = new AssetBrowser(*this, NULL);
+	m_asset_browser = new AssetBrowser(*this, nullptr);
 	m_file_server_ui = new FileServerWidget;
 	m_profiler_ui = new ProfilerUI;
 	m_entity_template_list_ui = new EntityTemplateList;
 	m_notifications = new Notifications(*this);
-	m_entity_list = new EntityList(NULL);
+	m_entity_list = new EntityList(nullptr);
 
 	m_metadata = new Metadata();
 
@@ -382,7 +382,7 @@ void MainWindow::on_actionLog_triggered()
 void MainWindow::on_actionOpen_triggered()
 {
 	QString filename = QFileDialog::getOpenFileName(
-		NULL, QString(), QString(), "universe (*.unv)");
+		nullptr, QString(), QString(), "universe (*.unv)");
 	QByteArray path = filename.toLocal8Bit();
 	if (!path.isEmpty())
 	{

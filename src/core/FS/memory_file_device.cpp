@@ -15,7 +15,7 @@ namespace Lumix
 		public:
 			MemoryFile(IFile* file, MemoryFileDevice& device, IAllocator& allocator)
 				: m_device(device)
-				, m_buffer(NULL)
+				, m_buffer(nullptr)
 				, m_size(0)
 				, m_capacity(0)
 				, m_pos(0)
@@ -42,7 +42,7 @@ namespace Lumix
 
 			virtual bool open(const char* path, Mode mode) override
 			{
-				ASSERT(NULL == m_buffer); // reopen is not supported currently
+				ASSERT(!m_buffer); // reopen is not supported currently
 
 				m_write = !!(mode & Mode::WRITE);
 				if(m_file)
@@ -84,7 +84,7 @@ namespace Lumix
 				}
 
 				m_allocator.deallocate(m_buffer);
-				m_buffer = NULL;
+				m_buffer = nullptr;
 			}
 
 			virtual bool read(void* buffer, size_t size) override

@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include "core/matrix.h"
 #include "universe/universe.h"
 
 
@@ -8,9 +9,7 @@ namespace Lumix
 {
 
 
-struct Component;
 class Engine;
-struct Entity;
 class Model;
 class PipelineInstance;
 class RenderScene;
@@ -31,7 +30,7 @@ class EditorIcon
 		};
 
 	public:
-		EditorIcon(Engine& engine, RenderScene& scene, const Entity& entity);
+		EditorIcon(Engine& engine, RenderScene& scene, Entity entity);
 		~EditorIcon();
 		void render(PipelineInstance& pipeline);
 		void show();

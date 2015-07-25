@@ -57,7 +57,7 @@ namespace Lumix
 			for (int32_t i = 0; i < size; ++i)
 			{
 				m_queue[i].key = i;
-				m_queue[i].el = NULL;
+				m_queue[i].el = nullptr;
 			}
 		}
 
@@ -72,9 +72,9 @@ namespace Lumix
 
 		template <class T, int32_t size> int32_t LockFreeQueue<T, size>::push(T* data)
 		{
-			ASSERT(NULL != data);
+			ASSERT(data);
 
-			Node cur_node(0, (T*)NULL);
+			Node cur_node(0, (T*)nullptr);
 			Node new_node(0, data);
 
 			while ((m_wr - m_rd) < size)
@@ -103,7 +103,7 @@ namespace Lumix
 				int32_t idx = cur_read_idx & (size - 1);
 
 				Node cur_node(cur_read_idx, m_queue[idx].el);
-				Node new_node(cur_read_idx + size, NULL);
+				Node new_node(cur_read_idx + size, nullptr);
 
 				if (compareAndExchange64(&m_queue[idx].val, new_node.val, cur_node.val))
 				{
@@ -112,7 +112,7 @@ namespace Lumix
 				}
 			}
 
-			return (T*)NULL;
+			return (T*)nullptr;
 		}
 
 	} // ~namespace MT

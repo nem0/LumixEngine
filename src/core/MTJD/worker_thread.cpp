@@ -24,8 +24,8 @@ namespace Lumix
 
 		bool WorkerTask::create(const char* name, Manager* manager, Manager::JobTransQueue* trans_queue)
 		{
-			ASSERT(NULL != manager);
-			ASSERT(NULL != trans_queue);
+			ASSERT(manager);
+			ASSERT(trans_queue);
 
 			m_manager = manager;
 			m_trans_queue = trans_queue;
@@ -35,12 +35,12 @@ namespace Lumix
 
 		int WorkerTask::task()
 		{
-			ASSERT(NULL != m_trans_queue);
+			ASSERT(m_trans_queue);
 
 			while (!m_trans_queue->isAborted())
 			{
 				Manager::JobTrans* tr = m_trans_queue->pop(true);
-				if (tr == NULL)
+				if (!tr)
 					break;
 
 				PROFILE_START("WorkerTask");

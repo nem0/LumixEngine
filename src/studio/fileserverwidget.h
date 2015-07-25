@@ -19,7 +19,7 @@ class FileServerWidget : public QDockWidget
 	Q_OBJECT
 
 public:
-	explicit FileServerWidget(QWidget* parent = NULL);
+	explicit FileServerWidget(QWidget* parent = nullptr);
 	~FileServerWidget();
 	
 	void setWorldEditor(Lumix::WorldEditor& server);

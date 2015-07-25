@@ -9,7 +9,7 @@ namespace Lumix
 	{
 		Mutex::Mutex(bool locked)
 		{
-			m_id = ::CreateMutex(NULL, locked, NULL);
+			m_id = ::CreateMutex(nullptr, locked, nullptr);
 		}
 
 		Mutex::~Mutex()

@@ -36,7 +36,7 @@ namespace Lumix
 		if(old_end < m_start && new_end >= m_start)
 		{
 			ASSERT(false); /// out of memory
-			return NULL;
+			return nullptr;
 		}
 		*(int32_t*)(m_buffer + (new_end - size)) = (int32_t)n;
 		m_end = new_end;
