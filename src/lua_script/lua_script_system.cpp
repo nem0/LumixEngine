@@ -235,6 +235,10 @@ public:
 				g_log_error.log("lua") << lua_tostring(m_global_state, -1);
 			}
 		}
+		else
+		{
+			lua_pop(m_global_state, 1);
+		}
 	}
 
 
