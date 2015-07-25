@@ -235,7 +235,7 @@ private:
 public:
 	EntityTemplateSystemImpl(WorldEditor& editor)
 		: m_editor(editor)
-		, m_universe(NULL)
+		, m_universe(nullptr)
 		, m_instances(editor.getAllocator())
 		, m_updated(editor.getAllocator())
 		, m_template_names(editor.getAllocator())
@@ -276,7 +276,7 @@ public:
 		m_editor.universeDestroyed()
 			.unbind<EntityTemplateSystemImpl,
 					&EntityTemplateSystemImpl::onUniverseDestroyed>(this);
-		setUniverse(NULL);
+		setUniverse(nullptr);
 	}
 
 
@@ -313,7 +313,7 @@ public:
 	{
 		m_instances.clear();
 		m_template_names.clear();
-		setUniverse(NULL);
+		setUniverse(nullptr);
 	}
 
 

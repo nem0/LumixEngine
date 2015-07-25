@@ -1315,7 +1315,7 @@ public:
 				return props[i];
 			}
 		}
-		return NULL;
+		return nullptr;
 	}
 
 
@@ -1700,7 +1700,7 @@ public:
 		if (m_mouse_handling_plugin)
 		{
 			m_mouse_handling_plugin->onMouseUp(x, y, button);
-			m_mouse_handling_plugin = NULL;
+			m_mouse_handling_plugin = nullptr;
 		}
 		m_mouse_mode = MouseMode::NONE;
 	}
@@ -1983,7 +1983,7 @@ public:
 
 	void stopGameMode()
 	{
-		selectEntities(NULL, 0);
+		selectEntities(nullptr, 0);
 		for (int i = 0; i < m_editor_icons.size(); ++i)
 		{
 			m_allocator.deleteObject(m_editor_icons[i]);
@@ -1993,7 +1993,7 @@ public:
 		m_game_mode_file->seek(FS::SeekMode::BEGIN, 0);
 		load(*m_game_mode_file);
 		m_engine->getFileSystem().close(m_game_mode_file);
-		m_game_mode_file = NULL;
+		m_game_mode_file = nullptr;
 		m_universe_loaded.invoke();
 	}
 
@@ -2344,7 +2344,7 @@ public:
 
 	WorldEditorImpl(Engine& engine)
 		: m_allocator(engine.getAllocator())
-		, m_engine(NULL)
+		, m_engine(nullptr)
 		, m_universe_mutex(false)
 		, m_gizmo(*this)
 		, m_component_properties(m_allocator)
@@ -2372,7 +2372,7 @@ public:
 	{
 		m_go_to_parameters.m_is_active = false;
 		m_undo_index = -1;
-		m_mouse_handling_plugin = NULL;
+		m_mouse_handling_plugin = nullptr;
 		m_is_game_mode = false;
 		m_universe_path = "";
 		m_terrain_brush_size = 10;
@@ -2679,14 +2679,14 @@ public:
 	{
 		destroyUndoStack();
 		m_universe_destroyed.invoke();
-		m_gizmo.setUniverse(NULL);
+		m_gizmo.setUniverse(nullptr);
 		m_gizmo.destroy();
 		for (int i = 0; i < m_editor_icons.size(); ++i)
 		{
 			m_allocator.deleteObject(m_editor_icons[i]);
 		}
 		m_components.clear();
-		selectEntities(NULL, 0);
+		selectEntities(nullptr, 0);
 		m_camera = INVALID_ENTITY;
 		m_editor_icons.clear();
 		m_engine->destroyUniverse();
@@ -2891,7 +2891,7 @@ public:
 		{
 			return m_editor_command_creators.at(index)(*this);
 		}
-		return NULL;
+		return nullptr;
 	}
 
 
@@ -2938,7 +2938,7 @@ public:
 			serializer.deserializeObjectEnd();
 			m_engine->getFileSystem().close(file);
 		}
-		return file != NULL;
+		return file != nullptr;
 	}
 
 

@@ -41,7 +41,7 @@ class ViewWidget : public QWidget
 
 		virtual QPaintEngine* paintEngine() const override
 		{
-			return NULL;
+			return nullptr;
 		}
 
 		virtual void wheelEvent(QWheelEvent* event) override

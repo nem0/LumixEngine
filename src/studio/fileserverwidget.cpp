@@ -65,7 +65,7 @@ FileServerWidget::FileServerWidget(QWidget* parent)
 	m_ui->setupUi(this);
 	m_ui->tableWidget->setColumnWidth(0, 75);
 	m_ui->tableWidget->setColumnWidth(1, 200);
-	m_server = NULL;
+	m_server = nullptr;
 	m_watcher = new FileServerWatcher(*this);
 	connect(this, SIGNAL(fileEvent(qint32, qint64, const QString&, qint32, qint32, qint64)), this, SLOT(onFileEvent(qint32, qint64, const QString&, qint32, qint32, qint64)));
 }

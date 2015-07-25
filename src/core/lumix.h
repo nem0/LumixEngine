@@ -57,10 +57,6 @@ int lengthOf(const T(&)[count])
 	#endif
 #endif
 
-#ifndef NULL
-	#define NULL nullptr
-#endif
-
 #define LUMIX_LIBRARY_EXPORT __declspec(dllexport)
 #define LUMIX_LIBRARY_IMPORT __declspec(dllimport)
 #define LUMIX_ALIGN_OF(T) __alignof(T)

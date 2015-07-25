@@ -25,7 +25,7 @@ static const uint32_t RENDERABLE_HASH = crc32("renderable");
 Gizmo::Gizmo(WorldEditor& editor)
 	: m_editor(editor)
 {
-	m_model = NULL;
+	m_model = nullptr;
 	m_pivot_mode = PivotMode::OBJECT_PIVOT;
 	m_coord_system = CoordSystem::LOCAL;
 }

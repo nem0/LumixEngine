@@ -58,7 +58,7 @@ void Material::updateShaderInstance()
 
 void Material::doUnload(void)
 {
-	setShader(NULL);
+	setShader(nullptr);
 
 	ResourceManagerBase* texture_manager = m_resource_manager.get(ResourceManager::TEXTURE);
 	for (int i = 0; i < m_texture_count; i++)

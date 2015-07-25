@@ -52,7 +52,7 @@ void InsertMeshCommand::execute()
 	universe->setPosition(m_entity, m_position);
 	const Lumix::Array<Lumix::IScene*>& scenes = engine.getScenes();
 	Lumix::ComponentIndex cmp;
-	Lumix::IScene* scene = NULL;
+	Lumix::IScene* scene = nullptr;
 	for (int i = 0; i < scenes.size(); ++i)
 	{
 		cmp = scenes[i]->createComponent(RENDERABLE_HASH, m_entity);

@@ -27,7 +27,7 @@ namespace Lumix
 
 			virtual void deallocate(void* p) override
 			{
-				if(p != NULL)
+				if(p != nullptr)
 				{
 					ASSERT(p >= m_data && p < m_data + SIZE);
 					m_end = ((uint8_t*)p) - m_data;

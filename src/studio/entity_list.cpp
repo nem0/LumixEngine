@@ -167,7 +167,7 @@ private:
 					return node;
 				}
 			}
-			return NULL;
+			return nullptr;
 		}
 
 		bool removeEntity(Lumix::Entity entity)
@@ -196,8 +196,8 @@ public:
 	EntityListModel(QWidget* parent, EntityListFilter* filter)
 		: QAbstractItemModel(parent)
 	{
-		m_root = NULL;
-		m_universe = NULL;
+		m_root = nullptr;
+		m_universe = nullptr;
 		m_filter = filter;
 		m_is_update_enabled = true;
 	}
@@ -522,7 +522,7 @@ public:
 					this);
 		}
 		delete m_root;
-		m_root = new EntityNode(NULL, Lumix::INVALID_ENTITY);
+		m_root = new EntityNode(nullptr, Lumix::INVALID_ENTITY);
 		m_universe = universe;
 		if (m_universe)
 		{
@@ -588,7 +588,7 @@ EntityList::EntityList(QWidget* parent)
 	, m_ui(new Ui::EntityList)
 {
 	m_is_update_enabled = true;
-	m_universe = NULL;
+	m_universe = nullptr;
 	m_ui->setupUi(this);
 	m_filter = new EntityListFilter(this);
 	m_model = new EntityListModel(this, m_filter);
@@ -711,8 +711,8 @@ void EntityList::onUniverseLoaded()
 
 void EntityList::onUniverseDestroyed()
 {
-	m_model->setUniverse(NULL);
-	m_universe = NULL;
+	m_model->setUniverse(nullptr);
+	m_universe = nullptr;
 }
 
 

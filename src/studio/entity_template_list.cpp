@@ -5,11 +5,11 @@
 
 
 EntityTemplateList::EntityTemplateList() 
-	: QDockWidget(NULL)
+	: QDockWidget(nullptr)
 	, m_ui(new Ui::EntityTemplateList)
 {
 	m_ui->setupUi(this);
-	m_editor = NULL;
+	m_editor = nullptr;
 }
 
 EntityTemplateList::~EntityTemplateList()

@@ -192,7 +192,7 @@ void EntityModel::addNameProperty()
 		if (m_editor.getUniverse()->nameExists(
 				value.toString().toLatin1().data()))
 		{
-			QMessageBox::warning(NULL,
+			QMessageBox::warning(nullptr,
 								 "Warning",
 								 "Entity with this name already exists!",
 								 QMessageBox::Ok);

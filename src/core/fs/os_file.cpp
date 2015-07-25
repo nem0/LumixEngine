@@ -21,12 +21,12 @@ namespace Lumix
 
 		OsFile::OsFile()
 		{
-			m_impl = NULL;
+			m_impl = nullptr;
 		}
 
 		OsFile::~OsFile()
 		{
-			ASSERT(NULL == m_impl);
+			ASSERT(!m_impl);
 		}
 
 		bool OsFile::open(const char* path, Mode mode, IAllocator& allocator)
@@ -37,30 +37,30 @@ namespace Lumix
 				hnd = ::CreateFile(path, 
 					Mode::WRITE & mode ? GENERIC_WRITE : 0 | Mode::READ & mode ? GENERIC_READ : 0,
 					Mode::WRITE & mode ? 0 : FILE_SHARE_READ,
-					NULL,
+					nullptr,
 					OPEN_EXISTING,
 					FILE_ATTRIBUTE_NORMAL,
-					NULL);
+					nullptr);
 			}
 			else if(Mode::OPEN_OR_CREATE & mode)
 			{
 				hnd = ::CreateFile(path, 
 					Mode::WRITE & mode ? GENERIC_WRITE : 0 | Mode::READ & mode ? GENERIC_READ : 0,
 					Mode::WRITE & mode ? 0 : FILE_SHARE_READ,
-					NULL,
+					nullptr,
 					OPEN_ALWAYS,
 					FILE_ATTRIBUTE_NORMAL,
-					NULL);
+					nullptr);
 			}
 			else if (Mode::CREATE & mode)
 			{
 				hnd = ::CreateFile(path, 
 					Mode::WRITE & mode ? GENERIC_WRITE : 0 | Mode::READ & mode ? GENERIC_READ : 0,
 					Mode::WRITE & mode ? 0 : FILE_SHARE_READ,
-					NULL,
+					nullptr,
 					CREATE_ALWAYS,
 					FILE_ATTRIBUTE_NORMAL,
-					NULL);
+					nullptr);
 			}
 			else
 			{
@@ -81,45 +81,45 @@ namespace Lumix
 
 		void OsFile::close()
 		{
-			if (NULL != m_impl)
+			if (nullptr != m_impl)
 			{
 				::CloseHandle(m_impl->m_file);
 				m_impl->m_allocator.deleteObject(m_impl);
-				m_impl = NULL;
+				m_impl = nullptr;
 			}
 		}
 
 		bool OsFile::write(const void* data, size_t size)
 		{
-			ASSERT(NULL != m_impl);
+			ASSERT(nullptr != m_impl);
 			size_t written = 0;
-			::WriteFile(m_impl->m_file, data, (DWORD)size, (LPDWORD)&written, NULL);
+			::WriteFile(m_impl->m_file, data, (DWORD)size, (LPDWORD)&written, nullptr);
 			return size == written;
 		}
 
 		bool OsFile::read(void* data, size_t size)
 		{
-			ASSERT(NULL != m_impl);
+			ASSERT(nullptr != m_impl);
 			size_t readed = 0;
-			::ReadFile(m_impl->m_file, data, (DWORD)size, (LPDWORD)&readed, NULL);
+			::ReadFile(m_impl->m_file, data, (DWORD)size, (LPDWORD)&readed, nullptr);
 			return size == readed;
 		}
 
 		size_t OsFile::size()
 		{
-			ASSERT(NULL != m_impl);
+			ASSERT(nullptr != m_impl);
 			return ::GetFileSize(m_impl->m_file, 0);
 		}
 
 		size_t OsFile::pos()
 		{
-			ASSERT(NULL != m_impl);
-			return ::SetFilePointer(m_impl->m_file, 0, NULL, FILE_CURRENT);
+			ASSERT(nullptr != m_impl);
+			return ::SetFilePointer(m_impl->m_file, 0, nullptr, FILE_CURRENT);
 		}
 
 		size_t OsFile::seek(SeekMode base, size_t pos)
 		{
-			ASSERT(NULL != m_impl);
+			ASSERT(nullptr != m_impl);
 			int dir = 0;
 			switch(base)
 			{
@@ -134,12 +134,12 @@ namespace Lumix
 				break;
 			}
 
-			return ::SetFilePointer(m_impl->m_file, (DWORD)pos, NULL, dir);
+			return ::SetFilePointer(m_impl->m_file, (DWORD)pos, nullptr, dir);
 		}
 
 		void OsFile::writeEOF()
 		{
-			ASSERT(NULL != m_impl);
+			ASSERT(nullptr != m_impl);
 			::SetEndOfFile(m_impl->m_file);
 		}
 	} // ~namespace FS

@@ -53,7 +53,7 @@ namespace Lumix
 
 		TCPStream* TCPAcceptor::accept()
 		{
-			SOCKET socket = ::accept(m_socket, NULL, NULL);
+			SOCKET socket = ::accept(m_socket, nullptr, nullptr);
 			return m_allocator.newObject<TCPStream>(socket);
 		}
 	} // ~namespace Net

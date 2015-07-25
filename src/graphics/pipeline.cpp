@@ -287,7 +287,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_debug_line_material = static_cast<Material*>(material_manager->load(
 			Lumix::Path("models/editor/debug_line.mat")));
 
-		m_scene = NULL;
+		m_scene = nullptr;
 		m_width = m_height = -1;
 		m_framebuffer_width = m_framebuffer_height = -1;
 		pipeline.onLoaded<PipelineInstanceImpl,

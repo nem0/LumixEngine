@@ -27,7 +27,7 @@ namespace Lumix
 		: Resource(path, resource_manager, allocator)
 		, m_allocator(allocator)
 		, m_characters(allocator)
-		, m_material(NULL)
+		, m_material(nullptr)
 	{
 
 	}
@@ -50,7 +50,7 @@ namespace Lumix
 		int index = m_characters.find(character);
 		if (index < 0)
 		{
-			return NULL;
+			return nullptr;
 		}
 		return &m_characters.at(index);
 	}

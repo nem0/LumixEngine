@@ -138,7 +138,7 @@ public:
 			char path[LUMIX_MAX_PATH];
 			serializer.readString(path, sizeof(path));
 			m_animables[i].m_animation =
-				path[0] == '\0' ? NULL : loadAnimation(path);
+				path[0] == '\0' ? nullptr : loadAnimation(path);
 			m_universe.addComponent(
 				m_animables[i].m_entity, ANIMABLE_HASH, this, i);
 		}
@@ -232,7 +232,7 @@ private:
 
 	ComponentIndex createAnimable(Entity entity)
 	{
-		Animable* src = NULL;
+		Animable* src = nullptr;
 		for (int i = 0, c = m_animables.size(); i < c; ++i)
 		{
 			if (m_animables[i].m_is_free)
@@ -245,7 +245,7 @@ private:
 		animable.m_time = 0;
 		animable.m_is_free = false;
 		animable.m_renderable = INVALID_COMPONENT;
-		animable.m_animation = NULL;
+		animable.m_animation = nullptr;
 		animable.m_entity = entity;
 
 		ComponentIndex renderable =

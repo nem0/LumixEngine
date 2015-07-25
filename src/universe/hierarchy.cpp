@@ -187,7 +187,7 @@ public:
 		{
 			return iter.value();
 		}
-		return NULL;
+		return nullptr;
 	}
 
 private:

@@ -445,7 +445,7 @@ public:
 		serializer.read(size);
 		for (int i = size; i < m_renderables.size(); ++i)
 		{
-			setModel(i, NULL);
+			setModel(i, nullptr);
 			m_allocator.deleteObject(m_renderables[i]);
 		}
 		m_culling_system->clear();
@@ -466,7 +466,7 @@ public:
 			serializer.read(m_renderables[i]->m_scale);
 			int64_t layer_mask;
 			serializer.read(layer_mask);
-			m_renderables[i]->m_model = NULL;
+			m_renderables[i]->m_model = nullptr;
 			m_renderables[i]->m_matrix =
 				m_universe.getMatrix(m_renderables[i]->m_entity);
 
@@ -536,7 +536,7 @@ public:
 		for (int i = size; i < m_terrains.size(); ++i)
 		{
 			m_allocator.deleteObject(m_terrains[i]);
-			m_terrains[i] = NULL;
+			m_terrains[i] = nullptr;
 		}
 		m_terrains.resize(size);
 		for (int i = 0; i < size; ++i)
@@ -552,7 +552,7 @@ public:
 			}
 			else
 			{
-				m_terrains[i] = NULL;
+				m_terrains[i] = nullptr;
 			}
 		}
 	}
@@ -588,7 +588,7 @@ public:
 			}
 		}
 
-		setModel(renderable_index, NULL);
+		setModel(renderable_index, nullptr);
 		m_always_visible.eraseItemFast(component);
 		m_allocator.deleteObject(m_renderables[renderable_index]);
 		m_renderables.erase(renderable_index);
@@ -648,7 +648,7 @@ public:
 		{
 			Entity entity = m_cameras[component].m_entity;
 			m_allocator.deleteObject(m_terrains[component]);
-			m_terrains[component] = NULL;
+			m_terrains[component] = nullptr;
 			m_universe.destroyComponent(entity, type, this, component);
 		}
 		else
@@ -1113,7 +1113,7 @@ public:
 	{
 		PROFILE_FUNCTION();
 		if (m_renderables.empty())
-			return NULL;
+			return nullptr;
 
 		m_culling_system->cullToFrustumAsync(frustum, layer_mask);
 		return &m_culling_system->getResult();
@@ -2113,7 +2113,7 @@ private:
 		m_renderables.push(&r);
 		r.m_entity = entity;
 		r.m_scale = 1;
-		r.m_model = NULL;
+		r.m_model = nullptr;
 		r.m_component_index = new_index;
 		r.m_is_always_visible = false;
 		r.m_matrix = m_universe.getMatrix(entity);

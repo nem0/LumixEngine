@@ -76,7 +76,7 @@ namespace Lumix
 
 		void Manager::schedule(Job* job)
 		{
-			ASSERT(NULL != job);
+			ASSERT(job);
 			ASSERT(false == job->m_scheduled);
 			ASSERT(job->m_dependency_count > 0);
 
@@ -142,7 +142,7 @@ namespace Lumix
 					}
 
 					Job* job = getNextReadyJob();
-					if (NULL != job)
+					if (job)
 					{
 						scheduleCpu(job);
 					}
@@ -172,12 +172,12 @@ namespace Lumix
 
 #endif //TYPE == MULTI_THREAD
 
-			return NULL;
+			return nullptr;
 		}
 
 		void Manager::pushReadyJob(Job* job)
 		{
-			ASSERT(NULL != job);
+			ASSERT(job);
 
 #if TYPE == MULTI_THREAD
 

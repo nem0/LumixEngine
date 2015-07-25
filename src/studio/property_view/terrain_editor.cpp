@@ -829,7 +829,7 @@ TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor,
 	, m_main_window(main_window)
 {
 	editor.addPlugin(*this);
-	m_texture_tree_item = NULL;
+	m_texture_tree_item = nullptr;
 	m_terrain_brush_size = 10;
 	m_terrain_brush_strength = 0.1f;
 	m_type = NOT_SET;
