@@ -75,7 +75,7 @@ namespace Lumix
 		int index = m_paths.find(hash);
 		if (index < 0)
 		{
-			return NULL;
+			return nullptr;
 		}
 		++m_paths.at(index)->m_ref_count;
 		return m_paths.at(index);

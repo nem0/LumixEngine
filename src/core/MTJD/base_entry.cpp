@@ -14,7 +14,7 @@ namespace Lumix
 		{
 #if TYPE == MULTI_THREAD
 
-			m_sync_event = sync_event ? m_allocator.newObject<MT::Event>(MT::EventFlags::MANUAL_RESET) : NULL;
+			m_sync_event = sync_event ? m_allocator.newObject<MT::Event>(MT::EventFlags::MANUAL_RESET) : nullptr;
 
 #endif // TYPE == MULTI_THREAD
 		}
@@ -45,7 +45,7 @@ namespace Lumix
 		{
 #if TYPE == MULTI_THREAD
 
-			ASSERT(NULL != m_sync_event);
+			ASSERT(nullptr != m_sync_event);
 			m_sync_event->wait();
 
 #endif //TYPE == MULTI_THREAD

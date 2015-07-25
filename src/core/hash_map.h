@@ -14,7 +14,7 @@ namespace Lumix
 		HashNode(const K& key, const V& value)
 			: m_key(key)
 			, m_value(value)
-			, m_next(NULL)
+			, m_next(nullptr)
 		{}
 
 		explicit HashNode(const my_node& src)
@@ -117,8 +117,8 @@ namespace Lumix
 			friend class hm_type;
 
 			HashMapIterator()
-				: m_hash_map(NULL)
-				, m_current_node(NULL)
+				: m_hash_map(nullptr)
+				, m_current_node(nullptr)
 			{
 			}
 
@@ -140,7 +140,7 @@ namespace Lumix
 
 			bool isValid() const
 			{
-				return NULL != m_current_node && m_hash_map->m_sentinel != m_current_node;
+				return nullptr != m_current_node && m_hash_map->m_sentinel != m_current_node;
 			}
 
 			key_type& key()
@@ -210,8 +210,8 @@ namespace Lumix
 			friend class hm_type;
 
 			ConstHashMapIterator()
-				: m_hash_map(NULL)
-				, m_current_node(NULL)
+				: m_hash_map(nullptr)
+				, m_current_node(nullptr)
 			{
 			}
 
@@ -233,7 +233,7 @@ namespace Lumix
 
 			bool isValid() const
 			{
-				return NULL != m_current_node && m_hash_map->m_sentinel != m_current_node;
+				return nullptr != m_current_node && m_hash_map->m_sentinel != m_current_node;
 			}
 
 			const key_type& key() const
@@ -366,10 +366,10 @@ namespace Lumix
 
 			size_type idx = getPosition(it.m_current_node->m_key);
 			node_type* n = &m_table[idx];
-			node_type* prev = NULL;
-			node_type* next_it = NULL;
+			node_type* prev = nullptr;
+			node_type* next_it = nullptr;
 
-			while(NULL != n && m_sentinel != n->m_next)
+			while(nullptr != n && m_sentinel != n->m_next)
 			{
 				if(n == it.m_current_node)
 				{
@@ -392,9 +392,9 @@ namespace Lumix
 			size_type count = 0;
 			size_type idx = getPosition(key);
 			node_type* n = &m_table[idx];
-			node_type* prev = NULL;
+			node_type* prev = nullptr;
 
-			while(NULL != n && m_sentinel != n->m_next)
+			while(nullptr != n && m_sentinel != n->m_next)
 			{
 				if(key == n->m_key)
 				{
@@ -425,7 +425,7 @@ namespace Lumix
 			}
 
 			m_allocator.deallocate(m_table);
-			m_table = NULL;
+			m_table = nullptr;
 			m_size = 0;
 			m_max_id = 0;
 			m_mask = 0;
@@ -533,12 +533,12 @@ namespace Lumix
 		node_type* getEmptyNode(size_type pos)
 		{
 			node_type* node = &m_table[pos];
-			while (m_sentinel != node->m_next && NULL != node->m_next)
+			while (m_sentinel != node->m_next && nullptr != node->m_next)
 			{
 				node = node->m_next;
 			}
 
-			node->m_next = (NULL == node->m_next ? construct(reinterpret_cast<node_type*>(m_allocator.allocate(sizeof(node_type))), m_sentinel) : node);
+			node->m_next = (nullptr == node->m_next ? construct(reinterpret_cast<node_type*>(m_allocator.allocate(sizeof(node_type))), m_sentinel) : node);
 			return node->m_next;
 		}
 
@@ -560,7 +560,7 @@ namespace Lumix
 				return m_sentinel;
 
 			node_type* next = n->m_next;
-			if((NULL == next || m_sentinel == next))
+			if((nullptr == next || m_sentinel == next))
 			{
 				size_type idx = getPosition(n->m_key) + 1;
 				for(size_type i = idx; i < m_max_id; i++)
@@ -578,7 +578,7 @@ namespace Lumix
 		node_type* _find(const key_type& key)
 		{
 			size_type pos = getPosition(key);
-			for(node_type* n = &m_table[pos]; NULL != n && m_sentinel != n->m_next; n = n->m_next)
+			for(node_type* n = &m_table[pos]; nullptr != n && m_sentinel != n->m_next; n = n->m_next)
 			{
 				if(n->m_key == key)
 					return n;
@@ -589,7 +589,7 @@ namespace Lumix
 
 		void deleteNode(node_type*& n, node_type* prev)
 		{
-			if(NULL == prev)
+			if(nullptr == prev)
 			{
 				node_type* next = n->m_next;
 				destruct(n);
@@ -614,12 +614,12 @@ namespace Lumix
 			for(size_type i = 0; i < ids_count; i++)
 			{
 				node_type* n = &src[i];
-				while(NULL != n && src_sentinel != n->m_next)
+				while(nullptr != n && src_sentinel != n->m_next)
 				{
 					size_type pos = getPosition(n->m_key);
 					node_type* new_node = getEmptyNode(pos);
 					copyUninitialized(n, new_node);
-					new_node->m_next = NULL;
+					new_node->m_next = nullptr;
 					n = n->m_next;
 				}
 			}
@@ -630,7 +630,7 @@ namespace Lumix
 			for(size_type i = 0; i < ids_count; i++)
 			{
 				node_type* n = &src[i];
-				while(NULL != n && src_sentinel != n->m_next)
+				while(nullptr != n && src_sentinel != n->m_next)
 				{
 					node_type* destr = n;
 					n = n->m_next;

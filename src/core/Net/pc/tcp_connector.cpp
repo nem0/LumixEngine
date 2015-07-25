@@ -24,13 +24,13 @@ namespace Lumix
 			sockVer = MAKEWORD(2,2);
 			if(WSAStartup(sockVer, &wsaData) != 0)
 			{
-				return NULL;
+				return nullptr;
 			}
 
 			SOCKET socket = ::socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 			if(socket == INVALID_SOCKET)
 			{
-				return NULL;
+				return nullptr;
 			}
 
 			SOCKADDR_IN sin;
@@ -42,7 +42,7 @@ namespace Lumix
 
 			if (::connect(socket, (LPSOCKADDR)&sin, sizeof(sin)) != 0) 
 			{
-				return NULL;
+				return nullptr;
 			}
 
 			m_socket = socket;

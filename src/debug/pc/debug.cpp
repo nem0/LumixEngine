@@ -90,7 +90,7 @@ BOOL SendFile(LPCSTR lpszSubject,
 	MAPImsg.nFileCount = 1;
 	MAPImsg.lpFiles = &MAPIfile;
 
-	ULONG nSent = lpfnMAPISendMail(0, 0, &MAPImsg, NULL, 0);
+	ULONG nSent = lpfnMAPISendMail(0, 0, &MAPImsg, 0, 0);
 
 	FreeLibrary(hMAPI);
 	return (nSent == SUCCESS_SUCCESS || nSent == MAPI_E_USER_ABORT);
@@ -113,10 +113,10 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 	HANDLE file = CreateFile(filename,
 							 GENERIC_WRITE,
 							 0,
-							 NULL,
+							 nullptr,
 							 CREATE_ALWAYS,
 							 FILE_ATTRIBUTE_NORMAL,
-							 NULL);
+							 nullptr);
 	MINIDUMP_TYPE minidump_type = (MINIDUMP_TYPE)(
 		/*MiniDumpWithFullMemory | MiniDumpWithFullMemoryInfo |*/ MiniDumpFilterMemory |
 		MiniDumpWithHandleData | MiniDumpWithThreadInfo |
@@ -131,9 +131,9 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 					  process_id,
 					  file,
 					  minidump_type,
-					  info ? &minidump_exception_info : NULL,
-					  NULL,
-					  NULL);
+					  info ? &minidump_exception_info : nullptr,
+					  nullptr,
+					  nullptr);
 	CloseHandle(file);
 
 	SendFile("Lumix Studio crash",
@@ -149,17 +149,17 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 	file = CreateFile("fulldump.dmp",
 					  GENERIC_WRITE,
 					  0,
-					  NULL,
+					  nullptr,
 					  CREATE_ALWAYS,
 					  FILE_ATTRIBUTE_NORMAL,
-					  NULL);
+					  nullptr);
 	MiniDumpWriteDump(process,
 					  process_id,
 					  file,
 					  minidump_type,
-					  info ? &minidump_exception_info : NULL,
-					  NULL,
-					  NULL);
+					  info ? &minidump_exception_info : nullptr,
+					  nullptr,
+					  nullptr);
 	CloseHandle(file);
 
 	return EXCEPTION_CONTINUE_SEARCH;

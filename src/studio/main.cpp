@@ -28,9 +28,9 @@ public:
 #ifdef _DEBUG
 		Lumix::enableFloatingPointTraps(true);
 #endif
-		m_qt_app = NULL;
-		m_main_window = NULL;
-		m_world_editor = NULL;
+		m_qt_app = nullptr;
+		m_main_window = nullptr;
+		m_world_editor = nullptr;
 	}
 
 	~App()

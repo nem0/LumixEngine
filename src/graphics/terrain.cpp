@@ -57,7 +57,7 @@ namespace Lumix
 		{
 			for (int i = 0; i < CHILD_COUNT; ++i)
 			{
-				m_children[i] = NULL;
+				m_children[i] = nullptr;
 			}
 		}
 
@@ -169,9 +169,9 @@ namespace Lumix
 
 
 	Terrain::Terrain(Renderer& renderer, Entity entity, RenderScene& scene, IAllocator& allocator)
-		: m_mesh(NULL)
-		, m_material(NULL)
-		, m_root(NULL)
+		: m_mesh(nullptr)
+		, m_material(nullptr)
+		, m_root(nullptr)
 		, m_width(0)
 		, m_height(0)
 		, m_layer_mask(1)
@@ -201,7 +201,7 @@ namespace Lumix
 
 	Terrain::~Terrain()
 	{
-		setMaterial(NULL);
+		setMaterial(nullptr);
 		m_allocator.deleteObject(m_mesh);
 		m_allocator.deleteObject(m_root);
 		for(int i = 0; i < m_grass_types.size(); ++i)
@@ -309,7 +309,7 @@ namespace Lumix
 		{
 			type.m_grass_model->getResourceManager().get(ResourceManager::MODEL)->unload(*type.m_grass_model);
 			type.m_grass_model->getObserverCb().unbind<GrassType, &GrassType::grassLoaded>(&type);
-			type.m_grass_model = NULL;
+			type.m_grass_model = nullptr;
 		}
 		if (path.isValid())
 		{
@@ -405,7 +405,7 @@ namespace Lumix
 				{
 					if (quad_x < old_bounds[0] || quad_x > old_bounds[1] || quad_z < old_bounds[2] || quad_z > old_bounds[3])
 					{
-						GrassQuad* quad = NULL;
+						GrassQuad* quad = nullptr;
 						if(!m_free_grass_quads.empty())
 						{
 							quad = m_free_grass_quads.back();
@@ -510,8 +510,8 @@ namespace Lumix
 				m_material->getObserverCb().unbind<Terrain, &Terrain::onMaterialLoaded>(this);
 			}
 			m_material = material;
-			m_splatmap = NULL;
-			m_heightmap = NULL;
+			m_splatmap = nullptr;
+			m_heightmap = nullptr;
 			if (m_mesh && m_material)
 			{
 				m_mesh->setMaterial(m_material);
@@ -786,7 +786,7 @@ namespace Lumix
 	void Terrain::generateGeometry()
 	{
 		m_allocator.deleteObject(m_mesh);
-		m_mesh = NULL;
+		m_mesh = nullptr;
 		Array<Sample> points(m_allocator);
 		points.resize(GRID_SIZE * GRID_SIZE * 4);
 		Array<short> indices(m_allocator);

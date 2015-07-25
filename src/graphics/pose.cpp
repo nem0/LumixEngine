@@ -57,8 +57,8 @@ void Pose::resize(int count)
 	}
 	else
 	{
-		m_positions = NULL;
-		m_rotations = NULL;
+		m_positions = nullptr;
+		m_rotations = nullptr;
 	}
 }
 

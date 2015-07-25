@@ -53,7 +53,7 @@ namespace Lumix
 				while(!m_trans_queue->isAborted())
 				{
 					AsynTrans* tr = m_trans_queue->pop(true);
-					if(NULL == tr)
+					if(!tr)
 						break;
 
 					if((tr->data.m_flags & E_IS_OPEN) == E_IS_OPEN)
@@ -148,10 +148,10 @@ namespace Lumix
 					else
 					{
 						prev->release();
-						return NULL;
+						return nullptr;
 					}
 				}
-				return NULL;
+				return nullptr;
 			}
 
 			bool openAsync(const char* device_list, const char* file, int mode, const ReadCallback& call_back) override
@@ -169,7 +169,7 @@ namespace Lumix
 					item.m_flags = E_IS_OPEN;
 				}
 
-				return NULL != prev;
+				return nullptr != prev;
 			}
 
 			void close(IFile* file) override
@@ -244,12 +244,12 @@ namespace Lumix
 						return m_devices[i];
 				}
 
-				return NULL;
+				return nullptr;
 			}
 
 			IFile* parseDeviceList(const char* device_list)
 			{
-				IFile* prev = NULL;
+				IFile* prev = nullptr;
 				StackAllocator<128> allocators[2];
 				base_string<char> token(allocators[0]), dev_list(device_list, allocators[1]);
 				while(dev_list.length() > 0)
@@ -268,7 +268,7 @@ namespace Lumix
 					}
 
 					IFileDevice* dev = getDevice(token.c_str());
-					if(NULL != dev)
+					if (!dev)
 					{
 						prev = dev->createFile(prev);
 					}

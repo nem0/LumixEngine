@@ -218,7 +218,7 @@ void PhysicsSystemImpl::destroy()
 
 bool PhysicsSystemImpl::connect2VisualDebugger()
 {
-	if(m_physics->getPvdConnectionManager() == NULL)
+	if(m_physics->getPvdConnectionManager() == nullptr)
 		return false;
 
 	const char* pvd_host_ip = "127.0.0.1";
@@ -227,7 +227,7 @@ bool PhysicsSystemImpl::connect2VisualDebugger()
 	physx::PxVisualDebuggerConnectionFlags connectionFlags = physx::PxVisualDebuggerExt::getAllConnectionFlags();
 
 	PVD::PvdConnection* theConnection = physx::PxVisualDebuggerExt::createConnection(m_physics->getPvdConnectionManager(), pvd_host_ip, port, timeout, connectionFlags);
-	return theConnection != NULL;
+	return theConnection != nullptr;
 }
 
 

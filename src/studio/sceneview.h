@@ -16,7 +16,7 @@ class SceneView : public QDockWidget
 {
 	Q_OBJECT
 public:
-	explicit SceneView(QWidget* parent = NULL);
+	explicit SceneView(QWidget* parent = nullptr);
 	~SceneView();
 
 	void shutdown();

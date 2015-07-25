@@ -130,7 +130,7 @@ QWidget* DynamicObjectItemDelegate::createEditor(QWidget* parent, const QStyleOp
 		}
 		else if (node->m_getter().type() == QMetaType::Bool)
 		{
-			return NULL;
+			return nullptr;
 		}
 		else if (node->m_getter().type() == QMetaType::Float)
 		{
@@ -159,7 +159,7 @@ DynamicObjectModel::Node::~Node()
 
 DynamicObjectModel::DynamicObjectModel()
 {
-	m_root = new Node("root", NULL, 0);
+	m_root = new Node("root", nullptr, 0);
 	Node* root = m_root;
 	m_root->m_getter = [root]() -> QVariant { return ""; };
 }

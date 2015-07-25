@@ -27,7 +27,7 @@ class FileSystemWatcherPC : public FileSystemWatcher
 		void start(LPCSTR path)
 		{
 			m_overlapped.hEvent = this;
-			m_handle = CreateFile(path, FILE_LIST_DIRECTORY, FILE_SHARE_DELETE | FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, NULL);
+			m_handle = CreateFile(path, FILE_LIST_DIRECTORY, FILE_SHARE_DELETE | FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, nullptr);
 			ReadDirectoryChangesW(m_handle, m_info, sizeof(m_info), TRUE, READ_DIR_CHANGE_FILTER, &m_received, &m_overlapped, callback);
 		}
 
@@ -60,7 +60,7 @@ class FileSystemWatcherPC : public FileSystemWatcher
 							ASSERT(false);
 							break;
 					}
-					info = info->NextEntryOffset == 0 ? NULL : (FILE_NOTIFY_INFORMATION*)(((char*)info) + info->NextEntryOffset);
+					info = info->NextEntryOffset == 0 ? nullptr : (FILE_NOTIFY_INFORMATION*)(((char*)info) + info->NextEntryOffset);
 				}
 			}
 			BOOL b = ReadDirectoryChangesW(watcher->m_handle, watcher->m_info, sizeof(watcher->m_info), TRUE, READ_DIR_CHANGE_FILTER, &watcher->m_received, &watcher->m_overlapped, callback);

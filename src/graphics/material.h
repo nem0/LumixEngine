@@ -94,7 +94,7 @@ public:
 
 	Material(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 		: Resource(path, resource_manager, allocator)
-		, m_shader(NULL)
+		, m_shader(nullptr)
 		, m_depth_func(DepthFunc::LEQUAL)
 		, m_is_alpha_cutout(false)
 		, m_is_shadow_receiver(true)

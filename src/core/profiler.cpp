@@ -12,8 +12,8 @@ namespace Lumix
 		: m_frame_listeners(m_allocator)
 	{
 		m_timer = Timer::create(m_allocator);
-		m_current_block = NULL;
-		m_root_block = NULL;
+		m_current_block = nullptr;
+		m_root_block = nullptr;
 		m_is_recording = false;
 		m_is_record_toggle_request = false;
 	}
@@ -71,9 +71,9 @@ namespace Lumix
 			else
 			{
 				Block* root = m_allocator.newObject<Block>(*this);
-				root->m_parent = NULL;
+				root->m_parent = nullptr;
 				root->m_next = m_root_block;
-				root->m_first_child = NULL;
+				root->m_first_child = nullptr;
 				root->m_name = name;
 				m_root_block = m_current_block = root;
 			}
@@ -89,7 +89,7 @@ namespace Lumix
 			{
 				child = m_allocator.newObject<Block>(*this);
 				child->m_parent = m_current_block;
-				child->m_first_child = NULL;
+				child->m_first_child = nullptr;
 				child->m_name = name;
 				child->m_next = m_current_block->m_first_child;
 				m_current_block->m_first_child = child;

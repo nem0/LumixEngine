@@ -40,12 +40,12 @@ JsonSerializer::JsonSerializer(FS::IFile& file, AccessMode access_mode, const ch
 	m_is_error = false;
 	m_path = path;
 	m_is_first_in_block = true;
-	m_data = NULL;
+	m_data = nullptr;
 	m_is_string_token = false;
 	if(m_access_mode == READ)
 	{
 		m_data_size = file.size();
-		if (file.getBuffer() != NULL)
+		if (file.getBuffer() != nullptr)
 		{
 			m_data = (const char*)file.getBuffer();
 			m_own_data = false;
@@ -118,7 +118,7 @@ void JsonSerializer::serialize(const char* label, const char* value)
 	writeBlockComma();
 	writeString(label);
 	m_file.write(" : \"", 4);
-	if(value == NULL)
+	if(value == nullptr)
 	{
 		m_file.write("", 1);
 	}

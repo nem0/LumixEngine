@@ -11,8 +11,8 @@ ProfilerGraph::ProfilerGraph(QWidget *parent)
 {
 	m_ui->setupUi(this);
 	m_frame = 0;
-	m_block = NULL;
-	m_model = NULL;
+	m_block = nullptr;
+	m_model = nullptr;
 }
 
 ProfilerGraph::~ProfilerGraph()

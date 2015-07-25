@@ -237,7 +237,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		{
 			Entity entity = m_terrains[cmp]->m_entity;
 			m_allocator.deleteObject(m_terrains[cmp]);
-			m_terrains[cmp] = NULL;
+			m_terrains[cmp] = nullptr;
 			m_universe.destroyComponent(entity, type, this, cmp);
 		}
 		else if (type == CONTROLLER_HASH)
@@ -265,9 +265,9 @@ struct PhysicsSceneImpl : public PhysicsScene
 	{
 		Terrain* terrain = m_allocator.newObject<Terrain>();
 		m_terrains.push(terrain);
-		terrain->m_heightmap = NULL;
+		terrain->m_heightmap = nullptr;
 		terrain->m_scene = this;
-		terrain->m_actor = NULL;
+		terrain->m_actor = nullptr;
 		terrain->m_entity = entity;
 		m_universe.addComponent(
 			entity, HEIGHTFIELD_HASH, this, m_terrains.size() - 1);
@@ -284,8 +284,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 		cDesc.slopeLimit = 0.0f;
 		cDesc.contactOffset = 0.1f;
 		cDesc.stepOffset = 0.02f;
-		cDesc.callback = NULL;
-		cDesc.behaviorCallback = NULL;
+		cDesc.callback = nullptr;
+		cDesc.behaviorCallback = nullptr;
 		Vec3 position = m_universe.getPosition(entity);
 		cDesc.position.set(position.x, position.y, position.z);
 		PhysicsSceneImpl::Controller c;
@@ -713,7 +713,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 				physx::PxRigidActor* actor = terrain->m_actor;
 				m_scene->removeActor(*actor);
 				actor->release();
-				terrain->m_actor = NULL;
+				terrain->m_actor = nullptr;
 			}
 
 			physx::PxTransform transform;
@@ -1072,8 +1072,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 				cDesc.slopeLimit = 0.0f;
 				cDesc.contactOffset = 0.1f;
 				cDesc.stepOffset = 0.02f;
-				cDesc.callback = NULL;
-				cDesc.behaviorCallback = NULL;
+				cDesc.callback = nullptr;
+				cDesc.behaviorCallback = nullptr;
 				Vec3 position = m_universe.getPosition(e);
 				cDesc.position.set(position.x, position.y, position.z);
 				c.m_controller =
@@ -1093,13 +1093,13 @@ struct PhysicsSceneImpl : public PhysicsScene
 		for (int i = count; i < m_terrains.size(); ++i)
 		{
 			m_allocator.deleteObject(m_terrains[i]);
-			m_terrains[i] = NULL;
+			m_terrains[i] = nullptr;
 		}
 		int old_size = m_terrains.size();
 		m_terrains.resize(count);
 		for (int i = old_size; i < count; ++i)
 		{
-			m_terrains[i] = NULL;
+			m_terrains[i] = nullptr;
 		}
 		for (int i = 0; i < count; ++i)
 		{
@@ -1118,7 +1118,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 				serializer.read(m_terrains[i]->m_xz_scale);
 				serializer.read(m_terrains[i]->m_y_scale);
 
-				if (m_terrains[i]->m_heightmap == NULL ||
+				if (m_terrains[i]->m_heightmap == nullptr ||
 					strcmp(tmp,
 						   m_terrains[i]->m_heightmap->getPath().c_str()) != 0)
 				{
@@ -1197,7 +1197,7 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system,
 	if (!impl->m_scene)
 	{
 		allocator.deleteObject(impl);
-		return NULL;
+		return nullptr;
 	} /*
 
 	 impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_SHAPES,
@@ -1312,10 +1312,10 @@ void PhysicsSceneImpl::RigidActor::setResource(PhysicsGeometry* resource)
 
 Terrain::Terrain()
 {
-	m_heightmap = NULL;
+	m_heightmap = nullptr;
 	m_xz_scale = 1.0f;
 	m_y_scale = 1.0f;
-	m_actor = NULL;
+	m_actor = nullptr;
 }
 
 

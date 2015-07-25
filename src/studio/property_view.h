@@ -35,7 +35,7 @@ class PropertyView : public QDockWidget
 	public:
 
 	public:
-		explicit PropertyView(QWidget* parent = NULL);
+		explicit PropertyView(QWidget* parent = nullptr);
 		~PropertyView();
 		void setWorldEditor(Lumix::WorldEditor& editor);
 		void setAssetBrowser(AssetBrowser& asset_browser);

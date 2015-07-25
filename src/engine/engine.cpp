@@ -83,17 +83,17 @@ public:
 		else
 		{
 			m_file_system = fs;
-			m_mem_file_device = NULL;
-			m_disk_file_device = NULL;
+			m_mem_file_device = nullptr;
+			m_disk_file_device = nullptr;
 		}
 
 		m_resource_manager.create(*m_file_system);
 
 		m_timer = Timer::create(m_allocator);
 		m_fps_timer = Timer::create(m_allocator);
-		m_fps_frame = NULL;
-		m_universe = NULL;
-		m_hierarchy = NULL;
+		m_fps_frame = 0;
+		m_universe = nullptr;
+		m_hierarchy = nullptr;
 		m_base_path = base_path;
 	}
 
@@ -169,7 +169,7 @@ public:
 				return m_scenes[i];
 			}
 		}
-		return NULL;
+		return nullptr;
 	}
 
 
@@ -182,7 +182,7 @@ public:
 				return m_scenes[i];
 			}
 		}
-		return NULL;
+		return nullptr;
 	}
 
 
@@ -206,9 +206,9 @@ public:
 			}
 			m_scenes.clear();
 			Hierarchy::destroy(m_hierarchy);
-			m_hierarchy = NULL;
+			m_hierarchy = nullptr;
 			m_allocator.deleteObject(m_universe);
-			m_universe = NULL;
+			m_universe = nullptr;
 		}
 	}
 
@@ -429,7 +429,7 @@ Engine::create(const char* base_path, FS::FileSystem* fs, IAllocator& allocator)
 	if (!engine->create())
 	{
 		allocator.deleteObject(engine);
-		return NULL;
+		return nullptr;
 	}
 	return engine;
 }

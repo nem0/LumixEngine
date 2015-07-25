@@ -59,7 +59,7 @@ namespace Lumix
 					}
 				} while (wait);
 
-				return NULL;
+				return nullptr;
 			}
 
 			void dealoc(T* tr, bool wait)
@@ -120,7 +120,7 @@ namespace Lumix
 
 				if (isAborted())
 				{
-					return NULL;
+					return nullptr;
 				}
 
 				while (can_read)
@@ -145,7 +145,7 @@ namespace Lumix
 					}
 				}
 
-				return NULL;
+				return nullptr;
 			}
 
 
@@ -255,7 +255,7 @@ namespace Lumix
 					}
 				} while (wait);
 
-				return NULL;
+				return nullptr;
 			}
 
 			void dealoc(T* tr)
@@ -317,7 +317,7 @@ namespace Lumix
 
 				if (isAborted())
 				{
-					return NULL;
+					return nullptr;
 				}
 
 				while (can_read)
@@ -342,7 +342,7 @@ namespace Lumix
 					}
 				}
 
-				return NULL;
+				return nullptr;
 			}
 
 

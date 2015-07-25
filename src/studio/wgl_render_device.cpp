@@ -55,7 +55,7 @@ void WGLRenderDevice::onUniverseCreated()
 
 void WGLRenderDevice::onUniverseDestroyed()
 {
-	getPipeline().setScene(NULL);
+	getPipeline().setScene(nullptr);
 }
 
 
