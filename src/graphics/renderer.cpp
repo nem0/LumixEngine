@@ -171,7 +171,7 @@ struct RendererImpl : public Renderer
 		if (m_engine.getWorldEditor())
 		{
 			WorldEditor& editor = *m_engine.getWorldEditor();
-			IAllocator& allocator = m_engine.getAllocator();
+			IAllocator& allocator = m_engine.getWorldEditor()->getAllocator();
 
 			editor.registerComponentType("camera", "Camera");
 			editor.registerComponentType("global_light", "Global light");

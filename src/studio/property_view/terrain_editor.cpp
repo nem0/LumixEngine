@@ -931,6 +931,11 @@ bool TerrainEditor::onEntityMouseDown(const Lumix::RayCastModelHit& hit,
 									  int,
 									  int)
 {
+	if (m_type == NOT_SET)
+	{
+		return false;
+	}
+
 	for (int i = m_world_editor.getSelectedEntities().size() - 1; i >= 0; --i)
 	{
 		if (m_world_editor.getSelectedEntities()[i] == hit.m_entity)
@@ -964,8 +969,7 @@ bool TerrainEditor::onEntityMouseDown(const Lumix::RayCastModelHit& hit,
 }
 
 
-void TerrainEditor::onMouseMove(
-	int x, int y, int /*rel_x*/, int /*rel_y*/, int /*mouse_flags*/)
+void TerrainEditor::onMouseMove(int x, int y, int, int, int)
 {
 	Lumix::ComponentUID camera_cmp = m_world_editor.getEditCamera();
 	Lumix::RenderScene* scene =
