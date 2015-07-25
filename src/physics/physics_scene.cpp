@@ -195,6 +195,23 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
+	void enableVisualization()
+	{
+		m_scene->setVisualizationParameter(
+			physx::PxVisualizationParameter::eCOLLISION_SHAPES, 1.0f);
+		m_scene->setVisualizationParameter(
+			physx::PxVisualizationParameter::eSCALE, 1.0);
+		m_scene->setVisualizationParameter(
+			physx::PxVisualizationParameter::eACTOR_AXES, 1.0f);
+		m_scene->setVisualizationParameter(
+			physx::PxVisualizationParameter::eCOLLISION_AABBS, 1.0f);
+		m_scene->setVisualizationParameter(
+			physx::PxVisualizationParameter::eWORLD_AXES, 1.0f);
+		m_scene->setVisualizationParameter(
+			physx::PxVisualizationParameter::eCONTACT_POINT, 1.0f);
+	}
+
+
 	virtual Universe& getUniverse() override { return m_universe; }
 
 
@@ -1198,21 +1215,8 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system,
 	{
 		allocator.deleteObject(impl);
 		return nullptr;
-	} /*
+	}
 
-	 impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_SHAPES,
-	 1.0f);
-	 impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE,
-	 1.0);
-	 impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eACTOR_AXES,
-	 1.0f);
-	 impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_AABBS,
-	 1.0f);
-	 impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eWORLD_AXES,
-	 1.0f);
-	 impl->m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eCONTACT_POINT,
-	 1.0f);
-	 */
 	impl->m_system = &system;
 	impl->m_default_material =
 		impl->m_system->getPhysics()->createMaterial(0.5, 0.5, 0.5);

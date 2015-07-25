@@ -1,5 +1,5 @@
-#include "core/lumix.h"
 #include "culling_system.h"
+#include "core/lumix.h"
 
 #include "core/array.h"
 #include "core/binary_array.h"

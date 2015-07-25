@@ -1561,19 +1561,25 @@ public:
 						m_mouse_mode = MouseMode::TRANSFORM;
 						if (gizmo_hit.m_mesh->getNameHash() == crc32("x_axis"))
 						{
-							m_gizmo.startTransform(
-								camera_cmp.index, x, y, Gizmo::TransformMode::X);
+							m_gizmo.startTransform(camera_cmp.index,
+												   x,
+												   y,
+												   Gizmo::TransformMode::X);
 						}
 						else if (gizmo_hit.m_mesh->getNameHash() ==
 								 crc32("y_axis"))
 						{
-							m_gizmo.startTransform(
-								camera_cmp.index, x, y, Gizmo::TransformMode::Y);
+							m_gizmo.startTransform(camera_cmp.index,
+												   x,
+												   y,
+												   Gizmo::TransformMode::Y);
 						}
 						else
 						{
-							m_gizmo.startTransform(
-								camera_cmp.index, x, y, Gizmo::TransformMode::Z);
+							m_gizmo.startTransform(camera_cmp.index,
+												   x,
+												   y,
+												   Gizmo::TransformMode::Z);
 						}
 					}
 				}
@@ -1637,10 +1643,11 @@ public:
 			if (entity_already_selected)
 			{
 				m_mouse_mode = MouseMode::TRANSFORM;
-				m_gizmo.startTransform(getComponent(m_camera, CAMERA_HASH).index,
-									   x,
-									   y,
-									   Gizmo::TransformMode::CAMERA_XZ);
+				m_gizmo.startTransform(
+					getComponent(m_camera, CAMERA_HASH).index,
+					x,
+					y,
+					Gizmo::TransformMode::CAMERA_XZ);
 			}
 			else
 			{
@@ -1757,8 +1764,10 @@ public:
 
 				ComponentUID renderable =
 					getComponent(m_selected_entities[i], RENDERABLE_HASH);
-				RayCastModelHit hit = scene->castRay(
-					universe->getPosition(entity), Vec3(0, -1, 0), renderable.index);
+				RayCastModelHit hit =
+					scene->castRay(universe->getPosition(entity),
+								   Vec3(0, -1, 0),
+								   renderable.index);
 				if (hit.m_is_hit)
 				{
 					new_positions.push(hit.m_origin + hit.m_dir * hit.m_t);
@@ -1803,8 +1812,7 @@ public:
 
 		scene->getRay(
 			camera_cmp.index, (float)camera_x, (float)camera_y, origin, dir);
-		RayCastModelHit hit =
-			scene->castRay(origin, dir, INVALID_COMPONENT);
+		RayCastModelHit hit = scene->castRay(origin, dir, INVALID_COMPONENT);
 		Vec3 pos;
 		if (hit.m_is_hit)
 		{
@@ -1837,8 +1845,7 @@ public:
 		Vec3 dir;
 		scene->getRay(
 			camera_cmp.index, (float)camera_x, (float)camera_y, origin, dir);
-		RayCastModelHit hit =
-			scene->castRay(origin, dir, INVALID_COMPONENT);
+		RayCastModelHit hit = scene->castRay(origin, dir, INVALID_COMPONENT);
 		Vec3 pos;
 		if (hit.m_is_hit)
 		{
@@ -2065,8 +2072,7 @@ public:
 	}
 
 
-	virtual void cloneComponent(const ComponentUID& src,
-								Entity entity) override
+	virtual void cloneComponent(const ComponentUID& src, Entity entity) override
 	{
 		ComponentUID clone = ComponentUID::INVALID;
 
@@ -2249,8 +2255,7 @@ public:
 		return m_components.at(cmps_index);
 	}
 
-	virtual ComponentUID getComponent(Entity entity,
-									  uint32_t type) override
+	virtual ComponentUID getComponent(Entity entity, uint32_t type) override
 	{
 		const Array<ComponentUID>& cmps = getComponents(entity);
 		for (int i = 0; i < cmps.size(); ++i)
@@ -2369,12 +2374,12 @@ public:
 		, m_editor_command_creators(m_allocator)
 		, m_component_types(m_allocator)
 		, m_is_loading(false)
+		, m_universe_path("")
 	{
 		m_go_to_parameters.m_is_active = false;
 		m_undo_index = -1;
 		m_mouse_handling_plugin = nullptr;
 		m_is_game_mode = false;
-		m_universe_path = "";
 		m_terrain_brush_size = 10;
 		m_terrain_brush_strength = 0.01f;
 		m_measure_tool = m_allocator.newObject<MeasureTool>();
@@ -2745,8 +2750,7 @@ public:
 	}
 
 
-	virtual DelegateList<void(Entity, const char*)>&
-	entityNameSet() override
+	virtual DelegateList<void(Entity, const char*)>& entityNameSet() override
 	{
 		return m_entity_name_set;
 	}
@@ -2795,7 +2799,8 @@ public:
 		universe->componentAdded()
 			.bind<WorldEditorImpl, &WorldEditorImpl::onComponentAdded>(this);
 		universe->componentDestroyed()
-			.bind<WorldEditorImpl, &WorldEditorImpl::onComponentDestroyed>(this);
+			.bind<WorldEditorImpl, &WorldEditorImpl::onComponentDestroyed>(
+				this);
 		universe->entityDestroyed()
 			.bind<WorldEditorImpl, &WorldEditorImpl::onEntityDestroyed>(this);
 
@@ -2813,8 +2818,6 @@ public:
 			RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 			scene->setCameraSlot(cmp.index, string("editor", m_allocator));
 		}
-		RenderScene* scene =
-			static_cast<RenderScene*>(m_engine->getScene(crc32("renderer")));
 	}
 
 
