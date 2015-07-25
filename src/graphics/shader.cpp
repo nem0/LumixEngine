@@ -431,7 +431,6 @@ void ShaderCombinations::parseCombinations(lua_State* L,
 		int len = (int)lua_rawlen(L, -1);
 		for (int pass_idx = 0; pass_idx < len; ++pass_idx)
 		{
-			int& define_mask = output[pass_idx];
 			if (lua_rawgeti(L, -1, 1 + pass_idx) == LUA_TTABLE)
 			{
 				int len = (int)lua_rawlen(L, -1);
@@ -440,7 +439,7 @@ void ShaderCombinations::parseCombinations(lua_State* L,
 					if (lua_rawgeti(L, -1, 1 + i) == LUA_TSTRING)
 					{
 						const char* tmp = lua_tostring(L, -1);
-						define_mask |= 1 << indexOf(*this, tmp);
+						output[pass_idx] |= 1 << indexOf(*this, tmp);
 					}
 					lua_pop(L, 1);
 				}

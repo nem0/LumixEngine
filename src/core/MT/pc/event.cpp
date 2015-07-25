@@ -8,7 +8,7 @@ namespace Lumix
 	{
 		Event::Event(EventFlags flags)
 		{
-			m_id = ::CreateEvent(NULL, !!(flags & EventFlags::MANUAL_RESET), !!(flags & EventFlags::SIGNALED), NULL);
+			m_id = ::CreateEvent(nullptr, !!(flags & EventFlags::MANUAL_RESET), !!(flags & EventFlags::SIGNALED), nullptr);
 		}
 
 		Event::~Event()

@@ -30,9 +30,9 @@ void AnimationManager::destroyResource(Resource& resource)
 Animation::Animation(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
 {
-	m_rotations = NULL;
-	m_positions = NULL;
-	m_bones = NULL;
+	m_rotations = nullptr;
+	m_positions = nullptr;
+	m_bones = nullptr;
 	m_frame_count = 0;
 	m_fps = 30;
 }
@@ -100,8 +100,8 @@ void Animation::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		allocator.deallocate(m_positions);
 		allocator.deallocate(m_rotations);
 		allocator.deallocate(m_bones);
-		m_positions = NULL;
-		m_rotations = NULL;
+		m_positions = nullptr;
+		m_rotations = nullptr;
 		m_bones = 0;
 		m_frame_count = m_bone_count = 0;
 		Header header;
@@ -155,9 +155,9 @@ void Animation::doUnload(void)
 	allocator.deallocate(m_positions);
 	allocator.deallocate(m_rotations);
 	allocator.deallocate(m_bones);
-	m_rotations = NULL;
-	m_positions = NULL;
-	m_bones = NULL;
+	m_rotations = nullptr;
+	m_positions = nullptr;
+	m_bones = nullptr;
 	m_frame_count = 0;
 	m_size = 0;
 	onEmpty();

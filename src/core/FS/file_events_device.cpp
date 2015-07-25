@@ -74,7 +74,7 @@ namespace Lumix
 
 			virtual const void* getBuffer() const override
 			{
-				return NULL;
+				return nullptr;
 			}
 
 

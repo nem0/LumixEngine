@@ -182,7 +182,6 @@ bool Model::parseVertexDef(FS::IFile* file, bgfx::VertexDecl* vertex_definition)
 
 		uint32_t type;
 		file->read(&type, sizeof(type));
-		type = type;
 	}
 
 	vertex_definition->end();

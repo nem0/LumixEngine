@@ -8,7 +8,6 @@
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "graphics/render_scene.h"
-#include "universe/entity.h"
 #include "universe/hierarchy.h"
 #include <qmimedata.h>
 
@@ -21,8 +20,8 @@ class SetParentEditorCommand : public Lumix::IEditorCommand
 public:
 	SetParentEditorCommand(Lumix::WorldEditor& editor,
 						   Lumix::Hierarchy& hierarchy,
-						   const Lumix::Entity& child,
-						   const Lumix::Entity& parent)
+						   Lumix::Entity child,
+						   Lumix::Entity parent)
 		: m_new_parent(parent)
 		, m_child(child)
 		, m_old_parent(hierarchy.getParent(child))
@@ -34,17 +33,15 @@ public:
 
 	virtual void serialize(Lumix::JsonSerializer& serializer)
 	{
-		serializer.serialize("parent", m_new_parent.index);
-		serializer.serialize("child", m_child.index);
+		serializer.serialize("parent", m_new_parent);
+		serializer.serialize("child", m_child);
 	}
 
 
 	virtual void deserialize(Lumix::JsonSerializer& serializer)
 	{
-		serializer.deserialize("parent", m_new_parent.index, 0);
-		serializer.deserialize("child", m_child.index, 0);
-		m_new_parent.universe = m_editor.getUniverse();
-		m_child.universe = m_editor.getUniverse();
+		serializer.deserialize("parent", m_new_parent, 0);
+		serializer.deserialize("child", m_child, 0);
 		m_old_parent = m_hierarchy.getParent(m_child);
 	}
 
@@ -115,13 +112,12 @@ protected:
 				filterRegExp());
 		}
 		int entity_index = sourceModel()->data(index, Qt::UserRole).toInt();
-		return m_editor->getComponent(Lumix::Entity(m_universe, entity_index),
-									  m_component)
+		return m_editor->getComponent(Lumix::Entity(entity_index), m_component)
 				   .isValid() &&
 			   sourceModel()->data(index).toString().contains(filterRegExp());
 	}
 
-	void onEntityNameSet(const Lumix::Entity&, const char*)
+	void onEntityNameSet(Lumix::Entity, const char*)
 	{
 		if (m_is_update_enabled)
 		{
@@ -143,7 +139,7 @@ private:
 	class EntityNode
 	{
 	public:
-		EntityNode(EntityNode* parent, const Lumix::Entity& entity)
+		EntityNode(EntityNode* parent, Lumix::Entity entity)
 			: m_entity(entity)
 			, m_parent(parent)
 		{
@@ -157,7 +153,7 @@ private:
 			}
 		}
 
-		EntityNode* getNode(const Lumix::Entity& entity)
+		EntityNode* getNode(Lumix::Entity entity)
 		{
 			if (m_entity == entity)
 			{
@@ -171,10 +167,10 @@ private:
 					return node;
 				}
 			}
-			return NULL;
+			return nullptr;
 		}
 
-		bool removeEntity(const Lumix::Entity& entity)
+		bool removeEntity(Lumix::Entity entity)
 		{
 			if (m_entity == entity)
 			{
@@ -200,8 +196,8 @@ public:
 	EntityListModel(QWidget* parent, EntityListFilter* filter)
 		: QAbstractItemModel(parent)
 	{
-		m_root = NULL;
-		m_universe = NULL;
+		m_root = nullptr;
+		m_universe = nullptr;
 		m_filter = filter;
 		m_is_update_enabled = true;
 	}
@@ -247,24 +243,24 @@ public:
 			return false;
 		}
 
-		Lumix::Entity parent_entity(m_universe, -1);
+		Lumix::Entity parent_entity(-1);
 		if (row != -1)
 		{
-			parent_entity.index = parent.data(Qt::UserRole).toInt();
+			parent_entity = parent.data(Qt::UserRole).toInt();
 		}
 		else if (parent.isValid())
 		{
-			parent_entity.index = parent.data(Qt::UserRole).toInt();
+			parent_entity = parent.data(Qt::UserRole).toInt();
 		}
 
 		QByteArray encodedData = data->data("application/lumix.entity");
 		QDataStream stream(&encodedData, QIODevice::ReadOnly);
 		QStringList newItems;
 
-		Lumix::Entity child(m_universe, -1);
+		Lumix::Entity child(-1);
 		if (!stream.atEnd())
 		{
-			stream >> child.index;
+			stream >> child;
 		}
 
 		SetParentEditorCommand* command =
@@ -433,16 +429,18 @@ public:
 
 		if (index.isValid() && role == Qt::DisplayRole)
 		{
-			Lumix::Component renderable =
+			Lumix::ComponentUID renderable =
 				m_engine->getWorldEditor()->getComponent(item->m_entity,
 														 RENDERABLE_HASH);
-			const char* name = item->m_entity.getName();
+			const char* name =
+				m_engine->getWorldEditor()->getUniverse()->getEntityName(
+					item->m_entity);
 			if (renderable.isValid())
 			{
 				Lumix::StackAllocator<LUMIX_MAX_PATH> allocator;
 				Lumix::string path(allocator);
 				static_cast<Lumix::RenderScene*>(renderable.scene)
-					->getRenderablePath(renderable, path);
+					->getRenderablePath(renderable.index, path);
 				if (path.length() != 0)
 				{
 					char basename[LUMIX_MAX_PATH];
@@ -452,16 +450,16 @@ public:
 							   ? QVariant(
 									 QString("%1 - %2").arg(name).arg(basename))
 							   : QVariant(QString("%1 - %2")
-											  .arg(item->m_entity.index)
+											  .arg(item->m_entity)
 											  .arg(basename));
 				}
 			}
 			return name && name[0] != '\0' ? QVariant(name)
-										   : QVariant(item->m_entity.index);
+										   : QVariant(item->m_entity);
 		}
 		else if (index.isValid() && role == Qt::UserRole)
 		{
-			return item->m_entity.index;
+			return item->m_entity;
 		}
 		return role == 6 ? QVariant(QString("AAA")) : QVariant();
 	}
@@ -479,15 +477,15 @@ public:
 			for (int i = 0; i < children->size(); ++i)
 			{
 				EntityNode* new_node = new EntityNode(
-					node, Lumix::Entity(m_universe, (*children)[i].m_entity));
+					node, Lumix::Entity((*children)[i].m_entity));
 				node->m_children.push_back(new_node);
 				fillChildren(new_node);
 			}
 		}
 	}
+	 
 
-
-	void onParentSet(const Lumix::Entity& child, const Lumix::Entity& parent)
+	void onParentSet(Lumix::Entity child, Lumix::Entity parent)
 	{
 		if (!m_root->m_children.empty())
 		{
@@ -524,7 +522,7 @@ public:
 					this);
 		}
 		delete m_root;
-		m_root = new EntityNode(NULL, Lumix::Entity::INVALID);
+		m_root = new EntityNode(nullptr, Lumix::INVALID_ENTITY);
 		m_universe = universe;
 		if (m_universe)
 		{
@@ -537,10 +535,10 @@ public:
 				.bind<EntityListModel, &EntityListModel::onEntityDestroyed>(
 					this);
 			Lumix::Entity e = m_universe->getFirstEntity();
-			while (e.isValid())
+			while (e >= 0)
 			{
 				Lumix::Entity parent = m_engine->getHierarchy()->getParent(e);
-				if (!parent.isValid())
+				if (parent < 0)
 				{
 					EntityNode* node = new EntityNode(m_root, e);
 					m_root->m_children.push_back(node);
@@ -557,7 +555,7 @@ public:
 
 
 private:
-	void onEntityCreated(const Lumix::Entity& entity)
+	void onEntityCreated(Lumix::Entity entity)
 	{
 		EntityNode* node = new EntityNode(m_root, entity);
 		m_root->m_children.push_back(node);
@@ -567,7 +565,7 @@ private:
 		}
 	}
 
-	void onEntityDestroyed(const Lumix::Entity& entity)
+	void onEntityDestroyed(Lumix::Entity entity)
 	{
 		m_root->removeEntity(entity);
 		if (m_is_update_enabled)
@@ -590,7 +588,7 @@ EntityList::EntityList(QWidget* parent)
 	, m_ui(new Ui::EntityList)
 {
 	m_is_update_enabled = true;
-	m_universe = NULL;
+	m_universe = nullptr;
 	m_ui->setupUi(this);
 	m_filter = new EntityListFilter(this);
 	m_model = new EntityListModel(this, m_filter);
@@ -666,7 +664,7 @@ void EntityList::fillSelection(const QModelIndex& parent,
 		auto entity_index = m_filter->data(index, Qt::UserRole).toInt();
 		for (int j = entities.size() - 1; j >= 0; --j)
 		{
-			if (entity_index == entities[j].index)
+			if (entity_index == entities[j])
 			{
 				selection->append(
 					QItemSelectionRange(m_filter->index(i, 0, parent)));
@@ -713,16 +711,15 @@ void EntityList::onUniverseLoaded()
 
 void EntityList::onUniverseDestroyed()
 {
-	m_model->setUniverse(NULL);
-	m_universe = NULL;
+	m_model->setUniverse(nullptr);
+	m_universe = nullptr;
 }
 
 
 void EntityList::on_entityList_clicked(const QModelIndex& index)
 {
-	m_editor->selectEntities(
-		&Lumix::Entity(m_universe, m_filter->data(index, Qt::UserRole).toInt()),
-		1);
+	Lumix::Entity e(m_filter->data(index, Qt::UserRole).toInt());
+	m_editor->selectEntities(&e, 1);
 }
 
 

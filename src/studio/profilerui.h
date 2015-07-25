@@ -18,7 +18,7 @@ class ProfilerUI : public QDockWidget
 	Q_OBJECT
 
 public:
-	explicit ProfilerUI(QWidget* parent = NULL);
+	explicit ProfilerUI(QWidget* parent = nullptr);
 	~ProfilerUI();
 
 private slots:

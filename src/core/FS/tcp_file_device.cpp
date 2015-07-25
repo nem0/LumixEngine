@@ -88,7 +88,7 @@ namespace Lumix
 
 			virtual const void* getBuffer() const override
 			{
-				return NULL;
+				return nullptr;
 			}
 
 			virtual size_t size() override

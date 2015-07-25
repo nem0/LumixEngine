@@ -33,14 +33,14 @@ namespace Lumix
 		public:
 			Delegate(void)
 			{
-				m_stub.first = NULL;
-				m_stub.second = NULL;
+				m_stub.first = nullptr;
+				m_stub.second = nullptr;
 			}
 
 			template <R (*Function)()>
 			void bind(void)
 			{
-				m_stub.first = NULL;
+				m_stub.first = nullptr;
 				m_stub.second = &FunctionStub<Function>;
 			}
 
@@ -53,7 +53,7 @@ namespace Lumix
 
 			R invoke() const
 			{
-				ASSERT(m_stub.second != NULL);
+				ASSERT(m_stub.second != nullptr);
 				return m_stub.second(m_stub.first);
 			}
 
@@ -89,19 +89,19 @@ namespace Lumix
 		public:
 			Delegate(void)
 			{
-				m_stub.first = NULL;
-				m_stub.second = NULL;
+				m_stub.first = nullptr;
+				m_stub.second = nullptr;
 			}
 
 			bool isValid()
 			{
-				return m_stub.second != NULL;
+				return m_stub.second != nullptr;
 			}
 
 			template <R (*Function)(A0)>
 			void bind(void)
 			{
-				m_stub.first = NULL;
+				m_stub.first = nullptr;
 				m_stub.second = &FunctionStub<Function>;
 			}
 
@@ -114,7 +114,7 @@ namespace Lumix
 
 			R invoke(A0 a0) const
 			{
-				ASSERT(m_stub.second != NULL);
+				ASSERT(m_stub.second != nullptr);
 				return m_stub.second(m_stub.first, a0);
 			}
 
@@ -151,14 +151,14 @@ namespace Lumix
 		public:
 			Delegate(void)
 			{
-				m_stub.first = NULL;
-				m_stub.second = NULL;
+				m_stub.first = nullptr;
+				m_stub.second = nullptr;
 			}
 
 			template <R (*Function)(A0, A1)>
 			void bind(void)
 			{
-				m_stub.first = NULL;
+				m_stub.first = nullptr;
 				m_stub.second = &FunctionStub<Function>;
 			}
 
@@ -171,7 +171,7 @@ namespace Lumix
 
 			R invoke(A0 a0, A1 a1) const
 			{
-				ASSERT(m_stub.second != NULL);
+				ASSERT(m_stub.second != nullptr);
 				return m_stub.second(m_stub.first, a0, a1);
 			}
 
@@ -207,14 +207,14 @@ namespace Lumix
 		public:
 			Delegate(void)
 			{
-				m_stub.first = NULL;
-				m_stub.second = NULL;
+				m_stub.first = nullptr;
+				m_stub.second = nullptr;
 			}
 
 			template <R (*Function)(A0, A1, A2)>
 			void bind(void)
 			{
-				m_stub.first = NULL;
+				m_stub.first = nullptr;
 				m_stub.second = &FunctionStub<Function>;
 			}
 
@@ -227,7 +227,7 @@ namespace Lumix
 
 			R invoke(A0 a0, A1 a1, A2 a2) const
 			{
-				ASSERT(m_stub.second != NULL);
+				ASSERT(m_stub.second != nullptr);
 				return m_stub.second(m_stub.first, a0, a1, a2);
 			}
 
@@ -263,14 +263,14 @@ namespace Lumix
 		public:
 			Delegate(void)
 			{
-				m_stub.first = NULL;
-				m_stub.second = NULL;
+				m_stub.first = nullptr;
+				m_stub.second = nullptr;
 			}
 
 			template <R (*Function)(A0, A1, A2, A3)>
 			void bind(void)
 			{
-				m_stub.first = NULL;
+				m_stub.first = nullptr;
 				m_stub.second = &FunctionStub<Function>;
 			}
 
@@ -283,7 +283,7 @@ namespace Lumix
 
 			R invoke(A0 a0, A1 a1, A2 a2, A3 a3) const
 			{
-				ASSERT(m_stub.second != NULL);
+				ASSERT(m_stub.second != nullptr);
 				return m_stub.second(m_stub.first, a0, a1, a2, a3);
 			}
 

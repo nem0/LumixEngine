@@ -104,7 +104,7 @@ class PluginManagerImpl : public PluginManager
 					{
 						m_engine.getAllocator().deleteObject(plugin);
 						ASSERT(false);
-						return NULL;
+						return nullptr;
 					}
 					m_plugins.push(plugin);
 					m_libraries.push(lib);

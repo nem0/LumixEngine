@@ -7,13 +7,11 @@
 #include "core/string.h"
 #include "core/resource.h"
 #include "property_view/dynamic_object_model.h"
-#include "universe/entity.h"
 
 
 namespace Lumix
 {
-	struct Component;
-	struct Entity;
+	struct ComponentUID;
 	class Event;
 	class Path;
 	class Resource;
@@ -37,7 +35,7 @@ class PropertyView : public QDockWidget
 	public:
 
 	public:
-		explicit PropertyView(QWidget* parent = NULL);
+		explicit PropertyView(QWidget* parent = nullptr);
 		~PropertyView();
 		void setWorldEditor(Lumix::WorldEditor& editor);
 		void setAssetBrowser(AssetBrowser& asset_browser);
@@ -46,7 +44,7 @@ class PropertyView : public QDockWidget
 		QAbstractItemModel* getModel() const;
 
 	signals:
-		void componentNodeCreated(DynamicObjectModel::Node&, const Lumix::Component&);
+		void componentNodeCreated(DynamicObjectModel::Node&, const Lumix::ComponentUID&);
 
 	public:
 		Ui::PropertyView* m_ui;

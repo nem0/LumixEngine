@@ -34,7 +34,7 @@ namespace Lumix
 			return *it;
 		}
 
-		return NULL;
+		return nullptr;
 	}
 
 	void ResourceManagerBase::remove(Resource* resource)
@@ -55,7 +55,7 @@ namespace Lumix
 	{
 		Resource* resource = get(path);
 
-		if(NULL == resource)
+		if(nullptr == resource)
 		{
 			resource = createResource(path);
 			m_resources.insert(path, resource);
@@ -85,7 +85,7 @@ namespace Lumix
 	void ResourceManagerBase::unload(const Path& path)
 	{
 		Resource* resource = get(path);
-		if(NULL != resource)
+		if(nullptr != resource)
 		{
 			unload(*resource);
 		}
@@ -107,7 +107,7 @@ namespace Lumix
 	void ResourceManagerBase::forceUnload(const Path& path)
 	{
 		Resource* resource = get(path);
-		if(NULL != resource)
+		if(nullptr != resource)
 		{
 			forceUnload(*resource);
 		}
@@ -127,7 +127,7 @@ namespace Lumix
 	void ResourceManagerBase::reload(const Path& path)
 	{
 		Resource* resource = get(path);
-		if(NULL != resource)
+		if(nullptr != resource)
 		{
 			reload(*resource);
 		}

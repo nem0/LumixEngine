@@ -57,7 +57,7 @@ namespace Lumix
 		{
 			for (int i = 0; i < CHILD_COUNT; ++i)
 			{
-				m_children[i] = NULL;
+				m_children[i] = nullptr;
 			}
 		}
 
@@ -168,10 +168,10 @@ namespace Lumix
 	};
 
 
-	Terrain::Terrain(Renderer& renderer, const Entity& entity, RenderScene& scene, IAllocator& allocator)
-		: m_mesh(NULL)
-		, m_material(NULL)
-		, m_root(NULL)
+	Terrain::Terrain(Renderer& renderer, Entity entity, RenderScene& scene, IAllocator& allocator)
+		: m_mesh(nullptr)
+		, m_material(nullptr)
+		, m_root(nullptr)
 		, m_width(0)
 		, m_height(0)
 		, m_layer_mask(1)
@@ -201,7 +201,7 @@ namespace Lumix
 
 	Terrain::~Terrain()
 	{
-		setMaterial(NULL);
+		setMaterial(nullptr);
 		m_allocator.deleteObject(m_mesh);
 		m_allocator.deleteObject(m_root);
 		for(int i = 0; i < m_grass_types.size(); ++i)
@@ -309,7 +309,7 @@ namespace Lumix
 		{
 			type.m_grass_model->getResourceManager().get(ResourceManager::MODEL)->unload(*type.m_grass_model);
 			type.m_grass_model->getObserverCb().unbind<GrassType, &GrassType::grassLoaded>(&type);
-			type.m_grass_model = NULL;
+			type.m_grass_model = nullptr;
 		}
 		if (path.isValid())
 		{
@@ -333,7 +333,7 @@ namespace Lumix
 		}
 	}
 
-	Array<Terrain::GrassQuad*>& Terrain::getQuads(const Component& camera)
+	Array<Terrain::GrassQuad*>& Terrain::getQuads(ComponentIndex camera)
 	{
 		int quads_index = m_grass_quads.find(camera);
 		if (quads_index < 0)
@@ -345,7 +345,7 @@ namespace Lumix
 	}
 
 
-	void Terrain::updateGrass(const Component& camera)
+	void Terrain::updateGrass(ComponentIndex camera)
 	{
 		PROFILE_FUNCTION();
 		if (!m_splatmap)
@@ -364,12 +364,14 @@ namespace Lumix
 			}
 		}
 
-		Vec3 camera_position = camera.entity.getPosition();
+		Universe& universe = m_scene.getUniverse();
+		Entity camera_entity = m_scene.getCameraEntity(camera);
+		Vec3 camera_position = universe.getPosition(camera_entity);
 		if ((m_last_camera_position[camera] - camera_position).length() > 1 || m_force_grass_update)
 		{
 			m_force_grass_update = false;
-			Matrix mtx = m_entity.getMatrix();
-			Matrix inv_mtx = m_entity.getMatrix();
+			Matrix mtx = universe.getMatrix(m_entity);
+			Matrix inv_mtx = mtx;
 			inv_mtx.fastInverse();
 			Vec3 local_camera_position = inv_mtx.multiplyPosition(camera_position);
 			float cx = (int)(local_camera_position.x / (GRASS_QUAD_SIZE)) * (float)GRASS_QUAD_SIZE;
@@ -403,7 +405,7 @@ namespace Lumix
 				{
 					if (quad_x < old_bounds[0] || quad_x > old_bounds[1] || quad_z < old_bounds[2] || quad_z > old_bounds[3])
 					{
-						GrassQuad* quad = NULL;
+						GrassQuad* quad = nullptr;
 						if(!m_free_grass_quads.empty())
 						{
 							quad = m_free_grass_quads.back();
@@ -473,7 +475,7 @@ namespace Lumix
 	}
 
 
-	void Terrain::getGrassInfos(const Frustum&, Array<GrassInfo>& infos, const Component& camera)
+	void Terrain::getGrassInfos(const Frustum&, Array<GrassInfo>& infos, ComponentIndex camera)
 	{
 		updateGrass(camera);
 		Array<GrassQuad*>& quads = getQuads(camera);
@@ -508,8 +510,8 @@ namespace Lumix
 				m_material->getObserverCb().unbind<Terrain, &Terrain::onMaterialLoaded>(this);
 			}
 			m_material = material;
-			m_splatmap = NULL;
-			m_heightmap = NULL;
+			m_splatmap = nullptr;
+			m_heightmap = nullptr;
 			if (m_mesh && m_material)
 			{
 				m_mesh->setMaterial(m_material);
@@ -524,8 +526,7 @@ namespace Lumix
 
 	void Terrain::deserialize(InputBlob& serializer, Universe& universe, RenderScene& scene, int index)
 	{
-		serializer.read(m_entity.index);
-		m_entity.universe = &universe;
+		serializer.read(m_entity);
 		serializer.read(m_layer_mask);
 		char path[LUMIX_MAX_PATH];
 		serializer.readString(path, LUMIX_MAX_PATH);
@@ -557,7 +558,7 @@ namespace Lumix
 
 	void Terrain::serialize(OutputBlob& serializer)
 	{
-		serializer.write(m_entity.index);
+		serializer.write(m_entity);
 		serializer.write(m_layer_mask);
 		serializer.writeString(m_material ? m_material->getPath().c_str() : "");
 		serializer.write(m_scale.x);
@@ -578,7 +579,7 @@ namespace Lumix
 	{
 		if (m_root)
 		{
-			Matrix matrix = m_entity.getMatrix();
+			Matrix matrix = m_scene.getUniverse().getMatrix(m_entity);
 			Matrix inv_matrix = matrix;
 			inv_matrix.fastInverse();
 			Vec3 local_camera_pos = inv_matrix.multiplyPosition(camera_pos);
@@ -686,7 +687,7 @@ namespace Lumix
 		hit.m_is_hit = false;
 		if (m_material && m_material->isReady())
 		{
-			Matrix mtx = m_entity.getMatrix();
+			Matrix mtx = m_scene.getUniverse().getMatrix(m_entity);
 			mtx.fastInverse();
 			Vec3 rel_origin = mtx.multiplyPosition(origin);
 			Vec3 rel_dir = mtx * dir;
@@ -785,7 +786,7 @@ namespace Lumix
 	void Terrain::generateGeometry()
 	{
 		m_allocator.deleteObject(m_mesh);
-		m_mesh = NULL;
+		m_mesh = nullptr;
 		Array<Sample> points(m_allocator);
 		points.resize(GRID_SIZE * GRID_SIZE * 4);
 		Array<short> indices(m_allocator);

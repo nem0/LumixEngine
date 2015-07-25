@@ -46,7 +46,7 @@ namespace Lumix
 		Task::Task(IAllocator& allocator)
 		{
 			TaskImpl* impl = allocator.newObject<TaskImpl>(allocator);
-			impl->m_handle = NULL;
+			impl->m_handle = nullptr;
 			impl->m_affinity_mask = getProccessAffinityMask();
 			impl->m_priority = ::GetThreadPriority(GetCurrentThread());
 			impl->m_is_running = false;
@@ -60,20 +60,20 @@ namespace Lumix
 
 		Task::~Task()
 		{
-			ASSERT(NULL == m_implementation->m_handle);
+			ASSERT(!m_implementation->m_handle);
 			m_implementation->m_allocator.deleteObject(m_implementation);
 		}
 
 		bool Task::create(const char* name)
 		{
-			HANDLE handle = CreateThread(NULL, STACK_SIZE, threadFunction, m_implementation, CREATE_SUSPENDED, &m_implementation->m_thread_id);
+			HANDLE handle = CreateThread(nullptr, STACK_SIZE, threadFunction, m_implementation, CREATE_SUSPENDED, &m_implementation->m_thread_id);
 			if (handle)
 			{
 				m_implementation->m_exited = false;
 				m_implementation->m_thread_name = name;
 				m_implementation->m_handle = handle;
 			}
-			return handle != NULL;
+			return handle != nullptr;
 		}
 
 		bool Task::run()
@@ -90,7 +90,7 @@ namespace Lumix
 			}
 
 			::CloseHandle(m_implementation->m_handle);
-			m_implementation->m_handle = NULL;
+			m_implementation->m_handle = nullptr;
 			return true;
 		}
 

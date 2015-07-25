@@ -30,7 +30,7 @@ class base_string
 		base_string(IAllocator& allocator)
 			: m_allocator(allocator)
 		{
-			m_cstr = NULL;
+			m_cstr = nullptr;
 			m_size = 0;
 		}
 
@@ -125,7 +125,7 @@ class base_string
 				else
 				{
 					m_size = 0;
-					m_cstr = NULL;
+					m_cstr = nullptr;
 				}
 			}
 		}

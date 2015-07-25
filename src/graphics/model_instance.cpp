@@ -8,7 +8,7 @@ namespace Lumix
 
 
 ModelInstance::ModelInstance(IAllocator& allocator)
-	: m_model(NULL)
+	: m_model(nullptr)
 	, m_matrix(Matrix::IDENTITY)
 	, m_pose(allocator)
 {
@@ -17,7 +17,7 @@ ModelInstance::ModelInstance(IAllocator& allocator)
 
 ModelInstance::~ModelInstance()
 {
-	setModel(NULL);
+	setModel(nullptr);
 }
 
 

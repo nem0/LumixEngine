@@ -40,20 +40,20 @@ class IPropertyDescriptor
 		{ }
 		virtual ~IPropertyDescriptor() {}
 
-		virtual void set(Component cmp, InputBlob& stream) const = 0;
-		virtual void get(Component cmp, OutputBlob& stream) const = 0;
-		virtual void set(Component cmp, int index, InputBlob& stream) const = 0;
-		virtual void get(Component cmp, int index, OutputBlob& stream) const = 0;
+		virtual void set(ComponentUID cmp, InputBlob& stream) const = 0;
+		virtual void get(ComponentUID cmp, OutputBlob& stream) const = 0;
+		virtual void set(ComponentUID cmp, int index, InputBlob& stream) const = 0;
+		virtual void get(ComponentUID cmp, int index, OutputBlob& stream) const = 0;
 
 		template <typename T>
-		void setValue(Component cmp, const T& value)
+		void setValue(ComponentUID cmp, const T& value)
 		{
 			InputBlob stream(&value, sizeof(value));
 			set(cmp, stream);
 		}
 
 		template <typename T>
-		T getValue(Component cmp)
+		T getValue(ComponentUID cmp)
 		{
 			T ret;
 			StackAllocator<sizeof(T)> allocator;
@@ -104,8 +104,8 @@ template <class S>
 class IntArrayObjectDescriptor : public IIntPropertyDescriptor
 {
 	public:
-		typedef int (S::*IntegerGetter)(Component, int);
-		typedef void (S::*IntegerSetter)(Component, int, int);
+		typedef int (S::*IntegerGetter)(ComponentIndex, int);
+		typedef void (S::*IntegerSetter)(ComponentIndex, int, int);
 
 	public:
 		IntArrayObjectDescriptor(const char* name, IntegerGetter _getter, IntegerSetter _setter, IAllocator& allocator)
@@ -118,24 +118,24 @@ class IntArrayObjectDescriptor : public IIntPropertyDescriptor
 		}
 
 
-		virtual void set(Component cmp, int index, InputBlob& stream) const override
+		virtual void set(ComponentUID cmp, int index, InputBlob& stream) const override
 		{
 			int32_t i;
 			stream.read(&i, sizeof(i));
-			(static_cast<S*>(cmp.scene)->*m_integer_setter)(cmp, index, i);
+			(static_cast<S*>(cmp.scene)->*m_integer_setter)(cmp.index, index, i);
 		}
 
 
-		virtual void get(Component cmp, int index, OutputBlob& stream) const override
+		virtual void get(ComponentUID cmp, int index, OutputBlob& stream) const override
 		{
-			int32_t i = (static_cast<S*>(cmp.scene)->*m_integer_getter)(cmp, index);
+			int32_t i = (static_cast<S*>(cmp.scene)->*m_integer_getter)(cmp.index, index);
 			int len = sizeof(i);
 			stream.write(&i, len);
 		}
 
 
-		virtual void set(Component, InputBlob&) const override {};
-		virtual void get(Component, OutputBlob&) const override {};
+		virtual void set(ComponentUID, InputBlob&) const override {};
+		virtual void get(ComponentUID, OutputBlob&) const override {};
 
 	private:
 		IntegerGetter m_integer_getter;
@@ -147,8 +147,8 @@ template <class S>
 class BoolArrayObjectDescriptor : public IPropertyDescriptor
 {
 	public:
-		typedef void (S::*Getter)(Component, int, int&);
-		typedef void (S::*Setter)(Component, int, const int&);
+		typedef void (S::*Getter)(ComponentIndex, int, int&);
+		typedef void (S::*Setter)(ComponentIndex, int, const int&);
 
 	public:
 		BoolArrayObjectDescriptor(const char* name, Getter _getter, Setter _setter, IAllocator& allocator)
@@ -161,7 +161,7 @@ class BoolArrayObjectDescriptor : public IPropertyDescriptor
 		}
 
 
-		virtual void set(Component cmp, int index, OutputBlob& stream) const override
+		virtual void set(ComponentUID cmp, int index, OutputBlob& stream) const override
 		{
 			bool b;
 			stream.read(&b, sizeof(b));
@@ -169,7 +169,7 @@ class BoolArrayObjectDescriptor : public IPropertyDescriptor
 		}
 
 
-		virtual void get(Component cmp, int index, OutputBlob& stream) const override
+		virtual void get(ComponentUID cmp, int index, OutputBlob& stream) const override
 		{
 			bool b;
 			(static_cast<S*>(cmp.scene)->*m_getter)(cmp, index, b);
@@ -177,8 +177,8 @@ class BoolArrayObjectDescriptor : public IPropertyDescriptor
 		}
 
 
-		virtual void set(Component, OutputBlob&) const { ASSERT(false); };
-		virtual void get(Component, OutputBlob&) const { ASSERT(false); };
+		virtual void set(ComponentUID, OutputBlob&) const { ASSERT(false); };
+		virtual void get(ComponentUID, OutputBlob&) const { ASSERT(false); };
 
 	private:
 		Getter m_getter;
@@ -190,8 +190,8 @@ template <class S>
 class DecimalArrayObjectDescriptor : public IPropertyDescriptor
 {
 	public:
-		typedef float (S::*Getter)(Component, int);
-		typedef void (S::*Setter)(Component, int, float);
+		typedef float (S::*Getter)(ComponentIndex, int);
+		typedef void (S::*Setter)(ComponentIndex, int, float);
 
 	public:
 		DecimalArrayObjectDescriptor(const char* name, Getter _getter, Setter _setter, IAllocator& allocator)
@@ -204,7 +204,7 @@ class DecimalArrayObjectDescriptor : public IPropertyDescriptor
 		}
 
 
-		virtual void set(Component cmp, int index, OutputBlob& stream) const override
+		virtual void set(ComponentUID cmp, int index, OutputBlob& stream) const override
 		{
 			float f;
 			stream.read(&f, sizeof(f));
@@ -212,15 +212,15 @@ class DecimalArrayObjectDescriptor : public IPropertyDescriptor
 		}
 
 
-		virtual void get(Component cmp, int index, OutputBlob& stream) const override
+		virtual void get(ComponentUID cmp, int index, OutputBlob& stream) const override
 		{
 			float f = (static_cast<S*>(cmp.scene)->*m_getter)(cmp, index);
 			stream.write(&f, sizeof(f));
 		}
 
 
-		virtual void set(Component, OutputBlob&) const { ASSERT(false); };
-		virtual void get(Component, OutputBlob&) const { ASSERT(false); };
+		virtual void set(ComponentUID, OutputBlob&) const { ASSERT(false); };
+		virtual void get(ComponentUID, OutputBlob&) const { ASSERT(false); };
 
 	private:
 		Getter m_getter;
@@ -235,8 +235,8 @@ class StringArrayObjectDescriptor : public IPropertyDescriptor
 		static const int MAX_STRING_SIZE = 300;
 
 	public:
-		typedef void (S::*Getter)(Component, int, string&);
-		typedef void (S::*Setter)(Component, int, const string&);
+		typedef void (S::*Getter)(ComponentIndex, int, string&);
+		typedef void (S::*Setter)(ComponentIndex, int, const string&);
 
 	public:
 		StringArrayObjectDescriptor(const char* name, Getter _getter, Setter _setter, IAllocator& allocator)
@@ -249,7 +249,7 @@ class StringArrayObjectDescriptor : public IPropertyDescriptor
 		}
 
 
-		virtual void set(Component cmp, int index, InputBlob& stream) const override
+		virtual void set(ComponentUID cmp, int index, InputBlob& stream) const override
 		{
 			char tmp[MAX_STRING_SIZE];
 			char* c = tmp;
@@ -261,22 +261,22 @@ class StringArrayObjectDescriptor : public IPropertyDescriptor
 			while (*(c - 1) && (c - 1) - tmp < MAX_STRING_SIZE);
 			StackAllocator<MAX_STRING_SIZE> allocator;
 			string s((char*)tmp, allocator);
-			(static_cast<S*>(cmp.scene)->*m_setter)(cmp, index, s);
+			(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, index, s);
 		}
 
 
-		virtual void get(Component cmp, int index, OutputBlob& stream) const override
+		virtual void get(ComponentUID cmp, int index, OutputBlob& stream) const override
 		{
 			StackAllocator<MAX_STRING_SIZE> allocator;
 			string value(allocator);
-			(static_cast<S*>(cmp.scene)->*m_getter)(cmp, index, value);
+			(static_cast<S*>(cmp.scene)->*m_getter)(cmp.index, index, value);
 			int len = value.length() + 1;
 			stream.write(value.c_str(), len);
 		}
 
 
-		virtual void set(Component, InputBlob&) const { ASSERT(false); };
-		virtual void get(Component, OutputBlob&) const { ASSERT(false); };
+		virtual void set(ComponentUID, InputBlob&) const { ASSERT(false); };
+		virtual void get(ComponentUID, OutputBlob&) const { ASSERT(false); };
 
 	private:
 		Getter m_getter;
@@ -323,14 +323,14 @@ template <class S>
 class Vec3ArrayObjectDescriptor : public IPropertyDescriptor
 {
 	public:
-		typedef Vec3 (S::*Getter)(Component, int);
-		typedef void (S::*Setter)(Component, int, const Vec3&);
+		typedef Vec3(S::*Getter)(ComponentIndex, int);
+		typedef void (S::*Setter)(ComponentIndex, int, const Vec3&);
 
 	public:
 		Vec3ArrayObjectDescriptor(const char* name, Getter _getter, Setter _setter) { setName(name); m_vec3_getter = _getter; m_vec3_setter = _setter; m_type = VEC3; }
 		
 		
-		virtual void set(Component cmp, int index, OutputBlob& stream) const override
+		virtual void set(ComponentUID cmp, int index, OutputBlob& stream) const override
 		{
 			Vec3 v;
 			stream.read(&v, sizeof(v));
@@ -338,7 +338,7 @@ class Vec3ArrayObjectDescriptor : public IPropertyDescriptor
 		}
 
 
-		virtual void get(Component cmp, int index, OutputBlob& stream) const override
+		virtual void get(ComponentUID cmp, int index, OutputBlob& stream) const override
 		{
 			Vec3 v = (static_cast<S*>(cmp.scene)->*m_vec3_getter)(cmp, index);
 			len = sizeof(v);
@@ -346,8 +346,8 @@ class Vec3ArrayObjectDescriptor : public IPropertyDescriptor
 		}
 
 
-		virtual void set(Component, OutputBlob&) const {};
-		virtual void get(Component, OutputBlob&) const {};
+		virtual void set(ComponentUID, OutputBlob&) const {};
+		virtual void get(ComponentUID, OutputBlob&) const {};
 
 	private:
 		Getter m_getter;
@@ -362,9 +362,9 @@ class IArrayDescriptor : public IPropertyDescriptor
 			: IPropertyDescriptor(allocator)
 		{ }
 
-		virtual void removeArrayItem(Component cmp, int index) const = 0;
-		virtual void addArrayItem(Component cmp, int index) const = 0;
-		virtual int getCount(Component cmp) const = 0;
+		virtual void removeArrayItem(ComponentUID cmp, int index) const = 0;
+		virtual void addArrayItem(ComponentUID cmp, int index) const = 0;
+		virtual int getCount(ComponentUID cmp) const = 0;
 };
 
 
@@ -372,9 +372,9 @@ template <class S>
 class ArrayDescriptor : public IArrayDescriptor
 {
 	public:
-		typedef int (S::*Counter)(Component);
-		typedef void (S::*Adder)(Component, int);
-		typedef void (S::*Remover)(Component, int);
+		typedef int (S::*Counter)(ComponentIndex);
+		typedef void (S::*Adder)(ComponentIndex, int);
+		typedef void (S::*Remover)(ComponentIndex, int);
 
 	public:
 		ArrayDescriptor(const char* name, Counter counter, Adder adder, Remover remover, IAllocator& allocator)
@@ -396,7 +396,7 @@ class ArrayDescriptor : public IArrayDescriptor
 		}
 
 
-		virtual void set(Component cmp, InputBlob& stream) const override
+		virtual void set(ComponentUID cmp, InputBlob& stream) const override
 		{
 			int count;
 			stream.read(count);
@@ -418,7 +418,7 @@ class ArrayDescriptor : public IArrayDescriptor
 		}
 
 
-		virtual void get(Component cmp, OutputBlob& stream) const override
+		virtual void get(ComponentUID cmp, OutputBlob& stream) const override
 		{
 			int count = getCount(cmp);
 			stream.write(count);
@@ -432,12 +432,12 @@ class ArrayDescriptor : public IArrayDescriptor
 		}
 
 
-		virtual void set(Component, int, InputBlob&) const override { ASSERT(false); };
-		virtual void get(Component, int, OutputBlob&) const override { ASSERT(false); };
+		virtual void set(ComponentUID, int, InputBlob&) const override { ASSERT(false); };
+		virtual void get(ComponentUID, int, OutputBlob&) const override { ASSERT(false); };
 
-		virtual int getCount(Component cmp) const override { return (static_cast<S*>(cmp.scene)->*m_counter)(cmp); }
-		virtual void addArrayItem(Component cmp, int index) const override { (static_cast<S*>(cmp.scene)->*m_adder)(cmp, index); }
-		virtual void removeArrayItem(Component cmp, int index) const override { (static_cast<S*>(cmp.scene)->*m_remover)(cmp, index); }
+		virtual int getCount(ComponentUID cmp) const override { return (static_cast<S*>(cmp.scene)->*m_counter)(cmp.index); }
+		virtual void addArrayItem(ComponentUID cmp, int index) const override { (static_cast<S*>(cmp.scene)->*m_adder)(cmp.index, index); }
+		virtual void removeArrayItem(ComponentUID cmp, int index) const override { (static_cast<S*>(cmp.scene)->*m_remover)(cmp.index, index); }
 
 	private:
 		IAllocator& m_allocator;
@@ -451,14 +451,14 @@ template <class S>
 class IntPropertyDescriptor : public IIntPropertyDescriptor
 {
 	public:
-		typedef int (S::*IntegerGetter)(Component);
-		typedef void (S::*IntegerSetter)(Component, int);
+		typedef int (S::*IntegerGetter)(ComponentIndex);
+		typedef void (S::*IntegerSetter)(ComponentIndex, int);
 
 	public:
 		IntPropertyDescriptor(const char* name, IntegerGetter _getter, IntegerSetter _setter) { setName(name); m_integer_getter = _getter; m_integer_setter = _setter; m_type = INTEGER; }
 
 
-		virtual void set(Component cmp, OutputBlob& stream) const override
+		virtual void set(ComponentUID cmp, OutputBlob& stream) const override
 		{
 			int32_t i;
 			stream.read(&i, sizeof(i));
@@ -466,7 +466,7 @@ class IntPropertyDescriptor : public IIntPropertyDescriptor
 		}
 
 
-		virtual void get(Component cmp, OutputBlob& stream) const override
+		virtual void get(ComponentUID cmp, OutputBlob& stream) const override
 		{
 			int32_t i = (static_cast<S*>(cmp.scene)->*m_integer_getter)(cmp);
 			len = sizeof(i);
@@ -474,8 +474,8 @@ class IntPropertyDescriptor : public IIntPropertyDescriptor
 		}
 
 
-		virtual void set(Component cmp, int index, OutputBlob& stream) const override { ASSERT(index == -1); set(cmp, stream); };
-		virtual void get(Component cmp, int index, OutputBlob& stream) const override { ASSERT(index == -1); get(cmp, stream); };
+		virtual void set(ComponentUID cmp, int index, OutputBlob& stream) const override { ASSERT(index == -1); set(cmp, stream); };
+		virtual void get(ComponentUID cmp, int index, OutputBlob& stream) const override { ASSERT(index == -1); get(cmp, stream); };
 
 	private:
 		IntegerGetter m_integer_getter;
@@ -490,8 +490,8 @@ class StringPropertyDescriptor : public IPropertyDescriptor
 		static const int MAX_STRING_SIZE = 300;
 
 	public:
-		typedef void (S::*Getter)(Component, string&);
-		typedef void (S::*Setter)(Component, const string&);
+		typedef void (S::*Getter)(ComponentIndex, string&);
+		typedef void (S::*Setter)(ComponentIndex, const string&);
 
 	public:
 		StringPropertyDescriptor(const char* name, Getter getter, Setter setter, IAllocator& allocator)
@@ -504,7 +504,7 @@ class StringPropertyDescriptor : public IPropertyDescriptor
 		}
 
 
-		virtual void set(Component cmp, InputBlob& stream) const override
+		virtual void set(ComponentUID cmp, InputBlob& stream) const override
 		{
 			char tmp[MAX_STRING_SIZE];
 			char* c = tmp;
@@ -516,22 +516,22 @@ class StringPropertyDescriptor : public IPropertyDescriptor
 			while (*(c - 1) && (c - 1) - tmp < MAX_STRING_SIZE);
 			StackAllocator<MAX_STRING_SIZE> allocator;
 			string s((char*)tmp, allocator);
-			(static_cast<S*>(cmp.scene)->*m_setter)(cmp, s);
+			(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, s);
 		}
 
 
-		virtual void get(Component cmp, OutputBlob& stream) const override
+		virtual void get(ComponentUID cmp, OutputBlob& stream) const override
 		{
 			StackAllocator<MAX_STRING_SIZE> allocator;
 			string value(allocator);
-			(static_cast<S*>(cmp.scene)->*m_getter)(cmp, value);
+			(static_cast<S*>(cmp.scene)->*m_getter)(cmp.index, value);
 			int len = value.length() + 1;
 			stream.write(value.c_str(), len);
 		}
 
 
-		virtual void set(Component cmp, int index, InputBlob& stream) const override { ASSERT(index == -1); set(cmp, stream); };
-		virtual void get(Component cmp, int index, OutputBlob& stream) const override { ASSERT(index == -1); get(cmp, stream); };
+		virtual void set(ComponentUID cmp, int index, InputBlob& stream) const override { ASSERT(index == -1); set(cmp, stream); };
+		virtual void get(ComponentUID cmp, int index, OutputBlob& stream) const override { ASSERT(index == -1); get(cmp, stream); };
 
 	private:
 		Getter m_getter;
@@ -543,8 +543,8 @@ template <class S>
 class BoolPropertyDescriptor : public IPropertyDescriptor
 {
 	public:
-		typedef bool (S::*Getter)(Component);
-		typedef void (S::*Setter)(Component, bool);
+		typedef bool (S::*Getter)(ComponentIndex);
+		typedef void (S::*Setter)(ComponentIndex, bool);
 
 	public:
 		BoolPropertyDescriptor(const char* name, Getter getter, Setter setter, IAllocator& allocator)
@@ -557,24 +557,24 @@ class BoolPropertyDescriptor : public IPropertyDescriptor
 		}
 
 
-		virtual void set(Component cmp, InputBlob& stream) const override
+		virtual void set(ComponentUID cmp, InputBlob& stream) const override
 		{
 			bool b;
 			stream.read(&b, sizeof(b));
-			(static_cast<S*>(cmp.scene)->*m_setter)(cmp, b);
+			(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, b);
 		}
 
 
-		virtual void get(Component cmp, OutputBlob& stream) const override
+		virtual void get(ComponentUID cmp, OutputBlob& stream) const override
 		{
-			bool b = (static_cast<S*>(cmp.scene)->*m_getter)(cmp);
+			bool b = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
 			int len = sizeof(b);
 			stream.write(&b, len);
 		}
 
 
-		virtual void set(Component cmp, int index, InputBlob& stream) const override { ASSERT(index == -1); set(cmp, stream); };
-		virtual void get(Component cmp, int index, OutputBlob& stream) const override { ASSERT(index == -1); get(cmp, stream); };
+		virtual void set(ComponentUID cmp, int index, InputBlob& stream) const override { ASSERT(index == -1); set(cmp, stream); };
+		virtual void get(ComponentUID cmp, int index, OutputBlob& stream) const override { ASSERT(index == -1); get(cmp, stream); };
 
 	private:
 		Getter m_getter;
@@ -586,8 +586,8 @@ template <class S>
 class Vec3PropertyDescriptor : public IPropertyDescriptor
 {
 	public:
-		typedef Vec3 (S::*Getter)(Component);
-		typedef void (S::*Setter)(Component, const Vec3&);
+		typedef Vec3(S::*Getter)(ComponentIndex);
+		typedef void (S::*Setter)(ComponentIndex, const Vec3&);
 
 	public:
 		Vec3PropertyDescriptor(const char* name, Getter getter, Setter setter, IAllocator& allocator)
@@ -600,24 +600,24 @@ class Vec3PropertyDescriptor : public IPropertyDescriptor
 		}
 
 
-		virtual void set(Component cmp, InputBlob& stream) const override
+		virtual void set(ComponentUID cmp, InputBlob& stream) const override
 		{
 			Vec3 v;
 			stream.read(&v, sizeof(v));
-			(static_cast<S*>(cmp.scene)->*m_setter)(cmp, v);
+			(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, v);
 		}
 
 
-		virtual void get(Component cmp, OutputBlob& stream) const override
+		virtual void get(ComponentUID cmp, OutputBlob& stream) const override
 		{
-			Vec3 v = (static_cast<S*>(cmp.scene)->*m_getter)(cmp);
+			Vec3 v = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
 			int len = sizeof(v);
 			stream.write(&v, len);
 		}
 
 
-		virtual void set(Component cmp, int index, InputBlob& stream) const override { ASSERT(index == -1); set(cmp, stream); };
-		virtual void get(Component cmp, int index, OutputBlob& stream) const override { ASSERT(index == -1); get(cmp, stream); };
+		virtual void set(ComponentUID cmp, int index, InputBlob& stream) const override { ASSERT(index == -1); set(cmp, stream); };
+		virtual void get(ComponentUID cmp, int index, OutputBlob& stream) const override { ASSERT(index == -1); get(cmp, stream); };
 
 	private:
 		Getter m_getter;
@@ -699,8 +699,8 @@ template <class S>
 class DecimalPropertyDescriptor : public IDecimalPropertyDescriptor
 {
 	public:
-		typedef float (S::*Getter)(Component);
-		typedef void (S::*Setter)(Component, float);
+		typedef float (S::*Getter)(ComponentIndex);
+		typedef void (S::*Setter)(ComponentIndex, float);
 
 	public:
 		DecimalPropertyDescriptor(const char* name, Getter _getter, Setter _setter, float min, float max, float step, IAllocator& allocator)
@@ -716,23 +716,23 @@ class DecimalPropertyDescriptor : public IDecimalPropertyDescriptor
 		}
 		
 		
-		virtual void set(Component cmp, InputBlob& stream) const override
+		virtual void set(ComponentUID cmp, InputBlob& stream) const override
 		{
 			float f;
 			stream.read(&f, sizeof(f));
-			(static_cast<S*>(cmp.scene)->*m_setter)(cmp, f);
+			(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, f);
 		}
 
 
-		virtual void get(Component cmp, OutputBlob& stream) const override
+		virtual void get(ComponentUID cmp, OutputBlob& stream) const override
 		{
-			float f = (static_cast<S*>(cmp.scene)->*m_getter)(cmp);
+			float f = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
 			int len = sizeof(f);
 			stream.write(&f, len);
 		}
 
-		virtual void set(Component cmp, int index, InputBlob& stream) const override { ASSERT(index == -1); set(cmp, stream); };
-		virtual void get(Component cmp, int index, OutputBlob& stream) const override { ASSERT(index == -1); get(cmp, stream);};
+		virtual void set(ComponentUID cmp, int index, InputBlob& stream) const override { ASSERT(index == -1); set(cmp, stream); };
+		virtual void get(ComponentUID cmp, int index, OutputBlob& stream) const override { ASSERT(index == -1); get(cmp, stream);};
 
 	private:
 		Getter m_getter;
@@ -744,8 +744,8 @@ template <class S>
 class ColorPropertyDescriptor : public IPropertyDescriptor
 {
 	public:
-		typedef Vec3 (S::*Getter)(Component);
-		typedef void (S::*Setter)(Component, const Vec3&);
+		typedef Vec3(S::*Getter)(ComponentIndex);
+		typedef void (S::*Setter)(ComponentIndex, const Vec3&);
 
 	public:
 		ColorPropertyDescriptor(const char* name, Getter _getter, Setter _setter, IAllocator& allocator)
@@ -758,24 +758,24 @@ class ColorPropertyDescriptor : public IPropertyDescriptor
 		}
 		
 		
-		virtual void set(Component cmp, InputBlob& stream) const override
+		virtual void set(ComponentUID cmp, InputBlob& stream) const override
 		{
 			Vec3 f;
 			stream.read(&f, sizeof(f));
-			(static_cast<S*>(cmp.scene)->*m_setter)(cmp, f);
+			(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, f);
 		}
 
 
-		virtual void get(Component cmp, OutputBlob& stream) const override
+		virtual void get(ComponentUID cmp, OutputBlob& stream) const override
 		{
-			Vec3 f = (static_cast<S*>(cmp.scene)->*m_getter)(cmp);
+			Vec3 f = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
 			int len = sizeof(f);
 			stream.write(&f, len);
 		}
 
 
-		virtual void set(Component cmp, int index, InputBlob& stream) const override { ASSERT(index == -1); set(cmp, stream); };
-		virtual void get(Component cmp, int index, OutputBlob& stream) const override { ASSERT(index == -1); get(cmp, stream);};
+		virtual void set(ComponentUID cmp, int index, InputBlob& stream) const override { ASSERT(index == -1); set(cmp, stream); };
+		virtual void get(ComponentUID cmp, int index, OutputBlob& stream) const override { ASSERT(index == -1); get(cmp, stream);};
 
 	private:
 		Getter m_getter;

@@ -55,7 +55,7 @@ ProfileModel::ProfileModel(QWidget* parent)
 	: QAbstractItemModel(parent)
 {
 	Lumix::g_profiler.getFrameListeners().bind<ProfileModel, &ProfileModel::onFrame>(this);
-	m_root = NULL;
+	m_root = nullptr;
 	m_frame = -1;
 }
 
@@ -100,8 +100,8 @@ void ProfileModel::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bl
 		Block* my_child = new Block;
 		my_child->m_name = remote_child->m_name;
 		my_child->m_parent = my_block;
-		my_child->m_next = NULL;
-		my_child->m_first_child = NULL;
+		my_child->m_next = nullptr;
+		my_child->m_first_child = nullptr;
 		my_block->m_first_child = my_child;
 		endInsertRows();
 		cloneBlock(my_child, remote_child);
@@ -117,7 +117,7 @@ void ProfileModel::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bl
 			my_new_child->m_name = remote_child->m_name;
 			my_new_child->m_parent = my_block;
 			my_new_child->m_next = my_child;
-			my_new_child->m_first_child = NULL;
+			my_new_child->m_first_child = nullptr;
 			my_block->m_first_child = my_new_child;
 			my_child = my_new_child;
 			endInsertRows();
@@ -133,8 +133,8 @@ void ProfileModel::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bl
 		Block* my_next = new Block;
 		my_next->m_name = remote_next->m_name;
 		my_next->m_parent = my_block->m_parent;
-		my_next->m_next = NULL;
-		my_next->m_first_child = NULL;
+		my_next->m_next = nullptr;
+		my_next->m_first_child = nullptr;
 		my_block->m_next = my_next;
 		endInsertRows();
 		cloneBlock(my_next, remote_next);
@@ -150,7 +150,7 @@ void ProfileModel::cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_bl
 			my_next->m_name = remote_next->m_name;
 			my_next->m_parent = my_block->m_parent;
 			my_next->m_next = my_block->m_next;
-			my_next->m_first_child = NULL;
+			my_next->m_first_child = nullptr;
 			my_block->m_next = my_next;
 			endInsertRows();
 		}
@@ -165,9 +165,9 @@ void ProfileModel::onFrame()
 		beginInsertRows(QModelIndex(), 0, 0);
 		m_root = new Block;
 		m_root->m_name = Lumix::g_profiler.getRootBlock()->m_name;
-		m_root->m_parent = NULL;
-		m_root->m_next = NULL;
-		m_root->m_first_child = NULL;
+		m_root->m_parent = nullptr;
+		m_root->m_next = nullptr;
+		m_root->m_first_child = nullptr;
 		endInsertRows();
 	}
 	else
@@ -249,8 +249,8 @@ QModelIndex ProfileModel::index(int row, int column, const QModelIndex& parent) 
 	{
 		return QModelIndex();
 	}
-	Block* block = NULL;
-	if(parent.internalPointer() != NULL)
+	Block* block = nullptr;
+	if(parent.internalPointer() != nullptr)
 	{
 		block = static_cast<Block*>(parent.internalPointer())->m_first_child;
 	}
@@ -279,7 +279,7 @@ QModelIndex ProfileModel::parent(const QModelIndex& index) const
 	Block* child = static_cast<Block*>(index.internalPointer());
 	Block* parent = child->m_parent;
 
-	if (parent == NULL)
+	if (parent == nullptr)
 	{
 		return QModelIndex();
 	}
@@ -298,7 +298,7 @@ QModelIndex ProfileModel::parent(const QModelIndex& index) const
 int ProfileModel::rowCount(const QModelIndex& parent_index) const
 {
 	Block* parent;
-	if (parent_index.column() > 0 || Lumix::g_profiler.getRootBlock() == NULL)
+	if (parent_index.column() > 0 || Lumix::g_profiler.getRootBlock() == nullptr)
 		return 0;
 
 	if (!parent_index.isValid() || !parent_index.internalPointer())

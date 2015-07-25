@@ -21,7 +21,7 @@ BinaryArray::Accessor::Accessor(BinaryArray& array, int index)
 
 BinaryArray::BinaryArray(IAllocator& allocator)
 	: m_allocator(allocator)
-	, m_data(NULL)
+	, m_data(nullptr)
 	, m_size(0)
 	, m_capacity(0)
 {

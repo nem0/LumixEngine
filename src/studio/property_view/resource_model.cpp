@@ -109,7 +109,7 @@ void ResourceModel::setResource(const Lumix::Path& path)
 	else
 	{
 		m_resource_type = 0;
-		m_resource = NULL;
+		m_resource = nullptr;
 		return;
 	}
 
@@ -153,7 +153,7 @@ static Lumix::Material::Uniform* getMaterialUniform(Lumix::Material* material, Q
 			return &material->getUniform(i);
 		}
 	}
-	return NULL;
+	return nullptr;
 }
 
 
@@ -184,7 +184,7 @@ void ResourceModel::saveMaterial(Lumix::Material* material)
 
 void ResourceModel::showFileDialog(const DynamicObjectModel::Node* node, QString filter)
 {
-	auto fileName = QFileDialog::getOpenFileName(NULL, "Select file", "", filter);
+	auto fileName = QFileDialog::getOpenFileName(nullptr, "Select file", "", filter);
 	if (!fileName.isEmpty())
 	{
 		node->m_setter(fileName);

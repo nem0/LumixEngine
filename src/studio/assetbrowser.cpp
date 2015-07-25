@@ -14,7 +14,6 @@
 #include "mainwindow.h"
 #include "metadata.h"
 #include "notifications.h"
-#include "scripts/scriptcompiler.h"
 #include "shader_compiler.h"
 #include <qdesktopservices.h>
 #include <qfileiconprovider.h>
@@ -212,7 +211,7 @@ AssetBrowser::AssetBrowser(MainWindow& main_window, QWidget* parent)
 	m_watcher = FileSystemWatcher::create(QDir::currentPath());
 	m_watcher->getCallback().bind<AssetBrowser, &AssetBrowser::onFileSystemWatcherCallback>(this);
 	m_base_path = QDir::currentPath();
-	m_editor = NULL;
+	m_editor = nullptr;
 	m_ui->setupUi(this);
 	m_flat_filtered_model = new FlatFileListModel;
 	m_model = new QFileSystemModel;
@@ -394,13 +393,13 @@ void AssetBrowser::reimportAsset(const QString& filepath)
 
 void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
 {
-	QMenu *menu = new QMenu("Item actions",NULL);
+	QMenu *menu = new QMenu("Item actions",nullptr);
 	const QModelIndex& index = m_ui->treeView->indexAt(pos);
 	QFileInfo root_info(QDir::currentPath());
 	const QFileInfo& file_info = index.isValid() 
 		? index.model() == m_model ? m_model->fileInfo(index) : m_flat_filtered_model->fileInfo(index)
 		: root_info;
-	QAction* selected_action = NULL;
+	QAction* selected_action = nullptr;
 	QAction* delete_file_action = new QAction("Delete", menu);
 	QAction* rename_file_action = new QAction("Rename", menu);
 	QAction* create_dir_action = new QAction("Create directory", menu);
