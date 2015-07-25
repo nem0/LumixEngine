@@ -59,7 +59,7 @@ namespace Lumix
 	static bool readLine(FS::IFile* file, char buffer[], int max_size)
 	{
 		int i = 0;
-		while (file->read(buffer + i, 1) && buffer[i] != '\n' && buffer[i] != '\0' && i < max_size - 1)
+		while (i < max_size - 1 && file->read(buffer + i, 1) && buffer[i] != '\n' && buffer[i] != '\0')
 		{
 			++i;
 		}
