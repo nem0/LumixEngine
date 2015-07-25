@@ -29,8 +29,6 @@
 
 #include "universe/hierarchy.h"
 
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
 
 namespace Lumix
 {
@@ -412,8 +410,8 @@ private:
 
 void showLogInVS(const char*, const char* message)
 {
-	OutputDebugString(message);
-	OutputDebugString("\n");
+	Debug::debugOutput(message);
+	Debug::debugOutput("\n");
 }
 
 
