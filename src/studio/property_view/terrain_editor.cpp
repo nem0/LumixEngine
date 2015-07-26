@@ -228,42 +228,45 @@ private:
 	}
 
 
-	int computeAverage(const Lumix::Texture* texture,
+	int computeAverage32(const Lumix::Texture* texture,
 					   int from_x,
 					   int to_x,
 					   int from_y,
 					   int to_y)
 	{
+		ASSERT(texture->getBytesPerPixel() == 4);
 		uint64_t sum = 0;
 		int texture_width = texture->getWidth();
-		switch (texture->getBytesPerPixel())
+		for (int i = from_x, end = to_x; i < end; ++i)
 		{
-			case 4:
-				for (int i = from_x, end = to_x; i < end; ++i)
-				{
-					for (int j = from_y, end2 = to_y; j < end2; ++j)
-					{
-						sum += texture->getData()[4 * (i + j * texture_width)];
-					}
-				}
-				break;
-			case 2:
-				for (int i = from_x, end = to_x; i < end; ++i)
-				{
-					for (int j = from_y, end2 = to_y; j < end2; ++j)
-					{
-						sum +=
-							((uint16_t*)
-								 texture->getData())[(i + j * texture_width)];
-					}
-				}
-				break;
-			default:
-				ASSERT(false);
-				break;
+			for (int j = from_y, end2 = to_y; j < end2; ++j)
+			{
+				sum += texture->getData()[4 * (i + j * texture_width)];
+			}
 		}
 		return sum / (to_x - from_x) / (to_y - from_y);
 	}
+
+
+	uint16_t computeAverage16(const Lumix::Texture* texture,
+							  int from_x,
+							  int to_x,
+							  int from_y,
+							  int to_y)
+	{
+		ASSERT(texture->getBytesPerPixel() == 2);
+		uint32_t sum = 0;
+		int texture_width = texture->getWidth();
+		for (int i = from_x, end = to_x; i < end; ++i)
+		{
+			for (int j = from_y, end2 = to_y; j < end2; ++j)
+			{
+				sum += ((uint16_t*)texture->getData())[(i + j * texture_width)];
+			}
+		}
+		return uint16_t(sum / (to_x - from_x) / (to_y - from_y));
+	}
+
 
 	float getAttenuation(Item& item, int i, int j) const
 	{
@@ -286,10 +289,21 @@ private:
 		int to_z = Lumix::Math::minValue((int)(item.m_center_y + item.m_radius),
 										 texture_width);
 
-		float strength_multiplicator = 0xFFFF;
+		int avg = 0;
+		float avg16 = 0;
+		float strength_multiplicator = 256.0f;
 		if (texture->getBytesPerPixel() == 4)
 		{
-			strength_multiplicator = 0xFF;
+			avg = m_type == TerrainEditor::SMOOTH_HEIGHT
+					  ? computeAverage32(texture, from_x, to_x, from_z, to_z)
+					  : 0;
+			strength_multiplicator = 16.0f;
+		}
+		else
+		{
+			avg16 = m_type == TerrainEditor::SMOOTH_HEIGHT
+				? computeAverage16(texture, from_x, to_x, from_z, to_z)
+				: 0;
 		}
 		float amount = Lumix::Math::maxValue(
 			item.m_amount * item.m_amount * strength_multiplicator, 1.0f);
@@ -297,20 +311,19 @@ private:
 		{
 			amount = -amount;
 		}
-		int avg = m_type == TerrainEditor::SMOOTH_HEIGHT
-					  ? computeAverage(texture, from_x, to_x, from_z, to_z)
-					  : 0;
+
 
 		for (int i = from_x, end = to_x; i < end; ++i)
 		{
 			for (int j = from_z, end2 = to_z; j < end2; ++j)
 			{
 				float attenuation = getAttenuation(item, i, j);
-				int add = attenuation * amount;
 				int offset = i - m_x + (j - m_y) * m_width;
 				switch (texture->getBytesPerPixel())
 				{
 					case 4:
+					{
+						int add = attenuation * amount;
 						if (m_type == TerrainEditor::TEXTURE)
 						{
 							addTexelSplatWeight(
@@ -353,31 +366,17 @@ private:
 							data[offset * 4 + 3] = 255;
 						}
 						break;
+					}
 					case 2:
-						if (m_type == TerrainEditor::SMOOTH_HEIGHT)
-						{
-							add = (avg -
-								   ((uint16_t*)texture
-										->getData())[(i + j * texture_width)]) *
-								  item.m_amount * attenuation;
-						}
-						else if (add > 0)
-						{
-							add = Lumix::Math::minValue(
-								add,
-								0xFFFF -
-									((uint16_t*)texture
-										 ->getData())[(i + j * texture_width)]);
-						}
-						else
-						{
-							add = Lumix::Math::maxValue(
-								add,
-								0 - ((uint16_t*)texture
-										 ->getData())[(i + j * texture_width)]);
-						}
-						((uint16_t*)&data[0])[offset] += add;
+					{
+						uint16_t add = uint16_t(attenuation * amount);
+						uint16_t x = ((uint16_t*)texture->getData())[(i + j * texture_width)];
+						x += m_type == TerrainEditor::SMOOTH_HEIGHT
+								 ? (avg16 - x) * item.m_amount * attenuation
+								 : add;
+						((uint16_t*)&data[0])[offset] = x;
 						break;
+					}
 					default:
 						ASSERT(false);
 						break;
@@ -880,7 +879,7 @@ void TerrainEditor::drawCursor(Lumix::RenderScene& scene,
 		if (local_from.x >= 0 && local_from.z >= 0 && local_from.x <= w &&
 			local_from.z <= h)
 		{
-			from.y = 0.25f +
+			from.y = terrain_matrix.m42 + 0.25f +
 					 scene.getTerrainHeightAt(
 						 terrain.index, local_from.x, local_from.z);
 		}
@@ -889,7 +888,7 @@ void TerrainEditor::drawCursor(Lumix::RenderScene& scene,
 		if (local_to.x >= 0 && local_to.z >= 0 && local_to.x <= w &&
 			local_to.z <= h)
 		{
-			to.y =
+			to.y = terrain_matrix.m42 +
 				0.25f +
 				scene.getTerrainHeightAt(terrain.index, local_to.x, local_to.z);
 		}
