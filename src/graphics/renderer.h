@@ -33,8 +33,7 @@ class LUMIX_ENGINE_API Renderer : public IPlugin
 		static void destroyInstance(Renderer& renderer);
 
 		static void frame();
-		static void init(void* data);
-		static void shutdown();
+		static void setInitData(void* data);
 
 		virtual void makeScreenshot(const Path& filename) = 0;
 		virtual int getPassIdx(const char* pass) = 0;

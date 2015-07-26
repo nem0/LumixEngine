@@ -150,6 +150,10 @@ struct RendererImpl : public Renderer
 		m_shader_manager.destroy();
 		m_pipeline_manager.destroy();
 		m_font_manager.destroy();
+
+		bgfx::frame();
+		bgfx::frame();
+		bgfx::shutdown();
 	}
 
 
@@ -450,17 +454,9 @@ struct RendererImpl : public Renderer
 HWND RendererImpl::s_hwnd;
 
 
-void Renderer::init(void* data)
+void Renderer::setInitData(void* data)
 {
 	RendererImpl::s_hwnd = (HWND)data;
-}
-
-
-void Renderer::shutdown()
-{
-	bgfx::frame();
-	bgfx::frame();
-	bgfx::shutdown();
 }
 
 

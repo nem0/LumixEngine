@@ -127,29 +127,11 @@ void ShaderCompiler::makeUpToDate()
 void ShaderCompiler::onFileChanged(const char* path)
 {
 	QFileInfo info(path);
-	if (info.suffix() == "shb")
+	if (m_dependencies.contains(QString("shaders/") + path))
 	{
-		if (m_editor)
-		{
-			auto shader_manager =
-				m_editor->getEngine().getResourceManager().get(
-					Lumix::ResourceManager::SHADER);
-			QString shader_path("shaders/");
-			QString source_basename =
-				getSourceFromBinaryBasename(info.baseName());
-			shader_path +=
-				source_basename.mid(0, source_basename.length() - 3) + ".shd";
-			shader_manager->reload(Lumix::Path(shader_path.toLatin1().data()));
-		}
-	}
-	else
-	{
-		if (m_dependencies.contains(QString("shaders/") + path))
-		{
-			QString tmp = QString("shaders/") + path;
-			tmp = tmp.mid(0, tmp.length() - 6) + ".shd";
-			compile(tmp);
-		}
+		QString tmp = QString("shaders/") + path;
+		tmp = tmp.mid(0, tmp.length() - 6) + ".shd";
+		compile(tmp);
 	}
 	parseDependencies();
 }

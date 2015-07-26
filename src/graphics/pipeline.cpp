@@ -731,6 +731,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 		Vec4 fog_color_density(m_scene->getFogColor(light_cmp),
 							   m_scene->getFogDensity(light_cmp));
+		fog_color_density.w *= fog_color_density.w * fog_color_density.w;
 		bgfx::setUniform(m_fog_color_density_uniform, &fog_color_density);
 
 		bgfx::submit(m_view_idx);
