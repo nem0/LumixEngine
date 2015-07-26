@@ -10,6 +10,8 @@ class QString;
 class FileSystemWatcher
 {
 	public:
+		virtual ~FileSystemWatcher() {}
+
 		static FileSystemWatcher* create(const QString& path);
 		static void destroy(FileSystemWatcher* watcher); 
 		virtual Lumix::Delegate<void (const char*)>& getCallback() = 0;
