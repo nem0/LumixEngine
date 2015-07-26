@@ -685,7 +685,7 @@ namespace Lumix
 	{
 		RayCastModelHit hit;
 		hit.m_is_hit = false;
-		if (m_material && m_material->isReady())
+		if (m_root)
 		{
 			Matrix mtx = m_scene.getUniverse().getMatrix(m_entity);
 			mtx.fastInverse();
@@ -822,14 +822,14 @@ namespace Lumix
 		PROFILE_FUNCTION();
 		if (new_state == Resource::State::READY)
 		{
-			m_heightmap = m_material->getTextureByUniform("u_heightmap");
+			m_heightmap = m_material->getTextureByUniform("u_texHeightmap");
 			bool is_data_ready = true;
 			if (m_heightmap && m_heightmap->getData() == nullptr)
 			{
 				m_heightmap->addDataReference();
 				is_data_ready = false;
 			}
-			m_splatmap = m_material->getTextureByUniform("u_splatmap");
+			m_splatmap = m_material->getTextureByUniform("u_texSplatmap");
 			if (m_splatmap && m_splatmap->getData() == nullptr)
 			{
 				m_splatmap->addDataReference();
