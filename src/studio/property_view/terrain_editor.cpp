@@ -28,8 +28,12 @@
 
 
 static const uint32_t RENDERABLE_HASH = crc32("renderable");
-static const char* HEIGHTMAP_UNIFORM = "u_heightmap";
-static const char* SPLATMAP_UNIFORM = "u_splatmap";
+static const char* HEIGHTMAP_UNIFORM = "u_texHeightmap";
+static const char* SPLATMAP_UNIFORM = "u_texSplatmap";
+static const char* TEX_COLOR0_UNIFORM = "u_texColor0";
+static const char* TEX_COLOR1_UNIFORM = "u_texColor1";
+static const char* TEX_COLOR2_UNIFORM = "u_texColor2";
+static const char* TEX_COLOR3_UNIFORM = "u_texColor3";
 
 
 class PaintTerrainCommand : public Lumix::IEditorCommand
@@ -756,15 +760,23 @@ void TerrainComponentPlugin::addTextureNode(DynamicObjectModel::Node& node)
 	{
 		auto material = m_terrain_editor->getMaterial();
 		QComboBox* cb = new QComboBox(parent);
-		for (int i = 0; i < material->getTextureCount(); ++i)
+		
+		Lumix::Texture* tex[4] =
 		{
-			auto uniform = material->getTextureUniform(i);
-			if (strcmp(uniform, HEIGHTMAP_UNIFORM) != 0 &&
-				strcmp(uniform, SPLATMAP_UNIFORM) != 0)
+			material->getTextureByUniform(TEX_COLOR0_UNIFORM),
+			material->getTextureByUniform(TEX_COLOR1_UNIFORM),
+			material->getTextureByUniform(TEX_COLOR2_UNIFORM),
+			material->getTextureByUniform(TEX_COLOR3_UNIFORM)
+		};
+
+		for (int i = 0; i < lengthOf(tex); ++i)
+		{
+			if (tex[i])
 			{
-				cb->addItem(material->getTexture(i)->getPath().c_str());
+				cb->addItem(tex[i]->getPath().c_str());
 			}
 		}
+
 		connect(cb,
 				(void (QComboBox::*)(int)) & QComboBox::activated,
 				[this](int index)

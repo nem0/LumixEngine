@@ -3,6 +3,7 @@
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
+#include "debug/allocator.h"
 #include "debug/floating_points.h"
 #include "editor/world_editor.h"
 #include "editor/gizmo.h"
@@ -24,6 +25,7 @@ class App
 {
 public:
 	App()
+		: m_allocator(m_main_allocator)
 	{
 #ifdef _DEBUG
 		Lumix::enableFloatingPointTraps(true);
@@ -68,7 +70,7 @@ public:
 
 		HWND hwnd =
 			(HWND)m_main_window->getSceneView()->getViewWidget()->winId();
-		Lumix::Renderer::init(hwnd);
+		Lumix::Renderer::setInitData(hwnd);
 		m_engine = Lumix::Engine::create(
 			QDir::currentPath().toLocal8Bit().data(), nullptr, m_allocator);
 		m_world_editor = Lumix::WorldEditor::create(*m_engine);
@@ -103,8 +105,8 @@ public:
 		m_main_window->shutdown();
 		Lumix::WorldEditor::destroy(m_world_editor);
 		Lumix::Engine::destroy(m_engine);
-		Lumix::Renderer::shutdown();
-		delete m_main_window;
+		m_main_window->deleteLater();
+		m_qt_app->processEvents();
 		delete m_qt_app;
 		m_engine = nullptr;
 		m_main_window = nullptr;
@@ -209,7 +211,8 @@ public:
 	}
 
 private:
-	Lumix::DefaultAllocator m_allocator;
+	Lumix::DefaultAllocator m_main_allocator;
+	Lumix::Debug::Allocator m_allocator;
 	MainWindow* m_main_window;
 	Lumix::WorldEditor* m_world_editor;
 	Lumix::Engine* m_engine;
