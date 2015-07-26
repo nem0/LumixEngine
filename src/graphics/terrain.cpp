@@ -625,7 +625,7 @@ namespace Lumix
 		int idx = Math::clamp(texture_x, 0, m_width) + Math::clamp(texture_y, 0, m_height) * m_width;
 		if (t->getBytesPerPixel() == 2)
 		{
-			return ((m_scale.y / (256.0f * 256.0f - 1)) * ((uint16_t*)t->getData())[idx]);
+			return m_scale.y / 65535.0f * ((uint16_t*)t->getData())[idx];
 		}
 		else if(t->getBytesPerPixel() == 4)
 		{
@@ -692,7 +692,7 @@ namespace Lumix
 			Vec3 rel_origin = mtx.multiplyPosition(origin);
 			Vec3 rel_dir = mtx * dir;
 			Vec3 start;
-			Vec3 size(m_root->m_size * m_scale.x, m_scale.y, m_root->m_size * m_scale.x);
+			Vec3 size(m_root->m_size * m_scale.x, m_scale.y * 65535.0f, m_root->m_size * m_scale.x);
 			if (Math::getRayAABBIntersection(rel_origin, rel_dir, m_root->m_min, size, start))
 			{
 				int hx = (int)(start.x / m_scale.x);
@@ -845,6 +845,11 @@ namespace Lumix
 					m_root = generateQuadTree((float)m_width);
 				}
 			}
+		}
+		else
+		{
+			m_allocator.deleteObject(m_root);
+			m_root = nullptr;
 		}
 	}
 

@@ -1,6 +1,7 @@
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
 #include "core/log.h"
+#include "core/math_utils.h"
 #include "core/path_utils.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
@@ -13,26 +14,28 @@ namespace Lumix
 {
 
 
-#pragma pack(1) 
-	struct TGAHeader
-	{
-		char  idLength;
-		char  colourMapType;
-		char  dataType;
-		short int colourMapOrigin;
-		short int colourMapLength;
-		char  colourMapDepth;
-		short int xOrigin;
-		short int yOrigin;
-		short int width;
-		short int height;
-		char  bitsPerPixel;
-		char  imageDescriptor;
-	};
+#pragma pack(1)
+struct TGAHeader
+{
+	char idLength;
+	char colourMapType;
+	char dataType;
+	short int colourMapOrigin;
+	short int colourMapLength;
+	char colourMapDepth;
+	short int xOrigin;
+	short int yOrigin;
+	short int width;
+	short int height;
+	char bitsPerPixel;
+	char imageDescriptor;
+};
 #pragma pack()
 
 
-Texture::Texture(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
+Texture::Texture(const Path& path,
+				 ResourceManager& resource_manager,
+				 IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
 	, m_data_reference(0)
 	, m_allocator(allocator)
@@ -51,14 +54,15 @@ Texture::~Texture()
 
 bool Texture::create(int w, int h)
 {
-	m_texture_handle = bgfx::createTexture2D(w, h, 1, bgfx::TextureFormat::RGBA8);
+	m_texture_handle =
+		bgfx::createTexture2D(w, h, 1, bgfx::TextureFormat::RGBA8);
 	return bgfx::isValid(m_texture_handle);
 }
 
-	
+
 uint32_t Texture::getPixel(float x, float y) const
 {
-	if(m_data.empty() || x >= m_width || y >= m_height || x < 0 || y < 0)
+	if (m_data.empty() || x >= m_width || y >= m_height || x < 0 || y < 0)
 	{
 		return 0;
 	}
@@ -67,46 +71,52 @@ uint32_t Texture::getPixel(float x, float y) const
 	int px = (int)x;
 	int py = (int)y;
 	const uint32_t* p0 = (uint32_t*)&m_data[(px + py * m_width) * 4];
- 
+
 	const uint8_t* p1 = (uint8_t*)p0;
 	const uint8_t* p2 = (uint8_t*)(p0 + 1);
 	const uint8_t* p3 = (uint8_t*)(p0 + m_width);
 	const uint8_t* p4 = (uint8_t*)(p0 + 1 + m_width);
- 
+
 	float fx = x - px;
 	float fy = y - py;
 	float fx1 = 1.0f - fx;
 	float fy1 = 1.0f - fy;
-  
+
 	int w1 = (int)(fx1 * fy1 * 256.0f);
-	int w2 = (int)(fx  * fy1 * 256.0f);
-	int w3 = (int)(fx1 * fy  * 256.0f);
-	int w4 = (int)(fx  * fy  * 256.0f);
- 
+	int w2 = (int)(fx * fy1 * 256.0f);
+	int w3 = (int)(fx1 * fy * 256.0f);
+	int w4 = (int)(fx * fy * 256.0f);
+
 	uint8_t res[4];
-	res[0] = (uint8_t)((p1[0] * w1 + p2[0] * w2 + p3[0] * w3 + p4[0] * w4) >> 8);
-	res[1] = (uint8_t)((p1[1] * w1 + p2[1] * w2 + p3[1] * w3 + p4[1] * w4) >> 8);
-	res[2] = (uint8_t)((p1[2] * w1 + p2[2] * w2 + p3[2] * w3 + p4[2] * w4) >> 8);
-	res[3] = (uint8_t)((p1[3] * w1 + p2[3] * w2 + p3[3] * w3 + p4[3] * w4) >> 8);
- 
+	res[0] =
+		(uint8_t)((p1[0] * w1 + p2[0] * w2 + p3[0] * w3 + p4[0] * w4) >> 8);
+	res[1] =
+		(uint8_t)((p1[1] * w1 + p2[1] * w2 + p3[1] * w3 + p4[1] * w4) >> 8);
+	res[2] =
+		(uint8_t)((p1[2] * w1 + p2[2] * w2 + p3[2] * w3 + p4[2] * w4) >> 8);
+	res[3] =
+		(uint8_t)((p1[3] * w1 + p2[3] * w2 + p3[3] * w3 + p4[3] * w4) >> 8);
+
 	return *(uint32_t*)res;
 }
 
 
-unsigned int Texture::compareTGA(IAllocator& allocator, FS::IFile* file1, FS::IFile* file2, int difference)
+unsigned int Texture::compareTGA(IAllocator& allocator,
+								 FS::IFile* file1,
+								 FS::IFile* file2,
+								 int difference)
 {
 	TGAHeader header1, header2;
 	file1->read(&header1, sizeof(header1));
 	file2->read(&header2, sizeof(header2));
 
-	if (header1.bitsPerPixel != header2.bitsPerPixel
-		|| header1.width != header2.width
-		|| header1.height != header2.height
-		|| header1.dataType != header2.dataType
-		|| header1.imageDescriptor != header2.imageDescriptor
-		)
+	if (header1.bitsPerPixel != header2.bitsPerPixel ||
+		header1.width != header2.width || header1.height != header2.height ||
+		header1.dataType != header2.dataType ||
+		header1.imageDescriptor != header2.imageDescriptor)
 	{
-		g_log_error.log("renderer") << "Trying to compare textures with different formats";
+		g_log_error.log("renderer")
+			<< "Trying to compare textures with different formats";
 		return 0;
 	}
 
@@ -145,11 +155,19 @@ unsigned int Texture::compareTGA(IAllocator& allocator, FS::IFile* file1, FS::IF
 }
 
 
-bool Texture::saveTGA(IAllocator& allocator, FS::IFile* file, int width, int height, int bytes_per_pixel, const uint8_t* image_dest, const Path& path)
+bool Texture::saveTGA(IAllocator& allocator,
+					  FS::IFile* file,
+					  int width,
+					  int height,
+					  int bytes_per_pixel,
+					  const uint8_t* image_dest,
+					  const Path& path)
 {
 	if (bytes_per_pixel != 4)
 	{
-		g_log_error.log("renderer") << "Texture " << path.c_str() << " could not be saved, unsupported TGA format";
+		g_log_error.log("renderer")
+			<< "Texture " << path.c_str()
+			<< " could not be saved, unsupported TGA format";
 		return false;
 	}
 
@@ -167,7 +185,9 @@ bool Texture::saveTGA(IAllocator& allocator, FS::IFile* file, int width, int hei
 	for (long y = 0; y < header.height; y++)
 	{
 		long read_index = y * header.width * 4;
-		long write_index = ((header.imageDescriptor & 32) != 0) ? read_index : y * header.width * 4;
+		long write_index = ((header.imageDescriptor & 32) != 0)
+							   ? read_index
+							   : y * header.width * 4;
 		for (long x = 0; x < header.width; x++)
 		{
 			data[write_index + 0] = image_dest[write_index + 2];
@@ -190,12 +210,15 @@ void Texture::saveTGA()
 {
 	if (m_data.empty())
 	{
-		g_log_error.log("renderer") << "Texture " << getPath().c_str() << " could not be saved, no data was loaded";
+		g_log_error.log("renderer")
+			<< "Texture " << getPath().c_str()
+			<< " could not be saved, no data was loaded";
 		return;
 	}
 
 	FS::FileSystem& fs = m_resource_manager.getFileSystem();
-	FS::IFile* file = fs.open("disk", getPath().c_str(), FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
+	FS::IFile* file = fs.open(
+		"disk", getPath().c_str(), FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
 
 	saveTGA(m_allocator, file, m_width, m_height, m_BPP, &m_data[0], getPath());
 
@@ -211,7 +234,10 @@ void Texture::save()
 	if (strcmp(ext, "raw") == 0 && m_BPP == 2)
 	{
 		FS::FileSystem& fs = m_resource_manager.getFileSystem();
-		FS::IFile* file = fs.open(fs.getDefaultDevice(), getPath().c_str(), FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
+		FS::IFile* file = fs.open(fs.getDefaultDevice(),
+								  getPath().c_str(),
+								  FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
+
 		file->write(&m_data[0], m_data.size() * sizeof(m_data[0]));
 		fs.close(file);
 	}
@@ -221,14 +247,32 @@ void Texture::save()
 	}
 	else
 	{
-		g_log_error.log("renderer") << "Texture " << getPath() << " can not be saved - unsupported format";
+		g_log_error.log("renderer") << "Texture " << getPath()
+									<< " can not be saved - unsupported format";
 	}
 }
 
 
 void Texture::onDataUpdated()
 {
-	bgfx::updateTexture2D(m_texture_handle, 0, 0, 0, m_width, m_height, bgfx::copy(&m_data[0], m_data.size() * sizeof(m_data[0])));
+	const bgfx::Memory* mem = nullptr;
+
+	if (m_BPP == 2)
+	{
+		const uint16_t* src_mem = (const uint16_t*)&m_data[0];
+		mem = bgfx::alloc(m_width * m_height * sizeof(float));
+		float* dst_mem = (float*)mem->data;
+
+		for (int i = 0; i < m_width * m_height; ++i)
+		{
+			dst_mem[i] = src_mem[i] / 65535.0f;
+		}
+	}
+	else
+	{
+		mem = bgfx::copy(&m_data[0], m_data.size() * sizeof(m_data[0]));
+	}
+	bgfx::updateTexture2D(m_texture_handle, 0, 0, 0, m_width, m_height, mem);
 }
 
 
@@ -246,7 +290,17 @@ bool Texture::loadRaw(FS::IFile& file)
 		file.read(&m_data[0], size);
 	}
 
-	m_texture_handle = bgfx::createTexture2D(m_width, m_height, 1, bgfx::TextureFormat::R16, 0, bgfx::copy(file.getBuffer(), file.size()));
+	const uint16_t* src_mem = (const uint16_t*)file.getBuffer();
+	const bgfx::Memory* mem = bgfx::alloc(m_width * m_height * sizeof(float));
+	float* dst_mem = (float*)mem->data;
+
+	for (int i = 0; i < m_width * m_height; ++i)
+	{
+		dst_mem[i] = src_mem[i] / 65535.0f;
+	}
+
+	m_texture_handle = bgfx::createTexture2D(
+		m_width, m_height, 1, bgfx::TextureFormat::R32F, 0, mem);
 	return bgfx::isValid(m_texture_handle);
 }
 
@@ -261,30 +315,37 @@ bool Texture::loadTGA(FS::IFile& file)
 	int image_size = header.width * header.height * 4;
 	if (header.dataType != 2)
 	{
-		g_log_error.log("renderer") << "Unsupported texture format " << m_path.c_str();
+		g_log_error.log("renderer") << "Unsupported texture format "
+									<< m_path.c_str();
 		return false;
 	}
 
 	if (color_mode < 3)
 	{
-		g_log_error.log("renderer") << "Unsupported color mode " << m_path.c_str();
+		g_log_error.log("renderer") << "Unsupported color mode "
+									<< m_path.c_str();
 		return false;
 	}
 
 	m_width = header.width;
 	m_height = header.height;
-	TextureManager* manager = static_cast<TextureManager*>(getResourceManager().get(ResourceManager::TEXTURE));
+	TextureManager* manager = static_cast<TextureManager*>(
+		getResourceManager().get(ResourceManager::TEXTURE));
 	if (m_data_reference)
 	{
 		m_data.resize(image_size);
 	}
-	uint8_t* image_dest = m_data_reference ? &m_data[0] : (uint8_t*)manager->getBuffer(image_size);
+	uint8_t* image_dest = m_data_reference
+							  ? &m_data[0]
+							  : (uint8_t*)manager->getBuffer(image_size);
 
 	// Targa is BGR, swap to RGB, add alpha and flip Y axis
 	for (long y = 0; y < header.height; y++)
 	{
 		long read_index = y * header.width * color_mode;
-		long write_index = ((header.imageDescriptor & 32) != 0) ? read_index : y * header.width * 4;
+		long write_index = ((header.imageDescriptor & 32) != 0)
+							   ? read_index
+							   : y * header.width * 4;
 		for (long x = 0; x < header.width; x++)
 		{
 			file.read(&image_dest[write_index + 2], sizeof(uint8_t));
@@ -299,7 +360,13 @@ bool Texture::loadTGA(FS::IFile& file)
 	}
 	m_BPP = 4;
 
-	m_texture_handle = bgfx::createTexture2D(header.width, header.height, 1, bgfx::TextureFormat::RGBA8, 0, bgfx::copy(image_dest, header.width * header.height * 4));
+	m_texture_handle = bgfx::createTexture2D(
+		header.width,
+		header.height,
+		1,
+		bgfx::TextureFormat::RGBA8,
+		0,
+		bgfx::copy(image_dest, header.width * header.height * 4));
 	return bgfx::isValid(m_texture_handle);
 }
 
@@ -327,7 +394,8 @@ void Texture::removeDataReference()
 bool Texture::loadDDS(FS::IFile& file)
 {
 	bgfx::TextureInfo info;
-	m_texture_handle = bgfx::createTexture(bgfx::copy(file.getBuffer(), file.size()), 0, 0, &info);
+	m_texture_handle = bgfx::createTexture(
+		bgfx::copy(file.getBuffer(), file.size()), 0, 0, &info);
 	m_BPP = -1;
 	m_width = info.width;
 	m_height = info.height;
@@ -356,9 +424,10 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		{
 			loaded = loadTGA(*file);
 		}
-		if(!loaded)
+		if (!loaded)
 		{
-			g_log_warning.log("renderer") << "Error loading texture " << m_path.c_str();
+			g_log_warning.log("renderer") << "Error loading texture "
+										  << m_path.c_str();
 			onFailure();
 		}
 		else
@@ -369,10 +438,11 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	}
 	else
 	{
-		g_log_warning.log("renderer") << "Error loading texture " << m_path.c_str();
+		g_log_warning.log("renderer") << "Error loading texture "
+									  << m_path.c_str();
 		onFailure();
 	}
-	
+
 	fs.close(file);
 }
 
