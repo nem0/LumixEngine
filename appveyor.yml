@@ -11,17 +11,28 @@ before_build:
 build:
   project: projects\LumixEngine.sln
   verbosity: minimal
-test_script:
-- ps: >-
-    git clone --depth=1  https://github.com/nem0/LumixEngine_data.git 2>&1 | % { $_.ToString() } 
+#test_script:
+#- ps: >-
+#    git clone --depth=1  https://github.com/nem0/LumixEngine_data.git 2>&1 | % { $_.ToString() } 
+#
+#    cd LumixEngine_data
+#
+#    & "..\bin\Win32_AppVeyor\unit_tests.exe" | Write-Output
+#
+#    $wc = New-Object Net.WebClient
+#            $url = "https://ci.appveyor.com/api/testresults/nunit/$Env:APPVEYOR_JOB_ID"
+#            $wc.UploadFile($url, (Resolve-Path .\tests.xml))
 
-    cd LumixEngine_data
-
-    & "..\bin\Win32_AppVeyor\unit_tests.exe" | Write-Output
-
-    $wc = New-Object Net.WebClient
-            $url = "https://ci.appveyor.com/api/testresults/nunit/$Env:APPVEYOR_JOB_ID"
-            $wc.UploadFile($url, (Resolve-Path .\tests.xml))
+after_build:
+	7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\Release\animation.dll
+	7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\Release\engine.dll
+	7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\Release\physics.dll
+	7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\Release\lua_script.dll
+	7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\Release\studio.exe
+	
 artifacts:
-- path: tests.xml
-  name: tests.xml
+#- path: tests.xml
+#  name: tests.xml
+  
+- path: lumix.zip
+  name: lumix.zip
