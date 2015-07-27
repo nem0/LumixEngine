@@ -1,4 +1,5 @@
 #include "metadata.h"
+#include <qdatastream.h>
 #include <qfile.h>
 
 
