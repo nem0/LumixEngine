@@ -36,3 +36,11 @@ artifacts:
   
 - path: lumix.zip
   name: lumix.zip
+
+deploy:
+- provider: GitHub
+  release: Nightly
+  auth_token:
+    secure: QZu1kxlNSWRDaEOLPp638C1xhEKxULSdR3xnsGTOwKv5QQaJKTCodd3R/1nhd7wllUJho8vcQ6c0KpYbp6WWLmjpDeT1jeD1bJfKSI2ZO+I=
+  artifact: lumix.zip
+  draft: true
