@@ -2,8 +2,8 @@ version: 0.8.{build}
 os: Windows Server 2012 R2
 configuration: AppVeyor
 environment:
-	QTDIR: C:\Qt\5.4\msvc2013_32_opengl
-	CMAKE_PREFIX_PATH: C:\Qt\5.4\msvc2013_32_opengl
+	QTDIR: "C:\Qt\5.4\msvc2013_32_opengl"
+	CMAKE_PREFIX_PATH: "C:\Qt\5.4\msvc2013_32_opengl"
 before_build:
   - cd projects
   - cmake -G "Visual Studio 12" 
