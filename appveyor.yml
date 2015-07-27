@@ -39,7 +39,6 @@ artifacts:
 
 deploy:
 - provider: GitHub
-  release: Nightly
   auth_token:
     secure: jzy/AlMvwZNQxXNV//oVQBph4zGudG3CuRZCU3UdGXwM8p5uccxy8JqZl3mcT2/3
   artifact: lumix.zip
