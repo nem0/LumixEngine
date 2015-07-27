@@ -1,6 +1,8 @@
 #LumixEngine
 =========
 
+[Latest executables](https://ci.appveyor.com/project/nem0/lumixengine/build/artifacts)
+
 3D Game Engine
 
 Features:
