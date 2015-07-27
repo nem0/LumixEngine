@@ -1,6 +1,6 @@
 version: 0.8.{build}
 os: Windows Server 2012 R2
-configuration: AppVeyor
+configuration: Release
 environment:
   QTDIR: C:\Qt\5.5\msvc2013
   CMAKE_PREFIX_PATH: C:\Qt\5.5\msvc2013
