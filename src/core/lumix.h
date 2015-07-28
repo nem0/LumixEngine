@@ -87,6 +87,13 @@ int lengthOf(const T(&)[count])
 	#define LUMIX_ANIMATION_API LUMIX_LIBRARY_IMPORT
 #endif
 
+#ifdef BUILDING_EDITOR
+	#define LUMIX_EDITOR_API LUMIX_LIBRARY_EXPORT
+#else
+	#define LUMIX_EDITOR_API LUMIX_LIBRARY_IMPORT
+#endif
+
+
 #define LUMIX_RESTRICT __restrict
 
 #pragma warning(disable : 4251)

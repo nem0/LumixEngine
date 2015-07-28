@@ -1,13 +1,16 @@
 #pragma once
 
 
+#include "core/lumix.h"
+
+
 namespace Lumix
 {
 	class IAllocator;
 }
 
 
-class FPSLimiter
+class LUMIX_EDITOR_API FPSLimiter
 {
 	public:
 		static void destroy(FPSLimiter* limiter);

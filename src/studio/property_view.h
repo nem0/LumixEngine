@@ -4,6 +4,7 @@
 #include <QDockWidget>
 #include "core/array.h"
 #include "core/delegate_list.h"
+#include "core/lumix.h"
 #include "core/string.h"
 #include "core/resource.h"
 #include "property_view/dynamic_object_model.h"
@@ -29,7 +30,7 @@ class QAbstractItemModel;
 class AssetBrowser;
 
 
-class PropertyView : public QDockWidget
+class LUMIX_EDITOR_API PropertyView : public QDockWidget
 {
 	Q_OBJECT
 	public:

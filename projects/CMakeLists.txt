@@ -130,10 +130,16 @@ add_library(lua_script SHARED
 
 set_target_properties (lua_script PROPERTIES COMPILE_DEFINITIONS "BUILDING_LUA_SCRIPT")
 
+target_link_libraries(lua_script Qt5::Core)
+target_link_libraries(lua_script Qt5::Gui)
+target_link_libraries(lua_script Qt5::Widgets)
+
 target_link_libraries(lua_script ${EXTERNAL_PATH}lua/lib/debug/lua.lib)
 target_link_libraries(lua_script engine)
+target_link_libraries(lua_script editor)
 
-###################### STUDIO ######################
+
+###################### EDITOR ######################
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_AUTOMOC ON)
@@ -166,7 +172,7 @@ include_directories(${SRC_PATH}studio)
 include_directories(${EXTERNAL_PATH}assimp/include)
 include_directories(${EXTERNAL_PATH}crunch/include)
 
-add_executable(studio
+add_library(editor SHARED
 	${STUDIO_ROOT_FILES}
 	${STUDIO_PC_FILES}
 	${STUDIO_FORM_FILES}
@@ -176,17 +182,44 @@ add_executable(studio
 	${STUDIO_ANIMATION_EDITOR_FILES}
 )
 
-target_link_libraries(studio engine)
-# target_link_libraries(studio script)
-target_link_libraries(studio physics)
-target_link_libraries(studio animation)
-target_link_libraries(studio Qt5::Core)
-target_link_libraries(studio Qt5::Gui)
-target_link_libraries(studio Qt5::Widgets)
-target_link_libraries(studio Qt5::WinMain)
-target_link_libraries(studio optimized ${EXTERNAL_PATH}assimp/lib/win32/assimp-vc120-mt.lib)
-target_link_libraries(studio debug ${EXTERNAL_PATH}assimp/lib/win32/assimp-vc120-mtd.lib)
-target_link_libraries(studio ${EXTERNAL_PATH}crunch/lib/win32/crnlib${CMAKE_CFG_INTDIR}.lib)
+target_link_libraries(editor engine)
+# target_link_libraries(editor script)
+target_link_libraries(editor physics)
+target_link_libraries(editor animation)
+target_link_libraries(editor Qt5::Core)
+target_link_libraries(editor Qt5::Gui)
+target_link_libraries(editor Qt5::Widgets)
+target_link_libraries(editor Qt5::WinMain)
+target_link_libraries(editor optimized ${EXTERNAL_PATH}assimp/lib/win32/assimp-vc120-mt.lib)
+target_link_libraries(editor debug ${EXTERNAL_PATH}assimp/lib/win32/assimp-vc120-mtd.lib)
+target_link_libraries(editor ${EXTERNAL_PATH}crunch/lib/win32/crnlib${CMAKE_CFG_INTDIR}.lib)
+
+
+set_target_properties (editor PROPERTIES COMPILE_DEFINITIONS "BUILDING_EDITOR")
+
+# set_target_properties(editor PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
+ 
+
+###################### STUDIO ######################
+
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTOUIC ON)
+
+find_package(Qt5Core REQUIRED)
+find_package(Qt5Gui REQUIRED)
+find_package(Qt5Widgets REQUIRED)
+
+include_directories(${SRC_PATH})
+include_directories(${SRC_PATH}studio)
+include_directories(${EXTERNAL_PATH}assimp/include)
+include_directories(${EXTERNAL_PATH}crunch/include)
+
+add_executable(studio ${SRC_PATH}studio/main.cpp)
+
+add_dependencies(studio lua_script)
+
+target_link_libraries(studio editor)
 set_target_properties(studio PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
  
 ###################### COPY_DLLS ######################
