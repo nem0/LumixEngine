@@ -1,27 +1,40 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
+#include "core/MTJD/job.h"
+#include "core/MTJD/manager.h"
 
-#include "core/MTJD/framework.h"
 
 namespace
 {
-	const int32_t BUFFER_SIZE = 10000;
-	const int32_t TESTS_COUNT = 10;
-	const int32_t TEST_RUNS = 100;
+const int32_t BUFFER_SIZE = 10000;
+const int32_t TESTS_COUNT = 10;
+const int32_t TEST_RUNS = 100;
 
-	float IN1_BUFFER[TESTS_COUNT][BUFFER_SIZE];
-	float IN2_BUFFER[TESTS_COUNT][BUFFER_SIZE];
-	float OUT_BUFFER[TESTS_COUNT][BUFFER_SIZE];
+float IN1_BUFFER[TESTS_COUNT][BUFFER_SIZE];
+float IN2_BUFFER[TESTS_COUNT][BUFFER_SIZE];
+float OUT_BUFFER[TESTS_COUNT][BUFFER_SIZE];
 
-	static int s_auto_delete_count = 0;
+static int s_auto_delete_count = 0;
 
-	static_assert(TESTS_COUNT % 2 == 0, "");
+static_assert(TESTS_COUNT % 2 == 0, "");
 }
+
 
 class TestJob : public Lumix::MTJD::Job
 {
 public:
-	TestJob(float* buffer_in1, float* buffer_in2, float* buffer_out, int32_t size, bool auto_destroy, Lumix::MTJD::Manager& manager, Lumix::IAllocator& allocator)
-		: Job(auto_destroy, Lumix::MTJD::Priority::Default, true, manager, allocator, allocator)
+	TestJob(float* buffer_in1,
+			float* buffer_in2,
+			float* buffer_out,
+			int32_t size,
+			bool auto_destroy,
+			Lumix::MTJD::Manager& manager,
+			Lumix::IAllocator& allocator)
+		: Job(auto_destroy,
+			  Lumix::MTJD::Priority::Default,
+			  true,
+			  manager,
+			  allocator,
+			  allocator)
 		, m_buffer_in1(buffer_in1)
 		, m_buffer_in2(buffer_in2)
 		, m_buffer_out(buffer_out)
@@ -49,7 +62,7 @@ public:
 private:
 	float* m_buffer_in1;
 	float* m_buffer_in2;
-	float* m_buffer_out; 
+	float* m_buffer_out;
 	int32_t m_size;
 };
 
@@ -70,11 +83,18 @@ void UT_MTJDFrameworkTest(const char* params)
 			}
 		}
 
-		TestJob** jobs = (TestJob**)allocator.allocate(sizeof(TestJob*) * TESTS_COUNT);
+		TestJob** jobs =
+			(TestJob**)allocator.allocate(sizeof(TestJob*) * TESTS_COUNT);
 
 		for (int32_t i = 0; i < TESTS_COUNT; i++)
 		{
-			jobs[i] = allocator.newObject<TestJob>(IN1_BUFFER[i], IN2_BUFFER[i], OUT_BUFFER[i], BUFFER_SIZE, false, manager, allocator);
+			jobs[i] = allocator.newObject<TestJob>(IN1_BUFFER[i],
+												   IN2_BUFFER[i],
+												   OUT_BUFFER[i],
+												   BUFFER_SIZE,
+												   false,
+												   manager,
+												   allocator);
 		}
 
 		for (int32_t i = 0; i < TESTS_COUNT / 2; i += 2)
@@ -124,14 +144,28 @@ void UT_MTJDFrameworkDependencyTest(const char* params)
 
 	Lumix::MTJD::Manager manager(allocator);
 
-	TestJob** jobs = (TestJob**)allocator.allocate(sizeof(TestJob*) *  TESTS_COUNT);
+	TestJob** jobs =
+		(TestJob**)allocator.allocate(sizeof(TestJob*) * TESTS_COUNT);
 
 	for (int32_t i = 0; i < TESTS_COUNT - 1; i++)
 	{
-		jobs[i] = allocator.newObject<TestJob>(IN1_BUFFER[i], IN2_BUFFER[i], IN2_BUFFER[i + 1], BUFFER_SIZE, false, manager, allocator);
+		jobs[i] = allocator.newObject<TestJob>(IN1_BUFFER[i],
+											   IN2_BUFFER[i],
+											   IN2_BUFFER[i + 1],
+											   BUFFER_SIZE,
+											   false,
+											   manager,
+											   allocator);
 	}
 
-	jobs[TESTS_COUNT - 1] = allocator.newObject<TestJob>(IN1_BUFFER[TESTS_COUNT - 1], IN2_BUFFER[TESTS_COUNT - 1], OUT_BUFFER[0], BUFFER_SIZE, false, manager, allocator);
+	jobs[TESTS_COUNT - 1] =
+		allocator.newObject<TestJob>(IN1_BUFFER[TESTS_COUNT - 1],
+									 IN2_BUFFER[TESTS_COUNT - 1],
+									 OUT_BUFFER[0],
+									 BUFFER_SIZE,
+									 false,
+									 manager,
+									 allocator);
 
 	for (int32_t i = 0; i < TESTS_COUNT - 1; i++)
 	{
@@ -162,4 +196,6 @@ void UT_MTJDFrameworkDependencyTest(const char* params)
 }
 
 REGISTER_TEST("unit_tests/core/MTJD/frameworkTest", UT_MTJDFrameworkTest, "")
-REGISTER_TEST("unit_tests/core/MTJD/frameworkDependencyTest", UT_MTJDFrameworkDependencyTest, "")
+REGISTER_TEST("unit_tests/core/MTJD/frameworkDependencyTest",
+			  UT_MTJDFrameworkDependencyTest,
+			  "")
