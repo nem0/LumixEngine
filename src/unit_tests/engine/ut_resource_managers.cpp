@@ -415,7 +415,7 @@ namespace
 	}
 }
 
-REGISTER_TEST("unit_tests/engine/material_manager", UT_material_manager, "unit_tests/resource_managers/cisla.tga 262188");
-REGISTER_TEST("unit_tests/engine/material_manager", UT_material_manager, "unit_tests/resource_managers/trava3.dds 2796344");
+//REGISTER_TEST("unit_tests/engine/material_manager", UT_material_manager, "unit_tests/resource_managers/cisla.tga 262188");
+//REGISTER_TEST("unit_tests/engine/material_manager", UT_material_manager, "unit_tests/resource_managers/trava3.dds 2796344");
 REGISTER_TEST("unit_tests/engine/animation_manager", UT_animation_manager, "unit_tests/resource_managers/blender.ani 3424");
 REGISTER_TEST("unit_tests/engine/failure_reload", UT_failure_reload, "");

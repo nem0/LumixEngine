@@ -222,6 +222,39 @@ add_dependencies(studio lua_script)
 target_link_libraries(studio editor)
 set_target_properties(studio PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
  
+
+
+###################### UNIT TESTS ######################
+
+file(GLOB UNIT_TESTS_ROOT_FILES ${SRC_PATH}unit_tests/*.cpp ${SRC_PATH}unit_tests/*.h)
+file(GLOB UNIT_TESTS_CORE_FILES ${SRC_PATH}unit_tests/core/*.cpp ${SRC_PATH}unit_tests/core/*.h)
+file(GLOB UNIT_TESTS_ENGINE_FILES ${SRC_PATH}unit_tests/engine/*.cpp ${SRC_PATH}unit_tests/engine/*.h)
+file(GLOB UNIT_TESTS_GRAPHICS_FILES ${SRC_PATH}unit_tests/graphics/*.cpp ${SRC_PATH}unit_tests/graphics/*.h)
+file(GLOB UNIT_TESTS_SUITE_FILES ${SRC_PATH}unit_tests/suite/*.cpp ${SRC_PATH}unit_tests/suite/*.h)
+
+
+source_group("" FILES ${UNIT_TESTS_ROOT_FILES})
+source_group(core FILES ${UNIT_TESTS_CORE_FILES})
+source_group(engine FILES ${UNIT_TESTS_ENGINE_FILES})
+source_group(graphics FILES ${UNIT_TESTS_GRAPHICS_FILES})
+source_group(suite FILES ${UNIT_TESTS_SUITE_FILES})
+
+include_directories(${SRC_PATH})
+
+add_executable(unit_tests
+	${UNIT_TESTS_ROOT_FILES}
+	${UNIT_TESTS_CORE_FILES}
+	${UNIT_TESTS_ENGINE_FILES}
+	${UNIT_TESTS_GRAPHICS_FILES}
+	${UNIT_TESTS_SUITE_FILES}
+)
+
+set_target_properties(unit_tests PROPERTIES LINK_FLAGS "/SUBSYSTEM:CONSOLE")
+
+target_link_libraries(unit_tests engine)
+target_link_libraries(unit_tests animation)
+
+
 ###################### COPY_DLLS ######################
 
 if (NOT DEFINED ENV{QTDIR})
