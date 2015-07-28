@@ -69,6 +69,12 @@ class PluginManagerImpl : public PluginManager
 		}
 
 
+		virtual const Array<Library*>& getLibraries() const override
+		{
+			return m_libraries;
+		}
+
+
 		const Array<IPlugin*>& getPlugins() const override
 		{
 			return m_plugins;

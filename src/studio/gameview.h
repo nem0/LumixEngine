@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include "core/lumix.h"
 #include <QDockWidget>
 
 
@@ -18,7 +19,7 @@ namespace Ui
 	class GameView;
 }
 
-class GameView : public QDockWidget
+class LUMIX_EDITOR_API GameView : public QDockWidget
 {
 	Q_OBJECT
 

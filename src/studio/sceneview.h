@@ -1,7 +1,8 @@
 #pragma once
 
-
+#include "core/lumix.h"
 #include <QDockWidget>
+
 
 namespace Lumix
 {
@@ -12,7 +13,7 @@ namespace Lumix
 class QDoubleSpinBox;
 class QLabel;
 
-class SceneView : public QDockWidget
+class LUMIX_EDITOR_API SceneView : public QDockWidget
 {
 	Q_OBJECT
 public:

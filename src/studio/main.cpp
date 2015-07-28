@@ -1,4 +1,5 @@
 #include "mainwindow.h"
+#include "core/library.h"
 #include "core/log.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
@@ -96,6 +97,17 @@ public:
 				command_line_arguments[index_of_run_test + 2].toLatin1();
 			m_world_editor->runTest(Lumix::Path(undo_stack_path.data()),
 									Lumix::Path(result_universe_path.data()));
+		}
+
+		auto& libraries = m_engine->getPluginManager().getLibraries();
+		for (auto* lib : libraries)
+		{
+			typedef void(*Setter)(Lumix::Engine&, MainWindow&);
+			Setter setter = (Setter)lib->resolve("setStudioMainWindow");
+			if (setter)
+			{
+				setter(*m_engine, *m_main_window);
+			}
 		}
 	}
 

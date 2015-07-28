@@ -21,7 +21,7 @@ class Metadata;
 class PropertyView;
 
 
-class MainWindow : public QMainWindow
+class LUMIX_EDITOR_API MainWindow : public QMainWindow
 {
 	Q_OBJECT
 
