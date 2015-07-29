@@ -295,8 +295,8 @@ bool Model::parseBones(FS::IFile* file)
 		Model::Bone& b = m_bones.emplace(m_allocator);
 		int len;
 		file->read(&len, sizeof(len));
-		char tmp[LUMIX_MAX_PATH];
-		if (len >= LUMIX_MAX_PATH)
+		char tmp[MAX_PATH_LENGTH];
+		if (len >= MAX_PATH_LENGTH)
 		{
 			return false;
 		}
@@ -305,7 +305,7 @@ bool Model::parseBones(FS::IFile* file)
 		b.name = tmp;
 		m_bone_map.insert(crc32(b.name.c_str()), m_bones.size() - 1);
 		file->read(&len, sizeof(len));
-		if (len >= LUMIX_MAX_PATH)
+		if (len >= MAX_PATH_LENGTH)
 		{
 			return false;
 		}
@@ -370,21 +370,21 @@ bool Model::parseMeshes(FS::IFile* file)
 		return false;
 	}
 	m_meshes.reserve(object_count);
-	char model_dir[LUMIX_MAX_PATH];
-	PathUtils::getDir(model_dir, LUMIX_MAX_PATH, m_path.c_str());
+	char model_dir[MAX_PATH_LENGTH];
+	PathUtils::getDir(model_dir, MAX_PATH_LENGTH, m_path.c_str());
 	for (int i = 0; i < object_count; ++i)
 	{
 		int32_t str_size;
 		file->read(&str_size, sizeof(str_size));
-		char material_name[LUMIX_MAX_PATH];
+		char material_name[MAX_PATH_LENGTH];
 		file->read(material_name, str_size);
-		if (str_size >= LUMIX_MAX_PATH)
+		if (str_size >= MAX_PATH_LENGTH)
 		{
 			return false;
 		}
 		material_name[str_size] = 0;
 		
-		char material_path[LUMIX_MAX_PATH];
+		char material_path[MAX_PATH_LENGTH];
 		copyString(material_path, sizeof(material_path), model_dir);
 		catCString(material_path, sizeof(material_path), material_name);
 		catCString(material_path, sizeof(material_path), ".mat");
@@ -400,11 +400,11 @@ bool Model::parseMeshes(FS::IFile* file)
 		file->read(&mesh_tri_count, sizeof(mesh_tri_count));
 
 		file->read(&str_size, sizeof(str_size));
-		if (str_size >= LUMIX_MAX_PATH)
+		if (str_size >= MAX_PATH_LENGTH)
 		{
 			return false;
 		}
-		char mesh_name[LUMIX_MAX_PATH];
+		char mesh_name[MAX_PATH_LENGTH];
 		mesh_name[str_size] = 0;
 		file->read(mesh_name, str_size);
 

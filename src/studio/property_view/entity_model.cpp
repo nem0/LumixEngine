@@ -373,9 +373,9 @@ void EntityModel::addFileProperty(Node& child,
 		Q_ASSERT(urls.size() < 2);
 		if (urls.size() == 1)
 		{
-			char rel_path[LUMIX_MAX_PATH];
+			char rel_path[Lumix::MAX_PATH_LENGTH];
 			Lumix::Path path(urls[0].toLocalFile().toLatin1().data());
-			m_editor.getRelativePath(rel_path, LUMIX_MAX_PATH, path);
+			m_editor.getRelativePath(rel_path, Lumix::MAX_PATH_LENGTH, path);
 			this->set(cmp.entity, cmp.type, -1, desc, rel_path);
 			return true;
 		}
@@ -396,10 +396,10 @@ void EntityModel::addFileProperty(Node& child,
 					auto value = QFileDialog::getOpenFileName();
 					if (!value.isEmpty())
 					{
-						char rel_path[LUMIX_MAX_PATH];
+						char rel_path[Lumix::MAX_PATH_LENGTH];
 						Lumix::Path path(value.toLatin1().data());
 						m_editor.getRelativePath(
-							rel_path, LUMIX_MAX_PATH, path);
+							rel_path, Lumix::MAX_PATH_LENGTH, path);
 						edit->setText(rel_path);
 					}
 				});

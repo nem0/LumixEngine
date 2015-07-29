@@ -962,7 +962,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 			case TRIMESH:
 			case CONVEX:
 			{
-				char tmp[LUMIX_MAX_PATH];
+				char tmp[MAX_PATH_LENGTH];
 				serializer.readString(tmp, sizeof(tmp));
 				m_actors[idx]->setResource(static_cast<PhysicsGeometry*>(
 					manager->load(Lumix::Path(tmp))));
@@ -1128,8 +1128,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 				}
 				m_terrains[i]->m_scene = this;
 				serializer.read(m_terrains[i]->m_entity);
-				char tmp[LUMIX_MAX_PATH];
-				serializer.readString(tmp, LUMIX_MAX_PATH);
+				char tmp[MAX_PATH_LENGTH];
+				serializer.readString(tmp, MAX_PATH_LENGTH);
 				serializer.read(m_terrains[i]->m_xz_scale);
 				serializer.read(m_terrains[i]->m_y_scale);
 

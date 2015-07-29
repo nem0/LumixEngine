@@ -17,7 +17,7 @@ class OutputBlob;
 class PathInternal
 {
 public:
-	char m_path[LUMIX_MAX_PATH];
+	char m_path[MAX_PATH_LENGTH];
 	uint32_t m_id;
 	volatile int32_t m_ref_count;
 };

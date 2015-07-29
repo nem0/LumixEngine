@@ -157,12 +157,12 @@ struct ShaderLoader
 
 	bool load()
 	{
-		char shader_name[LUMIX_MAX_PATH];
+		char shader_name[MAX_PATH_LENGTH];
 		PathUtils::getBasename(
 			shader_name, sizeof(shader_name), m_shader.getPath().c_str());
 
 		const char* pass = m_shader.m_combintions.m_passes[m_pass_idx];
-		char path[LUMIX_MAX_PATH];
+		char path[MAX_PATH_LENGTH];
 		copyString(path, sizeof(path), "shaders/compiled/");
 		catCString(path, sizeof(path), shader_name);
 		catCString(path, sizeof(path), "_");

@@ -301,7 +301,7 @@ class FileArrayObjectDescriptor : public StringArrayObjectDescriptor<S>, public 
 		}
 
 	private:
-		StackAllocator<LUMIX_MAX_PATH> m_file_type_allocator;
+		StackAllocator<MAX_PATH_LENGTH> m_file_type_allocator;
 		string m_file_type;
 };
 
@@ -651,7 +651,7 @@ class FilePropertyDescriptor : public StringPropertyDescriptor<T>, public IFileP
 		}
 
 	private:
-		StackAllocator<LUMIX_MAX_PATH> m_file_type_allocator;
+		StackAllocator<MAX_PATH_LENGTH> m_file_type_allocator;
 		string m_file_type;
 };
 

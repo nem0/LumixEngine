@@ -528,8 +528,8 @@ namespace Lumix
 	{
 		serializer.read(m_entity);
 		serializer.read(m_layer_mask);
-		char path[LUMIX_MAX_PATH];
-		serializer.readString(path, LUMIX_MAX_PATH);
+		char path[MAX_PATH_LENGTH];
+		serializer.readString(path, MAX_PATH_LENGTH);
 		setMaterial(static_cast<Material*>(scene.getEngine().getResourceManager().get(ResourceManager::MATERIAL)->load(Path(path))));
 		serializer.read(m_scale.x);
 		serializer.read(m_scale.y);
@@ -547,7 +547,7 @@ namespace Lumix
 		}
 		for(int i = 0; i < count; ++i)
 		{
-			serializer.readString(path, LUMIX_MAX_PATH);
+			serializer.readString(path, MAX_PATH_LENGTH);
 			serializer.read(m_grass_types[i]->m_ground);
 			serializer.read(m_grass_types[i]->m_density);
 			setGrassTypePath(i, Path(path));

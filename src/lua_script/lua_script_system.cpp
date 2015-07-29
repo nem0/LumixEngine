@@ -318,8 +318,8 @@ public:
 		{
 			Script& script = m_scripts.emplace(m_system.getAllocator());
 			serializer.read(m_scripts[i].m_entity);
-			char tmp[LUMIX_MAX_PATH];
-			serializer.readString(tmp, LUMIX_MAX_PATH);
+			char tmp[MAX_PATH_LENGTH];
+			serializer.readString(tmp, MAX_PATH_LENGTH);
 			m_valid[i] = serializer.read<bool>();
 			script.m_script = static_cast<LuaScript*>(
 				m_system.getScriptManager().load(Lumix::Path(tmp)));

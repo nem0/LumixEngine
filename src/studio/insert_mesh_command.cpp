@@ -11,16 +11,16 @@ static const uint32_t RENDERABLE_HASH = crc32("renderable");
 InsertMeshCommand::InsertMeshCommand(Lumix::WorldEditor& editor)
 	: m_editor(editor)
 {
-
 }
 
 
-InsertMeshCommand::InsertMeshCommand(Lumix::WorldEditor& editor, const Lumix::Vec3& position, const Lumix::Path& mesh_path)
+InsertMeshCommand::InsertMeshCommand(Lumix::WorldEditor& editor,
+									 const Lumix::Vec3& position,
+									 const Lumix::Path& mesh_path)
 	: m_mesh_path(mesh_path)
 	, m_position(position)
 	, m_editor(editor)
 {
-
 }
 
 
@@ -35,7 +35,7 @@ void InsertMeshCommand::serialize(Lumix::JsonSerializer& serializer)
 
 void InsertMeshCommand::deserialize(Lumix::JsonSerializer& serializer)
 {
-	char path[LUMIX_MAX_PATH];
+	char path[Lumix::MAX_PATH_LENGTH];
 	serializer.deserialize("path", path, sizeof(path), "");
 	m_mesh_path = path;
 	serializer.deserialize("pos_x", m_position.x, 0);
@@ -65,17 +65,20 @@ void InsertMeshCommand::execute()
 	}
 	if (cmp >= 0)
 	{
-		char rel_path[LUMIX_MAX_PATH];
-		m_editor.getRelativePath(rel_path, LUMIX_MAX_PATH, Lumix::Path(m_mesh_path.c_str()));
-		Lumix::StackAllocator<LUMIX_MAX_PATH> allocator;
-		static_cast<Lumix::RenderScene*>(scene)->setRenderablePath(cmp, Lumix::string(rel_path, allocator));
+		char rel_path[Lumix::MAX_PATH_LENGTH];
+		m_editor.getRelativePath(
+			rel_path, Lumix::MAX_PATH_LENGTH, Lumix::Path(m_mesh_path.c_str()));
+		Lumix::StackAllocator<Lumix::MAX_PATH_LENGTH> allocator;
+		static_cast<Lumix::RenderScene*>(scene)
+			->setRenderablePath(cmp, Lumix::string(rel_path, allocator));
 	}
 }
 
 
 void InsertMeshCommand::undo()
 {
-	const Lumix::WorldEditor::ComponentList& cmps = m_editor.getComponents(m_entity);
+	const Lumix::WorldEditor::ComponentList& cmps =
+		m_editor.getComponents(m_entity);
 	for (int i = 0; i < cmps.size(); ++i)
 	{
 		cmps[i].scene->destroyComponent(cmps[i].index, cmps[i].type);
@@ -96,4 +99,3 @@ bool InsertMeshCommand::merge(IEditorCommand&)
 {
 	return false;
 }
-
