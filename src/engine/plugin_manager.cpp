@@ -4,7 +4,6 @@
 #include "core/array.h"
 #include "engine/engine.h"
 #include "engine/iplugin.h"
-#include <Windows.h>
 
 
 namespace Lumix 
