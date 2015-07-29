@@ -47,7 +47,7 @@ namespace Lumix
 		serializer.read(size);
 		for (int i = 0; i < size; ++i)
 		{
-			char path[LUMIX_MAX_PATH];
+			char path[MAX_PATH_LENGTH];
 			serializer.readString(path, sizeof(path));
 			uint32_t hash = crc32(path);
 			PathInternal* internal = getPathMultithreadUnsafe(hash, path);
@@ -137,9 +137,9 @@ namespace Lumix
 
 	Path::Path(const char* path)
 	{
-		char tmp[LUMIX_MAX_PATH];
+		char tmp[MAX_PATH_LENGTH];
 		size_t len = strlen(path);
-		ASSERT(len < LUMIX_MAX_PATH);
+		ASSERT(len < MAX_PATH_LENGTH);
 		PathUtils::normalize(path, tmp, (uint32_t)len + 1);
 		uint32_t hash = crc32(tmp);
 		m_data = g_path_manager.getPath(hash, tmp);
@@ -162,9 +162,9 @@ namespace Lumix
 
 	void Path::operator =(const char* rhs)
 	{
-		char tmp[LUMIX_MAX_PATH];
+		char tmp[MAX_PATH_LENGTH];
 		size_t len = strlen(rhs);
-		ASSERT(len < LUMIX_MAX_PATH);
+		ASSERT(len < MAX_PATH_LENGTH);
 		PathUtils::normalize(rhs, tmp, (uint32_t)len + 1);
 		uint32_t hash = crc32(tmp);
 

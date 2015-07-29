@@ -29,7 +29,7 @@ namespace Lumix
 			IFile* m_file;
 			ReadCallback m_cb;
 			Mode m_mode;
-			char m_path[LUMIX_MAX_PATH];
+			char m_path[MAX_PATH_LENGTH];
 			uint8_t m_flags;
 
 		};

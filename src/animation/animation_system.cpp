@@ -135,7 +135,7 @@ public:
 			}
 			serializer.read(m_animables[i].m_time);
 			serializer.read(m_animables[i].m_is_free);
-			char path[LUMIX_MAX_PATH];
+			char path[MAX_PATH_LENGTH];
 			serializer.readString(path, sizeof(path));
 			m_animables[i].m_animation =
 				path[0] == '\0' ? nullptr : loadAnimation(path);

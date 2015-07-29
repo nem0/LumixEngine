@@ -208,7 +208,7 @@ public:
 private:
 	Lumix::Material* getMaterial()
 	{
-		Lumix::StackAllocator<LUMIX_MAX_PATH> allocator;
+		Lumix::StackAllocator<Lumix::MAX_PATH_LENGTH> allocator;
 		Lumix::string material_path(allocator);
 		static_cast<Lumix::RenderScene*>(m_terrain.scene)
 			->getTerrainMaterial(m_terrain.index, material_path);
@@ -229,10 +229,10 @@ private:
 
 
 	int computeAverage32(const Lumix::Texture* texture,
-					   int from_x,
-					   int to_x,
-					   int from_y,
-					   int to_y)
+						 int from_x,
+						 int to_x,
+						 int from_y,
+						 int to_y)
 	{
 		ASSERT(texture->getBytesPerPixel() == 4);
 		uint64_t sum = 0;
@@ -302,8 +302,8 @@ private:
 		else
 		{
 			avg16 = m_type == TerrainEditor::SMOOTH_HEIGHT
-				? computeAverage16(texture, from_x, to_x, from_z, to_z)
-				: 0;
+						? computeAverage16(texture, from_x, to_x, from_z, to_z)
+						: 0;
 		}
 		float amount = Lumix::Math::maxValue(
 			item.m_amount * item.m_amount * strength_multiplicator, 1.0f);
@@ -370,7 +370,9 @@ private:
 					case 2:
 					{
 						uint16_t add = uint16_t(attenuation * amount);
-						uint16_t x = ((uint16_t*)texture->getData())[(i + j * texture_width)];
+						uint16_t x =
+							((uint16_t*)
+								 texture->getData())[(i + j * texture_width)];
 						x += m_type == TerrainEditor::SMOOTH_HEIGHT
 								 ? (avg16 - x) * item.m_amount * attenuation
 								 : add;
@@ -759,14 +761,12 @@ void TerrainComponentPlugin::addTextureNode(DynamicObjectModel::Node& node)
 	{
 		auto material = m_terrain_editor->getMaterial();
 		QComboBox* cb = new QComboBox(parent);
-		
-		Lumix::Texture* tex[4] =
-		{
+
+		Lumix::Texture* tex[4] = {
 			material->getTextureByUniform(TEX_COLOR0_UNIFORM),
 			material->getTextureByUniform(TEX_COLOR1_UNIFORM),
 			material->getTextureByUniform(TEX_COLOR2_UNIFORM),
-			material->getTextureByUniform(TEX_COLOR3_UNIFORM)
-		};
+			material->getTextureByUniform(TEX_COLOR3_UNIFORM)};
 
 		for (int i = 0; i < lengthOf(tex); ++i)
 		{
@@ -888,8 +888,8 @@ void TerrainEditor::drawCursor(Lumix::RenderScene& scene,
 		if (local_to.x >= 0 && local_to.z >= 0 && local_to.x <= w &&
 			local_to.z <= h)
 		{
-			to.y = terrain_matrix.m42 +
-				0.25f +
+			to.y =
+				terrain_matrix.m42 + 0.25f +
 				scene.getTerrainHeightAt(terrain.index, local_to.x, local_to.z);
 		}
 
@@ -1023,7 +1023,7 @@ void TerrainEditor::onMouseUp(int, int, Lumix::MouseButton::Value)
 
 Lumix::Material* TerrainEditor::getMaterial()
 {
-	Lumix::StackAllocator<LUMIX_MAX_PATH> allocator;
+	Lumix::StackAllocator<Lumix::MAX_PATH_LENGTH> allocator;
 	Lumix::string material_path(allocator);
 	static_cast<Lumix::RenderScene*>(m_component.scene)
 		->getTerrainMaterial(m_component.index, material_path);

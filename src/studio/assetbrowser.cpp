@@ -37,129 +37,136 @@ struct ProcessInfo
 
 class FlatFileListModel : public QAbstractItemModel
 {
-	public:
-		void setFilter(const QString& filter, const QStringList& ext_filter)
+public:
+	void setFilter(const QString& filter, const QStringList& ext_filter)
+	{
+		m_filter.clear();
+		for (auto i : ext_filter)
 		{
-			m_filter.clear();
-			for (auto i : ext_filter)
-			{
-				m_filter << QString("*") + filter + i;
-			}
-			m_files.clear();
-			beginResetModel();
-			fillList(QDir::currentPath(), m_filter);
-			endResetModel();
+			m_filter << QString("*") + filter + i;
+		}
+		m_files.clear();
+		beginResetModel();
+		fillList(QDir::currentPath(), m_filter);
+		endResetModel();
+	}
+
+
+	const QFileInfo& fileInfo(const QModelIndex& index) const
+	{
+		return m_files[index.row()];
+	}
+
+
+	QStringList mimeTypes() const override
+	{
+		QStringList types;
+		types << "text/uri-list";
+		return types;
+	}
+
+
+	virtual Qt::ItemFlags flags(const QModelIndex& index) const override
+	{
+		Qt::ItemFlags default_flags = QAbstractItemModel::flags(index);
+		if (index.isValid())
+			return Qt::ItemIsDragEnabled | default_flags;
+		else
+			return default_flags;
+	}
+
+
+	QMimeData* mimeData(const QModelIndexList& indexes) const override
+	{
+		QMimeData* mime_data = new QMimeData();
+		QList<QUrl> urls;
+		for (auto& index : indexes)
+		{
+			urls.push_back(
+				QUrl::fromLocalFile(m_files[index.row()].filePath()));
+		}
+		mime_data->setUrls(urls);
+		return mime_data;
+	}
+
+
+	virtual Qt::DropActions supportedDragActions() const override
+	{
+		return Qt::CopyAction | Qt::MoveAction;
+	}
+
+
+	virtual QModelIndex index(int row,
+							  int column,
+							  const QModelIndex& = QModelIndex()) const override
+	{
+		return createIndex(row, column);
+	}
+
+
+	virtual QModelIndex parent(const QModelIndex&) const override
+	{
+		return QModelIndex();
+	}
+
+
+	virtual int
+	rowCount(const QModelIndex& parent = QModelIndex()) const override
+	{
+		if (parent.isValid())
+			return 0;
+		return m_files.size();
+	}
+
+
+	virtual int columnCount(const QModelIndex& = QModelIndex()) const override
+	{
+		return 1;
+	}
+
+
+	virtual QVariant data(const QModelIndex& index,
+						  int role = Qt::DisplayRole) const override
+	{
+		if (Qt::DecorationRole == role && index.column() == 0)
+		{
+			return m_icons[index.row()];
+		}
+		if (Qt::DisplayRole == role)
+		{
+			return m_files[index.row()].fileName();
+		}
+		return QVariant();
+	}
+
+
+private:
+	void fillList(const QDir& dir, const QStringList& filters)
+	{
+		QFileInfoList list = dir.entryInfoList(
+			filters, QDir::Files | QDir::NoDotAndDotDot, QDir::NoSort);
+
+		for (int i = 0, c = list.size(); i < c; ++i)
+		{
+			m_icons.append(m_icon_provider.icon(list[i].filePath()));
+			m_files.append(list[i].filePath());
 		}
 
+		list =
+			dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::NoSort);
 
-		const QFileInfo& fileInfo(const QModelIndex& index) const
+		for (int i = 0, c = list.size(); i < c; ++i)
 		{
-			return m_files[index.row()];
+			QString filename = list[i].fileName();
+			fillList(QDir(list[i].filePath()), filters);
 		}
+	}
 
-
-		QStringList mimeTypes() const override
-		{
-			QStringList types;
-			types << "text/uri-list";
-			return types;
-		}
-
-
-		virtual Qt::ItemFlags flags(const QModelIndex &index) const override
-		{
-			Qt::ItemFlags default_flags = QAbstractItemModel::flags(index);
-			if (index.isValid())
-				return Qt::ItemIsDragEnabled | default_flags;
-			else
-				return default_flags;
-		}
-
-
-		QMimeData* mimeData(const QModelIndexList &indexes) const override
-		{
-			QMimeData *mime_data = new QMimeData();
-			QList<QUrl> urls;
-			for (auto& index : indexes)
-			{
-				urls.push_back(QUrl::fromLocalFile(m_files[index.row()].filePath()));
-			}
-			mime_data->setUrls(urls);
-			return mime_data;
-		}
-
-
-		virtual Qt::DropActions supportedDragActions() const override
-		{
-			return Qt::CopyAction | Qt::MoveAction;
-		}
-
-
-		virtual QModelIndex index(int row, int column, const QModelIndex& = QModelIndex()) const override
-		{
-			return createIndex(row, column);
-		}
-
-
-		virtual QModelIndex parent(const QModelIndex&) const override
-		{
-			return QModelIndex();
-		}
-
-
-		virtual int rowCount(const QModelIndex& parent = QModelIndex()) const override
-		{
-			if (parent.isValid())
-				return 0;
-			return m_files.size();
-		}
-
-
-		virtual int columnCount(const QModelIndex& = QModelIndex()) const override
-		{
-			return 1;
-		}
-
-
-		virtual QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override
-		{
-			if (Qt::DecorationRole == role && index.column() == 0)
-			{
-				return m_icons[index.row()];
-			}
-			if (Qt::DisplayRole == role)
-			{
-				return m_files[index.row()].fileName();
-			}
-			return QVariant();
-		}
-
-
-	private:
-		void fillList(const QDir& dir, const QStringList& filters)
-		{
-			QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoDotAndDotDot, QDir::NoSort);
-
-			for (int i = 0, c = list.size(); i < c; ++i)
-			{
-				m_icons.append(m_icon_provider.icon(list[i].filePath()));
-				m_files.append(list[i].filePath());
-			}
-
-			list = dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::NoSort);
-
-			for (int i = 0, c = list.size(); i < c; ++i)
-			{
-				QString filename = list[i].fileName();
-				fillList(QDir(list[i].filePath()), filters);
-			}
-		}
-
-	private:
-		QFileIconProvider m_icon_provider;
-		QStringList m_filter;
-		QVector<QFileInfo> m_files;
-		QVector<QIcon> m_icons;
+private:
+	QFileIconProvider m_icon_provider;
+	QStringList m_filter;
+	QVector<QFileInfo> m_files;
+	QVector<QIcon> m_icons;
 };
 
 
@@ -188,13 +195,23 @@ static bool isAssimpAsset(const QString& suffix)
 	Assimp::Importer importer;
 	aiString extension_list;
 	importer.GetExtensionList(extension_list);
-	return QString(extension_list.C_Str()).split(';').contains(QString("*.") + suffix);
+	return QString(extension_list.C_Str())
+		.split(';')
+		.contains(QString("*.") + suffix);
 }
 
 
 static void getDefaultFilters(QStringList& filters)
 {
-	filters << "*.msh" << "*.unv" << "*.ani" <<  "*.mat" << "*.fbx" << "*.shd" << "*.json" << "*.phy" << "*.lua";
+	filters << "*.msh"
+			<< "*.unv"
+			<< "*.ani"
+			<< "*.mat"
+			<< "*.fbx"
+			<< "*.shd"
+			<< "*.json"
+			<< "*.phy"
+			<< "*.lua";
 	Assimp::Importer importer;
 	aiString extension_list;
 	importer.GetExtensionList(extension_list);
@@ -209,7 +226,8 @@ AssetBrowser::AssetBrowser(MainWindow& main_window, QWidget* parent)
 	, m_main_window(main_window)
 {
 	m_watcher = FileSystemWatcher::create(QDir::currentPath());
-	m_watcher->getCallback().bind<AssetBrowser, &AssetBrowser::onFileSystemWatcherCallback>(this);
+	m_watcher->getCallback()
+		.bind<AssetBrowser, &AssetBrowser::onFileSystemWatcherCallback>(this);
 	m_base_path = QDir::currentPath();
 	m_editor = nullptr;
 	m_ui->setupUi(this);
@@ -227,7 +245,8 @@ AssetBrowser::AssetBrowser(MainWindow& main_window, QWidget* parent)
 	m_ui->treeView->hideColumn(2);
 	m_ui->treeView->hideColumn(3);
 	m_ui->treeView->hideColumn(4);
-	connect(this, &AssetBrowser::fileChanged, this, &AssetBrowser::onFileChanged);
+	connect(
+		this, &AssetBrowser::fileChanged, this, &AssetBrowser::onFileChanged);
 }
 
 
@@ -243,11 +262,13 @@ AssetBrowser::~AssetBrowser()
 void AssetBrowser::setWorldEditor(Lumix::WorldEditor& editor)
 {
 	m_editor = &editor;
-	m_editor->registerEditorCommandCreator("insert_mesh", &AssetBrowser::createInsertMeshCommand);
+	m_editor->registerEditorCommandCreator(
+		"insert_mesh", &AssetBrowser::createInsertMeshCommand);
 }
 
 
-Lumix::IEditorCommand* AssetBrowser::createInsertMeshCommand(Lumix::WorldEditor& editor)
+Lumix::IEditorCommand*
+AssetBrowser::createInsertMeshCommand(Lumix::WorldEditor& editor)
 {
 	return editor.getAllocator().newObject<InsertMeshCommand>(editor);
 }
@@ -272,53 +293,67 @@ void AssetBrowser::handleDoubleClick(const QFileInfo& file_info)
 	QStringList texture_filters;
 	getTextureFilters(texture_filters, false);
 
-	if(suffix == "unv")
+	if (suffix == "unv")
 	{
 		m_editor->loadUniverse(Lumix::Path(file.toLatin1().data()));
 	}
-	else if(suffix == "msh")
+	else if (suffix == "msh")
 	{
-		InsertMeshCommand* command = m_editor->getAllocator().newObject<InsertMeshCommand>(*m_editor, m_editor->getCameraRaycastHit(), Lumix::Path(file.toLatin1().data()));
+		InsertMeshCommand* command =
+			m_editor->getAllocator().newObject<InsertMeshCommand>(
+				*m_editor,
+				m_editor->getCameraRaycastHit(),
+				Lumix::Path(file.toLatin1().data()));
 		m_editor->executeCommand(command);
 	}
-	else if(suffix == "ani")
+	else if (suffix == "ani")
 	{
 		m_editor->addComponent(crc32("animable"));
-		m_editor->setProperty(crc32("animable"), -1, *m_editor->getProperty("animable", "preview"), file.toLatin1().data(), file.length());
+		m_editor->setProperty(crc32("animable"),
+							  -1,
+							  *m_editor->getProperty("animable", "preview"),
+							  file.toLatin1().data(),
+							  file.length());
 	}
-	else if (isAssimpAsset(suffix) || texture_filters.contains(suffix) || suffix == "shd" || suffix == "lua")
+	else if (isAssimpAsset(suffix) || texture_filters.contains(suffix) ||
+			 suffix == "shd" || suffix == "lua")
 	{
-		QDesktopServices::openUrl(QUrl::fromLocalFile(file_info.absoluteFilePath()));
+		QDesktopServices::openUrl(
+			QUrl::fromLocalFile(file_info.absoluteFilePath()));
 	}
 }
 
 
 void AssetBrowser::on_treeView_doubleClicked(const QModelIndex& index)
 {
-	handleDoubleClick(index.model() == m_model ?  m_model->fileInfo(index) : m_flat_filtered_model->fileInfo(index));
+	handleDoubleClick(index.model() == m_model
+						  ? m_model->fileInfo(index)
+						  : m_flat_filtered_model->fileInfo(index));
 }
 
 
 void AssetBrowser::onFileChanged(const QString& path)
 {
 	QFileInfo info(path);
-	if(info.suffix() == "blend@")
+	if (info.suffix() == "blend@")
 	{
 		QFileInfo file_info(path);
-		QString base_name = file_info.absolutePath() + "/" + file_info.baseName() + ".blend";
+		QString base_name =
+			file_info.absolutePath() + "/" + file_info.baseName() + ".blend";
 		QFileInfo result_file_info(base_name);
 		importAsset(result_file_info);
 	}
-	else if(m_editor)
+	else if (m_editor)
 	{
-		m_editor->getEngine().getResourceManager().reload(path.toLatin1().data());
+		m_editor->getEngine().getResourceManager().reload(
+			path.toLatin1().data());
 	}
 }
 
 
-void AssetBrowser::on_searchInput_textEdited(const QString &arg1)
+void AssetBrowser::on_searchInput_textEdited(const QString& arg1)
 {
-	if(arg1.length() == 0)
+	if (arg1.length() == 0)
 	{
 		m_ui->treeView->setModel(m_model);
 		m_ui->treeView->setRootIndex(m_model->index(QDir::currentPath()));
@@ -336,7 +371,7 @@ void AssetBrowser::on_exportFinished(int exit_code)
 	QProcess* process = static_cast<QProcess*>(QObject::sender());
 	QString s = process->readAll();
 	process->deleteLater();
-	while(process->waitForReadyRead())
+	while (process->waitForReadyRead())
 	{
 		s += process->readAll();
 	}
@@ -362,7 +397,8 @@ void AssetBrowser::on_exportFinished(int exit_code)
 
 void AssetBrowser::importAsset(const QFileInfo& file_info)
 {
-	ImportAssetDialog* dlg = new ImportAssetDialog(m_main_window, this, m_base_path);
+	ImportAssetDialog* dlg =
+		new ImportAssetDialog(m_main_window, this, m_base_path);
 	if (!file_info.isDir())
 	{
 		dlg->setSource(file_info.filePath());
@@ -376,12 +412,13 @@ void AssetBrowser::importAsset(const QFileInfo& file_info)
 }
 
 
-
 void AssetBrowser::reimportAsset(const QString& filepath)
 {
-	QString import_source = m_main_window.getMetadata()->get(filepath, "import_source").toString();
+	QString import_source =
+		m_main_window.getMetadata()->get(filepath, "import_source").toString();
 
-	ImportAssetDialog* dlg = new ImportAssetDialog(m_main_window, this, m_base_path);
+	ImportAssetDialog* dlg =
+		new ImportAssetDialog(m_main_window, this, m_base_path);
 	dlg->setSource(import_source);
 	QFileInfo destination_info(filepath);
 	dlg->setCreateDirectory(false);
@@ -390,21 +427,23 @@ void AssetBrowser::reimportAsset(const QString& filepath)
 }
 
 
-
-void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
+void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint& pos)
 {
-	QMenu *menu = new QMenu("Item actions",nullptr);
+	QMenu* menu = new QMenu("Item actions", nullptr);
 	const QModelIndex& index = m_ui->treeView->indexAt(pos);
 	QFileInfo root_info(QDir::currentPath());
-	const QFileInfo& file_info = index.isValid() 
-		? index.model() == m_model ? m_model->fileInfo(index) : m_flat_filtered_model->fileInfo(index)
-		: root_info;
+	const QFileInfo& file_info =
+		index.isValid()
+			? index.model() == m_model ? m_model->fileInfo(index)
+									   : m_flat_filtered_model->fileInfo(index)
+			: root_info;
 	QAction* selected_action = nullptr;
 	QAction* delete_file_action = new QAction("Delete", menu);
 	QAction* rename_file_action = new QAction("Rename", menu);
 	QAction* create_dir_action = new QAction("Create directory", menu);
 	QAction* create_material_action = new QAction("Create material", menu);
-	QAction* create_raw_texture_action = new QAction("Create raw texture", menu);
+	QAction* create_raw_texture_action =
+		new QAction("Create raw texture", menu);
 	QAction* import_asset_action = new QAction("Import asset", menu);
 	QAction* reimport_asset_action = new QAction("Reimport asset", menu);
 
@@ -418,8 +457,11 @@ void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
 		menu->addAction(create_raw_texture_action);
 	}
 
-	char relative_path[LUMIX_MAX_PATH];
-	m_editor->getRelativePath(relative_path, sizeof(relative_path), Lumix::Path(file_info.absoluteFilePath().toLatin1().data()));
+	char relative_path[Lumix::MAX_PATH_LENGTH];
+	m_editor->getRelativePath(
+		relative_path,
+		sizeof(relative_path),
+		Lumix::Path(file_info.absoluteFilePath().toLatin1().data()));
 	if (m_main_window.getMetadata()->exists(relative_path, "import_source"))
 	{
 		menu->addAction(reimport_asset_action);
@@ -427,7 +469,8 @@ void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
 
 	QStringList texture_filters;
 	getTextureFilters(texture_filters, false);
-	if (isAssimpAsset(file_info.suffix()) || texture_filters.contains(file_info.suffix()))
+	if (isAssimpAsset(file_info.suffix()) ||
+		texture_filters.contains(file_info.suffix()))
 	{
 		menu->addAction(import_asset_action);
 	}
@@ -443,7 +486,10 @@ void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
 	else if (selected_action == delete_file_action)
 	{
 		QMessageBox::StandardButton reply;
-		reply = QMessageBox::question(this, "Delete", "Are you sure?", QMessageBox::Yes | QMessageBox::No);
+		reply = QMessageBox::question(this,
+									  "Delete",
+									  "Are you sure?",
+									  QMessageBox::Yes | QMessageBox::No);
 		if (reply == QMessageBox::Yes)
 		{
 			if (file_info.isFile())
@@ -464,7 +510,12 @@ void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
 	else if (selected_action == create_dir_action)
 	{
 		bool ok;
-		QString text = QInputDialog::getText(this, "Create directory", "Directory name:", QLineEdit::Normal, QDir::home().dirName(), &ok);
+		QString text = QInputDialog::getText(this,
+											 "Create directory",
+											 "Directory name:",
+											 QLineEdit::Normal,
+											 QDir::home().dirName(),
+											 &ok);
 		if (ok && !text.isEmpty())
 		{
 			QDir().mkdir(file_info.absoluteFilePath() + "/" + text);
@@ -472,12 +523,16 @@ void AssetBrowser::on_treeView_customContextMenuRequested(const QPoint &pos)
 	}
 	else if (selected_action == create_material_action)
 	{
-		auto material_name = QInputDialog::getText(nullptr, "Set filename", "Filename", QLineEdit::Normal, ".mat");
+		auto material_name = QInputDialog::getText(
+			nullptr, "Set filename", "Filename", QLineEdit::Normal, ".mat");
 		auto path = file_info.absoluteFilePath() + "/" + material_name;
 		QFile file(path);
 		if (!file.open(QIODevice::WriteOnly))
 		{
-			QMessageBox::warning(nullptr, "Error", QString("Could not create file %1").arg(path), QMessageBox::StandardButton::Ok);
+			QMessageBox::warning(nullptr,
+								 "Error",
+								 QString("Could not create file %1").arg(path),
+								 QMessageBox::StandardButton::Ok);
 		}
 		else
 		{
@@ -508,7 +563,7 @@ void AssetBrowser::setExtentionsFilter(const QStringList& filters)
 void AssetBrowser::on_filterComboBox_currentTextChanged(const QString&)
 {
 	QStringList filters;
-	if(m_ui->filterComboBox->currentText() == "All")
+	if (m_ui->filterComboBox->currentText() == "All")
 	{
 		getDefaultFilters(filters);
 	}
@@ -544,7 +599,7 @@ void AssetBrowser::on_filterComboBox_currentTextChanged(const QString&)
 }
 
 
-void AssetBrowser::on_treeView_clicked(const QModelIndex &index)
+void AssetBrowser::on_treeView_clicked(const QModelIndex& index)
 {
 	if (index.isValid())
 	{
@@ -553,7 +608,8 @@ void AssetBrowser::on_treeView_clicked(const QModelIndex &index)
 			const QFileInfo& file_info = m_model->fileInfo(index);
 			if (file_info.isFile())
 			{
-				QByteArray byte_array = file_info.filePath().toLower().toLatin1();
+				QByteArray byte_array =
+					file_info.filePath().toLower().toLatin1();
 				const char* filename = byte_array.data();
 				emit fileSelected(filename);
 			}
@@ -563,7 +619,8 @@ void AssetBrowser::on_treeView_clicked(const QModelIndex &index)
 			const QFileInfo& file_info = m_flat_filtered_model->fileInfo(index);
 			if (file_info.isFile())
 			{
-				QByteArray byte_array = file_info.filePath().toLower().toLatin1();
+				QByteArray byte_array =
+					file_info.filePath().toLower().toLatin1();
 				const char* filename = byte_array.data();
 				emit fileSelected(filename);
 			}
