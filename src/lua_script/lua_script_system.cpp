@@ -128,6 +128,11 @@ public:
 
 	void applyProperty(Script& script, Property& prop)
 	{
+		if (prop.m_value.length() == 0)
+		{
+			return;
+		}
+
 		lua_State* state = script.m_state;
 		const char* name =
 			script.m_script->getPropertyName(prop.m_name_hash);
@@ -330,6 +335,7 @@ public:
 						script.m_properties.emplace(m_system.getAllocator());
 					serializer.read(prop.m_name_hash);
 					char tmp[1024];
+					tmp[0] = 0;
 					serializer.readString(tmp, sizeof(tmp));
 					prop.m_value = tmp;
 				}

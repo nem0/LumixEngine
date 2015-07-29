@@ -41,10 +41,16 @@ namespace Lumix
 
 	void OutputBlob::writeString(const char* string)
 	{
-		int32_t size = (int32_t)strlen(string) + 1;
-
-		write(size);
-		write(string, size);
+		if (string)
+		{
+			int32_t size = (int32_t)strlen(string) + 1;
+			write(size);
+			write(string, size);
+		}
+		else
+		{
+			write((int32_t)0);
+		}
 	}
 
 
