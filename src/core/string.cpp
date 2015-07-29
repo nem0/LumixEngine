@@ -6,6 +6,11 @@ namespace Lumix
 
 	bool copyString(char* destination, int length, const char* source)
 	{
+		if (!source)
+		{
+			return false;
+		}
+
 		while (*source && length)
 		{
 			*destination = *source;

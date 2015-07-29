@@ -103,7 +103,10 @@ namespace Lumix
 			inline void writeString(const char* str)
 			{
 				m_file.write("\"", 1);
-				m_file.write(str, (int32_t)strlen(str));
+				if (str)
+				{
+					m_file.write(str, (int32_t)strlen(str));
+				}
 				m_file.write("\"", 1);
 			}
 
