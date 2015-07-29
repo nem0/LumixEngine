@@ -646,7 +646,7 @@ public:
 		}
 		else if (type == TERRAIN_HASH)
 		{
-			Entity entity = m_cameras[component].m_entity;
+			Entity entity = m_terrains[component]->getEntity();
 			m_allocator.deleteObject(m_terrains[component]);
 			m_terrains[component] = nullptr;
 			m_universe.destroyComponent(entity, type, this, component);
