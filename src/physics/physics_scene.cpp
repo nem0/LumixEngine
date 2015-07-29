@@ -1,7 +1,4 @@
 #include "physics/physics_scene.h"
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-#include <PxPhysicsAPI.h>
 #include "cooking/PxCooking.h"
 #include "core/blob.h"
 #include "core/crc32.h"
@@ -19,6 +16,7 @@
 #include "graphics/texture.h"
 #include "physics/physics_system.h"
 #include "physics/physics_geometry_manager.h"
+#include <PxPhysicsAPI.h>
 
 
 namespace Lumix
