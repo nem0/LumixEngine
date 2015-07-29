@@ -513,6 +513,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		{
 			handler.invoke();
 		}
+		finishInstances();
 	}
 
 
