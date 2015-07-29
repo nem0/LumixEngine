@@ -25,6 +25,7 @@ test_script:
 
 after_build:
  - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\Release\animation.dll
+ - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\Release\editor.dll
  - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\Release\engine.dll
  - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\Release\physics.dll
  - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\Release\lua_script.dll
