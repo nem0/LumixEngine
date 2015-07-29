@@ -25,6 +25,8 @@ Videos
 * [Terrain editor](https://www.youtube.com/watch?v=eyqk61Yw52E)
 * [Normal mapping](https://www.youtube.com/watch?v=67_gamlrwso)
 * [Lua scripting](https://www.youtube.com/watch?v=ThF0HPeirus)
+* [Minecraft-like world](https://www.youtube.com/watch?v=Chux7v1AX8k)
+* [Hot-reload](https://www.youtube.com/watch?v=BVE7x3Su9qA)
 
 ![Editor screenshot](https://raw.githubusercontent.com/nem0/LumixEngine/master/docs/editor.png "Editor screenshot")
 
