@@ -52,10 +52,13 @@ void PropertyView::setModel(QAbstractItemModel* model, QAbstractItemDelegate* de
 	{
 		m_ui->treeView->setItemDelegate(new QItemDelegate(this));
 	}
-	connect(model, &QAbstractItemModel::rowsInserted, [this, model](const QModelIndex &parent, int, int){
-		openPersistentEditors(model, parent);
-	});
-	openPersistentEditors(model, QModelIndex());
+	if (model)
+	{
+		connect(model, &QAbstractItemModel::rowsInserted, [this, model](const QModelIndex &parent, int, int){
+			openPersistentEditors(model, parent);
+		});
+		openPersistentEditors(model, QModelIndex());
+	}
 }
 
 
@@ -112,6 +115,10 @@ void PropertyView::onEntitySelected(const Lumix::Array<Lumix::Entity>& e)
 		EntityModel* model = new EntityModel(*this, *m_world_editor, m_selected_entity);
 		setModel(model, new DynamicObjectItemDelegate(m_ui->treeView));
 		m_ui->treeView->expandAll();
+	}
+	else
+	{
+		setModel(nullptr, nullptr);
 	}
 }
 
