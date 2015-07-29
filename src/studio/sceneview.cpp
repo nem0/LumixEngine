@@ -164,7 +164,7 @@ void SceneView::setWorldEditor(Lumix::WorldEditor& world_editor)
 	static_cast<ViewWidget*>(m_view)->m_world_editor = &world_editor;
 	m_world_editor = &world_editor;
 	m_render_device =
-		new WGLRenderDevice(m_world_editor->getEngine(), "pipelines/main.json");
+		new WGLRenderDevice(m_world_editor->getEngine(), "pipelines/main.lua");
 	world_editor.getMeasureTool()
 		->distanceMeasured()
 		.bind<SceneView, &SceneView::onDistanceMeasured>(this);

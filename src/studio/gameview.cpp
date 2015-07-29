@@ -42,7 +42,7 @@ void GameView::setWorldEditor(Lumix::WorldEditor& editor)
 {
 	ASSERT(m_editor == nullptr);
 	m_editor = &editor;
-	m_render_device = new WGLRenderDevice(m_editor->getEngine(), "pipelines/game_view.json");
+	m_render_device = new WGLRenderDevice(m_editor->getEngine(), "pipelines/game_view.lua");
 	m_render_device->setWidget(*getContentWidget());
 }
 
