@@ -12,7 +12,7 @@
 #include <qmimedata.h>
 
 
-static const uint32_t RENDERABLE_HASH = crc32("renderable");
+static const uint32_t RENDERABLE_HASH = Lumix::crc32("renderable");
 
 
 class SetParentEditorCommand : public Lumix::IEditorCommand
@@ -63,7 +63,7 @@ public:
 
 	virtual uint32_t getType() override
 	{
-		static const uint32_t hash = crc32("set_entity_parent");
+		static const uint32_t hash = Lumix::crc32("set_entity_parent");
 		return hash;
 	}
 
@@ -729,7 +729,7 @@ void EntityList::on_comboBox_activated(const QString& arg1)
 	{
 		if (arg1 == m_editor->getComponentTypeName(i))
 		{
-			m_filter->filterComponent(crc32(m_editor->getComponentTypeID(i)));
+			m_filter->filterComponent(Lumix::crc32(m_editor->getComponentTypeID(i)));
 			if (m_is_update_enabled)
 			{
 				m_filter->invalidate();

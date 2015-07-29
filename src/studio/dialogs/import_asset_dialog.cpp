@@ -1199,7 +1199,7 @@ void ImportAssetDialog::importAnimation()
 			for (int i = 0; i < bone_count; ++i)
 			{
 				uint32_t hash =
-					crc32(animation->mChannels[i]->mNodeName.C_Str());
+					Lumix::crc32(animation->mChannels[i]->mNodeName.C_Str());
 				file.write((const char*)&hash, sizeof(hash));
 			}
 

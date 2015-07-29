@@ -27,7 +27,7 @@
 #include <qtreewidget.h>
 
 
-static const uint32_t RENDERABLE_HASH = crc32("renderable");
+static const uint32_t RENDERABLE_HASH = Lumix::crc32("renderable");
 static const char* HEIGHTMAP_UNIFORM = "u_texHeightmap";
 static const char* SPLATMAP_UNIFORM = "u_texSplatmap";
 static const char* TEX_COLOR0_UNIFORM = "u_texColor0";
@@ -179,7 +179,7 @@ public:
 
 	virtual uint32_t getType() override
 	{
-		static const uint32_t type = crc32("paint_terrain");
+		static const uint32_t type = Lumix::crc32("paint_terrain");
 		return type;
 	}
 
@@ -592,7 +592,7 @@ TerrainComponentPlugin::TerrainComponentPlugin(MainWindow& main_window)
 		&PropertyView::componentNodeCreated,
 		[this](DynamicObjectModel::Node& node, const Lumix::ComponentUID& cmp)
 		{
-			if (cmp.type == crc32("terrain"))
+			if (cmp.type == Lumix::crc32("terrain"))
 			{
 				createEditor(node, cmp);
 			}
@@ -909,7 +909,8 @@ void TerrainEditor::tick()
 			 --i)
 		{
 			Lumix::ComponentUID terrain = m_world_editor.getComponent(
-				m_world_editor.getSelectedEntities()[i], crc32("terrain"));
+				m_world_editor.getSelectedEntities()[i],
+				Lumix::crc32("terrain"));
 			if (terrain.isValid())
 			{
 				Lumix::ComponentUID camera_cmp = m_world_editor.getEditCamera();
@@ -951,8 +952,8 @@ bool TerrainEditor::onEntityMouseDown(const Lumix::RayCastModelHit& hit,
 	{
 		if (m_world_editor.getSelectedEntities()[i] == hit.m_entity)
 		{
-			Lumix::ComponentUID terrain =
-				m_world_editor.getComponent(hit.m_entity, crc32("terrain"));
+			Lumix::ComponentUID terrain = m_world_editor.getComponent(
+				hit.m_entity, Lumix::crc32("terrain"));
 			if (terrain.isValid())
 			{
 				Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
@@ -992,7 +993,7 @@ void TerrainEditor::onMouseMove(int x, int y, int, int, int)
 	if (hit.m_is_hit)
 	{
 		Lumix::ComponentUID terrain =
-			m_world_editor.getComponent(hit.m_entity, crc32("terrain"));
+			m_world_editor.getComponent(hit.m_entity, Lumix::crc32("terrain"));
 		if (terrain.isValid())
 		{
 			switch (m_type)
@@ -1157,7 +1158,7 @@ void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
 		return;
 	}
 	Lumix::Entity tpl = m_world_editor.getEntityTemplateSystem().getInstances(
-		crc32(m_selected_entity_template.toLatin1().data()))[0];
+		Lumix::crc32(m_selected_entity_template.toLatin1().data()))[0];
 	if (tpl < 0)
 	{
 		return;

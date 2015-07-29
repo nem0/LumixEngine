@@ -20,7 +20,8 @@
 #include "studio/property_view.h"
 
 
-static const uint32_t SCRIPT_HASH = crc32("script");
+static const uint32_t SCRIPT_HASH = Lumix::crc32("script");
+
 
 namespace Lumix
 {
