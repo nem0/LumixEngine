@@ -2179,9 +2179,12 @@ public:
 		if (strncmp(
 				m_base_path.c_str(), source.c_str(), m_base_path.length()) == 0)
 		{
-			strncpy(relative_path,
-					source.c_str() + m_base_path.length(),
-					max_length);
+			const char* rel_path_start = source.c_str() + m_base_path.length();
+			if (rel_path_start[0] == '/')
+			{
+				++rel_path_start;
+			}
+			strncpy(relative_path, rel_path_start, max_length);
 		}
 		else
 		{

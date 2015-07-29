@@ -194,7 +194,7 @@ static bool isAssimpAsset(const QString& suffix)
 
 static void getDefaultFilters(QStringList& filters)
 {
-	filters << "*.msh" << "*.unv" << "*.ani" <<  "*.mat" << "*.fbx" << "*.shd" << "*.json" << "*.phy";
+	filters << "*.msh" << "*.unv" << "*.ani" <<  "*.mat" << "*.fbx" << "*.shd" << "*.json" << "*.phy" << "*.lua";
 	Assimp::Importer importer;
 	aiString extension_list;
 	importer.GetExtensionList(extension_list);
@@ -286,7 +286,7 @@ void AssetBrowser::handleDoubleClick(const QFileInfo& file_info)
 		m_editor->addComponent(crc32("animable"));
 		m_editor->setProperty(crc32("animable"), -1, *m_editor->getProperty("animable", "preview"), file.toLatin1().data(), file.length());
 	}
-	else if (isAssimpAsset(suffix) || texture_filters.contains(suffix) || suffix == "shd")
+	else if (isAssimpAsset(suffix) || texture_filters.contains(suffix) || suffix == "shd" || suffix == "lua")
 	{
 		QDesktopServices::openUrl(QUrl::fromLocalFile(file_info.absoluteFilePath()));
 	}
