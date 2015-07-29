@@ -19,11 +19,12 @@ Features:
 
 [Mindmap](https://github.com/nem0/LumixEngine/blob/master/docs/lumix_mindmap.png)
 
-[Terrain video](https://www.youtube.com/watch?v=DirHQUGFoOg)
+Videos
 
-[Terrain editor video](https://www.youtube.com/watch?v=eyqk61Yw52E)
-
-[Normal mapping video](https://www.youtube.com/watch?v=67_gamlrwso)
+* [Terrain](https://www.youtube.com/watch?v=DirHQUGFoOg)
+* [Terrain editor](https://www.youtube.com/watch?v=eyqk61Yw52E)
+* [Normal mapping](https://www.youtube.com/watch?v=67_gamlrwso)
+* [Lua scripting](https://www.youtube.com/watch?v=ThF0HPeirus)
 
 ![Editor screenshot](https://raw.githubusercontent.com/nem0/LumixEngine/master/docs/editor.png "Editor screenshot")
 
