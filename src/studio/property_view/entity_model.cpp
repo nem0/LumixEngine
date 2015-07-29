@@ -294,10 +294,7 @@ void EntityModel::addPositionProperty()
 		Node& x_node = rotation_node.addChild("x");
 		x_node.m_getter = [this]() -> QVariant
 		{
-			return getUniverse()
-				->getRotation(m_entity)
-				.getAxisAngle()
-				.axis.x;
+			return getUniverse()->getRotation(m_entity).getAxisAngle().axis.x;
 		};
 		x_node.m_setter = [this](const QVariant& value)
 		{
@@ -306,10 +303,7 @@ void EntityModel::addPositionProperty()
 		Node& y_node = rotation_node.addChild("y");
 		y_node.m_getter = [this]() -> QVariant
 		{
-			return getUniverse()
-				->getRotation(m_entity)
-				.getAxisAngle()
-				.axis.y;
+			return getUniverse()->getRotation(m_entity).getAxisAngle().axis.y;
 		};
 		y_node.m_setter = [this](const QVariant& value)
 		{
@@ -318,10 +312,7 @@ void EntityModel::addPositionProperty()
 		Node& z_node = rotation_node.addChild("z");
 		z_node.m_getter = [this]() -> QVariant
 		{
-			return getUniverse()
-				->getRotation(m_entity)
-				.getAxisAngle()
-				.axis.z;
+			return getUniverse()->getRotation(m_entity).getAxisAngle().axis.z;
 		};
 		z_node.m_setter = [this](const QVariant& value)
 		{
@@ -331,10 +322,7 @@ void EntityModel::addPositionProperty()
 		angle_node.m_getter = [this]() -> QVariant
 		{
 			return Lumix::Math::radiansToDegrees(
-				getUniverse()
-					->getRotation(m_entity)
-					.getAxisAngle()
-					.angle);
+				getUniverse()->getRotation(m_entity).getAxisAngle().angle);
 		};
 		angle_node.m_setter = [this](const QVariant& value)
 		{
@@ -364,9 +352,10 @@ void EntityModel::onEntityPosition(Lumix::Entity entity)
 }
 
 
-void EntityModel::addResourceProperty(Node& child,
-									  Lumix::IPropertyDescriptor* desc,
-									  Lumix::ComponentUID cmp)
+void EntityModel::addFileProperty(Node& child,
+								  Lumix::IPropertyDescriptor* desc,
+								  Lumix::ComponentUID cmp,
+								  bool is_resource)
 {
 	child.m_setter = [desc, cmp, this](const QVariant& value)
 	{
@@ -392,7 +381,7 @@ void EntityModel::addResourceProperty(Node& child,
 		}
 		return false;
 	};
-	child.onCreateEditor = [desc, cmp, this](
+	child.onCreateEditor = [is_resource, desc, cmp, this](
 		QWidget* parent, const QStyleOptionViewItem&) -> QWidget*
 	{
 		QWidget* widget = new QWidget(parent);
@@ -415,15 +404,18 @@ void EntityModel::addResourceProperty(Node& child,
 					}
 				});
 		layout->addWidget(button);
-		QPushButton* go_button = new QPushButton("->", widget);
-		connect(go_button,
-				&QPushButton::clicked,
-				[edit, this]()
-				{
-					m_view.setSelectedResourceFilename(
-						edit->text().toLatin1().data());
-				});
-		layout->addWidget(go_button);
+		if (is_resource)
+		{
+			QPushButton* go_button = new QPushButton("->", widget);
+			connect(go_button,
+					&QPushButton::clicked,
+					[edit, this]()
+					{
+						m_view.setSelectedResourceFilename(
+							edit->text().toLatin1().data());
+					});
+			layout->addWidget(go_button);
+		}
 		layout->setContentsMargins(0, 0, 0, 0);
 		edit->setText(this->get(cmp.entity, cmp.type, -1, desc).toString());
 		return widget;
@@ -541,8 +533,11 @@ void EntityModel::addComponentNode(Lumix::ComponentUID cmp, int component_index)
 				}
 				break;
 			}
+			case Lumix::IPropertyDescriptor::FILE:
+				addFileProperty(child, desc, cmp, false);
+				break;
 			case Lumix::IPropertyDescriptor::RESOURCE:
-				addResourceProperty(child, desc, cmp);
+				addFileProperty(child, desc, cmp, true);
 				break;
 			case Lumix::IPropertyDescriptor::VEC3:
 			{
