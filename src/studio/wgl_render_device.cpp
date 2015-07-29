@@ -21,7 +21,7 @@ WGLRenderDevice::WGLRenderDevice(Lumix::Engine& engine,
 		m_pipeline = Lumix::PipelineInstance::create(*pipeline_object,
 													 engine.getAllocator());
 		m_pipeline->setScene(
-			(Lumix::RenderScene*)engine.getScene(crc32("renderer")));
+			(Lumix::RenderScene*)engine.getScene(Lumix::crc32("renderer")));
 	}
 	engine.getWorldEditor()
 		->universeCreated()
@@ -49,7 +49,7 @@ void WGLRenderDevice::setWidget(QWidget& widget)
 void WGLRenderDevice::onUniverseCreated()
 {
 	getPipeline().setScene(
-		(Lumix::RenderScene*)m_engine.getScene(crc32("renderer")));
+		(Lumix::RenderScene*)m_engine.getScene(Lumix::crc32("renderer")));
 }
 
 

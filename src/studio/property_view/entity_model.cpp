@@ -17,7 +17,7 @@ const char* EntityModel::getComponentName(Lumix::ComponentUID cmp) const
 {
 	for (int i = 0; i < m_editor.getComponentTypesCount(); ++i)
 	{
-		if (cmp.type == crc32(m_editor.getComponentTypeID(i)))
+		if (cmp.type == Lumix::crc32(m_editor.getComponentTypeID(i)))
 		{
 			return m_editor.getComponentTypeName(i);
 		}
@@ -617,11 +617,12 @@ void EntityModel::addComponent(QWidget* widget, QPoint pos)
 				{
 					if (!m_editor.getComponent(
 									 m_entity,
-									 crc32(m_editor.getComponentTypeID(i)))
+									 Lumix::crc32(
+										 m_editor.getComponentTypeID(i)))
 							 .isValid())
 					{
 						m_editor.addComponent(
-							crc32(m_editor.getComponentTypeID(i)));
+							Lumix::crc32(m_editor.getComponentTypeID(i)));
 					}
 					break;
 				}

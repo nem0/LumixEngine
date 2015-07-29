@@ -5,7 +5,7 @@
 #include "graphics/render_scene.h"
 
 
-static const uint32_t RENDERABLE_HASH = crc32("renderable");
+static const uint32_t RENDERABLE_HASH = Lumix::crc32("renderable");
 
 
 InsertMeshCommand::InsertMeshCommand(Lumix::WorldEditor& editor)
@@ -90,7 +90,7 @@ void InsertMeshCommand::undo()
 
 uint32_t InsertMeshCommand::getType()
 {
-	static const uint32_t type = crc32("insert_mesh");
+	static const uint32_t type = Lumix::crc32("insert_mesh");
 	return type;
 }
 
