@@ -1,6 +1,12 @@
 #LumixEngine
 =========
 
+<a href="https://scan.coverity.com/projects/5919">
+  <img alt="Coverity Scan Build Status"
+       src="https://scan.coverity.com/projects/5919/badge.svg"/>
+</a>
+<img src="https://ci.appveyor.com/api/projects/status/7tcoign219kb5bny" />
+
 [Latest executables](https://ci.appveyor.com/project/nem0/lumixengine/build/artifacts)
 
 3D Game Engine
