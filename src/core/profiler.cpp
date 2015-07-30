@@ -1,5 +1,6 @@
 #include "profiler.h"
 #include "core/log.h"
+#include "core/timer.h"
 
 
 namespace Lumix

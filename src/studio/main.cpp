@@ -1,4 +1,5 @@
 #include "mainwindow.h"
+#include "core/crc32.h"
 #include "core/library.h"
 #include "core/log.h"
 #include "core/profiler.h"

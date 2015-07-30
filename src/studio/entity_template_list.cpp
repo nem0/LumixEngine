@@ -1,4 +1,5 @@
 #include "entity_template_list.h"
+#include "core/crc32.h"
 #include "ui_entity_template_list.h"
 #include "editor/entity_template_system.h"
 #include "editor/world_editor.h"

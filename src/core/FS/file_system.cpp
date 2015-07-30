@@ -1,6 +1,7 @@
 #include "core/fs/file_system.h"
 
 #include "core/array.h"
+#include "core/base_proxy_allocator.h"
 #include "core/fs/disk_file_device.h"
 #include "core/fs/ifile.h"
 #include "core/mt/lock_free_fixed_queue.h"

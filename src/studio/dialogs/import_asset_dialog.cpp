@@ -5,6 +5,7 @@
 #include "assimp/postprocess.h"
 #include "assimp/progresshandler.hpp"
 #include "assimp/scene.h"
+#include "core/crc32.h"
 #include "core/log.h"
 #include "core/vec3.h"
 #include "crnlib.h"

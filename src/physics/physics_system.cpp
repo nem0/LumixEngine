@@ -3,6 +3,7 @@
 #include <PxPhysicsAPI.h>
 
 #include "cooking/PxCooking.h"
+#include "core/base_proxy_allocator.h"
 #include "core/crc32.h"
 #include "core/log.h"
 #include "core/resource_manager.h"

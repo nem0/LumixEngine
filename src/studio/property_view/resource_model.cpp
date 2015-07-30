@@ -4,6 +4,7 @@
 #include "core/path_utils.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
+#include "core/stack_allocator.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "graphics/material.h"

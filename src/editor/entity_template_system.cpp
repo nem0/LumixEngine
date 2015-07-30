@@ -1,5 +1,6 @@
 #include "entity_template_system.h"
 #include "core/array.h"
+#include "core/blob.h"
 #include "core/crc32.h"
 #include "core/json_serializer.h"
 #include "core/math_utils.h"

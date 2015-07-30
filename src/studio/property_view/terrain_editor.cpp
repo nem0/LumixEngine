@@ -1,7 +1,9 @@
 #include "terrain_editor.h"
+#include "core/crc32.h"
 #include "core/json_serializer.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
+#include "core/stack_allocator.h"
 #include "editor/entity_template_system.h"
 #include "editor/ieditor_command.h"
 #include "engine/engine.h"
@@ -13,6 +15,7 @@
 #include "graphics/texture.h"
 #include "mainwindow.h"
 #include "property_view.h"
+#include "universe/universe.h"
 #include <QColorDialog>
 #include <qcombobox.h>
 #include <QDoubleSpinBox>

@@ -2,7 +2,6 @@
 
 
 #include "core/vec3.h"
-#include "universe/universe.h"
 
 
 namespace Lumix

@@ -21,7 +21,6 @@
 
 #include "engine/engine.h"
 
-#include "graphics/bitmap_font.h"
 #include "graphics/culling_system.h"
 #include "graphics/geometry.h"
 #include "graphics/material.h"

@@ -1,6 +1,7 @@
 #include "terrain.h"
 #include "core/aabb.h"
 #include "core/blob.h"
+#include "core/crc32.h"
 #include "core/frustum.h"
 #include "core/json_serializer.h"
 #include "core/lifo_allocator.h"
@@ -16,6 +17,7 @@
 #include "graphics/render_scene.h"
 #include "graphics/shader.h"
 #include "graphics/texture.h"
+#include "universe/universe.h"
 #include <cfloat>
 
 
