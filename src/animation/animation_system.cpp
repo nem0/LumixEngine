@@ -1,9 +1,12 @@
 #include "animation_system.h"
 #include "animation/animation.h"
+#include "core/base_proxy_allocator.h"
+#include "core/blob.h"
 #include "core/crc32.h"
 #include "core/json_serializer.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
+#include "editor/property_descriptor.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "graphics/render_scene.h"
@@ -135,7 +138,7 @@ public:
 			}
 			serializer.read(m_animables[i].m_time);
 			serializer.read(m_animables[i].m_is_free);
-			char path[LUMIX_MAX_PATH];
+			char path[MAX_PATH_LENGTH];
 			serializer.readString(path, sizeof(path));
 			m_animables[i].m_animation =
 				path[0] == '\0' ? nullptr : loadAnimation(path);

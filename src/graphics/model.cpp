@@ -2,6 +2,7 @@
 #include "graphics/model.h"
 
 #include "core/array.h"
+#include "core/crc32.h"
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
 #include "core/log.h"
@@ -21,22 +22,47 @@
 namespace Lumix
 {
 
-		
+
+Mesh::Mesh(const bgfx::VertexDecl& def,
+		   Material* mat,
+		   int attribute_array_offset,
+		   int attribute_array_size,
+		   int indices_offset,
+		   int index_count,
+		   const char* name,
+		   IAllocator& allocator)
+	: m_name(allocator)
+	, m_vertex_def(def)
+{
+	m_material = mat;
+	m_attribute_array_offset = attribute_array_offset;
+	m_attribute_array_size = attribute_array_size;
+	m_indices_offset = indices_offset;
+	m_index_count = index_count;
+	m_name_hash = crc32(name);
+	m_name = name;
+	m_instance_idx = -1;
+}
+
+
 Model::~Model()
 {
 	ASSERT(isEmpty());
 }
 
 
-RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform, float scale)
+RayCastModelHit Model::castRay(const Vec3& origin,
+							   const Vec3& dir,
+							   const Matrix& model_transform,
+							   float scale)
 {
 	RayCastModelHit hit;
 	hit.m_is_hit = false;
-	if(!isReady())
+	if (!isReady())
 	{
 		return hit;
 	}
-	
+
 	Matrix inv = model_transform;
 	inv.multiply3x3(scale);
 	inv.inverse();
@@ -48,8 +74,10 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 	int vertex_offset = 0;
 	for (int mesh_index = 0; mesh_index < m_meshes.size(); ++mesh_index)
 	{
-		int indices_end = m_meshes[mesh_index].getIndicesOffset() + m_meshes[mesh_index].getIndexCount();
-		for (int i = m_meshes[mesh_index].getIndicesOffset(); i < indices_end; i += 3)
+		int indices_end = m_meshes[mesh_index].getIndicesOffset() +
+						  m_meshes[mesh_index].getIndexCount();
+		for (int i = m_meshes[mesh_index].getIndicesOffset(); i < indices_end;
+			 i += 3)
 		{
 			Vec3 p0 = vertices[vertex_offset + indices[i]];
 			Vec3 p1 = vertices[vertex_offset + indices[i + 1]];
@@ -96,7 +124,8 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 				hit.m_mesh = &m_meshes[mesh_index];
 			}
 		}
-		vertex_offset += m_meshes[mesh_index].getAttributeArraySize() / m_meshes[mesh_index].getVertexDefinition().getStride();
+		vertex_offset += m_meshes[mesh_index].getAttributeArraySize() /
+						 m_meshes[mesh_index].getVertexDefinition().getStride();
 	}
 	hit.m_origin = origin;
 	hit.m_dir = dir;
@@ -118,10 +147,10 @@ LODMeshIndices Model::getLODMeshIndices(float squared_distance) const
 void Model::getPose(Pose& pose)
 {
 	ASSERT(pose.getCount() == getBoneCount());
-	Vec3* pos =	pose.getPositions();
+	Vec3* pos = pose.getPositions();
 	Quat* rot = pose.getRotations();
 	Matrix mtx;
-	for(int i = 0, c = getBoneCount(); i < c; ++i) 
+	for (int i = 0, c = getBoneCount(); i < c; ++i)
 	{
 		mtx = m_bones[i].inv_bind_matrix;
 		mtx.fastInverse();
@@ -152,27 +181,33 @@ bool Model::parseVertexDef(FS::IFile* file, bgfx::VertexDecl* vertex_definition)
 
 		if (strcmp(tmp, "in_position") == 0)
 		{
-			vertex_definition->add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float);
+			vertex_definition->add(
+				bgfx::Attrib::Position, 3, bgfx::AttribType::Float);
 		}
 		else if (strcmp(tmp, "in_tex_coords") == 0)
 		{
-			vertex_definition->add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float);
+			vertex_definition->add(
+				bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float);
 		}
 		else if (strcmp(tmp, "in_normal") == 0)
 		{
-			vertex_definition->add(bgfx::Attrib::Normal, 4, bgfx::AttribType::Uint8, true, true);
+			vertex_definition->add(
+				bgfx::Attrib::Normal, 4, bgfx::AttribType::Uint8, true, true);
 		}
 		else if (strcmp(tmp, "in_tangents") == 0)
 		{
-			vertex_definition->add(bgfx::Attrib::Tangent, 4, bgfx::AttribType::Uint8, true, true);
+			vertex_definition->add(
+				bgfx::Attrib::Tangent, 4, bgfx::AttribType::Uint8, true, true);
 		}
 		else if (strcmp(tmp, "in_weights") == 0)
 		{
-			vertex_definition->add(bgfx::Attrib::Weight, 4, bgfx::AttribType::Float);
+			vertex_definition->add(
+				bgfx::Attrib::Weight, 4, bgfx::AttribType::Float);
 		}
 		else if (strcmp(tmp, "in_indices") == 0)
 		{
-			vertex_definition->add(bgfx::Attrib::Indices, 4, bgfx::AttribType::Int16, false, true);
+			vertex_definition->add(
+				bgfx::Attrib::Indices, 4, bgfx::AttribType::Int16, false, true);
 		}
 		else
 		{
@@ -189,12 +224,25 @@ bool Model::parseVertexDef(FS::IFile* file, bgfx::VertexDecl* vertex_definition)
 }
 
 
-void Model::create(const bgfx::VertexDecl& def, Material* material, const int* indices_data, int indices_size, const void* attributes_data, int attributes_size)
+void Model::create(const bgfx::VertexDecl& def,
+				   Material* material,
+				   const int* indices_data,
+				   int indices_size,
+				   const void* attributes_data,
+				   int attributes_size)
 {
-	m_geometry_buffer_object.setAttributesData(attributes_data, attributes_size, def);
+	m_geometry_buffer_object.setAttributesData(
+		attributes_data, attributes_size, def);
 	m_geometry_buffer_object.setIndicesData(indices_data, indices_size);
 
-	m_meshes.emplace(def, material, 0, attributes_size, 0, indices_size / sizeof(int), "default", m_allocator);
+	m_meshes.emplace(def,
+					 material,
+					 0,
+					 attributes_size,
+					 0,
+					 indices_size / sizeof(int),
+					 "default",
+					 m_allocator);
 
 	Model::LOD lod;
 	lod.m_distance = FLT_MAX;
@@ -221,14 +269,24 @@ void Model::computeRuntimeData(const uint8_t* vertices)
 
 	for (int i = 0; i < m_meshes.size(); ++i)
 	{
-		int mesh_vertex_count = m_meshes[i].getAttributeArraySize() / m_meshes[i].getVertexDefinition().getStride();
-		int mesh_attributes_array_offset = m_meshes[i].getAttributeArrayOffset();
+		int mesh_vertex_count = m_meshes[i].getAttributeArraySize() /
+								m_meshes[i].getVertexDefinition().getStride();
+		int mesh_attributes_array_offset =
+			m_meshes[i].getAttributeArrayOffset();
 		int mesh_vertex_size = m_meshes[i].getVertexDefinition().getStride();
-		int mesh_position_attribute_offset = m_meshes[i].getVertexDefinition().getOffset(bgfx::Attrib::Position);
+		int mesh_position_attribute_offset =
+			m_meshes[i].getVertexDefinition().getOffset(bgfx::Attrib::Position);
 		for (int j = 0; j < mesh_vertex_count; ++j)
 		{
-			m_vertices[index] = *(const Vec3*)&vertices[mesh_attributes_array_offset + j * mesh_vertex_size + mesh_position_attribute_offset];
-			bounding_radius_squared = Math::maxValue(bounding_radius_squared, dotProduct(m_vertices[index], m_vertices[index]) > 0 ? m_vertices[index].squaredLength() : 0);
+			m_vertices[index] =
+				*(const Vec3*)&vertices[mesh_attributes_array_offset +
+										j * mesh_vertex_size +
+										mesh_position_attribute_offset];
+			bounding_radius_squared = Math::maxValue(
+				bounding_radius_squared,
+				dotProduct(m_vertices[index], m_vertices[index]) > 0
+					? m_vertices[index].squaredLength()
+					: 0);
 			min_vertex.x = Math::minValue(min_vertex.x, m_vertices[index].x);
 			min_vertex.y = Math::minValue(min_vertex.y, m_vertices[index].y);
 			min_vertex.z = Math::minValue(min_vertex.z, m_vertices[index].z);
@@ -254,7 +312,7 @@ bool Model::parseGeometry(FS::IFile* file)
 	}
 	m_indices.resize(indices_count);
 	file->read(&m_indices[0], sizeof(m_indices[0]) * indices_count);
-	
+
 	int32_t vertices_size = 0;
 	file->read(&vertices_size, sizeof(vertices_size));
 	if (vertices_size <= 0)
@@ -265,17 +323,20 @@ bool Model::parseGeometry(FS::IFile* file)
 	Array<uint8_t> vertices(m_allocator);
 	vertices.resize(vertices_size);
 	file->read(&vertices[0], sizeof(vertices[0]) * vertices.size());
-	
-	m_geometry_buffer_object.setAttributesData(&vertices[0], vertices.size(), m_meshes[0].getVertexDefinition());
-	m_geometry_buffer_object.setIndicesData(&m_indices[0], m_indices.size() * sizeof(m_indices[0]));
+
+	m_geometry_buffer_object.setAttributesData(
+		&vertices[0], vertices.size(), m_meshes[0].getVertexDefinition());
+	m_geometry_buffer_object.setIndicesData(
+		&m_indices[0], m_indices.size() * sizeof(m_indices[0]));
 
 	int vertex_count = 0;
 	for (int i = 0; i < m_meshes.size(); ++i)
 	{
-		vertex_count += m_meshes[i].getAttributeArraySize() / m_meshes[i].getVertexDefinition().getStride();
+		vertex_count += m_meshes[i].getAttributeArraySize() /
+						m_meshes[i].getVertexDefinition().getStride();
 	}
 	m_vertices.resize(vertex_count);
-	
+
 	computeRuntimeData(&vertices[0]);
 
 	return true;
@@ -295,8 +356,8 @@ bool Model::parseBones(FS::IFile* file)
 		Model::Bone& b = m_bones.emplace(m_allocator);
 		int len;
 		file->read(&len, sizeof(len));
-		char tmp[LUMIX_MAX_PATH];
-		if (len >= LUMIX_MAX_PATH)
+		char tmp[MAX_PATH_LENGTH];
+		if (len >= MAX_PATH_LENGTH)
 		{
 			return false;
 		}
@@ -305,15 +366,15 @@ bool Model::parseBones(FS::IFile* file)
 		b.name = tmp;
 		m_bone_map.insert(crc32(b.name.c_str()), m_bones.size() - 1);
 		file->read(&len, sizeof(len));
-		if (len >= LUMIX_MAX_PATH)
+		if (len >= MAX_PATH_LENGTH)
 		{
 			return false;
 		}
 		file->read(tmp, len);
 		tmp[len] = 0;
 		b.parent = tmp;
-		file->read(&b.position.x, sizeof(float)* 3);
-		file->read(&b.rotation.x, sizeof(float)* 4);
+		file->read(&b.position.x, sizeof(float) * 3);
+		file->read(&b.rotation.x, sizeof(float) * 4);
 	}
 	m_first_nonroot_bone_index = -1;
 	for (int i = 0; i < bone_count; ++i)
@@ -328,7 +389,8 @@ bool Model::parseBones(FS::IFile* file)
 			b.parent_idx = getBoneIdx(b.parent.c_str());
 			if (b.parent_idx > i || b.parent_idx < 0)
 			{
-				g_log_error.log("renderer") << "Invalid skeleton in " << getPath().c_str();
+				g_log_error.log("renderer") << "Invalid skeleton in "
+											<< getPath().c_str();
 				return false;
 			}
 			if (m_first_nonroot_bone_index == -1)
@@ -370,25 +432,27 @@ bool Model::parseMeshes(FS::IFile* file)
 		return false;
 	}
 	m_meshes.reserve(object_count);
-	char model_dir[LUMIX_MAX_PATH];
-	PathUtils::getDir(model_dir, LUMIX_MAX_PATH, m_path.c_str());
+	char model_dir[MAX_PATH_LENGTH];
+	PathUtils::getDir(model_dir, MAX_PATH_LENGTH, m_path.c_str());
 	for (int i = 0; i < object_count; ++i)
 	{
 		int32_t str_size;
 		file->read(&str_size, sizeof(str_size));
-		char material_name[LUMIX_MAX_PATH];
+		char material_name[MAX_PATH_LENGTH];
 		file->read(material_name, str_size);
-		if (str_size >= LUMIX_MAX_PATH)
+		if (str_size >= MAX_PATH_LENGTH)
 		{
 			return false;
 		}
 		material_name[str_size] = 0;
-		
-		char material_path[LUMIX_MAX_PATH];
+
+		char material_path[MAX_PATH_LENGTH];
 		copyString(material_path, sizeof(material_path), model_dir);
 		catCString(material_path, sizeof(material_path), material_name);
 		catCString(material_path, sizeof(material_path), ".mat");
-		Material* material = static_cast<Material*>(m_resource_manager.get(ResourceManager::MATERIAL)->load(Path(material_path)));
+		Material* material = static_cast<Material*>(
+			m_resource_manager.get(ResourceManager::MATERIAL)
+				->load(Path(material_path)));
 
 		int32_t attribute_array_offset = 0;
 		file->read(&attribute_array_offset, sizeof(attribute_array_offset));
@@ -400,17 +464,24 @@ bool Model::parseMeshes(FS::IFile* file)
 		file->read(&mesh_tri_count, sizeof(mesh_tri_count));
 
 		file->read(&str_size, sizeof(str_size));
-		if (str_size >= LUMIX_MAX_PATH)
+		if (str_size >= MAX_PATH_LENGTH)
 		{
 			return false;
 		}
-		char mesh_name[LUMIX_MAX_PATH];
+		char mesh_name[MAX_PATH_LENGTH];
 		mesh_name[str_size] = 0;
 		file->read(mesh_name, str_size);
 
 		bgfx::VertexDecl def;
 		parseVertexDef(file, &def);
-		m_meshes.emplace(def, material, attribute_array_offset, attribute_array_size, indices_offset, mesh_tri_count * 3, mesh_name, m_allocator);
+		m_meshes.emplace(def,
+						 material,
+						 attribute_array_offset,
+						 attribute_array_size,
+						 indices_offset,
+						 mesh_tri_count * 3,
+						 mesh_name,
+						 m_allocator);
 		addDependency(*material);
 	}
 	return true;
@@ -437,25 +508,24 @@ bool Model::parseLODs(FS::IFile* file)
 
 
 void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
-{ 
+{
 	PROFILE_FUNCTION();
-	if(success)
+	if (success)
 	{
 		FileHeader header;
 		file->read(&header, sizeof(header));
-		if (header.m_magic == FILE_MAGIC
-			&& header.m_version <= (uint32_t)FileVersion::LATEST
-			&& parseMeshes(file)
-			&& parseGeometry(file)
-			&& parseBones(file)
-			&& parseLODs(file))
+		if (header.m_magic == FILE_MAGIC &&
+			header.m_version <= (uint32_t)FileVersion::LATEST &&
+			parseMeshes(file) && parseGeometry(file) && parseBones(file) &&
+			parseLODs(file))
 		{
 			m_size = file->size();
 			decrementDepCount();
 		}
 		else
 		{
-			g_log_warning.log("renderer") << "Error loading model " << m_path.c_str();
+			g_log_warning.log("renderer") << "Error loading model "
+										  << m_path.c_str();
 			onFailure();
 			fs.close(file);
 			return;
@@ -463,7 +533,8 @@ void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 	}
 	else
 	{
-		g_log_warning.log("renderer") << "Error loading model " << m_path.c_str();
+		g_log_warning.log("renderer") << "Error loading model "
+									  << m_path.c_str();
 		onFailure();
 	}
 
@@ -475,7 +546,8 @@ void Model::doUnload(void)
 	for (int i = 0; i < m_meshes.size(); ++i)
 	{
 		removeDependency(*m_meshes[i].getMaterial());
-		m_resource_manager.get(ResourceManager::MATERIAL)->unload(*m_meshes[i].getMaterial());
+		m_resource_manager.get(ResourceManager::MATERIAL)
+			->unload(*m_meshes[i].getMaterial());
 	}
 	m_meshes.clear();
 	m_bones.clear();

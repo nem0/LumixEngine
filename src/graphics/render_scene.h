@@ -2,16 +2,17 @@
 
 #include "core/lumix.h"
 #include "core/array.h"
+#include "core/delegate_list.h"
 #include "core/matrix.h"
 #include "core/string.h"
 #include "engine/iplugin.h"
 #include "graphics/ray_cast_model_hit.h"
+#include "universe/component.h"
 
 
 namespace Lumix
 {
 
-class BitmapFont;
 class Engine;
 class Frustum;
 class Geometry;
@@ -199,8 +200,9 @@ public:
 								 const Vec3& camera_pos,
 								 LIFOAllocator& allocator) = 0;
 	virtual float getTerrainHeightAt(ComponentIndex cmp, float x, float z) = 0;
-	virtual void setTerrainMaterial(ComponentIndex cmp, const string& path) = 0;
-	virtual void getTerrainMaterial(ComponentIndex cmp, string& path) = 0;
+	virtual void setTerrainMaterialPath(ComponentIndex cmp, const string& path) = 0;
+	virtual void getTerrainMaterialPath(ComponentIndex cmp, string& path) = 0;
+	virtual Material* getTerrainMaterial(ComponentIndex cmp) = 0;
 	virtual void setTerrainXZScale(ComponentIndex cmp, float scale) = 0;
 	virtual float getTerrainXZScale(ComponentIndex cmp) = 0;
 	virtual void setTerrainYScale(ComponentIndex cmp, float scale) = 0;

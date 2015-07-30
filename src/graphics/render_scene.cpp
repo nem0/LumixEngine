@@ -21,7 +21,6 @@
 
 #include "engine/engine.h"
 
-#include "graphics/bitmap_font.h"
 #include "graphics/culling_system.h"
 #include "graphics/geometry.h"
 #include "graphics/material.h"
@@ -820,7 +819,7 @@ public:
 	}
 
 
-	virtual void setTerrainMaterial(ComponentIndex cmp,
+	virtual void setTerrainMaterialPath(ComponentIndex cmp,
 									const string& path) override
 	{
 		Material* material =
@@ -831,7 +830,13 @@ public:
 	}
 
 
-	virtual void getTerrainMaterial(ComponentIndex cmp, string& path) override
+	virtual Material* getTerrainMaterial(ComponentIndex cmp) override
+	{
+		return m_terrains[cmp]->getMaterial();
+	}
+
+
+	virtual void getTerrainMaterialPath(ComponentIndex cmp, string& path) override
 	{
 		if (m_terrains[cmp]->getMaterial())
 		{

@@ -3,12 +3,14 @@
 
 #include "core/lumix.h"
 #include "core/delegate_list.h"
-#include "core/string.h"
-#include "core/timer.h"
+#include "core/default_allocator.h"
 
 
 namespace Lumix
 {
+
+
+	class Timer;
 
 
 	class LUMIX_ENGINE_API Profiler

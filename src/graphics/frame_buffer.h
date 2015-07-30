@@ -1,8 +1,6 @@
 #pragma once
 
 
-#include "core/stack_allocator.h"
-#include "core/string.h"
 #include <bgfx.h>
 
 

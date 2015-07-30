@@ -5,6 +5,7 @@
 #include "assimp/postprocess.h"
 #include "assimp/progresshandler.hpp"
 #include "assimp/scene.h"
+#include "core/crc32.h"
 #include "core/log.h"
 #include "core/vec3.h"
 #include "crnlib.h"
@@ -25,17 +26,18 @@
 
 class LogStream : public Assimp::LogStream
 {
-	public:
-		LogStream(ImportThread& thread)
-			: m_thread(thread)
-		{}
+public:
+	LogStream(ImportThread& thread)
+		: m_thread(thread)
+	{
+	}
 
-		void write(const char* message) override
-		{
-			Lumix::g_log_info.log("import") << message;
-		}
+	void write(const char* message) override
+	{
+		Lumix::g_log_info.log("import") << message;
+	}
 
-		ImportThread& m_thread;
+	ImportThread& m_thread;
 };
 
 
@@ -71,7 +73,9 @@ struct SkinInfo
 };
 
 
-static void writeAttribute(const char* attribute_name, VertexAttributeDef attribute_type, QFile& file)
+static void writeAttribute(const char* attribute_name,
+						   VertexAttributeDef attribute_type,
+						   QFile& file)
 {
 	uint32_t length = strlen(attribute_name);
 	file.write((const char*)&length, sizeof(length));
@@ -113,7 +117,8 @@ static bool isSkinned(const aiScene* scene, const aiMaterial* material)
 {
 	for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
 	{
-		if (scene->mMaterials[scene->mMeshes[i]->mMaterialIndex] == material && isSkinned(scene->mMeshes[i]))
+		if (scene->mMaterials[scene->mMeshes[i]->mMaterialIndex] == material &&
+			isSkinned(scene->mMeshes[i]))
 		{
 			return true;
 		}
@@ -143,7 +148,8 @@ static int getVertexSize(const aiMesh* mesh)
 	static const int NORMAL_SIZE = sizeof(uint8_t) * 4;
 	static const int TANGENT_SIZE = sizeof(uint8_t) * 4;
 	static const int UV_SIZE = sizeof(float) * 2;
-	static const int BONE_INDICES_WEIGHTS_SIZE = sizeof(float) * 4 + sizeof(uint16_t) * 4;
+	static const int BONE_INDICES_WEIGHTS_SIZE =
+		sizeof(float) * 4 + sizeof(uint16_t) * 4;
 	int size = POSITION_SIZE + NORMAL_SIZE + UV_SIZE;
 	if (mesh->mTangents)
 	{
@@ -170,15 +176,18 @@ void ImportThread::writeMeshes(QFile& file)
 		const aiMesh* mesh = scene->mMeshes[i];
 		int vertex_size = getVertexSize(mesh);
 		aiString material_name;
-		scene->mMaterials[mesh->mMaterialIndex]->Get(AI_MATKEY_NAME, material_name);
+		scene->mMaterials[mesh->mMaterialIndex]->Get(AI_MATKEY_NAME,
+													 material_name);
 		int32_t length = strlen(material_name.C_Str());
 		file.write((const char*)&length, sizeof(length));
 		file.write((const char*)material_name.C_Str(), length);
 
-		file.write((const char*)&attribute_array_offset, sizeof(attribute_array_offset));
+		file.write((const char*)&attribute_array_offset,
+				   sizeof(attribute_array_offset));
 		int32_t attribute_array_size = mesh->mNumVertices * vertex_size;
 		attribute_array_offset += attribute_array_size;
-		file.write((const char*)&attribute_array_size, sizeof(attribute_array_size));
+		file.write((const char*)&attribute_array_size,
+				   sizeof(attribute_array_size));
 
 		file.write((const char*)&indices_offset, sizeof(indices_offset));
 		int32_t mesh_tri_count = mesh->mNumFaces;
@@ -212,8 +221,9 @@ void ImportThread::writeMeshes(QFile& file)
 
 QVector<QString> getBoneNames(const aiScene* scene)
 {
-	struct S {
-		static void x(const aiNode* node, QVector<QString>& node_names) 
+	struct S
+	{
+		static void x(const aiNode* node, QVector<QString>& node_names)
 		{
 			node_names.push_back(node->mName.C_Str());
 			for (unsigned int i = 0; i < node->mNumChildren; ++i)
@@ -222,14 +232,15 @@ QVector<QString> getBoneNames(const aiScene* scene)
 			}
 		}
 	};
-	
+
 	QVector<QString> names;
 	S::x(scene->mRootNode, names);
 	return names;
 }
 
 
-static void fillSkinInfo(const aiScene* scene, QVector<SkinInfo>& infos, int vertices_count)
+static void
+fillSkinInfo(const aiScene* scene, QVector<SkinInfo>& infos, int vertices_count)
 {
 	QVector<QString> node_names = getBoneNames(scene);
 	infos.resize(vertices_count);
@@ -274,9 +285,9 @@ static uint32_t packUint32(uint8_t _x, uint8_t _y, uint8_t _z, uint8_t _w)
 
 static uint32_t packF4u(const aiVector3D& vec)
 {
-	const uint8_t xx = uint8_t(vec.x*127.0f + 128.0f);
-	const uint8_t yy = uint8_t(vec.y*127.0f + 128.0f);
-	const uint8_t zz = uint8_t(vec.z*127.0f + 128.0f);
+	const uint8_t xx = uint8_t(vec.x * 127.0f + 128.0f);
+	const uint8_t yy = uint8_t(vec.y * 127.0f + 128.0f);
+	const uint8_t zz = uint8_t(vec.z * 127.0f + 128.0f);
 	const uint8_t ww = uint8_t(0);
 	return packUint32(xx, yy, zz, ww);
 }
@@ -292,7 +303,8 @@ void ImportThread::writeGeometry(QFile& file)
 	{
 		indices_count += scene->mMeshes[i]->mNumFaces * 3;
 		vertices_count += scene->mMeshes[i]->mNumVertices;
-		vertices_size += scene->mMeshes[i]->mNumVertices * getVertexSize(scene->mMeshes[i]);
+		vertices_size +=
+			scene->mMeshes[i]->mNumVertices * getVertexSize(scene->mMeshes[i]);
 	}
 
 	file.write((const char*)&indices_count, sizeof(indices_count));
@@ -325,12 +337,16 @@ void ImportThread::writeGeometry(QFile& file)
 		{
 			if (is_skinned)
 			{
-				file.write((const char*)skin_infos[skin_index].weights, sizeof(skin_infos[skin_index].weights));
-				file.write((const char*)skin_infos[skin_index].bone_indices, sizeof(skin_infos[skin_index].bone_indices));
+				file.write((const char*)skin_infos[skin_index].weights,
+						   sizeof(skin_infos[skin_index].weights));
+				file.write((const char*)skin_infos[skin_index].bone_indices,
+						   sizeof(skin_infos[skin_index].bone_indices));
 			}
 			++skin_index;
 
-			Lumix::Vec3 position(mesh->mVertices[j].x, mesh->mVertices[j].y, mesh->mVertices[j].z);
+			Lumix::Vec3 position(mesh->mVertices[j].x,
+								 mesh->mVertices[j].y,
+								 mesh->mVertices[j].z);
 			file.write((const char*)&position, sizeof(position));
 
 			auto normal = mesh->mNormals[j];
@@ -363,7 +379,8 @@ static int countNodes(const aiNode* node)
 }
 
 
-static void writeNode(QFile& file, const aiNode* node, aiMatrix4x4 parent_transform)
+static void
+writeNode(QFile& file, const aiNode* node, aiMatrix4x4 parent_transform)
 {
 	int32_t len = (int32_t)strlen(node->mName.C_Str());
 	file.write((const char*)&len, sizeof(len));
@@ -392,10 +409,10 @@ static void writeNode(QFile& file, const aiNode* node, aiMatrix4x4 parent_transf
 
 	for (unsigned int i = 0; i < node->mNumChildren; ++i)
 	{
-		writeNode(file, node->mChildren[i], parent_transform * node->mTransformation);
+		writeNode(
+			file, node->mChildren[i], parent_transform * node->mTransformation);
 	}
 }
-
 
 
 void ImportThread::writeSkeleton(QFile& file)
@@ -424,17 +441,20 @@ bool ImportThread::checkModel()
 		const aiMesh* mesh = scene->mMeshes[i];
 		if (!mesh->HasNormals())
 		{
-			m_error_message = QString("Mesh %1 has no normals.").arg(mesh->mName.C_Str());
+			m_error_message =
+				QString("Mesh %1 has no normals.").arg(mesh->mName.C_Str());
 			return false;
 		}
 		if (!mesh->HasPositions())
 		{
-			m_error_message = QString("Mesh %1 has no positions.").arg(mesh->mName.C_Str());
+			m_error_message =
+				QString("Mesh %1 has no positions.").arg(mesh->mName.C_Str());
 			return false;
 		}
 		if (!mesh->HasTextureCoords(0))
 		{
-			m_error_message = QString("Mesh %1 has no texture coords.").arg(mesh->mName.C_Str());
+			m_error_message = QString("Mesh %1 has no texture coords.")
+								  .arg(mesh->mName.C_Str());
 			return false;
 		}
 	}
@@ -474,9 +494,10 @@ bool ImportThread::saveLumixPhysics()
 	for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
 	{
 		const aiMesh* mesh = scene->mMeshes[i];
-		file.write((const char*)mesh->mVertices, sizeof(mesh->mVertices[0]) * mesh->mNumVertices);
+		file.write((const char*)mesh->mVertices,
+				   sizeof(mesh->mVertices[0]) * mesh->mNumVertices);
 	}
-	
+
 	if (!m_make_convex)
 	{
 		count = 0;
@@ -556,7 +577,10 @@ bool ImportThread::saveLumixModel()
 }
 
 
-static bool convertToDDS(const QImage& image, const QString& dest, crn_progress_callback_func callback, void* callback_data)
+static bool convertToDDS(const QImage& image,
+						 const QString& dest,
+						 crn_progress_callback_func callback,
+						 void* callback_data)
 {
 	if (image.isNull())
 	{
@@ -582,7 +606,9 @@ static bool convertToDDS(const QImage& image, const QString& dest, crn_progress_
 		for (int i = 0; i < image.width(); ++i)
 		{
 			QRgb rgb = image.pixel(i, j);
-			img_data[i + j * image.width()] = qRed(rgb) | (qGreen(rgb) << 8) | (qBlue(rgb) << 16) | (qAlpha(rgb) << 24);
+			img_data[i + j * image.width()] = qRed(rgb) | (qGreen(rgb) << 8) |
+											  (qBlue(rgb) << 16) |
+											  (qAlpha(rgb) << 24);
 		}
 	}
 	comp_params.m_pImages[0][0] = &img_data[0];
@@ -607,7 +633,10 @@ static bool convertToDDS(const QImage& image, const QString& dest, crn_progress_
 }
 
 
-bool ImportThread::saveTexture(const QString& source_path, const QFileInfo& material_info,  QFile& material_file, bool is_normal_map)
+bool ImportThread::saveTexture(const QString& source_path,
+							   const QFileInfo& material_info,
+							   QFile& material_file,
+							   bool is_normal_map)
 {
 	QString texture_path = source_path;
 	bool is_embedded = false;
@@ -620,8 +649,12 @@ bool ImportThread::saveTexture(const QString& source_path, const QFileInfo& mate
 	QFileInfo texture_info(texture_path);
 
 	QDir().mkpath(m_destination + "/" + texture_info.path());
-	QString texture_entry = QString("\t, \"texture\" : {\n\t\t\"source\" : \"%1\"\n")
-		.arg(m_convert_texture_to_DDS ? texture_info.path() + "/" + texture_info.baseName() + ".dds" : texture_path);
+	QString texture_entry =
+		QString("\t, \"texture\" : {\n\t\t\"source\" : \"%1\"\n")
+			.arg(m_convert_texture_to_DDS
+					 ? texture_info.path() + "/" + texture_info.baseName() +
+						   ".dds"
+					 : texture_path);
 	if (is_normal_map)
 	{
 		texture_entry += "\t\t, \"uniform\" : \"normalmap\"\n";
@@ -640,10 +673,12 @@ bool ImportThread::saveTexture(const QString& source_path, const QFileInfo& mate
 	if (m_convert_texture_to_DDS && texture_info.suffix() != "dds")
 	{
 		auto source = material_info.path() + "/" + texture_path;
-		auto dest = m_destination + "/" + texture_info.path() + "/" + texture_info.baseName() + ".dds";
+		auto dest = m_destination + "/" + texture_info.path() + "/" +
+					texture_info.baseName() + ".dds";
 		if (!convertToDDS(QImage(source), dest, nullptr, nullptr))
 		{
-			m_error_message = QString("Error converting %1 to %2").arg(source).arg(dest);
+			m_error_message =
+				QString("Error converting %1 to %2").arg(source).arg(dest);
 			return false;
 		}
 	}
@@ -663,7 +698,8 @@ bool ImportThread::saveTexture(const QString& source_path, const QFileInfo& mate
 			}
 			if (!QFile::copy(source, dest))
 			{
-				m_error_message = QString("Error copying %1 to %2").arg(source).arg(dest);
+				m_error_message =
+					QString("Error copying %1 to %2").arg(source).arg(dest);
 				return false;
 			}
 		}
@@ -683,7 +719,8 @@ bool ImportThread::saveEmbeddedTextures(const aiScene* scene)
 		const aiTexture* texture = scene->mTextures[i];
 		if (texture->mHeight != 0)
 		{
-			m_error_message = "Uncompressed texture embedded. This is not supported.";
+			m_error_message =
+				"Uncompressed texture embedded. This is not supported.";
 			return false;
 		}
 		if (texture->achFormatHint[0] == '\0')
@@ -692,7 +729,9 @@ bool ImportThread::saveEmbeddedTextures(const aiScene* scene)
 			return false;
 		}
 		QImage image;
-		if (!image.loadFromData((const uchar*)texture->pcData, texture->mWidth, texture->achFormatHint))
+		if (!image.loadFromData((const uchar*)texture->pcData,
+								texture->mWidth,
+								texture->achFormatHint))
 		{
 			m_error_message = "Could not load embedded texture.";
 			return false;
@@ -702,11 +741,13 @@ bool ImportThread::saveEmbeddedTextures(const aiScene* scene)
 		{
 			auto texture_name = QString("texture%1.dds").arg(i);
 			m_saved_embedded_textures.push_back(texture_name);
-			convertToDDS(image, m_destination + "/" + texture_name, nullptr, nullptr);
+			convertToDDS(
+				image, m_destination + "/" + texture_name, nullptr, nullptr);
 		}
 		else
 		{
-			auto texture_name = QString("texture%1.%2").arg(i).arg(texture->achFormatHint);
+			auto texture_name =
+				QString("texture%1.%2").arg(i).arg(texture->achFormatHint);
 			m_saved_embedded_textures.push_back(texture_name);
 			image.save(m_destination + "/" + texture_name);
 		}
@@ -740,13 +781,20 @@ bool ImportThread::saveLumixMaterials()
 		const aiMaterial* material = scene->mMaterials[i];
 		aiString material_name;
 		material->Get(AI_MATKEY_NAME, material_name);
-		emit progress(PROGRESS_FROM + PROGRESS_LENGTH * i / (float)scene->mNumMaterials, QString("Saving material %1...").arg(material_name.C_Str()));
-		auto output_material_name = m_destination + "/" + material_name.C_Str() + ".mat";
+		emit progress(
+			PROGRESS_FROM + PROGRESS_LENGTH * i / (float)scene->mNumMaterials,
+			QString("Saving material %1...").arg(material_name.C_Str()));
+		auto output_material_name =
+			m_destination + "/" + material_name.C_Str() + ".mat";
 		QFile file(output_material_name);
 		if (file.open(QIODevice::WriteOnly))
 		{
-			file.write(QString("{\n\t\"shader\" : \"shaders/%1.shd\"\n").arg(isSkinned(scene, material) ? "skinned" : "rigid").toLatin1().data());
-			if(material->GetTextureCount(aiTextureType_DIFFUSE) == 1)
+			file.write(
+				QString("{\n\t\"shader\" : \"shaders/%1.shd\"\n")
+					.arg(isSkinned(scene, material) ? "skinned" : "rigid")
+					.toLatin1()
+					.data());
+			if (material->GetTextureCount(aiTextureType_DIFFUSE) == 1)
 			{
 				aiString texture_path;
 				material->GetTexture(aiTextureType_DIFFUSE, 0, &texture_path);
@@ -771,7 +819,8 @@ bool ImportThread::saveLumixMaterials()
 			}
 			else if (material->GetTextureCount(aiTextureType_NORMALS) > 1)
 			{
-				m_error_message = QString("Too many normal maps in %1").arg(material_name.C_Str());
+				m_error_message = QString("Too many normal maps in %1")
+									  .arg(material_name.C_Str());
 				file.close();
 				return false;
 			}
@@ -780,7 +829,8 @@ bool ImportThread::saveLumixMaterials()
 		}
 		else
 		{
-			m_error_message = QString("Error writing %1").arg(output_material_name);
+			m_error_message =
+				QString("Error writing %1").arg(output_material_name);
 			return false;
 		}
 	}
@@ -795,10 +845,16 @@ void ImportThread::run()
 	if (!m_importer.GetScene())
 	{
 		Lumix::enableFloatingPointTraps(false);
-		m_importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS, aiComponent_COLORS | aiComponent_LIGHTS | aiComponent_CAMERAS);
-		const aiScene* scene = m_importer.ReadFile(m_source.toLatin1().data(), 
-			aiProcess_JoinIdenticalVertices | aiProcess_RemoveComponent | aiProcess_GenUVCoords | aiProcess_RemoveRedundantMaterials | aiProcess_Triangulate
-			| aiProcess_LimitBoneWeights | aiProcess_OptimizeGraph | aiProcess_OptimizeMeshes | aiProcess_GenSmoothNormals | aiProcess_CalcTangentSpace);
+		m_importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS,
+									  aiComponent_COLORS | aiComponent_LIGHTS |
+										  aiComponent_CAMERAS);
+		const aiScene* scene = m_importer.ReadFile(
+			m_source.toLatin1().data(),
+			aiProcess_JoinIdenticalVertices | aiProcess_RemoveComponent |
+				aiProcess_GenUVCoords | aiProcess_RemoveRedundantMaterials |
+				aiProcess_Triangulate | aiProcess_LimitBoneWeights |
+				aiProcess_OptimizeGraph | aiProcess_OptimizeMeshes |
+				aiProcess_GenSmoothNormals | aiProcess_CalcTangentSpace);
 		if (!scene || !scene->mMeshes || !scene->mMeshes[0]->mTangents)
 		{
 			m_error_message = m_importer.GetErrorString();
@@ -815,9 +871,11 @@ void ImportThread::run()
 	}
 	Assimp::DefaultLogger::get()->detatchStream(m_log_stream);
 }
-		
 
-ImportAssetDialog::ImportAssetDialog(MainWindow& main_window, QWidget* parent, const QString& base_path)
+
+ImportAssetDialog::ImportAssetDialog(MainWindow& main_window,
+									 QWidget* parent,
+									 const QString& base_path)
 	: QDialog(parent)
 	, m_base_path(base_path)
 	, m_main_window(main_window)
@@ -837,13 +895,24 @@ ImportAssetDialog::ImportAssetDialog(MainWindow& main_window, QWidget* parent, c
 	m_ui->convertToDDSCheckbox->hide();
 	m_ui->importButton->setEnabled(false);
 
-	connect(m_ui->importPhysicsCheckbox, &QCheckBox::stateChanged, [this](){
-		bool enabled = m_ui->importPhysicsCheckbox->isChecked();
-		m_ui->convexPhysicsCheckbox->setEnabled(enabled);
-	});
+	connect(m_ui->importPhysicsCheckbox,
+			&QCheckBox::stateChanged,
+			[this]()
+			{
+				bool enabled = m_ui->importPhysicsCheckbox->isChecked();
+				m_ui->convexPhysicsCheckbox->setEnabled(enabled);
+			});
 
-	connect(m_import_thread, &ImportThread::progress, this, &ImportAssetDialog::on_progressUpdate, Qt::QueuedConnection);
-	connect(m_import_thread, &QThread::finished, this, &ImportAssetDialog::on_importFinished, Qt::QueuedConnection);
+	connect(m_import_thread,
+			&ImportThread::progress,
+			this,
+			&ImportAssetDialog::on_progressUpdate,
+			Qt::QueuedConnection);
+	connect(m_import_thread,
+			&QThread::finished,
+			this,
+			&ImportAssetDialog::on_importFinished,
+			Qt::QueuedConnection);
 	m_ui->destinationInput->setText(QDir::currentPath());
 	on_progressUpdate(1, "");
 }
@@ -866,7 +935,7 @@ static bool isTexture(const QFileInfo& info)
 
 void ImportAssetDialog::on_sourceInput_textChanged(const QString& text)
 {
-	m_ui->importButton->setEnabled(false); 
+	m_ui->importButton->setEnabled(false);
 	m_ui->convertToRawCheckbox->hide();
 	m_ui->importMaterialsCheckbox->hide();
 	m_ui->convertToDDSCheckbox->hide();
@@ -904,12 +973,18 @@ void ImportAssetDialog::on_importFinished()
 		m_ui->convexPhysicsCheckbox->show();
 		m_ui->createDirectoryCheckbox->show();
 		m_ui->importAnimationCheckbox->show();
-		m_ui->importAnimationCheckbox->setEnabled(m_importer.GetScene()->HasAnimations());
-		m_ui->importMaterialsCheckbox->setText(QString("Import %1 materials").arg(m_importer.GetScene()->mNumMaterials));
-		m_ui->importAnimationCheckbox->setText(QString("Import %1 animations").arg(m_importer.GetScene()->mNumAnimations));
+		m_ui->importAnimationCheckbox->setEnabled(
+			m_importer.GetScene()->HasAnimations());
+		m_ui->importMaterialsCheckbox->setText(
+			QString("Import %1 materials")
+				.arg(m_importer.GetScene()->mNumMaterials));
+		m_ui->importAnimationCheckbox->setText(
+			QString("Import %1 animations")
+				.arg(m_importer.GetScene()->mNumAnimations));
 		m_ui->importMaterialsCheckbox->show();
 		m_ui->convertToDDSCheckbox->show();
-		m_ui->convertToDDSCheckbox->setEnabled(m_ui->importMaterialsCheckbox->isChecked());
+		m_ui->convertToDDSCheckbox->setEnabled(
+			m_ui->importMaterialsCheckbox->isChecked());
 		m_ui->statusLabel->setText("Done.");
 	}
 	else
@@ -929,7 +1004,8 @@ void ImportAssetDialog::on_progressUpdate(float percentage, QString message)
 
 void ImportAssetDialog::on_browseSourceButton_clicked()
 {
-	QString path = QFileDialog::getOpenFileName(this, "Select source", QString(), "All files (*.*)");
+	QString path = QFileDialog::getOpenFileName(
+		this, "Select source", QString(), "All files (*.*)");
 	if (!path.isEmpty())
 	{
 		m_ui->sourceInput->setText(path);
@@ -952,7 +1028,8 @@ void ImportAssetDialog::on_importMaterialsCheckbox_stateChanged(int)
 
 void ImportAssetDialog::on_browseDestinationButton_clicked()
 {
-	QString path = QFileDialog::getExistingDirectory(this, "Select destination", QDir::currentPath());
+	QString path = QFileDialog::getExistingDirectory(
+		this, "Select destination", QDir::currentPath());
 	if (!path.isEmpty())
 	{
 		m_ui->destinationInput->setText(path);
@@ -988,24 +1065,32 @@ void ImportAssetDialog::importModel()
 	}
 	m_import_thread->setDestination(dest);
 	m_import_thread->setSource(m_ui->sourceInput->text());
-	m_import_thread->setConvertTexturesToDDS(m_ui->convertToDDSCheckbox->isChecked());
-	m_import_thread->setImportMaterials(m_ui->importMaterialsCheckbox->isChecked());
+	m_import_thread->setConvertTexturesToDDS(
+		m_ui->convertToDDSCheckbox->isChecked());
+	m_import_thread->setImportMaterials(
+		m_ui->importMaterialsCheckbox->isChecked());
 	m_import_thread->setImportModel(m_ui->importMeshCheckbox->isChecked());
-	m_import_thread->setImportPhysics(m_ui->importPhysicsCheckbox->isChecked(), m_ui->convexPhysicsCheckbox->isChecked());
+	m_import_thread->setImportPhysics(m_ui->importPhysicsCheckbox->isChecked(),
+									  m_ui->convexPhysicsCheckbox->isChecked());
 	m_import_thread->start();
 
 	QFileInfo source_path(m_ui->sourceInput->text());
 	auto dest_mesh_file = dest + "/" + source_path.baseName() + ".msh";
-	char relative_path[LUMIX_MAX_PATH];
-	m_main_window.getWorldEditor()->getRelativePath(relative_path, sizeof(relative_path), Lumix::Path(dest_mesh_file.toLatin1().data()));
-	m_main_window.getMetadata()->set(relative_path, "import_source", m_ui->sourceInput->text());
+	char relative_path[Lumix::MAX_PATH_LENGTH];
+	m_main_window.getWorldEditor()->getRelativePath(
+		relative_path,
+		sizeof(relative_path),
+		Lumix::Path(dest_mesh_file.toLatin1().data()));
+	m_main_window.getMetadata()->set(
+		relative_path, "import_source", m_ui->sourceInput->text());
 }
 
 
 Lumix::Vec3 getPosition(const aiNodeAnim* channel, float frame)
 {
 	unsigned int i = 0;
-	while (frame > (float)channel->mPositionKeys[i].mTime && i < channel->mNumPositionKeys - 1)
+	while (frame > (float)channel->mPositionKeys[i].mTime &&
+		   i < channel->mNumPositionKeys - 1)
 	{
 		++i;
 	}
@@ -1016,7 +1101,9 @@ Lumix::Vec3 getPosition(const aiNodeAnim* channel, float frame)
 		return Lumix::Vec3(first.x, first.y, first.z);
 	}
 	auto second = channel->mPositionKeys[i + 1].mValue;
-	float t = (frame - channel->mPositionKeys[i].mTime) / (channel->mPositionKeys[i + 1].mTime - channel->mPositionKeys[i].mTime);
+	float t =
+		(frame - channel->mPositionKeys[i].mTime) /
+		(channel->mPositionKeys[i + 1].mTime - channel->mPositionKeys[i].mTime);
 	first *= 1 - t;
 	second *= t;
 
@@ -1029,7 +1116,8 @@ Lumix::Vec3 getPosition(const aiNodeAnim* channel, float frame)
 Lumix::Quat getRotation(const aiNodeAnim* channel, float frame)
 {
 	unsigned int i = 0;
-	while (frame > (float)channel->mRotationKeys[i].mTime && i < channel->mNumRotationKeys - 1)
+	while (frame > (float)channel->mRotationKeys[i].mTime &&
+		   i < channel->mNumRotationKeys - 1)
 	{
 		++i;
 	}
@@ -1041,7 +1129,9 @@ Lumix::Quat getRotation(const aiNodeAnim* channel, float frame)
 	}
 
 	auto second = channel->mRotationKeys[i + 1].mValue;
-	float t = (frame - channel->mRotationKeys[i].mTime) / (channel->mRotationKeys[i + 1].mTime - channel->mRotationKeys[i].mTime);
+	float t =
+		(frame - channel->mRotationKeys[i].mTime) /
+		(channel->mRotationKeys[i + 1].mTime - channel->mRotationKeys[i].mTime);
 	aiQuaternion out;
 	aiQuaternion::Interpolate(out, first, second, t);
 
@@ -1058,17 +1148,22 @@ void ImportAssetDialog::importAnimation()
 	for (unsigned int i = 0; i < m_importer.GetScene()->mNumAnimations; ++i)
 	{
 		const aiAnimation* animation = scene->mAnimations[0];
-		on_progressUpdate(0.9f + 0.1f * (i / scene->mNumAnimations), QString("Importing animation %1...").arg(animation->mName.C_Str()));
+		on_progressUpdate(
+			0.9f + 0.1f * (i / scene->mNumAnimations),
+			QString("Importing animation %1...").arg(animation->mName.C_Str()));
 		auto dest_dir = m_ui->destinationInput->text() + "/";
 		if (m_ui->createDirectoryCheckbox->isChecked())
 		{
-			dest_dir = m_ui->destinationInput->text() + "/" + QFileInfo(m_ui->sourceInput->text()).baseName() + "/";
+			dest_dir = m_ui->destinationInput->text() + "/" +
+					   QFileInfo(m_ui->sourceInput->text()).baseName() + "/";
 		}
 		QFile file(dest_dir + animation->mName.C_Str() + ".ani");
 		if (file.open(QIODevice::WriteOnly))
 		{
 			Lumix::Animation::Header header;
-			float fps = animation->mTicksPerSecond == 0 ? 25 : animation->mTicksPerSecond;
+			float fps = animation->mTicksPerSecond == 0
+							? 25
+							: animation->mTicksPerSecond;
 			header.fps = fps;
 			header.magic = Lumix::Animation::HEADER_MAGIC;
 			header.version = 1;
@@ -1084,21 +1179,28 @@ void ImportAssetDialog::importAnimation()
 			positions.resize(bone_count * frame_count);
 			rotations.resize(bone_count * frame_count);
 
-			for (unsigned int channel_idx = 0; channel_idx < animation->mNumChannels; ++channel_idx)
+			for (unsigned int channel_idx = 0;
+				 channel_idx < animation->mNumChannels;
+				 ++channel_idx)
 			{
 				const aiNodeAnim* channel = animation->mChannels[channel_idx];
 				for (int frame = 0; frame < frame_count; ++frame)
 				{
-					positions[frame * bone_count + channel_idx] = getPosition(channel, frame);
-					rotations[frame * bone_count + channel_idx] = getRotation(channel, frame);
+					positions[frame * bone_count + channel_idx] =
+						getPosition(channel, frame);
+					rotations[frame * bone_count + channel_idx] =
+						getRotation(channel, frame);
 				}
 			}
-			
-			file.write((const char*)&positions[0], sizeof(positions[0]) * positions.size());
-			file.write((const char*)&rotations[0], sizeof(rotations[0]) * rotations.size());
+
+			file.write((const char*)&positions[0],
+					   sizeof(positions[0]) * positions.size());
+			file.write((const char*)&rotations[0],
+					   sizeof(rotations[0]) * rotations.size());
 			for (int i = 0; i < bone_count; ++i)
 			{
-				uint32_t hash = crc32(animation->mChannels[i]->mNodeName.C_Str());
+				uint32_t hash =
+					Lumix::crc32(animation->mChannels[i]->mNodeName.C_Str());
 				file.write((const char*)&hash, sizeof(hash));
 			}
 
@@ -1126,7 +1228,8 @@ static bool convertToRaw(const QImage& image, const QString& dest)
 	{
 		return false;
 	}
-	output.write((const char*)&img_data[0], sizeof(img_data[0]) * img_data.size());
+	output.write((const char*)&img_data[0],
+				 sizeof(img_data[0]) * img_data.size());
 	output.close();
 	return true;
 }
@@ -1143,7 +1246,9 @@ void ImportAssetDialog::importTexture()
 
 	if (m_ui->convertToRawCheckbox->isChecked())
 	{
-		if (convertToRaw(QImage(m_ui->sourceInput->text()), m_ui->destinationInput->text() + "/" + source_info.baseName() + ".raw"))
+		if (convertToRaw(QImage(m_ui->sourceInput->text()),
+						 m_ui->destinationInput->text() + "/" +
+							 source_info.baseName() + ".raw"))
 		{
 			on_progressUpdate(1.0f, "Import successful.");
 		}
@@ -1156,14 +1261,27 @@ void ImportAssetDialog::importTexture()
 	{
 		struct Callback
 		{
-			static crn_bool foo(crn_uint32 phase_index, crn_uint32 total_phases, crn_uint32 subphase_index, crn_uint32 total_subphases, void* pUser_data_ptr)
+			static crn_bool foo(crn_uint32 phase_index,
+								crn_uint32 total_phases,
+								crn_uint32 subphase_index,
+								crn_uint32 total_subphases,
+								void* pUser_data_ptr)
 			{
-				static_cast<ImportAssetDialog*>(pUser_data_ptr)->on_progressUpdate(phase_index / (float)total_phases + subphase_index / (float)total_subphases / total_phases, "Importing texture...");
+				static_cast<ImportAssetDialog*>(pUser_data_ptr)
+					->on_progressUpdate(phase_index / (float)total_phases +
+											subphase_index /
+												(float)total_subphases /
+												total_phases,
+										"Importing texture...");
 				QCoreApplication::processEvents();
 				return true;
 			}
 		};
-		if (convertToDDS(QImage(m_ui->sourceInput->text()), m_ui->destinationInput->text() + "/" + source_info.baseName() + ".dds", &Callback::foo, this))
+		if (convertToDDS(QImage(m_ui->sourceInput->text()),
+						 m_ui->destinationInput->text() + "/" +
+							 source_info.baseName() + ".dds",
+						 &Callback::foo,
+						 this))
 		{
 			on_progressUpdate(1.0f, "Import successful.");
 		}

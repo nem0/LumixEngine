@@ -21,6 +21,7 @@
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
+#include "core/timer.h"
 #include "debug/allocator.h"
 #include "editor/editor_icon.h"
 #include "editor/entity_template_system.h"

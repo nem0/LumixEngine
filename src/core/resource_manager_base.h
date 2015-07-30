@@ -1,54 +1,61 @@
 #pragma once
 
+
 #include "core/pod_hash_map.h"
 
-namespace Lumix 
+
+namespace Lumix
 {
-	namespace FS
-	{
-		class FileSystem;
-	}
 
-	class Path;
-	class Resource;
-	class ResourceManager;
 
-	class LUMIX_ENGINE_API ResourceManagerBase abstract
-	{
-		friend class Resource;
-		typedef PODHashMap<uint32_t, Resource*> ResourceTable;
+namespace FS
+{
+class FileSystem;
+}
 
-	public:
-		void create(uint32_t id, ResourceManager& owner);
-		void destroy(void);
 
-		Resource* get(const Path& path);
-		Resource* load(const Path& path);
-		void add(Resource* resource);
-		void remove(Resource* resource);
-		void load(Resource& resource);
+class Path;
+class Resource;
+class ResourceManager;
 
-		void unload(const Path& path);
-		void unload(Resource& resource);
 
-		void forceUnload(const Path& path);
-		void forceUnload(Resource& resource);
+class LUMIX_ENGINE_API ResourceManagerBase abstract
+{
+	friend class Resource;
+	typedef PODHashMap<uint32_t, Resource*> ResourceTable;
 
-		void reload(const Path& path);
-		void reload(Resource& resource);
+public:
+	void create(uint32_t id, ResourceManager& owner);
+	void destroy(void);
 
-		ResourceManagerBase(IAllocator& allocator);
-		~ResourceManagerBase(void);
+	Resource* get(const Path& path);
+	Resource* load(const Path& path);
+	void add(Resource* resource);
+	void remove(Resource* resource);
+	void load(Resource& resource);
 
-	protected:
-		virtual Resource* createResource(const Path& path) = 0;
-		virtual void destroyResource(Resource& resource) = 0;
+	void unload(const Path& path);
+	void unload(Resource& resource);
 
-		ResourceManager& getOwner() const { return *m_owner; }
-	private:
+	void forceUnload(const Path& path);
+	void forceUnload(Resource& resource);
 
-		uint32_t m_size;
-		ResourceTable m_resources;
-		ResourceManager* m_owner;
-	};
+	void reload(const Path& path);
+	void reload(Resource& resource);
+
+	ResourceManagerBase(IAllocator& allocator);
+	~ResourceManagerBase(void);
+
+protected:
+	virtual Resource* createResource(const Path& path) = 0;
+	virtual void destroyResource(Resource& resource) = 0;
+
+	ResourceManager& getOwner() const { return *m_owner; }
+private:
+	uint32_t m_size;
+	ResourceTable m_resources;
+	ResourceManager* m_owner;
+};
+
+
 }

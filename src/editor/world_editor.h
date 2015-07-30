@@ -1,8 +1,10 @@
 #pragma once
 
 #include "core/lumix.h"
+#include "core/array.h"
 #include "core/delegate_list.h"
-#include "editor/property_descriptor.h"
+#include "core/quat.h"
+#include "universe/component.h"
 
 
 namespace Lumix
@@ -10,10 +12,15 @@ namespace Lumix
 
 class Engine;
 class EntityTemplateSystem;
+class IArrayDescriptor;
 class IPlugin;
+class IPropertyDescriptor;
 class Path;
 class PipelineInstance;
 class RayCastModelHit;
+class Universe;
+
+
 namespace FS
 {
 class TCPFileServer;

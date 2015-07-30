@@ -3,7 +3,6 @@
 
 #include "core/lumix.h"
 #include "engine/iplugin.h"
-#include "core/string.h"
 
 
 namespace Lumix

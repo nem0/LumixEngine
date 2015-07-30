@@ -1,6 +1,5 @@
 #include "core/blob.h"
-#include <cstring>
-#include <new>
+
 
 namespace Lumix
 {

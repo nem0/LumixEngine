@@ -1,6 +1,7 @@
 #include "terrain.h"
 #include "core/aabb.h"
 #include "core/blob.h"
+#include "core/crc32.h"
 #include "core/frustum.h"
 #include "core/json_serializer.h"
 #include "core/lifo_allocator.h"
@@ -16,6 +17,7 @@
 #include "graphics/render_scene.h"
 #include "graphics/shader.h"
 #include "graphics/texture.h"
+#include "universe/universe.h"
 #include <cfloat>
 
 
@@ -528,8 +530,8 @@ namespace Lumix
 	{
 		serializer.read(m_entity);
 		serializer.read(m_layer_mask);
-		char path[LUMIX_MAX_PATH];
-		serializer.readString(path, LUMIX_MAX_PATH);
+		char path[MAX_PATH_LENGTH];
+		serializer.readString(path, MAX_PATH_LENGTH);
 		setMaterial(static_cast<Material*>(scene.getEngine().getResourceManager().get(ResourceManager::MATERIAL)->load(Path(path))));
 		serializer.read(m_scale.x);
 		serializer.read(m_scale.y);
@@ -547,7 +549,7 @@ namespace Lumix
 		}
 		for(int i = 0; i < count; ++i)
 		{
-			serializer.readString(path, LUMIX_MAX_PATH);
+			serializer.readString(path, MAX_PATH_LENGTH);
 			serializer.read(m_grass_types[i]->m_ground);
 			serializer.read(m_grass_types[i]->m_density);
 			setGrassTypePath(i, Path(path));
@@ -835,6 +837,14 @@ namespace Lumix
 				m_splatmap->addDataReference();
 				is_data_ready = false;
 			}
+
+			Texture* colormap = m_material->getTextureByUniform("u_texColormap");
+			if (colormap && colormap->getData() == nullptr)
+			{
+				colormap->addDataReference();
+				is_data_ready = false;
+			}
+
 			if (is_data_ready)
 			{
 				m_allocator.deleteObject(m_root);

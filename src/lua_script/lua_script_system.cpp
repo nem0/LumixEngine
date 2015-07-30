@@ -1,5 +1,7 @@
 #include "core/array.h"
+#include "core/base_proxy_allocator.h"
 #include "core/binary_array.h"
+#include "core/blob.h"
 #include "core/crc32.h"
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
@@ -8,6 +10,7 @@
 #include "core/library.h"
 #include "core/log.h"
 #include "core/resource_manager.h"
+#include "editor/property_descriptor.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "engine/iplugin.h"
@@ -20,7 +23,8 @@
 #include "studio/property_view.h"
 
 
-static const uint32_t SCRIPT_HASH = crc32("script");
+static const uint32_t SCRIPT_HASH = Lumix::crc32("script");
+
 
 namespace Lumix
 {
@@ -318,8 +322,8 @@ public:
 		{
 			Script& script = m_scripts.emplace(m_system.getAllocator());
 			serializer.read(m_scripts[i].m_entity);
-			char tmp[LUMIX_MAX_PATH];
-			serializer.readString(tmp, LUMIX_MAX_PATH);
+			char tmp[MAX_PATH_LENGTH];
+			serializer.readString(tmp, MAX_PATH_LENGTH);
 			m_valid[i] = serializer.read<bool>();
 			script.m_script = static_cast<LuaScript*>(
 				m_system.getScriptManager().load(Lumix::Path(tmp)));

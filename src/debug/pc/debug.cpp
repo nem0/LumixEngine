@@ -1,7 +1,6 @@
 #include "debug/debug.h"
 #include "core/string.h"
 #include <Windows.h>
-#include <cstdio>
 #include <DbgHelp.h>
 #include <mapi.h>
 
@@ -102,7 +101,8 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 	HANDLE process = GetCurrentProcess();
 	DWORD process_id = GetProcessId(process);
 	char filename[MAX_PATH];
-	sprintf(filename, "%s/minidump.dmp", g_base_path);
+	copyString(filename, sizeof(filename), g_base_path);
+	catCString(filename, sizeof(filename), "/minidump.dmp");
 	char* c = filename;
 	while (*c)
 	{
