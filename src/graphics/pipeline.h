@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/lumix.h"
-#include "core/delegate_list.h"
+#include "core/delegate.h"
 #include "core/resource.h"
 #include "core/resource_manager_base.h"
 

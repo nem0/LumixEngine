@@ -1,8 +1,10 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
 
-#include <Windows.h>
 #include "core/log.h"
-#include <stdio.h>
+#include "core/stack_allocator.h"
+#include <cstdio>
+#include <Windows.h>
+
 
 namespace Lumix
 {

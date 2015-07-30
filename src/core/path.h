@@ -3,7 +3,6 @@
 #include "core/associative_array.h"
 #include "core/MT/spin_mutex.h"
 #include "core/string.h"
-#include <cstring>
 
 
 namespace Lumix

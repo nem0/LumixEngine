@@ -1,8 +1,10 @@
 #include "insert_mesh_command.h"
 #include "core/crc32.h"
 #include "core/json_serializer.h"
+#include "core/stack_allocator.h"
 #include "engine/engine.h"
 #include "graphics/render_scene.h"
+#include "universe/universe.h"
 
 
 static const uint32_t RENDERABLE_HASH = Lumix::crc32("renderable");

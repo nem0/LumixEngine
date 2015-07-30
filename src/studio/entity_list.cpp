@@ -3,12 +3,14 @@
 #include "core/crc32.h"
 #include "core/json_serializer.h"
 #include "core/path_utils.h"
+#include "core/stack_allocator.h"
 #include "core/string.h"
 #include "editor/ieditor_command.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "graphics/render_scene.h"
 #include "universe/hierarchy.h"
+#include "universe/universe.h"
 #include <qmimedata.h>
 
 

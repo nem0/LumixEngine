@@ -1,4 +1,5 @@
 #include "binary_array.h"
+#include "core/iallocator.h"
 #include <cstring>
 
 

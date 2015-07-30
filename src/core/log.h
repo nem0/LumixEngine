@@ -3,7 +3,6 @@
 
 #include "core/lumix.h"
 #include "core/delegate_list.h"
-#include "core/stack_allocator.h"
 #include "core/string.h"
 
 

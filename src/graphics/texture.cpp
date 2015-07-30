@@ -9,6 +9,7 @@
 #include "graphics/texture.h"
 #include "graphics/texture_manager.h"
 #include <bgfx.h>
+#include <cmath>
 
 namespace Lumix
 {
