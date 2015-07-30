@@ -3,7 +3,6 @@
 #include "core/MT/atomic.h"
 #include "core/string.h"
 #include <Windows.h>
-#include <cstdio>
 #include <Dbghelp.h>
 
 

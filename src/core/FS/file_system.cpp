@@ -1,6 +1,7 @@
 #include "core/fs/file_system.h"
 
 #include "core/array.h"
+#include "core/base_proxy_allocator.h"
 #include "core/fs/disk_file_device.h"
 #include "core/fs/ifile.h"
 #include "core/mt/lock_free_fixed_queue.h"
@@ -29,7 +30,7 @@ namespace Lumix
 			IFile* m_file;
 			ReadCallback m_cb;
 			Mode m_mode;
-			char m_path[LUMIX_MAX_PATH];
+			char m_path[MAX_PATH_LENGTH];
 			uint8_t m_flags;
 
 		};

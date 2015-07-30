@@ -17,7 +17,6 @@
 #include "engine/engine.h"
 #include "engine/lua_wrapper.h"
 #include "engine/plugin_manager.h"
-#include "graphics/bitmap_font.h"
 #include "graphics/frame_buffer.h"
 #include "graphics/geometry.h"
 #include "graphics/material.h"
@@ -27,6 +26,7 @@
 #include "graphics/shader.h"
 #include "graphics/terrain.h"
 #include "graphics/texture.h"
+#include "universe/universe.h"
 #include <bgfx.h>
 
 

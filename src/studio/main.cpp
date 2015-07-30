@@ -1,4 +1,5 @@
 #include "mainwindow.h"
+#include "core/crc32.h"
 #include "core/library.h"
 #include "core/log.h"
 #include "core/profiler.h"
@@ -49,9 +50,9 @@ public:
 	{
 		Lumix::RenderScene* render_scene =
 			(Lumix::RenderScene*)m_world_editor->getEngine().getScene(
-				crc32("renderer"));
+				Lumix::crc32("renderer"));
 		Lumix::PhysicsScene* scene = static_cast<Lumix::PhysicsScene*>(
-			m_world_editor->getEngine().getScene(crc32("physics")));
+			m_world_editor->getEngine().getScene(Lumix::crc32("physics")));
 		if (scene && render_scene)
 		{
 			scene->render(*render_scene);

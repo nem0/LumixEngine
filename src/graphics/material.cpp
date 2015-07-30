@@ -82,10 +82,10 @@ bool Material::save(JsonSerializer& serializer)
 	serializer.serialize("shader", m_shader ? m_shader->getPath().c_str() : "");
 	for (int i = 0; i < m_texture_count; ++i)
 	{
-		char path[LUMIX_MAX_PATH];
+		char path[MAX_PATH_LENGTH];
 		if (m_textures[i])
 		{
-			PathUtils::getFilename(path, LUMIX_MAX_PATH, m_textures[i]->getPath().c_str());
+			PathUtils::getFilename(path, MAX_PATH_LENGTH, m_textures[i]->getPath().c_str());
 		}
 		else
 		{
@@ -296,7 +296,7 @@ Texture* Material::getTextureByUniform(const char* uniform) const
 
 bool Material::deserializeTexture(JsonSerializer& serializer, const char* material_dir)
 {
-	char path[LUMIX_MAX_PATH];
+	char path[MAX_PATH_LENGTH];
 	serializer.deserializeObjectBegin();
 	char label[256];
 	bool keep_data = false;
@@ -305,10 +305,10 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 		serializer.deserializeLabel(label, sizeof(label));
 		if (strcmp(label, "source") == 0)
 		{
-			serializer.deserialize(path, LUMIX_MAX_PATH, "");
+			serializer.deserialize(path, MAX_PATH_LENGTH, "");
 			if (path[0] != '\0')
 			{
-				char texture_path[LUMIX_MAX_PATH];
+				char texture_path[MAX_PATH_LENGTH];
 				copyString(texture_path, sizeof(texture_path), material_dir);
 				catCString(texture_path, sizeof(texture_path), path);
 				m_textures[m_texture_count] = static_cast<Texture*>(m_resource_manager.get(ResourceManager::TEXTURE)->load(Path(texture_path)));
@@ -357,10 +357,10 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		m_uniforms.clear();
 		JsonSerializer serializer(*file, JsonSerializer::READ, m_path.c_str(), m_allocator);
 		serializer.deserializeObjectBegin();
-		char path[LUMIX_MAX_PATH];
+		char path[MAX_PATH_LENGTH];
 		char label[256];
-		char material_dir[LUMIX_MAX_PATH];
-		PathUtils::getDir(material_dir, LUMIX_MAX_PATH, m_path.c_str());
+		char material_dir[MAX_PATH_LENGTH];
+		PathUtils::getDir(material_dir, MAX_PATH_LENGTH, m_path.c_str());
 		bool b_value;
 		while (!serializer.isObjectEnd())
 		{
@@ -401,7 +401,7 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			}
 			else if (strcmp(label, "shader") == 0)
 			{
-				serializer.deserialize(path, LUMIX_MAX_PATH, "");
+				serializer.deserialize(path, MAX_PATH_LENGTH, "");
 				setShader(static_cast<Shader*>(m_resource_manager.get(ResourceManager::SHADER)->load(Path(path))));
 			}
 			else if (strcmp(label, "z_test") == 0)

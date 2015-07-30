@@ -2,16 +2,18 @@
 
 
 #include "core/lumix.h"
-#include "core/fs/ifile.h"
 #include "core/log.h"
 #include "core/path.h"
 #include "core/string.h"
-#include <map>
-#include <vector>
 
 
 namespace Lumix
 {
+
+	namespace FS
+	{
+		class IFile;
+	}
 
 
 	class LUMIX_ENGINE_API JsonSerializer
@@ -83,13 +85,7 @@ namespace Lumix
 			void deserializeRawString(char* buffer, int max_length);
 			void nextArrayItem();
 			bool isObjectEnd();
-
-			size_t getRestOfFileSize()
-			{
-				const size_t NEW_LINE_AND_NULL_TERMINATION_SIZE = sizeof(char) + sizeof(char);
-				return m_file.size() - m_file.pos() + NEW_LINE_AND_NULL_TERMINATION_SIZE + strlen(m_token);
-			}
-
+			size_t getRestOfFileSize() const;
 			bool isError() const { return m_is_error; }
 
 		private:
@@ -99,24 +95,8 @@ namespace Lumix
 			float tokenToFloat();
 			ErrorProxy error();
 			void expectToken(char expected_token);
-
-			inline void writeString(const char* str)
-			{
-				m_file.write("\"", 1);
-				if (str)
-				{
-					m_file.write(str, (int32_t)strlen(str));
-				}
-				m_file.write("\"", 1);
-			}
-
-			inline void writeBlockComma()
-			{
-				if(!m_is_first_in_block)
-				{
-					m_file.write(",\n", 2);
-				}
-			}
+			void writeString(const char* str);
+			void writeBlockComma();
 
 		private:
 			void operator=(const JsonSerializer&);

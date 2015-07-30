@@ -1,5 +1,5 @@
 #include "binary_array.h"
-#include <cstring>
+#include "core/iallocator.h"
 
 
 namespace Lumix

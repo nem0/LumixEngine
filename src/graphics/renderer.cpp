@@ -11,9 +11,9 @@
 #include "core/resource_manager_base.h"
 #include "core/vec4.h"
 #include "debug/allocator.h"
+#include "editor/property_descriptor.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
-#include "graphics/bitmap_font.h"
 #include "graphics/geometry.h"
 #include "graphics/material.h"
 #include "graphics/material_manager.h"
@@ -120,7 +120,6 @@ struct RendererImpl : public Renderer
 		, m_model_manager(m_allocator, *this)
 		, m_material_manager(m_allocator)
 		, m_shader_manager(*this, m_allocator)
-		, m_font_manager(m_allocator)
 		, m_pipeline_manager(*this, m_allocator)
 		, m_passes(m_allocator)
 	{
@@ -137,7 +136,6 @@ struct RendererImpl : public Renderer
 		m_material_manager.create(ResourceManager::MATERIAL, manager);
 		m_shader_manager.create(ResourceManager::SHADER, manager);
 		m_pipeline_manager.create(ResourceManager::PIPELINE, manager);
-		m_font_manager.create(ResourceManager::BITMAP_FONT, manager);
 
 		m_current_pass_hash = crc32("MAIN");
 	}
@@ -149,7 +147,6 @@ struct RendererImpl : public Renderer
 		m_material_manager.destroy();
 		m_shader_manager.destroy();
 		m_pipeline_manager.destroy();
-		m_font_manager.destroy();
 
 		bgfx::frame();
 		bgfx::frame();
@@ -339,8 +336,8 @@ struct RendererImpl : public Renderer
 				"terrain",
 				allocator.newObject<ResourcePropertyDescriptor<RenderScene>>(
 					"material",
-					&RenderScene::getTerrainMaterial,
-					&RenderScene::setTerrainMaterial,
+					&RenderScene::getTerrainMaterialPath,
+					&RenderScene::setTerrainMaterialPath,
 					"Material (*.mat)",
 					allocator));
 			editor.registerProperty(
@@ -444,7 +441,6 @@ struct RendererImpl : public Renderer
 	MaterialManager m_material_manager;
 	ShaderManager m_shader_manager;
 	ModelManager m_model_manager;
-	BitmapFontManager m_font_manager;
 	PipelineManager m_pipeline_manager;
 	uint32_t m_current_pass_hash;
 	static HWND s_hwnd;

@@ -1,4 +1,5 @@
 #include "core/math_utils.h"
+#include "core/vec3.h"
 
 
 namespace Lumix

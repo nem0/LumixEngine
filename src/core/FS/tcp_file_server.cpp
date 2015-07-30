@@ -55,7 +55,7 @@ namespace Lumix
 								OsFile* file = getAllocator().newObject<OsFile>();
 								m_files[id] = file;
 
-								StackAllocator<LUMIX_MAX_PATH> allocator;
+								StackAllocator<MAX_PATH_LENGTH> allocator;
 								string path(allocator);
 								if (strncmp(m_buffer.data(), m_base_path.c_str(), m_base_path.length()) != 0)
 								{
@@ -180,7 +180,7 @@ namespace Lumix
 
 			void setBasePath(const char* base_path) 
 			{
-				StackAllocator<LUMIX_MAX_PATH> allocator;
+				StackAllocator<MAX_PATH_LENGTH> allocator;
 				string base_path_str(base_path, allocator);
 				if (base_path_str[base_path_str.length() - 1] != '/')
 				{

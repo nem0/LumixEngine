@@ -1,11 +1,14 @@
 #pragma once
 
 
-#include "core/iallocator.h"
+#include "core/lumix.h"
 
 
 namespace Lumix
 {
+
+
+	class IAllocator;
 
 
 	class LUMIX_ENGINE_API BinaryArray

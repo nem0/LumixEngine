@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstring>
 #include "core/string.h"
 
 namespace Lumix

@@ -1,8 +1,12 @@
 #include "entity_model.h"
+#include "core/crc32.h"
+#include "core/stack_allocator.h"
 #include "core/math_utils.h"
 #include "core/path.h"
+#include "editor/property_descriptor.h"
 #include "editor/world_editor.h"
 #include "property_view.h"
+#include "universe/universe.h"
 #include <qapplication.h>
 #include <qboxlayout.h>
 #include <qcombobox.h>
@@ -17,7 +21,7 @@ const char* EntityModel::getComponentName(Lumix::ComponentUID cmp) const
 {
 	for (int i = 0; i < m_editor.getComponentTypesCount(); ++i)
 	{
-		if (cmp.type == crc32(m_editor.getComponentTypeID(i)))
+		if (cmp.type == Lumix::crc32(m_editor.getComponentTypeID(i)))
 		{
 			return m_editor.getComponentTypeName(i);
 		}
@@ -373,9 +377,9 @@ void EntityModel::addFileProperty(Node& child,
 		Q_ASSERT(urls.size() < 2);
 		if (urls.size() == 1)
 		{
-			char rel_path[LUMIX_MAX_PATH];
+			char rel_path[Lumix::MAX_PATH_LENGTH];
 			Lumix::Path path(urls[0].toLocalFile().toLatin1().data());
-			m_editor.getRelativePath(rel_path, LUMIX_MAX_PATH, path);
+			m_editor.getRelativePath(rel_path, Lumix::MAX_PATH_LENGTH, path);
 			this->set(cmp.entity, cmp.type, -1, desc, rel_path);
 			return true;
 		}
@@ -396,10 +400,10 @@ void EntityModel::addFileProperty(Node& child,
 					auto value = QFileDialog::getOpenFileName();
 					if (!value.isEmpty())
 					{
-						char rel_path[LUMIX_MAX_PATH];
+						char rel_path[Lumix::MAX_PATH_LENGTH];
 						Lumix::Path path(value.toLatin1().data());
 						m_editor.getRelativePath(
-							rel_path, LUMIX_MAX_PATH, path);
+							rel_path, Lumix::MAX_PATH_LENGTH, path);
 						edit->setText(rel_path);
 					}
 				});
@@ -617,11 +621,12 @@ void EntityModel::addComponent(QWidget* widget, QPoint pos)
 				{
 					if (!m_editor.getComponent(
 									 m_entity,
-									 crc32(m_editor.getComponentTypeID(i)))
+									 Lumix::crc32(
+										 m_editor.getComponentTypeID(i)))
 							 .isValid())
 					{
 						m_editor.addComponent(
-							crc32(m_editor.getComponentTypeID(i)));
+							Lumix::crc32(m_editor.getComponentTypeID(i)));
 					}
 					break;
 				}

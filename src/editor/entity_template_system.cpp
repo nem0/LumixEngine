@@ -1,5 +1,6 @@
 #include "entity_template_system.h"
 #include "core/array.h"
+#include "core/blob.h"
 #include "core/crc32.h"
 #include "core/json_serializer.h"
 #include "core/math_utils.h"
@@ -12,13 +13,13 @@
 #include "universe/universe.h"
 
 
-static const uint32_t RENDERABLE_HASH = crc32("renderable");
-static const uint32_t CAMERA_HASH = crc32("camera");
-static const uint32_t GLOBAL_LIGHT_HASH = crc32("global_light");
-static const uint32_t POINT_LIGHT_HASH = crc32("point_light");
-static const uint32_t SCRIPT_HASH = crc32("script");
-static const uint32_t ANIMABLE_HASH = crc32("animable");
-static const uint32_t TERRAIN_HASH = crc32("terrain");
+static const uint32_t RENDERABLE_HASH = Lumix::crc32("renderable");
+static const uint32_t CAMERA_HASH = Lumix::crc32("camera");
+static const uint32_t GLOBAL_LIGHT_HASH = Lumix::crc32("global_light");
+static const uint32_t POINT_LIGHT_HASH = Lumix::crc32("point_light");
+static const uint32_t SCRIPT_HASH = Lumix::crc32("script");
+static const uint32_t ANIMABLE_HASH = Lumix::crc32("animable");
+static const uint32_t TERRAIN_HASH = Lumix::crc32("terrain");
 
 
 namespace Lumix

@@ -5,7 +5,6 @@
 #include "core/string.h"
 #include "core/vec3.h"
 #include "engine/iplugin.h"
-#include "universe/universe.h"
 
 
 namespace Lumix
@@ -14,6 +13,7 @@ namespace Lumix
 
 class Engine;
 class RenderScene;
+class Universe;
 
 
 struct RaycastHit

@@ -1,7 +1,6 @@
 #pragma once
 
 
-#include "core/string.h"
 #include "core/resource.h"
 #include <bgfx.h>
 

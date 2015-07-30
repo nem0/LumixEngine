@@ -30,12 +30,15 @@ public:
 		RAISE_HEIGHT,
 		LOWER_HEIGHT,
 		SMOOTH_HEIGHT,
-		TEXTURE,
+		LAYER,
 		ENTITY,
+		COLOR,
 		NOT_SET
 	};
 
-	TerrainEditor(Lumix::WorldEditor& editor, MainWindow& main_window);
+	TerrainEditor(Lumix::WorldEditor& editor,
+				  MainWindow& main_window,
+				  TerrainComponentPlugin& plugin);
 	~TerrainEditor();
 
 	virtual void tick() override;
@@ -74,6 +77,7 @@ private:
 							   float& max);
 
 private:
+	TerrainComponentPlugin& m_plugin;
 	Lumix::WorldEditor& m_world_editor;
 	MainWindow& m_main_window;
 	Type m_type;
@@ -95,14 +99,17 @@ public:
 
 	void createEditor(DynamicObjectModel::Node& parent_widget,
 					  const Lumix::ComponentUID& component);
+	QColor getSelectedColor() const { return m_selected_color; }
 
 private:
 	void addEntityTemplateNode(DynamicObjectModel::Node& node);
 	void addTextureNode(DynamicObjectModel::Node& node);
+	void addColorNode(DynamicObjectModel::Node& node);
 
 private:
 	MainWindow& m_main_window;
 	TerrainEditor* m_terrain_editor;
 	QTreeWidgetItem* m_tools_item;
 	QTreeWidgetItem* m_texture_tool_item;
+	QColor m_selected_color;
 };

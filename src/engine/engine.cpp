@@ -28,6 +28,7 @@
 #include "graphics/texture_manager.h"
 
 #include "universe/hierarchy.h"
+#include "universe/universe.h"
 
 
 namespace Lumix

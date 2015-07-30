@@ -3,16 +3,18 @@
 #include "core/crc32.h"
 #include "core/json_serializer.h"
 #include "core/path_utils.h"
+#include "core/stack_allocator.h"
 #include "core/string.h"
 #include "editor/ieditor_command.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "graphics/render_scene.h"
 #include "universe/hierarchy.h"
+#include "universe/universe.h"
 #include <qmimedata.h>
 
 
-static const uint32_t RENDERABLE_HASH = crc32("renderable");
+static const uint32_t RENDERABLE_HASH = Lumix::crc32("renderable");
 
 
 class SetParentEditorCommand : public Lumix::IEditorCommand
@@ -63,7 +65,7 @@ public:
 
 	virtual uint32_t getType() override
 	{
-		static const uint32_t hash = crc32("set_entity_parent");
+		static const uint32_t hash = Lumix::crc32("set_entity_parent");
 		return hash;
 	}
 
@@ -437,15 +439,15 @@ public:
 					item->m_entity);
 			if (renderable.isValid())
 			{
-				Lumix::StackAllocator<LUMIX_MAX_PATH> allocator;
+				Lumix::StackAllocator<Lumix::MAX_PATH_LENGTH> allocator;
 				Lumix::string path(allocator);
 				static_cast<Lumix::RenderScene*>(renderable.scene)
 					->getRenderablePath(renderable.index, path);
 				if (path.length() != 0)
 				{
-					char basename[LUMIX_MAX_PATH];
+					char basename[Lumix::MAX_PATH_LENGTH];
 					Lumix::PathUtils::getBasename(
-						basename, LUMIX_MAX_PATH, path.c_str());
+						basename, Lumix::MAX_PATH_LENGTH, path.c_str());
 					return name && name[0] != '\0'
 							   ? QVariant(
 									 QString("%1 - %2").arg(name).arg(basename))
@@ -729,7 +731,7 @@ void EntityList::on_comboBox_activated(const QString& arg1)
 	{
 		if (arg1 == m_editor->getComponentTypeName(i))
 		{
-			m_filter->filterComponent(crc32(m_editor->getComponentTypeID(i)));
+			m_filter->filterComponent(Lumix::crc32(m_editor->getComponentTypeID(i)));
 			if (m_is_update_enabled)
 			{
 				m_filter->invalidate();

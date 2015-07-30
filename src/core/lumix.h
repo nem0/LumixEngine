@@ -24,13 +24,11 @@
 #include <type_traits>	
 #include <cstdint>
 #include <cassert>
-#include <malloc.h>
-
-const uint32_t LUMIX_MAX_PATH = 260;
 
 
 namespace Lumix
 {
+	const uint32_t MAX_PATH_LENGTH = 260;
 	typedef int ComponentIndex;
 	typedef int Entity;
 	const int INVALID_ENTITY = -1;

@@ -1,4 +1,5 @@
 #include "entity_template_list.h"
+#include "core/crc32.h"
 #include "ui_entity_template_list.h"
 #include "editor/entity_template_system.h"
 #include "editor/world_editor.h"
@@ -58,7 +59,7 @@ int EntityTemplateList::getTemplate() const
 {
 	if (m_ui->templateList->currentIndex().row() >= 0)
 	{
-		uint32_t hash = crc32(m_ui->templateList->item(m_ui->templateList->currentIndex().row())->text().toLatin1().data());
+		uint32_t hash = Lumix::crc32(m_ui->templateList->item(m_ui->templateList->currentIndex().row())->text().toLatin1().data());
 		return m_editor->getEntityTemplateSystem().getInstances(hash)[0];
 	}
 	return Lumix::INVALID_ENTITY;
