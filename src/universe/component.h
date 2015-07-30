@@ -16,7 +16,7 @@ struct LUMIX_ENGINE_API ComponentUID final
 
 	typedef uint32_t Type;
 
-	ComponentUID() { index = -1; }
+	ComponentUID() { index = -1; scene = nullptr; entity = -1; type = 0; }
 	ComponentUID(Entity _entity,
 				 uint32_t _type,
 				 IScene* _scene,
