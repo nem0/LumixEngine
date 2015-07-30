@@ -4,7 +4,6 @@
 #include "core/fs/ifile_system_defines.h"
 #include "core/math_utils.h"
 
-#include <string.h>
 
 namespace Lumix
 {
