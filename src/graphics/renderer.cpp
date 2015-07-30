@@ -336,8 +336,8 @@ struct RendererImpl : public Renderer
 				"terrain",
 				allocator.newObject<ResourcePropertyDescriptor<RenderScene>>(
 					"material",
-					&RenderScene::getTerrainMaterial,
-					&RenderScene::setTerrainMaterial,
+					&RenderScene::getTerrainMaterialPath,
+					&RenderScene::setTerrainMaterialPath,
 					"Material (*.mat)",
 					allocator));
 			editor.registerProperty(

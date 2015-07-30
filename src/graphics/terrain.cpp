@@ -837,6 +837,14 @@ namespace Lumix
 				m_splatmap->addDataReference();
 				is_data_ready = false;
 			}
+
+			Texture* colormap = m_material->getTextureByUniform("u_texColormap");
+			if (colormap && colormap->getData() == nullptr)
+			{
+				colormap->addDataReference();
+				is_data_ready = false;
+			}
+
 			if (is_data_ready)
 			{
 				m_allocator.deleteObject(m_root);

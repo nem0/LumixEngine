@@ -3,7 +3,6 @@
 #include "core/json_serializer.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
-#include "core/stack_allocator.h"
 #include "editor/entity_template_system.h"
 #include "editor/ieditor_command.h"
 #include "engine/engine.h"
@@ -33,6 +32,7 @@
 static const uint32_t RENDERABLE_HASH = Lumix::crc32("renderable");
 static const char* HEIGHTMAP_UNIFORM = "u_texHeightmap";
 static const char* SPLATMAP_UNIFORM = "u_texSplatmap";
+static const char* COLORMAP_UNIFORM = "u_texColormap";
 static const char* TEX_COLOR0_UNIFORM = "u_texColor0";
 static const char* TEX_COLOR1_UNIFORM = "u_texColor1";
 static const char* TEX_COLOR2_UNIFORM = "u_texColor2";
@@ -48,6 +48,7 @@ private:
 		int m_center_y;
 		int m_radius;
 		float m_amount;
+		Lumix::Vec3 m_color;
 	};
 
 
@@ -63,42 +64,11 @@ public:
 
 	PaintTerrainCommand(Lumix::WorldEditor& editor,
 						TerrainEditor::Type type,
-						const Lumix::Vec3& hit_pos,
-						float radius,
-						float rel_amount,
-						Lumix::ComponentUID terrain,
-						bool can_be_merged)
-		: m_world_editor(editor)
-		, m_terrain(terrain)
-		, m_can_be_merged(can_be_merged)
-		, m_new_data(editor.getAllocator())
-		, m_old_data(editor.getAllocator())
-		, m_items(editor.getAllocator())
-		, m_type(type)
-		, m_texture_idx(0)
-	{
-		Lumix::Matrix entity_mtx =
-			editor.getUniverse()->getMatrix(terrain.entity);
-		entity_mtx.fastInverse();
-		Lumix::Vec3 local_pos = entity_mtx.multiplyPosition(hit_pos);
-		float xz_scale = static_cast<Lumix::RenderScene*>(terrain.scene)
-							 ->getTerrainXZScale(terrain.index);
-		local_pos = local_pos / xz_scale;
-
-		Item& item = m_items.pushEmpty();
-		item.m_center_x = (int)local_pos.x;
-		item.m_center_y = (int)local_pos.z;
-		item.m_radius = (int)radius;
-		item.m_amount = rel_amount;
-	}
-
-
-	PaintTerrainCommand(Lumix::WorldEditor& editor,
-						TerrainEditor::Type type,
 						int texture_idx,
 						const Lumix::Vec3& hit_pos,
 						float radius,
 						float rel_amount,
+						Lumix::Vec3 color,
 						Lumix::ComponentUID terrain,
 						bool can_be_merged)
 		: m_world_editor(editor)
@@ -110,6 +80,7 @@ public:
 		, m_type(type)
 		, m_texture_idx(texture_idx)
 	{
+		m_width = m_height = m_x = m_y = -1;
 		Lumix::Matrix entity_mtx =
 			editor.getUniverse()->getMatrix(terrain.entity);
 		entity_mtx.fastInverse();
@@ -127,6 +98,7 @@ public:
 			(int)(local_pos.z / hm->getHeight() * texture->getHeight());
 		item.m_radius = (int)radius;
 		item.m_amount = rel_amount;
+		item.m_color = color;
 	}
 
 
@@ -141,6 +113,9 @@ public:
 			serializer.serializeArrayItem(m_items[i].m_center_x);
 			serializer.serializeArrayItem(m_items[i].m_center_y);
 			serializer.serializeArrayItem(m_items[i].m_radius);
+			serializer.serializeArrayItem(m_items[i].m_color.x);
+			serializer.serializeArrayItem(m_items[i].m_color.y);
+			serializer.serializeArrayItem(m_items[i].m_color.z);
 		}
 		serializer.endArray();
 	}
@@ -161,6 +136,9 @@ public:
 			serializer.deserializeArrayItem(item.m_center_x, 0);
 			serializer.deserializeArrayItem(item.m_center_y, 0);
 			serializer.deserializeArrayItem(item.m_radius, 0);
+			serializer.deserializeArrayItem(item.m_color.x, 0);
+			serializer.deserializeArrayItem(item.m_color.y, 0);
+			serializer.deserializeArrayItem(item.m_color.z, 0);
 		}
 		serializer.deserializeArrayEnd();
 	}
@@ -211,23 +189,33 @@ public:
 private:
 	Lumix::Material* getMaterial()
 	{
-		Lumix::StackAllocator<Lumix::MAX_PATH_LENGTH> allocator;
-		Lumix::string material_path(allocator);
-		static_cast<Lumix::RenderScene*>(m_terrain.scene)
-			->getTerrainMaterial(m_terrain.index, material_path);
+		auto* material = static_cast<Lumix::RenderScene*>(m_terrain.scene)
+							 ->getTerrainMaterial(m_terrain.index);
 		return static_cast<Lumix::Material*>(
 			m_world_editor.getEngine()
 				.getResourceManager()
 				.get(Lumix::ResourceManager::MATERIAL)
-				->get(Lumix::Path(material_path.c_str())));
+				->get(Lumix::Path(material->getPath().c_str())));
 	}
 
 
 	Lumix::Texture* getDestinationTexture()
 	{
-		return getMaterial()->getTextureByUniform(
-			m_type == TerrainEditor::TEXTURE ? SPLATMAP_UNIFORM
-											 : HEIGHTMAP_UNIFORM);
+		const char* uniform_name = "";
+		switch (m_type)
+		{
+			case TerrainEditor::LAYER:
+				uniform_name = SPLATMAP_UNIFORM;
+				break;
+			case TerrainEditor::COLOR:
+				uniform_name = COLORMAP_UNIFORM;
+				break;
+			default:
+				uniform_name = HEIGHTMAP_UNIFORM;
+				break;
+		}
+
+		return getMaterial()->getTextureByUniform(uniform_name);
 	}
 
 
@@ -279,9 +267,48 @@ private:
 	}
 
 
+	void rasterColorItem(Lumix::Texture* texture, Lumix::Array<uint8_t>& data, Item& item)
+	{
+		int texture_width = texture->getWidth();
+		int from_x =
+			Lumix::Math::maxValue((int)(item.m_center_x - item.m_radius), 0);
+		int to_x = Lumix::Math::minValue((int)(item.m_center_x + item.m_radius),
+			texture_width);
+		int from_z =
+			Lumix::Math::maxValue((int)(item.m_center_y - item.m_radius), 0);
+		int to_z = Lumix::Math::minValue((int)(item.m_center_y + item.m_radius),
+			texture_width);
+
+		if (texture->getBytesPerPixel() != 4)
+		{
+			ASSERT(false);
+			return;
+		}
+		for (int i = from_x, end = to_x; i < end; ++i)
+		{
+			for (int j = from_z, end2 = to_z; j < end2; ++j)
+			{
+				float attenuation = getAttenuation(item, i, j);
+				int offset = 4 * (i - m_x + (j - m_y) * m_width);
+				uint8_t* d = &data[offset];
+				d[0] += uint8_t((item.m_color.x * 255 - d[0]) * attenuation);
+				d[1] += uint8_t((item.m_color.y * 255 - d[1]) * attenuation);
+				d[2] += uint8_t((item.m_color.z * 255 - d[2]) * attenuation);
+				d[3] = 255;
+			}
+		}
+	}
+
+
 	void
 	rasterItem(Lumix::Texture* texture, Lumix::Array<uint8_t>& data, Item& item)
 	{
+		if (m_type == TerrainEditor::COLOR)
+		{
+			rasterColorItem(texture, data, item);
+			return;
+		}
+
 		int texture_width = texture->getWidth();
 		int from_x =
 			Lumix::Math::maxValue((int)(item.m_center_x - item.m_radius), 0);
@@ -327,7 +354,7 @@ private:
 					case 4:
 					{
 						int add = attenuation * amount;
-						if (m_type == TerrainEditor::TEXTURE)
+						if (m_type == TerrainEditor::LAYER)
 						{
 							addTexelSplatWeight(
 								data[4 * offset + m_texture_idx],
@@ -588,8 +615,10 @@ private:
 TerrainComponentPlugin::TerrainComponentPlugin(MainWindow& main_window)
 	: m_main_window(main_window)
 {
+	m_tools_item = nullptr;
+	m_texture_tool_item = nullptr;
 	m_terrain_editor =
-		new TerrainEditor(*main_window.getWorldEditor(), main_window);
+		new TerrainEditor(*main_window.getWorldEditor(), main_window, *this);
 	connect(
 		main_window.getPropertyView(),
 		&PropertyView::componentNodeCreated,
@@ -644,8 +673,8 @@ void TerrainComponentPlugin::createEditor(DynamicObjectModel::Node& node,
 	{
 		auto container = new QWidget(parent);
 		auto layout = new QHBoxLayout(container);
-		auto height_button = new QPushButton("Heightmap", container);
-		auto texture_button = new QPushButton("Splatmap", container);
+		auto* height_button = new QPushButton("Heightmap", container);
+		auto* texture_button = new QPushButton("Splatmap", container);
 		height_button->connect(
 			height_button,
 			&QPushButton::clicked,
@@ -664,6 +693,22 @@ void TerrainComponentPlugin::createEditor(DynamicObjectModel::Node& node,
 			});
 		layout->addWidget(height_button);
 		layout->addWidget(texture_button);
+
+		Lumix::Material* material = m_terrain_editor->getMaterial();
+		if (material->getTextureByUniform(COLORMAP_UNIFORM))
+		{
+			auto* colormap_button = new QPushButton("Colormap", container);
+			colormap_button->connect(
+				colormap_button,
+				&QPushButton::clicked,
+				[this]()
+			{
+				Lumix::Material* material = m_terrain_editor->getMaterial();
+				material->getTextureByUniform(COLORMAP_UNIFORM)->save();
+			});
+			layout->addWidget(colormap_button);
+		}
+
 		layout->setContentsMargins(0, 0, 0, 0);
 		layout->addStretch();
 		return container;
@@ -711,8 +756,13 @@ void TerrainComponentPlugin::createEditor(DynamicObjectModel::Node& node,
 		editor->addItem("Raise height");
 		editor->addItem("Lower height");
 		editor->addItem("Smooth height");
-		editor->addItem("Texture");
+		editor->addItem("Layers");
 		editor->addItem("Entity");
+		auto* material = m_terrain_editor->getMaterial();
+		if (material->getTextureByUniform(COLORMAP_UNIFORM))
+		{
+			editor->addItem("Color");
+		}
 		m_terrain_editor->m_type = TerrainEditor::RAISE_HEIGHT;
 		connect(editor,
 				(void (QComboBox::*)(int)) & QComboBox::currentIndexChanged,
@@ -731,11 +781,14 @@ void TerrainComponentPlugin::createEditor(DynamicObjectModel::Node& node,
 						case TerrainEditor::LOWER_HEIGHT:
 						case TerrainEditor::SMOOTH_HEIGHT:
 							break;
-						case TerrainEditor::TEXTURE:
+						case TerrainEditor::LAYER:
 							addTextureNode(tools_node);
 							break;
 						case TerrainEditor::ENTITY:
 							addEntityTemplateNode(tools_node);
+							break;
+						case TerrainEditor::COLOR:
+							addColorNode(tools_node);
 							break;
 						default:
 							ASSERT(false);
@@ -743,6 +796,24 @@ void TerrainComponentPlugin::createEditor(DynamicObjectModel::Node& node,
 				});
 		return editor;
 	};
+}
+
+
+void TerrainComponentPlugin::addColorNode(DynamicObjectModel::Node& node)
+{
+	auto model = static_cast<DynamicObjectModel*>(
+		m_main_window.getPropertyView()->getModel());
+	model->childAboutToBeAdded(node);
+	auto& child = node.addChild("Color");
+	child.m_getter = [this]() -> QVariant
+	{
+		return m_selected_color;
+	};
+	child.m_setter = [this](const QVariant& value)
+	{
+		m_selected_color = value.value<QColor>();
+	};
+	model->childAdded();
 }
 
 
@@ -838,9 +909,11 @@ TerrainEditor::~TerrainEditor()
 
 
 TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor,
-							 MainWindow& main_window)
+							 MainWindow& main_window,
+							 TerrainComponentPlugin& plugin)
 	: m_world_editor(editor)
 	, m_main_window(main_window)
+	, m_plugin(plugin)
 {
 	editor.addPlugin(*this);
 	m_texture_tree_item = nullptr;
@@ -965,7 +1038,8 @@ bool TerrainEditor::onEntityMouseDown(const Lumix::RayCastModelHit& hit,
 					case RAISE_HEIGHT:
 					case LOWER_HEIGHT:
 					case SMOOTH_HEIGHT:
-					case TEXTURE:
+					case COLOR:
+					case LAYER:
 						paint(hit, m_type, false);
 						break;
 					case ENTITY:
@@ -1004,7 +1078,8 @@ void TerrainEditor::onMouseMove(int x, int y, int, int, int)
 				case RAISE_HEIGHT:
 				case LOWER_HEIGHT:
 				case SMOOTH_HEIGHT:
-				case TEXTURE:
+				case COLOR:
+				case LAYER:
 					paint(hit, m_type, true);
 					break;
 				case ENTITY:
@@ -1027,15 +1102,8 @@ void TerrainEditor::onMouseUp(int, int, Lumix::MouseButton::Value)
 
 Lumix::Material* TerrainEditor::getMaterial()
 {
-	Lumix::StackAllocator<Lumix::MAX_PATH_LENGTH> allocator;
-	Lumix::string material_path(allocator);
-	static_cast<Lumix::RenderScene*>(m_component.scene)
-		->getTerrainMaterial(m_component.index, material_path);
-	return static_cast<Lumix::Material*>(
-		m_world_editor.getEngine()
-			.getResourceManager()
-			.get(Lumix::ResourceManager::MATERIAL)
-			->get(Lumix::Path(material_path.c_str())));
+	auto* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
+	return scene->getTerrainMaterial(m_component.index);
 }
 
 
@@ -1208,6 +1276,10 @@ void TerrainEditor::paint(const Lumix::RayCastModelHit& hit,
 						  bool old_stroke)
 {
 	Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
+	Lumix::Vec3 color;
+	color.x = m_plugin.getSelectedColor().redF();
+	color.y = m_plugin.getSelectedColor().greenF();
+	color.z = m_plugin.getSelectedColor().blueF();
 	PaintTerrainCommand* command =
 		m_world_editor.getAllocator().newObject<PaintTerrainCommand>(
 			m_world_editor,
@@ -1216,6 +1288,7 @@ void TerrainEditor::paint(const Lumix::RayCastModelHit& hit,
 			hit_pos,
 			(float)m_terrain_brush_size,
 			m_terrain_brush_strength,
+			color,
 			m_component,
 			old_stroke);
 	m_world_editor.executeCommand(command);
