@@ -72,7 +72,7 @@ void InsertMeshCommand::execute()
 			rel_path, Lumix::MAX_PATH_LENGTH, Lumix::Path(m_mesh_path.c_str()));
 		Lumix::StackAllocator<Lumix::MAX_PATH_LENGTH> allocator;
 		static_cast<Lumix::RenderScene*>(scene)
-			->setRenderablePath(cmp, Lumix::string(rel_path, allocator));
+			->setRenderablePath(cmp, rel_path);
 	}
 }
 

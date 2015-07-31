@@ -95,8 +95,7 @@ static void setEntityRotation(
 static void setRenderablePath(IScene* scene, int component, const char* path)
 {
 	RenderScene* render_scene = (RenderScene*)scene;
-	render_scene->setRenderablePath(component,
-									string(path, render_scene->getAllocator()));
+	render_scene->setRenderablePath(component, path);
 }
 
 
