@@ -189,10 +189,11 @@ public:
 				fps_limiter->beginFrame();
 
 				m_main_window->update();
+				
 				m_main_window->getSceneView()->render();
 				m_main_window->getGameView()->render();
 
-				Lumix::Renderer::frame();
+				m_engine->getRenderer().frame();
 
 				m_world_editor->update();
 				if (m_main_window->getSceneView()->isFrameDebuggerActive())

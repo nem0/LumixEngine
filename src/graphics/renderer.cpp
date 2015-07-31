@@ -138,6 +138,7 @@ struct RendererImpl : public Renderer
 		m_pipeline_manager.create(ResourceManager::PIPELINE, manager);
 
 		m_current_pass_hash = crc32("MAIN");
+		m_view_counter = 0;
 	}
 
 	~RendererImpl()
@@ -169,226 +170,224 @@ struct RendererImpl : public Renderer
 
 	void registerPropertyDescriptors()
 	{
-		if (m_engine.getWorldEditor())
-		{
-			WorldEditor& editor = *m_engine.getWorldEditor();
-			IAllocator& allocator = m_engine.getWorldEditor()->getAllocator();
+		ASSERT(m_engine.getWorldEditor());
+		WorldEditor& editor = *m_engine.getWorldEditor();
+		IAllocator& allocator = m_engine.getWorldEditor()->getAllocator();
 
-			editor.registerComponentType("camera", "Camera");
-			editor.registerComponentType("global_light", "Global light");
-			editor.registerComponentType("renderable", "Mesh");
-			editor.registerComponentType("point_light", "Point light");
-			editor.registerComponentType("terrain", "Terrain");
+		editor.registerComponentType("camera", "Camera");
+		editor.registerComponentType("global_light", "Global light");
+		editor.registerComponentType("renderable", "Mesh");
+		editor.registerComponentType("point_light", "Point light");
+		editor.registerComponentType("terrain", "Terrain");
 
-			editor.registerProperty(
-				"camera",
-				allocator.newObject<StringPropertyDescriptor<RenderScene>>(
-					"slot",
-					&RenderScene::getCameraSlot,
-					&RenderScene::setCameraSlot,
-					allocator));
-			editor.registerProperty(
-				"camera",
-				allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
-					"fov",
-					&RenderScene::getCameraFOV,
-					&RenderScene::setCameraFOV,
-					0.0f,
-					360.0f,
-					1.0f,
-					allocator));
-			editor.registerProperty(
-				"camera",
-				allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
-					"near",
-					&RenderScene::getCameraNearPlane,
-					&RenderScene::setCameraNearPlane,
-					0.0f,
-					FLT_MAX,
-					0.0f,
-					allocator));
-			editor.registerProperty(
-				"camera",
-				allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
-					"far",
-					&RenderScene::getCameraFarPlane,
-					&RenderScene::setCameraFarPlane,
-					0.0f,
-					FLT_MAX,
-					0.0f,
-					allocator));
+		editor.registerProperty(
+			"camera",
+			allocator.newObject<StringPropertyDescriptor<RenderScene>>(
+				"slot",
+				&RenderScene::getCameraSlot,
+				&RenderScene::setCameraSlot,
+				allocator));
+		editor.registerProperty(
+			"camera",
+			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
+				"fov",
+				&RenderScene::getCameraFOV,
+				&RenderScene::setCameraFOV,
+				0.0f,
+				360.0f,
+				1.0f,
+				allocator));
+		editor.registerProperty(
+			"camera",
+			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
+				"near",
+				&RenderScene::getCameraNearPlane,
+				&RenderScene::setCameraNearPlane,
+				0.0f,
+				FLT_MAX,
+				0.0f,
+				allocator));
+		editor.registerProperty(
+			"camera",
+			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
+				"far",
+				&RenderScene::getCameraFarPlane,
+				&RenderScene::setCameraFarPlane,
+				0.0f,
+				FLT_MAX,
+				0.0f,
+				allocator));
 
-			editor.registerProperty(
-				"renderable",
-				allocator.newObject<ResourcePropertyDescriptor<RenderScene>>(
-					"source",
-					&RenderScene::getRenderablePath,
-					&RenderScene::setRenderablePath,
-					"Mesh (*.msh)",
-					allocator));
-			editor.registerProperty(
-				"renderable",
-				allocator.newObject<BoolPropertyDescriptor<RenderScene>>(
-					"is_always_visible",
-					&RenderScene::isRenderableAlwaysVisible,
-					&RenderScene::setRenderableIsAlwaysVisible,
-					allocator));
+		editor.registerProperty(
+			"renderable",
+			allocator.newObject<ResourcePropertyDescriptor<RenderScene>>(
+				"source",
+				&RenderScene::getRenderablePath,
+				&RenderScene::setRenderablePath,
+				"Mesh (*.msh)",
+				allocator));
+		editor.registerProperty(
+			"renderable",
+			allocator.newObject<BoolPropertyDescriptor<RenderScene>>(
+				"is_always_visible",
+				&RenderScene::isRenderableAlwaysVisible,
+				&RenderScene::setRenderableIsAlwaysVisible,
+				allocator));
 
-			editor.registerProperty(
-				"global_light",
-				allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
-					"ambient_intensity",
-					&RenderScene::getLightAmbientIntensity,
-					&RenderScene::setLightAmbientIntensity,
-					0.0f,
-					1.0f,
-					0.05f,
-					allocator));
-			editor.registerProperty(
-				"global_light",
-				allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
-					"intensity",
-					&RenderScene::getGlobalLightIntensity,
-					&RenderScene::setGlobalLightIntensity,
-					0.0f,
-					1.0f,
-					0.05f,
-					allocator));
-			editor.registerProperty(
-				"global_light",
-				allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
-					"fog_density",
-					&RenderScene::getFogDensity,
-					&RenderScene::setFogDensity,
-					0.0f,
-					1.0f,
-					0.01f,
-					allocator));
-			editor.registerProperty(
-				"global_light",
-				allocator.newObject<ColorPropertyDescriptor<RenderScene>>(
-					"ambient_color",
-					&RenderScene::getLightAmbientColor,
-					&RenderScene::setLightAmbientColor,
-					allocator));
-			editor.registerProperty(
-				"global_light",
-				allocator.newObject<ColorPropertyDescriptor<RenderScene>>(
-					"color",
-					&RenderScene::getGlobalLightColor,
-					&RenderScene::setGlobalLightColor,
-					allocator));
-			editor.registerProperty(
-				"global_light",
-				allocator.newObject<ColorPropertyDescriptor<RenderScene>>(
-					"fog_color",
-					&RenderScene::getFogColor,
-					&RenderScene::setFogColor,
-					allocator));
+		editor.registerProperty(
+			"global_light",
+			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
+				"ambient_intensity",
+				&RenderScene::getLightAmbientIntensity,
+				&RenderScene::setLightAmbientIntensity,
+				0.0f,
+				1.0f,
+				0.05f,
+				allocator));
+		editor.registerProperty(
+			"global_light",
+			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
+				"intensity",
+				&RenderScene::getGlobalLightIntensity,
+				&RenderScene::setGlobalLightIntensity,
+				0.0f,
+				1.0f,
+				0.05f,
+				allocator));
+		editor.registerProperty(
+			"global_light",
+			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
+				"fog_density",
+				&RenderScene::getFogDensity,
+				&RenderScene::setFogDensity,
+				0.0f,
+				1.0f,
+				0.01f,
+				allocator));
+		editor.registerProperty(
+			"global_light",
+			allocator.newObject<ColorPropertyDescriptor<RenderScene>>(
+				"ambient_color",
+				&RenderScene::getLightAmbientColor,
+				&RenderScene::setLightAmbientColor,
+				allocator));
+		editor.registerProperty(
+			"global_light",
+			allocator.newObject<ColorPropertyDescriptor<RenderScene>>(
+				"color",
+				&RenderScene::getGlobalLightColor,
+				&RenderScene::setGlobalLightColor,
+				allocator));
+		editor.registerProperty(
+			"global_light",
+			allocator.newObject<ColorPropertyDescriptor<RenderScene>>(
+				"fog_color",
+				&RenderScene::getFogColor,
+				&RenderScene::setFogColor,
+				allocator));
 
-			editor.registerProperty(
-				"point_light",
-				allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
-					"intensity",
-					&RenderScene::getPointLightIntensity,
-					&RenderScene::setPointLightIntensity,
-					0.0f,
-					1.0f,
-					0.05f,
-					allocator));
-			editor.registerProperty(
-				"point_light",
-				allocator.newObject<ColorPropertyDescriptor<RenderScene>>(
-					"color",
-					&RenderScene::getPointLightColor,
-					&RenderScene::setPointLightColor,
-					allocator));
-			editor.registerProperty(
-				"point_light",
-				allocator.newObject<ColorPropertyDescriptor<RenderScene>>(
-					"specular",
-					&RenderScene::getPointLightSpecularColor,
-					&RenderScene::setPointLightSpecularColor,
-					allocator));
-			editor.registerProperty(
-				"point_light",
-				allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
-					"range",
-					&RenderScene::getLightRange,
-					&RenderScene::setLightRange,
-					0.0f,
-					FLT_MAX,
-					0.0f,
-					allocator));
-			editor.registerProperty(
-				"point_light",
-				allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
-					"FOV",
-					&RenderScene::getLightFOV,
-					&RenderScene::setLightFOV,
-					0.0f,
-					360.0f,
-					5.0f,
-					allocator));
+		editor.registerProperty(
+			"point_light",
+			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
+				"intensity",
+				&RenderScene::getPointLightIntensity,
+				&RenderScene::setPointLightIntensity,
+				0.0f,
+				1.0f,
+				0.05f,
+				allocator));
+		editor.registerProperty(
+			"point_light",
+			allocator.newObject<ColorPropertyDescriptor<RenderScene>>(
+				"color",
+				&RenderScene::getPointLightColor,
+				&RenderScene::setPointLightColor,
+				allocator));
+		editor.registerProperty(
+			"point_light",
+			allocator.newObject<ColorPropertyDescriptor<RenderScene>>(
+				"specular",
+				&RenderScene::getPointLightSpecularColor,
+				&RenderScene::setPointLightSpecularColor,
+				allocator));
+		editor.registerProperty(
+			"point_light",
+			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
+				"range",
+				&RenderScene::getLightRange,
+				&RenderScene::setLightRange,
+				0.0f,
+				FLT_MAX,
+				0.0f,
+				allocator));
+		editor.registerProperty(
+			"point_light",
+			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
+				"FOV",
+				&RenderScene::getLightFOV,
+				&RenderScene::setLightFOV,
+				0.0f,
+				360.0f,
+				5.0f,
+				allocator));
 
-			editor.registerProperty(
-				"terrain",
-				allocator.newObject<ResourcePropertyDescriptor<RenderScene>>(
-					"material",
-					&RenderScene::getTerrainMaterialPath,
-					&RenderScene::setTerrainMaterialPath,
-					"Material (*.mat)",
-					allocator));
-			editor.registerProperty(
-				"terrain",
-				allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
-					"xz_scale",
-					&RenderScene::getTerrainXZScale,
-					&RenderScene::setTerrainXZScale,
-					0.0f,
-					FLT_MAX,
-					0.0f,
-					allocator));
-			editor.registerProperty(
-				"terrain",
-				allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
-					"y_scale",
-					&RenderScene::getTerrainYScale,
-					&RenderScene::setTerrainYScale,
-					0.0f,
-					FLT_MAX,
-					0.0f,
-					allocator));
+		editor.registerProperty(
+			"terrain",
+			allocator.newObject<ResourcePropertyDescriptor<RenderScene>>(
+				"material",
+				&RenderScene::getTerrainMaterialPath,
+				&RenderScene::setTerrainMaterialPath,
+				"Material (*.mat)",
+				allocator));
+		editor.registerProperty(
+			"terrain",
+			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
+				"xz_scale",
+				&RenderScene::getTerrainXZScale,
+				&RenderScene::setTerrainXZScale,
+				0.0f,
+				FLT_MAX,
+				0.0f,
+				allocator));
+		editor.registerProperty(
+			"terrain",
+			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
+				"y_scale",
+				&RenderScene::getTerrainYScale,
+				&RenderScene::setTerrainYScale,
+				0.0f,
+				FLT_MAX,
+				0.0f,
+				allocator));
 
-			auto grass = allocator.newObject<ArrayDescriptor<RenderScene>>(
-				"grass",
-				&RenderScene::getGrassCount,
-				&RenderScene::addGrass,
-				&RenderScene::removeGrass,
+		auto grass = allocator.newObject<ArrayDescriptor<RenderScene>>(
+			"grass",
+			&RenderScene::getGrassCount,
+			&RenderScene::addGrass,
+			&RenderScene::removeGrass,
+			allocator);
+		grass->addChild(
+			allocator.newObject<ResourceArrayObjectDescriptor<RenderScene>>(
+				"mesh",
+				&RenderScene::getGrassPath,
+				&RenderScene::setGrassPath,
+				"Mesh (*.msh)",
+				allocator));
+		auto ground =
+			allocator.newObject<IntArrayObjectDescriptor<RenderScene>>(
+				"ground",
+				&RenderScene::getGrassGround,
+				&RenderScene::setGrassGround,
 				allocator);
-			grass->addChild(
-				allocator.newObject<ResourceArrayObjectDescriptor<RenderScene>>(
-					"mesh",
-					&RenderScene::getGrassPath,
-					&RenderScene::setGrassPath,
-					"Mesh (*.msh)",
-					allocator));
-			auto ground =
-				allocator.newObject<IntArrayObjectDescriptor<RenderScene>>(
-					"ground",
-					&RenderScene::getGrassGround,
-					&RenderScene::setGrassGround,
-					allocator);
-			ground->setLimit(0, 4);
-			grass->addChild(ground);
-			grass->addChild(
-				allocator.newObject<IntArrayObjectDescriptor<RenderScene>>(
-					"density",
-					&RenderScene::getGrassDensity,
-					&RenderScene::setGrassDensity,
-					allocator));
-			editor.registerProperty("terrain", grass);
-		}
+		ground->setLimit(0, 4);
+		grass->addChild(ground);
+		grass->addChild(
+			allocator.newObject<IntArrayObjectDescriptor<RenderScene>>(
+				"density",
+				&RenderScene::getGrassDensity,
+				&RenderScene::setGrassDensity,
+				allocator));
+		editor.registerProperty("terrain", grass);
 	}
 
 
@@ -432,6 +431,25 @@ struct RendererImpl : public Renderer
 	}
 
 
+	virtual void frame() override
+	{
+		bgfx::frame();
+		m_view_counter = 0;
+	}
+
+
+	virtual int getViewCounter() const override
+	{
+		return m_view_counter;
+	}
+
+
+	virtual void viewCounterAdd() override
+	{
+		++m_view_counter;
+	}
+
+
 	Engine& m_engine;
 	Debug::Allocator m_allocator;
 	Lumix::Array<ShaderCombinations::Pass> m_passes;
@@ -442,6 +460,8 @@ struct RendererImpl : public Renderer
 	ModelManager m_model_manager;
 	PipelineManager m_pipeline_manager;
 	uint32_t m_current_pass_hash;
+	int m_view_counter;
+
 	static HWND s_hwnd;
 };
 
@@ -452,12 +472,6 @@ HWND RendererImpl::s_hwnd;
 void Renderer::setInitData(void* data)
 {
 	RendererImpl::s_hwnd = (HWND)data;
-}
-
-
-void Renderer::frame()
-{
-	bgfx::frame();
 }
 
 

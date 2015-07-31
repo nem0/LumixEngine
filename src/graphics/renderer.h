@@ -32,9 +32,11 @@ class LUMIX_ENGINE_API Renderer : public IPlugin
 		static Renderer* createInstance(Engine& engine);
 		static void destroyInstance(Renderer& renderer);
 
-		static void frame();
 		static void setInitData(void* data);
 
+		virtual void frame() = 0;
+		virtual int getViewCounter() const = 0;
+		virtual void viewCounterAdd() = 0;
 		virtual void makeScreenshot(const Path& filename) = 0;
 		virtual int getPassIdx(const char* pass) = 0;
 

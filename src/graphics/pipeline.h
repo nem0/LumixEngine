@@ -57,6 +57,7 @@ class LUMIX_ENGINE_API Pipeline : public Resource
 };
 
 
+
 class LUMIX_ENGINE_API PipelineInstance abstract
 {
 	public:

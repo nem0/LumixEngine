@@ -380,20 +380,24 @@ struct PipelineInstanceImpl : public PipelineInstance
 	void setPass(const char* name)
 	{
 		m_pass_idx = m_renderer.getPassIdx(name);
+		bool found = false;
 		for (int i = 0; i < lengthOf(m_view2pass_map); ++i)
 		{
 			if (m_view2pass_map[i] == m_pass_idx)
 			{
 				m_view_idx = i;
-				break;
-			}
-			else if (m_view2pass_map[i] == 0xff)
-			{
-				m_view2pass_map[i] = m_pass_idx;
-				m_view_idx = i;
+				found = true;
 				break;
 			}
 		}
+
+		if (!found)
+		{
+			m_renderer.viewCounterAdd();
+			m_view_idx = m_renderer.getViewCounter();
+			m_view2pass_map[m_view_idx] = m_pass_idx;
+		}
+
 		if (m_current_framebuffer)
 		{
 			bgfx::setViewFrameBuffer(m_view_idx,
@@ -539,7 +543,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 		{
 			if (split_index > 0)
 			{
-				++m_view_idx;
+				m_renderer.viewCounterAdd();
+				m_view_idx = m_renderer.getViewCounter();
 				m_view2pass_map[m_view_idx] = m_pass_idx;
 			}
 
@@ -1262,7 +1267,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 		m_render_state = BGFX_STATE_RGB_WRITE | BGFX_STATE_ALPHA_WRITE |
 						 BGFX_STATE_DEPTH_WRITE | BGFX_STATE_MSAA;
-		m_view_idx = -1;
+		m_view_idx = m_renderer.getViewCounter();
 		m_pass_idx = -1;
 		m_current_framebuffer = m_default_framebuffer;
 		m_global_textures.clear();
