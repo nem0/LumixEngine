@@ -409,18 +409,18 @@ public:
 	}
 
 
-	void getScriptPath(ComponentIndex cmp, string& path)
+	const char* getScriptPath(ComponentIndex cmp)
 	{
-		path = m_scripts[cmp].m_script
+		return m_scripts[cmp].m_script
 				   ? m_scripts[cmp].m_script->getPath().c_str()
 				   : "";
 	}
 
 
-	void setScriptPath(ComponentIndex cmp, const string& path)
+	void setScriptPath(ComponentIndex cmp, const char* path)
 	{
 		m_scripts[cmp].m_script = static_cast<LuaScript*>(
-			m_system.getScriptManager().load(Lumix::Path(path.c_str())));
+			m_system.getScriptManager().load(Lumix::Path(path)));
 	}
 
 
@@ -475,8 +475,7 @@ void LuaScriptSystem::setWorldEditor(WorldEditor& editor)
 		"lua_script",
 		allocator.newObject<FilePropertyDescriptor<LuaScriptScene>>(
 			"source",
-			(void (LuaScriptScene::*)(ComponentIndex, string&)) &
-				LuaScriptScene::getScriptPath,
+			&LuaScriptScene::getScriptPath,
 			&LuaScriptScene::setScriptPath,
 			"Lua (*.lua)",
 			allocator));

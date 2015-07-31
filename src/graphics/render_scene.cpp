@@ -820,12 +820,12 @@ public:
 
 
 	virtual void setTerrainMaterialPath(ComponentIndex cmp,
-									const string& path) override
+									const char* path) override
 	{
 		Material* material =
 			static_cast<Material*>(m_engine.getResourceManager()
 									   .get(ResourceManager::MATERIAL)
-									   ->load(Path(path.c_str())));
+									   ->load(Path(path)));
 		m_terrains[cmp]->setMaterial(material);
 	}
 
@@ -836,15 +836,15 @@ public:
 	}
 
 
-	virtual void getTerrainMaterialPath(ComponentIndex cmp, string& path) override
+	virtual const char* getTerrainMaterialPath(ComponentIndex cmp) override
 	{
 		if (m_terrains[cmp]->getMaterial())
 		{
-			path = m_terrains[cmp]->getMaterial()->getPath().c_str();
+			return m_terrains[cmp]->getMaterial()->getPath().c_str();
 		}
 		else
 		{
-			path = "";
+			return "";
 		}
 	}
 
@@ -929,16 +929,16 @@ public:
 	}
 
 
-	virtual void getRenderablePath(ComponentIndex cmp, string& path) override
+	virtual const char* getRenderablePath(ComponentIndex cmp) override
 	{
 		int index = getRenderable(cmp);
 		if (index >= 0 && m_renderables[index]->m_model)
 		{
-			path = m_renderables[index]->m_model->getPath().c_str();
+			return m_renderables[index]->m_model->getPath().c_str();
 		}
 		else
 		{
-			path = "";
+			return "";
 		}
 	}
 
@@ -959,14 +959,14 @@ public:
 
 
 	virtual void setRenderablePath(ComponentIndex cmp,
-								   const string& path) override
+								   const char* path) override
 	{
 		int renderable_index = getRenderable(cmp);
 		Renderable& r = *m_renderables[renderable_index];
 
 		Model* model = static_cast<Model*>(m_engine.getResourceManager()
 											   .get(ResourceManager::MODEL)
-											   ->load(Path(path.c_str())));
+											   ->load(Path(path)));
 		setModel(renderable_index, model);
 		r.m_matrix = m_universe.getMatrix(r.m_entity);
 	}
@@ -1034,15 +1034,15 @@ public:
 
 
 	virtual void
-	setGrass(ComponentIndex cmp, int index, const string& path) override
+	setGrassPath(ComponentIndex cmp, int index, const char* path) override
 	{
-		m_terrains[cmp]->setGrassTypePath(index, Path(path.c_str()));
+		m_terrains[cmp]->setGrassTypePath(index, Path(path));
 	}
 
 
-	virtual void getGrass(ComponentIndex cmp, int index, string& path) override
+	virtual const char* getGrassPath(ComponentIndex cmp, int index) override
 	{
-		path = m_terrains[cmp]->getGrassTypePath(index).c_str();
+		return m_terrains[cmp]->getGrassTypePath(index).c_str();
 	}
 
 
@@ -1329,15 +1329,15 @@ public:
 	}
 
 	virtual void setCameraSlot(ComponentIndex camera,
-							   const string& slot) override
+							   const char* slot) override
 	{
 		copyString(
-			m_cameras[camera].m_slot, Camera::MAX_SLOT_LENGTH, slot.c_str());
+			m_cameras[camera].m_slot, Camera::MAX_SLOT_LENGTH, slot);
 	}
 
-	virtual void getCameraSlot(ComponentIndex camera, string& slot) override
+	virtual const char* getCameraSlot(ComponentIndex camera) override
 	{
-		slot = m_cameras[camera].m_slot;
+		return m_cameras[camera].m_slot;
 	}
 
 	virtual float getCameraFOV(ComponentIndex camera) override

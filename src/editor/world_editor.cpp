@@ -2820,7 +2820,7 @@ public:
 			ComponentUID cmp = createComponent(CAMERA_HASH, m_camera);
 			ASSERT(cmp.isValid());
 			RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
-			scene->setCameraSlot(cmp.index, string("editor", m_allocator));
+			scene->setCameraSlot(cmp.index, "editor");
 		}
 	}
 

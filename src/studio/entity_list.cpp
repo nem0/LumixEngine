@@ -439,15 +439,14 @@ public:
 					item->m_entity);
 			if (renderable.isValid())
 			{
-				Lumix::StackAllocator<Lumix::MAX_PATH_LENGTH> allocator;
-				Lumix::string path(allocator);
-				static_cast<Lumix::RenderScene*>(renderable.scene)
-					->getRenderablePath(renderable.index, path);
-				if (path.length() != 0)
+				const char* path =
+					static_cast<Lumix::RenderScene*>(renderable.scene)
+						->getRenderablePath(renderable.index);
+				if (path && path[0] != 0)
 				{
 					char basename[Lumix::MAX_PATH_LENGTH];
 					Lumix::PathUtils::getBasename(
-						basename, Lumix::MAX_PATH_LENGTH, path.c_str());
+						basename, Lumix::MAX_PATH_LENGTH, path);
 					return name && name[0] != '\0'
 							   ? QVariant(
 									 QString("%1 - %2").arg(name).arg(basename))

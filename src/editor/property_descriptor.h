@@ -144,49 +144,6 @@ class IntArrayObjectDescriptor : public IIntPropertyDescriptor
 
 
 template <class S>
-class BoolArrayObjectDescriptor : public IPropertyDescriptor
-{
-	public:
-		typedef void (S::*Getter)(ComponentIndex, int, int&);
-		typedef void (S::*Setter)(ComponentIndex, int, const int&);
-
-	public:
-		BoolArrayObjectDescriptor(const char* name, Getter _getter, Setter _setter, IAllocator& allocator)
-			: IPropertyDescriptor(allocator)
-		{
-			setName(name);
-			m_getter = _getter;
-			m_setter = _setter;
-			m_type = BOOL;
-		}
-
-
-		virtual void set(ComponentUID cmp, int index, OutputBlob& stream) const override
-		{
-			bool b;
-			stream.read(&b, sizeof(b));
-			(static_cast<S*>(cmp.scene)->*m_setter)(cmp, index, b);
-		}
-
-
-		virtual void get(ComponentUID cmp, int index, OutputBlob& stream) const override
-		{
-			bool b;
-			(static_cast<S*>(cmp.scene)->*m_getter)(cmp, index, b);
-			stream.write(&b, sizeof(b));
-		}
-
-
-		virtual void set(ComponentUID, OutputBlob&) const { ASSERT(false); };
-		virtual void get(ComponentUID, OutputBlob&) const { ASSERT(false); };
-
-	private:
-		Getter m_getter;
-		Setter m_setter;
-};
-
-
-template <class S>
 class DecimalArrayObjectDescriptor : public IPropertyDescriptor
 {
 	public:
@@ -235,8 +192,8 @@ class StringArrayObjectDescriptor : public IPropertyDescriptor
 		static const int MAX_STRING_SIZE = 300;
 
 	public:
-		typedef void (S::*Getter)(ComponentIndex, int, string&);
-		typedef void (S::*Setter)(ComponentIndex, int, const string&);
+		typedef const char* (S::*Getter)(ComponentIndex, int);
+		typedef void (S::*Setter)(ComponentIndex, int, const char*);
 
 	public:
 		StringArrayObjectDescriptor(const char* name, Getter _getter, Setter _setter, IAllocator& allocator)
@@ -259,9 +216,7 @@ class StringArrayObjectDescriptor : public IPropertyDescriptor
 				++c;
 			}
 			while (*(c - 1) && (c - 1) - tmp < MAX_STRING_SIZE);
-			StackAllocator<MAX_STRING_SIZE> allocator;
-			string s((char*)tmp, allocator);
-			(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, index, s);
+			(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, index, tmp);
 		}
 
 
@@ -269,7 +224,7 @@ class StringArrayObjectDescriptor : public IPropertyDescriptor
 		{
 			StackAllocator<MAX_STRING_SIZE> allocator;
 			string value(allocator);
-			(static_cast<S*>(cmp.scene)->*m_getter)(cmp.index, index, value);
+			value = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index, index);
 			int len = value.length() + 1;
 			stream.write(value.c_str(), len);
 		}
@@ -490,8 +445,8 @@ class StringPropertyDescriptor : public IPropertyDescriptor
 		static const int MAX_STRING_SIZE = 300;
 
 	public:
-		typedef void (S::*Getter)(ComponentIndex, string&);
-		typedef void (S::*Setter)(ComponentIndex, const string&);
+		typedef const char* (S::*Getter)(ComponentIndex);
+		typedef void (S::*Setter)(ComponentIndex, const char*);
 
 	public:
 		StringPropertyDescriptor(const char* name, Getter getter, Setter setter, IAllocator& allocator)
@@ -514,9 +469,7 @@ class StringPropertyDescriptor : public IPropertyDescriptor
 				++c;
 			}
 			while (*(c - 1) && (c - 1) - tmp < MAX_STRING_SIZE);
-			StackAllocator<MAX_STRING_SIZE> allocator;
-			string s((char*)tmp, allocator);
-			(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, s);
+			(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, tmp);
 		}
 
 
@@ -524,7 +477,7 @@ class StringPropertyDescriptor : public IPropertyDescriptor
 		{
 			StackAllocator<MAX_STRING_SIZE> allocator;
 			string value(allocator);
-			(static_cast<S*>(cmp.scene)->*m_getter)(cmp.index, value);
+			value = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
 			int len = value.length() + 1;
 			stream.write(value.c_str(), len);
 		}

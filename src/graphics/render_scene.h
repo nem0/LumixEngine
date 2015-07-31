@@ -165,8 +165,8 @@ public:
 	virtual float getCameraNearPlane(ComponentIndex camera) = 0;
 	virtual float getCameraWidth(ComponentIndex camera) = 0;
 	virtual float getCameraHeight(ComponentIndex camera) = 0;
-	virtual void setCameraSlot(ComponentIndex camera, const string& slot) = 0;
-	virtual void getCameraSlot(ComponentIndex camera, string& slot) = 0;
+	virtual void setCameraSlot(ComponentIndex camera, const char* slot) = 0;
+	virtual const char* getCameraSlot(ComponentIndex camera) = 0;
 	virtual void setCameraSize(ComponentIndex camera, int w, int h) = 0;
 
 	virtual DelegateList<void(ComponentIndex)>& renderableCreated() = 0;
@@ -177,10 +177,10 @@ public:
 	virtual void showRenderable(ComponentIndex cmp) = 0;
 	virtual void hideRenderable(ComponentIndex cmp) = 0;
 	virtual ComponentIndex getRenderableComponent(Entity entity) = 0;
-	virtual void getRenderablePath(ComponentIndex cmp, string& path) = 0;
+	virtual const char* getRenderablePath(ComponentIndex cmp) = 0;
 	virtual void setRenderableLayer(ComponentIndex cmp,
 									const int32_t& layer) = 0;
-	virtual void setRenderablePath(ComponentIndex cmp, const string& path) = 0;
+	virtual void setRenderablePath(ComponentIndex cmp, const char* path) = 0;
 	virtual void setRenderableScale(ComponentIndex cmp, float scale) = 0;
 	virtual void getRenderableInfos(const Frustum& frustum,
 									Array<const RenderableMesh*>& meshes,
@@ -200,8 +200,8 @@ public:
 								 const Vec3& camera_pos,
 								 LIFOAllocator& allocator) = 0;
 	virtual float getTerrainHeightAt(ComponentIndex cmp, float x, float z) = 0;
-	virtual void setTerrainMaterialPath(ComponentIndex cmp, const string& path) = 0;
-	virtual void getTerrainMaterialPath(ComponentIndex cmp, string& path) = 0;
+	virtual void setTerrainMaterialPath(ComponentIndex cmp, const char* path) = 0;
+	virtual const char* getTerrainMaterialPath(ComponentIndex cmp) = 0;
 	virtual Material* getTerrainMaterial(ComponentIndex cmp) = 0;
 	virtual void setTerrainXZScale(ComponentIndex cmp, float scale) = 0;
 	virtual float getTerrainXZScale(ComponentIndex cmp) = 0;
@@ -213,8 +213,8 @@ public:
 	getTerrainSize(ComponentIndex cmp, float* width, float* height) = 0;
 
 	virtual void
-	setGrass(ComponentIndex cmp, int index, const string& path) = 0;
-	virtual void getGrass(ComponentIndex cmp, int index, string& path) = 0;
+	setGrassPath(ComponentIndex cmp, int index, const char* path) = 0;
+	virtual const char* getGrassPath(ComponentIndex cmp, int index) = 0;
 	virtual void setGrassGround(ComponentIndex cmp, int index, int ground) = 0;
 	virtual int getGrassGround(ComponentIndex cmp, int index) = 0;
 	virtual void

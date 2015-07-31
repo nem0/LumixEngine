@@ -360,11 +360,11 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual void getHeightmap(ComponentIndex cmp, string& str) override
+	virtual const char* getHeightmap(ComponentIndex cmp) override
 	{
-		str = m_terrains[cmp]->m_heightmap
-				  ? m_terrains[cmp]->m_heightmap->getPath().c_str()
-				  : "";
+		return m_terrains[cmp]->m_heightmap
+				   ? m_terrains[cmp]->m_heightmap->getPath().c_str()
+				   : "";
 	}
 
 
@@ -407,7 +407,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual void setHeightmap(ComponentIndex cmp, const string& str) override
+	virtual void setHeightmap(ComponentIndex cmp, const char* str) override
 	{
 		if (m_terrains[cmp]->m_heightmap)
 		{
@@ -421,7 +421,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		m_terrains[cmp]->m_heightmap =
 			static_cast<Texture*>(m_engine->getResourceManager()
 									  .get(ResourceManager::TEXTURE)
-									  ->load(Path(str.c_str())));
+									  ->load(Path(str)));
 		m_terrains[cmp]
 			->m_heightmap->onLoaded<Terrain, &Terrain::heightmapLoaded>(
 				m_terrains[cmp]);
@@ -429,20 +429,20 @@ struct PhysicsSceneImpl : public PhysicsScene
 	}
 
 
-	virtual void getShapeSource(ComponentIndex cmp, string& str) override
+	virtual const char* getShapeSource(ComponentIndex cmp) override
 	{
-		str = m_actors[cmp]->getResource()
-				  ? m_actors[cmp]->getResource()->getPath().c_str()
-				  : "";
+		return m_actors[cmp]->getResource()
+				   ? m_actors[cmp]->getResource()->getPath().c_str()
+				   : "";
 	}
 
 
-	virtual void setShapeSource(ComponentIndex cmp, const string& str) override
+	virtual void setShapeSource(ComponentIndex cmp, const char* str) override
 	{
 		ASSERT(m_actors[cmp]);
 		bool is_dynamic = isDynamic(cmp);
 		if (m_actors[cmp]->getResource() &&
-			m_actors[cmp]->getResource()->getPath() == str.c_str() &&
+			m_actors[cmp]->getResource()->getPath() == str &&
 			(!m_actors[cmp]->getPhysxActor() ||
 			 is_dynamic == !m_actors[cmp]->getPhysxActor()->isRigidStatic()))
 		{
@@ -452,7 +452,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		ResourceManagerBase* manager =
 			m_engine->getResourceManager().get(ResourceManager::PHYSICS);
 		PhysicsGeometry* geom_res = static_cast<PhysicsGeometry*>(
-			manager->load(Lumix::Path(str.c_str())));
+			manager->load(Lumix::Path(str)));
 
 		m_actors[cmp]->setResource(geom_res);
 
@@ -1138,7 +1138,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 					strcmp(tmp,
 						   m_terrains[i]->m_heightmap->getPath().c_str()) != 0)
 				{
-					setHeightmap(i, string(tmp, m_allocator));
+					setHeightmap(i, tmp);
 				}
 				m_universe.addComponent(
 					m_terrains[i]->m_entity, HEIGHTFIELD_HASH, this, i);

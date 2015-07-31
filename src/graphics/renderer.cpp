@@ -223,8 +223,7 @@ struct RendererImpl : public Renderer
 				allocator.newObject<ResourcePropertyDescriptor<RenderScene>>(
 					"source",
 					&RenderScene::getRenderablePath,
-					(void (RenderScene::*)(ComponentIndex, const string&)) &
-						RenderScene::setRenderablePath,
+					&RenderScene::setRenderablePath,
 					"Mesh (*.msh)",
 					allocator));
 			editor.registerProperty(
@@ -370,8 +369,8 @@ struct RendererImpl : public Renderer
 			grass->addChild(
 				allocator.newObject<ResourceArrayObjectDescriptor<RenderScene>>(
 					"mesh",
-					&RenderScene::getGrass,
-					&RenderScene::setGrass,
+					&RenderScene::getGrassPath,
+					&RenderScene::setGrassPath,
 					"Mesh (*.msh)",
 					allocator));
 			auto ground =
