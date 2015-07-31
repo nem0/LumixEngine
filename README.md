@@ -7,8 +7,6 @@
 </a>
 <img src="https://ci.appveyor.com/api/projects/status/7tcoign219kb5bny" />
 
-[Latest executables](https://ci.appveyor.com/project/nem0/lumixengine/build/artifacts)
-
 3D Game Engine
 
 Features:
@@ -19,10 +17,10 @@ Features:
   * component based
   * data driven
 
+[Getting started](https://github.com/nem0/LumixEngine/wiki/Getting-started)
+[Download latest executables](https://ci.appveyor.com/project/nem0/lumixengine/build/artifacts)
 [Code rules](code_rules.md)
-
 [Data repository](https://github.com/nem0/lumixengine_data)
-
 [Mindmap](https://github.com/nem0/LumixEngine/blob/master/docs/lumix_mindmap.png)
 
 Videos
