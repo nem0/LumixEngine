@@ -148,17 +148,17 @@ public:
 	}
 
 
-	void getPreview(ComponentIndex cmp, string& path)
+	const char* getPreview(ComponentIndex cmp)
 	{
-		path = m_animables[cmp].m_animation
+		return m_animables[cmp].m_animation
 				   ? m_animables[cmp].m_animation->getPath().c_str()
 				   : "";
 	}
 
 
-	void setPreview(ComponentIndex cmp, const string& path)
+	void setPreview(ComponentIndex cmp, const char* path)
 	{
-		playAnimation(cmp, path.c_str());
+		playAnimation(cmp, path);
 	}
 
 
