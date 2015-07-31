@@ -575,23 +575,17 @@ private:
 		add = Lumix::Math::minValue(add, 255 - w1);
 		add = Lumix::Math::maxValue(add, -w1);
 		w1 += add;
-		if (w2 + w3 + w4 == 0)
+		float sum = (float)w2 + (float)w3 + (float)w4;
+		float rest = 255.0f - w1;
+		if (sum > 0)
 		{
-			uint8_t rest = (255 - w1) / 3;
-			w2 = rest;
-			w3 = rest;
-			w4 = rest;
+			w2 = rest * w2 / sum;
+			w3 = rest * w3 / sum;
+			w4 = 255 - w1 - w2 - w3;
 		}
 		else
 		{
-			float m = (255 - w1) / (float)(w2 + w3 + w4);
-			w2 = w2 * m;
-			w3 = w3 * m;
-			w4 = w4 * m;
-		}
-		if (w1 + w2 + w3 + w4 > 255)
-		{
-			w4 = 255 - w1 - w2 - w3;
+			w1 = 255;
 		}
 	}
 
