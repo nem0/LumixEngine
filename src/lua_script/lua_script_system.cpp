@@ -12,15 +12,15 @@
 #include "core/resource_manager.h"
 #include "editor/property_descriptor.h"
 #include "editor/world_editor.h"
+#include "editor_plugin_loader.h"
 #include "engine/engine.h"
 #include "engine/iplugin.h"
 #include "engine/plugin_manager.h"
 #include "engine/lua_wrapper.h"
 #include "lua_script/lua_script_manager.h"
-#include "universe/universe.h"
-
 #include "studio/mainwindow.h"
 #include "studio/property_view.h"
+#include "universe/universe.h"
 
 
 static const uint32_t SCRIPT_HASH = Lumix::crc32("script");
@@ -44,6 +44,8 @@ class LuaScriptSystem : public IPlugin
 {
 public:
 	LuaScriptSystem(Engine& engine);
+	virtual ~LuaScriptSystem();
+
 	IAllocator& getAllocator();
 	virtual IScene* createScene(Universe& universe) override;
 	virtual void destroyScene(IScene* scene) override;
@@ -56,6 +58,7 @@ public:
 	Engine& m_engine;
 	BaseProxyAllocator m_allocator;
 	LuaScriptManager m_script_manager;
+	EditorPluginLoader* m_editor_plugin_loader;
 };
 
 
@@ -138,8 +141,7 @@ public:
 		}
 
 		lua_State* state = script.m_state;
-		const char* name =
-			script.m_script->getPropertyName(prop.m_name_hash);
+		const char* name = script.m_script->getPropertyName(prop.m_name_hash);
 		if (!name)
 		{
 			return;
@@ -157,8 +159,8 @@ public:
 
 		if (errors)
 		{
-			g_log_error.log("lua") << script.m_script->getPath().c_str()
-				<< ": " << lua_tostring(state, -1);
+			g_log_error.log("lua") << script.m_script->getPath().c_str() << ": "
+								   << lua_tostring(state, -1);
 			lua_pop(state, 1);
 		}
 	}
@@ -195,7 +197,7 @@ public:
 					script.m_state = lua_newthread(m_global_state);
 					lua_pushinteger(script.m_state, script.m_entity);
 					lua_setglobal(script.m_state, "this");
-					
+
 					applyProperties(script);
 
 					fseek(fp, 0, SEEK_END);
@@ -379,7 +381,8 @@ public:
 	const Script& getScript(ComponentIndex cmp) const { return m_scripts[cmp]; }
 
 
-	void setPropertyValue(ComponentIndex cmp, const char* name, const char* value)
+	void
+	setPropertyValue(ComponentIndex cmp, const char* name, const char* value)
 	{
 		Property& prop = getScriptProperty(cmp, name);
 		prop.m_value = value;
@@ -391,7 +394,7 @@ public:
 	}
 
 
-	Property& getScriptProperty(ComponentIndex cmp, const char* name) 
+	Property& getScriptProperty(ComponentIndex cmp, const char* name)
 	{
 		uint32_t name_hash = crc32(name);
 		for (auto& prop : m_scripts[cmp].m_properties)
@@ -439,7 +442,14 @@ LuaScriptSystem::LuaScriptSystem(Engine& engine)
 	, m_allocator(engine.getAllocator())
 	, m_script_manager(m_allocator)
 {
+	m_editor_plugin_loader = nullptr;
 	m_script_manager.create(crc32("lua_script"), engine.getResourceManager());
+}
+
+
+LuaScriptSystem::~LuaScriptSystem()
+{
+	m_allocator.deleteObject(m_editor_plugin_loader);
 }
 
 
@@ -540,7 +550,11 @@ setStudioMainWindow(Engine& engine, MainWindow& main_window)
 		{
 			onComponentNodeCreated(node, cmp);
 		});
-	// return engine.getAllocator().newObject<LuaScriptSystem>(engine);
+
+	auto system = static_cast<LuaScriptSystem*>(
+		engine.getPluginManager().getPlugin("lua_script"));
+	system->m_editor_plugin_loader =
+		system->getAllocator().newObject<EditorPluginLoader>(main_window);
 }
 
 } // ~namespace Lumix

@@ -83,19 +83,23 @@ template <> inline bool isType<void*>(lua_State* L, int index)
 
 template <typename T> inline void pushLua(lua_State* L, T value)
 {
-	return lua_pushnumber(L, value);
+	lua_pushnumber(L, value);
 }
 template <> inline void pushLua(lua_State* L, float value)
 {
-	return lua_pushnumber(L, value);
+	lua_pushnumber(L, value);
+}
+template <> inline void pushLua(lua_State* L, const char* value)
+{
+	lua_pushstring(L, value);
 }
 template <> inline void pushLua(lua_State* L, int value)
 {
-	return lua_pushinteger(L, value);
+	lua_pushinteger(L, value);
 }
 template <> inline void pushLua(lua_State* L, void* value)
 {
-	return lua_pushlightuserdata(L, value);
+	lua_pushlightuserdata(L, value);
 }
 
 

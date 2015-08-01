@@ -144,6 +144,12 @@ MainWindow::MainWindow(QWidget* parent)
 }
 
 
+QMenu* MainWindow::getToolsMenu() const
+{
+	return m_ui->menuTools;
+}
+
+
 void MainWindow::installPlugins()
 {
 	m_terrain_component_plugin = new TerrainComponentPlugin(*this);
@@ -319,9 +325,9 @@ MainWindow::~MainWindow()
 }
 
 
-Lumix::WorldEditor* MainWindow::getWorldEditor() const
+Lumix::WorldEditor& MainWindow::getWorldEditor() const
 {
-	return m_world_editor;
+	return *m_world_editor;
 }
 
 

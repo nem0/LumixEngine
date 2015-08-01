@@ -6,6 +6,11 @@ set(LUMIX_ROOT_PATH ${PROJECT_SOURCE_DIR}/../)
 set(SRC_PATH ${LUMIX_ROOT_PATH}src/)
 set(EXTERNAL_PATH ${LUMIX_ROOT_PATH}external/)
 
+find_package(Qt5Core REQUIRED)
+find_package(Qt5Gui REQUIRED)
+find_package(Qt5Widgets REQUIRED)
+find_package(Qt5UiTools REQUIRED)
+
 
 ###################### ENGINE ######################
 
@@ -133,6 +138,7 @@ set_target_properties (lua_script PROPERTIES COMPILE_DEFINITIONS "BUILDING_LUA_S
 target_link_libraries(lua_script Qt5::Core)
 target_link_libraries(lua_script Qt5::Gui)
 target_link_libraries(lua_script Qt5::Widgets)
+target_link_libraries(lua_script Qt5::UiTools)
 
 target_link_libraries(lua_script ${EXTERNAL_PATH}lua/lib/debug/lua.lib)
 target_link_libraries(lua_script engine)
@@ -144,10 +150,6 @@ target_link_libraries(lua_script editor)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
-
-find_package(Qt5Core REQUIRED)
-find_package(Qt5Gui REQUIRED)
-find_package(Qt5Widgets REQUIRED)
 
 file(GLOB STUDIO_ROOT_FILES ${SRC_PATH}studio/*.cpp ${SRC_PATH}studio/*.h)
 file(GLOB STUDIO_PROPERTY_VIEW_FILES ${SRC_PATH}studio/property_view/*.cpp ${SRC_PATH}studio/property_view/*.h)
@@ -205,10 +207,6 @@ set_target_properties (editor PROPERTIES COMPILE_DEFINITIONS "BUILDING_EDITOR")
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
-
-find_package(Qt5Core REQUIRED)
-find_package(Qt5Gui REQUIRED)
-find_package(Qt5Widgets REQUIRED)
 
 include_directories(${SRC_PATH})
 include_directories(${SRC_PATH}studio)
