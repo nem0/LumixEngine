@@ -336,6 +336,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		{
 			g_log_error.log("lua") << getPath().c_str() << ": "
 								   << lua_tostring(L, -1);
+			lua_pop(L, 1);
 			onFailure();
 		}
 		else
@@ -462,6 +463,7 @@ bool Shader::getShaderCombinations(const char* shader_content,
 	errors = errors || lua_pcall(L, 0, LUA_MULTRET, 0) != LUA_OK;
 	if (errors)
 	{
+		lua_pop(L, 1);
 		return false;
 	}
 	else
