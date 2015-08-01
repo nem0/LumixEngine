@@ -77,6 +77,7 @@ public:
 	virtual IPropertyDescriptor* getProperty(const char* component_type,
 											 const char* property_name) = 0;
 	virtual void executeCommand(IEditorCommand* command) = 0;
+	virtual IEditorCommand* createEditorCommand(uint32_t command_type) = 0;
 	virtual Engine& getEngine() = 0;
 	virtual Universe* getUniverse() = 0;
 	virtual IAllocator& getAllocator() = 0;

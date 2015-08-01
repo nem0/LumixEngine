@@ -612,7 +612,7 @@ TerrainComponentPlugin::TerrainComponentPlugin(MainWindow& main_window)
 	m_tools_item = nullptr;
 	m_texture_tool_item = nullptr;
 	m_terrain_editor =
-		new TerrainEditor(*main_window.getWorldEditor(), main_window, *this);
+		new TerrainEditor(main_window.getWorldEditor(), main_window, *this);
 	connect(
 		main_window.getPropertyView(),
 		&PropertyView::componentNodeCreated,
@@ -874,7 +874,7 @@ void TerrainComponentPlugin::addEntityTemplateNode(
 	child.onCreateEditor = [this](QWidget* parent, const QStyleOptionViewItem&)
 	{
 		auto& templates = m_main_window.getWorldEditor()
-							  ->getEntityTemplateSystem()
+							  .getEntityTemplateSystem()
 							  .getTemplateNames();
 		QComboBox* cb = new QComboBox(parent);
 		m_terrain_editor->m_selected_entity_template =

@@ -12,7 +12,6 @@
 #include "graphics/pipeline.h"
 #include "dialogs/import_asset_dialog.h"
 #include "log_widget.h"
-#include "lua_plugin_loader.h"
 #include "metadata.h"
 #include "notifications.h"
 #include "profilerui.h"
@@ -52,7 +51,6 @@ MainWindow::MainWindow(QWidget* parent)
 	m_entity_template_list_ui = new EntityTemplateList;
 	m_notifications = new Notifications(*this);
 	m_entity_list = new EntityList(nullptr);
-	m_lua_plugin_loader = new LuaPluginLoader(*this);
 
 	m_metadata = new Metadata();
 
@@ -143,6 +141,12 @@ MainWindow::MainWindow(QWidget* parent)
 	}
 
 	m_metadata->load(METADATA_FILE);
+}
+
+
+QMenu* MainWindow::getToolsMenu() const
+{
+	return m_ui->menuTools;
 }
 
 
@@ -262,7 +266,6 @@ void MainWindow::shutdown()
 	delete m_log;
 	delete m_ui;
 	delete m_scene_view;
-	delete m_lua_plugin_loader;
 	delete m_property_view;
 	delete m_asset_browser;
 	delete m_file_server_ui;
@@ -307,7 +310,6 @@ void MainWindow::closeEvent(QCloseEvent* event)
 
 MainWindow::~MainWindow()
 {
-	ASSERT(!m_lua_plugin_loader);
 	ASSERT(!m_terrain_component_plugin);
 	ASSERT(!m_shader_compiler);
 	ASSERT(!m_log);
@@ -323,9 +325,9 @@ MainWindow::~MainWindow()
 }
 
 
-Lumix::WorldEditor* MainWindow::getWorldEditor() const
+Lumix::WorldEditor& MainWindow::getWorldEditor() const
 {
-	return m_world_editor;
+	return *m_world_editor;
 }
 
 
@@ -343,7 +345,6 @@ void MainWindow::setWorldEditor(Lumix::WorldEditor& editor)
 	m_property_view->setWorldEditor(editor);
 	m_shader_compiler->setWorldEditor(editor);
 	m_scene_view->setWorldEditor(editor);
-	m_lua_plugin_loader->setWorldEditor(editor);
 
 	m_world_editor->universeLoaded()
 		.bind<MainWindow, &MainWindow::onUniverseLoaded>(this);
