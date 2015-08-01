@@ -23,6 +23,7 @@
 #include <qdir.h>
 #include <Windows.h>
 
+
 class App
 {
 public:

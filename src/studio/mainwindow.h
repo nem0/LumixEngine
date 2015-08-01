@@ -115,6 +115,7 @@ private:
 	class AssetBrowser* m_asset_browser;
 	class FileServerWidget* m_file_server_ui;
 	class ProfilerUI* m_profiler_ui;
+	class LuaPluginLoader* m_lua_plugin_loader;
 	EntityTemplateList* m_entity_template_list_ui;
 	class Notifications* m_notifications;
 	EntityList* m_entity_list;
