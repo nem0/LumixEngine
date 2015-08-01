@@ -209,6 +209,7 @@ struct PipelineImpl : public Pipeline
 			{
 				g_log_error.log("lua") << getPath().c_str() << ": "
 									   << lua_tostring(m_lua_state, -1);
+				lua_pop(m_lua_state, 1);
 				onFailure();
 			}
 			else

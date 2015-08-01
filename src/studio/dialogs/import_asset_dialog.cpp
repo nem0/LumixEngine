@@ -1077,7 +1077,7 @@ void ImportAssetDialog::importModel()
 	QFileInfo source_path(m_ui->sourceInput->text());
 	auto dest_mesh_file = dest + "/" + source_path.baseName() + ".msh";
 	char relative_path[Lumix::MAX_PATH_LENGTH];
-	m_main_window.getWorldEditor()->getRelativePath(
+	m_main_window.getWorldEditor().getRelativePath(
 		relative_path,
 		sizeof(relative_path),
 		Lumix::Path(dest_mesh_file.toLatin1().data()));

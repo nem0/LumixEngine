@@ -32,7 +32,7 @@ public:
 	void shutdown();
 	void update();
 	void setWorldEditor(Lumix::WorldEditor& world_editor);
-	Lumix::WorldEditor* getWorldEditor() const;
+	Lumix::WorldEditor& getWorldEditor() const;
 	class SceneView* getSceneView() const;
 	class GameView* getGameView() const;
 	PropertyView* getPropertyView() const { return m_property_view; }
@@ -40,6 +40,7 @@ public:
 	Metadata* getMetadata() const { return m_metadata; }
 	EntityTemplateList* getEntityTemplateList() { return m_entity_template_list_ui; }
 	EntityList* getEntityList() { return m_entity_list; }
+	QMenu* getToolsMenu() const;
 
 signals:
 	void resized(const QSize& size);

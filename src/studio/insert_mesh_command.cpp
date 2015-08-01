@@ -29,9 +29,11 @@ InsertMeshCommand::InsertMeshCommand(Lumix::WorldEditor& editor,
 void InsertMeshCommand::serialize(Lumix::JsonSerializer& serializer)
 {
 	serializer.serialize("path", m_mesh_path.c_str());
-	serializer.serialize("pos_x", m_position.x);
-	serializer.serialize("pos_y", m_position.y);
-	serializer.serialize("pos_z", m_position.z);
+	serializer.beginArray("pos");
+	serializer.serializeArrayItem(m_position.x);
+	serializer.serializeArrayItem(m_position.y);
+	serializer.serializeArrayItem(m_position.z);
+	serializer.endArray();
 }
 
 
@@ -40,9 +42,11 @@ void InsertMeshCommand::deserialize(Lumix::JsonSerializer& serializer)
 	char path[Lumix::MAX_PATH_LENGTH];
 	serializer.deserialize("path", path, sizeof(path), "");
 	m_mesh_path = path;
-	serializer.deserialize("pos_x", m_position.x, 0);
-	serializer.deserialize("pos_y", m_position.y, 0);
-	serializer.deserialize("pos_z", m_position.z, 0);
+	serializer.deserializeArrayBegin("pos");
+	serializer.deserializeArrayItem(m_position.x, 0);
+	serializer.deserializeArrayItem(m_position.y, 0);
+	serializer.deserializeArrayItem(m_position.z, 0);
+	serializer.deserializeArrayEnd();
 }
 
 
