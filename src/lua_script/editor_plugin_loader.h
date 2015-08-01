@@ -11,13 +11,14 @@ class WorldEditor;
 }
 
 
-class LuaPluginLoader
+class EditorPluginLoader
 {
 public:
-	LuaPluginLoader(MainWindow& win);
-	~LuaPluginLoader();
+	EditorPluginLoader(MainWindow& win);
+	~EditorPluginLoader();
 
 	void setWorldEditor(Lumix::WorldEditor& editor);
+	MainWindow& getMainWindow() const { return m_main_window; }
 
 private:
 	void registerAPI();

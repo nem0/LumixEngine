@@ -2891,7 +2891,7 @@ public:
 	}
 
 
-	IEditorCommand* createEditorCommand(uint32_t command_type)
+	virtual IEditorCommand* createEditorCommand(uint32_t command_type) override
 	{
 		int index = m_editor_command_creators.find(command_type);
 		if (index >= 0)
