@@ -10,7 +10,6 @@
 3D Game Engine
 
 Features:
-  * multiplatform (PC, consoles, phones, tablets, ...)
   * editor included
   * easy to use, fast and flexible 
   * open source
@@ -38,3 +37,4 @@ Videos
 
 ![Editor screenshot](https://raw.githubusercontent.com/nem0/LumixEngine/master/docs/editor.png "Editor screenshot")
 
+Contact: mikulas.florek@gamedev.sk
