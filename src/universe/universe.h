@@ -44,7 +44,7 @@ public:
 						  int index);
 	int getEntityCount() const
 	{
-		return m_positions.size() - m_free_slots.size();
+		return m_transformations.size() - m_free_slots.size();
 	}
 
 	Entity getFirstEntity();
@@ -54,14 +54,22 @@ public:
 	void setEntityName(Entity entity, const char* name);
 	bool hasEntity(Entity entity) const;
 
-	void setMatrix(int entity_index, const Matrix& mtx);
-	Matrix getMatrix(int entity_index) const;
-	void setRotation(int entity_index, float x, float y, float z, float w);
-	void setRotation(int entity_index, const Quat& rot);
-	void setPosition(int entity_index, float x, float y, float z);
-	void setPosition(int entity_index, const Vec3& pos);
-	const Vec3& getPosition(int index) const { return m_positions[index]; }
-	const Quat& getRotation(int index) const { return m_rotations[index]; }
+	void setMatrix(Entity entity, const Matrix& mtx);
+	Matrix getMatrix(Entity entity) const;
+	void setRotation(Entity entity, float x, float y, float z, float w);
+	void setRotation(Entity entity, const Quat& rot);
+	void setPosition(Entity entity, float x, float y, float z);
+	void setPosition(Entity entity, const Vec3& pos);
+	void setScale(Entity entity, float scale);
+	float getScale(Entity entity);
+	const Vec3& getPosition(Entity entity) const
+	{
+		return m_transformations[entity].position;
+	}
+	const Quat& getRotation(Entity entity) const
+	{
+		return m_transformations[entity].rotation;
+	}
 
 	DelegateList<void(Entity)>& entityMoved() { return m_entity_moved; }
 	DelegateList<void(Entity)>& entityCreated() { return m_entity_created; }
@@ -81,9 +89,16 @@ public:
 	void deserialize(InputBlob& serializer);
 
 private:
+	struct Transformation
+	{
+		Vec3 position;
+		Quat rotation;
+		float scale;
+	};
+
+private:
 	IAllocator& m_allocator;
-	Array<Vec3> m_positions;
-	Array<Quat> m_rotations;
+	Array<Transformation> m_transformations;
 	Array<int> m_free_slots;
 	AssociativeArray<uint32_t, uint32_t> m_name_to_id_map;
 	AssociativeArray<uint32_t, string> m_id_to_name_map;
