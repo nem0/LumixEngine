@@ -17,6 +17,9 @@
 #include <qpushbutton.h>
 
 
+static const int COMPONENT_OFFSET = 4;
+
+
 const char* EntityModel::getComponentName(Lumix::ComponentUID cmp) const
 {
 	for (int i = 0; i < m_editor.getComponentTypesCount(); ++i)
@@ -131,10 +134,10 @@ void EntityModel::onComponentAdded(Lumix::ComponentUID component)
 	if (m_entity == component.entity)
 	{
 		auto& cmps = m_editor.getComponents(component.entity);
-		int row = cmps.indexOf(component) + 3;
+		int row = cmps.indexOf(component) + COMPONENT_OFFSET;
 		QModelIndex parent_index = createIndex(0, 0, &getRoot());
 		beginInsertRows(parent_index, row, row);
-		addComponentNode(component, row - 3);
+		addComponentNode(component, row - COMPONENT_OFFSET);
 		endInsertRows();
 	}
 }
@@ -145,7 +148,7 @@ void EntityModel::onComponentDestroyed(Lumix::ComponentUID component)
 	if (component.entity == m_entity)
 	{
 		auto& cmps = m_editor.getComponents(component.entity);
-		int row = cmps.indexOf(component) + 3;
+		int row = cmps.indexOf(component) + COMPONENT_OFFSET;
 		QModelIndex parent_index = createIndex(0, 0, &getRoot());
 		beginRemoveRows(parent_index, row, row);
 		delete getRoot().m_children[row];
@@ -167,7 +170,7 @@ void EntityModel::onPropertySet(Lumix::ComponentUID component,
 			{
 				auto& descriptors =
 					m_editor.getPropertyDescriptors(component.type);
-				auto* node = getRoot().m_children[i + 3];
+				auto* node = getRoot().m_children[i + COMPONENT_OFFSET];
 				for (int j = 0; j < node->m_children.size(); ++j)
 				{
 					if (descriptors[j] == &descriptor)
@@ -207,6 +210,17 @@ void EntityModel::addNameProperty()
 								   value.toString().toLatin1().data());
 		}
 	};
+}
+
+
+void EntityModel::setEntityScale(float value)
+{
+	Lumix::StackAllocator<256> allocator;
+	Lumix::Array<Lumix::Entity> entities(allocator);
+	Lumix::Array<float> scales(allocator);
+	entities.push(m_entity);
+	scales.push(value);
+	m_editor.setEntitiesScales(entities, scales);
 }
 
 
@@ -335,6 +349,16 @@ void EntityModel::addPositionProperty()
 		};
 		DynamicObjectModel::setSliderEditor(angle_node, 0, 360, 5);
 	}
+
+	Node& scale_node = getRoot().addChild("scale");
+	scale_node.m_getter = [this]() -> QVariant
+	{
+		return getUniverse()->getScale(m_entity);
+	};
+	scale_node.m_setter = [this](const QVariant& value)
+	{
+		setEntityScale(value.toFloat());
+	};
 
 	m_editor.getUniverse()
 		->entityMoved()
@@ -478,7 +502,7 @@ void EntityModel::addArrayProperty(Node& child,
 
 void EntityModel::addComponentNode(Lumix::ComponentUID cmp, int component_index)
 {
-	Node& node = getRoot().addChild(getComponentName(cmp), component_index + 3);
+	Node& node = getRoot().addChild(getComponentName(cmp), component_index + COMPONENT_OFFSET);
 	node.m_getter = []() -> QVariant
 	{
 		return "";

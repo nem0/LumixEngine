@@ -380,6 +380,132 @@ private:
 };
 
 
+class ScaleEntityCommand : public IEditorCommand
+{
+public:
+	ScaleEntityCommand(WorldEditor& editor)
+		: m_new_scales(editor.getAllocator())
+		, m_old_scales(editor.getAllocator())
+		, m_entities(editor.getAllocator())
+		, m_editor(editor)
+	{
+	}
+
+
+	ScaleEntityCommand(WorldEditor& editor,
+					   const Array<Entity>& entities,
+					   const Array<float>& new_scales,
+					   IAllocator& allocator)
+		: m_new_scales(allocator)
+		, m_old_scales(allocator)
+		, m_entities(allocator)
+		, m_editor(editor)
+	{
+		Universe* universe = m_editor.getUniverse();
+		ASSERT(entities.size() == new_scales.size());
+		for (int i = entities.size() - 1; i >= 0; --i)
+		{
+			m_entities.push(entities[i]);
+			m_new_scales.push(new_scales[i]);
+			m_old_scales.push(universe->getScale(entities[i]));
+		}
+	}
+
+
+	virtual void serialize(JsonSerializer& serializer) override
+	{
+		serializer.serialize("count", m_entities.size());
+		serializer.beginArray("entities");
+		for (int i = 0; i < m_entities.size(); ++i)
+		{
+			serializer.serializeArrayItem(m_entities[i]);
+			serializer.serializeArrayItem(m_new_scales[i]);
+		}
+		serializer.endArray();
+	}
+
+
+	virtual void deserialize(JsonSerializer& serializer) override
+	{
+		Universe* universe = m_editor.getUniverse();
+		int count;
+		serializer.deserialize("count", count, 0);
+		m_entities.resize(count);
+		m_new_scales.resize(count);
+		m_old_scales.resize(count);
+		serializer.deserializeArrayBegin("entities");
+		for (int i = 0; i < m_entities.size(); ++i)
+		{
+			serializer.deserializeArrayItem(m_entities[i], 0);
+			serializer.deserializeArrayItem(m_new_scales[i], 0);
+			m_old_scales[i] = universe->getScale(m_entities[i]);
+		}
+		serializer.deserializeArrayEnd();
+	}
+
+
+	virtual void execute() override
+	{
+		Universe* universe = m_editor.getUniverse();
+		for (int i = 0, c = m_entities.size(); i < c; ++i)
+		{
+			Entity entity = m_entities[i];
+			universe->setScale(entity, m_new_scales[i]);
+		}
+	}
+
+
+	virtual void undo() override
+	{
+		Universe* universe = m_editor.getUniverse();
+		for (int i = 0, c = m_entities.size(); i < c; ++i)
+		{
+			Entity entity = m_entities[i];
+			universe->setScale(entity, m_old_scales[i]);
+		}
+	}
+
+
+	virtual uint32_t getType() override
+	{
+		static const uint32_t type = crc32("scale_entity");
+		return type;
+	}
+
+
+	virtual bool merge(IEditorCommand& command)
+	{
+		ASSERT(command.getType() == getType());
+		auto& my_command = static_cast<ScaleEntityCommand&>(command);
+		if (my_command.m_entities.size() == m_entities.size())
+		{
+			for (int i = 0, c = m_entities.size(); i < c; ++i)
+			{
+				if (m_entities[i] != my_command.m_entities[i])
+				{
+					return false;
+				}
+			}
+			for (int i = 0, c = m_entities.size(); i < c; ++i)
+			{
+				my_command.m_new_scales[i] = m_new_scales[i];
+			}
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
+
+private:
+	WorldEditor& m_editor;
+	Array<Entity> m_entities;
+	Array<float> m_new_scales;
+	Array<float> m_old_scales;
+};
+
+
 class RemoveArrayPropertyItemCommand : public IEditorCommand
 {
 
@@ -1875,6 +2001,20 @@ public:
 	}
 
 
+	virtual void setEntitiesScales(const Array<Entity>& entities,
+								   const Array<float>& scales) override
+	{
+		if (entities.empty())
+		{
+			return;
+		}
+		Universe* universe = getUniverse();
+		IEditorCommand* command = m_allocator.newObject<ScaleEntityCommand>(
+			*this, entities, scales, m_allocator);
+		executeCommand(command);
+	}
+
+
 	virtual void setEntitiesRotations(const Array<Entity>& entities,
 									  const Array<Quat>& rotations) override
 	{
@@ -2135,8 +2275,8 @@ public:
 			m_go_to_parameters.m_is_active = true;
 			m_go_to_parameters.m_t = 0;
 			m_go_to_parameters.m_from = universe->getPosition(m_camera);
-			Matrix camera_mtx = universe->getMatrix(m_camera);
-			Vec3 dir = camera_mtx * Vec3(0, 0, 1);
+			Quat camera_rot = universe->getRotation(m_camera);
+			Vec3 dir = camera_rot * Vec3(0, 0, 1);
 			m_go_to_parameters.m_to =
 				universe->getPosition(m_selected_entities[0]) + dir * 10;
 			float len =
@@ -2424,6 +2564,9 @@ public:
 		createUniverse(true);
 		m_template_system = EntityTemplateSystem::create(*this);
 
+		m_editor_command_creators.insert(
+			crc32("scale_entity"),
+			&WorldEditorImpl::constructEditorCommand<ScaleEntityCommand>);
 		m_editor_command_creators.insert(
 			crc32("move_entity"),
 			&WorldEditorImpl::constructEditorCommand<MoveEntityCommand>);

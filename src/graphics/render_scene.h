@@ -181,7 +181,6 @@ public:
 	virtual void setRenderableLayer(ComponentIndex cmp,
 									const int32_t& layer) = 0;
 	virtual void setRenderablePath(ComponentIndex cmp, const char* path) = 0;
-	virtual void setRenderableScale(ComponentIndex cmp, float scale) = 0;
 	virtual void getRenderableInfos(const Frustum& frustum,
 									Array<const RenderableMesh*>& meshes,
 									int64_t layer_mask) = 0;

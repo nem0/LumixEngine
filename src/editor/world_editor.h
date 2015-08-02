@@ -107,6 +107,8 @@ public:
 	virtual Entity addEntityAt(int camera_x, int camera_y) = 0;
 	virtual void setEntitiesPositions(const Array<Entity>& entity,
 									  const Array<Vec3>& position) = 0;
+	virtual void setEntitiesScales(const Array<Entity>& entities,
+								   const Array<float>& scales) = 0;
 	virtual void setEntitiesRotations(const Array<Entity>& entity,
 									  const Array<Quat>& rotations) = 0;
 	virtual void setEntityPositionAndRotaion(const Array<Entity>& entity,
