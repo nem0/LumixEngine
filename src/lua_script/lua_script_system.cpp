@@ -227,8 +227,7 @@ public:
 			{
 				Script& script = m_scripts[i];
 
-				FILE* fp = fopen(script.m_script->getPath().c_str(), "rb");
-				if (fp)
+				if (script.m_script->isReady())
 				{
 					script.m_state = lua_newthread(m_global_state);
 					lua_pushinteger(script.m_state, script.m_entity);
@@ -236,19 +235,12 @@ public:
 
 					applyProperties(script);
 
-					fseek(fp, 0, SEEK_END);
-					long size = ftell(fp);
-					fseek(fp, 0, SEEK_SET);
-					Array<char> content(m_system.getAllocator());
-					content.resize(size + 1);
-					fread(&content[0], 1, size, fp);
-					content[size] = '\0';
 					bool errors =
-						luaL_loadbuffer(script.m_state,
-										&content[0],
-										size,
-										script.m_script->getPath().c_str()) !=
-						LUA_OK;
+						luaL_loadbuffer(
+							script.m_state,
+							script.m_script->getSourceCode(),
+							strlen(script.m_script->getSourceCode()),
+							script.m_script->getPath().c_str()) != LUA_OK;
 					errors =
 						errors ||
 						lua_pcall(script.m_state, 0, LUA_MULTRET, 0) != LUA_OK;
@@ -259,14 +251,14 @@ public:
 							<< lua_tostring(script.m_state, -1);
 						lua_pop(script.m_state, 1);
 					}
-					fclose(fp);
 				}
 				else
 				{
 					script.m_state = nullptr;
 					g_log_error.log("lua script")
-						<< "error loading "
-						<< script.m_script->getPath().c_str();
+						<< "Script "
+						<< script.m_script->getPath().c_str()
+						<< " is not loaded";
 				}
 			}
 		}
