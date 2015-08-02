@@ -44,7 +44,7 @@ public:
 	void reload(Resource& resource);
 
 	ResourceManagerBase(IAllocator& allocator);
-	~ResourceManagerBase(void);
+	virtual ~ResourceManagerBase(void);
 
 protected:
 	virtual Resource* createResource(const Path& path) = 0;

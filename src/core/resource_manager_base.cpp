@@ -22,7 +22,7 @@ namespace Lumix
 			ASSERT(iter.value()->isEmpty());
 			destroyResource(*iter.value());
 		}
-
+		m_resources.clear();
 	}
 
 	Resource* ResourceManagerBase::get(const Path& path)
@@ -155,5 +155,6 @@ namespace Lumix
 
 	ResourceManagerBase::~ResourceManagerBase()
 	{ 
+		ASSERT(m_resources.empty());
 	}
 }
