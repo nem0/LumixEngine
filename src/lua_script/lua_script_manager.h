@@ -4,6 +4,7 @@
 #include "core/array.h"
 #include "core/resource.h"
 #include "core/resource_manager_base.h"
+#include "core/string.h"
 
 
 namespace Lumix

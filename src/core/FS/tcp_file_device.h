@@ -49,7 +49,6 @@ namespace Lumix
 			void connect(const char* ip, uint16_t port, IAllocator& allocator);
 			void disconnect();
 
-			bool isInitialized() const;
 			Net::TCPStream* getStream();
 
 		private:

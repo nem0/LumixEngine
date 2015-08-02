@@ -2,7 +2,6 @@
 #include "ui_fileserverwidget.h"
 #include "core/default_allocator.h"
 #include "core/fs/file_system.h"
-#include "core/fs/tcp_file_server.h"
 #include "core/fs/file_events_device.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
@@ -67,7 +66,7 @@ FileServerWidget::FileServerWidget(QWidget* parent)
 	m_ui->setupUi(this);
 	m_ui->tableWidget->setColumnWidth(0, 75);
 	m_ui->tableWidget->setColumnWidth(1, 200);
-	m_server = nullptr;
+	m_editor = nullptr;
 	m_watcher = new FileServerWatcher(*this);
 	connect(this,
 			SIGNAL(fileEvent(
@@ -90,7 +89,7 @@ void FileServerWidget::onFileEvent(qint32 event, qint64 handle, const QString& p
 	int row = m_ui->tableWidget->rowCount();
 	m_ui->tableWidget->insertRow(row);
 	
-	QString base_path = m_server->getTCPFileServer().getBasePath();
+	QString base_path = m_editor->getBasePath();
 
 	QTableWidgetItem* new_item = new QTableWidgetItem(QString::number(double(time / 1000000.0)));
 	m_ui->tableWidget->setItem(row, 0, new_item);
@@ -129,14 +128,22 @@ void FileServerWidget::emitFileEvent(const Lumix::FS::Event& event, qint64 time)
 }
 
 
-void FileServerWidget::setWorldEditor(Lumix::WorldEditor& server)
+void FileServerWidget::setWorldEditor(Lumix::WorldEditor& editor)
 {
-	m_server = &server;
+	m_editor = &editor;
 
 	Lumix::FS::FileEventsDevice& dev = m_watcher->getFileEventDevice();
-	Lumix::FS::FileSystem& fs = m_server->getEngine().getFileSystem();
+	Lumix::FS::FileSystem& fs = m_editor->getEngine().getFileSystem();
 	fs.mount(&dev);
-	fs.setDefaultDevice("memory:events:disk");
+	if (strcmp(fs.getDefaultDevice().m_devices[0]->name(), "disk") == 0 &&
+		strcmp(fs.getDefaultDevice().m_devices[1]->name(), "memory") == 0)
+	{
+		fs.setDefaultDevice("memory:events:disk");
+	}
+	else
+	{
+		ASSERT(false);
+	}
 }
 
 
@@ -163,14 +170,23 @@ void FileServerWidget::on_filter_returnPressed()
 
 void FileServerWidget::on_checkBox_stateChanged(int)
 {
-	ASSERT(m_server);
-	if (m_ui->checkBox->isChecked())
+	ASSERT(m_editor);
+	Lumix::FS::FileSystem& fs = m_editor->getEngine().getFileSystem();
+	if (strcmp(fs.getDefaultDevice().m_devices[0]->name(), "disk") == 0 &&
+		strcmp(fs.getDefaultDevice().m_devices[1]->name(), "memory") == 0)
 	{
-		m_server->getEngine().getFileSystem().setDefaultDevice("memory:events:tcp");
+		if (m_ui->checkBox->isChecked())
+		{
+			fs.setDefaultDevice("memory:events:disk");
+		}
+		else
+		{
+			fs.setDefaultDevice("memory:disk");
+		}
 	}
 	else
 	{
-		m_server->getEngine().getFileSystem().setDefaultDevice("memory:tcp");
+		ASSERT(false);
 	}
 }
 

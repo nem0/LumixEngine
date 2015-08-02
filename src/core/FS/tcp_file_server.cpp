@@ -221,7 +221,7 @@ public:
 		{
 			base_path_str += "/";
 		}
-		m_base_path = base_path_str;
+		m_base_path = base_path_str.c_str();
 	}
 
 

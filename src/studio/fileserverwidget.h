@@ -22,7 +22,7 @@ public:
 	explicit FileServerWidget(QWidget* parent = nullptr);
 	~FileServerWidget();
 	
-	void setWorldEditor(Lumix::WorldEditor& server);
+	void setWorldEditor(Lumix::WorldEditor& editor);
 	void fsEventCb(const Lumix::FS::Event& event, int32_t param);
 	void emitFileEvent(const Lumix::FS::Event& event, qint64 time);
 
@@ -44,7 +44,7 @@ private:
 	void filterTable();
 
 	Ui::FileServerWidget* m_ui;
-	Lumix::WorldEditor* m_server;
+	Lumix::WorldEditor* m_editor;
 	class FileServerWatcher* m_watcher;
 };
 
