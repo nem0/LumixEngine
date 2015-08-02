@@ -2,8 +2,9 @@
 
 #include "core/associative_array.h"
 #include "core/base_proxy_allocator.h"
+#include "core/default_allocator.h"
 #include "core/MT/spin_mutex.h"
-#include "core/string.h"
+
 
 namespace Lumix
 {
@@ -61,7 +62,6 @@ public:
 	explicit Path(const char* path);
 	void operator=(const Path& rhs);
 	void operator=(const char* rhs);
-	void operator=(const string& rhs);
 	bool operator==(const Path& rhs) const
 	{
 		return m_data->m_id == rhs.m_data->m_id;

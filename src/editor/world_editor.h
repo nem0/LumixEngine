@@ -84,7 +84,6 @@ public:
 	virtual void renderIcons(PipelineInstance& pipeline) = 0;
 	virtual ComponentUID getEditCamera() = 0;
 	virtual class Gizmo& getGizmo() = 0;
-	virtual class FS::TCPFileServer& getTCPFileServer() = 0;
 	virtual void undo() = 0;
 	virtual void redo() = 0;
 	virtual void loadUniverse(const Path& path) = 0;

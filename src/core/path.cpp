@@ -176,8 +176,4 @@ namespace Lumix
 	}
 
 
-	void Path::operator =(const string& rhs)
-	{
-		*this = rhs.c_str();
-	}
-}
+} // namespace Lumix

@@ -1,5 +1,8 @@
 #include "mainwindow.h"
 #include "core/crc32.h"
+#include "core/fs/disk_file_device.h"
+#include "core/fs/file_system.h"
+#include "core/fs/memory_file_device.h"
 #include "core/library.h"
 #include "core/log.h"
 #include "core/profiler.h"
@@ -36,10 +39,14 @@ public:
 		m_qt_app = nullptr;
 		m_main_window = nullptr;
 		m_world_editor = nullptr;
+		m_file_system = nullptr;
+		m_memory_device = nullptr;
+		m_disk_device = nullptr;
 	}
 
 	~App()
 	{
+		ASSERT(!m_file_system);
 		ASSERT(!m_world_editor);
 		ASSERT(!m_main_window);
 		ASSERT(!m_qt_app);
@@ -61,6 +68,19 @@ public:
 	}
 
 
+	void initFilesystem()
+	{
+		m_file_system = Lumix::FS::FileSystem::create(m_allocator);
+		m_memory_device = m_allocator.newObject<Lumix::FS::MemoryFileDevice>(m_allocator);
+		m_disk_device = m_allocator.newObject<Lumix::FS::DiskFileDevice>(m_allocator);
+
+		m_file_system->mount(m_memory_device);
+		m_file_system->mount(m_disk_device);
+		m_file_system->setDefaultDevice("memory:disk");
+		m_file_system->setSaveGameDevice("memory:disk");
+	}
+
+
 	void init(int argc, char* argv[])
 	{
 		m_qt_app = new QApplication(argc, argv);
@@ -74,7 +94,8 @@ public:
 		HWND hwnd =
 			(HWND)m_main_window->getSceneView()->getViewWidget()->winId();
 		Lumix::Renderer::setInitData(hwnd);
-		m_engine = Lumix::Engine::create(nullptr, m_allocator);
+		initFilesystem();
+		m_engine = Lumix::Engine::create(m_file_system, m_allocator);
 		m_world_editor = Lumix::WorldEditor::create(
 			QDir::currentPath().toLocal8Bit().data(), *m_engine);
 		m_engine->update(false, 1, -1);
@@ -126,6 +147,12 @@ public:
 		m_main_window = nullptr;
 		m_qt_app = nullptr;
 		m_world_editor = nullptr;
+		m_allocator.deleteObject(m_memory_device);
+		m_memory_device = nullptr;
+		m_allocator.deleteObject(m_disk_device);
+		m_disk_device = nullptr;
+		Lumix::FS::FileSystem::destroy(m_file_system);
+		m_file_system = nullptr;
 	}
 
 
@@ -231,6 +258,9 @@ private:
 	MainWindow* m_main_window;
 	Lumix::WorldEditor* m_world_editor;
 	Lumix::Engine* m_engine;
+	Lumix::FS::FileSystem* m_file_system;
+	Lumix::FS::MemoryFileDevice* m_memory_device;
+	Lumix::FS::DiskFileDevice* m_disk_device;
 	QApplication* m_qt_app;
 };
 

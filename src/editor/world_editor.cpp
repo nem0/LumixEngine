@@ -1635,10 +1635,6 @@ public:
 
 		destroyUniverse();
 		EntityTemplateSystem::destroy(m_template_system);
-
-		m_tcp_file_device.disconnect();
-		m_tpc_file_server.stop();
-		FS::FileSystem::destroy(m_file_system);
 	}
 
 
@@ -2482,12 +2478,6 @@ public:
 	virtual Gizmo& getGizmo() override { return m_gizmo; }
 
 
-	virtual FS::TCPFileServer& getTCPFileServer() override
-	{
-		return m_tpc_file_server;
-	}
-
-
 	virtual ComponentUID getEditCamera() override
 	{
 		return getComponent(m_camera, CAMERA_HASH);
@@ -2511,8 +2501,6 @@ public:
 		, m_gizmo(*this)
 		, m_component_properties(m_allocator)
 		, m_components(m_allocator)
-		, m_mem_file_device(m_allocator)
-		, m_disk_file_device(m_allocator)
 		, m_entity_name_set(m_allocator)
 		, m_entity_selected(m_allocator)
 		, m_universe_destroyed(m_allocator)
@@ -2542,18 +2530,7 @@ public:
 		m_measure_tool = m_allocator.newObject<MeasureTool>();
 		addPlugin(*m_measure_tool);
 
-		m_file_system = FS::FileSystem::create(m_allocator);
-		m_tpc_file_server.start(base_path, m_allocator);
 		m_base_path = base_path;
-
-		m_tcp_file_device.connect("127.0.0.1", 10001, m_allocator);
-
-		m_file_system->mount(&m_mem_file_device);
-		m_file_system->mount(&m_disk_file_device);
-		m_file_system->mount(&m_tcp_file_device);
-
-		m_file_system->setDefaultDevice("memory:disk");
-		m_file_system->setSaveGameDevice("memory:disk");
 
 		m_engine = &engine;
 		m_engine->setWorldEditor(*this);
@@ -3202,11 +3179,6 @@ private:
 	DelegateList<void(Entity, const char*)> m_entity_name_set;
 	DelegateList<void(bool)> m_game_mode_toggled;
 
-	FS::FileSystem* m_file_system;
-	FS::TCPFileServer m_tpc_file_server;
-	FS::DiskFileDevice m_disk_file_device;
-	FS::MemoryFileDevice m_mem_file_device;
-	FS::TCPFileDevice m_tcp_file_device;
 	Path m_universe_path;
 	Path m_base_path;
 	int m_terrain_brush_size;
