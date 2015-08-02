@@ -180,9 +180,28 @@ public:
 	}
 
 
+	static void* luaAllocator(void* ud, void* ptr, size_t osize, size_t nsize)
+	{
+		auto& allocator = *static_cast<IAllocator*>(ud);
+		if (nsize == 0)
+		{
+			allocator.deallocate(ptr);
+			return nullptr;
+		}
+		if (nsize > 0 && ptr == nullptr)
+		{
+			return allocator.allocate(nsize);
+		}
+		void* new_mem = allocator.allocate(nsize);
+		memcpy(new_mem, ptr, Math::minValue(osize, nsize));
+		allocator.deallocate(ptr);
+		return new_mem;
+	}
+
+
 	void startGame()
 	{
-		m_global_state = luaL_newstate();
+		m_global_state = lua_newstate(luaAllocator, &m_system.getAllocator());
 		luaL_openlibs(m_global_state);
 		registerAPI(m_global_state);
 		for (int i = 0; i < m_scripts.size(); ++i)
