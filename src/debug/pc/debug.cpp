@@ -11,9 +11,6 @@ namespace Lumix
 {
 
 
-static char g_base_path[MAX_PATH];
-
-
 namespace Debug
 {
 
@@ -100,17 +97,7 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 {
 	HANDLE process = GetCurrentProcess();
 	DWORD process_id = GetProcessId(process);
-	char filename[MAX_PATH];
-	copyString(filename, sizeof(filename), g_base_path);
-	catCString(filename, sizeof(filename), "/minidump.dmp");
-	char* c = filename;
-	while (*c)
-	{
-		if (*c == '/')
-			*c = '\\';
-		++c;
-	}
-	HANDLE file = CreateFile(filename,
+	HANDLE file = CreateFile("minidump.dmp",
 							 GENERIC_WRITE,
 							 0,
 							 nullptr,
@@ -140,7 +127,7 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 			 "SMTP:mikulas.florek@gamedev.sk",
 			 "Lumix Studio",
 			 "Lumix Studio crashed, minidump attached",
-			 filename);
+			 "minidump.dmp");
 
 	minidump_type =
 		(MINIDUMP_TYPE)(MiniDumpWithFullMemory | MiniDumpWithFullMemoryInfo |
@@ -166,10 +153,8 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 }
 
 
-void installUnhandledExceptionHandler(const char* base_path)
+void installUnhandledExceptionHandler()
 {
-	ASSERT(base_path);
-	copyString(g_base_path, sizeof(g_base_path), base_path);
 	SetUnhandledExceptionFilter(unhandledExceptionHandler);
 }
 

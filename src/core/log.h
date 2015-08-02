@@ -14,6 +14,8 @@ namespace Lumix
 	class LUMIX_ENGINE_API LogProxy
 	{
 		public:
+
+		public:
 			LogProxy(Log& log, const char* system, IAllocator& allocator);
 			~LogProxy();
 
@@ -23,6 +25,7 @@ namespace Lumix
 			LogProxy& operator <<(uint32_t message);
 			LogProxy& operator <<(const Path& path);
 			LogProxy& operator <<(const string& path);
+			LogProxy& substring(const char* str, int start, int length);
 
 		private:
 			IAllocator& m_allocator;

@@ -2120,8 +2120,10 @@ public:
 		}
 		else
 		{
-			m_game_mode_file =
-				m_engine->getFileSystem().open("memory", "", FS::Mode::WRITE);
+			m_game_mode_file = m_engine->getFileSystem().open(
+				m_engine->getFileSystem().getMemoryDevice(),
+				"",
+				FS::Mode::WRITE);
 			save(*m_game_mode_file);
 			m_is_game_mode = true;
 			m_game_mode_toggled.invoke(true);
@@ -2502,7 +2504,7 @@ public:
 	}
 
 
-	WorldEditorImpl(Engine& engine)
+	WorldEditorImpl(const char* base_path, Engine& engine)
 		: m_allocator(engine.getAllocator())
 		, m_engine(nullptr)
 		, m_universe_mutex(false)
@@ -2541,8 +2543,8 @@ public:
 		addPlugin(*m_measure_tool);
 
 		m_file_system = FS::FileSystem::create(m_allocator);
-		m_tpc_file_server.start(engine.getBasePath(), m_allocator);
-		m_base_path = engine.getBasePath();
+		m_tpc_file_server.start(base_path, m_allocator);
+		m_base_path = base_path;
 
 		m_tcp_file_device.connect("127.0.0.1", 10001, m_allocator);
 
@@ -3018,7 +3020,9 @@ public:
 			return;
 		}
 		FS::IFile* file = m_engine->getFileSystem().open(
-			"disk", path.c_str(), FS::Mode::CREATE | FS::Mode::WRITE);
+			m_engine->getFileSystem().getDiskDevice(),
+			path.c_str(),
+			FS::Mode::CREATE | FS::Mode::WRITE);
 		if (file)
 		{
 			JsonSerializer serializer(
@@ -3069,7 +3073,9 @@ public:
 		destroyUndoStack();
 		m_undo_index = -1;
 		FS::IFile* file = m_engine->getFileSystem().open(
-			"disk", path.c_str(), FS::Mode::OPEN | FS::Mode::READ);
+			m_engine->getFileSystem().getDiskDevice(),
+			path.c_str(),
+			FS::Mode::OPEN | FS::Mode::READ);
 		if (file)
 		{
 			JsonSerializer serializer(
@@ -3109,15 +3115,17 @@ public:
 		newUniverse();
 		executeUndoStack(undo_stack_path);
 		FS::IFile* file = m_engine->getFileSystem().open(
-			"memory", "", FS::Mode::CREATE | FS::Mode::WRITE);
+			m_engine->getFileSystem().getMemoryDevice(),
+			"",
+			FS::Mode::CREATE | FS::Mode::WRITE);
 		if (!file)
 		{
 			return false;
 		}
-		FS::IFile* result_file =
-			m_engine->getFileSystem().open("memory:disk",
-										   result_universe_path.c_str(),
-										   FS::Mode::OPEN | FS::Mode::READ);
+		FS::IFile* result_file = m_engine->getFileSystem().open(
+			m_engine->getFileSystem().getDefaultDevice(),
+			result_universe_path.c_str(),
+			FS::Mode::OPEN | FS::Mode::READ);
 		if (!result_file)
 		{
 			return false;
@@ -3215,9 +3223,9 @@ private:
 };
 
 
-WorldEditor* WorldEditor::create(Engine& engine)
+WorldEditor* WorldEditor::create(const char* base_path, Engine& engine)
 {
-	return engine.getAllocator().newObject<WorldEditorImpl>(engine);
+	return engine.getAllocator().newObject<WorldEditorImpl>(base_path, engine);
 }
 
 

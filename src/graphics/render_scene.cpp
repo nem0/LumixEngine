@@ -46,22 +46,6 @@ static const uint32_t CAMERA_HASH = crc32("camera");
 static const uint32_t TERRAIN_HASH = crc32("terrain");
 
 
-class DebugText
-{
-public:
-	DebugText(IAllocator& allocator)
-		: m_text(allocator)
-	//, m_mesh(allocator)
-	{
-	}
-
-public:
-	string m_text;
-	int m_x;
-	int m_y;
-};
-
-
 struct Renderable
 {
 	Renderable(IAllocator& allocator)

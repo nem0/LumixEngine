@@ -74,9 +74,9 @@ public:
 		HWND hwnd =
 			(HWND)m_main_window->getSceneView()->getViewWidget()->winId();
 		Lumix::Renderer::setInitData(hwnd);
-		m_engine = Lumix::Engine::create(
-			QDir::currentPath().toLocal8Bit().data(), nullptr, m_allocator);
-		m_world_editor = Lumix::WorldEditor::create(*m_engine);
+		m_engine = Lumix::Engine::create(nullptr, m_allocator);
+		m_world_editor = Lumix::WorldEditor::create(
+			QDir::currentPath().toLocal8Bit().data(), *m_engine);
 		m_engine->update(false, 1, -1);
 
 		m_main_window->setWorldEditor(*m_world_editor);

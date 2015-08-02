@@ -218,8 +218,9 @@ void Texture::saveTGA()
 	}
 
 	FS::FileSystem& fs = m_resource_manager.getFileSystem();
-	FS::IFile* file = fs.open(
-		"disk", getPath().c_str(), FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
+	FS::IFile* file = fs.open(fs.getDiskDevice(),
+							  getPath().c_str(),
+							  FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
 
 	saveTGA(m_allocator, file, m_width, m_height, m_BPP, &m_data[0], getPath());
 
