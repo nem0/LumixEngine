@@ -19,7 +19,8 @@ public:
 	LuaScript(const Path& path,
 			  ResourceManager& resource_manager,
 			  IAllocator& allocator);
-
+	virtual ~LuaScript();
+	
 	virtual void doUnload() override;
 	virtual void
 	loaded(FS::IFile* file, bool success, FS::FileSystem& fs) override;

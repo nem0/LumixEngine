@@ -28,7 +28,7 @@ namespace Debug
 
 		private:
 			StackNode* m_root;
-			volatile int32_t m_instances = 0;
+			static int32_t s_instances;
 	};
 
 
