@@ -73,37 +73,68 @@ public:
 	}
 
 
-	void initNetworkfilesystem()
+	void initFilesystem(bool is_network)
 	{
-		m_tcp_file_server = m_allocator.newObject<Lumix::FS::TCPFileServer>();
-		m_tcp_file_server->start(QDir::currentPath().toLocal8Bit().data(),
-								 m_allocator);
-
 		m_file_system = Lumix::FS::FileSystem::create(m_allocator);
 		m_memory_device =
 			m_allocator.newObject<Lumix::FS::MemoryFileDevice>(m_allocator);
-		m_tcp_device = m_allocator.newObject<Lumix::FS::TCPFileDevice>();
-		m_tcp_device->connect("127.0.0.1", 10001, m_allocator);
-
 		m_file_system->mount(m_memory_device);
-		m_file_system->mount(m_tcp_device);
-		m_file_system->setDefaultDevice("memory:tcp");
-		m_file_system->setSaveGameDevice("memory:tcp");
+
+		if (is_network)
+		{
+			m_tcp_file_server =
+				m_allocator.newObject<Lumix::FS::TCPFileServer>();
+			m_tcp_file_server->start(QDir::currentPath().toLocal8Bit().data(),
+									 m_allocator);
+
+			m_tcp_device = m_allocator.newObject<Lumix::FS::TCPFileDevice>();
+			m_tcp_device->connect("127.0.0.1", 10001, m_allocator);
+
+			m_file_system->mount(m_memory_device);
+			m_file_system->mount(m_tcp_device);
+			m_file_system->setDefaultDevice("memory:tcp");
+			m_file_system->setSaveGameDevice("memory:tcp");
+		}
+		else
+		{
+			m_disk_device =
+				m_allocator.newObject<Lumix::FS::DiskFileDevice>(m_allocator);
+			m_file_system->mount(m_disk_device);
+			m_file_system->setDefaultDevice("memory:disk");
+			m_file_system->setSaveGameDevice("memory:disk");
+		}
 	}
 
 
-	void initFilesystem()
+	void checkTests()
 	{
-		m_file_system = Lumix::FS::FileSystem::create(m_allocator);
-		m_memory_device =
-			m_allocator.newObject<Lumix::FS::MemoryFileDevice>(m_allocator);
-		m_disk_device =
-			m_allocator.newObject<Lumix::FS::DiskFileDevice>(m_allocator);
+		auto command_line_arguments = m_qt_app->arguments();
+		auto index_of_run_test = command_line_arguments.indexOf("-run_test");
+		if (index_of_run_test >= 0 &&
+			index_of_run_test + 2 < command_line_arguments.size())
+		{
+			auto undo_stack_path =
+				command_line_arguments[index_of_run_test + 1].toLatin1();
+			auto result_universe_path =
+				command_line_arguments[index_of_run_test + 2].toLatin1();
+			m_world_editor->runTest(Lumix::Path(undo_stack_path.data()),
+				Lumix::Path(result_universe_path.data()));
+		}
+	}
 
-		m_file_system->mount(m_memory_device);
-		m_file_system->mount(m_disk_device);
-		m_file_system->setDefaultDevice("memory:disk");
-		m_file_system->setSaveGameDevice("memory:disk");
+
+	void initEditorPlugins()
+	{
+		auto& libraries = m_engine->getPluginManager().getLibraries();
+		for (auto* lib : libraries)
+		{
+			typedef void(*Setter)(Lumix::Engine&, MainWindow&);
+			Setter setter = (Setter)lib->resolve("setStudioMainWindow");
+			if (setter)
+			{
+				setter(*m_engine, *m_main_window);
+			}
+		}
 	}
 
 
@@ -117,47 +148,25 @@ public:
 		m_main_window = new MainWindow();
 		m_main_window->show();
 
-		HWND hwnd =
-			(HWND)m_main_window->getSceneView()->getViewWidget()->winId();
+		SceneView* scene_view =m_main_window->getSceneView();
+		HWND hwnd = (HWND)scene_view->getViewWidget()->winId();
 		Lumix::Renderer::setInitData(hwnd);
-		initNetworkfilesystem();
+		initFilesystem(false);
 		m_engine = Lumix::Engine::create(m_file_system, m_allocator);
 		m_world_editor = Lumix::WorldEditor::create(
 			QDir::currentPath().toLocal8Bit().data(), *m_engine);
+		
 		m_engine->update(false, 1, -1);
-
 		m_main_window->setWorldEditor(*m_world_editor);
 
-		Lumix::PipelineInstance* pipeline =
-			m_main_window->getSceneView()->getPipeline();
+		Lumix::PipelineInstance* pipeline = scene_view->getPipeline();
 		pipeline->addCustomCommandHandler("render_physics")
 			.bind<App, &App::renderPhysics>(this);
 		pipeline->addCustomCommandHandler("render_gizmos")
 			.bind<App, &App::renderGizmos>(this);
 
-		auto command_line_arguments = m_qt_app->arguments();
-		auto index_of_run_test = command_line_arguments.indexOf("-run_test");
-		if (index_of_run_test >= 0 &&
-			index_of_run_test + 2 < command_line_arguments.size())
-		{
-			auto undo_stack_path =
-				command_line_arguments[index_of_run_test + 1].toLatin1();
-			auto result_universe_path =
-				command_line_arguments[index_of_run_test + 2].toLatin1();
-			m_world_editor->runTest(Lumix::Path(undo_stack_path.data()),
-									Lumix::Path(result_universe_path.data()));
-		}
-
-		auto& libraries = m_engine->getPluginManager().getLibraries();
-		for (auto* lib : libraries)
-		{
-			typedef void (*Setter)(Lumix::Engine&, MainWindow&);
-			Setter setter = (Setter)lib->resolve("setStudioMainWindow");
-			if (setter)
-			{
-				setter(*m_engine, *m_main_window);
-			}
-		}
+		checkTests();
+		initEditorPlugins();
 	}
 
 
