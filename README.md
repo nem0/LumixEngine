@@ -20,7 +20,7 @@ Features:
 
 [Download latest executables](https://ci.appveyor.com/project/nem0/lumixengine/build/artifacts)
 
-[Code rules](code_rules.md)
+[Code rules](https://github.com/nem0/LumixEngine/wiki/Code-rules)
 
 [Data repository](https://github.com/nem0/lumixengine_data)
 
