@@ -140,6 +140,11 @@ void FileServerWidget::setWorldEditor(Lumix::WorldEditor& editor)
 	{
 		fs.setDefaultDevice("memory:events:disk");
 	}
+	else if (strcmp(fs.getDefaultDevice().m_devices[0]->name(), "tcp") == 0 &&
+			 strcmp(fs.getDefaultDevice().m_devices[1]->name(), "memory") == 0)
+	{
+		fs.setDefaultDevice("memory:events:tcp");
+	}
 	else
 	{
 		ASSERT(false);

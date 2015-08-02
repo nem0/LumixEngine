@@ -20,6 +20,7 @@ namespace Lumix
 				: m_device(device)
 				, m_stream(stream)
 				, m_spin_mutex(spin_mutex)
+				, m_file(-1)
 			{}
 
 			~TCPFile() {}
@@ -31,6 +32,11 @@ namespace Lumix
 
 			virtual bool open(const char* path, Mode mode) override
 			{
+				if (!m_stream)
+				{
+					return false;
+				}
+
 				int32_t op = TCPCommand::OpenFile;
 
 				MT::SpinLock lock(m_spin_mutex);
@@ -151,6 +157,7 @@ namespace Lumix
 				: m_spin_mutex(false)
 				, m_allocator(allocator)
 				, m_connector(m_allocator)
+				, m_stream(nullptr)
 			{}
 
 			IAllocator& m_allocator;
