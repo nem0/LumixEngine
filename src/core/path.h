@@ -1,9 +1,9 @@
 #pragma once
 
 #include "core/associative_array.h"
+#include "core/base_proxy_allocator.h"
 #include "core/MT/spin_mutex.h"
 #include "core/string.h"
-
 
 namespace Lumix
 {
@@ -41,9 +41,11 @@ private:
 	void decrementRefCount(PathInternal* path);
 
 private:
-	DefaultAllocator m_allocator;
+	DefaultAllocator m_src_allocator;
+	BaseProxyAllocator m_allocator;
 	AssociativeArray<uint32_t, PathInternal*> m_paths;
 	MT::SpinMutex m_mutex;
+	PathInternal* m_empty_path;
 };
 
 

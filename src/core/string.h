@@ -22,6 +22,7 @@ LUMIX_ENGINE_API const char* fromCString(const char* input, int length, int64_t*
 LUMIX_ENGINE_API const char* fromCString(const char* input, int length, uint32_t* value);
 LUMIX_ENGINE_API bool copyString(char* destination, int length, const char* source);
 LUMIX_ENGINE_API bool catCString(char* destination, int length, const char* source);
+LUMIX_ENGINE_API bool makeLowercase(char* destination, int length, const char* source);
 
 template <class T>
 class base_string

@@ -246,11 +246,13 @@ void SceneView::dropEvent(QDropEvent* event)
 			{
 				position.set(0, 0, 0);
 			}
+			char rel_path[Lumix::MAX_PATH_LENGTH];
+			m_world_editor->getRelativePath(rel_path, sizeof(rel_path), file.toLatin1().data());
 			InsertMeshCommand* command =
 				m_world_editor->getAllocator().newObject<InsertMeshCommand>(
 					*static_cast<ViewWidget&>(*m_view).m_world_editor,
 					position,
-					Lumix::Path(file.toLatin1().data()));
+					Lumix::Path(rel_path));
 			m_world_editor->executeCommand(command);
 			Lumix::Entity entity = command->getEntity();
 			m_world_editor->selectEntities(&entity, 1);

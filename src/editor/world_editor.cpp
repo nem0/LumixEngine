@@ -2314,13 +2314,16 @@ public:
 	}
 
 	virtual void getRelativePath(char* relative_path,
-								 int max_length,
-								 const Path& source) override
+		int max_length,
+		const char* source) override
 	{
+		char tmp[MAX_PATH_LENGTH];
+		makeLowercase(tmp, sizeof(tmp), source);
+
 		if (strncmp(
-				m_base_path.c_str(), source.c_str(), m_base_path.length()) == 0)
+			m_base_path.c_str(), tmp, m_base_path.length()) == 0)
 		{
-			const char* rel_path_start = source.c_str() + m_base_path.length();
+			const char* rel_path_start = tmp + m_base_path.length();
 			if (rel_path_start[0] == '/')
 			{
 				++rel_path_start;
@@ -2329,8 +2332,16 @@ public:
 		}
 		else
 		{
-			strncpy(relative_path, source.c_str(), max_length);
+			strncpy(relative_path, tmp, max_length);
 		}
+	}
+
+
+	virtual void getRelativePath(char* relative_path,
+								 int max_length,
+								 const Path& source) override
+	{
+		getRelativePath(relative_path, max_length, source.c_str());
 	}
 
 	virtual void newUniverse() override
