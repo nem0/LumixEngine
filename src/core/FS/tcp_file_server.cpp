@@ -30,7 +30,9 @@ public:
 	}
 
 
-	~TCPFileServerTask() {}
+	~TCPFileServerTask()
+	{
+	}
 
 
 	void openFile(Net::TCPStream* stream)
@@ -59,6 +61,12 @@ public:
 				copyString(path, sizeof(path), m_buffer.data());
 			}
 			ret = file->open(path, mode, getAllocator()) ? id : -1;
+			if (ret == -1)
+			{
+				m_ids.release(id);
+				file->close();
+				getAllocator().deleteObject(file);
+			}
 		}
 		stream->write(ret);
 	}
@@ -111,11 +119,9 @@ public:
 
 		while (size > 0)
 		{
-			int32_t read = (int32_t)size > m_buffer.size()
-				? m_buffer.size()
-				: (int32_t)size;
-			write_successful &=
-				stream->read((void*)m_buffer.data(), read);
+			int32_t read = (int32_t)size > m_buffer.size() ? m_buffer.size()
+														   : (int32_t)size;
+			write_successful &= stream->read((void*)m_buffer.data(), read);
 			file->write(m_buffer.data(), read);
 			size -= read;
 		}
