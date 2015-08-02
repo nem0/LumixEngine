@@ -62,7 +62,7 @@ public:
 	};
 
 public:
-	static WorldEditor* create(Engine& engine);
+	static WorldEditor* create(const char* base_path, Engine& engine);
 	static void destroy(WorldEditor* editor);
 
 	virtual void update() = 0;
@@ -107,6 +107,8 @@ public:
 	virtual Entity addEntityAt(int camera_x, int camera_y) = 0;
 	virtual void setEntitiesPositions(const Array<Entity>& entity,
 									  const Array<Vec3>& position) = 0;
+	virtual void setEntitiesScales(const Array<Entity>& entities,
+								   const Array<float>& scales) = 0;
 	virtual void setEntitiesRotations(const Array<Entity>& entity,
 									  const Array<Quat>& rotations) = 0;
 	virtual void setEntityPositionAndRotaion(const Array<Entity>& entity,
@@ -153,6 +155,9 @@ public:
 
 	virtual void addPlugin(Plugin& plugin) = 0;
 	virtual void removePlugin(Plugin& plugin) = 0;
+	virtual void getRelativePath(char* relative_path,
+								 int max_length,
+								 const char* source) = 0;
 	virtual void getRelativePath(char* relative_path,
 								 int max_length,
 								 const Path& source) = 0;

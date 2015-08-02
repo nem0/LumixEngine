@@ -9,7 +9,7 @@ namespace Lumix
 {
 
 
-static const int RESERVED_ENTITIES = 5000;
+static const int RESERVED_ENTITIES_COUNT = 5000;
 
 
 Universe::~Universe()
@@ -21,30 +21,28 @@ Universe::Universe(IAllocator& allocator)
 	: m_allocator(allocator)
 	, m_name_to_id_map(m_allocator)
 	, m_id_to_name_map(m_allocator)
-	, m_positions(m_allocator)
-	, m_rotations(m_allocator)
+	, m_transformations(m_allocator)
 	, m_component_destroyed(m_allocator)
 	, m_entity_created(m_allocator)
 	, m_entity_destroyed(m_allocator)
 	, m_entity_moved(m_allocator)
 	, m_free_slots(m_allocator)
 {
-	m_positions.reserve(RESERVED_ENTITIES);
-	m_rotations.reserve(RESERVED_ENTITIES);
+	m_transformations.reserve(RESERVED_ENTITIES_COUNT);
 }
 
 
-void Universe::setRotation(int entity_index, const Quat& rot)
+void Universe::setRotation(Entity entity, const Quat& rot)
 {
-	m_rotations[entity_index] = rot;
-	entityMoved().invoke(Entity(entity_index));
+	m_transformations[entity].rotation = rot;
+	entityMoved().invoke(Entity(entity));
 }
 
 
-void Universe::setRotation(int entity_index, float x, float y, float z, float w)
+void Universe::setRotation(Entity entity, float x, float y, float z, float w)
 {
-	m_rotations[entity_index].set(x, y, z, w);
-	entityMoved().invoke(Entity(entity_index));
+	m_transformations[entity].rotation.set(x, y, z, w);
+	entityMoved().invoke(Entity(entity));
 }
 
 
@@ -56,40 +54,40 @@ bool Universe::hasEntity(Entity entity) const
 			return false;
 	}
 	return entity != -1;
-
 }
 
 
-void Universe::setMatrix(int entity_index, const Matrix& mtx)
+void Universe::setMatrix(Entity entity, const Matrix& mtx)
 {
 	Quat rot;
 	mtx.getRotation(rot);
-	m_positions[entity_index] = mtx.getTranslation();
-	m_rotations[entity_index] = rot;
-	entityMoved().invoke(Entity(entity_index));
+	m_transformations[entity].position = mtx.getTranslation();
+	m_transformations[entity].rotation = rot;
+	entityMoved().invoke(Entity(entity));
 }
 
 
-Matrix Universe::getMatrix(int entity_index) const
+Matrix Universe::getMatrix(Entity entity) const
 {
 	Matrix mtx;
-	m_rotations[entity_index].toMatrix(mtx);
-	mtx.setTranslation(m_positions[entity_index]);
+	m_transformations[entity].rotation.toMatrix(mtx);
+	mtx.setTranslation(m_transformations[entity].position);
+	mtx.multiply3x3(m_transformations[entity].scale);
 	return mtx;
 }
 
 
-void Universe::setPosition(int entity_index, float x, float y, float z)
+void Universe::setPosition(Entity entity, float x, float y, float z)
 {
-	m_positions[entity_index].set(x, y, z);
-	entityMoved().invoke(Entity(entity_index));
+	m_transformations[entity].position.set(x, y, z);
+	entityMoved().invoke(Entity(entity));
 }
 
 
-void Universe::setPosition(int entity_index, const Vec3& pos)
+void Universe::setPosition(Entity entity, const Vec3& pos)
 {
-	m_positions[entity_index] = pos;
-	entityMoved().invoke(Entity(entity_index));
+	m_transformations[entity].position = pos;
+	entityMoved().invoke(Entity(entity));
 }
 
 
@@ -126,8 +124,9 @@ void Universe::createEntity(Entity entity)
 		if (m_free_slots[i] == entity)
 		{
 			m_free_slots.eraseFast(i);
-			m_positions[entity].set(0, 0, 0);
-			m_rotations[entity].set(0, 0, 0, 1);
+			m_transformations[entity].position.set(0, 0, 0);
+			m_transformations[entity].rotation.set(0, 0, 0, 1);
+			m_transformations[entity].scale = 1;
 			m_entity_created.invoke(entity);
 			return;
 		}
@@ -140,9 +139,11 @@ Entity Universe::createEntity()
 {
 	if (m_free_slots.empty())
 	{
-		m_positions.push(Vec3(0, 0, 0));
-		m_rotations.push(Quat(0, 0, 0, 1));
-		Entity e(m_positions.size() - 1);
+		Transformation& t = m_transformations.pushEmpty();
+		t.position.set(0, 0, 0);
+		t.rotation.set(0, 0, 0, 1);
+		t.scale = 1;
+		Entity e(m_transformations.size() - 1);
 		m_entity_created.invoke(e);
 		return e;
 	}
@@ -150,8 +151,9 @@ Entity Universe::createEntity()
 	{
 		Entity e(m_free_slots.back());
 		m_free_slots.pop();
-		m_positions[e].set(0, 0, 0);
-		m_rotations[e].set(0, 0, 0, 1);
+		m_transformations[e].position.set(0, 0, 0);
+		m_transformations[e].rotation.set(0, 0, 0, 1);
+		m_transformations[e].scale = 1;
 		m_entity_created.invoke(e);
 		return e;
 	}
@@ -170,7 +172,7 @@ void Universe::destroyEntity(Entity entity)
 
 Entity Universe::getFirstEntity()
 {
-	for (int i = 0; i < m_positions.size(); ++i)
+	for (int i = 0; i < m_transformations.size(); ++i)
 	{
 		bool found = false;
 		for (int j = 0, cj = m_free_slots.size(); j < cj; ++j)
@@ -192,7 +194,7 @@ Entity Universe::getFirstEntity()
 
 Entity Universe::getNextEntity(Entity entity)
 {
-	for (int i = entity + 1; i < m_positions.size(); ++i)
+	for (int i = entity + 1; i < m_transformations.size(); ++i)
 	{
 		bool found = false;
 		for (int j = 0, cj = m_free_slots.size(); j < cj; ++j)
@@ -214,11 +216,9 @@ Entity Universe::getNextEntity(Entity entity)
 
 void Universe::serialize(OutputBlob& serializer)
 {
-	serializer.write((int32_t)m_positions.size());
-	serializer.write(&m_positions[0].x,
-					 sizeof(m_positions[0]) * m_positions.size());
-	serializer.write(&m_rotations[0].x,
-					 sizeof(m_rotations[0]) * m_rotations.size());
+	serializer.write((int32_t)m_transformations.size());
+	serializer.write(&m_transformations[0],
+					 sizeof(m_transformations[0]) * m_transformations.size());
 	serializer.write((int32_t)m_id_to_name_map.size());
 	for (int i = 0, c = m_id_to_name_map.size(); i < c; ++i)
 	{
@@ -239,13 +239,10 @@ void Universe::deserialize(InputBlob& serializer)
 {
 	int32_t count;
 	serializer.read(count);
-	m_positions.resize(count);
-	m_rotations.resize(count);
+	m_transformations.resize(count);
 
-	serializer.read(&m_positions[0].x,
-					sizeof(m_positions[0]) * m_positions.size());
-	serializer.read(&m_rotations[0].x,
-					sizeof(m_rotations[0]) * m_rotations.size());
+	serializer.read(&m_transformations[0],
+					sizeof(m_transformations[0]) * m_transformations.size());
 
 	serializer.read(count);
 	m_id_to_name_map.clear();
@@ -269,6 +266,19 @@ void Universe::deserialize(InputBlob& serializer)
 }
 
 
+void Universe::setScale(Entity entity, float scale)
+{
+	m_transformations[entity].scale = scale;
+	entityMoved().invoke(Entity(entity));
+}
+
+
+float Universe::getScale(Entity entity)
+{
+	return m_transformations[entity].scale;
+}
+
+
 void Universe::destroyComponent(Entity entity,
 								uint32_t component_type,
 								IScene* scene,
@@ -280,9 +290,9 @@ void Universe::destroyComponent(Entity entity,
 
 
 void Universe::addComponent(Entity entity,
-									uint32_t component_type,
-									IScene* scene,
-									int index)
+							uint32_t component_type,
+							IScene* scene,
+							int index)
 {
 	ComponentUID cmp(entity, component_type, scene, index);
 	if (m_component_added.isValid())

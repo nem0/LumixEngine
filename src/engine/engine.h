@@ -37,8 +37,7 @@ class LUMIX_ENGINE_API Engine
 public:
 	virtual ~Engine() {}
 
-	static Engine*
-	create(const char* base_path, FS::FileSystem* fs, IAllocator& allocator);
+	static Engine* create(FS::FileSystem* fs, IAllocator& allocator);
 	static void destroy(Engine* engine);
 
 	virtual Universe* createUniverse() = 0;
@@ -61,7 +60,6 @@ public:
 	virtual IAllocator& getAllocator() = 0;
 	virtual ResourceManager& getResourceManager() = 0;
 
-	virtual const char* getBasePath() const = 0;
 	virtual void update(bool is_game_running,
 						float time_delta_multiplier,
 						float forced_time_delta) = 0;

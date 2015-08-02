@@ -33,7 +33,8 @@ void EntityTemplateList::setWorldEditor(Lumix::WorldEditor& editor)
 
 void EntityTemplateList::onSystemUpdated()
 {
-	Lumix::Array<Lumix::string>& template_names = m_editor->getEntityTemplateSystem().getTemplateNames();
+	Lumix::Array<Lumix::string>& template_names =
+		m_editor->getEntityTemplateSystem().getTemplateNames();
 	m_ui->templateList->clear();
 	for (int i = 0, c = template_names.size(); i < c; ++i)
 	{

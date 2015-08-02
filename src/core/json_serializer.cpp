@@ -199,12 +199,12 @@ void JsonSerializer::serializeArrayItem(const char* value)
 }
 
 
-void JsonSerializer::serializeArrayItem(string& value)
+/*void JsonSerializer::serializeArrayItem(string& value)
 {
 	writeBlockComma();
 	writeString(value.c_str() ? value.c_str() : "");
 	m_is_first_in_block = false;
-}
+}*/
 
 
 void JsonSerializer::serializeArrayItem(unsigned int value)
@@ -481,22 +481,6 @@ void JsonSerializer::deserializeArrayItem(char* value,
 					  << "\", expected string.";
 		deserializeToken();
 		copyString(value, max_length, default_value);
-	}
-}
-
-
-void JsonSerializer::deserializeArrayItem(string& value,
-										  const char* default_value)
-{
-	deserializeArrayComma();
-	if (m_is_string_token)
-	{
-		value.set(m_token, m_token_size);
-		deserializeToken();
-	}
-	else
-	{
-		value = default_value;
 	}
 }
 

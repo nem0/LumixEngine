@@ -58,9 +58,8 @@ public:
 class EngineImpl : public Engine
 {
 public:
-	EngineImpl(const char* base_path, FS::FileSystem* fs, IAllocator& allocator)
-		: m_base_path(m_allocator)
-		, m_allocator(allocator)
+	EngineImpl(FS::FileSystem* fs, IAllocator& allocator)
+		: m_allocator(allocator)
 		, m_resource_manager(m_allocator)
 		, m_mtjd_manager(m_allocator)
 		, m_scenes(m_allocator)
@@ -95,7 +94,6 @@ public:
 		m_fps_frame = 0;
 		m_universe = nullptr;
 		m_hierarchy = nullptr;
-		m_base_path = base_path;
 	}
 
 	bool create()
@@ -304,12 +302,6 @@ public:
 	virtual InputSystem& getInputSystem() override { return m_input_system; }
 
 
-	virtual const char* getBasePath() const override
-	{
-		return m_base_path.c_str();
-	}
-
-
 	virtual Universe* getUniverse() const override { return m_universe; }
 
 
@@ -390,7 +382,6 @@ private:
 
 	MTJD::Manager m_mtjd_manager;
 
-	string m_base_path;
 	WorldEditor* m_editor;
 	PluginManager* m_plugin_manager;
 	Universe* m_universe;
@@ -416,17 +407,16 @@ void showLogInVS(const char*, const char* message)
 }
 
 
-Engine*
-Engine::create(const char* base_path, FS::FileSystem* fs, IAllocator& allocator)
+Engine* Engine::create(FS::FileSystem* fs, IAllocator& allocator)
 {
-	installUnhandledExceptionHandler(base_path);
+	installUnhandledExceptionHandler();
 
 	g_log_info.getCallback().bind<showLogInVS>();
 	g_log_warning.getCallback().bind<showLogInVS>();
 	g_log_error.getCallback().bind<showLogInVS>();
 
 	EngineImpl* engine =
-		allocator.newObject<EngineImpl>(base_path, fs, allocator);
+		allocator.newObject<EngineImpl>(fs, allocator);
 	if (!engine->create())
 	{
 		allocator.deleteObject(engine);

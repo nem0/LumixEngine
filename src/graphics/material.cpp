@@ -310,7 +310,7 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 			{
 				char texture_path[MAX_PATH_LENGTH];
 				copyString(texture_path, sizeof(texture_path), material_dir);
-				catCString(texture_path, sizeof(texture_path), path);
+				catString(texture_path, sizeof(texture_path), path);
 				m_textures[m_texture_count] = static_cast<Texture*>(m_resource_manager.get(ResourceManager::TEXTURE)->load(Path(texture_path)));
 				addDependency(*m_textures[m_texture_count]);
 			}

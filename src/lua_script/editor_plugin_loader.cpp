@@ -186,7 +186,9 @@ executeEditorCommand(lua_State* L, const char* name, const char* data)
 		if (command)
 		{
 			Lumix::FS::IFile* file = engine.getFileSystem().open(
-				"memory", "", Lumix::FS::Mode::WRITE);
+				engine.getFileSystem().getMemoryDevice(),
+				"",
+				Lumix::FS::Mode::WRITE);
 			ASSERT(file);
 			file->write(data, strlen(data));
 			file->seek(Lumix::FS::SeekMode::BEGIN, 0);

@@ -46,22 +46,6 @@ static const uint32_t CAMERA_HASH = crc32("camera");
 static const uint32_t TERRAIN_HASH = crc32("terrain");
 
 
-class DebugText
-{
-public:
-	DebugText(IAllocator& allocator)
-		: m_text(allocator)
-	//, m_mesh(allocator)
-	{
-	}
-
-public:
-	string m_text;
-	int m_x;
-	int m_y;
-};
-
-
 struct Renderable
 {
 	Renderable(IAllocator& allocator)
@@ -76,7 +60,6 @@ struct Renderable
 	Model* m_model;
 	Matrix m_matrix;
 	Entity m_entity;
-	float m_scale;
 	bool m_is_always_visible;
 
 private:
@@ -383,7 +366,6 @@ public:
 			serializer.write(m_renderables[i]->m_is_always_visible);
 			serializer.write(m_renderables[i]->m_component_index);
 			serializer.write(m_renderables[i]->m_entity);
-			serializer.write(m_renderables[i]->m_scale);
 			serializer.write(m_culling_system->getLayerMask(i));
 			serializer.write(m_renderables[i]->m_model->getPath().getHash());
 		}
@@ -462,7 +444,6 @@ public:
 				m_always_visible.push(m_renderables[i]->m_component_index);
 			}
 			serializer.read(m_renderables[i]->m_entity);
-			serializer.read(m_renderables[i]->m_scale);
 			int64_t layer_mask;
 			serializer.read(layer_mask);
 			m_renderables[i]->m_model = nullptr;
@@ -948,13 +929,6 @@ public:
 	{
 		m_culling_system->setLayerMask(getRenderable(cmp),
 									   (int64_t)1 << (int64_t)layer);
-	}
-
-
-	virtual void setRenderableScale(ComponentIndex cmp, float scale) override
-	{
-		Renderable& r = *m_renderables[getRenderable(cmp)];
-		r.m_scale = scale;
 	}
 
 
@@ -1692,6 +1666,7 @@ public:
 	{
 		RayCastModelHit hit;
 		hit.m_is_hit = false;
+		Universe& universe = getUniverse();
 		int ignore_index = getRenderable(ignored_renderable);
 		for (int i = 0; i < m_renderables.size(); ++i)
 		{
@@ -1699,7 +1674,7 @@ public:
 			{
 				const Vec3& pos = m_renderables[i]->m_matrix.getTranslation();
 				float radius = m_renderables[i]->m_model->getBoundingRadius();
-				float scale = m_renderables[i]->m_scale;
+				float scale = universe.getScale(m_renderables[i]->m_entity);
 				Vec3 intersection;
 				if (dotProduct(pos - origin, pos - origin) < radius * radius ||
 					Math::getRaySphereIntersection(
@@ -2117,7 +2092,6 @@ private:
 		Renderable& r = *m_allocator.newObject<Renderable>(m_allocator);
 		m_renderables.push(&r);
 		r.m_entity = entity;
-		r.m_scale = 1;
 		r.m_model = nullptr;
 		r.m_component_index = new_index;
 		r.m_is_always_visible = false;
