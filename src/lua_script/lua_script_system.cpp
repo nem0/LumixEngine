@@ -10,6 +10,7 @@
 #include "core/library.h"
 #include "core/log.h"
 #include "core/resource_manager.h"
+#include "Debug/allocator.h"
 #include "editor/property_descriptor.h"
 #include "editor/world_editor.h"
 #include "editor_plugin_loader.h"
@@ -56,7 +57,7 @@ public:
 	LuaScriptManager& getScriptManager() { return m_script_manager; }
 
 	Engine& m_engine;
-	BaseProxyAllocator m_allocator;
+	Debug::Allocator m_allocator;
 	LuaScriptManager m_script_manager;
 	EditorPluginLoader* m_editor_plugin_loader;
 };
@@ -110,6 +111,8 @@ public:
 
 	~LuaScriptScene()
 	{
+		unloadAllScripts();
+
 		if (m_system.m_engine.getWorldEditor())
 		{
 			m_system.m_engine.getWorldEditor()
@@ -117,6 +120,20 @@ public:
 				.unbind<LuaScriptScene, &LuaScriptScene::onGameModeToggled>(
 					this);
 		}
+	}
+
+
+	void unloadAllScripts()
+	{
+		for (int i = 0; i < m_scripts.size(); ++i)
+		{
+			Script& script = m_scripts[i];
+			if (m_valid[i] && script.m_script)
+			{
+				m_system.getScriptManager().unload(*script.m_script);
+			}
+		}
+		m_scripts.clear();
 	}
 
 
@@ -150,8 +167,8 @@ public:
 		lua_setglobal(state, name);
 		char tmp[1024];
 		copyString(tmp, sizeof(tmp), name);
-		catCString(tmp, sizeof(tmp), " = ");
-		catCString(tmp, sizeof(tmp), prop.m_value.c_str());
+		catString(tmp, sizeof(tmp), " = ");
+		catString(tmp, sizeof(tmp), prop.m_value.c_str());
 
 		bool errors =
 			luaL_loadbuffer(state, tmp, strlen(tmp), nullptr) != LUA_OK;
@@ -180,9 +197,28 @@ public:
 	}
 
 
+	static void* luaAllocator(void* ud, void* ptr, size_t osize, size_t nsize)
+	{
+		auto& allocator = *static_cast<IAllocator*>(ud);
+		if (nsize == 0)
+		{
+			allocator.deallocate(ptr);
+			return nullptr;
+		}
+		if (nsize > 0 && ptr == nullptr)
+		{
+			return allocator.allocate(nsize);
+		}
+		void* new_mem = allocator.allocate(nsize);
+		memcpy(new_mem, ptr, Math::minValue(osize, nsize));
+		allocator.deallocate(ptr);
+		return new_mem;
+	}
+
+
 	void startGame()
 	{
-		m_global_state = luaL_newstate();
+		m_global_state = lua_newstate(luaAllocator, &m_system.getAllocator());
 		luaL_openlibs(m_global_state);
 		registerAPI(m_global_state);
 		for (int i = 0; i < m_scripts.size(); ++i)
@@ -317,7 +353,7 @@ public:
 	virtual void deserialize(InputBlob& serializer) override
 	{
 		int len = serializer.read<int>();
-		m_scripts.clear();
+		unloadAllScripts();
 		m_scripts.reserve(len);
 		m_valid.resize(len);
 		for (int i = 0; i < len; ++i)
@@ -422,6 +458,11 @@ public:
 
 	void setScriptPath(ComponentIndex cmp, const char* path)
 	{
+		if (m_scripts[cmp].m_script)
+		{
+			m_system.getScriptManager().unload(*m_scripts[cmp].m_script);
+		}
+
 		m_scripts[cmp].m_script = static_cast<LuaScript*>(
 			m_system.getScriptManager().load(Lumix::Path(path)));
 	}
@@ -449,6 +490,7 @@ LuaScriptSystem::LuaScriptSystem(Engine& engine)
 
 LuaScriptSystem::~LuaScriptSystem()
 {
+	m_script_manager.destroy();
 	m_allocator.deleteObject(m_editor_plugin_loader);
 }
 

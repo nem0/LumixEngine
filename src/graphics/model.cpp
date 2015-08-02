@@ -448,8 +448,8 @@ bool Model::parseMeshes(FS::IFile* file)
 
 		char material_path[MAX_PATH_LENGTH];
 		copyString(material_path, sizeof(material_path), model_dir);
-		catCString(material_path, sizeof(material_path), material_name);
-		catCString(material_path, sizeof(material_path), ".mat");
+		catString(material_path, sizeof(material_path), material_name);
+		catString(material_path, sizeof(material_path), ".mat");
 		Material* material = static_cast<Material*>(
 			m_resource_manager.get(ResourceManager::MATERIAL)
 				->load(Path(material_path)));

@@ -49,6 +49,7 @@ private:
 	void addComponent(QWidget* widget, QPoint pos);
 	void setEntityPosition(int index, float value);
 	void setEntityRotation(int index, float value);
+	void setEntityScale(float value);
 	void reset(const QString& reason);
 	void set(Lumix::Entity entity,
 			 uint32_t component_type,

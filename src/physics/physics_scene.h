@@ -2,7 +2,7 @@
 
 
 #include "core/lumix.h"
-#include "core/string.h"
+#include "core/iallocator.h"
 #include "core/vec3.h"
 #include "engine/iplugin.h"
 

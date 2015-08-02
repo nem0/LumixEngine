@@ -18,14 +18,17 @@ namespace Lumix
 	PathManager::PathManager()
 		: m_paths(m_allocator)
 		, m_mutex(false)
+		, m_allocator(m_src_allocator)
 	{
-		getPath(0, "");
+		m_empty_path = getPath(0, "");
 	}
 
 
 	PathManager::~PathManager()
 	{
-		ASSERT(m_paths.size() == 1 && m_paths.at(0)->m_ref_count == 1);
+		decrementRefCount(m_empty_path);
+		m_empty_path = nullptr;
+		ASSERT(m_paths.size() == 0);
 	}
 
 

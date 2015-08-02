@@ -20,8 +20,16 @@ LuaScript::LuaScript(const Path& path,
 }
 
 
+LuaScript::~LuaScript()
+{
+
+}
+
+
 void LuaScript::doUnload()
 {
+	m_size = 0;
+	onEmpty();
 }
 
 

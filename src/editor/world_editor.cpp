@@ -380,6 +380,132 @@ private:
 };
 
 
+class ScaleEntityCommand : public IEditorCommand
+{
+public:
+	ScaleEntityCommand(WorldEditor& editor)
+		: m_new_scales(editor.getAllocator())
+		, m_old_scales(editor.getAllocator())
+		, m_entities(editor.getAllocator())
+		, m_editor(editor)
+	{
+	}
+
+
+	ScaleEntityCommand(WorldEditor& editor,
+					   const Array<Entity>& entities,
+					   const Array<float>& new_scales,
+					   IAllocator& allocator)
+		: m_new_scales(allocator)
+		, m_old_scales(allocator)
+		, m_entities(allocator)
+		, m_editor(editor)
+	{
+		Universe* universe = m_editor.getUniverse();
+		ASSERT(entities.size() == new_scales.size());
+		for (int i = entities.size() - 1; i >= 0; --i)
+		{
+			m_entities.push(entities[i]);
+			m_new_scales.push(new_scales[i]);
+			m_old_scales.push(universe->getScale(entities[i]));
+		}
+	}
+
+
+	virtual void serialize(JsonSerializer& serializer) override
+	{
+		serializer.serialize("count", m_entities.size());
+		serializer.beginArray("entities");
+		for (int i = 0; i < m_entities.size(); ++i)
+		{
+			serializer.serializeArrayItem(m_entities[i]);
+			serializer.serializeArrayItem(m_new_scales[i]);
+		}
+		serializer.endArray();
+	}
+
+
+	virtual void deserialize(JsonSerializer& serializer) override
+	{
+		Universe* universe = m_editor.getUniverse();
+		int count;
+		serializer.deserialize("count", count, 0);
+		m_entities.resize(count);
+		m_new_scales.resize(count);
+		m_old_scales.resize(count);
+		serializer.deserializeArrayBegin("entities");
+		for (int i = 0; i < m_entities.size(); ++i)
+		{
+			serializer.deserializeArrayItem(m_entities[i], 0);
+			serializer.deserializeArrayItem(m_new_scales[i], 0);
+			m_old_scales[i] = universe->getScale(m_entities[i]);
+		}
+		serializer.deserializeArrayEnd();
+	}
+
+
+	virtual void execute() override
+	{
+		Universe* universe = m_editor.getUniverse();
+		for (int i = 0, c = m_entities.size(); i < c; ++i)
+		{
+			Entity entity = m_entities[i];
+			universe->setScale(entity, m_new_scales[i]);
+		}
+	}
+
+
+	virtual void undo() override
+	{
+		Universe* universe = m_editor.getUniverse();
+		for (int i = 0, c = m_entities.size(); i < c; ++i)
+		{
+			Entity entity = m_entities[i];
+			universe->setScale(entity, m_old_scales[i]);
+		}
+	}
+
+
+	virtual uint32_t getType() override
+	{
+		static const uint32_t type = crc32("scale_entity");
+		return type;
+	}
+
+
+	virtual bool merge(IEditorCommand& command)
+	{
+		ASSERT(command.getType() == getType());
+		auto& my_command = static_cast<ScaleEntityCommand&>(command);
+		if (my_command.m_entities.size() == m_entities.size())
+		{
+			for (int i = 0, c = m_entities.size(); i < c; ++i)
+			{
+				if (m_entities[i] != my_command.m_entities[i])
+				{
+					return false;
+				}
+			}
+			for (int i = 0, c = m_entities.size(); i < c; ++i)
+			{
+				my_command.m_new_scales[i] = m_new_scales[i];
+			}
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
+
+private:
+	WorldEditor& m_editor;
+	Array<Entity> m_entities;
+	Array<float> m_new_scales;
+	Array<float> m_old_scales;
+};
+
+
 class RemoveArrayPropertyItemCommand : public IEditorCommand
 {
 
@@ -1875,6 +2001,20 @@ public:
 	}
 
 
+	virtual void setEntitiesScales(const Array<Entity>& entities,
+								   const Array<float>& scales) override
+	{
+		if (entities.empty())
+		{
+			return;
+		}
+		Universe* universe = getUniverse();
+		IEditorCommand* command = m_allocator.newObject<ScaleEntityCommand>(
+			*this, entities, scales, m_allocator);
+		executeCommand(command);
+	}
+
+
 	virtual void setEntitiesRotations(const Array<Entity>& entities,
 									  const Array<Quat>& rotations) override
 	{
@@ -1980,8 +2120,10 @@ public:
 		}
 		else
 		{
-			m_game_mode_file =
-				m_engine->getFileSystem().open("memory", "", FS::Mode::WRITE);
+			m_game_mode_file = m_engine->getFileSystem().open(
+				m_engine->getFileSystem().getMemoryDevice(),
+				"",
+				FS::Mode::WRITE);
 			save(*m_game_mode_file);
 			m_is_game_mode = true;
 			m_game_mode_toggled.invoke(true);
@@ -2135,8 +2277,8 @@ public:
 			m_go_to_parameters.m_is_active = true;
 			m_go_to_parameters.m_t = 0;
 			m_go_to_parameters.m_from = universe->getPosition(m_camera);
-			Matrix camera_mtx = universe->getMatrix(m_camera);
-			Vec3 dir = camera_mtx * Vec3(0, 0, 1);
+			Quat camera_rot = universe->getRotation(m_camera);
+			Vec3 dir = camera_rot * Vec3(0, 0, 1);
 			m_go_to_parameters.m_to =
 				universe->getPosition(m_selected_entities[0]) + dir * 10;
 			float len =
@@ -2174,13 +2316,16 @@ public:
 	}
 
 	virtual void getRelativePath(char* relative_path,
-								 int max_length,
-								 const Path& source) override
+		int max_length,
+		const char* source) override
 	{
+		char tmp[MAX_PATH_LENGTH];
+		makeLowercase(tmp, sizeof(tmp), source);
+
 		if (strncmp(
-				m_base_path.c_str(), source.c_str(), m_base_path.length()) == 0)
+			m_base_path.c_str(), tmp, m_base_path.length()) == 0)
 		{
-			const char* rel_path_start = source.c_str() + m_base_path.length();
+			const char* rel_path_start = tmp + m_base_path.length();
 			if (rel_path_start[0] == '/')
 			{
 				++rel_path_start;
@@ -2189,8 +2334,16 @@ public:
 		}
 		else
 		{
-			strncpy(relative_path, source.c_str(), max_length);
+			strncpy(relative_path, tmp, max_length);
 		}
+	}
+
+
+	virtual void getRelativePath(char* relative_path,
+								 int max_length,
+								 const Path& source) override
+	{
+		getRelativePath(relative_path, max_length, source.c_str());
 	}
 
 	virtual void newUniverse() override
@@ -2351,7 +2504,7 @@ public:
 	}
 
 
-	WorldEditorImpl(Engine& engine)
+	WorldEditorImpl(const char* base_path, Engine& engine)
 		: m_allocator(engine.getAllocator())
 		, m_engine(nullptr)
 		, m_universe_mutex(false)
@@ -2390,8 +2543,8 @@ public:
 		addPlugin(*m_measure_tool);
 
 		m_file_system = FS::FileSystem::create(m_allocator);
-		m_tpc_file_server.start(engine.getBasePath(), m_allocator);
-		m_base_path = engine.getBasePath();
+		m_tpc_file_server.start(base_path, m_allocator);
+		m_base_path = base_path;
 
 		m_tcp_file_device.connect("127.0.0.1", 10001, m_allocator);
 
@@ -2424,6 +2577,9 @@ public:
 		createUniverse(true);
 		m_template_system = EntityTemplateSystem::create(*this);
 
+		m_editor_command_creators.insert(
+			crc32("scale_entity"),
+			&WorldEditorImpl::constructEditorCommand<ScaleEntityCommand>);
 		m_editor_command_creators.insert(
 			crc32("move_entity"),
 			&WorldEditorImpl::constructEditorCommand<MoveEntityCommand>);
@@ -2864,7 +3020,9 @@ public:
 			return;
 		}
 		FS::IFile* file = m_engine->getFileSystem().open(
-			"disk", path.c_str(), FS::Mode::CREATE | FS::Mode::WRITE);
+			m_engine->getFileSystem().getDiskDevice(),
+			path.c_str(),
+			FS::Mode::CREATE | FS::Mode::WRITE);
 		if (file)
 		{
 			JsonSerializer serializer(
@@ -2915,7 +3073,9 @@ public:
 		destroyUndoStack();
 		m_undo_index = -1;
 		FS::IFile* file = m_engine->getFileSystem().open(
-			"disk", path.c_str(), FS::Mode::OPEN | FS::Mode::READ);
+			m_engine->getFileSystem().getDiskDevice(),
+			path.c_str(),
+			FS::Mode::OPEN | FS::Mode::READ);
 		if (file)
 		{
 			JsonSerializer serializer(
@@ -2955,15 +3115,17 @@ public:
 		newUniverse();
 		executeUndoStack(undo_stack_path);
 		FS::IFile* file = m_engine->getFileSystem().open(
-			"memory", "", FS::Mode::CREATE | FS::Mode::WRITE);
+			m_engine->getFileSystem().getMemoryDevice(),
+			"",
+			FS::Mode::CREATE | FS::Mode::WRITE);
 		if (!file)
 		{
 			return false;
 		}
-		FS::IFile* result_file =
-			m_engine->getFileSystem().open("memory:disk",
-										   result_universe_path.c_str(),
-										   FS::Mode::OPEN | FS::Mode::READ);
+		FS::IFile* result_file = m_engine->getFileSystem().open(
+			m_engine->getFileSystem().getDefaultDevice(),
+			result_universe_path.c_str(),
+			FS::Mode::OPEN | FS::Mode::READ);
 		if (!result_file)
 		{
 			return false;
@@ -3061,9 +3223,9 @@ private:
 };
 
 
-WorldEditor* WorldEditor::create(Engine& engine)
+WorldEditor* WorldEditor::create(const char* base_path, Engine& engine)
 {
-	return engine.getAllocator().newObject<WorldEditorImpl>(engine);
+	return engine.getAllocator().newObject<WorldEditorImpl>(base_path, engine);
 }
 
 
