@@ -164,15 +164,15 @@ struct ShaderLoader
 		const char* pass = m_shader.m_combintions.m_passes[m_pass_idx];
 		char path[MAX_PATH_LENGTH];
 		copyString(path, sizeof(path), "shaders/compiled/");
-		catCString(path, sizeof(path), shader_name);
-		catCString(path, sizeof(path), "_");
-		catCString(path, sizeof(path), pass);
+		catString(path, sizeof(path), shader_name);
+		catString(path, sizeof(path), "_");
+		catString(path, sizeof(path), pass);
 		char mask_str[10];
 		int actual_mask =
 			m_mask & m_shader.m_combintions.m_vs_combinations[m_pass_idx];
 		toCString(actual_mask, mask_str, sizeof(mask_str));
-		catCString(path, sizeof(path), mask_str);
-		catCString(path, sizeof(path), "_vs.shb");
+		catString(path, sizeof(path), mask_str);
+		catString(path, sizeof(path), "_vs.shb");
 
 		FS::FileSystem& fs = m_shader.m_resource_manager.getFileSystem();
 		bool success = fs.openAsync(fs.getDefaultDevice(),
@@ -185,14 +185,14 @@ struct ShaderLoader
 		}
 
 		copyString(path, sizeof(path), "shaders/compiled/");
-		catCString(path, sizeof(path), shader_name);
-		catCString(path, sizeof(path), "_");
-		catCString(path, sizeof(path), pass);
+		catString(path, sizeof(path), shader_name);
+		catString(path, sizeof(path), "_");
+		catString(path, sizeof(path), pass);
 		actual_mask =
 			m_mask & m_shader.m_combintions.m_fs_combinations[m_pass_idx];
 		toCString(actual_mask, mask_str, sizeof(mask_str));
-		catCString(path, sizeof(path), mask_str);
-		catCString(path, sizeof(path), "_fs.shb");
+		catString(path, sizeof(path), mask_str);
+		catString(path, sizeof(path), "_fs.shb");
 
 		if (!fs.openAsync(fs.getDefaultDevice(),
 						  path,

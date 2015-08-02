@@ -34,6 +34,30 @@ bool makeLowercase(char* destination, int length, const char* source)
 }
 
 
+bool copyNString(char* destination, int length, const char* source, int source_len)
+{
+	if (!source)
+	{
+		return false;
+	}
+
+	while (*source && length && source_len)
+	{
+		*destination = *source;
+		--source_len;
+		--length;
+		++destination;
+		++source;
+	}
+	if (length > 0)
+	{
+		*destination = 0;
+		return true;
+	}
+	return false;
+}
+
+
 bool copyString(char* destination, int length, const char* source)
 {
 	if (!source)
@@ -56,7 +80,45 @@ bool copyString(char* destination, int length, const char* source)
 	return false;
 }
 
-bool catCString(char* destination, int length, const char* source)
+
+const char* reverseFind(const char* str, const char* from, char c)
+{
+	const char* tmp = from == nullptr ? nullptr : from - 1;
+	if (tmp == nullptr)
+	{
+		tmp = str;
+		while (*tmp)
+		{
+			++tmp;
+		}
+	}
+	while (tmp >= str && *tmp != c)
+	{
+		--tmp;
+	}
+	if (tmp >= str)
+	{
+		return tmp;
+	}
+	return nullptr;
+}
+
+
+bool catNString(char* destination,
+				int length,
+				const char* source,
+				int source_len)
+{
+	while (*destination && length)
+	{
+		--length;
+		++destination;
+	}
+	return copyNString(destination, length, source, source_len);
+}
+
+
+bool catString(char* destination, int length, const char* source)
 {
 	while (*destination && length)
 	{

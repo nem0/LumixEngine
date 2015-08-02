@@ -167,8 +167,8 @@ public:
 		lua_setglobal(state, name);
 		char tmp[1024];
 		copyString(tmp, sizeof(tmp), name);
-		catCString(tmp, sizeof(tmp), " = ");
-		catCString(tmp, sizeof(tmp), prop.m_value.c_str());
+		catString(tmp, sizeof(tmp), " = ");
+		catString(tmp, sizeof(tmp), prop.m_value.c_str());
 
 		bool errors =
 			luaL_loadbuffer(state, tmp, strlen(tmp), nullptr) != LUA_OK;

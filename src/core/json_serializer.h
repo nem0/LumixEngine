@@ -56,7 +56,6 @@ namespace Lumix
 			void serializeArrayItem(float value);
 			void serializeArrayItem(bool value);
 			void serializeArrayItem(const char* value);
-			void serializeArrayItem(string& value);
 
 			// deserialize		
 			void deserialize(const char* label, uint32_t& value, uint32_t default_value);
@@ -78,7 +77,6 @@ namespace Lumix
 			void deserializeArrayItem(float& value, float default_value);
 			void deserializeArrayItem(bool& value, bool default_value);
 			void deserializeArrayItem(char* value, int max_length, const char* default_value);
-			void deserializeArrayItem(string& value, const char* default_value);
 			void deserializeObjectBegin();
 			void deserializeObjectEnd();
 			void deserializeLabel(char* label, int max_length);

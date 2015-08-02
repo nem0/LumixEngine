@@ -62,7 +62,7 @@ public:
 	};
 
 public:
-	static WorldEditor* create(Engine& engine);
+	static WorldEditor* create(const char* base_path, Engine& engine);
 	static void destroy(WorldEditor* editor);
 
 	virtual void update() = 0;
