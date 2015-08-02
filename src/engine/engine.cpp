@@ -317,6 +317,34 @@ public:
 	virtual float getFPS() const override { return m_fps; }
 
 
+	void serializePluginList(OutputBlob& serializer)
+	{
+		serializer.write((int32_t)m_plugin_manager->getPlugins().size());
+		for (auto* plugin : m_plugin_manager->getPlugins())
+		{
+			serializer.writeString(plugin->getName());
+		}
+	}
+
+
+	bool hasSerializedPlugins(InputBlob& serializer)
+	{
+		int32_t count;
+		serializer.read(count);
+		for (int i = 0; i < count; ++i)
+		{
+			char tmp[32];
+			serializer.readString(tmp, sizeof(tmp));
+			if (!m_plugin_manager->getPlugin(tmp))
+			{
+				g_log_error.log("engine") << "Missing plugin " << tmp;
+				return false;
+			}
+		}
+		return true;
+	}
+
+
 	virtual uint32_t serialize(OutputBlob& serializer) override
 	{
 		SerializedEngineHeader header;
@@ -324,14 +352,17 @@ public:
 		header.m_version = SerializedEngineVersion::LATEST;
 		header.m_reserved = 0;
 		serializer.write(header);
+		serializePluginList(serializer);
 		g_path_manager.serialize(serializer);
 		int pos = serializer.getSize();
 		m_universe->serialize(serializer);
 		m_hierarchy->serialize(serializer);
 		m_renderer->serialize(serializer);
 		m_plugin_manager->serialize(serializer);
+		serializer.write((int32_t)m_scenes.size());
 		for (int i = 0; i < m_scenes.size(); ++i)
 		{
+			serializer.writeString(m_scenes[i]->getPlugin().getName());
 			m_scenes[i]->serialize(serializer);
 		}
 		uint32_t crc = crc32((const uint8_t*)serializer.getData() + pos,
@@ -354,14 +385,22 @@ public:
 			g_log_error.log("engine") << "Unsupported version";
 			return false;
 		}
+		if (!hasSerializedPlugins(serializer))
+		{
+			return false;
+		}
 		g_path_manager.deserialize(serializer);
 		m_universe->deserialize(serializer);
 		m_hierarchy->deserialize(serializer);
 		m_renderer->deserialize(serializer);
 		m_plugin_manager->deserialize(serializer);
-		for (int i = 0; i < m_scenes.size(); ++i)
+		int32_t scene_count;
+		serializer.read(scene_count);
+		for (int i = 0; i < scene_count; ++i)
 		{
-			m_scenes[i]->deserialize(serializer);
+			char tmp[32];
+			serializer.readString(tmp, sizeof(tmp));
+			getScene(crc32(tmp))->deserialize(serializer);
 		}
 		return true;
 	}
