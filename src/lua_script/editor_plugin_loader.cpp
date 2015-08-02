@@ -20,8 +20,6 @@
 
 namespace Lumix
 {
-
-
 namespace LuaWrapper
 {
 
@@ -32,10 +30,8 @@ template <> inline void pushLua(lua_State* L, QString value)
 }
 
 
-}
-
-
-}
+} // namespace LuaWrapper
+} // namespace Lumix
 
 
 EditorPluginLoader::EditorPluginLoader(MainWindow& main_window)
@@ -106,7 +102,7 @@ static QString getTextEditText(void* widget_ptr, const char* child_name)
 	{
 		return "";
 	}
-	
+
 	return edit->toPlainText();
 }
 
@@ -134,16 +130,14 @@ static void registerButtonClickCallback(lua_State* L,
 			bool error = lua_pcall(L, 0, LUA_MULTRET, 0) != LUA_OK;
 			if (error)
 			{
-				Lumix::g_log_error.log("editor") << ": "
-					<< lua_tostring(L, -1);
+				Lumix::g_log_error.log("editor") << ": " << lua_tostring(L, -1);
 				lua_pop(L, 1);
 			}
 		}
 		else
 		{
-			Lumix::g_log_error.log("editor") << "Lua function "
-				<< func.toLatin1().data()
-				<< " not found.";
+			Lumix::g_log_error.log("editor")
+				<< "Lua function " << func.toLatin1().data() << " not found.";
 			lua_pop(L, 1);
 		}
 	};
@@ -165,6 +159,18 @@ static void* createUI(const char* ui)
 static void logError(const char* text)
 {
 	Lumix::g_log_error.log("editor") << text;
+}
+
+
+static void logWarning(const char* text)
+{
+	Lumix::g_log_warning.log("editor") << text;
+}
+
+
+static void logInfo(const char* text)
+{
+	Lumix::g_log_info.log("editor") << text;
 }
 
 
@@ -211,10 +217,16 @@ void EditorPluginLoader::registerAPI()
 	f = Lumix::LuaWrapper::wrap<decltype(&API::logError), API::logError>;
 	lua_register(m_global_state, "API_logError", f);
 
+	f = Lumix::LuaWrapper::wrap<decltype(&API::logWarning), API::logWarning>;
+	lua_register(m_global_state, "API_logWarning", f);
+
+	f = Lumix::LuaWrapper::wrap<decltype(&API::logInfo), API::logInfo>;
+	lua_register(m_global_state, "API_logInfo", f);
+
 	f = Lumix::LuaWrapper::wrap<decltype(&API::executeEditorCommand),
 								API::executeEditorCommand>;
 	lua_register(m_global_state, "API_executeEditorCommand", f);
-	
+
 	f = Lumix::LuaWrapper::wrap<decltype(&API::createUI), API::createUI>;
 	lua_register(m_global_state, "API_createUI", f);
 

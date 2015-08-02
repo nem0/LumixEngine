@@ -33,14 +33,13 @@ namespace Lumix
 	typedef int Entity;
 	const int INVALID_ENTITY = -1;
 	const int INVALID_COMPONENT = -1;
+
+	template <typename T, int count>
+	int lengthOf(const T(&)[count])
+	{
+		return count;
+	};
 }
-
-
-template <typename T, int count>
-int lengthOf(const T(&)[count])
-{
-	return count;
-};
 
 
 #ifndef ASSERT

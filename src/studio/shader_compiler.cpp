@@ -64,7 +64,8 @@ void ShaderCompiler::makeUpToDate()
 				{
 					QString pass_path =
 						bin_base_path + combinations.m_passes[i];
-					for (int j = 0; j < 1 << lengthOf(combinations.m_defines);
+					for (int j = 0;
+						 j < 1 << Lumix::lengthOf(combinations.m_defines);
 						 ++j)
 					{
 						if ((j & (~combinations.m_vs_combinations[i])) == 0)
@@ -240,7 +241,7 @@ void ShaderCompiler::compilePass(
 	const Lumix::ShaderCombinations::Defines& all_defines)
 {
 
-	for (int mask = 0; mask < 1 << lengthOf(all_defines); ++mask)
+	for (int mask = 0; mask < 1 << Lumix::lengthOf(all_defines); ++mask)
 	{
 		if ((mask & (~define_mask)) == 0)
 		{
@@ -273,7 +274,7 @@ void ShaderCompiler::compilePass(
 			cmd.append(is_vertex_shader ? "vertex" : "fragment");
 			cmd.append(" -D ");
 			cmd.append(pass);
-			for (int i = 0; i < lengthOf(all_defines); ++i)
+			for (int i = 0; i < Lumix::lengthOf(all_defines); ++i)
 			{
 				if (mask & (1 << i))
 				{
