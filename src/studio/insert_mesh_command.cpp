@@ -73,7 +73,7 @@ void InsertMeshCommand::execute()
 	{
 		char rel_path[Lumix::MAX_PATH_LENGTH];
 		m_editor.getRelativePath(
-			rel_path, Lumix::MAX_PATH_LENGTH, Lumix::Path(m_mesh_path.c_str()));
+			rel_path, Lumix::MAX_PATH_LENGTH, m_mesh_path.c_str());
 		Lumix::StackAllocator<Lumix::MAX_PATH_LENGTH> allocator;
 		static_cast<Lumix::RenderScene*>(scene)
 			->setRenderablePath(cmp, rel_path);
