@@ -3,6 +3,8 @@
 #include "core/fs/disk_file_device.h"
 #include "core/fs/file_system.h"
 #include "core/fs/memory_file_device.h"
+#include "core/fs/tcp_file_device.h"
+#include "core/fs/tcp_file_server.h"
 #include "core/library.h"
 #include "core/log.h"
 #include "core/profiler.h"
@@ -41,6 +43,7 @@ public:
 		m_world_editor = nullptr;
 		m_file_system = nullptr;
 		m_memory_device = nullptr;
+		m_tcp_device = nullptr;
 		m_disk_device = nullptr;
 	}
 
@@ -65,6 +68,20 @@ public:
 		{
 			scene->render(*render_scene);
 		}
+	}
+
+
+	void initNetworkfilesystem()
+	{
+		m_file_system = Lumix::FS::FileSystem::create(m_allocator);
+		m_memory_device = m_allocator.newObject<Lumix::FS::MemoryFileDevice>(m_allocator);
+		m_tcp_device = m_allocator.newObject<Lumix::FS::TCPFileDevice>();
+		m_tcp_device->connect("127.0.0.1", 10001, m_allocator);
+
+		m_file_system->mount(m_memory_device);
+		m_file_system->mount(m_tcp_device);
+		m_file_system->setDefaultDevice("memory:tcp");
+		m_file_system->setSaveGameDevice("memory:tcp");
 	}
 
 
@@ -94,7 +111,7 @@ public:
 		HWND hwnd =
 			(HWND)m_main_window->getSceneView()->getViewWidget()->winId();
 		Lumix::Renderer::setInitData(hwnd);
-		initFilesystem();
+		initNetworkfilesystem();
 		m_engine = Lumix::Engine::create(m_file_system, m_allocator);
 		m_world_editor = Lumix::WorldEditor::create(
 			QDir::currentPath().toLocal8Bit().data(), *m_engine);
@@ -151,6 +168,12 @@ public:
 		m_memory_device = nullptr;
 		m_allocator.deleteObject(m_disk_device);
 		m_disk_device = nullptr;
+		if (m_tcp_device)
+		{
+			m_tcp_device->disconnect();
+		}
+		m_allocator.deleteObject(m_tcp_device);
+		m_tcp_device = nullptr;
 		Lumix::FS::FileSystem::destroy(m_file_system);
 		m_file_system = nullptr;
 	}
@@ -260,6 +283,7 @@ private:
 	Lumix::Engine* m_engine;
 	Lumix::FS::FileSystem* m_file_system;
 	Lumix::FS::MemoryFileDevice* m_memory_device;
+	Lumix::FS::TCPFileDevice* m_tcp_device;
 	Lumix::FS::DiskFileDevice* m_disk_device;
 	QApplication* m_qt_app;
 };
