@@ -248,11 +248,8 @@ public:
 	}
 
 
-	const DeviceList& getDiskDevice() const override
-	{
-		return m_disk_device;
-	}
-	
+	const DeviceList& getDiskDevice() const override { return m_disk_device; }
+
 
 	void setSaveGameDevice(const char* dev) override
 	{
@@ -260,21 +257,23 @@ public:
 	}
 
 
-	void close(IFile* file) override
+	void close(IFile& file) override
 	{
-		file->close();
-		file->release();
+		file.close();
+		file.release();
 	}
 
-	void closeAsync(IFile* file) override
+
+	void closeAsync(IFile& file) override
 	{
 		AsyncItem& item = m_pending.pushEmpty();
 
-		item.m_file = file;
+		item.m_file = &file;
 		item.m_cb.bind<closeAsync>();
 		item.m_mode = 0;
 		item.m_flags = E_NONE;
 	}
+
 
 	void updateAsyncTransactions() override
 	{
@@ -288,7 +287,7 @@ public:
 				m_in_progress.pop();
 
 				tr->data.m_cb.invoke(
-					tr->data.m_file, !!(tr->data.m_flags & E_SUCCESS), *this);
+					*tr->data.m_file, !!(tr->data.m_flags & E_SUCCESS), *this);
 				m_transaction_queue.dealoc(tr);
 			}
 			else
@@ -340,7 +339,7 @@ public:
 		return nullptr;
 	}
 
-	static void closeAsync(IFile* file, bool, FileSystem&) { file->release(); }
+	static void closeAsync(IFile& file, bool, FileSystem&) { file.release(); } TODO("file.close()?");
 
 	void destroy()
 	{

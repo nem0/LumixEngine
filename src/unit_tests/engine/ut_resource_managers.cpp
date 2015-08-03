@@ -347,8 +347,8 @@ void UT_failure_reload(const char* params)
 		valid_file->read(buffer, size);
 		error_file->write(buffer, size);
 
-		file_system->close(valid_file);
-		file_system->close(error_file);
+		file_system->close(*valid_file);
+		file_system->close(*error_file);
 	}
 
 	Lumix::g_log_info.log("unit") << "loading ...";
@@ -390,8 +390,8 @@ void UT_failure_reload(const char* params)
 		invalid_file->read(buffer, size);
 		error_file->write(buffer, size);
 
-		file_system->close(invalid_file);
-		file_system->close(error_file);
+		file_system->close(*invalid_file);
+		file_system->close(*error_file);
 	}
 
 	Lumix::g_log_info.log("unit") << "reloading invalid ...";
@@ -422,8 +422,8 @@ void UT_failure_reload(const char* params)
 		valid_file->read(buffer, size);
 		error_file->write(buffer, size);
 
-		file_system->close(valid_file);
-		file_system->close(error_file);
+		file_system->close(*valid_file);
+		file_system->close(*error_file);
 	}
 
 	Lumix::g_log_info.log("unit") << "reloading valid ...";

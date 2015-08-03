@@ -188,7 +188,7 @@ struct PipelineImpl : public Pipeline
 
 
 	virtual void
-	loaded(FS::IFile* file, bool success, FS::FileSystem& fs) override
+	loaded(FS::IFile& file, bool success, FS::FileSystem& fs) override
 	{
 		if (m_lua_state)
 		{
@@ -200,8 +200,8 @@ struct PipelineImpl : public Pipeline
 			m_lua_state = luaL_newstate();
 			luaL_openlibs(m_lua_state);
 			bool errors = luaL_loadbuffer(m_lua_state,
-										  (const char*)file->getBuffer(),
-										  file->size(),
+										  (const char*)file.getBuffer(),
+										  file.size(),
 										  "") != LUA_OK;
 			errors =
 				errors || lua_pcall(m_lua_state, 0, LUA_MULTRET, 0) != LUA_OK;

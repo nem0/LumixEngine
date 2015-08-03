@@ -224,7 +224,7 @@ void Texture::saveTGA()
 
 	saveTGA(m_allocator, file, m_width, m_height, m_BPP, &m_data[0], getPath());
 
-	fs.closeAsync(file);
+	fs.close(*file);
 }
 
 
@@ -241,7 +241,7 @@ void Texture::save()
 								  FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
 
 		file->write(&m_data[0], m_data.size() * sizeof(m_data[0]));
-		fs.closeAsync(file);
+		fs.close(*file);
 	}
 	else if (strcmp(ext, "tga") == 0 && m_BPP == 4)
 	{
@@ -405,10 +405,9 @@ bool Texture::loadDDS(FS::IFile& file)
 }
 
 
-void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
+void Texture::loaded(FS::IFile& file, bool success, FS::FileSystem& fs)
 {
 	PROFILE_FUNCTION();
-	ASSERT(file);
 	if (success)
 	{
 		const char* path = m_path.c_str();
@@ -416,15 +415,15 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		bool loaded = false;
 		if (len > 3 && strcmp(path + len - 4, ".dds") == 0)
 		{
-			loaded = loadDDS(*file);
+			loaded = loadDDS(file);
 		}
 		else if (len > 3 && strcmp(path + len - 4, ".raw") == 0)
 		{
-			loaded = loadRaw(*file);
+			loaded = loadRaw(file);
 		}
 		else
 		{
-			loaded = loadTGA(*file);
+			loaded = loadTGA(file);
 		}
 		if (!loaded)
 		{
@@ -434,7 +433,7 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		}
 		else
 		{
-			m_size = file->size();
+			m_size = file.size();
 			decrementDepCount();
 		}
 	}

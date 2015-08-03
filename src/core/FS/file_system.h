@@ -41,8 +41,8 @@ public:
 						   int mode,
 						   const ReadCallback& call_back) = 0;
 
-	virtual void close(IFile* file) = 0;
-	virtual void closeAsync(IFile* file) = 0;
+	virtual void close(IFile& file) = 0;
+	virtual void closeAsync(IFile& file) = 0;
 
 	virtual void updateAsyncTransactions() = 0;
 

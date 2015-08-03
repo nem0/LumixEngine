@@ -348,14 +348,14 @@ void Material::setRenderState(bool value, uint64_t state, uint64_t mask)
 }
 
 
-void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
+void Material::loaded(FS::IFile& file, bool success, FS::FileSystem& fs)
 {
 	m_render_states = BGFX_STATE_DEPTH_TEST_LEQUAL | BGFX_STATE_CULL_CW;
 	PROFILE_FUNCTION();
 	if(success)
 	{
 		m_uniforms.clear();
-		JsonSerializer serializer(*file, JsonSerializer::READ, m_path.c_str(), m_allocator);
+		JsonSerializer serializer(file, JsonSerializer::READ, m_path.c_str(), m_allocator);
 		serializer.deserializeObjectBegin();
 		char path[MAX_PATH_LENGTH];
 		char label[256];
@@ -446,7 +446,7 @@ void Material::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			return;
 		}
 
-		m_size = file->size();
+		m_size = file.size();
 		decrementDepCount();
 	}
 	else

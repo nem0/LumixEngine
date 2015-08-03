@@ -196,7 +196,7 @@ void ResourceModel::saveMaterial(Lumix::Material* material)
 			material->getPath().c_str(),
 			allocator);
 		material->save(serializer);
-		fs.closeAsync(file);
+		fs.close(*file);
 
 		QFile::remove(material->getPath().c_str());
 		QFile::rename(tmp_path, material->getPath().c_str());

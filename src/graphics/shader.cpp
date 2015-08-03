@@ -206,31 +206,31 @@ struct ShaderLoader
 		return success;
 	}
 
-	void onFSLoaded(FS::IFile* file, bool success, FS::FileSystem& fs)
+	void onFSLoaded(FS::IFile& file, bool success, FS::FileSystem& fs)
 	{
 		if (success)
 		{
-			auto* mem = bgfx::alloc(file->size() + 1);
-			file->read(mem->data, file->size());
-			mem->data[file->size()] = '\0';
+			auto* mem = bgfx::alloc(file.size() + 1);
+			file.read(mem->data, file.size());
+			mem->data[file.size()] = '\0';
 			m_fragment_shader = bgfx::createShader(mem);
 			ASSERT(bgfx::isValid(m_fragment_shader));
-			fs.closeAsync(file);
 		}
+		fs.closeAsync(file);
 		checkFinish();
 	}
 
-	void onVSLoaded(FS::IFile* file, bool success, FS::FileSystem& fs)
+	void onVSLoaded(FS::IFile& file, bool success, FS::FileSystem& fs)
 	{
 		if (success)
 		{
-			auto* mem = bgfx::alloc(file->size() + 1);
-			file->read(mem->data, file->size());
-			mem->data[file->size()] = '\0';
+			auto* mem = bgfx::alloc(file.size() + 1);
+			file.read(mem->data, file.size());
+			mem->data[file.size()] = '\0';
 			m_vertex_shader = bgfx::createShader(mem);
 			ASSERT(bgfx::isValid(m_vertex_shader));
-			fs.closeAsync(file);
 		}
+		fs.closeAsync(file);
 		checkFinish();
 	}
 
@@ -321,7 +321,7 @@ void ShaderCombinations::parse(lua_State* L)
 }
 
 
-void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
+void Shader::loaded(FS::IFile& file, bool success, FS::FileSystem& fs)
 {
 	if (success)
 	{
@@ -330,7 +330,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 
 		bool errors =
 			luaL_loadbuffer(
-				L, (const char*)file->getBuffer(), file->size(), "") != LUA_OK;
+				L, (const char*)file.getBuffer(), file.size(), "") != LUA_OK;
 		errors = errors || lua_pcall(L, 0, LUA_MULTRET, 0) != LUA_OK;
 		if (errors)
 		{
@@ -351,7 +351,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			}
 			else
 			{
-				m_size = file->size();
+				m_size = file.size();
 				decrementDepCount();
 			}
 		}

@@ -42,7 +42,7 @@ class LUMIX_ENGINE_API Texture : public Resource
 		void saveTGA();
 
 		virtual void doUnload(void) override;
-		virtual void loaded(FS::IFile* file, bool success, FS::FileSystem& fs) override;
+		virtual void loaded(FS::IFile& file, bool success, FS::FileSystem& fs) override;
 
 	private:
 		IAllocator& m_allocator;

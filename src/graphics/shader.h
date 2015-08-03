@@ -108,7 +108,7 @@ class LUMIX_ENGINE_API Shader : public Resource
 		Renderer& getRenderer();
 
 		virtual void doUnload(void) override;
-		virtual void loaded(FS::IFile* file, bool success, FS::FileSystem& fs) override;
+		virtual void loaded(FS::IFile& file, bool success, FS::FileSystem& fs) override;
 
 	private:
 		IAllocator&			m_allocator;
