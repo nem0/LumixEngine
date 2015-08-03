@@ -108,14 +108,12 @@ void Animation::loaded(FS::IFile& file, bool success, FS::FileSystem& fs)
 		file.read(&header, sizeof(header));
 		if (header.magic != HEADER_MAGIC)
 		{
-			fs.closeAsync(file);
 			onFailure();
 			g_log_error.log("animation") << m_path.c_str() << " is not an animation file";
 			return;
 		}
 		if (header.version > 1)
 		{
-			fs.closeAsync(file);
 			onFailure();
 			g_log_error.log("animation") << "Unsupported animation version " << header.version << " (" << m_path.c_str() << ")";
 			return;
@@ -138,8 +136,6 @@ void Animation::loaded(FS::IFile& file, bool success, FS::FileSystem& fs)
 	{
 		onFailure();
 	}
-
-	fs.closeAsync(file);
 }
 
 

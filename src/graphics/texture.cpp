@@ -443,8 +443,6 @@ void Texture::loaded(FS::IFile& file, bool success, FS::FileSystem& fs)
 									  << m_path.c_str();
 		onFailure();
 	}
-
-	fs.closeAsync(file);
 }
 
 

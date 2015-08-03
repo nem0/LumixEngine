@@ -223,8 +223,6 @@ struct PipelineImpl : public Pipeline
 		{
 			onFailure();
 		}
-
-		fs.closeAsync(file);
 	}
 
 	lua_State* m_lua_state;

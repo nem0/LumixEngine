@@ -374,7 +374,6 @@ void Material::loaded(FS::IFile& file, bool success, FS::FileSystem& fs)
 				if (!deserializeTexture(serializer, material_dir))
 				{
 					onFailure();
-					fs.closeAsync(file);
 					return;
 				}
 				
@@ -442,7 +441,6 @@ void Material::loaded(FS::IFile& file, bool success, FS::FileSystem& fs)
 		{
 			g_log_error.log("renderer") << "Material " << m_path.c_str() << " without a shader";
 			onFailure();
-			fs.closeAsync(file);
 			return;
 		}
 
@@ -454,7 +452,6 @@ void Material::loaded(FS::IFile& file, bool success, FS::FileSystem& fs)
 		g_log_info.log("renderer") << "Error loading material " << m_path.c_str();
 		onFailure();
 	}
-	fs.closeAsync(file);
 }
 
 
