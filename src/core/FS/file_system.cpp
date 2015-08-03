@@ -21,9 +21,10 @@ namespace FS
 
 enum TransFlags
 {
-	E_NONE = 0,
+	E_CLOSE = 0,
 	E_SUCCESS = 0x1,
 	E_IS_OPEN = E_SUCCESS << 1,
+	E_FAIL = E_IS_OPEN << 1
 };
 
 struct AsyncItem
@@ -45,6 +46,7 @@ typedef Queue<AsynTrans*, C_MAX_TRANS> InProgressQueue;
 typedef Array<AsyncItem> ItemsTable;
 typedef Array<IFileDevice*> DevicesTable;
 
+
 class FSTask : public MT::Task
 {
 public:
@@ -53,7 +55,10 @@ public:
 		, m_trans_queue(queue)
 	{
 	}
+
+
 	~FSTask() {}
+
 
 	int task()
 	{
@@ -68,11 +73,12 @@ public:
 				tr->data.m_flags |=
 					tr->data.m_file->open(tr->data.m_path, tr->data.m_mode)
 						? E_SUCCESS
-						: E_NONE;
+						: E_FAIL;
 			}
-			else
+			else if ((tr->data.m_flags & E_CLOSE) == E_CLOSE)
 			{
 				tr->data.m_file->close();
+				tr->data.m_file->release();
 			}
 			tr->setCompleted();
 		}
@@ -271,7 +277,7 @@ public:
 		item.m_file = &file;
 		item.m_cb.bind<closeAsync>();
 		item.m_mode = 0;
-		item.m_flags = E_NONE;
+		item.m_flags = E_CLOSE;
 	}
 
 
@@ -288,6 +294,10 @@ public:
 
 				tr->data.m_cb.invoke(
 					*tr->data.m_file, !!(tr->data.m_flags & E_SUCCESS), *this);
+				if ((tr->data.m_flags & (E_SUCCESS | E_FAIL)) != 0)
+				{
+					closeAsync(*tr->data.m_file);
+				}
 				m_transaction_queue.dealoc(tr);
 			}
 			else
@@ -339,7 +349,7 @@ public:
 		return nullptr;
 	}
 
-	static void closeAsync(IFile& file, bool, FileSystem&) { file.release(); } TODO("file.close()?");
+	static void closeAsync(IFile& file, bool, FileSystem&) { }
 
 	void destroy()
 	{

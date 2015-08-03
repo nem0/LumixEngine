@@ -2307,7 +2307,6 @@ public:
 			resetAndLoad(file);
 		}
 
-		fs.closeAsync(file);
 		m_universe_loaded.invoke();
 	}
 
