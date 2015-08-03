@@ -224,7 +224,7 @@ void Texture::saveTGA()
 
 	saveTGA(m_allocator, file, m_width, m_height, m_BPP, &m_data[0], getPath());
 
-	fs.close(file);
+	fs.closeAsync(file);
 }
 
 
@@ -241,7 +241,7 @@ void Texture::save()
 								  FS::Mode::OPEN_OR_CREATE | FS::Mode::WRITE);
 
 		file->write(&m_data[0], m_data.size() * sizeof(m_data[0]));
-		fs.close(file);
+		fs.closeAsync(file);
 	}
 	else if (strcmp(ext, "tga") == 0 && m_BPP == 4)
 	{
@@ -445,7 +445,7 @@ void Texture::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		onFailure();
 	}
 
-	fs.close(file);
+	fs.closeAsync(file);
 }
 
 

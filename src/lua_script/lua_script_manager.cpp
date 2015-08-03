@@ -107,7 +107,7 @@ void LuaScript::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		onFailure();
 	}
 
-	fs.close(file);
+	fs.closeAsync(file);
 }
 
 

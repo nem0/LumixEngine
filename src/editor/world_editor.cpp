@@ -1849,7 +1849,7 @@ public:
 		FS::IFile* file = fs.open(
 			fs.getDefaultDevice(), path, FS::Mode::CREATE | FS::Mode::WRITE);
 		save(*file);
-		fs.close(file);
+		fs.closeAsync(file);
 		m_universe_path = path;
 	}
 
@@ -2138,7 +2138,7 @@ public:
 		m_is_game_mode = false;
 		m_game_mode_file->seek(FS::SeekMode::BEGIN, 0);
 		load(*m_game_mode_file);
-		m_engine->getFileSystem().close(m_game_mode_file);
+		m_engine->getFileSystem().closeAsync(m_game_mode_file);
 		m_game_mode_file = nullptr;
 		m_universe_loaded.invoke();
 	}
@@ -2307,7 +2307,7 @@ public:
 			resetAndLoad(*file);
 		}
 
-		fs.close(file);
+		fs.closeAsync(file);
 		m_universe_loaded.invoke();
 	}
 
@@ -3016,7 +3016,7 @@ public:
 			}
 			serializer.endArray();
 			serializer.endObject();
-			m_engine->getFileSystem().close(file);
+			m_engine->getFileSystem().closeAsync(file);
 		}
 		else
 		{
@@ -3080,7 +3080,7 @@ public:
 			}
 			serializer.deserializeArrayEnd();
 			serializer.deserializeObjectEnd();
-			m_engine->getFileSystem().close(file);
+			m_engine->getFileSystem().closeAsync(file);
 		}
 		return file != nullptr;
 	}
@@ -3111,8 +3111,8 @@ public:
 		bool is_same = file->size() > 8 && result_file->size() > 8 &&
 					   *((const uint32_t*)result_file->getBuffer() + 1) ==
 						   *((const uint32_t*)file->getBuffer() + 1);
-		m_engine->getFileSystem().close(result_file);
-		m_engine->getFileSystem().close(file);
+		m_engine->getFileSystem().closeAsync(result_file);
+		m_engine->getFileSystem().closeAsync(file);
 
 		return is_same;
 	}

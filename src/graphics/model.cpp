@@ -527,7 +527,7 @@ void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			g_log_warning.log("renderer") << "Error loading model "
 										  << m_path.c_str();
 			onFailure();
-			fs.close(file);
+			fs.closeAsync(file);
 			return;
 		}
 	}
@@ -538,7 +538,7 @@ void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		onFailure();
 	}
 
-	fs.close(file);
+	fs.closeAsync(file);
 }
 
 void Model::doUnload(void)
