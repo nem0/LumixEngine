@@ -160,23 +160,23 @@ void Model::getPose(Pose& pose)
 }
 
 
-bool Model::parseVertexDef(FS::IFile* file, bgfx::VertexDecl* vertex_definition)
+bool Model::parseVertexDef(FS::IFile& file, bgfx::VertexDecl* vertex_definition)
 {
 	vertex_definition->begin();
 
 	uint32_t attribute_count;
-	file->read(&attribute_count, sizeof(attribute_count));
+	file.read(&attribute_count, sizeof(attribute_count));
 
 	for (uint32_t i = 0; i < attribute_count; ++i)
 	{
 		char tmp[50];
 		uint32_t len;
-		file->read(&len, sizeof(len));
+		file.read(&len, sizeof(len));
 		if (len > sizeof(tmp) - 1)
 		{
 			return false;
 		}
-		file->read(tmp, len);
+		file.read(tmp, len);
 		tmp[len] = '\0';
 
 		if (strcmp(tmp, "in_position") == 0)
@@ -216,7 +216,7 @@ bool Model::parseVertexDef(FS::IFile* file, bgfx::VertexDecl* vertex_definition)
 		}
 
 		uint32_t type;
-		file->read(&type, sizeof(type));
+		file.read(&type, sizeof(type));
 	}
 
 	vertex_definition->end();
@@ -302,19 +302,19 @@ void Model::computeRuntimeData(const uint8_t* vertices)
 }
 
 
-bool Model::parseGeometry(FS::IFile* file)
+bool Model::parseGeometry(FS::IFile& file)
 {
 	int32_t indices_count = 0;
-	file->read(&indices_count, sizeof(indices_count));
+	file.read(&indices_count, sizeof(indices_count));
 	if (indices_count <= 0)
 	{
 		return false;
 	}
 	m_indices.resize(indices_count);
-	file->read(&m_indices[0], sizeof(m_indices[0]) * indices_count);
+	file.read(&m_indices[0], sizeof(m_indices[0]) * indices_count);
 
 	int32_t vertices_size = 0;
-	file->read(&vertices_size, sizeof(vertices_size));
+	file.read(&vertices_size, sizeof(vertices_size));
 	if (vertices_size <= 0)
 	{
 		return false;
@@ -322,7 +322,7 @@ bool Model::parseGeometry(FS::IFile* file)
 
 	Array<uint8_t> vertices(m_allocator);
 	vertices.resize(vertices_size);
-	file->read(&vertices[0], sizeof(vertices[0]) * vertices.size());
+	file.read(&vertices[0], sizeof(vertices[0]) * vertices.size());
 
 	m_geometry_buffer_object.setAttributesData(
 		&vertices[0], vertices.size(), m_meshes[0].getVertexDefinition());
@@ -342,10 +342,10 @@ bool Model::parseGeometry(FS::IFile* file)
 	return true;
 }
 
-bool Model::parseBones(FS::IFile* file)
+bool Model::parseBones(FS::IFile& file)
 {
 	int bone_count;
-	file->read(&bone_count, sizeof(bone_count));
+	file.read(&bone_count, sizeof(bone_count));
 	if (bone_count < 0)
 	{
 		return false;
@@ -355,26 +355,26 @@ bool Model::parseBones(FS::IFile* file)
 	{
 		Model::Bone& b = m_bones.emplace(m_allocator);
 		int len;
-		file->read(&len, sizeof(len));
+		file.read(&len, sizeof(len));
 		char tmp[MAX_PATH_LENGTH];
 		if (len >= MAX_PATH_LENGTH)
 		{
 			return false;
 		}
-		file->read(tmp, len);
+		file.read(tmp, len);
 		tmp[len] = 0;
 		b.name = tmp;
 		m_bone_map.insert(crc32(b.name.c_str()), m_bones.size() - 1);
-		file->read(&len, sizeof(len));
+		file.read(&len, sizeof(len));
 		if (len >= MAX_PATH_LENGTH)
 		{
 			return false;
 		}
-		file->read(tmp, len);
+		file.read(tmp, len);
 		tmp[len] = 0;
 		b.parent = tmp;
-		file->read(&b.position.x, sizeof(float) * 3);
-		file->read(&b.rotation.x, sizeof(float) * 4);
+		file.read(&b.position.x, sizeof(float) * 3);
+		file.read(&b.rotation.x, sizeof(float) * 4);
 	}
 	m_first_nonroot_bone_index = -1;
 	for (int i = 0; i < bone_count; ++i)
@@ -423,10 +423,10 @@ int Model::getBoneIdx(const char* name)
 	return -1;
 }
 
-bool Model::parseMeshes(FS::IFile* file)
+bool Model::parseMeshes(FS::IFile& file)
 {
 	int object_count = 0;
-	file->read(&object_count, sizeof(object_count));
+	file.read(&object_count, sizeof(object_count));
 	if (object_count <= 0)
 	{
 		return false;
@@ -437,9 +437,9 @@ bool Model::parseMeshes(FS::IFile* file)
 	for (int i = 0; i < object_count; ++i)
 	{
 		int32_t str_size;
-		file->read(&str_size, sizeof(str_size));
+		file.read(&str_size, sizeof(str_size));
 		char material_name[MAX_PATH_LENGTH];
-		file->read(material_name, str_size);
+		file.read(material_name, str_size);
 		if (str_size >= MAX_PATH_LENGTH)
 		{
 			return false;
@@ -455,22 +455,22 @@ bool Model::parseMeshes(FS::IFile* file)
 				->load(Path(material_path)));
 
 		int32_t attribute_array_offset = 0;
-		file->read(&attribute_array_offset, sizeof(attribute_array_offset));
+		file.read(&attribute_array_offset, sizeof(attribute_array_offset));
 		int32_t attribute_array_size = 0;
-		file->read(&attribute_array_size, sizeof(attribute_array_size));
+		file.read(&attribute_array_size, sizeof(attribute_array_size));
 		int32_t indices_offset = 0;
-		file->read(&indices_offset, sizeof(indices_offset));
+		file.read(&indices_offset, sizeof(indices_offset));
 		int32_t mesh_tri_count = 0;
-		file->read(&mesh_tri_count, sizeof(mesh_tri_count));
+		file.read(&mesh_tri_count, sizeof(mesh_tri_count));
 
-		file->read(&str_size, sizeof(str_size));
+		file.read(&str_size, sizeof(str_size));
 		if (str_size >= MAX_PATH_LENGTH)
 		{
 			return false;
 		}
 		char mesh_name[MAX_PATH_LENGTH];
 		mesh_name[str_size] = 0;
-		file->read(mesh_name, str_size);
+		file.read(mesh_name, str_size);
 
 		bgfx::VertexDecl def;
 		parseVertexDef(file, &def);
@@ -488,10 +488,10 @@ bool Model::parseMeshes(FS::IFile* file)
 }
 
 
-bool Model::parseLODs(FS::IFile* file)
+bool Model::parseLODs(FS::IFile& file)
 {
 	int32_t lod_count;
-	file->read(&lod_count, sizeof(lod_count));
+	file.read(&lod_count, sizeof(lod_count));
 	if (lod_count <= 0)
 	{
 		return false;
@@ -499,27 +499,27 @@ bool Model::parseLODs(FS::IFile* file)
 	m_lods.resize(lod_count);
 	for (int i = 0; i < lod_count; ++i)
 	{
-		file->read(&m_lods[i].m_to_mesh, sizeof(m_lods[i].m_to_mesh));
-		file->read(&m_lods[i].m_distance, sizeof(m_lods[i].m_distance));
+		file.read(&m_lods[i].m_to_mesh, sizeof(m_lods[i].m_to_mesh));
+		file.read(&m_lods[i].m_distance, sizeof(m_lods[i].m_distance));
 		m_lods[i].m_from_mesh = i > 0 ? m_lods[i - 1].m_to_mesh + 1 : 0;
 	}
 	return true;
 }
 
 
-void Model::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
+void Model::loaded(FS::IFile& file, bool success, FS::FileSystem& fs)
 {
 	PROFILE_FUNCTION();
 	if (success)
 	{
 		FileHeader header;
-		file->read(&header, sizeof(header));
+		file.read(&header, sizeof(header));
 		if (header.m_magic == FILE_MAGIC &&
 			header.m_version <= (uint32_t)FileVersion::LATEST &&
 			parseMeshes(file) && parseGeometry(file) && parseBones(file) &&
 			parseLODs(file))
 		{
-			m_size = file->size();
+			m_size = file.size();
 			decrementDepCount();
 		}
 		else

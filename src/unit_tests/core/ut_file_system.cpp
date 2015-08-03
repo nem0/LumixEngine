@@ -115,7 +115,7 @@ void UT_file_events_device(const char* params)
 	LUMIX_EXPECT_FALSE(!!(1 << (uint32_t)Lumix::FS::EventType::CLOSE_FINISHED &
 						  occured_event));
 
-	file_system->close(file);
+	file_system->close(*file);
 
 	LUMIX_EXPECT_TRUE(
 		!!(1 << (uint32_t)Lumix::FS::EventType::CLOSE_BEGIN & occured_event));
@@ -159,7 +159,7 @@ void UT_file_events_device(const char* params)
 	LUMIX_EXPECT_FALSE(!!(1 << (uint32_t)Lumix::FS::EventType::CLOSE_FINISHED &
 						  occured_event));
 
-	file_system->close(file);
+	file_system->close(*file);
 
 	LUMIX_EXPECT_TRUE(
 		!!(1 << (uint32_t)Lumix::FS::EventType::CLOSE_BEGIN & occured_event));

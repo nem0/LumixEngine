@@ -92,7 +92,7 @@ void Animation::getPose(float time, Pose& pose, Model& model) const
 }
 
 
-void Animation::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
+void Animation::loaded(FS::IFile& file, bool success, FS::FileSystem& fs)
 {
 	if (success)
 	{
@@ -105,7 +105,7 @@ void Animation::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		m_bones = 0;
 		m_frame_count = m_bone_count = 0;
 		Header header;
-		file->read(&header, sizeof(header));
+		file.read(&header, sizeof(header));
 		if (header.magic != HEADER_MAGIC)
 		{
 			fs.closeAsync(file);
@@ -121,17 +121,17 @@ void Animation::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 			return;
 		}
 		m_fps = header.fps;
-		file->read(&m_frame_count, sizeof(m_frame_count));
-		file->read(&m_bone_count, sizeof(m_bone_count));
+		file.read(&m_frame_count, sizeof(m_frame_count));
+		file.read(&m_bone_count, sizeof(m_bone_count));
 
 		m_positions = static_cast<Vec3*>(allocator.allocate(sizeof(Vec3) * m_frame_count * m_bone_count));
 		m_rotations = static_cast<Quat*>(allocator.allocate(sizeof(Quat) * m_frame_count * m_bone_count));
 		m_bones = static_cast<uint32_t*>(allocator.allocate(sizeof(uint32_t) * m_bone_count));
-		file->read(&m_positions[0], sizeof(Vec3)* m_bone_count * m_frame_count);
-		file->read(&m_rotations[0], sizeof(Quat)* m_bone_count * m_frame_count);
-		file->read(m_bones, sizeof(m_bones[0]) * m_bone_count);
+		file.read(&m_positions[0], sizeof(Vec3)* m_bone_count * m_frame_count);
+		file.read(&m_rotations[0], sizeof(Quat)* m_bone_count * m_frame_count);
+		file.read(m_bones, sizeof(m_bones[0]) * m_bone_count);
 		
-		m_size = file->size();
+		m_size = file.size();
 		decrementDepCount();
 	}
 	else

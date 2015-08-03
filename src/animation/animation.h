@@ -63,7 +63,7 @@ class LUMIX_ANIMATION_API Animation : public Resource
 		IAllocator& getAllocator();
 
 		virtual void doUnload(void) override;
-		virtual void loaded(FS::IFile* file, bool success, FS::FileSystem& fs) override;
+		virtual void loaded(FS::IFile& file, bool success, FS::FileSystem& fs) override;
 
 	private:
 		int	m_frame_count;

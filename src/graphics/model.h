@@ -190,17 +190,17 @@ public:
 	static const uint32_t FILE_MAGIC = 0x5f4c4d4f; // == '_LMO'
 
 private:
-	bool parseVertexDef(FS::IFile* file, bgfx::VertexDecl* vertex_definition);
-	bool parseGeometry(FS::IFile* file);
-	bool parseBones(FS::IFile* file);
-	bool parseMeshes(FS::IFile* file);
-	bool parseLODs(FS::IFile* file);
+	bool parseVertexDef(FS::IFile& file, bgfx::VertexDecl* vertex_definition);
+	bool parseGeometry(FS::IFile& file);
+	bool parseBones(FS::IFile& file);
+	bool parseMeshes(FS::IFile& file);
+	bool parseLODs(FS::IFile& file);
 	int getBoneIdx(const char* name);
 	void computeRuntimeData(const uint8_t* vertices);
 
 	virtual void doUnload(void) override;
 	virtual void
-	loaded(FS::IFile* file, bool success, FS::FileSystem& fs) override;
+	loaded(FS::IFile& file, bool success, FS::FileSystem& fs) override;
 
 private:
 	IAllocator& m_allocator;

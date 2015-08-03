@@ -91,13 +91,13 @@ void LuaScript::parseProperties()
 }
 
 
-void LuaScript::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
+void LuaScript::loaded(FS::IFile& file, bool success, FS::FileSystem& fs)
 {
 	if (success)
 	{
-		m_source_code.set((const char*)file->getBuffer(), file->size());
+		m_source_code.set((const char*)file.getBuffer(), file.size());
 		parseProperties();
-		m_size = file->size();
+		m_size = file.size();
 		decrementDepCount();
 	}
 	else

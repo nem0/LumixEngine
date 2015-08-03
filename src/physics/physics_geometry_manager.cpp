@@ -108,12 +108,12 @@ namespace Lumix
 	}
 
 
-	void PhysicsGeometry::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
+	void PhysicsGeometry::loaded(FS::IFile& file, bool success, FS::FileSystem& fs)
 	{
 		if (success)
 		{
 			Header header;
-			file->read(&header, sizeof(header));
+			file.read(&header, sizeof(header));
 			if (header.m_magic != HEADER_MAGIC || header.m_version > (uint32_t)Versions::LAST)
 			{
 				onFailure();
@@ -125,9 +125,9 @@ namespace Lumix
 			
 			uint32_t num_verts;
 			Array<Vec3> verts(getAllocator());
-			file->read(&num_verts, sizeof(num_verts));
+			file.read(&num_verts, sizeof(num_verts));
 			verts.resize(num_verts);
-			file->read(&verts[0], sizeof(verts[0]) * verts.size());
+			file.read(&verts[0], sizeof(verts[0]) * verts.size());
 
 			m_is_convex = header.m_convex != 0;
 			if (!m_is_convex)
@@ -136,9 +136,9 @@ namespace Lumix
 				m_geometry = geom;
 				uint32_t num_indices;
 				Array<uint32_t> tris(getAllocator());
-				file->read(&num_indices, sizeof(num_indices));
+				file.read(&num_indices, sizeof(num_indices));
 				tris.resize(num_indices);
-				file->read(&tris[0], sizeof(tris[0]) * tris.size());
+				file.read(&tris[0], sizeof(tris[0]) * tris.size());
 
 				physx::PxTriangleMeshDesc meshDesc;
 				meshDesc.points.count = num_verts;
@@ -175,7 +175,7 @@ namespace Lumix
 				geom->convexMesh = mesh;
 			}
 
-			m_size = file->size();
+			m_size = file.size();
 			decrementDepCount();
 		}
 		else
