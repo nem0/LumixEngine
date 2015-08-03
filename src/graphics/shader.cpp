@@ -215,7 +215,7 @@ struct ShaderLoader
 			mem->data[file->size()] = '\0';
 			m_fragment_shader = bgfx::createShader(mem);
 			ASSERT(bgfx::isValid(m_fragment_shader));
-			fs.close(file);
+			fs.closeAsync(file);
 		}
 		checkFinish();
 	}
@@ -229,7 +229,7 @@ struct ShaderLoader
 			mem->data[file->size()] = '\0';
 			m_vertex_shader = bgfx::createShader(mem);
 			ASSERT(bgfx::isValid(m_vertex_shader));
-			fs.close(file);
+			fs.closeAsync(file);
 		}
 		checkFinish();
 	}
@@ -364,7 +364,7 @@ void Shader::loaded(FS::IFile* file, bool success, FS::FileSystem& fs)
 		onFailure();
 	}
 
-	fs.close(file);
+	fs.closeAsync(file);
 }
 
 

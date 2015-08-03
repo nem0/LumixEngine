@@ -151,7 +151,7 @@ public:
 		SceneView* scene_view =m_main_window->getSceneView();
 		HWND hwnd = (HWND)scene_view->getViewWidget()->winId();
 		Lumix::Renderer::setInitData(hwnd);
-		initFilesystem(false);
+		initFilesystem(true);
 		m_engine = Lumix::Engine::create(m_file_system, m_allocator);
 		m_world_editor = Lumix::WorldEditor::create(
 			QDir::currentPath().toLocal8Bit().data(), *m_engine);

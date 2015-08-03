@@ -196,7 +196,7 @@ executeEditorCommand(lua_State* L, const char* name, const char* data)
 				*file, Lumix::JsonSerializer::READ, "", engine.getAllocator());
 			command->deserialize(serializer);
 			editor.executeCommand(command);
-			engine.getFileSystem().close(file);
+			engine.getFileSystem().closeAsync(file);
 		}
 	}
 	lua_pop(L, 1);

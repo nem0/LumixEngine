@@ -117,7 +117,7 @@ namespace Lumix
 			if (header.m_magic != HEADER_MAGIC || header.m_version > (uint32_t)Versions::LAST)
 			{
 				onFailure();
-				fs.close(file);
+				fs.closeAsync(file);
 				return;
 			}
 
@@ -183,7 +183,7 @@ namespace Lumix
 			onFailure();
 		}
 
-		fs.close(file);
+		fs.closeAsync(file);
 	}
 
 
