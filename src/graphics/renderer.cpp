@@ -29,6 +29,7 @@
 #include "universe/universe.h"
 #include <bgfx.h>
 #include <Windows.h>
+#include <cstdio>
 
 
 namespace bgfx
@@ -74,6 +75,14 @@ struct RendererImpl : public Renderer
 			{
 				abort();
 			}
+		}
+
+
+		virtual void traceVargs(const char* _filePath, uint16_t _line, const char* _format, va_list _argList) override
+		{
+			char tmp[2048];
+			vsnprintf(tmp, sizeof(tmp), _format, _argList);
+			Lumix::g_log_info.log("bgfx") << _filePath << "(" << _line << ") " << tmp;
 		}
 
 
@@ -127,7 +136,8 @@ struct RendererImpl : public Renderer
 		d.nwh = s_hwnd;
 		bgfx::setPlatformData(d);
 		bgfx::init(bgfx::RendererType::Count, 0, 0, &m_callback_stub);
-		bgfx::reset(800, 600);
+		TODO("todo");
+		//bgfx::reset(800, 600);
 		bgfx::setDebug(BGFX_DEBUG_TEXT);
 
 		ResourceManager& manager = engine.getResourceManager();

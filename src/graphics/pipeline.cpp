@@ -344,9 +344,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 			const Material* material = mesh.getMaterial();
 
 			setMaterial(material);
-			bgfx::setProgram(info.m_mesh->getMaterial()
-								 ->getShaderInstance()
-								 .m_program_handles[m_pass_idx]);
 			bgfx::setVertexBuffer(geometry.getAttributesArrayID(),
 								  mesh.getAttributeArrayOffset() /
 									  mesh.getVertexDefinition().getStride(),
@@ -358,7 +355,9 @@ struct PipelineInstanceImpl : public PipelineInstance
 			bgfx::setState(m_render_state | material->getRenderStates());
 			bgfx::setInstanceDataBuffer(m_instances_data[idx].m_buffer,
 										m_instances_data[idx].m_instance_count);
-			bgfx::submit(m_view_idx);
+			bgfx::submit(m_view_idx, info.m_mesh->getMaterial()
+				->getShaderInstance()
+				.m_program_handles[m_pass_idx]);
 			m_instances_data[idx].m_buffer = nullptr;
 			m_instances_data[idx].m_instance_count = 0;
 			m_instances_data[idx].m_mesh.m_mesh->setInstanceIdx(-1);
@@ -550,7 +549,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 			bgfx::setViewFrameBuffer(m_view_idx,
 									 m_current_framebuffer->getHandle());
 			bgfx::setViewClear(m_view_idx, BGFX_CLEAR_DEPTH, 0, 1.0f, 0);
-			bgfx::submit(m_view_idx);
+			bgfx::touch(m_view_idx);
 			float* viewport = viewports + split_index * 2;
 			bgfx::setViewRect(m_view_idx,
 							  (uint16_t)(1 + shadowmap_width * viewport[0]),
@@ -659,14 +658,14 @@ struct PipelineInstanceImpl : public PipelineInstance
 				indices += 2;
 			}
 
-			bgfx::setProgram(m_debug_line_material->getShaderInstance()
-								 .m_program_handles[m_pass_idx]);
 			bgfx::setVertexBuffer(&tvb);
 			bgfx::setIndexBuffer(&tib);
 			bgfx::setState(m_render_state |
 						   m_debug_line_material->getRenderStates() |
 						   BGFX_STATE_PT_LINES);
-			bgfx::submit(m_view_idx);
+			bgfx::submit(m_view_idx,
+						 m_debug_line_material->getShaderInstance()
+							 .m_program_handles[m_pass_idx]);
 		}
 	}
 
@@ -700,7 +699,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 			m_scene->getPointLightSpecularColor(light_cmp), 1.0);
 		bgfx::setUniform(m_light_specular_uniform, &light_specular);
 
-		bgfx::submit(m_view_idx);
+		bgfx::touch(m_view_idx);
 	}
 
 
@@ -739,7 +738,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		fog_color_density.w *= fog_color_density.w * fog_color_density.w;
 		bgfx::setUniform(m_fog_color_density_uniform, &fog_color_density);
 
-		bgfx::submit(m_view_idx);
+		bgfx::touch(m_view_idx);
 	}
 
 
@@ -848,10 +847,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 				bgfx::setTexture(i, t.m_uniform, t.m_texture);
 			}
 
-			bgfx::setProgram(m_screen_space_material->getShaderInstance()
-								 .m_program_handles[m_pass_idx]);
 			bgfx::setVertexBuffer(&vb);
-			bgfx::submit(m_view_idx);
+			bgfx::submit(m_view_idx,
+						 m_screen_space_material->getShaderInstance()
+							 .m_program_handles[m_pass_idx]);
 		}
 	}
 
@@ -950,9 +949,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 		setPoseUniform(info);
 		setMaterial(material);
 		bgfx::setTransform(info.m_matrix);
-		bgfx::setProgram(info.m_mesh->getMaterial()
-							 ->getShaderInstance()
-							 .m_program_handles[m_pass_idx]);
 		bgfx::setVertexBuffer(geometry.getAttributesArrayID(),
 							  mesh.getAttributeArrayOffset() /
 								  mesh.getVertexDefinition().getStride(),
@@ -962,7 +958,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 							 mesh.getIndicesOffset(),
 							 mesh.getIndexCount());
 		bgfx::setState(m_render_state | material->getRenderStates());
-		bgfx::submit(m_view_idx);
+		bgfx::submit(m_view_idx,
+					 info.m_mesh->getMaterial()
+						 ->getShaderInstance()
+						 .m_program_handles[m_pass_idx]);
 	}
 
 
@@ -1002,9 +1001,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 			const Material* material = mesh.getMaterial();
 
 			setMaterial(material);
-			bgfx::setProgram(info.m_mesh->getMaterial()
-								 ->getShaderInstance()
-								 .m_program_handles[m_pass_idx]);
 			bgfx::setVertexBuffer(geometry.getAttributesArrayID(),
 								  mesh.getAttributeArrayOffset() /
 									  mesh.getVertexDefinition().getStride(),
@@ -1015,7 +1011,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 								 mesh.getIndexCount());
 			bgfx::setState(m_render_state | material->getRenderStates());
 			bgfx::setInstanceDataBuffer(data.m_buffer, data.m_instance_count);
-			bgfx::submit(m_view_idx);
+			bgfx::submit(m_view_idx,
+						 info.m_mesh->getMaterial()
+							 ->getShaderInstance()
+							 .m_program_handles[m_pass_idx]);
 			data.m_mesh.m_mesh->setInstanceIdx(-1);
 			data.m_buffer = nullptr;
 			data.m_instance_count = 0;
@@ -1025,9 +1024,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void setMaterial(const Material* material) const
 	{
-		bgfx::setProgram(
-			material->getShaderInstance().m_program_handles[m_pass_idx]);
-
 		for (int i = 0; i < material->getUniformCount(); ++i)
 		{
 			const Material::Uniform& uniform = material->getUniform(i);
@@ -1134,8 +1130,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 		bgfx::setUniform(m_terrain_matrix_uniform, &info.m_world_matrix.m11);
 
 		setMaterial(material);
-		bgfx::setProgram(
-			material->getShaderInstance().m_program_handles[m_pass_idx]);
 
 		const bgfx::InstanceDataBuffer* instance_buffer =
 			bgfx::allocInstanceDataBuffer(m_terrain_instances[index].m_count,
@@ -1165,7 +1159,9 @@ struct PipelineInstanceImpl : public PipelineInstance
 		bgfx::setState(m_render_state | mesh.getMaterial()->getRenderStates());
 		bgfx::setInstanceDataBuffer(instance_buffer,
 									m_terrain_instances[index].m_count);
-		bgfx::submit(m_view_idx);
+		bgfx::submit(
+			m_view_idx,
+			material->getShaderInstance().m_program_handles[m_pass_idx]);
 		m_terrain_instances[index].m_count = 0;
 	}
 
@@ -1182,8 +1178,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 		const Material* material = mesh.getMaterial();
 
 		setMaterial(material);
-		bgfx::setProgram(
-			material->getShaderInstance().m_program_handles[m_pass_idx]);
 		bgfx::setVertexBuffer(geometry.getAttributesArrayID(),
 							  mesh.getAttributeArrayOffset() /
 								  mesh.getVertexDefinition().getStride(),
@@ -1194,7 +1188,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 							 mesh.getIndexCount());
 		bgfx::setState(m_render_state | material->getRenderStates());
 		bgfx::setInstanceDataBuffer(idb, grass.m_matrix_count);
-		bgfx::submit(m_view_idx);
+		bgfx::submit(m_view_idx, material->getShaderInstance().m_program_handles[m_pass_idx]);
 	}
 
 
@@ -1248,7 +1242,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 		}
 		else
 		{
-			bgfx::reset(w, h);
+			TODO("todo");
+			//bgfx::reset(w, h);
 		}
 		m_width = w;
 		m_height = h;
@@ -1519,7 +1514,7 @@ void clear(PipelineInstanceImpl* pipeline, const char* buffers)
 		flags = BGFX_CLEAR_DEPTH;
 	}
 	bgfx::setViewClear(pipeline->m_view_idx, flags, 0x303030ff, 1.0f, 0);
-	bgfx::submit(pipeline->m_view_idx);
+	bgfx::touch(pipeline->m_view_idx);
 }
 
 

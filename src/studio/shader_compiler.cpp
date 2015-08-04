@@ -248,30 +248,32 @@ void ShaderCompiler::compilePass(
 			++m_to_compile;
 			updateNotifications();
 			QProcess* process = new QProcess;
+			QString source_path = shader_file_info.dir().path() + "/" +
+								  shader_file_info.baseName() +
+								  (is_vertex_shader ? "_vs.sc" : "_fs.sc");
 			process->connect(
 				process,
 				(void (QProcess::*)(int)) & QProcess::finished,
-				[process, this](int value)
+				[process, this, source_path](int value)
 				{
 					++m_compiled;
 					updateNotifications();
 					if (value != 0)
 					{
 						Lumix::g_log_error.log("shader compiler")
+							<< source_path.toLatin1().data() << ":\n"
 							<< process->readAllStandardError().data();
 					}
 				});
 
 			QString cmd = "shaders/shaderc.exe -f ";
-			cmd.append(shader_file_info.dir().path() + "/" +
-					   shader_file_info.baseName());
-			cmd.append(is_vertex_shader ? "_vs.sc" : "_fs.sc");
+			cmd.append(source_path);
 			cmd.append(" -o shaders/compiled/");
 			cmd.append(shader_file_info.baseName() + "_" + pass);
 			cmd.append(QString::number(mask));
 			cmd.append(is_vertex_shader ? "_vs.shb" : "_fs.shb");
-			cmd.append(" --depends --platform linux --profile 130 --type ");
-			cmd.append(is_vertex_shader ? "vertex" : "fragment");
+			cmd.append(" --depends --platform windows --type ");
+			cmd.append(is_vertex_shader ? "vertex --profile vs_3_0" : "fragment --profile ps_3_0");
 			cmd.append(" -D ");
 			cmd.append(pass);
 			for (int i = 0; i < Lumix::lengthOf(all_defines); ++i)

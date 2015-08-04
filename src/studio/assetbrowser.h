@@ -16,7 +16,6 @@ namespace Ui
 
 class MainWindow;
 class Notifications;
-class ScriptCompiler;
 class ShaderCompiler;
 
 class AssetBrowser : public QDockWidget
