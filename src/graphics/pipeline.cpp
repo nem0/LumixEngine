@@ -1242,8 +1242,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		}
 		else
 		{
-			TODO("todo");
-			//bgfx::reset(w, h);
+			bgfx::reset(w, h);
 		}
 		m_width = w;
 		m_height = h;

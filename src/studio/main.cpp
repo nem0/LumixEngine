@@ -23,7 +23,6 @@
 #include "physics/physics_system.h"
 #include "sceneview.h"
 #include "gameview.h"
-#include "wgl_render_device.h"
 #include <QApplication>
 #include <qdir.h>
 #include <Windows.h>
@@ -79,6 +78,9 @@ public:
 		m_memory_device =
 			m_allocator.newObject<Lumix::FS::MemoryFileDevice>(m_allocator);
 		m_file_system->mount(m_memory_device);
+		m_disk_device =
+			m_allocator.newObject<Lumix::FS::DiskFileDevice>(m_allocator);
+		m_file_system->mount(m_disk_device);
 
 		if (is_network)
 		{
@@ -97,9 +99,6 @@ public:
 		}
 		else
 		{
-			m_disk_device =
-				m_allocator.newObject<Lumix::FS::DiskFileDevice>(m_allocator);
-			m_file_system->mount(m_disk_device);
 			m_file_system->setDefaultDevice("memory:disk");
 			m_file_system->setSaveGameDevice("memory:disk");
 		}
