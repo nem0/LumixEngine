@@ -284,6 +284,11 @@ const char* Material::getTextureUniform(int i)
 
 Texture* Material::getTextureByUniform(const char* uniform) const
 {
+	if (!m_shader)
+	{
+		return nullptr;
+	}
+
 	for (int i = 0, c = m_shader->getTextureSlotCount(); i < c; ++i)
 	{
 		if (strcmp(m_shader->getTextureSlot(i).m_uniform, uniform) == 0)
