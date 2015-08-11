@@ -4,7 +4,7 @@
 #include "core/fs/file_system.h"
 #include "core/fs/file_events_device.h"
 #include "editor/world_editor.h"
-#include "engine/engine.h"
+#include "engine.h"
 #include <QElapsedTimer>
 
 

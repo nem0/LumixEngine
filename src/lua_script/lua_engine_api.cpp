@@ -1,8 +1,8 @@
-#include "engine/lua_wrapper.h"
 #include "core/crc32.h"
 #include "core/input_system.h"
-#include "engine/engine.h"
-#include "engine/iplugin.h"
+#include "core/lua_wrapper.h"
+#include "engine.h"
+#include "iplugin.h"
 #include "graphics/render_scene.h"
 #include "universe/universe.h"
 

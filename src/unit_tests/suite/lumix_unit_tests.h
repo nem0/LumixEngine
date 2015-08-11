@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/lumix.h"
+#include "lumix.h"
 #include "core/log.h"
 #include "core/mt/task.h"
 

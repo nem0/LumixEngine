@@ -4,7 +4,7 @@
 #include "editor/entity_template_system.h"
 #include "editor/gizmo.h"
 #include "editor/world_editor.h"
-#include "engine/engine.h"
+#include "engine.h"
 #include "entity_list.h"
 #include "entity_template_list.h"
 #include "fileserverwidget.h"

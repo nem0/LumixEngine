@@ -4,10 +4,10 @@
 #include "core/fs/file_system.h"
 #include "core/fs/ifile.h"
 #include "core/json_serializer.h"
+#include "core/lua_wrapper.h"
 #include "editor/ieditor_command.h"
 #include "editor/world_editor.h"
-#include "engine/engine.h"
-#include "engine/lua_wrapper.h"
+#include "engine.h"
 #include "mainwindow.h"
 #include <lua.hpp>
 #include <qbuffer.h>

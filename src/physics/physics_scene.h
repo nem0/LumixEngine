@@ -1,10 +1,10 @@
 #pragma once
 
 
-#include "core/lumix.h"
+#include "lumix.h"
 #include "core/iallocator.h"
 #include "core/vec3.h"
-#include "engine/iplugin.h"
+#include "iplugin.h"
 
 
 namespace Lumix

@@ -4,7 +4,7 @@
 #include <QDockWidget>
 #include "core/array.h"
 #include "core/delegate_list.h"
-#include "core/lumix.h"
+#include "lumix.h"
 #include "core/string.h"
 #include "core/resource.h"
 #include "property_view/dynamic_object_model.h"

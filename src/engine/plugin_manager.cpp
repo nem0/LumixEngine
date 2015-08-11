@@ -1,9 +1,9 @@
-#include "engine/plugin_manager.h"
+#include "plugin_manager.h"
 #include "core/library.h"
 #include "core/log.h"
 #include "core/array.h"
-#include "engine/engine.h"
-#include "engine/iplugin.h"
+#include "engine.h"
+#include "iplugin.h"
 
 
 namespace Lumix 

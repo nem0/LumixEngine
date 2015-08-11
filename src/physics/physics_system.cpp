@@ -9,7 +9,7 @@
 #include "core/resource_manager.h"
 #include "editor/world_editor.h"
 #include "editor/property_descriptor.h"
-#include "engine/engine.h"
+#include "engine.h"
 #include "physics/physics_geometry_manager.h"
 #include "physics/physics_scene.h"
 

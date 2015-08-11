@@ -5,7 +5,7 @@
 #include "core/resource_manager_base.h"
 #include "editor/entity_template_system.h"
 #include "editor/ieditor_command.h"
-#include "engine/engine.h"
+#include "engine.h"
 #include "entity_list.h"
 #include "entity_template_list.h"
 #include "graphics/material.h"

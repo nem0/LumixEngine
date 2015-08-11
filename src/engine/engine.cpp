@@ -1,5 +1,5 @@
-#include "core/lumix.h"
-#include "engine/engine.h"
+#include "lumix.h"
+#include "engine.h"
 
 #include "core/blob.h"
 #include "core/crc32.h"
@@ -17,7 +17,7 @@
 
 #include "debug/debug.h"
 
-#include "engine/plugin_manager.h"
+#include "plugin_manager.h"
 
 #include "graphics/culling_system.h"
 #include "graphics/material_manager.h"

@@ -7,7 +7,7 @@
 #include "core/string.h"
 #include "editor/ieditor_command.h"
 #include "editor/world_editor.h"
-#include "engine/engine.h"
+#include "engine.h"
 #include "graphics/render_scene.h"
 #include "universe/hierarchy.h"
 #include "universe/universe.h"
