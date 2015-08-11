@@ -157,7 +157,7 @@ public:
 
 		return m_universe;
 	}
-
+	
 
 	virtual IScene* getSceneByComponentType(uint32_t type) const override
 	{

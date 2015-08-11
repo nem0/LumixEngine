@@ -173,15 +173,15 @@ struct LUMIX_ENGINE_API Matrix
 	}
 
 
-	void setOrtho(float left, float right, float bottom, float top, float z_near, float z_far)
+	void setOrtho(float left, float right, float top, float bottom, float z_near, float z_far)
 	{
 		*this = IDENTITY;
 		m11 = 2 / (right - left);
 		m22 = 2 / (top - bottom);
-		m33 = -2 / (z_far - z_near);
-		m41 = -(right + left) / (right - left);
-		m42 = -(top + bottom) / (top - bottom);
-		m43 = -(z_far + z_near) / (z_far - z_near);
+		m33 = -1 / (z_far - z_near);
+		m41 = (right + left) / (left - right);
+		m42 = (top + bottom) / (bottom - top);
+		m43 = z_near / (z_near - z_far);
 	}
 
 
