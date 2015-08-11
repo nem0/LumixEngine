@@ -94,6 +94,11 @@ void LogWidget::onLogReceived(Type type,
 
 LogWidget::~LogWidget()
 {
+	Lumix::g_log_info.getCallback().unbind<LogWidget, &LogWidget::onInfo>(this);
+	Lumix::g_log_warning.getCallback().unbind<LogWidget, &LogWidget::onWarning>(
+		this);
+	Lumix::g_log_error.getCallback().unbind<LogWidget, &LogWidget::onError>(this);
+
 	delete m_ui;
 }
 
