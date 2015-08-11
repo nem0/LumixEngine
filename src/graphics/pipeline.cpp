@@ -573,8 +573,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 			Vec3 shadow_cam_pos = frustum.getCenter();
 			float bb_size = frustum.getRadius();
 			Matrix projection_matrix;
-			projection_matrix.setOrtho(-bb_size,
-									   bb_size,
+			projection_matrix.setOrtho(bb_size,
+									   -bb_size,
 									   -bb_size,
 									   bb_size,
 									   SHADOW_CAM_NEAR,
@@ -588,22 +588,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 							   light_mtx.getYVector());
 			bgfx::setViewTransform(
 				m_view_idx, &view_matrix.m11, &projection_matrix.m11);
-			static const Matrix biasMatrix(0.5,
-										   0.0,
-										   0.0,
-										   0.0,
-										   0.0,
-										   0.5,
-										   0.0,
-										   0.0,
-										   0.0,
-										   0.0,
-										   0.5,
-										   0.0,
-										   0.5,
-										   0.5,
-										   0.5,
-										   1.0);
+			static const Matrix biasMatrix(0.5, 0.0, 0.0, 0.0,
+										   0.0, -0.5, 0.0, 0.0,
+										   0.0, 0.0, 0.5, 0.0,
+										   0.5, 0.5, 0.5, 1.0);
 			m_shadow_modelviewprojection[split_index] =
 				biasMatrix * (projection_matrix * view_matrix);
 
@@ -787,7 +775,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 			bgfx::checkAvailTransientVertexBuffer(3, BaseVertex::s_vertex_decl))
 		{
 			Matrix projection_mtx;
-			projection_mtx.setOrtho(-1, 1, -1, 1, 0, 30);
+			projection_mtx.setOrtho(-1, 1, 1, -1, 0, 30);
+
 			bgfx::setViewTransform(
 				m_view_idx, &Matrix::IDENTITY.m11, &projection_mtx.m11);
 			bgfx::setViewRect(
@@ -1048,6 +1037,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 			}
 		}
 
+		Shader* shader = material->getShader();
 		for (int i = 0; i < material->getTextureCount(); ++i)
 		{
 			Texture* texture = material->getTexture(i);
@@ -1055,7 +1045,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 			{
 				bgfx::setTexture(
 					i,
-					material->getShader()->getTextureSlot(i).m_uniform_handle,
+					shader->getTextureSlot(i).m_uniform_handle,
 					texture->getTextureHandle());
 			}
 		}
@@ -1064,7 +1054,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 								material->getShininess());
 		bgfx::setUniform(m_specular_shininess_uniform, &specular_shininess);
 
-		int global_texture_offset = material->getTextureCount();
+		int global_texture_offset = shader->getTextureSlotCount();
 		for (int i = 0; i < m_global_textures.size(); ++i)
 		{
 			const GlobalTexture& t = m_global_textures[i];
