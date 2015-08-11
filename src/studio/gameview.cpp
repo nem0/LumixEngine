@@ -19,6 +19,7 @@ GameView::GameView(MainWindow& parent)
 	m_ui->setupUi(this);
 	m_editor = nullptr;
 	m_render_device = nullptr;
+	m_isInputHandling = false;
 }
 
 
@@ -42,7 +43,8 @@ void GameView::setWorldEditor(Lumix::WorldEditor& editor)
 {
 	ASSERT(m_editor == nullptr);
 	m_editor = &editor;
-	m_render_device = new WGLRenderDevice(m_editor->getEngine(), "pipelines/game_view.lua");
+	m_render_device =
+		new WGLRenderDevice(m_editor->getEngine(), "pipelines/game_view.lua");
 	m_render_device->setWidget(*getContentWidget());
 }
 
@@ -81,17 +83,41 @@ void GameView::mousePressEvent(QMouseEvent*)
 	c.setShape(Qt::BlankCursor);
 	setCursor(c);
 	m_editor->getEngine().getInputSystem().enable(true);
+	m_isInputHandling = true;
+}
+
+
+void GameView::disableInputHandling()
+{
+	m_isInputHandling = false;
+	releaseMouse();
+	releaseKeyboard();
+	setMouseTracking(false);
+	unsetCursor();
+	m_editor->getEngine().getInputSystem().enable(false);
+}
+
+
+void GameView::focusOutEvent(QFocusEvent* event)
+{
+	disableInputHandling();
 }
 
 
 void GameView::mouseMoveEvent(QMouseEvent* event)
 {
+	if (!m_isInputHandling)
+	{
+		return;
+	}
+
 	int half_width = width() / 2;
 	int half_height = height() / 2;
 	if (event->x() != half_width || event->y() != half_height)
 	{
-		m_editor->getEngine().getInputSystem().injectMouseXMove(event->x() - half_width);
-		m_editor->getEngine().getInputSystem().injectMouseYMove(event->y() - half_height);
+		auto& input_system = m_editor->getEngine().getInputSystem();
+		input_system.injectMouseXMove(event->x() - half_width);
+		input_system.injectMouseYMove(event->y() - half_height);
 		QCursor c = cursor();
 		c.setPos(mapToGlobal(QPoint(half_width, half_height)));
 		c.setShape(Qt::BlankCursor);
@@ -104,11 +130,7 @@ void GameView::keyPressEvent(QKeyEvent* event)
 {
 	if (event->key() == Qt::Key_Escape)
 	{
-		releaseMouse();
-		releaseKeyboard();
-		setMouseTracking(false);
-		unsetCursor();
-		m_editor->getEngine().getInputSystem().enable(false);
+		disableInputHandling();
 	}
 }
 
@@ -117,4 +139,3 @@ void GameView::on_playButton_clicked()
 {
 	m_main_window.on_actionGame_mode_triggered();
 }
-
