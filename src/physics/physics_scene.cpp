@@ -1188,7 +1188,7 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system,
 {
 	PhysicsSceneImpl* impl =
 		allocator.newObject<PhysicsSceneImpl>(universe, allocator);
-	impl->m_universe.entityMoved()
+	impl->m_universe.entityTransformed()
 		.bind<PhysicsSceneImpl, &PhysicsSceneImpl::onEntityMoved>(impl);
 	impl->m_engine = &engine;
 	physx::PxSceneDesc sceneDesc(system.getPhysics()->getTolerancesScale());

@@ -124,7 +124,7 @@ EntityModel::~EntityModel()
 	m_editor.propertySet().unbind<EntityModel, &EntityModel::onPropertySet>(
 		this);
 	m_editor.getUniverse()
-		->entityMoved()
+		->entityTransformed()
 		.unbind<EntityModel, &EntityModel::onEntityPosition>(this);
 }
 
@@ -361,7 +361,7 @@ void EntityModel::addPositionProperty()
 	};
 
 	m_editor.getUniverse()
-		->entityMoved()
+		->entityTransformed()
 		.bind<EntityModel, &EntityModel::onEntityPosition>(this);
 }
 

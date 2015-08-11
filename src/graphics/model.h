@@ -180,10 +180,8 @@ public:
 	}
 	void getPose(Pose& pose);
 	float getBoundingRadius() const { return m_bounding_radius; }
-	RayCastModelHit castRay(const Vec3& origin,
-							const Vec3& dir,
-							const Matrix& model_transform,
-							float scale);
+	RayCastModelHit
+	castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform);
 	const AABB& getAABB() const { return m_aabb; }
 
 public:

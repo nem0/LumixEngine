@@ -35,14 +35,14 @@ Universe::Universe(IAllocator& allocator)
 void Universe::setRotation(Entity entity, const Quat& rot)
 {
 	m_transformations[entity].rotation = rot;
-	entityMoved().invoke(Entity(entity));
+	entityTransformed().invoke(Entity(entity));
 }
 
 
 void Universe::setRotation(Entity entity, float x, float y, float z, float w)
 {
 	m_transformations[entity].rotation.set(x, y, z, w);
-	entityMoved().invoke(Entity(entity));
+	entityTransformed().invoke(Entity(entity));
 }
 
 
@@ -63,7 +63,7 @@ void Universe::setMatrix(Entity entity, const Matrix& mtx)
 	mtx.getRotation(rot);
 	m_transformations[entity].position = mtx.getTranslation();
 	m_transformations[entity].rotation = rot;
-	entityMoved().invoke(Entity(entity));
+	entityTransformed().invoke(Entity(entity));
 }
 
 
@@ -80,14 +80,14 @@ Matrix Universe::getMatrix(Entity entity) const
 void Universe::setPosition(Entity entity, float x, float y, float z)
 {
 	m_transformations[entity].position.set(x, y, z);
-	entityMoved().invoke(Entity(entity));
+	entityTransformed().invoke(Entity(entity));
 }
 
 
 void Universe::setPosition(Entity entity, const Vec3& pos)
 {
 	m_transformations[entity].position = pos;
-	entityMoved().invoke(Entity(entity));
+	entityTransformed().invoke(Entity(entity));
 }
 
 
@@ -269,7 +269,7 @@ void Universe::deserialize(InputBlob& serializer)
 void Universe::setScale(Entity entity, float scale)
 {
 	m_transformations[entity].scale = scale;
-	entityMoved().invoke(Entity(entity));
+	entityTransformed().invoke(Entity(entity));
 }
 
 

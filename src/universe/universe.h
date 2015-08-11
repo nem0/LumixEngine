@@ -71,7 +71,7 @@ public:
 		return m_transformations[entity].rotation;
 	}
 
-	DelegateList<void(Entity)>& entityMoved() { return m_entity_moved; }
+	DelegateList<void(Entity)>& entityTransformed() { return m_entity_moved; }
 	DelegateList<void(Entity)>& entityCreated() { return m_entity_created; }
 	DelegateList<void(Entity)>& entityDestroyed() { return m_entity_destroyed; }
 

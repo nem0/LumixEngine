@@ -166,7 +166,8 @@ RayCastModelHit Gizmo::castRay(const Vec3& origin, const Vec3& dir)
 	{
 		Matrix mtx;
 		getMatrix(mtx);
-		return m_model->castRay(origin, dir, mtx, m_scale);
+		mtx.multiply3x3(m_scale);
+		return m_model->castRay(origin, dir, mtx);
 	}
 	RayCastModelHit hit;
 	hit.m_is_hit = false;
