@@ -7,7 +7,7 @@
 #include "core/resource.h"
 #include "core/resource_manager.h"
 #include "editor/world_editor.h"
-#include "engine/engine.h"
+#include "engine.h"
 #include "dialogs/create_texture_dialog.h"
 #include "dialogs/import_asset_dialog.h"
 #include "insert_mesh_command.h"

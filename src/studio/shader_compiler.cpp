@@ -5,7 +5,7 @@
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "editor/world_editor.h"
-#include "engine/engine.h"
+#include "engine.h"
 #include "file_system_watcher.h"
 #include "graphics/shader.h"
 #include "notifications.h"

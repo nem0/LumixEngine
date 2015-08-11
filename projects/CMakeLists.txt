@@ -14,17 +14,19 @@ find_package(Qt5UiTools REQUIRED)
 
 ###################### ENGINE ######################
 
-file(GLOB CORE_ROOT_FILES ${SRC_PATH}core/*.cpp ${SRC_PATH}core/*.h)
-file(GLOB CORE_MTJD_FILES ${SRC_PATH}core/MTJD/*.cpp ${SRC_PATH}core/MTJD/*.h)
-file(GLOB CORE_MT_FILES ${SRC_PATH}core/MT/*.cpp ${SRC_PATH}core/MT/*.h ${SRC_PATH}core/MT/pc/*.cpp ${SRC_PATH}core/MT/pc/*.h)
-file(GLOB CORE_FS_FILES ${SRC_PATH}core/FS/*.cpp ${SRC_PATH}core/FS/*.h ${SRC_PATH}core/FS/pc/*.cpp)
-file(GLOB CORE_NET_FILES ${SRC_PATH}core/Net/*.cpp ${SRC_PATH}core/Net/*.h ${SRC_PATH}core/Net/pc/*.cpp ${SRC_PATH}core/Net/pc/*.h)
-file(GLOB CORE_PC_FILES ${SRC_PATH}core/PC/*.cpp ${SRC_PATH}core/PC/*.h)
-file(GLOB CORE_DEBUG_FILES ${SRC_PATH}debug/*.cpp ${SRC_PATH}debug/*.h ${SRC_PATH}debug/pc/*.cpp ${SRC_PATH}debug/pc/*.h)
-file(GLOB ENGINE_FILES ${SRC_PATH}engine/*.cpp ${SRC_PATH}engine/*.h)
-file(GLOB UNIVERSE_FILES ${SRC_PATH}universe/*.cpp ${SRC_PATH}universe/*.h)
-file(GLOB GRAPHICS_FILES ${SRC_PATH}graphics/*.cpp ${SRC_PATH}graphics/*.h)
-file(GLOB EDITOR_FILES ${SRC_PATH}editor/*.cpp ${SRC_PATH}editor/*.h)
+set(ENGINE_ROOT_PATH ${SRC_PATH}engine/)
+
+file(GLOB CORE_ROOT_FILES ${ENGINE_ROOT_PATH}core/*.cpp ${ENGINE_ROOT_PATH}core/*.h)
+file(GLOB CORE_MTJD_FILES ${ENGINE_ROOT_PATH}core/MTJD/*.cpp ${ENGINE_ROOT_PATH}core/MTJD/*.h)
+file(GLOB CORE_MT_FILES ${ENGINE_ROOT_PATH}core/MT/*.cpp ${ENGINE_ROOT_PATH}core/MT/*.h ${ENGINE_ROOT_PATH}core/MT/pc/*.cpp ${ENGINE_ROOT_PATH}core/MT/pc/*.h)
+file(GLOB CORE_FS_FILES ${ENGINE_ROOT_PATH}core/FS/*.cpp ${ENGINE_ROOT_PATH}core/FS/*.h ${ENGINE_ROOT_PATH}core/FS/pc/*.cpp)
+file(GLOB CORE_NET_FILES ${ENGINE_ROOT_PATH}core/Net/*.cpp ${ENGINE_ROOT_PATH}core/Net/*.h ${ENGINE_ROOT_PATH}core/Net/pc/*.cpp ${ENGINE_ROOT_PATH}core/Net/pc/*.h)
+file(GLOB CORE_PC_FILES ${ENGINE_ROOT_PATH}core/PC/*.cpp ${ENGINE_ROOT_PATH}core/PC/*.h)
+file(GLOB CORE_DEBUG_FILES ${ENGINE_ROOT_PATH}debug/*.cpp ${ENGINE_ROOT_PATH}debug/*.h ${ENGINE_ROOT_PATH}debug/pc/*.cpp ${ENGINE_ROOT_PATH}debug/pc/*.h)
+file(GLOB ENGINE_FILES ${ENGINE_ROOT_PATH}*.cpp ${ENGINE_ROOT_PATH}*.h)
+file(GLOB UNIVERSE_FILES ${ENGINE_ROOT_PATH}universe/*.cpp ${ENGINE_ROOT_PATH}universe/*.h)
+file(GLOB GRAPHICS_FILES ${ENGINE_ROOT_PATH}graphics/*.cpp ${ENGINE_ROOT_PATH}graphics/*.h)
+file(GLOB EDITOR_FILES ${ENGINE_ROOT_PATH}editor/*.cpp ${ENGINE_ROOT_PATH}editor/*.h)
 
 
 source_group(core FILES ${CORE_ROOT_FILES})
@@ -37,9 +39,10 @@ source_group(core\\net FILES ${CORE_NET_FILES})
 source_group(editor FILES ${EDITOR_FILES})
 source_group(universe FILES ${UNIVERSE_FILES})
 source_group(graphics FILES ${GRAPHICS_FILES})
-source_group(engine FILES ${ENGINE_FILES})
+source_group("" FILES ${ENGINE_FILES})
 
 include_directories(${SRC_PATH})
+include_directories(${ENGINE_ROOT_PATH})
 include_directories(${EXTERNAL_PATH}bgfx/include)
 include_directories(${EXTERNAL_PATH}lua/include)
 

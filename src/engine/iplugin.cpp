@@ -1,4 +1,4 @@
-#include "engine/iplugin.h"
+#include "iplugin.h"
 
 
 namespace Lumix

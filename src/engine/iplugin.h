@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "core/lumix.h"
+#include "lumix.h"
 
 
 namespace Lumix

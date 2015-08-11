@@ -11,7 +11,7 @@
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
-#include "engine/engine.h"
+#include "engine.h"
 #include "graphics/render_scene.h"
 #include "graphics/texture.h"
 #include "physics/physics_system.h"

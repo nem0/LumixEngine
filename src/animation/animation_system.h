@@ -1,8 +1,8 @@
 #pragma once
 
 
-#include "core/lumix.h"
-#include "engine/iplugin.h"
+#include "lumix.h"
+#include "iplugin.h"
 
 
 namespace Lumix

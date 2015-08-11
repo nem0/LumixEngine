@@ -2,7 +2,7 @@
 #include "core/crc32.h"
 #include "core/json_serializer.h"
 #include "core/stack_allocator.h"
-#include "engine/engine.h"
+#include "engine.h"
 #include "graphics/render_scene.h"
 #include "universe/universe.h"
 
