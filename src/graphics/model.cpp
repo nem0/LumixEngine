@@ -53,8 +53,7 @@ Model::~Model()
 
 RayCastModelHit Model::castRay(const Vec3& origin,
 							   const Vec3& dir,
-							   const Matrix& model_transform,
-							   float scale)
+							   const Matrix& model_transform)
 {
 	RayCastModelHit hit;
 	hit.m_is_hit = false;
@@ -64,7 +63,6 @@ RayCastModelHit Model::castRay(const Vec3& origin,
 	}
 
 	Matrix inv = model_transform;
-	inv.multiply3x3(scale);
 	inv.inverse();
 	Vec3 local_origin = inv.multiplyPosition(origin);
 	Vec3 local_dir = static_cast<Vec3>(inv * Vec4(dir.x, dir.y, dir.z, 0));

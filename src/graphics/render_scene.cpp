@@ -177,7 +177,7 @@ public:
 		, m_renderable_created(m_allocator)
 		, m_renderable_destroyed(m_allocator)
 	{
-		m_universe.entityMoved()
+		m_universe.entityTransformed()
 			.bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 		m_culling_system =
 			CullingSystem::create(m_engine.getMTJDManager(), m_allocator);
@@ -187,7 +187,7 @@ public:
 
 	~RenderSceneImpl()
 	{
-		m_universe.entityMoved()
+		m_universe.entityTransformed()
 			.unbind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 
 		for (int i = 0; i < m_model_loaded_callbacks.size(); ++i)
@@ -719,6 +719,12 @@ public:
 					m_renderables[i]->m_matrix = m_universe.getMatrix(entity);
 					m_culling_system->updateBoundingPosition(
 						m_universe.getPosition(entity), i);
+					float bounding_radius =
+						m_renderables[i]->m_model
+							? m_renderables[i]->m_model->getBoundingRadius()
+							: 1;
+					m_culling_system->updateBoundingRadius(
+						m_universe.getScale(entity) * bounding_radius, i);
 					renderable_index = i;
 					break;
 				}
@@ -733,6 +739,13 @@ public:
 
 			m_culling_system->updateBoundingPosition(
 				m_universe.getPosition(entity), iter.value());
+
+			float bounding_radius = m_renderables[renderable_index]->m_model
+										? m_renderables[renderable_index]
+											  ->m_model->getBoundingRadius()
+										: 1;
+			m_culling_system->updateBoundingRadius(
+				m_universe.getScale(entity) * bounding_radius, iter.value());
 		}
 
 		for (int i = 0, c = m_point_lights.size(); i < c; ++i)
@@ -801,7 +814,7 @@ public:
 
 
 	virtual void setTerrainMaterialPath(ComponentIndex cmp,
-									const char* path) override
+										const char* path) override
 	{
 		Material* material =
 			static_cast<Material*>(m_engine.getResourceManager()
@@ -1302,11 +1315,9 @@ public:
 		}
 	}
 
-	virtual void setCameraSlot(ComponentIndex camera,
-							   const char* slot) override
+	virtual void setCameraSlot(ComponentIndex camera, const char* slot) override
 	{
-		copyString(
-			m_cameras[camera].m_slot, Camera::MAX_SLOT_LENGTH, slot);
+		copyString(m_cameras[camera].m_slot, Camera::MAX_SLOT_LENGTH, slot);
 	}
 
 	virtual const char* getCameraSlot(ComponentIndex camera) override
@@ -1682,7 +1693,7 @@ public:
 				{
 					RayCastModelHit new_hit =
 						m_renderables[i]->m_model->castRay(
-							origin, dir, m_renderables[i]->m_matrix, scale);
+							origin, dir, m_renderables[i]->m_matrix);
 					if (new_hit.m_is_hit &&
 						(!hit.m_is_hit || new_hit.m_t < hit.m_t))
 					{
@@ -1727,7 +1738,7 @@ public:
 		return -1;
 	}
 
-	
+
 	int getGlobalLightIndex(int uid) const
 	{
 		for (int i = 0; i < m_global_lights.size(); ++i)
@@ -1896,7 +1907,9 @@ private:
 	{
 		float bounding_radius =
 			m_renderables[renderable_index]->m_model->getBoundingRadius();
-		m_culling_system->updateBoundingRadius(bounding_radius,
+		float scale =
+			m_universe.getScale(m_renderables[renderable_index]->m_entity);
+		m_culling_system->updateBoundingRadius(bounding_radius * scale,
 											   renderable_index);
 		m_renderables[renderable_index]->m_meshes.clear();
 		m_renderables[renderable_index]->m_pose.resize(model->getBoneCount());

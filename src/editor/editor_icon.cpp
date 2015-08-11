@@ -120,7 +120,7 @@ float EditorIcon::hit(const Vec3& origin, const Vec3& dir) const
 {
 	if (m_is_visible)
 	{
-		RayCastModelHit hit = m_model->castRay(origin, dir, m_matrix, m_scale);
+		RayCastModelHit hit = m_model->castRay(origin, dir, m_matrix);
 		return hit.m_is_hit ? hit.m_t : -1;
 	}
 	else

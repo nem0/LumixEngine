@@ -27,7 +27,7 @@ public:
 		, m_parent_set(allocator)
 	{
 		m_is_processing = false;
-		universe.entityMoved()
+		universe.entityTransformed()
 			.bind<HierarchyImpl, &HierarchyImpl::onEntityMoved>(this);
 	}
 
