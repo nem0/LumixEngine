@@ -16,11 +16,51 @@
 // http://prideout.net/blog/?p=36
 
 
-struct Context
+class Context
 {
+public:
 	Context()
 		: m_allocator(m_main_allocator)
 	{
+	}
+
+	void init(HWND win)
+	{
+		m_engine = Lumix::Engine::create(win, nullptr, m_allocator);
+		m_engine->loadPlugin("lua_script.dll");
+		m_engine->loadPlugin("animation.dll");
+		m_engine->loadPlugin("physics.dll");
+
+		m_pipeline_source = static_cast<Lumix::Pipeline*>(
+			m_engine->getResourceManager()
+				.get(Lumix::ResourceManager::PIPELINE)
+				->load(Lumix::Path("pipelines/game_view.lua")));
+		m_pipeline = Lumix::PipelineInstance::create(*m_pipeline_source,
+													 m_engine->getAllocator());
+
+		m_universe_context = &m_engine->createUniverse();
+		ASSERT(m_universe_context);
+
+		auto fp = fopen("main.unv", "rb");
+		fseek(fp, 0, SEEK_END);
+		auto l = ftell(fp);
+		fseek(fp, 0, SEEK_SET);
+		Lumix::Array<char*> b(m_allocator);
+		b.resize(l);
+		fread(&b[0], 1, l, fp);
+		fclose(fp);
+
+		Lumix::InputBlob blob(&b[0], b.size());
+
+		uint32_t engine_hash;
+		blob.read(engine_hash);
+		uint32_t editor_hash;
+		blob.read(editor_hash);
+		m_engine->deserialize(*m_universe_context, blob);
+		m_pipeline->setScene((Lumix::RenderScene*)m_universe_context->getScene(
+			Lumix::crc32("renderer")));
+
+		m_pipeline->resize(800, 600);
 	}
 
 	Lumix::UniverseContext* m_universe_context;
@@ -33,48 +73,6 @@ struct Context
 
 
 Context g_context;
-
-
-void init(HWND win)
-{
-	Lumix::Renderer::setInitData(win);
-	g_context.m_engine = Lumix::Engine::create(nullptr, g_context.m_allocator);
-	g_context.m_engine->loadPlugin("lua_script.dll");
-	g_context.m_engine->loadPlugin("animation.dll");
-	g_context.m_engine->loadPlugin("physics.dll");
-
-	g_context.m_pipeline_source = static_cast<Lumix::Pipeline*>(
-		g_context.m_engine->getResourceManager()
-			.get(Lumix::ResourceManager::PIPELINE)
-			->load(Lumix::Path("pipelines/game_view.lua")));
-	g_context.m_pipeline = Lumix::PipelineInstance::create(
-		*g_context.m_pipeline_source, g_context.m_engine->getAllocator());
-
-	g_context.m_universe_context = &g_context.m_engine->createUniverse();
-	ASSERT(g_context.m_universe_context);
-
-	auto fp = fopen("main.unv", "rb");
-	fseek(fp, 0, SEEK_END);
-	auto l = ftell(fp);
-	fseek(fp, 0, SEEK_SET);
-	Lumix::Array<char*> b(g_context.m_allocator);
-	b.resize(l);
-	fread(&b[0], 1, l, fp);
-	fclose(fp);
-
-	Lumix::InputBlob blob(&b[0], b.size());
-
-	uint32_t engine_hash;
-	blob.read(engine_hash);
-	uint32_t editor_hash;
-	blob.read(editor_hash);
-	g_context.m_engine->deserialize(*g_context.m_universe_context, blob);
-	g_context.m_pipeline->setScene(
-		(Lumix::RenderScene*)g_context.m_universe_context->getScene(
-			Lumix::crc32("renderer")));
-
-	g_context.m_pipeline->resize(800, 600);
-}
 
 
 LRESULT WINAPI msgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -151,7 +149,7 @@ INT WINAPI WinMain(HINSTANCE hInst,
 	auto e = GetLastError();
 	ASSERT(hwnd);
 
-	init(hwnd);
+	g_context.init(hwnd);
 	SetWindowTextA(hwnd, "Lumix Sample app");
 
 	while (g_context.m_engine->getResourceManager().isLoading())
@@ -171,7 +169,8 @@ INT WINAPI WinMain(HINSTANCE hInst,
 		}
 		else
 		{
-			g_context.m_engine->update(*g_context.m_universe_context, 1.0f, -1.0f);
+			g_context.m_engine->update(
+				*g_context.m_universe_context, 1.0f, -1.0f);
 			g_context.m_pipeline->render();
 			g_context.m_engine->getRenderer().frame();
 		}

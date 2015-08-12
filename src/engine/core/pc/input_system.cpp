@@ -1,6 +1,7 @@
 #include "core/input_system.h"
 #include "core/associative_array.h"
 #include "core/string.h"
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
 

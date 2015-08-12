@@ -1,5 +1,6 @@
 #include "debug/debug.h"
 #include "core/string.h"
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <DbgHelp.h>
 #include <mapi.h>

@@ -1,7 +1,6 @@
 #include "core/net/tcp_acceptor.h"
 #include "core/iallocator.h"
 #include "core/net/tcp_stream.h"
-
 #include <Windows.h>
 
 namespace Lumix

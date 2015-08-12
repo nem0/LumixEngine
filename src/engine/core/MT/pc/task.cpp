@@ -2,7 +2,9 @@
 #include "core/iallocator.h"
 #include "core/mt/task.h"
 #include "core/mt/thread.h"
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+
 
 namespace Lumix
 {

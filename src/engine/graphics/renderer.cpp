@@ -28,6 +28,7 @@
 #include "graphics/texture_manager.h"
 #include "universe/universe.h"
 #include <bgfx.h>
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <cstdio>
 
@@ -122,7 +123,7 @@ struct RendererImpl : public Renderer
 	};
 
 
-	RendererImpl(Engine& engine)
+	RendererImpl(Engine& engine, void* init_data)
 		: m_engine(engine)
 		, m_allocator(engine.getAllocator())
 		, m_texture_manager(m_allocator)
@@ -133,10 +134,10 @@ struct RendererImpl : public Renderer
 		, m_passes(m_allocator)
 	{
 		bgfx::PlatformData d;
-		if (s_hwnd)
+		if (init_data)
 		{
 			memset(&d, 0, sizeof(d));
-			d.nwh = s_hwnd;
+			d.nwh = init_data;
 			bgfx::setPlatformData(d);
 		}
 		bgfx::init(bgfx::RendererType::Count, 0, 0, &m_callback_stub);
@@ -474,23 +475,12 @@ struct RendererImpl : public Renderer
 	PipelineManager m_pipeline_manager;
 	uint32_t m_current_pass_hash;
 	int m_view_counter;
-
-	static HWND s_hwnd;
 };
 
 
-HWND RendererImpl::s_hwnd;
-
-
-void Renderer::setInitData(void* data)
+Renderer* Renderer::createInstance(Engine& engine, void* init_data)
 {
-	RendererImpl::s_hwnd = (HWND)data;
-}
-
-
-Renderer* Renderer::createInstance(Engine& engine)
-{
-	return engine.getAllocator().newObject<RendererImpl>(engine);
+	return engine.getAllocator().newObject<RendererImpl>(engine, init_data);
 }
 
 

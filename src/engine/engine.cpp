@@ -108,14 +108,14 @@ public:
 		m_fps_frame = 0;
 	}
 
-	bool create()
+	bool create(void* init_data)
 	{
 		m_plugin_manager = PluginManager::create(*this);
 		if (!m_plugin_manager)
 		{
 			return false;
 		}
-		m_renderer = Renderer::createInstance(*this);
+		m_renderer = Renderer::createInstance(*this, init_data);
 		if (!m_renderer)
 		{
 			return false;
@@ -438,7 +438,7 @@ void showLogInVS(const char*, const char* message)
 }
 
 
-Engine* Engine::create(FS::FileSystem* fs, IAllocator& allocator)
+Engine* Engine::create(void* init_data, FS::FileSystem* fs, IAllocator& allocator)
 {
 	installUnhandledExceptionHandler();
 
@@ -447,7 +447,7 @@ Engine* Engine::create(FS::FileSystem* fs, IAllocator& allocator)
 	g_log_error.getCallback().bind<showLogInVS>();
 
 	EngineImpl* engine = allocator.newObject<EngineImpl>(fs, allocator);
-	if (!engine->create())
+	if (!engine->create(init_data))
 	{
 		allocator.deleteObject(engine);
 		return nullptr;

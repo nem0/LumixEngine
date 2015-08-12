@@ -32,7 +32,6 @@ class Universe;
 class WorldEditor;
 
 
-
 struct LUMIX_ENGINE_API UniverseContext
 {
 	UniverseContext(IAllocator& allocator)
@@ -53,7 +52,7 @@ class LUMIX_ENGINE_API Engine
 public:
 	virtual ~Engine() {}
 
-	static Engine* create(FS::FileSystem* fs, IAllocator& allocator);
+	static Engine* create(void* init_data, FS::FileSystem* fs, IAllocator& allocator);
 	static void destroy(Engine* engine);
 
 	virtual UniverseContext& createUniverse() = 0;
@@ -67,9 +66,8 @@ public:
 	virtual PluginManager& getPluginManager() = 0;
 	virtual IPlugin* loadPlugin(const char* name) = 0;
 	virtual MTJD::Manager& getMTJDManager() = 0;
-
-	virtual IAllocator& getAllocator() = 0;
 	virtual ResourceManager& getResourceManager() = 0;
+	virtual IAllocator& getAllocator() = 0;
 
 	virtual void startGame(UniverseContext& context) = 0;
 	virtual void stopGame(UniverseContext& context) = 0;
