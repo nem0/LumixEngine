@@ -133,9 +133,12 @@ struct RendererImpl : public Renderer
 		, m_passes(m_allocator)
 	{
 		bgfx::PlatformData d;
-		memset(&d, 0, sizeof(d));
-		d.nwh = s_hwnd;
-		bgfx::setPlatformData(d);
+		if (s_hwnd)
+		{
+			memset(&d, 0, sizeof(d));
+			d.nwh = s_hwnd;
+			bgfx::setPlatformData(d);
+		}
 		bgfx::init(bgfx::RendererType::Count, 0, 0, &m_callback_stub);
 		bgfx::reset(800, 600);
 		bgfx::setDebug(BGFX_DEBUG_TEXT);

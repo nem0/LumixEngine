@@ -26,6 +26,8 @@ namespace Lumix
 			virtual void update(float time_delta) = 0;
 			virtual bool ownComponentType(uint32_t type) const = 0;
 			virtual Universe& getUniverse() = 0;
+			virtual void startGame() {}
+			virtual void stopGame() {}
 	};
 
 

@@ -14,6 +14,7 @@
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
+#include "core/static_array.h"
 #include "core/string.h"
 #include "engine.h"
 #include "plugin_manager.h"
@@ -379,7 +380,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	{
 		m_pass_idx = m_renderer.getPassIdx(name);
 		bool found = false;
-		for (int i = 0; i < lengthOf(m_view2pass_map); ++i)
+		for (int i = 0; i < m_view2pass_map.size(); ++i)
 		{
 			if (m_view2pass_map[i] == m_pass_idx)
 			{
@@ -502,6 +503,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 				{
 					g_log_error.log("lua")
 						<< lua_tostring(m_source.m_lua_state, -1);
+					lua_pop(m_source.m_lua_state, 1);
 				}
 			}
 		}
@@ -1254,7 +1256,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_pass_idx = -1;
 		m_current_framebuffer = m_default_framebuffer;
 		m_global_textures.clear();
-		memset(m_view2pass_map, 0xFF, sizeof(m_view2pass_map));
+		m_view2pass_map.assign(0xFF);
 		m_instance_data_idx = 0;
 		for (int i = 0; i < lengthOf(m_terrain_instances); ++i)
 		{
@@ -1273,6 +1275,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 			{
 				g_log_error.log("lua")
 					<< lua_tostring(m_source.m_lua_state, -1);
+				lua_pop(m_source.m_lua_state, 1);
 			}
 		}
 		finishInstances();
@@ -1320,7 +1323,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	uint32_t m_debug_flags;
 	uint8_t m_view_idx;
 	int m_pass_idx;
-	uint8_t m_view2pass_map[16];
+	StaticArray<uint8_t, 16> m_view2pass_map;
 	uint64_t m_render_state;
 	IAllocator& m_allocator;
 	Renderer& m_renderer;

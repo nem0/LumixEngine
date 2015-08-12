@@ -100,26 +100,12 @@ public:
 		, m_valid(system.getAllocator())
 		, m_global_state(nullptr)
 	{
-		if (system.m_engine.getWorldEditor())
-		{
-			system.m_engine.getWorldEditor()
-				->gameModeToggled()
-				.bind<LuaScriptScene, &LuaScriptScene::onGameModeToggled>(this);
-		}
 	}
 
 
 	~LuaScriptScene()
 	{
 		unloadAllScripts();
-
-		if (m_system.m_engine.getWorldEditor())
-		{
-			m_system.m_engine.getWorldEditor()
-				->gameModeToggled()
-				.unbind<LuaScriptScene, &LuaScriptScene::onGameModeToggled>(
-					this);
-		}
 	}
 
 
@@ -216,7 +202,7 @@ public:
 	}
 
 
-	void startGame()
+	virtual void startGame() override
 	{
 		m_global_state = lua_newstate(luaAllocator, &m_system.getAllocator());
 		luaL_openlibs(m_global_state);
@@ -265,7 +251,7 @@ public:
 	}
 
 
-	void stopGame()
+	virtual void stopGame() override
 	{
 		for (Script& script : m_scripts)
 		{
@@ -275,20 +261,7 @@ public:
 		lua_close(m_global_state);
 	}
 
-
-	void onGameModeToggled(bool is_game_mode)
-	{
-		if (is_game_mode)
-		{
-			startGame();
-		}
-		else
-		{
-			stopGame();
-		}
-	}
-
-
+	
 	virtual ComponentIndex createComponent(uint32_t type,
 										   Entity entity) override
 	{

@@ -248,6 +248,24 @@ public:
 	}
 
 
+	virtual void startGame() override
+	{
+		for (auto* scene : m_scenes)
+		{
+			scene->startGame();
+		}
+	}
+
+
+	virtual void stopGame() override
+	{
+		for (auto* scene : m_scenes)
+		{
+			scene->stopGame();
+		}
+	}
+
+
 	virtual void update(bool is_game_running,
 						float time_delta_multiplier,
 						float forced_time_delta) override
@@ -276,7 +294,6 @@ public:
 		m_last_time_delta = dt;
 		if (is_game_running)
 		{
-
 			updateGame(dt);
 		}
 		else
