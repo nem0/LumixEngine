@@ -268,10 +268,11 @@ public:
 		SetParentEditorCommand* command =
 			m_engine->getWorldEditor()
 				->getAllocator()
-				.newObject<SetParentEditorCommand>(*m_engine->getWorldEditor(),
-												   *m_engine->getHierarchy(),
-												   child,
-												   parent_entity);
+				.newObject<SetParentEditorCommand>(
+					*m_engine->getWorldEditor(),
+					*m_engine->getWorldEditor()->getHierarchy(),
+					child,
+					parent_entity);
 		m_engine->getWorldEditor()->executeCommand(command);
 
 		return false;
@@ -472,7 +473,8 @@ public:
 	void fillChildren(EntityNode* node)
 	{
 		Lumix::Array<Lumix::Hierarchy::Child>* children =
-			m_engine->getHierarchy()->getChildren(node->m_entity);
+			m_engine->getWorldEditor()->getHierarchy()->getChildren(
+				node->m_entity);
 		if (children)
 		{
 			for (int i = 0; i < children->size(); ++i)
@@ -527,7 +529,8 @@ public:
 		m_universe = universe;
 		if (m_universe)
 		{
-			m_engine->getHierarchy()
+			m_engine->getWorldEditor()
+				->getHierarchy()
 				->parentSet()
 				.bind<EntityListModel, &EntityListModel::onParentSet>(this);
 			m_universe->entityCreated()
@@ -538,7 +541,8 @@ public:
 			Lumix::Entity e = m_universe->getFirstEntity();
 			while (e >= 0)
 			{
-				Lumix::Entity parent = m_engine->getHierarchy()->getParent(e);
+				Lumix::Entity parent =
+					m_engine->getWorldEditor()->getHierarchy()->getParent(e);
 				if (parent < 0)
 				{
 					EntityNode* node = new EntityNode(m_root, e);

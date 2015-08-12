@@ -55,6 +55,20 @@ public:
 };
 #pragma pack()
 
+
+IScene* UniverseContext::getScene(uint32_t hash) const
+{
+	for (auto* scene : m_scenes)
+	{
+		if (crc32(scene->getPlugin().getName()) == hash)
+		{
+			return scene;
+		}
+	}
+	return nullptr;
+}
+
+
 class EngineImpl : public Engine
 {
 public:
@@ -62,9 +76,9 @@ public:
 		: m_allocator(allocator)
 		, m_resource_manager(m_allocator)
 		, m_mtjd_manager(m_allocator)
-		, m_scenes(m_allocator)
 		, m_fps(0)
 		, m_editor(nullptr)
+		, m_is_game_running(false)
 	{
 		if (!fs)
 		{
@@ -92,8 +106,6 @@ public:
 		m_timer = Timer::create(m_allocator);
 		m_fps_timer = Timer::create(m_allocator);
 		m_fps_frame = 0;
-		m_universe = nullptr;
-		m_hierarchy = nullptr;
 	}
 
 	bool create()
@@ -141,74 +153,40 @@ public:
 	virtual IAllocator& getAllocator() override { return m_allocator; }
 
 
-	virtual Universe* createUniverse() override
+	virtual UniverseContext& createUniverse() override
 	{
-		m_universe = m_allocator.newObject<Universe>(m_allocator);
-		m_hierarchy = Hierarchy::create(*m_universe, m_allocator);
+		UniverseContext* context =
+			m_allocator.newObject<UniverseContext>(m_allocator);
+		context->m_universe = m_allocator.newObject<Universe>(m_allocator);
+		context->m_hierarchy =
+			Hierarchy::create(*context->m_universe, m_allocator);
 		const Array<IPlugin*>& plugins = m_plugin_manager->getPlugins();
 		for (auto* plugin : plugins)
 		{
-			IScene* scene = plugin->createScene(*m_universe);
+			IScene* scene = plugin->createScene(*context);
 			if (scene)
 			{
-				m_scenes.push(scene);
+				context->m_scenes.push(scene);
 			}
 		}
 
-		return m_universe;
-	}
-	
-
-	virtual IScene* getSceneByComponentType(uint32_t type) const override
-	{
-		for (int i = 0; i < m_scenes.size(); ++i)
-		{
-			if (m_scenes[i]->ownComponentType(type))
-			{
-				return m_scenes[i];
-			}
-		}
-		return nullptr;
-	}
-
-
-	virtual IScene* getScene(uint32_t type) const override
-	{
-		for (int i = 0; i < m_scenes.size(); ++i)
-		{
-			if (crc32(m_scenes[i]->getPlugin().getName()) == type)
-			{
-				return m_scenes[i];
-			}
-		}
-		return nullptr;
+		return *context;
 	}
 
 
 	virtual MTJD::Manager& getMTJDManager() override { return m_mtjd_manager; }
 
 
-	virtual const Array<IScene*>& getScenes() const override
+	virtual void destroyUniverse(UniverseContext& context) override
 	{
-		return m_scenes;
-	}
-
-
-	virtual void destroyUniverse() override
-	{
-		ASSERT(m_universe);
-		if (m_universe)
+		for (int i = context.m_scenes.size() - 1; i >= 0; --i)
 		{
-			for (int i = m_scenes.size() - 1; i >= 0; --i)
-			{
-				m_scenes[i]->getPlugin().destroyScene(m_scenes[i]);
-			}
-			m_scenes.clear();
-			Hierarchy::destroy(m_hierarchy);
-			m_hierarchy = nullptr;
-			m_allocator.deleteObject(m_universe);
-			m_universe = nullptr;
+			context.m_scenes[i]->getPlugin().destroyScene(context.m_scenes[i]);
 		}
+		Hierarchy::destroy(context.m_hierarchy);
+		m_allocator.deleteObject(context.m_universe);
+
+		m_allocator.deleteObject(&context);
 	}
 
 	virtual void setWorldEditor(WorldEditor& editor) override
@@ -236,37 +214,40 @@ public:
 	virtual Renderer& getRenderer() override { return *m_renderer; }
 
 
-	void updateGame(float dt)
+	void updateGame(UniverseContext& context, float dt)
 	{
 		PROFILE_FUNCTION();
-		for (int i = 0; i < m_scenes.size(); ++i)
+		for (int i = 0; i < context.m_scenes.size(); ++i)
 		{
-			m_scenes[i]->update(dt);
+			context.m_scenes[i]->update(dt);
 		}
 		m_plugin_manager->update(dt);
 		m_input_system.update(dt);
 	}
 
 
-	virtual void startGame() override
+	virtual void startGame(UniverseContext& context) override
 	{
-		for (auto* scene : m_scenes)
+		ASSERT(!m_is_game_running);
+		m_is_game_running = true;
+		for (auto* scene : context.m_scenes)
 		{
 			scene->startGame();
 		}
 	}
 
 
-	virtual void stopGame() override
+	virtual void stopGame(UniverseContext& context) override
 	{
-		for (auto* scene : m_scenes)
+		ASSERT(m_is_game_running);
+		for (auto* scene : context.m_scenes)
 		{
 			scene->stopGame();
 		}
 	}
 
 
-	virtual void update(bool is_game_running,
+	virtual void update(UniverseContext& context,
 						float time_delta_multiplier,
 						float forced_time_delta) override
 	{
@@ -292,17 +273,17 @@ public:
 			dt = m_timer->tick() * time_delta_multiplier;
 		}
 		m_last_time_delta = dt;
-		if (is_game_running)
+		if (m_is_game_running)
 		{
-			updateGame(dt);
+			updateGame(context, dt);
 		}
 		else
 		{
-			for (int i = 0; i < m_scenes.size(); ++i)
+			for (int i = 0; i < context.m_scenes.size(); ++i)
 			{
-				if (&m_scenes[i]->getPlugin() == m_renderer)
+				if (&context.m_scenes[i]->getPlugin() == m_renderer)
 				{
-					m_scenes[i]->update(dt);
+					context.m_scenes[i]->update(dt);
 				}
 			}
 		}
@@ -317,12 +298,6 @@ public:
 
 
 	virtual InputSystem& getInputSystem() override { return m_input_system; }
-
-
-	virtual Universe* getUniverse() const override { return m_universe; }
-
-
-	virtual Hierarchy* getHierarchy() const override { return m_hierarchy; }
 
 
 	virtual ResourceManager& getResourceManager() override
@@ -362,7 +337,8 @@ public:
 	}
 
 
-	virtual uint32_t serialize(OutputBlob& serializer) override
+	virtual uint32_t serialize(UniverseContext& ctx,
+							   OutputBlob& serializer) override
 	{
 		SerializedEngineHeader header;
 		header.m_magic = SERIALIZED_ENGINE_MAGIC; // == '_LEN'
@@ -372,15 +348,15 @@ public:
 		serializePluginList(serializer);
 		g_path_manager.serialize(serializer);
 		int pos = serializer.getSize();
-		m_universe->serialize(serializer);
-		m_hierarchy->serialize(serializer);
+		ctx.m_universe->serialize(serializer);
+		ctx.m_hierarchy->serialize(serializer);
 		m_renderer->serialize(serializer);
 		m_plugin_manager->serialize(serializer);
-		serializer.write((int32_t)m_scenes.size());
-		for (int i = 0; i < m_scenes.size(); ++i)
+		serializer.write((int32_t)ctx.m_scenes.size());
+		for (int i = 0; i < ctx.m_scenes.size(); ++i)
 		{
-			serializer.writeString(m_scenes[i]->getPlugin().getName());
-			m_scenes[i]->serialize(serializer);
+			serializer.writeString(ctx.m_scenes[i]->getPlugin().getName());
+			ctx.m_scenes[i]->serialize(serializer);
 		}
 		uint32_t crc = crc32((const uint8_t*)serializer.getData() + pos,
 							 serializer.getSize() - pos);
@@ -388,7 +364,8 @@ public:
 	}
 
 
-	virtual bool deserialize(InputBlob& serializer) override
+	virtual bool deserialize(UniverseContext& ctx,
+							 InputBlob& serializer) override
 	{
 		SerializedEngineHeader header;
 		serializer.read(header);
@@ -407,8 +384,8 @@ public:
 			return false;
 		}
 		g_path_manager.deserialize(serializer);
-		m_universe->deserialize(serializer);
-		m_hierarchy->deserialize(serializer);
+		ctx.m_universe->deserialize(serializer);
+		ctx.m_hierarchy->deserialize(serializer);
 		m_renderer->deserialize(serializer);
 		m_plugin_manager->deserialize(serializer);
 		int32_t scene_count;
@@ -417,7 +394,7 @@ public:
 		{
 			char tmp[32];
 			serializer.readString(tmp, sizeof(tmp));
-			getScene(crc32(tmp))->deserialize(serializer);
+			ctx.getScene(crc32(tmp))->deserialize(serializer);
 		}
 		return true;
 	}
@@ -440,15 +417,13 @@ private:
 
 	WorldEditor* m_editor;
 	PluginManager* m_plugin_manager;
-	Universe* m_universe;
-	Hierarchy* m_hierarchy;
-	Array<IScene*> m_scenes;
 	InputSystem m_input_system;
 	Timer* m_timer;
 	Timer* m_fps_timer;
 	int m_fps_frame;
 	float m_fps;
 	float m_last_time_delta;
+	bool m_is_game_running;
 
 private:
 	void operator=(const EngineImpl&);
@@ -471,8 +446,7 @@ Engine* Engine::create(FS::FileSystem* fs, IAllocator& allocator)
 	g_log_warning.getCallback().bind<showLogInVS>();
 	g_log_error.getCallback().bind<showLogInVS>();
 
-	EngineImpl* engine =
-		allocator.newObject<EngineImpl>(fs, allocator);
+	EngineImpl* engine = allocator.newObject<EngineImpl>(fs, allocator);
 	if (!engine->create())
 	{
 		allocator.deleteObject(engine);

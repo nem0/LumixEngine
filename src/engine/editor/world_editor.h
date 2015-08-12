@@ -12,6 +12,7 @@ namespace Lumix
 
 class Engine;
 class EntityTemplateSystem;
+class Hierarchy;
 class IArrayDescriptor;
 class IPlugin;
 class IPropertyDescriptor;
@@ -80,6 +81,10 @@ public:
 	virtual IEditorCommand* createEditorCommand(uint32_t command_type) = 0;
 	virtual Engine& getEngine() = 0;
 	virtual Universe* getUniverse() = 0;
+	virtual Hierarchy* getHierarchy() = 0;
+	virtual const Array<IScene*>& getScenes() const = 0;
+	virtual IScene* getScene(uint32_t hash) = 0;
+	virtual IScene* getSceneByComponentType(uint32_t hash) = 0;
 	virtual IAllocator& getAllocator() = 0;
 	virtual void renderIcons(PipelineInstance& pipeline) = 0;
 	virtual ComponentUID getEditCamera() = 0;

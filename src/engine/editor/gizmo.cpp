@@ -52,7 +52,7 @@ void Gizmo::create()
 									  .getResourceManager()
 									  .get(ResourceManager::MODEL)
 									  ->load(Path("models/editor/gizmo.msh")));
-	m_scene = static_cast<RenderScene*>(m_editor.getEngine().getScene(crc32("renderer")));
+	m_scene = static_cast<RenderScene*>(m_editor.getScene(crc32("renderer")));
 }
 
 

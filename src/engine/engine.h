@@ -32,6 +32,22 @@ class Universe;
 class WorldEditor;
 
 
+
+struct LUMIX_ENGINE_API UniverseContext
+{
+	UniverseContext(IAllocator& allocator)
+		: m_scenes(allocator)
+	{
+	}
+
+	IScene* getScene(uint32_t hash) const;
+
+	Universe* m_universe;
+	Hierarchy* m_hierarchy;
+	Array<IScene*> m_scenes;
+};
+
+
 class LUMIX_ENGINE_API Engine
 {
 public:
@@ -40,8 +56,8 @@ public:
 	static Engine* create(FS::FileSystem* fs, IAllocator& allocator);
 	static void destroy(Engine* engine);
 
-	virtual Universe* createUniverse() = 0;
-	virtual void destroyUniverse() = 0;
+	virtual UniverseContext& createUniverse() = 0;
+	virtual void destroyUniverse(UniverseContext& context) = 0;
 
 	virtual void setWorldEditor(WorldEditor& editor) = 0;
 	virtual WorldEditor* getWorldEditor() const = 0;
@@ -50,24 +66,19 @@ public:
 	virtual InputSystem& getInputSystem() = 0;
 	virtual PluginManager& getPluginManager() = 0;
 	virtual IPlugin* loadPlugin(const char* name) = 0;
-	virtual Universe* getUniverse() const = 0;
-	virtual Hierarchy* getHierarchy() const = 0;
-	virtual const Array<IScene*>& getScenes() const = 0;
-	virtual IScene* getScene(uint32_t type) const = 0;
-	virtual IScene* getSceneByComponentType(uint32_t type) const = 0;
 	virtual MTJD::Manager& getMTJDManager() = 0;
 
 	virtual IAllocator& getAllocator() = 0;
 	virtual ResourceManager& getResourceManager() = 0;
 
-	virtual void startGame() = 0;
-	virtual void stopGame() = 0;
+	virtual void startGame(UniverseContext& context) = 0;
+	virtual void stopGame(UniverseContext& context) = 0;
 
-	virtual void update(bool is_game_running,
+	virtual void update(UniverseContext& context,
 						float time_delta_multiplier,
 						float forced_time_delta) = 0;
-	virtual uint32_t serialize(OutputBlob& serializer) = 0;
-	virtual bool deserialize(InputBlob& serializer) = 0;
+	virtual uint32_t serialize(UniverseContext& ctx, OutputBlob& serializer) = 0;
+	virtual bool deserialize(UniverseContext& ctx, InputBlob& serializer) = 0;
 	virtual float getFPS() const = 0;
 	virtual float getLastTimeDelta() = 0;
 
