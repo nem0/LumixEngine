@@ -2111,7 +2111,6 @@ public:
 	{
 		if (m_is_game_mode)
 		{
-			m_game_mode_toggled.invoke(false);
 			stopGameMode();
 		}
 		else
@@ -2122,13 +2121,14 @@ public:
 				FS::Mode::WRITE);
 			save(*m_game_mode_file);
 			m_is_game_mode = true;
-			m_game_mode_toggled.invoke(true);
+			m_engine->startGame();
 		}
 	}
 
 
 	void stopGameMode()
 	{
+		m_engine->stopGame();
 		selectEntities(nullptr, 0);
 		for (int i = 0; i < m_editor_icons.size(); ++i)
 		{
@@ -2503,7 +2503,6 @@ public:
 		, m_entity_name_set(m_allocator)
 		, m_entity_selected(m_allocator)
 		, m_universe_destroyed(m_allocator)
-		, m_game_mode_toggled(m_allocator)
 		, m_universe_created(m_allocator)
 		, m_universe_loaded(m_allocator)
 		, m_property_set(m_allocator)
@@ -2843,12 +2842,6 @@ public:
 	}
 
 
-	virtual DelegateList<void(bool)>& gameModeToggled() override
-	{
-		return m_game_mode_toggled;
-	}
-
-
 	virtual DelegateList<void(const Array<Entity>&)>& entitySelected() override
 	{
 		return m_entity_selected;
@@ -3176,7 +3169,6 @@ private:
 	DelegateList<void(ComponentUID, const IPropertyDescriptor&)> m_property_set;
 	DelegateList<void(const Array<Entity>&)> m_entity_selected;
 	DelegateList<void(Entity, const char*)> m_entity_name_set;
-	DelegateList<void(bool)> m_game_mode_toggled;
 
 	Path m_universe_path;
 	Path m_base_path;

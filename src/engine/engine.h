@@ -60,6 +60,9 @@ public:
 	virtual IAllocator& getAllocator() = 0;
 	virtual ResourceManager& getResourceManager() = 0;
 
+	virtual void startGame() = 0;
+	virtual void stopGame() = 0;
+
 	virtual void update(bool is_game_running,
 						float time_delta_multiplier,
 						float forced_time_delta) = 0;

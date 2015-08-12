@@ -51,9 +51,6 @@ class LUMIX_ENGINE_API Pipeline : public Resource
 	public:
 		Pipeline(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 		virtual ~Pipeline() {}
-
-		static Pipeline* create(Renderer& renderer);
-		static void destroy(Pipeline* pipeline);
 };
 
 

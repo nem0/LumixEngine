@@ -101,7 +101,8 @@ static void setRenderablePath(IScene* scene, int component, const char* path)
 
 static float getInputActionValue(Engine* engine, uint32_t action)
 {
-	return engine->getInputSystem().getActionValue(action);
+	auto v = engine->getInputSystem().getActionValue(action);
+	return v;
 }
 
 

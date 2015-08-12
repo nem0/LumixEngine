@@ -19,7 +19,7 @@ class Resource;
 class ResourceManager;
 
 
-class LUMIX_ENGINE_API ResourceManagerBase abstract
+class LUMIX_ENGINE_API ResourceManagerBase
 {
 	friend class Resource;
 	typedef PODHashMap<uint32_t, Resource*> ResourceTable;
