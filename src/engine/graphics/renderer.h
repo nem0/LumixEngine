@@ -29,10 +29,8 @@ struct VertexDef;
 class LUMIX_ENGINE_API Renderer : public IPlugin 
 {
 	public:
-		static Renderer* createInstance(Engine& engine);
+		static Renderer* createInstance(Engine& engine, void* init_data);
 		static void destroyInstance(Renderer& renderer);
-
-		static void setInitData(void* data);
 
 		virtual void frame() = 0;
 		virtual int getViewCounter() const = 0;

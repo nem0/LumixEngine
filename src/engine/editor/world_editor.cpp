@@ -38,6 +38,7 @@
 #include "graphics/texture.h"
 #include "ieditor_command.h"
 #include "universe/universe.h"
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
 

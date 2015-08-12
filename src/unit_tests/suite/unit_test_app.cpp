@@ -3,6 +3,7 @@
 #include "core/log.h"
 #include "core/stack_allocator.h"
 #include <cstdio>
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
 
