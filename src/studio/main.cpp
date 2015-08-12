@@ -61,10 +61,10 @@ public:
 	void renderPhysics()
 	{
 		Lumix::RenderScene* render_scene =
-			(Lumix::RenderScene*)m_world_editor->getEngine().getScene(
+			(Lumix::RenderScene*)m_world_editor->getScene(
 				Lumix::crc32("renderer"));
 		Lumix::PhysicsScene* scene = static_cast<Lumix::PhysicsScene*>(
-			m_world_editor->getEngine().getScene(Lumix::crc32("physics")));
+			m_world_editor->getScene(Lumix::crc32("physics")));
 		if (scene && render_scene)
 		{
 			scene->render(*render_scene);
@@ -155,7 +155,8 @@ public:
 		m_world_editor = Lumix::WorldEditor::create(
 			QDir::currentPath().toLocal8Bit().data(), *m_engine);
 		
-		m_engine->update(false, 1, -1);
+		Lumix::UniverseContext ctx(m_allocator);
+		m_engine->update(ctx, 1, -1);
 		m_main_window->setWorldEditor(*m_world_editor);
 
 		Lumix::PipelineInstance* pipeline = scene_view->getPipeline();

@@ -11,6 +11,7 @@ namespace Lumix
 	class IPlugin;
 	class OutputBlob;
 	class Universe;
+	struct UniverseContext;
 
 
 	class LUMIX_ENGINE_API IScene abstract
@@ -45,7 +46,7 @@ namespace Lumix
 			virtual void sendMessage(const char*) {};
 			virtual void setWorldEditor(class WorldEditor& editor) {}
 
-			virtual IScene* createScene(Universe&) { return nullptr; }
+			virtual IScene* createScene(UniverseContext&) { return nullptr; }
 			virtual void destroyScene(IScene*) { ASSERT(false); }
 	};
 

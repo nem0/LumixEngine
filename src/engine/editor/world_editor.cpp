@@ -550,8 +550,7 @@ public:
 		serializer.deserialize("entity_index", m_component.entity, 0);
 		serializer.deserialize("component_index", m_component.index, 0);
 		serializer.deserialize("component_type", m_component.type, 0);
-		m_component.scene =
-			m_editor.getEngine().getSceneByComponentType(m_component.type);
+		m_component.scene = m_editor.getSceneByComponentType(m_component.type);
 		uint32_t property_name_hash;
 		serializer.deserialize("property_name_hash", property_name_hash, 0);
 		m_descriptor = static_cast<const IArrayDescriptor*>(
@@ -632,8 +631,7 @@ public:
 		serializer.deserialize("entity_index", m_component.entity, 0);
 		serializer.deserialize("component_index", m_component.index, 0);
 		serializer.deserialize("component_type", m_component.type, 0);
-		m_component.scene =
-			m_editor.getEngine().getSceneByComponentType(m_component.type);
+		m_component.scene = m_editor.getSceneByComponentType(m_component.type);
 		uint32_t property_name_hash;
 		serializer.deserialize("property_name_hash", property_name_hash, 0);
 		m_descriptor = static_cast<const IArrayDescriptor*>(
@@ -947,7 +945,7 @@ private:
 
 		virtual void execute() override
 		{
-			const Array<IScene*>& scenes = m_editor.getEngine().getScenes();
+			const Array<IScene*>& scenes = m_editor.getScenes();
 
 			for (int j = 0; j < m_entities.size(); ++j)
 			{
@@ -1114,7 +1112,7 @@ private:
 		virtual void undo() override
 		{
 			Universe* universe = m_editor.getUniverse();
-			const Array<IScene*>& scenes = m_editor.getEngine().getScenes();
+			const Array<IScene*>& scenes = m_editor.getScenes();
 			InputBlob blob(m_old_values);
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
@@ -1217,7 +1215,7 @@ private:
 			serializer.deserialize("component", m_component.index, 0);
 			serializer.deserialize("component_type", m_component.type, 0);
 			m_component.scene =
-				m_editor.getEngine().getSceneByComponentType(m_component.type);
+				m_editor.getSceneByComponentType(m_component.type);
 		}
 
 
@@ -1225,7 +1223,7 @@ private:
 		{
 			uint32_t template_hash =
 				m_editor.m_template_system->getTemplate(m_component.entity);
-			const Array<IScene*>& scenes = m_editor.m_engine->getScenes();
+			const Array<IScene*>& scenes = m_editor.getScenes();
 			int props_index =
 				m_editor.m_component_properties.find(m_component.type);
 
@@ -1424,7 +1422,42 @@ public:
 	virtual IAllocator& getAllocator() override { return m_allocator; }
 
 
-	virtual Universe* getUniverse() override { return m_engine->getUniverse(); }
+	virtual IScene* getSceneByComponentType(uint32_t hash) override
+	{
+		for (auto* scene : m_universe_context->m_scenes)
+		{
+			if (scene->ownComponentType(hash))
+			{
+				return scene;
+			}
+		}
+		return nullptr;
+	}
+
+
+	virtual IScene* getScene(uint32_t hash) override
+	{
+		for (auto* scene : m_universe_context->m_scenes)
+		{
+			if (crc32(scene->getPlugin().getName()) == hash)
+			{
+				return scene;
+			}
+		}
+		return nullptr;
+	}
+
+
+	virtual Hierarchy* getHierarchy() override
+	{
+		return m_universe_context->m_hierarchy;
+	}
+
+
+	virtual Universe* getUniverse() override
+	{
+		return m_universe_context->m_universe;
+	}
 
 
 	virtual Engine& getEngine() override { return *m_engine; }
@@ -1613,8 +1646,9 @@ public:
 	virtual void updateEngine(float forced_time_delta,
 							  float time_delta_multiplier) override
 	{
+		ASSERT(m_universe_context);
 		m_engine->update(
-			m_is_game_mode, time_delta_multiplier, forced_time_delta);
+			*m_universe_context, time_delta_multiplier, forced_time_delta);
 	}
 
 
@@ -1856,12 +1890,14 @@ public:
 
 	void save(FS::IFile& file)
 	{
+		ASSERT(m_universe_context);
+
 		OutputBlob blob(m_allocator);
 		blob.reserve(1 << 20);
 		uint32_t hash = 0;
 		blob.write(hash);
 		blob.write(hash);
-		uint32_t engine_hash = m_engine->serialize(blob);
+		uint32_t engine_hash = m_engine->serialize(*m_universe_context, blob);
 		(*(((uint32_t*)blob.getData()) + 1)) = engine_hash;
 		m_template_system->serialize(blob);
 		hash = crc32((const uint8_t*)blob.getData() + sizeof(hash),
@@ -1877,8 +1913,8 @@ public:
 		if (!m_selected_entities.empty())
 		{
 			Array<Vec3> new_positions(m_allocator);
-			RenderScene* scene = static_cast<RenderScene*>(
-				m_engine->getScene(crc32("renderer")));
+			RenderScene* scene =
+				static_cast<RenderScene*>(getScene(crc32("renderer")));
 			Universe* universe = getUniverse();
 
 			for (int i = 0; i < m_selected_entities.size(); ++i)
@@ -2109,6 +2145,7 @@ public:
 
 	virtual void toggleGameMode() override
 	{
+		ASSERT(m_universe_context);
 		if (m_is_game_mode)
 		{
 			stopGameMode();
@@ -2121,14 +2158,15 @@ public:
 				FS::Mode::WRITE);
 			save(*m_game_mode_file);
 			m_is_game_mode = true;
-			m_engine->startGame();
+			m_engine->startGame(*m_universe_context);
 		}
 	}
 
 
 	void stopGameMode()
 	{
-		m_engine->stopGame();
+		ASSERT(m_universe_context);
+		m_engine->stopGame(*m_universe_context);
 		selectEntities(nullptr, 0);
 		for (int i = 0; i < m_editor_icons.size(); ++i)
 		{
@@ -2215,7 +2253,7 @@ public:
 	{
 		ComponentUID clone = ComponentUID::INVALID;
 
-		const Array<IScene*>& scenes = m_engine->getScenes();
+		const Array<IScene*>& scenes = getScenes();
 		for (int i = 0; i < scenes.size(); ++i)
 		{
 			clone = ComponentUID(entity,
@@ -2311,14 +2349,13 @@ public:
 	}
 
 	virtual void getRelativePath(char* relative_path,
-		int max_length,
-		const char* source) override
+								 int max_length,
+								 const char* source) override
 	{
 		char tmp[MAX_PATH_LENGTH];
 		makeLowercase(tmp, sizeof(tmp), source);
 
-		if (strncmp(
-			m_base_path.c_str(), tmp, m_base_path.length()) == 0)
+		if (strncmp(m_base_path.c_str(), tmp, m_base_path.length()) == 0)
 		{
 			const char* rel_path_start = tmp + m_base_path.length();
 			if (rel_path_start[0] == '/')
@@ -2371,11 +2408,11 @@ public:
 			m_is_loading = false;
 			return;
 		}
-		if (m_engine->deserialize(blob))
+		if (m_engine->deserialize(*m_universe_context, blob))
 		{
 			m_template_system->deserialize(blob);
-			auto* render_scene = static_cast<RenderScene*>(
-				m_engine->getScene(crc32("renderer")));
+			auto* render_scene =
+				static_cast<RenderScene*>(getScene(crc32("renderer")));
 
 			m_camera = render_scene->getCameraEntity(
 				render_scene->getCameraInSlot("editor"));
@@ -2384,7 +2421,7 @@ public:
 									 << timer->getTimeSinceStart()
 									 << " seconds";
 
-			Universe* universe = m_engine->getUniverse();
+			Universe* universe = getUniverse();
 			for (int i = 0; i < universe->getEntityCount(); ++i)
 			{
 				Entity e(i);
@@ -2518,6 +2555,7 @@ public:
 		, m_component_types(m_allocator)
 		, m_is_loading(false)
 		, m_universe_path("")
+		, m_universe_context(nullptr)
 	{
 		m_go_to_parameters.m_is_active = false;
 		m_undo_index = -1;
@@ -2817,6 +2855,7 @@ public:
 
 	void destroyUniverse()
 	{
+		ASSERT(m_universe_context);
 		destroyUndoStack();
 		m_universe_destroyed.invoke();
 		m_gizmo.setUniverse(nullptr);
@@ -2829,7 +2868,8 @@ public:
 		selectEntities(nullptr, 0);
 		m_camera = INVALID_ENTITY;
 		m_editor_icons.clear();
-		m_engine->destroyUniverse();
+		m_engine->destroyUniverse(*m_universe_context);
+		m_universe_context = nullptr;
 	}
 
 
@@ -2898,7 +2938,7 @@ public:
 
 	ComponentUID createComponent(uint32_t hash, Entity entity)
 	{
-		const Array<IScene*>& scenes = m_engine->getScenes();
+		const Array<IScene*>& scenes = getScenes();
 		ComponentUID cmp;
 		for (int i = 0; i < scenes.size(); ++i)
 		{
@@ -2918,8 +2958,11 @@ public:
 
 	void createUniverse(bool create_basic_entities)
 	{
+		ASSERT(!m_universe_context);
+
 		destroyUndoStack();
-		Universe* universe = m_engine->createUniverse();
+		m_universe_context = &m_engine->createUniverse();
+		Universe* universe = m_universe_context->m_universe;
 		m_gizmo.create();
 		m_gizmo.setUniverse(universe);
 
@@ -3110,6 +3153,12 @@ public:
 	}
 
 
+	virtual const Array<IScene*>& getScenes() const override
+	{
+		return m_universe_context->m_scenes;
+	}
+
+
 private:
 	struct MouseMode
 	{
@@ -3183,6 +3232,7 @@ private:
 	int m_undo_index;
 	OutputBlob m_copy_buffer;
 	bool m_is_loading;
+	UniverseContext* m_universe_context;
 };
 
 
