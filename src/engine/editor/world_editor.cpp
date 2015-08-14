@@ -1644,12 +1644,10 @@ public:
 	}
 
 
-	virtual void updateEngine(float forced_time_delta,
-							  float time_delta_multiplier) override
+	virtual void updateEngine() override
 	{
 		ASSERT(m_universe_context);
-		m_engine->update(
-			*m_universe_context, time_delta_multiplier, forced_time_delta);
+		m_engine->update(*m_universe_context);
 	}
 
 

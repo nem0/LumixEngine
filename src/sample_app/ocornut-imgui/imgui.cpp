@@ -254,7 +254,7 @@
        Button("Play##0");      // Label = "Play",   ID = hash of "Play##0"
        Button("Play##1");      // Label = "Play",   ID = hash of "Play##1" (different from above)
 
-   - so if you want to hide the label but need an ID:
+   - so if you want to hide the label but need an ID:	
 
        Checkbox("##On", &b);   // Label = "",       ID = hash of "##On"
 

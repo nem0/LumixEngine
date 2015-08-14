@@ -67,8 +67,7 @@ public:
 	static void destroy(WorldEditor* editor);
 
 	virtual void update() = 0;
-	virtual void updateEngine(float forced_time_delta,
-							  float time_delta_multiplier) = 0;
+	virtual void updateEngine() = 0;
 	virtual void registerProperty(const char* component_type,
 								  IPropertyDescriptor* descriptor) = 0;
 	virtual int getComponentTypesCount() const = 0;

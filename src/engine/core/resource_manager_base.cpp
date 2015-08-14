@@ -17,10 +17,11 @@ namespace Lumix
 
 	void ResourceManagerBase::destroy(void)
 	{ 
-		for (ResourceTable::iterator iter = m_resources.begin(), end = m_resources.end(); iter != end; ++iter)
+		for (auto iter = m_resources.begin(), end = m_resources.end(); iter != end; ++iter)
 		{
-			ASSERT(iter.value()->isEmpty());
-			destroyResource(*iter.value());
+			Resource* resource = iter.value();
+			ASSERT(resource->isEmpty());
+			destroyResource(*resource);
 		}
 		m_resources.clear();
 	}
