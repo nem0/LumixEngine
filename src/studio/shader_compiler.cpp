@@ -273,7 +273,7 @@ void ShaderCompiler::compilePass(
 			cmd.append(QString::number(mask));
 			cmd.append(is_vertex_shader ? "_vs.shb" : "_fs.shb");
 			cmd.append(" --depends --platform windows --type ");
-			cmd.append(is_vertex_shader ? "vertex --profile vs_3_0" : "fragment --profile ps_3_0");
+			cmd.append(is_vertex_shader ? "vertex --profile vs_5_0" : "fragment --profile ps_5_0");
 			cmd.append(" -D ");
 			cmd.append(pass);
 			for (int i = 0; i < Lumix::lengthOf(all_defines); ++i)
