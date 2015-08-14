@@ -247,31 +247,17 @@ public:
 	}
 
 
-	virtual void update(UniverseContext& context,
-						float time_delta_multiplier,
-						float forced_time_delta) override
+	virtual void update(UniverseContext& context) override
 	{
 		PROFILE_FUNCTION();
 		float dt;
-		if (forced_time_delta >= 0)
+		++m_fps_frame;
+		if (m_fps_frame == 30)
 		{
-			dt = forced_time_delta * time_delta_multiplier;
+			m_fps = 30.0f / m_fps_timer->tick();
 			m_fps_frame = 0;
-			m_fps = forced_time_delta * time_delta_multiplier == 0
-						? 0
-						: 1.0f / (forced_time_delta * time_delta_multiplier);
-			m_fps_timer->tick();
 		}
-		else
-		{
-			++m_fps_frame;
-			if (m_fps_frame == 30)
-			{
-				m_fps = 30.0f / m_fps_timer->tick();
-				m_fps_frame = 0;
-			}
-			dt = m_timer->tick() * time_delta_multiplier;
-		}
+		dt = m_timer->tick();
 		m_last_time_delta = dt;
 		if (m_is_game_running)
 		{
@@ -396,6 +382,7 @@ public:
 			serializer.readString(tmp, sizeof(tmp));
 			ctx.getScene(crc32(tmp))->deserialize(serializer);
 		}
+		g_path_manager.clear();
 		return true;
 	}
 

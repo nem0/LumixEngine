@@ -155,7 +155,7 @@ public:
 			QDir::currentPath().toLocal8Bit().data(), *m_engine);
 		
 		Lumix::UniverseContext ctx(m_allocator);
-		m_engine->update(ctx, 1, -1);
+		m_engine->update(ctx);
 		m_main_window->setWorldEditor(*m_world_editor);
 
 		Lumix::PipelineInstance* pipeline = scene_view->getPipeline();
@@ -271,24 +271,7 @@ public:
 				m_engine->getRenderer().frame();
 
 				m_world_editor->update();
-				if (m_main_window->getSceneView()->isFrameDebuggerActive())
-				{
-					if (m_main_window->getSceneView()->isFrameRequested())
-					{
-						m_world_editor->updateEngine(
-							1.0f / 30.0f,
-							m_main_window->getSceneView()
-								->getTimeDeltaMultiplier());
-						m_main_window->getSceneView()->frameServed();
-					}
-				}
-				else
-				{
-					m_world_editor->updateEngine(
-						-1,
-						m_main_window->getSceneView()
-							->getTimeDeltaMultiplier());
-				}
+				m_world_editor->updateEngine();
 				handleEvents();
 
 				fps_limiter->endFrame();

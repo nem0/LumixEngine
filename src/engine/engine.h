@@ -72,9 +72,7 @@ public:
 	virtual void startGame(UniverseContext& context) = 0;
 	virtual void stopGame(UniverseContext& context) = 0;
 
-	virtual void update(UniverseContext& context,
-						float time_delta_multiplier,
-						float forced_time_delta) = 0;
+	virtual void update(UniverseContext& context) = 0;
 	virtual uint32_t serialize(UniverseContext& ctx, OutputBlob& serializer) = 0;
 	virtual bool deserialize(UniverseContext& ctx, InputBlob& serializer) = 0;
 	virtual float getFPS() const = 0;

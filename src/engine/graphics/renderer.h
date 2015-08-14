@@ -8,6 +8,14 @@
 #include "graphics/render_scene.h"
 
 
+namespace bgfx
+{
+	struct VertexDecl;
+	struct TransientVertexBuffer;
+	struct TransientIndexBuffer;
+}
+
+
 namespace Lumix
 {
 
@@ -26,8 +34,17 @@ class Universe;
 struct VertexDef;
 
 
+void bgfx_allocTransientVertexBuffer(bgfx::TransientVertexBuffer* tvb, uint32_t num, const bgfx::VertexDecl& decl);
+void bgfx_allocTransientIndexBuffer(bgfx::TransientIndexBuffer* tib, uint32_t num);
+void bgfx_setState(uint64_t state, uint32_t rgba = 0);
+uint16_t bgfx_setScissor(uint16_t x, uint16_t y, uint16_t width, uint16_t height);
+
+
 class LUMIX_ENGINE_API Renderer : public IPlugin 
 {
+	public:
+		typedef void* TransientDataHandle;
+
 	public:
 		static Renderer* createInstance(Engine& engine, void* init_data);
 		static void destroyInstance(Renderer& renderer);

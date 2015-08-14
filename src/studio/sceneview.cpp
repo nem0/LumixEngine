@@ -86,8 +86,6 @@ public:
 
 SceneView::SceneView(QWidget* parent)
 	: QDockWidget(parent)
-	, m_is_frame_requested(false)
-	, m_is_frame_debugger_active(false)
 	, m_render_device(nullptr)
 {
 	m_measure_tool_label = new QLabel("");
@@ -99,31 +97,7 @@ SceneView::SceneView(QWidget* parent)
 	m_speed_input->setSingleStep(0.1f);
 	m_speed_input->setValue(0.1f);
 
-	QPushButton* stop_button = new QPushButton("Stop", root);
-	QPushButton* next_button = new QPushButton("Next", root);
-	m_time_delta_multiplier_input = new QDoubleSpinBox(root);
-	m_time_delta_multiplier_input->setDecimals(2);
-	m_time_delta_multiplier_input->setValue(1.0);
-	m_time_delta_multiplier_input->setSingleStep(0.1);
-	m_time_delta_multiplier_input->setMinimumWidth(60);
-	stop_button->connect(stop_button,
-						 &QPushButton::clicked,
-						 [this]()
-						 {
-							 m_is_frame_debugger_active =
-								 !m_is_frame_debugger_active;
-						 });
-	next_button->connect(next_button,
-						 &QPushButton::clicked,
-						 [this]()
-						 {
-							 m_is_frame_requested = true;
-						 });
 
-	horizontal_layout->addWidget(stop_button);
-	horizontal_layout->addWidget(next_button);
-	horizontal_layout->addWidget(m_time_delta_multiplier_input);
-	horizontal_layout->addStretch();
 	horizontal_layout->addWidget(m_measure_tool_label);
 	horizontal_layout->addStretch();
 	horizontal_layout->addWidget(m_speed_input);
@@ -194,12 +168,6 @@ void SceneView::changeNavigationSpeed(float value)
 {
 	m_speed_input->setValue(
 		Lumix::Math::maxValue(0.1f, (float)m_speed_input->value() + value));
-}
-
-
-float SceneView::getTimeDeltaMultiplier() const
-{
-	return m_time_delta_multiplier_input->value();
 }
 
 

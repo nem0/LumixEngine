@@ -27,6 +27,7 @@
 #include "graphics/shader.h"
 #include "graphics/terrain.h"
 #include "graphics/texture.h"
+#include "graphics/transient_geometry.h"
 #include "universe/universe.h"
 #include <bgfx.h>
 
@@ -333,6 +334,14 @@ struct PipelineInstanceImpl : public PipelineInstance
 		}
 		m_allocator.deleteObject(m_default_framebuffer);
 	}
+
+
+	virtual void setViewProjection(const Matrix& mtx, int width, int height) override
+	{
+		bgfx::setViewRect(m_view_idx, 0, 0, width, height);
+		bgfx::setViewTransform(m_view_idx, nullptr, &mtx.m11);
+	}
+
 
 	void finishInstances(int idx)
 	{
@@ -953,6 +962,28 @@ struct PipelineInstanceImpl : public PipelineInstance
 					 info.m_mesh->getMaterial()
 						 ->getShaderInstance()
 						 .m_program_handles[m_pass_idx]);
+	}
+
+
+	virtual void render(TransientGeometry& geom,
+		int first_index,
+		int num_indices,
+		const Material& material) override
+	{
+		TODO("todo");
+		bgfx::setState(0 | BGFX_STATE_RGB_WRITE | BGFX_STATE_ALPHA_WRITE |
+					   BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA,
+											 BGFX_STATE_BLEND_INV_SRC_ALPHA));
+
+		bgfx::setTransform(nullptr);
+
+		setMaterial(&material);
+
+		bgfx::setVertexBuffer(&geom.getVertexBuffer(), 0, geom.getNumVertices());
+		bgfx::setIndexBuffer(&geom.getIndexBuffer(), first_index, num_indices);
+		bgfx::submit(
+			m_view_idx,
+			material.getShaderInstance().m_program_handles[m_pass_idx]);
 	}
 
 

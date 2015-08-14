@@ -34,6 +34,8 @@ public:
 	void serialize(OutputBlob& serializer);
 	void deserialize(InputBlob& serializer);
 
+	void clear();
+
 private:
 	PathInternal* getPath(uint32_t hash, const char* path);
 	PathInternal* getPath(uint32_t hash);
