@@ -39,11 +39,11 @@ Videos
 
 3rd party libraries
 
-[bgfx](https://github.com/bkaradzic/bgfx)
-[lua](https://github.com/LuaDist/lua)
-[crunch/crnlib](https://github.com/richgel999/crunch)
-[assimp](https://github.com/assimp/assimp)
-[PhysX](https://developer.nvidia.com/physx-sdk)
-[Qt](https://www.qt.io/download-open-source/)
+* [bgfx](https://github.com/bkaradzic/bgfx)
+* [lua](https://github.com/LuaDist/lua)
+* [crunch/crnlib](https://github.com/richgel999/crunch)
+* [assimp](https://github.com/assimp/assimp)
+* [PhysX](https://developer.nvidia.com/physx-sdk)
+* [Qt](https://www.qt.io/download-open-source/)
 
 Contact: mikulas.florek@gamedev.sk
