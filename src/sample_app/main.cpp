@@ -258,22 +258,17 @@ static void imGuiCallback(ImDrawData* draw_data)
 				continue;
 			}
 
-			TODO("todo");
-			/*Lumix::bgfx_setState(
-				0 | BGFX_STATE_RGB_WRITE | BGFX_STATE_ALPHA_WRITE |
-				BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA,
-									  BGFX_STATE_BLEND_INV_SRC_ALPHA) |
-				BGFX_STATE_MSAA);
-			Lumix::bgfx_setScissor(
+			TODO("scissor seems to be not working");
+			g_context.m_pipeline->setScissor(
 				uint16_t(Lumix::Math::maxValue(pcmd->ClipRect.x, 0.0f)),
 				uint16_t(Lumix::Math::maxValue(pcmd->ClipRect.y, 0.0f)),
 				uint16_t(Lumix::Math::maxValue(pcmd->ClipRect.z, 65535.0f) -
 						 Lumix::Math::maxValue(pcmd->ClipRect.x, 0.0f)),
 				uint16_t(Lumix::Math::maxValue(pcmd->ClipRect.w, 65535.0f) -
 						 Lumix::Math::maxValue(pcmd->ClipRect.y, 0.0f)));
-						 */
-			g_context.m_pipeline->render(
-				geom, elem_offset, pcmd->ElemCount, *g_context.m_material);
+			
+				g_context.m_pipeline->render(
+					geom, elem_offset, pcmd->ElemCount, *g_context.m_material);
 
 			elem_offset += pcmd->ElemCount;
 		}
