@@ -24,7 +24,7 @@ Features:
 
 [Data repository](https://github.com/nem0/lumixengine_data)
 
-[Mindmap](https://github.com/nem0/LumixEngine/blob/master/docs/lumix_mindmap.png)
+[Mindmap](https://raw.githubusercontent.com/nem0/LumixEngine/gh-pages/images/lumix_mindmap.png)
 
 Videos
 
@@ -35,6 +35,15 @@ Videos
 * [Minecraft-like world](https://www.youtube.com/watch?v=Chux7v1AX8k)
 * [Hot-reload](https://www.youtube.com/watch?v=BVE7x3Su9qA)
 
-![Editor screenshot](https://raw.githubusercontent.com/nem0/LumixEngine/master/docs/editor.png "Editor screenshot")
+![Editor screenshot](https://raw.githubusercontent.com/nem0/LumixEngine/gh-pages/images/editor.png "Editor screenshot")
+
+3rd party libraries
+
+* [bgfx](https://github.com/bkaradzic/bgfx)
+* [lua](https://github.com/LuaDist/lua)
+* [crunch/crnlib](https://github.com/richgel999/crunch)
+* [assimp](https://github.com/assimp/assimp)
+* [PhysX](https://developer.nvidia.com/physx-sdk)
+* [Qt](https://www.qt.io/download-open-source/)
 
 Contact: mikulas.florek@gamedev.sk
