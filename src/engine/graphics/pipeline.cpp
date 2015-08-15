@@ -965,20 +965,20 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
+	virtual void setScissor(int x, int y, int width, int height) override
+	{
+		bgfx::setScissor(x, y, width, height);
+	}
+
+
 	virtual void render(TransientGeometry& geom,
 		int first_index,
 		int num_indices,
 		const Material& material) override
 	{
-		TODO("todo");
-		bgfx::setState(0 | BGFX_STATE_RGB_WRITE | BGFX_STATE_ALPHA_WRITE |
-					   BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA,
-											 BGFX_STATE_BLEND_INV_SRC_ALPHA));
-
+		bgfx::setState(m_render_state | material.getRenderStates());
 		bgfx::setTransform(nullptr);
-
 		setMaterial(&material);
-
 		bgfx::setVertexBuffer(&geom.getVertexBuffer(), 0, geom.getNumVertices());
 		bgfx::setIndexBuffer(&geom.getIndexBuffer(), first_index, num_indices);
 		bgfx::submit(

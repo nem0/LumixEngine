@@ -256,6 +256,26 @@ target_link_libraries(unit_tests engine)
 target_link_libraries(unit_tests animation)
 
 
+###################### RENDER TEST ######################
+
+file(GLOB RENDER_TEST_FILES ${SRC_PATH}render_test/*.*)
+
+source_group("" FILES ${RENDER_TEST_FILES})
+
+include_directories(${SRC_PATH})
+include_directories(${SRC_PATH}render_test/)
+
+add_executable(render_test
+	${RENDER_TEST_FILES}
+)
+
+set_target_properties(render_test PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
+target_link_libraries(render_test engine)
+target_link_libraries(render_test Qt5::Core)
+target_link_libraries(render_test Qt5::Gui)
+target_link_libraries(render_test Qt5::Widgets)
+target_link_libraries(render_test Qt5::WinMain)
+
 ###################### SAMPLE APP ######################
 
 file(GLOB SAMPLE_APP_FILES ${SRC_PATH}sample_app/*.cpp ${SRC_PATH}sample_app/*.c ${SRC_PATH}sample_app/*.h)

@@ -78,6 +78,7 @@ class LUMIX_ENGINE_API PipelineInstance abstract
 		virtual CustomCommandHandler& addCustomCommandHandler(const char* name) = 0;
 		virtual void
 		setViewProjection(const Matrix& mtx, int width, int height) = 0;
+		virtual void setScissor(int x, int y, int width, int height) = 0;
 		virtual void render(TransientGeometry& geom,
 							int first_index,
 							int num_indices,

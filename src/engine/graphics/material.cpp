@@ -357,106 +357,115 @@ void Material::loaded(FS::IFile& file, bool success, FS::FileSystem& fs)
 {
 	m_render_states = BGFX_STATE_DEPTH_TEST_LEQUAL | BGFX_STATE_CULL_CW;
 	PROFILE_FUNCTION();
-	if(success)
-	{
-		m_uniforms.clear();
-		JsonSerializer serializer(file, JsonSerializer::READ, m_path.c_str(), m_allocator);
-		serializer.deserializeObjectBegin();
-		char path[MAX_PATH_LENGTH];
-		char label[256];
-		char material_dir[MAX_PATH_LENGTH];
-		PathUtils::getDir(material_dir, MAX_PATH_LENGTH, m_path.c_str());
-		bool b_value;
-		while (!serializer.isObjectEnd())
-		{
-			serializer.deserializeLabel(label, 255);
-			if (strcmp(label, "uniforms") == 0)
-			{
-				deserializeUniforms(serializer);
-			}
-			else if (strcmp(label, "texture") == 0)
-			{
-				if (!deserializeTexture(serializer, material_dir))
-				{
-					onFailure();
-					return;
-				}
-				
-			}
-			else if (strcmp(label, "alpha_cutout") == 0)
-			{
-				serializer.deserialize(m_is_alpha_cutout, false);
-			}
-			else if (strcmp(label, "specular") == 0)
-			{
-				serializer.deserializeArrayBegin();
-				serializer.deserializeArrayItem(m_specular.x, 1.0f);
-				serializer.deserializeArrayItem(m_specular.y, 1.0f);
-				serializer.deserializeArrayItem(m_specular.z, 1.0f);
-				serializer.deserializeArrayEnd();
-			}
-			else if (strcmp(label, "shininess") == 0)
-			{
-				serializer.deserialize(m_shininess, 4.0f);
-			}
-			else if (strcmp(label, "shadow_receiver") == 0)
-			{
-				serializer.deserialize(m_is_shadow_receiver, true);
-			}
-			else if (strcmp(label, "shader") == 0)
-			{
-				serializer.deserialize(path, MAX_PATH_LENGTH, "");
-				setShader(static_cast<Shader*>(m_resource_manager.get(ResourceManager::SHADER)->load(Path(path))));
-			}
-			else if (strcmp(label, "z_test") == 0)
-			{
-				serializer.deserialize(b_value, true);
-				enableZTest(b_value);
-			}
-			else if (strcmp(label, "backface_culling") == 0)
-			{
-				serializer.deserialize(b_value, true);
-				enableBackfaceCulling(b_value);
-			}
-			else if (strcmp(label, "depth_func") == 0)
-			{
-				char tmp[30];
-				serializer.deserialize(tmp, 30, "lequal");
-				if (strcmp(tmp, "lequal") == 0)
-				{
-					m_depth_func = DepthFunc::LEQUAL;
-				}
-				else if (strcmp(tmp, "less") == 0)
-				{
-					m_depth_func = DepthFunc::LESS;
-				}
-				else
-				{
-					g_log_warning.log("Renderer") << "Unknown depth function " << tmp << " in material " << m_path.c_str();
-				}
-			}
-			else
-			{
-				g_log_warning.log("renderer") << "Unknown parameter " << label << " in material " << m_path.c_str();
-			}
-		}
-		serializer.deserializeObjectEnd();
-
-		if (!m_shader)
-		{
-			g_log_error.log("renderer") << "Material " << m_path.c_str() << " without a shader";
-			onFailure();
-			return;
-		}
-
-		m_size = file.size();
-		decrementDepCount();
-	}
-	else
+	if (!success)
 	{
 		g_log_info.log("renderer") << "Error loading material " << m_path.c_str();
 		onFailure();
+		return;
 	}
+
+	m_uniforms.clear();
+	JsonSerializer serializer(file, JsonSerializer::READ, m_path.c_str(), m_allocator);
+	serializer.deserializeObjectBegin();
+	char path[MAX_PATH_LENGTH];
+	char label[256];
+	char material_dir[MAX_PATH_LENGTH];
+	PathUtils::getDir(material_dir, MAX_PATH_LENGTH, m_path.c_str());
+	bool b_value;
+	while (!serializer.isObjectEnd())
+	{
+		serializer.deserializeLabel(label, 255);
+		if (strcmp(label, "uniforms") == 0)
+		{
+			deserializeUniforms(serializer);
+		}
+		else if (strcmp(label, "texture") == 0)
+		{
+			if (!deserializeTexture(serializer, material_dir))
+			{
+				onFailure();
+				return;
+			}
+				
+		}
+		else if (strcmp(label, "alpha_cutout") == 0)
+		{
+			serializer.deserialize(m_is_alpha_cutout, false);
+		}
+		else if (strcmp(label, "alpha_blending") == 0)
+		{
+			bool is_alpha_blending;
+			serializer.deserialize(is_alpha_blending, false);
+			if (is_alpha_blending)
+			{
+				m_render_states |= BGFX_STATE_BLEND_FUNC(
+					BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA);
+			}
+		}
+		else if (strcmp(label, "specular") == 0)
+		{
+			serializer.deserializeArrayBegin();
+			serializer.deserializeArrayItem(m_specular.x, 1.0f);
+			serializer.deserializeArrayItem(m_specular.y, 1.0f);
+			serializer.deserializeArrayItem(m_specular.z, 1.0f);
+			serializer.deserializeArrayEnd();
+		}
+		else if (strcmp(label, "shininess") == 0)
+		{
+			serializer.deserialize(m_shininess, 4.0f);
+		}
+		else if (strcmp(label, "shadow_receiver") == 0)
+		{
+			serializer.deserialize(m_is_shadow_receiver, true);
+		}
+		else if (strcmp(label, "shader") == 0)
+		{
+			serializer.deserialize(path, MAX_PATH_LENGTH, "");
+			setShader(static_cast<Shader*>(m_resource_manager.get(ResourceManager::SHADER)->load(Path(path))));
+		}
+		else if (strcmp(label, "z_test") == 0)
+		{
+			serializer.deserialize(b_value, true);
+			enableZTest(b_value);
+		}
+		else if (strcmp(label, "backface_culling") == 0)
+		{
+			serializer.deserialize(b_value, true);
+			enableBackfaceCulling(b_value);
+		}
+		else if (strcmp(label, "depth_func") == 0)
+		{
+			char tmp[30];
+			serializer.deserialize(tmp, 30, "lequal");
+			if (strcmp(tmp, "lequal") == 0)
+			{
+				m_depth_func = DepthFunc::LEQUAL;
+			}
+			else if (strcmp(tmp, "less") == 0)
+			{
+				m_depth_func = DepthFunc::LESS;
+			}
+			else
+			{
+				g_log_warning.log("Renderer") << "Unknown depth function " << tmp << " in material " << m_path.c_str();
+			}
+		}
+		else
+		{
+			g_log_warning.log("renderer") << "Unknown parameter " << label << " in material " << m_path.c_str();
+		}
+	}
+	serializer.deserializeObjectEnd();
+
+	if (!m_shader)
+	{
+		g_log_error.log("renderer") << "Material " << m_path.c_str() << " without a shader";
+		onFailure();
+		return;
+	}
+
+	m_size = file.size();
+	decrementDepCount();
 }
 
 
