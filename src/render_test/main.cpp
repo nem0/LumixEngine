@@ -13,11 +13,9 @@
 #include "editor/gizmo.h"
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
-#include "graphics/pipeline.h"
-#include "graphics/renderer.h"
-#include "graphics/texture.h"
-#include "physics/physics_scene.h"
-#include "physics/physics_system.h"
+#include "renderer/pipeline.h"
+#include "renderer/renderer.h"
+#include "renderer/texture.h"
 
 
 class App
@@ -80,7 +78,8 @@ public:
 		m_main_window->show();
 
 		HWND hwnd = (HWND)m_main_window->centralWidget()->winId();
-		m_engine = Lumix::Engine::create(hwnd, NULL, m_allocator);
+		Lumix::Renderer::setInitData(hwnd);
+		m_engine = Lumix::Engine::create(NULL, m_allocator);
 		Lumix::Pipeline* pipeline_object = static_cast<Lumix::Pipeline*>(
 			m_engine->getResourceManager()
 				.get(Lumix::ResourceManager::PIPELINE)
@@ -144,11 +143,14 @@ public:
 			char path[Lumix::MAX_PATH_LENGTH];
 			if (m_current_test >= 0)
 			{
+				Lumix::Renderer* renderer = static_cast<Lumix::Renderer*>(
+					m_engine->getPluginManager().getPlugin("renderer"));
+
 				Lumix::copyString(path,
 								  sizeof(path),
 								  m_tests[m_current_test].toLatin1().data());
 				Lumix::catString(path, sizeof(path), "_res.tga");
-				m_engine->getRenderer().makeScreenshot(Lumix::Path(path));
+				renderer->makeScreenshot(Lumix::Path(path));
 
 				char path_preimage[Lumix::MAX_PATH_LENGTH];
 				Lumix::copyString(path_preimage,

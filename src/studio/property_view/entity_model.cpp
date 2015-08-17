@@ -3,8 +3,8 @@
 #include "core/stack_allocator.h"
 #include "core/math_utils.h"
 #include "core/path.h"
-#include "editor/property_descriptor.h"
 #include "editor/world_editor.h"
+#include "engine/property_descriptor.h"
 #include "property_view.h"
 #include "universe/universe.h"
 #include <qapplication.h>

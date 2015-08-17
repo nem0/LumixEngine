@@ -2,7 +2,7 @@
 
 #include "core/FS/disk_file_device.h"
 #include "core/FS/ifile.h"
-#include "graphics/texture.h"
+#include "renderer/texture.h"
 
 namespace
 {

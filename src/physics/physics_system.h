@@ -35,10 +35,4 @@ class LUMIX_PHYSICS_API PhysicsSystem : public IPlugin
 };
 
 
-extern "C"
-{
-	LUMIX_PHYSICS_API IPlugin* createPlugin(Engine& engine);
-}
-
-
 } // !namespace Lumix

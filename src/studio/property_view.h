@@ -30,7 +30,7 @@ class QAbstractItemModel;
 class AssetBrowser;
 
 
-class LUMIX_EDITOR_API PropertyView : public QDockWidget
+class LUMIX_STUDIO_LIB_API PropertyView : public QDockWidget
 {
 	Q_OBJECT
 	public:

@@ -8,7 +8,7 @@
 #include "editor/ieditor_command.h"
 #include "editor/world_editor.h"
 #include "engine.h"
-#include "graphics/render_scene.h"
+#include "renderer/render_scene.h"
 #include "universe/hierarchy.h"
 #include "universe/universe.h"
 #include <qmimedata.h>

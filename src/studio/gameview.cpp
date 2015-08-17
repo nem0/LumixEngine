@@ -4,7 +4,7 @@
 #include "core/input_system.h"
 #include "editor/world_editor.h"
 #include "engine.h"
-#include "graphics/pipeline.h"
+#include "renderer/pipeline.h"
 #include "mainwindow.h"
 #include "wgl_render_device.h"
 

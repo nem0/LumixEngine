@@ -5,6 +5,7 @@
 #include "core/crc32.h"
 #include "core/input_system.h"
 #include "core/log.h"
+#include "core/path.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/timer.h"
@@ -19,13 +20,7 @@
 
 #include "plugin_manager.h"
 
-#include "graphics/culling_system.h"
-#include "graphics/material_manager.h"
-#include "graphics/model_manager.h"
-#include "graphics/pipeline.h"
-#include "graphics/renderer.h"
-#include "graphics/shader_manager.h"
-#include "graphics/texture_manager.h"
+#include "renderer/renderer.h"
 
 #include "universe/hierarchy.h"
 #include "universe/universe.h"
@@ -108,24 +103,13 @@ public:
 		m_fps_frame = 0;
 	}
 
-	bool create(void* init_data)
+	bool create()
 	{
 		m_plugin_manager = PluginManager::create(*this);
 		if (!m_plugin_manager)
 		{
 			return false;
 		}
-		m_renderer = Renderer::createInstance(*this, init_data);
-		if (!m_renderer)
-		{
-			return false;
-		}
-		if (!m_renderer->create())
-		{
-			Renderer::destroyInstance(*m_renderer);
-			return false;
-		}
-		m_plugin_manager->addPlugin(m_renderer);
 		if (!m_input_system.create(m_allocator))
 		{
 			return false;
@@ -211,9 +195,6 @@ public:
 	virtual FS::FileSystem& getFileSystem() override { return *m_file_system; }
 
 
-	virtual Renderer& getRenderer() override { return *m_renderer; }
-
-
 	void updateGame(UniverseContext& context, float dt)
 	{
 		PROFILE_FUNCTION();
@@ -268,7 +249,9 @@ public:
 		{
 			for (int i = 0; i < context.m_scenes.size(); ++i)
 			{
-				if (&context.m_scenes[i]->getPlugin() == m_renderer)
+				TODO("todo");
+				if (strcmp(context.m_scenes[i]->getPlugin().getName(),
+						   "renderer") == 0)
 				{
 					context.m_scenes[i]->update(dt);
 				}
@@ -337,7 +320,6 @@ public:
 		int pos = serializer.getSize();
 		ctx.m_universe->serialize(serializer);
 		ctx.m_hierarchy->serialize(serializer);
-		m_renderer->serialize(serializer);
 		m_plugin_manager->serialize(serializer);
 		serializer.write((int32_t)ctx.m_scenes.size());
 		for (int i = 0; i < ctx.m_scenes.size(); ++i)
@@ -373,7 +355,6 @@ public:
 		g_path_manager.deserialize(serializer);
 		ctx.m_universe->deserialize(serializer);
 		ctx.m_hierarchy->deserialize(serializer);
-		m_renderer->deserialize(serializer);
 		m_plugin_manager->deserialize(serializer);
 		int32_t scene_count;
 		serializer.read(scene_count);
@@ -394,7 +375,6 @@ public:
 private:
 	IAllocator& m_allocator;
 
-	Renderer* m_renderer;
 	FS::FileSystem* m_file_system;
 	FS::MemoryFileDevice* m_mem_file_device;
 	FS::DiskFileDevice* m_disk_file_device;
@@ -426,7 +406,7 @@ void showLogInVS(const char*, const char* message)
 }
 
 
-Engine* Engine::create(void* init_data, FS::FileSystem* fs, IAllocator& allocator)
+Engine* Engine::create(FS::FileSystem* fs, IAllocator& allocator)
 {
 	installUnhandledExceptionHandler();
 
@@ -435,7 +415,7 @@ Engine* Engine::create(void* init_data, FS::FileSystem* fs, IAllocator& allocato
 	g_log_error.getCallback().bind<showLogInVS>();
 
 	EngineImpl* engine = allocator.newObject<EngineImpl>(fs, allocator);
-	if (!engine->create(init_data))
+	if (!engine->create())
 	{
 		allocator.deleteObject(engine);
 		return nullptr;

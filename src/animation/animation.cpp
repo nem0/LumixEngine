@@ -7,8 +7,8 @@
 #include "core/quat.h"
 #include "core/resource_manager.h"
 #include "core/vec3.h"
-#include "graphics/model.h"
-#include "graphics/pose.h"
+#include "renderer/model.h"
+#include "renderer/pose.h"
 
 
 namespace Lumix
