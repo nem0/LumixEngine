@@ -19,7 +19,9 @@ class LUMIX_ENGINE_API Texture : public Resource
 		Texture(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 		~Texture();
 
-		bool create(int w, int h);
+		bool create(int w, int h, void* data);
+		void destroy();
+		
 		int getWidth() const { return m_width; }
 		int getHeight() const { return m_height; }
 		int getBytesPerPixel() const { return m_BPP; }

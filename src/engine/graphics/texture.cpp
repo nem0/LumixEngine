@@ -53,11 +53,42 @@ Texture::~Texture()
 }
 
 
-bool Texture::create(int w, int h)
+void Texture::destroy()
 {
-	m_texture_handle =
-		bgfx::createTexture2D(w, h, 1, bgfx::TextureFormat::RGBA8);
-	return bgfx::isValid(m_texture_handle);
+	doUnload();
+}
+
+
+bool Texture::create(int w, int h, void* data)
+{
+	if (data)
+	{
+		m_texture_handle = bgfx::createTexture2D(w,
+												 h,
+												 1,
+												 bgfx::TextureFormat::RGBA8,
+												 0,
+												 bgfx::copy(data, w * h * 4));
+	}
+	else
+	{
+		m_texture_handle =
+			bgfx::createTexture2D(w, h, 1, bgfx::TextureFormat::RGBA8);
+	}
+
+
+	bool isReady = bgfx::isValid(m_texture_handle);
+
+	if (isReady)
+	{
+		onReady();
+	}
+	else
+	{
+		onFailure();
+	}
+
+	return isReady;
 }
 
 
@@ -302,7 +333,15 @@ bool Texture::loadRaw(FS::IFile& file)
 	}
 
 	m_texture_handle = bgfx::createTexture2D(
-		m_width, m_height, 1, bgfx::TextureFormat::R32F, 0, mem);
+		m_width, m_height, 1, bgfx::TextureFormat::R32F, 0, nullptr);
+	bgfx::updateTexture2D(
+		m_texture_handle,
+		0,
+		0,
+		0,
+		m_width,
+		m_height,
+		mem);
 	return bgfx::isValid(m_texture_handle);
 }
 
@@ -368,6 +407,14 @@ bool Texture::loadTGA(FS::IFile& file)
 		1,
 		bgfx::TextureFormat::RGBA8,
 		0,
+		0);
+	bgfx::updateTexture2D(
+		m_texture_handle,
+		0,
+		0,
+		0,
+		header.width,
+		header.height,
 		bgfx::copy(image_dest, header.width * header.height * 4));
 	return bgfx::isValid(m_texture_handle);
 }

@@ -12,6 +12,7 @@ namespace Lumix
 
 class Engine;
 class EntityTemplateSystem;
+class Hierarchy;
 class IArrayDescriptor;
 class IPlugin;
 class IPropertyDescriptor;
@@ -66,8 +67,7 @@ public:
 	static void destroy(WorldEditor* editor);
 
 	virtual void update() = 0;
-	virtual void updateEngine(float forced_time_delta,
-							  float time_delta_multiplier) = 0;
+	virtual void updateEngine() = 0;
 	virtual void registerProperty(const char* component_type,
 								  IPropertyDescriptor* descriptor) = 0;
 	virtual int getComponentTypesCount() const = 0;
@@ -80,6 +80,10 @@ public:
 	virtual IEditorCommand* createEditorCommand(uint32_t command_type) = 0;
 	virtual Engine& getEngine() = 0;
 	virtual Universe* getUniverse() = 0;
+	virtual Hierarchy* getHierarchy() = 0;
+	virtual const Array<IScene*>& getScenes() const = 0;
+	virtual IScene* getScene(uint32_t hash) = 0;
+	virtual IScene* getSceneByComponentType(uint32_t hash) = 0;
 	virtual IAllocator& getAllocator() = 0;
 	virtual void renderIcons(PipelineInstance& pipeline) = 0;
 	virtual ComponentUID getEditCamera() = 0;
@@ -141,7 +145,6 @@ public:
 	virtual Array<IPropertyDescriptor*>&
 	getPropertyDescriptors(uint32_t type) = 0;
 
-	virtual DelegateList<void(bool)>& gameModeToggled() = 0;
 	virtual DelegateList<void(const Array<Entity>&)>& entitySelected() = 0;
 	virtual DelegateList<void()>& universeCreated() = 0;
 	virtual DelegateList<void()>& universeDestroyed() = 0;

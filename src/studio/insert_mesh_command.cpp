@@ -53,10 +53,10 @@ void InsertMeshCommand::deserialize(Lumix::JsonSerializer& serializer)
 void InsertMeshCommand::execute()
 {
 	Lumix::Engine& engine = m_editor.getEngine();
-	Lumix::Universe* universe = engine.getUniverse();
+	Lumix::Universe* universe = m_editor.getUniverse();
 	m_entity = universe->createEntity();
 	universe->setPosition(m_entity, m_position);
-	const Lumix::Array<Lumix::IScene*>& scenes = engine.getScenes();
+	const Lumix::Array<Lumix::IScene*>& scenes = m_editor.getScenes();
 	Lumix::ComponentIndex cmp;
 	Lumix::IScene* scene = nullptr;
 	for (int i = 0; i < scenes.size(); ++i)

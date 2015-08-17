@@ -14,6 +14,7 @@
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
+#include "core/static_array.h"
 #include "core/string.h"
 #include "engine.h"
 #include "plugin_manager.h"
@@ -26,6 +27,7 @@
 #include "graphics/shader.h"
 #include "graphics/terrain.h"
 #include "graphics/texture.h"
+#include "graphics/transient_geometry.h"
 #include "universe/universe.h"
 #include <bgfx.h>
 
@@ -333,6 +335,14 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_allocator.deleteObject(m_default_framebuffer);
 	}
 
+
+	virtual void setViewProjection(const Matrix& mtx, int width, int height) override
+	{
+		bgfx::setViewRect(m_view_idx, 0, 0, width, height);
+		bgfx::setViewTransform(m_view_idx, nullptr, &mtx.m11);
+	}
+
+
 	void finishInstances(int idx)
 	{
 		if (m_instances_data[idx].m_buffer)
@@ -379,7 +389,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	{
 		m_pass_idx = m_renderer.getPassIdx(name);
 		bool found = false;
-		for (int i = 0; i < lengthOf(m_view2pass_map); ++i)
+		for (int i = 0; i < m_view2pass_map.size(); ++i)
 		{
 			if (m_view2pass_map[i] == m_pass_idx)
 			{
@@ -502,6 +512,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 				{
 					g_log_error.log("lua")
 						<< lua_tostring(m_source.m_lua_state, -1);
+					lua_pop(m_source.m_lua_state, 1);
 				}
 			}
 		}
@@ -954,6 +965,28 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
+	virtual void setScissor(int x, int y, int width, int height) override
+	{
+		bgfx::setScissor(x, y, width, height);
+	}
+
+
+	virtual void render(TransientGeometry& geom,
+		int first_index,
+		int num_indices,
+		const Material& material) override
+	{
+		bgfx::setState(m_render_state | material.getRenderStates());
+		bgfx::setTransform(nullptr);
+		setMaterial(&material);
+		bgfx::setVertexBuffer(&geom.getVertexBuffer(), 0, geom.getNumVertices());
+		bgfx::setIndexBuffer(&geom.getIndexBuffer(), first_index, num_indices);
+		bgfx::submit(
+			m_view_idx,
+			material.getShaderInstance().m_program_handles[m_pass_idx]);
+	}
+
+
 	void renderRigidMesh(const RenderableMesh& info)
 	{
 		if (!info.m_model->isReady())
@@ -1254,7 +1287,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_pass_idx = -1;
 		m_current_framebuffer = m_default_framebuffer;
 		m_global_textures.clear();
-		memset(m_view2pass_map, 0xFF, sizeof(m_view2pass_map));
+		m_view2pass_map.assign(0xFF);
 		m_instance_data_idx = 0;
 		for (int i = 0; i < lengthOf(m_terrain_instances); ++i)
 		{
@@ -1273,6 +1306,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 			{
 				g_log_error.log("lua")
 					<< lua_tostring(m_source.m_lua_state, -1);
+				lua_pop(m_source.m_lua_state, 1);
 			}
 		}
 		finishInstances();
@@ -1320,7 +1354,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	uint32_t m_debug_flags;
 	uint8_t m_view_idx;
 	int m_pass_idx;
-	uint8_t m_view2pass_map[16];
+	StaticArray<uint8_t, 16> m_view2pass_map;
 	uint64_t m_render_state;
 	IAllocator& m_allocator;
 	Renderer& m_renderer;
@@ -1540,6 +1574,12 @@ void executeCustomCommand(PipelineInstanceImpl* pipeline, const char* command)
 }
 
 
+bool cameraExists(PipelineInstanceImpl* pipeline, const char* slot_name)
+{
+	return pipeline->getScene()->getCameraInSlot(slot_name) != INVALID_ENTITY;
+}
+
+
 float getFPS(PipelineInstanceImpl* pipeline)
 {
 	return pipeline->m_renderer.getEngine().getFPS();
@@ -1631,6 +1671,8 @@ void PipelineImpl::registerCFunctions()
 									   LuaAPI::renderDebugLines>);
 	registerCFunction(
 		"getFPS", LuaWrapper::wrap<decltype(&LuaAPI::getFPS), LuaAPI::getFPS>);
+	registerCFunction(
+		"cameraExists", LuaWrapper::wrap<decltype(&LuaAPI::cameraExists), LuaAPI::cameraExists>);
 }
 
 

@@ -10,10 +10,12 @@ namespace Lumix
 	
 class FrameBuffer;
 class JsonSerializer;
+class Material;
 struct Matrix;
 class Model;
 class Renderer;
 class RenderScene;
+class TransientGeometry;
 
 
 namespace FS
@@ -51,9 +53,6 @@ class LUMIX_ENGINE_API Pipeline : public Resource
 	public:
 		Pipeline(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 		virtual ~Pipeline() {}
-
-		static Pipeline* create(Renderer& renderer);
-		static void destroy(Pipeline* pipeline);
 };
 
 
@@ -77,6 +76,13 @@ class LUMIX_ENGINE_API PipelineInstance abstract
 		virtual int getWidth() = 0;
 		virtual int getHeight() = 0;
 		virtual CustomCommandHandler& addCustomCommandHandler(const char* name) = 0;
+		virtual void
+		setViewProjection(const Matrix& mtx, int width, int height) = 0;
+		virtual void setScissor(int x, int y, int width, int height) = 0;
+		virtual void render(TransientGeometry& geom,
+							int first_index,
+							int num_indices,
+							const Material& material) = 0;
 		virtual void setWireframe(bool wireframe) = 0;
 		virtual void renderModel(Model& model, const Matrix& mtx) = 0;
 		virtual void toggleStats() = 0;

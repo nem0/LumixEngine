@@ -8,6 +8,7 @@
 #include "core/queue.h"
 #include "core/array.h"
 
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <cstdio>
 

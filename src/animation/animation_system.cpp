@@ -45,16 +45,24 @@ private:
 public:
 	AnimationSceneImpl(IPlugin& anim_system,
 					   Engine& engine,
-					   Universe& universe,
+					   UniverseContext& ctx,
 					   IAllocator& allocator)
-		: m_universe(universe)
+		: m_universe(*ctx.m_universe)
 		, m_engine(engine)
 		, m_anim_system(anim_system)
 		, m_animables(allocator)
 	{
-		IScene* scene = engine.getScene(crc32("renderer"));
-		ASSERT(scene);
-		m_render_scene = static_cast<RenderScene*>(scene);
+		m_render_scene = nullptr;
+		uint32_t hash = crc32("renderer");
+		for (auto* scene : ctx.m_scenes)
+		{
+			if (crc32(scene->getPlugin().getName()) == hash)
+			{
+				m_render_scene = static_cast<RenderScene*>(scene);
+				break;
+			}
+		}
+		ASSERT(m_render_scene);
 		m_render_scene->renderableCreated()
 			.bind<AnimationSceneImpl, &AnimationSceneImpl::onRenderableCreated>(
 				this);
@@ -286,10 +294,10 @@ public:
 	{
 	}
 
-	virtual IScene* createScene(Universe& universe) override
+	virtual IScene* createScene(UniverseContext& ctx) override
 	{
 		return m_allocator.newObject<AnimationSceneImpl>(
-			*this, m_engine, universe, m_allocator);
+			*this, m_engine, ctx, m_allocator);
 	}
 
 

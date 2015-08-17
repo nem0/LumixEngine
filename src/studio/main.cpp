@@ -61,10 +61,10 @@ public:
 	void renderPhysics()
 	{
 		Lumix::RenderScene* render_scene =
-			(Lumix::RenderScene*)m_world_editor->getEngine().getScene(
+			(Lumix::RenderScene*)m_world_editor->getScene(
 				Lumix::crc32("renderer"));
 		Lumix::PhysicsScene* scene = static_cast<Lumix::PhysicsScene*>(
-			m_world_editor->getEngine().getScene(Lumix::crc32("physics")));
+			m_world_editor->getScene(Lumix::crc32("physics")));
 		if (scene && render_scene)
 		{
 			scene->render(*render_scene);
@@ -149,13 +149,13 @@ public:
 
 		SceneView* scene_view =m_main_window->getSceneView();
 		HWND hwnd = (HWND)scene_view->getViewWidget()->winId();
-		Lumix::Renderer::setInitData(hwnd);
 		initFilesystem(true);
-		m_engine = Lumix::Engine::create(m_file_system, m_allocator);
+		m_engine = Lumix::Engine::create(hwnd, m_file_system, m_allocator);
 		m_world_editor = Lumix::WorldEditor::create(
 			QDir::currentPath().toLocal8Bit().data(), *m_engine);
 		
-		m_engine->update(false, 1, -1);
+		Lumix::UniverseContext ctx(m_allocator);
+		m_engine->update(ctx);
 		m_main_window->setWorldEditor(*m_world_editor);
 
 		Lumix::PipelineInstance* pipeline = scene_view->getPipeline();
@@ -271,24 +271,7 @@ public:
 				m_engine->getRenderer().frame();
 
 				m_world_editor->update();
-				if (m_main_window->getSceneView()->isFrameDebuggerActive())
-				{
-					if (m_main_window->getSceneView()->isFrameRequested())
-					{
-						m_world_editor->updateEngine(
-							1.0f / 30.0f,
-							m_main_window->getSceneView()
-								->getTimeDeltaMultiplier());
-						m_main_window->getSceneView()->frameServed();
-					}
-				}
-				else
-				{
-					m_world_editor->updateEngine(
-						-1,
-						m_main_window->getSceneView()
-							->getTimeDeltaMultiplier());
-				}
+				m_world_editor->updateEngine();
 				handleEvents();
 
 				fps_limiter->endFrame();
