@@ -1943,6 +1943,15 @@ public:
 
 	virtual void destroyEntities(const Entity* entities, int count) override
 	{
+		for (int i = 0; i < count; ++i)
+		{
+			if (m_camera == entities[i])
+			{
+				g_log_warning.log("editor") << "Can not destroy editor camera.";
+				return;
+			}
+		}
+
 		DestroyEntitiesCommand* command =
 			m_allocator.newObject<DestroyEntitiesCommand>(
 				*this, entities, count);
@@ -2280,6 +2289,12 @@ public:
 
 	virtual void destroyComponent(const ComponentUID& component) override
 	{
+		if (component.entity == m_camera)
+		{
+			g_log_warning.log("editor") << "Can not destroy component from the editing camera";
+			return;
+		}
+
 		if (component.isValid())
 		{
 			IEditorCommand* command =

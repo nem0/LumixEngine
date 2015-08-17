@@ -240,6 +240,7 @@ public:
 	virtual void stopGame(UniverseContext& context) override
 	{
 		ASSERT(m_is_game_running);
+		m_is_game_running = false;
 		for (auto* scene : context.m_scenes)
 		{
 			scene->stopGame();

@@ -13,7 +13,7 @@ namespace Lumix
 		InputSystemImpl(IAllocator& allocator)
 			: m_actions(allocator)
 			, m_allocator(allocator)
-			, m_is_enabled(true)
+			, m_is_enabled(false)
 		{}
 
 		struct Action
