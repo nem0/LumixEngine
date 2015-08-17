@@ -5,11 +5,12 @@
 #include "core/resource_manager.h"
 #include "debug/allocator.h"
 #include "engine.h"
-#include "graphics/material.h"
-#include "graphics/pipeline.h"
-#include "graphics/renderer.h"
-#include "graphics/texture.h"
-#include "graphics/transient_geometry.h"
+#include "engine/plugin_manager.h"
+#include "renderer/material.h"
+#include "renderer/pipeline.h"
+#include "renderer/renderer.h"
+#include "renderer/texture.h"
+#include "renderer/transient_geometry.h"
 #include "ocornut-imgui/imgui.h"
 
 #include <bgfx.h>
@@ -156,7 +157,9 @@ public:
 
 	void init(HWND win)
 	{
-		m_engine = Lumix::Engine::create(win, nullptr, m_allocator);
+		Lumix::Renderer::setInitData(win);
+		m_engine = Lumix::Engine::create(nullptr, m_allocator);
+		m_engine->loadPlugin("renderer.dll");
 		m_engine->loadPlugin("lua_script.dll");
 		m_engine->loadPlugin("animation.dll");
 		m_engine->loadPlugin("physics.dll");
@@ -397,11 +400,12 @@ INT WINAPI WinMain(HINSTANCE hInst,
 		}
 		else
 		{
-
+			Lumix::Renderer* renderer = static_cast<Lumix::Renderer*>(
+				g_context.m_engine->getPluginManager().getPlugin("renderer"));
 			g_context.m_engine->update(*g_context.m_universe_context);
 			g_context.m_pipeline->render();
 			g_context.onGUI();
-			g_context.m_engine->getRenderer().frame();
+			renderer->frame();
 		}
 	}
 

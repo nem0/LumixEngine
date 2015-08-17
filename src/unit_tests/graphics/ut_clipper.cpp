@@ -8,7 +8,7 @@
 
 #include "core/MTJD/manager.h"
 
-#include "graphics/culling_system.h"
+#include "renderer/culling_system.h"
 
 namespace
 {

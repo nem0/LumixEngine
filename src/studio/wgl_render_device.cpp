@@ -3,7 +3,7 @@
 #include "core/resource_manager.h"
 #include "editor/world_editor.h"
 #include "engine.h"
-#include "graphics/pipeline.h"
+#include "renderer/pipeline.h"
 #include <qwidget.h>
 
 

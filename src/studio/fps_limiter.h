@@ -10,7 +10,7 @@ namespace Lumix
 }
 
 
-class LUMIX_EDITOR_API FPSLimiter
+class LUMIX_STUDIO_LIB_API FPSLimiter
 {
 	public:
 		static void destroy(FPSLimiter* limiter);

@@ -5,8 +5,8 @@
 #include "editor/measure_tool.h"
 #include "engine.h"
 #include "iplugin.h"
-#include "graphics/pipeline.h"
-#include "graphics/render_scene.h"
+#include "renderer/pipeline.h"
+#include "renderer/render_scene.h"
 #include "insert_mesh_command.h"
 #include "wgl_render_device.h"
 #include <qapplication.h>

@@ -9,7 +9,7 @@
 #include "entity_template_list.h"
 #include "fileserverwidget.h"
 #include "gameview.h"
-#include "graphics/pipeline.h"
+#include "renderer/pipeline.h"
 #include "dialogs/import_asset_dialog.h"
 #include "log_widget.h"
 #include "metadata.h"

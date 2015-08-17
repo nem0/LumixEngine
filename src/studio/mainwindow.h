@@ -1,6 +1,6 @@
 #pragma once
 
-#include <QMainWindow>
+#include <qmainwindow.h>
 #include "core/delegate_list.h"
 
 
@@ -21,7 +21,7 @@ class Metadata;
 class PropertyView;
 
 
-class LUMIX_EDITOR_API MainWindow : public QMainWindow
+class LUMIX_STUDIO_LIB_API MainWindow : public QMainWindow
 {
 	Q_OBJECT
 

@@ -10,8 +10,8 @@
 #include "core/resource_manager.h"
 #include "core/resource.h"
 
-#include "graphics/texture_manager.h"
-#include "graphics/texture.h"
+#include "renderer/texture_manager.h"
+#include "renderer/texture.h"
 
 #include "animation/animation.h"
 

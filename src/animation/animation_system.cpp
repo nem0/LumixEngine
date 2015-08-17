@@ -6,10 +6,10 @@
 #include "core/json_serializer.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
-#include "editor/property_descriptor.h"
 #include "editor/world_editor.h"
 #include "engine.h"
-#include "graphics/render_scene.h"
+#include "engine/property_descriptor.h"
+#include "renderer/render_scene.h"
 #include "universe/universe.h"
 
 

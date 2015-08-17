@@ -26,7 +26,6 @@ class IScene;
 class JsonSerializer;
 class OutputBlob;
 class PluginManager;
-class Renderer;
 class ResourceManager;
 class Universe;
 class WorldEditor;
@@ -52,7 +51,7 @@ class LUMIX_ENGINE_API Engine
 public:
 	virtual ~Engine() {}
 
-	static Engine* create(void* init_data, FS::FileSystem* fs, IAllocator& allocator);
+	static Engine* create(FS::FileSystem* fs, IAllocator& allocator);
 	static void destroy(Engine* engine);
 
 	virtual UniverseContext& createUniverse() = 0;
@@ -61,7 +60,6 @@ public:
 	virtual void setWorldEditor(WorldEditor& editor) = 0;
 	virtual WorldEditor* getWorldEditor() const = 0;
 	virtual FS::FileSystem& getFileSystem() = 0;
-	virtual Renderer& getRenderer() = 0;
 	virtual InputSystem& getInputSystem() = 0;
 	virtual PluginManager& getPluginManager() = 0;
 	virtual IPlugin* loadPlugin(const char* name) = 0;

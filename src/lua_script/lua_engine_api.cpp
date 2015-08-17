@@ -3,7 +3,7 @@
 #include "core/lua_wrapper.h"
 #include "engine.h"
 #include "iplugin.h"
-#include "graphics/render_scene.h"
+#include "renderer/render_scene.h"
 #include "universe/universe.h"
 
 

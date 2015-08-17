@@ -8,8 +8,8 @@
 #include "core/log.h"
 #include "core/resource_manager.h"
 #include "editor/world_editor.h"
-#include "editor/property_descriptor.h"
 #include "engine.h"
+#include "engine/property_descriptor.h"
 #include "physics/physics_geometry_manager.h"
 #include "physics/physics_scene.h"
 
@@ -75,7 +75,7 @@ struct PhysicsSystemImpl : public PhysicsSystem
 };
 
 
-extern "C" IPlugin* createPlugin(Engine& engine)
+extern "C" LUMIX_PHYSICS_API IPlugin* createPlugin(Engine& engine)
 {
 	return engine.getAllocator().newObject<PhysicsSystemImpl>(engine);
 }
