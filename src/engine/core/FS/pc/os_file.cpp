@@ -1,6 +1,7 @@
 #include "core/fs/os_file.h"
 #include "core/iallocator.h"
 #include "lumix.h"
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
 

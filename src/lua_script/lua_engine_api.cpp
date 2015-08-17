@@ -15,11 +15,18 @@ namespace LuaAPI
 {
 
 
-static void* getScene(Engine* engine, const char* name)
+static void* getScene(UniverseContext* ctx, const char* name)
 {
-	if (engine)
+	if (ctx)
 	{
-		return engine->getScene(crc32(name));
+		uint32_t hash = crc32(name);
+		for (auto* scene : ctx->m_scenes)
+		{
+			if (crc32(scene->getPlugin().getName()) == hash)
+			{
+				return scene;
+			}
+		}
 	}
 	return nullptr;
 }
@@ -101,7 +108,8 @@ static void setRenderablePath(IScene* scene, int component, const char* path)
 
 static float getInputActionValue(Engine* engine, uint32_t action)
 {
-	return engine->getInputSystem().getActionValue(action);
+	auto v = engine->getInputSystem().getActionValue(action);
+	return v;
 }
 
 
@@ -123,9 +131,12 @@ registerCFunction(lua_State* L, const char* name, lua_CFunction func)
 }
 
 
-void registerEngineLuaAPI(Engine& engine, Universe& universe, lua_State* L)
+void registerEngineLuaAPI(Engine& engine, UniverseContext& ctx, lua_State* L)
 {
-	lua_pushlightuserdata(L, &universe);
+	lua_pushlightuserdata(L, &ctx);
+	lua_setglobal(L, "g_universe_context");
+
+	lua_pushlightuserdata(L, ctx.m_universe);
 	lua_setglobal(L, "g_universe");
 
 	lua_pushlightuserdata(L, &engine);

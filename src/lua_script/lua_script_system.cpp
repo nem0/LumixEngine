@@ -34,7 +34,7 @@ namespace Lumix
 class LuaScriptSystemImpl;
 
 
-void registerEngineLuaAPI(Engine&, Universe&, lua_State* L);
+void registerEngineLuaAPI(Engine&, UniverseContext&, lua_State* L);
 void registerPhysicsLuaAPI(Engine&, Universe&, lua_State* L);
 
 
@@ -48,7 +48,7 @@ public:
 	virtual ~LuaScriptSystem();
 
 	IAllocator& getAllocator();
-	virtual IScene* createScene(Universe& universe) override;
+	virtual IScene* createScene(UniverseContext& universe) override;
 	virtual void destroyScene(IScene* scene) override;
 	virtual bool create() override;
 	virtual void destroy() override;
@@ -93,33 +93,19 @@ public:
 
 
 public:
-	LuaScriptScene(LuaScriptSystem& system, Engine& engine, Universe& universe)
+	LuaScriptScene(LuaScriptSystem& system, Engine& engine, UniverseContext& ctx)
 		: m_system(system)
-		, m_universe(universe)
+		, m_universe_context(ctx)
 		, m_scripts(system.getAllocator())
 		, m_valid(system.getAllocator())
 		, m_global_state(nullptr)
 	{
-		if (system.m_engine.getWorldEditor())
-		{
-			system.m_engine.getWorldEditor()
-				->gameModeToggled()
-				.bind<LuaScriptScene, &LuaScriptScene::onGameModeToggled>(this);
-		}
 	}
 
 
 	~LuaScriptScene()
 	{
 		unloadAllScripts();
-
-		if (m_system.m_engine.getWorldEditor())
-		{
-			m_system.m_engine.getWorldEditor()
-				->gameModeToggled()
-				.unbind<LuaScriptScene, &LuaScriptScene::onGameModeToggled>(
-					this);
-		}
 	}
 
 
@@ -137,15 +123,15 @@ public:
 	}
 
 
-	virtual Universe& getUniverse() override { return m_universe; }
+	virtual Universe& getUniverse() override { return *m_universe_context.m_universe; }
 
 
 	void registerAPI(lua_State* L)
 	{
-		registerEngineLuaAPI(m_system.m_engine, m_universe, L);
+		registerEngineLuaAPI(m_system.m_engine, m_universe_context, L);
 		if (m_system.m_engine.getPluginManager().getPlugin("physics"))
 		{
-			registerPhysicsLuaAPI(m_system.m_engine, m_universe, L);
+			registerPhysicsLuaAPI(m_system.m_engine, *m_universe_context.m_universe, L);
 		}
 	}
 
@@ -216,7 +202,7 @@ public:
 	}
 
 
-	void startGame()
+	virtual void startGame() override
 	{
 		m_global_state = lua_newstate(luaAllocator, &m_system.getAllocator());
 		luaL_openlibs(m_global_state);
@@ -265,7 +251,7 @@ public:
 	}
 
 
-	void stopGame()
+	virtual void stopGame() override
 	{
 		for (Script& script : m_scripts)
 		{
@@ -273,22 +259,10 @@ public:
 		}
 
 		lua_close(m_global_state);
+		m_global_state = nullptr;
 	}
 
-
-	void onGameModeToggled(bool is_game_mode)
-	{
-		if (is_game_mode)
-		{
-			startGame();
-		}
-		else
-		{
-			stopGame();
-		}
-	}
-
-
+	
 	virtual ComponentIndex createComponent(uint32_t type,
 										   Entity entity) override
 	{
@@ -300,7 +274,8 @@ public:
 			script.m_script = nullptr;
 			script.m_state = nullptr;
 			m_valid.push(true);
-			m_universe.addComponent(entity, type, this, m_scripts.size() - 1);
+			m_universe_context.m_universe->addComponent(
+				entity, type, this, m_scripts.size() - 1);
 			return m_scripts.size() - 1;
 		}
 		return INVALID_COMPONENT;
@@ -312,7 +287,7 @@ public:
 	{
 		if (type == LUA_SCRIPT_HASH)
 		{
-			m_universe.destroyComponent(
+			m_universe_context.m_universe->destroyComponent(
 				Entity(m_scripts[component].m_entity), type, this, component);
 			m_valid[component] = false;
 		}
@@ -373,7 +348,7 @@ public:
 					serializer.readString(tmp, sizeof(tmp));
 					prop.m_value = tmp;
 				}
-				m_universe.addComponent(
+				m_universe_context.m_universe->addComponent(
 					Entity(m_scripts[i].m_entity), LUA_SCRIPT_HASH, this, i);
 			}
 		}
@@ -466,7 +441,7 @@ private:
 	BinaryArray m_valid;
 	Array<Script> m_scripts;
 	lua_State* m_global_state;
-	Universe& m_universe;
+	UniverseContext& m_universe_context;
 };
 
 
@@ -493,9 +468,9 @@ IAllocator& LuaScriptSystem::getAllocator()
 }
 
 
-IScene* LuaScriptSystem::createScene(Universe& universe)
+IScene* LuaScriptSystem::createScene(UniverseContext& ctx)
 {
-	return m_allocator.newObject<LuaScriptScene>(*this, m_engine, universe);
+	return m_allocator.newObject<LuaScriptScene>(*this, m_engine, ctx);
 }
 
 

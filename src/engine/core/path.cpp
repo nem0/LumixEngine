@@ -92,6 +92,19 @@ namespace Lumix
 	}
 
 
+	void PathManager::clear()
+	{
+		for (int i = m_paths.size() - 1; i >= 0; --i)
+		{
+			if (m_paths.at(i)->m_ref_count == 0)
+			{
+				m_allocator.deleteObject(m_paths.at(i));
+				m_paths.eraseAt(i);
+			}
+		}
+	}
+
+
 	PathInternal* PathManager::getPathMultithreadUnsafe(uint32_t hash, const char* path)
 	{
 		int index = m_paths.find(hash);

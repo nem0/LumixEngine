@@ -1,6 +1,7 @@
 #include "core/input_system.h"
 #include "core/associative_array.h"
 #include "core/string.h"
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
 
@@ -12,7 +13,7 @@ namespace Lumix
 		InputSystemImpl(IAllocator& allocator)
 			: m_actions(allocator)
 			, m_allocator(allocator)
-			, m_is_enabled(true)
+			, m_is_enabled(false)
 		{}
 
 		struct Action

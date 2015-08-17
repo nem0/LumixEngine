@@ -1,5 +1,6 @@
 #include "file_system_watcher.h"
 #include <qstring.h>
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
 static const DWORD READ_DIR_CHANGE_FILTER =

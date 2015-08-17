@@ -9,7 +9,7 @@ namespace Lumix
 	// forward declarations
 	class ResourceManager;
 
-	class LUMIX_ENGINE_API Resource abstract
+	class LUMIX_ENGINE_API Resource
 	{
 	public:
 		friend class ResourceManagerBase;

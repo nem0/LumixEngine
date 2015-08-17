@@ -1,7 +1,7 @@
 #include "lumix.h"
-#include <iostream>
 #include "debug/floating_points.h"
 #include "unit_tests/suite/unit_test_app.h"
+
 
 int main(int argc, const char * argv[])
 {
