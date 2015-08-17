@@ -74,16 +74,19 @@ void GameView::resizeEvent(QResizeEvent* event)
 
 void GameView::mousePressEvent(QMouseEvent*)
 {
-	setFocus();
-	setMouseTracking(true);
-	grabMouse();
-	grabKeyboard();
-	QCursor c = cursor();
-	c.setPos(mapToGlobal(QPoint(width() / 2, height() / 2)));
-	c.setShape(Qt::BlankCursor);
-	setCursor(c);
-	m_editor->getEngine().getInputSystem().enable(true);
-	m_isInputHandling = true;
+	if (m_editor->isGameMode())
+	{
+		setFocus();
+		setMouseTracking(true);
+		grabMouse();
+		grabKeyboard();
+		QCursor c = cursor();
+		c.setPos(mapToGlobal(QPoint(width() / 2, height() / 2)));
+		c.setShape(Qt::BlankCursor);
+		setCursor(c);
+		m_editor->getEngine().getInputSystem().enable(true);
+		m_isInputHandling = true;
+	}
 }
 
 
@@ -131,6 +134,19 @@ void GameView::keyPressEvent(QKeyEvent* event)
 	if (event->key() == Qt::Key_Escape)
 	{
 		disableInputHandling();
+	}
+}
+
+
+void GameView::onGameModeTriggered()
+{
+	if (m_editor->isGameMode())
+	{
+		m_ui->playButton->setText("Stop");
+	}
+	else
+	{
+		m_ui->playButton->setText("Play");
 	}
 }
 

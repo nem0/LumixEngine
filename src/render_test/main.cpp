@@ -20,7 +20,6 @@
 #include "physics/physics_system.h"
 
 
-
 class App
 {
 public:
@@ -60,7 +59,8 @@ public:
 				ASSERT(false);
 				return;
 			}
-			bool deserialize_succeeded = m_engine->deserialize(*m_universe_context, blob);
+			bool deserialize_succeeded =
+				m_engine->deserialize(*m_universe_context, blob);
 			m_is_test_universe_loaded = true;
 			ASSERT(deserialize_succeeded);
 		}
@@ -93,15 +93,15 @@ public:
 		}
 
 		m_universe_context = &m_engine->createUniverse();
-		m_pipeline->setScene(
-			(Lumix::RenderScene*)m_universe_context->getScene(Lumix::crc32("renderer")));
+		m_pipeline->setScene((Lumix::RenderScene*)m_universe_context->getScene(
+			Lumix::crc32("renderer")));
 		m_pipeline->resize(600, 400);
 
 		enumerateTests();
 	}
 
 
-	void shutdown() 
+	void shutdown()
 	{
 		if (m_pipeline)
 		{

@@ -457,6 +457,7 @@ void MainWindow::on_actionPolygon_Mode_changed()
 void MainWindow::on_actionGame_mode_triggered()
 {
 	m_world_editor->toggleGameMode();
+	m_game_view->onGameModeTriggered();
 }
 
 void MainWindow::on_actionLook_at_selected_entity_triggered()

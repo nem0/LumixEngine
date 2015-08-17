@@ -89,6 +89,10 @@ template <> inline void pushLua(lua_State* L, float value)
 {
 	lua_pushnumber(L, value);
 }
+template <> inline void pushLua(lua_State* L, bool value)
+{
+	lua_pushboolean(L, value);
+}
 template <> inline void pushLua(lua_State* L, const char* value)
 {
 	lua_pushstring(L, value);

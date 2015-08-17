@@ -259,6 +259,7 @@ public:
 		}
 
 		lua_close(m_global_state);
+		m_global_state = nullptr;
 	}
 
 	
