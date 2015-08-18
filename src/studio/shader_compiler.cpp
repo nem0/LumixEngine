@@ -7,7 +7,7 @@
 #include "editor/world_editor.h"
 #include "engine.h"
 #include "file_system_watcher.h"
-#include "graphics/shader.h"
+#include "renderer/shader.h"
 #include "notifications.h"
 #include <qdatetime.h>
 #include <qdir.h>

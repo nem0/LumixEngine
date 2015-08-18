@@ -25,8 +25,6 @@ file(GLOB CORE_PC_FILES ${ENGINE_ROOT_PATH}core/PC/*.cpp ${ENGINE_ROOT_PATH}core
 file(GLOB CORE_DEBUG_FILES ${ENGINE_ROOT_PATH}debug/*.cpp ${ENGINE_ROOT_PATH}debug/*.h ${ENGINE_ROOT_PATH}debug/pc/*.cpp ${ENGINE_ROOT_PATH}debug/pc/*.h)
 file(GLOB ENGINE_FILES ${ENGINE_ROOT_PATH}*.cpp ${ENGINE_ROOT_PATH}*.h)
 file(GLOB UNIVERSE_FILES ${ENGINE_ROOT_PATH}universe/*.cpp ${ENGINE_ROOT_PATH}universe/*.h)
-file(GLOB GRAPHICS_FILES ${ENGINE_ROOT_PATH}graphics/*.cpp ${ENGINE_ROOT_PATH}graphics/*.h)
-file(GLOB EDITOR_FILES ${ENGINE_ROOT_PATH}editor/*.cpp ${ENGINE_ROOT_PATH}editor/*.h)
 
 
 source_group(core FILES ${CORE_ROOT_FILES})
@@ -36,14 +34,11 @@ source_group(core\\fs FILES ${CORE_FS_FILES})
 source_group(core\\mt FILES ${CORE_MT_FILES})
 source_group(core\\mtjd FILES ${CORE_MTJD_FILES})
 source_group(core\\net FILES ${CORE_NET_FILES})
-source_group(editor FILES ${EDITOR_FILES})
 source_group(universe FILES ${UNIVERSE_FILES})
-source_group(graphics FILES ${GRAPHICS_FILES})
 source_group("" FILES ${ENGINE_FILES})
 
 include_directories(${SRC_PATH})
 include_directories(${ENGINE_ROOT_PATH})
-include_directories(${EXTERNAL_PATH}bgfx/include)
 include_directories(${EXTERNAL_PATH}lua/include)
 
 add_library(engine SHARED
@@ -56,15 +51,34 @@ add_library(engine SHARED
 	${CORE_DEBUG_FILES}
 	${ENGINE_FILES}
 	${UNIVERSE_FILES}
-	${GRAPHICS_FILES}
-	${EDITOR_FILES}
 )
 
 set_target_properties (engine PROPERTIES COMPILE_DEFINITIONS "BUILDING_ENGINE")
 
 target_link_libraries(engine psapi)
 target_link_libraries(engine ${EXTERNAL_PATH}lua/lib/debug/lua.lib)
-target_link_libraries(engine ${EXTERNAL_PATH}bgfx/lib/bgfx${CMAKE_CFG_INTDIR}.lib)
+
+###################### RENDERER ######################
+
+file(GLOB RENDERER_ROOT_FILES ${SRC_PATH}renderer/*.cpp ${SRC_PATH}renderer/*.h)
+
+source_group("" FILES ${RENDERER_ROOT_FILES})
+
+include_directories(${SRC_PATH})
+include_directories(${ENGINE_ROOT_PATH})
+include_directories(${EXTERNAL_PATH}bgfx/include)
+include_directories(${EXTERNAL_PATH}lua/include)
+
+add_library(renderer SHARED
+	${RENDERER_ROOT_FILES}
+)
+
+set_target_properties (renderer PROPERTIES COMPILE_DEFINITIONS "BUILDING_RENDERER")
+
+target_link_libraries(renderer engine)
+target_link_libraries(renderer ${EXTERNAL_PATH}lua/lib/debug/lua.lib)
+target_link_libraries(renderer ${EXTERNAL_PATH}bgfx/lib/bgfx${CMAKE_CFG_INTDIR}.lib)
+
 
 ###################### PHYSICS ######################
 
@@ -82,6 +96,7 @@ add_library(physics SHARED
 set_target_properties (physics PROPERTIES COMPILE_DEFINITIONS "BUILDING_PHYSICS")
 
 target_link_libraries(physics engine)
+target_link_libraries(physics renderer)
 target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/x86/PhysXVisualDebuggerSDKCHECKED.lib)
 target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/x86/PhysX3CHECKED_x86.lib)
 target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/x86/PhysX3CommonCHECKED_x86.lib)
@@ -122,33 +137,27 @@ add_library(animation SHARED
 set_target_properties (animation PROPERTIES COMPILE_DEFINITIONS "BUILDING_ANIMATION")
 
 target_link_libraries(animation engine)
+target_link_libraries(animation renderer)
 
-###################### LUA_SCRIPT ######################
+###################### EDITOR ######################
 
-file(GLOB LUA_SCRIPT_ROOT_FILES ${SRC_PATH}lua_script/*.cpp ${SRC_PATH}lua_script/*.h)
+file(GLOB EDITOR_ROOT_FILES ${SRC_PATH}editor/*.cpp ${SRC_PATH}editor/*.h)
 
 include_directories(${EXTERNAL_PATH}lua/include)
-source_group("" FILES ${LUA_SCRIPT_ROOT_FILES})
+source_group("" FILES ${EDITOR_ROOT_FILES})
 
 include_directories(${SRC_PATH})
 
-add_library(lua_script SHARED
-	${LUA_SCRIPT_ROOT_FILES}
+add_library(editor SHARED
+	${EDITOR_ROOT_FILES}
 )
 
-set_target_properties (lua_script PROPERTIES COMPILE_DEFINITIONS "BUILDING_LUA_SCRIPT")
+set_target_properties (editor PROPERTIES COMPILE_DEFINITIONS "BUILDING_EDITOR")
 
-target_link_libraries(lua_script Qt5::Core)
-target_link_libraries(lua_script Qt5::Gui)
-target_link_libraries(lua_script Qt5::Widgets)
-target_link_libraries(lua_script Qt5::UiTools)
+target_link_libraries(editor engine)
+target_link_libraries(editor renderer)
 
-target_link_libraries(lua_script ${EXTERNAL_PATH}lua/lib/debug/lua.lib)
-target_link_libraries(lua_script engine)
-target_link_libraries(lua_script editor)
-
-
-###################### EDITOR ######################
+###################### STUDIO_LIB ######################
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_AUTOMOC ON)
@@ -161,6 +170,7 @@ file(GLOB STUDIO_SCRIPTS_FILES ${SRC_PATH}studio/scripts/*.cpp ${SRC_PATH}studio
 file(GLOB STUDIO_PC_FILES ${SRC_PATH}studio/pc/*.cpp ${SRC_PATH}studio/pc/*.h)
 file(GLOB STUDIO_ANIMATION_EDITOR_FILES ${SRC_PATH}studio/animation_editor/*.cpp ${SRC_PATH}studio/animation_editor/*.h)
 file(GLOB_RECURSE STUDIO_FORM_FILES ${SRC_PATH}studio/*.ui)
+list(REMOVE_ITEM STUDIO_ROOT_FILES ${SRC_PATH}studio/main.cpp)
 
 qt5_wrap_ui(${STUDIO_FORM_FILES})
 
@@ -177,7 +187,7 @@ include_directories(${SRC_PATH}studio)
 include_directories(${EXTERNAL_PATH}assimp/include)
 include_directories(${EXTERNAL_PATH}crunch/include)
 
-add_library(editor SHARED
+add_library(studio_lib SHARED
 	${STUDIO_ROOT_FILES}
 	${STUDIO_PC_FILES}
 	${STUDIO_FORM_FILES}
@@ -187,22 +197,23 @@ add_library(editor SHARED
 	${STUDIO_ANIMATION_EDITOR_FILES}
 )
 
-target_link_libraries(editor engine)
-# target_link_libraries(editor script)
-target_link_libraries(editor physics)
-target_link_libraries(editor animation)
-target_link_libraries(editor Qt5::Core)
-target_link_libraries(editor Qt5::Gui)
-target_link_libraries(editor Qt5::Widgets)
-target_link_libraries(editor Qt5::WinMain)
-target_link_libraries(editor optimized ${EXTERNAL_PATH}assimp/lib/win32/assimp-vc120-mt.lib)
-target_link_libraries(editor debug ${EXTERNAL_PATH}assimp/lib/win32/assimp-vc120-mtd.lib)
-target_link_libraries(editor ${EXTERNAL_PATH}crunch/lib/win32/crnlib${CMAKE_CFG_INTDIR}.lib)
+target_link_libraries(studio_lib engine)
+# target_link_libraries(studio_lib script)
+target_link_libraries(studio_lib renderer)
+target_link_libraries(studio_lib animation)
+target_link_libraries(studio_lib editor)
+target_link_libraries(studio_lib Qt5::Core)
+target_link_libraries(studio_lib Qt5::Gui)
+target_link_libraries(studio_lib Qt5::Widgets)
+target_link_libraries(studio_lib Qt5::WinMain)
+target_link_libraries(studio_lib optimized ${EXTERNAL_PATH}assimp/lib/win32/assimp-vc120-mt.lib)
+target_link_libraries(studio_lib debug ${EXTERNAL_PATH}assimp/lib/win32/assimp-vc120-mtd.lib)
+target_link_libraries(studio_lib ${EXTERNAL_PATH}crunch/lib/win32/crnlib${CMAKE_CFG_INTDIR}.lib)
 
 
-set_target_properties (editor PROPERTIES COMPILE_DEFINITIONS "BUILDING_EDITOR")
+set_target_properties (studio_lib PROPERTIES COMPILE_DEFINITIONS "BUILDING_STUDIO_LIB")
 
-# set_target_properties(editor PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
+# set_target_properties(studio_lib PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
  
 
 ###################### STUDIO ######################
@@ -221,6 +232,9 @@ add_executable(studio ${SRC_PATH}studio/main.cpp)
 add_dependencies(studio lua_script)
 
 target_link_libraries(studio editor)
+target_link_libraries(studio renderer)
+target_link_libraries(studio studio_lib)
+
 set_target_properties(studio PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
  
 
@@ -271,6 +285,7 @@ add_executable(render_test
 
 set_target_properties(render_test PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
 target_link_libraries(render_test engine)
+target_link_libraries(render_test renderer)
 target_link_libraries(render_test Qt5::Core)
 target_link_libraries(render_test Qt5::Gui)
 target_link_libraries(render_test Qt5::Widgets)
@@ -297,6 +312,34 @@ add_executable(sample_app
 
 set_target_properties(sample_app PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
 target_link_libraries(sample_app engine)
+target_link_libraries(sample_app renderer)
+
+
+###################### LUA_SCRIPT ######################
+
+file(GLOB LUA_SCRIPT_ROOT_FILES ${SRC_PATH}lua_script/*.cpp ${SRC_PATH}lua_script/*.h)
+
+include_directories(${EXTERNAL_PATH}lua/include)
+source_group("" FILES ${LUA_SCRIPT_ROOT_FILES})
+
+include_directories(${SRC_PATH})
+
+add_library(lua_script SHARED
+	${LUA_SCRIPT_ROOT_FILES}
+)
+
+set_target_properties (lua_script PROPERTIES COMPILE_DEFINITIONS "BUILDING_LUA_SCRIPT")
+
+target_link_libraries(lua_script Qt5::Core)
+target_link_libraries(lua_script Qt5::Gui)
+target_link_libraries(lua_script Qt5::Widgets)
+target_link_libraries(lua_script Qt5::UiTools)
+
+target_link_libraries(lua_script ${EXTERNAL_PATH}lua/lib/debug/lua.lib)
+target_link_libraries(lua_script engine)
+target_link_libraries(lua_script renderer)
+target_link_libraries(lua_script editor)
+target_link_libraries(lua_script studio_lib)
 
 
 ###################### COPY_DLLS ######################

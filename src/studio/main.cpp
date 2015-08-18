@@ -17,8 +17,8 @@
 #include "engine.h"
 #include "plugin_manager.h"
 #include "fps_limiter.h"
-#include "graphics/pipeline.h"
-#include "graphics/renderer.h"
+#include "renderer/pipeline.h"
+#include "renderer/renderer.h"
 #include "physics/physics_scene.h"
 #include "physics/physics_system.h"
 #include "sceneview.h"
@@ -150,7 +150,8 @@ public:
 		SceneView* scene_view =m_main_window->getSceneView();
 		HWND hwnd = (HWND)scene_view->getViewWidget()->winId();
 		initFilesystem(true);
-		m_engine = Lumix::Engine::create(hwnd, m_file_system, m_allocator);
+		Lumix::Renderer::setInitData(hwnd);
+		m_engine = Lumix::Engine::create(m_file_system, m_allocator);
 		m_world_editor = Lumix::WorldEditor::create(
 			QDir::currentPath().toLocal8Bit().data(), *m_engine);
 		
@@ -257,6 +258,8 @@ public:
 	{
 		FPSLimiter* fps_limiter = FPSLimiter::create(60, m_allocator);
 
+		auto* renderer =
+			static_cast<Lumix::Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
 		while (m_main_window->isVisible())
 		{
 			{
@@ -268,7 +271,7 @@ public:
 				m_main_window->getSceneView()->render();
 				m_main_window->getGameView()->render();
 
-				m_engine->getRenderer().frame();
+				renderer->frame();
 
 				m_world_editor->update();
 				m_world_editor->updateEngine();

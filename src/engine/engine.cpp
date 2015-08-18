@@ -1,32 +1,21 @@
 #include "lumix.h"
 #include "engine.h"
-
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/input_system.h"
 #include "core/log.h"
+#include "core/path.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/timer.h"
-
 #include "core/fs/disk_file_device.h"
 #include "core/fs/file_system.h"
 #include "core/fs/memory_file_device.h"
-
 #include "core/mtjd/manager.h"
-
 #include "debug/debug.h"
-
+#include "engine/property_descriptor.h"
 #include "plugin_manager.h"
-
-#include "graphics/culling_system.h"
-#include "graphics/material_manager.h"
-#include "graphics/model_manager.h"
-#include "graphics/pipeline.h"
-#include "graphics/renderer.h"
-#include "graphics/shader_manager.h"
-#include "graphics/texture_manager.h"
-
+#include "renderer/renderer.h"
 #include "universe/hierarchy.h"
 #include "universe/universe.h"
 
@@ -77,8 +66,9 @@ public:
 		, m_resource_manager(m_allocator)
 		, m_mtjd_manager(m_allocator)
 		, m_fps(0)
-		, m_editor(nullptr)
 		, m_is_game_running(false)
+		, m_component_properties(m_allocator)
+		, m_component_types(m_allocator)
 	{
 		if (!fs)
 		{
@@ -108,24 +98,13 @@ public:
 		m_fps_frame = 0;
 	}
 
-	bool create(void* init_data)
+	bool create()
 	{
 		m_plugin_manager = PluginManager::create(*this);
 		if (!m_plugin_manager)
 		{
 			return false;
 		}
-		m_renderer = Renderer::createInstance(*this, init_data);
-		if (!m_renderer)
-		{
-			return false;
-		}
-		if (!m_renderer->create())
-		{
-			Renderer::destroyInstance(*m_renderer);
-			return false;
-		}
-		m_plugin_manager->addPlugin(m_renderer);
 		if (!m_input_system.create(m_allocator))
 		{
 			return false;
@@ -137,6 +116,15 @@ public:
 
 	virtual ~EngineImpl()
 	{
+		for (int j = 0; j < m_component_properties.size(); ++j)
+		{
+			Array<IPropertyDescriptor*>& props = m_component_properties.at(j);
+			for (int i = 0, c = props.size(); i < c; ++i)
+			{
+				m_allocator.deleteObject(props[i]);
+			}
+		}
+
 		Timer::destroy(m_timer);
 		Timer::destroy(m_fps_timer);
 		PluginManager::destroy(m_plugin_manager);
@@ -151,6 +139,85 @@ public:
 
 
 	virtual IAllocator& getAllocator() override { return m_allocator; }
+
+
+	virtual const char* getComponentTypeName(int index) override
+	{
+		return m_component_types[index].m_name.c_str();
+	}
+
+
+	virtual const char* getComponentTypeID(int index) override
+	{
+		return m_component_types[index].m_id.c_str();
+	}
+
+
+	virtual int getComponentTypesCount() const override
+	{
+		return m_component_types.size();
+	}
+
+
+	Array<IPropertyDescriptor*>& getPropertyDescriptors(uint32_t type)
+	{
+		int props_index = m_component_properties.find(type);
+		if (props_index < 0)
+		{
+			m_component_properties.insert(
+				type, Array<IPropertyDescriptor*>(m_allocator));
+			props_index = m_component_properties.find(type);
+		}
+		return m_component_properties.at(props_index);
+	}
+
+
+	virtual const IPropertyDescriptor&
+	getPropertyDescriptor(uint32_t type, uint32_t name_hash) override
+	{
+		Array<IPropertyDescriptor*>& props = getPropertyDescriptors(type);
+		for (int i = 0; i < props.size(); ++i)
+		{
+			if (props[i]->getNameHash() == name_hash)
+			{
+				return *props[i];
+			}
+		}
+		ASSERT(false);
+		return *props[0];
+	}
+
+
+	virtual IPropertyDescriptor* getProperty(const char* component_type,
+		const char* property_name) override
+	{
+		auto& props = getPropertyDescriptors(crc32(component_type));
+		auto name_hash = crc32(property_name);
+		for (int i = 0; i < props.size(); ++i)
+		{
+			if (props[i]->getNameHash() == name_hash)
+			{
+				return props[i];
+			}
+		}
+		return nullptr;
+	}
+
+
+	virtual void registerComponentType(const char* id, const char* name) override
+	{
+		ComponentType& type = m_component_types.emplace(m_allocator);
+		type.m_name = name;
+		type.m_id = id;
+	}
+
+
+	virtual void registerProperty(const char* component_type,
+								  IPropertyDescriptor* descriptor) override
+	{
+		ASSERT(descriptor);
+		getPropertyDescriptors(crc32(component_type)).push(descriptor);
+	}
 
 
 	virtual UniverseContext& createUniverse() override
@@ -189,18 +256,6 @@ public:
 		m_allocator.deleteObject(&context);
 	}
 
-	virtual void setWorldEditor(WorldEditor& editor) override
-	{
-		m_editor = &editor;
-		for (auto* plugin : m_plugin_manager->getPlugins())
-		{
-			plugin->setWorldEditor(editor);
-		}
-	}
-
-
-	virtual WorldEditor* getWorldEditor() const override { return m_editor; }
-
 
 	virtual PluginManager& getPluginManager() override
 	{
@@ -209,21 +264,6 @@ public:
 
 
 	virtual FS::FileSystem& getFileSystem() override { return *m_file_system; }
-
-
-	virtual Renderer& getRenderer() override { return *m_renderer; }
-
-
-	void updateGame(UniverseContext& context, float dt)
-	{
-		PROFILE_FUNCTION();
-		for (int i = 0; i < context.m_scenes.size(); ++i)
-		{
-			context.m_scenes[i]->update(dt);
-		}
-		m_plugin_manager->update(dt);
-		m_input_system.update(dt);
-	}
 
 
 	virtual void startGame(UniverseContext& context) override
@@ -260,20 +300,12 @@ public:
 		}
 		dt = m_timer->tick();
 		m_last_time_delta = dt;
-		if (m_is_game_running)
+		for (int i = 0; i < context.m_scenes.size(); ++i)
 		{
-			updateGame(context, dt);
+			context.m_scenes[i]->update(dt);
 		}
-		else
-		{
-			for (int i = 0; i < context.m_scenes.size(); ++i)
-			{
-				if (&context.m_scenes[i]->getPlugin() == m_renderer)
-				{
-					context.m_scenes[i]->update(dt);
-				}
-			}
-		}
+		m_plugin_manager->update(dt);
+		m_input_system.update(dt);
 		getFileSystem().updateAsyncTransactions();
 	}
 
@@ -337,7 +369,6 @@ public:
 		int pos = serializer.getSize();
 		ctx.m_universe->serialize(serializer);
 		ctx.m_hierarchy->serialize(serializer);
-		m_renderer->serialize(serializer);
 		m_plugin_manager->serialize(serializer);
 		serializer.write((int32_t)ctx.m_scenes.size());
 		for (int i = 0; i < ctx.m_scenes.size(); ++i)
@@ -373,7 +404,6 @@ public:
 		g_path_manager.deserialize(serializer);
 		ctx.m_universe->deserialize(serializer);
 		ctx.m_hierarchy->deserialize(serializer);
-		m_renderer->deserialize(serializer);
 		m_plugin_manager->deserialize(serializer);
 		int32_t scene_count;
 		serializer.read(scene_count);
@@ -390,20 +420,33 @@ public:
 
 	virtual float getLastTimeDelta() override { return m_last_time_delta; }
 
+private:
+	struct ComponentType
+	{
+		ComponentType(IAllocator& allocator)
+			: m_name(allocator)
+			, m_id(allocator)
+		{
+		}
+
+		string m_name;
+		string m_id;
+	};
 
 private:
 	IAllocator& m_allocator;
 
-	Renderer* m_renderer;
 	FS::FileSystem* m_file_system;
 	FS::MemoryFileDevice* m_mem_file_device;
 	FS::DiskFileDevice* m_disk_file_device;
 
 	ResourceManager m_resource_manager;
-
+	
 	MTJD::Manager m_mtjd_manager;
 
-	WorldEditor* m_editor;
+	AssociativeArray<uint32_t, Array<IPropertyDescriptor*>>
+		m_component_properties;
+	Array<ComponentType> m_component_types;
 	PluginManager* m_plugin_manager;
 	InputSystem m_input_system;
 	Timer* m_timer;
@@ -426,7 +469,7 @@ void showLogInVS(const char*, const char* message)
 }
 
 
-Engine* Engine::create(void* init_data, FS::FileSystem* fs, IAllocator& allocator)
+Engine* Engine::create(FS::FileSystem* fs, IAllocator& allocator)
 {
 	installUnhandledExceptionHandler();
 
@@ -435,7 +478,7 @@ Engine* Engine::create(void* init_data, FS::FileSystem* fs, IAllocator& allocato
 	g_log_error.getCallback().bind<showLogInVS>();
 
 	EngineImpl* engine = allocator.newObject<EngineImpl>(fs, allocator);
-	if (!engine->create(init_data))
+	if (!engine->create())
 	{
 		allocator.deleteObject(engine);
 		return nullptr;

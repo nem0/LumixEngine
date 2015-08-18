@@ -7,10 +7,10 @@
 #include "core/stack_allocator.h"
 #include "editor/world_editor.h"
 #include "engine.h"
-#include "graphics/material.h"
-#include "graphics/model.h"
-#include "graphics/shader.h"
-#include "graphics/texture.h"
+#include "renderer/material.h"
+#include "renderer/model.h"
+#include "renderer/shader.h"
+#include "renderer/texture.h"
 #include <qapplication.h>
 #include <qfile.h>
 #include <qfiledialog.h>

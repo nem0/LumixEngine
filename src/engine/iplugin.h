@@ -44,7 +44,6 @@ namespace Lumix
 			virtual void update(float) {}
 			virtual const char* getName() const = 0;
 			virtual void sendMessage(const char*) {};
-			virtual void setWorldEditor(class WorldEditor& editor) {}
 
 			virtual IScene* createScene(UniverseContext&) { return nullptr; }
 			virtual void destroyScene(IScene*) { ASSERT(false); }

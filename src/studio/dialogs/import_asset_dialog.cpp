@@ -11,7 +11,7 @@
 #include "crnlib.h"
 #include "debug/floating_points.h"
 #include "editor/world_editor.h"
-#include "graphics/model.h"
+#include "renderer/model.h"
 #include "mainwindow.h"
 #include "metadata.h"
 #include "physics/physics_geometry_manager.h"

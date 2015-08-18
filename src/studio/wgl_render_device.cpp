@@ -3,13 +3,15 @@
 #include "core/resource_manager.h"
 #include "editor/world_editor.h"
 #include "engine.h"
-#include "graphics/pipeline.h"
+#include "renderer/pipeline.h"
 #include <qwidget.h>
 
 
-WGLRenderDevice::WGLRenderDevice(Lumix::Engine& engine,
+WGLRenderDevice::WGLRenderDevice(Lumix::WorldEditor& editor,
+								 Lumix::Engine& engine,
 								 const char* pipeline_path)
 	: m_engine(engine)
+	, m_editor(editor)
 {
 	Lumix::Pipeline* pipeline_object =
 		static_cast<Lumix::Pipeline*>(engine.getResourceManager()
@@ -21,14 +23,11 @@ WGLRenderDevice::WGLRenderDevice(Lumix::Engine& engine,
 		m_pipeline = Lumix::PipelineInstance::create(*pipeline_object,
 													 engine.getAllocator());
 		m_pipeline->setScene(
-			(Lumix::RenderScene*)engine.getWorldEditor()->getScene(
-				Lumix::crc32("renderer")));
+			(Lumix::RenderScene*)editor.getScene(Lumix::crc32("renderer")));
 	}
-	engine.getWorldEditor()
-		->universeCreated()
+	editor.universeCreated()
 		.bind<WGLRenderDevice, &WGLRenderDevice::onUniverseCreated>(this);
-	engine.getWorldEditor()
-		->universeDestroyed()
+	editor.universeDestroyed()
 		.bind<WGLRenderDevice, &WGLRenderDevice::onUniverseDestroyed>(this);
 }
 
@@ -50,8 +49,7 @@ void WGLRenderDevice::setWidget(QWidget& widget)
 void WGLRenderDevice::onUniverseCreated()
 {
 	getPipeline().setScene(
-		(Lumix::RenderScene*)m_engine.getWorldEditor()->getScene(
-			Lumix::crc32("renderer")));
+		(Lumix::RenderScene*)m_editor.getScene(Lumix::crc32("renderer")));
 }
 
 
@@ -81,11 +79,9 @@ int WGLRenderDevice::getHeight() const
 
 void WGLRenderDevice::shutdown()
 {
-	m_engine.getWorldEditor()
-		->universeCreated()
+	m_editor.universeCreated()
 		.unbind<WGLRenderDevice, &WGLRenderDevice::onUniverseCreated>(this);
-	m_engine.getWorldEditor()
-		->universeDestroyed()
+	m_editor.universeDestroyed()
 		.unbind<WGLRenderDevice, &WGLRenderDevice::onUniverseDestroyed>(this);
 	if (m_pipeline)
 	{
