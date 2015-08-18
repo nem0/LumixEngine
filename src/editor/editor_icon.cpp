@@ -54,14 +54,14 @@ void EditorIcon::unloadIcons()
 }
 
 
-EditorIcon::EditorIcon(Engine& engine, RenderScene& scene, Entity entity)
+EditorIcon::EditorIcon(WorldEditor& editor, RenderScene& scene, Entity entity)
 {
 	m_scale = 1;
 	m_scene = &scene;
 	m_entity = entity;
 	m_is_visible = true;
 	const WorldEditor::ComponentList& cmps =
-		engine.getWorldEditor()->getComponents(entity);
+		editor.getComponents(entity);
 	m_type = ENTITY;
 	for (int i = 0; i < cmps.size(); ++i)
 	{
@@ -92,7 +92,8 @@ EditorIcon::EditorIcon(Engine& engine, RenderScene& scene, Entity entity)
 			break;
 		}
 	}
-	m_model = static_cast<Model*>(engine.getResourceManager()
+	m_model = static_cast<Model*>(editor.getEngine()
+									  .getResourceManager()
 									  .get(ResourceManager::MODEL)
 									  ->load(Path(ICON_NAMES[m_type])));
 }

@@ -153,6 +153,8 @@ struct RendererImpl : public Renderer
 
 		m_current_pass_hash = crc32("MAIN");
 		m_view_counter = 0;
+
+		registerPropertyDescriptors();
 	}
 
 	~RendererImpl()
@@ -184,24 +186,22 @@ struct RendererImpl : public Renderer
 
 	void registerPropertyDescriptors()
 	{
-		ASSERT(m_engine.getWorldEditor());
-		WorldEditor& editor = *m_engine.getWorldEditor();
-		IAllocator& allocator = m_engine.getWorldEditor()->getAllocator();
+		IAllocator& allocator = m_engine.getAllocator();
 
-		editor.registerComponentType("camera", "Camera");
-		editor.registerComponentType("global_light", "Global light");
-		editor.registerComponentType("renderable", "Mesh");
-		editor.registerComponentType("point_light", "Point light");
-		editor.registerComponentType("terrain", "Terrain");
+		m_engine.registerComponentType("camera", "Camera");
+		m_engine.registerComponentType("global_light", "Global light");
+		m_engine.registerComponentType("renderable", "Mesh");
+		m_engine.registerComponentType("point_light", "Point light");
+		m_engine.registerComponentType("terrain", "Terrain");
 
-		editor.registerProperty(
+		m_engine.registerProperty(
 			"camera",
 			allocator.newObject<StringPropertyDescriptor<RenderScene>>(
 				"slot",
 				&RenderScene::getCameraSlot,
 				&RenderScene::setCameraSlot,
 				allocator));
-		editor.registerProperty(
+		m_engine.registerProperty(
 			"camera",
 			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
 				"fov",
@@ -211,7 +211,7 @@ struct RendererImpl : public Renderer
 				360.0f,
 				1.0f,
 				allocator));
-		editor.registerProperty(
+		m_engine.registerProperty(
 			"camera",
 			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
 				"near",
@@ -221,7 +221,7 @@ struct RendererImpl : public Renderer
 				FLT_MAX,
 				0.0f,
 				allocator));
-		editor.registerProperty(
+		m_engine.registerProperty(
 			"camera",
 			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
 				"far",
@@ -232,7 +232,7 @@ struct RendererImpl : public Renderer
 				0.0f,
 				allocator));
 
-		editor.registerProperty(
+		m_engine.registerProperty(
 			"renderable",
 			allocator.newObject<ResourcePropertyDescriptor<RenderScene>>(
 				"source",
@@ -240,7 +240,7 @@ struct RendererImpl : public Renderer
 				&RenderScene::setRenderablePath,
 				"Mesh (*.msh)",
 				allocator));
-		editor.registerProperty(
+		m_engine.registerProperty(
 			"renderable",
 			allocator.newObject<BoolPropertyDescriptor<RenderScene>>(
 				"is_always_visible",
@@ -248,7 +248,7 @@ struct RendererImpl : public Renderer
 				&RenderScene::setRenderableIsAlwaysVisible,
 				allocator));
 
-		editor.registerProperty(
+		m_engine.registerProperty(
 			"global_light",
 			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
 				"ambient_intensity",
@@ -258,7 +258,7 @@ struct RendererImpl : public Renderer
 				1.0f,
 				0.05f,
 				allocator));
-		editor.registerProperty(
+		m_engine.registerProperty(
 			"global_light",
 			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
 				"intensity",
@@ -268,7 +268,7 @@ struct RendererImpl : public Renderer
 				1.0f,
 				0.05f,
 				allocator));
-		editor.registerProperty(
+		m_engine.registerProperty(
 			"global_light",
 			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
 				"fog_density",
@@ -278,21 +278,21 @@ struct RendererImpl : public Renderer
 				1.0f,
 				0.01f,
 				allocator));
-		editor.registerProperty(
+		m_engine.registerProperty(
 			"global_light",
 			allocator.newObject<ColorPropertyDescriptor<RenderScene>>(
 				"ambient_color",
 				&RenderScene::getLightAmbientColor,
 				&RenderScene::setLightAmbientColor,
 				allocator));
-		editor.registerProperty(
+		m_engine.registerProperty(
 			"global_light",
 			allocator.newObject<ColorPropertyDescriptor<RenderScene>>(
 				"color",
 				&RenderScene::getGlobalLightColor,
 				&RenderScene::setGlobalLightColor,
 				allocator));
-		editor.registerProperty(
+		m_engine.registerProperty(
 			"global_light",
 			allocator.newObject<ColorPropertyDescriptor<RenderScene>>(
 				"fog_color",
@@ -300,7 +300,7 @@ struct RendererImpl : public Renderer
 				&RenderScene::setFogColor,
 				allocator));
 
-		editor.registerProperty(
+		m_engine.registerProperty(
 			"point_light",
 			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
 				"intensity",
@@ -310,21 +310,21 @@ struct RendererImpl : public Renderer
 				1.0f,
 				0.05f,
 				allocator));
-		editor.registerProperty(
+		m_engine.registerProperty(
 			"point_light",
 			allocator.newObject<ColorPropertyDescriptor<RenderScene>>(
 				"color",
 				&RenderScene::getPointLightColor,
 				&RenderScene::setPointLightColor,
 				allocator));
-		editor.registerProperty(
+		m_engine.registerProperty(
 			"point_light",
 			allocator.newObject<ColorPropertyDescriptor<RenderScene>>(
 				"specular",
 				&RenderScene::getPointLightSpecularColor,
 				&RenderScene::setPointLightSpecularColor,
 				allocator));
-		editor.registerProperty(
+		m_engine.registerProperty(
 			"point_light",
 			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
 				"range",
@@ -334,7 +334,7 @@ struct RendererImpl : public Renderer
 				FLT_MAX,
 				0.0f,
 				allocator));
-		editor.registerProperty(
+		m_engine.registerProperty(
 			"point_light",
 			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
 				"FOV",
@@ -345,7 +345,7 @@ struct RendererImpl : public Renderer
 				5.0f,
 				allocator));
 
-		editor.registerProperty(
+		m_engine.registerProperty(
 			"terrain",
 			allocator.newObject<ResourcePropertyDescriptor<RenderScene>>(
 				"material",
@@ -353,7 +353,7 @@ struct RendererImpl : public Renderer
 				&RenderScene::setTerrainMaterialPath,
 				"Material (*.mat)",
 				allocator));
-		editor.registerProperty(
+		m_engine.registerProperty(
 			"terrain",
 			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
 				"xz_scale",
@@ -363,7 +363,7 @@ struct RendererImpl : public Renderer
 				FLT_MAX,
 				0.0f,
 				allocator));
-		editor.registerProperty(
+		m_engine.registerProperty(
 			"terrain",
 			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
 				"y_scale",
@@ -401,7 +401,7 @@ struct RendererImpl : public Renderer
 				&RenderScene::getGrassDensity,
 				&RenderScene::setGrassDensity,
 				allocator));
-		editor.registerProperty("terrain", grass);
+		m_engine.registerProperty("terrain", grass);
 	}
 
 
@@ -430,12 +430,6 @@ struct RendererImpl : public Renderer
 		auto& new_pass = m_passes.pushEmpty();
 		copyString(new_pass, sizeof(new_pass), pass);
 		return m_passes.size() - 1;
-	}
-
-
-	virtual void setWorldEditor(WorldEditor& editor) override
-	{
-		registerPropertyDescriptors();
 	}
 
 

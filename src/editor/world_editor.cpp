@@ -555,8 +555,8 @@ public:
 		uint32_t property_name_hash;
 		serializer.deserialize("property_name_hash", property_name_hash, 0);
 		m_descriptor = static_cast<const IArrayDescriptor*>(
-			&m_editor.getPropertyDescriptor(m_component.type,
-											property_name_hash));
+			&m_editor.getEngine().getPropertyDescriptor(m_component.type,
+														property_name_hash));
 	}
 
 
@@ -636,8 +636,8 @@ public:
 		uint32_t property_name_hash;
 		serializer.deserialize("property_name_hash", property_name_hash, 0);
 		m_descriptor = static_cast<const IArrayDescriptor*>(
-			&m_editor.getPropertyDescriptor(m_component.type,
-											property_name_hash));
+			&m_editor.getEngine().getPropertyDescriptor(m_component.type,
+														property_name_hash));
 	}
 
 
@@ -756,7 +756,7 @@ public:
 		serializer.deserializeArrayEnd();
 		uint32_t property_name_hash;
 		serializer.deserialize("property_name_hash", property_name_hash, 0);
-		m_property_descriptor = &m_editor.getPropertyDescriptor(
+		m_property_descriptor = &m_editor.getEngine().getPropertyDescriptor(
 			m_component_type, property_name_hash);
 	}
 
@@ -1087,16 +1087,12 @@ private:
 				for (int j = cmps.size() - 1; j >= 0; --j)
 				{
 					m_old_values.write(cmps[j].type);
-					int props_index =
-						m_editor.m_component_properties.find(cmps[j].type);
-					if (props_index >= 0)
+					Array<IPropertyDescriptor*>& props =
+						m_editor.getEngine().getPropertyDescriptors(
+							cmps[j].type);
+					for (int k = 0; k < props.size(); ++k)
 					{
-						Array<IPropertyDescriptor*>& props =
-							m_editor.m_component_properties.at(props_index);
-						for (int k = 0; k < props.size(); ++k)
-						{
-							props[k]->get(cmps[j], m_old_values);
-						}
+						props[k]->get(cmps[j], m_old_values);
 					}
 					cmps[j].scene->destroyComponent(cmps[j].index,
 													cmps[j].type);
@@ -1142,17 +1138,12 @@ private:
 						}
 					}
 
-					int props_index =
-						m_editor.m_component_properties.find(cmp_type);
-					if (props_index >= 0)
-					{
-						Array<IPropertyDescriptor*>& props =
-							m_editor.m_component_properties.at(props_index);
+					Array<IPropertyDescriptor*>& props =
+						m_editor.getEngine().getPropertyDescriptors(cmp_type);
 
-						for (int k = 0; k < props.size(); ++k)
-						{
-							props[k]->set(new_component, blob);
-						}
+					for (int k = 0; k < props.size(); ++k)
+					{
+						props[k]->set(new_component, blob);
 					}
 				}
 			}
@@ -1225,8 +1216,6 @@ private:
 			uint32_t template_hash =
 				m_editor.m_template_system->getTemplate(m_component.entity);
 			const Array<IScene*>& scenes = m_editor.getScenes();
-			int props_index =
-				m_editor.m_component_properties.find(m_component.type);
 
 			if (template_hash == 0)
 			{
@@ -1242,14 +1231,12 @@ private:
 					}
 				}
 				InputBlob blob(m_old_values);
-				if (props_index >= 0)
+				const Array<IPropertyDescriptor*>& props =
+					m_editor.getEngine().getPropertyDescriptors(
+						m_component.type);
+				for (int i = 0; i < props.size(); ++i)
 				{
-					const Array<IPropertyDescriptor*>& props =
-						m_editor.m_component_properties.at(props_index);
-					for (int i = 0; i < props.size(); ++i)
-					{
-						props[i]->set(m_component, blob);
-					}
+					props[i]->set(m_component, blob);
 				}
 				m_editor.componentAdded().invoke(m_component);
 			}
@@ -1273,15 +1260,12 @@ private:
 						if (cmp_new.isValid())
 						{
 							InputBlob blob(m_old_values);
-							if (props_index >= 0)
+							const Array<IPropertyDescriptor*>& props =
+								m_editor.getEngine().getPropertyDescriptors(
+									m_component.type);
+							for (int i = 0; i < props.size(); ++i)
 							{
-								const Array<IPropertyDescriptor*>& props =
-									m_editor.m_component_properties.at(
-										props_index);
-								for (int i = 0; i < props.size(); ++i)
-								{
-									props[i]->set(cmp_new, blob);
-								}
+								props[i]->set(cmp_new, blob);
 							}
 							m_editor.componentAdded().invoke(cmp_new);
 						}
@@ -1304,7 +1288,7 @@ private:
 		virtual void execute() override
 		{
 			Array<IPropertyDescriptor*>& props =
-				m_editor.getPropertyDescriptors(m_component.type);
+				m_editor.getEngine().getPropertyDescriptors(m_component.type);
 			for (int i = 0; i < props.size(); ++i)
 			{
 				props[i]->get(m_component, m_old_values);
@@ -1464,57 +1448,6 @@ public:
 	virtual Engine& getEngine() override { return *m_engine; }
 
 
-	virtual IPropertyDescriptor* getProperty(const char* component_type,
-											 const char* property_name) override
-	{
-		auto& props = getPropertyDescriptors(crc32(component_type));
-		auto name_hash = crc32(property_name);
-		for (int i = 0; i < props.size(); ++i)
-		{
-			if (props[i]->getNameHash() == name_hash)
-			{
-				return props[i];
-			}
-		}
-		return nullptr;
-	}
-
-
-	virtual const char* getComponentTypeName(int index) override
-	{
-		return m_component_types[index].m_name.c_str();
-	}
-
-
-	virtual const char* getComponentTypeID(int index) override
-	{
-		return m_component_types[index].m_id.c_str();
-	}
-
-
-	virtual int getComponentTypesCount() const override
-	{
-		return m_component_types.size();
-	}
-
-
-	virtual void registerComponentType(const char* id,
-									   const char* name) override
-	{
-		ComponentType& type = m_component_types.emplace(m_allocator);
-		type.m_name = name;
-		type.m_id = id;
-	}
-
-
-	virtual void registerProperty(const char* component_type,
-								  IPropertyDescriptor* descriptor) override
-	{
-		ASSERT(descriptor);
-		getPropertyDescriptors(crc32(component_type)).push(descriptor);
-	}
-
-
 	Vec3 minCoords(const Vec3& a, const Vec3& b)
 	{
 		return Vec3(Math::minValue(a.x, b.x),
@@ -1657,14 +1590,6 @@ public:
 		removePlugin(*m_measure_tool);
 		m_allocator.deleteObject(m_measure_tool);
 		destroyUndoStack();
-		for (int j = 0; j < m_component_properties.size(); ++j)
-		{
-			Array<IPropertyDescriptor*>& props = m_component_properties.at(j);
-			for (int i = 0, c = props.size(); i < c; ++i)
-			{
-				m_allocator.deleteObject(props[i]);
-			}
-		}
 
 		destroyUniverse();
 		EntityTemplateSystem::destroy(m_template_system);
@@ -2032,7 +1957,7 @@ public:
 		if (m_camera >= 0)
 		{
 			EditorIcon* er = m_allocator.newObject<EditorIcon>(
-				*m_engine,
+				*this,
 				*static_cast<RenderScene*>(
 					getComponent(m_camera, CAMERA_HASH).scene),
 				entity);
@@ -2238,7 +2163,7 @@ public:
 				uint32_t cmp_type = cmps[i].type;
 				m_copy_buffer.write(cmp_type);
 				Array<IPropertyDescriptor*>& props =
-					getPropertyDescriptors(cmps[i].type);
+					getEngine().getPropertyDescriptors(cmps[i].type);
 				int32_t prop_count = props.size();
 				for (int j = 0; j < prop_count; ++j)
 				{
@@ -2275,7 +2200,7 @@ public:
 		}
 
 		const Array<IPropertyDescriptor*>& properties =
-			getPropertyDescriptors(src.type);
+			getEngine().getPropertyDescriptors(src.type);
 		OutputBlob stream(m_allocator);
 		for (int i = 0; i < properties.size(); ++i)
 		{
@@ -2291,7 +2216,8 @@ public:
 	{
 		if (component.entity == m_camera)
 		{
-			g_log_warning.log("editor") << "Can not destroy component from the editing camera";
+			g_log_warning.log("editor")
+				<< "Can not destroy component from the editing camera";
 			return;
 		}
 
@@ -2502,7 +2428,7 @@ public:
 		if (!found_renderable)
 		{
 			EditorIcon* er = m_allocator.newObject<EditorIcon>(
-				*m_engine,
+				*this,
 				*static_cast<RenderScene*>(
 					getComponent(m_camera, CAMERA_HASH).scene),
 				entity);
@@ -2549,7 +2475,6 @@ public:
 		, m_engine(nullptr)
 		, m_universe_mutex(false)
 		, m_gizmo(*this)
-		, m_component_properties(m_allocator)
 		, m_components(m_allocator)
 		, m_entity_name_set(m_allocator)
 		, m_entity_selected(m_allocator)
@@ -2566,7 +2491,6 @@ public:
 		, m_copy_buffer(m_allocator)
 		, m_camera(INVALID_ENTITY)
 		, m_editor_command_creators(m_allocator)
-		, m_component_types(m_allocator)
 		, m_is_loading(false)
 		, m_universe_path("")
 		, m_universe_context(nullptr)
@@ -2583,18 +2507,16 @@ public:
 		m_base_path = base_path;
 
 		m_engine = &engine;
-		m_engine->setWorldEditor(*this);
 
-		const char* plugins[] = {
-			"renderer.dll", "animation.dll", "physics.dll", "lua_script.dll", "script.dll"};
+		const char* plugins[] = {"renderer.dll",
+								 "animation.dll",
+								 "physics.dll",
+								 "lua_script.dll",
+								 "script.dll"};
 
 		for (auto* plugin_name : plugins)
 		{
-			if (auto plugin = m_engine->loadPlugin(plugin_name))
-			{
-				plugin->setWorldEditor(*this);
-			}
-			else
+			if (!m_engine->loadPlugin(plugin_name))
 			{
 				g_log_info.log("plugins") << plugin_name
 										  << " plugin has not been loaded";
@@ -2659,36 +2581,6 @@ public:
 	virtual const Array<Entity>& getSelectedEntities() const override
 	{
 		return m_selected_entities;
-	}
-
-
-	virtual Array<IPropertyDescriptor*>&
-	getPropertyDescriptors(uint32_t type) override
-	{
-		int props_index = m_component_properties.find(type);
-		if (props_index < 0)
-		{
-			m_component_properties.insert(
-				type, Array<IPropertyDescriptor*>(m_allocator));
-			props_index = m_component_properties.find(type);
-		}
-		return m_component_properties.at(props_index);
-	}
-
-
-	virtual const IPropertyDescriptor&
-	getPropertyDescriptor(uint32_t type, uint32_t name_hash) override
-	{
-		Array<IPropertyDescriptor*>& props = getPropertyDescriptors(type);
-		for (int i = 0; i < props.size(); ++i)
-		{
-			if (props[i]->getNameHash() == name_hash)
-			{
-				return *props[i];
-			}
-		}
-		ASSERT(false);
-		return *props[0];
 	}
 
 
@@ -2843,7 +2735,7 @@ public:
 			getComponents(cmp.entity).empty())
 		{
 			EditorIcon* er = m_allocator.newObject<EditorIcon>(
-				*m_engine,
+				*this,
 				*static_cast<RenderScene*>(
 					getComponent(m_camera, CAMERA_HASH).scene),
 				cmp.entity);
@@ -3211,10 +3103,7 @@ private:
 	GoToParameters m_go_to_parameters;
 	MT::Mutex m_universe_mutex;
 	Gizmo m_gizmo;
-	Array<ComponentType> m_component_types;
 	Array<Entity> m_selected_entities;
-	AssociativeArray<uint32_t, Array<IPropertyDescriptor*>>
-		m_component_properties;
 	MouseMode::Value m_mouse_mode;
 	float m_mouse_x;
 	float m_mouse_y;
@@ -3278,7 +3167,7 @@ void PasteEntityCommand::execute()
 		ComponentUID cmp = static_cast<WorldEditorImpl&>(m_editor)
 							   .createComponent(type, new_entity);
 		Array<IPropertyDescriptor*>& props =
-			m_editor.getPropertyDescriptors(type);
+			m_editor.getEngine().getPropertyDescriptors(type);
 		for (int j = 0; j < props.size(); ++j)
 		{
 			props[j]->set(cmp, blob);

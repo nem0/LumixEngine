@@ -4,6 +4,7 @@
 #include "core/math_utils.h"
 #include "core/path.h"
 #include "editor/world_editor.h"
+#include "engine/engine.h"
 #include "engine/property_descriptor.h"
 #include "property_view.h"
 #include "universe/universe.h"
@@ -22,11 +23,12 @@ static const int COMPONENT_OFFSET = 4;
 
 const char* EntityModel::getComponentName(Lumix::ComponentUID cmp) const
 {
-	for (int i = 0; i < m_editor.getComponentTypesCount(); ++i)
+	for (int i = 0; i < m_editor.getEngine().getComponentTypesCount(); ++i)
 	{
-		if (cmp.type == Lumix::crc32(m_editor.getComponentTypeID(i)))
+		if (cmp.type ==
+			Lumix::crc32(m_editor.getEngine().getComponentTypeID(i)))
 		{
-			return m_editor.getComponentTypeName(i);
+			return m_editor.getEngine().getComponentTypeName(i);
 		}
 	}
 	return "Unknown component";
@@ -169,7 +171,7 @@ void EntityModel::onPropertySet(Lumix::ComponentUID component,
 			if (cmps[i].type == component.type)
 			{
 				auto& descriptors =
-					m_editor.getPropertyDescriptors(component.type);
+					m_editor.getEngine().getPropertyDescriptors(component.type);
 				auto* node = getRoot().m_children[i + COMPONENT_OFFSET];
 				for (int j = 0; j < node->m_children.size(); ++j)
 				{
@@ -502,7 +504,8 @@ void EntityModel::addArrayProperty(Node& child,
 
 void EntityModel::addComponentNode(Lumix::ComponentUID cmp, int component_index)
 {
-	Node& node = getRoot().addChild(getComponentName(cmp), component_index + COMPONENT_OFFSET);
+	Node& node = getRoot().addChild(getComponentName(cmp),
+									component_index + COMPONENT_OFFSET);
 	node.m_getter = []() -> QVariant
 	{
 		return "";
@@ -525,7 +528,7 @@ void EntityModel::addComponentNode(Lumix::ComponentUID cmp, int component_index)
 		return widget;
 	};
 	node.enablePeristentEditor();
-	auto& descriptors = m_editor.getPropertyDescriptors(cmp.type);
+	auto& descriptors = m_editor.getEngine().getPropertyDescriptors(cmp.type);
 	for (int j = 0; j < descriptors.size(); ++j)
 	{
 		auto* desc = descriptors[j];
@@ -629,28 +632,29 @@ void EntityModel::addComponent(QWidget* widget, QPoint pos)
 	};
 
 	CB* combobox = new CB(widget);
-	for (int i = 0; i < m_editor.getComponentTypesCount(); ++i)
+	for (int i = 0; i < m_editor.getEngine().getComponentTypesCount(); ++i)
 	{
-		combobox->addItem(m_editor.getComponentTypeName(i));
+		combobox->addItem(m_editor.getEngine().getComponentTypeName(i));
 	}
 	combobox->connect(
 		combobox,
 		(void (QComboBox::*)(int)) & QComboBox::activated,
 		[this, combobox](int value)
 		{
-			for (int i = 0; i < m_editor.getComponentTypesCount(); ++i)
+			for (int i = 0; i < m_editor.getEngine().getComponentTypesCount();
+				 ++i)
 			{
 				if (combobox->itemText(value) ==
-					m_editor.getComponentTypeName(i))
+					m_editor.getEngine().getComponentTypeName(i))
 				{
 					if (!m_editor.getComponent(
 									 m_entity,
-									 Lumix::crc32(
-										 m_editor.getComponentTypeID(i)))
+									 Lumix::crc32(m_editor.getEngine()
+													  .getComponentTypeID(i)))
 							 .isValid())
 					{
-						m_editor.addComponent(
-							Lumix::crc32(m_editor.getComponentTypeID(i)));
+						m_editor.addComponent(Lumix::crc32(
+							m_editor.getEngine().getComponentTypeID(i)));
 					}
 					break;
 				}

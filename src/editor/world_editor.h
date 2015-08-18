@@ -68,14 +68,6 @@ public:
 
 	virtual void update() = 0;
 	virtual void updateEngine() = 0;
-	virtual void registerProperty(const char* component_type,
-								  IPropertyDescriptor* descriptor) = 0;
-	virtual int getComponentTypesCount() const = 0;
-	virtual const char* getComponentTypeName(int index) = 0;
-	virtual const char* getComponentTypeID(int index) = 0;
-	virtual void registerComponentType(const char* id, const char* name) = 0;
-	virtual IPropertyDescriptor* getProperty(const char* component_type,
-											 const char* property_name) = 0;
 	virtual void executeCommand(IEditorCommand* command) = 0;
 	virtual IEditorCommand* createEditorCommand(uint32_t command_type) = 0;
 	virtual Engine& getEngine() = 0;
@@ -140,10 +132,6 @@ public:
 	virtual void lookAtSelected() = 0;
 	virtual const char* getBasePath() = 0;
 	virtual const Array<Entity>& getSelectedEntities() const = 0;
-	virtual const IPropertyDescriptor&
-	getPropertyDescriptor(uint32_t type, uint32_t name_hash) = 0;
-	virtual Array<IPropertyDescriptor*>&
-	getPropertyDescriptors(uint32_t type) = 0;
 
 	virtual DelegateList<void(const Array<Entity>&)>& entitySelected() = 0;
 	virtual DelegateList<void()>& universeCreated() = 0;

@@ -33,6 +33,7 @@ struct PhysicsSystemImpl : public PhysicsSystem
 		, m_manager(*this, engine.getAllocator())
 	{
 		m_manager.create(ResourceManager::PHYSICS, engine.getResourceManager());
+		registerProperties();
 	}
 
 	virtual bool create() override;
@@ -54,12 +55,7 @@ struct PhysicsSystemImpl : public PhysicsSystem
 	{
 		return m_cooking;
 	}
-
-	virtual void setWorldEditor(WorldEditor& editor) override
-	{
-		registerProperties();
-	}
-
+	
 	bool connect2VisualDebugger();
 	void registerProperties();
 
@@ -118,68 +114,64 @@ class AssertNullAllocator : public physx::PxAllocatorCallback
 
 void PhysicsSystemImpl::registerProperties()
 {
-	WorldEditor* editor = m_engine.getWorldEditor();
-	if (editor)
-	{
-		editor->registerComponentType("box_rigid_actor", "Physics Box");
-		editor->registerComponentType("physical_controller",
-									  "Physics Controller");
-		editor->registerComponentType("mesh_rigid_actor", "Physics Mesh");
-		editor->registerComponentType("physical_heightfield",
-									  "Physics Heightfield");
+	m_engine.registerComponentType("box_rigid_actor", "Physics Box");
+	m_engine.registerComponentType("physical_controller",
+									"Physics Controller");
+	m_engine.registerComponentType("mesh_rigid_actor", "Physics Mesh");
+	m_engine.registerComponentType("physical_heightfield",
+									"Physics Heightfield");
 
-		IAllocator& allocator = editor->getAllocator();
-		editor->registerProperty(
-			"box_rigid_actor",
-			allocator.newObject<BoolPropertyDescriptor<PhysicsScene>>(
-				"dynamic",
-				&PhysicsScene::isDynamic,
-				&PhysicsScene::setIsDynamic,
-				allocator));
-		editor->registerProperty(
-			"box_rigid_actor",
-			allocator.newObject<Vec3PropertyDescriptor<PhysicsScene>>(
-				"size",
-				&PhysicsScene::getHalfExtents,
-				&PhysicsScene::setHalfExtents,
-				allocator));
-		editor->registerProperty(
-			"mesh_rigid_actor",
-			allocator.newObject<ResourcePropertyDescriptor<PhysicsScene>>(
-				"source",
-				&PhysicsScene::getShapeSource,
-				&PhysicsScene::setShapeSource,
-				"Physics (*.pda)",
-				allocator));
-		editor->registerProperty(
-			"physical_heightfield",
-			allocator.newObject<ResourcePropertyDescriptor<PhysicsScene>>(
-				"heightmap",
-				&PhysicsScene::getHeightmap,
-				&PhysicsScene::setHeightmap,
-				"Image (*.raw)",
-				allocator));
-		editor->registerProperty(
-			"physical_heightfield",
-			allocator.newObject<DecimalPropertyDescriptor<PhysicsScene>>(
-				"xz_scale",
-				&PhysicsScene::getHeightmapXZScale,
-				&PhysicsScene::setHeightmapXZScale,
-				0.0f,
-				FLT_MAX,
-				0.0f,
-				allocator));
-		editor->registerProperty(
-			"physical_heightfield",
-			allocator.newObject<DecimalPropertyDescriptor<PhysicsScene>>(
-				"y_scale",
-				&PhysicsScene::getHeightmapYScale,
-				&PhysicsScene::setHeightmapYScale,
-				0.0f,
-				FLT_MAX,
-				0.0f,
-				allocator));
-	}
+	IAllocator& allocator = m_engine.getAllocator();
+	m_engine.registerProperty(
+		"box_rigid_actor",
+		allocator.newObject<BoolPropertyDescriptor<PhysicsScene>>(
+			"dynamic",
+			&PhysicsScene::isDynamic,
+			&PhysicsScene::setIsDynamic,
+			allocator));
+	m_engine.registerProperty(
+		"box_rigid_actor",
+		allocator.newObject<Vec3PropertyDescriptor<PhysicsScene>>(
+			"size",
+			&PhysicsScene::getHalfExtents,
+			&PhysicsScene::setHalfExtents,
+			allocator));
+	m_engine.registerProperty(
+		"mesh_rigid_actor",
+		allocator.newObject<ResourcePropertyDescriptor<PhysicsScene>>(
+			"source",
+			&PhysicsScene::getShapeSource,
+			&PhysicsScene::setShapeSource,
+			"Physics (*.pda)",
+			allocator));
+	m_engine.registerProperty(
+		"physical_heightfield",
+		allocator.newObject<ResourcePropertyDescriptor<PhysicsScene>>(
+			"heightmap",
+			&PhysicsScene::getHeightmap,
+			&PhysicsScene::setHeightmap,
+			"Image (*.raw)",
+			allocator));
+	m_engine.registerProperty(
+		"physical_heightfield",
+		allocator.newObject<DecimalPropertyDescriptor<PhysicsScene>>(
+			"xz_scale",
+			&PhysicsScene::getHeightmapXZScale,
+			&PhysicsScene::setHeightmapXZScale,
+			0.0f,
+			FLT_MAX,
+			0.0f,
+			allocator));
+	m_engine.registerProperty(
+		"physical_heightfield",
+		allocator.newObject<DecimalPropertyDescriptor<PhysicsScene>>(
+			"y_scale",
+			&PhysicsScene::getHeightmapYScale,
+			&PhysicsScene::setHeightmapYScale,
+			0.0f,
+			FLT_MAX,
+			0.0f,
+			allocator));
 }
 
 

@@ -13,6 +13,7 @@ class Engine;
 class Model;
 class PipelineInstance;
 class RenderScene;
+class WorldEditor;
 
 
 class EditorIcon
@@ -30,7 +31,7 @@ class EditorIcon
 		};
 
 	public:
-		EditorIcon(Engine& engine, RenderScene& scene, Entity entity);
+		EditorIcon(WorldEditor& editor, RenderScene& scene, Entity entity);
 		~EditorIcon();
 		void render(PipelineInstance& pipeline);
 		void show();
