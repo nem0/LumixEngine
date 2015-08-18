@@ -202,9 +202,13 @@ public:
 		m_universe = nullptr;
 		m_filter = filter;
 		m_is_update_enabled = true;
+		m_editor = nullptr;
 	}
 
 	~EntityListModel() { delete m_root; }
+
+
+	void setWorldEditor(Lumix::WorldEditor& editor) { m_editor = &editor; }
 
 
 	void enableUpdate(bool enable) { m_is_update_enabled = enable; }
@@ -266,14 +270,9 @@ public:
 		}
 
 		SetParentEditorCommand* command =
-			m_engine->getWorldEditor()
-				->getAllocator()
-				.newObject<SetParentEditorCommand>(
-					*m_engine->getWorldEditor(),
-					*m_engine->getWorldEditor()->getHierarchy(),
-					child,
-					parent_entity);
-		m_engine->getWorldEditor()->executeCommand(command);
+			m_editor->getAllocator().newObject<SetParentEditorCommand>(
+				*m_editor, *m_editor->getHierarchy(), child, parent_entity);
+		m_editor->executeCommand(command);
 
 		return false;
 	}
@@ -408,8 +407,7 @@ public:
 				case 0:
 				{
 					const QByteArray& name = value.toString().toLatin1();
-					m_engine->getWorldEditor()->setEntityName(item->m_entity,
-															  name.data());
+					m_editor->setEntityName(item->m_entity, name.data());
 					emit dataChanged(index, index);
 					return true;
 				}
@@ -433,11 +431,9 @@ public:
 		if (index.isValid() && role == Qt::DisplayRole)
 		{
 			Lumix::ComponentUID renderable =
-				m_engine->getWorldEditor()->getComponent(item->m_entity,
-														 RENDERABLE_HASH);
+				m_editor->getComponent(item->m_entity, RENDERABLE_HASH);
 			const char* name =
-				m_engine->getWorldEditor()->getUniverse()->getEntityName(
-					item->m_entity);
+				m_editor->getUniverse()->getEntityName(item->m_entity);
 			if (renderable.isValid())
 			{
 				const char* path =
@@ -467,14 +463,10 @@ public:
 	}
 
 
-	void setEngine(Lumix::Engine& engine) { m_engine = &engine; }
-
-
 	void fillChildren(EntityNode* node)
 	{
 		Lumix::Array<Lumix::Hierarchy::Child>* children =
-			m_engine->getWorldEditor()->getHierarchy()->getChildren(
-				node->m_entity);
+			m_editor->getHierarchy()->getChildren(node->m_entity);
 		if (children)
 		{
 			for (int i = 0; i < children->size(); ++i)
@@ -486,7 +478,7 @@ public:
 			}
 		}
 	}
-	 
+
 
 	void onParentSet(Lumix::Entity child, Lumix::Entity parent)
 	{
@@ -529,8 +521,7 @@ public:
 		m_universe = universe;
 		if (m_universe)
 		{
-			m_engine->getWorldEditor()
-				->getHierarchy()
+			m_editor->getHierarchy()
 				->parentSet()
 				.bind<EntityListModel, &EntityListModel::onParentSet>(this);
 			m_universe->entityCreated()
@@ -541,8 +532,7 @@ public:
 			Lumix::Entity e = m_universe->getFirstEntity();
 			while (e >= 0)
 			{
-				Lumix::Entity parent =
-					m_engine->getWorldEditor()->getHierarchy()->getParent(e);
+				Lumix::Entity parent = m_editor->getHierarchy()->getParent(e);
 				if (parent < 0)
 				{
 					EntityNode* node = new EntityNode(m_root, e);
@@ -581,7 +571,7 @@ private:
 
 private:
 	Lumix::Universe* m_universe;
-	Lumix::Engine* m_engine;
+	Lumix::WorldEditor* m_editor;
 	EntityNode* m_root;
 	EntityListFilter* m_filter;
 	bool m_is_update_enabled;
@@ -644,15 +634,15 @@ void EntityList::setWorldEditor(Lumix::WorldEditor& editor)
 	editor.universeLoaded().bind<EntityList, &EntityList::onUniverseLoaded>(
 		this);
 	m_universe = editor.getUniverse();
-	m_model->setEngine(editor.getEngine());
+	m_model->setWorldEditor(editor);
 	m_model->setUniverse(m_universe);
 	m_filter->setSourceModel(m_model);
 	m_filter->setWorldEditor(editor);
 	m_ui->comboBox->clear();
 	m_ui->comboBox->addItem("All");
-	for (int i = 0; i < m_editor->getComponentTypesCount(); ++i)
+	for (int i = 0; i < m_editor->getEngine().getComponentTypesCount(); ++i)
 	{
-		m_ui->comboBox->addItem(m_editor->getComponentTypeName(i));
+		m_ui->comboBox->addItem(m_editor->getEngine().getComponentTypeName(i));
 	}
 	editor.entitySelected().bind<EntityList, &EntityList::onEntitySelected>(
 		this);
@@ -730,11 +720,12 @@ void EntityList::on_entityList_clicked(const QModelIndex& index)
 
 void EntityList::on_comboBox_activated(const QString& arg1)
 {
-	for (int i = 0; i < m_editor->getComponentTypesCount(); ++i)
+	for (int i = 0; i < m_editor->getEngine().getComponentTypesCount(); ++i)
 	{
-		if (arg1 == m_editor->getComponentTypeName(i))
+		if (arg1 == m_editor->getEngine().getComponentTypeName(i))
 		{
-			m_filter->filterComponent(Lumix::crc32(m_editor->getComponentTypeID(i)));
+			m_filter->filterComponent(
+				Lumix::crc32(m_editor->getEngine().getComponentTypeID(i)));
 			if (m_is_update_enabled)
 			{
 				m_filter->invalidate();

@@ -292,6 +292,7 @@ public:
 		, m_engine(engine)
 		, m_animation_manager(m_allocator)
 	{
+		registerPropertyDescriptors();
 	}
 
 	virtual IScene* createScene(UniverseContext& ctx) override
@@ -310,11 +311,11 @@ public:
 	virtual const char* getName() const override { return "animation"; }
 
 
-	virtual void setWorldEditor(WorldEditor& editor) override
+	void registerPropertyDescriptors()
 	{
-		IAllocator& allocator = editor.getAllocator();
-		editor.registerComponentType("animable", "Animable");
-		editor.registerProperty(
+		IAllocator& allocator = m_engine.getAllocator();
+		m_engine.registerComponentType("animable", "Animable");
+		m_engine.registerProperty(
 			"animable",
 			allocator.newObject<FilePropertyDescriptor<AnimationSceneImpl>>(
 				"preview",

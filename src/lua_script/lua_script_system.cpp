@@ -11,8 +11,7 @@
 #include "core/log.h"
 #include "core/lua_wrapper.h"
 #include "core/resource_manager.h"
-#include "Debug/allocator.h"
-#include "editor/world_editor.h"
+#include "debug/allocator.h"
 #include "editor_plugin_loader.h"
 #include "engine.h"
 #include "engine/property_descriptor.h"
@@ -53,7 +52,7 @@ public:
 	virtual bool create() override;
 	virtual void destroy() override;
 	virtual const char* getName() const override;
-	virtual void setWorldEditor(WorldEditor& editor) override;
+	void registerProperties();
 	LuaScriptManager& getScriptManager() { return m_script_manager; }
 
 	Engine& m_engine;
@@ -360,6 +359,11 @@ public:
 
 	virtual void update(float time_delta) override
 	{
+		if (!m_global_state)
+		{
+			return;
+		}
+
 		if (lua_getglobal(m_global_state, "update") == LUA_TFUNCTION)
 		{
 			lua_pushnumber(m_global_state, time_delta);
@@ -452,6 +456,7 @@ LuaScriptSystem::LuaScriptSystem(Engine& engine)
 {
 	m_editor_plugin_loader = nullptr;
 	m_script_manager.create(crc32("lua_script"), engine.getResourceManager());
+	registerProperties();
 }
 
 
@@ -486,11 +491,11 @@ bool LuaScriptSystem::create()
 }
 
 
-void LuaScriptSystem::setWorldEditor(WorldEditor& editor)
+void LuaScriptSystem::registerProperties()
 {
-	IAllocator& allocator = editor.getAllocator();
-	editor.registerComponentType("lua_script", "Lua script");
-	editor.registerProperty(
+	IAllocator& allocator = m_engine.getAllocator();
+	m_engine.registerComponentType("lua_script", "Lua script");
+	m_engine.registerProperty(
 		"lua_script",
 		allocator.newObject<FilePropertyDescriptor<LuaScriptScene>>(
 			"source",

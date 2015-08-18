@@ -22,6 +22,7 @@ class InputBlob;
 class EditorServer;
 class InputSystem;
 class IPlugin;
+class IPropertyDescriptor;
 class IScene;
 class JsonSerializer;
 class OutputBlob;
@@ -57,8 +58,6 @@ public:
 	virtual UniverseContext& createUniverse() = 0;
 	virtual void destroyUniverse(UniverseContext& context) = 0;
 
-	virtual void setWorldEditor(WorldEditor& editor) = 0;
-	virtual WorldEditor* getWorldEditor() const = 0;
 	virtual FS::FileSystem& getFileSystem() = 0;
 	virtual InputSystem& getInputSystem() = 0;
 	virtual PluginManager& getPluginManager() = 0;
@@ -75,6 +74,18 @@ public:
 	virtual bool deserialize(UniverseContext& ctx, InputBlob& serializer) = 0;
 	virtual float getFPS() const = 0;
 	virtual float getLastTimeDelta() = 0;
+	
+	virtual const IPropertyDescriptor&
+		getPropertyDescriptor(uint32_t type, uint32_t name_hash) = 0;
+	virtual Array<IPropertyDescriptor*>&
+		getPropertyDescriptors(uint32_t type) = 0;
+	virtual void registerProperty(const char* name, IPropertyDescriptor* desc) = 0;
+	virtual IPropertyDescriptor* getProperty(const char* component_type,
+											 const char* property_name) = 0;
+	virtual void registerComponentType(const char* name, const char* title) = 0;
+	virtual int getComponentTypesCount() const = 0;
+	virtual const char* getComponentTypeName(int index) = 0;
+	virtual const char* getComponentTypeID(int index) = 0;
 
 protected:
 	Engine() {}

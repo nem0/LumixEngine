@@ -1,6 +1,5 @@
 #include "lumix.h"
 #include "engine.h"
-
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/input_system.h"
@@ -9,19 +8,14 @@
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/timer.h"
-
 #include "core/fs/disk_file_device.h"
 #include "core/fs/file_system.h"
 #include "core/fs/memory_file_device.h"
-
 #include "core/mtjd/manager.h"
-
 #include "debug/debug.h"
-
+#include "engine/property_descriptor.h"
 #include "plugin_manager.h"
-
 #include "renderer/renderer.h"
-
 #include "universe/hierarchy.h"
 #include "universe/universe.h"
 
@@ -72,8 +66,9 @@ public:
 		, m_resource_manager(m_allocator)
 		, m_mtjd_manager(m_allocator)
 		, m_fps(0)
-		, m_editor(nullptr)
 		, m_is_game_running(false)
+		, m_component_properties(m_allocator)
+		, m_component_types(m_allocator)
 	{
 		if (!fs)
 		{
@@ -121,6 +116,15 @@ public:
 
 	virtual ~EngineImpl()
 	{
+		for (int j = 0; j < m_component_properties.size(); ++j)
+		{
+			Array<IPropertyDescriptor*>& props = m_component_properties.at(j);
+			for (int i = 0, c = props.size(); i < c; ++i)
+			{
+				m_allocator.deleteObject(props[i]);
+			}
+		}
+
 		Timer::destroy(m_timer);
 		Timer::destroy(m_fps_timer);
 		PluginManager::destroy(m_plugin_manager);
@@ -135,6 +139,85 @@ public:
 
 
 	virtual IAllocator& getAllocator() override { return m_allocator; }
+
+
+	virtual const char* getComponentTypeName(int index) override
+	{
+		return m_component_types[index].m_name.c_str();
+	}
+
+
+	virtual const char* getComponentTypeID(int index) override
+	{
+		return m_component_types[index].m_id.c_str();
+	}
+
+
+	virtual int getComponentTypesCount() const override
+	{
+		return m_component_types.size();
+	}
+
+
+	Array<IPropertyDescriptor*>& getPropertyDescriptors(uint32_t type)
+	{
+		int props_index = m_component_properties.find(type);
+		if (props_index < 0)
+		{
+			m_component_properties.insert(
+				type, Array<IPropertyDescriptor*>(m_allocator));
+			props_index = m_component_properties.find(type);
+		}
+		return m_component_properties.at(props_index);
+	}
+
+
+	virtual const IPropertyDescriptor&
+	getPropertyDescriptor(uint32_t type, uint32_t name_hash) override
+	{
+		Array<IPropertyDescriptor*>& props = getPropertyDescriptors(type);
+		for (int i = 0; i < props.size(); ++i)
+		{
+			if (props[i]->getNameHash() == name_hash)
+			{
+				return *props[i];
+			}
+		}
+		ASSERT(false);
+		return *props[0];
+	}
+
+
+	virtual IPropertyDescriptor* getProperty(const char* component_type,
+		const char* property_name) override
+	{
+		auto& props = getPropertyDescriptors(crc32(component_type));
+		auto name_hash = crc32(property_name);
+		for (int i = 0; i < props.size(); ++i)
+		{
+			if (props[i]->getNameHash() == name_hash)
+			{
+				return props[i];
+			}
+		}
+		return nullptr;
+	}
+
+
+	virtual void registerComponentType(const char* id, const char* name) override
+	{
+		ComponentType& type = m_component_types.emplace(m_allocator);
+		type.m_name = name;
+		type.m_id = id;
+	}
+
+
+	virtual void registerProperty(const char* component_type,
+								  IPropertyDescriptor* descriptor) override
+	{
+		ASSERT(descriptor);
+		getPropertyDescriptors(crc32(component_type)).push(descriptor);
+	}
 
 
 	virtual UniverseContext& createUniverse() override
@@ -173,18 +256,6 @@ public:
 		m_allocator.deleteObject(&context);
 	}
 
-	virtual void setWorldEditor(WorldEditor& editor) override
-	{
-		m_editor = &editor;
-		for (auto* plugin : m_plugin_manager->getPlugins())
-		{
-			plugin->setWorldEditor(editor);
-		}
-	}
-
-
-	virtual WorldEditor* getWorldEditor() const override { return m_editor; }
-
 
 	virtual PluginManager& getPluginManager() override
 	{
@@ -193,18 +264,6 @@ public:
 
 
 	virtual FS::FileSystem& getFileSystem() override { return *m_file_system; }
-
-
-	void updateGame(UniverseContext& context, float dt)
-	{
-		PROFILE_FUNCTION();
-		for (int i = 0; i < context.m_scenes.size(); ++i)
-		{
-			context.m_scenes[i]->update(dt);
-		}
-		m_plugin_manager->update(dt);
-		m_input_system.update(dt);
-	}
 
 
 	virtual void startGame(UniverseContext& context) override
@@ -241,22 +300,12 @@ public:
 		}
 		dt = m_timer->tick();
 		m_last_time_delta = dt;
-		if (m_is_game_running)
+		for (int i = 0; i < context.m_scenes.size(); ++i)
 		{
-			updateGame(context, dt);
+			context.m_scenes[i]->update(dt);
 		}
-		else
-		{
-			for (int i = 0; i < context.m_scenes.size(); ++i)
-			{
-				TODO("todo");
-				if (strcmp(context.m_scenes[i]->getPlugin().getName(),
-						   "renderer") == 0)
-				{
-					context.m_scenes[i]->update(dt);
-				}
-			}
-		}
+		m_plugin_manager->update(dt);
+		m_input_system.update(dt);
 		getFileSystem().updateAsyncTransactions();
 	}
 
@@ -371,6 +420,18 @@ public:
 
 	virtual float getLastTimeDelta() override { return m_last_time_delta; }
 
+private:
+	struct ComponentType
+	{
+		ComponentType(IAllocator& allocator)
+			: m_name(allocator)
+			, m_id(allocator)
+		{
+		}
+
+		string m_name;
+		string m_id;
+	};
 
 private:
 	IAllocator& m_allocator;
@@ -380,10 +441,12 @@ private:
 	FS::DiskFileDevice* m_disk_file_device;
 
 	ResourceManager m_resource_manager;
-
+	
 	MTJD::Manager m_mtjd_manager;
 
-	WorldEditor* m_editor;
+	AssociativeArray<uint32_t, Array<IPropertyDescriptor*>>
+		m_component_properties;
+	Array<ComponentType> m_component_types;
 	PluginManager* m_plugin_manager;
 	InputSystem m_input_system;
 	Timer* m_timer;
