@@ -3,7 +3,7 @@
 
 #include <qdockwidget.h>
 #include <qmap.h>
-#include "graphics/shader.h"
+#include "renderer/shader.h"
 
 
 namespace Lumix

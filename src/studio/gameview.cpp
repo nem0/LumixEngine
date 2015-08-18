@@ -4,7 +4,7 @@
 #include "core/input_system.h"
 #include "editor/world_editor.h"
 #include "engine.h"
-#include "graphics/pipeline.h"
+#include "renderer/pipeline.h"
 #include "mainwindow.h"
 #include "wgl_render_device.h"
 
@@ -44,7 +44,7 @@ void GameView::setWorldEditor(Lumix::WorldEditor& editor)
 	ASSERT(m_editor == nullptr);
 	m_editor = &editor;
 	m_render_device =
-		new WGLRenderDevice(m_editor->getEngine(), "pipelines/game_view.lua");
+		new WGLRenderDevice(*m_editor, m_editor->getEngine(), "pipelines/game_view.lua");
 	m_render_device->setWidget(*getContentWidget());
 }
 

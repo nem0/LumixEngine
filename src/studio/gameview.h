@@ -19,7 +19,7 @@ namespace Ui
 	class GameView;
 }
 
-class LUMIX_EDITOR_API GameView : public QDockWidget
+class LUMIX_STUDIO_LIB_API GameView : public QDockWidget
 {
 	Q_OBJECT
 

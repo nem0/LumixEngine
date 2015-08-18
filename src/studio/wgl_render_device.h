@@ -5,13 +5,16 @@ namespace Lumix
 {
 	class Engine;
 	class PipelineInstance;
+	class WorldEditor;
 }
 
 
 class WGLRenderDevice
 {
 	public:
-		WGLRenderDevice(Lumix::Engine& engine, const char* pipeline_path);
+		WGLRenderDevice(Lumix::WorldEditor& editor,
+						Lumix::Engine& engine,
+						const char* pipeline_path);
 		virtual ~WGLRenderDevice();
 
 		void shutdown();
@@ -27,4 +30,5 @@ class WGLRenderDevice
 	private:
 		Lumix::PipelineInstance* m_pipeline;
 		Lumix::Engine& m_engine;
+		Lumix::WorldEditor& m_editor;
 };

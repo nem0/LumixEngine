@@ -13,7 +13,7 @@ namespace Lumix
 class QDoubleSpinBox;
 class QLabel;
 
-class LUMIX_EDITOR_API SceneView : public QDockWidget
+class LUMIX_STUDIO_LIB_API SceneView : public QDockWidget
 {
 	Q_OBJECT
 public:

@@ -5,8 +5,8 @@
 #include "editor/measure_tool.h"
 #include "engine.h"
 #include "iplugin.h"
-#include "graphics/pipeline.h"
-#include "graphics/render_scene.h"
+#include "renderer/pipeline.h"
+#include "renderer/render_scene.h"
 #include "insert_mesh_command.h"
 #include "wgl_render_device.h"
 #include <qapplication.h>
@@ -138,7 +138,7 @@ void SceneView::setWorldEditor(Lumix::WorldEditor& world_editor)
 	static_cast<ViewWidget*>(m_view)->m_world_editor = &world_editor;
 	m_world_editor = &world_editor;
 	m_render_device =
-		new WGLRenderDevice(m_world_editor->getEngine(), "pipelines/main.lua");
+		new WGLRenderDevice(*m_world_editor, m_world_editor->getEngine(), "pipelines/main.lua");
 	world_editor.getMeasureTool()
 		->distanceMeasured()
 		.bind<SceneView, &SceneView::onDistanceMeasured>(this);
