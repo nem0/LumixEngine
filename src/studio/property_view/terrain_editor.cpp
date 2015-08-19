@@ -33,10 +33,7 @@ static const uint32_t RENDERABLE_HASH = Lumix::crc32("renderable");
 static const char* HEIGHTMAP_UNIFORM = "u_texHeightmap";
 static const char* SPLATMAP_UNIFORM = "u_texSplatmap";
 static const char* COLORMAP_UNIFORM = "u_texColormap";
-static const char* TEX_COLOR0_UNIFORM = "u_texColor0";
-static const char* TEX_COLOR1_UNIFORM = "u_texColor1";
-static const char* TEX_COLOR2_UNIFORM = "u_texColor2";
-static const char* TEX_COLOR3_UNIFORM = "u_texColor3";
+static const char* TEX_COLOR_UNIFORM = "u_texColor";
 
 
 class PaintTerrainCommand : public Lumix::IEditorCommand
@@ -356,12 +353,10 @@ private:
 						int add = attenuation * amount;
 						if (m_type == TerrainEditor::LAYER)
 						{
-							addTexelSplatWeight(
-								data[4 * offset + m_texture_idx],
-								data[4 * offset + (m_texture_idx + 1) % 4],
-								data[4 * offset + (m_texture_idx + 2) % 4],
-								data[4 * offset + (m_texture_idx + 3) % 4],
-								add);
+							data[4 * offset] = m_texture_idx;
+							data[4 * offset + 1] = add;
+							data[4 * offset + 2] = 0;
+							data[4 * offset + 3] = 255;
 						}
 						else
 						{
@@ -565,28 +560,6 @@ private:
 		rect.m_to_x = Lumix::Math::minValue(rect.m_to_x, texture->getWidth());
 		rect.m_from_y = Lumix::Math::maxValue(rect.m_from_y, 0);
 		rect.m_to_y = Lumix::Math::minValue(rect.m_to_y, texture->getHeight());
-	}
-
-
-	static void addTexelSplatWeight(
-		uint8_t& w1, uint8_t& w2, uint8_t& w3, uint8_t& w4, int value)
-	{
-		int add = value;
-		add = Lumix::Math::minValue(add, 255 - w1);
-		add = Lumix::Math::maxValue(add, -w1);
-		w1 += add;
-		float sum = (float)w2 + (float)w3 + (float)w4;
-		float rest = 255.0f - w1;
-		if (sum > 0)
-		{
-			w2 = rest * w2 / sum;
-			w3 = rest * w3 / sum;
-			w4 = 255 - w1 - w2 - w3;
-		}
-		else
-		{
-			w1 = 255;
-		}
 	}
 
 
@@ -816,7 +789,7 @@ void TerrainComponentPlugin::addTextureNode(DynamicObjectModel::Node& node)
 	auto model = static_cast<DynamicObjectModel*>(
 		m_main_window.getPropertyView()->getModel());
 	model->childAboutToBeAdded(node);
-	auto& child = node.addChild("Texture");
+	auto& child = node.addChild("Layer");
 	child.m_getter = []()
 	{
 		return QVariant();
@@ -830,18 +803,11 @@ void TerrainComponentPlugin::addTextureNode(DynamicObjectModel::Node& node)
 		auto material = m_terrain_editor->getMaterial();
 		QComboBox* cb = new QComboBox(parent);
 
-		Lumix::Texture* tex[4] = {
-			material->getTextureByUniform(TEX_COLOR0_UNIFORM),
-			material->getTextureByUniform(TEX_COLOR1_UNIFORM),
-			material->getTextureByUniform(TEX_COLOR2_UNIFORM),
-			material->getTextureByUniform(TEX_COLOR3_UNIFORM)};
+		Lumix::Texture* tex = material->getTextureByUniform(TEX_COLOR_UNIFORM);
 
-		for (int i = 0; i < lengthOf(tex); ++i)
+		for (int i = 0; i < tex->getDepth(); ++i)
 		{
-			if (tex[i])
-			{
-				cb->addItem(tex[i]->getPath().c_str());
-			}
+			cb->addItem(QString::number(1 + i));
 		}
 
 		connect(cb,

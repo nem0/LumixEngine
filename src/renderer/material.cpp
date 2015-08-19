@@ -305,6 +305,7 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 	serializer.deserializeObjectBegin();
 	char label[256];
 	bool keep_data = false;
+	uint32_t flags = 0;
 	while (!serializer.isObjectEnd())
 	{
 		serializer.deserializeLabel(label, sizeof(label));
@@ -316,8 +317,73 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 				char texture_path[MAX_PATH_LENGTH];
 				copyString(texture_path, sizeof(texture_path), material_dir);
 				catString(texture_path, sizeof(texture_path), path);
-				m_textures[m_texture_count] = static_cast<Texture*>(m_resource_manager.get(ResourceManager::TEXTURE)->load(Path(texture_path)));
+				m_textures[m_texture_count] = static_cast<Texture*>(
+					m_resource_manager.get(ResourceManager::TEXTURE)
+						->load(Path(texture_path)));
 				addDependency(*m_textures[m_texture_count]);
+			}
+		}
+		else if (strcmp(label, "min_filter") == 0)
+		{
+			serializer.deserialize(label, sizeof(label), "");
+			if (strcmp(label, "point") == 0)
+			{
+				flags |= BGFX_TEXTURE_MIN_POINT;
+			}
+			else if (strcmp(label, "anisotropic") == 0)
+			{
+				flags |= BGFX_TEXTURE_MIN_ANISOTROPIC;
+			}
+			else
+			{
+				g_log_error.log("Renderer") << "Unknown texture filter \""
+											<< label << "\" in material "
+											<< m_path.c_str();
+			}
+		}
+		else if (strcmp(label, "mag_filter") == 0)
+		{
+			serializer.deserialize(label, sizeof(label), "");
+			if (strcmp(label, "point") == 0)
+			{
+				flags |= BGFX_TEXTURE_MAG_POINT;
+			}
+			else if (strcmp(label, "anisotropic") == 0)
+			{
+				flags |= BGFX_TEXTURE_MAG_ANISOTROPIC;
+			}
+			else
+			{
+				g_log_error.log("Renderer") << "Unknown texture filter \""
+					<< label << "\" in material "
+					<< m_path.c_str();
+			}
+		}
+		else if (strcmp(label, "u_clamp") == 0)
+		{
+			bool b;
+			serializer.deserialize(b, false);
+			if (b)
+			{
+				flags |= BGFX_TEXTURE_U_CLAMP;
+			}
+		}
+		else if (strcmp(label, "v_clamp") == 0)
+		{
+			bool b;
+			serializer.deserialize(b, false);
+			if (b)
+			{
+				flags |= BGFX_TEXTURE_V_CLAMP;
+			}
+		}
+		else if (strcmp(label, "w_clamp") == 0)
+		{
+			bool b;
+			serializer.deserialize(b, false);
+			if (b)
+			{
+				flags |= BGFX_TEXTURE_W_CLAMP;
 			}
 		}
 		else if (strcmp(label, "keep_data") == 0)
@@ -330,9 +396,14 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 			return false;
 		}
 	}
-	if (keep_data)
+	if (m_textures[m_texture_count])
 	{
-		m_textures[m_texture_count]->addDataReference();
+		m_textures[m_texture_count]->setFlags(flags);
+
+		if (keep_data)
+		{
+			m_textures[m_texture_count]->addDataReference();
+		}
 	}
 	serializer.deserializeObjectEnd();
 	++m_texture_count;
