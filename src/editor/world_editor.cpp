@@ -2499,8 +2499,6 @@ public:
 		m_undo_index = -1;
 		m_mouse_handling_plugin = nullptr;
 		m_is_game_mode = false;
-		m_terrain_brush_size = 10;
-		m_terrain_brush_strength = 0.01f;
 		m_measure_tool = m_allocator.newObject<MeasureTool>();
 		addPlugin(*m_measure_tool);
 
@@ -3124,8 +3122,6 @@ private:
 
 	Path m_universe_path;
 	Path m_base_path;
-	int m_terrain_brush_size;
-	float m_terrain_brush_strength;
 	Array<Plugin*> m_plugins;
 	MeasureTool* m_measure_tool;
 	Plugin* m_mouse_handling_plugin;

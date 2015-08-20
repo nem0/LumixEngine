@@ -38,17 +38,6 @@ static const char* TEX_COLOR_UNIFORM = "u_texColor";
 
 class PaintTerrainCommand : public Lumix::IEditorCommand
 {
-private:
-	struct Item
-	{
-		int m_center_x;
-		int m_center_y;
-		int m_radius;
-		float m_amount;
-		Lumix::Vec3 m_color;
-	};
-
-
 public:
 	struct Rectangle
 	{
@@ -58,7 +47,7 @@ public:
 		int m_to_y;
 	};
 
-
+public:
 	PaintTerrainCommand(Lumix::WorldEditor& editor,
 						TerrainEditor::Type type,
 						int texture_idx,
@@ -85,15 +74,13 @@ public:
 		float xz_scale = static_cast<Lumix::RenderScene*>(terrain.scene)
 							 ->getTerrainXZScale(terrain.index);
 		local_pos = local_pos / xz_scale;
+		local_pos.y = -1;
 		auto hm = getMaterial()->getTextureByUniform(HEIGHTMAP_UNIFORM);
 		auto texture = getDestinationTexture();
 
 		Item& item = m_items.pushEmpty();
-		item.m_center_x =
-			(int)(local_pos.x / hm->getWidth() * texture->getWidth());
-		item.m_center_y =
-			(int)(local_pos.z / hm->getHeight() * texture->getHeight());
-		item.m_radius = (int)radius;
+		item.m_local_pos = local_pos;
+		item.m_radius = radius;
 		item.m_amount = rel_amount;
 		item.m_color = color;
 	}
@@ -107,8 +94,8 @@ public:
 		for (int i = 0; i < m_items.size(); ++i)
 		{
 			serializer.serializeArrayItem(m_items[i].m_amount);
-			serializer.serializeArrayItem(m_items[i].m_center_x);
-			serializer.serializeArrayItem(m_items[i].m_center_y);
+			serializer.serializeArrayItem(m_items[i].m_local_pos.x);
+			serializer.serializeArrayItem(m_items[i].m_local_pos.z);
 			serializer.serializeArrayItem(m_items[i].m_radius);
 			serializer.serializeArrayItem(m_items[i].m_color.x);
 			serializer.serializeArrayItem(m_items[i].m_color.y);
@@ -130,8 +117,8 @@ public:
 		{
 			Item& item = m_items.pushEmpty();
 			serializer.deserializeArrayItem(item.m_amount, 0);
-			serializer.deserializeArrayItem(item.m_center_x, 0);
-			serializer.deserializeArrayItem(item.m_center_y, 0);
+			serializer.deserializeArrayItem(item.m_local_pos.x, 0);
+			serializer.deserializeArrayItem(item.m_local_pos.z, 0);
 			serializer.deserializeArrayItem(item.m_radius, 0);
 			serializer.deserializeArrayItem(item.m_color.x, 0);
 			serializer.deserializeArrayItem(item.m_color.y, 0);
@@ -182,6 +169,24 @@ public:
 		return false;
 	}
 
+private:
+	struct Item
+	{
+		Rectangle getBoundingRectangle(int max_x, int max_z) const 
+		{
+			Rectangle r;
+			r.m_from_x = qMax(0, int(m_local_pos.x - m_radius - 0.5f));
+			r.m_from_y = qMax(0, int(m_local_pos.z - m_radius - 0.5f));
+			r.m_to_x = qMin(max_x, int(m_local_pos.x + m_radius + 0.5f));
+			r.m_to_y = qMin(max_z, int(m_local_pos.z + m_radius + 0.5f));
+			return r;
+		}
+
+		float m_radius;
+		float m_amount;
+		Lumix::Vec3 m_local_pos;
+		Lumix::Vec3 m_color;
+	};
 
 private:
 	Lumix::Material* getMaterial()
@@ -258,23 +263,22 @@ private:
 
 	float getAttenuation(Item& item, int i, int j) const
 	{
-		float dist = sqrt((item.m_center_x - i) * (item.m_center_x - i) +
-						  (item.m_center_y - j) * (item.m_center_y - j));
+		float dist = sqrt(
+			(item.m_local_pos.x - 0.5f - i) * (item.m_local_pos.x - 0.5f - i) +
+			(item.m_local_pos.z - 0.5f - j) * (item.m_local_pos.z - 0.5f - j));
 		return 1.0f - Lumix::Math::minValue(dist / item.m_radius, 1.0f);
 	}
 
 
-	void rasterColorItem(Lumix::Texture* texture, Lumix::Array<uint8_t>& data, Item& item)
+	void rasterColorItem(Lumix::Texture* texture,
+						 Lumix::Array<uint8_t>& data,
+						 Item& item)
 	{
 		int texture_width = texture->getWidth();
-		int from_x =
-			Lumix::Math::maxValue((int)(item.m_center_x - item.m_radius), 0);
-		int to_x = Lumix::Math::minValue((int)(item.m_center_x + item.m_radius),
-			texture_width);
-		int from_z =
-			Lumix::Math::maxValue((int)(item.m_center_y - item.m_radius), 0);
-		int to_z = Lumix::Math::minValue((int)(item.m_center_y + item.m_radius),
-			texture_width);
+		int from_x = qMax(int(item.m_local_pos.x - item.m_radius), 0);
+		int to_x = qMin(int(item.m_local_pos.x + item.m_radius), texture_width);
+		int from_z = qMax(int(item.m_local_pos.z - item.m_radius), 0);
+		int to_z = qMin(int(item.m_local_pos.z + item.m_radius), texture_width);
 
 		if (texture->getBytesPerPixel() != 4)
 		{
@@ -307,14 +311,8 @@ private:
 		}
 
 		int texture_width = texture->getWidth();
-		int from_x =
-			Lumix::Math::maxValue((int)(item.m_center_x - item.m_radius), 0);
-		int to_x = Lumix::Math::minValue((int)(item.m_center_x + item.m_radius),
-										 texture_width);
-		int from_z =
-			Lumix::Math::maxValue((int)(item.m_center_y - item.m_radius), 0);
-		int to_z = Lumix::Math::minValue((int)(item.m_center_y + item.m_radius),
-										 texture_width);
+		Rectangle rect;
+		rect = item.getBoundingRectangle(texture_width, texture->getHeight());
 
 		int avg = 0;
 		float avg16 = 0;
@@ -322,14 +320,22 @@ private:
 		if (texture->getBytesPerPixel() == 4)
 		{
 			avg = m_type == TerrainEditor::SMOOTH_HEIGHT
-					  ? computeAverage32(texture, from_x, to_x, from_z, to_z)
+					  ? computeAverage32(texture,
+										 rect.m_from_x,
+										 rect.m_to_x,
+										 rect.m_from_y,
+										 rect.m_to_y)
 					  : 0;
 			strength_multiplicator = 16.0f;
 		}
 		else
 		{
 			avg16 = m_type == TerrainEditor::SMOOTH_HEIGHT
-						? computeAverage16(texture, from_x, to_x, from_z, to_z)
+						? computeAverage16(texture,
+										   rect.m_from_x,
+										   rect.m_to_x,
+										   rect.m_from_y,
+										   rect.m_to_y)
 						: 0;
 		}
 		float amount = Lumix::Math::maxValue(
@@ -340,9 +346,9 @@ private:
 		}
 
 
-		for (int i = from_x, end = to_x; i < end; ++i)
+		for (int i = rect.m_from_x, end = rect.m_to_x; i < end; ++i)
 		{
-			for (int j = from_z, end2 = to_z; j < end2; ++j)
+			for (int j = rect.m_from_y, end2 = rect.m_to_y; j < end2; ++j)
 			{
 				float attenuation = getAttenuation(item, i, j);
 				int offset = i - m_x + (j - m_y) * m_width;
@@ -353,10 +359,13 @@ private:
 						int add = attenuation * amount;
 						if (m_type == TerrainEditor::LAYER)
 						{
-							data[4 * offset] = m_texture_idx;
-							data[4 * offset + 1] = add;
-							data[4 * offset + 2] = 0;
-							data[4 * offset + 3] = 255;
+							if(attenuation > 0)
+							{
+								data[4 * offset] = m_texture_idx;
+								data[4 * offset + 1] = add;
+								data[4 * offset + 2] = 0;
+								data[4 * offset + 3] = 255;
+							}
 						}
 						else
 						{
@@ -419,8 +428,9 @@ private:
 		int bpp = texture->getBytesPerPixel();
 		Rectangle rect;
 		getBoundingRectangle(texture, rect);
-		m_new_data.resize(bpp * (rect.m_to_x - rect.m_from_x) *
-						  (rect.m_to_y - rect.m_from_y));
+		m_new_data.resize(bpp * qMax(1,
+									 (rect.m_to_x - rect.m_from_x) *
+										 (rect.m_to_y - rect.m_from_y)));
 		memcpy(&m_new_data[0], &m_old_data[0], m_new_data.size());
 
 		for (int item_index = 0; item_index < m_items.size(); ++item_index)
@@ -536,30 +546,28 @@ private:
 	void getBoundingRectangle(Lumix::Texture* texture, Rectangle& rect)
 	{
 		Item& item = m_items[0];
-		rect.m_from_x =
-			Lumix::Math::maxValue(item.m_center_x - item.m_radius, 0);
-		rect.m_to_x = Lumix::Math::minValue(item.m_center_x + item.m_radius,
-											texture->getWidth());
-		rect.m_from_y =
-			Lumix::Math::maxValue(item.m_center_y - item.m_radius, 0);
-		rect.m_to_y = Lumix::Math::minValue(item.m_center_y + item.m_radius,
-											texture->getHeight());
+		rect.m_from_x = qMax(int(item.m_local_pos.x - item.m_radius - 0.5f), 0);
+		rect.m_from_y = qMax(int(item.m_local_pos.z - item.m_radius - 0.5f), 0);
+		rect.m_to_x = qMin(int(item.m_local_pos.x + item.m_radius + 0.5f),
+						   texture->getWidth());
+		rect.m_to_y = qMin(int(item.m_local_pos.z + item.m_radius + 0.5f),
+						   texture->getHeight());
 		for (int i = 1; i < m_items.size(); ++i)
 		{
 			Item& item = m_items[i];
-			rect.m_from_x = Lumix::Math::minValue(
-				item.m_center_x - item.m_radius, rect.m_from_x);
-			rect.m_to_x = Lumix::Math::maxValue(item.m_center_x + item.m_radius,
-												rect.m_to_x);
-			rect.m_from_y = Lumix::Math::minValue(
-				item.m_center_y - item.m_radius, rect.m_from_y);
-			rect.m_to_y = Lumix::Math::maxValue(item.m_center_y + item.m_radius,
-												rect.m_to_y);
+			rect.m_from_x = qMin(int(item.m_local_pos.x - item.m_radius - 0.5f),
+								 rect.m_from_x);
+			rect.m_to_x = qMax(int(item.m_local_pos.x + item.m_radius + 0.5f),
+							   rect.m_to_x);
+			rect.m_from_y = qMin(int(item.m_local_pos.z - item.m_radius - 0.5f),
+								 rect.m_from_y);
+			rect.m_to_y = qMax(int(item.m_local_pos.z + item.m_radius + 0.5f),
+							   rect.m_to_y);
 		}
-		rect.m_from_x = Lumix::Math::maxValue(rect.m_from_x, 0);
-		rect.m_to_x = Lumix::Math::minValue(rect.m_to_x, texture->getWidth());
-		rect.m_from_y = Lumix::Math::maxValue(rect.m_from_y, 0);
-		rect.m_to_y = Lumix::Math::minValue(rect.m_to_y, texture->getHeight());
+		rect.m_from_x = qMax(rect.m_from_x, 0);
+		rect.m_to_x = qMin(rect.m_to_x, texture->getWidth());
+		rect.m_from_y = qMax(rect.m_from_y, 0);
+		rect.m_to_y = qMin(rect.m_to_y, texture->getHeight());
 	}
 
 
@@ -669,10 +677,10 @@ void TerrainComponentPlugin::createEditor(DynamicObjectModel::Node& node,
 				colormap_button,
 				&QPushButton::clicked,
 				[this]()
-			{
-				Lumix::Material* material = m_terrain_editor->getMaterial();
-				material->getTextureByUniform(COLORMAP_UNIFORM)->save();
-			});
+				{
+					Lumix::Material* material = m_terrain_editor->getMaterial();
+					material->getTextureByUniform(COLORMAP_UNIFORM)->save();
+				});
 			layout->addWidget(colormap_button);
 		}
 
@@ -688,10 +696,10 @@ void TerrainComponentPlugin::createEditor(DynamicObjectModel::Node& node,
 	};
 	brush_size_node.m_setter = [this](const QVariant& value)
 	{
-		m_terrain_editor->m_terrain_brush_size = value.toInt();
+		m_terrain_editor->m_terrain_brush_size = value.toFloat();
 	};
 	brush_size_node.enablePeristentEditor();
-	DynamicObjectModel::setSliderEditor(brush_size_node, 1, 100, 1);
+	DynamicObjectModel::setSliderEditor(brush_size_node, 0.5f, 100, 1);
 
 	auto& brush_strength_node = tools_node.addChild("Brush strength");
 	brush_strength_node.m_getter = [this]() -> QVariant
@@ -1246,7 +1254,7 @@ void TerrainEditor::paint(const Lumix::RayCastModelHit& hit,
 			type,
 			m_texture_idx,
 			hit_pos,
-			(float)m_terrain_brush_size,
+			m_terrain_brush_size,
 			m_terrain_brush_strength,
 			color,
 			m_component,
