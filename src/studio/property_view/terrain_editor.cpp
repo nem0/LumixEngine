@@ -275,19 +275,17 @@ private:
 						 Item& item)
 	{
 		int texture_width = texture->getWidth();
-		int from_x = qMax(int(item.m_local_pos.x - item.m_radius), 0);
-		int to_x = qMin(int(item.m_local_pos.x + item.m_radius), texture_width);
-		int from_z = qMax(int(item.m_local_pos.z - item.m_radius), 0);
-		int to_z = qMin(int(item.m_local_pos.z + item.m_radius), texture_width);
+		Rectangle r =
+			item.getBoundingRectangle(texture_width, texture->getHeight());
 
 		if (texture->getBytesPerPixel() != 4)
 		{
 			ASSERT(false);
 			return;
 		}
-		for (int i = from_x, end = to_x; i < end; ++i)
+		for (int i = r.m_from_x, end = r.m_to_x; i < end; ++i)
 		{
-			for (int j = from_z, end2 = to_z; j < end2; ++j)
+			for (int j = r.m_from_y, end2 = r.m_to_y; j < end2; ++j)
 			{
 				float attenuation = getAttenuation(item, i, j);
 				int offset = 4 * (i - m_x + (j - m_y) * m_width);
@@ -301,6 +299,71 @@ private:
 	}
 
 
+	void rasterLayerItem(Lumix::Texture* texture,
+						 Lumix::Array<uint8_t>& data,
+						 Item& item)
+	{
+		int texture_width = texture->getWidth();
+		Rectangle r =
+			item.getBoundingRectangle(texture_width, texture->getHeight());
+
+		if (texture->getBytesPerPixel() != 4)
+		{
+			ASSERT(false);
+			return;
+		}
+
+		for (int i = r.m_from_x, end = r.m_to_x; i < end; ++i)
+		{
+			for (int j = r.m_from_y, end2 = r.m_to_y; j < end2; ++j)
+			{
+				int offset = 4 * (i - m_x + (j - m_y) * m_width);
+				float attenuation = getAttenuation(item, i, j);
+				int add = attenuation * item.m_amount * 255;
+				if (add > 0)
+				{
+					data[offset] = m_texture_idx;
+					data[offset + 1] += qMin(255 - data[offset + 1], add);
+					data[offset + 2] = 0;
+					data[offset + 3] = 255;
+				}
+			}
+		}
+	}
+
+
+	void rasterSmoothHeightItem(Lumix::Texture* texture,
+								Lumix::Array<uint8_t>& data,
+								Item& item)
+	{
+		ASSERT(texture->getBytesPerPixel() == 2);
+
+		int texture_width = texture->getWidth();
+		Rectangle rect;
+		rect = item.getBoundingRectangle(texture_width, texture->getHeight());
+
+		float amount = qMax(item.m_amount * item.m_amount * 256.0f, 1.0f);
+		float avg = computeAverage16(texture,
+									rect.m_from_x,
+									rect.m_to_x,
+									rect.m_from_y,
+									rect.m_to_y);
+		for (int i = rect.m_from_x, end = rect.m_to_x; i < end; ++i)
+		{
+			for (int j = rect.m_from_y, end2 = rect.m_to_y; j < end2; ++j)
+			{
+				float attenuation = getAttenuation(item, i, j);
+				int offset = i - m_x + (j - m_y) * m_width;
+				uint16_t x =
+					((uint16_t*)
+							texture->getData())[(i + j * texture_width)];
+				x += (avg - x) * item.m_amount * attenuation;
+				((uint16_t*)&data[0])[offset] = x;
+			}
+		}
+	}
+
+
 	void
 	rasterItem(Lumix::Texture* texture, Lumix::Array<uint8_t>& data, Item& item)
 	{
@@ -309,42 +372,26 @@ private:
 			rasterColorItem(texture, data, item);
 			return;
 		}
+		else if (m_type == TerrainEditor::LAYER)
+		{
+			rasterLayerItem(texture, data, item);
+			return;
+		}
+		else if (m_type == TerrainEditor::SMOOTH_HEIGHT)
+		{
+			rasterSmoothHeightItem(texture, data, item);
+			return;
+		}
+		
+		ASSERT(texture->getBytesPerPixel() == 2);
 
 		int texture_width = texture->getWidth();
 		Rectangle rect;
 		rect = item.getBoundingRectangle(texture_width, texture->getHeight());
 
-		int avg = 0;
-		float avg16 = 0;
-		float strength_multiplicator = 256.0f;
-		if (texture->getBytesPerPixel() == 4)
-		{
-			avg = m_type == TerrainEditor::SMOOTH_HEIGHT
-					  ? computeAverage32(texture,
-										 rect.m_from_x,
-										 rect.m_to_x,
-										 rect.m_from_y,
-										 rect.m_to_y)
-					  : 0;
-			strength_multiplicator = 16.0f;
-		}
-		else
-		{
-			avg16 = m_type == TerrainEditor::SMOOTH_HEIGHT
-						? computeAverage16(texture,
-										   rect.m_from_x,
-										   rect.m_to_x,
-										   rect.m_from_y,
-										   rect.m_to_y)
-						: 0;
-		}
-		float amount = Lumix::Math::maxValue(
-			item.m_amount * item.m_amount * strength_multiplicator, 1.0f);
-		if (m_type == TerrainEditor::LOWER_HEIGHT)
-		{
-			amount = -amount;
-		}
-
+		const float STRENGTH_MULTIPLICATOR = 256.0f;
+		float amount =
+			qMax(item.m_amount * item.m_amount * STRENGTH_MULTIPLICATOR, 1.0f);
 
 		for (int i = rect.m_from_x, end = rect.m_to_x; i < end; ++i)
 		{
@@ -352,71 +399,14 @@ private:
 			{
 				float attenuation = getAttenuation(item, i, j);
 				int offset = i - m_x + (j - m_y) * m_width;
-				switch (texture->getBytesPerPixel())
-				{
-					case 4:
-					{
-						int add = attenuation * amount;
-						if (m_type == TerrainEditor::LAYER)
-						{
-							if(attenuation > 0)
-							{
-								data[4 * offset] = m_texture_idx;
-								data[4 * offset + 1] = add;
-								data[4 * offset + 2] = 0;
-								data[4 * offset + 3] = 255;
-							}
-						}
-						else
-						{
-							if (m_type == TerrainEditor::SMOOTH_HEIGHT)
-							{
-								add =
-									(avg -
-									 texture
-										 ->getData()[4 *
-													 (i + j * texture_width)]) *
-									item.m_amount * attenuation;
-							}
-							else if (add > 0)
-							{
-								add = Lumix::Math::minValue(
-									add,
-									255 -
-										texture->getData()
-											[4 * (i + j * texture_width)]);
-							}
-							else
-							{
-								add = Lumix::Math::maxValue(
-									add,
-									0 -
-										texture->getData()
-											[4 * (i + j * texture_width)]);
-							}
-							data[offset * 4] += add;
-							data[offset * 4 + 1] += add;
-							data[offset * 4 + 2] += add;
-							data[offset * 4 + 3] = 255;
-						}
-						break;
-					}
-					case 2:
-					{
-						uint16_t add = uint16_t(attenuation * amount);
-						uint16_t x =
-							((uint16_t*)
-								 texture->getData())[(i + j * texture_width)];
-						x += m_type == TerrainEditor::SMOOTH_HEIGHT
-								 ? (avg16 - x) * item.m_amount * attenuation
-								 : add;
-						((uint16_t*)&data[0])[offset] = x;
-						break;
-					}
-					default:
-						ASSERT(false);
-						break;
-				}
+
+				int add = int(attenuation * amount);
+				uint16_t x =
+					((uint16_t*)texture->getData())[(i + j * texture_width)];
+				x += m_type == TerrainEditor::RAISE_HEIGHT
+						 ? qMin(add, 0xFFFF - x)
+						 : qMax(-add, -x);
+				((uint16_t*)&data[0])[offset] = x;
 			}
 		}
 	}
