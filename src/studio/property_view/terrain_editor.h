@@ -103,6 +103,11 @@ public:
 	QColor getSelectedColor() const { return m_selected_color; }
 
 private:
+	QWidget* TerrainComponentPlugin::createBrushTypeEditor(
+		QWidget* parent,
+		DynamicObjectModel::Node& tools_node,
+		int last_node_index);
+
 	void addEntityTemplateNode(DynamicObjectModel::Node& node);
 	void addTextureNode(DynamicObjectModel::Node& node);
 	void addColorNode(DynamicObjectModel::Node& node);
