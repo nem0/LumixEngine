@@ -42,7 +42,9 @@ Texture::Texture(const Path& path,
 	, m_allocator(allocator)
 	, m_data(m_allocator)
 	, m_BPP(-1)
+	, m_depth(-1)
 {
+	m_flags = 0;
 	m_texture_handle = BGFX_INVALID_HANDLE;
 }
 
@@ -50,6 +52,19 @@ Texture::Texture(const Path& path,
 Texture::~Texture()
 {
 	ASSERT(isEmpty());
+}
+
+
+void Texture::setFlags(uint32_t flags)
+{
+	if (isReady() && m_flags != flags)
+	{
+		g_log_warning.log("Renderer")
+			<< "Trying to set different flags for texture " << getPath().c_str()
+			<< ". They are ignored.";
+		return;
+	}
+	m_flags = flags;
 }
 
 
@@ -67,13 +82,13 @@ bool Texture::create(int w, int h, void* data)
 												 h,
 												 1,
 												 bgfx::TextureFormat::RGBA8,
-												 0,
+												 m_flags,
 												 bgfx::copy(data, w * h * 4));
 	}
 	else
 	{
 		m_texture_handle =
-			bgfx::createTexture2D(w, h, 1, bgfx::TextureFormat::RGBA8);
+			bgfx::createTexture2D(w, h, 1, bgfx::TextureFormat::RGBA8, m_flags);
 	}
 
 
@@ -333,7 +348,7 @@ bool Texture::loadRaw(FS::IFile& file)
 	}
 
 	m_texture_handle = bgfx::createTexture2D(
-		m_width, m_height, 1, bgfx::TextureFormat::R32F, 0, nullptr);
+		m_width, m_height, 1, bgfx::TextureFormat::R32F, m_flags, nullptr);
 	bgfx::updateTexture2D(
 		m_texture_handle,
 		0,
@@ -342,6 +357,7 @@ bool Texture::loadRaw(FS::IFile& file)
 		m_width,
 		m_height,
 		mem);
+	m_depth = 1;
 	return bgfx::isValid(m_texture_handle);
 }
 
@@ -406,7 +422,7 @@ bool Texture::loadTGA(FS::IFile& file)
 		header.height,
 		1,
 		bgfx::TextureFormat::RGBA8,
-		0,
+		m_flags,
 		0);
 	bgfx::updateTexture2D(
 		m_texture_handle,
@@ -416,6 +432,7 @@ bool Texture::loadTGA(FS::IFile& file)
 		header.width,
 		header.height,
 		bgfx::copy(image_dest, header.width * header.height * 4));
+	m_depth = 1;
 	return bgfx::isValid(m_texture_handle);
 }
 
@@ -443,11 +460,15 @@ void Texture::removeDataReference()
 bool Texture::loadDDS(FS::IFile& file)
 {
 	bgfx::TextureInfo info;
-	m_texture_handle = bgfx::createTexture(
-		bgfx::copy(file.getBuffer(), file.size()), 0, 0, &info);
+	m_texture_handle =
+		bgfx::createTexture(bgfx::copy(file.getBuffer(), file.size()),
+							m_flags,
+							0,
+							&info);
 	m_BPP = -1;
 	m_width = info.width;
 	m_height = info.height;
+	m_depth = info.depth;
 	return bgfx::isValid(m_texture_handle);
 }
 

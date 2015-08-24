@@ -20,6 +20,7 @@ class RenderScene;
 class Texture;
 }
 
+
 class TerrainEditor : public Lumix::WorldEditor::Plugin
 {
 	friend class TerrainComponentPlugin;
@@ -84,7 +85,7 @@ private:
 	Lumix::ComponentUID m_component;
 	QTreeWidgetItem* m_texture_tree_item;
 	float m_terrain_brush_strength;
-	int m_terrain_brush_size;
+	float m_terrain_brush_size;
 	int m_texture_idx;
 	QString m_selected_entity_template;
 };
@@ -102,6 +103,11 @@ public:
 	QColor getSelectedColor() const { return m_selected_color; }
 
 private:
+	QWidget* TerrainComponentPlugin::createBrushTypeEditor(
+		QWidget* parent,
+		DynamicObjectModel::Node& tools_node,
+		int last_node_index);
+
 	void addEntityTemplateNode(DynamicObjectModel::Node& node);
 	void addTextureNode(DynamicObjectModel::Node& node);
 	void addColorNode(DynamicObjectModel::Node& node);

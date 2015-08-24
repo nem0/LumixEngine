@@ -285,6 +285,11 @@ LRESULT WINAPI msgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	int y = HIWORD(lParam);
 	static int old_x = x;
 	static int old_y = y;
+	if (!g_context.m_pipeline)
+	{
+		return DefWindowProc(hWnd, msg, wParam, lParam);
+	}
+
 	switch (msg)
 	{
 		case WM_SIZE:
