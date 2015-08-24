@@ -36,6 +36,7 @@ namespace Lumix
 	static const uint32_t BRUSH_SIZE_HASH = crc32("brush_size");
 	static const uint32_t MAP_SIZE_HASH = crc32("map_size");
 	static const uint32_t CAMERA_POS_HASH = crc32("camera_pos");
+	static const char* TEX_COLOR_UNIFORM = "u_texColor";
 
 	struct Sample
 	{
@@ -174,6 +175,7 @@ namespace Lumix
 		: m_mesh(nullptr)
 		, m_material(nullptr)
 		, m_root(nullptr)
+		, m_detail_texture(nullptr)
 		, m_width(0)
 		, m_height(0)
 		, m_layer_mask(1)
@@ -824,6 +826,8 @@ namespace Lumix
 		PROFILE_FUNCTION();
 		if (new_state == Resource::State::READY)
 		{
+			m_detail_texture = m_material->getTextureByUniform(TEX_COLOR_UNIFORM);
+
 			m_heightmap = m_material->getTextureByUniform("u_texHeightmap");
 			bool is_data_ready = true;
 			if (m_heightmap && m_heightmap->getData() == nullptr)

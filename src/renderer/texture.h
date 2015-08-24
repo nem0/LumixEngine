@@ -21,7 +21,8 @@ class LUMIX_RENDERER_API Texture : public Resource
 
 		bool create(int w, int h, void* data);
 		void destroy();
-		
+
+		int getDepth() const { return m_depth; }
 		int getWidth() const { return m_width; }
 		int getHeight() const { return m_height; }
 		int getBytesPerPixel() const { return m_BPP; }
@@ -31,6 +32,7 @@ class LUMIX_RENDERER_API Texture : public Resource
 		void removeDataReference();
 		void onDataUpdated();
 		void save();
+		void setFlags(uint32_t flags);
 		uint32_t getPixel(float x, float y) const;
 		bgfx::TextureHandle getTextureHandle() const { return m_texture_handle; }
 
@@ -38,6 +40,7 @@ class LUMIX_RENDERER_API Texture : public Resource
 		static unsigned int compareTGA(IAllocator& allocator, FS::IFile* file1, FS::IFile* file2, int difference);
 
 	private:
+		bool load3D(FS::IFile& file);
 		bool loadDDS(FS::IFile& file);
 		bool loadTGA(FS::IFile& file);
 		bool loadRaw(FS::IFile& file);
@@ -51,7 +54,9 @@ class LUMIX_RENDERER_API Texture : public Resource
 		int m_width;
 		int m_height;
 		int m_BPP;
+		int m_depth;
 		int m_data_reference;
+		uint32_t m_flags;
 		Array<uint8_t> m_data;
 		bgfx::TextureHandle m_texture_handle;
 };

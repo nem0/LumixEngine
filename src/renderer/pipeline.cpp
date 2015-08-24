@@ -48,6 +48,7 @@ static const uint32_t MAP_SIZE_HASH = crc32("map_size");
 static const uint32_t POINT_LIGHT_HASH = crc32("point_light");
 static const uint32_t BRUSH_SIZE_HASH = crc32("brush_size");
 static const uint32_t BRUSH_POSITION_HASH = crc32("brush_position");
+static const char* TEX_COLOR_UNIFORM = "u_texColor";
 static float split_distances[] = {0.01f, 5, 20, 100, 300};
 static const float SHADOW_CAM_NEAR = 0.1f;
 static const float SHADOW_CAM_FAR = 10000.0f;
@@ -256,8 +257,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 			bgfx::createUniform("u_terrainScale", bgfx::UniformType::Vec4);
 		m_rel_camera_pos_uniform =
 			bgfx::createUniform("u_relCamPos", bgfx::UniformType::Vec4);
-		m_map_size_uniform =
-			bgfx::createUniform("u_mapSize", bgfx::UniformType::Vec4);
+		m_terrain_params_uniform =
+			bgfx::createUniform("u_terrainParams", bgfx::UniformType::Vec4);
 		m_fog_color_density_uniform =
 			bgfx::createUniform("u_fogColorDensity", bgfx::UniformType::Vec4);
 		m_light_pos_radius_uniform =
@@ -307,7 +308,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		bgfx::destroyUniform(m_bone_matrices_uniform);
 		bgfx::destroyUniform(m_terrain_scale_uniform);
 		bgfx::destroyUniform(m_rel_camera_pos_uniform);
-		bgfx::destroyUniform(m_map_size_uniform);
+		bgfx::destroyUniform(m_terrain_params_uniform);
 		bgfx::destroyUniform(m_fog_color_density_uniform);
 		bgfx::destroyUniform(m_light_pos_radius_uniform);
 		bgfx::destroyUniform(m_light_color_uniform);
@@ -1144,8 +1145,17 @@ struct PipelineInstanceImpl : public PipelineInstance
 		const Geometry& geometry = *info.m_terrain->getGeometry();
 		const Mesh& mesh = *info.m_terrain->getMesh();
 
-		Vec4 map_size(info.m_terrain->getRootSize(), 0, 0, 0);
-		bgfx::setUniform(m_map_size_uniform, &map_size);
+		Texture* detail_texture = info.m_terrain->getDetailTexture();
+		if (!detail_texture)
+		{
+			return;
+		}
+
+		Vec4 terrain_params(info.m_terrain->getRootSize(),
+							(float)detail_texture->getWidth(),
+							(float)detail_texture->getDepth(),
+							0);
+		bgfx::setUniform(m_terrain_params_uniform, &terrain_params);
 
 		bgfx::setUniform(m_rel_camera_pos_uniform, &Vec4(rel_cam_pos, 0));
 		bgfx::setUniform(m_terrain_scale_uniform,
@@ -1383,7 +1393,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	bgfx::UniformHandle m_bone_matrices_uniform;
 	bgfx::UniformHandle m_terrain_scale_uniform;
 	bgfx::UniformHandle m_rel_camera_pos_uniform;
-	bgfx::UniformHandle m_map_size_uniform;
+	bgfx::UniformHandle m_terrain_params_uniform;
 	bgfx::UniformHandle m_fog_color_density_uniform;
 	bgfx::UniformHandle m_light_pos_radius_uniform;
 	bgfx::UniformHandle m_light_color_uniform;
