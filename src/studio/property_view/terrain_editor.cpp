@@ -322,8 +322,15 @@ private:
 				int add = attenuation * item.m_amount * 255;
 				if (add > 0)
 				{
+					if (data[offset] == m_texture_idx)
+					{
+						data[offset + 1] += qMin(255 - data[offset + 1], add);
+					}
+					else
+					{
+						data[offset + 1] = add;
+					}
 					data[offset] = m_texture_idx;
-					data[offset + 1] += qMin(255 - data[offset + 1], add);
 					data[offset + 2] = 0;
 					data[offset + 3] = 255;
 				}
@@ -603,6 +610,56 @@ TerrainComponentPlugin::~TerrainComponentPlugin()
 }
 
 
+QWidget* TerrainComponentPlugin::createBrushTypeEditor(
+	QWidget* parent, DynamicObjectModel::Node& tools_node, int last_node_index)
+{
+	auto editor = new QComboBox(parent);
+	editor->addItem("Raise height");
+	editor->addItem("Lower height");
+	editor->addItem("Smooth height");
+	editor->addItem("Layers");
+	editor->addItem("Entity");
+
+	auto* material = m_terrain_editor->getMaterial();
+	if (material->getTextureByUniform(COLORMAP_UNIFORM))
+	{
+		editor->addItem("Color");
+	}
+	m_terrain_editor->m_type = TerrainEditor::RAISE_HEIGHT;
+	connect(editor,
+		(void (QComboBox::*)(int)) & QComboBox::currentIndexChanged,
+		[this, &tools_node, last_node_index](int index)
+	{
+		while (tools_node.m_children.size() > last_node_index + 1)
+		{
+			auto model = static_cast<DynamicObjectModel*>(
+				m_main_window.getPropertyView()->getModel());
+			model->removeNode(*tools_node.m_children.back());
+		}
+		m_terrain_editor->m_type = (TerrainEditor::Type)index;
+		switch (m_terrain_editor->m_type)
+		{
+		case TerrainEditor::RAISE_HEIGHT:
+		case TerrainEditor::LOWER_HEIGHT:
+		case TerrainEditor::SMOOTH_HEIGHT:
+			break;
+		case TerrainEditor::LAYER:
+			addTextureNode(tools_node);
+			break;
+		case TerrainEditor::ENTITY:
+			addEntityTemplateNode(tools_node);
+			break;
+		case TerrainEditor::COLOR:
+			addColorNode(tools_node);
+			break;
+		default:
+			ASSERT(false);
+		}
+	});
+	return editor; 
+}
+
+
 void TerrainComponentPlugin::createEditor(DynamicObjectModel::Node& node,
 										  const Lumix::ComponentUID& component)
 {
@@ -717,49 +774,7 @@ void TerrainComponentPlugin::createEditor(DynamicObjectModel::Node& node,
 	brush_type_node.onCreateEditor = [this, &tools_node, last_node_index](
 		QWidget* parent, const QStyleOptionViewItem&)
 	{
-		auto editor = new QComboBox(parent);
-		editor->addItem("Raise height");
-		editor->addItem("Lower height");
-		editor->addItem("Smooth height");
-		editor->addItem("Layers");
-		editor->addItem("Entity");
-		auto* material = m_terrain_editor->getMaterial();
-		if (material->getTextureByUniform(COLORMAP_UNIFORM))
-		{
-			editor->addItem("Color");
-		}
-		m_terrain_editor->m_type = TerrainEditor::RAISE_HEIGHT;
-		connect(editor,
-				(void (QComboBox::*)(int)) & QComboBox::currentIndexChanged,
-				[this, &tools_node, last_node_index](int index)
-				{
-					while (tools_node.m_children.size() > last_node_index + 1)
-					{
-						auto model = static_cast<DynamicObjectModel*>(
-							m_main_window.getPropertyView()->getModel());
-						model->removeNode(*tools_node.m_children.back());
-					}
-					m_terrain_editor->m_type = (TerrainEditor::Type)index;
-					switch (m_terrain_editor->m_type)
-					{
-						case TerrainEditor::RAISE_HEIGHT:
-						case TerrainEditor::LOWER_HEIGHT:
-						case TerrainEditor::SMOOTH_HEIGHT:
-							break;
-						case TerrainEditor::LAYER:
-							addTextureNode(tools_node);
-							break;
-						case TerrainEditor::ENTITY:
-							addEntityTemplateNode(tools_node);
-							break;
-						case TerrainEditor::COLOR:
-							addColorNode(tools_node);
-							break;
-						default:
-							ASSERT(false);
-					}
-				});
-		return editor;
+		return this->createBrushTypeEditor(parent, tools_node, last_node_index);
 	};
 }
 
@@ -796,25 +811,28 @@ void TerrainComponentPlugin::addTextureNode(DynamicObjectModel::Node& node)
 	{
 	};
 
-	child.onCreateEditor = [this](QWidget* parent, const QStyleOptionViewItem&)
+	child.onCreateEditor = [this](QWidget* parent,
+								  const QStyleOptionViewItem&) -> QWidget*
 	{
+		QWidget* editor = new QWidget(parent);
+		QHBoxLayout* layout = new QHBoxLayout(editor);
+		layout->setContentsMargins(0, 0, 0, 0);
+
 		auto material = m_terrain_editor->getMaterial();
-		QComboBox* cb = new QComboBox(parent);
 
 		Lumix::Texture* tex = material->getTextureByUniform(TEX_COLOR_UNIFORM);
-
-		for (int i = 0; i < tex->getDepth(); ++i)
+		if (tex)
 		{
-			cb->addItem(QString::number(1 + i));
-		}
-
-		connect(cb,
-				(void (QComboBox::*)(int)) & QComboBox::activated,
-				[this](int index)
-				{
-					m_terrain_editor->m_texture_idx = index;
+			for (int i = 0; i < tex->getDepth(); ++i)
+			{
+				QPushButton* button = new QPushButton(QString::number(1 + i));
+				layout->addWidget(button);
+				connect(button, &QPushButton::clicked, [this, i](){
+					m_terrain_editor->m_texture_idx = i;
 				});
-		return cb;
+			}
+		}
+		return editor;
 	};
 	child.enablePeristentEditor();
 	model->childAdded();

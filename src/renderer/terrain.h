@@ -76,6 +76,7 @@ class Terrain
 
 		Geometry* getGeometry() { return &m_geometry; }
 		Material* getMaterial() const { return m_material; }
+		Texture* getDetailTexture() const { return m_detail_texture; }
 		int64_t getLayerMask() const { return m_layer_mask; }
 		Entity getEntity() const { return m_entity; }
 		float getRootSize() const;
@@ -132,6 +133,7 @@ class Terrain
 		Material* m_material;
 		Texture* m_heightmap;
 		Texture* m_splatmap;
+		Texture* m_detail_texture;
 		RenderScene& m_scene;
 		Array<GrassType*> m_grass_types;
 		Array<GrassQuad*> m_free_grass_quads;
