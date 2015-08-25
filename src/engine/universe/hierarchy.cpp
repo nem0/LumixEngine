@@ -49,46 +49,46 @@ public:
 
 	void onEntityMoved(Entity entity)
 	{
-		if (!m_is_processing)
+		if (m_is_processing) return;
+
+		m_is_processing = true;
+		Children::iterator iter = m_children.find(entity);
+		if (iter.isValid())
 		{
-			m_is_processing = true;
-			Children::iterator iter = m_children.find(entity);
-			if (iter.isValid())
+			Matrix parent_matrix = m_universe.getPositionAndRotation(entity);
+			Array<Child>& children = *iter.value();
+			for (int i = 0, c = children.size(); i < c; ++i)
 			{
-				Matrix parent_matrix = m_universe.getMatrix(entity);
-				Array<Child>& children = *iter.value();
+				m_universe.setMatrix(children[i].m_entity,
+									 parent_matrix *
+										 children[i].m_local_matrix);
+			}
+		}
+
+		Parents::iterator parent_iter = m_parents.find(entity);
+		if (parent_iter.isValid())
+		{
+			Entity parent(parent_iter.value());
+			Children::iterator child_iter = m_children.find(parent);
+			if (child_iter.isValid())
+			{
+				Array<Child>& children = *child_iter.value();
 				for (int i = 0, c = children.size(); i < c; ++i)
 				{
-					Entity e(children[i].m_entity);
-					m_universe.setMatrix(e, parent_matrix * children[i].m_local_matrix);
-				}
-			}
-
-			Parents::iterator parent_iter = m_parents.find(entity);
-			if (parent_iter.isValid())
-			{
-				Entity parent(parent_iter.value());
-				Children::iterator child_iter = m_children.find(parent);
-				if (child_iter.isValid())
-				{
-					Array<Child>& children = *child_iter.value();
-					for (int i = 0, c = children.size(); i < c; ++i)
+					if (children[i].m_entity == entity)
 					{
-						if (children[i].m_entity == entity)
-						{
-							Matrix inv_parent_matrix =
-								m_universe.getMatrix(parent);
-							inv_parent_matrix.inverse();
-							children[i].m_local_matrix =
-								inv_parent_matrix *
-								m_universe.getMatrix(entity);
-							break;
-						}
+						Matrix inv_parent_matrix =
+							m_universe.getPositionAndRotation(parent);
+						inv_parent_matrix.inverse();
+						children[i].m_local_matrix =
+							inv_parent_matrix *
+							m_universe.getPositionAndRotation(entity);
+						break;
 					}
 				}
 			}
-			m_is_processing = false;
 		}
+		m_is_processing = false;
 	}
 
 
@@ -126,9 +126,9 @@ public:
 			}
 			Child& c = child_iter.value()->pushEmpty();
 			c.m_entity = child;
-			Matrix inv_parent_matrix = m_universe.getMatrix(parent);
+			Matrix inv_parent_matrix = m_universe.getPositionAndRotation(parent);
 			inv_parent_matrix.inverse();
-			c.m_local_matrix = inv_parent_matrix * m_universe.getMatrix(child);
+			c.m_local_matrix = inv_parent_matrix * m_universe.getPositionAndRotation(child);
 		}
 		m_parent_set.invoke(child, parent);
 	}
