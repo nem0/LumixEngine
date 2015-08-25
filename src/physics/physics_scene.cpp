@@ -177,6 +177,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 		, m_terrains(m_allocator)
 		, m_dynamic_actors(m_allocator)
 		, m_universe(universe)
+		, m_is_game_running(false)
 	{
 	}
 
@@ -551,6 +552,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 
 	virtual void update(float time_delta) override
 	{
+		if (!m_is_game_running) return;
+		
 		time_delta = Math::minValue(0.01f, time_delta);
 		simulateScene(time_delta);
 		fetchResults();
@@ -558,6 +561,18 @@ struct PhysicsSceneImpl : public PhysicsScene
 		updateControllers(time_delta);
 	}
 
+
+	virtual void startGame() override
+	{
+		m_is_game_running = true;
+	}
+
+
+	virtual void stopGame() override
+	{
+		m_is_game_running = false;
+	}
+	
 
 	virtual ComponentIndex getController(Entity entity) override
 	{
@@ -1175,6 +1190,7 @@ struct PhysicsSceneImpl : public PhysicsScene
 	physx::PxMaterial* m_default_material;
 	Array<RigidActor*> m_actors;
 	Array<RigidActor*> m_dynamic_actors;
+	bool m_is_game_running;
 
 	Array<Controller> m_controllers;
 	Array<Terrain*> m_terrains;

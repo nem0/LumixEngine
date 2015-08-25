@@ -67,6 +67,15 @@ void Universe::setMatrix(Entity entity, const Matrix& mtx)
 }
 
 
+Matrix Universe::getPositionAndRotation(Entity entity) const
+{
+	Matrix mtx;
+	m_transformations[entity].rotation.toMatrix(mtx);
+	mtx.setTranslation(m_transformations[entity].position);
+	return mtx;
+}
+
+
 Matrix Universe::getMatrix(Entity entity) const
 {
 	Matrix mtx;

@@ -21,7 +21,7 @@ namespace Lumix
 			class Child
 			{
 				public:
-					int32_t m_entity;
+					Entity m_entity;
 					Matrix m_local_matrix;
 			};
 

@@ -55,6 +55,7 @@ public:
 	bool hasEntity(Entity entity) const;
 
 	void setMatrix(Entity entity, const Matrix& mtx);
+	Matrix getPositionAndRotation(Entity entity) const;
 	Matrix getMatrix(Entity entity) const;
 	void setRotation(Entity entity, float x, float y, float z, float w);
 	void setRotation(Entity entity, const Quat& rot);
