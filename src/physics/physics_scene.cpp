@@ -1079,7 +1079,10 @@ struct PhysicsSceneImpl : public PhysicsScene
 		serializer.read(count);
 		for (int i = 0; i < m_controllers.size(); ++i)
 		{
-			m_controllers[i].m_controller->release();
+			if (!m_controllers[i].m_is_free)
+			{
+				m_controllers[i].m_controller->release();
+			}
 		}
 		m_controllers.clear();
 		for (int i = 0; i < count; ++i)

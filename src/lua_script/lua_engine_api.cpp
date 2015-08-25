@@ -4,6 +4,7 @@
 #include "engine.h"
 #include "iplugin.h"
 #include "renderer/render_scene.h"
+#include "universe/hierarchy.h"
 #include "universe/universe.h"
 
 
@@ -95,8 +96,20 @@ setEntityPosition(Universe* univ, int entity_index, float x, float y, float z)
 static void setEntityRotation(
 	Universe* univ, int entity_index, float x, float y, float z, float angle)
 {
+	if (entity_index < 0 || entity_index > univ->getEntityCount()) return;
+
 	univ->setRotation(entity_index, Quat(Vec3(x, y, z), angle));
 }
+
+
+static void setEntityLocalRotation(
+	UniverseContext* univ, int entity_index, float x, float y, float z, float angle)
+{
+	if (entity_index < 0 || entity_index >= univ->m_universe->getEntityCount()) return;
+
+	univ->m_hierarchy->setLocalRotation(entity_index, Quat(Vec3(x, y, z), angle));
+}
+
 
 
 static void setRenderablePath(IScene* scene, int component, const char* path)
@@ -156,6 +169,12 @@ void registerEngineLuaAPI(Engine& engine, UniverseContext& ctx, lua_State* L)
 					  "API_setEntityRotation",
 					  LuaWrapper::wrap<decltype(&LuaAPI::setEntityRotation),
 									   LuaAPI::setEntityRotation>);
+
+	registerCFunction(
+		L,
+		"API_setEntityLocalRotation",
+		LuaWrapper::wrap<decltype(&LuaAPI::setEntityLocalRotation),
+						 LuaAPI::setEntityLocalRotation>);
 
 	registerCFunction(L,
 					  "API_createComponent",
