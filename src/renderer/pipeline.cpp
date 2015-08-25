@@ -1269,13 +1269,20 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	virtual void resize(int w, int h) override
 	{
+		if (m_width == w && m_height == h) return;
+
 		if (m_default_framebuffer)
 		{
 			m_default_framebuffer->resize(w, h);
 		}
 		else
 		{
+			// call bgfx::frame here because of a bug in bgfx - if main window
+			// and some other window are resized in one frame, the other window
+			// stops working
+			bgfx::frame();
 			bgfx::reset(w, h);
+			bgfx::frame();
 		}
 		m_width = w;
 		m_height = h;

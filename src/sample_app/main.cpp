@@ -57,6 +57,8 @@ public:
 
 		ImGui::NewFrame();
 
+		ImGui::ShowTestWindow();
+
 		if (ImGui::BeginMainMenuBar())
 		{
 			if (ImGui::BeginMenu("File"))
@@ -265,9 +267,9 @@ static void imGuiCallback(ImDrawData* draw_data)
 			g_context.m_pipeline->setScissor(
 				uint16_t(Lumix::Math::maxValue(pcmd->ClipRect.x, 0.0f)),
 				uint16_t(Lumix::Math::maxValue(pcmd->ClipRect.y, 0.0f)),
-				uint16_t(Lumix::Math::maxValue(pcmd->ClipRect.z, 65535.0f) -
+				uint16_t(Lumix::Math::minValue(pcmd->ClipRect.z, 65535.0f) -
 						 Lumix::Math::maxValue(pcmd->ClipRect.x, 0.0f)),
-				uint16_t(Lumix::Math::maxValue(pcmd->ClipRect.w, 65535.0f) -
+				uint16_t(Lumix::Math::minValue(pcmd->ClipRect.w, 65535.0f) -
 						 Lumix::Math::maxValue(pcmd->ClipRect.y, 0.0f)));
 			
 				g_context.m_pipeline->render(
