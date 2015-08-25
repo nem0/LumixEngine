@@ -411,7 +411,8 @@ public:
 		{
 			char tmp[32];
 			serializer.readString(tmp, sizeof(tmp));
-			ctx.getScene(crc32(tmp))->deserialize(serializer);
+			IScene* scene = ctx.getScene(crc32(tmp));
+			scene->deserialize(serializer);
 		}
 		g_path_manager.clear();
 		return true;

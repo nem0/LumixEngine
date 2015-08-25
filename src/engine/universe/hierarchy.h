@@ -1,8 +1,8 @@
 #pragma once
 
 
-#include "core/delegate_list.h"
 #include "lumix.h"
+#include "core/delegate_list.h"
 #include "core/matrix.h"
 
 
@@ -32,6 +32,7 @@ namespace Lumix
 
 			virtual ~Hierarchy() {}
 
+			virtual void setLocalRotation(Entity entity, const Quat& rotation) = 0;
 			virtual void setParent(Entity child, Entity parent) = 0;
 			virtual Entity getParent(Entity child) = 0;
 			virtual void serialize(OutputBlob& serializer) = 0;

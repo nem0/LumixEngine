@@ -92,6 +92,21 @@ public:
 	}
 
 
+	virtual void setLocalRotation(Entity entity, const Quat& rotation) override
+	{
+		Parents::iterator parent_iter = m_parents.find(entity);
+
+		if (parent_iter.isValid())
+		{
+			Quat parent_rot = m_universe.getRotation(parent_iter.value());
+			m_universe.setRotation(entity, rotation * parent_rot);
+			return;
+		}
+
+		m_universe.setRotation(entity, rotation);
+	}
+
+
 	virtual void setParent(Entity child, Entity parent) override
 	{
 		Parents::iterator old_parent_iter = m_parents.find(child);
