@@ -311,6 +311,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 		c.m_entity = entity;
 		c.m_is_free = false;
 		c.m_frame_change.set(0, 0, 0);
+		c.m_radius = cDesc.radius;
+		c.m_height = cDesc.height;
 
 		m_controllers.push(c);
 
@@ -573,6 +575,18 @@ struct PhysicsSceneImpl : public PhysicsScene
 		m_is_game_running = false;
 	}
 	
+
+	virtual float getControllerRadius(ComponentIndex cmp) override
+	{
+		return m_controllers[cmp].m_radius;
+	}
+
+
+	virtual float getControllerHeight(ComponentIndex cmp) override
+	{
+		return m_controllers[cmp].m_height;
+	}
+
 
 	virtual ComponentIndex getController(Entity entity) override
 	{
@@ -1181,6 +1195,8 @@ struct PhysicsSceneImpl : public PhysicsScene
 		physx::PxController* m_controller;
 		Entity m_entity;
 		Vec3 m_frame_change;
+		float m_radius;
+		float m_height;
 		bool m_is_free;
 	};
 

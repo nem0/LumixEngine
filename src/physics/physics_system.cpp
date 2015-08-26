@@ -10,8 +10,10 @@
 #include "editor/world_editor.h"
 #include "engine.h"
 #include "engine/property_descriptor.h"
+#include "renderer/render_scene.h"
 #include "physics/physics_geometry_manager.h"
 #include "physics/physics_scene.h"
+#include "studio/mainwindow.h"
 
 
 namespace Lumix
@@ -74,6 +76,67 @@ struct PhysicsSystemImpl : public PhysicsSystem
 extern "C" LUMIX_PHYSICS_API IPlugin* createPlugin(Engine& engine)
 {
 	return engine.getAllocator().newObject<PhysicsSystemImpl>(engine);
+}
+
+
+struct EditorPlugin : public WorldEditor::Plugin
+{
+	EditorPlugin(WorldEditor& editor)
+		: m_editor(editor)
+	{
+	}
+
+	virtual bool showGizmo(ComponentUID cmp) override
+	{
+		PhysicsScene* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
+		if (cmp.type == CONTROLLER_HASH)
+		{
+			auto* scene =
+				static_cast<RenderScene*>(m_editor.getScene(crc32("renderer")));
+			float height = phy_scene->getControllerHeight(cmp.index);
+			float radius = phy_scene->getControllerRadius(cmp.index);
+
+			Universe& universe = scene->getUniverse();
+			Vec3 pos = universe.getPosition(cmp.entity);
+			Vec3 up(0, (height + 2 * radius), 0);
+			scene->addDebugCylinder(
+				pos - up * 0.5f, up, radius, Vec3(1, 0, 0), 0);
+			return true;
+		}
+
+		if (cmp.type == BOX_ACTOR_HASH)
+		{
+			auto* scene =
+				static_cast<RenderScene*>(m_editor.getScene(crc32("renderer")));
+			Vec3 extents = phy_scene->getHalfExtents(cmp.index);
+
+			Universe& universe = scene->getUniverse();
+			Matrix mtx = universe.getMatrix(cmp.entity);
+
+			scene->addDebugCube(mtx.getTranslation(),
+								mtx.getXVector() * extents.x,
+								mtx.getYVector() * extents.y,
+								mtx.getZVector() * extents.z,
+								Vec3(1, 0, 0),
+								0);
+			return true;
+
+		}
+
+		return false;
+	}
+
+	WorldEditor& m_editor;
+};
+
+
+extern "C" LUMIX_LIBRARY_EXPORT void
+setStudioMainWindow(Engine& engine, MainWindow& main_window)
+{
+	IAllocator& allocator = main_window.getWorldEditor().getAllocator();
+	EditorPlugin* plugin =
+		allocator.newObject<EditorPlugin>(main_window.getWorldEditor());
+	main_window.getWorldEditor().addPlugin(*plugin);
 }
 
 

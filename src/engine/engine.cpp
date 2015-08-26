@@ -13,9 +13,9 @@
 #include "core/fs/memory_file_device.h"
 #include "core/mtjd/manager.h"
 #include "debug/debug.h"
+#include "engine/iplugin.h"
 #include "engine/property_descriptor.h"
 #include "plugin_manager.h"
-#include "renderer/renderer.h"
 #include "universe/hierarchy.h"
 #include "universe/universe.h"
 

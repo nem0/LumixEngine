@@ -263,7 +263,6 @@ static void imGuiCallback(ImDrawData* draw_data)
 				continue;
 			}
 
-			TODO("scissor seems to be not working");
 			g_context.m_pipeline->setScissor(
 				uint16_t(Lumix::Math::maxValue(pcmd->ClipRect.x, 0.0f)),
 				uint16_t(Lumix::Math::maxValue(pcmd->ClipRect.y, 0.0f)),

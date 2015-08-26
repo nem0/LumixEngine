@@ -9,11 +9,9 @@
 #include "editor/world_editor.h"
 #include "engine.h"
 #include "iplugin.h"
-#include "renderer/render_scene.h"
 #include "universe/universe.h"
 
 
-static const uint32_t RENDERABLE_HASH = Lumix::crc32("renderable");
 static const uint32_t CAMERA_HASH = Lumix::crc32("camera");
 static const uint32_t GLOBAL_LIGHT_HASH = Lumix::crc32("global_light");
 static const uint32_t POINT_LIGHT_HASH = Lumix::crc32("point_light");

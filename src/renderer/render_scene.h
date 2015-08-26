@@ -121,6 +121,12 @@ public:
 							   float size,
 							   const Vec3& color,
 							   float life) = 0;
+	virtual void addDebugCube(const Vec3& pos,
+							  const Vec3& dir,
+							  const Vec3& up,
+							  const Vec3& right,
+							  const Vec3& color,
+							  float life) = 0;
 	virtual void addDebugCube(const Vec3& from,
 							  const Vec3& max,
 							  const Vec3& color,

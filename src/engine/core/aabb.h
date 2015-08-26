@@ -15,9 +15,28 @@ namespace Lumix
 		public:
 			AABB() {}
 			AABB(const Vec3& min, const Vec3& max) : m_min(min), m_max(max) {}
-			
+
+			void set(const Vec3& min, const Vec3& max)
+			{
+				m_min = min;
+				m_max = max;
+			}
+
+			void merge(const AABB& rhs)
+			{
+				addPoint(rhs.getMin());
+				addPoint(rhs.getMax());
+			}
+
+			void addPoint(const Vec3& point)
+			{
+				m_min = minCoords(point, m_min);
+				m_max = maxCoords(point, m_max);
+			}
+
 			const Vec3& getMin() const { return m_min; }
 			const Vec3& getMax() const { return m_max; }
+
 			void transform(const Matrix& matrix)
 			{
 				Vec3 points[8];
