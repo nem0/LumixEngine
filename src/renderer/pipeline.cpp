@@ -1277,12 +1277,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		}
 		else
 		{
-			// call bgfx::frame here because of a bug in bgfx - if main window
-			// and some other window are resized in one frame, the other window
-			// stops working
-			bgfx::frame();
 			bgfx::reset(w, h);
-			bgfx::frame();
 		}
 		m_width = w;
 		m_height = h;
