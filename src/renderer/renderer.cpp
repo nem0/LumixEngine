@@ -483,6 +483,15 @@ void Renderer::setInitData(void* data)
 }
 
 
+struct EditorPlugin : public WorldEditor::Plugin
+{
+	virtual bool showGizmo(ComponentUID cmp) override
+	{
+	
+	}
+};
+
+
 extern "C"
 {
 	LUMIX_RENDERER_API IPlugin* createPlugin(Engine& engine)
@@ -494,6 +503,13 @@ extern "C"
 		}
 		engine.getAllocator().deleteObject(r);
 		return nullptr;
+	}
+
+
+	LUMIX_LIBRARY_EXPORT void setStudioMainWindow(Engine& engine,
+												  class MainWindow& main_window)
+	{
+		//WorldEditor& editor = main_window.getWorldEditor();
 	}
 }
 

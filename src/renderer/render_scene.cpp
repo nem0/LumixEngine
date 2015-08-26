@@ -1473,6 +1473,31 @@ public:
 	}
 
 
+	virtual void addDebugCube(const Vec3& pos,
+							  const Vec3& dir,
+							  const Vec3& up,
+							  const Vec3& right,
+							  const Vec3& color,
+							  float life) override
+	{
+		addDebugLine(pos + dir + up + right, pos + dir + up - right, color, life);
+		addDebugLine(pos - dir + up + right, pos - dir + up - right, color, life);
+		addDebugLine(pos + dir + up + right, pos - dir + up + right, color, life);
+		addDebugLine(pos + dir + up - right, pos - dir + up - right, color, life);
+
+		addDebugLine(pos + dir - up + right, pos + dir - up - right, color, life);
+		addDebugLine(pos - dir - up + right, pos - dir - up - right, color, life);
+		addDebugLine(pos + dir - up + right, pos - dir - up + right, color, life);
+		addDebugLine(pos + dir - up - right, pos - dir - up - right, color, life);
+
+		addDebugLine(pos + dir + up + right, pos + dir - up + right, color, life);
+		addDebugLine(pos + dir + up - right, pos + dir - up - right, color, life);
+		addDebugLine(pos - dir + up + right, pos - dir - up + right, color, life);
+		addDebugLine(pos - dir + up - right, pos - dir - up - right, color, life);
+
+	}
+
+
 	virtual void addDebugCube(const Vec3& min,
 							  const Vec3& max,
 							  const Vec3& color,

@@ -52,6 +52,8 @@ class LUMIX_PHYSICS_API PhysicsScene : public IScene
 
 		virtual void moveController(ComponentIndex cmp, const Vec3& v, float dt) = 0;
 		virtual ComponentIndex getController(Entity entity) = 0;
+		virtual float getControllerRadius(ComponentIndex cmp) = 0;
+		virtual float getControllerHeight(ComponentIndex cmp) = 0;
 };
 
 

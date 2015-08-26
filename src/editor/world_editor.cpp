@@ -1,6 +1,5 @@
 #include "world_editor.h"
 
-#include "animation/animation_system.h"
 #include "core/aabb.h"
 #include "core/array.h"
 #include "core/associative_array.h"
@@ -49,10 +48,6 @@ namespace Lumix
 static const uint32_t RENDERABLE_HASH = crc32("renderable");
 static const uint32_t CAMERA_HASH = crc32("camera");
 static const uint32_t GLOBAL_LIGHT_HASH = crc32("global_light");
-static const uint32_t POINT_LIGHT_HASH = crc32("point_light");
-static const uint32_t SCRIPT_HASH = crc32("script");
-static const uint32_t ANIMABLE_HASH = crc32("animable");
-static const uint32_t TERRAIN_HASH = crc32("terrain");
 
 
 class SetEntityNameCommand : public IEditorCommand
@@ -1464,84 +1459,180 @@ public:
 	}
 
 
-	void createEditorLines()
+	void showRenderableGizmo(ComponentUID renderable)
 	{
+		RenderScene* scene = static_cast<RenderScene*>(renderable.scene);
+		Universe& universe = scene->getUniverse();
+		Model* model = scene->getRenderableModel(renderable.index);
+		Vec3 points[8];
+		if (!model) return;
+
+		const AABB& aabb = model->getAABB();
+		points[0] = aabb.getMin();
+		points[7] = aabb.getMax();
+		points[1].set(points[0].x, points[0].y, points[7].z);
+		points[2].set(points[0].x, points[7].y, points[0].z);
+		points[3].set(points[0].x, points[7].y, points[7].z);
+		points[4].set(points[7].x, points[0].y, points[0].z);
+		points[5].set(points[7].x, points[0].y, points[7].z);
+		points[6].set(points[7].x, points[7].y, points[0].z);
+		Matrix mtx = universe.getMatrix(renderable.entity);
+
+		for (int j = 0; j < 8; ++j)
+		{
+			points[j] = mtx.multiplyPosition(points[j]);
+		}
+
+		Vec3 this_min = points[0];
+		Vec3 this_max = points[0];
+
+		for (int j = 0; j < 8; ++j)
+		{
+			this_min = minCoords(points[j], this_min);
+			this_max = maxCoords(points[j], this_max);
+		}
+			
+		scene->addDebugCube(this_min, this_max, Vec3(1, 0, 0), 0);
+	}
+
+
+	void showCameraGizmo(ComponentUID camera)
+	{
+		RenderScene* scene = static_cast<RenderScene*>(camera.scene);
+		Universe& universe = scene->getUniverse();
+		Vec3 pos = universe.getPosition(camera.entity);
+
+		float fov = scene->getCameraFOV(camera.index);
+		float near_distance = scene->getCameraNearPlane(camera.index);
+		float far_distance = scene->getCameraFarPlane(camera.index);
+		Vec3 dir = universe.getRotation(camera.entity) * Vec3(0, 0, -1);
+		Vec3 right = universe.getRotation(camera.entity) * Vec3(1, 0, 0);
+		Vec3 up = universe.getRotation(camera.entity) * Vec3(0, 1, 0);
+		float w = scene->getCameraWidth(camera.index);
+		float h = scene->getCameraHeight(camera.index);
+		float ratio = h <= FLT_MIN ? 1 : w / h;
+
+		scene->addDebugFrustum(pos,
+							   dir,
+							   up,
+							   fov,
+							   ratio,
+							   near_distance,
+							   far_distance,
+							   Vec3(1, 0, 0),
+							   0);
+	}
+
+
+	void
+	showGlobalLightGizmo(ComponentUID light)
+	{
+		RenderScene* scene = static_cast<RenderScene*>(light.scene);
+		Universe& universe = scene->getUniverse();
+		Vec3 pos = universe.getPosition(light.entity);
+
+		Vec3 dir = universe.getRotation(light.entity) * Vec3(0, 0, 1);
+		Vec3 right = universe.getRotation(light.entity) * Vec3(1, 0, 0);
+		Vec3 up = universe.getRotation(light.entity) * Vec3(0, 1, 0);
+
+		scene->addDebugLine(pos, pos + dir, 0xff0000ff, 0);
+		scene->addDebugLine(pos + right, pos + dir + right, 0xff0000ff, 0);
+		scene->addDebugLine(pos - right, pos + dir - right, 0xff0000ff, 0);
+		scene->addDebugLine(pos + up, pos + dir + up, 0xff0000ff, 0);
+		scene->addDebugLine(pos - up, pos + dir - up, 0xff0000ff, 0);
+
+		scene->addDebugLine(
+			pos + right + up, pos + dir + right + up, 0xff0000ff, 0);
+		scene->addDebugLine(
+			pos + right - up, pos + dir + right - up, 0xff0000ff, 0);
+		scene->addDebugLine(
+			pos - right - up, pos + dir - right - up, 0xff0000ff, 0);
+		scene->addDebugLine(
+			pos - right + up, pos + dir - right + up, 0xff0000ff, 0);
+
+		scene->addDebugSphere(pos - dir, 0.1f, Vec3(1, 0, 0), 0);
+	}
+
+
+	AABB getEntityAABB(Universe& universe, Entity entity)
+	{
+		AABB aabb;
+
+		ComponentUID cmp = getComponent(entity, RENDERABLE_HASH);
+		if (cmp.isValid())
+		{
+			RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
+			Model* model = scene->getRenderableModel(cmp.index);
+			Vec3 points[8];
+			if (!model) return aabb;
+
+			aabb = model->getAABB();
+			aabb.transform(universe.getMatrix(entity));
+
+			return aabb;
+		}
+
+		Vec3 pos = universe.getPosition(entity);
+		aabb.set(pos, pos);
+
+		return aabb;
+	}
+
+
+	void showGizmos()
+	{
+		if (m_selected_entities.empty()) return;
+
 		ComponentUID camera_cmp = getComponent(m_camera, CAMERA_HASH);
 		RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);
 		Universe* universe = getUniverse();
-		bool first_found = true;
-		Vec3 all_min;
-		Vec3 all_max;
-		for (int i = 0; i < m_selected_entities.size(); ++i)
-		{
-			ComponentUID renderable =
-				getComponent(m_selected_entities[i], RENDERABLE_HASH);
-			if (renderable.isValid())
-			{
-				Model* model = scene->getRenderableModel(renderable.index);
-				Vec3 points[8];
-				if (model)
-				{
-					const AABB& aabb = model->getAABB();
-					points[0] = aabb.getMin();
-					points[7] = aabb.getMax();
-					points[1].set(points[0].x, points[0].y, points[7].z);
-					points[2].set(points[0].x, points[7].y, points[0].z);
-					points[3].set(points[0].x, points[7].y, points[7].z);
-					points[4].set(points[7].x, points[0].y, points[0].z);
-					points[5].set(points[7].x, points[0].y, points[7].z);
-					points[6].set(points[7].x, points[7].y, points[0].z);
-					Matrix mtx = universe->getMatrix(m_selected_entities[i]);
 
-					Vec3 this_min, this_max;
-					for (int j = 0; j < 8; ++j)
-					{
-						points[j] = mtx.multiplyPosition(points[j]);
-					}
-
-					this_min = points[0];
-					this_max = points[0];
-
-					for (int j = 0; j < 8; ++j)
-					{
-						this_min = minCoords(points[j], this_min);
-						this_max = maxCoords(points[j], this_max);
-					}
-
-					if (i > 0)
-					{
-						all_min = minCoords(this_min, all_min);
-						all_max = maxCoords(this_max, all_max);
-					}
-					else
-					{
-						all_min = this_min;
-						all_max = this_max;
-					}
-
-					scene->addDebugCube(this_min, this_max, Vec3(1, 0, 0), 0);
-				}
-			}
-			else
-			{
-				Vec3 pos = universe->getPosition(m_selected_entities[i]);
-				if (first_found)
-				{
-					first_found = false;
-					all_min = pos - Vec3(0.5f, 0.5f, 0.5f);
-					all_max = pos + Vec3(0.5f, 0.5f, 0.5f);
-				}
-				else
-				{
-					all_min = minCoords(pos - Vec3(0.1f, 0.1f, 0.1f), all_min);
-					all_max = maxCoords(pos - Vec3(0.1f, 0.1f, 0.1f), all_max);
-				}
-			}
-		}
 		if (m_selected_entities.size() > 1)
 		{
-			scene->addDebugCube(all_min, all_max, Vec3(1, 1, 0), 0);
+			AABB aabb = getEntityAABB(*universe, m_selected_entities[0]);
+			for (int i = 1; i < m_selected_entities.size(); ++i)
+			{
+				AABB entity_aabb =
+					getEntityAABB(*universe, m_selected_entities[i]);
+				aabb.merge(entity_aabb);
+			}
+
+			scene->addDebugCube(aabb.getMin(), aabb.getMax(), Vec3(1, 1, 0), 0);
+			return;
 		}
+
+		const Array<ComponentUID>& cmps = getComponents(m_selected_entities[0]);
+
+		for (auto cmp : cmps)
+		{
+			for (auto* plugin : m_plugins)
+			{
+				if (plugin->showGizmo(cmp))
+					break;
+			}
+
+			if (cmp.type == RENDERABLE_HASH)
+			{
+				showRenderableGizmo(cmp);
+			}
+			else if (cmp.type == CAMERA_HASH)
+			{
+				showCameraGizmo(cmp);
+			}
+			else if (cmp.type == GLOBAL_LIGHT_HASH)
+			{
+				showGlobalLightGizmo(cmp);
+			}
+		}
+	}
+
+
+	void createEditorLines()
+	{
+		showGizmos();
+
+		RenderScene* scene = static_cast<RenderScene*>(
+			m_universe_context->getScene(crc32("renderer")));
 		m_measure_tool->createEditorLines(*scene);
 	}
 
@@ -1589,6 +1680,10 @@ public:
 		EditorIcon::unloadIcons();
 		removePlugin(*m_measure_tool);
 		m_allocator.deleteObject(m_measure_tool);
+		for (auto* plugin : m_plugins)
+		{
+			getAllocator().deleteObject(plugin);
+		}
 		destroyUndoStack();
 
 		destroyUniverse();

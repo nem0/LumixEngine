@@ -97,6 +97,11 @@ set_target_properties (physics PROPERTIES COMPILE_DEFINITIONS "BUILDING_PHYSICS"
 
 target_link_libraries(physics engine)
 target_link_libraries(physics renderer)
+target_link_libraries(physics editor)
+target_link_libraries(physics studio_lib)
+target_link_libraries(physics Qt5::Core)
+target_link_libraries(physics Qt5::Gui)
+target_link_libraries(physics Qt5::Widgets)
 target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/x86/PhysXVisualDebuggerSDKCHECKED.lib)
 target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/x86/PhysX3CHECKED_x86.lib)
 target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/x86/PhysX3CommonCHECKED_x86.lib)
