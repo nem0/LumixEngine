@@ -581,7 +581,7 @@ void AssetBrowser::on_filterComboBox_currentTextChanged(const QString&)
 	}
 	else if (m_ui->filterComboBox->currentText() == "Pipeline")
 	{
-		filters << "*.json";
+		filters << "*.lua";
 	}
 	else if (m_ui->filterComboBox->currentText() == "Physics")
 	{
