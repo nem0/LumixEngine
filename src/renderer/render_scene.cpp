@@ -173,7 +173,6 @@ public:
 		, m_global_light_last_uid(-1)
 		, m_point_light_last_uid(-1)
 		, m_is_forward_rendered(is_forward_rendered)
-		, m_applied_camera(INVALID_COMPONENT)
 		, m_renderable_created(m_allocator)
 		, m_renderable_destroyed(m_allocator)
 	{
@@ -269,26 +268,22 @@ public:
 	}
 
 
-	virtual ComponentIndex getAppliedCamera() const override
+	virtual Frustum getCameraFrustum(ComponentIndex camera) const override
 	{
-		return m_applied_camera;
+		Matrix mtx = m_universe.getMatrix(m_cameras[camera].m_entity);
+		Frustum ret;
+		ret.computePerspective(mtx.getTranslation(),
+							   mtx.getZVector(),
+							   mtx.getYVector(),
+							   m_cameras[camera].m_fov,
+							   m_cameras[camera].m_width /
+								   m_cameras[camera].m_height,
+							   m_cameras[camera].m_near,
+							   m_cameras[camera].m_far);
+
+		return ret;
 	}
 
-
-	virtual void applyCamera(ComponentIndex cmp) override
-	{
-		m_applied_camera = cmp;
-		Matrix mtx = getUniverse().getMatrix(m_cameras[cmp].m_entity);
-
-		m_camera_frustum.computePerspective(mtx.getTranslation(),
-											mtx.getZVector(),
-											mtx.getYVector(),
-											m_cameras[cmp].m_fov,
-											m_cameras[cmp].m_width /
-												m_cameras[cmp].m_height,
-											m_cameras[cmp].m_near,
-											m_cameras[cmp].m_far);
-	}
 
 	void update(float dt) override
 	{
@@ -979,7 +974,8 @@ public:
 
 	virtual void getGrassInfos(const Frustum& frustum,
 							   Array<GrassInfo>& infos,
-							   int64_t layer_mask) override
+							   int64_t layer_mask,
+							   ComponentIndex camera) override
 	{
 		PROFILE_FUNCTION();
 		for (int i = 0; i < m_terrains.size(); ++i)
@@ -988,7 +984,7 @@ public:
 				(m_terrains[i]->getLayerMask() & layer_mask) != 0)
 			{
 				m_terrains[i]->getGrassInfos(
-					frustum, infos, getAppliedCamera());
+					frustum, infos, camera);
 			}
 		}
 	}
@@ -1049,9 +1045,6 @@ public:
 	{
 		m_terrains[cmp]->removeGrassType(index);
 	}
-
-
-	virtual Frustum& getFrustum() override { return m_camera_frustum; }
 
 
 	virtual ComponentIndex getFirstRenderable() override
@@ -2157,8 +2150,6 @@ private:
 	Array<GlobalLight> m_global_lights;
 
 	Array<Camera> m_cameras;
-	ComponentIndex m_applied_camera;
-	Frustum m_camera_frustum;
 
 	Array<Terrain*> m_terrains;
 	Universe& m_universe;

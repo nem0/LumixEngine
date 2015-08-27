@@ -98,8 +98,7 @@ public:
 	virtual void getRay(
 		ComponentIndex camera, float x, float y, Vec3& origin, Vec3& dir) = 0;
 
-	virtual void applyCamera(ComponentIndex camera) = 0;
-	virtual ComponentIndex getAppliedCamera() const = 0;
+	virtual Frustum getCameraFrustum(ComponentIndex camera) const = 0;
 	virtual void update(float dt) = 0;
 	virtual float getTime() const = 0;
 	virtual Engine& getEngine() const = 0;
@@ -199,7 +198,8 @@ public:
 
 	virtual void getGrassInfos(const Frustum& frustum,
 							   Array<GrassInfo>& infos,
-							   int64_t layer_mask) = 0;
+							   int64_t layer_mask,
+							   ComponentIndex camera) = 0;
 	virtual void getTerrainInfos(Array<const TerrainInfo*>& infos,
 								 int64_t layer_mask,
 								 const Vec3& camera_pos,
@@ -262,7 +262,6 @@ public:
 	virtual Vec3 getLightAmbientColor(ComponentIndex cmp) = 0;
 	virtual float getFogDensity(ComponentIndex cmp) = 0;
 	virtual Vec3 getFogColor(ComponentIndex cmp) = 0;
-	virtual Frustum& getFrustum() = 0;
 	virtual Vec3 getPointLightSpecularColor(ComponentIndex cmp) = 0;
 	virtual void setPointLightSpecularColor(ComponentIndex cmp,
 											const Vec3& color) = 0;
