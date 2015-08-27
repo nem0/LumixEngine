@@ -364,11 +364,15 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch,
 	{
 		for (float dz = 0; dz < GRASS_QUAD_SIZE; dz += step)
 		{
-			uint32_t pixel_value = splat_map->getPixel(
-				splat_map->getWidth() * (quad_x + dx) / (m_width * m_scale.x),
-				splat_map->getHeight() * (quad_z + dz) /
-					(m_height * m_scale.x));
-			uint8_t count = (pixel_value >> (8 * patch.m_type->m_ground)) & 0xff;
+			uint32_t pixel_value = splat_map->getPixelNearest(
+				int(splat_map->getWidth() * (quad_x + dx) /
+					(m_width * m_scale.x)),
+				int(splat_map->getHeight() * (quad_z + dz) /
+					(m_height * m_scale.x)));
+
+			int ground_index = pixel_value & 0xff;
+			int weight = (pixel_value >> 8) & 0xff;
+			uint8_t count = ground_index == patch.m_type->m_ground ? weight : 0;
 			float density = count / 255.0f;
 
 			if (density < 0.25f) continue;

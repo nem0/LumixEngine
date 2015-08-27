@@ -33,6 +33,7 @@ class LUMIX_RENDERER_API Texture : public Resource
 		void onDataUpdated();
 		void save();
 		void setFlags(uint32_t flags);
+		uint32_t getPixelNearest(int x, int y) const;
 		uint32_t getPixel(float x, float y) const;
 		bgfx::TextureHandle getTextureHandle() const { return m_texture_handle; }
 
