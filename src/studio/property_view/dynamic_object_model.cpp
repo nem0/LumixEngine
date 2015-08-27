@@ -5,6 +5,7 @@
 #include <qevent.h>
 #include <qlabel.h>
 #include <qlayout.h>
+#include <qlineedit.h>
 #include <qpainter.h>
 #include <qspinbox.h>
 
@@ -33,6 +34,13 @@ void DynamicObjectItemDelegate::setEditorData(QWidget* editor, const QModelIndex
 		qobject_cast<QDoubleSpinBox*>(editor)->setValue(index.data().toFloat());
 		return;
 	}
+
+	if (qobject_cast<QLineEdit*>(editor))
+	{
+		qobject_cast<QLineEdit*>(editor)->setText(index.data().toString());
+		return;
+	}
+
 	QStyledItemDelegate::setEditorData(editor, index);
 }
 

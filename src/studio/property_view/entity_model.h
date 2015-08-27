@@ -27,6 +27,15 @@ public:
 private:
 	Lumix::Universe* getUniverse();
 
+	QModelIndex getNodeIndex(Node& node);
+	void addPropertyNode(Node& node,
+						 Lumix::IPropertyDescriptor* desc,
+						 Lumix::ComponentUID cmp,
+						 int index);
+	void addArrayItem(Node& parent,
+					  Lumix::IArrayDescriptor* array_desc,
+					  Lumix::ComponentUID cmp,
+					  int index);
 	void onComponentAdded(Lumix::ComponentUID component);
 	void onComponentDestroyed(Lumix::ComponentUID component);
 	void onPropertySet(Lumix::ComponentUID component,
@@ -42,6 +51,7 @@ private:
 	void addFileProperty(Node& child,
 						 Lumix::IPropertyDescriptor* desc,
 						 Lumix::ComponentUID cmp,
+						 int index,
 						 bool is_resource);
 	void addNameProperty();
 	void addPositionProperty();
