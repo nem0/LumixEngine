@@ -48,6 +48,7 @@ namespace Lumix
 static const uint32_t RENDERABLE_HASH = crc32("renderable");
 static const uint32_t CAMERA_HASH = crc32("camera");
 static const uint32_t GLOBAL_LIGHT_HASH = crc32("global_light");
+static const uint32_t POINT_LIGHT_HASH = crc32("point_light");
 
 
 class SetEntityNameCommand : public IEditorCommand
@@ -1459,6 +1460,18 @@ public:
 	}
 
 
+	void showPointLightGizmo(ComponentUID light)
+	{
+		RenderScene* scene = static_cast<RenderScene*>(light.scene);
+		Universe& universe = scene->getUniverse();
+
+		float range = scene->getLightRange(light.index);
+
+		Vec3 pos = universe.getPosition(light.entity);
+		scene->addDebugSphere(pos, range, Vec3(1, 0, 0), 0);
+	}
+
+
 	void showRenderableGizmo(ComponentUID renderable)
 	{
 		RenderScene* scene = static_cast<RenderScene*>(renderable.scene);
@@ -1622,6 +1635,10 @@ public:
 			else if (cmp.type == GLOBAL_LIGHT_HASH)
 			{
 				showGlobalLightGizmo(cmp);
+			}
+			else if (cmp.type == POINT_LIGHT_HASH)
+			{
+				showPointLightGizmo(cmp);
 			}
 		}
 	}
