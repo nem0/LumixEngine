@@ -1572,17 +1572,17 @@ public:
 		Vec3 near_center = position + direction * near_distance;
 		Vec3 far_center = position + direction * far_distance;
 		Vec3 right = crossProduct(direction, up);
-		float scale = (float)tan(Math::PI / 180.0f * fov * 0.5f);
-		Vec3 up_near = up * 0.5f * near_distance * scale;
-		Vec3 right_near = right * (0.5f * near_distance * scale * ratio);
+		float scale = (float)tan(Math::degreesToRadians(fov * 0.5f));
+		Vec3 up_near = up * near_distance * scale;
+		Vec3 right_near = right * (near_distance * scale * ratio);
 
 		points[0] = near_center + up_near + right_near;
 		points[1] = near_center + up_near - right_near;
 		points[2] = near_center - up_near - right_near;
 		points[3] = near_center - up_near + right_near;
 
-		Vec3 up_far = up * 0.5f * far_distance * scale;
-		Vec3 right_far = right * (0.5f * far_distance * scale * ratio);
+		Vec3 up_far = up  * far_distance * scale;
+		Vec3 right_far = right * (far_distance * scale * ratio);
 
 		points[4] = far_center + up_far + right_far;
 		points[5] = far_center + up_far - right_far;
