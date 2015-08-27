@@ -770,7 +770,7 @@ void TerrainComponentPlugin::createEditor(DynamicObjectModel::Node& node,
 	{
 	};
 	brush_type_node.enablePeristentEditor();
-	int last_node_index = brush_type_node.m_index;
+	int last_node_index = brush_type_node.getIndex();
 	brush_type_node.onCreateEditor = [this, &tools_node, last_node_index](
 		QWidget* parent, const QStyleOptionViewItem&)
 	{

@@ -385,20 +385,29 @@ void EntityModel::onEntityPosition(Lumix::Entity entity)
 void EntityModel::addFileProperty(Node& child,
 								  Lumix::IPropertyDescriptor* desc,
 								  Lumix::ComponentUID cmp,
-								  int index,
+								  bool is_array,
 								  bool is_resource)
 {
-	child.m_setter = [index, desc, cmp, this](const QVariant& value)
+	child.m_setter = [is_array, &child, desc, cmp, this](const QVariant& value)
 	{
-		this->set(cmp.entity, cmp.type, index, desc, value);
+		this->set(cmp.entity,
+				  cmp.type,
+				  is_array ? child.m_parent->getIndex() : -1,
+				  desc,
+				  value);
 	};
-	child.onSetModelData = [index, desc, cmp, this](QWidget* editor)
+	child.onSetModelData = [is_array, &child, desc, cmp, this](QWidget* editor)
 	{
 		const auto& children = editor->children();
 		auto value = qobject_cast<QLineEdit*>(children[1])->text();
-		this->set(cmp.entity, cmp.type, index, desc, value);
+		this->set(cmp.entity,
+				  cmp.type,
+				  is_array ? child.m_parent->getIndex() : -1,
+				  desc,
+				  value);
 	};
-	child.onDrop = [index, desc, cmp, this](const QMimeData* data, Qt::DropAction)
+	child.onDrop = [is_array, &child, desc, cmp, this](const QMimeData* data,
+													   Qt::DropAction)
 	{
 		QList<QUrl> urls = data->urls();
 		Q_ASSERT(urls.size() < 2);
@@ -407,12 +416,16 @@ void EntityModel::addFileProperty(Node& child,
 			char rel_path[Lumix::MAX_PATH_LENGTH];
 			Lumix::Path path(urls[0].toLocalFile().toLatin1().data());
 			m_editor.getRelativePath(rel_path, Lumix::MAX_PATH_LENGTH, path);
-			this->set(cmp.entity, cmp.type, index, desc, rel_path);
+			this->set(cmp.entity,
+					  cmp.type,
+					  is_array ? child.m_parent->getIndex() : -1,
+					  desc,
+					  rel_path);
 			return true;
 		}
 		return false;
 	};
-	child.onCreateEditor = [index, is_resource, desc, cmp, this](
+	child.onCreateEditor = [is_array, &child, is_resource, desc, cmp, this](
 		QWidget* parent, const QStyleOptionViewItem&) -> QWidget*
 	{
 		QWidget* widget = new QWidget(parent);
@@ -448,7 +461,11 @@ void EntityModel::addFileProperty(Node& child,
 			layout->addWidget(go_button);
 		}
 		layout->setContentsMargins(0, 0, 0, 0);
-		edit->setText(this->get(cmp.entity, cmp.type, index, desc).toString());
+		edit->setText(this->get(cmp.entity,
+								cmp.type,
+								is_array ? child.m_parent->getIndex() : -1,
+								desc)
+						  .toString());
 		return widget;
 	};
 }
@@ -461,12 +478,45 @@ QModelIndex EntityModel::getNodeIndex(Node& node)
 }
 
 
+void EntityModel::removeArrayItem(Node& node,
+					 Lumix::IArrayDescriptor* array_desc,
+					 Lumix::ComponentUID cmp)
+{
+	int row = node.getIndex();
+	beginRemoveRows(getIndex(*node.m_parent), row, row);
+	array_desc->removeArrayItem(cmp, row);
+	node.m_parent->removeChild(node);
+	endRemoveRows();
+}
+
+
 void EntityModel::addArrayItem(Node& parent,
 							   Lumix::IArrayDescriptor* array_desc,
-							   Lumix::ComponentUID cmp,
-							   int index)
+							   Lumix::ComponentUID cmp)
 {
-	Node& array_item_node = parent.addChild(QString::number(index));
+	Node& array_item_node =
+		parent.addChild(QString::number(parent.m_children.size()));
+	array_item_node.onCreateEditor = [this, &array_item_node, cmp, array_desc](
+		QWidget* parent, const QStyleOptionViewItem&) -> QWidget*
+	{
+		auto* widget = new QWidget(parent);
+		auto* layout = new QHBoxLayout(widget);
+		layout->setContentsMargins(0, 0, 0, 0);
+		layout->addStretch();
+		auto* button = new QPushButton(" - ", widget);
+		layout->addWidget(button);
+
+		button->connect(button,
+						&QPushButton::clicked,
+						[this, &array_item_node, cmp, array_desc]()
+						{
+							removeArrayItem(array_item_node, array_desc, cmp);
+						});
+
+		return widget;
+	};
+	array_item_node.m_setter = [](const QVariant&) {};
+	array_item_node.enablePeristentEditor();
 	array_item_node.m_getter = []() -> QVariant
 	{
 		return "";
@@ -475,7 +525,7 @@ void EntityModel::addArrayItem(Node& parent,
 	{
 		auto* array_item_property_desc = array_desc->getChildren()[l];
 
-		addPropertyNode(array_item_node, array_item_property_desc, cmp, index);
+		addPropertyNode(array_item_node, array_item_property_desc, cmp, true);
 	}
 }
 
@@ -497,7 +547,7 @@ void EntityModel::addArrayProperty(Node& child,
 							beginInsertRows(parent_index, row, row);
 
 							array_desc->addArrayItem(cmp, -1);
-							addArrayItem(child, array_desc, cmp, row);
+							addArrayItem(child, array_desc, cmp);
 
 							endInsertRows();
 
@@ -510,7 +560,7 @@ void EntityModel::addArrayProperty(Node& child,
 	child.m_is_persistent_editor = true;
 	for (int k = 0; k < array_desc->getCount(cmp); ++k)
 	{
-		addArrayItem(child, array_desc, cmp, k);
+		addArrayItem(child, array_desc, cmp);
 	}
 }
 
@@ -546,7 +596,7 @@ void EntityModel::addComponentNode(Lumix::ComponentUID cmp, int component_index)
 	{
 		auto* desc = descriptors[j];
 		
-		addPropertyNode(node, desc, cmp, -1);
+		addPropertyNode(node, desc, cmp, false);
 	}
 	emit m_view.componentNodeCreated(node, cmp);
 }
@@ -555,27 +605,33 @@ void EntityModel::addComponentNode(Lumix::ComponentUID cmp, int component_index)
 void EntityModel::addPropertyNode(Node& node,
 								  Lumix::IPropertyDescriptor* desc,
 								  Lumix::ComponentUID cmp,
-								  int index)
+								  bool is_array)
 {
 	Node& child = node.addChild(desc->getName());
-	child.m_getter = [index, desc, cmp, this]() -> QVariant
+	child.m_getter = [is_array, &node, desc, cmp, this]() -> QVariant
 	{
-		return this->get(cmp.entity, cmp.type, index, desc);
+		return this->get(
+			cmp.entity, cmp.type, is_array ? node.getIndex() : -1, desc);
 	};
 	switch (desc->getType())
 	{
 		case Lumix::IPropertyDescriptor::ARRAY:
 		{
-			ASSERT(index == -1); // subarrays not supported
+			ASSERT(!is_array); // subarrays not supported
 			addArrayProperty(
 				child, static_cast<Lumix::IArrayDescriptor*>(desc), cmp);
 			break;
 		}
 		case Lumix::IPropertyDescriptor::DECIMAL:
 		{
-			child.m_setter = [index, desc, cmp, this](const QVariant& value)
+			child.m_setter =
+				[is_array, &node, desc, cmp, this](const QVariant& value)
 			{
-				this->set(cmp.entity, cmp.type, index, desc, value);
+				this->set(cmp.entity,
+						  cmp.type,
+						  is_array ? node.getIndex() : -1,
+						  desc,
+						  value);
 			};
 			auto decimal_desc =
 				static_cast<Lumix::IDecimalPropertyDescriptor*>(desc);
@@ -590,14 +646,16 @@ void EntityModel::addPropertyNode(Node& node,
 			break;
 		}
 		case Lumix::IPropertyDescriptor::FILE:
-			addFileProperty(child, desc, cmp, index, false);
+			addFileProperty(
+				child, desc, cmp, is_array, false);
 			break;
 		case Lumix::IPropertyDescriptor::RESOURCE:
-			addFileProperty(child, desc, cmp, index, true);
+			addFileProperty(
+				child, desc, cmp, is_array, true);
 			break;
 		case Lumix::IPropertyDescriptor::VEC3:
 		{
-			ASSERT(index == -1); // vec3s in arrays are not supported
+			ASSERT(!is_array); // vec3s in arrays are not supported
 			Node& x_node = child.addChild("x");
 			x_node.m_getter = [desc, cmp]() -> QVariant
 			{
@@ -634,9 +692,14 @@ void EntityModel::addPropertyNode(Node& node,
 			break;
 		}
 		default:
-			child.m_setter = [index, desc, cmp, this](const QVariant& value)
+			child.m_setter =
+				[is_array, &node, desc, cmp, this](const QVariant& value)
 			{
-				this->set(cmp.entity, cmp.type, index, desc, value);
+				this->set(cmp.entity,
+						  cmp.type,
+						  is_array ? node.getIndex() : -1,
+						  desc,
+						  value);
 			};
 			break;
 	}
