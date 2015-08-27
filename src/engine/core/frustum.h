@@ -9,7 +9,13 @@ namespace Lumix
 	class Frustum
 	{
 		public:
-			void computeOrtho(const Vec3& position, const Vec3& direction, const Vec3& up, float width, float height, float near_distance, float far_distance)
+			void computeOrtho(const Vec3& position,
+							  const Vec3& direction,
+							  const Vec3& up,
+							  float width,
+							  float height,
+							  float near_distance,
+							  float far_distance)
 			{
 				Vec3 z = direction;
 				z.normalize();

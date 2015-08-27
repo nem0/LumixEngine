@@ -122,15 +122,15 @@ private:
 			, m_ref_count(0)
 			, m_model(model)
 		{
-			m_model->onLoaded<ModelLoadedCallback,
-							  &ModelLoadedCallback::callback>(this);
+			m_model->onLoaded < ModelLoadedCallback,
+				&ModelLoadedCallback::callback > (this);
 		}
 
 		~ModelLoadedCallback()
 		{
 			m_model->getObserverCb()
 				.unbind<ModelLoadedCallback, &ModelLoadedCallback::callback>(
-					this);
+				this);
 		}
 
 		void callback(Resource::State, Resource::State new_state)
@@ -148,10 +148,10 @@ private:
 
 public:
 	RenderSceneImpl(Renderer& renderer,
-					Engine& engine,
-					Universe& universe,
-					bool is_forward_rendered,
-					IAllocator& allocator)
+		Engine& engine,
+		Universe& universe,
+		bool is_forward_rendered,
+		IAllocator& allocator)
 		: m_engine(engine)
 		, m_universe(universe)
 		, m_renderer(renderer)
@@ -221,8 +221,8 @@ public:
 	virtual bool ownComponentType(uint32_t type) const override
 	{
 		return type == RENDERABLE_HASH || type == POINT_LIGHT_HASH ||
-			   type == GLOBAL_LIGHT_HASH || type == CAMERA_HASH ||
-			   type == TERRAIN_HASH;
+			type == GLOBAL_LIGHT_HASH || type == CAMERA_HASH ||
+			type == TERRAIN_HASH;
 	}
 
 
@@ -230,10 +230,10 @@ public:
 
 
 	virtual void getRay(ComponentIndex camera,
-						float x,
-						float y,
-						Vec3& origin,
-						Vec3& dir) override
+		float x,
+		float y,
+		Vec3& origin,
+		Vec3& dir) override
 	{
 		Vec3 camera_pos = m_universe.getPosition(m_cameras[camera].m_entity);
 		float width = m_cameras[camera].m_width;
@@ -273,13 +273,13 @@ public:
 		Matrix mtx = m_universe.getMatrix(m_cameras[camera].m_entity);
 		Frustum ret;
 		ret.computePerspective(mtx.getTranslation(),
-							   mtx.getZVector(),
-							   mtx.getYVector(),
-							   m_cameras[camera].m_fov,
-							   m_cameras[camera].m_width /
-								   m_cameras[camera].m_height,
-							   m_cameras[camera].m_near,
-							   m_cameras[camera].m_far);
+			mtx.getZVector(),
+			mtx.getYVector(),
+			m_cameras[camera].m_fov,
+			m_cameras[camera].m_width /
+			m_cameras[camera].m_height,
+			m_cameras[camera].m_near,
+			m_cameras[camera].m_far);
 
 		return ret;
 	}
@@ -453,9 +453,9 @@ public:
 			m_culling_system->setLayerMask(i, layer_mask);
 
 			setModel(i,
-					 static_cast<Model*>(m_engine.getResourceManager()
-											 .get(ResourceManager::MODEL)
-											 ->load(Path(path))));
+				static_cast<Model*>(m_engine.getResourceManager()
+				.get(ResourceManager::MODEL)
+				->load(Path(path))));
 
 			m_universe.addComponent(
 				m_renderables[i]->m_entity, RENDERABLE_HASH, this, i);
@@ -585,7 +585,7 @@ public:
 	}
 
 	virtual void destroyComponent(ComponentIndex component,
-								  uint32_t type) override
+		uint32_t type) override
 	{
 		if (type == RENDERABLE_HASH)
 		{
@@ -634,7 +634,7 @@ public:
 
 
 	virtual ComponentIndex createComponent(uint32_t type,
-										   Entity entity) override
+		Entity entity) override
 	{
 		if (type == TERRAIN_HASH)
 		{
@@ -699,6 +699,22 @@ public:
 	}
 
 
+	Frustum getPointLightFrustum(ComponentIndex index) const
+	{
+		const PointLight& light = m_point_lights[index];
+		Frustum frustum;
+		frustum.computeOrtho(m_universe.getPosition(light.m_entity),
+							 Vec3(1, 0, 0),
+							 Vec3(0, 1, 0),
+							 2.0f * light.m_range,
+							 2.0f * light.m_range,
+							 -light.m_range,
+							 light.m_range);
+
+		return frustum;
+	}
+
+
 	void onEntityMoved(Entity entity)
 	{
 		DynamicRenderableCache::iterator iter =
@@ -745,19 +761,10 @@ public:
 
 		for (int i = 0, c = m_point_lights.size(); i < c; ++i)
 		{
-			Frustum frustum;
-			PointLight& light = m_point_lights[i];
-
-			frustum.computeOrtho(m_universe.getPosition(light.m_entity),
-								 Vec3(1, 0, 0),
-								 Vec3(0, 1, 0),
-								 light.m_range,
-								 light.m_range,
-								 -light.m_range,
-								 light.m_range);
-
 			if (renderable_index >= 0 && m_is_forward_rendered)
 			{
+				Frustum frustum = getPointLightFrustum(i);
+
 				for (int j = 0; j < m_light_influenced_geometry[i].size(); ++j)
 				{
 					if (m_light_influenced_geometry[i][j] == renderable_index)
@@ -766,11 +773,11 @@ public:
 						break;
 					}
 				}
-				if (frustum.isSphereInside(
-						m_universe.getPosition(
-							m_renderables[renderable_index]->m_entity),
-						m_renderables[renderable_index]
-							->m_model->getBoundingRadius()))
+				Renderable* r = m_renderables[renderable_index];
+				Vec3 pos = m_universe.getPosition(r->m_entity);
+				float dist = (pos - frustum.getCenter()).length();
+				if (frustum.isSphereInside(pos,
+										   r->m_model->getBoundingRadius()))
 				{
 					m_light_influenced_geometry[i].push(renderable_index);
 				}
@@ -2018,32 +2025,23 @@ private:
 
 	void detectLightInfluencedGeometry(int light_index)
 	{
-		if (m_is_forward_rendered)
+		if (!m_is_forward_rendered) return;
+		
+		Frustum frustum = getPointLightFrustum(light_index);
+		m_culling_system->cullToFrustum(frustum, 0xffffFFFF);
+		const CullingSystem::Results& results =
+			m_culling_system->getResult();
+		Array<int>& influenced_geometry =
+			m_light_influenced_geometry[light_index];
+		influenced_geometry.clear();
+		for (int i = 0; i < results.size(); ++i)
 		{
-			Frustum frustum;
-			PointLight& light = m_point_lights[light_index];
-			frustum.computeOrtho(m_universe.getPosition(light.m_entity),
-								 Vec3(1, 0, 0),
-								 Vec3(0, 1, 0),
-								 light.m_range,
-								 light.m_range,
-								 -light.m_range,
-								 light.m_range);
-			m_culling_system->cullToFrustum(frustum, 0xffffFFFF);
-			const CullingSystem::Results& results =
-				m_culling_system->getResult();
-			Array<int>& influenced_geometry =
-				m_light_influenced_geometry[light_index];
-			influenced_geometry.clear();
-			for (int i = 0; i < results.size(); ++i)
+			const CullingSystem::Subresults& subresult = results[i];
+			influenced_geometry.reserve(influenced_geometry.size() +
+										subresult.size());
+			for (int j = 0, c = subresult.size(); j < c; ++j)
 			{
-				const CullingSystem::Subresults& subresult = results[i];
-				influenced_geometry.reserve(influenced_geometry.size() +
-											subresult.size());
-				for (int j = 0, c = subresult.size(); j < c; ++j)
-				{
-					influenced_geometry.push(subresult[j]);
-				}
+				influenced_geometry.push(subresult[j]);
 			}
 		}
 	}
