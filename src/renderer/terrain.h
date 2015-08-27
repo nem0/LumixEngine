@@ -116,6 +116,10 @@ class Terrain
 		TerrainQuad* generateQuadTree(float size);
 		float getHeight(int x, int z);
 		void updateGrass(ComponentIndex camera);
+		void generateGrassTypeQuad(GrassPatch& patch,
+								   const Matrix& terrain_matrix,
+								   float quad_x,
+								   float quad_z);
 		void generateGeometry();
 		void onMaterialLoaded(Resource::State, Resource::State new_state);
 		void forceGrassUpdate();
