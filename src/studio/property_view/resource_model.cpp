@@ -14,6 +14,7 @@
 #include <qapplication.h>
 #include <qfile.h>
 #include <qfiledialog.h>
+#include <qlabel.h>
 #include <qlayout.h>
 #include <qlineedit.h>
 #include <qpushbutton.h>
@@ -289,14 +290,23 @@ void ResourceModel::fillMaterialInfo(Lumix::Material* material, Node& node)
 	object.getNode().onCreateEditor = [this, material](
 		QWidget* parent, const QStyleOptionViewItem&) -> QWidget*
 	{
-		QPushButton* button = new QPushButton("Save", parent);
+		auto* widget = new QWidget(parent);
+		auto* layout = new QHBoxLayout(widget);
+		layout->setContentsMargins(0, 0, 0, 0);
+		auto* label = new QLabel(material->getPath().c_str(), widget);
+		layout->addWidget(label);
+		layout->addStretch();
+
+		QPushButton* button = new QPushButton("Save", widget);
 		connect(button,
 				&QPushButton::clicked,
 				[this, material]()
 				{
 					saveMaterial(material);
 				});
-		return button;
+		layout->addWidget(button);
+
+		return widget;
 	};
 	object.getNode().enablePeristentEditor();
 	object.property("Alpha cutout",

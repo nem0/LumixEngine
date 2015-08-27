@@ -32,8 +32,16 @@ class DynamicObjectModel : public QAbstractItemModel
 		class Node
 		{
 			public:
-				Node(QString name, Node* parent, int index) : m_name(name), m_parent(parent), m_index(index), m_is_persistent_editor(false) {}
+				Node(QString name, Node* parent, int index) : m_name(name), m_parent(parent), m_is_persistent_editor(false) {}
 				~Node();
+
+				void removeChild(Node& child)
+				{
+					Q_ASSERT(child.m_parent == this);
+
+					m_children.removeOne(&child);
+					delete &child;
+				}
 
 				Node& addChild(QString name)
 				{
@@ -50,6 +58,21 @@ class DynamicObjectModel : public QAbstractItemModel
 				}
 
 				void enablePeristentEditor() { m_is_persistent_editor = true; }
+				int getIndex() const
+				{
+					if (!m_parent) return 0;
+
+					for (int i = 0, c = m_parent->m_children.size(); i < c; ++i)
+					{
+						if (m_parent->m_children[i] == this)
+						{
+							return i;
+						}
+					}
+
+					return -1;
+				}
+
 
 				std::function<QVariant()> m_getter;
 				std::function<QVariant()> m_decoration;
@@ -60,11 +83,14 @@ class DynamicObjectModel : public QAbstractItemModel
 				std::function<QWidget*(QWidget*, const QStyleOptionViewItem&)> onCreateEditor;
 				std::function<void(QWidget*)> onSetModelData;
 				std::function<bool(const QMimeData*, Qt::DropAction)> onDrop;
-				int m_index;
 				QString m_name;
 				Node* m_parent;
 				QList<Node*> m_children;
 				bool m_is_persistent_editor;
+
+			private:
+				Node(const Node&);
+				void operator=(const Node&);
 		};
 
 		typedef char yes[2];

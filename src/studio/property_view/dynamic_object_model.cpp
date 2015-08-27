@@ -207,8 +207,8 @@ QStringList DynamicObjectModel::mimeTypes() const
 void DynamicObjectModel::removeNode(Node& node)
 {
 	Q_ASSERT(node.m_parent);
-	beginRemoveRows(getIndex(*node.m_parent), node.m_index, node.m_index);
-	node.m_parent->m_children.removeAt(node.m_index);
+	beginRemoveRows(getIndex(*node.m_parent), node.getIndex(), node.getIndex());
+	node.m_parent->m_children.removeAt(node.getIndex());
 	delete &node;
 	endRemoveRows();
 }
@@ -228,7 +228,7 @@ void DynamicObjectModel::childAdded()
 
 QModelIndex DynamicObjectModel::getIndex(Node& node)
 {
-	return createIndex(node.m_index, 0, &node);
+	return createIndex(node.getIndex(), 0, &node);
 }
 
 
@@ -253,7 +253,7 @@ QModelIndex DynamicObjectModel::parent(const QModelIndex& child) const
 	{
 		return QModelIndex();
 	}
-	return createIndex(node->m_parent->m_index, 0, node->m_parent);
+	return createIndex(node->m_parent->getIndex(), 0, node->m_parent);
 }
 
 
@@ -376,7 +376,7 @@ void DynamicObjectModel::setSliderEditor(Node& node, float min, float max, float
 			node.m_setter(value * 0.01f);
 			input->setValue(value * 0.01f);
 		});
-		connect(input, (void (QDoubleSpinBox::*)(double))&QDoubleSpinBox::valueChanged, [slider, node](double value){
+		connect(input, (void (QDoubleSpinBox::*)(double))&QDoubleSpinBox::valueChanged, [slider, &node](double value){
 			node.m_setter(value);
 			slider->setValue((int)(value * 100));
 		});
