@@ -484,7 +484,7 @@ void EntityModel::removeArrayItem(Node& node,
 {
 	int row = node.getIndex();
 	beginRemoveRows(getIndex(*node.m_parent), row, row);
-	array_desc->removeArrayItem(cmp, row);
+	m_editor.removeArrayPropertyItem(cmp, row, *array_desc);
 	node.m_parent->removeChild(node);
 	endRemoveRows();
 }

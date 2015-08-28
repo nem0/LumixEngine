@@ -69,6 +69,14 @@ struct DebugLine
 };
 
 
+struct DebugPoint
+{
+	Vec3 m_pos;
+	uint32_t m_color;
+	float m_life;
+};
+
+
 enum class RenderableType
 {
 	SKINNED_MESH,
@@ -107,6 +115,8 @@ public:
 	virtual Pose& getPose(ComponentIndex cmp) = 0;
 	virtual ComponentIndex getActiveGlobalLight() = 0;
 	virtual void setActiveGlobalLight(ComponentIndex cmp) = 0;
+
+	virtual void addDebugPoint(const Vec3& pos, uint32_t color, float life) = 0;
 
 	virtual void addDebugLine(const Vec3& from,
 							  const Vec3& to,
@@ -159,6 +169,7 @@ public:
 								  float life) = 0;
 
 	virtual const Array<DebugLine>& getDebugLines() const = 0;
+	virtual const Array<DebugPoint>& getDebugPoints() const = 0;
 
 	virtual Entity getCameraEntity(ComponentIndex camera) const = 0;
 	virtual ComponentIndex getCameraInSlot(const char* slot) = 0;

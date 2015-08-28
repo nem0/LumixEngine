@@ -165,6 +165,7 @@ public:
 		, m_light_influenced_geometry(m_allocator)
 		, m_global_lights(m_allocator)
 		, m_debug_lines(m_allocator)
+		, m_debug_points(m_allocator)
 		, m_always_visible(m_allocator)
 		, m_temporary_infos(m_allocator)
 		, m_sync_point(true, m_allocator)
@@ -300,6 +301,20 @@ public:
 			{
 				life -= dt;
 				m_debug_lines[i].m_life = life;
+			}
+		}
+
+		for (int i = m_debug_points.size() - 1; i >= 0; --i)
+		{
+			float life = m_debug_points[i].m_life;
+			if (life < 0)
+			{
+				m_debug_points.eraseFast(i);	
+			}
+			else
+			{
+				life -= dt;
+				m_debug_points[i].m_life = life;
 			}
 		}
 	}
@@ -1383,6 +1398,12 @@ public:
 	}
 
 
+	virtual const Array<DebugPoint>& getDebugPoints() const override
+	{
+		return m_debug_points;
+	}
+
+
 	virtual void addDebugSphere(const Vec3& center,
 								float radius,
 								const Vec3& color,
@@ -1648,6 +1669,16 @@ public:
 			center, Vec3(center.x, center.y, center.z - size), color, life);
 		addDebugLine(
 			center, Vec3(center.x, center.y, center.z + size), color, life);
+	}
+
+
+	virtual void
+	addDebugPoint(const Vec3& pos, uint32_t color, float life) override
+	{
+		DebugPoint& point = m_debug_points.pushEmpty();
+		point.m_pos = pos;
+		point.m_color = color;
+		point.m_life = life;
 	}
 
 
@@ -2154,6 +2185,7 @@ private:
 	Renderer& m_renderer;
 	Engine& m_engine;
 	Array<DebugLine> m_debug_lines;
+	Array<DebugPoint> m_debug_points;
 	CullingSystem* m_culling_system;
 	DynamicRenderableCache m_dynamic_renderable_cache;
 	Array<Array<const RenderableMesh*>> m_temporary_infos;

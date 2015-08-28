@@ -650,6 +650,49 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
+	void renderDebugPoints()
+	{
+		const Array<DebugPoint>& points = m_scene->getDebugPoints();
+		if (points.empty() || !m_debug_line_material->isReady())
+		{
+			return;
+		}
+		bgfx::TransientVertexBuffer tvb;
+		bgfx::TransientIndexBuffer tib;
+		if (bgfx::allocTransientBuffers(&tvb,
+			BaseVertex::s_vertex_decl,
+			points.size(),
+			&tib,
+			points.size()))
+		{
+			BaseVertex* vertex = (BaseVertex*)tvb.data;
+			uint16_t* indices = (uint16_t*)tib.data;
+			for (int i = 0; i < points.size(); ++i)
+			{
+				const DebugPoint& point = points[i];
+				vertex[0].m_rgba = point.m_color;
+				vertex[0].m_x = point.m_pos.x;
+				vertex[0].m_y = point.m_pos.y;
+				vertex[0].m_z = point.m_pos.z;
+				vertex[0].m_u = vertex[0].m_v = 0;
+
+				indices[0] = i;
+				++vertex;
+				++indices;
+			}
+
+			bgfx::setVertexBuffer(&tvb);
+			bgfx::setIndexBuffer(&tib);
+			bgfx::setState(m_render_state |
+				m_debug_line_material->getRenderStates() |
+				BGFX_STATE_PT_POINTS);
+			bgfx::submit(m_view_idx,
+				m_debug_line_material->getShaderInstance()
+				.m_program_handles[m_pass_idx]);
+		}
+	}
+
+
 	void renderDebugLines()
 	{
 		const Array<DebugLine>& lines = m_scene->getDebugLines();
@@ -1589,9 +1632,10 @@ float getFPS(PipelineInstanceImpl* pipeline)
 }
 
 
-void renderDebugLines(PipelineInstanceImpl* pipeline)
+void renderDebugShapes(PipelineInstanceImpl* pipeline)
 {
 	pipeline->renderDebugLines();
+	pipeline->renderDebugPoints();
 }
 
 
@@ -1669,9 +1713,9 @@ void PipelineImpl::registerCFunctions()
 	registerCFunction("executeCustomCommand",
 					  LuaWrapper::wrap<decltype(&LuaAPI::executeCustomCommand),
 									   LuaAPI::executeCustomCommand>);
-	registerCFunction("renderDebugLines",
-					  LuaWrapper::wrap<decltype(&LuaAPI::renderDebugLines),
-									   LuaAPI::renderDebugLines>);
+	registerCFunction("renderDebugShapes",
+					  LuaWrapper::wrap<decltype(&LuaAPI::renderDebugShapes),
+									   LuaAPI::renderDebugShapes>);
 	registerCFunction(
 		"getFPS", LuaWrapper::wrap<decltype(&LuaAPI::getFPS), LuaAPI::getFPS>);
 	registerCFunction(
