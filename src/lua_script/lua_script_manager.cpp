@@ -28,6 +28,8 @@ LuaScript::~LuaScript()
 
 void LuaScript::doUnload()
 {
+	m_properties.clear();
+	m_source_code = "";
 	m_size = 0;
 	onEmpty();
 }
@@ -86,7 +88,7 @@ void LuaScript::parseProperties()
 		PropertyName& token = m_properties.pushEmpty();
 		getToken(prop_name, token, sizeof(token));
 
-		prop = strstr(prop + 1, "-- LUMIX_PROPERTY");
+		prop = strstr(prop + 1, PROPERTY_MARK);
 	}
 }
 
@@ -95,6 +97,7 @@ void LuaScript::loaded(FS::IFile& file, bool success, FS::FileSystem& fs)
 {
 	if (success)
 	{
+		m_properties.clear();
 		m_source_code.set((const char*)file.getBuffer(), file.size());
 		parseProperties();
 		m_size = file.size();

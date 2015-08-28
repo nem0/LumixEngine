@@ -554,8 +554,8 @@ static void onComponentNodeCreated(DynamicObjectModel::Node& node,
 }
 
 
-extern "C" LUMIX_LIBRARY_EXPORT void
-setStudioMainWindow(Engine& engine, MainWindow& main_window)
+extern "C" LUMIX_LIBRARY_EXPORT void initEditorPlugin(Engine& engine,
+													  MainWindow& main_window)
 {
 	main_window.getPropertyView()->connect(
 		main_window.getPropertyView(),

@@ -130,8 +130,8 @@ struct EditorPlugin : public WorldEditor::Plugin
 };
 
 
-extern "C" LUMIX_LIBRARY_EXPORT void
-setStudioMainWindow(Engine& engine, MainWindow& main_window)
+extern "C" LUMIX_LIBRARY_EXPORT void initEditorPlugin(Engine& engine,
+													  MainWindow& main_window)
 {
 	IAllocator& allocator = main_window.getWorldEditor().getAllocator();
 	EditorPlugin* plugin =
