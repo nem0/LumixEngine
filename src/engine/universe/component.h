@@ -31,7 +31,7 @@ struct LUMIX_ENGINE_API ComponentUID final
 	Entity entity; 
 	Type type;
 	IScene* scene;
-	int index;
+	ComponentIndex index;
 
 	static const ComponentUID INVALID;
 

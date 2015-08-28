@@ -128,7 +128,7 @@ public:
 		for (auto* lib : libraries)
 		{
 			typedef void(*Setter)(Lumix::Engine&, MainWindow&);
-			Setter setter = (Setter)lib->resolve("setStudioMainWindow");
+			Setter setter = (Setter)lib->resolve("initEditorPlugin");
 			if (setter)
 			{
 				setter(*m_engine, *m_main_window);
