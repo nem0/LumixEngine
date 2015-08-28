@@ -273,8 +273,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 			bgfx::createUniform("u_ambientColor", bgfx::UniformType::Vec4);
 		m_shadowmap_matrices_uniform = bgfx::createUniform(
 			"u_shadowmapMatrices", bgfx::UniformType::Mat4, 4);
-		m_shadowmap_splits_uniform =
-			bgfx::createUniform("u_shadowmapSplits", bgfx::UniformType::Vec4);
 		m_bone_matrices_uniform =
 			bgfx::createUniform("u_boneMatrices", bgfx::UniformType::Mat4, 64);
 		m_specular_shininess_uniform = bgfx::createUniform(
@@ -314,7 +312,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 		bgfx::destroyUniform(m_light_dir_fov_uniform);
 		bgfx::destroyUniform(m_ambient_color_uniform);
 		bgfx::destroyUniform(m_shadowmap_matrices_uniform);
-		bgfx::destroyUniform(m_shadowmap_splits_uniform);
 		bgfx::destroyUniform(m_light_specular_uniform);
 
 		for (int i = 0; i < m_uniforms.size(); ++i)
@@ -804,7 +801,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 		bgfx::setUniform(
 			m_shadowmap_matrices_uniform, &m_shadow_modelviewprojection, 4);
-		bgfx::setUniform(m_shadowmap_splits_uniform, &m_shadowmap_splits);
 
 		Vec4 fog_color_density(m_scene->getFogColor(light_cmp),
 							   m_scene->getFogDensity(light_cmp));
@@ -1480,7 +1476,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 	bgfx::UniformHandle m_ambient_color_uniform;
 	bgfx::UniformHandle m_light_dir_fov_uniform;
 	bgfx::UniformHandle m_shadowmap_matrices_uniform;
-	bgfx::UniformHandle m_shadowmap_splits_uniform;
 	bgfx::UniformHandle m_light_specular_uniform;
 	bgfx::UniformHandle m_terrain_matrix_uniform;
 	Material* m_screen_space_material;

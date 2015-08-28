@@ -63,15 +63,6 @@ static const uint32_t CAMERA_HASH = crc32("camera");
 
 struct RendererImpl : public Renderer
 {
-	TODO("todo");
-	/*
-	#error teren - premenne do shadra
-	#error spravit 0.15 release
-	#error tiene podla bgfx
-	#error point light tiene
-	#error camera width/height should not be in render scene, but in pipeline
-	#error check Pipeline::m_shadowmap_splits ci sa pouziva
-	*/
 	struct CallbackStub : public bgfx::CallbackI
 	{
 		virtual void fatal(bgfx::Fatal::Enum _code, const char* _str) override
