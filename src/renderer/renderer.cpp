@@ -65,11 +65,7 @@ struct RendererImpl : public Renderer
 {
 	TODO("todo");
 	/*
-	#error script - scriptove property - jedna property viac krat; nezobrazia sa hned
-	#error teren kurzor - bodky vnutry podobne ako torque 3d
 	#error teren - premenne do shadra
-	#error cim dalej trava od kamery, tym je mensia
-	#error zmazat travu + undo
 	#error spravit 0.15 release
 	#error tiene podla bgfx
 	#error point light tiene
