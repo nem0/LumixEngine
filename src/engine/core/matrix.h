@@ -185,11 +185,11 @@ struct LUMIX_ENGINE_API Matrix
 	}
 
 
-	void setPerspective(float fov, float width, float height, float near_plane, float far_plane)
+	void setPerspective(float fov, float ratio, float near_plane, float far_plane)
 	{
 		*this = Matrix::IDENTITY;
 		float f = 1 / tanf(fov * 0.5f);
-		m11 = f / (width / height);
+		m11 = f / ratio;
 		m22 = f;
 		m33 = (far_plane + near_plane) / (near_plane - far_plane);
 		m44 = 0;

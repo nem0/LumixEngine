@@ -69,13 +69,14 @@ private:
 
 struct PointLight
 {
-	Vec3 m_color;
+	Vec3 m_diffuse_color;
 	Vec3 m_specular_color;
 	float m_intensity;
 	float m_range;
 	Entity m_entity;
 	int m_uid;
 	float m_fov;
+	bool m_cast_shadows;
 };
 
 
@@ -245,10 +246,11 @@ public:
 		float fov = m_cameras[camera].m_fov;
 		float near_plane = m_cameras[camera].m_near;
 		float far_plane = m_cameras[camera].m_far;
+		float ratio = width / height;
 
 		Matrix projection_matrix;
 		projection_matrix.setPerspective(
-			Math::degreesToRadians(fov), width, height, near_plane, far_plane);
+			Math::degreesToRadians(fov), ratio, near_plane, far_plane);
 		Matrix view_matrix = m_universe.getMatrix(m_cameras[camera].m_entity);
 		view_matrix.inverse();
 		Matrix inverted = (projection_matrix * view_matrix);
@@ -342,12 +344,13 @@ public:
 		{
 			PointLight& point_light = m_point_lights[i];
 			serializer.write(point_light.m_uid);
-			serializer.write(point_light.m_color);
+			serializer.write(point_light.m_diffuse_color);
 			serializer.write(point_light.m_intensity);
 			serializer.write(point_light.m_entity);
 			serializer.write(point_light.m_range);
 			serializer.write(point_light.m_fov);
 			serializer.write(point_light.m_specular_color);
+			serializer.write(point_light.m_cast_shadows);
 		}
 		serializer.write(m_point_light_last_uid);
 
@@ -488,12 +491,13 @@ public:
 			m_light_influenced_geometry.push(Array<int>(m_allocator));
 			PointLight& light = m_point_lights[i];
 			serializer.read(light.m_uid);
-			serializer.read(light.m_color);
+			serializer.read(light.m_diffuse_color);
 			serializer.read(light.m_intensity);
 			serializer.read(light.m_entity);
 			serializer.read(light.m_range);
 			serializer.read(light.m_fov);
 			serializer.read(light.m_specular_color);
+			serializer.read(light.m_cast_shadows);
 			m_universe.addComponent(
 				light.m_entity, POINT_LIGHT_HASH, this, light.m_uid);
 		}
@@ -1222,6 +1226,24 @@ public:
 	}
 
 
+	virtual int getClosestPointLights(const Vec3& reference_pos,
+									   ComponentIndex* lights,
+									   int max_lights) override
+	{
+		int i = 0;
+		for (auto light : m_point_lights)
+		{
+			Vec3 light_pos = m_universe.getPosition(light.m_entity);
+			float dist_squared = (reference_pos - light_pos).squaredLength();
+
+			lights[i] = light.m_uid;
+			++i;
+			if (i == max_lights - 1) break;
+		}
+		return i;
+	}
+
+
 	virtual void getPointLights(const Frustum& frustum,
 								Array<ComponentIndex>& lights) override
 	{
@@ -1244,11 +1266,24 @@ public:
 	}
 
 
+	virtual void setLightCastShadows(ComponentIndex cmp,
+									 bool cast_shadows) override
+	{
+		m_point_lights[getPointLightIndex(cmp)].m_cast_shadows = cast_shadows;
+	}
+
+
+	virtual bool getLightCastShadows(ComponentIndex cmp) override 
+	{
+		return m_point_lights[getPointLightIndex(cmp)].m_cast_shadows;
+	}
+
+
 	virtual void
 	getPointLightInfluencedGeometry(ComponentIndex light_cmp,
 									const Frustum& frustum,
 									Array<const RenderableMesh*>& infos,
-									int64_t layer_mask)
+									int64_t layer_mask) override
 	{
 		PROFILE_FUNCTION();
 
@@ -1271,6 +1306,26 @@ public:
 				{
 					infos.push(&renderable->m_meshes[k]);
 				}
+			}
+		}
+	}
+
+
+	virtual void
+		getPointLightInfluencedGeometry(ComponentIndex light_cmp,
+		Array<const RenderableMesh*>& infos,
+		int64_t layer_mask) override
+	{
+		PROFILE_FUNCTION();
+
+		int light_index = getPointLightIndex(light_cmp);
+		auto& geoms = m_light_influenced_geometry[light_index];
+		for (int j = 0, cj = geoms.size(); j < cj; ++j)
+		{
+			Renderable* renderable = m_renderables[geoms[j]];
+			for (int k = 0, kc = renderable->m_meshes.size(); k < kc; ++k)
+			{
+				infos.push(&renderable->m_meshes[k]);
 			}
 		}
 	}
@@ -1855,7 +1910,7 @@ public:
 	virtual void setPointLightColor(ComponentIndex cmp,
 									const Vec3& color) override
 	{
-		m_point_lights[getPointLightIndex(cmp)].m_color = color;
+		m_point_lights[getPointLightIndex(cmp)].m_diffuse_color = color;
 	}
 
 	virtual void setGlobalLightColor(ComponentIndex cmp,
@@ -1889,7 +1944,7 @@ public:
 
 	virtual Vec3 getPointLightColor(ComponentIndex cmp) override
 	{
-		return m_point_lights[getPointLightIndex(cmp)].m_color;
+		return m_point_lights[getPointLightIndex(cmp)].m_diffuse_color;
 	}
 
 	virtual void setPointLightSpecularColor(ComponentIndex cmp,
@@ -2129,12 +2184,13 @@ private:
 		PointLight& light = m_point_lights.pushEmpty();
 		m_light_influenced_geometry.push(Array<int>(m_allocator));
 		light.m_entity = entity;
-		light.m_color.set(1, 1, 1);
+		light.m_diffuse_color.set(1, 1, 1);
 		light.m_intensity = 1;
 		light.m_range = 10;
 		light.m_uid = ++m_point_light_last_uid;
 		light.m_fov = 999;
 		light.m_specular_color.set(1, 1, 1);
+		light.m_cast_shadows = false;
 
 		m_universe.addComponent(entity, POINT_LIGHT_HASH, this, light.m_uid);
 

@@ -302,6 +302,13 @@ struct RendererImpl : public Renderer
 
 		m_engine.registerProperty(
 			"point_light",
+			allocator.newObject<BoolPropertyDescriptor<RenderScene>>(
+			"cast shadows",
+			&RenderScene::getLightCastShadows,
+			&RenderScene::setLightCastShadows,
+			allocator));
+		m_engine.registerProperty(
+			"point_light",
 			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
 				"intensity",
 				&RenderScene::getPointLightIntensity,

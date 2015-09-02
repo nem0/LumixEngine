@@ -252,6 +252,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		, m_default_framebuffer(nullptr)
 		, m_debug_line_material(nullptr)
 		, m_debug_flags(BGFX_DEBUG_TEXT)
+		, m_point_light_shadowmaps(allocator)
 	{
 		m_terrain_scale_uniform =
 			bgfx::createUniform("u_terrainScale", bgfx::UniformType::Vec4);
@@ -384,11 +385,9 @@ struct PipelineInstanceImpl : public PipelineInstance
 		float fov = getScene()->getCameraFOV(cmp);
 		float near_plane = getScene()->getCameraNearPlane(cmp);
 		float far_plane = getScene()->getCameraFarPlane(cmp);
-		projection_matrix.setPerspective(Math::degreesToRadians(fov),
-										 (float)m_width,
-										 (float)m_height,
-										 near_plane,
-										 far_plane);
+		float ratio = float(m_width) / m_height;
+		projection_matrix.setPerspective(
+			Math::degreesToRadians(fov), ratio, near_plane, far_plane);
 
 		Universe& universe = getScene()->getUniverse();
 		Matrix mtx = universe.getMatrix(getScene()->getCameraEntity(cmp));
@@ -412,6 +411,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	void setPass(const char* name)
 	{
+		m_global_textures.clear();
+
 		m_pass_idx = m_renderer.getPassIdx(name);
 		bool found = false;
 		for (int i = 0; i < m_view2pass_map.size(); ++i)
@@ -426,9 +427,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 		if (!found)
 		{
-			m_renderer.viewCounterAdd();
-			m_view_idx = m_renderer.getViewCounter();
-			m_view2pass_map[m_view_idx] = m_pass_idx;
+			beginNewView();
 		}
 
 		if (m_current_framebuffer)
@@ -558,6 +557,99 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
+	void renderPointLightShadowmaps(ComponentIndex camera, ComponentIndex light)
+	{
+		Frustum light_frustum;
+		int64_t mask = 0;
+		mask = ~mask;
+		renderPointLightInfluencedGeometry(light_frustum, mask);
+	}
+
+	void beginNewView()
+	{
+		m_renderer.viewCounterAdd();
+		m_view_idx = m_renderer.getViewCounter();
+		m_view2pass_map[m_view_idx] = m_pass_idx;
+	}
+
+	void renderSpotLightShadowmap(FrameBuffer* fb,
+								  ComponentIndex light,
+								  int64_t layer_mask)
+	{
+		ASSERT(fb);
+		beginNewView();
+		m_current_framebuffer = fb;
+		bgfx::setViewFrameBuffer(m_view_idx,
+								 m_current_framebuffer->getHandle());
+
+		Entity light_entity = m_scene->getPointLightEntity(light);
+		Matrix mtx = m_scene->getUniverse().getMatrix(light_entity);
+		float fov = m_scene->getLightFOV(light);
+		float range = m_scene->getLightRange(light);
+		uint16_t shadowmap_height = (uint16_t)m_current_framebuffer->getHeight();
+		uint16_t shadowmap_width = (uint16_t)m_current_framebuffer->getWidth();
+		Vec3 pos = mtx.getTranslation();
+		
+		bgfx::setViewFrameBuffer(m_view_idx,
+								 m_current_framebuffer->getHandle());
+		bgfx::setViewClear(m_view_idx, BGFX_CLEAR_DEPTH, 0, 1.0f, 0);
+		bgfx::touch(m_view_idx);
+		bgfx::setViewRect(m_view_idx, 0, 0, shadowmap_width, shadowmap_height);
+
+		Matrix projection_matrix;
+		projection_matrix.setPerspective(
+			Math::degreesToRadians(fov), 1, 0.01f, range);
+		Matrix view_matrix;
+		view_matrix.lookAt(pos, pos + mtx.getZVector(), mtx.getYVector());
+		bgfx::setViewTransform(
+			m_view_idx, &view_matrix.m11, &projection_matrix.m11);
+
+		PointLightShadowmap& s = m_point_light_shadowmaps.pushEmpty();
+		s.m_framebuffer = m_current_framebuffer;
+		s.m_light = light;
+		static const Matrix biasMatrix(
+			0.5,  0.0, 0.0, 0.0,
+			0.0, -0.5, 0.0, 0.0,
+			0.0,  0.0, 0.5, 0.0,
+			0.5,  0.5, 0.5, 1.0);
+		s.m_matrix = biasMatrix * (projection_matrix * view_matrix);
+
+		renderPointLightInfluencedGeometry(light, layer_mask);
+	}
+
+
+	void renderLocalLightShadowmaps(ComponentIndex camera,
+									FrameBuffer** fbs,
+									int framebuffers_count,
+									int64_t layer_mask)
+	{
+		Universe& universe = m_scene->getUniverse();
+		Entity camera_entity = m_scene->getCameraEntity(camera);
+		Vec3 camera_pos = universe.getPosition(camera_entity);
+
+		ComponentIndex lights[16];
+		int light_count = m_scene->getClosestPointLights(
+			camera_pos, lights, lengthOf(lights));
+
+		int fb_index = 0;
+		for (int i = 0; i < light_count; ++i)
+		{
+			if (!m_scene->getLightCastShadows(lights[i])) continue;
+			if (fb_index == framebuffers_count) break;
+
+			float fov = m_scene->getLightFOV(lights[i]);
+			if (fov < 180)
+			{
+				renderSpotLightShadowmap(fbs[fb_index], lights[i], layer_mask);
+				++fb_index;
+				continue;
+			}
+			ASSERT(false);
+			TODO("todo");
+		}
+	}
+
+
 	void renderShadowmap(ComponentIndex camera, int64_t layer_mask)
 	{
 		Universe& universe = m_scene->getUniverse();
@@ -580,9 +672,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		{
 			if (split_index > 0)
 			{
-				m_renderer.viewCounterAdd();
-				m_view_idx = m_renderer.getViewCounter();
-				m_view2pass_map[m_view_idx] = m_pass_idx;
+				beginNewView();
 			}
 
 			bgfx::setViewFrameBuffer(m_view_idx,
@@ -612,8 +702,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 			Vec3 shadow_cam_pos = frustum.getCenter();
 			float bb_size = frustum.getRadius();
 			Matrix projection_matrix;
-			projection_matrix.setOrtho(bb_size,
-									   -bb_size,
+			projection_matrix.setOrtho(-bb_size,
+									   bb_size,
 									   -bb_size,
 									   bb_size,
 									   SHADOW_CAM_NEAR,
@@ -740,7 +830,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void setPointLightUniforms(ComponentIndex light_cmp) const
+	void setPointLightUniforms(ComponentIndex light_cmp)
 	{
 		if (light_cmp < 0)
 		{
@@ -760,16 +850,39 @@ struct PipelineInstanceImpl : public PipelineInstance
 						 innerRadius);
 		bgfx::setUniform(m_light_color_uniform, &light_color);
 
-		Vec4 light_dir_fov(universe.getRotation(entity) *
-							   Vec3(0, 0, 1),
-						   m_scene->getLightFOV(light_cmp));
+		Vec4 light_dir_fov(
+			universe.getRotation(entity) * Vec3(0, 0, 1),
+			Math::degreesToRadians(m_scene->getLightFOV(light_cmp)));
 		bgfx::setUniform(m_light_dir_fov_uniform, &light_dir_fov);
 
 		Vec4 light_specular(
 			m_scene->getPointLightSpecularColor(light_cmp), 1.0);
 		bgfx::setUniform(m_light_specular_uniform, &light_specular);
 
+		if (m_scene->getLightCastShadows(light_cmp))
+		{
+			setShadowmapUniforms(light_cmp);
+		}
+
 		bgfx::touch(m_view_idx);
+	}
+
+
+	void setShadowmapUniforms(ComponentIndex light)
+	{
+		for (auto& info : m_point_light_shadowmaps)
+		{
+			if (info.m_light == light)
+			{
+				bgfx::setUniform(m_shadowmap_matrices_uniform, &info.m_matrix.m11, 1);
+				
+				GlobalTexture& t = m_global_textures.pushEmpty();
+				t.m_texture = info.m_framebuffer->getRenderbufferHandle(0);
+				static bgfx::UniformHandle u = bgfx::createUniform("u_texShadowmap", bgfx::UniformType::Int1);
+				t.m_uniform = u;
+				break;
+			}
+		}
 	}
 
 
@@ -817,6 +930,23 @@ struct PipelineInstanceImpl : public PipelineInstance
 	void disableBlending() { m_render_state &= ~BGFX_STATE_BLEND_MASK; }
 
 
+	void renderPointLightInfluencedGeometry(ComponentIndex light,
+											int64_t layer_mask)
+	{
+		PROFILE_FUNCTION();
+
+		m_tmp_meshes.clear();
+
+		m_scene->getPointLightInfluencedGeometry(
+			light, m_tmp_meshes, layer_mask);
+
+		int global_textures_count = m_global_textures.size();
+		//setPointLightUniforms(light);
+		renderMeshes(m_tmp_meshes);
+		m_global_textures.resize(global_textures_count);
+	}
+
+
 	void renderPointLightInfluencedGeometry(const Frustum& frustum,
 											int64_t layer_mask)
 	{
@@ -831,6 +961,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 			m_tmp_terrains.clear();
 
 			ComponentIndex light = lights[i];
+			m_current_light = light;
+			m_is_current_light_global = false;
 			m_scene->getPointLightInfluencedGeometry(
 				light, frustum, m_tmp_meshes, layer_mask);
 
@@ -843,10 +975,12 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 			m_scene->getGrassInfos(
 				frustum, m_tmp_grasses, layer_mask, m_applied_camera);
-			setPointLightUniforms(light);
+			int global_textures_count = m_global_textures.size();
+
 			renderMeshes(m_tmp_meshes);
 			renderTerrains(m_tmp_terrains);
 			renderGrasses(m_tmp_grasses);
+			m_global_textures.resize(global_textures_count);
 		}
 	}
 
@@ -945,6 +1079,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 			m_scene->getUniverse().getPosition(
 				m_scene->getCameraEntity(m_applied_camera)),
 			m_frame_allocator);
+		m_is_current_light_global = true;
+		m_current_light = m_scene->getActiveGlobalLight();
 		setDirectionalLightUniforms(m_scene->getActiveGlobalLight());
 		renderMeshes(m_tmp_meshes);
 		renderTerrains(m_tmp_terrains);
@@ -1116,8 +1252,13 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void setMaterial(const Material* material) const
+	void setMaterial(const Material* material)
 	{
+		if (m_is_current_light_global)
+			setDirectionalLightUniforms(m_current_light);
+		else
+			setPointLightUniforms(m_current_light);
+
 		for (int i = 0; i < material->getUniformCount(); ++i)
 		{
 			const Material::Uniform& uniform = material->getUniform(i);
@@ -1373,6 +1514,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_global_textures.clear();
 		m_view2pass_map.assign(0xFF);
 		m_instance_data_idx = 0;
+		m_point_light_shadowmaps.clear();
 		for (int i = 0; i < lengthOf(m_terrain_instances); ++i)
 		{
 			m_terrain_instances[i].m_count = 0;
@@ -1436,11 +1578,18 @@ struct PipelineInstanceImpl : public PipelineInstance
 		const TerrainInfo* m_infos[64];
 	};
 
+	struct PointLightShadowmap
+	{
+		ComponentIndex m_light;
+		FrameBuffer* m_framebuffer;
+		Matrix m_matrix;
+	};
+
 	TerrainInstance m_terrain_instances[4];
 	uint32_t m_debug_flags;
 	uint8_t m_view_idx;
 	int m_pass_idx;
-	StaticArray<uint8_t, 16> m_view2pass_map;
+	StaticArray<uint8_t, 256> m_view2pass_map;
 	uint64_t m_render_state;
 	IAllocator& m_allocator;
 	Renderer& m_renderer;
@@ -1452,9 +1601,12 @@ struct PipelineInstanceImpl : public PipelineInstance
 	Array<FrameBuffer*> m_framebuffers;
 	Array<GlobalTexture> m_global_textures;
 	Array<bgfx::UniformHandle> m_uniforms;
+	Array<PointLightShadowmap> m_point_light_shadowmaps;
 	InstanceData m_instances_data[128];
 	int m_instance_data_idx;
 	ComponentIndex m_applied_camera;
+	ComponentIndex m_current_light;
+	bool m_is_current_light_global;
 	Frustum m_camera_frustum;
 
 	Matrix m_shadow_modelviewprojection[4];
@@ -1634,6 +1786,37 @@ void renderDebugShapes(PipelineInstanceImpl* pipeline)
 }
 
 
+int renderLocalLightsShadowmaps(lua_State* L)
+{
+	if (!LuaWrapper::isType<PipelineInstanceImpl*>(L, 1)
+		|| !LuaWrapper::isType<int>(L, 2)
+		|| !LuaWrapper::isType<const char*>(L, 4))
+	{
+		return 0;
+	}
+
+	FrameBuffer* fbs[16];
+	auto* pipeline = (PipelineInstanceImpl*)lua_touserdata(L, 1);
+	int len = Math::minValue((int)lua_rawlen(L, 3), lengthOf(fbs));
+	for (int i = 0; i < len; ++i)
+	{
+		if (lua_rawgeti(L, 3, 1 + i) == LUA_TSTRING)
+		{
+			const char* fb_name = lua_tostring(L, -1);
+			fbs[i] = pipeline->getFramebuffer(fb_name);
+		}
+		lua_pop(L, 1);
+	}
+
+	RenderScene* scene = pipeline->m_scene;
+	int64_t layer_mask = (int64_t)lua_tonumber(L, 2);
+	ComponentIndex camera = scene->getCameraInSlot(lua_tostring(L, 4));
+	pipeline->renderLocalLightShadowmaps(camera, fbs, len, layer_mask);
+
+	return 0;
+}
+
+
 void renderShadowmap(PipelineInstanceImpl* pipeline,
 					 int64_t layer_mask,
 					 const char* slot)
@@ -1701,6 +1884,8 @@ void PipelineImpl::registerCFunctions()
 	registerCFunction("renderShadowmap",
 					  LuaWrapper::wrap<decltype(&LuaAPI::renderShadowmap),
 									   LuaAPI::renderShadowmap>);
+	registerCFunction("renderLocalLightsShadowmaps",
+					  &LuaAPI::renderLocalLightsShadowmaps);
 	registerCFunction(
 		"bindFramebufferTexture",
 		LuaWrapper::wrap<decltype(&LuaAPI::bindFramebufferTexture),
