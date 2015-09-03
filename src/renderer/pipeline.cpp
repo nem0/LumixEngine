@@ -864,7 +864,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 			setShadowmapUniforms(light_cmp);
 		}
 
-		bgfx::touch(m_view_idx);
+//		bgfx::touch(m_view_idx);
 	}
 
 
@@ -982,6 +982,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 			renderGrasses(m_tmp_grasses);
 			m_global_textures.resize(global_textures_count);
 		}
+		m_current_light = -1;
 	}
 
 
@@ -1090,6 +1091,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 				frustum, m_tmp_grasses, layer_mask, m_applied_camera);
 			renderGrasses(m_tmp_grasses);
 		}
+		m_current_light = -1;
 	}
 
 
