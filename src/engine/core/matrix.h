@@ -198,6 +198,34 @@ struct LUMIX_ENGINE_API Matrix
 	}
 
 
+	void fromEuler(float yaw, float pitch, float roll)
+	{
+		float sroll = sinf(roll);
+		float croll = cosf(roll);
+		float spitch = sinf(pitch);
+		float cpitch = cosf(pitch);
+		float syaw = sinf(yaw);
+		float cyaw = cosf(yaw);
+
+		m11 = sroll * spitch * syaw + croll * cyaw;
+		m12 = sroll * cpitch;
+		m13 = sroll * spitch * cyaw - croll * syaw;
+		m14 = 0.0f;
+		m21 = croll * spitch * syaw - sroll * cyaw;
+		m22 = croll * cpitch;
+		m23 = croll * spitch * cyaw + sroll * syaw;
+		m24 = 0.0f;
+		m31 = cpitch * syaw;
+		m32 = -spitch;
+		m33 = cpitch * cyaw;
+		m34 = 0.0f;
+		m41 = 0.0f;
+		m42 = 0.0f;
+		m43 = 0.0f;
+		m44 = 1.0f;
+	}
+
+
 	void lookAt(const Vec3& pos, const Vec3& center, const Vec3& up)
 	{
 		*this = Matrix::IDENTITY;

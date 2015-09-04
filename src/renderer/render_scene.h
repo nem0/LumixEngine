@@ -256,10 +256,12 @@ public:
 									int64_t layer_mask) = 0;
 	virtual void setLightCastShadows(ComponentIndex cmp, bool cast_shadows) = 0;
 	virtual bool getLightCastShadows(ComponentIndex cmp) = 0;
+	virtual Vec3 getLightAttenuation(ComponentIndex cmp) = 0;
+	virtual void setLightAttenuation(ComponentIndex cmp,
+									 const Vec3& attenuation) = 0;
 	virtual float getLightFOV(ComponentIndex cmp) = 0;
 	virtual void setLightFOV(ComponentIndex cmp, float fov) = 0;
 	virtual float getLightRange(ComponentIndex cmp) = 0;
-	virtual void setLightRange(ComponentIndex cmp, float range) = 0;
 	virtual void setPointLightIntensity(ComponentIndex cmp,
 										float intensity) = 0;
 	virtual void setGlobalLightIntensity(ComponentIndex cmp,
