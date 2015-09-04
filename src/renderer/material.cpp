@@ -22,37 +22,79 @@ namespace Lumix
 static const uint32_t SHADOWMAP_HASH = crc32("shadowmap");
 
 
+Material::Material(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
+	: Resource(path, resource_manager, allocator)
+	, m_shader(nullptr)
+	, m_depth_func(DepthFunc::LEQUAL)
+	, m_is_alpha_cutout(false)
+	, m_is_shadow_receiver(true)
+	, m_uniforms(allocator)
+	, m_allocator(allocator)
+	, m_texture_count(0)
+	, m_render_states(0)
+	, m_specular(1, 1, 1)
+	, m_shininess(4)
+	, m_shader_instance(nullptr)
+	, m_user_mask(0)
+{
+	enableZTest(true);
+	enableBackfaceCulling(true);
+	enableShadowReceiving(true);
+	for (int i = 0; i < MAX_TEXTURE_COUNT; ++i)
+	{
+		m_textures[i] = nullptr;
+	}
+	updateShaderInstance();
+}
+
+
 Material::~Material()
 {
 	ASSERT(isEmpty());
 }
 
 
+void Material::setUserDefines(const char** defines, int count)
+{
+	if (!isReady()) return;
+	if (!m_shader) return;
+
+	uint32_t old_mask = m_user_mask;
+	m_user_mask = 0;
+	for (int i = 0; i < count; ++i)
+	{
+		m_user_mask |= m_shader->getDefineMask(defines[i]);
+	}
+
+	if (old_mask != m_user_mask)
+	{
+		updateShaderInstance();
+	}
+}
+
+
 void Material::updateShaderInstance()
 {
-	if (isReady())
+	if (!isReady()) return;
+	if (!m_shader) return;
+
+	uint32_t mask = m_user_mask;
+	if (m_is_alpha_cutout)
 	{
-		if (m_shader && m_shader->isReady())
+		mask |= m_shader->getDefineMask("ALPHA_CUTOUT");
+	}
+	if (m_is_shadow_receiver)
+	{
+		mask |= m_shader->getDefineMask("SHADOW_RECEIVER");
+	}
+	for (int i = 0; i < m_shader->getTextureSlotCount(); ++i)
+	{
+		if (m_shader->getTextureSlot(i).m_define[0] != '\0' && m_textures[i])
 		{
-			uint32_t mask = 0;
-			if (m_is_alpha_cutout)
-			{
-				mask |= m_shader->getDefineMask("ALPHA_CUTOUT");
-			}
-			if (m_is_shadow_receiver)
-			{
-				mask |= m_shader->getDefineMask("SHADOW_RECEIVER");
-			}
-			for (int i = 0; i < m_shader->getTextureSlotCount(); ++i)
-			{
-				if (m_shader->getTextureSlot(i).m_define[0] != '\0' && m_textures[i])
-				{
-					mask |= m_shader->getDefineMask(m_shader->getTextureSlot(i).m_define);
-				}
-			}
-			m_shader_instance = &m_shader->getInstance(mask);
+			mask |= m_shader->getDefineMask(m_shader->getTextureSlot(i).m_define);
 		}
 	}
+	m_shader_instance = &m_shader->getInstance(mask);
 }
 
 

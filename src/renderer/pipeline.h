@@ -82,7 +82,7 @@ class LUMIX_RENDERER_API PipelineInstance abstract
 		virtual void render(TransientGeometry& geom,
 							int first_index,
 							int num_indices,
-							const Material& material) = 0;
+							Material& material) = 0;
 		virtual void setWireframe(bool wireframe) = 0;
 		virtual void renderModel(Model& model, const Matrix& mtx) = 0;
 		virtual void toggleStats() = 0;
