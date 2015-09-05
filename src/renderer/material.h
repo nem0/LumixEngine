@@ -68,10 +68,10 @@ public:
 	void enableZTest(bool enable) { setRenderState(enable, BGFX_STATE_DEPTH_TEST_LEQUAL, BGFX_STATE_DEPTH_TEST_MASK); }
 	bool isBackfaceCulling() const { return (m_render_states & BGFX_STATE_CULL_MASK) != 0; }
 	void enableBackfaceCulling(bool enable) { setRenderState(enable, BGFX_STATE_CULL_CW, BGFX_STATE_CULL_MASK); }
-	bool isAlphaCutout() const { return m_is_alpha_cutout; }
-	void enableAlphaCutout(bool enable) { m_is_alpha_cutout = enable; updateShaderInstance(); }
-	bool isShadowReceiver() const { return m_is_shadow_receiver; }
-	void enableShadowReceiving(bool enable) { m_is_shadow_receiver = enable; updateShaderInstance(); }
+	bool isAlphaCutout() const;
+	void enableAlphaCutout(bool enable);
+	bool isShadowReceiver() const;
+	void enableShadowReceiving(bool enable);
 	float getShininess() const { return m_shininess; }
 	void setShininess(float value) { m_shininess = value; }
 	Vec3 getSpecular() const { return m_specular; }
@@ -106,7 +106,6 @@ private:
 
 private:
 	void deserializeUniforms(JsonSerializer& serializer);
-	void updateShaderInstance();
 	void setRenderState(bool value, uint64_t state, uint64_t mask);
 
 private:
@@ -117,15 +116,13 @@ private:
 	Texture* m_textures[MAX_TEXTURE_COUNT];
 	int m_texture_count;
 	Array<Uniform> m_uniforms;
-	bool m_is_alpha_cutout;
-	bool m_is_shadow_receiver;
 	DepthFunc m_depth_func;
 	IAllocator& m_allocator;
 	bgfx::ProgramHandle m_program_id;
 	uint64_t m_render_states;
 	Vec3 m_specular;
 	float m_shininess;
-	uint32_t m_user_mask;
+	uint32_t m_shader_mask;
 	int m_alpha_cutout_define_idx;
 	int m_shadow_receiver_define_idx;
 };
