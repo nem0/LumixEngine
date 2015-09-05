@@ -254,6 +254,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 		, m_debug_flags(BGFX_DEBUG_TEXT)
 		, m_point_light_shadowmaps(allocator)
 	{
+		m_has_shadowmap_define_idx = m_renderer.getShaderDefineIdx("HAS_SHADOWMAP");
+
+		m_tex_shadowmap_uniform =
+			bgfx::createUniform("u_texShadowmap", bgfx::UniformType::Int1);
 		m_attenuation_params_uniform =
 			bgfx::createUniform("u_attenuationParams", bgfx::UniformType::Vec4);
 		m_terrain_scale_uniform =
@@ -303,6 +307,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 			m_source.getResourceManager().get(ResourceManager::MATERIAL);
 		material_manager->unload(*m_screen_space_material);
 		material_manager->unload(*m_debug_line_material);
+		bgfx::destroyUniform(m_tex_shadowmap_uniform);
 		bgfx::destroyUniform(m_attenuation_params_uniform);
 		bgfx::destroyUniform(m_terrain_matrix_uniform);
 		bgfx::destroyUniform(m_specular_shininess_uniform);
@@ -827,7 +832,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 										   0.0, -0.5, 0.0, 0.0,
 										   0.0, 0.0, 0.5, 0.0,
 										   0.5, 0.5, 0.5, 1.0);
-			m_shadow_modelviewprojection[split_index] =
+			m_shadow_viewprojection[split_index] =
 				biasMatrix * (projection_matrix * view_matrix);
 
 			Frustum shadow_camera_frustum;
@@ -944,50 +949,43 @@ struct PipelineInstanceImpl : public PipelineInstance
 		}
 
 		Universe& universe = m_scene->getUniverse();
-		Entity entity = m_scene->getPointLightEntity(light_cmp);
-
+		Entity light_entity = m_scene->getPointLightEntity(light_cmp);
+		Vec3 light_pos = universe.getPosition(light_entity);
+		Vec3 light_dir = universe.getRotation(light_entity) * Vec3(0, 0, 1);
+		float fov = Math::degreesToRadians(m_scene->getLightFOV(light_cmp));
+		Vec3 color = m_scene->getPointLightColor(light_cmp) *
+					 m_scene->getPointLightIntensity(light_cmp);
 		Vec4 attenuation_params(m_scene->getLightAttenuation(light_cmp), 1);
+		Vec4 light_pos_radius(light_pos, m_scene->getLightRange(light_cmp));
+		Vec4 light_color(color, 0);
+		Vec4 light_dir_fov(light_dir, fov);
+		Vec4 light_specular(m_scene->getPointLightSpecularColor(light_cmp), 1);
+
 		bgfx::setUniform(m_attenuation_params_uniform, &attenuation_params);
-
-		Vec4 light_pos_radius(universe.getPosition(entity),
-							  m_scene->getLightRange(light_cmp));
 		bgfx::setUniform(m_light_pos_radius_uniform, &light_pos_radius);
-
-		float innerRadius = 0;
-		Vec4 light_color(m_scene->getPointLightColor(light_cmp) *
-							 m_scene->getPointLightIntensity(light_cmp),
-						 innerRadius);
 		bgfx::setUniform(m_light_color_uniform, &light_color);
-
-		Vec4 light_dir_fov(
-			universe.getRotation(entity) * Vec3(0, 0, 1),
-			Math::degreesToRadians(m_scene->getLightFOV(light_cmp)));
 		bgfx::setUniform(m_light_dir_fov_uniform, &light_dir_fov);
-
-		Vec4 light_specular(
-			m_scene->getPointLightSpecularColor(light_cmp), 1.0);
 		bgfx::setUniform(m_light_specular_uniform, &light_specular);
 
 		if (m_scene->getLightCastShadows(light_cmp))
 		{
-			setShadowmapUniforms(material, light_cmp);
+			setPointLightShadowmapUniforms(material, light_cmp);
 		}
 		else
 		{
-			material->setUserDefines(nullptr, 0);
+			material->unsetUserDefine(m_has_shadowmap_define_idx);
 		}
 	}
 
 
-	void setShadowmapUniforms(Material* material, ComponentIndex light)
+	void setPointLightShadowmapUniforms(Material* material,
+										ComponentIndex light)
 	{
 		for (auto& info : m_point_light_shadowmaps)
 		{
 			if (info.m_light == light)
 			{
-				TODO("get rid of strings");
-				const char* tmp = "HAS_SHADOWMAP";
-				material->setUserDefines(&tmp, 1);
+				material->setUserDefine(m_has_shadowmap_define_idx);
 
 				bgfx::setUniform(m_shadowmap_matrices_uniform,
 								 &info.m_matrices[0].m11,
@@ -995,13 +993,11 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 				GlobalTexture& t = m_global_textures.pushEmpty();
 				t.m_texture = info.m_framebuffer->getRenderbufferHandle(0);
-				TODO("uniform");
-				static bgfx::UniformHandle u = bgfx::createUniform("u_texShadowmap", bgfx::UniformType::Int1);
-				t.m_uniform = u;
+				t.m_uniform = m_tex_shadowmap_uniform;
 				return;
 			}
 		}
-		material->setUserDefines(nullptr, 0);
+		material->unsetUserDefine(m_has_shadowmap_define_idx);
 	}
 
 
@@ -1013,31 +1009,26 @@ struct PipelineInstanceImpl : public PipelineInstance
 		}
 
 		Universe& universe = m_scene->getUniverse();
-		Entity entity = m_scene->getGlobalLightEntity(light_cmp);
+		Entity light_entity = m_scene->getGlobalLightEntity(light_cmp);
+		Vec3 light_dir = universe.getRotation(light_entity) * Vec3(0, 0, 1);
+		Vec3 diffuse_color = m_scene->getGlobalLightColor(light_cmp) *
+							 m_scene->getGlobalLightIntensity(light_cmp);
+		Vec3 ambient_color = m_scene->getLightAmbientColor(light_cmp) *
+							 m_scene->getLightAmbientIntensity(light_cmp);
+		Vec4 diffuse_light_color(diffuse_color, 1);
+		Vec3 fog_color = m_scene->getFogColor(light_cmp);
+		float fog_density = m_scene->getFogDensity(light_cmp);
+		Vec4 ambient_light_color(ambient_color, 1);
+		Vec4 light_dir_fov(light_dir, 0);
+		fog_density *= fog_density * fog_density;
+		Vec4 fog_color_density(fog_color, fog_density);
 
-		Vec4 diffuse_light_color(
-			m_scene->getGlobalLightColor(light_cmp) *
-				m_scene->getGlobalLightIntensity(light_cmp),
-			1);
 		bgfx::setUniform(m_light_color_uniform, &diffuse_light_color);
-
-		Vec4 ambient_light_color(
-			m_scene->getLightAmbientColor(light_cmp) *
-				m_scene->getLightAmbientIntensity(light_cmp),
-			1);
 		bgfx::setUniform(m_ambient_color_uniform, &ambient_light_color);
-
-		Vec4 light_dir_fov(
-			universe.getRotation(entity) * Vec3(0, 0, 1), 0);
 		bgfx::setUniform(m_light_dir_fov_uniform, &light_dir_fov);
-
-		bgfx::setUniform(
-			m_shadowmap_matrices_uniform, &m_shadow_modelviewprojection, 4);
-
-		Vec4 fog_color_density(m_scene->getFogColor(light_cmp),
-							   m_scene->getFogDensity(light_cmp));
-		fog_color_density.w *= fog_color_density.w * fog_color_density.w;
 		bgfx::setUniform(m_fog_color_density_uniform, &fog_color_density);
+		bgfx::setUniform(
+			m_shadowmap_matrices_uniform, &m_shadow_viewprojection, 4);
 	}
 
 
@@ -1738,7 +1729,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	bool m_is_current_light_global;
 	Frustum m_camera_frustum;
 
-	Matrix m_shadow_modelviewprojection[4];
+	Matrix m_shadow_viewprojection[4];
 	Vec4 m_shadowmap_splits;
 	int m_width;
 	int m_height;
@@ -1760,8 +1751,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 	bgfx::UniformHandle m_light_specular_uniform;
 	bgfx::UniformHandle m_terrain_matrix_uniform;
 	bgfx::UniformHandle m_attenuation_params_uniform;
+	bgfx::UniformHandle m_tex_shadowmap_uniform;
 	Material* m_screen_space_material;
 	Material* m_debug_line_material;
+	int m_has_shadowmap_define_idx;
 
 private:
 	void operator=(const PipelineInstanceImpl&);
