@@ -421,6 +421,12 @@ struct RendererImpl : public Renderer
 	virtual Engine& getEngine() override { return m_engine; }
 
 
+	virtual const char* getShaderDefine(int define_idx) override
+	{
+		return m_shader_defines[define_idx];
+	}
+
+
 	virtual int getShaderDefineIdx(const char* define) override
 	{
 		for (int i = 0; i < m_shader_defines.size(); ++i)

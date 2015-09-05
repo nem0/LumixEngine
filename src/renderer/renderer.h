@@ -37,6 +37,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual void makeScreenshot(const Path& filename) = 0;
 		virtual int getPassIdx(const char* pass) = 0;
 		virtual int getShaderDefineIdx(const char* define) = 0;
+		virtual const char* getShaderDefine(int define_idx) = 0;
 
 		virtual Engine& getEngine() = 0;
 }; 
