@@ -24,7 +24,7 @@ public:
 	ShaderCompiler();
 	~ShaderCompiler();
 
-	void setWorldEditor(Lumix::WorldEditor& editor) { m_editor = &editor; }
+	void setWorldEditor(Lumix::WorldEditor& editor) { m_editor = &editor; makeUpToDate(); }
 	void compileAll();
 	void setNotifications(Notifications& notifications);
 
@@ -46,6 +46,7 @@ private:
 	void parseDependencies();
 	void compile(const QString& path);
 	void makeUpToDate();
+	Lumix::Renderer& getRenderer();
 
 private:
 	int m_to_compile;

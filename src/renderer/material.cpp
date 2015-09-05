@@ -11,6 +11,7 @@
 #include "core/timer.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/pipeline.h"
+#include "renderer/renderer.h"
 #include "renderer/shader.h"
 #include "renderer/texture.h"
 
@@ -44,7 +45,6 @@ Material::Material(const Path& path, ResourceManager& resource_manager, IAllocat
 	{
 		m_textures[i] = nullptr;
 	}
-	updateShaderInstance();
 }
 
 
@@ -54,23 +54,35 @@ Material::~Material()
 }
 
 
-void Material::setUserDefines(const char** defines, int count)
+void Material::setUserDefine(int define_idx)
 {
 	if (!isReady()) return;
 	if (!m_shader) return;
 
 	uint32_t old_mask = m_user_mask;
-	m_user_mask = 0;
-	for (int i = 0; i < count; ++i)
-	{
-		m_user_mask |= m_shader->getDefineMask(defines[i]);
-	}
+	m_user_mask |= m_shader->getDefineMask(define_idx);
 
 	if (old_mask != m_user_mask)
 	{
 		updateShaderInstance();
 	}
 }
+
+
+void Material::unsetUserDefine(int define_idx)
+{
+	if (!isReady()) return;
+	if (!m_shader) return;
+
+	uint32_t old_mask = m_user_mask;
+	m_user_mask &= ~m_shader->getDefineMask(define_idx);
+
+	if (old_mask != m_user_mask)
+	{
+		updateShaderInstance();
+	}
+}
+
 
 
 void Material::updateShaderInstance()
@@ -81,17 +93,18 @@ void Material::updateShaderInstance()
 	uint32_t mask = m_user_mask;
 	if (m_is_alpha_cutout)
 	{
-		mask |= m_shader->getDefineMask("ALPHA_CUTOUT");
+		mask |= m_shader->getDefineMask(m_alpha_cutout_define_idx);
 	}
 	if (m_is_shadow_receiver)
 	{
-		mask |= m_shader->getDefineMask("SHADOW_RECEIVER");
+		mask |= m_shader->getDefineMask(m_shadow_receiver_define_idx);
 	}
 	for (int i = 0; i < m_shader->getTextureSlotCount(); ++i)
 	{
-		if (m_shader->getTextureSlot(i).m_define[0] != '\0' && m_textures[i])
+		if (m_shader->getTextureSlot(i).m_define_idx >= 0 && m_textures[i])
 		{
-			mask |= m_shader->getDefineMask(m_shader->getTextureSlot(i).m_define);
+			mask |= m_shader->getDefineMask(
+				m_shader->getTextureSlot(i).m_define_idx);
 		}
 	}
 	m_shader_instance = &m_shader->getInstance(mask);
@@ -290,6 +303,13 @@ void Material::setShader(const Path& path)
 void Material::onReady()
 {
 	Resource::onReady();
+	if (m_shader)
+	{
+		m_alpha_cutout_define_idx =
+			m_shader->getRenderer().getShaderDefineIdx("ALPHA_CUTOUT");
+		m_shadow_receiver_define_idx = 
+			m_shader->getRenderer().getShaderDefineIdx("SHADOW_RECEIVER");
+	}
 	updateShaderInstance();
 }
 

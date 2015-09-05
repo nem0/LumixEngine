@@ -94,7 +94,8 @@ public:
 	const Uniform& getUniform(int index) const { return m_uniforms[index]; }
 	ShaderInstance& getShaderInstance() { ASSERT(m_shader_instance); return *m_shader_instance; }
 	const ShaderInstance& getShaderInstance() const { ASSERT(m_shader_instance); return *m_shader_instance; }
-	void setUserDefines(const char** defines, int count);
+	void setUserDefine(int define_idx);
+	void unsetUserDefine(int define_idx);
 
 private:
 	virtual void onReady(void) override;
@@ -125,6 +126,8 @@ private:
 	Vec3 m_specular;
 	float m_shininess;
 	uint32_t m_user_mask;
+	int m_alpha_cutout_define_idx;
+	int m_shadow_receiver_define_idx;
 };
 
 } // ~namespace Lumix
