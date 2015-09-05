@@ -290,7 +290,7 @@ void ShaderCompiler::compilePass(
 				if (mask & (1 << i))
 				{
 					cmd.append(" -D ");
-					cmd.append(all_defines[i]);
+					cmd.append(getRenderer().getShaderDefine(all_defines[i]));
 				}
 			}
 			QFile::remove(QString("shaders/compiled/") +
