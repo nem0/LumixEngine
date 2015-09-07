@@ -88,6 +88,10 @@ static bgfx::TextureFormat::Enum getFormat(const char* name)
 	{
 		return bgfx::TextureFormat::D24;
 	}
+	else if (strcmp(name, "rgba8") == 0)
+	{
+		return bgfx::TextureFormat::RGBA8;
+	}
 	else
 	{
 		g_log_error.log("Renderer") << "Uknown texture format " << name;
