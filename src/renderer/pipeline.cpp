@@ -50,7 +50,7 @@ static const uint32_t BRUSH_SIZE_HASH = crc32("brush_size");
 static const uint32_t BRUSH_POSITION_HASH = crc32("brush_position");
 static const char* TEX_COLOR_UNIFORM = "u_texColor";
 static float split_distances[] = {0.01f, 5, 20, 100, 300};
-static const float SHADOW_CAM_NEAR = 0.1f;
+static const float SHADOW_CAM_NEAR = 0.5f;
 static const float SHADOW_CAM_FAR = 10000.0f;
 
 class InstanceData
@@ -788,7 +788,11 @@ struct PipelineInstanceImpl : public PipelineInstance
 				beginNewView(m_current_framebuffer);
 			}
 
-			bgfx::setViewClear(m_view_idx, BGFX_CLEAR_DEPTH, 0, 1.0f, 0);
+			bgfx::setViewClear(m_view_idx,
+							   BGFX_CLEAR_DEPTH | BGFX_CLEAR_COLOR,
+							   0xffffffff,
+							   1.0f,
+							   0);
 			bgfx::touch(m_view_idx);
 			float* viewport = viewports + split_index * 2;
 			bgfx::setViewRect(m_view_idx,
@@ -810,16 +814,15 @@ struct PipelineInstanceImpl : public PipelineInstance
 			(&m_shadowmap_splits.x)[split_index] =
 				split_distances[split_index + 1];
 
-			Vec3 shadow_cam_pos = frustum.getCenter();
+			Vec3 shadow_cam_pos = camera_matrix.getTranslation();
 			float bb_size = frustum.getRadius();
 			Matrix projection_matrix;
-			projection_matrix.setOrtho(-bb_size,
-									   bb_size,
+			projection_matrix.setOrtho(bb_size,
+									   -bb_size,
 									   -bb_size,
 									   bb_size,
 									   SHADOW_CAM_NEAR,
 									   SHADOW_CAM_FAR);
-
 			Vec3 light_forward = light_mtx.getZVector();
 			shadow_cam_pos -= light_forward * SHADOW_CAM_FAR * 0.5f;
 			Matrix view_matrix;
