@@ -240,17 +240,28 @@ public:
 	virtual void addGrass(ComponentIndex cmp, int index) = 0;
 	virtual void removeGrass(ComponentIndex cmp, int index) = 0;
 
+	virtual int getClosestPointLights(const Vec3& pos,
+									   ComponentIndex* lights,
+									   int max_lights) = 0;
 	virtual void getPointLights(const Frustum& frustum,
 								Array<ComponentIndex>& lights) = 0;
+	virtual void
+	getPointLightInfluencedGeometry(ComponentIndex light_cmp,
+									Array<const RenderableMesh*>& infos,
+									int64_t layer_mask) = 0;
 	virtual void
 	getPointLightInfluencedGeometry(ComponentIndex light_cmp,
 									const Frustum& frustum,
 									Array<const RenderableMesh*>& infos,
 									int64_t layer_mask) = 0;
+	virtual void setLightCastShadows(ComponentIndex cmp, bool cast_shadows) = 0;
+	virtual bool getLightCastShadows(ComponentIndex cmp) = 0;
+	virtual float getLightAttenuation(ComponentIndex cmp) = 0;
+	virtual void setLightAttenuation(ComponentIndex cmp, float attenuation) = 0;
 	virtual float getLightFOV(ComponentIndex cmp) = 0;
 	virtual void setLightFOV(ComponentIndex cmp, float fov) = 0;
 	virtual float getLightRange(ComponentIndex cmp) = 0;
-	virtual void setLightRange(ComponentIndex cmp, float range) = 0;
+	virtual void setLightRange(ComponentIndex cmp, float value) = 0;
 	virtual void setPointLightIntensity(ComponentIndex cmp,
 										float intensity) = 0;
 	virtual void setGlobalLightIntensity(ComponentIndex cmp,

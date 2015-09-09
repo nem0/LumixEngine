@@ -6,7 +6,9 @@
 #include "core/resource_manager_base.h"
 #include "editor/world_editor.h"
 #include "engine.h"
+#include "engine/plugin_manager.h"
 #include "file_system_watcher.h"
+#include "renderer/renderer.h"
 #include "renderer/shader.h"
 #include "notifications.h"
 #include <qdatetime.h>
@@ -29,7 +31,6 @@ ShaderCompiler::ShaderCompiler()
 		.bind<ShaderCompiler, &ShaderCompiler::onFileChanged>(this);
 
 	parseDependencies();
-	makeUpToDate();
 }
 
 
@@ -38,6 +39,14 @@ static QString getSourceFromBinaryBasename(const QString& binary_basename)
 	QString ret = binary_basename.mid(0, binary_basename.indexOf('_'));
 	ret += binary_basename.mid(binary_basename.length() - 3);
 	return ret;
+}
+
+
+Lumix::Renderer& ShaderCompiler::getRenderer()
+{
+	Lumix::IPlugin* plugin = m_editor->getEngine().getPluginManager().getPlugin("renderer");
+	ASSERT(plugin);
+	return static_cast<Lumix::Renderer&>(*plugin);
 }
 
 
@@ -55,8 +64,8 @@ void ShaderCompiler::makeUpToDate()
 			{
 				auto content = file.readAll();
 				Lumix::ShaderCombinations combinations;
-				Lumix::Shader::getShaderCombinations(content.data(),
-													 &combinations);
+				Lumix::Shader::getShaderCombinations(
+					getRenderer(), content.data(), &combinations);
 
 				QString bin_base_path =
 					QString("shaders/compiled/%1_").arg(source_info.baseName());
@@ -281,7 +290,7 @@ void ShaderCompiler::compilePass(
 				if (mask & (1 << i))
 				{
 					cmd.append(" -D ");
-					cmd.append(all_defines[i]);
+					cmd.append(getRenderer().getShaderDefine(all_defines[i]));
 				}
 			}
 			QFile::remove(QString("shaders/compiled/") +
@@ -320,7 +329,8 @@ void ShaderCompiler::compile(const QString& path)
 	{
 		auto content = shader_file.readAll();
 		Lumix::ShaderCombinations combinations;
-		Lumix::Shader::getShaderCombinations(content.data(), &combinations);
+		Lumix::Shader::getShaderCombinations(
+			getRenderer(), content.data(), &combinations);
 
 		compileAllPasses(
 			file, false, combinations.m_fs_combinations, combinations);
@@ -349,7 +359,8 @@ void ShaderCompiler::compileAll()
 		{
 			auto content = shader_file.readAll();
 			Lumix::ShaderCombinations combinations;
-			Lumix::Shader::getShaderCombinations(content.data(), &combinations);
+			Lumix::Shader::getShaderCombinations(
+				getRenderer(), content.data(), &combinations);
 
 			compileAllPasses(
 				file, false, combinations.m_fs_combinations, combinations);
