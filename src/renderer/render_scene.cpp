@@ -2249,6 +2249,7 @@ private:
 		light.m_specular_color.set(1, 1, 1);
 		light.m_cast_shadows = false;
 		light.m_attenuation_param = 2;
+		light.m_range = 10;
 
 		m_universe.addComponent(entity, POINT_LIGHT_HASH, this, light.m_uid);
 
