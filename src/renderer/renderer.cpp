@@ -132,6 +132,7 @@ struct RendererImpl : public Renderer
 		, m_shader_manager(*this, m_allocator)
 		, m_pipeline_manager(*this, m_allocator)
 		, m_passes(m_allocator)
+		, m_shader_defines(m_allocator)
 	{
 		bgfx::PlatformData d;
 		if (s_hwnd)
@@ -302,6 +303,13 @@ struct RendererImpl : public Renderer
 
 		m_engine.registerProperty(
 			"point_light",
+			allocator.newObject<BoolPropertyDescriptor<RenderScene>>(
+			"cast shadows",
+			&RenderScene::getLightCastShadows,
+			&RenderScene::setLightCastShadows,
+			allocator));
+		m_engine.registerProperty(
+			"point_light",
 			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
 				"intensity",
 				&RenderScene::getPointLightIntensity,
@@ -327,16 +335,6 @@ struct RendererImpl : public Renderer
 		m_engine.registerProperty(
 			"point_light",
 			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
-				"range",
-				&RenderScene::getLightRange,
-				&RenderScene::setLightRange,
-				0.0f,
-				FLT_MAX,
-				0.0f,
-				allocator));
-		m_engine.registerProperty(
-			"point_light",
-			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
 				"FOV",
 				&RenderScene::getLightFOV,
 				&RenderScene::setLightFOV,
@@ -344,7 +342,26 @@ struct RendererImpl : public Renderer
 				360.0f,
 				5.0f,
 				allocator));
-
+		m_engine.registerProperty(
+			"point_light",
+			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
+				"attenuation",
+				&RenderScene::getLightAttenuation,
+				&RenderScene::setLightAttenuation,
+				-1.0f,
+				1000.0f,
+				0.1f,
+				allocator));
+		m_engine.registerProperty(
+			"point_light",
+			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
+				"range",
+				&RenderScene::getLightRange,
+				&RenderScene::setLightRange,
+				0,
+				FLT_MAX,
+				1,
+				allocator));
 		m_engine.registerProperty(
 			"terrain",
 			allocator.newObject<ResourcePropertyDescriptor<RenderScene>>(
@@ -417,6 +434,28 @@ struct RendererImpl : public Renderer
 	virtual Engine& getEngine() override { return m_engine; }
 
 
+	virtual const char* getShaderDefine(int define_idx) override
+	{
+		return m_shader_defines[define_idx];
+	}
+
+
+	virtual int getShaderDefineIdx(const char* define) override
+	{
+		for (int i = 0; i < m_shader_defines.size(); ++i)
+		{
+			if (strcmp(m_shader_defines[i], define) == 0)
+			{
+				return i;
+			}
+		}
+
+		auto& new_define = m_shader_defines.pushEmpty();
+		copyString(new_define, sizeof(new_define), define);
+		return m_shader_defines.size() - 1;
+	}
+
+
 	virtual int getPassIdx(const char* pass) override
 	{
 		for (int i = 0; i < m_passes.size(); ++i)
@@ -458,9 +497,13 @@ struct RendererImpl : public Renderer
 	}
 
 
+	typedef char ShaderDefine[32];
+
+
 	Engine& m_engine;
 	Debug::Allocator m_allocator;
-	Lumix::Array<ShaderCombinations::Pass> m_passes;
+	Array<ShaderCombinations::Pass> m_passes;
+	Array<ShaderDefine> m_shader_defines;
 	CallbackStub m_callback_stub;
 	TextureManager m_texture_manager;
 	MaterialManager m_material_manager;

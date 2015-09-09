@@ -37,15 +37,12 @@ Shader::~Shader()
 }
 
 
-uint32_t Shader::getDefineMask(const char* define) const
+uint32_t Shader::getDefineMask(int define_idx) const
 {
-	int c = lengthOf(m_combintions.m_defines);
-	for (int i = 0; i < c; ++i)
+	ASSERT(define_idx < lengthOf(m_combintions.m_define_idx_map));
+	if (m_combintions.m_define_idx_map[define_idx] >= 0)
 	{
-		if (strcmp(define, m_combintions.m_defines[i]) == 0)
-		{
-			return 1 << i;
-		}
+		return 1 << m_combintions.m_define_idx_map[define_idx];
 	}
 	return 0;
 }
@@ -64,6 +61,16 @@ ShaderInstance& Shader::getInstance(uint32_t mask)
 	g_log_error.log("Shader") << "Unknown shader combination requested: "
 							  << mask;
 	return *m_instances[0];
+}
+
+
+ShaderCombinations::ShaderCombinations()
+{
+	memset(this, 0, sizeof(*this));
+	for (int i = 0; i < lengthOf(m_define_idx_map); ++i)
+	{
+		m_define_idx_map[i] = -1;
+	}
 }
 
 
@@ -120,9 +127,8 @@ void Shader::parseTextureSlots(lua_State* L)
 				lua_pop(L, 1);
 				if (lua_getfield(L, -1, "define") == LUA_TSTRING)
 				{
-					copyString(m_texture_slots[i].m_define,
-							   sizeof(m_texture_slots[i].m_define),
-							   lua_tostring(L, -1));
+					m_texture_slots[i].m_define_idx =
+						getRenderer().getShaderDefineIdx(lua_tostring(L, -1));
 				}
 				lua_pop(L, 1);
 			}
@@ -310,12 +316,12 @@ bool Shader::generateInstances()
 }
 
 
-void ShaderCombinations::parse(lua_State* L)
+void ShaderCombinations::parse(Renderer& renderer, lua_State* L)
 {
 	parsePasses(L);
 
-	parseCombinations(L, "fs_combinations", m_fs_combinations);
-	parseCombinations(L, "vs_combinations", m_vs_combinations);
+	parseCombinations(renderer, L, "fs_combinations", m_fs_combinations);
+	parseCombinations(renderer, L, "vs_combinations", m_vs_combinations);
 }
 
 
@@ -340,7 +346,7 @@ void Shader::loaded(FS::IFile& file, bool success, FS::FileSystem& fs)
 		else
 		{
 			parseTextureSlots(L);
-			m_combintions.parse(L);
+			m_combintions.parse(getRenderer(), L);
 			if (!generateInstances())
 			{
 				g_log_error.log("renderer")
@@ -401,25 +407,28 @@ static int indexOf(const ShaderCombinations::Passes& passes, const char* pass)
 }
 
 
-static int indexOf(ShaderCombinations& combination, const char* define)
+static int
+indexOf(Renderer& renderer, ShaderCombinations& combination, const char* define)
 {
+	int define_idx = renderer.getShaderDefineIdx(define);
+
 	for (int i = 0; i < combination.m_define_count; ++i)
 	{
-		if (strcmp(combination.m_defines[i], define) == 0)
+		if (combination.m_defines[i] == define_idx)
 		{
 			return i;
 		}
 	}
 
-	copyString(combination.m_defines[combination.m_define_count],
-			   sizeof(combination.m_defines[0]),
-			   define);
+	combination.m_define_idx_map[define_idx] = combination.m_define_count;
+	combination.m_defines[combination.m_define_count] = define_idx;
 	++combination.m_define_count;
 	return combination.m_define_count - 1;
 }
 
 
-void ShaderCombinations::parseCombinations(lua_State* L,
+void ShaderCombinations::parseCombinations(Renderer& renderer,
+										   lua_State* L,
 										   const char* name,
 										   int* output)
 {
@@ -436,7 +445,7 @@ void ShaderCombinations::parseCombinations(lua_State* L,
 					if (lua_rawgeti(L, -1, 1 + i) == LUA_TSTRING)
 					{
 						const char* tmp = lua_tostring(L, -1);
-						output[pass_idx] |= 1 << indexOf(*this, tmp);
+						output[pass_idx] |= 1 << indexOf(renderer, *this, tmp);
 					}
 					lua_pop(L, 1);
 				}
@@ -448,7 +457,8 @@ void ShaderCombinations::parseCombinations(lua_State* L,
 }
 
 
-bool Shader::getShaderCombinations(const char* shader_content,
+bool Shader::getShaderCombinations(Renderer& renderer,
+								   const char* shader_content,
 								   ShaderCombinations* output)
 {
 	lua_State* L = luaL_newstate();
@@ -464,7 +474,7 @@ bool Shader::getShaderCombinations(const char* shader_content,
 	}
 	else
 	{
-		output->parse(L);
+		output->parse(renderer, L);
 	}
 	lua_close(L);
 	return true;

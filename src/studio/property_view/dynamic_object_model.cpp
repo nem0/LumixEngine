@@ -143,6 +143,7 @@ QWidget* DynamicObjectItemDelegate::createEditor(QWidget* parent, const QStyleOp
 		else if (node->m_getter().type() == QMetaType::Float)
 		{
 			QDoubleSpinBox* input = new QDoubleSpinBox(parent);
+			input->setDecimals(3);
 			input->setMaximum(FLT_MAX);
 			input->setMinimum(-FLT_MAX);
 			connect(input, (void (QDoubleSpinBox::*)(double))&QDoubleSpinBox::valueChanged, [node](double value){

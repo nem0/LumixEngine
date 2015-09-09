@@ -49,7 +49,7 @@ namespace Lumix
 				ASSERT(near_distance < far_distance);
 				ASSERT(fov > 0);
 				ASSERT(ratio > 0);
-				float tang = (float)tan(Math::PI / 180.0f * fov * 0.5f);
+				float tang = (float)tan(fov * 0.5f);
 				float near_height = near_distance * tang;
 				float near_width = near_height * ratio;
 
