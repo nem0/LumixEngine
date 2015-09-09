@@ -344,10 +344,23 @@ struct RendererImpl : public Renderer
 				allocator));
 		m_engine.registerProperty(
 			"point_light",
-			allocator.newObject<Vec3PropertyDescriptor<RenderScene>>(
+			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
 				"attenuation",
 				&RenderScene::getLightAttenuation,
 				&RenderScene::setLightAttenuation,
+				-1,
+				1000,
+				0.1,
+				allocator));
+		m_engine.registerProperty(
+			"point_light",
+			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
+				"range",
+				&RenderScene::getLightRange,
+				&RenderScene::setLightRange,
+				0,
+				FLT_MAX,
+				1,
 				allocator));
 		m_engine.registerProperty(
 			"terrain",
