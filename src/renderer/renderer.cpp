@@ -348,9 +348,9 @@ struct RendererImpl : public Renderer
 				"attenuation",
 				&RenderScene::getLightAttenuation,
 				&RenderScene::setLightAttenuation,
-				-1,
-				1000,
-				0.1,
+				-1.0f,
+				1000.0f,
+				0.1f,
 				allocator));
 		m_engine.registerProperty(
 			"point_light",

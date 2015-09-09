@@ -49,7 +49,7 @@ static const uint32_t POINT_LIGHT_HASH = crc32("point_light");
 static const uint32_t BRUSH_SIZE_HASH = crc32("brush_size");
 static const uint32_t BRUSH_POSITION_HASH = crc32("brush_position");
 static const char* TEX_COLOR_UNIFORM = "u_texColor";
-static float split_distances[] = { 0.01f, 3, 8, 100, 300 }; TODO("property in editor");
+static float split_distances[] = { 0.01f, 3, 8, 100, 300 };
 static const float SHADOW_CAM_NEAR = 0.5f;
 static const float SHADOW_CAM_FAR = 10000.0f;
 
