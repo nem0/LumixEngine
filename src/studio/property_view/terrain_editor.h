@@ -53,6 +53,7 @@ public:
 	virtual void onMouseUp(int, int, Lumix::MouseButton::Value) override;
 
 private:
+	void detectModifiers();
 	void drawCursor(Lumix::RenderScene& scene,
 					const Lumix::ComponentUID& cmp,
 					const Lumix::Vec3& center);

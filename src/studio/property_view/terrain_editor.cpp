@@ -15,6 +15,7 @@
 #include "mainwindow.h"
 #include "property_view.h"
 #include "universe/universe.h"
+#include <qapplication.h>
 #include <QColorDialog>
 #include <qcombobox.h>
 #include <QDoubleSpinBox>
@@ -614,9 +615,7 @@ QWidget* TerrainComponentPlugin::createBrushTypeEditor(
 	QWidget* parent, DynamicObjectModel::Node& tools_node, int last_node_index)
 {
 	auto editor = new QComboBox(parent);
-	editor->addItem("Raise height");
-	editor->addItem("Lower height");
-	editor->addItem("Smooth height");
+	editor->addItem("Height");
 	editor->addItem("Layers");
 	editor->addItem("Entity");
 
@@ -628,7 +627,7 @@ QWidget* TerrainComponentPlugin::createBrushTypeEditor(
 	m_terrain_editor->m_type = TerrainEditor::RAISE_HEIGHT;
 	connect(editor,
 		(void (QComboBox::*)(int)) & QComboBox::currentIndexChanged,
-		[this, &tools_node, last_node_index](int index)
+		[this, &tools_node, last_node_index, editor](int index)
 	{
 		while (tools_node.m_children.size() > last_node_index + 1)
 		{
@@ -636,7 +635,16 @@ QWidget* TerrainComponentPlugin::createBrushTypeEditor(
 				m_main_window.getPropertyView()->getModel());
 			model->removeNode(*tools_node.m_children.back());
 		}
-		m_terrain_editor->m_type = (TerrainEditor::Type)index;
+		auto text = editor->itemText(index);
+		if (text == "Height")
+			m_terrain_editor->m_type = (TerrainEditor::RAISE_HEIGHT);
+		else if (text == "Layers")
+			m_terrain_editor->m_type = (TerrainEditor::LAYER);
+		else if (text == "Entity")
+			m_terrain_editor->m_type = (TerrainEditor::ENTITY);
+		else if (text == "Color")
+			m_terrain_editor->m_type = (TerrainEditor::COLOR);
+
 		switch (m_terrain_editor->m_type)
 		{
 		case TerrainEditor::RAISE_HEIGHT:
@@ -1009,6 +1017,28 @@ void TerrainEditor::tick()
 }
 
 
+void TerrainEditor::detectModifiers()
+{
+	bool is_height_tool = m_type == LOWER_HEIGHT || m_type == RAISE_HEIGHT ||
+		m_type == SMOOTH_HEIGHT;
+	if (is_height_tool)
+	{
+		if (QApplication::keyboardModifiers() & Qt::Modifier::SHIFT)
+		{
+			m_type = LOWER_HEIGHT;
+		}
+		else if (QApplication::keyboardModifiers() & Qt::Modifier::CTRL)
+		{
+			m_type = SMOOTH_HEIGHT;
+		}
+		else
+		{
+			m_type = RAISE_HEIGHT;
+		}
+	}
+}
+
+
 bool TerrainEditor::onEntityMouseDown(const Lumix::RayCastModelHit& hit,
 									  int,
 									  int)
@@ -1017,6 +1047,8 @@ bool TerrainEditor::onEntityMouseDown(const Lumix::RayCastModelHit& hit,
 	{
 		return false;
 	}
+
+	detectModifiers();
 
 	for (int i = m_world_editor.getSelectedEntities().size() - 1; i >= 0; --i)
 	{
@@ -1054,6 +1086,8 @@ bool TerrainEditor::onEntityMouseDown(const Lumix::RayCastModelHit& hit,
 
 void TerrainEditor::onMouseMove(int x, int y, int, int, int)
 {
+	detectModifiers();
+
 	Lumix::ComponentUID camera_cmp = m_world_editor.getEditCamera();
 	Lumix::RenderScene* scene =
 		static_cast<Lumix::RenderScene*>(camera_cmp.scene);
