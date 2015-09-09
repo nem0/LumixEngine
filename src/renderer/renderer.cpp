@@ -358,9 +358,9 @@ struct RendererImpl : public Renderer
 				"range",
 				&RenderScene::getLightRange,
 				&RenderScene::setLightRange,
-				0,
+				0.0f,
 				FLT_MAX,
-				1,
+				1.0f,
 				allocator));
 		m_engine.registerProperty(
 			"terrain",
