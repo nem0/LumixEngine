@@ -49,7 +49,7 @@ static const uint32_t POINT_LIGHT_HASH = crc32("point_light");
 static const uint32_t BRUSH_SIZE_HASH = crc32("brush_size");
 static const uint32_t BRUSH_POSITION_HASH = crc32("brush_position");
 static const char* TEX_COLOR_UNIFORM = "u_texColor";
-static float split_distances[] = {0.01f, 5, 20, 100, 300};
+static float split_distances[] = { 0.01f, 3, 8, 100, 300 }; TODO("property in editor");
 static const float SHADOW_CAM_NEAR = 0.5f;
 static const float SHADOW_CAM_FAR = 10000.0f;
 
@@ -958,7 +958,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 		float fov = Math::degreesToRadians(m_scene->getLightFOV(light_cmp));
 		Vec3 color = m_scene->getPointLightColor(light_cmp) *
 					 m_scene->getPointLightIntensity(light_cmp);
-		Vec4 attenuation_params(m_scene->getLightAttenuation(light_cmp), 1);
+		Vec4 attenuation_params(m_scene->getLightRange(light_cmp),
+								m_scene->getLightAttenuation(light_cmp),
+								0,
+								1);
 		Vec4 light_pos_radius(light_pos, m_scene->getLightRange(light_cmp));
 		Vec4 light_color(color, 0);
 		Vec4 light_dir_fov(light_dir, fov);

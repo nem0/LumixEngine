@@ -75,7 +75,7 @@ struct PointLight
 	Entity m_entity;
 	int m_uid;
 	float m_fov;
-	Vec3 m_attenuation_params;
+	float m_attenuation_param;
 	float m_range;
 	bool m_cast_shadows;
 };
@@ -348,7 +348,7 @@ public:
 			serializer.write(point_light.m_diffuse_color);
 			serializer.write(point_light.m_intensity);
 			serializer.write(point_light.m_entity);
-			serializer.write(point_light.m_attenuation_params);
+			serializer.write(point_light.m_attenuation_param);
 			serializer.write(point_light.m_fov);
 			serializer.write(point_light.m_specular_color);
 			serializer.write(point_light.m_cast_shadows);
@@ -495,11 +495,10 @@ public:
 			serializer.read(light.m_diffuse_color);
 			serializer.read(light.m_intensity);
 			serializer.read(light.m_entity);
-			serializer.read(light.m_attenuation_params);
+			serializer.read(light.m_attenuation_param);
 			serializer.read(light.m_fov);
 			serializer.read(light.m_specular_color);
 			serializer.read(light.m_cast_shadows);
-			updateLightRange(light.m_uid);
 			m_universe.addComponent(
 				light.m_entity, POINT_LIGHT_HASH, this, light.m_uid);
 		}
@@ -1932,22 +1931,26 @@ public:
 		return m_global_lights[getGlobalLightIndex(cmp)].m_fog_color;
 	}
 
-	virtual Vec3 getLightAttenuation(ComponentIndex cmp) override
+	virtual float getLightAttenuation(ComponentIndex cmp) override
 	{
-		return m_point_lights[getPointLightIndex(cmp)].m_attenuation_params;
+		return m_point_lights[getPointLightIndex(cmp)].m_attenuation_param;
 	}
 
 	virtual void setLightAttenuation(ComponentIndex cmp,
-									 const Vec3& attenuation) override
+									 float attenuation) override
 	{
 		int index = getPointLightIndex(cmp);
-		m_point_lights[index].m_attenuation_params = attenuation;
-		updateLightRange(cmp);
+		m_point_lights[index].m_attenuation_param = attenuation;
 	}
 
 	virtual float getLightRange(ComponentIndex cmp) override
 	{
 		return m_point_lights[getPointLightIndex(cmp)].m_range;
+	}
+
+	virtual void setLightRange(ComponentIndex cmp, float value) override
+	{
+		m_point_lights[getPointLightIndex(cmp)].m_range = value;
 	}
 
 	virtual void setPointLightIntensity(ComponentIndex cmp,
@@ -2234,23 +2237,6 @@ private:
 	}
 
 
-	void updateLightRange(ComponentIndex cmp)
-	{
-		PointLight& light = m_point_lights[getPointLightIndex(cmp)];
-		Vec3 a = light.m_attenuation_params;
-		
-		bool is_quadratic = a.z != 0;
-		if (!is_quadratic)
-		{
-			light.m_range = a.y == 0 ? 10 : (255 - a.x) / a.y;
-			return;
-		}
-
-		float D = a.y*a.y - 4 * a.z*(a.x - 255);
-		light.m_range = D < 0 ? 1 : (-a.y + sqrt(D)) / (2 * a.z);
-	}
-
-
 	ComponentIndex createPointLight(Entity entity)
 	{
 		PointLight& light = m_point_lights.pushEmpty();
@@ -2262,8 +2248,7 @@ private:
 		light.m_fov = 999;
 		light.m_specular_color.set(1, 1, 1);
 		light.m_cast_shadows = false;
-		light.m_attenuation_params.set(1, 0.2f, 0.04f);
-		updateLightRange(light.m_uid);
+		light.m_attenuation_param = 2;
 
 		m_universe.addComponent(entity, POINT_LIGHT_HASH, this, light.m_uid);
 
