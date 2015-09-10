@@ -115,6 +115,10 @@ public:
 	virtual Pose& getPose(ComponentIndex cmp) = 0;
 	virtual ComponentIndex getActiveGlobalLight() = 0;
 	virtual void setActiveGlobalLight(ComponentIndex cmp) = 0;
+	virtual Vec4 getShadowmapCascades(ComponentIndex cmp) = 0;
+	virtual void setShadowmapCascades(ComponentIndex cmp,
+									  const Vec4& value) = 0;
+
 
 	virtual void addDebugPoint(const Vec3& pos, uint32_t color, float life) = 0;
 

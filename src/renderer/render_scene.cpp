@@ -91,6 +91,7 @@ struct GlobalLight
 	Vec3 m_fog_color;
 	float m_fog_density;
 	Entity m_entity;
+	Vec4 m_cascades;
 };
 
 
@@ -367,6 +368,7 @@ public:
 			serializer.write(global_light.m_ambient_intensity);
 			serializer.write(global_light.m_fog_color);
 			serializer.write(global_light.m_fog_density);
+			serializer.write(global_light.m_cascades);
 		}
 		serializer.write((int32_t)m_global_light_last_uid);
 		serializer.write((int32_t)m_active_global_light_uid);
@@ -517,6 +519,7 @@ public:
 			serializer.read(light.m_ambient_intensity);
 			serializer.read(light.m_fog_color);
 			serializer.read(light.m_fog_density);
+			serializer.read(light.m_cascades);
 			m_universe.addComponent(
 				light.m_entity, GLOBAL_LIGHT_HASH, this, light.m_uid);
 		}
@@ -1898,6 +1901,25 @@ public:
 	}
 
 
+	virtual Vec4 getShadowmapCascades(ComponentIndex cmp) override
+	{
+		return m_global_lights[getGlobalLightIndex(cmp)].m_cascades;
+	}
+
+
+	virtual void setShadowmapCascades(ComponentIndex cmp,
+									  const Vec4& value) override
+	{
+		Vec4 valid_value = value;
+		valid_value.x = Math::maxValue(valid_value.x, 0.02f);
+		valid_value.y = Math::maxValue(valid_value.x + 0.01f, valid_value.y);
+		valid_value.z = Math::maxValue(valid_value.y + 0.01f, valid_value.z);
+		valid_value.w = Math::maxValue(valid_value.z + 0.01f, valid_value.w);
+
+		m_global_lights[getGlobalLightIndex(cmp)].m_cascades = valid_value;
+	}
+
+
 	int getGlobalLightIndex(int uid) const
 	{
 		for (int i = 0; i < m_global_lights.size(); ++i)
@@ -2226,6 +2248,7 @@ private:
 		light.m_fog_color.set(1, 1, 1);
 		light.m_fog_density = 0;
 		light.m_uid = ++m_global_light_last_uid;
+		light.m_cascades.set(3, 8, 100, 300);
 
 		if (m_global_lights.size() == 1)
 		{

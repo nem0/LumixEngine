@@ -691,6 +691,55 @@ void EntityModel::addPropertyNode(Node& node,
 			};
 			break;
 		}
+		case Lumix::IPropertyDescriptor::VEC4:
+		{
+			ASSERT(!is_array); // vec4s in arrays are not supported
+			Node& x_node = child.addChild("x");
+			x_node.m_getter = [desc, cmp]() -> QVariant
+			{
+				return desc->getValue<Lumix::Vec4>(cmp).x;
+			};
+			x_node.m_setter = [desc, cmp](const QVariant& value)
+			{
+				Lumix::Vec4 v = desc->getValue<Lumix::Vec4>(cmp);
+				v.x = value.toFloat();
+				desc->setValue(cmp, v);
+			};
+			Node& y_node = child.addChild("y");
+			y_node.m_getter = [desc, cmp]() -> QVariant
+			{
+				return desc->getValue<Lumix::Vec4>(cmp).y;
+			};
+			y_node.m_setter = [desc, cmp](const QVariant& value)
+			{
+				Lumix::Vec4 v = desc->getValue<Lumix::Vec4>(cmp);
+				v.y = value.toFloat();
+				desc->setValue(cmp, v);
+			};
+			Node& z_node = child.addChild("z");
+			z_node.m_getter = [desc, cmp]() -> QVariant
+			{
+				return desc->getValue<Lumix::Vec4>(cmp).z;
+			};
+			z_node.m_setter = [desc, cmp](const QVariant& value)
+			{
+				Lumix::Vec4 v = desc->getValue<Lumix::Vec4>(cmp);
+				v.z = value.toFloat();
+				desc->setValue(cmp, v);
+			};
+			Node& w_node = child.addChild("w");
+			w_node.m_getter = [desc, cmp]() -> QVariant
+			{
+				return desc->getValue<Lumix::Vec4>(cmp).w;
+			};
+			w_node.m_setter = [desc, cmp](const QVariant& value)
+			{
+				Lumix::Vec4 v = desc->getValue<Lumix::Vec4>(cmp);
+				v.w = value.toFloat();
+				desc->setValue(cmp, v);
+			};
+			break;
+		}
 		default:
 			child.m_setter =
 				[is_array, &node, desc, cmp, this](const QVariant& value)
@@ -862,6 +911,12 @@ QVariant EntityModel::get(Lumix::Entity entity,
 			Lumix::Vec3 v;
 			input.read(v);
 			return QString("%1; %2; %3").arg(v.x).arg(v.y).arg(v.z);
+		}
+		case Lumix::IPropertyDescriptor::VEC4:
+		{
+			Lumix::Vec4 v;
+			input.read(v);
+			return QString("%1; %2; %3; %4").arg(v.x).arg(v.y).arg(v.z).arg(v.w);
 		}
 		case Lumix::IPropertyDescriptor::STRING:
 		case Lumix::IPropertyDescriptor::RESOURCE:
