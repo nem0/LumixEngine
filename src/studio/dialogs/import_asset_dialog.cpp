@@ -633,12 +633,25 @@ static bool convertToDDS(const QImage& image,
 }
 
 
+static QString findMissingTexture(const QString& original_path)
+{
+	auto supported_formats = QImageReader::supportedImageFormats();
+	QString exts = "";
+	for (auto format : supported_formats)
+	{
+		exts += "*." + format + ";";
+	}
+	return QFileDialog::getOpenFileName(nullptr, "Select texture", QString(), "Texture files (*.png)");
+}
+
+
 bool ImportThread::saveTexture(const QString& source_path,
 							   const QFileInfo& material_info,
-							   QFile& material_file,
-							   bool is_normal_map)
+							   QFile& material_file)
 {
 	QString texture_path = source_path;
+	if (m_path_mapping.find(source_path) != m_path_mapping.end())
+		texture_path = m_path_mapping[source_path];
 	bool is_embedded = false;
 	if (source_path[0] == '*')
 	{
@@ -650,31 +663,22 @@ bool ImportThread::saveTexture(const QString& source_path,
 
 	QDir().mkpath(m_destination + "/" + texture_info.path());
 	QString texture_entry =
-		QString("\t, \"texture\" : {\n\t\t\"source\" : \"%1\"\n")
-			.arg(m_convert_texture_to_DDS
-					 ? texture_info.path() + "/" + texture_info.baseName() +
-						   ".dds"
-					 : texture_path);
-	if (is_normal_map)
-	{
-		texture_entry += "\t\t, \"uniform\" : \"normalmap\"\n";
-	}
-	texture_entry += "\t}\n";
-	if (is_normal_map)
-	{
-		material_file.write("\t, \"normal_mapping\" : true\n");
-	}
+		QString("\t, \"texture\" : {\n\t\t\"source\" : \"%1.%2\"\n }\n")
+			.arg(texture_info.baseName())
+			.arg(m_convert_texture_to_DDS ? + "dds" : texture_info.suffix());
 	material_file.write(texture_entry.toLatin1().data());
 
 	if (is_embedded || m_saved_textures.indexOf(texture_path) >= 0)
 	{
 		return true;
 	}
+
+	auto source = texture_info.isAbsolute()
+					  ? texture_path
+					  : material_info.path() + "/" + texture_path;
 	if (m_convert_texture_to_DDS && texture_info.suffix() != "dds")
 	{
-		auto source = material_info.path() + "/" + texture_path;
-		auto dest = m_destination + "/" + texture_info.path() + "/" +
-					texture_info.baseName() + ".dds";
+		auto dest = m_destination + "/" + texture_info.baseName() + ".dds";
 		if (!convertToDDS(QImage(source), dest, nullptr, nullptr))
 		{
 			m_error_message =
@@ -684,7 +688,6 @@ bool ImportThread::saveTexture(const QString& source_path,
 	}
 	else
 	{
-		auto source = material_info.dir().path() + "/" + texture_path;
 		auto dest = m_destination + "/" + texture_path;
 		if (source != dest)
 		{
@@ -798,24 +801,24 @@ bool ImportThread::saveLumixMaterials()
 			{
 				aiString texture_path;
 				material->GetTexture(aiTextureType_DIFFUSE, 0, &texture_path);
-				saveTexture(texture_path.C_Str(), source_info, file, false);
+				saveTexture(texture_path.C_Str(), source_info, file);
 			}
 			else
 			{
-				saveTexture("undefined.dds", source_info, file, false);
+				saveTexture("undefined.dds", source_info, file);
 			}
 
 			if (material->GetTextureCount(aiTextureType_NORMALS) == 1)
 			{
 				aiString texture_path;
 				material->GetTexture(aiTextureType_NORMALS, 0, &texture_path);
-				saveTexture(texture_path.C_Str(), source_info, file, true);
+				saveTexture(texture_path.C_Str(), source_info, file);
 			}
 			else if (material->GetTextureCount(aiTextureType_HEIGHT) == 1)
 			{
 				aiString texture_path;
 				material->GetTexture(aiTextureType_HEIGHT, 0, &texture_path);
-				saveTexture(texture_path.C_Str(), source_info, file, true);
+				saveTexture(texture_path.C_Str(), source_info, file);
 			}
 			else if (material->GetTextureCount(aiTextureType_NORMALS) > 1)
 			{
@@ -844,6 +847,7 @@ void ImportThread::run()
 	Assimp::DefaultLogger::get()->attachStream(m_log_stream);
 	if (!m_importer.GetScene())
 	{
+		m_path_mapping.clear();
 		Lumix::enableFloatingPointTraps(false);
 		m_importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS,
 									  aiComponent_COLORS | aiComponent_LIGHTS |
@@ -1055,8 +1059,58 @@ void ImportAssetDialog::setSource(const QString& source)
 }
 
 
+bool ImportAssetDialog::checkTexture(const QString& path)
+{
+	if (!QFile::exists(path))
+	{
+		QMessageBox::warning(nullptr,
+							 "Texture not found",
+							 "Texture " + path +
+								 " not found. Please select another one.",
+							 QMessageBox::StandardButton::Ok);
+		auto new_path = findMissingTexture(path);
+		if (new_path.isEmpty())
+			return false;
+
+		m_import_thread->setPathMapping(path, new_path);
+	}
+	return true;
+}
+
+
+bool ImportAssetDialog::checkTextures()
+{
+	if (!m_ui->importMaterialsCheckbox->isChecked()) return true;
+
+	auto scene = m_importer.GetScene();
+	for (unsigned int i = 0; i < scene->mNumMaterials; ++i)
+	{
+		const aiMaterial* material = scene->mMaterials[i];
+
+		int types[] = { aiTextureType_DIFFUSE, aiTextureType_NORMALS, aiTextureType_HEIGHT };
+
+		for (auto type : types)
+		{
+			for (unsigned int j = 0; j < material->GetTextureCount((aiTextureType)type); ++j)
+			{
+				aiString texture_path;
+				material->GetTexture((aiTextureType)type, j, &texture_path);
+				if (!checkTexture(texture_path.C_Str()))
+				{
+					return false;
+				}
+			}
+		}
+	}
+
+	return true;
+}
+
+
 void ImportAssetDialog::importModel()
 {
+	checkTextures();
+
 	auto dest = m_ui->destinationInput->text();
 	if (m_ui->createDirectoryCheckbox->isChecked())
 	{
@@ -1083,6 +1137,7 @@ void ImportAssetDialog::importModel()
 		Lumix::Path(dest_mesh_file.toLatin1().data()));
 	m_main_window.getMetadata()->set(
 		relative_path, "import_source", m_ui->sourceInput->text());
+
 }
 
 

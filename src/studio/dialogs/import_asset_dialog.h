@@ -4,6 +4,7 @@
 #include "assimp/Importer.hpp"
 #include "assimp/progresshandler.hpp"
 #include <qdialog.h>
+#include <qmap.h>
 #include <qthread.h>
 
 
@@ -36,13 +37,19 @@ class ImportThread : public QThread, public Assimp::ProgressHandler
 		void setImportModel(bool import_model) { m_import_model = import_model; }
 		void setImportPhysics(bool import_physics, bool make_convex) { m_import_physics = import_physics; m_make_convex = make_convex; }
 		const QString& getErrorMessage() const { return m_error_message; }
+		void setPathMapping(const QString& from, const QString& to)
+		{
+			m_path_mapping[from] = to;
+		}
 
 	private:
 		void writeSkeleton(QFile& file);
 		void writeMeshes(QFile& file);
 		void writeGeometry(QFile& file);
 		bool saveLumixMaterials();
-		bool saveTexture(const QString& texture_path, const QFileInfo& material_info, QFile& material_file, bool is_normal_map);
+		bool saveTexture(const QString& texture_path,
+						 const QFileInfo& material_info,
+						 QFile& material_file);
 		bool saveLumixModel();
 		bool saveLumixPhysics();
 		bool saveEmbeddedTextures(const aiScene* scene);
@@ -65,6 +72,7 @@ class ImportThread : public QThread, public Assimp::ProgressHandler
 		QString m_error_message;
 		QVector<QString> m_saved_embedded_textures;
 		QVector<QString> m_saved_textures;
+		QMap<QString, QString> m_path_mapping;
 };
 
 
@@ -82,6 +90,8 @@ class ImportAssetDialog : public QDialog
 		Assimp::Importer& getImporter() { return m_importer; }
 
 	private:
+		bool checkTexture(const QString& path);
+		bool checkTextures();
 		void importModel();
 		void importAnimation();
 		void importTexture();
