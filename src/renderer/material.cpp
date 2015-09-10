@@ -366,9 +366,11 @@ void Material::setShader(Shader* shader)
 	bool is_alpha = isAlphaCutout();
 	bool is_receiver = isShadowReceiver();
 	if (m_shader)
-	{ 
-		removeDependency(*m_shader);
-		m_resource_manager.get(ResourceManager::SHADER)->unload(*m_shader);
+	{
+		Shader* shader = m_shader;
+		m_shader = nullptr;
+		removeDependency(*shader);
+		m_resource_manager.get(ResourceManager::SHADER)->unload(*shader);
 	}
 	m_shader = shader;
 	if (m_shader)
