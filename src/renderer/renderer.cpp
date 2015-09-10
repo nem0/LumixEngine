@@ -261,6 +261,14 @@ struct RendererImpl : public Renderer
 				allocator));
 		m_engine.registerProperty(
 			"global_light",
+			allocator.newObject<Vec4PropertyDescriptor<RenderScene>>(
+			"shadow cascades",
+			&RenderScene::getShadowmapCascades,
+			&RenderScene::setShadowmapCascades,
+			allocator));
+
+		m_engine.registerProperty(
+			"global_light",
 			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
 				"intensity",
 				&RenderScene::getGlobalLightIntensity,

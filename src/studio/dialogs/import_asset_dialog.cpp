@@ -1109,7 +1109,7 @@ bool ImportAssetDialog::checkTextures()
 
 void ImportAssetDialog::importModel()
 {
-	checkTextures();
+	if (!checkTextures()) return;
 
 	auto dest = m_ui->destinationInput->text();
 	if (m_ui->createDirectoryCheckbox->isChecked())
