@@ -16,6 +16,8 @@ struct LUMIX_ENGINE_API Vec4
 	Vec4(float a, float b, float c, float d) : x(a), y(b), z(c), w(d) {}
 	Vec4(const Vec3& v, float d) : x(v.x), y(v.y), z(v.z), w(d) {}
 
+	Vec3 xyz() const { return Vec3(x, y, z); }
+
 	Vec4 operator +(const Vec4& rhs) const
 	{
 		return Vec4(x + rhs.x, y + rhs.y, z + rhs.z, w + rhs.w );

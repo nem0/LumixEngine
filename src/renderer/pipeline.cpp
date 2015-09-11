@@ -247,14 +247,18 @@ struct PipelineInstanceImpl : public PipelineInstance
 		, m_global_textures(allocator)
 		, m_frame_allocator(allocator, 10 * 1024 * 1024)
 		, m_renderer(static_cast<PipelineImpl&>(pipeline).getRenderer())
-		, m_screen_space_material(nullptr)
 		, m_default_framebuffer(nullptr)
 		, m_debug_line_material(nullptr)
 		, m_debug_flags(BGFX_DEBUG_TEXT)
 		, m_point_light_shadowmaps(allocator)
+		, m_materials(allocator)
 	{
 		m_has_shadowmap_define_idx = m_renderer.getShaderDefineIdx("HAS_SHADOWMAP");
 
+		m_cam_view_uniform =
+			bgfx::createUniform("u_camView", bgfx::UniformType::Mat4);
+		m_cam_inv_proj_uniform =
+			bgfx::createUniform("u_camInvProj", bgfx::UniformType::Mat4);
 		m_tex_shadowmap_uniform =
 			bgfx::createUniform("u_texShadowmap", bgfx::UniformType::Int1);
 		m_attenuation_params_uniform =
@@ -288,8 +292,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 		ResourceManagerBase* material_manager =
 			pipeline.getResourceManager().get(ResourceManager::MATERIAL);
-		m_screen_space_material = static_cast<Material*>(material_manager->load(
-			Lumix::Path("models/editor/screen_space.mat")));
 		m_debug_line_material = static_cast<Material*>(material_manager->load(
 			Lumix::Path("models/editor/debug_line.mat")));
 
@@ -304,7 +306,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 	{
 		ResourceManagerBase* material_manager =
 			m_source.getResourceManager().get(ResourceManager::MATERIAL);
-		material_manager->unload(*m_screen_space_material);
+		for (auto* material : m_materials)
+		{
+			material_manager->unload(*material);
+		}
 		material_manager->unload(*m_debug_line_material);
 		bgfx::destroyUniform(m_tex_shadowmap_uniform);
 		bgfx::destroyUniform(m_attenuation_params_uniform);
@@ -321,6 +326,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 		bgfx::destroyUniform(m_ambient_color_uniform);
 		bgfx::destroyUniform(m_shadowmap_matrices_uniform);
 		bgfx::destroyUniform(m_light_specular_uniform);
+		bgfx::destroyUniform(m_cam_inv_proj_uniform);
+		bgfx::destroyUniform(m_cam_view_uniform);
 
 		for (int i = 0; i < m_uniforms.size(); ++i)
 		{
@@ -1107,9 +1114,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void drawQuad(float x, float y, float w, float h)
+	void drawQuad(float x, float y, float w, float h, int material_index)
 	{
-		if (!m_screen_space_material->isReady() ||
+		Material* material = m_materials[material_index];
+		if (!material->isReady() ||
 			!bgfx::checkAvailTransientVertexBuffer(3,
 												   BaseVertex::s_vertex_decl))
 			return;
@@ -1176,10 +1184,30 @@ struct PipelineInstanceImpl : public PipelineInstance
 			bgfx::setTexture(i, t.m_uniform, t.m_texture);
 		}
 
+		if (m_applied_camera >= 0)
+		{
+			Matrix projection_matrix;
+			float fov = getScene()->getCameraFOV(m_applied_camera);
+			float near_plane = getScene()->getCameraNearPlane(m_applied_camera);
+			float far_plane = getScene()->getCameraFarPlane(m_applied_camera);
+			float ratio = float(m_width) / m_height;
+			projection_matrix.setPerspective(
+				Math::degreesToRadians(fov), ratio, near_plane, far_plane);
+			projection_matrix.inverse();
+
+			bgfx::setUniform(m_cam_inv_proj_uniform, &projection_matrix.m11);
+
+			Universe& universe = getScene()->getUniverse();
+			Matrix mtx = universe.getMatrix(getScene()->getCameraEntity(m_applied_camera));
+
+			bgfx::setUniform(m_cam_view_uniform, &mtx.m11);
+		}
+
+		bgfx::setState(m_render_state | material->getRenderStates());
 		bgfx::setVertexBuffer(&vb);
-		bgfx::submit(m_view_idx,
-						m_screen_space_material->getShaderInstance()
-							.m_program_handles[m_pass_idx]);
+		bgfx::submit(
+			m_view_idx,
+			material->getShaderInstance().m_program_handles[m_pass_idx]);
 	}
 
 
@@ -1729,6 +1757,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	Array<FrameBuffer*> m_framebuffers;
 	Array<GlobalTexture> m_global_textures;
 	Array<bgfx::UniformHandle> m_uniforms;
+	Array<Material*> m_materials;
 	Array<PointLightShadowmap> m_point_light_shadowmaps;
 	InstanceData m_instances_data[128];
 	int m_instance_data_idx;
@@ -1760,7 +1789,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 	bgfx::UniformHandle m_terrain_matrix_uniform;
 	bgfx::UniformHandle m_attenuation_params_uniform;
 	bgfx::UniformHandle m_tex_shadowmap_uniform;
-	Material* m_screen_space_material;
+	bgfx::UniformHandle m_cam_view_uniform;
+	bgfx::UniformHandle m_cam_inv_proj_uniform;
 	Material* m_debug_line_material;
 	int m_has_shadowmap_define_idx;
 
@@ -2002,10 +2032,23 @@ int createUniform(PipelineInstanceImpl* pipeline, const char* name)
 }
 
 
-void drawQuad(
-	PipelineInstanceImpl* pipeline, float x, float y, float w, float h)
+int loadMaterial(PipelineInstanceImpl* pipeline, const char* path)
 {
-	pipeline->drawQuad(x, y, w, h);
+	ResourceManagerBase* material_manager =
+		pipeline->m_source.getResourceManager().get(ResourceManager::MATERIAL);
+	auto* material =
+		static_cast<Material*>(material_manager->load(Lumix::Path(path)));
+
+	pipeline->m_materials.push(material);
+	return pipeline->m_materials.size() - 1;
+}
+
+
+
+void drawQuad(
+	PipelineInstanceImpl* pipeline, float x, float y, float w, float h, int material_index)
+{
+	pipeline->drawQuad(x, y, w, h, material_index);
 }
 
 
@@ -2025,6 +2068,9 @@ void PipelineImpl::registerCFunctions()
 		LuaWrapper::wrap<decltype(&LuaAPI::drawQuad), LuaAPI::drawQuad>);
 	registerCFunction(
 		"print", LuaWrapper::wrap<decltype(&LuaAPI::print), LuaAPI::print>);
+	registerCFunction("loadMaterial",
+					  LuaWrapper::wrap<decltype(&LuaAPI::loadMaterial),
+									   LuaAPI::loadMaterial>);
 	registerCFunction("createUniform",
 					  LuaWrapper::wrap<decltype(&LuaAPI::createUniform),
 									   LuaAPI::createUniform>);
