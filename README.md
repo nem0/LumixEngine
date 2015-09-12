@@ -34,6 +34,7 @@ Videos
 * [Lua scripting](https://www.youtube.com/watch?v=ThF0HPeirus)
 * [Minecraft-like world](https://www.youtube.com/watch?v=Chux7v1AX8k)
 * [Hot-reload](https://www.youtube.com/watch?v=BVE7x3Su9qA)
+* [Atmospheric scattering](https://www.youtube.com/watch?v=VJppE0E4auc)
 
 ![Editor screenshot](https://raw.githubusercontent.com/nem0/LumixEngine/gh-pages/images/editor.png "Editor screenshot")
 
