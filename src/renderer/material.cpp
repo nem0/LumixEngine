@@ -596,8 +596,11 @@ void Material::loaded(FS::IFile& file, bool success, FS::FileSystem& fs)
 			serializer.deserialize(is_alpha_blending, false);
 			if (is_alpha_blending)
 			{
-				m_render_states |= BGFX_STATE_BLEND_FUNC(
-					BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA);
+				m_render_states |= BGFX_STATE_BLEND_ALPHA;
+			}
+			else
+			{
+				m_render_states &= ~BGFX_STATE_BLEND_MASK;
 			}
 		}
 		else if (strcmp(label, "specular") == 0)
