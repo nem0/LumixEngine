@@ -3,7 +3,9 @@
 #include "core/lua_wrapper.h"
 #include "engine.h"
 #include "iplugin.h"
+#include "renderer/material.h"
 #include "renderer/render_scene.h"
+#include "renderer/texture.h"
 #include "universe/hierarchy.h"
 #include "universe/universe.h"
 
@@ -14,6 +16,60 @@ namespace Lumix
 
 namespace LuaAPI
 {
+
+
+static int setTextureData(lua_State* L)
+{
+	if (!LuaWrapper::isType<Texture*>(L, 1) || !lua_istable(L, 2))
+	{
+		return 0;
+	}
+
+	auto* texture = (Texture*)lua_touserdata(L, 1);
+	int len = (int)lua_rawlen(L, 2);
+	
+	if (!texture || texture->getBytesPerPixel() != 2) return 0;
+
+	uint16_t* data = (uint16_t*)texture->getData();
+	for (int i = 0; i < len; ++i)
+	{
+		if (lua_rawgeti(L, 2, 1 + i) == LUA_TNUMBER)
+		{
+			data[i] = (uint16_t)lua_tonumber(L, -1);
+		}
+		lua_pop(L, 1);
+	}
+
+	texture->onDataUpdated();
+
+	return 0;
+}
+
+
+static void
+setTexturePixel(Texture* texture, int x, int y, int r, int g, int b, int a)
+{
+	if (!texture) return;
+
+	uint32_t color = (r & 0xff) << 24 | (g & 0xff) << 16 | (b & 0xff) << 8 | (a & 0xff);
+	texture->setPixel(x, y, color);
+}
+
+
+static Texture* getMaterialTexture(Material* material, int texture_index)
+{
+	if (!material) return nullptr;
+	return material->getTexture(texture_index);
+}
+
+
+static Material* getTerrainMaterial(RenderScene* scene, Entity entity)
+{
+	if (!scene) return nullptr;
+	ComponentIndex cmp = scene->getTerrainComponent(entity);
+	if (cmp < 0) return nullptr;
+	return scene->getTerrainMaterial(cmp);
+}
 
 
 static void* getScene(UniverseContext* ctx, const char* name)
@@ -144,16 +200,37 @@ registerCFunction(lua_State* L, const char* name, lua_CFunction func)
 }
 
 
-void registerEngineLuaAPI(Engine& engine, UniverseContext& ctx, lua_State* L)
+void registerUniverse(UniverseContext* ctx, lua_State* L)
 {
-	lua_pushlightuserdata(L, &ctx);
+	lua_pushlightuserdata(L, ctx);
 	lua_setglobal(L, "g_universe_context");
 
-	lua_pushlightuserdata(L, ctx.m_universe);
+	lua_pushlightuserdata(L, ctx ? ctx->m_universe : nullptr);
 	lua_setglobal(L, "g_universe");
+}
 
+
+void registerEngineLuaAPI(Engine& engine, lua_State* L)
+{
 	lua_pushlightuserdata(L, &engine);
 	lua_setglobal(L, "g_engine");
+
+	registerCFunction(L, "API_setTextureData", &LuaAPI::setTextureData);
+
+	registerCFunction(L,
+					  "API_setTexturePixel",
+					  LuaWrapper::wrap<decltype(&LuaAPI::setTexturePixel),
+									   LuaAPI::setTexturePixel>);
+
+	registerCFunction(L,
+					  "API_getMaterialTexture",
+					  LuaWrapper::wrap<decltype(&LuaAPI::getMaterialTexture),
+									   LuaAPI::getMaterialTexture>);
+
+	registerCFunction(L,
+					  "API_getTerrainMaterial",
+					  LuaWrapper::wrap<decltype(&LuaAPI::getTerrainMaterial),
+									   LuaAPI::getTerrainMaterial>);
 
 	registerCFunction(
 		L,

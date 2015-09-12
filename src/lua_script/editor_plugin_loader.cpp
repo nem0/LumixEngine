@@ -8,6 +8,7 @@
 #include "editor/ieditor_command.h"
 #include "editor/world_editor.h"
 #include "engine.h"
+#include "engine/property_descriptor.h"
 #include "mainwindow.h"
 #include <lua.hpp>
 #include <qbuffer.h>
@@ -20,6 +21,12 @@
 
 namespace Lumix
 {
+
+
+void registerEngineLuaAPI(Lumix::Engine& engine, lua_State* L);
+void registerUniverse(UniverseContext* ctx, lua_State* L);
+
+
 namespace LuaWrapper
 {
 
@@ -37,6 +44,7 @@ template <> inline void pushLua(lua_State* L, QString value)
 EditorPluginLoader::EditorPluginLoader(MainWindow& main_window)
 	: m_main_window(main_window)
 {
+	m_world_editor = nullptr;
 	m_global_state = nullptr;
 	setWorldEditor(main_window.getWorldEditor());
 }
@@ -145,6 +153,39 @@ static void registerButtonClickCallback(lua_State* L,
 }
 
 
+static const char* getProperty(Lumix::WorldEditor* editor,
+							   Lumix::IScene* scene,
+							   const char* component,
+							   Lumix::Entity entity,
+							   const char* property_name)
+{
+	if (!editor || !scene || !component || !property_name || entity < 0) return "";
+
+	auto* desc = editor->getEngine().getProperty(component, property_name);
+	if (!desc) return "";
+	if (desc->getType() != Lumix::IPropertyDescriptor::STRING 
+		&& desc->getType() != Lumix::IPropertyDescriptor::RESOURCE)
+		return "";
+
+	auto cmp = editor->getComponent(entity, Lumix::crc32(component));
+	
+	static Lumix::OutputBlob stream(editor->getAllocator()); TODO("todo");// TODO handle memory
+	
+	desc->get(cmp, stream);
+
+	return (const char*)stream.getData();
+}
+
+
+static Lumix::Entity getSelectedEntity(Lumix::WorldEditor* editor)
+{
+	auto& ents = editor->getSelectedEntities();
+	if (ents.empty()) return -1;
+
+	return ents[0];
+}
+
+
 static void* createUI(const char* ui)
 {
 	QUiLoader loader;
@@ -206,11 +247,19 @@ executeEditorCommand(lua_State* L, const char* name, const char* data)
 } // namespace API
 
 
-void EditorPluginLoader::registerAPI()
+void EditorPluginLoader::registerAPI(Lumix::Engine& engine)
 {
+	ASSERT(m_world_editor);
+
 	luaL_openlibs(m_global_state);
+
 	lua_pushlightuserdata(m_global_state, this);
 	lua_setglobal(m_global_state, "API_plugin_loader");
+
+	lua_pushlightuserdata(m_global_state, m_world_editor);
+	lua_setglobal(m_global_state, "g_world_editor");
+
+	Lumix::registerEngineLuaAPI(engine, m_global_state);
 
 	auto f = Lumix::LuaWrapper::wrap<decltype(&API::registerMenuFunction),
 									 API::registerMenuFunction>;
@@ -239,13 +288,39 @@ void EditorPluginLoader::registerAPI()
 	f = Lumix::LuaWrapper::wrap<decltype(&API::getTextEditText),
 								API::getTextEditText>;
 	lua_register(m_global_state, "API_getTextEditText", f);
+
+	f = Lumix::LuaWrapper::wrap<decltype(&API::getSelectedEntity),
+								API::getSelectedEntity>;
+	lua_register(m_global_state, "API_getSelectedEntity", f);
+
+	f = Lumix::LuaWrapper::wrap<decltype(&API::getProperty), API::getProperty>;
+	lua_register(m_global_state, "API_getProperty", f);
+}
+
+
+void EditorPluginLoader::onUniverseCreated()
+{
+	Lumix::registerUniverse(m_world_editor->getUniverseContext(),
+							m_global_state);
+}
+
+
+void EditorPluginLoader::onUniverseDestroyed()
+{
+	Lumix::registerUniverse(nullptr, m_global_state);
 }
 
 
 void EditorPluginLoader::setWorldEditor(Lumix::WorldEditor& editor)
 {
+	m_world_editor = &editor;
 	m_global_state = luaL_newstate();
-	registerAPI();
+	registerAPI(editor.getEngine());
+	editor.universeCreated()
+		.bind<EditorPluginLoader, &EditorPluginLoader::onUniverseCreated>(this);
+	editor.universeDestroyed()
+		.bind<EditorPluginLoader, &EditorPluginLoader::onUniverseDestroyed>(this);
+
 	auto lua_plugins = QDir("plugins").entryInfoList(QStringList() << "*.lua");
 	for (auto& lua_plugin : lua_plugins)
 	{

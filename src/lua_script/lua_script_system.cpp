@@ -33,7 +33,8 @@ namespace Lumix
 class LuaScriptSystemImpl;
 
 
-void registerEngineLuaAPI(Engine&, UniverseContext&, lua_State* L);
+void registerEngineLuaAPI(Engine&, lua_State* L);
+void registerUniverse(UniverseContext*, lua_State* L);
 void registerPhysicsLuaAPI(Engine&, Universe&, lua_State* L);
 
 
@@ -127,7 +128,8 @@ public:
 
 	void registerAPI(lua_State* L)
 	{
-		registerEngineLuaAPI(m_system.m_engine, m_universe_context, L);
+		registerUniverse(&m_universe_context, L);
+		registerEngineLuaAPI(m_system.m_engine, L);
 		if (m_system.m_engine.getPluginManager().getPlugin("physics"))
 		{
 			registerPhysicsLuaAPI(m_system.m_engine, *m_universe_context.m_universe, L);

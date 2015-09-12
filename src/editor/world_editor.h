@@ -20,6 +20,7 @@ class Path;
 class PipelineInstance;
 class RayCastModelHit;
 class Universe;
+struct UniverseContext;
 
 
 namespace FS
@@ -75,6 +76,7 @@ public:
 	virtual void executeCommand(IEditorCommand* command) = 0;
 	virtual IEditorCommand* createEditorCommand(uint32_t command_type) = 0;
 	virtual Engine& getEngine() = 0;
+	virtual UniverseContext* getUniverseContext() = 0;
 	virtual Universe* getUniverse() = 0;
 	virtual Hierarchy* getHierarchy() = 0;
 	virtual const Array<IScene*>& getScenes() const = 0;

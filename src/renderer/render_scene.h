@@ -231,6 +231,7 @@ public:
 	setTerrainBrush(ComponentIndex cmp, const Vec3& position, float size) = 0;
 	virtual void
 	getTerrainSize(ComponentIndex cmp, float* width, float* height) = 0;
+	virtual ComponentIndex getTerrainComponent(Entity entity) = 0;
 
 	virtual void
 	setGrassPath(ComponentIndex cmp, int index, const char* path) = 0;
