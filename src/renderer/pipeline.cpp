@@ -1964,6 +1964,12 @@ void executeCustomCommand(PipelineInstanceImpl* pipeline, const char* command)
 }
 
 
+bool hasScene(PipelineInstanceImpl* pipeline)
+{
+	return pipeline->getScene();
+}
+
+
 bool cameraExists(PipelineInstanceImpl* pipeline, const char* slot_name)
 {
 	return pipeline->getScene()->getCameraInSlot(slot_name) != INVALID_ENTITY;
@@ -2131,6 +2137,8 @@ void PipelineImpl::registerCFunctions()
 		"getFPS", LuaWrapper::wrap<decltype(&LuaAPI::getFPS), LuaAPI::getFPS>);
 	registerCFunction(
 		"cameraExists", LuaWrapper::wrap<decltype(&LuaAPI::cameraExists), LuaAPI::cameraExists>);
+	registerCFunction(
+		"hasScene", LuaWrapper::wrap<decltype(&LuaAPI::hasScene), LuaAPI::hasScene>);
 }
 
 

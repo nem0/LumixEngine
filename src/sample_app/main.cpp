@@ -4,6 +4,8 @@
 #include "core/input_system.h"
 #include "core/resource_manager.h"
 #include "debug/allocator.h"
+#include "editor/gizmo.h"
+#include "editor/world_editor.h"
 #include "engine.h"
 #include "engine/plugin_manager.h"
 #include "renderer/material.h"
@@ -57,18 +59,39 @@ public:
 
 		ImGui::NewFrame();
 
-		ImGui::ShowTestWindow();
-
 		if (ImGui::BeginMainMenuBar())
 		{
 			if (ImGui::BeginMenu("File"))
 			{
+				if (ImGui::MenuItem("New"))
+				{
+					m_editor->newUniverse();
+				}
+				if (ImGui::MenuItem("Open"))
+				{
+					m_editor->loadUniverse(Lumix::Path("main.unv"));
+				}
 				if (ImGui::MenuItem("Exit"))
 				{
 					PostQuitMessage(0);
 				}
 				ImGui::EndMenu();
 			}
+
+			if (ImGui::BeginMenu("Edit"))
+			{
+				if (ImGui::MenuItem("Undo"))
+				{
+					m_editor->undo();
+				}
+				if (ImGui::MenuItem("Redo"))
+				{
+					m_editor->redo();
+				}
+				ImGui::EndMenu();
+			}
+		
+
 			ImGui::EndMainMenuBar();
 		}
 
@@ -80,8 +103,7 @@ public:
 	{
 		shutdownImGui();
 
-		m_engine->stopGame(*m_universe_context);
-		m_engine->destroyUniverse(*m_universe_context);
+		Lumix::WorldEditor::destroy(m_editor);
 		Lumix::PipelineInstance::destroy(m_pipeline);
 		m_pipeline_source->getResourceManager()
 			.get(Lumix::ResourceManager::PIPELINE)
@@ -90,6 +112,7 @@ public:
 		m_engine = nullptr;
 		m_pipeline = nullptr;
 		m_pipeline_source = nullptr;
+		m_editor = nullptr;
 	}
 
 
@@ -157,43 +180,44 @@ public:
 	}
 
 
+	void onUniverseCreated()
+	{
+		m_pipeline->setScene(static_cast<Lumix::RenderScene*>(
+			m_editor->getScene(Lumix::crc32("renderer"))));
+	}
+
+
+	void onUniverseDestroyed()
+	{
+		m_pipeline->setScene(nullptr);
+	}
+
+
+	void renderGizmos()
+	{
+		m_editor->renderIcons(*m_pipeline);
+		m_editor->getGizmo().updateScale(m_editor->getEditCamera().index);
+		m_editor->getGizmo().render(*m_pipeline);
+	}
+
+
 	void init(HWND win)
 	{
 		Lumix::Renderer::setInitData(win);
 		m_engine = Lumix::Engine::create(nullptr, m_allocator);
-		m_engine->loadPlugin("renderer.dll");
-		m_engine->loadPlugin("lua_script.dll");
-		m_engine->loadPlugin("animation.dll");
-		m_engine->loadPlugin("physics.dll");
+		m_editor = Lumix::WorldEditor::create("", *m_engine);
+
+		m_editor->universeCreated().bind<Context, &Context::onUniverseCreated>(this);
+		m_editor->universeDestroyed().bind<Context, &Context::onUniverseDestroyed>(this);
 
 		m_pipeline_source = static_cast<Lumix::Pipeline*>(
 			m_engine->getResourceManager()
 				.get(Lumix::ResourceManager::PIPELINE)
-				->load(Lumix::Path("pipelines/game_view.lua")));
+				->load(Lumix::Path("pipelines/main.lua")));
 		m_pipeline = Lumix::PipelineInstance::create(*m_pipeline_source,
 													 m_engine->getAllocator());
-
-		m_universe_context = &m_engine->createUniverse();
-		ASSERT(m_universe_context);
-
-		auto fp = fopen("main.unv", "rb");
-		fseek(fp, 0, SEEK_END);
-		auto l = ftell(fp);
-		fseek(fp, 0, SEEK_SET);
-		Lumix::Array<char*> b(m_allocator);
-		b.resize(l);
-		fread(&b[0], 1, l, fp);
-		fclose(fp);
-
-		Lumix::InputBlob blob(&b[0], b.size());
-
-		uint32_t engine_hash;
-		blob.read(engine_hash);
-		uint32_t editor_hash;
-		blob.read(editor_hash);
-		m_engine->deserialize(*m_universe_context, blob);
-		m_pipeline->setScene((Lumix::RenderScene*)m_universe_context->getScene(
-			Lumix::crc32("renderer")));
+		m_pipeline->addCustomCommandHandler("render_gizmos")
+			.bind<Context, &Context::renderGizmos>(this);
 
 		RECT rect;
 		GetClientRect(win, &rect);
@@ -205,12 +229,12 @@ public:
 	HWND m_hwnd;
 	bgfx::VertexDecl m_decl;
 	Lumix::Material* m_material;
-	Lumix::UniverseContext* m_universe_context;
 	Lumix::Engine* m_engine;
 	Lumix::Pipeline* m_pipeline_source;
 	Lumix::PipelineInstance* m_pipeline;
 	Lumix::DefaultAllocator m_main_allocator;
 	Lumix::Debug::Allocator m_allocator;
+	Lumix::WorldEditor* m_editor;
 };
 
 
@@ -303,19 +327,24 @@ LRESULT WINAPI msgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		case WM_ERASEBKGND:
 			return 1;
 		case WM_LBUTTONUP:
+			g_context.m_editor->onMouseUp(old_x, old_y, Lumix::MouseButton::LEFT);
 			ImGui::GetIO().MouseDown[0] = false;
 			break;
 		case WM_LBUTTONDOWN:
+			g_context.m_editor->onMouseDown(old_x, old_y, Lumix::MouseButton::LEFT);
 			ImGui::GetIO().MouseDown[0] = true;
 			break;
 		case WM_RBUTTONDOWN:
+			g_context.m_editor->onMouseDown(old_x, old_y, Lumix::MouseButton::RIGHT);
 			ImGui::GetIO().MouseDown[1] = true;
 			break;
 		case WM_RBUTTONUP:
+			g_context.m_editor->onMouseUp(old_x, old_y, Lumix::MouseButton::RIGHT);
 			ImGui::GetIO().MouseDown[1] = false;
 			break;
 		case WM_MOUSEMOVE:
 		{
+			g_context.m_editor->onMouseMove(x, y, x - old_x, y - old_y, 0);
 			auto& input_system = g_context.m_engine->getInputSystem();
 			input_system.injectMouseXMove(float(old_x - x));
 			input_system.injectMouseYMove(float(old_y - y));
@@ -391,10 +420,10 @@ INT WINAPI WinMain(HINSTANCE hInst,
 
 	while (g_context.m_engine->getResourceManager().isLoading())
 	{
-		g_context.m_engine->update(*g_context.m_universe_context);
+		g_context.m_engine->update(*g_context.m_editor->getUniverseContext());
 	}
 
-	g_context.m_engine->startGame(*g_context.m_universe_context);
+	g_context.m_engine->startGame(*g_context.m_editor->getUniverseContext());
 
 	MSG msg = {0};
 	while (msg.message != WM_QUIT)
@@ -408,7 +437,7 @@ INT WINAPI WinMain(HINSTANCE hInst,
 		{
 			Lumix::Renderer* renderer = static_cast<Lumix::Renderer*>(
 				g_context.m_engine->getPluginManager().getPlugin("renderer"));
-			g_context.m_engine->update(*g_context.m_universe_context);
+			g_context.m_engine->update(*g_context.m_editor->getUniverseContext());
 			g_context.m_pipeline->render();
 			g_context.onGUI();
 			renderer->frame();

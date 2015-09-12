@@ -318,6 +318,7 @@ add_executable(sample_app
 set_target_properties(sample_app PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
 target_link_libraries(sample_app engine)
 target_link_libraries(sample_app renderer)
+target_link_libraries(sample_app editor)
 
 
 ###################### LUA_SCRIPT ######################
