@@ -824,6 +824,20 @@ public:
 	}
 
 
+	virtual ComponentIndex getTerrainComponent(Entity entity) override
+	{
+		for (int i = 0; i < m_terrains.size(); ++i)
+		{
+			auto* terrain = m_terrains[i];
+			if (terrain && terrain->getEntity() == entity)
+			{
+				return i;
+			}
+		}
+		return -1;
+	}
+
+
 	virtual float
 	getTerrainHeightAt(ComponentIndex cmp, float x, float z) override
 	{

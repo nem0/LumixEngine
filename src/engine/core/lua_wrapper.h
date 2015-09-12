@@ -47,6 +47,24 @@ template <> inline void* toType(lua_State* L, int index)
 }
 
 
+template <typename T> inline const char* typeToString()
+{
+	return "userdata";
+}
+template <> inline const char* typeToString<int>()
+{
+	return "number";
+}
+template <> inline const char* typeToString<const char*>()
+{
+	return "string";
+}
+template <> inline const char* typeToString<bool>()
+{
+	return "boolean";
+}
+
+
 template <typename T> inline bool isType(lua_State* L, int index)
 {
 	return lua_islightuserdata(L, index) != 0;
@@ -83,7 +101,7 @@ template <> inline bool isType<void*>(lua_State* L, int index)
 
 template <typename T> inline void pushLua(lua_State* L, T value)
 {
-	lua_pushnumber(L, value);
+	lua_pushlightuserdata(L, value);
 }
 template <> inline void pushLua(lua_State* L, float value)
 {
@@ -122,7 +140,7 @@ template <int N> struct FunctionCaller
 			int depth = 0;
 
 			auto er = g_log_error.log("lua");
-			er << "Wrong arguments in\n";
+			er << "Wrong argument " << sizeof...(ArgsF)-N << " in\n";
 			while (lua_getstack(L, depth, &entry))
 			{
 				int status = lua_getinfo(L, "Sln", &entry);
@@ -131,6 +149,8 @@ template <int N> struct FunctionCaller
 				   << "): " << (entry.name ? entry.name : "?") << "\n";
 				depth++;
 			}
+			er << " " << typeToString<T>() << " expected";
+
 			return R();
 		}
 		T a = toType<T>(L, sizeof...(ArgsF)-N + 1);

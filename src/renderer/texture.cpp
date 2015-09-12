@@ -107,6 +107,24 @@ bool Texture::create(int w, int h, void* data)
 }
 
 
+void Texture::setPixel(int x, int y, uint32_t color)
+{
+	if (m_data.empty() || x >= m_width || y >= m_height || x < 0 || y < 0)
+	{
+		return;
+	}
+
+	if (getBytesPerPixel() == 4)
+	{
+		*(uint32_t*)&m_data[(x + y * m_width) * 4] = color;
+	}
+	else if(getBytesPerPixel() == 2)
+	{
+		*(uint16_t*)&m_data[(x + y * m_width) * 2] = color >> 16;
+	}
+	onDataUpdated();
+}
+
 uint32_t Texture::getPixelNearest(int x, int y) const
 {
 	if (m_data.empty() || x >= m_width || y >= m_height || x < 0 || y < 0 ||

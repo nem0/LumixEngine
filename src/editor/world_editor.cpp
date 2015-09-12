@@ -1435,6 +1435,12 @@ public:
 	}
 
 
+	virtual UniverseContext* getUniverseContext() override
+	{
+		return m_universe_context;
+	}
+
+
 	virtual Universe* getUniverse() override
 	{
 		return m_universe_context->m_universe;
