@@ -231,12 +231,8 @@ void EntityModel::setEntityRotation(int index, float value)
 	auto axis_angle = getUniverse()->getRotation(m_entity).getAxisAngle();
 	((float*)&axis_angle)[index] = value;
 	axis_angle.axis.normalize();
-	Lumix::StackAllocator<256> allocator;
-	Lumix::Array<Lumix::Entity> entities(allocator);
-	Lumix::Array<Lumix::Quat> rotations(allocator);
-	entities.push(m_entity);
-	rotations.push(Lumix::Quat(axis_angle.axis, axis_angle.angle));
-	m_editor.setEntitiesRotations(entities, rotations);
+	Lumix::Quat rot(axis_angle.axis, axis_angle.angle);
+	m_editor.setEntitiesRotations(&m_entity, &rot, 1);
 }
 
 
@@ -244,12 +240,7 @@ void EntityModel::setEntityPosition(int index, float value)
 {
 	Lumix::Vec3 v = getUniverse()->getPosition(m_entity);
 	((float*)&v)[index] = value;
-	Lumix::StackAllocator<256> allocator;
-	Lumix::Array<Lumix::Entity> entities(allocator);
-	Lumix::Array<Lumix::Vec3> positions(allocator);
-	entities.push(m_entity);
-	positions.push(v);
-	m_editor.setEntitiesPositions(entities, positions);
+	m_editor.setEntitiesPositions(&m_entity, &v, 1);
 }
 
 

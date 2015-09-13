@@ -205,10 +205,10 @@ struct RendererImpl : public Renderer
 		m_engine.registerProperty(
 			"camera",
 			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
-				"fov",
+				"FOV",
 				&RenderScene::getCameraFOV,
 				&RenderScene::setCameraFOV,
-				0.0f,
+				1.0f,
 				360.0f,
 				1.0f,
 				allocator));

@@ -268,8 +268,10 @@ void Gizmo::rotate(int relx, int rely, int flags)
 
 		new_positions.push(pos);
 	}
-	m_editor.setEntityPositionAndRotaion(
-		m_editor.getSelectedEntities(), new_positions, new_rotations);
+	m_editor.setEntitiesPositionsAndRotaions(&m_editor.getSelectedEntities()[0],
+											 &new_positions[0],
+											 &new_rotations[0],
+											 new_positions.size());
 }
 
 
@@ -298,8 +300,9 @@ void Gizmo::transform(ComponentIndex camera,
 			pos += delta;
 			new_positions.push(pos);
 		}
-		m_editor.setEntitiesPositions(m_editor.getSelectedEntities(),
-									  new_positions);
+		m_editor.setEntitiesPositions(&m_editor.getSelectedEntities()[0],
+									  &new_positions[0],
+									  new_positions.size());
 		m_transform_point = intersection;
 	}
 }

@@ -2,12 +2,14 @@
 #include "core/crc32.h"
 #include "core/default_allocator.h"
 #include "core/input_system.h"
+#include "core/path_utils.h"
 #include "core/resource_manager.h"
 #include "debug/allocator.h"
 #include "editor/gizmo.h"
 #include "editor/world_editor.h"
 #include "engine.h"
 #include "engine/plugin_manager.h"
+#include "engine/property_descriptor.h"
 #include "renderer/material.h"
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"
@@ -80,22 +82,279 @@ public:
 
 			if (ImGui::BeginMenu("Edit"))
 			{
-				if (ImGui::MenuItem("Undo"))
+				if (ImGui::MenuItem("Undo", "Ctrl - Z"))
 				{
 					m_editor->undo();
 				}
-				if (ImGui::MenuItem("Redo"))
+				if (ImGui::MenuItem("Redo", "Ctrl - Shift - Z"))
 				{
 					m_editor->redo();
 				}
 				ImGui::EndMenu();
 			}
 		
+			if (ImGui::BeginMenu("Tools"))
+			{
+				if (ImGui::MenuItem("Snap to terrain", "Ctrl - T"))
+				{
+					m_editor->snapToTerrain();
+				}
+				if (ImGui::MenuItem("Look at selected", "Ctrl - F"))
+				{
+					m_editor->lookAtSelected();
+				}
+				ImGui::EndMenu();
+			}
 
 			ImGui::EndMainMenuBar();
 		}
 
+		showPropertyGrid();
+		showEntityList();
+		showFPS();
+
 		ImGui::Render();
+	}
+
+
+	const char* getComponentTypeName(Lumix::ComponentUID cmp)
+	{
+		for (int i = 0; i < m_engine->getComponentTypesCount(); ++i)
+		{
+			if (cmp.type ==
+				Lumix::crc32(m_engine->getComponentTypeID(i)))
+			{
+				return m_engine->getComponentTypeName(i);
+			}
+		}
+		return "Unknown";
+	}
+
+
+
+	void showProperty(Lumix::IPropertyDescriptor& desc, Lumix::ComponentUID cmp)
+	{
+		Lumix::OutputBlob stream(m_editor->getAllocator());
+		desc.get(cmp, stream);
+		Lumix::InputBlob tmp(stream);
+
+		switch (desc.getType())
+		{
+			case Lumix::IPropertyDescriptor::DECIMAL:
+			{
+				float f;
+				tmp.read(f);
+				auto& d = static_cast<Lumix::IDecimalPropertyDescriptor&>(desc);
+				if ((d.getMax() - d.getMin()) / d.getStep() <= 100)
+				{
+					if (ImGui::SliderFloat(desc.getName(), &f, d.getMin(), d.getMax()))
+					{
+						m_editor->setProperty(cmp.type, -1, desc, &f, sizeof(f));
+					}
+				}
+				else
+				{
+					if (ImGui::DragFloat(desc.getName(), &f, d.getStep(), d.getMin(), d.getMax()))
+					{
+						m_editor->setProperty(cmp.type, -1, desc, &f, sizeof(f));
+					}
+				}
+				break;
+			}
+			case Lumix::IPropertyDescriptor::BOOL:
+			{
+				bool b;
+				tmp.read(b);
+				if (ImGui::Checkbox(desc.getName(), &b))
+				{
+					m_editor->setProperty(cmp.type, -1, desc, &b, sizeof(b));
+				}
+				break;
+			}
+			case Lumix::IPropertyDescriptor::COLOR:
+			{
+				Lumix::Vec3 v;
+				tmp.read(v);
+				if (ImGui::ColorEdit3(desc.getName(), &v.x))
+				{
+					m_editor->setProperty(cmp.type, -1, desc, &v, sizeof(v));
+				}
+				break;
+			}
+			case Lumix::IPropertyDescriptor::VEC3:
+			{
+				Lumix::Vec3 v;
+				tmp.read(v);
+				if (ImGui::DragFloat3(desc.getName(), &v.x))
+				{
+					m_editor->setProperty(cmp.type, -1, desc, &v, sizeof(v));
+				}
+				break;
+			}
+			case Lumix::IPropertyDescriptor::VEC4:
+			{
+				Lumix::Vec4 v;
+				tmp.read(v);
+				if (ImGui::DragFloat4(desc.getName(), &v.x))
+				{
+					m_editor->setProperty(cmp.type, -1, desc, &v, sizeof(v));
+				}
+				break;
+			}
+			case Lumix::IPropertyDescriptor::STRING:
+			case Lumix::IPropertyDescriptor::FILE:
+			case Lumix::IPropertyDescriptor::RESOURCE:
+			{
+				char buf[1024];
+				Lumix::copyString(buf, sizeof(buf), (const char*)stream.getData());
+				if (ImGui::InputText(desc.getName(), buf, sizeof(buf)))
+				{
+					m_editor->setProperty(cmp.type, -1, desc, buf, strlen(buf) + 1);
+				}
+				break;
+			}
+			case Lumix::IPropertyDescriptor::ARRAY:
+				break;
+			default:
+				ASSERT(false);
+				break;
+		}
+	}
+
+
+	void showComponentProperties(Lumix::ComponentUID cmp)
+	{
+		if (!ImGui::CollapsingHeader(
+				getComponentTypeName(cmp), nullptr, true, true))
+			return;
+
+		auto& descs = m_engine->getPropertyDescriptors(cmp.type);
+
+		for (auto* desc : descs)
+		{
+			showProperty(*desc, cmp);
+		}
+	}
+
+
+	void showCoreProperties(Lumix::Entity entity)
+	{
+		char name[256];
+		const char* tmp = m_editor->getUniverse()->getEntityName(entity);
+		Lumix::copyString(name, sizeof(name), tmp);
+		if (ImGui::InputText("name", name, sizeof(name)))
+		{
+			m_editor->setEntityName(entity, name);
+		}
+
+		auto pos = m_editor->getUniverse()->getPosition(entity);
+		if (ImGui::DragFloat3("position", &pos.x))
+		{
+			m_editor->setEntitiesPositions(&entity, &pos, 1);
+		}
+
+		auto rot = m_editor->getUniverse()->getRotation(entity);
+		if (ImGui::DragFloat4("rotation", &rot.x))
+		{
+			m_editor->setEntitiesRotations(&entity, &rot, 1);
+		}
+	}
+
+
+	void showPropertyGrid()
+	{
+		auto& ents = m_editor->getSelectedEntities();
+		if (ImGui::Begin("Properties") && ents.size() == 1)
+		{
+			showCoreProperties(ents[0]);
+
+
+			auto& cmps = m_editor->getComponents(ents[0]);
+			for (auto cmp : cmps)
+			{
+				showComponentProperties(cmp);
+			}
+		}
+		ImGui::End();
+	}
+
+
+	void showFPS()
+	{
+		ImGui::SetNextWindowPos(ImVec2(10, 30));
+		bool opened;
+		if (!ImGui::Begin("Example: Fixed Overlay", &opened, ImVec2(0, 0), 0.3f, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings))
+		{
+			ImGui::End();
+			return;
+		}
+		ImGui::Text("FPS: (%.1f)", m_engine->getFPS());
+		ImGui::End();
+
+	}
+
+
+	void getEntityListDisplayName(char* buf, int max_size, Lumix::Entity entity)
+	{
+		const char* name = m_editor->getUniverse()->getEntityName(entity);
+		static const uint32_t RENDERABLE_HASH = Lumix::crc32("renderable");
+		Lumix::ComponentUID renderable =
+			m_editor->getComponent(entity, RENDERABLE_HASH);
+		if (renderable.isValid())
+		{
+			auto* scene = static_cast<Lumix::RenderScene*>(renderable.scene);
+			const char* path = scene->getRenderablePath(renderable.index);
+			if (path && path[0] != 0)
+			{
+				char basename[Lumix::MAX_PATH_LENGTH];
+				Lumix::copyString(buf, max_size, path);
+				Lumix::PathUtils::getBasename(
+					basename, Lumix::MAX_PATH_LENGTH, path);
+				if (name && name[0] != '\0')
+					Lumix::copyString(buf, max_size, name);
+				else
+					Lumix::toCString(entity, buf, max_size);
+
+				Lumix::catString(buf, max_size, " - ");
+				Lumix::catString(buf, max_size, basename);
+				return;
+			}
+		}
+
+		if (name && name[0] != '\0')
+		{
+			Lumix::copyString(buf, max_size, name);
+		}
+		else
+		{
+			Lumix::toCString(entity, buf, max_size);
+		}
+	}
+
+
+	void showEntityList()
+	{
+		if (ImGui::Begin("Entity list"))
+		{
+			if (ImGui::Button("Create entity"))
+			{
+				m_editor->addEntity();
+			}
+			auto* universe = m_editor->getUniverse();
+			auto entity = universe->getFirstEntity();
+			while (entity >= 0)
+			{
+				char buf[1024];
+
+				getEntityListDisplayName(buf, sizeof(buf), entity);
+				if (ImGui::TreeNode((void*)entity, buf))
+				{
+					ImGui::TreePop();
+				}
+				entity = universe->getNextEntity(entity);
+			}
+		}
+		ImGui::End();
 	}
 
 
@@ -226,6 +485,60 @@ public:
 		initIMGUI(win);
 	}
 
+	void checkShortcuts()
+	{
+		if (ImGui::GetIO().KeysDown[VK_CONTROL])
+		{
+			if (ImGui::GetIO().KeysDown['F'])
+			{
+				m_editor->lookAtSelected();
+			}
+			if (ImGui::GetIO().KeysDown['T'])
+			{
+				m_editor->snapToTerrain();
+			}
+			if (ImGui::GetIO().KeysDown['Z'])
+			{
+				if (ImGui::GetIO().KeysDown[VK_SHIFT])
+				{
+					m_editor->redo();
+				}
+				else
+				{
+					m_editor->undo();
+				}
+			}
+		}
+	}
+
+
+	void updateNavigation()
+	{
+		if (ImGui::IsMouseHoveringAnyWindow()) return;
+		float speed = 0.1f;
+		if (ImGui::GetIO().KeysDown[VK_SHIFT])
+		{
+			speed *= 10;
+		}
+		if (ImGui::GetIO().KeysDown['W'])
+		{
+			m_editor->navigate(1.0f, 0, speed);
+		}
+		if (ImGui::GetIO().KeysDown['S'])
+		{
+			m_editor->navigate(-1.0f, 0, speed);
+		}
+		if (ImGui::GetIO().KeysDown['A'])
+		{
+			m_editor->navigate(0.0f, -1.0f, speed);
+		}
+		if (ImGui::GetIO().KeysDown['D'])
+		{
+			m_editor->navigate(0.0f, 1.0f, speed);
+		}
+	}
+
+
 	HWND m_hwnd;
 	bgfx::VertexDecl m_decl;
 	Lumix::Material* m_material;
@@ -317,6 +630,9 @@ LRESULT WINAPI msgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 	switch (msg)
 	{
+		case WM_CLOSE:
+			PostQuitMessage(0);
+			break;
 		case WM_SIZE:
 		{
 			uint32_t width = ((int)(short)LOWORD(lParam));
@@ -331,11 +647,17 @@ LRESULT WINAPI msgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			ImGui::GetIO().MouseDown[0] = false;
 			break;
 		case WM_LBUTTONDOWN:
-			g_context.m_editor->onMouseDown(old_x, old_y, Lumix::MouseButton::LEFT);
+			if (!ImGui::IsMouseHoveringAnyWindow())
+			{
+				g_context.m_editor->onMouseDown(old_x, old_y, Lumix::MouseButton::LEFT);
+			}
 			ImGui::GetIO().MouseDown[0] = true;
 			break;
 		case WM_RBUTTONDOWN:
-			g_context.m_editor->onMouseDown(old_x, old_y, Lumix::MouseButton::RIGHT);
+			if (!ImGui::IsMouseHoveringAnyWindow())
+			{
+				g_context.m_editor->onMouseDown(old_x, old_y, Lumix::MouseButton::RIGHT);
+			}
 			ImGui::GetIO().MouseDown[1] = true;
 			break;
 		case WM_RBUTTONUP:
@@ -344,7 +666,10 @@ LRESULT WINAPI msgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			break;
 		case WM_MOUSEMOVE:
 		{
-			g_context.m_editor->onMouseMove(x, y, x - old_x, y - old_y, 0);
+			int flags = ImGui::GetIO().KeysDown[VK_MENU]
+							? (int)Lumix::WorldEditor::MouseFlags::ALT
+							: 0;
+			g_context.m_editor->onMouseMove(x, y, x - old_x, y - old_y, flags);
 			auto& input_system = g_context.m_engine->getInputSystem();
 			input_system.injectMouseXMove(float(old_x - x));
 			input_system.injectMouseYMove(float(old_y - y));
@@ -364,9 +689,16 @@ LRESULT WINAPI msgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		case WM_KEYUP:
 			ImGui::GetIO().KeysDown[wParam] = false;
 			break;
+		case WM_SYSKEYDOWN:
+			ImGui::GetIO().KeysDown[wParam] = true;
+			break;
+		case WM_SYSKEYUP:
+			ImGui::GetIO().KeysDown[wParam] = true;
+			break;
 		case WM_KEYDOWN:
 		{
 			ImGui::GetIO().KeysDown[wParam] = true;
+			g_context.checkShortcuts();
 			switch (wParam)
 			{
 				case VK_ESCAPE:
@@ -423,25 +755,29 @@ INT WINAPI WinMain(HINSTANCE hInst,
 		g_context.m_engine->update(*g_context.m_editor->getUniverseContext());
 	}
 
-	g_context.m_engine->startGame(*g_context.m_editor->getUniverseContext());
-
-	MSG msg = {0};
-	while (msg.message != WM_QUIT)
+	bool finished = false;
+	while(!finished)
 	{
-		if (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
+		MSG msg = { 0 };
+		while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
 		{
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
+
+			if (msg.message == WM_QUIT)
+			{
+				finished = true;
+			}
 		}
-		else
-		{
-			Lumix::Renderer* renderer = static_cast<Lumix::Renderer*>(
-				g_context.m_engine->getPluginManager().getPlugin("renderer"));
-			g_context.m_engine->update(*g_context.m_editor->getUniverseContext());
-			g_context.m_pipeline->render();
-			g_context.onGUI();
-			renderer->frame();
-		}
+
+		g_context.m_editor->update();
+		g_context.updateNavigation();
+		Lumix::Renderer* renderer = static_cast<Lumix::Renderer*>(
+			g_context.m_engine->getPluginManager().getPlugin("renderer"));
+		g_context.m_engine->update(*g_context.m_editor->getUniverseContext());
+		g_context.m_pipeline->render();
+		g_context.onGUI();
+		renderer->frame();
 	}
 
 	g_context.shutdown();
