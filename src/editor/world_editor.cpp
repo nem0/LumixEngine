@@ -238,9 +238,10 @@ public:
 
 
 	MoveEntityCommand(WorldEditor& editor,
-					  const Array<Entity>& entities,
-					  const Array<Vec3>& new_positions,
-					  const Array<Quat>& new_rotations,
+					  const Entity* entities,
+					  const Vec3* new_positions,
+					  const Quat* new_rotations,
+					  int count,
 					  IAllocator& allocator)
 		: m_new_positions(allocator)
 		, m_new_rotations(allocator)
@@ -249,9 +250,9 @@ public:
 		, m_entities(allocator)
 		, m_editor(editor)
 	{
+		ASSERT(count > 0);
 		Universe* universe = m_editor.getUniverse();
-		ASSERT(entities.size() == new_positions.size());
-		for (int i = entities.size() - 1; i >= 0; --i)
+		for (int i = count - 1; i >= 0; --i)
 		{
 			m_entities.push(entities[i]);
 			m_new_positions.push(new_positions[i]);
@@ -784,7 +785,7 @@ public:
 		SetPropertyCommand& src = static_cast<SetPropertyCommand&>(command);
 		if (m_component_type == src.m_component_type &&
 			m_entity == src.m_entity &&
-			&src.m_property_descriptor == &m_property_descriptor &&
+			src.m_property_descriptor == m_property_descriptor &&
 			m_index == src.m_index)
 		{
 			src.m_new_value = m_new_value;
@@ -1979,7 +1980,9 @@ public:
 						universe->getPosition(m_selected_entities[i]));
 				}
 			}
-			setEntitiesPositions(m_selected_entities, new_positions);
+			setEntitiesPositions(&m_selected_entities[0],
+								 &new_positions[0],
+								 new_positions.size());
 		}
 	}
 
@@ -2098,53 +2101,52 @@ public:
 	}
 
 
-	virtual void setEntitiesRotations(const Array<Entity>& entities,
-									  const Array<Quat>& rotations) override
+	virtual void setEntitiesRotations(const Entity* entities,
+									  const Quat* rotations,
+									  int count) override
 	{
+		ASSERT(entities && rotations);
+		if (count <= 0) return;
+		
 		Universe* universe = getUniverse();
-		if (!entities.empty())
+		Array<Vec3> positions(m_allocator);
+		for (int i = 0; i < count; ++i)
 		{
-			Array<Vec3> positions(m_allocator);
-			for (int i = 0; i < entities.size(); ++i)
-			{
-				positions.push(universe->getPosition(entities[i]));
-			}
-			IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(
-				*this, entities, positions, rotations, m_allocator);
-			executeCommand(command);
+			positions.push(universe->getPosition(entities[i]));
 		}
-	}
-
-
-	virtual void setEntitiesPositions(const Array<Entity>& entities,
-									  const Array<Vec3>& positions) override
-	{
-		Universe* universe = getUniverse();
-		if (!entities.empty())
-		{
-			Array<Quat> rots(m_allocator);
-			for (int i = 0; i < entities.size(); ++i)
-			{
-				rots.push(universe->getRotation(entities[i]));
-			}
-			IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(
-				*this, entities, positions, rots, m_allocator);
-			executeCommand(command);
-		}
+		IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(
+			*this, entities, &positions[0], rotations, count, m_allocator);
+		executeCommand(command);
 	}
 
 
 	virtual void
-	setEntityPositionAndRotaion(const Array<Entity>& entities,
-								const Array<Vec3>& positions,
-								const Array<Quat>& rotations) override
+	setEntitiesPositions(const Entity* entities, const Vec3* positions, int count) override
 	{
-		if (!entities.empty())
+		ASSERT(entities && positions);
+		if (count <= 0) return;
+
+		Universe* universe = getUniverse();
+		Array<Quat> rots(m_allocator);
+		for (int i = 0; i < count; ++i)
 		{
-			IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(
-				*this, entities, positions, rotations, m_allocator);
-			executeCommand(command);
+			rots.push(universe->getRotation(entities[i]));
 		}
+		IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(
+			*this, entities, positions, &rots[0], count, m_allocator);
+		executeCommand(command);
+	}
+
+
+	virtual void setEntitiesPositionsAndRotaions(const Entity* entities,
+												 const Vec3* positions,
+												 const Quat* rotations,
+												 int count) override
+	{
+		if (count <= 0) return;
+		IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(
+			*this, entities, positions, rotations, count, m_allocator);
+		executeCommand(command);
 	}
 
 

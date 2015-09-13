@@ -106,15 +106,18 @@ public:
 	virtual void selectEntities(const Entity* entities, int count) = 0;
 	virtual void selectEntitiesWithSameMesh() = 0;
 	virtual Entity addEntityAt(int camera_x, int camera_y) = 0;
-	virtual void setEntitiesPositions(const Array<Entity>& entity,
-									  const Array<Vec3>& position) = 0;
+	virtual void setEntitiesPositions(const Entity* entities,
+									  const Vec3* positions,
+									  int count) = 0;
 	virtual void setEntitiesScales(const Array<Entity>& entities,
 								   const Array<float>& scales) = 0;
-	virtual void setEntitiesRotations(const Array<Entity>& entity,
-									  const Array<Quat>& rotations) = 0;
-	virtual void setEntityPositionAndRotaion(const Array<Entity>& entity,
-											 const Array<Vec3>& position,
-											 const Array<Quat>& rotation) = 0;
+	virtual void setEntitiesRotations(const Entity* entity,
+									  const Quat* rotations,
+									  int count) = 0;
+	virtual void setEntitiesPositionsAndRotaions(const Entity* entity,
+												 const Vec3* position,
+												 const Quat* rotation,
+												 int count) = 0;
 	virtual void setEntityName(Entity entity, const char* name) = 0;
 	virtual void snapToTerrain() = 0;
 	virtual void toggleGameMode() = 0;

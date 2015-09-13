@@ -153,30 +153,6 @@ static void registerButtonClickCallback(lua_State* L,
 }
 
 
-static const char* getProperty(Lumix::WorldEditor* editor,
-							   Lumix::IScene* scene,
-							   const char* component,
-							   Lumix::Entity entity,
-							   const char* property_name)
-{
-	if (!editor || !scene || !component || !property_name || entity < 0) return "";
-
-	auto* desc = editor->getEngine().getProperty(component, property_name);
-	if (!desc) return "";
-	if (desc->getType() != Lumix::IPropertyDescriptor::STRING 
-		&& desc->getType() != Lumix::IPropertyDescriptor::RESOURCE)
-		return "";
-
-	auto cmp = editor->getComponent(entity, Lumix::crc32(component));
-	
-	static Lumix::OutputBlob stream(editor->getAllocator()); TODO("todo");// TODO handle memory
-	
-	desc->get(cmp, stream);
-
-	return (const char*)stream.getData();
-}
-
-
 static Lumix::Entity getSelectedEntity(Lumix::WorldEditor* editor)
 {
 	auto& ents = editor->getSelectedEntities();
@@ -292,9 +268,6 @@ void EditorPluginLoader::registerAPI(Lumix::Engine& engine)
 	f = Lumix::LuaWrapper::wrap<decltype(&API::getSelectedEntity),
 								API::getSelectedEntity>;
 	lua_register(m_global_state, "API_getSelectedEntity", f);
-
-	f = Lumix::LuaWrapper::wrap<decltype(&API::getProperty), API::getProperty>;
-	lua_register(m_global_state, "API_getProperty", f);
 }
 
 
