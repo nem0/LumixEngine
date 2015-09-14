@@ -37,6 +37,30 @@ LUMIX_ENGINE_API bool
 makeLowercase(char* destination, int length, const char* source);
 
 
+template <int size>
+struct StringBuilder
+{
+	template <typename T>
+	StringBuilder(const char* str, T i)
+	{
+		copyString(data, size, str);
+		int len = (int)strlen(str);
+		toCString(i, data + len, size - len);
+	}
+
+	StringBuilder(const char* str, const char* postfix)
+	{
+		copyString(data, size, str);
+		catString(data, size, postfix);
+	}
+
+	operator const char*() {
+		return data;
+	}
+	char data[size];
+};
+
+
 template <class T> class base_string
 {
 public:

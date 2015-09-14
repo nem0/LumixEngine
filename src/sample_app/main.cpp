@@ -1,8 +1,10 @@
+#include "asset_browser.h"
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/default_allocator.h"
 #include "core/input_system.h"
 #include "core/path_utils.h"
+#include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "debug/allocator.h"
 #include "editor/gizmo.h"
@@ -10,12 +12,15 @@
 #include "engine.h"
 #include "engine/plugin_manager.h"
 #include "engine/property_descriptor.h"
+#include "import_asset_dialog.h"
+#include "log_ui.h"
 #include "renderer/material.h"
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
 #include "renderer/transient_geometry.h"
 #include "ocornut-imgui/imgui.h"
+#include "terrain_editor.h"
 
 #include <bgfx.h>
 #include <cstdio>
@@ -34,7 +39,23 @@ class Context
 public:
 	Context()
 		: m_allocator(m_main_allocator)
+		, m_is_property_grid_shown(true)
+		, m_is_entity_list_shown(true)
+		, m_is_asset_browser_shown(true)
+		, m_is_profiler_shown(false)
+		, m_is_log_shown(true)
+		, m_finished(false)
+		, m_is_import_asset_shown(false)
+		, m_import_asset_dialog(nullptr)
 	{
+	}
+
+
+	void update()
+	{
+		float time_delta = m_editor->getEngine().getLastTimeDelta();
+
+		m_log_ui->update(time_delta);
 	}
 
 
@@ -60,60 +81,107 @@ public:
 		SetCursor(io.MouseDrawCursor ? NULL : LoadCursor(NULL, IDC_ARROW));
 
 		ImGui::NewFrame();
+		
+		showMainMenu();
 
+		if (m_is_log_shown) m_log_ui->onGui();
+		if (m_is_asset_browser_shown) m_asset_browser->onGui();
+		if(m_is_property_grid_shown) showPropertyGrid();
+		if(m_is_entity_list_shown)	showEntityList();
+		if (m_is_profiler_shown) showProfiler();
+		if (m_is_import_asset_shown) m_import_asset_dialog->onGui();
+		showFPS();
+		
+		ImGui::Render();
+	}
+
+	void showProfileBlock(Lumix::Profiler::Block* block)
+	{
+		while (block)
+		{
+			if (ImGui::TreeNode(block, block->m_name))
+			{
+				showProfileBlock(block->m_first_child);
+				ImGui::TreePop();
+			}
+			block = block->m_next;
+		}
+	}
+
+
+	void showProfiler()
+	{
+		if (ImGui::Begin("Profiler"))
+		{
+			bool b = Lumix::g_profiler.isRecording();
+			if (ImGui::Checkbox("Recording", &b))
+			{
+				Lumix::g_profiler.toggleRecording();
+			}
+			
+			showProfileBlock(Lumix::g_profiler.getRootBlock());
+		}
+
+		ImGui::End();
+	}
+
+
+	void showMainMenu()
+	{
 		if (ImGui::BeginMainMenuBar())
 		{
 			if (ImGui::BeginMenu("File"))
 			{
-				if (ImGui::MenuItem("New"))
+				if (ImGui::MenuItem("New")) m_editor->newUniverse();
+				if (ImGui::BeginMenu("Open"))
 				{
-					m_editor->newUniverse();
+					auto& universes =
+						m_asset_browser->getResources(AssetBrowser::UNIVERSE);
+					for (auto& univ : universes)
+					{
+						if (ImGui::MenuItem(univ.c_str()))
+						{
+							m_editor->loadUniverse(univ);
+						}
+					}
+					ImGui::EndMenu();
 				}
-				if (ImGui::MenuItem("Open"))
+				if (ImGui::MenuItem("Save"))
 				{
-					m_editor->loadUniverse(Lumix::Path("main.unv"));
+					m_editor->saveUniverse(m_editor->getUniversePath());
 				}
-				if (ImGui::MenuItem("Exit"))
-				{
-					PostQuitMessage(0);
-				}
+				if (ImGui::MenuItem("Exit")) PostQuitMessage(0);
+
 				ImGui::EndMenu();
 			}
 
 			if (ImGui::BeginMenu("Edit"))
 			{
-				if (ImGui::MenuItem("Undo", "Ctrl - Z"))
-				{
-					m_editor->undo();
-				}
-				if (ImGui::MenuItem("Redo", "Ctrl - Shift - Z"))
-				{
-					m_editor->redo();
-				}
+				if (ImGui::MenuItem("Undo", "Ctrl - Z")) m_editor->undo();
+				if (ImGui::MenuItem("Redo", "Ctrl - Shift - Z")) m_editor->redo();
 				ImGui::EndMenu();
 			}
-		
+
 			if (ImGui::BeginMenu("Tools"))
 			{
-				if (ImGui::MenuItem("Snap to terrain", "Ctrl - T"))
-				{
-					m_editor->snapToTerrain();
-				}
-				if (ImGui::MenuItem("Look at selected", "Ctrl - F"))
-				{
-					m_editor->lookAtSelected();
-				}
+				if (ImGui::MenuItem("Snap to terrain", "Ctrl - T")) m_editor->snapToTerrain();
+				if (ImGui::MenuItem("Look at selected", "Ctrl - F")) m_editor->lookAtSelected();
+				if (ImGui::MenuItem("Import asset")) m_is_import_asset_shown = true;
+				ImGui::EndMenu();
+			}
+
+			if (ImGui::BeginMenu("View"))
+			{
+				ImGui::MenuItem("Asset browser", nullptr, &m_is_asset_browser_shown);
+				ImGui::MenuItem("Entity list", nullptr, &m_is_entity_list_shown);
+				ImGui::MenuItem("Log", nullptr, &m_is_log_shown);
+				ImGui::MenuItem("Profiler", nullptr, &m_is_profiler_shown);
+				ImGui::MenuItem("Properties", nullptr, &m_is_property_grid_shown);
 				ImGui::EndMenu();
 			}
 
 			ImGui::EndMainMenuBar();
 		}
-
-		showPropertyGrid();
-		showEntityList();
-		showFPS();
-
-		ImGui::Render();
 	}
 
 
@@ -132,10 +200,13 @@ public:
 
 
 
-	void showProperty(Lumix::IPropertyDescriptor& desc, Lumix::ComponentUID cmp)
+	void showProperty(Lumix::IPropertyDescriptor& desc, int index, Lumix::ComponentUID cmp)
 	{
 		Lumix::OutputBlob stream(m_editor->getAllocator());
-		desc.get(cmp, stream);
+		if(index < 0)
+			desc.get(cmp, stream);
+		else
+			desc.get(cmp, index, stream);
 		Lumix::InputBlob tmp(stream);
 
 		switch (desc.getType())
@@ -149,15 +220,25 @@ public:
 				{
 					if (ImGui::SliderFloat(desc.getName(), &f, d.getMin(), d.getMax()))
 					{
-						m_editor->setProperty(cmp.type, -1, desc, &f, sizeof(f));
+						m_editor->setProperty(cmp.type, index, desc, &f, sizeof(f));
 					}
 				}
 				else
 				{
 					if (ImGui::DragFloat(desc.getName(), &f, d.getStep(), d.getMin(), d.getMax()))
 					{
-						m_editor->setProperty(cmp.type, -1, desc, &f, sizeof(f));
+						m_editor->setProperty(cmp.type, index, desc, &f, sizeof(f));
 					}
+				}
+				break;
+			}
+			case Lumix::IPropertyDescriptor::INTEGER:
+			{
+				int i;
+				tmp.read(i);
+				if (ImGui::DragInt(desc.getName(), &i))
+				{
+					m_editor->setProperty(cmp.type, index, desc, &i, sizeof(i));
 				}
 				break;
 			}
@@ -167,7 +248,7 @@ public:
 				tmp.read(b);
 				if (ImGui::Checkbox(desc.getName(), &b))
 				{
-					m_editor->setProperty(cmp.type, -1, desc, &b, sizeof(b));
+					m_editor->setProperty(cmp.type, index, desc, &b, sizeof(b));
 				}
 				break;
 			}
@@ -177,7 +258,7 @@ public:
 				tmp.read(v);
 				if (ImGui::ColorEdit3(desc.getName(), &v.x))
 				{
-					m_editor->setProperty(cmp.type, -1, desc, &v, sizeof(v));
+					m_editor->setProperty(cmp.type, index, desc, &v, sizeof(v));
 				}
 				break;
 			}
@@ -187,7 +268,7 @@ public:
 				tmp.read(v);
 				if (ImGui::DragFloat3(desc.getName(), &v.x))
 				{
-					m_editor->setProperty(cmp.type, -1, desc, &v, sizeof(v));
+					m_editor->setProperty(cmp.type, index, desc, &v, sizeof(v));
 				}
 				break;
 			}
@@ -197,23 +278,43 @@ public:
 				tmp.read(v);
 				if (ImGui::DragFloat4(desc.getName(), &v.x))
 				{
-					m_editor->setProperty(cmp.type, -1, desc, &v, sizeof(v));
+					m_editor->setProperty(cmp.type, index, desc, &v, sizeof(v));
+				}
+				break;
+			}
+			case Lumix::IPropertyDescriptor::RESOURCE:
+			{
+				char buf[1024];
+				Lumix::copyString(buf, sizeof(buf), (const char*)stream.getData());
+				if (ImGui::InputText("", buf, sizeof(buf)))
+				{
+					m_editor->setProperty(cmp.type, index, desc, buf, strlen(buf) + 1);
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Select"))
+					ImGui::OpenPopup("SelectResourcePopup");
+				if (ImGui::BeginPopup("SelectResourcePopup"))
+				{
+					if (getResourcePath(buf, sizeof(buf)))
+					{
+						m_editor->setProperty(cmp.type, index, desc, buf, strlen(buf) + 1);
+					}
 				}
 				break;
 			}
 			case Lumix::IPropertyDescriptor::STRING:
 			case Lumix::IPropertyDescriptor::FILE:
-			case Lumix::IPropertyDescriptor::RESOURCE:
 			{
 				char buf[1024];
 				Lumix::copyString(buf, sizeof(buf), (const char*)stream.getData());
 				if (ImGui::InputText(desc.getName(), buf, sizeof(buf)))
 				{
-					m_editor->setProperty(cmp.type, -1, desc, buf, strlen(buf) + 1);
+					m_editor->setProperty(cmp.type, index, desc, buf, strlen(buf) + 1);
 				}
 				break;
 			}
 			case Lumix::IPropertyDescriptor::ARRAY:
+				showArrayProperty(cmp, static_cast<Lumix::IArrayDescriptor&>(desc));
 				break;
 			default:
 				ASSERT(false);
@@ -222,39 +323,112 @@ public:
 	}
 
 
+	void showArrayProperty(Lumix::ComponentUID cmp, Lumix::IArrayDescriptor& desc)
+	{
+		if (!ImGui::CollapsingHeader(desc.getName(), nullptr, true, true)) return;
+
+		int count = desc.getCount(cmp);
+		if (ImGui::Button("Add"))
+		{
+			desc.addArrayItem(cmp, count);
+		}
+		count = desc.getCount(cmp);
+
+		for (int i = 0; i < count; ++i)
+		{
+			char tmp[10];
+			Lumix::toCString(i, tmp, sizeof(tmp));
+			if (ImGui::TreeNode(tmp))
+			{
+				ImGui::SameLine();
+				if (ImGui::Button("Remove"))
+				{
+					desc.removeArrayItem(cmp, i);
+					--i;
+					count = desc.getCount(cmp);
+					ImGui::TreePop();
+					continue;
+				}
+
+				for (int j = 0; j < desc.getChildren().size(); ++j)
+				{
+					auto* child = desc.getChildren()[j];
+					showProperty(*child, i, cmp);
+				}
+				ImGui::TreePop();
+			}
+		}
+	}
+
+
+	bool getResourcePath(char* buf, int max_size)
+	{
+		static char filter[128] = "";
+		ImGui::InputText("Filter", filter, sizeof(filter));
+
+		for (auto unv : m_asset_browser->getResources(AssetBrowser::MODEL))
+		{
+			if (filter[0] != '\0' && strstr(unv.c_str(), filter) == nullptr) continue;
+
+			if (ImGui::Selectable(unv.c_str(), false))
+			{
+				Lumix::copyString(buf, max_size, unv.c_str());
+				ImGui::EndPopup();
+				return true;
+			}
+		}
+
+		ImGui::EndPopup();
+
+		return false;
+	}
+
+
 	void showComponentProperties(Lumix::ComponentUID cmp)
 	{
 		if (!ImGui::CollapsingHeader(
 				getComponentTypeName(cmp), nullptr, true, true))
 			return;
+		if (ImGui::Button(
+				Lumix::StringBuilder<30>("Remove component##", cmp.type)))
+		{
+			m_editor->destroyComponent(cmp);
+			return;
+		}
 
 		auto& descs = m_engine->getPropertyDescriptors(cmp.type);
 
 		for (auto* desc : descs)
 		{
-			showProperty(*desc, cmp);
+			showProperty(*desc, -1, cmp);
+		}
+
+		if (cmp.type == Lumix::crc32("terrain"))
+		{
+			m_terrain_editor->setComponent(cmp);
+			m_terrain_editor->onGui();
 		}
 	}
 
-
+	
 	void showCoreProperties(Lumix::Entity entity)
 	{
 		char name[256];
 		const char* tmp = m_editor->getUniverse()->getEntityName(entity);
 		Lumix::copyString(name, sizeof(name), tmp);
-		if (ImGui::InputText("name", name, sizeof(name)))
+		if (ImGui::InputText("Name", name, sizeof(name)))
 		{
 			m_editor->setEntityName(entity, name);
 		}
 
 		auto pos = m_editor->getUniverse()->getPosition(entity);
-		if (ImGui::DragFloat3("position", &pos.x))
+		if (ImGui::DragFloat3("Position", &pos.x))
 		{
 			m_editor->setEntitiesPositions(&entity, &pos, 1);
 		}
 
 		auto rot = m_editor->getUniverse()->getRotation(entity);
-		if (ImGui::DragFloat4("rotation", &rot.x))
+		if (ImGui::DragFloat4("Rotation", &rot.x))
 		{
 			m_editor->setEntitiesRotations(&entity, &rot, 1);
 		}
@@ -266,14 +440,34 @@ public:
 		auto& ents = m_editor->getSelectedEntities();
 		if (ImGui::Begin("Properties") && ents.size() == 1)
 		{
-			showCoreProperties(ents[0]);
+			if (ImGui::Button("Add component"))
+			{
+				ImGui::OpenPopup("AddComponentPopup");
+			}
+			if (ImGui::BeginPopup("AddComponentPopup"))
+			{
+				for (int i = 0;
+					 i < m_editor->getEngine().getComponentTypesCount();
+					 ++i)
+				{
+					if (ImGui::Selectable(
+							m_editor->getEngine().getComponentTypeName(i)))
+					{
+						m_editor->addComponent(Lumix::crc32(
+							m_editor->getEngine().getComponentTypeID(i)));
+					}
+				}
+				ImGui::EndPopup();
+			}
 
+			showCoreProperties(ents[0]);
 
 			auto& cmps = m_editor->getComponents(ents[0]);
 			for (auto cmp : cmps)
 			{
 				showComponentProperties(cmp);
 			}
+
 		}
 		ImGui::End();
 	}
@@ -283,7 +477,13 @@ public:
 	{
 		ImGui::SetNextWindowPos(ImVec2(10, 30));
 		bool opened;
-		if (!ImGui::Begin("Example: Fixed Overlay", &opened, ImVec2(0, 0), 0.3f, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings))
+		if (!ImGui::Begin(
+				"",
+				&opened,
+				ImVec2(0, 0),
+				0.3f,
+				ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+					ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings))
 		{
 			ImGui::End();
 			return;
@@ -340,16 +540,23 @@ public:
 			{
 				m_editor->addEntity();
 			}
+
+			char filter[100] = "";
+			ImGui::InputText("Filter", filter, sizeof(filter));
 			auto* universe = m_editor->getUniverse();
 			auto entity = universe->getFirstEntity();
+			
 			while (entity >= 0)
 			{
 				char buf[1024];
-
 				getEntityListDisplayName(buf, sizeof(buf), entity);
-				if (ImGui::TreeNode((void*)entity, buf))
+
+				if (filter[0] == '\0' || strstr(buf, filter) != nullptr)
 				{
-					ImGui::TreePop();
+					if (ImGui::Selectable(buf))
+					{
+						m_editor->selectEntities(&entity, 1);
+					}
 				}
 				entity = universe->getNextEntity(entity);
 			}
@@ -362,6 +569,10 @@ public:
 	{
 		shutdownImGui();
 
+		delete m_terrain_editor;
+		delete m_asset_browser;
+		delete m_log_ui;
+		delete m_import_asset_dialog;
 		Lumix::WorldEditor::destroy(m_editor);
 		Lumix::PipelineInstance::destroy(m_pipeline);
 		m_pipeline_source->getResourceManager()
@@ -464,7 +675,13 @@ public:
 	{
 		Lumix::Renderer::setInitData(win);
 		m_engine = Lumix::Engine::create(nullptr, m_allocator);
-		m_editor = Lumix::WorldEditor::create("", *m_engine);
+		char current_dir[MAX_PATH];
+		GetCurrentDirectory(sizeof(current_dir), current_dir);
+		m_editor = Lumix::WorldEditor::create(current_dir, *m_engine); TODO("todo");
+		m_asset_browser = new AssetBrowser(*m_editor);
+		m_terrain_editor = new TerrainEditor(*m_editor);
+		m_log_ui = new LogUI(m_editor->getAllocator());
+		m_import_asset_dialog = new ImportAssetDialog(*m_editor);
 
 		m_editor->universeCreated().bind<Context, &Context::onUniverseCreated>(this);
 		m_editor->universeDestroyed().bind<Context, &Context::onUniverseDestroyed>(this);
@@ -548,6 +765,18 @@ public:
 	Lumix::DefaultAllocator m_main_allocator;
 	Lumix::Debug::Allocator m_allocator;
 	Lumix::WorldEditor* m_editor;
+	AssetBrowser* m_asset_browser;
+	TerrainEditor* m_terrain_editor;
+	LogUI* m_log_ui;
+	ImportAssetDialog* m_import_asset_dialog;
+	bool m_finished;
+
+	bool m_is_log_shown;
+	bool m_is_property_grid_shown;
+	bool m_is_profiler_shown;
+	bool m_is_entity_list_shown;
+	bool m_is_asset_browser_shown;
+	bool m_is_import_asset_shown;
 };
 
 
@@ -607,9 +836,9 @@ static void imGuiCallback(ImDrawData* draw_data)
 						 Lumix::Math::maxValue(pcmd->ClipRect.x, 0.0f)),
 				uint16_t(Lumix::Math::minValue(pcmd->ClipRect.w, 65535.0f) -
 						 Lumix::Math::maxValue(pcmd->ClipRect.y, 0.0f)));
-			
-				g_context.m_pipeline->render(
-					geom, elem_offset, pcmd->ElemCount, *g_context.m_material);
+
+			g_context.m_pipeline->render(
+				geom, elem_offset, pcmd->ElemCount, *g_context.m_material, (Lumix::Texture*)pcmd->TextureId);
 
 			elem_offset += pcmd->ElemCount;
 		}
@@ -693,7 +922,7 @@ LRESULT WINAPI msgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			ImGui::GetIO().KeysDown[wParam] = true;
 			break;
 		case WM_SYSKEYUP:
-			ImGui::GetIO().KeysDown[wParam] = true;
+			ImGui::GetIO().KeysDown[wParam] = false;
 			break;
 		case WM_KEYDOWN:
 		{
@@ -701,9 +930,6 @@ LRESULT WINAPI msgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			g_context.checkShortcuts();
 			switch (wParam)
 			{
-				case VK_ESCAPE:
-					PostQuitMessage(0);
-					break;
 				case VK_OEM_2: // Question Mark / Forward Slash for US Keyboards
 					break;
 			}
@@ -755,8 +981,8 @@ INT WINAPI WinMain(HINSTANCE hInst,
 		g_context.m_engine->update(*g_context.m_editor->getUniverseContext());
 	}
 
-	bool finished = false;
-	while(!finished)
+
+	while(!g_context.m_finished)
 	{
 		MSG msg = { 0 };
 		while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
@@ -766,7 +992,7 @@ INT WINAPI WinMain(HINSTANCE hInst,
 
 			if (msg.message == WM_QUIT)
 			{
-				finished = true;
+				g_context.m_finished = true;
 			}
 		}
 
@@ -776,8 +1002,10 @@ INT WINAPI WinMain(HINSTANCE hInst,
 			g_context.m_engine->getPluginManager().getPlugin("renderer"));
 		g_context.m_engine->update(*g_context.m_editor->getUniverseContext());
 		g_context.m_pipeline->render();
+		g_context.update();
 		g_context.onGUI();
 		renderer->frame();
+		Lumix::g_profiler.frame();
 	}
 
 	g_context.shutdown();

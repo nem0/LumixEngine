@@ -27,6 +27,12 @@ namespace Lumix
 			size_t seek(SeekMode base, size_t pos);
 			void writeEOF();
 
+			static bool deleteFile(const char* path);
+			static bool moveFile(const char* from, const char* to);
+			static bool fileExists(const char* path);
+			static bool getOpenFilename(char* out, int max_size, const char* filter);
+			static bool getOpenDirectory(char* out, int max_size);
+
 		private:
 			struct OsFileImpl* m_impl;
 		};

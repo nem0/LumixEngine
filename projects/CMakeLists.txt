@@ -308,6 +308,8 @@ source_group("stb" FILES ${STB_FILES})
 
 include_directories(${SRC_PATH})
 include_directories(${SRC_PATH}sample_app/)
+include_directories(${EXTERNAL_PATH}assimp/include)
+include_directories(${EXTERNAL_PATH}crunch/include)
 
 add_executable(sample_app
 	${SAMPLE_APP_FILES}
@@ -319,6 +321,10 @@ set_target_properties(sample_app PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
 target_link_libraries(sample_app engine)
 target_link_libraries(sample_app renderer)
 target_link_libraries(sample_app editor)
+target_link_libraries(sample_app optimized ${EXTERNAL_PATH}assimp/lib/win32/assimp-vc120-mt.lib)
+target_link_libraries(sample_app debug ${EXTERNAL_PATH}assimp/lib/win32/assimp-vc120-mtd.lib)
+target_link_libraries(sample_app ${EXTERNAL_PATH}crunch/lib/win32/crnlib${CMAKE_CFG_INTDIR}.lib)
+
 
 
 ###################### LUA_SCRIPT ######################

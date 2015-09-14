@@ -15,6 +15,7 @@ struct Matrix;
 class Model;
 class Renderer;
 class RenderScene;
+class Texture;
 class TransientGeometry;
 
 
@@ -82,7 +83,8 @@ class LUMIX_RENDERER_API PipelineInstance abstract
 		virtual void render(TransientGeometry& geom,
 							int first_index,
 							int num_indices,
-							Material& material) = 0;
+							Material& material,
+							Texture* texture) = 0;
 		virtual void setWireframe(bool wireframe) = 0;
 		virtual void renderModel(Model& model, const Matrix& mtx) = 0;
 		virtual void toggleStats() = 0;

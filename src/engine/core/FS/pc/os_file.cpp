@@ -1,7 +1,8 @@
 #include "core/fs/os_file.h"
 #include "core/iallocator.h"
 #include "lumix.h"
-#define WIN32_LEAN_AND_MEAN
+
+#include <ShlObj.h>
 #include <windows.h>
 
 
@@ -115,10 +116,78 @@ size_t OsFile::seek(SeekMode base, size_t pos)
 	return ::SetFilePointer(m_impl->m_file, (DWORD)pos, nullptr, dir);
 }
 
+
 void OsFile::writeEOF()
 {
 	ASSERT(nullptr != m_impl);
 	::SetEndOfFile(m_impl->m_file);
 }
+
+
+bool OsFile::deleteFile(const char* path)
+{
+	return DeleteFile(path) == TRUE;
+}
+
+
+bool OsFile::moveFile(const char* from, const char* to)
+{
+	return MoveFile(from, to) == TRUE;
+}
+
+
+bool OsFile::fileExists(const char* path)
+{
+	DWORD dwAttrib = GetFileAttributes(path);
+	return (dwAttrib != INVALID_FILE_ATTRIBUTES &&
+		!(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+}
+
+
+bool OsFile::getOpenFilename(char* out, int max_size, const char* filter)
+{
+	OPENFILENAME ofn;
+	ZeroMemory(&ofn, sizeof(ofn));
+	ofn.lStructSize = sizeof(ofn);
+	ofn.hwndOwner = NULL;
+	ofn.lpstrFile = out;
+	ofn.lpstrFile[0] = '\0';
+	ofn.nMaxFile = max_size;
+	ofn.lpstrFilter = filter;
+	ofn.nFilterIndex = 1;
+	ofn.lpstrFileTitle = NULL;
+	ofn.nMaxFileTitle = 0;
+	ofn.lpstrInitialDir = NULL;
+	ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+
+	char current_dir[MAX_PATH];
+	GetCurrentDirectory(sizeof(current_dir), current_dir);
+	bool status = GetOpenFileName(&ofn) == TRUE;
+	SetCurrentDirectory(current_dir);
+
+	return status;
+}
+
+
+bool OsFile::getOpenDirectory(char* out, int max_size)
+{
+	ASSERT(max_size >= MAX_PATH);
+	BROWSEINFO bi;
+	ZeroMemory(&bi, sizeof(bi));
+	bi.hwndOwner = NULL;
+	bi.pidlRoot = NULL;
+	bi.pszDisplayName = out;
+	bi.lpszTitle = "Please, select a folder";
+	bi.ulFlags = 0;
+	bi.lpfn = NULL;
+	bi.lParam = 0;
+	bi.iImage = -1;
+	SHBrowseForFolder(&bi);
+
+	return true;
+}
+
+
+
 } // ~namespace FS
 } // ~namespace Lumix
