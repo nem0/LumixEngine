@@ -1330,13 +1330,21 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 
 	virtual void render(TransientGeometry& geom,
-		int first_index,
-		int num_indices,
-		Material& material) override
+						int first_index,
+						int num_indices,
+						Material& material,
+						Texture* texture) override
 	{
 		bgfx::setState(m_render_state | material.getRenderStates());
 		bgfx::setTransform(nullptr);
 		setMaterial(&material);
+		if (texture)
+		{
+			bgfx::setTexture(
+				0,
+				material.getShader()->getTextureSlot(0).m_uniform_handle,
+				texture->getTextureHandle());
+		}
 		bgfx::setVertexBuffer(&geom.getVertexBuffer(), 0, geom.getNumVertices());
 		bgfx::setIndexBuffer(&geom.getIndexBuffer(), first_index, num_indices);
 		bgfx::submit(
@@ -1966,7 +1974,7 @@ void executeCustomCommand(PipelineInstanceImpl* pipeline, const char* command)
 
 bool hasScene(PipelineInstanceImpl* pipeline)
 {
-	return pipeline->getScene();
+	return pipeline->getScene() != nullptr;
 }
 
 

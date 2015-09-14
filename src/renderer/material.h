@@ -69,8 +69,10 @@ public:
 	bool isBackfaceCulling() const { return (m_render_states & BGFX_STATE_CULL_MASK) != 0; }
 	void enableBackfaceCulling(bool enable) { setRenderState(enable, BGFX_STATE_CULL_CW, BGFX_STATE_CULL_MASK); }
 	bool isAlphaCutout() const;
+	bool hasAlphaCutoutDefine() const;
 	void enableAlphaCutout(bool enable);
 	bool isShadowReceiver() const;
+	bool hasShadowReceivingDefine() const;
 	void enableShadowReceiving(bool enable);
 	float getShininess() const { return m_shininess; }
 	void setShininess(float value) { m_shininess = value; }

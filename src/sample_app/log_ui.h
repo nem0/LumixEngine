@@ -1,0 +1,51 @@
+#pragma once
+
+
+#include "core/array.h"
+#include "core/string.h"
+
+
+class LogUI
+{
+	public:
+		LogUI(Lumix::IAllocator& allocator);
+		~LogUI();
+
+		void onGui();
+		void update(float time_delta);
+
+	private:
+		enum Type
+		{
+			Info,
+			Warning,
+			Error,
+			BGFX,
+
+			Count
+		};
+
+		struct Notification
+		{
+			Notification(Lumix::IAllocator& alloc)
+				: message(alloc)
+			{
+			}
+			float time;
+			Lumix::string message;
+		};
+
+	private:
+		void onInfo(const char* system, const char* message);
+		void onWarning(const char* system, const char* message);
+		void onError(const char* system, const char* message);
+		void push(Type type, const char* message);
+		void showNotifications();
+
+	private:
+		Lumix::IAllocator& m_allocator;
+		Lumix::Array<Lumix::Array<Lumix::string> > m_messages;
+		Lumix::Array<Notification> m_notifications;
+		int m_new_message_count[Count];
+		int m_current_tab;
+};

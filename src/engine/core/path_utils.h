@@ -10,6 +10,8 @@ namespace Lumix
 		{
 			ASSERT(max_size > 0);
 			uint32_t i = 0;
+			if (path[0] == '.' && (path[1] == '\\' || path[1] == '/'))
+				++path;
 			if (path[0] == '\\' || path[0] == '/')
 				++path;
 			while (*path != '\0' && i < max_size)
@@ -72,17 +74,19 @@ namespace Lumix
 		}
 
 
-		static void getExtension(char* extension, int /*max_length*/, const char* src)
+		static void getExtension(char* extension, int max_length, const char* src)
 		{
+			ASSERT(max_length > 0);
 			for (int i = (int)strlen(src) - 1; i >= 0; --i)
 			{
 				if (src[i] == '.')
 				{
 					++i;
-					strcpy(extension, src + i);
-					break;
+					copyString(extension, max_length, src + i);
+					return;
 				}
 			}
+			extension[0] = '\0';
 		}
 
 		private:
