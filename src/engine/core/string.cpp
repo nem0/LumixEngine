@@ -483,4 +483,14 @@ bool toCString(float value, char* output, int length, int after_point)
 }
 
 
+char* trimmed(char* str)
+{
+	while (*str && (*str == '\t' || *str == ' '))
+	{
+		++str;
+	}
+	return str;
+}
+
+
 } // ~namespace Lumix

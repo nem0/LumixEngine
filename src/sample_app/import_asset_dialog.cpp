@@ -8,6 +8,7 @@
 #include "core/log.h"
 #include "core/MT/task.h"
 #include "core/path_utils.h"
+#include "core/system.h"
 #include "debug/floating_points.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
@@ -474,7 +475,7 @@ ImportAssetDialog::ImportAssetDialog(Lumix::WorldEditor& editor)
 
 void ImportAssetDialog::checkSource()
 {
-	m_source_exists = Lumix::FS::OsFile::fileExists(m_source);
+	m_source_exists = Lumix::fileExists(m_source);
 	if (!m_source_exists) return;
 
 	Lumix::enableFloatingPointTraps(false);
@@ -513,7 +514,7 @@ void ImportAssetDialog::onGui()
 		ImGui::SameLine();
 		if (ImGui::Button("..."))
 		{
-			Lumix::FS::OsFile::getOpenFilename(m_source, sizeof(m_source), "All\0*.*\0");
+			Lumix::getOpenFilename(m_source, sizeof(m_source), "All\0*.*\0");
 			checkSource();
 		}
 

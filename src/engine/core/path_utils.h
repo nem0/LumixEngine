@@ -6,6 +6,7 @@ namespace Lumix
 {
 	struct LUMIX_ENGINE_API PathUtils
 	{
+	
 		static void normalize(const char* path, char* out, uint32_t max_size)
 		{
 			ASSERT(max_size > 0);
@@ -42,11 +43,12 @@ namespace Lumix
 
 		static void getBasename(char* basename, int /*max_length*/, const char* src)
 		{
+			basename[0] = '\0';
 			for (int i = (int)strlen(src) - 1; i >= 0; --i)
 			{
-				if (src[i] == '\\' || src[i] == '/')
+				if (src[i] == '\\' || src[i] == '/' || i == 0)
 				{
-					++i;
+					if(i != 0) ++i;
 					int j = 0;
 					basename[j] = src[i];
 					while (src[i + j] && src[i + j] != '.')
@@ -55,7 +57,7 @@ namespace Lumix
 						basename[j] = src[j + i];
 					}
 					basename[j] = '\0';
-					break;
+					return;
 				}
 			}
 		}
@@ -87,6 +89,14 @@ namespace Lumix
 				}
 			}
 			extension[0] = '\0';
+		}
+
+		static bool hasExtension(const char* filename, const char* ext)
+		{
+			char tmp[20];
+			getExtension(tmp, sizeof(tmp), filename);
+
+			return strcmp(tmp, ext) == 0;
 		}
 
 		private:

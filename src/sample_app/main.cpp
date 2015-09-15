@@ -20,6 +20,7 @@
 #include "renderer/texture.h"
 #include "renderer/transient_geometry.h"
 #include "ocornut-imgui/imgui.h"
+#include "shader_compiler.h"
 #include "terrain_editor.h"
 
 #include <bgfx.h>
@@ -46,7 +47,9 @@ public:
 		, m_is_log_shown(true)
 		, m_finished(false)
 		, m_is_import_asset_shown(false)
+		, m_is_style_editor_shown(false)
 		, m_import_asset_dialog(nullptr)
+		, m_shader_compiler(nullptr)
 	{
 	}
 
@@ -55,6 +58,7 @@ public:
 	{
 		float time_delta = m_editor->getEngine().getLastTimeDelta();
 
+		m_shader_compiler->update(time_delta);
 		m_log_ui->update(time_delta);
 	}
 
@@ -90,8 +94,10 @@ public:
 		if(m_is_entity_list_shown)	showEntityList();
 		if (m_is_profiler_shown) showProfiler();
 		if (m_is_import_asset_shown) m_import_asset_dialog->onGui();
+		if (m_is_style_editor_shown) ImGui::ShowStyleEditor();
 		showFPS();
 		
+
 		ImGui::Render();
 	}
 
@@ -177,6 +183,7 @@ public:
 				ImGui::MenuItem("Log", nullptr, &m_is_log_shown);
 				ImGui::MenuItem("Profiler", nullptr, &m_is_profiler_shown);
 				ImGui::MenuItem("Properties", nullptr, &m_is_property_grid_shown);
+				ImGui::MenuItem("Style editor", nullptr, &m_is_style_editor_shown);
 				ImGui::EndMenu();
 			}
 
@@ -573,6 +580,7 @@ public:
 		delete m_asset_browser;
 		delete m_log_ui;
 		delete m_import_asset_dialog;
+		delete m_shader_compiler;
 		Lumix::WorldEditor::destroy(m_editor);
 		Lumix::PipelineInstance::destroy(m_pipeline);
 		m_pipeline_source->getResourceManager()
@@ -677,11 +685,12 @@ public:
 		m_engine = Lumix::Engine::create(nullptr, m_allocator);
 		char current_dir[MAX_PATH];
 		GetCurrentDirectory(sizeof(current_dir), current_dir);
-		m_editor = Lumix::WorldEditor::create(current_dir, *m_engine); TODO("todo");
+		m_editor = Lumix::WorldEditor::create(current_dir, *m_engine);
 		m_asset_browser = new AssetBrowser(*m_editor);
 		m_terrain_editor = new TerrainEditor(*m_editor);
 		m_log_ui = new LogUI(m_editor->getAllocator());
 		m_import_asset_dialog = new ImportAssetDialog(*m_editor);
+		m_shader_compiler = new ShaderCompiler(*m_editor);
 
 		m_editor->universeCreated().bind<Context, &Context::onUniverseCreated>(this);
 		m_editor->universeDestroyed().bind<Context, &Context::onUniverseDestroyed>(this);
@@ -769,6 +778,7 @@ public:
 	TerrainEditor* m_terrain_editor;
 	LogUI* m_log_ui;
 	ImportAssetDialog* m_import_asset_dialog;
+	ShaderCompiler* m_shader_compiler;
 	bool m_finished;
 
 	bool m_is_log_shown;
@@ -777,6 +787,7 @@ public:
 	bool m_is_entity_list_shown;
 	bool m_is_asset_browser_shown;
 	bool m_is_import_asset_shown;
+	bool m_is_style_editor_shown;
 };
 
 
