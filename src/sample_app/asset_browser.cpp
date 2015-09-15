@@ -1,13 +1,13 @@
 #include "asset_browser.h"
 #include "core/FS/file_iterator.h"
 #include "core/FS/file_system.h"
-#include "core/FS/os_file.h"
 #include "core/json_serializer.h"
 #include "core/path_utils.h"
 #include "core/resource.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "core/string.h"
+#include "core/system.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "renderer/material.h"
@@ -109,8 +109,8 @@ void AssetBrowser::saveMaterial(Lumix::Material* material)
 		material->save(serializer);
 		fs.close(*file);
 
-		Lumix::FS::OsFile::deleteFile(material->getPath().c_str());
-		Lumix::FS::OsFile::moveFile(tmp_path, material->getPath().c_str());
+		Lumix::deleteFile(material->getPath().c_str());
+		Lumix::moveFile(tmp_path, material->getPath().c_str());
 	}
 	else
 	{

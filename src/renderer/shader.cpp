@@ -469,6 +469,7 @@ bool Shader::getShaderCombinations(Renderer& renderer,
 	errors = errors || lua_pcall(L, 0, LUA_MULTRET, 0) != LUA_OK;
 	if (errors)
 	{
+		g_log_error.log("lua") << lua_tostring(L, -1);
 		lua_pop(L, 1);
 		return false;
 	}
