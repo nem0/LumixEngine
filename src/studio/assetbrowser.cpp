@@ -225,7 +225,9 @@ AssetBrowser::AssetBrowser(MainWindow& main_window, QWidget* parent)
 	, m_ui(new Ui::AssetBrowser)
 	, m_main_window(main_window)
 {
-	m_watcher = FileSystemWatcher::create(QDir::currentPath());
+	m_watcher =
+		FileSystemWatcher::create(QDir::currentPath().toLatin1().data(),
+								  main_window.getWorldEditor().getAllocator());
 	m_watcher->getCallback()
 		.bind<AssetBrowser, &AssetBrowser::onFileSystemWatcherCallback>(this);
 	m_base_path = QDir::currentPath();

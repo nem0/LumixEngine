@@ -2,6 +2,7 @@
 
 
 #include "core/associative_array.h"
+#include "core/mt/spin_mutex.h"
 #include "core/string.h"
 #include "renderer/shader.h"
 
@@ -49,6 +50,7 @@ private:
 	void makeUpToDate();
 	Lumix::Renderer& getRenderer();
 	void addDependency(const char* key, const char* value);
+	void processChangedFiles();
 
 private:
 	bool m_is_compiling;
@@ -58,4 +60,6 @@ private:
 	Lumix::AssociativeArray<Lumix::string, Lumix::Array<Lumix::string>> m_dependencies;
 	Lumix::Array<Lumix::string> m_to_reload;
 	Lumix::Array<Lumix::Process*> m_processes;
+	Lumix::Array<Lumix::string> m_changed_files;
+	Lumix::MT::SpinMutex m_mutex;
 };

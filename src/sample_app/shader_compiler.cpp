@@ -4,6 +4,7 @@
 #include "core/FS/ifile.h"
 #include "core/FS/os_file.h"
 #include "core/log.h"
+#include "core/mt/thread.h"
 #include "core/path.h"
 #include "core/path_utils.h"
 #include "core/resource_manager.h"
@@ -17,24 +18,20 @@
 #include "renderer/shader.h"
 
 
-
-
-#include "core/timer.h"
-
-
 ShaderCompiler::ShaderCompiler(Lumix::WorldEditor& editor)
 	: m_editor(editor)
 	, m_dependencies(editor.getAllocator())
 	, m_to_reload(editor.getAllocator())
 	, m_processes(editor.getAllocator())
+	, m_changed_files(editor.getAllocator())
+	, m_mutex(false)
 {
 	m_notifications_id = -1;
 	m_is_compiling = false;
-	/*
-	m_watcher = FileSystemWatcher::create("shaders");
+	
+	m_watcher = FileSystemWatcher::create("shaders", m_editor.getAllocator());
 	m_watcher->getCallback()
 		.bind<ShaderCompiler, &ShaderCompiler::onFileChanged>(this);
-		*/
 	parseDependencies();
 	makeUpToDate();
 }
@@ -190,14 +187,17 @@ void ShaderCompiler::makeUpToDate()
 
 void ShaderCompiler::onFileChanged(const char* path)
 {
-	/*QFileInfo info(path);
-	if (m_dependencies.contains(QString("shaders/") + path))
-	{
-		QString tmp = QString("shaders/") + path;
-		tmp = tmp.mid(0, tmp.length() - 6) + ".shd";
-		compile(tmp);
-	}
-	parseDependencies();*/
+	char ext[10];
+	Lumix::PathUtils::getExtension(ext, sizeof(ext), path);
+	if (strcmp("sc", ext) != 0 && strcmp("shd", ext) != 0 &&
+		strcmp("sh", ext) != 0)
+		return;
+
+	char tmp[Lumix::MAX_PATH_LENGTH];
+	Lumix::copyString(tmp, sizeof(tmp), "shaders/");
+	Lumix::catString(tmp, sizeof(tmp), path);
+	Lumix::MT::SpinLock lock(m_mutex);
+	m_changed_files.push(Lumix::string(tmp, m_editor.getAllocator()));
 }
 
 
@@ -304,12 +304,13 @@ void ShaderCompiler::addDependency(const char* ckey, const char* cvalue)
 
 ShaderCompiler::~ShaderCompiler()
 {
+	FileSystemWatcher::destroy(m_watcher);
 }
 
 
 void ShaderCompiler::reloadShaders()
 {
-	//m_to_reload.removeDuplicates();
+	m_to_reload.removeDuplicates();
 
 	auto shader_manager = m_editor.getEngine().getResourceManager().get(
 		Lumix::ResourceManager::SHADER);
@@ -411,6 +412,37 @@ void ShaderCompiler::compilePass(
 }
 
 
+void ShaderCompiler::processChangedFiles()
+{
+	if (m_is_compiling) return;
+
+	char changed_file_path[Lumix::MAX_PATH_LENGTH];
+	{
+		Lumix::MT::SpinLock lock(m_mutex);
+		if (m_changed_files.empty()) return;
+
+		m_changed_files.removeDuplicates();
+		m_changed_files.back();
+		Lumix::copyString(changed_file_path,
+			sizeof(changed_file_path),
+			m_changed_files.back().c_str());
+		m_changed_files.pop();
+	}
+	Lumix::string tmp_string(changed_file_path, m_editor.getAllocator());
+	if (m_dependencies.find(tmp_string))
+	{
+		int len = (int)strlen(changed_file_path);
+		if (len > 6)
+		{
+			Lumix::copyString(changed_file_path + len - 6,
+				sizeof(changed_file_path) - len + 6,
+				".shd");
+			compile(changed_file_path);
+		}
+	}
+}
+
+
 void ShaderCompiler::update(float time_delta)
 {
 	for (int i = 0; i < m_processes.size(); ++i)
@@ -419,8 +451,16 @@ void ShaderCompiler::update(float time_delta)
 		{
 			Lumix::destroyProcess(*m_processes[i]);
 			m_processes.eraseFast(i);
+
+			if (m_processes.empty() && m_changed_files.empty())
+			{
+				reloadShaders();
+			}
 		}
 	}
+	m_is_compiling = !m_processes.empty();
+
+	processChangedFiles();
 }
 
 
