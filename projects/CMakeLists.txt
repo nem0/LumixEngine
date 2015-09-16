@@ -200,6 +200,7 @@ add_library(studio_lib SHARED
 	${STUDIO_DIALOGS_FILES}
 	${STUDIO_SCRIPTS_FILES}
 	${STUDIO_ANIMATION_EDITOR_FILES}
+	${SRC_PATH}sample_app/pc/file_system_watcher.cpp
 )
 
 target_link_libraries(studio_lib engine)
@@ -298,7 +299,7 @@ target_link_libraries(render_test Qt5::WinMain)
 
 ###################### SAMPLE APP ######################
 
-file(GLOB SAMPLE_APP_FILES ${SRC_PATH}sample_app/*.cpp ${SRC_PATH}sample_app/*.c ${SRC_PATH}sample_app/*.h)
+file(GLOB SAMPLE_APP_FILES ${SRC_PATH}sample_app/*.cpp ${SRC_PATH}sample_app/pc/*.cpp ${SRC_PATH}sample_app/*.c ${SRC_PATH}sample_app/*.h)
 file(GLOB OCORNUT_IMGUI_FILES ${SRC_PATH}sample_app/ocornut-imgui/*.cpp ${SRC_PATH}sample_app/ocornut-imgui/*.h)
 file(GLOB STB_FILES ${SRC_PATH}sample_app/stb/*.cpp ${SRC_PATH}sample_app/stb/*.c ${SRC_PATH}sample_app/stb/*.h)
 

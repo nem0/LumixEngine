@@ -21,7 +21,8 @@ namespace Lumix
 	bool isProcessFinished(Process& process)
 	{
 		DWORD exit_code;
-		return GetExitCodeProcess(process.process_info.hProcess, &exit_code) != STILL_ACTIVE;
+		if (GetExitCodeProcess(process.process_info.hProcess, &exit_code) == FALSE) return false;
+		return exit_code != STILL_ACTIVE;
 	}
 
 

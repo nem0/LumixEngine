@@ -26,11 +26,19 @@ ShaderCompiler::ShaderCompiler()
 	m_to_compile = 0;
 	m_notifications_id = -1;
 	m_is_compiling = false;
-	m_watcher = FileSystemWatcher::create("shaders");
+	m_watcher = nullptr;
+	parseDependencies();
+}
+
+
+void ShaderCompiler::setWorldEditor(Lumix::WorldEditor& editor)
+{
+	ASSERT(!m_watcher);
+	m_editor = &editor;
+	makeUpToDate();
+	m_watcher = FileSystemWatcher::create("shaders", editor.getAllocator());
 	m_watcher->getCallback()
 		.bind<ShaderCompiler, &ShaderCompiler::onFileChanged>(this);
-
-	parseDependencies();
 }
 
 
