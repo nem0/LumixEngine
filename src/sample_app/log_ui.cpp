@@ -8,6 +8,7 @@ LogUI::LogUI(Lumix::IAllocator& allocator)
 	, m_messages(allocator)
 	, m_current_tab(0)
 	, m_notifications(allocator)
+	, m_last_uid(1)
 {
 	Lumix::g_log_info.getCallback().bind<LogUI, &LogUI::onInfo>(this);
 	Lumix::g_log_error.getCallback().bind<LogUI, &LogUI::onError>(this);
@@ -29,6 +30,29 @@ LogUI::~LogUI()
 }
 
 
+void LogUI::setNotificationTime(int uid, float time)
+{
+	for (auto& notif : m_notifications)
+	{
+		if (notif.uid == uid)
+		{
+			notif.time = time;
+			break;
+		}
+	}
+}
+
+
+int LogUI::addNotification(const char* text)
+{
+	auto& notif = m_notifications.emplace(m_allocator);
+	notif.time = 10.0f;
+	notif.message = text;
+	notif.uid = ++m_last_uid;
+	return notif.uid;
+}
+
+
 void LogUI::push(Type type, const char* message)
 {
 	++m_new_message_count[type];
@@ -36,9 +60,7 @@ void LogUI::push(Type type, const char* message)
 
 	if (type == Error || type == Warning)
 	{
-		auto& notif = m_notifications.emplace(m_allocator);
-		notif.time = 10.0f;
-		notif.message = message;
+		addNotification(message);
 	}
 }
 
