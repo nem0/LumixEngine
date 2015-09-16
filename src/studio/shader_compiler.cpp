@@ -22,8 +22,6 @@ ShaderCompiler::ShaderCompiler()
 	, m_notifications(nullptr)
 
 {
-	m_compiled = 0;
-	m_to_compile = 0;
 	m_notifications_id = -1;
 	m_is_compiling = false;
 	m_watcher = nullptr;

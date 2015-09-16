@@ -13,6 +13,8 @@ class LogUI
 
 		void onGui();
 		void update(float time_delta);
+		int addNotification(const char* text);
+		void setNotificationTime(int uid, float time);
 
 	private:
 		enum Type
@@ -32,6 +34,7 @@ class LogUI
 			{
 			}
 			float time;
+			int uid;
 			Lumix::string message;
 		};
 
@@ -48,4 +51,5 @@ class LogUI
 		Lumix::Array<Notification> m_notifications;
 		int m_new_message_count[Count];
 		int m_current_tab;
+		int m_last_uid;
 };

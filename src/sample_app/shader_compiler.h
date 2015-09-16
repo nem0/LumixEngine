@@ -16,12 +16,13 @@ class WorldEditor;
 
 
 class FileSystemWatcher;
+class LogUI;
 
 
 class ShaderCompiler
 {
 public:
-	ShaderCompiler(Lumix::WorldEditor& editor);
+	ShaderCompiler(Lumix::WorldEditor& editor, LogUI& log_ui);
 	~ShaderCompiler();
 
 	void compileAll();
@@ -62,4 +63,5 @@ private:
 	Lumix::Array<Lumix::Process*> m_processes;
 	Lumix::Array<Lumix::string> m_changed_files;
 	Lumix::MT::SpinMutex m_mutex;
+	LogUI& m_log_ui;
 };

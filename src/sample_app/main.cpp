@@ -690,7 +690,7 @@ public:
 		m_terrain_editor = new TerrainEditor(*m_editor);
 		m_log_ui = new LogUI(m_editor->getAllocator());
 		m_import_asset_dialog = new ImportAssetDialog(*m_editor);
-		m_shader_compiler = new ShaderCompiler(*m_editor);
+		m_shader_compiler = new ShaderCompiler(*m_editor, *m_log_ui);
 
 		m_editor->universeCreated().bind<Context, &Context::onUniverseCreated>(this);
 		m_editor->universeDestroyed().bind<Context, &Context::onUniverseDestroyed>(this);

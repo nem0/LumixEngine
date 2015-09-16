@@ -14,12 +14,14 @@
 #include "engine.h"
 #include "engine/plugin_manager.h"
 #include "file_system_watcher.h"
+#include "log_ui.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
 
 
-ShaderCompiler::ShaderCompiler(Lumix::WorldEditor& editor)
+ShaderCompiler::ShaderCompiler(Lumix::WorldEditor& editor, LogUI& log_ui)
 	: m_editor(editor)
+	, m_log_ui(log_ui)
 	, m_dependencies(editor.getAllocator())
 	, m_to_reload(editor.getAllocator())
 	, m_processes(editor.getAllocator())
@@ -325,25 +327,16 @@ void ShaderCompiler::reloadShaders()
 
 void ShaderCompiler::updateNotifications()
 {
-	/*if (m_notifications)
+	if (m_is_compiling && m_notifications_id < 0)
 	{
-		if (m_notifications_id < 0)
-		{
-			m_notifications_id = m_notifications->showProgressNotification(
-				"Compiling shaders...");
-		}
+		m_notifications_id = m_log_ui.addNotification("Compiling shaders...");
+	}
 
-		m_notifications->setProgress(m_notifications_id,
-									 qMax(100 * m_compiled / m_to_compile, 1));
-
-		if (m_to_compile == m_compiled)
-		{
-			reloadShaders();
-			m_to_compile = m_compiled = 0;
-			m_notifications->setNotificationTime(m_notifications_id, 3.0f);
-			m_notifications_id = -1;
-		}
-	}*/
+	if (!m_is_compiling)
+	{
+		m_log_ui.setNotificationTime(m_notifications_id, 3.0f);
+		m_notifications_id = -1;
+	}
 }
 
 
@@ -358,8 +351,7 @@ void ShaderCompiler::compilePass(
 	{
 		if ((mask & (~define_mask)) == 0)
 		{
-			//updateNotifications();
-			//QProcess* process = new QProcess;
+			updateNotifications();
 			char basename[Lumix::MAX_PATH_LENGTH];
 			Lumix::PathUtils::getBasename(basename, sizeof(basename), shd_path);
 			const char* source_path =
@@ -452,6 +444,7 @@ void ShaderCompiler::update(float time_delta)
 			Lumix::destroyProcess(*m_processes[i]);
 			m_processes.eraseFast(i);
 
+			updateNotifications();
 			if (m_processes.empty() && m_changed_files.empty())
 			{
 				reloadShaders();
