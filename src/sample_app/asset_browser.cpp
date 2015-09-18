@@ -15,6 +15,7 @@
 #include "renderer/shader.h"
 #include "renderer/texture.h"
 #include "ocornut-imgui/imgui.h"
+#include "string_builder.h"
 
 
 AssetBrowser::AssetBrowser(Lumix::WorldEditor& editor)
@@ -56,6 +57,11 @@ void AssetBrowser::onGui()
 		return;
 	}
 	
+	if (ImGui::Button("Refresh"))
+	{
+		findResources();
+	}
+
 	const char* items = "Material\0Model\0Shader\0Texture\0Universe\0";
 	static int current_type = 0;
 	static char filter[128] = "";
@@ -127,7 +133,7 @@ bool AssetBrowser::resourceInput(const char* label, char* buf, int max_size, Typ
 		return true;
 	}
 	ImGui::SameLine();
-	if (ImGui::Button(Lumix::StringBuilder<30>("...##", label)))
+	if (ImGui::Button(StringBuilder<30>("...##", label)))
 	{
 		ImGui::OpenPopup(label);
 	}
