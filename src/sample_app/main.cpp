@@ -21,6 +21,7 @@
 #include "renderer/transient_geometry.h"
 #include "ocornut-imgui/imgui.h"
 #include "shader_compiler.h"
+#include "string_builder.h"
 #include "terrain_editor.h"
 
 #include <bgfx.h>
@@ -397,7 +398,7 @@ public:
 				getComponentTypeName(cmp), nullptr, true, true))
 			return;
 		if (ImGui::Button(
-				Lumix::StringBuilder<30>("Remove component##", cmp.type)))
+				StringBuilder<30>("Remove component##", cmp.type)))
 		{
 			m_editor->destroyComponent(cmp);
 			return;

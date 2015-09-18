@@ -17,6 +17,7 @@
 #include "log_ui.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
+#include "string_builder.h"
 
 
 ShaderCompiler::ShaderCompiler(Lumix::WorldEditor& editor, LogUI& log_ui)
@@ -73,7 +74,7 @@ bool ShaderCompiler::isChanged(const Lumix::ShaderCombinations& combinations,
 	for (int i = 0; i < combinations.m_pass_count; ++i)
 	{
 		const char* pass_path =
-			Lumix::StringBuilder<Lumix::MAX_PATH_LENGTH>(
+			StringBuilder<Lumix::MAX_PATH_LENGTH>(
 			bin_base_path, combinations.m_passes[i]);
 		for (int j = 0; j < 1 << Lumix::lengthOf(combinations.m_defines);
 			++j)
@@ -81,7 +82,7 @@ bool ShaderCompiler::isChanged(const Lumix::ShaderCombinations& combinations,
 			if ((j & (~combinations.m_vs_combinations[i])) == 0)
 			{
 				const char* vs_bin_info =
-					Lumix::StringBuilder<Lumix::MAX_PATH_LENGTH>(
+					StringBuilder<Lumix::MAX_PATH_LENGTH>(
 					pass_path, j, "_vs.shb");
 				if (!Lumix::fileExists(vs_bin_info) ||
 					Lumix::getLastModified(vs_bin_info) <
@@ -93,7 +94,7 @@ bool ShaderCompiler::isChanged(const Lumix::ShaderCombinations& combinations,
 			if ((j & (~combinations.m_fs_combinations[i])) == 0)
 			{
 				const char* fs_bin_info =
-					Lumix::StringBuilder<Lumix::MAX_PATH_LENGTH>(
+					StringBuilder<Lumix::MAX_PATH_LENGTH>(
 					pass_path, j, "_fs.shb");
 				if (!Lumix::fileExists(fs_bin_info) ||
 					Lumix::getLastModified(fs_bin_info) <
@@ -121,7 +122,7 @@ void ShaderCompiler::makeUpToDate()
 		char basename[Lumix::MAX_PATH_LENGTH];
 		Lumix::PathUtils::getBasename(basename, sizeof(basename), info.filename);
 		if (!Lumix::PathUtils::hasExtension(info.filename, "shd")) continue;
-		const char* shd_path = Lumix::StringBuilder<Lumix::MAX_PATH_LENGTH>(
+		const char* shd_path = StringBuilder<Lumix::MAX_PATH_LENGTH>(
 			"shaders/", info.filename);
 		auto* file = fs.open(fs.getDiskDevice(),
 							 shd_path,
@@ -146,7 +147,7 @@ void ShaderCompiler::makeUpToDate()
 			getRenderer(), &data[0], &combinations);
 
 		const char* bin_base_path =
-			Lumix::StringBuilder<Lumix::MAX_PATH_LENGTH>(
+			StringBuilder<Lumix::MAX_PATH_LENGTH>(
 				"shaders/compiled/", basename, "_");
 		if (isChanged(combinations, bin_base_path, shd_path))
 		{
@@ -236,7 +237,7 @@ void ShaderCompiler::parseDependencies()
 		if (!Lumix::PathUtils::hasExtension(info.filename, "d")) continue;
 
 		auto* file = fs.open(fs.getDiskDevice(),
-							 Lumix::StringBuilder<Lumix::MAX_PATH_LENGTH>(
+							 StringBuilder<Lumix::MAX_PATH_LENGTH>(
 								 "shaders/compiled/", info.filename),
 							 Lumix::FS::Mode::READ | Lumix::FS::Mode::OPEN);
 		if (!file)
@@ -281,7 +282,7 @@ void ShaderCompiler::parseDependencies()
 		Lumix::PathUtils::getBasename(basename, sizeof(basename), first_line);
 		getSourceFromBinaryBasename(src, sizeof(src), basename);
 
-		addDependency(Lumix::StringBuilder<Lumix::MAX_PATH_LENGTH>(
+		addDependency(StringBuilder<Lumix::MAX_PATH_LENGTH>(
 			"shaders/", src, ".sc"), first_line);
 
 		fs.close(*file);
@@ -355,7 +356,7 @@ void ShaderCompiler::compilePass(
 			char basename[Lumix::MAX_PATH_LENGTH];
 			Lumix::PathUtils::getBasename(basename, sizeof(basename), shd_path);
 			const char* source_path =
-				Lumix::StringBuilder<Lumix::MAX_PATH_LENGTH>(
+				StringBuilder<Lumix::MAX_PATH_LENGTH>(
 					"shaders/",
 					basename,
 					is_vertex_shader ? "_vs.sc" : "_fs.sc");
@@ -364,7 +365,7 @@ void ShaderCompiler::compilePass(
 			Lumix::catString(out_path, sizeof(out_path), "/shaders/compiled/");
 			Lumix::catString(out_path, sizeof(out_path), basename);
 			Lumix::catString(out_path, sizeof(out_path), "_");
-			Lumix::catString(out_path, sizeof(out_path), Lumix::StringBuilder<30>(pass, mask));
+			Lumix::catString(out_path, sizeof(out_path), StringBuilder<30>(pass, mask));
 			Lumix::catString(out_path, sizeof(out_path), is_vertex_shader ? "_vs.shb" : "_fs.shb");
 			char cmd[1024];
 			Lumix::copyString(cmd, sizeof(cmd), "/C \"");
@@ -524,7 +525,7 @@ void ShaderCompiler::compileAll()
 	{
 		if (!Lumix::PathUtils::hasExtension(info.filename, "shd")) return;
 
-		const char* shd_path = Lumix::StringBuilder<Lumix::MAX_PATH_LENGTH>(
+		const char* shd_path = StringBuilder<Lumix::MAX_PATH_LENGTH>(
 			"shaders/", info.filename);
 		auto* file = fs.open(fs.getDiskDevice(),
 							 shd_path,

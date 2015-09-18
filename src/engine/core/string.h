@@ -38,50 +38,6 @@ makeLowercase(char* destination, int length, const char* source);
 LUMIX_ENGINE_API char* trimmed(char* str);
 
 
-template <int size>
-struct StringBuilder
-{
-	template <typename T>
-	StringBuilder(const char* str, T value)
-	{
-		copyString(data, size, str);
-		add(value);
-	}
-
-	template <typename T, typename T2>
-	StringBuilder(const char* str, T value, T2 value2)
-	{
-		copyString(data, size, str);
-		
-		add(value);
-		add(value2);
-	}
-
-	void add(const char* value)
-	{
-		catString(data, size, value);
-	}
-
-	void add(char* value)
-	{
-		catString(data, size, value);
-	}
-
-	template <typename T>
-	void add(T value)
-	{
-		int len = (int)strlen(data);
-		toCString(value, data + len, size - len);
-	}
-
-
-	operator const char*() {
-		return data;
-	}
-	char data[size];
-};
-
-
 template <class T> class base_string
 {
 public:

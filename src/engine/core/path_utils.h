@@ -1,106 +1,50 @@
 #pragma once
 
-#include "core/string.h"
+
+#include "lumix.h"
+
 
 namespace Lumix
 {
-	struct LUMIX_ENGINE_API PathUtils
+namespace PathUtils
+{
+	LUMIX_ENGINE_API void normalize(const char* path, char* out, uint32_t max_size);
+	LUMIX_ENGINE_API void getDir(char* dir, int max_length, const char* src);
+	LUMIX_ENGINE_API void getBasename(char* basename, int max_length, const char* src);
+	LUMIX_ENGINE_API void getFilename(char* filename, int max_length, const char* src);
+	LUMIX_ENGINE_API void getExtension(char* extension, int max_length, const char* src);
+	LUMIX_ENGINE_API bool hasExtension(const char* filename, const char* ext);
+	LUMIX_ENGINE_API bool isAbsolute(const char* path);
+		
+
+	struct LUMIX_ENGINE_API PathDirectory
 	{
-	
-		static void normalize(const char* path, char* out, uint32_t max_size)
+		PathDirectory(const char* path)
 		{
-			ASSERT(max_size > 0);
-			uint32_t i = 0;
-			if (path[0] == '.' && (path[1] == '\\' || path[1] == '/'))
-				++path;
-			if (path[0] == '\\' || path[0] == '/')
-				++path;
-			while (*path != '\0' && i < max_size)
-			{
-				*out = *path == '\\' ? '/' : *path;
-				*out = *path >= 'A' && *path <= 'Z' ? *path - 'A' + 'a' : *out;
-
-				path++;
-				out++;
-				i++;
-			}
-			(i < max_size ? *out : *(out - 1)) = '\0';
+			getDir(m_dir, sizeof(m_dir), path);
 		}
 
-		static void getDir(char* dir, int max_length, const char* src)
+		operator const char*()
 		{
-			copyString(dir, max_length, src);
-			for (int i = (int)strlen(dir) - 1; i >= 0; --i)
-			{
-				if (dir[i] == '\\' || dir[i] == '/')
-				{
-					++i;
-					dir[i] = '\0';
-					break;
-				}
-			}
+			return m_dir;
 		}
 
-		static void getBasename(char* basename, int /*max_length*/, const char* src)
-		{
-			basename[0] = '\0';
-			for (int i = (int)strlen(src) - 1; i >= 0; --i)
-			{
-				if (src[i] == '\\' || src[i] == '/' || i == 0)
-				{
-					if(i != 0) ++i;
-					int j = 0;
-					basename[j] = src[i];
-					while (src[i + j] && src[i + j] != '.')
-					{
-						++j;
-						basename[j] = src[j + i];
-					}
-					basename[j] = '\0';
-					return;
-				}
-			}
-		}
-
-		static void getFilename(char* filename, int /*max_length*/, const char* src)
-		{
-			for (int i = (int)strlen(src) - 1; i >= 0; --i)
-			{
-				if (src[i] == '\\' || src[i] == '/')
-				{
-					++i;
-					strcpy(filename, src + i);
-					break;
-				}
-			}
-		}
-
-
-		static void getExtension(char* extension, int max_length, const char* src)
-		{
-			ASSERT(max_length > 0);
-			for (int i = (int)strlen(src) - 1; i >= 0; --i)
-			{
-				if (src[i] == '.')
-				{
-					++i;
-					copyString(extension, max_length, src + i);
-					return;
-				}
-			}
-			extension[0] = '\0';
-		}
-
-		static bool hasExtension(const char* filename, const char* ext)
-		{
-			char tmp[20];
-			getExtension(tmp, sizeof(tmp), filename);
-
-			return strcmp(tmp, ext) == 0;
-		}
-
-		private:
-			PathUtils();
-			~PathUtils();
+		char m_dir[MAX_PATH_LENGTH];
 	};
-}
+
+
+	struct LUMIX_ENGINE_API FileInfo
+	{
+		FileInfo(const char* path)
+		{
+			getExtension(m_extension, sizeof(m_extension), path);
+			getBasename(m_basename, sizeof(m_basename), path);
+			getDir(m_dir, sizeof(m_dir), path);
+		}
+
+		char m_extension[10];
+		char m_basename[MAX_PATH_LENGTH];
+		char m_dir[MAX_PATH_LENGTH];
+	};
+} // namespace PathUtils
+} // namespace Lumix

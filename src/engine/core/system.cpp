@@ -70,11 +70,23 @@ namespace Lumix
 	}
 
 
+	bool copyFile(const char* from, const char* to)
+	{
+		return CopyFile(from, to, FALSE) == TRUE;
+	}
+
+
 	bool fileExists(const char* path)
 	{
 		DWORD dwAttrib = GetFileAttributes(path);
 		return (dwAttrib != INVALID_FILE_ATTRIBUTES &&
 			!(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+	}
+
+
+	void messageBox(const char* text)
+	{
+		MessageBox(NULL, text, "Message", MB_OK);
 	}
 
 
@@ -105,20 +117,39 @@ namespace Lumix
 
 	bool getOpenDirectory(char* out, int max_size)
 	{
-		ASSERT(max_size >= MAX_PATH);
-		BROWSEINFO bi;
-		ZeroMemory(&bi, sizeof(bi));
-		bi.hwndOwner = NULL;
-		bi.pidlRoot = NULL;
-		bi.pszDisplayName = out;
-		bi.lpszTitle = "Please, select a folder";
-		bi.ulFlags = 0;
-		bi.lpfn = NULL;
-		bi.lParam = 0;
-		bi.iImage = -1;
-		SHBrowseForFolder(&bi);
-
-		return true;
+		bool ret = false;
+		IFileDialog *pfd;
+		if (SUCCEEDED(CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd))))
+		{
+			DWORD dwOptions;
+			if (SUCCEEDED(pfd->GetOptions(&dwOptions)))
+			{
+				pfd->SetOptions(dwOptions | FOS_PICKFOLDERS);
+			}
+			if (SUCCEEDED(pfd->Show(NULL)))
+			{
+				IShellItem *psi;
+				if (SUCCEEDED(pfd->GetResult(&psi)))
+				{
+					WCHAR* tmp;
+					if (SUCCEEDED(psi->GetDisplayName(SIGDN_DESKTOPABSOLUTEPARSING, &tmp)))
+					{
+						char* c = out;
+						while (*tmp && c - out < max_size - 1)
+						{
+							*c = (char)*tmp;
+							++c;
+							++tmp;
+						}
+						*c = '\0';
+						ret = true;
+					}
+					psi->Release();
+				}
+			}
+			pfd->Release();
+		}
+		return ret;
 	}
 
 
@@ -142,6 +173,12 @@ namespace Lumix
 		i.LowPart = ft.dwLowDateTime;
 		i.HighPart = ft.dwHighDateTime;
 		return i.QuadPart;
+	}
+
+
+	bool makePath(const char* path)
+	{
+		return SHCreateDirectoryEx(NULL, path, NULL) == ERROR_SUCCESS;
 	}
 
 }
