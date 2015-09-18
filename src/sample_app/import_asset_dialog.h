@@ -35,6 +35,9 @@ class ImportAssetDialog
 
 		void onGui();
 
+	public:
+		bool m_is_opened;
+
 	private:
 		void checkSource();
 		void convert();

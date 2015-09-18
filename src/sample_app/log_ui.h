@@ -16,6 +16,9 @@ class LogUI
 		int addNotification(const char* text);
 		void setNotificationTime(int uid, float time);
 
+	public:
+		bool m_is_opened;
+
 	private:
 		enum Type
 		{

@@ -24,6 +24,7 @@ AssetBrowser::AssetBrowser(Lumix::WorldEditor& editor)
 	, m_selected_resouce(nullptr)
 {
 	TODO("detect changes");
+	m_is_opened = false;
 	for (int i = 0; i < Count; ++i)
 	{
 		m_resources.emplace(editor.getAllocator());
@@ -51,7 +52,9 @@ static uint32_t getResourceType(const char* path)
 
 void AssetBrowser::onGui()
 {
-	if (!ImGui::Begin("AssetBrowser"))
+	if (!m_is_opened) return;
+
+	if (!ImGui::Begin("AssetBrowser", &m_is_opened))
 	{
 		ImGui::End();
 		return;
