@@ -14,6 +14,7 @@
 #include "engine/property_descriptor.h"
 #include "import_asset_dialog.h"
 #include "log_ui.h"
+#include "profiler_ui.h"
 #include "renderer/material.h"
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"
@@ -43,11 +44,7 @@ public:
 		: m_allocator(m_main_allocator)
 		, m_is_property_grid_shown(true)
 		, m_is_entity_list_shown(true)
-		, m_is_asset_browser_shown(true)
-		, m_is_profiler_shown(false)
-		, m_is_log_shown(true)
 		, m_finished(false)
-		, m_is_import_asset_shown(false)
 		, m_is_style_editor_shown(false)
 		, m_import_asset_dialog(nullptr)
 		, m_shader_compiler(nullptr)
@@ -89,47 +86,17 @@ public:
 		
 		showMainMenu();
 
-		if (m_is_log_shown) m_log_ui->onGui();
-		if (m_is_asset_browser_shown) m_asset_browser->onGui();
-		if(m_is_property_grid_shown) showPropertyGrid();
-		if(m_is_entity_list_shown)	showEntityList();
-		if (m_is_profiler_shown) showProfiler();
-		if (m_is_import_asset_shown) m_import_asset_dialog->onGui();
+		m_profiler_ui.onGui();
+		m_asset_browser->onGui();
+		m_log_ui->onGui();
+		m_import_asset_dialog->onGui();
+		showPropertyGrid();
+		showEntityList();
 		if (m_is_style_editor_shown) ImGui::ShowStyleEditor();
-		showFPS();
+		showStats();
 		
 
 		ImGui::Render();
-	}
-
-	void showProfileBlock(Lumix::Profiler::Block* block)
-	{
-		while (block)
-		{
-			if (ImGui::TreeNode(block, block->m_name))
-			{
-				showProfileBlock(block->m_first_child);
-				ImGui::TreePop();
-			}
-			block = block->m_next;
-		}
-	}
-
-
-	void showProfiler()
-	{
-		if (ImGui::Begin("Profiler"))
-		{
-			bool b = Lumix::g_profiler.isRecording();
-			if (ImGui::Checkbox("Recording", &b))
-			{
-				Lumix::g_profiler.toggleRecording();
-			}
-			
-			showProfileBlock(Lumix::g_profiler.getRootBlock());
-		}
-
-		ImGui::End();
 	}
 
 
@@ -173,16 +140,16 @@ public:
 			{
 				if (ImGui::MenuItem("Snap to terrain", "Ctrl - T")) m_editor->snapToTerrain();
 				if (ImGui::MenuItem("Look at selected", "Ctrl - F")) m_editor->lookAtSelected();
-				if (ImGui::MenuItem("Import asset")) m_is_import_asset_shown = true;
+				ImGui::MenuItem("Import asset", nullptr, &m_import_asset_dialog->m_is_opened);
 				ImGui::EndMenu();
 			}
 
 			if (ImGui::BeginMenu("View"))
 			{
-				ImGui::MenuItem("Asset browser", nullptr, &m_is_asset_browser_shown);
+				ImGui::MenuItem("Asset browser", nullptr, &m_asset_browser->m_is_opened);
 				ImGui::MenuItem("Entity list", nullptr, &m_is_entity_list_shown);
-				ImGui::MenuItem("Log", nullptr, &m_is_log_shown);
-				ImGui::MenuItem("Profiler", nullptr, &m_is_profiler_shown);
+				ImGui::MenuItem("Log", nullptr, &m_log_ui->m_is_opened);
+				ImGui::MenuItem("Profiler", nullptr, &m_profiler_ui.m_is_opened);
 				ImGui::MenuItem("Properties", nullptr, &m_is_property_grid_shown);
 				ImGui::MenuItem("Style editor", nullptr, &m_is_style_editor_shown);
 				ImGui::EndMenu();
@@ -445,8 +412,10 @@ public:
 
 	void showPropertyGrid()
 	{
+		if (!m_is_property_grid_shown) return;
+
 		auto& ents = m_editor->getSelectedEntities();
-		if (ImGui::Begin("Properties") && ents.size() == 1)
+		if (ImGui::Begin("Properties", &m_is_property_grid_shown) && ents.size() == 1)
 		{
 			if (ImGui::Button("Add component"))
 			{
@@ -481,22 +450,19 @@ public:
 	}
 
 
-	void showFPS()
+	void showStats()
 	{
 		ImGui::SetNextWindowPos(ImVec2(10, 30));
-		bool opened;
-		if (!ImGui::Begin(
-				"",
-				&opened,
-				ImVec2(0, 0),
-				0.3f,
-				ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-					ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings))
+		const ImGuiWindowFlags flags =
+			ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+			ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
+		if (!ImGui::Begin("", nullptr, ImVec2(0, 0), 0.3f, flags))
 		{
 			ImGui::End();
 			return;
 		}
-		ImGui::Text("FPS: (%.1f)", m_engine->getFPS());
+		ImGui::Text("FPS: %.1f", m_engine->getFPS());
+		ImGui::Text("Memory: %.1fMB", (m_allocator.getTotalSize() / 1024) / 1024.0f);
 		ImGui::End();
 
 	}
@@ -542,7 +508,9 @@ public:
 
 	void showEntityList()
 	{
-		if (ImGui::Begin("Entity list"))
+		if (!m_is_entity_list_shown) return;
+
+		if (ImGui::Begin("Entity list", &m_is_entity_list_shown))
 		{
 			if (ImGui::Button("Create entity"))
 			{
@@ -778,16 +746,13 @@ public:
 	AssetBrowser* m_asset_browser;
 	TerrainEditor* m_terrain_editor;
 	LogUI* m_log_ui;
+	ProfilerUI m_profiler_ui;
 	ImportAssetDialog* m_import_asset_dialog;
 	ShaderCompiler* m_shader_compiler;
 	bool m_finished;
 
-	bool m_is_log_shown;
 	bool m_is_property_grid_shown;
-	bool m_is_profiler_shown;
 	bool m_is_entity_list_shown;
-	bool m_is_asset_browser_shown;
-	bool m_is_import_asset_shown;
 	bool m_is_style_editor_shown;
 };
 

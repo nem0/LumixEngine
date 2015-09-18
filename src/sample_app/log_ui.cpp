@@ -10,6 +10,7 @@ LogUI::LogUI(Lumix::IAllocator& allocator)
 	, m_notifications(allocator)
 	, m_last_uid(1)
 {
+	m_is_opened = false;
 	Lumix::g_log_info.getCallback().bind<LogUI, &LogUI::onInfo>(this);
 	Lumix::g_log_error.getCallback().bind<LogUI, &LogUI::onError>(this);
 	Lumix::g_log_warning.getCallback().bind<LogUI, &LogUI::onWarning>(this);
@@ -136,7 +137,9 @@ void LogUI::update(float time_delta)
 
 void LogUI::onGui()
 {
-	if (ImGui::Begin("Log"))
+	if (!m_is_opened) return;
+
+	if (ImGui::Begin("Log", &m_is_opened))
 	{
 		const char* labels[] = { "Info", "Warning", "Error", "BGFX" };
 		for (int i = 0; i < Lumix::lengthOf(labels); ++i)

@@ -36,6 +36,7 @@ namespace Debug
 
 			virtual void* allocate(size_t size) override;
 			virtual void deallocate(void* ptr) override;
+			size_t getTotalSize() const { return m_total_size; }
 
 			IAllocator& getSourceAllocator() { return m_source; }
 

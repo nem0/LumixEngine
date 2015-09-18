@@ -1016,6 +1016,7 @@ ImportAssetDialog::ImportAssetDialog(Lumix::WorldEditor& editor)
 	, m_saved_embedded_textures(editor.getAllocator())
 	, m_path_mapping(editor.getAllocator())
 {
+	m_is_opened = false;
 	m_error_message[0] = '\0';
 	m_import_message[0] = '\0';
 	m_task = nullptr;
@@ -1215,7 +1216,9 @@ void ImportAssetDialog::importTexture()
 
 void ImportAssetDialog::onGui()
 {
-	if (ImGui::Begin("Import asset"))
+	if (!m_is_opened) return;
+
+	if (ImGui::Begin("Import asset", &m_is_opened))
 	{
 		if (hasErrorMessage())
 		{

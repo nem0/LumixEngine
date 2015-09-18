@@ -30,6 +30,9 @@ public:
 	void onGui();
 	const Lumix::Array<Lumix::Path>& getResources(Type type) const;
 
+public:
+	bool m_is_opened;
+
 private:
 	void findResources();
 	void processDir(const char* path);
