@@ -8,6 +8,7 @@
 #include "core/resource_manager.h"
 #include "debug/allocator.h"
 #include "editor/gizmo.h"
+#include "editor/entity_template_system.h"
 #include "editor/world_editor.h"
 #include "engine.h"
 #include "engine/plugin_manager.h"
@@ -48,6 +49,9 @@ public:
 		, m_is_style_editor_shown(false)
 		, m_import_asset_dialog(nullptr)
 		, m_shader_compiler(nullptr)
+		, m_is_wireframe(false)
+		, m_is_entity_template_list_opened(false)
+		, m_selected_template_name(m_allocator)
 	{
 	}
 
@@ -92,6 +96,7 @@ public:
 		m_import_asset_dialog->onGui();
 		showPropertyGrid();
 		showEntityList();
+		showEntityTemplateList();
 		if (m_is_style_editor_shown) ImGui::ShowStyleEditor();
 		showStats();
 		
@@ -102,6 +107,7 @@ public:
 
 	void showMainMenu()
 	{
+		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
 		if (ImGui::BeginMainMenuBar())
 		{
 			if (ImGui::BeginMenu("File"))
@@ -131,27 +137,108 @@ public:
 
 			if (ImGui::BeginMenu("Edit"))
 			{
-				if (ImGui::MenuItem("Undo", "Ctrl - Z")) m_editor->undo();
-				if (ImGui::MenuItem("Redo", "Ctrl - Shift - Z")) m_editor->redo();
+				if (ImGui::MenuItem("Undo", "Ctrl - Z", nullptr, m_editor->canUndo())) m_editor->undo();
+				if (ImGui::MenuItem("Redo", "Ctrl - Shift - Z", nullptr, m_editor->canRedo())) m_editor->redo();
+				ImGui::Separator();
+				if (ImGui::MenuItem("Copy", "Ctrl - C", nullptr, is_any_entity_selected)) m_editor->copyEntity();
+				if (ImGui::MenuItem("Paste", "Ctrl - V", nullptr, m_editor->canPasteEntity())) m_editor->pasteEntity();
+				ImGui::Separator();
+				if (ImGui::MenuItem("Center/Pivot")) m_editor->getGizmo().togglePivotMode();
+				if (ImGui::MenuItem("Local/Global")) m_editor->getGizmo().toggleCoordSystem();
+				if (ImGui::BeginMenu("Select"))
+				{
+					if (ImGui::MenuItem("Same mesh",
+										nullptr,
+										nullptr,
+										is_any_entity_selected))
+						m_editor->selectEntitiesWithSameMesh();
+					ImGui::EndMenu();
+				}
 				ImGui::EndMenu();
 			}
 
+			if (ImGui::BeginMenu("Entity"))
+			{
+				if (ImGui::MenuItem("Create", "Ctrl - E")) m_editor->addEntity();
+				if (ImGui::MenuItem("Remove", "Delete", nullptr, is_any_entity_selected))
+				{
+					if (!m_editor->getSelectedEntities().empty())
+					{
+						m_editor->destroyEntities(
+							&m_editor->getSelectedEntities()[0],
+							m_editor->getSelectedEntities().size());
+					}
+				}
+
+				if (ImGui::BeginMenu("Create template", is_any_entity_selected))
+				{
+					static char name[255] = "";
+					ImGui::InputText("Name##templatename", name, sizeof(name));
+					if (ImGui::Button("Create"))
+					{
+						auto entity = m_editor->getSelectedEntities()[0];
+						auto& system = m_editor->getEntityTemplateSystem();
+						system.createTemplateFromEntity(name, entity);
+						ImGui::CloseCurrentPopup();
+					}
+					ImGui::EndMenu();
+				}
+				if (ImGui::MenuItem("Instantiate template",
+									nullptr,
+									nullptr,
+									m_selected_template_name.length() > 0))
+				{
+					Lumix::Vec3 pos = m_editor->getCameraRaycastHit();
+					m_editor->getEntityTemplateSystem().createInstance(
+						m_selected_template_name.c_str(), pos);
+				}
+				if (ImGui::MenuItem("Show", nullptr, nullptr, is_any_entity_selected)) m_editor->showEntities();
+				if (ImGui::MenuItem("Hide", nullptr, nullptr, is_any_entity_selected)) m_editor->hideEntities();
+				ImGui::EndMenu();
+			}
+
+
 			if (ImGui::BeginMenu("Tools"))
 			{
-				if (ImGui::MenuItem("Snap to terrain", "Ctrl - T")) m_editor->snapToTerrain();
-				if (ImGui::MenuItem("Look at selected", "Ctrl - F")) m_editor->lookAtSelected();
+				bool b = m_editor->isMeasureToolActive();
+				if (ImGui::MenuItem("Measure", nullptr, &b))
+				{
+					m_editor->toggleMeasure();
+				}
+				if (ImGui::MenuItem("Snap to terrain",
+									"Ctrl - T",
+									nullptr,
+									is_any_entity_selected))
+				{
+					m_editor->snapToTerrain();
+				}
 				ImGui::MenuItem("Import asset", nullptr, &m_import_asset_dialog->m_is_opened);
 				ImGui::EndMenu();
 			}
 
+
 			if (ImGui::BeginMenu("View"))
 			{
-				ImGui::MenuItem("Asset browser", nullptr, &m_asset_browser->m_is_opened);
-				ImGui::MenuItem("Entity list", nullptr, &m_is_entity_list_shown);
-				ImGui::MenuItem("Log", nullptr, &m_log_ui->m_is_opened);
-				ImGui::MenuItem("Profiler", nullptr, &m_profiler_ui.m_is_opened);
-				ImGui::MenuItem("Properties", nullptr, &m_is_property_grid_shown);
-				ImGui::MenuItem("Style editor", nullptr, &m_is_style_editor_shown);
+				if (ImGui::MenuItem("Look at selected",
+									"Ctrl - F",
+									nullptr,
+									is_any_entity_selected))
+				{
+					m_editor->lookAtSelected();
+				}
+				if (ImGui::MenuItem("Wireframe", "Ctrl - W", &m_is_wireframe)) m_pipeline->setWireframe(m_is_wireframe);
+				if (ImGui::MenuItem("Stats")) m_pipeline->toggleStats();
+				if (ImGui::BeginMenu("Windows"))
+				{
+					ImGui::MenuItem("Asset browser", nullptr, &m_asset_browser->m_is_opened);
+					ImGui::MenuItem("Entity list", nullptr, &m_is_entity_list_shown);
+					ImGui::MenuItem("Entity templates", nullptr, &m_is_entity_template_list_opened);
+					ImGui::MenuItem("Log", nullptr, &m_log_ui->m_is_opened);
+					ImGui::MenuItem("Profiler", nullptr, &m_profiler_ui.m_is_opened);
+					ImGui::MenuItem("Properties", nullptr, &m_is_property_grid_shown);
+					ImGui::MenuItem("Style editor", nullptr, &m_is_style_editor_shown);
+					ImGui::EndMenu();
+				}
 				ImGui::EndMenu();
 			}
 
@@ -455,7 +542,8 @@ public:
 		ImGui::SetNextWindowPos(ImVec2(10, 30));
 		const ImGuiWindowFlags flags =
 			ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-			ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
+			ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove |
+			ImGuiWindowFlags_NoSavedSettings;
 		if (!ImGui::Begin("", nullptr, ImVec2(0, 0), 0.3f, flags))
 		{
 			ImGui::End();
@@ -463,6 +551,10 @@ public:
 		}
 		ImGui::Text("FPS: %.1f", m_engine->getFPS());
 		ImGui::Text("Memory: %.1fMB", (m_allocator.getTotalSize() / 1024) / 1024.0f);
+		if (m_editor->isMeasureToolActive())
+		{
+			ImGui::Text("Measured distance: %f", m_editor->getMeasuredDistance());
+		}
 		ImGui::End();
 
 	}
@@ -503,6 +595,27 @@ public:
 		{
 			Lumix::toCString(entity, buf, max_size);
 		}
+	}
+
+
+	void showEntityTemplateList()
+	{
+		if (!m_is_entity_template_list_opened) return;
+
+		if (ImGui::Begin("Entity templates", &m_is_entity_template_list_opened))
+		{
+			auto& template_system = m_editor->getEntityTemplateSystem();
+
+			for (auto& template_name : template_system.getTemplateNames())
+			{
+				bool b = m_selected_template_name == template_name;
+				if (ImGui::Selectable(template_name.c_str(), &b))
+				{
+					m_selected_template_name = template_name;
+				}
+			}
+		}
+		ImGui::End();
 	}
 
 
@@ -682,11 +795,38 @@ public:
 
 	void checkShortcuts()
 	{
+		if (ImGui::GetIO().KeysDown[VK_DELETE])
+		{
+			if (!m_editor->getSelectedEntities().empty())
+			{
+				m_editor->destroyEntities(
+					&m_editor->getSelectedEntities()[0],
+					m_editor->getSelectedEntities().size());
+			}
+		}
 		if (ImGui::GetIO().KeysDown[VK_CONTROL])
 		{
+			if (ImGui::GetIO().KeysDown['W'])
+			{
+				m_is_wireframe = !m_is_wireframe;
+				m_pipeline->setWireframe(m_is_wireframe);
+				
+			}
+			if (ImGui::GetIO().KeysDown['C'])
+			{
+				m_editor->copyEntity();
+			}
+			if (ImGui::GetIO().KeysDown['V'])
+			{
+				m_editor->pasteEntity();
+			}
 			if (ImGui::GetIO().KeysDown['F'])
 			{
 				m_editor->lookAtSelected();
+			}
+			if (ImGui::GetIO().KeysDown['E'])
+			{
+				m_editor->addEntity();
 			}
 			if (ImGui::GetIO().KeysDown['T'])
 			{
@@ -710,6 +850,8 @@ public:
 	void updateNavigation()
 	{
 		if (ImGui::IsMouseHoveringAnyWindow()) return;
+		if (ImGui::GetIO().KeysDown[VK_CONTROL]) return;
+
 		float speed = 0.1f;
 		if (ImGui::GetIO().KeysDown[VK_SHIFT])
 		{
@@ -749,11 +891,15 @@ public:
 	ProfilerUI m_profiler_ui;
 	ImportAssetDialog* m_import_asset_dialog;
 	ShaderCompiler* m_shader_compiler;
+	Lumix::string m_selected_template_name;
+
 	bool m_finished;
 
 	bool m_is_property_grid_shown;
 	bool m_is_entity_list_shown;
+	bool m_is_entity_template_list_opened;
 	bool m_is_style_editor_shown;
+	bool m_is_wireframe;
 };
 
 
@@ -846,6 +992,9 @@ LRESULT WINAPI msgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			g_context.m_pipeline->resize(width, height);
 		}
 		break;
+		case WM_MOUSEWHEEL:
+			ImGui::GetIO().MouseWheel = GET_WHEEL_DELTA_WPARAM(wParam) / 600.0f;
+			break;
 		case WM_ERASEBKGND:
 			return 1;
 		case WM_LBUTTONUP:

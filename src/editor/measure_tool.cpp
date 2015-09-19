@@ -24,7 +24,7 @@ namespace Lumix
 				m_is_from_set = false;
 				m_to = hit.m_origin + hit.m_dir * hit.m_t;
 			}
-			m_distance_measured.invoke(getDistance());
+			if(m_distance_measured.isValid()) m_distance_measured.invoke(getDistance());
 			return true;
 		}
 		return false;

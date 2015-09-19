@@ -1,5 +1,6 @@
 #include "import_asset_dialog.h"
 #include "assimp/postprocess.h"
+#include "assimp/ProgressHandler.hpp"
 #include "assimp/scene.h"
 #include "core/crc32.h"
 #include "core/FS/ifile.h"
@@ -27,11 +28,8 @@ typedef StringBuilder<Lumix::MAX_PATH_LENGTH> PathBuilder;
 TODO("todo");
 // TODO
 // profiler
-// menu items
+// release mode
 // game mode :(
-
-// lua imgui?
-// memory tool
 
 
 enum class VertexAttributeDef : uint32_t
@@ -216,6 +214,19 @@ struct ImportTextureTask : public Lumix::MT::Task
 
 struct ImportTask : public Lumix::MT::Task
 {
+	struct ProgressHandler : public Assimp::ProgressHandler
+	{
+		virtual bool Update(float percentage) override
+		{
+			m_task->m_dialog.setImportMessage(
+				StringBuilder<50>("Importing... ") << int(percentage*100) << "%%");
+
+			return true;
+		}
+
+		ImportTask* m_task;
+	};
+
 	ImportTask(ImportAssetDialog& dialog)
 		: Task(dialog.m_editor.getAllocator())
 		, m_dialog(dialog)
@@ -223,9 +234,17 @@ struct ImportTask : public Lumix::MT::Task
 	}
 
 
+	~ImportTask()
+	{
+		m_dialog.m_importer.SetProgressHandler(nullptr);
+	}
+
+
 	virtual int task() override
 	{
+		m_progress_handler.m_task = this;
 		Lumix::enableFloatingPointTraps(false);
+		m_dialog.m_importer.SetProgressHandler(&m_progress_handler);
 		m_dialog.m_importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS,
 			aiComponent_COLORS | aiComponent_LIGHTS |
 			aiComponent_CAMERAS);
@@ -251,6 +270,7 @@ struct ImportTask : public Lumix::MT::Task
 
 
 	ImportAssetDialog& m_dialog;
+	ProgressHandler m_progress_handler;
 
 }; // struct ImportTask
 

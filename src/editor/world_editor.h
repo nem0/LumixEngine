@@ -86,6 +86,8 @@ public:
 	virtual void renderIcons(PipelineInstance& pipeline) = 0;
 	virtual ComponentUID getEditCamera() = 0;
 	virtual class Gizmo& getGizmo() = 0;
+	virtual bool canUndo() const = 0;
+	virtual bool canRedo() const = 0;
 	virtual void undo() = 0;
 	virtual void redo() = 0;
 	virtual void loadUniverse(const Path& path) = 0;
@@ -95,6 +97,7 @@ public:
 	virtual void showEntities() = 0;
 	virtual void hideEntities() = 0;
 	virtual void copyEntity() = 0;
+	virtual bool canPasteEntity() const = 0;
 	virtual void pasteEntity() = 0;
 	virtual ComponentUID getComponent(Entity entity, uint32_t type) = 0;
 	virtual ComponentList& getComponents(Entity entity) = 0;
@@ -162,6 +165,8 @@ public:
 								 const Path& source) = 0;
 	virtual EntityTemplateSystem& getEntityTemplateSystem() = 0;
 	virtual Vec3 getCameraRaycastHit() = 0;
+	virtual bool isMeasureToolActive() const = 0;
+	virtual float getMeasuredDistance() const = 0;
 	virtual void toggleMeasure() = 0;
 	virtual class MeasureTool* getMeasureTool() const = 0;
 
