@@ -2294,6 +2294,12 @@ public:
 	}
 
 
+	virtual bool canPasteEntity() const override
+	{
+		return m_copy_buffer.getSize() > 0;
+	}
+
+
 	virtual void pasteEntity() override
 	{
 		PasteEntityCommand* command =
@@ -3017,6 +3023,18 @@ public:
 	}
 
 
+	virtual bool canUndo() const override
+	{
+		return m_undo_index < m_undo_stack.size() && m_undo_index >= 0;
+	}
+
+
+	virtual bool canRedo() const override
+	{
+		return m_undo_index + 1 < m_undo_stack.size();
+	}
+
+
 	virtual void undo() override
 	{
 		if (m_undo_index < m_undo_stack.size() && m_undo_index >= 0)
@@ -3040,6 +3058,18 @@ public:
 	virtual MeasureTool* getMeasureTool() const override
 	{
 		return m_measure_tool;
+	}
+
+
+	virtual float getMeasuredDistance() const override
+	{
+		return m_measure_tool->getDistance();
+	}
+
+
+	virtual bool isMeasureToolActive() const override
+	{
+		return m_measure_tool->isEnabled();
 	}
 
 
