@@ -1,8 +1,9 @@
 BasedOnStyle: LLVM
 
 AlignAfterOpenBracket : false
+AlignEscapedNewlinesLeft : true
 AlignConsecutiveAssignments : false
-AllowAllParametersOfDeclarationOnNextLine  : true
+AllowAllParametersOfDeclarationOnNextLine  : false
 AccessModifierOffset : -4
 AllowShortCaseLabelsOnASingleLine : true
 AllowShortFunctionsOnASingleLine : Inline

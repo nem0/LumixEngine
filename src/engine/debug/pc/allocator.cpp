@@ -99,6 +99,27 @@ namespace Debug
 	}
 
 
+	void* Allocator::reallocate(void* user_ptr, size_t size)
+	{
+		#ifndef _DEBUG
+			return m_source.reallocate(ptr, size);
+		#else
+			if (user_ptr == nullptr) return allocate(size);
+			if (size == 0) return nullptr;
+
+			void* new_data = allocate(size);
+			if (!new_data) return nullptr;
+
+			AllocationInfo* info = getAllocationInfoFromUser(user_ptr);
+			memcpy(new_data, user_ptr, info->m_size < size ? info->m_size : size);
+
+			deallocate(user_ptr);
+
+			return new_data;
+		#endif
+	}
+
+
 	void* Allocator::allocate(size_t size)
 	{
 		#ifndef _DEBUG

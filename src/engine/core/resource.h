@@ -32,7 +32,7 @@ namespace Lumix
 		bool isReady()		const { return State::READY		== m_state; }
 		bool isUnloading()	const { return State::UNLOADING	== m_state; }
 		bool isFailure()	const { return State::FAILURE	== m_state; }
-
+		uint32_t getRefCount() const { return m_ref_count; }
 
 		template <typename C, void (C::*Function)(State, State)>
 		void onLoaded(C* instance)
