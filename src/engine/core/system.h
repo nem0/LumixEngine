@@ -15,6 +15,8 @@ namespace Lumix
 	LUMIX_ENGINE_API bool copyFile(const char* from, const char* to);
 	LUMIX_ENGINE_API bool fileExists(const char* path);
 	LUMIX_ENGINE_API bool getOpenFilename(char* out, int max_size, const char* filter);
+	LUMIX_ENGINE_API bool getSaveFilename(
+		char* out, int max_size, const char* filter, const char* default_extension);
 	LUMIX_ENGINE_API bool getOpenDirectory(char* out, int max_size);
 	LUMIX_ENGINE_API uint64_t getLastModified(const char* file);
 	LUMIX_ENGINE_API void messageBox(const char* text);

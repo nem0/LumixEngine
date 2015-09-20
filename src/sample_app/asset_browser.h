@@ -1,6 +1,7 @@
 #pragma once
 #include "core/array.h"
 #include "core/path.h"
+#include <bgfx.h>
 
 
 namespace Lumix
@@ -63,4 +64,5 @@ private:
 	FileSystemWatcher* m_watcher;
 	char m_text_buffer[8192];
 	bool m_autoreload_changed_resource;
+	bgfx::TextureHandle m_texture_handle;
 };

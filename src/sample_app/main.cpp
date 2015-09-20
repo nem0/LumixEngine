@@ -6,6 +6,7 @@
 #include "core/path_utils.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
+#include "core/system.h"
 #include "debug/allocator.h"
 #include "editor/gizmo.h"
 #include "editor/entity_template_system.h"
@@ -153,9 +154,17 @@ public:
 					}
 					ImGui::EndMenu();
 				}
-				if (ImGui::MenuItem("Save"))
+				if (ImGui::MenuItem("Save", nullptr, nullptr, m_editor->getUniversePath().isValid()))
 				{
 					m_editor->saveUniverse(m_editor->getUniversePath());
+				}
+				if (ImGui::MenuItem("Save As"))
+				{
+					char filename[Lumix::MAX_PATH_LENGTH];
+					if (Lumix::getSaveFilename(filename, sizeof(filename), "Universes\0*.unv\0", "unv"))
+					{
+						m_editor->saveUniverse(Lumix::Path(filename));
+					}
 				}
 				if (ImGui::MenuItem("Exit")) PostQuitMessage(0);
 
