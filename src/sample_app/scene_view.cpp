@@ -163,7 +163,7 @@ void SceneView::onGui()
 	}
 
 	ImGui::PushItemWidth(60);
-	ImGui::DragFloat("Camera speed", &m_camera_speed, 0.1f, 0.0f, 999.0f, "%.2f");
+	ImGui::DragFloat("Camera speed", &m_camera_speed, 0.1f, 0.01f, 999.0f, "%.2f");
 	ImGui::SameLine();
 	if (m_editor->isMeasureToolActive())
 	{

@@ -315,9 +315,13 @@ void AssetBrowser::onGuiMaterial()
 void AssetBrowser::onGuiTexture()
 {
 	auto* texture = static_cast<Lumix::Texture*>(m_selected_resource);
+
+	ASSERT(texture->isReady() && bgfx::isValid(texture->getTextureHandle()));
+
 	ImGui::LabelText("Size", "%dx%d", texture->getWidth(), texture->getHeight());
 	ImGui::LabelText("BPP", "%d", texture->getBytesPerPixel());
-	ImGui::Image(&texture->getTextureHandle(), ImVec2(200, 200));
+	m_texture_handle = texture->getTextureHandle();
+	ImGui::Image(&m_texture_handle, ImVec2(200, 200));
 }
 
 
@@ -405,12 +409,16 @@ void AssetBrowser::onGuiResource()
 		case Lumix::ResourceManager::MATERIAL: onGuiMaterial(); break;
 		case Lumix::ResourceManager::TEXTURE: onGuiTexture(); break;
 		case Lumix::ResourceManager::MODEL: onGuiModel(); break;
+		case Lumix::ResourceManager::SHADER: break;
 		default:
 			if (resource_type == LUA_SCRIPT_HASH)
+			{
 				onGuiLuaScript();
-			else
-				ASSERT(false);
-			TODO("others");
+			}
+			else if (resource_type != UNIVERSE_HASH)
+			{
+				ASSERT(false); // unimplemented resource
+			}
 			break;
 	}
 }

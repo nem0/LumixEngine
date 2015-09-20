@@ -90,6 +90,27 @@ namespace Lumix
 	}
 
 
+	bool getSaveFilename(char* out, int max_size, const char* filter, const char* default_extension)
+	{
+		OPENFILENAME ofn;
+		ZeroMemory(&ofn, sizeof(ofn));
+		ofn.lStructSize = sizeof(ofn);
+		ofn.hwndOwner = NULL;
+		ofn.lpstrFile = out;
+		ofn.lpstrFile[0] = '\0';
+		ofn.nMaxFile = max_size;
+		ofn.lpstrFilter = filter;
+		ofn.nFilterIndex = 1;
+		ofn.lpstrDefExt = default_extension;
+		ofn.lpstrFileTitle = NULL;
+		ofn.nMaxFileTitle = 0;
+		ofn.lpstrInitialDir = NULL;
+		ofn.Flags = OFN_OVERWRITEPROMPT | OFN_NOCHANGEDIR | OFN_NONETWORKBUTTON;
+
+		return GetSaveFileName(&ofn) == TRUE;
+	}
+
+
 	bool getOpenFilename(char* out, int max_size, const char* filter)
 	{
 		OPENFILENAME ofn;
@@ -104,14 +125,9 @@ namespace Lumix
 		ofn.lpstrFileTitle = NULL;
 		ofn.nMaxFileTitle = 0;
 		ofn.lpstrInitialDir = NULL;
-		ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+		ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR | OFN_NONETWORKBUTTON;
 
-		char current_dir[MAX_PATH];
-		GetCurrentDirectory(sizeof(current_dir), current_dir);
-		bool status = GetOpenFileName(&ofn) == TRUE;
-		SetCurrentDirectory(current_dir);
-
-		return status;
+		return GetOpenFileName(&ofn) == TRUE;
 	}
 
 
