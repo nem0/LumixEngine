@@ -98,7 +98,7 @@ void LogUI::showNotifications()
 {
 	if (m_notifications.empty()) return;
 
-	ImGui::SetNextWindowPos(ImVec2(10, 70));
+	ImGui::SetNextWindowPos(ImVec2(10, 30));
 	bool opened;
 	if (!ImGui::Begin("Notifications",
 					  &opened,

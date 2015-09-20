@@ -17,6 +17,7 @@ SceneView::SceneView()
 {
 	m_pipeline = nullptr;
 	m_editor = nullptr;
+	m_camera_speed = 0.1f;
 }
 
 
@@ -63,13 +64,15 @@ void SceneView::update()
 	if (!m_is_opened) return;
 	if (ImGui::GetIO().KeysDown[VK_CONTROL]) return;
 
+	m_camera_speed = Lumix::Math::maxValue(0.01f, m_camera_speed + ImGui::GetIO().MouseWheel / 20.0f);
+
 	int screen_x = int(ImGui::GetIO().MousePos.x);
 	int screen_y = int(ImGui::GetIO().MousePos.y);
 	bool is_inside = screen_x >= m_screen_x && screen_y >= m_screen_y &&
 		screen_x <= m_screen_x + m_width && screen_y <= m_screen_y + m_height;
 	if (!is_inside) return;
 
-	float speed = 0.1f;
+	float speed = m_camera_speed;
 	if (ImGui::GetIO().KeysDown[VK_SHIFT])
 	{
 		speed *= 10;
@@ -143,6 +146,7 @@ void SceneView::onGui()
 		m_is_mouse_hovering_window = ImGui::IsMouseHoveringWindow();
 		m_is_opened = true;
 		auto size = ImGui::GetContentRegionAvail();
+		size.y -= ImGui::GetTextLineHeightWithSpacing();
 		auto pos = ImGui::GetWindowPos();
 		auto cp = ImGui::GetCursorPos();
 		m_pipeline->setViewport(0, 0, int(size.x), int(size.y));
@@ -152,10 +156,19 @@ void SceneView::onGui()
 		m_screen_x = int(cursor_pos.x);
 		m_screen_y = int(cursor_pos.y);
 		m_width = int(size.x);
-		m_height = int(size.x);
+		m_height = int(size.y);
 		ImGui::Image(&m_texture_handle, size);
 
 		m_pipeline->render();
 	}
+
+	ImGui::PushItemWidth(60);
+	ImGui::DragFloat("Camera speed", &m_camera_speed, 0.1f, 0.0f, 999.0f, "%.2f");
+	ImGui::SameLine();
+	if (m_editor->isMeasureToolActive())
+	{
+		ImGui::Text("| Measured distance: %f", m_editor->getMeasuredDistance());
+	}
+
 	ImGui::End();
 }

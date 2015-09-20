@@ -64,6 +64,7 @@ public:
 	{
 		float time_delta = m_editor->getEngine().getLastTimeDelta();
 
+		m_asset_browser->update();
 		m_shader_compiler->update(time_delta);
 		m_log_ui->update(time_delta);
 	}
@@ -104,7 +105,6 @@ public:
 		m_sceneview.onGui();
 		showGameView();
 		if (m_is_style_editor_shown) ImGui::ShowStyleEditor();
-		showStats();
 
 		ImGui::Render();
 	}
@@ -274,6 +274,12 @@ public:
 				}
 				ImGui::EndMenu();
 			}
+			StringBuilder<100> stats("FPS: ");
+			stats << m_engine->getFPS()
+				  << " Memory: " << (m_allocator.getTotalSize() / 1024) / 1024.0f << "MB";
+			auto stats_size = ImGui::CalcTextSize(stats);
+			ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x);
+			ImGui::Text(stats);
 
 			ImGui::EndMainMenuBar();
 		}
@@ -576,29 +582,6 @@ public:
 	}
 
 
-	void showStats()
-	{
-		ImGui::SetNextWindowPos(ImVec2(10, 30));
-		const ImGuiWindowFlags flags =
-			ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-			ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove |
-			ImGuiWindowFlags_NoSavedSettings;
-		if (!ImGui::Begin("", nullptr, ImVec2(0, 0), 0.3f, flags))
-		{
-			ImGui::End();
-			return;
-		}
-		ImGui::Text("FPS: %.1f", m_engine->getFPS());
-		ImGui::Text("Memory: %.1fMB", (m_allocator.getTotalSize() / 1024) / 1024.0f);
-		if (m_editor->isMeasureToolActive())
-		{
-			ImGui::Text("Measured distance: %f", m_editor->getMeasuredDistance());
-		}
-		ImGui::End();
-
-	}
-
-
 	void getEntityListDisplayName(char* buf, int max_size, Lumix::Entity entity)
 	{
 		const char* name = m_editor->getUniverse()->getEntityName(entity);
@@ -702,8 +685,8 @@ public:
 		delete m_log_ui;
 		delete m_import_asset_dialog;
 		delete m_shader_compiler;
-		m_sceneview.shutdown();
 		Lumix::WorldEditor::destroy(m_editor);
+		m_sceneview.shutdown();
 		Lumix::PipelineInstance::destroy(m_gui_pipeline);
 		Lumix::PipelineInstance::destroy(m_game_pipeline);
 		m_gui_pipeline_source->getResourceManager()
@@ -839,7 +822,9 @@ public:
 		RECT rect;
 		GetClientRect(win, &rect);
 		m_gui_pipeline->setViewport(0, 0, rect.right, rect.bottom);
-		m_game_pipeline->setViewport(0, 0, rect.right, rect.bottom);
+		auto& plugin_manager = m_editor->getEngine().getPluginManager();
+		auto* renderer = static_cast<Lumix::Renderer*>(plugin_manager.getPlugin("renderer"));
+		renderer->resize(rect.right, rect.bottom);
 		onUniverseCreated();
 		initIMGUI(win);
 	}

@@ -453,7 +453,7 @@ bool toCString(float value, char* output, int length, int after_point)
 	}
 	// decimal part
 	float dec_part = num;
-	if (length >= 1 && after_point > 0)
+	if (length > 1 && after_point > 0)
 	{
 		*c = '.';
 		++c;
@@ -468,7 +468,7 @@ bool toCString(float value, char* output, int length, int after_point)
 	{
 		return false;
 	}
-	while (length > 0 && after_point > 0)
+	while (length > 1 && after_point > 0)
 	{
 		dec_part *= 10;
 		char tmp = (char)dec_part;

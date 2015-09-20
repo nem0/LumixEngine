@@ -344,6 +344,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		for (int i = 0; i < m_framebuffers.size(); ++i)
 		{
 			m_allocator.deleteObject(m_framebuffers[i]);
+			if (m_framebuffers[i] == m_default_framebuffer) m_default_framebuffer = nullptr;
 		}
 		m_allocator.deleteObject(m_default_framebuffer);
 	}
