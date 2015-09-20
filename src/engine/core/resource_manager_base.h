@@ -22,6 +22,7 @@ class ResourceManager;
 class LUMIX_ENGINE_API ResourceManagerBase
 {
 	friend class Resource;
+public:
 	typedef PODHashMap<uint32_t, Resource*> ResourceTable;
 
 public:
@@ -42,6 +43,7 @@ public:
 
 	void reload(const Path& path);
 	void reload(Resource& resource);
+	ResourceTable& getResourceTable() { return m_resources; }
 
 	ResourceManagerBase(IAllocator& allocator);
 	virtual ~ResourceManagerBase(void);

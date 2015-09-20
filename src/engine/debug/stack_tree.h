@@ -14,7 +14,7 @@ namespace Debug
 	class StackNode;
 
 
-	class StackTree
+	class LUMIX_ENGINE_API StackTree
 	{
 		public:
 			StackTree();
@@ -22,6 +22,8 @@ namespace Debug
 
 			StackNode* record();
 			void printCallstack(StackNode* node);
+			static bool getFunction(StackNode* node, char* out, int max_size);
+			static StackNode* getParent(StackNode* node);
 
 		private:
 			StackNode* insertChildren(StackNode* node, void** instruction, void** stack);

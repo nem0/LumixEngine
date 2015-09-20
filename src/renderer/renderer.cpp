@@ -33,9 +33,31 @@
 #include <cstdio>
 
 
-namespace bgfx
+namespace bx
 {
 
+	struct AllocatorI
+	{
+		virtual ~AllocatorI() = 0;
+		virtual void* alloc(size_t _size, size_t _align, const char* _file, uint32_t _line) = 0;
+		virtual void free(void* _ptr, size_t _align, const char* _file, uint32_t _line) = 0;
+	};
+
+	inline AllocatorI::~AllocatorI()
+	{
+	}
+
+	struct ReallocatorI : public AllocatorI
+	{
+		virtual void* realloc(void* _ptr, size_t _size, size_t _align, const char* _file, uint32_t _line) = 0;
+	};
+
+
+} // namespace bx
+
+
+namespace bgfx
+{
 
 struct PlatformData
 {
@@ -48,7 +70,8 @@ struct PlatformData
 
 
 void setPlatformData(const PlatformData& _pd);
-}
+
+} // namespace bgfx
 
 
 namespace Lumix
@@ -59,6 +82,47 @@ static const uint32_t GLOBAL_LIGHT_HASH = crc32("global_light");
 static const uint32_t POINT_LIGHT_HASH = crc32("point_light");
 static const uint32_t RENDERABLE_HASH = crc32("renderable");
 static const uint32_t CAMERA_HASH = crc32("camera");
+
+
+struct BGFXAllocator : public bx::ReallocatorI
+{
+
+	BGFXAllocator(Lumix::IAllocator& source)
+		: m_source(source)
+	{
+	}
+
+
+	virtual ~BGFXAllocator()
+	{
+	}
+
+
+	virtual void* alloc(size_t _size, size_t _align, const char* _file, uint32_t _line) override 
+	{
+		return m_source.allocate(_size);
+	}
+
+
+	virtual void free(void* _ptr, size_t _align, const char* _file, uint32_t _line) override 
+	{
+		m_source.deallocate(_ptr);
+	}
+
+
+	virtual void* realloc(void* _ptr,
+		size_t _size,
+		size_t _align,
+		const char* _file,
+		uint32_t _line) override
+	{
+		return m_source.reallocate(_ptr, _size);
+	}
+
+
+	Lumix::IAllocator& m_source;
+
+};
 
 
 struct RendererImpl : public Renderer
@@ -79,7 +143,10 @@ struct RendererImpl : public Renderer
 		}
 
 
-		virtual void traceVargs(const char* _filePath, uint16_t _line, const char* _format, va_list _argList) override
+		virtual void traceVargs(const char* _filePath,
+			uint16_t _line,
+			const char* _format,
+			va_list _argList) override
 		{
 			char tmp[2048];
 			vsnprintf(tmp, sizeof(tmp), _format, _argList);
@@ -88,38 +155,32 @@ struct RendererImpl : public Renderer
 
 
 		virtual void screenShot(const char*,
-								uint32_t,
-								uint32_t,
-								uint32_t,
-								const void*,
-								uint32_t,
-								bool) override
+			uint32_t,
+			uint32_t,
+			uint32_t,
+			const void*,
+			uint32_t,
+			bool) override
 		{
 			ASSERT(false);
 		}
 
 
 		virtual void captureBegin(uint32_t,
-								  uint32_t,
-								  uint32_t,
-								  bgfx::TextureFormat::Enum,
-								  bool) override
+			uint32_t,
+			uint32_t,
+			bgfx::TextureFormat::Enum,
+			bool) override
 		{
 			ASSERT(false);
 		}
 
 
 		virtual uint32_t cacheReadSize(uint64_t) override { return 0; }
-		virtual bool cacheRead(uint64_t, void*, uint32_t) override
-		{
-			return false;
-		}
+		virtual bool cacheRead(uint64_t, void*, uint32_t) override { return false; }
 		virtual void cacheWrite(uint64_t, const void*, uint32_t) override {}
 		virtual void captureEnd() override { ASSERT(false); }
-		virtual void captureFrame(const void*, uint32_t) override
-		{
-			ASSERT(false);
-		}
+		virtual void captureFrame(const void*, uint32_t) override { ASSERT(false); }
 	};
 
 
@@ -133,6 +194,7 @@ struct RendererImpl : public Renderer
 		, m_pipeline_manager(*this, m_allocator)
 		, m_passes(m_allocator)
 		, m_shader_defines(m_allocator)
+		, m_bgfx_allocator(m_allocator)
 	{
 		bgfx::PlatformData d;
 		if (s_hwnd)
@@ -141,7 +203,7 @@ struct RendererImpl : public Renderer
 			d.nwh = s_hwnd;
 			bgfx::setPlatformData(d);
 		}
-		bgfx::init(bgfx::RendererType::Count, 0, 0, &m_callback_stub);
+		bgfx::init(bgfx::RendererType::Count, 0, 0, &m_callback_stub, &m_bgfx_allocator);
 		bgfx::reset(800, 600);
 		bgfx::setDebug(BGFX_DEBUG_TEXT);
 
@@ -195,17 +257,11 @@ struct RendererImpl : public Renderer
 		m_engine.registerComponentType("point_light", "Point light");
 		m_engine.registerComponentType("terrain", "Terrain");
 
-		m_engine.registerProperty(
-			"camera",
+		m_engine.registerProperty("camera",
 			allocator.newObject<StringPropertyDescriptor<RenderScene>>(
-				"slot",
-				&RenderScene::getCameraSlot,
-				&RenderScene::setCameraSlot,
-				allocator));
-		m_engine.registerProperty(
-			"camera",
-			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
-				"FOV",
+				"slot", &RenderScene::getCameraSlot, &RenderScene::setCameraSlot, allocator));
+		m_engine.registerProperty("camera",
+			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>("FOV",
 				&RenderScene::getCameraFOV,
 				&RenderScene::setCameraFOV,
 				1.0f,
@@ -526,6 +582,7 @@ struct RendererImpl : public Renderer
 	PipelineManager m_pipeline_manager;
 	uint32_t m_current_pass_hash;
 	int m_view_counter;
+	BGFXAllocator m_bgfx_allocator;
 
 	static HWND s_hwnd;
 };

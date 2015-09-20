@@ -37,6 +37,12 @@ namespace Lumix
 			m_pool[m_pool_index++] = reinterpret_cast<T*>(ptr);
 		}
 
+		void* reallocate(void*, size_t) override
+		{
+			ASSERT(false);
+			return nullptr;
+		}
+
 	private:
 		IAllocator&	m_allocator;
 		int32_t		m_pool_index;

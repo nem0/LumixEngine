@@ -35,6 +35,12 @@ public:
 		}
 	}
 
+	virtual void* reallocate(void* ptr, size_t size) override
+	{
+		return m_source.reallocate(ptr, size);
+	}
+
+
 	IAllocator& getSourceAllocator() { return m_source; }
 
 private:

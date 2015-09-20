@@ -57,6 +57,8 @@ public:
 		, m_is_entity_template_list_opened(false)
 		, m_selected_template_name(m_allocator)
 		, m_is_gameview_opened(true)
+		, m_profiler_ui(nullptr)
+		, m_asset_browser(nullptr)
 	{
 	}
 
@@ -96,7 +98,7 @@ public:
 		
 		showMainMenu();
 
-		m_profiler_ui.onGui();
+		m_profiler_ui->onGui();
 		m_asset_browser->onGui();
 		m_log_ui->onGui();
 		m_import_asset_dialog->onGui();
@@ -276,7 +278,7 @@ public:
 					ImGui::MenuItem("Entity list", nullptr, &m_is_entity_list_shown);
 					ImGui::MenuItem("Entity templates", nullptr, &m_is_entity_template_list_opened);
 					ImGui::MenuItem("Log", nullptr, &m_log_ui->m_is_opened);
-					ImGui::MenuItem("Profiler", nullptr, &m_profiler_ui.m_is_opened);
+					ImGui::MenuItem("Profiler", nullptr, &m_profiler_ui->m_is_opened);
 					ImGui::MenuItem("Properties", nullptr, &m_is_property_grid_shown);
 					ImGui::MenuItem("Style editor", nullptr, &m_is_style_editor_shown);
 					ImGui::EndMenu();
@@ -690,6 +692,7 @@ public:
 		shutdownImGui();
 
 		delete m_terrain_editor;
+		delete m_profiler_ui;
 		delete m_asset_browser;
 		delete m_log_ui;
 		delete m_import_asset_dialog;
@@ -805,6 +808,7 @@ public:
 		GetCurrentDirectory(sizeof(current_dir), current_dir);
 		m_editor = Lumix::WorldEditor::create(current_dir, *m_engine);
 		m_asset_browser = new AssetBrowser(*m_editor);
+		m_profiler_ui = new ProfilerUI(&m_allocator, &m_editor->getEngine().getResourceManager());
 		m_terrain_editor = new TerrainEditor(*m_editor);
 		m_log_ui = new LogUI(m_editor->getAllocator());
 		m_import_asset_dialog = new ImportAssetDialog(*m_editor);
@@ -918,7 +922,7 @@ public:
 	AssetBrowser* m_asset_browser;
 	TerrainEditor* m_terrain_editor;
 	LogUI* m_log_ui;
-	ProfilerUI m_profiler_ui;
+	ProfilerUI* m_profiler_ui;
 	ImportAssetDialog* m_import_asset_dialog;
 	ShaderCompiler* m_shader_compiler;
 	Lumix::string m_selected_template_name;

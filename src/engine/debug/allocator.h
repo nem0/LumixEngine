@@ -20,7 +20,7 @@ namespace Debug
 
 	class LUMIX_ENGINE_API Allocator : public IAllocator
 	{
-		private:
+		public:
 			class AllocationInfo
 			{
 			public:
@@ -36,9 +36,11 @@ namespace Debug
 
 			virtual void* allocate(size_t size) override;
 			virtual void deallocate(void* ptr) override;
+			virtual void* reallocate(void* ptr, size_t size) override;
 			size_t getTotalSize() const { return m_total_size; }
 
 			IAllocator& getSourceAllocator() { return m_source; }
+			AllocationInfo* getFirstAllocationInfo() const { return m_root; }
 
 		private:
 			inline size_t getAllocationOffset();
