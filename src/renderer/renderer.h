@@ -32,6 +32,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		static void setInitData(void* data);
 
 		virtual void frame() = 0;
+		virtual void resize(int width, int height) = 0;
 		virtual int getViewCounter() const = 0;
 		virtual void viewCounterAdd() = 0;
 		virtual void makeScreenshot(const Path& filename) = 0;

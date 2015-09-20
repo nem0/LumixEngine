@@ -233,6 +233,6 @@ void SceneView::resizeEvent(QResizeEvent*)
 {
 	if (getPipeline())
 	{
-		getPipeline()->resize(m_view->width(), m_view->height());
+		getPipeline()->setViewport(0, 0, m_view->width(), m_view->height());
 	}
 }

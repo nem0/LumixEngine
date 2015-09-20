@@ -13,18 +13,31 @@ void normalize(const char* path, char* out, uint32_t max_size)
 {
 	ASSERT(max_size > 0);
 	uint32_t i = 0;
+
+	bool is_prev_slash = false;
+
 	if (path[0] == '.' && (path[1] == '\\' || path[1] == '/'))
 		++path;
 	if (path[0] == '\\' || path[0] == '/')
 		++path;
 	while (*path != '\0' && i < max_size)
 	{
+		bool is_current_slash = *path == '\\' || *path == '/';
+
+		if (is_current_slash && is_prev_slash)
+		{
+			++path;
+			continue;
+		}
+
 		*out = *path == '\\' ? '/' : *path;
 		*out = *path >= 'A' && *path <= 'Z' ? *path - 'A' + 'a' : *out;
 
 		path++;
 		out++;
 		i++;
+
+		is_prev_slash = is_current_slash;
 	}
 	(i < max_size ? *out : *(out - 1)) = '\0';
 }

@@ -486,6 +486,12 @@ struct RendererImpl : public Renderer
 	}
 
 
+	virtual void resize(int w, int h) override
+	{
+		bgfx::reset(w, h);
+	}
+
+
 	virtual void frame() override
 	{
 		bgfx::frame();

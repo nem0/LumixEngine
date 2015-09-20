@@ -1,4 +1,5 @@
 #include "asset_browser.h"
+#include "core/crc32.h"
 #include "core/FS/file_iterator.h"
 #include "core/FS/file_system.h"
 #include "core/json_serializer.h"
@@ -10,6 +11,8 @@
 #include "core/system.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
+#include "file_system_watcher.h"
+#include "lua_script/lua_script_manager.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/shader.h"
@@ -17,13 +20,34 @@
 #include "ocornut-imgui/imgui.h"
 #include "string_builder.h"
 
+TODO("unload m_selected_resource");
+TODO("clang");
+static const uint32_t UNIVERSE_HASH = Lumix::crc32("universe");
+static const uint32_t LUA_SCRIPT_HASH = Lumix::crc32("lua_script");
+
+
+static uint32_t getResourceType(const char* path)
+{
+	char ext[10];
+	Lumix::PathUtils::getExtension(ext, sizeof(ext), path);
+
+	if (strcmp(ext, "mat") == 0) return Lumix::ResourceManager::MATERIAL;
+	if (strcmp(ext, "msh") == 0) return Lumix::ResourceManager::MODEL;
+	if (strcmp(ext, "dds") == 0) return Lumix::ResourceManager::TEXTURE;
+	if (strcmp(ext, "tga") == 0) return Lumix::ResourceManager::TEXTURE;
+	if (strcmp(ext, "shd") == 0) return Lumix::ResourceManager::SHADER;
+	if (strcmp(ext, "unv") == 0) return UNIVERSE_HASH;
+	if (strcmp(ext, "lua") == 0) return LUA_SCRIPT_HASH;
+
+	return 0;
+}
+
 
 AssetBrowser::AssetBrowser(Lumix::WorldEditor& editor)
 	: m_editor(editor)
 	, m_resources(editor.getAllocator())
 	, m_selected_resouce(nullptr)
 {
-	TODO("detect changes");
 	m_is_opened = false;
 	for (int i = 0; i < Count; ++i)
 	{
@@ -31,22 +55,48 @@ AssetBrowser::AssetBrowser(Lumix::WorldEditor& editor)
 	}
 
 	findResources();
+
+	m_watcher = FileSystemWatcher::create(editor.getBasePath(), editor.getAllocator());
+	m_watcher->getCallback().bind<AssetBrowser, &AssetBrowser::onFileChanged>(this);
 }
 
 
-static uint32_t getResourceType(const char* path)
+AssetBrowser::~AssetBrowser()
 {
-	char ext[10];
-	Lumix::PathUtils::getExtension(ext, sizeof(ext), path);
-	
-	if (strcmp(ext, "mat") == 0) return Lumix::ResourceManager::MATERIAL;
-	if (strcmp(ext, "msh") == 0) return Lumix::ResourceManager::MODEL;
-	if (strcmp(ext, "dds") == 0) return Lumix::ResourceManager::TEXTURE;
-	if (strcmp(ext, "tga") == 0) return Lumix::ResourceManager::TEXTURE;
-	if (strcmp(ext, "shd") == 0) return Lumix::ResourceManager::SHADER;
+	FileSystemWatcher::destroy(m_watcher);
+}
 
-	ASSERT(false);
-	return 0;
+
+void AssetBrowser::onFileChanged(const char* path)
+{
+	uint32_t resource_type = getResourceType(path);
+	if (resource_type == 0) return;
+
+	Lumix::Path path_obj(path);
+	if (!Lumix::fileExists(path))
+	{
+		int index = 0;
+		switch (resource_type)
+		{
+			case Lumix::ResourceManager::MODEL: index = MODEL; break;
+			case Lumix::ResourceManager::MATERIAL: index = MATERIAL; break;
+			case Lumix::ResourceManager::SHADER: index = SHADER; break;
+			case Lumix::ResourceManager::TEXTURE: index = TEXTURE; break;
+		}
+		if (resource_type == UNIVERSE_HASH)
+			index = UNIVERSE;
+		else if (resource_type == LUA_SCRIPT_HASH)
+			index = LUA_SCRIPT;
+
+		m_resources[index].eraseItemFast(path_obj);
+		return;
+	}
+
+	char dir[Lumix::MAX_PATH_LENGTH];
+	char filename[Lumix::MAX_PATH_LENGTH];
+	Lumix::PathUtils::getDir(dir, sizeof(dir), path);
+	Lumix::PathUtils::getFilename(filename, sizeof(filename), path);
+	addResource(dir, filename);
 }
 
 
@@ -59,13 +109,10 @@ void AssetBrowser::onGui()
 		ImGui::End();
 		return;
 	}
-	
-	if (ImGui::Button("Refresh"))
-	{
-		findResources();
-	}
 
-	const char* items = "Material\0Model\0Shader\0Texture\0Universe\0";
+	if (ImGui::Button("Refresh")) findResources();
+
+	const char* items = "Material\0Model\0Shader\0Texture\0Universe\0Lua Script\0";
 	static int current_type = 0;
 	static char filter[128] = "";
 	ImGui::Combo("Type", &current_type, items);
@@ -76,13 +123,10 @@ void AssetBrowser::onGui()
 
 	for (auto& resource : *resources)
 	{
-		if (filter[0] != '\0' && strstr(resource.c_str(), filter) == nullptr)
-			continue;
+		if (filter[0] != '\0' && strstr(resource.c_str(), filter) == nullptr) continue;
 
 		if (ImGui::Selectable(resource.c_str(),
-							  m_selected_resouce
-								  ? m_selected_resouce->getPath() == resource
-								  : false))
+				m_selected_resouce ? m_selected_resouce->getPath() == resource : false))
 		{
 			m_selected_resouce = m_editor.getEngine()
 									 .getResourceManager()
@@ -104,14 +148,11 @@ void AssetBrowser::saveMaterial(Lumix::Material* material)
 	strcpy(tmp_path, material->getPath().c_str());
 	strcat(tmp_path, ".tmp");
 	Lumix::FS::IFile* file =
-		fs.open(fs.getDefaultDevice(),
-		tmp_path,
-		Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE);
+		fs.open(fs.getDefaultDevice(), tmp_path, Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE);
 	if (file)
 	{
 		Lumix::DefaultAllocator allocator;
-		Lumix::JsonSerializer serializer(
-			*file,
+		Lumix::JsonSerializer serializer(*file,
 			Lumix::JsonSerializer::AccessMode::WRITE,
 			material->getPath().c_str(),
 			allocator);
@@ -123,18 +164,16 @@ void AssetBrowser::saveMaterial(Lumix::Material* material)
 	}
 	else
 	{
-		Lumix::g_log_error.log("Material manager")
-			<< "Could not save file " << material->getPath().c_str();
+		Lumix::g_log_error.log("Material manager") << "Could not save file "
+												   << material->getPath().c_str();
 	}
 }
 
 
 bool AssetBrowser::resourceInput(const char* label, char* buf, int max_size, Type type)
 {
-	if (ImGui::InputText(label, buf, max_size))
-	{
-		return true;
-	}
+	if (ImGui::InputText(label, buf, max_size)) return true;
+
 	ImGui::SameLine();
 	if (ImGui::Button(StringBuilder<30>("...##", label)))
 	{
@@ -169,33 +208,26 @@ void AssetBrowser::onGuiMaterial()
 {
 	auto* material = static_cast<Lumix::Material*>(m_selected_resouce);
 
-	if (ImGui::Button("Save"))
-	{
-		saveMaterial(material);
-	}
+	if (ImGui::Button("Save")) saveMaterial(material);
 
 	bool b;
 	if (material->hasAlphaCutoutDefine())
 	{
 		b = material->isAlphaCutout();
-		if (ImGui::Checkbox("Is alpha cutout", &b))
-			material->enableAlphaCutout(b);
+		if (ImGui::Checkbox("Is alpha cutout", &b)) material->enableAlphaCutout(b);
 	}
 
 	b = material->isBackfaceCulling();
-	if (ImGui::Checkbox("Is backface culling", &b))
-		material->enableBackfaceCulling(b);
+	if (ImGui::Checkbox("Is backface culling", &b)) material->enableBackfaceCulling(b);
 
 	if (material->hasShadowReceivingDefine())
 	{
 		b = material->isShadowReceiver();
-		if (ImGui::Checkbox("Is shadow receiver", &b))
-			material->enableShadowReceiving(b);
+		if (ImGui::Checkbox("Is shadow receiver", &b)) material->enableShadowReceiving(b);
 	}
 
 	b = material->isZTest();
-	if (ImGui::Checkbox("Z test", &b))
-		material->enableZTest(b);
+	if (ImGui::Checkbox("Z test", &b)) material->enableZTest(b);
 
 	Lumix::Vec3 specular = material->getSpecular();
 	if (ImGui::ColorEdit3("Specular", &specular.x))
@@ -211,22 +243,17 @@ void AssetBrowser::onGuiMaterial()
 
 	char buf[256];
 	Lumix::copyString(
-		buf,
-		sizeof(buf),
-		material->getShader() ? material->getShader()->getPath().c_str() : "");
+		buf, sizeof(buf), material->getShader() ? material->getShader()->getPath().c_str() : "");
 	if (resourceInput("Shader", buf, sizeof(buf), SHADER))
 	{
 		material->setShader(Lumix::Path(buf));
 	}
 
-	for (int i = 0; i < material->getShader()->getTextureSlotCount();
-		++i)
+	for (int i = 0; i < material->getShader()->getTextureSlotCount(); ++i)
 	{
 		auto& slot = material->getShader()->getTextureSlot(i);
 		auto* texture = material->getTexture(i);
-		Lumix::copyString(buf,
-			sizeof(buf),
-			texture ? texture->getPath().c_str() : "");
+		Lumix::copyString(buf, sizeof(buf), texture ? texture->getPath().c_str() : "");
 		if (resourceInput(slot.m_name, buf, sizeof(buf), TEXTURE))
 		{
 			material->setTexturePath(i, Lumix::Path(buf));
@@ -240,7 +267,26 @@ void AssetBrowser::onGuiTexture()
 	auto* texture = static_cast<Lumix::Texture*>(m_selected_resouce);
 	ImGui::LabelText("Size", "%dx%d", texture->getWidth(), texture->getHeight());
 	ImGui::LabelText("BPP", "%d", texture->getBytesPerPixel());
-	ImGui::Image(texture, ImVec2(200, 200));
+	ImGui::Image(&texture->getTextureHandle(), ImVec2(200, 200));
+}
+
+
+void AssetBrowser::onGuiLuaScript()
+{
+	auto* script = static_cast<Lumix::LuaScript*>(m_selected_resouce);
+
+	char buf[4096];
+	Lumix::copyString(buf, sizeof(buf), script->getSourceCode());
+	ImGui::InputTextMultiline("Code", buf, sizeof(buf), ImVec2(0, 300));
+	if (ImGui::Button("Update"))
+	{
+		TODO("Update");
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Save"))
+	{
+		TODO("save");
+	}
 }
 
 
@@ -258,7 +304,7 @@ void AssetBrowser::onGuiModel()
 	for (int i = 0; i < model->getMeshCount(); ++i)
 	{
 		auto& mesh = model->getMesh(i);
-		if (ImGui::TreeNode(&mesh	, mesh.getName()))
+		if (ImGui::TreeNode(&mesh, mesh.getName()))
 		{
 			ImGui::LabelText("Triangle count", "%d", mesh.getTriangleCount());
 			ImGui::Text(mesh.getMaterial()->getPath().c_str());
@@ -276,38 +322,36 @@ void AssetBrowser::onGuiModel()
 void AssetBrowser::onGuiResource()
 {
 	if (!m_selected_resouce) return;
-	
+
 
 	const char* path = m_selected_resouce->getPath().c_str();
-	if (ImGui::CollapsingHeader(path, nullptr, true, true))
+	if (!ImGui::CollapsingHeader(path, nullptr, true, true)) return;
+
+	if (m_selected_resouce->isFailure())
 	{
-		if (m_selected_resouce->isFailure())
-		{
-			ImGui::Text("Failed to load the resource");
-			return;
-		}
+		ImGui::Text("Failed to load the resource");
+		return;
+	}
 
-		if (m_selected_resouce->isLoading())
-		{
-			ImGui::Text("Loading...");
-			return;
-		}
+	if (m_selected_resouce->isLoading())
+	{
+		ImGui::Text("Loading...");
+		return;
+	}
 
-		switch (getResourceType(path))
-		{
-			case Lumix::ResourceManager::MATERIAL:
-				onGuiMaterial();
-				break;
-			case Lumix::ResourceManager::TEXTURE:
-				onGuiTexture();
-				break;
-			case Lumix::ResourceManager::MODEL:
-				onGuiModel();
-				break;
-			default:
+	auto resource_type = getResourceType(path);
+	switch (resource_type)
+	{
+		case Lumix::ResourceManager::MATERIAL: onGuiMaterial(); break;
+		case Lumix::ResourceManager::TEXTURE: onGuiTexture(); break;
+		case Lumix::ResourceManager::MODEL: onGuiModel(); break;
+		default:
+			if (resource_type == LUA_SCRIPT_HASH)
+				onGuiLuaScript();
+			else
 				ASSERT(false);
-				break;
-		}
+			TODO("others");
+			break;
 	}
 }
 
@@ -328,57 +372,46 @@ void AssetBrowser::addResource(const char* path, const char* filename)
 	Lumix::catString(fullpath, sizeof(fullpath), "/");
 	Lumix::catString(fullpath, sizeof(fullpath), filename);
 
-	if (strcmp(ext, "msh") == 0)
+	int index = -1;
+	if (strcmp(ext, "dds") == 0 || strcmp(ext, "tga") == 0) index = TEXTURE;
+	if (strcmp(ext, "msh") == 0) index = MODEL;
+	if (strcmp(ext, "mat") == 0) index = MATERIAL;
+	if (strcmp(ext, "unv") == 0) index = UNIVERSE;
+	if (strcmp(ext, "shd") == 0) index = SHADER;
+	if (strcmp(ext, "lua") == 0) index = LUA_SCRIPT;
+
+	if (index >= 0)
 	{
-		m_resources[MODEL].push(Lumix::Path(fullpath));
-		return;
-	}
-	if (strcmp(ext, "dds") == 0 || strcmp(ext, "tga") == 0)
-	{
-		m_resources[TEXTURE].push(Lumix::Path(fullpath));
-		return;
-	}
-	if (strcmp(ext, "mat") == 0)
-	{
-		m_resources[MATERIAL].push(Lumix::Path(fullpath));
-		return;
-	}
-	if (strcmp(ext, "unv") == 0)
-	{
-		m_resources[UNIVERSE].push(Lumix::Path(fullpath));
-		return;
-	}
-	if (strcmp(ext, "shd") == 0)
-	{
-		m_resources[SHADER].push(Lumix::Path(fullpath));
-		return;
+		Lumix::Path path_obj(fullpath);
+		if (m_resources[index].indexOf(path_obj) == -1)
+		{
+			m_resources[index].push(path_obj);
+		}
 	}
 }
 
 
-void AssetBrowser::processDir(const char* path)
+void AssetBrowser::processDir(const char* dir)
 {
-	auto* iter = Lumix::FS::createFileIterator(path, m_editor.getAllocator());
+	auto* iter = Lumix::FS::createFileIterator(dir, m_editor.getAllocator());
 	Lumix::FS::FileInfo info;
 	while (Lumix::FS::getNextFile(iter, &info))
 	{
-	
-		if (info.filename[0] == '.')
-			continue;
+
+		if (info.filename[0] == '.') continue;
 
 		if (info.is_directory)
 		{
 			char child_path[Lumix::MAX_PATH_LENGTH];
-			Lumix::copyString(child_path, sizeof(child_path), path);
+			Lumix::copyString(child_path, sizeof(child_path), dir);
 			Lumix::catString(child_path, sizeof(child_path), "/");
 			Lumix::catString(child_path, sizeof(child_path), info.filename);
 			processDir(child_path);
 		}
 		else
 		{
-			addResource(path, info.filename);
+			addResource(dir, info.filename);
 		}
-
 	}
 
 	Lumix::FS::destroyFileIterator(iter);

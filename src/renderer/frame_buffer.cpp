@@ -55,14 +55,31 @@ FrameBuffer::~FrameBuffer()
 
 void FrameBuffer::resize(int width, int height)
 {
-	ASSERT(m_window_handle);
 	if (bgfx::isValid(m_handle))
 	{
 		bgfx::destroyFrameBuffer(m_handle);
 	}
 	m_declaration.m_width = width;
 	m_declaration.m_height = height;
-	m_handle = bgfx::createFrameBuffer(m_window_handle, width, height);
+	if (m_window_handle)
+	{
+		m_handle = bgfx::createFrameBuffer(m_window_handle, width, height);
+	}
+	else
+	{
+		bgfx::TextureHandle texture_handles[16];
+
+		for (int i = 0; i < m_declaration.m_renderbuffers_count; ++i)
+		{
+			const RenderBuffer& renderbuffer = m_declaration.m_renderbuffers[i];
+			texture_handles[i] =
+				bgfx::createTexture2D(width, height, 1, renderbuffer.m_format, BGFX_TEXTURE_RT);
+			m_declaration.m_renderbuffers[i].m_handle = texture_handles[i];
+		}
+
+		m_window_handle = nullptr;
+		m_handle = bgfx::createFrameBuffer(m_declaration.m_renderbuffers_count, texture_handles);
+	}
 }
 
 

@@ -60,6 +60,12 @@ struct StringBuilder
 		Lumix::catString(data, size, value);
 	}
 
+	void add(float value)
+	{
+		int len = (int)strlen(data);
+		Lumix::toCString(value, data + len, size - len, 3);
+	}
+
 	template <typename T>
 	void add(T value)
 	{
