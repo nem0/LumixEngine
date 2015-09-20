@@ -47,7 +47,7 @@ class Context
 public:
 	Context()
 		: m_allocator(m_main_allocator)
-		, m_is_property_grid_shown(true)
+		, m_is_property_grid_opened(true)
 		, m_is_entity_list_shown(true)
 		, m_finished(false)
 		, m_is_style_editor_shown(false)
@@ -279,7 +279,7 @@ public:
 					ImGui::MenuItem("Entity templates", nullptr, &m_is_entity_template_list_opened);
 					ImGui::MenuItem("Log", nullptr, &m_log_ui->m_is_opened);
 					ImGui::MenuItem("Profiler", nullptr, &m_profiler_ui->m_is_opened);
-					ImGui::MenuItem("Properties", nullptr, &m_is_property_grid_shown);
+					ImGui::MenuItem("Properties", nullptr, &m_is_property_grid_opened);
 					ImGui::MenuItem("Style editor", nullptr, &m_is_style_editor_shown);
 					ImGui::EndMenu();
 				}
@@ -550,15 +550,21 @@ public:
 		{
 			m_editor->setEntitiesRotations(&entity, &rot, 1);
 		}
+
+		float scale = m_editor->getUniverse()->getScale(entity);
+		if (ImGui::DragFloat("Scale", &scale, 0.1))
+		{
+			m_editor->setEntitiesScales(&entity, &scale, 1);
+		}
 	}
 
 
 	void showPropertyGrid()
 	{
-		if (!m_is_property_grid_shown) return;
+		if (!m_is_property_grid_opened) return;
 
 		auto& ents = m_editor->getSelectedEntities();
-		if (ImGui::Begin("Properties", &m_is_property_grid_shown) && ents.size() == 1)
+		if (ImGui::Begin("Properties", &m_is_property_grid_opened) && ents.size() == 1)
 		{
 			if (ImGui::Button("Add component"))
 			{
@@ -931,7 +937,7 @@ public:
 
 	bool m_is_gameview_hovered;
 	bool m_is_gameview_opened;
-	bool m_is_property_grid_shown;
+	bool m_is_property_grid_opened;
 	bool m_is_entity_list_shown;
 	bool m_is_entity_template_list_opened;
 	bool m_is_style_editor_shown;

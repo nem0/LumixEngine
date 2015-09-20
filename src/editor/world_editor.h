@@ -109,35 +109,28 @@ public:
 	virtual void selectEntities(const Entity* entities, int count) = 0;
 	virtual void selectEntitiesWithSameMesh() = 0;
 	virtual Entity addEntityAt(int camera_x, int camera_y) = 0;
-	virtual void setEntitiesPositions(const Entity* entities,
-									  const Vec3* positions,
-									  int count) = 0;
-	virtual void setEntitiesScales(const Array<Entity>& entities,
-								   const Array<float>& scales) = 0;
-	virtual void setEntitiesRotations(const Entity* entity,
-									  const Quat* rotations,
-									  int count) = 0;
-	virtual void setEntitiesPositionsAndRotaions(const Entity* entity,
-												 const Vec3* position,
-												 const Quat* rotation,
-												 int count) = 0;
+	virtual void setEntitiesPositions(const Entity* entities, const Vec3* positions, int count) = 0;
+	virtual void setEntitiesScales(const Entity* entities, const float* scales, int count) = 0;
+	virtual void setEntitiesRotations(const Entity* entity, const Quat* rotations, int count) = 0;
+	virtual void setEntitiesPositionsAndRotations(const Entity* entity,
+		const Vec3* position,
+		const Quat* rotation,
+		int count) = 0;
 	virtual void setEntityName(Entity entity, const char* name) = 0;
 	virtual void snapToTerrain() = 0;
 	virtual void toggleGameMode() = 0;
 	virtual void navigate(float forward, float right, float speed) = 0;
 	virtual void setProperty(uint32_t component,
-							 int index,
-							 IPropertyDescriptor& property,
-							 const void* data,
-							 int size) = 0;
-	virtual void addArrayPropertyItem(const ComponentUID& cmp,
-									  IArrayDescriptor& property) = 0;
+		int index,
+		IPropertyDescriptor& property,
+		const void* data,
+		int size) = 0;
+	virtual void addArrayPropertyItem(const ComponentUID& cmp, IArrayDescriptor& property) = 0;
 	virtual void removeArrayPropertyItem(const ComponentUID& cmp,
-										 int index,
-										 IArrayDescriptor& property) = 0;
+		int index,
+		IArrayDescriptor& property) = 0;
 	virtual void onMouseDown(int x, int y, MouseButton::Value button) = 0;
-	virtual void
-	onMouseMove(int x, int y, int relx, int rely, int mouse_flags) = 0;
+	virtual void onMouseMove(int x, int y, int relx, int rely, int mouse_flags) = 0;
 	virtual void onMouseUp(int x, int y, MouseButton::Value button) = 0;
 	virtual float getMouseX() const = 0;
 	virtual float getMouseY() const = 0;
