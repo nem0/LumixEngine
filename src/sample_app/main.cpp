@@ -552,7 +552,7 @@ public:
 		}
 
 		float scale = m_editor->getUniverse()->getScale(entity);
-		if (ImGui::DragFloat("Scale", &scale, 0.1))
+		if (ImGui::DragFloat("Scale", &scale, 0.1f))
 		{
 			m_editor->setEntitiesScales(&entity, &scale, 1);
 		}
