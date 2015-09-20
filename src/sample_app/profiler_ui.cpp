@@ -197,7 +197,7 @@ void ProfilerUI::onGui()
 
 			auto* block = m_current_block ? m_current_block : m_root;
 			float width = ImGui::GetWindowContentRegionWidth();
-			int count = Lumix::Math::minValue(/*int(width / 5)*/40, block->m_hit_counts.size());
+			int count = Lumix::Math::minValue(int(width / 5), block->m_hit_counts.size());
 			int offset = block->m_hit_counts.size() - count;
 			struct PlotData
 			{

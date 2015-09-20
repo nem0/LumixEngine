@@ -33,6 +33,7 @@ public:
 	AssetBrowser(Lumix::WorldEditor& editor);
 	~AssetBrowser();
 	void onGui();
+	void update();
 	const Lumix::Array<Lumix::Path>& getResources(Type type) const;
 
 public:
@@ -50,10 +51,16 @@ private:
 	void onGuiLuaScript();
 	void saveMaterial(Lumix::Material* material);
 	bool resourceInput(const char* label, char* buf, int max_size, Type type);
+	void unloadResource();
+	void selectResource(const Lumix::Path& resource);
+	void selectResource(Lumix::Resource* resource);
 
 private:
+	Lumix::Array<Lumix::Path> m_changed_files;
 	Lumix::Array<Lumix::Array<Lumix::Path> > m_resources;
-	Lumix::Resource* m_selected_resouce;
+	Lumix::Resource* m_selected_resource;
 	Lumix::WorldEditor& m_editor;
 	FileSystemWatcher* m_watcher;
+	char m_text_buffer[8192];
+	bool m_autoreload_changed_resource;
 };

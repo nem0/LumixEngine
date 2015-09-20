@@ -2,6 +2,7 @@
 #include "core/crc32.h"
 #include "core/FS/file_iterator.h"
 #include "core/FS/file_system.h"
+#include "core/FS/ifile.h"
 #include "core/json_serializer.h"
 #include "core/path_utils.h"
 #include "core/resource.h"
@@ -20,8 +21,7 @@
 #include "ocornut-imgui/imgui.h"
 #include "string_builder.h"
 
-TODO("unload m_selected_resource");
-TODO("clang");
+
 static const uint32_t UNIVERSE_HASH = Lumix::crc32("universe");
 static const uint32_t LUA_SCRIPT_HASH = Lumix::crc32("lua_script");
 
@@ -46,8 +46,11 @@ static uint32_t getResourceType(const char* path)
 AssetBrowser::AssetBrowser(Lumix::WorldEditor& editor)
 	: m_editor(editor)
 	, m_resources(editor.getAllocator())
-	, m_selected_resouce(nullptr)
+	, m_selected_resource(nullptr)
+	, m_autoreload_changed_resource(true)
+	, m_changed_files(editor.getAllocator())
 {
+	m_text_buffer[0] = '\0';
 	m_is_opened = false;
 	for (int i = 0; i < Count; ++i)
 	{
@@ -63,6 +66,7 @@ AssetBrowser::AssetBrowser(Lumix::WorldEditor& editor)
 
 AssetBrowser::~AssetBrowser()
 {
+	unloadResource();
 	FileSystemWatcher::destroy(m_watcher);
 }
 
@@ -72,36 +76,66 @@ void AssetBrowser::onFileChanged(const char* path)
 	uint32_t resource_type = getResourceType(path);
 	if (resource_type == 0) return;
 
-	Lumix::Path path_obj(path);
-	if (!Lumix::fileExists(path))
+	m_changed_files.push(Lumix::Path(path));
+}
+
+
+void AssetBrowser::unloadResource()
+{
+	if (!m_selected_resource) return;
+
+	m_selected_resource->getResourceManager()
+		.get(getResourceType(m_selected_resource->getPath().c_str()))
+		->unload(*m_selected_resource);
+
+	m_selected_resource = nullptr;
+}
+
+
+void AssetBrowser::update()
+{
+	for (const auto& path_obj : m_changed_files)
 	{
-		int index = 0;
-		switch (resource_type)
+		const char* path = path_obj.c_str();
+		
+		uint32_t resource_type = getResourceType(path);
+		if (resource_type == 0) continue;
+
+		if (m_autoreload_changed_resource) m_editor.getEngine().getResourceManager().reload(path);
+
+		Lumix::Path path_obj(path);
+		if (!Lumix::fileExists(path))
 		{
+			int index = 0;
+			switch (resource_type)
+			{
 			case Lumix::ResourceManager::MODEL: index = MODEL; break;
 			case Lumix::ResourceManager::MATERIAL: index = MATERIAL; break;
 			case Lumix::ResourceManager::SHADER: index = SHADER; break;
 			case Lumix::ResourceManager::TEXTURE: index = TEXTURE; break;
+			}
+			if (resource_type == UNIVERSE_HASH)
+				index = UNIVERSE;
+			else if (resource_type == LUA_SCRIPT_HASH)
+				index = LUA_SCRIPT;
+
+			m_resources[index].eraseItemFast(path_obj);
+			continue;
 		}
-		if (resource_type == UNIVERSE_HASH)
-			index = UNIVERSE;
-		else if (resource_type == LUA_SCRIPT_HASH)
-			index = LUA_SCRIPT;
 
-		m_resources[index].eraseItemFast(path_obj);
-		return;
+		char dir[Lumix::MAX_PATH_LENGTH];
+		char filename[Lumix::MAX_PATH_LENGTH];
+		Lumix::PathUtils::getDir(dir, sizeof(dir), path);
+		Lumix::PathUtils::getFilename(filename, sizeof(filename), path);
+		addResource(dir, filename);
 	}
-
-	char dir[Lumix::MAX_PATH_LENGTH];
-	char filename[Lumix::MAX_PATH_LENGTH];
-	Lumix::PathUtils::getDir(dir, sizeof(dir), path);
-	Lumix::PathUtils::getFilename(filename, sizeof(filename), path);
-	addResource(dir, filename);
+	m_changed_files.clear();
 }
 
 
 void AssetBrowser::onGui()
 {
+
 	if (!m_is_opened) return;
 
 	if (!ImGui::Begin("AssetBrowser", &m_is_opened))
@@ -111,6 +145,8 @@ void AssetBrowser::onGui()
 	}
 
 	if (ImGui::Button("Refresh")) findResources();
+	ImGui::SameLine();
+	ImGui::Checkbox("Autoreload", &m_autoreload_changed_resource);
 
 	const char* items = "Material\0Model\0Shader\0Texture\0Universe\0Lua Script\0";
 	static int current_type = 0;
@@ -126,17 +162,31 @@ void AssetBrowser::onGui()
 		if (filter[0] != '\0' && strstr(resource.c_str(), filter) == nullptr) continue;
 
 		if (ImGui::Selectable(resource.c_str(),
-				m_selected_resouce ? m_selected_resouce->getPath() == resource : false))
+				m_selected_resource ? m_selected_resource->getPath() == resource : false))
 		{
-			m_selected_resouce = m_editor.getEngine()
-									 .getResourceManager()
-									 .get(getResourceType(resource.c_str()))
-									 ->load(resource);
+			selectResource(resource);
 		}
 	}
 	ImGui::ListBoxFooter();
 	onGuiResource();
 	ImGui::End();
+}
+
+
+void AssetBrowser::selectResource(Lumix::Resource* resource)
+{
+	m_text_buffer[0] = '\0';
+	unloadResource();
+	m_selected_resource = resource;
+}
+
+
+void AssetBrowser::selectResource(const Lumix::Path& resource)
+{
+	selectResource(m_editor.getEngine()
+					   .getResourceManager()
+					   .get(getResourceType(resource.c_str()))
+					   ->load(resource));
 }
 
 
@@ -206,7 +256,7 @@ bool AssetBrowser::resourceInput(const char* label, char* buf, int max_size, Typ
 
 void AssetBrowser::onGuiMaterial()
 {
-	auto* material = static_cast<Lumix::Material*>(m_selected_resouce);
+	auto* material = static_cast<Lumix::Material*>(m_selected_resource);
 
 	if (ImGui::Button("Save")) saveMaterial(material);
 
@@ -264,7 +314,7 @@ void AssetBrowser::onGuiMaterial()
 
 void AssetBrowser::onGuiTexture()
 {
-	auto* texture = static_cast<Lumix::Texture*>(m_selected_resouce);
+	auto* texture = static_cast<Lumix::Texture*>(m_selected_resource);
 	ImGui::LabelText("Size", "%dx%d", texture->getWidth(), texture->getHeight());
 	ImGui::LabelText("BPP", "%d", texture->getBytesPerPixel());
 	ImGui::Image(&texture->getTextureHandle(), ImVec2(200, 200));
@@ -273,26 +323,36 @@ void AssetBrowser::onGuiTexture()
 
 void AssetBrowser::onGuiLuaScript()
 {
-	auto* script = static_cast<Lumix::LuaScript*>(m_selected_resouce);
+	auto* script = static_cast<Lumix::LuaScript*>(m_selected_resource);
 
-	char buf[4096];
-	Lumix::copyString(buf, sizeof(buf), script->getSourceCode());
-	ImGui::InputTextMultiline("Code", buf, sizeof(buf), ImVec2(0, 300));
-	if (ImGui::Button("Update"))
+	if (m_text_buffer[0] == '\0')
 	{
-		TODO("Update");
+		Lumix::copyString(m_text_buffer, sizeof(m_text_buffer), script->getSourceCode());
 	}
-	ImGui::SameLine();
+	ImGui::InputTextMultiline("Code", m_text_buffer, sizeof(m_text_buffer), ImVec2(0, 300));
 	if (ImGui::Button("Save"))
 	{
-		TODO("save");
+		auto& fs = m_editor.getEngine().getFileSystem();
+		auto* file = fs.open(fs.getDiskDevice(),
+			m_selected_resource->getPath().c_str(),
+			Lumix::FS::Mode::CREATE | Lumix::FS::Mode::WRITE);
+
+		if (!file)
+		{
+			Lumix::g_log_warning.log("Asset browser") << "Could not save "
+													  << m_selected_resource->getPath().c_str();
+			return;
+		}
+
+		file->write(m_text_buffer, strlen(m_text_buffer));
+		fs.close(*file);
 	}
 }
 
 
 void AssetBrowser::onGuiModel()
 {
-	auto* model = static_cast<Lumix::Model*>(m_selected_resouce);
+	auto* model = static_cast<Lumix::Model*>(m_selected_resource);
 	ImGui::LabelText("Bone count", "%d", model->getBoneCount());
 	if (model->getBoneCount() > 0) ImGui::CollapsingHeader("Bones");
 	for (int i = 0; i < model->getBoneCount(); ++i)
@@ -311,7 +371,7 @@ void AssetBrowser::onGuiModel()
 			ImGui::SameLine();
 			if (ImGui::Button("View material"))
 			{
-				m_selected_resouce = mesh.getMaterial();
+				selectResource(mesh.getMaterial());
 			}
 			ImGui::TreePop();
 		}
@@ -321,19 +381,19 @@ void AssetBrowser::onGuiModel()
 
 void AssetBrowser::onGuiResource()
 {
-	if (!m_selected_resouce) return;
+	if (!m_selected_resource) return;
 
 
-	const char* path = m_selected_resouce->getPath().c_str();
+	const char* path = m_selected_resource->getPath().c_str();
 	if (!ImGui::CollapsingHeader(path, nullptr, true, true)) return;
 
-	if (m_selected_resouce->isFailure())
+	if (m_selected_resource->isFailure())
 	{
 		ImGui::Text("Failed to load the resource");
 		return;
 	}
 
-	if (m_selected_resouce->isLoading())
+	if (m_selected_resource->isLoading())
 	{
 		ImGui::Text("Loading...");
 		return;
