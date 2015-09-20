@@ -1,14 +1,23 @@
 #include "profiler_ui.h"
+#include "core/math_utils.h"
 #include "ocornut-imgui/imgui.h"
+#include "string_builder.h"
 
 
 static const int MAX_FRAMES = 200;
 
 
+enum Column
+{
+	NAME,
+	TIME
+};
+
 
 ProfilerUI::ProfilerUI()
 {
 	m_is_opened = false;
+	m_current_block = nullptr;
 	Lumix::g_profiler.getFrameListeners().bind<ProfilerUI, &ProfilerUI::onFrame>(this);
 }
 
@@ -112,23 +121,47 @@ void ProfilerUI::onFrame()
 }
 
 
-void ProfilerUI::showProfileBlock(Block* block) const
+void ProfilerUI::showProfileBlock(Block* block, int column)
 {
-	while (block)
+	if (column == NAME)
 	{
-		if (ImGui::TreeNode(block, block->m_name))
+		while (block)
 		{
-			showProfileBlock(block->m_first_child);
-			ImGui::TreePop();
+			if (ImGui::TreeNode(block->m_name))
+			{
+				block->m_is_opened = true;
+				showProfileBlock(block->m_first_child, column);
+				ImGui::TreePop();
+			}
+			else
+			{
+				block->m_is_opened = false;
+			}
+
+			block = block->m_next;
 		}
-		if (!block->m_hit_counts.empty())
+		return;
+	}
+
+	if (column == TIME)
+	{
+		while (block)
 		{
-			ImGui::SameLine();
-			ImGui::Text("%d", block->m_hit_counts.back());
-			ImGui::SameLine();
-			ImGui::Text("%f", block->m_frames.back());
+			if (ImGui::Selectable(
+					StringBuilder<50>("") << block->m_frames.back() << "##t"
+										  << (int64_t)block,
+					m_current_block == block,
+					ImGuiSelectableFlags_SpanAllColumns))
+			{
+				m_current_block = block;
+			}
+			if (block->m_is_opened)
+			{
+				showProfileBlock(block->m_first_child, column);
+			}
+
+			block = block->m_next;
 		}
-		block = block->m_next;
 	}
 }
 
@@ -146,7 +179,12 @@ void ProfilerUI::onGui()
 		}
 		if (m_root)
 		{
-			showProfileBlock(m_root);
+			ImGui::Columns(2);
+			showProfileBlock(m_root, NAME);
+			ImGui::NextColumn();
+			showProfileBlock(m_root, TIME);
+			ImGui::NextColumn();
+			ImGui::Columns(1);
 		}
 
 		if (m_root)
@@ -157,20 +195,31 @@ void ProfilerUI::onGui()
 				times[i] = m_root->m_frames[i];
 			}
 
-			auto getter = [](void* data, int idx) -> float {
-				auto* block = (Block*)data;
-				return block->m_frames[idx];
+			auto* block = m_current_block ? m_current_block : m_root;
+			float width = ImGui::GetWindowContentRegionWidth();
+			int count = Lumix::Math::minValue(/*int(width / 5)*/40, block->m_hit_counts.size());
+			int offset = block->m_hit_counts.size() - count;
+			struct PlotData
+			{
+				Block* block;
+				int offset;
 			};
-
+			auto getter = [](void* data, int idx) -> float {
+				auto* plot_data = (PlotData*)data;
+				return plot_data->block->m_frames[plot_data->offset + idx];
+			};
+			PlotData plot_data;
+			plot_data.block = block;
+			plot_data.offset = offset;
 			ImGui::PlotHistogram("",
 								 getter,
-								 m_root,
-								 m_root->m_hit_counts.size(),
+								 &plot_data,
+								 count,
 								 0,
-								 nullptr,
+								 block->m_name,
+								 0,
 								 FLT_MAX,
-								 FLT_MAX,
-								 ImVec2(0, 100));
+								 ImVec2(width, 100));
 		}
 	}
 	ImGui::End();

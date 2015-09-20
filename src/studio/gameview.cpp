@@ -67,7 +67,7 @@ void GameView::resizeEvent(QResizeEvent* event)
 	int h = event->size().height();
 	if (m_render_device)
 	{
-		m_render_device->getPipeline().resize(w, h);
+		m_render_device->getPipeline().setViewport(0, 0, w, h);
 	}
 }
 

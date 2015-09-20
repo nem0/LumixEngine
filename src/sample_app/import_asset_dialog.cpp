@@ -25,13 +25,6 @@
 typedef StringBuilder<Lumix::MAX_PATH_LENGTH> PathBuilder;
 
 
-TODO("todo");
-// TODO
-// profiler
-// release mode
-// game mode :(
-
-
 enum class VertexAttributeDef : uint32_t
 {
 	POSITION,

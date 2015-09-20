@@ -41,7 +41,7 @@ WGLRenderDevice::~WGLRenderDevice()
 void WGLRenderDevice::setWidget(QWidget& widget)
 {
 	auto handle = (HWND)widget.winId();
-	getPipeline().resize(widget.width(), widget.height());
+	getPipeline().setViewport(0, 0, widget.width(), widget.height());
 	getPipeline().setWindowHandle(handle);
 }
 

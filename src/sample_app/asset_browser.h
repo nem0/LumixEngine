@@ -11,6 +11,9 @@ namespace Lumix
 }
 
 
+class FileSystemWatcher;
+
+
 class AssetBrowser
 {
 public:
@@ -21,12 +24,14 @@ public:
 		SHADER,
 		TEXTURE,
 		UNIVERSE,
+		LUA_SCRIPT,
 
 		Count
 	};
 
 public:
 	AssetBrowser(Lumix::WorldEditor& editor);
+	~AssetBrowser();
 	void onGui();
 	const Lumix::Array<Lumix::Path>& getResources(Type type) const;
 
@@ -34,6 +39,7 @@ public:
 	bool m_is_opened;
 
 private:
+	void onFileChanged(const char* path);
 	void findResources();
 	void processDir(const char* path);
 	void addResource(const char* path, const char* filename);
@@ -41,6 +47,7 @@ private:
 	void onGuiMaterial();
 	void onGuiModel();
 	void onGuiTexture();
+	void onGuiLuaScript();
 	void saveMaterial(Lumix::Material* material);
 	bool resourceInput(const char* label, char* buf, int max_size, Type type);
 
@@ -48,4 +55,5 @@ private:
 	Lumix::Array<Lumix::Array<Lumix::Path> > m_resources;
 	Lumix::Resource* m_selected_resouce;
 	Lumix::WorldEditor& m_editor;
+	FileSystemWatcher* m_watcher;
 };

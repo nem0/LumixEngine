@@ -133,6 +133,8 @@ int FileSystemWatcherTask::task()
 				   OPEN_EXISTING,
 				   FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED,
 				   nullptr);
+	if (m_handle == INVALID_HANDLE_VALUE) return -1;
+
 	bool finished = false;
 	while (!finished)
 	{
@@ -155,6 +157,7 @@ int FileSystemWatcherTask::task()
 			case FILE_ACTION_RENAMED_NEW_NAME:
 			case FILE_ACTION_ADDED:
 			case FILE_ACTION_MODIFIED:
+			case FILE_ACTION_REMOVED:
 			{
 				char tmp[MAX_PATH];
 				wcharToCharArray(
@@ -163,7 +166,6 @@ int FileSystemWatcherTask::task()
 			}
 			break;
 			case FILE_ACTION_RENAMED_OLD_NAME:
-			case FILE_ACTION_REMOVED:
 				break;
 			default:
 				ASSERT(false);
