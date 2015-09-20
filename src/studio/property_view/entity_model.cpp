@@ -217,12 +217,7 @@ void EntityModel::addNameProperty()
 
 void EntityModel::setEntityScale(float value)
 {
-	Lumix::StackAllocator<256> allocator;
-	Lumix::Array<Lumix::Entity> entities(allocator);
-	Lumix::Array<float> scales(allocator);
-	entities.push(m_entity);
-	scales.push(value);
-	m_editor.setEntitiesScales(entities, scales);
+	m_editor.setEntitiesScales(&m_entity, &value, 1);
 }
 
 

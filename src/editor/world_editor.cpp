@@ -391,17 +391,17 @@ public:
 
 
 	ScaleEntityCommand(WorldEditor& editor,
-					   const Array<Entity>& entities,
-					   const Array<float>& new_scales,
-					   IAllocator& allocator)
+		const Entity* entities,
+		const float* new_scales,
+		int count,
+		IAllocator& allocator)
 		: m_new_scales(allocator)
 		, m_old_scales(allocator)
 		, m_entities(allocator)
 		, m_editor(editor)
 	{
 		Universe* universe = m_editor.getUniverse();
-		ASSERT(entities.size() == new_scales.size());
-		for (int i = entities.size() - 1; i >= 0; --i)
+		for (int i = count - 1; i >= 0; --i)
 		{
 			m_entities.push(entities[i]);
 			m_new_scales.push(new_scales[i]);
@@ -2077,37 +2077,32 @@ public:
 	{
 		if (m_camera >= 0)
 		{
-			EditorIcon* er = m_allocator.newObject<EditorIcon>(
-				*this,
-				*static_cast<RenderScene*>(
-					getComponent(m_camera, CAMERA_HASH).scene),
+			EditorIcon* er = m_allocator.newObject<EditorIcon>(*this,
+				*static_cast<RenderScene*>(getComponent(m_camera, CAMERA_HASH).scene),
 				entity);
 			m_editor_icons.push(er);
 		}
 	}
 
 
-	virtual void setEntitiesScales(const Array<Entity>& entities,
-								   const Array<float>& scales) override
+	virtual void setEntitiesScales(const Entity* entities, const float* scales, int count) override
 	{
-		if (entities.empty())
-		{
-			return;
-		}
+		if (count <= 0) return;
+
 		Universe* universe = getUniverse();
-		IEditorCommand* command = m_allocator.newObject<ScaleEntityCommand>(
-			*this, entities, scales, m_allocator);
+		IEditorCommand* command =
+			m_allocator.newObject<ScaleEntityCommand>(*this, entities, scales, count, m_allocator);
 		executeCommand(command);
 	}
 
 
 	virtual void setEntitiesRotations(const Entity* entities,
-									  const Quat* rotations,
-									  int count) override
+		const Quat* rotations,
+		int count) override
 	{
 		ASSERT(entities && rotations);
 		if (count <= 0) return;
-		
+
 		Universe* universe = getUniverse();
 		Array<Vec3> positions(m_allocator);
 		for (int i = 0; i < count; ++i)
@@ -2120,8 +2115,9 @@ public:
 	}
 
 
-	virtual void
-	setEntitiesPositions(const Entity* entities, const Vec3* positions, int count) override
+	virtual void setEntitiesPositions(const Entity* entities,
+		const Vec3* positions,
+		int count) override
 	{
 		ASSERT(entities && positions);
 		if (count <= 0) return;
@@ -2138,10 +2134,10 @@ public:
 	}
 
 
-	virtual void setEntitiesPositionsAndRotaions(const Entity* entities,
-												 const Vec3* positions,
-												 const Quat* rotations,
-												 int count) override
+	virtual void setEntitiesPositionsAndRotations(const Entity* entities,
+		const Vec3* positions,
+		const Quat* rotations,
+		int count) override
 	{
 		if (count <= 0) return;
 		IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(
