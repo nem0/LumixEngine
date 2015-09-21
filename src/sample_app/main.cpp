@@ -89,7 +89,7 @@ public:
 		RECT rect;
 		GetClientRect(m_hwnd, &rect);
 		io.DisplaySize = ImVec2((float)(rect.right - rect.left),
-								(float)(rect.bottom - rect.top));
+			(float)(rect.bottom - rect.top));
 
 		io.DeltaTime = m_engine->getLastTimeDelta();
 
@@ -104,7 +104,7 @@ public:
 		SetCursor(io.MouseDrawCursor ? NULL : LoadCursor(NULL, IDC_ARROW));
 
 		ImGui::NewFrame();
-		
+
 		showMainMenu();
 
 		m_profiler_ui->onGui();
@@ -122,7 +122,7 @@ public:
 		ImGui::Render();
 	}
 
-	
+
 	void showGameView()
 	{
 		if (!m_is_gameview_opened) return;
@@ -200,9 +200,9 @@ public:
 				if (ImGui::BeginMenu("Select"))
 				{
 					if (ImGui::MenuItem("Same mesh",
-										nullptr,
-										nullptr,
-										is_any_entity_selected))
+						nullptr,
+						nullptr,
+						is_any_entity_selected))
 						m_editor->selectEntitiesWithSameMesh();
 					ImGui::EndMenu();
 				}
@@ -236,9 +236,9 @@ public:
 					ImGui::EndMenu();
 				}
 				if (ImGui::MenuItem("Instantiate template",
-									nullptr,
-									nullptr,
-									m_selected_template_name.length() > 0))
+					nullptr,
+					nullptr,
+					m_selected_template_name.length() > 0))
 				{
 					Lumix::Vec3 pos = m_editor->getCameraRaycastHit();
 					m_editor->getEntityTemplateSystem().createInstance(
@@ -265,9 +265,9 @@ public:
 					m_editor->toggleMeasure();
 				}
 				if (ImGui::MenuItem("Snap to terrain",
-									"Ctrl - T",
-									nullptr,
-									is_any_entity_selected))
+					"Ctrl - T",
+					nullptr,
+					is_any_entity_selected))
 				{
 					m_editor->snapToTerrain();
 				}
@@ -279,7 +279,7 @@ public:
 			if (ImGui::BeginMenu("View"))
 			{
 				if (ImGui::MenuItem(
-						"Look at selected", "Ctrl - F", nullptr, is_any_entity_selected))
+					"Look at selected", "Ctrl - F", nullptr, is_any_entity_selected))
 				{
 					m_editor->lookAtSelected();
 				}
@@ -391,7 +391,7 @@ public:
 			ImGui::InputText("Filter", filter, sizeof(filter));
 			auto* universe = m_editor->getUniverse();
 			auto entity = universe->getFirstEntity();
-			
+
 			while (entity >= 0)
 			{
 				char buf[1024];
@@ -421,7 +421,7 @@ public:
 		delete m_property_grid;
 		delete m_import_asset_dialog;
 		delete m_shader_compiler;
-		Lumix::WorldEditor::destroy(m_editor);
+		Lumix::WorldEditor::destroy(m_editor, m_allocator);
 		m_sceneview.shutdown();
 		Lumix::PipelineInstance::destroy(m_gui_pipeline);
 		Lumix::PipelineInstance::destroy(m_game_pipeline);
@@ -431,7 +431,7 @@ public:
 		m_game_pipeline_source->getResourceManager()
 			.get(Lumix::ResourceManager::PIPELINE)
 			->unload(*m_game_pipeline_source);
-		Lumix::Engine::destroy(m_engine);
+		Lumix::Engine::destroy(m_engine, m_allocator);
 		m_engine = nullptr;
 		m_gui_pipeline = nullptr;
 		m_game_pipeline = nullptr;
@@ -444,7 +444,7 @@ public:
 	void shutdownImGui()
 	{
 		ImGui::Shutdown();
-		
+
 		Lumix::Texture* texture = m_material->getTexture(0);
 		m_material->setTexture(0, nullptr);
 		texture->destroy();
@@ -494,8 +494,8 @@ public:
 		io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
 		m_material = static_cast<Lumix::Material*>(
 			m_engine->getResourceManager()
-				.get(Lumix::ResourceManager::MATERIAL)
-				->load(Lumix::Path("models/imgui.mat")));
+			.get(Lumix::ResourceManager::MATERIAL)
+			->load(Lumix::Path("models/imgui.mat")));
 
 		Lumix::Texture* texture = m_allocator.newObject<Lumix::Texture>(
 			Lumix::Path("font"), m_engine->getResourceManager(), m_allocator);
@@ -523,7 +523,7 @@ public:
 		m_game_pipeline->setScene(nullptr);
 	}
 
-	
+
 	void init(HWND win)
 	{
 		Lumix::Renderer::setInitData(win);
@@ -548,7 +548,7 @@ public:
 		m_gui_pipeline_source = static_cast<Lumix::Pipeline*>(
 			pipeline_manager->load(Lumix::Path("pipelines/imgui.lua")));
 		m_gui_pipeline = Lumix::PipelineInstance::create(*m_gui_pipeline_source,
-													 m_engine->getAllocator());
+			m_engine->getAllocator());
 
 		m_sceneview.init(*m_editor);
 
@@ -623,6 +623,92 @@ public:
 				}
 			}
 		}
+	}
+
+
+	LRESULT windowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
+	{
+		int x = LOWORD(lParam);
+		int y = HIWORD(lParam);
+		static int old_x = x;
+		static int old_y = y;
+		if (!m_gui_pipeline)
+		{
+			return DefWindowProc(hWnd, msg, wParam, lParam);
+		}
+
+		switch (msg)
+		{
+			case WM_CLOSE: PostQuitMessage(0); break;
+			case WM_SIZE:
+			{
+				uint32_t width = ((int)(short)LOWORD(lParam));
+				uint32_t height = ((int)(short)HIWORD(lParam));
+
+				m_gui_pipeline->setViewport(0, 0, width, height);
+				auto& plugin_manager = m_editor->getEngine().getPluginManager();
+				auto* renderer =
+					static_cast<Lumix::Renderer*>(plugin_manager.getPlugin("renderer"));
+				renderer->resize(width, height);
+			}
+			break;
+			case WM_MOUSEWHEEL:
+				ImGui::GetIO().MouseWheel = GET_WHEEL_DELTA_WPARAM(wParam) / 600.0f;
+				break;
+			case WM_ERASEBKGND: return 1;
+			case WM_LBUTTONUP:
+				m_sceneview.onMouseUp(Lumix::MouseButton::LEFT);
+				ImGui::GetIO().MouseDown[0] = false;
+				break;
+			case WM_LBUTTONDOWN:
+				if (!m_sceneview.onMouseDown(old_x, old_y, Lumix::MouseButton::LEFT))
+				{
+					ImGui::GetIO().MouseDown[0] = true;
+				}
+				break;
+			case WM_RBUTTONDOWN:
+				if (!m_sceneview.onMouseDown(old_x, old_y, Lumix::MouseButton::RIGHT))
+				{
+					ImGui::GetIO().MouseDown[1] = true;
+				}
+				break;
+			case WM_RBUTTONUP:
+				m_sceneview.onMouseUp(Lumix::MouseButton::RIGHT);
+				ImGui::GetIO().MouseDown[1] = false;
+				break;
+			case WM_MOUSEMOVE:
+			{
+				m_sceneview.onMouseMove(x, y, x - old_x, y - old_y);
+
+				auto& input_system = m_engine->getInputSystem();
+				input_system.injectMouseXMove(float(old_x - x));
+				input_system.injectMouseYMove(float(old_y - y));
+				old_x = x;
+				old_y = y;
+
+				ImGuiIO& io = ImGui::GetIO();
+				io.MousePos.x = (float)x;
+				io.MousePos.y = (float)y;
+			}
+			break;
+			case WM_CHAR: ImGui::GetIO().AddInputCharacter((ImWchar)wParam); break;
+			case WM_KEYUP: ImGui::GetIO().KeysDown[wParam] = false; break;
+			case WM_SYSKEYDOWN: ImGui::GetIO().KeysDown[wParam] = true; break;
+			case WM_SYSKEYUP: ImGui::GetIO().KeysDown[wParam] = false; break;
+			case WM_KEYDOWN:
+			{
+				ImGui::GetIO().KeysDown[wParam] = true;
+				checkShortcuts();
+				switch (wParam)
+				{
+					case VK_OEM_2: // Question Mark / Forward Slash for US Keyboards
+						break;
+				}
+				break;
+			}
+		}
+
+		return DefWindowProc(hWnd, msg, wParam, lParam);
 	}
 
 
@@ -730,97 +816,7 @@ static void imGuiCallback(ImDrawData* draw_data)
 
 LRESULT WINAPI msgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-	int x = LOWORD(lParam);
-	int y = HIWORD(lParam);
-	static int old_x = x;
-	static int old_y = y;
-	if (!g_context.m_gui_pipeline)
-	{
-		return DefWindowProc(hWnd, msg, wParam, lParam);
-	}
-
-	switch (msg)
-	{
-		case WM_CLOSE:
-			PostQuitMessage(0);
-			break;
-		case WM_SIZE:
-		{
-			uint32_t width = ((int)(short)LOWORD(lParam));
-			uint32_t height = ((int)(short)HIWORD(lParam));
-			
-			g_context.m_gui_pipeline->setViewport(0, 0, width, height);
-			auto& plugin_manager = g_context.m_editor->getEngine().getPluginManager();
-			auto* renderer = static_cast<Lumix::Renderer*>(plugin_manager.getPlugin("renderer"));
-			renderer->resize(width, height);
-		}
-		break;
-		case WM_MOUSEWHEEL:
-			ImGui::GetIO().MouseWheel = GET_WHEEL_DELTA_WPARAM(wParam) / 600.0f;
-			break;
-		case WM_ERASEBKGND:
-			return 1;
-		case WM_LBUTTONUP:
-			g_context.m_sceneview.onMouseUp(Lumix::MouseButton::LEFT);
-			ImGui::GetIO().MouseDown[0] = false;
-			break;
-		case WM_LBUTTONDOWN:
-			if (!g_context.m_sceneview.onMouseDown(old_x, old_y, Lumix::MouseButton::LEFT))
-			{
-				ImGui::GetIO().MouseDown[0] = true;
-			}
-			break;
-		case WM_RBUTTONDOWN:
-			if (!g_context.m_sceneview.onMouseDown(old_x, old_y, Lumix::MouseButton::RIGHT))
-			{
-				ImGui::GetIO().MouseDown[1] = true;
-			}
-			break;
-		case WM_RBUTTONUP:
-			g_context.m_sceneview.onMouseUp(Lumix::MouseButton::RIGHT);
-			ImGui::GetIO().MouseDown[1] = false;
-			break;
-		case WM_MOUSEMOVE:
-		{
-			g_context.m_sceneview.onMouseMove(x, y, x - old_x, y - old_y);
-
-			auto& input_system = g_context.m_engine->getInputSystem();
-			input_system.injectMouseXMove(float(old_x - x));
-			input_system.injectMouseYMove(float(old_y - y));
-			old_x = x;
-			old_y = y;
-
-			ImGuiIO& io = ImGui::GetIO();
-			io.MousePos.x = (float)x;
-			io.MousePos.y = (float)y;
-		}
-		break;
-		case WM_CHAR:
-			ImGui::GetIO().AddInputCharacter((ImWchar)wParam);
-			break;
-		case WM_KEYUP:
-			ImGui::GetIO().KeysDown[wParam] = false;
-			break;
-		case WM_SYSKEYDOWN:
-			ImGui::GetIO().KeysDown[wParam] = true;
-			break;
-		case WM_SYSKEYUP:
-			ImGui::GetIO().KeysDown[wParam] = false;
-			break;
-		case WM_KEYDOWN:
-		{
-			ImGui::GetIO().KeysDown[wParam] = true;
-			g_context.checkShortcuts();
-			switch (wParam)
-			{
-				case VK_OEM_2: // Question Mark / Forward Slash for US Keyboards
-					break;
-			}
-			break;
-		}
-	}
-
-	return DefWindowProc(hWnd, msg, wParam, lParam);
+	return g_context.windowProc(hWnd, msg, wParam, lParam);
 }
 
 
@@ -829,7 +825,6 @@ INT WINAPI WinMain(HINSTANCE hInst,
 				   LPSTR ignoreMe1,
 				   INT ignoreMe2)
 {
-	LPCSTR szName = "Lumix Sample App";
 	WNDCLASSEX wnd;
 	memset(&wnd, 0, sizeof(wnd));
 	wnd.cbSize = sizeof(wnd);
@@ -884,7 +879,7 @@ INT WINAPI WinMain(HINSTANCE hInst,
 
 	g_context.shutdown();
 
-	UnregisterClassA(szName, wnd.hInstance);
+	UnregisterClassA("lmxa", wnd.hInstance);
 
 	return 0;
 }

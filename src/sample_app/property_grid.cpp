@@ -30,6 +30,7 @@ PropertyGrid::PropertyGrid(Lumix::WorldEditor& editor, AssetBrowser& asset_brows
 	, m_editor(editor)
 	, m_asset_browser(asset_browser)
 {
+	m_filter[0] = '\0';
 	m_terrain_editor = editor.getAllocator().newObject<TerrainEditor>(editor);
 }
 
@@ -42,13 +43,12 @@ PropertyGrid::~PropertyGrid()
 
 bool PropertyGrid::getResourcePath(char* buf, int max_size, uint32_t resource_type)
 {
-	static char filter[128] = "";
-	ImGui::InputText("Filter", filter, sizeof(filter));
+	ImGui::InputText("Filter", m_filter, sizeof(m_filter));
 
 	auto type = m_asset_browser.getTypeFromResourceManagerType(resource_type);
 	for (auto unv : m_asset_browser.getResources(type))
 	{
-		if (filter[0] != '\0' && strstr(unv.c_str(), filter) == nullptr) continue;
+		if (m_filter[0] != '\0' && strstr(unv.c_str(), m_filter) == nullptr) continue;
 
 		if (ImGui::Selectable(unv.c_str(), false))
 		{

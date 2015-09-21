@@ -71,4 +71,6 @@ private:
 	Block* m_current_block;
 	Lumix::Debug::Allocator* m_main_allocator;
 	Lumix::ResourceManager* m_resource_manager;
+	int m_allocation_size_from;
+	int m_allocation_size_to;
 };

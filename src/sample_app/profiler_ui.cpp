@@ -276,10 +276,8 @@ void ProfilerUI::onGuiMemoryProfiler()
 	if (!ImGui::CollapsingHeader("Memory")) return;
 
 	ImGui::Text("Total size: %.3fMB", (m_main_allocator->getTotalSize() / 1024) / 1024.0f);
-	static int from = 0;
-	static int to = 1024;
 	ImGui::SameLine();
-	ImGui::DragIntRange2("Interval", &from, &to);
+	ImGui::DragIntRange2("Interval", &m_allocation_size_from, &m_allocation_size_to);
 	auto* current_info = m_main_allocator->getFirstAllocationInfo();
 
 	int allocation_count = 0;
@@ -288,7 +286,10 @@ void ProfilerUI::onGuiMemoryProfiler()
 		auto info = current_info;
 		current_info = current_info->m_next;
 
-		if ((int)info->m_size < from || (int)info->m_size > to) continue;
+		if ((int)info->m_size < m_allocation_size_from || (int)info->m_size > m_allocation_size_to)
+		{
+			continue;
+		}
 
 		if (info->m_size < 1024)
 		{
