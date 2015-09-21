@@ -50,6 +50,8 @@ AssetBrowser::AssetBrowser(Lumix::WorldEditor& editor)
 	, m_autoreload_changed_resource(true)
 	, m_changed_files(editor.getAllocator())
 {
+	m_filter[0] = '\0';
+	m_current_type = 0;
 	m_text_buffer[0] = '\0';
 	m_is_opened = false;
 	for (int i = 0; i < Count; ++i)
@@ -139,7 +141,6 @@ void AssetBrowser::update()
 
 void AssetBrowser::onGui()
 {
-
 	if (!m_is_opened) return;
 
 	if (!ImGui::Begin("AssetBrowser", &m_is_opened))
@@ -153,20 +154,18 @@ void AssetBrowser::onGui()
 	ImGui::Checkbox("Autoreload", &m_autoreload_changed_resource);
 
 	const char* items = "Material\0Model\0Shader\0Texture\0Universe\0Lua Script\0";
-	static int current_type = 0;
-	static char filter[128] = "";
-	ImGui::Combo("Type", &current_type, items);
-	ImGui::InputText("Filter", filter, sizeof(filter));
+	ImGui::Combo("Type", &m_current_type, items);
+	ImGui::InputText("Filter", m_filter, sizeof(m_filter));
 
 	ImGui::ListBoxHeader("Resources");
-	auto* resources = &m_resources[current_type];
+	auto* resources = &m_resources[m_current_type];
 
 	for (auto& resource : *resources)
 	{
-		if (filter[0] != '\0' && strstr(resource.c_str(), filter) == nullptr) continue;
+		if (m_filter[0] != '\0' && strstr(resource.c_str(), m_filter) == nullptr) continue;
 
-		if (ImGui::Selectable(resource.c_str(),
-				m_selected_resource ? m_selected_resource->getPath() == resource : false))
+		bool is_selected = m_selected_resource ? m_selected_resource->getPath() == resource : false;
+		if (ImGui::Selectable(resource.c_str(), is_selected))
 		{
 			selectResource(resource);
 		}
