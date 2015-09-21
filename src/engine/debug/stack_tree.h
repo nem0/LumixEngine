@@ -22,7 +22,7 @@ namespace Debug
 
 			StackNode* record();
 			void printCallstack(StackNode* node);
-			static bool getFunction(StackNode* node, char* out, int max_size);
+			static bool getFunction(StackNode* node, char* out, int max_size, int* line);
 			static StackNode* getParent(StackNode* node);
 
 		private:

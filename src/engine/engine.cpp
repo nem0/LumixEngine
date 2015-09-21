@@ -12,6 +12,7 @@
 #include "core/fs/file_system.h"
 #include "core/fs/memory_file_device.h"
 #include "core/mtjd/manager.h"
+#include "debug/allocator.h"
 #include "debug/debug.h"
 #include "engine/iplugin.h"
 #include "engine/property_descriptor.h"
@@ -435,7 +436,7 @@ private:
 	};
 
 private:
-	IAllocator& m_allocator;
+	Debug::Allocator m_allocator;
 
 	FS::FileSystem* m_file_system;
 	FS::MemoryFileDevice* m_mem_file_device;

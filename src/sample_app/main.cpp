@@ -45,8 +45,7 @@ class Context
 {
 public:
 	Context()
-		: m_allocator(m_main_allocator)
-		, m_is_entity_list_shown(true)
+		: m_is_entity_list_shown(true)
 		, m_finished(false)
 		, m_is_style_editor_shown(false)
 		, m_import_asset_dialog(nullptr)
@@ -76,7 +75,6 @@ public:
 
 		m_gui_pipeline->render();
 		onGUI();
-		if (m_is_gameview_opened) m_game_pipeline->render();
 		Lumix::Renderer* renderer =
 			static_cast<Lumix::Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
 		renderer->frame();
@@ -127,21 +125,25 @@ public:
 	
 	void showGameView()
 	{
-		m_is_gameview_opened = false;
-		if (ImGui::Begin("Game view"))
+		if (!m_is_gameview_opened) return;
+
+		if (ImGui::Begin("Game view", &m_is_gameview_opened))
 		{
 			m_is_gameview_hovered = ImGui::IsWindowHovered();
-			m_is_gameview_opened = true;
 			auto size = ImGui::GetContentRegionAvail();
-			auto pos = ImGui::GetWindowPos();
-			auto cp = ImGui::GetCursorPos();
-			int gameview_x = int(pos.x + cp.x);
-			int gameview_y = int(pos.y + cp.y);
-			m_game_pipeline->setViewport(0, 0, int(size.x), int(size.y));
+			if (size.x > 0 && size.y > 0)
+			{
+				auto pos = ImGui::GetWindowPos();
+				auto cp = ImGui::GetCursorPos();
+				int gameview_x = int(pos.x + cp.x);
+				int gameview_y = int(pos.y + cp.y);
+				m_game_pipeline->setViewport(0, 0, int(size.x), int(size.y));
 
-			auto* fb = m_game_pipeline->getFramebuffer("default");
-			m_gameview_texture_handle = fb->getRenderbufferHandle(0);
-			ImGui::Image(&m_gameview_texture_handle, size);
+				auto* fb = m_game_pipeline->getFramebuffer("default");
+				m_gameview_texture_handle = fb->getRenderbufferHandle(0);
+				ImGui::Image(&m_gameview_texture_handle, size);
+				m_game_pipeline->render();
+			}
 		}
 		ImGui::End();
 	}
@@ -289,6 +291,7 @@ public:
 					ImGui::MenuItem("Asset browser", nullptr, &m_asset_browser->m_is_opened);
 					ImGui::MenuItem("Entity list", nullptr, &m_is_entity_list_shown);
 					ImGui::MenuItem("Entity templates", nullptr, &m_is_entity_template_list_opened);
+					ImGui::MenuItem("Game view", nullptr, &m_is_gameview_opened);
 					ImGui::MenuItem("Log", nullptr, &m_log_ui->m_is_opened);
 					ImGui::MenuItem("Profiler", nullptr, &m_profiler_ui->m_is_opened);
 					ImGui::MenuItem("Properties", nullptr, &m_property_grid->m_is_opened);
@@ -298,8 +301,7 @@ public:
 				ImGui::EndMenu();
 			}
 			StringBuilder<100> stats("FPS: ");
-			stats << m_engine->getFPS()
-				  << " Memory: " << (m_allocator.getTotalSize() / 1024) / 1024.0f << "MB";
+			stats << m_engine->getFPS();
 			auto stats_size = ImGui::CalcTextSize(stats);
 			ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x);
 			ImGui::Text(stats);
@@ -528,10 +530,11 @@ public:
 		m_engine = Lumix::Engine::create(nullptr, m_allocator);
 		char current_dir[MAX_PATH];
 		GetCurrentDirectory(sizeof(current_dir), current_dir);
-		m_editor = Lumix::WorldEditor::create(current_dir, *m_engine);
+		m_editor = Lumix::WorldEditor::create(current_dir, *m_engine, m_allocator);
 		m_asset_browser = new AssetBrowser(*m_editor);
 		m_property_grid = new PropertyGrid(*m_editor, *m_asset_browser);
-		m_profiler_ui = new ProfilerUI(&m_allocator, &m_editor->getEngine().getResourceManager());
+		auto engine_allocator = static_cast<Lumix::Debug::Allocator*>(&m_engine->getAllocator());
+		m_profiler_ui = new ProfilerUI(engine_allocator, &m_engine->getResourceManager());
 		m_log_ui = new LogUI(m_editor->getAllocator());
 		m_import_asset_dialog = new ImportAssetDialog(*m_editor);
 		m_shader_compiler = new ShaderCompiler(*m_editor, *m_log_ui);
@@ -638,8 +641,7 @@ public:
 	Lumix::PipelineInstance* m_game_pipeline;
 	bgfx::TextureHandle m_gameview_texture_handle;
 
-	Lumix::DefaultAllocator m_main_allocator;
-	Lumix::Debug::Allocator m_allocator;
+	Lumix::DefaultAllocator m_allocator;
 	Lumix::WorldEditor* m_editor;
 	AssetBrowser* m_asset_browser;
 	PropertyGrid* m_property_grid;
