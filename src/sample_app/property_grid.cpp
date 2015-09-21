@@ -194,7 +194,7 @@ void PropertyGrid::showArrayProperty(Lumix::ComponentUID cmp, Lumix::IArrayDescr
 	int count = desc.getCount(cmp);
 	if (ImGui::Button("Add"))
 	{
-		desc.addArrayItem(cmp, count);
+		m_editor.addArrayPropertyItem(cmp, desc);
 	}
 	count = desc.getCount(cmp);
 
@@ -207,7 +207,7 @@ void PropertyGrid::showArrayProperty(Lumix::ComponentUID cmp, Lumix::IArrayDescr
 			ImGui::SameLine();
 			if (ImGui::Button("Remove"))
 			{
-				desc.removeArrayItem(cmp, i);
+				m_editor.removeArrayPropertyItem(cmp, i, desc);
 				--i;
 				count = desc.getCount(cmp);
 				ImGui::TreePop();
