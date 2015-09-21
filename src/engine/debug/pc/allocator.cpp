@@ -102,7 +102,7 @@ namespace Debug
 	void* Allocator::reallocate(void* user_ptr, size_t size)
 	{
 		#ifndef _DEBUG
-			return m_source.reallocate(ptr, size);
+			return m_source.reallocate(user_ptr, size);
 		#else
 			if (user_ptr == nullptr) return allocate(size);
 			if (size == 0) return nullptr;
