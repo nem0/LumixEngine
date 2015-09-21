@@ -582,6 +582,8 @@ TerrainEditor::~TerrainEditor()
 TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor)
 	: m_world_editor(editor)
 	, m_color(1, 1, 1)
+	, m_current_brush(0)
+	, m_selected_entity_template(0)
 {
 	editor.addPlugin(*this);
 	m_terrain_brush_size = 10;
@@ -754,6 +756,9 @@ bool TerrainEditor::onEntityMouseDown(const Lumix::RayCastModelHit& hit,
 					case LAYER:
 						paint(hit, m_type, false);
 						break;
+					case ENTITY:
+						paintEntities(hit);
+						break;
 					default:
 						ASSERT(false);
 						break;
@@ -763,6 +768,49 @@ bool TerrainEditor::onEntityMouseDown(const Lumix::RayCastModelHit& hit,
 		}
 	}
 	return false;
+}
+
+void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
+{
+	Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
+	Lumix::Vec3 center_pos = hit.m_origin + hit.m_dir * hit.m_t;
+	Lumix::Matrix terrain_matrix = m_world_editor.getUniverse()->getMatrix(m_component.entity);
+	Lumix::Matrix inv_terrain_matrix = terrain_matrix;
+	inv_terrain_matrix.inverse();
+	auto& template_system = m_world_editor.getEntityTemplateSystem();
+	auto& template_names = template_system.getTemplateNames();
+	if (m_selected_entity_template < 0 || m_selected_entity_template >= template_names.size())
+	{
+		return;
+	}
+	const char* template_name = template_names[m_selected_entity_template].c_str();
+	Lumix::Entity tpl = template_system.getInstances(Lumix::crc32(template_name))[0];
+	if (tpl < 0) return;
+
+	Lumix::ComponentUID renderable = m_world_editor.getComponent(tpl, RENDERABLE_HASH);
+	if (!renderable.isValid()) return;
+
+	float w, h;
+	scene->getTerrainSize(m_component.index, &w, &h);
+	float scale = 1.0f - Lumix::Math::maxValue(0.01f, m_terrain_brush_strength);
+	Lumix::Model* model = scene->getRenderableModel(renderable.index);
+	for (int i = 0; i <= m_terrain_brush_size * m_terrain_brush_size / 1000.0f; ++i)
+	{
+		float angle = (float)(rand() % 360);
+		float dist = (rand() % 100 / 100.0f) * m_terrain_brush_size;
+		Lumix::Vec3 pos(center_pos.x + cos(angle) * dist, 0, center_pos.z + sin(angle) * dist);
+		Lumix::Vec3 terrain_pos = inv_terrain_matrix.multiplyPosition(pos);
+		if (terrain_pos.x >= 0 && terrain_pos.z >= 0 && terrain_pos.x <= w && terrain_pos.z <= h)
+		{
+			pos.y = scene->getTerrainHeightAt(m_component.index, terrain_pos.x, terrain_pos.z);
+			Lumix::Matrix mtx = Lumix::Matrix::IDENTITY;
+			mtx.setTranslation(pos);
+			if (!isOBBCollision(scene, mtx, model, scale))
+			{
+				template_system.createInstance(template_name, pos);
+			}
+		}
+	}
 }
 
 
@@ -791,6 +839,9 @@ void TerrainEditor::onMouseMove(int x, int y, int, int, int)
 				case COLOR:
 				case LAYER:
 					paint(hit, m_type, true);
+					break;
+				case ENTITY:
+					paintEntities(hit);
 					break;
 				default:
 					ASSERT(false);
@@ -932,21 +983,21 @@ void TerrainEditor::onGui()
 
 	enum BrushType
 	{
-		Height,
-		Layer,
-		Entity,
-		Color
+		HEIGHT,
+		LAYER,
+		ENTITY,
+		COLOR
 	};
 
 	if (ImGui::Combo(
 			"Brush type", &m_current_brush, "Height\0Layer\0Entity\0Color\0"))
 	{
-		m_type = m_current_brush == Height ? TerrainEditor::RAISE_HEIGHT : m_type;
+		m_type = m_current_brush == HEIGHT ? TerrainEditor::RAISE_HEIGHT : m_type;
 	}
 
 	switch (m_current_brush)
 	{
-		case Height:
+		case HEIGHT:
 		{
 			if (ImGui::Button("Raise"))
 			{
@@ -964,13 +1015,13 @@ void TerrainEditor::onGui()
 			}
 			break;
 		}
-		case Color:
+		case COLOR:
 		{
 			m_type = TerrainEditor::COLOR;
 			ImGui::ColorEdit3("Color", &m_color.x);
 			break;
 		}
-		case Layer:
+		case LAYER:
 		{
 			m_type = TerrainEditor::LAYER;
 			auto* material = scene->getTerrainMaterial(m_component.index);
@@ -989,6 +1040,25 @@ void TerrainEditor::onGui()
 			}
 			break;
 		}
+		case ENTITY:
+		{
+			m_type = TerrainEditor::ENTITY;
+			auto& template_system = m_world_editor.getEntityTemplateSystem();
+			auto& template_names = template_system.getTemplateNames();
+			ImGui::Combo("Entity",
+				&m_selected_entity_template,
+				[](void* data, int idx, const char** out_text) -> bool
+				{
+					auto& template_names = *static_cast<Lumix::Array<Lumix::string>*>(data);
+					if (idx >= template_names.size()) return false;
+					*out_text = template_names[idx].c_str();
+					return true;
+				},
+				&template_names,
+				template_names.size());
+		}
+		break;
+		default: ASSERT(false); break;
 	}
 }
 

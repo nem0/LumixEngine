@@ -63,6 +63,8 @@ private:
 	Lumix::Resource* m_selected_resource;
 	Lumix::WorldEditor& m_editor;
 	FileSystemWatcher* m_watcher;
+	int m_current_type;
+	char m_filter[128];
 	char m_text_buffer[8192];
 	bool m_autoreload_changed_resource;
 	bgfx::TextureHandle m_texture_handle;
