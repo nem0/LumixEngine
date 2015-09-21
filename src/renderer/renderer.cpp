@@ -265,23 +265,19 @@ struct RendererImpl : public Renderer
 				&RenderScene::getCameraFOV,
 				&RenderScene::setCameraFOV,
 				1.0f,
-				360.0f,
+				179.0f,
 				1.0f,
 				allocator));
-		m_engine.registerProperty(
-			"camera",
-			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
-				"near",
+		m_engine.registerProperty("camera",
+			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>("near",
 				&RenderScene::getCameraNearPlane,
 				&RenderScene::setCameraNearPlane,
 				0.0f,
 				FLT_MAX,
 				0.0f,
 				allocator));
-		m_engine.registerProperty(
-			"camera",
-			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
-				"far",
+		m_engine.registerProperty("camera",
+			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>("far",
 				&RenderScene::getCameraFarPlane,
 				&RenderScene::setCameraFarPlane,
 				0.0f,
@@ -289,165 +285,127 @@ struct RendererImpl : public Renderer
 				0.0f,
 				allocator));
 
-		m_engine.registerProperty(
-			"renderable",
-			allocator.newObject<ResourcePropertyDescriptor<RenderScene>>(
-				"source",
+		m_engine.registerProperty("renderable",
+			allocator.newObject<ResourcePropertyDescriptor<RenderScene>>("source",
 				&RenderScene::getRenderablePath,
 				&RenderScene::setRenderablePath,
 				"Mesh (*.msh)",
+				Lumix::ResourceManager::MODEL,
 				allocator));
-		m_engine.registerProperty(
-			"renderable",
-			allocator.newObject<BoolPropertyDescriptor<RenderScene>>(
-				"is_always_visible",
+		m_engine.registerProperty("renderable",
+			allocator.newObject<BoolPropertyDescriptor<RenderScene>>("is_always_visible",
 				&RenderScene::isRenderableAlwaysVisible,
 				&RenderScene::setRenderableIsAlwaysVisible,
 				allocator));
 
-		m_engine.registerProperty(
-			"global_light",
-			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
-				"ambient_intensity",
+		m_engine.registerProperty("global_light",
+			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>("ambient_intensity",
 				&RenderScene::getLightAmbientIntensity,
 				&RenderScene::setLightAmbientIntensity,
 				0.0f,
 				1.0f,
 				0.05f,
 				allocator));
-		m_engine.registerProperty(
-			"global_light",
-			allocator.newObject<Vec4PropertyDescriptor<RenderScene>>(
-			"shadow cascades",
-			&RenderScene::getShadowmapCascades,
-			&RenderScene::setShadowmapCascades,
-			allocator));
+		m_engine.registerProperty("global_light",
+			allocator.newObject<Vec4PropertyDescriptor<RenderScene>>("shadow cascades",
+				&RenderScene::getShadowmapCascades,
+				&RenderScene::setShadowmapCascades,
+				allocator));
 
-		m_engine.registerProperty(
-			"global_light",
-			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
-				"intensity",
+		m_engine.registerProperty("global_light",
+			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>("intensity",
 				&RenderScene::getGlobalLightIntensity,
 				&RenderScene::setGlobalLightIntensity,
 				0.0f,
 				1.0f,
 				0.05f,
 				allocator));
-		m_engine.registerProperty(
-			"global_light",
-			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
-				"fog_density",
+		m_engine.registerProperty("global_light",
+			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>("fog_density",
 				&RenderScene::getFogDensity,
 				&RenderScene::setFogDensity,
 				0.0f,
 				1.0f,
 				0.01f,
 				allocator));
-		m_engine.registerProperty(
-			"global_light",
-			allocator.newObject<ColorPropertyDescriptor<RenderScene>>(
-				"ambient_color",
+		m_engine.registerProperty("global_light",
+			allocator.newObject<ColorPropertyDescriptor<RenderScene>>("ambient_color",
 				&RenderScene::getLightAmbientColor,
 				&RenderScene::setLightAmbientColor,
 				allocator));
-		m_engine.registerProperty(
-			"global_light",
-			allocator.newObject<ColorPropertyDescriptor<RenderScene>>(
-				"color",
+		m_engine.registerProperty("global_light",
+			allocator.newObject<ColorPropertyDescriptor<RenderScene>>("color",
 				&RenderScene::getGlobalLightColor,
 				&RenderScene::setGlobalLightColor,
 				allocator));
-		m_engine.registerProperty(
-			"global_light",
+		m_engine.registerProperty("global_light",
 			allocator.newObject<ColorPropertyDescriptor<RenderScene>>(
-				"fog_color",
-				&RenderScene::getFogColor,
-				&RenderScene::setFogColor,
-				allocator));
+				"fog_color", &RenderScene::getFogColor, &RenderScene::setFogColor, allocator));
 
-		m_engine.registerProperty(
-			"point_light",
-			allocator.newObject<BoolPropertyDescriptor<RenderScene>>(
-			"cast shadows",
-			&RenderScene::getLightCastShadows,
-			&RenderScene::setLightCastShadows,
-			allocator));
-		m_engine.registerProperty(
-			"point_light",
-			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
-				"intensity",
+		m_engine.registerProperty("point_light",
+			allocator.newObject<BoolPropertyDescriptor<RenderScene>>("cast shadows",
+				&RenderScene::getLightCastShadows,
+				&RenderScene::setLightCastShadows,
+				allocator));
+		m_engine.registerProperty("point_light",
+			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>("intensity",
 				&RenderScene::getPointLightIntensity,
 				&RenderScene::setPointLightIntensity,
 				0.0f,
 				1.0f,
 				0.05f,
 				allocator));
-		m_engine.registerProperty(
-			"point_light",
-			allocator.newObject<ColorPropertyDescriptor<RenderScene>>(
-				"color",
+		m_engine.registerProperty("point_light",
+			allocator.newObject<ColorPropertyDescriptor<RenderScene>>("color",
 				&RenderScene::getPointLightColor,
 				&RenderScene::setPointLightColor,
 				allocator));
-		m_engine.registerProperty(
-			"point_light",
-			allocator.newObject<ColorPropertyDescriptor<RenderScene>>(
-				"specular",
+		m_engine.registerProperty("point_light",
+			allocator.newObject<ColorPropertyDescriptor<RenderScene>>("specular",
 				&RenderScene::getPointLightSpecularColor,
 				&RenderScene::setPointLightSpecularColor,
 				allocator));
-		m_engine.registerProperty(
-			"point_light",
-			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
-				"FOV",
+		m_engine.registerProperty("point_light",
+			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>("FOV",
 				&RenderScene::getLightFOV,
 				&RenderScene::setLightFOV,
 				0.0f,
 				360.0f,
 				5.0f,
 				allocator));
-		m_engine.registerProperty(
-			"point_light",
-			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
-				"attenuation",
+		m_engine.registerProperty("point_light",
+			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>("attenuation",
 				&RenderScene::getLightAttenuation,
 				&RenderScene::setLightAttenuation,
 				-1.0f,
 				1000.0f,
 				0.1f,
 				allocator));
-		m_engine.registerProperty(
-			"point_light",
-			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
-				"range",
+		m_engine.registerProperty("point_light",
+			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>("range",
 				&RenderScene::getLightRange,
 				&RenderScene::setLightRange,
 				0.0f,
 				FLT_MAX,
 				1.0f,
 				allocator));
-		m_engine.registerProperty(
-			"terrain",
-			allocator.newObject<ResourcePropertyDescriptor<RenderScene>>(
-				"material",
+		m_engine.registerProperty("terrain",
+			allocator.newObject<ResourcePropertyDescriptor<RenderScene>>("material",
 				&RenderScene::getTerrainMaterialPath,
 				&RenderScene::setTerrainMaterialPath,
 				"Material (*.mat)",
+				Lumix::ResourceManager::MATERIAL,
 				allocator));
-		m_engine.registerProperty(
-			"terrain",
-			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
-				"xz_scale",
+		m_engine.registerProperty("terrain",
+			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>("xz_scale",
 				&RenderScene::getTerrainXZScale,
 				&RenderScene::setTerrainXZScale,
 				0.0f,
 				FLT_MAX,
 				0.0f,
 				allocator));
-		m_engine.registerProperty(
-			"terrain",
-			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>(
-				"y_scale",
+		m_engine.registerProperty("terrain",
+			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>("y_scale",
 				&RenderScene::getTerrainYScale,
 				&RenderScene::setTerrainYScale,
 				0.0f,
@@ -455,33 +413,23 @@ struct RendererImpl : public Renderer
 				0.0f,
 				allocator));
 
-		auto grass = allocator.newObject<ArrayDescriptor<RenderScene>>(
-			"grass",
+		auto grass = allocator.newObject<ArrayDescriptor<RenderScene>>("grass",
 			&RenderScene::getGrassCount,
 			&RenderScene::addGrass,
 			&RenderScene::removeGrass,
 			allocator);
-		grass->addChild(
-			allocator.newObject<ResourceArrayObjectDescriptor<RenderScene>>(
-				"mesh",
-				&RenderScene::getGrassPath,
-				&RenderScene::setGrassPath,
-				"Mesh (*.msh)",
-				allocator));
-		auto ground =
-			allocator.newObject<IntArrayObjectDescriptor<RenderScene>>(
-				"ground",
-				&RenderScene::getGrassGround,
-				&RenderScene::setGrassGround,
-				allocator);
+		grass->addChild(allocator.newObject<ResourceArrayObjectDescriptor<RenderScene>>("mesh",
+			&RenderScene::getGrassPath,
+			&RenderScene::setGrassPath,
+			"Mesh (*.msh)",
+			crc32("model"),
+			allocator));
+		auto ground = allocator.newObject<IntArrayObjectDescriptor<RenderScene>>(
+			"ground", &RenderScene::getGrassGround, &RenderScene::setGrassGround, allocator);
 		ground->setLimit(0, 4);
 		grass->addChild(ground);
-		grass->addChild(
-			allocator.newObject<IntArrayObjectDescriptor<RenderScene>>(
-				"density",
-				&RenderScene::getGrassDensity,
-				&RenderScene::setGrassDensity,
-				allocator));
+		grass->addChild(allocator.newObject<IntArrayObjectDescriptor<RenderScene>>(
+			"density", &RenderScene::getGrassDensity, &RenderScene::setGrassDensity, allocator));
 		m_engine.registerProperty("terrain", grass);
 	}
 

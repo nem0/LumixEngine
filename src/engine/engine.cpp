@@ -293,9 +293,9 @@ public:
 		PROFILE_FUNCTION();
 		float dt;
 		++m_fps_frame;
-		if (m_fps_frame == 30)
+		if (m_fps_timer->getTimeSinceTick() > 0.5f)
 		{
-			m_fps = 30.0f / m_fps_timer->tick();
+			m_fps = m_fps_frame / m_fps_timer->tick();
 			m_fps_frame = 0;
 		}
 		dt = m_timer->tick();
