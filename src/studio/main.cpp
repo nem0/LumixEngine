@@ -32,7 +32,6 @@ class App
 {
 public:
 	App()
-		: m_allocator(m_main_allocator)
 	{
 #ifdef _DEBUG
 		Lumix::enableFloatingPointTraps(true);
@@ -153,7 +152,7 @@ public:
 		Lumix::Renderer::setInitData(hwnd);
 		m_engine = Lumix::Engine::create(m_file_system, m_allocator);
 		m_world_editor = Lumix::WorldEditor::create(
-			QDir::currentPath().toLocal8Bit().data(), *m_engine);
+			QDir::currentPath().toLocal8Bit().data(), *m_engine, m_allocator);
 		
 		Lumix::UniverseContext ctx(m_allocator);
 		m_engine->update(ctx);
@@ -286,8 +285,7 @@ public:
 	}
 
 private:
-	Lumix::DefaultAllocator m_main_allocator;
-	Lumix::Debug::Allocator m_allocator;
+	Lumix::DefaultAllocator m_allocator;
 	MainWindow* m_main_window;
 	Lumix::WorldEditor* m_world_editor;
 	Lumix::Engine* m_engine;

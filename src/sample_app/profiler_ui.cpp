@@ -181,9 +181,12 @@ static void showCallstack(Lumix::Debug::Allocator::AllocationInfo* info)
 	auto* node = info->m_stack_leaf;
 	while (node)
 	{
-		if (Lumix::Debug::StackTree::getFunction(node, fn_name, sizeof(fn_name)))
+		int line;
+		if (Lumix::Debug::StackTree::getFunction(node, fn_name, sizeof(fn_name), &line))
 		{
 			ImGui::BulletText(fn_name);
+			ImGui::SameLine();
+			ImGui::Text("(%d)", line);
 		}
 		else
 		{
@@ -274,7 +277,7 @@ void ProfilerUI::onGuiMemoryProfiler()
 
 	ImGui::Text("Total size: %.3fMB", (m_main_allocator->getTotalSize() / 1024) / 1024.0f);
 	static int from = 0;
-	static int to = 0x7fffFFFF;
+	static int to = 1024;
 	ImGui::SameLine();
 	ImGui::DragIntRange2("Interval", &from, &to);
 	auto* current_info = m_main_allocator->getFirstAllocationInfo();
@@ -285,7 +288,7 @@ void ProfilerUI::onGuiMemoryProfiler()
 		auto info = current_info;
 		current_info = current_info->m_next;
 
-		if (info->m_size < from || info->m_size > to) continue;
+		if ((int)info->m_size < from || (int)info->m_size > to) continue;
 
 		if (info->m_size < 1024)
 		{

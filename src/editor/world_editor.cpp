@@ -2592,8 +2592,8 @@ public:
 	}
 
 
-	WorldEditorImpl(const char* base_path, Engine& engine)
-		: m_allocator(engine.getAllocator())
+	WorldEditorImpl(const char* base_path, Engine& engine, IAllocator& allocator)
+		: m_allocator(allocator)
 		, m_engine(nullptr)
 		, m_universe_mutex(false)
 		, m_gizmo(*this)
@@ -3281,9 +3281,9 @@ private:
 };
 
 
-WorldEditor* WorldEditor::create(const char* base_path, Engine& engine)
+WorldEditor* WorldEditor::create(const char* base_path, Engine& engine, IAllocator& allocator)
 {
-	return engine.getAllocator().newObject<WorldEditorImpl>(base_path, engine);
+	return allocator.newObject<WorldEditorImpl>(base_path, engine, allocator);
 }
 
 

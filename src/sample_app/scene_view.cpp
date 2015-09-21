@@ -147,19 +147,22 @@ void SceneView::onGui()
 		m_is_opened = true;
 		auto size = ImGui::GetContentRegionAvail();
 		size.y -= ImGui::GetTextLineHeightWithSpacing();
-		auto pos = ImGui::GetWindowPos();
-		auto cp = ImGui::GetCursorPos();
-		m_pipeline->setViewport(0, 0, int(size.x), int(size.y));
-		auto* fb = m_pipeline->getFramebuffer("default");
-		m_texture_handle = fb->getRenderbufferHandle(0);
-		auto cursor_pos = ImGui::GetCursorScreenPos();
-		m_screen_x = int(cursor_pos.x);
-		m_screen_y = int(cursor_pos.y);
-		m_width = int(size.x);
-		m_height = int(size.y);
-		ImGui::Image(&m_texture_handle, size);
+		if (size.x > 0 && size.y > 0)
+		{
+			auto pos = ImGui::GetWindowPos();
+			auto cp = ImGui::GetCursorPos();
+			m_pipeline->setViewport(0, 0, int(size.x), int(size.y));
+			auto* fb = m_pipeline->getFramebuffer("default");
+			m_texture_handle = fb->getRenderbufferHandle(0);
+			auto cursor_pos = ImGui::GetCursorScreenPos();
+			m_screen_x = int(cursor_pos.x);
+			m_screen_y = int(cursor_pos.y);
+			m_width = int(size.x);
+			m_height = int(size.y);
+			ImGui::Image(&m_texture_handle, size);
 
-		m_pipeline->render();
+			m_pipeline->render();
+		}
 	}
 
 	ImGui::PushItemWidth(60);
