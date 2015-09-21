@@ -201,7 +201,7 @@ void PhysicsSystemImpl::registerProperties()
 			allocator));
 	m_engine.registerProperty(
 		"mesh_rigid_actor",
-		allocator.newObject<ResourcePropertyDescriptor<PhysicsScene>>(
+		allocator.newObject<FilePropertyDescriptor<PhysicsScene>>(
 			"source",
 			&PhysicsScene::getShapeSource,
 			&PhysicsScene::setShapeSource,
@@ -209,7 +209,7 @@ void PhysicsSystemImpl::registerProperties()
 			allocator));
 	m_engine.registerProperty(
 		"physical_heightfield",
-		allocator.newObject<ResourcePropertyDescriptor<PhysicsScene>>(
+		allocator.newObject<FilePropertyDescriptor<PhysicsScene>>(
 			"heightmap",
 			&PhysicsScene::getHeightmap,
 			&PhysicsScene::setHeightmap,

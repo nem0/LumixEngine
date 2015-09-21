@@ -92,6 +92,22 @@ void AssetBrowser::unloadResource()
 }
 
 
+AssetBrowser::Type AssetBrowser::getTypeFromResourceManagerType(uint32_t type) const
+{
+	switch (type)
+	{
+		case Lumix::ResourceManager::MODEL: return MODEL;
+		case Lumix::ResourceManager::SHADER: return SHADER;
+		case Lumix::ResourceManager::TEXTURE: return TEXTURE;
+		case Lumix::ResourceManager::MATERIAL: return MATERIAL;
+	}
+	if (type == UNIVERSE_HASH) return UNIVERSE;
+	if (type == LUA_SCRIPT_HASH) return LUA_SCRIPT;
+
+	return MODEL;
+}
+
+
 void AssetBrowser::update()
 {
 	for (const auto& path_obj : m_changed_files)
@@ -106,19 +122,7 @@ void AssetBrowser::update()
 		Lumix::Path path_obj(path);
 		if (!Lumix::fileExists(path))
 		{
-			int index = 0;
-			switch (resource_type)
-			{
-			case Lumix::ResourceManager::MODEL: index = MODEL; break;
-			case Lumix::ResourceManager::MATERIAL: index = MATERIAL; break;
-			case Lumix::ResourceManager::SHADER: index = SHADER; break;
-			case Lumix::ResourceManager::TEXTURE: index = TEXTURE; break;
-			}
-			if (resource_type == UNIVERSE_HASH)
-				index = UNIVERSE;
-			else if (resource_type == LUA_SCRIPT_HASH)
-				index = LUA_SCRIPT;
-
+			int index = getTypeFromResourceManagerType(resource_type);
 			m_resources[index].eraseItemFast(path_obj);
 			continue;
 		}

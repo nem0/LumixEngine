@@ -36,6 +36,7 @@ public:
 	void onGui();
 	void update();
 	const Lumix::Array<Lumix::Path>& getResources(Type type) const;
+	Type getTypeFromResourceManagerType(uint32_t type) const;
 
 public:
 	bool m_is_opened;
