@@ -253,6 +253,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		, m_point_light_shadowmaps(allocator)
 		, m_materials(allocator)
 	{
+		m_is_wireframe = false;
 		m_view_x = m_view_y = 0;
 		m_has_shadowmap_define_idx = m_renderer.getShaderDefineIdx("HAS_SHADOWMAP");
 
@@ -1673,6 +1674,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 		m_render_state = BGFX_STATE_RGB_WRITE | BGFX_STATE_ALPHA_WRITE |
 						 BGFX_STATE_DEPTH_WRITE | BGFX_STATE_MSAA;
+		m_render_state |= m_is_wireframe ? BGFX_STATE_PT_LINESTRIP : 0;
 		m_view_idx = m_renderer.getViewCounter();
 		m_pass_idx = -1;
 		m_current_framebuffer = m_default_framebuffer;
@@ -1718,15 +1720,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	virtual void setWireframe(bool wireframe) override
 	{
-		if (wireframe)
-		{
-			m_debug_flags = m_debug_flags | BGFX_DEBUG_WIREFRAME;
-		}
-		else
-		{
-			m_debug_flags = m_debug_flags & ~BGFX_DEBUG_WIREFRAME;
-		}
-		bgfx::setDebug(m_debug_flags);
+		m_is_wireframe = wireframe;
 	}
 
 
@@ -1773,6 +1767,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	ComponentIndex m_applied_camera;
 	ComponentIndex m_current_light;
 	bool m_is_current_light_global;
+	bool m_is_wireframe;
 	Frustum m_camera_frustum;
 
 	Matrix m_shadow_viewprojection[4];

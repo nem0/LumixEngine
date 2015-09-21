@@ -28,6 +28,7 @@ class SceneView
 		void onMouseUp(Lumix::MouseButton::Value button);
 		bool onMouseDown(int screen_x, int screen_y, Lumix::MouseButton::Value button);
 		void onMouseMove(int screen_x, int screen_y, int rel_x, int rel_y);
+		void setWireframe(bool wireframe);
 
 	private:
 		void renderGizmos();

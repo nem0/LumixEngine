@@ -284,7 +284,7 @@ public:
 					m_editor->lookAtSelected();
 				}
 				if (ImGui::MenuItem("Wireframe", "Ctrl - W", &m_is_wireframe))
-					m_gui_pipeline->setWireframe(m_is_wireframe);
+					m_sceneview.setWireframe(m_is_wireframe);
 				if (ImGui::MenuItem("Stats")) m_gui_pipeline->toggleStats();
 				if (ImGui::BeginMenu("Windows"))
 				{
@@ -588,7 +588,7 @@ public:
 			if (ImGui::GetIO().KeysDown['W'])
 			{
 				m_is_wireframe = !m_is_wireframe;
-				m_gui_pipeline->setWireframe(m_is_wireframe);
+				m_sceneview.setWireframe(m_is_wireframe);
 			}
 			if (ImGui::GetIO().KeysDown['P'])
 			{
