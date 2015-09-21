@@ -489,9 +489,9 @@ Engine* Engine::create(FS::FileSystem* fs, IAllocator& allocator)
 }
 
 
-void Engine::destroy(Engine* engine)
+void Engine::destroy(Engine* engine, IAllocator& allocator)
 {
-	engine->getAllocator().deleteObject(engine);
+	allocator.deleteObject(engine);
 }
 
 

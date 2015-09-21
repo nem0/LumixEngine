@@ -75,4 +75,5 @@ private:
 	float m_terrain_brush_size;
 	int m_texture_idx;
 	Lumix::Vec3 m_color;
+	int m_current_brush;
 };

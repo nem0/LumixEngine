@@ -3287,10 +3287,9 @@ WorldEditor* WorldEditor::create(const char* base_path, Engine& engine, IAllocat
 }
 
 
-void WorldEditor::destroy(WorldEditor* editor)
+void WorldEditor::destroy(WorldEditor* editor, IAllocator& allocator)
 {
-	editor->getEngine().getAllocator().deleteObject(
-		static_cast<WorldEditorImpl*>(editor));
+	allocator.deleteObject(static_cast<WorldEditorImpl*>(editor));
 }
 
 

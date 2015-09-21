@@ -38,4 +38,5 @@ class PropertyGrid
 		Lumix::WorldEditor& m_editor;
 		AssetBrowser& m_asset_browser;
 		class TerrainEditor* m_terrain_editor;
+		char m_filter[128];
 };

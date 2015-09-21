@@ -172,8 +172,8 @@ public:
 	void shutdown()
 	{
 		m_main_window->shutdown();
-		Lumix::WorldEditor::destroy(m_world_editor);
-		Lumix::Engine::destroy(m_engine);
+		Lumix::WorldEditor::destroy(m_world_editor, m_allocator);
+		Lumix::Engine::destroy(m_engine, m_allocator);
 		m_main_window->deleteLater();
 		m_qt_app->processEvents();
 		delete m_qt_app;

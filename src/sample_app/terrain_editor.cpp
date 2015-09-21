@@ -938,14 +938,13 @@ void TerrainEditor::onGui()
 		Color
 	};
 
-	static int current_brush = 0;
 	if (ImGui::Combo(
-			"Brush type", &current_brush, "Height\0Layer\0Entity\0Color\0"))
+			"Brush type", &m_current_brush, "Height\0Layer\0Entity\0Color\0"))
 	{
-		m_type = current_brush == Height ? TerrainEditor::RAISE_HEIGHT : m_type;
+		m_type = m_current_brush == Height ? TerrainEditor::RAISE_HEIGHT : m_type;
 	}
 
-	switch (current_brush)
+	switch (m_current_brush)
 	{
 		case Height:
 		{
