@@ -1424,7 +1424,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 		else
 		{
 			setPointLightUniforms(material, m_current_light);
-
 		}
 
 		for (int i = 0; i < material->getUniformCount(); ++i)
@@ -1678,6 +1677,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		m_view_idx = m_renderer.getViewCounter();
 		m_pass_idx = -1;
 		m_current_framebuffer = m_default_framebuffer;
+		m_current_light = -1;
 		m_global_textures.clear();
 		m_view2pass_map.assign(0xFF);
 		m_instance_data_idx = 0;
