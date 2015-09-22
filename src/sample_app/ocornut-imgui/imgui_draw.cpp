@@ -766,6 +766,19 @@ void ImDrawList::AddRectFilled(const ImVec2& a, const ImVec2& b, ImU32 col, floa
     }
 }
 
+void ImDrawList::AddTriangleFilledMultiColor(const ImVec2& a, const ImVec2& b, const ImVec2& c, ImU32 col_a, ImU32 col_b, ImU32 col_c)
+{
+	if (((col_a | col_b | col_c) >> 24) == 0)
+		return;
+
+	const ImVec2 uv = GImGui->FontTexUvWhitePixel;
+	PrimReserve(3, 3);
+	PrimWriteIdx((ImDrawIdx)(_VtxCurrentIdx)); PrimWriteIdx((ImDrawIdx)(_VtxCurrentIdx + 1)); PrimWriteIdx((ImDrawIdx)(_VtxCurrentIdx + 2));
+	PrimWriteVtx(a, uv, col_a);
+	PrimWriteVtx(b, uv, col_b);
+	PrimWriteVtx(c, uv, col_c);
+}
+
 void ImDrawList::AddRectFilledMultiColor(const ImVec2& a, const ImVec2& c, ImU32 col_upr_left, ImU32 col_upr_right, ImU32 col_bot_right, ImU32 col_bot_left)
 {
     if (((col_upr_left | col_upr_right | col_bot_right | col_bot_left) >> 24) == 0)
