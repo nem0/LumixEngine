@@ -13,7 +13,6 @@
 #include "renderer/render_scene.h"
 #include "physics/physics_geometry_manager.h"
 #include "physics/physics_scene.h"
-#include "studio/mainwindow.h"
 
 
 namespace Lumix
@@ -129,15 +128,6 @@ struct EditorPlugin : public WorldEditor::Plugin
 	WorldEditor& m_editor;
 };
 
-
-extern "C" LUMIX_LIBRARY_EXPORT void initEditorPlugin(Engine& engine,
-													  MainWindow& main_window)
-{
-	IAllocator& allocator = main_window.getWorldEditor().getAllocator();
-	EditorPlugin* plugin =
-		allocator.newObject<EditorPlugin>(main_window.getWorldEditor());
-	main_window.getWorldEditor().addPlugin(*plugin);
-}
 
 
 struct CustomErrorCallback : public physx::PxErrorCallback

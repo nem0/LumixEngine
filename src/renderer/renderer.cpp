@@ -566,13 +566,6 @@ extern "C"
 		engine.getAllocator().deleteObject(r);
 		return nullptr;
 	}
-
-
-	LUMIX_LIBRARY_EXPORT void initEditorPlugin(Engine& engine,
-											   class MainWindow& main_window)
-	{
-		//WorldEditor& editor = main_window.getWorldEditor();
-	}
 }
 
 
