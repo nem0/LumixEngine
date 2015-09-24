@@ -5,8 +5,8 @@
 #include "engine/engine.h"
 #include "engine/property_descriptor.h"
 #include "ocornut-imgui/imgui.h"
-#include "string_builder.h"
 #include "terrain_editor.h"
+#include "utils.h"
 
 
 const char* PropertyGrid::getComponentTypeName(Lumix::ComponentUID cmp) const

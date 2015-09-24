@@ -14,12 +14,12 @@
 #include "engine/engine.h"
 #include "file_system_watcher.h"
 #include "lua_script/lua_script_manager.h"
+#include "ocornut-imgui/imgui.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/shader.h"
 #include "renderer/texture.h"
-#include "ocornut-imgui/imgui.h"
-#include "string_builder.h"
+#include "utils.h"
 
 
 static const uint32_t UNIVERSE_HASH = Lumix::crc32("universe");

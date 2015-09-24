@@ -17,7 +17,7 @@
 #include "log_ui.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
-#include "string_builder.h"
+#include "utils.h"
 
 
 ShaderCompiler::ShaderCompiler(Lumix::WorldEditor& editor, LogUI& log_ui)

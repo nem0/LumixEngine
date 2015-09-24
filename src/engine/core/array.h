@@ -338,7 +338,7 @@ public:
 		m_data = p;
 	}
 
-	int indexOf(const T& item)
+	int indexOf(const T& item) const
 	{
 		for (int i = 0; i < m_size; ++i)
 		{

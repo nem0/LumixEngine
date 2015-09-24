@@ -2698,6 +2698,12 @@ public:
 	}
 
 
+	virtual bool isEntitySelected(Entity entity) const override
+	{
+		return m_selected_entities.indexOf(entity) >= 0;
+	}
+
+
 	virtual const Array<Entity>& getSelectedEntities() const override
 	{
 		return m_selected_entities;
@@ -2787,6 +2793,13 @@ public:
 			m_selected_entities.push(entities[i]);
 		}
 		m_entity_selected.invoke(m_selected_entities);
+	}
+
+
+	virtual void addEntityToSelection(Entity entity) override
+	{
+		if (m_selected_entities.indexOf(entity) >= 0) return;
+		m_selected_entities.push(entity);
 	}
 
 
