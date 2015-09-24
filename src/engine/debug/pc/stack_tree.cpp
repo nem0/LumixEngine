@@ -59,6 +59,31 @@ StackTree::~StackTree()
 }
 
 
+StackNode* StackTree::getParent(StackNode* node)
+{
+	return node ? node->m_parent : nullptr;
+}
+
+
+bool StackTree::getFunction(StackNode* node, char* out, int max_size, int* line)
+{
+	HANDLE process = GetCurrentProcess();
+	uint8_t symbol_mem[sizeof(SYMBOL_INFO) + 256 * sizeof(char)];
+	SYMBOL_INFO* symbol = reinterpret_cast<SYMBOL_INFO*>(symbol_mem);
+	memset(symbol_mem, 0, sizeof(symbol_mem));
+	symbol->MaxNameLen = 255;
+	symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+	BOOL success = SymFromAddr(process, (DWORD64)(node->m_instruction), 0, symbol);
+	IMAGEHLP_LINE64 line_info;
+	DWORD displacement;
+	SymGetLineFromAddr64(process, (DWORD64)(node->m_instruction), &displacement, &line_info);
+	*line = line_info.LineNumber;
+	if (success) Lumix::copyString(out, max_size, symbol->Name);
+
+	return success == TRUE;
+}
+
+
 void StackTree::printCallstack(StackNode* node)
 {
 	while (node)

@@ -478,8 +478,10 @@ public:
 				.get(ResourceManager::MODEL)
 				->load(Path(path))));
 
-			m_universe.addComponent(
-				m_renderables[i]->m_entity, RENDERABLE_HASH, this, i);
+			m_universe.addComponent(m_renderables[i]->m_entity,
+				RENDERABLE_HASH,
+				this,
+				m_renderables[i]->m_component_index);
 		}
 	}
 

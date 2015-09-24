@@ -263,12 +263,32 @@ class FileArrayObjectDescriptor : public StringArrayObjectDescriptor<S>, public 
 };
 
 
-template <class S>
-class ResourceArrayObjectDescriptor : public FileArrayObjectDescriptor<S>
+class ResourcePropertyDescriptorBase
 {
 	public:
-		ResourceArrayObjectDescriptor(const char* name, Getter getter, Setter setter, const char* file_type, IAllocator& allocator)
+		ResourcePropertyDescriptorBase(uint32_t resource_type)
+		{
+			m_resource_type = resource_type;
+		}
+
+		uint32_t getResourceType() { return m_resource_type; }
+
+		uint32_t m_resource_type;
+};
+
+
+template <class S>
+class ResourceArrayObjectDescriptor : public FileArrayObjectDescriptor<S>, public ResourcePropertyDescriptorBase
+{
+	public:
+		ResourceArrayObjectDescriptor(const char* name,
+			Getter getter,
+			Setter setter,
+			const char* file_type,
+			uint32_t resource_type,
+			IAllocator& allocator)
 			: FileArrayObjectDescriptor(name, getter, setter, file_type, allocator)
+			, ResourcePropertyDescriptorBase(resource_type)
 		{
 			m_type = IPropertyDescriptor::RESOURCE;
 		}
@@ -670,11 +690,17 @@ class FilePropertyDescriptor : public StringPropertyDescriptor<T>, public IFileP
 
 
 template <class T>
-class ResourcePropertyDescriptor : public FilePropertyDescriptor<T>
+class ResourcePropertyDescriptor : public FilePropertyDescriptor<T>, public ResourcePropertyDescriptorBase
 {
 	public:
-		ResourcePropertyDescriptor(const char* name, Getter getter, Setter setter, const char* file_type, IAllocator& allocator)
+		ResourcePropertyDescriptor(const char* name,
+			Getter getter,
+			Setter setter,
+			const char* file_type,
+			uint32_t resource_type,
+			IAllocator& allocator)
 			: FilePropertyDescriptor(name, getter, setter, file_type, allocator)
+			, ResourcePropertyDescriptorBase(resource_type)
 		{
 			m_type = IPropertyDescriptor::RESOURCE;
 		}

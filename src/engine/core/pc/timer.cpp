@@ -27,11 +27,21 @@ class TimerImpl : public Timer
 			return delta;
 		}
 
-		float tick()
+		float getTimeSinceTick() override
 		{
 			LARGE_INTEGER tick;
 			QueryPerformanceCounter(&tick);
-			float delta = static_cast<float>((double)(tick.QuadPart - m_last_tick.QuadPart) / (double)m_frequency.QuadPart);
+			float delta = static_cast<float>(
+				(double)(tick.QuadPart - m_last_tick.QuadPart) / (double)m_frequency.QuadPart);
+			return delta;
+		}
+
+		float tick() override
+		{
+			LARGE_INTEGER tick;
+			QueryPerformanceCounter(&tick);
+			float delta = static_cast<float>(
+				(double)(tick.QuadPart - m_last_tick.QuadPart) / (double)m_frequency.QuadPart);
 			m_last_tick = tick;
 			return delta;
 		} 

@@ -268,10 +268,10 @@ void Gizmo::rotate(int relx, int rely, int flags)
 
 		new_positions.push(pos);
 	}
-	m_editor.setEntitiesPositionsAndRotaions(&m_editor.getSelectedEntities()[0],
-											 &new_positions[0],
-											 &new_rotations[0],
-											 new_positions.size());
+	m_editor.setEntitiesPositionsAndRotations(&m_editor.getSelectedEntities()[0],
+		&new_positions[0],
+		&new_rotations[0],
+		new_positions.size());
 }
 
 

@@ -253,6 +253,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 		, m_point_light_shadowmaps(allocator)
 		, m_materials(allocator)
 	{
+		m_is_wireframe = false;
+		m_view_x = m_view_y = 0;
 		m_has_shadowmap_define_idx = m_renderer.getShaderDefineIdx("HAS_SHADOWMAP");
 
 		m_cam_view_uniform =
@@ -343,6 +345,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		for (int i = 0; i < m_framebuffers.size(); ++i)
 		{
 			m_allocator.deleteObject(m_framebuffers[i]);
+			if (m_framebuffers[i] == m_default_framebuffer) m_default_framebuffer = nullptr;
 		}
 		m_allocator.deleteObject(m_default_framebuffer);
 	}
@@ -409,7 +412,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		bgfx::setViewTransform(m_view_idx, &mtx.m11, &projection_matrix.m11);
 		
 		bgfx::setViewRect(
-			m_view_idx, 0, 0, (uint16_t)m_width, (uint16_t)m_height);
+			m_view_idx, m_view_x, m_view_y, (uint16_t)m_width, (uint16_t)m_height);
 	}
 
 
@@ -452,7 +455,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	FrameBuffer* getFramebuffer(const char* framebuffer_name)
+	virtual FrameBuffer* getFramebuffer(const char* framebuffer_name) override
 	{
 		for (int i = 0, c = m_framebuffers.size(); i < c; ++i)
 		{
@@ -529,7 +532,9 @@ struct PipelineInstanceImpl : public PipelineInstance
 			for (int i = 0; i < m_source.m_framebuffers.size(); ++i)
 			{
 				FrameBuffer::Declaration& decl = m_source.m_framebuffers[i];
-				m_framebuffers.push(m_allocator.newObject<FrameBuffer>(decl));
+				auto* fb = m_allocator.newObject<FrameBuffer>(decl);
+				m_framebuffers.push(fb);
+				if (strcmp(decl.m_name, "default") == 0) m_default_framebuffer = fb;
 			}
 
 			if (lua_getglobal(m_source.m_lua_state, "init") == LUA_TFUNCTION)
@@ -1128,7 +1133,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		bgfx::setViewTransform(
 			m_view_idx, &Matrix::IDENTITY.m11, &projection_mtx.m11);
 		bgfx::setViewRect(
-			m_view_idx, 0, 0, (uint16_t)m_width, (uint16_t)m_height);
+			m_view_idx, m_view_x, m_view_y, (uint16_t)m_width, (uint16_t)m_height);
 
 		bgfx::TransientVertexBuffer vb;
 		bgfx::allocTransientVertexBuffer(&vb, 6, BaseVertex::s_vertex_decl);
@@ -1330,13 +1335,21 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 
 	virtual void render(TransientGeometry& geom,
-		int first_index,
-		int num_indices,
-		Material& material) override
+						int first_index,
+						int num_indices,
+						Material& material,
+						bgfx::TextureHandle* texture) override
 	{
 		bgfx::setState(m_render_state | material.getRenderStates());
 		bgfx::setTransform(nullptr);
 		setMaterial(&material);
+		if (texture)
+		{
+			bgfx::setTexture(
+				0,
+				material.getShader()->getTextureSlot(0).m_uniform_handle,
+				*texture);
+		}
 		bgfx::setVertexBuffer(&geom.getVertexBuffer(), 0, geom.getNumVertices());
 		bgfx::setIndexBuffer(&geom.getIndexBuffer(), first_index, num_indices);
 		bgfx::submit(
@@ -1411,7 +1424,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 		else
 		{
 			setPointLightUniforms(material, m_current_light);
-
 		}
 
 		for (int i = 0; i < material->getUniformCount(); ++i)
@@ -1635,17 +1647,15 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	virtual void resize(int w, int h) override
+	virtual void setViewport(int x, int y, int w, int h) override
 	{
+		m_view_x = x;
+		m_view_y = y;
 		if (m_width == w && m_height == h) return;
 
 		if (m_default_framebuffer)
 		{
 			m_default_framebuffer->resize(w, h);
-		}
-		else
-		{
-			bgfx::reset(w, h);
 		}
 		m_width = w;
 		m_height = h;
@@ -1663,10 +1673,11 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 		m_render_state = BGFX_STATE_RGB_WRITE | BGFX_STATE_ALPHA_WRITE |
 						 BGFX_STATE_DEPTH_WRITE | BGFX_STATE_MSAA;
+		m_render_state |= m_is_wireframe ? BGFX_STATE_PT_LINESTRIP : 0;
 		m_view_idx = m_renderer.getViewCounter();
-		bgfx::setViewClear(m_view_idx, 0);
 		m_pass_idx = -1;
 		m_current_framebuffer = m_default_framebuffer;
+		m_current_light = -1;
 		m_global_textures.clear();
 		m_view2pass_map.assign(0xFF);
 		m_instance_data_idx = 0;
@@ -1709,15 +1720,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	virtual void setWireframe(bool wireframe) override
 	{
-		if (wireframe)
-		{
-			m_debug_flags = m_debug_flags | BGFX_DEBUG_WIREFRAME;
-		}
-		else
-		{
-			m_debug_flags = m_debug_flags & ~BGFX_DEBUG_WIREFRAME;
-		}
-		bgfx::setDebug(m_debug_flags);
+		m_is_wireframe = wireframe;
 	}
 
 
@@ -1764,10 +1767,13 @@ struct PipelineInstanceImpl : public PipelineInstance
 	ComponentIndex m_applied_camera;
 	ComponentIndex m_current_light;
 	bool m_is_current_light_global;
+	bool m_is_wireframe;
 	Frustum m_camera_frustum;
 
 	Matrix m_shadow_viewprojection[4];
 	Vec4 m_shadowmap_splits;
+	int m_view_x;
+	int m_view_y;
 	int m_width;
 	int m_height;
 	AssociativeArray<uint32_t, CustomCommandHandler> m_custom_commands_handlers;
@@ -1966,7 +1972,7 @@ void executeCustomCommand(PipelineInstanceImpl* pipeline, const char* command)
 
 bool hasScene(PipelineInstanceImpl* pipeline)
 {
-	return pipeline->getScene();
+	return pipeline->getScene() != nullptr;
 }
 
 

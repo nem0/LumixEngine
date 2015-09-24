@@ -187,6 +187,7 @@ struct ShaderLoader
 									m_vs_callback);
 		if (!success)
 		{
+			g_log_error.log("renderer") << "Could not open " << path;
 			++m_loaded;
 		}
 
@@ -205,6 +206,7 @@ struct ShaderLoader
 						  FS::Mode::READ | FS::Mode::OPEN,
 						  m_fs_callback))
 		{
+			g_log_error.log("renderer") << "Could not open " << path;
 			success = false;
 			checkFinish();
 		}
@@ -222,6 +224,12 @@ struct ShaderLoader
 			m_fragment_shader = bgfx::createShader(mem);
 			ASSERT(bgfx::isValid(m_fragment_shader));
 		}
+		else
+		{
+			g_log_error.log("renderer") << "Could not open fragment shader "
+										<< m_shader.getPath().c_str()
+										<< " mask = " << m_mask;
+		}
 		checkFinish();
 	}
 
@@ -234,6 +242,12 @@ struct ShaderLoader
 			mem->data[file.size()] = '\0';
 			m_vertex_shader = bgfx::createShader(mem);
 			ASSERT(bgfx::isValid(m_vertex_shader));
+		}
+		else
+		{
+			g_log_error.log("renderer") << "Could not open vertex shader "
+				<< m_shader.getPath().c_str()
+				<< " mask = " << m_mask;
 		}
 		checkFinish();
 	}
@@ -469,6 +483,7 @@ bool Shader::getShaderCombinations(Renderer& renderer,
 	errors = errors || lua_pcall(L, 0, LUA_MULTRET, 0) != LUA_OK;
 	if (errors)
 	{
+		g_log_error.log("lua") << lua_tostring(L, -1);
 		lua_pop(L, 1);
 		return false;
 	}

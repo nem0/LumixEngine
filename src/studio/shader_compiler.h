@@ -24,7 +24,7 @@ public:
 	ShaderCompiler();
 	~ShaderCompiler();
 
-	void setWorldEditor(Lumix::WorldEditor& editor) { m_editor = &editor; makeUpToDate(); }
+	void setWorldEditor(Lumix::WorldEditor& editor);
 	void compileAll();
 	void setNotifications(Notifications& notifications);
 

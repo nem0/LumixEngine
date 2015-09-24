@@ -17,4 +17,10 @@ namespace Lumix
 	}
 
 
+	void* DefaultAllocator::reallocate(void* ptr, size_t size)
+	{
+		return realloc(ptr, size);
+	}
+
+
 } // ~namespace Lumix

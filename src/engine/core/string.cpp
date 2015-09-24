@@ -417,7 +417,7 @@ static bool increment(char* output, char* end, bool is_space_after)
 
 bool toCString(float value, char* output, int length, int after_point)
 {
-	if (length < 1)
+	if (length < 2)
 	{
 		return false;
 	}
@@ -432,19 +432,28 @@ bool toCString(float value, char* output, int length, int after_point)
 	int exponent = value == 0 ? 0 : (int)log10(value);
 	float num = value;
 	char* c = output;
-	while ((num >= 1 || exponent >= 0) && length > 0)
+	if (num  < 1 && num > -1)
 	{
-		float power = (float)pow(10, exponent);
-		char digit = (char)floor(num / power);
-		num -= digit * power;
-		*c = digit + '0';
-		--exponent;
-		--length;
+		*c = '0';
 		++c;
+		--length;
+	}
+	else
+	{
+		while ((num >= 1 || exponent >= 0) && length > 0)
+		{
+			float power = (float)pow(10, exponent);
+			char digit = (char)floor(num / power);
+			num -= digit * power;
+			*c = digit + '0';
+			--exponent;
+			--length;
+			++c;
+		}
 	}
 	// decimal part
 	float dec_part = num;
-	if (length >= 1 && after_point > 0)
+	if (length > 1 && after_point > 0)
 	{
 		*c = '.';
 		++c;
@@ -459,7 +468,7 @@ bool toCString(float value, char* output, int length, int after_point)
 	{
 		return false;
 	}
-	while (length > 0 && after_point > 0)
+	while (length > 1 && after_point > 0)
 	{
 		dec_part *= 10;
 		char tmp = (char)dec_part;
@@ -480,6 +489,16 @@ bool toCString(float value, char* output, int length, int after_point)
 		return false;
 	}
 	return true;
+}
+
+
+char* trimmed(char* str)
+{
+	while (*str && (*str == '\t' || *str == ' '))
+	{
+		++str;
+	}
+	return str;
 }
 
 

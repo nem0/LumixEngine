@@ -1,7 +1,7 @@
 #include "core/fs/os_file.h"
 #include "core/iallocator.h"
 #include "lumix.h"
-#define WIN32_LEAN_AND_MEAN
+
 #include <windows.h>
 
 
@@ -115,10 +115,13 @@ size_t OsFile::seek(SeekMode base, size_t pos)
 	return ::SetFilePointer(m_impl->m_file, (DWORD)pos, nullptr, dir);
 }
 
+
 void OsFile::writeEOF()
 {
 	ASSERT(nullptr != m_impl);
 	::SetEndOfFile(m_impl->m_file);
 }
+
+
 } // ~namespace FS
 } // ~namespace Lumix

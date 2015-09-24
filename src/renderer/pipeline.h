@@ -4,6 +4,8 @@
 #include "core/delegate.h"
 #include "core/resource.h"
 #include "core/resource_manager_base.h"
+#include <bgfx.h>
+
 
 namespace Lumix
 {
@@ -15,6 +17,7 @@ struct Matrix;
 class Model;
 class Renderer;
 class RenderScene;
+class Texture;
 class TransientGeometry;
 
 
@@ -66,11 +69,12 @@ class LUMIX_RENDERER_API PipelineInstance abstract
 		virtual ~PipelineInstance() {}
 
 		virtual void render() = 0;
-		virtual void resize(int w, int h) = 0;
+		virtual void setViewport(int x, int y, int width, int height) = 0;
 
 		static PipelineInstance* create(Pipeline& src, IAllocator& allocator);
 		static void destroy(PipelineInstance* pipeline);
 
+		virtual FrameBuffer* getFramebuffer(const char* framebuffer_name) = 0;
 		virtual void setScene(RenderScene* scene) = 0;
 		virtual RenderScene* getScene() = 0;
 		virtual int getWidth() = 0;
@@ -82,7 +86,8 @@ class LUMIX_RENDERER_API PipelineInstance abstract
 		virtual void render(TransientGeometry& geom,
 							int first_index,
 							int num_indices,
-							Material& material) = 0;
+							Material& material,
+							bgfx::TextureHandle* texture) = 0;
 		virtual void setWireframe(bool wireframe) = 0;
 		virtual void renderModel(Model& model, const Matrix& mtx) = 0;
 		virtual void toggleStats() = 0;

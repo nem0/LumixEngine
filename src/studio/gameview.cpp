@@ -44,7 +44,7 @@ void GameView::setWorldEditor(Lumix::WorldEditor& editor)
 	ASSERT(m_editor == nullptr);
 	m_editor = &editor;
 	m_render_device =
-		new WGLRenderDevice(*m_editor, m_editor->getEngine(), "pipelines/game_view.lua");
+		new WGLRenderDevice(*m_editor, m_editor->getEngine(), "pipelines/game_view_qt.lua");
 	m_render_device->setWidget(*getContentWidget());
 }
 
@@ -67,7 +67,7 @@ void GameView::resizeEvent(QResizeEvent* event)
 	int h = event->size().height();
 	if (m_render_device)
 	{
-		m_render_device->getPipeline().resize(w, h);
+		m_render_device->getPipeline().setViewport(0, 0, w, h);
 	}
 }
 

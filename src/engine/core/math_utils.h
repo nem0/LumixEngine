@@ -58,6 +58,11 @@ template <typename T> LUMIX_FORCE_INLINE T maxValue(T a, T b)
 	return a < b ? b : a;
 }
 
+LUMIX_FORCE_INLINE float floor(float f)
+{
+	return float(int(f));
+}
+
 template <typename T> LUMIX_FORCE_INLINE T abs(T a)
 {
 	return a > 0 ? a : -a;
