@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include "lumix.h"
 #include "core/string.h"
 
 
@@ -79,3 +80,15 @@ struct StringBuilder
 	}
 	char data[size];
 };
+
+
+namespace Lumix
+{
+	class WorldEditor;
+}
+
+
+void getEntityListDisplayName(Lumix::WorldEditor& editor,
+	char* buf,
+	int max_size,
+	Lumix::Entity entity);

@@ -3,7 +3,6 @@
 #include "core/crc32.h"
 #include "core/default_allocator.h"
 #include "core/input_system.h"
-#include "core/json_serializer.h"
 #include "core/path_utils.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
@@ -11,10 +10,10 @@
 #include "debug/allocator.h"
 #include "editor/gizmo.h"
 #include "editor/entity_template_system.h"
-#include "editor/ieditor_command.h"
 #include "editor/world_editor.h"
 #include "engine.h"
 #include "engine/plugin_manager.h"
+#include "hierarchy_ui.h"
 #include "import_asset_dialog.h"
 #include "log_ui.h"
 #include "profiler_ui.h"
@@ -28,8 +27,8 @@
 #include "ocornut-imgui/imgui.h"
 #include "scene_view.h"
 #include "shader_compiler.h"
-#include "string_builder.h"
 #include "universe/hierarchy.h"
+#include "utils.h"
 
 #include <bgfx.h>
 #include <cstdio>
@@ -42,69 +41,6 @@
 
 void imGuiCallback(ImDrawData* draw_data);
 LRESULT WINAPI msgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-
-
-
-class SetParentEditorCommand : public Lumix::IEditorCommand
-{
-public:
-	SetParentEditorCommand(Lumix::WorldEditor& editor,
-		Lumix::Hierarchy& hierarchy,
-		Lumix::Entity child,
-		Lumix::Entity parent)
-		: m_new_parent(parent)
-		, m_child(child)
-		, m_old_parent(hierarchy.getParent(child))
-		, m_hierarchy(hierarchy)
-		, m_editor(editor)
-	{
-	}
-
-
-	virtual void serialize(Lumix::JsonSerializer& serializer)
-	{
-		serializer.serialize("parent", m_new_parent);
-		serializer.serialize("child", m_child);
-	}
-
-
-	virtual void deserialize(Lumix::JsonSerializer& serializer)
-	{
-		serializer.deserialize("parent", m_new_parent, 0);
-		serializer.deserialize("child", m_child, 0);
-		m_old_parent = m_hierarchy.getParent(m_child);
-	}
-
-
-	virtual void execute() override
-	{
-		m_hierarchy.setParent(m_child, m_new_parent);
-	}
-
-
-	virtual void undo() override
-	{
-		m_hierarchy.setParent(m_child, m_old_parent);
-	}
-
-
-	virtual bool merge(IEditorCommand&) override { return false; }
-
-
-	virtual uint32_t getType() override
-	{
-		static const uint32_t hash = Lumix::crc32("set_entity_parent");
-		return hash;
-	}
-
-
-private:
-	Lumix::Entity m_child;
-	Lumix::Entity m_new_parent;
-	Lumix::Entity m_old_parent;
-	Lumix::Hierarchy& m_hierarchy;
-	Lumix::WorldEditor& m_editor;
-};
 
 
 class Context
@@ -124,6 +60,7 @@ public:
 		, m_asset_browser(nullptr)
 		, m_property_grid(nullptr)
 	{
+		m_entity_list_filter[0] = '\0';
 	}
 
 
@@ -181,71 +118,11 @@ public:
 		showEntityList();
 		showEntityTemplateList();
 		m_sceneview.onGui();
-		showHierarchy();
+		m_hierarchy_ui.onGui();
 		showGameView();
 		if (m_is_style_editor_shown) ImGui::ShowStyleEditor();
 
 		ImGui::Render();
-	}
-
-
-	void showHierarchy()
-	{
-		if(!ImGui::Begin("Hierarchy"))
-		{
-			ImGui::End();
-			return;
-		}
-		char name[50];
-		auto* hierarchy = m_editor->getHierarchy();
-		const auto& all_children = hierarchy->getAllChildren();
-		for(auto i = all_children.begin(), e = all_children.end(); i != e; ++i)
-		{
-			if((*i.value()).empty()) continue;
-			getEntityListDisplayName(name, sizeof(name), i.key());
-			ImGui::BulletText(name);
-			ImGui::Indent();
-			for(auto c : *i.value())
-			{
-				getEntityListDisplayName(name, sizeof(name), c.m_entity);
-				ImGui::BulletText(name);
-				ImGui::SameLine();
-				if(ImGui::Button("Remove"))
-				{
-					auto* command = m_editor->getAllocator().newObject<SetParentEditorCommand>(*m_editor, *hierarchy, c.m_entity, -1);
-					m_editor->executeCommand(command);
-				}
-			}
-			ImGui::Unindent();
-		}
-
-		ImGui::Separator();
-
-		static char buf[50];
-		static int parent = 0;
-		static int child = 1;
-		getEntityListDisplayName(name, sizeof(name), parent);
-		ImGui::LabelText("Parent", name);
-		ImGui::SameLine();
-		if(ImGui::Button("...##a"))
-		{
-			parent = m_editor->getSelectedEntities()[0];
-		}
-
-		getEntityListDisplayName(name, sizeof(name), child);
-		ImGui::LabelText("Child", name);
-		ImGui::SameLine();
-		if(ImGui::Button("...##b"))
-		{
-			child = m_editor->getSelectedEntities()[0];
-		}
-			
-		if(ImGui::Button("Add"))
-		{
-			auto* command = m_editor->getAllocator().newObject<SetParentEditorCommand>(*m_editor, *hierarchy, child, parent);
-			m_editor->executeCommand(command);
-		}
-		ImGui::End();
 	}
 
 
@@ -418,6 +295,7 @@ public:
 					ImGui::MenuItem("Entity list", nullptr, &m_is_entity_list_shown);
 					ImGui::MenuItem("Entity templates", nullptr, &m_is_entity_template_list_opened);
 					ImGui::MenuItem("Game view", nullptr, &m_is_gameview_opened);
+					ImGui::MenuItem("Hierarchy", nullptr, &m_hierarchy_ui.m_is_opened);
 					ImGui::MenuItem("Log", nullptr, &m_log_ui->m_is_opened);
 					ImGui::MenuItem("Profiler", nullptr, &m_profiler_ui->m_is_opened);
 					ImGui::MenuItem("Properties", nullptr, &m_property_grid->m_is_opened);
@@ -443,42 +321,7 @@ public:
 	}
 
 
-	void getEntityListDisplayName(char* buf, int max_size, Lumix::Entity entity)
-	{
-		const char* name = m_editor->getUniverse()->getEntityName(entity);
-		static const uint32_t RENDERABLE_HASH = Lumix::crc32("renderable");
-		Lumix::ComponentUID renderable =
-			m_editor->getComponent(entity, RENDERABLE_HASH);
-		if (renderable.isValid())
-		{
-			auto* scene = static_cast<Lumix::RenderScene*>(renderable.scene);
-			const char* path = scene->getRenderablePath(renderable.index);
-			if (path && path[0] != 0)
-			{
-				char basename[Lumix::MAX_PATH_LENGTH];
-				Lumix::copyString(buf, max_size, path);
-				Lumix::PathUtils::getBasename(
-					basename, Lumix::MAX_PATH_LENGTH, path);
-				if (name && name[0] != '\0')
-					Lumix::copyString(buf, max_size, name);
-				else
-					Lumix::toCString(entity, buf, max_size);
-
-				Lumix::catString(buf, max_size, " - ");
-				Lumix::catString(buf, max_size, basename);
-				return;
-			}
-		}
-
-		if (name && name[0] != '\0')
-		{
-			Lumix::copyString(buf, max_size, name);
-		}
-		else
-		{
-			Lumix::toCString(entity, buf, max_size);
-		}
-	}
+	
 
 
 	void showEntityTemplateList()
@@ -512,26 +355,39 @@ public:
 			{
 				m_editor->addEntity();
 			}
+			ImGui::InputText("Filter", m_entity_list_filter, sizeof(m_entity_list_filter));
+			ImGui::Separator();
 
-			char filter[100] = "";
-			ImGui::InputText("Filter", filter, sizeof(filter));
 			auto* universe = m_editor->getUniverse();
 			auto entity = universe->getFirstEntity();
 
-			while (entity >= 0)
+			if (ImGui::BeginChild("header"))
 			{
-				char buf[1024];
-				getEntityListDisplayName(buf, sizeof(buf), entity);
-
-				if (filter[0] == '\0' || strstr(buf, filter) != nullptr)
+				while (entity >= 0)
 				{
-					if (ImGui::Selectable(buf))
+					char buf[1024];
+					getEntityListDisplayName(*m_editor, buf, sizeof(buf), entity);
+
+					if (m_entity_list_filter[0] == '\0' || strstr(buf, m_entity_list_filter) != nullptr)
 					{
-						m_editor->selectEntities(&entity, 1);
+						bool is_selected = m_editor->isEntitySelected(entity);
+						if (ImGui::Selectable(buf, &is_selected))
+						{
+							if (ImGui::GetIO().KeysDown[VK_CONTROL])
+							{
+								m_editor->addEntityToSelection(entity);
+							}
+							else
+							{
+								m_editor->selectEntities(&entity, 1);
+							}
+						}
 					}
+					entity = universe->getNextEntity(entity);
 				}
-				entity = universe->getNextEntity(entity);
 			}
+			ImGui::EndChild();
+
 		}
 		ImGui::End();
 	}
@@ -667,6 +523,7 @@ public:
 		m_log_ui = new LogUI(m_editor->getAllocator());
 		m_import_asset_dialog = new ImportAssetDialog(*m_editor);
 		m_shader_compiler = new ShaderCompiler(*m_editor, *m_log_ui);
+		m_hierarchy_ui.setWorldEditor(*m_editor);
 
 		m_editor->universeCreated().bind<Context, &Context::onUniverseCreated>(this);
 		m_editor->universeDestroyed().bind<Context, &Context::onUniverseDestroyed>(this);
@@ -865,6 +722,8 @@ public:
 	ImportAssetDialog* m_import_asset_dialog;
 	ShaderCompiler* m_shader_compiler;
 	Lumix::string m_selected_template_name;
+	HierarchyUI m_hierarchy_ui;
+	char m_entity_list_filter[100];
 
 	bool m_finished;
 

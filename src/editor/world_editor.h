@@ -106,6 +106,7 @@ public:
 	virtual void destroyComponent(const ComponentUID& crc) = 0;
 	virtual Entity addEntity() = 0;
 	virtual void destroyEntities(const Entity* entities, int count) = 0;
+	virtual void addEntityToSelection(Entity entity) = 0;
 	virtual void selectEntities(const Entity* entities, int count) = 0;
 	virtual void selectEntitiesWithSameMesh() = 0;
 	virtual Entity addEntityAt(int camera_x, int camera_y) = 0;
@@ -137,6 +138,7 @@ public:
 	virtual void lookAtSelected() = 0;
 	virtual const char* getBasePath() = 0;
 	virtual const Array<Entity>& getSelectedEntities() const = 0;
+	virtual bool isEntitySelected(Entity entity) const = 0;
 
 	virtual DelegateList<void(const Array<Entity>&)>& entitySelected() = 0;
 	virtual DelegateList<void()>& universeCreated() = 0;

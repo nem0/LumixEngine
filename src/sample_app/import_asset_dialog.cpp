@@ -19,7 +19,7 @@
 #include "renderer/model.h"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb/stb_image.h"
-#include "string_builder.h"
+#include "utils.h"
 
 
 typedef StringBuilder<Lumix::MAX_PATH_LENGTH> PathBuilder;
