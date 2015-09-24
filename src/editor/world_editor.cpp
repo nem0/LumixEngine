@@ -391,17 +391,17 @@ public:
 
 
 	ScaleEntityCommand(WorldEditor& editor,
-					   const Array<Entity>& entities,
-					   const Array<float>& new_scales,
-					   IAllocator& allocator)
+		const Entity* entities,
+		const float* new_scales,
+		int count,
+		IAllocator& allocator)
 		: m_new_scales(allocator)
 		, m_old_scales(allocator)
 		, m_entities(allocator)
 		, m_editor(editor)
 	{
 		Universe* universe = m_editor.getUniverse();
-		ASSERT(entities.size() == new_scales.size());
-		for (int i = entities.size() - 1; i >= 0; --i)
+		for (int i = count - 1; i >= 0; --i)
 		{
 			m_entities.push(entities[i]);
 			m_new_scales.push(new_scales[i]);
@@ -2077,37 +2077,32 @@ public:
 	{
 		if (m_camera >= 0)
 		{
-			EditorIcon* er = m_allocator.newObject<EditorIcon>(
-				*this,
-				*static_cast<RenderScene*>(
-					getComponent(m_camera, CAMERA_HASH).scene),
+			EditorIcon* er = m_allocator.newObject<EditorIcon>(*this,
+				*static_cast<RenderScene*>(getComponent(m_camera, CAMERA_HASH).scene),
 				entity);
 			m_editor_icons.push(er);
 		}
 	}
 
 
-	virtual void setEntitiesScales(const Array<Entity>& entities,
-								   const Array<float>& scales) override
+	virtual void setEntitiesScales(const Entity* entities, const float* scales, int count) override
 	{
-		if (entities.empty())
-		{
-			return;
-		}
+		if (count <= 0) return;
+
 		Universe* universe = getUniverse();
-		IEditorCommand* command = m_allocator.newObject<ScaleEntityCommand>(
-			*this, entities, scales, m_allocator);
+		IEditorCommand* command =
+			m_allocator.newObject<ScaleEntityCommand>(*this, entities, scales, count, m_allocator);
 		executeCommand(command);
 	}
 
 
 	virtual void setEntitiesRotations(const Entity* entities,
-									  const Quat* rotations,
-									  int count) override
+		const Quat* rotations,
+		int count) override
 	{
 		ASSERT(entities && rotations);
 		if (count <= 0) return;
-		
+
 		Universe* universe = getUniverse();
 		Array<Vec3> positions(m_allocator);
 		for (int i = 0; i < count; ++i)
@@ -2120,8 +2115,9 @@ public:
 	}
 
 
-	virtual void
-	setEntitiesPositions(const Entity* entities, const Vec3* positions, int count) override
+	virtual void setEntitiesPositions(const Entity* entities,
+		const Vec3* positions,
+		int count) override
 	{
 		ASSERT(entities && positions);
 		if (count <= 0) return;
@@ -2138,10 +2134,10 @@ public:
 	}
 
 
-	virtual void setEntitiesPositionsAndRotaions(const Entity* entities,
-												 const Vec3* positions,
-												 const Quat* rotations,
-												 int count) override
+	virtual void setEntitiesPositionsAndRotations(const Entity* entities,
+		const Vec3* positions,
+		const Quat* rotations,
+		int count) override
 	{
 		if (count <= 0) return;
 		IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(
@@ -2291,6 +2287,12 @@ public:
 				}
 			}
 		}
+	}
+
+
+	virtual bool canPasteEntity() const override
+	{
+		return m_copy_buffer.getSize() > 0;
 	}
 
 
@@ -2590,8 +2592,8 @@ public:
 	}
 
 
-	WorldEditorImpl(const char* base_path, Engine& engine)
-		: m_allocator(engine.getAllocator())
+	WorldEditorImpl(const char* base_path, Engine& engine, IAllocator& allocator)
+		: m_allocator(allocator)
 		, m_engine(nullptr)
 		, m_universe_mutex(false)
 		, m_gizmo(*this)
@@ -2696,6 +2698,12 @@ public:
 	}
 
 
+	virtual bool isEntitySelected(Entity entity) const override
+	{
+		return m_selected_entities.indexOf(entity) >= 0;
+	}
+
+
 	virtual const Array<Entity>& getSelectedEntities() const override
 	{
 		return m_selected_entities;
@@ -2785,6 +2793,13 @@ public:
 			m_selected_entities.push(entities[i]);
 		}
 		m_entity_selected.invoke(m_selected_entities);
+	}
+
+
+	virtual void addEntityToSelection(Entity entity) override
+	{
+		if (m_selected_entities.indexOf(entity) >= 0) return;
+		m_selected_entities.push(entity);
 	}
 
 
@@ -3017,6 +3032,18 @@ public:
 	}
 
 
+	virtual bool canUndo() const override
+	{
+		return m_undo_index < m_undo_stack.size() && m_undo_index >= 0;
+	}
+
+
+	virtual bool canRedo() const override
+	{
+		return m_undo_index + 1 < m_undo_stack.size();
+	}
+
+
 	virtual void undo() override
 	{
 		if (m_undo_index < m_undo_stack.size() && m_undo_index >= 0)
@@ -3040,6 +3067,18 @@ public:
 	virtual MeasureTool* getMeasureTool() const override
 	{
 		return m_measure_tool;
+	}
+
+
+	virtual float getMeasuredDistance() const override
+	{
+		return m_measure_tool->getDistance();
+	}
+
+
+	virtual bool isMeasureToolActive() const override
+	{
+		return m_measure_tool->isEnabled();
 	}
 
 
@@ -3255,16 +3294,15 @@ private:
 };
 
 
-WorldEditor* WorldEditor::create(const char* base_path, Engine& engine)
+WorldEditor* WorldEditor::create(const char* base_path, Engine& engine, IAllocator& allocator)
 {
-	return engine.getAllocator().newObject<WorldEditorImpl>(base_path, engine);
+	return allocator.newObject<WorldEditorImpl>(base_path, engine, allocator);
 }
 
 
-void WorldEditor::destroy(WorldEditor* editor)
+void WorldEditor::destroy(WorldEditor* editor, IAllocator& allocator)
 {
-	editor->getEngine().getAllocator().deleteObject(
-		static_cast<WorldEditorImpl*>(editor));
+	allocator.deleteObject(static_cast<WorldEditorImpl*>(editor));
 }
 
 

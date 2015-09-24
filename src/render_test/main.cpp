@@ -94,7 +94,7 @@ public:
 		m_universe_context = &m_engine->createUniverse();
 		m_pipeline->setScene((Lumix::RenderScene*)m_universe_context->getScene(
 			Lumix::crc32("renderer")));
-		m_pipeline->resize(600, 400);
+		m_pipeline->setViewport(0, 0, 600, 400);
 
 		enumerateTests();
 	}

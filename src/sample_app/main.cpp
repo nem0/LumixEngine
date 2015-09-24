@@ -1,21 +1,34 @@
+#include "asset_browser.h"
 #include "core/blob.h"
 #include "core/crc32.h"
 #include "core/default_allocator.h"
 #include "core/input_system.h"
 #include "core/path_utils.h"
+#include "core/profiler.h"
 #include "core/resource_manager.h"
+#include "core/system.h"
 #include "debug/allocator.h"
 #include "editor/gizmo.h"
+#include "editor/entity_template_system.h"
 #include "editor/world_editor.h"
 #include "engine.h"
 #include "engine/plugin_manager.h"
-#include "engine/property_descriptor.h"
+#include "hierarchy_ui.h"
+#include "import_asset_dialog.h"
+#include "log_ui.h"
+#include "profiler_ui.h"
+#include "property_grid.h"
+#include "renderer/frame_buffer.h"
 #include "renderer/material.h"
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
 #include "renderer/transient_geometry.h"
 #include "ocornut-imgui/imgui.h"
+#include "scene_view.h"
+#include "shader_compiler.h"
+#include "universe/hierarchy.h"
+#include "utils.h"
 
 #include <bgfx.h>
 #include <cstdio>
@@ -27,14 +40,48 @@
 
 
 void imGuiCallback(ImDrawData* draw_data);
+LRESULT WINAPI msgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 
 class Context
 {
 public:
 	Context()
-		: m_allocator(m_main_allocator)
+		: m_is_entity_list_shown(true)
+		, m_finished(false)
+		, m_is_style_editor_shown(false)
+		, m_import_asset_dialog(nullptr)
+		, m_shader_compiler(nullptr)
+		, m_is_wireframe(false)
+		, m_is_entity_template_list_opened(false)
+		, m_selected_template_name(m_allocator)
+		, m_is_gameview_opened(true)
+		, m_profiler_ui(nullptr)
+		, m_asset_browser(nullptr)
+		, m_property_grid(nullptr)
 	{
+		m_entity_list_filter[0] = '\0';
+	}
+
+
+	void update()
+	{
+		float time_delta = m_editor->getEngine().getLastTimeDelta();
+
+		m_editor->update();
+		m_sceneview.update();
+		m_engine->update(*m_editor->getUniverseContext());
+
+		m_asset_browser->update();
+		m_shader_compiler->update(time_delta);
+		m_log_ui->update(time_delta);
+
+		m_gui_pipeline->render();
+		onGUI();
+		Lumix::Renderer* renderer =
+			static_cast<Lumix::Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
+		renderer->frame();
+		Lumix::g_profiler.frame();
 	}
 
 
@@ -45,7 +92,7 @@ public:
 		RECT rect;
 		GetClientRect(m_hwnd, &rect);
 		io.DisplaySize = ImVec2((float)(rect.right - rect.left),
-								(float)(rect.bottom - rect.top));
+			(float)(rect.bottom - rect.top));
 
 		io.DeltaTime = m_engine->getLastTimeDelta();
 
@@ -61,298 +108,286 @@ public:
 
 		ImGui::NewFrame();
 
-		if (ImGui::BeginMainMenuBar())
-		{
-			if (ImGui::BeginMenu("File"))
-			{
-				if (ImGui::MenuItem("New"))
-				{
-					m_editor->newUniverse();
-				}
-				if (ImGui::MenuItem("Open"))
-				{
-					m_editor->loadUniverse(Lumix::Path("main.unv"));
-				}
-				if (ImGui::MenuItem("Exit"))
-				{
-					PostQuitMessage(0);
-				}
-				ImGui::EndMenu();
-			}
+		showMainMenu();
 
-			if (ImGui::BeginMenu("Edit"))
-			{
-				if (ImGui::MenuItem("Undo", "Ctrl - Z"))
-				{
-					m_editor->undo();
-				}
-				if (ImGui::MenuItem("Redo", "Ctrl - Shift - Z"))
-				{
-					m_editor->redo();
-				}
-				ImGui::EndMenu();
-			}
-		
-			if (ImGui::BeginMenu("Tools"))
-			{
-				if (ImGui::MenuItem("Snap to terrain", "Ctrl - T"))
-				{
-					m_editor->snapToTerrain();
-				}
-				if (ImGui::MenuItem("Look at selected", "Ctrl - F"))
-				{
-					m_editor->lookAtSelected();
-				}
-				ImGui::EndMenu();
-			}
-
-			ImGui::EndMainMenuBar();
-		}
-
-		showPropertyGrid();
+		m_profiler_ui->onGui();
+		m_asset_browser->onGui();
+		m_log_ui->onGui();
+		m_import_asset_dialog->onGui();
+		m_property_grid->onGui();
 		showEntityList();
-		showFPS();
+		showEntityTemplateList();
+		m_sceneview.onGui();
+		m_hierarchy_ui.onGui();
+		showGameView();
+		if (m_is_style_editor_shown) ImGui::ShowStyleEditor();
 
 		ImGui::Render();
 	}
 
 
-	const char* getComponentTypeName(Lumix::ComponentUID cmp)
+	void showGameView()
 	{
-		for (int i = 0; i < m_engine->getComponentTypesCount(); ++i)
+		if (!m_is_gameview_opened) return;
+
+		if (ImGui::Begin("Game view", &m_is_gameview_opened))
 		{
-			if (cmp.type ==
-				Lumix::crc32(m_engine->getComponentTypeID(i)))
+			m_is_gameview_hovered = ImGui::IsWindowHovered();
+			auto size = ImGui::GetContentRegionAvail();
+			if (size.x > 0 && size.y > 0)
 			{
-				return m_engine->getComponentTypeName(i);
-			}
-		}
-		return "Unknown";
-	}
+				auto pos = ImGui::GetWindowPos();
+				auto cp = ImGui::GetCursorPos();
+				int gameview_x = int(pos.x + cp.x);
+				int gameview_y = int(pos.y + cp.y);
+				m_game_pipeline->setViewport(0, 0, int(size.x), int(size.y));
 
-
-
-	void showProperty(Lumix::IPropertyDescriptor& desc, Lumix::ComponentUID cmp)
-	{
-		Lumix::OutputBlob stream(m_editor->getAllocator());
-		desc.get(cmp, stream);
-		Lumix::InputBlob tmp(stream);
-
-		switch (desc.getType())
-		{
-			case Lumix::IPropertyDescriptor::DECIMAL:
-			{
-				float f;
-				tmp.read(f);
-				auto& d = static_cast<Lumix::IDecimalPropertyDescriptor&>(desc);
-				if ((d.getMax() - d.getMin()) / d.getStep() <= 100)
-				{
-					if (ImGui::SliderFloat(desc.getName(), &f, d.getMin(), d.getMax()))
-					{
-						m_editor->setProperty(cmp.type, -1, desc, &f, sizeof(f));
-					}
-				}
-				else
-				{
-					if (ImGui::DragFloat(desc.getName(), &f, d.getStep(), d.getMin(), d.getMax()))
-					{
-						m_editor->setProperty(cmp.type, -1, desc, &f, sizeof(f));
-					}
-				}
-				break;
-			}
-			case Lumix::IPropertyDescriptor::BOOL:
-			{
-				bool b;
-				tmp.read(b);
-				if (ImGui::Checkbox(desc.getName(), &b))
-				{
-					m_editor->setProperty(cmp.type, -1, desc, &b, sizeof(b));
-				}
-				break;
-			}
-			case Lumix::IPropertyDescriptor::COLOR:
-			{
-				Lumix::Vec3 v;
-				tmp.read(v);
-				if (ImGui::ColorEdit3(desc.getName(), &v.x))
-				{
-					m_editor->setProperty(cmp.type, -1, desc, &v, sizeof(v));
-				}
-				break;
-			}
-			case Lumix::IPropertyDescriptor::VEC3:
-			{
-				Lumix::Vec3 v;
-				tmp.read(v);
-				if (ImGui::DragFloat3(desc.getName(), &v.x))
-				{
-					m_editor->setProperty(cmp.type, -1, desc, &v, sizeof(v));
-				}
-				break;
-			}
-			case Lumix::IPropertyDescriptor::VEC4:
-			{
-				Lumix::Vec4 v;
-				tmp.read(v);
-				if (ImGui::DragFloat4(desc.getName(), &v.x))
-				{
-					m_editor->setProperty(cmp.type, -1, desc, &v, sizeof(v));
-				}
-				break;
-			}
-			case Lumix::IPropertyDescriptor::STRING:
-			case Lumix::IPropertyDescriptor::FILE:
-			case Lumix::IPropertyDescriptor::RESOURCE:
-			{
-				char buf[1024];
-				Lumix::copyString(buf, sizeof(buf), (const char*)stream.getData());
-				if (ImGui::InputText(desc.getName(), buf, sizeof(buf)))
-				{
-					m_editor->setProperty(cmp.type, -1, desc, buf, strlen(buf) + 1);
-				}
-				break;
-			}
-			case Lumix::IPropertyDescriptor::ARRAY:
-				break;
-			default:
-				ASSERT(false);
-				break;
-		}
-	}
-
-
-	void showComponentProperties(Lumix::ComponentUID cmp)
-	{
-		if (!ImGui::CollapsingHeader(
-				getComponentTypeName(cmp), nullptr, true, true))
-			return;
-
-		auto& descs = m_engine->getPropertyDescriptors(cmp.type);
-
-		for (auto* desc : descs)
-		{
-			showProperty(*desc, cmp);
-		}
-	}
-
-
-	void showCoreProperties(Lumix::Entity entity)
-	{
-		char name[256];
-		const char* tmp = m_editor->getUniverse()->getEntityName(entity);
-		Lumix::copyString(name, sizeof(name), tmp);
-		if (ImGui::InputText("name", name, sizeof(name)))
-		{
-			m_editor->setEntityName(entity, name);
-		}
-
-		auto pos = m_editor->getUniverse()->getPosition(entity);
-		if (ImGui::DragFloat3("position", &pos.x))
-		{
-			m_editor->setEntitiesPositions(&entity, &pos, 1);
-		}
-
-		auto rot = m_editor->getUniverse()->getRotation(entity);
-		if (ImGui::DragFloat4("rotation", &rot.x))
-		{
-			m_editor->setEntitiesRotations(&entity, &rot, 1);
-		}
-	}
-
-
-	void showPropertyGrid()
-	{
-		auto& ents = m_editor->getSelectedEntities();
-		if (ImGui::Begin("Properties") && ents.size() == 1)
-		{
-			showCoreProperties(ents[0]);
-
-
-			auto& cmps = m_editor->getComponents(ents[0]);
-			for (auto cmp : cmps)
-			{
-				showComponentProperties(cmp);
+				auto* fb = m_game_pipeline->getFramebuffer("default");
+				m_gameview_texture_handle = fb->getRenderbufferHandle(0);
+				ImGui::Image(&m_gameview_texture_handle, size);
+				m_game_pipeline->render();
 			}
 		}
 		ImGui::End();
 	}
 
 
-	void showFPS()
+	void showMainMenu()
 	{
-		ImGui::SetNextWindowPos(ImVec2(10, 30));
-		bool opened;
-		if (!ImGui::Begin("Example: Fixed Overlay", &opened, ImVec2(0, 0), 0.3f, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings))
+		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
+		if (ImGui::BeginMainMenuBar())
 		{
-			ImGui::End();
-			return;
-		}
-		ImGui::Text("FPS: (%.1f)", m_engine->getFPS());
-		ImGui::End();
+			if (ImGui::BeginMenu("File"))
+			{
+				if (ImGui::MenuItem("New")) m_editor->newUniverse();
+				if (ImGui::BeginMenu("Open"))
+				{
+					auto& universes =
+						m_asset_browser->getResources(AssetBrowser::UNIVERSE);
+					for (auto& univ : universes)
+					{
+						if (ImGui::MenuItem(univ.c_str()))
+						{
+							m_editor->loadUniverse(univ);
+						}
+					}
+					ImGui::EndMenu();
+				}
+				if (ImGui::MenuItem("Save", nullptr, nullptr, m_editor->getUniversePath().isValid()))
+				{
+					m_editor->saveUniverse(m_editor->getUniversePath());
+				}
+				if (ImGui::MenuItem("Save As"))
+				{
+					char filename[Lumix::MAX_PATH_LENGTH];
+					if (Lumix::getSaveFilename(filename, sizeof(filename), "Universes\0*.unv\0", "unv"))
+					{
+						m_editor->saveUniverse(Lumix::Path(filename));
+					}
+				}
+				if (ImGui::MenuItem("Exit")) PostQuitMessage(0);
 
+				ImGui::EndMenu();
+			}
+
+			if (ImGui::BeginMenu("Edit"))
+			{
+				if (ImGui::MenuItem("Undo", "Ctrl - Z", nullptr, m_editor->canUndo())) m_editor->undo();
+				if (ImGui::MenuItem("Redo", "Ctrl - Shift - Z", nullptr, m_editor->canRedo())) m_editor->redo();
+				ImGui::Separator();
+				if (ImGui::MenuItem("Copy", "Ctrl - C", nullptr, is_any_entity_selected)) m_editor->copyEntity();
+				if (ImGui::MenuItem("Paste", "Ctrl - V", nullptr, m_editor->canPasteEntity())) m_editor->pasteEntity();
+				ImGui::Separator();
+				if (ImGui::MenuItem("Center/Pivot")) m_editor->getGizmo().togglePivotMode();
+				if (ImGui::MenuItem("Local/Global")) m_editor->getGizmo().toggleCoordSystem();
+				if (ImGui::BeginMenu("Select"))
+				{
+					if (ImGui::MenuItem("Same mesh",
+						nullptr,
+						nullptr,
+						is_any_entity_selected))
+						m_editor->selectEntitiesWithSameMesh();
+					ImGui::EndMenu();
+				}
+				ImGui::EndMenu();
+			}
+
+			if (ImGui::BeginMenu("Entity"))
+			{
+				if (ImGui::MenuItem("Create", "Ctrl - E")) m_editor->addEntity();
+				if (ImGui::MenuItem("Remove", "Delete", nullptr, is_any_entity_selected))
+				{
+					if (!m_editor->getSelectedEntities().empty())
+					{
+						m_editor->destroyEntities(
+							&m_editor->getSelectedEntities()[0],
+							m_editor->getSelectedEntities().size());
+					}
+				}
+
+				if (ImGui::BeginMenu("Create template", is_any_entity_selected))
+				{
+					static char name[255] = "";
+					ImGui::InputText("Name##templatename", name, sizeof(name));
+					if (ImGui::Button("Create"))
+					{
+						auto entity = m_editor->getSelectedEntities()[0];
+						auto& system = m_editor->getEntityTemplateSystem();
+						system.createTemplateFromEntity(name, entity);
+						ImGui::CloseCurrentPopup();
+					}
+					ImGui::EndMenu();
+				}
+				if (ImGui::MenuItem("Instantiate template",
+					nullptr,
+					nullptr,
+					m_selected_template_name.length() > 0))
+				{
+					Lumix::Vec3 pos = m_editor->getCameraRaycastHit();
+					m_editor->getEntityTemplateSystem().createInstance(
+						m_selected_template_name.c_str(), pos);
+				}
+				if (ImGui::MenuItem("Show", nullptr, nullptr, is_any_entity_selected)) m_editor->showEntities();
+				if (ImGui::MenuItem("Hide", nullptr, nullptr, is_any_entity_selected)) m_editor->hideEntities();
+				ImGui::EndMenu();
+			}
+
+
+			if (ImGui::BeginMenu("Tools"))
+			{
+				bool b = m_editor->isGameMode();
+				if (ImGui::MenuItem("Game mode", "Ctrl - P", &b))
+				{
+					toggleGameMode();
+				}
+
+
+				b = m_editor->isMeasureToolActive();
+				if (ImGui::MenuItem("Measure", nullptr, &b))
+				{
+					m_editor->toggleMeasure();
+				}
+				if (ImGui::MenuItem("Snap to terrain",
+					"Ctrl - T",
+					nullptr,
+					is_any_entity_selected))
+				{
+					m_editor->snapToTerrain();
+				}
+				ImGui::MenuItem("Import asset", nullptr, &m_import_asset_dialog->m_is_opened);
+				ImGui::EndMenu();
+			}
+
+
+			if (ImGui::BeginMenu("View"))
+			{
+				if (ImGui::MenuItem(
+					"Look at selected", "Ctrl - F", nullptr, is_any_entity_selected))
+				{
+					m_editor->lookAtSelected();
+				}
+				if (ImGui::MenuItem("Wireframe", "Ctrl - W", &m_is_wireframe))
+					m_sceneview.setWireframe(m_is_wireframe);
+				if (ImGui::MenuItem("Stats")) m_gui_pipeline->toggleStats();
+				if (ImGui::BeginMenu("Windows"))
+				{
+					ImGui::MenuItem("Asset browser", nullptr, &m_asset_browser->m_is_opened);
+					ImGui::MenuItem("Entity list", nullptr, &m_is_entity_list_shown);
+					ImGui::MenuItem("Entity templates", nullptr, &m_is_entity_template_list_opened);
+					ImGui::MenuItem("Game view", nullptr, &m_is_gameview_opened);
+					ImGui::MenuItem("Hierarchy", nullptr, &m_hierarchy_ui.m_is_opened);
+					ImGui::MenuItem("Log", nullptr, &m_log_ui->m_is_opened);
+					ImGui::MenuItem("Profiler", nullptr, &m_profiler_ui->m_is_opened);
+					ImGui::MenuItem("Properties", nullptr, &m_property_grid->m_is_opened);
+					ImGui::MenuItem("Style editor", nullptr, &m_is_style_editor_shown);
+					ImGui::EndMenu();
+				}
+				ImGui::EndMenu();
+			}
+			StringBuilder<100> stats("FPS: ");
+			stats << m_engine->getFPS();
+			auto stats_size = ImGui::CalcTextSize(stats);
+			ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x);
+			ImGui::Text(stats);
+
+			ImGui::EndMainMenuBar();
+		}
 	}
 
 
-	void getEntityListDisplayName(char* buf, int max_size, Lumix::Entity entity)
+	void toggleGameMode()
 	{
-		const char* name = m_editor->getUniverse()->getEntityName(entity);
-		static const uint32_t RENDERABLE_HASH = Lumix::crc32("renderable");
-		Lumix::ComponentUID renderable =
-			m_editor->getComponent(entity, RENDERABLE_HASH);
-		if (renderable.isValid())
-		{
-			auto* scene = static_cast<Lumix::RenderScene*>(renderable.scene);
-			const char* path = scene->getRenderablePath(renderable.index);
-			if (path && path[0] != 0)
-			{
-				char basename[Lumix::MAX_PATH_LENGTH];
-				Lumix::copyString(buf, max_size, path);
-				Lumix::PathUtils::getBasename(
-					basename, Lumix::MAX_PATH_LENGTH, path);
-				if (name && name[0] != '\0')
-					Lumix::copyString(buf, max_size, name);
-				else
-					Lumix::toCString(entity, buf, max_size);
+		m_editor->toggleGameMode();
+	}
 
-				Lumix::catString(buf, max_size, " - ");
-				Lumix::catString(buf, max_size, basename);
-				return;
+
+	
+
+
+	void showEntityTemplateList()
+	{
+		if (!m_is_entity_template_list_opened) return;
+
+		if (ImGui::Begin("Entity templates", &m_is_entity_template_list_opened))
+		{
+			auto& template_system = m_editor->getEntityTemplateSystem();
+
+			for (auto& template_name : template_system.getTemplateNames())
+			{
+				bool b = m_selected_template_name == template_name;
+				if (ImGui::Selectable(template_name.c_str(), &b))
+				{
+					m_selected_template_name = template_name;
+				}
 			}
 		}
-
-		if (name && name[0] != '\0')
-		{
-			Lumix::copyString(buf, max_size, name);
-		}
-		else
-		{
-			Lumix::toCString(entity, buf, max_size);
-		}
+		ImGui::End();
 	}
 
 
 	void showEntityList()
 	{
-		if (ImGui::Begin("Entity list"))
+		if (!m_is_entity_list_shown) return;
+
+		if (ImGui::Begin("Entity list", &m_is_entity_list_shown))
 		{
 			if (ImGui::Button("Create entity"))
 			{
 				m_editor->addEntity();
 			}
+			ImGui::InputText("Filter", m_entity_list_filter, sizeof(m_entity_list_filter));
+			ImGui::Separator();
+
 			auto* universe = m_editor->getUniverse();
 			auto entity = universe->getFirstEntity();
-			while (entity >= 0)
-			{
-				char buf[1024];
 
-				getEntityListDisplayName(buf, sizeof(buf), entity);
-				if (ImGui::TreeNode((void*)entity, buf))
+			if (ImGui::BeginChild("header"))
+			{
+				while (entity >= 0)
 				{
-					ImGui::TreePop();
+					char buf[1024];
+					getEntityListDisplayName(*m_editor, buf, sizeof(buf), entity);
+
+					if (m_entity_list_filter[0] == '\0' || strstr(buf, m_entity_list_filter) != nullptr)
+					{
+						bool is_selected = m_editor->isEntitySelected(entity);
+						if (ImGui::Selectable(buf, &is_selected))
+						{
+							if (ImGui::GetIO().KeysDown[VK_CONTROL])
+							{
+								m_editor->addEntityToSelection(entity);
+							}
+							else
+							{
+								m_editor->selectEntities(&entity, 1);
+							}
+						}
+					}
+					entity = universe->getNextEntity(entity);
 				}
-				entity = universe->getNextEntity(entity);
 			}
+			ImGui::EndChild();
+
 		}
 		ImGui::End();
 	}
@@ -362,15 +397,28 @@ public:
 	{
 		shutdownImGui();
 
-		Lumix::WorldEditor::destroy(m_editor);
-		Lumix::PipelineInstance::destroy(m_pipeline);
-		m_pipeline_source->getResourceManager()
+		delete m_profiler_ui;
+		delete m_asset_browser;
+		delete m_log_ui;
+		delete m_property_grid;
+		delete m_import_asset_dialog;
+		delete m_shader_compiler;
+		Lumix::WorldEditor::destroy(m_editor, m_allocator);
+		m_sceneview.shutdown();
+		Lumix::PipelineInstance::destroy(m_gui_pipeline);
+		Lumix::PipelineInstance::destroy(m_game_pipeline);
+		m_gui_pipeline_source->getResourceManager()
 			.get(Lumix::ResourceManager::PIPELINE)
-			->unload(*m_pipeline_source);
-		Lumix::Engine::destroy(m_engine);
+			->unload(*m_gui_pipeline_source);
+		m_game_pipeline_source->getResourceManager()
+			.get(Lumix::ResourceManager::PIPELINE)
+			->unload(*m_game_pipeline_source);
+		Lumix::Engine::destroy(m_engine, m_allocator);
 		m_engine = nullptr;
-		m_pipeline = nullptr;
-		m_pipeline_source = nullptr;
+		m_gui_pipeline = nullptr;
+		m_game_pipeline = nullptr;
+		m_gui_pipeline_source = nullptr;
+		m_game_pipeline_source = nullptr;
 		m_editor = nullptr;
 	}
 
@@ -378,7 +426,7 @@ public:
 	void shutdownImGui()
 	{
 		ImGui::Shutdown();
-		
+
 		Lumix::Texture* texture = m_material->getTexture(0);
 		m_material->setTexture(0, nullptr);
 		texture->destroy();
@@ -392,6 +440,9 @@ public:
 
 	void initIMGUI(HWND hwnd)
 	{
+		ImGuiIO& io = ImGui::GetIO();
+		io.Fonts->AddFontFromFileTTF("editor/VeraMono.ttf", 13);
+
 		m_hwnd = hwnd;
 		m_decl.begin()
 			.add(bgfx::Attrib::Position, 2, bgfx::AttribType::Float)
@@ -399,7 +450,7 @@ public:
 			.add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true)
 			.end();
 
-		ImGuiIO& io = ImGui::GetIO();
+		//ImGuiIO& io = ImGui::GetIO();
 		io.KeyMap[ImGuiKey_Tab] = VK_TAB;
 		io.KeyMap[ImGuiKey_LeftArrow] = VK_LEFT;
 		io.KeyMap[ImGuiKey_RightArrow] = VK_RIGHT;
@@ -428,8 +479,8 @@ public:
 		io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
 		m_material = static_cast<Lumix::Material*>(
 			m_engine->getResourceManager()
-				.get(Lumix::ResourceManager::MATERIAL)
-				->load(Lumix::Path("models/imgui.mat")));
+			.get(Lumix::ResourceManager::MATERIAL)
+			->load(Lumix::Path("models/imgui.mat")));
 
 		Lumix::Texture* texture = m_allocator.newObject<Lumix::Texture>(
 			Lumix::Path("font"), m_engine->getResourceManager(), m_allocator);
@@ -441,22 +492,20 @@ public:
 
 	void onUniverseCreated()
 	{
-		m_pipeline->setScene(static_cast<Lumix::RenderScene*>(
-			m_editor->getScene(Lumix::crc32("renderer"))));
+		auto* scene =
+			static_cast<Lumix::RenderScene*>(m_editor->getScene(Lumix::crc32("renderer")));
+
+		m_sceneview.setScene(scene);
+		m_gui_pipeline->setScene(scene);
+		m_game_pipeline->setScene(scene);
 	}
 
 
 	void onUniverseDestroyed()
 	{
-		m_pipeline->setScene(nullptr);
-	}
-
-
-	void renderGizmos()
-	{
-		m_editor->renderIcons(*m_pipeline);
-		m_editor->getGizmo().updateScale(m_editor->getEditCamera().index);
-		m_editor->getGizmo().render(*m_pipeline);
+		m_sceneview.setScene(nullptr);
+		m_gui_pipeline->setScene(nullptr);
+		m_game_pipeline->setScene(nullptr);
 	}
 
 
@@ -464,34 +513,85 @@ public:
 	{
 		Lumix::Renderer::setInitData(win);
 		m_engine = Lumix::Engine::create(nullptr, m_allocator);
-		m_editor = Lumix::WorldEditor::create("", *m_engine);
+		char current_dir[MAX_PATH];
+		GetCurrentDirectory(sizeof(current_dir), current_dir);
+		m_editor = Lumix::WorldEditor::create(current_dir, *m_engine, m_allocator);
+		m_asset_browser = new AssetBrowser(*m_editor);
+		m_property_grid = new PropertyGrid(*m_editor, *m_asset_browser);
+		auto engine_allocator = static_cast<Lumix::Debug::Allocator*>(&m_engine->getAllocator());
+		m_profiler_ui = new ProfilerUI(engine_allocator, &m_engine->getResourceManager());
+		m_log_ui = new LogUI(m_editor->getAllocator());
+		m_import_asset_dialog = new ImportAssetDialog(*m_editor);
+		m_shader_compiler = new ShaderCompiler(*m_editor, *m_log_ui);
+		m_hierarchy_ui.setWorldEditor(*m_editor);
 
 		m_editor->universeCreated().bind<Context, &Context::onUniverseCreated>(this);
 		m_editor->universeDestroyed().bind<Context, &Context::onUniverseDestroyed>(this);
 
-		m_pipeline_source = static_cast<Lumix::Pipeline*>(
-			m_engine->getResourceManager()
-				.get(Lumix::ResourceManager::PIPELINE)
-				->load(Lumix::Path("pipelines/main.lua")));
-		m_pipeline = Lumix::PipelineInstance::create(*m_pipeline_source,
-													 m_engine->getAllocator());
-		m_pipeline->addCustomCommandHandler("render_gizmos")
-			.bind<Context, &Context::renderGizmos>(this);
+		auto* pipeline_manager =
+			m_engine->getResourceManager().get(Lumix::ResourceManager::PIPELINE);
+
+		m_gui_pipeline_source = static_cast<Lumix::Pipeline*>(
+			pipeline_manager->load(Lumix::Path("pipelines/imgui.lua")));
+		m_gui_pipeline = Lumix::PipelineInstance::create(*m_gui_pipeline_source,
+			m_engine->getAllocator());
+
+		m_sceneview.init(*m_editor);
+
+		m_game_pipeline_source = static_cast<Lumix::Pipeline*>(
+			pipeline_manager->load(Lumix::Path("pipelines/game_view.lua")));
+		m_game_pipeline = Lumix::PipelineInstance::create(
+			*m_game_pipeline_source, m_engine->getAllocator());
 
 		RECT rect;
 		GetClientRect(win, &rect);
-		m_pipeline->resize(rect.right, rect.bottom);
-
+		m_gui_pipeline->setViewport(0, 0, rect.right, rect.bottom);
+		auto& plugin_manager = m_editor->getEngine().getPluginManager();
+		auto* renderer = static_cast<Lumix::Renderer*>(plugin_manager.getPlugin("renderer"));
+		renderer->resize(rect.right, rect.bottom);
+		onUniverseCreated();
 		initIMGUI(win);
 	}
 
 	void checkShortcuts()
 	{
+		if (ImGui::IsAnyItemActive()) return;
+
+		if (ImGui::GetIO().KeysDown[VK_DELETE])
+		{
+			if (!m_editor->getSelectedEntities().empty())
+			{
+				m_editor->destroyEntities(
+					&m_editor->getSelectedEntities()[0],
+					m_editor->getSelectedEntities().size());
+			}
+		}
 		if (ImGui::GetIO().KeysDown[VK_CONTROL])
 		{
+			if (ImGui::GetIO().KeysDown['W'])
+			{
+				m_is_wireframe = !m_is_wireframe;
+				m_sceneview.setWireframe(m_is_wireframe);
+			}
+			if (ImGui::GetIO().KeysDown['P'])
+			{
+				toggleGameMode();
+			}
+			if (ImGui::GetIO().KeysDown['C'])
+			{
+				m_editor->copyEntity();
+			}
+			if (ImGui::GetIO().KeysDown['V'])
+			{
+				m_editor->pasteEntity();
+			}
 			if (ImGui::GetIO().KeysDown['F'])
 			{
 				m_editor->lookAtSelected();
+			}
+			if (ImGui::GetIO().KeysDown['E'])
+			{
+				m_editor->addEntity();
 			}
 			if (ImGui::GetIO().KeysDown['T'])
 			{
@@ -512,42 +612,127 @@ public:
 	}
 
 
-	void updateNavigation()
+	LRESULT windowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	{
-		if (ImGui::IsMouseHoveringAnyWindow()) return;
-		float speed = 0.1f;
-		if (ImGui::GetIO().KeysDown[VK_SHIFT])
+		int x = LOWORD(lParam);
+		int y = HIWORD(lParam);
+		static int old_x = x;
+		static int old_y = y;
+		if (!m_gui_pipeline)
 		{
-			speed *= 10;
+			return DefWindowProc(hWnd, msg, wParam, lParam);
 		}
-		if (ImGui::GetIO().KeysDown['W'])
+
+		switch (msg)
 		{
-			m_editor->navigate(1.0f, 0, speed);
+			case WM_CLOSE: PostQuitMessage(0); break;
+			case WM_SIZE:
+			{
+				uint32_t width = ((int)(short)LOWORD(lParam));
+				uint32_t height = ((int)(short)HIWORD(lParam));
+
+				m_gui_pipeline->setViewport(0, 0, width, height);
+				auto& plugin_manager = m_editor->getEngine().getPluginManager();
+				auto* renderer =
+					static_cast<Lumix::Renderer*>(plugin_manager.getPlugin("renderer"));
+				renderer->resize(width, height);
+			}
+			break;
+			case WM_MOUSEWHEEL:
+				ImGui::GetIO().MouseWheel = GET_WHEEL_DELTA_WPARAM(wParam) / 600.0f;
+				break;
+			case WM_ERASEBKGND: return 1;
+			case WM_LBUTTONUP:
+				m_sceneview.onMouseUp(Lumix::MouseButton::LEFT);
+				ImGui::GetIO().MouseDown[0] = false;
+				break;
+			case WM_LBUTTONDOWN:
+				if (!m_sceneview.onMouseDown(old_x, old_y, Lumix::MouseButton::LEFT))
+				{
+					ImGui::GetIO().MouseDown[0] = true;
+				}
+				break;
+			case WM_RBUTTONDOWN:
+				if (!m_sceneview.onMouseDown(old_x, old_y, Lumix::MouseButton::RIGHT))
+				{
+					ImGui::GetIO().MouseDown[1] = true;
+				}
+				break;
+			case WM_RBUTTONUP:
+				m_sceneview.onMouseUp(Lumix::MouseButton::RIGHT);
+				ImGui::GetIO().MouseDown[1] = false;
+				break;
+			case WM_MOUSEMOVE:
+			{
+				m_sceneview.onMouseMove(x, y, x - old_x, y - old_y);
+
+				auto& input_system = m_engine->getInputSystem();
+				input_system.injectMouseXMove(float(old_x - x));
+				input_system.injectMouseYMove(float(old_y - y));
+				old_x = x;
+				old_y = y;
+
+				ImGuiIO& io = ImGui::GetIO();
+				io.MousePos.x = (float)x;
+				io.MousePos.y = (float)y;
+			}
+			break;
+			case WM_CHAR: ImGui::GetIO().AddInputCharacter((ImWchar)wParam); break;
+			case WM_KEYUP: ImGui::GetIO().KeysDown[wParam] = false; break;
+			case WM_SYSKEYDOWN: ImGui::GetIO().KeysDown[wParam] = true; break;
+			case WM_SYSKEYUP: ImGui::GetIO().KeysDown[wParam] = false; break;
+			case WM_KEYDOWN:
+			{
+				ImGui::GetIO().KeysDown[wParam] = true;
+				checkShortcuts();
+				switch (wParam)
+				{
+					case VK_OEM_2: // Question Mark / Forward Slash for US Keyboards
+						break;
+				}
+				break;
+			}
 		}
-		if (ImGui::GetIO().KeysDown['S'])
-		{
-			m_editor->navigate(-1.0f, 0, speed);
-		}
-		if (ImGui::GetIO().KeysDown['A'])
-		{
-			m_editor->navigate(0.0f, -1.0f, speed);
-		}
-		if (ImGui::GetIO().KeysDown['D'])
-		{
-			m_editor->navigate(0.0f, 1.0f, speed);
-		}
+
+		return DefWindowProc(hWnd, msg, wParam, lParam);
 	}
 
 
 	HWND m_hwnd;
+	HINSTANCE m_instance;
 	bgfx::VertexDecl m_decl;
 	Lumix::Material* m_material;
 	Lumix::Engine* m_engine;
-	Lumix::Pipeline* m_pipeline_source;
-	Lumix::PipelineInstance* m_pipeline;
-	Lumix::DefaultAllocator m_main_allocator;
-	Lumix::Debug::Allocator m_allocator;
+
+	SceneView m_sceneview;
+
+	Lumix::Pipeline* m_gui_pipeline_source;
+	Lumix::PipelineInstance* m_gui_pipeline;
+
+	Lumix::Pipeline* m_game_pipeline_source;
+	Lumix::PipelineInstance* m_game_pipeline;
+	bgfx::TextureHandle m_gameview_texture_handle;
+
+	Lumix::DefaultAllocator m_allocator;
 	Lumix::WorldEditor* m_editor;
+	AssetBrowser* m_asset_browser;
+	PropertyGrid* m_property_grid;
+	LogUI* m_log_ui;
+	ProfilerUI* m_profiler_ui;
+	ImportAssetDialog* m_import_asset_dialog;
+	ShaderCompiler* m_shader_compiler;
+	Lumix::string m_selected_template_name;
+	HierarchyUI m_hierarchy_ui;
+	char m_entity_list_filter[100];
+
+	bool m_finished;
+
+	bool m_is_gameview_hovered;
+	bool m_is_gameview_opened;
+	bool m_is_entity_list_shown;
+	bool m_is_entity_template_list_opened;
+	bool m_is_style_editor_shown;
+	bool m_is_wireframe;
 };
 
 
@@ -567,7 +752,7 @@ static void imGuiCallback(ImDrawData* draw_data)
 	Lumix::Matrix ortho;
 	ortho.setOrtho(0.0f, width, 0.0f, height, -1.0f, 1.0f);
 
-	g_context.m_pipeline->setViewProjection(ortho, (int)width, (int)height);
+	g_context.m_gui_pipeline->setViewProjection(ortho, (int)width, (int)height);
 
 	for (int32_t ii = 0; ii < draw_data->CmdListsCount; ++ii)
 	{
@@ -600,16 +785,16 @@ static void imGuiCallback(ImDrawData* draw_data)
 				continue;
 			}
 
-			g_context.m_pipeline->setScissor(
+			g_context.m_gui_pipeline->setScissor(
 				uint16_t(Lumix::Math::maxValue(pcmd->ClipRect.x, 0.0f)),
 				uint16_t(Lumix::Math::maxValue(pcmd->ClipRect.y, 0.0f)),
 				uint16_t(Lumix::Math::minValue(pcmd->ClipRect.z, 65535.0f) -
 						 Lumix::Math::maxValue(pcmd->ClipRect.x, 0.0f)),
 				uint16_t(Lumix::Math::minValue(pcmd->ClipRect.w, 65535.0f) -
 						 Lumix::Math::maxValue(pcmd->ClipRect.y, 0.0f)));
-			
-				g_context.m_pipeline->render(
-					geom, elem_offset, pcmd->ElemCount, *g_context.m_material);
+
+			g_context.m_gui_pipeline->render(
+				geom, elem_offset, pcmd->ElemCount, *g_context.m_material, (bgfx::TextureHandle*)pcmd->TextureId);
 
 			elem_offset += pcmd->ElemCount;
 		}
@@ -619,99 +804,7 @@ static void imGuiCallback(ImDrawData* draw_data)
 
 LRESULT WINAPI msgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-	int x = LOWORD(lParam);
-	int y = HIWORD(lParam);
-	static int old_x = x;
-	static int old_y = y;
-	if (!g_context.m_pipeline)
-	{
-		return DefWindowProc(hWnd, msg, wParam, lParam);
-	}
-
-	switch (msg)
-	{
-		case WM_CLOSE:
-			PostQuitMessage(0);
-			break;
-		case WM_SIZE:
-		{
-			uint32_t width = ((int)(short)LOWORD(lParam));
-			uint32_t height = ((int)(short)HIWORD(lParam));
-			g_context.m_pipeline->resize(width, height);
-		}
-		break;
-		case WM_ERASEBKGND:
-			return 1;
-		case WM_LBUTTONUP:
-			g_context.m_editor->onMouseUp(old_x, old_y, Lumix::MouseButton::LEFT);
-			ImGui::GetIO().MouseDown[0] = false;
-			break;
-		case WM_LBUTTONDOWN:
-			if (!ImGui::IsMouseHoveringAnyWindow())
-			{
-				g_context.m_editor->onMouseDown(old_x, old_y, Lumix::MouseButton::LEFT);
-			}
-			ImGui::GetIO().MouseDown[0] = true;
-			break;
-		case WM_RBUTTONDOWN:
-			if (!ImGui::IsMouseHoveringAnyWindow())
-			{
-				g_context.m_editor->onMouseDown(old_x, old_y, Lumix::MouseButton::RIGHT);
-			}
-			ImGui::GetIO().MouseDown[1] = true;
-			break;
-		case WM_RBUTTONUP:
-			g_context.m_editor->onMouseUp(old_x, old_y, Lumix::MouseButton::RIGHT);
-			ImGui::GetIO().MouseDown[1] = false;
-			break;
-		case WM_MOUSEMOVE:
-		{
-			int flags = ImGui::GetIO().KeysDown[VK_MENU]
-							? (int)Lumix::WorldEditor::MouseFlags::ALT
-							: 0;
-			g_context.m_editor->onMouseMove(x, y, x - old_x, y - old_y, flags);
-			auto& input_system = g_context.m_engine->getInputSystem();
-			input_system.injectMouseXMove(float(old_x - x));
-			input_system.injectMouseYMove(float(old_y - y));
-			old_x = x;
-			old_y = y;
-
-			{
-				ImGuiIO& io = ImGui::GetIO();
-				io.MousePos.x = (float)x;
-				io.MousePos.y = (float)y;
-			}
-		}
-		break;
-		case WM_CHAR:
-			ImGui::GetIO().AddInputCharacter((ImWchar)wParam);
-			break;
-		case WM_KEYUP:
-			ImGui::GetIO().KeysDown[wParam] = false;
-			break;
-		case WM_SYSKEYDOWN:
-			ImGui::GetIO().KeysDown[wParam] = true;
-			break;
-		case WM_SYSKEYUP:
-			ImGui::GetIO().KeysDown[wParam] = true;
-			break;
-		case WM_KEYDOWN:
-		{
-			ImGui::GetIO().KeysDown[wParam] = true;
-			g_context.checkShortcuts();
-			switch (wParam)
-			{
-				case VK_ESCAPE:
-					PostQuitMessage(0);
-					break;
-				case VK_OEM_2: // Question Mark / Forward Slash for US Keyboards
-					break;
-			}
-			break;
-		}
-	}
-
-	return DefWindowProc(hWnd, msg, wParam, lParam);
+	return g_context.windowProc(hWnd, msg, wParam, lParam);
 }
 
 
@@ -720,7 +813,6 @@ INT WINAPI WinMain(HINSTANCE hInst,
 				   LPSTR ignoreMe1,
 				   INT ignoreMe2)
 {
-	LPCSTR szName = "Lumix Sample App";
 	WNDCLASSEX wnd;
 	memset(&wnd, 0, sizeof(wnd));
 	wnd.cbSize = sizeof(wnd);
@@ -744,9 +836,9 @@ INT WINAPI WinMain(HINSTANCE hInst,
 							  NULL,
 							  hInst,
 							  0);
-	auto e = GetLastError();
 	ASSERT(hwnd);
 
+	g_context.m_instance = hInst;
 	g_context.init(hwnd);
 	SetWindowTextA(hwnd, "Lumix Sample app");
 
@@ -755,8 +847,8 @@ INT WINAPI WinMain(HINSTANCE hInst,
 		g_context.m_engine->update(*g_context.m_editor->getUniverseContext());
 	}
 
-	bool finished = false;
-	while(!finished)
+
+	while(!g_context.m_finished)
 	{
 		MSG msg = { 0 };
 		while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
@@ -766,23 +858,16 @@ INT WINAPI WinMain(HINSTANCE hInst,
 
 			if (msg.message == WM_QUIT)
 			{
-				finished = true;
+				g_context.m_finished = true;
 			}
 		}
 
-		g_context.m_editor->update();
-		g_context.updateNavigation();
-		Lumix::Renderer* renderer = static_cast<Lumix::Renderer*>(
-			g_context.m_engine->getPluginManager().getPlugin("renderer"));
-		g_context.m_engine->update(*g_context.m_editor->getUniverseContext());
-		g_context.m_pipeline->render();
-		g_context.onGUI();
-		renderer->frame();
+		g_context.update();
 	}
 
 	g_context.shutdown();
 
-	UnregisterClassA(szName, wnd.hInstance);
+	UnregisterClassA("lmxa", wnd.hInstance);
 
 	return 0;
 }

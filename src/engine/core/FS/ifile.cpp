@@ -1,4 +1,5 @@
 #include "ifile.h"
+#include "core/string.h"
 #include "ifile_device.h"
 
 namespace Lumix
@@ -9,6 +10,13 @@ namespace Lumix
 		void IFile::release()
 		{
 			getDevice().destroyFile(this);
+		}
+
+
+		IFile& IFile::operator<<(const char* text)
+		{
+			write(text, strlen(text));
+			return *this;
 		}
 
 	}

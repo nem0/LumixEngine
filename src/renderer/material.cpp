@@ -92,6 +92,12 @@ bool Material::isAlphaCutout() const
 }
 
 
+bool Material::hasAlphaCutoutDefine() const
+{
+	return m_shader->getDefineMask(m_alpha_cutout_define_idx) != 0;
+}
+
+
 void Material::enableAlphaCutout(bool enable)
 {
 	if (!isReady()) return;
@@ -118,6 +124,12 @@ bool Material::isShadowReceiver() const
 
 	return (m_shader_mask &
 			m_shader->getDefineMask(m_shadow_receiver_define_idx)) != 0;
+}
+
+
+bool Material::hasShadowReceivingDefine() const
+{
+	return m_shader->getDefineMask(m_shadow_receiver_define_idx) != 0;
 }
 
 
@@ -555,7 +567,7 @@ void Material::loaded(FS::IFile& file, bool success, FS::FileSystem& fs)
 	PROFILE_FUNCTION();
 	if (!success)
 	{
-		g_log_info.log("renderer") << "Error loading material " << m_path.c_str();
+		g_log_warning.log("renderer") << "Failed to load material " << m_path.c_str();
 		onFailure();
 		return;
 	}

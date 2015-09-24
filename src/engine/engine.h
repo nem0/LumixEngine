@@ -53,7 +53,7 @@ public:
 	virtual ~Engine() {}
 
 	static Engine* create(FS::FileSystem* fs, IAllocator& allocator);
-	static void destroy(Engine* engine);
+	static void destroy(Engine* engine, IAllocator& allocator);
 
 	virtual UniverseContext& createUniverse() = 0;
 	virtual void destroyUniverse(UniverseContext& context) = 0;

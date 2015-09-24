@@ -15,7 +15,7 @@ namespace Lumix
 class HierarchyImpl : public Hierarchy
 {
 private:
-	typedef PODHashMap<int32_t, Array<Child>*> Children;
+	
 	typedef HashMap<int32_t, int32_t> Parents;
 
 public:
@@ -104,6 +104,12 @@ public:
 		}
 
 		m_universe.setRotation(entity, rotation);
+	}
+
+
+	virtual const Children& getAllChildren() const override
+	{
+		return m_children;
 	}
 
 

@@ -90,6 +90,7 @@ ImportThread::ImportThread(ImportAssetDialog& dialog)
 	: m_dialog(dialog)
 	, m_importer(dialog.getImporter())
 {
+	TODO("copy to sample app");
 	Assimp::Logger::LogSeverity severity = Assimp::Logger::NORMAL;
 	Assimp::DefaultLogger::create("", severity, aiDefaultLogStream_DEBUGGER);
 	m_log_stream = new LogStream(*this);

@@ -184,7 +184,101 @@ namespace Lumix
 			node_type* m_current_node;
 		};
 
+		template <class U, class S, class _Hasher>
+		class ConstHashMapIterator
+		{
+			public:
+			typedef U key_type;
+			typedef S value_type;
+			typedef _Hasher hasher_type;
+			typedef PODHashNode<key_type, value_type> node_type;
+			typedef PODHashMap<key_type, value_type, hasher_type> hm_type;
+			typedef ConstHashMapIterator<key_type, value_type, hasher_type> my_type;
+
+			friend class hm_type;
+
+			ConstHashMapIterator()
+				: m_hash_map(nullptr)
+				, m_current_node(nullptr)
+			{
+			}
+
+			ConstHashMapIterator(const my_type& src)
+				: m_hash_map(src.m_hash_map)
+				, m_current_node(src.m_current_node)
+			{
+			}
+
+			ConstHashMapIterator(const node_type* node, const hm_type* hm)
+				: m_hash_map(hm)
+				, m_current_node(node)
+			{
+			}
+
+			~ConstHashMapIterator()
+			{
+			}
+
+			bool isValid() const
+			{
+				return nullptr != m_current_node && &m_hash_map->m_sentinel != m_current_node;
+			}
+
+			const key_type& key()
+			{
+				return m_current_node->m_key;
+			}
+
+			const value_type& value()
+			{
+				return m_current_node->m_value;
+			}
+
+			const value_type& operator*()
+			{
+				return value();
+			}
+
+			my_type& operator++()
+			{
+				return preInc();
+			}
+
+			my_type operator++(int)
+			{
+				return postInc();
+			}
+
+			bool operator==(const my_type& it) const
+			{
+				return it.m_current_node == m_current_node;
+			}
+
+			bool operator!=(const my_type& it) const
+			{
+				return it.m_current_node != m_current_node;
+			}
+
+			private:
+			my_type& preInc()
+			{
+				m_current_node = m_hash_map->next(m_current_node);
+				return *this;
+			}
+
+			my_type postInc()
+			{
+				my_type p = *this;
+				m_current_node = m_hash_map->next(m_current_node);
+				return p;
+			}
+
+			const hm_type* m_hash_map;
+			const node_type* m_current_node;
+		};
+
 		typedef HashMapIterator<key_type, value_type, hasher_type> iterator;
+		typedef ConstHashMapIterator<key_type, value_type, hasher_type> const_iterator;
 
 		explicit PODHashMap(IAllocator& allocator)
 			: m_allocator(allocator)
@@ -324,6 +418,10 @@ namespace Lumix
 			m_mask = 0;
 		}
 
+		const_iterator begin() const { return const_iterator(first(), this); }
+
+		const_iterator end() const { return const_iterator(&m_sentinel, this); }
+
 		iterator begin() { return iterator(first(), this); }
 
 		iterator end() { return iterator(&m_sentinel, this); }
@@ -422,6 +520,18 @@ namespace Lumix
 			return node->m_next;
 		}
 
+		const node_type* first() const 
+		{
+			if(0 == m_size)
+				return &m_sentinel;
+
+			for(size_type i = 0; i < m_max_id; i++)
+				if(m_table[i].m_next != &m_sentinel)
+					return &m_table[i];
+
+			return &m_sentinel;
+		}
+
 		node_type* first()
 		{
 			if(0 == m_size)
@@ -435,6 +545,27 @@ namespace Lumix
 		}
 
 		node_type* next(node_type* n)
+		{
+			if(0 == m_size || &m_sentinel == n)
+				return &m_sentinel;
+
+			node_type* next = n->m_next;
+			if((nullptr == next || &m_sentinel == next))
+			{
+				size_type idx = getPosition(n->m_key) + 1;
+				for(size_type i = idx; i < m_max_id; i++)
+					if(m_table[i].m_next != &m_sentinel)
+						return &m_table[i];
+
+				return &m_sentinel;
+			}
+			else
+			{
+				return next;
+			}
+		}
+
+		const node_type* next(const node_type* n) const
 		{
 			if(0 == m_size || &m_sentinel == n)
 				return &m_sentinel;

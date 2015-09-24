@@ -225,9 +225,7 @@ AssetBrowser::AssetBrowser(MainWindow& main_window, QWidget* parent)
 	, m_ui(new Ui::AssetBrowser)
 	, m_main_window(main_window)
 {
-	m_watcher = FileSystemWatcher::create(QDir::currentPath());
-	m_watcher->getCallback()
-		.bind<AssetBrowser, &AssetBrowser::onFileSystemWatcherCallback>(this);
+	m_watcher = nullptr;
 	m_base_path = QDir::currentPath();
 	m_editor = nullptr;
 	m_ui->setupUi(this);
@@ -264,6 +262,10 @@ void AssetBrowser::setWorldEditor(Lumix::WorldEditor& editor)
 	m_editor = &editor;
 	m_editor->registerEditorCommandCreator(
 		"insert_mesh", &AssetBrowser::createInsertMeshCommand);
+	m_watcher = FileSystemWatcher::create(QDir::currentPath().toLatin1().data(),
+										  editor.getAllocator());
+	m_watcher->getCallback()
+		.bind<AssetBrowser, &AssetBrowser::onFileSystemWatcherCallback>(this);
 }
 
 

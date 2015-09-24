@@ -40,6 +40,22 @@ public:
 	T* end() const { return m_data + m_size; }
 
 
+	void removeDuplicates()
+	{
+		for (int i = 0; i < m_size-1; ++i)
+		{
+			for (int j = i + 1; j < m_size; ++j)
+			{
+				if (m_data[i] == m_data[j])
+				{
+					eraseFast(j);
+					--j;
+				}
+			}
+		}
+	}
+
+
 	void operator=(const Array& rhs)
 	{
 		if (this != &rhs)
@@ -322,7 +338,7 @@ public:
 		m_data = p;
 	}
 
-	int indexOf(const T& item)
+	int indexOf(const T& item) const
 	{
 		for (int i = 0; i < m_size; ++i)
 		{
