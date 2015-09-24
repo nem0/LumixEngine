@@ -3,6 +3,7 @@
 #include "core/crc32.h"
 #include "core/default_allocator.h"
 #include "core/input_system.h"
+#include "core/json_serializer.h"
 #include "core/path_utils.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
@@ -10,6 +11,7 @@
 #include "debug/allocator.h"
 #include "editor/gizmo.h"
 #include "editor/entity_template_system.h"
+#include "editor/ieditor_command.h"
 #include "editor/world_editor.h"
 #include "engine.h"
 #include "engine/plugin_manager.h"
@@ -27,6 +29,7 @@
 #include "scene_view.h"
 #include "shader_compiler.h"
 #include "string_builder.h"
+#include "universe/hierarchy.h"
 
 #include <bgfx.h>
 #include <cstdio>
@@ -39,6 +42,69 @@
 
 void imGuiCallback(ImDrawData* draw_data);
 LRESULT WINAPI msgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
+
+
+class SetParentEditorCommand : public Lumix::IEditorCommand
+{
+public:
+	SetParentEditorCommand(Lumix::WorldEditor& editor,
+		Lumix::Hierarchy& hierarchy,
+		Lumix::Entity child,
+		Lumix::Entity parent)
+		: m_new_parent(parent)
+		, m_child(child)
+		, m_old_parent(hierarchy.getParent(child))
+		, m_hierarchy(hierarchy)
+		, m_editor(editor)
+	{
+	}
+
+
+	virtual void serialize(Lumix::JsonSerializer& serializer)
+	{
+		serializer.serialize("parent", m_new_parent);
+		serializer.serialize("child", m_child);
+	}
+
+
+	virtual void deserialize(Lumix::JsonSerializer& serializer)
+	{
+		serializer.deserialize("parent", m_new_parent, 0);
+		serializer.deserialize("child", m_child, 0);
+		m_old_parent = m_hierarchy.getParent(m_child);
+	}
+
+
+	virtual void execute() override
+	{
+		m_hierarchy.setParent(m_child, m_new_parent);
+	}
+
+
+	virtual void undo() override
+	{
+		m_hierarchy.setParent(m_child, m_old_parent);
+	}
+
+
+	virtual bool merge(IEditorCommand&) override { return false; }
+
+
+	virtual uint32_t getType() override
+	{
+		static const uint32_t hash = Lumix::crc32("set_entity_parent");
+		return hash;
+	}
+
+
+private:
+	Lumix::Entity m_child;
+	Lumix::Entity m_new_parent;
+	Lumix::Entity m_old_parent;
+	Lumix::Hierarchy& m_hierarchy;
+	Lumix::WorldEditor& m_editor;
+};
 
 
 class Context
@@ -109,17 +175,77 @@ public:
 
 		m_profiler_ui->onGui();
 		m_asset_browser->onGui();
-
 		m_log_ui->onGui();
 		m_import_asset_dialog->onGui();
 		m_property_grid->onGui();
 		showEntityList();
 		showEntityTemplateList();
 		m_sceneview.onGui();
+		showHierarchy();
 		showGameView();
 		if (m_is_style_editor_shown) ImGui::ShowStyleEditor();
 
 		ImGui::Render();
+	}
+
+
+	void showHierarchy()
+	{
+		if(!ImGui::Begin("Hierarchy"))
+		{
+			ImGui::End();
+			return;
+		}
+		char name[50];
+		auto* hierarchy = m_editor->getHierarchy();
+		const auto& all_children = hierarchy->getAllChildren();
+		for(auto i = all_children.begin(), e = all_children.end(); i != e; ++i)
+		{
+			if((*i.value()).empty()) continue;
+			getEntityListDisplayName(name, sizeof(name), i.key());
+			ImGui::BulletText(name);
+			ImGui::Indent();
+			for(auto c : *i.value())
+			{
+				getEntityListDisplayName(name, sizeof(name), c.m_entity);
+				ImGui::BulletText(name);
+				ImGui::SameLine();
+				if(ImGui::Button("Remove"))
+				{
+					auto* command = m_editor->getAllocator().newObject<SetParentEditorCommand>(*m_editor, *hierarchy, c.m_entity, -1);
+					m_editor->executeCommand(command);
+				}
+			}
+			ImGui::Unindent();
+		}
+
+		ImGui::Separator();
+
+		static char buf[50];
+		static int parent = 0;
+		static int child = 1;
+		getEntityListDisplayName(name, sizeof(name), parent);
+		ImGui::LabelText("Parent", name);
+		ImGui::SameLine();
+		if(ImGui::Button("...##a"))
+		{
+			parent = m_editor->getSelectedEntities()[0];
+		}
+
+		getEntityListDisplayName(name, sizeof(name), child);
+		ImGui::LabelText("Child", name);
+		ImGui::SameLine();
+		if(ImGui::Button("...##b"))
+		{
+			child = m_editor->getSelectedEntities()[0];
+		}
+			
+		if(ImGui::Button("Add"))
+		{
+			auto* command = m_editor->getAllocator().newObject<SetParentEditorCommand>(*m_editor, *hierarchy, child, parent);
+			m_editor->executeCommand(command);
+		}
+		ImGui::End();
 	}
 
 
