@@ -179,33 +179,31 @@ bool Model::parseVertexDef(FS::IFile& file, bgfx::VertexDecl* vertex_definition)
 
 		if (strcmp(tmp, "in_position") == 0)
 		{
-			vertex_definition->add(
-				bgfx::Attrib::Position, 3, bgfx::AttribType::Float);
+			vertex_definition->add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float);
+		}
+		else if (strcmp(tmp, "in_colors") == 0)
+		{
+			vertex_definition->add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true, false);
 		}
 		else if (strcmp(tmp, "in_tex_coords") == 0)
 		{
-			vertex_definition->add(
-				bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float);
+			vertex_definition->add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float);
 		}
 		else if (strcmp(tmp, "in_normal") == 0)
 		{
-			vertex_definition->add(
-				bgfx::Attrib::Normal, 4, bgfx::AttribType::Uint8, true, true);
+			vertex_definition->add(bgfx::Attrib::Normal, 4, bgfx::AttribType::Uint8, true, true);
 		}
 		else if (strcmp(tmp, "in_tangents") == 0)
 		{
-			vertex_definition->add(
-				bgfx::Attrib::Tangent, 4, bgfx::AttribType::Uint8, true, true);
+			vertex_definition->add(bgfx::Attrib::Tangent, 4, bgfx::AttribType::Uint8, true, true);
 		}
 		else if (strcmp(tmp, "in_weights") == 0)
 		{
-			vertex_definition->add(
-				bgfx::Attrib::Weight, 4, bgfx::AttribType::Float);
+			vertex_definition->add(bgfx::Attrib::Weight, 4, bgfx::AttribType::Float);
 		}
 		else if (strcmp(tmp, "in_indices") == 0)
 		{
-			vertex_definition->add(
-				bgfx::Attrib::Indices, 4, bgfx::AttribType::Int16, false, true);
+			vertex_definition->add(bgfx::Attrib::Indices, 4, bgfx::AttribType::Int16, false, true);
 		}
 		else
 		{
