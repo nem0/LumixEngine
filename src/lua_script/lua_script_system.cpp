@@ -12,14 +12,11 @@
 #include "core/lua_wrapper.h"
 #include "core/resource_manager.h"
 #include "debug/allocator.h"
-#include "editor_plugin_loader.h"
 #include "engine.h"
 #include "engine/property_descriptor.h"
 #include "iplugin.h"
 #include "plugin_manager.h"
 #include "lua_script/lua_script_manager.h"
-#include "studio/mainwindow.h"
-#include "studio/property_view.h"
 #include "universe/universe.h"
 
 
@@ -59,7 +56,6 @@ public:
 	Engine& m_engine;
 	Debug::Allocator m_allocator;
 	LuaScriptManager m_script_manager;
-	EditorPluginLoader* m_editor_plugin_loader;
 };
 
 
@@ -456,7 +452,6 @@ LuaScriptSystem::LuaScriptSystem(Engine& engine)
 	, m_allocator(engine.getAllocator())
 	, m_script_manager(m_allocator)
 {
-	m_editor_plugin_loader = nullptr;
 	m_script_manager.create(crc32("lua_script"), engine.getResourceManager());
 	registerProperties();
 }
@@ -465,7 +460,6 @@ LuaScriptSystem::LuaScriptSystem(Engine& engine)
 LuaScriptSystem::~LuaScriptSystem()
 {
 	m_script_manager.destroy();
-	m_allocator.deleteObject(m_editor_plugin_loader);
 }
 
 
@@ -524,53 +518,5 @@ extern "C" LUMIX_LIBRARY_EXPORT IPlugin* createPlugin(Engine& engine)
 	return engine.getAllocator().newObject<LuaScriptSystem>(engine);
 }
 
-
-static void onComponentNodeCreated(DynamicObjectModel::Node& node,
-								   const Lumix::ComponentUID& cmp)
-{
-	if (cmp.type == LUA_SCRIPT_HASH)
-	{
-		auto* scene = static_cast<LuaScriptScene*>(cmp.scene);
-		auto& script = scene->getScript(cmp.index);
-		if (script.m_script)
-		{
-			for (auto& name : script.m_script->getPropertiesNames())
-			{
-				auto& child = node.addChild(name);
-				QString name_str = name;
-				child.m_getter = [scene, cmp, name_str]() -> QVariant
-				{
-					auto& property = scene->getScriptProperty(
-						cmp.index, name_str.toLatin1().data());
-					return property.m_value.c_str();
-				};
-				child.m_setter = [scene, cmp, name_str](const QVariant& value)
-				{
-					scene->setPropertyValue(cmp.index,
-											name_str.toLatin1().data(),
-											value.toString().toLatin1().data());
-				};
-			}
-		}
-	}
-}
-
-
-extern "C" LUMIX_LIBRARY_EXPORT void initEditorPlugin(Engine& engine,
-													  MainWindow& main_window)
-{
-	main_window.getPropertyView()->connect(
-		main_window.getPropertyView(),
-		&PropertyView::componentNodeCreated,
-		[](DynamicObjectModel::Node& node, const Lumix::ComponentUID& cmp)
-		{
-			onComponentNodeCreated(node, cmp);
-		});
-
-	auto system = static_cast<LuaScriptSystem*>(
-		engine.getPluginManager().getPlugin("lua_script"));
-	system->m_editor_plugin_loader =
-		system->getAllocator().newObject<EditorPluginLoader>(main_window);
-}
 
 } // ~namespace Lumix
