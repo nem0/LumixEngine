@@ -181,6 +181,7 @@ void AssetBrowser::selectResource(Lumix::Resource* resource)
 	m_text_buffer[0] = '\0';
 	unloadResource();
 	m_selected_resource = resource;
+	ASSERT(m_selected_resource->getRefCount() > 0);
 }
 
 
@@ -301,6 +302,13 @@ void AssetBrowser::onGuiMaterial()
 	{
 		material->setShader(Lumix::Path(buf));
 	}
+	ImGui::SameLine();
+	if (ImGui::Button(StringBuilder<30>("->##", "shader")))
+	{
+		selectResource(Lumix::Path(buf));
+		return;
+	}
+
 
 	for (int i = 0; i < material->getShader()->getTextureSlotCount(); ++i)
 	{
@@ -310,6 +318,12 @@ void AssetBrowser::onGuiMaterial()
 		if (resourceInput(slot.m_name, buf, sizeof(buf), TEXTURE))
 		{
 			material->setTexturePath(i, Lumix::Path(buf));
+		}
+		ImGui::SameLine();
+		if (ImGui::Button(StringBuilder<30>("->##", slot.m_name)))
+		{
+			selectResource(Lumix::Path(buf));
+			return;
 		}
 	}
 }
@@ -378,7 +392,7 @@ void AssetBrowser::onGuiModel()
 			ImGui::SameLine();
 			if (ImGui::Button("View material"))
 			{
-				selectResource(mesh.getMaterial());
+				selectResource(mesh.getMaterial()->getPath());
 			}
 			ImGui::TreePop();
 		}
@@ -403,6 +417,12 @@ void AssetBrowser::onGuiResource()
 	if (m_selected_resource->isLoading())
 	{
 		ImGui::Text("Loading...");
+		return;
+	}
+
+	if (!m_selected_resource->isReady())
+	{
+		ImGui::Text("Not ready");
 		return;
 	}
 

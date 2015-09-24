@@ -238,9 +238,8 @@ struct ImportTask : public Lumix::MT::Task
 		m_progress_handler.m_task = this;
 		Lumix::enableFloatingPointTraps(false);
 		m_dialog.m_importer.SetProgressHandler(&m_progress_handler);
-		m_dialog.m_importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS,
-			aiComponent_COLORS | aiComponent_LIGHTS |
-			aiComponent_CAMERAS);
+		m_dialog.m_importer.SetPropertyInteger(
+			AI_CONFIG_PP_RVC_FLAGS, aiComponent_LIGHTS | aiComponent_CAMERAS);
 		unsigned int flags = aiProcess_JoinIdenticalVertices | aiProcess_RemoveComponent |
 			aiProcess_GenUVCoords | aiProcess_RemoveRedundantMaterials |
 			aiProcess_Triangulate | aiProcess_LimitBoneWeights |
@@ -666,6 +665,17 @@ struct ConvertTask : public Lumix::MT::Task
 					mesh->mVertices[j].z);
 				file.write((const char*)&position, sizeof(position));
 
+				if (mesh->mColors[0])
+				{
+					auto assimp_color = mesh->mColors[0][j];
+					uint8_t color[4];
+					color[0] = uint8_t(assimp_color.r * 255);
+					color[1] = uint8_t(assimp_color.g * 255);
+					color[2] = uint8_t(assimp_color.b * 255);
+					color[3] = uint8_t(assimp_color.a * 255);
+					file.write(color, sizeof(color));
+				}
+
 				auto normal = mesh->mNormals[j];
 				uint32_t int_normal = packF4u(normal);
 				file.write((const char*)&int_normal, sizeof(int_normal));
@@ -688,14 +698,9 @@ struct ConvertTask : public Lumix::MT::Task
 	static int getAttributeCount(const aiMesh* mesh)
 	{
 		int count = 3; // position, normal, uv
-		if (isSkinned(mesh))
-		{
-			count += 2;
-		}
-		if (mesh->mTangents)
-		{
-			count += 1;
-		}
+		if (isSkinned(mesh)) count += 2;
+		if (mesh->mColors) ++count;
+		if (mesh->mTangents) ++count;
 		return count;
 	}
 
@@ -706,17 +711,13 @@ struct ConvertTask : public Lumix::MT::Task
 		static const int NORMAL_SIZE = sizeof(uint8_t) * 4;
 		static const int TANGENT_SIZE = sizeof(uint8_t) * 4;
 		static const int UV_SIZE = sizeof(float) * 2;
+		static const int COLOR_SIZE = sizeof(uint8_t) * 4;
 		static const int BONE_INDICES_WEIGHTS_SIZE =
 			sizeof(float) * 4 + sizeof(uint16_t) * 4;
 		int size = POSITION_SIZE + NORMAL_SIZE + UV_SIZE;
-		if (mesh->mTangents)
-		{
-			size += TANGENT_SIZE;
-		}
-		if (isSkinned(mesh))
-		{
-			size += BONE_INDICES_WEIGHTS_SIZE;
-		}
+		if (mesh->mTangents) size += TANGENT_SIZE;
+		if (mesh->mColors[0]) size += COLOR_SIZE;
+		if (isSkinned(mesh)) size += BONE_INDICES_WEIGHTS_SIZE;
 		return size;
 	}
 
@@ -767,11 +768,9 @@ struct ConvertTask : public Lumix::MT::Task
 			}
 
 			writeAttribute("in_position", VertexAttributeDef::POSITION, file);
+			if (mesh->mColors[0]) writeAttribute("in_colors", VertexAttributeDef::BYTE4, file);
 			writeAttribute("in_normal", VertexAttributeDef::BYTE4, file);
-			if (mesh->mTangents)
-			{
-				writeAttribute("in_tangents", VertexAttributeDef::BYTE4, file);
-			}
+			if (mesh->mTangents) writeAttribute("in_tangents", VertexAttributeDef::BYTE4, file);
 			writeAttribute("in_tex_coords", VertexAttributeDef::FLOAT2, file);
 		}
 	}
