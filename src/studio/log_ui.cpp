@@ -137,6 +137,8 @@ void LogUI::update(float time_delta)
 
 void LogUI::onGui()
 {
+	showNotifications();
+
 	if (!m_is_opened) return;
 
 	if (ImGui::Begin("Log", &m_is_opened))
@@ -154,8 +156,6 @@ void LogUI::onGui()
 			}
 		}
 		
-
-
 		auto* messages = &m_messages[m_current_tab];
 
 		if (ImGui::Button("Clear"))
@@ -181,6 +181,4 @@ void LogUI::onGui()
 		}
 	}
 	ImGui::End();
-
-	showNotifications();
 }

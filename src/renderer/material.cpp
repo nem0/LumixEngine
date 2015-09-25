@@ -179,8 +179,10 @@ bool Material::save(JsonSerializer& serializer)
 	for (int i = 0; i < m_texture_count; ++i)
 	{
 		char path[MAX_PATH_LENGTH];
+		int flags = 0;
 		if (m_textures[i])
 		{
+			flags = m_textures[i]->getFlags();
 			PathUtils::getFilename(path, MAX_PATH_LENGTH, m_textures[i]->getPath().c_str());
 		}
 		else
@@ -189,6 +191,14 @@ bool Material::save(JsonSerializer& serializer)
 		}
 		serializer.beginObject("texture");
 		serializer.serialize("source", path);
+		if (flags & BGFX_TEXTURE_U_CLAMP) serializer.serialize("u_clamp", true);
+		if (flags & BGFX_TEXTURE_V_CLAMP) serializer.serialize("v_clamp", true);
+		if (flags & BGFX_TEXTURE_W_CLAMP) serializer.serialize("w_clamp", true);
+		if (flags & BGFX_TEXTURE_MIN_POINT) serializer.serialize("min_filter", "point");
+		if (flags & BGFX_TEXTURE_MIN_ANISOTROPIC) serializer.serialize("min_filter", "anisotropic");
+		if (flags & BGFX_TEXTURE_MAG_POINT) serializer.serialize("mag_filter", "point");
+		if (flags & BGFX_TEXTURE_MAG_ANISOTROPIC) serializer.serialize("mag_filter", "anisotropic");
+		if (m_textures[i] && m_textures[i]->getData()) serializer.serialize("keep_data", true);
 		serializer.endObject();
 	}
 	serializer.beginArray("uniforms");
@@ -233,7 +243,7 @@ bool Material::save(JsonSerializer& serializer)
 	serializer.endArray();
 	serializer.serialize("z_test", isZTest());
 	serializer.endObject();
-	return false;
+	return true;
 }
 
 void Material::deserializeUniforms(JsonSerializer& serializer)
