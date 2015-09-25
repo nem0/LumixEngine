@@ -840,7 +840,7 @@ INT WINAPI WinMain(HINSTANCE hInst,
 
 	g_context.m_instance = hInst;
 	g_context.init(hwnd);
-	SetWindowTextA(hwnd, "Lumix Sample app");
+	SetWindowTextA(hwnd, "Lumix Studio");
 
 	while (g_context.m_engine->getResourceManager().isLoading())
 	{

@@ -205,34 +205,34 @@ target_link_libraries(unit_tests animation)
 ### target_link_libraries(render_test Qt5::Widgets)
 ### target_link_libraries(render_test Qt5::WinMain)
 
-###################### SAMPLE APP ######################
+###################### STUDIO ######################
 
-file(GLOB SAMPLE_APP_FILES ${SRC_PATH}sample_app/*.cpp ${SRC_PATH}sample_app/pc/*.cpp ${SRC_PATH}sample_app/*.c ${SRC_PATH}sample_app/*.h)
-file(GLOB OCORNUT_IMGUI_FILES ${SRC_PATH}sample_app/ocornut-imgui/*.cpp ${SRC_PATH}sample_app/ocornut-imgui/*.h)
-file(GLOB STB_FILES ${SRC_PATH}sample_app/stb/*.cpp ${SRC_PATH}sample_app/stb/*.c ${SRC_PATH}sample_app/stb/*.h)
+file(GLOB STUDIO_FILES ${SRC_PATH}studio/*.cpp ${SRC_PATH}studio/pc/*.cpp ${SRC_PATH}studio/*.c ${SRC_PATH}studio/*.h)
+file(GLOB OCORNUT_IMGUI_FILES ${SRC_PATH}studio/ocornut-imgui/*.cpp ${SRC_PATH}studio/ocornut-imgui/*.h)
+file(GLOB STB_FILES ${SRC_PATH}studio/stb/*.cpp ${SRC_PATH}studio/stb/*.c ${SRC_PATH}studio/stb/*.h)
 
-source_group("" FILES ${SAMPLE_APP_FILES})
+source_group("" FILES ${studio_FILES})
 source_group("ocornut-imgui" FILES ${OCORNUT_IMGUI_FILES})
 source_group("stb" FILES ${STB_FILES})
 
 include_directories(${SRC_PATH})
-include_directories(${SRC_PATH}sample_app/)
+include_directories(${SRC_PATH}studio/)
 include_directories(${EXTERNAL_PATH}assimp/include)
 include_directories(${EXTERNAL_PATH}crunch/include)
 
-add_executable(sample_app
-	${SAMPLE_APP_FILES}
+add_executable(studio
+	${STUDIO_FILES}
 	${OCORNUT_IMGUI_FILES}
 	${STB_FILES}
 )
 
-set_target_properties(sample_app PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
-target_link_libraries(sample_app engine)
-target_link_libraries(sample_app renderer)
-target_link_libraries(sample_app editor)
-target_link_libraries(sample_app optimized ${EXTERNAL_PATH}assimp/lib/win32/assimp-vc120-mt.lib)
-target_link_libraries(sample_app debug ${EXTERNAL_PATH}assimp/lib/win32/assimp-vc120-mtd.lib)
-target_link_libraries(sample_app ${EXTERNAL_PATH}crunch/lib/win32/crnlib${CMAKE_CFG_INTDIR}.lib)
+set_target_properties(studio PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
+target_link_libraries(studio engine)
+target_link_libraries(studio renderer)
+target_link_libraries(studio editor)
+target_link_libraries(studio optimized ${EXTERNAL_PATH}assimp/lib/win32/assimp-vc120-mt.lib)
+target_link_libraries(studio debug ${EXTERNAL_PATH}assimp/lib/win32/assimp-vc120-mtd.lib)
+target_link_libraries(studio ${EXTERNAL_PATH}crunch/lib/win32/crnlib${CMAKE_CFG_INTDIR}.lib)
 
 
 
@@ -259,27 +259,27 @@ target_link_libraries(lua_script editor)
 
 ###################### COPY_DLLS ######################
 
-### add_custom_command(TARGET sample_app POST_BUILD        
+### add_custom_command(TARGET studio POST_BUILD        
 ###     COMMAND ${CMAKE_COMMAND} -E copy_if_different  
 ###         "${EXTERNAL_PATH}assimp/dll/win32/assimp-vc120-mtd.dll"
 ###         $<TARGET_FILE_DIR:studio>)
 ### 
-### add_custom_command(TARGET sample_app POST_BUILD        
+### add_custom_command(TARGET studio POST_BUILD        
 ###     COMMAND ${CMAKE_COMMAND} -E copy_if_different  
 ###         "${EXTERNAL_PATH}physx/dll/x86/PhysX3CommonCHECKED_x86.dll"
 ###         $<TARGET_FILE_DIR:studio>)
 ### 
-### add_custom_command(TARGET sample_app POST_BUILD        
+### add_custom_command(TARGET studio POST_BUILD        
 ###     COMMAND ${CMAKE_COMMAND} -E copy_if_different  
 ###         "${EXTERNAL_PATH}physx/dll/x86/PhysX3CookingCHECKED_x86.dll"
 ###         $<TARGET_FILE_DIR:studio>)
 ### 
-### add_custom_command(TARGET sample_app POST_BUILD        
+### add_custom_command(TARGET studio POST_BUILD        
 ###     COMMAND ${CMAKE_COMMAND} -E copy_if_different  
 ###         "${EXTERNAL_PATH}physx/dll/x86/PhysX3CharacterKinematicCHECKED_x86.dll"
 ###         $<TARGET_FILE_DIR:studio>)
 ### 
-### add_custom_command(TARGET sample_app POST_BUILD        
+### add_custom_command(TARGET studio POST_BUILD        
 ###     COMMAND ${CMAKE_COMMAND} -E copy_if_different  
 ###         "${EXTERNAL_PATH}physx/dll/x86/PhysX3CHECKED_x86.dll"
 ###         $<TARGET_FILE_DIR:studio>)
