@@ -24,6 +24,7 @@ ProfilerUI::ProfilerUI(Lumix::Debug::Allocator* allocator, Lumix::ResourceManage
 	: m_main_allocator(allocator)
 	, m_resource_manager(resource_manager)
 {
+	m_current_frame = -1;
 	m_root = nullptr;
 	m_is_opened = false;
 	m_current_block = nullptr;
@@ -156,9 +157,11 @@ void ProfilerUI::showProfileBlock(Block* block, int column)
 	{
 		while (block)
 		{
-			if (ImGui::Selectable(
-					StringBuilder<50>("") << block->m_frames.back() << "##t"
-										  << (int64_t)block,
+			auto frame =
+				m_current_frame < 0 ? block->m_frames.back() : block->m_frames[m_current_frame];
+
+
+			if (ImGui::Selectable(StringBuilder<50>("") << frame << "##t" << (int64_t)block,
 					m_current_block == block,
 					ImGuiSelectableFlags_SpanAllColumns))
 			{
@@ -366,7 +369,7 @@ void ProfilerUI::onGuiCPUProfiler()
 		PlotData plot_data;
 		plot_data.block = block;
 		plot_data.offset = offset;
-		ImGui::PlotHistogram("",
+		auto i = ImGui::PlotHistogramEx("",
 			getter,
 			&plot_data,
 			count,
@@ -374,7 +377,9 @@ void ProfilerUI::onGuiCPUProfiler()
 			block->m_name,
 			0,
 			FLT_MAX,
-			ImVec2(width, 100));
+			ImVec2(width, 100),
+			m_current_frame - offset);
+		if (i != -1) m_current_frame = i + offset;
 	}
 }
 

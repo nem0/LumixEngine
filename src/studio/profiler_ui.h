@@ -73,4 +73,5 @@ private:
 	Lumix::ResourceManager* m_resource_manager;
 	int m_allocation_size_from;
 	int m_allocation_size_to;
+	int m_current_frame;
 };

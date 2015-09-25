@@ -1,4 +1,5 @@
 #include "scene_view.h"
+#include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "editor/gizmo.h"
 #include "editor/world_editor.h"
@@ -66,6 +67,7 @@ bool SceneView::init(Lumix::WorldEditor& editor)
 
 void SceneView::update()
 {
+	PROFILE_FUNCTION();
 	if(ImGui::IsAnyItemActive()) return;
 	if (!m_is_opened) return;
 	if (ImGui::GetIO().KeysDown[VK_CONTROL]) return;

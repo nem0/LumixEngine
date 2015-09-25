@@ -5,6 +5,7 @@
 #include "core/FS/ifile.h"
 #include "core/json_serializer.h"
 #include "core/path_utils.h"
+#include "core/profiler.h"
 #include "core/resource.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
@@ -112,6 +113,7 @@ AssetBrowser::Type AssetBrowser::getTypeFromResourceManagerType(uint32_t type) c
 
 void AssetBrowser::update()
 {
+	PROFILE_FUNCTION();
 	for (const auto& path_obj : m_changed_files)
 	{
 		const char* path = path_obj.c_str();

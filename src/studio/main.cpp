@@ -66,6 +66,7 @@ public:
 
 	void update()
 	{
+		PROFILE_FUNCTION();
 		float time_delta = m_editor->getEngine().getLastTimeDelta();
 
 		m_editor->update();
@@ -80,13 +81,14 @@ public:
 		onGUI();
 		Lumix::Renderer* renderer =
 			static_cast<Lumix::Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
+		
 		renderer->frame();
-		Lumix::g_profiler.frame();
 	}
 
 
 	void onGUI()
 	{
+		PROFILE_FUNCTION();
 		ImGuiIO& io = ImGui::GetIO();
 
 		RECT rect;
@@ -848,21 +850,25 @@ INT WINAPI WinMain(HINSTANCE hInst,
 	}
 
 
-	while(!g_context.m_finished)
+	while (!g_context.m_finished)
 	{
-		MSG msg = { 0 };
-		while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
 		{
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
-
-			if (msg.message == WM_QUIT)
+			PROFILE_BLOCK("tick");
+			MSG msg = {0};
+			while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
 			{
-				g_context.m_finished = true;
-			}
-		}
+				TranslateMessage(&msg);
+				DispatchMessage(&msg);
 
-		g_context.update();
+				if (msg.message == WM_QUIT)
+				{
+					g_context.m_finished = true;
+				}
+			}
+
+			g_context.update();
+		}
+		Lumix::g_profiler.frame();
 	}
 
 	g_context.shutdown();
