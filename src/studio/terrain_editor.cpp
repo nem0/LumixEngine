@@ -825,10 +825,7 @@ bool TerrainEditor::onEntityMouseDown(const Lumix::RayCastModelHit& hit,
 									  int,
 									  int)
 {
-	if (m_type == NOT_SET)
-	{
-		return false;
-	}
+	if (m_type == NOT_SET || !m_component.isValid()) return false;
 
 	detectModifiers();
 
