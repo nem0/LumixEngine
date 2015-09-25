@@ -212,7 +212,11 @@ void AssetBrowser::saveMaterial(Lumix::Material* material)
 			Lumix::JsonSerializer::AccessMode::WRITE,
 			material->getPath().c_str(),
 			allocator);
-		material->save(serializer);
+		if (!material->save(serializer))
+		{
+			Lumix::g_log_error.log("Material manager") << "Error saving "
+													   << material->getPath().c_str();
+		}
 		fs.close(*file);
 
 		Lumix::deleteFile(material->getPath().c_str());
