@@ -1183,11 +1183,48 @@ struct PipelineInstanceImpl : public PipelineInstance
 		vertex[5].m_u = 0;
 		vertex[5].m_v = 1;
 
+		for (int i = 0; i < material->getUniformCount(); ++i)
+		{
+			const Material::Uniform& uniform = material->getUniform(i);
+
+			switch (uniform.m_type)
+			{
+			case Material::Uniform::FLOAT:
+			{
+				Vec4 v(uniform.m_float, 0, 0, 0);
+				bgfx::setUniform(uniform.m_handle, &v);
+			}
+			break;
+			case Material::Uniform::TIME:
+			{
+				Vec4 v(m_scene->getTime(), 0, 0, 0);
+				bgfx::setUniform(uniform.m_handle, &v);
+			}
+			break;
+			default:
+				ASSERT(false);
+				break;
+			}
+		}
+
+		Shader* shader = material->getShader();
+		for (int i = 0; i < material->getTextureCount(); ++i)
+		{
+			Texture* texture = material->getTexture(i);
+			if (texture)
+			{
+				bgfx::setTexture(
+					i,
+					shader->getTextureSlot(i).m_uniform_handle,
+					texture->getTextureHandle());
+			}
+		}/*
+
 		for (int i = 0; i < m_global_textures.size(); ++i)
 		{
 			const GlobalTexture& t = m_global_textures[i];
 			bgfx::setTexture(i, t.m_uniform, t.m_texture);
-		}
+		}*/
 
 		if (m_applied_camera >= 0)
 		{
