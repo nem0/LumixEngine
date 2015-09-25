@@ -1682,6 +1682,7 @@ public:
 
 	virtual void update() override
 	{
+		PROFILE_FUNCTION();
 		updateGoTo();
 
 		for (int i = 0; i < m_plugins.size(); ++i)
@@ -1860,6 +1861,7 @@ public:
 	virtual void
 	onMouseMove(int x, int y, int relx, int rely, int mouse_flags) override
 	{
+		PROFILE_FUNCTION();
 		m_mouse_x = (float)x;
 		m_mouse_y = (float)y;
 		switch (m_mouse_mode)

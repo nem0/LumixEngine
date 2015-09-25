@@ -498,6 +498,7 @@ struct RendererImpl : public Renderer
 
 	virtual void frame() override
 	{
+		PROFILE_FUNCTION();
 		bgfx::frame();
 		m_view_counter = 0;
 	}

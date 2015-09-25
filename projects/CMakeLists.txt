@@ -259,27 +259,32 @@ target_link_libraries(lua_script editor)
 
 ###################### COPY_DLLS ######################
 
-### add_custom_command(TARGET studio POST_BUILD        
-###     COMMAND ${CMAKE_COMMAND} -E copy_if_different  
-###         "${EXTERNAL_PATH}assimp/dll/win32/assimp-vc120-mtd.dll"
-###         $<TARGET_FILE_DIR:studio>)
-### 
-### add_custom_command(TARGET studio POST_BUILD        
-###     COMMAND ${CMAKE_COMMAND} -E copy_if_different  
-###         "${EXTERNAL_PATH}physx/dll/x86/PhysX3CommonCHECKED_x86.dll"
-###         $<TARGET_FILE_DIR:studio>)
-### 
-### add_custom_command(TARGET studio POST_BUILD        
-###     COMMAND ${CMAKE_COMMAND} -E copy_if_different  
-###         "${EXTERNAL_PATH}physx/dll/x86/PhysX3CookingCHECKED_x86.dll"
-###         $<TARGET_FILE_DIR:studio>)
-### 
-### add_custom_command(TARGET studio POST_BUILD        
-###     COMMAND ${CMAKE_COMMAND} -E copy_if_different  
-###         "${EXTERNAL_PATH}physx/dll/x86/PhysX3CharacterKinematicCHECKED_x86.dll"
-###         $<TARGET_FILE_DIR:studio>)
-### 
-### add_custom_command(TARGET studio POST_BUILD        
-###     COMMAND ${CMAKE_COMMAND} -E copy_if_different  
-###         "${EXTERNAL_PATH}physx/dll/x86/PhysX3CHECKED_x86.dll"
-###         $<TARGET_FILE_DIR:studio>)
+add_custom_command(TARGET studio POST_BUILD        
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different  
+        "${EXTERNAL_PATH}assimp/dll/win32/assimp-vc120-mt.dll"
+        $<TARGET_FILE_DIR:studio>)
+
+add_custom_command(TARGET studio POST_BUILD        
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different  
+        "${EXTERNAL_PATH}assimp/dll/win32/assimp-vc120-mtd.dll"
+        $<TARGET_FILE_DIR:studio>)
+
+add_custom_command(TARGET studio POST_BUILD        
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different  
+        "${EXTERNAL_PATH}physx/dll/x86/PhysX3CommonCHECKED_x86.dll"
+        $<TARGET_FILE_DIR:studio>)
+
+add_custom_command(TARGET studio POST_BUILD        
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different  
+        "${EXTERNAL_PATH}physx/dll/x86/PhysX3CookingCHECKED_x86.dll"
+        $<TARGET_FILE_DIR:studio>)
+
+add_custom_command(TARGET studio POST_BUILD        
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different  
+        "${EXTERNAL_PATH}physx/dll/x86/PhysX3CharacterKinematicCHECKED_x86.dll"
+        $<TARGET_FILE_DIR:studio>)
+
+add_custom_command(TARGET studio POST_BUILD        
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different  
+        "${EXTERNAL_PATH}physx/dll/x86/PhysX3CHECKED_x86.dll"
+        $<TARGET_FILE_DIR:studio>)

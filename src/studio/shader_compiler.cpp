@@ -7,6 +7,7 @@
 #include "core/mt/thread.h"
 #include "core/path.h"
 #include "core/path_utils.h"
+#include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "core/system.h"
@@ -438,6 +439,7 @@ void ShaderCompiler::processChangedFiles()
 
 void ShaderCompiler::update(float time_delta)
 {
+	PROFILE_FUNCTION();
 	for (int i = 0; i < m_processes.size(); ++i)
 	{
 		if (Lumix::isProcessFinished(*m_processes[i]))
