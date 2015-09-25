@@ -36,7 +36,7 @@ Videos
 * [Hot-reload](https://www.youtube.com/watch?v=BVE7x3Su9qA)
 * [Atmospheric scattering](https://www.youtube.com/watch?v=VJppE0E4auc)
 
-![Editor screenshot](https://raw.githubusercontent.com/nem0/LumixEngine/gh-pages/images/editor.png "Editor screenshot")
+![Editor screenshot](https://cloud.githubusercontent.com/assets/153526/10109455/450c51be-63c7-11e5-9c87-96d9d00efe02.png)
 
 3rd party libraries
 
@@ -45,6 +45,6 @@ Videos
 * [crunch/crnlib](https://github.com/richgel999/crunch)
 * [assimp](https://github.com/assimp/assimp)
 * [PhysX](https://developer.nvidia.com/physx-sdk)
-* [Qt](https://www.qt.io/download-open-source/)
+* [ImGui](https://github.com/ocornut/imgui)
 
 Contact: mikulas.florek@gamedev.sk
