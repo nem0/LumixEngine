@@ -2,6 +2,7 @@
 
 
 #include "core/array.h"
+#include "debug/allocator.h"
 #include "core/default_allocator.h"
 #include "core/profiler.h"
 
@@ -9,13 +10,12 @@
 namespace Lumix
 {
 
-class IAllocator;
 class ResourceManager;
 
 namespace Debug
 {
 
-class Allocator;
+class StackNode;
 
 }
 
@@ -57,6 +57,24 @@ private:
 		Lumix::Array<int> m_hit_counts;
 	};
 
+	struct AllocationStackNode
+	{
+		AllocationStackNode(Lumix::IAllocator& allocator)
+			: m_children(allocator)
+			, m_allocations(allocator)
+		{
+		}
+		~AllocationStackNode();
+
+		void clear(Lumix::IAllocator& allocator);
+
+		size_t m_inclusive_size;
+		bool m_opened;
+		Lumix::Debug::StackNode* m_stack_node;
+		Lumix::Array<AllocationStackNode*> m_children;
+		Lumix::Array<Lumix::Debug::Allocator::AllocationInfo*> m_allocations;
+	};
+
 private:
 	void onGuiCPUProfiler();
 	void onGuiMemoryProfiler();
@@ -64,6 +82,11 @@ private:
 	void onFrame();
 	void showProfileBlock(ProfilerUI::Block* block, int column);
 	void cloneBlock(Block* my_block, Lumix::Profiler::Block* remote_block);
+	void addToTree(Lumix::Debug::Allocator::AllocationInfo* info);
+	void refreshAllocations();
+	void showAllocationTree(AllocationStackNode* node, int column);
+	AllocationStackNode* getOrCreate(AllocationStackNode* my_node,
+		Lumix::Debug::StackNode* external_node, size_t size);
 
 private:
 	Lumix::DefaultAllocator m_allocator;
@@ -74,4 +97,5 @@ private:
 	int m_allocation_size_from;
 	int m_allocation_size_to;
 	int m_current_frame;
+	AllocationStackNode* m_allocation_root;
 };

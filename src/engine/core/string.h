@@ -12,6 +12,7 @@ namespace Lumix
 LUMIX_ENGINE_API bool toCStringHex(uint8_t value, char* output, int length);
 LUMIX_ENGINE_API bool toCStringPretty(int32_t value, char* output, int length);
 LUMIX_ENGINE_API bool toCStringPretty(uint32_t value, char* output, int length);
+LUMIX_ENGINE_API bool toCStringPretty(uint64_t value, char* output, int length);
 LUMIX_ENGINE_API bool toCString(int32_t value, char* output, int length);
 LUMIX_ENGINE_API bool toCString(int64_t value, char* output, int length);
 LUMIX_ENGINE_API bool toCString(uint32_t value, char* output, int length);

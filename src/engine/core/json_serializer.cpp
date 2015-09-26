@@ -680,9 +680,7 @@ void JsonSerializer::deserializeLabel(char* label, int max_length)
 					  << "\", expected string.";
 		deserializeToken();
 	}
-	int size = Math::minValue(max_length - 1, m_token_size);
-	copyString(label, size, m_token);
-	label[size] = '\0';
+	copyNString(label, max_length, m_token, m_token_size);
 	deserializeToken();
 	expectToken(':');
 	deserializeToken();

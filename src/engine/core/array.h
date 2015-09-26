@@ -424,6 +424,17 @@ public:
 		m_size = size;
 	}
 
+	template <typename... Params> T& emplace(Params&&... params)
+	{
+		if (m_size == m_capacity)
+		{
+			grow();
+		}
+		new ((char*)(m_data + m_size)) T(std::forward<Params>(params)...);
+		++m_size;
+		return m_data[m_size - 1];
+	}
+
 	bool empty() const { return m_size == 0; }
 
 	void clear() { m_size = 0; }

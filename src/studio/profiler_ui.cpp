@@ -20,6 +20,30 @@ enum Column
 };
 
 
+enum MemoryColumn
+{
+	FUNCTION,
+	SIZE
+};
+
+
+void ProfilerUI::AllocationStackNode::clear(Lumix::IAllocator& allocator)
+{
+	for (auto* child : m_children)
+	{
+		child->clear(allocator);
+		allocator.deleteObject(child);
+	}
+	m_children.clear();
+}
+
+
+ProfilerUI::AllocationStackNode::~AllocationStackNode()
+{
+	ASSERT(m_children.empty());
+}
+
+
 ProfilerUI::ProfilerUI(Lumix::Debug::Allocator* allocator, Lumix::ResourceManager* resource_manager)
 	: m_main_allocator(allocator)
 	, m_resource_manager(resource_manager)
@@ -31,11 +55,15 @@ ProfilerUI::ProfilerUI(Lumix::Debug::Allocator* allocator, Lumix::ResourceManage
 	m_is_opened = false;
 	m_current_block = nullptr;
 	Lumix::g_profiler.getFrameListeners().bind<ProfilerUI, &ProfilerUI::onFrame>(this);
+	m_allocation_root = m_allocator.newObject<AllocationStackNode>(m_allocator);
+	m_allocation_root->m_stack_node = nullptr;
 }
 
 
 ProfilerUI::~ProfilerUI()
 {
+	m_allocation_root->clear(m_allocator);
+	m_allocator.deleteObject(m_allocation_root);
 	Lumix::g_profiler.getFrameListeners().unbind<ProfilerUI, &ProfilerUI::onFrame>(this);
 }
 
@@ -180,28 +208,6 @@ void ProfilerUI::showProfileBlock(Block* block, int column)
 }
 
 
-static void showCallstack(Lumix::Debug::Allocator::AllocationInfo* info)
-{
-	char fn_name[256];
-	auto* node = info->m_stack_leaf;
-	while (node)
-	{
-		int line;
-		if (Lumix::Debug::StackTree::getFunction(node, fn_name, sizeof(fn_name), &line))
-		{
-			ImGui::BulletText(fn_name);
-			ImGui::SameLine();
-			ImGui::Text("(%d)", line);
-		}
-		else
-		{
-			ImGui::BulletText("N/A");
-		}
-		node = Lumix::Debug::StackTree::getParent(node);
-	}
-}
-
-
 static const char* getResourceStateString(Lumix::Resource::State state)
 {
 	switch (state)
@@ -284,10 +290,127 @@ void ProfilerUI::onGuiResources()
 }
 
 
+ProfilerUI::AllocationStackNode* ProfilerUI::getOrCreate(AllocationStackNode* my_node,
+	Lumix::Debug::StackNode* external_node,
+	size_t size)
+{
+	for (auto* child : my_node->m_children)
+	{
+		if (child->m_stack_node == external_node)
+		{
+			child->m_inclusive_size += size;
+			return child;
+		}
+	}
+
+	auto new_node = m_allocator.newObject<AllocationStackNode>(m_allocator);
+	my_node->m_children.push(new_node);
+	new_node->m_stack_node = external_node;
+	new_node->m_inclusive_size = size;
+	return new_node;
+}
+
+
+void ProfilerUI::addToTree(Lumix::Debug::Allocator::AllocationInfo* info)
+{
+	Lumix::Debug::StackNode* nodes[1024];
+	int count = Lumix::Debug::StackTree::getPath(info->m_stack_leaf, nodes, Lumix::lengthOf(nodes));
+
+	auto node = m_allocation_root;
+	for (int i = count - 1; i >= 0; --i)
+	{
+		node = getOrCreate(node, nodes[i], info->m_size);
+	}
+	node->m_allocations.push(info);
+}
+
+
+void ProfilerUI::refreshAllocations()
+{
+	m_allocation_root->clear(m_allocator);
+	m_allocator.deleteObject(m_allocation_root);
+	m_allocation_root = m_allocator.newObject<AllocationStackNode>(m_allocator);
+	m_allocation_root->m_stack_node = nullptr;
+
+	m_main_allocator->lock();
+	auto* current_info = m_main_allocator->getFirstAllocationInfo();
+
+	int allocation_count = 0;
+	while (current_info)
+	{
+		addToTree(current_info);
+		current_info = current_info->m_next;
+	}
+	m_main_allocator->unlock();
+}
+
+
+void ProfilerUI::showAllocationTree(AllocationStackNode* node, int column)
+{
+	if (column == FUNCTION)
+	{
+		char fn_name[100];
+		int line;
+		if (Lumix::Debug::StackTree::getFunction(node->m_stack_node, fn_name, sizeof(fn_name), &line))
+		{
+			if (line >= 0)
+			{
+				int len = (int)strlen(fn_name);
+				if (len + 2 < sizeof(fn_name))
+				{
+					fn_name[len] = ' ';
+					fn_name[len + 1] = '\0';
+					++len;
+					Lumix::toCString(line, fn_name + len, sizeof(fn_name) - len);
+				}
+			}
+		}
+		else
+		{
+			Lumix::copyString(fn_name, sizeof(fn_name), "N/A");
+		}
+
+		if (ImGui::TreeNode(node, fn_name))
+		{
+			node->m_opened = true;
+			for (auto* child : node->m_children)
+			{
+				showAllocationTree(child, column);
+			}
+			ImGui::TreePop();
+		}
+		else
+		{
+			node->m_opened = false;
+		}
+		return;
+	}
+
+	ASSERT(column == SIZE);
+	#ifdef _MSC_VER
+		char size[50];
+		Lumix::toCStringPretty(node->m_inclusive_size, size, sizeof(size));
+		ImGui::Text(size);
+		if (node->m_opened)
+		{
+			for (auto* child : node->m_children)
+			{
+				showAllocationTree(child, column);
+			}
+		}
+	#endif
+}
+
+
 void ProfilerUI::onGuiMemoryProfiler()
 {
 	if (!m_main_allocator) return;
 	if (!ImGui::CollapsingHeader("Memory")) return;
+
+	if (ImGui::Button("Refresh"))
+	{
+		refreshAllocations();
+	}
 
 	ImGui::Text("Total size: %.3fMB", (m_main_allocator->getTotalSize() / 1024) / 1024.0f);
 	ImGui::SameLine();
@@ -295,49 +418,18 @@ void ProfilerUI::onGuiMemoryProfiler()
 	{
 		m_main_allocator->checkGuards();
 	}
-	ImGui::DragIntRange2("Interval", &m_allocation_size_from, &m_allocation_size_to);
-	m_main_allocator->lock();
-	auto* current_info = m_main_allocator->getFirstAllocationInfo();
-
-	int allocation_count = 0;
-	while (current_info)
+	
+	ImGui::Columns(2);
+	for (auto* child : m_allocation_root->m_children)
 	{
-		auto info = current_info;
-		current_info = current_info->m_next;
-
-		if ((int)info->m_size < m_allocation_size_from || (int)info->m_size > m_allocation_size_to)
-		{
-			continue;
-		}
-
-		if (info->m_size < 1024)
-		{
-			if (ImGui::TreeNode(info, "%dB", int(info->m_size)))
-			{
-				showCallstack(info);
-				ImGui::TreePop();
-			}
-		}
-		else if (info->m_size < 1024 * 1024)
-		{
-			if (ImGui::TreeNode(info, "%dKB", int(info->m_size / 1024)))
-			{
-				showCallstack(info);
-				ImGui::TreePop();
-			}
-		}
-		else
-		{
-			if (ImGui::TreeNode(info, "%.3fMB", (info->m_size / 1024) / 1024.0f))
-			{
-				showCallstack(info);
-				ImGui::TreePop();
-			}
-		}
-		++allocation_count;
+		showAllocationTree(child, FUNCTION);
 	}
-	m_main_allocator->unlock();
-	ImGui::Text("Total number of allocations: %d", allocation_count);
+	ImGui::NextColumn();
+	for (auto* child : m_allocation_root->m_children)
+	{
+		showAllocationTree(child, SIZE);
+	}
+	ImGui::Columns(1);
 }
 
 

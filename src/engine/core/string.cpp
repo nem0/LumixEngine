@@ -41,7 +41,7 @@ bool copyNString(char* destination, int length, const char* source, int source_l
 		return false;
 	}
 
-	while (*source && length && source_len)
+	while (*source && length > 1 && source_len)
 	{
 		*destination = *source;
 		--source_len;
@@ -52,7 +52,7 @@ bool copyNString(char* destination, int length, const char* source, int source_l
 	if (length > 0)
 	{
 		*destination = 0;
-		return true;
+		return *source == '\0' || source_len == 0;
 	}
 	return false;
 }
@@ -60,12 +60,12 @@ bool copyNString(char* destination, int length, const char* source, int source_l
 
 bool copyString(char* destination, int length, const char* source)
 {
-	if (!source)
+	if (!source || length < 1)
 	{
 		return false;
 	}
 
-	while (*source && length)
+	while (*source && length > 1)
 	{
 		*destination = *source;
 		--length;
@@ -75,7 +75,7 @@ bool copyString(char* destination, int length, const char* source)
 	if (length > 0)
 	{
 		*destination = 0;
-		return true;
+		return *source == '\0';
 	}
 	return false;
 }
@@ -223,6 +223,12 @@ bool toCStringPretty(int32_t value, char* output, int length)
 
 
 bool toCStringPretty(uint32_t value, char* output, int length)
+{
+	return toCStringPretty(uint64_t(value), output, length);
+}
+
+
+bool toCStringPretty(uint64_t value, char* output, int length)
 {
 	char* c = output;
 	char* num_start = output;
