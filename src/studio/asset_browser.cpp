@@ -315,7 +315,6 @@ void AssetBrowser::onGuiMaterial()
 		return;
 	}
 
-
 	for (int i = 0; i < material->getShader()->getTextureSlotCount(); ++i)
 	{
 		auto& slot = material->getShader()->getTextureSlot(i);
@@ -332,6 +331,24 @@ void AssetBrowser::onGuiMaterial()
 			return;
 		}
 	}
+
+	for (int i = 0; i < material->getUniformCount(); ++i)
+	{
+		auto& uniform = material->getUniform(i);
+		switch (uniform.m_type)
+		{
+			case Lumix::Material::Uniform::FLOAT: 
+				ImGui::DragFloat(uniform.m_name, &uniform.m_float);
+				break;
+			case Lumix::Material::Uniform::INT:
+				ImGui::DragInt(uniform.m_name, &uniform.m_int);
+				break;
+			default:
+				ImGui::Text(uniform.m_name);
+				break;
+		}
+	}
+	ImGui::Columns(1);
 }
 
 
