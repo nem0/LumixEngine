@@ -63,6 +63,36 @@ namespace Debug
 	}
 
 
+	void Allocator::lock()
+	{
+		m_mutex.lock();
+	}
+
+
+	void Allocator::unlock()
+	{
+		m_mutex.unlock();
+	}
+
+
+
+	void Allocator::checkGuards()
+	{
+		if (m_are_guards_enabled) return;
+
+		auto* info = m_root;
+		while (info)
+		{
+			auto user_ptr = getUserPtrFromAllocationInfo(info);
+			void* system_ptr = getSystemFromUser(user_ptr);
+			ASSERT(*(uint32_t*)system_ptr == ALLOCATION_GUARD);
+			ASSERT(*(uint32_t*)((uint8_t*)user_ptr + info->m_size) == ALLOCATION_GUARD);
+
+			info = info->m_next;
+		}
+	}
+
+
 	size_t Allocator::getAllocationOffset()
 	{
 		return sizeof(AllocationInfo) + (m_are_guards_enabled ? sizeof(ALLOCATION_GUARD) : 0);
@@ -78,6 +108,12 @@ namespace Debug
 	Allocator::AllocationInfo* Allocator::getAllocationInfoFromSystem(void* system_ptr)
 	{
 		return (AllocationInfo*)(m_are_guards_enabled ? (uint8_t*)system_ptr + sizeof(ALLOCATION_GUARD) : system_ptr);
+	}
+
+
+	void* Allocator::getUserPtrFromAllocationInfo(AllocationInfo* info)
+	{
+		return ((uint8_t*)info + sizeof(AllocationInfo));
 	}
 
 

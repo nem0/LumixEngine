@@ -533,20 +533,28 @@ public:
 	{
 		int32_t size = 0;
 		serializer.read(size);
+		int old_size = m_terrains.size();
 		for (int i = size; i < m_terrains.size(); ++i)
 		{
 			m_allocator.deleteObject(m_terrains[i]);
 			m_terrains[i] = nullptr;
 		}
 		m_terrains.resize(size);
+		for (int i = old_size; i < size; ++i)
+		{
+			m_terrains[i] = nullptr;
+		}
 		for (int i = 0; i < size; ++i)
 		{
 			bool exists;
 			serializer.read(exists);
 			if (exists)
 			{
-				m_terrains[i] = m_allocator.newObject<Terrain>(
-					m_renderer, INVALID_ENTITY, *this, m_allocator);
+				if (!m_terrains[i])
+				{
+					m_terrains[i] = m_allocator.newObject<Terrain>(
+						m_renderer, INVALID_ENTITY, *this, m_allocator);
+				}
 				Terrain* terrain = m_terrains[i];
 				terrain->deserialize(serializer, m_universe, *this, i);
 			}

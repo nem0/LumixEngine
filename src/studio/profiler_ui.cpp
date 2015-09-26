@@ -24,6 +24,8 @@ ProfilerUI::ProfilerUI(Lumix::Debug::Allocator* allocator, Lumix::ResourceManage
 	: m_main_allocator(allocator)
 	, m_resource_manager(resource_manager)
 {
+	m_allocation_size_from = 0;
+	m_allocation_size_to = 1024 * 1024;
 	m_current_frame = -1;
 	m_root = nullptr;
 	m_is_opened = false;
@@ -280,7 +282,12 @@ void ProfilerUI::onGuiMemoryProfiler()
 
 	ImGui::Text("Total size: %.3fMB", (m_main_allocator->getTotalSize() / 1024) / 1024.0f);
 	ImGui::SameLine();
+	if (ImGui::Button("Check memory"))
+	{
+		m_main_allocator->checkGuards();
+	}
 	ImGui::DragIntRange2("Interval", &m_allocation_size_from, &m_allocation_size_to);
+	m_main_allocator->lock();
 	auto* current_info = m_main_allocator->getFirstAllocationInfo();
 
 	int allocation_count = 0;
@@ -320,7 +327,7 @@ void ProfilerUI::onGuiMemoryProfiler()
 		}
 		++allocation_count;
 	}
-
+	m_main_allocator->unlock();
 	ImGui::Text("Total number of allocations: %d", allocation_count);
 }
 

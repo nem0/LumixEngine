@@ -38,9 +38,12 @@ namespace Debug
 			virtual void deallocate(void* ptr) override;
 			virtual void* reallocate(void* ptr, size_t size) override;
 			size_t getTotalSize() const { return m_total_size; }
+			void checkGuards();
 
 			IAllocator& getSourceAllocator() { return m_source; }
 			AllocationInfo* getFirstAllocationInfo() const { return m_root; }
+			void lock();
+			void unlock();
 
 		private:
 			inline size_t getAllocationOffset();
@@ -49,6 +52,7 @@ namespace Debug
 			inline void* getUserFromSystem(void* system_ptr);
 			inline void* getSystemFromUser(void* user_ptr);
 			inline size_t getNeededMemory(size_t size);
+			inline void* getUserPtrFromAllocationInfo(AllocationInfo* info);
 
 		private:
 			IAllocator& m_source;
