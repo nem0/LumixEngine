@@ -440,7 +440,7 @@ public:
 	{
 		int32_t size = 0;
 		serializer.read(size);
-		for (int i = size; i < m_renderables.size(); ++i)
+		for (int i = 0; i < m_renderables.size(); ++i)
 		{
 			setModel(i, nullptr);
 			m_allocator.deleteObject(m_renderables[i]);
@@ -2186,15 +2186,14 @@ private:
 		Model* old_model = m_renderables[renderable_index]->m_model;
 		if (model == old_model)
 		{
+			old_model->getResourceManager().get(ResourceManager::MODEL)->unload(*old_model);
 			return;
 		}
 		if (old_model)
 		{
 			ModelLoadedCallback* callback = getModelLoadedCallback(old_model);
 			--callback->m_ref_count;
-			old_model->getResourceManager()
-				.get(ResourceManager::MODEL)
-				->unload(*old_model);
+			old_model->getResourceManager().get(ResourceManager::MODEL)->unload(*old_model);
 		}
 		m_renderables[renderable_index]->m_model = model;
 		m_renderables[renderable_index]->m_meshes.clear();
