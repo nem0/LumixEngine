@@ -151,7 +151,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 		Lumix::copyString(buf, sizeof(buf), (const char*)stream.getData());
 		if (ImGui::InputText("", buf, sizeof(buf)))
 		{
-			m_editor.setProperty(cmp.type, index, desc, buf, strlen(buf) + 1);
+			m_editor.setProperty(cmp.type, index, desc, buf, (int)strlen(buf) + 1);
 		}
 		ImGui::SameLine();
 		if (ImGui::Button("Select"))
@@ -161,7 +161,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 			auto& resource_descriptor = dynamic_cast<Lumix::ResourcePropertyDescriptorBase&>(desc);
 			if (getResourcePath(buf, sizeof(buf), resource_descriptor.getResourceType()))
 			{
-				m_editor.setProperty(cmp.type, index, desc, buf, strlen(buf) + 1);
+				m_editor.setProperty(cmp.type, index, desc, buf, (int)strlen(buf) + 1);
 			}
 		}
 		break;
@@ -173,7 +173,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 		Lumix::copyString(buf, sizeof(buf), (const char*)stream.getData());
 		if (ImGui::InputText(desc.getName(), buf, sizeof(buf)))
 		{
-			m_editor.setProperty(cmp.type, index, desc, buf, strlen(buf) + 1);
+			m_editor.setProperty(cmp.type, index, desc, buf, (int)strlen(buf) + 1);
 		}
 		break;
 	}

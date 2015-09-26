@@ -12,16 +12,16 @@ namespace
 
 		LUMIX_EXPECT_TRUE(hash_table.empty());
 
-		size_t values[10] = {
+		int32_t values[10] = {
 			1, 2, 3, 4, 5, 6, 7, 8, 9, 10
 		};
 
-		for (size_t val : values)
+		for (int32_t val : values)
 		{
 			hash_table.insert(val, val);
 		}
 
-		for (size_t val : values)
+		for (int32_t val : values)
 		{
 			LUMIX_EXPECT_EQ(hash_table[val], val);
 		}
@@ -42,14 +42,14 @@ namespace
 
 		LUMIX_EXPECT_TRUE(hash_table.empty());
 
-		const size_t COUNT = 20;
+		const int32_t COUNT = 20;
 
-		for (size_t i = 0; i < COUNT; i++)
+		for (int32_t i = 0; i < COUNT; i++)
 		{
 			hash_table.insert(i, i);
 		}
 
-		for (size_t i = 0; i < COUNT; i++)
+		for (int32_t i = 0; i < COUNT; i++)
 		{
 			LUMIX_EXPECT_EQ(hash_table[i], i);
 		}
@@ -62,7 +62,7 @@ namespace
 
 		hash_table.rehash(8);
 
-		for (size_t i = 0; i < COUNT; i++)
+		for (int32_t i = 0; i < COUNT; i++)
 		{
 			hash_table.insert(i, i);
 		}
@@ -77,16 +77,16 @@ namespace
 
 		LUMIX_EXPECT_TRUE(hash_table.empty());
 
-		size_t values[10] = {
+		int32_t values[10] = {
 			1, 2, 3, 4, 5, 6, 7, 8, 9, 10
 		};
 
-		for (size_t val : values)
+		for (int32_t val : values)
 		{
 			hash_table.insert(val, val);
 		}
 
-		for (size_t val : values)
+		for (int32_t val : values)
 		{
 			LUMIX_EXPECT_EQ(hash_table[val], val);
 		}

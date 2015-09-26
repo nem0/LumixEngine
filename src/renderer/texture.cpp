@@ -364,7 +364,7 @@ bool Texture::loadRaw(FS::IFile& file)
 
 	if (m_data_reference)
 	{
-		m_data.resize(size);
+		m_data.resize((int)size);
 		file.read(&m_data[0], size);
 	}
 
@@ -491,7 +491,7 @@ bool Texture::loadDDS(FS::IFile& file)
 {
 	bgfx::TextureInfo info;
 	m_texture_handle =
-		bgfx::createTexture(bgfx::copy(file.getBuffer(), file.size()),
+		bgfx::createTexture(bgfx::copy(file.getBuffer(), (uint32_t)file.size()),
 							m_flags,
 							0,
 							&info);

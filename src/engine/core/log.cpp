@@ -63,6 +63,12 @@ LogProxy& LogProxy::operator<<(uint32_t message)
 	return *this;
 }
 
+LogProxy& LogProxy::operator<<(uint64_t message)
+{
+	m_message.cat(message);
+	return *this;
+}
+
 LogProxy& LogProxy::operator<<(int32_t message)
 {
 	m_message.cat(message);
