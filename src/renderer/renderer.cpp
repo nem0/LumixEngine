@@ -2,15 +2,16 @@
 
 #include "core/array.h"
 #include "core/crc32.h"
-#include "debug/debug.h"
 #include "core/fs/file_system.h"
 #include "core/json_serializer.h"
+#include "core/lifo_allocator.h"
 #include "core/math_utils.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "core/vec4.h"
 #include "debug/allocator.h"
+#include "debug/debug.h"
 #include "editor/world_editor.h"
 #include "engine.h"
 #include "engine/property_descriptor.h"
@@ -195,6 +196,7 @@ struct RendererImpl : public Renderer
 		, m_passes(m_allocator)
 		, m_shader_defines(m_allocator)
 		, m_bgfx_allocator(m_allocator)
+		, m_frame_allocator(m_allocator, 10 * 1024 * 1024)
 	{
 		bgfx::PlatformData d;
 		if (s_hwnd)
@@ -516,6 +518,12 @@ struct RendererImpl : public Renderer
 	}
 
 
+	virtual LIFOAllocator& getFrameAllocator() override
+	{
+		return m_frame_allocator;
+	}
+
+
 	typedef char ShaderDefine[32];
 
 
@@ -524,6 +532,7 @@ struct RendererImpl : public Renderer
 	Array<ShaderCombinations::Pass> m_passes;
 	Array<ShaderDefine> m_shader_defines;
 	CallbackStub m_callback_stub;
+	LIFOAllocator m_frame_allocator;
 	TextureManager m_texture_manager;
 	MaterialManager m_material_manager;
 	ShaderManager m_shader_manager;

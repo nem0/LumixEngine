@@ -340,12 +340,6 @@ void AssetBrowser::onGuiMaterial()
 			case Lumix::Material::Uniform::FLOAT: 
 				ImGui::DragFloat(uniform.m_name, &uniform.m_float);
 				break;
-			case Lumix::Material::Uniform::INT:
-				ImGui::DragInt(uniform.m_name, &uniform.m_int);
-				break;
-			default:
-				ImGui::Text(uniform.m_name);
-				break;
 		}
 	}
 	ImGui::Columns(1);
