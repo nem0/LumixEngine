@@ -248,6 +248,15 @@ void ProfilerUI::onGuiResources()
 		auto& resources = material_manager->getResourceTable();
 
 		ImGui::Columns(4);
+		ImGui::Text("Path");
+		ImGui::NextColumn();
+		ImGui::Text("Size");
+		ImGui::NextColumn();
+		ImGui::Text("Status");
+		ImGui::NextColumn();
+		ImGui::Text("References");
+		ImGui::NextColumn();
+		ImGui::Separator();
 		size_t sum = 0;
 		for (auto iter = resources.begin(), end = resources.end(); iter != end; ++iter)
 		{
@@ -261,7 +270,7 @@ void ProfilerUI::onGuiResources()
 			ImGui::Text("%u", iter.value()->getRefCount());
 			ImGui::NextColumn();
 		}
-
+		ImGui::Separator();
 		ImGui::Text("All");
 		ImGui::NextColumn();
 		ImGui::Text("%.3fKB", sum / 1024.0f);
@@ -269,7 +278,7 @@ void ProfilerUI::onGuiResources()
 		ImGui::NextColumn();
 
 		ImGui::Columns(1);
-		ImGui::Separator();
+		
 	}
 	ImGui::Unindent();
 }

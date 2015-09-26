@@ -840,6 +840,7 @@ INT WINAPI WinMain(HINSTANCE hInst,
 							  0);
 	ASSERT(hwnd);
 
+	ShowWindow(hwnd, SW_MAXIMIZE);
 	g_context.m_instance = hInst;
 	g_context.init(hwnd);
 	SetWindowTextA(hwnd, "Lumix Studio");
