@@ -236,7 +236,7 @@ void Model::create(const bgfx::VertexDecl& def,
 					 0,
 					 attributes_size,
 					 0,
-					 indices_size / sizeof(int),
+					 indices_size / int(sizeof(int)),
 					 "default",
 					 m_allocator);
 

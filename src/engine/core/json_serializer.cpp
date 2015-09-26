@@ -49,7 +49,7 @@ JsonSerializer::JsonSerializer(FS::IFile& file,
 	m_is_string_token = false;
 	if (m_access_mode == READ)
 	{
-		m_data_size = file.size();
+		m_data_size = (int)file.size();
 		if (file.getBuffer() != nullptr)
 		{
 			m_data = (const char*)file.getBuffer();
@@ -57,7 +57,7 @@ JsonSerializer::JsonSerializer(FS::IFile& file,
 		}
 		else
 		{
-			int size = m_file.size();
+			int size = (int)m_file.size();
 			char* data = (char*)m_allocator.allocate(size);
 			m_own_data = true;
 			file.read(data, m_data_size);
@@ -609,7 +609,7 @@ void JsonSerializer::deserializeToken()
 	if (*m_token == '/' && m_token < m_data + m_data_size - 1 &&
 		m_token[1] == '/')
 	{
-		m_token_size = (m_data + m_data_size) - m_token;
+		m_token_size = int((m_data + m_data_size) - m_token);
 		m_is_string_token = false;
 	}
 	else if (*m_token == '"')
@@ -626,7 +626,7 @@ void JsonSerializer::deserializeToken()
 			error().log() << "Unexpected end of file while looking for \".";
 			m_token_size = 0;
 		}
-		m_token_size = token_end - m_token;
+		m_token_size = int(token_end - m_token);
 	}
 	else if (isSingleCharToken(*m_token))
 	{
@@ -642,7 +642,7 @@ void JsonSerializer::deserializeToken()
 		{
 			++token_end;
 		}
-		m_token_size = token_end - m_token;
+		m_token_size = int(token_end - m_token);
 	}
 }
 

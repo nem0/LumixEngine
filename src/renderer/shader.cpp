@@ -218,7 +218,7 @@ struct ShaderLoader
 	{
 		if (success)
 		{
-			auto* mem = bgfx::alloc(file.size() + 1);
+			auto* mem = bgfx::alloc((uint32_t)file.size() + 1);
 			file.read(mem->data, file.size());
 			mem->data[file.size()] = '\0';
 			m_fragment_shader = bgfx::createShader(mem);
@@ -237,7 +237,7 @@ struct ShaderLoader
 	{
 		if (success)
 		{
-			auto* mem = bgfx::alloc(file.size() + 1);
+			auto* mem = bgfx::alloc((uint32_t)file.size() + 1);
 			file.read(mem->data, file.size());
 			mem->data[file.size()] = '\0';
 			m_vertex_shader = bgfx::createShader(mem);

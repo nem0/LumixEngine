@@ -293,6 +293,23 @@ bool toCString(int32_t value, char* output, int length)
 bool toCString(int64_t value, char* output, int length)
 {
 	char* c = output;
+	if (length > 0)
+	{
+		if (value < 0)
+		{
+			value = -value;
+			--length;
+			*c = '-';
+			++c;
+		}
+		return toCString((uint64_t)value, c, length);
+	}
+	return false;
+}
+
+bool toCString(uint64_t value, char* output, int length)
+{
+	char* c = output;
 	char* num_start = output;
 	if (length > 0)
 	{

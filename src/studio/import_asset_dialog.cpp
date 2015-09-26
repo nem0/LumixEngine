@@ -737,7 +737,7 @@ struct ConvertTask : public Lumix::MT::Task
 			aiString material_name;
 			scene->mMaterials[mesh->mMaterialIndex]->Get(AI_MATKEY_NAME,
 				material_name);
-			int32_t length = strlen(material_name.C_Str());
+			int32_t length = (int)strlen(material_name.C_Str());
 			file.write((const char*)&length, sizeof(length));
 			file.write((const char*)material_name.C_Str(), length);
 
@@ -754,7 +754,7 @@ struct ConvertTask : public Lumix::MT::Task
 			file.write((const char*)&mesh_tri_count, sizeof(mesh_tri_count));
 
 			aiString mesh_name = mesh->mName;
-			length = strlen(mesh_name.C_Str());
+			length = (int)strlen(mesh_name.C_Str());
 			file.write((const char*)&length, sizeof(length));
 			file.write((const char*)mesh_name.C_Str(), length);
 
@@ -781,7 +781,7 @@ struct ConvertTask : public Lumix::MT::Task
 		VertexAttributeDef attribute_type,
 		Lumix::FS::IFile& file)
 	{
-		uint32_t length = strlen(attribute_name);
+		uint32_t length = (int)strlen(attribute_name);
 		file.write((const char*)&length, sizeof(length));
 		file.write(attribute_name, length);
 

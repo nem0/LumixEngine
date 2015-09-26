@@ -20,6 +20,7 @@
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
+#include "core/system.h"
 #include "core/timer.h"
 #include "debug/allocator.h"
 #include "editor/editor_icon.h"
@@ -1925,8 +1926,11 @@ public:
 	{
 		g_log_info.log("editor") << "saving universe " << path.c_str() << "...";
 		FS::FileSystem& fs = m_engine->getFileSystem();
-		FS::IFile* file = fs.open(
-			fs.getDefaultDevice(), path, FS::Mode::CREATE | FS::Mode::WRITE);
+		char bkp_path[MAX_PATH_LENGTH];
+		copyString(bkp_path, sizeof(bkp_path), path);
+		catString(bkp_path, sizeof(bkp_path), ".bkp");
+		copyFile(path, bkp_path);
+		FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::CREATE | FS::Mode::WRITE);
 		save(*file);
 		fs.close(*file);
 		m_universe_path = path;
@@ -1945,8 +1949,7 @@ public:
 		uint32_t engine_hash = m_engine->serialize(*m_universe_context, blob);
 		(*(((uint32_t*)blob.getData()) + 1)) = engine_hash;
 		m_template_system->serialize(blob);
-		hash = crc32((const uint8_t*)blob.getData() + sizeof(hash),
-					 blob.getSize() - sizeof(hash));
+		hash = crc32((const uint8_t*)blob.getData() + sizeof(hash), blob.getSize() - sizeof(hash));
 		(*(uint32_t*)blob.getData()) = hash;
 		g_log_info.log("editor") << "universe saved";
 		file.write(blob.getData(), blob.getSize());
@@ -2204,9 +2207,7 @@ public:
 		else
 		{
 			m_game_mode_file = m_engine->getFileSystem().open(
-				m_engine->getFileSystem().getMemoryDevice(),
-				"",
-				FS::Mode::WRITE);
+				m_engine->getFileSystem().getMemoryDevice(), "", FS::Mode::WRITE);
 			save(*m_game_mode_file);
 			m_is_game_mode = true;
 			m_engine->startGame(*m_universe_context);
@@ -2408,7 +2409,10 @@ public:
 		{
 			resetAndLoad(file);
 		}
-
+		char path[MAX_PATH_LENGTH];
+		copyString(path, sizeof(path), m_universe_path.c_str());
+		catString(path, sizeof(path), ".lst");
+		copyFile(m_universe_path.c_str(), path);
 		m_universe_loaded.invoke();
 	}
 
@@ -2458,7 +2462,7 @@ public:
 		m_components.reserve(5000);
 		Timer* timer = Timer::create(m_allocator);
 		g_log_info.log("editor") << "Parsing universe...";
-		InputBlob blob(file.getBuffer(), file.size());
+		InputBlob blob(file.getBuffer(), (int)file.size());
 		uint32_t hash = 0;
 		blob.read(hash);
 		uint32_t engine_hash = 0;

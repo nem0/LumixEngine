@@ -828,7 +828,14 @@ void Terrain::generateGeometry()
 		.end();
 	m_geometry.setAttributesData(&points[0], sizeof(points[0]) * points.size(), vertex_def);
 	m_geometry.setIndicesData(&indices[0], sizeof(indices[0]) * indices.size());
-	m_mesh = m_allocator.newObject<Mesh>(vertex_def, m_material, 0, points.size() * sizeof(points[0]), 0, indices.size(), "terrain", m_allocator);
+	m_mesh = m_allocator.newObject<Mesh>(vertex_def,
+		m_material,
+		0,
+		int(points.size() * sizeof(points[0])),
+		0,
+		int(indices.size()),
+		"terrain",
+		m_allocator);
 }
 
 TerrainQuad* Terrain::generateQuadTree(float size)

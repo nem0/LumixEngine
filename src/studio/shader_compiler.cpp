@@ -55,7 +55,7 @@ static void getSourceFromBinaryBasename(char* out, int max_size, const char* bin
 	cin = binary_basename + strlen(binary_basename) - 3;
 	if (cin > binary_basename)
 	{
-		Lumix::copyString(cout, max_size - (cout - out), ".shd");
+		Lumix::copyString(cout, max_size - int(cout - out), ".shd");
 	}
 }
 

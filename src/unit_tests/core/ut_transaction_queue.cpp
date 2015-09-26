@@ -87,9 +87,9 @@ namespace
 	void UT_tq_heavy_usage(const char* params)
 	{
 		Lumix::DefaultAllocator allocator;
-		const size_t itemsCount = 1200000;
+		const uint32_t itemsCount = 1200000;
 		Test* testItems = (Test*)allocator.allocate(sizeof(Test) * itemsCount);
-		for (size_t i = 0; i < itemsCount; i++)
+		for (uint32_t i = 0; i < itemsCount; i++)
 		{
 			testItems[i].idx = i;
 			testItems[i].proc_count = 0;
@@ -168,9 +168,9 @@ namespace
 	void UT_tq_push(const char* params)
 	{
 		Lumix::DefaultAllocator allocator;
-		const size_t itemsCount = 1200000;
+		const uint32_t itemsCount = 1200000;
 		Test* testItems = (Test*)allocator.allocate(sizeof(Test) * itemsCount);
-		for (size_t i = 0; i < itemsCount; i++)
+		for (uint32_t i = 0; i < itemsCount; i++)
 		{
 			testItems[i].idx = i;
 			testItems[i].proc_count = 0;

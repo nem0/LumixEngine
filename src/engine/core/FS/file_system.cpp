@@ -233,11 +233,11 @@ public:
 			char device[32];
 			if (token)
 			{
-				copyNString(device, sizeof(device), token + 1, end - token - 1);
+				copyNString(device, (int)sizeof(device), token + 1, int(end - token - 1));
 			}
 			else
 			{
-				copyNString(device, sizeof(device), dev, end - dev);
+				copyNString(device, (int)sizeof(device), dev, int(end - dev));
 			}
 			end = token;
 			device_list.m_devices[device_index] = getDevice(device);
