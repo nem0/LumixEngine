@@ -59,6 +59,19 @@ StackTree::~StackTree()
 }
 
 
+int StackTree::getPath(StackNode* node, StackNode** output, int max_size)
+{
+	int i = 0;
+	while(i < max_size && node)
+	{
+		output[i] = node;
+		i++;
+		node = node->m_parent;
+	}
+	return i;
+}
+
+
 StackNode* StackTree::getParent(StackNode* node)
 {
 	return node ? node->m_parent : nullptr;
@@ -76,8 +89,14 @@ bool StackTree::getFunction(StackNode* node, char* out, int max_size, int* line)
 	BOOL success = SymFromAddr(process, (DWORD64)(node->m_instruction), 0, symbol);
 	IMAGEHLP_LINE64 line_info;
 	DWORD displacement;
-	SymGetLineFromAddr64(process, (DWORD64)(node->m_instruction), &displacement, &line_info);
-	*line = line_info.LineNumber;
+	if (SymGetLineFromAddr64(process, (DWORD64)(node->m_instruction), &displacement, &line_info))
+	{
+		*line = line_info.LineNumber;
+	}
+	else
+	{
+		*line = -1;
+	}
 	if (success) Lumix::copyString(out, max_size, symbol->Name);
 
 	return success == TRUE;
@@ -178,7 +197,7 @@ StackNode* StackTree::record()
 			node->m_next->m_next = nullptr;
 			node->m_next->m_first_child = nullptr;
 			--ptr;
-			return insertChildren(node, ptr, stack);
+			return insertChildren(node->m_next, ptr, stack);
 		}
 		else if (node->m_first_child)
 		{
@@ -187,11 +206,6 @@ StackNode* StackTree::record()
 		}
 		else if (ptr != stack)
 		{
-			node->m_first_child = new StackNode;
-			node->m_first_child->m_parent = node;
-			node->m_next = nullptr;
-			node->m_first_child = nullptr;
-			node->m_instruction = *ptr;
 			--ptr;
 			return insertChildren(node, ptr, stack);
 		}
