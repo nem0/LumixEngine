@@ -245,7 +245,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 		, m_framebuffers(allocator)
 		, m_uniforms(allocator)
 		, m_global_textures(allocator)
-		, m_frame_allocator(allocator, 10 * 1024 * 1024)
 		, m_renderer(static_cast<PipelineImpl&>(pipeline).getRenderer())
 		, m_default_framebuffer(nullptr)
 		, m_debug_line_material(nullptr)
@@ -1104,7 +1103,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 				layer_mask,
 				m_scene->getUniverse().getPosition(
 					m_scene->getCameraEntity(m_applied_camera)),
-				m_frame_allocator);
+				m_renderer.getFrameAllocator());
 
 			m_scene->getGrassInfos(
 				frustum, m_tmp_grasses, layer_mask, m_applied_camera);
@@ -1270,7 +1269,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 			layer_mask,
 			m_scene->getUniverse().getPosition(
 				m_scene->getCameraEntity(m_applied_camera)),
-			m_frame_allocator);
+			m_renderer.getFrameAllocator());
 		m_is_current_light_global = true;
 		m_current_light = m_scene->getActiveGlobalLight();
 		renderMeshes(m_tmp_meshes);
@@ -1745,7 +1744,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		}
 		finishInstances();
 
-		m_frame_allocator.clear();
+		m_renderer.getFrameAllocator().clear();
 	}
 
 
@@ -1789,7 +1788,6 @@ struct PipelineInstanceImpl : public PipelineInstance
 	uint64_t m_render_state;
 	IAllocator& m_allocator;
 	Renderer& m_renderer;
-	LIFOAllocator m_frame_allocator;
 	PipelineImpl& m_source;
 	RenderScene* m_scene;
 	FrameBuffer* m_current_framebuffer;
