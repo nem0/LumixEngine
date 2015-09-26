@@ -60,7 +60,6 @@ struct Renderable
 	Model* m_model;
 	Matrix m_matrix;
 	Entity m_entity;
-	bool m_is_always_visible;
 
 private:
 	Renderable(const Renderable&);
@@ -169,7 +168,6 @@ public:
 		, m_global_lights(m_allocator)
 		, m_debug_lines(m_allocator)
 		, m_debug_points(m_allocator)
-		, m_always_visible(m_allocator)
 		, m_temporary_infos(m_allocator)
 		, m_sync_point(true, m_allocator)
 		, m_jobs(m_allocator)
@@ -379,7 +377,6 @@ public:
 		serializer.write((int32_t)m_renderables.size());
 		for (int i = 0; i < m_renderables.size(); ++i)
 		{
-			serializer.write(m_renderables[i]->m_is_always_visible);
 			serializer.write(m_renderables[i]->m_component_index);
 			serializer.write(m_renderables[i]->m_entity);
 			serializer.write(m_culling_system->getLayerMask(i));
@@ -449,16 +446,10 @@ public:
 		m_renderables.clear();
 		m_renderables.reserve(size);
 		m_dynamic_renderable_cache = DynamicRenderableCache(m_allocator);
-		m_always_visible.clear();
 		for (int i = 0; i < size; ++i)
 		{
 			m_renderables.push(m_allocator.newObject<Renderable>(m_allocator));
-			serializer.read(m_renderables[i]->m_is_always_visible);
 			serializer.read(m_renderables[i]->m_component_index);
-			if (m_renderables[i]->m_is_always_visible)
-			{
-				m_always_visible.push(m_renderables[i]->m_component_index);
-			}
 			serializer.read(m_renderables[i]->m_entity);
 			int64_t layer_mask;
 			serializer.read(layer_mask);
@@ -597,7 +588,6 @@ public:
 		}
 
 		setModel(renderable_index, nullptr);
-		m_always_visible.eraseItemFast(component);
 		m_allocator.deleteObject(m_renderables[renderable_index]);
 		m_renderables.erase(renderable_index);
 		m_culling_system->removeStatic(renderable_index);
@@ -941,34 +931,7 @@ public:
 	virtual void hideRenderable(ComponentIndex cmp) override
 	{
 		int renderable_index = getRenderable(cmp);
-		if (!m_renderables[renderable_index]->m_is_always_visible)
-		{
-			m_culling_system->disableStatic(renderable_index);
-		}
-	}
-
-
-	virtual void setRenderableIsAlwaysVisible(ComponentIndex cmp,
-											  bool value) override
-	{
-		int renderable_index = getRenderable(cmp);
-		m_renderables[renderable_index]->m_is_always_visible = value;
-		if (value)
-		{
-			m_culling_system->disableStatic(renderable_index);
-			m_always_visible.push(cmp);
-		}
-		else
-		{
-			m_culling_system->enableStatic(renderable_index);
-			m_always_visible.eraseItemFast(cmp);
-		}
-	}
-
-
-	virtual bool isRenderableAlwaysVisible(ComponentIndex cmp) override
-	{
-		return m_renderables[getRenderable(cmp)]->m_is_always_visible;
+		m_culling_system->disableStatic(renderable_index);
 	}
 
 
@@ -1420,21 +1383,6 @@ public:
 
 		fillTemporaryInfos(*results, frustum, layer_mask);
 		mergeTemporaryInfos(meshes);
-
-		for (int i = 0, c = m_always_visible.size(); i < c; ++i)
-		{
-			int renderable_index = getRenderable(m_always_visible[i]);
-			const Renderable* LUMIX_RESTRICT renderable =
-				m_renderables[renderable_index];
-			if ((m_culling_system->getLayerMask(renderable_index) &
-				 layer_mask) != 0)
-			{
-				for (int j = 0, c = renderable->m_meshes.size(); j < c; ++j)
-				{
-					meshes.push(&renderable->m_meshes[j]);
-				}
-			}
-		}
 	}
 
 
@@ -2315,7 +2263,6 @@ private:
 		r.m_entity = entity;
 		r.m_model = nullptr;
 		r.m_component_index = new_index;
-		r.m_is_always_visible = false;
 		r.m_matrix = m_universe.getMatrix(entity);
 		m_universe.addComponent(
 			entity, RENDERABLE_HASH, this, r.m_component_index);
@@ -2330,7 +2277,6 @@ private:
 	Array<ModelLoadedCallback*> m_model_loaded_callbacks;
 
 	Array<Renderable*> m_renderables;
-	Array<int> m_always_visible;
 
 	int m_point_light_last_uid;
 	Array<PointLight> m_point_lights;
