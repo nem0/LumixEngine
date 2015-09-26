@@ -191,9 +191,6 @@ public:
 
 	virtual DelegateList<void(ComponentIndex)>& renderableCreated() = 0;
 	virtual DelegateList<void(ComponentIndex)>& renderableDestroyed() = 0;
-	virtual void setRenderableIsAlwaysVisible(ComponentIndex cmp,
-											  bool value) = 0;
-	virtual bool isRenderableAlwaysVisible(ComponentIndex cmp) = 0;
 	virtual void showRenderable(ComponentIndex cmp) = 0;
 	virtual void hideRenderable(ComponentIndex cmp) = 0;
 	virtual ComponentIndex getRenderableComponent(Entity entity) = 0;

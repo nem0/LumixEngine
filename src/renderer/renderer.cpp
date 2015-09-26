@@ -294,11 +294,6 @@ struct RendererImpl : public Renderer
 				"Mesh (*.msh)",
 				Lumix::ResourceManager::MODEL,
 				allocator));
-		m_engine.registerProperty("renderable",
-			allocator.newObject<BoolPropertyDescriptor<RenderScene>>("is_always_visible",
-				&RenderScene::isRenderableAlwaysVisible,
-				&RenderScene::setRenderableIsAlwaysVisible,
-				allocator));
 
 		m_engine.registerProperty("global_light",
 			allocator.newObject<DecimalPropertyDescriptor<RenderScene>>("ambient_intensity",
