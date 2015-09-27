@@ -455,7 +455,7 @@ bool toCString(float value, char* output, int length, int after_point)
 	int exponent = value == 0 ? 0 : (int)log10(value);
 	float num = value;
 	char* c = output;
-	if (num  < 1 && num > -1)
+	if (num  < 1 && num > -1 && length > 1)
 	{
 		*c = '0';
 		++c;
@@ -463,7 +463,7 @@ bool toCString(float value, char* output, int length, int after_point)
 	}
 	else
 	{
-		while ((num >= 1 || exponent >= 0) && length > 0)
+		while ((num >= 1 || exponent >= 0) && length > 1)
 		{
 			float power = (float)pow(10, exponent);
 			char digit = (char)floor(num / power);
@@ -482,7 +482,7 @@ bool toCString(float value, char* output, int length, int after_point)
 		++c;
 		--length;
 	}
-	else if (length >= 1 && after_point == 0)
+	else if (length > 0 && after_point == 0)
 	{
 		*c = 0;
 		return true;

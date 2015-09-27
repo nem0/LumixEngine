@@ -3,10 +3,12 @@
 #include "core/crc32.h"
 #include "core/default_allocator.h"
 #include "core/input_system.h"
+#include "core/mt/thread.h"
 #include "core/path_utils.h"
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/system.h"
+#include "core/timer.h"
 #include "debug/allocator.h"
 #include "editor/gizmo.h"
 #include "editor/entity_template_system.h"
@@ -34,7 +36,7 @@
 #include <cstdio>
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
-
+#include <mmsystem.h>
 
 // http://prideout.net/blog/?p=36
 
@@ -839,20 +841,22 @@ INT WINAPI WinMain(HINSTANCE hInst,
 							  hInst,
 							  0);
 	ASSERT(hwnd);
-
+	SetWindowTextA(hwnd, "Lumix Studio");
 	ShowWindow(hwnd, SW_MAXIMIZE);
 	g_context.m_instance = hInst;
 	g_context.init(hwnd);
-	SetWindowTextA(hwnd, "Lumix Studio");
+	timeBeginPeriod(1);
 
 	while (g_context.m_engine->getResourceManager().isLoading())
 	{
 		g_context.m_engine->update(*g_context.m_editor->getUniverseContext());
 	}
 
-
+	
+	Lumix::Timer* timer = Lumix::Timer::create(g_context.m_allocator);
 	while (!g_context.m_finished)
 	{
+		float frame_time;
 		{
 			PROFILE_BLOCK("tick");
 			MSG msg = {0};
@@ -868,12 +872,20 @@ INT WINAPI WinMain(HINSTANCE hInst,
 			}
 
 			g_context.update();
+			frame_time = timer->tick();
 		}
+		
+		if (frame_time < 0.016f)
+		{
+			PROFILE_BLOCK("sleep");
+			Lumix::MT::sleep(uint32_t(16 - frame_time * 1000));
+		}
+		timer->tick();
 		Lumix::g_profiler.frame();
 	}
 
+	Lumix::Timer::destroy(timer);
 	g_context.shutdown();
-
 	UnregisterClassA("lmxa", wnd.hInstance);
 
 	return 0;
