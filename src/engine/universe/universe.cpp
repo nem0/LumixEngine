@@ -170,7 +170,7 @@ void Universe::createEntity(Entity entity)
 }
 
 
-Entity Universe::createEntity()
+Entity Universe::createEntity(const Vec3& position, const Quat& rotation)
 {
 	int global_id = 0;
 	if (m_first_free_slot >= 0)
@@ -186,8 +186,8 @@ Entity Universe::createEntity()
 	}
 
 	Transformation& trans = m_transformations.pushEmpty();
-	trans.position.set(0, 0, 0);
-	trans.rotation.set(0, 0, 0, 1);
+	trans.position = position;
+	trans.rotation = rotation;
 	trans.scale = 1;
 	trans.id = global_id;
 	m_entity_created.invoke(global_id);
@@ -206,6 +206,12 @@ void Universe::destroyEntity(Entity entity)
 	m_id_map[entity] = m_first_free_slot >= 0 ? -m_first_free_slot : INT_MIN;
 	m_first_free_slot = entity;
 	m_entity_destroyed.invoke(entity);
+}
+
+
+Entity Universe::getEntityFromDenseIdx(int idx)
+{
+	return m_transformations[idx].id;
 }
 
 

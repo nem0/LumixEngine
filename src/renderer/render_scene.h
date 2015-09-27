@@ -199,10 +199,8 @@ public:
 									const int32_t& layer) = 0;
 	virtual void setRenderablePath(ComponentIndex cmp, const char* path) = 0;
 	virtual void getRenderableInfos(const Frustum& frustum,
-									Array<const RenderableMesh*>& meshes,
-									int64_t layer_mask) = 0;
-	virtual void getRenderableMeshes(Array<RenderableMesh>& meshes,
-									 int64_t layer_mask) = 0;
+		Array<const RenderableMesh*>& meshes,
+		int64_t layer_mask) = 0;
 	virtual Entity getRenderableEntity(ComponentIndex cmp) = 0;
 	virtual ComponentIndex getFirstRenderable() = 0;
 	virtual ComponentIndex getNextRenderable(ComponentIndex cmp) = 0;

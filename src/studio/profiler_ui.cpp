@@ -17,7 +17,8 @@ static const int MAX_FRAMES = 200;
 enum Column
 {
 	NAME,
-	TIME
+	TIME,
+	HIT_COUNT
 };
 
 
@@ -164,47 +165,60 @@ void ProfilerUI::onFrame()
 
 void ProfilerUI::showProfileBlock(Block* block, int column)
 {
-	if (column == NAME)
+	switch(column)
 	{
-		while (block)
-		{
-			if (ImGui::TreeNode(block->m_name))
+		case NAME:
+			while (block)
 			{
-				block->m_is_opened = true;
-				showProfileBlock(block->m_first_child, column);
-				ImGui::TreePop();
+				if (ImGui::TreeNode(block->m_name))
+				{
+					block->m_is_opened = true;
+					showProfileBlock(block->m_first_child, column);
+					ImGui::TreePop();
+				}
+				else
+				{
+					block->m_is_opened = false;
+				}
+
+				block = block->m_next;
 			}
-			else
+			return;
+		case TIME:
+			while (block)
 			{
-				block->m_is_opened = false;
-			}
+				auto frame =
+					m_current_frame < 0 ? block->m_frames.back() : block->m_frames[m_current_frame];
 
-			block = block->m_next;
-		}
-		return;
-	}
-
-	if (column == TIME)
-	{
-		while (block)
-		{
-			auto frame =
-				m_current_frame < 0 ? block->m_frames.back() : block->m_frames[m_current_frame];
-
-
-			if (ImGui::Selectable(StringBuilder<50>("") << frame << "##t" << (int64_t)block,
+				if (ImGui::Selectable(StringBuilder<50>("") << frame << "##t" << (int64_t)block,
 					m_current_block == block,
 					ImGuiSelectableFlags_SpanAllColumns))
-			{
-				m_current_block = block;
-			}
-			if (block->m_is_opened)
-			{
-				showProfileBlock(block->m_first_child, column);
-			}
+				{
+					m_current_block = block;
+				}
+				if (block->m_is_opened)
+				{
+					showProfileBlock(block->m_first_child, column);
+				}
 
-			block = block->m_next;
-		}
+				block = block->m_next;
+			}
+			return;
+		case HIT_COUNT:
+			while (block)
+			{
+				int hit_count = m_current_frame < 0 ? block->m_hit_counts.back()
+													: block->m_hit_counts[m_current_frame];
+
+				ImGui::Text("%d", hit_count);
+				if (block->m_is_opened)
+				{
+					showProfileBlock(block->m_first_child, column);
+				}
+
+				block = block->m_next;
+			}
+			return;
 	}
 }
 
@@ -445,10 +459,12 @@ void ProfilerUI::onGuiCPUProfiler()
 	}
 	if (m_root)
 	{
-		ImGui::Columns(2);
+		ImGui::Columns(3);
 		showProfileBlock(m_root, NAME);
 		ImGui::NextColumn();
 		showProfileBlock(m_root, TIME);
+		ImGui::NextColumn();
+		showProfileBlock(m_root, HIT_COUNT);
 		ImGui::NextColumn();
 		ImGui::Columns(1);
 	}

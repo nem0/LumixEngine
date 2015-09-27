@@ -1,6 +1,8 @@
 #include "terrain_editor.h"
 #include "core/crc32.h"
+#include "core/frustum.h"
 #include "core/json_serializer.h"
+#include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
 #include "editor/entity_template_system.h"
@@ -78,6 +80,7 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 
 	virtual void execute() override
 	{
+		PROFILE_FUNCTION();
 		m_entities.clear();
 		Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
 		Lumix::Matrix terrain_matrix = m_world_editor.getUniverse()->getMatrix(m_component.entity);
@@ -89,6 +92,7 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 		{
 			return;
 		}
+
 		const char* template_name = template_names[m_selected_entity_template].c_str();
 		uint32_t template_name_hash = Lumix::crc32(template_name);
 		Lumix::Entity tpl = template_system.getInstances(template_name_hash)[0];
@@ -96,6 +100,19 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 
 		Lumix::ComponentUID renderable = m_world_editor.getComponent(tpl, RENDERABLE_HASH);
 		if (!renderable.isValid()) return;
+
+		Lumix::Frustum frustum;
+		frustum.computeOrtho(m_center,
+			Lumix::Vec3(0, 0, 1),
+			Lumix::Vec3(0, 1, 0),
+			2 * m_brush_size,
+			2 * m_brush_size,
+			-m_brush_size,
+			m_brush_size);
+		TODO("get rid of static");
+		static Lumix::Array<const Lumix::RenderableMesh*> meshes(m_world_editor.getAllocator());
+		meshes.clear();
+		scene->getRenderableInfos(frustum, meshes, ~0);
 
 		float w, h;
 		scene->getTerrainSize(m_component.index, &w, &h);
@@ -111,9 +128,7 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 				terrain_pos.z <= h)
 			{
 				pos.y = scene->getTerrainHeightAt(m_component.index, terrain_pos.x, terrain_pos.z);
-				Lumix::Matrix mtx = Lumix::Matrix::IDENTITY;
-				mtx.setTranslation(pos);
-				if (!isOBBCollision(scene, mtx, model, scale))
+				if (!isOBBCollision(meshes, pos, model, scale))
 				{
 					auto entity = template_system.createInstanceNoCommand(template_name_hash, pos);
 					m_entities.push(entity);
@@ -198,25 +213,23 @@ struct PaintEntitiesCommand : public Lumix::IEditorCommand
 	}
 
 
-	bool isOBBCollision(Lumix::RenderScene* scene,
-		const Lumix::Matrix& matrix,
+	bool isOBBCollision(const Lumix::Array<const Lumix::RenderableMesh*>& meshes,
+		const Lumix::Vec3& pos_a,
 		Lumix::Model* model,
 		float scale)
 	{
-		Lumix::Vec3 pos_a = matrix.getTranslation();
-		static Lumix::Array<Lumix::RenderableMesh> meshes(m_world_editor.getAllocator());
-		meshes.clear();
-		scene->getRenderableMeshes(meshes, ~0);
 		float radius_a_squared = model->getBoundingRadius();
 		radius_a_squared = radius_a_squared * radius_a_squared;
-		for (int i = 0, c = meshes.size(); i < c; ++i)
+		for (auto* mesh : meshes)
 		{
-			Lumix::Vec3 pos_b = meshes[i].m_matrix->getTranslation();
-			float radius_b = meshes[i].m_model->getBoundingRadius();
+			Lumix::Vec3 pos_b = mesh->m_matrix->getTranslation();
+			float radius_b = mesh->m_model->getBoundingRadius();
 			float radius_squared = radius_a_squared + radius_b * radius_b;
 			if ((pos_a - pos_b).squaredLength() < radius_squared * scale * scale)
 			{
-				if (testOBBCollision(matrix, model, *meshes[i].m_matrix, meshes[i].m_model, scale))
+				Lumix::Matrix matrix = Lumix::Matrix::IDENTITY;
+				matrix.setTranslation(pos_a);
+				if (testOBBCollision(matrix, model, *mesh->m_matrix, mesh->m_model, scale))
 				{
 					return true;
 				}

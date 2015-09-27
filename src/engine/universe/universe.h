@@ -32,12 +32,13 @@ public:
 
 	IAllocator& getAllocator() { return m_allocator; }
 	void createEntity(Entity entity);
-	Entity createEntity();
+	Entity createEntity(const Vec3& position, const Quat& rotation);
 	void destroyEntity(Entity entity);
 	void addComponent(Entity entity, uint32_t component_type, IScene* scene, int index);
 	void destroyComponent(Entity entity, uint32_t component_type, IScene* scene, int index);
 	int getEntityCount() const { return m_transformations.size(); }
 
+	Entity getEntityFromDenseIdx(int idx);
 	Entity getFirstEntity();
 	Entity getNextEntity(Entity entity);
 	bool nameExists(const char* name) const;

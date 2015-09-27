@@ -55,7 +55,7 @@ static const float SHADOW_CAM_FAR = 10000.0f;
 class InstanceData
 {
 public:
-	static const int MAX_INSTANCE_COUNT = 32;
+	static const int MAX_INSTANCE_COUNT = 64;
 
 public:
 	const bgfx::InstanceDataBuffer* m_buffer;
@@ -1395,6 +1395,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 		Matrix* mtcs = (Matrix*)data.m_buffer->data;
 		mtcs[data.m_instance_count] = *info.m_matrix;
 		++data.m_instance_count;
+
 		if (data.m_instance_count == InstanceData::MAX_INSTANCE_COUNT)
 		{
 			const Mesh& mesh = *info.m_mesh;
