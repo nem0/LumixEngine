@@ -159,6 +159,15 @@ public:
 	}
 
 
+	void setTitle(const char* title)
+	{
+		char tmp[100];
+		Lumix::copyString(tmp, "Lumix Studio - ");
+		Lumix::catString(tmp, title);
+		SetWindowTextA(m_hwnd, tmp);
+	}
+
+
 	void showMainMenu()
 	{
 		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
@@ -175,14 +184,28 @@ public:
 						if (ImGui::MenuItem(univ.c_str()))
 						{
 							m_editor->loadUniverse(univ);
+							setTitle(univ.c_str());
 						}
 					}
 					ImGui::EndMenu();
 				}
-				if (ImGui::MenuItem(
-						"Save", nullptr, nullptr, m_editor->getUniversePath().isValid()))
+				if (ImGui::MenuItem("Save"))
 				{
-					m_editor->saveUniverse(m_editor->getUniversePath());
+					if (m_editor->getUniversePath().isValid())
+					{
+						m_editor->saveUniverse(m_editor->getUniversePath());
+					}
+					else
+					{
+						char filename[Lumix::MAX_PATH_LENGTH];
+						if (Lumix::getSaveFilename(
+							filename, sizeof(filename), "Universes\0*.unv\0", "unv"))
+						{
+							m_editor->saveUniverse(Lumix::Path(filename));
+							setTitle(filename);
+						}
+					}
+					
 				}
 				if (ImGui::MenuItem("Save As"))
 				{

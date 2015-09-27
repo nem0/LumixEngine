@@ -198,8 +198,8 @@ void ShaderCompiler::onFileChanged(const char* path)
 		return;
 
 	char tmp[Lumix::MAX_PATH_LENGTH];
-	Lumix::copyString(tmp, sizeof(tmp), "shaders/");
-	Lumix::catString(tmp, sizeof(tmp), path);
+	Lumix::copyString(tmp, "shaders/");
+	Lumix::catString(tmp, path);
 	Lumix::MT::SpinLock lock(m_mutex);
 	m_changed_files.push(Lumix::string(tmp, m_editor.getAllocator()));
 }
@@ -362,32 +362,32 @@ void ShaderCompiler::compilePass(
 					basename,
 					is_vertex_shader ? "_vs.sc" : "_fs.sc");
 			char out_path[Lumix::MAX_PATH_LENGTH];
-			Lumix::copyString(out_path, sizeof(out_path), m_editor.getBasePath());
-			Lumix::catString(out_path, sizeof(out_path), "/shaders/compiled/");
-			Lumix::catString(out_path, sizeof(out_path), basename);
-			Lumix::catString(out_path, sizeof(out_path), "_");
-			Lumix::catString(out_path, sizeof(out_path), StringBuilder<30>(pass, mask));
-			Lumix::catString(out_path, sizeof(out_path), is_vertex_shader ? "_vs.shb" : "_fs.shb");
+			Lumix::copyString(out_path, m_editor.getBasePath());
+			Lumix::catString(out_path, "/shaders/compiled/");
+			Lumix::catString(out_path, basename);
+			Lumix::catString(out_path, "_");
+			Lumix::catString(out_path, StringBuilder<30>(pass, mask));
+			Lumix::catString(out_path, is_vertex_shader ? "_vs.shb" : "_fs.shb");
 			char cmd[1024];
-			Lumix::copyString(cmd, sizeof(cmd), "/C \"");
+			Lumix::copyString(cmd, "/C \"");
 			
-			Lumix::catString(cmd, sizeof(cmd), m_editor.getBasePath());
-			Lumix::catString(cmd, sizeof(cmd), "/shaders/shaderc.exe\" -f ");
-			Lumix::catString(cmd, sizeof(cmd), source_path);
+			Lumix::catString(cmd, m_editor.getBasePath());
+			Lumix::catString(cmd, "/shaders/shaderc.exe\" -f ");
+			Lumix::catString(cmd, source_path);
 
-			Lumix::catString(cmd, sizeof(cmd), " -o ");
-			Lumix::catString(cmd, sizeof(cmd), out_path);
+			Lumix::catString(cmd, " -o ");
+			Lumix::catString(cmd, out_path);
 			
-			Lumix::catString(cmd, sizeof(cmd), " --depends --platform windows --type ");
-			Lumix::catString(cmd, sizeof(cmd), is_vertex_shader ? "vertex --profile vs_5_0" : "fragment --profile ps_5_0");
-			Lumix::catString(cmd, sizeof(cmd), " -D ");
-			Lumix::catString(cmd, sizeof(cmd), pass);
+			Lumix::catString(cmd, " --depends --platform windows --type ");
+			Lumix::catString(cmd, is_vertex_shader ? "vertex --profile vs_5_0" : "fragment --profile ps_5_0");
+			Lumix::catString(cmd, " -D ");
+			Lumix::catString(cmd, pass);
 			for (int i = 0; i < Lumix::lengthOf(all_defines); ++i)
 			{
 				if (mask & (1 << i))
 				{
-					Lumix::catString(cmd, sizeof(cmd), " -D ");
-					Lumix::catString(cmd, sizeof(cmd), getRenderer().getShaderDefine(all_defines[i]));
+					Lumix::catString(cmd, " -D ");
+					Lumix::catString(cmd, getRenderer().getShaderDefine(all_defines[i]));
 				}
 			}
 

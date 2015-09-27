@@ -302,8 +302,7 @@ void AssetBrowser::onGuiMaterial()
 	}
 
 	char buf[256];
-	Lumix::copyString(
-		buf, sizeof(buf), material->getShader() ? material->getShader()->getPath().c_str() : "");
+	Lumix::copyString(buf, material->getShader() ? material->getShader()->getPath().c_str() : "");
 	if (resourceInput("Shader", buf, sizeof(buf), SHADER))
 	{
 		material->setShader(Lumix::Path(buf));
@@ -319,7 +318,7 @@ void AssetBrowser::onGuiMaterial()
 	{
 		auto& slot = material->getShader()->getTextureSlot(i);
 		auto* texture = material->getTexture(i);
-		Lumix::copyString(buf, sizeof(buf), texture ? texture->getPath().c_str() : "");
+		Lumix::copyString(buf, texture ? texture->getPath().c_str() : "");
 		if (resourceInput(slot.m_name, buf, sizeof(buf), TEXTURE))
 		{
 			material->setTexturePath(i, Lumix::Path(buf));
@@ -365,7 +364,7 @@ void AssetBrowser::onGuiLuaScript()
 
 	if (m_text_buffer[0] == '\0')
 	{
-		Lumix::copyString(m_text_buffer, sizeof(m_text_buffer), script->getSourceCode());
+		Lumix::copyString(m_text_buffer, script->getSourceCode());
 	}
 	ImGui::InputTextMultiline("Code", m_text_buffer, sizeof(m_text_buffer), ImVec2(0, 300));
 	if (ImGui::Button("Save"))
@@ -476,9 +475,9 @@ void AssetBrowser::addResource(const char* path, const char* filename)
 	Lumix::PathUtils::getExtension(ext, sizeof(ext), filename);
 
 	char fullpath[Lumix::MAX_PATH_LENGTH];
-	Lumix::copyString(fullpath, sizeof(fullpath), path);
-	Lumix::catString(fullpath, sizeof(fullpath), "/");
-	Lumix::catString(fullpath, sizeof(fullpath), filename);
+	Lumix::copyString(fullpath, path);
+	Lumix::catString(fullpath, "/");
+	Lumix::catString(fullpath, filename);
 
 	int index = -1;
 	if (strcmp(ext, "dds") == 0 || strcmp(ext, "tga") == 0) index = TEXTURE;
@@ -511,9 +510,9 @@ void AssetBrowser::processDir(const char* dir)
 		if (info.is_directory)
 		{
 			char child_path[Lumix::MAX_PATH_LENGTH];
-			Lumix::copyString(child_path, sizeof(child_path), dir);
-			Lumix::catString(child_path, sizeof(child_path), "/");
-			Lumix::catString(child_path, sizeof(child_path), info.filename);
+			Lumix::copyString(child_path, dir);
+			Lumix::catString(child_path, "/");
+			Lumix::catString(child_path, info.filename);
 			processDir(child_path);
 		}
 		else

@@ -368,7 +368,7 @@ void ProfilerUI::showAllocationTree(AllocationStackNode* node, int column)
 		}
 		else
 		{
-			Lumix::copyString(fn_name, sizeof(fn_name), "N/A");
+			Lumix::copyString(fn_name, "N/A");
 		}
 
 		if (ImGui::TreeNode(node, fn_name))

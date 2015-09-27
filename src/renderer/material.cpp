@@ -462,8 +462,8 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 			if (path[0] != '\0')
 			{
 				char texture_path[MAX_PATH_LENGTH];
-				copyString(texture_path, sizeof(texture_path), material_dir);
-				catString(texture_path, sizeof(texture_path), path);
+				copyString(texture_path, material_dir);
+				catString(texture_path, path);
 				m_textures[m_texture_count] = static_cast<Texture*>(
 					m_resource_manager.get(ResourceManager::TEXTURE)
 						->load(Path(texture_path)));

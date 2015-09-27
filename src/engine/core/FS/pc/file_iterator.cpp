@@ -22,8 +22,8 @@ struct FileIterator
 FileIterator* createFileIterator(const char* path, IAllocator& allocator)
 {
 	char tmp[MAX_PATH_LENGTH];
-	copyString(tmp, sizeof(tmp), path);
-	catString(tmp, sizeof(tmp), "/*");
+	copyString(tmp, path);
+	catString(tmp, "/*");
 	auto* iter = allocator.newObject<FileIterator>();
 	iter->allocator = &allocator;
 	iter->handle = FindFirstFile(tmp, &iter->ffd);
@@ -43,9 +43,8 @@ bool getNextFile(FileIterator* iterator, FileInfo* info)
 {
 	if (!iterator->is_valid) return false;
 
-	info->is_directory =
-		(iterator->ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
-	copyString(info->filename, sizeof(info->filename), iterator->ffd.cFileName);
+	info->is_directory = (iterator->ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+	copyString(info->filename, iterator->ffd.cFileName);
 
 	iterator->is_valid = FindNextFile(iterator->handle, &iterator->ffd) == TRUE;
 	return true;
