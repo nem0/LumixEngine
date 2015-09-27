@@ -2132,7 +2132,7 @@ private:
 	void setModel(int renderable_index, Model* model)
 	{
 		Model* old_model = m_renderables[renderable_index]->m_model;
-		if (model == old_model)
+		if (model == old_model && old_model)
 		{
 			old_model->getResourceManager().get(ResourceManager::MODEL)->unload(*old_model);
 			return;
