@@ -12,7 +12,7 @@
 #include "renderer/render_scene.h"
 #include "renderer/texture.h"
 #include "universe/universe.h"
-
+#include "utils.h"
 
 
 static const uint32_t RENDERABLE_HASH = Lumix::crc32("renderable");
@@ -22,103 +22,221 @@ static const char* COLORMAP_UNIFORM = "u_texColormap";
 static const char* TEX_COLOR_UNIFORM = "u_texColor";
 
 
-static bool ColorPicker(const char* label, float col[3])
+struct PaintEntitiesCommand : public Lumix::IEditorCommand
 {
-	static const float HUE_PICKER_WIDTH = 20.0f;
-	static const float CROSSHAIR_SIZE = 7.0f;
-	static const ImVec2 SV_PICKER_SIZE = ImVec2(200, 200);
-
-	ImColor color(col[0], col[1], col[2]);
-	bool value_changed = false;
-
-	ImDrawList* draw_list = ImGui::GetWindowDrawList();
-
-	ImVec2 picker_pos = ImGui::GetCursorScreenPos();
-
-	ImColor colors[] = { ImColor(255, 0, 0),
-		ImColor(255, 255, 0),
-		ImColor(0, 255, 0),
-		ImColor(0, 255, 255),
-		ImColor(0, 0, 255),
-		ImColor(255, 0, 255),
-		ImColor(255, 0, 0) };
-
-	for (int i = 0; i < 6; ++i)
+	PaintEntitiesCommand(Lumix::WorldEditor& editor,
+		Lumix::ComponentUID component,
+		int entity_template,
+		float brush_strength,
+		float brush_size,
+		const Lumix::RayCastModelHit& hit)
+		: m_world_editor(editor)
+		, m_component(component)
+		, m_brush_size(brush_size)
+		, m_brush_strength(brush_strength)
+		, m_selected_entity_template(entity_template)
+		, m_entities(editor.getAllocator())
 	{
-		draw_list->AddRectFilledMultiColor(
-			ImVec2(picker_pos.x + SV_PICKER_SIZE.x + 10, picker_pos.y + i * (SV_PICKER_SIZE.y / 6)),
-			ImVec2(picker_pos.x + SV_PICKER_SIZE.x + 10 + HUE_PICKER_WIDTH,
-			picker_pos.y + (i + 1) * (SV_PICKER_SIZE.y / 6)),
-			colors[i],
-			colors[i],
-			colors[i + 1],
-			colors[i + 1]);
+		m_center = hit.m_origin + hit.m_dir * hit.m_t;
 	}
 
-	float hue, saturation, value;
-	ImGui::ColorConvertRGBtoHSV(
-		color.Value.x, color.Value.y, color.Value.z, hue, saturation, value);
-	auto hue_color = ImColor::HSV(hue, 1, 1);
 
-	draw_list->AddLine(
-		ImVec2(picker_pos.x + SV_PICKER_SIZE.x + 8, picker_pos.y + hue * SV_PICKER_SIZE.y),
-		ImVec2(picker_pos.x + SV_PICKER_SIZE.x + 12 + HUE_PICKER_WIDTH,
-		picker_pos.y + hue * SV_PICKER_SIZE.y),
-		ImColor(255, 255, 255));
-
-	draw_list->AddTriangleFilledMultiColor(picker_pos,
-		ImVec2(picker_pos.x + SV_PICKER_SIZE.x, picker_pos.y + SV_PICKER_SIZE.y),
-		ImVec2(picker_pos.x, picker_pos.y + SV_PICKER_SIZE.y),
-		ImColor(0, 0, 0),
-		hue_color,
-		ImColor(255, 255, 255));
-
-	float x = saturation * value;
-	ImVec2 p(picker_pos.x + x * SV_PICKER_SIZE.x, picker_pos.y + value * SV_PICKER_SIZE.y);
-	draw_list->AddLine(ImVec2(p.x - CROSSHAIR_SIZE, p.y), ImVec2(p.x - 2, p.y), ImColor(255, 255, 255));
-	draw_list->AddLine(ImVec2(p.x + CROSSHAIR_SIZE, p.y), ImVec2(p.x + 2, p.y), ImColor(255, 255, 255));
-	draw_list->AddLine(ImVec2(p.x, p.y + CROSSHAIR_SIZE), ImVec2(p.x, p.y + 2), ImColor(255, 255, 255));
-	draw_list->AddLine(ImVec2(p.x, p.y - CROSSHAIR_SIZE), ImVec2(p.x, p.y - 2), ImColor(255, 255, 255));
-
-	ImGui::InvisibleButton("saturation_value_selector", SV_PICKER_SIZE);
-	if (ImGui::IsItemHovered())
+	virtual void undo()
 	{
-		ImVec2 mouse_pos_in_canvas = ImVec2(
-			ImGui::GetIO().MousePos.x - picker_pos.x, ImGui::GetIO().MousePos.y - picker_pos.y);
-		if (ImGui::GetIO().MouseDown[0])
+		for (auto entity : m_entities)
 		{
-			mouse_pos_in_canvas.x =
-				Lumix::Math::minValue(mouse_pos_in_canvas.x, mouse_pos_in_canvas.y);
+			const auto& cmps = m_world_editor.getComponents(entity);
+			for (const auto& cmp : cmps)
+			{
+				cmp.scene->destroyComponent(cmp.index, cmp.type);
+			}
+			m_world_editor.getUniverse()->destroyEntity(entity);
+		}
+		m_entities.clear();
+	}
 
-			value = mouse_pos_in_canvas.y / SV_PICKER_SIZE.y;
-			saturation = value == 0 ? 0 : (mouse_pos_in_canvas.x / SV_PICKER_SIZE.x) / value;
-			value_changed = true;
+
+	virtual void serialize(Lumix::JsonSerializer& serializer) 
+	{
+	}
+
+
+	virtual void deserialize(Lumix::JsonSerializer& serializer) 
+	{
+	}
+	
+
+	virtual uint32_t getType()
+	{
+		static const uint32_t type = Lumix::crc32("paint_entities_on_terrain");
+		return type;
+	}
+	
+
+	virtual bool merge(IEditorCommand& command) { return false; }
+
+
+	virtual void execute() override
+	{
+		m_entities.clear();
+		Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
+		Lumix::Matrix terrain_matrix = m_world_editor.getUniverse()->getMatrix(m_component.entity);
+		Lumix::Matrix inv_terrain_matrix = terrain_matrix;
+		inv_terrain_matrix.inverse();
+		auto& template_system = m_world_editor.getEntityTemplateSystem();
+		auto& template_names = template_system.getTemplateNames();
+		if (m_selected_entity_template < 0 || m_selected_entity_template >= template_names.size())
+		{
+			return;
+		}
+		const char* template_name = template_names[m_selected_entity_template].c_str();
+		uint32_t template_name_hash = Lumix::crc32(template_name);
+		Lumix::Entity tpl = template_system.getInstances(template_name_hash)[0];
+		if (tpl < 0) return;
+
+		Lumix::ComponentUID renderable = m_world_editor.getComponent(tpl, RENDERABLE_HASH);
+		if (!renderable.isValid()) return;
+
+		float w, h;
+		scene->getTerrainSize(m_component.index, &w, &h);
+		float scale = 1.0f - Lumix::Math::maxValue(0.01f, m_brush_strength);
+		Lumix::Model* model = scene->getRenderableModel(renderable.index);
+		for (int i = 0; i <= m_brush_size * m_brush_size / 1000.0f; ++i)
+		{
+			float angle = (float)(rand() % 360);
+			float dist = (rand() % 100 / 100.0f) * m_brush_size;
+			Lumix::Vec3 pos(m_center.x + cos(angle) * dist, 0, m_center.z + sin(angle) * dist);
+			Lumix::Vec3 terrain_pos = inv_terrain_matrix.multiplyPosition(pos);
+			if (terrain_pos.x >= 0 && terrain_pos.z >= 0 && terrain_pos.x <= w &&
+				terrain_pos.z <= h)
+			{
+				pos.y = scene->getTerrainHeightAt(m_component.index, terrain_pos.x, terrain_pos.z);
+				Lumix::Matrix mtx = Lumix::Matrix::IDENTITY;
+				mtx.setTranslation(pos);
+				if (!isOBBCollision(scene, mtx, model, scale))
+				{
+					auto entity = template_system.createInstanceNoCommand(template_name_hash, pos);
+					m_entities.push(entity);
+				}
+			}
 		}
 	}
 
-	ImGui::SetCursorScreenPos(ImVec2(picker_pos.x + SV_PICKER_SIZE.x + 10, picker_pos.y));
-	ImGui::InvisibleButton("hue_selector", ImVec2(HUE_PICKER_WIDTH, SV_PICKER_SIZE.y));
 
-	if (ImGui::IsItemHovered())
+	static void getProjections(const Lumix::Vec3& axis,
+		const Lumix::Vec3 vertices[8],
+		float& min,
+		float& max)
 	{
-		if (ImGui::GetIO().MouseDown[0])
+		min = max = Lumix::dotProduct(vertices[0], axis);
+		for (int i = 1; i < 8; ++i)
 		{
-			hue = ((ImGui::GetIO().MousePos.y - picker_pos.y) / SV_PICKER_SIZE.y);
-			value_changed = true;
+			float dot = Lumix::dotProduct(vertices[i], axis);
+			min = Lumix::Math::minValue(dot, min);
+			max = Lumix::Math::maxValue(dot, max);
 		}
 	}
 
-	color = ImColor::HSV(hue, saturation, value);
-	col[0] = color.Value.x;
-	col[1] = color.Value.y;
-	col[2] = color.Value.z;
-	return value_changed | ImGui::ColorEdit3(label, col);
-}
+
+	static bool overlaps(float min1, float max1, float min2, float max2)
+	{
+		return (min1 <= min2 && min2 <= max1) || (min2 <= min1 && min1 <= max2);
+	}
 
 
-class PaintTerrainCommand : public Lumix::IEditorCommand
+	static bool testOBBCollision(const Lumix::Matrix& matrix_a,
+		const Lumix::Model* model_a,
+		const Lumix::Matrix& matrix_b,
+		const Lumix::Model* model_b,
+		float scale)
+	{
+		Lumix::Vec3 box_a_points[8];
+		Lumix::Vec3 box_b_points[8];
+
+		if (fabs(scale - 1.0) < 0.01f)
+		{
+			model_a->getAABB().getCorners(matrix_a, box_a_points);
+			model_b->getAABB().getCorners(matrix_b, box_b_points);
+		}
+		else
+		{
+			Lumix::Matrix scale_matrix_a = matrix_a;
+			scale_matrix_a.multiply3x3(scale);
+			Lumix::Matrix scale_matrix_b = matrix_b;
+			scale_matrix_b.multiply3x3(scale);
+			model_a->getAABB().getCorners(scale_matrix_a, box_a_points);
+			model_b->getAABB().getCorners(scale_matrix_b, box_b_points);
+		}
+
+		Lumix::Vec3 normals[] = {
+			matrix_a.getXVector(), matrix_a.getYVector(), matrix_a.getZVector() };
+		for (int i = 0; i < 3; i++)
+		{
+			float box_a_min, box_a_max, box_b_min, box_b_max;
+			getProjections(normals[i], box_a_points, box_a_min, box_a_max);
+			getProjections(normals[i], box_b_points, box_b_min, box_b_max);
+			if (!overlaps(box_a_min, box_a_max, box_b_min, box_b_max))
+			{
+				return false;
+			}
+		}
+
+		Lumix::Vec3 normals_b[] = {
+			matrix_b.getXVector(), matrix_b.getYVector(), matrix_b.getZVector() };
+		for (int i = 0; i < 3; i++)
+		{
+			float box_a_min, box_a_max, box_b_min, box_b_max;
+			getProjections(normals_b[i], box_a_points, box_a_min, box_a_max);
+			getProjections(normals_b[i], box_b_points, box_b_min, box_b_max);
+			if (!overlaps(box_a_min, box_a_max, box_b_min, box_b_max))
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+
+	bool isOBBCollision(Lumix::RenderScene* scene,
+		const Lumix::Matrix& matrix,
+		Lumix::Model* model,
+		float scale)
+	{
+		Lumix::Vec3 pos_a = matrix.getTranslation();
+		static Lumix::Array<Lumix::RenderableMesh> meshes(m_world_editor.getAllocator());
+		meshes.clear();
+		scene->getRenderableMeshes(meshes, ~0);
+		float radius_a_squared = model->getBoundingRadius();
+		radius_a_squared = radius_a_squared * radius_a_squared;
+		for (int i = 0, c = meshes.size(); i < c; ++i)
+		{
+			Lumix::Vec3 pos_b = meshes[i].m_matrix->getTranslation();
+			float radius_b = meshes[i].m_model->getBoundingRadius();
+			float radius_squared = radius_a_squared + radius_b * radius_b;
+			if ((pos_a - pos_b).squaredLength() < radius_squared * scale * scale)
+			{
+				if (testOBBCollision(matrix, model, *meshes[i].m_matrix, meshes[i].m_model, scale))
+				{
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	Lumix::WorldEditor& m_world_editor;
+	Lumix::ComponentUID m_component;
+	Lumix::Array<Lumix::Entity> m_entities;
+	float m_brush_strength;
+	float m_brush_size;
+	int m_selected_entity_template;
+	Lumix::Vec3 m_center;
+};
+
+
+struct PaintTerrainCommand : public Lumix::IEditorCommand
 {
-public:
 	struct Rectangle
 	{
 		int m_from_x;
@@ -127,7 +245,7 @@ public:
 		int m_to_y;
 	};
 
-public:
+
 	PaintTerrainCommand(Lumix::WorldEditor& editor,
 		TerrainEditor::Type type,
 		int texture_idx,
@@ -863,45 +981,14 @@ bool TerrainEditor::onEntityMouseDown(const Lumix::RayCastModelHit& hit,
 
 void TerrainEditor::paintEntities(const Lumix::RayCastModelHit& hit)
 {
-	Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
-	Lumix::Vec3 center_pos = hit.m_origin + hit.m_dir * hit.m_t;
-	Lumix::Matrix terrain_matrix = m_world_editor.getUniverse()->getMatrix(m_component.entity);
-	Lumix::Matrix inv_terrain_matrix = terrain_matrix;
-	inv_terrain_matrix.inverse();
-	auto& template_system = m_world_editor.getEntityTemplateSystem();
-	auto& template_names = template_system.getTemplateNames();
-	if (m_selected_entity_template < 0 || m_selected_entity_template >= template_names.size())
-	{
-		return;
-	}
-	const char* template_name = template_names[m_selected_entity_template].c_str();
-	Lumix::Entity tpl = template_system.getInstances(Lumix::crc32(template_name))[0];
-	if (tpl < 0) return;
-
-	Lumix::ComponentUID renderable = m_world_editor.getComponent(tpl, RENDERABLE_HASH);
-	if (!renderable.isValid()) return;
-
-	float w, h;
-	scene->getTerrainSize(m_component.index, &w, &h);
-	float scale = 1.0f - Lumix::Math::maxValue(0.01f, m_terrain_brush_strength);
-	Lumix::Model* model = scene->getRenderableModel(renderable.index);
-	for (int i = 0; i <= m_terrain_brush_size * m_terrain_brush_size / 1000.0f; ++i)
-	{
-		float angle = (float)(rand() % 360);
-		float dist = (rand() % 100 / 100.0f) * m_terrain_brush_size;
-		Lumix::Vec3 pos(center_pos.x + cos(angle) * dist, 0, center_pos.z + sin(angle) * dist);
-		Lumix::Vec3 terrain_pos = inv_terrain_matrix.multiplyPosition(pos);
-		if (terrain_pos.x >= 0 && terrain_pos.z >= 0 && terrain_pos.x <= w && terrain_pos.z <= h)
-		{
-			pos.y = scene->getTerrainHeightAt(m_component.index, terrain_pos.x, terrain_pos.z);
-			Lumix::Matrix mtx = Lumix::Matrix::IDENTITY;
-			mtx.setTranslation(pos);
-			if (!isOBBCollision(scene, mtx, model, scale))
-			{
-				template_system.createInstance(template_name, pos);
-			}
-		}
-	}
+	PaintEntitiesCommand* command =
+		LUMIX_NEW(m_world_editor.getAllocator(), PaintEntitiesCommand)(m_world_editor,
+			m_component,
+			m_selected_entity_template,
+			m_terrain_brush_strength,
+			m_terrain_brush_size,
+			hit);
+	m_world_editor.executeCommand(command);
 }
 
 
@@ -953,115 +1040,6 @@ Lumix::Material* TerrainEditor::getMaterial()
 	auto* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
 	return scene->getTerrainMaterial(m_component.index);
 }
-
-
-void TerrainEditor::getProjections(const Lumix::Vec3& axis,
-								   const Lumix::Vec3 vertices[8],
-								   float& min,
-								   float& max)
-{
-	min = max = Lumix::dotProduct(vertices[0], axis);
-	for (int i = 1; i < 8; ++i)
-	{
-		float dot = Lumix::dotProduct(vertices[i], axis);
-		min = Lumix::Math::minValue(dot, min);
-		max = Lumix::Math::maxValue(dot, max);
-	}
-}
-
-
-bool TerrainEditor::overlaps(float min1, float max1, float min2, float max2)
-{
-	return (min1 <= min2 && min2 <= max1) || (min2 <= min1 && min1 <= max2);
-}
-
-
-bool TerrainEditor::testOBBCollision(const Lumix::Matrix& matrix_a,
-									 const Lumix::Model* model_a,
-									 const Lumix::Matrix& matrix_b,
-									 const Lumix::Model* model_b,
-									 float scale)
-{
-	Lumix::Vec3 box_a_points[8];
-	Lumix::Vec3 box_b_points[8];
-
-	if (fabs(scale - 1.0) < 0.01f)
-	{
-		model_a->getAABB().getCorners(matrix_a, box_a_points);
-		model_b->getAABB().getCorners(matrix_b, box_b_points);
-	}
-	else
-	{
-		Lumix::Matrix scale_matrix_a = matrix_a;
-		scale_matrix_a.multiply3x3(scale);
-		Lumix::Matrix scale_matrix_b = matrix_b;
-		scale_matrix_b.multiply3x3(scale);
-		model_a->getAABB().getCorners(scale_matrix_a, box_a_points);
-		model_b->getAABB().getCorners(scale_matrix_b, box_b_points);
-	}
-
-	Lumix::Vec3 normals[] = {
-		matrix_a.getXVector(), matrix_a.getYVector(), matrix_a.getZVector()};
-	for (int i = 0; i < 3; i++)
-	{
-		float box_a_min, box_a_max, box_b_min, box_b_max;
-		getProjections(normals[i], box_a_points, box_a_min, box_a_max);
-		getProjections(normals[i], box_b_points, box_b_min, box_b_max);
-		if (!overlaps(box_a_min, box_a_max, box_b_min, box_b_max))
-		{
-			return false;
-		}
-	}
-
-	Lumix::Vec3 normals_b[] = {
-		matrix_b.getXVector(), matrix_b.getYVector(), matrix_b.getZVector()};
-	for (int i = 0; i < 3; i++)
-	{
-		float box_a_min, box_a_max, box_b_min, box_b_max;
-		getProjections(normals_b[i], box_a_points, box_a_min, box_a_max);
-		getProjections(normals_b[i], box_b_points, box_b_min, box_b_max);
-		if (!overlaps(box_a_min, box_a_max, box_b_min, box_b_max))
-		{
-			return false;
-		}
-	}
-
-	return true;
-}
-
-
-bool TerrainEditor::isOBBCollision(Lumix::RenderScene* scene,
-								   const Lumix::Matrix& matrix,
-								   Lumix::Model* model,
-								   float scale)
-{
-	Lumix::Vec3 pos_a = matrix.getTranslation();
-	static Lumix::Array<Lumix::RenderableMesh> meshes(
-		m_world_editor.getAllocator());
-	meshes.clear();
-	scene->getRenderableMeshes(meshes, ~0);
-	float radius_a_squared = model->getBoundingRadius();
-	radius_a_squared = radius_a_squared * radius_a_squared;
-	for (int i = 0, c = meshes.size(); i < c; ++i)
-	{
-		Lumix::Vec3 pos_b = meshes[i].m_matrix->getTranslation();
-		float radius_b = meshes[i].m_model->getBoundingRadius();
-		float radius_squared = radius_a_squared + radius_b * radius_b;
-		if ((pos_a - pos_b).squaredLength() < radius_squared * scale * scale)
-		{
-			if (testOBBCollision(matrix,
-								 model,
-								 *meshes[i].m_matrix,
-								 meshes[i].m_model,
-								 scale))
-			{
-				return true;
-			}
-		}
-	}
-	return false;
-}
-
 
 
 void TerrainEditor::onGui()

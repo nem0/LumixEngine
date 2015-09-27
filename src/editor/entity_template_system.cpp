@@ -257,13 +257,13 @@ public:
 
 	static IEditorCommand* createCreateInstanceCommand(WorldEditor& editor)
 	{
-		return editor.getAllocator().newObject<CreateInstanceCommand>(editor);
+		return LUMIX_NEW(editor.getAllocator(), CreateInstanceCommand)(editor);
 	}
 
 
 	static IEditorCommand* createCreateTemplateCommand(WorldEditor& editor)
 	{
-		return editor.getAllocator().newObject<CreateTemplateCommand>(editor);
+		return LUMIX_NEW(editor.getAllocator(), CreateTemplateCommand)(editor);
 	}
 
 
@@ -339,12 +339,35 @@ public:
 	}
 
 
+	virtual Entity createInstanceNoCommand(uint32_t name_hash, const Vec3& position) override
+	{
+		int instance_index = m_instances.find(name_hash);
+		ASSERT(instance_index >= 0);
+		if (instance_index < 0) return INVALID_ENTITY;
+
+		Universe* universe = m_editor.getUniverse();
+		Entity entity = universe->createEntity();
+		universe->setPosition(entity, position);
+		float random_angle = Math::degreesToRadians((float)(rand() % 360));
+		Lumix::Quat rotation(Lumix::Vec3(0, 1, 0), random_angle);
+		universe->setRotation(entity, rotation);
+
+		m_instances.at(instance_index).push(entity);
+		Entity template_entity = m_instances.at(instance_index)[0];
+		const auto& template_cmps = m_editor.getComponents(template_entity);
+		for (const auto& cmp : template_cmps)
+		{
+			m_editor.cloneComponent(cmp, entity);
+		}
+		return entity;
+	}
+
+
 	virtual void createTemplateFromEntity(const char* name,
 										  Entity entity) override
 	{
 		CreateTemplateCommand* command =
-			m_editor.getAllocator().newObject<CreateTemplateCommand>(
-				m_editor, name, entity);
+			LUMIX_NEW(m_editor.getAllocator(), CreateTemplateCommand)(m_editor, name, entity);
 		m_editor.executeCommand(command);
 	}
 
@@ -383,9 +406,8 @@ public:
 	virtual Entity createInstance(const char* name,
 								  const Vec3& position) override
 	{
-		CreateInstanceCommand* command =
-			m_editor.getAllocator().newObject<CreateInstanceCommand>(
-				*this, m_editor, name, position);
+		CreateInstanceCommand* command = LUMIX_NEW(m_editor.getAllocator(), CreateInstanceCommand)(
+			*this, m_editor, name, position);
 		m_editor.executeCommand(command);
 		return command->getEntity();
 	}
@@ -466,7 +488,7 @@ private:
 
 EntityTemplateSystem* EntityTemplateSystem::create(WorldEditor& editor)
 {
-	return editor.getAllocator().newObject<EntityTemplateSystemImpl>(editor);
+	return LUMIX_NEW(editor.getAllocator(), EntityTemplateSystemImpl)(editor);
 }
 
 
