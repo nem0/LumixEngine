@@ -1124,6 +1124,7 @@ public:
 
 	void mergeTemporaryInfos(Array<const RenderableMesh*>& all_infos)
 	{
+		TODO("we do not really need this, we can work with m_temporary_infos");
 		PROFILE_FUNCTION();
 		all_infos.reserve(m_renderables.size() * 2);
 		for (int i = 0; i < m_temporary_infos.size(); ++i)
@@ -1385,28 +1386,6 @@ public:
 		mergeTemporaryInfos(meshes);
 	}
 
-
-	virtual void getRenderableMeshes(Array<RenderableMesh>& meshes,
-									 int64_t layer_mask) override
-	{
-		PROFILE_FUNCTION();
-
-		if (m_renderables.empty())
-			return;
-
-		meshes.reserve(m_renderables.size() * 2);
-		for (int i = 0, c = m_renderables.size(); i < c; ++i)
-		{
-			const Renderable* LUMIX_RESTRICT renderable = m_renderables[i];
-			if ((m_culling_system->getLayerMask(i) & layer_mask) != 0)
-			{
-				for (int j = 0, c = renderable->m_meshes.size(); j < c; ++j)
-				{
-					meshes.push(renderable->m_meshes[j]);
-				}
-			}
-		}
-	}
 
 	virtual void setCameraSlot(ComponentIndex camera, const char* slot) override
 	{

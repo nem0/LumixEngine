@@ -174,9 +174,7 @@ private:
 			if (instance_index >= 0)
 			{
 				Universe* universe = m_entity_system.m_editor.getUniverse();
-				m_entity = universe->createEntity();
-				universe->setPosition(m_entity, m_position);
-				universe->setRotation(m_entity, m_rotation);
+				m_entity = universe->createEntity(m_position, m_rotation);
 
 				m_entity_system.m_instances.at(instance_index).push(m_entity);
 				Entity template_entity =
@@ -346,11 +344,9 @@ public:
 		if (instance_index < 0) return INVALID_ENTITY;
 
 		Universe* universe = m_editor.getUniverse();
-		Entity entity = universe->createEntity();
-		universe->setPosition(entity, position);
 		float random_angle = Math::degreesToRadians((float)(rand() % 360));
 		Lumix::Quat rotation(Lumix::Vec3(0, 1, 0), random_angle);
-		universe->setRotation(entity, rotation);
+		Entity entity = universe->createEntity(position, rotation);
 
 		m_instances.at(instance_index).push(entity);
 		Entity template_entity = m_instances.at(instance_index)[0];

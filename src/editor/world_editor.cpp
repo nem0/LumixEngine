@@ -1111,11 +1111,8 @@ private:
 			InputBlob blob(m_old_values);
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
-				Entity new_entity = universe->createEntity();
-				universe->setPosition(new_entity,
-									  m_positons_rotations[i].m_position);
-				universe->setRotation(new_entity,
-									  m_positons_rotations[i].m_rotation);
+				Entity new_entity = universe->createEntity(
+					m_positons_rotations[i].m_position, m_positons_rotations[i].m_rotation);
 				int cmps_count;
 				blob.read(cmps_count);
 				for (int j = cmps_count - 1; j >= 0; --j)
@@ -1346,13 +1343,13 @@ private:
 		{
 			if (m_entity < 0)
 			{
-				m_entity = m_editor.getUniverse()->createEntity();
+				m_entity = m_editor.getUniverse()->createEntity(m_position, Quat(0, 0, 0, 1));
 			}
 			else
 			{
 				m_editor.getUniverse()->createEntity(m_entity);
+				m_editor.getUniverse()->setPosition(m_entity, m_position);
 			}
-			m_editor.getUniverse()->setPosition(m_entity, m_position);
 			m_editor.selectEntities(&m_entity, 1);
 		}
 
@@ -1654,10 +1651,11 @@ public:
 
 	void createEditorLines()
 	{
+		PROFILE_FUNCTION();
 		showGizmos();
 
-		RenderScene* scene = static_cast<RenderScene*>(
-			m_universe_context->getScene(crc32("renderer")));
+		RenderScene* scene =
+			static_cast<RenderScene*>(m_universe_context->getScene(crc32("renderer")));
 		m_measure_tool->createEditorLines(*scene);
 	}
 
@@ -1942,7 +1940,7 @@ public:
 		ASSERT(m_universe_context);
 
 		OutputBlob blob(m_allocator);
-		blob.reserve(1 << 20);
+		blob.reserve(m_universe_context->m_universe->getEntityCount() * 100);
 		uint32_t hash = 0;
 		blob.write(hash);
 		blob.write(hash);
@@ -3027,10 +3025,8 @@ public:
 
 		if (create_basic_entities)
 		{
-			m_camera = universe->createEntity();
+			m_camera = universe->createEntity(Vec3(0, 0, -5), Quat(Vec3(0, 1, 0), -Math::PI));
 			universe->setEntityName(m_camera, "editor_camera");
-			universe->setPosition(m_camera, 0, 0, -5);
-			universe->setRotation(m_camera, Quat(Vec3(0, 1, 0), -Math::PI));
 			ComponentUID cmp = createComponent(CAMERA_HASH, m_camera);
 			ASSERT(cmp.isValid());
 			RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
@@ -3317,8 +3313,7 @@ void PasteEntityCommand::execute()
 {
 	InputBlob blob(m_blob.getData(), m_blob.getSize());
 	Universe* universe = m_editor.getUniverse();
-	Entity new_entity = universe->createEntity();
-	universe->setPosition(new_entity, m_position);
+	Entity new_entity = universe->createEntity(m_position, Quat(0, 0, 0, 1));
 	int32_t count;
 	blob.read(count);
 	for (int i = 0; i < count; ++i)
