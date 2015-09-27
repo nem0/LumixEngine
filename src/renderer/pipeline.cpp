@@ -776,90 +776,66 @@ struct PipelineInstanceImpl : public PipelineInstance
 	{
 		Universe& universe = m_scene->getUniverse();
 		ComponentIndex light_cmp = m_scene->getActiveGlobalLight();
-		if (light_cmp < 0 || camera < 0)
-		{
-			return;
-		}
-		Matrix light_mtx =
-			universe.getMatrix(m_scene->getGlobalLightEntity(light_cmp));
+		if (light_cmp < 0 || camera < 0) return;
 
+		Matrix light_mtx = universe.getMatrix(m_scene->getGlobalLightEntity(light_cmp));
 		float shadowmap_height = (float)m_current_framebuffer->getHeight();
 		float shadowmap_width = (float)m_current_framebuffer->getWidth();
 		float viewports[] = {0, 0, 0.5f, 0, 0, 0.5f, 0.5f, 0.5f};
 
-		float camera_fov =
-			Math::degreesToRadians(m_scene->getCameraFOV(camera));
-		float camera_ratio = m_scene->getCameraWidth(camera) /
-							 m_scene->getCameraHeight(camera);
+		float camera_fov = Math::degreesToRadians(m_scene->getCameraFOV(camera));
+		float camera_ratio = m_scene->getCameraWidth(camera) / m_scene->getCameraHeight(camera);
 		Vec4 cascades = m_scene->getShadowmapCascades(light_cmp);
-		float split_distances[] = {
-			0.01f, cascades.x, cascades.y, cascades.z, cascades.w};
+		float split_distances[] = {0.01f, cascades.x, cascades.y, cascades.z, cascades.w};
 		for (int split_index = 0; split_index < 4; ++split_index)
 		{
-			if (split_index > 0)
-			{
-				beginNewView(m_current_framebuffer);
-			}
+			if (split_index > 0) beginNewView(m_current_framebuffer);
 
-			bgfx::setViewClear(m_view_idx,
-							   BGFX_CLEAR_DEPTH | BGFX_CLEAR_COLOR,
-							   0xffffffff,
-							   1.0f,
-							   0);
+			bgfx::setViewClear(
+				m_view_idx, BGFX_CLEAR_DEPTH | BGFX_CLEAR_COLOR, 0xffffffff, 1.0f, 0);
 			bgfx::touch(m_view_idx);
 			float* viewport = viewports + split_index * 2;
 			bgfx::setViewRect(m_view_idx,
-							  (uint16_t)(1 + shadowmap_width * viewport[0]),
-							  (uint16_t)(1 + shadowmap_height * viewport[1]),
-							  (uint16_t)(0.5f * shadowmap_width - 2),
-							  (uint16_t)(0.5f * shadowmap_height - 2));
+				(uint16_t)(1 + shadowmap_width * viewport[0]),
+				(uint16_t)(1 + shadowmap_height * viewport[1]),
+				(uint16_t)(0.5f * shadowmap_width - 2),
+				(uint16_t)(0.5f * shadowmap_height - 2));
 
 			Frustum frustum;
-			Matrix camera_matrix =
-				universe.getMatrix(m_scene->getCameraEntity(camera));
+			Matrix camera_matrix = universe.getMatrix(m_scene->getCameraEntity(camera));
 			frustum.computePerspective(camera_matrix.getTranslation(),
-									   camera_matrix.getZVector(),
-									   camera_matrix.getYVector(),
-									   camera_fov,
-									   camera_ratio,
-									   split_distances[split_index],
-									   split_distances[split_index + 1]);
-			(&m_shadowmap_splits.x)[split_index] =
-				split_distances[split_index + 1];
+				camera_matrix.getZVector(),
+				camera_matrix.getYVector(),
+				camera_fov,
+				camera_ratio,
+				split_distances[split_index],
+				split_distances[split_index + 1]);
+			(&m_shadowmap_splits.x)[split_index] = split_distances[split_index + 1];
 
 			Vec3 shadow_cam_pos = camera_matrix.getTranslation();
 			float bb_size = frustum.getRadius();
 			Matrix projection_matrix;
-			projection_matrix.setOrtho(bb_size,
-									   -bb_size,
-									   -bb_size,
-									   bb_size,
-									   SHADOW_CAM_NEAR,
-									   SHADOW_CAM_FAR);
+			projection_matrix.setOrtho(
+				bb_size, -bb_size, -bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR);
 			Vec3 light_forward = light_mtx.getZVector();
 			shadow_cam_pos -= light_forward * SHADOW_CAM_FAR * 0.5f;
 			Matrix view_matrix;
-			view_matrix.lookAt(shadow_cam_pos,
-							   shadow_cam_pos + light_forward,
-							   light_mtx.getYVector());
-			bgfx::setViewTransform(
-				m_view_idx, &view_matrix.m11, &projection_matrix.m11);
-			static const Matrix biasMatrix(0.5, 0.0, 0.0, 0.0,
-										   0.0, -0.5, 0.0, 0.0,
-										   0.0, 0.0, 0.5, 0.0,
-										   0.5, 0.5, 0.5, 1.0);
-			m_shadow_viewprojection[split_index] =
-				biasMatrix * (projection_matrix * view_matrix);
+			view_matrix.lookAt(
+				shadow_cam_pos, shadow_cam_pos + light_forward, light_mtx.getYVector());
+			bgfx::setViewTransform(m_view_idx, &view_matrix.m11, &projection_matrix.m11);
+			static const Matrix biasMatrix(
+				0.5, 0.0, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.5, 0.5, 0.5, 1.0);
+			m_shadow_viewprojection[split_index] = biasMatrix * (projection_matrix * view_matrix);
 
 			Frustum shadow_camera_frustum;
 			shadow_camera_frustum.computeOrtho(shadow_cam_pos,
-											   -light_forward,
-											   light_mtx.getYVector(),
-											   bb_size * 2,
-											   bb_size * 2,
-											   SHADOW_CAM_NEAR,
-											   SHADOW_CAM_FAR);
-			renderAll(shadow_camera_frustum, layer_mask, true);
+				-light_forward,
+				light_mtx.getYVector(),
+				bb_size * 2,
+				bb_size * 2,
+				SHADOW_CAM_NEAR,
+				SHADOW_CAM_FAR);
+			renderAll(shadow_camera_frustum, layer_mask, false);
 		}
 	}
 
@@ -1252,8 +1228,7 @@ struct PipelineInstanceImpl : public PipelineInstance
 	}
 
 
-	void
-	renderAll(const Frustum& frustum, int64_t layer_mask, bool is_shadowmap)
+	void renderAll(const Frustum& frustum, int64_t layer_mask, bool render_grass)
 	{
 		PROFILE_FUNCTION();
 
@@ -1265,21 +1240,18 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 		m_scene->getRenderableInfos(frustum, m_tmp_meshes, layer_mask);
 		m_scene->getTerrainInfos(
-			m_tmp_terrains,
-			layer_mask,
-			m_scene->getUniverse().getPosition(
-				m_scene->getCameraEntity(m_applied_camera)),
-			m_renderer.getFrameAllocator());
+			m_tmp_terrains, layer_mask, frustum.getPosition(), m_renderer.getFrameAllocator());
 		m_is_current_light_global = true;
 		m_current_light = m_scene->getActiveGlobalLight();
+		
 		renderMeshes(m_tmp_meshes);
 		renderTerrains(m_tmp_terrains);
-		if (!is_shadowmap)
+		if (render_grass)
 		{
-			m_scene->getGrassInfos(
-				frustum, m_tmp_grasses, layer_mask, m_applied_camera);
+			m_scene->getGrassInfos(frustum, m_tmp_grasses, layer_mask, m_applied_camera);
 			renderGrasses(m_tmp_grasses);
 		}
+
 		m_current_light = -1;
 	}
 
@@ -1293,8 +1265,8 @@ struct PipelineInstanceImpl : public PipelineInstance
 
 	virtual void setWindowHandle(void* data) override
 	{
-		m_default_framebuffer = m_allocator.newObject<FrameBuffer>(
-			"default", m_width, m_height, data);
+		m_default_framebuffer =
+			m_allocator.newObject<FrameBuffer>("default", m_width, m_height, data);
 	}
 
 
@@ -1984,7 +1956,7 @@ void renderModels(PipelineInstanceImpl* pipeline,
 	}
 	else
 	{
-		pipeline->renderAll(pipeline->m_camera_frustum, layer_mask, false);
+		pipeline->renderAll(pipeline->m_camera_frustum, layer_mask, true);
 	}
 }
 
