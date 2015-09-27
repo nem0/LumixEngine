@@ -253,7 +253,7 @@ target_link_libraries(studio renderer)
 target_link_libraries(studio editor)
 target_link_libraries(studio optimized ${EXTERNAL_PATH}assimp/lib/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/assimp.lib)
 target_link_libraries(studio debug ${EXTERNAL_PATH}assimp/lib/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/assimp.lib)
-target_link_libraries(studio ${EXTERNAL_PATH}crunch/lib/${PLATFORM_DIR}/crnlib${CMAKE_CFG_INTDIR}.lib)
+target_link_libraries(studio ${EXTERNAL_PATH}crunch/lib/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/crnlib.lib)
 target_link_libraries(studio winmm.lib)
 
 
@@ -286,22 +286,50 @@ add_custom_command(TARGET studio POST_BUILD
         "${EXTERNAL_PATH}assimp/dll/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/assimp.dll"
         $<TARGET_FILE_DIR:studio>)
 
-add_custom_command(TARGET studio POST_BUILD        
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different  
-        "${EXTERNAL_PATH}physx/dll/${PLATFORM_DIR}/PhysX3CommonCHECKED_x86.dll"
-        $<TARGET_FILE_DIR:studio>)
+if(${IS64})
+	
+	add_custom_command(TARGET studio POST_BUILD        
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different  
+			"${EXTERNAL_PATH}physx/dll/${PLATFORM_DIR}/PhysX3CommonCHECKED_x64.dll"
+			$<TARGET_FILE_DIR:studio>)
 
-add_custom_command(TARGET studio POST_BUILD        
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different  
-        "${EXTERNAL_PATH}physx/dll/${PLATFORM_DIR}/PhysX3CookingCHECKED_x86.dll"
-        $<TARGET_FILE_DIR:studio>)
+	add_custom_command(TARGET studio POST_BUILD        
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different  
+			"${EXTERNAL_PATH}physx/dll/${PLATFORM_DIR}/PhysX3CookingCHECKED_x64.dll"
+			$<TARGET_FILE_DIR:studio>)
 
-add_custom_command(TARGET studio POST_BUILD        
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different  
-        "${EXTERNAL_PATH}physx/dll/${PLATFORM_DIR}/PhysX3CharacterKinematicCHECKED_x86.dll"
-        $<TARGET_FILE_DIR:studio>)
+	add_custom_command(TARGET studio POST_BUILD        
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different  
+			"${EXTERNAL_PATH}physx/dll/${PLATFORM_DIR}/PhysX3CharacterKinematicCHECKED_x64.dll"
+			$<TARGET_FILE_DIR:studio>)
 
-add_custom_command(TARGET studio POST_BUILD        
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different  
-        "${EXTERNAL_PATH}physx/dll/${PLATFORM_DIR}/PhysX3CHECKED_x86.dll"
-        $<TARGET_FILE_DIR:studio>)
+	add_custom_command(TARGET studio POST_BUILD        
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different  
+			"${EXTERNAL_PATH}physx/dll/${PLATFORM_DIR}/PhysX3CHECKED_x64.dll"
+			$<TARGET_FILE_DIR:studio>)
+
+else(${IS64})
+
+	add_custom_command(TARGET studio POST_BUILD        
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different  
+			"${EXTERNAL_PATH}physx/dll/${PLATFORM_DIR}/PhysX3CommonCHECKED_x86.dll"
+			$<TARGET_FILE_DIR:studio>)
+
+	add_custom_command(TARGET studio POST_BUILD        
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different  
+			"${EXTERNAL_PATH}physx/dll/${PLATFORM_DIR}/PhysX3CookingCHECKED_x86.dll"
+			$<TARGET_FILE_DIR:studio>)
+
+	add_custom_command(TARGET studio POST_BUILD        
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different  
+			"${EXTERNAL_PATH}physx/dll/${PLATFORM_DIR}/PhysX3CharacterKinematicCHECKED_x86.dll"
+			$<TARGET_FILE_DIR:studio>)
+
+	add_custom_command(TARGET studio POST_BUILD        
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different  
+			"${EXTERNAL_PATH}physx/dll/${PLATFORM_DIR}/PhysX3CHECKED_x86.dll"
+			$<TARGET_FILE_DIR:studio>)
+
+endif(${IS64})
+
+
