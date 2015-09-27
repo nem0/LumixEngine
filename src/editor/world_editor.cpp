@@ -1927,8 +1927,8 @@ public:
 		g_log_info.log("editor") << "saving universe " << path.c_str() << "...";
 		FS::FileSystem& fs = m_engine->getFileSystem();
 		char bkp_path[MAX_PATH_LENGTH];
-		copyString(bkp_path, sizeof(bkp_path), path);
-		catString(bkp_path, sizeof(bkp_path), ".bkp");
+		copyString(bkp_path, path);
+		catString(bkp_path, ".bkp");
 		copyFile(path, bkp_path);
 		FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::CREATE | FS::Mode::WRITE);
 		save(*file);

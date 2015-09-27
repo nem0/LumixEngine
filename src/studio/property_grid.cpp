@@ -148,7 +148,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 	case Lumix::IPropertyDescriptor::RESOURCE:
 	{
 		char buf[1024];
-		Lumix::copyString(buf, sizeof(buf), (const char*)stream.getData());
+		Lumix::copyString(buf, (const char*)stream.getData());
 		if (ImGui::InputText("", buf, sizeof(buf)))
 		{
 			m_editor.setProperty(cmp.type, index, desc, buf, (int)strlen(buf) + 1);
@@ -170,7 +170,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc, int index, Lum
 	case Lumix::IPropertyDescriptor::FILE:
 	{
 		char buf[1024];
-		Lumix::copyString(buf, sizeof(buf), (const char*)stream.getData());
+		Lumix::copyString(buf, (const char*)stream.getData());
 		if (ImGui::InputText(desc.getName(), buf, sizeof(buf)))
 		{
 			m_editor.setProperty(cmp.type, index, desc, buf, (int)strlen(buf) + 1);
@@ -256,7 +256,7 @@ void PropertyGrid::showCoreProperties(Lumix::Entity entity)
 {
 	char name[256];
 	const char* tmp = m_editor.getUniverse()->getEntityName(entity);
-	Lumix::copyString(name, sizeof(name), tmp);
+	Lumix::copyString(name, tmp);
 	if (ImGui::InputText("Name", name, sizeof(name)))
 	{
 		m_editor.setEntityName(entity, name);

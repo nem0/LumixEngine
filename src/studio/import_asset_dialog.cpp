@@ -860,7 +860,7 @@ struct ConvertTask : public Lumix::MT::Task
 		m_dialog.setImportMessage("Importing physics...");
 		char filename[Lumix::MAX_PATH_LENGTH];
 		Lumix::PathUtils::getBasename(filename, sizeof(filename), m_dialog.m_source);
-		Lumix::catString(filename, sizeof(filename), ".phy");
+		Lumix::catString(filename, ".phy");
 		auto& fs = m_dialog.m_editor.getEngine().getFileSystem();
 		PathBuilder phy_path(m_dialog.m_editor.getBasePath());
 		phy_path << "/" << filename;
@@ -1176,14 +1176,14 @@ void ImportAssetDialog::checkSource()
 void ImportAssetDialog::setErrorMessage(const char* message)
 {
 	Lumix::MT::SpinLock lock(m_mutex);
-	Lumix::copyString(m_error_message, sizeof(m_error_message), message);
+	Lumix::copyString(m_error_message, message);
 }
 
 
 void ImportAssetDialog::setImportMessage(const char* message)
 {
 	Lumix::MT::SpinLock lock(m_mutex);
-	Lumix::copyString(m_import_message, sizeof(m_import_message), message);
+	Lumix::copyString(m_import_message, message);
 }
 
 

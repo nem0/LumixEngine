@@ -22,7 +22,7 @@ struct FileSystemWatcherTask : public Lumix::MT::Task
 		: Task(allocator)
 		, m_watcher(watcher)
 	{
-		Lumix::copyString(m_path, sizeof(m_path), path);
+		Lumix::copyString(m_path, path);
 	}
 
 

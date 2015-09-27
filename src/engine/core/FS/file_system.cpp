@@ -206,7 +206,7 @@ public:
 			item.m_file = prev;
 			item.m_cb = call_back;
 			item.m_mode = mode;
-			copyString(item.m_path, sizeof(item.m_path), file);
+			copyString(item.m_path, file);
 			item.m_flags = E_IS_OPEN;
 		}
 
