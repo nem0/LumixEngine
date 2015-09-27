@@ -54,7 +54,6 @@ namespace Lumix
 		Resource(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 		virtual ~Resource();
 
-		//events
 		virtual void onReady(void);
 		void onEmpty(void);
 		void onLoading(void);
@@ -79,10 +78,14 @@ namespace Lumix
 		void decrementDepCount();
 
 	private:
+		void fileLoaded(FS::IFile& file, bool success, FS::FileSystem& fs);
+
+		Resource(const Resource&);
 		void operator=(const Resource&);
 		uint16_t m_ref_count;
 		uint16_t m_dep_count;
 		State m_state;
+		bool m_is_waiting_for_file;
 
 	protected:
 		Path m_path;

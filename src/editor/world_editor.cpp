@@ -2467,8 +2467,8 @@ public:
 		blob.read(hash);
 		uint32_t engine_hash = 0;
 		blob.read(engine_hash);
-		if (crc32((const uint8_t*)blob.getData() + sizeof(hash),
-				  blob.getSize() - sizeof(hash)) != hash)
+		if (crc32((const uint8_t*)blob.getData() + sizeof(hash), blob.getSize() - sizeof(hash)) !=
+			hash)
 		{
 			Timer::destroy(timer);
 			g_log_error.log("editor") << "Corrupted file.";
@@ -2479,14 +2479,11 @@ public:
 		if (m_engine->deserialize(*m_universe_context, blob))
 		{
 			m_template_system->deserialize(blob);
-			auto* render_scene =
-				static_cast<RenderScene*>(getScene(crc32("renderer")));
+			auto* render_scene = static_cast<RenderScene*>(getScene(crc32("renderer")));
 
-			m_camera = render_scene->getCameraEntity(
-				render_scene->getCameraInSlot("editor"));
+			m_camera = render_scene->getCameraEntity(render_scene->getCameraInSlot("editor"));
 
-			g_log_info.log("editor") << "Universe parsed in "
-									 << timer->getTimeSinceStart()
+			g_log_info.log("editor") << "Universe parsed in " << timer->getTimeSinceStart()
 									 << " seconds";
 
 			Universe* universe = getUniverse();
@@ -2495,6 +2492,10 @@ public:
 				Entity e(i);
 				createEditorIcon(e);
 			}
+		}
+		else
+		{
+			newUniverse();
 		}
 		Timer::destroy(timer);
 		m_is_loading = false;
