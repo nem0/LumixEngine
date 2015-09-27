@@ -34,14 +34,17 @@ namespace Lumix
 			if (m_is_recording)
 			{
 				m_frame_listeners.invoke();
-				ASSERT(!m_current_block);
 				m_root_block->frame();
+				auto* block = m_current_block;
+				float t = m_timer->getTimeSinceStart();
+				while (block)
+				{
+					auto& hit = block->m_hits.pushEmpty();
+					hit.m_start = t;
+					hit.m_length = 0;
+					block = block->m_parent;
+				}
 			}
-		}
-		if (m_is_record_toggle_request)
-		{
-			m_is_recording = !m_is_recording;
-			m_is_record_toggle_request = false;
 		}
 	}
 
@@ -49,6 +52,17 @@ namespace Lumix
 	void Profiler::toggleRecording()
 	{
 		m_is_record_toggle_request = true;
+	}
+
+
+	void Profiler::checkRecording()
+	{
+		ASSERT(!m_current_block);
+		if (m_is_record_toggle_request)
+		{
+			m_is_recording = !m_is_recording;
+			m_is_record_toggle_request = false;
+		}
 	}
 
 	

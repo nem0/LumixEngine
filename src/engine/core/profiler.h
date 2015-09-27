@@ -25,6 +25,7 @@ namespace Lumix
 			void frame();
 			void toggleRecording();
 			bool isRecording() const { return m_is_recording; }
+			void checkRecording();
 			DelegateList<void ()>& getFrameListeners() { return m_frame_listeners; }
 			Block* getRootBlock() const { return m_root_block; }
 
@@ -60,6 +61,7 @@ namespace Lumix
 
 			~Block();
 			void frame();
+			void frameHits(Lumix::Timer* timer);
 			float getLength();
 			int getHitCount() const { return m_hits.size(); }
 

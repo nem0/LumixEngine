@@ -1,5 +1,6 @@
 #include "profiler_ui.h"
 #include "core/math_utils.h"
+#include "core/profiler.h"
 #include "core/resource.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
@@ -494,6 +495,7 @@ void ProfilerUI::onGuiCPUProfiler()
 
 void ProfilerUI::onGui()
 {
+	PROFILE_FUNCTION();
 	if (!m_is_opened) return;
 
 	if (ImGui::Begin("Profiler", &m_is_opened))
