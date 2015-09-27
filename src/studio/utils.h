@@ -87,6 +87,7 @@ namespace Lumix
 	class WorldEditor;
 }
 
+bool ColorPicker(const char* label, float col[3]);
 
 void getEntityListDisplayName(Lumix::WorldEditor& editor,
 	char* buf,

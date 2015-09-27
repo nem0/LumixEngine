@@ -59,6 +59,8 @@ namespace Lumix
 	#endif
 #endif
 
+
+#define LUMIX_NEW(allocator, type) new ((allocator).allocate(sizeof(type))) type
 #define LUMIX_LIBRARY_EXPORT __declspec(dllexport)
 #define LUMIX_LIBRARY_IMPORT __declspec(dllimport)
 #define LUMIX_ALIGN_OF(T) __alignof(T)

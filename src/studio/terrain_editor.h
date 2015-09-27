@@ -47,16 +47,6 @@ private:
 		const Lumix::ComponentUID& cmp,
 		const Lumix::Vec3& center);
 	Lumix::Material* getMaterial();
-	bool overlaps(float min1, float max1, float min2, float max2);
-	bool testOBBCollision(const Lumix::Matrix& matrix_a,
-		const Lumix::Model* model_a,
-		const Lumix::Matrix& matrix_b,
-		const Lumix::Model* model_b,
-		float scale);
-	bool isOBBCollision(Lumix::RenderScene* scene,
-		const Lumix::Matrix& matrix,
-		Lumix::Model* model,
-		float scale);
 	void paint(const Lumix::RayCastModelHit& hit, TerrainEditor::Type type, bool new_stroke);
 
 	static void getProjections(const Lumix::Vec3& axis,

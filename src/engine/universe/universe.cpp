@@ -213,7 +213,7 @@ Entity Universe::getFirstEntity()
 {
 	for (int i = 0; i < m_id_map.size(); ++i)
 	{
-		if (m_id_map[i] != -1)
+		if (m_id_map[i] >= 0)
 		{
 			return i;
 		}
@@ -226,7 +226,7 @@ Entity Universe::getNextEntity(Entity entity)
 {
 	for (int i = entity + 1; i < m_id_map.size(); ++i)
 	{
-		if (m_id_map[i] != -1)
+		if (m_id_map[i] >= 0)
 		{
 			return i;
 		}
