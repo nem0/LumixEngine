@@ -1,5 +1,18 @@
 cmake_minimum_required(VERSION 3.1.2)
 
+
+string(FIND ${CMAKE_GENERATOR} "Win64" POS_X64)
+if(POS_X64 GREATER -1)
+	set(IS64 "TRUE")
+	set(PLATFORM_DIR "win64")
+else(POS_X64 GREATER -1)
+	set(IS64 "FALSE")
+	set(PLATFORM_DIR "win32")
+endif(POS_X64 GREATER -1)
+
+MESSAGE( STATUS "Generator: " ${CMAKE_GENERATOR} )
+MESSAGE( STATUS "64bit: " ${IS64} )
+
 project(LumixEngine)
 
 set(LUMIX_ROOT_PATH ${PROJECT_SOURCE_DIR}/../)
@@ -50,7 +63,7 @@ add_library(engine SHARED
 set_target_properties (engine PROPERTIES COMPILE_DEFINITIONS "BUILDING_ENGINE")
 
 target_link_libraries(engine psapi)
-target_link_libraries(engine ${EXTERNAL_PATH}lua/lib/debug/lua.lib)
+target_link_libraries(engine ${EXTERNAL_PATH}lua/lib/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/lua.lib)
 
 ###################### RENDERER ######################
 
@@ -70,8 +83,8 @@ add_library(renderer SHARED
 set_target_properties (renderer PROPERTIES COMPILE_DEFINITIONS "BUILDING_RENDERER")
 
 target_link_libraries(renderer engine)
-target_link_libraries(renderer ${EXTERNAL_PATH}lua/lib/debug/lua.lib)
-target_link_libraries(renderer ${EXTERNAL_PATH}bgfx/lib/bgfx${CMAKE_CFG_INTDIR}.lib)
+target_link_libraries(renderer ${EXTERNAL_PATH}lua/lib/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/lua.lib)
+target_link_libraries(renderer ${EXTERNAL_PATH}bgfx/lib/${PLATFORM_DIR}/bgfx${CMAKE_CFG_INTDIR}.lib)
 
 
 ###################### PHYSICS ######################
@@ -92,12 +105,12 @@ set_target_properties (physics PROPERTIES COMPILE_DEFINITIONS "BUILDING_PHYSICS"
 target_link_libraries(physics engine)
 target_link_libraries(physics renderer)
 target_link_libraries(physics editor)
-target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/x86/PhysXVisualDebuggerSDKCHECKED.lib)
-target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/x86/PhysX3CHECKED_x86.lib)
-target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/x86/PhysX3CommonCHECKED_x86.lib)
-target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/x86/PhysX3ExtensionsCHECKED.lib)
-target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/x86/PhysX3CharacterKinematicCHECKED_x86.lib)
-target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/x86/PhysX3CookingCHECKED_x86.lib)
+target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/${PLATFORM_DIR}/PhysXVisualDebuggerSDKCHECKED.lib)
+target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/${PLATFORM_DIR}/PhysX3CHECKED_x86.lib)
+target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/${PLATFORM_DIR}/PhysX3CommonCHECKED_x86.lib)
+target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/${PLATFORM_DIR}/PhysX3ExtensionsCHECKED.lib)
+target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/${PLATFORM_DIR}/PhysX3CharacterKinematicCHECKED_x86.lib)
+target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/${PLATFORM_DIR}/PhysX3CookingCHECKED_x86.lib)
 
 ###################### SCRIPT ######################
 
@@ -252,7 +265,7 @@ add_library(lua_script SHARED
 
 set_target_properties (lua_script PROPERTIES COMPILE_DEFINITIONS "BUILDING_LUA_SCRIPT")
 
-target_link_libraries(lua_script ${EXTERNAL_PATH}lua/lib/debug/lua.lib)
+target_link_libraries(lua_script ${EXTERNAL_PATH}lua/lib/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/lua.lib)
 target_link_libraries(lua_script engine)
 target_link_libraries(lua_script renderer)
 target_link_libraries(lua_script editor)
