@@ -30,6 +30,7 @@ static const uint32_t SERIALIZED_ENGINE_MAGIC = 0x5f4c454e; // == '_LEN'
 enum class SerializedEngineVersion : int32_t
 {
 	BASE,
+	SPARSE_TRANFORMATIONS,
 
 	LATEST // must be the last one
 };
@@ -393,7 +394,7 @@ public:
 			g_log_error.log("engine") << "Wrong or corrupted file";
 			return false;
 		}
-		if (header.m_version > SerializedEngineVersion::LATEST)
+		if (header.m_version != SerializedEngineVersion::LATEST)
 		{
 			g_log_error.log("engine") << "Unsupported version";
 			return false;

@@ -233,6 +233,7 @@ target_link_libraries(studio editor)
 target_link_libraries(studio optimized ${EXTERNAL_PATH}assimp/lib/win32/assimp-vc120-mt.lib)
 target_link_libraries(studio debug ${EXTERNAL_PATH}assimp/lib/win32/assimp-vc120-mtd.lib)
 target_link_libraries(studio ${EXTERNAL_PATH}crunch/lib/win32/crnlib${CMAKE_CFG_INTDIR}.lib)
+target_link_libraries(studio winmm.lib)
 
 
 
