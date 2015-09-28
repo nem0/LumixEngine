@@ -11,6 +11,29 @@ static char makeLowercase(char c)
 }
 
 
+LUMIX_ENGINE_API const char* stristr(const char* haystack, const char* needle)
+{
+	const char* c = haystack;
+	while (*c)
+	{
+		if (makeLowercase(*c) == makeLowercase(needle[0]))
+		{
+			const char* n = needle + 1;
+			const char* c2 = c + 1;
+			while (*n && *c2)
+			{
+				if (makeLowercase(*n) != makeLowercase(*c2)) break;
+				++n;
+				++c2;
+			}
+			if (*n == 0) return c;
+		}
+		++c;
+	}
+	return nullptr;
+}
+
+
 bool makeLowercase(char* destination, int length, const char* source)
 {
 	if (!source)
