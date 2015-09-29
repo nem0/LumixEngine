@@ -58,6 +58,7 @@ private:
 	void unloadResource();
 	void selectResource(const Lumix::Path& resource);
 	void selectResource(Lumix::Resource* resource);
+	void openInExternalEditor(Lumix::Resource* resource);
 
 private:
 	Metadata& m_metadata;
