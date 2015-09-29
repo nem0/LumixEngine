@@ -292,8 +292,7 @@ public:
 				PROFILE_BLOCK("processAsyncTransaction");
 				m_in_progress.pop();
 
-				tr->data.m_cb.invoke(
-					*tr->data.m_file, !!(tr->data.m_flags & E_SUCCESS), *this);
+				tr->data.m_cb.invoke(*tr->data.m_file, !!(tr->data.m_flags & E_SUCCESS), *this);
 				if ((tr->data.m_flags & (E_SUCCESS | E_FAIL)) != 0)
 				{
 					closeAsync(*tr->data.m_file);

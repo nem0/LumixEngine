@@ -49,6 +49,7 @@ private:
 	void addResource(const char* path, const char* filename);
 	void onGuiResource();
 	void onGuiMaterial();
+	void onGuiShader();
 	void onGuiModel();
 	void onGuiTexture();
 	void onGuiLuaScript();
