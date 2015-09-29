@@ -424,19 +424,13 @@ void AssetBrowser::onGuiResource()
 	const char* path = m_selected_resource->getPath().c_str();
 	if (!ImGui::CollapsingHeader(path, nullptr, true, true)) return;
 
-	if (m_selected_resource->isFailure())
-	{
-		ImGui::Text("Failed to load the resource");
-		return;
-	}
-
 	if (m_selected_resource->isLoading())
 	{
 		ImGui::Text("Loading...");
 		return;
 	}
 
-	if (!m_selected_resource->isReady())
+	if (!m_selected_resource->isReady() && !m_selected_resource->isFailure())
 	{
 		ImGui::Text("Not ready");
 		return;

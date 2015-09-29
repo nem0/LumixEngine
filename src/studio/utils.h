@@ -82,13 +82,48 @@ struct StringBuilder
 };
 
 
+class StudioApp;
+
+
+struct Action
+{
+	Action(const char* label, const char* name, void (StudioApp::*func)())
+	{
+		this->label = label;
+		this->name = name;
+		this->func = func;
+		shortcut[0] = shortcut[1] = shortcut[2] = -1;
+	}
+
+	Action(const char* label,
+		const char* name,
+		void (StudioApp::*func)(),
+		int shortcut0,
+		int shortcut1,
+		int shortcut2)
+	{
+		this->label = label;
+		this->name = name;
+		this->func = func;
+		shortcut[0] = shortcut0;
+		shortcut[1] = shortcut1;
+		shortcut[2] = shortcut2;
+	}
+
+	int shortcut[3];
+	const char* name;
+	const char* label;
+	void (StudioApp::*func)();
+};
+
+
 namespace Lumix
 {
 	class WorldEditor;
 }
 
 bool ColorPicker(const char* label, float col[3]);
-
+const char* getKeyToString(int key);
 void getEntityListDisplayName(Lumix::WorldEditor& editor,
 	char* buf,
 	int max_size,
