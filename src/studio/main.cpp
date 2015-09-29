@@ -96,11 +96,30 @@ public:
 		m_actions.push(Action("Stats", "toggleStats", &StudioApp::toggleStats));
 	}
 
+	
+	void autosave()
+	{
+		m_time_to_autosave = float(m_settings.m_autosave_time);
+		if (!m_editor->getUniversePath().isValid()) return;
+
+		char filename[Lumix::MAX_PATH_LENGTH];
+		Lumix::copyString(filename, m_editor->getUniversePath().c_str());
+		Lumix::catString(filename, "_autosave.unv");
+
+		m_editor->saveUniverse(Lumix::Path(filename), false);
+	}
+
 
 	void update()
 	{
 		PROFILE_FUNCTION();
 		float time_delta = m_editor->getEngine().getLastTimeDelta();
+
+		m_time_to_autosave -= time_delta;
+		if (m_time_to_autosave < 0)
+		{
+			autosave();
+		}
 
 		m_editor->update();
 		m_sceneview.update();
@@ -235,9 +254,10 @@ public:
 
 	void save()
 	{
+		m_time_to_autosave = float(m_settings.m_autosave_time);
 		if (m_editor->getUniversePath().isValid())
 		{
-			m_editor->saveUniverse(m_editor->getUniversePath());
+			m_editor->saveUniverse(m_editor->getUniversePath(), true);
 		}
 		else
 		{
@@ -245,7 +265,7 @@ public:
 			if (Lumix::getSaveFilename(
 				filename, sizeof(filename), "Universes\0*.unv\0", "unv"))
 			{
-				m_editor->saveUniverse(Lumix::Path(filename));
+				m_editor->saveUniverse(Lumix::Path(filename), true);
 				setTitle(filename);
 			}
 		}
@@ -255,16 +275,23 @@ public:
 
 	void saveAs()
 	{
+		m_time_to_autosave = float(m_settings.m_autosave_time);
 		char filename[Lumix::MAX_PATH_LENGTH];
 		if (Lumix::getSaveFilename(filename, sizeof(filename), "Universes\0*.unv\0", "unv"))
 		{
-			m_editor->saveUniverse(Lumix::Path(filename));
+			m_editor->saveUniverse(Lumix::Path(filename), true);
 		}
 	}
 
 
 	void exit() { PostQuitMessage(0); }
-	void newUniverse() { m_editor->newUniverse(); }
+
+	void newUniverse()
+	{
+		m_editor->newUniverse();
+		m_time_to_autosave = float(m_settings.m_autosave_time);
+	}
+
 	void undo() { m_editor->undo(); }
 	void redo() { m_editor->redo(); }
 	void copy() { m_editor->copyEntity(); }
@@ -295,6 +322,26 @@ public:
 	}
 
 
+	void loadAndExecuteCommands()
+	{
+		char filename[Lumix::MAX_PATH_LENGTH];
+		if (Lumix::getOpenFilename(filename, Lumix::lengthOf(filename), "JSON files\0*.json\0"))
+		{
+			m_editor->executeUndoStack(Lumix::Path(filename));
+		}
+	}
+
+
+	void saveUndoStack()
+	{
+		char filename[Lumix::MAX_PATH_LENGTH];
+		if (Lumix::getSaveFilename(filename, Lumix::lengthOf(filename), "JSON files\0*.json\0", "json"))
+		{
+			m_editor->saveUndoStack(Lumix::Path(filename));
+		}
+	}
+
+
 	void showMainMenu()
 	{
 		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
@@ -310,6 +357,7 @@ public:
 					{
 						if (ImGui::MenuItem(univ.c_str()))
 						{
+							m_time_to_autosave = float(m_settings.m_autosave_time);
 							m_editor->loadUniverse(univ);
 							setTitle(univ.c_str());
 						}
@@ -381,6 +429,8 @@ public:
 				doMenuItem(&StudioApp::toggleGameMode, m_editor->isGameMode(), true);
 				doMenuItem(&StudioApp::toggleMeasure, m_editor->isMeasureToolActive(), true);
 				doMenuItem(&StudioApp::snapToTerrain, false, is_any_entity_selected);
+				if (ImGui::MenuItem("Save commands")) saveUndoStack();
+				if (ImGui::MenuItem("Load commands")) loadAndExecuteCommands();
 
 				ImGui::MenuItem("Import asset", nullptr, &m_import_asset_dialog->m_is_opened);
 				ImGui::EndMenu();
@@ -864,6 +914,7 @@ public:
 	Lumix::PipelineInstance* m_game_pipeline;
 	bgfx::TextureHandle m_gameview_texture_handle;
 
+	float m_time_to_autosave;
 	Lumix::Array<Action> m_actions;
 	Lumix::WorldEditor* m_editor;
 	AssetBrowser* m_asset_browser;
