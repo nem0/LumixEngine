@@ -9,6 +9,9 @@
 #include "lumix.h"
 
 
+class Metadata;
+
+
 namespace Lumix
 {
 
@@ -28,7 +31,7 @@ class ImportAssetDialog
 	friend struct ConvertTask;
 	friend struct ImportTextureTask;
 	public:
-		ImportAssetDialog(Lumix::WorldEditor& editor);
+		ImportAssetDialog(Lumix::WorldEditor& editor, Metadata& metadata);
 		~ImportAssetDialog();
 		void setErrorMessage(const char* message);
 		void setImportMessage(const char* message);
@@ -70,4 +73,5 @@ class ImportAssetDialog
 		bool m_is_importing_texture;
 		Lumix::MT::Task* m_task;
 		Lumix::MT::SpinMutex m_mutex;
+		Metadata& m_metadata;
 };

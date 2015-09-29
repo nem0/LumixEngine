@@ -14,6 +14,7 @@
 #include "debug/floating_points.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
+#include "metadata.h"
 #include "ocornut-imgui/imgui.h"
 #include "physics/physics_geometry_manager.h"
 #include "renderer/model.h"
@@ -142,6 +143,31 @@ struct ImportTextureTask : public Lumix::MT::Task
 	}
 
 
+	static void getDestinationPath(const char* output_dir,
+		const char* source,
+		bool to_dds,
+		char* out,
+		int max_size)
+	{
+		char basename[Lumix::MAX_PATH_LENGTH];
+		Lumix::PathUtils::getBasename(basename, sizeof(basename), source);
+
+		if (to_dds)
+		{
+			PathBuilder dest_path(output_dir);
+			dest_path << "/" << basename << ".dds";
+			Lumix::copyString(out, max_size, dest_path);
+			return;
+		}
+
+		char ext[Lumix::MAX_PATH_LENGTH];
+		Lumix::PathUtils::getExtension(ext, sizeof(ext), source);
+		PathBuilder dest_path(output_dir);
+		dest_path << "/" << basename << "." << ext;
+		Lumix::copyString(out, max_size, dest_path);
+	}
+
+
 	virtual int task() override
 	{
 		m_dialog.setImportMessage("Importing texture...");
@@ -153,19 +179,20 @@ struct ImportTextureTask : public Lumix::MT::Task
 		if (!data)
 		{
 			m_dialog.setErrorMessage(
-				StringBuilder<Lumix::MAX_PATH_LENGTH + 30>("Could not load ")
-				<< m_dialog.m_source);
+				StringBuilder<Lumix::MAX_PATH_LENGTH + 30>("Could not load ") << m_dialog.m_source);
 			return -1;
 		}
+
+		char dest_path[Lumix::MAX_PATH_LENGTH];
+		getDestinationPath(m_dialog.m_output_dir,
+			m_dialog.m_source,
+			m_dialog.m_convert_to_dds,
+			dest_path,
+			Lumix::lengthOf(dest_path));
 
 		if (m_dialog.m_convert_to_dds)
 		{
 			m_dialog.setImportMessage("Converting to DDS...");
-			char basename[Lumix::MAX_PATH_LENGTH];
-			Lumix::PathUtils::getBasename(
-				basename, sizeof(basename), m_dialog.m_source);
-			PathBuilder dest_path(m_dialog.m_output_dir);
-			dest_path << "/" << basename << ".dds";
 
 			saveAsDDS(m_dialog,
 				m_dialog.m_editor.getEngine().getFileSystem(),
@@ -178,20 +205,14 @@ struct ImportTextureTask : public Lumix::MT::Task
 		else
 		{
 			m_dialog.setImportMessage("Copying...");
-			char basename[Lumix::MAX_PATH_LENGTH];
-			char ext[Lumix::MAX_PATH_LENGTH];
-			Lumix::PathUtils::getBasename(
-				basename, sizeof(basename), m_dialog.m_source);
-			Lumix::PathUtils::getExtension(
-				ext, sizeof(ext), m_dialog.m_source);
-			PathBuilder dest_path(m_dialog.m_output_dir);
-			dest_path << "/" << basename << "." << ext;
 
 			if (!Lumix::copyFile(m_dialog.m_source, dest_path))
 			{
 				m_dialog.setErrorMessage(
 					StringBuilder<Lumix::MAX_PATH_LENGTH * 2 + 30>("Could not copy ")
-					<< m_dialog.m_source << " to " << dest_path);
+					<< m_dialog.m_source
+					<< " to "
+					<< dest_path);
 			}
 		}
 		stbi_image_free(data);
@@ -1012,10 +1033,11 @@ struct ConvertTask : public Lumix::MT::Task
 	ImportAssetDialog& m_dialog;
 
 }; // struct ConvertTask
- 
 
-ImportAssetDialog::ImportAssetDialog(Lumix::WorldEditor& editor)
+
+ImportAssetDialog::ImportAssetDialog(Lumix::WorldEditor& editor, Metadata& metadata)
 	: m_source_exists(false)
+	, m_metadata(metadata)
 	, m_task(nullptr)
 	, m_editor(editor)
 	, m_import_physics(false)
@@ -1218,7 +1240,18 @@ void ImportAssetDialog::importTexture()
 {
 	ASSERT(!m_task);
 	setImportMessage("Importing texture...");
+
+	char dest_path[Lumix::MAX_PATH_LENGTH];
+	ImportTextureTask::getDestinationPath(
+		m_output_dir, m_source, m_convert_to_dds, dest_path, Lumix::lengthOf(dest_path));
 	
+	char tmp[Lumix::MAX_PATH_LENGTH];
+	Lumix::PathUtils::normalize(dest_path, tmp, Lumix::lengthOf(tmp));
+	m_editor.getRelativePath(dest_path, Lumix::lengthOf(dest_path), tmp);
+	uint32_t hash = Lumix::crc32(dest_path);
+
+	m_metadata.setString(hash, Lumix::crc32("source"), m_source);
+
 	m_is_importing_texture = true;
 	m_task = m_editor.getAllocator().newObject<ImportTextureTask>(*this);
 	m_task->create("ImportTextureTask");

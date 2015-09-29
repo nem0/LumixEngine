@@ -13,6 +13,7 @@ namespace Lumix
 
 
 class FileSystemWatcher;
+class Metadata;
 
 
 class AssetBrowser
@@ -31,7 +32,7 @@ public:
 	};
 
 public:
-	AssetBrowser(Lumix::WorldEditor& editor);
+	AssetBrowser(Lumix::WorldEditor& editor, Metadata& metadata);
 	~AssetBrowser();
 	void onGui();
 	void update();
@@ -58,6 +59,7 @@ private:
 	void selectResource(Lumix::Resource* resource);
 
 private:
+	Metadata& m_metadata;
 	Lumix::Array<Lumix::Path> m_changed_files;
 	Lumix::Array<Lumix::Array<Lumix::Path> > m_resources;
 	Lumix::Resource* m_selected_resource;
