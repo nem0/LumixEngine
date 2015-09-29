@@ -6,6 +6,24 @@
 #include "ocornut-imgui/imgui.h"
 #include "renderer/render_scene.h"
 #include "universe/universe.h"
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+
+
+const char* getKeyToString(int key)
+{
+	static const char* ALPHABET = "A\0B\0C\0D\0E\0F\0G\0H\0I\0J\0K\0L\0M\0N\0O\0P\0Q\0R\0S"
+		"\0T\0U\0V\0W\0X\0Y\0Z\0";
+	if (key >= 'A' && key <= 'Z') return ALPHABET + ((key - 'A') * 2);
+
+	switch (key)
+	{
+		case VK_CONTROL: return "Ctrl";
+		case VK_DELETE: return "Delete";
+		case VK_SHIFT: return "Shift";
+	}
+	return "";
+}
 
 
 void getEntityListDisplayName(Lumix::WorldEditor& editor,

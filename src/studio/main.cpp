@@ -18,6 +18,7 @@
 #include "hierarchy_ui.h"
 #include "import_asset_dialog.h"
 #include "log_ui.h"
+#include "ocornut-imgui/imgui.h"
 #include "profiler_ui.h"
 #include "property_grid.h"
 #include "renderer/frame_buffer.h"
@@ -26,8 +27,8 @@
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
 #include "renderer/transient_geometry.h"
-#include "ocornut-imgui/imgui.h"
 #include "scene_view.h"
+#include "settings.h"
 #include "shader_compiler.h"
 #include "universe/hierarchy.h"
 #include "utils.h"
@@ -41,6 +42,8 @@
 // http://prideout.net/blog/?p=36
 
 
+
+
 void imGuiCallback(ImDrawData* draw_data);
 LRESULT WINAPI msgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -48,10 +51,13 @@ LRESULT WINAPI msgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 class StudioApp
 {
 public:
+	
+
+public:
 	StudioApp()
-		: m_is_entity_list_shown(true)
+		: m_is_entity_list_opened(true)
 		, m_finished(false)
-		, m_is_style_editor_shown(false)
+		, m_is_style_editor_opened(false)
 		, m_import_asset_dialog(nullptr)
 		, m_shader_compiler(nullptr)
 		, m_is_wireframe(false)
@@ -61,8 +67,33 @@ public:
 		, m_profiler_ui(nullptr)
 		, m_asset_browser(nullptr)
 		, m_property_grid(nullptr)
+		, m_actions(m_allocator)
 	{
-		m_entity_list_filter[0] = '\0';
+		m_entity_list_search[0] = '\0';
+		m_actions.push(Action("New", "newUniverse", &StudioApp::newUniverse));
+		m_actions.push(Action("Save", "save", &StudioApp::save, VK_CONTROL, 'S', -1));
+		m_actions.push(Action("Save As", "saveAs", &StudioApp::saveAs, VK_CONTROL, VK_SHIFT, 'S'));
+		m_actions.push(Action("Exit", "exit", &StudioApp::exit, VK_CONTROL, 'X', -1));
+
+		m_actions.push(Action("Redo", "redo", &StudioApp::redo, VK_CONTROL, VK_SHIFT, 'Z'));
+		m_actions.push(Action("Undo", "undo", &StudioApp::undo, VK_CONTROL, 'Z', -1));
+		m_actions.push(Action("Copy", "copy", &StudioApp::copy, VK_CONTROL, 'C', -1));
+		m_actions.push(Action("Paste", "paste", &StudioApp::paste, VK_CONTROL, 'V', -1));
+		m_actions.push(Action("Center/Pivot", "togglePivotMode", &StudioApp::togglePivotMode));
+		m_actions.push(Action("Local/Global", "toggleCoordSystem", &StudioApp::toggleCoordSystem));
+
+		m_actions.push(Action("Create", "createEntity", &StudioApp::createEntity));
+		m_actions.push(Action("Destroy", "destroyEntity", &StudioApp::destroyEntity, VK_DELETE, -1, -1));
+		m_actions.push(Action("Show", "showEntities", &StudioApp::showEntities));
+		m_actions.push(Action("Hide", "hideEntities", &StudioApp::hideEntities));
+
+		m_actions.push(Action("Game Mode", "toggleGameMode", &StudioApp::toggleGameMode));
+		m_actions.push(Action("Toggle measure", "toggleMeasure", &StudioApp::toggleMeasure));
+		m_actions.push(Action("Snap to terrain", "snapToTerrain", &StudioApp::snapToTerrain));
+		m_actions.push(Action("Look at selected", "lookAtSelected", &StudioApp::lookAtSelected));
+		
+		m_actions.push(Action("Wireframe", "setWireframe", &StudioApp::setWireframe));
+		m_actions.push(Action("Stats", "toggleStats", &StudioApp::toggleStats));
 	}
 
 
@@ -126,7 +157,8 @@ public:
 		m_sceneview.onGui();
 		m_hierarchy_ui.onGui();
 		showGameView();
-		if (m_is_style_editor_shown) ImGui::ShowStyleEditor();
+		if (m_is_style_editor_opened) ImGui::ShowStyleEditor();
+		m_settings.onGui(&m_actions[0], m_actions.size());
 
 		ImGui::Render();
 	}
@@ -168,6 +200,101 @@ public:
 	}
 
 
+	static void getShortcut(const Action& action, char* buf, int max_size)
+	{
+		buf[0] = 0;
+		for (int i = 0; i < Lumix::lengthOf(action.shortcut); ++i)
+		{
+			const char* str = getKeyToString(action.shortcut[i]);
+			if (str[0] == 0) return;
+			if (i > 0) Lumix::catString(buf, max_size, " - ");
+			Lumix::catString(buf, max_size, str);
+		}
+	}
+
+
+	void doMenuItem(void (StudioApp::*func)(), bool selected, bool enabled)
+	{
+		for (const auto& a : m_actions)
+		{
+			if (a.func == func)
+			{
+				char buf[20];
+				getShortcut(a, buf, sizeof(buf));
+				if (ImGui::MenuItem(a.label, buf, selected, enabled))
+				{
+					(this->*func)();
+				}
+				return;
+			}
+		}
+
+		ASSERT(false);
+	}
+
+
+	void save()
+	{
+		if (m_editor->getUniversePath().isValid())
+		{
+			m_editor->saveUniverse(m_editor->getUniversePath());
+		}
+		else
+		{
+			char filename[Lumix::MAX_PATH_LENGTH];
+			if (Lumix::getSaveFilename(
+				filename, sizeof(filename), "Universes\0*.unv\0", "unv"))
+			{
+				m_editor->saveUniverse(Lumix::Path(filename));
+				setTitle(filename);
+			}
+		}
+
+	}
+
+
+	void saveAs()
+	{
+		char filename[Lumix::MAX_PATH_LENGTH];
+		if (Lumix::getSaveFilename(filename, sizeof(filename), "Universes\0*.unv\0", "unv"))
+		{
+			m_editor->saveUniverse(Lumix::Path(filename));
+		}
+	}
+
+
+	void exit() { PostQuitMessage(0); }
+	void newUniverse() { m_editor->newUniverse(); }
+	void undo() { m_editor->undo(); }
+	void redo() { m_editor->redo(); }
+	void copy() { m_editor->copyEntity(); }
+	void paste() { m_editor->pasteEntity(); }
+	void togglePivotMode() { m_editor->getGizmo().togglePivotMode(); }
+	void toggleCoordSystem() { m_editor->getGizmo().toggleCoordSystem(); }
+	void createEntity() { m_editor->addEntity(); }
+	void showEntities() { m_editor->showEntities(); }
+	void hideEntities() { m_editor->hideEntities(); }
+	void toggleMeasure() { m_editor->toggleMeasure(); }
+	void snapToTerrain() { m_editor->snapToTerrain(); }
+	void lookAtSelected() { m_editor->lookAtSelected(); }
+	void toggleStats() { m_gui_pipeline->toggleStats(); }
+
+
+	void setWireframe()
+	{
+		m_is_wireframe = !m_is_wireframe;
+		m_sceneview.setWireframe(m_is_wireframe);
+	}
+
+
+	void destroyEntity()
+	{
+		auto& selected_entities = m_editor->getSelectedEntities();
+		if (selected_entities.empty()) return;
+		m_editor->destroyEntities(&selected_entities[0], selected_entities.size());
+	}
+
+
 	void showMainMenu()
 	{
 		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
@@ -175,7 +302,7 @@ public:
 		{
 			if (ImGui::BeginMenu("File"))
 			{
-				if (ImGui::MenuItem("New")) m_editor->newUniverse();
+				doMenuItem(&StudioApp::newUniverse, false, true);
 				if (ImGui::BeginMenu("Open"))
 				{
 					auto& universes = m_asset_browser->getResources(AssetBrowser::UNIVERSE);
@@ -189,52 +316,23 @@ public:
 					}
 					ImGui::EndMenu();
 				}
-				if (ImGui::MenuItem("Save"))
-				{
-					if (m_editor->getUniversePath().isValid())
-					{
-						m_editor->saveUniverse(m_editor->getUniversePath());
-					}
-					else
-					{
-						char filename[Lumix::MAX_PATH_LENGTH];
-						if (Lumix::getSaveFilename(
-							filename, sizeof(filename), "Universes\0*.unv\0", "unv"))
-						{
-							m_editor->saveUniverse(Lumix::Path(filename));
-							setTitle(filename);
-						}
-					}
-					
-				}
-				if (ImGui::MenuItem("Save As"))
-				{
-					char filename[Lumix::MAX_PATH_LENGTH];
-					if (Lumix::getSaveFilename(
-							filename, sizeof(filename), "Universes\0*.unv\0", "unv"))
-					{
-						m_editor->saveUniverse(Lumix::Path(filename));
-					}
-				}
-				if (ImGui::MenuItem("Exit")) PostQuitMessage(0);
+				doMenuItem(&StudioApp::save, false, true);
+				doMenuItem(&StudioApp::saveAs, false, true);
+				doMenuItem(&StudioApp::exit, false, true);
 
 				ImGui::EndMenu();
 			}
 
 			if (ImGui::BeginMenu("Edit"))
 			{
-				if (ImGui::MenuItem("Undo", "Ctrl - Z", nullptr, m_editor->canUndo()))
-					m_editor->undo();
-				if (ImGui::MenuItem("Redo", "Ctrl - Shift - Z", nullptr, m_editor->canRedo()))
-					m_editor->redo();
+				doMenuItem(&StudioApp::undo, false, m_editor->canUndo());
+				doMenuItem(&StudioApp::redo, false, m_editor->canRedo());
 				ImGui::Separator();
-				if (ImGui::MenuItem("Copy", "Ctrl - C", nullptr, is_any_entity_selected))
-					m_editor->copyEntity();
-				if (ImGui::MenuItem("Paste", "Ctrl - V", nullptr, m_editor->canPasteEntity()))
-					m_editor->pasteEntity();
+				doMenuItem(&StudioApp::copy, false, is_any_entity_selected);
+				doMenuItem(&StudioApp::paste, false, m_editor->canPasteEntity());
 				ImGui::Separator();
-				if (ImGui::MenuItem("Center/Pivot")) m_editor->getGizmo().togglePivotMode();
-				if (ImGui::MenuItem("Local/Global")) m_editor->getGizmo().toggleCoordSystem();
+				doMenuItem(&StudioApp::togglePivotMode, false, is_any_entity_selected);
+				doMenuItem(&StudioApp::toggleCoordSystem, false, m_editor->canPasteEntity());
 				if (ImGui::BeginMenu("Select"))
 				{
 					if (ImGui::MenuItem("Same mesh", nullptr, nullptr, is_any_entity_selected))
@@ -246,15 +344,8 @@ public:
 
 			if (ImGui::BeginMenu("Entity"))
 			{
-				if (ImGui::MenuItem("Create", "Ctrl - E")) m_editor->addEntity();
-				if (ImGui::MenuItem("Remove", "Delete", nullptr, is_any_entity_selected))
-				{
-					if (!m_editor->getSelectedEntities().empty())
-					{
-						m_editor->destroyEntities(&m_editor->getSelectedEntities()[0],
-							m_editor->getSelectedEntities().size());
-					}
-				}
+				doMenuItem(&StudioApp::createEntity, false, true);
+				doMenuItem(&StudioApp::destroyEntity, false, is_any_entity_selected);
 
 				if (ImGui::BeginMenu("Create template", is_any_entity_selected))
 				{
@@ -278,32 +369,19 @@ public:
 					m_editor->getEntityTemplateSystem().createInstance(
 						m_selected_template_name.c_str(), pos);
 				}
-				if (ImGui::MenuItem("Show", nullptr, nullptr, is_any_entity_selected))
-					m_editor->showEntities();
-				if (ImGui::MenuItem("Hide", nullptr, nullptr, is_any_entity_selected))
-					m_editor->hideEntities();
+				
+				doMenuItem(&StudioApp::showEntities, false, is_any_entity_selected);
+				doMenuItem(&StudioApp::hideEntities, false, is_any_entity_selected);
 				ImGui::EndMenu();
 			}
 
 
 			if (ImGui::BeginMenu("Tools"))
 			{
-				bool b = m_editor->isGameMode();
-				if (ImGui::MenuItem("Game mode", "Ctrl - P", &b))
-				{
-					toggleGameMode();
-				}
+				doMenuItem(&StudioApp::toggleGameMode, m_editor->isGameMode(), true);
+				doMenuItem(&StudioApp::toggleMeasure, m_editor->isMeasureToolActive(), true);
+				doMenuItem(&StudioApp::snapToTerrain, false, is_any_entity_selected);
 
-
-				b = m_editor->isMeasureToolActive();
-				if (ImGui::MenuItem("Measure", nullptr, &b))
-				{
-					m_editor->toggleMeasure();
-				}
-				if (ImGui::MenuItem("Snap to terrain", "Ctrl - T", nullptr, is_any_entity_selected))
-				{
-					m_editor->snapToTerrain();
-				}
 				ImGui::MenuItem("Import asset", nullptr, &m_import_asset_dialog->m_is_opened);
 				ImGui::EndMenu();
 			}
@@ -311,25 +389,21 @@ public:
 
 			if (ImGui::BeginMenu("View"))
 			{
-				if (ImGui::MenuItem(
-						"Look at selected", "Ctrl - F", nullptr, is_any_entity_selected))
-				{
-					m_editor->lookAtSelected();
-				}
-				if (ImGui::MenuItem("Wireframe", "Ctrl - W", &m_is_wireframe))
-					m_sceneview.setWireframe(m_is_wireframe);
-				if (ImGui::MenuItem("Stats")) m_gui_pipeline->toggleStats();
+				doMenuItem(&StudioApp::lookAtSelected, false, is_any_entity_selected);
+				doMenuItem(&StudioApp::setWireframe, m_is_wireframe, true);
+				doMenuItem(&StudioApp::toggleStats, false, true);
 				if (ImGui::BeginMenu("Windows"))
 				{
 					ImGui::MenuItem("Asset browser", nullptr, &m_asset_browser->m_is_opened);
-					ImGui::MenuItem("Entity list", nullptr, &m_is_entity_list_shown);
+					ImGui::MenuItem("Entity list", nullptr, &m_is_entity_list_opened);
 					ImGui::MenuItem("Entity templates", nullptr, &m_is_entity_template_list_opened);
 					ImGui::MenuItem("Game view", nullptr, &m_is_gameview_opened);
 					ImGui::MenuItem("Hierarchy", nullptr, &m_hierarchy_ui.m_is_opened);
 					ImGui::MenuItem("Log", nullptr, &m_log_ui->m_is_opened);
 					ImGui::MenuItem("Profiler", nullptr, &m_profiler_ui->m_is_opened);
 					ImGui::MenuItem("Properties", nullptr, &m_property_grid->m_is_opened);
-					ImGui::MenuItem("Style editor", nullptr, &m_is_style_editor_shown);
+					ImGui::MenuItem("Settings", nullptr, &m_settings.m_is_opened);
+					ImGui::MenuItem("Style editor", nullptr, &m_is_style_editor_opened);
 					ImGui::EndMenu();
 				}
 				ImGui::EndMenu();
@@ -371,54 +445,89 @@ public:
 
 	void showEntityList()
 	{
-		if (!m_is_entity_list_shown) return;
+		if (!m_is_entity_list_opened) return;
 
-		if (ImGui::Begin("Entity list", &m_is_entity_list_shown))
+		if (ImGui::Begin("Entity list", &m_is_entity_list_opened))
 		{
 			if (ImGui::Button("Create entity"))
 			{
 				m_editor->addEntity();
 			}
-			ImGui::InputText("Filter", m_entity_list_filter, sizeof(m_entity_list_filter));
-			ImGui::Separator();
-
 			auto* universe = m_editor->getUniverse();
-			auto entity = universe->getFirstEntity();
+			int scroll_to = -1;
 
-			if (ImGui::BeginChild("header"))
+			if (ImGui::InputText("Search", m_entity_list_search, sizeof(m_entity_list_search)))
 			{
-				while (entity >= 0)
+				for (int i = 0, c = universe->getEntityCount(); i < c; ++i)
 				{
-					char buf[1024];
+					static char buf[1024];
+					auto entity = universe->getEntityFromDenseIdx(i);
 					getEntityListDisplayName(*m_editor, buf, sizeof(buf), entity);
-
-					if (m_entity_list_filter[0] == '\0' ||
-						strstr(buf, m_entity_list_filter) != nullptr)
+					if (Lumix::stristr(buf, m_entity_list_search) != nullptr)
 					{
-						bool is_selected = m_editor->isEntitySelected(entity);
-						if (ImGui::Selectable(buf, &is_selected))
-						{
-							if (ImGui::GetIO().KeysDown[VK_CONTROL])
-							{
-								m_editor->addEntityToSelection(entity);
-							}
-							else
-							{
-								m_editor->selectEntities(&entity, 1);
-							}
-						}
+						scroll_to = i;
+						break;
 					}
-					entity = universe->getNextEntity(entity);
 				}
 			}
-			ImGui::EndChild();
+			ImGui::Separator();
+
+			auto entity = universe->getFirstEntity();
+
+			struct ListBoxData
+			{
+				Lumix::WorldEditor* m_editor;
+				Lumix::Universe* universe;
+				char buffer[1024];
+				static bool itemsGetter(void* data, int idx, const char** txt)
+				{
+					auto* d = static_cast<ListBoxData*>(data);
+					auto entity = d->universe->getEntityFromDenseIdx(idx);
+					getEntityListDisplayName(*d->m_editor, d->buffer, sizeof(d->buffer), entity);
+					*txt = d->buffer;
+					return true;
+				}
+			};
+			ListBoxData data;
+			data.universe = universe;
+			data.m_editor = m_editor;
+			static int current_item;
+			if (ImGui::ListBox("Entities",
+					&current_item,
+					scroll_to,
+					&ListBoxData::itemsGetter,
+					&data,
+					universe->getEntityCount(),
+					15))
+			{
+				auto e = universe->getEntityFromDenseIdx(current_item);
+				m_editor->selectEntities(&e, 1);
+			};
 		}
 		ImGui::End();
 	}
 
 
+	void saveSettings()
+	{
+		m_settings.m_is_asset_browser_opened = m_asset_browser->m_is_opened;
+		m_settings.m_is_entity_list_opened = m_is_entity_list_opened;
+		m_settings.m_is_entity_template_list_opened = m_is_entity_template_list_opened;
+		m_settings.m_is_gameview_opened = m_is_gameview_opened;
+		m_settings.m_is_hierarchy_opened = m_hierarchy_ui.m_is_opened;
+		m_settings.m_is_log_opened = m_log_ui->m_is_opened;
+		m_settings.m_is_profiler_opened = m_profiler_ui->m_is_opened;
+		m_settings.m_is_properties_opened = m_property_grid->m_is_opened;
+		m_settings.m_is_style_editor_opened = m_is_style_editor_opened;
+
+		m_settings.save(&m_actions[0], m_actions.size());
+	}
+
+
 	void shutdown()
 	{
+		saveSettings();
+
 		shutdownImGui();
 
 		delete m_profiler_ui;
@@ -530,8 +639,39 @@ public:
 	}
 
 
+	void loadSettings()
+	{
+		m_settings.load(&m_actions[0], m_actions.size());
+
+		m_asset_browser->m_is_opened = m_settings.m_is_asset_browser_opened;
+		m_is_entity_list_opened = m_settings.m_is_entity_list_opened;
+		m_is_entity_template_list_opened = m_settings.m_is_entity_template_list_opened;
+		m_is_gameview_opened = m_settings.m_is_gameview_opened;
+		m_hierarchy_ui.m_is_opened = m_settings.m_is_hierarchy_opened;
+		m_log_ui->m_is_opened = m_settings.m_is_log_opened;
+		m_profiler_ui->m_is_opened = m_settings.m_is_profiler_opened;
+		m_property_grid->m_is_opened = m_settings.m_is_properties_opened;
+		m_is_style_editor_opened = m_settings.m_is_style_editor_opened;
+
+		if (m_settings.m_is_maximized)
+		{
+			ShowWindow(m_hwnd, SW_MAXIMIZE);
+		}
+		else if (m_settings.m_window.w > 0)
+		{
+			MoveWindow(m_hwnd,
+				m_settings.m_window.x,
+				m_settings.m_window.y,
+				m_settings.m_window.w,
+				m_settings.m_window.h,
+				FALSE);
+		}
+	}
+
+
 	void init(HWND win)
 	{
+
 		Lumix::Renderer::setInitData(win);
 		m_engine = Lumix::Engine::create(nullptr, m_allocator);
 		char current_dir[MAX_PATH];
@@ -572,62 +712,47 @@ public:
 		renderer->resize(rect.right, rect.bottom);
 		onUniverseCreated();
 		initIMGUI(win);
+
+		loadSettings();
 	}
 
 	void checkShortcuts()
 	{
 		if (ImGui::IsAnyItemActive()) return;
 
-		if (ImGui::GetIO().KeysDown[VK_DELETE])
+		bool* keysDown = ImGui::GetIO().KeysDown;
+		for (auto& a : m_actions)
 		{
-			if (!m_editor->getSelectedEntities().empty())
+			if (a.shortcut[0] == -1) continue;
+
+			for (int i = 0; i < Lumix::lengthOf(a.shortcut) + 1; ++i)
 			{
-				m_editor->destroyEntities(
-					&m_editor->getSelectedEntities()[0], m_editor->getSelectedEntities().size());
+				if (a.shortcut[i] == -1 || i == Lumix::lengthOf(a.shortcut))
+				{
+					(this->*a.func)();
+					return;
+				}
+
+				if (!keysDown[a.shortcut[i]]) break;
 			}
 		}
-		if (ImGui::GetIO().KeysDown[VK_CONTROL])
+	}
+
+
+	void onWindowTransformed()
+	{
+		RECT rect;
+		GetWindowRect(m_hwnd, &rect);
+		m_settings.m_window.x = rect.left;
+		m_settings.m_window.y = rect.top;
+		m_settings.m_window.w = rect.right - rect.left;
+		m_settings.m_window.h = rect.bottom - rect.top;
+		
+		WINDOWPLACEMENT wndpl;
+		wndpl.length = sizeof(wndpl);
+		if (GetWindowPlacement(m_hwnd, &wndpl))
 		{
-			if (ImGui::GetIO().KeysDown['W'])
-			{
-				m_is_wireframe = !m_is_wireframe;
-				m_sceneview.setWireframe(m_is_wireframe);
-			}
-			if (ImGui::GetIO().KeysDown['P'])
-			{
-				toggleGameMode();
-			}
-			if (ImGui::GetIO().KeysDown['C'])
-			{
-				m_editor->copyEntity();
-			}
-			if (ImGui::GetIO().KeysDown['V'])
-			{
-				m_editor->pasteEntity();
-			}
-			if (ImGui::GetIO().KeysDown['F'])
-			{
-				m_editor->lookAtSelected();
-			}
-			if (ImGui::GetIO().KeysDown['E'])
-			{
-				m_editor->addEntity();
-			}
-			if (ImGui::GetIO().KeysDown['T'])
-			{
-				m_editor->snapToTerrain();
-			}
-			if (ImGui::GetIO().KeysDown['Z'])
-			{
-				if (ImGui::GetIO().KeysDown[VK_SHIFT])
-				{
-					m_editor->redo();
-				}
-				else
-				{
-					m_editor->undo();
-				}
-			}
+			m_settings.m_is_maximized = wndpl.showCmd == SW_MAXIMIZE;
 		}
 	}
 
@@ -646,8 +771,13 @@ public:
 		switch (msg)
 		{
 			case WM_CLOSE: PostQuitMessage(0); break;
+			case WM_MOVE:
+				onWindowTransformed();
+				break;
 			case WM_SIZE:
 			{
+				onWindowTransformed();
+
 				uint32_t width = ((int)(short)LOWORD(lParam));
 				uint32_t height = ((int)(short)HIWORD(lParam));
 
@@ -718,6 +848,7 @@ public:
 	}
 
 
+	Lumix::DefaultAllocator m_allocator;
 	HWND m_hwnd;
 	HINSTANCE m_instance;
 	bgfx::VertexDecl m_decl;
@@ -733,7 +864,7 @@ public:
 	Lumix::PipelineInstance* m_game_pipeline;
 	bgfx::TextureHandle m_gameview_texture_handle;
 
-	Lumix::DefaultAllocator m_allocator;
+	Lumix::Array<Action> m_actions;
 	Lumix::WorldEditor* m_editor;
 	AssetBrowser* m_asset_browser;
 	PropertyGrid* m_property_grid;
@@ -743,15 +874,16 @@ public:
 	ShaderCompiler* m_shader_compiler;
 	Lumix::string m_selected_template_name;
 	HierarchyUI m_hierarchy_ui;
-	char m_entity_list_filter[100];
+	Settings m_settings;
+	char m_entity_list_search[100];
 
 	bool m_finished;
 
 	bool m_is_gameview_hovered;
 	bool m_is_gameview_opened;
-	bool m_is_entity_list_shown;
+	bool m_is_entity_list_opened;
 	bool m_is_entity_template_list_opened;
-	bool m_is_style_editor_shown;
+	bool m_is_style_editor_opened;
 	bool m_is_wireframe;
 };
 
@@ -850,7 +982,6 @@ INT WINAPI WinMain(HINSTANCE hInst, HINSTANCE ignoreMe0, LPSTR ignoreMe1, INT ig
 		"lmxa", "lmxa", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, 800, 600, NULL, NULL, hInst, 0);
 	ASSERT(hwnd);
 	SetWindowTextA(hwnd, "Lumix Studio");
-	ShowWindow(hwnd, SW_MAXIMIZE);
 	g_app.m_instance = hInst;
 	g_app.init(hwnd);
 	timeBeginPeriod(1);

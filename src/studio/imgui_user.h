@@ -13,4 +13,13 @@ int PlotHistogramEx(const char* label,
 	float scale_max,
 	ImVec2 graph_size,
 	int selected_index);
-}
+
+bool ListBox(const char* label,
+	int* current_item,
+	int scroll_to_item,
+	bool (*items_getter)(void*, int, const char**),
+	void* data,
+	int items_count,
+	int height_in_items);
+
+} // namespace ImGui

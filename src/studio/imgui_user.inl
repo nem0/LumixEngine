@@ -115,4 +115,43 @@ int PlotHistogramEx(const char* label,
 }
 
 
+bool ImGui::ListBox(const char* label,
+	int* current_item,
+	int scroll_to_item,
+	bool (*items_getter)(void*, int, const char**),
+	void* data,
+	int items_count,
+	int height_in_items)
+{
+	if (!ImGui::ListBoxHeader(label, items_count, height_in_items))
+		return false;
+
+	// Assume all items have even height (= 1 line of text). If you need items of different or variable sizes you can create a custom version of ListBox() in your code without using the clipper.
+	bool value_changed = false;
+	if (scroll_to_item != -1)
+	{
+		ImGui::SetScrollY(scroll_to_item * ImGui::GetTextLineHeightWithSpacing());
+	}
+	ImGuiListClipper clipper(items_count, ImGui::GetTextLineHeightWithSpacing());
+	for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++)
+	{
+		const bool item_selected = (i == *current_item);
+		const char* item_text;
+		if (!items_getter(data, i, &item_text))
+			item_text = "*Unknown item*";
+
+		ImGui::PushID(i);
+		if (ImGui::Selectable(item_text, item_selected))
+		{
+			*current_item = i;
+			value_changed = true;
+		}
+		ImGui::PopID();
+	}
+	clipper.End();
+	ImGui::ListBoxFooter();
+	return value_changed;
+}
+
+
 } // namespace ImGui
