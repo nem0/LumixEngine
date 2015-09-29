@@ -15,6 +15,7 @@
 #include "engine/engine.h"
 #include "file_system_watcher.h"
 #include "lua_script/lua_script_manager.h"
+#include "metadata.h"
 #include "ocornut-imgui/imgui.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
@@ -24,6 +25,7 @@
 
 
 static const uint32_t UNIVERSE_HASH = Lumix::crc32("universe");
+static const uint32_t SOURCE_HASH = Lumix::crc32("source");
 static const uint32_t LUA_SCRIPT_HASH = Lumix::crc32("lua_script");
 
 
@@ -44,8 +46,9 @@ static uint32_t getResourceType(const char* path)
 }
 
 
-AssetBrowser::AssetBrowser(Lumix::WorldEditor& editor)
+AssetBrowser::AssetBrowser(Lumix::WorldEditor& editor, Metadata& metadata)
 	: m_editor(editor)
+	, m_metadata(metadata)
 	, m_resources(editor.getAllocator())
 	, m_selected_resource(nullptr)
 	, m_autoreload_changed_resource(true)
@@ -434,6 +437,14 @@ void AssetBrowser::onGuiResource()
 	{
 		ImGui::Text("Not ready");
 		return;
+	}
+
+
+	char source[Lumix::MAX_PATH_LENGTH];
+	if (m_metadata.getString(
+			m_selected_resource->getPath().getHash(), SOURCE_HASH, source, Lumix::lengthOf(source)))
+	{
+		ImGui::LabelText("Source", source);
 	}
 
 	auto resource_type = getResourceType(path);

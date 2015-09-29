@@ -3,6 +3,7 @@
 #include "core/crc32.h"
 #include "core/default_allocator.h"
 #include "core/input_system.h"
+#include "core/log.h"
 #include "core/mt/thread.h"
 #include "core/path_utils.h"
 #include "core/profiler.h"
@@ -18,6 +19,7 @@
 #include "hierarchy_ui.h"
 #include "import_asset_dialog.h"
 #include "log_ui.h"
+#include "metadata.h"
 #include "ocornut-imgui/imgui.h"
 #include "profiler_ui.h"
 #include "property_grid.h"
@@ -68,6 +70,7 @@ public:
 		, m_asset_browser(nullptr)
 		, m_property_grid(nullptr)
 		, m_actions(m_allocator)
+		, m_metadata(m_allocator)
 	{
 		m_entity_list_search[0] = '\0';
 		m_actions.push(Action("New", "newUniverse", &StudioApp::newUniverse));
@@ -571,6 +574,11 @@ public:
 		m_settings.m_is_style_editor_opened = m_is_style_editor_opened;
 
 		m_settings.save(&m_actions[0], m_actions.size());
+
+		if (!m_metadata.save())
+		{
+			Lumix::g_log_warning.log("studio") << "Could not save metadata";
+		}
 	}
 
 
@@ -721,18 +729,17 @@ public:
 
 	void init(HWND win)
 	{
-
 		Lumix::Renderer::setInitData(win);
 		m_engine = Lumix::Engine::create(nullptr, m_allocator);
 		char current_dir[MAX_PATH];
 		GetCurrentDirectory(sizeof(current_dir), current_dir);
 		m_editor = Lumix::WorldEditor::create(current_dir, *m_engine, m_allocator);
-		m_asset_browser = new AssetBrowser(*m_editor);
+		m_asset_browser = new AssetBrowser(*m_editor, m_metadata);
 		m_property_grid = new PropertyGrid(*m_editor, *m_asset_browser);
 		auto engine_allocator = static_cast<Lumix::Debug::Allocator*>(&m_engine->getAllocator());
 		m_profiler_ui = new ProfilerUI(engine_allocator, &m_engine->getResourceManager());
 		m_log_ui = new LogUI(m_editor->getAllocator());
-		m_import_asset_dialog = new ImportAssetDialog(*m_editor);
+		m_import_asset_dialog = new ImportAssetDialog(*m_editor, m_metadata);
 		m_shader_compiler = new ShaderCompiler(*m_editor, *m_log_ui);
 		m_hierarchy_ui.setWorldEditor(*m_editor);
 
@@ -764,6 +771,11 @@ public:
 		initIMGUI(win);
 
 		loadSettings();
+
+		if (!m_metadata.load())
+		{
+			Lumix::g_log_info.log("studio") << "Could not load metadata";
+		}
 	}
 
 	void checkShortcuts()
@@ -926,6 +938,7 @@ public:
 	Lumix::string m_selected_template_name;
 	HierarchyUI m_hierarchy_ui;
 	Settings m_settings;
+	Metadata m_metadata;
 	char m_entity_list_search[100];
 
 	bool m_finished;
