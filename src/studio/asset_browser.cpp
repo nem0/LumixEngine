@@ -390,6 +390,47 @@ void AssetBrowser::onGuiLuaScript()
 }
 
 
+void AssetBrowser::onGuiShader()
+{
+	auto* shader = static_cast<Lumix::Shader*>(m_selected_resource);
+	StringBuilder<Lumix::MAX_PATH_LENGTH> path(m_editor.getBasePath());
+	char basename[Lumix::MAX_PATH_LENGTH];
+	Lumix::PathUtils::getBasename(
+		basename, Lumix::lengthOf(basename), m_selected_resource->getPath().c_str());
+	path << "/shaders/" << basename;
+	if (ImGui::Button("Open vertex shader"))
+	{
+		path << "_vs.sc";
+		Lumix::shellExecuteOpen(path);
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Open fragment shader"))
+	{
+		path << "_fs.sc";
+		Lumix::shellExecuteOpen(path);
+	}
+
+	if (ImGui::CollapsingHeader("Texture slots", nullptr, true, true))
+	{
+		ImGui::Columns(2);
+		ImGui::Text("name");
+		ImGui::NextColumn();
+		ImGui::Text("uniform");
+		ImGui::NextColumn();
+		ImGui::Separator();
+		for (int i = 0; i < shader->getTextureSlotCount(); ++i)
+		{
+			auto& slot = shader->getTextureSlot(i);
+			ImGui::Text(slot.m_name);
+			ImGui::NextColumn();
+			ImGui::Text(slot.m_uniform);
+			ImGui::NextColumn();
+		}
+		ImGui::Columns(1);
+	}
+}
+
+
 void AssetBrowser::onGuiModel()
 {
 	auto* model = static_cast<Lumix::Model*>(m_selected_resource);
@@ -425,7 +466,9 @@ void AssetBrowser::onGuiResource()
 
 
 	const char* path = m_selected_resource->getPath().c_str();
-	if (!ImGui::CollapsingHeader(path, nullptr, true, true)) return;
+	ImGui::Separator();
+	ImGui::LabelText("Selected resource", path);
+	ImGui::Separator();
 
 	if (m_selected_resource->isLoading())
 	{
@@ -453,7 +496,7 @@ void AssetBrowser::onGuiResource()
 		case Lumix::ResourceManager::MATERIAL: onGuiMaterial(); break;
 		case Lumix::ResourceManager::TEXTURE: onGuiTexture(); break;
 		case Lumix::ResourceManager::MODEL: onGuiModel(); break;
-		case Lumix::ResourceManager::SHADER: break;
+		case Lumix::ResourceManager::SHADER: onGuiShader(); break;
 		default:
 			if (resource_type == LUA_SCRIPT_HASH)
 			{

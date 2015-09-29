@@ -169,6 +169,12 @@ namespace Lumix
 	}
 
 
+	bool shellExecuteOpen(const char* path)
+	{
+		return (int)ShellExecute(NULL, NULL, path, NULL, NULL, SW_SHOW) > 32;
+	}
+
+
 	uint64_t getLastModified(const char* file)
 	{
 		FILETIME ft;

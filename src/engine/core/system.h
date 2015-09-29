@@ -21,6 +21,8 @@ namespace Lumix
 	LUMIX_ENGINE_API uint64_t getLastModified(const char* file);
 	LUMIX_ENGINE_API void messageBox(const char* text);
 
+	LUMIX_ENGINE_API bool shellExecuteOpen(const char* path);
+
 	LUMIX_ENGINE_API Process* createProcess(const char* cmd, char* args, IAllocator& allocator);
 	LUMIX_ENGINE_API void destroyProcess(Process& process);
 	LUMIX_ENGINE_API bool isProcessFinished(Process& process);
