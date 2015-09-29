@@ -1920,7 +1920,7 @@ public:
 	virtual float getMouseY() const override { return m_mouse_y; }
 
 
-	virtual void saveUniverse(const Path& path) override
+	virtual void saveUniverse(const Path& path, bool save_path) override
 	{
 		g_log_info.log("editor") << "saving universe " << path.c_str() << "...";
 		FS::FileSystem& fs = m_engine->getFileSystem();
@@ -1931,7 +1931,7 @@ public:
 		FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::CREATE | FS::Mode::WRITE);
 		save(*file);
 		fs.close(*file);
-		m_universe_path = path;
+		if (save_path) m_universe_path = path;
 	}
 
 

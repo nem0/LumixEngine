@@ -91,7 +91,7 @@ public:
 	virtual void undo() = 0;
 	virtual void redo() = 0;
 	virtual void loadUniverse(const Path& path) = 0;
-	virtual void saveUniverse(const Path& path) = 0;
+	virtual void saveUniverse(const Path& path, bool save_path) = 0;
 	virtual void newUniverse() = 0;
 	virtual Path getUniversePath() const = 0;
 	virtual void showEntities() = 0;

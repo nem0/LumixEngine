@@ -61,6 +61,17 @@ static bool getBoolean(lua_State* L, const char* name, bool default_value)
 }
 
 
+static int getInteger(lua_State* L, const char* name, int default_value)
+{
+	int value = default_value;
+	if (lua_getglobal(L, name) == LUA_TNUMBER)
+	{
+		value = (int)lua_tointeger(L, -1);
+	}
+	lua_pop(L, 1);
+	return value;
+}
+
 
 Settings::Settings()
 {
@@ -77,6 +88,8 @@ Settings::Settings()
 	m_is_log_opened = false;
 	m_is_profiler_opened = false;
 	m_is_properties_opened = false;
+
+	m_autosave_time = 300.0f;
 }
 
 
@@ -114,6 +127,7 @@ bool Settings::load(Action* actions, int actions_count)
 	m_is_profiler_opened = getBoolean(L, "profiler_opened", false);
 	m_is_properties_opened = getBoolean(L, "properties_opened", false);
 	m_is_style_editor_opened = getBoolean(L, "style_editor_opened", false);
+	m_autosave_time = getInteger(L, "autosave_time", 300);
 
 	if (lua_getglobal(L, "actions") == LUA_TTABLE)
 	{
@@ -169,6 +183,7 @@ bool Settings::save(Action* actions, int actions_count)
 	writeBool("profiler_opened", m_is_profiler_opened);
 	writeBool("properties_opened", m_is_properties_opened);
 	writeBool("style_editor_opened", m_is_style_editor_opened);
+	fprintf(fp, "autosave_time = %d\n", m_autosave_time);
 
 	fputs("actions = {\n", fp);
 	for (int i = 0; i < actions_count; ++i)
@@ -225,6 +240,8 @@ void Settings::onGui(Action* actions, int actions_count)
 		if (ImGui::Button("Reload")) load(actions, actions_count);
 		ImGui::SameLine();
 		ImGui::Text("Settings are saved when the application closes");
+
+		ImGui::DragInt("Autosave time (seconds)", &m_autosave_time);
 
 		if (ImGui::CollapsingHeader("Shortcuts")) showShortcutSettings(actions, actions_count);
 	}

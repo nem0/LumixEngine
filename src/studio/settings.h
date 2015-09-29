@@ -30,6 +30,8 @@ struct Settings
 	bool m_is_properties_opened;
 	bool m_is_style_editor_opened;
 
+	int m_autosave_time;
+
 	Settings();
 
 	bool save(Action* actions, int actions_count);
