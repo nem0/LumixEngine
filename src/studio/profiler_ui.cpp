@@ -268,7 +268,7 @@ void ProfilerUI::onGuiResources()
 		auto* material_manager = m_resource_manager->get(manager_types[i]);
 		auto& resources = material_manager->getResourceTable();
 
-		ImGui::Columns(4);
+		ImGui::Columns(4, "resc");
 		ImGui::Text("Path");
 		ImGui::NextColumn();
 		ImGui::Text("Size");
@@ -434,7 +434,7 @@ void ProfilerUI::onGuiMemoryProfiler()
 		m_main_allocator->checkGuards();
 	}
 	
-	ImGui::Columns(2);
+	ImGui::Columns(2, "memc");
 	for (auto* child : m_allocation_root->m_children)
 	{
 		showAllocationTree(child, FUNCTION);
@@ -459,7 +459,7 @@ void ProfilerUI::onGuiCPUProfiler()
 	}
 	if (m_root)
 	{
-		ImGui::Columns(3);
+		ImGui::Columns(3, "cpuc");
 		showProfileBlock(m_root, NAME);
 		ImGui::NextColumn();
 		showProfileBlock(m_root, TIME);
