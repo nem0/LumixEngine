@@ -427,13 +427,13 @@ void ProfilerUI::onGuiMemoryProfiler()
 		refreshAllocations();
 	}
 
-	ImGui::Text("Total size: %.3fMB", (m_main_allocator->getTotalSize() / 1024) / 1024.0f);
 	ImGui::SameLine();
 	if (ImGui::Button("Check memory"))
 	{
 		m_main_allocator->checkGuards();
 	}
-	
+	ImGui::Text("Total size: %.3fMB", (m_main_allocator->getTotalSize() / 1024) / 1024.0f);
+
 	ImGui::Columns(2, "memc");
 	for (auto* child : m_allocation_root->m_children)
 	{

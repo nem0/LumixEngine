@@ -399,7 +399,9 @@ void ShaderCompiler::compilePass(
 			}
 			else
 			{
-				m_processes.push(process);
+				auto& p = m_processes.pushEmpty();
+				p.process = process;
+				Lumix::copyString(p.path, out_path);
 			}
 		}
 	}
@@ -442,9 +444,15 @@ void ShaderCompiler::update(float time_delta)
 	PROFILE_FUNCTION();
 	for (int i = 0; i < m_processes.size(); ++i)
 	{
-		if (Lumix::isProcessFinished(*m_processes[i]))
+		if (Lumix::isProcessFinished(*m_processes[i].process))
 		{
-			Lumix::destroyProcess(*m_processes[i]);
+			bool failed = Lumix::getProcessExitCode(*m_processes[i].process) != 0;
+			if (failed && strstr(m_processes[i].path, "imgui") != nullptr)
+			{
+				Lumix::messageBox("Could not compile imgui shader");
+			}
+
+			Lumix::destroyProcess(*m_processes[i].process);
 			m_processes.eraseFast(i);
 
 			updateNotifications();

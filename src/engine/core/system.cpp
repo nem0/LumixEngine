@@ -26,6 +26,14 @@ namespace Lumix
 	}
 
 
+	int getProcessExitCode(Process& process)
+	{
+		DWORD exit_code;
+		if (GetExitCodeProcess(process.process_info.hProcess, &exit_code) == FALSE) return -1;
+		return (int)exit_code;
+	}
+
+
 	void destroyProcess(Process& process)
 	{
 		CloseHandle(process.process_info.hProcess);
