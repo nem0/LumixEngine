@@ -54,13 +54,20 @@ private:
 	void processChangedFiles();
 
 private:
+	struct ProcessInfo
+	{
+		Lumix::Process* process;
+		char path[Lumix::MAX_PATH_LENGTH];
+	};
+
+private:
 	bool m_is_compiling;
 	Lumix::WorldEditor& m_editor;
 	FileSystemWatcher* m_watcher;
 	int m_notifications_id;
 	Lumix::AssociativeArray<Lumix::string, Lumix::Array<Lumix::string>> m_dependencies;
 	Lumix::Array<Lumix::string> m_to_reload;
-	Lumix::Array<Lumix::Process*> m_processes;
+	Lumix::Array<ProcessInfo> m_processes;
 	Lumix::Array<Lumix::string> m_changed_files;
 	Lumix::MT::SpinMutex m_mutex;
 	LogUI& m_log_ui;
