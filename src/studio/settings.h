@@ -34,10 +34,10 @@ struct Settings
 
 	Settings();
 
-	bool save(Action* actions, int actions_count);
-	bool load(Action* actions, int actions_count);
-	void onGui(Action* actions, int actions_count);
+	bool save(Action** actions, int actions_count);
+	bool load(Action** actions, int actions_count);
+	void onGui(Action** actions, int actions_count);
 
 private:
-	void showShortcutSettings(Action* actions, int actions_count);
+	void showShortcutSettings(Action** actions, int actions_count);
 };

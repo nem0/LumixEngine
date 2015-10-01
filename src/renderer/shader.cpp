@@ -11,7 +11,7 @@
 #include "core/vec3.h"
 #include "renderer/renderer.h"
 #include "renderer/shader_manager.h"
-#include <bgfx.h>
+#include <bgfx/bgfx.h>
 #include <lua.hpp>
 #include <lauxlib.h>
 

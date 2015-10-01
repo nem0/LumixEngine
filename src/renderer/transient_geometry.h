@@ -2,7 +2,7 @@
 
 
 #include "lumix.h"
-#include <bgfx.h>
+#include <bgfx/bgfx.h>
 
 
 namespace Lumix

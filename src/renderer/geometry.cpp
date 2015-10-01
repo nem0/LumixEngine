@@ -4,7 +4,7 @@
 #include "core/math_utils.h"
 #include "core/profiler.h"
 #include "renderer/shader.h"
-#include <bgfx.h>
+#include <bgfx/bgfx.h>
 
 
 namespace Lumix

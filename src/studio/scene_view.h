@@ -2,7 +2,7 @@
 
 
 #include "editor/world_editor.h"
-#include <bgfx.h>
+#include <bgfx/bgfx.h>
 
 
 namespace Lumix

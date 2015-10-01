@@ -1,7 +1,7 @@
 #pragma once
 #include "core/array.h"
 #include "core/resource.h"
-#include <bgfx.h>
+#include <bgfx/bgfx.h>
 
 
 struct lua_State;

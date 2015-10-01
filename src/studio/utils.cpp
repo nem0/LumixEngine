@@ -10,19 +10,32 @@
 #include <Windows.h>
 
 
-const char* getKeyToString(int key)
+void getKeyName(int virtualKey, char* out, int max_size)
 {
-	static const char* ALPHABET = "A\0B\0C\0D\0E\0F\0G\0H\0I\0J\0K\0L\0M\0N\0O\0P\0Q\0R\0S"
-		"\0T\0U\0V\0W\0X\0Y\0Z\0";
-	if (key >= 'A' && key <= 'Z') return ALPHABET + ((key - 'A') * 2);
+	unsigned int scanCode = MapVirtualKey(virtualKey, MAPVK_VK_TO_VSC);
 
-	switch (key)
+	// because MapVirtualKey strips the extended bit for some keys
+	switch (virtualKey)
 	{
-		case VK_CONTROL: return "Ctrl";
-		case VK_DELETE: return "Delete";
-		case VK_SHIFT: return "Shift";
+		case VK_LEFT:
+		case VK_UP:
+		case VK_RIGHT:
+		case VK_DOWN: // arrow keys
+		case VK_PRIOR:
+		case VK_NEXT: // page up and page down
+		case VK_END:
+		case VK_HOME:
+		case VK_INSERT:
+		case VK_DELETE:
+		case VK_DIVIDE: // numpad slash
+		case VK_NUMLOCK:
+		{
+			scanCode |= 0x100; // set extended bit
+			break;
+		}
 	}
-	return "";
+
+	GetKeyNameText(scanCode << 16, out, max_size);
 }
 
 

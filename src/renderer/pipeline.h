@@ -4,7 +4,7 @@
 #include "core/delegate.h"
 #include "core/resource.h"
 #include "core/resource_manager_base.h"
-#include <bgfx.h>
+#include <bgfx/bgfx.h>
 
 
 namespace Lumix

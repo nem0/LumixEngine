@@ -167,9 +167,9 @@ void AssetBrowser::onGui()
 	ImGui::InputText("Filter", m_filter, sizeof(m_filter));
 
 	ImGui::ListBoxHeader("Resources");
-	auto* resources = &m_resources[m_current_type];
+	auto& resources = m_resources[m_current_type];
 
-	for (auto& resource : *resources)
+	for (auto& resource : resources)
 	{
 		if (m_filter[0] != '\0' && strstr(resource.c_str(), m_filter) == nullptr) continue;
 

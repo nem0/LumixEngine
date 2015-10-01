@@ -8,7 +8,7 @@
 #include "core/resource_manager_base.h"
 #include "renderer/texture.h"
 #include "renderer/texture_manager.h"
-#include <bgfx.h>
+#include <bgfx/bgfx.h>
 #include <cmath>
 
 namespace Lumix

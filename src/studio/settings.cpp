@@ -14,25 +14,25 @@ static void shortcutInput(int& shortcut)
 	StringBuilder<50> popup_name("");
 	popup_name << (int64_t)&shortcut;
 
-	const char* key_string = getKeyToString(shortcut);
-	StringBuilder<50> button_label(key_string[0] == 0 ? "Not Set" : key_string);
+	char key_string[30];
+	getKeyName(shortcut, key_string, 30);
+
+	StringBuilder<50> button_label(key_string);
 	button_label << "##" << (int64_t)&shortcut;
 
-	if (ImGui::Button(button_label, ImVec2(50, 0))) ImGui::OpenPopup(popup_name);
+	if (ImGui::Button(button_label, ImVec2(50, 0))) shortcut = -1;
 
-	if (ImGui::BeginPopup(popup_name))
+	auto& io = ImGui::GetIO();
+	if (ImGui::IsItemHovered())
 	{
-		if (ImGui::Selectable("Unset")) shortcut = -1;
-		for (int i = 0; i < 256; ++i)
+		for (int i = 0; i < Lumix::lengthOf(ImGui::GetIO().KeysDown); ++i)
 		{
-			const char* c = getKeyToString(i);
-			if (c[0] != 0)
+			if (io.KeysDown[i])
 			{
-				if (ImGui::Selectable(c)) shortcut = i;
+				shortcut = i;
+				break;
 			}
 		}
-
-		ImGui::EndPopup();
 	}
 }
 
@@ -89,11 +89,11 @@ Settings::Settings()
 	m_is_profiler_opened = false;
 	m_is_properties_opened = false;
 
-	m_autosave_time = 300.0f;
+	m_autosave_time = 300;
 }
 
 
-bool Settings::load(Action* actions, int actions_count)
+bool Settings::load(Action** actions, int actions_count)
 {
 	lua_State* L = luaL_newstate();
 	luaL_openlibs(L);
@@ -133,13 +133,13 @@ bool Settings::load(Action* actions, int actions_count)
 	{
 		for (int i = 0; i < actions_count; ++i)
 		{
-			if (lua_getfield(L, -1, actions[i].name) == LUA_TTABLE)
+			if (lua_getfield(L, -1, actions[i]->name) == LUA_TTABLE)
 			{
-				for (int j = 0; j < Lumix::lengthOf(actions[i].shortcut); ++j)
+				for (int j = 0; j < Lumix::lengthOf(actions[i]->shortcut); ++j)
 				{
 					if (lua_rawgeti(L, -1, 1 + j) == LUA_TNUMBER)
 					{
-						actions[i].shortcut[j] = (int)lua_tointeger(L, -1);
+						actions[i]->shortcut[j] = (int)lua_tointeger(L, -1);
 					}
 					lua_pop(L, 1);
 				}
@@ -154,7 +154,7 @@ bool Settings::load(Action* actions, int actions_count)
 }
 
 
-bool Settings::save(Action* actions, int actions_count)
+bool Settings::save(Action** actions, int actions_count)
 {
 	FILE* fp = fopen(SETTINGS_PATH, "wb");
 	if (!fp) return false;
@@ -189,13 +189,13 @@ bool Settings::save(Action* actions, int actions_count)
 	for (int i = 0; i < actions_count; ++i)
 	{
 		fputs("\t", fp);
-		fputs(actions[i].name, fp);
+		fputs(actions[i]->name, fp);
 		fputs(" = {", fp);
 		fprintf(fp,
 			"%d, %d, %d",
-			actions[i].shortcut[0],
-			actions[i].shortcut[1],
-			actions[i].shortcut[2]);
+			actions[i]->shortcut[0],
+			actions[i]->shortcut[1],
+			actions[i]->shortcut[2]);
 		fputs("},\n", fp);
 	}
 	fputs("}\n", fp);
@@ -206,13 +206,13 @@ bool Settings::save(Action* actions, int actions_count)
 
 
 
-void Settings::showShortcutSettings(Action* actions, int actions_count)
+void Settings::showShortcutSettings(Action** actions, int actions_count)
 {
 	ImGui::InputText("Filter", m_filter, Lumix::lengthOf(m_filter));
 	ImGui::Columns(4);
 	for (int i = 0; i < actions_count; ++i)
 	{
-		Action& a = actions[i];
+		Action& a = *actions[i];
 		if (m_filter[0] == 0 || Lumix::stristr(a.label, m_filter) != 0)
 		{
 			ImGui::Text(a.label);
@@ -229,7 +229,7 @@ void Settings::showShortcutSettings(Action* actions, int actions_count)
 }
 
 
-void Settings::onGui(Action* actions, int actions_count)
+void Settings::onGui(Action** actions, int actions_count)
 {
 	if (!m_is_opened) return;
 

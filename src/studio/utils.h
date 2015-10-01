@@ -2,7 +2,9 @@
 
 
 #include "lumix.h"
+#include "core/delegate.h"
 #include "core/string.h"
+#include "ocornut-imgui/imgui.h"
 
 
 template <int size>
@@ -82,38 +84,57 @@ struct StringBuilder
 };
 
 
-class StudioApp;
-
-
 struct Action
 {
-	Action(const char* label, const char* name, void (StudioApp::*func)())
+	Action(const char* label, const char* name)
 	{
 		this->label = label;
 		this->name = name;
-		this->func = func;
 		shortcut[0] = shortcut[1] = shortcut[2] = -1;
+		is_global = true;
 	}
 
 	Action(const char* label,
 		const char* name,
-		void (StudioApp::*func)(),
 		int shortcut0,
 		int shortcut1,
 		int shortcut2)
 	{
 		this->label = label;
 		this->name = name;
-		this->func = func;
 		shortcut[0] = shortcut0;
 		shortcut[1] = shortcut1;
 		shortcut[2] = shortcut2;
+		is_global = true;
 	}
+
+
+	bool isRequested()
+	{
+		if (ImGui::IsAnyItemActive()) return false;
+
+		bool* keysDown = ImGui::GetIO().KeysDown;
+		float* keysDownDuration = ImGui::GetIO().KeysDownDuration;
+		if (shortcut[0] == -1) return false;
+
+		for (int i = 0; i < Lumix::lengthOf(shortcut) + 1; ++i)
+		{
+			if (shortcut[i] == -1 || i == Lumix::lengthOf(shortcut))
+			{
+				return true;
+			}
+
+			if (!keysDown[shortcut[i]] || keysDownDuration[shortcut[i]] > 0) return false;
+		}
+		return false;
+	}
+
 
 	int shortcut[3];
 	const char* name;
 	const char* label;
-	void (StudioApp::*func)();
+	bool is_global;
+	Lumix::Delegate<void> func;
 };
 
 
@@ -123,7 +144,7 @@ namespace Lumix
 }
 
 bool ColorPicker(const char* label, float col[3]);
-const char* getKeyToString(int key);
+void getKeyName(int virtualKey, char* out, int max_size);
 void getEntityListDisplayName(Lumix::WorldEditor& editor,
 	char* buf,
 	int max_size,
