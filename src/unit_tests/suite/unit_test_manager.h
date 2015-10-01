@@ -55,7 +55,7 @@ namespace Lumix
 			~Helper() {}
 		};
 	} //~UnitTest
-} //~UnitTest
+} //~Lumix
 
 #define REGISTER_TEST(name, method, params) \
 namespace { extern "C" Lumix::UnitTest::Helper JOIN_STRINGS(JOIN_STRINGS(test_register_, method), __LINE__)(name, method, params); } \

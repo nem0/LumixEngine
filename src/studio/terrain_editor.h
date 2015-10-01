@@ -57,6 +57,8 @@ private:
 	void paintEntities(const Lumix::RayCastModelHit& hit);
 	void increaseBrushSize();
 	void decreaseBrushSize();
+	void nextTerrainTexture();
+	void prevTerrainTexture();
 
 private:
 	Lumix::WorldEditor& m_world_editor;
@@ -70,4 +72,6 @@ private:
 	int m_selected_entity_template;
 	Action* m_increase_brush_size;
 	Action* m_decrease_brush_size;
+	Action* m_increase_texture_idx;
+	Action* m_decrease_texture_idx;
 };

@@ -806,8 +806,6 @@ TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& 
 	, m_color(1, 1, 1)
 	, m_current_brush(0)
 	, m_selected_entity_template(0)
-	, m_increase_brush_size(nullptr)
-	, m_decrease_brush_size(nullptr)
 {
 	m_increase_brush_size =
 		LUMIX_NEW(editor.getAllocator(), Action)("Increase brush size", "increaseBrushSize");
@@ -819,11 +817,41 @@ TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& 
 	m_decrease_brush_size->is_global = false;
 	actions.push(m_increase_brush_size);
 	actions.push(m_decrease_brush_size);
+
+	m_increase_texture_idx =
+		LUMIX_NEW(editor.getAllocator(), Action)("Next terrain texture", "nextTerrainTexture");
+	m_increase_texture_idx->is_global = false;
+	m_increase_texture_idx->func.bind<TerrainEditor, &TerrainEditor::nextTerrainTexture>(this);
+	m_decrease_texture_idx =
+		LUMIX_NEW(editor.getAllocator(), Action)("Previous terrain texture", "prevTerrainTexture");
+	m_decrease_texture_idx->func.bind<TerrainEditor, &TerrainEditor::prevTerrainTexture>(this);
+	m_decrease_texture_idx->is_global = false;
+	actions.push(m_increase_texture_idx);
+	actions.push(m_decrease_texture_idx);
+
 	editor.addPlugin(*this);
 	m_terrain_brush_size = 10;
 	m_terrain_brush_strength = 0.1f;
 	m_type = RAISE_HEIGHT;
 	m_texture_idx = 0;
+}
+
+
+void TerrainEditor::nextTerrainTexture()
+{
+	auto* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
+	auto* material = scene->getTerrainMaterial(m_component.index);
+	Lumix::Texture* tex = material->getTextureByUniform(TEX_COLOR_UNIFORM);
+	if (tex)
+	{
+		m_texture_idx = Lumix::Math::minValue(tex->getDepth() - 1, m_texture_idx + 1);
+	}
+}
+
+
+void TerrainEditor::prevTerrainTexture()
+{
+	m_texture_idx = Lumix::Math::maxValue(0, m_texture_idx - 1);
 }
 
 
@@ -1088,14 +1116,10 @@ Lumix::Material* TerrainEditor::getMaterial()
 
 void TerrainEditor::onGui()
 {
-	if (m_decrease_brush_size->isRequested())
-	{
-		m_decrease_brush_size->func.invoke();
-	}
-	if (m_increase_brush_size->isRequested())
-	{
-		m_increase_brush_size->func.invoke();
-	}
+	if (m_decrease_brush_size->isRequested()) m_decrease_brush_size->func.invoke();
+	if (m_increase_brush_size->isRequested()) m_increase_brush_size->func.invoke();
+	if (m_increase_texture_idx->isRequested()) m_increase_texture_idx->func.invoke();
+	if (m_decrease_texture_idx->isRequested()) m_decrease_texture_idx->func.invoke();
 
 	auto* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
 	if (!ImGui::CollapsingHeader("Terrain editor", nullptr, true, true)) return;
