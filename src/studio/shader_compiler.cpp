@@ -379,7 +379,7 @@ void ShaderCompiler::compilePass(
 			Lumix::catString(cmd, out_path);
 			
 			Lumix::catString(cmd, " --depends --platform windows --type ");
-			Lumix::catString(cmd, is_vertex_shader ? "vertex --profile vs_5_0" : "fragment --profile ps_5_0");
+			Lumix::catString(cmd, is_vertex_shader ? "vertex --profile vs_4_0" : "fragment --profile ps_4_0");
 			Lumix::catString(cmd, " -D ");
 			Lumix::catString(cmd, pass);
 			for (int i = 0; i < Lumix::lengthOf(all_defines); ++i)
