@@ -13,7 +13,6 @@
 #include "renderer/render_scene.h"
 #include "physics/physics_geometry_manager.h"
 #include "physics/physics_scene.h"
-#include "studio/mainwindow.h"
 
 
 namespace Lumix
@@ -130,15 +129,6 @@ struct EditorPlugin : public WorldEditor::Plugin
 };
 
 
-extern "C" LUMIX_LIBRARY_EXPORT void initEditorPlugin(Engine& engine,
-													  MainWindow& main_window)
-{
-	IAllocator& allocator = main_window.getWorldEditor().getAllocator();
-	EditorPlugin* plugin =
-		allocator.newObject<EditorPlugin>(main_window.getWorldEditor());
-	main_window.getWorldEditor().addPlugin(*plugin);
-}
-
 
 struct CustomErrorCallback : public physx::PxErrorCallback
 {
@@ -201,7 +191,7 @@ void PhysicsSystemImpl::registerProperties()
 			allocator));
 	m_engine.registerProperty(
 		"mesh_rigid_actor",
-		allocator.newObject<ResourcePropertyDescriptor<PhysicsScene>>(
+		allocator.newObject<FilePropertyDescriptor<PhysicsScene>>(
 			"source",
 			&PhysicsScene::getShapeSource,
 			&PhysicsScene::setShapeSource,
@@ -209,7 +199,7 @@ void PhysicsSystemImpl::registerProperties()
 			allocator));
 	m_engine.registerProperty(
 		"physical_heightfield",
-		allocator.newObject<ResourcePropertyDescriptor<PhysicsScene>>(
+		allocator.newObject<FilePropertyDescriptor<PhysicsScene>>(
 			"heightmap",
 			&PhysicsScene::getHeightmap,
 			&PhysicsScene::setHeightmap,

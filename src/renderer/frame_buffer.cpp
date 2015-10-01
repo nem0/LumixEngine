@@ -1,7 +1,7 @@
 #include "renderer/frame_buffer.h"
 #include "core/json_serializer.h"
 #include "core/vec3.h"
-#include <bgfx.h>
+#include <bgfx/bgfx.h>
 #include <lua.hpp>
 #include <lauxlib.h>
 
@@ -35,7 +35,7 @@ FrameBuffer::FrameBuffer(const Declaration& decl)
 FrameBuffer::FrameBuffer(const char* name, int width, int height, void* window_handle)
 {
 	m_autodestroy_handle = false;
-	copyString(m_declaration.m_name, sizeof(m_declaration.m_name), name);
+	copyString(m_declaration.m_name, name);
 	m_declaration.m_width = width;
 	m_declaration.m_height = height;
 	m_declaration.m_renderbuffers_count = 0;
@@ -55,14 +55,31 @@ FrameBuffer::~FrameBuffer()
 
 void FrameBuffer::resize(int width, int height)
 {
-	ASSERT(m_window_handle);
 	if (bgfx::isValid(m_handle))
 	{
 		bgfx::destroyFrameBuffer(m_handle);
 	}
 	m_declaration.m_width = width;
 	m_declaration.m_height = height;
-	m_handle = bgfx::createFrameBuffer(m_window_handle, width, height);
+	if (m_window_handle)
+	{
+		m_handle = bgfx::createFrameBuffer(m_window_handle, width, height);
+	}
+	else
+	{
+		bgfx::TextureHandle texture_handles[16];
+
+		for (int i = 0; i < m_declaration.m_renderbuffers_count; ++i)
+		{
+			const RenderBuffer& renderbuffer = m_declaration.m_renderbuffers[i];
+			texture_handles[i] =
+				bgfx::createTexture2D(width, height, 1, renderbuffer.m_format, BGFX_TEXTURE_RT);
+			m_declaration.m_renderbuffers[i].m_handle = texture_handles[i];
+		}
+
+		m_window_handle = nullptr;
+		m_handle = bgfx::createFrameBuffer(m_declaration.m_renderbuffers_count, texture_handles);
+	}
 }
 
 
@@ -87,6 +104,14 @@ static bgfx::TextureFormat::Enum getFormat(const char* name)
 	else if (strcmp(name, "depth24") == 0)
 	{
 		return bgfx::TextureFormat::D24;
+	}
+	else if (strcmp(name, "rgba8") == 0)
+	{
+		return bgfx::TextureFormat::RGBA8;
+	}
+	else if (strcmp(name, "r32f") == 0)
+	{
+		return bgfx::TextureFormat::R32F;
 	}
 	else
 	{

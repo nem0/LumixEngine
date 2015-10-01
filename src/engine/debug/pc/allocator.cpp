@@ -63,6 +63,36 @@ namespace Debug
 	}
 
 
+	void Allocator::lock()
+	{
+		m_mutex.lock();
+	}
+
+
+	void Allocator::unlock()
+	{
+		m_mutex.unlock();
+	}
+
+
+
+	void Allocator::checkGuards()
+	{
+		if (m_are_guards_enabled) return;
+
+		auto* info = m_root;
+		while (info)
+		{
+			auto user_ptr = getUserPtrFromAllocationInfo(info);
+			void* system_ptr = getSystemFromUser(user_ptr);
+			ASSERT(*(uint32_t*)system_ptr == ALLOCATION_GUARD);
+			ASSERT(*(uint32_t*)((uint8_t*)user_ptr + info->m_size) == ALLOCATION_GUARD);
+
+			info = info->m_next;
+		}
+	}
+
+
 	size_t Allocator::getAllocationOffset()
 	{
 		return sizeof(AllocationInfo) + (m_are_guards_enabled ? sizeof(ALLOCATION_GUARD) : 0);
@@ -81,6 +111,12 @@ namespace Debug
 	}
 
 
+	void* Allocator::getUserPtrFromAllocationInfo(AllocationInfo* info)
+	{
+		return ((uint8_t*)info + sizeof(AllocationInfo));
+	}
+
+
 	Allocator::AllocationInfo* Allocator::getAllocationInfoFromUser(void* user_ptr)
 	{
 		return (AllocationInfo*)((uint8_t*)user_ptr - sizeof(AllocationInfo));
@@ -96,6 +132,27 @@ namespace Debug
 	void* Allocator::getSystemFromUser(void* user_ptr)
 	{
 		return (uint8_t*)user_ptr - (m_are_guards_enabled ? sizeof(ALLOCATION_GUARD) : 0) - sizeof(AllocationInfo);
+	}
+
+
+	void* Allocator::reallocate(void* user_ptr, size_t size)
+	{
+		#ifndef _DEBUG
+			return m_source.reallocate(user_ptr, size);
+		#else
+			if (user_ptr == nullptr) return allocate(size);
+			if (size == 0) return nullptr;
+
+			void* new_data = allocate(size);
+			if (!new_data) return nullptr;
+
+			AllocationInfo* info = getAllocationInfoFromUser(user_ptr);
+			memcpy(new_data, user_ptr, info->m_size < size ? info->m_size : size);
+
+			deallocate(user_ptr);
+
+			return new_data;
+		#endif
 	}
 
 

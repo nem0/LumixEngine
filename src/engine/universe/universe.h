@@ -32,21 +32,13 @@ public:
 
 	IAllocator& getAllocator() { return m_allocator; }
 	void createEntity(Entity entity);
-	Entity createEntity();
+	Entity createEntity(const Vec3& position, const Quat& rotation);
 	void destroyEntity(Entity entity);
-	void addComponent(Entity entity,
-					  uint32_t component_type,
-					  IScene* scene,
-					  int index);
-	void destroyComponent(Entity entity,
-						  uint32_t component_type,
-						  IScene* scene,
-						  int index);
-	int getEntityCount() const
-	{
-		return m_transformations.size() - m_free_slots.size();
-	}
+	void addComponent(Entity entity, uint32_t component_type, IScene* scene, int index);
+	void destroyComponent(Entity entity, uint32_t component_type, IScene* scene, int index);
+	int getEntityCount() const { return m_transformations.size(); }
 
+	Entity getEntityFromDenseIdx(int idx);
 	Entity getFirstEntity();
 	Entity getNextEntity(Entity entity);
 	bool nameExists(const char* name) const;
@@ -63,28 +55,14 @@ public:
 	void setPosition(Entity entity, const Vec3& pos);
 	void setScale(Entity entity, float scale);
 	float getScale(Entity entity);
-	const Vec3& getPosition(Entity entity) const
-	{
-		return m_transformations[entity].position;
-	}
-	const Quat& getRotation(Entity entity) const
-	{
-		return m_transformations[entity].rotation;
-	}
+	const Vec3& getPosition(Entity entity) const;
+	const Quat& getRotation(Entity entity) const;
 
 	DelegateList<void(Entity)>& entityTransformed() { return m_entity_moved; }
 	DelegateList<void(Entity)>& entityCreated() { return m_entity_created; }
 	DelegateList<void(Entity)>& entityDestroyed() { return m_entity_destroyed; }
-
-	DelegateList<void(const ComponentUID&)>& componentDestroyed()
-	{
-		return m_component_destroyed;
-	}
-
-	Delegate<void(const ComponentUID&)>& componentAdded()
-	{
-		return m_component_added;
-	}
+	DelegateList<void(const ComponentUID&)>& componentDestroyed() { return m_component_destroyed; }
+	Delegate<void(const ComponentUID&)>& componentAdded() { return m_component_added; }
 
 	void serialize(OutputBlob& serializer);
 	void deserialize(InputBlob& serializer);
@@ -92,6 +70,7 @@ public:
 private:
 	struct Transformation
 	{
+		int id;
 		Vec3 position;
 		Quat rotation;
 		float scale;
@@ -100,7 +79,7 @@ private:
 private:
 	IAllocator& m_allocator;
 	Array<Transformation> m_transformations;
-	Array<int> m_free_slots;
+	Array<int> m_id_map;
 	AssociativeArray<uint32_t, uint32_t> m_name_to_id_map;
 	AssociativeArray<uint32_t, string> m_id_to_name_map;
 	DelegateList<void(Entity)> m_entity_moved;
@@ -108,6 +87,7 @@ private:
 	DelegateList<void(Entity)> m_entity_destroyed;
 	DelegateList<void(const ComponentUID&)> m_component_destroyed;
 	Delegate<void(const ComponentUID&)> m_component_added;
+	int m_first_free_slot;
 };
 
 

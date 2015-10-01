@@ -10,7 +10,7 @@ namespace Lumix
 		class IFileDevice;
 
 
-		class IFile abstract
+		class LUMIX_ENGINE_API IFile
 		{
 		public:
 			IFile() {}
@@ -27,6 +27,8 @@ namespace Lumix
 
 			virtual size_t seek(SeekMode base, size_t pos) = 0;
 			virtual size_t pos() = 0;
+
+			IFile& operator << (const char* text);
 
 			void release();
 

@@ -15,7 +15,7 @@ namespace Lumix
 class HierarchyImpl : public Hierarchy
 {
 private:
-	typedef PODHashMap<int32_t, Array<Child>*> Children;
+	
 	typedef HashMap<int32_t, int32_t> Parents;
 
 public:
@@ -49,8 +49,7 @@ public:
 
 	void onEntityMoved(Entity entity)
 	{
-		if (m_is_processing) return;
-
+		bool was_processing = m_is_processing;
 		m_is_processing = true;
 		Children::iterator iter = m_children.find(entity);
 		if (iter.isValid())
@@ -64,6 +63,9 @@ public:
 										 children[i].m_local_matrix);
 			}
 		}
+		m_is_processing = was_processing;
+
+		if (m_is_processing) return;
 
 		Parents::iterator parent_iter = m_parents.find(entity);
 		if (parent_iter.isValid())
@@ -88,7 +90,6 @@ public:
 				}
 			}
 		}
-		m_is_processing = false;
 	}
 
 
@@ -104,6 +105,12 @@ public:
 		}
 
 		m_universe.setRotation(entity, rotation);
+	}
+
+
+	virtual const Children& getAllChildren() const override
+	{
+		return m_children;
 	}
 
 

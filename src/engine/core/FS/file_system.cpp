@@ -206,7 +206,7 @@ public:
 			item.m_file = prev;
 			item.m_cb = call_back;
 			item.m_mode = mode;
-			copyString(item.m_path, sizeof(item.m_path), file);
+			copyString(item.m_path, file);
 			item.m_flags = E_IS_OPEN;
 		}
 
@@ -233,11 +233,11 @@ public:
 			char device[32];
 			if (token)
 			{
-				copyNString(device, sizeof(device), token + 1, end - token - 1);
+				copyNString(device, (int)sizeof(device), token + 1, int(end - token - 1));
 			}
 			else
 			{
-				copyNString(device, sizeof(device), dev, end - dev);
+				copyNString(device, (int)sizeof(device), dev, int(end - dev));
 			}
 			end = token;
 			device_list.m_devices[device_index] = getDevice(device);
@@ -292,8 +292,7 @@ public:
 				PROFILE_BLOCK("processAsyncTransaction");
 				m_in_progress.pop();
 
-				tr->data.m_cb.invoke(
-					*tr->data.m_file, !!(tr->data.m_flags & E_SUCCESS), *this);
+				tr->data.m_cb.invoke(*tr->data.m_file, !!(tr->data.m_flags & E_SUCCESS), *this);
 				if ((tr->data.m_flags & (E_SUCCESS | E_FAIL)) != 0)
 				{
 					closeAsync(*tr->data.m_file);

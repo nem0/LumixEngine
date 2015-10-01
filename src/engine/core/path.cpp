@@ -113,7 +113,7 @@ namespace Lumix
 			PathInternal* internal = m_allocator.newObject<PathInternal>();
 			internal->m_ref_count = 1;
 			internal->m_id = hash;
-			copyString(internal->m_path, sizeof(internal->m_path), path);
+			copyString(internal->m_path, path);
 			m_paths.insert(hash, internal);
 			return internal;
 		}

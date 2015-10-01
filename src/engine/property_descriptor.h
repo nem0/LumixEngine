@@ -6,6 +6,7 @@
 #include "core/delegate.h"
 #include "core/stack_allocator.h"
 #include "core/string.h"
+#include "core/vec4.h"
 #include <cfloat>
 
 
@@ -30,7 +31,8 @@ class IPropertyDescriptor
 			INTEGER,
 			STRING,
 			ARRAY,
-			COLOR
+			COLOR,
+			VEC4
 		};
 
 	public:
@@ -261,12 +263,32 @@ class FileArrayObjectDescriptor : public StringArrayObjectDescriptor<S>, public 
 };
 
 
-template <class S>
-class ResourceArrayObjectDescriptor : public FileArrayObjectDescriptor<S>
+class ResourcePropertyDescriptorBase
 {
 	public:
-		ResourceArrayObjectDescriptor(const char* name, Getter getter, Setter setter, const char* file_type, IAllocator& allocator)
+		ResourcePropertyDescriptorBase(uint32_t resource_type)
+		{
+			m_resource_type = resource_type;
+		}
+
+		uint32_t getResourceType() { return m_resource_type; }
+
+		uint32_t m_resource_type;
+};
+
+
+template <class S>
+class ResourceArrayObjectDescriptor : public FileArrayObjectDescriptor<S>, public ResourcePropertyDescriptorBase
+{
+	public:
+		ResourceArrayObjectDescriptor(const char* name,
+			Getter getter,
+			Setter setter,
+			const char* file_type,
+			uint32_t resource_type,
+			IAllocator& allocator)
 			: FileArrayObjectDescriptor(name, getter, setter, file_type, allocator)
+			, ResourcePropertyDescriptorBase(resource_type)
 		{
 			m_type = IPropertyDescriptor::RESOURCE;
 		}
@@ -578,6 +600,64 @@ class Vec3PropertyDescriptor : public IPropertyDescriptor
 };
 
 
+template <class S>
+class Vec4PropertyDescriptor : public IPropertyDescriptor
+{
+public:
+	typedef Vec4(S::*Getter)(ComponentIndex);
+	typedef void (S::*Setter)(ComponentIndex, const Vec4&);
+
+public:
+	Vec4PropertyDescriptor(const char* name,
+						   Getter getter,
+						   Setter setter,
+						   IAllocator& allocator)
+		: IPropertyDescriptor(allocator)
+	{
+		setName(name);
+		m_getter = getter;
+		m_setter = setter;
+		m_type = IPropertyDescriptor::VEC4;
+	}
+
+
+	virtual void set(ComponentUID cmp, InputBlob& stream) const override
+	{
+		Vec4 v;
+		stream.read(&v, sizeof(v));
+		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.index, v);
+	}
+
+
+	virtual void get(ComponentUID cmp, OutputBlob& stream) const override
+	{
+		Vec4 v = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.index);
+		int len = sizeof(v);
+		stream.write(&v, len);
+	}
+
+
+	virtual void
+	set(ComponentUID cmp, int index, InputBlob& stream) const override
+	{
+		ASSERT(index == -1);
+		set(cmp, stream);
+	};
+
+
+	virtual void
+	get(ComponentUID cmp, int index, OutputBlob& stream) const override
+	{
+		ASSERT(index == -1);
+		get(cmp, stream);
+	};
+
+private:
+	Getter m_getter;
+	Setter m_setter;
+};
+
+
 class IFilePropertyDescriptor
 {
 	public:
@@ -610,11 +690,17 @@ class FilePropertyDescriptor : public StringPropertyDescriptor<T>, public IFileP
 
 
 template <class T>
-class ResourcePropertyDescriptor : public FilePropertyDescriptor<T>
+class ResourcePropertyDescriptor : public FilePropertyDescriptor<T>, public ResourcePropertyDescriptorBase
 {
 	public:
-		ResourcePropertyDescriptor(const char* name, Getter getter, Setter setter, const char* file_type, IAllocator& allocator)
+		ResourcePropertyDescriptor(const char* name,
+			Getter getter,
+			Setter setter,
+			const char* file_type,
+			uint32_t resource_type,
+			IAllocator& allocator)
 			: FilePropertyDescriptor(name, getter, setter, file_type, allocator)
+			, ResourcePropertyDescriptorBase(resource_type)
 		{
 			m_type = IPropertyDescriptor::RESOURCE;
 		}

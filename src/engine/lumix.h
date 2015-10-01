@@ -8,8 +8,13 @@
 #define JOIN_STRINGS_2(A, B) A ## B
 #define JOIN_STRINGS(A, B) JOIN_STRINGS_2(A, B)
 
-#define LUMIX_FORCE_SYMBOL(symbol) \
-	__pragma(comment(linker, "/INCLUDE:_" STRINGIZE(symbol)))
+#ifdef _WIN64
+	#define LUMIX_FORCE_SYMBOL(symbol) \
+		__pragma(comment(linker, "/INCLUDE:" STRINGIZE(symbol)))
+#else
+	#define LUMIX_FORCE_SYMBOL(symbol) \
+		__pragma(comment(linker, "/INCLUDE:_" STRINGIZE(symbol)))
+#endif
 
 #define NOTE(msg)\
 	__pragma(message(__FILE__ "(" STRINGIZE(__LINE__) ") : NOTE: " msg))
@@ -54,6 +59,8 @@ namespace Lumix
 	#endif
 #endif
 
+
+#define LUMIX_NEW(allocator, type) new ((allocator).allocate(sizeof(type))) type
 #define LUMIX_LIBRARY_EXPORT __declspec(dllexport)
 #define LUMIX_LIBRARY_IMPORT __declspec(dllimport)
 #define LUMIX_ALIGN_OF(T) __alignof(T)

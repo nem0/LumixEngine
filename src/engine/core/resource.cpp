@@ -7,139 +7,152 @@
 
 namespace Lumix
 {
-	Resource::Resource(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
-		: m_ref_count()
-		, m_dep_count(1)
-		, m_state(State::EMPTY)
-		, m_path(path)
-		, m_size()
-		, m_cb(allocator)
-		, m_resource_manager(resource_manager)
-	{ }
 
-	Resource::~Resource()
-	{ }
+Resource::Resource(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
+	: m_ref_count()
+	, m_dep_count(1)
+	, m_state(State::EMPTY)
+	, m_path(path)
+	, m_size()
+	, m_cb(allocator)
+	, m_resource_manager(resource_manager)
+	, m_is_waiting_for_file(false)
+{
+}
 
-	void Resource::onEmpty(void)
+Resource::~Resource()
+{
+}
+
+void Resource::onEmpty(void)
+{
+	State old_state = m_state;
+	m_state = State::EMPTY;
+	m_cb.invoke(old_state, State::EMPTY);
+	if (old_state == State::LOADING)
 	{
-		State old_state = m_state;
-		m_state = State::EMPTY;
-		m_cb.invoke(old_state, State::EMPTY);
-		if (old_state == State::LOADING)
-		{
-			m_resource_manager.decrementLoadingResources();
-		}
+		m_resource_manager.decrementLoadingResources();
 	}
+}
 
-	void Resource::onLoading(void)
+void Resource::onLoading(void)
+{
+	State old_state = m_state;
+	m_state = State::LOADING;
+	m_cb.invoke(old_state, State::LOADING);
+	m_resource_manager.incrementLoadingResources();
+}
+
+void Resource::onReady(void)
+{
+	State old_state = m_state;
+	m_state = State::READY;
+	m_cb.invoke(old_state, State::READY);
+	if (old_state == State::LOADING)
 	{
-		State old_state = m_state;
-		m_state = State::LOADING;
-		m_cb.invoke(old_state, State::LOADING);
-		m_resource_manager.incrementLoadingResources();
+		m_resource_manager.decrementLoadingResources();
 	}
+}
 
-	void Resource::onReady(void)
+void Resource::onUnloading(void)
+{
+	State old_state = m_state;
+	m_state = State::UNLOADING;
+	m_cb.invoke(old_state, State::UNLOADING);
+	if (old_state == State::LOADING)
 	{
-		State old_state = m_state;
-		m_state = State::READY;
-		m_cb.invoke(old_state, State::READY);
-		if (old_state == State::LOADING)
-		{
-			m_resource_manager.decrementLoadingResources();
-		}
+		m_resource_manager.decrementLoadingResources();
 	}
+}
 
-	void Resource::onUnloading(void)
+void Resource::onReloading(void)
+{
+	State old_state = m_state;
+
+	m_state = State::UNLOADING;
+	m_cb.invoke(old_state, State::UNLOADING);
+	if (old_state == State::LOADING)
 	{
-		State old_state = m_state;
-		m_state = State::UNLOADING;
-		m_cb.invoke(old_state, State::UNLOADING);
-		if (old_state == State::LOADING)
-		{
-			m_resource_manager.decrementLoadingResources();
-		}
+		m_resource_manager.decrementLoadingResources();
 	}
+}
 
-	void Resource::onReloading(void)
+void Resource::onFailure(void)
+{
+	State old_state = m_state;
+	m_state = State::FAILURE;
+	m_cb.invoke(old_state, State::FAILURE);
+	if (old_state == State::LOADING)
 	{
-		State old_state = m_state;
-
-		m_state = State::UNLOADING;
-		m_cb.invoke(old_state, State::UNLOADING);
-		if (old_state == State::LOADING)
-		{
-			m_resource_manager.decrementLoadingResources();
-		}
+		m_resource_manager.decrementLoadingResources();
 	}
+}
 
-	void Resource::onFailure(void)
+
+void Resource::fileLoaded(FS::IFile& file, bool success, FS::FileSystem& fs)
+{
+	loaded(file, success, fs);
+	m_is_waiting_for_file = false;
+}
+
+
+void Resource::doLoad(void)
+{
+	if (m_is_waiting_for_file) return;
+	FS::FileSystem& fs = m_resource_manager.getFileSystem();
+	FS::ReadCallback cb;
+	cb.bind<Resource, &Resource::fileLoaded>(this);
+	m_is_waiting_for_file = true;
+	fs.openAsync(fs.getDefaultDevice(), m_path, FS::Mode::OPEN | FS::Mode::READ, cb);
+}
+
+void Resource::addDependency(Resource& dependent_resource)
+{
+	dependent_resource.m_cb.bind<Resource, &Resource::onStateChanged>(this);
+	if (!dependent_resource.isReady() && !dependent_resource.isFailure())
 	{
-		State old_state = m_state;
-		m_state = State::FAILURE;
-		m_cb.invoke(old_state, State::FAILURE);
-		if (old_state == State::LOADING)
-		{
-			m_resource_manager.decrementLoadingResources();
-		}
+		incrementDepCount();
 	}
+}
 
-	void Resource::doLoad(void)
+void Resource::removeDependency(Resource& dependent_resource)
+{
+	dependent_resource.m_cb.unbind<Resource, &Resource::onStateChanged>(this);
+	if (!dependent_resource.isReady())
 	{
-		FS::FileSystem& fs = m_resource_manager.getFileSystem();
-		FS::ReadCallback cb;
-		cb.bind<Resource, &Resource::loaded>(this);
-		fs.openAsync(fs.getDefaultDevice(), m_path, FS::Mode::OPEN | FS::Mode::READ, cb);
+		decrementDepCount();
 	}
+}
 
-	void Resource::addDependency(Resource& dependent_resource)
+void Resource::onStateChanged(State old_state, State new_state)
+{
+	if (State::FAILURE == new_state)
 	{
-		dependent_resource.m_cb.bind<Resource, &Resource::onStateChanged>(this);
-		if (!dependent_resource.isReady() && !dependent_resource.isFailure())
-		{
-			incrementDepCount();
-		}
+		onFailure();
 	}
-
-	void Resource::removeDependency(Resource& dependent_resource)
+	else if (State::READY == new_state)
 	{
-		dependent_resource.m_cb.unbind<Resource, &Resource::onStateChanged>(this);
-		if (!dependent_resource.isReady())
-		{
-			decrementDepCount();
-		}
+		decrementDepCount();
 	}
-
-	void Resource::onStateChanged(State old_state, State new_state)
+	else if (State::READY == old_state && State::UNLOADING == new_state)
 	{
-		if (State::FAILURE == new_state)
+		if (isReady())
 		{
-			onFailure();
-		}
-		else if (State::READY == new_state)
-		{
-			decrementDepCount();
-		}
-		else if (State::READY == old_state && State::UNLOADING == new_state)
-		{
-			if(isReady())
-			{
-				onUnloading();
-			}
-
-			incrementDepCount();
-		}
-	}
-
-	void Resource::incrementDepCount()
-	{
-		if (m_dep_count++ == 0)
 			onUnloading();
-	}
+		}
 
-	void Resource::decrementDepCount()
-	{
-		if(--m_dep_count == 0)
-			onReady();
+		incrementDepCount();
 	}
+}
+
+void Resource::incrementDepCount()
+{
+	if (m_dep_count++ == 0) onUnloading();
+}
+
+void Resource::decrementDepCount()
+{
+	if (--m_dep_count == 0) onReady();
+}
+
 } // ~namespace Lumix

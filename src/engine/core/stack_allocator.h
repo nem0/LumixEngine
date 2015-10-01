@@ -34,6 +34,12 @@ namespace Lumix
 				}
 			}
 
+			virtual void* reallocate(void*, size_t) override
+			{
+				ASSERT(false);
+				return nullptr;
+			}
+
 		private:
 			size_t m_end;
 			uint8_t m_data[SIZE];

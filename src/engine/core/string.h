@@ -9,11 +9,14 @@ namespace Lumix
 {
 
 
+LUMIX_ENGINE_API const char* stristr(const char* haystack, const char* needle);
 LUMIX_ENGINE_API bool toCStringHex(uint8_t value, char* output, int length);
 LUMIX_ENGINE_API bool toCStringPretty(int32_t value, char* output, int length);
 LUMIX_ENGINE_API bool toCStringPretty(uint32_t value, char* output, int length);
+LUMIX_ENGINE_API bool toCStringPretty(uint64_t value, char* output, int length);
 LUMIX_ENGINE_API bool toCString(int32_t value, char* output, int length);
 LUMIX_ENGINE_API bool toCString(int64_t value, char* output, int length);
+LUMIX_ENGINE_API bool toCString(uint64_t value, char* output, int length);
 LUMIX_ENGINE_API bool toCString(uint32_t value, char* output, int length);
 LUMIX_ENGINE_API bool
 toCString(float value, char* output, int length, int after_point);
@@ -35,7 +38,18 @@ LUMIX_ENGINE_API bool
 catNString(char* destination, int length, const char* source, int source_len);
 LUMIX_ENGINE_API bool
 makeLowercase(char* destination, int length, const char* source);
+LUMIX_ENGINE_API char* trimmed(char* str);
 
+
+template <int SIZE> bool copyString(char(&destination)[SIZE], const char* source)
+{
+	return copyString(destination, SIZE, source);
+}
+
+template <int SIZE> bool catString(char(&destination)[SIZE], const char* source)
+{
+	return catString(destination, SIZE, source);
+}
 
 template <class T> class base_string
 {

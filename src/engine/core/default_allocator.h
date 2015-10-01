@@ -16,6 +16,7 @@ public:
 
 	virtual void* allocate(size_t n) override;
 	virtual void deallocate(void* p) override;
+	virtual void* reallocate(void* ptr, size_t size) override;
 };
 
 

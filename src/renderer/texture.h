@@ -2,7 +2,7 @@
 
 
 #include "core/resource.h"
-#include <bgfx.h>
+#include <bgfx/bgfx.h>
 
 
 namespace Lumix
@@ -33,6 +33,8 @@ class LUMIX_RENDERER_API Texture : public Resource
 		void onDataUpdated();
 		void save();
 		void setFlags(uint32_t flags);
+		uint32_t getFlags() const { return m_flags; }
+		void setPixel(int x, int y, uint32_t color);
 		uint32_t getPixelNearest(int x, int y) const;
 		uint32_t getPixel(float x, float y) const;
 		bgfx::TextureHandle getTextureHandle() const { return m_texture_handle; }

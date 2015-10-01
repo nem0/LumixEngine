@@ -11,7 +11,7 @@
 #include "core/vec3.h"
 #include "renderer/renderer.h"
 #include "renderer/shader_manager.h"
-#include <bgfx.h>
+#include <bgfx/bgfx.h>
 #include <lua.hpp>
 #include <lauxlib.h>
 
@@ -37,15 +37,12 @@ Shader::~Shader()
 }
 
 
-uint32_t Shader::getDefineMask(const char* define) const
+uint32_t Shader::getDefineMask(int define_idx) const
 {
-	int c = lengthOf(m_combintions.m_defines);
-	for (int i = 0; i < c; ++i)
+	ASSERT(define_idx < lengthOf(m_combintions.m_define_idx_map));
+	if (m_combintions.m_define_idx_map[define_idx] >= 0)
 	{
-		if (strcmp(define, m_combintions.m_defines[i]) == 0)
-		{
-			return 1 << i;
-		}
+		return 1 << m_combintions.m_define_idx_map[define_idx];
 	}
 	return 0;
 }
@@ -64,6 +61,16 @@ ShaderInstance& Shader::getInstance(uint32_t mask)
 	g_log_error.log("Shader") << "Unknown shader combination requested: "
 							  << mask;
 	return *m_instances[0];
+}
+
+
+ShaderCombinations::ShaderCombinations()
+{
+	memset(this, 0, sizeof(*this));
+	for (int i = 0; i < lengthOf(m_define_idx_map); ++i)
+	{
+		m_define_idx_map[i] = -1;
+	}
 }
 
 
@@ -120,9 +127,8 @@ void Shader::parseTextureSlots(lua_State* L)
 				lua_pop(L, 1);
 				if (lua_getfield(L, -1, "define") == LUA_TSTRING)
 				{
-					copyString(m_texture_slots[i].m_define,
-							   sizeof(m_texture_slots[i].m_define),
-							   lua_tostring(L, -1));
+					m_texture_slots[i].m_define_idx =
+						getRenderer().getShaderDefineIdx(lua_tostring(L, -1));
 				}
 				lua_pop(L, 1);
 			}
@@ -163,16 +169,16 @@ struct ShaderLoader
 
 		const char* pass = m_shader.m_combintions.m_passes[m_pass_idx];
 		char path[MAX_PATH_LENGTH];
-		copyString(path, sizeof(path), "shaders/compiled/");
-		catString(path, sizeof(path), shader_name);
-		catString(path, sizeof(path), "_");
-		catString(path, sizeof(path), pass);
+		copyString(path, "shaders/compiled/");
+		catString(path, shader_name);
+		catString(path, "_");
+		catString(path, pass);
 		char mask_str[10];
 		int actual_mask =
 			m_mask & m_shader.m_combintions.m_vs_combinations[m_pass_idx];
 		toCString(actual_mask, mask_str, sizeof(mask_str));
-		catString(path, sizeof(path), mask_str);
-		catString(path, sizeof(path), "_vs.shb");
+		catString(path, mask_str);
+		catString(path, "_vs.shb");
 
 		FS::FileSystem& fs = m_shader.m_resource_manager.getFileSystem();
 		bool success = fs.openAsync(fs.getDefaultDevice(),
@@ -181,24 +187,26 @@ struct ShaderLoader
 									m_vs_callback);
 		if (!success)
 		{
+			g_log_error.log("renderer") << "Could not open " << path;
 			++m_loaded;
 		}
 
-		copyString(path, sizeof(path), "shaders/compiled/");
-		catString(path, sizeof(path), shader_name);
-		catString(path, sizeof(path), "_");
-		catString(path, sizeof(path), pass);
+		copyString(path, "shaders/compiled/");
+		catString(path, shader_name);
+		catString(path, "_");
+		catString(path, pass);
 		actual_mask =
 			m_mask & m_shader.m_combintions.m_fs_combinations[m_pass_idx];
 		toCString(actual_mask, mask_str, sizeof(mask_str));
-		catString(path, sizeof(path), mask_str);
-		catString(path, sizeof(path), "_fs.shb");
+		catString(path, mask_str);
+		catString(path, "_fs.shb");
 
 		if (!fs.openAsync(fs.getDefaultDevice(),
 						  path,
 						  FS::Mode::READ | FS::Mode::OPEN,
 						  m_fs_callback))
 		{
+			g_log_error.log("renderer") << "Could not open " << path;
 			success = false;
 			checkFinish();
 		}
@@ -210,11 +218,17 @@ struct ShaderLoader
 	{
 		if (success)
 		{
-			auto* mem = bgfx::alloc(file.size() + 1);
+			auto* mem = bgfx::alloc((uint32_t)file.size() + 1);
 			file.read(mem->data, file.size());
 			mem->data[file.size()] = '\0';
 			m_fragment_shader = bgfx::createShader(mem);
 			ASSERT(bgfx::isValid(m_fragment_shader));
+		}
+		else
+		{
+			g_log_error.log("renderer") << "Could not open fragment shader "
+										<< m_shader.getPath().c_str()
+										<< " mask = " << m_mask;
 		}
 		checkFinish();
 	}
@@ -223,11 +237,17 @@ struct ShaderLoader
 	{
 		if (success)
 		{
-			auto* mem = bgfx::alloc(file.size() + 1);
+			auto* mem = bgfx::alloc((uint32_t)file.size() + 1);
 			file.read(mem->data, file.size());
 			mem->data[file.size()] = '\0';
 			m_vertex_shader = bgfx::createShader(mem);
 			ASSERT(bgfx::isValid(m_vertex_shader));
+		}
+		else
+		{
+			g_log_error.log("renderer") << "Could not open vertex shader "
+				<< m_shader.getPath().c_str()
+				<< " mask = " << m_mask;
 		}
 		checkFinish();
 	}
@@ -310,12 +330,12 @@ bool Shader::generateInstances()
 }
 
 
-void ShaderCombinations::parse(lua_State* L)
+void ShaderCombinations::parse(Renderer& renderer, lua_State* L)
 {
 	parsePasses(L);
 
-	parseCombinations(L, "fs_combinations", m_fs_combinations);
-	parseCombinations(L, "vs_combinations", m_vs_combinations);
+	parseCombinations(renderer, L, "fs_combinations", m_fs_combinations);
+	parseCombinations(renderer, L, "vs_combinations", m_vs_combinations);
 }
 
 
@@ -340,7 +360,7 @@ void Shader::loaded(FS::IFile& file, bool success, FS::FileSystem& fs)
 		else
 		{
 			parseTextureSlots(L);
-			m_combintions.parse(L);
+			m_combintions.parse(getRenderer(), L);
 			if (!generateInstances())
 			{
 				g_log_error.log("renderer")
@@ -401,25 +421,28 @@ static int indexOf(const ShaderCombinations::Passes& passes, const char* pass)
 }
 
 
-static int indexOf(ShaderCombinations& combination, const char* define)
+static int
+indexOf(Renderer& renderer, ShaderCombinations& combination, const char* define)
 {
+	int define_idx = renderer.getShaderDefineIdx(define);
+
 	for (int i = 0; i < combination.m_define_count; ++i)
 	{
-		if (strcmp(combination.m_defines[i], define) == 0)
+		if (combination.m_defines[i] == define_idx)
 		{
 			return i;
 		}
 	}
 
-	copyString(combination.m_defines[combination.m_define_count],
-			   sizeof(combination.m_defines[0]),
-			   define);
+	combination.m_define_idx_map[define_idx] = combination.m_define_count;
+	combination.m_defines[combination.m_define_count] = define_idx;
 	++combination.m_define_count;
 	return combination.m_define_count - 1;
 }
 
 
-void ShaderCombinations::parseCombinations(lua_State* L,
+void ShaderCombinations::parseCombinations(Renderer& renderer,
+										   lua_State* L,
 										   const char* name,
 										   int* output)
 {
@@ -436,7 +459,7 @@ void ShaderCombinations::parseCombinations(lua_State* L,
 					if (lua_rawgeti(L, -1, 1 + i) == LUA_TSTRING)
 					{
 						const char* tmp = lua_tostring(L, -1);
-						output[pass_idx] |= 1 << indexOf(*this, tmp);
+						output[pass_idx] |= 1 << indexOf(renderer, *this, tmp);
 					}
 					lua_pop(L, 1);
 				}
@@ -448,7 +471,8 @@ void ShaderCombinations::parseCombinations(lua_State* L,
 }
 
 
-bool Shader::getShaderCombinations(const char* shader_content,
+bool Shader::getShaderCombinations(Renderer& renderer,
+								   const char* shader_content,
 								   ShaderCombinations* output)
 {
 	lua_State* L = luaL_newstate();
@@ -459,12 +483,13 @@ bool Shader::getShaderCombinations(const char* shader_content,
 	errors = errors || lua_pcall(L, 0, LUA_MULTRET, 0) != LUA_OK;
 	if (errors)
 	{
+		g_log_error.log("lua") << lua_tostring(L, -1);
 		lua_pop(L, 1);
 		return false;
 	}
 	else
 	{
-		output->parse(L);
+		output->parse(renderer, L);
 	}
 	lua_close(L);
 	return true;

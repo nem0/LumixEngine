@@ -133,7 +133,11 @@ struct TerrainQuad
 		return (size > 17 ? 2.25f : 1.25f) * Math::SQRT2 * size;
 	}
 
-	bool getInfos(Array<const TerrainInfo*>& infos, const Vec3& camera_pos, Terrain* terrain, const Matrix& world_matrix, LIFOAllocator& allocator)
+	bool getInfos(Array<const TerrainInfo*>& infos,
+		const Vec3& camera_pos,
+		Terrain* terrain,
+		const Matrix& world_matrix,
+		LIFOAllocator& allocator)
 	{
 		float squared_dist = getSquaredDistance(camera_pos);
 		float r = getRadiusOuter(m_size);
@@ -246,11 +250,11 @@ void Terrain::addGrassType(int index)
 {
 	if(index < 0)
 	{
-		m_grass_types.push(m_allocator.newObject<GrassType>(*this));
+		m_grass_types.push(LUMIX_NEW(m_allocator, GrassType)(*this));
 	}
 	else
 	{
-		m_grass_types.insert(index, m_allocator.newObject<GrassType>(*this));
+		m_grass_types.insert(index, LUMIX_NEW(m_allocator, GrassType)(*this));
 	}
 }
 
@@ -467,7 +471,7 @@ void Terrain::updateGrass(ComponentIndex camera)
 			}
 			else
 			{
-				quad = m_allocator.newObject<GrassQuad>(m_allocator);
+				quad = LUMIX_NEW(m_allocator, GrassQuad)(m_allocator);
 			}
 			quads.push(quad);
 			quad->m_x = quad_x;
@@ -828,7 +832,14 @@ void Terrain::generateGeometry()
 		.end();
 	m_geometry.setAttributesData(&points[0], sizeof(points[0]) * points.size(), vertex_def);
 	m_geometry.setIndicesData(&indices[0], sizeof(indices[0]) * indices.size());
-	m_mesh = m_allocator.newObject<Mesh>(vertex_def, m_material, 0, points.size() * sizeof(points[0]), 0, indices.size(), "terrain", m_allocator);
+	m_mesh = m_allocator.newObject<Mesh>(vertex_def,
+		m_material,
+		0,
+		int(points.size() * sizeof(points[0])),
+		0,
+		int(indices.size()),
+		"terrain",
+		m_allocator);
 }
 
 TerrainQuad* Terrain::generateQuadTree(float size)

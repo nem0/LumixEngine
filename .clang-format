@@ -1,21 +1,30 @@
 BasedOnStyle: LLVM
 
-AllowAllParametersOfDeclarationOnNextLine  : true
+AlignAfterOpenBracket : false
+AlignEscapedNewlinesLeft : true
+AlignConsecutiveAssignments : false
+AllowAllParametersOfDeclarationOnNextLine  : false
 AccessModifierOffset : -4
+AllowShortCaseLabelsOnASingleLine : true
 AllowShortFunctionsOnASingleLine : Inline
-AllowShortIfStatementsOnASingleLine : false
+AllowShortIfStatementsOnASingleLine : true
+AllowShortLoopsOnASingleLine : true
 AlwaysBreakAfterDefinitionReturnType : None
 BinPackArguments : false
 BinPackParameters : false
 BreakBeforeBraces : Allman
 BreakConstructorInitializersBeforeComma  : true
+ColumnLimit  : 100
 ConstructorInitializerIndentWidth : 4
+ConstructorInitializerAllOnOneLineOrOnePerLine : false
 ContinuationIndentWidth : 4
 IndentCaseLabels : true
 IndentWidth : 4
 KeepEmptyLinesAtTheStartOfBlocks  : true
 MaxEmptyLinesToKeep : 2
 NamespaceIndentation : None
+PenaltyBreakBeforeFirstCallParameter : 0
+PenaltyReturnTypeOnItsOwnLine  : 1000
 PointerAlignment : Left
 SpaceAfterCStyleCast  : false
 SpaceBeforeAssignmentOperators : true

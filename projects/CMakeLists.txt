@@ -1,16 +1,23 @@
 cmake_minimum_required(VERSION 3.1.2)
 
+
+string(FIND ${CMAKE_GENERATOR} "Win64" POS_X64)
+if(POS_X64 GREATER -1)
+	set(IS64 "TRUE")
+	set(PLATFORM_DIR "win64")
+else(POS_X64 GREATER -1)
+	set(IS64 "FALSE")
+	set(PLATFORM_DIR "win32")
+endif(POS_X64 GREATER -1)
+
+MESSAGE( STATUS "Generator: " ${CMAKE_GENERATOR} )
+MESSAGE( STATUS "64bit: " ${IS64} )
+
 project(LumixEngine)
 
 set(LUMIX_ROOT_PATH ${PROJECT_SOURCE_DIR}/../)
 set(SRC_PATH ${LUMIX_ROOT_PATH}src/)
 set(EXTERNAL_PATH ${LUMIX_ROOT_PATH}external/)
-
-find_package(Qt5Core REQUIRED)
-find_package(Qt5Gui REQUIRED)
-find_package(Qt5Widgets REQUIRED)
-find_package(Qt5UiTools REQUIRED)
-
 
 ###################### ENGINE ######################
 
@@ -56,7 +63,7 @@ add_library(engine SHARED
 set_target_properties (engine PROPERTIES COMPILE_DEFINITIONS "BUILDING_ENGINE")
 
 target_link_libraries(engine psapi)
-target_link_libraries(engine ${EXTERNAL_PATH}lua/lib/debug/lua.lib)
+target_link_libraries(engine ${EXTERNAL_PATH}lua/lib/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/lua.lib)
 
 ###################### RENDERER ######################
 
@@ -76,8 +83,8 @@ add_library(renderer SHARED
 set_target_properties (renderer PROPERTIES COMPILE_DEFINITIONS "BUILDING_RENDERER")
 
 target_link_libraries(renderer engine)
-target_link_libraries(renderer ${EXTERNAL_PATH}lua/lib/debug/lua.lib)
-target_link_libraries(renderer ${EXTERNAL_PATH}bgfx/lib/bgfx${CMAKE_CFG_INTDIR}.lib)
+target_link_libraries(renderer ${EXTERNAL_PATH}lua/lib/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/lua.lib)
+target_link_libraries(renderer ${EXTERNAL_PATH}bgfx/lib/${PLATFORM_DIR}/bgfx${CMAKE_CFG_INTDIR}.lib)
 
 
 ###################### PHYSICS ######################
@@ -98,16 +105,20 @@ set_target_properties (physics PROPERTIES COMPILE_DEFINITIONS "BUILDING_PHYSICS"
 target_link_libraries(physics engine)
 target_link_libraries(physics renderer)
 target_link_libraries(physics editor)
-target_link_libraries(physics studio_lib)
-target_link_libraries(physics Qt5::Core)
-target_link_libraries(physics Qt5::Gui)
-target_link_libraries(physics Qt5::Widgets)
-target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/x86/PhysXVisualDebuggerSDKCHECKED.lib)
-target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/x86/PhysX3CHECKED_x86.lib)
-target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/x86/PhysX3CommonCHECKED_x86.lib)
-target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/x86/PhysX3ExtensionsCHECKED.lib)
-target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/x86/PhysX3CharacterKinematicCHECKED_x86.lib)
-target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/x86/PhysX3CookingCHECKED_x86.lib)
+target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/${PLATFORM_DIR}/PhysXVisualDebuggerSDKCHECKED.lib)
+if(${IS64})
+	target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/${PLATFORM_DIR}/PhysX3CHECKED_x64.lib)
+	target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/${PLATFORM_DIR}/PhysX3CommonCHECKED_x64.lib)
+	target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/${PLATFORM_DIR}/PhysX3ExtensionsCHECKED.lib)
+	target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/${PLATFORM_DIR}/PhysX3CharacterKinematicCHECKED_x64.lib)
+	target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/${PLATFORM_DIR}/PhysX3CookingCHECKED_x64.lib)
+else(${IS64})
+	target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/${PLATFORM_DIR}/PhysX3CHECKED_x86.lib)
+	target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/${PLATFORM_DIR}/PhysX3CommonCHECKED_x86.lib)
+	target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/${PLATFORM_DIR}/PhysX3ExtensionsCHECKED.lib)
+	target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/${PLATFORM_DIR}/PhysX3CharacterKinematicCHECKED_x86.lib)
+	target_link_libraries(physics ${EXTERNAL_PATH}physx/lib/${PLATFORM_DIR}/PhysX3CookingCHECKED_x86.lib)
+endif(${IS64})
 
 ###################### SCRIPT ######################
 
@@ -162,87 +173,6 @@ set_target_properties (editor PROPERTIES COMPILE_DEFINITIONS "BUILDING_EDITOR")
 target_link_libraries(editor engine)
 target_link_libraries(editor renderer)
 
-###################### STUDIO_LIB ######################
-
-set(CMAKE_INCLUDE_CURRENT_DIR ON)
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTOUIC ON)
-
-file(GLOB STUDIO_ROOT_FILES ${SRC_PATH}studio/*.cpp ${SRC_PATH}studio/*.h)
-file(GLOB STUDIO_PROPERTY_VIEW_FILES ${SRC_PATH}studio/property_view/*.cpp ${SRC_PATH}studio/property_view/*.h)
-file(GLOB STUDIO_DIALOGS_FILES ${SRC_PATH}studio/dialogs/*.cpp ${SRC_PATH}studio/dialogs/*.h)
-file(GLOB STUDIO_SCRIPTS_FILES ${SRC_PATH}studio/scripts/*.cpp ${SRC_PATH}studio/scripts/*.h)
-file(GLOB STUDIO_PC_FILES ${SRC_PATH}studio/pc/*.cpp ${SRC_PATH}studio/pc/*.h)
-file(GLOB STUDIO_ANIMATION_EDITOR_FILES ${SRC_PATH}studio/animation_editor/*.cpp ${SRC_PATH}studio/animation_editor/*.h)
-file(GLOB_RECURSE STUDIO_FORM_FILES ${SRC_PATH}studio/*.ui)
-list(REMOVE_ITEM STUDIO_ROOT_FILES ${SRC_PATH}studio/main.cpp)
-
-qt5_wrap_ui(${STUDIO_FORM_FILES})
-
-source_group("" FILES ${STUDIO_ROOT_FILES})
-source_group("forms" FILES ${STUDIO_FORM_FILES})
-source_group("property_view" FILES ${STUDIO_PROPERTY_VIEW_FILES})
-source_group("dialogs" FILES ${STUDIO_DIALOGS_FILES})
-source_group("scripts" FILES ${STUDIO_SCRIPTS_FILES})
-source_group("pc" FILES ${STUDIO_PC_FILES})
-source_group("animation_editor" FILES ${STUDIO_ANIMATION_EDITOR_FILES})
-
-include_directories(${SRC_PATH})
-include_directories(${SRC_PATH}studio)
-include_directories(${EXTERNAL_PATH}assimp/include)
-include_directories(${EXTERNAL_PATH}crunch/include)
-
-add_library(studio_lib SHARED
-	${STUDIO_ROOT_FILES}
-	${STUDIO_PC_FILES}
-	${STUDIO_FORM_FILES}
-	${STUDIO_PROPERTY_VIEW_FILES}
-	${STUDIO_DIALOGS_FILES}
-	${STUDIO_SCRIPTS_FILES}
-	${STUDIO_ANIMATION_EDITOR_FILES}
-)
-
-target_link_libraries(studio_lib engine)
-# target_link_libraries(studio_lib script)
-target_link_libraries(studio_lib renderer)
-target_link_libraries(studio_lib animation)
-target_link_libraries(studio_lib editor)
-target_link_libraries(studio_lib Qt5::Core)
-target_link_libraries(studio_lib Qt5::Gui)
-target_link_libraries(studio_lib Qt5::Widgets)
-target_link_libraries(studio_lib Qt5::WinMain)
-target_link_libraries(studio_lib optimized ${EXTERNAL_PATH}assimp/lib/win32/assimp-vc120-mt.lib)
-target_link_libraries(studio_lib debug ${EXTERNAL_PATH}assimp/lib/win32/assimp-vc120-mtd.lib)
-target_link_libraries(studio_lib ${EXTERNAL_PATH}crunch/lib/win32/crnlib${CMAKE_CFG_INTDIR}.lib)
-
-
-set_target_properties (studio_lib PROPERTIES COMPILE_DEFINITIONS "BUILDING_STUDIO_LIB")
-
-# set_target_properties(studio_lib PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
- 
-
-###################### STUDIO ######################
-
-set(CMAKE_INCLUDE_CURRENT_DIR ON)
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTOUIC ON)
-
-include_directories(${SRC_PATH})
-include_directories(${SRC_PATH}studio)
-include_directories(${EXTERNAL_PATH}assimp/include)
-include_directories(${EXTERNAL_PATH}crunch/include)
-
-add_executable(studio ${SRC_PATH}studio/main.cpp)
-
-add_dependencies(studio lua_script)
-
-target_link_libraries(studio editor)
-target_link_libraries(studio renderer)
-target_link_libraries(studio studio_lib)
-
-set_target_properties(studio PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
- 
-
 
 ###################### UNIT TESTS ######################
 
@@ -277,47 +207,55 @@ target_link_libraries(unit_tests animation)
 
 ###################### RENDER TEST ######################
 
-file(GLOB RENDER_TEST_FILES ${SRC_PATH}render_test/*.*)
+### file(GLOB RENDER_TEST_FILES ${SRC_PATH}render_test/*.*)
+### 
+### source_group("" FILES ${RENDER_TEST_FILES})
+### 
+### include_directories(${SRC_PATH})
+### include_directories(${SRC_PATH}render_test/)
+### 
+### add_executable(render_test
+### 	${RENDER_TEST_FILES}
+### )
+### 
+### set_target_properties(render_test PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
+### target_link_libraries(render_test engine)
+### target_link_libraries(render_test renderer)
+### target_link_libraries(render_test Qt5::Core)
+### target_link_libraries(render_test Qt5::Gui)
+### target_link_libraries(render_test Qt5::Widgets)
+### target_link_libraries(render_test Qt5::WinMain)
 
-source_group("" FILES ${RENDER_TEST_FILES})
+###################### STUDIO ######################
 
-include_directories(${SRC_PATH})
-include_directories(${SRC_PATH}render_test/)
+file(GLOB STUDIO_FILES ${SRC_PATH}studio/*.cpp ${SRC_PATH}studio/pc/*.cpp ${SRC_PATH}studio/*.c ${SRC_PATH}studio/*.h)
+file(GLOB OCORNUT_IMGUI_FILES ${SRC_PATH}studio/ocornut-imgui/*.cpp ${SRC_PATH}studio/ocornut-imgui/*.h)
+file(GLOB STB_FILES ${SRC_PATH}studio/stb/*.cpp ${SRC_PATH}studio/stb/*.c ${SRC_PATH}studio/stb/*.h)
 
-add_executable(render_test
-	${RENDER_TEST_FILES}
-)
-
-set_target_properties(render_test PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
-target_link_libraries(render_test engine)
-target_link_libraries(render_test renderer)
-target_link_libraries(render_test Qt5::Core)
-target_link_libraries(render_test Qt5::Gui)
-target_link_libraries(render_test Qt5::Widgets)
-target_link_libraries(render_test Qt5::WinMain)
-
-###################### SAMPLE APP ######################
-
-file(GLOB SAMPLE_APP_FILES ${SRC_PATH}sample_app/*.cpp ${SRC_PATH}sample_app/*.c ${SRC_PATH}sample_app/*.h)
-file(GLOB OCORNUT_IMGUI_FILES ${SRC_PATH}sample_app/ocornut-imgui/*.cpp ${SRC_PATH}sample_app/ocornut-imgui/*.h)
-file(GLOB STB_FILES ${SRC_PATH}sample_app/stb/*.cpp ${SRC_PATH}sample_app/stb/*.c ${SRC_PATH}sample_app/stb/*.h)
-
-source_group("" FILES ${SAMPLE_APP_FILES})
+source_group("" FILES ${studio_FILES})
 source_group("ocornut-imgui" FILES ${OCORNUT_IMGUI_FILES})
 source_group("stb" FILES ${STB_FILES})
 
 include_directories(${SRC_PATH})
-include_directories(${SRC_PATH}sample_app/)
+include_directories(${SRC_PATH}studio/)
+include_directories(${EXTERNAL_PATH}assimp/include)
+include_directories(${EXTERNAL_PATH}crunch/include)
 
-add_executable(sample_app
-	${SAMPLE_APP_FILES}
+add_executable(studio
+	${STUDIO_FILES}
 	${OCORNUT_IMGUI_FILES}
 	${STB_FILES}
 )
 
-set_target_properties(sample_app PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
-target_link_libraries(sample_app engine)
-target_link_libraries(sample_app renderer)
+set_target_properties(studio PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
+target_link_libraries(studio engine)
+target_link_libraries(studio renderer)
+target_link_libraries(studio editor)
+target_link_libraries(studio optimized ${EXTERNAL_PATH}assimp/lib/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/assimp.lib)
+target_link_libraries(studio debug ${EXTERNAL_PATH}assimp/lib/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/assimp.lib)
+target_link_libraries(studio ${EXTERNAL_PATH}crunch/lib/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/crnlib.lib)
+target_link_libraries(studio winmm.lib)
+
 
 
 ###################### LUA_SCRIPT ######################
@@ -335,45 +273,63 @@ add_library(lua_script SHARED
 
 set_target_properties (lua_script PROPERTIES COMPILE_DEFINITIONS "BUILDING_LUA_SCRIPT")
 
-target_link_libraries(lua_script Qt5::Core)
-target_link_libraries(lua_script Qt5::Gui)
-target_link_libraries(lua_script Qt5::Widgets)
-target_link_libraries(lua_script Qt5::UiTools)
-
-target_link_libraries(lua_script ${EXTERNAL_PATH}lua/lib/debug/lua.lib)
+target_link_libraries(lua_script ${EXTERNAL_PATH}lua/lib/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/lua.lib)
 target_link_libraries(lua_script engine)
 target_link_libraries(lua_script renderer)
 target_link_libraries(lua_script editor)
-target_link_libraries(lua_script studio_lib)
 
 
 ###################### COPY_DLLS ######################
 
-if (NOT DEFINED ENV{QTDIR})
-	message(WARNING $ENV{QTDIR})
-endif()
-
 add_custom_command(TARGET studio POST_BUILD        
     COMMAND ${CMAKE_COMMAND} -E copy_if_different  
-        "${EXTERNAL_PATH}assimp/dll/win32/assimp-vc120-mtd.dll"
+        "${EXTERNAL_PATH}assimp/dll/${PLATFORM_DIR}/${CMAKE_CFG_INTDIR}/assimp.dll"
         $<TARGET_FILE_DIR:studio>)
 
-add_custom_command(TARGET studio POST_BUILD        
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different  
-        "${EXTERNAL_PATH}physx/dll/x86/PhysX3CommonCHECKED_x86.dll"
-        $<TARGET_FILE_DIR:studio>)
+if(${IS64})
+	
+	add_custom_command(TARGET studio POST_BUILD        
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different  
+			"${EXTERNAL_PATH}physx/dll/${PLATFORM_DIR}/PhysX3CommonCHECKED_x64.dll"
+			$<TARGET_FILE_DIR:studio>)
 
-add_custom_command(TARGET studio POST_BUILD        
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different  
-        "${EXTERNAL_PATH}physx/dll/x86/PhysX3CookingCHECKED_x86.dll"
-        $<TARGET_FILE_DIR:studio>)
+	add_custom_command(TARGET studio POST_BUILD        
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different  
+			"${EXTERNAL_PATH}physx/dll/${PLATFORM_DIR}/PhysX3CookingCHECKED_x64.dll"
+			$<TARGET_FILE_DIR:studio>)
 
-add_custom_command(TARGET studio POST_BUILD        
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different  
-        "${EXTERNAL_PATH}physx/dll/x86/PhysX3CharacterKinematicCHECKED_x86.dll"
-        $<TARGET_FILE_DIR:studio>)
+	add_custom_command(TARGET studio POST_BUILD        
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different  
+			"${EXTERNAL_PATH}physx/dll/${PLATFORM_DIR}/PhysX3CharacterKinematicCHECKED_x64.dll"
+			$<TARGET_FILE_DIR:studio>)
 
-add_custom_command(TARGET studio POST_BUILD        
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different  
-        "${EXTERNAL_PATH}physx/dll/x86/PhysX3CHECKED_x86.dll"
-        $<TARGET_FILE_DIR:studio>)
+	add_custom_command(TARGET studio POST_BUILD        
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different  
+			"${EXTERNAL_PATH}physx/dll/${PLATFORM_DIR}/PhysX3CHECKED_x64.dll"
+			$<TARGET_FILE_DIR:studio>)
+
+else(${IS64})
+
+	add_custom_command(TARGET studio POST_BUILD        
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different  
+			"${EXTERNAL_PATH}physx/dll/${PLATFORM_DIR}/PhysX3CommonCHECKED_x86.dll"
+			$<TARGET_FILE_DIR:studio>)
+
+	add_custom_command(TARGET studio POST_BUILD        
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different  
+			"${EXTERNAL_PATH}physx/dll/${PLATFORM_DIR}/PhysX3CookingCHECKED_x86.dll"
+			$<TARGET_FILE_DIR:studio>)
+
+	add_custom_command(TARGET studio POST_BUILD        
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different  
+			"${EXTERNAL_PATH}physx/dll/${PLATFORM_DIR}/PhysX3CharacterKinematicCHECKED_x86.dll"
+			$<TARGET_FILE_DIR:studio>)
+
+	add_custom_command(TARGET studio POST_BUILD        
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different  
+			"${EXTERNAL_PATH}physx/dll/${PLATFORM_DIR}/PhysX3CHECKED_x86.dll"
+			$<TARGET_FILE_DIR:studio>)
+
+endif(${IS64})
+
+

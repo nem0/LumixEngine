@@ -115,6 +115,10 @@ public:
 	virtual Pose& getPose(ComponentIndex cmp) = 0;
 	virtual ComponentIndex getActiveGlobalLight() = 0;
 	virtual void setActiveGlobalLight(ComponentIndex cmp) = 0;
+	virtual Vec4 getShadowmapCascades(ComponentIndex cmp) = 0;
+	virtual void setShadowmapCascades(ComponentIndex cmp,
+									  const Vec4& value) = 0;
+
 
 	virtual void addDebugPoint(const Vec3& pos, uint32_t color, float life) = 0;
 
@@ -187,9 +191,6 @@ public:
 
 	virtual DelegateList<void(ComponentIndex)>& renderableCreated() = 0;
 	virtual DelegateList<void(ComponentIndex)>& renderableDestroyed() = 0;
-	virtual void setRenderableIsAlwaysVisible(ComponentIndex cmp,
-											  bool value) = 0;
-	virtual bool isRenderableAlwaysVisible(ComponentIndex cmp) = 0;
 	virtual void showRenderable(ComponentIndex cmp) = 0;
 	virtual void hideRenderable(ComponentIndex cmp) = 0;
 	virtual ComponentIndex getRenderableComponent(Entity entity) = 0;
@@ -198,10 +199,8 @@ public:
 									const int32_t& layer) = 0;
 	virtual void setRenderablePath(ComponentIndex cmp, const char* path) = 0;
 	virtual void getRenderableInfos(const Frustum& frustum,
-									Array<const RenderableMesh*>& meshes,
-									int64_t layer_mask) = 0;
-	virtual void getRenderableMeshes(Array<RenderableMesh>& meshes,
-									 int64_t layer_mask) = 0;
+		Array<const RenderableMesh*>& meshes,
+		int64_t layer_mask) = 0;
 	virtual Entity getRenderableEntity(ComponentIndex cmp) = 0;
 	virtual ComponentIndex getFirstRenderable() = 0;
 	virtual ComponentIndex getNextRenderable(ComponentIndex cmp) = 0;
@@ -227,6 +226,7 @@ public:
 	setTerrainBrush(ComponentIndex cmp, const Vec3& position, float size) = 0;
 	virtual void
 	getTerrainSize(ComponentIndex cmp, float* width, float* height) = 0;
+	virtual ComponentIndex getTerrainComponent(Entity entity) = 0;
 
 	virtual void
 	setGrassPath(ComponentIndex cmp, int index, const char* path) = 0;
@@ -240,17 +240,28 @@ public:
 	virtual void addGrass(ComponentIndex cmp, int index) = 0;
 	virtual void removeGrass(ComponentIndex cmp, int index) = 0;
 
+	virtual int getClosestPointLights(const Vec3& pos,
+									   ComponentIndex* lights,
+									   int max_lights) = 0;
 	virtual void getPointLights(const Frustum& frustum,
 								Array<ComponentIndex>& lights) = 0;
+	virtual void
+	getPointLightInfluencedGeometry(ComponentIndex light_cmp,
+									Array<const RenderableMesh*>& infos,
+									int64_t layer_mask) = 0;
 	virtual void
 	getPointLightInfluencedGeometry(ComponentIndex light_cmp,
 									const Frustum& frustum,
 									Array<const RenderableMesh*>& infos,
 									int64_t layer_mask) = 0;
+	virtual void setLightCastShadows(ComponentIndex cmp, bool cast_shadows) = 0;
+	virtual bool getLightCastShadows(ComponentIndex cmp) = 0;
+	virtual float getLightAttenuation(ComponentIndex cmp) = 0;
+	virtual void setLightAttenuation(ComponentIndex cmp, float attenuation) = 0;
 	virtual float getLightFOV(ComponentIndex cmp) = 0;
 	virtual void setLightFOV(ComponentIndex cmp, float fov) = 0;
 	virtual float getLightRange(ComponentIndex cmp) = 0;
-	virtual void setLightRange(ComponentIndex cmp, float range) = 0;
+	virtual void setLightRange(ComponentIndex cmp, float value) = 0;
 	virtual void setPointLightIntensity(ComponentIndex cmp,
 										float intensity) = 0;
 	virtual void setGlobalLightIntensity(ComponentIndex cmp,

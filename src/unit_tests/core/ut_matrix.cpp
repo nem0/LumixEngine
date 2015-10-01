@@ -120,6 +120,30 @@ void UT_matrix(const char* params)
 	expectSameMatrices(mtx, old);
 	mtx = Lumix::Matrix::IDENTITY * mtx;
 	expectSameMatrices(mtx, old);
+
+	Lumix::Matrix euler;
+	euler.fromEuler(0, 0, 0);
+	expectSameMatrices(euler, Lumix::Matrix::IDENTITY);
+
+	Lumix::Matrix check_matrix;
+	check_matrix = Lumix::Matrix::IDENTITY;
+	check_matrix.m11 = -1;
+	check_matrix.m33 = -1;
+	euler.fromEuler(3.14159265f, 0, 0);
+	expectSameMatrices(euler, check_matrix);
+
+	check_matrix = Lumix::Matrix::IDENTITY;
+	check_matrix.m11 = -1;
+	check_matrix.m22 = -1;
+	euler.fromEuler(0, 0, 3.14159265f);
+	expectSameMatrices(euler, check_matrix);
+
+	check_matrix = Lumix::Matrix::IDENTITY;
+	check_matrix.m22 = -1;
+	check_matrix.m33 = -1;
+	euler.fromEuler(0, 3.14159265f, 0);
+	expectSameMatrices(euler, check_matrix);
 }
+
 
 REGISTER_TEST("unit_tests/core/matrix", UT_matrix, "")

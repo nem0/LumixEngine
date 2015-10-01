@@ -60,7 +60,6 @@ struct Renderable
 	Model* m_model;
 	Matrix m_matrix;
 	Entity m_entity;
-	bool m_is_always_visible;
 
 private:
 	Renderable(const Renderable&);
@@ -69,13 +68,15 @@ private:
 
 struct PointLight
 {
-	Vec3 m_color;
+	Vec3 m_diffuse_color;
 	Vec3 m_specular_color;
 	float m_intensity;
-	float m_range;
 	Entity m_entity;
 	int m_uid;
 	float m_fov;
+	float m_attenuation_param;
+	float m_range;
+	bool m_cast_shadows;
 };
 
 
@@ -89,6 +90,7 @@ struct GlobalLight
 	Vec3 m_fog_color;
 	float m_fog_density;
 	Entity m_entity;
+	Vec4 m_cascades;
 };
 
 
@@ -166,7 +168,6 @@ public:
 		, m_global_lights(m_allocator)
 		, m_debug_lines(m_allocator)
 		, m_debug_points(m_allocator)
-		, m_always_visible(m_allocator)
 		, m_temporary_infos(m_allocator)
 		, m_sync_point(true, m_allocator)
 		, m_jobs(m_allocator)
@@ -245,10 +246,11 @@ public:
 		float fov = m_cameras[camera].m_fov;
 		float near_plane = m_cameras[camera].m_near;
 		float far_plane = m_cameras[camera].m_far;
+		float ratio = width / height;
 
 		Matrix projection_matrix;
 		projection_matrix.setPerspective(
-			Math::degreesToRadians(fov), width, height, near_plane, far_plane);
+			Math::degreesToRadians(fov), ratio, near_plane, far_plane);
 		Matrix view_matrix = m_universe.getMatrix(m_cameras[camera].m_entity);
 		view_matrix.inverse();
 		Matrix inverted = (projection_matrix * view_matrix);
@@ -274,13 +276,13 @@ public:
 		Matrix mtx = m_universe.getMatrix(m_cameras[camera].m_entity);
 		Frustum ret;
 		ret.computePerspective(mtx.getTranslation(),
-			mtx.getZVector(),
-			mtx.getYVector(),
-			m_cameras[camera].m_fov,
-			m_cameras[camera].m_width /
-			m_cameras[camera].m_height,
-			m_cameras[camera].m_near,
-			m_cameras[camera].m_far);
+							   mtx.getZVector(),
+							   mtx.getYVector(),
+							   Math::degreesToRadians(m_cameras[camera].m_fov),
+							   m_cameras[camera].m_width /
+								   m_cameras[camera].m_height,
+							   m_cameras[camera].m_near,
+							   m_cameras[camera].m_far);
 
 		return ret;
 	}
@@ -342,12 +344,13 @@ public:
 		{
 			PointLight& point_light = m_point_lights[i];
 			serializer.write(point_light.m_uid);
-			serializer.write(point_light.m_color);
+			serializer.write(point_light.m_diffuse_color);
 			serializer.write(point_light.m_intensity);
 			serializer.write(point_light.m_entity);
-			serializer.write(point_light.m_range);
+			serializer.write(point_light.m_attenuation_param);
 			serializer.write(point_light.m_fov);
 			serializer.write(point_light.m_specular_color);
+			serializer.write(point_light.m_cast_shadows);
 		}
 		serializer.write(m_point_light_last_uid);
 
@@ -363,6 +366,7 @@ public:
 			serializer.write(global_light.m_ambient_intensity);
 			serializer.write(global_light.m_fog_color);
 			serializer.write(global_light.m_fog_density);
+			serializer.write(global_light.m_cascades);
 		}
 		serializer.write((int32_t)m_global_light_last_uid);
 		serializer.write((int32_t)m_active_global_light_uid);
@@ -373,7 +377,6 @@ public:
 		serializer.write((int32_t)m_renderables.size());
 		for (int i = 0; i < m_renderables.size(); ++i)
 		{
-			serializer.write(m_renderables[i]->m_is_always_visible);
 			serializer.write(m_renderables[i]->m_component_index);
 			serializer.write(m_renderables[i]->m_entity);
 			serializer.write(m_culling_system->getLayerMask(i));
@@ -434,7 +437,7 @@ public:
 	{
 		int32_t size = 0;
 		serializer.read(size);
-		for (int i = size; i < m_renderables.size(); ++i)
+		for (int i = 0; i < m_renderables.size(); ++i)
 		{
 			setModel(i, nullptr);
 			m_allocator.deleteObject(m_renderables[i]);
@@ -443,16 +446,10 @@ public:
 		m_renderables.clear();
 		m_renderables.reserve(size);
 		m_dynamic_renderable_cache = DynamicRenderableCache(m_allocator);
-		m_always_visible.clear();
 		for (int i = 0; i < size; ++i)
 		{
 			m_renderables.push(m_allocator.newObject<Renderable>(m_allocator));
-			serializer.read(m_renderables[i]->m_is_always_visible);
 			serializer.read(m_renderables[i]->m_component_index);
-			if (m_renderables[i]->m_is_always_visible)
-			{
-				m_always_visible.push(m_renderables[i]->m_component_index);
-			}
 			serializer.read(m_renderables[i]->m_entity);
 			int64_t layer_mask;
 			serializer.read(layer_mask);
@@ -472,8 +469,10 @@ public:
 				.get(ResourceManager::MODEL)
 				->load(Path(path))));
 
-			m_universe.addComponent(
-				m_renderables[i]->m_entity, RENDERABLE_HASH, this, i);
+			m_universe.addComponent(m_renderables[i]->m_entity,
+				RENDERABLE_HASH,
+				this,
+				m_renderables[i]->m_component_index);
 		}
 	}
 
@@ -488,12 +487,13 @@ public:
 			m_light_influenced_geometry.push(Array<int>(m_allocator));
 			PointLight& light = m_point_lights[i];
 			serializer.read(light.m_uid);
-			serializer.read(light.m_color);
+			serializer.read(light.m_diffuse_color);
 			serializer.read(light.m_intensity);
 			serializer.read(light.m_entity);
-			serializer.read(light.m_range);
+			serializer.read(light.m_attenuation_param);
 			serializer.read(light.m_fov);
 			serializer.read(light.m_specular_color);
+			serializer.read(light.m_cast_shadows);
 			m_universe.addComponent(
 				light.m_entity, POINT_LIGHT_HASH, this, light.m_uid);
 		}
@@ -512,6 +512,7 @@ public:
 			serializer.read(light.m_ambient_intensity);
 			serializer.read(light.m_fog_color);
 			serializer.read(light.m_fog_density);
+			serializer.read(light.m_cascades);
 			m_universe.addComponent(
 				light.m_entity, GLOBAL_LIGHT_HASH, this, light.m_uid);
 		}
@@ -523,20 +524,28 @@ public:
 	{
 		int32_t size = 0;
 		serializer.read(size);
+		int old_size = m_terrains.size();
 		for (int i = size; i < m_terrains.size(); ++i)
 		{
 			m_allocator.deleteObject(m_terrains[i]);
 			m_terrains[i] = nullptr;
 		}
 		m_terrains.resize(size);
+		for (int i = old_size; i < size; ++i)
+		{
+			m_terrains[i] = nullptr;
+		}
 		for (int i = 0; i < size; ++i)
 		{
 			bool exists;
 			serializer.read(exists);
 			if (exists)
 			{
-				m_terrains[i] = m_allocator.newObject<Terrain>(
-					m_renderer, INVALID_ENTITY, *this, m_allocator);
+				if (!m_terrains[i])
+				{
+					m_terrains[i] = m_allocator.newObject<Terrain>(
+						m_renderer, INVALID_ENTITY, *this, m_allocator);
+				}
 				Terrain* terrain = m_terrains[i];
 				terrain->deserialize(serializer, m_universe, *this, i);
 			}
@@ -579,7 +588,6 @@ public:
 		}
 
 		setModel(renderable_index, nullptr);
-		m_always_visible.eraseItemFast(component);
 		m_allocator.deleteObject(m_renderables[renderable_index]);
 		m_renderables.erase(renderable_index);
 		m_culling_system->removeStatic(renderable_index);
@@ -816,6 +824,20 @@ public:
 	}
 
 
+	virtual ComponentIndex getTerrainComponent(Entity entity) override
+	{
+		for (int i = 0; i < m_terrains.size(); ++i)
+		{
+			auto* terrain = m_terrains[i];
+			if (terrain && terrain->getEntity() == entity)
+			{
+				return i;
+			}
+		}
+		return -1;
+	}
+
+
 	virtual float
 	getTerrainHeightAt(ComponentIndex cmp, float x, float z) override
 	{
@@ -909,34 +931,7 @@ public:
 	virtual void hideRenderable(ComponentIndex cmp) override
 	{
 		int renderable_index = getRenderable(cmp);
-		if (!m_renderables[renderable_index]->m_is_always_visible)
-		{
-			m_culling_system->disableStatic(renderable_index);
-		}
-	}
-
-
-	virtual void setRenderableIsAlwaysVisible(ComponentIndex cmp,
-											  bool value) override
-	{
-		int renderable_index = getRenderable(cmp);
-		m_renderables[renderable_index]->m_is_always_visible = value;
-		if (value)
-		{
-			m_culling_system->disableStatic(renderable_index);
-			m_always_visible.push(cmp);
-		}
-		else
-		{
-			m_culling_system->enableStatic(renderable_index);
-			m_always_visible.eraseItemFast(cmp);
-		}
-	}
-
-
-	virtual bool isRenderableAlwaysVisible(ComponentIndex cmp) override
-	{
-		return m_renderables[getRenderable(cmp)]->m_is_always_visible;
+		m_culling_system->disableStatic(renderable_index);
 	}
 
 
@@ -1129,6 +1124,7 @@ public:
 
 	void mergeTemporaryInfos(Array<const RenderableMesh*>& all_infos)
 	{
+		TODO("we do not really need this, we can work with m_temporary_infos");
 		PROFILE_FUNCTION();
 		all_infos.reserve(m_renderables.size() * 2);
 		for (int i = 0; i < m_temporary_infos.size(); ++i)
@@ -1175,39 +1171,26 @@ public:
 		{
 			m_temporary_infos.pop();
 		}
-		for (int subresult_index = 0; subresult_index < results.size();
-			 ++subresult_index)
+		for (int subresult_index = 0; subresult_index < results.size(); ++subresult_index)
 		{
-			Array<const RenderableMesh*>& subinfos =
-				m_temporary_infos[subresult_index];
+			Array<const RenderableMesh*>& subinfos = m_temporary_infos[subresult_index];
 			subinfos.clear();
-			MTJD::Job* job = MTJD::makeJob(
-				m_engine.getMTJDManager(),
-				[&subinfos,
-				 layer_mask,
-				 this,
-				 &results,
-				 subresult_index,
-				 &frustum]()
+			MTJD::Job* job = MTJD::makeJob(m_engine.getMTJDManager(),
+				[&subinfos, layer_mask, this, &results, subresult_index, &frustum]()
 				{
 					Vec3 frustum_position = frustum.getPosition();
-					const CullingSystem::Subresults& subresults =
-						results[subresult_index];
+					const CullingSystem::Subresults& subresults = results[subresult_index];
 					for (int i = 0, c = subresults.size(); i < c; ++i)
 					{
-						const Renderable* LUMIX_RESTRICT renderable =
-							m_renderables[subresults[i]];
+						const Renderable* LUMIX_RESTRICT renderable = m_renderables[subresults[i]];
 						const Model* LUMIX_RESTRICT model = renderable->m_model;
 						float squared_distance =
-							(renderable->m_matrix.getTranslation() -
-							 frustum_position)
+							(renderable->m_matrix.getTranslation() - frustum_position)
 								.squaredLength();
 						if (model && model->isReady())
 						{
-							LODMeshIndices lod =
-								model->getLODMeshIndices(squared_distance);
-							for (int j = lod.getFrom(), c = lod.getTo(); j <= c;
-								 ++j)
+							LODMeshIndices lod = model->getLODMeshIndices(squared_distance);
+							for (int j = lod.getFrom(), c = lod.getTo(); j <= c; ++j)
 							{
 								subinfos.push(&renderable->m_meshes[j]);
 							}
@@ -1219,6 +1202,71 @@ public:
 			m_jobs.push(job);
 		}
 		runJobs(m_jobs, m_sync_point);
+	}
+
+
+	virtual int getClosestPointLights(const Vec3& reference_pos,
+									   ComponentIndex* lights,
+									   int max_lights) override
+	{
+
+		float dists[16];
+		ASSERT(max_lights <= lengthOf(dists));
+		ASSERT(max_lights > 0);
+		if (m_point_lights.empty()) return 0;
+
+		int light_count = 0;
+		for (auto light : m_point_lights)
+		{
+			Vec3 light_pos = m_universe.getPosition(light.m_entity);
+			float dist_squared = (reference_pos - light_pos).squaredLength();
+
+			dists[light_count] = dist_squared;
+			lights[light_count] = light.m_uid;
+
+			for (int i = light_count; i > 0 && dists[i - 1] > dists[i]; --i)
+			{
+				float tmp = dists[i];
+				dists[i] = dists[i - 1];
+				dists[i - 1] = tmp;
+
+				ComponentIndex tmp2 = lights[i];
+				lights[i] = lights[i - 1];
+				lights[i - 1] = tmp2;
+			}
+			++light_count;
+			if (light_count == max_lights)
+			{
+				break;
+			}
+		}
+
+		for (int i = max_lights; i < m_point_lights.size(); ++i)
+		{
+			PointLight& light = m_point_lights[i];
+			Vec3 light_pos = m_universe.getPosition(light.m_entity);
+			float dist_squared = (reference_pos - light_pos).squaredLength();
+
+			if (dist_squared < dists[max_lights - 1])
+			{
+				dists[max_lights - 1] = dist_squared;
+				lights[max_lights - 1] = light.m_uid;
+
+				for (int i = max_lights - 1; i > 0 && dists[i - 1] > dists[i];
+					 --i)
+				{
+					float tmp = dists[i];
+					dists[i] = dists[i - 1];
+					dists[i - 1] = tmp;
+
+					ComponentIndex tmp2 = lights[i];
+					lights[i] = lights[i - 1];
+					lights[i - 1] = tmp2;
+				}
+			}
+		}
+
+		return light_count;
 	}
 
 
@@ -1244,11 +1292,24 @@ public:
 	}
 
 
+	virtual void setLightCastShadows(ComponentIndex cmp,
+									 bool cast_shadows) override
+	{
+		m_point_lights[getPointLightIndex(cmp)].m_cast_shadows = cast_shadows;
+	}
+
+
+	virtual bool getLightCastShadows(ComponentIndex cmp) override 
+	{
+		return m_point_lights[getPointLightIndex(cmp)].m_cast_shadows;
+	}
+
+
 	virtual void
 	getPointLightInfluencedGeometry(ComponentIndex light_cmp,
 									const Frustum& frustum,
 									Array<const RenderableMesh*>& infos,
-									int64_t layer_mask)
+									int64_t layer_mask) override
 	{
 		PROFILE_FUNCTION();
 
@@ -1276,6 +1337,26 @@ public:
 	}
 
 
+	virtual void
+		getPointLightInfluencedGeometry(ComponentIndex light_cmp,
+		Array<const RenderableMesh*>& infos,
+		int64_t layer_mask) override
+	{
+		PROFILE_FUNCTION();
+
+		int light_index = getPointLightIndex(light_cmp);
+		auto& geoms = m_light_influenced_geometry[light_index];
+		for (int j = 0, cj = geoms.size(); j < cj; ++j)
+		{
+			Renderable* renderable = m_renderables[geoms[j]];
+			for (int k = 0, kc = renderable->m_meshes.size(); k < kc; ++k)
+			{
+				infos.push(&renderable->m_meshes[k]);
+			}
+		}
+	}
+
+
 	virtual void getRenderableInfos(const Frustum& frustum,
 									Array<const RenderableMesh*>& meshes,
 									int64_t layer_mask) override
@@ -1290,45 +1371,8 @@ public:
 
 		fillTemporaryInfos(*results, frustum, layer_mask);
 		mergeTemporaryInfos(meshes);
-
-		for (int i = 0, c = m_always_visible.size(); i < c; ++i)
-		{
-			int renderable_index = getRenderable(m_always_visible[i]);
-			const Renderable* LUMIX_RESTRICT renderable =
-				m_renderables[renderable_index];
-			if ((m_culling_system->getLayerMask(renderable_index) &
-				 layer_mask) != 0)
-			{
-				for (int j = 0, c = renderable->m_meshes.size(); j < c; ++j)
-				{
-					meshes.push(&renderable->m_meshes[j]);
-				}
-			}
-		}
 	}
 
-
-	virtual void getRenderableMeshes(Array<RenderableMesh>& meshes,
-									 int64_t layer_mask) override
-	{
-		PROFILE_FUNCTION();
-
-		if (m_renderables.empty())
-			return;
-
-		meshes.reserve(m_renderables.size() * 2);
-		for (int i = 0, c = m_renderables.size(); i < c; ++i)
-		{
-			const Renderable* LUMIX_RESTRICT renderable = m_renderables[i];
-			if ((m_culling_system->getLayerMask(i) & layer_mask) != 0)
-			{
-				for (int j = 0, c = renderable->m_meshes.size(); j < c; ++j)
-				{
-					meshes.push(renderable->m_meshes[j]);
-				}
-			}
-		}
-	}
 
 	virtual void setCameraSlot(ComponentIndex camera, const char* slot) override
 	{
@@ -1795,6 +1839,25 @@ public:
 	}
 
 
+	virtual Vec4 getShadowmapCascades(ComponentIndex cmp) override
+	{
+		return m_global_lights[getGlobalLightIndex(cmp)].m_cascades;
+	}
+
+
+	virtual void setShadowmapCascades(ComponentIndex cmp,
+									  const Vec4& value) override
+	{
+		Vec4 valid_value = value;
+		valid_value.x = Math::maxValue(valid_value.x, 0.02f);
+		valid_value.y = Math::maxValue(valid_value.x + 0.01f, valid_value.y);
+		valid_value.z = Math::maxValue(valid_value.y + 0.01f, valid_value.z);
+		valid_value.w = Math::maxValue(valid_value.z + 0.01f, valid_value.w);
+
+		m_global_lights[getGlobalLightIndex(cmp)].m_cascades = valid_value;
+	}
+
+
 	int getGlobalLightIndex(int uid) const
 	{
 		for (int i = 0; i < m_global_lights.size(); ++i)
@@ -1828,16 +1891,26 @@ public:
 		return m_global_lights[getGlobalLightIndex(cmp)].m_fog_color;
 	}
 
+	virtual float getLightAttenuation(ComponentIndex cmp) override
+	{
+		return m_point_lights[getPointLightIndex(cmp)].m_attenuation_param;
+	}
+
+	virtual void setLightAttenuation(ComponentIndex cmp,
+									 float attenuation) override
+	{
+		int index = getPointLightIndex(cmp);
+		m_point_lights[index].m_attenuation_param = attenuation;
+	}
+
 	virtual float getLightRange(ComponentIndex cmp) override
 	{
 		return m_point_lights[getPointLightIndex(cmp)].m_range;
 	}
 
-	virtual void setLightRange(ComponentIndex cmp, float range) override
+	virtual void setLightRange(ComponentIndex cmp, float value) override
 	{
-		int index = getPointLightIndex(cmp);
-		m_point_lights[index].m_range = range;
-		detectLightInfluencedGeometry(index);
+		m_point_lights[getPointLightIndex(cmp)].m_range = value;
 	}
 
 	virtual void setPointLightIntensity(ComponentIndex cmp,
@@ -1855,7 +1928,7 @@ public:
 	virtual void setPointLightColor(ComponentIndex cmp,
 									const Vec3& color) override
 	{
-		m_point_lights[getPointLightIndex(cmp)].m_color = color;
+		m_point_lights[getPointLightIndex(cmp)].m_diffuse_color = color;
 	}
 
 	virtual void setGlobalLightColor(ComponentIndex cmp,
@@ -1889,7 +1962,7 @@ public:
 
 	virtual Vec3 getPointLightColor(ComponentIndex cmp) override
 	{
-		return m_point_lights[getPointLightIndex(cmp)].m_color;
+		return m_point_lights[getPointLightIndex(cmp)].m_diffuse_color;
 	}
 
 	virtual void setPointLightSpecularColor(ComponentIndex cmp,
@@ -2025,17 +2098,16 @@ private:
 	void setModel(int renderable_index, Model* model)
 	{
 		Model* old_model = m_renderables[renderable_index]->m_model;
-		if (model == old_model)
+		if (model == old_model && old_model)
 		{
+			old_model->getResourceManager().get(ResourceManager::MODEL)->unload(*old_model);
 			return;
 		}
 		if (old_model)
 		{
 			ModelLoadedCallback* callback = getModelLoadedCallback(old_model);
 			--callback->m_ref_count;
-			old_model->getResourceManager()
-				.get(ResourceManager::MODEL)
-				->unload(*old_model);
+			old_model->getResourceManager().get(ResourceManager::MODEL)->unload(*old_model);
 		}
 		m_renderables[renderable_index]->m_model = model;
 		m_renderables[renderable_index]->m_meshes.clear();
@@ -2113,6 +2185,7 @@ private:
 		light.m_fog_color.set(1, 1, 1);
 		light.m_fog_density = 0;
 		light.m_uid = ++m_global_light_last_uid;
+		light.m_cascades.set(3, 8, 100, 300);
 
 		if (m_global_lights.size() == 1)
 		{
@@ -2129,12 +2202,14 @@ private:
 		PointLight& light = m_point_lights.pushEmpty();
 		m_light_influenced_geometry.push(Array<int>(m_allocator));
 		light.m_entity = entity;
-		light.m_color.set(1, 1, 1);
+		light.m_diffuse_color.set(1, 1, 1);
 		light.m_intensity = 1;
-		light.m_range = 10;
 		light.m_uid = ++m_point_light_last_uid;
 		light.m_fov = 999;
 		light.m_specular_color.set(1, 1, 1);
+		light.m_cast_shadows = false;
+		light.m_attenuation_param = 2;
+		light.m_range = 10;
 
 		m_universe.addComponent(entity, POINT_LIGHT_HASH, this, light.m_uid);
 
@@ -2154,7 +2229,6 @@ private:
 		r.m_entity = entity;
 		r.m_model = nullptr;
 		r.m_component_index = new_index;
-		r.m_is_always_visible = false;
 		r.m_matrix = m_universe.getMatrix(entity);
 		m_universe.addComponent(
 			entity, RENDERABLE_HASH, this, r.m_component_index);
@@ -2169,7 +2243,6 @@ private:
 	Array<ModelLoadedCallback*> m_model_loaded_callbacks;
 
 	Array<Renderable*> m_renderables;
-	Array<int> m_always_visible;
 
 	int m_point_light_last_uid;
 	Array<PointLight> m_point_lights;

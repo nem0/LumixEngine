@@ -11,7 +11,7 @@
 #include "core/resource.h"
 #include "renderer/geometry.h"
 #include "renderer/ray_cast_model_hit.h"
-#include <bgfx.h>
+#include <bgfx/bgfx.h>
 
 
 namespace Lumix

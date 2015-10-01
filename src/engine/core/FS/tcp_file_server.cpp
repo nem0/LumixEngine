@@ -53,12 +53,12 @@ public:
 						m_base_path.c_str(),
 						m_base_path.length()) != 0)
 			{
-				copyString(path, sizeof(path), m_base_path.c_str());
-				catString(path, sizeof(path), m_buffer.data());
+				copyString(path, m_base_path.c_str());
+				catString(path, m_buffer.data());
 			}
 			else
 			{
-				copyString(path, sizeof(path), m_buffer.data());
+				copyString(path, m_buffer.data());
 			}
 			ret = file->open(path, mode, getAllocator()) ? id : -1;
 			if (ret == -1)

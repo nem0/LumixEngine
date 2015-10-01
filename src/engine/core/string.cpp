@@ -11,6 +11,29 @@ static char makeLowercase(char c)
 }
 
 
+LUMIX_ENGINE_API const char* stristr(const char* haystack, const char* needle)
+{
+	const char* c = haystack;
+	while (*c)
+	{
+		if (makeLowercase(*c) == makeLowercase(needle[0]))
+		{
+			const char* n = needle + 1;
+			const char* c2 = c + 1;
+			while (*n && *c2)
+			{
+				if (makeLowercase(*n) != makeLowercase(*c2)) break;
+				++n;
+				++c2;
+			}
+			if (*n == 0) return c;
+		}
+		++c;
+	}
+	return nullptr;
+}
+
+
 bool makeLowercase(char* destination, int length, const char* source)
 {
 	if (!source)
@@ -41,7 +64,7 @@ bool copyNString(char* destination, int length, const char* source, int source_l
 		return false;
 	}
 
-	while (*source && length && source_len)
+	while (*source && length > 1 && source_len)
 	{
 		*destination = *source;
 		--source_len;
@@ -52,7 +75,7 @@ bool copyNString(char* destination, int length, const char* source, int source_l
 	if (length > 0)
 	{
 		*destination = 0;
-		return true;
+		return *source == '\0' || source_len == 0;
 	}
 	return false;
 }
@@ -60,12 +83,12 @@ bool copyNString(char* destination, int length, const char* source, int source_l
 
 bool copyString(char* destination, int length, const char* source)
 {
-	if (!source)
+	if (!source || length < 1)
 	{
 		return false;
 	}
 
-	while (*source && length)
+	while (*source && length > 1)
 	{
 		*destination = *source;
 		--length;
@@ -75,7 +98,7 @@ bool copyString(char* destination, int length, const char* source)
 	if (length > 0)
 	{
 		*destination = 0;
-		return true;
+		return *source == '\0';
 	}
 	return false;
 }
@@ -224,6 +247,12 @@ bool toCStringPretty(int32_t value, char* output, int length)
 
 bool toCStringPretty(uint32_t value, char* output, int length)
 {
+	return toCStringPretty(uint64_t(value), output, length);
+}
+
+
+bool toCStringPretty(uint64_t value, char* output, int length)
+{
 	char* c = output;
 	char* num_start = output;
 	if (length > 0)
@@ -285,6 +314,23 @@ bool toCString(int32_t value, char* output, int length)
 }
 
 bool toCString(int64_t value, char* output, int length)
+{
+	char* c = output;
+	if (length > 0)
+	{
+		if (value < 0)
+		{
+			value = -value;
+			--length;
+			*c = '-';
+			++c;
+		}
+		return toCString((uint64_t)value, c, length);
+	}
+	return false;
+}
+
+bool toCString(uint64_t value, char* output, int length)
 {
 	char* c = output;
 	char* num_start = output;
@@ -417,7 +463,7 @@ static bool increment(char* output, char* end, bool is_space_after)
 
 bool toCString(float value, char* output, int length, int after_point)
 {
-	if (length < 1)
+	if (length < 2)
 	{
 		return false;
 	}
@@ -432,25 +478,34 @@ bool toCString(float value, char* output, int length, int after_point)
 	int exponent = value == 0 ? 0 : (int)log10(value);
 	float num = value;
 	char* c = output;
-	while ((num >= 1 || exponent >= 0) && length > 0)
+	if (num  < 1 && num > -1 && length > 1)
 	{
-		float power = (float)pow(10, exponent);
-		char digit = (char)floor(num / power);
-		num -= digit * power;
-		*c = digit + '0';
-		--exponent;
-		--length;
+		*c = '0';
 		++c;
+		--length;
+	}
+	else
+	{
+		while ((num >= 1 || exponent >= 0) && length > 1)
+		{
+			float power = (float)pow(10, exponent);
+			char digit = (char)floor(num / power);
+			num -= digit * power;
+			*c = digit + '0';
+			--exponent;
+			--length;
+			++c;
+		}
 	}
 	// decimal part
 	float dec_part = num;
-	if (length >= 1 && after_point > 0)
+	if (length > 1 && after_point > 0)
 	{
 		*c = '.';
 		++c;
 		--length;
 	}
-	else if (length >= 1 && after_point == 0)
+	else if (length > 0 && after_point == 0)
 	{
 		*c = 0;
 		return true;
@@ -459,7 +514,7 @@ bool toCString(float value, char* output, int length, int after_point)
 	{
 		return false;
 	}
-	while (length > 0 && after_point > 0)
+	while (length > 1 && after_point > 0)
 	{
 		dec_part *= 10;
 		char tmp = (char)dec_part;
@@ -480,6 +535,16 @@ bool toCString(float value, char* output, int length, int after_point)
 		return false;
 	}
 	return true;
+}
+
+
+char* trimmed(char* str)
+{
+	while (*str && (*str == '\t' || *str == ' '))
+	{
+		++str;
+	}
+	return str;
 }
 
 

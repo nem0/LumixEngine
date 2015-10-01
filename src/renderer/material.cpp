@@ -11,6 +11,7 @@
 #include "core/timer.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/pipeline.h"
+#include "renderer/renderer.h"
 #include "renderer/shader.h"
 #include "renderer/texture.h"
 
@@ -22,37 +23,132 @@ namespace Lumix
 static const uint32_t SHADOWMAP_HASH = crc32("shadowmap");
 
 
+Material::Material(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
+	: Resource(path, resource_manager, allocator)
+	, m_shader(nullptr)
+	, m_depth_func(DepthFunc::LEQUAL)
+	, m_uniforms(allocator)
+	, m_allocator(allocator)
+	, m_texture_count(0)
+	, m_render_states(0)
+	, m_specular(1, 1, 1)
+	, m_shininess(4)
+	, m_shader_instance(nullptr)
+	, m_shader_mask(0)
+{
+	enableZTest(true);
+	enableBackfaceCulling(true);
+	enableShadowReceiving(true);
+	for (int i = 0; i < MAX_TEXTURE_COUNT; ++i)
+	{
+		m_textures[i] = nullptr;
+	}
+}
+
+
 Material::~Material()
 {
 	ASSERT(isEmpty());
 }
 
 
-void Material::updateShaderInstance()
+void Material::setUserDefine(int define_idx)
 {
-	if (isReady())
+	if (!isReady()) return;
+	if (!m_shader) return;
+
+	uint32_t old_mask = m_shader_mask;
+	m_shader_mask |= m_shader->getDefineMask(define_idx);
+
+	if (old_mask != m_shader_mask)
 	{
-		if (m_shader && m_shader->isReady())
-		{
-			uint32_t mask = 0;
-			if (m_is_alpha_cutout)
-			{
-				mask |= m_shader->getDefineMask("ALPHA_CUTOUT");
-			}
-			if (m_is_shadow_receiver)
-			{
-				mask |= m_shader->getDefineMask("SHADOW_RECEIVER");
-			}
-			for (int i = 0; i < m_shader->getTextureSlotCount(); ++i)
-			{
-				if (m_shader->getTextureSlot(i).m_define[0] != '\0' && m_textures[i])
-				{
-					mask |= m_shader->getDefineMask(m_shader->getTextureSlot(i).m_define);
-				}
-			}
-			m_shader_instance = &m_shader->getInstance(mask);
-		}
+		m_shader_instance = &m_shader->getInstance(m_shader_mask);
 	}
+}
+
+
+void Material::unsetUserDefine(int define_idx)
+{
+	if (!isReady()) return;
+	if (!m_shader) return;
+
+	uint32_t old_mask = m_shader_mask;
+	m_shader_mask &= ~m_shader->getDefineMask(define_idx);
+
+	if (old_mask != m_shader_mask)
+	{
+		m_shader_instance = &m_shader->getInstance(m_shader_mask);
+	}
+}
+
+
+bool Material::isAlphaCutout() const
+{
+	if (!isReady()) return false;
+	if (!m_shader)	return false;
+
+	return (m_shader_mask &
+			m_shader->getDefineMask(m_alpha_cutout_define_idx)) != 0;
+}
+
+
+bool Material::hasAlphaCutoutDefine() const
+{
+	return m_shader->getDefineMask(m_alpha_cutout_define_idx) != 0;
+}
+
+
+void Material::enableAlphaCutout(bool enable)
+{
+	if (!isReady()) return;
+	if (!m_shader)	return;
+
+	uint32_t mask = m_shader->getDefineMask(m_alpha_cutout_define_idx);
+	if (enable)
+	{
+		m_shader_mask |= mask;
+	}
+	else
+	{
+		m_shader_mask &= ~mask;
+	}
+
+	m_shader_instance = &m_shader->getInstance(m_shader_mask);
+}
+
+
+bool Material::isShadowReceiver() const
+{
+	if (!isReady()) return false;
+	if (!m_shader)	return false;
+
+	return (m_shader_mask &
+			m_shader->getDefineMask(m_shadow_receiver_define_idx)) != 0;
+}
+
+
+bool Material::hasShadowReceivingDefine() const
+{
+	return m_shader->getDefineMask(m_shadow_receiver_define_idx) != 0;
+}
+
+
+void Material::enableShadowReceiving(bool enable)
+{
+	if (!isReady()) return;
+	if (!m_shader)	return;
+
+	uint32_t mask = m_shader->getDefineMask(m_shadow_receiver_define_idx);
+	if (enable)
+	{
+		m_shader_mask |= mask;
+	}
+	else
+	{
+		m_shader_mask &= ~mask;
+	}
+
+	m_shader_instance = &m_shader->getInstance(m_shader_mask);
 }
 
 
@@ -83,8 +179,10 @@ bool Material::save(JsonSerializer& serializer)
 	for (int i = 0; i < m_texture_count; ++i)
 	{
 		char path[MAX_PATH_LENGTH];
+		int flags = 0;
 		if (m_textures[i])
 		{
+			flags = m_textures[i]->getFlags();
 			PathUtils::getFilename(path, MAX_PATH_LENGTH, m_textures[i]->getPath().c_str());
 		}
 		else
@@ -93,6 +191,14 @@ bool Material::save(JsonSerializer& serializer)
 		}
 		serializer.beginObject("texture");
 		serializer.serialize("source", path);
+		if (flags & BGFX_TEXTURE_U_CLAMP) serializer.serialize("u_clamp", true);
+		if (flags & BGFX_TEXTURE_V_CLAMP) serializer.serialize("v_clamp", true);
+		if (flags & BGFX_TEXTURE_W_CLAMP) serializer.serialize("w_clamp", true);
+		if (flags & BGFX_TEXTURE_MIN_POINT) serializer.serialize("min_filter", "point");
+		if (flags & BGFX_TEXTURE_MIN_ANISOTROPIC) serializer.serialize("min_filter", "anisotropic");
+		if (flags & BGFX_TEXTURE_MAG_POINT) serializer.serialize("mag_filter", "point");
+		if (flags & BGFX_TEXTURE_MAG_ANISOTROPIC) serializer.serialize("mag_filter", "anisotropic");
+		if (m_textures[i] && m_textures[i]->getData()) serializer.serialize("keep_data", true);
 		serializer.endObject();
 	}
 	serializer.beginArray("uniforms");
@@ -127,8 +233,8 @@ bool Material::save(JsonSerializer& serializer)
 	}
 	serializer.endArray();
 	serializer.serialize("backface_culling", isBackfaceCulling());
-	serializer.serialize("alpha_cutout", m_is_alpha_cutout);
-	serializer.serialize("shadow_receiver", m_is_shadow_receiver);
+	serializer.serialize("alpha_cutout", isAlphaCutout());
+	serializer.serialize("shadow_receiver", isShadowReceiver());
 	serializer.serialize("shininess", m_shininess);
 	serializer.beginArray("specular");
 	serializer.serializeArrayItem(m_specular.x);
@@ -137,7 +243,7 @@ bool Material::save(JsonSerializer& serializer)
 	serializer.endArray();
 	serializer.serialize("z_test", isZTest());
 	serializer.endObject();
-	return false;
+	return true;
 }
 
 void Material::deserializeUniforms(JsonSerializer& serializer)
@@ -231,9 +337,19 @@ void Material::setTexture(int i, Texture* texture)
 		removeDependency(*old_texture);
 		m_resource_manager.get(ResourceManager::TEXTURE)->unload(*old_texture);
 	}
-	if (isReady())
+	if (isReady() && m_shader)
 	{
-		updateShaderInstance();
+		int define_idx = m_shader->getTextureSlot(i).m_define_idx;
+		if (define_idx >= 0 && m_textures[i])
+		{
+			m_shader_mask |= m_shader->getDefineMask(define_idx);
+		}
+		else
+		{
+			m_shader_mask &= ~m_shader->getDefineMask(define_idx);
+		}
+
+		m_shader_instance = &m_shader->getInstance(m_shader_mask);
 	}
 }
 
@@ -248,16 +364,35 @@ void Material::setShader(const Path& path)
 void Material::onReady()
 {
 	Resource::onReady();
-	updateShaderInstance();
+	if (m_shader)
+	{
+		m_alpha_cutout_define_idx =
+			m_shader->getRenderer().getShaderDefineIdx("ALPHA_CUTOUT");
+		m_shadow_receiver_define_idx =
+			m_shader->getRenderer().getShaderDefineIdx("SHADOW_RECEIVER");
+		for (int i = 0; i < m_shader->getTextureSlotCount(); ++i)
+		{
+			if (m_shader->getTextureSlot(i).m_define_idx >= 0 && m_textures[i])
+			{
+				m_shader_mask |= m_shader->getDefineMask(
+					m_shader->getTextureSlot(i).m_define_idx);
+			}
+		}
+		m_shader_instance = &m_shader->getInstance(m_shader_mask);
+	}
 }
 
 
 void Material::setShader(Shader* shader)
 {
+	bool is_alpha = isAlphaCutout();
+	bool is_receiver = isShadowReceiver();
 	if (m_shader)
-	{ 
-		removeDependency(*m_shader);
-		m_resource_manager.get(ResourceManager::SHADER)->unload(*m_shader);
+	{
+		Shader* shader = m_shader;
+		m_shader = nullptr;
+		removeDependency(*shader);
+		m_resource_manager.get(ResourceManager::SHADER)->unload(*shader);
 	}
 	m_shader = shader;
 	if (m_shader)
@@ -266,7 +401,19 @@ void Material::setShader(Shader* shader)
 
 		if (m_shader->isReady())
 		{
-			updateShaderInstance();
+			m_shader_mask = 0;
+			enableShadowReceiving(is_receiver);
+			enableAlphaCutout(is_alpha);
+
+			for (int i = 0; i < m_shader->getTextureSlotCount(); ++i)
+			{
+				if (m_shader->getTextureSlot(i).m_define_idx >= 0 && m_textures[i])
+				{
+					m_shader_mask |= m_shader->getDefineMask(
+						m_shader->getTextureSlot(i).m_define_idx);
+				}
+			}
+			m_shader_instance = &m_shader->getInstance(m_shader_mask);
 		}
 	}
 }
@@ -315,8 +462,8 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 			if (path[0] != '\0')
 			{
 				char texture_path[MAX_PATH_LENGTH];
-				copyString(texture_path, sizeof(texture_path), material_dir);
-				catString(texture_path, sizeof(texture_path), path);
+				copyString(texture_path, material_dir);
+				catString(texture_path, path);
 				m_textures[m_texture_count] = static_cast<Texture*>(
 					m_resource_manager.get(ResourceManager::TEXTURE)
 						->load(Path(texture_path)));
@@ -430,7 +577,7 @@ void Material::loaded(FS::IFile& file, bool success, FS::FileSystem& fs)
 	PROFILE_FUNCTION();
 	if (!success)
 	{
-		g_log_info.log("renderer") << "Error loading material " << m_path.c_str();
+		g_log_warning.log("renderer") << "Failed to load material " << m_path.c_str();
 		onFailure();
 		return;
 	}
@@ -461,7 +608,9 @@ void Material::loaded(FS::IFile& file, bool success, FS::FileSystem& fs)
 		}
 		else if (strcmp(label, "alpha_cutout") == 0)
 		{
-			serializer.deserialize(m_is_alpha_cutout, false);
+			bool b;
+			serializer.deserialize(b, false);
+			enableAlphaCutout(b);
 		}
 		else if (strcmp(label, "alpha_blending") == 0)
 		{
@@ -469,8 +618,11 @@ void Material::loaded(FS::IFile& file, bool success, FS::FileSystem& fs)
 			serializer.deserialize(is_alpha_blending, false);
 			if (is_alpha_blending)
 			{
-				m_render_states |= BGFX_STATE_BLEND_FUNC(
-					BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA);
+				m_render_states |= BGFX_STATE_BLEND_ALPHA;
+			}
+			else
+			{
+				m_render_states &= ~BGFX_STATE_BLEND_MASK;
 			}
 		}
 		else if (strcmp(label, "specular") == 0)
@@ -487,7 +639,9 @@ void Material::loaded(FS::IFile& file, bool success, FS::FileSystem& fs)
 		}
 		else if (strcmp(label, "shadow_receiver") == 0)
 		{
-			serializer.deserialize(m_is_shadow_receiver, true);
+			bool b;
+			serializer.deserialize(b, true);
+			enableShadowReceiving(b);
 		}
 		else if (strcmp(label, "shader") == 0)
 		{

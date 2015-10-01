@@ -179,33 +179,31 @@ bool Model::parseVertexDef(FS::IFile& file, bgfx::VertexDecl* vertex_definition)
 
 		if (strcmp(tmp, "in_position") == 0)
 		{
-			vertex_definition->add(
-				bgfx::Attrib::Position, 3, bgfx::AttribType::Float);
+			vertex_definition->add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float);
+		}
+		else if (strcmp(tmp, "in_colors") == 0)
+		{
+			vertex_definition->add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true, false);
 		}
 		else if (strcmp(tmp, "in_tex_coords") == 0)
 		{
-			vertex_definition->add(
-				bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float);
+			vertex_definition->add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float);
 		}
 		else if (strcmp(tmp, "in_normal") == 0)
 		{
-			vertex_definition->add(
-				bgfx::Attrib::Normal, 4, bgfx::AttribType::Uint8, true, true);
+			vertex_definition->add(bgfx::Attrib::Normal, 4, bgfx::AttribType::Uint8, true, true);
 		}
 		else if (strcmp(tmp, "in_tangents") == 0)
 		{
-			vertex_definition->add(
-				bgfx::Attrib::Tangent, 4, bgfx::AttribType::Uint8, true, true);
+			vertex_definition->add(bgfx::Attrib::Tangent, 4, bgfx::AttribType::Uint8, true, true);
 		}
 		else if (strcmp(tmp, "in_weights") == 0)
 		{
-			vertex_definition->add(
-				bgfx::Attrib::Weight, 4, bgfx::AttribType::Float);
+			vertex_definition->add(bgfx::Attrib::Weight, 4, bgfx::AttribType::Float);
 		}
 		else if (strcmp(tmp, "in_indices") == 0)
 		{
-			vertex_definition->add(
-				bgfx::Attrib::Indices, 4, bgfx::AttribType::Int16, false, true);
+			vertex_definition->add(bgfx::Attrib::Indices, 4, bgfx::AttribType::Int16, false, true);
 		}
 		else
 		{
@@ -238,7 +236,7 @@ void Model::create(const bgfx::VertexDecl& def,
 					 0,
 					 attributes_size,
 					 0,
-					 indices_size / sizeof(int),
+					 indices_size / int(sizeof(int)),
 					 "default",
 					 m_allocator);
 
@@ -445,9 +443,9 @@ bool Model::parseMeshes(FS::IFile& file)
 		material_name[str_size] = 0;
 
 		char material_path[MAX_PATH_LENGTH];
-		copyString(material_path, sizeof(material_path), model_dir);
-		catString(material_path, sizeof(material_path), material_name);
-		catString(material_path, sizeof(material_path), ".mat");
+		copyString(material_path, model_dir);
+		catString(material_path, material_name);
+		catString(material_path, ".mat");
 		Material* material = static_cast<Material*>(
 			m_resource_manager.get(ResourceManager::MATERIAL)
 				->load(Path(material_path)));

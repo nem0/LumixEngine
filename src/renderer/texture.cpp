@@ -8,7 +8,7 @@
 #include "core/resource_manager_base.h"
 #include "renderer/texture.h"
 #include "renderer/texture_manager.h"
-#include <bgfx.h>
+#include <bgfx/bgfx.h>
 #include <cmath>
 
 namespace Lumix
@@ -106,6 +106,24 @@ bool Texture::create(int w, int h, void* data)
 	return isReady;
 }
 
+
+void Texture::setPixel(int x, int y, uint32_t color)
+{
+	if (m_data.empty() || x >= m_width || y >= m_height || x < 0 || y < 0)
+	{
+		return;
+	}
+
+	if (getBytesPerPixel() == 4)
+	{
+		*(uint32_t*)&m_data[(x + y * m_width) * 4] = color;
+	}
+	else if(getBytesPerPixel() == 2)
+	{
+		*(uint16_t*)&m_data[(x + y * m_width) * 2] = color >> 16;
+	}
+	onDataUpdated();
+}
 
 uint32_t Texture::getPixelNearest(int x, int y) const
 {
@@ -346,7 +364,7 @@ bool Texture::loadRaw(FS::IFile& file)
 
 	if (m_data_reference)
 	{
-		m_data.resize(size);
+		m_data.resize((int)size);
 		file.read(&m_data[0], size);
 	}
 
@@ -473,7 +491,7 @@ bool Texture::loadDDS(FS::IFile& file)
 {
 	bgfx::TextureInfo info;
 	m_texture_handle =
-		bgfx::createTexture(bgfx::copy(file.getBuffer(), file.size()),
+		bgfx::createTexture(bgfx::copy(file.getBuffer(), (uint32_t)file.size()),
 							m_flags,
 							0,
 							&info);

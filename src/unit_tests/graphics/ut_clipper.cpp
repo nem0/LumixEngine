@@ -49,7 +49,7 @@ namespace
 			test_frustum.pos,
 			test_frustum.dir,
 			test_frustum.up,
-			test_frustum.fov,
+			Lumix::Math::degreesToRadians(test_frustum.fov),
 			test_frustum.ratio,
 			test_frustum.near,
 			test_frustum.far);
@@ -96,7 +96,7 @@ namespace
 			test_frustum.pos,
 			test_frustum.dir,
 			test_frustum.up,
-			test_frustum.fov,
+			Lumix::Math::degreesToRadians(test_frustum.fov),
 			test_frustum.ratio,
 			test_frustum.near,
 			test_frustum.far);

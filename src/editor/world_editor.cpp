@@ -20,6 +20,7 @@
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
+#include "core/system.h"
 #include "core/timer.h"
 #include "debug/allocator.h"
 #include "editor/editor_icon.h"
@@ -238,9 +239,10 @@ public:
 
 
 	MoveEntityCommand(WorldEditor& editor,
-					  const Array<Entity>& entities,
-					  const Array<Vec3>& new_positions,
-					  const Array<Quat>& new_rotations,
+					  const Entity* entities,
+					  const Vec3* new_positions,
+					  const Quat* new_rotations,
+					  int count,
 					  IAllocator& allocator)
 		: m_new_positions(allocator)
 		, m_new_rotations(allocator)
@@ -249,9 +251,9 @@ public:
 		, m_entities(allocator)
 		, m_editor(editor)
 	{
+		ASSERT(count > 0);
 		Universe* universe = m_editor.getUniverse();
-		ASSERT(entities.size() == new_positions.size());
-		for (int i = entities.size() - 1; i >= 0; --i)
+		for (int i = count - 1; i >= 0; --i)
 		{
 			m_entities.push(entities[i]);
 			m_new_positions.push(new_positions[i]);
@@ -390,17 +392,17 @@ public:
 
 
 	ScaleEntityCommand(WorldEditor& editor,
-					   const Array<Entity>& entities,
-					   const Array<float>& new_scales,
-					   IAllocator& allocator)
+		const Entity* entities,
+		const float* new_scales,
+		int count,
+		IAllocator& allocator)
 		: m_new_scales(allocator)
 		, m_old_scales(allocator)
 		, m_entities(allocator)
 		, m_editor(editor)
 	{
 		Universe* universe = m_editor.getUniverse();
-		ASSERT(entities.size() == new_scales.size());
-		for (int i = entities.size() - 1; i >= 0; --i)
+		for (int i = count - 1; i >= 0; --i)
 		{
 			m_entities.push(entities[i]);
 			m_new_scales.push(new_scales[i]);
@@ -784,7 +786,7 @@ public:
 		SetPropertyCommand& src = static_cast<SetPropertyCommand&>(command);
 		if (m_component_type == src.m_component_type &&
 			m_entity == src.m_entity &&
-			&src.m_property_descriptor == &m_property_descriptor &&
+			src.m_property_descriptor == m_property_descriptor &&
 			m_index == src.m_index)
 		{
 			src.m_new_value = m_new_value;
@@ -1109,11 +1111,8 @@ private:
 			InputBlob blob(m_old_values);
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
-				Entity new_entity = universe->createEntity();
-				universe->setPosition(new_entity,
-									  m_positons_rotations[i].m_position);
-				universe->setRotation(new_entity,
-									  m_positons_rotations[i].m_rotation);
+				Entity new_entity = universe->createEntity(
+					m_positons_rotations[i].m_position, m_positons_rotations[i].m_rotation);
 				int cmps_count;
 				blob.read(cmps_count);
 				for (int j = cmps_count - 1; j >= 0; --j)
@@ -1344,13 +1343,13 @@ private:
 		{
 			if (m_entity < 0)
 			{
-				m_entity = m_editor.getUniverse()->createEntity();
+				m_entity = m_editor.getUniverse()->createEntity(m_position, Quat(0, 0, 0, 1));
 			}
 			else
 			{
 				m_editor.getUniverse()->createEntity(m_entity);
+				m_editor.getUniverse()->setPosition(m_entity, m_position);
 			}
-			m_editor.getUniverse()->setPosition(m_entity, m_position);
 			m_editor.selectEntities(&m_entity, 1);
 		}
 
@@ -1432,6 +1431,12 @@ public:
 	virtual Hierarchy* getHierarchy() override
 	{
 		return m_universe_context->m_hierarchy;
+	}
+
+
+	virtual UniverseContext* getUniverseContext() override
+	{
+		return m_universe_context;
 	}
 
 
@@ -1646,10 +1651,11 @@ public:
 
 	void createEditorLines()
 	{
+		PROFILE_FUNCTION();
 		showGizmos();
 
-		RenderScene* scene = static_cast<RenderScene*>(
-			m_universe_context->getScene(crc32("renderer")));
+		RenderScene* scene =
+			static_cast<RenderScene*>(m_universe_context->getScene(crc32("renderer")));
 		m_measure_tool->createEditorLines(*scene);
 	}
 
@@ -1675,6 +1681,7 @@ public:
 
 	virtual void update() override
 	{
+		PROFILE_FUNCTION();
 		updateGoTo();
 
 		for (int i = 0; i < m_plugins.size(); ++i)
@@ -1853,6 +1860,7 @@ public:
 	virtual void
 	onMouseMove(int x, int y, int relx, int rely, int mouse_flags) override
 	{
+		PROFILE_FUNCTION();
 		m_mouse_x = (float)x;
 		m_mouse_y = (float)y;
 		switch (m_mouse_mode)
@@ -1912,15 +1920,18 @@ public:
 	virtual float getMouseY() const override { return m_mouse_y; }
 
 
-	virtual void saveUniverse(const Path& path) override
+	virtual void saveUniverse(const Path& path, bool save_path) override
 	{
 		g_log_info.log("editor") << "saving universe " << path.c_str() << "...";
 		FS::FileSystem& fs = m_engine->getFileSystem();
-		FS::IFile* file = fs.open(
-			fs.getDefaultDevice(), path, FS::Mode::CREATE | FS::Mode::WRITE);
+		char bkp_path[MAX_PATH_LENGTH];
+		copyString(bkp_path, path);
+		catString(bkp_path, ".bkp");
+		copyFile(path, bkp_path);
+		FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::CREATE | FS::Mode::WRITE);
 		save(*file);
 		fs.close(*file);
-		m_universe_path = path;
+		if (save_path) m_universe_path = path;
 	}
 
 
@@ -1929,15 +1940,14 @@ public:
 		ASSERT(m_universe_context);
 
 		OutputBlob blob(m_allocator);
-		blob.reserve(1 << 20);
+		blob.reserve(m_universe_context->m_universe->getEntityCount() * 100);
 		uint32_t hash = 0;
 		blob.write(hash);
 		blob.write(hash);
 		uint32_t engine_hash = m_engine->serialize(*m_universe_context, blob);
 		(*(((uint32_t*)blob.getData()) + 1)) = engine_hash;
 		m_template_system->serialize(blob);
-		hash = crc32((const uint8_t*)blob.getData() + sizeof(hash),
-					 blob.getSize() - sizeof(hash));
+		hash = crc32((const uint8_t*)blob.getData() + sizeof(hash), blob.getSize() - sizeof(hash));
 		(*(uint32_t*)blob.getData()) = hash;
 		g_log_info.log("editor") << "universe saved";
 		file.write(blob.getData(), blob.getSize());
@@ -1973,7 +1983,9 @@ public:
 						universe->getPosition(m_selected_entities[i]));
 				}
 			}
-			setEntitiesPositions(m_selected_entities, new_positions);
+			setEntitiesPositions(&m_selected_entities[0],
+								 &new_positions[0],
+								 new_positions.size());
 		}
 	}
 
@@ -2068,77 +2080,72 @@ public:
 	{
 		if (m_camera >= 0)
 		{
-			EditorIcon* er = m_allocator.newObject<EditorIcon>(
-				*this,
-				*static_cast<RenderScene*>(
-					getComponent(m_camera, CAMERA_HASH).scene),
+			EditorIcon* er = m_allocator.newObject<EditorIcon>(*this,
+				*static_cast<RenderScene*>(getComponent(m_camera, CAMERA_HASH).scene),
 				entity);
 			m_editor_icons.push(er);
 		}
 	}
 
 
-	virtual void setEntitiesScales(const Array<Entity>& entities,
-								   const Array<float>& scales) override
+	virtual void setEntitiesScales(const Entity* entities, const float* scales, int count) override
 	{
-		if (entities.empty())
-		{
-			return;
-		}
+		if (count <= 0) return;
+
 		Universe* universe = getUniverse();
-		IEditorCommand* command = m_allocator.newObject<ScaleEntityCommand>(
-			*this, entities, scales, m_allocator);
+		IEditorCommand* command =
+			m_allocator.newObject<ScaleEntityCommand>(*this, entities, scales, count, m_allocator);
 		executeCommand(command);
 	}
 
 
-	virtual void setEntitiesRotations(const Array<Entity>& entities,
-									  const Array<Quat>& rotations) override
+	virtual void setEntitiesRotations(const Entity* entities,
+		const Quat* rotations,
+		int count) override
 	{
+		ASSERT(entities && rotations);
+		if (count <= 0) return;
+
 		Universe* universe = getUniverse();
-		if (!entities.empty())
+		Array<Vec3> positions(m_allocator);
+		for (int i = 0; i < count; ++i)
 		{
-			Array<Vec3> positions(m_allocator);
-			for (int i = 0; i < entities.size(); ++i)
-			{
-				positions.push(universe->getPosition(entities[i]));
-			}
-			IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(
-				*this, entities, positions, rotations, m_allocator);
-			executeCommand(command);
+			positions.push(universe->getPosition(entities[i]));
 		}
+		IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(
+			*this, entities, &positions[0], rotations, count, m_allocator);
+		executeCommand(command);
 	}
 
 
-	virtual void setEntitiesPositions(const Array<Entity>& entities,
-									  const Array<Vec3>& positions) override
+	virtual void setEntitiesPositions(const Entity* entities,
+		const Vec3* positions,
+		int count) override
 	{
+		ASSERT(entities && positions);
+		if (count <= 0) return;
+
 		Universe* universe = getUniverse();
-		if (!entities.empty())
+		Array<Quat> rots(m_allocator);
+		for (int i = 0; i < count; ++i)
 		{
-			Array<Quat> rots(m_allocator);
-			for (int i = 0; i < entities.size(); ++i)
-			{
-				rots.push(universe->getRotation(entities[i]));
-			}
-			IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(
-				*this, entities, positions, rots, m_allocator);
-			executeCommand(command);
+			rots.push(universe->getRotation(entities[i]));
 		}
+		IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(
+			*this, entities, positions, &rots[0], count, m_allocator);
+		executeCommand(command);
 	}
 
 
-	virtual void
-	setEntityPositionAndRotaion(const Array<Entity>& entities,
-								const Array<Vec3>& positions,
-								const Array<Quat>& rotations) override
+	virtual void setEntitiesPositionsAndRotations(const Entity* entities,
+		const Vec3* positions,
+		const Quat* rotations,
+		int count) override
 	{
-		if (!entities.empty())
-		{
-			IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(
-				*this, entities, positions, rotations, m_allocator);
-			executeCommand(command);
-		}
+		if (count <= 0) return;
+		IEditorCommand* command = m_allocator.newObject<MoveEntityCommand>(
+			*this, entities, positions, rotations, count, m_allocator);
+		executeCommand(command);
 	}
 
 
@@ -2198,9 +2205,7 @@ public:
 		else
 		{
 			m_game_mode_file = m_engine->getFileSystem().open(
-				m_engine->getFileSystem().getMemoryDevice(),
-				"",
-				FS::Mode::WRITE);
+				m_engine->getFileSystem().getMemoryDevice(), "", FS::Mode::WRITE);
 			save(*m_game_mode_file);
 			m_is_game_mode = true;
 			m_engine->startGame(*m_universe_context);
@@ -2283,6 +2288,12 @@ public:
 				}
 			}
 		}
+	}
+
+
+	virtual bool canPasteEntity() const override
+	{
+		return m_copy_buffer.getSize() > 0;
 	}
 
 
@@ -2396,7 +2407,10 @@ public:
 		{
 			resetAndLoad(file);
 		}
-
+		char path[MAX_PATH_LENGTH];
+		copyString(path, sizeof(path), m_universe_path.c_str());
+		catString(path, sizeof(path), ".lst");
+		copyFile(m_universe_path.c_str(), path);
 		m_universe_loaded.invoke();
 	}
 
@@ -2446,13 +2460,13 @@ public:
 		m_components.reserve(5000);
 		Timer* timer = Timer::create(m_allocator);
 		g_log_info.log("editor") << "Parsing universe...";
-		InputBlob blob(file.getBuffer(), file.size());
+		InputBlob blob(file.getBuffer(), (int)file.size());
 		uint32_t hash = 0;
 		blob.read(hash);
 		uint32_t engine_hash = 0;
 		blob.read(engine_hash);
-		if (crc32((const uint8_t*)blob.getData() + sizeof(hash),
-				  blob.getSize() - sizeof(hash)) != hash)
+		if (crc32((const uint8_t*)blob.getData() + sizeof(hash), blob.getSize() - sizeof(hash)) !=
+			hash)
 		{
 			Timer::destroy(timer);
 			g_log_error.log("editor") << "Corrupted file.";
@@ -2463,14 +2477,11 @@ public:
 		if (m_engine->deserialize(*m_universe_context, blob))
 		{
 			m_template_system->deserialize(blob);
-			auto* render_scene =
-				static_cast<RenderScene*>(getScene(crc32("renderer")));
+			auto* render_scene = static_cast<RenderScene*>(getScene(crc32("renderer")));
 
-			m_camera = render_scene->getCameraEntity(
-				render_scene->getCameraInSlot("editor"));
+			m_camera = render_scene->getCameraEntity(render_scene->getCameraInSlot("editor"));
 
-			g_log_info.log("editor") << "Universe parsed in "
-									 << timer->getTimeSinceStart()
+			g_log_info.log("editor") << "Universe parsed in " << timer->getTimeSinceStart()
 									 << " seconds";
 
 			Universe* universe = getUniverse();
@@ -2479,6 +2490,10 @@ public:
 				Entity e(i);
 				createEditorIcon(e);
 			}
+		}
+		else
+		{
+			newUniverse();
 		}
 		Timer::destroy(timer);
 		m_is_loading = false;
@@ -2582,8 +2597,8 @@ public:
 	}
 
 
-	WorldEditorImpl(const char* base_path, Engine& engine)
-		: m_allocator(engine.getAllocator())
+	WorldEditorImpl(const char* base_path, Engine& engine, IAllocator& allocator)
+		: m_allocator(allocator)
 		, m_engine(nullptr)
 		, m_universe_mutex(false)
 		, m_gizmo(*this)
@@ -2688,6 +2703,12 @@ public:
 	}
 
 
+	virtual bool isEntitySelected(Entity entity) const override
+	{
+		return m_selected_entities.indexOf(entity) >= 0;
+	}
+
+
 	virtual const Array<Entity>& getSelectedEntities() const override
 	{
 		return m_selected_entities;
@@ -2777,6 +2798,13 @@ public:
 			m_selected_entities.push(entities[i]);
 		}
 		m_entity_selected.invoke(m_selected_entities);
+	}
+
+
+	virtual void addEntityToSelection(Entity entity) override
+	{
+		if (m_selected_entities.indexOf(entity) >= 0) return;
+		m_selected_entities.push(entity);
 	}
 
 
@@ -2997,15 +3025,25 @@ public:
 
 		if (create_basic_entities)
 		{
-			m_camera = universe->createEntity();
+			m_camera = universe->createEntity(Vec3(0, 0, -5), Quat(Vec3(0, 1, 0), -Math::PI));
 			universe->setEntityName(m_camera, "editor_camera");
-			universe->setPosition(m_camera, 0, 0, -5);
-			universe->setRotation(m_camera, Quat(Vec3(0, 1, 0), -Math::PI));
 			ComponentUID cmp = createComponent(CAMERA_HASH, m_camera);
 			ASSERT(cmp.isValid());
 			RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 			scene->setCameraSlot(cmp.index, "editor");
 		}
+	}
+
+
+	virtual bool canUndo() const override
+	{
+		return m_undo_index < m_undo_stack.size() && m_undo_index >= 0;
+	}
+
+
+	virtual bool canRedo() const override
+	{
+		return m_undo_index + 1 < m_undo_stack.size();
 	}
 
 
@@ -3032,6 +3070,18 @@ public:
 	virtual MeasureTool* getMeasureTool() const override
 	{
 		return m_measure_tool;
+	}
+
+
+	virtual float getMeasuredDistance() const override
+	{
+		return m_measure_tool->getDistance();
+	}
+
+
+	virtual bool isMeasureToolActive() const override
+	{
+		return m_measure_tool->isEnabled();
 	}
 
 
@@ -3247,16 +3297,15 @@ private:
 };
 
 
-WorldEditor* WorldEditor::create(const char* base_path, Engine& engine)
+WorldEditor* WorldEditor::create(const char* base_path, Engine& engine, IAllocator& allocator)
 {
-	return engine.getAllocator().newObject<WorldEditorImpl>(base_path, engine);
+	return allocator.newObject<WorldEditorImpl>(base_path, engine, allocator);
 }
 
 
-void WorldEditor::destroy(WorldEditor* editor)
+void WorldEditor::destroy(WorldEditor* editor, IAllocator& allocator)
 {
-	editor->getEngine().getAllocator().deleteObject(
-		static_cast<WorldEditorImpl*>(editor));
+	allocator.deleteObject(static_cast<WorldEditorImpl*>(editor));
 }
 
 
@@ -3264,8 +3313,7 @@ void PasteEntityCommand::execute()
 {
 	InputBlob blob(m_blob.getData(), m_blob.getSize());
 	Universe* universe = m_editor.getUniverse();
-	Entity new_entity = universe->createEntity();
-	universe->setPosition(new_entity, m_position);
+	Entity new_entity = universe->createEntity(m_position, Quat(0, 0, 0, 1));
 	int32_t count;
 	blob.read(count);
 	for (int i = 0; i < count; ++i)

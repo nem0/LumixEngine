@@ -47,6 +47,12 @@ namespace Lumix
 			}
 
 
+			virtual void* reallocate(void*, size_t) override
+			{
+				ASSERT(false);
+				return nullptr;
+			}
+
 		private:
 			IAllocator& m_source;
 			size_t m_bucket_size;

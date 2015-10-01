@@ -20,6 +20,7 @@ class Path;
 class PipelineInstance;
 class RayCastModelHit;
 class Universe;
+struct UniverseContext;
 
 
 namespace FS
@@ -67,14 +68,15 @@ public:
 	};
 
 public:
-	static WorldEditor* create(const char* base_path, Engine& engine);
-	static void destroy(WorldEditor* editor);
+	static WorldEditor* create(const char* base_path, Engine& engine, IAllocator& allocator);
+	static void destroy(WorldEditor* editor, IAllocator& allocator);
 
 	virtual void update() = 0;
 	virtual void updateEngine() = 0;
 	virtual void executeCommand(IEditorCommand* command) = 0;
 	virtual IEditorCommand* createEditorCommand(uint32_t command_type) = 0;
 	virtual Engine& getEngine() = 0;
+	virtual UniverseContext* getUniverseContext() = 0;
 	virtual Universe* getUniverse() = 0;
 	virtual Hierarchy* getHierarchy() = 0;
 	virtual const Array<IScene*>& getScenes() const = 0;
@@ -84,15 +86,18 @@ public:
 	virtual void renderIcons(PipelineInstance& pipeline) = 0;
 	virtual ComponentUID getEditCamera() = 0;
 	virtual class Gizmo& getGizmo() = 0;
+	virtual bool canUndo() const = 0;
+	virtual bool canRedo() const = 0;
 	virtual void undo() = 0;
 	virtual void redo() = 0;
 	virtual void loadUniverse(const Path& path) = 0;
-	virtual void saveUniverse(const Path& path) = 0;
+	virtual void saveUniverse(const Path& path, bool save_path) = 0;
 	virtual void newUniverse() = 0;
 	virtual Path getUniversePath() const = 0;
 	virtual void showEntities() = 0;
 	virtual void hideEntities() = 0;
 	virtual void copyEntity() = 0;
+	virtual bool canPasteEntity() const = 0;
 	virtual void pasteEntity() = 0;
 	virtual ComponentUID getComponent(Entity entity, uint32_t type) = 0;
 	virtual ComponentList& getComponents(Entity entity) = 0;
@@ -101,41 +106,39 @@ public:
 	virtual void destroyComponent(const ComponentUID& crc) = 0;
 	virtual Entity addEntity() = 0;
 	virtual void destroyEntities(const Entity* entities, int count) = 0;
+	virtual void addEntityToSelection(Entity entity) = 0;
 	virtual void selectEntities(const Entity* entities, int count) = 0;
 	virtual void selectEntitiesWithSameMesh() = 0;
 	virtual Entity addEntityAt(int camera_x, int camera_y) = 0;
-	virtual void setEntitiesPositions(const Array<Entity>& entity,
-									  const Array<Vec3>& position) = 0;
-	virtual void setEntitiesScales(const Array<Entity>& entities,
-								   const Array<float>& scales) = 0;
-	virtual void setEntitiesRotations(const Array<Entity>& entity,
-									  const Array<Quat>& rotations) = 0;
-	virtual void setEntityPositionAndRotaion(const Array<Entity>& entity,
-											 const Array<Vec3>& position,
-											 const Array<Quat>& rotation) = 0;
+	virtual void setEntitiesPositions(const Entity* entities, const Vec3* positions, int count) = 0;
+	virtual void setEntitiesScales(const Entity* entities, const float* scales, int count) = 0;
+	virtual void setEntitiesRotations(const Entity* entity, const Quat* rotations, int count) = 0;
+	virtual void setEntitiesPositionsAndRotations(const Entity* entity,
+		const Vec3* position,
+		const Quat* rotation,
+		int count) = 0;
 	virtual void setEntityName(Entity entity, const char* name) = 0;
 	virtual void snapToTerrain() = 0;
 	virtual void toggleGameMode() = 0;
 	virtual void navigate(float forward, float right, float speed) = 0;
 	virtual void setProperty(uint32_t component,
-							 int index,
-							 IPropertyDescriptor& property,
-							 const void* data,
-							 int size) = 0;
-	virtual void addArrayPropertyItem(const ComponentUID& cmp,
-									  IArrayDescriptor& property) = 0;
+		int index,
+		IPropertyDescriptor& property,
+		const void* data,
+		int size) = 0;
+	virtual void addArrayPropertyItem(const ComponentUID& cmp, IArrayDescriptor& property) = 0;
 	virtual void removeArrayPropertyItem(const ComponentUID& cmp,
-										 int index,
-										 IArrayDescriptor& property) = 0;
+		int index,
+		IArrayDescriptor& property) = 0;
 	virtual void onMouseDown(int x, int y, MouseButton::Value button) = 0;
-	virtual void
-	onMouseMove(int x, int y, int relx, int rely, int mouse_flags) = 0;
+	virtual void onMouseMove(int x, int y, int relx, int rely, int mouse_flags) = 0;
 	virtual void onMouseUp(int x, int y, MouseButton::Value button) = 0;
 	virtual float getMouseX() const = 0;
 	virtual float getMouseY() const = 0;
 	virtual void lookAtSelected() = 0;
 	virtual const char* getBasePath() = 0;
 	virtual const Array<Entity>& getSelectedEntities() const = 0;
+	virtual bool isEntitySelected(Entity entity) const = 0;
 
 	virtual DelegateList<void(const Array<Entity>&)>& entitySelected() = 0;
 	virtual DelegateList<void()>& universeCreated() = 0;
@@ -157,6 +160,8 @@ public:
 								 const Path& source) = 0;
 	virtual EntityTemplateSystem& getEntityTemplateSystem() = 0;
 	virtual Vec3 getCameraRaycastHit() = 0;
+	virtual bool isMeasureToolActive() const = 0;
+	virtual float getMeasuredDistance() const = 0;
 	virtual void toggleMeasure() = 0;
 	virtual class MeasureTool* getMeasureTool() const = 0;
 

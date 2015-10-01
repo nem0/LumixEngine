@@ -12,6 +12,7 @@
 #include "core/fs/file_system.h"
 #include "core/fs/memory_file_device.h"
 #include "core/mtjd/manager.h"
+#include "debug/allocator.h"
 #include "debug/debug.h"
 #include "engine/iplugin.h"
 #include "engine/property_descriptor.h"
@@ -29,6 +30,7 @@ static const uint32_t SERIALIZED_ENGINE_MAGIC = 0x5f4c454e; // == '_LEN'
 enum class SerializedEngineVersion : int32_t
 {
 	BASE,
+	SPARSE_TRANFORMATIONS,
 
 	LATEST // must be the last one
 };
@@ -293,9 +295,9 @@ public:
 		PROFILE_FUNCTION();
 		float dt;
 		++m_fps_frame;
-		if (m_fps_frame == 30)
+		if (m_fps_timer->getTimeSinceTick() > 0.5f)
 		{
-			m_fps = 30.0f / m_fps_timer->tick();
+			m_fps = m_fps_frame / m_fps_timer->tick();
 			m_fps_frame = 0;
 		}
 		dt = m_timer->tick();
@@ -392,7 +394,7 @@ public:
 			g_log_error.log("engine") << "Wrong or corrupted file";
 			return false;
 		}
-		if (header.m_version > SerializedEngineVersion::LATEST)
+		if (header.m_version != SerializedEngineVersion::LATEST)
 		{
 			g_log_error.log("engine") << "Unsupported version";
 			return false;
@@ -435,7 +437,7 @@ private:
 	};
 
 private:
-	IAllocator& m_allocator;
+	Debug::Allocator m_allocator;
 
 	FS::FileSystem* m_file_system;
 	FS::MemoryFileDevice* m_mem_file_device;
@@ -488,9 +490,9 @@ Engine* Engine::create(FS::FileSystem* fs, IAllocator& allocator)
 }
 
 
-void Engine::destroy(Engine* engine)
+void Engine::destroy(Engine* engine, IAllocator& allocator)
 {
-	engine->getAllocator().deleteObject(engine);
+	allocator.deleteObject(engine);
 }
 
 
