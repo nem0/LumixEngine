@@ -13,7 +13,7 @@
 		__pragma(comment(linker, "/INCLUDE:" STRINGIZE(symbol)))
 #else
 	#define LUMIX_FORCE_SYMBOL(symbol) \
-		__pragma(comment(linker, "/INCLUDE_:" STRINGIZE(symbol)))
+		__pragma(comment(linker, "/INCLUDE:_" STRINGIZE(symbol)))
 #endif
 
 #define NOTE(msg)\
