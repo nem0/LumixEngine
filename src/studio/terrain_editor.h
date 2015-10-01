@@ -2,6 +2,7 @@
 
 
 #include "editor/world_editor.h"
+#include "utils.h"
 
 
 namespace Lumix
@@ -27,7 +28,7 @@ public:
 		NOT_SET
 	};
 
-	TerrainEditor(Lumix::WorldEditor& editor);
+	TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& actions);
 	~TerrainEditor();
 
 	virtual void tick() override;
@@ -54,6 +55,8 @@ private:
 		float& min,
 		float& max);
 	void paintEntities(const Lumix::RayCastModelHit& hit);
+	void increaseBrushSize();
+	void decreaseBrushSize();
 
 private:
 	Lumix::WorldEditor& m_world_editor;
@@ -65,4 +68,6 @@ private:
 	Lumix::Vec3 m_color;
 	int m_current_brush;
 	int m_selected_entity_template;
+	Action* m_increase_brush_size;
+	Action* m_decrease_brush_size;
 };

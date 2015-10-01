@@ -29,7 +29,7 @@
 #include "renderer/texture.h"
 #include "renderer/transient_geometry.h"
 #include "universe/universe.h"
-#include <bgfx.h>
+#include <bgfx/bgfx.h>
 
 
 namespace Lumix
@@ -1350,13 +1350,10 @@ struct PipelineInstanceImpl : public PipelineInstance
 	{
 		bgfx::setState(m_render_state | material.getRenderStates());
 		bgfx::setTransform(nullptr);
-		setMaterial(&material);
 		if (texture)
 		{
-			bgfx::setTexture(
-				0,
-				material.getShader()->getTextureSlot(0).m_uniform_handle,
-				*texture);
+			auto handle = material.getShader()->getTextureSlot(0).m_uniform_handle;
+			bgfx::setTexture(0, handle, *texture);
 		}
 		bgfx::setVertexBuffer(&geom.getVertexBuffer(), 0, geom.getNumVertices());
 		bgfx::setIndexBuffer(&geom.getIndexBuffer(), first_index, num_indices);

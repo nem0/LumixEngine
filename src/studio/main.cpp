@@ -35,7 +35,7 @@
 #include "universe/hierarchy.h"
 #include "utils.h"
 
-#include <bgfx.h>
+#include <bgfx/bgfx.h>
 #include <cstdio>
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -73,33 +73,9 @@ public:
 		, m_metadata(m_allocator)
 	{
 		m_entity_list_search[0] = '\0';
-		m_actions.push(Action("New", "newUniverse", &StudioApp::newUniverse));
-		m_actions.push(Action("Save", "save", &StudioApp::save, VK_CONTROL, 'S', -1));
-		m_actions.push(Action("Save As", "saveAs", &StudioApp::saveAs, VK_CONTROL, VK_SHIFT, 'S'));
-		m_actions.push(Action("Exit", "exit", &StudioApp::exit, VK_CONTROL, 'X', -1));
-
-		m_actions.push(Action("Redo", "redo", &StudioApp::redo, VK_CONTROL, VK_SHIFT, 'Z'));
-		m_actions.push(Action("Undo", "undo", &StudioApp::undo, VK_CONTROL, 'Z', -1));
-		m_actions.push(Action("Copy", "copy", &StudioApp::copy, VK_CONTROL, 'C', -1));
-		m_actions.push(Action("Paste", "paste", &StudioApp::paste, VK_CONTROL, 'V', -1));
-		m_actions.push(Action("Center/Pivot", "togglePivotMode", &StudioApp::togglePivotMode));
-		m_actions.push(Action("Local/Global", "toggleCoordSystem", &StudioApp::toggleCoordSystem));
-
-		m_actions.push(Action("Create", "createEntity", &StudioApp::createEntity));
-		m_actions.push(Action("Destroy", "destroyEntity", &StudioApp::destroyEntity, VK_DELETE, -1, -1));
-		m_actions.push(Action("Show", "showEntities", &StudioApp::showEntities));
-		m_actions.push(Action("Hide", "hideEntities", &StudioApp::hideEntities));
-
-		m_actions.push(Action("Game Mode", "toggleGameMode", &StudioApp::toggleGameMode));
-		m_actions.push(Action("Toggle measure", "toggleMeasure", &StudioApp::toggleMeasure));
-		m_actions.push(Action("Snap to terrain", "snapToTerrain", &StudioApp::snapToTerrain));
-		m_actions.push(Action("Look at selected", "lookAtSelected", &StudioApp::lookAtSelected));
-		
-		m_actions.push(Action("Wireframe", "setWireframe", &StudioApp::setWireframe));
-		m_actions.push(Action("Stats", "toggleStats", &StudioApp::toggleStats));
 	}
 
-	
+
 	void autosave()
 	{
 		m_time_to_autosave = float(m_settings.m_autosave_time);
@@ -227,7 +203,8 @@ public:
 		buf[0] = 0;
 		for (int i = 0; i < Lumix::lengthOf(action.shortcut); ++i)
 		{
-			const char* str = getKeyToString(action.shortcut[i]);
+			char str[30];
+			getKeyName(action.shortcut[i], str, Lumix::lengthOf(str));
 			if (str[0] == 0) return;
 			if (i > 0) Lumix::catString(buf, max_size, " - ");
 			Lumix::catString(buf, max_size, str);
@@ -235,23 +212,14 @@ public:
 	}
 
 
-	void doMenuItem(void (StudioApp::*func)(), bool selected, bool enabled)
+	void doMenuItem(Action& a, bool selected, bool enabled)
 	{
-		for (const auto& a : m_actions)
+		char buf[20];
+		getShortcut(a, buf, sizeof(buf));
+		if (ImGui::MenuItem(a.label, buf, selected, enabled))
 		{
-			if (a.func == func)
-			{
-				char buf[20];
-				getShortcut(a, buf, sizeof(buf));
-				if (ImGui::MenuItem(a.label, buf, selected, enabled))
-				{
-					(this->*func)();
-				}
-				return;
-			}
+			a.func.invoke();
 		}
-
-		ASSERT(false);
 	}
 
 
@@ -345,6 +313,37 @@ public:
 	}
 
 
+	template <void (StudioApp::*func)()>
+	void addAction(const char* label, const char* name)
+	{
+		auto* a = LUMIX_NEW(m_editor->getAllocator(), Action)(label, name);
+		a->func.bind<StudioApp, func>(this);
+		m_actions.push(a);
+	}
+
+
+	template <void (StudioApp::*func)()>
+	void addAction(const char* label, const char* name, int shortcut0, int shortcut1, int shortcut2)
+	{
+		auto* a = LUMIX_NEW(m_editor->getAllocator(), Action)(
+			label, name, shortcut0, shortcut1, shortcut2);
+		a->func.bind<StudioApp, func>(this);
+		m_actions.push(a);
+	}
+
+
+
+	Action& getAction(const char* name)
+	{
+		for (auto* a : m_actions)
+		{
+			if (strcmp(a->name, name) == 0) return *a;
+		}
+		ASSERT(false);
+		return *m_actions[0];
+	}
+
+
 	void showMainMenu()
 	{
 		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
@@ -352,7 +351,7 @@ public:
 		{
 			if (ImGui::BeginMenu("File"))
 			{
-				doMenuItem(&StudioApp::newUniverse, false, true);
+				doMenuItem(getAction("newUniverse"), false, true);
 				if (ImGui::BeginMenu("Open"))
 				{
 					auto& universes = m_asset_browser->getResources(AssetBrowser::UNIVERSE);
@@ -367,23 +366,23 @@ public:
 					}
 					ImGui::EndMenu();
 				}
-				doMenuItem(&StudioApp::save, false, true);
-				doMenuItem(&StudioApp::saveAs, false, true);
-				doMenuItem(&StudioApp::exit, false, true);
+				doMenuItem(getAction("save"), false, true);
+				doMenuItem(getAction("saveAs"), false, true);
+				doMenuItem(getAction("exit"), false, true);
 
 				ImGui::EndMenu();
 			}
 
 			if (ImGui::BeginMenu("Edit"))
 			{
-				doMenuItem(&StudioApp::undo, false, m_editor->canUndo());
-				doMenuItem(&StudioApp::redo, false, m_editor->canRedo());
+				doMenuItem(getAction("undo"), false, m_editor->canUndo());
+				doMenuItem(getAction("redo"), false, m_editor->canRedo());
 				ImGui::Separator();
-				doMenuItem(&StudioApp::copy, false, is_any_entity_selected);
-				doMenuItem(&StudioApp::paste, false, m_editor->canPasteEntity());
+				doMenuItem(getAction("copy"), false, is_any_entity_selected);
+				doMenuItem(getAction("paste"), false, m_editor->canPasteEntity());
 				ImGui::Separator();
-				doMenuItem(&StudioApp::togglePivotMode, false, is_any_entity_selected);
-				doMenuItem(&StudioApp::toggleCoordSystem, false, m_editor->canPasteEntity());
+				doMenuItem(getAction("togglePivotMode"), false, is_any_entity_selected);
+				doMenuItem(getAction("toggleCoordSystem"), false, m_editor->canPasteEntity());
 				if (ImGui::BeginMenu("Select"))
 				{
 					if (ImGui::MenuItem("Same mesh", nullptr, nullptr, is_any_entity_selected))
@@ -395,8 +394,8 @@ public:
 
 			if (ImGui::BeginMenu("Entity"))
 			{
-				doMenuItem(&StudioApp::createEntity, false, true);
-				doMenuItem(&StudioApp::destroyEntity, false, is_any_entity_selected);
+				doMenuItem(getAction("createEntity"), false, true);
+				doMenuItem(getAction("destroyEntity"), false, is_any_entity_selected);
 
 				if (ImGui::BeginMenu("Create template", is_any_entity_selected))
 				{
@@ -421,17 +420,17 @@ public:
 						m_selected_template_name.c_str(), pos);
 				}
 				
-				doMenuItem(&StudioApp::showEntities, false, is_any_entity_selected);
-				doMenuItem(&StudioApp::hideEntities, false, is_any_entity_selected);
+				doMenuItem(getAction("showEntities"), false, is_any_entity_selected);
+				doMenuItem(getAction("hideEntities"), false, is_any_entity_selected);
 				ImGui::EndMenu();
 			}
 
 
 			if (ImGui::BeginMenu("Tools"))
 			{
-				doMenuItem(&StudioApp::toggleGameMode, m_editor->isGameMode(), true);
-				doMenuItem(&StudioApp::toggleMeasure, m_editor->isMeasureToolActive(), true);
-				doMenuItem(&StudioApp::snapToTerrain, false, is_any_entity_selected);
+				doMenuItem(getAction("toggleGameMode"), m_editor->isGameMode(), true);
+				doMenuItem(getAction("toggleMeasure"), m_editor->isMeasureToolActive(), true);
+				doMenuItem(getAction("snapToTerrain"), false, is_any_entity_selected);
 				if (ImGui::MenuItem("Save commands")) saveUndoStack();
 				if (ImGui::MenuItem("Load commands")) loadAndExecuteCommands();
 
@@ -442,9 +441,9 @@ public:
 
 			if (ImGui::BeginMenu("View"))
 			{
-				doMenuItem(&StudioApp::lookAtSelected, false, is_any_entity_selected);
-				doMenuItem(&StudioApp::setWireframe, m_is_wireframe, true);
-				doMenuItem(&StudioApp::toggleStats, false, true);
+				doMenuItem(getAction("lookAtSelected"), false, is_any_entity_selected);
+				doMenuItem(getAction("setWireframe"), m_is_wireframe, true);
+				doMenuItem(getAction("toggleStats"), false, true);
 				if (ImGui::BeginMenu("Windows"))
 				{
 					ImGui::MenuItem("Asset browser", nullptr, &m_asset_browser->m_is_opened);
@@ -585,6 +584,12 @@ public:
 	void shutdown()
 	{
 		saveSettings();
+
+		for (auto* a : m_actions)
+		{
+			m_editor->getAllocator().deleteObject(a);
+		}
+		m_actions.clear();
 
 		shutdownImGui();
 
@@ -727,6 +732,35 @@ public:
 	}
 
 
+	void addActions()
+	{
+		addAction<&StudioApp::newUniverse>("New", "newUniverse");
+		addAction<&StudioApp::save>("Save", "save", VK_CONTROL, 'S', -1);
+		addAction<&StudioApp::saveAs>("Save As", "saveAs", VK_CONTROL, VK_SHIFT, 'S');
+		addAction<&StudioApp::exit>("Exit", "exit", VK_CONTROL, 'X', -1);
+
+		addAction<&StudioApp::redo>("Redo", "redo", VK_CONTROL, VK_SHIFT, 'Z');
+		addAction<&StudioApp::undo>("Undo", "undo", VK_CONTROL, 'Z', -1);
+		addAction<&StudioApp::copy>("Copy", "copy", VK_CONTROL, 'C', -1);
+		addAction<&StudioApp::paste>("Paste", "paste", VK_CONTROL, 'V', -1);
+		addAction<&StudioApp::togglePivotMode>("Center/Pivot", "togglePivotMode");
+		addAction<&StudioApp::toggleCoordSystem>("Local/Global", "toggleCoordSystem");
+
+		addAction<&StudioApp::createEntity>("Create", "createEntity");
+		addAction<&StudioApp::destroyEntity>("Destroy", "destroyEntity", VK_DELETE, -1, -1);
+		addAction<&StudioApp::showEntities>("Show", "showEntities");
+		addAction<&StudioApp::hideEntities>("Hide", "hideEntities");
+
+		addAction<&StudioApp::toggleGameMode>("Game Mode", "toggleGameMode");
+		addAction<&StudioApp::toggleMeasure>("Toggle measure", "toggleMeasure");
+		addAction<&StudioApp::snapToTerrain>("Snap to terrain", "snapToTerrain");
+		addAction<&StudioApp::lookAtSelected>("Look at selected", "lookAtSelected");
+
+		addAction<&StudioApp::setWireframe>("Wireframe", "setWireframe");
+		addAction<&StudioApp::toggleStats>("Stats", "toggleStats"); 
+	}
+
+
 	void init(HWND win)
 	{
 		Lumix::Renderer::setInitData(win);
@@ -734,8 +768,11 @@ public:
 		char current_dir[MAX_PATH];
 		GetCurrentDirectory(sizeof(current_dir), current_dir);
 		m_editor = Lumix::WorldEditor::create(current_dir, *m_engine, m_allocator);
+
+		addActions();
+
 		m_asset_browser = new AssetBrowser(*m_editor, m_metadata);
-		m_property_grid = new PropertyGrid(*m_editor, *m_asset_browser);
+		m_property_grid = new PropertyGrid(*m_editor, *m_asset_browser, m_actions);
 		auto engine_allocator = static_cast<Lumix::Debug::Allocator*>(&m_engine->getAllocator());
 		m_profiler_ui = new ProfilerUI(engine_allocator, &m_engine->getResourceManager());
 		m_log_ui = new LogUI(m_editor->getAllocator());
@@ -783,19 +820,19 @@ public:
 		if (ImGui::IsAnyItemActive()) return;
 
 		bool* keysDown = ImGui::GetIO().KeysDown;
-		for (auto& a : m_actions)
+		for (auto* a : m_actions)
 		{
-			if (a.shortcut[0] == -1) continue;
+			if (!a->is_global || a->shortcut[0] == -1) continue;
 
-			for (int i = 0; i < Lumix::lengthOf(a.shortcut) + 1; ++i)
+			for (int i = 0; i < Lumix::lengthOf(a->shortcut) + 1; ++i)
 			{
-				if (a.shortcut[i] == -1 || i == Lumix::lengthOf(a.shortcut))
+				if (a->shortcut[i] == -1 || i == Lumix::lengthOf(a->shortcut))
 				{
-					(this->*a.func)();
+					a->func.invoke();
 					return;
 				}
 
-				if (!keysDown[a.shortcut[i]]) break;
+				if (!keysDown[a->shortcut[i]]) break;
 			}
 		}
 	}
@@ -897,11 +934,6 @@ public:
 			{
 				ImGui::GetIO().KeysDown[wParam] = true;
 				checkShortcuts();
-				switch (wParam)
-				{
-					case VK_OEM_2: // Question Mark / Forward Slash for US Keyboards
-						break;
-				}
 				break;
 			}
 		}
@@ -927,7 +959,7 @@ public:
 	bgfx::TextureHandle m_gameview_texture_handle;
 
 	float m_time_to_autosave;
-	Lumix::Array<Action> m_actions;
+	Lumix::Array<Action*> m_actions;
 	Lumix::WorldEditor* m_editor;
 	AssetBrowser* m_asset_browser;
 	PropertyGrid* m_property_grid;
@@ -1014,7 +1046,8 @@ static void imGuiCallback(ImDrawData* draw_data)
 				elem_offset,
 				pcmd->ElemCount,
 				*g_app.m_material,
-				(bgfx::TextureHandle*)pcmd->TextureId);
+				pcmd->TextureId ? (bgfx::TextureHandle*)pcmd->TextureId
+								: &g_app.m_material->getTexture(0)->getTextureHandle());
 
 			elem_offset += pcmd->ElemCount;
 		}

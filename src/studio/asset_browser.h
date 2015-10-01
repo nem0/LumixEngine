@@ -1,7 +1,7 @@
 #pragma once
 #include "core/array.h"
 #include "core/path.h"
-#include <bgfx.h>
+#include <bgfx/bgfx.h>
 
 
 namespace Lumix

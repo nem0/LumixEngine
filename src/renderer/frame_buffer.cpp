@@ -1,7 +1,7 @@
 #include "renderer/frame_buffer.h"
 #include "core/json_serializer.h"
 #include "core/vec3.h"
-#include <bgfx.h>
+#include <bgfx/bgfx.h>
 #include <lua.hpp>
 #include <lauxlib.h>
 

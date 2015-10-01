@@ -4,7 +4,7 @@
 #include "core/array.h"
 #include "core/resource.h"
 #include "core/vec3.h"
-#include <bgfx.h>
+#include <bgfx/bgfx.h>
 
 
 namespace Lumix

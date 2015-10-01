@@ -1171,39 +1171,26 @@ public:
 		{
 			m_temporary_infos.pop();
 		}
-		for (int subresult_index = 0; subresult_index < results.size();
-			 ++subresult_index)
+		for (int subresult_index = 0; subresult_index < results.size(); ++subresult_index)
 		{
-			Array<const RenderableMesh*>& subinfos =
-				m_temporary_infos[subresult_index];
+			Array<const RenderableMesh*>& subinfos = m_temporary_infos[subresult_index];
 			subinfos.clear();
-			MTJD::Job* job = MTJD::makeJob(
-				m_engine.getMTJDManager(),
-				[&subinfos,
-				 layer_mask,
-				 this,
-				 &results,
-				 subresult_index,
-				 &frustum]()
+			MTJD::Job* job = MTJD::makeJob(m_engine.getMTJDManager(),
+				[&subinfos, layer_mask, this, &results, subresult_index, &frustum]()
 				{
 					Vec3 frustum_position = frustum.getPosition();
-					const CullingSystem::Subresults& subresults =
-						results[subresult_index];
+					const CullingSystem::Subresults& subresults = results[subresult_index];
 					for (int i = 0, c = subresults.size(); i < c; ++i)
 					{
-						const Renderable* LUMIX_RESTRICT renderable =
-							m_renderables[subresults[i]];
+						const Renderable* LUMIX_RESTRICT renderable = m_renderables[subresults[i]];
 						const Model* LUMIX_RESTRICT model = renderable->m_model;
 						float squared_distance =
-							(renderable->m_matrix.getTranslation() -
-							 frustum_position)
+							(renderable->m_matrix.getTranslation() - frustum_position)
 								.squaredLength();
 						if (model && model->isReady())
 						{
-							LODMeshIndices lod =
-								model->getLODMeshIndices(squared_distance);
-							for (int j = lod.getFrom(), c = lod.getTo(); j <= c;
-								 ++j)
+							LODMeshIndices lod = model->getLODMeshIndices(squared_distance);
+							for (int j = lod.getFrom(), c = lod.getTo(); j <= c; ++j)
 							{
 								subinfos.push(&renderable->m_meshes[j]);
 							}

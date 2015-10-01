@@ -28,7 +28,7 @@
 #include "renderer/texture.h"
 #include "renderer/texture_manager.h"
 #include "universe/universe.h"
-#include <bgfx.h>
+#include <bgfx/bgfx.h>
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <cstdio>

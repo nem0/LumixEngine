@@ -24,14 +24,15 @@ const char* PropertyGrid::getComponentTypeName(Lumix::ComponentUID cmp) const
 }
 
 
-
-PropertyGrid::PropertyGrid(Lumix::WorldEditor& editor, AssetBrowser& asset_browser)
+PropertyGrid::PropertyGrid(Lumix::WorldEditor& editor,
+	AssetBrowser& asset_browser,
+	Lumix::Array<Action*>& actions)
 	: m_is_opened(true)
 	, m_editor(editor)
 	, m_asset_browser(asset_browser)
 {
 	m_filter[0] = '\0';
-	m_terrain_editor = editor.getAllocator().newObject<TerrainEditor>(editor);
+	m_terrain_editor = LUMIX_NEW(editor.getAllocator(), TerrainEditor)(editor, actions);
 }
 
 

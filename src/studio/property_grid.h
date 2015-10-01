@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include "core/array.h"
 #include "universe/component.h"
 
 
@@ -12,13 +13,16 @@ namespace Lumix
 }
 
 
+struct Action;
 class AssetBrowser;
 
 
 class PropertyGrid
 {
 	public:
-		PropertyGrid(Lumix::WorldEditor& editor, AssetBrowser& asset_browser);
+		PropertyGrid(Lumix::WorldEditor& editor,
+			AssetBrowser& asset_browser,
+			Lumix::Array<Action*>& actions);
 		~PropertyGrid();
 
 		void onGui();

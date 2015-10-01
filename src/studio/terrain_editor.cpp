@@ -795,26 +795,57 @@ private:
 };
 
 
-
-
-
 TerrainEditor::~TerrainEditor()
 {
 	m_world_editor.removePlugin(*this);
 }
 
 
-TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor)
+TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& actions)
 	: m_world_editor(editor)
 	, m_color(1, 1, 1)
 	, m_current_brush(0)
 	, m_selected_entity_template(0)
+	, m_increase_brush_size(nullptr)
+	, m_decrease_brush_size(nullptr)
 {
+	m_increase_brush_size =
+		LUMIX_NEW(editor.getAllocator(), Action)("Increase brush size", "increaseBrushSize");
+	m_increase_brush_size->is_global = false;
+	m_increase_brush_size->func.bind<TerrainEditor, &TerrainEditor::increaseBrushSize>(this);
+	m_decrease_brush_size =
+		LUMIX_NEW(editor.getAllocator(), Action)("Decrease brush size", "decreaseBrushSize");
+	m_decrease_brush_size->func.bind<TerrainEditor, &TerrainEditor::decreaseBrushSize>(this);
+	m_decrease_brush_size->is_global = false;
+	actions.push(m_increase_brush_size);
+	actions.push(m_decrease_brush_size);
 	editor.addPlugin(*this);
 	m_terrain_brush_size = 10;
 	m_terrain_brush_strength = 0.1f;
 	m_type = RAISE_HEIGHT;
 	m_texture_idx = 0;
+}
+
+
+void TerrainEditor::increaseBrushSize()
+{
+	if (m_terrain_brush_size < 10)
+	{
+		++m_terrain_brush_size;
+		return;
+	}
+	m_terrain_brush_size = Lumix::Math::minValue(100.0f, m_terrain_brush_size + 10);
+}
+
+
+void TerrainEditor::decreaseBrushSize()
+{
+	if (m_terrain_brush_size < 10)
+	{
+		m_terrain_brush_size = Lumix::Math::maxValue(1.0f, m_terrain_brush_size - 1.0f);
+		return;
+	}
+	m_terrain_brush_size = Lumix::Math::maxValue(1.0f, m_terrain_brush_size - 10.0f);
 }
 
 
@@ -1057,8 +1088,17 @@ Lumix::Material* TerrainEditor::getMaterial()
 
 void TerrainEditor::onGui()
 {
+	if (m_decrease_brush_size->isRequested())
+	{
+		m_decrease_brush_size->func.invoke();
+	}
+	if (m_increase_brush_size->isRequested())
+	{
+		m_increase_brush_size->func.invoke();
+	}
+
 	auto* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
-	if (!ImGui::CollapsingHeader("Terrain editor")) return;
+	if (!ImGui::CollapsingHeader("Terrain editor", nullptr, true, true)) return;
 
 	ImGui::SliderFloat("Brush size", &m_terrain_brush_size, 1, 100);
 	ImGui::SliderFloat("Brush strength", &m_terrain_brush_strength, 0, 1.0f);
