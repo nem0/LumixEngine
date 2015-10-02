@@ -94,7 +94,6 @@ void UT_material_manager(const char* params)
 
 	texture_manager.unload(*texture_tga2);
 
-	// Should start unloading. The get method doesn't count references.
 	LUMIX_EXPECT_TRUE(texture_tga1->isEmpty());
 	LUMIX_EXPECT_FALSE(texture_tga1->isReady());
 	LUMIX_EXPECT_FALSE(texture_tga1->isFailure());
@@ -147,7 +146,6 @@ void UT_material_manager(const char* params)
 	LUMIX_EXPECT_FALSE(texture_fail->isReady());
 	LUMIX_EXPECT_TRUE(texture_fail->isFailure());
 
-	// exit
 	texture_manager.unload(*texture_fail);
 	texture_manager.destroy();
 	resource_manager.destroy();
@@ -210,7 +208,6 @@ void UT_animation_manager(const char* params)
 
 	animation_manager.unload(*animation_2);
 
-	// Should start unloading. The get method doesn't count references.
 	LUMIX_EXPECT_TRUE(animation_1->isEmpty());
 	LUMIX_EXPECT_FALSE(animation_1->isReady());
 	LUMIX_EXPECT_FALSE(animation_1->isFailure());
@@ -261,7 +258,6 @@ void UT_animation_manager(const char* params)
 	LUMIX_EXPECT_FALSE(animation_fail->isReady());
 	LUMIX_EXPECT_TRUE(animation_fail->isFailure());
 
-	// exit
 	animation_manager.unload(*animation_fail);
 	animation_manager.destroy();
 	resource_manager.destroy();
@@ -397,8 +393,6 @@ void UT_failure_reload(const char* params)
 	LUMIX_EXPECT_TRUE(animation->isReady());
 	LUMIX_EXPECT_FALSE(animation->isFailure());
 
-
-	// exit
 	animation_manager.unload(*animation);
 	animation_manager.destroy();
 	resource_manager.destroy();

@@ -130,8 +130,7 @@ private:
 
 		~ModelLoadedCallback()
 		{
-			m_model->getObserverCb()
-				.unbind<ModelLoadedCallback, &ModelLoadedCallback::callback>(
+			m_model->getObserverCb().unbind<ModelLoadedCallback, &ModelLoadedCallback::callback>(
 				this);
 		}
 

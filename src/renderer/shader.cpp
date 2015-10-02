@@ -31,7 +31,7 @@ Shader::Shader(const Path& path, ResourceManager& resource_manager, IAllocator& 
 
 Shader::~Shader()
 {
-	doUnload();
+	ASSERT(isEmpty());
 }
 
 
@@ -228,7 +228,7 @@ bool Shader::load(FS::IFile& file)
 	m_combintions.parse(getRenderer(), L);
 	if (!generateInstances())
 	{
-		g_log_error.log("renderer") << "Could not load instances of shader " << m_path.c_str();
+		g_log_error.log("renderer") << "Could not load instances of shader " << getPath().c_str();
 		return false;
 	}
 

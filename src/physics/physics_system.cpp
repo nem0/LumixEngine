@@ -154,7 +154,8 @@ class AssertNullAllocator : public physx::PxAllocatorCallback
 		{
 			
 			void* ret = _aligned_malloc(size, 16);
-			//g_log_info.log("PhysX") << "Allocated " << size << " bytes for " << typeName << " from " << filename << "(" << line << ")";
+			// g_log_info.log("PhysX") << "Allocated " << size << " bytes for " << typeName << "
+			// from " << filename << "(" << line << ")";
 			ASSERT(ret);
 			return ret;
 		}

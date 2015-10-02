@@ -549,11 +549,11 @@ private:
 	{
 		if (m_mask.size() == 0) return true;
 
-		int s = sqrt(m_mask.size()); TODO("todo sqrt");
+		int s = int(sqrt(m_mask.size())); TODO("todo sqrt");
 		int ix = int(x * s);
 		int iy = int(y * s);
 
-		return m_mask[ix + x * iy];
+		return m_mask[int(ix + x * iy)];
 	}
 
 
@@ -771,28 +771,22 @@ private:
 		for (int row = rect.m_from_y; row < rect.m_to_y; ++row)
 		{
 			memcpy(&new_data[(row - rect.m_from_y) * new_w * bpp],
-				   &texture->getData()[row * bpp * texture->getWidth() +
-									   rect.m_from_x * bpp],
-				   bpp * new_w);
+				&texture->getData()[row * bpp * texture->getWidth() + rect.m_from_x * bpp],
+				bpp * new_w);
 			memcpy(&old_data[(row - rect.m_from_y) * new_w * bpp],
-				   &texture->getData()[row * bpp * texture->getWidth() +
-									   rect.m_from_x * bpp],
-				   bpp * new_w);
+				&texture->getData()[row * bpp * texture->getWidth() + rect.m_from_x * bpp],
+				bpp * new_w);
 		}
 
 		// new
 		for (int row = 0; row < m_height; ++row)
 		{
-			memcpy(&new_data[((row + m_y - rect.m_from_y) * new_w + m_x -
-							  rect.m_from_x) *
-							 bpp],
-				   &m_new_data[row * bpp * m_width],
-				   bpp * m_width);
-			memcpy(&old_data[((row + m_y - rect.m_from_y) * new_w + m_x -
-							  rect.m_from_x) *
-							 bpp],
-				   &m_old_data[row * bpp * m_width],
-				   bpp * m_width);
+			memcpy(&new_data[((row + m_y - rect.m_from_y) * new_w + m_x - rect.m_from_x) * bpp],
+				&m_new_data[row * bpp * m_width],
+				bpp * m_width);
+			memcpy(&old_data[((row + m_y - rect.m_from_y) * new_w + m_x - rect.m_from_x) * bpp],
+				&m_old_data[row * bpp * m_width],
+				bpp * m_width);
 		}
 
 		m_x = rect.m_from_x;

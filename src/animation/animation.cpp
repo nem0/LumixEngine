@@ -106,12 +106,13 @@ bool Animation::load(FS::IFile& file)
 	file.read(&header, sizeof(header));
 	if (header.magic != HEADER_MAGIC)
 	{
-		g_log_error.log("animation") << m_path.c_str() << " is not an animation file";
+		g_log_error.log("animation") << getPath().c_str() << " is not an animation file";
 		return false;
 	}
 	if (header.version > 1)
 	{
-		g_log_error.log("animation") << "Unsupported animation version " << header.version << " (" << m_path.c_str() << ")";
+		g_log_error.log("animation") << "Unsupported animation version " << header.version << " ("
+									 << getPath().c_str() << ")";
 		return false;
 	}
 	m_fps = header.fps;

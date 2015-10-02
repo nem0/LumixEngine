@@ -168,10 +168,5 @@ namespace Lumix
 			::ExitThread(exit_code);
 		}
 
-		//namespace Logger
-		//{
-		//	Event g_events[BUFFER_SIZE];
-		//	LONG g_pos = -1;
-		//}
-	} // ~namespace MT
-} // ~namespace Lumix
+	} // namespace MT
+} // namespace Lumix

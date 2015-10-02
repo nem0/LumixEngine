@@ -429,7 +429,7 @@ bool Model::parseMeshes(FS::IFile& file)
 	}
 	m_meshes.reserve(object_count);
 	char model_dir[MAX_PATH_LENGTH];
-	PathUtils::getDir(model_dir, MAX_PATH_LENGTH, m_path.c_str());
+	PathUtils::getDir(model_dir, MAX_PATH_LENGTH, getPath().c_str());
 	for (int i = 0; i < object_count; ++i)
 	{
 		int32_t str_size;
@@ -519,7 +519,7 @@ bool Model::load(FS::IFile& file)
 		return true;
 	}
 
-	g_log_warning.log("renderer") << "Error loading model " << m_path.c_str();
+	g_log_warning.log("renderer") << "Error loading model " << getPath().c_str();
 	return false;
 }
 

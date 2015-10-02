@@ -188,10 +188,6 @@ namespace Lumix
 				m_ready_to_execute[(int32_t)job->getPriority()].push(jobEntry, true);
 			}
 
-			//int32_t idx = -1;
-			//while (-1 == idx)
-			//	idx = m_ready_to_execute[(int32_t)job->getPriority()].push(job);
-
 #endif //TYPE == MULTI_THREAD
 		}
 
