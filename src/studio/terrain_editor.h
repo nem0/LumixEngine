@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include "core/binary_array.h"
 #include "editor/world_editor.h"
 #include "utils.h"
 
@@ -74,4 +75,6 @@ private:
 	Action* m_decrease_brush_size;
 	Action* m_increase_texture_idx;
 	Action* m_decrease_texture_idx;
+	Lumix::BinaryArray m_brush_mask;
+	Lumix::Texture* m_brush_texture;
 };

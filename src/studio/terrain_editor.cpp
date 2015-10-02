@@ -5,6 +5,7 @@
 #include "core/profiler.h"
 #include "core/resource_manager.h"
 #include "core/resource_manager_base.h"
+#include "core/system.h"
 #include "editor/entity_template_system.h"
 #include "editor/ieditor_command.h"
 #include "engine.h"
@@ -13,6 +14,7 @@
 #include "renderer/model.h"
 #include "renderer/render_scene.h"
 #include "renderer/texture.h"
+#include "stb/stb_image.h"
 #include "universe/universe.h"
 #include "utils.h"
 
@@ -263,6 +265,7 @@ struct PaintTerrainCommand : public Lumix::IEditorCommand
 		TerrainEditor::Type type,
 		int texture_idx,
 		const Lumix::Vec3& hit_pos,
+		Lumix::BinaryArray& mask,
 		float radius,
 		float rel_amount,
 		Lumix::Vec3 color,
@@ -276,7 +279,14 @@ struct PaintTerrainCommand : public Lumix::IEditorCommand
 		, m_items(editor.getAllocator())
 		, m_type(type)
 		, m_texture_idx(texture_idx)
+		, m_mask(editor.getAllocator())
 	{
+		m_mask.resize(mask.size());
+		for (int i = 0; i < mask.size(); ++i)
+		{
+			m_mask[i] = mask[i];
+		}
+
 		m_width = m_height = m_x = m_y = -1;
 		Lumix::Matrix entity_mtx =
 			editor.getUniverse()->getMatrix(terrain.entity);
@@ -313,6 +323,12 @@ struct PaintTerrainCommand : public Lumix::IEditorCommand
 			serializer.serializeArrayItem(m_items[i].m_color.z);
 		}
 		serializer.endArray();
+		serializer.beginArray("mask");
+		for (int i = 0; i < m_mask.size(); ++i)
+		{
+			serializer.serializeArrayItem((bool)m_mask[i]);
+		}
+		serializer.endArray();
 	}
 
 
@@ -334,6 +350,18 @@ struct PaintTerrainCommand : public Lumix::IEditorCommand
 			serializer.deserializeArrayItem(item.m_color.x, 0);
 			serializer.deserializeArrayItem(item.m_color.y, 0);
 			serializer.deserializeArrayItem(item.m_color.z, 0);
+		}
+		serializer.deserializeArrayEnd();
+		
+		serializer.deserializeArrayBegin("mask");
+		m_mask.clear();
+		int i = 0;
+		while (!serializer.isArrayEnd())
+		{
+			bool b;
+			serializer.deserialize(b, true);
+			m_mask[i] = b;
+			++i;
 		}
 		serializer.deserializeArrayEnd();
 	}
@@ -494,19 +522,38 @@ private:
 			ASSERT(false);
 			return;
 		}
-		for (int i = r.m_from_x, end = r.m_to_x; i < end; ++i)
+		float fx = 0, fy = 0;
+		float fstepx = 1.0f / (r.m_to_x - r.m_from_x);
+		float fstepy = 1.0f / (r.m_to_y - r.m_from_y);
+		for (int i = r.m_from_x, end = r.m_to_x; i < end; ++i, fx += fstepx)
 		{
-			for (int j = r.m_from_y, end2 = r.m_to_y; j < end2; ++j)
+			fy = 0;
+			for (int j = r.m_from_y, end2 = r.m_to_y; j < end2; ++j, fy += fstepy)
 			{
-				float attenuation = getAttenuation(item, i, j);
-				int offset = 4 * (i - m_x + (j - m_y) * m_width);
-				uint8_t* d = &data[offset];
-				d[0] += uint8_t((item.m_color.x * 255 - d[0]) * attenuation);
-				d[1] += uint8_t((item.m_color.y * 255 - d[1]) * attenuation);
-				d[2] += uint8_t((item.m_color.z * 255 - d[2]) * attenuation);
-				d[3] = 255;
+				if (isMasked(fx, fy))
+				{
+					float attenuation = getAttenuation(item, i, j);
+					int offset = 4 * (i - m_x + (j - m_y) * m_width);
+					uint8_t* d = &data[offset];
+					d[0] += uint8_t((item.m_color.x * 255 - d[0]) * attenuation);
+					d[1] += uint8_t((item.m_color.y * 255 - d[1]) * attenuation);
+					d[2] += uint8_t((item.m_color.z * 255 - d[2]) * attenuation);
+					d[3] = 255;
+				}
 			}
 		}
+	}
+
+
+	bool isMasked(float x, float y)
+	{
+		if (m_mask.size() == 0) return true;
+
+		int s = sqrt(m_mask.size()); TODO("todo sqrt");
+		int ix = int(x * s);
+		int iy = int(y * s);
+
+		return m_mask[ix + x * iy];
 	}
 
 
@@ -524,26 +571,33 @@ private:
 			return;
 		}
 
-		for (int i = r.m_from_x, end = r.m_to_x; i < end; ++i)
+		float fx = 0, fy = 0;
+		float fstepx = 1.0f / (r.m_to_x - r.m_from_x);
+		float fstepy = 1.0f / (r.m_to_y - r.m_from_y);
+		for (int i = r.m_from_x, end = r.m_to_x; i < end; ++i, fx += fstepx)
 		{
-			for (int j = r.m_from_y, end2 = r.m_to_y; j < end2; ++j)
+			fy = 0;
+			for (int j = r.m_from_y, end2 = r.m_to_y; j < end2; ++j, fy += fstepy)
 			{
-				int offset = 4 * (i - m_x + (j - m_y) * m_width);
-				float attenuation = getAttenuation(item, i, j);
-				int add = int(attenuation * item.m_amount * 255);
-				if (add > 0)
+				if (isMasked(fx, fy))
 				{
-					if (data[offset] == m_texture_idx)
+					int offset = 4 * (i - m_x + (j - m_y) * m_width);
+					float attenuation = getAttenuation(item, i, j);
+					int add = int(attenuation * item.m_amount * 255);
+					if (add > 0)
 					{
-						data[offset + 1] += Lumix::Math::minValue(255 - data[offset + 1], add);
+						if (data[offset] == m_texture_idx)
+						{
+							data[offset + 1] += Lumix::Math::minValue(255 - data[offset + 1], add);
+						}
+						else
+						{
+							data[offset + 1] = add;
+						}
+						data[offset] = m_texture_idx;
+						data[offset + 2] = 0;
+						data[offset + 3] = 255;
 					}
-					else
-					{
-						data[offset + 1] = add;
-					}
-					data[offset] = m_texture_idx;
-					data[offset + 2] = 0;
-					data[offset + 3] = 255;
 				}
 			}
 		}
@@ -791,12 +845,19 @@ private:
 	Lumix::Array<Item> m_items;
 	Lumix::ComponentUID m_terrain;
 	Lumix::WorldEditor& m_world_editor;
+	Lumix::BinaryArray m_mask;
 	bool m_can_be_merged;
 };
 
 
 TerrainEditor::~TerrainEditor()
 {
+	if (m_brush_texture)
+	{
+		m_brush_texture->destroy();
+		m_world_editor.getAllocator().deleteObject(m_brush_texture);
+	}
+
 	m_world_editor.removePlugin(*this);
 }
 
@@ -806,6 +867,8 @@ TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, Lumix::Array<Action*>& 
 	, m_color(1, 1, 1)
 	, m_current_brush(0)
 	, m_selected_entity_template(0)
+	, m_brush_mask(editor.getAllocator())
+	, m_brush_texture(nullptr)
 {
 	m_increase_brush_size =
 		LUMIX_NEW(editor.getAllocator(), Action)("Increase brush size", "increaseBrushSize");
@@ -1124,6 +1187,8 @@ void TerrainEditor::onGui()
 	auto* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
 	if (!ImGui::CollapsingHeader("Terrain editor", nullptr, true, true)) return;
 
+	
+
 	ImGui::SliderFloat("Brush size", &m_terrain_brush_size, 1, 100);
 	ImGui::SliderFloat("Brush strength", &m_terrain_brush_strength, 0, 1.0f);
 
@@ -1213,6 +1278,51 @@ void TerrainEditor::onGui()
 		break;
 		default: ASSERT(false); break;
 	}
+
+	if (m_current_brush == LAYER || m_current_brush == COLOR)
+	{
+		if (m_brush_texture)
+		{
+			static auto th = m_brush_texture->getTextureHandle();
+			ImGui::Image(&th, ImVec2(100, 100));
+			ImGui::SameLine();
+		}
+
+		if (ImGui::Button("Choose mask"))
+		{
+			char filename[Lumix::MAX_PATH_LENGTH];
+			if (Lumix::getOpenFilename(filename, Lumix::lengthOf(filename), "All\0*.*\0"))
+			{
+				int image_width;
+				int image_height;
+				int image_comp;
+				auto* data = stbi_load(filename, &image_width, &image_height, &image_comp, 4);
+				if (data)
+				{
+					m_brush_mask.resize(image_width * image_height);
+					for (int j = 0; j < image_width; ++j)
+					{
+						for (int i = 0; i < image_width; ++i)
+						{
+							m_brush_mask[i + j * image_width] = data[image_comp * (i + j * image_width)] > 128;
+						}
+					}
+
+					auto& rm = m_world_editor.getEngine().getResourceManager();
+					if (m_brush_texture)
+					{
+						m_brush_texture->destroy();
+						m_world_editor.getAllocator().deleteObject(m_brush_texture);
+					}
+					m_brush_texture = LUMIX_NEW(m_world_editor.getAllocator(), Lumix::Texture)(
+						Lumix::Path("brush_texture"), rm, m_world_editor.getAllocator());
+					m_brush_texture->create(image_width, image_height, data);
+
+					stbi_image_free(data);
+				}
+			}
+		}
+	}
 }
 
 
@@ -1221,7 +1331,6 @@ void TerrainEditor::paint(const Lumix::RayCastModelHit& hit,
 						  bool old_stroke)
 {
 	Lumix::Vec3 hit_pos = hit.m_origin + hit.m_dir * hit.m_t;
-	
 
 	PaintTerrainCommand* command =
 		m_world_editor.getAllocator().newObject<PaintTerrainCommand>(
@@ -1229,6 +1338,7 @@ void TerrainEditor::paint(const Lumix::RayCastModelHit& hit,
 			type,
 			m_texture_idx,
 			hit_pos,
+			m_brush_mask,
 			m_terrain_brush_size,
 			m_terrain_brush_strength,
 			m_color,
